@@ -271,6 +271,19 @@ SOCKS
   Add --with-socks, and then perhaps a command-line option to put them
   on or off.  This might be more reliable than LD_PRELOAD hacks.
 
+Better statistics:
+
+  <Rasmus> mbp: hey, how about an rsync option that just gives you the
+  summary without the list of files?  And perhaps gives more
+  information like the number of new files, number of changed,
+  deleted, etc. ?
+  <mbp> Rasmus: nice idea
+  <mbp> there is --stats
+  <mbp> but at the moment it's very tridge-oriented
+  <mbp> rather than user-friendly
+  <mbp> it would be nice to improve it
+  <mbp> that would also work well with --dryrun
+
 PLATFORMS ------------------------------------------------------------
 
 Win32
@@ -335,5 +348,3 @@ rsyncsh
    fairly directly into rsync commands: it just needs to remember the
    current host, directory and so on.  We can probably even do
    completion of remote filenames.
-
-%K%
