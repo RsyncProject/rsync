@@ -1828,19 +1828,11 @@ int delete_file(char *fname, int mode, int flags)
 		return -1;
 	}
 
-	if (!(flags & DEL_TERSE)) {
-		if (verbose || log_format)
-			log_delete(fname, mode);
-		flags |= DEL_TERSE;
-	}
-
 	dirlist = get_dirlist(fname, 0);
 	for (j = 0; j < dirlist->count; j++) {
 		struct file_struct *fp = dirlist->files[j];
 		f_name_to(fp, buf);
-		if (verbose || log_format)
-			log_delete(buf, fp->mode);
-		if (delete_file(buf, fp->mode, flags) != 0) {
+		if (delete_file(buf, fp->mode, flags & ~DEL_TERSE) != 0) {
 			flist_free(dirlist);
 			return -1;
 		}
@@ -1854,13 +1846,16 @@ int delete_file(char *fname, int mode, int flags)
 		ok = make_backup(fname);
 	else
 		ok = do_rmdir(fname) == 0;
-	if (!ok && errno != ENOENT) {
+	if (ok) {
+		if ((verbose || log_format) && !(flags & DEL_TERSE))
+			log_delete(fname, mode);
+		deletion_count++;
+	} else if (errno != ENOTEMPTY && errno != ENOENT) {
 		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
 			full_fname(fname));
 		return -1;
 	}
 
-	deletion_count++;
 	return 0;
 }
 
