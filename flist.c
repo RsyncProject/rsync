@@ -808,18 +808,22 @@ struct file_struct *make_file(char *fname, int exclude_level)
 	linkname_len = 0;
 #endif
 
-	idev_len = 0;
 #if SUPPORT_HARD_LINKS
-	if (preserve_hard_links && st.st_nlink > 1) {
+	if (preserve_hard_links) {
 		if (protocol_version < 28) {
 			if (S_ISREG(st.st_mode))
 				idev_len = sizeof (struct idev);
+			else
+				idev_len = 0;
 		} else {
-			if (!S_ISDIR(st.st_mode))
+			if (!S_ISDIR(st.st_mode) && st.st_nlink > 1)
 				idev_len = sizeof (struct idev);
+			else
+				idev_len = 0;
 		}
-	}
+	} else
 #endif
+		idev_len = 0;
 
 	sum_len = always_checksum && S_ISREG(st.st_mode) ? MD4_SUM_LENGTH : 0;
 	file_struct_len = idev_len? sizeof file[0] : min_file_struct_len;
