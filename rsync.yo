@@ -319,6 +319,7 @@ verb(
      --suffix=SUFFIX         backup suffix (default ~ w/o --backup-dir)
  -u, --update                update only (don't overwrite newer files)
      --inplace               update the destination files in-place
+ -k, --keep-dirs             transfer a directory without recursing
  -K, --keep-dirlinks         treat symlinked dir on receiver as dir
  -l, --links                 copy symlinks as symlinks
  -L, --copy-links            copy the referent of all symlinks
@@ -458,8 +459,7 @@ finding multiply-linked files is expensive.  You must separately
 specify bf(-H).
 
 dit(bf(-r, --recursive)) This tells rsync to copy directories
-recursively. If you don't specify this then rsync won't copy
-directories at all.
+recursively.  See also --keep-dirs (-k).
 
 dit(bf(-R, --relative)) Use relative paths. This means that the full path
 names specified on the command line are sent to the server rather than
@@ -528,6 +528,13 @@ is on the objects.  In other words, if the source has a directory or a
 symlink where the destination has a file, the transfer would occur
 regardless of the timestamps.  This might change in the future (feel
 free to comment on this on the mailing list if you have an opinion).
+
+dit(bf(-k, --keep-dirs)) Tell the sending side to keep any directories that
+are encountered.  Unlike --recursive, a directory's contents are not copied
+unless the directory was specified on the command-line as either "." or a
+name with a trailing slash (e.g. "foo/").  Without this option or the
+--recursive option, rsync will skip all directories it encounters (and
+output a message to that effect for each one).
 
 dit(bf(-K, --keep-dirlinks)) On the receiving side, if a symlink is
 pointing to a directory, it will be treated as matching a directory
