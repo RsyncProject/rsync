@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsyncd.conf)(5)(25 Nov 1998)()()
+manpage(rsyncd.conf)(5)(20 Jan 1999)()()
 manpagename(rsyncd.conf)(configuration file for rsync server)
 manpagesynopsis()
 
@@ -281,14 +281,15 @@ itemize(
   it() %f for the filename
   it() %P for the module path
   it() %m for the module name
-  it() %t for the current time
+  it() %t for the current date time
   it() %u for the authenticated username (or the null string)
   it() %b for the number of bytes actually transferred 
   it() %c when sending files this gives the number of checksum bytes
     received for this file
 )
 
-The default log format is "%o %h [%a] %m (%u) %f %l"
+The default log format is "%o %h [%a] %m (%u) %f %l", and a "%t [%p] "
+is always added to the beginning when using the "log file" option.
 
 A perl script called rsyncstats to summarize this format is included
 in the rsync source code distribution.
