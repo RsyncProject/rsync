@@ -19,8 +19,8 @@
 #define ABORT_ALL -1
 #define ABORT_TO_STARSTAR -2
 
-#ifdef WILD_TEST_DEPTH
-int wildmatch_depth;
+#ifdef WILD_TEST_ITERATIONS
+int wildmatch_iteration_count;
 #endif
 
 static int domatch(const char *p, const char *text)
@@ -28,8 +28,8 @@ static int domatch(const char *p, const char *text)
     int matched, special;
     char ch, prev;
 
-#ifdef WILD_TEST_DEPTH
-    wildmatch_depth++;
+#ifdef WILD_TEST_ITERATIONS
+    wildmatch_iteration_count++;
 #endif
 
     for ( ; (ch = *p) != '\0'; text++, p++) {
@@ -108,8 +108,8 @@ static int domatch(const char *p, const char *text)
 
 int wildmatch(const char *p, const char *text)
 {
-#ifdef WILD_TEST_DEPTH
-    wildmatch_depth = 0;
+#ifdef WILD_TEST_ITERATIONS
+    wildmatch_iteration_count = 0;
 #endif
     return domatch(p, text) == TRUE;
 }

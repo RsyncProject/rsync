@@ -4,7 +4,7 @@
 
 /*#define COMPARE_WITH_FNMATCH*/
 
-#define WILD_TEST_DEPTH
+#define WILD_TEST_ITERATIONS
 #include "lib/wildmatch.c"
 
 #include "popt.h"
@@ -18,11 +18,11 @@ typedef char bool;
 #define false 0
 #define true 1
 
-int output_depth = 0;
+int output_iterations = 0;
 
 static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
-  {"depth",          'd', POPT_ARG_NONE,   &output_depth, 0, 0, 0},
+  {"count",          'c', POPT_ARG_NONE,   &output_iterations, 0, 0, 0},
   {0,0,0,0, 0, 0, 0}
 };
 
@@ -52,8 +52,8 @@ ok(int n, const char *text, const char *pattern, bool matches, bool same_as_fnma
 	       n, text, pattern, matches ^ !same_as_fnmatch);
     }
 #endif
-    if (output_depth)
-	printf("[%s] depth = %d\n", pattern, wildmatch_depth);
+    if (output_iterations)
+	printf("[%s] iterations = %d\n", pattern, wildmatch_iteration_count);
 }
 
 int
