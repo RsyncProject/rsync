@@ -143,7 +143,7 @@ int hard_link_check(struct file_struct *file, int skip)
 	if (hlink_list[file->F_HLINDEX] != file) {
 		if (verbose > 1) {
 			rprintf(FINFO, "\"%s\" is a hard link\n",
-			    f_name(file));
+				safe_fname(f_name(file)));
 		}
 		return 1;
 	}
@@ -157,11 +157,11 @@ static void hard_link_one(char *hlink1, char *hlink2)
 	if (do_link(hlink1, hlink2)) {
 		if (verbose) {
 			rsyserr(FINFO, errno, "link %s => %s failed",
-				hlink2, hlink1);
+				full_name(hlink2), safe_fname(hlink1));
 		}
 	}
 	else if (verbose)
-		rprintf(FINFO, "%s => %s\n", hlink2, hlink1);
+		rprintf(FINFO, "%s => %s\n", safe_fname(hlink2), safe_fname(hlink1));
 }
 #endif
 

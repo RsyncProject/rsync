@@ -123,7 +123,8 @@ static int get_tmpname(char *fnametmp, char *fname)
 	maxname = MIN(MAXPATHLEN - 7 - length, NAME_MAX - 8);
 
 	if (maxname < 1) {
-		rprintf(FERROR, "temporary filename too long: %s\n", fname);
+		rprintf(FERROR, "temporary filename too long: %s\n",
+			safe_fname(fname));
 		fnametmp[0] = '\0';
 		return 0;
 	}
@@ -577,12 +578,14 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 					continue;
 				if (verbose > 2) {
 					rprintf(FINFO, "renaming %s to %s\n",
-						partialptr, fname);
+						safe_fname(partialptr),
+						safe_fname(fname));
 				}
 				if (do_rename(partialptr, fname) < 0) {
 					rsyserr(FERROR, errno,
 						"rename failed for %s (from %s)",
-						fname, partialptr);
+						full_fname(fname),
+						safe_fname(partialptr));
 				} else {
 					handle_partial_dir(partialptr,
 							   PDIR_DELETE);
