@@ -30,6 +30,8 @@
 extern struct stats stats;
 
 extern int verbose;
+extern int dry_run;
+extern int list_only;
 extern int am_root;
 extern int am_server;
 extern int am_daemon;
@@ -56,12 +58,15 @@ extern int copy_links;
 extern int copy_unsafe_links;
 extern int protocol_version;
 extern int sanitize_paths;
-extern int deletion_count;
 extern int max_delete;
+extern int force_delete;
 extern int orig_umask;
-extern int list_only;
+extern int make_backups;
 extern unsigned int curr_dir_len;
 extern char *log_format;
+extern char *backup_dir;
+extern char *backup_suffix;
+extern int backup_suffix_len;
 
 extern char curr_dir[MAXPATHLEN];
 
@@ -1766,6 +1771,128 @@ struct file_list *get_dirlist(const char *dirname, int ignore_filter_rules)
 }
 
 
+static int deletion_count = 0; /* used to implement --max-delete */
+
+static int is_backup_file(char *fn)
+{
+	int k = strlen(fn) - backup_suffix_len;
+	return k > 0 && strcmp(fn+k, backup_suffix) == 0;
+}
+
+
+/* Delete a file or directory.  If DEL_FORCE_RECURSE is set in the flags, or if
+ * force_delete is set, this will delete recursively as long as DEL_NO_RECURSE
+ * is not set in the flags. */
+int delete_file(char *fname, int mode, int flags)
+{
+	struct file_list *dirlist;
+	char buf[MAXPATHLEN];
+	int j, zap_dir, ok;
+
+	if (max_delete && deletion_count >= max_delete)
+		return -1;
+
+	if (!S_ISDIR(mode)) {
+		if (make_backups && (backup_dir || !is_backup_file(fname)))
+			ok = make_backup(fname);
+		else
+			ok = robust_unlink(fname) == 0;
+		if (ok) {
+			if ((verbose || log_format) && !(flags & DEL_TERSE))
+				log_delete(fname, mode);
+			deletion_count++;
+			return 0;
+		}
+		if (errno == ENOENT)
+			return 0;
+		rsyserr(FERROR, errno, "delete_file: unlink %s failed",
+			full_fname(fname));
+		return -1;
+	}
+
+	zap_dir = (flags & DEL_FORCE_RECURSE || (force_delete && recurse))
+		&& !(flags & DEL_NO_RECURSE);
+	if (dry_run && zap_dir)
+		errno = ENOTEMPTY;
+	else if (do_rmdir(fname) == 0) {
+		if ((verbose || log_format) && !(flags & DEL_TERSE))
+			log_delete(fname, mode);
+		deletion_count++;
+		return 0;
+	}
+	if (errno == ENOENT)
+		return 0;
+	if (!zap_dir || (errno != ENOTEMPTY && errno != EEXIST)) {
+		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
+			full_fname(fname));
+		return -1;
+	}
+
+	if (!(flags & DEL_TERSE)) {
+		if (verbose || log_format)
+			log_delete(fname, mode);
+		flags |= DEL_TERSE;
+	}
+
+	dirlist = get_dirlist(fname, 0);
+	for (j = 0; j < dirlist->count; j++) {
+		struct file_struct *fp = dirlist->files[j];
+		f_name_to(fp, buf);
+		if (verbose || log_format)
+			log_delete(buf, fp->mode);
+		if (delete_file(buf, fp->mode, flags) != 0) {
+			flist_free(dirlist);
+			return -1;
+		}
+	}
+	flist_free(dirlist);
+
+	if (max_delete && deletion_count >= max_delete)
+		return -1;
+
+	if (make_backups && !backup_dir && !is_backup_file(fname))
+		ok = make_backup(fname);
+	else
+		ok = do_rmdir(fname) == 0;
+	if (!ok && errno != ENOENT) {
+		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
+			full_fname(fname));
+		return -1;
+	}
+
+	deletion_count++;
+	return 0;
+}
+
+
+/* If an item in dir_list is not found in full_list, delete it from the
+ * filesystem. */
+static void delete_missing(struct file_list *full_list,
+			   struct file_list *dir_list, const char *dirname)
+{
+	char fbuf[MAXPATHLEN];
+	int i;
+
+	if (max_delete && deletion_count >= max_delete)
+		return;
+
+	if (verbose > 2)
+		rprintf(FINFO, "delete_missing(%s)\n", safe_fname(dirname));
+
+	for (i = dir_list->count; i--; ) {
+		if (!dir_list->files[i]->basename)
+			continue;
+		if (flist_find(full_list, dir_list->files[i]) < 0) {
+			char *fn = f_name_to(dir_list->files[i], fbuf);
+			int mode = dir_list->files[i]->mode;
+			int dflag = S_ISDIR(mode) ? DEL_FORCE_RECURSE : 0;
+			if (delete_file(fn, mode, dflag) < 0)
+				break;
+		}
+	}
+}
+
+
 /* This function is used to implement per-directory deletion, and
  * is used by all the --delete-WHEN options.  Note that the fbuf
  * pointer must point to a MAXPATHLEN buffer with the name of the
@@ -1827,32 +1954,4 @@ void delete_in_dir(struct file_list *flist, char *fbuf,
 	delete_missing(flist, dir_list, fbuf);
 
 	flist_free(dir_list);
-}
-
-
-/* If an item in dir_list is not found in full_list, delete it from the
- * filesystem. */
-void delete_missing(struct file_list *full_list, struct file_list *dir_list,
-		    const char *dirname)
-{
-	char fbuf[MAXPATHLEN];
-	int i;
-
-	if (max_delete && deletion_count >= max_delete)
-		return;
-
-	if (verbose > 2)
-		rprintf(FINFO, "delete_missing(%s)\n", safe_fname(dirname));
-
-	for (i = dir_list->count; i--; ) {
-		if (!dir_list->files[i]->basename)
-			continue;
-		if (flist_find(full_list, dir_list->files[i]) < 0) {
-			char *fn = f_name_to(dir_list->files[i], fbuf);
-			int mode = dir_list->files[i]->mode;
-			int dflag = S_ISDIR(mode) ? DEL_FORCE_RECURSE : 0;
-			if (delete_file(fn, mode, dflag) < 0)
-				break;
-		}
-	}
 }
