@@ -116,6 +116,8 @@ typedef struct
 	BOOL list;
 	char *uid;
 	char *gid;
+	char *hosts_allow;
+	char *hosts_deny;
 } service;
 
 
@@ -129,6 +131,8 @@ static service sDefault =
 	True,    /* list */
 	"nobody",/* uid */
 	"nobody",/* gid */
+	NULL,    /* hosts allow */
+	NULL,    /* hosts deny */
 };
 
 
@@ -153,6 +157,8 @@ static struct parm_struct parm_table[] =
   {"list",             P_BOOL,    P_LOCAL,  &sDefault.list,        NULL,   0},
   {"uid",              P_STRING,  P_LOCAL,  &sDefault.uid,         NULL,   0},
   {"gid",              P_STRING,  P_LOCAL,  &sDefault.gid,         NULL,   0},
+  {"hosts allow",      P_STRING,  P_LOCAL,  &sDefault.hosts_allow, NULL,   0},
+  {"hosts deny",       P_STRING,  P_LOCAL,  &sDefault.hosts_deny,  NULL,   0},
   {NULL,               P_BOOL,    P_NONE,   NULL,                  NULL,   0}
 };
 
@@ -204,6 +210,8 @@ FN_LOCAL_BOOL(lp_read_only, read_only)
 FN_LOCAL_BOOL(lp_list, list)
 FN_LOCAL_STRING(lp_uid, uid)
 FN_LOCAL_STRING(lp_gid, gid)
+FN_LOCAL_STRING(lp_hosts_allow, hosts_allow)
+FN_LOCAL_STRING(lp_hosts_deny, hosts_deny)
 
 /* local prototypes */
 static int    strwicmp( char *psz1, char *psz2 );

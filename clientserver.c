@@ -99,9 +99,17 @@ static int rsync_module(int fd, int i)
 	uid_t uid;
 	gid_t gid;
 	char *p;
+	char *addr = client_addr(fd);
+	char *host = client_name(fd);
+
+	if (!allow_access(addr, host, lp_hosts_allow(i), lp_hosts_deny(i))) {
+		rprintf(FERROR,"rsync denied on module %s from %s (%s)\n",
+			lp_name(i), client_name(fd), client_addr(fd));
+		return -1;
+	}
 
 	rprintf(FINFO,"rsync on module %s from %s (%s)\n",
-		lp_name(i), client_name(fd), client_addr(fd));
+		lp_name(i), host, addr);
 
 	module_id = i;
 
