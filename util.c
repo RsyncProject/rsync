@@ -805,7 +805,6 @@ char *alloc_sanitize_path(const char *path, const char *rootdir)
 			rlen--;
 		buf[rlen] = '\0';
 	}
-	fprintf(stderr, "p:`%s'\n", buf);
 
 	return buf;
 }
