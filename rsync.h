@@ -60,6 +60,7 @@
 #define FLAG_TOP_DIR (1<<0)
 #define FLAG_HLINK_EOL (1<<1)	/* generator only */
 #define FLAG_MOUNT_POINT (1<<2)	/* sender only */
+#define FLAG_NO_FUZZY (1<<2)	/* generator only */
 #define FLAG_DEL_HERE (1<<3)	/* receiver/generator */
 
 /* update this if you make incompatible changes */
@@ -127,6 +128,7 @@
 #define FNAMECMP_FNAME		0x80
 #define FNAMECMP_PARTIAL_DIR	0x81
 #define FNAMECMP_BACKUP 	0x82
+#define FNAMECMP_FUZZY		0x83
 
 /* For calling delete_file() */
 #define DEL_DIR 		(1<<0)
@@ -337,7 +339,7 @@ enum msgcode {
 #define uint32 unsigned int32
 #endif
 
-#if SIZEOF_OFF_T == 8 || !defined SIZEOF_OFF64_T || !defined HAVE_STRUCT_STAT64
+#if SIZEOF_OFF_T == 8 || !SIZEOF_OFF64_T || !defined HAVE_STRUCT_STAT64
 #define OFF_T off_t
 #define STRUCT_STAT struct stat
 #else
