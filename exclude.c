@@ -33,9 +33,9 @@ extern int recurse;
 
 extern char curr_dir[];
 
-struct exclude_list_struct exclude_list;
-struct exclude_list_struct local_exclude_list;
-struct exclude_list_struct server_exclude_list;
+struct exclude_list_struct exclude_list = { 0, 0, "" };
+struct exclude_list_struct local_exclude_list = { 0, 0, "local-cvsignore " };
+struct exclude_list_struct server_exclude_list = { 0, 0, "server " };
 char *exclude_path_prefix = NULL;
 
 /** Build an exclude structure given a exclude pattern */
@@ -103,15 +103,17 @@ void free_exclude_list(struct exclude_list_struct *listp)
 {
 	struct exclude_struct *ent, *next;
 
-	if (verbose > 2)
-		rprintf(FINFO, "[%s] clearing exclude list\n", who_am_i());
+	if (verbose > 2) {
+		rprintf(FINFO, "[%s] clearing %sexclude list\n",
+			who_am_i(), listp->debug_type);
+	}
 
 	for (ent = listp->head; ent; ent = next) {
 		next = ent->next;
 		free_exclude(ent);
 	}
 
-	memset(listp, 0, sizeof listp[0]);
+	listp->head = listp->tail = NULL;
 }
 
 static int check_one_exclude(char *name, struct exclude_struct *ex,
@@ -203,7 +205,7 @@ static void report_exclude_result(char const *name,
 	 * case we add it back in here. */
 
 	if (verbose >= 2) {
-		rprintf(FINFO, "[%s] %scluding %s %s because of %s %s%s\n",
+		rprintf(FINFO, "[%s] %scluding %s %s because of %spattern %s%s\n",
 			who_am_i(), ent->include ? "in" : "ex",
 			name_is_dir ? "directory" : "file", name, type,
 			ent->pattern, ent->directory ? "/" : "");
@@ -215,14 +217,14 @@ static void report_exclude_result(char const *name,
  * Return true if file NAME is defined to be excluded by the specified
  * exclude list.
  */
-int check_exclude(struct exclude_list_struct *listp, char *name, int name_is_dir,
-		  const char *type)
+int check_exclude(struct exclude_list_struct *listp, char *name, int name_is_dir)
 {
 	struct exclude_struct *ent;
 
 	for (ent = listp->head; ent; ent = ent->next) {
 		if (check_one_exclude(name, ent, name_is_dir)) {
-			report_exclude_result(name, ent, name_is_dir, type);
+			report_exclude_result(name, ent, name_is_dir,
+					      listp->debug_type);
 			return !ent->include;
 		}
 	}
@@ -300,8 +302,9 @@ void add_exclude(struct exclude_list_struct *listp, const char *pattern,
 			make_exclude(listp, cp, pat_len, incl);
 
 			if (verbose > 2) {
-				rprintf(FINFO, "[%s] add_exclude(%.*s,%s)\n",
+				rprintf(FINFO, "[%s] add_exclude(%.*s, %s%s)\n",
 					who_am_i(), pat_len, cp,
+					listp->debug_type,
 					incl ? "include" : "exclude");
 			}
 		}
