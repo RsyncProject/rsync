@@ -72,7 +72,7 @@ int numeric_ids = 0;
 int force_delete = 0;
 int io_timeout = 0;
 int am_server = 0;
-int am_sender = 0;
+int am_sender = -1;
 int am_generator = 0;
 char *files_from = NULL;
 int filesfrom_fd = -1;
@@ -824,6 +824,9 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			return 0;
 		}
 	}
+
+	if (am_sender < 0)
+		am_sender = 0;
 
 #if !SUPPORT_LINKS
 	if (preserve_links && !am_sender) {
