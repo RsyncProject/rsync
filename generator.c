@@ -226,7 +226,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 			if (!(relative_paths && errno==ENOENT && 
 			      create_directory_path(fname)==0 && 
 			      do_mkdir(fname,file->mode)==0)) {
-				rprintf(FERROR,"mkdir %s : %s (2)\n",
+				rprintf(FERROR,"recv_generator: mkdir %s: %s (2)\n",
 					fname,strerror(errno));
 			}
 		}
