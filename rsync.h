@@ -565,9 +565,12 @@ struct map_struct {
 #define MATCHFLG_FINISH_SETUP	(1<<13)/* per-dir merge file needs setup */
 #define MATCHFLG_NEGATE 	(1<<14)/* rule matches when pattern does not */
 #define MATCHFLG_CVS_IGNORE	(1<<15)/* rule was -C or :C */
+#define MATCHFLG_SENDER_SIDE	(1<<16)/* rule applies to the sending side */
+#define MATCHFLG_RECEIVER_SIDE	(1<<17)/* rule applies to the receiving side */
 
 #define MATCHFLGS_FROM_CONTAINER (MATCHFLG_ABS_PATH | MATCHFLG_INCLUDE \
-				| MATCHFLG_DIRECTORY | MATCHFLG_NEGATE)
+				| MATCHFLG_DIRECTORY | MATCHFLG_SENDER_SIDE \
+				| MATCHFLG_NEGATE | MATCHFLG_RECEIVER_SIDE)
 
 struct filter_struct {
 	struct filter_struct *next;
