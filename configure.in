@@ -270,11 +270,11 @@ AC_CHECK_LIB(resolv, inet_ntop)
 
 AC_MSG_NOTICE([Looking in libraries: $LIBS])
 
-AC_CHECK_FUNC(inet_ntop, , AC_LIBOBJ(lib/inet_ntop)) 
-AC_CHECK_FUNC(inet_pton, , AC_LIBOBJ(lib/inet_pton))
+AC_CHECK_FUNCS(inet_ntop, , AC_LIBOBJ(lib/inet_ntop)) 
+AC_CHECK_FUNCS(inet_pton, , AC_LIBOBJ(lib/inet_pton))
 
-AC_CHECK_FUNC(getaddrinfo, , AC_LIBOBJ(lib/getaddrinfo)) 
-AC_CHECK_FUNC(getnameinfo, , AC_LIBOBJ(lib/getnameinfo))
+AC_CHECK_FUNCS(getaddrinfo, , AC_LIBOBJ(lib/getaddrinfo)) 
+AC_CHECK_FUNCS(getnameinfo, , AC_LIBOBJ(lib/getnameinfo))
 
 AC_CHECK_MEMBER([struct sockaddr.sa_len], 
 		[ AC_DEFINE(HAVE_SOCKADDR_LEN) ],
@@ -289,7 +289,8 @@ AC_TRY_COMPILE([#include <sys/types.h>
 #include <sys/socket.h>],
 [struct sockaddr_storage x;],
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_SOCKADDR_STORAGE),
+	AC_DEFINE(HAVE_SOCKADDR_STORAGE, 1, 
+		[Define if you have strct sockaddr_storage.] ),
 	AC_MSG_RESULT(no))
 
 # if we can't find strcasecmp, look in -lresolv (for Unixware at least)

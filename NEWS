@@ -1,5 +1,26 @@
 rsync 2.5.1 (sometime in 2001?)
 
+  BUG FIXES: 
+   
+    * Fix for segfault in --daemon mode configuration parser by Paul
+      Mackerras.
+
+    * Correct string<->address parsing for both IPv4 and 6.  Thankyou
+      to YOSHIFUJI Hideaki, SUMIKAWA Munechika and Jun-ichiro "itojun"
+      Hagino.
+
+    * Various fixes for IPv6 support by Dave Dykstra.
+
+    * rsync.1 typo fix by Matt Kraai.
+
+    * Test suite typo fixes by Tom Schmidt.
+
+    * rsync.1 grammar and clarity improvements.  Thanks to Edward
+      Welbourne.
+
+    * Correction to ./configure tests for inet_ntop.  Thankyou to Jeff
+      Garzik.
+
   ENHANCEMENTS:
 
     * --progress and -P now show estimated data transfer rate (in a
@@ -10,14 +31,4 @@ rsync 2.5.1 (sometime in 2001?)
         useful when running on Unix under daemontools, AIX's SRC, or a
         debugger.  Thanks to Max Bowsher and Jos Backus.
 
-  BUG FIXES: 
-   
-    * Correct string<->address parsing for both IPv4 and 6.  Thankyou
-      to YOSHIFUJI Hideaki, SUMIKAWA Munechika and Jun-ichiro "itojun"
-      Hagino.
-
-    * rsync.1 typo fix by Matt Kraai.
-
-    * Fix for segfault in rsyncd.conf parser by Paul Mackerras.
-
-    * Test suite typo fixes Tom Schmidt.
+    * Clearer error messages for some conditions.
