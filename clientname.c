@@ -43,6 +43,7 @@ char *client_addr(int fd)
 {
 	struct sockaddr_storage ss;
 	socklen_t length = sizeof ss;
+	char *ssh_client, *p;
 	static char addr_buf[100];
 	static int initialised;
 
@@ -50,11 +51,21 @@ char *client_addr(int fd)
 
 	initialised = 1;
 
-	client_sockaddr(fd, &ss, &length);
+	ssh_client = getenv("SSH_CLIENT");
+	if (ssh_client != NULL) {
+		strlcpy(addr_buf, ssh_client, sizeof(addr_buf));
+		/* truncate SSH_CLIENT to just IP address */
+		p = strchr(addr_buf, ' ');
+		if (p)
+			*p = '\0';
+		else
+			strlcpy(addr_buf, "0.0.0.0", sizeof("0.0.0.0"));
+	} else
+		client_sockaddr(fd, &ss, &length);
 
 	getnameinfo((struct sockaddr *)&ss, length,
-		    addr_buf, sizeof(addr_buf), NULL, 0, NI_NUMERICHOST);
-	
+		addr_buf, sizeof(addr_buf), NULL, 0, NI_NUMERICHOST);
+
 	return addr_buf;
 }
 
@@ -80,8 +91,6 @@ static int get_sockaddr_family(const struct sockaddr_storage *ss)
  **/
 char *client_name(int fd)
 {
-	struct sockaddr_storage ss;
-	socklen_t ss_len = sizeof ss;
 	static char name_buf[100];
 	static char port_buf[100];
 	static int initialised;
@@ -91,11 +100,34 @@ char *client_name(int fd)
 	strcpy(name_buf, default_name);
 	initialised = 1;
 
-	client_sockaddr(fd, &ss, &ss_len);
+	if (getenv("SSH_CLIENT") != NULL) {
+		/* Look up name of IP address given in $SSH_CLIENT */
+#ifdef INET6
+		int af = AF_INET6;
+		struct sockaddr_in6 sin;
+#else
+		int af = AF_INET;
+		struct sockaddr_in sin;
+#endif
+		socklen_t sin_len = sizeof sin;
 
-	if (!lookup_name(fd, &ss, ss_len, name_buf, sizeof name_buf,
-			 port_buf, sizeof port_buf))
-		check_name(fd, &ss, name_buf);
+		memset(&sin, 0, sin_len);
+		sin.sin_family = af;
+		inet_pton(af, client_addr(fd), &sin.sin_addr.s_addr);
+
+		if (!lookup_name(fd, (struct sockaddr_storage *)&sin, sin_len, 
+				name_buf, sizeof name_buf, port_buf, sizeof port_buf))
+			check_name(fd, (struct sockaddr_storage *)&sin, name_buf);
+	} else {
+		struct sockaddr_storage ss;
+		socklen_t ss_len = sizeof ss;
+
+		client_sockaddr(fd, &ss, &ss_len);
+
+		if (!lookup_name(fd, &ss, ss_len, name_buf, sizeof name_buf, 
+				port_buf, sizeof port_buf))
+			check_name(fd, &ss, name_buf);
+	}
 
 	return name_buf;
 }

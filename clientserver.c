@@ -204,7 +204,8 @@ static int rsync_module(int f_in, int f_out, int i)
 	uid_t uid = (uid_t)-2;  /* canonically "nobody" */
 	gid_t gid = (gid_t)-2;
 	char *p;
-	char *addr, *host, addr_buf[128];
+	char *addr = client_addr(f_in);
+	char *host = client_name(f_in);
 	char *name = lp_name(i);
 	int use_chroot = lp_use_chroot(i);
 	int start_glob=0;
@@ -215,25 +216,6 @@ static int rsync_module(int f_in, int f_out, int i)
 	extern int am_daemon;
 	extern int remote_version;
 	extern int am_root;
-
-	if (is_a_socket(f_in)) {
-		addr = client_addr(f_in);
-		host = client_name(f_in);
-	} else {
-		char *ssh_client = getenv("SSH_CLIENT");
-		if (ssh_client) {
-			strlcpy(addr_buf, ssh_client, sizeof(addr_buf));
-			/* truncate SSH_CLIENT to just IP address */
-			p = strchr(addr_buf, ' ');
-			if (p)
-				*p = '\0';
-			addr = addr_buf;
-			host = "remote.shell.connection";
-		} else {
-			addr = "0.0.0.0";
-			host = "remote.shell.connection";
-		}
-	}
 
 	if (!allow_access(addr, host, lp_hosts_allow(i), lp_hosts_deny(i))) {
 		rprintf(FERROR,"rsync denied on module %s from %s (%s)\n",
