@@ -213,7 +213,7 @@ uIntf *v;               /* working area: values in order of bit length */
 
         /* compute minimum size table less than or equal to l bits */
         z = g - w;
-        z = z > (uInt)l ? l : z;        /* table size upper limit */
+        z = z > (uInt)l ? (uInt)l : z;  /* table size upper limit */
         if ((f = 1 << (j = k - w)) > a + 1)     /* try a k-w bit table */
         {                       /* too few codes for k-w bit table */
           f -= a + 1;           /* deduct codes from patterns left */
@@ -400,7 +400,7 @@ uIntf *bl;               /* literal desired/actual bit depth */
 uIntf *bd;               /* distance desired/actual bit depth */
 inflate_huft * FAR *tl;  /* literal/length tree result */
 inflate_huft * FAR *td;  /* distance tree result */
-z_streamp z;             /* for memory allocation */
+UNUSED(z_streamp z);     /* for memory allocation */
 {
 #ifdef BUILDFIXED
   /* build fixed tables if not already */
