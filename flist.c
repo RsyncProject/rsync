@@ -542,6 +542,9 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 		return;
 	}
 
+	if (!flist || !flist->count)	/* Ignore lastdir when invalid. */
+		lastdir_len = -1;
+
 	if (flags & XMIT_SAME_NAME)
 		l1 = read_byte(f);
 
@@ -745,7 +748,7 @@ struct file_struct *make_file(char *fname,
 	char *basename, *dirname, *bp;
 	unsigned short flags = 0;
 
-	if (!flist)	/* lastdir isn't valid if flist is NULL */
+	if (!flist || !flist->count)	/* Ignore lastdir when invalid. */
 		lastdir_len = -1;
 
 	if (strlcpy(thisname, fname, sizeof thisname)
