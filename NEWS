@@ -27,15 +27,22 @@ Changes since 2.6.2:
       items are now excluded from being uploaded (assuming that the module
       allows uploading at all) in addition to the old download exclusion.
 
+    - Got rid of a potential hang in the receiver when near the end of a
+      phase.
+
     - When using --backup without a --backup-dir, rsync no longer preserves
       the modify time on directories.  This avoids confusing NFS.
+
+    - When --copy-links (-L) is specified, we now output a separate error
+      for a symlink that has no referent instead of claiming that a file
+      "vanished".
 
     - Fixed a bug in the daemon authentication code when using one of the
       batch-processing options.
 
   ENHANCEMENTS:
 
-    - The new option --keep-dirlinks (-K) allows you to symlink a directory
+    - Added --keep-dirlinks (-K), which allows you to symlink a directory
       onto another patition on the receiving side and have rsync treat it
       as matching a normal directory from the sender.
 
@@ -67,12 +74,13 @@ Changes since 2.6.2:
       including configure, config.h.in, the man pages, and proto.h.
 
     - If "make proto" doesn't find some changes in the prototypes, the
-      proto.h file is left untouched (its timestamp used to be updated).
+      proto.h file is left untouched (its timestamp used to always be
+      updated).
 
   DEVELOPER RELATED:
 
     - The scripts in the testsuite dir were cleaned up a bit.
 
-    - A few new diffs were added to the patches dir (and some accepted
-      ones were removed as well).
+    - A few new diffs were added to the patches dir, and some accepted
+      ones were removed.
 
