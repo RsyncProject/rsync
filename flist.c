@@ -262,19 +262,26 @@ static int check_exclude_file(char *fname, int is_dir, int exclude_level)
 	if (exclude_level == NO_EXCLUDES)
 		return 0;
 #endif
-	if (fname && fname[0] == '.' && !fname[1]) {
+	if (fname) {
 		/* never exclude '.', even if somebody does --exclude '*' */
-		return 0;
+		if (fname[0] == '.' && !fname[1])
+			return 0;
+		/* Handle the -R version of the '.' dir. */
+		if (fname[0] == '/') {
+			int len = strlen(fname);
+			if (fname[len-1] == '.' && fname[len-2] == '/')
+				return 0;
+		}
 	}
-	if (server_exclude_list &&
-	    check_exclude(server_exclude_list, fname, is_dir))
+	if (server_exclude_list
+	 && check_exclude(server_exclude_list, fname, is_dir))
 		return 1;
 	if (exclude_level != ALL_EXCLUDES)
 		return 0;
 	if (exclude_list && check_exclude(exclude_list, fname, is_dir))
 		return 1;
-	if (local_exclude_list &&
-	    check_exclude(local_exclude_list, fname, is_dir))
+	if (local_exclude_list
+	 && check_exclude(local_exclude_list, fname, is_dir))
 		return 1;
 	return 0;
 }
@@ -938,14 +945,10 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		}
 
 		l = strlen(fname);
-		if (l != 1 && fname[l - 1] == '/') {
-			if ((l == 2) && (fname[0] == '.')) {
-				/*  Turn ./ into just . rather than ./.
-				   This was put in to avoid a problem with
-				   rsync -aR --delete from ./
-				   The send_file_name() below of ./ was
-				   mysteriously preventing deletes */
-				fname[1] = 0;
+		if (fname[l - 1] == '/') {
+			if (l == 2 && fname[0] == '.') {
+				/* Turn "./" into just "." rather than "./." */
+				fname[1] = '\0';
 			} else {
 				strlcat(fname, ".", MAXPATHLEN);
 			}
@@ -1290,7 +1293,7 @@ void flist_free(struct file_list *flist)
  */
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 {
-	int i;
+	int i, prev_i = 0;
 	char *name, *prev_name = NULL;
 
 	if (!flist || flist->count == 0)
@@ -1301,6 +1304,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 
 	for (i = no_dups? 0 : flist->count; i < flist->count; i++) {
 		if (flist->files[i]->basename) {
+			prev_i = i;
 			prev_name = f_name(flist->files[i]);
 			break;
 		}
@@ -1315,6 +1319,11 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 					"removing duplicate name %s from file list %d\n",
 					name, i);
 			}
+			/* Make sure that if we unduplicate '.', that we don't
+			 * lose track of a user-specified starting point (or
+			 * else deletions will mysteriously fail with -R). */
+			if (flist->files[i]->flags & FLAG_DELETE)
+				flist->files[prev_i]->flags |= FLAG_DELETE;
 			/* it's not great that the flist knows the semantics of
 			 * the file memory usage, but i'd rather not add a flag
 			 * byte to that struct.
@@ -1324,6 +1333,10 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			else
 				free_file(flist->files[i]);
 		}
+		else
+			prev_i = i;
+		/* We set prev_name every iteration to avoid it becoming
+		 * invalid when names[][] in f_name() wraps around. */
 		prev_name = name;
 	}
 
