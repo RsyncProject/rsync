@@ -383,7 +383,7 @@ static int unchanged_file(char *fn, struct file_struct *file, STRUCT_STAT *st)
  * The block size is a rounded square root of file length.
  *
  * The checksum size is determined according to:
- *     blocksum_bits = BLOCKSUM_EXP + 2*log2(file_len) - log2(block_len)
+ *     blocksum_bits = BLOCKSUM_BIAS + 2*log2(file_len) - log2(block_len)
  * provided by Donovan Baarda which gives a probability of rsync
  * algorithm corrupting data and falling back using the whole md4
  * checksums.
@@ -568,6 +568,8 @@ void check_for_finished_hlinks(int itemizing, enum logcode code)
 	}
 }
 
+static int phase = 0;
+
 /* Acts on the_file_list->file's ndx'th item, whose name is fname.  If a dir,
  * make sure it exists, and has the right permissions/timestamp info.  For
  * all other non-regular files (symlinks, etc.) we create them here.  For
@@ -707,7 +709,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (set_perms(fname, file, statret ? NULL : &st, 0)
 		    && verbose && code && f_out != -1)
 			rprintf(code, "%s/\n", safe_fname(fname));
-		if (delete_during && f_out != -1 && csum_length != SUM_LENGTH
+		if (delete_during && f_out != -1 && !phase
 		    && (file->flags & FLAG_DEL_HERE))
 			delete_in_dir(the_file_list, fname, file);
 		return;
@@ -1091,7 +1093,6 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 		    int f_out_name)
 {
 	int i, lull_mod;
-	int phase = 0;
 	char fbuf[MAXPATHLEN];
 	int itemizing, maybe_PERMS_REPORT;
 	enum logcode code;

@@ -605,8 +605,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 				send_msg(MSG_SUCCESS, numbuf, 4);
 			}
 		} else if (!recv_ok) {
-			int msgtype = csum_length == SUM_LENGTH || read_batch ?
-				FERROR : FINFO;
+			int msgtype = phase || read_batch ? FERROR : FINFO;
 			if (msgtype == FERROR || verbose) {
 				char *errstr, *redostr, *keptstr;
 				if (!(keep_partial && partialptr) && !inplace)
@@ -627,7 +626,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 					errstr, safe_fname(fname),
 					keptstr, redostr);
 			}
-			if (csum_length != SUM_LENGTH) {
+			if (!phase) {
 				SIVAL(numbuf, 0, i);
 				send_msg(MSG_REDO, numbuf, 4);
 			}
