@@ -55,7 +55,7 @@ static struct file_struct null_file;
 
 static void clean_flist(struct file_list *flist, int strip_root);
 
-struct string_area *string_area_new(int size)
+static struct string_area *string_area_new(int size)
 {
 	struct string_area *a;
 
@@ -65,12 +65,12 @@ struct string_area *string_area_new(int size)
 	a->current = a->base = malloc(size);
 	if (!a->current) out_of_memory("string_area_new buffer");
 	a->end = a->base + size;
-	a->next = 0;
+	a->next = NULL;
 
 	return a;
 }
 
-void string_area_free(struct string_area *a)
+static void string_area_free(struct string_area *a)
 {
 	struct string_area *next;
 
@@ -80,7 +80,7 @@ void string_area_free(struct string_area *a)
 	}
 }
 
-char *string_area_malloc(struct string_area **ap, int size)
+static char *string_area_malloc(struct string_area **ap, int size)
 {
 	char *p;
 	struct string_area *a;
@@ -100,7 +100,7 @@ char *string_area_malloc(struct string_area **ap, int size)
 	return p;
 }
 
-char *string_area_strdup(struct string_area **ap, const char *src)
+static char *string_area_strdup(struct string_area **ap, const char *src)
 {
 	char* dest = string_area_malloc(ap, strlen(src) + 1);
 	return strcpy(dest, src);
@@ -1015,7 +1015,7 @@ struct file_list *flist_new()
 #if ARENA_SIZE > 0
 	flist->string_area = string_area_new(0);
 #else
-	flist->string_area = 0;
+	flist->string_area = NULL;
 #endif
 	return flist;
 }
