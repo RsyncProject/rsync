@@ -25,7 +25,7 @@ cd "$testdir"
 
 for testbase in $test_names
 do
-    testscript="$testbase.test"
+    testscript="$testdir/$testbase.test"
     if test \! -f "$testscript" 
     then
 	echo "$testscript does not exist" >&2
