@@ -31,6 +31,7 @@ fi
 
 testdir=`cd $testdir && pwd`
 
+echo "srcdir is originally $srcdir"
 srcdir=`cd $srcdir && pwd`
 
 echo "============================================================"
