@@ -28,6 +28,15 @@ extern int dry_run;
 extern int am_server;
 
 
+/**
+ * @file
+ *
+ * The sender gets checksums from the generator, calculates deltas,
+ * and transmits them to the receiver.  The sender process runs on the
+ * machine holding the source files.
+ **/
+
+
 /*
   receive the checksums for a buffer
   */
