@@ -1,18 +1,18 @@
-/* 
+/*
    Copyright (C) Andrew Tridgell 1996
    Copyright (C) Paul Mackerras 1996
    Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
-   
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -216,12 +216,12 @@ int readlink_stat(const char *path, STRUCT_STAT * buffer, char *linkbuf)
 	if (S_ISLNK(buffer->st_mode)) {
 		int l;
 		l = readlink((char *) path, linkbuf, MAXPATHLEN - 1);
-		if (l == -1) 
+		if (l == -1)
 			return -1;
 		linkbuf[l] = 0;
 		if (copy_unsafe_links && unsafe_symlink(linkbuf, path)) {
 			if (verbose > 1) {
-				rprintf(FINFO,"copying unsafe symlink \"%s\" -> \"%s\"\n", 
+				rprintf(FINFO,"copying unsafe symlink \"%s\" -> \"%s\"\n",
 					path, linkbuf);
 			}
 			return do_stat(path, buffer);
@@ -307,14 +307,14 @@ static void flist_expand(struct file_list *flist)
 	if (flist->count >= flist->malloced) {
 		size_t new_bytes;
 		void *new_ptr;
-		
+
 		if (flist->malloced < 1000)
 			flist->malloced += 1000;
 		else
 			flist->malloced *= 2;
 
 		new_bytes = sizeof(flist->files[0]) * flist->malloced;
-		
+
 		if (flist->files)
 			new_ptr = realloc(flist->files, new_bytes);
 		else
@@ -325,7 +325,7 @@ static void flist_expand(struct file_list *flist)
 				(double) new_bytes,
 				(new_ptr == flist->files) ? " not" : "");
 		}
-		
+
 		flist->files = (struct file_struct **) new_ptr;
 
 		if (!flist->files)
@@ -374,7 +374,7 @@ static void send_file_entry(struct file_struct *file, int f,
 
 	for (l1 = 0;
 	     lastname[l1] && (fname[l1] == lastname[l1]) && (l1 < 255);
-	     l1++);
+	     l1++) {}
 	l2 = strlen(fname) - l1;
 
 	if (l1 > 0)
@@ -662,7 +662,7 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 	if (readlink_stat(fname, &st, linkbuf) != 0) {
 		int save_errno = errno;
 		if ((errno == ENOENT) && !noexcludes) {
-			/* either symlink pointing nowhere or file that 
+			/* either symlink pointing nowhere or file that
 			 * was removed during rsync run; see if excluded
 			 * before reporting an error */
 			memset((char *) &st, 0, sizeof(st));
@@ -1072,7 +1072,7 @@ struct file_list *recv_file_list(int f)
 
 	for (flags = read_byte(f); flags; flags = read_byte(f)) {
 		int i = flist->count;
-		
+
 		flist_expand(flist);
 
 		receive_file_entry(&flist->files[i], flags, f);
@@ -1250,7 +1250,7 @@ void flist_free(struct file_list *flist)
 
 /*
  * This routine ensures we don't have any duplicate names in our file list.
- * duplicate names can cause corruption because of the pipelining 
+ * duplicate names can cause corruption because of the pipelining
  */
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 {
