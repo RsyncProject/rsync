@@ -63,7 +63,7 @@
 
 #define MPLEX_BASE 7
 
-enum logcode {FERROR=1, FINFO=2, FLOG=3};
+enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3};
 
 #include "errcode.h"
 

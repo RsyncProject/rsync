@@ -429,7 +429,7 @@ void io_flush(void)
 	if (!io_buffer_count || no_flush) return;
 
 	if (io_multiplexing_out) {
-		mplex_write(fd, 0, io_buffer, io_buffer_count);
+		mplex_write(fd, FNONE, io_buffer, io_buffer_count);
 	} else {
 		writefd_unbuffered(fd, io_buffer, io_buffer_count);
 	}

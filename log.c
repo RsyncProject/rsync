@@ -194,7 +194,7 @@ void rflush(enum logcode code)
 
 /* a generic logging routine for send/recv, with parameter
    substitiution */
-static void log_formatted(int fd,
+static void log_formatted(enum logcode code,
 			  char *format, char *op, struct file_struct *file,
 			  struct stats *initial_stats)
 {
@@ -284,7 +284,7 @@ static void log_formatted(int fd,
 		s = p+l;
 	}
 
-	rprintf(fd,"%s\n", buf);
+	rprintf(code,"%s\n", buf);
 }
 
 /* log the outgoing transfer of a file */

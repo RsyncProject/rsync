@@ -84,7 +84,7 @@ int list_only = 0;
 
 struct in_addr socket_address = {INADDR_ANY};
 
-void usage(int F)
+void usage(enum logcode F)
 {
   rprintf(F,"rsync version %s Copyright Andrew Tridgell and Paul Mackerras\n\n",
 	  VERSION);
