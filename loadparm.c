@@ -665,8 +665,8 @@ static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
        string_set(parm_ptr,parmvalue);
        if ((cp = *(char**)parm_ptr) != NULL) {
 	   int len = strlen(cp);
-	   while (len && cp[--len] == '/')
-	       cp[len] = '\0';
+	   while (len > 1 && cp[len-1] == '/') len--;
+	   cp[len] = '\0';
        }
        break;
 
