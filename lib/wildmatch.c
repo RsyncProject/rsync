@@ -143,10 +143,18 @@ static int domatch(const unsigned char *p, const unsigned char *text)
 		else if (ch == '[' && p[1] == ':') {
 		    unsigned const char *s = p += 2;
 		    int i;
-		    while ((ch = *p) && (ch != ':' || p[1] != ']')) p++;
+		    while ((ch = *p) && ch != ']') p++;
 		    if (!ch)
 			return ABORT_ALL;
-		    i = p - s;
+		    i = p - s - 1;
+		    if (i < 0 || p[-1] != ':') {
+			/* Didn't find ":]", so treat like a normal set. */
+			p = s - 2;
+			ch = '[';
+			if (*text == ch)
+			    matched = TRUE;
+			continue;
+		    }
 		    if (CC_EQ(s,i, "alnum")) {
 			if (ISALNUM(*text))
 			    matched = TRUE;
@@ -197,7 +205,6 @@ static int domatch(const unsigned char *p, const unsigned char *text)
 		    }
 		    else /* malformed [:class:] string */
 			return ABORT_ALL;
-		    p++;
 		    ch = 0; /* This makes "prev" get set to 0. */
 		}
 		else if (*text == ch)
