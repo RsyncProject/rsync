@@ -952,18 +952,18 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			return 0;
 		}
 		keep_partial = 0;
-#else
-		snprintf(err_buf, sizeof err_buf,
-			 "--inplace is not supported on this %s\n",
-			 am_server ? "server" : "client");
-		return 0;
-#endif
 		if (dest_option) {
 			snprintf(err_buf, sizeof err_buf,
 				 "--inplace does not yet work with %s\n",
 				 dest_option);
 			return 0;
 		}
+#else
+		snprintf(err_buf, sizeof err_buf,
+			 "--inplace is not supported on this %s\n",
+			 am_server ? "server" : "client");
+		return 0;
+#endif
 	} else {
 		if (keep_partial && !partial_dir)
 			partial_dir = getenv("RSYNC_PARTIAL_DIR");
