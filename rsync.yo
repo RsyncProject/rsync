@@ -779,6 +779,10 @@ it. The most common cause is incorrectly configured shell startup
 scripts (such as .cshrc or .profile) that contain output statements
 for non-interactive logins.
 
+If you are having trouble debugging include and exclude patterns, then
+try specifying the -vv option.  At this level of verbosity rsync will
+show why each individual file is included or excluded.
+
 manpagesection(ENVIRONMENT VARIABLES)
 
 startdit()
