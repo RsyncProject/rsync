@@ -737,8 +737,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 		if (one_file_system)
 			set_filesystem(fname);
 
-		if (!recurse || !send_included_file_names(f,flist))
-			send_file_name(f,flist,fname,recurse,FLAG_DELETE);
+		send_file_name(f,flist,fname,recurse,FLAG_DELETE);
 
 		if (olddir != NULL) {
 			flist_dir = NULL;
