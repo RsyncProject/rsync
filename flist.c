@@ -424,7 +424,10 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
     p = strrchr(fname,'/');
     if (p) {
       *p = 0;
-      dir = fname;
+      if (p == fname) 
+	dir = "/";
+      else
+	dir = fname;      
       fname = p+1;      
     }
     if (!*fname)

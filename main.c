@@ -294,6 +294,8 @@ void do_server_sender(int argc,char *argv[])
   
   if (strcmp(dir,".")) {
     int l = strlen(dir);
+    if (strcmp(dir,"/") == 0) 
+      l = 0;
     for (i=0;i<argc;i++)
       argv[i] += l+1;
   }

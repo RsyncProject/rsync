@@ -136,6 +136,10 @@
 #include <utime.h>
 #endif
 
+#ifdef HAVE_SYS_SELECT_H
+#include <sys/select.h>
+#endif
+
 #ifdef HAVE_FNMATCH
 #include <fnmatch.h>
 #else
@@ -281,6 +285,10 @@ extern int errno;
 
 #if !SUPPORT_LINKS
 #define lstat stat
+#endif
+
+#ifndef HAVE_LCHOWN
+#define lchown chown
 #endif
 
 #define SIGNAL_CAST (RETSIGTYPE (*)())

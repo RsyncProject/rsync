@@ -13,7 +13,7 @@ AC_DEFINE_UNQUOTED(HAVE_REMSH, $HAVE_REMSH)
 AC_HEADER_DIRENT
 AC_HEADER_TIME
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS(sys/fcntl.h fcntl.h sys/time.h sys/unistd.h unistd.h utime.h grp.h)
+AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h unistd.h utime.h grp.h)
 AC_CHECK_HEADERS(compat.h sys/param.h ctype.h sys/wait.h sys/ioctl.h)
 AC_CHECK_HEADERS(sys/filio.h string.h stdlib.h)
 
@@ -42,7 +42,7 @@ AC_FUNC_MMAP
 AC_FUNC_UTIME_NULL
 AC_CHECK_FUNCS(waitpid strtok pipe getcwd mkdir strdup strerror chown chmod mknod)
 AC_CHECK_FUNCS(fchmod fstat strchr bcopy bzero readlink link utime utimes)
-AC_CHECK_FUNCS(memmove getopt_long)
+AC_CHECK_FUNCS(memmove getopt_long lchown)
 
 echo $ac_n "checking for working fnmatch... $ac_c"
 AC_TRY_RUN([#include <fnmatch.h>
