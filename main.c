@@ -65,11 +65,10 @@ extern char *basis_dir[];
 extern char *rsync_path;
 extern char *shell_cmd;
 extern char *batch_name;
+extern struct filter_list_struct filter_list;
 
-
-/* there's probably never more than at most 2 outstanding child processes,
- * but set it higher just in case.
- */
+/* There's probably never more than at most 2 outstanding child processes,
+ * but set it higher, just in case. */
 #define MAXCHILDPROCS 5
 
 struct pid_status {
@@ -625,8 +624,8 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	io_start_buffering_in();
 	if (delete_mode && !delete_excluded)
 		recv_filter_list(f_in);
-	if (cvs_exclude)
-		add_cvs_excludes();
+	if (cvs_exclude && protocol_version < 29)
+		add_filter(&filter_list, ":C", 0);
 
 	if (filesfrom_fd >= 0) {
 		/* We need to send the files-from names to the sender at the
