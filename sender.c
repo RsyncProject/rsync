@@ -35,6 +35,7 @@ extern int make_backups;
 extern int do_progress;
 extern int inplace;
 extern struct stats stats;
+extern struct file_list *the_file_list;
 extern char *log_format;
 
 
@@ -99,18 +100,16 @@ static struct sum_struct *receive_sums(int f)
 	return s;
 }
 
-static struct file_list *the_flist;
-
-void successful_send(int i)
+void successful_send(int ndx)
 {
 	char fname[MAXPATHLEN];
 	struct file_struct *file;
 	unsigned int offset;
 
-	if (!the_flist || i < 0 || i >= the_flist->count)
+	if (ndx < 0 || ndx >= the_file_list->count)
 		return;
 
-	file = the_flist->files[i];
+	file = the_file_list->files[ndx];
 	/* The generator might tell us about symlinks we didn't send. */
 	if (!(file->flags & FLAG_SENT) && !S_ISLNK(file->mode))
 		return;
@@ -144,8 +143,6 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 	if (verbose > 2)
 		rprintf(FINFO, "send_files starting\n");
-
-	the_flist = flist;
 
 	while (1) {
 		unsigned int offset;
