@@ -489,7 +489,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	}
 
 	if (preserve_hard_links)
-		do_hard_links(flist);
+		do_hard_links();
 
 	/* now we need to fix any directory permissions that were 
 	   modified during the transfer */

@@ -152,8 +152,13 @@ static void hard_link_one(int i)
 }
 #endif
 
-/* create any hard links in the flist */
-void do_hard_links(struct file_list *flist)
+
+
+/**
+ * Create any hard links in the global hlink_list.  They were put
+ * there by running init_hard_links on the filelist.
+ **/
+void do_hard_links(void)
 {
 #if SUPPORT_HARD_LINKS
 	int i;
