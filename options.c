@@ -298,6 +298,7 @@ void usage(enum logcode F)
   rprintf(F,"     --files-from=FILE       read FILE for list of source-file names\n");
   rprintf(F," -0, --from0                 all *-from file lists are delimited by nulls\n");
   rprintf(F,"     --version               print version number\n");
+  rprintf(F,"     --port=PORT             specify double-colon alternate port number\n");
   rprintf(F,"     --blocking-io           use blocking I/O for the remote shell\n");
   rprintf(F,"     --no-blocking-io        turn off --blocking-io\n");
   rprintf(F,"     --stats                 give some file transfer stats\n");
@@ -393,6 +394,7 @@ static struct poptOption long_options[] = {
   {"blocking-io",      0,  POPT_ARG_VAL,    &blocking_io, 1, 0, 0 },
   {"no-blocking-io",   0,  POPT_ARG_VAL,    &blocking_io, 0, 0, 0 },
   {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
+  {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
   {"log-format",       0,  POPT_ARG_STRING, &log_format, 0, 0, 0 },
   {"bwlimit",          0,  POPT_ARG_INT,    &bwlimit, 0, 0, 0 },
   {"backup-dir",       0,  POPT_ARG_STRING, &backup_dir, 0, 0, 0 },
@@ -413,7 +415,6 @@ static struct poptOption long_options[] = {
   {"config",           0,  POPT_ARG_STRING, 0, OPT_DAEMON, 0, 0 },
   {"daemon",           0,  POPT_ARG_NONE,   0, OPT_DAEMON, 0, 0 },
   {"no-detach",        0,  POPT_ARG_NONE,   0, OPT_DAEMON, 0, 0 },
-  {"port",             0,  POPT_ARG_INT,    0, OPT_DAEMON, 0, 0 },
   {0,0,0,0, 0, 0, 0}
 };
 
