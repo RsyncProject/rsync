@@ -72,7 +72,7 @@ Changes since 2.6.3:
     - Fixed a bug that would sometimes surface when using --compress and
       sending a file with a block-size larger than 64K (either manually
       specified, or computed due to the file being really large).  Prior
-      versions of rsync would sometimes fail to to decompress the data
+      versions of rsync would sometimes fail to decompress the data
       properly, and thus the transferred file would fail its verification.
 
     - If a daemon can't open the specified log file (i.e. syslog is not
@@ -94,10 +94,10 @@ Changes since 2.6.3:
       use /etc/popt and/or ~/.popt to create your own option aliases.
 
     - Added the --delete-during (--del) option which will delete files
-      from on the receiving side incrementally as each directory in the
+      from the receiving side incrementally as each directory in the
       transfer is being processed.  This makes it more efficient than the
       default, before-the-transfer behavior, which is now available as
-      --delete-before (that is still the default --delete-WHEN option that
+      --delete-before (and is still the default --delete-WHEN option that
       will be chosen if --delete or --delete-excluded is specified without
       a --delete-WHEN choice).  All the --del* options infer --delete, so
       an rsync daemon that refuses "delete" will still refuse to allow any
@@ -106,7 +106,8 @@ Changes since 2.6.3:
     - All the --delete-WHEN options are now more memory efficient:
       Previously an entire duplicate set of file-list objects was created
       on the receiving side for the entire destination hierarchy.  The new
-      algorithm only creates one directory of objects at a time.
+      algorithm only creates one directory of objects at a time (for files
+      inside the transfer).
 
     - Added support for specifying multiple --compare-dest or --link-dest
       options, but only of a single type. (Promoted from the patches dir
@@ -137,7 +138,7 @@ Changes since 2.6.3:
     - Added the --dirs (-d) option for an easier way to copy directories
       without recursion.
 
-    - Added the --list-only option which is mainly a way for the client to
+    - Added the --list-only option, which is mainly a way for the client to
       put the server into listing mode without needing to resort to any
       internal option kluges (e.g. the age-old use of "-r --exclude="/*/*"
       for a non-recursive listing).  This option is used automatically
