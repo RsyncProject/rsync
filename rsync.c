@@ -649,12 +649,16 @@ static int delete_already_done(struct file_list *flist,int j)
 		exit_cleanup(1);
 	}
 
+	name[strlen(name)-2] = 0;
+
 	p = strrchr(name,'/');
 	if (!p) {
 		free(name);
 		return 0;
 	}
 	*p = 0;
+
+	strcat(name,"/.");
 
 	while (low != high) {
 		int mid = (low+high)/2;
@@ -702,6 +706,8 @@ static void delete_files(struct file_list *flist)
 	  char *name = f_name(flist->files[j]);
 
 	  if (!S_ISDIR(flist->files[j]->mode)) continue;
+
+	  if (strlen(name)<2 || strcmp(name+strlen(name)-2,"/.")!=0) continue;
 
 	  if (delete_already_done(flist, j)) continue;
 
