@@ -21,7 +21,6 @@
 #include "rsync.h"
 
 extern int verbose;
-extern int recurse;
 extern int delete_after;
 extern int csum_length;
 extern struct stats stats;
@@ -57,7 +56,9 @@ extern struct filter_list_struct server_filter_list;
  * sending side.  This is used by --delete-before and --delete-after. */
 void delete_files(struct file_list *flist)
 {
+ 	struct file_list *dir_list;
 	char fbuf[MAXPATHLEN];
+	char *argv[1];
 	int j;
 
 	for (j = 0; j < flist->count; j++) {
@@ -65,7 +66,12 @@ void delete_files(struct file_list *flist)
 		    || !S_ISDIR(flist->files[j]->mode))
 			continue;
 
-		delete_in_dir(flist, f_name_to(flist->files[j], fbuf));
+		argv[0] = f_name_to(flist->files[j], fbuf);
+		dir_list = send_file_list(-1, 1, argv);
+
+		delete_missing(flist, dir_list, fbuf);
+
+		flist_free(dir_list);
 	}
 }
 
@@ -586,7 +592,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		}
 	}
 
-	if (delete_after && recurse && !local_name && flist->count > 0)
+	if (delete_after && !local_name && flist->count > 0)
 		delete_files(flist);
 
 	if (verbose > 2)
