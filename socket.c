@@ -1,20 +1,20 @@
 /* -*- c-file-style: "linux" -*-
-   
+
    rsync -- fast file replication program
-   
+
    Copyright (C) 1992-2001 by Andrew Tridgell <tridge@samba.org>
    Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
-   
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -22,7 +22,7 @@
 
 /**
  * @file socket.c
- * 
+ *
  * Socket functions used in rsync.
  *
  * This file is now converted to use the new-style getaddrinfo()
@@ -44,13 +44,13 @@ static int establish_proxy_connection(int fd, char *host, int port)
 	char *cp;
 
 	snprintf(buffer, sizeof(buffer), "CONNECT %s:%d HTTP/1.0\r\n\r\n", host, port);
-	if (write(fd, buffer, strlen(buffer)) != (int) strlen(buffer)) {
+	if (write(fd, buffer, strlen(buffer)) != (int)strlen(buffer)) {
 		rprintf(FERROR, "failed to write to proxy: %s\n",
 			strerror(errno));
 		return -1;
 	}
 
-	for (cp = buffer; cp < &buffer[sizeof(buffer) - 1]; cp++) {
+	for (cp = buffer; cp < &buffer[sizeof (buffer) - 1]; cp++) {
 		if (read(fd, cp, 1) != 1) {
 			rprintf(FERROR, "failed to read from proxy: %s\n",
 				strerror(errno));
@@ -70,8 +70,7 @@ static int establish_proxy_connection(int fd, char *host, int port)
 			buffer);
 		return -1;
 	}
-	for (cp = &buffer[5]; isdigit(* (unsigned char *) cp) || (*cp == '.'); cp++)
-		;
+	for (cp = &buffer[5]; isdigit(*(uchar*)cp) || *cp == '.'; cp++) {}
 	while (*cp == ' ')
 		cp++;
 	if (*cp != '2') {
@@ -81,7 +80,7 @@ static int establish_proxy_connection(int fd, char *host, int port)
 	}
 	/* throw away the rest of the HTTP header */
 	while (1) {
-		for (cp = buffer; cp < &buffer[sizeof(buffer) - 1];
+		for (cp = buffer; cp < &buffer[sizeof (buffer) - 1];
 		     cp++) {
 			if (read(fd, cp, 1) != 1) {
 				rprintf(FERROR, "failed to read from proxy: %s\n",
@@ -91,9 +90,9 @@ static int establish_proxy_connection(int fd, char *host, int port)
 			if (*cp == '\n')
 				break;
 		}
-		if ((cp > buffer) && (*cp == '\n'))
+		if (cp > buffer && *cp == '\n')
 			cp--;
-		if ((cp == buffer) && ((*cp == '\n') || (*cp == '\r')))
+		if (cp == buffer && (*cp == '\n' || *cp == '\r'))
 			break;
 	}
 	return 0;
@@ -173,7 +172,7 @@ int open_socket_out(char *host, int port, const char *bind_address,
 	 * connetcion via a web proxy at the given address. The format
 	 * is hostname:port */
 	h = getenv("RSYNC_PROXY");
-	proxied = (h != NULL) && (*h != '\0');
+	proxied = h != NULL && *h != '\0';
 
 	if (proxied) {
 		strlcpy(buffer, h, sizeof(buffer));
@@ -258,18 +257,14 @@ int open_socket_out(char *host, int port, const char *bind_address,
  *
  * @param bind_address Local address to use.  Normally NULL to get the stack default.
  **/
-int open_socket_out_wrapped (char *host,
-			     int port,
-			     const char *bind_address,
-			     int af_hint)
+int open_socket_out_wrapped(char *host, int port, const char *bind_address,
+			    int af_hint)
 {
 	char *prog;
 
-	if ((prog = getenv ("RSYNC_CONNECT_PROG")) != NULL) 
-		return sock_exec (prog);
-	else 
-		return open_socket_out (host, port, bind_address,
-					af_hint);
+	if ((prog = getenv("RSYNC_CONNECT_PROG")) != NULL)
+		return sock_exec(prog);
+	return open_socket_out(host, port, bind_address, af_hint);
 }
 
 
@@ -279,16 +274,16 @@ int open_socket_out_wrapped (char *host,
  *
  * Try to be better about handling the results of getaddrinfo(): when
  * opening an inbound socket, we might get several address results,
- * e.g. for the machine's ipv4 and ipv6 name.  
- * 
+ * e.g. for the machine's ipv4 and ipv6 name.
+ *
  * If binding a wildcard, then any one of them should do.  If an address
  * was specified but it's insufficiently specific then that's not our
- * fault.  
- * 
+ * fault.
+ *
  * However, some of the advertized addresses may not work because e.g. we
  * don't have IPv6 support in the kernel.  In that case go on and try all
  * addresses until one succeeds.
- * 
+ *
  * @param bind_address Local address to bind, or NULL to allow it to
  * default.
  **/
@@ -320,13 +315,13 @@ static int open_socket_in(int type, int port, const char *bind_address,
 		s = socket(resp->ai_family, resp->ai_socktype,
 			   resp->ai_protocol);
 
-		if (s == -1) 
+		if (s == -1)
 			/* See if there's another address that will work... */
 			continue;
-		
+
 		setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
 			   (char *)&one, sizeof one);
-		
+
 		/* now we've got a socket - we need to bind it */
 		if (bind(s, all_ai->ai_addr, all_ai->ai_addrlen) < 0) {
 			/* Nope, try another */
@@ -340,11 +335,11 @@ static int open_socket_in(int type, int port, const char *bind_address,
 
 	rprintf(FERROR, RSYNC_NAME ": open inbound socket on port %d failed: "
 		"%s\n",
-		port, 
+		port,
 		strerror(errno));
 
 	freeaddrinfo(all_ai);
-	return -1; 
+	return -1;
 }
 
 
@@ -370,7 +365,7 @@ int is_a_socket(int fd)
          * also has socklen_t [*]. See also accept(2).''
          *
          * We now return to your regularly scheduled programming.  */
-	return(getsockopt(fd, SOL_SOCKET, SO_TYPE, (char *)&v, &l) == 0);
+	return getsockopt(fd, SOL_SOCKET, SO_TYPE, (char *)&v, &l) == 0;
 }
 
 
@@ -418,15 +413,16 @@ void start_accept_loop(int port, int (*fn)(int, int))
 		FD_ZERO(&fds);
 		FD_SET(s, &fds);
 
-		if (select(s+1, &fds, NULL, NULL, NULL) != 1) {
+		if (select(s+1, &fds, NULL, NULL, NULL) != 1)
 			continue;
-		}
 
-		if(!FD_ISSET(s, &fds)) continue;
+		if (!FD_ISSET(s, &fds))
+			continue;
 
 		fd = accept(s,(struct sockaddr *)&addr,&addrlen);
 
-		if (fd == -1) continue;
+		if (fd == -1)
+			continue;
 
 		signal(SIGCHLD, sigchld_handler);
 
@@ -499,7 +495,7 @@ struct
 #endif
   {NULL,0,0,0,0}};
 
-	
+
 
 /**
  * Set user socket options
@@ -507,13 +503,16 @@ struct
 void set_socket_options(int fd, char *options)
 {
 	char *tok;
-	if (!options || !*options) return;
+
+	if (!options || !*options)
+		return;
 
 	options = strdup(options);
-	
-	if (!options) out_of_memory("set_socket_options");
 
-	for (tok=strtok(options, " \t,"); tok; tok=strtok(NULL," \t,")) {
+	if (!options)
+		out_of_memory("set_socket_options");
+
+	for (tok = strtok(options, " \t,"); tok; tok = strtok(NULL," \t,")) {
 		int ret=0,i;
 		int value = 1;
 		char *p;
@@ -525,9 +524,10 @@ void set_socket_options(int fd, char *options)
 			got_value = 1;
 		}
 
-		for (i=0;socket_options[i].name;i++)
+		for (i = 0; socket_options[i].name; i++) {
 			if (strcmp(socket_options[i].name,tok)==0)
 				break;
+		}
 
 		if (!socket_options[i].name) {
 			rprintf(FERROR,"Unknown socket option %s\n",tok);
@@ -540,7 +540,7 @@ void set_socket_options(int fd, char *options)
 			ret = setsockopt(fd,socket_options[i].level,
 					 socket_options[i].option,(char *)&value,sizeof(int));
 			break;
-			
+
 		case OPT_ON:
 			if (got_value)
 				rprintf(FERROR,"syntax error - %s does not take a value\n",tok);
@@ -550,9 +550,9 @@ void set_socket_options(int fd, char *options)
 				ret = setsockopt(fd,socket_options[i].level,
 						 socket_options[i].option,(char *)&on,sizeof(int));
 			}
-			break;	  
+			break;
 		}
-		
+
 		if (ret != 0)
 			rprintf(FERROR, "failed to set socket option %s: %s\n", tok,
 				strerror(errno));
@@ -579,15 +579,15 @@ void become_daemon(void)
 #ifdef TIOCNOTTY
 	i = open("/dev/tty", O_RDWR);
 	if (i >= 0) {
-		ioctl(i, (int) TIOCNOTTY, (char *)0);      
+		ioctl(i, (int)TIOCNOTTY, (char *)0);
 		close(i);
 	}
 #endif /* TIOCNOTTY */
 #endif
 	/* make sure that stdin, stdout an stderr don't stuff things
            up (library functions, for example) */
-	for (i=0;i<3;i++) {
-		close(i); 
+	for (i = 0; i < 3; i++) {
+		close(i);
 		open("/dev/null", O_RDWR);
 	}
 }
@@ -596,7 +596,7 @@ void become_daemon(void)
 /**
  * This is like socketpair but uses tcp. It is used by the Samba
  * regression test code.
- * 
+ *
  * The function guarantees that nobody else can attach to the socket,
  * or if they do that this function fails and the socket gets closed
  * returns 0 on success, -1 on failure the resulting file descriptors
@@ -609,12 +609,13 @@ static int socketpair_tcp(int fd[2])
 	struct sockaddr_in sock2;
 	socklen_t socklen = sizeof(sock);
 	int connect_done = 0;
-	
+
 	fd[0] = fd[1] = listener = -1;
 
 	memset(&sock, 0, sizeof(sock));
-	
-	if ((listener = socket(PF_INET, SOCK_STREAM, 0)) == -1) goto failed;
+
+	if ((listener = socket(PF_INET, SOCK_STREAM, 0)) == -1)
+		goto failed;
 
         memset(&sock2, 0, sizeof(sock2));
 #ifdef HAVE_SOCKADDR_LEN
@@ -624,39 +625,47 @@ static int socketpair_tcp(int fd[2])
 
         bind(listener, (struct sockaddr *)&sock2, sizeof(sock2));
 
-	if (listen(listener, 1) != 0) goto failed;
+	if (listen(listener, 1) != 0)
+		goto failed;
 
-	if (getsockname(listener, (struct sockaddr *)&sock, &socklen) != 0) goto failed;
+	if (getsockname(listener, (struct sockaddr *)&sock, &socklen) != 0)
+		goto failed;
 
-	if ((fd[1] = socket(PF_INET, SOCK_STREAM, 0)) == -1) goto failed;
+	if ((fd[1] = socket(PF_INET, SOCK_STREAM, 0)) == -1)
+		goto failed;
 
 	set_nonblocking(fd[1]);
 
 	sock.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
 	if (connect(fd[1],(struct sockaddr *)&sock,sizeof(sock)) == -1) {
-		if (errno != EINPROGRESS) goto failed;
-	} else {
+		if (errno != EINPROGRESS)
+			goto failed;
+	} else
 		connect_done = 1;
-	}
 
-	if ((fd[0] = accept(listener, (struct sockaddr *)&sock, &socklen)) == -1) goto failed;
+	if ((fd[0] = accept(listener, (struct sockaddr *)&sock, &socklen)) == -1)
+		goto failed;
 
 	close(listener);
 	if (connect_done == 0) {
 		if (connect(fd[1],(struct sockaddr *)&sock,sizeof(sock)) != 0
-		    && errno != EISCONN) goto failed;
+		    && errno != EISCONN)
+			goto failed;
 	}
 
-	set_blocking (fd[1]);
+	set_blocking(fd[1]);
 
 	/* all OK! */
 	return 0;
 
  failed:
-	if (fd[0] != -1) close(fd[0]);
-	if (fd[1] != -1) close(fd[1]);
-	if (listener != -1) close(listener);
+	if (fd[0] != -1)
+		close(fd[0]);
+	if (fd[1] != -1)
+		close(fd[1]);
+	if (listener != -1)
+		close(listener);
 	return -1;
 }
 
@@ -674,11 +683,10 @@ static int socketpair_tcp(int fd[2])
 int sock_exec(const char *prog)
 {
 	int fd[2];
-	
+
 	if (socketpair_tcp(fd) != 0) {
-		rprintf (FERROR, RSYNC_NAME
-			 ": socketpair_tcp failed (%s)\n",
-			 strerror(errno));
+		rprintf(FERROR, RSYNC_NAME ": socketpair_tcp failed (%s)\n",
+			strerror(errno));
 		return -1;
 	}
 	if (fork() == 0) {
@@ -689,15 +697,12 @@ int sock_exec(const char *prog)
 		dup(fd[1]);
 		if (verbose > 3) {
 			/* Can't use rprintf because we've forked. */
-			fprintf (stderr,
-				 RSYNC_NAME ": execute socket program \"%s\"\n",
-				 prog);
+			fprintf(stderr,
+				RSYNC_NAME ": execute socket program \"%s\"\n",
+				prog);
 		}
-		exit (system (prog));
+		exit(system(prog));
 	}
-	close (fd[1]);
+	close(fd[1]);
 	return fd[0];
 }
-
-
-
