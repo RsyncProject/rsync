@@ -247,6 +247,7 @@ verb(
      --delete                delete files that don't exist on the sending side
      --delete-excluded       also delete excluded files on the receiving side
      --delete-after          delete after transferring, not before
+     --max-delete=NUM        don't delete more than NUM files
      --partial               keep partially transferred files
      --force                 force deletion of directories even if not empty
      --numeric-ids           don't map uid/gid values by user/group name
@@ -426,6 +427,10 @@ contents of only one filesystem.
 
 dit(bf(--existing)) This tells rsync not to create any new files -
 only update files that already exist on the destination.
+
+dit(bf(--max-delete=NUM)) This tells rsync not to delete more than NUM
+files or directories. This is useful when mirroring very large trees
+to prevent disasters.
 
 dit(bf(--delete)) This tells rsync to delete any files on the receiving
 side that aren't on the sending side.   Files that are excluded from

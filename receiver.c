@@ -43,7 +43,6 @@ static struct delete_list {
 } *delete_list;
 static int dlist_len, dlist_alloc_len;
 
-
 /* yuck! This function wouldn't have been necessary if I had the sorting
    algorithm right. Unfortunately fixing the sorting algorithm would introduce
    a backward incompatibility as file list indexes are sent over the link.
@@ -110,6 +109,8 @@ static void delete_files(struct file_list *flist)
 	int i, j;
 	char *name;
 	extern int module_id;
+	extern int max_delete;
+	static int deletion_count;
 
 	if (cvs_exclude)
 		add_cvs_excludes();
@@ -137,6 +138,7 @@ static void delete_files(struct file_list *flist)
 			rprintf(FINFO,"deleting in %s\n", name);
 
 		for (i=local_file_list->count-1;i>=0;i--) {
+			if (max_delete && deletion_count > max_delete) break;
 			if (!local_file_list->files[i]->basename) continue;
 			if (remote_version < 19 &&
 			    S_ISDIR(local_file_list->files[i]->mode))
@@ -148,6 +150,7 @@ static void delete_files(struct file_list *flist)
 					    (strcmp(f+k,backup_suffix) != 0))) {
 					(void) make_backup(f);
 				} else {
+					deletion_count++;
 					delete_one(local_file_list->files[i]);
 				}
 			}

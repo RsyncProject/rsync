@@ -64,6 +64,7 @@ int block_size=BLOCK_SIZE;
 int size_only=0;
 int delete_after=0;
 int only_existing=0;
+int max_delete=0;
 
 char *backup_suffix = BACKUP_SUFFIX;
 char *tmpdir = NULL;
@@ -130,6 +131,7 @@ void usage(int F)
   rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
   rprintf(F,"     --delete-excluded       also delete excluded files on the receiving side\n");
   rprintf(F,"     --delete-after          delete after transferring, not before\n");
+  rprintf(F,"     --max-delete=NUM        don't delete more than NUM files\n");
   rprintf(F,"     --partial               keep partially transferred files\n");
   rprintf(F,"     --force                 force deletion of directories even if not empty\n");
   rprintf(F,"     --numeric-ids           don't map uid/gid values by user/group name\n");
@@ -167,7 +169,7 @@ enum {OPT_VERSION, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS,
       OPT_COPY_UNSAFE_LINKS, OPT_SAFE_LINKS, OPT_COMPARE_DEST,
       OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY, OPT_ADDRESS,
-      OPT_DELETE_AFTER, OPT_EXISTING};
+      OPT_DELETE_AFTER, OPT_EXISTING, OPT_MAX_DELETE};
 
 static char *short_options = "oblLWHpguDCtcahvqrRIxnSe:B:T:zP";
 
@@ -228,6 +230,7 @@ static struct option long_options[] = {
   {"port",        1,     0,    OPT_PORT},
   {"log-format",  1,     0,    OPT_LOG_FORMAT},
   {"address",     1,     0,    OPT_ADDRESS},
+  {"max-delete",  1,     0,    OPT_MAX_DELETE},
   {0,0,0,0}};
 
 
@@ -488,6 +491,10 @@ int parse_arguments(int argc, char *argv[], int frommain)
 			block_size = atoi(optarg);
 			break;
 
+		case OPT_MAX_DELETE:
+			max_delete = atoi(optarg);
+			break;
+
 		case OPT_TIMEOUT:
 			io_timeout = atoi(optarg);
 			break;
@@ -561,6 +568,7 @@ void server_options(char **args,int *argc)
 	static char argstr[50];
 	static char bsize[30];
 	static char iotime[30];
+	static char mdelete[30];
 	int i, x;
 
 	args[ac++] = "--server";
@@ -618,12 +626,17 @@ void server_options(char **args,int *argc)
 	if (x != 1) args[ac++] = argstr;
 
 	if (block_size != BLOCK_SIZE) {
-		sprintf(bsize,"-B%d",block_size);
+		slprintf(bsize,sizeof(bsize),"-B%d",block_size);
 		args[ac++] = bsize;
 	}    
 
+	if (max_delete && am_sender) {
+		slprintf(mdelete,sizeof(mdelete),"--max-delete=%d",max_delete);
+		args[ac++] = mdelete;
+	}    
+
 	if (io_timeout) {
-		sprintf(iotime,"--timeout=%d",io_timeout);
+		slprintf(iotime,sizeof(iotime),"--timeout=%d",io_timeout);
 		args[ac++] = iotime;
 	}    
 
@@ -659,7 +672,7 @@ void server_options(char **args,int *argc)
 	if (numeric_ids)
 		args[ac++] = "--numeric-ids";
 
-	if (only_existing)
+	if (only_existing && am_sender)
 		args[ac++] = "--existing";
 
 	if (tmpdir) {
