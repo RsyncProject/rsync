@@ -352,11 +352,12 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			  struct file_struct *file, struct stats *initial_stats,
 			  int iflags, char *hlink)
 {
-	char buf[MAXPATHLEN+1024];
-	char buf2[MAXPATHLEN];
-	char *p, *n;
+	char buf[MAXPATHLEN+1024], buf2[MAXPATHLEN], fmt[32];
+	char *p, *s, *n;
 	size_t len, total;
 	int64 b;
+
+	*fmt = '%';
 
 	/* We expand % codes one by one in place in buf.  We don't
 	 * copy in the terminating nul of the inserted strings, but
@@ -364,18 +365,25 @@ static void log_formatted(enum logcode code, char *format, char *op,
 	total = strlcpy(buf, format, sizeof buf);
 	
 	for (p = buf; (p = strchr(p, '%')) != NULL && p[1]; ) {
+		s = p++;
+		n = fmt + 1;
+		while (isdigit(*(uchar*)p) && n - fmt < 16)
+			*n++ = *p++;
+		*n = '\0';
 		n = NULL;
 
-		switch (p[1]) {
+		switch (*p++) {
 		case 'h': if (am_daemon) n = client_name(0); break;
 		case 'a': if (am_daemon) n = client_addr(0); break;
 		case 'l':
-			snprintf(buf2, sizeof buf2, "%.0f",
+			strlcat(fmt, ".0f", sizeof fmt);
+			snprintf(buf2, sizeof buf2, fmt,
 				 (double)file->length);
 			n = buf2;
 			break;
 		case 'p':
-			snprintf(buf2, sizeof buf2, "%d",
+			strlcat(fmt, "d", sizeof fmt);
+			snprintf(buf2, sizeof buf2, fmt,
 				 (int)getpid());
 			n = buf2;
 			break;
@@ -413,6 +421,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 		case 'P': n = lp_path(module_id); break;
 		case 'u': n = auth_user; break;
 		case 'b':
+			strlcat(fmt, ".0f", sizeof fmt);
 			if (am_sender) {
 				b = stats.total_written -
 					initial_stats->total_written;
@@ -420,10 +429,11 @@ static void log_formatted(enum logcode code, char *format, char *op,
 				b = stats.total_read -
 					initial_stats->total_read;
 			}
-			snprintf(buf2, sizeof buf2, "%.0f", (double)b);
+			snprintf(buf2, sizeof buf2, fmt, (double)b);
 			n = buf2;
 			break;
 		case 'c':
+			strlcat(fmt, ".0f", sizeof fmt);
 			if (!am_sender) {
 				b = stats.total_written -
 					initial_stats->total_written;
@@ -431,7 +441,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 				b = stats.total_read -
 					initial_stats->total_read;
 			}
-			snprintf(buf2, sizeof buf2, "%.0f", (double)b);
+			snprintf(buf2, sizeof buf2, fmt, (double)b);
 			n = buf2;
 			break;
 		case 'i':
@@ -477,34 +487,32 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			break;
 		}
 
-		/* n is the string to be inserted in place of this %
-		 * code; len is its length not including the trailing
-		 * NUL */
-		if (!n) {
-			p += 2;
-			continue;
-		}
+		/* Subtract the length of the escape from the string's size. */
+		total -= p - s;
 
+		/* "n" is the string to be inserted in place of this % code. */
+		if (!n)
+			continue;
 		len = strlen(n);
 
-		if (len + total - 2 >= sizeof buf) {
+		if (len + total >= sizeof buf) {
 			rprintf(FERROR,
 				"buffer overflow expanding %%%c -- exiting\n",
-				p[0]);
+				p[-1]);
 			exit_cleanup(RERR_MESSAGEIO);
 		}
 
 		/* Shuffle the rest of the string along to make space for n */
-		if (len != 2)
-			memmove(p + len, p + 2, total - (p + 2 - buf) + 1);
-		total += len - 2;
+		if (len != (size_t)(p - s))
+			memmove(s + len, p, total - (s - buf) + 1);
+		total += len;
 
-		/* Insert the contents of string "n", but NOT its nul. */
+		/* Insert the contents of string "n", but NOT its null. */
 		if (len)
-			memcpy(p, n, len);
+			memcpy(s, n, len);
 
 		/* Skip over inserted string; continue looking */
-		p += len;
+		p = s + len;
 	}
 
 	rprintf(code, "%s\n", buf);
