@@ -313,7 +313,7 @@ dit(bf(-I, --ignore-times)) Normally rsync will skip any files that are
 already the same length and have the same time-stamp. This option turns
 off this behavior.
 
-dit(bf(-I, --size-only)) Normally rsync will skip any files that are
+dit(bf(--size-only)) Normally rsync will skip any files that are
 already the same length and have the same time-stamp. With the
 --size-only option files will be skipped if they have the same size,
 regardless of timestamp. This is useful when starting to use rsync
