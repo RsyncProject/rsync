@@ -8,8 +8,25 @@
 
 # We need a few environment variables to know what to test.
 
+# rsync_bin gives the location of the rsync binary.  This is either
+# builddir/rsync if we're testing an uninstalled copy, or
+# install_prefix/bin/rsync if we're testing an installed copy.  On the
+# build farm rsync will be installed, but into a scratch /usr.
+
+# srcdir gives the location of the source tree, which lets us find the
+# build scripts.  It might be relative, so we need to make it
+# absolute.
+
+# The pwd is undefined when this script starts.
+
+srcdir=`cd $srcdir && pwd`
+
 echo "============================================================"
-echo "$0 running"
+echo "$0 running in `pwd`"
+echo "    rsync_bin=$rsync_bin"
+echo "    srcdir=$srcdir"
+
+set -e
 
 test_names="rsync-hello hands"
 
@@ -21,11 +38,13 @@ missing=0
 passed=0
 failed=0
 
-testsrcdir="`pwd`"
+suitedir="$srcdir/testsuite"
+cd "$suitedir"
+echo "    suitedir=$suitedir"
 
 for testbase in $test_names
 do
-    testscript="$testsrcdir/$testbase.test"
+    testscript="./$testbase.test"
     if test \! -f "$testscript" 
     then
 	echo "$testscript does not exist" >&2

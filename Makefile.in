@@ -17,7 +17,6 @@ srcdir=@srcdir@
 VPATH=$(srcdir)
 SHELL=/bin/sh
 
-
 .SUFFIXES:
 .SUFFIXES: .c .o
 
@@ -93,4 +92,4 @@ finddead:
 test: check
 
 check:
-	rsync_bin=`pwd`/rsync testdir=$(srcdir)/testsuite $(srcdir)/testsuite/master.test
+	rsync_bin=`pwd`/rsync srcdir="$(srcdir)" $(srcdir)/testsuite/master.test
