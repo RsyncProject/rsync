@@ -160,7 +160,8 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 			      change_gid?file->gid:st->st_gid) != 0) {
 			/* shouldn't have attempted to change uid or gid
 			     unless have the privilege */
-			rprintf(FERROR, "chown %s failed: %s\n",
+			rprintf(FERROR, "%s %s failed: %s\n",
+				change_uid ? "chown" : "chgrp",
 				full_fname(fname), strerror(errno));
 			return 0;
 		}
