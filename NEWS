@@ -73,9 +73,37 @@ rsync 2.4.7 (sometime in 2001, maybe :)		-*- indented-text -*-
     * autoconf2.52 (or later) is now required to rebuild the autoconf
       scripts.  It is not required to simply build rsync.
 
+    * Platforms thought to work in this release:
+
+		Cray SV1 UNICOS 10.0.0.8 cc
+		Debian Linux 2.2 UltraSparc gcc
+		Debian Linux testing/unstable ARM gcc
+		FreeBSD 3.3-RELEASE i386 cc
+		FreeBSD 4.1.1-RELEASE i386 cc
+		FreeBSD 4.3-STABLE i386 cc
+		HP-UX 10.10 gcc
+		HP-UX 11.11 cc
+		IRIX 6.5 MIPS cc
+		IRIX 6.5 MIPS gcc
+		Mac OS X PPC (--disable-ipv6) cc
+		NetBSD 1.5 i386 gcc
+		NetBSD Current i386 cc
+		OpenBSD 2.5 Sparc gcc
+		OpenBSD 2.9 i386 cc
+		OpenBSD Current i386 cc
+		RedHat 6.2 i386 gcc
+		RedHat 6.2 i386 insure++
+		RedHat 7.0 i386 gcc
+		RedHat 7.1 i386 (Kernel 2.4.10) gcc
+		Slackware 8.0 i686 (Kernel 2.4.10)
+		Solaris 8 UltraSparc cc
+		Solaris 8 UltraSparc gcc
+		Solaris 8 i386 gcc
+		SuSE 7.1 i386 gcc2.95.2
+		SuSE 7.1 ppc gcc2.95.2
+
   TESTING:
 
     * The existing test.sh script by Phil Hands has been merged into a
       test framework that works from both "make check" and the Samba
       build farm.
-
