@@ -11,7 +11,7 @@
 echo "============================================================"
 echo "$0 running"
 
-test_names="rsync-hello"
+test_names="rsync-hello hands"
 
 export rsync_bin
 export testdir
