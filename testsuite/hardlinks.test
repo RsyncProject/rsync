@@ -31,7 +31,7 @@ ln "$name1" "$name2" || fail "Can't create hardlink"
 ln "$name2" "$name3" || fail "Can't create hardlink"
 cp "$name2" "$name4" || fail "Can't copy file"
 
-checkit "rsync -aHvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+checkit "$RSYNC -aHvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
 exit 0
 # last [] may have failed but if we get here then we've won

@@ -31,7 +31,7 @@ do
 done
 sleep 2
 
-checkit "rsync -rtgvvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+checkit "$RSYNC -rtgvvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
 exit 0
 # last [] may have failed but if we get here then we've won
