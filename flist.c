@@ -65,7 +65,7 @@ static struct exclude_struct **local_exclude_list;
 
 static struct file_struct null_file;
 
-static void clean_flist(struct file_list *flist, int strip_root);
+static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
 
 
 static int show_filelist_p(void)
@@ -1010,7 +1010,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		finish_filelist_progress(flist);
 	}
 
-	clean_flist(flist, 0);
+	clean_flist(flist, 0, 0);
 
 	/* now send the uid/gid list. This was introduced in protocol
 	   version 15 */
@@ -1087,7 +1087,7 @@ struct file_list *recv_file_list(int f)
 	if (verbose > 2)
 		rprintf(FINFO, "received %d names\n", flist->count);
 
-	clean_flist(flist, relative_paths);
+	clean_flist(flist, relative_paths, 1);
 
 	if (show_filelist_p()) {
 		finish_filelist_progress(flist);
@@ -1246,7 +1246,7 @@ void flist_free(struct file_list *flist)
  * This routine ensures we don't have any duplicate names in our file list.
  * duplicate names can cause corruption because of the pipelining 
  */
-static void clean_flist(struct file_list *flist, int strip_root)
+static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 {
 	int i;
 	char *name, *prev_name = NULL;
@@ -1257,7 +1257,7 @@ static void clean_flist(struct file_list *flist, int strip_root)
 	qsort(flist->files, flist->count,
 	      sizeof(flist->files[0]), (int (*)()) file_compare);
 
-	for (i = 0; i < flist->count; i++) {
+	for (i = no_dups? 0 : flist->count; i < flist->count; i++) {
 		if (flist->files[i]->basename) {
 			prev_name = f_name(flist->files[i]);
 			break;
