@@ -1,24 +1,46 @@
-Summary: Program for efficient remote updates of files.
+Summary: A program for synchronizing files over a network.
 Name: rsync
 Version: 2.6.4pre2
 Release: 1
-Copyright: GPL
-Group: Applications/Networking
-Source:	ftp://samba.anu.edu.au/pub/rsync/rsync-%{version}.tar.gz
-URL: http://samba.anu.edu.au/rsync/
-Packager: Andrew Tridgell <tridge@samba.anu.edu.au>
-BuildRoot: /tmp/rsync
+Group: Applications/Internet
+Source:	ftp://rsync.samba.org/pub/rsync/rsync-%{version}.tar.gz
+URL: http://rsync.samba.org/
+
+Prefix: %{_prefix}
+BuildRoot: /var/tmp/%{name}-root
+License: GPL
 
 %description
-rsync is a replacement for rcp that has many more features.
+Rsync uses a reliable algorithm to bring remote and host files into
+sync very quickly. Rsync is fast because it just sends the differences
+in the files over the network instead of sending the complete
+files. Rsync is often used as a very powerful mirroring process or
+just as a more capable replacement for the rcp command. A technical
+report which describes the rsync algorithm is included in this
+package.
 
-rsync uses the "rsync algorithm" which provides a very fast method for
-bringing remote files into sync. It does this by sending just the
-differences in the files across the link, without requiring that both
-sets of files are present at one of the ends of the link beforehand.
+%prep
+%setup -q
 
-A technical report describing the rsync algorithm is included with
-this package. 
+%build
+%configure
+
+make
+
+%install
+rm -rf $RPM_BUILD_ROOT
+
+%makeinstall
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%files
+%defattr(-,root,root)
+%doc COPYING README tech_report.tex
+%{_prefix}/bin/rsync
+%{_mandir}/man1/rsync.1*
+%{_mandir}/man5/rsyncd.conf.5*
 
 %changelog
 * Thu Jan 30 2003 Horst von Brand <vonbrand@inf.utfsm.cl>
@@ -64,30 +86,3 @@ to '%build', removed '%prefix'.
 
 rsync-1.6.2-1 packaged.  (This entry by jam to credit Michael for the
 previous package(s).)
-
-%prep
-%setup
-
-%build
-./configure --prefix=/usr --mandir=%{_mandir}
-make CFLAGS="$RPM_OPT_FLAGS"
-strip rsync
-
-%install
-mkdir -p $RPM_BUILD_ROOT/usr/bin
-mkdir -p $RPM_BUILD_ROOT/%{_mandir}/man{1,5}
-install -m755 rsync $RPM_BUILD_ROOT/usr/bin
-install -m644 rsync.1 $RPM_BUILD_ROOT/%{_mandir}/man1
-install -m644 rsyncd.conf.5 $RPM_BUILD_ROOT/%{_mandir}/man5
-
-%clean
-rm -rf $RPM_BUILD_ROOT
-
-%files
-%attr(-,root,root) /usr/bin/rsync
-%attr(-,root,root) %{_mandir}/man1/rsync.1*
-%attr(-,root,root) %{_mandir}/man5/rsyncd.conf.5*
-%attr(-,root,root) %doc tech_report.tex
-%attr(-,root,root) %doc README
-%attr(-,root,root) %doc COPYING
-%attr(-,root,root) %doc doc/README-SGML doc/rsync.sgml
