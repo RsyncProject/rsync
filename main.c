@@ -235,8 +235,9 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 			goto oom;
 
 		for (tok = strtok(cmd, " "); tok; tok = strtok(NULL, " ")) {
-			if (argc >= MAX_ARGS) {
-				rprintf(FERROR, "Command is too long\n");
+			/* Comparison leaves rooms for server_options(). */
+			if (argc >= MAX_ARGS - 100) {
+				rprintf(FERROR, "internal: args[] overflowed in do_cmd()\n");
 				exit_cleanup(RERR_SYNTAX);
 			}
 			args[argc++] = tok;
@@ -277,6 +278,11 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 		}
 
 		server_options(args,&argc);
+
+		if (argc >= MAX_ARGS - 2) {
+			rprintf(FERROR, "internal: args[] overflowed in do_cmd()\n");
+			exit_cleanup(RERR_SYNTAX);
+		}
 	}
 
 	args[argc++] = ".";
@@ -284,16 +290,11 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 	if (!daemon_over_rsh && path && *path)
 		args[argc++] = path;
 
-	if (argc >= (int)(sizeof args / sizeof args[0])) {
-		rprintf(FERROR, "internal: args[] overflowed in do_cmd()\n");
-		exit_cleanup(RERR_MALLOC); /* XXX Need better RERR? */
-	}
-
 	args[argc] = NULL;
 
 	if (verbose > 3) {
 		rprintf(FINFO,"cmd=");
-		for (i=0;i<argc;i++)
+		for (i = 0; i < argc; i++)
 			rprintf(FINFO,"%s ",args[i]);
 		rprintf(FINFO,"\n");
 	}
@@ -395,7 +396,7 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 		int l = strlen(dir);
 		if (strcmp(dir,"/") == 0)
 			l = 0;
-		for (i=0;i<argc;i++)
+		for (i = 0; i < argc; i++)
 			argv[i] += l+1;
 	}
 
