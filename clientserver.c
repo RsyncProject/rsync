@@ -110,6 +110,8 @@ static int rsync_module(int fd, int i)
 	char *host = client_name(fd);
 	char *name = lp_name(i);
 	int start_glob=0;
+	char *request=NULL;
+	extern int am_sender;
 
 	if (!allow_access(addr, host, lp_hosts_allow(i), lp_hosts_deny(i))) {
 		rprintf(FERROR,"rsync denied on module %s from %s (%s)\n",
@@ -211,8 +213,7 @@ static int rsync_module(int fd, int i)
 
 		if (start_glob) {
 			if (start_glob == 1) {
-				rprintf(FINFO,"rsync on %s from %s (%s)\n",
-					p, host, addr);
+				request = strdup(p);
 				start_glob++;
 			}
 			glob_expand(name, argv, &argc, MAX_ARGS);
@@ -230,6 +231,13 @@ static int rsync_module(int fd, int i)
 	}
 
 	parse_arguments(argc, argv);
+
+	if (request) {
+		rprintf(FINFO,"rsync %s %s from %s (%s)\n",
+			am_sender?"on":"to",
+			request, host, addr);
+		free(request);
+	}
 
 	/* don't allow the logs to be flooded too fast */
 	if (verbose > 1) verbose = 1;

@@ -34,13 +34,14 @@ static void report(int f)
 	extern int am_sender;
 	extern int am_daemon;
 
-	if (!verbose) return;
-
 	if (am_daemon) {
 		rprintf(FINFO, "wrote %.0f bytes  read %.0f bytes  total size %.0f\n",
 			(double)write_total(),(double)read_total(),
 			(double)total_size);
+		if (f == -1 || !am_sender) return;
 	}
+
+	if (!verbose) return;
 
 	if (am_server && am_sender) {
 		write_longint(f,read_total());
@@ -295,6 +296,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	}
 
 	status = do_recv(f_in,f_out,flist,local_name);
+	report(-1);
 	exit_cleanup(status);
 }
 
