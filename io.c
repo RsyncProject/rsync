@@ -386,6 +386,10 @@ static int read_timeout(int fd, char *buf, size_t len)
 			FD_SET(msg_fd_in, &r_fds);
 			if (msg_fd_in >= fd_count)
 				fd_count = msg_fd_in+1;
+		} else if (msg_list_head) {
+			FD_SET(msg_fd_out, &w_fds);
+			if (msg_fd_out >= fd_count)
+				fd_count = msg_fd_out+1;
 		}
 		if (io_filesfrom_f_out >= 0) {
 			int new_fd;
@@ -415,12 +419,8 @@ static int read_timeout(int fd, char *buf, size_t len)
 			       io_filesfrom_buflen? &w_fds : NULL,
 			       NULL, &tv);
 
-		if (count == 0) {
-			msg_list_push(NORMAL_FLUSH);
-			check_timeout();
-		}
-
 		if (count <= 0) {
+			check_timeout();
 			if (errno == EBADF)
 				exit_cleanup(RERR_SOCKETIO);
 			continue;
@@ -428,6 +428,8 @@ static int read_timeout(int fd, char *buf, size_t len)
 
 		if (msg_fd_in >= 0 && FD_ISSET(msg_fd_in, &r_fds))
 			read_msg_fd();
+		else if (msg_list_head && FD_ISSET(msg_fd_out, &w_fds))
+			msg_list_push(NORMAL_FLUSH);
 
 		if (io_filesfrom_f_out >= 0) {
 			if (io_filesfrom_buflen) {
@@ -801,7 +803,10 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 	int fd_count, count;
 	struct timeval tv;
 
-	msg_list_push(NORMAL_FLUSH);
+	if (fd == msg_fd_out) {
+		rprintf(FERROR, "Internal error: wrong write used in receiver.\n");
+		exit_cleanup(RERR_PROTOCOL);
+	}
 
 	no_flush++;
 
@@ -824,12 +829,8 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 		count = select(fd_count+1, msg_fd_in >= 0 ? &r_fds : NULL,
 			       &w_fds, NULL, &tv);
 
-		if (count == 0) {
-			msg_list_push(NORMAL_FLUSH);
-			check_timeout();
-		}
-
 		if (count <= 0) {
+			check_timeout();
 			if (errno == EBADF)
 				exit_cleanup(RERR_SOCKETIO);
 			continue;
@@ -953,7 +954,10 @@ static void writefd(int fd,char *buf,size_t len)
 {
 	stats.total_written += len;
 
-	msg_list_push(NORMAL_FLUSH);
+	if (fd == msg_fd_out) {
+		rprintf(FERROR, "Internal error: wrong write used in receiver.\n");
+		exit_cleanup(RERR_PROTOCOL);
+	}
 
 	if (!io_buffer || fd != multiplex_out_fd) {
 		writefd_unbuffered(fd, buf, len);
