@@ -421,13 +421,15 @@ struct map_struct {
 	OFF_T file_size, p_offset, p_fd_offset;
 };
 
+#define MATCHFLG_WILD		0x0001 /* pattern has '*', '[', and/or '?' */
+#define MATCHFLG_WILD2		0x0002 /* pattern has '**' */
+#define MATCHFLG_WILD2_PREFIX	0x0004 /* pattern starts with '**' */
 struct exclude_struct {
 	char *pattern;
-	int regular_exp;
-	int fnmatch_flags;
+	int match_flags;
 	int include;
 	int directory;
-	int local;
+	int slash_cnt;
 };
 
 struct stats {
