@@ -447,11 +447,10 @@ destination.
 dit(bf(--force)) This options tells rsync to delete directories even if
 they are not empty.  This applies to both the --delete option and to
 cases where rsync tries to copy a normal file but the destination
-contains a directory of the same name. Normally rsync will refuse to
-do a recursive directory deletion in such cases, by using --force
-the recursive deletion will be done.
+contains a directory of the same name. 
 
-Use this option with caution!
+Since this option was added, deletions were reordered to be done depth-first
+so it is hardly ever needed anymore except in very obscure cases.
 
 dit(bf(-B , --block_size=BLOCKSIZE)) This controls the block size used in
 the rsync algorithm. See the technical report for details.
