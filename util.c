@@ -579,6 +579,55 @@ void clean_fname(char *name)
 	}
 }
 
+/*
+ * Make path appear as if a chroot had occurred:
+ *    0. call clean_fname on it.
+ *    1. remove leading "/" (or replace with "." if at end)
+ *    2. remove leading ".." components
+ *    3. delete any other "<dir>/.." (recursively)
+ * Return a malloc'ed copy.
+ * Contributed by Dave Dykstra <dwd@bell-labs.com>
+ */
+
+char *sanitize_path(char *p)
+{
+	char *copy, *copyp;
+
+	clean_fname(p);
+
+	copy = (char *) malloc(strlen(p)+1);
+	copyp = copy;
+	while (*p != '\0') {
+		if ((*p == '/') && (copyp == copy)) {
+			/* remove leading slash */
+			p++;
+		}
+		else if ((*p == '.') && (*(p+1) == '.') &&
+			    ((*(p+2) == '/') || (*(p+2) == '\0'))) {
+			/* remove .. followed by slash or end */
+			p += 2;
+			if (copyp != copy) {
+				/* backup the copy one level */
+				while ((--copyp != copy) && (*copyp == '/'))
+					/* skip trailing slashes */
+					;
+				while ((copyp != copy) && (*copyp != '/'))
+					/* skip back through slash */
+					copyp--;
+			}
+		} else {
+			/* copy one component */
+			while (1) {
+				*copyp++ = *p++;
+				if ((*p == '\0') || (*(p-1) == '/'))
+					break;
+			}
+		}
+	}
+	*copyp = '\0';
+	return(copy);
+}
+
 
 static char curr_dir[MAXPATHLEN];
 
@@ -714,52 +763,6 @@ int unsafe_symlink(char *dest, char *src)
 
 	free(dest);
 	return (depth < 0);
-}
-
-/*
- * Make path appear as if a chroot had occurred:
- *    1. remove leading "/" (or replace with "." if at end)
- *    2. remove leading ".." components
- *    3. delete any other "<dir>/.." (recursively)
- * Return a malloc'ed copy.
- * Contributed by Dave Dykstra <dwd@bell-labs.com>
- */
-
-char *sanitize_path(char *p)
-{
-	char *copy, *copyp;
-
-	copy = (char *) malloc(strlen(p)+1);
-	copyp = copy;
-	while (*p != '\0') {
-		if ((*p == '/') && (copyp == copy)) {
-			/* remove leading slash */
-			p++;
-		}
-		else if ((*p == '.') && (*(p+1) == '.') &&
-			    ((*(p+2) == '/') || (*(p+2) == '\0'))) {
-			/* remove .. followed by slash or end */
-			p += 2;
-			if (copyp != copy) {
-				/* backup the copy one level */
-				while ((--copyp != copy) && (*copyp == '/'))
-					/* skip trailing slashes */
-					;
-				while ((copyp != copy) && (*copyp != '/'))
-					/* skip back through slash */
-					copyp--;
-			}
-		} else {
-			/* copy one component */
-			while (1) {
-				*copyp++ = *p++;
-				if ((*p == '\0') || (*(p-1) == '/'))
-					break;
-			}
-		}
-	}
-	*copyp = '\0';
-	return(copy);
 }
 
 
