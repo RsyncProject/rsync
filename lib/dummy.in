@@ -1,0 +1,2 @@
+This is a dummy file to ensure that the lib directory gets created
+by configure when a VPATH is used.
