@@ -24,8 +24,11 @@ extern int dry_run;
 extern int verbose;
 
 #if SUPPORT_HARD_LINKS
-static int hlink_compare(struct file_struct *f1, struct file_struct *f2)
+static int hlink_compare(struct file_struct **file1, struct file_struct **file2)
 {
+	struct file_struct *f1 = *file1;
+	struct file_struct *f2 = *file2;
+
 	if (!S_ISREG(f1->mode) && !S_ISREG(f2->mode))
 		return 0;
 	if (!S_ISREG(f1->mode))
@@ -39,11 +42,11 @@ static int hlink_compare(struct file_struct *f1, struct file_struct *f2)
 	if (f1->inode != f2->inode)
 		return (int) (f1->inode > f2->inode ? 1 : -1);
 
-	return file_compare(&f1, &f2);
+
+	return file_compare(file1, file2);
 }
 
-
-static struct file_struct *hlink_list;
+static struct file_struct **hlink_list;
 static int hlink_count;
 #endif
 
@@ -51,23 +54,32 @@ void init_hard_links(struct file_list *flist)
 {
 #if SUPPORT_HARD_LINKS
 	int i;
+
 	if (flist->count < 2)
 		return;
 
 	if (hlink_list)
 		free(hlink_list);
 
-	if (!(hlink_list = new_array(struct file_struct, flist->count)))
+	if (!(hlink_list = new_array(struct file_struct *, flist->count)))
 		out_of_memory("init_hard_links");
+	
+/*	we'll want to restore the memcpy when we purge the
+ *	hlink list after the sort.
+ *	memcpy(hlink_list, flist->files, sizeof(hlink_list[0]) * flist->count);	
+ */
+	hlink_count = 0;
+	for (i = 0; i < flist->count; i++) {
+		if (S_ISREG(flist->files[i]->mode))
+			hlink_list[hlink_count++] = flist->files[i];
+	}
 
-	for (i = 0; i < flist->count; i++)
-		memcpy(&hlink_list[i], flist->files[i],
-		       sizeof(hlink_list[0]));
-
-	qsort(hlink_list, flist->count,
+	qsort(hlink_list, hlink_count,
 	      sizeof(hlink_list[0]), (int (*)()) hlink_compare);
 
-	hlink_count = flist->count;
+	if (!(hlink_list = realloc_array(hlink_list,
+					struct file_struct *, hlink_count)))
+		out_of_memory("init_hard_links");
 #endif
 }
 
@@ -84,7 +96,7 @@ int check_hard_link(struct file_struct *file)
 
 	while (low != high) {
 		int mid = (low + high) / 2;
-		ret = hlink_compare(&hlink_list[mid], file);
+		ret = hlink_compare(&hlink_list[mid], &file);
 		if (ret == 0) {
 			low = mid;
 			break;
@@ -97,16 +109,16 @@ int check_hard_link(struct file_struct *file)
 
 	/* XXX: To me this looks kind of dodgy -- why do we use [low]
 	 * here and [low-1] below? -- mbp */
-	if (hlink_compare(&hlink_list[low], file) != 0)
+	if (hlink_compare(&hlink_list[low], &file) != 0)
 		return 0;
 
 	if (low > 0 &&
-	    S_ISREG(hlink_list[low - 1].mode) &&
-	    file->dev == hlink_list[low - 1].dev &&
-	    file->inode == hlink_list[low - 1].inode) {
+	    S_ISREG(hlink_list[low - 1]->mode) &&
+	    file->dev == hlink_list[low - 1]->dev &&
+	    file->inode == hlink_list[low - 1]->inode) {
 		if (verbose >= 2) {
 			rprintf(FINFO, "check_hard_link: \"%s\" is a hard link to file %d, \"%s\"\n",
-				f_name(file), low-1, f_name(&hlink_list[low-1]));
+				f_name(file), low-1, f_name(hlink_list[low-1]));
 		}
 		return 1;
 	}
@@ -120,12 +132,12 @@ int check_hard_link(struct file_struct *file)
 static void hard_link_one(int i)
 {
 	STRUCT_STAT st1, st2;
-	char *hlink2, *hlink1 = f_name(&hlink_list[i - 1]);
+	char *hlink2, *hlink1 = f_name(hlink_list[i - 1]);
 
 	if (link_stat(hlink1, &st1) != 0)
 		return;
 
-	hlink2 = f_name(&hlink_list[i]);
+	hlink2 = f_name(hlink_list[i]);
 	if (link_stat(hlink2, &st2) != 0) {
 		if (do_link(hlink1, hlink2)) {
 			if (verbose > 0) {
@@ -166,11 +178,11 @@ void do_hard_links(void)
 		return;
 
 	for (i = 1; i < hlink_count; i++) {
-		if (S_ISREG(hlink_list[i].mode) &&
-		    S_ISREG(hlink_list[i - 1].mode) &&
-		    hlink_list[i].basename && hlink_list[i - 1].basename &&
-		    hlink_list[i].dev == hlink_list[i - 1].dev &&
-		    hlink_list[i].inode == hlink_list[i - 1].inode) {
+		if (S_ISREG(hlink_list[i]->mode) &&
+		    S_ISREG(hlink_list[i - 1]->mode) &&
+		    hlink_list[i]->basename && hlink_list[i - 1]->basename &&
+		    hlink_list[i]->dev == hlink_list[i - 1]->dev &&
+		    hlink_list[i]->inode == hlink_list[i - 1]->inode) {
 			hard_link_one(i);
 		}
 	}
