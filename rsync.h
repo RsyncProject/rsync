@@ -133,8 +133,9 @@
 
 /* For calling delete_file() */
 #define DEL_DIR 		(1<<0)
-#define DEL_RECURSE		(1<<1) /* recurse even w/o --force */
-#define DEL_TERSE		(1<<2)
+#define DEL_NO_RECURSE		(1<<1)
+#define DEL_FORCE_RECURSE	(1<<2) /* recurse even w/o --force */
+#define DEL_TERSE		(1<<3)
 
 
 /* Log-message categories.  FLOG is only used on the daemon side to
