@@ -75,7 +75,7 @@ int io_error;
 
 static char empty_sum[MD4_SUM_LENGTH];
 static unsigned int file_struct_len;
-static struct file_list *received_flist;
+static struct file_list *received_flist, *sorting_flist;
 static dev_t filesystem_dev; /* used to implement -x */
 static int deletion_count = 0; /* used to implement --max-delete */
 
@@ -1449,8 +1449,10 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 	if (!flist || flist->count == 0)
 		return;
 
+	sorting_flist = flist;
 	qsort(flist->files, flist->count,
 	    sizeof flist->files[0], (int (*)())file_compare);
+	sorting_flist = NULL;
 
 	for (i = no_dups? 0 : flist->count; i < flist->count; i++) {
 		if (flist->files[i]->basename) {
@@ -1671,6 +1673,18 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 		if (!*c2) {
 			switch (state2) {
 			case s_DIR:
+				if (state1 == s_SLASH && sorting_flist) {
+					int j;
+					/* Optimize for future comparisons. */
+					for (j = 0;
+					     j < sorting_flist->count;
+					     j++) {
+						struct file_struct *fp
+						    = sorting_flist->files[j];
+						if (fp->dirname == f2->dirname)
+							fp->dirname = f1->dirname;
+					}
+				}
 				state2 = s_SLASH;
 				c2 = (uchar*)"/";
 				break;
