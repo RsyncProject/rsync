@@ -391,7 +391,7 @@ struct idev {
 #define IN_LOOPBACKNET 127
 #endif
 
-#define GID_NONE (gid_t) -1
+#define GID_NONE ((gid_t)-1)
 
 #define HL_CHECK_MASTER	0
 #define HL_SKIP		1
