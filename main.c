@@ -22,7 +22,7 @@
 int verbose = 0;
 int always_checksum = 0;
 time_t starttime;
-off_t total_size = 0;
+int64 total_size = 0;
 int block_size=BLOCK_SIZE;
 
 char *backup_suffix = BACKUP_SUFFIX;
@@ -66,7 +66,7 @@ static void usage(FILE *f);
 
 static void report(int f)
 {
-  off_t in,out,tsize;
+  int64 in,out,tsize;
   time_t t = time(NULL);
   
   if (!verbose) return;
@@ -196,7 +196,7 @@ static int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f
 {
   char *args[100];
   int i,argc=0, ret;
-  char *tok,*p,*dir=NULL;
+  char *tok,*dir=NULL;
 
   if (!local_server) {
     if (!cmd)

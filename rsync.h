@@ -193,6 +193,11 @@
 #define uint32 unsigned int32
 #endif
 
+#ifdef HAVE_LONGLONG
+#define int64 long long
+#else
+#define int64 off_t
+#endif
 
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
@@ -257,7 +262,7 @@ struct map_struct {
 /* we need this function because of the silly way in which duplicate
    entries are handled in the file lists - we can't change this
    without breaking existing versions */
-static int flist_up(struct file_list *flist, int i)
+static inline int flist_up(struct file_list *flist, int i)
 {
 	while (!flist->files[i]->basename) i++;
 	return i;

@@ -929,14 +929,13 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 
 
-off_t send_files(struct file_list *flist,int f_out,int f_in)
+void send_files(struct file_list *flist,int f_out,int f_in)
 { 
   int fd;
   struct sum_struct *s;
   struct map_struct *buf;
   struct stat st;
   char fname[MAXPATHLEN];  
-  off_t total=0;
   int i;
   struct file_struct *file;
   int phase = 0;
@@ -971,7 +970,7 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
 		  if (strlen(fname) == MAXPATHLEN-1) {
 			  fprintf(FERROR, "send_files failed on long-named directory %s\n",
 				  fname);
-			  return -1;
+			  return;
 		  }
 		  strcat(fname,"/");
 		  offset = strlen(file->basedir)+1;
@@ -991,7 +990,7 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
 	  s = receive_sums(f_in);
 	  if (!s) {
 		  fprintf(FERROR,"receive_sums failed\n");
-		  return -1;
+		  return;
 	  }
 	  
 	  fd = open(fname,O_RDONLY);
@@ -1007,7 +1006,7 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
 		  fprintf(FERROR,"fstat failed : %s\n",strerror(errno));
 		  free_sums(s);
 		  close(fd);
-		  return -1;
+		  return;
 	  }
 	  
 	  if (st.st_size > 0) {
@@ -1042,8 +1041,6 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
 	  
 	  if (verbose > 2)
 		  fprintf(FERROR,"sender finished %s\n",fname);
-	  
-	  total += st.st_size;
   }
 
   if (verbose > 2)
@@ -1053,8 +1050,6 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
 
   write_int(f_out,-1);
   write_flush(f_out);
-
-  return total;
 }
 
 

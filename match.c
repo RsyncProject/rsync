@@ -39,7 +39,7 @@ static int data_transfer;
 static int total_false_alarms;
 static int total_tag_hits;
 static int total_matches;
-static off_t total_data_transfer;
+static int64 total_data_transfer;
 
 
 struct target {

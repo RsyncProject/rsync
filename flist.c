@@ -26,7 +26,7 @@ extern int csum_length;
 extern int verbose;
 extern int am_server;
 extern int always_checksum;
-extern off_t total_size;
+extern int64 total_size;
 
 extern int cvs_exclude;
 

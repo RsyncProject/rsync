@@ -24,18 +24,18 @@
   */
 #include "rsync.h"
 
-static off_t total_written;
-static off_t total_read;
+static int64 total_written;
+static int64 total_read;
 
 extern int verbose;
 extern int sparse_files;
 
-off_t write_total(void)
+int64 write_total(void)
 {
   return total_written;
 }
 
-off_t read_total(void)
+int64 read_total(void)
 {
   return total_read;
 }
@@ -145,17 +145,20 @@ int read_int(int f)
   return IVAL(b,0);
 }
 
-off_t read_longint(int f)
+int64 read_longint(int f)
 {
 	extern int remote_version;
-	off_t ret;
+	int64 ret;
 	char b[8];
 	ret = read_int(f);
-	if (ret == -1 && remote_version >= 16) {
-		if (sizeof(off_t) <= 4) {
-			fprintf(FERROR,"Integer overflow - attempted 64 bit offset\n");
-			exit_cleanup(1);
-		}
+
+	if (ret != -1) return ret;
+
+#ifndef HAVE_LONGLONG
+	fprintf(FERROR,"Integer overflow - attempted 64 bit offset\n");
+	exit_cleanup(1);
+#else
+	if (remote_version >= 16) {
 		if ((ret=readfd(f,b,8)) != 8) {
 			if (verbose > 1) 
 				fprintf(FERROR,"(%d) Error reading %d bytes : %s\n",
@@ -163,8 +166,10 @@ off_t read_longint(int f)
 			exit_cleanup(1);
 		}
 		total_read += 8;
-		ret = IVAL(b,0) | (((off_t)IVAL(b,4))<<32);
+		ret = IVAL(b,0) | (((int64)IVAL(b,4))<<32);
 	}
+#endif
+
 	return ret;
 }
 
@@ -318,7 +323,7 @@ void write_int(int f,int x)
   total_written += 4;
 }
 
-void write_longint(int f, off_t x)
+void write_longint(int f, int64 x)
 {
 	extern int remote_version;
 	char b[8];
