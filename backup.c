@@ -237,7 +237,7 @@ static int keep_backup(char *fname)
 				full_fname(fname), backup_dir_buf);
 		} else if (st.st_nlink > 1) {
 			/* If someone has hard-linked the file into the backup
-			 * dir, rename() can return success but do nothing! */
+			 * dir, rename() might return success but do nothing! */
 			robust_unlink(fname); /* Just in case... */
 		}
 	}
