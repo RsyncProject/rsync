@@ -350,9 +350,18 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	extern int delete_mode;
 	extern int delete_excluded;
 	extern int am_daemon;
+	extern int module_id;
+	extern int am_sender;
 
 	if (verbose > 2)
 		rprintf(FINFO,"server_recv(%d) starting pid=%d\n",argc,(int)getpid());
+
+	if (am_daemon && lp_read_only(module_id) && !am_sender) {
+		rprintf(FERROR,"ERROR: module is read only\n");
+		exit_cleanup(RERR_SYNTAX);
+		return;
+	}
+
 	
 	if (argc > 0) {
 		dir = argv[0];

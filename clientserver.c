@@ -101,8 +101,10 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	}
 	io_printf(fd,"\n");
 
-	if (remote_version == 22 || (remote_version > 17 && !am_sender))
-		io_start_multiplex_in(fd);
+	if (remote_version < 23) {
+		if (remote_version == 22 || (remote_version > 17 && !am_sender))
+			io_start_multiplex_in(fd);
+	}
 
 	return client_run(fd, fd, -1, argc, argv);
 }
@@ -162,9 +164,6 @@ static int rsync_module(int fd, int i)
 	}
 
 	module_id = i;
-
-	if (lp_read_only(i))
-		read_only = 1;
 
 	am_root = (getuid() == 0);
 
@@ -316,15 +315,9 @@ static int rsync_module(int fd, int i)
 	argp = argv + optind;
 	optind = 0;
 
-	if (remote_version == 22 || (remote_version > 17 && am_sender))
-		io_start_multiplex_out(fd);
-
-	if (read_only) {
-		extern int am_sender;
-		if (!am_sender) {
-			rprintf(FERROR,"ERROR: module is read only\n");
-			return -1;
-		}
+	if (remote_version < 23) {
+		if (remote_version == 22 || (remote_version > 17 && am_sender))
+			io_start_multiplex_out(fd);
 	}
 
 	if (!ret) {
