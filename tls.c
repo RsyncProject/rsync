@@ -114,9 +114,11 @@ static void list_file (const char *fname)
 	/* TODO: Perhaps escape special characters in fname? */
 
 	printf("%s ", permbuf);
-	if (IS_DEVICE(buf.st_mode))
-		printf("%6d,%5d", major(buf.st_rdev), minor(buf.st_rdev));
-	else /* NB: use double for size because it might not fit in a long. */
+	if (IS_DEVICE(buf.st_mode)) {
+		printf("%5ld,%6ld",
+		    (long)major(buf.st_rdev),
+		    (long)minor(buf.st_rdev));
+	} else /* NB: use double for size since it might not fit in a long. */
 		printf("%12.0f", (double)buf.st_size);
 	printf(" %6ld.%-6ld %6ld %s %s%s\n",
 	       (long)buf.st_uid, (long)buf.st_gid, (long)buf.st_nlink,
