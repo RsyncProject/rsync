@@ -57,6 +57,11 @@ static void report(int f)
 	extern int remote_version;
 	int send_stats;
 
+	if (do_stats) {
+		/* These come out from every process */
+		show_malloc_stats();
+	}
+
 	if (am_daemon) {
 		log_exit(0, __FILE__, __LINE__);
 		if (f == -1 || !am_sender) return;
@@ -120,7 +125,6 @@ static void report(int f)
 		rprintf(FINFO,"total size is %.0f  speedup is %.2f\n",
 		       (double)stats.total_size,
 		       (1.0*stats.total_size)/(stats.total_written+stats.total_read));
-		show_malloc_stats();
 	}
 
 	fflush(stdout);
@@ -135,10 +139,17 @@ static void show_malloc_stats(void)
 {
 #ifdef HAVE_MALLINFO
 	struct mallinfo mi;
+	extern int am_server;
+	extern int am_sender;
+	extern int am_daemon;
 
 	mi = mallinfo();
 
-	rprintf(FINFO, RSYNC_NAME " heap statistics:\n");
+	rprintf(FINFO, RSYNC_NAME "[%d] (%s%s%s) heap statistics:\n",
+		getpid(),
+		am_server ? "server " : "",
+		am_daemon ? "daemon " : "",
+		am_sender ? "sender" : "receiver");
 	rprintf(FINFO, "  arena:     %10d   (bytes from sbrk)\n", mi.arena);
 	rprintf(FINFO, "  ordblks:   %10d   (chunks not in use)\n", mi.ordblks);
 	rprintf(FINFO, "  smblks:    %10d\n", mi.smblks);
