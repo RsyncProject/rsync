@@ -87,37 +87,37 @@ void set_error_fd(int fd)
 
 /* this is the underlying (unformatted) rsync debugging function. Call
    it with FINFO, FERROR or FLOG */
-void rwrite(int fd, char *buf, int len)
+void rwrite(enum logcode code, char *buf, int len)
 {
 	FILE *f=NULL;
 	extern int am_daemon;
 	extern int quiet;
 	/* recursion can happen with certain fatal conditions */
 
-	if (quiet != 0 && fd == FINFO) return;
+	if (quiet != 0 && code == FINFO) return;
 
 	if (len < 0) exit_cleanup(RERR_MESSAGEIO);
 
 	buf[len] = 0;
 
-	if (fd == FLOG) {
+	if (code == FLOG) {
 		if (am_daemon) logit(LOG_INFO, buf);
 		return;
 	}
 
+	if (io_error_write(log_error_fd, code, buf, strlen(buf))) return;
+
 	if (am_daemon) {
 		static int depth;
 		int priority = LOG_INFO;
-		if (fd == FERROR) priority = LOG_WARNING;
+		if (code == FERROR) priority = LOG_WARNING;
 
 		if (depth) return;
 
 		depth++;
 
 		log_open();
-
-		if (!io_error_write(log_error_fd, buf, strlen(buf)) &&
-		    !io_multiplex_write(fd, buf, strlen(buf))) {
+		if (!io_multiplex_write(code, buf, strlen(buf))) {
 			logit(priority, buf);
 		}
 
@@ -125,11 +125,11 @@ void rwrite(int fd, char *buf, int len)
 		return;
 	}
 
-	if (fd == FERROR) {
+	if (code == FERROR) {
 		f = stderr;
 	} 
 
-	if (fd == FINFO) {
+	if (code == FINFO) {
 		extern int am_server;
 		if (am_server) 
 			f = stderr;
@@ -146,7 +146,7 @@ void rwrite(int fd, char *buf, int len)
 		
 
 /* this is the rsync debugging function. Call it with FINFO, FERROR or FLOG */
- void rprintf(int fd, const char *format, ...)
+ void rprintf(enum logcode code, const char *format, ...)
 {
 	va_list ap;  
 	char buf[1024];
@@ -158,10 +158,10 @@ void rwrite(int fd, char *buf, int len)
 
 	if (len > sizeof(buf)-1) exit_cleanup(RERR_MESSAGEIO);
 
-	rwrite(fd, buf, len);
+	rwrite(code, buf, len);
 }
 
-void rflush(int fd)
+void rflush(enum logcode code)
 {
 	FILE *f = NULL;
 	extern int am_daemon;
@@ -170,15 +170,15 @@ void rflush(int fd)
 		return;
 	}
 
-	if (fd == FLOG) {
+	if (code == FLOG) {
 		return;
 	} 
 
-	if (fd == FERROR) {
+	if (code == FERROR) {
 		f = stderr;
 	} 
 
-	if (fd == FINFO) {
+	if (code == FINFO) {
 		extern int am_server;
 		if (am_server) 
 			f = stderr;

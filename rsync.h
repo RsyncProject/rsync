@@ -47,8 +47,8 @@
 #define SAME_TIME (1<<7)
 
 /* update this if you make incompatible changes */
-#define PROTOCOL_VERSION 22
-#define MIN_PROTOCOL_VERSION 11
+#define PROTOCOL_VERSION 23
+#define MIN_PROTOCOL_VERSION 15
 #define MAX_PROTOCOL_VERSION 30
 
 #define RSYNC_PORT 873
@@ -62,9 +62,8 @@
 #define MAX_ARGS 1000
 
 #define MPLEX_BASE 7
-#define FERROR 1
-#define FINFO 2
-#define FLOG 3
+
+enum logcode {FERROR=1, FINFO=2, FLOG=3};
 
 #include "errcode.h"
 
@@ -477,7 +476,7 @@ extern int errno;
 #define NS(s) ((s)?(s):"<NULL>")
 
 /* use magic gcc attributes to catch format errors */
- void rprintf(int , const char *, ...)
+ void rprintf(enum logcode , const char *, ...)
 #ifdef __GNUC__
      __attribute__ ((format (printf, 2, 3)))
 #endif

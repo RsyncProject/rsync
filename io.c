@@ -40,6 +40,8 @@ extern struct stats stats;
 static int buffer_f_in = -1;
 static int io_error_fd = -1;
 
+static void read_loop(int fd, char *buf, int len);
+
 void setup_readbuffer(int f_in)
 {
 	buffer_f_in = f_in;
@@ -71,17 +73,29 @@ void io_set_error_fd(int fd)
 	io_error_fd = fd;
 }
 
-/* read some data from the error fd and write it to FERROR */
+/* read some data from the error fd and write it to the write log code */
 static void read_error_fd(void)
 {
 	char buf[200];
 	int n;
 	int fd = io_error_fd;
+	int tag, len;
+
 	io_error_fd = -1;
 
-	n = read(fd, buf, sizeof(buf)-1);
-	if (n > 0) {
-		rwrite(FERROR, buf, n);
+	read_loop(fd, buf, 4);
+	tag = IVAL(buf, 0);
+
+	len = tag & 0xFFFFFF;
+	tag = tag >> 24;
+	tag -= MPLEX_BASE;
+
+	while (len) {
+		n = len;
+		if (n > (sizeof(buf)-1)) n = sizeof(buf)-1;
+		read_loop(fd, buf, n);
+		rwrite((enum logcode)tag, buf, n);
+		len -= n;
 	}
 
 	io_error_fd = fd;
@@ -181,7 +195,6 @@ static void read_loop(int fd, char *buf, int len)
 static int read_unbuffered(int fd, char *buf, int len)
 {
 	static int remaining;
-	char ibuf[4];
 	int tag, ret=0;
 	char line[1024];
 
@@ -197,8 +210,8 @@ static int read_unbuffered(int fd, char *buf, int len)
 			continue;
 		}
 
-		read_loop(fd, ibuf, 4);
-		tag = IVAL(ibuf, 0);
+		read_loop(fd, line, 4);
+		tag = IVAL(line, 0);
 
 		remaining = tag & 0xFFFFFF;
 		tag = tag >> 24;
@@ -221,7 +234,7 @@ static int read_unbuffered(int fd, char *buf, int len)
 		read_loop(fd, line, remaining);
 		line[remaining] = 0;
 
-		rprintf(tag,"%s", line);
+		rprintf((enum logcode)tag,"%s", line);
 		remaining = 0;
 	}
 
@@ -382,13 +395,33 @@ void io_start_buffering(int fd)
 {
 	if (io_buffer) return;
 	multiplex_out_fd = fd;
-	io_buffer = (char *)malloc(IO_BUFFER_SIZE+4);
+	io_buffer = (char *)malloc(IO_BUFFER_SIZE);
 	if (!io_buffer) out_of_memory("writefd");
 	io_buffer_count = 0;
-
-	/* leave room for the multiplex header in case it's needed */
-	io_buffer += 4;
 }
+
+/* write an message to a multiplexed stream. If this fails then rsync
+   exits */
+static void mplex_write(int fd, enum logcode code, char *buf, int len)
+{
+	char buffer[4096];
+	int n = len;
+
+	SIVAL(buffer, 0, ((MPLEX_BASE + (int)code)<<24) + len);
+
+	if (n > (sizeof(buf)-4)) {
+		n = sizeof(buf)-4;
+	}
+
+	memcpy(&buffer[4], buf, n);
+	writefd_unbuffered(fd, buffer, n+4);
+
+	len -= n;
+	buf += n;
+
+	writefd_unbuffered(fd, buf, len);
+}
+
 
 void io_flush(void)
 {
@@ -396,8 +429,7 @@ void io_flush(void)
 	if (!io_buffer_count || no_flush) return;
 
 	if (io_multiplexing_out) {
-		SIVAL(io_buffer-4, 0, (MPLEX_BASE<<24) + io_buffer_count);
-		writefd_unbuffered(fd, io_buffer-4, io_buffer_count+4);
+		mplex_write(fd, 0, io_buffer, io_buffer_count);
 	} else {
 		writefd_unbuffered(fd, io_buffer, io_buffer_count);
 	}
@@ -408,7 +440,7 @@ void io_end_buffering(int fd)
 {
 	io_flush();
 	if (!io_multiplexing_out) {
-		free(io_buffer-4);
+		free(io_buffer);
 		io_buffer = NULL;
 	}
 }
@@ -539,26 +571,21 @@ void io_start_multiplex_in(int fd)
 }
 
 /* write an message to the multiplexed error stream */
-int io_multiplex_write(int f, char *buf, int len)
+int io_multiplex_write(enum logcode code, char *buf, int len)
 {
 	if (!io_multiplexing_out) return 0;
 
 	io_flush();
-
-	SIVAL(io_buffer-4, 0, ((MPLEX_BASE + f)<<24) + len);
-	memcpy(io_buffer, buf, len);
-
 	stats.total_written += (len+4);
-
-	writefd_unbuffered(multiplex_out_fd, io_buffer-4, len+4);
+	mplex_write(multiplex_out_fd, code, buf, len);
 	return 1;
 }
 
 /* write a message to the special error fd */
-int io_error_write(int f, char *buf, int len)
+int io_error_write(int f, enum logcode code, char *buf, int len)
 {
 	if (f == -1) return 0;
-	writefd_unbuffered(f, buf, len);
+	mplex_write(f, code, buf, len);
 	return 1;
 }
 
