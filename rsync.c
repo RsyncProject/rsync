@@ -656,6 +656,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
       /* open tmp file */
       if (strlen(fname) > (MAXPATHLEN-8)) {
 	fprintf(FERROR,"filename too long\n");
+	close(fd1);
 	continue;
       }
       sprintf(fnametmp,"%s.XXXXXX",fname);
@@ -667,7 +668,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	continue;
       }
       fd2 = open(fnametmp,O_WRONLY|O_CREAT,file->mode);
-      if (relative_paths && errno == ENOENT && 
+      if (fd2 == -1 && relative_paths && errno == ENOENT && 
 	  create_directory_path(fnametmp) == 0) {
 	      fd2 = open(fnametmp,O_WRONLY|O_CREAT,file->mode);
       }
@@ -817,6 +818,7 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
       /* map the local file */
       if (fstat(fd,&st) != 0) {
 	fprintf(FERROR,"fstat failed : %s\n",strerror(errno));
+	close(fd);
 	return -1;
       }
       
