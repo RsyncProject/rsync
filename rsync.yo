@@ -916,15 +916,15 @@ itemize(
   *?[ then expression matching is applied using the shell filename
   matching rules. Otherwise a simple string match is used.
 
-  it() if the pattern includes a double asterisk "**" then all wildcards in
-  the pattern will match slashes, otherwise they will stop at slashes.
+  it() the double asterisk pattern "**" will match slashes while a
+  single asterisk pattern "*" will stop at slashes.
 
   it() if the pattern contains a / (not counting a trailing /) or a "**"
   then it is matched against the full filename, including any leading
   directory. If the pattern doesn't contain a / or a "**", then it is
   matched only against the final component of the filename.  Again,
   remember that the algorithm is applied recursively so "full filename" can
-  actually be any portion of a path.
+  actually be any portion of a path below the starting directory.
 
   it() if the pattern starts with "+ " (a plus followed by a space)
   then it is always considered an include pattern, even if specified as
