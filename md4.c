@@ -225,7 +225,7 @@ static void MDreverse(X)
    /* Process data */
    if (count == 512)
      { /* Full block of data to handle */
-       MDblock(MDp,(unsigned int *)X);
+       MDblock(MDp,(unsigned int32 *)X);
      }
    else if (count > 512) /* Check for count too large */
      { rprintf(FERROR,"\nError: MDupdate called with illegal count value %d."
