@@ -20,6 +20,9 @@
 /* support rsync authentication */
 #include "rsync.h"
 
+extern char *password_file;
+extern int am_root;
+
 /***************************************************************************
 encode a buffer using base64 - simple and slow algorithm. null terminates
 the result.
@@ -68,22 +71,20 @@ static void gen_challenge(char *addr, char *challenge)
 }
 
 
-/* return the secret for a user from the sercret file. maximum length
-   is len. null terminate it */
+/* Return the secret for a user from the secret file, null terminated.
+ * Maximum length is len (not counting the null). */
 static int get_secret(int module, char *user, char *secret, int len)
 {
 	char *fname = lp_secrets_file(module);
-	int fd, found=0;
-	char line[MAXPATHLEN];
-	char *p, *pass=NULL;
 	STRUCT_STAT st;
-	int ok = 1;
-	extern int am_root;
+	int fd, ok = 1;
+	char ch, *p;
 
-	if (!fname || !*fname) return 0;
+	if (!fname || !*fname)
+		return 0;
 
-	fd = open(fname,O_RDONLY);
-	if (fd == -1) return 0;
+	if ((fd = open(fname, O_RDONLY)) < 0)
+		return 0;
 
 	if (do_stat(fname, &st) == -1) {
 		rsyserr(FERROR, errno, "stat(%s)", fname);
@@ -103,50 +104,61 @@ static int get_secret(int module, char *user, char *secret, int len)
 		return 0;
 	}
 
-	while (!found) {
-		int i = 0;
-		memset(line, 0, sizeof line);
-		while ((size_t) i < (sizeof(line)-1)) {
-			if (read(fd, &line[i], 1) != 1) {
-				memset(line, 0, sizeof(line));
-				close(fd);
-				return 0;
-			}
-			if (line[i] == '\r') continue;
-			if (line[i] == '\n') break;
-			i++;
-		}
-		line[i] = 0;
-		if (line[0] == '#') continue;
-		p = strchr(line,':');
-		if (!p) continue;
-		*p = 0;
-		if (strcmp(user, line)) continue;
-		pass = p+1;
-		found = 1;
+	if (*user == '#') {
+		/* Reject attempt to match a comment. */
+		close(fd);
+		return 0;
 	}
 
-	close(fd);
-	if (!found) return 0;
+	/* Try to find a line that starts with the user name and a ':'. */
+	p = user;
+	while (1) {
+		if (read(fd, &ch, 1) != 1) {
+			close(fd);
+			return 0;
+		}
+		if (ch == '\n')
+			p = user;
+		else if (p) {
+			if (*p == ch)
+				p++;
+			else if (!*p && ch == ':')
+				break;
+			else
+				p = NULL;
+		}
+	}
 
-	strlcpy(secret, pass, len);
+	/* Slurp the secret into the "secret" buffer. */
+	p = secret;
+	while (len > 0) {
+		if (read(fd, p, 1) != 1 || *p == '\n')
+			break;
+		if (*p == '\r')
+			continue;
+		p++;
+		len--;
+	}
+	*p = '\0';
+	close(fd);
+
 	return 1;
 }
 
 static char *getpassf(char *filename)
 {
-	char buffer[100];
-	int fd=0;
 	STRUCT_STAT st;
-	int ok = 1;
-	extern int am_root;
-	char *envpw=getenv("RSYNC_PASSWORD");
+	char buffer[512], *p;
+	int fd, n, ok = 1;
+	char *envpw = getenv("RSYNC_PASSWORD");
 
-	if (!filename) return NULL;
+	if (!filename)
+		return NULL;
 
-	if ( (fd=open(filename,O_RDONLY)) == -1) {
+	if ((fd = open(filename,O_RDONLY)) < 0) {
 		rsyserr(FERROR, errno, "could not open password file \"%s\"",filename);
-		if (envpw) rprintf(FERROR,"falling back to RSYNC_PASSWORD environment variable.\n");	
+		if (envpw)
+			rprintf(FERROR, "falling back to RSYNC_PASSWORD environment variable.\n");	
 		return NULL;
 	}
 	
@@ -156,26 +168,27 @@ static char *getpassf(char *filename)
 	} else if ((st.st_mode & 06) != 0) {
 		rprintf(FERROR,"password file must not be other-accessible\n");
 		ok = 0;
-	} else if (am_root && (st.st_uid != 0)) {
+	} else if (am_root && st.st_uid != 0) {
 		rprintf(FERROR,"password file must be owned by root when running as root\n");
 		ok = 0;
 	}
 	if (!ok) {
 		rprintf(FERROR,"continuing without password file\n");
-		if (envpw) rprintf(FERROR,"using RSYNC_PASSWORD environment variable.\n");
+		if (envpw)
+			rprintf(FERROR, "using RSYNC_PASSWORD environment variable.\n");
 		close(fd);
 		return NULL;
 	}
 
-	if (envpw) rprintf(FERROR,"RSYNC_PASSWORD environment variable ignored\n");
+	if (envpw)
+		rprintf(FERROR, "RSYNC_PASSWORD environment variable ignored\n");
 
-	buffer[sizeof(buffer)-1]='\0';
-	if (read(fd,buffer,sizeof(buffer)-1) > 0)
-	{
-		char *p = strtok(buffer,"\n\r");
-		close(fd);
-		if (p) p = strdup(p);
-		return p;
+	n = read(fd, buffer, sizeof buffer - 1);
+	close(fd);
+	if (n > 0) {
+		buffer[n] = '\0';
+		if ((p = strtok(buffer, "\n\r")) != NULL)
+			return strdup(p);
 	}	
 
 	return NULL;
@@ -267,7 +280,6 @@ void auth_client(int fd, char *user, char *challenge)
 {
 	char *pass;
 	char pass2[30];
-	extern char *password_file;
 
 	if (!user || !*user)
 		user = "nobody";
@@ -285,9 +297,8 @@ void auth_client(int fd, char *user, char *challenge)
 		pass = getpass("Password: ");
 	}
 
-	if (!pass || !*pass) {
+	if (!pass)
 		pass = "";
-	}
 
 	generate_hash(pass, challenge, pass2);
 	io_printf(fd, "%s %s\n", user, pass2);
