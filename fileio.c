@@ -24,6 +24,8 @@
 
 extern int sparse_files;
 
+unsigned int max_map_size = MAX_MAP_SIZE;
+
 static char last_byte;
 static int last_sparse;
 
@@ -186,7 +188,7 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 	} else {
 		window_start = 0;
 	}
-	window_size = MAX_MAP_SIZE;
+	window_size = max_map_size;
 	if (window_start + window_size > map->file_size) {
 		window_size = map->file_size - window_start;
 	}
