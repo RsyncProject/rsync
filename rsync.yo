@@ -317,6 +317,7 @@ verb(
      --ignore-errors         delete even if there are I/O errors
      --max-delete=NUM        don't delete more than NUM files
      --partial               keep partially transferred files
+     --partial-dir=DIR       put a partially transferred file into DIR
      --force                 force deletion of dirs even if not empty
      --numeric-ids           don't map uid/gid values by user/group name
      --timeout=TIME          set I/O timeout in seconds
@@ -864,6 +865,29 @@ transferred file if the transfer is interrupted. In some circumstances
 it is more desirable to keep partially transferred files. Using the
 --partial option tells rsync to keep the partial file which should
 make a subsequent transfer of the rest of the file much faster.
+
+dit(bf(--partial-dir=DIR)) Turns on --partial mode, but tells rsync to
+put a partially transferred file into DIR instead of writing out the
+file to the destination dir.  Rsync will also use a file found in this
+dir as data to speed up the transfer (i.e. when you redo the send after
+rsync creates a partial file) and delete such a file after it has served
+its purpose.
+
+Rsync will create the dir if it is missing (just the last dir -- not the
+whole path).  This makes it easy to use a relative path (such as
+"--partial-dir=.rsync-partial") to have rsync create the partial-directory
+in the destination file's directory (rsync will also try to remove the DIR
+if a partial file was found to exist at the start of the transfer and the
+DIR was specified as a relative path).
+
+If you are deleting files on the destination and your partial-dir is
+inside the destination hierarchy, make sure you specify an exclude to
+prevent the partial file from being deleted (it could get deleted at the
+end of the transfer when using --delete-after, or at the beginning of the
+transfer when using --delete).  E.g. "--exclude=.rsync-partial/".
+
+IMPORTANT: the --partial-dir should not be writable by other users to
+avoid a security risk.  E.g. AVOID "/tmp".
 
 dit(bf(--progress)) This option tells rsync to print information
 showing the progress of the transfer. This gives a bored user
