@@ -26,6 +26,7 @@ off_t total_size = 0;
 int block_size=BLOCK_SIZE;
 
 char *backup_suffix = BACKUP_SUFFIX;
+char *tmpdir = NULL;
 
 static char *rsync_path = RSYNC_NAME;
 
@@ -169,6 +170,11 @@ static void server_options(char **args,int *argc)
 
   if (numeric_ids)
     args[ac++] = "--numeric-ids";
+
+  if (tmpdir) {
+	  args[ac++] = "--temp-dir";
+	  args[ac++] = tmpdir;
+  }
 
   *argc = ac;
 }
@@ -440,6 +446,7 @@ static void usage(FILE *f)
   fprintf(f,"    --delete             delete files that don't exist on the sending side\n");
   fprintf(f,"    --numeric-ids        don't map uid/gid values by user/group name\n");
   fprintf(f,"-I, --ignore-times       don't exclude files that match length and time\n");
+  fprintf(f,"-T  --temp-dir DIR       create temporary files in directory DIR\n");
   fprintf(f,"-z, --compress           compress file data\n");
   fprintf(f,"    --exclude FILE       exclude file FILE\n");
   fprintf(f,"    --exclude-from FILE  exclude files listed in FILE\n");
@@ -454,7 +461,7 @@ static void usage(FILE *f)
 enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
       OPT_EXCLUDE_FROM,OPT_DELETE,OPT_NUMERIC_IDS,OPT_RSYNC_PATH};
 
-static char *short_options = "oblLWHpguDCtcahvrRIxnSe:B:z";
+static char *short_options = "oblLWHpguDCtcahvrRIxnSe:B:T:z";
 
 static struct option long_options[] = {
   {"version",     0,     0,    OPT_VERSION},
@@ -490,6 +497,7 @@ static struct option long_options[] = {
   {"rsh",         1,     0,    'e'},
   {"suffix",      1,     0,    OPT_SUFFIX},
   {"block-size",  1,     0,    'B'},
+  {"temp-dir",    1,     0,    'T'},
   {"compress",	  0,	 0,    'z'},
   {0,0,0,0}};
 
@@ -681,6 +689,10 @@ int main(int argc,char *argv[])
 	case 'B':
 	  block_size = atoi(optarg);
 	  break;
+
+	case 'T':
+		tmpdir = optarg;
+		break;
 
         case 'z':
 	  do_compression = 1;

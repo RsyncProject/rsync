@@ -29,6 +29,7 @@ extern time_t starttime;
 extern int remote_version;
 
 extern char *backup_suffix;
+extern char *tmpdir;
 
 extern int whole_file;
 extern int block_size;
@@ -744,7 +745,17 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	close(fd1);
 	continue;
       }
-      sprintf(fnametmp,"%s.XXXXXX",fname);
+      if (tmpdir) {
+	      char *f;
+	      f = strrchr(fname,'/');
+	      if (f == NULL) 
+		      f = fname;
+	      else 
+		      f++;
+	      sprintf(fnametmp,"%s/%s.XXXXXX",tmpdir,f);
+      } else {
+	      sprintf(fnametmp,"%s.XXXXXX",fname);
+      }
       if (NULL == mktemp(fnametmp)) {
 	fprintf(FERROR,"mktemp %s failed\n",fnametmp);
 	receive_data(f_in,buf,-1,NULL);
@@ -752,10 +763,10 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	close(fd1);
 	continue;
       }
-      fd2 = open(fnametmp,O_WRONLY|O_CREAT,file->mode);
+      fd2 = open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,file->mode);
       if (fd2 == -1 && relative_paths && errno == ENOENT && 
 	  create_directory_path(fnametmp) == 0) {
-	      fd2 = open(fnametmp,O_WRONLY|O_CREAT,file->mode);
+	      fd2 = open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,file->mode);
       }
       if (fd2 == -1) {
 	fprintf(FERROR,"open %s : %s\n",fnametmp,strerror(errno));
@@ -797,9 +808,18 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
       /* move tmp file over real file */
       if (rename(fnametmp,fname) != 0) {
-	fprintf(FERROR,"rename %s -> %s : %s\n",
-		fnametmp,fname,strerror(errno));
-	unlink(fnametmp);
+	      if (errno == EXDEV) {
+		      /* rename failed on cross-filesystem link.  
+			 Copy the file instead. */
+		      if (copy_file(fnametmp,fname, file->mode)) 
+			      fprintf(FERROR,"copy %s -> %s : %s\n",
+				      fnametmp,fname,strerror(errno));
+		      unlink(fnametmp);
+	      } else {
+		      fprintf(FERROR,"rename %s -> %s : %s\n",
+			      fnametmp,fname,strerror(errno));
+		      unlink(fnametmp);
+	      }
       }
 
       cleanup_fname = NULL;
