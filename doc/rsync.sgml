@@ -1,0 +1,116 @@
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V4.1//EN">
+<book id="rsync">
+  <bookinfo>
+    <title>rsync</title>
+    <copyright>
+      <year>1996 -- 2002</year>
+      <holder>Martin Pool</holder>
+      <holder>Andrew Tridgell</holder>
+    </copyright>
+    <author>
+      <firstname>Martin</firstname>
+      <surname>Pool</surname>
+    </author>
+  </bookinfo>
+
+  <chapter>
+    <title>Introduction</title>
+
+    <para>rsync is a flexible program for efficiently copying files or
+      directory trees.
+
+    <para>rsync has many options to select which files will be copied
+      and how they are to be transferred.  It may be used as an
+      alternative to ftp, http, scp or rcp.
+
+    <para>The rsync remote-update protocol allows rsync to transfer just
+      the differences between two sets of files across the network link,
+      using an efficient checksum-search algorithm described in the
+      technical report that accompanies this package.</para>
+
+    <para>Some of the additional features of rsync are:</para>
+
+    <itemizedlist>
+      
+      <listitem>
+	<para>support for copying links, devices, owners, groups and
+	  permissions
+	</para>
+      </listitem>
+      
+      <listitem>
+	<para>
+	  exclude and exclude-from options similar to GNU tar
+	</para>
+      </listitem>
+
+      <listitem>
+	<para>
+	  a CVS exclude mode for ignoring the same files that CVS would ignore
+      </listitem>
+
+      <listitem>
+	<para>
+	  can use any transparent remote shell, including rsh or ssh
+      </listitem>
+
+      <listitem>
+	<para>
+	  does not require root privileges
+      </listitem>
+
+      <listitem>
+	<para>
+	  pipelining of file transfers to minimize latency costs
+      </listitem>
+		
+      <listitem>
+	<para>
+	  support for anonymous or authenticated rsync servers (ideal for
+	  mirroring)
+	</para>
+      </listitem>
+    </itemizedlist>
+  </chapter>
+
+
+
+  <chapter>
+    <title>Using rsync</title>
+    <section>
+      <title>
+	Introductory example
+      </title>
+      
+      <para>
+	Probably the most common case of rsync usage is to copy files
+	to or from a remote machine using
+	<application>ssh</application> as a network transport.  In
+	this situation rsync is a good alternative to
+	<application>scp</application>.
+      </para>
+
+      <para>
+	The most commonly used arguments for rsync are
+      </para>
+
+<!--
+@item -a 
+Reproduce the structure and attributes of the origin files as exactly
+as possible: this includes copying subdirectories, symlinks, special
+files, ownership and permissions.  (@xref{Attributes to copy}.)
+
+@item -v 
+Be verbose.  Primarily, display the name of each file as it is copied.
+
+@item -z 
+Compress network traffic, using a modified version of the
+@command{zlib} library.
+
+@item -P
+Display a progress indicator while files are transferred.  This should
+normally be ommitted if rsync is not run on a terminal.
+-->
+    </section>
+  </chapter>
+</book>
