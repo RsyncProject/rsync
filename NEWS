@@ -29,8 +29,9 @@ Changes since 2.6.3:
     - The "ignore nonreadable" daemon parameter no longer affects symlinks
       that are being copied, even if they point nowhere.
 
-    - If the OS does not have lchown(), we no longer try to set the user
-      & group of a symlink (which would either fail or set the referent).
+    - If the OS does not have lchown() and its chown() tries to set the
+      referent of a symlink (as it should), we no longer try to set the
+      user and group of a symlink.
 
   ENHANCEMENTS:
 
