@@ -15,9 +15,9 @@ test_regular() {
 };
 
 test_copy() {
-	test_symlink dest/links/file1
-	test_symlink dest/links/file2
-	test_regular dest/links/unsafefile
+	test_symlink to/links/file1
+	test_symlink to/links/file2
+	test_regular to/links/unsafefile
 }
 
 cd "$TMP"
