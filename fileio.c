@@ -69,19 +69,22 @@ static int write_sparse(int f,char *buf,size_t len)
 	return len;
 }
 
-
-
+/*
+ * write_file does not allow incomplete writes.  It loops internally
+ * until len bytes are written or errno is set.
+ */
 int write_file(int f,char *buf,size_t len)
 {
 	int ret = 0;
 
-	if (!sparse_files) {
-		return write(f,buf,len);
-	}
-
 	while (len>0) {
-		int len1 = MIN(len, SPARSE_WRITE_SIZE);
-		int r1 = write_sparse(f, buf, len1);
+		int r1;
+		if (sparse_files) {
+			int len1 = MIN(len, SPARSE_WRITE_SIZE);
+			r1 = write_sparse(f, buf, len1);
+		} else {
+			r1 = write(f, buf, len);
+		}
 		if (r1 <= 0) {
 			if (ret > 0) return ret;
 			return r1;
