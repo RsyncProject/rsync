@@ -55,10 +55,6 @@ void setup_protocol(int f_out,int f_in)
 		exit_cleanup(RERR_PROTOCOL);
 	}	
 	
-	if (verbose > 2)
-		rprintf(FINFO, "local_version=%d remote_version=%d\n",
-			PROTOCOL_VERSION, remote_version);
-	
 	if (remote_version >= 12) {
 		if (am_server) {
 			checksum_seed = time(NULL);

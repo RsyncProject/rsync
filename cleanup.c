@@ -40,6 +40,7 @@ extern int io_error;
 void _exit_cleanup(int code, const char *file, int line)
 {
 	extern int keep_partial;
+	extern int log_got_error;
 
 	if (code == 0 && io_error) code = RERR_FILEIO;
 
@@ -68,6 +69,12 @@ void _exit_cleanup(int code, const char *file, int line)
 	}
 
 	if (code) log_exit(code, file, line);
+
+	if (code == 0) {
+		if (log_got_error) {
+			code = RERR_FILEIO;
+		}
+	}
 
 	exit(code);
 }

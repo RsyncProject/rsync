@@ -553,7 +553,7 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 		wait_process(pid, &status);
 	}
 	
-	return status | status2;
+	return MAX(status, status2);
 }
 
 static char *find_colon(char *s)
@@ -699,6 +699,8 @@ static RETSIGTYPE sigusr1_handler(int val) {
 }
 
 static RETSIGTYPE sigusr2_handler(int val) {
+	extern int log_got_error;
+	if (log_got_error) _exit(RERR_FILEIO);
 	_exit(0);
 }
 
@@ -709,6 +711,7 @@ int main(int argc,char *argv[])
 	extern int dry_run;
 	extern int am_daemon;
 	extern int am_server;
+	int ret;
 
 	signal(SIGUSR1, sigusr1_handler);
 	signal(SIGUSR2, sigusr2_handler);
@@ -734,7 +737,6 @@ int main(int argc,char *argv[])
 		exit_cleanup(RERR_SYNTAX);
 	}
 
-	signal(SIGCHLD,SIG_IGN);
 	signal(SIGINT,SIGNAL_CAST sig_int);
 	signal(SIGPIPE,SIGNAL_CAST sig_int);
 	signal(SIGHUP,SIGNAL_CAST sig_int);
@@ -771,6 +773,8 @@ int main(int argc,char *argv[])
 		start_server(STDIN_FILENO, STDOUT_FILENO, argc, argv);
 	}
 
-	return start_client(argc, argv);
+	ret = start_client(argc, argv);
+	exit_cleanup(ret);
+	return ret;
 }
 

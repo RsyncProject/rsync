@@ -490,18 +490,6 @@ void io_end_buffering(int fd)
 	}
 }
 
-/* some OSes have a bug where an exit causes the pending writes on
-   a socket to be flushed. Do an explicit shutdown to try to prevent this */
-void io_shutdown(void)
-{
-	err_list_push();
-	if (multiplex_out_fd != -1) close(multiplex_out_fd);
-	if (io_error_fd != -1) close(io_error_fd);
-	multiplex_out_fd = -1;
-	io_error_fd = -1;
-}
-
-
 static void writefd(int fd,char *buf,int len)
 {
 	stats.total_written += len;

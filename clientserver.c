@@ -63,7 +63,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
         }
         
 	if (*path == '/') {
-		rprintf(FERROR,"ERROR: The remote path must start with a module name\n");
+		rprintf(FERROR,"ERROR: The remote path must start with a module name not a /\n");
 		return -1;
 	}
 

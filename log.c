@@ -31,6 +31,7 @@ static char *logfname;
 static FILE *logfile;
 static int log_error_fd = -1;
 
+int log_got_error=0;
 
 struct {
         int code;
@@ -107,6 +108,8 @@ void err_list_push(void)
 	while (err_list_head) {
 		struct err_list *el = err_list_head;
 		int n = write(log_error_fd, el->buf+el->written, el->len - el->written);
+		/* don't check for an error if the best way of handling the error is
+		   to ignore it */
 		if (n == -1) break;
 		if (n > 0) {
 			el->written += n;
@@ -250,6 +253,7 @@ void rwrite(enum logcode code, char *buf, int len)
 	}
 
 	if (code == FERROR) {
+		log_got_error = 1;
 		f = stderr;
 	} 
 
