@@ -197,7 +197,7 @@ int create_directory_path(char *fname, int base_umask)
  *
  * Derived from GNU C's cccp.c.
  */
-static int full_write(int desc, char *ptr, size_t len)
+int full_write(int desc, char *ptr, size_t len)
 {
 	int total_written;
 
@@ -245,7 +245,7 @@ static int safe_read(int desc, char *ptr, size_t len)
 
 /** Copy a file.
  *
- * This is used in conjunction with the --temp-dir option */
+ * This is used in conjunction with the --temp-dir and --backup options */
 int copy_file(char *source, char *dest, mode_t mode)
 {
 	int ifd;
