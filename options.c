@@ -308,7 +308,7 @@ void usage(enum logcode F)
   rprintf(F," -z, --compress              compress file data during the transfer\n");
   rprintf(F," -C, --cvs-exclude           auto-ignore files the same way CVS does\n");
   rprintf(F," -f, --filter=RULE           add a file-filtering RULE\n");
-  rprintf(F," -F                          same as --filter=': /.rsync-filter'\n");
+  rprintf(F," -F                          same as --filter='dir-merge /.rsync-filter'\n");
   rprintf(F,"                             repeated: --filter='- .rsync-filter'\n");
   rprintf(F,"     --exclude=PATTERN       exclude files matching PATTERN\n");
   rprintf(F,"     --exclude-from=FILE     read exclude patterns from FILE\n");
