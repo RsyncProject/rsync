@@ -32,6 +32,7 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int force_delete;
 extern int recurse;
+extern int keep_dirlinks;
 extern int make_backups;
 extern char *backup_dir;
 extern int inplace;
@@ -187,7 +188,8 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
                  * destination had the setuid or setgid bits set due
                  * to the side effect of the chown call */
 		if (st->st_mode & (S_ISUID | S_ISGID)) {
-			link_stat(fname, st, 0);
+			link_stat(fname, st,
+				  keep_dirlinks && S_ISDIR(st->st_mode));
 		}
 		updated = 1;
 	}
