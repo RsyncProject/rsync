@@ -367,17 +367,6 @@ int robust_rename(char *from, char *to)
 		return -1;
 	return do_rename(from, to);
 #endif
-    }
-
-
-/* sleep for a while via select */
-void u_sleep(int usec)
-{
-	struct timeval tv;
-
-	tv.tv_sec = 0;
-	tv.tv_usec = usec;
-	select(0, NULL, NULL, NULL, &tv);
 }
 
 
