@@ -144,9 +144,7 @@ static BOOL disable_deltas_p(void)
 
 	assert(whole_file == 0 || whole_file == 1);
 
-	/* OK, we don't explicitly handle both whole_file and
-	 * no_whole_file; perhaps somebody will care to add an
-	 * error. */
+	/* whole_file and no_whole_file are never both on at the same time */
 
 	if (whole_file)
 		return True;

@@ -286,7 +286,7 @@ enum {OPT_VERSION = 1000, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
       OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY, OPT_ADDRESS,
       OPT_DELETE_AFTER, OPT_EXISTING, OPT_MAX_DELETE, OPT_BACKUP_DIR, 
       OPT_IGNORE_ERRORS, OPT_BWLIMIT, OPT_BLOCKING_IO,
-      OPT_NO_BLOCKING_IO, OPT_NO_WHOLE_FILE,
+      OPT_NO_BLOCKING_IO, OPT_WHOLE_FILE, OPT_NO_WHOLE_FILE,
       OPT_MODIFY_WINDOW, OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_IGNORE_EXISTING};
 
 static struct poptOption long_options[] = {
@@ -319,8 +319,8 @@ static struct poptOption long_options[] = {
   {"update",          'u', POPT_ARG_NONE,   &update_only , 0, 0, 0 },
   {"links",           'l', POPT_ARG_NONE,   &preserve_links , 0, 0, 0 },
   {"copy-links",      'L', POPT_ARG_NONE,   &copy_links , 0, 0, 0 },
-  {"whole-file",      'W', POPT_ARG_NONE,   &whole_file , 0, 0, 0 },
-  {"no-whole-file",    0,  POPT_ARG_NONE,   &no_whole_file , 0, 0, 0 },
+  {"whole-file",      'W', POPT_ARG_NONE,   0,              OPT_WHOLE_FILE, 0, 0 },
+  {"no-whole-file",    0,  POPT_ARG_NONE,   0,              OPT_NO_WHOLE_FILE, 0, 0 },
   {"copy-unsafe-links", 0, POPT_ARG_NONE,   &copy_unsafe_links , 0, 0, 0 },
   {"perms",           'p', POPT_ARG_NONE,   &preserve_perms , 0, 0, 0 },
   {"owner",           'o', POPT_ARG_NONE,   &preserve_uid , 0, 0, 0 },
@@ -482,6 +482,16 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 		case OPT_INCLUDE_FROM:
 			add_exclude_file(poptGetOptArg(pc), 1, 1);
+			break;
+
+		case OPT_WHOLE_FILE:
+			whole_file = 1;
+			no_whole_file = 0;
+			break;
+
+		case OPT_NO_WHOLE_FILE:
+			no_whole_file = 1;
+			whole_file = 0;
 			break;
 
 		case OPT_NO_BLOCKING_IO:
