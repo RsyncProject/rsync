@@ -159,9 +159,8 @@ test: check
 check: all $(CHECK_PROGS)
 	POSIXLY_CORRECT=1 TOOLDIR=`pwd` rsync_bin=`pwd`/rsync$(EXEEXT) srcdir="$(srcdir)" $(srcdir)/runtests.sh
 
-WILDTEST_OBJ = wildtest.o lib/wildmatch.o
-wildtest$(EXEEXT): $(WILDTEST_OBJ)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@  $(WILDTEST_OBJ)
+wildtest$(EXEEXT): wildtest.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
 
 # This does *not* depend on building or installing: you can use it to
 # check a version installed from a binary or some other source tree,
