@@ -47,6 +47,11 @@ Changes since 2.6.3:
     - Fixed a potential hang when verbosity is high, the client side is
       the sender, and the file-list is large.
 
+    - Fixed a potential protocol-corrupting bug where the generator
+      might accidentally merge a message from the receiver into the
+      middle of a multiplexed packet of data that is waiting for the
+      socket to allow it to flush.
+
     - We now check if the OS doesn't support using mknod() for creating
       FIFOs and sockets, and compile-in using mkfifo() and socket() when
       necessary.
@@ -116,6 +121,9 @@ Changes since 2.6.3:
     - Fixed a problem with refused-option messages sometimes not making it
       back to the client side when a remote --files-from was in effect and
       the daemon was the receiver.
+
+    - The --compare-dest option was not updating a file that differred in
+      (the preserved) attributes from the version in the compare-dest DIR.
 
   ENHANCEMENTS:
 
