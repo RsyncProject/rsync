@@ -33,24 +33,11 @@ extern int am_sender;
 extern int am_generator;
 extern int preserve_uid;
 extern int preserve_gid;
-extern int force_delete;
 extern int inplace;
 extern int recurse;
-extern int max_delete;
 extern int keep_dirlinks;
 extern int make_backups;
 extern struct stats stats;
-extern char *backup_dir;
-extern char *log_format;
-extern char *backup_suffix;
-extern int backup_suffix_len;
-
-
-static int is_backup_file(char *fn)
-{
-	int k = strlen(fn) - backup_suffix_len;
-	return k > 0 && strcmp(fn+k, backup_suffix) == 0;
-}
 
 
 /*
@@ -62,110 +49,6 @@ void free_sums(struct sum_struct *s)
 	free(s);
 }
 
-
-int deletion_count = 0; /* used to implement --max-delete */
-
-/*
- * delete a file or directory. If force_delete is set then delete
- * recursively
- */
-int delete_file(char *fname, int mode, int flags)
-{
-	DIR *d;
-	struct dirent *di;
-	char buf[MAXPATHLEN];
-	STRUCT_STAT st;
-	int zap_dir;
-
-	if (max_delete && deletion_count >= max_delete)
-		return -1;
-
-	if (!S_ISDIR(mode)) {
-		int ok;
-		if (make_backups && (backup_dir || !is_backup_file(fname)))
-			ok = make_backup(fname);
-		else
-			ok = robust_unlink(fname) == 0;
-		if (ok) {
-			if ((verbose || log_format) && !(flags & DEL_TERSE))
-				log_delete(fname, mode);
-			deletion_count++;
-			return 0;
-		}
-		if (errno == ENOENT)
-			return 0;
-		rsyserr(FERROR, errno, "delete_file: unlink %s failed",
-			full_fname(fname));
-		return -1;
-	}
-
-	zap_dir = (flags & DEL_FORCE_RECURSE || (force_delete && recurse))
-		&& !(flags & DEL_NO_RECURSE);
-	if (dry_run && zap_dir)
-		errno = ENOTEMPTY;
-	else if (do_rmdir(fname) == 0) {
-		if ((verbose || log_format) && !(flags & DEL_TERSE))
-			log_delete(fname, mode);
-		deletion_count++;
-		return 0;
-	}
-	if (errno == ENOENT)
-		return 0;
-	if (!zap_dir || (errno != ENOTEMPTY && errno != EEXIST)) {
-		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
-			full_fname(fname));
-		return -1;
-	}
-
-	/* now we do a recsursive delete on the directory ... */
-	if (!(d = opendir(fname))) {
-		rsyserr(FERROR, errno, "delete_file: opendir %s failed",
-			full_fname(fname));
-		return -1;
-	}
-
-	if (!(flags & DEL_TERSE)) {
-		if (verbose || log_format)
-			log_delete(fname, mode);
-		flags |= DEL_TERSE;
-	}
-
-	for (errno = 0, di = readdir(d); di; errno = 0, di = readdir(d)) {
-		char *dname = d_name(di);
-		if (dname[0] == '.' && (dname[1] == '\0'
-		    || (dname[1] == '.' && dname[2] == '\0')))
-			continue;
-		pathjoin(buf, sizeof buf, fname, dname);
-
-		if (do_lstat(buf, &st) < 0)
-			continue;
-		if (verbose || log_format)
-			log_delete(buf, st.st_mode);
-		if (delete_file(buf, st.st_mode, flags) != 0) {
-			closedir(d);
-			return -1;
-		}
-	}
-	if (errno) {
-		rsyserr(FERROR, errno, "delete_file: readdir %s failed",
-			full_fname(fname));
-		closedir(d);
-		return -1;
-	}
-
-	closedir(d);
-
-	if (max_delete && deletion_count >= max_delete)
-		return -1;
-	if (do_rmdir(fname) != 0 && errno != ENOENT) {
-		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
-			full_fname(fname));
-		return -1;
-	}
-	deletion_count++;
-
-	return 0;
-}
 
 int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	      int flags)
@@ -186,8 +69,7 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	}
 
 	if (!preserve_times || S_ISLNK(st->st_mode)
-	 || (S_ISDIR(st->st_mode)
-	  && (omit_dir_times || (make_backups && !backup_dir))))
+	 || (S_ISDIR(st->st_mode) && omit_dir_times))
 		flags |= PERMS_SKIP_MTIME;
 	if (!(flags & PERMS_SKIP_MTIME)
 	    && cmp_modtime(st->st_mtime, file->modtime) != 0) {
