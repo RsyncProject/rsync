@@ -53,20 +53,23 @@ Changes since 2.6.2:
     - Fixed a bug in the daemon authentication code when using one of the
       batch-processing options.
 
+    - We try to work around some buggy IPv6 implementations that fail to
+      implement IPV6_V6ONLY.  This should fix the "address in use" error
+      that some daemons get when running on an OS with a buggy IPv6
+      implementation.  Also, if the new code gets this error, we might
+      suggest that the user specify --ipv4 or --ipv6 (if we think it will
+      help).
+
   ENHANCEMENTS:
 
     - Added --keep-dirlinks (-K), which allows you to symlink a directory
-      onto another patition on the receiving side and have rsync treat it
+      onto another partition on the receiving side and have rsync treat it
       as matching a normal directory from the sender.
 
     - Added the "write only" option to the daemon's config file.
 
     - Added long-option names for -4 and -6 (namely --ipv4 and --ipv6)
       and documented all these options in the man page.
-
-    - If the daemon get an address-in-use error starting up, we sometimes
-      suggest that the user specify --ipv4 or --ipv6 to work around their
-      buggy socket implementation.
 
     - Improved the handling of the --bwlimit option so that it's less
       bursty, more accurate, and works properly over a larger range of
@@ -87,7 +90,7 @@ Changes since 2.6.2:
 
     - If an rsync daemon is listening on multiple sockets (to handle both
       IPv4 and IPv6 to a single port), we now close all the unneeded file
-      handles after we accept a connecton (we used to close just one of
+      handles after we accept a connection (we used to close just one of
       them).
 
   BUILD CHANGES:
@@ -96,7 +99,7 @@ Changes since 2.6.2:
       including configure, config.h.in, the man pages, and proto.h.
 
     - If "make proto" doesn't find some changes in the prototypes, the
-      proto.h file is left untouched (its timestamp used to always be
+      proto.h file is left untouched (its time-stamp used to always be
       updated).
 
     - The variable $STRIP (that is optionally set by the install-strip
