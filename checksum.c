@@ -140,7 +140,15 @@ void sum_init(void)
 	sum_update(s,4);
 }
 
-void sum_update(char *p,int len)
+/**
+ * Feed data into an MD4 accumulator, md.  The results may be
+ * retrieved using sum_end().  md is used for different purposes at
+ * different points during execution.
+ *
+ * @todo Perhaps get rid of md and just pass in the address each time.
+ * Very slightly clearer and slower.
+ **/
+void sum_update(char *p, int len)
 {
 	int i;
 	if (len + sumresidue < CSUM_CHUNK) {
