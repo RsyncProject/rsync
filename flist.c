@@ -539,11 +539,9 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 		rdev_major = 0;
 		uid = 0, gid = 0;
 		*lastname = '\0';
+		lastdir_len = -1;
 		return;
 	}
-
-	if (!flist || !flist->count)	/* Ignore lastdir when invalid. */
-		lastdir_len = -1;
 
 	if (flags & XMIT_SAME_NAME)
 		l1 = read_byte(f);
