@@ -3,7 +3,7 @@ dnl Process this file with autoconf to produce a configure script.
 AC_INIT()
 AC_CONFIG_SRCDIR([byteorder.h])
 AC_CONFIG_HEADER(config.h)
-AC_PREREQ(2.52)
+AC_PREREQ(2.59)
 
 RSYNC_VERSION=2.6.4cvs
 AC_SUBST(RSYNC_VERSION)
@@ -293,7 +293,10 @@ AC_HEADER_MAJOR
 
 AC_CHECK_SIZEOF(int)
 AC_CHECK_SIZEOF(long)
+AC_CHECK_SIZEOF(long long)
 AC_CHECK_SIZEOF(short)
+AC_CHECK_SIZEOF(off_t)
+AC_CHECK_SIZEOF(off64_t)
 
 AC_C_INLINE
 
@@ -514,25 +517,6 @@ then
     fi
 else
     AC_MSG_RESULT(no)
-fi
-
-AC_CACHE_CHECK([for long long],rsync_cv_HAVE_LONGLONG,[
-if test x"$GCC" = x"yes"; then
- rsync_cv_HAVE_LONGLONG=yes
-else
- AC_TRY_COMPILE(,[long long i;],
-  rsync_cv_HAVE_LONGLONG=yes,rsync_cv_HAVE_LONGLONG=no)
-fi])
-if test x"$rsync_cv_HAVE_LONGLONG" = x"yes"; then
-    AC_DEFINE(HAVE_LONGLONG, 1, [Define to 1 if you have the "long long" type])
-fi
-
-AC_CACHE_CHECK([for off64_t],rsync_cv_HAVE_OFF64_T,[
-AC_TRY_COMPILE([#include <stdio.h>
-#include <sys/stat.h>],[off64_t s;],
-rsync_cv_HAVE_OFF64_T=yes,rsync_cv_HAVE_OFF64_T=no)])
-if test x"$rsync_cv_HAVE_OFF64_T" = x"yes"; then
-    AC_DEFINE(HAVE_OFF64_T, 1, [Define to 1 if you have the off64_t type])
 fi
 
 AC_CACHE_CHECK([for unsigned char],rsync_cv_SIGNED_CHAR_OK,[
