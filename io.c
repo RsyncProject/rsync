@@ -81,6 +81,8 @@ static void read_error_fd(void)
 	int fd = io_error_fd;
 	int tag, len;
 
+        /* io_error_fd is temporarily disabled -- is this meant to
+         * prevent indefinite recursion? */
 	io_error_fd = -1;
 
 	read_loop(fd, buf, 4);
@@ -108,10 +110,12 @@ static int no_flush;
  * Read from a socket with IO timeout. return the number of bytes
  * read. If no bytes can be read then exit, never return a number <= 0.
  *
- * TODO: If the remote shell connection fails, then current versions actually
- * report an "unexpected EOF" error here.  Since it's a fairly common mistake
- * to try to use rsh when ssh is required, we should trap that: if we fail
- * to read any data at all, we should give a better explanation.
+ * TODO: If the remote shell connection fails, then current versions
+ * actually report an "unexpected EOF" error here.  Since it's a
+ * fairly common mistake to try to use rsh when ssh is required, we
+ * should trap that: if we fail to read any data at all, we should
+ * give a better explanation.  We can tell whether the connection has
+ * started by looking e.g. at whether the remote version is known yet.
  */
 static int read_timeout(int fd, char *buf, int len)
 {
@@ -173,7 +177,10 @@ static int read_timeout(int fd, char *buf, int len)
 
 		if (n == 0) {
 			if (eof_error) {
-				rprintf(FERROR,"unexpected EOF in read_timeout\n");
+				rprintf(FERROR,
+                                        "%s: connection to server unexpectedly closed"
+                                        " (%ld bytes read so far)\n",
+                                        RSYNC_NAME, stats.total_read);
 			}
 			exit_cleanup(RERR_STREAMIO);
 		}
