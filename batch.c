@@ -12,8 +12,65 @@ extern char *batch_name;
 extern int delete_mode;
 extern int delete_excluded;
 extern int eol_nulls;
+extern int recurse;
+extern int preserve_links;
+extern int preserve_hard_links;
+extern int preserve_devices;
+extern int preserve_uid;
+extern int preserve_gid;
+extern int always_checksum;
 
 extern struct exclude_list_struct exclude_list;
+
+static int *flag_ptr[] = {
+	&recurse,
+	&preserve_uid,
+	&preserve_gid,
+	&preserve_links,
+	&preserve_devices,
+	&preserve_hard_links,
+	&always_checksum,
+	NULL
+};
+
+static char *flag_name[] = {
+	"--recurse (-r)",
+	"--owner (-o)",
+	"--group (-g)",
+	"--links (-l)",
+	"--devices (-D)",
+	"--hard-links (-H)",
+	"--checksum (-c)",
+	NULL
+};
+
+void write_stream_flags(int fd)
+{
+	int i, flags;
+
+	/* Start the batch file with a bitmap of data-stream-affecting
+	 * flags. */
+	for (i = 0, flags = 0; flag_ptr[i]; i++) {
+		if (*flag_ptr[i])
+			flags |= 1 << i;
+	}
+	write_int(fd, flags);
+}
+
+void read_stream_flags(int fd)
+{
+	int i, flags;
+
+	for (i = 0, flags = read_int(fd); flag_ptr[i]; i++) {
+		int set = flags & (1 << i) ? 1 : 0;
+		if (*flag_ptr[i] != set) {
+			rprintf(FINFO,
+				"%sing the %s option to match the batchfile.\n",
+				set ? "Sett" : "Clear", flag_name[i]);
+			*flag_ptr[i] = set;
+		}
+	}
+}
 
 static void write_arg(int fd, char *arg)
 {
