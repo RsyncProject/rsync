@@ -522,7 +522,6 @@ void start_accept_loop(int port, int (*fn)(int, int))
 			close(fd);
 		}
 	}
-	free(sp);
 }
 
 
