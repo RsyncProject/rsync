@@ -985,6 +985,18 @@ void show_progress(OFF_T ofs, OFF_T size)
 
 /**
  * Determine if a symlink points outside the current directory tree.
+ * This is considered "unsafe" because e.g. when mirroring somebody
+ * else's machine it might allow them to establish a symlink to
+ * /etc/passwd, and then read it through a web server.
+ *
+ * @param dest Target of the symlink in question.
+ *
+ * @src src Top source directory currently applicable.  Basically this
+ * is the first parameter to rsync in a simple invocation, but it's
+ * modified as topsrcname in slightly complex ways.
+ *
+ * @retval True if unsafe
+ * @retval False is unsafe
  **/
 int unsafe_symlink(char *dest, char *src)
 {
