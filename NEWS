@@ -16,14 +16,16 @@ Changes since 2.6.2:
 
     - If a file has a read error on the sending side, the receiver will
       no longer keep the resulting file unless the --partial option was
-      specified.
+      specified.  (Note:  both sides must be running 2.6.3 for this to
+      work -- older receivers always keep the file, and older senders
+      don't tell the receiver that the file was not read correctly.)
 
     - Fixed an age-old crash problem with --read-batch on a local copy
       (rsync was improperly assuming --whole-file for the local copy).
 
     - Files specified in the daemon's "exclude" or "exclude from" config
       items are now excluded from being uploaded (if the module is not
-      read-only) as well as downloaded.
+      read-only) in addition to the old download exclusion.
 
     - When using --backup without a --backup-dir, rsync no longer preserves
       the modify time on directories.  This avoids confusing NFS.
@@ -42,8 +44,8 @@ Changes since 2.6.2:
 
   INTERNAL:
 
-    - Some cleanup in the exclude code has saved some memory and made
-      things easier to maintain.
+    - Some cleanup in the exclude code has saved some per-exclude memory
+      and made the code easier to maintain.
 
     - Use rsyserr() in the various places that were still calling
       rprintf() with strerror() as an arg.
@@ -61,6 +63,7 @@ Changes since 2.6.2:
 
     - The scripts in the testsuite dir were cleaned up a bit.
 
+
 NEWS for rsync 2.6.2 (30 Apr 2004)
 Protocol: 28 (unchanged)
 Changes since 2.6.1:
