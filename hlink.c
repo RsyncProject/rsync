@@ -183,11 +183,11 @@ void do_hard_links(void)
 
 	for (i = 0; i < hlink_count; i++) {
 		first = file = hlink_list[i];
-		if (link_stat(f_name_to(first, hlink1), &st1) != 0)
+		if (link_stat(f_name_to(first, hlink1), &st1, 0) < 0)
 			continue;
 		while ((file = file->F_NEXT) != first) {
 			hlink2 = f_name(file);
-			if (link_stat(hlink2, &st2) == 0) {
+			if (link_stat(hlink2, &st2, 0) == 0) {
 				if (st2.st_dev == st1.st_dev
 				    && st2.st_ino == st1.st_ino)
 					continue;

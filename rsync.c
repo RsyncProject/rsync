@@ -132,7 +132,7 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 		return 0;
 
 	if (!st) {
-		if (link_stat(fname,&st2) != 0) {
+		if (link_stat(fname, &st2, 0) < 0) {
 			rsyserr(FERROR, errno, "stat %s failed",
 				full_fname(fname));
 			return 0;
@@ -186,7 +186,7 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
                  * destination had the setuid or setgid bits set due
                  * to the side effect of the chown call */
 		if (st->st_mode & (S_ISUID | S_ISGID)) {
-			link_stat(fname, st);
+			link_stat(fname, st, 0);
 		}
 		updated = 1;
 	}
