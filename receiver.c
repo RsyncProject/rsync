@@ -38,8 +38,8 @@ extern int make_backups;
 extern char *backup_suffix;
 
 static struct delete_list {
-	dev_t dev;
-	INO_T inode;
+	DEV64_T dev;
+	INO64_T inode;
 } *delete_list;
 static int dlist_len, dlist_alloc_len;
 

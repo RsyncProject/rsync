@@ -310,8 +310,8 @@ static void send_file_entry(struct file_struct *file,int f,unsigned base_flags)
 			write_int(f,(int)file->inode);
 		} else {
 			/* 64-bit dev_t and ino_t */
-			write_longint(f, (int64) file->dev);
-			write_longint(f, (int64) file->inode);
+			write_longint(f, file->dev);
+			write_longint(f, file->inode);
 		}
 	}
 #endif

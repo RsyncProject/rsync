@@ -88,8 +88,8 @@ void write_batch_flist_info(int flist_count, struct file_struct **fptr)
 	    sizeof(time_t) +
 	    sizeof(OFF_T) +
 	    sizeof(mode_t) +
-	    sizeof(INO_T) +
-	    (2 * sizeof(dev_t)) + sizeof(uid_t) + sizeof(gid_t);
+	    sizeof(INO64_T) +
+	    (2 * sizeof(DEV64_T)) + sizeof(uid_t) + sizeof(gid_t);
 
 	fdb_open = 1;
 	fdb_close = 0;
@@ -289,8 +289,8 @@ void read_batch_flist_info(struct file_struct **fptr)
 	read_batch_flist_file((char *) &file->modtime, sizeof(time_t));
 	read_batch_flist_file((char *) &file->length, sizeof(OFF_T));
 	read_batch_flist_file((char *) &file->mode, sizeof(mode_t));
-	read_batch_flist_file((char *) &file->inode, sizeof(INO_T));
-	read_batch_flist_file((char *) &file->dev, sizeof(dev_t));
+	read_batch_flist_file((char *) &file->inode, sizeof(INO64_T));
+	read_batch_flist_file((char *) &file->dev, sizeof(DEV64_T));
 	read_batch_flist_file((char *) &file->rdev, sizeof(dev_t));
 	read_batch_flist_file((char *) &file->uid, sizeof(uid_t));
 	read_batch_flist_file((char *) &file->gid, sizeof(gid_t));

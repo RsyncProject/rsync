@@ -153,9 +153,9 @@ static void print_rsync_version(enum logcode f)
 	/* Note that this field may not have type ino_t.  It depends
 	 * on the complicated interaction between largefile feature
 	 * macros. */
-	rprintf(f, "              %d-bit inums, %d-bit INO_T\n",
+	rprintf(f, "              %d-bit system inums, %d-bit internal inums\n",
 		(int) (sizeof(dumstat->st_ino) * 8),
-		(int) (sizeof(INO_T) * 8));
+		(int) (sizeof(INO64_T) * 8));
 
 #ifdef NO_INT64
         rprintf(f, "WARNING: no 64-bit integers on this platform!\n");

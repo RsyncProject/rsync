@@ -272,12 +272,30 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #define NO_INT64
 #endif
 
-/* We want to manipulate 64-bit inums.  On some systems
- * STRUCT_STAT.st_ino can be bigger than an ino_t depending on the
- * combination of largefile feature macros.  Rather than try to guess,
- * we just internally store them in the largest know type.  Hopefully
- * it's enough. */
-#define INO_T int64
+/* Starting from protocol version 26, we always use 64-bit
+ * ino_t and dev_t internally, even if this platform does not
+ * allow files to have 64-bit inums.  That's because the
+ * receiver needs to find duplicate (dev,ino) tuples to detect
+ * hardlinks, and it might have files coming from a platform
+ * that has 64-bit inums.
+ *
+ * The only exception is if we're on a platform with no 64-bit type at
+ * all.
+ *
+ * Because we use read_longint() to get these off the wire, if you
+ * transfer devices or hardlinks with dev or inum > 2**32 to a machine
+ * with no 64-bit types then you will get an overflow error.  Probably
+ * not many people have that combination of machines, and you can
+ * avoid it by not preserving hardlinks or not transferring device
+ * nodes.  It's not clear that any other behaviour is better.
+ *
+ * Note that if you transfer devices from a 64-bit-devt machine (say,
+ * Solaris) to a 32-bit-devt machine (say, Linux-2.2/x86) then the
+ * device numbers will be truncated.  But it's a kind of silly thing
+ * to do anyhow.
+ */ 
+#define INO64_T int64
+#define DEV64_T int64
 
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
@@ -308,9 +326,13 @@ struct file_struct {
 	time_t modtime;
 	OFF_T length;
 	mode_t mode;
-	INO_T inode;
-	dev_t dev;
-	dev_t rdev;
+
+	INO64_T inode;
+	/** Device this file lives upon */
+	DEV64_T dev;
+
+	/** If this is a device node, the device number. */
+	DEV64_T rdev;
 	uid_t uid;
 	gid_t gid;
 	char *basename;
