@@ -329,15 +329,18 @@ AC_CHECK_FUNCS(inet_pton, , AC_LIBOBJ(lib/inet_pton))
 
 # Irix 6.5 has getaddrinfo but not the corresponding defines, so use
 #   builtin getaddrinfo if one of the defines don't exist
-AC_MSG_CHECKING([whether defines needed by getaddrinfo exist])
-AC_EGREP_CPP(yes, [
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#ifdef AI_PASSIVE
-yes
-#endif], [
-	AC_MSG_RESULT(yes)
+AC_CACHE_CHECK([whether defines needed by getaddrinfo exist],
+               rsync_cv_HAVE_GETADDR_DEFINES,[
+			AC_EGREP_CPP(yes, [
+			#include <sys/types.h>
+			#include <sys/socket.h>
+			#include <netdb.h>
+			#ifdef AI_PASSIVE
+			yes
+			#endif], 
+			rsync_cv_HAVE_GETADDR_DEFINES=yes,
+			rsync_cv_HAVE_GETADDR_DEFINES=no)])
+if test x"$rsync_cv_HAVE_GETADDR_DEFINES" = x"yes"; then
 	# Tru64 UNIX has getaddrinfo() but has it renamed in libc as
 	# something else so we must include <netdb.h> to get the
 	# redefinition.
@@ -352,10 +355,10 @@ yes
 			[AC_MSG_RESULT([no])
 			AC_LIBOBJ(lib/getaddrinfo)])])
 	AC_CHECK_FUNCS(getnameinfo, , AC_LIBOBJ(lib/getnameinfo))
-	],
-	[AC_MSG_RESULT(no)
+else
 	AC_LIBOBJ(lib/getaddrinfo)
-	AC_LIBOBJ(lib/getnameinfo)])
+	AC_LIBOBJ(lib/getnameinfo)
+fi
 
 
 AC_CHECK_MEMBER([struct sockaddr.sa_len], 
