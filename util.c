@@ -82,7 +82,16 @@ int fd_pair(int fd[2])
 }
 
 
-/* this is derived from CVS code */
+/* this is derived from CVS code 
+
+   note that in the child STDIN is set to blocking and STDOUT
+   is set to non-blocking. This is necessary as rsh relies on stdin being blocking
+   and ssh relies on stdout being non-blocking
+
+   if blocking_io is set then use blocking io on both fds. That can be
+   used to cope with badly broken rsh implementations like the one on
+   solaris.
+ */
 int piped_child(char **command,int *f_in,int *f_out)
 {
   int pid;
