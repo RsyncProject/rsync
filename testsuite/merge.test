@@ -1,0 +1,52 @@
+#! /bin/sh
+
+# Copyright (C) 2004 by Wayne Davison <wayned@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Make sure we can merge files from multiple directories into one.
+
+. $srcdir/testsuite/rsync.fns
+
+set -x
+
+# Build some files/dirs/links to copy
+
+fromdir="$scratchdir/from"
+from1dir="${fromdir}1"
+from2dir="${fromdir}2"
+from3dir="${fromdir}3"
+todir="$scratchdir/to"
+chkdir="$scratchdir/chk"
+
+mkdir "$from1dir" "$from2dir" "$from3dir"
+mkdir "$from2dir"/sub1 "$from3dir"/sub1
+mkdir "$from3dir"/sub2
+mkdir "$chkdir" "$chkdir"/sub1 "$chkdir"/sub2
+echo "one" >"$from1dir"/one
+echo "uno" >"$from2dir"/one
+echo "1" >"$from3dir"/one
+echo "two" >"$from1dir"/two
+echo "three" >"$from2dir"/three
+echo "four" >"$from3dir"/four
+echo "five" >"$from1dir"/five
+echo "six" >"$from3dir"/six
+echo "sub1" >"$from2dir"/sub1/uno
+echo "hmm1" >"$from3dir"/sub1/uno
+echo "sub2" >"$from3dir"/sub1/dos
+echo "sub3" >"$from2dir"/sub1/tres
+echo "subby" >"$from3dir"/sub2/subby
+
+cp -p "$from1dir"/one "$from1dir"/two "$from2dir"/three "$from3dir"/four "$from1dir"/five "$from3dir"/six "$chkdir"
+cp -p "$from2dir"/sub1/uno "$from3dir"/sub1/dos "$from2dir"/sub1/tres "$chkdir"/sub1
+cp -p "$from3dir"/sub2/subby "$chkdir"/sub2
+
+# Fix the directory times
+$RSYNC -av --include='*/' --exclude='*' "$from3dir/" "$chkdir/"
+$RSYNC -av --include='*/' --exclude='*' "$from2dir/" "$chkdir/"
+$RSYNC -av --include='*/' --exclude='*' "$from1dir/" "$chkdir/"
+
+checkit "$RSYNC -aHvv \"$fromdir\"?/ \"$todir/\"" "$chkdir" "$todir"
+
+exit 0
