@@ -544,7 +544,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			exit_cleanup(RERR_FILEIO);
 		}
 
-		if (recv_ok || keep_partial)
+		if (recv_ok || keep_partial || inplace)
 			finish_transfer(fname, fnametmp, file, recv_ok);
 		else
 			do_unlink(fnametmp);
