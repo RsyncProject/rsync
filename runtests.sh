@@ -125,6 +125,9 @@ set -e
 
 RUNSHFLAGS='-e'
 
+# for Solaris
+PATH="/usr/xpg4/bin/:$PATH"
+
 if [ -n "$loglevel" ] && [ "$loglevel" -gt 8 ]
 then
     if set -x
