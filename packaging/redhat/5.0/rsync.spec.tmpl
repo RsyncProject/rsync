@@ -21,6 +21,8 @@ A technical report describing the rsync algorithm is included with
 this package. 
 
 %changelog
+* Mon Jan 25 1999 Stefan Hornburg <racke@linuxia.de>
+  quoted RPM_OPT_FLAGS for the sake of robustness  
 * Mon May 18 1998 Andrew Tridgell <tridge@samba.anu.edu.au>
   reworked for auto-building when I release rsync (tridge@samba.anu.edu.au)
 
@@ -58,7 +60,7 @@ previous package(s).)
 
 %build
 ./configure --prefix=/usr
-make CFLAGS=$RPM_OPT_FLAGS
+make CFLAGS="$RPM_OPT_FLAGS"
 strip rsync
 
 %install
