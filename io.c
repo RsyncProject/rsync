@@ -804,6 +804,23 @@ void read_sum_head(int f, struct sum_struct *sum)
 	}
 }
 
+/* Send the values from a sum_struct over the socket.  Set sum to
+ * NULL if there are no checksums to send.  This is called by both
+ * the generator and the sender. */
+void write_sum_head(int f, struct sum_struct *sum)
+{
+	static struct sum_struct null_sum;
+
+	if (sum == NULL)
+		sum = &null_sum;
+
+	write_int(f, sum->count);
+	write_int(f, sum->blength);
+	if (protocol_version >= 27)
+		write_int(f, sum->s2length);
+	write_int(f, sum->remainder);
+}
+
 
 /**
  * Sleep after writing to limit I/O bandwidth usage.
