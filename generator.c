@@ -66,6 +66,7 @@ extern int always_checksum;
 extern char *partial_dir;
 extern char *basis_dir[];
 extern int compare_dest;
+extern int copy_dest;
 extern int link_dest;
 extern int whole_file;
 extern int local_server;
@@ -873,6 +874,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					continue;
 				best_match = i;
 				match_level = 2;
+				if (copy_dest)
+					break;
 				/* FALL THROUGH */
 			case 2:
 				if (!unchanged_attrs(file, &st))
@@ -910,7 +913,20 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				match_level = 2;
 			}
 #endif
-			if (compare_dest || (match_level && match_level < 3)) {
+			if (match_level == 2) {
+				/* Copy the file locally. */
+				if (copy_file(fnamecmpbuf, fname, file->mode) < 0) {
+					if (verbose) {
+						rsyserr(FINFO, errno,
+							"copy_file %s => %s",
+							full_fname(fnamecmpbuf),
+							safe_fname(fname));
+					}
+					match_level = 0;
+					statret = -1;
+				} else
+					set_perms(fname, file, NULL, 0);
+			} else if (compare_dest || match_level == 1) {
 				fnamecmp = fnamecmpbuf;
 				fnamecmp_type = i;
 			}
@@ -973,11 +989,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			return;
 		}
 		/* Only --compare-dest gets here. */
-		if (unchanged_attrs(file, &st)) {
-			itemize(file, ndx, real_ret, &real_st,
-				ITEM_NO_DEST_AND_NO_UPDATE, 0, NULL);
-			return;
-		}
+		itemize(file, ndx, real_ret, &real_st,
+			ITEM_NO_DEST_AND_NO_UPDATE, 0, NULL);
+		return;
 	}
 
 prepare_to_open:
