@@ -1169,7 +1169,8 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		/* We need to ensure that any dirs we create have writeable
 		 * permissions during the time we are putting files within
 		 * them.  This is then fixed after the transfer is done. */
-		if (!am_root && S_ISDIR(file->mode) && !(file->mode & S_IWUSR)) {
+		if (!am_root && S_ISDIR(file->mode) && !(file->mode & S_IWUSR)
+		    && !list_only) {
 			int mode = file->mode | S_IWUSR; /* user write */
 			char *fname = local_name ? local_name : fbuf;
 			if (do_chmod(fname, mode & CHMOD_BITS) < 0) {
