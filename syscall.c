@@ -95,3 +95,30 @@ char *do_mktemp(char *template)
 	if (dry_run) return NULL;
 	return mktemp(template);
 }
+
+int do_stat(const char *fname, STRUCT_STAT *st)
+{
+#if HAVE_OFF64_T
+	return stat64(fname, st);
+#else
+	return stat(fname, st);
+#endif
+}
+
+int do_lstat(const char *fname, STRUCT_STAT *st)
+{
+#if HAVE_OFF64_T
+	return lstat64(fname, st);
+#else
+	return lstat(fname, st);
+#endif
+}
+
+int do_fstat(int fd, STRUCT_STAT *st)
+{
+#if HAVE_OFF64_T
+	return fstat64(fd, st);
+#else
+	return fstat(fd, st);
+#endif
+}

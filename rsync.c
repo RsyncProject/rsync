@@ -72,15 +72,15 @@ static int delete_file(char *fname)
 	struct dirent *di;
 	char buf[MAXPATHLEN];
 	extern int force_delete;
-	struct stat st;
+	STRUCT_STAT st;
 	int ret;
 
 	if (do_unlink(fname) == 0 || errno == ENOENT) return 0;
 
 #if SUPPORT_LINKS
-	ret = lstat(fname, &st);
+	ret = do_lstat(fname, &st);
 #else
-	ret = stat(fname, &st);
+	ret = do_stat(fname, &st);
 #endif
 	if (ret) {
 		fprintf(FERROR,"stat(%s) : %s\n", fname, strerror(errno));
@@ -158,14 +158,14 @@ static void send_sums(struct sum_struct *s,int f_out)
 
   generate approximately one checksum every n bytes
   */
-static struct sum_struct *generate_sums(struct map_struct *buf,off_t len,int n)
+static struct sum_struct *generate_sums(struct map_struct *buf,OFF_T len,int n)
 {
   int i;
   struct sum_struct *s;
   int count;
   int block_len = n;
   int remainder = (len%block_len);
-  off_t offset = 0;
+  OFF_T offset = 0;
 
   count = (len+(block_len-1))/block_len;
 
@@ -219,7 +219,7 @@ static struct sum_struct *receive_sums(int f)
 {
   struct sum_struct *s;
   int i;
-  off_t offset = 0;
+  OFF_T offset = 0;
 
   s = (struct sum_struct *)malloc(sizeof(*s));
   if (!s) out_of_memory("receive_sums");
@@ -264,11 +264,11 @@ static struct sum_struct *receive_sums(int f)
 }
 
 
-static int set_perms(char *fname,struct file_struct *file,struct stat *st,
+static int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 		     int report)
 {
   int updated = 0;
-  struct stat st2;
+  STRUCT_STAT st2;
 
   if (dry_run) return 0;
 
@@ -329,7 +329,7 @@ static int set_perms(char *fname,struct file_struct *file,struct stat *st,
 
 /* choose whether to skip a particular file */
 static int skip_file(char *fname,
-		     struct file_struct *file, struct stat *st)
+		     struct file_struct *file, STRUCT_STAT *st)
 {
 	if (st->st_size != file->length) {
 		return 0;
@@ -364,7 +364,7 @@ int adapt_block_size(struct file_struct *file, int bsize)
 void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 {  
   int fd;
-  struct stat st;
+  STRUCT_STAT st;
   struct map_struct *buf;
   struct sum_struct *s;
   int statret;
@@ -541,8 +541,8 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
 {
   int i,n,remainder,len,count;
-  off_t offset = 0;
-  off_t offset2;
+  OFF_T offset = 0;
+  OFF_T offset2;
   char *data;
   static char file_sum1[MD4_SUM_LENGTH];
   static char file_sum2[MD4_SUM_LENGTH];
@@ -661,7 +661,7 @@ static void add_delete_entry(struct file_struct *file)
 static int delete_already_done(struct file_list *flist,int j)
 {
 	int i;
-	struct stat st;
+	STRUCT_STAT st;
 
 	if (link_stat(f_name(flist->files[j]), &st)) return 1;
 
@@ -743,7 +743,7 @@ void sig_int(void)
 int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 {  
   int fd1,fd2;
-  struct stat st;
+  STRUCT_STAT st;
   char *fname;
   char fnametmp[MAXPATHLEN];
   struct map_struct *buf;
@@ -794,7 +794,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
       /* open the file */  
       fd1 = open(fname,O_RDONLY);
 
-      if (fd1 != -1 && fstat(fd1,&st) != 0) {
+      if (fd1 != -1 && do_fstat(fd1,&st) != 0) {
 	fprintf(FERROR,"fstat %s : %s\n",fname,strerror(errno));
 	receive_data(f_in,NULL,-1,NULL);
 	close(fd1);
@@ -944,7 +944,7 @@ void send_files(struct file_list *flist,int f_out,int f_in)
   int fd;
   struct sum_struct *s;
   struct map_struct *buf;
-  struct stat st;
+  STRUCT_STAT st;
   char fname[MAXPATHLEN];  
   int i;
   struct file_struct *file;
@@ -1015,7 +1015,7 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 	  }
 	  
 	  /* map the local file */
-	  if (fstat(fd,&st) != 0) {
+	  if (do_fstat(fd,&st) != 0) {
 		  io_error = 1;
 		  fprintf(FERROR,"fstat failed : %s\n",strerror(errno));
 		  free_sums(s);

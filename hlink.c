@@ -106,7 +106,7 @@ int check_hard_link(struct file_struct *file)
 #if SUPPORT_HARD_LINKS
 static void hard_link_one(int i)
 {
-	struct stat st1,st2;
+	STRUCT_STAT st1,st2;
 
 	if (link_stat(f_name(&hlink_list[i-1]),&st1) != 0) return;
 

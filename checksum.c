@@ -93,13 +93,13 @@ void get_checksum2(char *buf,int len,char *sum)
 }
 
 
-void file_checksum(char *fname,char *sum,off_t size)
+void file_checksum(char *fname,char *sum,OFF_T size)
 {
-  off_t i;
+  OFF_T i;
   MDstruct MD;
   struct map_struct *buf;
   int fd;
-  off_t len = size;
+  OFF_T len = size;
   char tmpchunk[CSUM_CHUNK];
 
   bzero(sum,csum_length);

@@ -193,7 +193,17 @@
 #define uint32 unsigned int32
 #endif
 
-#if (SIZEOF_LONG == 8) 
+#if HAVE_OFF64_T
+#define OFF_T off64_t
+#define STRUCT_STAT struct stat64
+#else
+#define OFF_T off_t
+#define STRUCT_STAT struct stat
+#endif
+
+#if HAVE_OFF64_T
+#define int64 off64_t
+#elif (SIZEOF_LONG == 8) 
 #define int64 long
 #elif (SIZEOF_INT == 8) 
 #define int64 int
@@ -223,7 +233,7 @@
 struct file_struct {
 	unsigned flags;
 	time_t modtime;
-	off_t length;
+	OFF_T length;
 	mode_t mode;
 	ino_t inode;
 	dev_t dev;
@@ -244,7 +254,7 @@ struct file_list {
 };
 
 struct sum_buf {
-  off_t offset;			/* offset in file of this chunk */
+  OFF_T offset;			/* offset in file of this chunk */
   int len;			/* length of chunk of file */
   int i;			/* index of this chunk */
   uint32 sum1;	                /* simple checksum */
@@ -252,7 +262,7 @@ struct sum_buf {
 };
 
 struct sum_struct {
-  off_t flength;		/* total file length */
+  OFF_T flength;		/* total file length */
   int count;			/* how many chunks */
   int remainder;		/* flength % block_length */
   int n;			/* block_length */
@@ -262,7 +272,7 @@ struct sum_struct {
 struct map_struct {
 	char *map,*p;
 	int fd,p_size,p_len;
-	off_t size, p_offset;
+	OFF_T size, p_offset;
 };
 
 /* we need this function because of the silly way in which duplicate

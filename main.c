@@ -273,9 +273,9 @@ oom:
 
 static char *get_local_name(struct file_list *flist,char *name)
 {
-  struct stat st;
+  STRUCT_STAT st;
 
-  if (stat(name,&st) == 0) {
+  if (do_stat(name,&st) == 0) {
     if (S_ISDIR(st.st_mode)) {
       if (chdir(name) != 0) {
 	fprintf(FERROR,"chdir %s : %s (1)\n",name,strerror(errno));

@@ -48,16 +48,16 @@ extern int io_error;
 
 static char **local_exclude_list;
 
-int link_stat(const char *Path, struct stat *Buffer) 
+int link_stat(const char *Path, STRUCT_STAT *Buffer) 
 {
 #if SUPPORT_LINKS
     if (copy_links) {
-	return stat(Path, Buffer);
+	return do_stat(Path, Buffer);
     } else {
-	return lstat(Path, Buffer);
+	return do_lstat(Path, Buffer);
     }
 #else
-    return stat(Path, Buffer);
+    return do_stat(Path, Buffer);
 #endif
 }
 
@@ -65,7 +65,7 @@ int link_stat(const char *Path, struct stat *Buffer)
   This function is used to check if a file should be included/excluded
   from the list of files based on its name and type etc
  */
-static int match_file_name(char *fname,struct stat *st)
+static int match_file_name(char *fname,STRUCT_STAT *st)
 {
   if (check_exclude(fname,local_exclude_list)) {
     if (verbose > 2)
@@ -80,7 +80,7 @@ static dev_t filesystem_dev;
 
 static void set_filesystem(char *fname)
 {
-  struct stat st;
+  STRUCT_STAT st;
   if (link_stat(fname,&st) != 0) return;
   filesystem_dev = st.st_dev;
 }
@@ -322,9 +322,9 @@ static void receive_file_entry(struct file_struct **fptr,
 /* determine if a file in a different filesstem should be skipped
    when one_file_system is set. We bascally only want to include
    the mount points - but they can be hard to find! */
-static int skip_filesystem(char *fname, struct stat *st)
+static int skip_filesystem(char *fname, STRUCT_STAT *st)
 {
-	struct stat st2;
+	STRUCT_STAT st2;
 	char *p = strrchr(fname, '/');
 
 	/* skip all but directories */
@@ -346,7 +346,7 @@ static int skip_filesystem(char *fname, struct stat *st)
 static struct file_struct *make_file(char *fname)
 {
 	struct file_struct *file;
-	struct stat st;
+	STRUCT_STAT st;
 	char sum[SUM_LENGTH];
 	char *p;
 	char cleaned_name[MAXPATHLEN];
@@ -553,7 +553,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 struct file_list *send_file_list(int f,int argc,char *argv[])
 {
 	int i,l;
-	struct stat st;
+	STRUCT_STAT st;
 	char *p,*dir;
 	char dbuf[MAXPATHLEN];
 	char lastpath[MAXPATHLEN]="";

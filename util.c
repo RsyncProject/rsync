@@ -32,7 +32,7 @@ int num_waiting(int fd)
 }
 
 
-struct map_struct *map_file(int fd,off_t len)
+struct map_struct *map_file(int fd,OFF_T len)
 {
   struct map_struct *ret;
   ret = (struct map_struct *)malloc(sizeof(*ret));
@@ -54,7 +54,7 @@ struct map_struct *map_file(int fd,off_t len)
 }
 
 
-char *map_ptr(struct map_struct *map,off_t offset,int len)
+char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 {
   int nread = -2;
 

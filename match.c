@@ -87,13 +87,13 @@ static void build_hash_table(struct sum_struct *s)
 }
 
 
-static off_t last_match;
+static OFF_T last_match;
 
 
 static void matched(int f,struct sum_struct *s,struct map_struct *buf,
-		    off_t offset,int i)
+		    OFF_T offset,int i)
 {
-	off_t n = offset - last_match;
+	OFF_T n = offset - last_match;
 	int j;
 
 	if (verbose > 2 && i >= 0)
@@ -123,9 +123,9 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 
 
 static void hash_search(int f,struct sum_struct *s,
-			struct map_struct *buf,off_t len)
+			struct map_struct *buf,OFF_T len)
 {
-	off_t offset;
+	OFF_T offset;
 	int j,k;
 	int end;
 	char sum2[SUM_LENGTH];
@@ -220,7 +220,7 @@ static void hash_search(int f,struct sum_struct *s,
 }
 
 
-void match_sums(int f,struct sum_struct *s,struct map_struct *buf,off_t len)
+void match_sums(int f,struct sum_struct *s,struct map_struct *buf,OFF_T len)
 {
 	char file_sum[MD4_SUM_LENGTH];
 
