@@ -59,7 +59,7 @@ extern int filesfrom_fd;
 extern pid_t cleanup_child_pid;
 extern char *files_from;
 extern char *remote_filesfrom_file;
-extern char *compare_dest;
+extern char *basis_dir[];
 extern char *rsync_path;
 extern char *shell_cmd;
 extern char *batch_name;
@@ -463,7 +463,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	int pid;
 	int status = 0;
 	int error_pipe[2], name_pipe[2];
-	BOOL need_name_pipe = compare_dest && !dry_run;
+	BOOL need_name_pipe = basis_dir[0] && !dry_run;
 
 	/* The receiving side mustn't obey this, or an existing symlink that
 	 * points to an identical file won't be replaced by the referent. */
