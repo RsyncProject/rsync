@@ -324,24 +324,24 @@ static int rsync_module(int f_in, int f_out, int i)
 	}
 
 	p = lp_filter(i);
-	add_filter(&server_filter_list, p, MATCHFLG_WORD_SPLIT,
+	parse_rule(&server_filter_list, p, MATCHFLG_WORD_SPLIT,
 		   XFLG_ANCHORED2ABS);
 
 	p = lp_include_from(i);
-	add_filter_file(&server_filter_list, p, MATCHFLG_INCLUDE,
+	parse_filter_file(&server_filter_list, p, MATCHFLG_INCLUDE,
 	    XFLG_ANCHORED2ABS | XFLG_OLD_PREFIXES | XFLG_FATAL_ERRORS);
 
 	p = lp_include(i);
-	add_filter(&server_filter_list, p,
+	parse_rule(&server_filter_list, p,
 		   MATCHFLG_INCLUDE | MATCHFLG_WORD_SPLIT,
 		   XFLG_ANCHORED2ABS | XFLG_OLD_PREFIXES);
 
 	p = lp_exclude_from(i);
-	add_filter_file(&server_filter_list, p, 0,
+	parse_filter_file(&server_filter_list, p, 0,
 	    XFLG_ANCHORED2ABS | XFLG_OLD_PREFIXES | XFLG_FATAL_ERRORS);
 
 	p = lp_exclude(i);
-	add_filter(&server_filter_list, p, MATCHFLG_WORD_SPLIT,
+	parse_rule(&server_filter_list, p, MATCHFLG_WORD_SPLIT,
 		   XFLG_ANCHORED2ABS | XFLG_OLD_PREFIXES);
 
 	log_init();
