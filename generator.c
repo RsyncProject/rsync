@@ -165,6 +165,9 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 	char *fnamecmp;
 	char fnamecmpbuf[MAXPATHLEN];
 	extern char *compare_dest;
+	extern int list_only;
+
+	if (list_only) return;
 
 	if (verbose > 2)
 		rprintf(FINFO,"recv_generator(%s,%d)\n",fname,i);

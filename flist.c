@@ -51,6 +51,36 @@ static struct exclude_struct **local_exclude_list;
 
 static void clean_flist(struct file_list *flist, int strip_root);
 
+
+static void list_file_entry(struct file_struct *f)
+{
+	char perms[11] = "----------";
+	char *perm_map = "rwxrwxrwx";
+	int i;
+
+	for (i=0;i<9;i++) {
+		if (f->mode & (1<<i)) perms[9-i] = perm_map[8-i];
+	}
+	if (S_ISLNK(f->mode)) perms[0] = 'l';
+	if (S_ISDIR(f->mode)) perms[0] = 'd';
+	if (S_ISBLK(f->mode)) perms[0] = 'b';
+	if (S_ISCHR(f->mode)) perms[0] = 'c';
+	if (S_ISSOCK(f->mode)) perms[0] = 's';
+	if (S_ISFIFO(f->mode)) perms[0] = 'p';
+	
+	if (preserve_links && S_ISLNK(f->mode)) {
+		rprintf(FINFO,"%s %11.0f %s %s -> %s\n", 
+			perms, 
+			(double)f->length, timestring(f->modtime), 
+			f_name(f), f->link);
+	} else {
+		rprintf(FINFO,"%s %11.0f %s %s\n", 
+			perms, 
+			(double)f->length, timestring(f->modtime), f_name(f));
+	}
+}
+
+
 int link_stat(const char *Path, STRUCT_STAT *Buffer) 
 {
 #if SUPPORT_LINKS
@@ -699,6 +729,7 @@ struct file_list *recv_file_list(int f)
   struct file_list *flist;
   unsigned char flags;
   int64 start_read;
+  extern int list_only;
 
   if (verbose && recurse && !am_server) {
     rprintf(FINFO,"receiving file list ... ");
@@ -764,6 +795,14 @@ struct file_list *recv_file_list(int f)
   if (f != -1 && remote_version >= 17) {
 	  io_error |= read_int(f);
   }
+
+  if (list_only) {
+	  int i;
+	  for (i=0;i<flist->count;i++) {
+		  list_file_entry(flist->files[i]);
+	  }
+  }
+
 
   if (verbose > 2)
     rprintf(FINFO,"recv_file_list done\n");

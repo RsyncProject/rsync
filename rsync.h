@@ -23,6 +23,8 @@
 #define RSYNC_NAME "rsync"
 #define RSYNCD_CONF "/etc/rsyncd.conf"
 
+#define URL_PREFIX "rsync://"
+
 #define BACKUP_SUFFIX "~"
 
 /* a non-zero CHAR_OFFSET makes the rolling sum stronger, but is

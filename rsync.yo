@@ -140,6 +140,9 @@ itemize(
 
 	it() if you specify no path name on the remote server then the
 	list of accessible paths on the server will be shown.
+	
+	it() if you specify no local destination then a listing of the
+	specified files on the remote server is provided
 )
 
 Some paths on the remote server may require authentication. If so then

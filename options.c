@@ -73,7 +73,7 @@ int rsync_port = RSYNC_PORT;
 
 int verbose = 0;
 int always_checksum = 0;
-
+int list_only = 0;
 
 void usage(int F)
 {

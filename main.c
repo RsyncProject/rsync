@@ -384,6 +384,7 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 	int status = 0, status2 = 0;
 	char *local_name = NULL;
 	extern int am_sender;
+	extern int list_only;
 
 	setup_protocol(f_out,f_in);
 	
@@ -412,6 +413,8 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 		report(-1);
 		exit_cleanup(status);
 	}
+
+	if (argc == 0) list_only = 1;
 	
 	send_exclude_list(f_out);
 	
@@ -462,6 +465,20 @@ static int start_client(int argc, char *argv[])
 	extern int am_sender;
 	extern char *shell_cmd;
 
+	if (strncasecmp(URL_PREFIX, argv[0], strlen(URL_PREFIX)) == 0) {
+		char *host, *path;
+
+		host = argv[0] + strlen(URL_PREFIX);
+		p = strchr(host,'/');
+		if (p) {
+			*p = 0;
+			path = p+1;
+		} else {
+			path="";
+		}
+		return start_socket_client(host, path, argc-1, argv+1);
+	}
+
 	p = find_colon(argv[0]);
 
 	if (p) {
@@ -470,7 +487,7 @@ static int start_client(int argc, char *argv[])
 			return start_socket_client(argv[0], p+2, argc-1, argv+1);
 		}
 
-		if (argc < 2) {
+		if (argc < 1) {
 			usage(FERROR);
 			exit_cleanup(1);
 		}
@@ -525,7 +542,7 @@ static int start_client(int argc, char *argv[])
 			shell_path?shell_path:"");
 	}
 	
-	if (!am_sender && argc != 1) {
+	if (!am_sender && argc > 1) {
 		usage(FERROR);
 		exit_cleanup(1);
 	}
