@@ -76,6 +76,14 @@ There seems to be a bug with hardlinks
 IMPORTANT ------------------------------------------------------------
 
 
+--dry-run is insufficiently dry
+
+  Mark Santcroos points out that -n fails to list files which have
+  only metadata changes, though it probably should.  
+
+  There may be a Debian bug about this as well.
+
+
 use chroot
 
   If the platform doesn't support it, then don't even try.
@@ -86,11 +94,13 @@ use chroot
     http://lists.samba.org/pipermail/rsync/2001-August/thread.html
     http://lists.samba.org/pipermail/rsync/2001-September/thread.html
 
+
 --files-from
 
   Avoids traversal.  Better option than a pile of --include statements
   for people who want to generate the file list using a find(1)
   command or a script.
+
 
 File list structure in memory
 
