@@ -882,7 +882,7 @@ int pop_dir(char *dir)
  * empty line.  This function can return only MAX_SAFE_NAMES values at a
  * time!  The returned value can be longer than MAXPATHLEN (because we
  * may be trying to output an error about a too-long filename)! */
-const char *safe_fname(const char *fname)
+char *safe_fname(const char *fname)
 {
 #define MAX_SAFE_NAMES 4
 	static char fbuf[MAX_SAFE_NAMES][MAXPATHLEN*2];
