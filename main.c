@@ -46,6 +46,8 @@ int delete_mode=0;
 int one_file_system=0;
 int remote_version=0;
 int sparse_files=0;
+int do_compression=0;
+
 extern int csum_length;
 
 int am_server = 0;

@@ -50,6 +50,10 @@ rsync-1.4.1
 rsync-1.4.1.tar.gz
 rsync-1.4.2
 rsync-1.4.2.tar.gz
+rsync-1.4.3
+rsync-1.4.4
+rsync-1.4.5
+rsync-1.4.5.tar.gz
 rsync-1.4.tar.gz
 rsync-ERSION
 rsync.aux
@@ -60,5 +64,3 @@ tech_report.dvi
 tech_report.log
 tech_report.ps
 test
-rsync-1.4.3
-rsync-1.4.4
