@@ -298,6 +298,7 @@ static int open_socket_in(int type, int port, const char *bind_address,
 			case EPROTONOSUPPORT:
 			case EAFNOSUPPORT:
 			case EPFNOSUPPORT:
+			case EINVAL:
 				/* See if there's another address that will work... */
 				continue;
 			}
