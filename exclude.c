@@ -43,6 +43,8 @@ static int check_one_exclude(char *name,char *pattern)
 
   if (!name[0]) return 0;
 
+  if (*pattern == '/' && *name != '/') pattern++;
+
   if (is_regex(pattern)) {
     if (fnmatch(pattern, name, 0) == 0)
       return 1;
