@@ -206,14 +206,15 @@ static int get_tmpname(char *fnametmp, char *fname)
 		length = strlen(fnametmp);
 		fnametmp[length++] = '/';
 		fnametmp[length] = '\0';	/* always NULL terminated */
-		}
+	}
 
-	if ((f = strrchr(fname, '/'))) {	/* extra () for gcc */
+	if ((f = strrchr(fname, '/')) != NULL) {
 		++f;
 		if (!tmpdir) {
 			length = f - fname;
+			/* copy up to and including the slash */
 			strlcpy(fnametmp, fname, length + 1);
-		}		/* copy up to and including the slash */
+		}
 	} else {
 		f = fname;
 	} 
@@ -222,8 +223,7 @@ static int get_tmpname(char *fnametmp, char *fname)
 
 	maxname = MIN(MAXPATHLEN - 7 - length, NAME_MAX - 8);
 
-	if (maxname < 1)
-	{
+	if (maxname < 1) {
 		rprintf(FERROR, "temporary filename too long: %s\n", fname);
 		fnametmp[0] = '\0';
 		return 0;
@@ -466,7 +466,15 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
 		}
 		if (fd2 == -1) {
-			rprintf(FERROR,"mkstemp %s failed: %s\n",fnametmp,strerror(errno));
+			extern char curr_dir[];
+			char *p1, *p2;
+			if (*fnametmp == '.') {
+				p1 = curr_dir;
+				p2 = "/";
+			} else
+				p1 = p2 = "";
+			rprintf(FERROR, "mkstemp %s%s%s failed: %s\n",
+				p1, p2, fnametmp, strerror(errno));
 			receive_data(f_in,buf,-1,NULL,file->length);
 			if (buf) unmap_file(buf);
 			if (fd1 != -1) close(fd1);
