@@ -164,7 +164,7 @@ static int readfd(int fd,char *buffer,int N)
 }
 
 
-int read_int(int f)
+int32 read_int(int f)
 {
   int ret;
   char b[4];
@@ -185,7 +185,7 @@ int64 read_longint(int f)
 	char b[8];
 	ret = read_int(f);
 
-	if (ret != -1) return ret;
+	if ((int32)ret != (int32)0xffffffff) return ret;
 
 #ifdef NO_INT64
 	fprintf(FERROR,"Integer overflow - attempted 64 bit offset\n");
@@ -376,7 +376,7 @@ static int writefd(int fd,char *buf,int len)
 
 
 
-void write_int(int f,int x)
+void write_int(int f,int32 x)
 {
   int ret;
   char b[4];
