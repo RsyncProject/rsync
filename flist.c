@@ -316,6 +316,29 @@ void receive_file_entry(struct file_struct **fptr,
 }
 
 
+/* determine if a file in a different filesstem should be skipped
+   when one_file_system is set. We bascally only want to include
+   the mount points - but they can be hard to find! */
+static int skip_filesystem(char *fname, struct stat *st)
+{
+	struct stat st2;
+	char *p = strrchr(fname, '/');
+
+	/* skip all but directories */
+	if (!S_ISDIR(st->st_mode)) return 1;
+
+	/* if its not a subdirectory then allow */
+	if (!p) return 0;
+
+	*p = 0;
+	if (link_stat(fname, &st2)) {
+		*p = '/';
+		return 0;
+	}
+	*p = '/';
+	
+	return (st2.st_dev != filesystem_dev);
+}
 
 static struct file_struct *make_file(char *fname)
 {
@@ -343,8 +366,10 @@ static struct file_struct *make_file(char *fname)
 		return NULL;
 	}
 	
-	if (one_file_system && st.st_dev != filesystem_dev)
-		return NULL;
+	if (one_file_system && st.st_dev != filesystem_dev) {
+		if (skip_filesystem(fname, &st))
+			return NULL;
+	}
 	
 	if (!match_file_name(fname,&st))
 		return NULL;
