@@ -159,14 +159,15 @@ static void print_rsync_version(enum logcode f)
                 "Copyright (C) 1996-2002 by Andrew Tridgell and others\n");
 	rprintf(f, "<http://rsync.samba.org/>\n");
         rprintf(f, "Capabilities: %d-bit files, %ssocketpairs, "
-                "%shard links, %ssymlinks, batchfiles, %sIPv6,\n",
+                "%shard links, %ssymlinks, batchfiles, \n",
                 (int) (sizeof(OFF_T) * 8),
-                got_socketpair, hardlinks, links, ipv6);
+                got_socketpair, hardlinks, links);
 
 	/* Note that this field may not have type ino_t.  It depends
 	 * on the complicated interaction between largefile feature
 	 * macros. */
-	rprintf(f, "              %d-bit system inums, %d-bit internal inums\n",
+	rprintf(f, "              %sIPv6, %d-bit system inums, %d-bit internal inums\n",
+		ipv6, 
 		(int) (sizeof(dumstat->st_ino) * 8),
 		(int) (sizeof(INO64_T) * 8));
 
