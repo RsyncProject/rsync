@@ -76,11 +76,18 @@ static size_t wf_writeBufCnt;
 
 int flush_write_file(int f)
 {
-	int ret = write(f, wf_writeBuf, wf_writeBufCnt);
-	if (ret < 0)
-		return ret;
-	/* if (ret < wf_writeBufCnt) ??? */
-	wf_writeBufCnt = 0;
+	int ret = 0;
+	char *bp = wf_writeBuf;
+	
+	while (wf_writeBufCnt > 0) {
+		if ((ret = write(f, bp, wf_writeBufCnt)) < 0) {
+			if (errno == EINTR)
+				continue;
+			return ret;
+		}
+		wf_writeBufCnt -= ret;
+		bp += ret;
+	}
 	return ret;
 }
 
@@ -92,7 +99,7 @@ int write_file(int f,char *buf,size_t len)
 {
 	int ret = 0;
 
-	while (len>0) {
+	while (len > 0) {
 		int r1;
 		if (sparse_files) {
 			int len1 = MIN(len, SPARSE_WRITE_SIZE);
@@ -102,7 +109,8 @@ int write_file(int f,char *buf,size_t len)
 				wf_writeBufSize = MAX_MAP_SIZE;
 				wf_writeBufCnt  = 0;
 				wf_writeBuf = new_array(char, MAX_MAP_SIZE);
-				if (!wf_writeBuf) out_of_memory("write_file");
+				if (!wf_writeBuf)
+					out_of_memory("write_file");
 			}
 			r1 = MIN(len, wf_writeBufSize - wf_writeBufCnt);
 			if (r1) {
@@ -110,7 +118,8 @@ int write_file(int f,char *buf,size_t len)
 				wf_writeBufCnt += r1;
 			}
 			if (wf_writeBufCnt == wf_writeBufSize) {
-				if (flush_write_file(f) < 0) return -1;
+				if (flush_write_file(f) < 0)
+					return -1;
 				if (!r1 && len)
 					continue;
 			}
