@@ -375,8 +375,7 @@ int read_filesfrom_line(int fd, char *fname)
 	extern int io_timeout;
 	extern int eol_nulls;
 	extern char *remote_filesfrom_file;
-	extern int am_server;
-	int reading_remotely = remote_filesfrom_file || (am_server && fd == 0);
+	int reading_remotely = remote_filesfrom_file != NULL;
 	int nulls = eol_nulls || reading_remotely;
 
   start:
