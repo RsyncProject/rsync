@@ -4,6 +4,10 @@ rsync changes since last release
 
     * "make install-strip" works.  (Greg Louis)
 
+    * With --progress, if we've finished transferring a file, show the
+      time taken; otherwise show expected time to complete. (Cameron
+      Simpson)
+
   BUG FIXES:
 
     * Fix test suite on Solaris.  (Jos Backus)
