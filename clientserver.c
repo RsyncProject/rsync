@@ -67,6 +67,14 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 		if (!read_line(fd, line, sizeof(line)-1)) {
 			return -1;
 		}
+
+#if 0
+		if (strncmp(line,"@RSYNCD: AUTHREQD ",18) == 0) {
+			auth_client(fd, line+18);
+			continue;
+		}
+#endif
+
 		if (strcmp(line,"@RSYNCD: OK") == 0) break;
 		rprintf(FINFO,"%s\n", line);
 	}
@@ -101,12 +109,21 @@ static int rsync_module(int fd, int i)
 	char *p;
 	char *addr = client_addr(fd);
 	char *host = client_name(fd);
+	char *auth;
 
 	if (!allow_access(addr, host, lp_hosts_allow(i), lp_hosts_deny(i))) {
 		rprintf(FERROR,"rsync denied on module %s from %s (%s)\n",
 			lp_name(i), client_name(fd), client_addr(fd));
 		return -1;
 	}
+
+#if 0
+	if (!auth_server(fd, "@RSYNCD: AUTHREQD ")) {
+		rprintf(FERROR,"auth failed on module %s from %s (%s)\n",
+			lp_name(i), client_name(fd), client_addr(fd));
+		return -1;		
+	}
+#endif
 
 	if (!claim_connection(lp_lock_file(), lp_max_connections())) {
 		rprintf(FERROR,"ERROR: max connections reached\n");
@@ -115,7 +132,7 @@ static int rsync_module(int fd, int i)
 
 	rprintf(FINFO,"rsync on module %s from %s (%s)\n",
 		lp_name(i), host, addr);
-
+	
 	module_id = i;
 
 	if (lp_read_only(i))

@@ -491,12 +491,16 @@ int process_exists(int pid)
 	return(kill(pid,0) == 0 || errno != ESRCH);
 }
 
-int lock_file(int fd)
+/* lock a byte range in a open file */
+int lock_range(int fd, int offset, int len)
 {
-	return flock(fd, LOCK_EX) == 0;
-}
+	struct flock lock;
 
-int unlock_file(int fd)
-{
-	return flock(fd, LOCK_UN) == 0;
+	lock.l_type = F_WRLCK;
+	lock.l_whence = SEEK_SET;
+	lock.l_start = offset;
+	lock.l_len = len;
+	lock.l_pid = 0;
+	
+	return fcntl(fd,F_SETLK,&lock) == 0;
 }

@@ -57,13 +57,13 @@ typedef char pstring[1024];
 /* the following are used by loadparm for option lists */
 typedef enum
 {
-  P_BOOL,P_BOOLREV,P_CHAR,P_INTEGER,P_OCTAL,
-  P_STRING,P_GSTRING,P_ENUM,P_SEP
+	P_BOOL,P_BOOLREV,P_CHAR,P_INTEGER,P_OCTAL,
+	P_STRING,P_GSTRING,P_ENUM,P_SEP
 } parm_type;
 
 typedef enum
 {
-  P_LOCAL,P_GLOBAL,P_SEPARATOR,P_NONE
+	P_LOCAL,P_GLOBAL,P_SEPARATOR,P_NONE
 } parm_class;
 
 struct enum_list {
@@ -121,6 +121,8 @@ typedef struct
 	char *gid;
 	char *hosts_allow;
 	char *hosts_deny;
+	char *auth_users;
+	char *secrets_file;
 } service;
 
 
@@ -136,6 +138,8 @@ static service sDefault =
 	"nobody",/* gid */
 	NULL,    /* hosts allow */
 	NULL,    /* hosts deny */
+	NULL,    /* auth users */
+	NULL,    /* secrets file */
 };
 
 
@@ -165,6 +169,8 @@ static struct parm_struct parm_table[] =
   {"gid",              P_STRING,  P_LOCAL,  &sDefault.gid,         NULL,   0},
   {"hosts allow",      P_STRING,  P_LOCAL,  &sDefault.hosts_allow, NULL,   0},
   {"hosts deny",       P_STRING,  P_LOCAL,  &sDefault.hosts_deny,  NULL,   0},
+  {"auth users",       P_STRING,  P_LOCAL,  &sDefault.auth_users,  NULL,   0},
+  {"secrets file",     P_STRING,  P_LOCAL,  &sDefault.secrets_file,NULL,   0},
   {NULL,               P_BOOL,    P_NONE,   NULL,                  NULL,   0}
 };
 
@@ -225,6 +231,8 @@ FN_LOCAL_STRING(lp_uid, uid)
 FN_LOCAL_STRING(lp_gid, gid)
 FN_LOCAL_STRING(lp_hosts_allow, hosts_allow)
 FN_LOCAL_STRING(lp_hosts_deny, hosts_deny)
+FN_LOCAL_STRING(lp_auth_users, auth_users)
+FN_LOCAL_STRING(lp_secrets_file, secrets_file)
 
 /* local prototypes */
 static int    strwicmp( char *psz1, char *psz2 );
