@@ -628,4 +628,4 @@ const char *get_panic_action(void);
 
 #define UNUSED(x) x __attribute__((__unused__))
 
-const char *io_write_phase, *io_read_phase;
+extern const char *io_write_phase, *io_read_phase;
