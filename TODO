@@ -259,6 +259,10 @@ logging
   At the connections that just get a list of modules are not logged,
   but they should be.
 
+  If a child of the rsync daemon dies with a signal, we should notice
+  that when we reap it and log a message.
+
+
 rsyncd over ssh
 
   There are already some patches to do this.
