@@ -115,9 +115,12 @@ void clear_exclude_list(struct exclude_list_struct *listp)
 static int check_one_exclude(char *name, struct exclude_struct *ex,
                              int name_is_dir)
 {
-	char *p;
+	char *p, full_name[MAXPATHLEN];
 	int match_start = 0;
 	char *pattern = ex->pattern;
+
+	if (!*name)
+		return 0;
 
 	/* If the pattern does not have any slashes AND it does not have
 	 * a "**" (which could match a slash), then we just match the
@@ -126,14 +129,11 @@ static int check_one_exclude(char *name, struct exclude_struct *ex,
 		if ((p = strrchr(name,'/')) != NULL)
 			name = p+1;
 	}
-	else if (ex->match_flags & MATCHFLG_ABS_PATH && *name != '/') {
-		static char full_name[MAXPATHLEN];
-		int plus = curr_dir[1] == '\0'? 1 : 0;
-		pathjoin(full_name, sizeof full_name, curr_dir+plus, name);
+	else if (ex->match_flags & MATCHFLG_ABS_PATH && *name != '/'
+	    && curr_dir[1]) {
+		pathjoin(full_name, sizeof full_name, curr_dir + 1, name);
 		name = full_name;
 	}
-
-	if (!name[0]) return 0;
 
 	if (ex->match_flags & MATCHFLG_DIRECTORY && !name_is_dir)
 		return 0;
