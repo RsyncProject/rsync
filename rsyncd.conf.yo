@@ -345,7 +345,7 @@ The "dont compress" option takes a space separated list of
 case-insensitive wildcard patterns. Any source filename matching one
 of the patterns will not be compressed during transfer.
 
-The default setting is verb(*.gz *.tgz *.zip *.z *.rpm *.deb)
+The default setting is verb(*.gz *.tgz *.zip *.z *.rpm *.deb *.iso *.bz2 *.tbz)
 
 enddit()
 
