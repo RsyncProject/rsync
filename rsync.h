@@ -132,7 +132,6 @@
 #define FNAMECMP_FUZZY		0x83
 
 /* For calling delete_file() */
-#define DEL_DIR 		(1<<0)
 #define DEL_NO_RECURSE		(1<<1)
 #define DEL_FORCE_RECURSE	(1<<2) /* recurse even w/o --force */
 #define DEL_TERSE		(1<<3)
@@ -147,7 +146,8 @@
 #define ITEM_REPORT_GROUP (1<<6)
 #define ITEM_IS_NEW (1<<7)
 
-#define ITEM_MISSING_DATA (1<<16) /* this is outside the transmitted flags */
+#define ITEM_MISSING_DATA (1<<16) /* these are outside the transmitted flags */
+#define ITEM_DELETED (1<<17)
 
 /* Log-message categories.  FLOG is only used on the daemon side to
  * output messages to the log file. */
@@ -156,6 +156,7 @@ enum logcode { FERROR=1, FINFO=2, FLOG=3 };
 /* Messages types that are sent over the message channel.  The logcode
  * values must all be present here with identical numbers. */
 enum msgcode {
+	MSG_DELETED=7,	/* successfully deleted a file on receiving side */
 	MSG_SUCCESS=6,	/* successfully updated indicated flist index */
 	MSG_DONE=5,	/* current phase is done */
 	MSG_REDO=4,	/* reprocess indicated flist index */
