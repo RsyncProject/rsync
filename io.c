@@ -203,6 +203,10 @@ static void msg_list_add(int code, char *buf, int len)
 
 void send_msg(enum msgcode code, char *buf, int len)
 {
+	if (msg_fd_out < 0) {
+		io_multiplex_write(code, buf, len);
+		return;
+	}
 	msg_list_add(code, buf, len);
 	msg_list_push(NORMAL_FLUSH);
 }
@@ -243,6 +247,14 @@ static void read_msg_fd(void)
 		}
 		read_loop(fd, buf, 4);
 		redo_list_add(IVAL(buf,0));
+		break;
+	case MSG_DELETED:
+		if (len >= (int)sizeof buf || !am_generator) {
+			rprintf(FERROR, "invalid message %d:%d\n", tag, len);
+			exit_cleanup(RERR_STREAMIO);
+		}
+		read_loop(fd, buf, len);
+		io_multiplex_write(MSG_DELETED, buf, len);
 		break;
 	case MSG_INFO:
 	case MSG_ERROR:
@@ -640,7 +652,7 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 	static size_t remaining;
 	static size_t iobuf_in_ndx;
 	int tag, ret = 0;
-	char line[1024];
+	char line[MAXPATHLEN+1];
 
 	if (!iobuf_in || fd != sock_f_in)
 		return read_timeout(fd, buf, len);
@@ -676,6 +688,21 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 			}
 			read_loop(fd, iobuf_in, remaining);
 			iobuf_in_ndx = 0;
+			break;
+		case MSG_DELETED:
+			if (remaining >= sizeof line) {
+				rprintf(FERROR, "invalid multi-message %d:%ld\n",
+					tag, (long)remaining);
+				exit_cleanup(RERR_STREAMIO);
+			}
+			read_loop(fd, line, remaining);
+			line[remaining] = '\0';
+			/* A directory name was sent with the trailing null */
+			if (remaining > 0 && !line[remaining-1])
+				log_delete(line, S_IFDIR);
+			else
+				log_delete(line, S_IFREG);
+			remaining = 0;
 			break;
 		case MSG_INFO:
 		case MSG_ERROR:
@@ -729,7 +756,7 @@ static void readfd(int fd, char *buffer, size_t N)
 }
 
 
-unsigned short read_short(int f)
+int read_shortint(int f)
 {
 	uchar b[2];
 	readfd(f, (char *)b, 2);
@@ -1063,7 +1090,7 @@ static void writefd(int fd,char *buf,size_t len)
 }
 
 
-void write_short(int f, unsigned short x)
+void write_shortint(int f, int x)
 {
 	uchar b[2];
 	b[0] = x;
