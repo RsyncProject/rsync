@@ -21,8 +21,6 @@
 
 #include "rsync.h"
 
-time_t starttime = 0;
-
 extern int verbose;
 extern int dry_run;
 extern int list_only;
@@ -77,6 +75,9 @@ struct pid_status {
 	int   status;
 } pid_stat_table[MAXCHILDPROCS];
 
+static time_t starttime, endtime;
+static int64 total_read, total_written;
+
 static void show_malloc_stats(void);
 
 /****************************************************************************
@@ -121,12 +122,13 @@ void wait_process(pid_t pid, int *status)
  * the report.  All processes might also generate a set of debug stats, if
  * the verbose level is high enough (this is the only thing that the
  * generator process and the server receiver ever do here). */
-static void report(int f)
+static void handle_stats(int f)
 {
+	endtime = time(NULL);
+
 	/* Cache two stats because the read/write code can change it. */
-	int64 total_read = stats.total_read;
-	int64 total_written = stats.total_written;
-	time_t t = time(NULL);
+	total_read = stats.total_read;
+	total_written = stats.total_written;
 
 	if (do_stats && verbose > 1) {
 		/* These come out from every process */
@@ -207,11 +209,17 @@ static void report(int f)
 			(double)total_read);
 	}
 
+	fflush(stdout);
+	fflush(stderr);
+}
+
+static void output_summary(void)
+{
 	if (verbose || do_stats) {
 		rprintf(FINFO,
 			"\nsent %.0f bytes  received %.0f bytes  %.2f bytes/sec\n",
 			(double)total_written, (double)total_read,
-			(total_written + total_read)/(0.5 + (t - starttime)));
+			(total_written + total_read)/(0.5 + (endtime - starttime)));
 		rprintf(FINFO, "total size is %.0f  speedup is %.2f\n",
 			(double)stats.total_size,
 			(double)stats.total_size / (total_written+total_read));
@@ -509,7 +517,7 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 
 	send_files(flist,f_out,f_in);
 	io_flush(FULL_FLUSH);
-	report(f_out);
+	handle_stats(f_out);
 	if (protocol_version >= 24)
 		read_final_goodbye(f_in, f_out);
 	io_flush(FULL_FLUSH);
@@ -555,7 +563,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 		recv_files(f_in, flist, local_name);
 		io_flush(FULL_FLUSH);
-		report(f_in);
+		handle_stats(f_in);
 
 		send_msg(MSG_DONE, "", 0);
 		io_flush(FULL_FLUSH);
@@ -596,7 +604,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	generate_files(f_out, flist, local_name);
 
-	report(-1);
+	handle_stats(-1);
 	io_flush(FULL_FLUSH);
 	if (protocol_version >= 24) {
 		/* send a final goodbye message */
@@ -767,6 +775,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		io_flush(NORMAL_FLUSH);
 		send_files(flist,f_out,f_in);
 		io_flush(FULL_FLUSH);
+		handle_stats(-1);
 		if (protocol_version >= 24)
 			read_final_goodbye(f_in, f_out);
 		if (pid != -1) {
@@ -775,8 +784,8 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			io_flush(FULL_FLUSH);
 			wait_process(pid, &status);
 		}
-		report(-1);
 		io_flush(FULL_FLUSH);
+		output_summary();
 		exit_cleanup(status);
 	}
 
@@ -977,8 +986,11 @@ static RETSIGTYPE sigusr1_handler(UNUSED(int val))
 
 static RETSIGTYPE sigusr2_handler(UNUSED(int val))
 {
+	if (!am_server)
+		output_summary();
 	close_all();
-	if (log_got_error) _exit(RERR_PARTIAL);
+	if (log_got_error)
+		_exit(RERR_PARTIAL);
 	_exit(0);
 }
 
