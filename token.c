@@ -337,7 +337,7 @@ recv_deflated_token(int f, char **data)
 					exit_cleanup(RERR_STREAMIO);
 				}
 				if ((cbuf = malloc(MAX_DATA_COUNT)) == NULL
-				    || (dbuf = malloc(CHUNK_SIZE)) == NULL)
+				    || (dbuf = malloc(AVAIL_OUT_SIZE(CHUNK_SIZE))) == NULL)
 					out_of_memory("recv_deflated_token");
 				init_done = 1;
 			} else {
@@ -366,9 +366,9 @@ recv_deflated_token(int f, char **data)
 				/* check previous inflated stuff ended correctly */
 				rx_strm.avail_in = 0;
 				rx_strm.next_out = (Bytef *)dbuf;
-				rx_strm.avail_out = CHUNK_SIZE;
+				rx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
 				r = inflate(&rx_strm, Z_SYNC_FLUSH);
-				n = CHUNK_SIZE - rx_strm.avail_out;
+				n = AVAIL_OUT_SIZE(CHUNK_SIZE) - rx_strm.avail_out;
 				/*
 				 * Z_BUF_ERROR just means no progress was
 				 * made, i.e. the decompressor didn't have
@@ -422,9 +422,9 @@ recv_deflated_token(int f, char **data)
 
 		case r_inflating:
 			rx_strm.next_out = (Bytef *)dbuf;
-			rx_strm.avail_out = CHUNK_SIZE;
+			rx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
 			r = inflate(&rx_strm, Z_NO_FLUSH);
-			n = CHUNK_SIZE - rx_strm.avail_out;
+			n = AVAIL_OUT_SIZE(CHUNK_SIZE) - rx_strm.avail_out;
 			if (r != Z_OK) {
 				rprintf(FERROR, "inflate returned %d (%d bytes)\n", r, n);
 				exit_cleanup(RERR_STREAMIO);
@@ -479,7 +479,7 @@ static void see_deflate_token(char *buf, int len)
 			}
 		}
 		rx_strm.next_out = (Bytef *)dbuf;
-		rx_strm.avail_out = CHUNK_SIZE;
+		rx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
 		r = inflate(&rx_strm, Z_SYNC_FLUSH);
 		if (r != Z_OK) {
 			rprintf(FERROR, "inflate (token) returned %d\n", r);
