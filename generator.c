@@ -54,14 +54,14 @@ static int skip_file(char *fname,
 	}
 	if (link_dest) {
 		if (preserve_perms
-		 && (st->st_mode & ~_S_IFMT) != (file->mode & ~_S_IFMT))
+		    && (st->st_mode & ~_S_IFMT) != (file->mode & ~_S_IFMT))
 			return 0;
 
 		if (am_root && preserve_uid && st->st_uid != file->uid)
 			return 0;
 
-		if (preserve_gid && file->gid != (gid_t)-1
-		 && st->st_gid != file->gid)
+		if (preserve_gid && file->gid != GID_NONE
+		    && st->st_gid != file->gid)
 			return 0;
 	}
 

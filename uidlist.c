@@ -160,7 +160,7 @@ static gid_t match_gid(gid_t gid)
 	if (am_root)
 		last_out = gid;
 	else
-		last_out = (gid_t)-1;
+		last_out = GID_NONE;
 	return last_out;
 }
 
@@ -307,7 +307,7 @@ void recv_uid_list(int f, struct file_list *flist)
 			}
 			list->id2 = map_gid(id, name);
 			if (!am_root && !is_in_group(list->id2))
-				list->id2 = (gid_t)-1;
+				list->id2 = GID_NONE;
 			free(name);
 		}
 	}

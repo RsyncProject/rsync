@@ -362,6 +362,8 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #define IN_LOOPBACKNET 127
 #endif
 
+#define GID_NONE (gid_t) -1
+
 struct file_struct {
 	unsigned flags;
 	time_t modtime;
