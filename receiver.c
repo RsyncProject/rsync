@@ -55,9 +55,8 @@ static void delete_one(char *fn, int is_dir)
 		if (robust_unlink(fn) != 0) {
 			rsyserr(FERROR, errno, "delete_one: unlink %s failed",
 				full_fname(fn));
-		} else if (verbose) {
+		} else if (verbose)
 			rprintf(FINFO, "deleting %s\n", fn);
-		}
 	} else {
 		if (do_rmdir(fn) != 0) {
 			if (errno == ENOTDIR && keep_dirlinks) {
@@ -69,9 +68,8 @@ static void delete_one(char *fn, int is_dir)
 					"delete_one: rmdir %s failed",
 					full_fname(fn));
 			}
-		} else if (verbose) {
+		} else if (verbose)
 			rprintf(FINFO, "deleting directory %s\n", fn);
-		}
 	}
 }
 
@@ -121,7 +119,7 @@ void delete_files(struct file_list *flist)
 			if (flist_find(flist,local_file_list->files[i]) < 0) {
 				char *f = f_name(local_file_list->files[i]);
 				if (make_backups && (backup_dir || !is_backup_file(f))) {
-					(void) make_backup(f);
+					make_backup(f);
 					if (verbose)
 						rprintf(FINFO, "deleting %s\n", f);
 				} else {
@@ -241,7 +239,7 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
 		i = -(i+1);
 		offset2 = i*(OFF_T)sum.blength;
 		len = sum.blength;
-		if (i == (int) sum.count-1 && sum.remainder != 0)
+		if (i == (int)sum.count-1 && sum.remainder != 0)
 			len = sum.remainder;
 
 		stats.matched_data += len;
@@ -257,7 +255,7 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
 			sum_update(map,len);
 		}
 
-		if (fd != -1 && write_file(fd,map,len) != (int) len) {
+		if (fd != -1 && write_file(fd, map, len) != (int)len) {
 			rsyserr(FERROR, errno, "write failed on %s",
 				full_fname(fname));
 			exit_cleanup(RERR_FILEIO);
@@ -279,12 +277,10 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
 	sum_end(file_sum1);
 
 	read_buf(f_in,file_sum2,MD4_SUM_LENGTH);
-	if (verbose > 2) {
+	if (verbose > 2)
 		rprintf(FINFO,"got file_sum\n");
-	}
-	if (fd != -1 && memcmp(file_sum1,file_sum2,MD4_SUM_LENGTH) != 0) {
+	if (fd != -1 && memcmp(file_sum1, file_sum2, MD4_SUM_LENGTH) != 0)
 		return 0;
-	}
 	return 1;
 }
 
@@ -308,9 +304,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 	int save_make_backups = make_backups;
 	int i, recv_ok, phase = 0;
 
-	if (verbose > 2) {
+	if (verbose > 2)
 		rprintf(FINFO,"recv_files(%d) starting\n",flist->count);
-	}
 
 	if (flist->hlink_pool) {
 		pool_destroy(flist->hlink_pool);
@@ -353,9 +348,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 			fname = f_name_to(file, fbuf);
 
 		if (dry_run) {
-			if (!am_server && verbose) {	/* log transfer */
+			if (!am_server && verbose)
 				rprintf(FINFO, "%s\n", fname);
-			}
 			continue;
 		}
 
@@ -421,8 +415,10 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 			mapbuf = NULL;
 
 		if (!get_tmpname(fnametmp,fname)) {
-			if (mapbuf) unmap_file(mapbuf);
-			if (fd1 != -1) close(fd1);
+			if (mapbuf)
+				unmap_file(mapbuf);
+			if (fd1 != -1)
+				close(fd1);
 			continue;
 		}
 
@@ -448,26 +444,27 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 			rsyserr(FERROR, errno, "mkstemp %s failed",
 				full_fname(fnametmp));
 			receive_data(f_in,mapbuf,-1,NULL,file->length);
-			if (mapbuf) unmap_file(mapbuf);
-			if (fd1 != -1) close(fd1);
+			if (mapbuf)
+				unmap_file(mapbuf);
+			if (fd1 != -1)
+				close(fd1);
 			continue;
 		}
 
 		cleanup_set(fnametmp, fname, file, mapbuf, fd1, fd2);
 
-		if (!am_server && verbose) {	/* log transfer */
+		if (!am_server && verbose)
 			rprintf(FINFO, "%s\n", fname);
-		}
 
 		/* recv file data */
 		recv_ok = receive_data(f_in,mapbuf,fd2,fname,file->length);
 
 		log_recv(file, &initial_stats);
 
-		if (mapbuf) unmap_file(mapbuf);
-		if (fd1 != -1) {
+		if (mapbuf)
+			unmap_file(mapbuf);
+		if (fd1 != -1)
 			close(fd1);
-		}
 		if (close(fd2) < 0) {
 			rsyserr(FERROR, errno, "close failed on %s",
 				full_fname(fnametmp));
