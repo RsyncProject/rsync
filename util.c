@@ -781,25 +781,22 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
 		}
 		if (*p == '.' && p[1] == '.' && (p[2] == '/' || p[2] == '\0')) {
 			/* ".." component followed by slash or end */
-			if (depth > 0 && sanp == start) {
-				/* allow depth levels of .. at the beginning */
-				--depth;
-				*sanp++ = *p++;
-				*sanp++ = *p++;
-				/* move virtual beginning to leave .. alone */
-				start = sanp;
+			if (depth <= 0 || sanp != start) {
+				p += 2;
+				if (sanp != start) {
+					/* back up sanp one level */
+					--sanp; /* now pointing at slash */
+					while (sanp > start && sanp[-1] != '/') {
+						/* skip back up to slash */
+						sanp--;
+					}
+				}
 				continue;
 			}
-			p += 2;
-			if (sanp != start) {
-				/* back up sanp one level */
-				--sanp; /* now pointing at slash */
-				while (sanp > start && sanp[-1] != '/') {
-					/* skip back up to slash */
-					sanp--;
-				}
-			}
-			continue;
+			/* allow depth levels of .. at the beginning */
+			depth--;
+			/* move the virtual beginning to leave the .. alone */
+			start = sanp + 3;
 		}
 		/* copy one component through next slash */
 		while (*p && (*sanp++ = *p++) != '/') {}
