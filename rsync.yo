@@ -789,19 +789,24 @@ show why each individual file is included or excluded.
 manpagesection(EXIT VALUES)
 
 startdit()
-dit(bf(RERR_SYNTAX     1))       syntax or usage error 
-dit(bf(RERR_PROTOCOL   2))       protocol incompatibility 
-dit(bf(RERR_FILESELECT 3))       errors selecting input/output files, dirs 
-dit(bf(RERR_UNSUPPORTED 4))       requested action not supported 
-dit(bf(RERR_SOCKETIO   10))      error in socket IO 
-dit(bf(RERR_FILEIO     11))      error in file IO 
-dit(bf(RERR_STREAMIO   12))      error in rsync protocol data stream 
-dit(bf(RERR_MESSAGEIO  13))      errors with program diagnostics 
-dit(bf(RERR_IPC        14))      error in IPC code 
-dit(bf(RERR_SIGNAL     20))      status returned when sent SIGUSR1, SIGINT 
-dit(bf(RERR_WAITCHILD  21))      some error returned by waitpid() 
-dit(bf(RERR_MALLOC     22))      error allocating core memory buffers 
-dit(bf(RERR_TIMEOUT    30))      timeout in data send/receive 
+dit(bf(RERR_SYNTAX     1))       Syntax or usage error 
+dit(bf(RERR_PROTOCOL   2))       Protocol incompatibility 
+dit(bf(RERR_FILESELECT 3))       Errors selecting input/output files, dirs
+
+dit(bf(RERR_UNSUPPORTED 4)) Requested action not supported: an attempt
+was made to manipulate 64-bit files on a platform that cannot support
+them; or an option was speciifed that is supported by the client and
+not by the server.
+
+dit(bf(RERR_SOCKETIO   10))      Error in socket IO 
+dit(bf(RERR_FILEIO     11))      Error in file IO 
+dit(bf(RERR_STREAMIO   12))      Error in rsync protocol data stream 
+dit(bf(RERR_MESSAGEIO  13))      Errors with program diagnostics 
+dit(bf(RERR_IPC        14))      Error in IPC code 
+dit(bf(RERR_SIGNAL     20))      Received SIGUSR1 or SIGINT 
+dit(bf(RERR_WAITCHILD  21))      Some error returned by waitpid() 
+dit(bf(RERR_MALLOC     22))      Error allocating core memory buffers 
+dit(bf(RERR_TIMEOUT    30))      Timeout in data send/receive 
 enddit()
 
 manpagesection(ENVIRONMENT VARIABLES)
