@@ -126,7 +126,7 @@ static gid_t match_gid(gid_t gid)
 	if (am_root)
 		last_out = gid;
 	else
-		last_out = -1;
+		last_out = (gid_t) -1;
 	return last_out;
 }
 
