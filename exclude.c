@@ -605,9 +605,9 @@ int check_filter(struct filter_list_struct *listp, char *name, int name_is_dir)
 	return 0;
 }
 
-#define RULE_MATCH(s,r) rule_match((s), (r), sizeof (r) - 1)
+#define RULE_STRCMP(s,r) rule_strcmp((s), (r), sizeof (r) - 1)
 
-static const char *rule_match(const char *str, const char *rule, int rule_len)
+static const char *rule_strcmp(const char *str, const char *rule, int rule_len)
 {
 	if (strncmp(str, rule, rule_len) != 0)
 		return NULL;
@@ -667,23 +667,23 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 		char ch = 0, *mods = "";
 		switch (*s) {
 		case 'c':
-			if ((s = RULE_MATCH(s, "clear")) != NULL)
+			if ((s = RULE_STRCMP(s, "clear")) != NULL)
 				ch = '!';
 			break;
 		case 'd':
-			if ((s = RULE_MATCH(s, "dir-merge")) != NULL)
+			if ((s = RULE_STRCMP(s, "dir-merge")) != NULL)
 				ch = ':';
 			break;
 		case 'e':
-			if ((s = RULE_MATCH(s, "exclude")) != NULL)
+			if ((s = RULE_STRCMP(s, "exclude")) != NULL)
 				ch = '-';
 			break;
 		case 'i':
-			if ((s = RULE_MATCH(s, "include")) != NULL)
+			if ((s = RULE_STRCMP(s, "include")) != NULL)
 				ch = '+';
 			break;
 		case 'm':
-			if ((s = RULE_MATCH(s, "merge")) != NULL)
+			if ((s = RULE_STRCMP(s, "merge")) != NULL)
 				ch = '.';
 			break;
 		default:
