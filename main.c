@@ -355,8 +355,8 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		recv_exclude_list(f_in);
 
 	flist = recv_file_list(f_in);
-	if (!flist || flist->count == 0) {
-		rprintf(FERROR,"server_recv: nothing to do\n");
+	if (!flist) {
+		rprintf(FERROR,"server_recv: recv_file_list error\n");
 		exit_cleanup(RERR_FILESELECT);
 	}
 	
