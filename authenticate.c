@@ -28,7 +28,6 @@ static void base64_encode(char *buf, int len, char *out)
 	char *b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 	int bit_offset, byte_offset, idx, i;
 	unsigned char *d = (unsigned char *)buf;
-	char *p;
 	int bytes = (len*8 + 5)/6;
 
 	memset(out, 0, bytes+1);
@@ -56,7 +55,7 @@ static void gen_challenge(char *addr, char *challenge)
 
 	memset(input, 0, sizeof(input));
 
-	strncpy((char *)input, addr, 16);
+	strlcpy((char *)input, addr, 16);
 	gettimeofday(&tv, NULL);
 	SIVAL(input, 16, tv.tv_sec);
 	SIVAL(input, 20, tv.tv_usec);
@@ -74,8 +73,8 @@ static int get_secret(int module, char *user, char *secret, int len)
 {
 	char *fname = lp_secrets_file(module);
 	int fd, found=0;
-	char line[1024];
-	char *p, *pass;
+	char line[MAXPATHLEN];
+	char *p, *pass=NULL;
 
 	if (!fname || !*fname) return 0;
 
@@ -137,7 +136,7 @@ int auth_server(int fd, int module, char *addr, char *leader)
 	char *users = lp_auth_users(module);
 	char challenge[16];
 	char b64_challenge[30];
-	char line[1024];
+	char line[MAXPATHLEN];
 	char user[100];
 	char secret[100];
 	char pass[30];

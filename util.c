@@ -456,6 +456,21 @@ void strlcpy(char *d, char *s, int maxlen)
 	d[len] = 0;
 }
 
+/* like strncat but does not 0 fill the buffer and always null 
+   terminates (thus it can use maxlen+1 space in d) */
+void strlcat(char *d, char *s, int maxlen)
+{
+	int len1 = strlen(d);
+	int len2 = strlen(s);
+	if (len1+len2 > maxlen) {
+		len2 = maxlen-len1;
+	}
+	if (len2 > 0) {
+		memcpy(d+len1, s, len2);
+		d[len1+len2] = 0;
+	}
+}
+
 /* turn a user name into a uid */
 int name_to_uid(char *name, uid_t *uid)
 {
@@ -509,12 +524,15 @@ int lock_range(int fd, int offset, int len)
 static void glob_expand_one(char *s, char **argv, int *argc, int maxargs)
 {
 #ifndef HAVE_GLOB
+	if (!*s) s = ".";
 	argv[*argc] = strdup(s);
 	(*argc)++;
 	return;
 #else
 	glob_t globbuf;
 	int i;
+
+	if (!*s) s = ".";
 
 	argv[*argc] = strdup(s);
 
@@ -542,6 +560,10 @@ void glob_expand(char *base, char **argv, int *argc, int maxargs)
 
 	if (!s || !*s) return;
 
+	if (strncmp(s, base, strlen(base)) == 0) {
+		s += strlen(base);
+	}
+
 	s = strdup(s);
 	if (!s) out_of_memory("glob_expand");
 
@@ -551,7 +573,7 @@ void glob_expand(char *base, char **argv, int *argc, int maxargs)
 			/* split it at this point */
 			*(p-1) = 0;
 			glob_expand_one(q, argv, argc, maxargs);
-			q = p+strlen(base);
+			q = p+strlen(base)+1;
 		} else {
 			q++;
 		}
@@ -571,4 +593,75 @@ void strlower(char *s)
 		if (isupper(*s)) *s = tolower(*s);
 		s++;
 	}
+}
+
+/* this is like vsnprintf but the 'n' limit does not include
+   the terminating null. So if you have a 1024 byte buffer then
+   pass 1023 for n */
+int vslprintf(char *str, int n, const char *format, va_list ap)
+{
+#ifdef HAVE_VSNPRINTF
+	int ret = vsnprintf(str, n, format, ap);
+	if (ret > n || ret < 0) {
+		str[n] = 0;
+		return -1;
+	}
+	str[ret] = 0;
+	return ret;
+#else
+	static char *buf;
+	static int len=MAXPATHLEN*8;
+	int ret;
+
+	/* this code is NOT a proper vsnprintf() implementation. It
+	   relies on the fact that all calls to slprintf() in rsync
+	   pass strings which have already been checked to be less
+	   than MAXPATHLEN in length and never more than 2 strings are
+	   concatenated. This means the above buffer is absolutely
+	   ample and can never be overflowed.
+
+	   In the future we would like to replace this with a proper
+	   vsnprintf() implementation but right now we need a solution
+	   that is secure and portable. This is it.  */
+
+	if (!buf) {
+		buf = malloc(len);
+		if (!buf) {
+			/* can't call debug or we would recurse */
+			exit(1);
+		}
+	}
+
+	ret = vsprintf(buf, format, ap);
+
+	if (ret < 0) {
+		str[0] = 0;
+		return -1;
+	}
+
+	if (ret < n) {
+		n = ret;
+	} else if (ret > n) {
+		ret = -1;
+	}
+
+	buf[n] = 0;
+	
+	memcpy(str, buf, n+1);
+
+	return ret;
+#endif
+}
+
+
+/* like snprintf but always null terminates */
+int slprintf(char *str, int n, char *format, ...)
+{
+	va_list ap;  
+	int ret;
+
+	va_start(ap, format);
+	ret = vslprintf(str,n,format,ap);
+	va_end(ap);
+	return ret;
 }

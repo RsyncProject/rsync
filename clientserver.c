@@ -30,7 +30,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	int fd, i;
 	char *sargs[MAX_ARGS];
 	int sargc=0;
-	char line[1024];
+	char line[MAXPATHLEN];
 	char *p, *user=NULL;
 	extern int remote_version;
 
@@ -102,13 +102,12 @@ static int rsync_module(int fd, int i)
 	int argc=0;
 	char *argv[MAX_ARGS];
 	char **argp;
-	char line[1024];
+	char line[MAXPATHLEN];
 	uid_t uid;
 	gid_t gid;
 	char *p;
 	char *addr = client_addr(fd);
 	char *host = client_name(fd);
-	char *auth;
 	char *name = lp_name(i);
 	int start_glob=0;
 
@@ -201,17 +200,13 @@ static int rsync_module(int fd, int i)
 
 		p = line;
 
-		if (start_glob && strncmp(p, name, strlen(name)) == 0) {
-			p += strlen(name);
-			if (!*p) p = ".";
-		}
-
 		argv[argc] = strdup(p);
 		if (!argv[argc]) {
 			return -1;
 		}
 
 		if (start_glob) {
+			rprintf(FINFO,"transferring %s\n",p);
 			glob_expand(name, argv, &argc, MAX_ARGS);
 		} else {
 			argc++;
@@ -330,6 +325,8 @@ int daemon_main(void)
 	}
 
 	become_daemon();
+
+	rprintf(FINFO,"rsyncd version %s starting\n",VERSION);
 
 	start_accept_loop(rsync_port, start_daemon);
 	return -1;

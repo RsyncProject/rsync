@@ -23,6 +23,7 @@
   */
 #include "rsync.h"
 
+
 /* this is the rsync debugging function. Call it with FINFO or FERROR */
 void rprintf(int fd, const char *format, ...)
 {
@@ -33,13 +34,7 @@ void rprintf(int fd, const char *format, ...)
 	extern int am_daemon;
 
 	va_start(ap, format);
-
-#if HAVE_VSNPRINTF
-	len = vsnprintf(buf, sizeof(buf)-1, format, ap);
-#else
-	vsprintf(buf, format, ap);
-	len = strlen(buf);
-#endif
+	len = vslprintf(buf, sizeof(buf)-1, format, ap);
 	va_end(ap);
 
 	if (len < 0) exit_cleanup(1);

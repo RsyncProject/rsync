@@ -521,7 +521,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 			closedir(d);
 			return;
 		}
-		strcat(fname,"/");
+		strlcat(fname,"/", MAXPATHLEN-1);
 		l++;
 	}
 	p = fname + strlen(fname);
@@ -585,7 +585,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 
 		l = strlen(fname);
 		if (l != 1 && fname[l-1] == '/') {
-			strcat(fname,".");
+			strlcat(fname,".",MAXPATHLEN-1);
 		}
 
 		if (link_stat(fname,&st) != 0) {
@@ -878,7 +878,7 @@ char *f_name(struct file_struct *f)
 	n = (n+1)%10;
 
 	if (f->dirname) {
-		sprintf(p, "%s/%s", f->dirname, f->basename);
+		slprintf(p, MAXPATHLEN-1, "%s/%s", f->dirname, f->basename);
 	} else {
 		strlcpy(p, f->basename, MAXPATHLEN-1);
 	}

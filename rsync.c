@@ -111,10 +111,7 @@ static int delete_file(char *fname)
 		if (strcmp(dname,".")==0 ||
 		    strcmp(dname,"..")==0)
 			continue;
-		strlcpy(buf, fname, (MAXPATHLEN-strlen(dname))-2);
-		strcat(buf, "/");
-		strcat(buf, dname);
-		buf[MAXPATHLEN-1] = 0;
+		slprintf(buf, sizeof(buf)-1, "%s/%s", fname, dname);
 		if (verbose > 0)
 			rprintf(FINFO,"deleting %s\n", buf);
 		if (delete_file(buf) != 0) {
@@ -831,7 +828,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		      close(fd1);
 		      continue;
 	      }
-	      sprintf(fnametmp,"%s/.%s.XXXXXX",tmpdir,f);
+	      slprintf(fnametmp,sizeof(fnametmp)-1, "%s/.%s.XXXXXX",tmpdir,f);
       } else {
 	      char *f = strrchr(fname,'/');
 
@@ -844,10 +841,10 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 	      if (f) {
 		      *f = 0;
-		      sprintf(fnametmp,"%s/.%s.XXXXXX",fname,f+1);
+		      slprintf(fnametmp,sizeof(fnametmp)-1,"%s/.%s.XXXXXX",fname,f+1);
 		      *f = '/';
 	      } else {
-		      sprintf(fnametmp,".%s.XXXXXX",fname);
+		      slprintf(fnametmp,sizeof(fnametmp)-1,".%s.XXXXXX",fname);
 	      }
       }
       if (NULL == do_mktemp(fnametmp)) {
@@ -893,7 +890,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		rprintf(FERROR,"backup filename too long\n");
 		continue;
 	}
-	sprintf(fnamebak,"%s%s",fname,backup_suffix);
+	slprintf(fnamebak,sizeof(fnamebak)-1,"%s%s",fname,backup_suffix);
 	if (do_rename(fname,fnamebak) != 0 && errno != ENOENT) {
 	  rprintf(FERROR,"rename %s %s : %s\n",fname,fnamebak,strerror(errno));
 	  continue;
@@ -998,10 +995,10 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 				  fname);
 			  return;
 		  }
-		  strcat(fname,"/");
+		  strlcat(fname,"/",MAXPATHLEN-1);
 		  offset = strlen(file->basedir)+1;
 	  }
-	  strncat(fname,f_name(file),MAXPATHLEN-strlen(fname));
+	  strlcat(fname,f_name(file),MAXPATHLEN-strlen(fname));
 	  
 	  if (verbose > 2) 
 		  rprintf(FINFO,"send_files(%d,%s)\n",i,fname);

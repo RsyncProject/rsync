@@ -190,7 +190,6 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 	struct file_list *flist;
 	char *dir = argv[0];
 	extern int relative_paths;
-	extern int am_daemon;
 	extern int recurse;
 
 	if (verbose > 2)
