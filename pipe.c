@@ -73,9 +73,8 @@ pid_t piped_child(char **command, int *f_in, int *f_out)
 			close(from_child_pipe[1]);
 		umask(orig_umask);
 		set_blocking(STDIN_FILENO);
-		if (blocking_io) {
+		if (blocking_io > 0)
 			set_blocking(STDOUT_FILENO);
-		}
 		execvp(command[0], command);
 		rprintf(FERROR, "Failed to exec %s : %s\n",
 			command[0], strerror(errno));
