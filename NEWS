@@ -73,6 +73,8 @@ rsync changes since last release
     * Fixed a bug that prevented rsync from creating intervening directories
       when --relative-paths/-R is set.  (Craig Barratt)
 
+    * Prevent "Connection reset by peer" messages from Cygwin. (Randy O'Meara)
+
   INTERNAL:
 
     * Many code cleanups and improved internal documentation.  (Martin 

@@ -256,6 +256,14 @@ AC_MSG_RESULT($DEFAULT_MODIFY_WINDOW)
 AC_DEFINE_UNQUOTED(DEFAULT_MODIFY_WINDOW, $DEFAULT_MODIFY_WINDOW,
 	[Set to the default value for the --modify-window option])
 
+AC_MSG_CHECKING([whether to call shutdown on all sockets])
+case $host_os in
+	*cygwin* ) AC_MSG_RESULT(yes)
+                   AC_DEFINE(SHUTDOWN_ALL_SOCKETS, 1, [Define if sockets need to be shutdown])
+		   ;;
+	       * ) AC_MSG_RESULT(no);;
+esac
+
 AC_C_BIGENDIAN
 AC_HEADER_DIRENT
 AC_HEADER_TIME

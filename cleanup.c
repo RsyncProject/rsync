@@ -22,6 +22,32 @@
 #include "rsync.h"
 
 /**
+ * Close all open sockets and files, allowing a (somewhat) graceful
+ * shutdown() of socket connections.  This eliminates the abortive
+ * TCP RST sent by a Winsock-based system when the close() occurs.
+ **/
+void close_all()
+{
+#ifdef SHUTDOWN_ALL_SOCKETS
+	int max_fd;
+	int fd;
+	int ret;
+	struct stat st;
+
+	max_fd = sysconf(_SC_OPEN_MAX) - 1;
+	for (fd = max_fd; fd >= 0; fd--) {
+		ret = fstat(fd,&st);
+		if (fstat(fd,&st) == 0) {
+			if (is_a_socket(fd)) {
+				ret = shutdown(fd, 2);
+			}
+			ret = close(fd);
+		}
+	}
+#endif
+}
+
+/**
  * @file cleanup.c
  *
  * Code for handling interrupted transfers.  Depending on the @c
@@ -115,6 +141,7 @@ void _exit_cleanup(int code, const char *file, int line)
 		rprintf(FINFO,"_exit_cleanup(code=%d, file=%s, line=%d): about to call exit(%d)\n", 
 			ocode, file, line, code);
 
+	close_all();
 	exit(code);
 }
 

@@ -429,11 +429,14 @@ void start_accept_loop(int port, int (*fn)(int, int))
 #endif
 
 		if ((pid = fork()) == 0) {
+			int ret;
 			close(s);
 			/* open log file in child before possibly giving
 			   up privileges  */
 			log_open();
-			_exit(fn(fd, fd));
+			ret = fn(fd, fd);
+			close_all();
+			_exit(ret);
 		} else if (pid < 0) {
 			rprintf(FERROR,
 				RSYNC_NAME
