@@ -157,7 +157,7 @@ checkit() {
     echo ""
     for f in `cd "$2"; find . -type f -print `
     do 
-        diff -u "$2"/"$f" "$3"/"$f" || failed=YES
+        diff -c "$2"/"$f" "$3"/"$f" || failed=YES
     done
 
     echo "-------------"
@@ -165,7 +165,7 @@ checkit() {
     echo ""
     ( cd "$2" && rsync_ls_lR . ) > ${TMP}/ls-from 
     ( cd "$3" && rsync_ls_lR . ) > ${TMP}/ls-to 
-    diff -u ${TMP}/ls-from ${TMP}/ls-to || failed=YES
+    diff -c ${TMP}/ls-from ${TMP}/ls-to || failed=YES
     if [ -z "${failed}" ] ; then
 	return 0
     else
