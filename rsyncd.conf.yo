@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsyncd.conf)(5)(12 Feb 1999)()()
+manpage(rsyncd.conf)(5)(26 Jan 2003)()()
 manpagename(rsyncd.conf)(configuration file for rsync server)
 manpagesynopsis()
 
@@ -8,9 +8,7 @@ rsyncd.conf
 manpagedescription()
 
 The rsyncd.conf file is the runtime configuration file for rsync when
-run with the --daemon option. When run in this way rsync becomes a
-rsync server listening on TCP port 873. Connections from rsync clients
-are accepted for either anonymous or authenticated rsync sessions. 
+run as an rsync server. 
 
 The rsyncd.conf file controls authentication, access, logging and
 available modules.
@@ -51,9 +49,12 @@ bind to a port numbered under 1024 (as is the default 873), or to set
 file ownership.  Otherwise, it must just have permission to read and
 write the appropriate data, log, and lock files.
 
-You can launch it either via inetd or as a stand-alone daemon. If run
-as a daemon then just run the command "rsync --daemon" from a suitable
-startup script.
+You can launch it either via inetd, as a stand-alone daemon, or from
+an rsync client via a remote shell.  If run as a stand-alone daemon then
+just run the command "rsync --daemon" from a suitable startup script.
+If run from an rsync client via a remote shell (by specifying both the
+"-e/--rsh" option and server mode with "::" or "rsync://"), the --daemon
+option is automatically passed to the remote side.
 
 When run via inetd you should add a line like this to /etc/services:
 
