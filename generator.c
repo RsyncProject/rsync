@@ -844,10 +844,15 @@ static void recv_generator(char *fname, struct file_list *flist,
 			break;
 		} while (basis_dir[++i] != NULL);
 		if (match_level) {
+			statret = 0;
 			if (i != best_match) {
 				i = best_match;
 				pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
 					 basis_dir[i], fname);
+				if (link_stat(fnamecmpbuf, &st, 0) < 0) {
+					match_level = 0;
+					statret = -1;
+				}
 			}
 #ifdef HAVE_LINK
 			if (link_dest && match_level == 3 && !dry_run) {
@@ -863,11 +868,10 @@ static void recv_generator(char *fname, struct file_list *flist,
 				}
 			} else
 #endif
-			{
+			if (statret == 0) {
 				fnamecmp = fnamecmpbuf;
 				fnamecmp_type = i;
 			}
-			statret = 0;
 		}
 	}
 
