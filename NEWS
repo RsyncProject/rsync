@@ -24,3 +24,6 @@ rsync 2.5.2 (???)
       visible and people will think it's faster.  (With --progress,
       rsync will show you how many files it has seen as it builds the
       file_list, giving some indication that it has not hung.)
+
+    * Improvements to batch mode support.  This is still experimental
+      but testing would be welcome.   (Jos Backus)
