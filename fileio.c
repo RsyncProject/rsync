@@ -105,7 +105,7 @@ int write_file(int f,char *buf,size_t len)
 struct map_struct *map_file(int fd,OFF_T len)
 {
 	struct map_struct *map;
-	map = (struct map_struct *)malloc(sizeof(*map));
+	map = new(struct map_struct);
 	if (!map) out_of_memory("map_file");
 
 	map->fd = fd;
@@ -160,7 +160,7 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 
 	/* make sure we have allocated enough memory for the window */
 	if (window_size > map->p_size) {
-		map->p = (char *)Realloc(map->p, window_size);
+		map->p = realloc_array(map->p, char, window_size);
 		if (!map->p) out_of_memory("map_ptr");
 		map->p_size = window_size;
 	}

@@ -626,6 +626,10 @@ extern int errno;
 
 #endif
 
+/* Convenient wrappers for malloc and realloc.  Use them. */
+#define new(type) ((type *)malloc(sizeof(type)))
+#define new_array(type, num) ((type *)_new_array(sizeof(type), (num)))
+#define realloc_array(ptr, type, num) ((type *)_realloc_array((ptr), sizeof(type), (num)))
 
 /* use magic gcc attributes to catch format errors */
  void rprintf(enum logcode , const char *, ...)

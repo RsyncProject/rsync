@@ -58,7 +58,7 @@ void get_checksum2(char *buf,int len,char *sum)
 
 	if (len > len1) {
 		if (buf1) free(buf1);
-		buf1 = (char *)malloc(len+4);
+		buf1 = new_array(char, len+4);
 		len1 = len;
 		if (!buf1) out_of_memory("get_checksum2");
 	}

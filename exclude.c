@@ -40,7 +40,7 @@ static struct exclude_struct *make_exclude(const char *pattern, int include)
 	char *cp;
 	int pat_len;
 
-	ret = (struct exclude_struct *)malloc(sizeof(*ret));
+	ret = new(struct exclude_struct);
 	if (!ret) out_of_memory("make_exclude");
 
 	memset(ret, 0, sizeof(*ret));
@@ -57,8 +57,8 @@ static struct exclude_struct *make_exclude(const char *pattern, int include)
 	if (exclude_path_prefix)
 		ret->match_flags |= MATCHFLG_ABS_PATH;
 	if (exclude_path_prefix && *pattern == '/') {
-		ret->pattern = malloc(strlen(exclude_path_prefix)
-				+ strlen(pattern) + 1);
+		ret->pattern = new_array(char,
+			strlen(exclude_path_prefix) + strlen(pattern) + 1);
 		if (!ret->pattern) out_of_memory("make_exclude");
 		sprintf(ret->pattern, "%s%s", exclude_path_prefix, pattern);
 	}
@@ -245,7 +245,7 @@ void add_exclude(struct exclude_struct ***listp, const char *pattern, int includ
 	if (list)
 		for (; list[len]; len++) {}
 
-	list = *listp = (struct exclude_struct **)Realloc(list,sizeof(struct exclude_struct *)*(len+2));
+ 	list = *listp = realloc_array(list, struct exclude_struct *, len+2);
 
 	if (!list || !(list[len] = make_exclude(pattern, include)))
 		out_of_memory("add_exclude");

@@ -825,7 +825,7 @@ void server_options(char **args,int *argc)
 
 	/* Only send --suffix if it specifies a non-default value. */
 	if (strcmp(backup_suffix, backup_dir? "" : BACKUP_SUFFIX) != 0) {
-		char *s = malloc(9+backup_suffix_len+1);
+		char *s = new_array(char, 9+backup_suffix_len+1);
 		if (!s)
 			out_of_memory("server_options");
 		/* We use the following syntax to avoid weirdness with '~'. */

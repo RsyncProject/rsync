@@ -58,7 +58,7 @@ static struct sum_struct *receive_sums(int f)
 	int i;
 	OFF_T offset = 0;
 
-	s = (struct sum_struct *)malloc(sizeof(*s));
+	s = new(struct sum_struct);
 	if (!s) out_of_memory("receive_sums");
 
 	read_sum_head(f, s);
@@ -73,7 +73,7 @@ static struct sum_struct *receive_sums(int f)
 	if (s->count == 0)
 		return(s);
 
-	s->sums = (struct sum_buf *)malloc(sizeof(s->sums[0])*s->count);
+	s->sums = new_array(struct sum_buf, s->count);
 	if (!s->sums) out_of_memory("receive_sums");
 
 	for (i = 0; i < (int) s->count; i++) {

@@ -1,6 +1,6 @@
-NEWS for rsync version 2.5.7
+NEWS for rsync version 2.5.8
 Protocol: 27 (changed)
-Changes since version 2.5.6:
+Changes since version 2.5.7:
 
   ENHANCEMENTS:
 
@@ -111,6 +111,16 @@ Changes since version 2.5.6:
       Added an undocumented option, --protocol=N, to force the value
       we advertise to the other side (primarily for testing purposes).
       (Wayne Davison)
+
+
+NEWS for rsync version 2.5.7:
+Protocol: 26 (unchanged)
+Changes since version 2.5.6:
+
+  SECURITY:
+
+    * Fix buffer handling bugs.  (Andrew Tridgell, Martin Pool, Paul
+      Russell, Andrea Barisani)
 
 
 NEWS for rsync version 2.5.6, aka the dwd-between-jobs release

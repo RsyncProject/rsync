@@ -559,13 +559,6 @@ void strlower(char *s)
 	}
 }
 
-void *Realloc(void *p, int size)
-{
-	if (!p) return (void *)malloc(size);
-	return (void *)realloc(p, size);
-}
-
-
 void clean_fname(char *name)
 {
 	char *p;
@@ -1008,3 +1001,23 @@ int _Insure_trap_error(int a1, int a2, int a3, int a4, int a5, int a6)
 	return ret;
 }
 #endif
+
+
+#define MALLOC_MAX 0x40000000
+
+void *_new_array(unsigned int size, unsigned long num)
+{
+	if (num >= MALLOC_MAX/size)
+		return NULL;
+	return malloc(size * num);
+}
+
+void *_realloc_array(void *ptr, unsigned int size, unsigned long num)
+{
+	if (num >= MALLOC_MAX/size)
+		return NULL;
+	/* No realloc should need this, but just in case... */
+	if (!ptr)
+		return malloc(size * num);
+	return realloc(ptr, size * num);
+}

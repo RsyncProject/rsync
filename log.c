@@ -90,10 +90,10 @@ static struct err_list *err_list_tail;
 static void err_list_add(int code, char *buf, int len)
 {
 	struct err_list *el;
-	el = (struct err_list *)malloc(sizeof(*el));
+	el = new(struct err_list);
 	if (!el) exit_cleanup(RERR_MALLOC);
 	el->next = NULL;
-	el->buf = malloc(len+4);
+	el->buf = new_array(char, len+4);
 	if (!el->buf) exit_cleanup(RERR_MALLOC);
 	memcpy(el->buf+4, buf, len);
 	SIVAL(el->buf, 0, ((code+MPLEX_BASE)<<24) | len);

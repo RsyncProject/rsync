@@ -133,7 +133,7 @@ static int is_in_group(gid_t gid)
 		/* treat failure (-1) as if not member of any group */
 		ngroups = getgroups(0, 0);
 		if (ngroups > 0) {
-			gidset = (GETGROUPS_T *) malloc(ngroups * sizeof(GETGROUPS_T));
+			gidset = new_array(GETGROUPS_T, ngroups);
 			ngroups = getgroups(ngroups, gidset);
 		}
 	}

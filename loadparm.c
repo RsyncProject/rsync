@@ -441,10 +441,10 @@ static int add_a_service(service *pservice, char *name)
 
   i = iNumServices;
 
-  ServicePtrs = (service **)Realloc(ServicePtrs,sizeof(service *)*num_to_alloc);
+  ServicePtrs = realloc_array(ServicePtrs, service *, num_to_alloc);
 
   if (ServicePtrs)
-	  pSERVICE(iNumServices) = (service *)malloc(sizeof(service));
+	  pSERVICE(iNumServices) = new(service);
 
   if (!ServicePtrs || !pSERVICE(iNumServices))
 	  return(-1);

@@ -41,7 +41,7 @@ static struct idlist *gidlist;
 
 static struct idlist *add_list(int id, char *name)
 {
-	struct idlist *list = (struct idlist *)malloc(sizeof(list[0]));
+	struct idlist *list = new(struct idlist);
 	if (!list) out_of_memory("add_list");
 	list->next = NULL;
 	list->name = strdup(name);
@@ -241,7 +241,7 @@ void recv_uid_list(int f, struct file_list *flist)
 		id = read_int(f);
 		while (id != 0) {
 			int len = read_byte(f);
-			name = (char *)malloc(len+1);
+			name = new_array(char, len+1);
 			if (!name) out_of_memory("recv_uid_list");
 			read_sbuf(f, name, len);
 			if (!list) {
@@ -264,7 +264,7 @@ void recv_uid_list(int f, struct file_list *flist)
 		id = read_int(f);
 		while (id != 0) {
 			int len = read_byte(f);
-			name = (char *)malloc(len+1);
+			name = new_array(char, len+1);
 			if (!name) out_of_memory("recv_uid_list");
 			read_sbuf(f, name, len);
 			if (!list) {
