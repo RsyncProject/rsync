@@ -1205,6 +1205,8 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 
 		if (allowed_lull && !(i % lull_mod))
 			maybe_send_keepalive();
+		else if (!(i % 50))
+			maybe_flush_socket();
 	}
 	recv_generator(NULL, NULL, 0, 0, 0, code, -1);
 	if (delete_during)
@@ -1278,8 +1280,10 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 				continue;
 			recv_generator(f_name(file), file, i, itemizing,
 				       maybe_PERMS_REPORT, code, -1);
-			if (allowed_lull && !(j++ % lull_mod))
+			if (allowed_lull && !(++j % lull_mod))
 				maybe_send_keepalive();
+			else if (!(j % 50))
+				maybe_flush_socket();
 		}
 	}
 	recv_generator(NULL, NULL, 0, 0, 0, code, -1);
