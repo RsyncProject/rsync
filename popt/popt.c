@@ -1055,7 +1055,7 @@ poptContext poptFreeContext(poptContext con)
 }
 
 int poptAddAlias(poptContext con, struct poptAlias alias,
-		/*@unused@*/ UNUSED(int flags))
+		UNUSED(int flags))
 {
     poptItem item = (poptItem) alloca(sizeof(*item));
     memset(item, 0, sizeof(*item));
