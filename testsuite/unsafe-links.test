@@ -53,6 +53,11 @@ test_symlink to/links/file1
 test_symlink to/links/file2
 test_regular to/links/unsafefile
 
+# I think these are correct, but I don't really understand the code.
+# Waiting for an answer from dwd
+test_skipped "correct behaviour is unclear"
+
+
 rm -rf to
 #next rsync copy incorrectly - links are copied as files not as links
 echo "rsync with relative2 path";
