@@ -58,6 +58,7 @@ int delete_file(char *fname, int flags)
 	struct dirent *di;
 	char buf[MAXPATHLEN];
 	STRUCT_STAT st;
+	int zap_dir;
 
 	if (!(flags & DEL_DIR)) {
 		if (robust_unlink(fname) == 0) {
@@ -74,7 +75,10 @@ int delete_file(char *fname, int flags)
 		return -1;
 	}
 
-	if (do_rmdir(fname) == 0) {
+	zap_dir = flags & DEL_RECURSE || (force_delete && recurse);
+	if (dry_run && zap_dir)
+		errno = ENOTEMPTY;
+	else if (do_rmdir(fname) == 0) {
 		if (verbose && !(flags & DEL_TERSE)) {
 			rprintf(FINFO, "deleting %s/\n",
 				safe_fname(fname));
@@ -83,8 +87,7 @@ int delete_file(char *fname, int flags)
 	}
 	if (errno == ENOENT)
 		return 0;
-	if ((flags & DEL_NO_RECURSE) || !force_delete || !recurse
-	    || (errno != ENOTEMPTY && errno != EEXIST)) {
+	if (!zap_dir || (errno != ENOTEMPTY && errno != EEXIST)) {
 		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
 			full_fname(fname));
 		return -1;
