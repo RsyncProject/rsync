@@ -180,8 +180,8 @@ static void log_formatted(char *op, struct file_struct *file,
 	extern int module_id;
 	extern char *auth_user;
 	char buf[1024];
+	char buf2[1024];
 	char *p, *s, *n;
-	char buf2[100];
 	int l;
 	extern struct stats stats;		
 	extern int am_sender;
@@ -208,7 +208,13 @@ static void log_formatted(char *op, struct file_struct *file,
 			n = buf2;
 			break;
 		case 'o': n = op; break;
-		case 'f': n = f_name(file); break;
+		case 'f': 
+			slprintf(buf2, sizeof(buf2)-1, "%s/%s", 
+				 file->basedir?file->basedir:"", 
+				 f_name(file));
+			clean_fname(buf2);
+			n = buf2; 
+			break;
 		case 'm': n = lp_name(module_id); break;
 		case 'P': n = lp_path(module_id); break;
 		case 'u': n = auth_user; break;
