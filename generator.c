@@ -45,6 +45,7 @@ extern char *compare_dest;
 extern int link_dest;
 extern int whole_file;
 extern int local_server;
+extern int read_batch;
 extern int write_batch;
 extern int list_only;
 extern int only_existing;
