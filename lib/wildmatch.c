@@ -16,12 +16,21 @@
 
 #define FALSE 0
 #define TRUE 1
-#define ABORT -1
+#define ABORT_ALL -1
+#define ABORT_TO_STARSTAR -2
+
+#ifdef WILD_TEST_DEPTH
+int wildmatch_depth;
+#endif
 
 static int domatch(const char *p, const char *text)
 {
     int matched, special;
     char ch, prev;
+
+#ifdef WILD_TEST_DEPTH
+    wildmatch_depth++;
+#endif
 
     for ( ; (ch = *p) != '\0'; text++, p++) {
 	if (*text == '\0' && ch != '*')
@@ -54,12 +63,14 @@ static int domatch(const char *p, const char *text)
 		return special? TRUE : strchr(text, '/') == 0;
 	    }
 	    for ( ; *text; text++) {
-		if ((matched = domatch(p, text)) != FALSE)
-		    return matched;
-		if (!special && *text == '/')
-		    return FALSE;
+		if ((matched = domatch(p, text)) != FALSE) {
+		    if (!special || matched != ABORT_TO_STARSTAR)
+			return matched;
+		}
+		else if (!special && *text == '/')
+		    return ABORT_TO_STARSTAR;
 	    }
-	    return ABORT;
+	    return ABORT_ALL;
 	  case '[':
 	    special = *++p == NEGATE_CLASS ? TRUE : FALSE;
 	    if (special) {
@@ -97,5 +108,8 @@ static int domatch(const char *p, const char *text)
 
 int wildmatch(const char *p, const char *text)
 {
+#ifdef WILD_TEST_DEPTH
+    wildmatch_depth = 0;
+#endif
     return domatch(p, text) == TRUE;
 }
