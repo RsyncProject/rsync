@@ -98,6 +98,11 @@ Changes since 2.6.2:
     - Avoid a bogus run-time complaint about a lack of 64-bit integers when
       the int64 type is defined as an off_t and it actually has 64-bits.
 
+    - Added a configure check for open64() without mkstemp64() so that we
+      can avoid using mkstemp() when such a combination is encountered.
+      This bypasses a problem writing out large temp files on OSes such as
+      AIX and HP-UX.
+
   ENHANCEMENTS:
 
     - Added the --partial-dir=DIR option that lets you specify where to
