@@ -78,7 +78,7 @@ int filesfrom_fd = -1;
 char *remote_filesfrom_file = NULL;
 int eol_nulls = 0;
 int recurse = 0;
-int keep_dirs = 0;
+int xfer_dirs = 0;
 int am_daemon = 0;
 int daemon_over_rsh = 0;
 int do_stats = 0;
@@ -251,13 +251,13 @@ void usage(enum logcode F)
   rprintf(F,"     --suffix=SUFFIX         backup suffix (default %s w/o --backup-dir)\n",BACKUP_SUFFIX);
   rprintf(F," -u, --update                update only (don't overwrite newer files)\n");
   rprintf(F,"     --inplace               update destination files in-place (SEE MAN PAGE)\n");
-  rprintf(F," -k, --keep-dirs             transfer a directory without recursing\n");
-  rprintf(F," -K, --keep-dirlinks         treat symlinked dir on receiver as dir\n");
+  rprintf(F," -d, --dirs                  transfer directories without recursing\n");
   rprintf(F," -l, --links                 copy symlinks as symlinks\n");
   rprintf(F," -L, --copy-links            copy the referent of all symlinks\n");
   rprintf(F,"     --copy-unsafe-links     copy the referent of \"unsafe\" symlinks\n");
   rprintf(F,"     --safe-links            ignore \"unsafe\" symlinks\n");
   rprintf(F," -H, --hard-links            preserve hard links\n");
+  rprintf(F," -K, --keep-dirlinks         treat symlinked dir on receiver as dir\n");
   rprintf(F," -p, --perms                 preserve permissions\n");
   rprintf(F," -o, --owner                 preserve owner (root only)\n");
   rprintf(F," -g, --group                 preserve group\n");
@@ -308,6 +308,7 @@ void usage(enum logcode F)
   rprintf(F,"     --progress              show progress during transfer\n");
   rprintf(F,"     --log-format=FORMAT     log file transfers using specified format\n");
   rprintf(F,"     --password-file=FILE    get password from FILE\n");
+  rprintf(F,"     --list-only             list the files instead of copying them\n");
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth, KBytes per second\n");
   rprintf(F,"     --write-batch=FILE      write a batch to FILE\n");
   rprintf(F,"     --read-batch=FILE       read a batch from FILE\n");
@@ -357,10 +358,10 @@ static struct poptOption long_options[] = {
   {"cvs-exclude",     'C', POPT_ARG_NONE,   &cvs_exclude, 0, 0, 0 },
   {"update",          'u', POPT_ARG_NONE,   &update_only, 0, 0, 0 },
   {"inplace",          0,  POPT_ARG_NONE,   &inplace, 0, 0, 0 },
-  {"keep-dirs",       'k', POPT_ARG_VAL,    &keep_dirs, 2, 0, 0 },
-  {"keep-dirlinks",   'K', POPT_ARG_NONE,   &keep_dirlinks, 0, 0, 0 },
+  {"dirs",            'd', POPT_ARG_VAL,    &xfer_dirs, 2, 0, 0 },
   {"links",           'l', POPT_ARG_NONE,   &preserve_links, 0, 0, 0 },
   {"copy-links",      'L', POPT_ARG_NONE,   &copy_links, 0, 0, 0 },
+  {"keep-dirlinks",   'K', POPT_ARG_NONE,   &keep_dirlinks, 0, 0, 0 },
   {"whole-file",      'W', POPT_ARG_VAL,    &whole_file, 1, 0, 0 },
   {"no-whole-file",    0,  POPT_ARG_VAL,    &whole_file, 0, 0, 0 },
   {"copy-unsafe-links", 0, POPT_ARG_NONE,   &copy_unsafe_links, 0, 0, 0 },
@@ -848,7 +849,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 
 	if (recurse || list_only || files_from)
-		keep_dirs |= 1;
+		xfer_dirs |= 1;
 
 	if (relative_paths < 0)
 		relative_paths = files_from? 1 : 0;
@@ -1060,7 +1061,7 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'l';
 	if (copy_links)
 		argstr[x++] = 'L';
-	if (keep_dirs > 1)
+	if (xfer_dirs > 1)
 		argstr[x++] = 'k';
 	if (keep_dirlinks && am_sender)
 		argstr[x++] = 'K';
