@@ -122,16 +122,16 @@ void delete_files(struct file_list *flist)
 				continue;
 			if (flist_find(flist,local_file_list->files[i]) < 0) {
 				char *f = f_name(local_file_list->files[i]);
-				if (make_backups && (backup_dir || !is_backup_file(f))) {
+				int mode = local_file_list->files[i]->mode;
+				if (make_backups && (backup_dir || !is_backup_file(f))
+				  && !S_ISDIR(mode)) {
 					make_backup(f);
 					if (verbose) {
 						rprintf(FINFO, "deleting %s\n",
 							safe_fname(f));
 					}
-				} else {
-					int mode = local_file_list->files[i]->mode;
+				} else
 					delete_one(f, S_ISDIR(mode) != 0);
-				}
 				deletion_count++;
 			}
 		}
