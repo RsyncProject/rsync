@@ -94,7 +94,7 @@ pid_t piped_child(char **command, int *f_in, int *f_out)
 }
 
 pid_t local_child(int argc, char **argv,int *f_in,int *f_out,
-		  int (*child_main)(int, char **))
+		  int (*child_main)(int, char*[]))
 {
 	pid_t pid;
 	int to_child_pipe[2];
