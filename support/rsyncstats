@@ -1,9 +1,11 @@
 #!/usr/bin/perl
 #
 # This script parses the default logfile format produced by rsync when running
-# as a daemon with transfer logging enabled. It is derived from the xferstats
-# script that comes with wuftpd.  See the usage message at the bottom for the
-# options it takes.
+# as a daemon with transfer logging enabled.  It also parses a slightly tweaked
+# version of the default format where %o has been replaced with %i.
+#
+# This script is derived from the xferstats script that comes with wuftpd.  See
+# the usage message at the bottom for the options it takes.
 #
 # Andrew Tridgell, October 1998
 
@@ -50,10 +52,16 @@ if ($only_section) {
 
 line: while (<LOG>) {
 
-   ($day,$time,$pid,$op,$host,$ip,$module,$user,$bytes,$file) = split(' ', $_, 10);
-   next unless defined $file;
+   next unless ($day,$time,$op,$host,$module,$file,$bytes)
+      = m#^ (\d+/\d\d/\d\d)\s+(\d\d:\d\d:\d\d)\s+\[\d+\]\s+(send|recv|[<>]f\S+)\s+
+          (\S+)\s+\[\d+\.\d+\.\d+\.\d+\]\s+(\S+)\s+\(\S*\)\s+(.*)\s+(\d+) $ #x;
 
-   next if $op ne 'send' && $op ne 'recv';
+   # TODO actually divide the data by into send/recv categories
+   if ($op =~ /^>/) {
+      $op = 'send';
+   } elsif ($op =~ /^</) {
+      $op = 'recv';
+   }
 
    $daytime = $day;
    $hour = substr($time,0,2); 
