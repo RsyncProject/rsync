@@ -678,12 +678,13 @@ static int lookup_name(const struct sockaddr_storage *ss,
 #endif
 
 	/* reverse lookup */
-	if (!(name_err = getnameinfo((struct sockaddr *) ss, ss_len,
-				     name_buf, name_buf_len,
-				     port_buf, port_buf_len,
-				     NI_NAMEREQD | NI_NUMERICSERV))) {
+	name_err = getnameinfo((struct sockaddr *) ss, ss_len,
+			       name_buf, name_buf_len,
+			       port_buf, port_buf_len,
+			       NI_NAMEREQD | NI_NUMERICSERV);
+	if (name_err != 0) {
 		strcpy(name_buf, def);
-		rprintf(FERROR, RSYNC_NAME ": reverse name lookup failed: %s\n",
+		rprintf(FERROR, RSYNC_NAME ": name lookup failed: %s\n",
 			gai_strerror(name_err));
 		return name_err;
 	}
