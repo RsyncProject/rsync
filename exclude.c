@@ -224,9 +224,9 @@ struct exclude_struct **make_exclude_list(const char *fname,
 	char line[MAXPATHLEN];
 
 	if (strcmp(fname, "-")) {
-		f = fopen(fname,"r");
+		f = fopen(fname,"r" O_TEXT_STR);
 	} else {
-		f = fdopen(0, "r");
+		f = fdopen(0, "r" O_TEXT_STR);
 	}
 	if (!f) {
 		if (fatal) {

@@ -34,6 +34,10 @@ rsync changes since last release
     * Set the default value of --modify-window to 1 on Cygwin.  (Lapo
       Luchini)
 
+    * Open config files in text mode when O_TEXT is defined.  This helps
+      on Cygwin when the config files are on a filesystem that are mounted
+      in binary mode.  (Ville Herva)
+
     * Ignore errors from chmod when -p/-a/--preserve-perms is not set.
       (Dave Dykstra)
 

@@ -595,6 +595,20 @@ void rsyserr(enum logcode, int, const char *, ...)
 #define inet_ntoa rep_inet_ntoa
 #endif
 
+/* Compatibility defines so that platforms that don't distinguish between
+ * text and binary files (like Cygwin does) can use the same code. */
+#ifndef O_TEXT
+#define O_TEXT 0
+#define O_TEXT_STR ""
+#else
+#define O_TEXT_STR "t"
+#endif
+#ifndef O_BINARY
+#define O_BINARY 0
+#define O_BINARY_STR ""
+#else
+#define O_BINARY_STR "b"
+#endif
 
 #ifndef HAVE_STRLCPY
 size_t strlcpy(char *d, const char *s, size_t bufsize);
