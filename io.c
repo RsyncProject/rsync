@@ -62,12 +62,17 @@ static void read_check(int f)
 {
   int n;
 
+  if (f == -1) return;
+
   if (read_buffer_len == 0) {
     read_buffer_p = read_buffer;
   }
 
   if ((n=num_waiting(f)) <= 0)
     return;
+
+  /* things could deteriorate if we read in really small chunks */
+  if (n < 10) n = 1024;
 
   if (read_buffer_p != read_buffer) {
     memmove(read_buffer,read_buffer_p,read_buffer_len);
@@ -95,10 +100,13 @@ static int readfd(int fd,char *buffer,int N)
 {
   int  ret;
   int total=0;  
+
+  if (read_buffer_len < N)
+	  read_check(buffer_f_in);
  
   while (total < N)
     {
-      if (read_buffer_len > 0) {
+      if (read_buffer_len > 0 && buffer_f_in == fd) {
 	ret = MIN(read_buffer_len,N-total);
 	memcpy(buffer+total,read_buffer_p,ret);
 	read_buffer_p += ret;
@@ -228,7 +236,8 @@ int read_write(int fd_in,int fd_out,int size)
 static int writefd(int fd,char *buf,int len)
 {
   int total = 0;
-  fd_set fds;
+  fd_set w_fds, r_fds;
+  int fd_count;
   struct timeval tv;
 
   if (buffer_f_in == -1) 
@@ -245,11 +254,18 @@ static int writefd(int fd,char *buf,int len)
     if (ret == -1) {
       read_check(buffer_f_in);
 
-      FD_ZERO(&fds);
-      FD_SET(fd,&fds);
+      fd_count = fd+1;
+      FD_ZERO(&w_fds);
+      FD_ZERO(&r_fds);
+      FD_SET(fd,&w_fds);
+      if (buffer_f_in != -1) {
+	      FD_SET(buffer_f_in,&r_fds);
+	      if (buffer_f_in > fd) 
+		      fd_count = buffer_f_in+1;
+      }
       tv.tv_sec = BLOCKING_TIMEOUT;
       tv.tv_usec = 0;
-      select(fd+1,NULL,&fds,NULL,&tv);
+      select(fd_count,buffer_f_in == -1? NULL: &r_fds,&w_fds,NULL,&tv);
     } else {
       total += ret;
     }
