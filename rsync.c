@@ -158,6 +158,18 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	change_gid = preserve_gid && file->gid != GID_NONE
 		&& st->st_gid != file->gid;
 	if (change_uid || change_gid) {
+		if (verbose > 2 && !dry_run) {
+			if (change_uid) {
+				rprintf(FINFO,
+				    "set uid of %s from %ld to %ld\n",
+				    fname, (long)st->st_uid, (long)file->uid);
+			}
+			if (change_gid) {
+				rprintf(FINFO,
+				    "set gid of %s from %ld to %ld\n",
+				    fname, (long)st->st_gid, (long)file->gid);
+			}
+		}
 		if (do_lchown(fname,
 			      change_uid?file->uid:st->st_uid,
 			      change_gid?file->gid:st->st_gid) != 0) {
