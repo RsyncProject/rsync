@@ -1,23 +1,23 @@
 /* -*- c-file-style: "linux" -*-
-   
-   Copyright (C) 1996-2001 by Andrew Tridgell 
-   Copyright (C) Paul Mackerras 1996
-   Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
-   
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-   
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-   
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-*/
+ * 
+ * Copyright (C) 1996-2001 by Andrew Tridgell 
+ * Copyright (C) Paul Mackerras 1996
+ * Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
 
 /**
  * @file io.c
@@ -36,7 +36,7 @@
 
 #include "rsync.h"
 
-/* if no timeout is specified then use a 60 second select timeout */
+/** If no timeout is specified then use a 60 second select timeout */
 #define SELECT_TIMEOUT 60
 
 static int io_multiplexing_out;
@@ -86,13 +86,13 @@ static void check_timeout(void)
 	}
 }
 
-/* setup the fd used to propogate errors */
+/** Setup the fd used to propogate errors */
 void io_set_error_fd(int fd)
 {
 	io_error_fd = fd;
 }
 
-/* read some data from the error fd and write it to the write log code */
+/** Read some data from the error fd and write it to the write log code */
 static void read_error_fd(void)
 {
 	char buf[200];
@@ -124,21 +124,18 @@ static void read_error_fd(void)
 }
 
 
+/**
+ * It's almost always an error to get an EOF when we're trying to read
+ * from the network, because the protocol is self-terminating.
+ *
+ * However, there is one unfortunate cases where it is not, which is
+ * rsync <2.4.6 sending a list of modules on a server, since the list
+ * is terminated by closing the socket. So, for the section of the
+ * program where that is a problem (start_socket_client),
+ * kludge_around_eof is True and we just exit.
+ */
 static void whine_about_eof (void)
 {
-	/**
-	   It's almost always an error to get an EOF when we're trying
-	   to read from the network, because the protocol is
-	   self-terminating.
-	   
-	   However, there is one unfortunate cases where it is not,
-	   which is rsync <2.4.6 sending a list of modules on a
-	   server, since the list is terminated by closing the socket.
-	   So, for the section of the program where that is a problem
-	   (start_socket_client), kludge_around_eof is True and we
-	   just exit.
-	*/
-
 	if (kludge_around_eof)
 		exit_cleanup (0);
 	else {
@@ -163,7 +160,7 @@ static void die_from_readerr (int err)
 }
 
 
-/*!
+/**
  * Read from a socket with IO timeout. return the number of bytes
  * read. If no bytes can be read then exit, never return a number <= 0.
  *
@@ -245,8 +242,10 @@ static int read_timeout (int fd, char *buf, size_t len)
 
 
 
-/*! Continue trying to read len bytes - don't return until len has
-  been read.   */
+/**
+ * Continue trying to read len bytes - don't return until len has been
+ * read.
+ **/
 static void read_loop (int fd, char *buf, size_t len)
 {
 	while (len) {
@@ -316,8 +315,11 @@ static int read_unbuffered(int fd, char *buf, size_t len)
 
 
 
-/* do a buffered read from fd. don't return until all N bytes
-   have been read. If all N can't be read then exit with an error */
+/**
+ * Do a buffered read from @p fd.  Don't return until all @p n bytes
+ * have been read.  If all @p n can't be read then exit with an
+ * error.
+ **/
 static void readfd (int fd, char *buffer, size_t N)
 {
 	int  ret;
@@ -387,8 +389,13 @@ unsigned char read_byte(int f)
 	return c;
 }
 
-/* Write len bytes to fd.  This underlies the multiplexing system,
- * which is always called by application code.  */
+
+/**
+ * Write len bytes to the file descriptor @p fd.
+ *
+ * This function underlies the multiplexing system.  The body of the
+ * application never calls this function directly.
+ **/
 static void writefd_unbuffered(int fd,char *buf,size_t len)
 {
 	size_t total = 0;
@@ -499,8 +506,10 @@ void io_start_buffering(int fd)
 	io_buffer_count = 0;
 }
 
-/* write an message to a multiplexed stream. If this fails then rsync
-   exits */
+/**
+ * Write an message to a multiplexed stream. If this fails then rsync
+ * exits.
+ **/
 static void mplex_write(int fd, enum logcode code, char *buf, size_t len)
 {
 	char buffer[4096];
@@ -609,7 +618,7 @@ void write_buf(int f,char *buf,size_t len)
 	writefd(f,buf,len);
 }
 
-/* write a string to the connection */
+/** Write a string to the connection */
 static void write_sbuf(int f,char *buf)
 {
 	write_buf(f, buf, strlen(buf));
@@ -670,7 +679,7 @@ void io_printf(int fd, const char *format, ...)
 }
 
 
-/* setup for multiplexing an error stream with the data stream */
+/** Setup for multiplexing an error stream with the data stream */
 void io_start_multiplex_out(int fd)
 {
 	multiplex_out_fd = fd;
@@ -679,7 +688,7 @@ void io_start_multiplex_out(int fd)
 	io_multiplexing_out = 1;
 }
 
-/* setup for multiplexing an error stream with the data stream */
+/** Setup for multiplexing an error stream with the data stream */
 void io_start_multiplex_in(int fd)
 {
 	multiplex_in_fd = fd;
@@ -687,7 +696,7 @@ void io_start_multiplex_in(int fd)
 	io_multiplexing_in = 1;
 }
 
-/* write an message to the multiplexed error stream */
+/** Write an message to the multiplexed error stream */
 int io_multiplex_write(enum logcode code, char *buf, size_t len)
 {
 	if (!io_multiplexing_out) return 0;
@@ -698,7 +707,7 @@ int io_multiplex_write(enum logcode code, char *buf, size_t len)
 	return 1;
 }
 
-/* stop output multiplexing */
+/** Stop output multiplexing */
 void io_multiplexing_close(void)
 {
 	io_multiplexing_out = 0;
