@@ -71,22 +71,21 @@ static void send_directory(int f,struct file_list *flist,char *dir);
 
 static char *flist_dir = NULL;
 
-#define FILE_VALID 1
-#define SAME_MODE (1<<1)
-#define SAME_DEV (1<<2)
-#define SAME_UID (1<<3)
-#define SAME_GID (1<<4)
-#define SAME_DIR (1<<5)
+extern void (*send_file_entry)(struct file_struct *file,int f);
+extern void (*receive_file_entry)(struct file_struct *file,
+				  unsigned char flags,int f);
 
-static void send_file_entry(struct file_struct *file,int f)
+
+void send_file_entry_v11(struct file_struct *file,int f)
 {
   unsigned char flags;
+  static time_t last_time=0;
   static mode_t last_mode=0;
   static dev_t last_dev=0;
   static uid_t last_uid=0;
   static gid_t last_gid=0;
-  static char lastdir[MAXPATHLEN]="";
-  char *p=NULL;
+  static char lastname[MAXPATHLEN]="";
+  int l1,l2;
 
   if (f == -1) return;
 
@@ -101,22 +100,26 @@ static void send_file_entry(struct file_struct *file,int f)
   if (file->dev == last_dev) flags |= SAME_DEV;
   if (file->uid == last_uid) flags |= SAME_UID;
   if (file->gid == last_gid) flags |= SAME_GID;
-    
-  if (strncmp(file->name,lastdir,strlen(lastdir)) == 0) {
-    flags |= SAME_DIR;
-    p = file->name + strlen(lastdir);
-  } else {
-    p = file->name;
-  }
+  if (file->modtime == last_time) flags |= SAME_TIME;
 
-  write_byte(f,flags);
-  if (flags & SAME_DIR)
-    write_byte(f,strlen(p));
+  for (l1=0;lastname[l1] && file->name[l1] == lastname[l1];l1++) ;
+  l2 = strlen(file->name) - l1;
+
+  if (l1 > 0) flags |= SAME_NAME;
+  if (l2 > 255) flags |= LONG_NAME;
+    
+  write_byte(f,flags);  
+  if (flags & SAME_NAME)
+    write_byte(f,l1);
+  if (flags & LONG_NAME)
+    write_int(f,l2);
   else
-    write_int(f,strlen(p));
-  write_buf(f,p,strlen(p));
-  write_int(f,(int)file->modtime);
+    write_byte(f,l2);
+  write_buf(f,file->name+l1,l2);
+
   write_int(f,(int)file->length);
+  if (!(flags & SAME_TIME))
+    write_int(f,(int)file->modtime);
   if (!(flags & SAME_MODE))
     write_int(f,(int)file->mode);
   if (preserve_uid && !(flags & SAME_UID))
@@ -141,46 +144,42 @@ static void send_file_entry(struct file_struct *file,int f)
   last_dev = file->dev;
   last_uid = file->uid;
   last_gid = file->gid;
-  p = strrchr(file->name,'/');
-  if (p) {
-    int l = (int)(p - file->name) + 1;
-    strncpy(lastdir,file->name,l);
-    lastdir[l] = 0;
-  } else {
-    strcpy(lastdir,"");
-  }
+  last_time = file->modtime;
+
+  strcpy(lastname,file->name);
+  lastname[255] = 0;
 }
 
 
 
-static void receive_file_entry(struct file_struct *file,
-			       unsigned char flags,int f)
+void receive_file_entry_v11(struct file_struct *file,
+			    unsigned char flags,int f)
 {
+  static mode_t last_time=0;
   static mode_t last_mode=0;
   static dev_t last_dev=0;
   static uid_t last_uid=0;
   static gid_t last_gid=0;
-  static char lastdir[MAXPATHLEN]="";
-  char *p=NULL;
-  int l1,l2;
+  static char lastname[MAXPATHLEN]="";
+  int l1=0,l2=0;
 
-  if (flags & SAME_DIR) {
+  if (flags & SAME_NAME)
     l1 = read_byte(f);
-    l2 = strlen(lastdir);
-  } else {
-    l1 = read_int(f);
-    l2 = 0;
-  }
+  
+  if (flags & LONG_NAME)
+    l2 = read_int(f);
+  else
+    l2 = read_byte(f);
 
   file->name = (char *)malloc(l1+l2+1);
   if (!file->name) out_of_memory("receive_file_entry");
 
-  strncpy(file->name,lastdir,l2);
-  read_buf(f,file->name+l2,l1);
+  strncpy(file->name,lastname,l1);
+  read_buf(f,file->name+l1,l2);
   file->name[l1+l2] = 0;
 
-  file->modtime = (time_t)read_int(f);
   file->length = (off_t)read_int(f);
+  file->modtime = (flags & SAME_TIME) ? last_time : (time_t)read_int(f);
   file->mode = (flags & SAME_MODE) ? last_mode : (mode_t)read_int(f);
   if (preserve_uid)
     file->uid = (flags & SAME_UID) ? last_uid : (uid_t)read_int(f);
@@ -206,15 +205,12 @@ static void receive_file_entry(struct file_struct *file,
   last_dev = file->dev;
   last_uid = file->uid;
   last_gid = file->gid;
-  p = strrchr(file->name,'/');
-  if (p) {
-    int l = (int)(p - file->name) + 1;
-    strncpy(lastdir,file->name,l);
-    lastdir[l] = 0;
-  } else {
-    strcpy(lastdir,"");
-  }
+  last_time = file->modtime;
+
+  strcpy(lastname,file->name);
+  lastname[255] = 0;
 }
+
 
 
 static struct file_struct *make_file(int recurse,char *fname)

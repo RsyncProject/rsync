@@ -21,7 +21,7 @@ SHELL=/bin/sh
 
 LIBOBJ=lib/getopt.o lib/fnmatch.o 
 OBJS1=rsync.o exclude.o util.o md4.o main.o checksum.o match.o 
-OBJS=$(OBJS1) flist.o io.o $(LIBOBJ)
+OBJS=$(OBJS1) flist.o io.o compat.o $(LIBOBJ)
 
 .c.o:
 	$(CC) $(CFLAGS) -c $*.c -o $*.o

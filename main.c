@@ -43,6 +43,7 @@ int local_server=0;
 int ignore_times=0;
 int delete_mode=0;
 int one_file_system=0;
+int remote_version=0;
 
 int am_server = 0;
 static int sender = 0;
@@ -581,14 +582,16 @@ int main(int argc,char *argv[])
       verbose = MAX(verbose,1);
 
     if (am_server) {
-      int version = read_int(STDIN_FILENO);
-      if (version < MIN_PROTOCOL_VERSION) {
+      remote_version = read_int(STDIN_FILENO);
+      if (remote_version < MIN_PROTOCOL_VERSION) {
 	fprintf(stderr,"protocol version mismatch %d %d\n",
-		version,PROTOCOL_VERSION);
+		remote_version,PROTOCOL_VERSION);
 	exit(1);
       }
       write_int(STDOUT_FILENO,PROTOCOL_VERSION);
       write_flush(STDOUT_FILENO);
+
+      setup_protocol();
 	
       if (sender) {
 	recv_exclude_list(STDIN_FILENO);
@@ -665,12 +668,14 @@ int main(int argc,char *argv[])
     write_int(f_out,PROTOCOL_VERSION);
     write_flush(f_out);
     {
-      int version = read_int(f_in);
-      if (version < MIN_PROTOCOL_VERSION) {
+      remote_version = read_int(f_in);
+      if (remote_version < MIN_PROTOCOL_VERSION) {
 	fprintf(stderr,"protocol version mismatch\n");
 	exit(1);
       }	
     }
+
+    setup_protocol();
 
     if (verbose > 3) 
       fprintf(stderr,"parent=%d child=%d sender=%d recurse=%d\n",

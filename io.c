@@ -103,7 +103,8 @@ static int readfd(int fd,char *buffer,int N)
 	read_buffer_p += ret;
 	read_buffer_len -= ret;
       } else {
-	ret = read(fd,buffer + total,N - total);
+	if ((ret = read(fd,buffer + total,N - total)) == -1)
+	  return -1;
       }
 
       if (ret <= 0)
@@ -116,10 +117,12 @@ static int readfd(int fd,char *buffer,int N)
 
 int read_int(int f)
 {
+  int ret;
   char b[4];
-  if (readfd(f,b,4) != 4) {
+  if ((ret=readfd(f,b,4)) != 4) {
     if (verbose > 1) 
-      fprintf(stderr,"Error reading %d bytes : %s\n",4,strerror(errno));
+      fprintf(stderr,"Error reading %d bytes : %s\n",
+	      4,ret==-1?strerror(errno):"EOF");
     exit(1);
   }
   total_read += 4;
@@ -128,9 +131,11 @@ int read_int(int f)
 
 void read_buf(int f,char *buf,int len)
 {
-  if (readfd(f,buf,len) != len) {
+  int ret;
+  if ((ret=readfd(f,buf,len)) != len) {
     if (verbose > 1) 
-      fprintf(stderr,"Error reading %d bytes : %s\n",len,strerror(errno));
+      fprintf(stderr,"Error reading %d bytes : %s\n",
+	      len,ret==-1?strerror(errno):"EOF");
     exit(1);
   }
   total_read += len;
@@ -179,8 +184,8 @@ static int writefd(int fd,char *buf,int len)
 
     if (ret == 0) return total;
 
-    if (ret == -1 && errno != EWOULDBLOCK) 
-      return total?total:-1;
+    if (ret == -1 && !(errno == EWOULDBLOCK || errno == EAGAIN)) 
+      return -1;
 
     if (ret == -1) {
       read_check(buffer_f_in);
@@ -202,10 +207,12 @@ static int writefd(int fd,char *buf,int len)
 
 void write_int(int f,int x)
 {
+  int ret;
   char b[4];
   SIVAL(b,0,x);
-  if (writefd(f,b,4) != 4) {
-    fprintf(stderr,"write_int failed : %s\n",strerror(errno));
+  if ((ret=writefd(f,b,4)) != 4) {
+    fprintf(stderr,"write_int failed : %s\n",
+	    ret==-1?strerror(errno):"EOF");
     exit(1);
   }
   total_written += 4;
@@ -213,8 +220,10 @@ void write_int(int f,int x)
 
 void write_buf(int f,char *buf,int len)
 {
-  if (writefd(f,buf,len) != len) {
-    fprintf(stderr,"write_buf failed : %s\n",strerror(errno));
+  int ret;
+  if ((ret=writefd(f,buf,len)) != len) {
+    fprintf(stderr,"write_buf failed : %s\n",
+	    ret==-1?strerror(errno):"EOF");
     exit(1);
   }
   total_written += len;
