@@ -350,7 +350,7 @@ to the detailed description below for a complete description.  verb(
  -I, --ignore-times          don't skip files that match size and time
      --size-only             skip files that match in size
      --modify-window=NUM     compare mod-times with reduced accuracy
- -T  --temp-dir=DIR          create temporary files in directory DIR
+ -T, --temp-dir=DIR          create temporary files in directory DIR
      --compare-dest=DIR      also compare received files relative to DIR
      --copy-dest=DIR         ... and include copies of unchanged files
      --link-dest=DIR         hardlink to files in DIR when unchanged
@@ -364,7 +364,7 @@ to the detailed description below for a complete description.  verb(
      --include=PATTERN       don't exclude files matching PATTERN
      --include-from=FILE     read include patterns from FILE
      --files-from=FILE       read list of source-file names from FILE
- -0  --from0                 all *from file lists are delimited by nulls
+ -0, --from0                 all *from file lists are delimited by nulls
      --version               print version number
      --port=PORT             specify double-colon alternate port number
      --blocking-io           use blocking I/O for the remote shell
@@ -379,8 +379,8 @@ to the detailed description below for a complete description.  verb(
      --write-batch=FILE      write a batched update to FILE
      --read-batch=FILE       read a batched update from FILE
      --checksum-seed=NUM     set block/file checksum seed (advanced)
- -4  --ipv4                  prefer IPv4
- -6  --ipv6                  prefer IPv6
+ -4, --ipv4                  prefer IPv4
+ -6, --ipv6                  prefer IPv6
  -h, --help                  show this help screen)
 
 Rsync can also be run as a daemon, in which case the following options are
@@ -392,8 +392,8 @@ accepted: verb(
      --no-detach             do not detach from the parent
      --port=PORT             listen on alternate port number
  -v, --verbose               increase verbosity
- -4  --ipv4                  prefer IPv4
- -6  --ipv6                  prefer IPv6
+ -4, --ipv4                  prefer IPv4
+ -6, --ipv6                  prefer IPv6
  -h, --help                  show this help screen)
 
 manpageoptions()
