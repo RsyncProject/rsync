@@ -270,14 +270,14 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		return;
 
 	if (verbose > 2)
-		rprintf(FINFO,"recv_generator(%s,%d)\n",fname,i);
+		rprintf(FINFO, "recv_generator(%s,%d)\n", safe_fname(fname), i);
 
 	if (server_exclude_list.head
 	    && check_exclude(&server_exclude_list, fname,
 			     S_ISDIR(file->mode)) < 0) {
 		if (verbose) {
 			rprintf(FINFO, "skipping server-excluded file \"%s\"\n",
-				fname);
+				safe_fname(fname));
 		}
 		return;
 	}
@@ -286,8 +286,10 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 
 	if (only_existing && statret == -1 && errno == ENOENT) {
 		/* we only want to update existing files */
-		if (verbose > 1)
-			rprintf(FINFO, "not creating new file \"%s\"\n", fname);
+		if (verbose > 1) {
+			rprintf(FINFO, "not creating new file \"%s\"\n",
+				safe_fname(fname));
+		}
 		return;
 	}
 
@@ -331,7 +333,7 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		 * and modification-time repair. */
 		if (set_perms(fname, file, statret ? NULL : &st, 0)
 		    && verbose && f_out != -1)
-			rprintf(FINFO,"%s/\n",fname);
+			rprintf(FINFO, "%s/\n", safe_fname(fname));
 		return;
 	}
 
@@ -367,11 +369,12 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		}
 		if (do_symlink(file->u.link,fname) != 0) {
 			rsyserr(FERROR, errno, "symlink %s -> \"%s\" failed",
-				full_fname(fname), file->u.link);
+				full_fname(fname), safe_fname(file->u.link));
 		} else {
 			set_perms(fname,file,NULL,0);
 			if (verbose) {
-				rprintf(FINFO,"%s -> %s\n", fname,file->u.link);
+				rprintf(FINFO, "%s -> %s\n", safe_fname(fname),
+					safe_fname(file->u.link));
 			}
 		}
 #endif
@@ -386,15 +389,18 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 			delete_file(fname);
 			if (verbose > 2) {
 				rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",
-					fname,(int)file->mode,(int)file->u.rdev);
+					safe_fname(fname),
+					(int)file->mode, (int)file->u.rdev);
 			}
 			if (do_mknod(fname,file->mode,file->u.rdev) != 0) {
 				rsyserr(FERROR, errno, "mknod %s failed",
 					full_fname(fname));
 			} else {
 				set_perms(fname,file,NULL,0);
-				if (verbose)
-					rprintf(FINFO,"%s\n",fname);
+				if (verbose) {
+					rprintf(FINFO, "%s\n",
+						safe_fname(fname));
+				}
 			}
 		} else {
 			set_perms(fname, file, &st, PERMS_REPORT);
@@ -407,7 +413,8 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		return;
 
 	if (!S_ISREG(file->mode)) {
-		rprintf(FINFO, "skipping non-regular file \"%s\"\n",fname);
+		rprintf(FINFO, "skipping non-regular file \"%s\"\n",
+			safe_fname(fname));
 		return;
 	}
 
@@ -427,7 +434,7 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 			if (do_link(fnamecmpbuf, fname) != 0) {
 				if (verbose > 0) {
 					rsyserr(FINFO, errno, "link %s => %s",
-						fnamecmpbuf, fname);
+						fnamecmpbuf, safe_fname(fname));
 				}
 			}
 			fnamecmp = fnamecmpbuf;
@@ -468,14 +475,14 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 
 	if (opt_ignore_existing && fnamecmp == fname) {
 		if (verbose > 1)
-			rprintf(FINFO,"%s exists\n",fname);
+			rprintf(FINFO, "%s exists\n", safe_fname(fname));
 		return;
 	}
 
 	if (update_only && fnamecmp == fname
 	    && cmp_modtime(st.st_mtime, file->modtime) > 0) {
 		if (verbose > 1)
-			rprintf(FINFO,"%s is newer\n",fname);
+			rprintf(FINFO, "%s is newer\n", safe_fname(fname));
 		return;
 	}
 
@@ -511,8 +518,8 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 	}
 
 	if (verbose > 3) {
-		rprintf(FINFO,"gen mapped %s of size %.0f\n", fnamecmp,
-			(double)st.st_size);
+		rprintf(FINFO, "gen mapped %s of size %.0f\n",
+			safe_fname(fnamecmp), (double)st.st_size);
 	}
 
 	if (verbose > 2)

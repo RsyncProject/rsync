@@ -98,7 +98,7 @@ int delete_file(char *fname)
 			continue;
 		pathjoin(buf, sizeof buf, fname, dname);
 		if (verbose > 0)
-			rprintf(FINFO, "deleting %s\n", buf);
+			rprintf(FINFO, "deleting %s\n", safe_fname(buf));
 		if (delete_file(buf) != 0) {
 			closedir(d);
 			return -1;

@@ -62,7 +62,7 @@ static void delete_one(char *fn, int is_dir)
 			rsyserr(FERROR, errno, "delete_one: unlink %s failed",
 				full_fname(fn));
 		} else if (verbose)
-			rprintf(FINFO, "deleting %s\n", fn);
+			rprintf(FINFO, "deleting %s\n", safe_fname(fn));
 	} else {
 		if (do_rmdir(fn) != 0) {
 			if (errno == ENOTDIR && keep_dirlinks) {
@@ -74,8 +74,10 @@ static void delete_one(char *fn, int is_dir)
 					"delete_one: rmdir %s failed",
 					full_fname(fn));
 			}
-		} else if (verbose)
-			rprintf(FINFO, "deleting directory %s\n", fn);
+		} else if (verbose) {
+			rprintf(FINFO, "deleting directory %s\n",
+				safe_fname(fn));
+		}
 	}
 }
 
@@ -115,7 +117,7 @@ void delete_files(struct file_list *flist)
 			continue;
 
 		if (verbose > 1)
-			rprintf(FINFO, "deleting in %s\n", fbuf);
+			rprintf(FINFO, "deleting in %s\n", safe_fname(fbuf));
 
 		for (i = local_file_list->count-1; i >= 0; i--) {
 			if (max_delete && deletion_count > max_delete)
@@ -126,8 +128,10 @@ void delete_files(struct file_list *flist)
 				char *f = f_name(local_file_list->files[i]);
 				if (make_backups && (backup_dir || !is_backup_file(f))) {
 					make_backup(f);
-					if (verbose)
-						rprintf(FINFO, "deleting %s\n", f);
+					if (verbose) {
+						rprintf(FINFO, "deleting %s\n",
+							safe_fname(f));
+					}
 				} else {
 					int mode = local_file_list->files[i]->mode;
 					delete_one(f, S_ISDIR(mode) != 0);
@@ -221,7 +225,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		mapbuf = map_file(fd_r, size_r, sum.blength);
 		if (verbose > 2) {
 			rprintf(FINFO, "recv mapped %s of size %.0f\n",
-				fname_r, (double)size_r);
+				safe_fname(fname_r), (double)size_r);
 		}
 	} else
 		mapbuf = NULL;
@@ -396,15 +400,15 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			fname = f_name_to(file, fbuf);
 
 		if (dry_run) {
-			if (!am_server && verbose)
-				rprintf(FINFO, "%s\n", fname);
+			if (!am_server && verbose) /* log the transfer */
+				rprintf(FINFO, "%s\n", safe_fname(fname));
 			continue;
 		}
 
 		initial_stats = stats;
 
 		if (verbose > 2)
-			rprintf(FINFO,"recv_files(%s)\n",fname);
+			rprintf(FINFO, "recv_files(%s)\n", safe_fname(fname));
 
 		fnamecmp = fname;
 
@@ -416,7 +420,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			}
 			if (i < next_gen_i) {
 				rprintf(FINFO, "skipping update for \"%s\"\n",
-					fname);
+					safe_fname(fname));
 				discard_receive_data(f_in, file->length);
 				continue;
 			}
@@ -428,7 +432,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			if (verbose) {
 				rprintf(FINFO,
 					"skipping server-excluded update for \"%s\"\n",
-					fname);
+					safe_fname(fname));
 			}
 			discard_receive_data(f_in, file->length);
 			continue;
@@ -527,8 +531,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			cleanup_set(fnametmp, fname, file, fd1, fd2);
 		}
 
-		if (!am_server && verbose)
-			rprintf(FINFO, "%s\n", fname);
+		if (!am_server && verbose) /* log the transfer */
+			rprintf(FINFO, "%s\n", safe_fname(fname));
 
 		/* recv file data */
 		recv_ok = receive_data(f_in, fnamecmp, fd1, st.st_size,
@@ -567,7 +571,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 				}
 				rprintf(msgtype,
 					"%s: %s failed verification -- update %sed%s.\n",
-					errstr, fname, keptstr, redostr);
+					errstr, safe_fname(fname),
+					keptstr, redostr);
 			}
 			if (csum_length != SUM_LENGTH) {
 				char buf[4];

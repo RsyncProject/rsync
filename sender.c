@@ -115,7 +115,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 	struct sum_struct *s;
 	struct map_struct *mbuf = NULL;
 	STRUCT_STAT st;
-	char fname[MAXPATHLEN];
+	char *fname2, fname[MAXPATHLEN];
 	int i;
 	struct file_struct *file;
 	int phase = 0;
@@ -160,15 +160,14 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				fname[offset++] = '/';
 		} else
 			offset = 0;
-		f_name_to(file, fname + offset);
+		fname2 = f_name_to(file, fname + offset);
 
 		if (verbose > 2)
 			rprintf(FINFO, "send_files(%d, %s)\n", i, fname);
 
 		if (dry_run) {
-			if (!am_server && verbose) {
-				rprintf(FINFO, "%s\n", fname+offset);
-			}
+			if (!am_server && verbose) /* log the transfer */
+				rprintf(FINFO, "%s\n", safe_fname(fname2));
 			write_int(f_out, i);
 			continue;
 		}
@@ -213,18 +212,19 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		if (verbose > 2) {
 			rprintf(FINFO, "send_files mapped %s of size %.0f\n",
-				fname, (double)st.st_size);
+				safe_fname(fname), (double)st.st_size);
 		}
 
 		write_int(f_out, i);
 		write_sum_head(f_out, s);
 
-		if (verbose > 2)
-			rprintf(FINFO, "calling match_sums %s\n", fname);
-
-		if (!am_server && verbose) {
-			rprintf(FINFO, "%s\n", fname+offset);
+		if (verbose > 2) {
+			rprintf(FINFO, "calling match_sums %s\n",
+				safe_fname(fname));
 		}
+
+		if (!am_server && verbose) /* log the transfer */
+			rprintf(FINFO, "%s\n", safe_fname(fname2));
 
 		set_compression(fname);
 
@@ -244,8 +244,10 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		free_sums(s);
 
-		if (verbose > 2)
-			rprintf(FINFO, "sender finished %s\n", fname);
+		if (verbose > 2) {
+			rprintf(FINFO, "sender finished %s\n",
+				safe_fname(fname));
+		}
 	}
 
 	if (verbose > 2)
