@@ -88,10 +88,17 @@ static void report(int f)
     tsize = read_longint(f);
   }
 
+#if HAVE_LONGLONG
+  printf("wrote %lld bytes  read %lld bytes  %g bytes/sec\n",
+	 (long long)out,(long long)in,(in+out)/(0.5 + (t-starttime)));
+  printf("total size is %lld  speedup is %g\n",
+	 (long long)tsize,(1.0*tsize)/(in+out));
+#else
   printf("wrote %ld bytes  read %ld bytes  %g bytes/sec\n",
 	 (long)out,(long)in,(in+out)/(0.5 + (t-starttime)));
   printf("total size is %ld  speedup is %g\n",
 	 (long)tsize,(1.0*tsize)/(in+out));
+#endif
 }
 
 

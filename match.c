@@ -96,7 +96,7 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 	off_t n = offset - last_match;
 	int j;
 
-	if (verbose > 2 && i != -1)
+	if (verbose > 2 && i >= 0)
 		fprintf(FERROR,"match at %d last_match=%d j=%d len=%d n=%d\n",
 			(int)offset,(int)last_match,i,(int)s->sums[i].len,(int)n);
 
@@ -106,7 +106,7 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 	if (n > 0)
 		write_flush(f);
 
-	if (i != -1)
+	if (i >= 0)
 		n += s->sums[i].len;
   
 	for (j=0;j<n;j+=CHUNK_SIZE) {
@@ -115,8 +115,10 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 	}
 
 
-	if (i != -1)
+	if (i >= 0)
 		last_match = offset + s->sums[i].len;
+	else
+		last_match = offset;
 }
 
 
