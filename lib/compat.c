@@ -147,7 +147,7 @@
 }
 #endif
 
-#ifndef REPLACE_INET_ATON
+#ifdef REPLACE_INET_ATON
  int inet_aton(const char *cp, struct in_addr *inp)
 {
 	unsigned int a1, a2, a3, a4;
