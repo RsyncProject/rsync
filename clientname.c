@@ -195,7 +195,7 @@ void client_sockaddr(int fd,
 		memset(sin, 0, sizeof(*sin));
 		sin->sin_family = AF_INET;
 		*ss_len = sizeof(struct sockaddr_in);
-#if HAVE_SOCKADDR_SIN_LEN
+#if HAVE_SOCKADDR_IN_LEN
 		sin->sin_len = *ss_len;
 #endif
 		sin->sin_port = sin6.sin6_port;
