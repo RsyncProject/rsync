@@ -46,6 +46,7 @@ extern int io_timeout;
 extern int am_server;
 extern int am_daemon;
 extern int am_sender;
+extern int am_generator;
 extern int eol_nulls;
 extern int checksum_seed;
 extern int protocol_version;
@@ -162,17 +163,17 @@ void io_set_sock_fds(int f_in, int f_out)
 	sock_f_out = f_out;
 }
 
-/** Setup the fd used to receive MSG_* messages.  Only needed when
- * we're the generator because the sender and receiver both use the
- * multiplexed I/O setup. */
+/* Setup the fd used to receive MSG_* messages.  Only needed during the
+ * early stages of being a local sender (up through the sending of the
+ * file list) or when we're the generator (to fetch the messages from
+ * the receiver). */
 void set_msg_fd_in(int fd)
 {
 	msg_fd_in = fd;
 }
 
-/** Setup the fd used to send our MSG_* messages.  Only needed when
- * we're the receiver because the generator and the sender both use
- * the multiplexed I/O setup. */
+/* Setup the fd used to send our MSG_* messages.  Only needed when
+ * we're the receiver (to send our messages to the generator). */
 void set_msg_fd_out(int fd)
 {
 	msg_fd_out = fd;
@@ -205,8 +206,10 @@ void send_msg(enum msgcode code, char *buf, int len)
 	msg_list_push(NORMAL_FLUSH);
 }
 
-/** Read a message from the MSG_* fd and dispatch it.  This is only
- * called by the generator. */
+/* Read a message from the MSG_* fd and handle it.  This is called either
+ * during the early stages of being a local sender (up through the sending
+ * of the file list) or when we're the generator (to fetch the messages
+ * from the receiver). */
 static void read_msg_fd(void)
 {
 	char buf[2048];
@@ -226,14 +229,14 @@ static void read_msg_fd(void)
 
 	switch (tag) {
 	case MSG_DONE:
-		if (len != 0) {
+		if (len != 0 || !am_generator) {
 			rprintf(FERROR, "invalid message %d:%d\n", tag, len);
 			exit_cleanup(RERR_STREAMIO);
 		}
 		redo_list_add(-1);
 		break;
 	case MSG_REDO:
-		if (len != 4) {
+		if (len != 4 || !am_generator) {
 			rprintf(FERROR, "invalid message %d:%d\n", tag, len);
 			exit_cleanup(RERR_STREAMIO);
 		}
