@@ -87,7 +87,8 @@ static void report(int f)
 
 	if (do_stats) {
 		/* These come out from every process */
-		show_malloc_stats();
+		if (verbose > 1)
+			show_malloc_stats();
 		show_flist_stats();
 	}
 
@@ -142,12 +143,12 @@ static void report(int f)
 		rprintf(FINFO,"File list size: %d\n", stats.flist_size);
 		rprintf(FINFO,"Total bytes written: %.0f\n",
 			(double)stats.total_written);
-		rprintf(FINFO,"Total bytes read: %.0f\n\n",
+		rprintf(FINFO,"Total bytes read: %.0f\n",
 			(double)stats.total_read);
 	}
 
 	if (verbose || do_stats) {
-		rprintf(FINFO,"wrote %.0f bytes  read %.0f bytes  %.2f bytes/sec\n",
+		rprintf(FINFO,"\nwrote %.0f bytes  read %.0f bytes  %.2f bytes/sec\n",
 			(double)stats.total_written,
 			(double)stats.total_read,
 			(stats.total_written+stats.total_read)/(0.5 + (t-starttime)));
