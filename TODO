@@ -341,6 +341,12 @@ chmod:
   (Suggestion from david.e.sewell)
 
 
+Incorrect timestamps (Debian #100295)
+
+  A bit hard to believe, but apparently it happens.
+	  
+
+
 PLATFORMS ------------------------------------------------------------
 
 Win32
