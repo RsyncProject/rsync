@@ -499,7 +499,10 @@ static int exclude_server_path(char *arg)
 static void glob_expand_one(char *s, char **argv, int *argc, int maxargs)
 {
 #if !(defined(HAVE_GLOB) && defined(HAVE_GLOB_H))
-	if (!*s) s = ".";
+	if (maxargs <= *argc)
+		return;
+	if (!*s)
+		s = ".";
 	s = argv[*argc] = strdup(s);
 	exclude_server_path(s);
 	(*argc)++;
@@ -508,12 +511,12 @@ static void glob_expand_one(char *s, char **argv, int *argc, int maxargs)
 	glob_t globbuf;
 	int i;
 
-	if (!*s) s = ".";
+	if (!*s)
+		s = ".";
 
 	s = argv[*argc] = strdup(s);
-	if (sanitize_paths) {
+	if (sanitize_paths)
 		sanitize_path(s, NULL);
-	}
 
 	memset(&globbuf, 0, sizeof globbuf);
 	if (!exclude_server_path(s))
