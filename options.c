@@ -826,8 +826,12 @@ void server_options(char **args,int *argc)
 
 	/* Only send --suffix if it specifies a non-default value. */
 	if (strcmp(backup_suffix, backup_dir? "" : BACKUP_SUFFIX) != 0) {
-		args[ac++] = "--suffix";
-		args[ac++] = backup_suffix;
+		char *s = malloc(9+backup_suffix_len+1);
+		if (!s)
+			out_of_memory("server_options");
+		/* We use the following syntax to avoid weirdness with '~'. */
+		sprintf(s, "--suffix=%s", backup_suffix);
+		args[ac++] = s;
 	}
 
 	if (delete_mode && !delete_excluded)
