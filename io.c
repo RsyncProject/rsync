@@ -899,6 +899,13 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 			rsyserr(FERROR, errno,
 				"writefd_unbuffered failed to write %ld bytes: phase \"%s\"",
 				(long)len, io_write_phase);
+			/* If the other side is sending us error messages, try
+			 * to grab any messages they sent before they died. */
+			while (fd == sock_f_out && am_sender) {
+				io_timeout = 30;
+				readfd_unbuffered(sock_f_in, io_filesfrom_buf,
+						  sizeof io_filesfrom_buf);
+			}
 			exit_cleanup(RERR_STREAMIO);
 		}
 
