@@ -50,6 +50,9 @@ rsync changes since last release
       contains a duplicate name (if it sorts to the end of the file
       list) and using --delete.  (Wayne Davison)
 
+    * Fixed the file-name duplicate-removal code when dealing with multiple
+      dups in a row. (Wayne Davison)
+
     * Fixed a bug that caused rsync to lose the exit status of its child
       processes and sometimes return an exit code of 0 instead of showing
       an error.  (David R. Staples, Dave Dykstra)
@@ -67,6 +70,8 @@ rsync changes since last release
 
     * Many code cleanups and improved internal documentation.  (Martin 
       Pool, Nelson Beebe)
+
+    * Portability fixes. (Dave Dykstra and Wayne Davison)
 
     * More test cases.  (Martin Pool)
 
