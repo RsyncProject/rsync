@@ -543,7 +543,7 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 }
 
 
-void generate_files(int f, struct file_list *flist, char *local_name)
+void generate_files(int f_out, struct file_list *flist, char *local_name)
 {
 	int i;
 	int phase = 0;
@@ -584,7 +584,7 @@ void generate_files(int f, struct file_list *flist, char *local_name)
 		}
 
 		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
-			       file, i, f);
+			       file, i, f_out);
 	}
 
 	phase++;
@@ -594,21 +594,21 @@ void generate_files(int f, struct file_list *flist, char *local_name)
 	if (verbose > 2)
 		rprintf(FINFO,"generate_files phase=%d\n",phase);
 
-	write_int(f,-1);
+	write_int(f_out, -1);
 
 	/* files can cycle through the system more than once
 	 * to catch initial checksum errors */
 	while ((i = get_redo_num()) != -1) {
 		struct file_struct *file = flist->files[i];
 		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
-			       file, i, f);
+			       file, i, f_out);
 	}
 
 	phase++;
 	if (verbose > 2)
 		rprintf(FINFO,"generate_files phase=%d\n",phase);
 
-	write_int(f,-1);
+	write_int(f_out, -1);
 
 	if (preserve_hard_links)
 		do_hard_links();
