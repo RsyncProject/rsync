@@ -125,16 +125,6 @@ Do not rely on having a group called "nobody"
 
   On Debian it's "nogroup"
 
-Temporary file names can exceed max name length
-
-  Rsync creates temporary file names that are 10 characters longer
-  than the length of the file being transferred.  This creates
-  problems for operating systems have fairly short maximum lengths
-  (e.g., 32 characters for Stratus VOS). Even on operating systems
-  with long max lengths it can still be a problem as it is perfectly
-  reasonable to be using files with long names.
-
-
 DAEMON --------------------------------------------------------------
 
 server-imposed bandwidth limits
@@ -167,13 +157,6 @@ use chroot
 
     http://lists.samba.org/pipermail/rsync/2001-August/thread.html
     http://lists.samba.org/pipermail/rsync/2001-September/thread.html
-
-
---files-from
-
-  Avoids traversal.  Better option than a pile of --include statements
-  for people who want to generate the file list using a find(1)
-  command or a script.
 
 
 supplementary groups
