@@ -540,32 +540,28 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			break;
 
 		case OPT_EXCLUDE:
-			if (am_server || sanitize_paths)
-				return 0; /* Impossible... */
 			add_exclude(&exclude_list, poptGetOptArg(pc), 0);
 			break;
 
 		case OPT_INCLUDE:
-			if (am_server || sanitize_paths)
-				return 0; /* Impossible... */
 			add_exclude(&exclude_list, poptGetOptArg(pc),
 				    XFLG_DEF_INCLUDE);
 			break;
 
 		case OPT_EXCLUDE_FROM:
-			if (am_server || sanitize_paths)
-				return 0; /* Impossible... */
-			arg = poptGetOptArg(pc);
-			add_exclude_file(&exclude_list, arg,
-					 XFLG_FATAL_ERRORS);
-			break;
-
 		case OPT_INCLUDE_FROM:
-			if (am_server || sanitize_paths)
-				return 0; /* Impossible... */
 			arg = poptGetOptArg(pc);
-			add_exclude_file(&exclude_list, arg,
-					 XFLG_FATAL_ERRORS | XFLG_DEF_INCLUDE);
+			if (sanitize_paths)
+				arg = sanitize_path(NULL, arg, NULL, 0);
+			if (server_exclude_list.head) {
+				char *cp = (char *)arg;
+				clean_fname(cp, 1);
+				if (check_exclude(&server_exclude_list, cp, 0) < 0)
+					goto options_rejected;
+			}
+			add_exclude_file(&exclude_list, arg, XFLG_FATAL_ERRORS
+					 | (opt == OPT_INCLUDE_FROM
+					  ? XFLG_DEF_INCLUDE : 0));
 			break;
 
 		case 'h':
