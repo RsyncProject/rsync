@@ -32,7 +32,6 @@ extern int am_sender;
 extern int am_generator;
 extern int am_daemon;
 extern int blocking_io;
-extern int delete_before;
 extern int remove_sent_files;
 extern int daemon_over_rsh;
 extern int need_messages_from_generator;
@@ -508,11 +507,6 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	if (preserve_hard_links)
 		init_hard_links(flist);
-
-	if (delete_before && !local_name && flist->count > 0) {
-		/* Moved here from recv_files() to prevent a race condition */
-		delete_files(flist);
-	}
 
 	if (fd_pair(error_pipe) < 0
 	    || (need_name_pipe && fd_pair(name_pipe) < 0)) {
