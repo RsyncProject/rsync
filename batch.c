@@ -32,7 +32,7 @@ void write_batch_flist_info(int flist_count, struct file_struct **files)
 	stringjoin(filename, sizeof filename,
 	    batch_prefix, rsync_flist_file, NULL);
 
-	f = do_open(filename, O_WRONLY|O_CREAT|O_TRUNC, S_IREAD|S_IWRITE);
+	f = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
 	if (f < 0) {
 		rprintf(FERROR, "Batch file %s open error: %s\n",
 		    filename, strerror(errno));
@@ -70,7 +70,7 @@ void write_batch_argvs_file(int argc, char *argv[])
 	    batch_prefix, rsync_argvs_file, NULL);
 
 	f = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
-	    S_IREAD | S_IWRITE | S_IEXEC);
+	    S_IRUSR | S_IWUSR | S_IEXEC);
 	if (f < 0) {
 		rprintf(FERROR, "Batch file %s open error: %s\n",
 		    filename, strerror(errno));
@@ -194,7 +194,7 @@ void write_batch_csum_info(int *flist_entry, struct sum_struct *s)
 		    batch_prefix, rsync_csums_file, NULL);
 
 		f_csums = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
-		    S_IREAD | S_IWRITE);
+		    S_IRUSR | S_IWUSR);
 		if (f_csums < 0) {
 			rprintf(FERROR, "Batch file %s open error: %s\n",
 			    filename, strerror(errno));
@@ -282,7 +282,7 @@ void write_batch_delta_file(char *buff, int bytes_to_write)
 		    batch_prefix, rsync_delta_file, NULL);
 
 		f_delta = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
-				  S_IREAD | S_IWRITE);
+				  S_IRUSR | S_IWUSR);
 		if (f_delta < 0) {
 			rprintf(FERROR, "Batch file %s open error: %s\n",
 				filename, strerror(errno));
