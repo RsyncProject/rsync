@@ -29,20 +29,10 @@ int remote_protocol = 0;
 
 extern int am_server;
 
-extern int preserve_links;
-extern int preserve_perms;
-extern int preserve_devices;
-extern int preserve_uid;
-extern int preserve_gid;
-extern int preserve_times;
-extern int always_checksum;
 extern int checksum_seed;
 
 extern int protocol_version;
 extern int verbose;
-
-extern int read_batch;
-extern int write_batch;
 
 void setup_protocol(int f_out,int f_in)
 {
