@@ -173,12 +173,12 @@ was run as root. This complements the "uid" option. The default is gid -2,
 which is normally the group "nobody".
 
 dit(bf(exclude)) The "exclude" option allows you to specify a space
-separated list of patterns to add to the exclude list. This is
-equivalent to the client specifying these patterns with the --exclude
-option except that the exclude list is not passed to the client and
-thus only apply on the server.  Only one "exclude" option may be
-specified, but you can use "-" and "+" before patterns to specify
-exclude/include.
+separated list of patterns to add to the exclude list. This is equivalent
+to the client specifying these patterns with the --exclude option, except
+that the exclude list is not passed to the client and thus only applies on
+the server and also only applies when receiving files from a server and not
+when sending files to it.  Only one "exclude" option may be specified, but
+you can use "-" and "+" before patterns to specify exclude/include.
 
 Note that this option is not designed with strong security in
 mind, it is quite possible that a client may find a way to bypass this
