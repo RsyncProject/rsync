@@ -32,6 +32,7 @@ use chroot
   for people who want to generate the file list using a find(1)
   command or a script.
 
+
 Performance
 
   Traverse just one directory at a time.  Tridge says it's possible.
@@ -39,6 +40,9 @@ Performance
   At the moment rsync reads the whole file list into memory at the
   start, which makes us use a lot of memory and also not pipeline
   network access as much as we could.
+
+
+Handling duplicate names
 
   We need to be careful of duplicate names getting into the file list.
   See clean_flist().  This could happen if multiple arguments include
@@ -77,6 +81,11 @@ Performance
   I think even if we're using a different symlink mode we don't need
   to worry.
 
+  Unless we're really clever this will introduce a protocol
+  incompatibility, so we need to be able to accept the old format as
+  well.
+
+
 Memory accounting
 
   At exit, show how much memory was used for the file list, etc.
@@ -85,10 +94,18 @@ Memory accounting
   not sure this makes sense with modern mallocs.  At any rate it will
   make us allocate a huge amount of memory for large file lists.
 
+  We can try using the GNU/SVID/XPG mallinfo() function to get some
+  heap statistics.
+
+
 Hard-link handling
 
   At the moment hardlink handling is very expensive, so it's off by
   default.  It does not need to be so.  
+
+  Since most of the solutions are rather intertwined with the file
+  list it is probably better to fix that first, although fixing
+  hardlinks is possibly simpler.
 
   We can rule out hardlinked directories since they will probably
   screw us up in all kinds of ways.  They simply should not be used.
