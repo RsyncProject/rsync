@@ -332,6 +332,7 @@ void usage(enum logcode F)
   rprintf(F,"     --files-from=FILE       read list of source-file names from FILE\n");
   rprintf(F," -0, --from0                 all *-from file lists are delimited by nulls\n");
   rprintf(F,"     --version               print version number\n");
+  rprintf(F,"     --address=ADDRESS       bind address for outgoing socket to daemon\n");
   rprintf(F,"     --port=PORT             specify double-colon alternate port number\n");
   rprintf(F,"     --blocking-io           use blocking I/O for the remote shell\n");
   rprintf(F,"     --no-blocking-io        turn off blocking I/O when it is the default\n");
@@ -442,6 +443,7 @@ static struct poptOption long_options[] = {
   {"no-blocking-io",   0,  POPT_ARG_VAL,    &blocking_io, 0, 0, 0 },
   {0,                 'F', POPT_ARG_NONE,   0, 'F', 0, 0 },
   {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
+  {"address",          0,  POPT_ARG_STRING, &bind_address, 0, 0, 0 },
   {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
   {"log-format",       0,  POPT_ARG_STRING, &log_format, 0, 0, 0 },
   {"itemize-changes", 'i', POPT_ARG_NONE,   &itemize_changes, 0, 0, 0 },
@@ -460,7 +462,6 @@ static struct poptOption long_options[] = {
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
 #endif
   /* All these options switch us into daemon-mode option-parsing. */
-  {"address",          0,  POPT_ARG_STRING, 0, OPT_DAEMON, 0, 0 },
   {"config",           0,  POPT_ARG_STRING, 0, OPT_DAEMON, 0, 0 },
   {"daemon",           0,  POPT_ARG_NONE,   0, OPT_DAEMON, 0, 0 },
   {"detach",           0,  POPT_ARG_NONE,   0, OPT_DAEMON, 0, 0 },
