@@ -85,6 +85,9 @@ Changes since 2.6.2:
     - Some cleanup in the exclude code has saved some per-exclude memory
       and made the code easier to maintain.
 
+    - Improved the argv-overflow checking for a remote command that has
+      a lot of args.
+
     - Use rsyserr() in the various places that were still calling
       rprintf() with strerror() as an arg.
 
