@@ -1746,13 +1746,10 @@ void delete_missing(struct file_list *full_list, struct file_list *dir_list,
 					rprintf(FINFO, "deleting %s\n",
 						safe_fname(f));
 				}
-			} else if (S_ISDIR(mode)) {
-				int dflag = delete_during ? DEL_FORCE_RECURSE
-							  : DEL_NO_RECURSE;
-				delete_file(f, DEL_DIR | dflag);
-			} else {
+			} else if (S_ISDIR(mode))
+				delete_file(f, DEL_DIR | DEL_FORCE_RECURSE);
+			else
 				delete_file(f, 0);
-			}
 			deletion_count++;
 			if (max_delete && deletion_count >= max_delete)
 				break;
