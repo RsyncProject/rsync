@@ -58,6 +58,10 @@ static void list_file_entry(struct file_struct *f)
 	char *perm_map = "rwxrwxrwx";
 	int i;
 
+	if (!f->basename)
+		/* this can happen if duplicate names were removed */
+		return;
+
 	for (i=0;i<9;i++) {
 		if (f->mode & (1<<i)) perms[9-i] = perm_map[8-i];
 	}
