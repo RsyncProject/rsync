@@ -440,20 +440,31 @@ static void set_refuse_options(char *bp)
 {
 	struct poptOption *op;
 	char *cp;
+	int match_short, is_wild;
 
 	while (1) {
+		while (*bp == ' ') bp++;
+		if (!*bp)
+			break;
 		if ((cp = strchr(bp, ' ')) != NULL)
 			*cp= '\0';
+		/* If they specify "delete", reject all delete options. */
+		if (strcmp(bp, "delete") == 0)
+			bp = "delete*";
+		match_short = !bp[1] && *bp != '*';
+		is_wild = !match_short && strpbrk(bp, "*?[") != NULL;
 		for (op = long_options; ; op++) {
 			if (!op->longName) {
 				rprintf(FLOG,
-				    "Unknown option %s in \"refuse options\" setting\n",
+				    "No match for refuse-options string \"%s\"\n",
 				    bp);
 				break;
 			}
-			if (strcmp(bp, op->longName) == 0) {
-				op->val = (op - long_options)+OPT_REFUSED_BASE;
-				break;
+			if (match_short ? *bp == op->shortName
+					: wildmatch(bp, op->longName)) {
+				op->val = (op - long_options) + OPT_REFUSED_BASE;
+				if (!is_wild)
+					break;
 			}
 		}
 		if (!cp)
@@ -1000,10 +1011,19 @@ void server_options(char **args,int *argc)
 		args[ac++] = arg;
 	}
 
-	if (delete_excluded)
-		args[ac++] = "--delete-excluded";
-	else if (delete_mode)
-		args[ac++] = "--delete";
+	if (am_sender) {
+		if (delete_excluded)
+			args[ac++] = "--delete-excluded";
+		else if (delete_mode
+		    && (!delete_after || protocol_version < 27))
+			args[ac++] = "--delete";
+
+		if (delete_after)
+			args[ac++] = "--delete-after";
+
+		if (force_delete)
+			args[ac++] = "--force";
+	}
 
 	if (size_only)
 		args[ac++] = "--size-only";
@@ -1025,12 +1045,6 @@ void server_options(char **args,int *argc)
 		args[ac++] = partial_dir;
 	} else if (keep_partial)
 		args[ac++] = "--partial";
-
-	if (force_delete)
-		args[ac++] = "--force";
-
-	if (delete_after)
-		args[ac++] = "--delete-after";
 
 	if (ignore_errors)
 		args[ac++] = "--ignore-errors";
