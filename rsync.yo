@@ -368,6 +368,7 @@ verb(
      --files-from=FILE       read FILE for list of source-file names
  -0  --from0                 all file lists are delimited by nulls
      --version               print version number
+     --port=PORT             specify double-colon alternate port number
      --blocking-io           use blocking I/O for the remote shell
      --no-blocking-io        turn off --blocking-io
      --stats                 give some file transfer stats
@@ -391,7 +392,7 @@ verb(
      --bwlimit=KBPS          limit I/O bandwidth, KBytes per second
      --config=FILE           specify alternate rsyncd.conf file
      --no-detach             do not detach from the parent
-     --port=PORT             specify alternate rsyncd port number
+     --port=PORT             listen on alternate port number
  -4  --ipv4                  prefer IPv4
  -6  --ipv6                  prefer IPv6
  -h, --help                  show this help screen
@@ -896,6 +897,12 @@ dit(bf(--timeout=TIMEOUT)) This option allows you to set a maximum I/O
 timeout in seconds. If no data is transferred for the specified time
 then rsync will exit. The default is 0, which means no timeout.
 
+dit(bf(--port=PORT)) This specifies an alternate TCP port number to use
+rather than the default of 873.  This is only needed if you are using the
+double-colon (::) syntax to connect with an rsync daemon (since the URL
+syntax has a way to specify the port as a part of the URL).  See also this
+option in the --daemon mode section.
+
 dit(bf(--blocking-io)) This tells rsync to use blocking I/O when launching
 a remote shell transport.  If the remote shell is either rsh or remsh,
 rsync defaults to using
@@ -1019,7 +1026,7 @@ See the "BATCH MODE" section for details.
 dit(bf(-4, --ipv4) or bf(-6, --ipv6)) Tells rsync to prefer IPv4/IPv6
 when creating sockets.  This only affects sockets that rsync has direct
 control over, such as the outgoing socket when directly contacting an
-rsync daemon (see also these options in the --daemon mode section).
+rsync daemon.  See also these options in the --daemon mode section.
 
 dit(bf(--checksum-seed=NUM)) Set the MD4 checksum seed to the integer
 NUM.  This 4 byte checksum seed is included in each block and file
@@ -1076,9 +1083,9 @@ bf(--no-detach) is also recommended when rsync is run under a
 debugger.  This option has no effect if rsync is run from inetd or
 sshd.
 
-dit(bf(--port=PORT)) This specifies an alternate TCP port number to use
-rather than the default port 873.  See also the "port" global option in
-the rsyncd.conf manpage.
+dit(bf(--port=PORT)) This specifies an alternate TCP port number for the
+daemon to listen on rather than the default of 873.  See also the "port"
+global option in the rsyncd.conf manpage.
 
 dit(bf(-4, --ipv4) or bf(-6, --ipv6)) Tells rsync to prefer IPv4/IPv6
 when creating the incoming sockets that the rsync daemon will use to
