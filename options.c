@@ -624,7 +624,7 @@ void server_options(char **args,int *argc)
 	if (copy_links)
 		argstr[x++] = 'L';
 
-	assert(whole_file == 0 || whole_file == -1);
+	assert(whole_file == 0 || whole_file == 1);
 	if (whole_file)
 		argstr[x++] = 'W';
 	/* We don't need to send --no-whole-file, because it's the
