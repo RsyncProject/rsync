@@ -736,9 +736,9 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			break;
 
 		case OPT_MAX_SIZE:
-			for (arg = max_size_arg; isdigit(*arg); arg++) {}
+			for (arg = max_size_arg; isdigit(*(uchar*)arg); arg++) {}
 			if (*arg == '.')
-				for (arg++; isdigit(*arg); arg++) {}
+				for (arg++; isdigit(*(uchar*)arg); arg++) {}
 			switch (*arg) {
 			case 'k': case 'K':
 				max_size = atof(max_size_arg) * 1024;
