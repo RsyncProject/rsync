@@ -968,7 +968,7 @@ is complete, the current calculated file-completion rate (including both
 data over the wire and data being matched locally), and the estimated time
 remaining in this transfer.
 
-After the a file is complete, it the data looks like this:
+After a file is complete, the data looks like this:
 
 verb(
      1238099 100%  146.38kB/s    0:00:08  (5, 57.1% of 396)
