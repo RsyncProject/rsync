@@ -1224,6 +1224,8 @@ void server_options(char **args,int *argc)
 	 * default for remote transfers, and in any case old versions
 	 * of rsync will not understand it. */
 
+	if (itemize_changes)
+		argstr[x++] = 'i';
 	if (preserve_hard_links)
 		argstr[x++] = 'H';
 	if (preserve_uid)
@@ -1268,6 +1270,11 @@ void server_options(char **args,int *argc)
 
 	if (list_only > 1)
 		args[ac++] = "--list-only";
+
+	/* The server side doesn't use our log-format, but if verbose isn't
+	 * on, they may need to know that we want some extra messages. */
+	if (log_format && !verbose && !itemize_changes)
+		args[ac++] = "--log-format=specified";
 
 	if (block_size) {
 		if (asprintf(&arg, "-B%lu", block_size) < 0)
