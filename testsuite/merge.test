@@ -7,18 +7,15 @@
 
 # Make sure we can merge files from multiple directories into one.
 
-. $srcdir/testsuite/rsync.fns
+. "$suitedir/rsync.fns"
 
 set -x
 
 # Build some files/dirs/links to copy
 
-fromdir="$scratchdir/from"
 from1dir="${fromdir}1"
 from2dir="${fromdir}2"
 from3dir="${fromdir}3"
-todir="$scratchdir/to"
-chkdir="$scratchdir/chk"
 
 mkdir "$from1dir" "$from2dir" "$from3dir"
 mkdir "$from2dir"/sub1 "$from3dir"/sub1

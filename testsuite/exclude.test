@@ -10,7 +10,7 @@
 # Test some of the more obscure wildcard handling of exclude/include
 # processing.
 
-. $srcdir/testsuite/rsync.fns
+. "$suitedir/rsync.fns"
 
 set -x
 
@@ -19,10 +19,6 @@ CVSIGNORE='*.junk'
 export HOME CVSIGNORE
 
 # Build some files/dirs/links to copy
-
-fromdir="$scratchdir/from"
-todir="$scratchdir/to"
-chkdir="$scratchdir/chk"
 
 echo home-cvs-exclude >"$scratchdir"/.cvsignore
 makepath "$fromdir/foo/down/to/you"
