@@ -8,7 +8,7 @@
 #include "rsync.h"
 #include <time.h>
 
-extern char *batch_name;
+extern int am_sender;
 extern int eol_nulls;
 extern int recurse;
 extern int preserve_links;
@@ -18,6 +18,7 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int always_checksum;
 extern int protocol_version;
+extern char *batch_name;
 
 extern struct filter_list_struct filter_list;
 
@@ -198,9 +199,9 @@ void show_flist(int index, struct file_struct **fptr)
 		if (fptr[i]->dirname)
 			rprintf(FINFO, "flist->dirname=%s\n",
 				fptr[i]->dirname);
-		if (fptr[i]->basedir)
-			rprintf(FINFO, "flist->basedir=%s\n",
-				fptr[i]->basedir);
+		if (am_sender && fptr[i]->dir.root)
+			rprintf(FINFO, "flist->dir.root=%s\n",
+				fptr[i]->dir.root);
 	}
 }
 
