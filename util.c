@@ -763,8 +763,9 @@ char curr_dir[MAXPATHLEN];
 unsigned int curr_dir_len;
 
 /**
- * Like chdir() but can be reversed with pop_dir() if @p save is set.
- * It is also much faster as it remembers where we have been.
+ * Like chdir(), but it keeps track of the current directory (in the
+ * global "curr_dir"), and ensures that the path size doesn't overflow.
+ * Also cleans the path using the clean_fname() function.
  **/
 int push_dir(char *dir)
 {
@@ -804,7 +805,10 @@ int push_dir(char *dir)
 	return 1;
 }
 
-/** Reverse a push_dir() call */
+/**
+ * Reverse a push_dir() call.  You must pass in an absolute path
+ * that was copied from a prior value of "curr_dir".
+ **/
 int pop_dir(char *dir)
 {
 	if (chdir(dir))
