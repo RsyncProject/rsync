@@ -139,7 +139,7 @@
 #define DEL_TERSE		(1<<3)
 
 /* For use by the itemize_changes code */
-#define ITEM_UNUSED (1<<0)
+#define ITEM_DUMMY_BIT (1<<0)
 #define ITEM_REPORT_CHECKSUM (1<<1)
 #define ITEM_REPORT_SIZE (1<<2)
 #define ITEM_REPORT_TIME (1<<3)
