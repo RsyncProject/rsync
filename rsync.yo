@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsync)(1)(11 Nov 1998)()()
+manpage(rsync)(1)(24 Nov 1998)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
@@ -637,7 +637,10 @@ itemize(
   it() --exclude "/foo" would exclude a file in the base directory called foo
   it() --exclude "foo/" would exclude any directory called foo
   it() --include "*/" --include "*.c" --exclude "*" would include all 
-  directories and C source files.
+  directories and C source files
+  it() --include "foo/" --include "foo/bar.c" --exclude "*" would include
+  only foo/bar.c (the foo/ directory must be explicitly included or
+  it would be excluded by the "*")
 )
 
 manpagesection(DIAGNOSTICS)
