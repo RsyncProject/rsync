@@ -403,9 +403,13 @@ void write_batch_csum_info(int *flist_entry, int flist_count,
 
 	/* Write csum info to batch file */
 
+	/* FIXME: This will break if s->count is ever not exactly an int. */
 	write_batch_csums_file((char *) flist_entry, sizeof(int));
-	write_batch_csums_file((char *) (s ? &s->count : &int_zero),
-			       sizeof(int));
+	if (s)
+		write_batch_csums_file((char *) &s->count, sizeof(int));
+	else
+		write_batch_csums_file((char *) &int_zero, sizeof (int));
+	
 	if (s) {
 		for (i = 0; i < s->count; i++) {
 			write_batch_csums_file((char *) &s->sums[i].sum1,
