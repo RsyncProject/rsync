@@ -80,8 +80,7 @@ static int establish_proxy_connection(int fd, char *host, int port)
 	}
 	/* throw away the rest of the HTTP header */
 	while (1) {
-		for (cp = buffer; cp < &buffer[sizeof (buffer) - 1];
-		     cp++) {
+		for (cp = buffer; cp < &buffer[sizeof (buffer) - 1]; cp++) {
 			if (read(fd, cp, 1) != 1) {
 				rprintf(FERROR, "failed to read from proxy: %s\n",
 					strerror(errno));
@@ -103,8 +102,7 @@ static int establish_proxy_connection(int fd, char *host, int port)
  * Try to set the local address for a newly-created socket.  Return -1
  * if this fails.
  **/
-int try_bind_local(int s,
-		   int ai_family, int ai_socktype,
+int try_bind_local(int s, int ai_family, int ai_socktype,
 		   const char *bind_address)
 {
 	int error;
@@ -322,8 +320,8 @@ static int open_socket_in(int type, int port, const char *bind_address,
 		setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
 			   (char *)&one, sizeof one);
 
-		/* now we've got a socket - we need to bind it */
-		if (bind(s, all_ai->ai_addr, all_ai->ai_addrlen) < 0) {
+		/* Now we've got a socket - we need to bind it. */
+		if (bind(s, resp->ai_addr, resp->ai_addrlen) < 0) {
 			/* Nope, try another */
 			close(s);
 			continue;
