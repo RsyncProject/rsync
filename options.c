@@ -605,8 +605,13 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 	if (batch_prefix && strlen(batch_prefix) > MAX_BATCH_PREFIX_LEN) {
 		rprintf(FERROR,
-			"the batch_prefix string must be %d characters or less.\n",
+			"the batch-file prefix must be %d characters or less.\n",
 			MAX_BATCH_PREFIX_LEN);
+		exit_cleanup(RERR_SYNTAX);
+	}
+
+	if (tmpdir && strlen(tmpdir) >= MAXPATHLEN - 10) {
+		rprintf(FERROR, "the --temp-dir path is WAY too long.\n");
 		exit_cleanup(RERR_SYNTAX);
 	}
 
