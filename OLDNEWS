@@ -1,0 +1,114 @@
+rsync 2.5.0 (2001-11-30)
+
+  ANNOUNCEMENTS
+
+    * Martin Pool <mbp@samba.org> is now a co-maintainer.
+
+  NEW FEATURES
+
+    * Support for LSB-compliant packaging <http://www.linuxbase.org/>
+
+    * Shell wildcards are allowed in "auth users" lines.
+
+    * Merged UNC rsync+ patch to support creation of standalone patch
+      sets.  By Bert J. Dempsey and Debra Weiss, updated by Jos
+      Backus.  <http://www.ils.unc.edu/i2dsi/unc_rsync+.html>
+
+    * IPv6 support based on a patch from KAME.net, on systems
+      including modern versions of Linux, Solaris, and HP-UX.  Also
+      includes IPv6 compatibility functions for old OSs by the
+      Internet Software Consortium, Paul Vixie, the OpenSSH
+      portability project, and OpenBSD.
+
+  ENHANCEMENTS
+
+    * Include/exclude cluestick: with -vv, print out whether files are
+      included or excluded and why.
+
+    * Many error messages have more friendly explanations and more
+      details.
+
+    * Manual page improvements plus scanty protocol documentation.
+
+    * When running as --daemon in the background and using a "log
+      file" rsyncd.conf directive, close the log file every time it is
+      open when going to sleep on the socket.  This allows the log
+      file to get cleaned out by another process.
+
+    * Change to using libpopt rather than getopt for processing
+      options.	This makes the code cleaner and the behaviour more
+      consistent across platforms.  popt is included and built if not
+      installed on the platform.
+
+    * More details in --version, including note about whether 64-bit
+      files, symlinks and hardlinks are supported.
+
+    * MD4 code may use less CPU cycles.
+
+    * Use mkstemp on systems where it is secure.  If we use mktemp,
+      explain that we do it in a secure way.
+
+    * --whole-file is the default when source and target are on the
+	local machine.
+
+  BUG FIXES:
+
+    * Fix for various bugs causing rsync to hang.
+
+    * Attempt to fix Large File Summit support on AIX.
+
+    * Attempt to fix error handling lockup bug.
+
+    * Give a non-0 exit code if *any* of the files we have been asked
+      to transfer fail to transfer 
+
+    * For log messages containing ridiculously long strings that might
+      overflow a buffer rsync no longer aborts, but rather prints an
+      ellipsis at the end of the string.  (Patch from Ed Santiago.)
+
+  PLATFORMS:
+
+    * Improved support for UNICOS (tested on Cray T3E and Cray SV1)
+
+    * autoconf2.52 (or later) is now required to rebuild the autoconf
+      scripts.	It is not required to simply build rsync.
+
+    * Platforms thought to work in this release:
+
+		Cray SV1 UNICOS 10.0.0.8 cc
+		Debian Linux 2.2 UltraSparc gcc
+		Debian Linux testing/unstable ARM gcc
+		FreeBSD 3.3-RELEASE i386 cc
+		FreeBSD 4.1.1-RELEASE i386 cc
+		FreeBSD 4.3-STABLE i386 cc
+		HP PA-RISC HP-UX 10.20 gcc
+		HP PA-RISC HP-UX 11.11 cc
+		IRIX 6.5 MIPS cc
+		IRIX 6.5 MIPS gcc
+		Mac OS X PPC (--disable-ipv6) cc
+		NetBSD 1.5 i386 gcc
+		NetBSD Current i386 cc
+		OpenBSD 2.5 Sparc gcc
+		OpenBSD 2.9 i386 cc
+		OpenBSD Current i386 cc
+		RedHat 6.2 i386 gcc
+		RedHat 6.2 i386 insure++
+		RedHat 7.0 i386 gcc
+		RedHat 7.1 i386 (Kernel 2.4.10) gcc
+		Slackware 8.0 i686 (Kernel 2.4.10)
+		Solaris 8 UltraSparc cc
+		Solaris 8 UltraSparc gcc
+		Solaris 8 i386 gcc
+		SuSE 7.1 i386 gcc2.95.2
+		SuSE 7.1 ppc gcc2.95.2
+		i386-pc-sco3.2v5.0.5 cc
+		i386-pc-sco3.2v5.0.5 gcc
+		powerpc-ibm-aix4.3.3.0 cc
+		i686-unknown-sysv5UnixWare7.1.0 gcc
+		i686-unknown-sysv5UnixWare7.1.0 cc
+
+  TESTING:
+
+    * The existing test.sh script by Phil Hands has been merged into a
+      test framework that works from both "make check" and the Samba
+      build farm.
