@@ -560,22 +560,36 @@ int file_compare(struct file_struct *f1,struct file_struct *f2)
 }
 
 
+/* we need this function because of the silly way in which duplicate
+   entries are handled in the file lists - we can't change this
+   without breaking existing versions */
+static int flist_up(struct file_list *flist, int i)
+{
+	while (!flist->files[i].name) i++;
+	return i;
+}
+
+
 int flist_find(struct file_list *flist,struct file_struct *f)
 {
-  int low=0,high=flist->count-1;
+	int low=0,high=flist->count-1;
 
-  while (low != high) {
-    int mid = (low+high)/2;
-    int ret = file_compare(&flist->files[mid],f);
-    if (ret == 0) return mid;
-    if (ret > 0) 
-      high=mid;
-    else
-      low=mid+1;
-  }
-  if (file_compare(&flist->files[low],f) == 0)
-    return low;
-  return -1;
+	if (flist->count <= 0) return -1;
+
+	while (low != high) {
+		int mid = (low+high)/2;
+		int ret = file_compare(&flist->files[flist_up(flist, mid)],f);
+		if (ret == 0) return flist_up(flist, mid);
+		if (ret > 0) {
+			high=mid;
+		} else {
+			low=mid+1;
+		}
+	}
+
+	if (file_compare(&flist->files[flist_up(flist,low)],f) == 0)
+		return flist_up(flist,low);
+	return -1;
 }
 
 
