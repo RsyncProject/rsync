@@ -826,7 +826,7 @@ notify_others:
 		int iflags = SID_UPDATING;
 		if (always_checksum)
 			iflags |= SID_REPORT_CHECKSUM;
-		if (inplace && fnamecmp_type != FNAMECMP_FNAME)
+		if (fnamecmp_type != FNAMECMP_FNAME)
 			iflags |= SID_USING_ALT_BASIS;
 		itemize(file, statret, &st, iflags, f_out, -1);
 	}
