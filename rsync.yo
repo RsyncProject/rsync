@@ -13,7 +13,7 @@ rsync [options] [user@]host::module[/path] path
 
 rsync [options] path [user@]host::module[/path]
 
-rsync [options] rsync://host[:port]/module/path path
+rsync [options] rsync://[user@]host[:port]/module/path path
 
 manpagedescription()
 
@@ -208,7 +208,7 @@ Usage: rsync [OPTION]... SRC [USER@]HOST:DEST
   or   rsync [OPTION]... SRC DEST
   or   rsync [OPTION]... [USER@]HOST::SRC DEST
   or   rsync [OPTION]... SRC [USER@]HOST::DEST
-  or   rsync [OPTION]... rsync://HOST[:PORT]/SRC DEST
+  or   rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC DEST
 
 Options
  -v, --verbose               increase verbosity
