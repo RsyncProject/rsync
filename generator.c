@@ -234,7 +234,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 			l = readlink(fname,lnk,MAXPATHLEN-1);
 			if (l > 0) {
 				lnk[l] = 0;
-				if (strcmp(lnk,file->link) == 0) {
+				if (file->link && strcmp(lnk,file->link) == 0) {
 					set_perms(fname,file,&st,1);
 					return;
 				}
