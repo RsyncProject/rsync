@@ -36,6 +36,7 @@ extern int preserve_gid;
 extern int force_delete;
 extern int inplace;
 extern int recurse;
+extern int max_delete;
 extern int keep_dirlinks;
 extern int make_backups;
 extern struct stats stats;
@@ -53,6 +54,8 @@ void free_sums(struct sum_struct *s)
 }
 
 
+int deletion_count = 0; /* used to implement --max-delete */
+
 /*
  * delete a file or directory. If force_delete is set then delete
  * recursively
@@ -65,10 +68,14 @@ int delete_file(char *fname, int mode, int flags)
 	STRUCT_STAT st;
 	int zap_dir;
 
+	if (max_delete && deletion_count >= max_delete)
+		return -1;
+
 	if (!S_ISDIR(mode)) {
 		if (robust_unlink(fname) == 0) {
 			if ((verbose || log_format) && !(flags & DEL_TERSE))
 				log_delete(fname, mode);
+			deletion_count++;
 			return 0;
 		}
 		if (errno == ENOENT)
@@ -85,6 +92,7 @@ int delete_file(char *fname, int mode, int flags)
 	else if (do_rmdir(fname) == 0) {
 		if ((verbose || log_format) && !(flags & DEL_TERSE))
 			log_delete(fname, mode);
+		deletion_count++;
 		return 0;
 	}
 	if (errno == ENOENT)
@@ -133,11 +141,14 @@ int delete_file(char *fname, int mode, int flags)
 
 	closedir(d);
 
+	if (max_delete && deletion_count >= max_delete)
+		return -1;
 	if (do_rmdir(fname) != 0 && errno != ENOENT) {
 		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
 			full_fname(fname));
 		return -1;
 	}
+	deletion_count++;
 
 	return 0;
 }
