@@ -35,7 +35,7 @@ Changes since 2.6.2:
     - Fixed a crash bug that might appear when --delete was used and
       multiple source directories were specified.
 
-    - Fixed the 32-bit truncation of the file length when generating the
+    - Fixed a 32-bit truncation of the file length when generating the
       checksums.
 
     - The --backup code no longer attempts to create some directories
@@ -77,13 +77,13 @@ Changes since 2.6.2:
       option (mentioned below) for a way to specify that behavior.
 
     - Error messages from the daemon server's option-parsing (such as
-      refused options) now get sent back to the client (the server used
-      to just exit because the socket wasn't in the right state to send
-      the message).
+      refused options) are now successfully transferred back to the client
+      (the server used to fail to send the message because the socket
+      wasn't in the right state for the message to get through).
 
-    - Most errors that occur during a daemon transfer are now returned to
-      the user in addition to being logged (some messages are intended to
-      be daemon-only).
+    - Most transfer errors that occur during a daemon transfer are now
+      returned to the user in addition to being logged (some messages are
+      intended to be daemon-only and are not affected by this).
 
     - Fixed a bug in the daemon authentication code when using one of the
       batch-processing options.
@@ -101,8 +101,8 @@ Changes since 2.6.2:
 
     - When using --delete and a --backup-dir that contains files that are
       hard-linked to their destination equivalents, rsync now makes sure
-      that removed files really get removed (works around a really weird
-      rename() behavior).
+      that removed files really get removed (avoids a really weird rename()
+      behavior).
 
     - Avoid a bogus run-time complaint about a lack of 64-bit integers when
       the int64 type is defined as an off_t and it actually has 64-bits.
@@ -231,9 +231,12 @@ Changes since 2.6.2:
 
     - The variable $STRIP (that is optionally set by the install-strip
       target's rule) was changed to $INSTALL_STRIP because some systems
-      have $STRIP set in the environment.
+      have $STRIP already set in the environment.
 
     - Fixed a build problem when SUPPORT_HARD_LINKS isn't defined.
+
+    - When cross-compiling, the gettimeofday() function is now assumed to
+      be a modern version that takes two-args (since we can't test it).
 
   DEVELOPER RELATED:
 
