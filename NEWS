@@ -37,6 +37,10 @@ Changes since 2.6.2:
       for a symlink that has no referent instead of claiming that a file
       "vanished".
 
+    - Error messages from the daemon server's option-parsing (such as
+      refused options) now get sent back to the client (the server used
+      to just exit).
+
     - Fixed a bug in the daemon authentication code when using one of the
       batch-processing options.
 
