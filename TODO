@@ -71,7 +71,6 @@ If tests are skipped, say why.
 Test daemon feature to disallow particular options.
 Create pipe program for testing
 Create test makefile target for some tests
-Test "refuse options" works
 
 RELATED PROJECTS -----------------------------------------------------
 rsyncsh
@@ -806,19 +805,6 @@ Create test makefile target for some tests
 
   Separate makefile target to run rough tests -- or perhaps
   just run them every time?
-
-                      --          --
-
-
-Test "refuse options" works
-
-  What about for --recursive?
-
-  If you specify an unrecognized option here, you should get an error.
-
-  We need a test case for this...
-
-  Was this broken when we changed to popt?
 
                       --          --
 
