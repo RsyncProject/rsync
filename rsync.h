@@ -41,7 +41,7 @@
 
 /* These flags are only used during the flist transfer. */
 
-#define XMIT_TOP_DIR (1<<0)
+#define XMIT_DEL_START (1<<0)
 #define XMIT_SAME_MODE (1<<1)
 #define XMIT_EXTENDED_FLAGS (1<<2)
 #define XMIT_SAME_RDEV_pre28 XMIT_EXTENDED_FLAGS /* Only in protocols < 28 */
@@ -57,7 +57,7 @@
 
 /* These flags are used in the live flist data. */
 
-#define FLAG_TOP_DIR (1<<0)
+#define FLAG_DEL_START (1<<0)
 #define FLAG_HLINK_EOL (1<<1)	/* generator only */
 #define FLAG_MOUNT_POINT (1<<2)	/* sender only */
 

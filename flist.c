@@ -422,11 +422,11 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 
 	/* We must make sure we don't send a zero flag byte or the
 	 * other end will terminate the flist transfer.  Note that
-	 * the use of XMIT_TOP_DIR on a non-dir has no meaning, so
+	 * the use of XMIT_DEL_START on a non-dir has no meaning, so
 	 * it's harmless way to add a bit to the first flag byte. */
 	if (protocol_version >= 28) {
 		if (!flags && !S_ISDIR(mode))
-			flags |= XMIT_TOP_DIR;
+			flags |= XMIT_DEL_START;
 		if ((flags & 0xFF00) || !flags) {
 			flags |= XMIT_EXTENDED_FLAGS;
 			write_byte(f, flags);
@@ -435,7 +435,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 			write_byte(f, flags);
 	} else {
 		if (!(flags & 0xFF) && !S_ISDIR(mode))
-			flags |= XMIT_TOP_DIR;
+			flags |= XMIT_DEL_START;
 		if (!(flags & 0xFF))
 			flags |= XMIT_LONG_NAME;
 		write_byte(f, flags);
@@ -645,7 +645,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 	memset(bp, 0, file_struct_len);
 	bp += file_struct_len;
 
-	file->flags = flags & XMIT_TOP_DIR ? FLAG_TOP_DIR : 0;
+	file->flags = flags & XMIT_DEL_START ? FLAG_DEL_START : 0;
 	file->modtime = modtime;
 	file->length = file_length;
 	file->mode = mode;
@@ -1212,7 +1212,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (one_file_system)
 			set_filesystem(fname);
 
-		send_file_name(f, flist, fname, recurse, XMIT_TOP_DIR);
+		send_file_name(f, flist, fname, recurse, XMIT_DEL_START);
 
 		if (olddir[0]) {
 			flist_dir = NULL;
@@ -1475,8 +1475,8 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			/* Make sure that if we unduplicate '.', that we don't
 			 * lose track of a user-specified starting point (or
 			 * else deletions will mysteriously fail with -R). */
-			if (flist->files[i]->flags & FLAG_TOP_DIR)
-				flist->files[prev_i]->flags |= FLAG_TOP_DIR;
+			if (flist->files[i]->flags & FLAG_DEL_START)
+				flist->files[prev_i]->flags |= FLAG_DEL_START;
 
 			clear_file(i, flist);
 		} else

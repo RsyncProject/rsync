@@ -82,7 +82,7 @@ void delete_files(struct file_list *flist)
 	}
 
 	for (j = 0; j < flist->count; j++) {
-		if (!(flist->files[j]->flags & FLAG_TOP_DIR)
+		if (!(flist->files[j]->flags & FLAG_DEL_START)
 		    || !S_ISDIR(flist->files[j]->mode))
 			continue;
 
