@@ -473,9 +473,12 @@ struct file_struct {
 		char *link;	/* Points to symlink string, if a symlink */
 	} u;
 	OFF_T length;
-	char *basename;
-	char *dirname;
-	char *basedir;
+	char *basename;		/* The current item's name (AKA filename) */
+	char *dirname;		/* The directory info inside the transfer */
+	union {
+		char *root;	/* Sender-side dir info outside transfer */
+		int depth;	/* Receiver-side directory depth info */
+	} dir;
 	union {
 		struct idev *idev;
 		struct hlink *links;
@@ -515,6 +518,7 @@ struct file_list {
 	alloc_pool_t hlink_pool;
 	int count;
 	int malloced;
+	int low, high;
 };
 
 #define SUMFLG_SAME_OFFSET	(1<<0)
@@ -593,15 +597,6 @@ struct stats {
 	int current_file_index;
 };
 
-
-/* we need this function because of the silly way in which duplicate
-   entries are handled in the file lists - we can't change this
-   without breaking existing versions */
-static inline int flist_up(struct file_list *flist, int i)
-{
-	while (!flist->files[i]->basename) i++;
-	return i;
-}
 
 #include "byteorder.h"
 #include "lib/mdfour.h"
