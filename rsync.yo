@@ -61,11 +61,11 @@ itemize(
 
 	it() for copying from a remote rsync server to the local
 	machine. This is invoked when the source path contains a ::
-	separator or a rsync:// URL.
+	separator or an rsync:// URL.
 
 	it() for copying from the local machine to a remote rsync
 	server. This is invoked when the destination path contains a ::
-	separator or a rsync:// URL.
+	separator or an rsync:// URL.
 
 	it() for copying from a remote machine using a remote shell
 	program as the transport, using rsync server on the remote
@@ -170,7 +170,7 @@ that:
 
 itemize(
 	it() you use a double colon :: instead of a single colon to
-	separate the hostname from the path or a rsync:// URL.
+	separate the hostname from the path or an rsync:// URL.
 
 	it() the remote server may print a message of the day when you
 	connect.
@@ -334,7 +334,7 @@ verb(
      --files-from=FILE       read FILE for list of source-file names
  -0  --from0                 all file lists are delimited by nulls
      --version               print version number
-     --daemon                run as a rsync daemon
+     --daemon                run as an rsync daemon
      --no-detach             do not detach from the parent
      --address=ADDRESS       bind to the specified address
      --config=FILE           specify alternate rsyncd.conf file
@@ -863,7 +863,7 @@ option to make it easier.
 
 dit(bf(--password-file)) This option allows you to provide a password
 in a file for accessing a remote rsync server. Note that this option
-is only useful when accessing a rsync server using the built in
+is only useful when accessing an rsync server using the built in
 transport, not when using a remote shell as the transport. The file
 must not be world readable. It should contain just the password as a
 single line.
@@ -1166,12 +1166,12 @@ redirect your rsync client to use a web proxy when connecting to a
 rsync daemon. You should set RSYNC_PROXY to a hostname:port pair.
 
 dit(bf(RSYNC_PASSWORD)) Setting RSYNC_PASSWORD to the required
-password allows you to run authenticated rsync connections to a rsync
+password allows you to run authenticated rsync connections to an rsync
 daemon without user intervention. Note that this does not supply a
 password to a shell transport such as ssh.
 
 dit(bf(USER) or bf(LOGNAME)) The USER or LOGNAME environment variables
-are used to determine the default username sent to a rsync server.
+are used to determine the default username sent to an rsync server.
 
 dit(bf(HOME)) The HOME environment variable is used to find the user's
 default .cvsignore file.
