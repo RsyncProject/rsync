@@ -76,6 +76,12 @@ int kludge_around_eof = False;
 
 
 static int io_error_fd = -1;
+static int io_filesfrom_f_in = -1;
+static int io_filesfrom_f_out = -1;
+static char io_filesfrom_buf[2048];
+static char *io_filesfrom_bp;
+static char io_filesfrom_lastchar;
+static int io_filesfrom_buflen;
 
 static void read_loop(int fd, char *buf, size_t len);
 
@@ -118,8 +124,8 @@ static void read_error_fd(void)
 	int fd = io_error_fd;
 	int tag, len;
 
-        /* io_error_fd is temporarily disabled -- is this meant to
-         * prevent indefinite recursion? */
+	/* io_error_fd is temporarily disabled -- is this meant to
+	 * prevent indefinite recursion? */
 	io_error_fd = -1;
 
 	read_loop(fd, buf, 4);
@@ -141,6 +147,24 @@ static void read_error_fd(void)
 	io_error_fd = fd;
 }
 
+/**
+ * When we're the receiver and we have a local --files-from list of names
+ * that needs to be sent over the socket to the sender, we have to do two
+ * things at the same time: send the sender a list of what files we're
+ * processing and read the incoming file+info list from the sender.  We do
+ * this by augmenting the read_timeout() function to copy this data.  It
+ * uses the io_filesfrom_buf to read a block of data from f_in (when it is
+ * ready, since it might be a pipe) and then blast it out f_out (when it
+ * is ready to receive more data).
+ */
+void io_set_filesfrom_fds(int f_in, int f_out)
+{
+	io_filesfrom_f_in = f_in;
+	io_filesfrom_f_out = f_out;
+	io_filesfrom_bp = io_filesfrom_buf;
+	io_filesfrom_lastchar = '\0';
+	io_filesfrom_buflen = 0;
+}
 
 /**
  * It's almost always an error to get an EOF when we're trying to read
@@ -197,16 +221,33 @@ static int read_timeout (int fd, char *buf, size_t len)
 
 	while (ret == 0) {
 		/* until we manage to read *something* */
-		fd_set fds;
+		fd_set r_fds, w_fds;
 		struct timeval tv;
 		int fd_count = fd+1;
 		int count;
 
-		FD_ZERO(&fds);
-		FD_SET(fd, &fds);
+		FD_ZERO(&r_fds);
+		FD_SET(fd, &r_fds);
 		if (io_error_fd != -1) {
-			FD_SET(io_error_fd, &fds);
-			if (io_error_fd > fd) fd_count = io_error_fd+1;
+			FD_SET(io_error_fd, &r_fds);
+			if (io_error_fd >= fd_count) fd_count = io_error_fd+1;
+		}
+		if (io_filesfrom_f_out != -1) {
+			int new_fd;
+			if (io_filesfrom_buflen == 0) {
+				if (io_filesfrom_f_in != -1) {
+					FD_SET(io_filesfrom_f_in, &r_fds);
+					new_fd = io_filesfrom_f_in;
+				} else {
+					io_filesfrom_f_out = -1;
+					new_fd = -1;
+				}
+			} else {
+				FD_ZERO(&w_fds);
+				FD_SET(io_filesfrom_f_out, &w_fds);
+				new_fd = io_filesfrom_f_out;
+			}
+			if (new_fd >= fd_count) fd_count = new_fd+1;
 		}
 
 		tv.tv_sec = io_timeout?io_timeout:SELECT_TIMEOUT;
@@ -214,7 +255,9 @@ static int read_timeout (int fd, char *buf, size_t len)
 
 		errno = 0;
 
-		count = select(fd_count, &fds, NULL, NULL, &tv);
+		count = select(fd_count, &r_fds,
+			       io_filesfrom_buflen? &w_fds : NULL,
+			       NULL, &tv);
 
 		if (count == 0) {
 			check_timeout();
@@ -227,11 +270,76 @@ static int read_timeout (int fd, char *buf, size_t len)
 			continue;
 		}
 
-		if (io_error_fd != -1 && FD_ISSET(io_error_fd, &fds)) {
+
+		if (io_error_fd != -1 && FD_ISSET(io_error_fd, &r_fds)) {
 			read_error_fd();
 		}
 
-		if (!FD_ISSET(fd, &fds)) continue;
+		if (io_filesfrom_f_out != -1) {
+			if (io_filesfrom_buflen) {
+				if (FD_ISSET(io_filesfrom_f_out, &w_fds)) {
+					int l = write(io_filesfrom_f_out,
+						      io_filesfrom_bp,
+						      io_filesfrom_buflen);
+					if (l > 0) {
+						if (!(io_filesfrom_buflen -= l))
+							io_filesfrom_bp = io_filesfrom_buf;
+						else
+							io_filesfrom_bp += l;
+					} else {
+						/* XXX should we complain? */
+						io_filesfrom_f_out = -1;
+					}
+				}
+			} else if (io_filesfrom_f_in != -1) {
+				if (FD_ISSET(io_filesfrom_f_in, &r_fds)) {
+					int l = read(io_filesfrom_f_in,
+						     io_filesfrom_buf,
+						     sizeof io_filesfrom_buf);
+					if (l <= 0) {
+						/* Send end-of-file marker */
+						io_filesfrom_buf[0] = '\0';
+						io_filesfrom_buf[1] = '\0';
+						io_filesfrom_buflen = io_filesfrom_lastchar? 2 : 1;
+						io_filesfrom_f_in = -1;
+					} else {
+						extern int eol_nulls;
+						if (!eol_nulls) {
+							char *s = io_filesfrom_buf + l;
+							/* Transform CR and/or LF into '\0' */
+							while (s-- > io_filesfrom_buf) {
+								if (*s == '\n' || *s == '\r')
+									*s = '\0';
+							}
+						}
+						if (!io_filesfrom_lastchar) {
+							/* Last buf ended with a '\0', so don't
+							 * let this buf start with one. */
+							while (l && !*io_filesfrom_bp)
+								io_filesfrom_bp++, l--;
+						}
+						if (!l)
+							io_filesfrom_bp = io_filesfrom_buf;
+						else {
+							char *f = io_filesfrom_bp;
+							char *t = f;
+							char *eob = f + l;
+							/* Eliminate any multi-'\0' runs. */
+							while (f != eob) {
+								if (!(*t++ = *f++)) {
+									while (f != eob && !*f)
+										f++, l--;
+								}
+							}
+							io_filesfrom_lastchar = f[-1];
+						}
+						io_filesfrom_buflen = l;
+					}
+				}
+			}
+		}
+
+		if (!FD_ISSET(fd, &r_fds)) continue;
 
 		n = read(fd, buf, len);
 
@@ -257,7 +365,56 @@ static int read_timeout (int fd, char *buf, size_t len)
 	return ret;
 }
 
+/**
+ * Read a line into the "fname" buffer (which must be at least MAXPATHLEN
+ * characters long).
+ */
+int read_filesfrom_line(int fd, char *fname)
+{
+	char ch, *s, *eob = fname + MAXPATHLEN - 1;
+	int cnt;
+	extern int io_timeout;
+	extern int eol_nulls;
+	extern char *remote_filesfrom_file;
+	extern int am_server;
+	int reading_remotely = remote_filesfrom_file || (am_server && fd == 0);
+	int nulls = eol_nulls || reading_remotely;
 
+  start:
+	s = fname;
+	while (1) {
+		cnt = read(fd, &ch, 1);
+		if (cnt < 0 && (errno == EWOULDBLOCK
+		  || errno == EINTR || errno == EAGAIN)) {
+			struct timeval tv;
+			fd_set fds;
+			FD_ZERO(&fds);
+			FD_SET(fd, &fds);
+			tv.tv_sec = io_timeout? io_timeout : SELECT_TIMEOUT;
+			tv.tv_usec = 0;
+			if (!select(fd+1, &fds, NULL, NULL, &tv))
+				check_timeout();
+			continue;
+		}
+		if (cnt != 1)
+			break;
+		if (nulls? !ch : (ch == '\r' || ch == '\n')) {
+			/* Skip empty lines if reading locally. */
+			if (!reading_remotely && s == fname)
+				continue;
+			break;
+		}
+		if (s < eob)
+			*s++ = ch;
+	}
+	*s = '\0';
+
+	/* Dump comments. */
+	if (*fname == '#' || *fname == ';')
+		goto start;
+
+	return s - fname;
+}
 
 
 /**
@@ -454,11 +611,11 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 
 	while (total < len) {
 		FD_ZERO(&w_fds);
-		FD_ZERO(&r_fds);
 		FD_SET(fd,&w_fds);
 		fd_count = fd;
 
 		if (io_error_fd != -1) {
+			FD_ZERO(&r_fds);
 			FD_SET(io_error_fd,&r_fds);
 			if (io_error_fd > fd_count) 
 				fd_count = io_error_fd;
