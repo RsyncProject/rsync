@@ -142,14 +142,14 @@ static void hash_search(int f,struct sum_struct *s,
 {
 	OFF_T offset, end;
 	unsigned int k;
-	size_t last_i;
+	size_t want_i;
 	char sum2[SUM_LENGTH];
 	uint32 s1, s2, sum;
 	schar *map;
 
-	/* last_i is used to encourage adjacent matches, allowing the RLL coding of the
-	   output to work more efficiently */
-	last_i = (size_t)-1;
+	/* want_i is used to encourage adjacent matches, allowing the RLL
+	 * coding of the output to work more efficiently. */
+	want_i = 0;
 
 	if (verbose > 2) {
 		rprintf(FINFO,"hash search b=%u len=%.0f\n",
@@ -216,15 +216,15 @@ static void hash_search(int f,struct sum_struct *s,
 			}
 
 			/* we've found a match, but now check to see
-			 * if last_i can hint at a better match */
-			if (i != last_i + 1 && last_i + 1 < s->count
-			    && sum == s->sums[last_i+1].sum1
-			    && memcmp(sum2, s->sums[last_i+1].sum2, s->s2length) == 0) {
+			 * if want_i can hint at a better match. */
+			if (i != want_i && want_i < s->count
+			    && sum == s->sums[want_i].sum1
+			    && memcmp(sum2, s->sums[want_i].sum2, s->s2length) == 0) {
 				/* we've found an adjacent match - the RLL coder
 				 * will be happy */
-				i = last_i + 1;
+				i = want_i;
 			}
-			last_i = i;
+			want_i = i + 1;
 
 			matched(f,s,buf,offset,i);
 			offset += s->sums[i].len - 1;
