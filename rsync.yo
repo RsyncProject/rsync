@@ -193,8 +193,8 @@ Using rsync in this way is the same as using it with a remote shell except
 that:
 
 itemize(
-	it() you use a double colon :: instead of a single colon to
-	separate the hostname from the path or an rsync:// URL.
+	it() you either use a double colon :: instead of a single colon to
+	separate the hostname from the path, or you use an rsync:// URL.
 	it() the remote server may print a message of the day when you
 	connect.
 	it() if you specify no path name on the remote server then the
@@ -1256,8 +1256,8 @@ The options allowed when starting an rsync daemon are as follows:
 
 startdit()
 dit(bf(--daemon)) This tells rsync that it is to run as a daemon.  The
-daemon may be accessed using the bf(host::module) or
-bf(rsync://host/module/) syntax.
+daemon you start running may be accessed using an rsync client using
+the bf(host::module) or bf(rsync://host/module/) syntax.
 
 If standard input is a socket then rsync will assume that it is being
 run via inetd, otherwise it will detach from the current terminal and
