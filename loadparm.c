@@ -48,6 +48,8 @@
  *
  */
 
+/* TODO: Parameter to set debug level on server. */
+
 #include "rsync.h"
 #define PTR_DIFF(p1,p2) ((ptrdiff_t)(((char *)(p1)) - (char *)(p2)))
 #define strequal(a,b) (strcasecmp(a,b)==0)
