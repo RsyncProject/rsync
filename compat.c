@@ -61,7 +61,10 @@ void setup_protocol(int f_out,int f_in)
 		rprintf(FERROR,"(see the rsync man page for an explanation)\n");
 		exit_cleanup(RERR_PROTOCOL);
 	}	
-	
+	if (remote_version < OLD_PROTOCOL_VERSION)
+		rprintf(FINFO,"%s is very old version of rsync, upgrade recommended.\n",
+			am_server ? "Server" : "Client");
+
 	if (remote_version >= 12) {
 		if (am_server) {
 		    if (read_batch || write_batch) /* dw */

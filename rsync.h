@@ -57,13 +57,19 @@
  * people writing them to make sure that they don't send us anything
  * we won't understand.
  *
+ * Interoperation with old but supported protocol versions
+ * should cause a warning to be printed.  At a future date
+ * the old protocol will become the minimum and
+ * compatibility code removed.
+ *
  * There are two possible explanations for the limit at thirty: either
  * to allow new major-rev versions that do not interoperate with us,
  * and (more likely) so that we can detect an attempt to connect rsync
  * to a non-rsync server, which is unlikely to begin by sending a byte
  * between 15 and 30. */
 #define MIN_PROTOCOL_VERSION 15
-#define MAX_PROTOCOL_VERSION 30
+#define OLD_PROTOCOL_VERSION 20
+#define MAX_PROTOCOL_VERSION 40
 
 #define RSYNC_PORT 873
 
