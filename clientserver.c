@@ -129,7 +129,10 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 
 		if (strcmp(line,"@RSYNCD: EXIT") == 0) exit(0);
 
-		rprintf(FINFO,"%s\n", line);
+		if (strncmp(line, "@ERROR", 6) == 0)
+			rprintf(FERROR,"%s\n", line);
+		else
+			rprintf(FINFO,"%s\n", line);
 	}
 	kludge_around_eof = False;
 
