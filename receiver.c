@@ -1,18 +1,18 @@
 /* -*- c-file-style: "linux" -*-
-   
+
    Copyright (C) 1996-2000 by Andrew Tridgell
    Copyright (C) Paul Mackerras 1996
-   
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -47,9 +47,9 @@ static struct delete_list {
 static int dlist_len, dlist_alloc_len;
 
 /* yuck! This function wouldn't have been necessary if I had the sorting
-   algorithm right. Unfortunately fixing the sorting algorithm would introduce
-   a backward incompatibility as file list indexes are sent over the link.
-*/
+ * algorithm right. Unfortunately fixing the sorting algorithm would introduce
+ * a backward incompatibility as file list indexes are sent over the link.
+ */
 static int delete_already_done(struct file_list *flist,int j)
 {
 	int i;
@@ -57,7 +57,7 @@ static int delete_already_done(struct file_list *flist,int j)
 
 	if (link_stat(f_name(flist->files[j]), &st)) return 1;
 
-	for (i=0;i<dlist_len;i++) {
+	for (i = 0; i < dlist_len; i++) {
 		if (st.st_ino == delete_list[i].inode &&
 		    (DEV64_T)st.st_dev == delete_list[i].dev)
 			return 1;
@@ -92,11 +92,11 @@ static void delete_one(char *fn, int is_dir)
 		} else if (verbose) {
 			rprintf(FINFO, "deleting %s\n", fn);
 		}
-	} else {    
+	} else {
 		if (do_rmdir(fn) != 0) {
 			if (errno != ENOTEMPTY && errno != EEXIST) {
 				rprintf(FERROR, "delete_one: rmdir %s failed: %s\n",
-                                        full_fname(fn), strerror(errno));
+					full_fname(fn), strerror(errno));
 			}
 		} else if (verbose) {
 			rprintf(FINFO, "deleting directory %s\n", fn);
@@ -113,8 +113,8 @@ static int is_backup_file(char *fn)
 
 
 /* this deletes any files on the receiving side that are not present
-   on the sending side. For version 1.6.4 I have changed the behaviour
-   to match more closely what most people seem to expect of this option */
+ * on the sending side. For version 1.6.4 I have changed the behaviour
+ * to match more closely what most people seem to expect of this option */
 void delete_files(struct file_list *flist)
 {
 	struct file_list *local_file_list;
@@ -134,7 +134,7 @@ void delete_files(struct file_list *flist)
 	}
 
 	for (j=0;j<flist->count;j++) {
-		if (!S_ISDIR(flist->files[j]->mode) || 
+		if (!S_ISDIR(flist->files[j]->mode) ||
 		    !(flist->files[j]->flags & FLAG_DELETE)) continue;
 
 		if (protocol_version < 19 &&
@@ -182,7 +182,7 @@ void delete_files(struct file_list *flist)
  *   put it in.  Otherwise, the tmp filename is in the same
  *   directory as the given name.  Note that there may be no
  *   directory at all in the given name!
- *      
+ *
  *   The tmp filename is basically the given filename with a
  *   dot prepended, and .XXXXXX appended (for mkstemp() to
  *   put its unique gunk in).  Take care to not exceed
@@ -190,7 +190,7 @@ void delete_files(struct file_list *flist)
  *   the basename basically becomes 8 chars longer. In that
  *   case, the original name is shortened sufficiently to
  *   make it all fit.
- *      
+ *
  *   Of course, there's no real reason for the tmp name to
  *   look like the original, except to satisfy us humans.
  *   As long as it's unique, rsync will work.
@@ -218,7 +218,7 @@ static int get_tmpname(char *fnametmp, char *fname)
 		}
 	} else {
 		f = fname;
-	} 
+	}
 	fnametmp[length++] = '.';
 	fnametmp[length] = '\0';		/* always NULL terminated */
 
@@ -230,7 +230,7 @@ static int get_tmpname(char *fnametmp, char *fname)
 		return 0;
 	}
 
-	strlcpy(fnametmp + length, f, maxname); 
+	strlcpy(fnametmp + length, f, maxname);
 	strcat(fnametmp + length, ".XXXXXX");
 
 	return 1;
@@ -249,11 +249,11 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 	static char file_sum1[MD4_SUM_LENGTH];
 	static char file_sum2[MD4_SUM_LENGTH];
 	char *map=NULL;
-	
+
 	read_sum_head(f_in, &sum);
-	
+
 	sum_init();
-	
+
 	for (i=recv_token(f_in,&data); i != 0; i=recv_token(f_in,&data)) {
 		if (do_progress)
 			show_progress(offset, total_size);
@@ -268,7 +268,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 
 			stats.literal_data += i;
 			cleanup_got_literal = 1;
-      
+
 			sum_update(data,i);
 
 			if (fd != -1 && write_file(fd,data,i) != i) {
@@ -278,27 +278,27 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 			}
 			offset += i;
 			continue;
-		} 
+		}
 
 		i = -(i+1);
 		offset2 = i*(OFF_T)sum.blength;
 		len = sum.blength;
 		if (i == (int) sum.count-1 && sum.remainder != 0)
 			len = sum.remainder;
-		
+
 		stats.matched_data += len;
-		
+
 		if (verbose > 3)
 			rprintf(FINFO,"chunk[%d] of size %d at %.0f offset=%.0f\n",
 				i,len,(double)offset2,(double)offset);
-		
+
 		if (buf) {
 			map = map_ptr(buf,offset2,len);
-		
+
 			see_token(map, len);
 			sum_update(map,len);
 		}
-		
+
 		if (fd != -1 && write_file(fd,map,len) != (int) len) {
 			rprintf(FERROR, "write failed on %s: %s\n",
 				full_fname(fname), strerror(errno));
@@ -322,8 +322,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 	if (verbose > 2) {
 		rprintf(FINFO,"got file_sum\n");
 	}
-	if (fd != -1
-	    && memcmp(file_sum1,file_sum2,MD4_SUM_LENGTH) != 0) {
+	if (fd != -1 && memcmp(file_sum1,file_sum2,MD4_SUM_LENGTH) != 0) {
 		return 0;
 	}
 	return 1;
@@ -335,7 +334,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
  *
  * Receiver process runs on the same host as the generator process. */
 int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
-{  
+{
 	int fd1,fd2;
 	STRUCT_STAT st;
 	char *fname;
@@ -348,7 +347,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	struct file_struct *file;
 	int phase=0;
 	int recv_ok;
-	extern struct stats stats;		
+	extern struct stats stats;
 	extern int preserve_perms;
 	extern int delete_after;
 	extern int orig_umask;
@@ -358,7 +357,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		rprintf(FINFO,"recv_files(%d) starting\n",flist->count);
 	}
 
-	while (1) {      
+	while (1) {
 		cleanup_disable();
 
 		i = read_int(f_in);
@@ -375,7 +374,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		}
 
 		if (i < 0 || i >= flist->count) {
-			rprintf(FERROR,"Invalid file index %d in recv_files (count=%d)\n", 
+			rprintf(FERROR,"Invalid file index %d in recv_files (count=%d)\n",
 				i, flist->count);
 			exit_cleanup(RERR_PROTOCOL);
 		}
@@ -403,7 +402,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 		fnamecmp = fname;
 
-		/* open the file */  
+		/* open the file */
 		fd1 = do_open(fnamecmp, O_RDONLY, 0);
 
 		if ((fd1 == -1) && (compare_dest != NULL)) {
@@ -443,8 +442,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 		if (fd1 != -1 && !preserve_perms) {
 			/* if the file exists already and we aren't preserving
-			   permissions then act as though the remote end sent
-			   us the file permissions we already have */
+			 * permissions then act as though the remote end sent
+			 * us the file permissions we already have */
 			file->mode = st.st_mode;
 		}
 
@@ -465,17 +464,17 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		strlcpy(template, fnametmp, sizeof(template));
 
 		/* we initially set the perms without the
-		   setuid/setgid bits to ensure that there is no race
-		   condition. They are then correctly updated after
-		   the lchown. Thanks to snabb@epipe.fi for pointing
-		   this out.  We also set it initially without group
-		   access because of a similar race condition. */
+		 * setuid/setgid bits to ensure that there is no race
+		 * condition. They are then correctly updated after
+		 * the lchown. Thanks to snabb@epipe.fi for pointing
+		 * this out.  We also set it initially without group
+		 * access because of a similar race condition. */
 		fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
 
 		/* in most cases parent directories will already exist
-		   because their information should have been previously
-		   transferred, but that may not be the case with -R */
-		if (fd2 == -1 && relative_paths && errno == ENOENT && 
+		 * because their information should have been previously
+		 * transferred, but that may not be the case with -R */
+		if (fd2 == -1 && relative_paths && errno == ENOENT &&
 		    create_directory_path(fnametmp, orig_umask) == 0) {
 			strlcpy(fnametmp, template, sizeof(fnametmp));
 			fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
@@ -488,7 +487,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			if (fd1 != -1) close(fd1);
 			continue;
 		}
-      
+
 		cleanup_set(fnametmp, fname, file, buf, fd1, fd2);
 
 		if (!am_server && verbose) {	/* log transfer */
@@ -499,13 +498,13 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		recv_ok = receive_data(f_in,buf,fd2,fname,file->length);
 
 		log_recv(file, &initial_stats);
-		
+
 		if (buf) unmap_file(buf);
 		if (fd1 != -1) {
 			close(fd1);
 		}
 		close(fd2);
-		
+
 		if (verbose > 2)
 			rprintf(FINFO,"renaming %s to %s\n",fnametmp,fname);
 
@@ -534,8 +533,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	if (preserve_hard_links)
 		do_hard_links();
 
-	/* now we need to fix any directory permissions that were 
-	   modified during the transfer */
+	/* now we need to fix any directory permissions that were
+	 * modified during the transfer */
 	for (i = 0; i < flist->count; i++) {
 		file = flist->files[i];
 		if (!file->basename || !S_ISDIR(file->mode)) continue;
@@ -544,7 +543,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 	if (verbose > 2)
 		rprintf(FINFO,"recv_files finished\n");
-	
+
 	return 0;
 }
 
