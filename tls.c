@@ -65,38 +65,50 @@ static void list_file (const char *fname)
 	struct stat buf;
 	char permbuf[PERMSTRING_SIZE];
 	struct tm *mt;
+	char datebuf[50];
 
 	if (do_lstat(fname, &buf) == -1)
 		failed ("stat", fname);
 
-	/* On some BSD platforms the mode bits of a symlink are
-	 * undefined.  */
-	if (S_ISLNK(buf.st_mode))
-		buf.st_mode &= ~0777;
-		
 	/* The size of anything but a regular file is probably not
 	 * worth thinking about. */
 	if (!S_ISREG(buf.st_mode))
 		buf.st_size = 0;
 
+	/* On some BSD platforms the mode bits of a symlink are
+	 * undefined.  Also it tends not to be possible to reset a
+	 * symlink's mtime, so we have to ignore it too. */
+	if (S_ISLNK(buf.st_mode)) {
+		buf.st_mode &= ~0777;
+		buf.st_mtime = (time_t)0;
+		buf.st_uid = buf.st_gid = 0;
+	}
+
 	permstring(permbuf, buf.st_mode);
 
-	mt = gmtime(&buf.st_mtime);
-
+	if (buf.st_mtime) {
+		mt = gmtime(&buf.st_mtime);
+		
+		sprintf(datebuf, "%04d-%02d-%02d %02d:%02d:%02d",
+			mt->tm_year + 1900,
+			mt->tm_mon + 1,
+			mt->tm_mday,
+			mt->tm_hour,
+			mt->tm_min,
+			mt->tm_sec);
+	} else {
+		strcpy(datebuf, "                   ");
+	}
+	
 	/* TODO: Perhaps escape special characters in fname? */
-
+	
+	
 	/* NB: need to pass size as a double because it might be be
 	 * too large for a long. */
-	printf("%s %12.0f %6d.%-6d %04d-%02d-%02d %02d:%02d:%02d %s\n",
+	printf("%s %12.0f %6d.%-6d %s %s\n",
 	       permbuf, (double) buf.st_size,
 	       buf.st_uid, buf.st_gid,
-	       mt->tm_year + 1900,
-	       mt->tm_mon + 1,
-	       mt->tm_mday,
-	       mt->tm_hour,
-	       mt->tm_min,
-	       mt->tm_sec,
-	       fname);
+	       datebuf, fname);
 }
 
 
