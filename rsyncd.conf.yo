@@ -384,6 +384,7 @@ quote(itemize(
   it() %l for the length of the file in bytes
   it() %p for the process ID of this rsync session
   it() %o for the operation, which is "send", "recv", or "del."
+  (the latter includes the trailing period)
   it() %f for the filename (long form on sender; no trailing "/")
   it() %n for the filename (short form; trailing "/" on dir)
   it() %L either the string " -> SYMLINK" or "" if not a symlink
