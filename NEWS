@@ -87,8 +87,8 @@ Changes since 2.6.2:
       help).
 
     - When the remote rsync dies, make a better effort to recover any error
-      messages it may have sent instead of just dying with a write error
-      trying to send data over the socket.
+      messages it may have sent before dying (the local rsync used to just
+      die with a socket-write error).
 
     - When using --delete and a --backup-dir that contains files that are
       hard-linked to their destination equivalents, rsync now makes sure
@@ -114,7 +114,7 @@ Changes since 2.6.2:
       are also cases where this is more efficient (such as appending data).
       Use only when needed (see the man page for more details).
 
-    - Added the "write only" option to the daemon's config file.
+    - Added the "write only" option for the daemon's config file.
 
     - Added long-option names for -4 and -6 (namely --ipv4 and --ipv6)
       and documented all these options in the man page.
@@ -141,8 +141,11 @@ Changes since 2.6.2:
       presence in the list of available modules), a user that fails to
       authenticate gets the same "unknown module" error that they would get
       if the module were actually unknown (while still logging the real
-      error to the daemon's log file).  This prevents fishing for modules
+      error to the daemon's log file).  This prevents fishing for module
       names.
+
+    - The daemon's "refuse options" config item now allows you to match
+      option names using wildcards and/or the single-letter option names.
 
   INTERNAL:
 
