@@ -534,7 +534,7 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 		if (lastdir && strcmp(fname, lastdir)==0) {
 			file->dirname = lastdir;
 		} else {
-			file->dirname = STRDUP(ap, fname);
+			file->dirname = strdup(fname);
 			lastdir = file->dirname;
 		}
 		file->basename = STRDUP(ap, p+1);
@@ -579,7 +579,7 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 		if (lastdir && strcmp(lastdir, flist_dir)==0) {
 			file->basedir = lastdir;
 		} else {
-			file->basedir = STRDUP(ap, flist_dir);
+			file->basedir = strdup(flist_dir);
 			lastdir = file->basedir;
 		}
 	} else {
