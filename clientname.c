@@ -60,8 +60,7 @@ char *client_addr(int fd)
 		strcpy(addr_buf, "0.0.0.0");
 		if ((ssh_client = getenv("SSH_CLIENT")) != NULL) {
 			/* truncate SSH_CLIENT to just IP address */
-			p = strchr(ssh_client, ' ');
-			if (p) {
+			if ((p = strchr(ssh_client, ' ')) != NULL) {
 				len = MIN((unsigned int) (p - ssh_client),
 				    sizeof addr_buf - 1);
 				strncpy(addr_buf, ssh_client, len);
@@ -115,17 +114,15 @@ char *client_name(int fd)
 	strcpy(name_buf, default_name);
 	initialised = 1;
 
-	if (am_server) {
-		/* daemon over --rsh mode */
-
+	if (am_server) {	/* daemon over --rsh mode */
 		char *addr = client_addr(fd);
 #ifdef INET6
 		int dots = 0;
 		char *p;
 
 		for (p = addr; *p && (dots <= 3); p++) {
-		    if (*p == '.')
-			dots++;
+			if (*p == '.')
+				dots++;
 		}
 		if (dots > 3) {
 			/* more than 4 parts to IP address, must be ipv6 */
@@ -149,7 +146,6 @@ char *client_name(int fd)
 		ssp = &ss;
 
 		client_sockaddr(fd, &ss, &ss_len);
-
 	}
 
 	if (!lookup_name(fd, ssp, ss_len, name_buf, sizeof name_buf,
@@ -181,7 +177,7 @@ void client_sockaddr(int fd,
 	}
 
 #ifdef INET6
-        if (get_sockaddr_family(ss) == AF_INET6 && 
+	if (get_sockaddr_family(ss) == AF_INET6 &&
 	    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)ss)->sin6_addr)) {
 		/* OK, so ss is in the IPv6 family, but it is really
 		 * an IPv4 address: something like
@@ -207,7 +203,7 @@ void client_sockaddr(int fd,
 		 * to be present in the Linux headers. */
 		memcpy(&sin->sin_addr, &sin6.sin6_addr.s6_addr[12],
 		    sizeof sin->sin_addr);
-        }
+	}
 #endif
 }
 
@@ -270,8 +266,9 @@ int compare_addrinfo_sockaddr(const struct addrinfo *ai,
 		return memcmp(&sin1->sin_addr, &sin2->sin_addr,
 			      sizeof sin1->sin_addr);
 	}
+
 #ifdef INET6
-	else if (ss_family == AF_INET6) {
+	if (ss_family == AF_INET6) {
 		const struct sockaddr_in6 *sin1, *sin2;
 
 		sin1 = (const struct sockaddr_in6 *) ss;
@@ -295,10 +292,9 @@ int compare_addrinfo_sockaddr(const struct addrinfo *ai,
 		return 0;
 	}
 #endif /* INET6 */
-	else {
-		/* don't know */
-		return 1;
-	}
+
+	/* don't know */
+	return 1;
 }
 
 
