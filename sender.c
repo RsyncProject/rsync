@@ -72,8 +72,8 @@ static struct sum_struct *receive_sums(int f)
 	s->sums = NULL;
 
 	if (verbose > 3) {
-		rprintf(FINFO, "count=%ld n=%u rem=%u\n",
-			(long)s->count, s->blength, s->remainder);
+		rprintf(FINFO, "count=%.0f n=%ld rem=%ld\n",
+			(double)s->count, (long)s->blength, (long)s->remainder);
 	}
 
 	if (s->count == 0)
@@ -214,7 +214,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		}
 
 		if (st.st_size) {
-			OFF_T map_size = MAX(s->blength * 3, MAX_MAP_SIZE);
+			OFF_T map_size = MAX((OFF_T)s->blength * 3, MAX_MAP_SIZE);
 			mbuf = map_file(fd, st.st_size, map_size, s->blength);
 		} else
 			mbuf = NULL;
