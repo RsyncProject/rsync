@@ -34,50 +34,44 @@ struct exclude_struct **server_exclude_list;
 char *exclude_path_prefix = NULL;
 
 /** Build an exclude structure given a exclude pattern */
-static struct exclude_struct *make_exclude(const char *pattern, int include)
+static struct exclude_struct *make_exclude(const char *pattern, int pat_len,
+					   int include)
 {
 	struct exclude_struct *ret;
-	char *cp;
-	int pat_len;
+	const char *cp;
+	int ex_len;
 
 	ret = new(struct exclude_struct);
-	if (!ret) out_of_memory("make_exclude");
+	if (!ret)
+		out_of_memory("make_exclude");
 
 	memset(ret, 0, sizeof ret[0]);
-
-	if (strncmp(pattern,"- ",2) == 0) {
-		pattern += 2;
-	} else if (strncmp(pattern,"+ ",2) == 0) {
-		ret->include = 1;
-		pattern += 2;
-	} else {
-		ret->include = include;
-	}
+	ret->include = include;
 
 	if (exclude_path_prefix)
 		ret->match_flags |= MATCHFLG_ABS_PATH;
-	if (exclude_path_prefix && *pattern == '/') {
-		ret->pattern = new_array(char,
-			strlen(exclude_path_prefix) + strlen(pattern) + 1);
-		if (!ret->pattern) out_of_memory("make_exclude");
-		sprintf(ret->pattern, "%s%s", exclude_path_prefix, pattern);
-	}
-	else {
-		ret->pattern = strdup(pattern);
-		if (!ret->pattern) out_of_memory("make_exclude");
-	}
+	if (exclude_path_prefix && *pattern == '/')
+		ex_len = strlen(exclude_path_prefix);
+	else
+		ex_len = 0;
+	ret->pattern = new_array(char, ex_len + pat_len + 1);
+	if (!ret->pattern)
+		out_of_memory("make_exclude");
+	if (ex_len)
+		memcpy(ret->pattern, exclude_path_prefix, ex_len);
+	strlcpy(ret->pattern + ex_len, pattern, pat_len + 1);
+	pat_len += ex_len;
 
-	if (strpbrk(pattern, "*[?")) {
+	if (strpbrk(ret->pattern, "*[?")) {
 		ret->match_flags |= MATCHFLG_WILD;
-		if (strstr(pattern, "**")) {
+		if (strstr(ret->pattern, "**")) {
 			ret->match_flags |= MATCHFLG_WILD2;
 			/* If the pattern starts with **, note that. */
-			if (*pattern == '*' && pattern[1] == '*')
+			if (*ret->pattern == '*' && ret->pattern[1] == '*')
 				ret->match_flags |= MATCHFLG_WILD2_PREFIX;
 		}
 	}
 
-	pat_len = strlen(ret->pattern);
 	if (pat_len > 1 && ret->pattern[pat_len-1] == '/') {
 		ret->pattern[pat_len-1] = 0;
 		ret->directory = 1;
@@ -204,11 +198,9 @@ static void report_exclude_result(char const *name,
 	 * case we add it back in here. */
 
 	if (verbose >= 2) {
-		rprintf(FINFO, "[%s] %s %s %s because of pattern %s%s\n",
-			who_am_i(),
-			ent->include ? "including" : "excluding",
-			name_is_dir ? "directory" : "file",
-			name, ent->pattern,
+		rprintf(FINFO, "[%s] %scluding %s %s because of pattern %s%s\n",
+			who_am_i(), ent->include ? "in" : "ex",
+			name_is_dir ? "directory" : "file", name, ent->pattern,
 			ent->directory ? "/" : "");
 	}
 }
@@ -233,36 +225,110 @@ int check_exclude(struct exclude_struct **list, char *name, int name_is_dir)
 }
 
 
-void add_exclude(struct exclude_struct ***listp, const char *pattern, int include)
+/* Get the next include/exclude arg from the string.  The token will not
+ * be '\0' terminated, so use the returned length to limit the string.
+ * Also, be sure to add this length to the returned pointer before passing
+ * it back to ask for the next token.  This routine will not split off a
+ * prefix of "+ " or "- " unless xflags contains XFLG_NO_PREFIXES.
+ */
+static const char *get_exclude_tok(const char *p, int *len_ptr, int xflags)
+{
+	const unsigned char *s, *t;
+
+	/* Skip over any initial spaces */
+	for (s = (unsigned char *)p; isspace(*s); s++) {}
+
+	/* Remember the beginning of the token. */
+	t = s;
+
+	/* Do we have a token to parse? */
+	if (*s) {
+		/* Is this a '+' or '-' followed by a space (not whitespace)? */
+		if (!(xflags & XFLG_NO_PREFIXES)
+		    && (*s == '+' || *s == '-') && s[1] == ' ')
+			s += 2;
+
+		/* Skip to the next space or the end of the string */
+		while (!isspace(*s) && *s != '\0')
+			s++;
+	}
+
+	*len_ptr = s - t;
+	return (const char *)t;
+}
+
+
+void add_exclude(struct exclude_struct ***listp, const char *pattern, int xflags)
 {
 	struct exclude_struct **list = *listp;
-	int len = 0;
+	int add_cnt, pat_len, list_len = 0;
+	const char *cp;
 
-	if (*pattern == '!' && !pattern[1]) {
-		free_exclude_list(listp);
+	if (!pattern)
 		return;
+
+	if (xflags & XFLG_WORD_SPLIT) {
+		/* Count how many tokens we need to add.  Also looks for
+		 * the special "!" token, which clears the list up through
+		 * that token. */
+		for (add_cnt = 0, cp = pattern; ; cp += pat_len, add_cnt++) {
+			cp = get_exclude_tok(cp, &pat_len, xflags);
+			if (!pat_len)
+				break;
+			if (pat_len == 1 && *cp == '!') {
+				free_exclude_list(listp);
+				add_cnt = -1; /* Will increment to 0. */
+				pattern = cp + 1;
+			}
+		}
+		if (!add_cnt)
+			return;
+		cp = get_exclude_tok(pattern, &pat_len, xflags);
+	} else {
+		add_cnt = 1;
+		cp = pattern;
+		pat_len = strlen(pattern);
+
+		if (pat_len == 1 && *cp == '!') {
+			free_exclude_list(listp);
+			return;
+		}
 	}
 
 	if (list)
-		for (; list[len]; len++) {}
+		for ( ; list[list_len]; list_len++) {}
 
-	list = *listp = realloc_array(list, struct exclude_struct *, len+2);
-
-	if (!list || !(list[len] = make_exclude(pattern, include)))
+	list = *listp = realloc_array(list, struct exclude_struct *,
+				      list_len + add_cnt + 1);
+	if (!list)
 		out_of_memory("add_exclude");
 
-	if (verbose > 2) {
-		rprintf(FINFO, "[%s] add_exclude(%s,%s)\n",
-			who_am_i(), pattern,
-			include ? "include" : "exclude");
+	while (pat_len) {
+		int incl = xflags & XFLG_DEF_INCLUDE;
+		if (!(xflags & XFLG_NO_PREFIXES)
+		    && (*cp == '-' || *cp == '+')
+		    && cp[1] == ' ') {
+			incl = *cp == '+';
+			cp += 2;
+			pat_len -= 2;
+		}
+		list[list_len++] = make_exclude(cp, pat_len, incl);
+
+		if (verbose > 2) {
+			rprintf(FINFO, "[%s] add_exclude(%s,%s)\n",
+				who_am_i(), cp,
+				incl ? "include" : "exclude");
+		}
+		cp += pat_len;
+		cp = get_exclude_tok(cp, &pat_len, xflags);
 	}
 
-	list[len+1] = NULL;
+	list[list_len] = NULL;
 }
 
 
 void add_exclude_file(struct exclude_struct ***listp, const char *fname,
-		      int fatal, int include)
+		      int xflags)
 {
 	FILE *fp;
 	char line[MAXPATHLEN];
@@ -277,10 +343,10 @@ void add_exclude_file(struct exclude_struct ***listp, const char *fname,
 	else
 		fp = stdin;
 	if (!fp) {
-		if (fatal) {
+		if (xflags & XFLG_FATAL_ERRORS) {
 			rsyserr(FERROR, errno,
 				"failed to open %s file %s",
-				include ? "include" : "exclude",
+				xflags & XFLG_DEF_INCLUDE ? "include" : "exclude",
 				fname);
 			exit_cleanup(RERR_FILEIO);
 		}
@@ -306,7 +372,7 @@ void add_exclude_file(struct exclude_struct ***listp, const char *fname,
 			/* Skip lines starting with semicolon or pound.
 			 * It probably wouldn't cause any harm to not skip
 			 * them but there's no need to save them. */
-			add_exclude(listp, line, include);
+			add_exclude(listp, line, xflags);
 		}
 		if (ch == EOF)
 			break;
@@ -325,7 +391,7 @@ void send_exclude_list(int f)
 	 * FIXME: This pattern shows up in the output of
 	 * report_exclude_result(), which is not ideal. */
 	if (list_only && !recurse)
-		add_exclude(&exclude_list, "/*/*", ADD_EXCLUDE);
+		add_exclude(&exclude_list, "/*/*", 0);
 
 	if (!exclude_list) {
 		write_int(f, 0);
@@ -368,92 +434,35 @@ void recv_exclude_list(int f)
 		if (l >= sizeof line)
 			overflow("recv_exclude_list");
 		read_sbuf(f, line, l);
-		add_exclude(&exclude_list, line, ADD_EXCLUDE);
+		add_exclude(&exclude_list, line, 0);
 	}
 }
 
-/* Get the next include/exclude arg from the string. It works in a similar way
-** to strtok - initially an arg is sent over, from then on NULL. This
-** routine takes into account any +/- in the strings and does not
-** consider the space following it as a delimeter.
-*/
-char *get_exclude_tok(char *p)
-{
-	static char *s;
-	static int more;
-	char *t;
 
-	if (p) {
-		s=p;
-		if (*p)
-			more=1;
-	}
-
-	if (!more)
-		return(NULL);
-
-	/* Skip over any initial spaces */
-	while (isspace(* (unsigned char *) s))
-		s++;
-
-	/* Are we at the end of the string? */
-	if (*s) {
-		/* remember the beginning of the token */
-		t=s;
-
-		/* Is this a '+' or '-' followed by a space (not whitespace)? */
-		if ((*s=='+' || *s=='-') && *(s+1)==' ')
-			s+=2;
-
-		/* Skip to the next space or the end of the string */
-		while (!isspace(* (unsigned char *) s) && *s != '\0')
-			s++;
-	} else {
-		t=NULL;
-	}
-
-	/* Have we reached the end of the string? */
-	if (*s)
-		*s++='\0';
-	else
-		more=0;
-	return(t);
-}
-
-
-void add_exclude_line(struct exclude_struct ***listp,
-		      const char *line, int include)
-{
-	char *tok, *p;
-	if (!line || !*line) return;
-	p = strdup(line);
-	if (!p) out_of_memory("add_exclude_line");
-	for (tok=get_exclude_tok(p); tok; tok=get_exclude_tok(NULL))
-		add_exclude(listp, tok, include);
-	free(p);
-}
-
-
-static char *cvs_ignore_list[] = {
-  "RCS/", "SCCS/", "CVS/", ".svn/", "CVS.adm", "RCSLOG", "cvslog.*",
-  "tags", "TAGS", ".make.state", ".nse_depinfo",
-  "*~", "#*", ".#*", ", *", "*.old", "*.bak", "*.BAK", "*.orig",
-  "*.rej", ".del-*", "*.a", "*.o", "*.obj", "*.so", "*.Z", "*.elc", "*.ln",
-  "core", NULL};
-
+static char default_cvsignore[] = 
+	/* These default ignored items come from the CVS manual. */
+	"RCS SCCS CVS CVS.adm RCSLOG cvslog.* tags TAGS"
+	" .make.state .nse_depinfo *~ #* .#* ,* _$* *$"
+	" *.old *.bak *.BAK *.orig *.rej .del-*"
+	" *.a *.olb *.o *.obj *.so *.exe"
+	" *.Z *.elc *.ln core"
+	/* The rest we added to suit ourself. */
+	" .svn/";
 
 void add_cvs_excludes(void)
 {
 	char fname[MAXPATHLEN];
 	char *p;
-	int i;
 
-	for (i = 0; cvs_ignore_list[i]; i++)
-		add_exclude(&exclude_list, cvs_ignore_list[i], ADD_EXCLUDE);
+	add_exclude(&exclude_list, default_cvsignore,
+		    XFLG_WORD_SPLIT | XFLG_NO_PREFIXES);
 
 	if ((p = getenv("HOME"))
-	    && pathjoin(fname, sizeof fname, p, ".cvsignore") < sizeof fname)
-		add_exclude_file(&exclude_list, fname, MISSING_OK, ADD_EXCLUDE);
+	    && pathjoin(fname, sizeof fname, p, ".cvsignore") < sizeof fname) {
+		add_exclude_file(&exclude_list, fname,
+				 XFLG_WORD_SPLIT | XFLG_NO_PREFIXES);
+	}
 
-	add_exclude_line(&exclude_list, getenv("CVSIGNORE"), ADD_EXCLUDE);
+	add_exclude(&exclude_list, getenv("CVSIGNORE"),
+		    XFLG_WORD_SPLIT | XFLG_NO_PREFIXES);
 }
