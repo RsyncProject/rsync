@@ -319,13 +319,13 @@ verb(
      --suffix=SUFFIX         backup suffix (default ~ w/o --backup-dir)
  -u, --update                update only (don't overwrite newer files)
      --inplace               update the destination files in-place
- -k, --keep-dirs             transfer a directory without recursing
- -K, --keep-dirlinks         treat symlinked dir on receiver as dir
+ -d, --dirs                  transfer directories without recursing
  -l, --links                 copy symlinks as symlinks
  -L, --copy-links            copy the referent of all symlinks
      --copy-unsafe-links     copy the referent of "unsafe" symlinks
      --safe-links            ignore "unsafe" symlinks
  -H, --hard-links            preserve hard links
+ -K, --keep-dirlinks         treat symlinked dir on receiver as dir
  -p, --perms                 preserve permissions
  -o, --owner                 preserve owner (root only)
  -g, --group                 preserve group
@@ -376,6 +376,7 @@ verb(
      --progress              show progress during transfer
      --log-format=FORMAT     log file transfers using specified format
      --password-file=FILE    get password from FILE
+     --list-only             list the files instead of copying them
      --bwlimit=KBPS          limit I/O bandwidth, KBytes per second
      --write-batch=FILE      write a batch to FILE 
      --read-batch=FILE       read a batch from FILE
@@ -459,7 +460,7 @@ finding multiply-linked files is expensive.  You must separately
 specify bf(-H).
 
 dit(bf(-r, --recursive)) This tells rsync to copy directories
-recursively.  See also --keep-dirs (-k).
+recursively.  See also --dirs (-d).
 
 dit(bf(-R, --relative)) Use relative paths. This means that the full path
 names specified on the command line are sent to the server rather than
@@ -529,17 +530,6 @@ symlink where the destination has a file, the transfer would occur
 regardless of the timestamps.  This might change in the future (feel
 free to comment on this on the mailing list if you have an opinion).
 
-dit(bf(-k, --keep-dirs)) Tell the sending side to keep any directories that
-are encountered.  Unlike --recursive, a directory's contents are not copied
-unless the directory was specified on the command-line as either "." or a
-name with a trailing slash (e.g. "foo/").  Without this option or the
---recursive option, rsync will skip all directories it encounters (and
-output a message to that effect for each one).
-
-dit(bf(-K, --keep-dirlinks)) On the receiving side, if a symlink is
-pointing to a directory, it will be treated as matching a directory
-from the sender.
-
 dit(bf(--inplace)) This causes rsync not to create a new copy of the file
 and then move it into place.  Instead rsync will overwrite the existing
 file, meaning that the rsync algorithm can't accomplish the full amount of
@@ -562,6 +552,13 @@ transfer (and possibly afterward if the transfer gets interrupted), so you
 should not use this option to update files that are in use.  Also note that
 rsync will be unable to update a file in-place that is not writable by the
 receiving user.
+
+dit(bf(-d, --dirs)) Tell the sending side to include any directories that
+are encountered.  Unlike --recursive, a directory's contents are not copied
+unless the directory was specified on the command-line as either "." or a
+name with a trailing slash (e.g. "foo/").  Without this option or the
+--recursive option, rsync will skip all directories it encounters (and
+output a message to that effect for each one).
 
 dit(bf(-l, --links)) When symlinks are encountered, recreate the
 symlink on the destination.
@@ -593,6 +590,10 @@ Note that rsync can only detect hard links if both parts of the link
 are in the list of files being sent.
 
 This option can be quite slow, so only use it if you need it.
+
+dit(bf(-K, --keep-dirlinks)) On the receiving side, if a symlink is
+pointing to a directory, it will be treated as matching a directory
+from the sender.
 
 dit(bf(-W, --whole-file)) With this option the incremental rsync algorithm
 is not used and the whole file is sent as-is instead.  The transfer may be
@@ -1023,6 +1024,13 @@ is only useful when accessing an rsync server using the built in
 transport, not when using a remote shell as the transport. The file
 must not be world readable. It should contain just the password as a
 single line.
+
+dit(bf(--list-only)) This option will cause the source files to be listed
+instead of transferred.  This option is inferred if there is no destination
+specified, so you don't usually need to use it explicitly.  However, it can
+come in handy for a power user that wants to avoid the "-r --exclude="/*/*"
+options that rsync might use as a compatibility kluge when generating a
+non-recursive listing.
 
 dit(bf(--bwlimit=KBPS)) This option allows you to specify a maximum
 transfer rate in kilobytes per second. This option is most effective when
