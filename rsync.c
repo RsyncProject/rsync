@@ -111,9 +111,10 @@ static struct sum_struct *generate_sums(char *buf,off_t len,int n)
   
   for (i=0;i<count;i++) {
     int n1 = MIN(len,n);
+    char *map = map_ptr(buf,offset,n1);
 
-    s->sums[i].sum1 = get_checksum1(buf,n1);
-    get_checksum2(buf,n1,s->sums[i].sum2);
+    s->sums[i].sum1 = get_checksum1(map,n1);
+    get_checksum2(map,n1,s->sums[i].sum2);
 
     s->sums[i].offset = offset;
     s->sums[i].len = n1;
@@ -124,7 +125,6 @@ static struct sum_struct *generate_sums(char *buf,off_t len,int n)
 	      i,(int)s->sums[i].offset,s->sums[i].len,s->sums[i].sum1);
 
     len -= n1;
-    buf += n1;
     offset += n1;
   }
 
@@ -363,11 +363,6 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 
   if (st.st_size > 0) {
     buf = map_file(fd,st.st_size);
-    if (!buf) {
-      fprintf(stderr,"mmap : %s\n",strerror(errno));
-      close(fd);
-      return;
-    }
   } else {
     buf = NULL;
   }
@@ -420,7 +415,7 @@ static void receive_data(int f_in,char *buf,int fd,char *fname)
 	fprintf(stderr,"chunk[%d] of size %d at %d offset=%d\n",
 		i,len,(int)offset2,(int)offset);
 
-      if (write(fd,buf+offset2,len) != len) {
+      if (write(fd,map_ptr(buf,offset2,len),len) != len) {
 	fprintf(stderr,"write failed on %s : %s\n",fname,strerror(errno));
 	exit(1);
       }
@@ -529,10 +524,6 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 
       if (fd1 != -1 && st.st_size > 0) {
 	buf = map_file(fd1,st.st_size);
-	if (!buf) {
-	  fprintf(stderr,"map_file failed\n");
-	  return -1;
-	}
       } else {
 	buf = NULL;
       }
@@ -546,7 +537,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 	fprintf(stderr,"mktemp %s failed\n",fnametmp);
 	return -1;
       }
-      fd2 = open(fnametmp,O_WRONLY|O_CREAT,st.st_mode);
+      fd2 = open(fnametmp,O_WRONLY|O_CREAT,flist->files[i].mode);
       if (fd2 == -1) {
 	fprintf(stderr,"open %s : %s\n",fnametmp,strerror(errno));
 	return -1;
@@ -655,10 +646,6 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
       
       if (st.st_size > 0) {
 	buf = map_file(fd,st.st_size);
-	if (!buf) {
-	  fprintf(stderr,"map_file failed : %s\n",strerror(errno));	  
-	  return -1;
-	}
       } else {
 	buf = NULL;
       }

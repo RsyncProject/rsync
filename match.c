@@ -87,7 +87,8 @@ static void build_hash_table(struct sum_struct *s)
 static off_t last_match;
 
 
-static void matched(int f,struct sum_struct *s,char *buf,off_t len,int offset,int i)
+static void matched(int f,struct sum_struct *s,char *buf,off_t len,
+		    int offset,int i)
 {
   int n = offset - last_match;
   
@@ -97,8 +98,13 @@ static void matched(int f,struct sum_struct *s,char *buf,off_t len,int offset,in
 	      (int)offset,(int)last_match,i,(int)s->sums[i].len,n);
 
   if (n > 0) {
+    int l = 0;
     write_int(f,n);
-    write_buf(f,buf+last_match,n);
+    while (l < n) {
+      int n1 = MIN(WRITE_BLOCK_SIZE,n-l);
+      write_buf(f,map_ptr(buf,last_match+l,n1),n1);
+      l += n1;
+    }
     data_transfer += n;
   }
   write_int(f,-(i+1));
@@ -114,13 +120,17 @@ static void hash_search(int f,struct sum_struct *s,char *buf,off_t len)
   int offset,j,k;
   int end;
   char sum2[SUM_LENGTH];
-  uint32 s1, s2, sum;
+  uint32 s1, s2, sum; 
+  char *map;
 
   if (verbose > 2)
     fprintf(stderr,"hash search b=%d len=%d\n",s->n,(int)len);
 
   k = MIN(len, s->n);
-  sum = get_checksum1(buf, k);
+
+  map = map_ptr(buf,0,k);
+
+  sum = get_checksum1(map, k);
   s1 = sum & 0xFFFF;
   s2 = sum >> 16;
   if (verbose > 3)
@@ -155,14 +165,17 @@ static void hash_search(int f,struct sum_struct *s,char *buf,off_t len)
 		    offset,j,i,sum);
 
 	  if (!done_csum2) {
-	    get_checksum2(buf+offset,MIN(s->n,len-offset),sum2);
+	    int l = MIN(s->n,len-offset);
+	    map = map_ptr(buf,offset,l);
+	    get_checksum2(map,l,sum2);
 	    done_csum2 = 1;
 	  }
 	  if (memcmp(sum2,s->sums[i].sum2,SUM_LENGTH) == 0) {
 	    matched(f,s,buf,len,offset,i);
 	    offset += s->sums[i].len - 1;
 	    k = MIN((len-offset), s->n);
-	    sum = get_checksum1(buf+offset, k);
+	    map = map_ptr(buf,offset,k);
+	    sum = get_checksum1(map, k);
 	    s1 = sum & 0xFFFF;
 	    s2 = sum >> 16;
 	    ++matches;
@@ -176,21 +189,18 @@ static void hash_search(int f,struct sum_struct *s,char *buf,off_t len)
     }
 
     /* Trim off the first byte from the checksum */
-    s1 -= buf[offset];
-    s2 -= k * buf[offset];
+    map = map_ptr(buf,offset,k+1);
+    s1 -= map[0];
+    s2 -= k * map[0];
 
     /* Add on the next byte (if there is one) to the checksum */
     if (k < (len-offset)) {
-      s1 += buf[offset+k];
+      s1 += map[k];
       s2 += s1;
     } else {
       --k;
     }
 
-    if (verbose > 3) 
-      fprintf(stderr,"s2:s1 = %.4x%.4x sum=%.8x k=%d offset=%d took %x added %x\n",
-	      s2&0xffff, s1&0xffff, get_checksum1(buf+offset+1,k),
-	      k, (int)offset, buf[offset], buf[offset+k]);
   } while (++offset < end);
 
   matched(f,s,buf,len,len,-1);
