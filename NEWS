@@ -35,6 +35,9 @@ Changes since 2.6.0:
       some significant reductions in user CPU time for large file
       sets.  (Wayne Davison)
 
+    * Some variable-type cleanup that makes the code more consistent.
+      (Wayne Davison)
+
 
 NEWS for rsync 2.6.0 (1 Jan 2004)
 Protocol: 27 (changed)
