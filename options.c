@@ -97,7 +97,7 @@ int modify_window = 0;
 int blocking_io = -1;
 int checksum_seed = 0;
 int inplace = 0;
-unsigned int block_size = 0;
+long block_size = 0; /* "long" because popt can't set an int32. */
 
 
 /** Network address family. **/
@@ -376,7 +376,7 @@ static struct poptOption long_options[] = {
   {"relative",        'R', POPT_ARG_VAL,    &relative_paths, 1, 0, 0 },
   {"no-relative",      0,  POPT_ARG_VAL,    &relative_paths, 0, 0, 0 },
   {"rsh",             'e', POPT_ARG_STRING, &shell_cmd, 0, 0, 0 },
-  {"block-size",      'B', POPT_ARG_INT,    &block_size, 0, 0, 0 },
+  {"block-size",      'B', POPT_ARG_LONG,   &block_size, 0, 0, 0 },
   {"max-delete",       0,  POPT_ARG_INT,    &max_delete, 0, 0, 0 },
   {"max-size",         0,  POPT_ARG_STRING, &max_size_arg,  OPT_MAX_SIZE, 0, 0 },
   {"timeout",          0,  POPT_ARG_INT,    &io_timeout, OPT_TIMEOUT, 0, 0 },
@@ -1113,7 +1113,7 @@ void server_options(char **args,int *argc)
 		args[ac++] = argstr;
 
 	if (block_size) {
-		if (asprintf(&arg, "-B%u", block_size) < 0)
+		if (asprintf(&arg, "-B%lu", block_size) < 0)
 			goto oom;
 		args[ac++] = arg;
 	}

@@ -101,17 +101,20 @@ static OFF_T last_match;
  * @param i If >0, the number of a matched token.  If 0, indicates we
  * have only literal data.
  **/
-static void matched(int f,struct sum_struct *s,struct map_struct *buf,
-		    OFF_T offset,int i)
+static void matched(int f, struct sum_struct *s, struct map_struct *buf,
+		    OFF_T offset, int i)
 {
-	OFF_T n = offset - last_match;
-	OFF_T j;
+	int32 n = offset - last_match; /* max value: block_size (int32) */
+	int32 j;
 
-	if (verbose > 2 && i >= 0)
-		rprintf(FINFO,"match at %.0f last_match=%.0f j=%d len=%u n=%.0f\n",
-			(double)offset,(double)last_match,i,s->sums[i].len,(double)n);
+	if (verbose > 2 && i >= 0) {
+		rprintf(FINFO,
+			"match at %.0f last_match=%.0f j=%d len=%ld n=%ld\n",
+			(double)offset, (double)last_match, i,
+			(long)s->sums[i].len, (long)n);
+	}
 
-	send_token(f,i,buf,last_match,n,i<0?0:s->sums[i].len);
+	send_token(f, i, buf, last_match, n, i < 0 ? 0 : s->sums[i].len);
 	data_transfer += n;
 
 	if (i >= 0) {
@@ -120,8 +123,8 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 	}
 
 	for (j = 0; j < n; j += CHUNK_SIZE) {
-		int n1 = MIN(CHUNK_SIZE,n-j);
-		sum_update(map_ptr(buf,last_match+j,n1),n1);
+		int32 n1 = MIN(CHUNK_SIZE, n - j);
+		sum_update(map_ptr(buf, last_match + j, n1), n1);
 	}
 
 
@@ -143,7 +146,7 @@ static void hash_search(int f,struct sum_struct *s,
 			struct map_struct *buf, OFF_T len)
 {
 	OFF_T offset, end, backup;
-	unsigned int k;
+	int32 k;
 	size_t want_i;
 	char sum2[SUM_LENGTH];
 	uint32 s1, s2, sum;
@@ -155,11 +158,11 @@ static void hash_search(int f,struct sum_struct *s,
 	want_i = 0;
 
 	if (verbose > 2) {
-		rprintf(FINFO,"hash search b=%u len=%.0f\n",
-			s->blength, (double)len);
+		rprintf(FINFO, "hash search b=%ld len=%.0f\n",
+			(long)s->blength, (double)len);
 	}
 
-	k = MIN(len, s->blength);
+	k = (int32)MIN(len, (OFF_T)s->blength);
 
 	map = (schar *)map_ptr(buf, 0, k);
 
@@ -167,15 +170,15 @@ static void hash_search(int f,struct sum_struct *s,
 	s1 = sum & 0xFFFF;
 	s2 = sum >> 16;
 	if (verbose > 3)
-		rprintf(FINFO, "sum=%.8x k=%u\n", sum, k);
+		rprintf(FINFO, "sum=%.8x k=%ld\n", sum, (long)k);
 
 	offset = 0;
 
 	end = len + 1 - s->sums[s->count-1].len;
 
 	if (verbose > 3) {
-		rprintf(FINFO, "hash search s->blength=%u len=%.0f count=%.0f\n",
-			s->blength, (double)len, (double)s->count);
+		rprintf(FINFO, "hash search s->blength=%ld len=%.0f count=%.0f\n",
+			(long)s->blength, (double)len, (double)s->count);
 	}
 
 	do {
@@ -192,14 +195,14 @@ static void hash_search(int f,struct sum_struct *s,
 		sum = (s1 & 0xffff) | (s2 << 16);
 		tag_hits++;
 		do {
-			unsigned int l;
+			int32 l;
 			size_t i = targets[j].i;
 
 			if (sum != s->sums[i].sum1)
 				continue;
 
 			/* also make sure the two blocks are the same length */
-			l = MIN((OFF_T)s->blength, len-offset);
+			l = (int32)MIN((OFF_T)s->blength, len-offset);
 			if (l != s->sums[i].len)
 				continue;
 
@@ -263,7 +266,7 @@ static void hash_search(int f,struct sum_struct *s,
 
 			matched(f,s,buf,offset,i);
 			offset += s->sums[i].len - 1;
-			k = MIN(s->blength, len-offset);
+			k = (int32)MIN((OFF_T)s->blength, len-offset);
 			map = (schar *)map_ptr(buf, offset, k);
 			sum = get_checksum1((char *)map, k);
 			s1 = sum & 0xFFFF;
@@ -298,14 +301,12 @@ static void hash_search(int f,struct sum_struct *s,
 		   match. The 3 reads are caused by the
 		   running match, the checksum update and the
 		   literal send. */
-		if (backup >= CHUNK_SIZE + s->blength
-		    && end - offset > CHUNK_SIZE) {
-			matched(f,s,buf,offset - s->blength, -2);
-		}
+		if (backup >= s->blength+CHUNK_SIZE && end-offset > CHUNK_SIZE)
+			matched(f, s, buf, offset - s->blength, -2);
 	} while (++offset < end);
 
-	matched(f,s,buf,len,-1);
-	map_ptr(buf,len-1,1);
+	matched(f, s, buf, len, -1);
+	map_ptr(buf, len-1, 1);
 }
 
 
@@ -335,7 +336,7 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 
 	sum_init(checksum_seed);
 
-	if (len > 0 && s->count>0) {
+	if (len > 0 && s->count > 0) {
 		build_hash_table(s);
 
 		if (verbose > 2)
@@ -348,11 +349,9 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	} else {
 		OFF_T j;
 		/* by doing this in pieces we avoid too many seeks */
-		for (j = 0; j < len-CHUNK_SIZE; j += CHUNK_SIZE) {
-			int n1 = MIN(CHUNK_SIZE,(len-CHUNK_SIZE)-j);
-			matched(f,s,buf,j+n1,-2);
-		}
-		matched(f,s,buf,len,-1);
+		for (j = CHUNK_SIZE; j < len; j += CHUNK_SIZE)
+			matched(f, s, buf, j, -2);
+		matched(f, s, buf, len, -1);
 	}
 
 	sum_end(file_sum);
