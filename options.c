@@ -415,7 +415,7 @@ static struct poptOption long_options[] = {
   {"archive",         'a', POPT_ARG_NONE,   &archive_mode, 0, 0, 0 },
   {"server",           0,  POPT_ARG_NONE,   &am_server, 0, 0, 0 },
   {"sender",           0,  POPT_ARG_NONE,   0, OPT_SENDER, 0, 0 },
-  {"recursive",       'r', POPT_ARG_VAL,    &recurse, -1, 0, 0 },
+  {"recursive",       'r', POPT_ARG_NONE,   &recurse, 0, 0, 0 },
   {"list-only",        0,  POPT_ARG_VAL,    &list_only, 2, 0, 0 },
   {"relative",        'R', POPT_ARG_VAL,    &relative_paths, 1, 0, 0 },
   {"no-relative",      0,  POPT_ARG_VAL,    &relative_paths, 0, 0, 0 },
@@ -948,7 +948,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			return 0;
 		}
 		if (!files_from)
-			recurse = -1; /* infinite recursion */
+			recurse = 1;
 #ifdef SUPPORT_LINKS
 		preserve_links = 1;
 #endif
@@ -1281,7 +1281,7 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'O';
 	if (preserve_perms)
 		argstr[x++] = 'p';
-	if (recurse < 0)
+	if (recurse)
 		argstr[x++] = 'r';
 	if (always_checksum)
 		argstr[x++] = 'c';
@@ -1301,7 +1301,7 @@ void server_options(char **args,int *argc)
 	/* This is a complete hack - blame Rusty.  FIXME!
 	 * This hack is only needed for older rsync versions that
 	 * don't understand the --list-only option. */
-	if (list_only == 1 && recurse >= 0)
+	if (list_only == 1 && recurse)
 		argstr[x++] = 'r';
 
 	argstr[x] = 0;
