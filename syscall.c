@@ -72,7 +72,7 @@ int do_lchown(const char *path, uid_t owner, gid_t group)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-#ifndef HAVE_LCHOWN
+#if !HAVE_LCHOWN
 #define lchown chown
 #endif
 	return lchown(path, owner, group);
@@ -219,16 +219,18 @@ int do_stat(const char *fname, STRUCT_STAT *st)
 #endif
 }
 
-#if SUPPORT_LINKS
 int do_lstat(const char *fname, STRUCT_STAT *st)
 {
-#if HAVE_OFF64_T
+#if SUPPORT_LINKS
+# if HAVE_OFF64_T
 	return lstat64(fname, st);
-#else
+# else
 	return lstat(fname, st);
+# endif
+#else
+	return do_stat(fname, st);
 #endif
 }
-#endif
 
 int do_fstat(int fd, STRUCT_STAT *st)
 {
