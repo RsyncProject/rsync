@@ -364,6 +364,9 @@ verb(
  -P                          equivalent to --partial --progress
  -z, --compress              compress file data
  -C, --cvs-exclude           auto ignore files in the same way CVS does
+ -f, --filter=RULE           add a file-filtering RULE
+ -F                          same as --filter=': /.rsync-filter'
+                             repeated: --filter='- .rsync-filter'
      --exclude=PATTERN       exclude files matching PATTERN
      --exclude-from=FILE     exclude patterns listed in FILE
      --include=PATTERN       don't exclude files matching PATTERN
@@ -781,14 +784,41 @@ Finally, any file is ignored if it is in the same directory as a
 .cvsignore file and matches one of the patterns listed therein.
 See the bf(cvs(1)) manual for more information.
 
-dit(bf(--exclude=PATTERN)) This option allows you to selectively exclude
-certain files from the list of files to be transferred. This is most
-useful in combination with a recursive transfer.
+dit(bf(-f, --filter=RULE)) This option allows you to add rules to selectively
+exclude certain files from the list of files to be transferred. This is
+most useful in combination with a recursive transfer.
 
-You may use as many --exclude options on the command line as you like
+You may use as many --filter options on the command line as you like
 to build up the list of files to exclude.
 
-See the EXCLUDE PATTERNS section for detailed information on this option.
+See the FILTER RULES section for detailed information on this option.
+
+dit(bf(-F)) The -F option is a shorthand for adding two --filter rules to
+your command.  The first time it is used is a shorthand for this rule:
+
+verb(
+  --filter=': /.rsync-filter'
+)
+
+This tells rsync to look for per-directory .rsync-filter files that have
+been sprinkled through the hierarchy and use their rules to filter the
+files in the transfer.  If -F is repeated, it is a shorthand for this
+rule:
+
+verb(
+  --filter='- .rsync-filter'
+)
+
+This filters out the .rsync-filter files themselves from the transfer.
+
+See the FILTER RULES section for detailed information on how these options
+work.
+
+dit(bf(--exclude=PATTERN)) This option is a simplified form of the
+--filter option that defaults to an exclude rule and does not allow
+the full rule-parsing syntax of normal filter rules.
+
+See the FILTER RULES section for detailed information on this option.
 
 dit(bf(--exclude-from=FILE)) This option is similar to the --exclude
 option, but instead it adds all exclude patterns listed in the file
@@ -796,11 +826,11 @@ FILE to the exclude list.  Blank lines in FILE and lines starting with
 ';' or '#' are ignored.
 If em(FILE) is bf(-) the list will be read from standard input.
 
-dit(bf(--include=PATTERN)) This option tells rsync to not exclude the
-specified pattern of filenames. This is useful as it allows you to
-build up quite complex exclude/include rules.
+dit(bf(--include=PATTERN)) This option is a simplified form of the
+--filter option that defaults to an include rule and does not allow
+the full rule-parsing syntax of normal filter rules.
 
-See the EXCLUDE PATTERNS section for detailed information on this option.
+See the FILTER RULES section for detailed information on this option.
 
 dit(bf(--include-from=FILE)) This specifies a list of include patterns
 from a file.
@@ -845,7 +875,8 @@ was located on the remote "src" host.
 
 dit(bf(-0, --from0)) This tells rsync that the filenames it reads from a
 file are terminated by a null ('\0') character, not a NL, CR, or CR+LF.
-This affects --exclude-from, --include-from, and --files-from.
+This affects --exclude-from, --include-from, --files-from, and any
+merged files specified in a --filter rule.
 It does not affect --cvs-exclude (since all names read from a .cvsignore
 file are split on whitespace).
 
@@ -984,8 +1015,8 @@ If the partial-dir value is not an absolute path, rsync will also add an
 will prevent partial-dir files from being transferred and also prevent the
 untimely deletion of partial-dir items on the receiving side.  An example:
 the above --partial-dir option would add an "--exclude=.rsync-partial/"
-rule at the end of any other include/exclude rules.  Note that if you are
-supplying your own include/exclude rules, you may need to manually insert a
+rule at the end of any other filter rules.  Note that if you are
+supplying your own filter rules, you may need to manually insert a
 rule for this directory exclusion somewhere higher up in the list so that
 it has a high enough priority to be effective (e.g., if your rules specify
 a trailing --exclude=* rule, the auto-added rule will be ineffective).
@@ -1142,30 +1173,322 @@ page describing the options available for starting an rsync daemon.
 
 enddit()
 
-manpagesection(EXCLUDE PATTERNS)
+manpagesection(FILTER RULES)
 
-The exclude and include patterns specified to rsync allow for flexible
-selection of which files to transfer and which files to skip.
+The filter rules allow for flexible selection of which files to transfer
+(include) and which files to skip (exclude).  The rules either directly
+specify include/exclude patterns or they specify a way to acquire more
+include/exclude patterns (e.g. to read them from a file).
 
-Rsync builds an ordered list of include/exclude options as specified on
-the command line. Rsync checks each file and directory 
-name against each exclude/include pattern in turn. The first matching
-pattern is acted on. If it is an exclude pattern, then that file is
-skipped. If it is an include pattern then that filename is not
-skipped. If no matching include/exclude pattern is found then the
+As the list of files/directories to transfer is built, rsync checks each
+name to be transferred against the list of include/exclude patterns in
+turn, and the first matching pattern is acted on:  if it is an exclude
+pattern, then that file is skipped; if it is an include pattern then that
+filename is not skipped; if no matching pattern is found, then the
 filename is not skipped.
 
-The filenames matched against the exclude/include patterns are relative
-to the "root of the transfer".  If you think of the transfer as a
-subtree of names that are being sent from sender to receiver, the root
-is where the tree starts to be duplicated in the destination directory.
-This root governs where patterns that start with a / match (see below).
+Rsync builds an ordered list of filter rules as specified on the
+command-line.  Filter rules have the following syntax:
+
+itemize(
+  it() x RULE
+  it() xMODIFIERS RULE
+  it() !
+)
+
+The 'x' is a single-letter that specifies the kind of rule to create.  It
+can have trailing modifiers, and is separated from the RULE by one of the
+following characters: a single space, an equal-sign (=), or an underscore
+(_).  Here are the available rule prefixes:
+
+verb(
+  -  specifies an exclude pattern.
+  +  specifies an include pattern.
+  .  specifies a merge-file to read for more rules.
+  :  specifies a per-directory merge-file.
+  !  clears the current include/exclude list
+)
+
+Note that the --include/--exclude command-line options do not allow the
+full range of rule parsing as described above -- they only allow the
+specification of include/exclude patterns and the "!" token (not to
+mention the comment lines when reading rules from a file).  If a pattern
+does not begin with "- " (dash, space) or "+ " (plus, space), then the
+rule will be interpreted as if "+ " (for an include option) or "- " (for
+an exclude option) were prefixed to the string.  A --filter option, on
+the other hand, must always contain one of the prefixes above.
+
+Note also that the --filter, --include, and --exclude options take one
+rule/pattern each. To add multiple ones, you can repeat the options on
+the command-line, use the merge-file syntax of the --filter option, or
+the --include-from/--exclude-from options.
+
+When rules are being read from a file, empty lines are ignored, as are
+comment lines that start with a "#".
+
+manpagesection(INCLUDE/EXCLUDE PATTERN RULES)
+
+You can include and exclude files by specifing patterns using the "+" and
+"-" filter rules (as introduced in the FILTER RULES section above).  These
+rules specify a pattern that is matched against the names of the files
+that are going to be transferred.  These patterns can take several forms:
+
+itemize(
+
+  it() if the pattern starts with a / then it is anchored to a
+  particular spot in the hierarchy of files, otherwise it is matched
+  against the end of the pathname.  This is similar to a leading ^ in
+  regular expressions.
+  Thus "/foo" would match a file called "foo" at either the "root of the
+  transfer" (for a global rule) or in the merge-file's directory (for a
+  per-directory rule).
+  An unqualified "foo" would match any file or directory named "foo"
+  anywhere in the tree because the algorithm is applied recursively from
+  the
+  top down; it behaves as if each path component gets a turn at being the
+  end of the file name.  Even the unanchored "sub/foo" would match at
+  any point in the hierarchy where a "foo" was found within a directory
+  named "sub".  See the section on ANCHORING INCLUDE/EXCLUDE PATTERNS for
+  a full discussion of how to specify a pattern that matches at the root
+  of the transfer.
+
+  it() if the pattern ends with a / then it will only match a
+  directory, not a file, link, or device.
+
+  it() if the pattern contains a wildcard character from the set
+  *?[ then expression matching is applied using the shell filename
+  matching rules. Otherwise a simple string match is used.
+
+  it() the double asterisk pattern "**" will match slashes while a
+  single asterisk pattern "*" will stop at slashes.
+
+  it() if the pattern contains a / (not counting a trailing /) or a "**"
+  then it is matched against the full pathname, including any leading
+  directories. If the pattern doesn't contain a / or a "**", then it is
+  matched only against the final component of the filename.
+  (Remember that the algorithm is applied recursively so "full filename"
+  can actually be any portion of a path fomr the starting directory on
+  down.)
+
+)
+
+Note that, when using the --recursive (-r) option (which is implied by
+-a), every subcomponent of every path is visited from the top down, so
+include/exclude patterns get applied recursively to each subcomponent's
+full name (e.g. to include "/foo/bar/baz" the subcomponents "/foo" and
+"/foo/bar" must not be excluded).
+The exclude patterns actually short-circuit the directory traversal stage
+when rsync finds the files to send.  If a pattern excludes a particular
+parent directory, it can render a deeper include pattern ineffectual
+because rsync did not descend through that excluded section of the
+hierarchy.  This is particularly important when using a trailing '*' rule.
+For instance, this won't work:
+
+verb(
+    + /some/path/this-file-will-not-be-found
+    + /file-is-included
+    - *
+)
+
+This fails because the parent directory "some" is excluded by the '*'
+rule, so rsync never visits any of the files in the "some" or "some/path"
+directories.  One solution is to ask for all directories in the hierarchy
+to be included by using a single rule: "+_*/" (put it somewhere before the
+"-_*" rule).  Another solution is to add specific include rules for all
+the parent dirs that need to be visited.  For instance, this set of rules
+works fine:
+
+verb(
+    + /some/
+    + /some/path/
+    + /some/path/this-file-is-found
+    + /file-also-included
+    - *
+)
+
+Here are some examples of exclude/include matching:
+
+itemize(
+  it() "- *.o" would exclude all filenames matching *.o
+  it() "- /foo" would exclude a file called foo in the transfer-root directory
+  it() "- foo/" would exclude any directory called foo
+  it() "- /foo/*/bar" would exclude any file called bar two
+  levels below a directory called foo in the transfer-root directory
+  it() "- /foo/**/bar" would exclude any file called bar two
+  or more levels below a directory called foo in the transfer-root directory
+  it() The combination of "+ */", "+ *.c", and "- *" would include all 
+  directories and C source files but nothing else.
+  it() The combination of "+ foo/", "+ foo/bar.c", and "- *" would include
+  only the foo directory and foo/bar.c (the foo directory must be
+  explicitly included or it would be excluded by the "*")
+)
+
+manpagesection(MERGE-FILE FILTER RULES)
+
+You can merge whole files into your filter rules by specifying either a
+"." or a ":" filter rule (as introduced in the FILTER RULES section
+above).
+
+There are two kinds of merged files -- single-instance ('.') and
+per-directory (':').  A single-instance merge file is read one time, and
+its rules are incorporated into the filter list in the place of the "."
+rule.  For per-directory merge files, rsync will scan every directory that
+it traverses for the named file, merging its contents when the file exists
+into the current list of inherited rules.  These per-directory rule files
+must be created on the sending side because it is the sending side that is
+being scanned for the available files to transfer.  These rule files may
+also need to be transferred to the receiving side if you want them to
+affect what files don't get deleted (see PER-DIRECTORY RULES AND DELETE
+below).
+
+Some examples:
+
+verb(
+    . /etc/rsync/default.rules
+    : .per-dir-filter
+    :n- .non-inherited-per-dir-excludes
+)
+
+The following modifiers are accepted after the "." or ":":
+
+itemize(
+  it() A "-" specifies that the file should consist of only exclude
+  patterns, with no other rule-parsing except for the list-clearing
+  token ("!").
+
+  it() A "+" specifies that the file should consist of only include
+  patterns, with no other rule-parsing except for the list-clearing
+  token ("!").
+
+  it() A "C" is a shorthand for the modifiers "sn-", which makes the
+  parsing compatible with the way CVS parses their exclude files.  If no
+  filename is specified, ".cvsignore" is assumed.
+
+  it() A "e" will exclude the merge-file from the transfer; e.g.
+  ":e_.rules" is like ":_.rules" and "-_.rules".
+
+  it() An "n" specifies that the rules are not inherited by subdirectories.
+
+  it() An "s" specifies that the rules are split on all whitespace instead
+  of the normal line-splitting.  This also turns off comments.  Note: the
+  space that separates the prefix from the rule is treated specially, so
+  "- foo + bar" is parsed as two rules (assuming that "-" or "+" was not
+  specified to turn off the parsing of prefixes).
+)
+
+Per-directory rules are inherited in all subdirectories of the directory
+where the merge-file was found unless the 'n' modifier was used.  Each
+subdirectory's rules are prefixed to the inherited per-directory rules
+from its parents, which gives the newest rules a higher priority than the
+inherited rules.  The entire set of per-dir rules is grouped together in
+the spot where the merge-file was specified, so it is possible to override
+per-dir rules via a rule that got specified earlier in the list of global
+rules.  When the list-clearing rule ("!") is read from a per-directory
+file, it only clears the inherited rules for the current merge file.
+
+Another way to prevent a single per-dir rule from being inherited is to
+anchor it with a leading slash.  Anchored rules in a per-directory
+merge-file are relative to the merge-file's directory, so a pattern "/foo"
+would only match the file "foo" in the directory where the per-dir filter
+file was found.
+
+Here's an example filter file which you'd specify via --filter=". file":
+
+verb(
+    . /home/user/.global-filter
+    - *.gz
+    : .rules
+    + *.[ch]
+    - *.o
+)
+
+This will merge the contents of the /home/user/.global-filter file at the
+start of the list and also turns the ".rules" filename into a per-directory
+filter file.  All rules read-in prior to the start of the directory scan
+follow the global anchoring rules (i.e. a leading slash matches at the root
+of the transfer).
+
+If a per-directory merge-file is specified with a path that is a parent
+directory of the first transfer directory, rsync will scan all the parent
+dirs from that starting point to the transfer directory for the indicated
+per-directory file.  For instance, here is a common filter (see -F):
+
+verb(
+  --filter=': /.rsync-filter'
+)
+
+That rule tells rsync to scan for the file .rsync-filter in all
+directories from the root down through the parent directory of the
+transfer prior to the start of the normal directory scan of the file in
+the directories that are sent as a part of the transfer.  (Note: for an
+rsync daemon, the root is always the same as the module's "path".)
+
+Some examples of this pre-scanning for per-directory files:
+
+verb(
+  rsync -avF /src/path/ /dest/dir
+  rsync -av --filter=': ../../.rsync-filter' /src/path/ /dest/dir
+  rsync -av --fitler=': .rsync-filter' /src/path/ /dest/dir
+)
+
+The first two commands above will look for ".rsync-filter" in "/" and
+"/src" before the normal scan begins looking for the file in "/src/path"
+and its subdirectories.  The last command avoids the parent-dir scan
+and only looks for the ".rsync-filter" files in each directory that is
+a part of the transfer.
+
+If you want to include the contents of a ".cvsignore" in your patterns,
+you should use the rule ":C" -- this is a short-hand for the rule
+":sn-_.cvsignore", and ensures that the .cvsignore file's contents are
+interpreted according to the same parsing rules that CVS uses.  You can
+use this to affect where the --cvs-exclude (-C) option's inclusion of the
+per-directory .cvsignore file gets placed into your rules by putting a
+":C" wherever you like in your filter rules.  Without this, rsync would
+add the per-dir rule for the .cvignore file at the end of all your other
+rules (giving it a lower priority than your command-line rules).  For
+example:
+
+verb(
+  cat <<EOT | rsync -avC --filter='. -' a/ b
+  + foo.o
+  :C
+  - *.old
+  EOT
+
+  rsync -avC --include=foo.o -f :C --exclude='*.old' a/ b
+)
+
+Both of the above rsync commands are identical.  Each one will merge all
+the per-directory .cvsignore rules in the middle of the list rather than
+at the end.  This allows their dir-specific rules to supersede the rules
+that follow the :C instead of being subservient to all your rules.  (The
+global rules taken from the $HOME/.cvsignore file and from $CVSIGNORE are
+not repositioned from their spot at the end of your rules, however -- feel
+free to manually include $HOME/.cvsignore elsewhere in your rules.)
+
+manpagesection(LIST-CLEARING FILTER RULE)
+
+You can clear the current include/exclude list by using the "!" filter
+rule (as introduced in the FILTER RULES section above).  The "current"
+list is either the global list of rules (if the rule is encountered while
+parsing the filter options) or a set of per-directory rules (which are
+inherited in their own sub-list, so a subdirectory can use this to clear
+out the parent's rules).
+
+manpagesection(ANCHORING INCLUDE/EXCLUDE PATTERNS)
+
+As mentioned earlier, global include/exclude patterns are anchored at the
+"root of the transfer" (as opposed to per-directory patterns, which are
+anchored at the merge-file's directory).  If you think of the transfer as
+a subtree of names that are being sent from sender to receiver, the
+transfer-root is where the tree starts to be duplicated in the destination
+directory.  This root governs where patterns that start with a / match.
 
 Because the matching is relative to the transfer-root, changing the
 trailing slash on a source path or changing your use of the --relative
 option affects the path you need to use in your matching (in addition to
 changing how much of the file tree is duplicated on the destination
-system).  The following examples demonstrate this.
+host).  The following examples demonstrate this.
 
 Let's say that we want to match two source files, one with an absolute
 path of "/home/me/foo/bar", and one with a path of "/home/you/bar/baz".
@@ -1197,115 +1520,59 @@ verb(
    Target file: /dest/you/bar/baz
 )
 
-The easiest way to see what name you should include/exclude is to just
+The easiest way to see what name you should filter is to just
 look at the output when using --verbose and put a / in front of the name
 (use the --dry-run option if you're not yet ready to copy any files).
 
-Note that, when using the --recursive (-r) option (which is implied by -a),
-every subcomponent of
-every path is visited from the top down, so include/exclude patterns get
-applied recursively to each subcomponent's full name (e.g. to include
-"/foo/bar/baz" the subcomponents "/foo" and "/foo/bar" must not be excluded).
-The exclude patterns actually short-circuit the directory traversal stage
-when rsync finds the files to send.  If a pattern excludes a particular
-parent directory, it can render a deeper include pattern ineffectual
-because rsync did not descend through that excluded section of the
-hierarchy.
+manpagesection(PER-DIRECTORY RULES AND DELETE)
 
-Note also that the --include and --exclude options take one pattern
-each. To add multiple patterns use the --include-from and
---exclude-from options or multiple --include and --exclude options. 
-
-The patterns can take several forms. The rules are:
-
-itemize(
-
-  it() if the pattern starts with a / then it is matched against the
-  start of the filename, otherwise it is matched against the end of
-  the filename.
-  This is the equivalent of a leading ^ in regular expressions.
-  Thus "/foo" would match a file called "foo" at the transfer-root
-  (see above for how this is different from the filesystem-root).
-  On the other hand, "foo" would match any file called "foo"
-  anywhere in the tree because the algorithm is applied recursively from
-  top down; it behaves as if each path component gets a turn at being the
-  end of the file name.
-
-  it() if the pattern ends with a / then it will only match a
-  directory, not a file, link, or device.
-
-  it() if the pattern contains a wildcard character from the set
-  *?[ then expression matching is applied using the shell filename
-  matching rules. Otherwise a simple string match is used.
-
-  it() the double asterisk pattern "**" will match slashes while a
-  single asterisk pattern "*" will stop at slashes.
-
-  it() if the pattern contains a / (not counting a trailing /) or a "**"
-  then it is matched against the full filename, including any leading
-  directory. If the pattern doesn't contain a / or a "**", then it is
-  matched only against the final component of the filename.  Again,
-  remember that the algorithm is applied recursively so "full filename" can
-  actually be any portion of a path below the starting directory.
-
-  it() if the pattern starts with "+ " (a plus followed by a space)
-  then it is always considered an include pattern, even if specified as
-  part of an exclude option. The prefix is discarded before matching.
-
-  it() if the pattern starts with "- " (a minus followed by a space)
-  then it is always considered an exclude pattern, even if specified as
-  part of an include option. The prefix is discarded before matching.
-
-  it() if the pattern is a single exclamation mark ! then the current
-  include/exclude list is reset, removing all previously defined patterns.
-)
-
-The +/- rules are most useful in a list that was read from a file, allowing
-you to have a single exclude list that contains both include and exclude
-options in the proper order.
-
-Remember that the matching occurs at every step in the traversal of the
-directory hierarchy, so you must be sure that all the parent directories of
-the files you want to include are not excluded.  This is particularly
-important when using a trailing '*' rule.  For instance, this won't work:
+Without a delete option, per-directory rules are only relevant on the
+sending side, so you can feel free to exclude the merge files themselves
+without affecting the transfer.  To make this easy, the 'e' modifier adds
+this exclude for you, as seen in these two equivalent commands:
 
 verb(
-    + /some/path/this-file-will-not-be-found
-    + /file-is-included
-    - *
+  rsync -av --filter=': .excl' --exclude=.excl host:src/dir /dest
+  rsync -av --filter=':e .excl' host:src/dir /dest
 )
 
-This fails because the parent directory "some" is excluded by the '*' rule,
-so rsync never visits any of the files in the "some" or "some/path"
-directories.  One solution is to ask for all directories in the hierarchy
-to be included by using a single rule: --include='*/' (put it somewhere
-before the --exclude='*' rule).  Another solution is to add specific
-include rules for all the parent dirs that need to be visited.  For
-instance, this set of rules works fine:
+However, if you want to do a delete on the receiving side AND you want some
+files to be excluded from being deleted, you'll need to be sure that the
+receiving side knows what files to exclude.  The easiest way is to include
+the per-directory merge files in the transfer and use --delete-after,
+because this ensures that the receiving side gets all the same exclude
+rules as the sending side before it tries to delete anything:
 
 verb(
-    + /some/
-    + /some/path/
-    + /some/path/this-file-is-found
-    + /file-also-included
-    - *
+  rsync -avF --delete-after host:src/dir /dest
 )
 
-Here are some examples of exclude/include matching:
+However, if the merge files are not a part of the transfer, you'll need to
+either specify some global exclude rules (i.e. specified on the command
+line), or you'll need to maintain your own per-directory merge files on
+the receiving side.  An example of the first is this (assume that the
+remote .rules files exclude themselves):
 
-itemize(
-  it() --exclude "*.o" would exclude all filenames matching *.o
-  it() --exclude "/foo" would exclude a file called foo in the transfer-root directory
-  it() --exclude "foo/" would exclude any directory called foo
-  it() --exclude "/foo/*/bar" would exclude any file called bar two
-  levels below a directory called foo in the transfer-root directory
-  it() --exclude "/foo/**/bar" would exclude any file called bar two
-  or more levels below a directory called foo in the transfer-root directory
-  it() --include "*/" --include "*.c" --exclude "*" would include all 
-  directories and C source files
-  it() --include "foo/" --include "foo/bar.c" --exclude "*" would include
-  only foo/bar.c (the foo/ directory must be explicitly included or
-  it would be excluded by the "*")
+verb(
+  rsync -av --filter=': .rules' --filter='. /my/extra.rules'
+    --delete host:src/dir /dest
+)
+
+In the above example the extra.rules file can affect both sides of the
+transfer, but (on the sending side) the rules are subservient to the rules
+merged from the .rules files because they were specified after the
+per-directory merge rule.
+
+In one final example, the remote side is excluding the .rsync-filter
+files from the transfer, but we want to use our own .rsync-filter files
+to control what gets deleted on the receiving side.  To do this we must
+specifically exclude the per-directory merge files (so that they don't get
+deleted) and then put rules into the local files to control what else
+should not get deleted.  Like one of these commands:
+
+verb(
+  rsync -av --filter=':e /.rsync-filter' --delete host:src/dir /dest
+  rsync -avFF --delete host:src/dir /dest
 )
 
 manpagesection(BATCH MODE)
@@ -1474,7 +1741,7 @@ it. The most common cause is incorrectly configured shell startup
 scripts (such as .cshrc or .profile) that contain output statements
 for non-interactive logins.
 
-If you are having trouble debugging include and exclude patterns, then
+If you are having trouble debugging filter patterns, then
 try specifying the -vv option.  At this level of verbosity rsync will
 show why each individual file is included or excluded.
 
