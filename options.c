@@ -640,13 +640,23 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			"write-batch and read-batch can not be used together\n");
 		exit_cleanup(RERR_SYNTAX);
 	}
-	if ((write_batch || read_batch) && am_server) {
-		rprintf(FERROR,
-			"batch-mode is incompatible with server mode\n");
-		/* We don't actually exit_cleanup(), so that we can still service
-		 * older version clients that still send batch args to server. */
-		read_batch = write_batch = 0;
-		batch_name = NULL;
+	if (write_batch || read_batch) {
+		if (dry_run) {
+			rprintf(FERROR,
+				"--%s-batch cannot be used with --dry_run (-n)\n",
+				write_batch ? "write" : "read");
+			exit_cleanup(RERR_SYNTAX);
+		}
+		if (am_server) {
+			rprintf(FINFO,
+				"ignoring --%s-batch option sent to server\n",
+				write_batch ? "write" : "read");
+			/* We don't actually exit_cleanup(), so that we can
+			 * still service older version clients that still send
+			 * batch args to server. */
+			read_batch = write_batch = 0;
+			batch_name = NULL;
+		}
 	}
 	if (batch_name && strlen(batch_name) > MAX_BATCH_NAME_LEN) {
 		rprintf(FERROR,
