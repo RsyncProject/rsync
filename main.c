@@ -116,6 +116,9 @@ static void report(int f)
 		show_flist_stats();
 	}
 
+	if (am_generator)
+		return;
+
 	if (am_daemon) {
 		log_exit(0, __FILE__, __LINE__);
 		if (f == -1 || !am_sender) return;
@@ -467,6 +470,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	generate_files(f_out, flist, local_name);
 
 	get_redo_num(); /* Read final MSG_DONE and any prior messages. */
+	report(-1);
 	io_flush(FULL_FLUSH);
 	if (protocol_version >= 24) {
 		/* send a final goodbye message */
