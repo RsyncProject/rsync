@@ -652,45 +652,52 @@ size_t stringjoin(char *dest, size_t destsize, ...)
 
 void clean_fname(char *name)
 {
-	char *p;
-	int l;
-	int modified = 1;
+	char *limit = name, *t = name, *f = name;
+	int anchored;
 
 	if (!name)
 		return;
 
-	while (modified) {
-		modified = 0;
-
-		if ((p = strstr(name,"/./")) != NULL) {
-			modified = 1;
-			while (*p) {
-				p[0] = p[2];
-				p++;
+	if ((anchored = *f == '/') != 0)
+		*t++ = *f++;
+	while (*f) {
+		/* discard extra slashes */
+		if (*f == '/') {
+			f++;
+			continue;
+		}
+		if (*f == '.') {
+			/* discard "." dirs (but NOT a trailing '.'!) */
+			if (f[1] == '/') {
+				f++; /* not += 2! */
+				continue;
+			}
+			/* collapse ".." dirs */
+			if (f[1] == '.' && (f[2] == '/' || !f[2])) {
+				char *s = t - 1;
+				if (s == name && anchored) {
+					f += 2;
+					continue;
+				}
+				while (s > limit && *--s != '/') {}
+				if (s != t - 1 && *s == '/') {
+					t = s + 1;
+					f += 2;
+					continue;
+				}
+				*t++ = *f++;
+				*t++ = *f++;
+				limit = t;
 			}
 		}
-
-		if ((p = strstr(name,"//")) != NULL) {
-			modified = 1;
-			while (*p) {
-				p[0] = p[1];
-				p++;
-			}
-		}
-
-		if (strncmp(p = name, "./", 2) == 0) {
-			modified = 1;
-			do {
-				p[0] = p[2];
-			} while (*p++);
-		}
-
-		l = strlen(p = name);
-		if (l > 1 && p[l-1] == '/') {
-			modified = 1;
-			p[l-1] = 0;
-		}
+		while (*f && (*t++ = *f++) != '/') {}
 	}
+
+	if (t > name+anchored && t[-1] == '/')
+		t--;
+	if (t == name)
+		*t++ = '.';
+	*t = '\0';
 }
 
 /* Make path appear as if a chroot had occurred.  This handles a leading
