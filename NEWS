@@ -33,6 +33,12 @@ Changes since 2.6.3:
       referent of a symlink (as it should), we no longer try to set the
       user and group of a symlink.
 
+    - The generator now properly runs the hard-link loop and the dir-time
+      rewriting loop after we're sure that the redo phase is complete.
+
+    - When --backup was specified with --partial-dir=DIR, don't try to
+      backup a file in DIR when DIR is relative.
+
   ENHANCEMENTS:
 
     - Rsync now supports popt's option aliases, which means that you can
