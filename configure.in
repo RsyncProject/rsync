@@ -4,14 +4,23 @@ AC_CONFIG_HEADER(config.h)
 
 # compile with optimisation and without debugging by default
 CFLAGS=${CFLAGS-"-O"}
+LDFLAGS=${LDFLAGS-""}
 
 AC_CANONICAL_SYSTEM
 AC_VALIDATE_CACHE_SYSTEM_TYPE
+
+# look for getconf early as this affects just about everything
+AC_CHECK_PROG(HAVE_GETCONF, getconf, 1, 0)
+if test $HAVE_GETCONF = 1; then
+	CFLAGS=$CFLAGS" "`getconf LFS_CFLAGS`
+	LDFLAGS=$LDFLAGS" "`getconf LFS_LDFLAGS`
+fi
 
 dnl Checks for programs.
 AC_PROG_CC
 AC_PROG_INSTALL
 AC_SUBST(SHELL)
+
 
 AC_CHECK_PROG(HAVE_REMSH, remsh, 1, 0)
 AC_DEFINE_UNQUOTED(HAVE_REMSH, $HAVE_REMSH)
