@@ -956,7 +956,7 @@ char *timestring(time_t t)
 	struct tm *tm = localtime(&t);
 
 #ifdef HAVE_STRFTIME
-	strftime(TimeBuf,sizeof(TimeBuf)-1,"%Y/%m/%d %T",tm);
+	strftime(TimeBuf,sizeof(TimeBuf)-1,"%Y/%m/%d %H:%M:%S",tm);
 #else
 	strlcpy(TimeBuf, asctime(tm), sizeof(TimeBuf));
 #endif
