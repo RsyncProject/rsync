@@ -69,6 +69,13 @@ void log_open(void)
 	if (initialised) return;
 	initialised = 1;
 
+	/* this looks pointless, but it is needed in order for the
+	   C library on some systems to fetch the timezone info
+	   before the chroot */
+	t = time(NULL);
+	localtime(&t);
+
+	/* optionally use a log file instead of syslog */
 	logf = lp_log_file();
 	if (logf && *logf) {
 		logfile = fopen(logf, "a");
@@ -88,12 +95,6 @@ void log_open(void)
 #ifndef LOG_NDELAY
 	logit(LOG_INFO,"rsyncd started\n");
 #endif
-
-	/* this looks pointless, but it is needed in order for the
-	   C library on some systems to fetch the timezone info
-	   before the chroot */
-	t = time(NULL);
-	localtime(&t);
 }
 		
 
