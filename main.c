@@ -819,7 +819,7 @@ static int start_client(int argc, char *argv[])
 	}
 
 	if (shell_machine) {
-		p = strchr(shell_machine,'@');
+		p = strrchr(shell_machine,'@');
 		if (p) {
 			*p = 0;
 			shell_user = shell_machine;
