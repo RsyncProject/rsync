@@ -37,13 +37,9 @@ extern int protocol_version;
 void setup_protocol(int f_out,int f_in)
 {
 	if (remote_protocol == 0) {
-		if (am_server) {
-			remote_protocol = read_int(f_in);
+		if (!read_batch)
 			write_int(f_out, protocol_version);
-		} else {
-			write_int(f_out, protocol_version);
-			remote_protocol = read_int(f_in);
-		}
+		remote_protocol = read_int(f_in);
 		if (protocol_version > remote_protocol)
 			protocol_version = remote_protocol;
 	}
