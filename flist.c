@@ -43,7 +43,7 @@ extern int numeric_ids;
 extern int cvs_exclude;
 
 extern int recurse;
-extern int keep_dirs;
+extern int xfer_dirs;
 extern char curr_dir[MAXPATHLEN];
 extern int filesfrom_fd;
 
@@ -89,7 +89,7 @@ void init_flist(void)
 
 static int show_filelist_p(void)
 {
-	return verbose && keep_dirs && !am_server;
+	return verbose && xfer_dirs && !am_server;
 }
 
 static void start_filelist_progress(char *kind)
@@ -804,7 +804,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	if (exclude_level == NO_EXCLUDES)
 		goto skip_excludes;
 
-	if (S_ISDIR(st.st_mode) && !keep_dirs) {
+	if (S_ISDIR(st.st_mode) && !xfer_dirs) {
 		rprintf(FINFO, "skipping directory %s\n", thisname);
 		return NULL;
 	}
@@ -1130,7 +1130,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			}
 		}
 		if (fname[l-1] == '.' && (l == 1 || fname[l-2] == '/')) {
-			if (!recurse && keep_dirs)
+			if (!recurse && xfer_dirs)
 				recurse = 1; /* allow one level */
 		} else if (recurse > 0)
 			recurse = 0;
@@ -1144,7 +1144,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			continue;
 		}
 
-		if (S_ISDIR(st.st_mode) && !keep_dirs) {
+		if (S_ISDIR(st.st_mode) && !xfer_dirs) {
 			rprintf(FINFO, "skipping directory %s\n", fname);
 			continue;
 		}
@@ -1177,16 +1177,16 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			*p = '/';
 			if (fn != p || (*lp && *lp != '/')) {
 				int save_copy_links = copy_links;
-				int save_keep_dirs = keep_dirs;
+				int save_xfer_dirs = xfer_dirs;
 				copy_links = copy_unsafe_links;
-				keep_dirs = 1;
+				xfer_dirs = 1;
 				while ((slash = strchr(slash+1, '/')) != 0) {
 					*slash = 0;
 					send_file_name(f, flist, fname, 0, 0);
 					*slash = '/';
 				}
 				copy_links = save_copy_links;
-				keep_dirs = save_keep_dirs;
+				xfer_dirs = save_xfer_dirs;
 				*p = 0;
 				strlcpy(lastpath, fname, sizeof lastpath);
 				*p = '/';
