@@ -143,7 +143,7 @@ static void print_rsync_version(enum logcode f)
         rprintf(f, "%s  version %s  protocol version %d\n",
                 RSYNC_NAME, RSYNC_VERSION, PROTOCOL_VERSION);
         rprintf(f,
-                "Copyright (C) 1996-2001 by Andrew Tridgell and others\n");
+                "Copyright (C) 1996-2002 by Andrew Tridgell and others\n");
 	rprintf(f, "<http://rsync.samba.org/>\n");
         rprintf(f, "Capabilities: %d-bit files, %ssocketpairs, "
                 "%shard links, %ssymlinks, batchfiles, %sIPv6,\n",
