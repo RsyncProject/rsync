@@ -448,7 +448,6 @@ int daemon_main(void)
 	become_daemon();
 
 	if (!lp_load(config_file, 1)) {
-		fprintf(stderr,"failed to load config file %s\n", config_file);
 		exit_cleanup(RERR_SYNTAX);
 	}
 
@@ -464,7 +463,7 @@ int daemon_main(void)
 		if ((fd = do_open(lp_pid_file(), O_WRONLY|O_CREAT|O_TRUNC,
 					0666 & ~orig_umask)) == -1) {
 		    cleanup_set_pid(0);
-		    fprintf(stderr,"failed to create pid file %s\n", pid_file);
+		    rprintf(FLOG,"failed to create pid file %s\n", pid_file);
 		    exit_cleanup(RERR_FILEIO);
 		}
 		slprintf(pidbuf, sizeof(pidbuf), "%d\n", pid);
