@@ -148,7 +148,8 @@ static int readfd(int fd,char *buffer,int N)
 			tv.tv_sec = io_timeout;
 			tv.tv_usec = 0;
 
-			if (select(fd+1, &fds, NULL, NULL, &tv) != 1) {
+			if (select(fd+1, &fds, NULL, NULL, 
+				   io_timeout?&tv:NULL) != 1) {
 				check_timeout();
 			}
 		}
