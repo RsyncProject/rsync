@@ -80,12 +80,18 @@ static void list_file (const char *fname)
 	 * undefined.  Also it tends not to be possible to reset a
 	 * symlink's mtime, so we have to ignore it too. */
 	if (S_ISLNK(buf.st_mode)) {
+		int len;
 		buf.st_mode &= ~0777;
 		buf.st_mtime = (time_t)0;
 		buf.st_uid = buf.st_gid = 0;
 		strcpy(linkbuf, " -> ");
 		/* const-cast required for silly UNICOS headers */
-		readlink((char *) fname, linkbuf+4, sizeof(linkbuf) - 4);
+		len = readlink((char *) fname, linkbuf+4, sizeof(linkbuf) - 4);
+		if (len == -1) 
+			failed("readlink", fname);
+		else
+			/* it's not nul-terminated */
+			linkbuf[4+len] = 0;
 	} else {
 		linkbuf[0] = 0;
 	}
