@@ -84,6 +84,10 @@ Changes since 2.6.3:
       (since the forked process already has a copy of the exclude list,
       there's no need to send them a set of duplicates).
 
+    - When --progress is specified, the output of items that the generator
+      is creating (e.g. dirs, symlinks) is now integrated into the progress
+      output without overlapping it.
+
   ENHANCEMENTS:
 
     - Rsync now supports popt's option aliases, which means that you can
@@ -194,6 +198,10 @@ Changes since 2.6.3:
 
     - Added the --remove-sent-files option, which lets you move files
       between systems.
+
+    - When building under windows, the default for --daemon is now to
+      avoid detaching, requiring the new --detach option to force rsync
+      to detach.
 
     - Improved the option descriptions in the --help text.
 
