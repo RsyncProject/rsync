@@ -438,6 +438,11 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		} else
 			fnamecmp = partialptr = fname;
 
+		if (inplace && make_backups) {
+			if (!(fnamecmp = get_backup_name(fname)))
+				fnamecmp = partialptr;
+		}
+
 		/* open the file */
 		fd1 = do_open(fnamecmp, O_RDONLY, 0);
 
@@ -489,10 +494,10 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 
 		/* We now check to see if we are writing file "inplace" */
 		if (inplace)  {
-			fd2 = do_open(fnamecmp, O_WRONLY|O_CREAT, 0);
+			fd2 = do_open(fname, O_WRONLY|O_CREAT, 0);
 			if (fd2 == -1) {
 				rsyserr(FERROR, errno, "open %s failed",
-					full_fname(fnamecmp));
+					full_fname(fname));
 				discard_receive_data(f_in, file->length);
 				if (fd1 != -1)
 					close(fd1);
