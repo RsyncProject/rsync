@@ -22,14 +22,14 @@
 
 extern int verbose;
 extern int dry_run;
+extern int am_daemon;
+extern int am_server;
+extern int do_progress;
 extern int log_before_transfer;
 extern int log_format_has_i;
 extern int daemon_log_format_has_i;
-extern int am_daemon;
-extern int am_server;
 extern int delete_after;
 extern int csum_length;
-extern struct stats stats;
 extern int read_batch;
 extern int batch_gen_fd;
 extern int protocol_version;
@@ -38,12 +38,8 @@ extern int keep_dirlinks;
 extern int preserve_hard_links;
 extern int preserve_perms;
 extern int io_error;
-extern char *tmpdir;
-extern char *partial_dir;
-extern char *basis_dir[];
 extern int basis_dir_cnt;
 extern int make_backups;
-extern int do_progress;
 extern int cleanup_got_literal;
 extern int module_id;
 extern int ignore_errors;
@@ -52,7 +48,11 @@ extern int keep_partial;
 extern int checksum_seed;
 extern int inplace;
 extern int delay_updates;
+extern struct stats stats;
 extern char *log_format;
+extern char *tmpdir;
+extern char *partial_dir;
+extern char *basis_dir[];
 
 extern struct filter_list_struct server_filter_list;
 

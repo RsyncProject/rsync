@@ -21,21 +21,20 @@
 
 extern int verbose;
 extern int dry_run;
+extern int am_server;
+extern int am_daemon;
 extern int log_before_transfer;
 extern int log_format_has_i;
 extern int daemon_log_format_has_i;
-extern int am_server;
-extern int am_daemon;
 extern int csum_length;
-extern struct stats stats;
 extern int io_error;
 extern int protocol_version;
 extern int updating_basis_file;
 extern int make_backups;
 extern int do_progress;
 extern int inplace;
-extern char *log_format;
 extern struct stats stats;
+extern char *log_format;
 
 
 /**

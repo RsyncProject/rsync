@@ -30,11 +30,11 @@
 extern struct stats stats;
 
 extern int verbose;
-extern int do_progress;
 extern int am_root;
 extern int am_server;
 extern int am_daemon;
 extern int am_sender;
+extern int do_progress;
 extern int always_checksum;
 extern int module_id;
 extern int ignore_errors;
