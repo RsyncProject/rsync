@@ -208,7 +208,7 @@ static char *get_local_name(struct file_list *flist,char *name)
 		return name;
 	}
 
-	if (flist->count == 1)
+	if (flist->count <= 1)
 		return name;
 
 	if (do_mkdir(name,0777 & ~orig_umask) != 0) {
