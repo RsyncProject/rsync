@@ -1076,6 +1076,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	int save_only_existing = only_existing;
 	int save_opt_ignore_existing = opt_ignore_existing;
 	int allowed_lull = read_batch ? 0 : io_timeout / 2;
+	int lull_mod = allowed_lull * 5;
 
 	if (protocol_version >= 29) {
 		itemizing = 1;
@@ -1134,7 +1135,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 			       flist, file, i, itemizing, maybe_PERMS_REPORT,
 			       code, allowed_lull, f_out, f_out_name);
 
-		if (allowed_lull && !(i % 100))
+		if (allowed_lull && !(i % lull_mod))
 			maybe_send_keepalive(allowed_lull, flist->count);
 	}
 	recv_generator(NULL, NULL, NULL, 0, 0, 0, code, 0, -1, -1);
@@ -1164,8 +1165,6 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
 			       flist, file, i, itemizing, maybe_PERMS_REPORT,
 			       code, allowed_lull, f_out, f_out_name);
-		if (allowed_lull)
-			maybe_send_keepalive(allowed_lull, flist->count);
 	}
 
 	phase++;
@@ -1181,13 +1180,14 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	get_redo_num();
 
 	if (preserve_hard_links)
-		do_hard_links();
+		do_hard_links(allowed_lull, flist->count);
 
 	if (delete_after && !local_name && flist->count > 0)
 		do_delete_pass(flist, allowed_lull);
 
 	if ((need_retouch_dir_perms || need_retouch_dir_times)
 	    && !list_only && !local_name && !dry_run) {
+		int j = 0;
 		/* Now we need to fix any directory permissions that were
 		 * modified during the transfer and/or re-set any tweaked
 		 * modified-time values. */
@@ -1201,7 +1201,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 				       flist, file, i, itemizing,
 				       maybe_PERMS_REPORT, code, allowed_lull,
 				       -1, -1);
-			if (allowed_lull && !(i % 500))
+			if (allowed_lull && !(j++ % lull_mod))
 				maybe_send_keepalive(allowed_lull, flist->count);
 		}
 	}
