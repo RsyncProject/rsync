@@ -55,6 +55,7 @@ extern struct stats stats;
 const char phase_unknown[] = "unknown";
 int select_timeout = SELECT_TIMEOUT;
 int batch_fd = -1;
+int batch_gen_fd = -1;
 
 /**
  * The connection might be dropped at some point; perhaps because the
