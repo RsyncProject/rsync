@@ -23,6 +23,8 @@ Changes since 2.6.3:
 
   ENHANCEMENTS:
 
+    - Added the --max-size option (promoted from the patches dir).
+
     - The daemon-mode options were separated from the normal rsync options
       so that they can't be mixed together.  This makes it impossible for a
       user to start a daemon that had improper default option values that
@@ -34,7 +36,7 @@ Changes since 2.6.3:
 
   BUILD CHANGES:
 
-    - Support an OS that uses mkdev() instead of makedev().
+    - Handle an operating system that use mkdev() in place of makedev().
 
 
 NEWS for rsync 2.6.3 (30 Sep 2004)
