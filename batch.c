@@ -116,7 +116,7 @@ static void write_filter_rules(int fd)
 	write_sbuf(fd, " <<'#E#'\n");
 	for (ent = filter_list.head; ent; ent = ent->next) {
 		unsigned int plen;
-		char *p = get_rule_prefix(ent->match_flags, "- ", &plen);
+		char *p = get_rule_prefix(ent->match_flags, "- ", 0, &plen);
 		write_buf(fd, p, plen);
 		write_sbuf(fd, ent->pattern);
 		if (ent->match_flags & MATCHFLG_DIRECTORY)
