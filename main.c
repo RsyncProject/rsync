@@ -1,6 +1,6 @@
 /* -*- c-file-style: "linux" -*-
    
-   Copyright (C) 1996-2001 by Andrew Tridgell 
+   Copyright (C) 1996-2001 by Andrew Tridgell <tridge@samba.org>
    Copyright (C) Paul Mackerras 1996
    
    This program is free software; you can redistribute it and/or modify
@@ -36,6 +36,12 @@ void wait_process(pid_t pid, int *status)
 		msleep(20);
 		io_flush();
 	}
+        
+        /* TODO: If the child exited on a signal, then log an
+         * appropriate error message.  Perhaps we should also accept a
+         * message describing the purpose of the child.  Also indicate
+         * this to the caller so that thhey know something went
+         * wrong.  */
 	*status = WEXITSTATUS(*status);
 }
 
@@ -721,16 +727,12 @@ int main(int argc,char *argv[])
 	   carried across */
 	orig_umask = (int)umask(0);
 
-	if (!parse_arguments(argc, argv, 1)) {
+	if (!parse_arguments(&argc, (const char ***) &argv, 1)) {
                 /* FIXME: We ought to call the same error-handling
                  * code here, rather than relying on getopt. */
-		/* option_error(); */
+		option_error();
 		exit_cleanup(RERR_SYNTAX);
 	}
-
-	argc -= optind;
-	argv += optind;
-	optind = 0;
 
 	signal(SIGCHLD,SIG_IGN);
 	signal(SIGINT,SIGNAL_CAST sig_int);
