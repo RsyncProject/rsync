@@ -1368,22 +1368,22 @@ tt(:n- .non-inherited-per-dir-excludes)nl()
 The following modifiers are accepted after a "." or ":":
 
 itemize(
-  it() A "-" specifies that the file should consist of only exclude
+  it() A bf(-) specifies that the file should consist of only exclude
   patterns, with no other rule-parsing except for the list-clearing
   token ("!").
-  it() A "+" specifies that the file should consist of only include
+  it() A bf(+) specifies that the file should consist of only include
   patterns, with no other rule-parsing except for the list-clearing
   token ("!").
-  it() A "C" is a shorthand for the modifiers "sn-", which makes the
+  it() A bf(C) is a shorthand for the modifiers bf(nw-), which makes the
   parsing compatible with the way CVS parses their exclude files.  If no
   filename is specified, ".cvsignore" is assumed.
-  it() A "e" will exclude the merge-file from the transfer; e.g.
+  it() A bf(e) will exclude the merge-file from the transfer; e.g.
   ":e_.rules" is like ":_.rules" and "-_.rules".
-  it() An "n" specifies that the rules are not inherited by subdirectories.
-  it() An "s" specifies that the rules are split on all whitespace instead
+  it() An bf(n) specifies that the rules are not inherited by subdirectories.
+  it() A bf(w) specifies that the rules are word-split on whitespace instead
   of the normal line-splitting.  This also turns off comments.  Note: the
   space that separates the prefix from the rule is treated specially, so
-  "- foo + bar" is parsed as two rules (assuming that "-" or "+" was not
+  "- foo + bar" is parsed as two rules (assuming that bf(-) or bf(+) was not
   specified to turn off the parsing of prefixes).
 )
 
@@ -1457,7 +1457,7 @@ a part of the transfer.
 
 If you want to include the contents of a ".cvsignore" in your patterns,
 you should use the rule ":C" -- this is a short-hand for the rule
-":sn-_.cvsignore", and ensures that the .cvsignore file's contents are
+":nw-_.cvsignore", and ensures that the .cvsignore file's contents are
 interpreted according to the same parsing rules that CVS uses.  You can
 use this to affect where the bf(--cvs-exclude) (bf(-C)) option's inclusion of the
 per-directory .cvsignore file gets placed into your rules by putting a
