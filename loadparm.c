@@ -47,7 +47,6 @@
 #define BOOL int
 #define False 0
 #define True 1
-#define Realloc realloc
 #define PTR_DIFF(p1,p2) ((ptrdiff_t)(((char *)(p1)) - (char *)(p2)))
 #define strequal(a,b) (strcasecmp(a,b)==0)
 #define BOOLSTR(b) ((b) ? "Yes" : "No")
@@ -367,7 +366,13 @@ static int add_a_service(service *pservice, char *name)
 
   i = iNumServices;
 
-  ServicePtrs = (service **)Realloc(ServicePtrs,sizeof(service *)*num_to_alloc);
+  if (ServicePtrs) {
+	  ServicePtrs = (service **)realloc(ServicePtrs,
+					    sizeof(service *)*num_to_alloc);
+  } else {
+	  ServicePtrs = (service **)malloc(sizeof(service *)*num_to_alloc);
+  }
+
   if (ServicePtrs)
 	  pSERVICE(iNumServices) = (service *)malloc(sizeof(service));
 
