@@ -914,7 +914,7 @@ void server_options(char **args,int *argc)
 	}
 
 	if (checksum_seed) {
-		if (asprintf(&arg, "--checksum_seed=%d", checksum_seed) < 0)
+		if (asprintf(&arg, "--checksum-seed=%d", checksum_seed) < 0)
 			goto oom;
 		args[ac++] = arg;
 	}
