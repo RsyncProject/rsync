@@ -1,9 +1,15 @@
 #!/usr/bin/perl
+#
+# This script lets you update a hierarchy of files in an atomic way by
+# first creating a new hierarchy using --link-dest to rsync, and then
+# swapping the hierarchy into place.  See the usage message for more
+# details and some important caveats!
 
 use strict;
 use Cwd 'abs_path';
 
-my $RSYNC = '/usr/bin/rsync';
+my $RSYNC_PROG = '/usr/bin/rsync';
+my $RM_PROG = '/bin/rm';
 
 my $dest_dir = $ARGV[-1];
 usage(1) if $dest_dir eq '' || $dest_dir =~ /^--/;
@@ -28,13 +34,11 @@ if ($dest_dir eq '/') {
 my $old_dir = "$dest_dir~old~";
 my $new_dir = $ARGV[-1] = "$dest_dir~new~";
 
-if (-d $old_dir) {
-    rename($old_dir, $new_dir) or die "Unable to rename $old_dir to $new_dir: $!";
-}
+system($RM_PROG, '-rf', $old_dir) if -d $old_dir;
 
-if (system($RSYNC, "--link-dest=$dest_dir", @ARGV)) {
+if (system($RSYNC_PROG, "--link-dest=$dest_dir", @ARGV)) {
     if ($? == -1) {
-	print "failed to execute $RSYNC: $!\n";
+	print "failed to execute $RSYNC_PROG: $!\n";
     } elsif ($? & 127) {
 	printf "child died with signal %d, %s coredump\n",
 	    ($? & 127),  ($? & 128) ? 'with' : 'without';
@@ -55,20 +59,32 @@ sub usage
     my($ret) = @_;
     my $fh = $ret ? *STDERR : *STDOUT;
     print $fh <<EOT;
-Usage: atomic-rsync [RSYNC-OPTIONS] HOST:SOURCE DEST
+Usage: atomic-rsync [RSYNC-OPTIONS] HOST:/SOURCE/DIR/ /DEST/DIR/
+       atomic-rsync [RSYNC-OPTIONS] HOST::MOD/DIR/ /DEST/DIR/
 
-This script allows you to pull some files into DEST on the local system
-(which must exist) in an atomic manner.  It does this by first pulling
-files to DEST~new~ (using hard-links to unchanged files in order to keep
-the space requirements down), and then, at the end of the transfer, it
-renames DEST to DEST~old~ and renames DEST~new~ to DEST to effect the
-atomic update.  The DEST~old~ hierarchy will be preserved until the next
-run of this script, at which point it will be renamed to DEST~new~ and
-used in the copy.
+This script lets you update a hierarchy of files in an atomic way by first
+creating a new hierarchy (using hard-links to leverage the existing files),
+and then swapping the new hierarchy into place.  You must be pulling files
+to a local directory, and that directory must already exist.  For example:
+
+    atomic-rsync -av host:/remote/files/ /local/files/
+
+This would make the transfer to the directory /local/files~new~ and then
+swap out /local/files at the end of the transfer by renaming it to
+/local/files~old~ and putting the new directory into its place.  The
+/local/files~old~ directory will be preserved until the next update, at
+which point it will be deleted.
+
+Do NOT specify this command:
+
+    atomic-rsync -av host:/remote/files /local/
+
+... UNLESS you want the entire /local dir to be swapped out!
 
 See the "rsync" command for its list of options.  You may not use the
 --link-dest or --compare-dest options (since this script uses --link-dest
-to effect the atomic transfer).  Also, DEST cannot be "/".
+to make the transfer efficient).  Also, the destination directory cannot
+be "/".
 EOT
     exit $ret;
 }
