@@ -20,7 +20,9 @@
 #define ABORT_ALL -1
 #define ABORT_TO_STARSTAR -2
 
-#define CC_EQ(class, len, litmatch) ((len) == sizeof (litmatch)-1 && strncmp(class, litmatch, len) == 0)
+#define CC_EQ(class, len, litmatch) ((len) == sizeof (litmatch)-1 \
+				    && *(class) == *(litmatch) \
+				    && strncmp(class, litmatch, len) == 0)
 
 #if defined STDC_HEADERS || !defined isascii
 # define ISASCII(c) 1
@@ -119,11 +121,11 @@ static int domatch(const unsigned char *p, const unsigned char *text)
 	    matched = FALSE;
 	    do {
 		if (!ch)
-		    return FALSE;
+		    return ABORT_ALL;
 		if (ch == '\\') {
 		    ch = *++p;
 		    if (!ch)
-			return FALSE;
+			return ABORT_ALL;
 		    if (*text == ch)
 			matched = TRUE;
 		}
@@ -132,7 +134,7 @@ static int domatch(const unsigned char *p, const unsigned char *text)
 		    if (ch == '\\') {
 			ch = *++p;
 			if (!ch)
-			    return FALSE;
+			    return ABORT_ALL;
 		    }
 		    if (*text <= ch && *text >= prev)
 			matched = TRUE;
@@ -143,22 +145,58 @@ static int domatch(const unsigned char *p, const unsigned char *text)
 		    int i;
 		    while ((ch = *p) && (ch != ':' || p[1] != ']')) p++;
 		    if (!ch)
-			return FALSE;
+			return ABORT_ALL;
 		    i = p - s;
-		    ch = *text;
-		    if ((CC_EQ(s,i, "alnum") && ISALNUM(ch))
-		     || (CC_EQ(s,i, "alpha") && ISALPHA(ch))
-		     || (CC_EQ(s,i, "blank") && ISBLANK(ch))
-		     || (CC_EQ(s,i, "cntrl") && ISCNTRL(ch))
-		     || (CC_EQ(s,i, "digit") && ISDIGIT(ch))
-		     || (CC_EQ(s,i, "graph") && ISGRAPH(ch))
-		     || (CC_EQ(s,i, "lower") && ISLOWER(ch))
-		     || (CC_EQ(s,i, "print") && ISPRINT(ch))
-		     || (CC_EQ(s,i, "punct") && ISPUNCT(ch))
-		     || (CC_EQ(s,i, "space") && ISSPACE(ch))
-		     || (CC_EQ(s,i, "upper") && ISUPPER(ch))
-		     || (CC_EQ(s,i,"xdigit") && ISXDIGIT(ch)))
-			matched = TRUE;
+		    if (CC_EQ(s,i, "alnum")) {
+			if (ISALNUM(*text))
+			    matched = TRUE;
+		    }
+		    else if (CC_EQ(s,i, "alpha")) {
+			if (ISALPHA(*text))
+			    matched = TRUE;
+		    }
+		    else if (CC_EQ(s,i, "blank")) {
+			if (ISBLANK(*text))
+			    matched = TRUE;
+		    }
+		    else if (CC_EQ(s,i, "cntrl")) {
+			if (ISCNTRL(*text))
+			    matched = TRUE;
+		    }
+		    else if (CC_EQ(s,i, "digit")) {
+			if (ISDIGIT(*text))
+			    matched = TRUE;
+		    }
+		    else if (CC_EQ(s,i, "graph")) {
+			if (ISGRAPH(*text))
+			    matched = TRUE;
+		    }
+		    else if (CC_EQ(s,i, "lower")) {
+			if (ISLOWER(*text))
+			    matched = TRUE;
+		    }
+		    else if (CC_EQ(s,i, "print")) {
+			if (ISPRINT(*text))
+			    matched = TRUE;
+		    }
+		    else if (CC_EQ(s,i, "punct")) {
+			if (ISPUNCT(*text))
+			    matched = TRUE;
+		    }
+		    else if (CC_EQ(s,i, "space")) {
+			if (ISSPACE(*text))
+			    matched = TRUE;
+		    }
+		    else if (CC_EQ(s,i, "upper")) {
+			if (ISUPPER(*text))
+			    matched = TRUE;
+		    }
+		    else if (CC_EQ(s,i, "xdigit")) {
+			if (ISXDIGIT(*text))
+			    matched = TRUE;
+		    }
+		    else /* malformed [:class:] string */
+			return ABORT_ALL;
 		    p++;
 		    ch = 0; /* This makes "prev" get set to 0. */
 		}
