@@ -337,8 +337,6 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 	if ((iflags & SIGNIFICANT_ITEM_FLAGS || verbose > 1
 	  || (xname && *xname)) && !read_batch) {
 		if (protocol_version >= 29) {
-			if (iflags & (ITEM_LOCAL_CHANGE|ITEM_TRANSFER))/* XXX */
-				iflags |= ITEM_DUMMY_BIT; /* XXX Remove soon */
 			if (ndx >= 0)
 				write_int(sock_f_out, ndx);
 			write_shortint(sock_f_out, iflags);
