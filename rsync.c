@@ -248,6 +248,9 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
 		goto do_set_perms;
 	}
 
+	/* Change permissions before putting the file into place. */
+	set_perms(fnametmp, file, NULL, ok_to_set_time ? 0 : PERMS_SKIP_MTIME);
+
 	/* move tmp file over real file */
 	if (verbose > 2)
 		rprintf(FINFO, "renaming %s to %s\n", fnametmp, fname);
@@ -259,11 +262,15 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
 		do_unlink(fnametmp);
 		return;
 	}
+	if (ret == 0) {
+		/* The file was moved into place (not copied), so it's done. */
+		return;
+	}
     do_set_perms:
 	set_perms(fname, file, NULL, ok_to_set_time ? 0 : PERMS_SKIP_MTIME);
 }
 
 const char *who_am_i(void)
 {
-    return am_sender ? "sender" : am_generator ? "generator" : "receiver";
+	return am_sender ? "sender" : am_generator ? "generator" : "receiver";
 }
