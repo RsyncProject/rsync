@@ -21,6 +21,7 @@
 
 extern int verbose;
 extern int itemize_changes;
+extern int log_before_transfer;
 extern int csum_length;
 extern struct stats stats;
 extern int io_error;
@@ -30,7 +31,9 @@ extern int am_daemon;
 extern int protocol_version;
 extern int updating_basis_file;
 extern int make_backups;
+extern int do_progress;
 extern int inplace;
+extern char *log_format;
 extern struct stats stats;
 
 
@@ -104,12 +107,12 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 	struct map_struct *mbuf = NULL;
 	STRUCT_STAT st;
 	char *fname2, fname[MAXPATHLEN];
-	int i;
+	int iflags;
 	struct file_struct *file;
 	int phase = 0;
 	struct stats initial_stats;
 	int save_make_backups = make_backups;
-	int j;
+	int i, j;
 
 	if (verbose > 2)
 		rprintf(FINFO, "send_files starting\n");
@@ -139,15 +142,29 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
+		file = flist->files[i];
+
+		if (itemize_changes) {
+			iflags = read_byte(f_in);
+			if (!(iflags & ITEM_UPDATING) || !S_ISREG(file->mode)) {
+				if (am_server) {
+					write_int(f_out, i);
+					write_byte(f_out, iflags);
+				} else
+					log_send(file, &stats, iflags);
+				continue;
+			}
+		} else
+			iflags = ITEM_UPDATING | ITEM_MISSING_DATA;
+
 		if (inplace && protocol_version >= 29) {
 			uchar fnamecmp_type = read_byte(f_in);
 			updating_basis_file = fnamecmp_type == FNAMECMP_FNAME;
 		} else
 			updating_basis_file = inplace && !make_backups;
 
-		file = flist->files[i];
-		if (S_ISDIR(file->mode)) {
-			rprintf(FERROR, "[%s] got index of directory: %d\n",
+		if (!S_ISREG(file->mode)) {
+			rprintf(FERROR, "[%s] got index of non-regular file: %d\n",
 				who_am_i(), i);
 			exit_cleanup(RERR_PROTOCOL);
 		}
@@ -169,9 +186,13 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			rprintf(FINFO, "send_files(%d, %s)\n", i, fname);
 
 		if (dry_run) { /* log the transfer */
-			if (!am_server && verbose && !itemize_changes)
+			if (!am_server && verbose && !log_format)
 				rprintf(FINFO, "%s\n", safe_fname(fname2));
+			else if (!am_server)
+				log_send(file, &stats, iflags);
 			write_int(f_out, i);
+			if (itemize_changes)
+				write_byte(f_out, iflags);
 			continue;
 		}
 
@@ -223,6 +244,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		}
 
 		write_int(f_out, i);
+		if (itemize_changes)
+			write_byte(f_out, iflags);
 		write_sum_head(f_out, s);
 
 		if (verbose > 2) {
@@ -230,14 +253,16 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				safe_fname(fname));
 		}
 
-		/* log the transfer */
-		if (!am_server && verbose && !itemize_changes)
+		if (log_before_transfer)
+			log_send(file, &initial_stats, iflags);
+		else if (!am_server && verbose && (!log_format || do_progress))
 			rprintf(FINFO, "%s\n", safe_fname(fname2));
 
 		set_compression(fname);
 
 		match_sums(f_out, s, mbuf, st.st_size);
-		log_send(file, &initial_stats);
+		if (!log_before_transfer)
+			log_send(file, &initial_stats, iflags);
 
 		if (mbuf) {
 			j = unmap_file(mbuf);
