@@ -308,6 +308,15 @@ Hard-link handling
 
 IPv6
 
+  Put back the old socket code; if on a machine that does not properly
+  support the getaddrinfo API, then use it.  This is probably much
+  simpler than reimplementing it.  This might get us working again on
+  RedHat 5 and similar systems.  Although the Kame patch seems like a
+  good idea, in fact it is a much broader interface than the
+  relatively narrow "open by name", "accept and log" interface that
+  rsync uses internally, and it has the disadvantage of clashing with
+  half-arsed implementations of the API.
+
   Implement suggestions from http://www.kame.net/newsletter/19980604/
   and ftp://ftp.iij.ad.jp/pub/RFC/rfc2553.txt
 
