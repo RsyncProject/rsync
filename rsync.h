@@ -481,11 +481,13 @@ int asprintf(char **ptr, const char *format, ...);
 int vasprintf(char **ptr, const char *format, va_list ap);
 #endif
 
-#if !defined(HAVE_VSNPRINTF) && !defined(HAVE_C99_VSNPRINTF)
-int vsnprintf (char *str, size_t count, const char *fmt, va_list args);
+#if !defined(HAVE_VSNPRINTF) || !defined(HAVE_C99_VSNPRINTF)
+#define vsnprintf rsync_vsnprintf
+int vsnprintf(char *str, size_t count, const char *fmt, va_list args);
 #endif
 
-#if !defined(HAVE_SNPRINTF) && !defined(HAVE_C99_VSNPRINTF)
+#if !defined(HAVE_SNPRINTF) || !defined(HAVE_C99_VSNPRINTF)
+#define snprintf rsync_snprintf
 int snprintf(char *str,size_t count,const char *fmt,...);
 #endif
 
