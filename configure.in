@@ -476,7 +476,7 @@ AC_CACHE_CHECK([whether chown() dereferences symlinks],rsync_cv_chown_follows_sy
 	if (chown(dangling_symlink, getuid(), getgid()) < 0 && errno == ENOENT) exit(0);
 	exit(1);
     }],
-  rsync_cv_chown_follows_symlink=yes,rsync_cv_chown_follows_symlink=no,rsync_cv_chown_follows_symlink=no)])
+  rsync_cv_chown_follows_symlink=yes,rsync_cv_chown_follows_symlink=no,rsync_cv_chown_follows_symlink=yes)])
 if test $rsync_cv_chown_follows_symlink = no; then
   AC_DEFINE(CHOWN_MODIFIES_SYMLINK, 1, [Define if chown modifies symlinks.])
 fi
