@@ -2,9 +2,11 @@ rsync 2.5.3 (not released yet)
 
   SECURITY FIXES:
 
+    * (CVE CAN-2002-0059)
+
     * Make sure that supplementary groups are removed from a server
       process after changing uid and gid. (Ethan Benson) (Debian bug
-      #132272)
+      #132272, CVE CAN-2002-0080)
 
   BUG FIXES:
 
