@@ -17,6 +17,10 @@ Changes since 2.6.0:
 
   BUG FIXES:
 
+    * When -x (--one-file-system) is combined with -L (--copy-links)
+      or --copy-unsafe-links, no symlinked files are skipped, even
+      if the referant file is on a different filesystem.
+
     * The --link-dest code now works properly for a non-root user
       when the UIDs of the source and destination differ and -o was
       specified, and when the group of the source can't be used on
@@ -47,11 +51,18 @@ Changes since 2.6.0:
 
     * When transferring a file that has group 0 with -g specified
       (typically via -a) and not enough privs to retain the group,
-      rsync no longer complains about chown failing.
+      rsync no longer complains about "chown" failing.
 
     * When specifying the USER@HOST: prefix for a file, the USER
       part can now contain an '@', if needed (i.e. the last '@'
       is used to find the HOST, not the first).
+
+    * Fixed some bugs in the handling of group IDs for non-root
+      users:  (1) It properly handles a group that the sender didn't
+      have a name for (it would previously skip changing the group
+      on any files in that group).  (2) If --numeric-ids is used,
+      rsync no longer attempts to set groups that the user doesn't
+      have the permission to set.
 
   INTERNAL:
 
@@ -104,6 +115,9 @@ Changes since 2.6.0:
     * Optimized the -x (--one-file-system) flag's handling of any
       mount-point directories we encounter (it no longer scans the
       contents of the mount-point dirs, just to throw away the data).
+
+    * Improved the internal uid/gid code to be more portable and
+      a little more optimized.
 
 
 NEWS for rsync 2.6.0 (1 Jan 2004)
