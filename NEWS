@@ -73,3 +73,6 @@ Changes since 2.6.2:
 
     - The scripts in the testsuite dir were cleaned up a bit.
 
+    - A few new diffs were added to the patches dir (and some accepted
+      ones were removed as well).
+
