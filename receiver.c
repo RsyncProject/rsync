@@ -36,7 +36,9 @@ extern char *tmpdir;
 extern char *compare_dest;
 extern int make_backups;
 extern int do_progress;
+extern char *backup_dir;
 extern char *backup_suffix;
+extern int backup_suffix_len;
 
 static struct delete_list {
 	DEV64_T dev;
@@ -80,26 +82,33 @@ static void add_delete_entry(struct file_struct *file)
 		rprintf(FINFO,"added %s to delete list\n", f_name(file));
 }
 
-static void delete_one(struct file_struct *f)
+static void delete_one(char *fn, int is_dir)
 {
-	if (!S_ISDIR(f->mode)) {
-		if (robust_unlink(f_name(f)) != 0) {
-			rprintf(FERROR,"delete_one: unlink %s: %s\n",f_name(f),strerror(errno));
+	if (!is_dir) {
+		if (robust_unlink(fn) != 0) {
+			rprintf(FERROR, "delete_one: unlink %s: %s\n",
+				fn, strerror(errno));
 		} else if (verbose) {
-			rprintf(FINFO,"deleting %s\n",f_name(f));
+			rprintf(FINFO, "deleting %s\n", fn);
 		}
 	} else {    
-		if (do_rmdir(f_name(f)) != 0) {
-			if (errno != ENOTEMPTY && errno != EEXIST)
-				rprintf(FERROR,"delete_one: rmdir %s: %s\n",
-                                        f_name(f), strerror(errno));
+		if (do_rmdir(fn) != 0) {
+			if (errno != ENOTEMPTY && errno != EEXIST) {
+				rprintf(FERROR, "delete_one: rmdir %s: %s\n",
+                                        fn, strerror(errno));
+			}
 		} else if (verbose) {
-			rprintf(FINFO,"deleting directory %s\n",f_name(f));      
+			rprintf(FINFO, "deleting directory %s\n", fn);
 		}
 	}
 }
 
 
+static int is_backup_file(char *fn)
+{
+	int k = strlen(fn) - backup_suffix_len;
+	return k > 0 && strcmp(fn+k, backup_suffix) == 0;
+}
 
 
 /* this deletes any files on the receiving side that are not present
@@ -148,14 +157,14 @@ void delete_files(struct file_list *flist)
 				add_delete_entry(local_file_list->files[i]);
 			if (-1 == flist_find(flist,local_file_list->files[i])) {
 				char *f = f_name(local_file_list->files[i]);
-				int k = strlen(f) - strlen(backup_suffix);
-/* Hi Andrew, do we really need to play with backup_suffix here? */
-				if (make_backups && ((k <= 0) ||
-					    (strcmp(f+k,backup_suffix) != 0))) {
+				if (make_backups && (backup_dir || !is_backup_file(f))) {
 					(void) make_backup(f);
+					if (verbose)
+						rprintf(FINFO, "deleting %s\n", f);
 				} else {
+					int mode = local_file_list->files[i]->mode;
+					delete_one(f, S_ISDIR(mode) != 0);
 					deletion_count++;
-					delete_one(local_file_list->files[i]);
 				}
 			}
 		}
