@@ -1,19 +1,19 @@
 /*  -*- c-file-style: "linux" -*-
- * 
- * Copyright (C) 1996-2000 by Andrew Tridgell 
+ *
+ * Copyright (C) 1996-2000 by Andrew Tridgell
  * Copyright (C) Paul Mackerras 1996
  * Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -22,7 +22,7 @@
 /**
  * @file
  *
- * Utilities used in rsync 
+ * Utilities used in rsync
  **/
 
 #include "rsync.h"
@@ -67,7 +67,7 @@ void set_blocking(int fd)
 /**
  * Create a file descriptor pair - like pipe() but use socketpair if
  * possible (because of blocking issues on pipes).
- * 
+ *
  * Always set non-blocking.
  */
 int fd_pair(int fd[2])
@@ -134,10 +134,10 @@ int set_modtime(char *fname, time_t modtime)
 			fname, (long) modtime,
 			asctime(localtime(&modtime)));
 	}
-	
+
 	{
 #ifdef HAVE_UTIMBUF
-		struct utimbuf tbuf;  
+		struct utimbuf tbuf;
 		tbuf.actime = time(NULL);
 		tbuf.modtime = modtime;
 		return utime(fname,&tbuf);
@@ -173,7 +173,7 @@ int create_directory_path(char *fname, int base_umask)
 	p = fname;
 	while ((p=strchr(p,'/'))) {
 		*p = 0;
-		do_mkdir(fname, 0777 & ~base_umask); 
+		do_mkdir(fname, 0777 & ~base_umask);
 		*p = '/';
 		p++;
 	}
@@ -194,7 +194,7 @@ int create_directory_path(char *fname, int base_umask)
 static int full_write(int desc, char *ptr, size_t len)
 {
 	int total_written;
-	
+
 	total_written = 0;
 	while (len > 0) {
 		int written = write(desc, ptr, len);
@@ -225,14 +225,14 @@ static int full_write(int desc, char *ptr, size_t len)
 static int safe_read(int desc, char *ptr, size_t len)
 {
 	int n_chars;
- 
+
 	if (len == 0)
 		return len;
- 
+
 	do {
 		n_chars = read(desc, ptr, len);
 	} while (n_chars < 0 && errno == EINTR);
- 
+
 	return n_chars;
 }
 
@@ -268,7 +268,7 @@ int copy_file(char *source, char *dest, mode_t mode)
 		return -1;
 	}
 
-	while ((len = safe_read(ifd, buf, sizeof(buf))) > 0) {
+	while ((len = safe_read(ifd, buf, sizeof buf)) > 0) {
 		if (full_write(ofd, buf, len) < 0) {
 			rprintf(FERROR,"write %s: %s\n",
 				dest,strerror(errno));
@@ -323,8 +323,7 @@ int robust_unlink(char *fname)
 	while((path[--pos] != '/') && (pos >= 0))
 		;
 	++pos;
-	strlcpy(&path[pos], ".rsync", MAXPATHLEN-pos);
-	pos += sizeof(".rsync")-1;
+	pos += strlcpy(path+pos, ".rsync", MAXPATHLEN-pos);
 
 	if (pos > (MAXPATHLEN-MAX_RENAMES_DIGITS-1)) {
 		errno = ETXTBSY;
@@ -375,7 +374,7 @@ static int num_pids;
 pid_t do_fork(void)
 {
 	pid_t newpid = fork();
-	
+
 	if (newpid != 0  &&  newpid != -1) {
 		all_pids[num_pids++] = newpid;
 	}
@@ -449,7 +448,7 @@ int lock_range(int fd, int offset, int len)
 	lock.l_start = offset;
 	lock.l_len = len;
 	lock.l_pid = 0;
-	
+
 	return fcntl(fd,F_SETLK,&lock) == 0;
 }
 
@@ -490,7 +489,7 @@ static void glob_expand_one(char *s, char **argv, int *argc, int maxargs)
 		sanitize_path(s, NULL);
 	}
 
-	memset(&globbuf, 0, sizeof(globbuf));
+	memset(&globbuf, 0, sizeof globbuf);
 	if (!exclude_server_path(s))
 		glob(s, 0, NULL, &globbuf);
 	if (globbuf.gl_pathc == 0) {
@@ -581,7 +580,7 @@ size_t pathjoin(char *dest, size_t destsize, const char *p1, const char *p2)
  * should end with a NULL to indicate the end of the list. */
 size_t stringjoin(char *dest, size_t destsize, ...)
 {
-	va_list ap;  
+	va_list ap;
 	size_t len, ret = 0;
 	const char *src;
 
@@ -632,7 +631,7 @@ void clean_fname(char *name)
 			}
 		}
 
-		if (strncmp(p=name,"./",2) == 0) {      
+		if (strncmp(p=name,"./",2) == 0) {
 			modified = 1;
 			do {
 				p[0] = p[2];
@@ -774,7 +773,7 @@ int push_dir(char *dir)
 
 	if (!initialised) {
 		initialised = 1;
-		getcwd(curr_dir, sizeof(curr_dir)-1);
+		getcwd(curr_dir, sizeof curr_dir - 1);
 		curr_dir_len = strlen(curr_dir);
 	}
 
@@ -877,7 +876,7 @@ int u_strcmp(const char *cs1, const char *cs2)
 	while (*s1 && *s2 && (*s1 == *s2)) {
 		s1++; s2++;
 	}
-	
+
 	return (int)*s1 - (int)*s2;
 }
 
@@ -956,9 +955,9 @@ char *timestring(time_t t)
 	struct tm *tm = localtime(&t);
 
 #ifdef HAVE_STRFTIME
-	strftime(TimeBuf,sizeof(TimeBuf)-1,"%Y/%m/%d %H:%M:%S",tm);
+	strftime(TimeBuf, sizeof TimeBuf - 1, "%Y/%m/%d %H:%M:%S", tm);
 #else
-	strlcpy(TimeBuf, asctime(tm), sizeof(TimeBuf));
+	strlcpy(TimeBuf, asctime(tm), sizeof TimeBuf);
 #endif
 
 	if (TimeBuf[strlen(TimeBuf)-1] == '\n') {
@@ -978,20 +977,20 @@ char *timestring(time_t t)
 int msleep(int t)
 {
 	int tdiff=0;
-	struct timeval tval,t1,t2;  
+	struct timeval tval,t1,t2;
 
 	gettimeofday(&t1, NULL);
 	gettimeofday(&t2, NULL);
-  
+
 	while (tdiff < t) {
 		tval.tv_sec = (t-tdiff)/1000;
 		tval.tv_usec = 1000*((t-tdiff)%1000);
- 
+
 		errno = 0;
 		select(0,NULL,NULL, NULL, &tval);
 
 		gettimeofday(&t2, NULL);
-		tdiff = (t2.tv_sec - t1.tv_sec)*1000 + 
+		tdiff = (t2.tv_sec - t1.tv_sec)*1000 +
 			(t2.tv_usec - t1.tv_usec)/1000;
 	}
 
@@ -1037,7 +1036,7 @@ int _Insure_trap_error(int a1, int a2, int a3, int a4, int a5, int a6)
 	int ret;
 	char *cmd;
 
-	asprintf(&cmd, "/usr/X11R6/bin/xterm -display :0 -T Panic -n Panic -e /bin/sh -c 'cat /tmp/ierrs.*.%d ; gdb /proc/%d/exe %d'", 
+	asprintf(&cmd, "/usr/X11R6/bin/xterm -display :0 -T Panic -n Panic -e /bin/sh -c 'cat /tmp/ierrs.*.%d ; gdb /proc/%d/exe %d'",
 		getpid(), getpid(), getpid());
 
 	if (!fn) {
