@@ -104,9 +104,15 @@ static void read_error_fd(void)
 
 static int no_flush;
 
-/* read from a socket with IO timeout. return the number of
-   bytes read. If no bytes can be read then exit, never return
-   a number <= 0 */
+/*
+ * Read from a socket with IO timeout. return the number of bytes
+ * read. If no bytes can be read then exit, never return a number <= 0.
+ *
+ * TODO: If the remote shell connection fails, then current versions actually
+ * report an "unexpected EOF" error here.  Since it's a fairly common mistake
+ * to try to use rsh when ssh is required, we should trap that: if we fail
+ * to read any data at all, we should give a better explanation.
+ */
 static int read_timeout(int fd, char *buf, int len)
 {
 	int n, ret=0;
