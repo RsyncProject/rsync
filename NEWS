@@ -30,4 +30,7 @@ rsync 2.5.3 (not released yet)
     * Added --no-whole-file and --no-blocking-io options (Dave Dykstra)
 
     * Made the --write-batch and --read-batch options actually work
-	and added documentation in the man page (Jos Backus)
+      and added documentation in the man page (Jos Backus)
+
+    * If the daemon is unable to fork a child to accept a connection,
+      print an error message.  (Colin Walters)

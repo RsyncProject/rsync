@@ -387,6 +387,7 @@ void start_accept_loop(int port, int (*fn)(int ))
 	   for each incoming connection */
 	while (1) {
 		fd_set fds;
+		pid_t pid;
 		int fd;
 		struct sockaddr_storage addr;
 		socklen_t addrlen = sizeof addr;
@@ -418,12 +419,22 @@ void start_accept_loop(int port, int (*fn)(int ))
                 while (waitpid(-1, NULL, WNOHANG) > 0);
 #endif
 
-		if (fork()==0) {
+		if ((pid = fork()) == 0) {
 			close(s);
 			/* open log file in child before possibly giving
 			   up privileges  */
 			log_open();
 			_exit(fn(fd));
+		} else if (pid < 0) {
+			rprintf(FERROR,
+				RSYNC_NAME
+				": could not create child server process: %s\n",
+				strerror(errno));
+			close(fd);
+			/* This might have happened because we're
+			 * overloaded.  Sleep briefly before trying to
+			 * accept again. */
+			sleep(2);
 		}
 
 		close(fd);
