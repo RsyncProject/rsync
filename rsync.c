@@ -698,7 +698,7 @@ static void delete_one(struct file_struct *f)
 
 static struct delete_list {
 	dev_t dev;
-	ino_t inode;
+	INO_T inode;
 } *delete_list;
 static int dlist_len, dlist_alloc_len;
 

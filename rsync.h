@@ -259,6 +259,12 @@
 #define NO_INT64
 #endif
 
+#if HAVE_SHORT_INO_T
+#define INO_T uint32
+#else
+#define INO_T ino_t
+#endif
+
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #endif
@@ -284,7 +290,7 @@ struct file_struct {
 	time_t modtime;
 	OFF_T length;
 	mode_t mode;
-	ino_t inode;
+	INO_T inode;
 	dev_t dev;
 	dev_t rdev;
 	uid_t uid;
@@ -303,11 +309,11 @@ struct file_list {
 };
 
 struct sum_buf {
-  OFF_T offset;			/* offset in file of this chunk */
-  int len;			/* length of chunk of file */
-  int i;			/* index of this chunk */
-  uint32 sum1;	                /* simple checksum */
-  char sum2[SUM_LENGTH];	/* checksum  */
+	OFF_T offset;		/* offset in file of this chunk */
+	int len;		/* length of chunk of file */
+	int i;			/* index of this chunk */
+	uint32 sum1;	        /* simple checksum */
+	char sum2[SUM_LENGTH];	/* checksum  */
 };
 
 struct sum_struct {

@@ -62,6 +62,14 @@ main() { struct stat64 st; off64_t s; if (sizeof(off_t) == sizeof(off64_t)) retu
 echo yes;AC_DEFINE(HAVE_OFF64_T), 
 echo no)
 
+echo $ac_n "checking for short ino_t ... $ac_c"
+AC_TRY_RUN([#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+main() { if (sizeof(ino_t) < sizeof(unsigned int)) return 0; return 1; }],
+echo yes;AC_DEFINE(HAVE_SHORT_INO_T), 
+echo no)
+
 echo $ac_n "checking for unsigned char ... $ac_c"
 AC_TRY_RUN([#include <stdio.h>
 main() { char c; c=250; exit((c > 0)?0:1); }],
