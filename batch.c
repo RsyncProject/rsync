@@ -264,7 +264,7 @@ int read_batch_flist_file(char *buff, int len)
 	return bytes_read;
 }
 
-unsigned char read_batch_flags()
+unsigned char read_batch_flags(void)
 {
 	int flags;
 

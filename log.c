@@ -184,7 +184,7 @@ void log_init(void)
 #endif
 }
 
-void log_open()
+void log_open(void)
 {
 	if (logfname && !logfile) {
 		extern int orig_umask;
@@ -194,7 +194,7 @@ void log_open()
 	}
 }
 
-void log_close()
+void log_close(void)
 {
 	if (logfile) {
 		fclose(logfile);

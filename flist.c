@@ -1197,7 +1197,7 @@ void free_file(struct file_struct *file)
 /*
  * allocate a new file list
  */
-struct file_list *flist_new()
+struct file_list *flist_new(void)
 {
 	struct file_list *flist;
 
