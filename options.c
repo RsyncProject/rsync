@@ -1301,7 +1301,7 @@ void server_options(char **args,int *argc)
 	/* This is a complete hack - blame Rusty.  FIXME!
 	 * This hack is only needed for older rsync versions that
 	 * don't understand the --list-only option. */
-	if (list_only == 1 && recurse)
+	if (list_only == 1 && !recurse)
 		argstr[x++] = 'r';
 
 	argstr[x] = 0;
