@@ -254,14 +254,15 @@ static void generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
  * out.  It might be wrong.
  */
 static void recv_generator(char *fname, struct file_struct *file, int i,
-			   int f_out)
+			   int f_out, int f_out_name)
 {
-	int fd, f_copy;
+	int fd = -1, f_copy = -1;
 	STRUCT_STAT st, partial_st;
-	struct file_struct *back_file;
+	struct file_struct *back_file = NULL;
 	int statret, stat_errno;
-	char *fnamecmp, *partialptr, *backupptr;
+	char *fnamecmp, *partialptr, *backupptr = NULL;
 	char fnamecmpbuf[MAXPATHLEN];
+	uchar fnamecmp_type;
 
 	if (list_only)
 		return;
@@ -421,6 +422,7 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 	}
 
 	fnamecmp = fname;
+	fnamecmp_type = FNAMECMP_FNAME;
 
 	if (statret == -1 && compare_dest != NULL) {
 		/* try the file at compare_dest instead */
@@ -437,10 +439,14 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 							safe_fname(fname));
 					}
 					fnamecmp = fnamecmpbuf;
+					fnamecmp_type = FNAMECMP_CMPDEST;
 				}
 			} else
 #endif
+			{
 				fnamecmp = fnamecmpbuf;
+				fnamecmp_type = FNAMECMP_CMPDEST;
+			}
 			statret = 0;
 		}
 	}
@@ -463,11 +469,9 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 	if (statret == -1) {
 		if (preserve_hard_links && hard_link_check(file, HL_SKIP))
 			return;
-		if (stat_errno == ENOENT) {
-			write_int(f_out,i);
-			if (!dry_run && !read_batch)
-				write_sum_head(f_out, NULL);
-		} else if (verbose > 1) {
+		if (stat_errno == ENOENT)
+			goto notify_others;
+		if (verbose > 1) {
 			rsyserr(FERROR, stat_errno,
 				"recv_generator: failed to stat %s",
 				full_fname(fname));
@@ -475,13 +479,13 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		return;
 	}
 
-	if (opt_ignore_existing && fnamecmp == fname) {
+	if (opt_ignore_existing && fnamecmp_type == FNAMECMP_FNAME) {
 		if (verbose > 1)
 			rprintf(FINFO, "%s exists\n", safe_fname(fname));
 		return;
 	}
 
-	if (update_only && fnamecmp == fname
+	if (update_only && fnamecmp_type == FNAMECMP_FNAME
 	    && cmp_modtime(st.st_mtime, file->modtime) > 0) {
 		if (verbose > 1)
 			rprintf(FINFO, "%s is newer\n", safe_fname(fname));
@@ -489,26 +493,23 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 	}
 
 	if (skip_file(fnamecmp, file, &st)) {
-		if (fnamecmp == fname)
+		if (fnamecmp_type == FNAMECMP_FNAME)
 			set_perms(fname, file, &st, PERMS_REPORT);
 		return;
 	}
 
 prepare_to_open:
-	if (dry_run || read_batch) {
-		write_int(f_out,i);
-		return;
+	if (dry_run || whole_file > 0) {
+		statret = -1;
+		goto notify_others;
 	}
-
-	if (whole_file > 0) {
-		write_int(f_out,i);
-		write_sum_head(f_out, NULL);
-		return;
-	}
+	if (read_batch)
+		goto notify_others;
 
 	if (partialptr) {
 		st = partial_st;
 		fnamecmp = partialptr;
+		fnamecmp_type = FNAMECMP_PARTIAL_DIR;
 	}
 
 	/* open the file */
@@ -521,9 +522,8 @@ prepare_to_open:
 		/* pretend the file didn't exist */
 		if (preserve_hard_links && hard_link_check(file, HL_SKIP))
 			return;
-		write_int(f_out,i);
-		write_sum_head(f_out, NULL);
-		return;
+		statret = -1;
+		goto notify_others;
 	}
 
 	if (inplace && make_backups) {
@@ -550,10 +550,7 @@ prepare_to_open:
 			close(fd);
 			return;
 		}
-	} else {
-		backupptr = NULL;
-		back_file = NULL;
-		f_copy = -1;
+		fnamecmp_type = FNAMECMP_BACKUP;
 	}
 
 	if (verbose > 3) {
@@ -564,22 +561,35 @@ prepare_to_open:
 	if (verbose > 2)
 		rprintf(FINFO, "generating and sending sums for %d\n", i);
 
-	write_int(f_out,i);
-	generate_and_send_sums(fd, st.st_size, f_out, f_copy);
+notify_others:
+	write_int(f_out, i);
+	if (f_out_name >= 0)
+		write_byte(f_out_name, fnamecmp_type);
 
-	if (f_copy >= 0) {
-		close(f_copy);
-		set_perms(backupptr, back_file, NULL, 0);
-		if (verbose > 1)
-			rprintf(FINFO, "backed up %s to %s\n", fname, backupptr);
-		free(back_file);
-	}
+	if (dry_run || read_batch)
+		return;
 
-	close(fd);
+	if (statret == 0) {
+		generate_and_send_sums(fd, st.st_size, f_out, f_copy);
+
+		if (f_copy >= 0) {
+			close(f_copy);
+			set_perms(backupptr, back_file, NULL, 0);
+			if (verbose > 1) {
+				rprintf(FINFO, "backed up %s to %s\n",
+					fname, backupptr);
+			}
+			free(back_file);
+		}
+
+		close(fd);
+	} else
+		write_sum_head(f_out, NULL);
 }
 
 
-void generate_files(int f_out, struct file_list *flist, char *local_name)
+void generate_files(int f_out, struct file_list *flist, char *local_name,
+		    int f_out_name)
 {
 	int i;
 	int phase = 0;
@@ -620,7 +630,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		}
 
 		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
-			       file, i, f_out);
+			       file, i, f_out, f_out_name);
 	}
 
 	phase++;
@@ -637,7 +647,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	while ((i = get_redo_num()) != -1) {
 		struct file_struct *file = flist->files[i];
 		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
-			       file, i, f_out);
+			       file, i, f_out, f_out_name);
 	}
 
 	phase++;
@@ -656,7 +666,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		if (!file->basename || !S_ISDIR(file->mode))
 			continue;
 		recv_generator(local_name ? local_name : f_name(file),
-			       file, i, -1);
+			       file, i, -1, -1);
 	}
 
 	if (verbose > 2)

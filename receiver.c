@@ -30,6 +30,7 @@ extern int dry_run;
 extern int read_batch;
 extern int batch_gen_fd;
 extern int am_server;
+extern int protocol_version;
 extern int relative_paths;
 extern int keep_dirlinks;
 extern int preserve_hard_links;
@@ -329,7 +330,8 @@ static void discard_receive_data(int f_in, OFF_T length)
  * main routine for receiver process.
  *
  * Receiver process runs on the same host as the generator process. */
-int recv_files(int f_in, struct file_list *flist, char *local_name)
+int recv_files(int f_in, struct file_list *flist, char *local_name,
+	       int f_in_name)
 {
 	int next_gen_i = -1;
 	int fd1,fd2;
@@ -358,8 +360,13 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		i = read_int(f_in);
 		if (i == -1) {
 			if (read_batch) {
-				if (next_gen_i != flist->count)
-					while (read_int(batch_gen_fd) != -1) {}
+				if (next_gen_i != flist->count) {
+					do {
+						if (f_in_name >= 0
+						    && next_gen_i >= 0)
+							read_byte(f_in_name);
+					} while (read_int(batch_gen_fd) != -1);
+				}
 				next_gen_i = -1;
 			}
 
@@ -407,6 +414,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 
 		if (read_batch) {
 			while (i > next_gen_i) {
+				if (f_in_name >= 0 && next_gen_i >= 0)
+					read_byte(f_in_name);
 				next_gen_i = read_int(batch_gen_fd);
 				if (next_gen_i == -1)
 					next_gen_i = flist->count;
@@ -417,6 +426,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 				discard_receive_data(f_in, file->length);
 				continue;
 			}
+			next_gen_i = -1;
 		}
 
 		if (server_exclude_list.head
@@ -426,34 +436,31 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		if (partial_dir) {
-			if ((partialptr = partial_dir_fname(fname)) != NULL)
-				fnamecmp = partialptr;
-			else
-				fnamecmp = fname;
-		} else
-			fnamecmp = partialptr = fname;
+		partialptr = partial_dir ? partial_dir_fname(fname) : fname;
 
-		if (inplace && make_backups) {
-			if (!(fnamecmp = get_backup_name(fname)))
-				fnamecmp = partialptr;
-		}
+		if (f_in_name >= 0) {
+			switch (read_byte(f_in_name)) {
+			case FNAMECMP_FNAME:
+				fnamecmp = fname;
+				break;
+			case FNAMECMP_PARTIAL_DIR:
+				fnamecmp = partialptr ? partialptr : fname;
+				break;
+			case FNAMECMP_BACKUP:
+				fnamecmp = get_backup_name(fname);
+				break;
+			case FNAMECMP_CMPDEST:
+			default:
+				pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
+					 compare_dest, fname);
+				fnamecmp = fnamecmpbuf;
+				break;
+			}
+		} else
+			fnamecmp = fname;
 
 		/* open the file */
 		fd1 = do_open(fnamecmp, O_RDONLY, 0);
-
-		if (fd1 == -1 && fnamecmp != fname) {
-			fnamecmp = fname;
-			fd1 = do_open(fnamecmp, O_RDONLY, 0);
-		}
-
-		if (fd1 == -1 && compare_dest != NULL) {
-			/* try the file at compare_dest instead */
-			pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
-				 compare_dest, fname);
-			fnamecmp = fnamecmpbuf;
-			fd1 = do_open(fnamecmp, O_RDONLY, 0);
-		}
 
 		if (fd1 != -1 && do_fstat(fd1,&st) != 0) {
 			rsyserr(FERROR, errno, "fstat %s failed",

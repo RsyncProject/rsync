@@ -119,6 +119,11 @@
 #define PDIR_CREATE	1
 #define PDIR_DELETE	0
 
+#define FNAMECMP_CMPDEST	0x00
+#define FNAMECMP_FNAME		0x80
+#define FNAMECMP_PARTIAL_DIR	0x81
+#define FNAMECMP_BACKUP 	0x82
+
 
 /* Log-message categories.  FLOG is only used on the daemon side to
  * output messages to the log file. */

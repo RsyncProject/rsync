@@ -59,6 +59,7 @@ extern int filesfrom_fd;
 extern pid_t cleanup_child_pid;
 extern char *files_from;
 extern char *remote_filesfrom_file;
+extern char *compare_dest;
 extern char *rsync_path;
 extern char *shell_cmd;
 extern char *batch_name;
@@ -461,7 +462,8 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 {
 	int pid;
 	int status = 0;
-	int error_pipe[2];
+	int error_pipe[2], name_pipe[2];
+	BOOL need_name_pipe = compare_dest && !dry_run;
 
 	/* The receiving side mustn't obey this, or an existing symlink that
 	 * points to an identical file won't be replaced by the referent. */
@@ -476,7 +478,8 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 			delete_files(flist);
 	}
 
-	if (fd_pair(error_pipe) < 0) {
+	if (fd_pair(error_pipe) < 0
+	    || (need_name_pipe && fd_pair(name_pipe) < 0)) {
 		rsyserr(FERROR, errno, "pipe failed in do_recv");
 		exit_cleanup(RERR_SOCKETIO);
 	}
@@ -485,6 +488,11 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	if ((pid = do_fork()) == 0) {
 		close(error_pipe[0]);
+		if (need_name_pipe) {
+			close(name_pipe[1]);
+			set_blocking(name_pipe[0]);
+		} else
+			name_pipe[0] = -1;
 		if (f_in != f_out)
 			close(f_out);
 
@@ -494,7 +502,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		/* set place to send errors */
 		set_msg_fd_out(error_pipe[1]);
 
-		recv_files(f_in,flist,local_name);
+		recv_files(f_in, flist, local_name, name_pipe[0]);
 		io_flush(FULL_FLUSH);
 		report(f_in);
 
@@ -513,6 +521,11 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		stop_write_batch();
 
 	close(error_pipe[1]);
+	if (need_name_pipe) {
+		close(name_pipe[0]);
+		set_nonblocking(name_pipe[1]);
+	} else
+		name_pipe[1] = -1;
 	if (f_in != f_out)
 		close(f_in);
 
@@ -520,7 +533,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	set_msg_fd_in(error_pipe[0]);
 
-	generate_files(f_out, flist, local_name);
+	generate_files(f_out, flist, local_name, name_pipe[1]);
 
 	get_redo_num(); /* Read final MSG_DONE and any prior messages. */
 	report(-1);
