@@ -170,6 +170,7 @@
 #endif
 
 /* the length of the md4 checksum */
+#define MD4_SUM_LENGTH 16
 #define SUM_LENGTH 16
 
 #ifndef MAXPATHLEN
@@ -188,7 +189,7 @@ struct file_struct {
   char *name;
   char *dir;
   char *link;
-  char sum[SUM_LENGTH];
+  char sum[MD4_SUM_LENGTH];
 };
 
 struct file_list {
@@ -202,7 +203,7 @@ struct sum_buf {
   int len;			/* length of chunk of file */
   int i;			/* index of this chunk */
   uint32 sum1;	                /* simple checksum */
-  char sum2[SUM_LENGTH];	/* md4 checksum  */
+  char sum2[SUM_LENGTH];	/* checksum  */
 };
 
 struct sum_struct {

@@ -257,7 +257,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
   struct stat st;
   struct map_struct *buf;
   struct sum_struct *s;
-  char sum[SUM_LENGTH];
+  char sum[MD4_SUM_LENGTH];
   int statret;
   struct file_struct *file = &flist->files[i];
 
@@ -408,8 +408,8 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
   off_t offset = 0;
   off_t offset2;
   char *data;
-  static char file_sum1[SUM_LENGTH];
-  static char file_sum2[SUM_LENGTH];
+  static char file_sum1[MD4_SUM_LENGTH];
+  static char file_sum2[MD4_SUM_LENGTH];
   char *map=NULL;
 
   count = read_int(f_in);
@@ -462,10 +462,10 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
   sum_end(file_sum1);
 
   if (remote_version >= 14) {
-    read_buf(f_in,file_sum2,SUM_LENGTH);
+    read_buf(f_in,file_sum2,MD4_SUM_LENGTH);
     if (verbose > 2)
       fprintf(FERROR,"got file_sum\n");
-    if (memcmp(file_sum1,file_sum2,SUM_LENGTH) != 0)
+    if (memcmp(file_sum1,file_sum2,MD4_SUM_LENGTH) != 0)
       return 0;
   }
   return 1;

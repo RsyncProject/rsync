@@ -221,12 +221,12 @@ static void hash_search(int f,struct sum_struct *s,
 
     /* Trim off the first byte from the checksum */
     map = window_ptr(buf,offset,k+1);
-    s1 -= map[0];
-    s2 -= k * map[0];
+    s1 -= map[0] + 1;
+    s2 -= k * (map[0]+1);
 
     /* Add on the next byte (if there is one) to the checksum */
     if (k < (len-offset)) {
-      s1 += map[k];
+      s1 += (map[k]+1);
       s2 += s1;
     } else {
       --k;
@@ -241,7 +241,7 @@ static void hash_search(int f,struct sum_struct *s,
 
 void match_sums(int f,struct sum_struct *s,struct map_struct *buf,off_t len)
 {
-  char file_sum[SUM_LENGTH];
+  char file_sum[MD4_SUM_LENGTH];
 
   last_match = 0;
   false_alarms = 0;
@@ -270,7 +270,7 @@ void match_sums(int f,struct sum_struct *s,struct map_struct *buf,off_t len)
   if (remote_version >= 14) {
     if (verbose > 2)
       fprintf(FERROR,"sending file_sum\n");
-    write_buf(f,file_sum,SUM_LENGTH);
+    write_buf(f,file_sum,MD4_SUM_LENGTH);
   }
 
   if (targets) {
