@@ -48,8 +48,8 @@ static void report(int f)
 		out = write_total();
 		tsize = total_size;
 	} else {
-		in = read_longint(f);
 		out = read_longint(f);
+		in = read_longint(f);
 		tsize = read_longint(f);
 	}
 	
