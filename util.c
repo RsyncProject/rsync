@@ -991,6 +991,9 @@ char *partial_dir_fname(const char *fname)
 		fn = fname;
 	if ((int)pathjoin(t, sz, partial_dir, fn) >= sz)
 		return NULL;
+	if (server_exclude_list.head
+	    && check_exclude(&server_exclude_list, partial_fname, 0) < 0)
+		return NULL;
 
 	return partial_fname;
 }
