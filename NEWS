@@ -20,6 +20,10 @@ Changes since 2.6.2:
       work -- older receivers always keep the file, and older senders
       don't tell the receiver that the file was not read correctly.)
 
+    - If a file gets resent in a single transfer and the --backup option
+      is enabled, rsync no longer performs a duplicate backup (losing the
+      original file in the process).
+
     - Fixed an age-old crash problem with --read-batch on a local copy
       (rsync was improperly assuming --whole-file for the local copy).
 
@@ -42,6 +46,10 @@ Changes since 2.6.2:
       to just exit because the socket wasn't in the right state to send
       the message).
 
+    - Most errors that occur during a daemon transfer are now returned to
+      the user in addition to being logged (some messages are intended to
+      be daemon-only).
+
     - Fixed a bug in the daemon authentication code when using one of the
       batch-processing options.
 
@@ -55,6 +63,10 @@ Changes since 2.6.2:
 
     - Added long-option names for -4 and -6 (namely --ipv4 and --ipv6)
       and documented all these options in the man page.
+
+    - If the daemon get an address-in-use error starting up, we sometimes
+      suggest that the user specify --ipv4 or --ipv6 to work around their
+      buggy socket implementation.
 
     - Improved the handling of the --bwlimit option so that it's less
       bursty, more accurate, and works properly over a larger range of
@@ -73,6 +85,11 @@ Changes since 2.6.2:
     - Use rsyserr() in the various places that were still calling
       rprintf() with strerror() as an arg.
 
+    - If an rsync daemon is listening on multiple sockets (to handle both
+      IPv4 and IPv6 to a single port), we now close all the unneeded file
+      handles after we accept a connecton (we used to close just one of
+      them).
+
   BUILD CHANGES:
 
     - Added a "gen" target to rebuild most of the generated files,
@@ -81,6 +98,10 @@ Changes since 2.6.2:
     - If "make proto" doesn't find some changes in the prototypes, the
       proto.h file is left untouched (its timestamp used to always be
       updated).
+
+    - The variable $STRIP (that is optionally set by the install-strip
+      target's rule) was changed to $INSTALL_STRIP because some systems
+      have $STRIP set in the environment.
 
   DEVELOPER RELATED:
 
