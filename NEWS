@@ -1,4 +1,4 @@
-NEWS for rsync 2.6.2 (UNRELEASED)
+NEWS for rsync 2.6.2 (30 Apr 2004)
 Protocol: 28 (unchanged)
 Changes since 2.6.1:
 
@@ -20,9 +20,19 @@ Changes since 2.6.1:
       code.  (This bug probably had no ill effects.)
 
     - Got rid of the configure check for sys/sysctl.h (it wasn't used
-      and was causing a problem on some systems).
+      and was causing a problem on some systems).  Also improved the
+      broken-largefile-locking test to try to avoid failure due to an
+      NFS build-dir.
 
-  ENHANCEMENTS:
+    - Fixed a compile problem on systems that don't define
+      AI_NUMERICHOST.
+
+    - Fixed a compile problem in the popt source for compilers that
+      don't support __attribute__.
+
+  INTERNAL:
+
+    - Improved the testsuite's "merge" test to work on OSF1.
 
     - Two new diffs were added to the patches dir.
 
