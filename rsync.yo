@@ -1228,44 +1228,47 @@ Rsync builds an ordered list of filter rules as specified on the
 command-line.  Filter rules have the following syntax:
 
 quote(
-tt(x [PATTERN_OR_FILE])nl()
-tt(xMODIFIERS [PATTERN_OR_FILE])nl()
+tt(RULE [PATTERN_OR_FILENAME])nl()
+tt(RULE,MODIFIERS [PATTERN_OR_FILENAME])nl()
 )
 
-The 'x' is a single-letter that specifies the kind of rule to create.  It
-can have trailing modifiers, and is separated from its arg by either a
-single space or an underscore (_).  Here are the available rule prefixes:
+You have your choice of using either short or long RULE names, as described
+below.  If you use a short-named rule, the ',' separating the RULE from the
+MODIFIERS is optional.  The PATTERN or FILENAME that follows (when present)
+must come after either a single space or an underscore (_).
+Here are the available rule prefixes:
 
 quote(
-bf(-) specifies an exclude pattern. nl()
-bf(+) specifies an include pattern. nl()
-bf(.) specifies a merge-file to read for more rules. nl()
-bf(:) specifies a per-directory merge-file. nl()
-bf(!) clears the current include/exclude list (takes no arg) nl()
+bf(exclude, -) specifies an exclude pattern. nl()
+bf(include, +) specifies an include pattern. nl()
+bf(merge, .) specifies a merge-file to read for more rules. nl()
+bf(dir-merge, :) specifies a per-directory merge-file. nl()
+bf(clear, !) clears the current include/exclude list (takes no arg) nl()
 )
+
+When rules are being read from a file, empty lines are ignored, as are
+comment lines that start with a "#".
 
 Note that the bf(--include)/bf(--exclude) command-line options do not allow the
 full range of rule parsing as described above -- they only allow the
-specification of include/exclude patterns and the "!" token (not to
-mention the comment lines when reading rules from a file).  If a pattern
+specification of include/exclude patterns plus a "!" token to clear the
+list (and the normal comment parsing when rules are read from a file).
+If a pattern
 does not begin with "- " (dash, space) or "+ " (plus, space), then the
 rule will be interpreted as if "+ " (for an include option) or "- " (for
 an exclude option) were prefixed to the string.  A bf(--filter) option, on
-the other hand, must always contain one of the prefixes above.
+the other hand, must always contain either a short or long rule name at the
+start of the rule.
 
 Note also that the bf(--filter), bf(--include), and bf(--exclude) options take one
 rule/pattern each. To add multiple ones, you can repeat the options on
 the command-line, use the merge-file syntax of the bf(--filter) option, or
 the bf(--include-from)/bf(--exclude-from) options.
 
-When rules are being read from a file, empty lines are ignored, as are
-comment lines that start with a "#".
-
 manpagesection(INCLUDE/EXCLUDE PATTERN RULES)
 
 You can include and exclude files by specifying patterns using the "+" and
 "-" filter rules (as introduced in the FILTER RULES section above).
-
 The include/exclude rules each specify a pattern that is matched against
 the names of the files that are going to be transferred.  These patterns
 can take several forms:
@@ -1357,8 +1360,8 @@ itemize(
 manpagesection(MERGE-FILE FILTER RULES)
 
 You can merge whole files into your filter rules by specifying either a
-"." or a ":" filter rule (as introduced in the FILTER RULES section
-above).
+merge (.) or a dir-merge (:) filter rule (as introduced in the FILTER RULES
+section above).
 
 There are two kinds of merged files -- single-instance ('.') and
 per-directory (':').  A single-instance merge file is read one time, and
@@ -1375,34 +1378,36 @@ below).
 Some examples:
 
 quote(
+tt(merge /etc/rsync/default.rules)nl()
 tt(. /etc/rsync/default.rules)nl()
-tt(: .per-dir-filter)nl()
+tt(dir-merge .per-dir-filter)nl()
+tt(dir-merge,n- .non-inherited-per-dir-excludes)nl()
 tt(:n- .non-inherited-per-dir-excludes)nl()
 )
 
-The following modifiers are accepted after a "." or ":":
+The following modifiers are accepted after a merge or dir-merge rule:
 
 itemize(
   it() A bf(-) specifies that the file should consist of only exclude
-  patterns, with no other rule-parsing except for the list-clearing
-  token ("!").
+  patterns, with no other rule-parsing except for in-file comments.
   it() A bf(+) specifies that the file should consist of only include
-  patterns, with no other rule-parsing except for the list-clearing
-  token ("!").
-  it() A bf(C) is a shorthand for the modifiers bf(nw-), which makes the
-  parsing compatible with the way CVS parses their exclude files.  If no
-  filename is specified, ".cvsignore" is assumed.
-  it() A bf(e) will exclude the merge-file from the transfer; e.g.
-  ":e_.rules" is like ":_.rules" and "-_.rules".
+  patterns, with no other rule-parsing except for in-file comments.
+  it() A bf(C) is a way to specify that the file should be read in a
+  CVS-compatible manner.  This turns on 'n', 'w', and '-', but also
+  allows the list-clearing token (!) to be specified.  If no filename is
+  provided, ".cvsignore" is assumed.
+  it() A bf(e) will exclude the merge-file name from the transfer; e.g.
+  "dir-merge,e_.rules" is like "dir-merge,_.rules" and "-_.rules".
   it() An bf(n) specifies that the rules are not inherited by subdirectories.
   it() A bf(w) specifies that the rules are word-split on whitespace instead
   of the normal line-splitting.  This also turns off comments.  Note: the
   space that separates the prefix from the rule is treated specially, so
-  "- foo + bar" is parsed as two rules (assuming that bf(-) or bf(+) was not
-  specified to turn off the parsing of prefixes).
-  it() You may also specify any of the modifiers for "+" or "-" to have the
-  rules that are read-in default to having that option set.  For instance,
-  ".-/_.excl" would treat the contents of .excl as absolute-path excludes.
+  "- foo + bar" is parsed as two rules (assuming that prefix-parsing wasn't
+  also disabled).
+  it() You may also specify any of the modifiers for the "+" or "-" rules
+  (below) in order  to have the rules that are read-in from the file
+  default to having that modifier set.  For instance, "merge,-/_.excl" would
+  treat the contents of .excl as absolute-path excludes.
 )
 
 The following modifiers are accepted after a "+" or "-":
@@ -1424,24 +1429,24 @@ Per-directory rules are inherited in all subdirectories of the directory
 where the merge-file was found unless the 'n' modifier was used.  Each
 subdirectory's rules are prefixed to the inherited per-directory rules
 from its parents, which gives the newest rules a higher priority than the
-inherited rules.  The entire set of per-dir rules is grouped together in
+inherited rules.  The entire set of dir-merge rules are grouped together in
 the spot where the merge-file was specified, so it is possible to override
-per-dir rules via a rule that got specified earlier in the list of global
+dir-merge rules via a rule that got specified earlier in the list of global
 rules.  When the list-clearing rule ("!") is read from a per-directory
 file, it only clears the inherited rules for the current merge file.
 
-Another way to prevent a single per-dir rule from being inherited is to
+Another way to prevent a single rule from a dir-merge file from being inherited is to
 anchor it with a leading slash.  Anchored rules in a per-directory
 merge-file are relative to the merge-file's directory, so a pattern "/foo"
-would only match the file "foo" in the directory where the per-dir filter
+would only match the file "foo" in the directory where the dir-merge filter
 file was found.
 
 Here's an example filter file which you'd specify via bf(--filter=". file":)
 
 quote(
-tt(. /home/user/.global-filter)nl()
+tt(merge /home/user/.global-filter)nl()
 tt(- *.gz)nl()
-tt(: .rules)nl()
+tt(dir-merge .rules)nl()
 tt(+ *.[ch])nl()
 tt(- *.o)nl()
 )
@@ -1480,13 +1485,12 @@ and only looks for the ".rsync-filter" files in each directory that is
 a part of the transfer.
 
 If you want to include the contents of a ".cvsignore" in your patterns,
-you should use the rule ":C" -- this is a short-hand for the rule
-":nw-_.cvsignore", and ensures that the .cvsignore file's contents are
-interpreted according to the same parsing rules that CVS uses.  You can
+you should use the rule ":C", which creates a dir-merge of the .cvsignore
+file, but parsed in a CVS-compatible manner.  You can
 use this to affect where the bf(--cvs-exclude) (bf(-C)) option's inclusion of the
-per-directory .cvsignore file gets placed into your rules by putting a
+per-directory .cvsignore file gets placed into your rules by putting the
 ":C" wherever you like in your filter rules.  Without this, rsync would
-add the per-dir rule for the .cvsignore file at the end of all your other
+add the dir-merge rule for the .cvsignore file at the end of all your other
 rules (giving it a lower priority than your command-line rules).  For
 example:
 
