@@ -151,8 +151,7 @@ static int get_tmpname(char *fnametmp, char *fname)
 	int	maxname;
 
 	if (tmpdir) {
-		strlcpy(fnametmp, tmpdir, MAXPATHLEN - 2);
-		length = strlen(fnametmp);
+		length = strlcpy(fnametmp, tmpdir, MAXPATHLEN - 2);
 		fnametmp[length++] = '/';
 		fnametmp[length] = '\0';	/* always NULL terminated */
 	}
