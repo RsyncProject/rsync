@@ -58,11 +58,12 @@
 /* These flags are used in the live flist data. */
 
 #define FLAG_TOP_DIR (1<<0)
-#define FLAG_HLINK_EOL (1<<1)	/* generator only */
-#define FLAG_MOUNT_POINT (1<<2)	/* sender only */
-#define FLAG_NO_FUZZY (1<<2)	/* generator only */
+#define FLAG_HLINK_EOL (1<<1)	/* receiver/generator */
+#define FLAG_MOUNT_POINT (1<<2)	/* sender */
+#define FLAG_NO_FUZZY (1<<2)	/* generator */
 #define FLAG_DEL_HERE (1<<3)	/* receiver/generator */
-#define FLAG_SENT (1<<3)	/* sender only */
+#define FLAG_SENT (1<<3)	/* sender */
+#define FLAG_HLINK_TOL (1<<4)	/* receiver/generator */
 
 /* update this if you make incompatible changes */
 #define PROTOCOL_VERSION 29
@@ -137,7 +138,7 @@
 #define DEL_TERSE		(1<<3)
 
 /* For use by the itemize_changes code */
-#define ITEM_UPDATING (1<<0)
+#define ITEM_TRANSFER (1<<0)
 #define ITEM_REPORT_CHECKSUM (1<<1)
 #define ITEM_REPORT_SIZE (1<<2)
 #define ITEM_REPORT_TIME (1<<3)
@@ -146,10 +147,17 @@
 #define ITEM_REPORT_GROUP (1<<6)
 #define ITEM_IS_NEW (1<<7)
 #define ITEM_USING_ALT_BASIS (1<<8)
+#define ITEM_HARD_LINKED (1<<9)
+#define ITEM_LOCAL_CHANGE (1<<10)
+#define ITEM_REPORT_XATTRS (1<<11)
 /* These are outside the range of the transmitted flags. */
 #define ITEM_NO_DEST_AND_NO_UPDATE (1<<16) /* used by itemize() */
 #define ITEM_MISSING_DATA (1<<16)	   /* used by log_formatted() */
 #define ITEM_DELETED (1<<17)		   /* used by log_formatted() */
+
+#define SIGNIFICANT_ITEM_FLAGS (ITEM_TRANSFER | ITEM_REPORT_CHECKSUM \
+	| ITEM_REPORT_SIZE | ITEM_REPORT_TIME | ITEM_REPORT_PERMS \
+	| ITEM_REPORT_OWNER | ITEM_REPORT_GROUP | ITEM_IS_NEW)
 
 
 /* Log-message categories.  FLOG and FCLIENT are only used on the daemon
@@ -473,7 +481,7 @@ struct idev {
 #define HL_SKIP		1
 
 struct hlink {
-	struct file_struct *next;
+	int next;
 	int hlindex;
 };
 
