@@ -156,9 +156,14 @@ Note that you are free to setup user/group information in the chroot area
 differently from your normal system.  For example, you could abbreviate
 the list of users and groups.  Also, you can protect this information from
 being downloaded/uploaded by adding an exclude rule to the rsync.conf file
-(e.g. "exclude = /etc/").  Note that having the exclusion affect uploads
+(e.g. "exclude = /etc/**").  Note that having the exclusion affect uploads
 is a relatively new feature in rsync, so make sure your server is running
-at least 2.6.3 to effect this.
+at least 2.6.3 to effect this.  Also note that it is safest to exclude a
+directory and all its contents combining the rule "/some/dir/" with the
+rule "/some/dir/**" just to be sure that rsync will not allow deeper
+access to some of the excluded files inside the directory (rsync tries to
+do this automatically, but you might as well specify both to be extra
+sure).
 
 dit(bf(port)) You can override the default port the daemon will listen on
 by specifying this value (defaults to 873).  This is ignored if the daemon
