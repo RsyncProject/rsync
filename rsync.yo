@@ -42,7 +42,7 @@ itemize(
 
 manpagesection(GENERAL)
 
-There are six different ways of using rsync. They are:
+There are eight different ways of using rsync. They are:
 
 itemize(
 	it() for copying local files. This is invoked when neither
@@ -64,6 +64,18 @@ itemize(
 	it() for copying from the local machine to a remote rsync
 	server. This is invoked when the destination path contains a ::
 	separator. 
+
+	it() for copying from a remote machine using a remote shell
+	program as the transport, using rsync server on the remote
+	machine.  This is invoked when the source path contains a ::
+	separator and the --rsh=COMMAND (aka "-e COMMAND") option is
+	also provided.
+
+	it() for copying from the local machine to a remote machine
+	using a remote shell program as the transport, using rsync
+	server on the remote machine.  This is invoked when the
+	destination path contains a :: separator and the
+	--rsh=COMMMAND option is also provided.
 
 	it() for listing files on a remote machine. This is done the
 	same way as rsync transfers except that you leave off the
@@ -172,11 +184,58 @@ may be useful when scripting rsync.
 WARNING: On some systems environment variables are visible to all
 users. On those systems using --password-file is recommended.
 
+manpagesection(CONNECTING TO AN RSYNC SERVER OVER A REMOTE SHELL PROGRAM)
+
+It is sometimes useful to be able to set up file transfers using rsync
+server capabilities on the remote machine, while still using rsh or
+ssh for transport.  This is especially useful when you want to connect
+to a remote machine via ssh (for encryption or to get through a
+firewall), but you still want to have access to the rsync server
+features (see RUNNING AN RSYNC SERVER OVER A REMOTE SHELL PROGRAM,
+below).  
+
+From the user's perspective, using rsync in this way is the same as
+using it to connect to an rsync server, except that you must
+explicitly set the remote shell program on the command line with
+--rsh=COMMAND.  (Setting RSYNC_RSH in the environment will not turn on
+this functionality.)
+
+In order to distinguish between the remote-shell user and the rsync
+server user, you can use '-l user' on your remote-shell command:
+
+quote(rsync -av --rsh="ssh -l ssh-user" rsync-user@host::module[/path] local-path)
+
+The "ssh-user" will be used at the ssh level; the "rsync-user" will be
+used to check against the rsyncd.conf on the remote host.
+
 manpagesection(RUNNING AN RSYNC SERVER)
 
 An rsync server is configured using a config file which by default is
 called /etc/rsyncd.conf. Please see the rsyncd.conf(5) man page for more
 information. 
+
+manpagesection(RUNNING AN RSYNC SERVER OVER A REMOTE SHELL PROGRAM)
+
+See the rsyncd.conf(5) man page for full information on the rsync
+server configuration file.  
+
+Several configuration options will not be available unless the remote
+user is root (e.g. chroot, setuid/setgid, etc.).  There is no need to
+configure inetd or the services map to include the rsync server port
+if you run an rsync server only via a remote shell program.
+
+To run an rsync server out of a single-use ssh key, use the
+"command=em(COMMAND)" syntax in the remote user's
+authorized_keys entry, where command would be
+
+quote(rsync --server --daemon .)
+
+NOTE: rsync's argument parsing expects the trailing ".", so make sure
+that it's there.  If you want to use a rsyncd.conf(5)-style
+configuration file other than /etc/rsyncd.conf, you can added a
+--config-file option to the em(command):
+
+quote(rsync --server --daemon --config-file=em(file) .)
 
 manpagesection(EXAMPLES)
 
@@ -516,6 +575,12 @@ dit(bf(-e, --rsh=COMMAND)) This option allows you to choose an alternative
 remote shell program to use for communication between the local and
 remote copies of rsync. Typically, rsync is configured to use rsh by
 default, but you may prefer to use ssh because of its high security.
+
+If this option is used with bf([user@]host::module/path), then the
+remote shell em(COMMMAND) will be used to run an rsync server on the
+remote host, and all data will be transmitted through that remote
+shell connection, rather than through a direct socket connection to a
+running rsync server on the remote host.
 
 Command-line arguments are permitted in COMMAND provided that COMMAND is
 presented to rsync as a single argument.  For example:

@@ -222,6 +222,11 @@ usernames are passwords are stored in the file specified by the
 "secrets file" option. The default is for all users to be able to
 connect without a password (this is called "anonymous rsync").
 
+See also the bf(CONNECTING TO AN RSYNC SERVER OVER A REMOTE SHELL
+PROGRAM) section in rsync(1) for information on how handle an
+rsyncd.conf-level username that differs from the remote-shell-level
+username when using a remote shell to connect to a rsync server.
+
 dit(bf(secrets file)) The "secrets file" option specifies the name of
 a file that contains the username:password pairs used for
 authenticating this module. This file is only consulted if the "auth
