@@ -169,6 +169,12 @@ Changes since 2.6.2:
       finished file would have a very brief window where its permissions
       disallowed all group and world access.
 
+    - Support for literal IPv6 addresses was added to the URL parser for the
+      "rsync:" scheme (e.g. rsync://[2001:638:500:101::21]:873/module/dir).
+
+    - Added the ability to parse a literal IPv6 address in an "rsync:" URL
+      (e.g. rsync://[2001:638:500:101::21]:873/module/dir).
+
   INTERNAL:
 
     - Some cleanup in the exclude code has saved some per-exclude memory
