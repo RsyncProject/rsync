@@ -41,11 +41,10 @@ extern int module_id;
 extern int ignore_errors;
 extern int numeric_ids;
 
-extern int cvs_exclude;
-
 extern int recurse;
 extern int xfer_dirs;
 extern char curr_dir[MAXPATHLEN];
+extern unsigned int curr_dir_len;
 extern char *backup_dir;
 extern char *backup_suffix;
 extern int filesfrom_fd;
@@ -73,7 +72,6 @@ extern int list_only;
 
 extern struct exclude_list_struct exclude_list;
 extern struct exclude_list_struct server_exclude_list;
-extern struct exclude_list_struct local_exclude_list;
 
 int io_error;
 
@@ -229,8 +227,6 @@ int link_stat(const char *path, STRUCT_STAT *buffer, int follow_dirlinks)
  */
 static int check_exclude_file(char *fname, int is_dir, int exclude_level)
 {
-	int rc;
-
 #if 0 /* This currently never happens, so avoid a useless compare. */
 	if (exclude_level == NO_EXCLUDES)
 		return 0;
@@ -252,10 +248,7 @@ static int check_exclude_file(char *fname, int is_dir, int exclude_level)
 	if (exclude_level != ALL_EXCLUDES)
 		return 0;
 	if (exclude_list.head
-	    && (rc = check_exclude(&exclude_list, fname, is_dir)) != 0)
-		return rc < 0;
-	if (local_exclude_list.head
-	    && check_exclude(&local_exclude_list, fname, is_dir) < 0)
+	    && check_exclude(&exclude_list, fname, is_dir) < 0)
 		return 1;
 	return 0;
 }
@@ -1006,15 +999,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 
 	if (recursive && S_ISDIR(file->mode)
 	    && !(file->flags & FLAG_MOUNT_POINT)) {
-		struct exclude_list_struct last_list = local_exclude_list;
-		local_exclude_list.head = local_exclude_list.tail = NULL;
 		send_directory(f, flist, f_name_to(file, fbuf));
-		if (verbose > 2) {
-			rprintf(FINFO, "[%s] popping %sexclude list\n",
-				who_am_i(), local_exclude_list.debug_type);
-		}
-		clear_exclude_list(&local_exclude_list);
-		local_exclude_list = last_list;
 	}
 }
 
@@ -1027,6 +1012,7 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 	struct dirent *di;
 	char fname[MAXPATHLEN];
 	unsigned int offset;
+	void *save_excludes;
 	char *p;
 
 	d = opendir(dir);
@@ -1050,18 +1036,7 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 		offset++;
 	}
 
-	if (cvs_exclude) {
-		if (strlcpy(p, ".cvsignore", MAXPATHLEN - offset)
-		    < MAXPATHLEN - offset) {
-			add_exclude_file(&local_exclude_list, fname,
-					 XFLG_WORD_SPLIT | XFLG_WORDS_ONLY);
-		} else {
-			io_error |= IOERR_GENERAL;
-			rprintf(FINFO,
-				"cannot cvs-exclude in long-named directory %s\n",
-				full_fname(fname));
-		}
-	}
+	save_excludes = push_local_excludes(fname, offset);
 
 	for (errno = 0, di = readdir(d); di; errno = 0, di = readdir(d)) {
 		char *dname = d_name(di);
@@ -1083,6 +1058,8 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 		rsyserr(FERROR, errno, "readdir(%s)", dir);
 	}
 
+	pop_local_excludes(save_excludes);
+
 	closedir(d);
 }
 
@@ -1102,6 +1079,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	char *p, *dir, olddir[sizeof curr_dir];
 	char lastpath[MAXPATHLEN] = "";
 	struct file_list *flist;
+	BOOL need_first_push = True;
 	int64 start_write;
 	int use_ff_fd = 0;
 
@@ -1122,6 +1100,10 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				exit_cleanup(RERR_FILESELECT);
 			}
 			use_ff_fd = 1;
+			if (curr_dir_len < MAXPATHLEN - 1) {
+				push_local_excludes(curr_dir, curr_dir_len);
+				need_first_push = False;
+			}
 		}
 	}
 
@@ -1159,6 +1141,15 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				recurse = 1; /* allow one level */
 		} else if (recurse > 0)
 			recurse = 0;
+
+		if (need_first_push) {
+			if ((p = strrchr(fname, '/')) != NULL) {
+				if (*++p && strcmp(p, ".") != 0)
+					push_local_excludes(fname, p - fname);
+			} else if (strcmp(fname, ".") != 0)
+				push_local_excludes(fname, 0);
+			need_first_push = False;
+		}
 
 		if (link_stat(fname, &st, keep_dirlinks) != 0) {
 			if (f != -1) {
