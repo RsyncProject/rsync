@@ -144,8 +144,8 @@ checkit() {
     echo "-------------">>${log}
     echo "check how the directory listings compare with diff:">>${log}
     echo "">>${log}
-    ( rsync_ls_lR "$2" ) > ${TMP}/ls-from 2>>${log}
-    ( rsync_ls_lR "$3" ) > ${TMP}/ls-to  2>>${log}
+    ( cd "$2" && rsync_ls_lR ) > ${TMP}/ls-from 2>>${log}
+    ( cd "$3" && rsync_ls_lR ) > ${TMP}/ls-to  2>>${log}
     diff -c ${TMP}/ls-from ${TMP}/ls-to >>${log} 2>&1 || failed=YES
     if [ -z "${failed}" ] ; then
 	rm $log
