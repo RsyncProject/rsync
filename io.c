@@ -174,6 +174,7 @@ static int read_timeout (int fd, char *buf, int len)
 		fd_set fds;
 		struct timeval tv;
 		int fd_count = fd+1;
+		int count;
 
 		FD_ZERO(&fds);
 		FD_SET(fd, &fds);
@@ -187,11 +188,16 @@ static int read_timeout (int fd, char *buf, int len)
 
 		errno = 0;
 
-		if (select(fd_count, &fds, NULL, NULL, &tv) < 1) {
+		count = select(fd_count, &fds, NULL, NULL, &tv);
+
+		if (count == 0) {
+			check_timeout();
+		}
+
+		if (count <= 0) {
 			if (errno == EBADF) {
 				exit_cleanup(RERR_SOCKETIO);
 			}
-			check_timeout();
 			continue;
 		}
 
@@ -402,11 +408,14 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 			       &w_fds,NULL,
 			       &tv);
 
+		if (count == 0) {
+			check_timeout();
+		}
+
 		if (count <= 0) {
 			if (errno == EBADF) {
 				exit_cleanup(RERR_SOCKETIO);
 			}
-			check_timeout();
 			continue;
 		}
 
