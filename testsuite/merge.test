@@ -20,7 +20,7 @@ from3dir="${fromdir}3"
 mkdir "$from1dir" "$from2dir" "$from3dir"
 mkdir "$from2dir"/sub1 "$from3dir"/sub1
 mkdir "$from3dir"/sub2 "$from1dir"/dir-and-not-dir
-mkdir "$chkdir" "$chkdir"/sub1 "$chkdir"/sub2
+mkdir "$chkdir" "$chkdir"/sub1 "$chkdir"/sub2 "$chkdir"/dir-and-not-dir
 echo "one" >"$from1dir"/one
 cp -p "$from1dir"/one "$from2dir"/one
 cp -p "$from1dir"/one "$from3dir"/one
@@ -34,17 +34,18 @@ cp -p "$from2dir"/sub1/uno "$from3dir"/sub1/uno
 echo "sub2" >"$from3dir"/sub1/dos
 echo "sub3" >"$from2dir"/sub1/tres
 echo "subby" >"$from3dir"/sub2/subby
+echo "extra" >"$from1dir"/dir-and-not-dir/inside
 echo "not-dir" >"$from3dir"/dir-and-not-dir
 
 cp -p "$from1dir"/one "$from1dir"/two "$from2dir"/three "$from3dir"/four "$from1dir"/five "$from3dir"/six "$chkdir"
-cp -p "$from3dir"/dir-and-not-dir "$chkdir"
+cp -p "$from1dir"/dir-and-not-dir/inside "$chkdir"/dir-and-not-dir
 cp -p "$from2dir"/sub1/uno "$from3dir"/sub1/dos "$from2dir"/sub1/tres "$chkdir"/sub1
 cp -p "$from3dir"/sub2/subby "$chkdir"/sub2
 
 # Get rid of any directory-time differences
 touch "$from1dir" "$from2dir" "$from3dir" \
-    "$from2dir"/sub1 "$from3dir"/sub1 "$from3dir"/sub2 \
-    "$chkdir" "$chkdir"/sub1 "$chkdir"/sub2
+    "$from1dir"/dir-and-not-dir "$from2dir"/sub1 "$from3dir"/sub1 "$from3dir"/sub2 \
+    "$chkdir" "$chkdir"/dir-and-not-dir "$chkdir"/sub1 "$chkdir"/sub2
 
 checkit "$RSYNC -aHvv \"$from1dir/\" \"$from2dir/\" \"$from3dir/\" \"$todir/\"" "$chkdir" "$todir"
 
