@@ -354,7 +354,7 @@ to the detailed description below for a complete description.  verb(
      --compare-dest=DIR      also compare received files relative to DIR
      --copy-dest=DIR         ... and include copies of unchanged files
      --link-dest=DIR         hardlink to files in DIR when unchanged
- -z, --compress              compress file data
+ -z, --compress              compress file data during the transfer
  -C, --cvs-exclude           auto-ignore files in the same way CVS does
  -f, --filter=RULE           add a file-filtering RULE
  -F                          same as --filter=': /.rsync-filter'
@@ -956,15 +956,14 @@ bf(--link-dest) from working properly for a non-root user when bf(-o) was specif
 (or implied by bf(-a)).  You can work-around this bug by avoiding the bf(-o) option
 when sending to an old rsync.
 
-dit(bf(-z, --compress)) With this option, rsync compresses any data from
-the files that it sends to the destination machine.  This
-option is useful on slow connections.  The compression method used is the
-same method that gzip uses.
+dit(bf(-z, --compress)) With this option, rsync compresses the file data
+as it is sent to the destination machine, which reduces the amount of data
+being transmitted -- something that is useful over a slow connection.
 
-Note this this option typically achieves better compression ratios
-that can be achieved by using a compressing remote shell, or a
-compressing transport, as it takes advantage of the implicit
-information sent for matching data blocks.
+Note this this option typically achieves better compression ratios that can
+be achieved by using a compressing remote shell or a compressing transport
+because it takes advantage of the implicit information in the matching data
+blocks that are not explicitly sent over the connection.
 
 dit(bf(--numeric-ids)) With this option rsync will transfer numeric group
 and user IDs rather than using user and group names and mapping them
