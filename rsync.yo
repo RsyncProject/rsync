@@ -915,29 +915,24 @@ Here is how the various command choices differ for a 2-source transfer:
 
 verb(
    Example cmd: rsync -a /home/me /home/you /dest
-   Source root: /home       (me & you are part of transfer)
    +/- pattern: /me/foo/bar
    +/- pattern: /you/bar/baz
    Target file: /dest/me/foo/bar
    Target file: /dest/you/bar/baz
 
    Example cmd: rsync -a /home/me/ /home/you/ /dest
-   Source root: /home/me               (due to trailing /)
-   Source root: /home/you              (ditto)
    +/- pattern: /foo/bar               (note missing "me")
    +/- pattern: /bar/baz               (note missing "you")
    Target file: /dest/foo/bar
    Target file: /dest/bar/baz
 
    Example cmd: rsync -a --relative /home/me/ /home/you /dest
-   Source root: /
    +/- pattern: /home/me/foo/bar       (note full path)
    +/- pattern: /home/you/bar/baz      (ditto)
    Target file: /dest/home/me/foo/bar
    Target file: /dest/home/you/bar/baz
 
    Example cmd: cd /home; rsync -a --relative me/foo you/ /dest
-   Source root: /home
    +/- pattern: /me/foo/bar      (starts at specified path)
    +/- pattern: /you/bar/baz     (ditto)
    Target file: /dest/me/foo/bar
