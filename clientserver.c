@@ -129,7 +129,7 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out, int argc)
 
 	sargs[sargc] = NULL;
 
-	io_printf(f_out, "@RSYNCD: %d\n", PROTOCOL_VERSION);
+	io_printf(f_out, "@RSYNCD: %d\n", protocol_version);
 
 	if (!read_line(f_in, line, sizeof(line)-1)) {
 		rprintf(FERROR, "rsync: did not see server greeting\n");
@@ -522,7 +522,7 @@ int start_daemon(int f_in, int f_out)
 		set_nonblocking(f_in);
 	}
 
-	io_printf(f_out, "@RSYNCD: %d\n", PROTOCOL_VERSION);
+	io_printf(f_out, "@RSYNCD: %d\n", protocol_version);
 
 	motd = lp_motd_file();
 	if (motd && *motd) {
