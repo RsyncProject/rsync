@@ -123,7 +123,7 @@ enum msgcode {
 	MSG_DATA=0,	/* raw data on the multiplexed stream */
 	MSG_ERROR=FERROR, MSG_INFO=FINFO, MSG_LOG=FLOG, /* remote logging */
 	MSG_REDO=4,	/* reprocess indicated flist index */
-	MSG_DONE=5,	/* current phase is done */
+	MSG_DONE=5	/* current phase is done */
 };
 
 #include "errcode.h"
