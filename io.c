@@ -167,6 +167,7 @@ int sparse_end(int f)
     return (write(f,&last_byte,1) == 1 ? 0 : -1);
   }
 #endif  
+  last_sparse = 0;
   return 0;
 }
 
