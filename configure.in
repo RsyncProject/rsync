@@ -53,6 +53,21 @@ else
     dnl CFLAGS=${CFLAGS-"-g"}
 fi
 
+
+
+
+AC_ARG_ENABLE(profile,
+	AC_HELP_STRING([--enable-profile],	
+		[turn on CPU profiling (default no)],
+		[], []))
+if test x"$enable_profile" = xyes
+then
+	CFLAGS="$CFLAGS -pg"
+fi
+
+
+# This is needed for our included version of popt.  Kind of silly, but
+# I don't want our version too far out of sync.
 CFLAGS="$CFLAGS -DHAVE_CONFIG_H"
 
 # If GCC, turn on warnings.
