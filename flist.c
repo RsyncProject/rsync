@@ -39,15 +39,9 @@ extern int always_checksum;
 extern int module_id;
 extern int ignore_errors;
 extern int numeric_ids;
-
 extern int recurse;
 extern int xfer_dirs;
-extern char curr_dir[MAXPATHLEN];
-extern unsigned int curr_dir_len;
-extern char *backup_dir;
-extern char *backup_suffix;
 extern int filesfrom_fd;
-
 extern int one_file_system;
 extern int keep_dirlinks;
 extern int preserve_links;
@@ -58,16 +52,18 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int relative_paths;
 extern int implied_dirs;
-extern int make_backups;
-extern int backup_suffix_len;
 extern int copy_links;
 extern int copy_unsafe_links;
 extern int protocol_version;
 extern int sanitize_paths;
+extern int deletion_count;
 extern int max_delete;
 extern int orig_umask;
 extern int list_only;
+extern unsigned int curr_dir_len;
 extern char *log_format;
+
+extern char curr_dir[MAXPATHLEN];
 
 extern struct filter_list_struct filter_list;
 extern struct filter_list_struct server_filter_list;
@@ -78,7 +74,6 @@ static char empty_sum[MD4_SUM_LENGTH];
 static unsigned int file_struct_len;
 static struct file_list *received_flist, *sorting_flist;
 static dev_t filesystem_dev; /* used to implement -x */
-static int deletion_count = 0; /* used to implement --max-delete */
 
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
 static void output_flist(struct file_list *flist, const char *whose_list);
@@ -1751,12 +1746,6 @@ char *f_name(struct file_struct *f)
 }
 
 
-static int is_backup_file(char *fn)
-{
-	int k = strlen(fn) - backup_suffix_len;
-	return k > 0 && strcmp(fn+k, backup_suffix) == 0;
-}
-
 struct file_list *get_dirlist(const char *dirname, int ignore_filter_rules)
 {
 	struct file_list *dirlist;
@@ -1846,7 +1835,8 @@ void delete_in_dir(struct file_list *flist, char *fbuf,
 void delete_missing(struct file_list *full_list, struct file_list *dir_list,
 		    const char *dirname)
 {
-	int i, mode;
+	char fbuf[MAXPATHLEN];
+	int i;
 
 	if (max_delete && deletion_count >= max_delete)
 		return;
@@ -1857,20 +1847,11 @@ void delete_missing(struct file_list *full_list, struct file_list *dir_list,
 	for (i = dir_list->count; i--; ) {
 		if (!dir_list->files[i]->basename)
 			continue;
-		mode = dir_list->files[i]->mode;
 		if (flist_find(full_list, dir_list->files[i]) < 0) {
-			char *f = f_name(dir_list->files[i]);
-			if (make_backups && (backup_dir || !is_backup_file(f))
-			  && !S_ISDIR(mode)) {
-				make_backup(f);
-				if (verbose || log_format)
-					log_delete(f, mode);
-			} else if (S_ISDIR(mode))
-				delete_file(f, mode, DEL_FORCE_RECURSE);
-			else
-				delete_file(f, mode, 0);
-			deletion_count++;
-			if (max_delete && deletion_count >= max_delete)
+			char *fn = f_name_to(dir_list->files[i], fbuf);
+			int mode = dir_list->files[i]->mode;
+			int dflag = S_ISDIR(mode) ? DEL_FORCE_RECURSE : 0;
+			if (delete_file(fn, mode, dflag) < 0)
 				break;
 		}
 	}
