@@ -407,23 +407,23 @@ struct idev {
 #define F_NEXT	link_u.links->next
 
 struct file_struct {
-	time_t modtime;
-	OFF_T length;
-	mode_t mode;
 	union {
 		DEV64_T rdev;	/* The device number, if this is a device */
 		char *sum;	/* Only a normal file can have a checksum */
 		char *link;	/* Holds symlink string, if a symlink */
 	} u;
+	OFF_T length;
+	char *basename;
+	char *dirname;
+	char *basedir;
 	union {
 		struct idev *idev;
 		struct hlink *links;
 	} link_u;
-	char *basename;
-	char *dirname;
-	char *basedir;
+	time_t modtime;
 	uid_t uid;
 	gid_t gid;
+	mode_t mode;
 	uchar flags;	/* this item MUST remain last */
 };
 
