@@ -1,5 +1,6 @@
-/* 
-   Copyright (C) Andrew Tridgell 1996
+/* -*- c-file-style: "linux" -*-
+   
+   Copyright (C) 1996-2000 by Andrew Tridgell 
    Copyright (C) Paul Mackerras 1996
    
    This program is free software; you can redistribute it and/or modify
@@ -176,6 +177,15 @@ static struct sum_struct *generate_sums(struct map_struct *buf,OFF_T len,int n)
 }
 
 
+
+/*
+ * Acts on file number I from FLIST, whose name is fname.
+ *
+ * First fixes up permissions, then generates checksums for the file.
+ *
+ * (This comment was added later by mbp who was trying to work it out;
+ * it might be wrong.)
+ */ 
 void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 {  
 	int fd;

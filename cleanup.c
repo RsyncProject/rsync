@@ -1,5 +1,6 @@
-/* 
-   Copyright (C) Andrew Tridgell 1996
+/* -*- c-file-style: "linux" -*-
+   
+   Copyright (C) 1996-2000 by Andrew Tridgell
    Copyright (C) Paul Mackerras 1996
    
    This program is free software; you can redistribute it and/or modify
@@ -32,6 +33,10 @@ static struct map_struct *cleanup_buf;
 static int cleanup_pid = 0;
 extern int io_error;
 
+
+/*
+ * Code is one of the RERR_* codes from errcode.h.
+ */
 void _exit_cleanup(int code, const char *file, int line)
 {
 	extern int keep_partial;
