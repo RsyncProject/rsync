@@ -256,15 +256,6 @@ case $host_os in
 	       * ) AC_MSG_RESULT(no);;
 esac
 
-AC_MSG_CHECKING([whether generator should delay before signaling receiver])
-case $host_os in
-	*cygwin* ) AC_MSG_RESULT(yes)
-                   AC_DEFINE(DELAY_BEFORE_SIGNALING_RECEIVER, 1, 
-			    [Define if generator should delay before signaling receiver])
-		   ;;
-	       * ) AC_MSG_RESULT(no);;
-esac
-
 AC_C_BIGENDIAN
 AC_HEADER_DIRENT
 AC_HEADER_TIME
