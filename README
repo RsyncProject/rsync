@@ -57,6 +57,9 @@ Options:
     --exclude-from FILE  exclude files listed in FILE
     --suffix SUFFIX      override backup suffix
     --version            print version number
+    --daemon             run as a rsync daemon
+    --config FILE        specify alternate rsyncd.conf file
+    --port PORT          specify alternate rsyncd port number
 
 
 SETUP
@@ -80,6 +83,14 @@ case.
 
 Once built put a copy of rsync in your search path on the local and
 remote systems (or use "make install"). That's it!
+
+RSYNC SERVERS
+-------------
+
+rsync can also talk to "rsync servers" which can provide anonymous or
+authenticated rsync. See the rsync.conf(5) man page for details on how
+to setup a rsync server. See the rsync(1) man page for info on how to
+connect to a rsync server.
 
 
 MAILING LIST
@@ -138,7 +149,8 @@ paulus@cs.anu.edu.au
 AVAILABILITY
 ------------
 
-The main ftp site for rsync is ftp://samba.anu.edu.au/pub/rsync
+The main ftp site for rsync is ftp://samba.anu.edu.au/pub/rsync 
+This is also available as rsync://samba.anu.edu.au/rsyncftp/
 
 Mirrors are available at:
 
