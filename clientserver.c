@@ -118,6 +118,7 @@ static int rsync_module(int fd, int i)
 	char *name = lp_name(i);
 	char *user;
 	int start_glob=0;
+	int ret;
 	char *request=NULL;
 	extern int am_sender;
 	extern int remote_version;
@@ -251,7 +252,7 @@ static int rsync_module(int fd, int i)
 		}
 	}
 
-	parse_arguments(argc, argv);
+	ret = parse_arguments(argc, argv);
 
 	if (request) {
 		if (*user) {
@@ -275,6 +276,11 @@ static int rsync_module(int fd, int i)
 
 	if (remote_version > 17 && am_sender)
 		io_start_multiplex_out(fd);
+
+	if (!ret) {
+		rprintf(FERROR,"Error parsing options (unsupported option?) - aborting\n");
+		exit_cleanup(1);
+	}
 
 	start_server(fd, fd, argc, argp);
 
@@ -375,7 +381,15 @@ int daemon_main(void)
 	push_dir("/", 0);
 
 	if (is_a_socket(STDIN_FILENO)) {
-		/* we are running via inetd */
+		int i;
+
+		/* we are running via inetd - close off stdout and
+		   stderr so that library functions (and getopt) don't
+		   try to use them. Redirect them to /dev/null */
+		for (i=1;i<3;i++) {
+			close(i); 
+			open("/dev/null", O_RDWR);
+		}
 		return start_daemon(STDIN_FILENO);
 	}
 
