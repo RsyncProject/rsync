@@ -42,8 +42,12 @@ static void report(int f)
 
 	if (am_server) {
 		if (verbose && am_sender) {
+			int64 w;
+			/* store total_written in a temporary
+			    because write_longint changes it */
+			w = stats.total_written;
 			write_longint(f,stats.total_read);
-			write_longint(f,stats.total_written);
+			write_longint(f,w);
 			write_longint(f,stats.total_size);
 		}
 		return;
@@ -57,15 +61,12 @@ static void report(int f)
 		     is identical but the bytes read and written are slightly
 		     different.  It's done this way to avoid modifying the
 		     protocol to support --stats without -v. */
+		int64 r;
 		stats.total_written = read_longint(f);
-		stats.total_read = read_longint(f);
+		/* store total_read in a temporary, read_longint changes it */
+		r = read_longint(f);
 		stats.total_size = read_longint(f);
-
-		/* when the total_read was set above just now it would not
-		     have included the last two longints, but the last
-		     read_longint would have compensated for one of them.
-		     Compensate for the other one too by adding 8. */
-		stats.total_read += sizeof(int64);
+		stats.total_read = r;
 	}
 
 	if (do_stats) {
