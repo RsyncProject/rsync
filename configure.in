@@ -489,7 +489,7 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd strdup strerror chown chmod mknod mkfifo \
     fchmod fstat strchr readlink link utime utimes strftime mtrace ftruncate \
     memmove lchown vsnprintf snprintf vasprintf asprintf setsid glob strpbrk \
     strlcat strlcpy strtol mallinfo getgroups setgroups geteuid getegid \
-    setlocale setmode open64 mkstemp64 va_copy __va_copy)
+    setlocale setmode open64 lseek64 mkstemp64 va_copy __va_copy)
 
 AC_CHECK_FUNCS(getpgrp tcgetpgrp)
 if test $ac_cv_func_getpgrp = yes; then
@@ -632,7 +632,17 @@ rsync_cv_HAVE_SECURE_MKSTEMP=yes,
 rsync_cv_HAVE_SECURE_MKSTEMP=no,
 rsync_cv_HAVE_SECURE_MKSTEMP=cross)])
 if test x"$rsync_cv_HAVE_SECURE_MKSTEMP" = x"yes"; then
-    AC_DEFINE(HAVE_SECURE_MKSTEMP, 1, [Define to 1 if mkstemp() is available and works right])
+    case $target_os in
+    hpux*)
+	dnl HP-UX has a broken mkstemp() implementation they refuse to fix,
+	dnl so we noisily skip using it.  See HP change request JAGaf34426
+	dnl for details. (sbonds)
+	AC_MSG_WARN(Skipping broken HP-UX mkstemp() -- using mktemp() instead)
+	;;
+    *)
+	AC_DEFINE(HAVE_SECURE_MKSTEMP, 1, [Define to 1 if mkstemp() is available and works right])
+	;;
+    esac
 fi
 
 
