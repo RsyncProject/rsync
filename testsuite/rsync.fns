@@ -85,7 +85,7 @@ hands_setup() {
     ls -lt /bin > ${FROM}/dir/subdir/subsubdir2/bin-lt-list
 
     echo testing head:
-    ls -lR ${srcdir} | head -10
+    ls -lR ${srcdir} | head -10 || echo failed
 }
 
 
