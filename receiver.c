@@ -28,6 +28,8 @@ extern int max_delete;
 extern int csum_length;
 extern struct stats stats;
 extern int dry_run;
+extern int read_batch;
+extern int batch_gen_fd;
 extern int am_server;
 extern int relative_paths;
 extern int keep_dirlinks;
@@ -330,6 +332,7 @@ static void discard_receive_data(int f_in, OFF_T length)
  * Receiver process runs on the same host as the generator process. */
 int recv_files(int f_in, struct file_list *flist, char *local_name)
 {
+	int next_gen_i = -1;
 	int fd1,fd2;
 	STRUCT_STAT st;
 	char *fname, fbuf[MAXPATHLEN];
@@ -355,6 +358,12 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 
 		i = read_int(f_in);
 		if (i == -1) {
+			if (read_batch) {
+				if (next_gen_i != flist->count)
+					while (read_int(batch_gen_fd) != -1) {}
+				next_gen_i = -1;
+			}
+
 			if (phase)
 				break;
 
@@ -398,6 +407,20 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			rprintf(FINFO,"recv_files(%s)\n",fname);
 
 		fnamecmp = fname;
+
+		if (read_batch) {
+			while (i > next_gen_i) {
+				next_gen_i = read_int(batch_gen_fd);
+				if (next_gen_i == -1)
+					next_gen_i = flist->count;
+			}
+			if (i < next_gen_i) {
+				rprintf(FINFO, "skipping update for \"%s\"\n",
+					fname);
+				discard_receive_data(f_in, file->length);
+				continue;
+			}
+		}
 
 		if (server_exclude_list.head
 		    && check_exclude(&server_exclude_list, fname,
