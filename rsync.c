@@ -304,8 +304,9 @@ static int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 					fname,strerror(errno));
 				return 0;
 			}
+		} else {
+			updated = 1;
 		}
-		updated = 1;
 	}
 
 #ifdef HAVE_CHMOD
