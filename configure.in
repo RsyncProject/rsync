@@ -69,14 +69,16 @@ main() { char c; c=250; exit((c > 0)?0:1); }],
 echo yes;AC_DEFINE(HAVE_UNSIGNED_CHAR), 
 echo no)
 
-echo $ac_n "checking for utimbuf ... $ac_c"
-AC_TRY_COMPILE([#include <sys/types.h>
-#include <utime.h>],
-[struct utimbuf tbuf;  tbuf.actime = 0; tbuf.modtime = 1; return utime("foo.c",&tbuf);],
-echo yes;AC_DEFINE(HAVE_UTIMBUF), 
+echo $ac_n "checking for broken readdir ... $ac_c"
+AC_TRY_RUN([#include <sys/types.h>
+#include <dirent.h>
+main() { struct dirent *di; DIR *d = opendir("."); di = readdir(d);
+if (di && di->d_name[-2] == '.' && di->d_name[-1] == 0 &&
+di->d_name[0] == 0) return 0; return 1;} ],
+echo yes;AC_DEFINE(HAVE_BROKEN_READDIR), 
 echo no)
 
-echo $ac_n "checking for broken readdir ... $ac_c"
+echo $ac_n "checking for utimbuf ... $ac_c"
 AC_TRY_COMPILE([#include <sys/types.h>
 #include <utime.h>],
 [struct utimbuf tbuf;  tbuf.actime = 0; tbuf.modtime = 1; return utime("foo.c",&tbuf);],
