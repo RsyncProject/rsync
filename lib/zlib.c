@@ -7,7 +7,6 @@
  *
  * Changes that have been made include:
  * - changed functions not used outside this file to "local"
- * - added minCompression parameter to deflateInit2
  * - added Z_PACKET_FLUSH (see zlib.h for details)
  * - added inflateIncomp
  *
@@ -211,7 +210,6 @@ typedef struct deflate_state {
     int   noheader;      /* suppress zlib header and adler32 */
     Byte  data_type;     /* UNKNOWN, BINARY or ASCII */
     Byte  method;        /* STORED (for zip only) or DEFLATED */
-    int	  minCompr;	 /* min size decrease for Z_FLUSH_NOSTORE */
 
                 /* used by deflate.c: */
 
@@ -568,21 +566,18 @@ int deflateInit (strm, level)
     z_stream *strm;
     int level;
 {
-    return deflateInit2 (strm, level, DEFLATED, MAX_WBITS, DEF_MEM_LEVEL,
-			 0, 0);
+    return deflateInit2 (strm, level, DEFLATED, MAX_WBITS, DEF_MEM_LEVEL, 0);
     /* To do: ignore strm->next_in if we use it as window */
 }
 
 /* ========================================================================= */
-int deflateInit2 (strm, level, method, windowBits, memLevel,
-		  strategy, minCompression)
+int deflateInit2 (strm, level, method, windowBits, memLevel, strategy)
     z_stream *strm;
     int  level;
     int  method;
     int  windowBits;
     int  memLevel;
     int  strategy;
-    int  minCompression;
 {
     deflate_state *s;
     int noheader = 0;
@@ -642,7 +637,6 @@ int deflateInit2 (strm, level, method, windowBits, memLevel,
     s->level = level;
     s->strategy = strategy;
     s->method = (Byte)method;
-    s->minCompr = minCompression;
     s->blocks_in_packet = 0;
 
     return deflateReset(strm);
@@ -2336,17 +2330,6 @@ local ulg ct_flush_block(s, buf, stored_len, flush)
         s->method = STORED;
     } else
 #endif /* STORED_FILE_OK */
-
-    /* For Z_PACKET_FLUSH, if we don't achieve the required minimum
-     * compression, and this block contains all the data since the last
-     * time we used Z_PACKET_FLUSH, then just omit this block completely
-     * from the output.
-     */
-    if (flush == Z_PACKET_FLUSH && s->blocks_in_packet == 1
-	&& opt_lenb > stored_len - s->minCompr) {
-	s->blocks_in_packet = 0;
-	/* output nothing */
-    } else
 
 #ifdef FORCE_STORED
     if (buf != (char*)0) /* force stored block */

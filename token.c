@@ -116,7 +116,7 @@ send_deflated_token(int f, int token,
 	    tx_strm.zalloc = z_alloc;
 	    tx_strm.zfree = z_free;
 	    if (deflateInit2(&tx_strm, Z_DEFAULT_COMPRESSION, 8,
-			     -15, 8, Z_DEFAULT_STRATEGY, -4) != Z_OK) {
+			     -15, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
 		fprintf(FERROR, "compression init failed\n");
 		exit_cleanup(1);
 	    }

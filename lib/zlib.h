@@ -444,8 +444,7 @@ extern int deflateInit2 OF((z_stream *strm,
                             int  method,
                             int  windowBits,
                             int  memLevel,
-                            int  strategy,
-			    int  minCompression));
+                            int  strategy));
 /*   
      This is another version of deflateInit with more compression options. The
    fields next_in, zalloc and zfree must be initialized before by the caller.
