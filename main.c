@@ -250,6 +250,10 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 		exit_cleanup(0);
 	}
 
+	set_nonblocking(f_out);
+	if (f_in != f_out)
+		set_nonblocking(f_in);
+		
 	send_files(flist,f_out,f_in);
 	report(f_out);
 	io_flush();
@@ -278,6 +282,8 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		close(recv_pipe[0]);
 		if (f_in != f_out) close(f_out);
 
+		set_nonblocking(f_in);
+
 		recv_files(f_in,flist,local_name,recv_pipe[1]);
 		report(f_in);
 
@@ -291,6 +297,9 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	close(recv_pipe[1]);
 	io_close_input(f_in);
 	if (f_in != f_out) close(f_in);
+
+	set_nonblocking(f_out);
+
 	generate_files(f_out,flist,local_name,recv_pipe[0]);
 
 	io_flush();
@@ -381,6 +390,11 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 		flist = send_file_list(f_out,argc,argv);
 		if (verbose > 3) 
 			rprintf(FINFO,"file list sent\n");
+
+		set_nonblocking(f_out);
+		if (f_in != f_out)
+			set_nonblocking(f_in);
+
 		send_files(flist,f_out,f_in);
 		if (pid != -1) {
 			if (verbose > 3)
