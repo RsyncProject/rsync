@@ -295,7 +295,7 @@ if test x"$ac_cv_func_connect" = x"no"; then
     fi
 fi
 
-AC_MSG([Looking in libraries: $LIBS])
+AC_MSG_NOTICE([Looking in libraries: $LIBS])
 AC_REPLACE_FUNCS(getaddrinfo getnameinfo)
 
 AC_CHECK_MEMBER([struct sockaddr.sa_len], 
