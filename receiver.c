@@ -411,7 +411,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 			continue;
 		}
 
-		strlcpy(template, fnametmp, sizeof(template));
+		strlcpy(template, fnametmp, sizeof template);
 
 		/* we initially set the perms without the
 		 * setuid/setgid bits to ensure that there is no race
@@ -426,7 +426,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 		 * transferred, but that may not be the case with -R */
 		if (fd2 == -1 && relative_paths && errno == ENOENT &&
 		    create_directory_path(fnametmp, orig_umask) == 0) {
-			strlcpy(fnametmp, template, sizeof(fnametmp));
+			strlcpy(fnametmp, template, sizeof fnametmp);
 			fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
 		}
 		if (fd2 == -1) {

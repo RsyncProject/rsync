@@ -229,7 +229,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			write_int(f_out, i);
 
 			if (write_batch)
-				write_batch_delta_file((char *)&i, sizeof(i));
+				write_batch_delta_file((char *)&i, sizeof i);
 
 			write_sum_head(f_out, s);
 		}

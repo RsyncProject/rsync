@@ -297,10 +297,9 @@ static void flist_expand(struct file_list *flist)
 
 		if (verbose >= 2) {
 			rprintf(FINFO, "[%s] expand file_list to %.0f bytes, did%s move\n",
-				who_am_i(),
-				(double)sizeof(flist->files[0])
-				* flist->malloced,
-				(new_ptr == flist->files) ? " not" : "");
+			    who_am_i(),
+			    (double) sizeof flist->files[0] * flist->malloced,
+			    (new_ptr == flist->files) ? " not" : "");
 		}
 
 		flist->files = (struct file_struct **) new_ptr;
@@ -809,14 +808,18 @@ struct file_struct *make_file(char *fname, int exclude_level)
 	linkname_len = 0;
 #endif
 
+	idev_len = 0;
 #if SUPPORT_HARD_LINKS
-	if (preserve_hard_links) {
-		idev_len = (protocol_version < 28 ? S_ISREG(st.st_mode)
-			  : !S_ISDIR(st.st_mode) && st.st_nlink > 1)
-			 ? sizeof (struct idev) : 0;
-	} else
+	if (preserve_hard_links && st.st_nlink > 1) {
+		if (protocol_version < 28) {
+			if (S_ISREG(st.st_mode))
+				idev_len = sizeof (struct idev);
+		} else {
+			if (!S_ISDIR(st.st_mode))
+				idev_len = sizeof (struct idev);
+		}
+	}
 #endif
-		idev_len = 0;
 
 	sum_len = always_checksum && S_ISREG(st.st_mode) ? MD4_SUM_LENGTH : 0;
 	file_struct_len = idev_len? sizeof file[0] : min_file_struct_len;
@@ -1377,7 +1380,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 		return;
 
 	qsort(flist->files, flist->count,
-	      sizeof(flist->files[0]), (int (*)()) file_compare);
+	      sizeof flist->files[0], (int (*)()) file_compare);
 
 	for (i = no_dups? 0 : flist->count; i < flist->count; i++) {
 		if (flist->files[i]->basename) {
