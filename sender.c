@@ -125,8 +125,8 @@ void successful_send(int ndx)
 	}
 }
 
-static void write_item_attrs(int f_out, int ndx, int iflags,
-			     uchar fnamecmp_type, char *buf, int len)
+static void write_ndx_and_attrs(int f_out, int ndx, int iflags,
+				uchar fnamecmp_type, char *buf, int len)
 {
 	write_int(f_out, ndx);
 	if (protocol_version < 29)
@@ -134,11 +134,8 @@ static void write_item_attrs(int f_out, int ndx, int iflags,
 	write_shortint(f_out, iflags);
 	if (iflags & ITEM_BASIS_TYPE_FOLLOWS)
 		write_byte(f_out, fnamecmp_type);
-	if (iflags & ITEM_XNAME_FOLLOWS) {
-		if (len < 0)
-			len = strlen(buf);
+	if (iflags & ITEM_XNAME_FOLLOWS)
 		write_vstring(f_out, buf, len);
-	}
 }
 
 /* This is also used by receive.c with f_out = -1. */
@@ -155,12 +152,12 @@ int read_item_attrs(int f_in, int f_out, int ndx, uchar *type_ptr,
 	if (ndx == the_file_list->count && iflags == ITEM_IS_NEW)
 		;
 	else if (ndx < 0 || ndx >= the_file_list->count) {
-		rprintf(FERROR, "Invalid file index %d (count=%d) [%s]\n",
+		rprintf(FERROR, "Invalid file index: %d (count=%d) [%s]\n",
 			ndx, the_file_list->count, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
 	} else if (iflags == ITEM_IS_NEW) {
-		rprintf(FERROR, "Invalid itemized flag word [%s]\n",
-			who_am_i());
+		rprintf(FERROR, "Invalid itemized flag word: %x [%s]\n",
+			iflags, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
 	}
 
@@ -187,13 +184,13 @@ int read_item_attrs(int f_in, int f_out, int ndx, uchar *type_ptr,
 	if (iflags & ITEM_TRANSFER) {
 		if (!S_ISREG(the_file_list->files[ndx]->mode)) {
 			rprintf(FERROR,
-				"received index of non-regular file: %d [%s]\n",
+				"received request to transfer non-regular file: %d [%s]\n",
 				ndx, who_am_i());
 			exit_cleanup(RERR_PROTOCOL);
 		}
 	} else if (f_out >= 0) {
-		write_item_attrs(f_out, ndx, isave /*XXX iflags */,
-				 fnamecmp_type, buf, len);
+		write_ndx_and_attrs(f_out, ndx, isave /*XXX iflags */,
+				    fnamecmp_type, buf, len);
 	}
 
 	return iflags;
@@ -272,8 +269,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		if (dry_run) { /* log the transfer */
 			if (!am_server && log_format)
 				log_item(file, &stats, iflags, NULL);
-			write_item_attrs(f_out, i, iflags, fnamecmp_type,
-					 xname, xlen);
+			write_ndx_and_attrs(f_out, i, iflags, fnamecmp_type,
+					    xname, xlen);
 			continue;
 		}
 
@@ -324,7 +321,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				safe_fname(fname), (double)st.st_size);
 		}
 
-		write_item_attrs(f_out, i, iflags, fnamecmp_type, xname, xlen);
+		write_ndx_and_attrs(f_out, i, iflags, fnamecmp_type,
+				    xname, xlen);
 		write_sum_head(f_out, s);
 
 		if (verbose > 2) {
