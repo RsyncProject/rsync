@@ -66,6 +66,10 @@ Changes since 2.6.0:
 
     * Fixed the "refuse options" setting in the rsyncd.conf file.
 
+    * Rsync no longer discards a double-slash at the start of a filename
+      when trying to open the file.  It also no longer constructs names
+      that start with a double slash (unless the user supplied both).
+
   INTERNAL:
 
     * Most of the I/O is now buffered, which results in a pretty
