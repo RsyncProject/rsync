@@ -24,13 +24,6 @@ TO=${TMP}/to
 LOG=${TMP}/log
 RSYNC="$rsync_bin"
 
-# UID & GID to run rsyncd as if testsuite is running as root
-#
-# We don't know if this machine has "nobody" or "nogroup", so use the
-# quasi-canonical values of (uint16_t) -2.
-RSYNCD_UID=65534
-RSYNCD_GID=65534
-
 # Berkley's nice.
 PATH="$PATH:/usr/ucb"
 
@@ -198,8 +191,8 @@ use chroot = no
 hosts allow = localhost, 127.0.0.1
 log file = $logfile
 
-uid = $RSYNCD_UID 
-gid = $RSYNCD_GID 
+uid = 0
+gid = 0
 
 [test-from]
 	path = $FROM
