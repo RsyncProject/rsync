@@ -631,8 +631,6 @@ void server_options(char **args,int *argc)
 	assert(whole_file == 0 || whole_file == -1);
 	if (whole_file)
 		argstr[x++] = 'W';
- 	else 
- 		args[ac++] = "--no-whole-file";
 	
 	if (preserve_hard_links)
 		argstr[x++] = 'H';
