@@ -337,8 +337,7 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 		fd_count = fd+1;
 
 		if (!no_flush_read) {
-			reading = (buffer_f_in != -1 && 
-				   read_buffer_len < MAX_READ_BUFFER);
+			reading = (buffer_f_in != -1);
 		}
 
 		if (reading) {
