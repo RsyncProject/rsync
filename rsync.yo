@@ -277,8 +277,8 @@ verb(
      --log-format=FORMAT     log file transfers using specified format
      --password-file=FILE    get password from FILE
      --bwlimit=KBPS          limit I/O bandwidth, KBytes per second
- -f, --read-batch=FILE       read batch file
- -F, --write-batch           write batch file
+     --read-batch=FILE       read batch file
+     --write-batch           write batch file
  -h, --help                  show this help screen
 
 
@@ -798,7 +798,7 @@ for synchronizing the contents of bf(target_dir) with the updates found in
 bf(src_dir)
 
 quote(
-$ rsync -F [other rsync options here] \nl()
+$ rsync --write-batch [other rsync options here] \nl()
            /somewhere/src_dir /somewhere/target_dir
 )
 

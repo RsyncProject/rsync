@@ -35,6 +35,7 @@ void create_batch_file_ext()
 		timeptr->tm_year + 1900, timeptr->tm_mon + 1,
 		timeptr->tm_mday, timeptr->tm_hour, timeptr->tm_min,
 		timeptr->tm_sec);
+	rprintf(FINFO,"batch file extension: %s\n", batch_file_ext);
 }
 
 void set_batch_file_ext(char *ext)
@@ -84,12 +85,16 @@ void write_batch_flist_info(int flist_count, struct file_struct **fptr)
 
 	/* Write flist info to batch file */
 
-	bytes_to_write = sizeof(unsigned) +
+	bytes_to_write =
+	    sizeof(unsigned) +
 	    sizeof(time_t) +
 	    sizeof(OFF_T) +
 	    sizeof(mode_t) +
 	    sizeof(INO64_T) +
-	    (2 * sizeof(DEV64_T)) + sizeof(uid_t) + sizeof(gid_t);
+	    sizeof(DEV64_T) +
+	    sizeof(DEV64_T) +
+	    sizeof(uid_t) +
+	    sizeof(gid_t);
 
 	fdb_open = 1;
 	fdb_close = 0;
@@ -128,7 +133,7 @@ void write_char_bufs(char *buf)
 	}
 }
 
-void write_batch_argvs_file(int orig_argc, int argc, char **argv)
+void write_batch_argvs_file(int argc, char *argv[])
 {
 	int fdb;
 	int i;
@@ -149,23 +154,27 @@ void write_batch_argvs_file(int orig_argc, int argc, char **argv)
 	buff[0] = '\0';
 	/* Write argvs info to batch file */
 
-	for (i = argc - orig_argc; i < argc; i++) {
-		/* FIXME: This apparently crashes if rsync is run with
-		 * just "rsync -F".  I think directly manipulating
-		 * argv[] is probably bogus -- what if -F is part of a
-		 * run of several short options? */
-		if (!strcmp(argv[i], "-F")) {	/* safer to change it here than script */
-			strncat(buff, "-f ", 3);	/* chg to -f + ext to get ready for remote */
-			strncat(buff, batch_file_ext,
-				strlen(batch_file_ext));
+	for (i = 0; i < argc; ++i) {
+		if (i == argc - 2)
+		    continue;
+		/*
+		 * FIXME:
+		 * I think directly manipulating argv[] is probably bogus
+		 */
+		if (!strcmp(argv[i], "--write-batch")) {
+			/* Safer to change it here than script */
+			/* Change to --read-batch + ext * to get ready for remote */
+			strlcat(buff, "--read-batch ", sizeof(buff));
+			strlcat(buff, batch_file_ext, sizeof(buff));
 		} else {
-			strncat(buff, argv[i], strlen(argv[i]));
+			strlcat(buff, argv[i], sizeof(buff));
 		}
 
 		if (i < (argc - 1)) {
-			strncat(buff, " ", 1);
+			strlcat(buff, " ", sizeof(buff));
 		}
 	}
+	strlcat(buff, "\n", sizeof(buff));
 	if (!write(fdb, buff, strlen(buff))) {
 		rprintf(FERROR, "Batch file %s write error: %s\n",
 			rsync_argvs_file, strerror(errno));
@@ -291,7 +300,7 @@ void read_batch_flist_info(struct file_struct **fptr)
 	read_batch_flist_file((char *) &file->mode, sizeof(mode_t));
 	read_batch_flist_file((char *) &file->inode, sizeof(INO64_T));
 	read_batch_flist_file((char *) &file->dev, sizeof(DEV64_T));
-	read_batch_flist_file((char *) &file->rdev, sizeof(dev_t));
+	read_batch_flist_file((char *) &file->rdev, sizeof(DEV64_T));
 	read_batch_flist_file((char *) &file->uid, sizeof(uid_t));
 	read_batch_flist_file((char *) &file->gid, sizeof(gid_t));
 	read_batch_flist_file(char_str_len, sizeof(char_str_len));

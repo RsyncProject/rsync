@@ -240,8 +240,8 @@ void usage(enum logcode F)
   rprintf(F,"     --log-format=FORMAT     log file transfers using specified format\n");  
   rprintf(F,"     --password-file=FILE    get password from FILE\n");
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth, KBytes per second\n");
-  rprintf(F," -f  --read-batch=EXT        read batch file\n");
-  rprintf(F," -F  --write-batch           write batch file\n");
+  rprintf(F,"     --read-batch=EXT        read batch file\n");
+  rprintf(F,"     --write-batch           write batch file\n");
   rprintf(F," -h, --help                  show this help screen\n");
 #ifdef INET6
   rprintf(F," -4                          prefer IPv4\n");
@@ -262,7 +262,7 @@ enum {OPT_VERSION = 1000, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
       OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY, OPT_ADDRESS,
       OPT_DELETE_AFTER, OPT_EXISTING, OPT_MAX_DELETE, OPT_BACKUP_DIR, 
       OPT_IGNORE_ERRORS, OPT_BWLIMIT, OPT_BLOCKING_IO,
-      OPT_MODIFY_WINDOW};
+      OPT_MODIFY_WINDOW, OPT_READ_BATCH, OPT_WRITE_BATCH};
 
 static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
@@ -331,8 +331,8 @@ static struct poptOption long_options[] = {
   {"address",          0,  POPT_ARG_STRING, &bind_address, 0},
   {"backup-dir",       0,  POPT_ARG_STRING, &backup_dir},
   {"hard-links",      'H', POPT_ARG_NONE,   &preserve_hard_links},
-  {"read-batch",      'f', POPT_ARG_STRING, &batch_ext, 'f'},
-  {"write-batch",     'F', POPT_ARG_NONE,   &write_batch, 0},
+  {"read-batch",       0,  POPT_ARG_STRING, &batch_ext, OPT_READ_BATCH},
+  {"write-batch",      0,  POPT_ARG_NONE,   &write_batch},
 #ifdef INET6
   {0,		      '4', POPT_ARG_VAL,    &default_af_hint,   AF_INET },
   {0,		      '6', POPT_ARG_VAL,    &default_af_hint,   AF_INET6 },
@@ -511,9 +511,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			keep_partial = 1;
 			break;
 
-
-		case 'f':
-			/* The filename is stored for us by popt */
+		case OPT_READ_BATCH:
+			/* The filename is stored in batch_ext for us by popt */
 			read_batch = 1;
 			break;
 
@@ -550,7 +549,8 @@ void server_options(char **args,int *argc)
 	static char mdelete[30];
 	static char mwindow[30];
 	static char bw[50];
-	static char fext[20]; /* dw */
+	static char fext[20];
+	static char wbatch[14];
 
 	int i, x;
 
@@ -605,8 +605,6 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'S';
 	if (do_compression)
 		argstr[x++] = 'z';
-	if (write_batch)
-	    argstr[x++] = 'F'; /* dw */
 
 	/* this is a complete hack - blame Rusty 
 
@@ -629,8 +627,13 @@ void server_options(char **args,int *argc)
 		args[ac++] = mdelete;
 	}    
 	
+	if (write_batch) {
+		snprintf(wbatch,sizeof(wbatch),"--write-batch");
+		args[ac++] = wbatch;
+	}
+
 	if (batch_ext != NULL) {
-		sprintf(fext,"-f%s",batch_ext);
+		snprintf(fext,sizeof(fext),"--read-batch=%s",batch_ext);
 		args[ac++] = fext;
 	}
 

@@ -803,8 +803,10 @@ int main(int argc,char *argv[])
 	extern int write_batch;  /*  dw */
 	extern char *batch_ext;   /*  dw */
 	int orig_argc;  /* dw */
+	char **orig_argv;
 
 	orig_argc = argc;   /* dw */
+	orig_argv = argv;
 
 	signal(SIGUSR1, sigusr1_handler);
 	signal(SIGUSR2, sigusr2_handler);
@@ -844,7 +846,7 @@ int main(int argc,char *argv[])
 
 	if (write_batch) { /* dw */
 	    create_batch_file_ext();
-	    write_batch_argvs_file(orig_argc, argc, argv);
+	    write_batch_argvs_file(orig_argc, orig_argv);
 	}
 
 	if (read_batch) { /* dw */

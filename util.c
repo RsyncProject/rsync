@@ -173,10 +173,7 @@ pid_t local_child(int argc, char **argv,int *f_in,int *f_out)
 		extern int am_sender;
 		extern int am_server;
 
-		if (read_batch)
-		    am_sender = 0;
-		else
-		    am_sender = !am_sender;
+		am_sender = read_batch ? 0 : !am_sender;
 		am_server = 1;		
 
 		if (dup2(to_child_pipe[0], STDIN_FILENO) < 0 ||
