@@ -105,9 +105,10 @@ int no_detach = 0;
 
 int write_batch = 0;
 int read_batch = 0;
-int suffix_specified = 0;
+int backup_dir_len = 0;
+int backup_suffix_len;
 
-char *backup_suffix = BACKUP_SUFFIX;
+char *backup_suffix = NULL;
 char *tmpdir = NULL;
 char *compare_dest = NULL;
 char *config_file = NULL;
@@ -293,7 +294,7 @@ void usage(enum logcode F)
   rprintf(F,"See http://rsync.samba.org/ for updates, bug reports, and answers\n");
 }
 
-enum {OPT_VERSION = 1000, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
+enum {OPT_VERSION = 1000, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
       OPT_EXCLUDE_FROM, OPT_DELETE, OPT_DELETE_EXCLUDED, OPT_NUMERIC_IDS,
       OPT_RSYNC_PATH, OPT_FORCE, OPT_TIMEOUT, OPT_DAEMON, OPT_CONFIG, OPT_PORT,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS,
@@ -306,7 +307,7 @@ enum {OPT_VERSION = 1000, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
 static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
   {"version",          0,  POPT_ARG_NONE,   0,              OPT_VERSION, 0, 0},
-  {"suffix",           0,  POPT_ARG_STRING, &backup_suffix, OPT_SUFFIX, 0, 0 },
+  {"suffix",           0,  POPT_ARG_STRING, &backup_suffix, 0, 0, 0 },
   {"rsync-path",       0,  POPT_ARG_STRING, &rsync_path,	0, 0, 0 },
   {"password-file",    0,  POPT_ARG_STRING, &password_file,	0, 0, 0 },
   {"ignore-times",    'I', POPT_ARG_NONE,   &ignore_times, 0, 0, 0 },
@@ -485,13 +486,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			print_rsync_version(FINFO);
 			exit_cleanup(0);
 
-		case OPT_SUFFIX:
-			/* The value has already been set by popt, but
-			 * we need to remember that a suffix was specified
-			 * in case a backup-directory is used. */
-			suffix_specified = 1;
-			break;
-
 		case OPT_MODIFY_WINDOW:
 			/* The value has already been set by popt, but
 			 * we need to remember that we're using a
@@ -543,10 +537,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			 * rprintf?  Everybody who gets this message
 			 * ought to send it to the client and also to
 			 * the logs. */
-			snprintf(err_buf,sizeof(err_buf),
+			snprintf(err_buf, sizeof err_buf,
 				 "hard links are not supported on this %s\n",
 				 am_server ? "server" : "client");
-			rprintf(FERROR,"ERROR: hard links not supported on this platform\n");
+			rprintf(FERROR, "ERROR: %s", err_buf);
 			return 0;
 #endif /* SUPPORT_HARD_LINKS */
 			break;
@@ -588,10 +582,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			link_dest = 1;
 			break;
 #else
-			snprintf(err_buf,sizeof(err_buf),
+			snprintf(err_buf, sizeof err_buf,
 				 "hard links are not supported on this %s\n",
 				 am_server ? "server" : "client");
-			rprintf(FERROR,"ERROR: hard links not supported on this platform\n");
+			rprintf(FERROR, "ERROR: %s", err_buf);
 			return 0;
 #endif
 
@@ -609,19 +603,15 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 
 	if (write_batch && read_batch) {
-		snprintf(err_buf,sizeof(err_buf),
-			 "write-batch and read-batch can not be used together\n");
-		rprintf(FERROR,"ERROR: write-batch and read-batch"
-			" can not be used together\n");
-		return 0;
+		rprintf(FERROR,
+			"write-batch and read-batch can not be used together\n");
+		exit_cleanup(RERR_SYNTAX);
 	}
 
 	if (do_compression && (write_batch || read_batch)) {
-		snprintf(err_buf,sizeof(err_buf),
-			 "compress can not be used with write-batch or read-batch\n");
-		rprintf(FERROR,"ERROR: compress can not be used with"
-			"  write-batch or read-batch\n");
-		return 0;
+		rprintf(FERROR,
+			"compress can not be used with write-batch or read-batch\n");
+		exit_cleanup(RERR_SYNTAX);
 	}
 
 	if (archive_mode) {
@@ -639,6 +629,17 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 	if (relative_paths < 0)
 		relative_paths = files_from? 1 : 0;
+
+	if (!backup_suffix)
+		backup_suffix = backup_dir? "" : BACKUP_SUFFIX;
+	backup_suffix_len = strlen(backup_suffix);
+	if (backup_dir)
+		backup_dir_len = strlen(backup_dir);
+	else if (!backup_suffix_len) {
+		rprintf(FERROR,
+			"--suffix cannot be a null string without --backup-dir\n");
+		exit_cleanup(RERR_SYNTAX);
+	}
 
 	*argv = poptGetArgs(pc);
 	if (*argv)
@@ -813,7 +814,13 @@ void server_options(char **args,int *argc)
 		args[ac++] = bw;
 	}
 
-	if (strcmp(backup_suffix, BACKUP_SUFFIX)) {
+	if (backup_dir) {
+		args[ac++] = "--backup-dir";
+		args[ac++] = backup_dir;
+	}
+
+	/* Only send --suffix if it specifies a non-default value. */
+	if (strcmp(backup_suffix, backup_dir? "" : BACKUP_SUFFIX) != 0) {
 		args[ac++] = "--suffix";
 		args[ac++] = backup_suffix;
 	}
@@ -863,14 +870,6 @@ void server_options(char **args,int *argc)
 	if (tmpdir) {
 		args[ac++] = "--temp-dir";
 		args[ac++] = tmpdir;
-	}
-
-	if (backup_dir && am_sender) {
-		/* only the receiver needs this option, if we are the sender
-		 *   then we need to send it to the receiver.
-		 */
-		args[ac++] = "--backup-dir";
-		args[ac++] = backup_dir;
 	}
 
 	if (compare_dest && am_sender) {
