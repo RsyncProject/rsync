@@ -407,7 +407,7 @@ static struct poptOption long_options[] = {
   {"group",           'g', POPT_ARG_NONE,   &preserve_gid, 0, 0, 0 },
   {"devices",         'D', POPT_ARG_NONE,   &preserve_devices, 0, 0, 0 },
   {"times",           't', POPT_ARG_NONE,   &preserve_times, 0, 0, 0 },
-  {"omit-dir-times",  'O', POPT_ARG_NONE,   &omit_dir_times, 0, 0, 0 },
+  {"omit-dir-times",  'O', POPT_ARG_VAL,    &omit_dir_times, 2, 0, 0 },
   {"checksum",        'c', POPT_ARG_NONE,   &always_checksum, 0, 0, 0 },
   {"verbose",         'v', POPT_ARG_NONE,   0, 'v', 0, 0 },
   {"quiet",           'q', POPT_ARG_NONE,   0, 'q', 0, 0 },
@@ -1088,6 +1088,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			"--suffix cannot be a null string without --backup-dir\n");
 		return 0;
 	}
+	if (make_backups && !backup_dir)
+		omit_dir_times = 1;
 
 	if (log_format) {
 		if (strstr(log_format, "%i") != NULL)
@@ -1272,7 +1274,7 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'D';
 	if (preserve_times)
 		argstr[x++] = 't';
-	if (omit_dir_times && am_sender)
+	if (omit_dir_times == 2 && am_sender)
 		argstr[x++] = 'O';
 	if (preserve_perms)
 		argstr[x++] = 'p';
