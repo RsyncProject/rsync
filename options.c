@@ -305,7 +305,7 @@ void usage(enum logcode F)
   rprintf(F,"     --compare-dest=DIR      also compare destination files relative to DIR\n");
   rprintf(F,"     --copy-dest=DIR         ... and include copies of unchanged files\n");
   rprintf(F,"     --link-dest=DIR         hardlink to files in DIR when unchanged\n");
-  rprintf(F," -z, --compress              compress file data\n");
+  rprintf(F," -z, --compress              compress file data during the transfer\n");
   rprintf(F," -C, --cvs-exclude           auto-ignore files the same way CVS does\n");
   rprintf(F," -f, --filter=RULE           add a file-filtering RULE\n");
   rprintf(F," -F                          same as --filter=': /.rsync-filter'\n");
