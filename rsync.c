@@ -855,7 +855,7 @@ static void finish_transfer(char *fname, char *fnametmp, struct file_struct *fil
 		if (errno == EXDEV) {
 			/* rename failed on cross-filesystem link.  
 			   Copy the file instead. */
-			if (copy_file(fnametmp,fname, file->mode)) {
+			if (copy_file(fnametmp,fname, file->mode & ACCESSPERMS)) {
 				rprintf(FERROR,"copy %s -> %s : %s\n",
 					fnametmp,fname,strerror(errno));
 			} else {
