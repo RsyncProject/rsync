@@ -644,12 +644,6 @@ then files listed in a $HOME/.cvsignore are added to the list and any
 files listed in the CVSIGNORE environment variable (all cvsignore names
 are delimited by whitespace).
 
-Note that these cvs-exclude rules are inserted into the the user's list
-of excludes at the point the -C/--cvs-excludes option is mentioned, so
-any other include/exclude rules that precede the option override these
-rules, and any options that are specified afterwards are overridden by
-these rules.
-
 Finally, any file is ignored if it is in the same directory as a
 .cvsignore file and matches one of the patterns listed therein.
 There is not currently a way to override an exclude rule read from
