@@ -290,8 +290,8 @@ quote(      get:nl()
       sync: get put)
 
 this allows me to sync with a CVS directory at the other end of the
-connection. I then do cvs operations on the remote machine, which saves a
-lot of time as the remote cvs protocol isn't very efficient.
+connection. I then do CVS operations on the remote machine, which saves a
+lot of time as the remote CVS protocol isn't very efficient.
 
 I mirror a directory between my "old" and "new" ftp sites with the
 command
@@ -722,7 +722,7 @@ specified).
 
 dit(bf(--delete-during, --del)) Request that the file-deletions on the
 receiving side be done incrementally as the transfer happens.  This is
-a faster method than chosing the before- or after-transfer algorithm,
+a faster method than choosing the before- or after-transfer algorithm,
 but it is only supported beginning with rsync version 2.6.4.
 See --delete (which is implied) for more details on file-deletion.
 
@@ -1269,7 +1269,7 @@ comment lines that start with a "#".
 
 manpagesection(INCLUDE/EXCLUDE PATTERN RULES)
 
-You can include and exclude files by specifing patterns using the "+" and
+You can include and exclude files by specifying patterns using the "+" and
 "-" filter rules (as introduced in the FILTER RULES section above).  These
 rules specify a pattern that is matched against the names of the files
 that are going to be transferred.  These patterns can take several forms:
@@ -1308,7 +1308,7 @@ itemize(
   directories. If the pattern doesn't contain a / or a "**", then it is
   matched only against the final component of the filename.
   (Remember that the algorithm is applied recursively so "full filename"
-  can actually be any portion of a path fomr the starting directory on
+  can actually be any portion of a path from the starting directory on
   down.)
 
 )
@@ -1469,7 +1469,7 @@ Some examples of this pre-scanning for per-directory files:
 verb(
   rsync -avF /src/path/ /dest/dir
   rsync -av --filter=': ../../.rsync-filter' /src/path/ /dest/dir
-  rsync -av --fitler=': .rsync-filter' /src/path/ /dest/dir
+  rsync -av --filter=': .rsync-filter' /src/path/ /dest/dir
 )
 
 The first two commands above will look for ".rsync-filter" in "/" and
@@ -1485,7 +1485,7 @@ interpreted according to the same parsing rules that CVS uses.  You can
 use this to affect where the --cvs-exclude (-C) option's inclusion of the
 per-directory .cvsignore file gets placed into your rules by putting a
 ":C" wherever you like in your filter rules.  Without this, rsync would
-add the per-dir rule for the .cvignore file at the end of all your other
+add the per-dir rule for the .cvsignore file at the end of all your other
 rules (giving it a lower priority than your command-line rules).  For
 example:
 
