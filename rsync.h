@@ -564,17 +564,6 @@ size_t strlcat(char *d, const char *s, size_t bufsize);
 
 extern int verbose;
 
-extern struct global_opts {
-	/** Network address family. **/
-	int af_hint;
-	
-	/** Do not go into the background when run as --daemon.  Good
-	 * for debugging and required for running as a service on W32,
-	 * or under Unix process-monitors. **/
-	int no_detach;
-} global_opts;
-
-
 #ifndef HAVE_INET_NTOP
 const char *                 
 inet_ntop(int af, const void *src, char *dst, size_t size);
