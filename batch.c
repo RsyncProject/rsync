@@ -150,6 +150,10 @@ void write_batch_argvs_file(int orig_argc, int argc, char **argv)
 	/* Write argvs info to batch file */
 
 	for (i = argc - orig_argc; i < argc; i++) {
+		/* FIXME: This apparently crashes if rsync is run with
+		 * just "rsync -F".  I think directly manipulating
+		 * argv[] is probably bogus -- what if -F is part of a
+		 * run of several short options? */
 		if (!strcmp(argv[i], "-F")) {	/* safer to change it here than script */
 			strncat(buff, "-f ", 3);	/* chg to -f + ext to get ready for remote */
 			strncat(buff, batch_file_ext,
