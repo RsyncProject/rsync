@@ -27,15 +27,15 @@
 
 #include "rsync.h"
 
+extern int verbose;
+extern int list_only;
 extern int am_sender;
 extern int am_server;
 extern int am_daemon;
 extern int am_root;
-extern int verbose;
 extern int rsync_port;
 extern int kludge_around_eof;
 extern int daemon_over_rsh;
-extern int list_only;
 extern int sanitize_paths;
 extern int filesfrom_fd;
 extern int remote_protocol;
@@ -52,6 +52,7 @@ extern char *files_from;
 
 char *auth_user;
 int read_only = 0;
+int itemize_daemon_changes = 0;
 int module_id = -1;
 
 /* Length of lp_path() string when in daemon mode & not chrooted, else 0. */
@@ -282,6 +283,9 @@ static int rsync_module(int f_in, int f_out, int i)
 
 	if (lp_read_only(i))
 		read_only = 1;
+
+	if (lp_transfer_logging(i) && strstr(lp_log_format(i), "%i") != NULL)
+		itemize_daemon_changes = 1;
 
 	am_root = (MY_UID() == 0);
 
