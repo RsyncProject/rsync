@@ -43,6 +43,9 @@ Changes since 2.6.0:
     * Reduced memory requirements of hard link preservation.
       (J.W.  Schultz)
 
+    * Got rid of support for protocol versions 17 and 8 (which are
+      both over 6 years old).
+
 
 NEWS for rsync 2.6.0 (1 Jan 2004)
 Protocol: 27 (changed)
