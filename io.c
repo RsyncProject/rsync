@@ -181,8 +181,8 @@ static int read_timeout(int fd, char *buf, int len)
 			if (eof_error) {
 				rprintf(FERROR,
                                         "%s: connection to server unexpectedly closed"
-                                        " (%ld bytes read so far)\n",
-                                        RSYNC_NAME, stats.total_read);
+                                        " (%.0f bytes read so far)\n",
+                                        RSYNC_NAME, (double)stats.total_read);
 			}
 			exit_cleanup(RERR_STREAMIO);
 		}
@@ -381,7 +381,6 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 
 		if (FD_ISSET(fd, &w_fds)) {
 			int ret, n = len-total;
-			
 			ret = write(fd,buf+total,n);
 
 			if (ret == -1 && errno == EINTR) {
