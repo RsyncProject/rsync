@@ -160,15 +160,17 @@ missing=0
 passed=0
 failed=0
 
-scratchdir=./testtmp
-[ -d "$scratchdir" ] && rm -r "$scratchdir"
-mkdir "$scratchdir"
-scratchdir=`cd $scratchdir && pwd`
+scratchdir="`cd ./testtmp && pwd`"
 echo "    scratchdir=$scratchdir"
 
 suitedir="$srcdir/testsuite"
 
 export scratchdir suitedir
+
+clean_scratch() {
+    [ -d "$scratchdir" ] && rm -rf "$scratchdir"
+    mkdir "$scratchdir"
+}
 
 if [ "x$whichtests" = x ]
 then
@@ -180,6 +182,7 @@ do
     testbase=`echo $testscript | sed 's!.*/!!'`
 
     echo "----- $testbase starting"
+    clean_scratch
 
     if sh $RUNSHFLAGS "$testscript"
     then
