@@ -262,16 +262,22 @@ send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 	} else if (token != -2) {
 		/* Add the data in the current block to the compressor's
 		 * history and hash table. */
-		tx_strm.next_in = (Bytef *) map_ptr(buf, offset, toklen);
-		tx_strm.avail_in = toklen;
-		tx_strm.next_out = (Bytef *) obuf;
-		tx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
-		r = deflate(&tx_strm, Z_INSERT_ONLY);
-		if (r != Z_OK || tx_strm.avail_in != 0) {
-			rprintf(FERROR, "deflate on token returned %d (%d bytes left)\n",
-				r, tx_strm.avail_in);
-			exit_cleanup(RERR_STREAMIO);
-		}
+		do {
+			/* Break up long sections in the same way that
+			 * see_deflate_token() does. */
+			int32 n1 = toklen > 0xffff ? 0xffff : toklen;
+			toklen -= n1;
+			tx_strm.next_in = (Bytef *)map_ptr(buf, offset, n1);
+			tx_strm.avail_in = n1;
+			tx_strm.next_out = (Bytef *) obuf;
+			tx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
+			r = deflate(&tx_strm, Z_INSERT_ONLY);
+			if (r != Z_OK || tx_strm.avail_in != 0) {
+				rprintf(FERROR, "deflate on token returned %d (%d bytes left)\n",
+					r, tx_strm.avail_in);
+				exit_cleanup(RERR_STREAMIO);
+			}
+		} while (toklen > 0);
 	}
 }
 
