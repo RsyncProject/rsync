@@ -23,8 +23,6 @@
 
 extern int am_server;
 
-extern int csum_length;
-
 extern int preserve_links;
 extern int preserve_perms;
 extern int preserve_devices;

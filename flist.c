@@ -23,8 +23,6 @@
 
 extern struct stats stats;
 
-extern int csum_length;
-
 extern int verbose;
 extern int am_server;
 extern int always_checksum;
@@ -254,7 +252,11 @@ static void send_file_entry(struct file_struct *file,int f,unsigned base_flags)
 #endif
 
 	if (always_checksum) {
-		write_buf(f,file->sum,csum_length);
+		if (remote_version < 21) {
+			write_buf(f,file->sum,2);
+		} else {
+			write_buf(f,file->sum,MD4_SUM_LENGTH);
+		}
 	}       
 
 	last_mode = file->mode;
@@ -353,7 +355,11 @@ static void receive_file_entry(struct file_struct **fptr,
 	if (always_checksum) {
 		file->sum = (char *)malloc(MD4_SUM_LENGTH);
 		if (!file->sum) out_of_memory("md4 sum");
-		read_buf(f,file->sum,csum_length);
+		if (remote_version < 21) {
+			read_buf(f,file->sum,2);
+		} else {
+			read_buf(f,file->sum,MD4_SUM_LENGTH);
+		}
 	}
   
 	last_mode = file->mode;

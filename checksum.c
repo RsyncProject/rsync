@@ -91,7 +91,7 @@ void file_checksum(char *fname,char *sum,OFF_T size)
 	char tmpchunk[CSUM_CHUNK];
 	struct mdfour m;
 	
-	memset(sum,0,csum_length);
+	memset(sum,0,MD4_SUM_LENGTH);
 	
 	fd = open(fname,O_RDONLY);
 	if (fd == -1) return;

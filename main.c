@@ -23,8 +23,6 @@ time_t starttime = 0;
 
 struct stats stats;
 
-extern int csum_length;
-
 extern int verbose;
 
 static void report(int f)

@@ -50,7 +50,11 @@ static int skip_file(char *fname,
 	if (always_checksum && S_ISREG(st->st_mode)) {
 		char sum[MD4_SUM_LENGTH];
 		file_checksum(fname,sum,st->st_size);
-		return (memcmp(sum,file->sum,csum_length) == 0);
+		if (remote_version < 21) {
+			return (memcmp(sum,file->sum,2) == 0);
+		} else {
+			return (memcmp(sum,file->sum,MD4_SUM_LENGTH) == 0);
+		}
 	}
 
 	if (size_only) {
@@ -86,17 +90,19 @@ static int adapt_block_size(struct file_struct *file, int bsize)
 static void send_sums(struct sum_struct *s,int f_out)
 {
 	int i;
-
-  /* tell the other guy how many we are going to be doing and how many
-     bytes there are in the last chunk */
+	
+	/* tell the other guy how many we are going to be doing and how many
+	   bytes there are in the last chunk */
 	write_int(f_out,s?s->count:0);
 	write_int(f_out,s?s->n:block_size);
 	write_int(f_out,s?s->remainder:0);
-	if (s)
-		for (i=0;i<s->count;i++) {
-			write_int(f_out,s->sums[i].sum1);
-			write_buf(f_out,s->sums[i].sum2,csum_length);
-		}
+
+	if (!s) return;
+
+	for (i=0;i<s->count;i++) {
+		write_int(f_out,s->sums[i].sum1);
+		write_buf(f_out,s->sums[i].sum2,csum_length);
+	}
 }
 
 
