@@ -443,6 +443,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
 
       map = map_ptr(buf,offset2,len);
 
+      see_token(map, len);
       sum_update(map,len);
 
       if (write_sparse(fd,map,len) != len) {

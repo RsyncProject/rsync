@@ -136,6 +136,8 @@ static void server_options(char **args,int *argc)
     argstr[x++] = 'x';
   if (sparse_files)
     argstr[x++] = 'S';
+  if (do_compression)
+    argstr[x++] = 'z';
   argstr[x] = 0;
 
   if (x != 1) args[ac++] = argstr;
@@ -399,6 +401,7 @@ static void usage(FILE *f)
   fprintf(f,"-C, --cvs-exclude        auto ignore files in the same way CVS does\n");
   fprintf(f,"    --delete             delete files that don't exist on the sending side\n");
   fprintf(f,"-I, --ignore-times       don't exclude files that match length and time\n");
+  fprintf(f,"-z, --compress           compress file data\n");
   fprintf(f,"    --exclude FILE       exclude file FILE\n");
   fprintf(f,"    --exclude-from FILE  exclude files listed in FILE\n");
   fprintf(f,"    --suffix SUFFIX      override backup suffix\n");  
@@ -413,7 +416,7 @@ static void usage(FILE *f)
 enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
       OPT_EXCLUDE_FROM,OPT_DELETE,OPT_RSYNC_PATH};
 
-static char *short_options = "oblHpguDCtcahvrIxnSe:B:";
+static char *short_options = "oblHpguDCtcahvrIxnSe:B:z";
 
 static struct option long_options[] = {
   {"version",     0,     0,    OPT_VERSION},
@@ -445,6 +448,7 @@ static struct option long_options[] = {
   {"rsh",         1,     0,    'e'},
   {"suffix",      1,     0,    OPT_SUFFIX},
   {"block-size",  1,     0,    'B'},
+  {"compress",	  0,	 0,    'z'},
   {0,0,0,0}};
 
 int main(int argc,char *argv[])
@@ -613,8 +617,12 @@ int main(int argc,char *argv[])
 	  block_size = atoi(optarg);
 	  break;
 
+        case 'z':
+	  do_compression = 1;
+	  break;
+
 	default:
-	  fprintf(FERROR,"bad option -%c\n",opt);
+	  /* fprintf(FERROR,"bad option -%c\n",opt); */
 	  exit_cleanup(1);
 	}
     }
