@@ -485,7 +485,7 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		stat_errno = ENOENT;
 	}
 
-	if (partial_dir && (partialptr = partial_dir_fname(fname))
+	if (partial_dir && (partialptr = partial_dir_fname(fname)) != NULL
 	    && link_stat(partialptr, &partial_st, 0) == 0
 	    && S_ISREG(partial_st.st_mode)) {
 		if (statret == -1)
@@ -528,18 +528,19 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 	}
 
 prepare_to_open:
+	if (partialptr) {
+		st = partial_st;
+		fnamecmp = partialptr;
+		fnamecmp_type = FNAMECMP_PARTIAL_DIR;
+		statret = 0;
+	}
+
 	if (dry_run || whole_file > 0) {
 		statret = -1;
 		goto notify_others;
 	}
 	if (read_batch)
 		goto notify_others;
-
-	if (partialptr) {
-		st = partial_st;
-		fnamecmp = partialptr;
-		fnamecmp_type = FNAMECMP_PARTIAL_DIR;
-	}
 
 	/* open the file */
 	fd = do_open(fnamecmp, O_RDONLY, 0);
