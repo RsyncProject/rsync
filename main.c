@@ -700,6 +700,9 @@ static RETSIGTYPE sigusr2_handler(int val) {
 }
 
 static RETSIGTYPE sigchld_handler(int val) {
+#ifdef WNOHANG
+	while (waitpid(-1, NULL, WNOHANG) > 0) ;
+#endif
 }
 
 int main(int argc,char *argv[])
