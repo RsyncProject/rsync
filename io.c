@@ -61,39 +61,42 @@ static int read_buffer_size;
  * ssh will clag up. Uggh.  */
 static void read_check(int f)
 {
-  int n;
+	int n;
 
-  if (f == -1) return;
+	if (f == -1) return;
 
-  if (read_buffer_len == 0) {
-    read_buffer_p = read_buffer;
-  }
+	if (read_buffer_len == 0) {
+		read_buffer_p = read_buffer;
+	}
 
-  if ((n=num_waiting(f)) <= 0)
-    return;
+	if ((n=num_waiting(f)) <= 0)
+		return;
 
-  /* things could deteriorate if we read in really small chunks */
-  if (n < 10) n = 1024;
+	/* things could deteriorate if we read in really small chunks */
+	if (n < 10) n = 1024;
 
-  if (read_buffer_p != read_buffer) {
-    memmove(read_buffer,read_buffer_p,read_buffer_len);
-    read_buffer_p = read_buffer;
-  }
+	if (n > MAX_READ_BUFFER/4)
+		n = MAX_READ_BUFFER/4;
 
-  if (n > (read_buffer_size - read_buffer_len)) {
-    read_buffer_size += n;
-    if (!read_buffer)
-      read_buffer = (char *)malloc(read_buffer_size);
-    else
-      read_buffer = (char *)realloc(read_buffer,read_buffer_size);
-    if (!read_buffer) out_of_memory("read check");      
-    read_buffer_p = read_buffer;      
-  }
+	if (read_buffer_p != read_buffer) {
+		memmove(read_buffer,read_buffer_p,read_buffer_len);
+		read_buffer_p = read_buffer;
+	}
 
-  n = read(f,read_buffer+read_buffer_len,n);
-  if (n > 0) {
-    read_buffer_len += n;
-  }
+	if (n > (read_buffer_size - read_buffer_len)) {
+		read_buffer_size += n;
+		if (!read_buffer)
+			read_buffer = (char *)malloc(read_buffer_size);
+		else
+			read_buffer = (char *)realloc(read_buffer,read_buffer_size);
+		if (!read_buffer) out_of_memory("read check");      
+		read_buffer_p = read_buffer;      
+	}
+
+	n = read(f,read_buffer+read_buffer_len,n);
+	if (n > 0) {
+		read_buffer_len += n;
+	}
 }
 
 static time_t last_io;
@@ -334,38 +337,40 @@ static int writefd_unbuffered(int fd,char *buf,int len)
 
 
     if (ret == -1) {
-      read_check(buffer_f_in);
+	    if (read_buffer_len < MAX_READ_BUFFER)
+		    read_check(buffer_f_in);
 
-      fd_count = fd+1;
-      FD_ZERO(&w_fds);
-      FD_ZERO(&r_fds);
-      FD_SET(fd,&w_fds);
-      if (buffer_f_in != -1) {
-	      FD_SET(buffer_f_in,&r_fds);
-	      if (buffer_f_in > fd) 
-		      fd_count = buffer_f_in+1;
-      }
+	    fd_count = fd+1;
+	    FD_ZERO(&w_fds);
+	    FD_ZERO(&r_fds);
+	    FD_SET(fd,&w_fds);
+	    if (buffer_f_in != -1) {
+		    FD_SET(buffer_f_in,&r_fds);
+		    if (buffer_f_in > fd) 
+			    fd_count = buffer_f_in+1;
+	    }
 
-      tv.tv_sec = BLOCKING_TIMEOUT;
-      tv.tv_usec = 0;
-      count = select(fd_count,buffer_f_in == -1? NULL: &r_fds,
-		     &w_fds,NULL,&tv);
-      if (count == -1 && errno != EINTR) {
-	      if (verbose > 1) 
-		      rprintf(FERROR,"select error: %s\n", strerror(errno));
-	      exit_cleanup(1);
-      }
+	    tv.tv_sec = BLOCKING_TIMEOUT;
+	    tv.tv_usec = 0;
+	    count = select(fd_count,buffer_f_in == -1? NULL: &r_fds,
+			   &w_fds,NULL,&tv);
 
-      if (count == 0) {
-	      check_timeout();
-	      continue;
-      }
+	    if (count == -1 && errno != EINTR) {
+		    if (verbose > 1) 
+			    rprintf(FERROR,"select error: %s\n", strerror(errno));
+		    exit_cleanup(1);
+	    }
+
+	    if (count == 0) {
+		    check_timeout();
+		    continue;
+	    }
       
-      if (FD_ISSET(fd, &w_fds)) {
-	      got_select = 1;
-      }
+	    if (FD_ISSET(fd, &w_fds)) {
+		    got_select = 1;
+	    }
     } else {
-      total += ret;
+	    total += ret;
     }
   }
 
