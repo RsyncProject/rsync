@@ -39,6 +39,7 @@
    incompatible with older versions :-( */
 #define CHAR_OFFSET 0
 
+/* These flags are used during the flist transfer. */
 
 #define FLAG_DELETE (1<<0)
 #define SAME_MODE (1<<1)
@@ -54,7 +55,7 @@
 #define HAS_INODE_DATA (1<<9)
 #define SAME_DEV (1<<10)
 
-/* What flags are relevant after the transfer of the flist is complete? */
+/* What flags above are relevant after the transfer of the flist? */
 #define LIVE_FLAGS FLAG_DELETE
 
 /* update this if you make incompatible changes */
