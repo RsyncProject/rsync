@@ -78,8 +78,13 @@ Changes since version 2.5.6:
     * Fixed a bug in the --backup code that could cause deleted files
       to not get backed up.
 
+    * Call setgroups() in a more portable manner.
+
     * Improved the mkstemp error message to always include the directory
-      info where the temp file is being created.
+      info where the temp file is being created. (Wayne Davison)
+
+    * Fixed some bugs in the handling of --delete and --exclude when
+      using the --relative (-R) option. (Wayne Davison)
 
   INTERNAL:
 
