@@ -85,6 +85,19 @@ static void build_hash_table(struct sum_struct *s)
 }
 
 
+static void send_match(int f,int i)
+{
+  static int matches[32];
+  static int match_count=0;
+
+  matches[match_count++] = i;
+  if (match_count == 32 || i==0) {
+    int i;
+    for (i=0;i<match_count;i++)
+      write_int(f,matches[i]);
+    match_count=0;
+  }
+}
 
 static off_t last_match;
 
@@ -109,7 +122,7 @@ static void matched(int f,struct sum_struct *s,char *buf,off_t len,
     }
     data_transfer += n;
   }
-  write_int(f,-(i+1));
+  send_match(f,-(i+1));
   if (i != -1)
     last_match = offset + s->sums[i].len;
   if (n > 0)
