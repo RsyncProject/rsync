@@ -64,7 +64,6 @@ extern int copy_links;
 extern int copy_unsafe_links;
 extern int protocol_version;
 extern int sanitize_paths;
-extern int delete_excluded;
 extern int max_delete;
 extern int orig_umask;
 extern int list_only;
@@ -976,11 +975,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 	struct file_struct *file;
 	char fbuf[MAXPATHLEN];
 
-	/* f is set to -1 when calculating deletion file list */
-	file = make_file(fname, flist,
-	    f == -1 && delete_excluded? SERVER_FILTERS : ALL_FILTERS);
-
-	if (!file)
+	if (!(file = make_file(fname, flist, ALL_FILTERS)))
 		return;
 
 	maybe_emit_filelist_progress(flist);
