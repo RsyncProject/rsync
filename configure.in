@@ -2,12 +2,28 @@ dnl Process this file with autoconf to produce a configure script.
 AC_INIT(byteorder.h)
 AC_CONFIG_HEADER(config.h)
 
-# compile with optimisation and without debugging by default
-CFLAGS=${CFLAGS-"-O"}
 LDFLAGS=${LDFLAGS-""}
 
 AC_CANONICAL_SYSTEM
 AC_VALIDATE_CACHE_SYSTEM_TYPE
+
+# compile with optimisation and without debugging by default, unless
+# --debug is given.  We must decide this before testing the compiler.
+
+AC_ARG_ENABLE(debug,
+        [  --enable-debug          including debugging symbols and features])
+
+AC_MSG_CHECKING([whether to include debugging symbols])
+if test x"$enable_debug" = x"yes"
+then
+    AC_MSG_RESULT(yes)
+    # leave CFLAGS alone; AC_PROG_CC will try to include -g if it can
+    AC_DEFINE(DEBUG, 1, [Define to turn on debugging code that may slow normal operation])
+    CFLAGS=${CFLAGS-"-g"}
+else
+    AC_MSG_RESULT(no)
+    CFLAGS=${CFLAGS-"-O"}
+fi
 
 # look for getconf early as this affects just about everything
 AC_CHECK_PROG(HAVE_GETCONF, getconf, "yes", "no")
@@ -15,6 +31,9 @@ if test $HAVE_GETCONF = "yes"; then
 	CFLAGS=$CFLAGS" "`getconf LFS_CFLAGS 2> /dev/null`
 	LDFLAGS=$LDFLAGS" "`getconf LFS_LDFLAGS 2> /dev/null`
 fi
+
+AC_ARG_WITH(included-popt,
+        [  --with-included-popt    use bundled popt library, not from system])
 
 dnl Checks for programs.
 AC_PROG_CC
@@ -129,20 +148,18 @@ if test x"$rsync_cv_HAVE_FNMATCH" = x"yes"; then
     AC_DEFINE(HAVE_FNMATCH)
 fi
 
-# sometimes getopt_long cannot parse same arguments twice
-# e.g. on certain versions of CygWin32
-AC_CACHE_CHECK([for working getopt_long],rsync_cv_HAVE_GETOPT_LONG,[
-AC_TRY_RUN([#include <getopt.h>
-main() {
-    int i, x = 0; char *argv[] = { "x", "--xx" };
-    struct option o[] = {{"xx", 0, 0, 1}, {0,0,0,0}};
-    getopt_long(2, argv, "x", o, &i) == 1 ? x++ : 0; optind = 0;
-    getopt_long(2, argv, "x", o, &i) == 1 ? x++ : 0;
-    exit(x == 2 ? 0 : 1);
-}], rsync_cv_HAVE_GETOPT_LONG=yes,rsync_cv_HAVE_GETOPT_LONG=no,
-    rsync_cv_HAVE_GETOPT_LONG=cross)])
-if test x"$rsync_cv_HAVE_GETOPT_LONG" = x"yes"; then
-    AC_DEFINE(HAVE_GETOPT_LONG)
+AC_CONFIG_SUBDIRS(popt-1.2)
+AC_CHECK_LIB(popt, poptGetContext, , [with_included_popt=yes])
+
+AC_MSG_CHECKING("whether to use included libpopt...")
+if test x"$with_included_popt" = x"yes"
+then
+    AC_MSG_RESULT("$srcdir/popt-1.2")
+    BUILD_LIBPOPT=popt-1.2/libpopt.a
+    LDFLAGS="$CFLAGS -L popt-1.2"
+    CFLAGS="$CFLAGS -I $srcdir/popt-1.2"
+else
+    AC_MSG_RESULT(no)
 fi
 
 AC_CACHE_CHECK([for long long],rsync_cv_HAVE_LONGLONG,[
@@ -269,6 +286,6 @@ fi
 AC_SUBST(OBJ_SAVE)
 AC_SUBST(OBJ_RESTORE)
 AC_SUBST(CC_SHOBJ_FLAG)
-
+AC_SUBST(BUILD_LIBPOPT)
 
 AC_OUTPUT(Makefile lib/dummy zlib/dummy)
