@@ -241,6 +241,7 @@ recv_deflated_token(int f, char **data)
 		inflateReset(&rx_strm);
 	    }
 	    recv_state = r_idle;
+	    rx_token = 0;
 	    break;
 	    
 	case r_idle:
