@@ -1,0 +1,26 @@
+rsyncsh
+Copyright (C) 2001 by Martin Pool
+
+This is a quick hack to build an interactive shell around rsync, the
+same way we have the ftp, lftp and ncftp programs for the FTP
+protocol.  The key application for this is connecting to a public
+rsync server, such as rsync.kernel.org, change down through and list
+directories, and finally pull down the file you want.
+
+rsync is somewhat ill-at-ease as an interactive operation, since every
+network connection is used to carry out exactly one operation.  rsync
+kind of "forks across the network" passing the options and filenames
+to operate upon, and the connection is closed when the transfer is
+complete.  (This might be fixed in the future, either by adapting the
+current protocol to allow chained operations over a single socket, or
+by writing a new protocol that better supports interactive use.)
+
+So, rsyncsh runs a new rsync command and opens a new socket for every
+(network-based) command you type.
+
+This has two consequences.  Firstly, there is more command latency
+than is really desirable.  More seriously, if the connection cannot be
+done automatically, because for example it uses SSH with a password,
+then you will need to enter the password every time.  We might even
+fix this in the future, though, by having a way to automatically feed
+the password to SSH if it's entered once.
