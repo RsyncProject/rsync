@@ -643,7 +643,7 @@ a file should be ignored.
 
 The exclude list is initialized to:
 
-quote(RCS SCCS CVS CVS.adm RCSLOG cvslog.* tags TAGS .make.state
+quote(RCS/ SCCS/ CVS/ .svn/ CVS.adm RCSLOG cvslog.* tags TAGS .make.state
 .nse_depinfo *~ #* .#* ,* *.old *.bak *.BAK *.orig *.rej .del-*
 *.a *.o *.obj *.so *.Z *.elc *.ln core)
 
