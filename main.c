@@ -32,8 +32,15 @@ static void report(int f)
 	time_t t = time(NULL);
 	extern int am_server;
 	extern int am_sender;
+	extern int am_daemon;
 
 	if (!verbose) return;
+
+	if (am_daemon) {
+		rprintf(FINFO, "wrote %.0f bytes  read %.0f bytes  total size %.0f\n",
+			(double)write_total(),(double)read_total(),
+			(double)total_size);
+	}
 
 	if (am_server && am_sender) {
 		write_longint(f,read_total());
