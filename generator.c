@@ -43,7 +43,6 @@ extern int protocol_version;
 extern int always_checksum;
 extern char *compare_dest;
 extern int link_dest;
-extern struct file_struct **hlink_list;
 
 
 /* choose whether to skip a particular file */

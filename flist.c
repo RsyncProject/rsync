@@ -46,7 +46,6 @@ extern char *files_from;
 extern int filesfrom_fd;
 
 extern int one_file_system;
-extern int make_backups;
 extern int preserve_links;
 extern int preserve_hard_links;
 extern int preserve_perms;
