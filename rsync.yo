@@ -1126,7 +1126,8 @@ dit(bf(14)) Error in IPC code
 dit(bf(20)) Received SIGUSR1 or SIGINT 
 dit(bf(21)) Some error returned by waitpid() 
 dit(bf(22)) Error allocating core memory buffers 
-dit(bf(23)) Partial transfer
+dit(bf(23)) Partial transfer due to error
+dit(bf(24)) Partial transfer due to vanished source files
 dit(bf(30)) Timeout in data send/receive 
 enddit()
 
