@@ -85,9 +85,10 @@ proto:
 clean:
 	rm -f *~ $(OBJS) rsync 
 	rm -rf ./testtmp
+	rm -f config.h config.cache config.status
 
 distclean: clean
-	rm -f config.h config.cache config.status Makefile
+	rm -f Makefile
 
 # missing functions
 getaddrinfo.o:	lib/getaddrinfo.c
