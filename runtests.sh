@@ -177,9 +177,9 @@ done
 echo '------------------------------------------------------------'
 echo "----- overall results:"
 echo "      $passed passed"
-echo "      $failed failed"
-echo "      $skipped skipped"
-echo "      $missing missing"
+[ "$failed" -gt 0 ]  && echo "      $failed failed"
+[ "$skipped" -gt 0 ] && echo "      $skipped skipped"
+[ "$missing" -gt 0 ] && echo "      $missing missing"
 echo '------------------------------------------------------------'
 
 exit `expr $failed + $missing`
