@@ -50,6 +50,7 @@ extern char *bind_address;
 extern struct exclude_list_struct server_exclude_list;
 extern char *exclude_path_prefix;
 extern char *config_file;
+extern char *files_from;
 
 char *auth_user;
 
@@ -461,6 +462,8 @@ static int rsync_module(int f_in, int f_out, int i)
 		 * get the error back to the client.  This means getting
 		 * the protocol setup finished first in later versions. */
 		setup_protocol(f_out, f_in);
+		if (files_from && !am_sender && strcmp(files_from, "-") != 0)
+			write_byte(f_out, 0);
 		io_start_multiplex_out();
 	}
 
