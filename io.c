@@ -47,6 +47,7 @@ static time_t last_io;
 static int no_flush;
 
 extern int bwlimit;
+extern size_t bwlimit_writemax;
 extern int verbose;
 extern int io_timeout;
 extern int am_server;
@@ -739,22 +740,51 @@ unsigned char read_byte(int f)
  * use a bit less bandwidth than specified, because it doesn't make up
  * for slow periods.  But arguably this is a feature.  In addition, we
  * ought to take the time used to write the data into account.
+ *
+ * During some phases of big transfers (file FOO is uptodate) this is
+ * called with a small bytes_written every time.  As the kernel has to
+ * round small waits up to guarantee that we actually wait at least the
+ * requested number of microseconds, this can become grossly inaccurate.
+ * We therefore keep track of the bytes we've written over time and only
+ * sleep when the accumulated delay is at least 1 tenth of a second.
  **/
 static void sleep_for_bwlimit(int bytes_written)
 {
-	struct timeval tv;
+	static struct timeval prior_tv;
+	static long total_written = 0; 
+	struct timeval tv, start_tv;
+	long elapsed_usec, sleep_usec;
+
+#define ONE_SEC	1000000L /* # of microseconds in a second */
 
 	if (!bwlimit)
 		return;
 
-	assert(bytes_written > 0);
-	assert(bwlimit > 0);
+	total_written += bytes_written; 
 
-	tv.tv_usec = bytes_written * 1000 / bwlimit;
-	tv.tv_sec  = tv.tv_usec / 1000000;
-	tv.tv_usec = tv.tv_usec % 1000000;
+	gettimeofday(&start_tv, NULL);
+	if (prior_tv.tv_sec) {
+		elapsed_usec = (start_tv.tv_sec - prior_tv.tv_sec) * ONE_SEC
+			     + (start_tv.tv_usec - prior_tv.tv_usec);
+		total_written -= elapsed_usec * bwlimit / (ONE_SEC/1024);
+		if (total_written < 0)
+			total_written = 0;
+	}
 
+	sleep_usec = total_written * (ONE_SEC/1024) / bwlimit;
+	if (sleep_usec < ONE_SEC / 10) {
+		prior_tv = start_tv;
+		return;
+	}
+
+	tv.tv_sec  = sleep_usec / ONE_SEC;
+	tv.tv_usec = sleep_usec % ONE_SEC;
 	select(0, NULL, NULL, NULL, &tv);
+
+	gettimeofday(&prior_tv, NULL);
+	elapsed_usec = (prior_tv.tv_sec - start_tv.tv_sec) * ONE_SEC
+		     + (prior_tv.tv_usec - start_tv.tv_usec);
+	total_written = (sleep_usec - elapsed_usec) * bwlimit / (ONE_SEC/1024);
 }
 
 
@@ -812,6 +842,8 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 		if (FD_ISSET(fd, &w_fds)) {
 			int ret;
 			size_t n = len-total;
+			if (bwlimit && n > bwlimit_writemax)
+				n = bwlimit_writemax;
 			ret = write(fd,buf+total,n);
 
 			if (ret < 0) {
