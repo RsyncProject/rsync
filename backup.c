@@ -35,16 +35,32 @@ extern int preserve_hard_links;
 extern int orig_umask;
 extern int safe_symlinks;
 
+/* make a complete pathname for backup file */
+char *get_backup_name(char *fname)
+{
+	static char fnamebak[MAXPATHLEN];
+
+	if (backup_dir) {
+		if (stringjoin(backup_dir_buf + backup_dir_len, backup_dir_remainder,
+			       fname, backup_suffix, NULL) < backup_dir_remainder)
+			return backup_dir_buf;
+	} else {
+		if (stringjoin(fnamebak, sizeof fnamebak,
+			       fname, backup_suffix, NULL) < sizeof fnamebak)
+			return fnamebak;
+	}
+
+	rprintf(FERROR, "backup filename too long\n");
+	return NULL;
+}
+
 /* simple backup creates a backup with a suffix in the same directory */
 static int make_simple_backup(char *fname)
 {
-	char fnamebak[MAXPATHLEN];
+	char *fnamebak = get_backup_name(fname);
 
-	if (stringjoin(fnamebak, sizeof fnamebak, fname, backup_suffix, NULL)
-	    >= sizeof fnamebak) {
-		rprintf(FERROR, "backup filename too long\n");
+	if (!fnamebak)
 		return 0;
-	}
 
 	if (do_rename(fname, fnamebak) != 0) {
 		/* cygwin (at least version b19) reports EINVAL */
@@ -143,6 +159,7 @@ static int keep_backup(char *fname)
 {
 	STRUCT_STAT st;
 	struct file_struct *file;
+	char *buf;
 	int kept = 0;
 	int ret_code;
 
@@ -155,28 +172,21 @@ static int keep_backup(char *fname)
 	if (ret_code < 0)
 		return 1;
 
-	file = make_file(fname, NULL, NO_EXCLUDES);
+	if (!(file = make_file(fname, NULL, NO_EXCLUDES)))
+		return 1; /* the file could have disappeared */
 
-	/* the file could have disappeared */
-	if (!file)
-		return 1;
-
-	/* make a complete pathname for backup file */
-	if (stringjoin(backup_dir_buf + backup_dir_len, backup_dir_remainder,
-	    fname, backup_suffix, NULL) >= backup_dir_remainder) {
-		rprintf(FERROR, "keep_backup filename too long\n");
+	if (!(buf = get_backup_name(fname)))
 		return 0;
-	}
 
 #ifdef HAVE_MKNOD
 	/* Check to see if this is a device file, or link */
 	if (IS_DEVICE(file->mode)) {
 		if (am_root && preserve_devices) {
-			if (do_mknod(backup_dir_buf, file->mode, file->u.rdev) < 0
-			    && (errno != ENOENT || make_bak_dir(backup_dir_buf) < 0
-			     || do_mknod(backup_dir_buf, file->mode, file->u.rdev) < 0)) {
+			if (do_mknod(buf, file->mode, file->u.rdev) < 0
+			    && (errno != ENOENT || make_bak_dir(buf) < 0
+			     || do_mknod(buf, file->mode, file->u.rdev) < 0)) {
 				rsyserr(FERROR, errno, "mknod %s failed",
-					full_fname(backup_dir_buf));
+					full_fname(buf));
 			} else if (verbose > 2) {
 				rprintf(FINFO,
 					"make_backup: DEVICE %s successful.\n",
@@ -190,11 +200,11 @@ static int keep_backup(char *fname)
 
 	if (!kept && S_ISDIR(file->mode)) {
 		/* make an empty directory */
-		if (do_mkdir(backup_dir_buf, file->mode) < 0
-		    && (errno != ENOENT || make_bak_dir(backup_dir_buf) < 0
-		     || do_mkdir(backup_dir_buf, file->mode) < 0)) {
+		if (do_mkdir(buf, file->mode) < 0
+		    && (errno != ENOENT || make_bak_dir(buf) < 0
+		     || do_mkdir(buf, file->mode) < 0)) {
 			rsyserr(FINFO, errno, "mkdir %s failed",
-				full_fname(backup_dir_buf));
+				full_fname(buf));
 		}
 
 		ret_code = do_rmdir(fname);
@@ -207,18 +217,18 @@ static int keep_backup(char *fname)
 
 #if SUPPORT_LINKS
 	if (!kept && preserve_links && S_ISLNK(file->mode)) {
-		if (safe_symlinks && unsafe_symlink(file->u.link, backup_dir_buf)) {
+		if (safe_symlinks && unsafe_symlink(file->u.link, buf)) {
 			if (verbose) {
 				rprintf(FINFO, "ignoring unsafe symlink %s -> %s\n",
-					full_fname(backup_dir_buf), file->u.link);
+					full_fname(buf), file->u.link);
 			}
 			kept = 1;
 		}
-		if (do_symlink(file->u.link, backup_dir_buf) < 0
-		    && (errno != ENOENT || make_bak_dir(backup_dir_buf) < 0
-		     || do_symlink(file->u.link, backup_dir_buf) < 0)) {
+		if (do_symlink(file->u.link, buf) < 0
+		    && (errno != ENOENT || make_bak_dir(buf) < 0
+		     || do_symlink(file->u.link, buf) < 0)) {
 			rsyserr(FERROR, errno, "link %s -> \"%s\"",
-				full_fname(backup_dir_buf), file->u.link);
+				full_fname(buf), file->u.link);
 		}
 		do_unlink(fname);
 		kept = 1;
@@ -233,20 +243,20 @@ static int keep_backup(char *fname)
 
 	/* move to keep tree if a file */
 	if (!kept) {
-		if (robust_move(fname, backup_dir_buf) != 0) {
+		if (robust_move(fname, buf) != 0) {
 			rsyserr(FERROR, errno, "keep_backup failed: %s -> \"%s\"",
-				full_fname(fname), backup_dir_buf);
+				full_fname(fname), buf);
 		} else if (st.st_nlink > 1) {
 			/* If someone has hard-linked the file into the backup
 			 * dir, rename() might return success but do nothing! */
 			robust_unlink(fname); /* Just in case... */
 		}
 	}
-	set_perms(backup_dir_buf, file, NULL, 0);
+	set_perms(buf, file, NULL, 0);
 	free(file);
 
 	if (verbose > 1)
-		rprintf(FINFO, "keep_backup %s -> %s\n", fname, backup_dir_buf);
+		rprintf(FINFO, "keep_backup %s -> %s\n", fname, buf);
 	return 1;
 }
 
