@@ -1,0 +1,38 @@
+#! /bin/sh
+
+# Copyright (C) 2002 by Martin Pool <mbp@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test that when rsync is running as root and has -a it correctly sets
+# the ownership of the destination.
+
+# We don't know what users will be present on this system, so we just
+# use random numeric uids and gids.
+
+. $srcdir/testsuite/rsync.fns
+
+set -x
+
+# Build some hardlinks
+
+fromdir="$scratchdir/from"
+todir="$scratchdir/to"
+
+mkdir "$fromdir"
+name1="$fromdir/name1"
+name2="$fromdir/name2"
+echo "This is the file" > "$name1"
+echo "This is the other file" > "$name2"
+
+chown 5000 "$name1" || test_skipped "Can't chown"
+chown 5001 "$name2" || test_skipped "Can't chown"
+chgrp 5002 "$name1" || test_skipped "Can't chgrp"
+chgrp 5003 "$name2" || test_skipped "Can't chgrp"
+
+checkit "rsync -aHvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+
+exit 0
+# last [] may have failed but if we get here then we've won
+
