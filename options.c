@@ -303,7 +303,8 @@ void usage(enum logcode F)
 enum {OPT_VERSION = 1000, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_DELETE_AFTER, OPT_DELETE_EXCLUDED, OPT_LINK_DEST,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW,
-      OPT_READ_BATCH, OPT_WRITE_BATCH};
+      OPT_READ_BATCH, OPT_WRITE_BATCH,
+      OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
@@ -433,7 +434,7 @@ static void set_refuse_options(char *bp)
 				break;
 			}
 			if (strcmp(bp, op->longName) == 0) {
-				op->val = (op - long_options) + 9000;
+				op->val = (op - long_options)+OPT_REFUSED_BASE;
 				break;
 			}
 		}
@@ -578,9 +579,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 		default:
 			/* A large opt value means that set_refuse_options()
-			 * turned this option off (opt-9000 is its index). */
-			if (opt >= 9000) {
-				struct poptOption *op = &long_options[opt-9000];
+			 * turned this option off (opt-BASE is its index). */
+			if (opt >= OPT_REFUSED_BASE) {
+				struct poptOption *op =
+				    &long_options[opt-OPT_REFUSED_BASE];
 				int n = snprintf(err_buf, sizeof err_buf,
 				    "This server does not support --%s\n",
 				    op->longName) - 1;
