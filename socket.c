@@ -182,6 +182,10 @@ int open_socket_out(char *host, int port, const char *bind_address,
 		*cp++ = '\0';
 		strcpy(portbuf, cp);
 		h = buffer;
+		if (verbose >= 2) {
+			rprintf(FINFO, "connection via http proxy %s port %s\n",
+				h, portbuf);
+		}
 	} else {
 		snprintf(portbuf, sizeof(portbuf), "%d", port);
 		h = host;
