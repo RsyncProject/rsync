@@ -27,17 +27,31 @@
 
 #include "rsync.h"
 
+extern int am_sender;
+extern int am_server;
+extern int am_daemon;
+extern int am_root;
 extern int module_id;
 extern int read_only;
 extern int verbose;
 extern int rsync_port;
-char *auth_user;
+extern int kludge_around_eof;
+extern int daemon_over_rsh;
+extern int list_only;
 extern int sanitize_paths;
 extern int filesfrom_fd;
 extern int remote_protocol;
 extern int protocol_version;
+extern int io_timeout;
+extern int orig_umask;
+extern int no_detach;
+extern int default_af_hint;
+extern char *bind_address;
 extern struct exclude_struct **server_exclude_list;
 extern char *exclude_path_prefix;
+extern char *config_file;
+
+char *auth_user;
 
 /**
  * Run a client connected to an rsyncd.  The alternative to this
@@ -57,8 +71,6 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 {
 	int fd, ret;
 	char *p, *user=NULL;
-	extern char *bind_address;
-	extern int default_af_hint;
 
 	/* this is redundant with code in start_inband_exchange(), but
 	 * this short-circuits a problem before we open a socket, and
@@ -100,10 +112,6 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out, int argc)
 	int sargc = 0;
 	char line[MAXPATHLEN];
 	char *p;
-	extern int kludge_around_eof;
-	extern int am_sender;
-	extern int daemon_over_rsh;
-	extern int list_only;
 
 	if (argc == 0 && !am_sender)
 		list_only = 1;
@@ -217,10 +225,6 @@ static int rsync_module(int f_in, int f_out, int i)
 	int start_glob=0;
 	int ret;
 	char *request=NULL;
-	extern int am_sender;
-	extern int am_server;
-	extern int am_daemon;
-	extern int am_root;
 
 	if (!allow_access(addr, host, lp_hosts_allow(i), lp_hosts_deny(i))) {
 		rprintf(FERROR,"rsync denied on module %s from %s (%s)\n",
@@ -475,7 +479,6 @@ static int rsync_module(int f_in, int f_out, int i)
 	}
 
 	if (lp_timeout(i)) {
-		extern int io_timeout;
 		io_timeout = lp_timeout(i);
 	}
 
@@ -507,8 +510,6 @@ int start_daemon(int f_in, int f_out)
 	char line[200];
 	char *motd;
 	int i = -1;
-	extern char *config_file;
-	extern int am_server;
 
 	if (!lp_load(config_file, 0)) {
 		exit_cleanup(RERR_SYNTAX);
@@ -579,10 +580,7 @@ int start_daemon(int f_in, int f_out)
 
 int daemon_main(void)
 {
-	extern char *config_file;
-	extern int orig_umask;
 	char *pid_file;
-	extern int no_detach;
 
 	if (is_a_socket(STDIN_FILENO)) {
 		int i;
