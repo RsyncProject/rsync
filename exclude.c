@@ -1,6 +1,7 @@
-/* 
-   Copyright (C) Andrew Tridgell 1996
-   Copyright (C) Paul Mackerras 1996
+/* -*- c-file-style: "linux" -*-
+     
+   Copyright (C) 1996-2001 by Andrew Tridgell <tridge@samba.org>
+   Copyright (C) 1996 by Paul Mackerras
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -30,7 +31,7 @@ extern int delete_mode;
 static struct exclude_struct **exclude_list;
 
 /* build an exclude structure given a exclude pattern */
-static struct exclude_struct *make_exclude(char *pattern, int include)
+static struct exclude_struct *make_exclude(const char *pattern, int include)
 {
 	struct exclude_struct *ret;
 
@@ -178,7 +179,7 @@ int check_exclude(char *name, struct exclude_struct **local_exclude_list,
 }
 
 
-void add_exclude_list(char *pattern,struct exclude_struct ***list, int include)
+void add_exclude_list(const char *pattern, struct exclude_struct ***list, int include)
 {
 	int len=0;
 	if (list && *list)
@@ -206,12 +207,12 @@ void add_exclude_list(char *pattern,struct exclude_struct ***list, int include)
 	(*list)[len+1] = NULL;
 }
 
-void add_exclude(char *pattern, int include)
+void add_exclude(const char *pattern, int include)
 {
 	add_exclude_list(pattern,&exclude_list, include);
 }
 
-struct exclude_struct **make_exclude_list(char *fname,
+struct exclude_struct **make_exclude_list(const char *fname,
 					  struct exclude_struct **list1,
 					  int fatal, int include)
 {
@@ -245,7 +246,7 @@ struct exclude_struct **make_exclude_list(char *fname,
 }
 
 
-void add_exclude_file(char *fname,int fatal,int include)
+void add_exclude_file(const char *fname, int fatal, int include)
 {
 	if (!fname || !*fname) return;
 
