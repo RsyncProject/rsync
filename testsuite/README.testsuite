@@ -17,8 +17,8 @@ with the GNU Standards, installcheck does not look for rsync on the
 path.
 
 If the tests pass, you should see a report to that effect.  Some tests
-require being root or some other precondition, and so will normally be
-checked -- look at the test scripts for more information.
+require being root or some other precondition, and so will normally not
+be checked -- look at the test scripts for more information.
 
 If the tests fail, you will see rather more output.  The scratch
 directory will remain in the build directory.  It would be useful if
