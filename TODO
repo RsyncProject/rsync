@@ -46,7 +46,7 @@ IPv6
 
   If a host has multiple addresses, then listen try to connect to all
   in order until we get through.  (getaddrinfo may return multiple
-  addresses.)
+  addresses.)  This is kind of implemented already.
 
   Possibly also when starting as a server we may need to listen on
   multiple passive addresses.  This might be a bit harder, because we
