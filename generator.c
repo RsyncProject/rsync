@@ -190,9 +190,11 @@ static struct sum_struct *generate_sums(struct map_struct *buf, OFF_T len,
 		return s;
 	}
 
-	if (verbose > 3)
-		rprintf(FINFO, "count=%d rem=%d n=%d flength=%.0f\n",
-			s->count, s->remainder, s->n, (double) s->flength);
+	if (verbose > 3) {
+		rprintf(FINFO, "count=%ld rem=%ld n=%ld flength=%.0f\n",
+			(long) s->count, (long) s->remainder,
+			(long) s->n, (double) s->flength);
+	}
 
 	s->sums = (struct sum_buf *) malloc(sizeof(s->sums[0]) * s->count);
 	if (!s->sums)
