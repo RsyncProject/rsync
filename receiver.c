@@ -59,7 +59,7 @@ static int delete_already_done(struct file_list *flist,int j)
 
 	for (i=0;i<dlist_len;i++) {
 		if (st.st_ino == delete_list[i].inode &&
-		    st.st_dev == delete_list[i].dev)
+		    (DEV64_T)st.st_dev == delete_list[i].dev)
 			return 1;
 	}
 
