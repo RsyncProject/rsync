@@ -138,10 +138,9 @@
 	size_t len2 = strlen(s);
 	size_t ret = len1 + len2;
 
-	if (len1+len2 >= bufsize) {
-		len2 = bufsize - (len1+1);
-	}
-	if (len2 > 0) {
+	if (len1 < bufsize - 1) {
+		if (len2 >= bufsize - len1)
+			len2 = bufsize - len1 - 1;
 		memcpy(d+len1, s, len2);
 		d[len1+len2] = 0;
 	}
