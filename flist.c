@@ -185,17 +185,18 @@ static void list_file_entry(struct file_struct *f)
 
 	permstring(perms, f->mode);
 
+#if SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(f->mode)) {
 		rprintf(FINFO, "%s %11.0f %s %s -> %s\n",
 			perms,
 			(double) f->length, timestring(f->modtime),
 			f_name(f), f->u.link);
-	} else {
+	} else
+#endif
 		rprintf(FINFO, "%s %11.0f %s %s\n",
 			perms,
 			(double) f->length, timestring(f->modtime),
 			f_name(f));
-	}
 }
 
 
@@ -299,8 +300,10 @@ static void set_filesystem(char *fname)
 
 static int to_wire_mode(mode_t mode)
 {
+#if SUPPORT_LINKS
 	if (S_ISLNK(mode) && (_S_IFLNK != 0120000))
 		return (mode & ~(_S_IFMT)) | 0120000;
+#endif
 	return (int) mode;
 }
 
@@ -424,6 +427,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 		flags |= XMIT_SAME_TIME;
 	else
 		modtime = file->modtime;
+#if SUPPORT_HARD_LINKS
 	if (file->link_u.idev) {
 		if (file->F_DEV == dev) {
 			if (protocol_version >= 28)
@@ -432,6 +436,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 			dev = file->F_DEV;
 		flags |= XMIT_HAS_IDEV_DATA;
 	}
+#endif
 
 	for (l1 = 0;
 	     lastname[l1] && (fname[l1] == lastname[l1]) && (l1 < 255);
@@ -586,13 +591,11 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 	thisname[l1 + l2] = 0;
 
 	strlcpy(lastname, thisname, MAXPATHLEN);
-	lastname[MAXPATHLEN - 1] = 0;
 
 	clean_fname(thisname);
 
-	if (sanitize_paths) {
+	if (sanitize_paths)
 		sanitize_path(thisname, NULL);
-	}
 
 	if ((p = strrchr(thisname, '/'))) {
 		static char *lastdir;
@@ -649,6 +652,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 		}
 	}
 
+#if SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(mode)) {
 		int len = read_int(f);
 		if (len < 0 || len >= MAXPATHLEN) {
@@ -661,6 +665,8 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 		if (sanitize_paths)
 			sanitize_path(file->u.link, file->dirname);
 	}
+#endif
+
 #if SUPPORT_HARD_LINKS
 	if (preserve_hard_links && protocol_version < 28 && S_ISREG(mode))
 		flags |= XMIT_HAS_IDEV_DATA;
@@ -820,6 +826,18 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 	file->mode = st.st_mode;
 	file->uid = st.st_uid;
 	file->gid = st.st_gid;
+
+#ifdef HAVE_STRUCT_STAT_ST_RDEV
+	if (preserve_devices && IS_DEVICE(st.st_mode))
+		file->u.rdev = st.st_rdev;
+#endif
+
+#if SUPPORT_LINKS
+	if (S_ISLNK(st.st_mode))
+		file->u.link = STRDUP(ap, linkname);
+#endif
+
+#if SUPPORT_HARD_LINKS
 	if (preserve_hard_links) {
 		if (protocol_version < 28 ? S_ISREG(st.st_mode)
 		    : !S_ISDIR(st.st_mode) && st.st_nlink > 1) {
@@ -829,14 +847,6 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 			file->F_INODE = st.st_ino;
 		}
 	}
-#ifdef HAVE_STRUCT_STAT_ST_RDEV
-	if (preserve_devices && IS_DEVICE(st.st_mode))
-		file->u.rdev = st.st_rdev;
-#endif
-
-#if SUPPORT_LINKS
-	if (S_ISLNK(st.st_mode))
-		file->u.link = STRDUP(ap, linkname);
 #endif
 
 	if (always_checksum && S_ISREG(st.st_mode)) {
@@ -1298,10 +1308,12 @@ void free_file(struct file_struct *file)
 		return;
 	if (file->basename)
 		free(file->basename);
-	if (!IS_DEVICE(file->mode) && file->u.link)
-		free(file->u.link); /* Handles u.sum too. */
+	if (!IS_DEVICE(file->mode) && file->u.sum)
+		free(file->u.sum); /* Handles u.link too. */
+#if SUPPORT_HARD_LINKS
 	if (file->link_u.idev)
 		free((char*)file->link_u.idev); /* Handles link_u.links too. */
+#endif
 	*file = null_file;
 }
 
