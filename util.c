@@ -515,7 +515,6 @@ void glob_expand(char **argv, int *argc, int maxargs)
 	glob_t globbuf;
 	int i;
 
-	rprintf(FINFO,"glob(%s) -> %d\n", argv[*argc], globbuf.gl_pathc);
 	memset(&globbuf, 0, sizeof(globbuf));
 	glob(argv[*argc], 0, NULL, &globbuf);
 	if (globbuf.gl_pathc == 0) {
