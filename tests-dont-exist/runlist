@@ -4,5 +4,6 @@
 # directory to support old installations of the build farm client
 # software.
 
-echo 'Hello testor!'
+echo "$0 running" 
 
+TEST_ALL="rsync-version"

@@ -1,0 +1,3 @@
+Actually, rsync tests do too exist.  They're in this strangely-named
+directory to support old installations of the build farm client
+software.
