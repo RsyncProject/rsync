@@ -335,7 +335,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	unsigned short flags;
 	static time_t modtime;
 	static mode_t mode;
-	static uint64 dev;
+	static int64 dev;
 	static dev_t rdev;
 	static uint32 rdev_major;
 	static uid_t uid;
@@ -527,7 +527,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 {
 	static time_t modtime;
 	static mode_t mode;
-	static uint64 dev;
+	static int64 dev;
 	static dev_t rdev;
 	static uint32 rdev_major;
 	static uid_t uid;
@@ -684,7 +684,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 	if (preserve_hard_links && protocol_version < 28 && S_ISREG(mode))
 		flags |= XMIT_HAS_IDEV_DATA;
 	if (flags & XMIT_HAS_IDEV_DATA) {
-		uint64 inode;
+		int64 inode;
 		if (protocol_version < 26) {
 			dev = read_int(f);
 			inode = read_int(f);

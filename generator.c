@@ -117,7 +117,7 @@ static int unchanged_file(char *fn, struct file_struct *file, STRUCT_STAT *st)
  *
  * This might be made one of several selectable heuristics.
  */
-static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
+static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 {
 	int32 blength;
 	int s2length;
@@ -128,7 +128,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 		blength = BLOCK_SIZE;
 	else {
 		int32 c;
-		uint64 l;
+		int64 l;
 		int cnt;
 		for (c = 1, l = len, cnt = 0; l >>= 2; c <<= 1, cnt++) {}
 		if (cnt >= 31 || c >= MAX_BLOCK_SIZE)
@@ -137,7 +137,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 		    blength = 0;
 		    do {
 			    blength |= c;
-			    if (len < (uint64)blength * blength)
+			    if (len < (int64)blength * blength)
 				    blength &= ~c;
 			    c >>= 1;
 		    } while (c >= 8);	/* round to multiple of 8 */
@@ -151,7 +151,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 		s2length = SUM_LENGTH;
 	} else {
 		int32 c;
-		uint64 l;
+		int64 l;
 		int b = BLOCKSUM_BIAS;
 		for (l = len; l >>= 1; b += 2) {}
 		for (c = blength; c >>= 1 && b; b--) {}

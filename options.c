@@ -200,7 +200,7 @@ static void print_rsync_version(enum logcode f)
 	rprintf(f, "              %sinplace, %sIPv6, %d-bit system inums, %d-bit internal inums\n",
 		have_inplace, ipv6,
 		(int) (sizeof dumstat->st_ino * 8),
-		(int) (sizeof (uint64) * 8));
+		(int) (sizeof (int64) * 8));
 #ifdef MAINTAINER_MODE
 	rprintf(f, "              panic action: \"%s\"\n",
 		get_panic_action());
