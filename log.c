@@ -434,7 +434,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			break;
 		case 'i':
 			if (iflags & ITEM_DELETED) {
-				n = "deleting";
+				n = "*deleting";
 				break;
 			}
 			n = buf2;
@@ -470,8 +470,6 @@ static void log_formatted(enum logcode code, char *format, char *op,
 				if (!n[i]) {
 					for (i = 2; n[i]; i++)
 						n[i] = ' ';
-					if (n[0] == '.')
-						n[0] = '=';
 				}
 			}
 			break;
@@ -553,7 +551,7 @@ void log_delete(char *fname, int mode)
 			len++; /* directories include trailing null */
 		send_msg(MSG_DELETED, fname, len);
 	} else {
-		fmt = log_format_has_o_or_i ? log_format : "%i %n";
+		fmt = log_format_has_o_or_i ? log_format : "deleting %n";
 		log_formatted(FCLIENT, fmt, "del.", &file, &stats,
 			      ITEM_DELETED, NULL);
 	}
@@ -561,7 +559,7 @@ void log_delete(char *fname, int mode)
 	if (!am_daemon || dry_run || !lp_transfer_logging(module_id))
 		return;
 
-	fmt = daemon_log_format_has_o_or_i ? lp_log_format(module_id) : "%i %n";
+	fmt = daemon_log_format_has_o_or_i ? lp_log_format(module_id) : "deleting %n";
 	log_formatted(FLOG, fmt, "del.", &file, &stats, ITEM_DELETED, NULL);
 }
 
