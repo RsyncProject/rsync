@@ -140,15 +140,16 @@ root path, and leading slashes are removed from absolute paths.  The
 default for "use chroot" is true.
 
 dit(bf(max connections)) The "max connections" option allows you to
-specify the maximum number of simultaneous connections you will allow
-to this module of your rsync server. Any clients connecting when the
-maximum has been reached will receive a message telling them to try
-later.  The default is 0 which means no limit.
+specify the maximum number of simultaneous connections you will allow.
+Any clients connecting when the maximum has been reached will receive a
+message telling them to try later.  The default is 0 which means no limit.
+See also the "lock file" option.
 
 dit(bf(lock file)) The "lock file" option specifies the file to use to
 support the "max connections" option. The rsync server uses record
 locking on this file to ensure that the max connections limit is not
-exceeded. The default is tt(/var/run/rsyncd.lock).
+exceeded for the modules sharing the lock file. 
+The default is tt(/var/run/rsyncd.lock).
 
 dit(bf(read only)) The "read only" option determines whether clients
 will be able to upload files or not. If "read only" is true then any
