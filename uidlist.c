@@ -28,6 +28,7 @@
 extern int preserve_uid;
 extern int preserve_gid;
 extern int numeric_ids;
+extern int am_root;
 
 struct idlist {
 	struct idlist *next;
@@ -122,7 +123,10 @@ static gid_t match_gid(gid_t gid)
 		list = list->next;
 	}
 	
-	last_out = gid;
+	if (am_root)
+		last_out = gid;
+	else
+		last_out = -1;
 	return last_out;
 }
 
@@ -276,12 +280,12 @@ void recv_uid_list(int f, struct file_list *flist)
 		}
 	}
 
-	if (!uidlist && !gidlist) return;
+	if (!(am_root && preserve_uid) && !preserve_gid) return;
 
 	/* now convert the uid/gid of all files in the list to the mapped
 	   uid/gid */
 	for (i=0;i<flist->count;i++) {
-		if (preserve_uid && flist->files[i]->uid != 0) {
+		if (am_root && preserve_uid && flist->files[i]->uid != 0) {
 			flist->files[i]->uid = match_uid(flist->files[i]->uid);
 		}
 		if (preserve_gid && flist->files[i]->gid != 0) {

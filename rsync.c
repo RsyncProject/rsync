@@ -113,12 +113,46 @@ int delete_file(char *fname)
 	return 0;
 }
 
+static int is_in_group(gid_t gid)
+{
+#ifdef HAVE_GETGROUPS
+	static gid_t last_in = (gid_t) -2, last_out;
+	static int ngroups = -2;
+	static gid_t *gidset;
+	int n;
+
+	if (gid == last_in)
+		return last_out;
+	if (ngroups < -1) {
+		/* treat failure (-1) as if not member of any group */
+		ngroups = getgroups(0, 0);
+		if (ngroups > 0) {
+			gidset = (gid_t *) malloc(ngroups * sizeof(gid_t));
+			ngroups = getgroups(ngroups, gidset);
+		}
+	}
+
+	last_in = gid;
+	last_out = 0;
+	for (n = 0; n < ngroups; n++) {
+		if (gidset[n] == gid) {
+			last_out = 1;
+			break;
+		}
+	}
+	return last_out;
+
+#else
+	return 0;
+#endif
+}
 
 int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	      int report)
 {
 	int updated = 0;
 	STRUCT_STAT st2;
+	int change_uid, change_gid;
 	extern int am_daemon;
 
 	if (dry_run) return 0;
@@ -145,22 +179,24 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 		}
 	}
 
-	if ((am_root || !am_daemon) &&
-	    ((am_root && preserve_uid && st->st_uid != file->uid) || 
-	     (preserve_gid && st->st_gid != file->gid))) {
+	change_uid = am_root && preserve_uid && st->st_uid != file->uid;
+	change_gid = !am_daemon && preserve_gid && file->gid != -1 \
+				&& st->st_gid != file->gid;
+	if (change_gid && !am_root) {
+		/* enforce bsd-style group semantics: non-root can only
+		    change to groups that the user is a member of */
+		change_gid = is_in_group(file->gid);
+	}
+	if (change_uid || change_gid) {
 		if (do_lchown(fname,
-			      (am_root&&preserve_uid)?file->uid:st->st_uid,
-			      preserve_gid?file->gid:st->st_gid) != 0) {
-			if (preserve_uid && st->st_uid != file->uid)
-				updated = 1;
-			if (verbose>1 || preserve_uid) {
-				rprintf(FERROR,"chown %s : %s\n",
-					fname,strerror(errno));
-				return 0;
-			}
-		} else {
-			updated = 1;
+			      change_uid?file->uid:st->st_uid,
+			      change_gid?file->gid:st->st_gid) != 0) {
+			/* shouldn't have attempted to change uid or gid
+			     unless have the privilege */
+			rprintf(FERROR,"chown %s : %s\n", fname,strerror(errno));
+			return 0;
 		}
+		updated = 1;
 	}
 
 #ifdef HAVE_CHMOD

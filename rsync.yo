@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsync)(1)(22 Feb 1999)()()
+manpage(rsync)(1)(1 Mar 1999)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
@@ -319,11 +319,11 @@ explicitly checked on the receiver and any files of the same name
 which already exist and have the same checksum and size on the
 receiver are skipped.  This option can be quite slow.
 
-dit(bf(-a, --archive)) This is equivalent to -rlptDg. It is a quick way
+dit(bf(-a, --archive)) This is equivalent to -rlptg. It is a quick way
 of saying you want recursion and want to preserve everything.
 
-Note: if the user launching rsync is root then the -o option (preserve
-uid) is also implied.
+Note: if the user launching rsync is root then the -o (preserve
+uid) and -D (preserve devices) options are also implied.
 
 dit(bf(-r, --recursive)) This tells rsync to copy directories recursively.
 
@@ -400,9 +400,9 @@ the --numeric-ids option is implied because the source system cannot get
 access to the usernames.
 
 dit(bf(-g, --group)) This option causes rsync to update the  remote  group
-of the file to be the same as the local group.  Note that if the source
-system is a daemon using chroot, the --numeric-ids option is implied because
-the source system cannot get access to the group names.
+of the file to be the same as the local group.  If the receving system is
+not running as the super-user, only groups that the receiver is a member of
+will be preserved (by group name, not group id number).
 
 dit(bf(-D, --devices)) This option causes rsync to transfer character and
 block device information to the remote system to recreate these

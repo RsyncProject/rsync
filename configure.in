@@ -52,7 +52,7 @@ AC_FUNC_UTIME_NULL
 AC_CHECK_FUNCS(waitpid wait4 getcwd strdup strerror chown chmod mknod)
 AC_CHECK_FUNCS(fchmod fstat strchr readlink link utime utimes strftime)
 AC_CHECK_FUNCS(memmove getopt_long lchown vsnprintf snprintf setsid glob strpbrk)
-AC_CHECK_FUNCS(strlcat strlcpy)
+AC_CHECK_FUNCS(strlcat strlcpy getgroups)
 
 echo $ac_n "checking for working fnmatch... $ac_c"
 AC_TRY_RUN([#include <fnmatch.h>
