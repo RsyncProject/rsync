@@ -1,54 +1,116 @@
-#!/bin/sh -e 
+#!/bin/sh =
+
+#
+# Copyright (C) 1998 Philip Hands <http://www.hands.com/~phil/>
+#
+# This program is distributable under the terms of the GNU GPL (see COPYING)
+#
 # This is a simple test script that tests a few rsync
-# features to make sure I haven't broken them before a release. Thanks
-# to Phil Hands for writing this
+# features to make sure I haven't broken them before a release.
+#
+#
 
 export PATH=.:$PATH
 TMP=/tmp/rsync-test.$$
-F1=README
+FROM=${TMP}/from
+TO=${TMP}/to
+F1=text1
+LOG=${TMP}/log
 
 mkdir $TMP
+mkdir $FROM
+mkdir $TO
 
-pause() {
-    echo ... press enter to continue
-    read
+# set up test data
+touch ${FROM}/empty
+mkdir ${FROM}/emptydir
+ps ax > ${FROM}/pslist
+echo -n "This file has no trailing lf" > ${FROM}/nolf
+ln -s nolf ${FROM}/nolf-symlink
+cat /etc/inittab /etc/services /etc/resolv.conf > ${FROM}/${F1}
+mkdir ${FROM}/dir
+cp ${FROM}/${F1} ${FROM}/dir
+
+checkit() {
+  echo -n "Test $4: $5:"
+  log=${LOG}.$4
+  failed=
+  echo "Running: \"$1\""  >${log}
+  echo "">>${log}
+  eval "$1 || failed=YES"  >>${log} 2>&1
+
+  echo "-------------">>${log}
+  echo "check how the files compare with diff:">>${log}
+  echo "">>${log}
+  diff -ur $2 $3 >>${log} || failed=YES
+  echo "-------------">>${log}
+  echo "check how the directory listings compare with diff:">>${log}
+  echo "">>${log}
+  ls -la $2 > ${TMP}/ls-from
+  ls -la $3 > ${TMP}/ls-to
+  diff -u ${TMP}/ls-from ${TMP}/ls-to >>${log} || failed=YES
+  if [ -z "${failed}" ] ; then
+    echo "	done."
+    rm $log
+  else
+    echo "	FAILED.=07"
+  fi
 }
 
-echo "Test 1 basic operation"
-rsync -av testin/ ${TMP}/rsync
-diff -ur testin/ ${TMP}/rsync
-pause
+checkforlogs() {
+  if [ -f $1 ] ; then
+    cat <<EOF
 
-echo "Test 2 - one file"
-rm ${TMP}/rsync/${F1}
-rsync -av testin/ ${TMP}/rsync
-diff -ur testin/ ${TMP}/rsync
-pause
+Failures have occured.
 
-echo "Test 3 - extra data"
-echo "extra line" >> ${TMP}/rsync/${F1}
-rsync -av testin/ ${TMP}/rsync
-diff -ur testin/ ${TMP}/rsync
-pause
+You can find the output of the tests in these files:
+  $@
 
-echo "Test 4 - --delete"
-cp testin/${F1} ${TMP}/rsync/f1
-rsync --delete -av testin/ ${TMP}/rsync
-diff -ur testin/ ${TMP}/rsync
-pause
+Please hit <RETURN>
+EOF
+  read input
+  else
 
-echo "Test 5 (uses ssh, so will fail if you don't have it) "
-rm -rf ${TMP}/rsync
-rsync -av -e ssh testin/ localhost:${TMP}/rsync
-diff -ur testin/ ${TMP}/rsync
-pause
+    rm -rf ${TMP}
+    echo ""
+    echo "Tests Completed Successfully :-)"
+  fi
+}
 
-echo "Test 6 (uses ssh, so will fail if you don't have it) "
-mv ${TMP}/rsync/${F1} ${TMP}/rsync/f1
-rsync --delete -av -e ssh testin/ localhost:${TMP}/rsync
-diff -ur testin/ ${TMP}/rsync
-pause
+# Main script starts here
 
-rm -rf ${TMP}
+checkit "rsync -av ${FROM}/ ${TO}" ${FROM}/ ${TO} \
+  1 "basic operation"
 
-echo Tests Completed
+ln ${FROM}/pslist ${FROM}/dir
+checkit "rsync -avH ${FROM}/ ${TO}" ${FROM}/ ${TO} \
+  2 "hard links"
+
+rm ${TO}/${F1}
+checkit "rsync -avH ${FROM}/ ${TO}" ${FROM}/ ${TO} \
+  3 "one file"
+
+echo "extra line" >> ${TO}/${F1}
+checkit "rsync -avH ${FROM}/ ${TO}" ${FROM}/ ${TO} \
+  4 "extra data"
+
+cp ${FROM}/${F1} ${TO}/ThisShouldGo
+checkit "rsync --delete -avH ${FROM}/ ${TO}" ${FROM}/ ${TO} \
+  5 " --delete"
+
+if type ssh >/dev/null ; then
+rm -rf ${TO}
+  checkit "rsync -avH -e ssh ${FROM}/ localhost:${TO}" ${FROM}/ ${TO} \
+    6 "ssh: basic test"
+
+  mv ${TO}/${F1} ${TO}/ThisShouldGo
+  checkit "rsync --delete -avH -e ssh ${FROM}/ localhost:${TO}" ${FROM}/ ${TO}\
+    7 "ssh: renamed file"
+else
+  echo ""
+  echo "**** Skipping SSH tests because ssh is not in the path=07 ****"
+  echo ""
+fi
+
+checkforlogs ${LOG}.?
+
