@@ -143,7 +143,7 @@ int open_socket_out(char *host, int port, const char *bind_address)
 	hints.ai_socktype = type;
 	error = getaddrinfo(h, portbuf, &hints, &res0);
 	if (error) {
-		rprintf(FERROR, "getaddrinfo: %s\n", gai_strerror(error));
+		rprintf(FERROR, RSYNC_NAME ": getaddrinfo: %s: %s\n", portbuf, gai_strerror(error));
 		return -1;
 	}
 
@@ -162,11 +162,13 @@ int open_socket_out(char *host, int port, const char *bind_address)
 			bhints.ai_flags = AI_PASSIVE;
 			error = getaddrinfo(bind_address, NULL, &bhints, &bres);
 			if (error) {
-				rprintf(FERROR, "getaddrinfo: %s\n", gai_strerror(error));
+				rprintf(FERROR, RSYNC_NAME ": getaddrinfo: bind address %s: %s\n",
+					bind_address, gai_strerror(error));
 				continue;
 			}
 			if (bres->ai_next) {
-				rprintf(FERROR, "getaddrinfo: resolved to multiple hosts\n");
+				rprintf(FERROR, RSYNC_NAME ": getaddrinfo: bind address %s resolved to multiple hosts\n",
+					bind_address);
 				freeaddrinfo(bres);
 				continue;
 			}
@@ -188,7 +190,8 @@ int open_socket_out(char *host, int port, const char *bind_address)
 	}
 	freeaddrinfo(res0);
 	if (s < 0) {
-		rprintf(FERROR, "failed to connect to %s - %s\n", h, strerror(errno));
+		rprintf(FERROR, RSYNC_NAME ": failed to connect to %s: %s\n",
+			h, strerror(errno));
 		return -1;
 	}
 	return s;
@@ -242,18 +245,22 @@ static int open_socket_in(int type, int port, const char *bind_address)
 	snprintf(portbuf, sizeof(portbuf), "%d", port);
 	error = getaddrinfo(bind_address, portbuf, &hints, &res);
 	if (error) {
-		rprintf(FERROR, "getaddrinfo: %s\n", gai_strerror(error));
+		rprintf(FERROR, RSYNC_NAME ": getaddrinfo: bind address %s: %s\n",
+			bind_address, gai_strerror(error));
 		return -1;
 	}
 	if (res->ai_next) {
-		rprintf(FERROR, "getaddrinfo: resolved to multiple hosts\n");
+		rprintf(FERROR, RSYNC_NAME ": getaddrinfo: bind address %s: "
+			"resolved to multiple hosts\n",
+			bind_address);
 		freeaddrinfo(res);
 		return -1;
 	}
 
 	s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (s < 0) {
-		rprintf(FERROR, RSYNC_NAME ": socket failed\n"); 
+		rprintf(FERROR, RSYNC_NAME ": open socket in failed: %s\n",
+			strerror(errno)); 
 		freeaddrinfo(res);
 		return -1; 
 	}
@@ -582,7 +589,10 @@ char *client_name(int fd)
 	error = getaddrinfo(name_buf, port_buf, &hints, &res0);
 	if (error) {
 		strcpy(name_buf, def);
-		rprintf(FERROR, "forward name lookup failed\n");
+		rprintf(FERROR,
+			RSYNC_NAME ": forward name lookup for %s failed: %s\n",
+			port_buf,
+			gai_strerror(error));
 		return name_buf;
 	}
 
