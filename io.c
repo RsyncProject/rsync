@@ -238,7 +238,7 @@ static void readfd(int fd,char *buffer,int N)
 	int  ret;
 	int total=0;  
 	
-	if (read_buffer_len < N && N < 1024) {
+	if ((read_buffer_len < N) && (N < 1024)) {
 		read_check(buffer_f_in);
 	}
 	
