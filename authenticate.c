@@ -87,19 +87,19 @@ static int get_secret(int module, char *user, char *secret, int len)
 		return 0;
 
 	if (do_stat(fname, &st) == -1) {
-		rsyserr(FERROR, errno, "stat(%s)", fname);
+		rsyserr(FLOG, errno, "stat(%s)", fname);
 		ok = 0;
 	} else if (lp_strict_modes(module)) {
 		if ((st.st_mode & 06) != 0) {
-			rprintf(FERROR,"secrets file must not be other-accessible (see strict modes option)\n");
+			rprintf(FLOG, "secrets file must not be other-accessible (see strict modes option)\n");
 			ok = 0;
 		} else if (am_root && (st.st_uid != 0)) {
-			rprintf(FERROR,"secrets file must be owned by root when running as root (see strict modes)\n");
+			rprintf(FLOG, "secrets file must be owned by root when running as root (see strict modes)\n");
 			ok = 0;
 		}
 	}
 	if (!ok) {
-		rprintf(FERROR,"continuing without secrets file\n");
+		rprintf(FLOG, "continuing without secrets file\n");
 		close(fd);
 		return 0;
 	}
