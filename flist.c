@@ -872,7 +872,7 @@ char *f_name(struct file_struct *f)
 	if (f->dirname) {
 		sprintf(p, "%s/%s", f->dirname, f->basename);
 	} else {
-		strcpy(p, f->basename);
+		strlcpy(p, f->basename, MAXPATHLEN-1);
 	}
 
 	return p;

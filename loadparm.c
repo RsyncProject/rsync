@@ -52,7 +52,7 @@
 #define strequal(a,b) (strcasecmp(a,b)==0)
 #define BOOLSTR(b) ((b) ? "Yes" : "No")
 typedef char pstring[1024];
-#define pstrcpy(a,b) strcpy(a,b)
+#define pstrcpy(a,b) strlcpy(a,b,sizeof(pstring)-1)
 
 /* the following are used by loadparm for option lists */
 typedef enum
