@@ -78,11 +78,8 @@ static int skip_file(char *fname, struct file_struct *file, STRUCT_STAT *st)
 			}
 		}
 		file_checksum(fname,sum,st->st_size);
-		if (protocol_version < 21) {
-			return (memcmp(sum,file->sum,2) == 0);
-		} else {
-			return (memcmp(sum,file->sum,MD4_SUM_LENGTH) == 0);
-		}
+		return memcmp(sum, file->sum, protocol_version < 21? 2
+							: MD4_SUM_LENGTH) == 0;
 	}
 
 	if (size_only) {
@@ -525,7 +522,6 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 }
 
 
-
 void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 {
 	int i;
@@ -580,7 +576,7 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 
 	/* files can cycle through the system more than once
 	 * to catch initial checksum errors */
-	for (i = read_int(f_recv); i != -1; i = read_int(f_recv)) {
+	while ((i = read_int(f_recv)) != -1) {
 		struct file_struct *file = flist->files[i];
 		recv_generator(local_name? local_name
 			     : f_name_to(file,fbuf,sizeof fbuf), file, i, f);
