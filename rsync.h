@@ -62,7 +62,7 @@
 #define FLAG_MOUNT_POINT (1<<2)	/* sender only */
 
 /* update this if you make incompatible changes */
-#define PROTOCOL_VERSION 28
+#define PROTOCOL_VERSION 29
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
@@ -92,6 +92,7 @@
 #define CHUNK_SIZE (32*1024)
 #define MAX_MAP_SIZE (256*1024)
 #define IO_BUFFER_SIZE (4092)
+#define MAX_BLOCK_SIZE ((int32)1 << 29)
 
 #define IOERR_GENERAL	(1<<0) /* For backward compatibility, this must == 1 */
 #define IOERR_VANISHED	(1<<1)
@@ -413,8 +414,8 @@ struct idev {
 #define HL_SKIP		1
 
 struct hlink {
-	int hlindex;
 	struct file_struct *next;
+	int hlindex;
 };
 
 #define F_DEV	link_u.idev->dev
@@ -467,11 +468,11 @@ struct file_struct {
 #define WITHOUT_HLINK	0
 
 struct file_list {
-	int count;
-	int malloced;
+	struct file_struct **files;
 	alloc_pool_t file_pool;
 	alloc_pool_t hlink_pool;
-	struct file_struct **files;
+	int count;
+	int malloced;
 };
 
 #define SUMFLG_SAME_OFFSET	(1<<0)
@@ -486,23 +487,23 @@ struct sum_buf {
 
 struct sum_struct {
 	OFF_T flength;		/**< total file length */
+	struct sum_buf *sums;	/**< points to info for each chunk */
 	size_t count;		/**< how many chunks */
 	int32 blength;		/**< block_length */
 	int32 remainder;	/**< flength % block_length */
 	int s2length;		/**< sum2_length */
-	struct sum_buf *sums;	/**< points to info for each chunk */
 };
 
 struct map_struct {
-	char *p;		/* Window pointer			*/
-	int fd;			/* File Descriptor			*/
-	int p_size;		/* Largest window size we allocated	*/
-	int p_len;		/* Latest (rounded) window size		*/
-	int def_window_size;	/* Default window size			*/
-	int status;		/* first errno from read errors		*/
 	OFF_T file_size;	/* File size (from stat)		*/
 	OFF_T p_offset;		/* Window start				*/
 	OFF_T p_fd_offset;	/* offset of cursor in fd ala lseek	*/
+	char *p;		/* Window pointer			*/
+	int32 p_size;		/* Largest window size we allocated	*/
+	int32 p_len;		/* Latest (rounded) window size		*/
+	int32 def_window_size;	/* Default window size			*/
+	int fd;			/* File Descriptor			*/
+	int status;		/* first errno from read errors		*/
 };
 
 #define MATCHFLG_WILD		(1<<0) /* pattern has '*', '[', and/or '?' */
