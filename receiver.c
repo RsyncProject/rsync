@@ -309,7 +309,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 		i = read_int(f_in);
 		if (i == -1) {
-			if (phase==0) {
+			if (phase == 0) {
 				phase++;
 				csum_length = SUM_LENGTH;
 				if (verbose > 2)
@@ -328,6 +328,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 		file = flist->files[i];
 
+		stats.current_file_index = i;
 		stats.num_transferred_files++;
 		stats.total_transferred_size += file->length;
 		cleanup_got_literal = 0;

@@ -34,8 +34,6 @@ extern int am_server;
  * and transmits them to the receiver.  The sender process runs on the
  * machine holding the source files.
  **/
-
-
 void read_sum_head(int f, struct sum_struct *sum)
 {
 	extern int protocol_version;
@@ -155,6 +153,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		file = flist->files[i];
 
+		stats.current_file_index = i;
 		stats.num_transferred_files++;
 		stats.total_transferred_size += file->length;
 
