@@ -160,7 +160,7 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 			return;
 		}
 	  
-		fd = open(fname,O_RDONLY);
+		fd = do_open(fname, O_RDONLY, 0);
 		if (fd == -1) {
 			io_error = 1;
 			rprintf(FERROR,"send_files failed to open %s: %s\n",

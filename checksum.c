@@ -93,7 +93,7 @@ void file_checksum(char *fname,char *sum,OFF_T size)
 	
 	memset(sum,0,MD4_SUM_LENGTH);
 	
-	fd = open(fname,O_RDONLY);
+	fd = do_open(fname, O_RDONLY, 0);
 	if (fd == -1) return;
 	
 	buf = map_file(fd,size);

@@ -340,7 +340,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 	}
 
 	/* open the file */  
-	fd = open(fnamecmp,O_RDONLY);
+	fd = do_open(fnamecmp, O_RDONLY, 0);
 
 	if (fd == -1) {
 		rprintf(FERROR,"failed to open %s : %s\n",fnamecmp,strerror(errno));

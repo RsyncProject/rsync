@@ -282,7 +282,7 @@ int copy_file(char *source, char *dest, mode_t mode)
 	char buf[1024 * 8];
 	int len;   /* Number of bytes read into `buf'. */
 
-	ifd = open(source, O_RDONLY);
+	ifd = do_open(source, O_RDONLY, 0);
 	if (ifd == -1) {
 		rprintf(FERROR,"open %s: %s\n",
 			source,strerror(errno));
