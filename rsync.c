@@ -56,8 +56,6 @@ int delete_file(char *fname)
 	int ret;
 	extern int recurse;
 
-	if (robust_unlink(fname) == 0 || errno == ENOENT) return 0;
-
 #if SUPPORT_LINKS
 	ret = do_lstat(fname, &st);
 #else
@@ -69,6 +67,7 @@ int delete_file(char *fname)
 	}
 
 	if (!S_ISDIR(st.st_mode)) {
+		if (robust_unlink(fname) == 0 || errno == ENOENT) return 0;
 		rprintf(FERROR,"unlink(%s) : %s\n", fname, strerror(errno));
 		return -1;
 	}
