@@ -47,4 +47,5 @@ touch "$fromdir"? "$chkdir" "$fromdir"?/sub? "$chkdir"/sub?
 
 checkit "$RSYNC -aHvv \"$fromdir\"?/ \"$todir/\"" "$chkdir" "$todir"
 
+# The script would have aborted on error, so getting here means we've won.
 exit 0

@@ -72,4 +72,5 @@ $RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
 
 checkit "$RSYNC -avv --exclude-from=$excl \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
 
+# The script would have aborted on error, so getting here means we've won.
 exit 0

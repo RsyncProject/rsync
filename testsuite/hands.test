@@ -25,4 +25,5 @@ runtest "extra data" 'checkit "$RSYNC -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
 cp ${FROM}/text ${TO}/ThisShouldGo
 runtest " --delete" 'checkit "$RSYNC --delete -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
 
+# The script would have aborted on error, so getting here means we've won.
 exit 0

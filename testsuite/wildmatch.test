@@ -16,4 +16,5 @@ diff $diffopt "$scratchdir/wild.out" - <<EOF
 No wildmatch errors found.
 EOF
 
+# The script would have aborted on error, so getting here means we've won.
 exit 0

@@ -35,6 +35,5 @@ then
     test_fail "absolute symlink was copied"
 fi
 
+# The script would have aborted on error, so getting here means we've won.
 exit 0
-# last [] may have failed but if we get here then we've one
-

@@ -22,3 +22,6 @@ export RSYNC_CONNECT_PROG
 
 hands_setup
 checkit "$RSYNC -avvvvz \"$FROM/\" localhost::test-to/" "$FROM" "$TO"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

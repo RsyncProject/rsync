@@ -26,6 +26,5 @@ mknod "$fromdir/block3" b 105 73 || test_skipped "Can't create block device node
 
 checkit "$RSYNC -aHvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
+# The script would have aborted on error, so getting here means we've won.
 exit 0
-# last [] may have failed but if we get here then we've won
-

@@ -19,3 +19,6 @@ touch $LONGDIR/1 || test_skipped "unable to create files in long directory"
 date > ${LONGDIR}/1
 ls -la / > ${LONGDIR}/2
 checkit "$RSYNC --delete -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

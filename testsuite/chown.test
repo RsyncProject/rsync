@@ -33,6 +33,5 @@ chgrp 5003 "$name2" || test_skipped "Can't chgrp (probably need root)"
 
 checkit "$RSYNC -aHvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
+# The script would have aborted on error, so getting here means we've won.
 exit 0
-# last [] may have failed but if we get here then we've won
-
