@@ -187,7 +187,7 @@ int64 read_longint(int f)
 
 	if (ret != -1) return ret;
 
-#ifndef HAVE_LONGLONG
+#ifdef NO_INT64
 	fprintf(FERROR,"Integer overflow - attempted 64 bit offset\n");
 	exit_cleanup(1);
 #else

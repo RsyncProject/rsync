@@ -193,10 +193,15 @@
 #define uint32 unsigned int32
 #endif
 
-#ifdef HAVE_LONGLONG
+#if (SIZEOF_LONG == 8) 
+#define int64 long
+#elif (SIZEOF_INT == 8) 
+#define int64 int
+#elif HAVE_LONGLONG
 #define int64 long long
 #else
 #define int64 off_t
+#define NO_INT64
 #endif
 
 #ifndef MIN
