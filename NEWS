@@ -35,6 +35,8 @@ Changes since 2.6.2:
 
     - Added the "write only" option to the daemon's config file.
 
+    - Added the --checksum-seed=N option for advanced users.
+
     - Added long-option names for -4 and -6 (namely --ipv4 and --ipv6)
       and documented all these options in the man page.
 
