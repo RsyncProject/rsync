@@ -205,6 +205,11 @@ Errors
   eof" give a message that is more detailed if possible and also more
   helpful.  
 
+  If we get an error writing to a socket, then we should perhaps
+  continue trying to read to see if an error message comes across
+  explaining why the socket is closed.  I'm not sure if this would
+  work, but it would certainly make our messages more helpful.
+
 File attributes
 
   Device major/minor numbers should be at least 32 bits each.  See
