@@ -206,9 +206,11 @@ void mdfour(unsigned char *out, unsigned char *in, int n)
 }
 
 #ifdef TEST_MDFOUR
+int protocol_version = 28;
+
 static void file_checksum1(char *fname)
 {
-	int fd, i;
+	int fd, i, was_multiple_of_64 = 1;
 	struct mdfour md;
 	unsigned char buf[64*1024], sum[16];
 	
@@ -222,9 +224,13 @@ static void file_checksum1(char *fname)
 
 	while (1) {
 		int n = read(fd, buf, sizeof(buf));
-		if (n <= 0) break;
+		if (n <= 0)
+			break;
+		was_multiple_of_64 = !(n % 64);
 		mdfour_update(&md, buf, n);
 	}
+	if (was_multiple_of_64 && protocol_version >= 27)
+		mdfour_update(&md, buf, 0);
 
 	close(fd);
 
