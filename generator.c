@@ -146,17 +146,20 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 	else {
 		int32 c;
 		uint64 l;
-		for (c = 1, l = len; l >>= 2; c <<= 1) {
-		    assert(c > 0);
+		int cnt;
+		for (c = 1, l = len, cnt = 0; l >>= 2; c <<= 1, cnt++) {}
+		if (cnt >= 31 || c >= MAX_BLOCK_SIZE)
+			blength = MAX_BLOCK_SIZE;
+		else {
+		    blength = 0;
+		    do {
+			    blength |= c;
+			    if (len < (uint64)blength * blength)
+				    blength &= ~c;
+			    c >>= 1;
+		    } while (c >= 8);	/* round to multiple of 8 */
+		    blength = MAX(blength, BLOCK_SIZE);
 		}
-		blength = 0;
-		do {
-			blength |= c;
-			if (len < (uint64)blength * blength)
-				blength &= ~c;
-			c >>= 1;
-		} while (c >= 8);	/* round to multiple of 8 */
-		blength = MAX(blength, BLOCK_SIZE);
 	}
 
 	if (protocol_version < 27) {
