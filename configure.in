@@ -15,6 +15,10 @@ AC_PROG_CPP
 AC_PROG_INSTALL
 AC_SUBST(SHELL)
 
+RSYNC_VERSION=2.4.7pre2
+AC_SUBST(RSYNC_VERSION)
+AC_DEFINE_UNQUOTED(RSYNC_VERSION, ["$RSYNC_VERSION"], [rsync release version])
+
 # compile with optimisation and without debugging by default, unless
 # --debug is given.  We must decide this before testing the compiler.
 
@@ -120,7 +124,8 @@ if test "$ipv6" = "yes"; then
 yes
 #endif],
 				[ipv6type=$i;
-				CFLAGS="-DINET6 $CFLAGS"])
+				AC_DEFINE(INET6, 1, [true if you have IPv6])
+				])
 			;;
 		kame)
 			# http://www.kame.net/
@@ -129,8 +134,8 @@ yes
 #ifdef __KAME__
 yes
 #endif],
-				[ipv6type=$i;
-				CFLAGS="-DINET6 $CFLAGS"])
+				[ipv6type=$i; 
+				AC_DEFINE(INET6, 1, [true if you have IPv6])])
 			;;
 		linux-glibc)
 			# http://www.v6.linux.or.jp/
@@ -140,7 +145,7 @@ yes
 yes
 #endif],
 				[ipv6type=$i;
-				CFLAGS="-DINET6 $CFLAGS"])
+AC_DEFINE(INET6, 1, [true if you have IPv6])])
 			;;
 		linux-inet6)
 			# http://www.v6.linux.or.jp/
@@ -149,7 +154,8 @@ yes
 				ipv6lib=inet6
 				ipv6libdir=/usr/inet6/lib
 				ipv6trylibc=yes;
-				CFLAGS="-DINET6 -I/usr/inet6/include $CFLAGS"
+				AC_DEFINE(INET6, 1, [true if you have IPv6])
+				CFLAGS="-I/usr/inet6/include $CFLAGS"
 			fi
 			;;
 		toshiba)
@@ -161,7 +167,7 @@ yes
 				[ipv6type=$i;
 				ipv6lib=inet6;
 				ipv6libdir=/usr/local/v6/lib;
-				CFLAGS="-DINET6 $CFLAGS"])
+				AC_DEFINE(INET6, 1, [true if you have IPv6])])
 			;;
 		v6d)
 			AC_EGREP_CPP(yes, [
@@ -172,7 +178,7 @@ yes
 				[ipv6type=$i;
 				ipv6lib=v6;
 				ipv6libdir=/usr/local/v6/lib;
-				CFLAGS="-I/usr/local/v6/include $CFLAGS"])
+				AC_DEFINE(INET6, 1, [true if you have IPv6])])
 			;;
 		zeta)
 			AC_EGREP_CPP(yes, [
@@ -183,7 +189,7 @@ yes
 				[ipv6type=$i;
 				ipv6lib=inet6;
 				ipv6libdir=/usr/local/v6/lib;
-				CFLAGS="-DINET6 $CFLAGS"])
+				AC_DEFINE(INET6, 1, [true if you have IPv6])])
 			;;
 		esac
 		if test "$ipv6type" != "unknown"; then

@@ -508,7 +508,8 @@ int daemon_main(void)
 
 	log_init();
 
-	rprintf(FINFO, "rsyncd version %s starting, listening on port %d\n", VERSION,
+	rprintf(FINFO, "rsyncd version %s starting, listening on port %d\n",
+		RSYNC_VERSION,
                 rsync_port);
         /* TODO: If listening on a particular address, then show that
          * address too. */

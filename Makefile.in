@@ -17,6 +17,8 @@ srcdir=@srcdir@
 VPATH=$(srcdir)
 SHELL=/bin/sh
 
+VERSION=@VERSION@
+
 .SUFFIXES:
 .SUFFIXES: .c .o
 
@@ -132,3 +134,4 @@ installcheck: $(CHECK_PROGS)
 
 $(OBJS): config.h *.h */*.h
 
+# TODO: Add 'dist' target; need to know which files will be included

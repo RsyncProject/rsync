@@ -111,6 +111,7 @@ static void print_rsync_version(int f)
         char const *got_socketpair = "no ";
         char const *hardlinks = "no ";
         char const *links = "no ";
+	char const *ipv6 = "no ";
 
 #ifdef HAVE_SOCKETPAIR
         got_socketpair = "";
@@ -124,16 +125,19 @@ static void print_rsync_version(int f)
         links = "";
 #endif
 
+#if INET6
+	ipv6 = "";
+#endif       
+
         rprintf(f, "%s  version %s  protocol version %d\n",
-                RSYNC_NAME, VERSION, PROTOCOL_VERSION);
+                RSYNC_NAME, RSYNC_VERSION, PROTOCOL_VERSION);
         rprintf(f,
                 "Copyright (C) 1996-2001 by Andrew Tridgell and others\n");
 	rprintf(f, "<http://rsync.samba.org/>\n");
         rprintf(f, "Capabilities: %d-bit files, %ssocketpairs, "
-                "%shard links, %ssymlinks, batchfiles\n\n",
+                "%shard links, %ssymlinks, batchfiles, %sIPv6\n\n",
                 (int) (sizeof(OFF_T) * 8),
-                got_socketpair,
-                hardlinks, links);
+                got_socketpair, hardlinks, links, ipv6);
 
 #ifdef NO_INT64
         rprintf(f, "WARNING: no 64-bit integers on this platform!\n");

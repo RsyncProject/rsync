@@ -387,7 +387,6 @@ static inline int flist_up(struct file_list *flist, int i)
 }
 
 #include "byteorder.h"
-#include "version.h"
 #include "proto.h"
 #include "lib/mdfour.h"
 
