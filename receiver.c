@@ -249,7 +249,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 		i = -(i+1);
 		offset2 = i*(OFF_T)n;
 		len = n;
-		if (i == count-1 && remainder != 0)
+		if (i == (int) count-1 && remainder != 0)
 			len = remainder;
 		
 		stats.matched_data += len;
@@ -265,7 +265,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 			sum_update(map,len);
 		}
 		
-		if (fd != -1 && write_file(fd,map,len) != len) {
+		if (fd != -1 && write_file(fd,map,len) != (int) len) {
 			rprintf(FERROR,"write failed on %s : %s\n",
 				fname,strerror(errno));
 			exit_cleanup(RERR_FILEIO);

@@ -980,7 +980,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	}
 
 	if (f != -1) {
-		io_end_buffering(f);
+		io_end_buffering();
 		stats.flist_size = stats.total_written - start_write;
 		stats.num_files = flist->count;
 		if (write_batch)	/*  dw  */

@@ -71,7 +71,7 @@ static void build_hash_table(struct sum_struct *s)
   if (!tag_table || !targets) 
     out_of_memory("build_hash_table");
 
-  for (i=0;i<s->count;i++) {
+  for (i=0;i<(int) s->count;i++) {
     targets[i].i = i;
     targets[i].t = gettag(s->sums[i].sum1);
   }
@@ -175,7 +175,7 @@ static void hash_search(int f,struct sum_struct *s,
 
 		sum = (s1 & 0xffff) | (s2 << 16);
 		tag_hits++;
-		for (; j<s->count && targets[j].t == t; j++) {
+		for (; j < (int) s->count && targets[j].t == t; j++) {
 			int l, i = targets[j].i;
 			
 			if (sum != s->sums[i].sum1) continue;
@@ -201,7 +201,7 @@ static void hash_search(int f,struct sum_struct *s,
 
 			/* we've found a match, but now check to see
                            if last_i can hint at a better match */
-			for (j++; j<s->count && targets[j].t == t; j++) {
+			for (j++; j < (int) s->count && targets[j].t == t; j++) {
 				int i2 = targets[j].i;
 				if (i2 == last_i + 1) {
 					if (sum != s->sums[i2].sum1) break;
