@@ -337,7 +337,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 	}
 
 	if (preserve_links && S_ISLNK(file->mode)) {
-#if SUPPORT_LINKS
+#ifdef SUPPORT_LINKS
 		if (safe_symlinks && unsafe_symlink(file->u.link, fname)) {
 			if (verbose) {
 				rprintf(FINFO,
@@ -455,7 +455,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 				pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
 					 basis_dir[i], fname);
 			}
-#if HAVE_LINK
+#ifdef HAVE_LINK
 			if (link_dest && match_level == 3 && !dry_run) {
 				if (do_link(fnamecmpbuf, fname) < 0) {
 					if (verbose) {

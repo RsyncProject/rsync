@@ -26,7 +26,7 @@
 
 #include "rsync.h"
 
-#if !MKNOD_CREATES_SOCKETS && HAVE_SYS_UN_H
+#if !defined MKNOD_CREATES_SOCKETS && defined HAVE_SYS_UN_H
 #include <sys/un.h>
 #endif
 
@@ -59,7 +59,7 @@ int do_symlink(char *fname1, char *fname2)
 	return symlink(fname1, fname2);
 }
 
-#if HAVE_LINK
+#ifdef HAVE_LINK
 int do_link(char *fname1, char *fname2)
 {
 	if (dry_run) return 0;
@@ -72,7 +72,7 @@ int do_lchown(const char *path, uid_t owner, gid_t group)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-#if !HAVE_LCHOWN
+#ifndef HAVE_LCHOWN
 #define lchown chown
 #endif
 	return lchown(path, owner, group);
@@ -82,11 +82,11 @@ int do_mknod(char *pathname, mode_t mode, dev_t dev)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-#if !MKNOD_CREATES_FIFOS && HAVE_MKFIFO
+#if !defined MKNOD_CREATES_FIFOS && defined HAVE_MKFIFO
 	if (S_ISFIFO(mode))
 		return mkfifo(pathname, mode);
 #endif
-#if !MKNOD_CREATES_SOCKETS && HAVE_SYS_UN_H
+#if !defined MKNOD_CREATES_SOCKETS && defined HAVE_SYS_UN_H
 	if (S_ISSOCK(mode)) {
 		int sock;
 		struct sockaddr_un saddr;
@@ -94,7 +94,7 @@ int do_mknod(char *pathname, mode_t mode, dev_t dev)
 
 		saddr.sun_family = AF_UNIX;
 		len = strlcpy(saddr.sun_path, pathname, sizeof saddr.sun_path);
-#if HAVE_SOCKADDR_UN_LEN
+#ifdef HAVE_SOCKADDR_UN_LEN
 		saddr.sun_len = len >= sizeof saddr.sun_path
 			      ? sizeof saddr.sun_path : len + 1;
 #endif
@@ -107,7 +107,7 @@ int do_mknod(char *pathname, mode_t mode, dev_t dev)
 		return do_chmod(pathname, mode);
 	}
 #endif
-#if HAVE_MKNOD
+#ifdef HAVE_MKNOD
 	return mknod(pathname, mode, dev);
 #else
 	return -1;
@@ -131,7 +131,7 @@ int do_open(char *pathname, int flags, mode_t mode)
 	return open(pathname, flags | O_BINARY, mode);
 }
 
-#if HAVE_CHMOD
+#ifdef HAVE_CHMOD
 int do_chmod(const char *path, mode_t mode)
 {
 	int code;
@@ -186,7 +186,7 @@ int do_mkstemp(char *template, mode_t perms)
 	RETURN_ERROR_IF(dry_run, 0);
 	RETURN_ERROR_IF(read_only, EROFS);
 
-#if HAVE_SECURE_MKSTEMP && HAVE_FCHMOD && (!HAVE_OPEN64 || HAVE_MKSTEMP64)
+#if defined HAVE_SECURE_MKSTEMP && defined HAVE_FCHMOD && (!defined HAVE_OPEN64 || defined HAVE_MKSTEMP64)
 	{
 		int fd = mkstemp(template);
 		if (fd == -1)
@@ -198,7 +198,7 @@ int do_mkstemp(char *template, mode_t perms)
 			errno = errno_save;
 			return -1;
 		}
-#if HAVE_SETMODE && O_BINARY
+#if defined HAVE_SETMODE && O_BINARY
 		setmode(fd, O_BINARY);
 #endif
 		return fd;
@@ -212,7 +212,7 @@ int do_mkstemp(char *template, mode_t perms)
 
 int do_stat(const char *fname, STRUCT_STAT *st)
 {
-#if USE_STAT64_FUNCS
+#ifdef USE_STAT64_FUNCS
 	return stat64(fname, st);
 #else
 	return stat(fname, st);
@@ -221,8 +221,8 @@ int do_stat(const char *fname, STRUCT_STAT *st)
 
 int do_lstat(const char *fname, STRUCT_STAT *st)
 {
-#if SUPPORT_LINKS
-# if USE_STAT64_FUNCS
+#ifdef SUPPORT_LINKS
+# ifdef USE_STAT64_FUNCS
 	return lstat64(fname, st);
 # else
 	return lstat(fname, st);
@@ -234,7 +234,7 @@ int do_lstat(const char *fname, STRUCT_STAT *st)
 
 int do_fstat(int fd, STRUCT_STAT *st)
 {
-#if USE_STAT64_FUNCS
+#ifdef USE_STAT64_FUNCS
 	return fstat64(fd, st);
 #else
 	return fstat(fd, st);
@@ -243,7 +243,7 @@ int do_fstat(int fd, STRUCT_STAT *st)
 
 OFF_T do_lseek(int fd, OFF_T offset, int whence)
 {
-#if SIZEOF_OFF64_T
+#ifdef SIZEOF_OFF64_T
 	off64_t lseek64();
 	return lseek64(fd, offset, whence);
 #else
@@ -253,7 +253,7 @@ OFF_T do_lseek(int fd, OFF_T offset, int whence)
 
 char *d_name(struct dirent *di)
 {
-#if HAVE_BROKEN_READDIR
+#ifdef HAVE_BROKEN_READDIR
 	return (di->d_name - 2);
 #else
 	return di->d_name;

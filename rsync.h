@@ -155,100 +155,100 @@ enum msgcode {
 /* The default RSYNC_RSH is always set in config.h. */
 
 #include <stdio.h>
-#if HAVE_SYS_TYPES_H
+#ifdef HAVE_SYS_TYPES_H
 # include <sys/types.h>
 #endif
-#if HAVE_SYS_STAT_H
+#ifdef HAVE_SYS_STAT_H
 # include <sys/stat.h>
 #endif
-#if STDC_HEADERS
+#ifdef STDC_HEADERS
 # include <stdlib.h>
 # include <stddef.h>
 #else
-# if HAVE_STDLIB_H
+# ifdef HAVE_STDLIB_H
 #  include <stdlib.h>
 # endif
 #endif
-#if HAVE_STRING_H
-# if !STDC_HEADERS && HAVE_MEMORY_H
+#ifdef HAVE_STRING_H
+# if !defined STDC_HEADERS && defined HAVE_MEMORY_H
 #  include <memory.h>
 # endif
 # include <string.h>
 #endif
-#if HAVE_STRINGS_H
+#ifdef HAVE_STRINGS_H
 # include <strings.h>
 #endif
-#if HAVE_UNISTD_H
+#ifdef HAVE_UNISTD_H
 # include <unistd.h>
 #endif
 
-#if HAVE_SYS_PARAM_H
+#ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
 #endif
 
-#if HAVE_MALLOC_H && (HAVE_MALLINFO || !HAVE_STDLIB_H)
+#if defined HAVE_MALLOC_H && (defined HAVE_MALLINFO || !defined HAVE_STDLIB_H)
 #include <malloc.h>
 #endif
 
-#if HAVE_SYS_SOCKET_H
+#ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
 #endif
 
-#if TIME_WITH_SYS_TIME
+#ifdef TIME_WITH_SYS_TIME
 #include <sys/time.h>
 #include <time.h>
 #else
-#if HAVE_SYS_TIME_H
+#ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #else
 #include <time.h>
 #endif
 #endif
 
-#if HAVE_FCNTL_H
+#ifdef HAVE_FCNTL_H
 #include <fcntl.h>
 #else
-#if HAVE_SYS_FCNTL_H
+#ifdef HAVE_SYS_FCNTL_H
 #include <sys/fcntl.h>
 #endif
 #endif
 
-#if HAVE_SYS_IOCTL_H
+#ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
 
-#if HAVE_SYS_FILIO_H
+#ifdef HAVE_SYS_FILIO_H
 #include <sys/filio.h>
 #endif
 
 #include <signal.h>
-#if HAVE_SYS_WAIT_H
+#ifdef HAVE_SYS_WAIT_H
 #include <sys/wait.h>
 #endif
-#if HAVE_CTYPE_H
+#ifdef HAVE_CTYPE_H
 #include <ctype.h>
 #endif
-#if HAVE_GRP_H
+#ifdef HAVE_GRP_H
 #include <grp.h>
 #endif
 #include <errno.h>
 
-#if HAVE_UTIME_H
+#ifdef HAVE_UTIME_H
 #include <utime.h>
 #endif
 
-#if HAVE_SYS_SELECT_H
+#ifdef HAVE_SYS_SELECT_H
 #include <sys/select.h>
 #endif
 
-#if HAVE_SYS_MODE_H
+#ifdef HAVE_SYS_MODE_H
 /* apparently AIX needs this for S_ISLNK */
 #ifndef S_ISLNK
 #include <sys/mode.h>
 #endif
 #endif
 
-#if HAVE_GLOB_H
+#ifdef HAVE_GLOB_H
 #include <glob.h>
 #endif
 
@@ -263,31 +263,31 @@ enum msgcode {
 #include <syslog.h>
 #include <sys/file.h>
 
-#if HAVE_DIRENT_H
+#ifdef HAVE_DIRENT_H
 # include <dirent.h>
 #else
 # define dirent direct
-# if HAVE_SYS_NDIR_H
+# ifdef HAVE_SYS_NDIR_H
 #  include <sys/ndir.h>
 # endif
-# if HAVE_SYS_DIR_H
+# ifdef HAVE_SYS_DIR_H
 #  include <sys/dir.h>
 # endif
-# if HAVE_NDIR_H
+# ifdef HAVE_NDIR_H
 #  include <ndir.h>
 # endif
 #endif
 
-#if MAJOR_IN_MKDEV
+#ifdef MAJOR_IN_MKDEV
 #include <sys/mkdev.h>
-# if !defined(makedev) && defined(mkdev)
+# if !defined makedev && defined mkdev
 #  define makedev mkdev
 # endif
-#elif MAJOR_IN_SYSMACROS
+#elif defined MAJOR_IN_SYSMACROS
 #include <sys/sysmacros.h>
 #endif
 
-#if HAVE_COMPAT_H
+#ifdef HAVE_COMPAT_H
 #include <compat.h>
 #endif
 
@@ -301,7 +301,7 @@ enum msgcode {
 #define uchar unsigned char
 #endif
 
-#if SIGNED_CHAR_OK
+#ifdef SIGNED_CHAR_OK
 #define schar signed char
 #else
 #define schar char
@@ -337,7 +337,7 @@ enum msgcode {
 #define uint32 unsigned int32
 #endif
 
-#if SIZEOF_OFF_T == 8 || !SIZEOF_OFF64_T || !HAVE_STRUCT_STAT64
+#if SIZEOF_OFF_T == 8 || !defined SIZEOF_OFF64_T || !defined HAVE_STRUCT_STAT64
 #define OFF_T off_t
 #define STRUCT_STAT struct stat
 #else
@@ -613,36 +613,36 @@ struct stats {
 #include "proto.h"
 
 /* We have replacement versions of these if they're missing. */
-#if !HAVE_ASPRINTF
+#ifndef HAVE_ASPRINTF
 int asprintf(char **ptr, const char *format, ...);
 #endif
 
-#if !HAVE_VASPRINTF
+#ifndef HAVE_VASPRINTF
 int vasprintf(char **ptr, const char *format, va_list ap);
 #endif
 
-#if !HAVE_VSNPRINTF || !HAVE_C99_VSNPRINTF
+#if !defined HAVE_VSNPRINTF || !defined HAVE_C99_VSNPRINTF
 #define vsnprintf rsync_vsnprintf
 int vsnprintf(char *str, size_t count, const char *fmt, va_list args);
 #endif
 
-#if !HAVE_SNPRINTF || !HAVE_C99_VSNPRINTF
+#if !defined HAVE_SNPRINTF || !defined HAVE_C99_VSNPRINTF
 #define snprintf rsync_snprintf
 int snprintf(char *str,size_t count,const char *fmt,...);
 #endif
 
 
-#if !HAVE_STRERROR
+#ifndef HAVE_STRERROR
 extern char *sys_errlist[];
 #define strerror(i) sys_errlist[i]
 #endif
 
-#if !HAVE_STRCHR
+#ifndef HAVE_STRCHR
 # define strchr                 index
 # define strrchr                rindex
 #endif
 
-#if !HAVE_ERRNO_DECL
+#ifndef HAVE_ERRNO_DECL
 extern int errno;
 #endif
 
@@ -732,7 +732,7 @@ extern int errno;
 /* work out what fcntl flag to use for non-blocking */
 #ifdef O_NONBLOCK
 # define NONBLOCK_FLAG O_NONBLOCK
-#elif defined(SYSV)
+#elif defined SYSV
 # define NONBLOCK_FLAG O_NDELAY
 #else
 # define NONBLOCK_FLAG FNDELAY
@@ -756,7 +756,7 @@ extern int errno;
 /* handler for null strings in printf format */
 #define NS(s) ((s)?safe_fname(s):"<NULL>")
 
-#if !defined(__GNUC__) || defined(APPLE)
+#if !defined __GNUC__ || defined APPLE
 /* Apparently the OS X port of gcc gags on __attribute__.
  *
  * <http://www.opensource.apple.com/bugs/X/gcc/2512150.html> */
@@ -780,7 +780,7 @@ void rsyserr(enum logcode, int, const char *, ...)
      __attribute__((format (printf, 3, 4)))
      ;
 
-#if REPLACE_INET_NTOA
+#ifdef REPLACE_INET_NTOA
 #define inet_ntoa rep_inet_ntoa
 #endif
 
@@ -789,11 +789,11 @@ void rsyserr(enum logcode, int, const char *, ...)
 #define O_BINARY 0
 #endif
 
-#if !HAVE_STRLCPY
+#ifndef HAVE_STRLCPY
 size_t strlcpy(char *d, const char *s, size_t bufsize);
 #endif
 
-#if !HAVE_STRLCAT
+#ifndef HAVE_STRLCAT
 size_t strlcat(char *d, const char *s, size_t bufsize);
 #endif
 
@@ -803,13 +803,13 @@ size_t strlcat(char *d, const char *s, size_t bufsize);
 
 #define exit_cleanup(code) _exit_cleanup(code, __FILE__, __LINE__)
 
-#if HAVE_GETEUID
+#ifdef HAVE_GETEUID
 #define MY_UID() geteuid()
 #else
 #define MY_UID() getuid()
 #endif
 
-#if HAVE_GETEGID
+#ifdef HAVE_GETEGID
 #define MY_GID() getegid()
 #else
 #define MY_GID() getgid()
@@ -817,11 +817,11 @@ size_t strlcat(char *d, const char *s, size_t bufsize);
 
 extern int verbose;
 
-#if !HAVE_INET_NTOP
+#ifndef HAVE_INET_NTOP
 const char *inet_ntop(int af, const void *src, char *dst, size_t size);
-#endif /* !HAVE_INET_NTOP */
+#endif
 
-#if !HAVE_INET_PTON
+#ifndef HAVE_INET_PTON
 int inet_pton(int af, const char *src, void *dst);
 #endif
 

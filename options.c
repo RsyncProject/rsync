@@ -104,7 +104,7 @@ long block_size = 0; /* "long" because popt can't set an int32. */
 
 
 /** Network address family. **/
-#if INET6
+#ifdef INET6
 int default_af_hint = 0;	/* Any protocol */
 #else
 int default_af_hint = AF_INET;	/* Must use IPv4 */
@@ -170,23 +170,23 @@ static void print_rsync_version(enum logcode f)
 	char const *ipv6 = "no ";
 	STRUCT_STAT *dumstat;
 
-#if HAVE_SOCKETPAIR
+#ifdef HAVE_SOCKETPAIR
 	got_socketpair = "";
 #endif
 
-#if HAVE_FTRUNCATE
+#ifdef HAVE_FTRUNCATE
 	have_inplace = "";
 #endif
 
-#if SUPPORT_HARD_LINKS
+#ifdef SUPPORT_HARD_LINKS
 	hardlinks = "";
 #endif
 
-#if SUPPORT_LINKS
+#ifdef SUPPORT_LINKS
 	links = "";
 #endif
 
-#if INET6
+#ifdef INET6
 	ipv6 = "";
 #endif
 
@@ -329,7 +329,7 @@ void usage(enum logcode F)
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth; KBytes per second\n");
   rprintf(F,"     --write-batch=FILE      write a batched update to FILE\n");
   rprintf(F,"     --read-batch=FILE       read a batched update from FILE\n");
-#if INET6
+#ifdef INET6
   rprintf(F," -4, --ipv4                  prefer IPv4\n");
   rprintf(F," -6, --ipv6                  prefer IPv6\n");
 #endif
@@ -435,7 +435,7 @@ static struct poptOption long_options[] = {
   {"no-implied-dirs",  0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
   {"checksum-seed",    0,  POPT_ARG_INT,    &checksum_seed, 0, 0, 0 },
-#if INET6
+#ifdef INET6
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
 #endif
@@ -458,7 +458,7 @@ static void daemon_usage(enum logcode F)
   rprintf(F,"     --no-detach             do not detach from the parent\n");
   rprintf(F,"     --port=PORT             listen on alternate port number\n");
   rprintf(F," -v, --verbose               increase verbosity\n");
-#if INET6
+#ifdef INET6
   rprintf(F," -4, --ipv4                  prefer IPv4\n");
   rprintf(F," -6, --ipv6                  prefer IPv6\n");
 #endif
@@ -474,7 +474,7 @@ static struct poptOption long_daemon_options[] = {
   {"bwlimit",          0,  POPT_ARG_INT,    &daemon_bwlimit, 0, 0, 0 },
   {"config",           0,  POPT_ARG_STRING, &config_file, 0, 0, 0 },
   {"daemon",           0,  POPT_ARG_NONE,   &daemon_opt, 0, 0, 0 },
-#if INET6
+#ifdef INET6
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
 #endif
@@ -799,7 +799,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			break;
 
 		case OPT_LINK_DEST:
-#if HAVE_LINK
+#ifdef HAVE_LINK
 			link_dest = 1;
 			dest_option = "--link-dest";
 			goto set_dest_dir;
@@ -849,7 +849,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (am_sender < 0)
 		am_sender = 0;
 
-#if !SUPPORT_LINKS
+#ifndef SUPPORT_LINKS
 	if (preserve_links && !am_sender) {
 		snprintf(err_buf, sizeof err_buf,
 			 "symlinks are not supported on this %s\n",
@@ -858,7 +858,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 #endif
 
-#if !SUPPORT_HARD_LINKS
+#ifndef SUPPORT_HARD_LINKS
 	if (preserve_hard_links) {
 		snprintf(err_buf, sizeof err_buf,
 			 "hard links are not supported on this %s\n",
@@ -921,7 +921,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		}
 		if (!files_from)
 			recurse = -1; /* infinite recursion */
-#if SUPPORT_LINKS
+#ifdef SUPPORT_LINKS
 		preserve_links = 1;
 #endif
 		preserve_perms = 1;
@@ -1064,7 +1064,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		partial_dir = partialdir_for_delayupdate;
 
 	if (inplace) {
-#if HAVE_FTRUNCATE
+#ifdef HAVE_FTRUNCATE
 		if (partial_dir) {
 			snprintf(err_buf, sizeof err_buf,
 				 "--inplace cannot be used with --%s\n",

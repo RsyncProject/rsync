@@ -222,7 +222,7 @@ static void report(int f)
  **/
 static void show_malloc_stats(void)
 {
-#if HAVE_MALLINFO
+#ifdef HAVE_MALLINFO
 	struct mallinfo mi;
 
 	mi = mallinfo();
@@ -292,7 +292,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 				dash_l_set = 1;
 		}
 
-#if HAVE_REMSH
+#ifdef HAVE_REMSH
 		/* remsh (on HPUX) takes the arguments the other way around */
 		args[argc++] = machine;
 		if (user && !(daemon_over_rsh && dash_l_set)) {

@@ -26,7 +26,7 @@ extern int am_server;
 
 #define PROGRESS_HISTORY_SECS 5
 
-#if GETPGRP_VOID
+#ifdef GETPGRP_VOID
 #define GETPGRP_ARG
 #else
 #define GETPGRP_ARG 0
@@ -121,7 +121,7 @@ void end_progress(OFF_T size)
 void show_progress(OFF_T ofs, OFF_T size)
 {
 	struct timeval now;
-#if HAVE_GETPGRP && HAVE_TCGETPGRP
+#if defined HAVE_GETPGRP && defined HAVE_TCGETPGRP
 	static pid_t pgrp = -1;
 	pid_t tc_pgrp;
 #endif
@@ -129,7 +129,7 @@ void show_progress(OFF_T ofs, OFF_T size)
 	if (am_server)
 		return;
 
-#if HAVE_GETPGRP && HAVE_TCGETPGRP
+#if defined HAVE_GETPGRP && defined HAVE_TCGETPGRP
 	if (pgrp == -1)
 		pgrp = getpgrp(GETPGRP_ARG);
 #endif
@@ -165,7 +165,7 @@ void show_progress(OFF_T ofs, OFF_T size)
 		ph_list[newest_hpos].ofs = ofs;
 	}
 
-#if HAVE_GETPGRP && HAVE_TCGETPGRP
+#if defined HAVE_GETPGRP && defined HAVE_TCGETPGRP
 	tc_pgrp = tcgetpgrp(STDOUT_FILENO);
 	if (tc_pgrp != pgrp && tc_pgrp != -1)
 		return;

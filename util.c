@@ -79,7 +79,7 @@ int fd_pair(int fd[2])
 {
 	int ret;
 
-#if HAVE_SOCKETPAIR
+#ifdef HAVE_SOCKETPAIR
 	ret = socketpair(AF_UNIX, SOCK_STREAM, 0, fd);
 #else
 	ret = pipe(fd);
@@ -140,12 +140,12 @@ int set_modtime(char *fname, time_t modtime)
 		return 0;
 
 	{
-#if HAVE_UTIMBUF
+#ifdef HAVE_UTIMBUF
 		struct utimbuf tbuf;
 		tbuf.actime = time(NULL);
 		tbuf.modtime = modtime;
 		return utime(fname,&tbuf);
-#elif HAVE_UTIME
+#elif defined HAVE_UTIME
 		time_t t[2];
 		t[0] = time(NULL);
 		t[1] = modtime;
@@ -502,7 +502,7 @@ static void glob_expand_one(char *s, char ***argv_ptr, int *argc_ptr,
 	char **argv = *argv_ptr;
 	int argc = *argc_ptr;
 	int maxargs = *maxargs_ptr;
-#if !(HAVE_GLOB && HAVE_GLOB_H)
+#if !defined HAVE_GLOB || !defined HAVE_GLOB_H
 	if (argc == maxargs) {
 		maxargs += MAX_ARGS;
 		if (!(argv = realloc_array(argv, char *, maxargs)))
@@ -1105,7 +1105,7 @@ char *timestring(time_t t)
 	static char TimeBuf[200];
 	struct tm *tm = localtime(&t);
 
-#if HAVE_STRFTIME
+#ifdef HAVE_STRFTIME
 	strftime(TimeBuf, sizeof TimeBuf - 1, "%Y/%m/%d %H:%M:%S", tm);
 #else
 	strlcpy(TimeBuf, asctime(tm), sizeof TimeBuf);

@@ -208,7 +208,7 @@ static int keep_backup(char *fname)
 		kept = 1;
 	}
 
-#if SUPPORT_LINKS
+#ifdef SUPPORT_LINKS
 	if (!kept && preserve_links && S_ISLNK(file->mode)) {
 		if (safe_symlinks && unsafe_symlink(file->u.link, buf)) {
 			if (verbose) {

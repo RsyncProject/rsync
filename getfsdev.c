@@ -6,7 +6,7 @@
 	int ret;
 
 	while (--argc > 0) {
-#if USE_STAT64_FUNCS
+#ifdef USE_STAT64_FUNCS
 		ret = stat64(*++argv, &st);
 #else
 		ret = stat(*++argv, &st);

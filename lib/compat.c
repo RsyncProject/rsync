@@ -155,7 +155,7 @@
 {
 	unsigned char *p = (unsigned char *)&ip.s_addr;
 	static char buf[18];
-#if WORDS_BIGENDIAN
+#ifdef WORDS_BIGENDIAN
 	snprintf(buf, 18, "%d.%d.%d.%d", 
 		 (int)p[0], (int)p[1], (int)p[2], (int)p[3]);
 #else
@@ -196,7 +196,7 @@
 /* some systems don't take the 2nd argument */
 int sys_gettimeofday(struct timeval *tv)
 {
-#if HAVE_GETTIMEOFDAY_TZ
+#ifdef HAVE_GETTIMEOFDAY_TZ
 	return gettimeofday(tv, NULL);
 #else
 	return gettimeofday(tv);

@@ -452,7 +452,7 @@ void start_accept_loop(int port, int (*fn)(int, int))
 	for (i = 0, maxfd = -1; sp[i] >= 0; i++) {
 		if (listen(sp[i], 5) < 0) {
 			rsyserr(FERROR, errno, "listen() on socket failed");
-#if INET6
+#ifdef INET6
 			if (errno == EADDRINUSE && i > 0) {
 				rprintf(FINFO,
 				    "Try using --ipv4 or --ipv6 to avoid this listen() error.\n");
@@ -648,16 +648,14 @@ void become_daemon(void)
 	}
 
 	/* detach from the terminal */
-#if HAVE_SETSID
+#ifdef HAVE_SETSID
 	setsid();
-#else
-#ifdef TIOCNOTTY
+#elif defined TIOCNOTTY
 	i = open("/dev/tty", O_RDWR);
 	if (i >= 0) {
 		ioctl(i, (int)TIOCNOTTY, (char *)0);
 		close(i);
 	}
-#endif /* TIOCNOTTY */
 #endif
 	/* make sure that stdin, stdout an stderr don't stuff things
 	 * up (library functions, for example) */
@@ -693,7 +691,7 @@ static int socketpair_tcp(int fd[2])
 		goto failed;
 
 	memset(&sock2, 0, sizeof sock2);
-#if HAVE_SOCKADDR_IN_LEN
+#ifdef HAVE_SOCKADDR_IN_LEN
 	sock2.sin_len = sizeof sock2;
 #endif
 	sock2.sin_family = PF_INET;

@@ -185,7 +185,7 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	change_uid = am_root && preserve_uid && st->st_uid != file->uid;
 	change_gid = preserve_gid && file->gid != GID_NONE
 		&& st->st_gid != file->gid;
-#if !HAVE_LCHOWN && !CHOWN_MODIFIES_SYMLINK
+#if !defined HAVE_LCHOWN && !defined CHOWN_MODIFIES_SYMLINK
 	if (S_ISLNK(st->st_mode))
 		;
 	else
@@ -225,7 +225,7 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 		updated = 1;
 	}
 
-#if HAVE_CHMOD
+#ifdef HAVE_CHMOD
 	if (!S_ISLNK(st->st_mode)) {
 		if ((st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS)) {
 			updated = 1;

@@ -24,7 +24,7 @@ extern int dry_run;
 extern int verbose;
 extern int make_backups;
 
-#if SUPPORT_HARD_LINKS
+#ifdef SUPPORT_HARD_LINKS
 static int hlink_compare(struct file_struct **file1, struct file_struct **file2)
 {
 	struct file_struct *f1 = *file1;
@@ -104,7 +104,7 @@ static void link_idev_data(struct file_list *flist)
 
 void init_hard_links(struct file_list *flist)
 {
-#if SUPPORT_HARD_LINKS
+#ifdef SUPPORT_HARD_LINKS
 	int i;
 
 	if (flist->count < 2)
@@ -135,7 +135,7 @@ void init_hard_links(struct file_list *flist)
 
 int hard_link_check(struct file_struct *file, int skip)
 {
-#if SUPPORT_HARD_LINKS
+#ifdef SUPPORT_HARD_LINKS
 	if (!hlink_list || !file->link_u.links)
 		return 0;
 	if (skip && !(file->flags & FLAG_HLINK_EOL))
@@ -151,7 +151,7 @@ int hard_link_check(struct file_struct *file, int skip)
 	return 0;
 }
 
-#if SUPPORT_HARD_LINKS
+#ifdef SUPPORT_HARD_LINKS
 static void hard_link_one(char *hlink1, char *hlink2)
 {
 	if (do_link(hlink1, hlink2)) {
@@ -173,7 +173,7 @@ static void hard_link_one(char *hlink1, char *hlink2)
  **/
 void do_hard_links(void)
 {
-#if SUPPORT_HARD_LINKS
+#ifdef SUPPORT_HARD_LINKS
 	struct file_struct *file, *first;
 	char hlink1[MAXPATHLEN];
 	char *hlink2;

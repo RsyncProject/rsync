@@ -145,7 +145,7 @@ static void list_file_entry(struct file_struct *f)
 
 	permstring(perms, f->mode);
 
-#if SUPPORT_LINKS
+#ifdef SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(f->mode)) {
 		rprintf(FINFO, "%s %11.0f %s %s -> %s\n",
 			perms,
@@ -178,7 +178,7 @@ static void list_file_entry(struct file_struct *f)
  **/
 static int readlink_stat(const char *path, STRUCT_STAT *buffer, char *linkbuf)
 {
-#if SUPPORT_LINKS
+#ifdef SUPPORT_LINKS
 	if (copy_links)
 		return do_stat(path, buffer);
 	if (link_stat(path, buffer, 0) < 0)
@@ -204,7 +204,7 @@ static int readlink_stat(const char *path, STRUCT_STAT *buffer, char *linkbuf)
 
 int link_stat(const char *path, STRUCT_STAT *buffer, int follow_dirlinks)
 {
-#if SUPPORT_LINKS
+#ifdef SUPPORT_LINKS
 	if (copy_links)
 		return do_stat(path, buffer);
 	if (do_lstat(path, buffer) < 0)
@@ -253,7 +253,7 @@ static int is_excluded(char *fname, int is_dir, int filter_level)
 
 static int to_wire_mode(mode_t mode)
 {
-#if SUPPORT_LINKS
+#ifdef SUPPORT_LINKS
 	if (S_ISLNK(mode) && (_S_IFLNK != 0120000))
 		return (mode & ~(_S_IFMT)) | 0120000;
 #endif
@@ -385,7 +385,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	else
 		modtime = file->modtime;
 
-#if SUPPORT_HARD_LINKS
+#ifdef SUPPORT_HARD_LINKS
 	if (file->link_u.idev) {
 		if (file->F_DEV == dev) {
 			if (protocol_version >= 28)
@@ -463,7 +463,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 		}
 	}
 
-#if SUPPORT_LINKS
+#ifdef SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(mode)) {
 		int len = strlen(file->u.link);
 		write_int(f, len);
@@ -471,7 +471,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	}
 #endif
 
-#if SUPPORT_HARD_LINKS
+#ifdef SUPPORT_HARD_LINKS
 	if (flags & XMIT_HAS_IDEV_DATA) {
 		if (protocol_version < 26) {
 			/* 32-bit dev_t and ino_t */
@@ -611,7 +611,7 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 		}
 	}
 
-#if SUPPORT_LINKS
+#ifdef SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(mode)) {
 		linkname_len = read_int(f) + 1; /* count the '\0' */
 		if (linkname_len <= 0 || linkname_len > MAXPATHLEN) {
@@ -679,7 +679,7 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 	if (preserve_devices && IS_DEVICE(mode))
 		file->u.rdev = rdev;
 
-#if SUPPORT_LINKS
+#ifdef SUPPORT_LINKS
 	if (linkname_len) {
 		file->u.link = bp;
 		read_sbuf(f, bp, linkname_len - 1);
@@ -689,7 +689,7 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 	}
 #endif
 
-#if SUPPORT_HARD_LINKS
+#ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && protocol_version < 28 && S_ISREG(mode))
 		flags |= XMIT_HAS_IDEV_DATA;
 	if (flags & XMIT_HAS_IDEV_DATA) {
@@ -788,7 +788,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 		    && is_excluded(thisname, 0, filter_level))
 			return NULL;
 		if (save_errno == ENOENT) {
-#if SUPPORT_LINKS
+#ifdef SUPPORT_LINKS
 			/* Avoid "vanished" error if symlink points nowhere. */
 			if (copy_links && do_lstat(thisname, &st) == 0
 			    && S_ISLNK(st.st_mode)) {
@@ -832,7 +832,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 		return NULL;
 
 	if (lp_ignore_nonreadable(module_id)) {
-#if SUPPORT_LINKS
+#ifdef SUPPORT_LINKS
 		if (!S_ISLNK(st.st_mode))
 #endif
 			if (access(thisname, R_OK) != 0)
@@ -861,7 +861,7 @@ skip_filters:
 	}
 	basename_len = strlen(basename) + 1; /* count the '\0' */
 
-#if SUPPORT_LINKS
+#ifdef SUPPORT_LINKS
 	linkname_len = S_ISLNK(st.st_mode) ? strlen(linkname) + 1 : 0;
 #else
 	linkname_len = 0;
@@ -890,7 +890,7 @@ skip_filters:
 	file->uid = st.st_uid;
 	file->gid = st.st_gid;
 
-#if SUPPORT_HARD_LINKS
+#ifdef SUPPORT_HARD_LINKS
 	if (flist && flist->hlink_pool) {
 		if (protocol_version < 28) {
 			if (S_ISREG(st.st_mode))
@@ -923,12 +923,12 @@ skip_filters:
 	memcpy(bp, basename, basename_len);
 	bp += basename_len;
 
-#if HAVE_STRUCT_STAT_ST_RDEV
+#ifdef HAVE_STRUCT_STAT_ST_RDEV
 	if (preserve_devices && IS_DEVICE(st.st_mode))
 		file->u.rdev = st.st_rdev;
 #endif
 
-#if SUPPORT_LINKS
+#ifdef SUPPORT_LINKS
 	if (linkname_len) {
 		file->u.link = bp;
 		memcpy(bp, linkname, linkname_len);
@@ -1415,7 +1415,7 @@ struct file_list *flist_new(int with_hlink, char *msg)
 	    out_of_memory, POOL_INTERN)))
 		out_of_memory(msg);
 
-#if SUPPORT_HARD_LINKS
+#ifdef SUPPORT_HARD_LINKS
 	if (with_hlink && preserve_hard_links) {
 		if (!(flist->hlink_pool = pool_create(HLINK_EXTENT,
 		    sizeof (struct idev), out_of_memory, POOL_INTERN)))

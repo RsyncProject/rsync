@@ -25,7 +25,7 @@
 
 #include "rsync.h"
 
-#if HAVE_GETGROUPS
+#ifdef HAVE_GETGROUPS
 # ifndef GETGROUPS_T
 #  define GETGROUPS_T gid_t
 # endif
@@ -96,7 +96,7 @@ static int map_gid(int id, char *name)
 
 static int is_in_group(gid_t gid)
 {
-#if HAVE_GETGROUPS
+#ifdef HAVE_GETGROUPS
 	static gid_t last_in = GID_NONE, last_out;
 	static int ngroups = -2;
 	static GETGROUPS_T *gidset;
