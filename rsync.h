@@ -163,6 +163,9 @@
 #include "lib/getopt.h"
 #endif
 
+#ifndef S_IFLNK
+#define S_IFLNK  0120000
+#endif
 
 #ifndef S_ISLNK
 #define S_ISLNK(mode) (((mode) & S_IFLNK) == S_IFLNK)
@@ -287,12 +290,8 @@ extern int errno;
 #define bzero(buf,n) memset(buf,0,n)
 #endif
 
-#define SUPPORT_LINKS (HAVE_READLINK && defined(S_ISLNK))
+#define SUPPORT_LINKS HAVE_READLINK
 #define SUPPORT_HARD_LINKS HAVE_LINK
-
-#ifndef S_ISLNK
-#define S_ISLNK(x) 0
-#endif
 
 #if !SUPPORT_LINKS
 #define lstat stat

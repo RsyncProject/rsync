@@ -288,8 +288,8 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
     return;
   }
 
-#if SUPPORT_LINKS
   if (preserve_links && S_ISLNK(file->mode)) {
+#if SUPPORT_LINKS
     char lnk[MAXPATHLEN];
     int l;
     if (statret == 0) {
@@ -312,9 +312,9 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 	fprintf(FINFO,"%s -> %s\n",
 		fname,file->link);
     }
+#endif
     return;
   }
-#endif
 
 #ifdef HAVE_MKNOD
   if (am_root && preserve_devices && IS_DEVICE(file->mode)) {

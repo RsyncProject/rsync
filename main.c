@@ -553,14 +553,15 @@ int main(int argc,char *argv[])
 	  break;
 
 	case 'l':
-#if SUPPORT_LINKS
 	  preserve_links=1;
-#endif
 	  break;
 
 	case 'H':
 #if SUPPORT_HARD_LINKS
 	  preserve_hard_links=1;
+#else 
+	  fprintf(FERROR,"ERROR: hard links not supported on this platform\n");
+	  exit_cleanup(1);
 #endif
 	  break;
 
@@ -656,6 +657,13 @@ int main(int argc,char *argv[])
 
     if (dry_run)
       verbose = MAX(verbose,1);
+
+#ifndef SUPPORT_LINKS
+    if (!am_server && preserve_links) {
+	    fprintf(FERROR,"ERROR: symbolic links not supported\n");
+	    exit_cleanup(1);
+    }
+#endif
 
     if (am_server) {
       setup_protocol(STDOUT_FILENO,STDIN_FILENO);
