@@ -277,6 +277,15 @@ static int skip_file(char *fname,
 }
 
 
+/* use a larger block size for really big files */
+int adapt_block_size(struct file_struct *file, int bsize)
+{
+	int ret = file->length / (10000); /* rough heuristic */
+	ret = ret & ~15; /* multiple of 16 */
+	if (ret < bsize) ret = bsize;
+	return ret;
+}
+
 void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 {  
   int fd;
@@ -446,7 +455,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
   if (verbose > 3)
     fprintf(FERROR,"gen mapped %s of size %d\n",fname,(int)st.st_size);
 
-  s = generate_sums(buf,st.st_size,block_size);
+  s = generate_sums(buf,st.st_size,adapt_block_size(file, block_size));
 
   if (verbose > 2)
     fprintf(FERROR,"sending sums for %d\n",i);
@@ -649,11 +658,7 @@ void exit_cleanup(int code)
 		unlink(cleanup_fname);
 	signal(SIGUSR1, SIG_IGN);
 	if (code) {
-#ifdef GETPGRP_VOID
-		kill(-getpgrp(), SIGUSR1);
-#else
-		kill(-getpgrp(getpid()), SIGUSR1);
-#endif
+		kill_all(SIGUSR1);
 	}
 	exit(code);
 }

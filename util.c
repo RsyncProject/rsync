@@ -119,7 +119,7 @@ int piped_child(char **command,int *f_in,int *f_out)
   }
 
 
-  pid = fork();
+  pid = do_fork();
   if (pid < 0) {
     fprintf(FERROR,"fork: %s\n",strerror(errno));
     exit_cleanup(1);
@@ -351,4 +351,29 @@ void u_sleep(int usec)
 	tv.tv_sec = 0;
 	tv.tv_usec = usec;
 	select(0, NULL, NULL, NULL, &tv);
+}
+
+
+static pid_t all_pids[10];
+static int num_pids;
+
+/* fork and record the pid of the child */
+pid_t do_fork(void)
+{
+	pid_t newpid = fork();
+	
+	if (newpid) {
+		all_pids[num_pids++] = newpid;
+	}
+	return newpid;
+}
+
+/* kill all children */
+void kill_all(int sig)
+{
+	int i;
+	for (i=0;i<num_pids;i++) {
+		if (all_pids[i] != getpid())
+			kill(all_pids[i], sig);
+	}
 }
