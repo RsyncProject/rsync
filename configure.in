@@ -408,10 +408,10 @@ dnl AC_FUNC_MEMCMP
 
 AC_FUNC_UTIME_NULL
 AC_FUNC_ALLOCA
-AC_CHECK_FUNCS(waitpid wait4 getcwd strdup strerror chown chmod mknod mkfifo)
-AC_CHECK_FUNCS(fchmod fstat strchr readlink link utime utimes strftime mtrace)
-AC_CHECK_FUNCS(memmove lchown vsnprintf snprintf asprintf setsid glob strpbrk)
-AC_CHECK_FUNCS(strlcat strlcpy strtol mallinfo setgroups geteuid getegid)
+AC_CHECK_FUNCS(waitpid wait4 getcwd strdup strerror chown chmod mknod mkfifo \
+    fchmod fstat strchr readlink link utime utimes strftime mtrace \
+    memmove lchown vsnprintf snprintf asprintf setsid glob strpbrk \
+    strlcat strlcpy strtol mallinfo getgroups setgroups geteuid getegid)
 
 AC_CACHE_CHECK([for working socketpair],rsync_cv_HAVE_SOCKETPAIR,[
 AC_TRY_RUN([
