@@ -90,7 +90,12 @@ pool_alloc(alloc_pool_t p, size_t len, char *bomb)
 {
 	struct alloc_pool *pool = (struct alloc_pool *) p;
 	if (!pool)
-		return NULL;
+	{
+		char *msg;
+		if (asprintf(&msg, "pool_alloc(%s) on NULL pool", bomb) > 0)
+			bomb = msg;
+		goto bomb;
+	}
 
 	if (!len)
 		len = pool->quantum;
