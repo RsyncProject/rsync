@@ -59,7 +59,7 @@ rsync: $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o rsync $(OBJS) $(LIBS)
 
 Makefile: Makefile.in configure config.status
-	./config.status --recheck
+	echo "WARNING: You need to run ./config.status --recheck"
 
 # It's OK if this fails, because we don't require people to have
 # autoconf installed.
