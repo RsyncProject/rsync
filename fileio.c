@@ -69,6 +69,21 @@ static int write_sparse(int f,char *buf,size_t len)
 	return len;
 }
 
+
+static char *wf_writeBuf;
+static size_t wf_writeBufSize;
+static size_t wf_writeBufCnt;
+
+int flush_write_file(int f)
+{
+	int ret = write(f, wf_writeBuf, wf_writeBufCnt);
+	if (ret < 0)
+		return ret;
+	/* if (ret < wf_writeBufCnt) ??? */
+	wf_writeBufCnt = 0;
+	return ret;
+}
+
 /*
  * write_file does not allow incomplete writes.  It loops internally
  * until len bytes are written or errno is set.
@@ -83,7 +98,22 @@ int write_file(int f,char *buf,size_t len)
 			int len1 = MIN(len, SPARSE_WRITE_SIZE);
 			r1 = write_sparse(f, buf, len1);
 		} else {
-			r1 = write(f, buf, len);
+			if (!wf_writeBuf) {
+				wf_writeBufSize = MAX_MAP_SIZE;
+				wf_writeBufCnt  = 0;
+				wf_writeBuf = new_array(char, MAX_MAP_SIZE);
+				if (!wf_writeBuf) out_of_memory("write_file");
+			}
+			r1 = MIN(len, wf_writeBufSize - wf_writeBufCnt);
+			if (r1) {
+				memcpy(wf_writeBuf + wf_writeBufCnt, buf, r1);
+				wf_writeBufCnt += r1;
+			}
+			if (wf_writeBufCnt == wf_writeBufSize) {
+				if (flush_write_file(f) < 0) return -1;
+				if (!r1 && len)
+					continue;
+			}
 		}
 		if (r1 <= 0) {
 			if (ret > 0) return ret;

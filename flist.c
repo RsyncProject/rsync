@@ -924,7 +924,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	flist = flist_new();
 
 	if (f != -1) {
-		io_start_buffering(f);
+		io_start_buffering_out(f);
 		if (filesfrom_fd >= 0) {
 			if (argv[0] && !push_dir(argv[0], 0)) {
 				rprintf(FERROR, "push_dir %s failed: %s\n",

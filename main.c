@@ -380,6 +380,8 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 		exit_cleanup(0);
 	}
 
+	io_start_buffering_in(f_in);
+	io_start_buffering_out(f_out);
 	send_files(flist,f_out,f_in);
 	io_flush();
 	report(f_out);
@@ -454,7 +456,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	close(error_pipe[1]);
 	if (f_in != f_out) close(f_in);
 
-	io_start_buffering(f_out);
+	io_start_buffering_out(f_out);
 
 	io_set_error_fd(error_pipe[0]);
 
@@ -508,6 +510,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		}
 	}
 
+	io_start_buffering_in(f_in);
 	if (delete_mode && !delete_excluded)
 		recv_exclude_list(f_in);
 
@@ -606,6 +609,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		extern int cvs_exclude;
 		extern int delete_mode;
 		extern int delete_excluded;
+		io_start_buffering_out(f_out);
 		if (cvs_exclude)
 			add_cvs_excludes();
 		if (delete_mode && !delete_excluded)
@@ -617,7 +621,10 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		if (verbose > 3)
 			rprintf(FINFO,"file list sent\n");
 
+		io_flush();
+		io_start_buffering_out(f_out);
 		send_files(flist,f_out,f_in);
+		io_flush();
 		if (protocol_version >= 24) {
 			/* final goodbye message */
 			read_int(f_in);
@@ -629,6 +636,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			wait_process(pid, &status);
 		}
 		report(-1);
+		io_flush();
 		exit_cleanup(status);
 	}
 

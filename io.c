@@ -41,8 +41,8 @@
 
 static int io_multiplexing_out;
 static int io_multiplexing_in;
-static int multiplex_in_fd;
-static int multiplex_out_fd;
+static int multiplex_in_fd = -1;
+static int multiplex_out_fd = -1;
 static time_t last_io;
 static int no_flush;
 
@@ -440,17 +440,31 @@ static int read_unbuffered(int fd, char *buf, size_t len)
 	static size_t remaining;
 	int tag, ret = 0;
 	char line[1024];
+	static char *buffer;
+	static size_t bufferIdx = 0;
+	static size_t bufferSz;
 
-	if (!io_multiplexing_in || fd != multiplex_in_fd)
+	if (fd != multiplex_in_fd)
 		return read_timeout(fd, buf, len);
+
+	if (!io_multiplexing_in && remaining == 0) {
+		if (!buffer) {
+			bufferSz = 2 * IO_BUFFER_SIZE;
+			buffer   = new_array(char, bufferSz);
+			if (!buffer) out_of_memory("read_unbuffered");
+		}
+		remaining = read_timeout(fd, buffer, bufferSz);
+		bufferIdx = 0;
+	}
 
 	while (ret == 0) {
 		if (remaining) {
 			len = MIN(len, remaining);
-			read_loop(fd, buf, len);
+			memcpy(buf, buffer + bufferIdx, len);
+			bufferIdx += len;
 			remaining -= len;
 			ret = len;
-			continue;
+			break;
 		}
 
 		read_loop(fd, line, 4);
@@ -459,8 +473,16 @@ static int read_unbuffered(int fd, char *buf, size_t len)
 		remaining = tag & 0xFFFFFF;
 		tag = tag >> 24;
 
-		if (tag == MPLEX_BASE)
+		if (tag == MPLEX_BASE) {
+			if (!buffer || remaining > bufferSz) {
+				buffer = realloc_array(buffer, char, remaining);
+				if (!buffer) out_of_memory("read_unbuffered");
+				bufferSz = remaining;
+			}
+			read_loop(fd, buffer, remaining);
+			bufferIdx = 0;
 			continue;
+		}
 
 		tag -= MPLEX_BASE;
 
@@ -482,6 +504,9 @@ static int read_unbuffered(int fd, char *buf, size_t len)
 		remaining = 0;
 	}
 
+	if (remaining == 0)
+		io_flush();
+
 	return ret;
 }
 
@@ -498,8 +523,6 @@ static void readfd(int fd, char *buffer, size_t N)
 	size_t total=0;  
 
 	while (total < N) {
-		io_flush();
-
 		ret = read_unbuffered(fd, buffer + total, N-total);
 		total += ret;
 	}
@@ -682,13 +705,18 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 static char *io_buffer;
 static int io_buffer_count;
 
-void io_start_buffering(int fd)
+void io_start_buffering_out(int fd)
 {
 	if (io_buffer) return;
 	multiplex_out_fd = fd;
 	io_buffer = new_array(char, IO_BUFFER_SIZE);
 	if (!io_buffer) out_of_memory("writefd");
 	io_buffer_count = 0;
+}
+
+void io_start_buffering_in(int fd)
+{
+	multiplex_in_fd = fd;
 }
 
 /**
@@ -881,7 +909,7 @@ void io_start_multiplex_out(int fd)
 {
 	multiplex_out_fd = fd;
 	io_flush();
-	io_start_buffering(fd);
+	io_start_buffering_out(fd);
 	io_multiplexing_out = 1;
 }
 

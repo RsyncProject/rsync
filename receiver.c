@@ -303,6 +303,8 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
 		offset += len;
 	}
 
+	flush_write_file(fd);
+
 	if (do_progress)
 		end_progress(total_size);
 
