@@ -10,10 +10,14 @@ rsync changes since last release
 
   BUG FIXES:
 
+    * Fix situation where failure to fork (e.g. because out of process
+      slots) would cause rsync to kill all processes owned by the
+      current user.  Yes, really!  (Paul Haas, Martin Pool)
+
     * Fix test suite on Solaris.  (Jos Backus)
 
     * Fix minor memory leak in socket code.  (Dave Dykstra, Martin
       Pool.)
 
     * Fix --whole-file problem that caused it to be the default even
-      for remote connections.  (Frank Schulz)
+      for remote connections.  (Martin Pool, Frank Schulz)

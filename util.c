@@ -478,26 +478,46 @@ int robust_rename(char *from, char *to)
 static pid_t all_pids[10];
 static int num_pids;
 
-/* fork and record the pid of the child */
+/** Fork and record the pid of the child. **/
 pid_t do_fork(void)
 {
 	pid_t newpid = fork();
 	
-	if (newpid) {
+	if (newpid != 0  &&  newpid != -1) {
 		all_pids[num_pids++] = newpid;
 	}
 	return newpid;
 }
 
-/* kill all children */
+/**
+ * Kill all children.
+ *
+ * @todo It would be kind of nice to make sure that they are actually
+ * all our children before we kill them, because their pids may have
+ * been recycled by some other process.  Perhaps when we wait for a
+ * child, we should remove it from this array.  Alternatively we could
+ * perhaps use process groups, but I think that would not work on
+ * ancient Unix versions that don't support them.
+ **/
 void kill_all(int sig)
 {
 	int i;
-	for (i=0;i<num_pids;i++) {
-		if (all_pids[i] != getpid())
-			kill(all_pids[i], sig);
+
+	for (i = 0; i < num_pids; i++) {
+		/* Let's just be a little careful where we
+		 * point that gun, hey?  See kill(2) for the
+		 * magic caused by negative values. */
+		pid_t p = all_pids[i];
+
+		if (p == getpid())
+			continue;
+		if (p <= 0)
+			continue;
+
+		kill(p, sig);
 	}
 }
+
 
 /* turn a user name into a uid */
 int name_to_uid(char *name, uid_t *uid)
