@@ -1251,11 +1251,11 @@ const char *find_filename_suffix(const char *fn, int fn_len, int *len_ptr)
 			break;
 		s_len = fn_len - (s - fn);
 		fn_len = s - fn;
-		if (s_len == 3) {
+		if (s_len == 4) {
 			if (strcmp(s+1, "bak") == 0
 			 || strcmp(s+1, "old") == 0)
 				continue;
-		} else if (s_len == 4) {
+		} else if (s_len == 5) {
 			if (strcmp(s+1, "orig") == 0)
 				continue;
 		} else if (s_len > 2 && had_tilde
