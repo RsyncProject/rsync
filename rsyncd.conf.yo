@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsyncd.conf)(5)(9 Feb 1999)()()
+manpage(rsyncd.conf)(5)(12 Feb 1999)()()
 manpagename(rsyncd.conf)(configuration file for rsync server)
 manpagesynopsis()
 
@@ -163,9 +163,12 @@ was run as root. This complements the "uid" option. The default is the
 group "nobody".
 
 dit(bf(exclude)) The "exclude" option allows you to specify a space
-separated list of patterns to add to the exclude list. This is
-equivalent to the client specifying these patterns with the --exclude
-option. Note that this option is not designed with strong security in
+separated list of patterns to add to the exclude list. This is equivalent
+to the client specifying these patterns with the --exclude option.  Only
+one "exclude" option may be specified, but you can use "-" and "+" before
+patterns to specify exclude/include.
+
+Note that this option is not designed with strong security in
 mind, it is quite possible that a client may find a way to bypass this
 exclude list. If you want to absolutely ensure that certain files
 cannot be accessed then use the uid/gid options in combination with
@@ -180,11 +183,12 @@ option above.
 dit(bf(include)) The "include" option allows you to specify a space
 separated list of patterns which rsync should not exclude. This is
 equivalent to the client specifying these patterns with the --include
-option. This is useful as it allows you to build up quite complex
-exclude/include rules.
+option.  This is useful as it allows you to build up quite complex
+exclude/include rules.  Only one "include" option may be specified, but you
+can use "+" and "-" before patterns to switch include/exclude.
 
-See the section of exclude patterns for information  on the syntax of
-this option.
+See the section of exclude patterns in the rsync man page for information
+on the syntax of this option.
 
 dit(bf(include from)) The "include from" option specifies a filename
 on the server that contains include patterns, one per line. This is
