@@ -446,7 +446,8 @@ rather than the default port 873.
 
 dit(bf(--stats)) This tells rsync to print a verbose set of statistics
 on the file transfer, allowing you to tell how effective the rsync
-algorithm is for your data.
+algorithm is for your data. This option only works in conjunction with
+the -v (verbose) option.
 
 enddit()
 
