@@ -57,6 +57,7 @@ int numeric_ids = 0;
 int force_delete = 0;
 int io_timeout = 0;
 int io_error = 0;
+static int port = RSYNC_PORT;
 
 static char *shell_cmd;
 
@@ -65,8 +66,9 @@ extern int csum_length;
 int am_server = 0;
 int am_sender;
 int recurse = 0;
+int am_daemon;
 
-static void usage(FILE *f);
+static void usage(int fd);
 
 static void report(int f)
 {
@@ -242,10 +244,10 @@ static int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f
 	args[argc] = NULL;
 
 	if (verbose > 3) {
-		fprintf(FINFO,"cmd=");
+		rprintf(FINFO,"cmd=");
 		for (i=0;i<argc;i++)
-			fprintf(FINFO,"%s ",args[i]);
-		fprintf(FINFO,"\n");
+			rprintf(FINFO,"%s ",args[i]);
+		rprintf(FINFO,"\n");
 	}
 
 	if (local_server) {
@@ -273,13 +275,13 @@ static char *get_local_name(struct file_list *flist,char *name)
   if (do_stat(name,&st) == 0) {
     if (S_ISDIR(st.st_mode)) {
       if (chdir(name) != 0) {
-	fprintf(FERROR,"chdir %s : %s (1)\n",name,strerror(errno));
+	rprintf(FERROR,"chdir %s : %s (1)\n",name,strerror(errno));
 	exit_cleanup(1);
       }
       return NULL;
     }
     if (flist->count > 1) {
-      fprintf(FERROR,"ERROR: destination must be a directory when copying more than 1 file\n");
+      rprintf(FERROR,"ERROR: destination must be a directory when copying more than 1 file\n");
       exit_cleanup(1);
     }
     return name;
@@ -292,14 +294,14 @@ static char *get_local_name(struct file_list *flist,char *name)
     return NULL;
 
   if (do_mkdir(name,0777 & ~orig_umask) != 0) {
-    fprintf(FERROR,"mkdir %s : %s (1)\n",name,strerror(errno));
+    rprintf(FERROR,"mkdir %s : %s (1)\n",name,strerror(errno));
     exit_cleanup(1);
   } else {
-    fprintf(FINFO,"created directory %s\n",name);
+    rprintf(FINFO,"created directory %s\n",name);
   }
 
   if (chdir(name) != 0) {
-    fprintf(FERROR,"chdir %s : %s (2)\n",name,strerror(errno));
+    rprintf(FERROR,"chdir %s : %s (2)\n",name,strerror(errno));
     exit_cleanup(1);
   }
 
@@ -309,17 +311,17 @@ static char *get_local_name(struct file_list *flist,char *name)
 
 
 
-void do_server_sender(int argc,char *argv[])
+static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 {
   int i;
   struct file_list *flist;
   char *dir = argv[0];
 
   if (verbose > 2)
-    fprintf(FINFO,"server_sender starting pid=%d\n",(int)getpid());
+    rprintf(FINFO,"server_sender starting pid=%d\n",(int)getpid());
   
   if (!relative_paths && chdir(dir) != 0) {
-	  fprintf(FERROR,"chdir %s: %s (3)\n",dir,strerror(errno));
+	  rprintf(FERROR,"chdir %s: %s (3)\n",dir,strerror(errno));
 	  exit_cleanup(1);
   }
   argc--;
@@ -340,9 +342,9 @@ void do_server_sender(int argc,char *argv[])
   }
     
 
-  flist = send_file_list(STDOUT_FILENO,argc,argv);
-  send_files(flist,STDOUT_FILENO,STDIN_FILENO);
-  report(STDOUT_FILENO);
+  flist = send_file_list(f_out,argc,argv);
+  send_files(flist,f_out,f_in);
+  report(f_out);
   exit_cleanup(0);
 }
 
@@ -357,7 +359,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
     init_hard_links(flist);
 
   if (pipe(recv_pipe) < 0) {
-    fprintf(FERROR,"pipe failed in do_recv\n");
+    rprintf(FERROR,"pipe failed in do_recv\n");
     exit(1);
   }
   
@@ -365,7 +367,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
   if ((pid=do_fork()) == 0) {
     recv_files(f_in,flist,local_name,recv_pipe[1]);
     if (verbose > 2)
-      fprintf(FINFO,"receiver read %ld\n",(long)read_total());
+      rprintf(FINFO,"receiver read %ld\n",(long)read_total());
     exit_cleanup(0);
   }
 
@@ -377,7 +379,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 }
 
 
-void do_server_recv(int argc,char *argv[])
+static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 {
   int status;
   struct file_list *flist;
@@ -385,25 +387,25 @@ void do_server_recv(int argc,char *argv[])
   char *dir = NULL;
   
   if (verbose > 2)
-    fprintf(FINFO,"server_recv(%d) starting pid=%d\n",argc,(int)getpid());
+    rprintf(FINFO,"server_recv(%d) starting pid=%d\n",argc,(int)getpid());
 
   if (argc > 0) {
 	  dir = argv[0];
 	  argc--;
 	  argv++;
 	  if (chdir(dir) != 0) {
-		  fprintf(FERROR,"chdir %s : %s (4)\n",
+		  rprintf(FERROR,"chdir %s : %s (4)\n",
 			  dir,strerror(errno));
 		  exit_cleanup(1);
 	  }    
   }
 
   if (delete_mode)
-    recv_exclude_list(STDIN_FILENO);
+    recv_exclude_list(f_in);
 
-  flist = recv_file_list(STDIN_FILENO);
+  flist = recv_file_list(f_in);
   if (!flist || flist->count == 0) {
-    fprintf(FERROR,"nothing to do\n");
+    rprintf(FERROR,"nothing to do\n");
     exit_cleanup(1);
   }
 
@@ -415,24 +417,96 @@ void do_server_recv(int argc,char *argv[])
 	  local_name = get_local_name(flist,argv[0]);
   }
 
-  status = do_recv(STDIN_FILENO,STDOUT_FILENO,flist,local_name);
+  status = do_recv(f_in,f_out,flist,local_name);
   exit_cleanup(status);
 }
 
 
-void start_server(int argc, char *argv[])
+void start_server(int f_in, int f_out, int argc, char *argv[])
 {
-      setup_protocol(STDOUT_FILENO,STDIN_FILENO);
+      setup_protocol(f_out, f_in);
 	
       if (am_sender) {
-	      recv_exclude_list(STDIN_FILENO);
+	      recv_exclude_list(f_in);
 	      if (cvs_exclude)
 		      add_cvs_excludes();
-	      do_server_sender(argc,argv);
+	      do_server_sender(f_in, f_out, argc, argv);
       } else {
-	      do_server_recv(argc,argv);
+	      do_server_recv(f_in, f_out, argc, argv);
       }
       exit_cleanup(0);
+}
+
+static int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
+{
+	struct file_list *flist;
+	int status = 0, status2 = 0;
+	char *local_name = NULL;
+
+	setup_protocol(f_out,f_in);
+	
+	if (am_sender) {
+		if (cvs_exclude)
+			add_cvs_excludes();
+		if (delete_mode) 
+			send_exclude_list(f_out);
+		flist = send_file_list(f_out,argc,argv);
+		if (verbose > 3) 
+			rprintf(FINFO,"file list sent\n");
+		send_files(flist,f_out,f_in);
+		if (pid != -1) {
+			if (verbose > 3)
+				rprintf(FINFO,"waiting on %d\n",pid);
+			waitpid(pid, &status, 0);
+		}
+		report(-1);
+		exit_cleanup(status);
+	}
+	
+	send_exclude_list(f_out);
+	
+	flist = recv_file_list(f_in);
+	if (!flist || flist->count == 0) {
+		rprintf(FINFO,"nothing to do\n");
+		exit_cleanup(0);
+	}
+	
+	local_name = get_local_name(flist,argv[0]);
+	
+	status2 = do_recv(f_in,f_out,flist,local_name);
+	
+	report(f_in);
+	
+	if (pid != -1) {
+		waitpid(pid, &status, 0);
+	}
+	
+	return status | status2;
+}
+
+
+int start_socket_client(char *host, char *path, int argc, char *argv[])
+{
+	int fd;
+	char *sargs[100];
+	int sargc=0;
+	
+	fd = open_socket_out(host, port);
+	if (fd == -1) {
+		rprintf(FERROR,"failed to connect to %s - %s\n", host, strerror(errno));
+		exit_cleanup(1);
+	}
+	
+	server_options(sargs,&sargc);
+
+	sargs[sargc++] = ".";
+
+	if (path && *path) 
+		sargs[sargc++] = path;
+
+	sargs[sargc] = NULL;
+
+	return client_run(fd, fd, -1, argc, argv);
 }
 
 int start_client(int argc, char *argv[])
@@ -441,14 +515,16 @@ int start_client(int argc, char *argv[])
 	char *shell_machine = NULL;
 	char *shell_path = NULL;
 	char *shell_user = NULL;
-	int pid, status = 0, status2 = 0;
+	int pid;
 	int f_in,f_out;
-	struct file_list *flist;
-	char *local_name = NULL;
 
 	p = strchr(argv[0],':');
 
 	if (p) {
+		if (p[1] == ':') {
+			*p = 0;
+			return start_socket_client(argv[0], p+2, argc-1, argv+1);
+		}
 		am_sender = 0;
 		*p = 0;
 		shell_machine = argv[0];
@@ -457,12 +533,15 @@ int start_client(int argc, char *argv[])
 		argv++;
 	} else {
 		am_sender = 1;
-		
+
 		p = strchr(argv[argc-1],':');
 		if (!p) {
 			local_server = 1;
+		} else if (p[1] == ':') {
+			*p = 0;
+			return start_socket_client(argv[argc-1], p+2, argc-1, argv);
 		}
-
+		
 		if (local_server) {
 			shell_machine = NULL;
 			shell_path = argv[argc-1];
@@ -484,7 +563,7 @@ int start_client(int argc, char *argv[])
 	}
 
 	if (verbose > 3) {
-		fprintf(FINFO,"cmd=%s machine=%s user=%s path=%s\n",
+		rprintf(FINFO,"cmd=%s machine=%s user=%s path=%s\n",
 			shell_cmd?shell_cmd:"",
 			shell_machine?shell_machine:"",
 			shell_user?shell_user:"",
@@ -498,103 +577,65 @@ int start_client(int argc, char *argv[])
 	
 	pid = do_cmd(shell_cmd,shell_machine,shell_user,shell_path,&f_in,&f_out);
 	
-	setup_protocol(f_out,f_in);
-	
 #if HAVE_SETLINEBUF
-	setlinebuf(FINFO);
-	setlinebuf(FERROR);
+	setlinebuf(stdout);
+	setlinebuf(stderr);
 #endif
-	
-	if (verbose > 3) 
-		fprintf(FINFO,"parent=%d child=%d sender=%d recurse=%d\n",
-			(int)getpid(),pid,am_sender,recurse);
-	
-	if (am_sender) {
-		if (cvs_exclude)
-			add_cvs_excludes();
-		if (delete_mode) 
-			send_exclude_list(f_out);
-		flist = send_file_list(f_out,argc,argv);
-		if (verbose > 3) 
-			fprintf(FINFO,"file list sent\n");
-		send_files(flist,f_out,f_in);
-		if (verbose > 3)
-			fprintf(FINFO,"waiting on %d\n",pid);
-		waitpid(pid, &status, 0);
-		report(-1);
-		exit_cleanup(status);
-	}
-	
-	send_exclude_list(f_out);
-	
-	flist = recv_file_list(f_in);
-	if (!flist || flist->count == 0) {
-		fprintf(FINFO,"nothing to do\n");
-		exit_cleanup(0);
-	}
-	
-	local_name = get_local_name(flist,argv[0]);
-	
-	status2 = do_recv(f_in,f_out,flist,local_name);
-	
-	report(f_in);
-	
-	waitpid(pid, &status, 0);
-	
-	return status | status2;
+
+	return client_run(f_in, f_out, pid, argc, argv);
 }
 
 
-static void usage(FILE *f)
+static void usage(int F)
 {
-  fprintf(f,"rsync version %s Copyright Andrew Tridgell and Paul Mackerras\n\n",
+  rprintf(F,"rsync version %s Copyright Andrew Tridgell and Paul Mackerras\n\n",
 	  VERSION);
-  fprintf(f,"Usage:\t%s [options] src user@host:dest\nOR",RSYNC_NAME);
-  fprintf(f,"\t%s [options] user@host:src dest\n\n",RSYNC_NAME);
-  fprintf(f,"Options:\n");
-  fprintf(f,"-v, --verbose            increase verbosity\n");
-  fprintf(f,"-c, --checksum           always checksum\n");
-  fprintf(f,"-a, --archive            archive mode (same as -rlptDog)\n");
-  fprintf(f,"-r, --recursive          recurse into directories\n");
-  fprintf(f,"-R, --relative           use relative path names\n");
-  fprintf(f,"-b, --backup             make backups (default ~ extension)\n");
-  fprintf(f,"-u, --update             update only (don't overwrite newer files)\n");
-  fprintf(f,"-l, --links              preserve soft links\n");
-  fprintf(f,"-L, --copy-links         treat soft links like regular files\n");
-  fprintf(f,"-H, --hard-links         preserve hard links\n");
-  fprintf(f,"-p, --perms              preserve permissions\n");
-  fprintf(f,"-o, --owner              preserve owner (root only)\n");
-  fprintf(f,"-g, --group              preserve group\n");
-  fprintf(f,"-D, --devices            preserve devices (root only)\n");
-  fprintf(f,"-t, --times              preserve times\n");  
-  fprintf(f,"-S, --sparse             handle sparse files efficiently\n");
-  fprintf(f,"-n, --dry-run            show what would have been transferred\n");
-  fprintf(f,"-W, --whole-file         copy whole files, no incremental checks\n");
-  fprintf(f,"-x, --one-file-system    don't cross filesystem boundaries\n");
-  fprintf(f,"-B, --block-size SIZE    checksum blocking size\n");  
-  fprintf(f,"-e, --rsh COMMAND        specify rsh replacement\n");
-  fprintf(f,"    --rsync-path PATH    specify path to rsync on the remote machine\n");
-  fprintf(f,"-C, --cvs-exclude        auto ignore files in the same way CVS does\n");
-  fprintf(f,"    --delete             delete files that don't exist on the sending side\n");
-  fprintf(f,"    --force              force deletion of directories even if not empty\n");
-  fprintf(f,"    --numeric-ids        don't map uid/gid values by user/group name\n");
-  fprintf(f,"    --timeout TIME       set IO timeout in seconds\n");
-  fprintf(f,"-I, --ignore-times       don't exclude files that match length and time\n");
-  fprintf(f,"-T  --temp-dir DIR       create temporary files in directory DIR\n");
-  fprintf(f,"-z, --compress           compress file data\n");
-  fprintf(f,"    --exclude FILE       exclude file FILE\n");
-  fprintf(f,"    --exclude-from FILE  exclude files listed in FILE\n");
-  fprintf(f,"    --suffix SUFFIX      override backup suffix\n");  
-  fprintf(f,"    --version            print version number\n");  
+  rprintf(F,"Usage:\t%s [options] src user@host:dest\nOR",RSYNC_NAME);
+  rprintf(F,"\t%s [options] user@host:src dest\n\n",RSYNC_NAME);
+  rprintf(F,"Options:\n");
+  rprintf(F,"-v, --verbose            increase verbosity\n");
+  rprintf(F,"-c, --checksum           always checksum\n");
+  rprintf(F,"-a, --archive            archive mode (same as -rlptDog)\n");
+  rprintf(F,"-r, --recursive          recurse into directories\n");
+  rprintf(F,"-R, --relative           use relative path names\n");
+  rprintf(F,"-b, --backup             make backups (default ~ extension)\n");
+  rprintf(F,"-u, --update             update only (don't overwrite newer files)\n");
+  rprintf(F,"-l, --links              preserve soft links\n");
+  rprintf(F,"-L, --copy-links         treat soft links like regular files\n");
+  rprintf(F,"-H, --hard-links         preserve hard links\n");
+  rprintf(F,"-p, --perms              preserve permissions\n");
+  rprintf(F,"-o, --owner              preserve owner (root only)\n");
+  rprintf(F,"-g, --group              preserve group\n");
+  rprintf(F,"-D, --devices            preserve devices (root only)\n");
+  rprintf(F,"-t, --times              preserve times\n");  
+  rprintf(F,"-S, --sparse             handle sparse files efficiently\n");
+  rprintf(F,"-n, --dry-run            show what would have been transferred\n");
+  rprintf(F,"-W, --whole-file         copy whole files, no incremental checks\n");
+  rprintf(F,"-x, --one-file-system    don't cross filesystem boundaries\n");
+  rprintf(F,"-B, --block-size SIZE    checksum blocking size\n");  
+  rprintf(F,"-e, --rsh COMMAND        specify rsh replacement\n");
+  rprintf(F,"    --rsync-path PATH    specify path to rsync on the remote machine\n");
+  rprintf(F,"-C, --cvs-exclude        auto ignore files in the same way CVS does\n");
+  rprintf(F,"    --delete             delete files that don't exist on the sending side\n");
+  rprintf(F,"    --force              force deletion of directories even if not empty\n");
+  rprintf(F,"    --numeric-ids        don't map uid/gid values by user/group name\n");
+  rprintf(F,"    --timeout TIME       set IO timeout in seconds\n");
+  rprintf(F,"-I, --ignore-times       don't exclude files that match length and time\n");
+  rprintf(F,"-T  --temp-dir DIR       create temporary files in directory DIR\n");
+  rprintf(F,"-z, --compress           compress file data\n");
+  rprintf(F,"    --exclude FILE       exclude file FILE\n");
+  rprintf(F,"    --exclude-from FILE  exclude files listed in FILE\n");
+  rprintf(F,"    --suffix SUFFIX      override backup suffix\n");  
+  rprintf(F,"    --version            print version number\n");  
 
-  fprintf(f,"\n");
-  fprintf(f,"the backup suffix defaults to %s\n",BACKUP_SUFFIX);
-  fprintf(f,"the block size defaults to %d\n",BLOCK_SIZE);  
+  rprintf(F,"\n");
+  rprintf(F,"the backup suffix defaults to %s\n",BACKUP_SUFFIX);
+  rprintf(F,"the block size defaults to %d\n",BLOCK_SIZE);  
 }
 
 enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
       OPT_EXCLUDE_FROM,OPT_DELETE,OPT_NUMERIC_IDS,OPT_RSYNC_PATH,
-      OPT_FORCE,OPT_TIMEOUT};
+      OPT_FORCE,OPT_TIMEOUT,OPT_DAEMON};
 
 static char *short_options = "oblLWHpguDCtcahvrRIxnSe:B:T:z";
 
@@ -636,6 +677,7 @@ static struct option long_options[] = {
   {"timeout",     1,     0,    OPT_TIMEOUT},
   {"temp-dir",    1,     0,    'T'},
   {"compress",	  0,	 0,    'z'},
+  {"daemon",      0,     0,    OPT_DAEMON},
   {0,0,0,0}};
 
 RETSIGTYPE sigusr1_handler(int val) {
@@ -734,7 +776,7 @@ static void parse_arguments(int argc, char *argv[])
 #if SUPPORT_HARD_LINKS
 	  preserve_hard_links=1;
 #else 
-	  fprintf(FERROR,"ERROR: hard links not supported on this platform\n");
+	  rprintf(FERROR,"ERROR: hard links not supported on this platform\n");
 	  exit_cleanup(1);
 #endif
 	  break;
@@ -821,8 +863,12 @@ static void parse_arguments(int argc, char *argv[])
 	  do_compression = 1;
 	  break;
 
+	case OPT_DAEMON:
+		am_daemon = 1;
+		break;
+
 	default:
-	  /* fprintf(FERROR,"bad option -%c\n",opt); */
+	  /* rprintf(FERROR,"bad option -%c\n",opt); */
 	  exit_cleanup(1);
 	}
     }
@@ -858,13 +904,13 @@ int main(int argc,char *argv[])
 
 #ifndef SUPPORT_LINKS
     if (!am_server && preserve_links) {
-	    fprintf(FERROR,"ERROR: symbolic links not supported\n");
+	    rprintf(FERROR,"ERROR: symbolic links not supported\n");
 	    exit_cleanup(1);
     }
 #endif
 
     if (am_server) {
-	    start_server(argc, argv);
+	    start_server(STDIN_FILENO, STDOUT_FILENO, argc, argv);
     }
 
     if (argc < 2) {

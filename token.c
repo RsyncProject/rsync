@@ -117,7 +117,7 @@ send_deflated_token(int f, int token,
 	    tx_strm.zfree = z_free;
 	    if (deflateInit2(&tx_strm, Z_DEFAULT_COMPRESSION, 8,
 			     -15, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
-		fprintf(FERROR, "compression init failed\n");
+		rprintf(FERROR, "compression init failed\n");
 		exit_cleanup(1);
 	    }
 	    if ((obuf = malloc(MAX_DATA_COUNT+2)) == NULL)
@@ -168,7 +168,7 @@ send_deflated_token(int f, int token,
 	    }
 	    r = deflate(&tx_strm, nb? Z_NO_FLUSH: Z_PACKET_FLUSH);
 	    if (r != Z_OK) {
-		fprintf(FERROR, "deflate returned %d\n", r);
+		rprintf(FERROR, "deflate returned %d\n", r);
 		exit_cleanup(1);
 	    }
 	    if (nb == 0 || tx_strm.avail_out == 0) {
@@ -191,7 +191,7 @@ send_deflated_token(int f, int token,
 	tx_strm.avail_out = 2 * toklen;
 	r = deflate(&tx_strm, Z_INSERT_ONLY);
 	if (r != Z_OK || tx_strm.avail_in != 0) {
-	    fprintf(FERROR, "deflate on token returned %d (%d bytes left)\n",
+	    rprintf(FERROR, "deflate on token returned %d (%d bytes left)\n",
 		    r, tx_strm.avail_in);
 	    exit_cleanup(1);
 	}
@@ -231,7 +231,7 @@ recv_deflated_token(int f, char **data)
 		rx_strm.zalloc = z_alloc;
 		rx_strm.zfree = z_free;
 		if (inflateInit2(&rx_strm, -15) != Z_OK) {
-		    fprintf(FERROR, "inflate init failed\n");
+		    rprintf(FERROR, "inflate init failed\n");
 		    exit_cleanup(1);
 		}
 		if ((cbuf = malloc(MAX_DATA_COUNT)) == NULL
@@ -268,7 +268,7 @@ recv_deflated_token(int f, char **data)
 		r = inflate(&rx_strm, Z_PACKET_FLUSH);
 		n = CHUNK_SIZE - rx_strm.avail_out;
 		if (r != Z_OK) {
-		    fprintf(FERROR, "inflate flush returned %d (%d bytes)\n",
+		    rprintf(FERROR, "inflate flush returned %d (%d bytes)\n",
 			    r, n);
 		    exit_cleanup(1);
 		}
@@ -308,7 +308,7 @@ recv_deflated_token(int f, char **data)
 	    r = inflate(&rx_strm, Z_NO_FLUSH);
 	    n = CHUNK_SIZE - rx_strm.avail_out;
 	    if (r != Z_OK) {
-		fprintf(FERROR, "inflate returned %d (%d bytes)\n", r, n);
+		rprintf(FERROR, "inflate returned %d (%d bytes)\n", r, n);
 		exit_cleanup(1);
 	    }
 	    if (rx_strm.avail_in == 0)
@@ -341,7 +341,7 @@ see_deflate_token(char *buf, int len)
     rx_strm.avail_in = len;
     r = inflateIncomp(&rx_strm);
     if (r != Z_OK) {
-	fprintf(FERROR, "inflateIncomp returned %d\n", r);
+	rprintf(FERROR, "inflateIncomp returned %d\n", r);
 	exit_cleanup(1);
     }
 }

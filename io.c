@@ -113,7 +113,7 @@ static void check_timeout(void)
 	t = time(NULL);
 
 	if (last_io && io_timeout && (t-last_io)>io_timeout) {
-		fprintf(FERROR,"read timeout after %d second - exiting\n", 
+		rprintf(FERROR,"read timeout after %d second - exiting\n", 
 			(int)(t-last_io));
 		exit_cleanup(1);
 	}
@@ -170,7 +170,7 @@ int32 read_int(int f)
   char b[4];
   if ((ret=readfd(f,b,4)) != 4) {
     if (verbose > 1) 
-      fprintf(FERROR,"(%d) Error reading %d bytes : %s\n",
+      rprintf(FERROR,"(%d) Error reading %d bytes : %s\n",
 	      getpid(),4,ret==-1?strerror(errno):"EOF");
     exit_cleanup(1);
   }
@@ -188,13 +188,13 @@ int64 read_longint(int f)
 	if ((int32)ret != (int32)0xffffffff) return ret;
 
 #ifdef NO_INT64
-	fprintf(FERROR,"Integer overflow - attempted 64 bit offset\n");
+	rprintf(FERROR,"Integer overflow - attempted 64 bit offset\n");
 	exit_cleanup(1);
 #else
 	if (remote_version >= 16) {
 		if ((ret=readfd(f,b,8)) != 8) {
 			if (verbose > 1) 
-				fprintf(FERROR,"(%d) Error reading %d bytes : %s\n",
+				rprintf(FERROR,"(%d) Error reading %d bytes : %s\n",
 					getpid(),8,ret==-1?strerror(errno):"EOF");
 			exit_cleanup(1);
 		}
@@ -211,7 +211,7 @@ void read_buf(int f,char *buf,int len)
   int ret;
   if ((ret=readfd(f,buf,len)) != len) {
     if (verbose > 1) 
-      fprintf(FERROR,"(%d) Error reading %d bytes : %s\n",
+      rprintf(FERROR,"(%d) Error reading %d bytes : %s\n",
 	      getpid(),len,ret==-1?strerror(errno):"EOF");
     exit_cleanup(1);
   }
@@ -324,7 +324,7 @@ static int writefd(int fd,char *buf,int len)
 	       systems it seems (eg. IRIX) */
 	    u_sleep(1000);
 #if 0
-	    fprintf(FERROR,"write exception\n");
+	    rprintf(FERROR,"write exception\n");
 	    exit_cleanup(1);
 #endif
     }
@@ -351,7 +351,7 @@ static int writefd(int fd,char *buf,int len)
 		     &w_fds,NULL,&tv);
       if (count == -1 && errno != EINTR) {
 	      if (verbose > 1) 
-		      fprintf(FERROR,"select error: %s\n", strerror(errno));
+		      rprintf(FERROR,"select error: %s\n", strerror(errno));
 	      exit_cleanup(1);
       }
 
@@ -382,7 +382,7 @@ void write_int(int f,int32 x)
   char b[4];
   SIVAL(b,0,x);
   if ((ret=writefd(f,b,4)) != 4) {
-    fprintf(FERROR,"write_int failed : %s\n",
+    rprintf(FERROR,"write_int failed : %s\n",
 	    ret==-1?strerror(errno):"EOF");
     exit_cleanup(1);
   }
@@ -405,7 +405,7 @@ void write_longint(int f, int64 x)
 	SIVAL(b,4,((x>>32)&0xFFFFFFFF));
 
 	if ((ret=writefd(f,b,8)) != 8) {
-		fprintf(FERROR,"write_longint failed : %s\n",
+		rprintf(FERROR,"write_longint failed : %s\n",
 			ret==-1?strerror(errno):"EOF");
 		exit_cleanup(1);
 	}
@@ -416,7 +416,7 @@ void write_buf(int f,char *buf,int len)
 {
   int ret;
   if ((ret=writefd(f,buf,len)) != len) {
-    fprintf(FERROR,"write_buf failed : %s\n",
+    rprintf(FERROR,"write_buf failed : %s\n",
 	    ret==-1?strerror(errno):"EOF");
     exit_cleanup(1);
   }

@@ -43,6 +43,8 @@
 #define MIN_PROTOCOL_VERSION 11
 #define MAX_PROTOCOL_VERSION 30
 
+#define RSYNC_PORT 873
+
 #define SPARSE_WRITE_SIZE (1024)
 #define WRITE_SIZE (32*1024)
 #define CHUNK_SIZE (32*1024)
@@ -50,8 +52,8 @@
 
 #define BLOCKING_TIMEOUT 10
 
-#define FERROR stderr
-#define FINFO (am_server?stderr:stdout)
+#define FERROR 1
+#define FINFO 2
 
 #include "config.h"
 
@@ -166,6 +168,8 @@
 /* these are needed for the uid/gid mapping code */
 #include <pwd.h>
 #include <grp.h>
+
+#include <stdarg.h>
 
 #ifndef S_IFLNK
 #define S_IFLNK  0120000

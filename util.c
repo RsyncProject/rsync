@@ -89,7 +89,7 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 
   if (do_lseek(map->fd,offset,SEEK_SET) != offset ||
       (nread=read(map->fd,map->p,len)) != len) {
-	  fprintf(FERROR,"EOF in map_ptr! (offset=%d len=%d nread=%d errno=%d)\n",
+	  rprintf(FERROR,"EOF in map_ptr! (offset=%d len=%d nread=%d errno=%d)\n",
 		  (int)offset, len, nread, errno);
 	  exit_cleanup(1);
   }
@@ -121,14 +121,14 @@ int piped_child(char **command,int *f_in,int *f_out)
 
   if (pipe(to_child_pipe) < 0 ||
       pipe(from_child_pipe) < 0) {
-    fprintf(FERROR,"pipe: %s\n",strerror(errno));
+    rprintf(FERROR,"pipe: %s\n",strerror(errno));
     exit_cleanup(1);
   }
 
 
   pid = do_fork();
   if (pid < 0) {
-    fprintf(FERROR,"fork: %s\n",strerror(errno));
+    rprintf(FERROR,"fork: %s\n",strerror(errno));
     exit_cleanup(1);
   }
 
@@ -139,21 +139,21 @@ int piped_child(char **command,int *f_in,int *f_out)
 	  close(to_child_pipe[1]) < 0 ||
 	  close(from_child_pipe[0]) < 0 ||
 	  dup2(from_child_pipe[1], STDOUT_FILENO) < 0) {
-	fprintf(FERROR,"Failed to dup/close : %s\n",strerror(errno));
+	rprintf(FERROR,"Failed to dup/close : %s\n",strerror(errno));
 	exit_cleanup(1);
       }
       if (to_child_pipe[0] != STDIN_FILENO) close(to_child_pipe[0]);
       if (from_child_pipe[1] != STDOUT_FILENO) close(from_child_pipe[1]);
       umask(orig_umask);
       execvp(command[0], command);
-      fprintf(FERROR,"Failed to exec %s : %s\n",
+      rprintf(FERROR,"Failed to exec %s : %s\n",
 	      command[0],strerror(errno));
       exit_cleanup(1);
     }
 
   if (close(from_child_pipe[1]) < 0 ||
       close(to_child_pipe[0]) < 0) {
-    fprintf(FERROR,"Failed to close : %s\n",strerror(errno));   
+    rprintf(FERROR,"Failed to close : %s\n",strerror(errno));   
     exit_cleanup(1);
   }
 
@@ -171,14 +171,14 @@ int local_child(int argc, char **argv,int *f_in,int *f_out)
 
 	if (pipe(to_child_pipe) < 0 ||
 	    pipe(from_child_pipe) < 0) {
-		fprintf(FERROR,"pipe: %s\n",strerror(errno));
+		rprintf(FERROR,"pipe: %s\n",strerror(errno));
 		exit_cleanup(1);
 	}
 
 
 	pid = do_fork();
 	if (pid < 0) {
-		fprintf(FERROR,"fork: %s\n",strerror(errno));
+		rprintf(FERROR,"fork: %s\n",strerror(errno));
 		exit_cleanup(1);
 	}
 
@@ -193,17 +193,17 @@ int local_child(int argc, char **argv,int *f_in,int *f_out)
 		    close(to_child_pipe[1]) < 0 ||
 		    close(from_child_pipe[0]) < 0 ||
 		    dup2(from_child_pipe[1], STDOUT_FILENO) < 0) {
-			fprintf(FERROR,"Failed to dup/close : %s\n",strerror(errno));
+			rprintf(FERROR,"Failed to dup/close : %s\n",strerror(errno));
 			exit_cleanup(1);
 		}
 		if (to_child_pipe[0] != STDIN_FILENO) close(to_child_pipe[0]);
 		if (from_child_pipe[1] != STDOUT_FILENO) close(from_child_pipe[1]);
-		start_server(argc, argv);
+		start_server(STDIN_FILENO, STDOUT_FILENO, argc, argv);
 	}
 
 	if (close(from_child_pipe[1]) < 0 ||
 	    close(to_child_pipe[0]) < 0) {
-		fprintf(FERROR,"Failed to close : %s\n",strerror(errno));   
+		rprintf(FERROR,"Failed to close : %s\n",strerror(errno));   
 		exit_cleanup(1);
 	}
 
@@ -217,13 +217,13 @@ int local_child(int argc, char **argv,int *f_in,int *f_out)
 
 void out_of_memory(char *str)
 {
-  fprintf(FERROR,"ERROR: out of memory in %s\n",str);
+  rprintf(FERROR,"ERROR: out of memory in %s\n",str);
   exit_cleanup(1);
 }
 
 void overflow(char *str)
 {
-  fprintf(FERROR,"ERROR: buffer overflow in %s\n",str);
+  rprintf(FERROR,"ERROR: buffer overflow in %s\n",str);
   exit_cleanup(1);
 }
 
@@ -370,20 +370,20 @@ int copy_file(char *source, char *dest, mode_t mode)
 
 	ifd = open(source, O_RDONLY);
 	if (ifd == -1) {
-		fprintf(FERROR,"open %s: %s\n",
+		rprintf(FERROR,"open %s: %s\n",
 			source,strerror(errno));
 		return -1;
 	}
 
 	if (do_unlink(dest) && errno != ENOENT) {
-		fprintf(FERROR,"unlink %s: %s\n",
+		rprintf(FERROR,"unlink %s: %s\n",
 			dest,strerror(errno));
 		return -1;
 	}
 
 	ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode);
 	if (ofd < 0) {
-		fprintf(FERROR,"open %s: %s\n",
+		rprintf(FERROR,"open %s: %s\n",
 			dest,strerror(errno));
 		close(ifd);
 		return -1;
@@ -391,7 +391,7 @@ int copy_file(char *source, char *dest, mode_t mode)
 
 	while ((len = safe_read(ifd, buf, sizeof(buf))) > 0) {
 		if (full_write(ofd, buf, len) < 0) {
-			fprintf(FERROR,"write %s: %s\n",
+			rprintf(FERROR,"write %s: %s\n",
 				dest,strerror(errno));
 			close(ifd);
 			close(ofd);
@@ -403,7 +403,7 @@ int copy_file(char *source, char *dest, mode_t mode)
 	close(ofd);
 
 	if (len < 0) {
-		fprintf(FERROR,"read %s: %s\n",
+		rprintf(FERROR,"read %s: %s\n",
 			source,strerror(errno));
 		return -1;
 	}
@@ -444,4 +444,60 @@ void kill_all(int sig)
 		if (all_pids[i] != getpid())
 			kill(all_pids[i], sig);
 	}
+}
+
+/* this is the rsync debugging function. Call it with FINFO or FERROR */
+void rprintf(int fd, const char *format, ...)
+{
+	va_list ap;  
+	char buf[1024];
+	int len;
+	FILE *f=NULL;
+
+	va_start(ap, format);
+
+#if HAVE_VSNPRINTF
+	len = vsnprintf(buf, sizeof(buf)-1, format, ap);
+#else
+	len = vsprintf(buf, format, ap);
+#endif
+	va_end(ap);
+
+	if (len < 0) exit_cleanup(1);
+
+	if (fd == FERROR) {
+		f = stderr;
+	} 
+
+	if (fd == FINFO) {
+		extern int am_server;
+		if (am_server) 
+			f = stderr;
+		else
+			f = stdout;
+	} 
+
+	if (!f) exit_cleanup(1);
+
+	if (fwrite(buf, len, 1, f) != 1) exit_cleanup(1);
+}
+
+void rflush(int fd)
+{
+	FILE *f = NULL;
+
+	if (fd == FERROR) {
+		f = stderr;
+	} 
+
+	if (fd == FINFO) {
+		extern int am_server;
+		if (am_server) 
+			f = stderr;
+		else
+			f = stdout;
+	} 
+
+	if (!f) exit_cleanup(1);
+	fflush(f);
 }

@@ -19,7 +19,6 @@
 
 #include "rsync.h"
 
-extern int am_server;
 extern int dry_run;
 extern int verbose;
 
@@ -113,7 +112,7 @@ static void hard_link_one(int i)
 	if (link_stat(f_name(&hlink_list[i]),&st2) != 0) {
 		if (do_link(f_name(&hlink_list[i-1]),f_name(&hlink_list[i])) != 0) {
 			if (verbose > 0)
-				fprintf(FINFO,"link %s => %s : %s\n",
+				rprintf(FINFO,"link %s => %s : %s\n",
 					f_name(&hlink_list[i]),
 					f_name(&hlink_list[i-1]),strerror(errno));
 			return;
@@ -124,14 +123,14 @@ static void hard_link_one(int i)
 		if (do_unlink(f_name(&hlink_list[i])) != 0 ||
 		    do_link(f_name(&hlink_list[i-1]),f_name(&hlink_list[i])) != 0) {
 			if (verbose > 0)
-				fprintf(FINFO,"link %s => %s : %s\n",
+				rprintf(FINFO,"link %s => %s : %s\n",
 					f_name(&hlink_list[i]),
 					f_name(&hlink_list[i-1]),strerror(errno));
 			return;
 		}
 	}
 	if (verbose > 0)
-		fprintf(FINFO,"%s => %s\n",
+		rprintf(FINFO,"%s => %s\n",
 			f_name(&hlink_list[i]),f_name(&hlink_list[i-1]));
 }
 #endif
