@@ -406,8 +406,8 @@ int read_filesfrom_line(int fd, char *fname)
 	}
 	*s = '\0';
 
-	/* Dump comments. */
-	if (*fname == '#' || *fname == ';')
+	/* Dump comments if reading locally. */
+	if (!reading_remotely && (*fname == '#' || *fname == ';'))
 		goto start;
 
 	return s - fname;
