@@ -397,7 +397,7 @@ gid = nobody nl()
 use chroot = no nl()
 max connections = 4 nl()
 syslog facility = local5 nl()
-pid file = /etc/rsyncd.pid
+pid file = /var/run/rsyncd.pid
 
 verb([ftp]
         path = /var/ftp/pub
