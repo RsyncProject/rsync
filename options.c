@@ -143,6 +143,7 @@ int verbose = 0;
 int quiet = 0;
 int itemize_changes = 0;
 int log_before_transfer = 0;
+int log_format_has_i = 0;
 int log_format_has_o_or_i = 0;
 int always_checksum = 0;
 int list_only = 0;
@@ -540,8 +541,7 @@ static void set_refuse_options(char *bp)
 			if (!op->longName && !*shortname)
 				break;
 			if ((op->longName && wildmatch(bp, op->longName))
-			    || (*shortname && wildmatch(bp, shortname))
-			    || op->val == OPT_DAEMON) {
+			    || (*shortname && wildmatch(bp, shortname))) {
 				if (op->argInfo == POPT_ARG_VAL)
 					op->argInfo = POPT_ARG_NONE;
 				op->val = (op - long_options) + OPT_REFUSED_BASE;
@@ -576,6 +576,17 @@ static void set_refuse_options(char *bp)
 			break;
 		*cp = ' ';
 		bp = cp + 1;
+	}
+
+	for (op = long_options; ; op++) {
+		*shortname = op->shortName;
+		if (!op->longName && !*shortname)
+			break;
+		if (op->val == OPT_DAEMON) {
+			if (op->argInfo == POPT_ARG_VAL)
+				op->argInfo = POPT_ARG_NONE;
+			op->val = (op - long_options) + OPT_REFUSED_BASE;
+		}
 	}
 }
 
@@ -1058,14 +1069,13 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 	if (log_format) {
 		if (strstr(log_format, "%i") != NULL)
-			itemize_changes = 1;
-		else
-			itemize_changes = 0;
+			log_format_has_i = 1;
 		if (strstr(log_format, "%b") == NULL
 		 && strstr(log_format, "%c") == NULL)
 			log_before_transfer = !am_server;
 	} else if (itemize_changes) {
 		log_format = "%i %n%L";
+		log_format_has_i = 1;
 		log_before_transfer = !am_server;
 	}
 
@@ -1077,7 +1087,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		log_format = "%n%L";
 		log_before_transfer = !am_server;
 	}
-	if (itemize_changes || (log_format && strstr(log_format, "%o") != NULL))
+	if (log_format_has_i
+	    || (log_format && strstr(log_format, "%o") != NULL))
 		log_format_has_o_or_i = 1;
 
 	if (daemon_bwlimit && (!bwlimit || bwlimit > daemon_bwlimit))
@@ -1229,8 +1240,6 @@ void server_options(char **args,int *argc)
 	 * default for remote transfers, and in any case old versions
 	 * of rsync will not understand it. */
 
-	if (itemize_changes && am_sender)
-		argstr[x++] = 'i';
 	if (preserve_hard_links)
 		argstr[x++] = 'H';
 	if (preserve_uid)
@@ -1278,8 +1287,10 @@ void server_options(char **args,int *argc)
 
 	/* The server side doesn't use our log-format, but in certain
 	 * circumstances they need to know a little about the option. */
-	if (log_format && am_sender && !itemize_changes) {
-		if (log_format_has_o_or_i)
+	if (log_format && am_sender) {
+		if (log_format_has_i)
+			args[ac++] = "--log-format=%i";
+		else if (log_format_has_o_or_i)
 			args[ac++] = "--log-format=%o";
 		else if (!verbose)
 			args[ac++] = "--log-format=X";
