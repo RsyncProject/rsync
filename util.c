@@ -240,10 +240,18 @@ void overflow(char *str)
 
 
 
-int set_modtime(char *fname,time_t modtime)
+int set_modtime(char *fname, time_t modtime)
 {
 	extern int dry_run;
-	if (dry_run) return 0;
+	if (dry_run)
+		return 0;
+
+	if (verbose > 2) {
+		rprintf(FINFO, "set modtime of %s to (%ld) %s",
+			fname, (long) modtime,
+			asctime(localtime(&modtime)));
+	}
+	
 	{
 #ifdef HAVE_UTIMBUF
 		struct utimbuf tbuf;  
