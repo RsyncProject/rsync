@@ -1,6 +1,7 @@
 /* -*- c-file-style: "linux"; -*-
    
-   Copyright (C) 1998-2000 by Andrew Tridgell
+   Copyright (C) 1998-2001 by Andrew Tridgell <tridge@samba.org>
+   Copyright (C) 2001 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -27,7 +28,6 @@ extern int verbose;
 extern int rsync_port;
 char *auth_user;
 int sanitize_paths = 0;
-
 
 /*
  * Run a client connected to an rsyncd.  The alternative to this
@@ -315,7 +315,8 @@ static int rsync_module(int fd, int i)
 		}
 	}
 
-	ret = parse_arguments(argc, argv, 0);
+        argp = argv;
+	ret = parse_arguments(&argc, (const char ***) &argp, 0);
 
 	if (request) {
 		if (*auth_user) {
@@ -330,22 +331,27 @@ static int rsync_module(int fd, int i)
 		free(request);
 	}
 
-#if !TRIDGE
+#ifndef DEBUG
 	/* don't allow the logs to be flooded too fast */
 	if (verbose > 1) verbose = 1;
 #endif
-
-	argc -= optind;
-	argp = argv + optind;
-	optind = 0;
 
 	if (remote_version < 23) {
 		if (remote_version == 22 || (remote_version > 17 && am_sender))
 			io_start_multiplex_out(fd);
 	}
+        
+        /* For later protocol versions, we don't start multiplexing
+         * until we've configured nonblocking in start_server.  That
+         * means we're in a sticky situation now: there's no way to
+         * convey errors to the client. */
 
+        /* FIXME: Hold off on reporting option processing errors until
+         * we've set up nonblocking and multiplexed IO and can get the
+         * message back to them. */
 	if (!ret) {
-		option_error();
+                option_error();
+                exit_cleanup(RERR_UNSUPPORTED);
 	}
 
 	if (lp_timeout(i)) {
@@ -470,7 +476,10 @@ int daemon_main(void)
 
 	log_init();
 
-	rprintf(FINFO,"rsyncd version %s starting\n",VERSION);
+	rprintf(FINFO, "rsyncd version %s starting, listening on port %d\n", VERSION,
+                rsync_port);
+        /* TODO: If listening on a particular address, then show that
+         * address too. */
 
 	if (((pid_file = lp_pid_file()) != NULL) && (*pid_file != '\0')) {
 		char pidbuf[16];
