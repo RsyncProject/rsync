@@ -26,27 +26,26 @@ extern int do_compression;
 /* non-compressing recv token */
 static int simple_recv_token(int f,char **data)
 {
-  static int residue;
-  static char *buf;
-  int n;
+	static int residue;
+	static char *buf;
+	int n;
 
-  if (!buf) {
-    buf = (char *)malloc(CHUNK_SIZE);
-    if (!buf) out_of_memory("simple_recv_token");
-  }
+	if (!buf) {
+		buf = (char *)malloc(CHUNK_SIZE);
+		if (!buf) out_of_memory("simple_recv_token");
+	}
 
+	if (residue == 0) {
+		int i = read_int(f);
+		if (i <= 0) return i;
+		residue = i;
+	}
 
-  if (residue == 0) {
-    int i = read_int(f);
-    if (i <= 0) return i;
-    residue = i;
-  }
-
-  *data = buf;
-  n = MIN(CHUNK_SIZE,residue);
-  residue -= n;
-  read_buf(f,buf,n);
-  return n;
+	*data = buf;
+	n = MIN(CHUNK_SIZE,residue);
+	residue -= n;
+	read_buf(f,buf,n);
+	return n;
 }
 
 
@@ -54,16 +53,16 @@ static int simple_recv_token(int f,char **data)
 static void simple_send_token(int f,int token,
 			      struct map_struct *buf,int offset,int n)
 {
-  if (n > 0) {
-    int l = 0;
-    while (l < n) {
-      int n1 = MIN(CHUNK_SIZE,n-l);
-      write_int(f,n1);
-      write_buf(f,map_ptr(buf,offset+l,n1),n1);
-      l += n1;
-    }
-  }
-  write_int(f,-(token+1));
+	if (n > 0) {
+		int l = 0;
+		while (l < n) {
+			int n1 = MIN(CHUNK_SIZE,n-l);
+			write_int(f,n1);
+			write_buf(f,map_ptr(buf,offset+l,n1),n1);
+			l += n1;
+		}
+	}
+	write_int(f,-(token+1));
 }
 
 
