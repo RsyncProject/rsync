@@ -97,8 +97,10 @@
 
 
 #ifndef HAVE_STRLCPY
-/* like strncpy but does not 0 fill the buffer and always null 
-   terminates. bufsize is the size of the destination buffer */
+/* Like strncpy but does not 0 fill the buffer and always null 
+ * terminates. bufsize is the size of the destination buffer.
+ *
+ * Returns the index of the terminating byte. */
  size_t strlcpy(char *d, const char *s, size_t bufsize)
 {
 	size_t len = strlen(s);
