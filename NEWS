@@ -82,6 +82,14 @@ Changes since 2.6.0:
     * Fixed compilation problem on Tru64 Unix (having to do with
       sockaddr.sa_len and sockaddr.sin_len).
 
+    * Fixed a compatibility problem interacting with older rsync
+      versions that might send us an empty suffix without telling us
+      about the backup-dir.
+
+    * The "hosts allow" option for a daemon-over-remote-shell
+      process now has improved support for IPv6 addresses and a fix
+      for systems that have a length field in their socket structs.
+
   INTERNAL:
 
     * Most of the I/O is now buffered, which results in a pretty
