@@ -1,5 +1,6 @@
 /* 
    Copyright (C) Andrew Tridgell 1998
+   Copyright (C) 2002 by Martin Pool
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -16,9 +17,12 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-/*
-  syscall wrappers to ensure that nothing gets done in dry_run mode
-  */
+/**
+ * @file syscall.c
+ *
+ * Syscall wrappers to ensure that nothing gets done in dry_run mode
+ * and to handle system peculiarities.
+ **/
 
 #include "rsync.h"
 
@@ -106,12 +110,23 @@ int do_rename(char *fname1, char *fname2)
 	return rename(fname1, fname2);
 }
 
+
 int do_mkdir(char *fname, mode_t mode)
 {
-	if (dry_run) return 0;
-	CHECK_RO
+	int l;
+	if (dry_run)
+		return 0;
+	CHECK_RO;
+	
+	/* Some BSD systems cannot make a directory if the name
+	 * contains a trailing slash.
+	 * <http://www.opensource.apple.com/bugs/X/BSD%20Kernel/2734739.html> */
+	if ((l = strlen(fname))  &&  (fname[l-1] == '/'))
+		fname[l-1] = '/';
+	
 	return mkdir(fname, mode);
 }
+
 
 /* like mkstemp but forces permissions */
 int do_mkstemp(char *template, mode_t perms)

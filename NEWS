@@ -20,6 +20,9 @@ rsync 2.5.3 (not released yet)
     * Fix for rsync server processes hanging around after the client
       unexpectedly disconnects.  (Colin Walters) (Debian bug #128632)
 
+    * Cope with BSD systems on which mkdir() will not accept a trailing
+      slash.
+
   ENHANCEMENTS:
 
     * Command to initiate connections is only shown with -vv, rather
