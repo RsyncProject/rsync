@@ -558,10 +558,11 @@ static void glob_expand_one(char *s, char **argv, int *argc, int maxargs)
 #endif
 }
 
-void glob_expand(char *base, char **argv, int *argc, int maxargs)
+void glob_expand(char *base1, char **argv, int *argc, int maxargs)
 {
 	char *s = argv[*argc];
 	char *p, *q;
+	char *base = base1;
 
 	if (!s || !*s) return;
 
@@ -572,21 +573,23 @@ void glob_expand(char *base, char **argv, int *argc, int maxargs)
 	s = strdup(s);
 	if (!s) out_of_memory("glob_expand");
 
+	base = (char *)malloc(strlen(base1)+3);
+	if (!base) out_of_memory("glob_expand");
+
+	sprintf(base," %s/", base1);
+
 	q = s;
 	while ((p = strstr(q,base)) && ((*argc) < maxargs)) {
-		if (p != q && *(p-1) == ' ' && p[strlen(base)] == '/') {
-			/* split it at this point */
-			*(p-1) = 0;
-			glob_expand_one(q, argv, argc, maxargs);
-			q = p+strlen(base)+1;
-		} else {
-			q++;
-		}
+		/* split it at this point */
+		*p = 0;
+		glob_expand_one(q, argv, argc, maxargs);
+		q = p+strlen(base);
 	}
 
 	if (*q && (*argc < maxargs)) glob_expand_one(q, argv, argc, maxargs);
 
 	free(s);
+	free(base);
 }
 
 /*******************************************************************

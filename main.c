@@ -43,6 +43,8 @@ static void report(int f)
 
 	if (!verbose) return;
 
+	if (am_server && !am_sender) return;
+
 	if (am_server && am_sender) {
 		write_longint(f,read_total());
 		write_longint(f,write_total());
@@ -235,7 +237,6 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	int status=0;
 	int recv_pipe[2];
 	extern int preserve_hard_links;
-	extern int am_server;
 
 	if (preserve_hard_links)
 		init_hard_links(flist);
@@ -252,8 +253,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		if (f_in != f_out) close(f_out);
 
 		recv_files(f_in,flist,local_name,recv_pipe[1]);
-		if (!am_server)
-			report(f_in);
+		report(f_in);
 
 		if (verbose > 3)
 			rprintf(FINFO,"do_recv waiting on %d\n",pid);
