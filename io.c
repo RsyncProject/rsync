@@ -423,10 +423,16 @@ void write_buf(int f,char *buf,int len)
   total_written += len;
 }
 
+/* write a string to the connection */
+void write_sbuf(int f,char *buf)
+{
+	write_buf(f, buf, strlen(buf));
+}
+
 
 void write_byte(int f,unsigned char c)
 {
-  write_buf(f,(char *)&c,1);
+	write_buf(f,(char *)&c,1);
 }
 
 void write_flush(int f)
@@ -434,3 +440,43 @@ void write_flush(int f)
 }
 
 
+int read_line(int f, char *buf, int maxlen)
+{
+	while (maxlen) {
+		read_buf(f, buf, 1);
+		if (buf[0] == '\n') {
+			buf[0] = 0;
+			break;
+		}
+		if (buf[0] != '\r') {
+			buf++;
+			maxlen--;
+		}
+	}
+	if (maxlen == 0) {
+		*buf = 0;
+		return 0;
+	}
+	return 1;
+}
+
+
+void io_printf(int fd, const char *format, ...)
+{
+	va_list ap;  
+	char buf[1024];
+	int len;
+	
+	va_start(ap, format);
+
+#if HAVE_VSNPRINTF
+	len = vsnprintf(buf, sizeof(buf)-1, format, ap);
+#else
+	len = vsprintf(buf, format, ap);
+#endif
+	va_end(ap);
+
+	if (len < 0) exit_cleanup(1);
+
+	write_sbuf(fd, buf);
+}

@@ -23,16 +23,21 @@
 #include "rsync.h"
 
 extern int dry_run;
+extern int read_only;
+
+#define CHECK_RO if (read_only) {errno = EROFS; return -1;}
 
 int do_unlink(char *fname)
 {
 	if (dry_run) return 0;
+	CHECK_RO
 	return unlink(fname);
 }
 
 int do_symlink(char *fname1, char *fname2)
 {
 	if (dry_run) return 0;
+	CHECK_RO
 	return symlink(fname1, fname2);
 }
 
@@ -40,6 +45,7 @@ int do_symlink(char *fname1, char *fname2)
 int do_link(char *fname1, char *fname2)
 {
 	if (dry_run) return 0;
+	CHECK_RO
 	return link(fname1, fname2);
 }
 #endif
@@ -47,6 +53,7 @@ int do_link(char *fname1, char *fname2)
 int do_lchown(const char *path, uid_t owner, gid_t group)
 {
 	if (dry_run) return 0;
+	CHECK_RO
 	return lchown(path, owner, group);
 }
 
@@ -54,6 +61,7 @@ int do_lchown(const char *path, uid_t owner, gid_t group)
 int do_mknod(char *pathname, mode_t mode, dev_t dev)
 {
 	if (dry_run) return 0;
+	CHECK_RO
 	return mknod(pathname, mode, dev);
 }
 #endif
@@ -61,12 +69,14 @@ int do_mknod(char *pathname, mode_t mode, dev_t dev)
 int do_rmdir(char *pathname)
 {
 	if (dry_run) return 0;
+	CHECK_RO
 	return rmdir(pathname);
 }
 
 int do_open(char *pathname, int flags, mode_t mode)
 {
 	if (dry_run) return -1;
+	CHECK_RO
 	return open(pathname, flags, mode);
 }
 
@@ -74,6 +84,7 @@ int do_open(char *pathname, int flags, mode_t mode)
 int do_chmod(const char *path, mode_t mode)
 {
 	if (dry_run) return 0;
+	CHECK_RO
 	return chmod(path, mode);
 }
 #endif
@@ -81,18 +92,21 @@ int do_chmod(const char *path, mode_t mode)
 int do_rename(char *fname1, char *fname2)
 {
 	if (dry_run) return 0;
+	CHECK_RO
 	return rename(fname1, fname2);
 }
 
 int do_mkdir(char *fname, mode_t mode)
 {
 	if (dry_run) return 0;
+	CHECK_RO
 	return mkdir(fname, mode);
 }
 
 char *do_mktemp(char *template)
 {
 	if (dry_run) return NULL;
+	if (read_only) {errno = EROFS; return NULL;}
 	return mktemp(template);
 }
 

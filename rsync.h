@@ -21,6 +21,9 @@
 #define RSYNC_RSH_ENV "RSYNC_RSH"
 
 #define RSYNC_NAME "rsync"
+#define RSYNCD_CONF "/etc/rsyncd.conf"
+#define RSYNCD_LOG "/var/adm/rsyncd.log"
+
 #define BACKUP_SUFFIX "~"
 
 /* a non-zero CHAR_OFFSET makes the rolling sum stronger, but is
@@ -49,6 +52,8 @@
 #define WRITE_SIZE (32*1024)
 #define CHUNK_SIZE (32*1024)
 #define MAX_MAP_SIZE (4*1024*1024)
+
+#define MAX_ARGS 100
 
 #define BLOCKING_TIMEOUT 10
 
@@ -170,6 +175,9 @@
 #include <grp.h>
 
 #include <stdarg.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
 
 #ifndef S_IFLNK
 #define S_IFLNK  0120000
@@ -178,6 +186,8 @@
 #ifndef S_ISLNK
 #define S_ISLNK(mode) (((mode) & S_IFLNK) == S_IFLNK)
 #endif
+
+#define BOOL int
 
 #ifndef uchar
 #define uchar unsigned char

@@ -21,7 +21,7 @@
 
 int verbose = 0;
 int always_checksum = 0;
-time_t starttime;
+time_t starttime = 0;
 int64 total_size = 0;
 int block_size=BLOCK_SIZE;
 
@@ -57,6 +57,9 @@ int numeric_ids = 0;
 int force_delete = 0;
 int io_timeout = 0;
 int io_error = 0;
+int read_only = 0;
+static int module_id;
+
 static int port = RSYNC_PORT;
 
 static char *shell_cmd;
@@ -64,9 +67,9 @@ static char *shell_cmd;
 extern int csum_length;
 
 int am_server = 0;
-int am_sender;
+int am_sender=0;
 int recurse = 0;
-int am_daemon;
+int am_daemon=0;
 
 static void usage(int fd);
 
@@ -335,12 +338,24 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 		  argv[i] += l+1;
   }
 
+  if (am_daemon) {
+	  char *name = lp_name(module_id);
+	  int l = strlen(name);
+	  for (i=0;i<argc;i++) {
+		  if (strncmp(argv[i], name, l) == 0) {
+			  argv[i] += l;
+			  if (!*argv[i]) argv[i] = ".";
+		  }
+	  }
+  }
+
   if (argc == 0 && recurse) {
 	  argc=1;
 	  argv--;
 	  argv[0] = ".";
   }
-    
+
+  rprintf(FINFO,"sending file list\n");
 
   flist = send_file_list(f_out,argc,argv);
   send_files(flist,f_out,f_in);
@@ -389,11 +404,23 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
   if (verbose > 2)
     rprintf(FINFO,"server_recv(%d) starting pid=%d\n",argc,(int)getpid());
 
+  if (am_daemon) {
+	  char *name = lp_name(module_id);
+	  int i, l = strlen(name);
+	  for (i=0;i<argc;i++) {
+		  if (strncmp(argv[i], name, l) == 0) {
+			  argv[i] += l;
+			  if (!*argv[i]) argv[i] = ".";
+		  }
+		  rprintf(FINFO,"argv[%d]=%s\n", i, argv[i]);
+	  }
+  }
+
   if (argc > 0) {
 	  dir = argv[0];
 	  argc--;
 	  argv++;
-	  if (chdir(dir) != 0) {
+	  if (!am_daemon && chdir(dir) != 0) {
 		  rprintf(FERROR,"chdir %s : %s (4)\n",
 			  dir,strerror(errno));
 		  exit_cleanup(1);
@@ -487,13 +514,15 @@ static int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 
 int start_socket_client(char *host, char *path, int argc, char *argv[])
 {
-	int fd;
-	char *sargs[100];
+	int fd, i;
+	char *sargs[MAX_ARGS];
 	int sargc=0;
-	
+	char line[1024];
+	char *p;
+	int version;
+
 	fd = open_socket_out(host, port);
 	if (fd == -1) {
-		rprintf(FERROR,"failed to connect to %s - %s\n", host, strerror(errno));
 		exit_cleanup(1);
 	}
 	
@@ -505,6 +534,41 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 		sargs[sargc++] = path;
 
 	sargs[sargc] = NULL;
+
+	p = strchr(path,'/');
+	if (p) *p = 0;
+	io_printf(fd,"%s\n",path);
+	if (p) *p = '/';
+
+	if (!read_line(fd, line, sizeof(line)-1)) {
+		return -1;
+	}
+
+	if (sscanf(line,"RSYNCD %d", &version) != 1) {
+		return -1;
+	}
+
+	while (1) {
+		if (!read_line(fd, line, sizeof(line)-1)) {
+			return -1;
+		}
+		if (strcmp(line,"RSYNCD: OK") == 0) break;
+		rprintf(FINFO,"%s\n", line);
+	}
+
+	for (i=0;i<sargc;i++) {
+		io_printf(fd,"%s\n", sargs[i]);
+	}
+	io_printf(fd,"\n");
+
+#if 0
+	while (1) {
+		if (!read_line(fd, line, sizeof(line)-1)) {
+			return -1;
+		}
+		rprintf(FINFO,"%s\n", line);
+	}
+#endif
 
 	return client_run(fd, fd, -1, argc, argv);
 }
@@ -874,6 +938,161 @@ static void parse_arguments(int argc, char *argv[])
     }
 }
 
+static int rsync_module(int fd, int i)
+{
+	int argc=0;
+	char *argv[MAX_ARGS];
+	char **argp;
+	char line[1024];
+
+	module_id = i;
+
+	if (lp_read_only(i))
+		read_only = 1;
+
+	rprintf(FERROR,"rsyncd starting\n");
+
+	if (chroot(lp_path(i))) {
+		io_printf(fd,"ERROR: chroot failed\n");
+		return -1;
+	}
+
+	if (chdir("/")) {
+		io_printf(fd,"ERROR: chdir failed\n");
+		return -1;
+	}
+
+	if (setgid(lp_gid(i))) {
+		io_printf(fd,"ERROR: setgid failed\n");
+		return -1;
+	}
+
+	if (setuid(lp_uid(i))) {
+		io_printf(fd,"ERROR: setuid failed\n");
+		return -1;
+	}
+
+	io_printf(fd,"RSYNCD: OK\n");
+
+	argv[argc++] = "rsyncd";
+
+	while (1) {
+		if (!read_line(fd, line, sizeof(line)-1)) {
+			return -1;
+		}
+
+		if (!*line) break;
+
+		argv[argc] = strdup(line);
+		if (!argv[argc]) {
+			return -1;
+		}
+
+		argc++;
+		if (argc == MAX_ARGS) {
+			return -1;
+		}
+	}
+
+	parse_arguments(argc, argv);
+
+	/* don't allow the logs to be flooded too fast */
+	if (verbose > 1) verbose = 1;
+
+	argc -= optind;
+	argp = argv + optind;
+	optind = 0;
+
+	start_server(fd, fd, argc, argp);
+
+	return 0;
+}
+
+static void send_listing(int fd)
+{
+	int n = lp_numservices();
+	int i;
+	
+	for (i=0;i<n;i++)
+		if (lp_list(i))
+		    io_printf(fd, "%-15s\t%s\n", lp_name(i), lp_comment(i));
+}
+
+/* this is called when a socket connection is established to a client
+   and we want to start talking. The setup of the system is done from
+   here */
+static int start_daemon(int fd)
+{
+	char line[1024];
+	char *motd;
+
+	set_socket_options(fd,"SO_KEEPALIVE");
+
+	io_printf(fd,"RSYNCD %d\n", PROTOCOL_VERSION);
+
+	motd = lp_motd_file();
+	if (*motd) {
+		FILE *f = fopen(motd,"r");
+		while (f && !feof(f)) {
+			int len = fread(line, 1, sizeof(line)-1, f);
+			if (len > 0) {
+				line[len] = 0;
+				io_printf(fd,"%s", line);
+			}
+		}
+		if (f) fclose(f);
+		io_printf(fd,"\n");
+	}
+
+	/* read a single line indicating the resource that is wanted */
+	while (1) {
+		int i;
+
+		line[0] = 0;
+		if (!read_line(fd, line, sizeof(line)-1)) {
+			return -1;
+		}
+
+		if (!*line || strcmp(line,"#list")==0) {
+			send_listing(fd);
+			return -1;
+		} 
+
+		if (*line == '#') {
+			/* it's some sort of command that I don't understand */
+			io_printf(fd,"ERROR: Unknown command '%s'\n", line);
+			return -1;
+		}
+
+		i = lp_number(line);
+		if (i == -1) {
+			io_printf(fd,"ERROR: Unknown module '%s'\n", line);
+			return -1;
+		}
+
+		return rsync_module(fd, i);
+	}
+
+	return 0;
+}
+
+
+static int daemon_main(void)
+{
+	if (!lp_load(RSYNCD_CONF)) {
+		exit_cleanup(1);
+	}
+
+	if (is_a_socket(STDIN_FILENO)) {
+		/* we are running via inetd */
+		return start_daemon(STDIN_FILENO);
+	}
+
+	become_daemon();
+
+	return start_accept_loop(port, start_daemon);
+}
+
 int main(int argc,char *argv[])
 {
 
@@ -888,16 +1107,18 @@ int main(int argc,char *argv[])
 
     parse_arguments(argc, argv);
 
-    while (optind) {
-      argc--;
-      argv++;
-      optind--;
-    }
+    argc -= optind;
+    argv += optind;
+    optind = 0;
 
     signal(SIGCHLD,SIG_IGN);
     signal(SIGINT,SIGNAL_CAST sig_int);
     signal(SIGPIPE,SIGNAL_CAST sig_int);
     signal(SIGHUP,SIGNAL_CAST sig_int);
+
+    if (am_daemon) {
+	    return daemon_main();
+    }
 
     if (dry_run)
       verbose = MAX(verbose,1);

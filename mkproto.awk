@@ -19,6 +19,41 @@ BEGIN {
   }
 }
 
+/^FN_LOCAL_BOOL/ {
+  split($0,a,"[,()]")
+  printf "BOOL %s(int );\n", a[2]
+}
+
+/^FN_LOCAL_STRING/ {
+  split($0,a,"[,()]")
+  printf "char *%s(int );\n", a[2]
+}
+
+/^FN_LOCAL_INT/ {
+  split($0,a,"[,()]")
+  printf "int %s(int );\n", a[2]
+}
+
+/^FN_LOCAL_CHAR/ {
+  split($0,a,"[,()]")
+  printf "char %s(int );\n", a[2]
+}
+
+/^FN_GLOBAL_BOOL/ {
+  split($0,a,"[,()]")
+  printf "BOOL %s(void);\n", a[2]
+}
+
+/^FN_GLOBAL_STRING/ {
+  split($0,a,"[,()]")
+  printf "char *%s(void);\n", a[2]
+}
+
+/^FN_GLOBAL_INT/ {
+  split($0,a,"[,()]")
+  printf "int %s(void);\n", a[2]
+}
+
 /^static|^extern/ || !/^[a-zA-Z]/ || /[;]/ {
   next;
 }
