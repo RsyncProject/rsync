@@ -30,7 +30,9 @@ OBJS=$(OBJS1) $(OBJS2) $(DAEMON_OBJ) $(LIBOBJ)
 .c.o:
 	$(CC) -I. -I$(srcdir) $(CFLAGS) -c $< -o $@
 
-all: rsync rsync.1 rsyncd.conf.5
+all: rsync
+
+man: rsync.1 rsyncd.conf.5
 
 install: all
 	-mkdir -p ${INSTALL_BIN}
@@ -44,12 +46,10 @@ rsync: $(OBJS)
 	$(CC) $(CFLAGS) -o rsync $(OBJS) $(LIBS)
 
 rsync.1: rsync.yo
-	yodl2man rsync.yo
-	mv rsync.man rsync.1
+	yodl2man -o rsync.1 rsync.yo
 
 rsyncd.conf.5: rsyncd.conf.yo
-	yodl2man rsyncd.conf.yo
-	mv rsyncd.conf.man rsyncd.conf.5
+	yodl2man -o rsyncd.conf.5 rsyncd.conf.yo
 
 proto:
 	cat *.c | awk -f mkproto.awk > proto.h

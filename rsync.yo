@@ -450,7 +450,7 @@ times are transferred as unix time_t values
 file permissions, devices etc are transferred as native numerical
 values
 
-see also the comments on the -delete option
+see also the comments on the --delete option
 
 Please report bugs! The rsync bug tracking system is online at
 url(http://samba.anu.edu.au/rsync/)(http://samba.anu.edu.au/rsync/)
