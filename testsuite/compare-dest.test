@@ -11,23 +11,29 @@
 
 set -x
 
-altdir="$tmpdir/alt"
+alt1dir="$tmpdir/alt1"
+alt2dir="$tmpdir/alt2"
 
 # Build some files/dirs/links to copy
 
 hands_setup
 
 # Setup the alt and chk dirs
-$RSYNC -av --include=text --include='*/' --exclude='*' "$fromdir/" "$altdir/"
+$RSYNC -av --include=text --include='*/' --exclude='*' "$fromdir/" "$alt1dir/"
+$RSYNC -av --include=etc-ltr-list --include='*/' --exclude='*' "$fromdir/" "$alt2dir/"
 
 sleep 1
 touch "$fromdir/dir/text"
 
-$RSYNC -av --exclude=/text "$fromdir/" "$chkdir/"
+$RSYNC -av --exclude=/text --exclude=etc-ltr-list "$fromdir/" "$chkdir/"
 
 # Let's do it!
-checkit "$RSYNC -avv --no-whole-file --compare-dest=\"$altdir\" \
+checkit "$RSYNC -avv --no-whole-file \
+    --compare-dest=\"$alt1dir\" --compare-dest=\"$alt2dir\" \
     \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+checkit "$RSYNC -avv --no-whole-file \
+    --copy-dest=\"$alt1dir\" --copy-dest=\"$alt2dir\" \
+    \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
