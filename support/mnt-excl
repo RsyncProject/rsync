@@ -1,0 +1,35 @@
+#!/usr/bin/perl -w
+# This script takes a command-line arg of a source directory
+# that will be passed to rsync, and generates a set of excludes
+# that will exclude all mount points from the list.  This is
+# useful if you have "bind" mounts since the --one-file-system
+# option won't notice the transition to a different spot on
+# the same disk.  For example:
+#
+# mnt-excl /dir | rsync --exclude-from=- ... /dir /dest/
+# mnt-excl /dir/ | rsync --exclude-from=- ... /dir/ /dest/
+#
+# Imagine that /dir/foo is a mount point: the first invocation of
+# mnt-excl would have output /dir/foo, while the second would have
+# output /foo (which are the properly anchored excludes).
+#
+# NOTE:  This script expects /proc/mounts to exist, but could be
+# easily adapted to read /etc/mtab or similar.
+
+use strict;
+use Cwd 'abs_path';
+
+my $dir = shift || '/';
+$dir = abs_path($dir);
+$dir =~ s#([^/]*)$##;
+my $trailing = $1;
+$trailing = '' if $trailing eq '.' || !-d "$dir$trailing";
+$trailing .= '/' if $trailing ne '';
+
+open(IN, '/proc/mounts') or die $!;
+while (<IN>) {
+    $_ = (split)[1];
+    next unless s#^\Q$dir$trailing\E##o && $_ ne '';
+    print "- /$trailing$_\n";
+}
+close IN;
