@@ -801,6 +801,19 @@ static void recv_generator(char *fname, struct file_list *flist,
 		return;
 	}
 
+	if (opt_ignore_existing && statret == 0) {
+		if (verbose > 1)
+			rprintf(FINFO, "%s exists\n", safe_fname(fname));
+		return;
+	}
+
+	if (update_only && statret == 0
+	    && cmp_modtime(st.st_mtime, file->modtime) > 0) {
+		if (verbose > 1)
+			rprintf(FINFO, "%s is newer\n", safe_fname(fname));
+		return;
+	}
+
 	fnamecmp = fname;
 	fnamecmp_type = FNAMECMP_FNAME;
 
@@ -907,19 +920,6 @@ static void recv_generator(char *fname, struct file_list *flist,
 				"recv_generator: failed to stat %s",
 				full_fname(fname));
 		}
-		return;
-	}
-
-	if (opt_ignore_existing && fnamecmp_type == FNAMECMP_FNAME) {
-		if (verbose > 1)
-			rprintf(FINFO, "%s exists\n", safe_fname(fname));
-		return;
-	}
-
-	if (update_only && fnamecmp_type == FNAMECMP_FNAME
-	    && cmp_modtime(st.st_mtime, file->modtime) > 0) {
-		if (verbose > 1)
-			rprintf(FINFO, "%s is newer\n", safe_fname(fname));
 		return;
 	}
 
