@@ -142,7 +142,7 @@ echo "$0 running in `pwd`"
 echo "    rsync_bin=$rsync_bin"
 echo "    srcdir=$srcdir"
 
-testuser=`whoami || echo UNKNOWN`
+testuser=`id -un || whoami || echo UNKNOWN`
 
 echo "    testuser=$testuser"
 echo "    os=`uname -a`"
