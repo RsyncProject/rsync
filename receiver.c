@@ -408,11 +408,11 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 				int see_item = itemizing && (iflags || verbose > 1);
 				if (am_server) {
 					if (am_daemon && !dry_run && see_item)
-						log_recv(file, &stats, iflags);
+						log_item(file, &stats, iflags, NULL);
 				} else if (see_item || iflags & ITEM_UPDATING
 				    || (S_ISDIR(file->mode)
 				     && iflags & ITEM_REPORT_TIME))
-					log_recv(file, &stats, iflags);
+					log_item(file, &stats, iflags, NULL);
 				continue;
 			}
 		} else
@@ -437,7 +437,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 
 		if (dry_run) { /* log the transfer */
 			if (!am_server && log_format)
-				log_recv(file, &stats, iflags);
+				log_item(file, &stats, iflags, NULL);
 			continue;
 		}
 
@@ -581,7 +581,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 
 		/* log the transfer */
 		if (log_before_transfer)
-			log_recv(file, &initial_stats, iflags);
+			log_item(file, &initial_stats, iflags, NULL);
 		else if (!am_server && verbose && do_progress)
 			rprintf(FINFO, "%s\n", safe_fname(fname));
 
@@ -590,7 +590,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 				       fname, fd2, file->length);
 
 		if (!log_before_transfer)
-			log_recv(file, &initial_stats, iflags);
+			log_item(file, &initial_stats, iflags, NULL);
 
 		if (fd1 != -1)
 			close(fd1);

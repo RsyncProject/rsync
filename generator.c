@@ -331,7 +331,7 @@ static void itemize(struct file_struct *file, int statret, STRUCT_STAT *st,
 				write_int(f_out, ndx);
 			write_shortint(f_out, iflags);
 		} else if (ndx >= 0)
-			log_recv(file, &stats, iflags);
+			log_item(file, &stats, iflags, NULL);
 	}
 }
 
