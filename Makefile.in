@@ -91,5 +91,16 @@ finddead:
 
 test: check
 
+
+# There seems to be no standard way to specify some variables as
+# exported from a Makefile apart from listing them like this.
+
+# TODO: These targets both ought to depend on a set of test programs
+# to build, if any.
+
 check:
-	rsync_bin=`pwd`/rsync srcdir="$(srcdir)" testdir=`pwd`/testdir $(srcdir)/testsuite/master.test
+	rsync_bin=./rsync srcdir="$(srcdir)" $(srcdir)/runtests.sh
+
+installcheck:
+	rsync_bin="$(bindir)/rsync" srcdir="$(srcdir)" $(srcdir)/runtests.sh
+
