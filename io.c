@@ -86,7 +86,7 @@ void io_set_error_fd(int fd)
 static void read_error_fd(void)
 {
 	char buf[200];
-	int n;
+	size_t n;
 	int fd = io_error_fd;
 	int tag, len;
 
@@ -103,7 +103,8 @@ static void read_error_fd(void)
 
 	while (len) {
 		n = len;
-		if (n > (sizeof(buf)-1)) n = sizeof(buf)-1;
+		if (n > (sizeof(buf)-1))
+			n = sizeof(buf)-1;
 		read_loop(fd, buf, n);
 		rwrite((enum logcode)tag, buf, n);
 		len -= n;
@@ -310,7 +311,7 @@ static int read_unbuffered(int fd, char *buf, size_t len)
 static void readfd (int fd, char *buffer, size_t N)
 {
 	int  ret;
-	int total=0;  
+	size_t total=0;  
 	
 	while (total < N) {
 		io_flush();
@@ -379,7 +380,7 @@ unsigned char read_byte(int f)
 /* write len bytes to fd */
 static void writefd_unbuffered(int fd,char *buf,size_t len)
 {
-	int total = 0;
+	size_t total = 0;
 	fd_set w_fds, r_fds;
 	int fd_count, count;
 	struct timeval tv;
@@ -426,7 +427,8 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 		}
 
 		if (FD_ISSET(fd, &w_fds)) {
-			int ret, n = len-total;
+			int ret;
+			size_t n = len-total;
 			ret = write(fd,buf+total,n);
 
 			if (ret == -1 && errno == EINTR) {
@@ -488,7 +490,7 @@ void io_start_buffering(int fd)
 static void mplex_write(int fd, enum logcode code, char *buf, size_t len)
 {
 	char buffer[4096];
-	int n = len;
+	size_t n = len;
 
 	SIVAL(buffer, 0, ((MPLEX_BASE + (int)code)<<24) + len);
 
