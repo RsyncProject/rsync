@@ -24,6 +24,8 @@ beg(int n, const char *text, const char *pattern, bool matches, bool same_as_fnm
 #ifdef COMPARE_WITH_FNMATCH
     bool fn_matched;
     int flags = strstr(pattern, "**")? 0 : FNM_PATHNAME;
+#else
+    same_as_fnmatch = 0; /* Get rid of unused-variable compiler warning. */
 #endif
 
     matched = wildmatch(pattern, text);
@@ -50,6 +52,8 @@ end(int n, const char *text, const char *pattern, bool matches, bool same_as_fnm
 #ifdef COMPARE_WITH_FNMATCH
     bool fn_matched = false;
     int flags = strstr(pattern, "**")? 0 : FNM_PATHNAME;
+#else
+    same_as_fnmatch = 0; /* Get rid of unused-variable compiler warning. */
 #endif
 
     if (strncmp(pattern, "**", 2) == 0) {
