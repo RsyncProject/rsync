@@ -93,6 +93,8 @@ char *client_name(int fd)
 	static char name_buf[100];
 	static char port_buf[100];
 	static int initialised;
+	struct sockaddr_storage *ssp;
+	socklen_t ss_len;
 
 	if (initialised) return name_buf;
 
@@ -101,38 +103,47 @@ char *client_name(int fd)
 
 	if (getenv("SSH_CLIENT") != NULL) {
 		/* Look up name of IP address given in $SSH_CLIENT */
-#ifdef INET6
-		int af = AF_INET6;
-		struct sockaddr_in6 sin;
-#else
-		int af = AF_INET;
+		char *addr = client_addr(fd);
 		struct sockaddr_in sin;
-#endif
-		socklen_t sin_len = sizeof sin;
-
-		memset(&sin, 0, sin_len);
-
 #ifdef INET6
-		sin.sin6_family = af;
-		inet_pton(af, client_addr(fd), &sin.sin6_addr.s6_addr);
-#else
-		sin.sin_family = af;
-		inet_pton(af, client_addr(fd), &sin.sin_addr.s_addr);
-#endif
+		int dots = 0;
+		char *p;
+		struct sockaddr_in6 sin6;
 
-		if (!lookup_name(fd, (struct sockaddr_storage *)&sin, sin_len, 
-				name_buf, sizeof name_buf, port_buf, sizeof port_buf))
-			check_name(fd, (struct sockaddr_storage *)&sin, name_buf);
+		for (p = addr; *p && (dots < 3); p++) {
+		    if (*p == '.')
+			dots++;
+		}
+		if (dots > 3) {
+			/* more than 4 parts to IP address, must be ipv6 */
+			ssp = (struct sockaddr_storage *) &sin6;
+			ss_len = sizeof sin6;
+			memset(ssp, 0, ss_len);
+			inet_pton(AF_INET6, addr, &sin6.sin6_addr.s6_addr);
+			sin6.sin6_family = AF_INET6;
+		} else
+#endif
+		{
+			ssp = (struct sockaddr_storage *) &sin;
+			ss_len = sizeof sin;
+			memset(ssp, 0, ss_len);
+			inet_pton(AF_INET, addr, &sin.sin_addr.s_addr);
+			sin.sin_family = AF_INET;
+		}
+
 	} else {
 		struct sockaddr_storage ss;
-		socklen_t ss_len = sizeof ss;
+
+		ss_len = sizeof ss;
+		ssp = &ss;
 
 		client_sockaddr(fd, &ss, &ss_len);
 
-		if (!lookup_name(fd, &ss, ss_len, name_buf, sizeof name_buf, 
-				port_buf, sizeof port_buf))
-			check_name(fd, &ss, name_buf);
 	}
+
+	if (!lookup_name(fd, ssp, ss_len, name_buf, sizeof name_buf, 
+			port_buf, sizeof port_buf))
+		check_name(fd, ssp, name_buf);
 
 	return name_buf;
 }
