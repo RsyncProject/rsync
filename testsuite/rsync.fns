@@ -253,6 +253,8 @@ do
 	fi
    done
 done
+# ok, now get rid of it
+rm "$scratchdir/testlink"
 
 
 if [ "x$TEST_SYMLINK_CMD" = 'x' ]
