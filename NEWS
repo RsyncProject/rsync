@@ -16,6 +16,8 @@ Changes since 2.6.3:
       FIFOs and sockets, and compile-in using mkfifo() and socket() when
       necessary.
 
+    - Fixed an off-by-one error in the handling of --max-delete=N.
+
   ENHANCEMENTS:
 
     - The daemon-mode options were separated from the normal rsync options
