@@ -58,6 +58,7 @@ struct {
 	{ RERR_FILESELECT , "errors selecting input/output files, dirs" },
 	{ RERR_UNSUPPORTED, "requested action not supported" },
 	{ RERR_STARTCLIENT, "error starting client-server protocol" },
+	{ RERR_LOG_FAILURE, "daemon unable to append to log-file" },
 	{ RERR_SOCKETIO   , "error in socket IO" },
 	{ RERR_FILEIO     , "error in file IO" },
 	{ RERR_STREAMIO   , "error in rsync protocol data stream" },
@@ -73,7 +74,7 @@ struct {
 	{ RERR_CMD_KILLED , "remote shell killed" },
 	{ RERR_CMD_RUN    , "remote command could not be run" },
 	{ RERR_CMD_NOTFOUND,"remote command not found" },
-	{ RERR_DEL_LIMIT  , "--max-delete limit stopped deletions" },
+	{ RERR_DEL_LIMIT  , "the --max-delete limit stopped deletions" },
 	{ 0, NULL }
 };
 
@@ -156,7 +157,7 @@ void log_open(void)
 		if (!logfile) {
 			am_daemon = 0; /* avoid trying to log again */
 			rsyserr(FERROR, errno, "fopen() of log-file failed");
-			exit_cleanup(RERR_FILESELECT);
+			exit_cleanup(RERR_LOG_FAILURE);
 		}
 	}
 }
