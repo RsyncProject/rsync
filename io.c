@@ -2,6 +2,7 @@
    
    Copyright (C) 1996-2001 by Andrew Tridgell 
    Copyright (C) Paul Mackerras 1996
+   Copyright (C) 2001 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -28,17 +29,23 @@
 /* if no timeout is specified then use a 60 second select timeout */
 #define SELECT_TIMEOUT 60
 
-extern int bwlimit;
-
 static int io_multiplexing_out;
 static int io_multiplexing_in;
 static int multiplex_in_fd;
 static int multiplex_out_fd;
 static time_t last_io;
-static int eof_error=1;
+static int no_flush;
+
+extern int bwlimit;
 extern int verbose;
 extern int io_timeout;
 extern struct stats stats;
+
+
+/** Ignore EOF errors while reading a module listing if the remote
+    version is 24 or less. */
+int kludge_around_eof = False;
+
 
 static int io_error_fd = -1;
 
@@ -106,9 +113,46 @@ static void read_error_fd(void)
 }
 
 
-static int no_flush;
+static void whine_about_eof (void)
+{
+	/**
+	   It's almost always an error to get an EOF when we're trying
+	   to read from the network, because the protocol is
+	   self-terminating.
+	   
+	   However, there is one unfortunate cases where it is not,
+	   which is rsync <2.4.6 sending a list of modules on a
+	   server, since the list is terminated by closing the socket.
+	   So, for the section of the program where that is a problem
+	   (start_socket_client), kludge_around_eof is True and we
+	   just exit.
+	*/
 
-/*
+	if (kludge_around_eof)
+		exit_cleanup (0);
+	else {
+		rprintf (FERROR,
+			 "%s: connection unexpectedly closed "
+			 "(%.0f bytes read so far)\n",
+			 RSYNC_NAME, (double)stats.total_read);
+	
+		exit_cleanup (RERR_STREAMIO);
+	}
+}
+
+
+static void die_from_readerr (int err)
+{
+	/* this prevents us trying to write errors on a dead socket */
+	io_multiplexing_close();
+				
+	rprintf(FERROR, "%s: read error: %s\n",
+		RSYNC_NAME, strerror (err));
+	exit_cleanup(RERR_STREAMIO);
+}
+
+
+/*!
  * Read from a socket with IO timeout. return the number of bytes
  * read. If no bytes can be read then exit, never return a number <= 0.
  *
@@ -119,13 +163,14 @@ static int no_flush;
  * give a better explanation.  We can tell whether the connection has
  * started by looking e.g. at whether the remote version is known yet.
  */
-static int read_timeout(int fd, char *buf, int len)
+static int read_timeout (int fd, char *buf, int len)
 {
 	int n, ret=0;
 
 	io_flush();
 
 	while (ret == 0) {
+		/* until we manage to read *something* */
 		fd_set fds;
 		struct timeval tv;
 		int fd_count = fd+1;
@@ -165,41 +210,27 @@ static int read_timeout(int fd, char *buf, int len)
 			if (io_timeout)
 				last_io = time(NULL);
 			continue;
+		} else if (n == 0) {
+			whine_about_eof ();
+			return -1; /* doesn't return */
+		} else if (n == -1) {
+			if (errno == EINTR || errno == EWOULDBLOCK ||
+			    errno == EAGAIN) 
+				continue;
+			else
+				die_from_readerr (errno);
 		}
-
-		if (n == -1 && errno == EINTR) {
-			continue;
-		}
-
-		if (n == -1 && 
-		    (errno == EWOULDBLOCK || errno == EAGAIN)) {
-			continue;
-		}
-
-
-		if (n == 0) {
-			if (eof_error) {
-				rprintf(FERROR,
-                                        "%s: connection to server unexpectedly closed"
-                                        " (%.0f bytes read so far)\n",
-                                        RSYNC_NAME, (double)stats.total_read);
-			}
-			exit_cleanup(RERR_STREAMIO);
-		}
-
-		/* this prevents us trying to write errors on a dead socket */
-		io_multiplexing_close();
-
-		rprintf(FERROR,"read error: %s\n", strerror(errno));
-		exit_cleanup(RERR_STREAMIO);
 	}
 
 	return ret;
 }
 
-/* continue trying to read len bytes - don't return until len
-   has been read */
-static void read_loop(int fd, char *buf, int len)
+
+
+
+/*! Continue trying to read len bytes - don't return until len has
+  been read.   */
+static void read_loop (int fd, char *buf, int len)
 {
 	while (len) {
 		int n = read_timeout(fd, buf, len);
@@ -209,16 +240,20 @@ static void read_loop(int fd, char *buf, int len)
 	}
 }
 
-/* read from the file descriptor handling multiplexing - 
-   return number of bytes read
-   never return <= 0 */
+
+/**
+ * Read from the file descriptor handling multiplexing - return number
+ * of bytes read.
+ * 
+ * Never returns <= 0. 
+ */
 static int read_unbuffered(int fd, char *buf, int len)
 {
 	static int remaining;
 	int tag, ret=0;
 	char line[1024];
 
-	if (!io_multiplexing_in || fd != multiplex_in_fd) 
+	if (!io_multiplexing_in || fd != multiplex_in_fd)
 		return read_timeout(fd, buf, len);
 
 	while (ret == 0) {
@@ -230,7 +265,7 @@ static int read_unbuffered(int fd, char *buf, int len)
 			continue;
 		}
 
-		read_loop(fd, line, 4);
+		read_loop (fd, line, 4);
 		tag = IVAL(line, 0);
 
 		remaining = tag & 0xFFFFFF;
@@ -264,7 +299,7 @@ static int read_unbuffered(int fd, char *buf, int len)
 
 /* do a buffered read from fd. don't return until all N bytes
    have been read. If all N can't be read then exit with an error */
-static void readfd(int fd,char *buffer,int N)
+static void readfd (int fd, char *buffer, int N)
 {
 	int  ret;
 	int total=0;  
@@ -272,7 +307,7 @@ static void readfd(int fd,char *buffer,int N)
 	while (total < N) {
 		io_flush();
 
-		ret = read_unbuffered(fd,buffer + total,N-total);
+		ret = read_unbuffered (fd, buffer + total, N-total);
 		total += ret;
 	}
 
@@ -322,14 +357,14 @@ void read_buf(int f,char *buf,int len)
 
 void read_sbuf(int f,char *buf,int len)
 {
-	read_buf(f,buf,len);
+	read_buf (f,buf,len);
 	buf[len] = 0;
 }
 
 unsigned char read_byte(int f)
 {
 	unsigned char c;
-	read_buf(f,(char *)&c,1);
+	read_buf (f, (char *)&c, 1);
 	return c;
 }
 
@@ -560,10 +595,10 @@ void write_byte(int f,unsigned char c)
 	write_buf(f,(char *)&c,1);
 }
 
+
+
 int read_line(int f, char *buf, int maxlen)
 {
-	eof_error = 0;
-
 	while (maxlen) {
 		buf[0] = 0;
 		read_buf(f, buf, 1);
@@ -581,8 +616,6 @@ int read_line(int f, char *buf, int maxlen)
 		*buf = 0;
 		return 0;
 	}
-
-	eof_error = 1;
 
 	return 1;
 }

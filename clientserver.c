@@ -44,7 +44,8 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	extern int am_sender;
 	extern struct in_addr socket_address;
 	extern char *shell_cmd;
-
+	extern int kludge_around_eof;
+	
 	if (argc == 0 && !am_sender) {
 		extern int list_only;
 		list_only = 1;
@@ -107,6 +108,10 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	if (p) *p = '/';
 
 	while (1) {
+		/* Old servers may just drop the connection here,
+		   rather than sending a proper EXIT command.  Yuck. */
+		kludge_around_eof= True;
+
 		if (!read_line(fd, line, sizeof(line)-1)) {
 			return -1;
 		}
@@ -122,6 +127,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 
 		rprintf(FINFO,"%s\n", line);
 	}
+	kludge_around_eof = False;
 
 	for (i=0;i<sargc;i++) {
 		io_printf(fd,"%s\n", sargs[i]);
