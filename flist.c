@@ -53,7 +53,6 @@ extern int preserve_perms;
 extern int preserve_devices;
 extern int preserve_uid;
 extern int preserve_gid;
-extern int preserve_times;
 extern int relative_paths;
 extern int implied_dirs;
 extern int copy_links;
