@@ -1,7 +1,7 @@
 WHAT IS RSYNC?
 --------------
 
-rsync is a replacement for rcp that has many more features.
+rsync is a replacement for scp/rcp that has many more features.
 
 rsync uses the "rsync algorithm" which provides a very fast method for
 bringing remote files into sync. It does this by sending just the
@@ -31,7 +31,7 @@ SETUP
 
 Rsync normally uses ssh or rsh for communication.  It does not need to
 be setuid and requires no special privileges for installation.  You
-must, however, have a working ssh or rsh system. Using ssh is
+must, however, have a working ssh or rsh system.  Using ssh is
 recommended for its security features.
 
 Alternatively, rsync can run in `daemon' mode, listening on a socket.
@@ -102,8 +102,7 @@ recent version of cvs then use the following commands:
 
 	cvs -d :pserver:cvs@pserver.samba.org:/cvsroot co rsync
 
-Look at the cvs documentation, or http://samba.org/cvs.html, for more
-details.
+Look at the cvs documentation for more details.
 
 
 COPYRIGHT
