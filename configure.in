@@ -378,4 +378,4 @@ AC_SUBST(OBJ_RESTORE)
 AC_SUBST(CC_SHOBJ_FLAG)
 AC_SUBST(BUILD_POPT)
 
-AC_OUTPUT(Makefile lib/dummy zlib/dummy shconfig)
+AC_OUTPUT(Makefile lib/dummy zlib/dummy popt/dummy shconfig)
