@@ -331,6 +331,7 @@ verb(
  -g, --group                 preserve group
  -D, --devices               preserve devices (root only)
  -t, --times                 preserve times
+ -O, --omit-dir-times        omit directories when preserving times
  -S, --sparse                handle sparse files efficiently
  -n, --dry-run               show what would have been transferred
  -W, --whole-file            copy whole files, no incremental checks
@@ -637,6 +638,10 @@ modified cannot be effective; in other words, a missing -t or -a will
 cause the next transfer to behave as if it used -I, causing all files to be
 updated (though the rsync algorithm will make the update fairly efficient
 if the files haven't actually changed, you're much better off using -t).
+
+dit(bf(-O, --omit-dir-times)) This tells rsync to omit directories when
+the preserving of modification times is enabled (see --times).  If NFS
+is sharing the files on the receiving end, it is a good idea to use -O.
 
 dit(bf(-n, --dry-run)) This tells rsync to not do any file transfers,
 instead it will just report the actions it would have taken.
