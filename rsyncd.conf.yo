@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsyncd.conf)(5)(24 Nov 1998)()()
+manpage(rsyncd.conf)(5)(25 Nov 1998)()()
 manpagename(rsyncd.conf)(configuration file for rsync server)
 manpagesynopsis()
 
@@ -302,12 +302,12 @@ a 10 minute timeout).
 
 dit(bf(refuse options)) The "refuse options" option allows you to
 specify a space separated list of rsync command line options that will
-be refused by your rsync server. When an option is refused the server
-prints an error message and exits, except for the "compress" option
-in which case the server silently sends all files uncompressed.
-
-The full names of the options must be used (ie. you must use
-"checksum" not "c" to disable checksumming).
+be refused by your rsync server.  The full names of the options must be
+used (i.e., you must use "checksum" not "c" to disable checksumming).  
+When an option is refused, the server prints an error message and exits.
+To prevent all compression, you can use "dont compress = *" (see below)
+instead of "refuse options = compress" to avoid returning an error to a
+client that requests compression.
 
 dit(bf(dont compress)) The "dont compress" option allows you to select
 filenames based on wildcard patterns that should not be compressed
