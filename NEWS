@@ -64,6 +64,8 @@ Changes since 2.6.0:
       rsync no longer attempts to set groups that the user doesn't
       have the permission to set.
 
+    * Fixed the "refuse options" setting in the rsyncd.conf file.
+
   INTERNAL:
 
     * Most of the I/O is now buffered, which results in a pretty
