@@ -246,6 +246,10 @@ enum msgcode {
 # endif
 #endif
 
+#ifdef HAVE_SYS_MKDEV_H
+#include <sys/mkdev.h>
+#endif
+
 #ifdef HAVE_COMPAT_H
 #include <compat.h>
 #endif
