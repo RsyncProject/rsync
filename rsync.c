@@ -240,6 +240,8 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
 		return;
 
 	/* move tmp file over real file */
+	if (verbose > 2)
+		rprintf(FINFO, "renaming %s to %s\n", fnametmp, fname);
 	ret = robust_rename(fnametmp, fname, file->mode & INITACCESSPERMS);
 	if (ret < 0) {
 		rsyserr(FERROR, errno, "%s %s -> \"%s\"",

@@ -474,9 +474,6 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 			exit_cleanup(RERR_FILEIO);
 		}
 
-		if (verbose > 2)
-			rprintf(FINFO,"renaming %s to %s\n",fnametmp,fname);
-
 		if (recv_ok || keep_partial)
 			finish_transfer(fname, fnametmp, file, recv_ok);
 		else
