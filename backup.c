@@ -228,6 +228,7 @@ static int keep_backup(char *fname)
 	if (!kept && !S_ISREG(file->mode)) {
 		rprintf(FINFO, "make_bak: skipping non-regular file %s\n",
 			fname);
+		return 1;
 	}
 
 	/* move to keep tree if a file */
