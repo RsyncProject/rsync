@@ -16,6 +16,11 @@ test_names="rsync-hello hands"
 export rsync_bin
 export testdir
 
+skipped=0
+missing=0
+passed=0
+failed=0
+
 cd "$testdir"
 
 for testbase in $test_names
@@ -24,6 +29,7 @@ do
     if test \! -f "$testscript" 
     then
 	echo "$testscript does not exist" >&2
+	missing=`expr $missing + 1`
 	continue
     fi
 
@@ -33,9 +39,17 @@ do
     if sh $testscript
     then
 	echo "----- $testbase completed succesfully"
+	passed=`expr $passed + 1`
     else
 	echo "----- $testbase failed!"
+	failed=`expr $failed + 1`
     fi	
 done
 
+echo '------------------------------------------------------------'
+echo "----- overall results:"
+echo "      $passed passed"
+echo "      $failed failed"
+echo "      $skipped skipped"
+echo "      $missing missing"
 echo '------------------------------------------------------------'
