@@ -53,7 +53,8 @@ Performance
   Possibly if we did one directory at a time that would be sufficient.
 
   Alternatively we could pre-process the arguments to make sure no
-  duplicates will ever be inserted.  
+  duplicates will ever be inserted.  There could be some bad cases
+  when we're collapsing symlinks.
 
   We could have a hash table.
 
@@ -235,8 +236,6 @@ SIGHUP
   parent exits.
 
 hang/timeout friendliness
-
-  On 
 
 verbose output
   
