@@ -20,12 +20,6 @@
 #define BLOCK_SIZE 700
 #define RSYNC_RSH_ENV "RSYNC_RSH"
 
-#if HAVE_REMSH
-#define RSYNC_RSH "remsh"
-#else
-#define RSYNC_RSH "rsh"
-#endif
-
 #define RSYNC_NAME "rsync"
 #define BACKUP_SUFFIX "~"
 
@@ -60,6 +54,12 @@
 #define FINFO (am_server?stderr:stdout)
 
 #include "config.h"
+
+#if HAVE_REMSH
+#define RSYNC_RSH "remsh"
+#else
+#define RSYNC_RSH "rsh"
+#endif
 
 #include <sys/types.h>
 #ifdef HAVE_UNISTD_H
