@@ -36,6 +36,10 @@ Changes since 2.6.0:
 
     * Fixed "make test" bug when build dir is not the source dir.
 
+    * When using --cvs-exclude, the exclude items we get from a
+      directory's .cvsignore file once again only affect that one
+      directory (and not all following directories too).
+
   INTERNAL:
 
     * Most of the I/O is now buffered, which results in a pretty
