@@ -593,7 +593,7 @@ static int start_client(int argc, char *argv[])
 
 		am_sender = 0;
 		*p = 0;
-		shell_machine = argv[0];
+		shell_machine = argv0;
 		shell_path = p+1;
 		argc--;
 		argv++;
