@@ -123,28 +123,6 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 }
 
 
-static inline char *window_ptr(struct map_struct *buf,int off,int len)
-{
-  static char *p=NULL;
-  static int p_len = 0;
-  static int p_off = 0;  
-
-  if (off == 0) {
-    p_off = 0;
-    p_len = CHUNK_SIZE;
-    p = map_ptr(buf,p_off,p_len);    
-  }
-
-  while (off+len > p_off+p_len) {
-    p_off += CHUNK_SIZE;
-    p_len = CHUNK_SIZE;
-    p = map_ptr(buf,p_off,p_len);  
-  }
-
-  return(p + (off-p_off));
-}
-
-
 static void hash_search(int f,struct sum_struct *s,
 			struct map_struct *buf,off_t len)
 {
@@ -159,7 +137,7 @@ static void hash_search(int f,struct sum_struct *s,
 
   k = MIN(len, s->n);
 
-  map = window_ptr(buf,0,k);
+  map = map_ptr(buf,0,k);
 
   sum = get_checksum1(map, k);
   s1 = sum & 0xFFFF;
@@ -197,7 +175,7 @@ static void hash_search(int f,struct sum_struct *s,
 
 	  if (!done_csum2) {
 	    int l = MIN(s->n,len-offset);
-	    map = window_ptr(buf,offset,l);
+	    map = map_ptr(buf,offset,l);
 	    get_checksum2(map,l,sum2);
 	    done_csum2 = 1;
 	  }
@@ -205,7 +183,7 @@ static void hash_search(int f,struct sum_struct *s,
 	    matched(f,s,buf,len,offset,i);
 	    offset += s->sums[i].len - 1;
 	    k = MIN((len-offset), s->n);
-	    map = window_ptr(buf,offset,k);
+	    map = map_ptr(buf,offset,k);
 	    sum = get_checksum1(map, k);
 	    s1 = sum & 0xFFFF;
 	    s2 = sum >> 16;
@@ -220,7 +198,7 @@ static void hash_search(int f,struct sum_struct *s,
     }
 
     /* Trim off the first byte from the checksum */
-    map = window_ptr(buf,offset,k+1);
+    map = map_ptr(buf,offset,k+1);
     s1 -= map[0] + CHAR_OFFSET;
     s2 -= k * (map[0]+CHAR_OFFSET);
 
@@ -235,7 +213,7 @@ static void hash_search(int f,struct sum_struct *s,
   } while (++offset < end);
 
   matched(f,s,buf,len,len,-1);
-  window_ptr(buf,len-1,1);
+  map_ptr(buf,len-1,1);
 }
 
 
