@@ -39,7 +39,7 @@ extern int cvs_exclude;
 extern int io_error;
 extern char *tmpdir;
 extern char *partial_dir;
-extern char *compare_dest;
+extern char *basis_dir[];
 extern int make_backups;
 extern int do_progress;
 extern char *backup_dir;
@@ -439,7 +439,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		partialptr = partial_dir ? partial_dir_fname(fname) : fname;
 
 		if (f_in_name >= 0) {
-			switch (read_byte(f_in_name)) {
+			uchar j;
+			switch (j = read_byte(f_in_name)) {
 			case FNAMECMP_FNAME:
 				fnamecmp = fname;
 				break;
@@ -449,10 +450,10 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 			case FNAMECMP_BACKUP:
 				fnamecmp = get_backup_name(fname);
 				break;
-			case FNAMECMP_CMPDEST:
+			case FNAMECMP_BASIS_DIR:
 			default:
 				pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
-					 compare_dest, fname);
+					 basis_dir[j], fname);
 				fnamecmp = fnamecmpbuf;
 				break;
 			}
