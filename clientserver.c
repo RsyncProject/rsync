@@ -38,6 +38,11 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	extern int am_sender;
 	extern struct in_addr socket_address;
 
+	if (argc == 0 && !am_sender) {
+		extern int list_only;
+		list_only = 1;
+	}
+
 	if (*path == '/') {
 		rprintf(FERROR,"ERROR: The remote path must start with a module name\n");
 		return -1;

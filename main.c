@@ -349,9 +349,9 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		close(recv_pipe[1]);
 		io_flush();
 		/* finally we go to sleep until our parent kills us
-		   with a USR2 signal. We sleepp for a short time as on
+		   with a USR2 signal. We sleep for a short time as on
 		   some OSes a signal won't interrupt a sleep! */
-		while (1) sleep(1);
+		while (1) msleep(20);
 	}
 
 	close(recv_pipe[1]);
@@ -464,7 +464,6 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 	int status = 0, status2 = 0;
 	char *local_name = NULL;
 	extern int am_sender;
-	extern int list_only;
 	extern int remote_version;
 
 	set_nonblocking(f_in);
@@ -502,7 +501,10 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 		exit_cleanup(status);
 	}
 
-	if (argc == 0) list_only = 1;
+	if (argc == 0) {
+		extern int list_only;
+		list_only = 1;
+	}
 	
 	send_exclude_list(f_out);
 	
@@ -639,6 +641,11 @@ static int start_client(int argc, char *argv[])
 	if (!am_sender && argc > 1) {
 		usage(FERROR);
 		exit_cleanup(RERR_SYNTAX);
+	}
+
+	if (argc == 0 && !am_sender) {
+		extern int list_only;
+		list_only = 1;
 	}
 	
 	pid = do_cmd(shell_cmd,shell_machine,shell_user,shell_path,&f_in,&f_out);
