@@ -27,8 +27,6 @@
 
 #include "rsync.h"
 
-extern struct stats stats;
-
 extern int verbose;
 extern int dry_run;
 extern int list_only;
@@ -59,6 +57,8 @@ extern int copy_unsafe_links;
 extern int protocol_version;
 extern int sanitize_paths;
 extern int orig_umask;
+extern struct stats stats;
+extern struct file_list *the_file_list;
 
 extern char curr_dir[MAXPATHLEN];
 
@@ -70,7 +70,7 @@ dev_t filesystem_dev; /* used to implement -x */
 
 static char empty_sum[MD4_SUM_LENGTH];
 static unsigned int file_struct_len;
-static struct file_list *received_flist, *sorting_flist;
+static struct file_list *sorting_flist;
 
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
 static void output_flist(struct file_list *flist);
@@ -943,7 +943,7 @@ skip_filters:
 		STRUCT_STAT st2;
 		int save_mode = file->mode;
 		file->mode = S_IFDIR; /* find a directory w/our name */
-		if (flist_find(received_flist, file) >= 0
+		if (flist_find(the_file_list, file) >= 0
 		    && do_stat(thisname, &st2) == 0 && S_ISDIR(st2.st_mode)) {
 			file->modtime = st2.st_mtime;
 			file->length = st2.st_size;
@@ -1275,7 +1275,6 @@ struct file_list *recv_file_list(int f)
 	start_read = stats.total_read;
 
 	flist = flist_new(WITH_HLINK, "recv_file_list");
-	received_flist = flist;
 
 	flist->count = 0;
 	flist->malloced = 1000;
