@@ -294,6 +294,8 @@ static int rsync_module(int f_in, int f_out, int i)
 	 * supplementary groups. */
 
 	exclude_path_prefix = use_chroot? "" : lp_path(i);
+	if (*exclude_path_prefix == '/' && !exclude_path_prefix[1])
+		exclude_path_prefix = "";
 
 	p = lp_include_from(i);
 	add_exclude_file(&server_exclude_list, p, MISSING_FATAL, ADD_INCLUDE);
