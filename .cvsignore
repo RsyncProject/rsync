@@ -5,4 +5,5 @@ config.h
 config.log
 config.status
 rsync
+testdir
 zlib/dummy

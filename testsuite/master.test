@@ -17,7 +17,19 @@
 # build scripts.  It might be relative, so we need to make it
 # absolute.
 
+# testdir is a scratch directory for holding temporary test files.
+
 # The pwd is undefined when this script starts.
+
+set -e
+
+if ! [ -d "$testdir" ] && ! mkdir "$testdir"
+then
+    echo "warning: testdir $testdir is not a directory!" >&2
+    exit 1
+fi
+
+testdir=`cd $testdir && pwd`
 
 srcdir=`cd $srcdir && pwd`
 
@@ -25,8 +37,7 @@ echo "============================================================"
 echo "$0 running in `pwd`"
 echo "    rsync_bin=$rsync_bin"
 echo "    srcdir=$srcdir"
-
-set -e
+echo "    testdir=$testdir"
 
 test_names="rsync-hello hands"
 
