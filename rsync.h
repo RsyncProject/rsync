@@ -157,91 +157,108 @@ enum msgcode {
 
 /* The default RSYNC_RSH is always set in config.h. */
 
-#include <sys/types.h>
-
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
 #include <stdio.h>
-#include <stddef.h>
+#if HAVE_SYS_TYPES_H
+# include <sys/types.h>
+#endif
+#if HAVE_SYS_STAT_H
+# include <sys/stat.h>
+#endif
+#if STDC_HEADERS
+# include <stdlib.h>
+# include <stddef.h>
+#else
+# if HAVE_STDLIB_H
+#  include <stdlib.h>
+# endif
+#endif
+#if HAVE_STRING_H
+# if !STDC_HEADERS && HAVE_MEMORY_H
+#  include <memory.h>
+# endif
+# include <string.h>
+#endif
+#if HAVE_STRINGS_H
+# include <strings.h>
+#endif
+#if HAVE_INTTYPES_H
+# include <inttypes.h>
+#else
+# if HAVE_STDINT_H
+#  include <stdint.h>
+# endif
+#endif
+#if HAVE_UNISTD_H
+# include <unistd.h>
+#endif
 
-#ifdef HAVE_SYS_PARAM_H
+#if HAVE_SYS_PARAM_H
 #include <sys/param.h>
 #endif
 
-#ifdef HAVE_STDLIB_H
-#include <stdlib.h>
-#endif
-
-#if defined(HAVE_MALLOC_H) && (defined(HAVE_MALLINFO) || !defined(HAVE_STDLIB_H))
+#if HAVE_MALLOC_H && (HAVE_MALLINFO || !HAVE_STDLIB_H)
 #include <malloc.h>
 #endif
 
-#ifdef HAVE_SYS_SOCKET_H
+#if HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
 #endif
 
-#ifdef HAVE_STRING_H
-#include <string.h>
-#endif
-
-#ifdef TIME_WITH_SYS_TIME
+#if TIME_WITH_SYS_TIME
 #include <sys/time.h>
 #include <time.h>
 #else
-#ifdef HAVE_SYS_TIME_H
+#if HAVE_SYS_TIME_H
 #include <sys/time.h>
 #else
 #include <time.h>
 #endif
 #endif
 
-#ifdef HAVE_FCNTL_H
+#if HAVE_FCNTL_H
 #include <fcntl.h>
 #else
-#ifdef HAVE_SYS_FCNTL_H
+#if HAVE_SYS_FCNTL_H
 #include <sys/fcntl.h>
 #endif
 #endif
 
-#include <sys/stat.h>
-
-#ifdef HAVE_SYS_IOCTL_H
+#if HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
 
-#ifdef HAVE_SYS_FILIO_H
+#if HAVE_SYS_FILIO_H
 #include <sys/filio.h>
 #endif
 
 #include <signal.h>
-#ifdef HAVE_SYS_WAIT_H
+#if HAVE_SYS_WAIT_H
 #include <sys/wait.h>
 #endif
-#ifdef HAVE_CTYPE_H
+#if HAVE_CTYPE_H
 #include <ctype.h>
 #endif
-#ifdef HAVE_GRP_H
+#if HAVE_GRP_H
 #include <grp.h>
 #endif
 #include <errno.h>
 
-#ifdef HAVE_UTIME_H
+#if HAVE_UTIME_H
 #include <utime.h>
 #endif
 
-#ifdef HAVE_SYS_SELECT_H
+#if HAVE_SYS_SELECT_H
 #include <sys/select.h>
 #endif
 
-#ifdef HAVE_SYS_MODE_H
+#if HAVE_SYS_MODE_H
 /* apparently AIX needs this for S_ISLNK */
 #ifndef S_ISLNK
 #include <sys/mode.h>
 #endif
 #endif
 
-#ifdef HAVE_GLOB_H
+#if HAVE_GLOB_H
 #include <glob.h>
 #endif
 
@@ -280,7 +297,7 @@ enum msgcode {
 #include <sys/sysmacros.h>
 #endif
 
-#ifdef HAVE_COMPAT_H
+#if HAVE_COMPAT_H
 #include <compat.h>
 #endif
 
@@ -589,20 +606,20 @@ static inline int flist_up(struct file_list *flist, int i)
 #include "proto.h"
 
 /* We have replacement versions of these if they're missing. */
-#ifndef HAVE_ASPRINTF
+#if !HAVE_ASPRINTF
 int asprintf(char **ptr, const char *format, ...);
 #endif
 
-#ifndef HAVE_VASPRINTF
+#if !HAVE_VASPRINTF
 int vasprintf(char **ptr, const char *format, va_list ap);
 #endif
 
-#if !defined(HAVE_VSNPRINTF) || !defined(HAVE_C99_VSNPRINTF)
+#if !HAVE_VSNPRINTF || !HAVE_C99_VSNPRINTF
 #define vsnprintf rsync_vsnprintf
 int vsnprintf(char *str, size_t count, const char *fmt, va_list args);
 #endif
 
-#if !defined(HAVE_SNPRINTF) || !defined(HAVE_C99_VSNPRINTF)
+#if !HAVE_SNPRINTF || !HAVE_C99_VSNPRINTF
 #define snprintf rsync_snprintf
 int snprintf(char *str,size_t count,const char *fmt,...);
 #endif
@@ -613,12 +630,12 @@ extern char *sys_errlist[];
 #define strerror(i) sys_errlist[i]
 #endif
 
-#ifndef HAVE_STRCHR
+#if !HAVE_STRCHR
 # define strchr                 index
 # define strrchr                rindex
 #endif
 
-#ifndef HAVE_ERRNO_DECL
+#if !HAVE_ERRNO_DECL
 extern int errno;
 #endif
 
@@ -756,7 +773,7 @@ void rsyserr(enum logcode, int, const char *, ...)
      __attribute__((format (printf, 3, 4)))
      ;
 
-#ifdef REPLACE_INET_NTOA
+#if REPLACE_INET_NTOA
 #define inet_ntoa rep_inet_ntoa
 #endif
 
@@ -765,11 +782,11 @@ void rsyserr(enum logcode, int, const char *, ...)
 #define O_BINARY 0
 #endif
 
-#ifndef HAVE_STRLCPY
+#if !HAVE_STRLCPY
 size_t strlcpy(char *d, const char *s, size_t bufsize);
 #endif
 
-#ifndef HAVE_STRLCAT
+#if !HAVE_STRLCAT
 size_t strlcat(char *d, const char *s, size_t bufsize);
 #endif
 
@@ -779,13 +796,13 @@ size_t strlcat(char *d, const char *s, size_t bufsize);
 
 #define exit_cleanup(code) _exit_cleanup(code, __FILE__, __LINE__)
 
-#ifdef HAVE_GETEUID
+#if HAVE_GETEUID
 #define MY_UID() geteuid()
 #else
 #define MY_UID() getuid()
 #endif
 
-#ifdef HAVE_GETEGID
+#if HAVE_GETEGID
 #define MY_GID() getegid()
 #else
 #define MY_GID() getgid()
@@ -793,11 +810,11 @@ size_t strlcat(char *d, const char *s, size_t bufsize);
 
 extern int verbose;
 
-#ifndef HAVE_INET_NTOP
+#if !HAVE_INET_NTOP
 const char *inet_ntop(int af, const void *src, char *dst, size_t size);
 #endif /* !HAVE_INET_NTOP */
 
-#ifndef HAVE_INET_PTON
+#if !HAVE_INET_PTON
 int inet_pton(int af, const char *src, void *dst);
 #endif
 
