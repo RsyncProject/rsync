@@ -420,6 +420,15 @@ information on what files are being skipped and slightly more
 information at the end. More than two bf(-v) flags should only be used if
 you are debugging rsync.
 
+Note that the names of the transferred files that are output are done using
+a default bf(--log-format) of "%n%L", which tells you just the name of the
+file and, if the item is a symlink, where it points.  At the single bf(-v)
+level of verbosity, this does not mention when a file gets its attributes
+changed.  If you ask for an itemized list of changed attributes (either
+bf(--itemize-changes) or adding "%i" to the bf(--log-format) setting), the
+output (on the client) increases to mention all items that are changed in
+any way.  See the bf(--log-format) option for more details.
+
 dit(bf(-q, --quiet)) This option decreases the amount of information you
 are given during the transfer, notably suppressing information messages
 from the remote server. This flag is useful when invoking rsync from
@@ -1013,14 +1022,25 @@ dit(bf(--no-blocking-io)) Turn off bf(--blocking-io), for use when it is the
 default.
 
 dit(bf(-i, --itemize-changes)) Requests a simple itemized list of the
-changes that are being made to each file.  It is equivalent to specifying
-bf(--log-format='%i %n%L').  See the description of these items in the
-rsyncd.conf manpage.
+changes that are being made to each file, including attribute changes.
+This is equivalent to specifying bf(--log-format='%i %n%L').  (See the
+description of what the output of '%i' means in the rsyncd.conf manpage.)
+Rsync also mentions the delete action when an item replaces an item of a
+different type (e.g. a directory replaces a file of the same name).
 
 dit(bf(--log-format=FORMAT)) This allows you to specify exactly what the
-rsync client logs to stdout on a per-file basis. The log format is
-specified using the same format conventions as the log format option in
-rsyncd.conf.
+rsync client logs to stdout on a per-file basis. This format can be used
+without bf(--verbose) to enable just the outputting of the file-transfer
+information, or it can be used to change how the names are output when
+bf(--verbose) is enabled.  Rsync will log the name of an item prior to its
+transfer unless one of the transferred-byte-count values is requested, in
+which case the logging is done at the end of the item's transfer.  In this
+late-transfer state, if bf(--progress) is also specified, rsync will output
+just the name of the file prior to the progress information.
+
+The log format is specified using the same format conventions as the
+"log format" option in rsyncd.conf, so see that manpage for details.
+(Note that this option does not affect what a daemon logs to its logfile.)
 
 dit(bf(--stats)) This tells rsync to print a verbose set of statistics
 on the file transfer, allowing you to tell how effective the rsync
