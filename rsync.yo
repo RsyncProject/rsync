@@ -699,7 +699,7 @@ itemize(
 The +/- rules are most useful in exclude lists, allowing you to have a
 single exclude list that contains both include and exclude options.
 
-Here are some examples:
+Here are some exclude/include examples:
 
 itemize(
   it() --exclude "*.o" would exclude all filenames matching *.o
