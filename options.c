@@ -67,6 +67,7 @@ int delete_after=0;
 int only_existing=0;
 int max_delete=0;
 int ignore_errors=0;
+int blocking_io=0;
 
 char *backup_suffix = BACKUP_SUFFIX;
 char *tmpdir = NULL;
@@ -156,6 +157,7 @@ void usage(enum logcode F)
   rprintf(F,"     --address               bind to the specified address\n");  
   rprintf(F,"     --config=FILE           specify alternate rsyncd.conf file\n");  
   rprintf(F,"     --port=PORT             specify alternate rsyncd port number\n");
+  rprintf(F,"     --blocking-io           use blocking IO for the remote shell\n");  
   rprintf(F,"     --stats                 give some file transfer stats\n");  
   rprintf(F,"     --progress              show progress during transfer\n");  
   rprintf(F,"     --log-format=FORMAT     log file transfers using specified format\n");  
@@ -176,7 +178,7 @@ enum {OPT_VERSION, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
       OPT_COPY_UNSAFE_LINKS, OPT_SAFE_LINKS, OPT_COMPARE_DEST,
       OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY, OPT_ADDRESS,
       OPT_DELETE_AFTER, OPT_EXISTING, OPT_MAX_DELETE, OPT_BACKUP_DIR, 
-      OPT_IGNORE_ERRORS, OPT_BWLIMIT};
+      OPT_IGNORE_ERRORS, OPT_BWLIMIT, OPT_BLOCKING_IO};
 
 static char *short_options = "oblLWHpguDCtcahvqrRIxnSe:B:T:zP";
 
@@ -234,6 +236,7 @@ static struct option long_options[] = {
   {"partial",     0,     0,    OPT_PARTIAL},
   {"delete-after",0,     0,    OPT_DELETE_AFTER},
   {"ignore-errors",0,     0,   OPT_IGNORE_ERRORS},
+  {"blocking-io" ,0,     0,    OPT_BLOCKING_IO},
   {"config",      1,     0,    OPT_CONFIG},
   {"port",        1,     0,    OPT_PORT},
   {"log-format",  1,     0,    OPT_LOG_FORMAT},
@@ -537,6 +540,10 @@ int parse_arguments(int argc, char *argv[], int frommain)
 
 		case OPT_IGNORE_ERRORS:
 			ignore_errors = 1;
+			break;
+
+		case OPT_BLOCKING_IO:
+			blocking_io = 1;
 			break;
 
 		case 'P':
