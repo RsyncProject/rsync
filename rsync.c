@@ -203,9 +203,9 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 
 #ifdef HAVE_CHMOD
 	if (!S_ISLNK(st->st_mode)) {
-		if (st->st_mode != file->mode) {
+		if ((st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS)) {
 			updated = 1;
-			if (do_chmod(fname,file->mode) != 0) {
+			if (do_chmod(fname,(file->mode & CHMOD_BITS)) != 0) {
 				rprintf(FERROR,"failed to set permissions on %s : %s\n",
 					fname,strerror(errno));
 				return 0;

@@ -497,6 +497,16 @@ extern int errno;
 #define S_IWUSR 0200
 #endif
 
+#ifndef ACCESSPERMS
+#define ACCESSPERMS 0777
+#endif
+
+#ifndef S_ISVTX
+#define S_ISVTX 0
+#endif
+
+#define CHMOD_BITS (S_ISUID | S_ISGID | S_ISVTX | ACCESSPERMS)
+
 #ifndef _S_IFMT
 #define _S_IFMT        0170000
 #endif
@@ -560,9 +570,6 @@ extern int errno;
 
 #define IS_DEVICE(mode) (S_ISCHR(mode) || S_ISBLK(mode) || S_ISSOCK(mode) || S_ISFIFO(mode))
 
-#ifndef ACCESSPERMS
-#define ACCESSPERMS 0777
-#endif
 /* Initial mask on permissions given to temporary files.  Mask off setuid
      bits and group access because of potential race-condition security
      holes, and mask other access because mode 707 is bizarre */
