@@ -73,16 +73,25 @@ static int match_address(char *addr, char *tok)
 #endif
 	char mask[16];
 	char *a = NULL, *t = NULL;
+	unsigned int len;
 
 	if (!addr || !*addr) return 0;
 
 	p = strchr(tok,'/');
-	if (p) *p = 0;
+	if (p) {
+		*p = '\0';
+		len = p - tok;
+	}
+	else
+		len = strlen(tok);
 
-	/* skip if last char is not a digit (i.e. not an address) */
-	/* (don't check first char - might be 11.22.33.44.an.isp) */
-	if (!*tok) return 0;	/* nothing to check */
-	if (!isdigit(*(unsigned char*)tok+strlen(tok)-1)) return 0;
+	/* Fail quietly if tok is a hostname (not an address) */
+	if (strspn(tok, "./0123456789") != len
+#ifdef INET6
+	 && strspn(tok, "/0123456789:ABCDEFabcdef") != len
+	 && !strchr(tok, '%')
+#endif
+		) return 0;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_UNSPEC;
@@ -98,7 +107,10 @@ static int match_address(char *addr, char *tok)
 	if (p)
 		*p++ = '/';
 	if (gai) {
-		rprintf(FERROR,"malformed address %s\n", tok);
+		rprintf(FERROR,
+			"error matching address %s: %s\n",
+			tok,
+			gai_strerror(gai));
 		freeaddrinfo(resa);
 		return 0;
 	}
