@@ -23,6 +23,24 @@ Changes since version 2.5.6:
 
   BUG FIXES:
 
+    * Fixed several exclude/include matching bugs when using wild-cards.
+      This has a several user-visible effects, all of which make the
+      matching more consistent and intuitive.  This should hopefully not
+      cause anyone problems since it makes the matching work more like
+      what people are expecting. (Wayne Davison)
+
+      - "**/foo" now matches at the base of the transfer (i.e. /foo).
+
+      - An non-anchored wildcard term floats to match beyond the base of
+        the transfer.  E.g. "CVS/R*" matches at the end of the path,
+        just like the non-wildcard term "CVS/Root" does.
+
+      - Including a "**" in the match term causes it to be matched
+        against the entire path, not just the name portion, even if
+        there aren't any interior slashes in the term.  E.g. "foo**bar"
+        would exclude "/path/foo-bar" (just like before) as well as
+        "/foo-path/baz-bar" (for instance).
+
     * The exclude list specified in the daemon's config file is now
       properly applied to the pulled items no matter how deep the
       user's file args are in the source tree.  (Wayne Davison)
@@ -47,11 +65,6 @@ Changes since version 2.5.6:
 
     * Made rsync treat a trailing slash in the destination in a more
       consistent manner.
-
-    * Fixed some exclude/include matching bugs when using wild-cards.
-      For instance, "**/foo" now matches at the root, "CVS/R*" now
-      matches beyond the root, and "foo**bar" is matched against the
-      path, not just the trailing name.  (Wayne Davison)
 
     * Fixed file I/O error detection.  (John Van Essen)
 
