@@ -247,11 +247,8 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 			sum_update(data,i);
 
-			if (fd != -1 && write_file(fd,data,i) != i) {
-				rsyserr(FERROR, errno, "write failed on %s",
-					full_fname(fname));
-				exit_cleanup(RERR_FILEIO);
-			}
+			if (fd != -1 && write_file(fd,data,i) != i)
+				goto report_write_error;
 			offset += i;
 			continue;
 		}
@@ -277,7 +274,8 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 		if (inplace) {
 			if (offset == offset2 && fd != -1) {
-				flush_write_file(fd);
+				if (flush_write_file(fd) < 0)
+					goto report_write_error;
 				offset += len;
 				if (do_lseek(fd, len, SEEK_CUR) != offset) {
 					rsyserr(FERROR, errno,
@@ -288,11 +286,8 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 				continue;
 			}
 		}
-		if (fd != -1 && write_file(fd, map, len) != (int)len) {
-			rsyserr(FERROR, errno, "write failed on %s",
-				full_fname(fname));
-			exit_cleanup(RERR_FILEIO);
-		}
+		if (fd != -1 && write_file(fd, map, len) != (int)len)
+			goto report_write_error;
 		offset += len;
 	}
 
@@ -307,6 +302,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		end_progress(total_size);
 
 	if (fd != -1 && offset > 0 && sparse_end(fd) != 0) {
+	    report_write_error:
 		rsyserr(FERROR, errno, "write failed on %s",
 			full_fname(fname));
 		exit_cleanup(RERR_FILEIO);
