@@ -83,10 +83,14 @@ Changes since 2.6.2:
 
     - Added the --checksum-seed=N option for advanced users.
 
-    - Batch writing/reading has a brand-new implementation that is
-      simpler, fixes a few weird problems with the old code, and is much
-      less intrusive into the code (making it easier to maintain for the
-      future).  (Chris Shoemaker)
+    - Batch writing/reading has a brand-new implementation that is simpler,
+      fixes a few weird problems with the old code (such as no longer
+      sprinkling the batch files into different dirs or even onto different
+      systems), and is much less intrusive into the code (making it easier
+      to maintain for the future).  The new code generates just one data
+      file instead of three, which makes it possible to read the batch via
+      stdin.  Also, the old requirement of using the same fixed checksum-
+      seed for all batch processing has been removed.  (Chris Shoemaker)
 
   INTERNAL:
 
