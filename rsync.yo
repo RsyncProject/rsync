@@ -952,9 +952,9 @@ directory.  This is useful for creating a sparse backup of just files that
 have changed from an earlier backup.
 
 Beginning in version 2.6.4, multiple bf(--compare-dest) directories may be
-provided and rsync will search the list in the order specified until it
-finds an existing file.  That first discovery is used as the basis file,
-and also determines if the transfer needs to happen.
+provided and rsync will try to find an exact match (searching
+the list in the order specified), and if not found, a basis file from one
+of the em(DIR)s will be selected to try to speed up the transfer.
 
 If em(DIR) is a relative path, it is relative to the destination directory.
 See also bf(--link-dest).
