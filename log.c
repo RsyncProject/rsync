@@ -286,13 +286,14 @@ void rprintf(enum logcode code, const char *format, ...)
 	int len;
 
 	va_start(ap, format);
+	/* Note: might return -1 */
 	len = vsnprintf(buf, sizeof(buf), format, ap);
 	va_end(ap);
 
 	/* Deal with buffer overruns.  Instead of panicking, just
 	 * truncate the resulting string.  Note that some vsnprintf()s
 	 * return -1 on truncation, e.g., glibc 2.0.6 and earlier. */
-	if (len > sizeof(buf)-1  ||  len < 0) {
+	if ((size_t) len > sizeof(buf)-1  ||  len < 0) {
 		const char ellipsis[] = "[...]";
 
 		/* Reset length, and zero-terminate the end of our buffer */
@@ -331,18 +332,21 @@ void rsyserr(enum logcode code, int errcode, const char *format, ...)
 {
 	va_list ap;  
 	char buf[1024];
-	int len, sys_len;
+	int len;
+	size_t sys_len;
         char *sysmsg;
 
 	va_start(ap, format);
+	/* Note: might return <0 */
 	len = vsnprintf(buf, sizeof(buf), format, ap);
 	va_end(ap);
 
-	if (len > sizeof(buf)-1) exit_cleanup(RERR_MESSAGEIO);
+	if ((size_t) len > sizeof(buf)-1)
+		exit_cleanup(RERR_MESSAGEIO);
 
         sysmsg = strerror(errcode);
         sys_len = strlen(sysmsg);
-        if (len + 3 + sys_len > sizeof(buf) - 1)
+        if ((size_t) len + 3 + sys_len > sizeof(buf) - 1)
                 exit_cleanup(RERR_MESSAGEIO);
 
         strcpy(buf + len, ": ");
@@ -399,7 +403,7 @@ static void log_formatted(enum logcode code,
 	char buf[1024];
 	char buf2[1024];
 	char *p, *s, *n;
-	int l;
+	size_t l;
 	extern struct stats stats;		
 	extern int am_sender;
 	extern int am_daemon;
