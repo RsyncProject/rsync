@@ -298,6 +298,10 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
  * major/minor, and transfer the two parts as 32-bit ints.  That gives
  * you somewhat more of a chance that they'll come from a big machine
  * to a little one in a useful way.
+ *
+ * FIXME: Really we need an unsigned type, and we perhaps ought to
+ * cope with platforms on which this is an unsigned int or even a
+ * struct.  Later.
  */ 
 #define INO64_T int64
 #define DEV64_T int64
