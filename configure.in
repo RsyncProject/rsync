@@ -43,7 +43,7 @@ then
 else
     AC_MSG_RESULT([yes])
     # leave CFLAGS alone; AC_PROG_CC will try to include -g if it can
-    AC_DEFINE(DEBUG, 1, [Define to turn on debugging code that may slow normal operation])
+    dnl AC_DEFINE(DEBUG, 1, [Define to turn on debugging code that may slow normal operation])
     dnl CFLAGS=${CFLAGS-"-g"}
 fi
 
