@@ -567,7 +567,9 @@ extern int errno;
 #define NS(s) ((s)?(s):"<NULL>")
 
 #if !defined(__GNUC__) || defined(APPLE)
-/* Apparently the OS X port of gcc gags on __attribute__. */
+/* Apparently the OS X port of gcc gags on __attribute__.
+ *
+ * <http://www.opensource.apple.com/bugs/X/gcc/2512150.html> */
 #define __attribute__(x) 
 
 #endif
