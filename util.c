@@ -581,10 +581,12 @@ void clean_fname(char *name)
 
 /*
  * Make path appear as if a chroot had occurred:
- *    0. call clean_fname on it.
  *    1. remove leading "/" (or replace with "." if at end)
  *    2. remove leading ".." components
  *    3. delete any other "<dir>/.." (recursively)
+ * While we're at it, remove double slashes and "." components like
+ *   clean_fname does(), but DON'T remove a trailing slash because that
+ *   is sometimes significant on command line arguments.
  * Return a malloc'ed copy.
  * Contributed by Dave Dykstra <dwd@bell-labs.com>
  */
@@ -593,36 +595,54 @@ char *sanitize_path(char *p)
 {
 	char *copy, *copyp;
 
-	clean_fname(p);
-
 	copy = (char *) malloc(strlen(p)+1);
 	copyp = copy;
+	while (*p == '/') {
+		/* remove leading slashes */
+		p++;
+	}
 	while (*p != '\0') {
-		if ((*p == '/') && (copyp == copy)) {
-			/* remove leading slash */
-			p++;
-		}
-		else if ((*p == '.') && (*(p+1) == '.') &&
+		/* this loop iterates once per filename component in p.
+		 * both p (and copyp if the original had a slash) should
+		 * always be left pointing after a slash
+		 */
+		if ((*p == '.') && ((*(p+1) == '/') || (*(p+1) == '\0'))) {
+			/* skip "." component */
+			while (*++p == '/') {
+				/* skip following slashes */
+				;
+			}
+		} else if ((*p == '.') && (*(p+1) == '.') &&
 			    ((*(p+2) == '/') || (*(p+2) == '\0'))) {
-			/* remove .. followed by slash or end */
+			/* skip ".." component followed by slash or end */
 			p += 2;
+			if (*p == '/')
+				p++;
 			if (copyp != copy) {
-				/* backup the copy one level */
-				while ((--copyp != copy) && (*copyp == '/'))
-					/* skip trailing slashes */
-					;
-				while ((copyp != copy) && (*copyp != '/'))
-					/* skip back through slash */
+				/* back up the copy one level */
+				--copyp; /* now pointing at slash */
+				while ((copyp > copy) && (*(copyp - 1) != '/')) {
+					/* skip back up to slash */
 					copyp--;
+				}
 			}
 		} else {
-			/* copy one component */
 			while (1) {
+				/* copy one component through next slash */
 				*copyp++ = *p++;
-				if ((*p == '\0') || (*(p-1) == '/'))
+				if ((*p == '\0') || (*(p-1) == '/')) {
+					while (*p == '/') {
+						/* skip multiple slashes */
+						p++;
+					}
 					break;
+				}
 			}
 		}
+	}
+	if (copyp == copy) {
+		/* ended up with nothing, so put in "." component */
+		*copyp++ = '.';
 	}
 	*copyp = '\0';
 	return(copy);
