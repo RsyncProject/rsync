@@ -384,6 +384,9 @@ struct idev {
 #define F_DEV	link_u.idev->dev
 #define F_INODE	link_u.idev->inode
 
+#define F_HEAD	link_u.links->head
+#define F_NEXT	link_u.links->next
+
 struct file_struct {
 	time_t modtime;
 	OFF_T length;
