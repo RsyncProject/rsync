@@ -324,9 +324,10 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		write_int(recv_pipe[1],1);
 		close(recv_pipe[1]);
 		io_flush();
-		/* finally we go to sleep until our parent kills us with
-		   a USR2 signal */
-		while (1) sleep(60);
+		/* finally we go to sleep until our parent kills us
+		   with a USR2 signal. We sleepp for a short time as on
+		   some OSes a signal won't interrupt a sleep! */
+		while (1) sleep(1);
 	}
 
 	close(recv_pipe[1]);
