@@ -101,23 +101,6 @@ static int unchanged_file(char *fn, struct file_struct *file, STRUCT_STAT *st)
 
 
 /*
- * NULL sum_struct means we have no checksums
- */
-void write_sum_head(int f, struct sum_struct *sum)
-{
-	static struct sum_struct null_sum;
-
-	if (sum == NULL)
-		sum = &null_sum;
-
-	write_int(f, sum->count);
-	write_int(f, sum->blength);
-	if (protocol_version >= 27)
-		write_int(f, sum->s2length);
-	write_int(f, sum->remainder);
-}
-
-/*
  * set (initialize) the size entries in the per-file sum_struct
  * calculating dynamic block and checksum sizes.
  *
@@ -242,7 +225,6 @@ static void generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 }
 
 
-
 /*
  * Acts on file number @p i from @p flist, whose name is @p fname.
  *
@@ -315,12 +297,7 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		if (dry_run)
 			return; /* TODO: causes inaccuracies -- fix */
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
-			if (robust_unlink(fname) != 0) {
-				rsyserr(FERROR, errno,
-					"recv_generator: unlink %s to make room for directory",
-					full_fname(fname));
-				return;
-			}
+			delete_file(fname, DEL_TERSE);
 			statret = -1;
 		}
 		if (statret != 0 && do_mkdir(fname,file->mode) != 0 && errno != EEXIST) {
@@ -346,9 +323,6 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 
 	if (preserve_links && S_ISLNK(file->mode)) {
 #if SUPPORT_LINKS
-		char lnk[MAXPATHLEN];
-		int l;
-
 		if (safe_symlinks && unsafe_symlink(file->u.link, fname)) {
 			if (verbose) {
 				rprintf(FINFO, "ignoring unsafe symlink %s -> \"%s\"\n",
@@ -357,22 +331,25 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 			return;
 		}
 		if (statret == 0) {
-			l = readlink(fname,lnk,MAXPATHLEN-1);
-			if (l > 0) {
-				lnk[l] = 0;
+			int dflag = S_ISDIR(st.st_mode) ? DEL_DIR : 0;
+			char lnk[MAXPATHLEN];
+			int len;
+
+			if (!dflag
+			    && (len = readlink(fname, lnk, MAXPATHLEN-1)) > 0) {
+				lnk[len] = 0;
 				/* A link already pointing to the
 				 * right place -- no further action
 				 * required. */
-				if (strcmp(lnk,file->u.link) == 0) {
+				if (strcmp(lnk, file->u.link) == 0) {
 					set_perms(fname, file, &st,
 						  PERMS_REPORT);
 					return;
 				}
 			}
-			/* Not a symlink, so delete whatever's
-			 * already there and put a new symlink
-			 * in place. */
-			delete_file(fname);
+			/* Not the right symlink (or not a symlink), so
+			 * delete it. */
+			delete_file(fname, dflag | DEL_TERSE);
 		}
 		if (do_symlink(file->u.link,fname) != 0) {
 			rsyserr(FERROR, errno, "symlink %s -> \"%s\" failed",
@@ -392,7 +369,8 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		if (statret != 0 ||
 		    st.st_mode != file->mode ||
 		    st.st_rdev != file->u.rdev) {
-			delete_file(fname);
+			int dflag = S_ISDIR(st.st_mode) ? DEL_DIR : 0;
+			delete_file(fname, dflag | DEL_TERSE);
 			if (verbose > 2) {
 				rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",
 					safe_fname(fname),
@@ -482,7 +460,8 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 	}
 
 	if (statret == 0 && !S_ISREG(st.st_mode)) {
-		if (delete_file(fname) != 0)
+		int dflag = S_ISDIR(st.st_mode) ? DEL_DIR : 0;
+		if (delete_file(fname, dflag | DEL_TERSE) != 0)
 			return;
 		statret = -1;
 		stat_errno = ENOENT;
