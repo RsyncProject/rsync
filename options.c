@@ -248,7 +248,7 @@ void usage(enum logcode F)
   rprintf(F,"     --backup-dir            make backups into this directory\n");
   rprintf(F,"     --suffix=SUFFIX         backup suffix (default %s w/o --backup-dir)\n",BACKUP_SUFFIX);
   rprintf(F," -u, --update                update only (don't overwrite newer files)\n");
-  rprintf(F,"     --inplace               update destination files inplace (SEE MAN PAGE)\n");
+  rprintf(F,"     --inplace               update destination files in-place (SEE MAN PAGE)\n");
   rprintf(F," -K, --keep-dirlinks         treat symlinked dir on receiver as dir\n");
   rprintf(F," -l, --links                 copy symlinks as symlinks\n");
   rprintf(F," -L, --copy-links            copy the referent of all symlinks\n");
@@ -952,12 +952,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			return 0;
 		}
 		keep_partial = 0;
-		if (dest_option) {
-			snprintf(err_buf, sizeof err_buf,
-				 "--inplace does not yet work with %s\n",
-				 dest_option);
-			return 0;
-		}
 #else
 		snprintf(err_buf, sizeof err_buf,
 			 "--inplace is not supported on this %s\n",
