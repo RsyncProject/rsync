@@ -493,12 +493,13 @@ struct map_struct {
 #define MATCHFLG_WILD2		(1<<1) /* pattern has '**' */
 #define MATCHFLG_WILD2_PREFIX	(1<<2) /* pattern starts with '**' */
 #define MATCHFLG_ABS_PATH	(1<<3) /* path-match on absolute path */
+#define MATCHFLG_INCLUDE	(1<<4) /* this is an include, not an exclude */
+#define MATCHFLG_DIRECTORY	(1<<5) /* this matches only directories */
+#define MATCHFLG_CLEAR_LIST 	(1<<6) /* this item is the "!" token */
 struct exclude_struct {
 	struct exclude_struct *next;
 	char *pattern;
-	int match_flags;
-	int include;
-	int directory;
+	unsigned int match_flags;
 	int slash_cnt;
 };
 
