@@ -43,6 +43,7 @@ extern int local_server;
 extern int log_got_error;
 extern int module_id;
 extern int orig_umask;
+extern int copy_links;
 extern int keep_dirlinks;
 extern int preserve_hard_links;
 extern int protocol_version;
@@ -457,6 +458,10 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	int pid;
 	int status = 0;
 	int error_pipe[2];
+
+	/* The receiving side mustn't obey this, or an existing symlink that
+	 * points to an identical file won't be replaced by the referent. */
+	copy_links = 0;
 
 	if (preserve_hard_links)
 		init_hard_links(flist);
