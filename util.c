@@ -664,11 +664,11 @@ int count_dir_elements(const char *p)
 	return cnt;
 }
 
-/* Turns multiple adjacent slashes into a single slash; gets rid of "./"
- * elements; collapses ".." elements except for those at the start of the
- * string; removes a trailing slash.  If the resulting name would be empty,
- * change it into a ".". */
-unsigned int clean_fname(char *name)
+/* Turns multiple adjacent slashes into a single slash, gets rid of "./"
+ * elements (but not a trailing dot dir), removes a trailing slash, and
+ * optionally collapses ".." elements (except for those at the start of the
+ * string).  If the resulting name would be empty, change it into a ".". */
+unsigned int clean_fname(char *name, BOOL collapse_dot_dot)
 {
 	char *limit = name - 1, *t = name, *f = name;
 	int anchored;
@@ -691,7 +691,8 @@ unsigned int clean_fname(char *name)
 				continue;
 			}
 			/* collapse ".." dirs */
-			if (f[1] == '.' && (f[2] == '/' || !f[2])) {
+			if (collapse_dot_dot
+			    && f[1] == '.' && (f[2] == '/' || !f[2])) {
 				char *s = t - 1;
 				if (s == name && anchored) {
 					f += 2;
@@ -734,9 +735,14 @@ unsigned int clean_fname(char *name)
  * If depth is > 0, it is a count of how many '..'s to allow at the start
  * of the path.
  *
- * We call clean_fname() to clean up the path, but we preserve a trailing
- * slash because that is sometimes significant on command-line arguments.
- */
+ * We also clean the path in a manner similar to clean_fname() but with a
+ * few differences: 
+ *
+ * Turns multiple adjacent slashes into a single slash, gets rid of "." dir
+ * elements (INCLUDING a trailing dot dir), PRESERVES a trailing slash, and
+ * ALWAYS collapses ".." elements (except for those at the start of the
+ * string up to "depth" deep).  If the resulting name would be empty,
+ * change it into a ".". */
 char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
 {
 	char *start, *sanp;
@@ -851,7 +857,7 @@ int push_dir(char *dir)
 		curr_dir_len += len;
 	}
 
-	curr_dir_len = clean_fname(curr_dir);
+	curr_dir_len = clean_fname(curr_dir, 1);
 
 	return 1;
 }
