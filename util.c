@@ -639,13 +639,18 @@ void clean_fname(char *name)
  *    1. remove leading "/" (or replace with "." if at end)
  *    2. remove leading ".." components (except those allowed by "reldir")
  *    3. delete any other "<dir>/.." (recursively)
- * If "reldir" is non-null, it is a sanitized directory that the path will be
- *    relative to, so allow as many ".." at the beginning of the path as
- *    there are components in reldir.
+ * Can only shrink paths, so sanitizes in place.
  * While we're at it, remove double slashes and "." components like
  *   clean_fname does(), but DON'T remove a trailing slash because that
  *   is sometimes significant on command line arguments.
- * Can only shrink paths, so sanitizes in place.
+ * If "reldir" is non-null, it is a sanitized directory that the path will be
+ *    relative to, so allow as many ".." at the beginning of the path as
+ *    there are components in reldir.  This is used for symbolic link targets.
+ *    If reldir is non-null and the path began with "/", to be completely like
+ *    a chroot we should add in depth levels of ".." at the beginning of the
+ *    path, but that would blow the assumption that the path doesn't grow and
+ *    it is not likely to end up being a valid symlink anyway, so just do
+ *    the normal removal of the leading "/" instead.
  * Contributed by Dave Dykstra <dwd@bell-labs.com>
  */
 
@@ -723,6 +728,12 @@ void sanitize_path(char *p, char *reldir)
 	}
 	if ((sanp == start) && !allowdotdot) {
 		/* ended up with nothing, so put in "." component */
+		/*
+		 * note that the !allowdotdot doesn't prevent this from
+		 *  happening in all allowed ".." situations, but I didn't
+		 *  think it was worth putting in an extra variable to ensure
+		 *  it since an extra "." won't hurt in those situations.
+		 */
 		*sanp++ = '.';
 	}
 	*sanp = '\0';
