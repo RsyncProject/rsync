@@ -243,7 +243,7 @@ int do_fstat(int fd, STRUCT_STAT *st)
 
 OFF_T do_lseek(int fd, OFF_T offset, int whence)
 {
-#if SIZEOF_OFF64_T
+#ifdef HAVE_LSEEK64
 	off64_t lseek64();
 	return lseek64(fd, offset, whence);
 #else
