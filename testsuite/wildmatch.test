@@ -13,6 +13,7 @@ set -x
 
 "$TOOLDIR/wildtest" >"$scratchdir/wild.out"
 diff $diffopt "$scratchdir/wild.out" - <<EOF
+No wildmatch errors found.
 EOF
 
 exit 0
