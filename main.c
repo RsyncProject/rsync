@@ -1,5 +1,6 @@
-/* 
-   Copyright (C) Andrew Tridgell 1996
+/* -*- c-file-style: "linux" -*-
+   
+   Copyright (C) 1996-2000 by Andrew Tridgell 
    Copyright (C) Paul Mackerras 1996
    
    This program is free software; you can redistribute it and/or modify
@@ -458,6 +459,11 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 	exit_cleanup(0);
 }
 
+
+/*
+ * This is called once the connection has been negotiated.  It is used
+ * for rsyncd, remote-shell, and local connections.
+ */
 int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 {
 	struct file_list *flist;
@@ -545,6 +551,12 @@ static char *find_colon(char *s)
 	return p;
 }
 
+
+/*
+ * Start a client for either type of remote connection.  Work out
+ * whether the arguments request a remote shell or rsyncd connection,
+ * and call the appropriate connection function, then run_client.
+ */
 static int start_client(int argc, char *argv[])
 {
 	char *p;

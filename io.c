@@ -455,6 +455,8 @@ void io_flush(void)
 	io_buffer_count = 0;
 }
 
+
+/* XXX: fd is ignored, which seems a little strange. */
 void io_end_buffering(int fd)
 {
 	io_flush();
