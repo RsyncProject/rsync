@@ -639,7 +639,8 @@ dit(bf(--password-file)) This option allows you to provide a password
 in a file for accessing a remote rsync server. Note that this option
 is only useful when accessing a rsync server using the built in
 transport, not when using a remote shell as the transport. The file
-must not be world readable.
+must not be world readable. It should contain just the password as a
+single line.
 
 enddit()
 
