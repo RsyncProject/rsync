@@ -458,6 +458,8 @@ very useful for incremental backups.  You can additionally
 specify a backup suffix using the --suffix option
 (otherwise the files backed up in the specified directory
 will keep their original filenames).
+If DIR is a relative path, it is relative to the destination directory
+(which changes in a recursive transfer).
 
 dit(bf(--suffix=SUFFIX)) This option allows you to override the default
 backup suffix used with the --backup (-b) option. The default suffix is a ~
@@ -727,14 +729,14 @@ although this skips files that haven't changed; see also --link-dest).
 This option increases the usefulness of --partial because partially
 transferred files will remain in the new temporary destination until they
 have a chance to be completed.  If DIR is a relative path, it is relative
-to the destination directory.
+to the destination directory (which changes in a recursive transfer).
 
 dit(bf(--link-dest=DIR)) This option behaves like bf(--compare-dest) but
 also will create hard links from em(DIR) to the destination directory for
 unchanged files.  Files with changed ownership or permissions will not be
 linked.
 Like bf(--compare-dest) if DIR is a relative path, it is relative
-to the destination directory.
+to the destination directory (which changes in a recursive transfer).
 
 dit(bf(-z, --compress)) With this option, rsync compresses any data from
 the files that it sends to the destination machine.  This
