@@ -397,7 +397,10 @@ static void log_formatted(enum logcode code, char *format, char *op,
 					 file->dir.root, n);
 				/* The buffer from safe_fname() has more
 				 * room than MAXPATHLEN, so this is safe. */
-				strcpy(n, buf2);
+				if (fmt[1])
+					strcpy(n, buf2);
+				else
+					n = buf2;
 			}
 			clean_fname(n, 0);
 			if (*n == '/')
