@@ -40,6 +40,7 @@ extern int io_error;
 extern char *tmpdir;
 extern char *partial_dir;
 extern char *basis_dir[];
+extern int basis_dir_cnt;
 extern int make_backups;
 extern int do_progress;
 extern char *backup_dir;
@@ -453,8 +454,13 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 			case FNAMECMP_BACKUP:
 				fnamecmp = get_backup_name(fname);
 				break;
-			case FNAMECMP_BASIS_DIR:
 			default:
+				if (j >= basis_dir_cnt) {
+					rprintf(FERROR,
+						"invalid basis_dir index: %d.\n",
+						j);
+					exit_cleanup(RERR_PROTOCOL);
+				}
 				pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
 					 basis_dir[j], fname);
 				fnamecmp = fnamecmpbuf;
