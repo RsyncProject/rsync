@@ -201,10 +201,12 @@ use chroot = no
 hosts allow = localhost, 127.0.0.1
 log file = $logfile
 
-[test-from] = $scratchdir/daemon-from/
+[test-from]
+	path = $FROM
 	read only = yes
 
-[test-to] = $scratchdir/daemon-to/
+[test-to]
+	path = $TO
 	read only = no
 EOF
 }
