@@ -60,3 +60,11 @@ proto:
 clean:
 	rm -f *~ $(OBJS) rsync config.cache config.log config.status
 
+
+# this target is really just for my use. It only works on a limited
+# range of machines and is used to produce a list of potentially
+# dead (ie. unused) functions in the code. (tridge)
+finddead:
+	nm *.o */*.o |grep 'U ' | awk '{print $$2}' | sort -u > nmused.txt
+	nm *.o */*.o |grep 'T ' | awk '{print $$3}' | sort -u > nmfns.txt
+	comm -13 nmused.txt nmfns.txt 

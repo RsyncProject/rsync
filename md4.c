@@ -102,7 +102,7 @@
  ** Assumes X is an array of 16 ints.
  ** The macro revx reverses the byte-ordering of the next word of X.
  */
- void MDreverse(X)
+static void MDreverse(X)
  unsigned int32 *X;
  { register unsigned int32 t;
    register unsigned int i;

@@ -544,7 +544,7 @@ static int start_client(int argc, char *argv[])
 }
 
 
-RETSIGTYPE sigusr1_handler(int val) {
+static RETSIGTYPE sigusr1_handler(int val) {
 	exit_cleanup(1);
 }
 

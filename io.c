@@ -484,7 +484,7 @@ void write_buf(int f,char *buf,int len)
 }
 
 /* write a string to the connection */
-void write_sbuf(int f,char *buf)
+static void write_sbuf(int f,char *buf)
 {
 	write_buf(f, buf, strlen(buf));
 }

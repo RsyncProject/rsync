@@ -112,7 +112,7 @@ static int get_secret(int module, char *user, char *secret, int len)
 }
 
 /* generate a 16 byte hash from a password and challenge */
-void generate_hash(char *in, char *challenge, char *out)
+static void generate_hash(char *in, char *challenge, char *out)
 {
 	char buf[16];
 

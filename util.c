@@ -253,7 +253,7 @@ static int full_write(int desc, char *ptr, int len)
    for an error.  
 
    derived from GNU C's cccp.c. */
-int safe_read(int desc, char *ptr, int len)
+static int safe_read(int desc, char *ptr, int len)
 {
 	int n_chars;
  
@@ -409,14 +409,6 @@ int name_to_gid(char *name, gid_t *gid)
 	return 0;
 }
 
-
-/****************************************************************************
-check if a process exists. 
-****************************************************************************/
-int process_exists(int pid)
-{
-	return(kill(pid,0) == 0 || errno != ESRCH);
-}
 
 /* lock a byte range in a open file */
 int lock_range(int fd, int offset, int len)

@@ -94,7 +94,7 @@ static void send_directory(int f,struct file_list *flist,char *dir);
 static char *flist_dir;
 
 
-void send_file_entry(struct file_struct *file,int f,unsigned base_flags)
+static void send_file_entry(struct file_struct *file,int f,unsigned base_flags)
 {
 	unsigned char flags;
 	static time_t last_time;

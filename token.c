@@ -366,8 +366,7 @@ recv_deflated_token(int f, char **data)
  * put the data corresponding to a token that we've just returned
  * from recv_deflated_token into the decompressor's history buffer.
  */
-void
-see_deflate_token(char *buf, int len)
+static void see_deflate_token(char *buf, int len)
 {
 	int r, blklen;
 	unsigned char hdr[5];
