@@ -1,72 +1,59 @@
-#! /usr/bin/perl
-# ---------------------------------------------------------------------------
-#
-# USAGE: rsyncstats <options>
-#
-# OPTIONS:
-#       -f <filename>   Use <filename> for the log file
-#       -h		include report on hourly traffic
-#       -d		include report on domain traffic
-#       -t		report on total traffic by section
-#       -D <domain>     report only on traffic from <domain>
-#       -l <depth>      Depth of path detail for sections
-#       -s <section>    Section to report on, For example: -s /pub will report
-#				only on paths under /pub
+#!/usr/bin/perl
 #
 # This script parses the default logfile format produced by rsync when running
 # as a daemon with transfer logging enabled. It is derived from the xferstats
-# script that comes with wuftpd
+# script that comes with wuftpd.  See the usage message at the bottom for the
+# options it takes.
 #
 # Andrew Tridgell, October 1998
-# rsync-bugs@samba.org
-#
-# ---------------------------------------------------------------------------
 
-# edit the next line to customize for your default log file
+use Getopt::Long;
+
+# You may wish to edit the next line to customize for your default log file.
 $usage_file = "/var/adm/rsyncd.log";
 
 # Edit the following lines for default report settings.
 # Entries defined here will be over-ridden by the command line.
 
-$opt_h = 1; 
-$opt_d = 0;
-$opt_t = 1;
-$opt_l = 2;
+$hourly_report = 0; 
+$domain_report = 0;
+$total_report = 0;
+$depth_limit = 9999;
+$only_section = '';
 
-require 'getopts.pl';
-&Getopts('f:rahdD:l:s:');
+&Getopt::Long::Configure('bundling');
+&usage if !&GetOptions(
+    'hourly-report|h' => \$hourly_report,
+    'domain-report|d' => \$domain_report,
+    'domain|D:s' => \$only_domain,
+    'total-report|t' => \$total_report,
+    'depth-limit|l:i' => \$depth_limit,
+    'real|r' => \$real,
+    'anon|a' => \$anon,
+    'section|s:s' => \$only_section,
+    'file|f:s' => \$usage_file,
+);
 
-if ($opt_r) { $real = 1;}
-if ($opt_a) { $anon = 1;}
-if ($real == 0 && $anon == 0) { $anon = 1; }
-if ($opt_f) {$usage_file = $opt_f;}
+$anon = 1 if !$real && !$anon;
 
-open (LOG,$usage_file) || die "Error opening usage log file: $usage_file\n";
+open(LOG, $usage_file) || die "Error opening usage log file: $usage_file\n";
 
-if ($opt_D) {print "Transfer Totals include the '$opt_D' domain only.\n";
-	     print "All other domains are filtered out for this report.\n\n";}
+if ($only_domain) {
+    print "Transfer Totals include the '$only_domain' domain only.\n";
+    print "All other domains are filtered out for this report.\n\n";
+}
 
-if ($opt_s) {print "Transfer Totals include the '$opt_s' section only.\n";
-	     print "All other sections are filtered out for this report.\n\n";}
+if ($only_section) {
+    print "Transfer Totals include the '$only_section' section only.\n";
+    print "All other sections are filtered out for this report.\n\n";
+}
 
 line: while (<LOG>) {
 
-   @line = split;
+   ($day,$time,$pid,$op,$host,$ip,$module,$user,$bytes,$file) = split(' ', $_, 10);
+   next unless defined $file;
 
-   $day = $line[0];
-   $time = $line[1];
-   $pid = $line[2];
-   $op = $line[3];
-   $host = $line[4];
-   $ip = $line[5];
-   $module = $line[6];
-   $user = $line[7];
-   $file = $line[8];
-   $bytes = $line[9];
-
-   next if ($#line != 9);
-
-   next if ($op != "send" && $op != "recv");
+   next if $op ne 'send' && $op ne 'recv';
 
    $daytime = $day;
    $hour = substr($time,0,2); 
@@ -78,11 +65,13 @@ line: while (<LOG>) {
    @path = split(/\//, $file);
 
    $pathkey = "";
-   for ($i=0; $i <= $#path && $i <= $opt_l;$i++) {
+   for ($i=0; $i <= $#path && $i <= $depth_limit; $i++) {
 	$pathkey = $pathkey . "/" . $path[$i];
    }
 
-   next if (substr($pathkey,0,length("$opt_s")) ne "$opt_s");
+   if ($only_section ne '') {
+       next unless (substr($pathkey,0,length($only_section)) eq $only_section);
+   }
 
    $host =~ tr/A-Z/a-z/;
 
@@ -92,12 +81,12 @@ line: while (<LOG>) {
    if ( int($address[0]) > 0 || $#address < 2 )
       { $domain = "unresolved"; }
 
-   if ($opt_D) {
-       next unless (substr($domain,0,length("$opt_D")) eq "$opt_D");
+   if ($only_domain ne '') {
+       next unless (substr($domain,0,length($only_domain)) eq $only_domain);
    }
 
 
-#   printf ("c=%d day=%s bytes=%d file=%s path=%s\n", 
+#   printf("c=%d day=%s bytes=%d file=%s path=%s\n", 
 #	   $#line, $daytime, $bytes, $file, $pathkey);
 
    $xferfiles++;                                # total files sent
@@ -117,20 +106,20 @@ line: while (<LOG>) {
 }
 close LOG;
 
-@syslist = keys(systemfiles);
-@dates = sort datecompare keys(xferbytes);
+#@syslist = keys %systemfiles;
+@dates = sort datecompare keys %xferbytes;
 
 if ($xferfiles == 0) {die "There was no data to process.\n";}
 
 
 print "TOTALS FOR SUMMARY PERIOD ", $dates[0], " TO ", $dates[$#dates], "\n\n";
-printf ("Files Transmitted During Summary Period  %12.0f\n", $xferfiles);
-printf ("Bytes Transmitted During Summary Period  %12.0f\n", $xferbytes); 
-printf ("Systems Using Archives                   %12.0f\n\n", $#syslist+1);
+printf("Files Transmitted During Summary Period  %12.0f\n", $xferfiles);
+printf("Bytes Transmitted During Summary Period  %12.0f\n", $xferbytes); 
+#printf("Systems Using Archives                   %12.0f\n\n", $#syslist+1);
 
-printf ("Average Files Transmitted Daily          %12.0f\n",
+printf("Average Files Transmitted Daily          %12.0f\n",
    $xferfiles / ($#dates + 1));
-printf ("Average Bytes Transmitted Daily          %12.0f\n",
+printf("Average Bytes Transmitted Daily          %12.0f\n",
    $xferbytes / ($#dates + 1));
 
 format top1 =
@@ -150,7 +139,7 @@ $date,           $nfiles,    $nbytes/(1024*1024), $pctfiles,  $pctbytes
 $^ = top1;
 $~ = line1;
 
-foreach $date ( sort datecompare keys(xferbytes) ) {
+foreach $date (sort datecompare keys %xferbytes) {
 
    $nfiles   = $xferfiles{$date};
    $nbytes   = $xferbytes{$date};
@@ -159,7 +148,7 @@ foreach $date ( sort datecompare keys(xferbytes) ) {
    write;
 }
 
-if ($opt_t) {
+if ($total_report) {
 format top2 =
 
 Total Transfers from each Archive Section (By bytes)
@@ -179,7 +168,7 @@ $- = 0;
 $^ = top2;
 $~ = line2;
 
-foreach $section ( sort bytecompare keys(groupfiles) ) {
+foreach $section (sort bytecompare keys %groupfiles) {
 
    $files = $groupfiles{$section};
    $bytes = $groupbytes{$section};
@@ -193,7 +182,7 @@ if ( $xferfiles < 1 ) { $xferfiles = 1; }
 if ( $xferbytes < 1 ) { $xferbytes = 1; }
 }
 
-if ($opt_d) {
+if ($domain_report) {
 format top3 =
 
 Total Transfer Amount By Domain
@@ -212,7 +201,7 @@ $- = 0;
 $^ = top3;
 $~ = line3;
 
-foreach $domain ( sort domnamcompare keys(domainfiles) ) {
+foreach $domain (sort domnamcompare keys %domainfiles) {
 
    if ( $domainsecs{$domain} < 1 ) { $domainsecs{$domain} = 1; }
 
@@ -226,7 +215,7 @@ foreach $domain ( sort domnamcompare keys(domainfiles) ) {
 
 }
 
-if ($opt_h) {
+if ($hourly_report) {
 
 format top8 =
 
@@ -248,7 +237,7 @@ $- = 0;
 $^ = top8;
 $~ = line8;
 
-foreach $hour ( sort keys(xfertbytes) ) {
+foreach $hour (sort keys %xfertbytes) {
 
    $nfiles   = $xfertfiles{$hour};
    $nbytes   = $xfertbytes{$hour};
@@ -284,3 +273,19 @@ sub faccompare {
 
 }
 
+sub usage
+{
+    die <<EOT;
+USAGE: rsyncstats [options]
+
+OPTIONS:
+  -f FILENAME   Use FILENAME for the log file.
+  -h            Include report on hourly traffic.
+  -d            Include report on domain traffic.
+  -t            Report on total traffic by section.
+  -D DOMAIN     Report only on traffic from DOMAIN.
+  -l DEPTH      Set DEPTH of path detail for sections.
+  -s SECTION    Set SECTION to report on. For example, "-s /pub"
+                will report only on paths under "/pub".
+EOT
+}
