@@ -4,6 +4,9 @@ Changes since version 2.5.7:
 
   ENHANCEMENTS:
 
+    * "ssh" is now the default remote shell for rsync.  If you want to
+      change this, configure like this:  "./configure --with-rsh=rsh".
+
     * Added --files-from, --no-relative, --no-implied-dirs, and --from0.
       Note that --from0 affects the line-ending character for all the
       files read by the --*-from options. (Wayne Davison)
