@@ -291,7 +291,11 @@ if test x"$ac_cv_func_strcasecmp" = x"no"; then
     AC_CHECK_LIB(resolv, strcasecmp)
 fi
 
-AC_FUNC_MEMCMP
+dnl At the moment we don't test for a broken memcmp(), because all we
+dnl need to do is test for equality, not comparison, and it seems that
+dnl every platform has a memcmp that can do at least that.  
+dnl AC_FUNC_MEMCMP
+
 AC_FUNC_UTIME_NULL
 AC_CHECK_FUNCS(waitpid wait4 getcwd strdup strerror chown chmod mknod)
 AC_CHECK_FUNCS(fchmod fstat strchr readlink link utime utimes strftime)
