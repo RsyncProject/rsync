@@ -119,10 +119,11 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 	else
 		last_match = offset;
 
-	if (buf)
+	if (buf) {
 		show_progress(last_match, buf->file_size);
 
-	if (i == -1) end_progress(buf->file_size);
+		if (i == -1) end_progress(buf->file_size);
+	}
 }
 
 
