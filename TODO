@@ -585,6 +585,11 @@ verbose output
   123123 newer than 1283198")
 
 
+debugging of daemon
+
+  Add an rsyncd.conf parameter to turn on debugging on the server.
+
+
 
 NICE -----------------------------------------------------------------
 
