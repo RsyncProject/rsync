@@ -84,14 +84,14 @@ static void make_exclude(struct exclude_list_struct *listp, const char *pat,
 	for (cp = ret->pattern; (cp = strchr(cp, '/')) != NULL; cp++)
 		ret->slash_cnt++;
 
+	ret->match_flags = mflags;
+
 	if (!listp->tail)
 		listp->head = listp->tail = ret;
 	else {
 		listp->tail->next = ret;
 		listp->tail = ret;
 	}
-
-	ret->match_flags = mflags;
 }
 
 static void free_exclude(struct exclude_struct *ex)
