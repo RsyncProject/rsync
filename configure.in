@@ -224,16 +224,6 @@ if test "$ipv6" = "yes" -a "$ipv6lib" != "none"; then
 	fi
 fi
 
-AC_REPLACE_FUNCS(getaddrinfo getnameinfo)
-
-AC_CHECK_MEMBER([struct sockaddr.sa_len], 
-		[ AC_DEFINE(HAVE_SOCKADDR_LEN) ],
-		[],
-		[
-#include <sys/types.h>
-#include <sys/socket.h>
-])
-
 AC_C_BIGENDIAN
 AC_HEADER_DIRENT
 AC_HEADER_TIME
@@ -305,7 +295,17 @@ if test x"$ac_cv_func_connect" = x"no"; then
     fi
 fi
 
-# 
+AC_MSG([Looking in libraries: $LIBS])
+AC_REPLACE_FUNCS(getaddrinfo getnameinfo)
+
+AC_CHECK_MEMBER([struct sockaddr.sa_len], 
+		[ AC_DEFINE(HAVE_SOCKADDR_LEN) ],
+		[],
+		[
+#include <sys/types.h>
+#include <sys/socket.h>
+])
+
 # if we can't find strcasecmp, look in -lresolv (for Unixware at least)
 #
 AC_CHECK_FUNCS(strcasecmp)
