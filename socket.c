@@ -1,7 +1,7 @@
 /* -*- c-file-style: "linux" -*-
    
    Copyright (C) 1992-2001 by Andrew Tridgell <tridge@samba.org>
-   Copyright (C) 2001 by Martin Pool <mbp@samba.org>
+   Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -22,6 +22,11 @@
  * @file socket.c
  * 
  * Socket functions used in rsync.
+ *
+ * This file is now converted to use the new-style getaddrinfo()
+ * interface, which supports IPv6 but is also supported on recent
+ * IPv4-only machines.  On systems that don't have that interface, we
+ * emulate it using the KAME implementation.
  **/
 
 #include "rsync.h"
@@ -619,6 +624,12 @@ char *client_name(int fd)
 #ifdef INET6
         if (get_sockaddr_family(&ss) == AF_INET6 && 
 	    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)&ss)->sin6_addr)) {
+		/* OK, so ss is in the IPv6 family, but it is really
+		 * an IPv4 address: something like
+		 * "::ffff:10.130.1.2".  If we use it as-is, then the
+		 * reverse lookup might fail or perhaps something else
+		 * bad might happen.  So instead we convert it to an
+		 * equivalent address in the IPv4 address family.  */
 		struct sockaddr_in6 sin6;
 		struct sockaddr_in *sin;
 
@@ -631,6 +642,9 @@ char *client_name(int fd)
 		sin->sin_len = length;
 #endif
 		sin->sin_port = sin6.sin6_port;
+		/* FIXME: Isn't there a macro we can use here rather
+		 * than grovelling through the struct?  It might be
+		 * wrong on some systems. */
 		memcpy(&sin->sin_addr, &sin6.sin6_addr.s6_addr[12],
 			sizeof(sin->sin_addr));
         }
@@ -669,13 +683,11 @@ char *client_name(int fd)
 			break;
 	}
 
-	/* TODO: Do a  forward lookup as well to prevent spoofing */
-
 	if (res == NULL) {
 		strcpy(name_buf, def);
 		rprintf(FERROR, RSYNC_NAME ": "
-			"reverse name lookup mismatch on fd%d - spoofed address?\n",
-			fd);
+			"reverse name lookup for \"%s\" failed on fd%d - spoofed address? \n",
+			name_buf, fd);
 	}
 
 	freeaddrinfo(res0);
