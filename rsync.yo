@@ -737,6 +737,11 @@ unchanged files.  Files with changed ownership or permissions will not be
 linked.
 Like bf(--compare-dest) if DIR is a relative path, it is relative
 to the destination directory (which changes in a recursive transfer).
+An example:
+
+verb(
+    rsync -av --link-dest=$PWD/prior_dir host:src_dir/ new_dir/
+)
 
 dit(bf(-z, --compress)) With this option, rsync compresses any data from
 the files that it sends to the destination machine.  This
