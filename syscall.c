@@ -36,11 +36,13 @@ int do_symlink(char *fname1, char *fname2)
 	return symlink(fname1, fname2);
 }
 
+#if HAVE_LINK
 int do_link(char *fname1, char *fname2)
 {
 	if (dry_run) return 0;
 	return link(fname1, fname2);
 }
+#endif
 
 int do_lchown(const char *path, uid_t owner, gid_t group)
 {
@@ -48,11 +50,13 @@ int do_lchown(const char *path, uid_t owner, gid_t group)
 	return lchown(path, owner, group);
 }
 
+#if HAVE_MKNOD
 int do_mknod(char *pathname, mode_t mode, dev_t dev)
 {
 	if (dry_run) return 0;
 	return mknod(pathname, mode, dev);
 }
+#endif
 
 int do_rmdir(char *pathname)
 {
@@ -66,8 +70,10 @@ int do_open(char *pathname, int flags, mode_t mode)
 	return open(pathname, flags, mode);
 }
 
+#if HAVE_CHMOD
 int do_chmod(const char *path, mode_t mode)
 {
 	if (dry_run) return 0;
 	return chmod(path, mode);
 }
+#endif
