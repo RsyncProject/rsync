@@ -513,7 +513,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 	d = opendir(dir);
 	if (!d) {
 		io_error = 1;
-		rprintf(FERROR,"%s: %s\n",
+		rprintf(FERROR,"opendir(%s): %s\n",
 			dir,strerror(errno));
 		return;
 	}
