@@ -324,7 +324,7 @@ to the detailed description below for a complete description.  verb(
  -O, --omit-dir-times        omit directories when preserving times
  -S, --sparse                handle sparse files efficiently
  -n, --dry-run               show what would have been transferred
- -W, --whole-file            copy files whole
+ -W, --whole-file            copy files whole (without rsync algorithm)
      --no-whole-file         always use incremental rsync algorithm
  -x, --one-file-system       don't cross filesystem boundaries
  -B, --block-size=SIZE       force a fixed checksum block-size

@@ -276,7 +276,7 @@ void usage(enum logcode F)
   rprintf(F," -O, --omit-dir-times        omit directories when preserving times\n");
   rprintf(F," -S, --sparse                handle sparse files efficiently\n");
   rprintf(F," -n, --dry-run               show what would have been transferred\n");
-  rprintf(F," -W, --whole-file            copy files whole\n");
+  rprintf(F," -W, --whole-file            copy files whole (without rsync algorithm)\n");
   rprintf(F,"     --no-whole-file         always use incremental rsync algorithm\n");
   rprintf(F," -x, --one-file-system       don't cross filesystem boundaries\n");
   rprintf(F," -B, --block-size=SIZE       force a fixed checksum block-size\n");
