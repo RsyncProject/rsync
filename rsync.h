@@ -318,7 +318,7 @@ enum msgcode {
 #define uint32 unsigned int32
 #endif
 
-#if HAVE_OFF64_T
+#if SIZEOF_OFF64_T
 #define OFF_T off64_t
 #define STRUCT_STAT struct stat64
 #else
