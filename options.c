@@ -66,6 +66,7 @@ int read_only = 0;
 int module_id = -1;
 int am_server = 0;
 int am_sender = 0;
+int am_generator = 0;
 char *files_from = NULL;
 int filesfrom_fd = -1;
 char *remote_filesfrom_file = NULL;
