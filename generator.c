@@ -219,8 +219,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 
 	if (only_existing && statret == -1 && errno == ENOENT) {
 		/* we only want to update existing files */
-		if (verbose > 1) rprintf(FINFO, RSYNC_NAME
-					 ": not creating new file \"%s\"\n",fname);
+		if (verbose > 1) rprintf(FINFO, "not creating new file \"%s\"\n",fname);
 		return;
 	}
 
@@ -273,7 +272,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 
 		if (safe_symlinks && unsafe_symlink(file->link, fname)) {
 			if (verbose) {
-				rprintf(FINFO,RSYNC_NAME ": ignoring unsafe symlink \"%s\" -> \"%s\"\n",
+				rprintf(FINFO,"ignoring unsafe symlink \"%s\" -> \"%s\"\n",
 					fname,file->link);
 			}
 			return;
@@ -301,8 +300,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 		} else {
 			set_perms(fname,file,NULL,0);
 			if (verbose) {
-				rprintf(FINFO,RSYNC_NAME": %s -> %s\n",
-					fname,file->link);
+				rprintf(FINFO,"%s -> %s\n", fname,file->link);
 			}
 		}
 #endif
@@ -334,14 +332,12 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 
 	if (preserve_hard_links && check_hard_link(file)) {
 		if (verbose > 1)
-			rprintf(FINFO, RSYNC_NAME
-				": \"%s\" is a hard link\n",f_name(file));
+			rprintf(FINFO, "\"%s\" is a hard link\n",f_name(file));
 		return;
 	}
 
 	if (!S_ISREG(file->mode)) {
-		rprintf(FINFO, RSYNC_NAME
-			": skipping non-regular file \"%s\"\n",fname);
+		rprintf(FINFO, "skipping non-regular file \"%s\"\n",fname);
 		return;
 	}
 

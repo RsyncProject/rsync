@@ -34,6 +34,7 @@
 extern struct stats stats;
 
 extern int verbose;
+extern int do_progress;
 extern int am_server;
 extern int always_checksum;
 
@@ -69,29 +70,32 @@ static struct file_struct null_file;
 static void clean_flist(struct file_list *flist, int strip_root);
 
 
-static int show_build_progress_p(void)
+static int show_filelist_p(void)
 {
-	extern int do_progress;
-
-	return do_progress && verbose && recurse && !am_server;
+	return verbose && recurse && !am_server;
 }
 
-/**
- * True if we're local, etc, and should emit progress emssages.
- **/
-static void emit_build_progress(const struct file_list *flist)
+static void start_filelist_progress(char *kind)
+{
+	rprintf(FINFO, "%s ... ", kind);
+	if ((verbose > 1) || do_progress)
+		rprintf(FINFO, "\n");
+	rflush(FINFO);
+}
+
+static void emit_filelist_progress(const struct file_list *flist)
 {
 	rprintf(FINFO, " %d files...\r", flist->count);
 }
 
 
-static void finish_build_progress(const struct file_list *flist)
+static void finish_filelist_progress(const struct file_list *flist)
 {
-	if (verbose && recurse && !am_server) {
-		/* This overwrites the progress line, if any. */
-		rprintf(FINFO, RSYNC_NAME ": %d files to consider.\n",
-			flist->count);
-	}
+	if (do_progress) {
+		/* This overwrites the progress line */
+		rprintf(FINFO, "%d files to consider\n", flist->count);
+	} else
+		rprintf(FINFO, "done\n");
 }
 
 
@@ -292,7 +296,7 @@ static void flist_expand(struct file_list *flist)
 		new_ptr = realloc(flist->files, new_bytes);
 
 		if (verbose >= 2) {
-			rprintf(FINFO, RSYNC_NAME ": expand file_list to %.0f bytes, did%s move\n",
+			rprintf(FINFO, "expand file_list to %.0f bytes, did%s move\n",
 				(double) new_bytes,
 				(new_ptr == flist->files) ? " not" : "");
 		}
@@ -736,8 +740,8 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 	if (!file)
 		return;
 
-	if (show_build_progress_p() & !(flist->count % 100))
-		emit_build_progress(flist);
+	if (do_progress && show_filelist_p() && ((flist->count % 100) == 0))
+		emit_filelist_progress(flist);
 
 	flist_expand(flist);
 
@@ -836,12 +840,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	struct file_list *flist;
 	int64 start_write;
 
-	if (verbose && recurse && !am_server && f != -1) {
-		rprintf(FINFO, RSYNC_NAME ": building file list...\n");
-		if (verbose > 1)
-			rprintf(FINFO, "\n");
-		rflush(FINFO);
-	}
+	if (show_filelist_p() && f != -1)
+		start_filelist_progress("building file list");
 
 	start_write = stats.total_written;
 
@@ -963,7 +963,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		send_file_entry(NULL, f, 0);
 	}
 
-	finish_build_progress(flist);
+	if (show_filelist_p())
+		finish_filelist_progress(flist);
 
 	clean_flist(flist, 0);
 
@@ -1001,10 +1002,8 @@ struct file_list *recv_file_list(int f)
 	int64 start_read;
 	extern int list_only;
 
-	if (verbose && recurse && !am_server) {
-		rprintf(FINFO, "receiving file list ... ");
-		rflush(FINFO);
-	}
+	if (show_filelist_p())
+		start_filelist_progress("receiving file list");
 
 	start_read = stats.total_read;
 
@@ -1033,6 +1032,9 @@ struct file_list *recv_file_list(int f)
 
 		flist->count++;
 
+		if (do_progress && show_filelist_p() && ((flist->count % 100) == 0))
+			emit_filelist_progress(flist);
+
 		if (verbose > 2)
 			rprintf(FINFO, "recv_file_name(%s)\n",
 				f_name(flist->files[i]));
@@ -1044,8 +1046,8 @@ struct file_list *recv_file_list(int f)
 
 	clean_flist(flist, relative_paths);
 
-	if (verbose && recurse && !am_server) {
-		rprintf(FINFO, "done\n");
+	if (show_filelist_p()) {
+		finish_filelist_progress(flist);
 	}
 
 	/* now recv the uid/gid list. This was introduced in protocol version 15 */

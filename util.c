@@ -86,7 +86,7 @@ int fd_pair(int fd[2])
 
 void print_child_argv(char **cmd)
 {
-	rprintf(FINFO, RSYNC_NAME ": open connection using ");
+	rprintf(FINFO, "opening connection using ");
 	for (; *cmd; cmd++) {
 		/* Look for characters that ought to be quoted.  This
 		* is not a great quoting algorithm, but it's
