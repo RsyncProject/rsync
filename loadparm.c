@@ -584,6 +584,9 @@ static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
 			     break;
 		     }
 	     }
+	     if (!parm_table[parmnum].enum_list[i].name) {
+		     *(int *)parm_ptr = atoi(parmvalue);
+	     }
 	     break;
      case P_SEP:
 	     break;
