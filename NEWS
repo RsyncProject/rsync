@@ -13,10 +13,9 @@ Changes since 2.6.0:
 
     * The --progress output now mentions how far along in the
       transfer we are, including both a count of files transferred
-      and a percentage of the total file-count that we're processed.
-      It was also improved to better show the current rate of
-      transfer (which is used to estimate the remaining transfer
-      time).
+      and a percentage of the total file-count that we've processed.
+      It also shows better current-rate-of-transfer and remaining-
+      transfer-time values.
 
     * The configure script now accepts --with-rsyncd-conf=PATH
       to override the default value of the /etc/rsyncd.conf file.
