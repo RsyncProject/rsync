@@ -19,6 +19,14 @@
 #include <unistd.h>
 #endif
 
+#if !defined(__GNUC__) || defined(APPLE)
+/* Apparently the OS X port of gcc gags on __attribute__.
+ *
+ * <http://www.opensource.apple.com/bugs/X/gcc/2512150.html> */
+#define __attribute__(x) 
+
+#endif
+
 #ifdef __NeXT
 /* access macros are not declared in non posix mode in unistd.h -
  don't try to use posix on NeXTstep 3.3 ! */
