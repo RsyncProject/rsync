@@ -41,7 +41,7 @@ printmsg() {
 }
 
 
-rsync_ls_lR {
+rsync_ls_lR() {
     find "$@" -print | sort | xargs $TLS
 }
 
