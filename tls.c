@@ -62,7 +62,7 @@ static void failed (char const *what,
 
 static void list_file (const char *fname)
 {
-	struct stat buf;
+	STRUCT_STAT buf;
 	char permbuf[PERMSTRING_SIZE];
 	struct tm *mt;
 	char datebuf[50];
