@@ -687,7 +687,7 @@ static int start_client(int argc, char *argv[])
 			*p = 0;
 			path = p+1;
 		} else {
-			path="";
+			path = "";
 		}
 		p = strchr(host,':');
 		if (p) {
@@ -698,7 +698,7 @@ static int start_client(int argc, char *argv[])
 	}
 
 	if (!read_batch) {
-	    p = find_colon(argv[0]);
+		p = find_colon(argv[0]);
 
 	if (p) {
 		if (p[1] == ':') { /* double colon */
@@ -724,6 +724,26 @@ static int start_client(int argc, char *argv[])
 		argv++;
 	} else {
 		am_sender = 1;
+
+		/* rsync:// destination uses rsync server over direct socket */
+		if (strncasecmp(URL_PREFIX, argv[argc-1], strlen(URL_PREFIX)) == 0) {
+			char *host, *path;
+
+			host = argv[argc-1] + strlen(URL_PREFIX);
+			p = strchr(host,'/');
+			if (p) {
+				*p = 0;
+				path = p+1;
+			} else {
+				path = "";
+			}
+			p = strchr(host,':');
+			if (p) {
+				rsync_port = atoi(p+1);
+				*p = 0;
+			}
+			return start_socket_client(host, path, argc-1, argv);
+		}
 
 		p = find_colon(argv[argc-1]);
 		if (!p) {
