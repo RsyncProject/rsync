@@ -25,6 +25,7 @@
 
 extern int verbose;
 extern int dry_run;
+extern int itemize_changes;
 extern int relative_paths;
 extern int keep_dirlinks;
 extern int preserve_links;
@@ -92,28 +93,29 @@ static void itemize(struct file_struct *file, int statret, STRUCT_STAT *st,
 	if (statret >= 0) {
 		if (S_ISREG(file->mode) && file->length != st->st_size)
 			iflags |= ITEM_REPORT_SIZE;
-	} else
-		iflags |= ITEM_IS_NEW;
-	if (statret >= 0 && !(sflags & SID_NO_DEST_AND_NO_UPDATE)) {
-		int keep_time = !preserve_times ? 0
-		    : S_ISDIR(file->mode) ? !omit_dir_times : !S_ISLNK(file->mode);
+		if (!(sflags & SID_NO_DEST_AND_NO_UPDATE)) {
+			int keep_time = !preserve_times ? 0
+			    : S_ISDIR(file->mode) ? !omit_dir_times
+			    : !S_ISLNK(file->mode);
 
-		if ((iflags & ITEM_UPDATING && !keep_time)
-		    || (keep_time && file->modtime != st->st_mtime))
-			iflags |= ITEM_REPORT_TIME;
-		if (preserve_perms && file->mode != st->st_mode)
-			iflags |= ITEM_REPORT_PERMS;
-		if (preserve_uid && am_root && file->uid != st->st_uid)
-			iflags |= ITEM_REPORT_OWNER;
-		if (preserve_gid && file->gid != GID_NONE && st->st_gid != file->gid)
-			iflags |= ITEM_REPORT_GROUP;
-	}
+			if ((iflags & ITEM_UPDATING && !keep_time)
+			    || (keep_time && file->modtime != st->st_mtime))
+				iflags |= ITEM_REPORT_TIME;
+			if (preserve_perms && file->mode != st->st_mode)
+				iflags |= ITEM_REPORT_PERMS;
+			if (preserve_uid && am_root && file->uid != st->st_uid)
+				iflags |= ITEM_REPORT_OWNER;
+			if (preserve_gid && file->gid != GID_NONE
+			    && st->st_gid != file->gid)
+				iflags |= ITEM_REPORT_GROUP;
+		}
+	} else
+		iflags |= ITEM_IS_NEW | ITEM_UPDATING;
 
 	if (iflags && !read_batch) {
 		if (ndx >= 0)
 			write_int(f_out, ndx);
-		write_byte(f_out, iflags);
-		write_byte(f_out, iflags >> 8);
+		write_short(f_out, iflags);
 	}
 }
 
@@ -345,6 +347,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 	char *fnamecmp, *partialptr, *backupptr = NULL;
 	char fnamecmpbuf[MAXPATHLEN];
 	uchar fnamecmp_type;
+	int maybe_DEL_TERSE = itemize_changes ? 0 : DEL_TERSE;
 
 	if (list_only)
 		return;
@@ -427,7 +430,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 		 * we need to delete it.  If it doesn't exist, then
 		 * (perhaps recursively) create it. */
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
-			delete_file(fname, DEL_TERSE);
+			delete_file(fname, maybe_DEL_TERSE);
 			statret = -1;
 		}
 		if (dry_run && statret != 0 && missing_below < 0) {
@@ -496,7 +499,12 @@ static void recv_generator(char *fname, struct file_list *flist,
 			}
 			/* Not the right symlink (or not a symlink), so
 			 * delete it. */
-			delete_file(fname, dflag | DEL_TERSE);
+			if (S_ISLNK(st.st_mode))
+				delete_file(fname, dflag | DEL_TERSE);
+			else {
+				delete_file(fname, dflag | maybe_DEL_TERSE);
+				statret = -1;
+			}
 		}
 		if (do_symlink(file->u.link,fname) != 0) {
 			rsyserr(FERROR, errno, "symlink %s -> \"%s\" failed",
@@ -520,11 +528,12 @@ static void recv_generator(char *fname, struct file_list *flist,
 		    st.st_mode != file->mode ||
 		    st.st_rdev != file->u.rdev) {
 			int dflag = S_ISDIR(st.st_mode) ? DEL_DIR : 0;
-			if (protocol_version >= 29) {
-				itemize(file, statret, &st, SID_UPDATING,
-					f_out, ndx);
+			if (IS_DEVICE(st.st_mode))
+				delete_file(fname, dflag | DEL_TERSE);
+			else {
+				delete_file(fname, dflag | maybe_DEL_TERSE);
+				statret = -1;
 			}
-			delete_file(fname, dflag | DEL_TERSE);
 			if (verbose > 2) {
 				rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",
 					safe_fname(fname),
@@ -535,7 +544,10 @@ static void recv_generator(char *fname, struct file_list *flist,
 					full_fname(fname));
 			} else {
 				set_perms(fname,file,NULL,0);
-				if (verbose && protocol_version < 29) {
+				if (protocol_version >= 29) {
+					itemize(file, statret, &st, SID_UPDATING,
+						f_out, ndx);
+				} else if (verbose) {
 					rprintf(FINFO, "%s\n",
 						safe_fname(fname));
 				}
@@ -619,7 +631,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 
 	if (statret == 0 && !S_ISREG(st.st_mode)) {
 		int dflag = S_ISDIR(st.st_mode) ? DEL_DIR : 0;
-		if (delete_file(fname, dflag | DEL_TERSE) != 0)
+		if (delete_file(fname, dflag | maybe_DEL_TERSE) != 0)
 			return;
 		statret = -1;
 		stat_errno = ENOENT;
