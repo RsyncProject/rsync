@@ -80,6 +80,7 @@ void init_flist(void)
 
     /* Figure out how big the file_struct is without trailing padding */
     min_file_struct_len = ((char*)&f.flags - (char*)&f) + sizeof f.flags;
+    min_file_struct_len = sizeof f; /* XXX test for build-farm */
 }
 
 
