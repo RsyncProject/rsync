@@ -44,10 +44,8 @@ void setup_protocol(int f_out,int f_in)
 		if (am_server) {
 			remote_version = read_int(f_in);
 			write_int(f_out,PROTOCOL_VERSION);
-			write_flush(f_out);
 		} else {
 			write_int(f_out,PROTOCOL_VERSION);
-			write_flush(f_out);
 			remote_version = read_int(f_in);
 		}
 	}

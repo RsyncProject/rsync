@@ -56,8 +56,6 @@
 
 #define MAX_ARGS 1000
 
-#define BLOCKING_TIMEOUT 10
-
 #define MPLEX_BASE 7
 #define FERROR 1
 #define FINFO 2

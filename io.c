@@ -34,7 +34,6 @@ static int multiplex_out_fd;
 static time_t last_io;
 
 extern int verbose;
-extern int sparse_files;
 extern int io_timeout;
 
 int64 write_total(void)
@@ -49,9 +48,8 @@ int64 read_total(void)
 
 static int buffer_f_in = -1;
 
-void setup_nonblocking(int f_in,int f_out)
+void setup_readbuffer(int f_in)
 {
-	set_blocking(f_out,0);
 	buffer_f_in = f_in;
 }
 
@@ -81,44 +79,70 @@ static char *read_buffer_p;
 static int read_buffer_len;
 static int read_buffer_size;
 
+/* read from a socket with IO timeout. return the number of
+   bytes read. If no bytes can be read then exit, never return
+   a number <= 0 */
+static int read_timeout(int fd, char *buf, int len)
+{
+	int n, ret=0;
+
+	while (ret == 0) {
+		fd_set fds;
+		struct timeval tv;
+
+		FD_ZERO(&fds);
+		FD_SET(fd, &fds);
+		tv.tv_sec = io_timeout;
+		tv.tv_usec = 0;
+
+		if (select(fd+1, &fds, NULL, NULL, 
+			   io_timeout?&tv:NULL) != 1) {
+			check_timeout();
+			continue;
+		}
+
+		n = read(fd, buf, len);
+
+		if (n > 0) {
+			buf += n;
+			len -= n;
+			ret += n;
+			if (io_timeout)
+				last_io = time(NULL);
+			continue;
+		}
+
+		if (n == -1 && errno == EINTR) {
+			continue;
+		}
+
+		if (n == 0) {
+			rprintf(FERROR,"EOF in read_timeout\n");
+			exit_cleanup(1);
+		}
+
+		rprintf(FERROR,"read error: %s\n", strerror(errno));
+		exit_cleanup(1);
+	}
+
+	return ret;
+}
 
 /* continue trying to read len bytes - don't return until len
    has been read */
 static void read_loop(int fd, char *buf, int len)
 {
 	while (len) {
-		int n = read(fd, buf, len);
-		if (n > 0) {
-			buf += n;
-			len -= n;
-		}
-		if (n == 0) {
-			rprintf(FERROR,"EOF in read_loop\n");
-			exit_cleanup(1);
-		}
-		if (n == -1) {
-			fd_set fds;
-			struct timeval tv;
+		int n = read_timeout(fd, buf, len);
 
-			if (errno != EAGAIN && errno != EWOULDBLOCK) {
-				rprintf(FERROR,"io error: %s\n", 
-					strerror(errno));
-				exit_cleanup(1);
-			}
-
-			FD_ZERO(&fds);
-			FD_SET(fd, &fds);
-			tv.tv_sec = io_timeout;
-			tv.tv_usec = 0;
-
-			if (select(fd+1, &fds, NULL, NULL, 
-				   io_timeout?&tv:NULL) != 1) {
-				check_timeout();
-			}
-		}
+		buf += n;
+		len -= n;
 	}
 }
 
+/* read from the file descriptor handing multiplexing - 
+   return number of bytes read
+   never return <= 0 */
 static int read_unbuffered(int fd, char *buf, int len)
 {
 	static int remaining;
@@ -127,7 +151,7 @@ static int read_unbuffered(int fd, char *buf, int len)
 	char line[1024];
 
 	if (!io_multiplexing_in || fd != multiplex_in_fd) 
-		return read(fd, buf, len);
+		return read_timeout(fd, buf, len);
 
 	while (ret == 0) {
 		if (remaining) {
@@ -170,24 +194,19 @@ static int read_unbuffered(int fd, char *buf, int len)
 }
 
 
+
 /* This function was added to overcome a deadlock problem when using
  * ssh.  It looks like we can't allow our receive queue to get full or
  * ssh will clag up. Uggh.  */
 static void read_check(int f)
 {
-	int n;
+	int n = 8192;
 
 	if (f == -1) return;
 
 	if (read_buffer_len == 0) {
 		read_buffer_p = read_buffer;
 	}
-
-	if ((n=num_waiting(f)) <= 0)
-		return;
-
-	/* things could deteriorate if we read in really small chunks */
-	if (n < 10) n = 1024;
 
 	if (n > MAX_READ_BUFFER/4)
 		n = MAX_READ_BUFFER/4;
@@ -208,19 +227,20 @@ static void read_check(int f)
 	}
 
 	n = read_unbuffered(f,read_buffer+read_buffer_len,n);
-	if (n > 0) {
-		read_buffer_len += n;
-	}
+	read_buffer_len += n;
 }
 
-static int readfd(int fd,char *buffer,int N)
+
+/* do a buffered read from fd. don't return until all N bytes
+   have been read. If all N can't be read then exit with an error */
+static void readfd(int fd,char *buffer,int N)
 {
 	int  ret;
 	int total=0;  
-	struct timeval tv;
 	
-	if (read_buffer_len < N)
+	if (read_buffer_len < N && N < 1024) {
 		read_check(buffer_f_in);
+	}
 	
 	while (total < N) {
 		if (read_buffer_len > 0 && buffer_f_in == fd) {
@@ -234,45 +254,18 @@ static int readfd(int fd,char *buffer,int N)
 
 		io_flush();
 
-		while ((ret = read_unbuffered(fd,buffer + total,N-total)) == -1) {
-			fd_set fds;
-
-			if (errno != EAGAIN && errno != EWOULDBLOCK)
-				return -1;
-			FD_ZERO(&fds);
-			FD_SET(fd, &fds);
-			tv.tv_sec = io_timeout;
-			tv.tv_usec = 0;
-
-			if (select(fd+1, &fds, NULL, NULL, 
-				   io_timeout?&tv:NULL) != 1) {
-				check_timeout();
-			}
-		}
-
-		if (ret <= 0)
-			return total;
+		ret = read_unbuffered(fd,buffer + total,N-total);
 		total += ret;
 	}
-
-	if (io_timeout)
-		last_io = time(NULL);
-	return total;
 }
 
 
 int32 read_int(int f)
 {
-  int ret;
-  char b[4];
-  if ((ret=readfd(f,b,4)) != 4) {
-    if (verbose > 1) 
-      rprintf(FERROR,"(%d) read_int: Error reading %d bytes : %s\n",
-	      getpid(),4,ret==-1?strerror(errno):"EOF");
-    exit_cleanup(1);
-  }
-  total_read += 4;
-  return IVAL(b,0);
+	char b[4];
+	readfd(f,b,4);
+	total_read += 4;
+	return IVAL(b,0);
 }
 
 int64 read_longint(int f)
@@ -289,12 +282,7 @@ int64 read_longint(int f)
 	exit_cleanup(1);
 #else
 	if (remote_version >= 16) {
-		if ((ret=readfd(f,b,8)) != 8) {
-			if (verbose > 1) 
-				rprintf(FERROR,"(%d) read_longint: Error reading %d bytes : %s\n",
-					getpid(),8,ret==-1?strerror(errno):"EOF");
-			exit_cleanup(1);
-		}
+		readfd(f,b,8);
 		total_read += 8;
 		ret = IVAL(b,0) | (((int64)IVAL(b,4))<<32);
 	}
@@ -305,14 +293,8 @@ int64 read_longint(int f)
 
 void read_buf(int f,char *buf,int len)
 {
-  int ret;
-  if ((ret=readfd(f,buf,len)) != len) {
-    if (verbose > 1) 
-      rprintf(FERROR,"(%d) read_buf: Error reading %d bytes : %s\n",
-	      getpid(),len,ret==-1?strerror(errno):"EOF");
-    exit_cleanup(1);
-  }
-  total_read += len;
+	readfd(f,buf,len);
+	total_read += len;
 }
 
 void read_sbuf(int f,char *buf,int len)
@@ -323,149 +305,73 @@ void read_sbuf(int f,char *buf,int len)
 
 unsigned char read_byte(int f)
 {
-  unsigned char c;
-  read_buf(f,(char *)&c,1);
-  return c;
-}
-
-
-static char last_byte;
-static int last_sparse;
-
-int sparse_end(int f)
-{
-	if (last_sparse) {
-		do_lseek(f,-1,SEEK_CUR);
-		return (write(f,&last_byte,1) == 1 ? 0 : -1);
-	}
-	last_sparse = 0;
-	return 0;
-}
-
-
-static int write_sparse(int f,char *buf,int len)
-{
-	int l1=0,l2=0;
-	int ret;
-
-	for (l1=0;l1<len && buf[l1]==0;l1++) ;
-	for (l2=0;l2<(len-l1) && buf[len-(l2+1)]==0;l2++) ;
-
-	last_byte = buf[len-1];
-
-	if (l1 == len || l2 > 0)
-		last_sparse=1;
-
-	if (l1 > 0)
-		do_lseek(f,l1,SEEK_CUR);  
-
-	if (l1 == len) 
-		return len;
-
-	if ((ret=write(f,buf+l1,len-(l1+l2))) != len-(l1+l2)) {
-		if (ret == -1 || ret == 0) return ret;
-		return (l1+ret);
-	}
-
-	if (l2 > 0)
-		do_lseek(f,l2,SEEK_CUR);
-	
-	return len;
+	unsigned char c;
+	read_buf(f,(char *)&c,1);
+	return c;
 }
 
 
 
-int write_file(int f,char *buf,int len)
-{
-	int ret = 0;
-
-	if (!sparse_files) 
-		return write(f,buf,len);
-
-	while (len>0) {
-		int len1 = MIN(len, SPARSE_WRITE_SIZE);
-		int r1 = write_sparse(f, buf, len1);
-		if (r1 <= 0) {
-			if (ret > 0) return ret;
-			return r1;
-		}
-		len -= r1;
-		buf += r1;
-		ret += r1;
-	}
-	return ret;
-}
-
-
-static int writefd_unbuffered(int fd,char *buf,int len)
+/* write len bytes to fd, possibly reading from buffer_f_in if set
+   in order to unclog the pipe. don't return until all len
+   bytes have been written */
+static void writefd_unbuffered(int fd,char *buf,int len)
 {
 	int total = 0;
 	fd_set w_fds, r_fds;
-	int fd_count, count, got_select=0;
+	int fd_count, count;
 	struct timeval tv;
+	int reading;
+
+	reading = (buffer_f_in != -1 && read_buffer_len < MAX_READ_BUFFER);
 
 	while (total < len) {
-		int ret = write(fd,buf+total,len-total);
-
-		if (ret == 0) return total;
-
-		if (ret == -1 && !(errno == EWOULDBLOCK || errno == EAGAIN)) 
-			return -1;
-
-		if (ret == -1 && got_select) {
-			/* hmmm, we got a write select on the fd and
-			   then failed to write.  Why doesn't that
-			   mean that the fd is dead? It doesn't on
-			   some systems it seems (eg. IRIX) */
-			u_sleep(1000);
-		}
-
-		got_select = 0;
-
-
-		if (ret != -1) {
-			total += ret;
-			continue;
-		}
-
-		if (read_buffer_len < MAX_READ_BUFFER && buffer_f_in != -1)
-			read_check(buffer_f_in);
-
-		fd_count = fd+1;
 		FD_ZERO(&w_fds);
 		FD_ZERO(&r_fds);
 		FD_SET(fd,&w_fds);
-		if (buffer_f_in != -1) {
+		fd_count = fd+1;
+
+		if (reading) {
 			FD_SET(buffer_f_in,&r_fds);
 			if (buffer_f_in > fd) 
 				fd_count = buffer_f_in+1;
 		}
 
-		tv.tv_sec = BLOCKING_TIMEOUT;
+		tv.tv_sec = io_timeout;
 		tv.tv_usec = 0;
-		count = select(fd_count,buffer_f_in == -1? NULL: &r_fds,
-			       &w_fds,NULL,&tv);
-		
-		if (count == -1 && errno != EINTR) {
-			if (verbose > 1) 
-				rprintf(FERROR,"select error: %s\n", strerror(errno));
-			exit_cleanup(1);
-		}
-		
-		if (count == 0) {
+
+		count = select(fd_count,
+			       reading?&r_fds:NULL,
+			       &w_fds,NULL,
+			       io_timeout?&tv:NULL);
+
+		if (count <= 0) {
 			check_timeout();
 			continue;
 		}
-		
+
 		if (FD_ISSET(fd, &w_fds)) {
-			got_select = 1;
+			int ret = write(fd,buf+total,len-total);
+
+			if (ret == -1 && errno == EINTR) {
+				continue;
+			}
+
+			if (ret <= 0) {
+				rprintf(FERROR,"erroring writing %d bytes - exiting\n", len);
+				exit_cleanup(1);
+			}
+
+			total += ret;
+			if (io_timeout)
+				last_io = time(NULL);
+			continue;
+		}
+
+		if (reading && FD_ISSET(buffer_f_in, &r_fds)) {
+			read_check(buffer_f_in);
 		}
 	}
-
-	if (io_timeout)
-		last_io = time(NULL);
-	
-	return total;
 }
 
 
@@ -491,17 +397,9 @@ void io_flush(void)
 
 	if (io_multiplexing_out) {
 		SIVAL(io_buffer-4, 0, (MPLEX_BASE<<24) + io_buffer_count);
-		if (writefd_unbuffered(fd, io_buffer-4, io_buffer_count+4) !=
-		    io_buffer_count+4) {
-			rprintf(FERROR,"write failed\n");
-			exit_cleanup(1);
-		}
+		writefd_unbuffered(fd, io_buffer-4, io_buffer_count+4);
 	} else {
-		if (writefd_unbuffered(fd, io_buffer, io_buffer_count) != 
-		    io_buffer_count) {
-			rprintf(FERROR,"write failed\n");
-			exit_cleanup(1);
-		}
+		writefd_unbuffered(fd, io_buffer, io_buffer_count);
 	}
 	io_buffer_count = 0;
 }
@@ -515,11 +413,12 @@ void io_end_buffering(int fd)
 	}
 }
 
-static int writefd(int fd,char *buf,int len1)
+static void writefd(int fd,char *buf,int len)
 {
-	int len = len1;
-
-	if (!io_buffer) return writefd_unbuffered(fd, buf, len);
+	if (!io_buffer) {
+		writefd_unbuffered(fd, buf, len);
+		return;
+	}
 
 	while (len) {
 		int n = MIN(len, IO_BUFFER_SIZE-io_buffer_count);
@@ -532,21 +431,14 @@ static int writefd(int fd,char *buf,int len1)
 		
 		if (io_buffer_count == IO_BUFFER_SIZE) io_flush();
 	}
-
-	return len1;
 }
 
 
 void write_int(int f,int32 x)
 {
-	int ret;
 	char b[4];
 	SIVAL(b,0,x);
-	if ((ret=writefd(f,b,4)) != 4) {
-		rprintf(FERROR,"write_int failed : %s\n",
-			ret==-1?strerror(errno):"EOF");
-		exit_cleanup(1);
-	}
+	writefd(f,b,4);
 	total_written += 4;
 }
 
@@ -554,7 +446,6 @@ void write_longint(int f, int64 x)
 {
 	extern int remote_version;
 	char b[8];
-	int ret;
 
 	if (remote_version < 16 || x <= 0x7FFFFFFF) {
 		write_int(f, (int)x);
@@ -565,22 +456,13 @@ void write_longint(int f, int64 x)
 	SIVAL(b,0,(x&0xFFFFFFFF));
 	SIVAL(b,4,((x>>32)&0xFFFFFFFF));
 
-	if ((ret=writefd(f,b,8)) != 8) {
-		rprintf(FERROR,"write_longint failed : %s\n",
-			ret==-1?strerror(errno):"EOF");
-		exit_cleanup(1);
-	}
+	writefd(f,b,8);
 	total_written += 8;
 }
 
 void write_buf(int f,char *buf,int len)
 {
-	int ret;
-	if ((ret=writefd(f,buf,len)) != len) {
-		rprintf(FERROR,"write_buf failed : %s\n",
-			ret==-1?strerror(errno):"EOF");
-		exit_cleanup(1);
-	}
+	writefd(f,buf,len);
 	total_written += len;
 }
 
@@ -595,11 +477,6 @@ void write_byte(int f,unsigned char c)
 {
 	write_buf(f,(char *)&c,1);
 }
-
-void write_flush(int f)
-{
-}
-
 
 int read_line(int f, char *buf, int maxlen)
 {

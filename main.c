@@ -49,7 +49,6 @@ static void report(int f)
 		write_longint(f,read_total());
 		write_longint(f,write_total());
 		write_longint(f,total_size);
-		write_flush(f);
 		return;
 	}
     

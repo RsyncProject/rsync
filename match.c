@@ -103,9 +103,6 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 	send_token(f,i,buf,last_match,n,i<0?0:s->sums[i].len);
 	data_transfer += n;
 
-	if (n > 0)
-		write_flush(f);
-
 	if (i >= 0)
 		n += s->sums[i].len;
   

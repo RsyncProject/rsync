@@ -691,7 +691,6 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 
 	if (f != -1) {
 		io_end_buffering(f);
-		write_flush(f);
 	}
 
 	if (verbose > 2)

@@ -147,7 +147,6 @@ static void send_sums(struct sum_struct *s,int f_out)
       write_int(f_out,s->sums[i].sum1);
       write_buf(f_out,s->sums[i].sum2,csum_length);
     }
-  write_flush(f_out);
 }
 
 
@@ -528,7 +527,6 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 
   write_int(f_out,i);
   send_sums(s,f_out);
-  write_flush(f_out);
 
   close(fd);
   if (buf) unmap_file(buf);
@@ -773,7 +771,6 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	  if (verbose > 2)
 	    rprintf(FINFO,"recv_files phase=%d\n",phase);
 	  write_int(f_gen,-1);
-	  write_flush(f_gen);
 	  continue;
 	}
 	break;
@@ -972,7 +969,7 @@ void send_files(struct file_list *flist,int f_out,int f_in)
   if (verbose > 2)
     rprintf(FINFO,"send_files starting\n");
 
-  setup_nonblocking(f_in,f_out);
+  setup_readbuffer(f_in);
 
   while (1) {
 	  i = read_int(f_in);
@@ -981,7 +978,6 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 			  phase++;
 			  csum_length = SUM_LENGTH;
 			  write_int(f_out,-1);
-			  write_flush(f_out);
 			  if (verbose > 2)
 				  rprintf(FINFO,"send_files phase=%d\n",phase);
 			  continue;
@@ -1063,7 +1059,6 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 		  printf("%s\n",fname+offset);
 	  
 	  match_sums(f_out,s,buf,st.st_size);
-	  write_flush(f_out);
 	  
 	  if (buf) unmap_file(buf);
 	  close(fd);
@@ -1080,7 +1075,6 @@ void send_files(struct file_list *flist,int f_out,int f_in)
   match_report();
 
   write_int(f_out,-1);
-  write_flush(f_out);
 }
 
 
@@ -1120,7 +1114,6 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
     rprintf(FINFO,"generate_files phase=%d\n",phase);
 
   write_int(f,-1);
-  write_flush(f);
 
   /* we expect to just sit around now, so don't exit on a timeout. If we
      really get a timeout then the other process should exit */
@@ -1140,7 +1133,6 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
       rprintf(FINFO,"generate_files phase=%d\n",phase);
 
     write_int(f,-1);
-    write_flush(f);
   }
 
 
