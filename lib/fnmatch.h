@@ -55,9 +55,13 @@ extern "C" {
 #define	FNM_NOESCAPE	(1 << 1) /* Backslashes don't quote special chars.  */
 #define	FNM_PERIOD	(1 << 2) /* Leading `.' is matched only explicitly.  */
 
-#if !defined _POSIX_C_SOURCE || _POSIX_C_SOURCE < 2 || defined _GNU_SOURCE
+#ifndef FNM_FILE_NAME
 # define FNM_FILE_NAME	 FNM_PATHNAME	/* Preferred GNU name.  */
+#endif
+#ifndef FNM_LEADING_DIR
 # define FNM_LEADING_DIR (1 << 3)	/* Ignore `/...' after a match.  */
+#endif
+#ifndef FNM_CASEFOLD
 # define FNM_CASEFOLD	 (1 << 4)	/* Compare without regard to case.  */
 #endif
 

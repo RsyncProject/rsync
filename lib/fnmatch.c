@@ -48,7 +48,6 @@
 #endif
 
 #endif /* 0 */
-
 /* For platform which support the ISO C amendement 1 functionality we
    support user defined character classes.  */
 #if defined _LIBC || (defined HAVE_WCTYPE_H && defined HAVE_WCHAR_H)
@@ -65,8 +64,7 @@
    program understand `configure --with-gnu-libc' and omit the object files,
    it is simpler to just do this in the source for each such file.  */
 
-#if defined _LIBC || !defined __GNU_LIBRARY__
-
+#if 1
 
 # if defined STDC_HEADERS || !defined isascii
 #  define ISASCII(c) 1
