@@ -117,6 +117,9 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 		}
 
 		if (strcmp(line,"@RSYNCD: OK") == 0) break;
+
+		if (strcmp(line,"@RSYNCD: EXIT") == 0) exit(0);
+
 		rprintf(FINFO,"%s\n", line);
 	}
 
@@ -381,6 +384,8 @@ static void send_listing(int fd)
 	for (i=0;i<n;i++)
 		if (lp_list(i))
 		    io_printf(fd, "%-15s\t%s\n", lp_name(i), lp_comment(i));
+
+	io_printf(fd, "@RSYNCD: EXIT\n");
 }
 
 /* this is called when a socket connection is established to a client
