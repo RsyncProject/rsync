@@ -386,9 +386,16 @@ static void init_service(service *pservice)
 
 
 /**
- * Assign a copy of @p v to @p *s, freeing any existing values and
- * handling NULL strings.  @p *v must be initialized when this is
- * called, either to NULL or a malloc'd string.
+ * Assign a copy of @p v to @p *s.  Handles NULL strings.  @p *v must
+ * be initialized when this is called, either to NULL or a malloc'd
+ * string.
+ *
+ * @fixme There is a small leak here in that sometimes the existing
+ * value will be dynamically allocated, and the old copy is lost.
+ * However, we can't always deallocate the old value, because in the
+ * case of sDefault, it points to a static string.  It would be nice
+ * to have either all-strdup'd values, or to never need to free
+ * memory.
  **/
 static void string_set(char **s, const char *v)
 {
@@ -396,8 +403,6 @@ static void string_set(char **s, const char *v)
 		*s = NULL;
 		return;
 	}
-	if (*s)
-		free(*s);
 	*s = strdup(v);
 	if (!*s)
 		exit_cleanup(RERR_MALLOC);
