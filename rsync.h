@@ -373,11 +373,11 @@ struct sum_buf {
 };
 
 struct sum_struct {
-  OFF_T flength;		/* total file length */
-  size_t count;			/* how many chunks */
-  size_t remainder;		/* flength % block_length */
-  size_t n;			/* block_length */
-  struct sum_buf *sums;		/* points to info for each chunk */
+	OFF_T flength;		/* total file length */
+	size_t count;		/* how many chunks */
+	size_t remainder;	/* flength % block_length */
+	size_t n;		/* block_length */
+	struct sum_buf *sums;	/* points to info for each chunk */
 };
 
 struct map_struct {
