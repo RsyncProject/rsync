@@ -22,6 +22,7 @@
 
 extern int dry_run;
 extern int verbose;
+extern int make_backups;
 
 #if SUPPORT_HARD_LINKS
 static int hlink_compare(struct file_struct **file1, struct file_struct **file2)
@@ -38,8 +39,8 @@ static int hlink_compare(struct file_struct **file1, struct file_struct **file2)
 	return file_compare(file1, file2);
 }
 
-struct file_struct **hlink_list;
-int hlink_count;
+static struct file_struct **hlink_list;
+static int hlink_count;
 
 #define LINKED(p1,p2) ((p1)->F_DEV == (p2)->F_DEV \
 		    && (p1)->F_INODE == (p2)->F_INODE)
@@ -190,7 +191,10 @@ void do_hard_links(void)
 				if (st2.st_dev == st1.st_dev
 				    && st2.st_ino == st1.st_ino)
 					continue;
-				if (robust_unlink(hlink2)) {
+				if (make_backups) {
+					if (!make_backup(hlink2))
+						continue;
+				} else if (robust_unlink(hlink2)) {
 					if (verbose > 0) {
 						rprintf(FINFO,
 						    "unlink %s failed: %s\n",
