@@ -44,6 +44,7 @@ Options
  -u, --update                update only (don't overwrite newer files)
  -l, --links                 preserve soft links
  -L, --copy-links            treat soft links like regular files
+     --copy-unsafe-links     copy links outside the source tree
      --safe-links            ignore links outside the destination tree
  -H, --hard-links            preserve hard links
  -p, --perms                 preserve permissions

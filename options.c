@@ -59,6 +59,7 @@ int do_stats=0;
 int do_progress=0;
 int keep_partial=0;
 int safe_symlinks=0;
+int copy_unsafe_links=0;
 int block_size=BLOCK_SIZE;
 
 char *backup_suffix = BACKUP_SUFFIX;
@@ -104,6 +105,7 @@ void usage(int F)
   rprintf(F," -u, --update                update only (don't overwrite newer files)\n");
   rprintf(F," -l, --links                 preserve soft links\n");
   rprintf(F," -L, --copy-links            treat soft links like regular files\n");
+  rprintf(F,"     --copy-unsafe-links     copy links outside the source tree\n");
   rprintf(F,"     --safe-links            ignore links outside the destination tree\n");
   rprintf(F," -H, --hard-links            preserve hard links\n");
   rprintf(F," -p, --perms                 preserve permissions\n");
@@ -152,7 +154,8 @@ enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
       OPT_EXCLUDE_FROM,OPT_DELETE,OPT_NUMERIC_IDS,OPT_RSYNC_PATH,
       OPT_FORCE,OPT_TIMEOUT,OPT_DAEMON,OPT_CONFIG,OPT_PORT,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS,
-      OPT_SAFE_LINKS, OPT_COMPARE_DEST, OPT_LOG_FORMAT,OPT_PASSWORD_FILE};
+      OPT_COPY_UNSAFE_LINKS, OPT_SAFE_LINKS, OPT_COMPARE_DEST,
+      OPT_LOG_FORMAT, OPT_PASSWORD_FILE};
 
 static char *short_options = "oblLWHpguDCtcahvqrRIxnSe:B:T:z";
 
@@ -187,6 +190,7 @@ static struct option long_options[] = {
   {"perms",       0,     0,    'p'},
   {"links",       0,     0,    'l'},
   {"copy-links",  0,     0,    'L'},
+  {"copy-unsafe-links", 0, 0,  OPT_COPY_UNSAFE_LINKS},
   {"safe-links",  0,     0,    OPT_SAFE_LINKS},
   {"whole-file",  0,     0,    'W'},
   {"hard-links",  0,     0,    'H'},
@@ -319,6 +323,10 @@ int parse_arguments(int argc, char *argv[], int frommain)
 
 		case OPT_INCLUDE_FROM:
 			add_exclude_file(optarg,1, 1);
+			break;
+
+		case OPT_COPY_UNSAFE_LINKS:
+			copy_unsafe_links=1;
 			break;
 
 		case OPT_SAFE_LINKS:
@@ -583,6 +591,9 @@ void server_options(char **args,int *argc)
 
 	if (force_delete)
 		args[ac++] = "--force";
+
+	if (copy_unsafe_links)
+		args[ac++] = "--copy-unsafe-links";
 
 	if (safe_symlinks)
 		args[ac++] = "--safe-links";

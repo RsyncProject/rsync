@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsync)(1)(15 Feb 1999)()()
+manpage(rsync)(1)(17 Feb 1999)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
@@ -233,6 +233,7 @@ Options
  -u, --update                update only (don't overwrite newer files)
  -l, --links                 preserve soft links
  -L, --copy-links            treat soft links like regular files
+     --copy-unsafe-links     copy links outside the source tree
      --safe-links            ignore links outside the destination tree
  -H, --hard-links            preserve hard links
  -p, --perms                 preserve permissions
@@ -349,7 +350,12 @@ remote system  to  be the same as the local system. Without this
 option, all symbolic links are skipped.
 
 dit(bf(-L, --copy-links)) This tells rsync to treat symbolic links just
-like  ordinary files.
+like ordinary files.
+
+dit(bf(--copy-unsafe-links)) This tells rsync to treat symbolic links that
+point outside the source tree like ordinary files.  Absolute symlinks are
+also treated like ordinary files, and so are any symlinks in the source
+path itself when --relative is used.
 
 dit(bf(--safe-links)) This tells rsync to ignore any symbolic links
 which point outside the destination tree. All absolute symlinks are

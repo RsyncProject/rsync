@@ -44,8 +44,11 @@ extern int preserve_gid;
 extern int preserve_times;
 extern int relative_paths;
 extern int copy_links;
+extern int copy_unsafe_links;
 extern int remote_version;
 extern int io_error;
+
+static char topsrcname[MAXPATHLEN];
 
 static struct exclude_struct **local_exclude_list;
 
@@ -84,6 +87,32 @@ static void list_file_entry(struct file_struct *f)
 	}
 }
 
+
+int readlink_stat(const char *Path, STRUCT_STAT *Buffer, char *Linkbuf) 
+{
+#if SUPPORT_LINKS
+	if (copy_links) {
+		return do_stat(Path, Buffer);
+	}
+	if (do_lstat(Path, Buffer) == -1) {
+		return -1;
+	}
+	if (S_ISLNK(Buffer->st_mode)) {
+		int l;
+		if ((l = readlink(Path,Linkbuf,MAXPATHLEN-1)) == -1) {
+			return -1;
+		}
+		Linkbuf[l] = 0;
+		if (copy_unsafe_links && (topsrcname[0] != '\0') &&
+				    unsafe_symlink(Linkbuf, topsrcname)) {
+			return do_stat(Path, Buffer);
+		}
+	}
+	return 0;
+#else
+	return do_stat(Path, Buffer);
+#endif
+}
 
 int link_stat(const char *Path, STRUCT_STAT *Buffer) 
 {
@@ -373,6 +402,7 @@ static struct file_struct *make_file(char *fname)
 	char sum[SUM_LENGTH];
 	char *p;
 	char cleaned_name[MAXPATHLEN];
+	char linkbuf[MAXPATHLEN];
 
 	strlcpy(cleaned_name, fname, MAXPATHLEN);
 	cleaned_name[MAXPATHLEN-1] = 0;
@@ -381,7 +411,7 @@ static struct file_struct *make_file(char *fname)
 
 	memset(sum,0,SUM_LENGTH);
 
-	if (link_stat(fname,&st) != 0) {
+	if (readlink_stat(fname,&st,linkbuf) != 0) {
 		io_error = 1;
 		rprintf(FERROR,"%s: %s\n",
 			fname,strerror(errno));
@@ -437,16 +467,7 @@ static struct file_struct *make_file(char *fname)
 
 #if SUPPORT_LINKS
 	if (S_ISLNK(st.st_mode)) {
-		int l;
-		char lnk[MAXPATHLEN];
-		if ((l=readlink(fname,lnk,MAXPATHLEN-1)) == -1) {
-			io_error=1;
-			rprintf(FERROR,"readlink %s : %s\n",
-				fname,strerror(errno));
-			return NULL;
-		}
-		lnk[l] = 0;
-		file->link = strdup(lnk);
+		file->link = strdup(linkbuf);
 	}
 #endif
 
@@ -609,8 +630,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 	}
 
 	for (i=0;i<argc;i++) {
-		char fname2[MAXPATHLEN];
-		char *fname = fname2;
+		char *fname = topsrcname;
 
 		strlcpy(fname,argv[i],MAXPATHLEN);
 
@@ -653,7 +673,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 				for (p=fname+1; (p=strchr(p,'/')); p++) {
 					int copy_links_saved = copy_links;
 					*p = 0;
-					copy_links = 0;
+					copy_links = copy_unsafe_links;
 					send_file_name(f, flist, fname, 0, 0);
 					copy_links = copy_links_saved;
 					*p = '/';
@@ -694,6 +714,8 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 			}
 		}
 	}
+
+	topsrcname[0] = '\0';
 
 	if (f != -1) {
 		send_file_entry(NULL,f,0);
