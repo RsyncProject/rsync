@@ -307,23 +307,24 @@ to the detailed description below for a complete description.
 
 verb(
  -v, --verbose               increase verbosity
- -q, --quiet                 decrease verbosity
+ -q, --quiet                 suppress non-error messages
  -c, --checksum              always checksum
- -a, --archive               archive mode, equivalent to -rlptgoD
+ -c, --checksum              skip based on checksum, not mod-time & size
+ -a, --archive               archive mode; same as -rlptgoD (no -H)
  -r, --recursive             recurse into directories
  -R, --relative              use relative path names
      --no-relative           turn off --relative
      --no-implied-dirs       don't send implied dirs with -R
  -b, --backup                make backups (see --suffix & --backup-dir)
-     --backup-dir            make backups into this directory
+     --backup-dir=DIR        make backups into hierarchy based in DIR
      --suffix=SUFFIX         backup suffix (default ~ w/o --backup-dir)
- -u, --update                update only (don't overwrite newer files)
-     --inplace               update the destination files in-place
+ -u, --update                skip files that are newer on the receiver
+     --inplace               update destination files in-place
  -d, --dirs                  transfer directories without recursing
  -l, --links                 copy symlinks as symlinks
- -L, --copy-links            copy the referent of all symlinks
-     --copy-unsafe-links     copy the referent of "unsafe" symlinks
-     --safe-links            ignore "unsafe" symlinks
+ -L, --copy-links            transform symlink into referent file/dir
+     --copy-unsafe-links     only "unsafe" symlinks are transformed
+     --safe-links            ignore symlinks that point outside the tree
  -H, --hard-links            preserve hard links
  -K, --keep-dirlinks         treat symlinked dir on receiver as dir
  -p, --perms                 preserve permissions
@@ -334,11 +335,11 @@ verb(
  -O, --omit-dir-times        omit directories when preserving times
  -S, --sparse                handle sparse files efficiently
  -n, --dry-run               show what would have been transferred
- -W, --whole-file            copy whole files, no incremental checks
-     --no-whole-file         turn off --whole-file
+ -W, --whole-file            copy files whole
+     --no-whole-file         always use incremental rsync algorithm
  -x, --one-file-system       don't cross filesystem boundaries
  -B, --block-size=SIZE       force a fixed checksum block-size
- -e, --rsh=COMMAND           specify the remote shell
+ -e, --rsh=COMMAND           specify the remote shell to use
      --rsync-path=PATH       specify path to rsync on the remote machine
      --existing              only update files that already exist
      --ignore-existing       ignore files that already exist on receiver
@@ -354,41 +355,41 @@ verb(
      --max-size=SIZE         don't transfer any file larger than SIZE
      --partial               keep partially transferred files
      --partial-dir=DIR       put a partially transferred file into DIR
-     --delay-updates         update transferred files into place at end
+     --delay-updates         put all updated files into place at end
      --numeric-ids           don't map uid/gid values by user/group name
      --timeout=TIME          set I/O timeout in seconds
- -I, --ignore-times          turn off mod time & file size quick check
-     --size-only             ignore mod time for quick check (use size)
-     --modify-window=NUM     compare mod times with reduced accuracy
+ -I, --ignore-times          don't skip files that match size and time
+     --size-only             skip files that match in size
+     --modify-window=NUM     compare mod-times with reduced accuracy
  -T  --temp-dir=DIR          create temporary files in directory DIR
      --compare-dest=DIR      also compare received files relative to DIR
      --copy-dest=DIR         ... and include copies of unchanged files
      --link-dest=DIR         hardlink to files in DIR when unchanged
- -P                          equivalent to --partial --progress
  -z, --compress              compress file data
- -C, --cvs-exclude           auto ignore files in the same way CVS does
+ -C, --cvs-exclude           auto-ignore files in the same way CVS does
  -f, --filter=RULE           add a file-filtering RULE
  -F                          same as --filter=': /.rsync-filter'
                              repeated: --filter='- .rsync-filter'
      --exclude=PATTERN       exclude files matching PATTERN
-     --exclude-from=FILE     exclude patterns listed in FILE
+     --exclude-from=FILE     read exclude patterns from FILE
      --include=PATTERN       don't exclude files matching PATTERN
-     --include-from=FILE     don't exclude patterns listed in FILE
-     --files-from=FILE       read FILE for list of source-file names
- -0  --from0                 all file lists are delimited by nulls
+     --include-from=FILE     read include patterns from FILE
+     --files-from=FILE       read list of source-file names from FILE
+ -0  --from0                 all *from file lists are delimited by nulls
      --version               print version number
      --port=PORT             specify double-colon alternate port number
      --blocking-io           use blocking I/O for the remote shell
-     --no-blocking-io        turn off --blocking-io
-     --stats                 give some file transfer stats
+     --no-blocking-io        turn off blocking I/O when it is default
+     --stats                 give some file-transfer stats
      --progress              show progress during transfer
-     --log-format=FORMAT     log file transfers using specified format
-     --password-file=FILE    get password from FILE
+ -P                          same as --partial --progress
+     --log-format=FORMAT     log file-transfers using specified format
+     --password-file=FILE    read password from FILE
      --list-only             list the files instead of copying them
-     --bwlimit=KBPS          limit I/O bandwidth, KBytes per second
-     --write-batch=FILE      write a batch to FILE 
-     --read-batch=FILE       read a batch from FILE
-     --checksum-seed=NUM     set block/file checksum seed
+     --bwlimit=KBPS          limit I/O bandwidth; KBytes per second
+     --write-batch=FILE      write a batched update to FILE 
+     --read-batch=FILE       read a batched update from FILE
+     --checksum-seed=NUM     set block/file checksum seed (advanced)
  -4  --ipv4                  prefer IPv4
  -6  --ipv6                  prefer IPv6
  -h, --help                  show this help screen
@@ -399,7 +400,7 @@ Rsync can also be run as a daemon, in which case the following options are accep
 verb(
      --daemon                run as an rsync daemon
      --address=ADDRESS       bind to the specified address
-     --bwlimit=KBPS          limit I/O bandwidth, KBytes per second
+     --bwlimit=KBPS          limit I/O bandwidth; KBytes per second
      --config=FILE           specify alternate rsyncd.conf file
      --no-detach             do not detach from the parent
      --port=PORT             listen on alternate port number
