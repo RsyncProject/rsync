@@ -17,8 +17,10 @@ hands_setup
 
 chmod 440 "$fromdir/text"
 chmod 500 "$fromdir/dir/text"
-chmod 6450 "$fromdir/dir/subdir/foobar.baz"
-chmod 2670 "$fromdir/dir/subdir/subsubdir/etc-ltr-list"
+e="$fromdir/dir/subdir/foobar.baz"
+chmod 6450 "$e" || chmod 2450 "$e" || chmod 1450 "$e" || chmod 450 "$e"
+e="$fromdir/dir/subdir/subsubdir/etc-ltr-list"
+chmod 2670 "$e" || chmod 1670 "$e" || chmod 670 "$e"
 
 # First a normal copy.
 runtest "normal copy" 'checkit "$RSYNC -avv \"$fromdir/\" \"$todir\"" "$fromdir" "$todir"'

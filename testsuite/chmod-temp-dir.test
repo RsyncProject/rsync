@@ -26,13 +26,15 @@ fi
 
 chmod 440 "$fromdir/text"
 chmod 500 "$fromdir/dir/text"
-chmod 6450 "$fromdir/dir/subdir/foobar.baz"
-chmod 2670 "$fromdir/dir/subdir/subsubdir/etc-ltr-list"
+e="$fromdir/dir/subdir/foobar.baz"
+chmod 6450 "$e" || chmod 2450 "$e" || chmod 1450 "$e" || chmod 450 "$e"
+e="$fromdir/dir/subdir/subsubdir/etc-ltr-list"
+chmod 2670 "$e" || chmod 1670 "$e" || chmod 670 "$e"
 
-# First a normal copy using --temp-dir.
+# First a normal copy.
 runtest "normal copy" 'checkit "$RSYNC -avv --temp-dir=\"$tmpdir2\" \"$fromdir/\" \"$todir\"" "$fromdir" "$todir"'
 
-# Then we update all the files using --temp-dir.
+# Then we update all the files.
 runtest "update copy" 'checkit "$RSYNC -avvI --no-whole-file --temp-dir=\"$tmpdir2\" \"$fromdir/\" \"$todir\"" "$fromdir" "$todir"'
 
 # The script would have aborted on error, so getting here means we've won.
