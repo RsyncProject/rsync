@@ -21,6 +21,7 @@
 
 extern int am_server;
 extern int dry_run;
+extern int verbose;
 
 #if SUPPORT_HARD_LINKS
 static int hlink_compare(struct file_struct *f1,struct file_struct *f2)
@@ -118,8 +119,10 @@ void do_hard_links(struct file_list *flist)
       if (lstat(hlink_list[i-1].name,&st1) != 0) continue;
       if (lstat(hlink_list[i].name,&st2) != 0) {
 	if (!dry_run && link(hlink_list[i-1].name,hlink_list[i].name) != 0) {
-	  fprintf(FINFO,"link %s => %s : %s\n",
-		  hlink_list[i].name,hlink_list[i-1].name,strerror(errno));
+		if (verbose > 0)
+			fprintf(FINFO,"link %s => %s : %s\n",
+				hlink_list[i].name,
+				hlink_list[i-1].name,strerror(errno));
 	  continue;
 	}
       } else {
@@ -127,13 +130,16 @@ void do_hard_links(struct file_list *flist)
 	
 	if (!dry_run && (unlink(hlink_list[i].name) != 0 ||
 			 link(hlink_list[i-1].name,hlink_list[i].name) != 0)) {
-	  fprintf(FINFO,"link %s => %s : %s\n",
-		  hlink_list[i].name,hlink_list[i-1].name,strerror(errno));
+		if (verbose > 0)
+			fprintf(FINFO,"link %s => %s : %s\n",
+				hlink_list[i].name,
+				hlink_list[i-1].name,strerror(errno));
 	  continue;
 	}
       }
-      fprintf(FINFO,"%s => %s\n",
-	      hlink_list[i].name,hlink_list[i-1].name);
+      if (verbose > 0)
+	      fprintf(FINFO,"%s => %s\n",
+		      hlink_list[i].name,hlink_list[i-1].name);
     }	
   }
 #endif

@@ -256,6 +256,9 @@ static int writefd(int fd,char *buf,int len)
 	    exit_cleanup(1);
     }
 
+    got_select = 0;
+
+
     if (ret == -1) {
       read_check(buffer_f_in);
 
@@ -268,8 +271,6 @@ static int writefd(int fd,char *buf,int len)
 	      if (buffer_f_in > fd) 
 		      fd_count = buffer_f_in+1;
       }
-
-      got_select = 0;
 
       tv.tv_sec = BLOCKING_TIMEOUT;
       tv.tv_usec = 0;

@@ -360,8 +360,10 @@ static void send_directory(int f,struct file_list *flist,char *dir)
   strncpy(fname,dir,MAXPATHLEN-1);
   fname[MAXPATHLEN-1]=0;
   l = strlen(fname);
-  if (fname[l-1] != '/')
-    strcat(fname,"/");
+  if (fname[l-1] != '/') {
+	  strcat(fname,"/");
+	  l++;
+  }
   p = fname + strlen(fname);
 
   if (cvs_exclude) {
@@ -373,7 +375,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
     if (strcmp(di->d_name,".")==0 ||
 	strcmp(di->d_name,"..")==0)
       continue;
-    strncpy(p,di->d_name,MAXPATHLEN-l);
+    strncpy(p,di->d_name,MAXPATHLEN-(l+1));
     send_file_name(f,flist,fname);
   }
 
