@@ -11,6 +11,7 @@
 extern int am_sender;
 extern int eol_nulls;
 extern int recurse;
+extern int xfer_dirs;
 extern int preserve_links;
 extern int preserve_hard_links;
 extern int preserve_devices;
@@ -22,14 +23,17 @@ extern char *batch_name;
 
 extern struct filter_list_struct filter_list;
 
+static int fudged_recurse;
+
 static int *flag_ptr[] = {
-	&recurse,
+	&fudged_recurse,
 	&preserve_uid,
 	&preserve_gid,
 	&preserve_links,
 	&preserve_devices,
 	&preserve_hard_links,
 	&always_checksum,
+	&xfer_dirs,
 	NULL
 };
 
@@ -41,6 +45,7 @@ static char *flag_name[] = {
 	"--devices (-D)",
 	"--hard-links (-H)",
 	"--checksum (-c)",
+	"--dirs (-d)",
 	NULL
 };
 
@@ -50,6 +55,7 @@ void write_stream_flags(int fd)
 
 	/* Start the batch file with a bitmap of data-stream-affecting
 	 * flags. */
+	fudged_recurse = recurse < 0;
 	for (i = 0, flags = 0; flag_ptr[i]; i++) {
 		if (*flag_ptr[i])
 			flags |= 1 << i;
@@ -61,6 +67,9 @@ void read_stream_flags(int fd)
 {
 	int i, flags;
 
+	fudged_recurse = recurse < 0;
+	if (protocol_version < 29)
+		xfer_dirs = 0;
 	for (i = 0, flags = read_int(fd); flag_ptr[i]; i++) {
 		int set = flags & (1 << i) ? 1 : 0;
 		if (*flag_ptr[i] != set) {
@@ -72,6 +81,9 @@ void read_stream_flags(int fd)
 			*flag_ptr[i] = set;
 		}
 	}
+	recurse = fudged_recurse ? -1 : 0;
+	if (protocol_version < 29)
+		xfer_dirs = recurse ? 1 : 0;
 }
 
 static void write_arg(int fd, char *arg)
