@@ -131,11 +131,6 @@ static void report_exclude_result(char const *name,
         /* If a trailing slash is present to match only directories,
          * then it is stripped out by make_exclude.  So as a special
          * case we add it back in here. */
-
-	/* FIXME: At the moment if you don't specify --recursive, this
-	 * seems to give messages like "excluding file
-	 * mbpconfig/.Xresources because of pattern /*""/*", which is
-	 * a bit confusing.  See Rusty's gross hack below. */
         
         if (verbose >= 2)
                 rprintf(FINFO, "%s %s %s because of pattern %s%s\n",
@@ -267,7 +262,10 @@ void send_exclude_list(int f)
 	extern int remote_version;
 	extern int list_only, recurse;
 
-	/* this is a complete hack - blame Rusty */
+	/* This is a complete hack - blame Rusty.
+	 *
+	 * FIXME: This pattern shows up in the output of
+	 * report_exclude_result(), which is not ideal. */
 	if (list_only && !recurse) {
 		add_exclude("/*/*", 0);
 	}
