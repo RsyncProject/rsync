@@ -46,8 +46,7 @@ extern int link_dest;
 
 
 /* choose whether to skip a particular file */
-static int skip_file(char *fname,
-		     struct file_struct *file, STRUCT_STAT *st)
+static int skip_file(char *fname, struct file_struct *file, STRUCT_STAT *st)
 {
 	if (st->st_size != file->length) {
 		return 0;
@@ -266,13 +265,12 @@ static void generate_and_send_sums(struct map_struct *buf, size_t len, int f_out
  * @note This comment was added later by mbp who was trying to work it
  * out.  It might be wrong.
  **/
-void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
+void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 {
 	int fd;
 	STRUCT_STAT st;
 	struct map_struct *mapbuf;
 	int statret;
-	struct file_struct *file = flist->files[i];
 	char *fnamecmp;
 	char fnamecmpbuf[MAXPATHLEN];
 	extern char *compare_dest;
@@ -280,7 +278,8 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 	extern int only_existing;
 	extern int orig_umask;
 
-	if (list_only) return;
+	if (list_only)
+		return;
 
 	if (verbose > 2)
 		rprintf(FINFO,"recv_generator(%s,%d)\n",fname,i);
@@ -510,8 +509,10 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 	else
 		mapbuf = NULL;
 
-	if (verbose > 3)
-		rprintf(FINFO,"gen mapped %s of size %.0f\n",fnamecmp,(double)st.st_size);
+	if (verbose > 3) {
+		rprintf(FINFO,"gen mapped %s of size %.0f\n", fnamecmp,
+			(double)st.st_size);
+	}
 
 	if (verbose > 2)
 		rprintf(FINFO, "generating and sending sums for %d\n", i);
@@ -549,22 +550,23 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 
 	for (i = 0; i < flist->count; i++) {
 		struct file_struct *file = flist->files[i];
-		mode_t saved_mode = file->mode;
-		if (!file->basename) continue;
+		struct file_struct copy;
 
+		if (!file->basename)
+			continue;
 		/* we need to ensure that any directories we create have writeable
 		   permissions initially so that we can create the files within
 		   them. This is then fixed after the files are transferred */
-		if (!am_root && S_ISDIR(file->mode)) {
-			file->mode |= S_IWUSR; /* user write */
+		if (!am_root && S_ISDIR(file->mode) && !(file->mode & S_IWUSR)) {
+			copy = *file;
 			/* XXX: Could this be causing a problem on SCO?  Perhaps their
 			 * handling of permissions is strange? */
+			copy.mode |= S_IWUSR; /* user write */
+			file = &copy;
 		}
 
 		recv_generator(local_name? local_name
-			     : f_name_to(file,fbuf,sizeof fbuf), flist, i, f);
-
-		file->mode = saved_mode;
+			     : f_name_to(file,fbuf,sizeof fbuf), file, i, f);
 	}
 
 	phase++;
@@ -581,7 +583,7 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 	for (i = read_int(f_recv); i != -1; i = read_int(f_recv)) {
 		struct file_struct *file = flist->files[i];
 		recv_generator(local_name? local_name
-			     : f_name_to(file,fbuf,sizeof fbuf), flist, i, f);
+			     : f_name_to(file,fbuf,sizeof fbuf), file, i, f);
 	}
 
 	phase++;
