@@ -152,7 +152,7 @@ static int daemon_opt;   /* sets am_daemon after option error-reporting */
 static int F_option_cnt = 0;
 static int modify_window_set;
 static int refused_verbose, refused_delete, refused_archive_part;
-static int refused_partial, refused_progress;
+static int refused_partial, refused_progress, refused_delete_before;
 static char *dest_option = NULL;
 static char *max_size_arg;
 static char partialdir_for_delayupdate[] = ".~tmp~";
@@ -557,6 +557,8 @@ static void set_refuse_options(char *bp)
 				case '\0':
 					if (wildmatch("delete", op->longName))
 						refused_delete = op->val;
+					else if (wildmatch("delete-before", op->longName))
+						refused_delete_before = op->val;
 					else if (wildmatch("partial", op->longName))
 						refused_partial = op->val;
 					else if (wildmatch("progress", op->longName))
@@ -953,8 +955,13 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		delete_mode = delete_excluded = 0;
 	} else if (delete_before || delete_during || delete_after)
 		delete_mode = 1;
-	else if (delete_mode || delete_excluded)
+	else if (delete_mode || delete_excluded) {
+		if (refused_delete_before) {
+			create_refuse_error(refused_delete_before);
+			return 0;
+		}
 		delete_mode = delete_before = 1;
+	}
 
 	if (delete_mode && refused_delete) {
 		create_refuse_error(refused_delete);
