@@ -566,19 +566,22 @@ extern int errno;
 /* handler for null strings in printf format */
 #define NS(s) ((s)?(s):"<NULL>")
 
+#if !defined(__GNUC__) || defined(APPLE)
+/* Apparently the OS X port of gcc gags on __attribute__. */
+#define __attribute__(x) 
+
+#endif
+
+
 /* use magic gcc attributes to catch format errors */
  void rprintf(enum logcode , const char *, ...)
-#ifdef __GNUC__
-     __attribute__ ((format (printf, 2, 3)))
-#endif
+     __attribute__((format (printf, 2, 3)))
 ;
 
 /* This is just like rprintf, but it also tries to print some
  * representation of the error code.  Normally errcode = errno. */
 void rsyserr(enum logcode, int, const char *, ...)
-#ifdef __GNUC__
-     __attribute__ ((format (printf, 3, 4)))
-#endif
+     __attribute__((format (printf, 3, 4)))
      ;
 
 #ifdef REPLACE_INET_NTOA
@@ -612,8 +615,4 @@ inet_ntop(int af, const void *src, char *dst, size_t size);
 int isc_net_pton(int af, const char *src, void *dst);
 #endif
 
-#ifdef __GNUC__
-#  define UNUSED(x) x __attribute__((__unused__))
-#else
-#  define UNUSED(x) x
-#endif /* ndef __GNUC__ */
+#define UNUSED(x) x __attribute__((__unused__))
