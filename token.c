@@ -65,11 +65,11 @@ void set_compression(char *fname)
 }
 
 /* non-compressing recv token */
-static int simple_recv_token(int f,char **data)
+static int32 simple_recv_token(int f, char **data)
 {
 	static int residue;
 	static char *buf;
-	int n;
+	int32 n;
 
 	if (!buf) {
 		buf = new_array(char, CHUNK_SIZE);
@@ -78,7 +78,7 @@ static int simple_recv_token(int f,char **data)
 	}
 
 	if (residue == 0) {
-		int i = read_int(f);
+		int32 i = read_int(f);
 		if (i <= 0)
 			return i;
 		residue = i;
@@ -93,22 +93,21 @@ static int simple_recv_token(int f,char **data)
 
 
 /* non-compressing send token */
-static void simple_send_token(int f,int token,
-			      struct map_struct *buf,OFF_T offset,int n)
+static void simple_send_token(int f, int token, struct map_struct *buf,
+			      OFF_T offset, int32 n)
 {
 	if (n > 0) {
-		int l = 0;
-		while (l < n) {
-			int n1 = MIN(CHUNK_SIZE,n-l);
-			write_int(f,n1);
-			write_buf(f,map_ptr(buf,offset+l,n1),n1);
-			l += n1;
+		int32 len = 0;
+		while (len < n) {
+			int32 n1 = MIN(CHUNK_SIZE, n-len);
+			write_int(f, n1);
+			write_buf(f, map_ptr(buf, offset+len, n1), n1);
+			len += n1;
 		}
 	}
 	/* a -2 token means to send data only and no token */
-	if (token != -2) {
-		write_int(f,-(token+1));
-	}
+	if (token != -2)
+		write_int(f, -(token+1));
 }
 
 
@@ -149,10 +148,10 @@ static char *obuf;
 
 /* Send a deflated token */
 static void
-send_deflated_token(int f, int token,
-		    struct map_struct *buf, OFF_T offset, int nb, int toklen)
+send_deflated_token(int f, int token, struct map_struct *buf, OFF_T offset,
+		    int32 nb, int32 toklen)
 {
-	int n, r;
+	int32 n, r;
 	static int init_done, flush_pending;
 
 	if (last_token == -1) {
@@ -265,14 +264,17 @@ send_deflated_token(int f, int token,
 		   history and hash table */
 		tx_strm.next_in = (Bytef *) map_ptr(buf, offset, toklen);
 		tx_strm.avail_in = toklen;
-		tx_strm.next_out = (Bytef *) obuf;
-		tx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
-		r = deflate(&tx_strm, Z_INSERT_ONLY);
-		if (r != Z_OK || tx_strm.avail_in != 0) {
-			rprintf(FERROR, "deflate on token returned %d (%d bytes left)\n",
-				r, tx_strm.avail_in);
-			exit_cleanup(RERR_STREAMIO);
-		}
+		do {
+			tx_strm.next_out = (Bytef *)obuf;
+			tx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
+			r = deflate(&tx_strm, Z_INSERT_ONLY);
+			if (r != Z_OK) {
+				rprintf(FERROR,
+					"deflate on token returned %d (%d bytes left)\n",
+					r, tx_strm.avail_in);
+				exit_cleanup(RERR_STREAMIO);
+			}
+		} while (tx_strm.avail_in != 0);
 	}
 }
 
@@ -286,16 +288,16 @@ static char *cbuf;
 static char *dbuf;
 
 /* for decoding runs of tokens */
-static int rx_token;
-static int rx_run;
+static int32 rx_token;
+static int32 rx_run;
 
 /* Receive a deflated token and inflate it */
-static int
-recv_deflated_token(int f, char **data)
+static int32 recv_deflated_token(int f, char **data)
 {
-	int n, r, flag;
 	static int init_done;
 	static int saved_flag;
+	int r, flag;
+	int32 n;
 
 	for (;;) {
 		switch (recv_state) {
@@ -422,7 +424,7 @@ recv_deflated_token(int f, char **data)
  * put the data corresponding to a token that we've just returned
  * from recv_deflated_token into the decompressor's history buffer.
  */
-static void see_deflate_token(char *buf, int len)
+static void see_deflate_token(char *buf, int32 len)
 {
 	int r, blklen;
 	unsigned char hdr[5];
@@ -465,14 +467,13 @@ static void see_deflate_token(char *buf, int len)
  * If token == -1 then we have reached EOF
  * If n == 0 then don't send a buffer
  */
-void send_token(int f,int token,struct map_struct *buf,OFF_T offset,
-		int n,int toklen)
+void send_token(int f, int token, struct map_struct *buf, OFF_T offset,
+		int32 n, int32 toklen)
 {
-	if (!do_compression) {
-		simple_send_token(f,token,buf,offset,n);
-	} else {
+	if (!do_compression)
+		simple_send_token(f, token, buf, offset, n);
+	else
 		send_deflated_token(f, token, buf, offset, n, toklen);
-	}
 }
 
 
@@ -482,7 +483,7 @@ void send_token(int f,int token,struct map_struct *buf,OFF_T offset,
  * if the return value is -i then it represents token i-1
  * if the return value is 0 then the end has been reached
  */
-int recv_token(int f,char **data)
+int32 recv_token(int f, char **data)
 {
 	int tok;
 
@@ -497,7 +498,7 @@ int recv_token(int f,char **data)
 /*
  * look at the data corresponding to a token, if necessary
  */
-void see_token(char *data, int toklen)
+void see_token(char *data, int32 toklen)
 {
 	if (do_compression)
 		see_deflate_token(data, toklen);
