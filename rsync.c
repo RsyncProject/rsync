@@ -35,7 +35,6 @@ extern int am_starting_up;
 extern int preserve_uid;
 extern int preserve_gid;
 extern int inplace;
-extern int recurse;
 extern int keep_dirlinks;
 extern int make_backups;
 extern struct stats stats;
