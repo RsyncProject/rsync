@@ -145,6 +145,7 @@
 #define ITEM_REPORT_OWNER (1<<5)
 #define ITEM_REPORT_GROUP (1<<6)
 #define ITEM_IS_NEW (1<<7)
+#define ITEM_USING_ALT_BASIS (1<<8)
 
 #define ITEM_MISSING_DATA (1<<16) /* these are outside the transmitted flags */
 #define ITEM_DELETED (1<<17)
