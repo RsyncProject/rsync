@@ -74,6 +74,7 @@ static int delete_file(char *fname)
 	extern int force_delete;
 	STRUCT_STAT st;
 	int ret;
+	extern int recurse;
 
 	if (do_unlink(fname) == 0 || errno == ENOENT) return 0;
 
@@ -93,7 +94,8 @@ static int delete_file(char *fname)
 	}
 
 	if (do_rmdir(fname) == 0 || errno == ENOENT) return 0;
-	if (!force_delete || (errno != ENOTEMPTY && errno != EEXIST)) {
+	if (!force_delete || !recurse || 
+	    (errno != ENOTEMPTY && errno != EEXIST)) {
 		rprintf(FERROR,"rmdir(%s) : %s\n", fname, strerror(errno));
 		return -1;
 	}
