@@ -60,7 +60,10 @@ int send_included_file_names(int f,struct file_list *flist)
 			/* skip the allowed beginning slashes */
 			p++;
 		}
-		send_file_name(f,flist,p,0,0);
+		/* silently skip files that don't exist to
+		   be more like non-optimized case */
+		if (access(p,0) == 0)
+			send_file_name(f,flist,p,0,0);
 	}
 	exclude_list = ex_list;
 	
