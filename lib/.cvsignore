@@ -7,6 +7,7 @@ config.h
 config.log
 config.status
 dist.tar.gz
+dummy
 rsync
 rsync-0.1
 rsync-0.1
@@ -30,6 +31,13 @@ rsync-0.5
 rsync-0.5
 rsync-0.5
 rsync-0.5.tar.gz
+rsync-0.6
+rsync-0.7
+rsync-0.7
+rsync-0.8
+rsync-0.8
+rsync-0.8
+rsync-0.8
 rsync-ERSION
 rsync.aux
 rsync.dvi
@@ -39,10 +47,3 @@ tech_report.dvi
 tech_report.log
 tech_report.ps
 test
-rsync-0.6
-rsync-0.7
-rsync-0.7
-rsync-0.8
-rsync-0.8
-rsync-0.8
-rsync-0.8
