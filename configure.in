@@ -22,6 +22,9 @@ AC_PROG_INSTALL
 AC_PROG_CC_STDC
 AC_SUBST(SHELL)
 
+AC_DEFINE([_GNU_SOURCE], 1,
+          [Define _GNU_SOURCE so that we get all necessary prototypes])
+
 if test "$xac_cv_prog_cc_stdc" = xno
 then
 	AC_MSG_WARN([rsync requires an ANSI C compiler and you don't seem to have one])
