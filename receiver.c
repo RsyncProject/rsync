@@ -257,6 +257,36 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 }
 
 
+static void read_gen_name(int fd, char *dirname, char *buf)
+{
+	int dlen;
+	int len = read_byte(fd);
+
+	if (len & 0x80) {
+#if MAXPATHLEN > 32767
+		uchar lenbuf[2];
+		read_buf(fd, (char *)lenbuf, 2);
+		len = (len & ~0x80) * 0x10000 + lenbuf[0] * 0x100 + lenbuf[1];
+#else
+		len = (len & ~0x80) * 0x100 + read_byte(fd);
+#endif
+	}
+
+	if (dirname) {
+		dlen = strlcpy(buf, dirname, MAXPATHLEN);
+		buf[dlen++] = '/';
+	} else
+		dlen = 0;
+
+	if (dlen + len >= MAXPATHLEN) {
+		rprintf(FERROR, "bogus data on generator name pipe\n");
+		exit_cleanup(RERR_PROTOCOL);
+	}
+
+	read_sbuf(fd, buf + dlen, len);
+}
+
+
 static void discard_receive_data(int f_in, OFF_T length)
 {
 	receive_data(f_in, NULL, -1, 0, NULL, -1, length);
@@ -395,6 +425,10 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 				break;
 			case FNAMECMP_BACKUP:
 				fnamecmp = get_backup_name(fname);
+				break;
+			case FNAMECMP_FUZZY:
+				read_gen_name(f_in_name, file->dirname, fnamecmpbuf);
+				fnamecmp = fnamecmpbuf;
 				break;
 			default:
 				if (j >= basis_dir_cnt) {
