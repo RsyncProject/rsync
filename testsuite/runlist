@@ -1,0 +1,5 @@
+#! /bin/sh
+
+# This file is sourced by the Samba build_farm scripts.  It contains a
+# list of tests to run.
+
