@@ -152,6 +152,72 @@ static BOOL bInGlobalSection = True;
 
 #define NUMPARAMETERS (sizeof(parm_table) / sizeof(struct parm_struct))
 
+static struct enum_list enum_facilities[] = {
+#ifdef LOG_AUTH
+	{ LOG_AUTH, "auth" },
+#endif
+#ifdef LOG_AUTHPRIV
+	{ LOG_AUTHPRIV, "authpriv" },
+#endif
+#ifdef LOG_CRON
+	{ LOG_CRON, "cron" },
+#endif
+#ifdef LOG_DAEMON
+	{ LOG_DAEMON, "daemon" },
+#endif
+#ifdef LOG_FTP
+	{ LOG_FTP, "ftp" },
+#endif
+#ifdef LOG_KERN
+	{ LOG_KERN, "kern" },
+#endif
+#ifdef LOG_LPR
+	{ LOG_LPR, "lpr" },
+#endif
+#ifdef LOG_MAIL
+	{ LOG_MAIL, "mail" },
+#endif
+#ifdef LOG_NEWS
+	{ LOG_NEWS, "news" },
+#endif
+#ifdef LOG_AUTH
+	{ LOG_AUTH, "security" },		
+#endif
+#ifdef LOG_SYSLOG
+	{ LOG_SYSLOG, "syslog" },
+#endif
+#ifdef LOG_USER
+	{ LOG_USER, "user" },
+#endif
+#ifdef LOG_UUCP
+	{ LOG_UUCP, "uucp" },
+#endif
+#ifdef LOG_LOCAL0
+	{ LOG_LOCAL0, "local0" },
+#endif
+#ifdef LOG_LOCAL1
+	{ LOG_LOCAL1, "local1" },
+#endif
+#ifdef LOG_LOCAL2
+	{ LOG_LOCAL2, "local2" },
+#endif
+#ifdef LOG_LOCAL3
+	{ LOG_LOCAL3, "local3" },
+#endif
+#ifdef LOG_LOCAL4
+	{ LOG_LOCAL4, "local4" },
+#endif
+#ifdef LOG_LOCAL5
+	{ LOG_LOCAL5, "local5" },
+#endif
+#ifdef LOG_LOCAL6
+	{ LOG_LOCAL6, "local6" },
+#endif
+#ifdef LOG_LOCAL7
+	{ LOG_LOCAL7, "local7" },
+#endif
+	{ -1, NULL }};
+
 
 /* note that we do not initialise the defaults union - it is not allowed in ANSI C */
 static struct parm_struct parm_table[] =
@@ -159,7 +225,7 @@ static struct parm_struct parm_table[] =
   {"max connections",  P_INTEGER, P_GLOBAL, &Globals.max_connections,NULL, 0},
   {"motd file",        P_STRING,  P_GLOBAL, &Globals.motd_file,    NULL,   0},
   {"lock file",        P_STRING,  P_GLOBAL, &Globals.lock_file,    NULL,   0},
-  {"syslog facility",  P_INTEGER, P_GLOBAL, &Globals.syslog_facility, NULL,0},
+  {"syslog facility",  P_ENUM,    P_GLOBAL, &Globals.syslog_facility, enum_facilities,0},
   {"name",             P_STRING,  P_LOCAL,  &sDefault.name,        NULL,   0},
   {"comment",          P_STRING,  P_LOCAL,  &sDefault.comment,     NULL,   0},
   {"path",             P_STRING,  P_LOCAL,  &sDefault.path,        NULL,   0},
