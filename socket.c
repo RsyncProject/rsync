@@ -81,7 +81,7 @@ static int open_socket_in(int type, int port)
 		return -1;
 	}
   
-	bzero((char *)&sock,sizeof(sock));
+	memset((char *)&sock,0,sizeof(sock));
 	memcpy((char *)&sock.sin_addr,(char *)hp->h_addr, hp->h_length);
 	sock.sin_port = htons(port);
 	sock.sin_family = hp->h_addrtype;

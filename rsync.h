@@ -373,14 +373,6 @@ extern char *sys_errlist[];
 extern int errno;
 #endif
 
-#ifndef HAVE_BCOPY
-#define bcopy(src,dest,n) memcpy(dest,src,n)
-#endif
-
-#ifndef HAVE_BZERO
-#define bzero(buf,n) memset(buf,0,n)
-#endif
-
 #define SUPPORT_LINKS HAVE_READLINK
 #define SUPPORT_HARD_LINKS HAVE_LINK
 

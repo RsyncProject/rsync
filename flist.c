@@ -211,7 +211,7 @@ static void receive_file_entry(struct file_struct **fptr,
 
   file = (struct file_struct *)malloc(sizeof(*file));
   if (!file) out_of_memory("receive_file_entry");
-  bzero((char *)file,sizeof(*file));
+  memset((char *)file, 0, sizeof(*file));
   (*fptr) = file;
 
   if (l2 >= MAXPATHLEN-l1) overflow("receive_file_entry");
@@ -325,7 +325,7 @@ static struct file_struct *make_file(char *fname)
 	clean_fname(cleaned_name);
 	fname = cleaned_name;
 
-	bzero(sum,SUM_LENGTH);
+	memset(sum,0,SUM_LENGTH);
 
 	if (link_stat(fname,&st) != 0) {
 		io_error = 1;
@@ -352,7 +352,7 @@ static struct file_struct *make_file(char *fname)
 	
 	file = (struct file_struct *)malloc(sizeof(*file));
 	if (!file) out_of_memory("make_file");
-	bzero((char *)file,sizeof(*file));
+	memset((char *)file,0,sizeof(*file));
 
 	if ((p = strrchr(fname,'/'))) {
 		static char *lastdir;
@@ -794,7 +794,7 @@ static void free_file(struct file_struct *file)
 	if (file->basename) free(file->basename);
 	if (file->link) free(file->link);
 	if (file->sum) free(file->sum);
-	bzero((char *)file, sizeof(*file));
+	memset((char *)file, 0, sizeof(*file));
 }
 
 
@@ -808,9 +808,9 @@ void flist_free(struct file_list *flist)
 		free_file(flist->files[i]);
 		free(flist->files[i]);
 	}	
-	bzero((char *)flist->files, sizeof(flist->files[0])*flist->count);
+	memset((char *)flist->files, 0, sizeof(flist->files[0])*flist->count);
 	free(flist->files);
-	bzero((char *)flist, sizeof(*flist));
+	memset((char *)flist, 0, sizeof(*flist));
 	free(flist);
 }
 

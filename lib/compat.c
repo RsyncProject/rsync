@@ -54,7 +54,7 @@ pid_t waitpid(pid_t pid, int *statptr, int options)
 #ifndef HAVE_MEMMOVE
 void *memmove(void *dest, const void *src, size_t n)
 {
-	bcopy(src, dest, n);
+	memcpy(dest, src, n);
 	return dest;
 }
 #endif

@@ -56,7 +56,7 @@ void init_hard_links(struct file_list *flist)
 		out_of_memory("init_hard_links");
 
 	for (i = 0; i < flist->count; i++)
-		bcopy(flist->files[i], &hlink_list[i], sizeof(hlink_list[0]));
+		memcpy(&hlink_list[i], flist->files[i], sizeof(hlink_list[0]));
 
 	qsort(hlink_list,flist->count,
 	      sizeof(hlink_list[0]),

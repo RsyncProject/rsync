@@ -329,7 +329,7 @@ initialise a service to the defaults
 ***************************************************************************/
 static void init_service(service *pservice)
 {
-	bzero((char *)pservice,sizeof(service));
+	memset((char *)pservice,0,sizeof(service));
 	copy_service(pservice,&sDefault);
 }
 

@@ -77,7 +77,7 @@ void get_checksum2(char *buf,int len,char *sum)
 
   MDbegin(&MD);
 
-  bcopy(buf,buf1,len);
+  memcpy(buf1,buf,len);
   if (checksum_seed) {
     SIVAL(buf1,len,checksum_seed);
     len += 4;
@@ -102,7 +102,7 @@ void file_checksum(char *fname,char *sum,OFF_T size)
   OFF_T len = size;
   char tmpchunk[CSUM_CHUNK];
 
-  bzero(sum,csum_length);
+  memset(sum,0,csum_length);
 
   fd = open(fname,O_RDONLY);
   if (fd == -1) return;
@@ -112,12 +112,12 @@ void file_checksum(char *fname,char *sum,OFF_T size)
   MDbegin(&MD);
 
   for(i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK) {
-    bcopy(map_ptr(buf,i,CSUM_CHUNK),tmpchunk,CSUM_CHUNK);
+    memcpy(tmpchunk, map_ptr(buf,i,CSUM_CHUNK), CSUM_CHUNK);
     MDupdate(&MD, tmpchunk, CSUM_CHUNK*8);
   }
 
   if (len - i > 0) {
-    bcopy(map_ptr(buf,i,len-i),tmpchunk,len-i);
+    memcpy(tmpchunk, map_ptr(buf,i,len-i), len-i);
     MDupdate(&MD, tmpchunk, (len-i)*8);
   }
 
@@ -155,27 +155,27 @@ void sum_update(char *p,int len)
 {
   int i;
   if (len + sumresidue < CSUM_CHUNK) {
-    bcopy(p,sumrbuf+sumresidue,len);
+    memcpy(sumrbuf+sumresidue, p, len);
     sumresidue += len;
     return;
   }
 
   if (sumresidue) {
     i = MIN(CSUM_CHUNK-sumresidue,len);
-    bcopy(p,sumrbuf+sumresidue,i);
+    memcpy(sumrbuf+sumresidue,p,i);
     MDupdate(&sumMD, sumrbuf, (i+sumresidue)*8);
     len -= i;
     p += i;
   }
 
   for(i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK) {
-    bcopy(p+i,sumrbuf,CSUM_CHUNK);
+    memcpy(sumrbuf,p+i,CSUM_CHUNK);
     MDupdate(&sumMD, sumrbuf, CSUM_CHUNK*8);
   }
 
   if (len - i > 0) {
     sumresidue = len-i;
-    bcopy(p+i,sumrbuf,sumresidue);
+    memcpy(sumrbuf,p+i,sumresidue);
   } else {
     sumresidue = 0;    
   }
