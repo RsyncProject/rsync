@@ -479,18 +479,6 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 	    && flist->count > 0)
 		delete_files(flist);
 
-	if (preserve_hard_links)
-		do_hard_links();
-
-	/* now we need to fix any directory permissions that were
-	 * modified during the transfer */
-	for (i = 0; i < flist->count; i++) {
-		file = flist->files[i];
-		if (!file->basename || !S_ISDIR(file->mode)) continue;
-		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
-			       file, i, -1);
-	}
-
 	if (verbose > 2)
 		rprintf(FINFO,"recv_files finished\n");
 
