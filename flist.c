@@ -45,7 +45,7 @@ extern int relative_paths;
 extern int copy_links;
 extern int remote_version;
 
-static char **local_exclude_list = NULL;
+static char **local_exclude_list;
 
 int link_stat(const char *Path, struct stat *Buffer) 
 {
@@ -87,7 +87,7 @@ static void set_filesystem(char *fname)
 
 static void send_directory(int f,struct file_list *flist,char *dir);
 
-static char *flist_dir = NULL;
+static char *flist_dir;
 
 static void clean_fname(char *name)
 {
@@ -136,12 +136,12 @@ static void clean_fname(char *name)
 void send_file_entry(struct file_struct *file,int f)
 {
   unsigned char flags;
-  static time_t last_time=0;
-  static mode_t last_mode=0;
-  static dev_t last_rdev=0;
-  static uid_t last_uid=0;
-  static gid_t last_gid=0;
-  static char lastname[MAXPATHLEN]="";
+  static time_t last_time;
+  static mode_t last_mode;
+  static dev_t last_rdev;
+  static uid_t last_uid;
+  static gid_t last_gid;
+  static char lastname[MAXPATHLEN];
   char *fname;
   int l1,l2;
 
@@ -177,7 +177,7 @@ void send_file_entry(struct file_struct *file,int f)
     write_byte(f,l2);
   write_buf(f,fname+l1,l2);
 
-  write_int(f,(int)file->length);
+  write_longint(f,file->length);
   if (!(flags & SAME_TIME))
     write_int(f,(int)file->modtime);
   if (!(flags & SAME_MODE))
@@ -202,8 +202,8 @@ void send_file_entry(struct file_struct *file,int f)
 
 #if SUPPORT_HARD_LINKS
   if (preserve_hard_links && S_ISREG(file->mode)) {
-    write_int(f,file->dev);
-    write_int(f,file->inode);
+    write_int(f,(int)file->dev);
+    write_int(f,(int)file->inode);
   }
 #endif
 
@@ -226,11 +226,11 @@ void send_file_entry(struct file_struct *file,int f)
 void receive_file_entry(struct file_struct **fptr,
 			unsigned char flags,int f)
 {
-  static time_t last_time=0;
-  static mode_t last_mode=0;
-  static dev_t last_rdev=0;
-  static uid_t last_uid=0;
-  static gid_t last_gid=0;
+  static time_t last_time;
+  static mode_t last_mode;
+  static dev_t last_rdev;
+  static uid_t last_uid;
+  static gid_t last_gid;
   static char lastname[MAXPATHLEN];
   char thisname[MAXPATHLEN];
   int l1=0,l2=0;
@@ -277,7 +277,7 @@ void receive_file_entry(struct file_struct **fptr,
   if (!file->basename) out_of_memory("receive_file_entry 1");
 
 
-  file->length = (off_t)read_int(f);
+  file->length = read_longint(f);
   file->modtime = (flags & SAME_TIME) ? last_time : (time_t)read_int(f);
   file->mode = (flags & SAME_MODE) ? last_mode : (mode_t)read_int(f);
   if (preserve_uid)

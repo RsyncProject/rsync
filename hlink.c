@@ -31,7 +31,7 @@ static int hlink_compare(struct file_struct *f1,struct file_struct *f2)
   if (!S_ISREG(f2->mode)) return 1;
 
   if (f1->dev != f2->dev) 
-    return (f1->dev - f2->dev);
+    return (int)(f1->dev - f2->dev);
 
   if (f1->inode != f2->inode) 
     return (f1->inode - f2->inode);
@@ -40,8 +40,8 @@ static int hlink_compare(struct file_struct *f1,struct file_struct *f2)
 }
 
 
-static struct file_struct *hlink_list = NULL;
-static int hlink_count=0;
+static struct file_struct *hlink_list;
+static int hlink_count;
 #endif
 
 void init_hard_links(struct file_list *flist)

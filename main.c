@@ -58,22 +58,22 @@ int numeric_ids = 0;
 extern int csum_length;
 
 int am_server = 0;
-static int sender = 0;
+static int sender;
 int recurse = 0;
 
 static void usage(FILE *f);
 
 static void report(int f)
 {
-  int in,out,tsize;
+  off_t in,out,tsize;
   time_t t = time(NULL);
   
   if (!verbose) return;
 
   if (am_server && sender) {
-    write_int(f,read_total());
-    write_int(f,write_total());
-    write_int(f,total_size);
+    write_longint(f,read_total());
+    write_longint(f,write_total());
+    write_longint(f,total_size);
     write_flush(f);
     return;
   }
@@ -81,17 +81,17 @@ static void report(int f)
   if (sender) {
     in = read_total();
     out = write_total();
-    tsize = (int)total_size;
+    tsize = total_size;
   } else {
-    in = read_int(f);
-    out = read_int(f);
-    tsize = read_int(f);
+    in = read_longint(f);
+    out = read_longint(f);
+    tsize = read_longint(f);
   }
 
-  printf("wrote %d bytes  read %d bytes  %g bytes/sec\n",
-	 out,in,(in+out)/(0.5 + (t-starttime)));        
-  printf("total size is %d  speedup is %g\n",
-	 tsize,(1.0*tsize)/(in+out));
+  printf("wrote %ld bytes  read %ld bytes  %g bytes/sec\n",
+	 (long)out,(long)in,(in+out)/(0.5 + (t-starttime)));
+  printf("total size is %ld  speedup is %g\n",
+	 (long)tsize,(1.0*tsize)/(in+out));
 }
 
 
@@ -359,7 +359,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
   if ((pid=do_fork()) == 0) {
     recv_files(f_in,flist,local_name,recv_pipe[1]);
     if (verbose > 2)
-      fprintf(FERROR,"receiver read %d\n",read_total());
+      fprintf(FERROR,"receiver read %ld\n",(long)read_total());
     exit_cleanup(0);
   }
 
@@ -526,7 +526,7 @@ int main(int argc,char *argv[])
 
     /* we set a 0 umask so that correct file permissions can be
        carried across */
-    orig_umask = umask(0);
+    orig_umask = (int)umask(0);
 
     while ((opt = getopt_long(argc, argv, 
 			      short_options, long_options, &option_index)) 

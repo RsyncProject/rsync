@@ -25,7 +25,7 @@
 
 extern int verbose;
 
-static char **exclude_list = NULL;
+static char **exclude_list;
 
 static int is_regex(char *str)
 {

@@ -36,10 +36,10 @@ static int tag_hits;
 static int matches;
 static int data_transfer;
 
-static int total_false_alarms=0;
-static int total_tag_hits=0;
-static int total_matches=0;
-static int total_data_transfer=0;
+static int total_false_alarms;
+static int total_tag_hits;
+static int total_matches;
+static off_t total_data_transfer;
 
 
 struct target {
@@ -47,9 +47,9 @@ struct target {
   int i;
 };
 
-static struct target *targets=NULL;
+static struct target *targets;
 
-static tag *tag_table = NULL;
+static tag *tag_table;
 
 #define gettag2(s1,s2) (((s1) + (s2)) & 0xFFFF)
 #define gettag(sum) gettag2((sum)&0xFFFF,(sum)>>16)
@@ -273,7 +273,7 @@ void match_report(void)
 		return;
 
 	fprintf(FINFO,
-		"total: matches=%d  tag_hits=%d  false_alarms=%d  data=%d\n",
+		"total: matches=%d  tag_hits=%d  false_alarms=%d  data=%ld\n",
 		total_matches,total_tag_hits,
-		total_false_alarms,total_data_transfer);
+		total_false_alarms,(long)total_data_transfer);
 }

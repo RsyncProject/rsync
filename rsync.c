@@ -651,7 +651,7 @@ static void delete_files(struct file_list *flist)
   }
 }
 
-static char *cleanup_fname = NULL;
+static char *cleanup_fname;
 
 void exit_cleanup(int code)
 {
@@ -1053,7 +1053,7 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 
 
   if (verbose > 2)
-    fprintf(FERROR,"generator wrote %d\n",write_total());
+    fprintf(FERROR,"generator wrote %ld\n",(long)write_total());
 }
 
 

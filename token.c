@@ -26,8 +26,8 @@ extern int do_compression;
 /* non-compressing recv token */
 static int simple_recv_token(int f,char **data)
 {
-  static int residue = 0;
-  static char *buf = NULL;
+  static int residue;
+  static char *buf;
   int n;
 
   if (!buf) {
@@ -99,7 +99,7 @@ static int last_run_end;
 static z_stream tx_strm;
 
 /* Output buffer */
-static char *obuf = NULL;
+static char *obuf;
 
 /* Send a deflated token */
 static void
@@ -220,8 +220,8 @@ static int
 recv_deflated_token(int f, char **data)
 {
     int n, r, flag;
-    static int init_done = 0;
-    static int saved_flag = 0;
+    static int init_done;
+    static int saved_flag;
 
     for (;;) {
 	switch (recv_state) {

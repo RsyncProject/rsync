@@ -65,8 +65,8 @@ void get_checksum2(char *buf,int len,char *sum)
 {
   int i;
   MDstruct MD;
-  static char *buf1 = NULL;
-  static int len1 = 0;
+  static char *buf1;
+  static int len1;
 
   if (len > len1) {
     if (buf1) free(buf1);

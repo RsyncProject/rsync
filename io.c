@@ -24,18 +24,18 @@
   */
 #include "rsync.h"
 
-static int total_written = 0;
-static int total_read = 0;
+static off_t total_written;
+static off_t total_read;
 
 extern int verbose;
 extern int sparse_files;
 
-int write_total(void)
+off_t write_total(void)
 {
   return total_written;
 }
 
-int read_total(void)
+off_t read_total(void)
 {
   return total_read;
 }
@@ -49,10 +49,10 @@ void setup_nonblocking(int f_in,int f_out)
 }
 
 
-static char *read_buffer = NULL;
-static char *read_buffer_p = NULL;
-static int read_buffer_len = 0;
-static int read_buffer_size = 0;
+static char *read_buffer;
+static char *read_buffer_p;
+static int read_buffer_len;
+static int read_buffer_size;
 
 
 /* This function was added to overcome a deadlock problem when using
@@ -145,6 +145,29 @@ int read_int(int f)
   return IVAL(b,0);
 }
 
+off_t read_longint(int f)
+{
+	extern int remote_version;
+	off_t ret;
+	char b[8];
+	ret = read_int(f);
+	if (ret == -1 && remote_version >= 16) {
+		if (sizeof(off_t) <= 4) {
+			fprintf(FERROR,"Integer overflow - attempted 64 bit offset\n");
+			exit_cleanup(1);
+		}
+		if ((ret=readfd(f,b,8)) != 8) {
+			if (verbose > 1) 
+				fprintf(FERROR,"(%d) Error reading %d bytes : %s\n",
+					getpid(),8,ret==-1?strerror(errno):"EOF");
+			exit_cleanup(1);
+		}
+		total_read += 8;
+		ret = IVAL(b,0) | (((off_t)IVAL(b,4))<<32);
+	}
+	return ret;
+}
+
 void read_buf(int f,char *buf,int len)
 {
   int ret;
@@ -165,8 +188,8 @@ unsigned char read_byte(int f)
 }
 
 
-static char last_byte=0;
-static int last_sparse = 0;
+static char last_byte;
+static int last_sparse;
 
 int sparse_end(int f)
 {
@@ -293,6 +316,29 @@ void write_int(int f,int x)
     exit_cleanup(1);
   }
   total_written += 4;
+}
+
+void write_longint(int f, off_t x)
+{
+	extern int remote_version;
+	char b[8];
+	int ret;
+
+	if (remote_version < 16 || x <= 0x7FFFFFFF) {
+		write_int(f, (int)x);
+		return;
+	}
+
+	write_int(f, -1);
+	SIVAL(b,0,(x&0xFFFFFFFF));
+	SIVAL(b,4,((x>>32)&0xFFFFFFFF));
+
+	if ((ret=writefd(f,b,8)) != 8) {
+		fprintf(FERROR,"write_longint failed : %s\n",
+			ret==-1?strerror(errno):"EOF");
+		exit_cleanup(1);
+	}
+	total_written += 8;
 }
 
 void write_buf(int f,char *buf,int len)
