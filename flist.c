@@ -1517,11 +1517,17 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 	if (!(c1 = (uchar*)f1->dirname)) {
 		state1 = fnc_BASE;
 		c1 = (uchar*)f1->basename;
+	} else if (!*c1) {
+		state1 = fnc_SLASH;
+		c1 = (uchar*)"/";
 	} else
 		state1 = fnc_DIR;
 	if (!(c2 = (uchar*)f2->dirname)) {
 		state2 = fnc_BASE;
 		c2 = (uchar*)f2->basename;
+	} else if (!*c2) {
+		state2 = fnc_SLASH;
+		c2 = (uchar*)"/";
 	} else
 		state2 = fnc_DIR;
 
