@@ -23,6 +23,7 @@
 #define RSYNC_NAME "rsync"
 #define RSYNCD_CONF "/etc/rsyncd.conf"
 
+#define DEFAULT_LOCK_FILE "/var/run/rsyncd.lock"
 #define URL_PREFIX "rsync://"
 
 #define BACKUP_SUFFIX "~"

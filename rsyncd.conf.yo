@@ -80,17 +80,6 @@ dit(bf(motd file)) The "motd file" option allows you to specify a
 usually contains site information and any legal notices. The default
 is no motd file.
 
-dit(bf(max connections)) The "max connections" option allows you to
-specify the maximum number of simultaneous connections you will allow
-to your rsync server. Any clients connecting when the maximum has
-been reached will receive a message telling them to try later. 
-The default is 0 which means no limit.
-
-dit(bf(lock file)) The "lock file" option specifies the file to use to
-support the "max connections" option. The rsync server uses record
-locking on this file to ensure that the max connections limit is not
-exceeded. The default is tt(/var/run/rsyncd.lock).
-
 dit(bf(log file)) The "log file" option tells the rsync daemon to log
 messages to that file rather than using syslog. This is particularly
 useful on systems (such as AIX) where syslog() doesn't work for
@@ -140,6 +129,17 @@ the advantage of extra protection against possible implementation security
 holes, but it has the disadvantages of requiring super-user privileges and
 of not being able to follow symbolic links outside of the new root path.
 The default is to use chroot.
+
+dit(bf(max connections)) The "max connections" option allows you to
+specify the maximum number of simultaneous connections you will allow
+to this module of your rsync server. Any clients connecting when the
+maximum has been reached will receive a message telling them to try
+later.  The default is 0 which means no limit.
+
+dit(bf(lock file)) The "lock file" option specifies the file to use to
+support the "max connections" option. The rsync server uses record
+locking on this file to ensure that the max connections limit is not
+exceeded. The default is tt(/var/run/rsyncd.lock).
 
 dit(bf(read only)) The "read only" option determines whether clients
 will be able to upload files or not. If "read only" is true then any

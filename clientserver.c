@@ -138,16 +138,16 @@ static int rsync_module(int fd, int i)
 		return -1;
 	}
 
-	if (!claim_connection(lp_lock_file(), lp_max_connections())) {
+	if (!claim_connection(lp_lock_file(i), lp_max_connections(i))) {
 		if (errno) {
 			rprintf(FERROR,"failed to open lock file %s : %s\n",
-				lp_lock_file(), strerror(errno));
+				lp_lock_file(i), strerror(errno));
 			io_printf(fd,"@ERROR: failed to open lock file %s : %s\n",
-				  lp_lock_file(), strerror(errno));
+				  lp_lock_file(i), strerror(errno));
 		} else {
 			rprintf(FERROR,"max connections (%d) reached\n",
-				lp_max_connections());
-			io_printf(fd,"@ERROR: max connections (%d) reached - try again later\n", lp_max_connections());
+				lp_max_connections(i));
+			io_printf(fd,"@ERROR: max connections (%d) reached - try again later\n", lp_max_connections(i));
 		}
 		return -1;
 	}

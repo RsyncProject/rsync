@@ -97,11 +97,9 @@ static BOOL bLoaded = False;
 typedef struct
 {
 	char *motd_file;
-	char *lock_file;
 	char *log_file;
 	char *pid_file;
 	int syslog_facility;
-	int max_connections;
 	char *socket_options;
 } global;
 
@@ -117,6 +115,7 @@ typedef struct
 	char *name;
 	char *path;
 	char *comment;
+	char *lock_file;
 	BOOL read_only;
 	BOOL list;
 	BOOL use_chroot;
@@ -135,6 +134,7 @@ typedef struct
 	char *refuse_options;
 	char *dont_compress;
 	int timeout;
+	int max_connections;
 } service;
 
 
@@ -144,6 +144,7 @@ static service sDefault =
 	NULL,    /* name */
 	NULL,    /* path */
 	NULL,    /* comment */
+	DEFAULT_LOCK_FILE,    /* lock file */
 	True,    /* read only */
 	True,    /* list */
 	True,    /* use chroot */
@@ -161,7 +162,8 @@ static service sDefault =
 	"%o %h [%a] %m (%u) %f %l",    /* log format */
 	NULL,    /* refuse options */
 	"*.gz *.tgz *.zip *.z *.rpm *.deb",    /* dont compress */
-	0        /* timeout */
+	0,        /* timeout */
+	0        /* max connections */
 };
 
 
@@ -244,17 +246,17 @@ static struct enum_list enum_facilities[] = {
 /* note that we do not initialise the defaults union - it is not allowed in ANSI C */
 static struct parm_struct parm_table[] =
 {
-  {"max connections",  P_INTEGER, P_GLOBAL, &Globals.max_connections,NULL, 0},
   {"motd file",        P_STRING,  P_GLOBAL, &Globals.motd_file,    NULL,   0},
-  {"lock file",        P_STRING,  P_GLOBAL, &Globals.lock_file,    NULL,   0},
   {"syslog facility",  P_ENUM,    P_GLOBAL, &Globals.syslog_facility, enum_facilities,0},
   {"socket options",   P_STRING,  P_GLOBAL, &Globals.socket_options,NULL,  0},
   {"log file",         P_STRING,  P_GLOBAL, &Globals.log_file,      NULL,  0},
   {"pid file",         P_STRING,  P_GLOBAL, &Globals.pid_file,      NULL,  0},
 
   {"timeout",          P_INTEGER, P_LOCAL,  &sDefault.timeout,     NULL,  0},
+  {"max connections",  P_INTEGER, P_LOCAL,  &sDefault.max_connections,NULL, 0},
   {"name",             P_STRING,  P_LOCAL,  &sDefault.name,        NULL,   0},
   {"comment",          P_STRING,  P_LOCAL,  &sDefault.comment,     NULL,   0},
+  {"lock file",        P_STRING,  P_LOCAL,  &sDefault.lock_file,   NULL,   0},
   {"path",             P_STRING,  P_LOCAL,  &sDefault.path,        NULL,   0},
   {"read only",        P_BOOL,    P_LOCAL,  &sDefault.read_only,   NULL,   0},
   {"list",             P_BOOL,    P_LOCAL,  &sDefault.list,        NULL,   0},
@@ -286,7 +288,6 @@ static void init_globals(void)
 #ifdef LOG_DAEMON
 	Globals.syslog_facility = LOG_DAEMON;
 #endif
-	Globals.lock_file = "/var/run/rsyncd.lock";
 }
 
 /***************************************************************************
@@ -322,16 +323,15 @@ static void init_locals(void)
 
 
 FN_GLOBAL_STRING(lp_motd_file, &Globals.motd_file)
-FN_GLOBAL_STRING(lp_lock_file, &Globals.lock_file)
 FN_GLOBAL_STRING(lp_log_file, &Globals.log_file)
 FN_GLOBAL_STRING(lp_pid_file, &Globals.pid_file)
 FN_GLOBAL_STRING(lp_socket_options, &Globals.socket_options)
-FN_GLOBAL_INTEGER(lp_max_connections, &Globals.max_connections)
 FN_GLOBAL_INTEGER(lp_syslog_facility, &Globals.syslog_facility)
 
 FN_LOCAL_STRING(lp_name, name)
 FN_LOCAL_STRING(lp_comment, comment)
 FN_LOCAL_STRING(lp_path, path)
+FN_LOCAL_STRING(lp_lock_file, lock_file)
 FN_LOCAL_BOOL(lp_read_only, read_only)
 FN_LOCAL_BOOL(lp_list, list)
 FN_LOCAL_BOOL(lp_use_chroot, use_chroot)
@@ -350,6 +350,7 @@ FN_LOCAL_STRING(lp_log_format, log_format)
 FN_LOCAL_STRING(lp_refuse_options, refuse_options)
 FN_LOCAL_STRING(lp_dont_compress, dont_compress)
 FN_LOCAL_INTEGER(lp_timeout, timeout)
+FN_LOCAL_INTEGER(lp_max_connections, max_connections)
 
 /* local prototypes */
 static int    strwicmp( char *psz1, char *psz2 );
