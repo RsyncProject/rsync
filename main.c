@@ -462,7 +462,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	generate_files(f_out, flist, local_name);
 
-	get_redo_num(); /* Read final -1, and any prior messages. */
+	get_redo_num(); /* Read final MSG_DONE and any prior messages. */
 	io_flush(FULL_FLUSH);
 	if (protocol_version >= 24) {
 		/* send a final goodbye message */
