@@ -78,7 +78,8 @@ void log_open(void)
 	/* optionally use a log file instead of syslog */
 	logf = lp_log_file();
 	if (logf && *logf) {
-		int old_umask = umask(077);
+		extern int orig_umask;
+		int old_umask = umask(022 | orig_umask);
 		logfile = fopen(logf, "a");
 		umask(old_umask);
 		return;
