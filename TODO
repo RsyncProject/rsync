@@ -396,10 +396,16 @@ configure option to enable dangerous tests
 
 If tests are skipped, say why.
 
+Test daemon feature to disallow particular options.
+
 
 DOCUMENTATION --------------------------------------------------------
 
 Update README
+
+Keep list of open issues and todos on the web site
+
+Update web site from CVS
 
 BUILD FARM -----------------------------------------------------------
 
