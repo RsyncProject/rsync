@@ -79,6 +79,7 @@ static char *read_buffer;
 static char *read_buffer_p;
 static int read_buffer_len;
 static int read_buffer_size;
+static int no_flush;
 
 /* read from a socket with IO timeout. return the number of
    bytes read. If no bytes can be read then exit, never return
@@ -325,6 +326,8 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 	struct timeval tv;
 	int reading;
 
+	no_flush++;
+
 	reading = (buffer_f_in != -1 && read_buffer_len < MAX_READ_BUFFER);
 
 	while (total < len) {
@@ -374,6 +377,8 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 			read_check(buffer_f_in);
 		}
 	}
+
+	no_flush--;
 }
 
 
@@ -395,7 +400,7 @@ void io_start_buffering(int fd)
 void io_flush(void)
 {
 	int fd = multiplex_out_fd;
-	if (!io_buffer_count) return;
+	if (!io_buffer_count || no_flush) return;
 
 	if (io_multiplexing_out) {
 		SIVAL(io_buffer-4, 0, (MPLEX_BASE<<24) + io_buffer_count);
