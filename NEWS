@@ -1,3 +1,52 @@
+NEWS for rsync 2.6.3 (UNRELEASED)
+Protocol: 28 (unchanged)
+Changes since 2.6.2:
+
+  BUG FIXES:
+
+    - Fixed a crash bug that could cause --delete to crash when multiple
+      source directories were specified.
+
+    - The --backup code no longer attempts to create some directories
+      over and over again (generating warnings along the way).
+
+    - Fixed a bug in the reading of the password file (by the daemon)
+      and the secrets file (by the client):  the files no longer need to
+      be terminated by a newline for their content to be read in.
+
+    - If a file has a read error on the sending side, the receiver will
+      no longer keep the resulting file unless the --partial option was
+      specified.
+
+    - Fixed an age-old crash problem with --read-batch on a local copy
+      (rsync was improperly assuming --whole-file for the local copy).
+
+  ENHANCEMENTS:
+
+    - Added long-option names for -4 and -6 (namely --ipv4 and --ipv6)
+      and documented them in the man page.
+
+  INTERNAL:
+
+    - Some cleanup in the exclude code has saved some memory and made
+      things easier to maintain.
+
+    - Use rsyserr() in the various places that were still calling
+      rprintf() with strerror() as an arg.
+
+  BUILD CHANGES:
+
+    - Added a "gen" target to rebuild most of the various generated
+      files, including configure, config.h.in, the man pages, and
+      proto.h.
+
+    - The timestamp of the proto.h file is unaltered by "make proto"
+      if the contents didn't change.
+
+  DEVELOPER RELATED:
+
+    - The scripts in the testsuite dir were cleaned up a bit.
+
 NEWS for rsync 2.6.2 (30 Apr 2004)
 Protocol: 28 (unchanged)
 Changes since 2.6.1:
