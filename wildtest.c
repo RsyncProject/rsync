@@ -43,13 +43,13 @@ ok(int n, const char *text, const char *pattern, bool matches, bool same_as_fnma
     fn_matched = !fnmatch(pattern, text, flags);
 #endif
     if (matched != matches) {
-	printf("wildmatch failure on #%d:\n  %s\n  %s\n  expected %d\n",
-	       n, text, pattern, matches);
+	printf("wildmatch failure on #%d:\n  %s\n  %s\n  expected %s match\n",
+	       n, text, pattern, matches? "a" : "NO");
     }
 #ifdef COMPARE_WITH_FNMATCH
     if (fn_matched != (matches ^ !same_as_fnmatch)) {
-	printf("fnmatch disagreement on #%d:\n  %s\n  %s\n  expected %d\n",
-	       n, text, pattern, matches ^ !same_as_fnmatch);
+	printf("fnmatch disagreement on #%d:\n  %s\n  %s\n  expected %s match\n",
+	       n, text, pattern, matches ^ !same_as_fnmatch? "a" : "NO");
     }
 #endif
     if (output_iterations)
@@ -96,12 +96,13 @@ main(int argc, char **argv)
     ok(118, "ten",		"t[a-g]n",		true,	true);
     ok(119, "ten",		"t[!a-g]n",		false,	true);
     ok(120, "ton",		"t[!a-g]n",		true,	true);
-    ok(121, "]",		"]",			true,	true);
+    ok(121, "ton",		"t[^a-g]n",		true,	true);
     ok(122, "a]b",		"a[]]b",		true,	true);
     ok(123, "a-b",		"a[]-]b",		true,	true);
     ok(124, "a]b",		"a[]-]b",		true,	true);
     ok(125, "aab",		"a[]-]b",		false,	true);
     ok(126, "aab",		"a[]a-]b",		true,	true);
+    ok(127, "]",		"]",			true,	true);
 
     /* Extended slash-matching features */
     /* TEST, "text",		"pattern",		MATCH?, SAME-AS-FNMATCH? */
@@ -132,13 +133,25 @@ main(int argc, char **argv)
     ok(311, "foo",		"",			false,	true);
     ok(312, "foo/bar/baz/to",	"**/t[o]",		true,	true);
 
+    /* Character class tests. */
+    /* TEST, "txt","pattern",				MATCH?, SAME-AS-FNMATCH? */
+    ok(400, "a1B", "[[:alpha:]][[:digit:]][[:upper:]]",	true,	true);
+    ok(401, "a",   "[[:digit:][:upper:][:space:]]",	false,	true);
+    ok(402, "A",   "[[:digit:][:upper:][:space:]]",	true,	true);
+    ok(403, "1",   "[[:digit:][:upper:][:space:]]",	true,	true);
+    ok(404, " ",   "[[:digit:][:upper:][:space:]]",	true,	true);
+    ok(405, ".",   "[[:digit:][:upper:][:space:]]",	false,	true);
+    ok(406, "5",   "[[:xdigit:]]",			true,	true);
+    ok(407, "f",   "[[:xdigit:]]",			true,	true);
+    ok(408, "D",   "[[:xdigit:]]",			true,	true);
+
     /* Additional tests, including some malformed wildmats. */
     /* TEST, "text",		"pattern",		MATCH?, SAME-AS-FNMATCH? */
-    ok(500, "]",		"[\\-_]",		true,	true);
-    ok(501, "[",		"[\\-_]",		false,	true);
-    ok(502, ".",		"[\\\\-_]",		false,	true);
-    ok(503, "^",		"[\\\\-_]",		true,	true);
-    ok(504, "Z",		"[\\\\-_]",		false,	true);
+    ok(500, "]",		"[\\\\-^]",		true,	true);
+    ok(501, "[",		"[\\\\-^]",		false,	true);
+    ok(502, "-",		"[\\-_]",		true,	true);
+    ok(503, "]",		"[\\]]",		true,	true);
+    ok(504, "\\]",		"[\\]]",		false,	true);
     ok(505, "\\",		"[\\]]",		false,	true);
     ok(506, "ab",		"a[]b",			false,	true);
     ok(507, "a[]b",		"a[]b",			false,	true);
@@ -166,15 +179,15 @@ main(int argc, char **argv)
     ok(529, "[",		"[!]-a]",		true,	true);
     ok(530, "^",		"[a^bc]",		true,	true);
     ok(531, "-b]",		"[a-]b]",		true,	true);
-    ok(532, "\\]",		"[\\]]",		true,	true);
-    ok(533, "\\",		"[\\]",			true,	true);
-    ok(534, "\\",		"[!\\]",		false,	true);
-    ok(535, "G",		"[A-\\]",		true,	true);
+    ok(532, "\\",		"[\\]",			false,	true);
+    ok(533, "\\",		"[\\\\]",		true,	true);
+    ok(534, "\\",		"[!\\\\]",		false,	true);
+    ok(535, "G",		"[A-\\\\]",		true,	true);
     ok(536, "aaabbb",		"b*a",			false,	true);
     ok(537, "aabcaa",		"*ba*",			false,	true);
     ok(538, ",",		"[,]",			true,	true);
-    ok(539, ",",		"[\\,]",		true,	true);
-    ok(540, "\\",		"[\\,]",		true,	true);
+    ok(539, ",",		"[\\\\,]",		true,	true);
+    ok(540, "\\",		"[\\\\,]",		true,	true);
     ok(541, "-",		"[,-.]",		true,	true);
     ok(542, "+",		"[,-.]",		false,	true);
     ok(543, "-.]",		"[,-.]",		false,	true);
