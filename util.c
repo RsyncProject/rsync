@@ -245,7 +245,8 @@ static int safe_read(int desc, char *ptr, size_t len)
 
 /** Copy a file.
  *
- * This is used in conjunction with the --temp-dir and --backup options */
+ * This is used in conjunction with the --temp-dir, --backup, and
+ * --copy-dest options. */
 int copy_file(char *source, char *dest, mode_t mode)
 {
 	int ifd;
