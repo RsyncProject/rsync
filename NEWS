@@ -7,7 +7,7 @@ Changes since 2.6.2:
     - A bug in the sanitize_path routine (which affects a non-chrooted
       rsync daemon) could allow a user to craft a pathname that would get
       transformed into an absolute path for certain options (but not for
-      file-transfer names).  If you're running a rsync daemon with chroot
+      file-transfer names).  If you're running an rsync daemon with chroot
       disabled, *please upgrade*, ESPECIALLY if the user privs you run
       rsync under is anything above "nobody".
 
@@ -151,7 +151,7 @@ Changes since 2.6.2:
       systems), and is much less intrusive into the code (making it easier
       to maintain for the future).  The new code generates just one data
       file instead of three, which makes it possible to read the batch via
-      stdin over a remote shell.  Also, the old requirement of forcing the
+      stdin via a remote shell.  Also, the old requirement of forcing the
       same fixed checksum-seed for all batch processing has been removed.
 
     - If an rsync daemon has a module set with "list = no" (which hides its
@@ -164,8 +164,10 @@ Changes since 2.6.2:
     - The daemon's "refuse options" config item now allows you to match
       option names using wildcards and/or the single-letter option names.
 
-    - The finished file now gets its permissions and modified-time updated
-      before it gets moved into place.
+    - Each transferred file now gets its permissions and modified-time
+      updated before the temp-file gets moved into place.  Previously, the
+      finished file would have a very brief window where its permissions
+      disallowed all group and world access.
 
   INTERNAL:
 
