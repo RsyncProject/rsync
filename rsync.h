@@ -751,7 +751,7 @@ extern int errno;
 #define INITACCESSPERMS 0700
 
 /* handler for null strings in printf format */
-#define NS(s) ((s)?(s):"<NULL>")
+#define NS(s) ((s)?safe_fname(s):"<NULL>")
 
 #if !defined(__GNUC__) || defined(APPLE)
 /* Apparently the OS X port of gcc gags on __attribute__.
