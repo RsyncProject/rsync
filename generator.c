@@ -187,7 +187,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
  */
 static void generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 {
-	size_t i;
+	int32 i;
 	struct map_struct *mapbuf;
 	struct sum_struct sum;
 	OFF_T offset = 0;

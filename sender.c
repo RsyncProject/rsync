@@ -47,7 +47,7 @@ extern struct stats stats;
 static struct sum_struct *receive_sums(int f)
 {
 	struct sum_struct *s;
-	size_t i;
+	int32 i;
 	OFF_T offset = 0;
 
 	if (!(s = new(struct sum_struct)))
