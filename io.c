@@ -194,7 +194,7 @@ void send_msg(enum msgcode code, char *buf, int len)
  * called by the generator. */
 static void read_msg_fd(void)
 {
-	char buf[200];
+	char buf[2048];
 	size_t n;
 	int fd = msg_fd_in;
 	int tag, len;
@@ -247,7 +247,7 @@ static void read_msg_fd(void)
 
 /* Try to push messages off the list onto the wire.  If we leave with more
  * to do, return 0.  On error, return -1.  If everything flushed, return 1.
- * This is only called by the receiver. */
+ * This is only active in the receiver. */
 int msg_list_push(int flush_it_all)
 {
 	static int written = 0;
