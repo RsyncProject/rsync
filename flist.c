@@ -327,7 +327,8 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	unsigned short flags;
 	static time_t modtime;
 	static mode_t mode;
-	static dev_t dev, rdev;
+	static uint64 dev;
+	static dev_t rdev;
 	static uint32 rdev_major;
 	static uid_t uid;
 	static gid_t gid;
@@ -341,7 +342,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	if (!file) {
 		write_byte(f, 0);
 		modtime = 0, mode = 0;
-		dev = rdev = makedev(0, 0);
+		dev = 0, rdev = makedev(0, 0);
 		rdev_major = 0;
 		uid = 0, gid = 0;
 		*lastname = '\0';
@@ -478,20 +479,14 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 
 #if SUPPORT_HARD_LINKS
 	if (flags & XMIT_HAS_IDEV_DATA) {
-		if (protocol_version >= 28) {
-			/* major/minor dev_t and 64-bit ino_t */
-			if (!(flags & XMIT_SAME_DEV)) {
-				write_int(f, major(dev));
-				write_int(f, minor(dev));
-			}
-			write_longint(f, file->F_INODE);
-		} else if (protocol_version < 26) {
+		if (protocol_version < 26) {
 			/* 32-bit dev_t and ino_t */
 			write_int(f, dev);
 			write_int(f, file->F_INODE);
 		} else {
 			/* 64-bit dev_t and ino_t */
-			write_longint(f, dev);
+			if (!(flags & XMIT_SAME_DEV))
+				write_longint(f, dev);
 			write_longint(f, file->F_INODE);
 		}
 	}
@@ -524,7 +519,8 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 {
 	static time_t modtime;
 	static mode_t mode;
-	static dev_t dev, rdev;
+	static uint64 dev;
+	static dev_t rdev;
 	static uint32 rdev_major;
 	static uid_t uid;
 	static gid_t gid;
@@ -539,7 +535,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 
 	if (!fptr) {
 		modtime = 0, mode = 0;
-		dev = rdev = makedev(0, 0);
+		dev = 0, rdev = makedev(0, 0);
 		rdev_major = 0;
 		uid = 0, gid = 0;
 		*lastname = '\0';
@@ -677,19 +673,13 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 	if (preserve_hard_links && protocol_version < 28 && S_ISREG(mode))
 		flags |= XMIT_HAS_IDEV_DATA;
 	if (flags & XMIT_HAS_IDEV_DATA) {
-		INO64_T inode;
-		if (protocol_version >= 28) {
-			if (!(flags & XMIT_SAME_DEV)) {
-				uint32 dev_major = read_int(f);
-				uint32 dev_minor = read_int(f);
-				dev = makedev(dev_major, dev_minor);
-			}
-			inode = read_longint(f);
-		} else if (protocol_version < 26) {
-			dev = (dev_t)read_int(f);
+		uint64 inode;
+		if (protocol_version < 26) {
+			dev = read_int(f);
 			inode = read_int(f);
 		} else {
-			dev = (dev_t)read_longint(f);
+			if (!(flags & XMIT_SAME_DEV))
+				dev = read_longint(f);
 			inode = read_longint(f);
 		}
 		if (flist->hlink_pool) {
