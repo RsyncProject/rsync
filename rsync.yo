@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsync)(1)(5 Jan 2001)()()
+manpage(rsync)(1)(3 Mar 2001)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
@@ -562,17 +562,17 @@ scratch directory when creating temporary copies of the files
 transferred on the receiving side.  The default behavior is to create
 the temporary files in the receiving directory.
 
-dit(bf(--compare-dest=DIR)) This option instructs rsync to use DIR as an
-additional directory to compare destination files against when doing
-transfers.  This is useful for doing transfers to a new destination while
-leaving existing files intact, and then doing a flash-cutover when all
-files have been successfully transferred (for example by moving directories
-around and removing the old directory, although this requires also doing
-the transfer with -I to avoid skipping files that haven't changed).  This
-option increases the usefulness of --partial because partially transferred
-files will remain in the new temporary destination until they have a chance
-to be completed.  If DIR is a relative path, it is relative to the
-destination directory.
+dit(bf(--compare-dest=DIR)) This option instructs rsync to use DIR on
+the destination machine as an additional directory to compare destination
+files against when doing transfers.  This is useful for doing transfers to
+a new destination while leaving existing files intact, and then doing a
+flash-cutover when all files have been successfully transferred (for
+example by moving directories around and removing the old directory,
+although this requires also doing the transfer with -I to avoid skipping
+files that haven't changed).  This option increases the usefulness of
+--partial because partially transferred files will remain in the new
+temporary destination until they have a chance to be completed.  If DIR is
+a relative path, it is relative to the destination directory.
 
 dit(bf(-z, --compress)) With this option, rsync compresses any data from
 the source file(s) which it sends to the destination machine.  This
