@@ -169,6 +169,11 @@ void send_file_entry(struct file_struct *file,int f,unsigned base_flags)
   if (l1 > 0) flags |= SAME_NAME;
   if (l2 > 255) flags |= LONG_NAME;
 
+  /* we must make sure we don't send a zero flags byte or the other
+     end will terminate the flist transfer */
+  if (flags == 0 && !S_ISDIR(file->mode)) flags |= FLAG_DELETE;
+  if (flags == 0) flags |= LONG_NAME;
+
   write_byte(f,flags);  
   if (flags & SAME_NAME)
     write_byte(f,l1);

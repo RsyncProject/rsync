@@ -145,7 +145,7 @@ static void read_loop(int fd, char *buf, int len)
 	}
 }
 
-/* read from the file descriptor handing multiplexing - 
+/* read from the file descriptor handling multiplexing - 
    return number of bytes read
    never return <= 0 */
 static int read_unbuffered(int fd, char *buf, int len)
