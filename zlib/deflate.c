@@ -1092,11 +1092,6 @@ local block_state deflate_stored(s, flush)
         max_block_size = s->pending_buf_size - 5;
     }
 
-    if (flush == Z_INSERT_ONLY) {
-	s->block_start = s->strstart;
-	return need_more;
-    }
-
     /* Copy as much as possible from input to output: */
     for (;;) {
         /* Fill the window as much as possible: */
@@ -1115,6 +1110,11 @@ local block_state deflate_stored(s, flush)
 	s->strstart += s->lookahead;
 	s->lookahead = 0;
 
+	if (flush == Z_INSERT_ONLY) {
+	    s->block_start = s->strstart;
+	    continue;
+	}
+
 	/* Emit a stored block if pending_buf will be full: */
  	max_start = s->block_start + max_block_size;
         if (s->strstart == 0 || (ulg)s->strstart >= max_start) {
@@ -1130,6 +1130,11 @@ local block_state deflate_stored(s, flush)
             FLUSH_BLOCK(s, 0);
 	}
     }
+    if (flush == Z_INSERT_ONLY) {
+	s->block_start = s->strstart;
+	return need_more;
+    }
+
     FLUSH_BLOCK(s, flush == Z_FINISH);
     return flush == Z_FINISH ? finish_done : block_done;
 }
