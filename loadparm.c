@@ -61,7 +61,7 @@ typedef char pstring[1024];
 typedef enum
 {
 	P_BOOL,P_BOOLREV,P_CHAR,P_INTEGER,P_OCTAL,
-	P_STRING,P_GSTRING,P_ENUM,P_SEP
+	P_PATH,P_STRING,P_GSTRING,P_ENUM,P_SEP
 } parm_type;
 
 typedef enum
@@ -274,7 +274,7 @@ static struct parm_struct parm_table[] =
   {"name",             P_STRING,  P_LOCAL,  &sDefault.name,        NULL,   0},
   {"comment",          P_STRING,  P_LOCAL,  &sDefault.comment,     NULL,   0},
   {"lock file",        P_STRING,  P_LOCAL,  &sDefault.lock_file,   NULL,   0},
-  {"path",             P_STRING,  P_LOCAL,  &sDefault.path,        NULL,   0},
+  {"path",             P_PATH,    P_LOCAL,  &sDefault.path,        NULL,   0},
   {"read only",        P_BOOL,    P_LOCAL,  &sDefault.read_only,   NULL,   0},
   {"list",             P_BOOL,    P_LOCAL,  &sDefault.list,        NULL,   0},
   {"use chroot",       P_BOOL,    P_LOCAL,  &sDefault.use_chroot,  NULL,   0},
@@ -593,6 +593,7 @@ static void copy_service(service *pserviceDest,
 	    *(char *)dest_ptr = *(char *)src_ptr;
 	    break;
 
+	  case P_PATH:
 	  case P_STRING:
 	    string_set(dest_ptr,*(char **)src_ptr);
 	    break;
@@ -613,6 +614,7 @@ static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
    int parmnum, i;
    void *parm_ptr=NULL; /* where we are going to store the result */
    void *def_ptr=NULL;
+   char *cp;
 
    parmnum = map_parameter(parmname);
 
@@ -657,6 +659,15 @@ static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
 
      case P_OCTAL:
        sscanf(parmvalue,"%o",(int *)parm_ptr);
+       break;
+
+     case P_PATH:
+       string_set(parm_ptr,parmvalue);
+       if ((cp = *(char**)parm_ptr) != NULL) {
+	   int len = strlen(cp);
+	   while (len && cp[--len] == '/')
+	       cp[len] = '\0';
+       }
        break;
 
      case P_STRING:
