@@ -41,8 +41,15 @@
 #  ifdef _AIX
 #pragma alloca
 #  else
-#   ifndef alloca /* predefined by HP cc +Olibcalls */
+#   if HAVE_ALLOCA
+#    ifndef alloca /* predefined by HP cc +Olibcalls */
 char *alloca ();
+#    endif
+#   else
+#    ifdef alloca
+#     undef alloca
+#    endif
+#    define alloca(sz) malloc(sz) /* Kludge this for now */
 #   endif
 #  endif
 # endif
