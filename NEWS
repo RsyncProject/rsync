@@ -1,4 +1,4 @@
-NEWS for rsync 2.6.4 (UNRELEASED)
+NEWS for rsync 2.6.4 (30 March 2005)
 Protocol: 29 (changed)
 Changes since 2.6.3:
 
@@ -21,12 +21,12 @@ Changes since 2.6.3:
       avoids outputting the name of the file twice in most circumstances.
       As long as the --log-format item does not refer to any post-transfer
       items (such as %b or %c), the --log-format message is output prior to
-      the transfer with --verbose being the equivalent of a --log-format of
-      '%n%L' (which outputs the name and any symlink info).  If the log
-      output must occur after the transfer to be complete, the only time
-      the name is also output prior to the transfer is when --progress was
-      specified (so that the name will precede the progress stats, and the
-      full --log-format output will come after).
+      the transfer, so --verbose is now the equivalent of a --log-format of
+      '%n%L' (which outputs the name and any link info).  If the log output
+      must occur after the transfer to be complete, the only time the name
+      is also output prior to the transfer is when --progress was specified
+      (so that the name will precede the progress stats, and the full
+      --log-format output will come after).
   
   BUG FIXES:
 
@@ -49,19 +49,22 @@ Changes since 2.6.3:
 
     - Fixed a potential protocol-corrupting bug where the generator could
       merge a message from the receiver into the middle of a multiplexed
-      packet of data if only part of that data was written out to the
-      socket when we got the message from the generator.
+      packet of data if only part of that data had been written out to the
+      socket when the message from the generator arrived.
 
     - We now check if the OS doesn't support using mknod() for creating
-      FIFOs and sockets, and compile-in using mkfifo() and socket() when
-      necessary.
+      FIFOs and sockets, and compile-in some compatibility code using
+      mkfifo() and socket() when necessary.
 
-    - Fixed an off-by-one error in the handling of --max-delete=N.
+    - Fixed an off-by-one error in the handling of --max-delete=N.  Also,
+      if the --max-delete limit is exceeded during a run, we now output a
+      warning about this at the end of the run and exit with a new error
+      code (25).
 
     - One place in the code wasn't checking if fork() failed.
 
     - The "ignore nonreadable" daemon parameter used to erroneously affect
-      symlinks that pointed to a non-existent file.  This has been fixed.
+      readable symlinks that pointed to a non-existent file.
 
     - If the OS does not have lchown() and a chown() of a symlink will
       affect the referent of a symlink (as it should), we no longer try
@@ -70,8 +73,8 @@ Changes since 2.6.3:
     - The generator now properly runs the hard-link loop and the dir-time
       rewriting loop after we're sure that the redo phase is complete.
 
-    - When --backup was specified with --partial-dir=DIR (where DIR is a
-      relative path), the backup code was erroneously trying to backup a
+    - When --backup was specified with --partial-dir=DIR, where DIR is a
+      relative path, the backup code was erroneously trying to backup a
       file that was put into the partial-dir.
 
     - If a file gets resent in a single transfer and the --backup option is
@@ -98,7 +101,7 @@ Changes since 2.6.3:
     - If a daemon can't open the specified log file (i.e. syslog is not
       being used), die without crashing.  We also output an error about
       the failure on stderr (which will only be seen if --no-detach was
-      specified).
+      specified) and exit with a new error code (6).
 
     - A local transfer no longer duplicates all its include/exclude options
       (since the forked process already has a copy of the exclude list,
@@ -116,7 +119,7 @@ Changes since 2.6.3:
       make progress.  (Requires protocol 29.)
 
     - The stat size of a device is not added to the total file size of the
-      items in the transfer since the size might be undefined on some OSes.
+      items in the transfer (the size might be undefined on some OSes).
 
     - Fixed a problem with refused-option messages sometimes not making it
       back to the client side when a remote --files-from was in effect and
@@ -137,21 +140,21 @@ Changes since 2.6.3:
     - Added the --delete-during (--del) option which will delete files
       from the receiving side incrementally as each directory in the
       transfer is being processed.  This makes it more efficient than the
-      default, before-the-transfer behavior, which is now available as
+      default, before-the-transfer behavior, which is now also available as
       --delete-before (and is still the default --delete-WHEN option that
       will be chosen if --delete or --delete-excluded is specified without
       a --delete-WHEN choice).  All the --del* options infer --delete, so
       an rsync daemon that refuses "delete" will still refuse to allow any
-      file-deleting options.
+      file-deleting options (including the new --remove-sent-files option).
 
     - All the --delete-WHEN options are now more memory efficient:
-      Previously an entire duplicate set of file-list objects was created
-      on the receiving side for the entire destination hierarchy.  The new
+      Previously an duplicate set of file-list objects was created on the
+      receiving side for the entire destination hierarchy.  The new
       algorithm only creates one directory of objects at a time (for files
       inside the transfer).
 
     - Added the --copy-dest option, which works like --link-dest except
-      that it copies identical files instead of hard-linking them.
+      that it locally copies identical files instead of hard-linking them.
 
     - Added support for specifying multiple --compare-dest, --copy-dest, or
       --link-dest options, but only of a single type. (Promoted from the
@@ -159,18 +162,19 @@ Changes since 2.6.3:
 
     - Added the --max-size option. (Promoted from the patches dir.)
 
-    - The daemon-mode options were separated from the normal rsync options
-      so that they can't be mixed together.  This makes it impossible to
-      start a daemon that had improper default option values that could
-      cause problems when a client connects (e.g. a hang or an abort).
+    - The daemon-mode options are now separated from the normal rsync
+      options so that they can't be mixed together.  This makes it
+      impossible to start a daemon that has improper default option values
+      (which could cause problems when a client connects, such as hanging
+      or crashing).
 
     - The --bwlimit option may now be used in combination with --daemon
       to specify both a default value for the daemon side and a value
       that cannot be exceeded by a user-specified --bwlimit option.
 
     - Added the "port" parameter to the rsyncd.conf file. (Promoted from
-      the patches dir.)  Also added "address".  A command-line option
-      will take precedence over a config-file option, as expected.
+      the patches dir.)  Also added "address".  The command-line options
+      take precedence over a config-file option, as expected.
 
     - In _exit_cleanup(): when we are exiting with a partially-received
       file, we now flush any data in the write-cache before closing the
@@ -194,7 +198,7 @@ Changes since 2.6.3:
     - Added the --omit-dir-times (-O) option, which will avoid updating
       the modified time for directories when --times was specified.  This
       option will avoid an extra pass through the file-list at the end of
-      the transfer (to tweak all the directory times), which can result in
+      the transfer (to tweak all the directory times), which may provide
       an appreciable speedup for a really large transfer. (Promoted from
       the patches dir.)
 
@@ -225,18 +229,18 @@ Changes since 2.6.3:
       very wrong).
 
     - Added the --itemize-changes (-i) option, which is a way to output a
-      more detailed list of what files changed in any way and how they
-      changed.  The effect is the same as specifying a --log-format of
-      "%i %n%L" (see the rsyncd.conf manpage).  Works with --dry-run too.
+      more detailed list of what files changed and in what way.  The effect
+      is the same as specifying a --log-format of "%i %n%L" (see both the
+      rsync and rsyncd.conf manpages).  Works with --dry-run too.
 
-    - Added the --fuzzy option, which attempts to find a basis file for a
-      file that is being created from scratch.  The current algorithm
-      only looks in the destination directory for the created file, but
-      it does attempt to find a match based on size/mod-time (in case the
-      file was renamed with no other changes) as well as based on a fuzzy
-      name-matching algorithm.  This option requires protocol 29 because
-      it needs the new file-sorting order.  (Promoted from patches dir
-      and enhanced.) (Requires protocol 29.)
+    - Added the --fuzzy (-y) option, which attempts to find a basis file
+      for a file that is being created from scratch.  The current algorithm
+      only looks in the destination directory for the created file, but it
+      does attempt to find a match based on size/mod-time (in case the file
+      was renamed with no other changes) as well as based on a fuzzy
+      name-matching algorithm.  This option requires protocol 29 because it
+      needs the new file-sorting order.  (Promoted from patches dir and
+      enhanced.) (Requires protocol 29.)
 
     - Added the --remove-sent-files option, which lets you move files
       between systems.
@@ -246,7 +250,7 @@ Changes since 2.6.3:
       literals in the rsync://HOST:PORT/PATH format.)
 
     - When rsync recurses to build the file list, it no longer keeps open
-      the directory handles of all the parent dirs inside the transfer.
+      one or more directory handles from the dir's parent dirs.
 
     - When building under windows, the default for --daemon is now to
       avoid detaching, requiring the new --detach option to force rsync
@@ -255,6 +259,10 @@ Changes since 2.6.3:
     - The --dry-run option can now be combined with either --write-batch or
       --read-batch, allowing you to run a do-nothing test command to see
       what would happen without --dry-run.
+
+    - The daemon's "read only" config item now sets an internal read_only
+      variable that makes extra sure that no write/delete calls on the
+      read-only side can succeed.
 
     - Improved the option descriptions in the --help text.
 
@@ -275,11 +283,11 @@ Changes since 2.6.3:
     - Added savetransfer.c to the support dir: a C program that can make
       a copy of all the data that flows over the wire.  This lets you test
       for data corruption (by saving the data on both the sending side and
-      the receiving side) or provides a way to help debug a protocol error.
+      the receiving side) and provides one way to debug a protocol error.
 
-    - Added rrsync to the support dir: this is my version of Joe Smith's
-      restricted rsync perl script.  This helps to ensure that only certain
-      rsync commands can be run by an ssh invocation.
+    - Added rrsync to the support dir: this is an updated version of Joe
+      Smith's restricted rsync perl script.  This helps to ensure that only
+      certain rsync commands can be run by an ssh invocation.
 
   INTERNAL:
 
@@ -299,10 +307,6 @@ Changes since 2.6.3:
     - Defined int32 in a way that ensures that the build dies if we can't
       find a variable with at least 32 bits.
 
-    - The daemon's "read only" config item now sets an internal read_only
-      variable that makes extra sure that no write/delete calls on the
-      read-only side can succeed.
-
   PROTOCOL DIFFERENCES FOR VERSION 29:
 
     - A 16-bit flag-word is transmitted after every file-list index.  This
@@ -313,19 +317,20 @@ Changes since 2.6.3:
       less prone to screen corruption (because the local receiver/sender is
       now outputting all the file-change info messages).
 
-    - If a file is being hard-linked, the appropriate bit is enabled in
-      the flag-word and the name of the file that was linked immediately
+    - If a file is being hard-linked, the ITEM_XNAME_FOLLOWS bit is enabled
+      in the flag-word and the name of the file that was linked immediately
       follows in vstring format (see below).
 
     - If a file is being transferred with an alternate-basis file, the
-      appropriate bit is enabled in the flag-word and a single-byte
-      follows, indicating what type of basis file was chosen.  If that
-      indicates that a fuzzy-match was selected, the name of the match
-      immediately follows in vstring format.  A vstring is a variable
-      length string that has its size written prior to the string, and
-      no terminating null.  If the string is from 1-127 bytes, the length
-      is a single byte.  If it is from 128-32767 bytes, the length is
-      written as ((len >> 8) | 0x80) followed by (len % 0x100).
+      ITEM_BASIS_TYPE_FOLLOWS bit is enabled in the flag-word and a single
+      byte follows, indicating what type of basis file was chosen.  If that
+      indicates that a fuzzy-match was selected, the ITEM_XNAME_FOLLOWS bit
+      is set in the flag-word and the name of the match in vstring format
+      follows the basis byte.  A vstring is a variable length string that
+      has its size written prior to the string, and no terminating null.
+      If the string is from 1-127 bytes, the length is a single byte.  If
+      it is from 128-32767 bytes, the length is written as ((len >> 8) |
+      0x80) followed by (len % 0x100).
 
     - The sending of exclude names is done using filter-rule syntax.  This
       means that all names have a prefixed rule indicator, even excludes
