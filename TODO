@@ -5,16 +5,6 @@ URGENT ---------------------------------------------------------------
 
 IMPORTANT ------------------------------------------------------------
 
-Cross-test versions
-
-  Part of the regression suite should be making sure that we don't
-  break backwards compatibility: old clients vs new servers and so
-  on.  Ideally we would test the cross product of versions.  
-
-  It might be sufficient to test downloads from well-known public
-  rsync servers running different versions of rsync.  This will give
-  some testing and also be the most common case for having different
-  versions and not being able to upgrade.
 
 use chroot
 
@@ -365,6 +355,32 @@ Memory debugger
   jra recommends Valgrind:
 
     http://devel-home.kde.org/~sewardj/
+
+TESTING --------------------------------------------------------------
+
+Cross-test versions
+
+  Part of the regression suite should be making sure that we don't
+  break backwards compatibility: old clients vs new servers and so
+  on.  Ideally we would test the cross product of versions.  
+
+  It might be sufficient to test downloads from well-known public
+  rsync servers running different versions of rsync.  This will give
+  some testing and also be the most common case for having different
+  versions and not being able to upgrade.
+
+Test large files
+
+  Sparse and non-sparse
+
+Mutator program
+
+  Insert bytes, delete bytes, swap blocks, ...
+
+configure option to enable dangerous tests
+
+If tests are skipped, say why.
+
 
 DOCUMENTATION --------------------------------------------------------
 
