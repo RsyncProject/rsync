@@ -1,6 +1,7 @@
 /* 
    Copyright (C) by Andrew Tridgell 1996, 2000
    Copyright (C) Paul Mackerras 1996
+   Copyright (C) 2001 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -63,6 +64,9 @@
 
 #define MPLEX_BASE 7
 
+/* Log values.  I *think* what these mean is: FLOG goes to the server
+ * logfile; FERROR and FINFO try to end up on the client, with
+ * different levels of filtering. */
 enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 
 #include "errcode.h"
@@ -76,12 +80,6 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #endif
 
 #include <sys/types.h>
-
-#ifdef HAVE_GETOPT_LONG
-#include <getopt.h>
-#else
-#include "lib/getopt.h"
-#endif
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
