@@ -142,7 +142,9 @@ char **make_exclude_list(char *fname,char **list1,int fatal)
 
 void add_exclude_file(char *fname,int fatal)
 {
-  exclude_list = make_exclude_list(fname,exclude_list,fatal);
+	if (!fname || !*fname) return;
+
+	exclude_list = make_exclude_list(fname,exclude_list,fatal);
 }
 
 
@@ -172,6 +174,18 @@ void recv_exclude_list(int f)
 }
 
 
+void add_exclude_line(char *p)
+{
+	char *tok;
+	if (!p || !*p) return;
+	p = strdup(p);
+	if (!p) out_of_memory("add_exclude_line");
+	for (tok=strtok(p," "); tok; tok=strtok(NULL," "))
+		add_exclude(tok);
+	free(p);
+}
+
+
 static char *cvs_ignore_list[] = {
   "RCS","SCCS","CVS","CVS.adm","RCSLOG","cvslog.*",
   "tags","TAGS",".make.state",".nse_depinfo",
@@ -195,9 +209,5 @@ void add_cvs_excludes(void)
     add_exclude_file(fname,0);
   }
 
-  if ((p=getenv("CVSIGNORE"))) {
-    char *tok;
-    for (tok=strtok(p," "); tok; tok=strtok(NULL," "))
-      add_exclude(tok);
-  }
+  add_exclude_line(getenv("CVSIGNORE"));
 }

@@ -162,6 +162,12 @@ static int rsync_module(int fd, int i)
 		gid = atoi(p);
 	}
 
+	p = lp_exclude_from(i);
+	add_exclude_file(p, 1);
+
+	p = lp_exclude_from(i);
+	add_exclude_line(p);
+
 	if (chroot(lp_path(i))) {
 		io_printf(fd,"@ERROR: chroot failed\n");
 		return -1;

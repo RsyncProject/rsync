@@ -140,6 +140,21 @@ dit(bf(gid)) The "gid" option specifies the group name or group id that
 file transfers to and from that module should take place as. This
 complements the "uid" option. The default is the group "nobody".
 
+dit(bf(exclude)) The "exclude" option allows you to specify a space
+separated list of patterns to add to the exclude list. This is
+equivalent to the client specifying these patterns with the --exclude
+option. Note that this option is not designed with strong security in
+mind, it is quite possible that a client may find a way to bypass this
+exclude list. If you want to absolutely ensure that certain files
+cannot be accessed then use the uid/gid options in combination with
+file permissions.
+
+dit(bf(exclude from)) The "exclude from" option specifies a filename
+on the server that contains exclude patterns, one per line. This is
+equivalent to the client specifying the --exclude-from option with a
+equivalent file. See also the note about security for the exclude
+option above.
+
 dit(bf(auth users)) The "auth users" option specifies a comma
 and space separated list of usernames that will be allowed to connect
 to this module. The usernames do not need to exist on the local
