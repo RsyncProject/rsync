@@ -838,6 +838,7 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
     double        rate = diff ? ((ofs-start_ofs) / diff) * 1000.0/1024.0 : 0;
     const char    *units, *rem_units;
     double        remain = rate ? (size-ofs) / rate : 0.0;
+    int 	  remain_h, remain_m, remain_s;
 
     if (rate > 1024*1024) {
 	    rate /= 1024.0 * 1024.0;
@@ -849,19 +850,13 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 	    units = "kB/s";
     }
 
-    if (remain > 5*60*60) {
-	    remain /= 60*60;
-	    rem_units = "h";
-    } if (remain > 5*60) {
-	    remain /= 60;
-	    rem_units = "m";
-    } else {
-	    rem_units = "s";
-    }
+    remain_s = (int) remain % 60;
+    remain_m = (int) (remain / 60.0) % 60;
+    remain_h = (int) (remain / 3600.0);
     
-    rprintf(FINFO, "%12.0f %3d%% %7.2f%s %6.0f%s%s",
+    rprintf(FINFO, "%12.0f %3d%% %7.2f%s %4d:%02d:%02d%s",
 	    (double) ofs, pct, rate, units,
-	    remain, rem_units,
+	    remain_h, remain_m, remain_s,
 	    is_last ? "\n" : "\r");
 }
 
