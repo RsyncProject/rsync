@@ -37,7 +37,9 @@ Performance
   Traverse just one directory at a time.  Tridge says it's possible.
  
   Can possibly also be smarter about memory use while looking for hard
-  links by reducing the refcount as we find alternative names.
+  links by reducing the refcount as we find alternative names.  In
+  fact at the moment the code seems to make a whole second copy of the
+  file list, which seems unnecessary.
 
 IPv6
 
