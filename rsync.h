@@ -51,9 +51,11 @@
 #define LONG_NAME (1<<6)
 #define SAME_TIME (1<<7)
 #define SAME_HIGH_RDEV (1<<8)
+#define HAS_INODE_DATA (1<<9)
+#define SAME_DEV (1<<10)
 
 /* update this if you make incompatible changes */
-#define PROTOCOL_VERSION 27
+#define PROTOCOL_VERSION 28
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
