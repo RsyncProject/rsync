@@ -179,10 +179,7 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 		} else
 			write_arg(fd, p);
 	}
-	if ((p = find_colon(argv[argc - 1])) != NULL) {
-		if (*++p == ':')
-			p++;
-	} else
+	if (!(p = check_for_hostspec(argv[argc - 1], &p, &i)))
 		p = argv[argc - 1];
 	write(fd, " ${1:-", 6);
 	write_arg(fd, p);
