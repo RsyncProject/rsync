@@ -69,11 +69,17 @@
 0 1 a		[[:digit:][:upper:][:space:]]
 1 1 A		[[:digit:][:upper:][:space:]]
 1 1 1		[[:digit:][:upper:][:space:]]
+0 1 1		[[:digit:][:upper:][:spack:]]
 1 1 ' '		[[:digit:][:upper:][:space:]]
 0 1 .		[[:digit:][:upper:][:space:]]
+1 1 .		[[:digit:][:punct:][:space:]]
 1 1 5		[[:xdigit:]]
 1 1 f		[[:xdigit:]]
 1 1 D		[[:xdigit:]]
+1 1 _		[[:alnum:][:alpha:][:blank:][:cntrl:][:digit:][:graph:][:lower:][:print:][:punct:][:space:][:upper:][:xdigit:]]
+1 1 …		[^[:alnum:][:alpha:][:blank:][:cntrl:][:digit:][:graph:][:lower:][:print:][:punct:][:space:][:upper:][:xdigit:]]
+1 1 		[^[:alnum:][:alpha:][:blank:][:digit:][:graph:][:lower:][:print:][:punct:][:space:][:upper:][:xdigit:]]
+1 1 .		[^[:alnum:][:alpha:][:blank:][:cntrl:][:digit:][:lower:][:space:][:upper:][:xdigit:]]
 
 # Additional tests, including some malformed wildmats
 1 1 ]		[\\-^]
@@ -121,11 +127,13 @@
 0 1 -.]		[,-.]
 1 1 \		[[-\]]
 0 1 -		[[-\]]
+0 1 /\		/\
 
-# Test recursive calls and the ABORT code
+# Test recursion and the abort code (use "wildtest -i" to see iteration counts)
 1 1 -adobe-courier-bold-o-normal--12-120-75-75-m-70-iso8859-1	-*-*-*-*-*-*-12-*-*-*-m-*-*-*
 0 1 -adobe-courier-bold-o-normal--12-120-75-75-X-70-iso8859-1	-*-*-*-*-*-*-12-*-*-*-m-*-*-*
 0 1 -adobe-courier-bold-o-normal--12-120-75-75-/-70-iso8859-1	-*-*-*-*-*-*-12-*-*-*-m-*-*-*
 1 1 /adobe/courier/bold/o/normal//12/120/75/75/m/70/iso8859/1	/*/*/*/*/*/*/12/*/*/*/m/*/*/*
 0 1 /adobe/courier/bold/o/normal//12/120/75/75/X/70/iso8859/1	/*/*/*/*/*/*/12/*/*/*/m/*/*/*
 1 1 abcd/abcdefg/abcdefghijk/abcdefghijklmnop.txt		**/*a*b*g*n*t
+0 1 abcd/abcdefg/abcdefghijk/abcdefghijklmnop.txtz		**/*a*b*g*n*t
