@@ -231,6 +231,28 @@ if test x"$rsync_cv_HAVE_GETTIMEOFDAY_TZ" = x"yes"; then
     AC_DEFINE(HAVE_GETTIMEOFDAY_TZ)
 fi
 
+AC_CACHE_CHECK([for secure mkstemp],rsync_cv_HAVE_SECURE_MKSTEMP,[
+AC_TRY_RUN([#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+main() { 
+  struct stat st;
+  char tpl[20]="/tmp/test.XXXXXX"; 
+  int fd = mkstemp(tpl); 
+  if (fd == -1) exit(1);
+  unlink(tpl);
+  if (fstat(fd, &st) != 0) exit(1);
+  if ((st.st_mode & 0777) != 0600) exit(1);
+  exit(0);
+}],
+rsync_cv_HAVE_SECURE_MKSTEMP=yes,
+rsync_cv_HAVE_SECURE_MKSTEMP=no,
+rsync_cv_HAVE_SECURE_MKSTEMP=cross)])
+if test x"$rsync_cv_HAVE_SECURE_MKSTEMP" = x"yes"; then
+    AC_DEFINE(HAVE_SECURE_MKSTEMP)
+fi
+
 
 AC_CACHE_CHECK([for broken inet_ntoa],rsync_cv_REPLACE_INET_NTOA,[
 AC_TRY_RUN([

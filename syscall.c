@@ -113,14 +113,27 @@ int do_mkdir(char *fname, mode_t mode)
 	return mkdir(fname, mode);
 }
 
-char *do_mktemp(char *template)
+/* like mkstemp but forces permissions */
+int do_mkstemp(char *template, mode_t perms)
 {
-	if (dry_run) return NULL;
-	if (read_only) {errno = EROFS; return NULL;}
-	
-        /* TODO: Replace this with a good builtin mkstemp, perhaps
-	 * from OpenBSD.  Some glibc versions are buggy.  */
-	return mktemp(template);
+	if (dry_run) return -1;
+	if (read_only) {errno = EROFS; return -1;}
+
+#if defined(HAVE_SECURE_MKSTEMP) && defined(HAVE_FCHMOD)
+	{
+		int fd = mkstemp(template);
+		if (fd == -1) return -1;
+		if (fchmod(fd, perms) != 0) {
+			close(fd);
+			unlink(template);
+			return -1;
+		}
+		return fd;
+	}
+#else
+	if (!mktemp(template)) return -1;
+	return open(template, O_RDWR|O_EXCL|O_CREAT, perms);
+#endif
 }
 
 int do_stat(const char *fname, STRUCT_STAT *st)

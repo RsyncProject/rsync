@@ -304,6 +304,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	int fd1,fd2;
 	STRUCT_STAT st;
 	char *fname;
+	char template[MAXPATHLEN];
 	char fnametmp[MAXPATHLEN];
 	char *fnamecmp;
 	char fnamecmpbuf[MAXPATHLEN];
@@ -412,17 +413,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			continue;
 		}
 
-		/* mktemp is deliberately used here instead of mkstemp.
-		   because O_EXCL is used on the open, the race condition
-		   is not a problem or a security hole, and we want to
-		   control the access permissions on the created file. */
-		if (NULL == do_mktemp(fnametmp)) {
-			rprintf(FERROR,"mktemp %s failed\n",fnametmp);
-			receive_data(f_in,buf,-1,NULL,file->length);
-			if (buf) unmap_file(buf);
-			if (fd1 != -1) close(fd1);
-			continue;
-		}
+		strlcpy(template, fnametmp, sizeof(template));
 
 		/* we initially set the perms without the
 		   setuid/setgid bits to ensure that there is no race
@@ -430,16 +421,21 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		   the lchown. Thanks to snabb@epipe.fi for pointing
 		   this out.  We also set it initially without group
 		   access because of a similar race condition. */
-		fd2 = do_open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,
-			      file->mode & INITACCESSPERMS);
+		fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
+		if (fd2 == -1) {
+			rprintf(FERROR,"mkstemp %s failed\n",fnametmp);
+			receive_data(f_in,buf,-1,NULL,file->length);
+			if (buf) unmap_file(buf);
+			continue;
+		}
 
 		/* in most cases parent directories will already exist
 		   because their information should have been previously
 		   transferred, but that may not be the case with -R */
 		if (fd2 == -1 && relative_paths && errno == ENOENT && 
 		    create_directory_path(fnametmp) == 0) {
-			fd2 = do_open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,
-				      file->mode & INITACCESSPERMS);
+			strlcpy(fnametmp, template, sizeof(fnametmp));
+			fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
 		}
 		if (fd2 == -1) {
 			rprintf(FERROR,"cannot create %s : %s\n",fnametmp,strerror(errno));

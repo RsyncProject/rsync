@@ -54,17 +54,14 @@ install-strip:
 	$(MAKE) INSTALLCMD='$(INSTALLCMD) -s' install
 
 rsync: $(OBJS)
-	@-echo "    Note: The link command may give a warning about use of mktemp."
-	@-echo "    The warning may be ignored because rsync uses this function in a safe way."
 	$(CC) $(CFLAGS) $(LDFLAGS) -o rsync $(OBJS) $(LIBS)
 
 Makefile: Makefile.in configure config.status
 	echo "WARNING: You need to run ./config.status --recheck"
 
-# It's OK if this fails, because we don't require people to have
-# autoconf installed.
+# don't actually run autoconf, just issue a warning
 configure: configure.in
-	-cd $(srcdir) && autoconf
+	echo "WARNING: you need to rerun autoconf"
 
 rsync.1: rsync.yo
 	yodl2man -o rsync.1 rsync.yo
