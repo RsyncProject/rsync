@@ -212,7 +212,7 @@ int do_mkstemp(char *template, mode_t perms)
 
 int do_stat(const char *fname, STRUCT_STAT *st)
 {
-#if SIZEOF_OFF64_T
+#if SIZEOF_OFF64_T && HAVE_STRUCT_STAT64
 	return stat64(fname, st);
 #else
 	return stat(fname, st);
@@ -222,7 +222,7 @@ int do_stat(const char *fname, STRUCT_STAT *st)
 int do_lstat(const char *fname, STRUCT_STAT *st)
 {
 #if SUPPORT_LINKS
-# if SIZEOF_OFF64_T
+# if SIZEOF_OFF64_T && HAVE_STRUCT_STAT64
 	return lstat64(fname, st);
 # else
 	return lstat(fname, st);
@@ -234,7 +234,7 @@ int do_lstat(const char *fname, STRUCT_STAT *st)
 
 int do_fstat(int fd, STRUCT_STAT *st)
 {
-#if SIZEOF_OFF64_T
+#if SIZEOF_OFF64_T && HAVE_STRUCT_STAT64
 	return fstat64(fd, st);
 #else
 	return fstat(fd, st);
@@ -243,7 +243,7 @@ int do_fstat(int fd, STRUCT_STAT *st)
 
 OFF_T do_lseek(int fd, OFF_T offset, int whence)
 {
-#if SIZEOF_OFF64_T
+#if SIZEOF_OFF64_T && HAVE_STRUCT_STAT64
 	off64_t lseek64();
 	return lseek64(fd, offset, whence);
 #else
