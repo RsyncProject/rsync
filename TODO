@@ -93,9 +93,18 @@ Progress indicator can produce corrupt output when transferring directories:
   main/binary-arm/misc/
 
 lchmod
-
   I don't think we handle this properly on systems that don't have the
   call.
+
+Cross-test versions
+  Part of the regression suite should be making sure that we don't
+  break backwards compatibility: old clients vs new servers and so
+  on.  Ideally we would test the cross product of versions.  
+
+  It might be sufficient to test downloads from well-known public
+  rsync servers running different versions of rsync.  This will give
+  some testing and also be the most common case for having different
+  versions and not being able to upgrade.
 
 
 DAEMON --------------------------------------------------------------
@@ -369,6 +378,21 @@ zlib
   do this is to just disable gzip (with a warning) when talking to old
   versions.
 
+
+logging
+
+  Perhaps flush stdout after each filename, so that people trying to
+  monitor progress in a log file can do so more easily.  See
+  http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=48108
+
+  At the connections that just get a list of modules are not logged,
+  but they should be.
+
+  If a child of the rsync daemon dies with a signal, we should notice
+  that when we reap it and log a message.
+
+  Keep stderr and stdout properly separated (Debian #23626)
+
   After we get the @RSYNCD greeting from the server, we know it's
   version but we have not yet sent the command line, so we could just
   remove the -z option if the server is too old.  
@@ -379,6 +403,10 @@ zlib
   the remote version emit an error if it's too old.  I'm not sure if
   that's a good tradeoff or not.
 
+
+rsyncd over ssh
+
+  There are already some patches to do this.
 
 proxy authentication
 
@@ -392,6 +420,16 @@ SOCKS
 
   Add --with-socks, and then perhaps a command-line option to put them
   on or off.  This might be more reliable than LD_PRELOAD hacks.
+
+FAT support
+
+  rsync to a FAT partition on a Unix machine doesn't work very well
+  at the moment.  I think we get errors about invalid filenames and 
+  perhaps also trying to do atomic renames.
+
+  I guess the code to do this is currently #ifdef'd on Windows; perhaps
+  we ought to intelligently fall back to it on Unix too.
+
 
 Better statistics:
 
@@ -498,7 +536,6 @@ String area code
   it's not (anymore), throw it out.
 	  
 
-
 PLATFORMS ------------------------------------------------------------
 
 Win32
@@ -513,6 +550,7 @@ Win32
   platform we should probably do shutdown() instead.  However, on Unix
   we are correct to call close(), because shutdown() discards
   untransmitted data.
+
 
 DEVELOPMENT ----------------------------------------------------------
 
@@ -696,7 +734,6 @@ internationalization
   Does anyone care?  Before we bother modifying the code, we ought to
   get the manual translated first, because that's possibly more useful
   and at any rate demonstrates desire.
-
 
 rsyncsh 
 
