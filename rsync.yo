@@ -1238,9 +1238,8 @@ itemize(
 )
 
 The 'x' is a single-letter that specifies the kind of rule to create.  It
-can have trailing modifiers, and is separated from the RULE by one of the
-following characters: a single space, an equal-sign (=), or an underscore
-(_).  Here are the available rule prefixes:
+can have trailing modifiers, and is separated from the RULE by either a
+single space or an underscore (_).  Here are the available rule prefixes:
 
 verb(
   -  specifies an exclude pattern.
@@ -1390,7 +1389,7 @@ verb(
     :n- .non-inherited-per-dir-excludes
 )
 
-The following modifiers are accepted after the "." or ":":
+The following modifiers are accepted after a "." or ":":
 
 itemize(
   it() A "-" specifies that the file should consist of only exclude
@@ -1415,6 +1414,15 @@ itemize(
   space that separates the prefix from the rule is treated specially, so
   "- foo + bar" is parsed as two rules (assuming that "-" or "+" was not
   specified to turn off the parsing of prefixes).
+)
+
+The following modifier is accepted after a "+" or "-":
+
+itemize(
+  it() A "/" specifies that the include/exclude should be treated as an
+  absolute path, relative to the root of the filesystem.  For example,
+  "-/ /etc/passwd" would exclude the passwd file any time the transfer
+  was sending files from the "/etc" directory.
 )
 
 Per-directory rules are inherited in all subdirectories of the directory
