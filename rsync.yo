@@ -965,15 +965,22 @@ Jean-loup Gailly and Mark Adler.
 manpagesection(THANKS)
 
 Thanks to Richard Brent, Brendan Mackay, Bill Waite, Stephen Rothwell
-and David Bell for helpful suggestions and testing of rsync. I've
-probably missed some people, my apologies if I have.
+and David Bell for helpful suggestions, patches and testing of rsync.
+I've probably missed some people, my apologies if I have.
+
+Especial thanks also to: David Dykstra, Jos Backus, Sebastian Krahmer.
 
 
 manpageauthor()
 
-rsync was written by Andrew Tridgell and Paul Mackerras.  
+rsync was written by Andrew Tridgell <tridge@samba.org> and Paul
+Mackerras.
 
-rsync is now maintained by Martin Pool <mbp@samba.org>.
+rsync is now maintained by Martin Pool <mbp@samba.org>.  
 
 Mailing lists for support and development are available at
-url(http://lists.samba.org)(lists.samba.org)
+url(http://lists.samba.org)(lists.samba.org) 
+
+If you suspect you have found a security vulnerability in rsync,
+please send it directly to Martin Pool and Andrew Tridgell.  For other
+enquiries, please use the mailing list.
