@@ -115,10 +115,10 @@ int delete_file(char *fname)
 
 static int is_in_group(gid_t gid)
 {
-#ifdef HAVE_GETGROUPS
+#ifdef GETGROUPS_T
 	static gid_t last_in = (gid_t) -2, last_out;
 	static int ngroups = -2;
-	static gid_t *gidset;
+	static GETGROUPS_T *gidset;
 	int n;
 
 	if (gid == last_in)
@@ -127,7 +127,7 @@ static int is_in_group(gid_t gid)
 		/* treat failure (-1) as if not member of any group */
 		ngroups = getgroups(0, 0);
 		if (ngroups > 0) {
-			gidset = (gid_t *) malloc(ngroups * sizeof(gid_t));
+			gidset = (GETGROUPS_T *) malloc(ngroups * sizeof(GETGROUPS_T));
 			ngroups = getgroups(ngroups, gidset);
 		}
 	}
