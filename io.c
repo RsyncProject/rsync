@@ -48,6 +48,8 @@ static void check_timeout(void)
 {
 	extern int am_server, am_daemon;
 	time_t t;
+
+	err_list_push();
 	
 	if (!io_timeout) return;
 
@@ -339,6 +341,8 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 	int fd_count, count;
 	struct timeval tv;
 
+	err_list_push();
+
 	no_flush++;
 
 	while (total < len) {
@@ -462,6 +466,9 @@ static void mplex_write(int fd, enum logcode code, char *buf, int len)
 void io_flush(void)
 {
 	int fd = multiplex_out_fd;
+
+	err_list_push();
+
 	if (!io_buffer_count || no_flush) return;
 
 	if (io_multiplexing_out) {
@@ -487,6 +494,7 @@ void io_end_buffering(int fd)
    a socket to be flushed. Do an explicit shutdown to try to prevent this */
 void io_shutdown(void)
 {
+	err_list_push();
 	if (multiplex_out_fd != -1) close(multiplex_out_fd);
 	if (io_error_fd != -1) close(io_error_fd);
 	multiplex_out_fd = -1;
@@ -497,6 +505,8 @@ void io_shutdown(void)
 static void writefd(int fd,char *buf,int len)
 {
 	stats.total_written += len;
+
+	err_list_push();
 
 	if (!io_buffer || fd != multiplex_out_fd) {
 		writefd_unbuffered(fd, buf, len);
@@ -632,14 +642,6 @@ int io_multiplex_write(enum logcode code, char *buf, int len)
 	io_flush();
 	stats.total_written += (len+4);
 	mplex_write(multiplex_out_fd, code, buf, len);
-	return 1;
-}
-
-/* write a message to the special error fd */
-int io_error_write(int f, enum logcode code, char *buf, int len)
-{
-	if (f == -1) return 0;
-	mplex_write(f, code, buf, len);
 	return 1;
 }
 
