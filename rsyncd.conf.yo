@@ -294,6 +294,18 @@ prints an error message and exits.
 The full names of the options must be used (ie. you must use
 "compress" not "z" to disable compression).
 
+dit(bf(dont compress)) The "dont compress" option allows you to select
+filenames based on wildcard patterns that should not be compressed
+during transfer. Compression is expensive in terms of CPU usage so it
+is usually good to not try to compress files that won't compress well,
+such as already compressed files. 
+
+The "dont compress" option takes a space separated list of
+case-insensitive wildcard patterns. Any source filename matching one
+of the patterns will not be compressed during transfer.
+
+The default setting is verb(*.gz *.tgz *.zip *.z *.rpm *.deb)
+
 enddit()
 
 manpagesection(AUTHENTICATION STRENGTH)

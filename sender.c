@@ -200,6 +200,8 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 		if (!am_server) {
 			log_transfer(file, fname+offset);
 		}
+
+		set_compression(fname);
 	  
 		match_sums(f_out,s,buf,st.st_size);
 

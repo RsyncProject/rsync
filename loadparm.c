@@ -131,6 +131,7 @@ typedef struct
 	char *exclude_from;
 	char *log_format;
 	char *refuse_options;
+	char *dont_compress;
 	int timeout;
 } service;
 
@@ -155,6 +156,7 @@ static service sDefault =
 	NULL,    /* exclude from */
 	"%o %h [%a] %m (%u) %f %l",    /* log format */
 	NULL,    /* refuse options */
+	"*.gz *.tgz *.zip *.z *.rpm *.deb",    /* dont compress */
 	0        /* timeout */
 };
 
@@ -264,6 +266,7 @@ static struct parm_struct parm_table[] =
   {"transfer logging", P_BOOL,    P_LOCAL,  &sDefault.transfer_logging,NULL,0},
   {"log format",       P_STRING,  P_LOCAL,  &sDefault.log_format,  NULL,   0},
   {"refuse options",   P_STRING,  P_LOCAL,  &sDefault.refuse_options,NULL, 0},
+  {"dont compress",    P_STRING,  P_LOCAL,  &sDefault.dont_compress,NULL,  0},
   {NULL,               P_BOOL,    P_NONE,   NULL,                  NULL,   0}
 };
 
@@ -337,6 +340,7 @@ FN_LOCAL_STRING(lp_exclude, exclude)
 FN_LOCAL_STRING(lp_exclude_from, exclude_from)
 FN_LOCAL_STRING(lp_log_format, log_format)
 FN_LOCAL_STRING(lp_refuse_options, refuse_options)
+FN_LOCAL_STRING(lp_dont_compress, dont_compress)
 FN_LOCAL_INTEGER(lp_timeout, timeout)
 
 /* local prototypes */
