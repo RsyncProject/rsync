@@ -124,7 +124,7 @@ static void showchg(const char *fname, struct file_struct *file, int statret,
 		while (*s == '-') s++;
 	if (*s) {
 	    print_it:
-		rprintf(FINFO, "%s %s%s%s", ch, fname,
+		rprintf(FINFO, "%s %s%s%s", ch, safe_fname(fname),
 			ch[1] == 'd' ? "/" : "",
 			flags & SC_NO_NL ? "" : "\n");
 	}
