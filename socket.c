@@ -30,8 +30,6 @@
 #include "lib/addrinfo.h"
 #endif
 
-// extern int af;			/* NO MORE BLOODY GLOBALS! */
-
 /* Establish a proxy connection on an open socket to a web roxy by
  * using the CONNECT method. */
 static int establish_proxy_connection(int fd, char *host, int port)
