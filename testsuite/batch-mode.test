@@ -1,0 +1,45 @@
+#! /bin/sh
+
+# Copyright (C) 2004 by Chris Shoemaker <c.shoemaker@cox.net>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test rsync's --write-batch and --read-batch options
+
+. "$suitedir/rsync.fns"
+
+set -x
+
+hands_setup
+
+cd "$tmpdir"
+
+# Build chkdir for the daemon tests using a normal rsync and an --exclude.
+$RSYNC -av --exclude=foobar.baz "$fromdir/" "$chkdir/"
+
+runtest "local --write-batch" 'checkit "$RSYNC -av --write-batch=BATCH \"$fromdir/\" \"$todir\"" "$fromdir" "$todir"'
+
+rm -rf "$todir"
+runtest "--read-batch" 'checkit "$RSYNC -av --read-batch=BATCH \"$todir\"" "$fromdir" "$todir"'
+
+build_rsyncd_conf
+
+RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon"
+export RSYNC_CONNECT_PROG
+
+rm -rf "$todir"
+runtest "daemon sender --write-batch" 'checkit "$RSYNC -av --write-batch=BATCH rsync://localhost/test-from/ \"$todir\"" "$chkdir" "$todir"'
+
+rm -rf "$todir"
+runtest "--read-batch from daemon" 'checkit "$RSYNC -av --read-batch=BATCH \"$todir\"" "$chkdir" "$todir"'
+
+rm -rf "$todir"
+runtest "BATCH.sh use of --read-batch" 'checkit "./BATCH.sh" "$chkdir" "$todir"'
+
+rm -rf "$todir"
+mkdir "$todir" || test_fail "failed to restore empty destination directory"
+runtest "daemon recv --write-batch" 'checkit "$RSYNC -av --write-batch=BATCH \"$fromdir/\" rsync://localhost/test-to" "$chkdir" "$todir"'
+
+# The script would have aborted on error, so getting here means we pass.
+exit 0
