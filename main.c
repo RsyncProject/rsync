@@ -510,7 +510,9 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 	
 	flist = recv_file_list(f_in);
 	if (!flist || flist->count == 0) {
-		rprintf(FINFO,"client: nothing to do\n");
+		rprintf(FINFO, "client: nothing to do: "
+                        "perhaps you need to specify some filenames or "
+                        "the --recursive option?\n");
 		exit_cleanup(0);
 	}
 	
