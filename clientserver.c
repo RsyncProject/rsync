@@ -88,6 +88,9 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 		*p = '\0';
 	}
 
+	if (rsync_port == 0)
+		rsync_port = RSYNC_PORT;
+
 	fd = open_socket_out_wrapped(host, rsync_port, bind_address,
 				     default_af_hint);
 	if (fd == -1)
