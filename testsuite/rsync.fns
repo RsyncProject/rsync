@@ -83,3 +83,18 @@ checkit() {
     fi
 }
 
+
+# In fact, we need a more general feature of capturing all stderr/log files,
+# and dumping them if something goes wrong.
+
+checkforlogs() {
+  # skip it if we're under debian-test
+  if test -n "${Debian}" ; then return 0 ; fi
+
+  if [ -f $1 -a -s $1 ] ; then
+	echo "Failures have occurred.  $1 follows:" >&2
+	cat $1 >&2
+	exit 1
+  fi
+}
+

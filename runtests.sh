@@ -147,8 +147,7 @@ do
 	continue
     fi
 
-    echo "------------------------------------------------------------"
-    echo "----- $testbase running"
+    echo "----- $testbase starting"
 
     if sh $RUNSHFLAGS "$testscript"
     then
