@@ -158,8 +158,6 @@ Changes since 2.6.2:
     - The finished file now gets its permissions and modified-time updated
       before it gets moved into place.
 
-    - Lots of documentation improvements in the exclude/include sections.
-
   INTERNAL:
 
     - Some cleanup in the exclude code has saved some per-exclude memory
