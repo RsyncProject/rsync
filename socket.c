@@ -162,6 +162,10 @@ int open_socket_out(char *host, int port, const char *bind_address,
 	}
 
 	s = -1;
+	/* Try to connect to all addresses for this machine until we get
+	 * through.  It might e.g. be multi-homed, or have both IPv4 and IPv6
+	 * addresses.  We need to create a socket for each record, since the
+	 * address record tells us what protocol to use to try to connect. */
 	for (res = res0; res; res = res->ai_next) {
 		s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 		if (s < 0)
@@ -176,12 +180,16 @@ int open_socket_out(char *host, int port, const char *bind_address,
 			bhints.ai_flags = AI_PASSIVE;
 			error = getaddrinfo(bind_address, NULL, &bhints, &bres);
 			if (error) {
-				rprintf(FERROR, RSYNC_NAME ": getaddrinfo: bind address %s <noport>: %s\n",
+				rprintf(FERROR, RSYNC_NAME ": getaddrinfo: "
+					"bind address %s <noport>: %s\n",
 					bind_address, gai_strerror(error));
 				continue;
 			}
 			if (bres->ai_next) {
-				rprintf(FERROR, RSYNC_NAME ": getaddrinfo: bind address %s resolved to multiple hosts\n",
+				/* I'm not at all sure that this is the right
+				 * response here... -- mbp */
+				rprintf(FERROR, RSYNC_NAME ": getaddrinfo: "
+					"bind address %s resolved to multiple hosts\n",
 					bind_address);
 				freeaddrinfo(bres);
 				continue;
@@ -372,8 +380,8 @@ void start_accept_loop(int port, int (*fn)(int ))
 	while (1) {
 		fd_set fds;
 		int fd;
-		struct sockaddr addr;
-		int in_addrlen = sizeof(addr);
+		struct sockaddr_storage addr;
+		int addrlen = sizeof(addr);
 
 		/* close log file before the potentially very long select so
 		   file can be trimmed by another process instead of growing
@@ -389,7 +397,7 @@ void start_accept_loop(int port, int (*fn)(int ))
 
 		if(!FD_ISSET(s, &fds)) continue;
 
-		fd = accept(s,(struct sockaddr *)&addr,&in_addrlen);
+		fd = accept(s,(struct sockaddr *)&addr,&addrlen);
 
 		if (fd == -1) continue;
 
@@ -555,7 +563,7 @@ void become_daemon(void)
  **/
 char *client_addr(int fd)
 {
-	struct sockaddr ss;
+	struct sockaddr_storage ss;
 	int     length = sizeof(ss);
 	static char addr_buf[100];
 	static int initialised;
@@ -564,11 +572,11 @@ char *client_addr(int fd)
 
 	initialised = 1;
 
-	if (getpeername(fd, &ss, &length)) {
+	if (getpeername(fd, (struct sockaddr *)&ss, &length)) {
 		exit_cleanup(RERR_SOCKETIO);
 	}
 
-	getnameinfo(&ss, length,
+	getnameinfo((struct sockaddr *)&ss, length,
 		addr_buf, sizeof(addr_buf), NULL, 0, NI_NUMERICHOST);
 	return addr_buf;
 }
@@ -579,7 +587,7 @@ char *client_addr(int fd)
  **/
 char *client_name(int fd)
 {
-	struct sockaddr ss;
+	struct sockaddr_storage ss;
 	int     length = sizeof(ss);
 	static char name_buf[100];
 	static char port_buf[100];
@@ -602,7 +610,7 @@ char *client_name(int fd)
 	}
 
 #ifdef INET6
-        if (ss.sa_family == AF_INET6 && 
+        if (ss.ss_family == AF_INET6 && 
 	    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)&ss)->sin6_addr)) {
 		struct sockaddr_in6 sin6;
 		struct sockaddr_in *sin;
@@ -646,7 +654,7 @@ char *client_name(int fd)
 
 	/* XXX sin6_flowinfo and other fields */
 	for (res = res0; res; res = res->ai_next) {
-		if (res->ai_family != ss.sa_family)
+		if (res->ai_family != ss.ss_family)
 			continue;
 		if (res->ai_addrlen != length)
 			continue;

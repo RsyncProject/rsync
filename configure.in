@@ -284,6 +284,14 @@ AC_CHECK_MEMBER([struct sockaddr.sa_len],
 #include <sys/socket.h>
 ])
 
+AC_MSG_CHECKING(struct sockaddr_storage)
+AC_TRY_COMPILE([#include <sys/types.h>
+#include <sys/socket.h>],
+[struct sockaddr_storage x;],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SOCKADDR_STORAGE),
+	AC_MSG_RESULT(no))
+
 # if we can't find strcasecmp, look in -lresolv (for Unixware at least)
 #
 AC_CHECK_FUNCS(strcasecmp)

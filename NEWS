@@ -8,8 +8,12 @@ rsync 2.5.1 (sometime in 2001?)
 
   BUG FIXES: 
    
-    * rsync.1 typo fix by Matt Kraai
+    * Correct string<->address parsing for both IPv4 and 6.  Thankyou
+      to YOSHIFUJI Hideaki, SUMIKAWA Munechika and Jun-ichiro "itojun"
+      Hagino.
 
-    * Fix for segfault in rsyncd.conf parser by Paul Mackerras
+    * rsync.1 typo fix by Matt Kraai.
 
-    * Test suite typo fixes Tom Schmidt
+    * Fix for segfault in rsyncd.conf parser by Paul Mackerras.
+
+    * Test suite typo fixes Tom Schmidt.
