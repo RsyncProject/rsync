@@ -32,7 +32,7 @@ wait for a process to exit, calling io_flush while waiting
 void wait_process(pid_t pid, int *status)
 {
 	while (waitpid(pid, status, WNOHANG) == 0) {
-		sleep(1);
+		msleep(20);
 		io_flush();
 	}
 	*status = WEXITSTATUS(*status);
