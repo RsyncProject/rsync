@@ -8,12 +8,11 @@ AC_PROG_INSTALL
 AC_SUBST(SHELL)
 
 AC_HEADER_DIRENT
-AC_HEADER_STDC
 AC_HEADER_TIME
 AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS(sys/fcntl.h fcntl.h sys/time.h unistd.h utime.h grp.h)
 AC_CHECK_HEADERS(compat.h sys/param.h ctype.h sys/wait.h sys/ioctl.h)
-AC_CHECK_HEADERS(sys/filio.h)
+AC_CHECK_HEADERS(sys/filio.h string.h stdlib.h)
 
 AC_CHECK_SIZEOF(int)
 AC_CHECK_SIZEOF(long)
