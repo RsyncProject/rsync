@@ -21,5 +21,4 @@ RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon"
 export RSYNC_CONNECT_PROG
 
 hands_setup
-checkit "$RSYNC -avvz \"$FROM/\" localhost::test-to/" "$FROM" "$TO"
-
+checkit "$RSYNC -avvvvz \"$FROM/\" localhost::test-to/" "$FROM" "$TO"
