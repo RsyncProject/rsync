@@ -85,4 +85,35 @@ AC_TRY_COMPILE([#include <sys/types.h>
 echo yes;AC_DEFINE(HAVE_UTIMBUF), 
 echo no)
 
+# If we can't find connect, try looking in -lsocket, -lnsl, and -linet.
+# The Irix 5 libc.so has connect and gethostbyname, but Irix 5 also has
+# libsocket.so which has a bad implementation of gethostbyname (it
+# only looks in /etc/hosts), so we only look for -lsocket if we need
+# it.
+AC_CHECK_FUNC(connect, :, 
+[case "$LIBS" in
+*-lnsl*) ;;
+*) AC_CHECK_LIB(nsl_s, printf) ;;
+esac
+case "$LIBS" in
+*-lnsl*) ;;
+*) AC_CHECK_LIB(nsl, printf) ;;
+esac
+case "$LIBS" in
+*-lsocket*) ;;
+*) AC_CHECK_LIB(socket, connect) ;;
+esac
+case "$LIBS" in
+*-linet*) ;;
+*) AC_CHECK_LIB(inet, connect) ;;
+esac
+dnl We can't just call AC_CHECK_FUNCS(connect) here, because the value
+dnl has been cached.
+if test "$ac_cv_lib_socket_connect" = "yes" || test "$ac_cv_lib_inet_connect" = 
+"yes"; then
+  ac_cv_func_connect=yes
+  AC_DEFINE(HAVE_CONNECT)
+fi])
+
+
 AC_OUTPUT(Makefile lib/dummy)

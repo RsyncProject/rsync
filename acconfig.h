@@ -6,3 +6,4 @@
 #undef HAVE_UNSIGNED_CHAR
 #undef HAVE_UTIMBUF
 #undef ino_t
+#undef HAVE_CONNECT
