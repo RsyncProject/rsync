@@ -962,15 +962,14 @@ skip_filters:
 }
 
 
-void send_file_name(int f, struct file_list *flist, char *fname,
-		    int recursive, unsigned short base_flags)
+static struct file_struct *send_file_name(int f, struct file_list *flist,
+					  char *fname, unsigned short base_flags)
 {
 	struct file_struct *file;
-	char fbuf[MAXPATHLEN];
 
 	file = make_file(fname, flist, f == -2 ? SERVER_FILTERS : ALL_FILTERS);
 	if (!file)
-		return;
+		return NULL;
 
 	maybe_emit_filelist_progress(flist);
 
@@ -980,8 +979,15 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 		flist->files[flist->count++] = file;
 		send_file_entry(file, f, base_flags);
 	}
+	return file;
+}
 
-	if (recursive && S_ISDIR(file->mode)
+static void send_if_directory(int f, struct file_list *flist,
+			      struct file_struct *file)
+{
+	char fbuf[MAXPATHLEN];
+
+	if (S_ISDIR(file->mode)
 	    && !(file->flags & FLAG_MOUNT_POINT) && f_name_to(file, fbuf)) {
 		void *save_filters;
 		unsigned int len = strlen(fbuf);
@@ -1000,13 +1006,11 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 }
 
 
-/* Note that the "recurse" value either contains -1, for infinite recursion, or
- * a number >= 0 indicating how many levels of recursion we will allow.  This
- * function is normally called by the sender, but the receiving side also calls
- * it from delete_in_dir() with f set to -1 so that we just construct the file
- * list in memory without sending it over the wire.  Also, get_dirlist() might
- * call this with f set to -2, which indicates that local filter rules should
- * be ignored. */
+/* This function is normally called by the sender, but the receiving side also
+ * calls it from delete_in_dir() with f set to -1 so that we just construct the
+ * file list in memory without sending it over the wire.  Also, get_dirlist()
+ * might call this with f set to -2, which also indicates that local filter
+ * rules should be ignored. */
 static void send_directory(int f, struct file_list *flist,
 			   char *fbuf, int len)
 {
@@ -1014,6 +1018,7 @@ static void send_directory(int f, struct file_list *flist,
 	unsigned remainder;
 	char *p;
 	DIR *d;
+	int start = flist->count;
 
 	if (!(d = opendir(fbuf))) {
 		io_error |= IOERR_GENERAL;
@@ -1032,10 +1037,9 @@ static void send_directory(int f, struct file_list *flist,
 		if (dname[0] == '.' && (dname[1] == '\0'
 		    || (dname[1] == '.' && dname[2] == '\0')))
 			continue;
-		if (strlcpy(p, dname, remainder) < remainder) {
-			int do_subdirs = recurse >= 1 ? recurse-- : recurse;
-			send_file_name(f, flist, fbuf, do_subdirs, 0);
-		} else {
+		if (strlcpy(p, dname, remainder) < remainder)
+			send_file_name(f, flist, fbuf, 0);
+		else {
 			io_error |= IOERR_GENERAL;
 			rprintf(FINFO,
 				"cannot send long-named file %s\n",
@@ -1051,6 +1055,12 @@ static void send_directory(int f, struct file_list *flist,
 	}
 
 	closedir(d);
+
+	if (recurse) {
+		int i, end = flist->count - 1;
+		for (i = start; i <= end; i++)
+			send_if_directory(f, flist, flist->files[i]);
+	}
 }
 
 
@@ -1084,9 +1094,10 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	}
 
 	while (1) {
+		struct file_struct *file;
 		char fname2[MAXPATHLEN];
 		char *fname = fname2;
-		int do_subdirs;
+		int is_dot_dir;
 
 		if (use_ff_fd) {
 			if (read_filesfrom_line(filesfrom_fd, fname) == 0)
@@ -1109,12 +1120,11 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				fname[l++] = '.';
 				fname[l] = '\0';
 			}
+			is_dot_dir = 1;
+		} else {
+			is_dot_dir = fname[l-1] == '.'
+				   && (l == 1 || fname[l-2] == '/');
 		}
-		if (fname[l-1] == '.' && (l == 1 || fname[l-2] == '/')) {
-			if (!recurse && xfer_dirs)
-				recurse = 1; /* allow one level */
-		} else if (recurse > 0)
-			recurse = 0;
 
 		if (link_stat(fname, &st, keep_dirlinks) != 0) {
 			io_error |= IOERR_GENERAL;
@@ -1162,7 +1172,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				xfer_dirs = 1;
 				while ((slash = strchr(slash+1, '/')) != 0) {
 					*slash = 0;
-					send_file_name(f, flist, fname, 0, 0);
+					send_file_name(f, flist, fname, 0);
 					*slash = '/';
 				}
 				copy_links = save_copy_links;
@@ -1201,8 +1211,10 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (one_file_system)
 			filesystem_dev = st.st_dev;
 
-		do_subdirs = recurse >= 1 ? recurse-- : recurse;
-		send_file_name(f, flist, fname, do_subdirs, XMIT_TOP_DIR);
+		if ((file = send_file_name(f, flist, fname, XMIT_TOP_DIR))) {
+			if (recurse || (xfer_dirs && is_dot_dir))
+				send_if_directory(f, flist, file);
+		}
 
 		if (olddir[0]) {
 			flist_dir = NULL;
