@@ -44,6 +44,7 @@ extern int keep_dirlinks;
 extern int preserve_hard_links;
 extern int protocol_version;
 extern int recurse;
+extern int fuzzy_basis;
 extern int relative_paths;
 extern int rsync_port;
 extern int whole_file;
@@ -488,7 +489,8 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	int pid;
 	int status = 0;
 	int error_pipe[2], name_pipe[2];
-	BOOL need_name_pipe = (basis_dir[0] || partial_dir) && !dry_run;
+	BOOL need_name_pipe = (basis_dir[0] || partial_dir || fuzzy_basis)
+			    && !dry_run;
 
 	/* The receiving side mustn't obey this, or an existing symlink that
 	 * points to an identical file won't be replaced by the referent. */
