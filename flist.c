@@ -464,7 +464,8 @@ static int skip_filesystem(char *fname, STRUCT_STAT *st)
 }
 
 #define STRDUP(ap, p)	(ap ? string_area_strdup(ap, p) : strdup(p))
-#define MALLOC(ap, i)	(ap ? string_area_malloc(ap, i) : malloc(i))
+/* IRIX cc cares that the operands to the ternary have the same type. */
+#define MALLOC(ap, i)	(ap ? (void*) string_area_malloc(ap, i) : malloc(i))
 
 /* create a file_struct for a named file */
 struct file_struct *make_file(int f, char *fname, struct string_area **ap,
