@@ -26,6 +26,7 @@ Here is a brief description of available options:
 -c, --checksum           always checksum
 -a, --archive            archive mode (same as -rlptDog)
 -r, --recursive          recurse into directories
+-R, --relative           use relative path names
 -b, --backup             make backups (default ~ extension)
 -u, --update             update only (don't overwrite newer files)
 -l, --links              preserve soft links
@@ -79,6 +80,21 @@ To join the mailing list send mail to listproc@samba.anu.edu.au with
 no subject and a body of "subscribe rsync Your Name".
 
 To send mail to everyone on the list send it to rsync@samba.anu.edu.au
+
+
+BUG REPORTS
+-----------
+
+If you have web access then please look at
+http://samba.anu.edu.au/cgi-bin/rsync 
+
+This will give you access to the bug tracking system used by the
+developers of rsync and will allow you to look at other bug reports or
+submit a new bug report.
+
+If you don't have web access then mail bug reports to
+rsync-bugs@samba.anu.edu.au or (if you think it will be of interest to
+lots of people) send it to rsync@samba.anu.edu.au
 
 
 COPYRIGHT

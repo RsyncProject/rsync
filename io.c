@@ -237,7 +237,7 @@ static int writefd(int fd,char *buf,int len)
 {
   int total = 0;
   fd_set w_fds, r_fds;
-  int fd_count;
+  int fd_count, count, got_select=0;
   struct timeval tv;
 
   if (buffer_f_in == -1) 
@@ -251,6 +251,11 @@ static int writefd(int fd,char *buf,int len)
     if (ret == -1 && !(errno == EWOULDBLOCK || errno == EAGAIN)) 
       return -1;
 
+    if (ret == -1 && got_select) {
+	    fprintf(FERROR,"write exception\n");
+	    exit_cleanup(1);
+    }
+
     if (ret == -1) {
       read_check(buffer_f_in);
 
@@ -263,9 +268,24 @@ static int writefd(int fd,char *buf,int len)
 	      if (buffer_f_in > fd) 
 		      fd_count = buffer_f_in+1;
       }
+
+      got_select = 0;
+
       tv.tv_sec = BLOCKING_TIMEOUT;
       tv.tv_usec = 0;
-      select(fd_count,buffer_f_in == -1? NULL: &r_fds,&w_fds,NULL,&tv);
+      count = select(fd_count,buffer_f_in == -1? NULL: &r_fds,
+		     &w_fds,NULL,&tv);
+      if (count == -1 && errno != EINTR) {
+	      if (verbose > 1) 
+		      fprintf(FERROR,"select error: %s\n", strerror(errno));
+	      exit_cleanup(1);
+      }
+
+      if (count == 0) continue;
+      
+      if (FD_ISSET(fd, &w_fds)) {
+	      got_select = 1;
+      }
     } else {
       total += ret;
     }
