@@ -69,6 +69,7 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 	if (len > (map->size-offset))
 		len = map->size-offset;
 
+#ifdef HAVE_MMAP
 	if (map->map) {
 		if (offset >= map->p_offset && 
 		    offset+len <= map->p_offset+map->p_len) {
@@ -103,6 +104,7 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 			return (map->map + (offset - map->p_offset));
 		}
 	}
+#endif
 
 	if (offset >= map->p_offset && 
 	    offset+len <= map->p_offset+map->p_len) {
