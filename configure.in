@@ -254,7 +254,7 @@ AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h unistd.h utime.h grp.h)
 AC_CHECK_HEADERS(compat.h sys/param.h ctype.h sys/wait.h sys/ioctl.h)
 AC_CHECK_HEADERS(sys/filio.h string.h stdlib.h sys/socket.h sys/mode.h sys/un.h)
-AC_CHECK_HEADERS(glob.h alloca.h mcheck.h sys/sysctl.h arpa/inet.h arpa/nameser.h)
+AC_CHECK_HEADERS(glob.h mcheck.h sys/sysctl.h arpa/inet.h arpa/nameser.h)
 AC_CHECK_HEADERS(netdb.h)
 AC_CHECK_HEADERS(malloc.h)
 AC_CHECK_HEADERS(float.h)
@@ -381,6 +381,7 @@ dnl every platform has a memcmp that can do at least that.
 dnl AC_FUNC_MEMCMP
 
 AC_FUNC_UTIME_NULL
+AC_FUNC_ALLOCA
 AC_CHECK_FUNCS(waitpid wait4 getcwd strdup strerror chown chmod mknod mkfifo)
 AC_CHECK_FUNCS(fchmod fstat strchr readlink link utime utimes strftime)
 AC_CHECK_FUNCS(memmove lchown vsnprintf snprintf asprintf setsid glob strpbrk)
@@ -420,6 +421,12 @@ then
     AC_MSG_RESULT($srcdir/popt)
     BUILD_POPT='$(popt_OBJS)'
     CFLAGS="$CFLAGS -I$srcdir/popt"
+    if test -z "$ALLOCA"
+    then
+	# this can be removed when/if we add an included alloca.c; see
+	#  autoconf documentation on AC_FUNC_ALLOCA
+	AC_MSG_ERROR([included libpopt requires alloca which is not available])
+    fi
 else
     AC_MSG_RESULT(no)
 fi
