@@ -104,7 +104,7 @@ static void check_timeout(void)
 	}
 }
 
-/** Setup the fd used to propogate errors */
+/** Setup the fd used to propagate errors */
 void io_set_error_fd(int fd)
 {
 	io_error_fd = fd;
