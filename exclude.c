@@ -23,6 +23,7 @@
 #include "rsync.h"
 
 extern int verbose;
+extern int delete_mode;
 
 static struct exclude_struct **exclude_list;
 
@@ -41,7 +42,7 @@ int send_included_file_names(int f,struct file_list *flist)
 	int n;
 	char *p;
 
-	if (!only_included_files || (exclude_the_rest == NULL))
+	if (!only_included_files || (exclude_the_rest == NULL) || delete_mode)
 		return 0;
 
 	if (verbose > 1) {
