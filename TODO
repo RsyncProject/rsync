@@ -316,6 +316,21 @@ chmod:
   parser.
 
 
+--diff
+
+  Allow people to specify the diff command.  (Might want to use wdiff,
+  gnudiff, etc.)
+
+  Just diff the temporary file with the destination file, and delete
+  the tmp file rather than moving it into place.
+
+  Interaction with --partial.
+
+  Security interactions with daemon mode?
+
+  (Suggestion from david.e.sewell)
+
+
 PLATFORMS ------------------------------------------------------------
 
 Win32
