@@ -935,15 +935,15 @@ void parse_filter_file(struct filter_list_struct *listp, const char *fname,
 	fclose(fp);
 }
 
-/* If the "sending" flag is > 0, the prefix is made compatible with the
+/* If the "for_xfer" flag is set, the prefix is made compatible with the
  * current protocol_version (if possible) or a NULL is returned (if not
  * possible). */
-char *get_rule_prefix(int match_flags, const char *pat, int sending,
+char *get_rule_prefix(int match_flags, const char *pat, int for_xfer,
 		      unsigned int *plen_ptr)
 {
 	static char buf[MAX_RULE_PREFIX+1];
 	char *op = buf;
-	int legal_len = sending && protocol_version < 29 ? 1 : MAX_RULE_PREFIX;
+	int legal_len = for_xfer && protocol_version < 29 ? 1 : MAX_RULE_PREFIX;
 
 	if (match_flags & MATCHFLG_PERDIR_MERGE) {
 		if (legal_len == 1)
