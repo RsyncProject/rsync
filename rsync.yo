@@ -1402,8 +1402,7 @@ itemize(
   specified to turn off the parsing of prefixes).
   it() You may also specify any of the modifiers for "+" or "-" to have the
   rules that are read-in default to having that option set.  For instance,
-  ":-/_.excl" would treat the contents of .excl as absolute-path exclude
-  rules.
+  ".-/_.excl" would treat the contents of .excl as absolute-path excludes.
 )
 
 The following modifiers are accepted after a "+" or "-":
