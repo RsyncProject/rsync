@@ -62,6 +62,7 @@
 #define FLAG_MOUNT_POINT (1<<2)	/* sender only */
 #define FLAG_NO_FUZZY (1<<2)	/* generator only */
 #define FLAG_DEL_HERE (1<<3)	/* receiver/generator */
+#define FLAG_SENT (1<<3)	/* sender only */
 
 /* update this if you make incompatible changes */
 #define PROTOCOL_VERSION 29
@@ -136,6 +137,17 @@
 #define DEL_FORCE_RECURSE	(1<<2) /* recurse even w/o --force */
 #define DEL_TERSE		(1<<3)
 
+/* For use by the itemize_changes code */
+#define ITEM_UPDATING (1<<0)
+#define ITEM_REPORT_CHECKSUM (1<<1)
+#define ITEM_REPORT_SIZE (1<<2)
+#define ITEM_REPORT_TIME (1<<3)
+#define ITEM_REPORT_PERMS (1<<4)
+#define ITEM_REPORT_OWNER (1<<5)
+#define ITEM_REPORT_GROUP (1<<6)
+#define ITEM_IS_NEW (1<<7)
+
+#define ITEM_MISSING_DATA (1<<15)
 
 /* Log-message categories.  FLOG is only used on the daemon side to
  * output messages to the log file. */
@@ -144,6 +156,7 @@ enum logcode { FERROR=1, FINFO=2, FLOG=3 };
 /* Messages types that are sent over the message channel.  The logcode
  * values must all be present here with identical numbers. */
 enum msgcode {
+	MSG_SUCCESS=6,	/* successfully updated indicated flist index */
 	MSG_DONE=5,	/* current phase is done */
 	MSG_REDO=4,	/* reprocess indicated flist index */
 	MSG_ERROR=FERROR, MSG_INFO=FINFO, MSG_LOG=FLOG, /* remote logging */
