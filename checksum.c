@@ -102,7 +102,7 @@ void file_checksum(char *fname,char *sum,OFF_T size)
 	if (fd == -1)
 		return;
 
-	buf = map_file(fd, size, CSUM_CHUNK * 2048, 0);
+	buf = map_file(fd, size, MAX_MAP_SIZE, CSUM_CHUNK);
 
 	mdfour_begin(&m);
 
