@@ -514,26 +514,30 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			break;
 
 		case OPT_EXCLUDE:
+			if (am_server || sanitize_paths)
+				return 0; /* Impossible... */
 			add_exclude(&exclude_list, poptGetOptArg(pc), 0);
 			break;
 
 		case OPT_INCLUDE:
+			if (am_server || sanitize_paths)
+				return 0; /* Impossible... */
 			add_exclude(&exclude_list, poptGetOptArg(pc),
 				    XFLG_DEF_INCLUDE);
 			break;
 
 		case OPT_EXCLUDE_FROM:
+			if (am_server || sanitize_paths)
+				return 0; /* Impossible... */
 			arg = poptGetOptArg(pc);
-			if (sanitize_paths)
-				arg = alloc_sanitize_path(arg, curr_dir);
 			add_exclude_file(&exclude_list, arg,
 					 XFLG_FATAL_ERRORS);
 			break;
 
 		case OPT_INCLUDE_FROM:
+			if (am_server || sanitize_paths)
+				return 0; /* Impossible... */
 			arg = poptGetOptArg(pc);
-			if (sanitize_paths)
-				arg = alloc_sanitize_path(arg, curr_dir);
 			add_exclude_file(&exclude_list, arg,
 					 XFLG_FATAL_ERRORS | XFLG_DEF_INCLUDE);
 			break;
