@@ -578,7 +578,7 @@ char *client_addr(int fd)
 }
 
 
-static sa_family_t get_sockaddr_family(const struct sockaddr_storage *ss)
+static int get_sockaddr_family(const struct sockaddr_storage *ss)
 {
 	return ((struct sockaddr *) ss)->sa_family;
 }
