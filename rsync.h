@@ -47,7 +47,7 @@
 #define SAME_TIME (1<<7)
 
 /* update this if you make incompatible changes */
-#define PROTOCOL_VERSION 21
+#define PROTOCOL_VERSION 22
 #define MIN_PROTOCOL_VERSION 11
 #define MAX_PROTOCOL_VERSION 30
 

@@ -468,7 +468,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		finish_transfer(fname, fnametmp, file);
 
 		cleanup_disable();
-				
+
 		if (!recv_ok) {
 			if (csum_length == SUM_LENGTH) {
 				rprintf(FERROR,"ERROR: file corruption in %s. File changed during transfer?\n",

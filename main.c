@@ -278,6 +278,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	int pid;
 	int status=0;
 	int recv_pipe[2];
+	int error_pipe[2];
 	extern int preserve_hard_links;
 
 	if (preserve_hard_links)
@@ -287,12 +288,24 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		rprintf(FERROR,"pipe failed in do_recv\n");
 		exit_cleanup(RERR_SOCKETIO);
 	}
+
+	if (pipe(error_pipe) < 0) {
+		rprintf(FERROR,"error pipe failed in do_recv\n");
+		exit_cleanup(RERR_SOCKETIO);
+	}
   
 	io_flush();
 
 	if ((pid=do_fork()) == 0) {
 		close(recv_pipe[0]);
+		close(error_pipe[0]);
 		if (f_in != f_out) close(f_out);
+
+		/* we can't let two processes write to the socket at one time */
+		io_multiplexing_close();
+
+		/* set place to send errors */
+		set_error_fd(error_pipe[1]);
 
 		recv_files(f_in,flist,local_name,recv_pipe[1]);
 		report(f_in);
@@ -302,10 +315,13 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	}
 
 	close(recv_pipe[1]);
+	close(error_pipe[1]);
 	io_close_input(f_in);
 	if (f_in != f_out) close(f_in);
 
 	io_start_buffering(f_out);
+
+	io_set_error_fd(error_pipe[0]);
 
 	generate_files(f_out,flist,local_name,recv_pipe[0]);
 

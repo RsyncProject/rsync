@@ -24,7 +24,7 @@
 #include "rsync.h"
 
 static FILE *logfile;
-
+static int log_error_fd = -1;
 
 static void logit(int priority, char *buf)
 {
@@ -77,14 +77,18 @@ void log_open(void)
 	logit(LOG_INFO,"rsyncd started\n");
 #endif
 }
-		
 
-/* this is the rsync debugging function. Call it with FINFO, FERROR or FLOG */
- void rprintf(int fd, const char *format, ...)
+/* setup the error file descriptor - used when we are a server
+   that is receiving files */
+void set_error_fd(int fd)
 {
-	va_list ap;  
-	char buf[1024];
-	int len;
+	log_error_fd = fd;
+}
+
+/* this is the underlying (unformatted) rsync debugging function. Call
+   it with FINFO, FERROR or FLOG */
+void rwrite(int fd, char *buf, int len)
+{
 	FILE *f=NULL;
 	extern int am_daemon;
 	extern int quiet;
@@ -92,13 +96,7 @@ void log_open(void)
 
 	if (quiet != 0 && fd == FINFO) return;
 
-	va_start(ap, format);
-	len = vslprintf(buf, sizeof(buf), format, ap);
-	va_end(ap);
-
 	if (len < 0) exit_cleanup(RERR_MESSAGEIO);
-
-	if (len > sizeof(buf)-1) exit_cleanup(RERR_MESSAGEIO);
 
 	buf[len] = 0;
 
@@ -117,7 +115,9 @@ void log_open(void)
 		depth++;
 
 		log_open();
-		if (!io_multiplex_write(fd, buf, strlen(buf))) {
+
+		if (!io_error_write(log_error_fd, buf, strlen(buf)) &&
+		    !io_multiplex_write(fd, buf, strlen(buf))) {
 			logit(priority, buf);
 		}
 
@@ -142,6 +142,23 @@ void log_open(void)
 	if (fwrite(buf, len, 1, f) != 1) exit_cleanup(RERR_MESSAGEIO);
 
 	if (buf[len-1] == '\r' || buf[len-1] == '\n') fflush(f);
+}
+		
+
+/* this is the rsync debugging function. Call it with FINFO, FERROR or FLOG */
+ void rprintf(int fd, const char *format, ...)
+{
+	va_list ap;  
+	char buf[1024];
+	int len;
+
+	va_start(ap, format);
+	len = vslprintf(buf, sizeof(buf), format, ap);
+	va_end(ap);
+
+	if (len > sizeof(buf)-1) exit_cleanup(RERR_MESSAGEIO);
+
+	rwrite(fd, buf, len);
 }
 
 void rflush(int fd)
