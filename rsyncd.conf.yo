@@ -392,7 +392,8 @@ quote(itemize(
   (the latter includes the trailing period)
   it() %f for the filename (long form on sender; no trailing "/")
   it() %n for the filename (short form; trailing "/" on dir)
-  it() %L either the string " -> SYMLINK" or "" if not a symlink
+  it() %L either the string " -> SYMLINK", or " => HARDLINK" or an
+  empty string (where bf(SYMLINK) or bf(HARDLINK) is a filename)
   it() %P for the module path
   it() %m for the module name
   it() %t for the current date time
