@@ -1790,6 +1790,7 @@ int delete_file(char *fname, int mode, int flags)
 	struct file_list *dirlist;
 	char buf[MAXPATHLEN];
 	int j, zap_dir, ok;
+	void *save_filters;
 
 	if (max_delete && deletion_count >= max_delete)
 		return -1;
@@ -1837,6 +1838,8 @@ int delete_file(char *fname, int mode, int flags)
 	}
 	flags |= DEL_FORCE_RECURSE;
 
+	save_filters = push_local_filters(fname, strlen(fname));
+
 	dirlist = get_dirlist(fname, 0);
 	for (j = dirlist->count; j--; ) {
 		struct file_struct *fp = dirlist->files[j];
@@ -1847,6 +1850,8 @@ int delete_file(char *fname, int mode, int flags)
 		}
 	}
 	flist_free(dirlist);
+
+	pop_local_filters(save_filters);
 
 	if (max_delete && deletion_count >= max_delete)
 		return -1;
