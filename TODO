@@ -24,6 +24,7 @@ FAT support
 Allow forcing arbitrary permissions				2002/03/12
 --diff						david.e.sewell	2002/03/15
 Add daemon --no-detach and --no-fork options
+Create more granular verbosity				jw	2003/05/15
 
 DOCUMENTATION --------------------------------------------------------
 Update README
@@ -424,6 +425,22 @@ Add daemon --no-detach and --no-fork options
   Very useful for debugging.  Also good when running under a
   daemon-monitoring process that tries to restart the service when the
   parent exits.
+
+                      --          --
+
+
+Create more granular verbosity				jw	2003/05/15
+
+  Control output with the --report option.
+
+  The option takes as a single argument (no whitespace) a
+  comma delimited lists of keywords.
+
+  This would separate debugging from "logging" as well as
+  fine grained selection of statistical reporting and what
+  actions are logged.
+
+  http://lists.samba.org/archive/rsync/2003-May/006059.html
 
                       --          --
 
