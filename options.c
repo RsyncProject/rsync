@@ -418,11 +418,13 @@ static int check_refuse_options(char *ref, int opt)
 	char *p;
 	const char *name;
 
-	for (i=0; long_options[i].longName; i++) {
-		if (long_options[i].val == opt) break;
+	for (i = 0; long_options[i].longName; i++) {
+		if (long_options[i].val == opt)
+			break;
 	}
 
-	if (!long_options[i].longName) return 0;
+	if (!long_options[i].longName)
+		return 0;
 
 	name = long_options[i].longName;
 	len = strlen(name);
@@ -472,9 +474,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	pc = poptGetContext(RSYNC_NAME, *argc, *argv, long_options, 0);
 
 	while ((opt = poptGetNextOpt(pc)) != -1) {
-		if (ref) {
-			if (check_refuse_options(ref, opt)) return 0;
-		}
+		if (ref && check_refuse_options(ref, opt))
+			return 0;
 
 		/* most options are handled automatically by popt;
 		 * only special cases are returned and listed here. */
@@ -530,7 +531,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			break;
 
 		case 'q':
-			if (frommain) quiet++;
+			if (frommain)
+				quiet++;
 			break;
 
 		case OPT_SENDER:
@@ -720,13 +722,7 @@ void server_options(char **args,int *argc)
 {
 	int ac = *argc;
 	static char argstr[50];
-	static char bsize[30];
-	static char iotime[30];
-	static char mdelete[30];
-	static char mwindow[30];
-	static char bw[50];
-	/* Leave room for ``--(write|read)-batch='' */
-	static char fext[MAX_BATCH_PREFIX_LEN + 15];
+	char *arg;
 
 	int i, x;
 
@@ -747,7 +743,7 @@ void server_options(char **args,int *argc)
 
 	x = 1;
 	argstr[0] = '-';
-	for (i=0;i<verbose;i++)
+	for (i = 0; i < verbose; i++)
 		argstr[x++] = 'v';
 
 	/* the -q option is intentionally left out */
@@ -806,38 +802,38 @@ void server_options(char **args,int *argc)
 
 	argstr[x] = 0;
 
-	if (x != 1) args[ac++] = argstr;
+	if (x != 1)
+		args[ac++] = argstr;
 
 	if (block_size) {
-		snprintf(bsize, sizeof bsize, "-B%u", block_size);
-		args[ac++] = bsize;
+		if (asprintf(&arg, "-B%u", block_size) < 0)
+			goto oom;
+		args[ac++] = arg;
 	}
 
 	if (max_delete && am_sender) {
-		snprintf(mdelete, sizeof mdelete, "--max-delete=%d",
-		    max_delete);
-		args[ac++] = mdelete;
+		if (asprintf(&arg, "--max-delete=%d", max_delete) < 0)
+			goto oom;
+		args[ac++] = arg;
 	}
 
-	if (batch_prefix != NULL) {
-		char *fmt = "";
-		if (write_batch)
-			fmt = "--write-batch=%s";
-		else
-		if (read_batch)
-			fmt = "--read-batch=%s";
-		snprintf(fext, sizeof fext, fmt, batch_prefix);
-		args[ac++] = fext;
+	if (batch_prefix) {
+		char *r_or_w = write_batch ? "write" : "read";
+		if (asprintf(&arg, "--%s-batch=%s", r_or_w, batch_prefix) < 0)
+			goto oom;
+		args[ac++] = arg;
 	}
 
 	if (io_timeout) {
-		snprintf(iotime, sizeof iotime, "--timeout=%d", io_timeout);
-		args[ac++] = iotime;
+		if (asprintf(&arg, "--timeout=%d", io_timeout) < 0)
+			goto oom;
+		args[ac++] = arg;
 	}
 
 	if (bwlimit) {
-		snprintf(bw, sizeof bw, "--bwlimit=%d", bwlimit);
-		args[ac++] = bw;
+		if (asprintf(&arg, "--bwlimit=%d", bwlimit) < 0)
+			goto oom;
+		args[ac++] = arg;
 	}
 
 	if (backup_dir) {
@@ -846,28 +842,25 @@ void server_options(char **args,int *argc)
 	}
 
 	/* Only send --suffix if it specifies a non-default value. */
-	if (strcmp(backup_suffix, backup_dir? "" : BACKUP_SUFFIX) != 0) {
-		char *s = new_array(char, 9+backup_suffix_len+1);
-		if (!s)
-			out_of_memory("server_options");
+	if (strcmp(backup_suffix, backup_dir ? "" : BACKUP_SUFFIX) != 0) {
 		/* We use the following syntax to avoid weirdness with '~'. */
-		sprintf(s, "--suffix=%s", backup_suffix);
-		args[ac++] = s;
+		if (asprintf(&arg, "--suffix=%s", backup_suffix) < 0)
+			goto oom;
+		args[ac++] = arg;
 	}
-
-	if (delete_mode && !delete_excluded)
-		args[ac++] = "--delete";
 
 	if (delete_excluded)
 		args[ac++] = "--delete-excluded";
+	else if (delete_mode)
+		args[ac++] = "--delete";
 
 	if (size_only)
 		args[ac++] = "--size-only";
 
 	if (modify_window_set) {
-		snprintf(mwindow, sizeof mwindow, "--modify-window=%d",
-			 modify_window);
-		args[ac++] = mwindow;
+		if (asprintf(&arg, "--modify-window=%d", modify_window) < 0)
+			goto oom;
+		args[ac++] = arg;
 	}
 
 	if (keep_partial)
@@ -924,6 +917,10 @@ void server_options(char **args,int *argc)
 	}
 
 	*argc = ac;
+	return;
+
+    oom:
+	out_of_memory("server_options");
 }
 
 /**
@@ -935,12 +932,14 @@ char *find_colon(char *s)
 	char *p, *p2;
 
 	p = strchr(s,':');
-	if (!p) return NULL;
+	if (!p)
+		return NULL;
 
 	/* now check to see if there is a / in the string before the : - if there is then
 	   discard the colon on the assumption that the : is part of a filename */
 	p2 = strchr(s,'/');
-	if (p2 && p2 < p) return NULL;
+	if (p2 && p2 < p)
+		return NULL;
 
 	return p;
 }
