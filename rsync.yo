@@ -1264,9 +1264,11 @@ comment lines that start with a "#".
 manpagesection(INCLUDE/EXCLUDE PATTERN RULES)
 
 You can include and exclude files by specifying patterns using the "+" and
-"-" filter rules (as introduced in the FILTER RULES section above).  These
-rules specify a pattern that is matched against the names of the files
-that are going to be transferred.  These patterns can take several forms:
+"-" filter rules (as introduced in the FILTER RULES section above).
+
+The include/exclude rules each specify a pattern that is matched against
+the names of the files that are going to be transferred.  These patterns
+can take several forms:
 
 itemize(
   it() if the pattern starts with a / then it is anchored to a
@@ -1398,6 +1400,10 @@ itemize(
   space that separates the prefix from the rule is treated specially, so
   "- foo + bar" is parsed as two rules (assuming that bf(-) or bf(+) was not
   specified to turn off the parsing of prefixes).
+  it() You may also specify any of the modifiers for "+" or "-" to have the
+  rules that are read-in default to having that option set.  For instance,
+  ":-/_.excl" would treat the contents of .excl as absolute-path exclude
+  rules.
 )
 
 The following modifiers are accepted after a "+" or "-":
@@ -1706,10 +1712,10 @@ error.
 When reading a batch file, rsync will force the value of certain options
 to match the data in the batch file if you didn't set them to the same
 as the batch-writing command.  Other options can (and should) be changed.
-For instance
-bf(--write-batch) changes to bf(--read-batch), bf(--files-from) is dropped, and the
-bf(--filter)/bf(--include)/bf(--exclude) options are not needed unless one of the
-bf(--delete) options is specified without bf(--delete-excluded).
+For instance bf(--write-batch) changes to bf(--read-batch),
+bf(--files-from) is dropped, and the
+bf(--filter)/bf(--include)/bf(--exclude) options are not needed unless
+one of the bf(--delete) options is specified.
 
 The code that creates the BATCH.sh file transforms any filter/include/exclude
 options into a single list that is appended as a "here" document to the
