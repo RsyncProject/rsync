@@ -283,6 +283,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	extern int delete_after;
 	extern int recurse;
 	extern int delete_mode;
+	extern int remote_version;
 
 	if (preserve_hard_links)
 		init_hard_links(flist);
@@ -320,6 +321,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		recv_files(f_in,flist,local_name,recv_pipe[1]);
 		report(f_in);
 
+		write_int(recv_pipe[1],-1);
 		io_flush();
 		_exit(0);
 	}
@@ -335,7 +337,13 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	generate_files(f_out,flist,local_name,recv_pipe[0]);
 
+	read_int(recv_pipe[1]);
+	if (remote_version >= 24) {
+		/* send a final goodbye message */
+		write_int(f_out, -1);
+	}
 	io_flush();
+
 	wait_process(pid, &status);
 	return status;
 }
@@ -452,6 +460,10 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 			wait_process(pid, &status);
 		}
 		report(-1);
+		if (remote_version >= 24) {
+			/* final goodbye message */		
+			read_int(f_in);
+		}
 		exit_cleanup(status);
 	}
 
