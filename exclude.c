@@ -64,10 +64,10 @@ static struct exclude_struct *make_exclude(const char *pattern, int pat_len,
 
 	if (strpbrk(ret->pattern, "*[?")) {
 		ret->match_flags |= MATCHFLG_WILD;
-		if (strstr(ret->pattern, "**")) {
+		if ((cp = strstr(ret->pattern, "**")) != NULL) {
 			ret->match_flags |= MATCHFLG_WILD2;
 			/* If the pattern starts with **, note that. */
-			if (*ret->pattern == '*' && ret->pattern[1] == '*')
+			if (cp == ret->pattern)
 				ret->match_flags |= MATCHFLG_WILD2_PREFIX;
 		}
 	}
@@ -229,70 +229,83 @@ int check_exclude(struct exclude_struct **list, char *name, int name_is_dir)
  * be '\0' terminated, so use the returned length to limit the string.
  * Also, be sure to add this length to the returned pointer before passing
  * it back to ask for the next token.  This routine will not split off a
- * prefix of "+ " or "- " unless xflags contains XFLG_NO_PREFIXES.
+ * prefix of "+ " or "- " unless xflags contains XFLG_NO_PREFIXES.  The
+ * *incl_ptr value will be 1 for an include, 0 for an exclude, and -1 for
+ * the list-clearing "!" token.
  */
-static const char *get_exclude_tok(const char *p, int *len_ptr, int xflags)
+static const char *get_exclude_tok(const char *p, int *len_ptr, int *incl_ptr,
+				   int xflags)
 {
-	const unsigned char *s, *t;
+	const unsigned char *s = (unsigned char *)p;
+	int len;
 
-	/* Skip over any initial spaces */
-	for (s = (unsigned char *)p; isspace(*s); s++) {}
-
-	/* Remember the beginning of the token. */
-	t = s;
-
-	/* Do we have a token to parse? */
-	if (*s) {
-		/* Is this a '+' or '-' followed by a space (not whitespace)? */
-		if (!(xflags & XFLG_NO_PREFIXES)
-		    && (*s == '+' || *s == '-') && s[1] == ' ')
-			s += 2;
-
-		/* Skip to the next space or the end of the string */
-		while (!isspace(*s) && *s != '\0')
+	if (xflags & XFLG_WORD_SPLIT) {
+		/* Skip over any initial whitespace. */
+		while (isspace(*s))
 			s++;
 	}
 
-	*len_ptr = s - t;
-	return (const char *)t;
+	/* Is this a '+' or '-' followed by a space (not whitespace)? */
+	if (!(xflags & XFLG_NO_PREFIXES)
+	    && (*s == '-' || *s == '+') && s[1] == ' ') {
+		*incl_ptr = *s == '+';
+		s += 2;
+	} else
+		*incl_ptr = xflags & XFLG_DEF_INCLUDE;
+
+	if (xflags & XFLG_WORD_SPLIT) {
+		const unsigned char *cp = s;
+		/* Token ends at whitespace or the end of the string. */
+		while (!isspace(*cp) && *cp != '\0')
+			cp++;
+		len = cp - s;
+	} else
+		len = strlen(s);
+
+	if (*s == '!' && len == 1 && !(xflags & XFLG_NO_PREFIXES)
+	    && (const char *)s == p)
+		*incl_ptr = -1;
+
+	*len_ptr = len;
+	return (const char *)s;
 }
 
 
 void add_exclude(struct exclude_struct ***listp, const char *pattern, int xflags)
 {
 	struct exclude_struct **list = *listp;
-	int add_cnt, pat_len, list_len = 0;
+	int pat_len, list_len = 0;
+	int incl, add_cnt = 1;
 	const char *cp;
 
 	if (!pattern)
 		return;
 
 	if (xflags & XFLG_WORD_SPLIT) {
-		/* Count how many tokens we need to add.  Also looks for
-		 * the special "!" token, which clears the list up through
-		 * that token. */
-		for (add_cnt = 0, cp = pattern; ; cp += pat_len, add_cnt++) {
-			cp = get_exclude_tok(cp, &pat_len, xflags);
-			if (!pat_len)
-				break;
-			if (pat_len == 1 && *cp == '!') {
-				free_exclude_list(listp);
-				add_cnt = -1; /* Will increment to 0. */
-				pattern = cp + 1;
-			}
+		int add = 0;
+		/* Count maximum extra tokens we might encounter. */
+		for (cp = pattern; *cp; cp++) {
+			if (isspace(*(unsigned char *)cp)) {
+				add_cnt += add;
+				add = 0;
+			} else
+				add = 1;
 		}
-		if (!add_cnt)
-			return;
-		cp = get_exclude_tok(pattern, &pat_len, xflags);
-	} else {
-		add_cnt = 1;
-		cp = pattern;
-		pat_len = strlen(pattern);
+	}
 
-		if (pat_len == 1 && *cp == '!') {
-			free_exclude_list(listp);
+	cp = get_exclude_tok(pattern, &pat_len, &incl, xflags);
+	if (!pat_len)
+		return;
+
+	/* Check for the special "!" token that clears the list.  Yes, we
+	 * only honor it at the start of a XFLG_WORD_SPLIT string. */
+	if (incl < 0) {
+		free_exclude_list(listp);
+		if (!--add_cnt)
 			return;
-		}
+		cp = get_exclude_tok(cp + pat_len, &pat_len, &incl, xflags);
+		if (!pat_len)
+			return;
 	}
 
 	if (list)
@@ -304,14 +317,6 @@ void add_exclude(struct exclude_struct ***listp, const char *pattern, int xflags
 		out_of_memory("add_exclude");
 
 	while (pat_len) {
-		int incl = xflags & XFLG_DEF_INCLUDE;
-		if (!(xflags & XFLG_NO_PREFIXES)
-		    && (*cp == '-' || *cp == '+')
-		    && cp[1] == ' ') {
-			incl = *cp == '+';
-			cp += 2;
-			pat_len -= 2;
-		}
 		list[list_len++] = make_exclude(cp, pat_len, incl);
 
 		if (verbose > 2) {
@@ -319,8 +324,7 @@ void add_exclude(struct exclude_struct ***listp, const char *pattern, int xflags
 				who_am_i(), cp,
 				incl ? "include" : "exclude");
 		}
-		cp += pat_len;
-		cp = get_exclude_tok(cp, &pat_len, xflags);
+		cp = get_exclude_tok(cp + pat_len, &pat_len, &incl, xflags);
 	}
 
 	list[list_len] = NULL;
