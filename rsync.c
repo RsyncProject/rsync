@@ -43,7 +43,7 @@ void free_sums(struct sum_struct *s)
 
 
 /*
- * delete a file or directory. If force_delet is set then delete 
+ * delete a file or directory. If force_delete is set then delete 
  * recursively 
  */
 int delete_file(char *fname)
@@ -62,7 +62,6 @@ int delete_file(char *fname)
 	ret = do_stat(fname, &st);
 #endif
 	if (ret) {
-		rprintf(FERROR,"stat(%s) : %s\n", fname, strerror(errno));
 		return -1;
 	}
 
