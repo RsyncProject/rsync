@@ -36,21 +36,45 @@
 
 /**
  * Establish a proxy connection on an open socket to a web proxy by
- * using the HTTP CONNECT method.
+ * using the CONNECT method. If proxy_user and proxy_pass are not NULL,
+ * they are used to authenticate to the proxy using the "Basic"
+ * proxy-authorization protocol
  **/
-static int establish_proxy_connection(int fd, char *host, int port)
+static int establish_proxy_connection(int fd, char *host, int port,
+				      char *proxy_user, char *proxy_pass)
 {
-	char buffer[1024];
-	char *cp;
+	char *cp, buffer[1024];
+	char *authhdr, authbuf[1024];
+	int len;
 
-	snprintf(buffer, sizeof(buffer), "CONNECT %s:%d HTTP/1.0\r\n\r\n", host, port);
-	if (write(fd, buffer, strlen(buffer)) != (int)strlen(buffer)) {
+	if (proxy_user && proxy_pass) {
+		snprintf(buffer, sizeof buffer, "%s:%s",
+			 proxy_user, proxy_pass);
+		len = strlen(buffer);
+
+		if ((len*8 + 5) / 6 - 2 >= (int)sizeof authbuf) {
+			rprintf(FERROR,
+				"authentication information is too long\n");
+			return -1;
+		}
+
+		base64_encode(buffer, len, authbuf);
+		authhdr = "\r\nProxy-Authorization: Basic ";
+	} else {
+		*authbuf = '\0';
+		authhdr = "";
+	}
+
+	snprintf(buffer, sizeof buffer, "CONNECT %s:%d HTTP/1.0%s%s\r\n\r\n",
+		 host, port, authhdr, authbuf);
+	len = strlen(buffer);
+	if (write(fd, buffer, len) != len) {
 		rprintf(FERROR, "failed to write to proxy: %s\n",
 			strerror(errno));
 		return -1;
 	}
 
-	for (cp = buffer; cp < &buffer[sizeof (buffer) - 1]; cp++) {
+	for (cp = buffer; cp < &buffer[sizeof buffer - 1]; cp++) {
 		if (read(fd, cp, 1) != 1) {
 			rprintf(FERROR, "failed to read from proxy: %s\n",
 				strerror(errno));
@@ -80,7 +104,7 @@ static int establish_proxy_connection(int fd, char *host, int port)
 	}
 	/* throw away the rest of the HTTP header */
 	while (1) {
-		for (cp = buffer; cp < &buffer[sizeof (buffer) - 1]; cp++) {
+		for (cp = buffer; cp < &buffer[sizeof buffer - 1]; cp++) {
 			if (read(fd, cp, 1) != 1) {
 				rprintf(FERROR, "failed to read from proxy: %s\n",
 					strerror(errno));
@@ -108,7 +132,7 @@ int try_bind_local(int s, int ai_family, int ai_socktype,
 	int error;
 	struct addrinfo bhints, *bres_all, *r;
 
-	memset(&bhints, 0, sizeof(bhints));
+	memset(&bhints, 0, sizeof bhints);
 	bhints.ai_family = ai_family;
 	bhints.ai_socktype = ai_socktype;
 	bhints.ai_flags = AI_PASSIVE;
@@ -157,42 +181,59 @@ int open_socket_out(char *host, int port, const char *bind_address,
 		    int af_hint)
 {
 	int type = SOCK_STREAM;
-	int error;
-	int s;
+	int error, s;
 	struct addrinfo hints, *res0, *res;
 	char portbuf[10];
-	char *h;
+	char *h, *cp;
 	int proxied = 0;
 	char buffer[1024];
-	char *cp;
+	char *proxy_user = NULL, *proxy_pass = NULL;
 
 	/* if we have a RSYNC_PROXY env variable then redirect our
-	 * connetcion via a web proxy at the given address. The format
-	 * is hostname:port */
+	 * connetcion via a web proxy at the given address. */
 	h = getenv("RSYNC_PROXY");
 	proxied = h != NULL && *h != '\0';
 
 	if (proxied) {
-		strlcpy(buffer, h, sizeof(buffer));
-		cp = strchr(buffer, ':');
-		if (cp == NULL) {
+		strlcpy(buffer, h, sizeof buffer);
+
+		/* Is the USER:PASS@ prefix present? */
+		if ((cp = strchr(buffer, '@')) != NULL) {
+			*cp++ = '\0';
+			/* The remainder is the HOST:PORT part. */
+			h = cp;
+
+			if ((cp = strchr(buffer, ':')) == NULL) {
+				rprintf(FERROR,
+					"invalid proxy specification: should be USER:PASS@HOST:PORT\n");
+				return -1;
+			}
+			*cp++ = '\0';
+
+			proxy_user = buffer;
+			proxy_pass = cp;
+		} else {
+			/* The whole buffer is the HOST:PORT part. */
+			h = buffer;
+		}
+
+		if ((cp = strchr(h, ':')) == NULL) {
 			rprintf(FERROR,
 				"invalid proxy specification: should be HOST:PORT\n");
 			return -1;
 		}
 		*cp++ = '\0';
-		strcpy(portbuf, cp);
-		h = buffer;
+		strlcpy(portbuf, cp, sizeof portbuf);
 		if (verbose >= 2) {
 			rprintf(FINFO, "connection via http proxy %s port %s\n",
 				h, portbuf);
 		}
 	} else {
-		snprintf(portbuf, sizeof(portbuf), "%d", port);
+		snprintf(portbuf, sizeof portbuf, "%d", port);
 		h = host;
 	}
 
-	memset(&hints, 0, sizeof(hints));
+	memset(&hints, 0, sizeof hints);
 	hints.ai_family = af_hint;
 	hints.ai_socktype = type;
 	error = getaddrinfo(h, portbuf, &hints, &res0);
@@ -212,26 +253,26 @@ int open_socket_out(char *host, int port, const char *bind_address,
 		if (s < 0)
 			continue;
 
-		if (bind_address)
-			if (try_bind_local(s, res->ai_family, type,
-					   bind_address) == -1) {
-				close(s);
-				s = -1;
-				continue;
-			}
-
+		if (bind_address
+		 && try_bind_local(s, res->ai_family, type,
+				   bind_address) == -1) {
+			close(s);
+			s = -1;
+			continue;
+		}
 		if (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
 			close(s);
 			s = -1;
 			continue;
 		}
-		if (proxied &&
-		    establish_proxy_connection(s, host, port) != 0) {
+		if (proxied
+		 && establish_proxy_connection(s, host, port,
+					       proxy_user, proxy_pass) != 0) {
 			close(s);
 			s = -1;
 			continue;
-		} else
-			break;
+		}
+		break;
 	}
 	freeaddrinfo(res0);
 	if (s < 0) {
@@ -294,11 +335,11 @@ static int *open_socket_in(int type, int port, const char *bind_address,
 	char portbuf[10];
 	int error;
 
-	memset(&hints, 0, sizeof(hints));
+	memset(&hints, 0, sizeof hints);
 	hints.ai_family = af_hint;
 	hints.ai_socktype = type;
 	hints.ai_flags = AI_PASSIVE;
-	snprintf(portbuf, sizeof(portbuf), "%d", port);
+	snprintf(portbuf, sizeof portbuf, "%d", port);
 	error = getaddrinfo(bind_address, portbuf, &hints, &all_ai);
 	if (error) {
 		rprintf(FERROR, RSYNC_NAME ": getaddrinfo: bind address %s: %s\n",
@@ -369,22 +410,21 @@ static int *open_socket_in(int type, int port, const char *bind_address,
 int is_a_socket(int fd)
 {
 	int v;
-	socklen_t l;
-	l = sizeof(int);
+	socklen_t l = sizeof (int);
 
-        /* Parameters to getsockopt, setsockopt etc are very
-         * unstandardized across platforms, so don't be surprised if
-         * there are compiler warnings on e.g. SCO OpenSwerver or AIX.
-         * It seems they all eventually get the right idea.
-         *
-         * Debian says: ``The fifth argument of getsockopt and
-         * setsockopt is in reality an int [*] (and this is what BSD
-         * 4.* and libc4 and libc5 have).  Some POSIX confusion
-         * resulted in the present socklen_t.  The draft standard has
-         * not been adopted yet, but glibc2 already follows it and
-         * also has socklen_t [*]. See also accept(2).''
-         *
-         * We now return to your regularly scheduled programming.  */
+	/* Parameters to getsockopt, setsockopt etc are very
+	 * unstandardized across platforms, so don't be surprised if
+	 * there are compiler warnings on e.g. SCO OpenSwerver or AIX.
+	 * It seems they all eventually get the right idea.
+	 *
+	 * Debian says: ``The fifth argument of getsockopt and
+	 * setsockopt is in reality an int [*] (and this is what BSD
+	 * 4.* and libc4 and libc5 have).  Some POSIX confusion
+	 * resulted in the present socklen_t.  The draft standard has
+	 * not been adopted yet, but glibc2 already follows it and
+	 * also has socklen_t [*]. See also accept(2).''
+	 *
+	 * We now return to your regularly scheduled programming.  */
 	return getsockopt(fd, SOL_SOCKET, SO_TYPE, (char *)&v, &l) == 0;
 }
 
@@ -427,7 +467,7 @@ void start_accept_loop(int port, int (*fn)(int, int))
 
 
 	/* now accept incoming connections - forking a new process
-	   for each incoming connection */
+	 * for each incoming connection */
 	while (1) {
 		fd_set fds;
 		pid_t pid;
@@ -436,8 +476,8 @@ void start_accept_loop(int port, int (*fn)(int, int))
 		socklen_t addrlen = sizeof addr;
 
 		/* close log file before the potentially very long select so
-		   file can be trimmed by another process instead of growing
-		   forever */
+		 * file can be trimmed by another process instead of growing
+		 * forever */
 		log_close();
 
 #ifdef FD_COPY
@@ -467,7 +507,7 @@ void start_accept_loop(int port, int (*fn)(int, int))
 			int ret;
 			close(sp[i]);
 			/* open log file in child before possibly giving
-			   up privileges  */
+			 * up privileges  */
 			log_open();
 			ret = fn(fd, fd);
 			close_all();
@@ -576,7 +616,8 @@ void set_socket_options(int fd, char *options)
 		case OPT_BOOL:
 		case OPT_INT:
 			ret = setsockopt(fd,socket_options[i].level,
-					 socket_options[i].option,(char *)&value,sizeof(int));
+					 socket_options[i].option,
+					 (char *)&value, sizeof (int));
 			break;
 
 		case OPT_ON:
@@ -586,7 +627,8 @@ void set_socket_options(int fd, char *options)
 			{
 				int on = socket_options[i].value;
 				ret = setsockopt(fd,socket_options[i].level,
-						 socket_options[i].option,(char *)&on,sizeof(int));
+						 socket_options[i].option,
+						 (char *)&on, sizeof (int));
 			}
 			break;
 		}
@@ -623,7 +665,7 @@ void become_daemon(void)
 #endif /* TIOCNOTTY */
 #endif
 	/* make sure that stdin, stdout an stderr don't stuff things
-           up (library functions, for example) */
+	 * up (library functions, for example) */
 	for (i = 0; i < 3; i++) {
 		close(i);
 		open("/dev/null", O_RDWR);
@@ -645,23 +687,23 @@ static int socketpair_tcp(int fd[2])
 	int listener;
 	struct sockaddr_in sock;
 	struct sockaddr_in sock2;
-	socklen_t socklen = sizeof(sock);
+	socklen_t socklen = sizeof sock;
 	int connect_done = 0;
 
 	fd[0] = fd[1] = listener = -1;
 
-	memset(&sock, 0, sizeof(sock));
+	memset(&sock, 0, sizeof sock);
 
 	if ((listener = socket(PF_INET, SOCK_STREAM, 0)) == -1)
 		goto failed;
 
-        memset(&sock2, 0, sizeof(sock2));
+	memset(&sock2, 0, sizeof sock2);
 #ifdef HAVE_SOCKADDR_LEN
-        sock2.sin_len = sizeof(sock2);
+	sock2.sin_len = sizeof sock2;
 #endif
-        sock2.sin_family = PF_INET;
+	sock2.sin_family = PF_INET;
 
-        bind(listener, (struct sockaddr *)&sock2, sizeof(sock2));
+	bind(listener, (struct sockaddr *)&sock2, sizeof sock2);
 
 	if (listen(listener, 1) != 0)
 		goto failed;
@@ -676,7 +718,7 @@ static int socketpair_tcp(int fd[2])
 
 	sock.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-	if (connect(fd[1],(struct sockaddr *)&sock,sizeof(sock)) == -1) {
+	if (connect(fd[1], (struct sockaddr *)&sock, sizeof sock) == -1) {
 		if (errno != EINPROGRESS)
 			goto failed;
 	} else
@@ -687,7 +729,7 @@ static int socketpair_tcp(int fd[2])
 
 	close(listener);
 	if (connect_done == 0) {
-		if (connect(fd[1],(struct sockaddr *)&sock,sizeof(sock)) != 0
+		if (connect(fd[1], (struct sockaddr *)&sock, sizeof sock) != 0
 		    && errno != EISCONN)
 			goto failed;
 	}
