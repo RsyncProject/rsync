@@ -1,20 +1,20 @@
 /* -*- c-file-style: "linux" -*-
-   
+
    rsync -- fast file replication program
-   
+
    Copyright (C) 1992-2001 by Andrew Tridgell <tridge@samba.org>
    Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
-   
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -22,7 +22,7 @@
 
 /**
  * @file clientname.c
- * 
+ *
  * Functions for looking up the remote name or addr of a socket.
  *
  * This file is now converted to use the new-style getaddrinfo()
@@ -39,7 +39,7 @@ extern int am_server;
 
 
 /**
- * Return the IP addr of the client as a string 
+ * Return the IP addr of the client as a string
  **/
 char *client_addr(int fd)
 {
@@ -61,8 +61,8 @@ char *client_addr(int fd)
 			/* truncate SSH_CLIENT to just IP address */
 			p = strchr(ssh_client, ' ');
 			if (p) {
-				len = MIN((unsigned int) (p - ssh_client), 
-						sizeof(addr_buf) - 1);
+				len = MIN((unsigned int) (p - ssh_client),
+				    sizeof addr_buf - 1);
 				strncpy(addr_buf, ssh_client, len);
 				*(addr_buf + len) = '\0';
 			}
@@ -150,7 +150,7 @@ char *client_name(int fd)
 
 	}
 
-	if (!lookup_name(fd, ssp, ss_len, name_buf, sizeof name_buf, 
+	if (!lookup_name(fd, ssp, ss_len, name_buf, sizeof name_buf,
 			port_buf, sizeof port_buf))
 		check_name(fd, ssp, name_buf);
 
@@ -169,7 +169,7 @@ void client_sockaddr(int fd,
 		     struct sockaddr_storage *ss,
 		     socklen_t *ss_len)
 {
-	memset(ss, 0, sizeof(*ss));
+	memset(ss, 0, sizeof *ss);
 
 	if (getpeername(fd, (struct sockaddr *) ss, ss_len)) {
 		/* FIXME: Can we really not continue? */
@@ -190,11 +190,11 @@ void client_sockaddr(int fd,
 		struct sockaddr_in6 sin6;
 		struct sockaddr_in *sin;
 
-		memcpy(&sin6, ss, sizeof(sin6));
+		memcpy(&sin6, ss, sizeof sin6);
 		sin = (struct sockaddr_in *)ss;
-		memset(sin, 0, sizeof(*sin));
+		memset(sin, 0, sizeof *sin);
 		sin->sin_family = AF_INET;
-		*ss_len = sizeof(struct sockaddr_in);
+		*ss_len = sizeof (struct sockaddr_in);
 #if HAVE_SOCKADDR_IN_LEN
 		sin->sin_len = *ss_len;
 #endif
@@ -204,7 +204,7 @@ void client_sockaddr(int fd,
 		 * (IN6_V4MAPPED_TO_SINADDR ?), but it does not seem
 		 * to be present in the Linux headers. */
 		memcpy(&sin->sin_addr, &sin6.sin6_addr.s6_addr[12],
-			sizeof(sin->sin_addr));
+		    sizeof sin->sin_addr);
         }
 #endif
 }
@@ -250,7 +250,7 @@ int compare_addrinfo_sockaddr(const struct addrinfo *ai,
 {
 	int ss_family = get_sockaddr_family(ss);
 	const char fn[] = "compare_addrinfo_sockaddr";
-		      
+
 	if (ai->ai_family != ss_family) {
 		rprintf(FERROR,
 			"%s: response family %d != %d\n",
@@ -275,7 +275,7 @@ int compare_addrinfo_sockaddr(const struct addrinfo *ai,
 		sin1 = (const struct sockaddr_in6 *) ss;
 		sin2 = (const struct sockaddr_in6 *) ai->ai_addr;
 
-		if (ai->ai_addrlen < sizeof(struct sockaddr_in6)) {
+		if (ai->ai_addrlen < sizeof (struct sockaddr_in6)) {
 			rprintf(FERROR,
 				"%s: too short sockaddr_in6; length=%d\n",
 				fn, ai->ai_addrlen);
@@ -318,7 +318,7 @@ int check_name(int fd,
 	int error;
 	int ss_family = get_sockaddr_family(ss);
 
-	memset(&hints, 0, sizeof(hints));
+	memset(&hints, 0, sizeof hints);
 	hints.ai_family = ss_family;
 	hints.ai_flags = AI_CANONNAME;
 	hints.ai_socktype = SOCK_STREAM;
