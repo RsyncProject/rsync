@@ -86,6 +86,8 @@ static int read_timeout(int fd, char *buf, int len)
 {
 	int n, ret=0;
 
+	io_flush();
+
 	while (ret == 0) {
 		fd_set fds;
 		struct timeval tv;
