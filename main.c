@@ -66,6 +66,7 @@ extern char *shell_cmd;
 extern char *batch_name;
 
 int local_server = 0;
+struct file_list *the_file_list;
 
 /* There's probably never more than at most 2 outstanding child processes,
  * but set it higher, just in case. */
@@ -500,6 +501,7 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 	if (!flist || flist->count == 0) {
 		exit_cleanup(0);
 	}
+	the_file_list = flist;
 
 	io_start_buffering_in();
 	io_start_buffering_out();
@@ -676,6 +678,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		rprintf(FERROR,"server_recv: recv_file_list error\n");
 		exit_cleanup(RERR_FILESELECT);
 	}
+	the_file_list = flist;
 
 	if (argc > 0) {
 		if (strcmp(dir,".")) {
@@ -766,11 +769,11 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 		if (write_batch)
 			start_write_batch(f_out);
-		if (!read_batch) /* don't write to pipe */
-			flist = send_file_list(f_out,argc,argv);
+		flist = send_file_list(f_out, argc, argv);
 		set_msg_fd_in(-1);
 		if (verbose > 3)
 			rprintf(FINFO,"file list sent\n");
+		the_file_list = flist;
 
 		io_flush(NORMAL_FLUSH);
 		send_files(flist,f_out,f_in);
@@ -810,6 +813,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			"the --recursive option?\n");
 		exit_cleanup(0);
 	}
+	the_file_list = flist;
 
 	local_name = get_local_name(flist,argv[0]);
 
