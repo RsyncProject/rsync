@@ -284,6 +284,19 @@ Better statistics:
   <mbp> it would be nice to improve it
   <mbp> that would also work well with --dryrun
 
+TDB:
+
+  Rather than storing the file list in memory, store it in a TDB.
+
+  This *might* make memory usage lower while building the file list.
+
+  Hashtable lookup will mean files are not transmitted in order,
+  though... hm.
+
+  This would neatly eliminate one of the major post-fork shared data
+  structures.
+
+
 PLATFORMS ------------------------------------------------------------
 
 Win32
