@@ -20,9 +20,25 @@ printmsg() {
     echo "$1"
 }
 
+
+####################
+# Build test directories TO and FROM, with FROM full of files.
+
 hands_setup() {
     [ -d $FROM ] || mkdir $FROM
     [ -d $TO ] || mkdir $TO
+
+    # On some BSD systems, the umask affects the mode of created
+    # symlinks, even though the mode apparently has no effect on how
+    # the links behave in the future, and it cannot be changed using
+    # chmod!  rsync always sets its umask to 000 so that it can
+    # accurately recreate permissions, but this script is probably run
+    # with a different umask. 
+
+    # This causes a little problem that "ls -l" of the two will not be
+    # the same.  So, we need to set our umask before doing any creations.
+
+    umask 0
 
     # set up test data
     touch ${FROM}/empty
@@ -42,7 +58,10 @@ hands_setup() {
     ls -ltr /etc > ${FROM}/dir/subdir/subsubdir/etc-ltr-list
     mkdir ${FROM}/dir/subdir/subsubdir2
     ls -lt /bin > ${FROM}/dir/subdir/subsubdir2/bin-lt-list
+
+    umask 077
 }
+
 
 
 ###########################
