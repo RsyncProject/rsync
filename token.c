@@ -262,19 +262,22 @@ send_deflated_token(int f, int token, struct map_struct *buf, OFF_T offset,
 	} else if (token != -2) {
 		/* add the data in the current block to the compressor's
 		   history and hash table */
-		tx_strm.next_in = (Bytef *) map_ptr(buf, offset, toklen);
-		tx_strm.avail_in = toklen;
 		do {
+			n = MIN(toklen, CHUNK_SIZE);
+			tx_strm.next_in = (Bytef *) map_ptr(buf, offset, n);
+			tx_strm.avail_in = n;
 			tx_strm.next_out = (Bytef *)obuf;
 			tx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
 			r = deflate(&tx_strm, Z_INSERT_ONLY);
-			if (r != Z_OK) {
+			if (r != Z_OK || tx_strm.avail_in != 0) {
 				rprintf(FERROR,
 					"deflate on token returned %d (%d bytes left)\n",
 					r, tx_strm.avail_in);
 				exit_cleanup(RERR_STREAMIO);
 			}
-		} while (tx_strm.avail_in != 0);
+			toklen -= n;
+			offset += n;
+		} while (toklen);
 	}
 }
 
