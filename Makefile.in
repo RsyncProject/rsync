@@ -72,6 +72,9 @@ $(OBJS): config.h
 tls: $(TLS_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TLS_OBJ) $(LIBS)
 
+getgroups: getgroups.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
+
 Makefile: Makefile.in configure config.status
 	echo "WARNING: You need to run ./config.status --recheck"
 
