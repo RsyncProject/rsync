@@ -950,7 +950,7 @@ prepare_to_open:
 		statret = 0;
 	}
 
-	if (dry_run || read_batch || whole_file > 0)
+	if (dry_run || read_batch || whole_file)
 		goto notify_others;
 
 	if (fuzzy_basis) {
@@ -1040,7 +1040,7 @@ notify_others:
 	if (dry_run || read_batch)
 		return;
 
-	if (statret != 0 || whole_file > 0) {
+	if (statret != 0 || whole_file) {
 		write_sum_head(f_out, NULL);
 		return;
 	}
@@ -1102,9 +1102,11 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	if (delete_before && !local_name && flist->count > 0)
 		do_delete_pass(flist, allowed_lull);
 
+	if (whole_file < 0)
+		whole_file = 0;
 	if (verbose >= 2) {
 		rprintf(FINFO, "delta-transmission %s\n",
-			whole_file > 0
+			whole_file
 			? "disabled for local transfer or --whole-file"
 			: "enabled");
 	}
