@@ -795,7 +795,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 	if (write_batch)	/*  dw  */
 		file->flags = FLAG_DELETE;
 
-	if (strcmp(file->basename, "")) {
+	if (file->basename[0]) {
 		flist->files[flist->count++] = file;
 		send_file_entry(file, f, base_flags);
 	}
@@ -859,7 +859,8 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 
 	for (di = readdir(d); di; di = readdir(d)) {
 		char *dname = d_name(di);
-		if (strcmp(dname, ".") == 0 || strcmp(dname, "..") == 0)
+		if (dname[0] == '.' && (dname[1] == '\0' ||
+		    (dname[1] == '.' && dname[2] == '\0')))
 			continue;
 		strlcpy(p, dname, MAXPATHLEN - l);
 		send_file_name(f, flist, fname, recurse, 0);
