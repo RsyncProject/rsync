@@ -183,7 +183,7 @@ do
 
     if sh $RUNSHFLAGS "$testscript"
     then
-	echo "----- $testbase completed succesfully"
+	echo "----- $testbase completed successfully"
 	passed=`expr $passed + 1`
     else 
 	case $? in
