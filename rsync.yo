@@ -59,8 +59,7 @@ itemize(
 
 	it() for copying from a remote rsync server to the local
 	machine. This is invoked when the source path contains a ::
-	separator. You can also use a rsync:// URL if no username
-	is required.
+	separator or a rsync:// URL.
 
 	it() for copying from the local machine to a remote rsync
 	server. This is invoked when the destination path contains a ::
