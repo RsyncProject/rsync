@@ -280,7 +280,7 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
  * main routine for receiver process.
  *
  * Receiver process runs on the same host as the generator process. */
-int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
+int recv_files(int f_in,struct file_list *flist,char *local_name)
 {
 	int fd1,fd2;
 	STRUCT_STAT st;
@@ -314,7 +314,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 				csum_length = SUM_LENGTH;
 				if (verbose > 2)
 					rprintf(FINFO,"recv_files phase=%d\n",phase);
-				write_int(f_gen,-1);
+				send_msg(MSG_DONE, "", 0);
 				continue;
 			}
 			break;
@@ -466,9 +466,11 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 				rprintf(FERROR,"ERROR: file corruption in %s. File changed during transfer?\n",
 					full_fname(fname));
 			} else {
+				char buf[4];
 				if (verbose > 1)
 					rprintf(FINFO,"redoing %s(%d)\n",fname,i);
-				write_int(f_gen,i);
+				SIVAL(buf, 0, i);
+				send_msg(MSG_REDO, buf, 4);
 			}
 		}
 	}
