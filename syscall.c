@@ -111,19 +111,27 @@ int do_rename(char *fname1, char *fname2)
 }
 
 
-int do_mkdir(char *fname, mode_t mode)
+void trim_trailing_slashes(char *name)
 {
-	int l;
-	if (dry_run)
-		return 0;
-	CHECK_RO;
-	
+	char *p;
 	/* Some BSD systems cannot make a directory if the name
 	 * contains a trailing slash.
 	 * <http://www.opensource.apple.com/bugs/X/BSD%20Kernel/2734739.html> */
-	if ((l = strlen(fname))  &&  (fname[l-1] == '/'))
-		fname[l-1] = '/';
-	
+	if (!*name)
+		return;		/* empty string */
+	p = strchr(name, '\0') - 1;
+	while (p == '/') {
+		p-- = '\0';
+	}
+}
+
+
+int do_mkdir(char *fname, mode_t mode)
+{
+	if (dry_run)
+		return 0;
+	CHECK_RO;
+	trim_trailing_slashes(fname);	
 	return mkdir(fname, mode);
 }
 
