@@ -760,57 +760,61 @@ void sanitize_path(char *p, char *reldir)
 
 
 char curr_dir[MAXPATHLEN];
+unsigned int curr_dir_len;
 
 /**
  * Like chdir() but can be reversed with pop_dir() if @p save is set.
  * It is also much faster as it remembers where we have been.
  **/
-char *push_dir(char *dir, int save)
+int push_dir(char *dir)
 {
-	char *ret = curr_dir;
 	static int initialised;
+	unsigned int len;
 
 	if (!initialised) {
 		initialised = 1;
 		getcwd(curr_dir, sizeof(curr_dir)-1);
+		curr_dir_len = strlen(curr_dir);
 	}
 
-	if (!dir) return NULL; /* this call was probably just to initialize */
+	if (!dir)	/* this call was probably just to initialize */
+		return 0;
 
-	if (chdir(dir)) return NULL;
+	len = strlen(dir);
+	if (len == 1 && *dir == '.')
+		return 1;
 
-	if (save) {
-		ret = strdup(curr_dir);
-	}
+	if ((*dir == '/' ? len : curr_dir_len + 1 + len) >= sizeof curr_dir)
+		return 0;
+
+	if (chdir(dir))
+		return 0;
 
 	if (*dir == '/') {
-		strlcpy(curr_dir, dir, sizeof(curr_dir));
-	} else if (dir[0] != '.' || dir[1] != '\0') {
-		strlcat(curr_dir,"/", sizeof(curr_dir));
-		strlcat(curr_dir,dir, sizeof(curr_dir));
+		memcpy(curr_dir, dir, len + 1);
+		curr_dir_len = len;
+	} else {
+		curr_dir[curr_dir_len++] = '/';
+		memcpy(curr_dir + curr_dir_len, dir, len + 1);
+		curr_dir_len += len;
 	}
 
 	clean_fname(curr_dir);
 
-	return ret;
+	return 1;
 }
 
 /** Reverse a push_dir() call */
 int pop_dir(char *dir)
 {
-	int ret;
+	if (chdir(dir))
+		return 0;
 
-	ret = chdir(dir);
-	if (ret) {
-		free(dir);
-		return ret;
-	}
+	curr_dir_len = strlcpy(curr_dir, dir, sizeof curr_dir);
+	if (curr_dir_len >= sizeof curr_dir)
+		curr_dir_len = sizeof curr_dir - 1;
 
-	strlcpy(curr_dir, dir, sizeof(curr_dir));
-
-	free(dir);
-
-	return 0;
+	return 1;
 }
 
 /**
