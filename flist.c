@@ -436,7 +436,7 @@ struct file_struct *make_file(int f, char *fname)
 
 	if (readlink_stat(fname,&st,linkbuf) != 0) {
 		io_error = 1;
-		rprintf(FERROR,"%s: %s\n",
+		rprintf(FERROR,"readlink %s: %s\n",
 			fname,strerror(errno));
 		return NULL;
 	}
@@ -673,8 +673,10 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 		}
 
 		if (link_stat(fname,&st) != 0) {
-			io_error=1;
-			rprintf(FERROR,"%s : %s\n",fname,strerror(errno));
+			if (f != -1) {
+				io_error=1;
+				rprintf(FERROR,"link_stat %s : %s\n",fname,strerror(errno));
+			}
 			continue;
 		}
 
