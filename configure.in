@@ -285,12 +285,14 @@ AC_CHECK_FUNCS(memmove lchown vsnprintf snprintf asprintf setsid glob strpbrk)
 AC_CHECK_FUNCS(strlcat strlcpy mtrace)
 
 AC_CACHE_CHECK([for working socketpair],rsync_cv_HAVE_SOCKETPAIR,[
-AC_TRY_RUN([#include <sys/types.h>
-	    #include <sys/socket.h>
-	    main() {
-		int fd[2];
-		exit((socketpair(AF_UNIX, SOCK_STREAM, 0, fd) != -1) ? 0 : 1);
-	    }],
+AC_TRY_RUN([
+#include <sys/types.h>
+#include <sys/socket.h>
+
+main() {
+       int fd[2];
+       exit((socketpair(AF_UNIX, SOCK_STREAM, 0, fd) != -1) ? 0 : 1);
+}],
 rsync_cv_HAVE_SOCKETPAIR=yes,rsync_cv_HAVE_SOCKETPAIR=no,rsync_cv_HAVE_SOCKETPAIR=cross)])
 if test x"$rsync_cv_HAVE_SOCKETPAIR" = x"yes"; then
     AC_DEFINE(HAVE_SOCKETPAIR, 1, [ ])
