@@ -62,12 +62,16 @@
 
 # Each test case runs in its own shell. 
 
-# Exit codes: (passed back to build farm):
+# Exit codes from tests:
 
 #    1  tests failed
 #    2  error in starting tests
 #   77  this test skipped (random value unlikely to happen by chance, same as
 #       automake)
+
+# HOWEVER, the overall exit code to the farm is different: we return
+# the *number of tests that failed*, so that it will show up nicely in
+# the overall summary.
 
 # rsync.fns contains some general setup functions and definitions.
 
@@ -175,9 +179,4 @@ echo "      $skipped skipped"
 echo "      $missing missing"
 echo '------------------------------------------------------------'
 
-if test "$failed" -gt 0 || test "$missing" -gt 0
-then
-    exit 1
-else
-    exit 0
-fi
+exit `expr $failed + $missing`
