@@ -169,6 +169,7 @@ then
 fi
 
 RSYNC="$rsync_bin"
+#RSYNC="valgrind --tool=addrcheck $rsync_bin"
 
 export rsync_bin RSYNC
 
