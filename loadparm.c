@@ -1,6 +1,11 @@
 /* This is based on loadparm.c from Samba, written by Andrew Tridgell
    and Karl Auer */
 
+/* some fixes
+ *
+ * Copyright (C) 2001 by Martin Pool <mbp@samba.org>
+ */
+
 /* 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -379,14 +384,23 @@ static void init_service(service *pservice)
 	copy_service(pservice,&sDefault);
 }
 
-static void string_set(char **s, char *v)
+
+/**
+ * Assign a copy of @p v to @p *s, freeing any existing values and
+ * handling NULL strings.  @p *v must be initialized when this is
+ * called, either to NULL or a malloc'd string.
+ **/
+static void string_set(char **s, const char *v)
 {
 	if (!v) {
 		*s = NULL;
 		return;
 	}
+	if (*s)
+		free(*s);
 	*s = strdup(v);
-	if (!*s) exit_cleanup(RERR_MALLOC);
+	if (!*s)
+		exit_cleanup(RERR_MALLOC);
 }
 
 
