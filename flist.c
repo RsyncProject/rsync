@@ -262,6 +262,12 @@ static void receive_file_entry(struct file_struct **fptr,
 
   clean_fname(thisname);
 
+  if (relative_paths && thisname[0] == '/') {
+	  /* strip / off absolute paths in destination */
+	  memmove(thisname, thisname+1, strlen(thisname));
+	  if (!thisname[0]) strcpy(thisname,".");
+  }
+
   if ((p = strrchr(thisname,'/'))) {
 	  static char *lastdir;
 	  *p = 0;
