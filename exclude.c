@@ -1034,7 +1034,7 @@ char *get_rule_prefix(int match_flags, const char *pat, int for_xfer,
 {
 	static char buf[MAX_RULE_PREFIX+1];
 	char *op = buf;
-	int legal_len = for_xfer && protocol_version < 29 ? 1 : MAX_RULE_PREFIX;
+	int legal_len = for_xfer && protocol_version < 29 ? 1 : MAX_RULE_PREFIX-1;
 
 	if (match_flags & MATCHFLG_PERDIR_MERGE) {
 		if (legal_len == 1)
@@ -1071,10 +1071,10 @@ char *get_rule_prefix(int match_flags, const char *pat, int for_xfer,
 	    && (!for_xfer || protocol_version >= 29
 	     || (delete_excluded && am_sender)))
 		*op++ = 'r';
-	if (legal_len)
-		*op++ = ' ';
 	if (op - buf > legal_len)
 		return NULL;
+	if (legal_len)
+		*op++ = ' ';
 	*op = '\0';
 	if (plen_ptr)
 		*plen_ptr = op - buf;
