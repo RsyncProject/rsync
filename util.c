@@ -82,9 +82,9 @@ char *map_ptr(struct map_struct *map,off_t offset,int len)
 
   if (lseek(map->fd,offset,SEEK_SET) != offset ||
       (nread=read(map->fd,map->p,len)) != len) {
-    fprintf(FERROR,"EOF in map_ptr! (offset=%d len=%d nread=%d errno=%d)\n",
-	    (int)offset, len, nread, errno);
-    exit_cleanup(1);
+	  fprintf(FERROR,"EOF in map_ptr! (offset=%d len=%d nread=%d errno=%d)\n",
+		  (int)offset, len, nread, errno);
+	  exit_cleanup(1);
   }
 
   map->p_offset = offset;
@@ -341,4 +341,14 @@ int copy_file(char *source, char *dest, mode_t mode)
 	}
 
 	return 0;
+}
+
+/* sleep for a while via select */
+void u_sleep(int usec)
+{
+	struct timeval tv;
+
+	tv.tv_sec = 0;
+	tv.tv_usec = usec;
+	select(0, NULL, NULL, NULL, &tv);
 }
