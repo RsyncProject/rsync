@@ -20,11 +20,17 @@ altdir="$tmpdir/alt"
 
 hands_setup
 
-# Setup the chk and alt dirs
-$RSYNC -av --exclude=text "$fromdir/" "$chkdir/"
+# Setup the alt and chk dirs
 $RSYNC -av --include=text --include='*/' --exclude='*' "$fromdir/" "$altdir/"
 
-checkit "$RSYNC -avv --compare-dest=\"$altdir\" \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+sleep 1
+touch "$fromdir/dir/text"
+
+$RSYNC -av --exclude=/text "$fromdir/" "$chkdir/"
+
+# Let's do it!
+checkit "$RSYNC -avv --no-whole-file --compare-dest=\"$altdir\" \
+    \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
