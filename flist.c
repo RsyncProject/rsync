@@ -192,6 +192,13 @@ static void list_file_entry(struct file_struct *f)
 }
 
 
+/**
+ * Stat either a symlink or its referent, depending on the settings of
+ * copy_links, copy_unsafe_links, etc.
+ *
+ * @return -1 on error; or 0.  If a symlink, then @p Linkbuf (of size
+ * MAXPATHLEN) contains the symlink target.
+ **/
 int readlink_stat(const char *Path, STRUCT_STAT * Buffer, char *Linkbuf)
 {
 #if SUPPORT_LINKS
