@@ -712,6 +712,17 @@ size_t strlcat(char *d, const char *s, size_t bufsize);
 
 #define exit_cleanup(code) _exit_cleanup(code, __FILE__, __LINE__)
 
+#ifdef HAVE_GETEUID
+#define MY_UID() geteuid()
+#else
+#define MY_UID() getuid()
+#endif
+
+#ifdef HAVE_GETEGID
+#define MY_GID() getegid()
+#else
+#define MY_GID() getgid()
+#endif
 
 extern int verbose;
 
