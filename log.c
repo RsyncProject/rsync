@@ -363,6 +363,12 @@ static void log_formatted(enum logcode code, char *format, char *op,
 	 * copy in the terminating null of the inserted strings, but
 	 * rather keep going until we reach the null of the format. */
 	total = strlcpy(buf, format, sizeof buf);
+	if (total > MAXPATHLEN) {
+		rprintf(FERROR, "log-format string is WAY too long!\n");
+		exit_cleanup(RERR_MESSAGEIO);
+	}
+	buf[total++] = '\n';
+	buf[total] = '\0';
 	
 	for (p = buf; (p = strchr(p, '%')) != NULL; ) {
 		s = p++;
@@ -517,7 +523,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 		/* Subtract the length of the escape from the string's size. */
 		total -= p - s;
 
-		if (len + total >= sizeof buf) {
+		if (len + total >= (size_t)sizeof buf) {
 			rprintf(FERROR,
 				"buffer overflow expanding %%%c -- exiting\n",
 				p[-1]);
@@ -537,7 +543,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 		p = s + len;
 	}
 
-	rprintf(code, "%s\n", buf);
+	rwrite(code, buf, total);
 }
 
 int log_format_has(const char *format, char esc)
