@@ -423,6 +423,8 @@ Test daemon feature to disallow particular options.
 
 Pipe program that makes slow/jerky connections.
 
+Versions of read() and write() that corrupt the stream, or abruptly fail
+
 
 DOCUMENTATION --------------------------------------------------------
 
