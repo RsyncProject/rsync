@@ -286,8 +286,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 #endif
 
 #ifdef HAVE_MKNOD
-  if (preserve_devices && 
-      (S_ISCHR(flist->files[i].mode) || S_ISBLK(flist->files[i].mode))) {
+  if (preserve_devices && IS_DEVICE(flist->files[i].mode)) {
     if (statret != 0 || 
 	st.st_mode != flist->files[i].mode ||
 	st.st_rdev != flist->files[i].dev) {	

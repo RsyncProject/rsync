@@ -24,7 +24,8 @@
 #define BACKUP_SUFFIX "~"
 
 /* update this if you make incompatible changes */
-#define PROTOCOL_VERSION 9
+#define PROTOCOL_VERSION 10
+#define MIN_PROTOCOL_VERSION 10
 
 /* block size to write files in */
 #define WRITE_BLOCK_SIZE (32*1024)
@@ -242,3 +243,5 @@ extern int errno;
 #ifndef EWOULDBLOCK
 #define EWOULDBLOCK EAGAIN
 #endif
+
+#define IS_DEVICE(mode) (S_ISCHR(mode) || S_ISBLK(mode))

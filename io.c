@@ -136,6 +136,12 @@ void read_buf(int f,char *buf,int len)
   total_read += len;
 }
 
+unsigned char read_byte(int f)
+{
+  char c;
+  read_buf(f,&c,1);
+  return (unsigned char)c;
+}
 
 int read_write(int fd_in,int fd_out,int size)
 {
@@ -214,6 +220,11 @@ void write_buf(int f,char *buf,int len)
   total_written += len;
 }
 
+
+void write_byte(int f,unsigned char c)
+{
+  write_buf(f,(char *)&c,1);
+}
 
 void write_flush(int f)
 {

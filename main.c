@@ -582,7 +582,7 @@ int main(int argc,char *argv[])
 
     if (am_server) {
       int version = read_int(STDIN_FILENO);
-      if (version != PROTOCOL_VERSION) {
+      if (version < MIN_PROTOCOL_VERSION) {
 	fprintf(stderr,"protocol version mismatch %d %d\n",
 		version,PROTOCOL_VERSION);
 	exit(1);
@@ -666,7 +666,7 @@ int main(int argc,char *argv[])
     write_flush(f_out);
     {
       int version = read_int(f_in);
-      if (version != PROTOCOL_VERSION) {
+      if (version < MIN_PROTOCOL_VERSION) {
 	fprintf(stderr,"protocol version mismatch\n");
 	exit(1);
       }	

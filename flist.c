@@ -71,24 +71,57 @@ static void send_directory(int f,struct file_list *flist,char *dir);
 
 static char *flist_dir = NULL;
 
+#define FILE_VALID 1
+#define SAME_MODE (1<<1)
+#define SAME_DEV (1<<2)
+#define SAME_UID (1<<3)
+#define SAME_GID (1<<4)
+#define SAME_DIR (1<<5)
+
 static void send_file_entry(struct file_struct *file,int f)
 {
+  unsigned char flags;
+  static mode_t last_mode=0;
+  static dev_t last_dev=0;
+  static uid_t last_uid=0;
+  static gid_t last_gid=0;
+  static char lastdir[MAXPATHLEN]="";
+  char *p=NULL;
+
   if (f == -1) return;
 
-  write_int(f,strlen(file->name));
-  write_buf(f,file->name,strlen(file->name));
+  if (!file) {
+    write_byte(f,0);
+    return;
+  }
+
+  flags = FILE_VALID;
+
+  if (file->mode == last_mode) flags |= SAME_MODE;
+  if (file->dev == last_dev) flags |= SAME_DEV;
+  if (file->uid == last_uid) flags |= SAME_UID;
+  if (file->gid == last_gid) flags |= SAME_GID;
+    
+  if (strncmp(file->name,lastdir,strlen(lastdir)) == 0) {
+    flags |= SAME_DIR;
+    p = file->name + strlen(lastdir);
+  } else {
+    p = file->name;
+  }
+
+  write_byte(f,flags);
+  write_byte(f,strlen(p));
+  write_buf(f,p,strlen(p));
   write_int(f,(int)file->modtime);
   write_int(f,(int)file->length);
-  write_int(f,(int)file->mode);
-  if (preserve_uid)
+  if (!(flags & SAME_MODE))
+    write_int(f,(int)file->mode);
+  if (preserve_uid && !(flags & SAME_UID))
     write_int(f,(int)file->uid);
-  if (preserve_gid)
+  if (preserve_gid && !(flags & SAME_GID))
     write_int(f,(int)file->gid);
-  if (preserve_devices) {
-    if (verbose > 2)
-      fprintf(stderr,"dev=0x%x\n",(int)file->dev);
+  if (preserve_devices && IS_DEVICE(file->mode) && !(flags & SAME_DEV))
     write_int(f,(int)file->dev);
-  }
 
 #if SUPPORT_LINKS
   if (preserve_links && S_ISLNK(file->mode)) {
@@ -100,6 +133,82 @@ static void send_file_entry(struct file_struct *file,int f)
   if (always_checksum) {
     write_buf(f,file->sum,SUM_LENGTH);
   }       
+
+  last_mode = file->mode;
+  last_dev = file->dev;
+  last_uid = file->uid;
+  last_gid = file->gid;
+  p = strrchr(file->name,'/');
+  if (p) {
+    int l = (int)(p - file->name) + 1;
+    strncpy(lastdir,file->name,l);
+    lastdir[l] = 0;
+  } else {
+    strcpy(lastdir,"");
+  }
+}
+
+
+
+static void receive_file_entry(struct file_struct *file,
+			       unsigned char flags,int f)
+{
+  static mode_t last_mode=0;
+  static dev_t last_dev=0;
+  static uid_t last_uid=0;
+  static gid_t last_gid=0;
+  static char lastdir[MAXPATHLEN]="";
+  char *p=NULL;
+  int l1,l2;
+
+  l1 = read_byte(f);
+  if (flags & SAME_DIR)
+    l2 = strlen(lastdir);
+  else
+    l2 = 0;
+
+  file->name = (char *)malloc(l1+l2+1);
+  if (!file->name) out_of_memory("receive_file_entry");
+
+  strncpy(file->name,lastdir,l2);
+  read_buf(f,file->name+l2,l1);
+  file->name[l1+l2] = 0;
+
+  file->modtime = (time_t)read_int(f);
+  file->length = (off_t)read_int(f);
+  file->mode = (flags & SAME_MODE) ? last_mode : (mode_t)read_int(f);
+  if (preserve_uid)
+    file->uid = (flags & SAME_UID) ? last_uid : (uid_t)read_int(f);
+  if (preserve_gid)
+    file->gid = (flags & SAME_GID) ? last_gid : (gid_t)read_int(f);
+  if (preserve_devices && IS_DEVICE(file->mode))
+    file->dev = (flags & SAME_DEV) ? last_dev : (dev_t)read_int(f);
+
+#if SUPPORT_LINKS
+  if (preserve_links && S_ISLNK(file->mode)) {
+    int l = read_int(f);
+    file->link = (char *)malloc(l+1);
+    if (!file->link) out_of_memory("receive_file_entry");
+    read_buf(f,file->link,l);
+    file->link[l] = 0;
+  }
+#endif
+  
+  if (always_checksum)
+    read_buf(f,file->sum,SUM_LENGTH);
+  
+  last_mode = file->mode;
+  last_dev = file->dev;
+  last_uid = file->uid;
+  last_gid = file->gid;
+  p = strrchr(file->name,'/');
+  if (p) {
+    int l = (int)(p - file->name) + 1;
+    strncpy(lastdir,file->name,l);
+    lastdir[l] = 0;
+  } else {
+    strcpy(lastdir,"");
+  }
 }
 
 
@@ -323,7 +432,7 @@ struct file_list *send_file_list(int f,int recurse,int argc,char *argv[])
   }
 
   if (f != -1) {
-    write_int(f,0);
+    send_file_entry(NULL,f);
     write_flush(f);
   }
 
@@ -338,8 +447,8 @@ struct file_list *send_file_list(int f,int recurse,int argc,char *argv[])
 
 struct file_list *recv_file_list(int f)
 {
-  int l;
   struct file_list *flist;
+  unsigned char flags;
 
   if (verbose > 2)
     fprintf(stderr,"recv_file_list starting\n");
@@ -356,7 +465,7 @@ struct file_list *recv_file_list(int f)
     goto oom;
 
 
-  for (l=read_int(f); l; l=read_int(f)) {
+  for (flags=read_byte(f); flags; flags=read_byte(f)) {
     int i = flist->count;
 
     if (i >= flist->malloced) {
@@ -368,33 +477,7 @@ struct file_list *recv_file_list(int f)
 	goto oom;
     }
 
-    flist->files[i].name = (char *)malloc(l+1);
-    if (!flist->files[i].name) 
-      goto oom;
-
-    read_buf(f,flist->files[i].name,l);
-    flist->files[i].name[l] = 0;
-    flist->files[i].modtime = (time_t)read_int(f);
-    flist->files[i].length = (off_t)read_int(f);
-    flist->files[i].mode = (mode_t)read_int(f);
-    if (preserve_uid)
-      flist->files[i].uid = (uid_t)read_int(f);
-    if (preserve_gid)
-      flist->files[i].gid = (gid_t)read_int(f);
-    if (preserve_devices)
-      flist->files[i].dev = (dev_t)read_int(f);
-
-#if SUPPORT_LINKS
-    if (preserve_links && S_ISLNK(flist->files[i].mode)) {
-      int l = read_int(f);
-      flist->files[i].link = (char *)malloc(l+1);
-      read_buf(f,flist->files[i].link,l);
-      flist->files[i].link[l] = 0;
-    }
-#endif
-
-    if (always_checksum)
-      read_buf(f,flist->files[i].sum,SUM_LENGTH);
+    receive_file_entry(&flist->files[i],flags,f);
 
     if (S_ISREG(flist->files[i].mode))
       total_size += flist->files[i].length;
