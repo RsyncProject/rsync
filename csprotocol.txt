@@ -1,0 +1,60 @@
+This is kind of informal and may be wrong, but it helped me.  It's
+basically a summary of clientserver.c and authenticate.c.
+
+ -- Martin Pool <mbp@samba.org>
+
+
+
+
+This is the protocol used for rsync --daemon; i.e. connections to port
+873 rather than invocations over a remote shell.
+
+When the server accepts a connection, it prints a greeting
+
+  @RSYNCD: <version>
+
+where <version> is the numeric version; currently 24.  It follows this
+with a free text message-of-the-day.  It expects to see a similar
+greeting back from the client.
+
+The server is now in the connected state.  The client can either send
+the command
+
+  #list
+
+to get a listing of modules, or the name of a module.  After this, the
+connection is now bound to a particular module.  Access per host for
+this module is now checked, as is per-module connection limits.
+
+If authentication is required to use this module, the server will say
+
+  @RSYNCD: AUTHREQD <challenge>
+
+where <challenge> is a random string of base64 characters.  The client
+must respond with
+
+  <user> <response>
+
+where <user> is the username they claim to be, and <response> is the
+base64 form of the MD4 hash of challenge+password.
+
+At this point the server applies all remaining constraints before
+handing control to the client, including switching uid/gid, setting up
+include and exclude lists, moving to the root of the module, and doing
+chroot.
+
+If the login is acceptable, then the server will respond with
+
+  @RSYNCD: OK
+
+The client now writes some rsync options, as if it were remotely
+executing the command.  The server parses these arguments as if it had
+just been invoked with them, but they're added to the existing state.
+So if the client specifies a list of files to be included or excluded,
+they'll defer to existing limits specified in the server
+configuration.
+
+The server then talks to the client as normal across the socket,
+passing checksums, file lists and so on.  For documentation of that,
+stay tuned (or write it yourself!).
+
