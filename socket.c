@@ -33,6 +33,8 @@
 
 #include "rsync.h"
 
+static const char default_name[] = "UNKNOWN";
+
 static int lookup_name(const struct sockaddr_storage *ss,
 		       socklen_t ss_len,
 		       char *name_buf, size_t name_buf_len,
@@ -610,6 +612,10 @@ static int get_sockaddr_family(const struct sockaddr_storage *ss)
  *
  * The name is statically cached so that repeated lookups are quick,
  * so there is a limit of one lookup per customer.
+ *
+ * If anything goes wrong, including the name->addr->name check, then
+ * we just use "UNKNOWN", so you can use that value in hosts allow
+ * lines.
  **/
 char *client_name(int fd)
 {
@@ -621,6 +627,7 @@ char *client_name(int fd)
 
 	if (initialised) return name_buf;
 
+	strcpy(name_buf, default_name);
 	initialised = 1;
 
 	if (getpeername(fd, (struct sockaddr *)&ss, &ss_len)) {
@@ -646,7 +653,6 @@ static int lookup_name(const struct sockaddr_storage *ss,
 		       char *port_buf, size_t port_buf_len)
 {
 	int name_err;
-	const char *def = "UNKNOWN";
 	
 #ifdef INET6
         if (get_sockaddr_family(ss) == AF_INET6 && 
@@ -683,7 +689,7 @@ static int lookup_name(const struct sockaddr_storage *ss,
 			       port_buf, port_buf_len,
 			       NI_NAMEREQD | NI_NUMERICSERV);
 	if (name_err != 0) {
-		strcpy(name_buf, def);
+		strcpy(name_buf, default_name);
 		rprintf(FERROR, RSYNC_NAME ": name lookup failed: %s\n",
 			gai_strerror(name_err));
 		return name_err;
@@ -711,8 +717,7 @@ static int check_name(const struct sockaddr_storage *ss,
 	hints.ai_socktype = SOCK_STREAM;
 	error = getaddrinfo(name_buf, port_buf, &hints, &res0);
 	if (error) {
-		/* We still use the name found by the reverse lookup,
-		 * but emit a warning. */
+		strcpy(name_buf, default_name);
 		rprintf(FERROR,
 			RSYNC_NAME ": forward name lookup for %s:%s failed: %s\n",
 			name_buf, port_buf,
@@ -732,6 +737,7 @@ static int check_name(const struct sockaddr_storage *ss,
 	}
 
 	if (res == NULL) {
+		strcpy(name_buf, default_name);
 		/* We hit the end of the list without finding an
 		 * address that was the same as ss. */
 		rprintf(FERROR, RSYNC_NAME
