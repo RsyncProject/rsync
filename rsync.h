@@ -305,10 +305,20 @@ struct file_struct {
 };
 
 
+#define ARENA_SIZE	(32 * 1024)
+
+struct string_area {
+	char *base;
+	char *end;
+	char *current;
+	struct string_area *next;
+};
+
 struct file_list {
 	int count;
 	int malloced;
 	struct file_struct **files;
+	struct string_area *string_area;
 };
 
 struct sum_buf {

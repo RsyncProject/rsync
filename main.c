@@ -271,6 +271,7 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 	}
 
 	send_files(flist,f_out,f_in);
+	io_flush();
 	report(f_out);
 	io_flush();
 	exit_cleanup(0);
@@ -323,6 +324,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		set_error_fd(error_pipe[1]);
 
 		recv_files(f_in,flist,local_name,recv_pipe[1]);
+		io_flush();
 		report(f_in);
 
 		write_int(recv_pipe[1],1);
@@ -475,11 +477,11 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 			io_flush();
 			wait_process(pid, &status);
 		}
-		report(-1);
 		if (remote_version >= 24) {
 			/* final goodbye message */		
 			read_int(f_in);
 		}
+		report(-1);
 		exit_cleanup(status);
 	}
 

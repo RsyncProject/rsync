@@ -51,8 +51,60 @@ static char topsrcname[MAXPATHLEN];
 
 static struct exclude_struct **local_exclude_list;
 
+static struct file_struct null_file;
+
 static void clean_flist(struct file_list *flist, int strip_root);
 
+struct string_area *string_area_new(int size)
+{
+	struct string_area *a;
+
+	if (size <= 0) size = ARENA_SIZE;
+	a = malloc(sizeof(*a));
+	if (!a) out_of_memory("string_area_new");
+	a->current = a->base = malloc(size);
+	if (!a->current) out_of_memory("string_area_new buffer");
+	a->end = a->base + size;
+	a->next = 0;
+
+	return a;
+}
+
+void string_area_free(struct string_area *a)
+{
+	struct string_area *next;
+
+	for ( ; a ; a = next) {
+		next = a->next;
+		free(a->base);
+	}
+}
+
+char *string_area_malloc(struct string_area **ap, int size)
+{
+	char *p;
+	struct string_area *a;
+
+	/* does the request fit into the current space? */
+	a = *ap;
+	if (a->current + size >= a->end) {
+		/* no; get space, move new string_area to front of the list */
+		a = string_area_new(size > ARENA_SIZE ? size : ARENA_SIZE);
+		a->next = *ap;
+		*ap = a;
+	}
+
+	/* have space; do the "allocation." */
+	p = a->current;
+	a->current += size;
+	return p;
+}
+
+char *string_area_strdup(struct string_area **ap, const char *src)
+{
+	char* dest = string_area_malloc(ap, strlen(src) + 1);
+	return strcpy(dest, src);
+}
 
 static void list_file_entry(struct file_struct *f)
 {
@@ -413,8 +465,11 @@ static int skip_filesystem(char *fname, STRUCT_STAT *st)
 	return (st2.st_dev != filesystem_dev);
 }
 
+#define STRDUP(ap, p)	(ap ? string_area_strdup(ap, p) : strdup(p))
+#define MALLOC(ap, i)	(ap ? string_area_malloc(ap, i) : malloc(i))
+
 /* create a file_struct for a named file */
-struct file_struct *make_file(int f, char *fname)
+struct file_struct *make_file(int f, char *fname, struct string_area **ap)
 {
 	struct file_struct *file;
 	STRUCT_STAT st;
@@ -468,14 +523,14 @@ struct file_struct *make_file(int f, char *fname)
 		if (lastdir && strcmp(fname, lastdir)==0) {
 			file->dirname = lastdir;
 		} else {
-			file->dirname = strdup(fname);
+			file->dirname = STRDUP(ap, fname);
 			lastdir = file->dirname;
 		}
-		file->basename = strdup(p+1);
+		file->basename = STRDUP(ap, p+1);
 		*p = '/';
 	} else {
 		file->dirname = NULL;
-		file->basename = strdup(fname);
+		file->basename = STRDUP(ap, fname);
 	}
 
 	file->modtime = st.st_mtime;
@@ -491,12 +546,12 @@ struct file_struct *make_file(int f, char *fname)
 
 #if SUPPORT_LINKS
 	if (S_ISLNK(st.st_mode)) {
-		file->link = strdup(linkbuf);
+		file->link = STRDUP(ap, linkbuf);
 	}
 #endif
 
 	if (always_checksum) {
-		file->sum = (char *)malloc(MD4_SUM_LENGTH);
+		file->sum = (char *)MALLOC(ap, MD4_SUM_LENGTH);
 		if (!file->sum) out_of_memory("md4 sum");
 		/* drat. we have to provide a null checksum for non-regular
 		   files in order to be compatible with earlier versions
@@ -513,7 +568,7 @@ struct file_struct *make_file(int f, char *fname)
 		if (lastdir && strcmp(lastdir, flist_dir)==0) {
 			file->basedir = lastdir;
 		} else {
-			file->basedir = strdup(flist_dir);
+			file->basedir = STRDUP(ap, flist_dir);
 			lastdir = file->basedir;
 		}
 	} else {
@@ -533,7 +588,7 @@ void send_file_name(int f,struct file_list *flist,char *fname,
 {
   struct file_struct *file;
 
-  file = make_file(f,fname);
+  file = make_file(f,fname, &flist->string_area);
 
   if (!file) return;  
   
@@ -623,7 +678,6 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 }
 
 
-
 struct file_list *send_file_list(int f,int argc,char *argv[])
 {
 	int i,l;
@@ -640,14 +694,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 
 	start_write = stats.total_written;
 
-	flist = (struct file_list *)malloc(sizeof(flist[0]));
-	if (!flist) out_of_memory("send_file_list");
-
-	flist->count=0;
-	flist->malloced = 1000;
-	flist->files = (struct file_struct **)malloc(sizeof(flist->files[0])*
-						     flist->malloced);
-	if (!flist->files) out_of_memory("send_file_list");
+	flist = flist_new();
 
 	if (f != -1) {
 		io_start_buffering(f);
@@ -935,10 +982,32 @@ void free_file(struct file_struct *file)
 	if (file->basename) free(file->basename);
 	if (file->link) free(file->link);
 	if (file->sum) free(file->sum);
-	memset((char *)file, 0, sizeof(*file));
+	*file = null_file;
 }
 
 
+/*
+ * allocate a new file list
+ */
+struct file_list *flist_new()
+{
+	struct file_list *flist;
+
+	flist = (struct file_list *)malloc(sizeof(flist[0]));
+	if (!flist) out_of_memory("send_file_list");
+
+	flist->count=0;
+	flist->malloced = 1000;
+	flist->files = (struct file_struct **)malloc(sizeof(flist->files[0])*
+						     flist->malloced);
+	if (!flist->files) out_of_memory("send_file_list");
+#if ARENA_SIZE > 0
+	flist->string_area = string_area_new(0);
+#else
+	flist->string_area = 0;
+#endif
+	return flist;
+}
 /*
  * free up all elements in a flist
  */
@@ -946,11 +1015,14 @@ void flist_free(struct file_list *flist)
 {
 	int i;
 	for (i=1;i<flist->count;i++) {
-		free_file(flist->files[i]);
+		if (!flist->string_area)
+			free_file(flist->files[i]);
 		free(flist->files[i]);
 	}	
 	memset((char *)flist->files, 0, sizeof(flist->files[0])*flist->count);
 	free(flist->files);
+	if (flist->string_area)
+		string_area_free(flist->string_area);
 	memset((char *)flist, 0, sizeof(*flist));
 	free(flist);
 }
@@ -979,7 +1051,13 @@ static void clean_flist(struct file_list *flist, int strip_root)
 			if (verbose > 1 && !am_server)
 				rprintf(FINFO,"removing duplicate name %s from file list %d\n",
 					f_name(flist->files[i-1]),i-1);
-			free_file(flist->files[i]);
+			/* it's not great that the flist knows the semantics of the
+			 * file memory usage, but i'd rather not add a flag byte
+			 * to that struct. XXX can i use a bit in the flags field? */
+			if (flist->string_area)
+				flist->files[i][0] = null_file;
+			else
+				free_file(flist->files[i]);
 		} 
 	}
 
