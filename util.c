@@ -775,6 +775,34 @@ void sanitize_path(char *p, char *reldir)
 	*sanp = '\0';
 }
 
+/* Works much like sanitize_path(), with these differences:  (1) a new buffer
+ * is allocated for the sanitized path rather than modifying it in-place; (2)
+ * a leading slash gets transformed into the rootdir value (which can be empty
+ * or NULL if you just want the slash to get dropped); (3) no "reldir" can be
+ * specified. */
+char *alloc_sanitize_path(const char *path, const char *rootdir)
+{
+	char *buf;
+	int rlen, plen = strlen(path);
+
+	if (*path == '/' && rootdir)
+		rlen = strlen(rootdir);
+	else
+		rlen = 0;
+	if (!(buf = new_array(char, rlen + plen + 1)))
+		out_of_memory("alloc_sanitize_path");
+	if (rlen)
+		memcpy(buf, rootdir, rlen);
+	memcpy(buf + rlen, path, plen + 1);
+
+	if (rlen)
+		rlen++;
+	sanitize_path(buf + rlen, NULL);
+	if (rlen && buf[rlen] == '.' && buf[rlen+1] == '\0')
+		buf[rlen-1] = '\0';
+
+	return buf;
+}
 
 char curr_dir[MAXPATHLEN];
 unsigned int curr_dir_len;
