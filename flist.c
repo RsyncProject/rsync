@@ -361,7 +361,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	unsigned short flags;
 	static time_t modtime;
 	static mode_t mode;
-	static DEV64_T rdev;	/* just high bytes in p28 onward */
+	static DEV64_T rdev, rdev_high;
 	static DEV64_T dev;
 	static uid_t uid;
 	static gid_t gid;
@@ -375,7 +375,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	if (!file) {
 		write_byte(f, 0);
 		modtime = 0, mode = 0;
-		rdev = 0, dev = 0;
+		rdev = 0, rdev_high = 0, dev = 0;
 		uid = 0, gid = 0;
 		*lastname = '\0';
 		return;
@@ -404,10 +404,12 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 			} else
 				rdev = 0;
 		} else if (IS_DEVICE(mode)) {
-			if ((file->u.rdev & ~0xFF) == rdev)
+			if ((file->u.rdev & ~0xFF) == rdev_high)
 				flags |= XMIT_SAME_HIGH_RDEV;
-			else
-				rdev = file->u.rdev & ~0xFF;
+			else {
+				rdev = file->u.rdev;
+				rdev_high = rdev & ~0xFF;
+			}
 		}
 	}
 	if (file->uid == uid)
@@ -484,12 +486,11 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	}
 	if (preserve_devices && IS_DEVICE(mode)) {
 		/* If XMIT_SAME_HIGH_RDEV is off, XMIT_SAME_RDEV_pre28 is
-		 * also off.  Also, avoid using "rdev" because it may be
-		 * incomplete. */
+		 * also off. */
 		if (!(flags & XMIT_SAME_HIGH_RDEV))
-			write_int(f, file->u.rdev);
+			write_int(f, rdev);
 		else if (protocol_version >= 28)
-			write_byte(f, file->u.rdev);
+			write_byte(f, rdev);
 	}
 
 #if SUPPORT_LINKS
@@ -541,7 +542,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 {
 	static time_t modtime;
 	static mode_t mode;
-	static DEV64_T rdev;	/* just high bytes in p28 onward */
+	static DEV64_T rdev, rdev_high;
 	static DEV64_T dev;
 	static uid_t uid;
 	static gid_t gid;
@@ -553,7 +554,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 
 	if (!fptr) {
 		modtime = 0, mode = 0;
-		rdev = 0, dev = 0;
+		rdev = 0, rdev_high = 0, dev = 0;
 		uid = 0, gid = 0;
 		*lastname = '\0';
 		return;
@@ -640,10 +641,11 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 				rdev = 0;
 		} else if (IS_DEVICE(mode)) {
 			if (!(flags & XMIT_SAME_HIGH_RDEV)) {
-				file->u.rdev = (DEV64_T)read_int(f);
-				rdev = file->u.rdev & ~0xFF;
+				rdev = (DEV64_T)read_int(f);
+				rdev_high = rdev & ~0xFF;
 			} else
-				file->u.rdev = rdev | (DEV64_T)read_byte(f);
+				rdev = rdev_high | (DEV64_T)read_byte(f);
+			file->u.rdev = rdev;
 		}
 	}
 
@@ -828,7 +830,7 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 		}
 	}
 #ifdef HAVE_STRUCT_STAT_ST_RDEV
-	if (IS_DEVICE(st.st_mode))
+	if (preserve_devices && IS_DEVICE(st.st_mode))
 		file->u.rdev = st.st_rdev;
 #endif
 
