@@ -827,6 +827,14 @@ const char *get_panic_action(void)
 }
 
 
+/**
+ * Handle a fatal signal by launching a debugger, controlled by $RSYNC_PANIC_ACTION.
+ *
+ * This signal handler is only installed if we were configured with
+ * --enable-maintainer-mode.  Perhaps it should always be on and we
+ * should just look at the environment variable, but I'm a bit leery
+ * of a signal sending us into a busy loop.
+ **/
 static RETSIGTYPE rsync_panic_handler(int UNUSED(whatsig))
 {
 	char cmd_buf[300];
