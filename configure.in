@@ -43,7 +43,7 @@ AC_ARG_WITH(rsync-path,
 	[ RSYNC_PATH="$with_rsync_name" ],
 	[ RSYNC_PATH="rsync" ])
 RSYNC_PATH="\"$RSYNC_PATH\""
-AC_DEFINE_UNQUOTED(RSYNC_PATH, $RSYNC_PATH)
+AC_DEFINE_UNQUOTED(RSYNC_PATH, $RSYNC_PATH, [ ])
 
 dnl Checks for programs.
 AC_PROG_CC
@@ -51,7 +51,7 @@ AC_PROG_INSTALL
 AC_SUBST(SHELL)
 
 AC_CHECK_PROG(HAVE_REMSH, remsh, 1, 0)
-AC_DEFINE_UNQUOTED(HAVE_REMSH, $HAVE_REMSH)
+AC_DEFINE_UNQUOTED(HAVE_REMSH, $HAVE_REMSH, [ ])
 
 AC_SYS_LARGEFILE
 AC_C_BIGENDIAN
@@ -77,13 +77,13 @@ AC_TYPE_SIZE_T
 AC_TYPE_PID_T
 AC_TYPE_GETGROUPS
 AC_STRUCT_ST_RDEV
-AC_CHECK_TYPE(ino_t,unsigned)
+AC_CHECK_TYPE(ino_t,unsigned, [ ])
 
 AC_CACHE_CHECK([for errno in errno.h],rsync_cv_errno, [
     AC_TRY_COMPILE([#include <errno.h>],[int i = errno],
 	rsync_cv_errno=yes,rsync_cv_have_errno_decl=no)])
 if test x"$rsync_cv_errno" = x"yes"; then
-   AC_DEFINE(HAVE_ERRNO_DECL)
+   AC_DEFINE(HAVE_ERRNO_DECL, 1, [ ])
 fi
 
 # The following test taken from the cvs sources
@@ -118,7 +118,7 @@ if test x"$ac_cv_func_connect" = x"no"; then
        test x"$ac_cv_lib_inet_connect" = x"yes"; then
         # ac_cv_func_connect=yes
         # don't!  it would cause AC_CHECK_FUNC to succeed next time configure is run
-        AC_DEFINE(HAVE_CONNECT)
+        AC_DEFINE(HAVE_CONNECT, 1, [ ])
     fi
 fi
 
@@ -146,7 +146,7 @@ AC_TRY_RUN([#include <sys/types.h>
 	    }],
 rsync_cv_HAVE_SOCKETPAIR=yes,rsync_cv_HAVE_SOCKETPAIR=no,rsync_cv_HAVE_SOCKETPAIR=cross)])
 if test x"$rsync_cv_HAVE_SOCKETPAIR" = x"yes"; then
-    AC_DEFINE(HAVE_SOCKETPAIR)
+    AC_DEFINE(HAVE_SOCKETPAIR, 1, [ ])
 fi
 
 AC_CACHE_CHECK([for working fnmatch],rsync_cv_HAVE_FNMATCH,[
@@ -155,7 +155,7 @@ main() { exit((fnmatch("*.o", "x.o", FNM_PATHNAME) == 0 &&
                fnmatch("a/b/*", "a/b/c/d", FNM_PATHNAME) != 0) ? 0: 1); }],
 rsync_cv_HAVE_FNMATCH=yes,rsync_cv_HAVE_FNMATCH=no,rsync_cv_HAVE_FNMATCH=cross)])
 if test x"$rsync_cv_HAVE_FNMATCH" = x"yes"; then
-    AC_DEFINE(HAVE_FNMATCH)
+    AC_DEFINE(HAVE_FNMATCH, 1, [ ])
 fi
 
 if test x"$with_included_popt" != x"yes"
@@ -178,7 +178,7 @@ AC_TRY_RUN([#include <stdio.h>
 main() { long long x = 1000000; x *= x; exit(((x/1000000) == 1000000)? 0: 1); }],
 rsync_cv_HAVE_LONGLONG=yes,rsync_cv_HAVE_LONGLONG=no,rsync_cv_HAVE_LONGLONG=cross)])
 if test x"$rsync_cv_HAVE_LONGLONG" = x"yes"; then
-    AC_DEFINE(HAVE_LONGLONG)
+    AC_DEFINE(HAVE_LONGLONG, 1, [ ])
 fi
 
 AC_CACHE_CHECK([for off64_t],rsync_cv_HAVE_OFF64_T,[
@@ -187,7 +187,7 @@ AC_TRY_RUN([#include <stdio.h>
 main() { struct stat64 st; off64_t s; if (sizeof(off_t) == sizeof(off64_t)) exit(1); exit((lstat64("/dev/null", &st)==0)?0:1); }],
 rsync_cv_HAVE_OFF64_T=yes,rsync_cv_HAVE_OFF64_T=no,rsync_cv_HAVE_OFF64_T=cross)])
 if test x"$rsync_cv_HAVE_OFF64_T" = x"yes"; then
-    AC_DEFINE(HAVE_OFF64_T)
+    AC_DEFINE(HAVE_OFF64_T, 1, [ ])
 fi
 
 AC_CACHE_CHECK([for short ino_t],rsync_cv_HAVE_SHORT_INO_T,[
@@ -197,7 +197,7 @@ AC_TRY_RUN([#include <stdio.h>
 main() { if (sizeof(ino_t) < sizeof(unsigned int)) return 0; return 1; }],
 rsync_cv_HAVE_SHORT_INO_T=yes,rsync_cv_HAVE_SHORT_INO_T=no,rsync_cv_HAVE_SHORT_INO_T=cross)])
 if test x"$rsync_cv_HAVE_SHORT_INO_T" = x"yes"; then
-    AC_DEFINE(HAVE_SHORT_INO_T)
+    AC_DEFINE(HAVE_SHORT_INO_T, 1, [ ])
 fi
 
 AC_CACHE_CHECK([for unsigned char],rsync_cv_HAVE_UNSIGNED_CHAR,[
@@ -205,7 +205,7 @@ AC_TRY_RUN([#include <stdio.h>
 main() { char c; c=250; exit((c > 0)?0:1); }],
 rsync_cv_HAVE_UNSIGNED_CHAR=yes,rsync_cv_HAVE_UNSIGNED_CHAR=no,rsync_cv_HAVE_UNSIGNED_CHAR=cross)])
 if test x"$rsync_cv_HAVE_UNSIGNED_CHAR" = x"yes"; then
-    AC_DEFINE(HAVE_UNSIGNED_CHAR)
+    AC_DEFINE(HAVE_UNSIGNED_CHAR, 1, [ ])
 fi
 
 AC_CACHE_CHECK([for broken readdir],rsync_cv_HAVE_BROKEN_READDIR,[
@@ -216,7 +216,7 @@ if (di && di->d_name[-2] == '.' && di->d_name[-1] == 0 &&
 di->d_name[0] == 0) exit(0); exit(1);} ],
 rsync_cv_HAVE_BROKEN_READDIR=yes,rsync_cv_HAVE_BROKEN_READDIR=no,rsync_cv_HAVE_BROKEN_READDIR=cross)])
 if test x"$rsync_cv_HAVE_BROKEN_READDIR" = x"yes"; then
-    AC_DEFINE(HAVE_BROKEN_READDIR)
+    AC_DEFINE(HAVE_BROKEN_READDIR, 1, [ ])
 fi
 
 AC_CACHE_CHECK([for utimbuf],rsync_cv_HAVE_UTIMBUF,[
@@ -225,7 +225,7 @@ AC_TRY_COMPILE([#include <sys/types.h>
 [struct utimbuf tbuf;  tbuf.actime = 0; tbuf.modtime = 1; exit(utime("foo.c",&tbuf));],
 rsync_cv_HAVE_UTIMBUF=yes,rsync_cv_HAVE_UTIMBUF=no,rsync_cv_HAVE_UTIMBUF=cross)])
 if test x"$rsync_cv_HAVE_UTIMBUF" = x"yes"; then
-    AC_DEFINE(HAVE_UTIMBUF)
+    AC_DEFINE(HAVE_UTIMBUF, 1, [ ])
 fi
 
 AC_CACHE_CHECK([if gettimeofday takes tz argument],rsync_cv_HAVE_GETTIMEOFDAY_TZ,[
@@ -235,7 +235,7 @@ AC_TRY_RUN([
 main() { struct timeval tv; exit(gettimeofday(&tv, NULL));}],
            rsync_cv_HAVE_GETTIMEOFDAY_TZ=yes,rsync_cv_HAVE_GETTIMEOFDAY_TZ=no,rsync_cv_HAVE_GETTIMEOFDAY_TZ=cross)])
 if test x"$rsync_cv_HAVE_GETTIMEOFDAY_TZ" = x"yes"; then
-    AC_DEFINE(HAVE_GETTIMEOFDAY_TZ)
+    AC_DEFINE(HAVE_GETTIMEOFDAY_TZ, 1, [ ])
 fi
 
 AC_CACHE_CHECK([for C99 vsnprintf],rsync_cv_HAVE_C99_VSNPRINTF,[
@@ -260,7 +260,7 @@ main() { foo("hello"); }
 ],
 rsync_cv_HAVE_C99_VSNPRINTF=yes,rsync_cv_HAVE_C99_VSNPRINTF=no,rsync_cv_HAVE_C99_VSNPRINTF=cross)])
 if test x"$rsync_cv_HAVE_C99_VSNPRINTF" = x"yes"; then
-    AC_DEFINE(HAVE_C99_VSNPRINTF)
+    AC_DEFINE(HAVE_C99_VSNPRINTF, 1, [ ])
 fi
 
 
@@ -283,7 +283,7 @@ rsync_cv_HAVE_SECURE_MKSTEMP=yes,
 rsync_cv_HAVE_SECURE_MKSTEMP=no,
 rsync_cv_HAVE_SECURE_MKSTEMP=cross)])
 if test x"$rsync_cv_HAVE_SECURE_MKSTEMP" = x"yes"; then
-    AC_DEFINE(HAVE_SECURE_MKSTEMP)
+    AC_DEFINE(HAVE_SECURE_MKSTEMP, 1, [ ])
 fi
 
 
@@ -299,7 +299,7 @@ if (strcmp(inet_ntoa(ip),"18.52.86.120") &&
 exit(0);}],
            rsync_cv_REPLACE_INET_NTOA=no,rsync_cv_REPLACE_INET_NTOA=yes,rsync_cv_REPLACE_INET_NTOA=cross)])
 if test x"$rsync_cv_REPLACE_INET_NTOA" = x"yes"; then
-    AC_DEFINE(REPLACE_INET_NTOA)
+    AC_DEFINE(REPLACE_INET_NTOA, 1, [ ])
 fi
 
 
@@ -313,7 +313,7 @@ main() { struct in_addr ip;
 if (inet_aton("example", &ip) == 0) exit(0); exit(1);}],
            rsync_cv_REPLACE_INET_ATON=no,rsync_cv_REPLACE_INET_ATON=yes,rsync_cv_REPLACE_INET_ATON=cross)])
 if test x"$rsync_cv_REPLACE_INET_ATON" = x"yes"; then
-    AC_DEFINE(REPLACE_INET_ATON)
+    AC_DEFINE(REPLACE_INET_ATON, 1, [ ])
 fi
 
 #
