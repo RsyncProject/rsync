@@ -384,10 +384,10 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
       }
       statret = -1;
     }
-    if (statret != 0 && mkdir(fname,file->mode) != 0 && errno != EEXIST) {
+    if (statret != 0 && do_mkdir(fname,file->mode) != 0 && errno != EEXIST) {
 	    if (!(relative_paths && errno==ENOENT && 
 		  create_directory_path(fname)==0 && 
-		  mkdir(fname,file->mode)==0)) {
+		  do_mkdir(fname,file->mode)==0)) {
 		    fprintf(FERROR,"mkdir %s : %s (2)\n",
 			    fname,strerror(errno));
 	    }
@@ -834,7 +834,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
       } else {
 	      sprintf(fnametmp,"%s.XXXXXX",fname);
       }
-      if (NULL == mktemp(fnametmp)) {
+      if (NULL == do_mktemp(fnametmp)) {
 	fprintf(FERROR,"mktemp %s failed\n",fnametmp);
 	receive_data(f_in,buf,-1,NULL);
 	if (buf) unmap_file(buf);
@@ -878,14 +878,14 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		continue;
 	}
 	sprintf(fnamebak,"%s%s",fname,backup_suffix);
-	if (rename(fname,fnamebak) != 0 && errno != ENOENT) {
+	if (do_rename(fname,fnamebak) != 0 && errno != ENOENT) {
 	  fprintf(FERROR,"rename %s %s : %s\n",fname,fnamebak,strerror(errno));
 	  continue;
 	}
       }
 
       /* move tmp file over real file */
-      if (rename(fnametmp,fname) != 0) {
+      if (do_rename(fnametmp,fname) != 0) {
 	      if (errno == EXDEV) {
 		      /* rename failed on cross-filesystem link.  
 			 Copy the file instead. */

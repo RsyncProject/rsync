@@ -296,7 +296,7 @@ static char *get_local_name(struct file_list *flist,char *name)
   if (!name) 
     return NULL;
 
-  if (mkdir(name,0777 & ~orig_umask) != 0) {
+  if (do_mkdir(name,0777 & ~orig_umask) != 0) {
     fprintf(FERROR,"mkdir %s : %s (1)\n",name,strerror(errno));
     exit_cleanup(1);
   } else {

@@ -298,7 +298,7 @@ int create_directory_path(char *fname)
 	p = fname;
 	while ((p=strchr(p,'/'))) {
 		*p = 0;
-		mkdir(fname,0777 & ~orig_umask); 
+		do_mkdir(fname,0777 & ~orig_umask); 
 		*p = '/';
 		p++;
 	}

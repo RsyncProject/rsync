@@ -77,3 +77,21 @@ int do_chmod(const char *path, mode_t mode)
 	return chmod(path, mode);
 }
 #endif
+
+int do_rename(char *fname1, char *fname2)
+{
+	if (dry_run) return 0;
+	return rename(fname1, fname2);
+}
+
+int do_mkdir(char *fname, mode_t mode)
+{
+	if (dry_run) return 0;
+	return mkdir(fname, mode);
+}
+
+char *do_mktemp(char *template)
+{
+	if (dry_run) return NULL;
+	return mktemp(template);
+}
