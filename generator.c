@@ -36,6 +36,8 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int update_only;
 extern int opt_ignore_existing;
+extern int inplace;
+extern int make_backups;
 extern int csum_length;
 extern int ignore_times;
 extern int size_only;
@@ -198,7 +200,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
  *
  * Generate approximately one checksum every block_len bytes.
  */
-static void generate_and_send_sums(int fd, OFF_T len, int f_out)
+static void generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 {
 	size_t i;
 	struct map_struct *mapbuf;
@@ -219,6 +221,9 @@ static void generate_and_send_sums(int fd, OFF_T len, int f_out)
 		char *map = map_ptr(mapbuf, offset, n1);
 		uint32 sum1 = get_checksum1(map, n1);
 		char sum2[SUM_LENGTH];
+
+		if (f_copy >= 0)
+			full_write(f_copy, map, n1);
 
 		get_checksum2(map, n1, sum2);
 
@@ -251,10 +256,11 @@ static void generate_and_send_sums(int fd, OFF_T len, int f_out)
 static void recv_generator(char *fname, struct file_struct *file, int i,
 			   int f_out)
 {
-	int fd;
+	int fd, f_copy;
 	STRUCT_STAT st, partial_st;
+	struct file_struct *back_file;
 	int statret, stat_errno;
-	char *fnamecmp, *partialptr;
+	char *fnamecmp, *partialptr, *backupptr;
 	char fnamecmpbuf[MAXPATHLEN];
 
 	if (list_only)
@@ -513,12 +519,43 @@ prepare_to_open:
 	if (fd == -1) {
 		rsyserr(FERROR, errno, "failed to open %s, continuing",
 			full_fname(fnamecmp));
+	    pretend_missing:
 		/* pretend the file didn't exist */
 		if (preserve_hard_links && hard_link_check(file, HL_SKIP))
 			return;
 		write_int(f_out,i);
 		write_sum_head(f_out, NULL);
 		return;
+	}
+
+	if (inplace && make_backups) {
+		if (!(backupptr = get_backup_name(fname))) {
+			close(fd);
+			return;
+		}
+		if (!(back_file = make_file(fname, NULL, NO_EXCLUDES))) {
+			close(fd);
+			goto pretend_missing;
+		}
+		if (robust_unlink(backupptr) && errno != ENOENT) {
+			rsyserr(FERROR, errno, "unlink %s",
+				full_fname(backupptr));
+			free(back_file);
+			close(fd);
+			return;
+		}
+		if ((f_copy = do_open(backupptr,
+		    O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0) {
+			rsyserr(FERROR, errno, "open %s",
+				full_fname(backupptr));
+			free(back_file);
+			close(fd);
+			return;
+		}
+	} else {
+		backupptr = NULL;
+		back_file = NULL;
+		f_copy = -1;
 	}
 
 	if (verbose > 3) {
@@ -530,7 +567,13 @@ prepare_to_open:
 		rprintf(FINFO, "generating and sending sums for %d\n", i);
 
 	write_int(f_out,i);
-	generate_and_send_sums(fd, st.st_size, f_out);
+	generate_and_send_sums(fd, st.st_size, f_out, f_copy);
+
+	if (f_copy >= 0) {
+		close(f_copy);
+		set_perms(backupptr, back_file, NULL, 0);
+		free(back_file);
+	}
 
 	close(fd);
 }
