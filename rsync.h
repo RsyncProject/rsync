@@ -623,6 +623,10 @@ void rsyserr(enum logcode, int, const char *, ...)
 #define inet_ntoa rep_inet_ntoa
 #endif
 
+/* Make sure that the O_BINARY flag is defined. */
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
 
 #ifndef HAVE_STRLCPY
 size_t strlcpy(char *d, const char *s, size_t bufsize);
