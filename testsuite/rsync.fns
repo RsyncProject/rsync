@@ -261,5 +261,11 @@ is_a_link() {
     test -L "$1" || test -h "$1" || /usr/bin/test -L "$1" || /usr/bin/test -h "$1"
 }
 
-# be reproducible
-umask 077
+
+# We need to set the umask to be reproducible.  Note also that when we
+# do some daemon tests as root, we will setuid() and therefore the
+# directory has to be writable by the nobody user in some cases.  The
+# best thing is probably to explicitly chmod those directories after
+# creation.
+ 
+umask 022
