@@ -319,6 +319,7 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 	int fd_count, count;
 	struct timeval tv;
 	int reading;
+	int blocked=0;
 
 	no_flush++;
 
@@ -350,7 +351,8 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 		}
 
 		if (FD_ISSET(fd, &w_fds)) {
-			int ret = write(fd,buf+total,len-total);
+			int n = (len-total)>>blocked;
+			int ret = write(fd,buf+total,n?n:1);
 
 			if (ret == -1 && errno == EINTR) {
 				continue;
@@ -358,10 +360,7 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 
 			if (ret == -1 && 
 			    (errno == EAGAIN || errno == EWOULDBLOCK)) {
-				/* this shouldn't happen, if it does then
-				   sleep for a short time to prevent us
-				   chewing too much CPU */
-				u_sleep(100);
+				blocked++;
 				continue;
 			}
 
@@ -370,6 +369,7 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 				exit_cleanup(1);
 			}
 
+			blocked = 0;
 			total += ret;
 			stats.total_written += ret;
 
