@@ -14,8 +14,8 @@
 # build farm rsync will be installed, but into a scratch /usr.
 
 # srcdir gives the location of the source tree, which lets us find the
-# build scripts.  It might be relative, so we need to make it
-# absolute.
+# build scripts.  At the moment we assume we are invoked from the
+# source directory.
 
 # testdir is a scratch directory for holding temporary test files.
 
@@ -31,8 +31,8 @@ fi
 
 testdir=`cd $testdir && pwd`
 
-echo "srcdir is originally $srcdir"
-srcdir=`cd $srcdir && pwd`
+echo "srcdir is originally \"$srcdir\""
+srcdir=`cd "$srcdir" && pwd`
 
 echo "============================================================"
 echo "$0 running in `pwd`"
@@ -50,15 +50,14 @@ missing=0
 passed=0
 failed=0
 
-suitedir="$srcdir/testsuite"
-cd "$suitedir"
+suitedir=`cd ./testsuite && pwd`
 echo "    suitedir=$suitedir"
 
 . "$suitedir/config.sh"
 
 for testbase in $test_names
 do
-    testscript="./$testbase.test"
+    testscript="$suitedir/$testbase.test"
     if test \! -f "$testscript" 
     then
 	echo "$testscript does not exist" >&2
@@ -69,7 +68,7 @@ do
     echo "------------------------------------------------------------"
     echo "----- $testbase running"
 
-    if sh $testscript
+    if sh "$testscript"
     then
 	echo "----- $testbase completed succesfully"
 	passed=`expr $passed + 1`
