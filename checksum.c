@@ -135,13 +135,13 @@ static int sumresidue;
 static char sumrbuf[CSUM_CHUNK];
 static struct mdfour md;
 
-void sum_init(void)
+void sum_init(int seed)
 {
 	char s[4];
 	mdfour_begin(&md);
-	sumresidue=0;
-	SIVAL(s,0,checksum_seed);
-	sum_update(s,4);
+	sumresidue = 0;
+	SIVAL(s, 0, seed);
+	sum_update(s, 4);
 }
 
 /**

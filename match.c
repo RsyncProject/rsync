@@ -22,6 +22,7 @@
 extern int verbose;
 extern int am_server;
 extern int do_progress;
+extern int checksum_seed;
 
 typedef unsigned short tag;
 
@@ -299,7 +300,7 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	matches = 0;
 	data_transfer = 0;
 
-	sum_init();
+	sum_init(checksum_seed);
 
 	if (len > 0 && s->count>0) {
 		build_hash_table(s);

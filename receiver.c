@@ -46,6 +46,7 @@ extern int module_id;
 extern int ignore_errors;
 extern int orig_umask;
 extern int keep_partial;
+extern int checksum_seed;
 
 static void delete_one(char *fn, int is_dir)
 {
@@ -206,7 +207,7 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
 
 	read_sum_head(f_in, &sum);
 
-	sum_init();
+	sum_init(checksum_seed);
 
 	while ((i = recv_token(f_in, &data)) != 0) {
 		if (do_progress)
