@@ -83,3 +83,6 @@ rsync changes since last release
 
     * Updated included popt to the latest vendor drop, version 1.6.4.
       (Jos Backus)
+
+    * Updated config.guess and config.sub to latest versions; this
+      means rsync should build on more platforms.  (Paul Green)
