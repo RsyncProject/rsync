@@ -112,8 +112,6 @@
 #define FULL_FLUSH	1
 #define NORMAL_FLUSH	0
 
-#define CLEAR_STRUCT	0
-#define FREE_STRUCT	1
 
 /* Log-message categories.  FLOG is only used on the daemon side to
  * output messages to the log file. */
@@ -254,6 +252,7 @@ enum msgcode {
 
 #include <assert.h>
 
+#include "lib/pool_alloc.h"
 
 #define BOOL int
 
@@ -434,10 +433,27 @@ struct file_struct {
  */
 #define FLIST_START	(32 * 1024)
 #define FLIST_LINEAR	(FLIST_START * 512)
+/*
+ * Extent size for allocation pools A minimum size of 128KB
+ * is needed to mmap them so that freeing will release the
+ * space to the OS.
+ *
+ * Larger sizes reduce leftover fragments and speed free calls
+ * (when they happen) Smaller sizes increase the chance of
+ * freed allocations freeing whole extents.
+ */
+
+#define FILE_EXTENT	(256 * 1024)
+#define HLINK_EXTENT	(128 * 1024)
+
+#define WITH_HLINK	1
+#define WITHOUT_HLINK	0
 
 struct file_list {
 	int count;
 	int malloced;
+	alloc_pool_t file_pool;
+	alloc_pool_t hlink_pool;
 	struct file_struct **files;
 };
 

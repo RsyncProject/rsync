@@ -27,7 +27,7 @@ VERSION=@VERSION@
 
 HEADERS=byteorder.h config.h errcode.h proto.h rsync.h
 LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o \
-	lib/permstring.o @LIBOBJS@
+	lib/permstring.o lib/pool_alloc.o @LIBOBJS@
 ZLIBOBJ=zlib/deflate.o zlib/infblock.o zlib/infcodes.o zlib/inffast.o \
 	zlib/inflate.o zlib/inftrees.o zlib/infutil.o zlib/trees.o \
 	zlib/zutil.o zlib/adler32.o

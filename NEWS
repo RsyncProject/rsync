@@ -100,6 +100,10 @@ Changes since 2.6.0:
 
     * Less memory is used in the file list (a per-file savings).
 
+    * Changed hardlink info and file_struct + strings to use
+      allocation pools.  This reduces memory use for large
+      filesets and permits freeing memory to the OS.  (J.W. Schultz) 
+
     * The 2 pipes used between the receiver and generator processes
       (which are forked on the same machine) were reduced to 1 pipe
       and the protocol improved so that (1) it is now impossible to

@@ -71,18 +71,17 @@ extern struct exclude_struct **local_exclude_list;
 int io_error;
 
 static char empty_sum[MD4_SUM_LENGTH];
-static unsigned int min_file_struct_len;
+static unsigned int file_struct_len;
 
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
 static void output_flist(struct file_list *flist);
-
 
 void init_flist(void)
 {
 	struct file_struct f;
 
 	/* Figure out how big the file_struct is without trailing padding */
-	min_file_struct_len = ((char*)&f.flags - (char*)&f) + sizeof f.flags;
+	file_struct_len = ((char*)&f.flags - (char*)&f) + sizeof f.flags;
 }
 
 
@@ -507,7 +506,8 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 
 
 
-void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
+void receive_file_entry(struct file_struct **fptr, unsigned short flags,
+    struct file_list *flist, int f)
 {
 	static time_t modtime;
 	static mode_t mode;
@@ -520,7 +520,6 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 	char thisname[MAXPATHLEN];
 	unsigned int l1 = 0, l2 = 0;
 	int alloc_len, basename_len, dirname_len, linkname_len, sum_len;
-	int file_struct_len, idev_len;
 	OFF_T file_length;
 	char *basename, *dirname, *bp;
 	struct file_struct *file;
@@ -614,24 +613,14 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 #endif
 		linkname_len = 0;
 
-#if SUPPORT_HARD_LINKS
-	if (preserve_hard_links && protocol_version < 28 && S_ISREG(mode))
-		flags |= XMIT_HAS_IDEV_DATA;
-	if (flags & XMIT_HAS_IDEV_DATA)
-		idev_len = sizeof (struct idev);
-	else
-#endif
-		idev_len = 0;
-
 	sum_len = always_checksum && S_ISREG(mode) ? MD4_SUM_LENGTH : 0;
-	file_struct_len = idev_len? sizeof file[0] : min_file_struct_len;
 
 	alloc_len = file_struct_len + dirname_len + basename_len
-		  + linkname_len + sum_len + idev_len;
-	if (!(bp = new_array(char, alloc_len)))
-		out_of_memory("receive_file_entry");
+		  + linkname_len + sum_len;
+	bp = pool_alloc(flist->file_pool, alloc_len, "receive_file_entry");
+
 	file = *fptr = (struct file_struct *)bp;
-	memset(bp, 0, min_file_struct_len);
+	memset(bp, 0, file_struct_len);
 	bp += file_struct_len;
 
 	file->flags = flags & XMIT_TOP_DIR ? FLAG_TOP_DIR : 0;
@@ -640,13 +629,6 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 	file->mode = mode;
 	file->uid = uid;
 	file->gid = gid;
-
-#if SUPPORT_HARD_LINKS
-	if (idev_len) {
-		file->link_u.idev = (struct idev *)bp;
-		bp += idev_len;
-	}
-#endif
 
 	if (dirname_len) {
 		file->dirname = lastdir = bp;
@@ -675,16 +657,24 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 #endif
 
 #if SUPPORT_HARD_LINKS
-	if (idev_len) {
+	if (preserve_hard_links && protocol_version < 28 && S_ISREG(mode))
+		flags |= XMIT_HAS_IDEV_DATA;
+	if (flags & XMIT_HAS_IDEV_DATA && flist->hlink_pool) {
+		INO64_T inode;
+		file->link_u.idev = pool_talloc(flist->hlink_pool,
+		    struct idev, 1, "inode_table");
 		if (protocol_version < 26) {
 			dev = read_int(f);
-			file->F_INODE = read_int(f);
+			inode = read_int(f);
 		} else {
 			if (!(flags & XMIT_SAME_DEV))
 				dev = read_longint(f);
-			file->F_INODE = read_longint(f);
+			inode = read_longint(f);
 		}
-		file->F_DEV = dev;
+		if (flist->hlink_pool) {
+			file->F_INODE = inode;
+			file->F_DEV = dev;
+		}
 	}
 #endif
 
@@ -728,7 +718,8 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
  * statting directories if we're not recursing, but this is not a very
  * important case.  Some systems may not have d_type.
  **/
-struct file_struct *make_file(char *fname, int exclude_level)
+struct file_struct *make_file(char *fname,
+    struct file_list *flist, int exclude_level)
 {
 	static char *lastdir;
 	static int lastdir_len = -1;
@@ -738,9 +729,9 @@ struct file_struct *make_file(char *fname, int exclude_level)
 	char thisname[MAXPATHLEN];
 	char linkname[MAXPATHLEN];
 	int alloc_len, basename_len, dirname_len, linkname_len, sum_len;
-	int file_struct_len, idev_len;
 	char *basename, *dirname, *bp;
 	unsigned short flags = 0;
+
 
 	if (strlcpy(thisname, fname, sizeof thisname)
 	    >= sizeof thisname - flist_dir_len) {
@@ -820,32 +811,20 @@ struct file_struct *make_file(char *fname, int exclude_level)
 	linkname_len = 0;
 #endif
 
-#if SUPPORT_HARD_LINKS
-	if (preserve_hard_links) {
-		if (protocol_version < 28) {
-			if (S_ISREG(st.st_mode))
-				idev_len = sizeof (struct idev);
-			else
-				idev_len = 0;
-		} else {
-			if (!S_ISDIR(st.st_mode) && st.st_nlink > 1)
-				idev_len = sizeof (struct idev);
-			else
-				idev_len = 0;
-		}
-	} else
-#endif
-		idev_len = 0;
-
 	sum_len = always_checksum && S_ISREG(st.st_mode) ? MD4_SUM_LENGTH : 0;
-	file_struct_len = idev_len? sizeof file[0] : min_file_struct_len;
 
 	alloc_len = file_struct_len + dirname_len + basename_len
-		  + linkname_len + sum_len + idev_len;
-	if (!(bp = new_array(char, alloc_len)))
-		out_of_memory("receive_file_entry");
+	    + linkname_len + sum_len;
+	if (flist) {
+		bp = pool_alloc(flist->file_pool, alloc_len,
+		    "receive_file_entry");
+	} else {
+		if (!(bp = new_array(char, alloc_len)))
+			out_of_memory("receive_file_entry");
+	}
+
 	file = (struct file_struct *)bp;
-	memset(bp, 0, min_file_struct_len);
+	memset(bp, 0, file_struct_len);
 	bp += file_struct_len;
 
 	file->flags = flags;
@@ -856,9 +835,20 @@ struct file_struct *make_file(char *fname, int exclude_level)
 	file->gid = st.st_gid;
 
 #if SUPPORT_HARD_LINKS
-	if (idev_len) {
-		file->link_u.idev = (struct idev *)bp;
-		bp += idev_len;
+	if (flist && flist->hlink_pool) {
+		if (protocol_version < 28) {
+			if (S_ISREG(st.st_mode))
+				file->link_u.idev = pool_talloc(
+				    flist->hlink_pool, struct idev, 1,
+				    "inode_table");
+		} else {
+			if (!S_ISDIR(st.st_mode) && st.st_nlink > 1)
+				file->link_u.idev = pool_talloc(
+				    flist->hlink_pool, struct idev, 1,
+				    "inode_table");
+		}
+	}
+	if (file->link_u.idev) {
 		file->F_DEV = st.st_dev;
 		file->F_INODE = st.st_ino;
 	}
@@ -913,9 +903,8 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 	extern int delete_excluded;
 
 	/* f is set to -1 when calculating deletion file list */
-	file = make_file(fname,
-			 f == -1 && delete_excluded? SERVER_EXCLUDES
-						   : ALL_EXCLUDES);
+	file = make_file(fname, flist,
+	    f == -1 && delete_excluded? SERVER_EXCLUDES : ALL_EXCLUDES);
 
 	if (!file)
 		return;
@@ -1034,7 +1023,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 	start_write = stats.total_written;
 
-	flist = flist_new();
+	flist = flist_new(f == -1 ? WITHOUT_HLINK : WITH_HLINK,
+	    "send_file_list");
 
 	if (f != -1) {
 		io_start_buffering_out(f);
@@ -1185,6 +1175,12 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			finish_filelist_progress(flist);
 	}
 
+	if (flist->hlink_pool)
+	{
+		pool_destroy(flist->hlink_pool);
+		flist->hlink_pool = NULL;
+	}
+
 	clean_flist(flist, 0, 0);
 
 	if (f != -1) {
@@ -1224,9 +1220,7 @@ struct file_list *recv_file_list(int f)
 
 	start_read = stats.total_read;
 
-	flist = new(struct file_list);
-	if (!flist)
-		goto oom;
+	flist = flist_new(WITH_HLINK, "recv_file_list");
 
 	flist->count = 0;
 	flist->malloced = 1000;
@@ -1242,7 +1236,7 @@ struct file_list *recv_file_list(int f)
 
 		if (protocol_version >= 28 && (flags & XMIT_EXTENDED_FLAGS))
 			flags |= read_byte(f) << 8;
-		receive_file_entry(&flist->files[i], flags, f);
+		receive_file_entry(&flist->files[i], flags, flist, f);
 
 		if (S_ISREG(flist->files[i]->mode))
 			stats.total_size += flist->files[i]->length;
@@ -1256,7 +1250,7 @@ struct file_list *recv_file_list(int f)
 				f_name(flist->files[i]));
 		}
 	}
-	receive_file_entry(NULL, 0, 0); /* Signal that we're done. */
+	receive_file_entry(NULL, 0, NULL, 0); /* Signal that we're done. */
 
 	if (verbose > 2)
 		rprintf(FINFO, "received %d names\n", flist->count);
@@ -1345,34 +1339,42 @@ int flist_find(struct file_list *flist, struct file_struct *f)
 	return -1;
 }
 
-
 /*
- * Free up any resources a file_struct has allocated, and optionally free
- * it up as well.
+ * Free up any resources a file_struct has allocated
+ * and clear the file.
  */
-void free_file(struct file_struct *file, int free_the_struct)
+void clear_file(int i, struct file_list *flist)
 {
-	if (free_the_struct)
-		free(file);
-	else
-		memset(file, 0, min_file_struct_len);
+	if (flist->hlink_pool && flist->files[i]->link_u.idev)
+		pool_free(flist->hlink_pool, 0, flist->files[i]->link_u.idev);
+	memset(flist->files[i], 0, file_struct_len);
 }
 
 
 /*
  * allocate a new file list
  */
-struct file_list *flist_new(void)
+struct file_list *flist_new(int with_hlink, char *msg)
 {
 	struct file_list *flist;
 
 	flist = new(struct file_list);
 	if (!flist)
-		out_of_memory("send_file_list");
+		out_of_memory(msg);
 
-	flist->count = 0;
-	flist->malloced = 0;
-	flist->files = NULL;
+	memset(flist, 0, sizeof (struct file_list));
+
+	if (!(flist->file_pool = pool_create(FILE_EXTENT, 0,
+	    out_of_memory, POOL_INTERN)))
+		out_of_memory(msg);
+
+#if SUPPORT_HARD_LINKS
+	if (with_hlink && preserve_hard_links) {
+		if (!(flist->hlink_pool = pool_create(HLINK_EXTENT, 
+		    sizeof (struct idev), out_of_memory, POOL_INTERN)))
+			out_of_memory(msg);
+	}
+#endif
 
 	return flist;
 }
@@ -1382,9 +1384,8 @@ struct file_list *flist_new(void)
  */
 void flist_free(struct file_list *flist)
 {
-	int i;
-	for (i = 1; i < flist->count; i++)
-		free_file(flist->files[i], FREE_STRUCT);
+	pool_destroy(flist->file_pool);
+	pool_destroy(flist->hlink_pool);
 	free(flist->files);
 	free(flist);
 }
@@ -1424,7 +1425,8 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			 * else deletions will mysteriously fail with -R). */
 			if (flist->files[i]->flags & FLAG_TOP_DIR)
 				flist->files[prev_i]->flags |= FLAG_TOP_DIR;
-			free_file(flist->files[i], CLEAR_STRUCT);
+
+			clear_file(i, flist);
 		} else
 			prev_i = i;
 	}

@@ -136,9 +136,7 @@ struct file_list *create_flist_from_batch(void)
 		exit_cleanup(1);
 	}
 
-	batch_flist = new(struct file_list);
-	if (!batch_flist)
-		out_of_memory("create_flist_from_batch");
+	batch_flist = flist_new(WITH_HLINK, "create_flist_from_batch");
 
 	save_read = stats.total_read;
 	save_pv = protocol_version;
@@ -150,9 +148,9 @@ struct file_list *create_flist_from_batch(void)
 	for (i = 0; (flags = read_byte(f)) != 0; i++) {
 		if (protocol_version >= 28 && (flags & XMIT_EXTENDED_FLAGS))
 			flags |= read_byte(f) << 8;
-		receive_file_entry(&batch_flist->files[i], flags, f);
+		receive_file_entry(&batch_flist->files[i], flags, batch_flist, f);
 	}
-	receive_file_entry(NULL, 0, 0); /* Signal that we're done. */
+	receive_file_entry(NULL, 0, NULL, 0); /* Signal that we're done. */
 
 	protocol_version = save_pv;
 	stats.total_read = save_read;

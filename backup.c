@@ -189,6 +189,7 @@ static int keep_backup(char *fname)
 			backup_dir[--backup_dir_len] = '\0';
 		if (verbose > 0)
 			rprintf(FINFO, "backup_dir is %s\n", backup_dir);
+
 		initialised = 1;
 	}
 
@@ -199,7 +200,7 @@ static int keep_backup(char *fname)
 	if (do_stat(fname, &st)) return 1;
 #endif
 
-	file = make_file(fname, NO_EXCLUDES);
+	file = make_file(fname, NULL, NO_EXCLUDES);
 
 	/* the file could have disappeared */
 	if (!file) return 1;
@@ -282,7 +283,7 @@ static int keep_backup(char *fname)
 		}
 	}
 	set_perms(keep_name, file, NULL, 0);
-	free_file(file, FREE_STRUCT);
+	free(file);
 
 	if (verbose > 1)
 		rprintf(FINFO, "keep_backup %s -> %s\n", fname, keep_name);
