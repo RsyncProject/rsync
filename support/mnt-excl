@@ -8,6 +8,7 @@
 #
 # mnt-excl /dir | rsync --exclude-from=- ... /dir /dest/
 # mnt-excl /dir/ | rsync --exclude-from=- ... /dir/ /dest/
+# ssh host mnt-excl /dir | rsync --exclude-from=- ... host:/dir /dest/
 #
 # Imagine that /dir/foo is a mount point: the first invocation of
 # mnt-excl would have output /dir/foo, while the second would have
