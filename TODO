@@ -41,6 +41,17 @@ Performance
 
 IPv6
 
+  Implement suggestions from http://www.kame.net/newsletter/19980604/
+  and ftp://ftp.iij.ad.jp/pub/RFC/rfc2553.txt
+
+  If a host has multiple addresses, then listen try to connect to all
+  in order until we get through.  (getaddrinfo may return multiple
+  addresses.)
+
+  Possibly also when starting as a server we may need to listen on
+  multiple passive addresses.  This might be a bit harder, because we
+  may need to select on all of them.  Hm.
+
   Define a syntax for IPv6 literal addresses.  Since they include
   colons, they tend to break most naming systems, including ours.
   Based on the HTTP IPv6 syntax, I think we should use
