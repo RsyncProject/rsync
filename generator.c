@@ -100,31 +100,15 @@ static int adapt_block_size(struct file_struct *file, int bsize)
 
 
 /*
-  send a sums struct down a fd
+  send a header that says "we have no checksums" down the f_out fd
   */
-static void send_sums(struct sum_struct *s, int f_out)
+static void send_null_sums(int f_out)
 {
-	if (s) {
-		size_t i;
-
-		/* tell the other guy how many we are going to be
-		   doing and how many bytes there are in the last
-		   chunk */
-		write_int(f_out, s->count);
-		write_int(f_out, s->n);
-		write_int(f_out, s->remainder);
-
-		for (i = 0; i < s->count; i++) {
-			write_int(f_out, s->sums[i].sum1);
-			write_buf(f_out, s->sums[i].sum2, csum_length);
-		}
-	} else {
-		/* we don't have checksums */
-		write_int(f_out, 0);
-		write_int(f_out, block_size);
-		write_int(f_out, 0);
-	}
+	write_int(f_out, 0);
+	write_int(f_out, block_size);
+	write_int(f_out, 0);
 }
+
 
 
 /**
@@ -157,71 +141,52 @@ static BOOL disable_deltas_p(void)
 }
 
 
-/**
- * Generate a stream of signatures/checksums that describe a buffer.
+/*
+ * Generate and send a stream of signatures/checksums that describe a buffer
  *
- * Generate approximately one checksum every @p n bytes.
- *
- * @return Newly-allocated sum_struct
- **/
-static struct sum_struct *generate_sums(struct map_struct *buf, OFF_T len,
-					int n)
+ * Generate approximately one checksum every block_len bytes.
+ */
+static void generate_and_send_sums(struct map_struct *buf, OFF_T len,
+				   int block_len, int f_out)
 {
-	int i;
-	struct sum_struct *s;
-	int count;
-	int block_len = n;
-	int remainder = (len % block_len);
+	size_t i;
+	struct sum_struct sum;
 	OFF_T offset = 0;
 
-	count = (len + (block_len - 1)) / block_len;
+	sum.count = (len + (block_len - 1)) / block_len;
+	sum.remainder = (len % block_len);
+	sum.n = block_len;
+	sum.flength = len;
+	/* not needed here  sum.sums = NULL; */
 
-	s = (struct sum_struct *) malloc(sizeof(*s));
-	if (!s)
-		out_of_memory("generate_sums");
-
-	s->count = count;
-	s->remainder = remainder;
-	s->n = n;
-	s->flength = len;
-
-	if (count == 0) {
-		s->sums = NULL;
-		return s;
-	}
-
-	if (verbose > 3) {
+	if (sum.count && verbose > 3) {
 		rprintf(FINFO, "count=%ld rem=%ld n=%ld flength=%.0f\n",
-			(long) s->count, (long) s->remainder,
-			(long) s->n, (double) s->flength);
+			(long) sum.count, (long) sum.remainder,
+			(long) sum.n, (double) sum.flength);
 	}
 
-	s->sums = (struct sum_buf *) malloc(sizeof(s->sums[0]) * s->count);
-	if (!s->sums)
-		out_of_memory("generate_sums");
+	write_int(f_out, sum.count);
+	write_int(f_out, sum.n);
+	write_int(f_out, sum.remainder);
 
-	for (i = 0; i < count; i++) {
-		int n1 = MIN(len, n);
+	for (i = 0; i < sum.count; i++) {
+		int n1 = MIN(len, block_len);
 		char *map = map_ptr(buf, offset, n1);
+		uint32 sum1 = get_checksum1(map, n1);
+		char sum2[SUM_LENGTH];
 
-		s->sums[i].sum1 = get_checksum1(map, n1);
-		get_checksum2(map, n1, s->sums[i].sum2);
+		get_checksum2(map, n1, sum2);
 
-		s->sums[i].offset = offset;
-		s->sums[i].len = n1;
-		s->sums[i].i = i;
-
-		if (verbose > 3)
+		if (verbose > 3) {
 			rprintf(FINFO,
-				"chunk[%d] offset=%.0f len=%d sum1=%08x\n",
-				i, (double) s->sums[i].offset,
-				s->sums[i].len, s->sums[i].sum1);
-
+				"chunk[%d] offset=%.0f len=%d sum1=%08lx\n",
+				i, (double) offset, n1, (unsigned long) sum1);
+		}
+		write_int(f_out, sum1);
+		write_buf(f_out, sum2, csum_length);
 		len -= n1;
 		offset += n1;
 	}
-
-	return s;
 }
 
 
@@ -239,7 +204,6 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 	int fd;
 	STRUCT_STAT st;
 	struct map_struct *buf;
-	struct sum_struct *s;
 	int statret;
 	struct file_struct *file = flist->files[i];
 	char *fnamecmp;
@@ -399,7 +363,7 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 	if (statret == -1) {
 		if (errno == ENOENT) {
 			write_int(f_out,i);
-			if (!dry_run) send_sums(NULL,f_out);
+			if (!dry_run) send_null_sums(f_out);
 		} else {
 			if (verbose > 1)
 				rprintf(FERROR, RSYNC_NAME
@@ -416,7 +380,7 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 
 		/* now pretend the file didn't exist */
 		write_int(f_out,i);
-		if (!dry_run) send_sums(NULL,f_out);    
+		if (!dry_run) send_null_sums(f_out);
 		return;
 	}
 
@@ -445,7 +409,7 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 
 	if (disable_deltas_p()) {
 		write_int(f_out,i);
-		send_sums(NULL,f_out);    
+		send_null_sums(f_out);
 		return;
 	}
 
@@ -456,7 +420,7 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 		rprintf(FERROR,RSYNC_NAME": failed to open \"%s\", continuing : %s\n",fnamecmp,strerror(errno));
 		/* pretend the file didn't exist */
 		write_int(f_out,i);
-		send_sums(NULL,f_out);
+		send_null_sums(f_out);
 		return;
 	}
 
@@ -469,18 +433,15 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 	if (verbose > 3)
 		rprintf(FINFO,"gen mapped %s of size %.0f\n",fnamecmp,(double)st.st_size);
 
-	s = generate_sums(buf,st.st_size,adapt_block_size(file, block_size));
-
 	if (verbose > 2)
-		rprintf(FINFO,"sending sums for %d\n",i);
+		rprintf(FINFO, "generating and sending sums for %d\n", i);
 
 	write_int(f_out,i);
-	send_sums(s,f_out);
+	generate_and_send_sums(buf, st.st_size,
+			       adapt_block_size(file, block_size), f_out);
 
 	close(fd);
 	if (buf) unmap_file(buf);
-
-	free_sums(s);
 }
 
 
