@@ -30,6 +30,7 @@ int remote_protocol = 0;
 extern int verbose;
 extern int am_server;
 extern int am_sender;
+extern int fuzzy_basis;
 extern int read_batch;
 extern int checksum_seed;
 extern int protocol_version;
@@ -71,6 +72,13 @@ void setup_protocol(int f_out,int f_in)
 	if (protocol_version > PROTOCOL_VERSION) {
 		rprintf(FERROR, "--protocol must be no more than %d on the %s.\n",
 			PROTOCOL_VERSION, am_server? "Server" : "Client");
+		exit_cleanup(RERR_PROTOCOL);
+	}
+
+	if (fuzzy_basis && protocol_version < 29) {
+		rprintf(FERROR,
+			"--fuzzy requres protocol 29 or higher (negotiated %d).\n",
+			protocol_version);
 		exit_cleanup(RERR_PROTOCOL);
 	}
 
