@@ -215,7 +215,8 @@ static void report_exclude_result(char const *name,
 
 /*
  * Return true if file NAME is defined to be excluded by the specified
- * exclude list.
+ * exclude list.  Returns -1 for an exclude, 1 for an include, and 0 if
+ * no match.
  */
 int check_exclude(struct exclude_list_struct *listp, char *name, int name_is_dir)
 {
@@ -225,7 +226,7 @@ int check_exclude(struct exclude_list_struct *listp, char *name, int name_is_dir
 		if (check_one_exclude(name, ent, name_is_dir)) {
 			report_exclude_result(name, ent, name_is_dir,
 					      listp->debug_type);
-			return !ent->include;
+			return ent->include ? 1 : -1;
 		}
 	}
 
