@@ -31,15 +31,11 @@ extern int am_generator;
 extern int am_daemon;
 extern int verbose;
 extern int blocking_io;
-extern int cvs_exclude;
-extern int delete_mode;
 extern int delete_before;
-extern int delete_excluded;
 extern int daemon_over_rsh;
 extern int do_stats;
 extern int dry_run;
 extern int list_only;
-extern int local_server;
 extern int log_got_error;
 extern int module_id;
 extern int orig_umask;
@@ -64,7 +60,8 @@ extern char *basis_dir[];
 extern char *rsync_path;
 extern char *shell_cmd;
 extern char *batch_name;
-extern struct filter_list_struct filter_list;
+
+int local_server = 0;
 
 /* There's probably never more than at most 2 outstanding child processes,
  * but set it higher, just in case. */
@@ -620,10 +617,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	}
 
 	io_start_buffering_in();
-	if (delete_mode && !delete_excluded)
-		recv_filter_list(f_in);
-	if (cvs_exclude && protocol_version < 29)
-		add_filter(&filter_list, ":C", 0, 0);
+	recv_filter_list(f_in);
 
 	if (filesfrom_fd >= 0) {
 		/* We need to send the files-from names to the sender at the
@@ -678,8 +672,6 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
 
 		recv_filter_list(f_in);
-		if (cvs_exclude)
-			add_cvs_excludes();
 		do_server_sender(f_in, f_out, argc, argv);
 	} else {
 		do_server_recv(f_in, f_out, argc, argv);
@@ -725,10 +717,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		io_start_buffering_out();
 		if (!remote_filesfrom_file)
 			set_msg_fd_in(f_in);
-		if (cvs_exclude)
-			add_cvs_excludes();
-		if (delete_mode && !delete_excluded)
-			send_filter_list(f_out);
+		send_filter_list(f_out);
 		if (remote_filesfrom_file)
 			filesfrom_fd = f_in;
 
@@ -761,10 +750,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	if (argc == 0)
 		list_only |= 1;
 
-	if (!read_batch)
-		send_filter_list(f_out);
-	if (cvs_exclude)
-		add_cvs_excludes();
+	send_filter_list(read_batch ? -1 : f_out);
 
 	if (filesfrom_fd >= 0) {
 		io_set_filesfrom_fds(filesfrom_fd, f_out);
