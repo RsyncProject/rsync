@@ -43,12 +43,11 @@ extern int am_server;
  **/
 char *client_addr(int fd)
 {
-	struct sockaddr_storage ss;
-	socklen_t length = sizeof ss;
-	char *ssh_client, *p;
-	int len;
 	static char addr_buf[100];
 	static int initialised;
+	struct sockaddr_storage ss;
+	socklen_t length = sizeof ss;
+	char *ssh_info, *p;
 
 	if (initialised)
 		return addr_buf;
@@ -57,14 +56,13 @@ char *client_addr(int fd)
 
 	if (am_server) {	/* daemon over --rsh mode */
 		strcpy(addr_buf, "0.0.0.0");
-		if ((ssh_client = getenv("SSH_CLIENT")) != NULL) {
-			/* truncate SSH_CLIENT to just IP address */
-			if ((p = strchr(ssh_client, ' ')) != NULL) {
-				len = MIN((unsigned int) (p - ssh_client),
-				    sizeof addr_buf - 1);
-				strncpy(addr_buf, ssh_client, len);
-				*(addr_buf + len) = '\0';
-			}
+		if ((ssh_info = getenv("SSH_CONNECTION")) != NULL
+		    || (ssh_info = getenv("SSH_CLIENT")) != NULL
+		    || (ssh_info = getenv("SSH2_CLIENT")) != NULL) {
+			strlcpy(addr_buf, ssh_info, sizeof addr_buf);
+			/* Truncate the value to just the IP address. */
+			if ((p = strchr(addr_buf, ' ')) != NULL)
+				*p = '\0';
 		}
 	} else {
 		client_sockaddr(fd, &ss, &length);
