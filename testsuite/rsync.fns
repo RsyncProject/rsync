@@ -99,10 +99,6 @@ hands_setup() {
 
 #      echo testing head:
 #      ls -lR ${srcdir} | head -10 || echo failed
-
-    # sleep here to prevent a copy from being made within the
-    #  default --modify-window time on Cygwin
-    sleep 2
 }
 
 
@@ -144,6 +140,10 @@ makepath () {
 # should be excluded, you might need to use something else.
 
 checkit() {
+    # sleep here to prevent a copy from being made within the
+    #  default --modify-window time on Cygwin
+    sleep 2
+
     failed=
 
     # We can just write everything to stdout/stderr, because the
