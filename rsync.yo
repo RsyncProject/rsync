@@ -337,22 +337,29 @@ environment variable.
 dit(bf(--rsync-path PATH)) Use this to specify the path to the copy of
 rsync on the remote machine. Useful when its not in your path.
 
-dit(bf(--exclude FILE)) This option allows you to selectively exclude
+dit(bf(--exclude pattern)) This option allows you to selectively exclude
 certain files from the list of files to be transferred. This is most
 useful in combination with a recursive transfer.
-
-The option FILE can either be a file name or a shell wildcard
-expression. If it is a directory name then rsync will not recurse into
-directories of that name.
 
 You may use as many --exclude options on the command line as you like
 to build up the list of files to exclude.
 
-If the filename is a single ! then the exclude list is reset.
+See the section of exclude patterns for information on the syntax of 
+this option.
 
 dit(bf(--exclude-from FILE)) This option is similar to the --exclude
 option, but instead it adds all filenames listed in the file FILE to
 the exclude list.
+
+dit(bf(--include pattern)) This option tells rsync to not exclude the
+specified pattern of filenames. This is useful as it allows you to
+build up quite complex exclude/include rules.
+
+See the section of exclude patterns for information on the syntax of 
+this option.
+
+dit(bf(--include-from FILE)) This specifies a list of include patterns
+from a file.
 
 dit(bf(-C, --cvs-exclude)) This is a useful shorthand for excluding a
 broad range of files that you often don't want to transfer between
@@ -435,6 +442,63 @@ dit(bf(--port PORT)) This specifies an alternate TCP port number to use
 rather than the default port 873. 
 
 enddit()
+
+manpagesection(EXCLUDE PATTERNS)
+
+The exclude and include patterns specified to rsync allow for flexible
+selection of what files to transfer and what files to skip.
+
+rsync build a ordered list of include/exclude options as specified on
+the command line. When a filename is encountered rsync then checks the
+name against each exclude/include pattern in turn. The first matching
+pattern is acted on. If it is an exclude pattern than that file is
+skipped. If it is an include pattern then that filename is not
+skipped. If no matching include/exclude pattern is found then the
+filename is not skipped.
+
+The patterns themselves can take several forms. The rules are:
+
+itemize(
+  it() if the pattern starts with a / then it is matched against the
+  start of the filename, otherwise it is matched against the end of
+  the filename. Thus /foo would match a file called foo
+  at the base of the tree whereas foo would match any file
+  called foo anywhere in the tree.
+
+  it() if the pattern ends with a / then it will only match a
+  directory, not a file, link or device.
+
+  it() if the pattern contains a wildcard character from the set
+  *?[ then regular expression matching is applied using the
+  normal shell filename matching rules. Otherwise a simple string
+  match is used.
+
+  it() if the pattern contains a / (not counting a trailing /) then it
+  is matched against the full filename, including any leading
+  directory. If the pattern doesn't contain a / then it is matched
+  only against the final component of the filename.
+
+  it() if the pattern starts with "+ " (a plus followed by a space)
+  then it is always considered a include pattern, even if specified as
+  part of an exclude option. The "+ " part is discarded before matching.
+
+  it() if the pattern starts with "- " (a minus followed by a space)
+  then it is always considered a exclude pattern, even if specified as
+  part of an include option. The "- " part is discarded before matching.
+)
+
+The +/- rules are most useful in exclude lists, allowing you to have a
+single exclude list that contains both include and exclude options.
+
+Here are some examples:
+
+itemize(
+  it() --exclude "*.o" would exclude all filenames matching *.o
+  it() --exclude "/foo" would exclude a file in the base directory called foo
+  it() --exclude "foo/" would exclude any directory called foo
+  it() --include "*/" --include "*.c" --exclude "*" would include all 
+  directories and C source files.
+)
 
 manpagefiles()
 
