@@ -440,7 +440,7 @@ static void set_refuse_options(char *bp)
 {
 	struct poptOption *op;
 	char *cp, shortname[2];
-	int is_wild;
+	int is_wild, found_match;
 
 	shortname[1] = '\0';
 
@@ -454,19 +454,22 @@ static void set_refuse_options(char *bp)
 		if (strcmp(bp, "delete") == 0)
 			bp = "delete*";
 		is_wild = strpbrk(bp, "*?[") != NULL;
+		found_match = 0;
 		for (op = long_options; ; op++) {
-			if (!op->longName) {
-				rprintf(FLOG,
-				    "No match for refuse-options string \"%s\"\n",
-				    bp);
-				break;
-			}
 			*shortname = op->shortName;
-			if (wildmatch(bp, op->longName) || wildmatch(bp, shortname)) {
+			if (!op->longName && !*shortname)
+				break;
+			if ((op->longName && wildmatch(bp, op->longName))
+			    || (*shortname && wildmatch(bp, shortname))) {
 				op->val = (op - long_options) + OPT_REFUSED_BASE;
+				found_match = 1;
 				if (!is_wild)
 					break;
 			}
+		}
+		if (!found_match) {
+			rprintf(FLOG, "No match for refuse-options string \"%s\"\n",
+				bp);
 		}
 		if (!cp)
 			break;
