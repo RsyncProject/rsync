@@ -66,6 +66,7 @@ static void list_file (const char *fname)
 	char permbuf[PERMSTRING_SIZE];
 	struct tm *mt;
 	char datebuf[50];
+	char linkbuf[4096];
 
 	if (do_lstat(fname, &buf) == -1)
 		failed ("stat", fname);
@@ -82,6 +83,10 @@ static void list_file (const char *fname)
 		buf.st_mode &= ~0777;
 		buf.st_mtime = (time_t)0;
 		buf.st_uid = buf.st_gid = 0;
+		strcpy(linkbuf, " -> ");
+		readlink(fname, linkbuf+4, sizeof(linkbuf) - 4);
+	} else {
+		linkbuf[0] = 0;
 	}
 
 	permstring(permbuf, buf.st_mode);
@@ -105,10 +110,10 @@ static void list_file (const char *fname)
 	
 	/* NB: need to pass size as a double because it might be be
 	 * too large for a long. */
-	printf("%s %12.0f %6d.%-6d %s %s\n",
+	printf("%s %12.0f %6d.%-6d %s %s%s\n",
 	       permbuf, (double) buf.st_size,
 	       buf.st_uid, buf.st_gid,
-	       datebuf, fname);
+	       datebuf, fname, linkbuf);
 }
 
 
