@@ -45,7 +45,45 @@ AC_SUBST(SHELL)
 AC_CHECK_PROG(HAVE_REMSH, remsh, 1, 0)
 AC_DEFINE_UNQUOTED(HAVE_REMSH, $HAVE_REMSH, [ ])
 
-AC_SYS_LARGEFILE
+
+# arrgh. libc in the current debian stable screws up the largefile
+# stuff, getting byte range locking wrong
+AC_CACHE_CHECK([for broken largefile support],rsync_cv_HAVE_BROKEN_LARGEFILE,[
+AC_TRY_RUN([
+#define _FILE_OFFSET_BITS 64
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+int main(void) 
+{
+	struct flock lock;
+        int status;
+	int fd = open("conftest.dat", O_CREAT|O_RDWR, 0600);
+	lock.l_type = F_WRLCK;
+	lock.l_whence = SEEK_SET;
+	lock.l_start = 0;
+	lock.l_len = 1;
+	lock.l_pid = 0;
+	
+	fcntl(fd,F_SETLK,&lock);
+	if (fork() == 0) {
+		lock.l_start = 1;		
+		exit(fcntl(fd,F_SETLK,&lock) == 0);
+        }
+        wait(&status);
+	unlink("conftest.dat");
+	exit(WEXITSTATUS(status));
+}
+],
+rsync_cv_HAVE_BROKEN_LARGEFILE=yes,rsync_cv_HAVE_BROKEN_LARGEFILE=no,rsync_cv_HAVE_BROKEN_LARGEFILE=cross)])
+if test x"$rsync_cv_HAVE_BROKEN_LARGEFILE" != x"yes"; then
+   AC_SYS_LARGEFILE
+fi
+
+
+
 AC_C_BIGENDIAN
 AC_HEADER_DIRENT
 AC_HEADER_TIME
