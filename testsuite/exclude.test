@@ -35,7 +35,6 @@ ln -s too "$fromdir/bar/down/to/foo/sym"
 
 # Setup our test exclude/include file.
 
-# XXX comments reflect up-coming fixed behavior!
 excl="$scratchdir/exclude-from"
 cat >"$excl" <<EOF
 # If the second line of these two lines does anything, it's a bug.
@@ -59,12 +58,10 @@ checkit "$RSYNC -avv \"$fromdir/\" \"$chkdir/\"" "$fromdir" "$chkdir"
 
 sleep 1 # Ensures that the rm commands will tweak the directory times.
 
-# XXX Note modified to work with current broken behavior (to be fixed soon!)
 rm -r "$chkdir"/foo/down
-#rm -r "$chkdir"/mid/for/foo/and
+rm -r "$chkdir"/mid/for/foo/and
 rm "$chkdir"/foo/file[235-9]
-#rm "$chkdir"/bar/down/to/foo/to "$chkdir"/bar/down/to/foo/file[235-9]
-rm -r "$chkdir"/bar # XXX
+rm "$chkdir"/bar/down/to/foo/to "$chkdir"/bar/down/to/foo/file[235-9]
 rm "$chkdir"/mid/for/foo/extra
 
 # Un-tweak the directory times in our first (weak) exclude test (though
