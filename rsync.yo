@@ -25,7 +25,7 @@ greatly speed up file transfers when the destination file already
 exists.
 
 The rsync remote-update protocol allows rsync to transfer just the
-differences between two sets of files across the network link, using
+differences between two sets of files across the network connection, using
 an efficient checksum-search algorithm described in the technical
 report that accompanies this package.
 
@@ -251,7 +251,7 @@ files and mail folders, I use a cron job that runs
 
 quote(rsync -Cavz . arvidsjaur:backup)
 
-each night over a PPP link to a duplicate directory on my machine
+each night over a PPP connection to a duplicate directory on my machine
 "arvidsjaur".
 
 To synchronize my samba source trees I use the following Makefile
@@ -266,7 +266,7 @@ quote(      get:nl()
       sync: get put)
 
 this allows me to sync with a CVS directory at the other end of the
-link. I then do cvs operations on the remote machine, which saves a
+connection. I then do cvs operations on the remote machine, which saves a
 lot of time as the remote cvs protocol isn't very efficient.
 
 I mirror a directory between my "old" and "new" ftp sites with the
@@ -657,7 +657,7 @@ the bf(cvs(1)) manual for more information.
 dit(bf(--csum-length=LENGTH)) By default the primary checksum used in
 rsync is a very strong 16 byte MD4 checksum. In most cases you will
 find that a truncated version of this checksum is quite efficient, and
-this will decrease the size of the checksum data sent over the link,
+this will decrease the size of the checksum data sent over the connection,
 making things faster. 
 
 You can choose the number of bytes in the truncated checksum using the
@@ -698,7 +698,7 @@ linked.
 
 dit(bf(-z, --compress)) With this option, rsync compresses any data from
 the files that it sends to the destination machine.  This
-option is useful on slow links.  The compression method used is the
+option is useful on slow connections.  The compression method used is the
 same method that gzip uses.
 
 Note this this option typically achieves better compression ratios

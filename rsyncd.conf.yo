@@ -389,7 +389,7 @@ It should be good enough for most purposes but if you want really top
 quality security then I recommend that you run rsync over ssh.
 
 Also note that the rsync server protocol does not currently provide any
-encryption of the data that is transferred over the link. Only
+encryption of the data that is transferred over the connection. Only
 authentication is provided. Use ssh as the transport if you want
 encryption.
 
