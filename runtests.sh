@@ -139,6 +139,16 @@ echo "$0 running in `pwd`"
 echo "    rsync_bin=$rsync_bin"
 echo "    srcdir=$srcdir"
 
+if testuser=`whoami`
+then
+    :
+else 
+    testuser='(unknown)'
+fi
+
+echo "    testuser=$testuser"
+echo "    os=`uname -a`"
+
 if test ! -f $rsync_bin
 then
     echo "rsync_bin $rsync_bin is not a file" >&2
