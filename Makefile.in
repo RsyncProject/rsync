@@ -79,12 +79,17 @@ TRIMSLASH_OBJ = trimslash.o syscall.o
 trimslash: $(TRIMSLASH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TRIMSLASH_OBJ) $(LIBS)
 
-Makefile: Makefile.in configure config.status
-	echo "WARNING: You need to run ./config.status --recheck"
+# I don't like these rules because CVS can skew the timestamps and
+# produce spurious warnings, and also make "make install" fail if the
+# source directory can no longer be found.  Since we don't rebuild
+# automatically they're kind of lame anyhow.
+
+#Makefile: Makefile.in configure config.status
+#	echo "WARNING: You need to run ./config.status --recheck"
 
 # don't actually run autoconf, just issue a warning
-configure: configure.in
-	echo "WARNING: you need to rerun autoconf"
+#configure: configure.in
+#	echo "WARNING: you need to rerun autoconf"
 
 rsync.1: rsync.yo
 	yodl2man -o rsync.1 rsync.yo
