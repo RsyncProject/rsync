@@ -10,7 +10,7 @@
 
 . $srcdir/testsuite/rsync.fns
 
-build_symlinks
+build_symlinks || test_fail "failed to build symlinks"
 
 # Copy recursively, but without -l or -L or -a, and all the symlinks
 # should be missing.
