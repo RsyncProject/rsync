@@ -311,7 +311,7 @@ verb(
      --ignore-existing       ignore files that already exist on receiver
      --delete                delete files that don't exist on sender
      --delete-excluded       also delete excluded files on receiver
-     --delete-after          delete after transferring, not before
+     --delete-after          receiver deletes after transfer, not before
      --ignore-errors         delete even if there are IO errors
      --max-delete=NUM        don't delete more than NUM files
      --partial               keep partially transferred files
@@ -580,10 +580,10 @@ receiving side that are not on the sending side, this tells rsync to also
 delete any files on the receiving side that are excluded (see --exclude).
 Implies --delete.
 
-dit(bf(--delete-after)) By default rsync does file deletions before
-transferring files to try to ensure that there is sufficient space on
-the receiving filesystem. If you want to delete after transferring
-then use the --delete-after switch. Implies --delete.
+dit(bf(--delete-after)) By default rsync does file deletions on the
+receiving side before transferring files to try to ensure that there is
+sufficient space on the receiving filesystem. If you want to delete
+after transferring, use the --delete-after switch. Implies --delete.
 
 dit(bf(--ignore-errors)) Tells --delete to go ahead and delete files
 even when there are IO errors.
