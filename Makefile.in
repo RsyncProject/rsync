@@ -133,3 +133,12 @@ installcheck: $(CHECK_PROGS)
 	POSIXLY_CORRECT=1 TLS=`pwd`/tls rsync_bin="$(bindir)/rsync" srcdir="$(srcdir)" $(srcdir)/runtests.sh
 
 # TODO: Add 'dist' target; need to know which files will be included
+
+rsync.dvi: doc/rsync.texinfo
+	texi2dvi -o $@ $<
+
+rsync.ps: rsync.dvi	
+	dvips -ta4 -o $@ $<
+
+rsync.pdf: doc/rsync.texinfo
+	texi2dvi -o $@ --pdf $<
