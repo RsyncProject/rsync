@@ -376,7 +376,9 @@ quote(itemize(
   it() %l for the length of the file in bytes
   it() %p for the process ID of this rsync session
   it() %o for the operation, which is either "send" or "recv"
-  it() %f for the filename
+  it() %f for the filename (long form)
+  it() %n for the filename (short form)
+  it() %L either the string " -> SYMLINK" or "" if not a symlink
   it() %P for the module path
   it() %m for the module name
   it() %t for the current date time
@@ -384,6 +386,7 @@ quote(itemize(
   it() %b for the number of bytes actually transferred 
   it() %c when sending files this gives the number of checksum bytes
     received for this file
+  it() %i an itemized list of what is being updated
 ))
 
 The default log format is "%o %h [%a] %m (%u) %f %l", and a "%t [%p] "
@@ -391,6 +394,35 @@ is always added to the beginning when using the "log file" option.
 
 A perl script called rsyncstats to summarize this format is included
 in the rsync source code distribution.
+
+The %i format is a set of cryptic characters that are output as follows:
+
+quote(tt(  *Xcstpog ITEM_NAME))
+
+The bf(*) is either bf(<) (receive) or bf(>) (send) or bf(*) (--dry-run) if
+the item is being updated, otherwise it is a space.  The bf(X) will be
+replaced by one of the following: an "f" for a file, a "d" for a dir, an
+"L" for a symlink, or a "D" for a device.  The rest of the letters in the
+string above are the actual letters that will be output if the associated
+attribute for the item is being updated; otherwise the letter will be
+replaced by either a "-" for no change, or a "+" if this is a new item.
+The meanings of the attribute letters are as follows:
+
+quote(itemize(
+  it() A bf(c) means the checksum of the file is different and will be
+  updated by the file transfer (requries bf(--checksum)).
+  it() A bf(s) means the size of the file is different and will be updated
+  by the file transfer.
+  it() A bf(t) means the modified time is being updated to the server's
+  value (requires --times).  An alternate value of bf(T) means that the
+  time is being set to the transfer time (which happens when symlinks are
+  updated or when a file or device is updated without --times).
+  it() A bf(p) means the permissions are being updated (requires
+  bf(--perms)).
+  it() An bf(o) means the owner is being updated (requires bf(--owner) and
+  root privileges).
+  it() A bf(g) means the group is being updated (requires bf(--group)).
+))
 
 dit(bf(timeout)) The "timeout" option allows you to override the
 clients choice for I/O timeout for this module. Using this option you
