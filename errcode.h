@@ -26,6 +26,7 @@
 #define RERR_PROTOCOL   2       /* protocol incompatibility */
 #define RERR_FILESELECT 3       /* errors selecting input/output files, dirs */
 #define RERR_UNSUPPORTED 4       /* requested action not supported */
+#define RERR_STARTCLIENT 5      /* error starting client-server protocol */
 
 #define RERR_SOCKETIO   10      /* error in socket IO */
 #define RERR_FILEIO     11      /* error in file IO */

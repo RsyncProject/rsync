@@ -87,9 +87,8 @@ int default_af_hint = AF_INET;	/* Must use IPv4 */
  * or under Unix process-monitors. **/
 int no_detach = 0;
 
-
-int read_batch=0;
-int write_batch=0;
+int write_batch = 0;
+int read_batch = 0;
 
 char *backup_suffix = BACKUP_SUFFIX;
 char *tmpdir = NULL;
@@ -107,7 +106,7 @@ int quiet = 0;
 int always_checksum = 0;
 int list_only = 0;
 
-char *batch_ext = NULL;
+char *batch_prefix = NULL;
 
 static int modify_window_set;
 
@@ -244,8 +243,8 @@ void usage(enum logcode F)
   rprintf(F,"     --log-format=FORMAT     log file transfers using specified format\n");  
   rprintf(F,"     --password-file=FILE    get password from FILE\n");
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth, KBytes per second\n");
-  rprintf(F,"     --read-batch=EXT        read batch file\n");
-  rprintf(F,"     --write-batch           write batch file\n");
+  rprintf(F,"     --write-batch=PREFIX    write batch fileset starting with PREFIX\n");
+  rprintf(F,"     --read-batch=PREFIX     read batch fileset starting with PREFIX\n");
   rprintf(F," -h, --help                  show this help screen\n");
 #ifdef INET6
   rprintf(F," -4                          prefer IPv4\n");
@@ -339,8 +338,8 @@ static struct poptOption long_options[] = {
   {"address",          0,  POPT_ARG_STRING, &bind_address, 0},
   {"backup-dir",       0,  POPT_ARG_STRING, &backup_dir},
   {"hard-links",      'H', POPT_ARG_NONE,   &preserve_hard_links},
-  {"read-batch",       0,  POPT_ARG_STRING, &batch_ext, OPT_READ_BATCH},
-  {"write-batch",      0,  POPT_ARG_NONE,   &write_batch},
+  {"read-batch",       0,  POPT_ARG_STRING, &batch_prefix, OPT_READ_BATCH},
+  {"write-batch",      0,  POPT_ARG_STRING, &batch_prefix, OPT_WRITE_BATCH},
 #ifdef INET6
   {0,		      '4', POPT_ARG_VAL,    &default_af_hint,   AF_INET },
   {0,		      '6', POPT_ARG_VAL,    &default_af_hint,   AF_INET6 },
@@ -523,8 +522,13 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			keep_partial = 1;
 			break;
 
+		case OPT_WRITE_BATCH:
+			/* popt stores the filename in batch_prefix for us */
+			write_batch = 1;
+			break;
+
 		case OPT_READ_BATCH:
-			/* The filename is stored in batch_ext for us by popt */
+			/* popt stores the filename in batch_prefix for us */
 			read_batch = 1;
 			break;
 
@@ -538,6 +542,22 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
                                  poptStrerror(opt));
                         return 0;
 		}
+	}
+
+	if (write_batch && read_batch) {
+	    snprintf(err_buf,sizeof(err_buf),
+		"write-batch and read-batch can not be used together\n");
+	    rprintf(FERROR,"ERROR: write-batch and read-batch"
+		" can not be used together\n");
+	    return 0;
+	}
+
+	if (do_compression && (write_batch || read_batch)) {
+	    snprintf(err_buf,sizeof(err_buf),
+		"compress can not be used with write-batch or read-batch\n");
+	    rprintf(FERROR,"ERROR: compress can not be used with"
+		"  write-batch or read-batch\n");
+	    return 0;
 	}
 
         *argv = poptGetArgs(pc);
@@ -561,8 +581,8 @@ void server_options(char **args,int *argc)
 	static char mdelete[30];
 	static char mwindow[30];
 	static char bw[50];
-	static char fext[20];
-	static char wbatch[14];
+	/* Leave room for ``--(write|read)-batch='' */
+	static char fext[MAXPATHLEN + 15];
 
 	int i, x;
 
@@ -644,13 +664,14 @@ void server_options(char **args,int *argc)
 		args[ac++] = mdelete;
 	}    
 	
-	if (write_batch) {
-		snprintf(wbatch,sizeof(wbatch),"--write-batch");
-		args[ac++] = wbatch;
-	}
-
-	if (batch_ext != NULL) {
-		snprintf(fext,sizeof(fext),"--read-batch=%s",batch_ext);
+	if (batch_prefix != NULL) {
+		char *fmt = "";
+		if (write_batch)
+		    fmt = "--write-batch=%s";
+		else
+		if (read_batch)
+		    fmt = "--read-batch=%s";
+		snprintf(fext,sizeof(fext),fmt,batch_prefix);
 		args[ac++] = fext;
 	}
 

@@ -280,8 +280,8 @@ verb(
      --log-format=FORMAT     log file transfers using specified format
      --password-file=FILE    get password from FILE
      --bwlimit=KBPS          limit I/O bandwidth, KBytes per second
-     --read-batch=FILE       read batch file
-     --write-batch           write batch file
+     --read-batch=PREFIX     read batch fileset starting with PREFIX
+     --write-batch=PREFIX    write batch fileset starting with PREFIX
  -h, --help                  show this help screen
 
 
@@ -706,10 +706,13 @@ transfer was too fast, it will wait before sending the next data block. The
 result is an average transfer rate equalling the specified limit. A value
 of zero specifies no limit.
 
-dit(bf(--read-batch)) Apply a previously generated change batch.
+dit(bf(--write-batch=PREFIX)) Generate a set of files that can be
+transferred as a batch update. Each filename in the set starts with
+PREFIX. See the "BATCH MODE" section for details.
 
-dit(bf(--write-batch)) Generate a set of files that can be transferred
-as a batch update.
+dit(bf(--read-batch=PREFIX)) Apply a previously generated change batch,
+using the fileset whose filenames start with PREFIX. See the "BATCH
+MODE" section for details.
 
 enddit()
 
@@ -804,25 +807,82 @@ itemize(
 manpagesection(BATCH MODE)
 
 bf(Note:) Batch mode should be considered experimental in this version
-of rsync.  The interface or behaviour may change before it stabilizes.
+of rsync. The interface or behaviour may change before it stabilizes.
 
-The following call generates 4 files that encapsulate the information
-for synchronizing the contents of bf(target_dir) with the updates found in
-bf(src_dir)
+Batch mode can be used to apply the same set of updates to many
+identical systems. Suppose one has a tree which is replicated on a
+number of hosts.  Now suppose some changes have been made to this
+source tree and those changes need to be propagated to the other
+hosts. In order to do this using batch mode, rsync is run with the
+write-batch option to apply the changes made to the source tree to one
+of the destination trees.  The write-batch option causes the rsync
+client to store the information needed to repeat this operation against
+other destination trees in a batch update fileset (see below).  The
+filename of each file in the fileset starts with a prefix specified by
+the user as an argument to the write-batch option.  This fileset is
+then copied to each remote host, where rsync is run with the read-batch
+option, again specifying the same prefix, and the destination tree.
+Rsync updates the destination tree using the information stored in the
+batch update fileset.
 
-quote(
-$ rsync --write-batch [other rsync options here] \nl()
-           /somewhere/src_dir /somewhere/target_dir
-)
-
-The generated files are labeled with a common timestamp:
+The fileset consists of 4 files:
 
 itemize(
-it() bf(rsync_argvs.<timestamp>) command-line arguments
-it() bf(rsync_flist.<timestamp>) rsync internal file metadata
-it() bf(rsync_csums.<timestamp>) rsync checksums
-it() bf(rsync_delta.<timestamp>) data blocks for file update & change
+it() bf(<prefix>.rsync_argvs) command-line arguments
+it() bf(<prefix>.rsync_flist) rsync internal file metadata
+it() bf(<prefix>.rsync_csums) rsync checksums
+it() bf(<prefix>.rsync_delta) data blocks for file update & change
 )
+
+The .rsync_argvs file contains a command-line suitable for updating a
+destination tree using that batch update fileset. It can be executed
+using a Bourne(-like) shell, optionally passing in an alternate
+destination tree pathname which is then used instead of the original
+path. This is useful when the destination tree path differs from the
+original destination tree path.
+
+Generating the batch update fileset once saves having to perform the
+file status, checksum and data block generation more than once when
+updating multiple destination trees. Multicast transport protocols can
+be used to transfer the batch update files in parallel to many hosts at
+once, instead of sending the same data to every host individually.
+
+Example:
+
+verb(
+$ rsync --write_batch=pfx -a /source/dir/ /adest/dir/
+$ rcp pfx.rsync_* remote:
+$ rsh remote rsync --read_batch=pfx -a /bdest/dir/
+# or alternatively
+$ rsh remote ./pfx.rsync_argvs /bdest/dir/
+)
+
+In this example, rsync is used to update /adest/dir/ with /source/dir/
+and the information to repeat this operation is stored in the files
+pfx.rsync_*. These files are then copied to the machine named "remote".
+Rsync is then invoked on "remote" to update /bdest/dir/ the same way as
+/adest/dir/. The last line shows the rsync_argvs file being used to
+invoke rsync.
+
+Caveats:
+
+The read-batch option expects the destination tree it is meant to update
+to be identical to the destination tree that was used to create the
+batch update fileset.  When a difference between the destination trees
+is encountered the update will fail at that point, leaving the
+destination tree in a partially updated state. In that case, rsync can
+be used in its regular (non-batch) mode of operation to fix up the
+destination tree.
+
+The rsync version used on all destinations should be identical to the
+one used on the original destination.
+
+The -z/--compress option does not work in batch mode and yields a usage
+error. A separate compression tool can be used instead to reduce the
+size of the batch update files for transport to the destination.
+
+The -n/--dryrun option does not work in batch mode and yields a runtime
+error.
 
 See bf(http://www.ils.unc.edu/i2dsi/unc_rsync+.html) for papers and technical
 reports.

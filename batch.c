@@ -8,55 +8,38 @@
 #include "rsync.h"
 #include <time.h>
 
-char rsync_flist_file[27] = "rsync_flist.";
-char rsync_csums_file[27] = "rsync_csums.";
-char rsync_delta_file[27] = "rsync_delta.";
-char rsync_argvs_file[27] = "rsync_argvs.";
-
-char batch_file_ext[15];
-
-int fdb;
-int fdb_delta;
-int fdb_open;
-int fdb_close;
+extern char *batch_prefix;
 
 struct file_list *batch_flist;
 
-void create_batch_file_ext()
-{
-	struct tm *timeptr;
-	time_t elapsed_seconds;
+static char rsync_flist_file[] = ".rsync_flist";
+static char rsync_csums_file[] = ".rsync_csums";
+static char rsync_delta_file[] = ".rsync_delta";
+static char rsync_argvs_file[] = ".rsync_argvs";
 
-	/* Save run date and time to use for batch file extensions */
-	time(&elapsed_seconds);
-	timeptr = localtime(&elapsed_seconds);
-
-	sprintf(batch_file_ext, "%4d%02d%02d%02d%02d%02d",
-		timeptr->tm_year + 1900, timeptr->tm_mon + 1,
-		timeptr->tm_mday, timeptr->tm_hour, timeptr->tm_min,
-		timeptr->tm_sec);
-	rprintf(FINFO,"batch file extension: %s\n", batch_file_ext);
-}
-
-void set_batch_file_ext(char *ext)
-{
-	strcpy(batch_file_ext, ext);
-}
+static int fdb;
+static int fdb_delta;
+static int fdb_open;
+static int fdb_close;
 
 void write_batch_flist_file(char *buff, int bytes_to_write)
 {
+	char filename[MAXPATHLEN];
 
 	if (fdb_open) {
 		/* Set up file extension */
-		strcat(rsync_flist_file, batch_file_ext);
+		strlcpy(filename, batch_prefix, sizeof(filename));
+		strlcat(filename, rsync_flist_file, sizeof(filename));
 
-		/* Open batch flist file for writing; create it if it doesn't exist */
-		fdb =
-		    do_open(rsync_flist_file, O_WRONLY | O_CREAT | O_TRUNC,
+		/*
+		 * Open batch flist file for writing;
+		 * create it if it doesn't exist
+		 */
+		fdb = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 			    S_IREAD | S_IWRITE);
 		if (fdb == -1) {
 			rprintf(FERROR, "Batch file %s open error: %s\n",
-				rsync_flist_file, strerror(errno));
+				filename, strerror(errno));
 			close(fdb);
 			exit_cleanup(1);
 		}
@@ -67,11 +50,10 @@ void write_batch_flist_file(char *buff, int bytes_to_write)
 
 	if (write(fdb, buff, bytes_to_write) == -1) {
 		rprintf(FERROR, "Batch file %s write error: %s\n",
-			rsync_flist_file, strerror(errno));
+			filename, strerror(errno));
 		close(fdb);
 		exit_cleanup(1);
 	}
-
 
 	if (fdb_close) {
 		close(fdb);
@@ -110,7 +92,6 @@ void write_batch_flist_info(int flist_count, struct file_struct **fptr)
 		}
 		write_char_bufs(fptr[i]->sum);
 	}
-
 }
 
 void write_char_bufs(char *buf)
@@ -118,11 +99,8 @@ void write_char_bufs(char *buf)
 	/* Write the size of the string which will follow  */
 
 	char b[4];
-	if (buf != NULL)
-		SIVAL(b, 0, strlen(buf));
-	else {
-		SIVAL(b, 0, 0);
-	}
+
+	SIVAL(b, 0, buf != NULL ? strlen(buf) : 0);
 
 	write_batch_flist_file(b, sizeof(int));
 
@@ -137,36 +115,52 @@ void write_batch_argvs_file(int argc, char *argv[])
 {
 	int fdb;
 	int i;
-	char buff[256];
+	char buff[256]; /* XXX */
+	char buff2[MAXPATHLEN + 6];
+	char filename[MAXPATHLEN];
 
-	strcat(rsync_argvs_file, batch_file_ext);
+	/* Set up file extension */
+	strlcpy(filename, batch_prefix, sizeof(filename));
+	strlcat(filename, rsync_argvs_file, sizeof(filename));
 
-
-	/* Open batch argvs file for writing; create it if it doesn't exist */
-	fdb = do_open(rsync_argvs_file, O_WRONLY | O_CREAT | O_TRUNC,
+	/*
+	 * Open batch argvs file for writing;
+	 * create it if it doesn't exist
+	 */
+	fdb = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 		      S_IREAD | S_IWRITE | S_IEXEC);
 	if (fdb == -1) {
 		rprintf(FERROR, "Batch file %s open error: %s\n",
-			rsync_argvs_file, strerror(errno));
+			filename, strerror(errno));
 		close(fdb);
 		exit_cleanup(1);
 	}
 	buff[0] = '\0';
+
 	/* Write argvs info to batch file */
 
 	for (i = 0; i < argc; ++i) {
-		if (i == argc - 2)
+		if (i == argc - 2) /* Skip source directory on cmdline */
 		    continue;
 		/*
 		 * FIXME:
 		 * I think directly manipulating argv[] is probably bogus
 		 */
-		if (!strcmp(argv[i], "--write-batch")) {
+		if (!strncmp(argv[i], "--write-batch",
+			strlen("--write-batch"))) {
 			/* Safer to change it here than script */
-			/* Change to --read-batch + ext * to get ready for remote */
-			strlcat(buff, "--read-batch ", sizeof(buff));
-			strlcat(buff, batch_file_ext, sizeof(buff));
-		} else {
+			/*
+			 * Change to --read-batch=prefix
+			 * to get ready for remote
+			 */
+			strlcat(buff, "--read-batch=", sizeof(buff));
+			strlcat(buff, batch_prefix, sizeof(buff));
+		} else
+		if (i == argc - 1) {
+		    snprintf(buff2, sizeof(buff2), "${1:-%s}", argv[i]);
+		    strlcat(buff, buff2, sizeof(buff));
+		}
+		else {
 			strlcat(buff, argv[i], sizeof(buff));
 		}
 
@@ -177,14 +171,14 @@ void write_batch_argvs_file(int argc, char *argv[])
 	strlcat(buff, "\n", sizeof(buff));
 	if (!write(fdb, buff, strlen(buff))) {
 		rprintf(FERROR, "Batch file %s write error: %s\n",
-			rsync_argvs_file, strerror(errno));
+			filename, strerror(errno));
 		close(fdb);
 		exit_cleanup(1);
 	}
 	close(fdb);
 }
 
-struct file_list *create_flist_from_batch()
+struct file_list *create_flist_from_batch(void)
 {
 	unsigned char flags;
 
@@ -201,7 +195,7 @@ struct file_list *create_flist_from_batch()
 	    (struct file_struct **) malloc(sizeof(batch_flist->files[0]) *
 					   batch_flist->malloced);
 	if (!batch_flist->files) {
-		out_of_memory("create_flist_from_batch");	/* dw -- will exit */
+		out_of_memory("create_flist_from_batch");
 	}
 
 	for (flags = read_batch_flags(); flags; flags = read_batch_flags()) {
@@ -231,23 +225,23 @@ struct file_list *create_flist_from_batch()
 	}
 
 	return batch_flist;
-
 }
 
 int read_batch_flist_file(char *buff, int len)
 {
 	int bytes_read;
+	char filename[MAXPATHLEN];
 
 	if (fdb_open) {
-
-		/*  Set up file extension  */
-		strcat(rsync_flist_file, batch_file_ext);
+		/* Set up file extension */
+		strlcpy(filename, batch_prefix, sizeof(filename));
+		strlcat(filename, rsync_flist_file, sizeof(filename));
 
 		/* Open batch flist file for reading */
-		fdb = do_open(rsync_flist_file, O_RDONLY, 0);
+		fdb = do_open(filename, O_RDONLY, 0);
 		if (fdb == -1) {
 			rprintf(FERROR, "Batch file %s open error: %s\n",
-				rsync_flist_file, strerror(errno));
+				filename, strerror(errno));
 			close(fdb);
 			exit_cleanup(1);
 		}
@@ -256,17 +250,17 @@ int read_batch_flist_file(char *buff, int len)
 
 	/* Read flist batch file */
 
-	bytes_read = read(fdb, buff, len);
-
-	if (bytes_read == -1) {
+	switch (bytes_read = read(fdb, buff, len)) {
+	    case -1:
 		rprintf(FERROR, "Batch file %s read error: %s\n",
-			rsync_flist_file, strerror(errno));
+			filename, strerror(errno));
 		close(fdb);
 		exit_cleanup(1);
-	}
-	if (bytes_read == 0) {	/* EOF */
+		break;
+	    case 0:	/* EOF */
 		close(fdb);
 	}
+
 	return bytes_read;
 }
 
@@ -293,8 +287,12 @@ void read_batch_flist_info(struct file_struct **fptr)
 		out_of_memory("read_batch_flist_info");
 	memset((char *) file, 0, sizeof(*file));
 
-	(*fptr) = file;
+	*fptr = file;
 
+	/*
+	 * Keep these in sync with bytes_to_write assignment
+	 * in write_batch_flist_info()
+	 */
 	read_batch_flist_file((char *) &file->modtime, sizeof(time_t));
 	read_batch_flist_file((char *) &file->length, sizeof(OFF_T));
 	read_batch_flist_file((char *) &file->mode, sizeof(mode_t));
@@ -356,20 +354,23 @@ void read_batch_flist_info(struct file_struct **fptr)
 
 void write_batch_csums_file(void *buff, int bytes_to_write)
 {
-
 	static int fdb_open = 1;
+	char filename[MAXPATHLEN];
 
 	if (fdb_open) {
 		/* Set up file extension */
-		strcat(rsync_csums_file, batch_file_ext);
+		strlcpy(filename, batch_prefix, sizeof(filename));
+		strlcat(filename, rsync_csums_file, sizeof(filename));
 
-		/* Open batch csums file for writing; create it if it doesn't exist */
-		fdb =
-		    do_open(rsync_csums_file, O_WRONLY | O_CREAT | O_TRUNC,
+		/*
+		 * Open batch csums file for writing;
+		 * create it if it doesn't exist
+		 */
+		fdb = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 			    S_IREAD | S_IWRITE);
 		if (fdb == -1) {
 			rprintf(FERROR, "Batch file %s open error: %s\n",
-				rsync_csums_file, strerror(errno));
+				filename, strerror(errno));
 			close(fdb);
 			exit_cleanup(1);
 		}
@@ -380,16 +381,15 @@ void write_batch_csums_file(void *buff, int bytes_to_write)
 
 	if (write(fdb, buff, bytes_to_write) == -1) {
 		rprintf(FERROR, "Batch file %s write error: %s\n",
-			rsync_csums_file, strerror(errno));
+			filename, strerror(errno));
 		close(fdb);
 		exit_cleanup(1);
 	}
 }
 
-void close_batch_csums_file()
+void close_batch_csums_file(void)
 {
 	close(fdb);
-
 }
 
 void write_batch_csum_info(int *flist_entry, int flist_count,
@@ -405,10 +405,7 @@ void write_batch_csum_info(int *flist_entry, int flist_count,
 
 	/* FIXME: This will break if s->count is ever not exactly an int. */
 	write_batch_csums_file(flist_entry, sizeof(int));
-	if (s)
-		write_batch_csums_file(&s->count, sizeof(int));
-	else
-		write_batch_csums_file(&int_zero, sizeof (int));
+	write_batch_csums_file(s ? &s->count : &int_zero, sizeof(int));
 	
 	if (s) {
 		for (i = 0; i < s->count; i++) {
@@ -417,8 +414,7 @@ void write_batch_csum_info(int *flist_entry, int flist_count,
 			    && (i == s->count - 1)) {
 				fdb_close = 1;
 			}
-			write_batch_csums_file(s->sums[i].sum2,
-					       csum_length);
+			write_batch_csums_file(s->sums[i].sum2, csum_length);
 		}
 	}
 }
@@ -427,17 +423,18 @@ int read_batch_csums_file(char *buff, int len)
 {
 	static int fdb_open = 1;
 	int bytes_read;
+	char filename[MAXPATHLEN];
 
 	if (fdb_open) {
-
-		/*  Set up file extension  */
-		strcat(rsync_csums_file, batch_file_ext);
+		/* Set up file extension */
+		strlcpy(filename, batch_prefix, sizeof(filename));
+		strlcat(filename, rsync_csums_file, sizeof(filename));
 
 		/* Open batch flist file for reading */
-		fdb = do_open(rsync_csums_file, O_RDONLY, 0);
+		fdb = do_open(filename, O_RDONLY, 0);
 		if (fdb == -1) {
 			rprintf(FERROR, "Batch file %s open error: %s\n",
-				rsync_csums_file, strerror(errno));
+				filename, strerror(errno));
 			close(fdb);
 			exit_cleanup(1);
 		}
@@ -450,13 +447,13 @@ int read_batch_csums_file(char *buff, int len)
 
 	if (bytes_read == -1) {
 		rprintf(FERROR, "Batch file %s read error: %s\n",
-			rsync_csums_file, strerror(errno));
+			filename, strerror(errno));
 		close(fdb);
 		exit_cleanup(1);
 	}
+
 	return bytes_read;
 }
-
 
 void read_batch_csum_info(int flist_entry, struct sum_struct *s,
 			  int *checksums_match)
@@ -468,11 +465,9 @@ void read_batch_csum_info(int flist_entry, struct sum_struct *s,
 	char file_sum2[SUM_LENGTH];
 	extern int csum_length;
 
-
 	read_batch_csums_file((char *) &file_flist_entry, sizeof(int));
 	if (file_flist_entry != flist_entry) {
-		rprintf(FINFO, "file_list_entry NE flist_entry\n");
-		rprintf(FINFO, "file_flist_entry = %d  flist_entry = %d\n",
+		rprintf(FINFO, "file_flist_entry (%d) != flist_entry (%d)\n",
 			file_flist_entry, flist_entry);
 		close(fdb);
 		exit_cleanup(1);
@@ -488,31 +483,33 @@ void read_batch_csum_info(int flist_entry, struct sum_struct *s,
 			read_batch_csums_file(file_sum2, csum_length);
 
 			if ((s->sums[i].sum1 != file_sum1) ||
-			    (memcmp
-			     (s->sums[i].sum2, file_sum2,
-			      csum_length) != 0)) {
+			    (memcmp(s->sums[i].sum2, file_sum2, csum_length)
+				!= 0)) {
 				*checksums_match = 0;
 			}
 		}		/*  end for  */
 	}
-
 }
 
 void write_batch_delta_file(char *buff, int bytes_to_write)
 {
 	static int fdb_delta_open = 1;
+	char filename[MAXPATHLEN];
 
 	if (fdb_delta_open) {
 		/* Set up file extension */
-		strcat(rsync_delta_file, batch_file_ext);
+		strlcpy(filename, batch_prefix, sizeof(filename));
+		strlcat(filename, rsync_delta_file, sizeof(filename));
 
-		/* Open batch delta file for writing; create it if it doesn't exist */
-		fdb_delta =
-		    do_open(rsync_delta_file, O_WRONLY | O_CREAT | O_TRUNC,
+		/*
+		 * Open batch delta file for writing;
+		 * create it if it doesn't exist
+		 */
+		fdb_delta = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 			    S_IREAD | S_IWRITE);
 		if (fdb_delta == -1) {
 			rprintf(FERROR, "Batch file %s open error: %s\n",
-				rsync_delta_file, strerror(errno));
+				filename, strerror(errno));
 			close(fdb_delta);
 			exit_cleanup(1);
 		}
@@ -523,32 +520,33 @@ void write_batch_delta_file(char *buff, int bytes_to_write)
 
 	if (write(fdb_delta, buff, bytes_to_write) == -1) {
 		rprintf(FERROR, "Batch file %s write error: %s\n",
-			rsync_delta_file, strerror(errno));
+			filename, strerror(errno));
 		close(fdb_delta);
 		exit_cleanup(1);
 	}
 }
-void close_batch_delta_file()
+
+void close_batch_delta_file(void)
 {
 	close(fdb_delta);
-
 }
 
 int read_batch_delta_file(char *buff, int len)
 {
 	static int fdb_delta_open = 1;
 	int bytes_read;
+	char filename[MAXPATHLEN];
 
 	if (fdb_delta_open) {
-
-		/*  Set up file extension  */
-		strcat(rsync_delta_file, batch_file_ext);
+		/* Set up file extension */
+		strlcpy(filename, batch_prefix, sizeof(filename));
+		strlcat(filename, rsync_delta_file, sizeof(filename));
 
 		/* Open batch flist file for reading */
-		fdb_delta = do_open(rsync_delta_file, O_RDONLY, 0);
+		fdb_delta = do_open(filename, O_RDONLY, 0);
 		if (fdb_delta == -1) {
 			rprintf(FERROR, "Batch file %s open error: %s\n",
-				rsync_delta_file, strerror(errno));
+				filename, strerror(errno));
 			close(fdb_delta);
 			exit_cleanup(1);
 		}
@@ -561,13 +559,13 @@ int read_batch_delta_file(char *buff, int len)
 
 	if (bytes_read == -1) {
 		rprintf(FERROR, "Batch file %s read error: %s\n",
-			rsync_delta_file, strerror(errno));
+			filename, strerror(errno));
 		close(fdb_delta);
 		exit_cleanup(1);
 	}
+
 	return bytes_read;
 }
-
 
 void show_flist(int index, struct file_struct **fptr)
 {

@@ -41,6 +41,7 @@ struct {
 	{ RERR_PROTOCOL   , "protocol incompatibility" }, 
 	{ RERR_FILESELECT , "errors selecting input/output files, dirs" }, 
 	{ RERR_UNSUPPORTED, "requested action not supported" }, 
+	{ RERR_STARTCLIENT, "error starting client-server protocol" }, 
 	{ RERR_SOCKETIO   , "error in socket IO" }, 
 	{ RERR_FILEIO     , "error in file IO" }, 
 	{ RERR_STREAMIO   , "error in rsync protocol data stream" }, 
@@ -559,20 +560,16 @@ void log_exit(int code, const char *file, int line)
 	}
 }
 
-
-
-
-/* log the incoming transfer of a file for interactive use, this
-   will be called at the end where the client was run 
-   
-   it i called when a file starts to be transferred
-*/
+/*
+ * Log the incoming transfer of a file for interactive use,
+ * this will be called at the end where the client was run.
+ * Called when a file starts to be transferred.
+ */
 void log_transfer(struct file_struct *file, const char *fname)
 {
 	extern int verbose;
 
 	if (!verbose) return;
 
-	rprintf(FINFO,"%s\n", fname);
+	rprintf(FINFO, "%s\n", fname);
 }
-

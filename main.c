@@ -177,7 +177,7 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 	extern int blocking_io;
 	extern int read_batch;
 
-	if (!read_batch && !local_server) { /* dw -- added read_batch */
+	if (!read_batch && !local_server) {
 		if (!cmd)
 			cmd = getenv(RSYNC_RSH_ENV);
 		if (!cmd)
@@ -230,7 +230,7 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 
 	if (local_server) {
 		if (read_batch)
-		    create_flist_from_batch();
+		    create_flist_from_batch(); /* sets batch_flist */
 		ret = local_child(argc, args, f_in, f_out);
 	} else {
 		ret = piped_child(args,f_in,f_out);
@@ -443,8 +443,8 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	extern int am_daemon;
 	extern int module_id;
 	extern int am_sender;
-	extern int read_batch;   /* dw */
-	extern struct file_list *batch_flist;  /* dw */
+	extern int read_batch;
+	extern struct file_list *batch_flist;
 
 	if (verbose > 2)
 		rprintf(FINFO,"server_recv(%d) starting pid=%d\n",argc,(int)getpid());
@@ -470,7 +470,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	if (delete_mode && !delete_excluded)
 		recv_exclude_list(f_in);
 
-	if (read_batch) /*  dw  */
+	if (read_batch)
 	    flist = batch_flist;
 	else
 	    flist = recv_file_list(f_in);
@@ -497,7 +497,7 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 	extern int cvs_exclude;
 	extern int am_sender;
 	extern int remote_version;
-	extern int read_batch; /* dw */
+	extern int read_batch;
 
 	setup_protocol(f_out, f_in);
 
@@ -508,7 +508,7 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 		io_start_multiplex_out(f_out);
 
 	if (am_sender) {
-		if (!read_batch) { /* dw */
+		if (!read_batch) {
 		    recv_exclude_list(f_in);
 		    if (cvs_exclude)
 			add_cvs_excludes();
@@ -527,19 +527,19 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
  */
 int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 {
-	struct file_list *flist;
+	struct file_list *flist = NULL;
 	int status = 0, status2 = 0;
 	char *local_name = NULL;
 	extern int am_sender;
 	extern int remote_version;
 	extern pid_t cleanup_child_pid;
-	extern int write_batch; /* dw */
-	extern int read_batch; /* dw */
-	extern struct file_list *batch_flist; /*  dw */
+	extern int write_batch;
+	extern int read_batch;
+	extern struct file_list *batch_flist;
 
 	cleanup_child_pid = pid;
 	if (read_batch)
-	    flist = batch_flist;  /* dw */
+	    flist = batch_flist;
 
 	set_nonblocking(f_in);
 	set_nonblocking(f_out);
@@ -582,7 +582,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		list_only = 1;
 	}
 	
-	if (!write_batch) /* dw */
+	if (!write_batch)
 	    send_exclude_list(f_out);
 	
 	flist = recv_file_list(f_in);
@@ -658,6 +658,7 @@ static int start_client(int argc, char *argv[])
 	extern char *shell_cmd;
 	extern int rsync_port;
 	extern int whole_file;
+	extern int write_batch;
 	extern int read_batch;
 	int rc;
 
@@ -685,7 +686,7 @@ static int start_client(int argc, char *argv[])
 		return start_socket_client(host, path, argc-1, argv+1);
 	}
 
-	if (!read_batch) { /* dw */
+	if (!read_batch) {
 	    p = find_colon(argv[0]);
 
 	if (p) {
@@ -711,8 +712,11 @@ static int start_client(int argc, char *argv[])
 		p = find_colon(argv[argc-1]);
 		if (!p) {
 			local_server = 1;
-			/* disable "rsync algorithm" when both sides local */
-			if (whole_file == -1)
+			/*
+			 * disable "rsync algorithm" when both sides local,
+			 * except when creating a batch update
+			 */
+			if (!write_batch && whole_file == -1)
 				whole_file = 1;
 		} else if (p[1] == ':') {
 			*p = 0;
@@ -735,9 +739,9 @@ static int start_client(int argc, char *argv[])
 		argc--;
 	}
 	} else {
-	    am_sender = 1;  /*  dw */
-	    local_server = 1;  /* dw */
-	    shell_path = argv[argc-1];  /* dw */
+	    am_sender = 1;
+	    local_server = 1;
+	    shell_path = argv[argc-1];
 	}
 
 	if (shell_machine) {
@@ -802,13 +806,11 @@ int main(int argc,char *argv[])
 	extern int am_daemon;
 	extern int am_server;
 	int ret;
-	extern int read_batch;   /*  dw */
-	extern int write_batch;  /*  dw */
-	extern char *batch_ext;   /*  dw */
-	int orig_argc;  /* dw */
+	extern int write_batch;
+	int orig_argc;
 	char **orig_argv;
 
-	orig_argc = argc;   /* dw */
+	orig_argc = argc;
 	orig_argv = argv;
 
 	signal(SIGUSR1, sigusr1_handler);
@@ -847,13 +849,8 @@ int main(int argc,char *argv[])
 	   that implement getcwd that way "pwd" can't be found after chroot. */
 	push_dir(NULL,0);
 
-	if (write_batch) { /* dw */
-	    create_batch_file_ext();
+	if (write_batch && !am_server) {
 	    write_batch_argvs_file(orig_argc, orig_argv);
-	}
-
-	if (read_batch) { /* dw */
-	    set_batch_file_ext(batch_ext);
 	}
 
 	if (am_daemon) {
@@ -882,7 +879,9 @@ int main(int argc,char *argv[])
 	}
 
 	ret = start_client(argc, argv);
-	exit_cleanup(ret);
+	if (ret == -1) 
+	    exit_cleanup(RERR_STARTCLIENT);
+	else
+	    exit_cleanup(ret);
 	return ret;
 }
-
