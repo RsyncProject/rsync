@@ -26,7 +26,7 @@
  * shutdown() of socket connections.  This eliminates the abortive
  * TCP RST sent by a Winsock-based system when the close() occurs.
  **/
-void close_all()
+void close_all(void)
 {
 #ifdef SHUTDOWN_ALL_SOCKETS
 	int max_fd;
