@@ -255,6 +255,9 @@ enum msgcode {
 
 #if MAJOR_IN_MKDEV
 #include <sys/mkdev.h>
+# if !defined(makedev) && defined(mkdev)
+#  define makedev mkdev
+# endif
 #elif MAJOR_IN_SYSMACROS
 #include <sys/sysmacros.h>
 #endif
