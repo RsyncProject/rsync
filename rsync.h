@@ -147,19 +147,17 @@
 #define ITEM_REPORT_OWNER (1<<5)
 #define ITEM_REPORT_GROUP (1<<6)
 #define ITEM_IS_NEW (1<<7)
-#define ITEM_USING_ALT_BASIS (1<<8)
-#define ITEM_HARD_LINKED (1<<9)
-#define ITEM_LOCAL_CHANGE (1<<10)
-#define ITEM_REPORT_XATTRS (1<<11)
+#define ITEM_REPORT_XATTRS (1<<8)
+#define ITEM_BASIS_TYPE_FOLLOWS (1<<11)
+#define ITEM_XNAME_FOLLOWS (1<<12)
+#define ITEM_LOCAL_CHANGE (1<<15)
 /* These are outside the range of the transmitted flags. */
 #define ITEM_NO_DEST_AND_NO_UPDATE (1<<16) /* used by itemize() */
 #define ITEM_MISSING_DATA (1<<16)	   /* used by log_formatted() */
 #define ITEM_DELETED (1<<17)		   /* used by log_formatted() */
 
-#define SIGNIFICANT_ITEM_FLAGS (ITEM_TRANSFER | ITEM_REPORT_CHECKSUM \
-	| ITEM_REPORT_SIZE | ITEM_REPORT_TIME | ITEM_REPORT_PERMS \
-	| ITEM_REPORT_OWNER | ITEM_REPORT_GROUP | ITEM_REPORT_XATTRS \
-	| ITEM_IS_NEW)
+#define SIGNIFICANT_ITEM_FLAGS (~(\
+	ITEM_BASIS_TYPE_FOLLOWS | ITEM_XNAME_FOLLOWS | ITEM_LOCAL_CHANGE))
 
 
 /* Log-message categories.  FLOG and FCLIENT are only used on the daemon
