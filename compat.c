@@ -42,8 +42,8 @@ extern int checksum_seed;
 extern int protocol_version;
 extern int verbose;
 
-extern int read_batch;  /* dw */
-extern int write_batch;  /* dw */
+extern int read_batch;
+extern int write_batch;
 
 void setup_protocol(int f_out,int f_in)
 {
@@ -85,7 +85,7 @@ void setup_protocol(int f_out,int f_in)
 	}
 
 	if (am_server) {
-		if (read_batch || write_batch) /* dw */
+		if (read_batch || write_batch)
 			checksum_seed = 32761;
 		else
 			checksum_seed = time(NULL);
