@@ -240,7 +240,7 @@ void sig_int(void)
 /* finish off a file transfer, renaming the file and setting the permissions
    and ownership */
 void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
-		     int ok_to_set_time)
+		     int ok_to_set_time, int overwriting_basis)
 {
 	int ret;
 
@@ -250,7 +250,7 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
 		goto do_set_perms;
 	}
 
-	if (make_backups && !make_backup(fname))
+	if (make_backups && overwriting_basis && !make_backup(fname))
 		return;
 
 	/* Change permissions before putting the file into place. */
