@@ -1011,23 +1011,24 @@ it is more desirable to keep partially transferred files. Using the
 bf(--partial) option tells rsync to keep the partial file which should
 make a subsequent transfer of the rest of the file much faster.
 
-dit(bf(--partial-dir=DIR)) Turns on bf(--partial) mode, but tells rsync to
-put a partially transferred file into em(DIR) instead of writing out the
-file to the destination dir.  Rsync will also use a file found in this
-dir as data to speed up the transfer (i.e. when you redo the send after
-rsync creates a partial file) and delete such a file after it has served
-its purpose.  Note that if bf(--whole-file) is specified (or implied) that an
-existing partial-dir file will not be used to speedup the transfer (since
+dit(bf(--partial-dir=DIR)) A better way to keep partial files than the
+bf(--partial) option is to specify a em(DIR) that will be used to hold the
+partial data (instead of writing it out to the destination file).
+On the next transfer, rsync will use a file found in this
+dir as data to speed up the resumption of the transfer and then deletes it
+after it has served its purpose.
+Note that if bf(--whole-file) is specified (or implied), any partial-dir
+file that is found for a file that is being updated will simply be removed
+(since
 rsync is sending files without using the incremental rsync algorithm).
 
-Rsync will create the dir if it is missing (just the last dir -- not the
-whole path).  This makes it easy to use a relative path (such as
-"bf(--partial-dir=.rsync-partial)") to have rsync create the partial-directory
-in the destination file's directory (rsync will also try to remove the em(DIR)
-if a partial file was found to exist at the start of the transfer and the
-DIR was specified as a relative path).
+Rsync will create the em(DIR) if it is missing (just the last dir -- not
+the whole path).  This makes it easy to use a relative path (such as
+"bf(--partial-dir=.rsync-partial)") to have rsync create the
+partial-directory in the destination file's directory when needed, and then
+remove it again when the partial file is deleted.
 
-If the partial-dir value is not an absolute path, rsync will also add an
+If the partial-dir value is not an absolute path, rsync will also add a directory
 bf(--exclude) of this value at the end of all your existing excludes.  This
 will prevent partial-dir files from being transferred and also prevent the
 untimely deletion of partial-dir items on the receiving side.  An example:
@@ -1036,7 +1037,8 @@ rule at the end of any other filter rules.  Note that if you are
 supplying your own filter rules, you may need to manually insert a
 rule for this directory exclusion somewhere higher up in the list so that
 it has a high enough priority to be effective (e.g., if your rules specify
-a trailing bf(--exclude='*') rule, the auto-added rule will be ineffective).
+a trailing bf(--exclude='*') rule, the auto-added rule would never be
+reached).
 
 IMPORTANT: the bf(--partial-dir) should not be writable by other users or it
 is a security risk.  E.g. AVOID "/tmp".
@@ -1052,13 +1054,22 @@ option does not look for this environment value is (1) when bf(--inplace) was
 specified (since bf(--inplace) conflicts with bf(--partial-dir)), or (2) when
 bf(--delay-updates) was specified (see below).
 
+For the purposes of the server-config's "refuse options" setting,
+bf(--partial-dir) does em(not) imply bf(--partial).  This is so that a
+refusal of the bf(--partial) option can be used to disallow the overwriting
+of destination files with a partial transfer, while still allowing the
+safer idiom provided by bf(--partial-dir).
+
 dit(bf(--delay-updates)) This option puts the temporary file from each
-updated file into the file's partial-dir (see above) until the end of the
+updated file into a holding directory until the end of the
 transfer, at which time all the files are renamed into place in rapid
 succession.  This attempts to make the updating of the files a little more
-atomic.  If you don't specify the bf(--partial-dir) option, this option will
-cause it to default to ".~tmp~" (RSYNC_PARTIAL_DIR is not consulted for
-this value).  Conflicts with bf(--inplace).
+atomic.  By default the files are placed into a directory named ".~tmp~" in
+each file's destination directory, but you can override this by specifying
+the bf(--partial-dir) option.  (Note that RSYNC_PARTIAL_DIR has no effect
+on this value, nor is bf(--partial-dir) considered to be implied for the
+purposes of the server-config's "refuse options" setting.)
+Conflicts with bf(--inplace).
 
 This option uses more memory on the receiving side (one bit per file
 transferred) and also requires enough free disk space on the receiving
@@ -1075,7 +1086,7 @@ parallel hierarchy of files).
 dit(bf(--progress)) This option tells rsync to print information
 showing the progress of the transfer. This gives a bored user
 something to watch.
-Implies bf(--verbose) without incrementing verbosity.
+Implies bf(--verbose) if it wasn't already specified.
 
 When the file is transferring, the data looks like this:
 
@@ -1424,7 +1435,7 @@ itemize(
   it() A bf(C) is used to indicate that all the global CVS-exclude rules
   should be inserted as excludes in place of the "-C".  No arg should
   follow.
-)
+  )
 
 Per-directory rules are inherited in all subdirectories of the directory
 where the merge-file was found unless the 'n' modifier was used.  Each
