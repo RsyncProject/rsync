@@ -11,8 +11,8 @@ rsync changes since last release
 
   INTERNAL:
 
-    * Many code cleanups and improved internal documentation.  (Martin Pool, Nelson
-      Beebe)
+    * Many code cleanups and improved internal documentation.  (Martin 
+      Pool, Nelson Beebe)
 
     * More test cases.  (Martin Pool)
 
