@@ -595,7 +595,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			break;
 		case OPT_LINK_DEST:
 #if HAVE_LINK
-			compare_dest = poptGetOptArg(pc);
+			compare_dest = (char *)poptGetOptArg(pc);
 			link_dest = 1;
 			break;
 #else
