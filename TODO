@@ -317,6 +317,8 @@ chmod:
   the program.  For bonus points there would be a test case for the  
   parser.
 
+  (Debian #23628)
+
 
 --diff
 
