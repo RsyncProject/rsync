@@ -831,13 +831,12 @@ static unsigned long msdiff(struct timeval *t1, struct timeval *t2)
 static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 			    int is_last)
 {
-    int           pct  = (int)((100.0*ofs)/size);
+    int           pct  = (ofs == size) ? 100 : (int)((100.0*ofs)/size);
     unsigned long diff = msdiff(&start_time, now);
     double        rate = diff ? ((ofs-start_ofs) / diff) * 1000.0/1024.0 : 0;
-    const char    *units;
+    const char    *units, *rem_units;
+    double        remain = pct ? ((100.0-pct) * diff / pct / 1000.0) : 0;
 
-    if (ofs == size) pct = 100;
-    
     if (rate > 1024*1024) {
 	    rate /= 1024.0 * 1024.0;
 	    units = "GB/s";
@@ -847,9 +846,20 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
     } else {
 	    units = "kB/s";
     }
+
+    if (remain > 5*60*60) {
+	    remain /= 60*60;
+	    rem_units = "h";
+    } if (remain > 5*60) {
+	    remain /= 60;
+	    rem_units = "m";
+    } else {
+	    rem_units = "s";
+    }
     
-    rprintf(FINFO, "%12.0f %3d%% %7.2f%s%s",
+    rprintf(FINFO, "%12.0f %3d%% %7.2f%s %5.0f%s%s",
 	    (double) ofs, pct, rate, units,
+	    remain, rem_units,
 	    is_last ? "\n" : "\r");
 }
 
