@@ -238,6 +238,7 @@ test_fail() {
 
 test_skipped() {
     echo "$@" >&2
+    echo "$@" > "$TMP/whyskipped"
     exit 77
 }
 

@@ -220,7 +220,8 @@ do
 	maybe_discard_scratch
 	;;
     77)
-	echo "SKIP    $testbase"
+	# backticks will fill the whole file onto one line, which is a feature
+	echo "SKIP    $testbase (`cat \"$scratchdir/whyskipped\"`)"
 	skipped=`expr $skipped + 1`
 	maybe_discard_scratch
 	;;
