@@ -78,7 +78,6 @@ int do_progress=0;
 int keep_partial=0;
 int safe_symlinks=0;
 int copy_unsafe_links=0;
-int block_size=0;
 int size_only=0;
 int bwlimit=0;
 int delete_after=0;
@@ -88,6 +87,7 @@ int max_delete=0;
 int ignore_errors=0;
 int modify_window=0;
 int blocking_io=-1;
+unsigned int block_size = 0;
 
 
 /** Network address family. **/
@@ -790,7 +790,7 @@ void server_options(char **args,int *argc)
 	if (x != 1) args[ac++] = argstr;
 
 	if (block_size) {
-		snprintf(bsize,sizeof(bsize),"-B%d",block_size);
+		snprintf(bsize, sizeof bsize, "-B%u", block_size);
 		args[ac++] = bsize;
 	}
 

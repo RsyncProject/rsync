@@ -404,7 +404,7 @@ struct file_list {
 
 struct sum_buf {
 	OFF_T offset;		/**< offset in file of this chunk */
-	int len;		/**< length of chunk of file */
+	unsigned int len;	/**< length of chunk of file */
 	int i;			/**< index of this chunk */
 	uint32 sum1;	        /**< simple checksum */
 	char sum2[SUM_LENGTH];	/**< checksum  */
@@ -413,9 +413,9 @@ struct sum_buf {
 struct sum_struct {
 	OFF_T flength;		/**< total file length */
 	size_t count;		/**< how many chunks */
-	size_t remainder;	/**< flength % block_length */
-	size_t blength;		/**< block_length */
-	size_t s2length;	/**< sum2_length */
+	unsigned int blength;	/**< block_length */
+	unsigned int remainder;	/**< flength % block_length */
+	int s2length;		/**< sum2_length */
 	struct sum_buf *sums;	/**< points to info for each chunk */
 };
 

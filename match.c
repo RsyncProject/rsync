@@ -105,7 +105,7 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 	OFF_T j;
 
 	if (verbose > 2 && i >= 0)
-		rprintf(FINFO,"match at %.0f last_match=%.0f j=%d len=%d n=%.0f\n",
+		rprintf(FINFO,"match at %.0f last_match=%.0f j=%d len=%u n=%.0f\n",
 			(double)offset,(double)last_match,i,s->sums[i].len,(double)n);
 
 	send_token(f,i,buf,last_match,n,i<0?0:s->sums[i].len);
@@ -136,7 +136,7 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 
 
 static void hash_search(int f,struct sum_struct *s,
-			struct map_struct *buf,OFF_T len)
+			struct map_struct *buf, OFF_T len)
 {
 	OFF_T offset, end;
 	int j,k, last_i;
@@ -185,7 +185,8 @@ static void hash_search(int f,struct sum_struct *s,
 		sum = (s1 & 0xffff) | (s2 << 16);
 		tag_hits++;
 		for (; j < (int) s->count && targets[j].t == t; j++) {
-			int l, i = targets[j].i;
+			unsigned int l;
+			int i = targets[j].i;
 
 			if (sum != s->sums[i].sum1) continue;
 

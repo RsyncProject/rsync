@@ -71,10 +71,10 @@ static struct sum_struct *receive_sums(int f)
 
 	s->sums = NULL;
 
-	if (verbose > 3)
-		rprintf(FINFO, "count=%ld n=%ld rem=%ld\n",
-			(long) s->count, (long) s->blength,
-			(long) s->remainder);
+	if (verbose > 3) {
+		rprintf(FINFO, "count=%ld n=%u rem=%u\n",
+			(long)s->count, s->blength, s->remainder);
+	}
 
 	if (s->count == 0)
 		return(s);

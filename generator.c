@@ -136,8 +136,9 @@ void write_sum_head(int f, struct sum_struct *sum)
 
 static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 {
-	extern int block_size;
-	int blength, s2length, b;
+	extern unsigned int block_size;
+	unsigned int blength;
+	int s2length;
 	uint32 c;
 	uint64 l;
 
@@ -166,7 +167,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 	} else if (csum_length == SUM_LENGTH) {
 		s2length = SUM_LENGTH;
 	} else {
-		b = BLOCKSUM_BIAS;
+		int b = BLOCKSUM_BIAS;
 		l = len;
 		while (l >>= 1) {
 			b += 2;
@@ -191,10 +192,9 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 	sum->remainder	= (len % blength);
 
 	if (sum->count && verbose > 2) {
-		rprintf(FINFO, "count=%ld rem=%ld blength=%ld s2length=%ld flength=%.0f\n",
-			(long) sum->count, (long) sum->remainder,
-			(long) sum->blength, (long) sum->s2length,
-			(double) sum->flength);
+		rprintf(FINFO, "count=%ld rem=%u blength=%u s2length=%d flength=%.0f\n",
+			(long)sum->count, sum->remainder, sum->blength,
+			sum->s2length, (double)sum->flength);
 	}
 }
 
