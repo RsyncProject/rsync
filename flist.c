@@ -351,18 +351,32 @@ static void flist_expand(struct file_list *flist)
 	}
 }
 
+/* These vars are used by both send_file_entry() and receive_file_entry()
+ * (but just one at a time).  They have been placed outside these functions
+ * so that we can reset the values when the batch-processing wants to make
+ * extra use of these functions (which needs to start from a known state). */
+static time_t modtime;
+static mode_t mode;
+static DEV64_T rdev;	/* just high bytes in p28 onward */
+static uid_t uid;
+static gid_t gid;
+static DEV64_T dev;
+static char lastname[MAXPATHLEN];
 
-static void send_file_entry(struct file_struct *file, int f,
-			    unsigned short base_flags)
+void reset_file_entry_vars(void)
+{
+	modtime = 0;
+	mode = 0;
+	rdev = 0;
+	uid = 0;
+	gid = 0;
+	dev = 0;
+	*lastname = '\0';
+}
+
+void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 {
 	unsigned short flags;
-	static time_t modtime;
-	static mode_t mode;
-	static DEV64_T rdev;	/* just high bytes in p28 onward */
-	static uid_t uid;
-	static gid_t gid;
-	static DEV64_T dev;
-	static char lastname[MAXPATHLEN];
 	char *fname, fbuf[MAXPATHLEN];
 	int l1, l2;
 
@@ -515,16 +529,8 @@ static void send_file_entry(struct file_struct *file, int f,
 
 
 
-static void receive_file_entry(struct file_struct **fptr,
-			       unsigned short flags, int f)
+void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 {
-	static time_t modtime;
-	static mode_t mode;
-	static DEV64_T rdev;	/* just high bytes in p28 onward */
-	static uid_t uid;
-	static gid_t gid;
-	static DEV64_T dev;
-	static char lastname[MAXPATHLEN];
 	char thisname[MAXPATHLEN];
 	unsigned int l1 = 0, l2 = 0;
 	char *p;
