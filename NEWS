@@ -152,7 +152,7 @@ Changes since 2.6.3:
 
     - Added support for specifying multiple --compare-dest or --link-dest
       options, but only of a single type. (Promoted from the patches dir
-      and enhanced.)
+      and enhanced.) (Requires protocol 29.)
 
     - Added the --max-size option. (Promoted from the patches dir.)
 
@@ -232,7 +232,7 @@ Changes since 2.6.3:
       file was renamed with no other changes) as well as based on a fuzzy
       name-matching algorithm.  This option requires protocol 29 because
       it needs the new file-sorting order.  (Promoted from patches dir
-      and enhanced.)
+      and enhanced.) (Requires protocol 29.)
 
     - Added the --remove-sent-files option, which lets you move files
       between systems.
@@ -302,9 +302,19 @@ Changes since 2.6.3:
       less prone to screen corruption (because either the receiver or the
       sender is now outputting all the file-change info).
 
-    - If --inplace is specified, the generator flags any transfer that is
-      using an alternate basis file so that the sender can use the entire
-      basis file in the rsync algorithm (unlike a normal --inplace update).
+    - If a file is being hard-linked, the appropriate bit is enabled in
+      the flag-word and the name of the file that was linked immediately
+      follows in vstring format (see below).
+
+    - If a file is being transferred with an alternate-basis file, the
+      appropriate bit is enabled in the flag-word and a single-byte
+      follows, indicating what type of basis file was chosen.  If that
+      indicates that a fuzzy-match was selected, the name of the match
+      immediately follows in vstring format.  A vstring is a variable
+      length string that has its size written prior to the string, and
+      no terminating null.  If the string is from 1-127 bytes, the length
+      is a single byte.  If it is from 128-32767 bytes, the length is
+      written as ((len >> 8) | 0x80) followed by (len % 0x100).
 
     - The sending of exclude names is done using filter-rule syntax.  This
       means that all names have a prefixed rule indicator, even excludes
