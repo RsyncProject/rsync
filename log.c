@@ -28,6 +28,43 @@ static char *logfname;
 static FILE *logfile;
 static int log_error_fd = -1;
 
+
+struct {
+        int code;
+        char const *name;
+} const rerr_names[] = {
+	{ RERR_SYNTAX     , "syntax or usage error" }, 
+	{ RERR_PROTOCOL   , "protocol incompatibility" }, 
+	{ RERR_FILESELECT , "errors selecting input/output files, dirs" }, 
+	{ RERR_UNSUPPORTED , "requested action not supported" }, 
+	{ RERR_SOCKETIO   , "error in socket IO" }, 
+	{ RERR_FILEIO     , "error in file IO" }, 
+	{ RERR_STREAMIO   , "error in rsync protocol data stream" }, 
+	{ RERR_MESSAGEIO  , "errors with program diagnostics" }, 
+	{ RERR_IPC        , "error in IPC code" }, 
+	{ RERR_SIGNAL     , "status returned when sent SIGUSR1, SIGINT" }, 
+	{ RERR_WAITCHILD  , "some error returned by waitpid()" }, 
+	{ RERR_MALLOC     , "error allocating core memory buffers" }, 
+	{ RERR_TIMEOUT    , "timeout in data send/receive" }, 
+        { 0, NULL }
+};
+
+
+
+/*
+ * Map from rsync error code to name, or return NULL.
+ */
+static char const *rerr_name(int code)
+{
+        int i;
+        for (i = 0; rerr_names[i].name; i++) {
+                if (rerr_names[i].code == code)
+                        return rerr_names[i].name;
+        }
+        return NULL;
+}
+
+
 static void logit(int priority, char *buf)
 {
 	if (logfname) {
@@ -382,7 +419,15 @@ void log_recv(struct file_struct *file, struct stats *initial_stats)
 	}
 }
 
-/* called when the transfer is interrupted for some reason */
+
+
+
+/*
+ * Called when the transfer is interrupted for some reason.
+ *
+ * Code is one of the RERR_* codes from errcode.h, or terminating
+ * successfully.
+ */
 void log_exit(int code, const char *file, int line)
 {
 	if (code == 0) {
@@ -392,10 +437,19 @@ void log_exit(int code, const char *file, int line)
 			(double)stats.total_read,
 			(double)stats.total_size);
 	} else {
-		rprintf(FLOG,"transfer interrupted (code %d) at %s(%d)\n", 
-			code, file, line);
+                const char *name;
+
+                name = rerr_name(code);
+                if (!name)
+                        name = "unexplained error";
+                
+		rprintf(FLOG,"transfer interrupted: %s (code %d) at %s(%d)\n", 
+			name, code, file, line);
 	}
 }
+
+
+
 
 /* log the incoming transfer of a file for interactive use, this
    will be called at the end where the client was run 
