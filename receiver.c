@@ -116,7 +116,7 @@ void delete_files(struct file_list *flist)
 			rprintf(FINFO, "deleting in %s\n", safe_fname(fbuf));
 
 		for (i = local_file_list->count-1; i >= 0; i--) {
-			if (max_delete && deletion_count > max_delete)
+			if (max_delete && deletion_count >= max_delete)
 				break;
 			if (!local_file_list->files[i]->basename)
 				continue;
