@@ -422,10 +422,11 @@ static inline int flist_up(struct file_list *flist, int i)
 }
 
 #include "byteorder.h"
-#include "proto.h"
 #include "lib/mdfour.h"
 #include "lib/permstring.h"
 #include "lib/addrinfo.h"
+
+#include "proto.h"
 
 /* We have replacement versions of these if they're missing. */
 #ifndef HAVE_ASPRINTF
