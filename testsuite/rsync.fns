@@ -50,7 +50,7 @@ printmsg() {
 
 
 rsync_ls_lR() {
-    find "$@" -print | sort | xargs "$TOOLDIR/tls"
+    find "$@" -print | sort | sed 's/ /\\ /g' | xargs "$TOOLDIR/tls"
 }
 
 rsync_getgroups() { 
@@ -168,10 +168,7 @@ checkit() {
     echo "-------------"
     echo "check how the files compare with diff:"
     echo ""
-    for f in `cd "$2"; find . -type f -print `
-    do 
-        diff $diffopt "$2"/"$f" "$3"/"$f" || failed=YES
-    done
+    diff -r $diffopt "$2" "$3" || failed=YES
 
     echo "-------------"
     echo "check how the directory listings compare with diff:"
