@@ -919,7 +919,7 @@ is where the tree starts to be duplicated in the destination directory.
 This root governs where patterns that start with a / match (see below).
 
 Because the matching is relative to the transfer-root, changing the
-trailing slash on the source path or changing your use of the --relative
+trailing slash on a source path or changing your use of the --relative
 option affects the path you need to use in your matching (in addition to
 changing how much of the file tree is duplicated on the destination
 system).  The following examples demonstrate this.
@@ -962,6 +962,11 @@ Note that, when using the --recursive (-r) option (which is implied by -a),
 every subcomponent of
 every path is visited from the top down, so include/exclude patterns get
 applied recursively to each subcomponent.
+The exclude patterns actually short-circuit the directory traversal stage
+when rsync finds the files to send.  If a pattern excludes a particular
+parent directory, it can render a deeper include pattern ineffectual
+because rsync did not descend through that excluded section of the
+hierarchy.
 
 Note also that the --include and --exclude options take one pattern
 each. To add multiple patterns use the --include-from and
@@ -1013,16 +1018,36 @@ itemize(
 
 The +/- rules are most useful in a list that was read from a file, allowing
 you to have a single exclude list that contains both include and exclude
-options.
+options in the proper order.
 
-If you end an exclude list with --exclude '*', note that since the
-algorithm is applied recursively that unless you explicitly include
-parent directories of files you want to include then the algorithm
-will stop at the parent directories and never see the files below
-them.  To include all directories, use --include '*/' before the
---exclude '*'.
+Remember that the matching occurs at every step in the traversal of the
+directory hierarchy, so you must be sure that all the parent directories of
+the files you want to include are not excluded.  This is particularly
+important when using a trailing '*' rule.  For instance, this won't work:
 
-Here are some exclude/include examples:
+verb(
+    + /some/path/this-file-will-not-be-found
+    + /file-is-included
+    - *
+)
+
+This fails because the parent directory "some" is excluded by the '*' rule,
+so rsync never visits any of the files in the "some" or "some/path"
+directories.  One solution is to ask for all directories in the hierarchy
+to be included by using a single rule: --include='*/' (put it somewhere
+before the --excludde='*' rule).  Another solution is to add specific
+include rules for all the parent dirs that need to be visited.  For
+instance, this set of rules works fine:
+
+verb(
+    + /some/
+    + /some/path/
+    + /some/path/this-file-is-found
+    + /file-also-included
+    - *
+)
+
+Here are some examples of exclude/include matching:
 
 itemize(
   it() --exclude "*.o" would exclude all filenames matching *.o
