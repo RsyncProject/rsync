@@ -32,7 +32,7 @@
 #define BACKUP_SUFFIX "~"
 
 /* a non-zero CHAR_OFFSET makes the rolling sum stronger, but is
-   imcompatible with older versions :-( */
+   incompatible with older versions :-( */
 #define CHAR_OFFSET 0
 
 
