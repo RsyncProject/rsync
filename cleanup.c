@@ -63,11 +63,11 @@ void _exit_cleanup(int code, const char *file, int line)
 	extern int log_got_error;
 	static int inside_cleanup = 0;
 
-	if (inside_cleanup != 0) {
+	if (inside_cleanup > 10) {
 		/* prevent the occasional infinite recursion */
 		return;
 	}
-	inside_cleanup = 1;
+	inside_cleanup++;
 
 	signal(SIGUSR1, SIG_IGN);
 	signal(SIGUSR2, SIG_IGN);

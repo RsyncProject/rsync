@@ -69,7 +69,7 @@ rsync changes since last release
       broken.  (Dave Dykstra)
 
     * Prevent infinite recursion in cleanup code under certain circumstances.
-      (Sviatoslav Sviridov)
+      (Sviatoslav Sviridov and Marc Espie)
 
     * Fixed a bug that prevented rsync from creating intervening directories
       when --relative-paths/-R is set.  (Craig Barratt)
