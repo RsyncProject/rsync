@@ -83,7 +83,10 @@
 # Also, we can't count on 'cp -a' or 'mkdir -p', although they're
 # pretty handy.
 
-# Eventually we would like to not count on shell functions.
+# I think some of the GNU documentation suggests that we shouldn't
+# rely on shell functions.  However, the Bash manual seems to say that
+# they're in POSIX 1003.2, and since the build farm relies on them
+# they're probably working on most machines we really care about.
 
 
 set -e
@@ -170,7 +173,7 @@ echo "      $skipped skipped"
 echo "      $missing missing"
 echo '------------------------------------------------------------'
 
-if test $failed -gt 0
+if test "$failed" -gt 0 || test "$missing" -gt 0
 then
     exit 1
 else
