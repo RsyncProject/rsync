@@ -3,8 +3,8 @@
 
 prefix=@prefix@
 exec_prefix=@exec_prefix@
-INSTALL_BIN=$(exec_prefix)/bin
-INSTALL_MAN=$(prefix)/man
+bindir=@bindir@
+mandir=@mandir@
 
 LIBS=@LIBS@
 CC=@CC@
@@ -12,8 +12,8 @@ CFLAGS=@CFLAGS@
 
 INSTALLCMD=@INSTALL@
 
-VPATH=@srcdir@
 srcdir=@srcdir@
+VPATH=$(srcdir)
 SHELL=/bin/sh
 
 
@@ -38,12 +38,15 @@ all: rsync
 man: rsync.1 rsyncd.conf.5
 
 install: all
-	-mkdir -p ${INSTALL_BIN}
-	${INSTALLCMD} -m 755 rsync ${INSTALL_BIN}
-	-mkdir -p ${INSTALL_MAN}/man1
-	-mkdir -p ${INSTALL_MAN}/man5
-	${INSTALLCMD} -m 644 $(srcdir)/rsync.1 ${INSTALL_MAN}/man1
-	${INSTALLCMD} -m 644 $(srcdir)/rsyncd.conf.5 ${INSTALL_MAN}/man5
+	-mkdir -p ${bindir}
+	${INSTALLCMD} -m 755 rsync ${bindir}
+	-mkdir -p ${mandir}/man1
+	-mkdir -p ${mandir}/man5
+	${INSTALLCMD} -m 644 $(srcdir)/rsync.1 ${mandir}/man1
+	${INSTALLCMD} -m 644 $(srcdir)/rsyncd.conf.5 ${mandir}/man5
+
+install-strip:
+	$(MAKE) INSTALLCMD='$(INSTALLCMD) -s' install
 
 rsync: $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o rsync $(OBJS) $(LIBS)
