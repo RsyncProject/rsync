@@ -401,7 +401,7 @@ int adapt_block_size(struct file_struct *file, int bsize)
 	return ret;
 }
 
-void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
+static void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 {  
   int fd;
   STRUCT_STAT st;
