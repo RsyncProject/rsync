@@ -20,7 +20,7 @@ SHELL=/bin/sh
 .SUFFIXES:
 .SUFFIXES: .c .o
 
-LIBOBJ=lib/getopt.o lib/fnmatch.o lib/zlib.o
+LIBOBJ=lib/getopt.o lib/fnmatch.o lib/zlib.o lib/compat.o
 OBJS1=rsync.o exclude.o util.o md4.o main.o checksum.o match.o
 OBJS=$(OBJS1) flist.o io.o compat.o hlink.o token.o uidlist.o $(LIBOBJ)
 

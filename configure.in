@@ -52,4 +52,13 @@ main() { exit(fnmatch("*.o", "x.o", 0) == 0? 0: 1); }],
 echo yes;AC_DEFINE(HAVE_FNMATCH), 
 echo no)
 
+echo $ac_n "checking for utimbuf ... $ac_c"
+AC_TRY_COMPILE([#include <sys/types.h>
+#include <utime.h>],
+[int set_modtime(char *fname,time_t modtime)
+{  struct utimbuf tbuf;  tbuf.actime = 0; tbuf.modtime = modtime;
+   return utime(fname,&tbuf); }],
+echo yes;AC_DEFINE(HAVE_UTIMBUF), 
+echo no)
+
 AC_OUTPUT(Makefile)

@@ -164,21 +164,10 @@ void out_of_memory(char *str)
 }
 
 
-#ifndef HAVE_STRDUP
- char *strdup(char *s)
-{
-  int l = strlen(s) + 1;
-  char *ret = (char *)malloc(l);
-  if (ret)
-    strcpy(ret,s);
-  return ret;
-}
-#endif
-
 
 int set_modtime(char *fname,time_t modtime)
 {
-#ifdef HAVE_UTIME_H
+#ifdef HAVE_UTIMBUF
   struct utimbuf tbuf;  
   tbuf.actime = time(NULL);
   tbuf.modtime = modtime;

@@ -333,5 +333,21 @@ extern int errno;
 #define S_IWUSR 0200
 #endif
 
+#ifndef S_ISBLK
+#define S_ISBLK(mode) (((mode) & (_S_IFMT)) == (_S_IFBLK))
+#endif
+
+#ifndef S_ISCHR
+#define S_ISCHR(mode) (((mode) & (_S_IFMT)) == (_S_IFCHR))
+#endif
+
+#ifndef S_ISDIR
+#define S_ISDIR(mode) (((mode) & (_S_IFMT)) == (_S_IFDIR))
+#endif
+
+#ifndef S_ISREG
+#define S_ISREG(mode) (((mode) & (_S_IFMT)) == (_S_IFREG))
+#endif
+
 #define IS_DEVICE(mode) (S_ISCHR(mode) || S_ISBLK(mode))
 
