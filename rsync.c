@@ -199,10 +199,10 @@ int make_backup(char *fname)
 		return 0;
 	}
 
-	slprintf(fnamebak,sizeof(fnamebak)-1,"%s%s",fname,backup_suffix);
+	slprintf(fnamebak,sizeof(fnamebak),"%s%s",fname,backup_suffix);
 	if (do_rename(fname,fnamebak) != 0) {
 		if (errno != ENOENT) {
-			rprintf(FERROR,"rename %s %s : s\n",fname,fnamebak,strerror(errno));
+			rprintf(FERROR,"rename %s %s : %s\n",fname,fnamebak,strerror(errno));
 			return 0;
 		}
 	} else if (verbose > 1) {
