@@ -168,3 +168,6 @@ Changes since 2.6.0:
       their 32-bit brethren.  Note that optimizations in the binary
       protocol often sends the device data using fewer bytes than
       before, even though more precision is now available.
+
+    * Some cleanup of the exclude/include structures and its code
+      made things clearer, simpler, and more efficient.
