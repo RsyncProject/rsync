@@ -308,6 +308,41 @@ static void discard_receive_data(int f_in, OFF_T length)
 	receive_data(f_in, NULL, -1, 0, NULL, -1, length);
 }
 
+static void handle_delayed_updates(struct file_list *flist, char *local_name)
+{
+	char *fname, *partialptr, numbuf[4];
+	int i;
+
+	for (i = -1; (i = next_delayed_bit(i)) >= 0; ) {
+		struct file_struct *file = flist->files[i];
+		fname = local_name ? local_name : f_name(file);
+		if ((partialptr = partial_dir_fname(fname)) != NULL) {
+			if (make_backups && !make_backup(fname))
+				continue;
+			if (verbose > 2) {
+				rprintf(FINFO, "renaming %s to %s\n",
+					safe_fname(partialptr),
+					safe_fname(fname));
+			}
+			if (do_rename(partialptr, fname) < 0) {
+				rsyserr(FERROR, errno,
+					"rename failed for %s (from %s)",
+					full_fname(fname),
+					safe_fname(partialptr));
+			} else {
+				if (remove_sent_files
+				    || (preserve_hard_links
+				     && file->link_u.links)) {
+					SIVAL(numbuf, 0, i);
+					send_msg(MSG_SUCCESS,numbuf,4);
+				}
+				handle_partial_dir(partialptr,
+						   PDIR_DELETE);
+			}
+		}
+	}
+}
+
 
 /**
  * main routine for receiver process.
@@ -353,14 +388,16 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 					while (read_int(batch_gen_fd) != -1) {}
 				next_gen_i = -1;
 			}
-
 			if (phase)
 				break;
-
 			phase = 1;
 			csum_length = SUM_LENGTH;
 			if (verbose > 2)
 				rprintf(FINFO, "recv_files phase=%d\n", phase);
+			if (delay_updates) {
+				handle_delayed_updates(flist, local_name);
+				delay_updates = 0;
+			}
 			send_msg(MSG_DONE, "", 0);
 			if (keep_partial && !partial_dir)
 				make_backups = 0; /* prevents double backup */
@@ -643,37 +680,6 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 	}
 	make_backups = save_make_backups;
 
-	if (delay_updates) {
-		for (i = -1; (i = next_delayed_bit(i)) >= 0; ) {
-			struct file_struct *file = flist->files[i];
-			fname = local_name ? local_name : f_name(file);
-			partialptr = partial_dir_fname(fname);
-			if (partialptr) {
-				if (make_backups && !make_backup(fname))
-					continue;
-				if (verbose > 2) {
-					rprintf(FINFO, "renaming %s to %s\n",
-						safe_fname(partialptr),
-						safe_fname(fname));
-				}
-				if (do_rename(partialptr, fname) < 0) {
-					rsyserr(FERROR, errno,
-						"rename failed for %s (from %s)",
-						full_fname(fname),
-						safe_fname(partialptr));
-				} else {
-					if (remove_sent_files
-					    || (preserve_hard_links
-					     && file->link_u.links)) {
-						SIVAL(numbuf, 0, i);
-						send_msg(MSG_SUCCESS,numbuf,4);
-					}
-					handle_partial_dir(partialptr,
-							   PDIR_DELETE);
-				}
-			}
-		}
-	}
 
 	if (verbose > 2)
 		rprintf(FINFO,"recv_files finished\n");
