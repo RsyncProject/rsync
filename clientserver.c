@@ -614,7 +614,7 @@ int daemon_main(void)
 	if (((pid_file = lp_pid_file()) != NULL) && (*pid_file != '\0')) {
 		char pidbuf[16];
 		int fd;
-		int pid = (int) getpid();
+		pid_t pid = getpid();
 		cleanup_set_pid(pid);
 		if ((fd = do_open(lp_pid_file(), O_WRONLY|O_CREAT|O_TRUNC,
 					0666 & ~orig_umask)) == -1) {
@@ -622,7 +622,7 @@ int daemon_main(void)
 			rsyserr(FLOG, errno, "failed to create pid file %s", pid_file);
 			exit_cleanup(RERR_FILEIO);
 		}
-		snprintf(pidbuf, sizeof(pidbuf), "%d\n", pid);
+		snprintf(pidbuf, sizeof pidbuf, "%ld\n", (long)pid);
 		write(fd, pidbuf, strlen(pidbuf));
 		close(fd);
 	}
