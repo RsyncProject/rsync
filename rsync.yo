@@ -518,10 +518,17 @@ from the sender.
 dit(bf(--inplace)) This causes rsync not to create a new copy of the file
 and then move it into place.  Instead rsync will overwrite the existing
 file, meaning that the rsync algorithm can't extract the full amount of
-network reduction it might otherwise.
+network reduction it might otherwise (since it does not yet try to sort
+data matches -- a future version may improve this).
 
-This option is useful for transfer of large files with block-based change
-or appended data, and also on systems that are disk bound not network bound.
+This option is useful for transfer of large files with block-based changes
+or appended data, and also on systems that are disk bound, not network
+bound.
+
+The option implies --partial (since an interrupted transfer does not delete
+the file), but conflicts with --partial-dir, --compare-dest, and
+--link-dest (a future rsync version will hopefully update the protocol to
+remove these restrictions).
 
 WARNING: The file's data will be in an inconsistent state during the
 transfer (and possibly afterward if the transfer gets interrupted), so you
@@ -975,9 +982,9 @@ the file, and the addition of a total-transfer summary in parentheses.
 These additional numbers tell you how many files have been updated, and
 what percent of the total number of files has been scanned.
 
-dit(bf(-P)) The -P option is equivalent to --partial --progress. I
-found myself typing that combination quite often so I created an
-option to make it easier.
+dit(bf(-P)) The -P option is equivalent to --partial --progress.  Its
+purpose is to make it much easier to specify these two options for a long
+transfer that may be interrupted.
 
 dit(bf(--password-file)) This option allows you to provide a password
 in a file for accessing a remote rsync server. Note that this option
