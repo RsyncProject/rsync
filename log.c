@@ -102,6 +102,8 @@ void rprintf(int fd, const char *format, ...)
 
 	if (fwrite(buf, len, 1, f) != 1) exit_cleanup(1);
 
+	if (buf[len-1] == '\r') fflush(f);
+
 	depth--;
 }
 

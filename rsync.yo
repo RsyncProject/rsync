@@ -234,6 +234,7 @@ verb(
      --config=FILE           specify alternate rsyncd.conf file
      --port=PORT             specify alternate rsyncd port number
      --stats                 give some file transfer stats
+     --progress              show progress during transfer
  -h, --help                  show this help screen
 )
 
@@ -509,6 +510,10 @@ dit(bf(--stats)) This tells rsync to print a verbose set of statistics
 on the file transfer, allowing you to tell how effective the rsync
 algorithm is for your data. This option only works in conjunction with
 the -v (verbose) option.
+
+dit(bf(--progress)) This option tells rsync to print information
+showing the progress of the transfer. This gives a bored user
+something to watch.
 
 enddit()
 

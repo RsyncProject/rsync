@@ -56,6 +56,7 @@ int recurse = 0;
 int am_daemon=0;
 int am_client=0;
 int do_stats=0;
+int do_progress=0;
 int keep_partial=0;
 
 int block_size=BLOCK_SIZE;
@@ -126,6 +127,7 @@ void usage(int F)
   rprintf(F,"     --config=FILE           specify alternate rsyncd.conf file\n");  
   rprintf(F,"     --port=PORT             specify alternate rsyncd port number\n");
   rprintf(F,"     --stats                 give some file transfer stats\n");  
+  rprintf(F,"     --progress              show progress during transfer\n");  
   rprintf(F," -h, --help                  show this help screen\n");
 
   rprintf(F,"\n");
@@ -139,7 +141,7 @@ void usage(int F)
 enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
       OPT_EXCLUDE_FROM,OPT_DELETE,OPT_NUMERIC_IDS,OPT_RSYNC_PATH,
       OPT_FORCE,OPT_TIMEOUT,OPT_DAEMON,OPT_CONFIG,OPT_PORT,
-      OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL};
+      OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS};
 
 static char *short_options = "oblLWHpguDCtcahvrRIxnSe:B:T:z";
 
@@ -185,6 +187,7 @@ static struct option long_options[] = {
   {"compress",	  0,	 0,    'z'},
   {"daemon",      0,     0,    OPT_DAEMON},
   {"stats",       0,     0,    OPT_STATS},
+  {"progress",    0,     0,    OPT_PROGRESS},
   {"partial",     0,     0,    OPT_PARTIAL},
   {"config",      1,     0,    OPT_CONFIG},
   {"port",        1,     0,    OPT_PORT},
@@ -385,6 +388,10 @@ void parse_arguments(int argc, char *argv[])
 		do_stats = 1;
 		break;
 
+	case OPT_PROGRESS:
+		do_progress = 1;
+		break;
+
 	case OPT_PARTIAL:
 		keep_partial = 1;
 		break;
@@ -486,6 +493,9 @@ void server_options(char **args,int *argc)
 
   if (keep_partial)
     args[ac++] = "--partial";
+
+  if (do_progress)
+    args[ac++] = "--progress";
 
   if (force_delete)
     args[ac++] = "--force";

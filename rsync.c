@@ -577,78 +577,92 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 
 
 
-static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
+static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
+			OFF_T total_size)
 {
-  int i,n,remainder,len,count;
-  OFF_T offset = 0;
-  OFF_T offset2;
-  char *data;
-  static char file_sum1[MD4_SUM_LENGTH];
-  static char file_sum2[MD4_SUM_LENGTH];
-  char *map=NULL;
+	int i,n,remainder,len,count;
+	OFF_T offset = 0;
+	OFF_T offset2;
+	char *data;
+	static char file_sum1[MD4_SUM_LENGTH];
+	static char file_sum2[MD4_SUM_LENGTH];
+	char *map=NULL;
+	
+	count = read_int(f_in);
+	n = read_int(f_in);
+	remainder = read_int(f_in);
+	
+	sum_init();
+	
+	for (i=recv_token(f_in,&data); i != 0; i=recv_token(f_in,&data)) {
 
-  count = read_int(f_in);
-  n = read_int(f_in);
-  remainder = read_int(f_in);
+		show_progress(offset, total_size);
 
-  sum_init();
+		if (i > 0) {
+			if (verbose > 3) {
+				rprintf(FINFO,"data recv %d at %d\n",
+					i,(int)offset);
+			}
 
-  for (i=recv_token(f_in,&data); i != 0; i=recv_token(f_in,&data)) {
-    if (i > 0) {
-      if (verbose > 3)
-	rprintf(FINFO,"data recv %d at %d\n",i,(int)offset);
-
-      stats.literal_data += i;
-      cleanup_got_literal = 1;
+			stats.literal_data += i;
+			cleanup_got_literal = 1;
       
-      sum_update(data,i);
+			sum_update(data,i);
 
-      if (fd != -1 && write_file(fd,data,i) != i) {
-	rprintf(FERROR,"write failed on %s : %s\n",fname,strerror(errno));
-	exit_cleanup(1);
-      }
-      offset += i;
-    } else {
-      i = -(i+1);
-      offset2 = i*n;
-      len = n;
-      if (i == count-1 && remainder != 0)
-	len = remainder;
+			if (fd != -1 && write_file(fd,data,i) != i) {
+				rprintf(FERROR,"write failed on %s : %s\n",fname,strerror(errno));
+				exit_cleanup(1);
+			}
+			offset += i;
+			continue;
+		} 
 
-      stats.matched_data += len;
+		i = -(i+1);
+		offset2 = i*n;
+		len = n;
+		if (i == count-1 && remainder != 0)
+			len = remainder;
+		
+		stats.matched_data += len;
+		
+		if (verbose > 3)
+			rprintf(FINFO,"chunk[%d] of size %d at %d offset=%d\n",
+				i,len,(int)offset2,(int)offset);
+		
+		map = map_ptr(buf,offset2,len);
+		
+		see_token(map, len);
+		sum_update(map,len);
+		
+		if (fd != -1 && write_file(fd,map,len) != len) {
+			rprintf(FERROR,"write failed on %s : %s\n",
+				fname,strerror(errno));
+			exit_cleanup(1);
+		}
+		offset += len;
+	}
 
-      if (verbose > 3)
-	rprintf(FINFO,"chunk[%d] of size %d at %d offset=%d\n",
-		i,len,(int)offset2,(int)offset);
+	end_progress();
 
-      map = map_ptr(buf,offset2,len);
+	if (fd != -1 && offset > 0 && sparse_end(fd) != 0) {
+		rprintf(FERROR,"write failed on %s : %s\n",
+			fname,strerror(errno));
+		exit_cleanup(1);
+	}
 
-      see_token(map, len);
-      sum_update(map,len);
+	sum_end(file_sum1);
 
-      if (fd != -1 && write_file(fd,map,len) != len) {
-	rprintf(FERROR,"write failed on %s : %s\n",fname,strerror(errno));
-	exit_cleanup(1);
-      }
-      offset += len;
-    }
-  }
-
-  if (fd != -1 && offset > 0 && sparse_end(fd) != 0) {
-    rprintf(FERROR,"write failed on %s : %s\n",fname,strerror(errno));
-    exit_cleanup(1);
-  }
-
-  sum_end(file_sum1);
-
-  if (remote_version >= 14) {
-    read_buf(f_in,file_sum2,MD4_SUM_LENGTH);
-    if (verbose > 2)
-      rprintf(FINFO,"got file_sum\n");
-    if (fd != -1 && memcmp(file_sum1,file_sum2,MD4_SUM_LENGTH) != 0)
-      return 0;
-  }
-  return 1;
+	if (remote_version >= 14) {
+		read_buf(f_in,file_sum2,MD4_SUM_LENGTH);
+		if (verbose > 2) {
+			rprintf(FINFO,"got file_sum\n");
+		}
+		if (fd != -1 && 
+		    memcmp(file_sum1,file_sum2,MD4_SUM_LENGTH) != 0) {
+			return 0;
+		}
+	}
+	return 1;
 }
 
 
@@ -915,14 +929,14 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 		if (fd1 != -1 && do_fstat(fd1,&st) != 0) {
 			rprintf(FERROR,"fstat %s : %s\n",fname,strerror(errno));
-			receive_data(f_in,NULL,-1,NULL);
+			receive_data(f_in,NULL,-1,NULL,file->length);
 			close(fd1);
 			continue;
 		}
 
 		if (fd1 != -1 && !S_ISREG(st.st_mode)) {
 			rprintf(FERROR,"%s : not a regular file (recv_files)\n",fname);
-			receive_data(f_in,NULL,-1,NULL);
+			receive_data(f_in,NULL,-1,NULL,file->length);
 			close(fd1);
 			continue;
 		}
@@ -943,7 +957,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 		if (NULL == do_mktemp(fnametmp)) {
 			rprintf(FERROR,"mktemp %s failed\n",fnametmp);
-			receive_data(f_in,buf,-1,NULL);
+			receive_data(f_in,buf,-1,NULL,file->length);
 			if (buf) unmap_file(buf);
 			close(fd1);
 			continue;
@@ -964,7 +978,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		}
 		if (fd2 == -1) {
 			rprintf(FERROR,"open %s : %s\n",fnametmp,strerror(errno));
-			receive_data(f_in,buf,-1,NULL);
+			receive_data(f_in,buf,-1,NULL,file->length);
 			if (buf) unmap_file(buf);
 			close(fd1);
 			continue;
@@ -978,7 +992,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			printf("%s\n",fname);
 		
 		/* recv file data */
-		recv_ok = receive_data(f_in,buf,fd2,fname);
+		recv_ok = receive_data(f_in,buf,fd2,fname,file->length);
 		
 		if (buf) unmap_file(buf);
 		if (fd1 != -1) {

@@ -118,6 +118,10 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 		last_match = offset + s->sums[i].len;
 	else
 		last_match = offset;
+
+	show_progress(last_match, buf->size);
+
+	if (i == -1) end_progress();
 }
 
 
@@ -252,6 +256,12 @@ void match_sums(int f,struct sum_struct *s,struct map_struct *buf,OFF_T len)
 		if (verbose > 2) 
 			rprintf(FINFO,"done hash search\n");
 	} else {
+		OFF_T j;
+		/* by doing this in pieces we avoid too many seeks */
+		for (j=0;j<(len-CHUNK_SIZE);j+=CHUNK_SIZE) {
+			int n1 = MIN(CHUNK_SIZE,(len-CHUNK_SIZE)-j);
+			matched(f,s,buf,j+n1,-2);
+		}
 		matched(f,s,buf,len,-1);
 	}
 

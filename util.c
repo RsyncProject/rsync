@@ -685,3 +685,28 @@ int u_strcmp(const char *cs1, const char *cs2)
 	
 	return (int)*s1 - (int)*s2;
 }
+
+static int last_pct = -1;
+
+void end_progress(void)
+{
+	extern int do_progress, am_server;
+
+	if (do_progress && !am_server) {
+		rprintf(FINFO,"\n");
+	}
+	last_pct = -1;
+}
+
+void show_progress(OFF_T ofs, OFF_T size)
+{
+	extern int do_progress, am_server;
+
+	if (do_progress && !am_server) {
+		int pct = (int)((100.0*ofs)/size + 0.5);
+		if (pct != last_pct) {
+			rprintf(FINFO,"%.0f (%d%%)\r", (double)ofs, pct);
+			last_pct = pct;
+		}
+	}
+}
