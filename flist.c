@@ -163,7 +163,7 @@ void send_file_entry(struct file_struct *file,int f,unsigned base_flags)
   if (file->gid == last_gid) flags |= SAME_GID;
   if (file->modtime == last_time) flags |= SAME_TIME;
 
-  for (l1=0;lastname[l1] && fname[l1] == lastname[l1];l1++) ;
+  for (l1=0;lastname[l1] && (fname[l1] == lastname[l1]) && (l1 < 255);l1++) ;  
   l2 = strlen(fname) - l1;
 
   if (l1 > 0) flags |= SAME_NAME;
