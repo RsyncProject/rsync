@@ -348,6 +348,8 @@ verb(
      --bwlimit=KBPS          limit I/O bandwidth, KBytes per second
      --write-batch=PREFIX    write batch fileset starting with PREFIX
      --read-batch=PREFIX     read batch fileset starting with PREFIX
+ -4  --ipv4                  prefer IPv4
+ -6  --ipv6                  prefer IPv6
  -h, --help                  show this help screen
 
 
@@ -603,7 +605,7 @@ they are not empty when they are to be replaced by non-directories.  This
 is only relevant without --delete because deletions are now done depth-first.
 Requires the --recursive option (which is implied by -a) to have any effect.
 
-dit(bf(-B , --block-size=BLOCKSIZE)) This controls the block size used in
+dit(bf(-B, --block-size=BLOCKSIZE)) This controls the block size used in
 the rsync algorithm. See the technical report for details.
 
 dit(bf(-e, --rsh=COMMAND)) This option allows you to choose an alternative
@@ -896,6 +898,15 @@ PREFIX. See the "BATCH MODE" section for details.
 dit(bf(--read-batch=PREFIX)) Apply a previously generated change batch,
 using the fileset whose filenames start with PREFIX. See the "BATCH
 MODE" section for details.
+
+dit(bf(-4, --ipv4) or bf(-6, --ipv6)) Tells rsync to prefer IPv4/IPv6
+when creating sockets.  This only affects sockets that rsync has direct
+control over, such as the outgoing socket when directly contacting an
+rsync daemon, or the incoming sockets that an rsync daemon uses to
+listen for connections.  One of these options may be required in older
+versions of Linux to work around an IPv6 bug in the kernel (if you see
+an "address already in use" error when nothing else is using the port,
+try specifying --ipv6 or --ipv4 when starting the daemon).
 
 enddit()
 
