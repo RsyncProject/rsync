@@ -486,7 +486,12 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	io_flush(NORMAL_FLUSH);
 
-	if ((pid = do_fork()) == 0) {
+	if ((pid = do_fork()) == -1) {
+		rsyserr(FERROR, errno, "fork failed in do_recv()");
+		exit_cleanup(RERR_IPC);
+	}
+
+	if (pid == 0) {
 		close(error_pipe[0]);
 		if (need_name_pipe) {
 			close(name_pipe[1]);
