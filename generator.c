@@ -299,21 +299,13 @@ static int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
 }
 
 
-#define SID_UPDATING		  ITEM_UPDATING
-#define SID_REPORT_CHECKSUM	  ITEM_REPORT_CHECKSUM
-#define SID_USING_ALT_BASIS	  ITEM_USING_ALT_BASIS
-/* This flag doesn't get sent, so it must be outside 0xffff. */
-#define SID_NO_DEST_AND_NO_UPDATE (1<<16)
-
 static void itemize(struct file_struct *file, int statret, STRUCT_STAT *st,
-		    int32 sflags, int f_out, int ndx)
+		    int32 iflags, int f_out, int ndx)
 {
-	int iflags = sflags & 0xffff;
-
 	if (statret >= 0) {
 		if (S_ISREG(file->mode) && file->length != st->st_size)
 			iflags |= ITEM_REPORT_SIZE;
-		if (!(sflags & SID_NO_DEST_AND_NO_UPDATE)) {
+		if (!(iflags & ITEM_NO_DEST_AND_NO_UPDATE)) {
 			int keep_time = !preserve_times ? 0
 			    : S_ISDIR(file->mode) ? !omit_dir_times
 			    : !S_ISLNK(file->mode);
@@ -332,6 +324,7 @@ static void itemize(struct file_struct *file, int statret, STRUCT_STAT *st,
 	} else
 		iflags |= ITEM_IS_NEW | ITEM_UPDATING;
 
+	iflags &= 0xffff;
 	if ((iflags || verbose > 1) && !read_batch) {
 		if (protocol_version >= 29) {
 			if (ndx >= 0)
@@ -746,7 +739,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 		} else {
 			set_perms(fname,file,NULL,0);
 			if (itemizing) {
-				itemize(file, statret, &st, SID_UPDATING,
+				itemize(file, statret, &st, ITEM_UPDATING,
 					f_out, ndx);
 			}
 			if (code && verbose) {
@@ -781,7 +774,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 			} else {
 				set_perms(fname,file,NULL,0);
 				if (itemizing) {
-					itemize(file, statret, &st, SID_UPDATING,
+					itemize(file, statret, &st, ITEM_UPDATING,
 						f_out, ndx);
 				}
 				if (code && verbose) {
@@ -850,6 +843,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 				if (link_stat(fnamecmpbuf, &st, 0) < 0) {
 					match_level = 0;
 					statret = -1;
+					stat_errno = errno;
 				}
 			}
 #ifdef HAVE_LINK
@@ -934,15 +928,18 @@ static void recv_generator(char *fname, struct file_list *flist,
 	else if (fnamecmp_type == FNAMECMP_FUZZY)
 		;
 	else if (unchanged_file(fnamecmp, file, &st)) {
-		if (itemizing) {
-			itemize(file, statret, &st,
-				fnamecmp_type == FNAMECMP_FNAME
-					       ? 0 : SID_NO_DEST_AND_NO_UPDATE,
-				f_out, ndx);
-		}
-		if (fnamecmp_type == FNAMECMP_FNAME)
+		if (fnamecmp_type == FNAMECMP_FNAME) {
+			if (itemizing)
+				itemize(file, statret, &st, 0, f_out, ndx);
 			set_perms(fname, file, &st, maybe_PERMS_REPORT);
-		return;
+			return;
+		}
+		/* Only --compare-dest gets here. */
+		if (unchanged_attrs(file, &st)) {
+			itemize(file, statret, &st, ITEM_NO_DEST_AND_NO_UPDATE,
+				f_out, ndx);
+			return;
+		}
 	}
 
 prepare_to_open:
@@ -1019,11 +1016,11 @@ prepare_to_open:
 notify_others:
 	write_int(f_out, ndx);
 	if (itemizing) {
-		int iflags = SID_UPDATING;
+		int iflags = ITEM_UPDATING;
 		if (always_checksum)
-			iflags |= SID_REPORT_CHECKSUM;
+			iflags |= ITEM_REPORT_CHECKSUM;
 		if (fnamecmp_type != FNAMECMP_FNAME)
-			iflags |= SID_USING_ALT_BASIS;
+			iflags |= ITEM_USING_ALT_BASIS;
 		itemize(file, statret, &st, iflags, f_out, -1);
 	}
 	if (f_out_name >= 0) {
