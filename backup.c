@@ -23,6 +23,8 @@
 extern int verbose;
 extern int backup_suffix_len;
 extern int backup_dir_len;
+extern unsigned int backup_dir_remainder;
+extern char backup_dir_buf[MAXPATHLEN];
 extern char *backup_suffix;
 extern char *backup_dir;
 
@@ -56,80 +58,73 @@ static int make_simple_backup(char *fname)
 }
 
 
-/* recursively make a directory path */
-static int make_dir(char *name, int mask)
-{
-	char newdir [MAXPATHLEN];
-	char *p, *d;
-
-	/* copy pathname over, look for last '/' */
-	for (p = d = newdir; *name; *d++ = *name++)
-		if (*name == '/')
-			p = d;
-	if (p == newdir)
-		return 0;
-	*p = 0;
-
-	/* make the new directory, if that fails then make its parent */
-	while (do_mkdir(newdir, mask) != 0) {
-		if (errno != ENOENT || !make_dir(newdir, mask))
-			return 0;
-	}
-
-	return 1;
-} /* make_dir */
-
-
 /****************************************************************************
 Create a directory given an absolute path, perms based upon another directory
 path
 ****************************************************************************/
-static int make_bak_dir(char *fname, char *bak_path)
+static int make_bak_dir(char *fullpath)
 {
 	STRUCT_STAT st;
-	STRUCT_STAT *st2;
-	char fullpath[MAXPATHLEN];
-	char *p;
-	char *q;
+	char *rel = fullpath + backup_dir_len;
+	char *end = rel + strlen(rel);
+	char *p = end;
 
-	while(strncmp(bak_path, "./", 2) == 0) bak_path += 2;
+	while (strncmp(fullpath, "./", 2) == 0)
+		fullpath += 2;
 
-	if (pathjoin(fullpath, sizeof fullpath, bak_path, fname)
-	    >= sizeof fullpath) {
-		rprintf(FERROR, "backup dirname too long\n");
-		return 0;
-	}
-	p = fullpath;
-	q = fullpath + strlen(bak_path);
-	if (*q == '/')
-		q++; /* Point past the middle '/' added by pathjoin(). */
-
-	/* Make the directories */
-	while ((p = strchr(p, '/')) != NULL) {
-		*p = 0;
-		if (do_lstat(fullpath, &st) != 0) {
-			do_mkdir(fullpath, 0777 & ~orig_umask);
-			if (p > q) {
-				if (do_lstat(q, &st) != 0) {
-					rprintf(FERROR, "make_bak_dir stat %s failed: %s\n",
-						full_fname(fullpath), strerror(errno));
-				} else {
-					st2 = &st;
-					set_modtime(fullpath, st2->st_mtime);
-					if (do_lchown(fullpath, st2->st_uid, st2->st_gid) != 0) {
-						rprintf(FERROR, "make_bak_dir chown %s failed: %s\n",
-							full_fname(fullpath), strerror(errno));
-					}
-					if (do_chmod(fullpath, st2->st_mode) != 0) {
-						rprintf(FERROR, "make_bak_dir failed to set permissions on %s: %s\n",
-							full_fname(fullpath), strerror(errno));
-					}
-				}
+	/* Try to find an existing dir, starting from the deepest dir. */
+	while (1) {
+		if (--p == fullpath) {
+			p += strlen(p);
+			goto failure;
+		}
+		if (*p == '/') {
+			*p = '\0';
+			if (do_mkdir(fullpath, 0777 & ~orig_umask) == 0)
+				break;
+			if (errno != ENOENT) {
+				rprintf(FERROR,
+				    "make_bak_dir mkdir %s failed: %s\n",
+				    full_fname(fullpath), strerror(errno));
+				goto failure;
 			}
 		}
-		*p++ = '/';
+	}
+
+	/* Make all the dirs that we didn't find on the way here. */
+	while (1) {
+		if (p >= rel) {
+			/* Try to transfer the directory settings of the
+			 * actual dir that the files are coming from. */
+			if (do_lstat(rel, &st) != 0) {
+				rprintf(FERROR,
+				    "make_bak_dir stat %s failed: %s\n",
+				    full_fname(rel), strerror(errno));
+			} else {
+				set_modtime(fullpath, st.st_mtime);
+				do_lchown(fullpath, st.st_uid, st.st_gid);
+				do_chmod(fullpath, st.st_mode);
+			}
+		}
+		*p = '/';
+		p += strlen(p);
+		if (p == end)
+			break;
+		if (do_mkdir(fullpath, 0777 & ~orig_umask) < 0) {
+			rprintf(FERROR,
+			    "make_bak_dir mkdir %s failed: %s\n",
+			    full_fname(fullpath), strerror(errno));
+			goto failure;
+		}
 	}
 	return 0;
+
+failure:
+	while (p != end) {
+		*p = '/';
+		p += strlen(p);
+	}
+	return -1;
 }
 
 /* robustly move a file, creating new directory structures if necessary */
@@ -158,8 +153,10 @@ static int robust_move(char *src, char *dst)
 				keep_trying--;
 				break;
 			case ENOENT:	/* no directory to write to */
-				make_dir(dst, 0700);
-				keep_trying--;
+				if (make_bak_dir(dst) < 0)
+					keep_trying = 0;
+				else
+					keep_trying--;
 				break;
 			default:
 				keep_trying = 0;
@@ -167,30 +164,19 @@ static int robust_move(char *src, char *dst)
 			}
 		} else
 			keep_trying = 0;
-	} /* while */
+	}
 	return !failed;
-} /* robust_move */
+}
 
 
-/* if we have a backup_dir, then we get here from make_backup().
-   We will move the file to be deleted into a parallel directory tree */
+/* If we have a --backup-dir, then we get here from make_backup().
+ * We will move the file to be deleted into a parallel directory tree. */
 static int keep_backup(char *fname)
 {
-	static int initialised;
-	char keep_name[MAXPATHLEN];
 	STRUCT_STAT st;
 	struct file_struct *file;
 	int kept = 0;
 	int ret_code;
-
-	if (!initialised) {
-		if (backup_dir_len && backup_dir[backup_dir_len - 1] == '/')
-			backup_dir[--backup_dir_len] = '\0';
-		if (verbose > 0)
-			rprintf(FINFO, "backup_dir is %s\n", backup_dir);
-
-		initialised = 1;
-	}
 
 	/* return if no file to keep */
 #if SUPPORT_LINKS
@@ -205,9 +191,8 @@ static int keep_backup(char *fname)
 	if (!file) return 1;
 
 	/* make a complete pathname for backup file */
-	if (stringjoin(keep_name, sizeof keep_name,
-		       backup_dir, "/", fname, backup_suffix, NULL)
-	    >= sizeof keep_name) {
+	if (stringjoin(backup_dir_buf + backup_dir_len, backup_dir_remainder,
+	    fname, backup_suffix, NULL) >= backup_dir_remainder) {
 		rprintf(FERROR, "keep_backup filename too long\n");
 		return 0;
 	}
@@ -216,10 +201,10 @@ static int keep_backup(char *fname)
 	/* Check to see if this is a device file, or link */
 	if (IS_DEVICE(file->mode)) {
 		if (am_root && preserve_devices) {
-			make_bak_dir(fname, backup_dir);
-			if (do_mknod(keep_name, file->mode, file->u.rdev) != 0) {
+			make_bak_dir(backup_dir_buf);
+			if (do_mknod(backup_dir_buf, file->mode, file->u.rdev) != 0) {
 				rprintf(FERROR, "mknod %s failed: %s\n",
-					full_fname(keep_name), strerror(errno));
+					full_fname(backup_dir_buf), strerror(errno));
 			} else if (verbose > 2) {
 				rprintf(FINFO,
 					"make_backup: DEVICE %s successful.\n",
@@ -233,8 +218,8 @@ static int keep_backup(char *fname)
 
 	if (!kept && S_ISDIR(file->mode)) {
 		/* make an empty directory */
-		make_bak_dir(fname, backup_dir);
-		do_mkdir(keep_name, file->mode);
+		make_bak_dir(backup_dir_buf);
+		do_mkdir(backup_dir_buf, file->mode);
 		ret_code = do_rmdir(fname);
 
 		if (verbose > 2) {
@@ -247,17 +232,17 @@ static int keep_backup(char *fname)
 #if SUPPORT_LINKS
 	if (!kept && preserve_links && S_ISLNK(file->mode)) {
 		extern int safe_symlinks;
-		if (safe_symlinks && unsafe_symlink(file->u.link, keep_name)) {
+		if (safe_symlinks && unsafe_symlink(file->u.link, backup_dir_buf)) {
 			if (verbose) {
 				rprintf(FINFO, "ignoring unsafe symlink %s -> %s\n",
-					full_fname(keep_name), file->u.link);
+					full_fname(backup_dir_buf), file->u.link);
 			}
 			kept = 1;
 		}
-		make_bak_dir(fname, backup_dir);
-		if (do_symlink(file->u.link, keep_name) != 0) {
+		make_bak_dir(backup_dir_buf);
+		if (do_symlink(file->u.link, backup_dir_buf) != 0) {
 			rprintf(FERROR, "link %s -> %s : %s\n",
-				full_fname(keep_name), file->u.link, strerror(errno));
+				full_fname(backup_dir_buf), file->u.link, strerror(errno));
 		}
 		do_unlink(fname);
 		kept = 1;
@@ -271,18 +256,18 @@ static int keep_backup(char *fname)
 
 	/* move to keep tree if a file */
 	if (!kept) {
-		if (!robust_move(fname, keep_name)) {
+		if (!robust_move(fname, backup_dir_buf)) {
 			rprintf(FERROR, "keep_backup failed: %s -> \"%s\": %s\n",
-				full_fname(fname), keep_name, strerror(errno));
+				full_fname(fname), backup_dir_buf, strerror(errno));
 		}
 	}
-	set_perms(keep_name, file, NULL, 0);
+	set_perms(backup_dir_buf, file, NULL, 0);
 	free(file);
 
 	if (verbose > 1)
-		rprintf(FINFO, "keep_backup %s -> %s\n", fname, keep_name);
+		rprintf(FINFO, "keep_backup %s -> %s\n", fname, backup_dir_buf);
 	return 1;
-} /* keep_backup */
+}
 
 
 /* main backup switch routine */
