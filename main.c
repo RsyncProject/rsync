@@ -243,17 +243,13 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 		args[argc++] = rsync_path;
 
 		if (blocking_io < 0) {
-			char *cp = getenv(RSYNC_RSH_IO_ENV);
-			if (rsh_env && cp && strcmp(cmd, rsh_env) == 0)
-				blocking_io = *cp == 'b' || *cp == 'B';
-			else {
-				if ((cp = strrchr(cmd, '/')) != NULL)
-					cp++;
-				else
-					cp = cmd;
-				if (strcmp(cp, "rsh") == 0 || strcmp(cp, "remsh") == 0)
-					blocking_io = 1;
-			}
+			char *cp;
+			if ((cp = strrchr(cmd, '/')) != NULL)
+				cp++;
+			else
+				cp = cmd;
+			if (strcmp(cp, "rsh") == 0 || strcmp(cp, "remsh") == 0)
+				blocking_io = 1;
 		}
 
 		server_options(args,&argc);
