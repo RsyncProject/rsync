@@ -2,6 +2,7 @@
     
     Copyright (C) 1996-2000 by Andrew Tridgell 
     Copyright (C) Paul Mackerras 1996
+    Copyright (C) 2001 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -901,10 +902,13 @@ char *timestring(time_t t)
 }
 
 
-/*******************************************************************
-sleep for a specified number of milliseconds
-********************************************************************/
-void msleep(int t)
+/**
+ * Sleep for a specified number of milliseconds.
+ *
+ * Always returns TRUE.  (In the future it might return FALSE if
+ * interrupted.)
+ **/
+int msleep(int t)
 {
 	int tdiff=0;
 	struct timeval tval,t1,t2;  
@@ -923,6 +927,8 @@ void msleep(int t)
 		tdiff = (t2.tv_sec - t1.tv_sec)*1000 + 
 			(t2.tv_usec - t1.tv_usec)/1000;
 	}
+
+	return True;
 }
 
 

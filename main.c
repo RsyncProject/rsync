@@ -360,7 +360,8 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		/* finally we go to sleep until our parent kills us
 		   with a USR2 signal. We sleep for a short time as on
 		   some OSes a signal won't interrupt a sleep! */
-		while (1) msleep(20);
+		while (msleep(20))
+			;
 	}
 
 	close(recv_pipe[1]);
