@@ -42,6 +42,10 @@ Changes since 2.6.2:
     - Added long-option names for -4 and -6 (namely --ipv4 and --ipv6)
       and documented all these options in the man page.
 
+    - Improved the handling of the --bwlimit option so that it's less
+      bursty, more accurate, and works properly over a larger range of
+      values.
+
   INTERNAL:
 
     - Some cleanup in the exclude code has saved some per-exclude memory
