@@ -231,6 +231,7 @@ Options
      --timeout=TIME          set IO timeout in seconds
  -I, --ignore-times          don't exclude files that match length and time
  -T  --temp-dir=DIR          create temporary files in directory DIR
+     --compare-dest=DIR      also compare destination files relative to DIR
  -z, --compress              compress file data
      --exclude=PATTERN       exclude file FILE
      --exclude-from=PATTERN  exclude files listed in FILE
@@ -477,10 +478,20 @@ checksum length by default, using a 16 byte file checksum to determine
 if a 2nd pass is required with a longer block checksum. Only use this
 option if you have read the source code and know what you are doing.
 
-dit(bf(-T, --temp-dir DIR)) This options instructs rsync to use DIR as a
-scratch directory when creating a temporary copies of the files
+dit(bf(-T, --temp-dir DIR)) This option instructs rsync to use DIR as a
+scratch directory when creating temporary copies of the files
 transferred on the receiving side.  The default behavior is to create
 the temporary files in the receiving directory.
+
+dit(bf(--compare-dest DIR)) This option instructs rsync to use DIR as an
+additional directory to compare destination files against when doing
+transfers.  This is useful for doing transfers to a new destination while
+leaving existing files intact, and then doing a flash-cutover when all
+files have been successfully transfered (for example by moving directories
+around and removing the old directory).  This option increases the
+usefulness of --partial because partially transferred files will remain in
+the new temporary destination until they have a chance to be completed.
+If DIR is a relative path, it is relative to the destination directory.
 
 dit(bf(-z, --compress)) With this option, rsync compresses any data from
 the source file(s) which it sends to the destination machine.  This

@@ -32,6 +32,7 @@ extern int preserve_hard_links;
 extern int cvs_exclude;
 extern int io_error;
 extern char *tmpdir;
+extern char *compare_dest;
 
 
 static struct delete_list {
@@ -284,6 +285,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	STRUCT_STAT st;
 	char *fname;
 	char fnametmp[MAXPATHLEN];
+	char *fnamecmp;
+	char fnamecmpbuf[MAXPATHLEN];
 	struct map_struct *buf;
 	int i;
 	struct file_struct *file;
@@ -338,18 +341,28 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		if (verbose > 2)
 			rprintf(FINFO,"recv_files(%s)\n",fname);
 
+		fnamecmp = fname;
+
 		/* open the file */  
-		fd1 = open(fname,O_RDONLY);
+		fd1 = open(fnamecmp,O_RDONLY);
+
+		if ((fd1 == -1) && (compare_dest != NULL)) {
+			/* try the file at compare_dest instead */
+			slprintf(fnamecmpbuf,MAXPATHLEN-1,"%s/%s",
+						compare_dest,fname);
+			fnamecmp = fnamecmpbuf;
+			fd1 = open(fnamecmp,O_RDONLY);
+		}
 
 		if (fd1 != -1 && do_fstat(fd1,&st) != 0) {
-			rprintf(FERROR,"fstat %s : %s\n",fname,strerror(errno));
+			rprintf(FERROR,"fstat %s : %s\n",fnamecmp,strerror(errno));
 			receive_data(f_in,NULL,-1,NULL,file->length);
 			close(fd1);
 			continue;
 		}
 
 		if (fd1 != -1 && !S_ISREG(st.st_mode)) {
-			rprintf(FERROR,"%s : not a regular file (recv_files)\n",fname);
+			rprintf(FERROR,"%s : not a regular file (recv_files)\n",fnamecmp);
 			receive_data(f_in,NULL,-1,NULL,file->length);
 			close(fd1);
 			continue;
@@ -358,7 +371,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		if (fd1 != -1 && st.st_size > 0) {
 			buf = map_file(fd1,st.st_size);
 			if (verbose > 2)
-				rprintf(FINFO,"recv mapped %s of size %d\n",fname,(int)st.st_size);
+				rprintf(FINFO,"recv mapped %s of size %d\n",fnamecmp,(int)st.st_size);
 		} else {
 			buf = NULL;
 		}

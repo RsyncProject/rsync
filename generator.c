@@ -162,6 +162,9 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 	struct sum_struct *s;
 	int statret;
 	struct file_struct *file = flist->files[i];
+	char *fnamecmp;
+	char fnamecmpbuf[MAXPATHLEN];
+	extern char *compare_dest;
 
 	if (verbose > 2)
 		rprintf(FINFO,"recv_generator(%s,%d)\n",fname,i);
@@ -262,6 +265,21 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 		return;
 	}
 
+	fnamecmp = fname;
+
+	if ((statret == -1) && (compare_dest != NULL)) {
+		/* try the file at compare_dest instead */
+		int saveerrno = errno;
+		slprintf(fnamecmpbuf,MAXPATHLEN-1,"%s/%s",compare_dest,fname);
+		statret = link_stat(fnamecmpbuf,&st);
+		if (!S_ISREG(st.st_mode))
+			statret = -1;
+		if (statret == -1)
+			errno = saveerrno;
+		else
+			fnamecmp = fnamecmpbuf;
+	}
+
 	if (statret == -1) {
 		if (errno == ENOENT) {
 			write_int(f_out,i);
@@ -284,7 +302,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 		return;
 	}
 
-	if (update_only && st.st_mtime > file->modtime) {
+	if (update_only && st.st_mtime > file->modtime && fnamecmp == fname) {
 		if (verbose > 1)
 			rprintf(FINFO,"%s is newer\n",fname);
 		return;
@@ -307,10 +325,10 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 	}
 
 	/* open the file */  
-	fd = open(fname,O_RDONLY);
+	fd = open(fnamecmp,O_RDONLY);
 
 	if (fd == -1) {
-		rprintf(FERROR,"failed to open %s : %s\n",fname,strerror(errno));
+		rprintf(FERROR,"failed to open %s : %s\n",fnamecmp,strerror(errno));
 		rprintf(FERROR,"skipping %s\n",fname);
 		return;
 	}
@@ -322,7 +340,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 	}
 
 	if (verbose > 3)
-		rprintf(FINFO,"gen mapped %s of size %d\n",fname,(int)st.st_size);
+		rprintf(FINFO,"gen mapped %s of size %d\n",fnamecmp,(int)st.st_size);
 
 	s = generate_sums(buf,st.st_size,adapt_block_size(file, block_size));
 

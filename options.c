@@ -64,6 +64,7 @@ int block_size=BLOCK_SIZE;
 
 char *backup_suffix = BACKUP_SUFFIX;
 char *tmpdir = NULL;
+char *compare_dest = NULL;
 char *config_file = RSYNCD_CONF;
 char *shell_cmd = NULL;
 
@@ -118,6 +119,7 @@ void usage(int F)
   rprintf(F,"     --timeout=TIME          set IO timeout in seconds\n");
   rprintf(F," -I, --ignore-times          don't exclude files that match length and time\n");
   rprintf(F," -T  --temp-dir=DIR          create temporary files in directory DIR\n");
+  rprintf(F,"     --compare-dest=DIR      also compare destination files relative to DIR\n");
   rprintf(F," -z, --compress              compress file data\n");
   rprintf(F,"     --exclude=PATTERN       exclude file FILE\n");
   rprintf(F,"     --exclude-from=FILE     exclude patterns listed in FILE\n");
@@ -144,7 +146,7 @@ enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
       OPT_EXCLUDE_FROM,OPT_DELETE,OPT_NUMERIC_IDS,OPT_RSYNC_PATH,
       OPT_FORCE,OPT_TIMEOUT,OPT_DAEMON,OPT_CONFIG,OPT_PORT,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS,
-      OPT_SAFE_LINKS};
+      OPT_SAFE_LINKS, OPT_COMPARE_DEST};
 
 static char *short_options = "oblLWHpguDCtcahvrRIxnSe:B:T:z";
 
@@ -188,6 +190,7 @@ static struct option long_options[] = {
   {"block-size",  1,     0,    'B'},
   {"timeout",     1,     0,    OPT_TIMEOUT},
   {"temp-dir",    1,     0,    'T'},
+  {"compare-dest", 1,    0,    OPT_COMPARE_DEST},
   {"compress",	  0,	 0,    'z'},
   {"daemon",      0,     0,    OPT_DAEMON},
   {"stats",       0,     0,    OPT_STATS},
@@ -384,6 +387,10 @@ int parse_arguments(int argc, char *argv[])
 			tmpdir = optarg;
 			break;
 
+		case OPT_COMPARE_DEST:
+			compare_dest = optarg;
+			break;
+
 		case 'z':
 			do_compression = 1;
 			break;
@@ -515,6 +522,16 @@ void server_options(char **args,int *argc)
 		args[ac++] = "--temp-dir";
 		args[ac++] = tmpdir;
 	}
+
+	if (compare_dest && am_sender) {
+		/* the server only needs this option if it is not the sender,
+		 *   and it may be an older version that doesn't know this
+		 *   option, so don't send it if client is the sender.
+		 */
+		args[ac++] = "--compare-dest";
+		args[ac++] = compare_dest;
+	}
+
 
 	*argc = ac;
 }
