@@ -73,7 +73,7 @@ CFLAGS="$CFLAGS -DHAVE_CONFIG_H"
 # If GCC, turn on warnings.
 if test "x$GCC" = "xyes"
 then
-	CFLAGS="$CFLAGS -Wall"
+	CFLAGS="$CFLAGS -Wall -W"
 fi
 
 AC_ARG_WITH(included-popt,
@@ -296,7 +296,7 @@ fi
 
 AC_CHECK_LIB(resolv, inet_ntop)
 
-AC_MSG_NOTICE([Looking in libraries: $LIBS])
+dnl AC_MSG_NOTICE([Looking in libraries: $LIBS])
 
 AC_CHECK_FUNCS(inet_ntop, , AC_LIBOBJ(lib/inet_ntop)) 
 AC_CHECK_FUNCS(inet_pton, , AC_LIBOBJ(lib/inet_pton))
