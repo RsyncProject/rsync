@@ -617,4 +617,8 @@ inet_ntop(int af, const void *src, char *dst, size_t size);
 int isc_net_pton(int af, const char *src, void *dst);
 #endif
 
+#ifdef MAINTAINER_MODE
+const char *get_panic_action(void);
+#endif
+
 #define UNUSED(x) x __attribute__((__unused__))
