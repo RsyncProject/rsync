@@ -14,23 +14,36 @@
 
 set -x
 
+HOME="$scratchdir"
+CVSIGNORE='*.junk'
+export HOME CVSIGNORE
+
 # Build some files/dirs/links to copy
 
 fromdir="$scratchdir/from"
 todir="$scratchdir/to"
 chkdir="$scratchdir/chk"
 
+echo home-cvs-exclude >"$scratchdir"/.cvsignore
 makepath "$fromdir/foo/down/to/you"
 makepath "$fromdir/bar/down/to/foo/too"
 makepath "$fromdir/mid/for/foo/and/that/is/who"
 echo kept >"$fromdir/foo/file1"
 echo removed >"$fromdir/foo/file2"
+echo cvsout >"$fromdir/foo/file2.old"
 echo keeper >"$fromdir/bar/down/to/foo/file1"
+echo cvsout >"$fromdir/bar/down/to/foo/file1.bak"
 echo gone >"$fromdir/bar/down/to/foo/file3"
 echo lost >"$fromdir/bar/down/to/foo/file4"
+echo cvsout >"$fromdir/bar/down/to/foo/file4.junk"
 echo smashed >"$fromdir/bar/down/to/foo/to"
+echo cvsout >"$fromdir/bar/down/to/home-cvs-exclude"
+echo cvsout >"$fromdir/mid/one-in-one-out"
+echo one-in-one-out >"$fromdir/mid/.cvsignore"
+echo cvsin >"$fromdir/mid/one-for-all"
 echo expunged >"$fromdir/mid/for/foo/extra"
 echo retained >"$fromdir/mid/for/foo/keep"
+echo cvsin >"$fromdir/mid/for/one-in-one-out"
 ln -s too "$fromdir/bar/down/to/foo/sym"
 
 # Setup our test exclude/include file.
@@ -71,6 +84,22 @@ $RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
 # Now, test if rsync excludes the same files.
 
 checkit "$RSYNC -avv --exclude-from=$excl \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+
+# Modify the chk dir by removing cvs-ignored files and then tweaking the dir times.
+
+rm "$chkdir"/foo/*.old
+rm "$chkdir"/bar/down/to/foo/*.bak
+rm "$chkdir"/bar/down/to/foo/*.junk
+rm "$chkdir"/bar/down/to/home-cvs-exclude
+rm "$chkdir"/mid/one-in-one-out
+
+$RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
+
+# Now, test if rsync excludes the same files, this time with --cvs-exclude
+# and --delete-excluded.
+
+checkit "$RSYNC -avvC --delete-excluded --exclude-from=$excl \
+    \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
