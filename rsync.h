@@ -461,6 +461,9 @@ extern int errno;
 #define SUPPORT_LINKS HAVE_READLINK
 #define SUPPORT_HARD_LINKS HAVE_LINK
 
+/* This could be bad on systems which have no lchown and where chown
+ * follows symbollic links.  On such systems it might be better not to
+ * try to chown symlinks at all. */
 #ifndef HAVE_LCHOWN
 #define lchown chown
 #endif
