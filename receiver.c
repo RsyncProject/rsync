@@ -396,8 +396,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		}
 
 		if (fd1 != -1 && !preserve_perms) {
-			/* if the file exists already and we aren't perserving
-			   presmissions then act as though the remote end sent
+			/* if the file exists already and we aren't preserving
+			   permissions then act as though the remote end sent
 			   us the file permissions we already have */
 			file->mode = st.st_mode;
 		}
