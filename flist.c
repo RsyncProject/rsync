@@ -659,7 +659,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 #if SUPPORT_HARD_LINKS
 	if (preserve_hard_links && protocol_version < 28 && S_ISREG(mode))
 		flags |= XMIT_HAS_IDEV_DATA;
-	if (flags & XMIT_HAS_IDEV_DATA && flist->hlink_pool) {
+	if (flags & XMIT_HAS_IDEV_DATA) {
 		INO64_T inode;
 		file->link_u.idev = pool_talloc(flist->hlink_pool,
 		    struct idev, 1, "inode_table");
