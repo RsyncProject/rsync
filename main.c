@@ -732,6 +732,9 @@ int main(int argc,char *argv[])
 
     setup_protocol(f_out,f_in);
 
+    setlinebuf(FINFO);
+    setlinebuf(FERROR);
+
     if (verbose > 3) 
       fprintf(FERROR,"parent=%d child=%d sender=%d recurse=%d\n",
 	      (int)getpid(),pid,sender,recurse);
