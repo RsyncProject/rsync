@@ -1,5 +1,6 @@
-/* 
-   Copyright (C) Andrew Tridgell 1998
+/* -*- c-file-style: "linux"; -*-
+   
+   Copyright (C) 1998-2000 by Andrew Tridgell
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -210,20 +211,20 @@ static int rsync_module(int fd, int i)
 
 	if (use_chroot) {
 		if (chroot(lp_path(i))) {
-			rprintf(FERROR,"chroot %s failed\n", lp_path(i));
+			rsyserr(FERROR, errno, "chroot %s failed", lp_path(i));
 			io_printf(fd,"@ERROR: chroot failed\n");
 			return -1;
 		}
 
 		if (!push_dir("/", 0)) {
-			rprintf(FERROR,"chdir %s failed\n", lp_path(i));
+                        rsyserr(FERROR, errno, "chdir %s failed\n", lp_path(i));
 			io_printf(fd,"@ERROR: chdir failed\n");
 			return -1;
 		}
 
 	} else {
 		if (!push_dir(lp_path(i), 0)) {
-			rprintf(FERROR,"chdir %s failed\n", lp_path(i));
+			rsyserr(FERROR, errno, "chdir %s failed\n", lp_path(i));
 			io_printf(fd,"@ERROR: chdir failed\n");
 			return -1;
 		}
@@ -232,13 +233,13 @@ static int rsync_module(int fd, int i)
 
 	if (am_root) {
 		if (setgid(gid)) {
-			rprintf(FERROR,"setgid %d failed\n", gid);
+			rsyserr(FERROR, errno, "setgid %d failed", gid);
 			io_printf(fd,"@ERROR: setgid failed\n");
 			return -1;
 		}
 
 		if (setuid(uid)) {
-			rprintf(FERROR,"setuid %d failed\n", uid);
+			rsyserr(FERROR, errno, "setuid %d failed", uid);
 			io_printf(fd,"@ERROR: setuid failed\n");
 			return -1;
 		}
@@ -461,7 +462,7 @@ int daemon_main(void)
 		if ((fd = do_open(lp_pid_file(), O_WRONLY|O_CREAT|O_TRUNC,
 					0666 & ~orig_umask)) == -1) {
 		    cleanup_set_pid(0);
-		    rprintf(FLOG,"failed to create pid file %s\n", pid_file);
+		    rsyserr(FLOG, errno, "failed to create pid file %s", pid_file);
 		    exit_cleanup(RERR_FILEIO);
 		}
 		slprintf(pidbuf, sizeof(pidbuf), "%d\n", pid);

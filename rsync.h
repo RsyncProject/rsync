@@ -1,5 +1,5 @@
 /* 
-   Copyright (C) Andrew Tridgell 1996
+   Copyright (C) by Andrew Tridgell 1996, 2000
    Copyright (C) Paul Mackerras 1996
    
    This program is free software; you can redistribute it and/or modify
@@ -63,7 +63,7 @@
 
 #define MPLEX_BASE 7
 
-enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3};
+enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 
 #include "errcode.h"
 
@@ -495,6 +495,14 @@ extern int errno;
      __attribute__ ((format (printf, 2, 3)))
 #endif
 ;
+
+/* This is just like rprintf, but it also tries to print some
+ * representation of the error code.  Normally errcode = errno. */
+void rsyserr(enum logcode, int, const char *, ...)
+#ifdef __GNUC__
+     __attribute__ ((format (printf, 3, 4)))
+#endif
+     ;
 
 #ifdef REPLACE_INET_NTOA
 #define inet_ntoa rep_inet_ntoa

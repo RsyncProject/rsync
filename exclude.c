@@ -220,7 +220,10 @@ struct exclude_struct **make_exclude_list(char *fname,
 	char line[MAXPATHLEN];
 	if (!f) {
 		if (fatal) {
-			rprintf(FERROR,"%s : %s\n",fname,strerror(errno));
+			rsyserr(FERROR, errno,
+                                "failed to open %s file %s",
+                                include ? "include" : "exclude",
+                                fname);
 			exit_cleanup(RERR_FILEIO);
 		}
 		return list;

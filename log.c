@@ -1,5 +1,6 @@
-/* 
-   Copyright (C) Andrew Tridgell 1998
+/* -*- c-file-style: "linux"; -*-
+   
+   Copyright (C) 1998-2000 by Andrew Tridgell
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -171,8 +172,9 @@ void rwrite(enum logcode code, char *buf, int len)
 }
 		
 
-/* this is the rsync debugging function. Call it with FINFO, FERROR or FLOG */
- void rprintf(enum logcode code, const char *format, ...)
+/* This is the rsync debugging function. Call it with FINFO, FERROR or
+ * FLOG. */
+void rprintf(enum logcode code, const char *format, ...)
 {
 	va_list ap;  
 	char buf[1024];
@@ -186,6 +188,45 @@ void rwrite(enum logcode code, char *buf, int len)
 
 	rwrite(code, buf, len);
 }
+
+
+/* This is like rprintf, but it also tries to print some
+ * representation of the error code.  Normally errcode = errno.
+ *
+ * Unlike rprintf, this always adds a newline and there should not be
+ * one in the format string.
+ *
+ * Note that since strerror might involve dynamically loading a
+ * message catalog we need to call it once before chroot-ing. */
+void rsyserr(enum logcode code, int errcode, const char *format, ...)
+{
+	va_list ap;  
+	char buf[1024];
+	int len, sys_len;
+        char *sysmsg;
+
+	va_start(ap, format);
+	len = vslprintf(buf, sizeof(buf), format, ap);
+	va_end(ap);
+
+	if (len > sizeof(buf)-1) exit_cleanup(RERR_MESSAGEIO);
+
+        sysmsg = strerror(errcode);
+        sys_len = strlen(sysmsg);
+        if (len + 3 + sys_len > sizeof(buf) - 1)
+                exit_cleanup(RERR_MESSAGEIO);
+
+        strcpy(buf + len, ": ");
+        len += 2;
+        strcpy(buf + len, sysmsg);
+        len += sys_len;
+        strcpy(buf + len, "\n");
+        len++;
+
+	rwrite(code, buf, len);
+}
+
+
 
 void rflush(enum logcode code)
 {

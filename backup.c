@@ -43,7 +43,7 @@ static int make_simple_backup(char *fname)
 	if (do_rename(fname,fnamebak) != 0) {
 		/* cygwin (at least version b19) reports EINVAL */
 		if (errno != ENOENT && errno != EINVAL) {
-			rprintf(FERROR,"rename %s %s : %s\n",fname,fnamebak,strerror(errno));
+			rsyserr(FERROR, errno, "rename %s to backup %s", fname, fnamebak);
 			return 0;
 		}
 	} else if (verbose > 1) {

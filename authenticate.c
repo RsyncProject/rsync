@@ -85,7 +85,7 @@ static int get_secret(int module, char *user, char *secret, int len)
 	if (fd == -1) return 0;
 
 	if (do_stat(fname, &st) == -1) {
-		rprintf(FERROR,"stat(%s) : %s\n", fname, strerror(errno));
+		rsyserr(FERROR, errno, "stat(%s)", fname);
 		ok = 0;
 	} else if (lp_strict_modes(module)) {
 		if ((st.st_mode & 06) != 0) {
@@ -150,7 +150,7 @@ static char *getpassf(char *filename)
 	}
 	
 	if (do_stat(filename, &st) == -1) {
-		rprintf(FERROR,"stat(%s) : %s\n", filename, strerror(errno));
+		rsyserr(FERROR, errno, "stat(%s)", filename);
 		ok = 0;
 	} else if ((st.st_mode & 06) != 0) {
 		rprintf(FERROR,"password file must not be other-accessible\n");
