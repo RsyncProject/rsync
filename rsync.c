@@ -195,6 +195,12 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 			rprintf(FERROR,"chown %s : %s\n", fname,strerror(errno));
 			return 0;
 		}
+		/* a lchown had been done - we have to re-stat if the
+                   destination had the setuid or setgid bits set due
+                   to the side effect of the chown call */
+		if (st->st_mode & (S_ISUID | S_ISGID)) {
+			link_stat(fname, st);
+		}
 		updated = 1;
 	}
 
