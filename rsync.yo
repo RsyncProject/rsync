@@ -913,11 +913,11 @@ itemize(
   it() if the pattern includes a double asterisk "**" then all wildcards in
   the pattern will match slashes, otherwise they will stop at slashes.
 
-  it() if the pattern contains a / (not counting a trailing /) then it
-  is matched against the full filename, including any leading
-  directory. If the pattern doesn't contain a / then it is matched
-  only against the final component of the filename.  Again, remember
-  that the algorithm is applied recursively so "full filename" can 
+  it() if the pattern contains a / (not counting a trailing /) or a "**"
+  then it is matched against the full filename, including any leading
+  directory. If the pattern doesn't contain a / or a "**", then it is
+  matched only against the final component of the filename.  Again,
+  remember that the algorithm is applied recursively so "full filename" can
   actually be any portion of a path.
 
   it() if the pattern starts with "+ " (a plus followed by a space)
