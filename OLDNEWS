@@ -1,3 +1,42 @@
+rsync 2.5.5 "Snowy River" (2 April 2002)
+
+  ENHANCEMENTS:
+
+    * With --progress, when a transfer is complete show the time taken;
+      otherwise show expected time to complete. (Cameron Simpson)
+
+    * Make "make install-strip" works properly, and "make install"
+      accepts a DESTDIR variable for help in building binary packages.
+      (Peter Breitenlohner, Greg Louis)
+
+    * If configured with --enable-maintainer-mode, then on receipt of
+      a fatal signal rsync will try to open an xterm running gdb,
+      similarly to Samba's "panic action" or GNOME's bug-buddy.
+      (Martin Pool)
+
+
+  BUG FIXES:
+
+    * Fix situation where failure to fork (e.g. because out of process
+      slots) would cause rsync to kill all processes owned by the
+      current user.  Yes, really!  (Paul Haas, Martin Pool)
+
+    * Fix test suite on Solaris.  (Jos Backus, Martin Pool)
+
+    * Fix minor memory leak in socket code.  (Dave Dykstra, Martin
+      Pool.)
+
+    * Fix --whole-file problem that caused it to be the default even
+      for remote connections.  (Martin Pool, Frank Schulz)
+
+    * Work around bug in Mac OS X mkdir(2), which cannot handle
+      trailing slashes.
+      <http://www.opensource.apple.com/bugs/X/BSD%20Kernel/2734739.html>
+      (Martin Pool)
+
+    * Improved network error handling.  (Greg A. Woods)
+
+
 rsync 2.5.4 (13 March 2002)
 
   "Imitation lizard skin"
