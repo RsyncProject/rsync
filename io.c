@@ -255,9 +255,6 @@ static void read_check(int f)
 		read_buffer_p = read_buffer;
 	}
 
-	if (n > MAX_READ_BUFFER/4)
-		n = MAX_READ_BUFFER/4;
-
 	if (read_buffer_p != read_buffer) {
 		memmove(read_buffer,read_buffer_p,read_buffer_len);
 		read_buffer_p = read_buffer;
@@ -385,7 +382,8 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 		fd_count = fd;
 
 		if (!no_flush_read) {
-			reading = (buffer_f_in != -1);
+			reading = (buffer_f_in != -1) && 
+				(read_buffer_len < MAX_READ_BUFFER);
 		}
 
 		if (reading) {
