@@ -388,9 +388,16 @@ else
 	AC_LIBOBJ(lib/getnameinfo)
 fi
 
-
 AC_CHECK_MEMBER([struct sockaddr.sa_len],
-		[ AC_DEFINE(HAVE_SOCKADDR_LEN, 1, [Do we have sockaddr.sa_len?]) ],
+		[ AC_DEFINE(HAVE_SOCKADDR_SA_LEN, 1, [Do we have sockaddr.sa_len?]) ],
+		[],
+		[
+#include <sys/types.h>
+#include <sys/socket.h>
+])
+
+AC_CHECK_MEMBER([struct sockaddr.sin_len],
+		[ AC_DEFINE(HAVE_SOCKADDR_SIN_LEN, 1, [Do we have sockaddr.sin_len?]) ],
 		[],
 		[
 #include <sys/types.h>
