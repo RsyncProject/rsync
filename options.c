@@ -306,7 +306,7 @@ static struct poptOption long_options[] = {
   {"delete",           0,  POPT_ARG_NONE,   &delete_mode , 0, 0, 0 },
   {"existing",         0,  POPT_ARG_NONE,   &only_existing , 0, 0, 0 },
   {"ignore-existing",  0,  POPT_ARG_NONE,   &opt_ignore_existing , 0, 0, 0 },
-  {"delete-after",     0,  POPT_ARG_NONE,   &delete_after , 0, 0, 0 },
+  {"delete-after",     0,  POPT_ARG_NONE,   0,              OPT_DELETE_AFTER, 0, 0 },
   {"delete-excluded",  0,  POPT_ARG_NONE,   0,              OPT_DELETE_EXCLUDED, 0, 0 },
   {"force",            0,  POPT_ARG_NONE,   &force_delete , 0, 0, 0 },
   {"numeric-ids",      0,  POPT_ARG_NONE,   &numeric_ids , 0, 0, 0 },
@@ -476,7 +476,12 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
                          * non-default setting. */
 			modify_window_set = 1;
 			break;
-			
+
+		case OPT_DELETE_AFTER:
+			delete_after = 1;
+			delete_mode = 1;
+			break;
+
 		case OPT_DELETE_EXCLUDED:
 			delete_excluded = 1;
 			delete_mode = 1;
