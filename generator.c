@@ -812,39 +812,40 @@ static void recv_generator(char *fname, struct file_list *flist,
 	fnamecmp_type = FNAMECMP_FNAME;
 
 	if (statret != 0 && basis_dir[0] != NULL) {
-		int fallback_match = -1;
+		int best_match = -1;
 		int match_level = 0;
 		int i = 0;
 		do {
 			pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
 				 basis_dir[i], fname);
-			if (link_stat(fnamecmpbuf, &st, 0) == 0
-			    && S_ISREG(st.st_mode)) {
-				statret = 0;
-				switch (match_level) {
-				case 0:
-					if (compare_dest)
-						break;
-					fallback_match = i;
-					match_level = 1;
-					/* FALL THROUGH */
-				case 1:
-					if (!unchanged_file(fnamecmpbuf, file, &st))
-						continue;
-					fallback_match = i;
-					match_level = 2;
-					/* FALL THROUGH */
-				case 2:
-					if (!unchanged_attrs(file, &st))
-						continue;
-				}
+			if (link_stat(fnamecmpbuf, &st, 0) < 0
+			    || !S_ISREG(st.st_mode))
+				continue;
+			switch (match_level) {
+			case 0:
+				best_match = i;
+				match_level = 1;
+				if (compare_dest)
+					break;
+				/* FALL THROUGH */
+			case 1:
+				if (!unchanged_file(fnamecmpbuf, file, &st))
+					continue;
+				best_match = i;
+				match_level = 2;
+				/* FALL THROUGH */
+			case 2:
+				if (!unchanged_attrs(file, &st))
+					continue;
+				best_match = i;
 				match_level = 3;
 				break;
 			}
+			break;
 		} while (basis_dir[++i] != NULL);
-		if (statret == 0) {
-			if (match_level < 3) {
-				i = fallback_match;
+		if (match_level) {
+			if (i != best_match) {
+				i = best_match;
 				pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
 					 basis_dir[i], fname);
 			}
@@ -866,6 +867,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 				fnamecmp = fnamecmpbuf;
 				fnamecmp_type = i;
 			}
+			statret = 0;
 		}
 	}
 
