@@ -26,6 +26,10 @@
 
 #include "rsync.h"
 
+#if !MKNOD_CREATES_SOCKETS && HAVE_SYS_UN_H
+#include <sys/un.h>
+#endif
+
 extern int dry_run;
 extern int read_only;
 extern int list_only;
@@ -71,14 +75,41 @@ int do_lchown(const char *path, uid_t owner, gid_t group)
 	return lchown(path, owner, group);
 }
 
-#if HAVE_MKNOD
 int do_mknod(char *pathname, mode_t mode, dev_t dev)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-	return mknod(pathname, mode, dev);
-}
+#if !MKNOD_CREATES_FIFOS && HAVE_MKFIFO
+	if (S_ISFIFO(mode))
+		return mkfifo(pathname, mode);
 #endif
+#if !MKNOD_CREATES_SOCKETS && HAVE_SYS_UN_H
+	if (S_ISSOCK(mode)) {
+		int sock;
+		struct sockaddr_un saddr;
+		unsigned int len;
+
+		saddr.sun_family = AF_UNIX;
+		len = strlcpy(saddr.sun_path, pathname, sizeof saddr.sun_path);
+#if HAVE_SOCKADDR_UN_LEN
+		saddr.sun_len = len >= sizeof saddr.sun_path
+			      ? sizeof saddr.sun_path : len + 1;
+#endif
+
+		if ((sock = socket(PF_UNIX, SOCK_STREAM, 0)) < 0
+		    || (unlink(pathname) < 0 && errno != ENOENT)
+		    || (bind(sock, (struct sockaddr*)&saddr, sizeof saddr)) < 0)
+			return -1;
+		close(sock);
+		return do_chmod(pathname, mode);
+	}
+#endif
+#if HAVE_MKNOD
+	return mknod(pathname, mode, dev);
+#else
+	return -1;
+#endif
+}
 
 int do_rmdir(char *pathname)
 {
