@@ -69,9 +69,8 @@ static int is_backup_file(char *fn)
 }
 
 
-/* this deletes any files on the receiving side that are not present
- * on the sending side. For version 1.6.4 I have changed the behaviour
- * to match more closely what most people seem to expect of this option */
+/* This deletes any files on the receiving side that are not present
+ * on the sending side. */
 void delete_files(struct file_list *flist)
 {
 	struct file_list *local_file_list;
@@ -90,7 +89,7 @@ void delete_files(struct file_list *flist)
 		return;
 	}
 
-	for (j = 0;j < flist->count; j++) {
+	for (j = 0; j < flist->count; j++) {
 		if (!(flist->files[j]->flags & FLAG_TOP_DIR)
 		    || !S_ISDIR(flist->files[j]->mode))
 			continue;
