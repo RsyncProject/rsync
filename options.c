@@ -277,9 +277,10 @@ void usage(enum logcode F)
   rprintf(F,"     --rsync-path=PATH       specify path to rsync on the remote machine\n");
   rprintf(F,"     --existing              only update files that already exist\n");
   rprintf(F,"     --ignore-existing       ignore files that already exist on receiving side\n");
+  rprintf(F,"     --del                   an alias for --delete-during\n");
   rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
-  rprintf(F,"     --delete-before         receiver deletes before transfer, not during\n");
-  rprintf(F,"     --delete-after          receiver deletes after transfer, not during\n");
+  rprintf(F,"     --delete-during         receiver deletes during transfer, not before\n");
+  rprintf(F,"     --delete-after          receiver deletes after transfer, not before\n");
   rprintf(F,"     --delete-excluded       also delete excluded files on the receiving side\n");
   rprintf(F,"     --ignore-errors         delete even if there are I/O errors\n");
   rprintf(F,"     --force                 force deletion of directories even if not empty\n");
@@ -349,8 +350,8 @@ static struct poptOption long_options[] = {
   {"one-file-system", 'x', POPT_ARG_NONE,   &one_file_system, 0, 0, 0 },
   {"existing",         0,  POPT_ARG_NONE,   &only_existing, 0, 0, 0 },
   {"ignore-existing",  0,  POPT_ARG_NONE,   &opt_ignore_existing, 0, 0, 0 },
-  {"delete",           0,  POPT_ARG_NONE,   &delete_during, 0, 0, 0 },
-  {"delete-before",    0,  POPT_ARG_NONE,   &delete_before, 0, 0, 0 },
+  {"delete",           0,  POPT_ARG_NONE,   &delete_mode, 0, 0, 0 },
+  {"delete-during",    0,  POPT_ARG_NONE,   &delete_during, 0, 0, 0 },
   {"delete-after",     0,  POPT_ARG_NONE,   &delete_after, 0, 0, 0 },
   {"delete-excluded",  0,  POPT_ARG_NONE,   &delete_excluded, 0, 0, 0 },
   {"force",            0,  POPT_ARG_NONE,   &force_delete, 0, 0, 0 },
@@ -578,6 +579,16 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	/* The context leaks in case of an error, but if there's a
 	 * problem we always exit anyhow. */
 	pc = poptGetContext(RSYNC_NAME, *argc, *argv, long_options, 0);
+	{
+		struct poptAlias my_alias;
+		char **argv = new_array(char *, 1);
+		argv[0] = strdup("--delete-during");
+		my_alias.longName = "del", my_alias.shortName = '\0';
+		my_alias.argc = 1;
+		my_alias.argv = (const char **)argv;
+		if (argv && argv[0])
+			poptAddAlias(pc, my_alias, 0);
+	}
 	poptReadDefaultConfig(pc, 0);
 
 	while ((opt = poptGetNextOpt(pc)) != -1) {
@@ -884,10 +895,15 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (relative_paths < 0)
 		relative_paths = files_from? 1 : 0;
 
-	if (delete_during || delete_before || delete_after)
+	if (delete_during && delete_after) {
+		snprintf(err_buf, sizeof err_buf,
+			"You may not combine --delete-during (--del) and --delete-after.\n");
+		return 0;
+	}
+	if (delete_during || delete_after)
 		delete_mode = 1;
-	if (delete_excluded && !delete_mode)
-		delete_mode = delete_during = 1;
+	else if (delete_mode || delete_excluded)
+		delete_mode = delete_before = 1;
 
 	*argv = poptGetArgs(pc);
 	*argc = count_args(*argv);
@@ -1192,14 +1208,12 @@ void server_options(char **args,int *argc)
 	if (am_sender) {
 		if (delete_excluded)
 			args[ac++] = "--delete-excluded";
-		else if (delete_before)
-			args[ac++] = "--delete-before";
-		else if (delete_during || delete_after)
+		else if (delete_before || delete_after)
 			args[ac++] = "--delete";
-
+		if (delete_during)
+			args[ac++] = "--delete-during";
 		if (delete_after)
 			args[ac++] = "--delete-after";
-
 		if (force_delete)
 			args[ac++] = "--force";
 	}
