@@ -61,9 +61,7 @@ echo no)
 echo $ac_n "checking for utimbuf ... $ac_c"
 AC_TRY_COMPILE([#include <sys/types.h>
 #include <utime.h>],
-[int set_modtime(char *fname,time_t modtime)
-{  struct utimbuf tbuf;  tbuf.actime = 0; tbuf.modtime = modtime;
-   return utime(fname,&tbuf); }],
+[struct utimbuf tbuf;  tbuf.actime = 0; tbuf.modtime = 1; return utime("foo.c",&tbuf);],
 echo yes;AC_DEFINE(HAVE_UTIMBUF), 
 echo no)
 
