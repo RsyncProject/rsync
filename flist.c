@@ -317,7 +317,7 @@ void flist_expand(struct file_list *flist)
 	new_ptr = realloc_array(flist->files, struct file_struct *,
 				flist->malloced);
 
-	if (verbose >= 2) {
+	if (verbose >= 2 && flist->malloced != FLIST_START) {
 		rprintf(FINFO, "[%s] expand file_list to %.0f bytes, did%s move\n",
 		    who_am_i(),
 		    (double)sizeof flist->files[0] * flist->malloced,
