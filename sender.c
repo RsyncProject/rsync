@@ -159,15 +159,14 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		fname[0] = 0;
 		if (file->basedir) {
-			strlcpy(fname, file->basedir, MAXPATHLEN);
-			if (strlen(fname) == MAXPATHLEN-1) {
+			offset = stringjoin(fname, sizeof fname,
+					    file->basedir, "/", NULL);
+			if (offset >= MAXPATHLEN-1) {
 				io_error |= IOERR_GENERAL;
 				rprintf(FERROR, "send_files failed on long-named directory %s\n",
 					full_fname(fname));
 				return;
 			}
-			strlcat(fname, "/", MAXPATHLEN);
-			offset = strlen(file->basedir)+1;
 		}
 		f_name_to(file, fname + offset, MAXPATHLEN - offset);
 
