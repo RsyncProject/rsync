@@ -261,10 +261,6 @@ Add machines
 
 NICE -----------------------------------------------------------------
 
-SIGHUP
-
-  Re-read config file (just exec() ourselves) rather than exiting.
-
 --no-detach and --no-fork options
 
   Very useful for debugging.  Also good when running under a
