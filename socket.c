@@ -1,5 +1,6 @@
-/* 
-   Copyright (C) Andrew Tridgell 1998
+/* -*- c-file-style: "linux" -*-
+   
+   Copyright (C) 1998-2000 by Andrew Tridgell 
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -211,13 +212,27 @@ static int open_socket_in(int type, int port, struct in_addr *address)
 }
 
 
-/****************************************************************************
-determine if a file descriptor is in fact a socket
-****************************************************************************/
+/*
+ * Determine if a file descriptor is in fact a socket
+ */
 int is_a_socket(int fd)
 {
-	int v,l;
+	int v, l;
 	l = sizeof(int);
+
+        /* Parameters to getsockopt, setsockopt etc are very
+         * unstandardized across platforms, so don't be surprised if
+         * there are compiler warnings on e.g. SCO OpenSwerver.  It
+         * seems they all eventually get the right idea.
+         *
+         * Debian says: ``The fifth argument of getsockopt and
+         * setsockopt is in reality an int [*] (and this is what BSD
+         * 4.* and libc4 and libc5 have).  Some POSIX confusion
+         * resulted in the present socklen_t.  The draft standard has
+         * not been adopted yet, but glibc2 already follows it and
+         * also has socklen_t [*]. See also accept(2).''
+         *
+         * We now return to your regularly scheduled programming.  */
 	return(getsockopt(fd, SOL_SOCKET, SO_TYPE, (char *)&v, &l) == 0);
 }
 
@@ -261,6 +276,7 @@ void start_accept_loop(int port, int (*fn)(int ))
 
 		if(!FD_ISSET(s, &fds)) continue;
 
+                /* See note above prototypes. */
 		fd = accept(s,&addr,&in_addrlen);
 
 		if (fd == -1) continue;
