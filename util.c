@@ -523,9 +523,10 @@ static void glob_expand_one(char *s, char ***argv_ptr, int *argc_ptr,
 	if (!*s)
 		s = ".";
 
-	s = strdup(s);
 	if (sanitize_paths)
-		sanitize_path(s, NULL);
+		s = sanitize_path(NULL, s, NULL);
+	else
+		s = strdup(s);
 
 	memset(&globbuf, 0, sizeof globbuf);
 	if (!exclude_server_path(s))
@@ -692,37 +693,54 @@ void clean_fname(char *name)
 	}
 }
 
-/**
- * Make path appear as if a chroot had occurred:
+/* Make path appear as if a chroot had occurred.  This handles a leading
+ * "/" (either removing it or expanding it) and any leading or embedded
+ * ".." components that attempt to escape past the module's top dir.
  *
- * @li 1. remove leading "/" (or replace with "." if at end)
+ * If dest is NULL, a buffer is allocated to hold the result.  If dest is
+ * the same buffer as p (the path) OR if reldir is NULL, a leading slash
+ * is dropped instead of being expanded to be the module's top dir.
  *
- * @li 2. remove leading ".." components (except those allowed by @p reldir)
- *
- * @li 3. delete any other "<dir>/.." (recursively)
- *
- * Can only shrink paths, so sanitizes in place.
+ * If reldir is non-NULL (and non-empty), it is a sanitized directory that
+ * the path will be relative to, so allow as many '..'s at the beginning of
+ * the path as there are components in reldir.  This is used for symbolic
+ * link targets.  If reldir is non-null and the path began with "/", to be
+ * completely like a chroot we should add in depth levels of ".." at the
+ * beginning of the path, but that would blow the assumption that the path
+ * doesn't grow and it is not likely to end up being a valid symlink
+ * anyway, so just do the normal removal of the leading "/" instead.
  *
  * While we're at it, remove double slashes and "." components like
- *   clean_fname() does, but DON'T remove a trailing slash because that
- *   is sometimes significant on command line arguments.
+ * clean_fname() does, but DON'T remove a trailing slash because that is
+ * sometimes significant on command line arguments.
  *
- * If @p reldir is non-null, it is a sanitized directory that the path will be
- *    relative to, so allow as many ".." at the beginning of the path as
- *    there are components in reldir.  This is used for symbolic link targets.
- *    If reldir is non-null and the path began with "/", to be completely like
- *    a chroot we should add in depth levels of ".." at the beginning of the
- *    path, but that would blow the assumption that the path doesn't grow and
- *    it is not likely to end up being a valid symlink anyway, so just do
- *    the normal removal of the leading "/" instead.
- *
- * Contributed by Dave Dykstra <dwd@bell-labs.com>
+ * If the resulting path would be empty, change it into ".".
  */
-void sanitize_path(char *p, char *reldir)
+char *sanitize_path(char *dest, const char *p, const char *reldir)
 {
 	char *start, *sanp;
 	int depth = 0;
 	int allowdotdot = 0;
+	int rlen = 0;
+
+	if (dest != p) {
+		int plen = strlen(p);
+		if (*p == '/' && reldir) {
+			rlen = strlen(lp_path(module_id));
+			reldir = NULL;
+			p++;
+		}
+		if (dest) {
+			if (rlen + plen + 1 >= MAXPATHLEN)
+				return NULL;
+		} else if (!(dest = new_array(char, rlen + plen + 1)))
+			out_of_memory("sanitize_path");
+		if (rlen) {
+			memcpy(dest, lp_path(module_id), rlen);
+			if (rlen > 1)
+				dest[rlen++] = '/';
+		}
+	}
 
 	if (reldir) {
 		int new_component = 1;
@@ -735,8 +753,8 @@ void sanitize_path(char *p, char *reldir)
 			}
 		}
 	}
-	start = p;
-	sanp = p;
+
+	start = sanp = dest + rlen;
 	while (*p == '/') {
 		/* remove leading slashes */
 		p++;
@@ -792,51 +810,13 @@ void sanitize_path(char *p, char *reldir)
 			start = sanp;
 		}
 	}
-	if (sanp == start && !allowdotdot) {
+	if (sanp == dest) {
 		/* ended up with nothing, so put in "." component */
-		/*
-		 * note that the !allowdotdot doesn't prevent this from
-		 *  happening in all allowed ".." situations, but I didn't
-		 *  think it was worth putting in an extra variable to ensure
-		 *  it since an extra "." won't hurt in those situations.
-		 */
 		*sanp++ = '.';
 	}
 	*sanp = '\0';
-}
 
-/* Works much like sanitize_path(), with these differences:  (1) a new buffer
- * is allocated for the sanitized path rather than modifying it in-place; (2)
- * a leading slash gets transformed into the rootdir value (which can be empty
- * or NULL if you just want the slash to get dropped); (3) no "reldir" can be
- * specified. */
-char *alloc_sanitize_path(const char *path, const char *rootdir)
-{
-	char *buf;
-	int rlen, plen = strlen(path);
-
-	if (*path == '/' && rootdir) {
-		rlen = strlen(rootdir);
-		if (rlen == 1)
-			path++;
-	} else
-		rlen = 0;
-	if (!(buf = new_array(char, rlen + plen + 1)))
-		out_of_memory("alloc_sanitize_path");
-	if (rlen)
-		memcpy(buf, rootdir, rlen);
-	memcpy(buf + rlen, path, plen + 1);
-
-	if (rlen > 1)
-		rlen++;
-	sanitize_path(buf + rlen, NULL);
-	if (rlen && buf[rlen] == '.' && buf[rlen+1] == '\0') {
-		if (rlen > 1)
-			rlen--;
-		buf[rlen] = '\0';
-	}
-
-	return buf;
+	return dest;
 }
 
 char curr_dir[MAXPATHLEN];
