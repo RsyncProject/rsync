@@ -704,9 +704,7 @@ unsigned int clean_fname(char *name, BOOL collapse_dot_dot)
 					f += 2;
 					continue;
 				}
-				*t++ = *f++;
-				*t++ = *f++;
-				limit = t;
+				limit = t + 2;
 			}
 		}
 		while (*f && (*t++ = *f++) != '/') {}
