@@ -358,7 +358,7 @@ static void string_set(char **s, char *v)
 		return;
 	}
 	*s = strdup(v);
-	if (!*s) exit_cleanup(1);
+	if (!*s) exit_cleanup(RERR_MALLOC);
 }
 
 

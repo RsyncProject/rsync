@@ -60,7 +60,7 @@ static void check_timeout(void)
 	if (last_io && io_timeout && (t-last_io) >= io_timeout) {
 		rprintf(FERROR,"io timeout after %d second - exiting\n", 
 			(int)(t-last_io));
-		exit_cleanup(1);
+		exit_cleanup(RERR_TIMEOUT);
 	}
 }
 
@@ -125,11 +125,11 @@ static int read_timeout(int fd, char *buf, int len)
 			if (eof_error) {
 				rprintf(FERROR,"unexpected EOF in read_timeout\n");
 			}
-			exit_cleanup(1);
+			exit_cleanup(RERR_STREAMIO);
 		}
 
 		rprintf(FERROR,"read error: %s\n", strerror(errno));
-		exit_cleanup(1);
+		exit_cleanup(RERR_STREAMIO);
 	}
 
 	return ret;
@@ -181,13 +181,13 @@ static int read_unbuffered(int fd, char *buf, int len)
 
 		if (tag != FERROR && tag != FINFO) {
 			rprintf(FERROR,"unexpected tag %d\n", tag);
-			exit_cleanup(1);
+			exit_cleanup(RERR_STREAMIO);
 		}
 
 		if (remaining > sizeof(line)-1) {
 			rprintf(FERROR,"multiplexing overflow %d\n\n", 
 				remaining);
-			exit_cleanup(1);
+			exit_cleanup(RERR_STREAMIO);
 		}
 
 		read_loop(fd, line, remaining);
@@ -292,7 +292,7 @@ int64 read_longint(int f)
 
 #ifdef NO_INT64
 	rprintf(FERROR,"Integer overflow - attempted 64 bit offset\n");
-	exit_cleanup(1);
+	exit_cleanup(RERR_UNSUPPORTED);
 #else
 	if (remote_version >= 16) {
 		readfd(f,b,8);
@@ -386,7 +386,7 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 
 			if (ret <= 0) {
 				rprintf(FERROR,"erroring writing %d bytes - exiting\n", len);
-				exit_cleanup(1);
+				exit_cleanup(RERR_STREAMIO);
 			}
 
 			blocked = 0;
@@ -541,7 +541,7 @@ void io_printf(int fd, const char *format, ...)
 	len = vslprintf(buf, sizeof(buf)-1, format, ap);
 	va_end(ap);
 
-	if (len < 0) exit_cleanup(1);
+	if (len < 0) exit_cleanup(RERR_STREAMIO);
 
 	write_sbuf(fd, buf);
 }
@@ -563,7 +563,7 @@ void io_start_multiplex_in(int fd)
 	io_flush();
 	if (read_buffer_len) {
 		fprintf(stderr,"ERROR: data in read buffer at mplx start\n");
-		exit_cleanup(1);
+		exit_cleanup(RERR_STREAMIO);
 	}
 
 	io_multiplexing_in = 1;

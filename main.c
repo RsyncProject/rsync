@@ -178,13 +178,13 @@ static char *get_local_name(struct file_list *flist,char *name)
 			if (!push_dir(name, 0)) {
 				rprintf(FERROR,"push_dir %s : %s (1)\n",
 					name,strerror(errno));
-				exit_cleanup(1);
+				exit_cleanup(RERR_FILESELECT);
 			}
 			return NULL;
 		}
 		if (flist->count > 1) {
 			rprintf(FERROR,"ERROR: destination must be a directory when copying more than 1 file\n");
-			exit_cleanup(1);
+			exit_cleanup(RERR_FILESELECT);
 		}
 		return name;
 	}
@@ -197,7 +197,7 @@ static char *get_local_name(struct file_list *flist,char *name)
 
 	if (do_mkdir(name,0777 & ~orig_umask) != 0) {
 		rprintf(FERROR,"mkdir %s : %s (1)\n",name,strerror(errno));
-		exit_cleanup(1);
+		exit_cleanup(RERR_FILEIO);
 	} else {
 		if (verbose > 0)
 			rprintf(FINFO,"created directory %s\n",name);
@@ -206,7 +206,7 @@ static char *get_local_name(struct file_list *flist,char *name)
 	if (!push_dir(name, 0)) {
 		rprintf(FERROR,"push_dir %s : %s (2)\n",
 			name,strerror(errno));
-		exit_cleanup(1);
+		exit_cleanup(RERR_FILESELECT);
 	}
 
 	return NULL;
@@ -228,7 +228,7 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
   
 	if (!relative_paths && !push_dir(dir, 0)) {
 		rprintf(FERROR,"push_dir %s: %s (3)\n",dir,strerror(errno));
-		exit_cleanup(1);
+		exit_cleanup(RERR_FILESELECT);
 	}
 	argc--;
 	argv++;
@@ -275,7 +275,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	if (pipe(recv_pipe) < 0) {
 		rprintf(FERROR,"pipe failed in do_recv\n");
-		exit_cleanup(1);
+		exit_cleanup(RERR_SOCKETIO);
 	}
   
 	io_flush();
@@ -330,7 +330,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		if (!am_daemon && !push_dir(dir, 0)) {
 			rprintf(FERROR,"push_dir %s : %s (4)\n",
 				dir,strerror(errno));
-			exit_cleanup(1);
+			exit_cleanup(RERR_FILESELECT);
 		}    
 	}
 
@@ -340,7 +340,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	flist = recv_file_list(f_in);
 	if (!flist || flist->count == 0) {
 		rprintf(FERROR,"server_recv: nothing to do\n");
-		exit_cleanup(1);
+		exit_cleanup(RERR_FILESELECT);
 	}
 	
 	if (argc > 0) {    
@@ -489,7 +489,7 @@ static int start_client(int argc, char *argv[])
 
 		if (argc < 1) {
 			usage(FERROR);
-			exit_cleanup(1);
+			exit_cleanup(RERR_SYNTAX);
 		}
 
 		am_sender = 0;
@@ -511,7 +511,7 @@ static int start_client(int argc, char *argv[])
 
 		if (argc < 2) {
 			usage(FERROR);
-			exit_cleanup(1);
+			exit_cleanup(RERR_SYNTAX);
 		}
 		
 		if (local_server) {
@@ -544,7 +544,7 @@ static int start_client(int argc, char *argv[])
 	
 	if (!am_sender && argc > 1) {
 		usage(FERROR);
-		exit_cleanup(1);
+		exit_cleanup(RERR_SYNTAX);
 	}
 	
 	pid = do_cmd(shell_cmd,shell_machine,shell_user,shell_path,&f_in,&f_out);
@@ -559,7 +559,7 @@ static int start_client(int argc, char *argv[])
 
 
 static RETSIGTYPE sigusr1_handler(int val) {
-	exit_cleanup(1);
+	exit_cleanup(RERR_SIGNAL);
 }
 
 int main(int argc,char *argv[])
@@ -579,7 +579,7 @@ int main(int argc,char *argv[])
 
 	if (argc < 2) {
 		usage(FERROR);
-		exit_cleanup(1);
+		exit_cleanup(RERR_SYNTAX);
 	}
 
 	/* we set a 0 umask so that correct file permissions can be
@@ -587,7 +587,7 @@ int main(int argc,char *argv[])
 	orig_umask = (int)umask(0);
 
 	if (!parse_arguments(argc, argv)) {
-		exit_cleanup(1);
+		exit_cleanup(RERR_SYNTAX);
 	}
 
 	argc -= optind;
@@ -606,7 +606,7 @@ int main(int argc,char *argv[])
 
 	if (argc < 1) {
 		usage(FERROR);
-		exit_cleanup(1);
+		exit_cleanup(RERR_SYNTAX);
 	}
 
 	if (dry_run)
@@ -615,7 +615,7 @@ int main(int argc,char *argv[])
 #ifndef SUPPORT_LINKS
 	if (!am_server && preserve_links) {
 		rprintf(FERROR,"ERROR: symbolic links not supported\n");
-		exit_cleanup(1);
+		exit_cleanup(RERR_UNSUPPORTED);
 	}
 #endif
 

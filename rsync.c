@@ -188,7 +188,7 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 
 void sig_int(void)
 {
-	exit_cleanup(1);
+	exit_cleanup(RERR_SIGNAL);
 }
 
 

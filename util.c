@@ -61,14 +61,14 @@ int piped_child(char **command,int *f_in,int *f_out)
   if (pipe(to_child_pipe) < 0 ||
       pipe(from_child_pipe) < 0) {
     rprintf(FERROR,"pipe: %s\n",strerror(errno));
-    exit_cleanup(1);
+    exit_cleanup(RERR_IPC);
   }
 
 
   pid = do_fork();
   if (pid < 0) {
     rprintf(FERROR,"fork: %s\n",strerror(errno));
-    exit_cleanup(1);
+    exit_cleanup(RERR_IPC);
   }
 
   if (pid == 0)
@@ -79,7 +79,7 @@ int piped_child(char **command,int *f_in,int *f_out)
 	  close(from_child_pipe[0]) < 0 ||
 	  dup2(from_child_pipe[1], STDOUT_FILENO) < 0) {
 	rprintf(FERROR,"Failed to dup/close : %s\n",strerror(errno));
-	exit_cleanup(1);
+	exit_cleanup(RERR_IPC);
       }
       if (to_child_pipe[0] != STDIN_FILENO) close(to_child_pipe[0]);
       if (from_child_pipe[1] != STDOUT_FILENO) close(from_child_pipe[1]);
@@ -87,13 +87,13 @@ int piped_child(char **command,int *f_in,int *f_out)
       execvp(command[0], command);
       rprintf(FERROR,"Failed to exec %s : %s\n",
 	      command[0],strerror(errno));
-      exit_cleanup(1);
+      exit_cleanup(RERR_IPC);
     }
 
   if (close(from_child_pipe[1]) < 0 ||
       close(to_child_pipe[0]) < 0) {
     rprintf(FERROR,"Failed to close : %s\n",strerror(errno));   
-    exit_cleanup(1);
+    exit_cleanup(RERR_IPC);
   }
 
   *f_in = from_child_pipe[0];
@@ -114,14 +114,14 @@ int local_child(int argc, char **argv,int *f_in,int *f_out)
 	if (pipe(to_child_pipe) < 0 ||
 	    pipe(from_child_pipe) < 0) {
 		rprintf(FERROR,"pipe: %s\n",strerror(errno));
-		exit_cleanup(1);
+		exit_cleanup(RERR_IPC);
 	}
 
 
 	pid = do_fork();
 	if (pid < 0) {
 		rprintf(FERROR,"fork: %s\n",strerror(errno));
-		exit_cleanup(1);
+		exit_cleanup(RERR_IPC);
 	}
 
 	if (pid == 0) {
@@ -136,7 +136,7 @@ int local_child(int argc, char **argv,int *f_in,int *f_out)
 		    close(from_child_pipe[0]) < 0 ||
 		    dup2(from_child_pipe[1], STDOUT_FILENO) < 0) {
 			rprintf(FERROR,"Failed to dup/close : %s\n",strerror(errno));
-			exit_cleanup(1);
+			exit_cleanup(RERR_IPC);
 		}
 		if (to_child_pipe[0] != STDIN_FILENO) close(to_child_pipe[0]);
 		if (from_child_pipe[1] != STDOUT_FILENO) close(from_child_pipe[1]);
@@ -146,7 +146,7 @@ int local_child(int argc, char **argv,int *f_in,int *f_out)
 	if (close(from_child_pipe[1]) < 0 ||
 	    close(to_child_pipe[0]) < 0) {
 		rprintf(FERROR,"Failed to close : %s\n",strerror(errno));   
-		exit_cleanup(1);
+		exit_cleanup(RERR_IPC);
 	}
 
 	*f_in = from_child_pipe[0];
@@ -160,13 +160,13 @@ int local_child(int argc, char **argv,int *f_in,int *f_out)
 void out_of_memory(char *str)
 {
   rprintf(FERROR,"ERROR: out of memory in %s\n",str);
-  exit_cleanup(1);
+  exit_cleanup(RERR_MALLOC);
 }
 
 void overflow(char *str)
 {
   rprintf(FERROR,"ERROR: buffer overflow in %s\n",str);
-  exit_cleanup(1);
+  exit_cleanup(RERR_MALLOC);
 }
 
 

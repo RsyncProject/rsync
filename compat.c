@@ -54,7 +54,7 @@ void setup_protocol(int f_out,int f_in)
 	    remote_version > MAX_PROTOCOL_VERSION) {
 		rprintf(FERROR,"protocol version mismatch - is your shell clean?\n");
 		rprintf(FERROR,"(see the rsync man page for an explanation)\n");
-		exit_cleanup(1);
+		exit_cleanup(RERR_PROTOCOL);
 	}	
 	
 	if (verbose > 2)

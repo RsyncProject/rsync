@@ -136,7 +136,7 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 		}
 		if (munmap(map->map, map->p_len) != 0) {
 			rprintf(FERROR,"munmap failed : %s\n", strerror(errno));
-			exit_cleanup(1);
+			exit_cleanup(RERR_MALLOC);
 		}
 
 		/* align the mmap region on a nice boundary back a bit from
@@ -186,7 +186,7 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 
 	if (do_lseek(map->fd,offset,SEEK_SET) != offset) {
 		rprintf(FERROR,"lseek failed in map_ptr\n");
-		exit_cleanup(1);
+		exit_cleanup(RERR_FILEIO);
 	}
 
 	if ((nread=read(map->fd,map->p,len)) != len) {		

@@ -223,7 +223,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 
 			if (fd != -1 && write_file(fd,data,i) != i) {
 				rprintf(FERROR,"write failed on %s : %s\n",fname,strerror(errno));
-				exit_cleanup(1);
+				exit_cleanup(RERR_FILEIO);
 			}
 			offset += i;
 			continue;
@@ -249,7 +249,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 		if (fd != -1 && write_file(fd,map,len) != len) {
 			rprintf(FERROR,"write failed on %s : %s\n",
 				fname,strerror(errno));
-			exit_cleanup(1);
+			exit_cleanup(RERR_FILEIO);
 		}
 		offset += len;
 	}
@@ -259,7 +259,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 	if (fd != -1 && offset > 0 && sparse_end(fd) != 0) {
 		rprintf(FERROR,"write failed on %s : %s\n",
 			fname,strerror(errno));
-		exit_cleanup(1);
+		exit_cleanup(RERR_FILEIO);
 	}
 
 	sum_end(file_sum1);
@@ -322,7 +322,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		if (i < 0 || i >= flist->count) {
 			rprintf(FERROR,"Invalid file index %d in recv_files (count=%d)\n", 
 				i, flist->count);
-			exit_cleanup(1);
+			exit_cleanup(RERR_PROTOCOL);
 		}
 
 		file = flist->files[i];

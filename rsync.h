@@ -63,6 +63,8 @@
 #define FINFO 2
 #define FLOG 3
 
+#include "errcode.h"
+
 #include "config.h"
 
 #if HAVE_REMSH

@@ -108,7 +108,7 @@ send_deflated_token(int f, int token,
 					 Z_DEFLATED, -15, 8,
 					 Z_DEFAULT_STRATEGY) != Z_OK) {
 				rprintf(FERROR, "compression init failed\n");
-				exit_cleanup(1);
+				exit_cleanup(RERR_STREAMIO);
 			}
 			if ((obuf = malloc(MAX_DATA_COUNT+2)) == NULL)
 				out_of_memory("send_deflated_token");
@@ -178,7 +178,7 @@ send_deflated_token(int f, int token,
 			r = deflate(&tx_strm, flush);
 			if (r != Z_OK) {
 				rprintf(FERROR, "deflate returned %d\n", r);
-				exit_cleanup(1);
+				exit_cleanup(RERR_STREAMIO);
 			}
 			if (nb == 0 || tx_strm.avail_out == 0) {
 				n = MAX_DATA_COUNT - tx_strm.avail_out;
@@ -215,7 +215,7 @@ send_deflated_token(int f, int token,
 		if (r != Z_OK || tx_strm.avail_in != 0) {
 			rprintf(FERROR, "deflate on token returned %d (%d bytes left)\n",
 				r, tx_strm.avail_in);
-			exit_cleanup(1);
+			exit_cleanup(RERR_STREAMIO);
 		}
 	}
 }
@@ -250,7 +250,7 @@ recv_deflated_token(int f, char **data)
 				rx_strm.zfree = NULL;
 				if (inflateInit2(&rx_strm, -15) != Z_OK) {
 					rprintf(FERROR, "inflate init failed\n");
-					exit_cleanup(1);
+					exit_cleanup(RERR_STREAMIO);
 				}
 				if ((cbuf = malloc(MAX_DATA_COUNT)) == NULL
 				    || (dbuf = malloc(CHUNK_SIZE)) == NULL)
@@ -293,7 +293,7 @@ recv_deflated_token(int f, char **data)
 				if (r != Z_OK && r != Z_BUF_ERROR) {
 					rprintf(FERROR, "inflate flush returned %d (%d bytes)\n",
 						r, n);
-					exit_cleanup(1);
+					exit_cleanup(RERR_STREAMIO);
 				}
 				if (n != 0 && r != Z_BUF_ERROR) {
 					/* have to return some more data and
@@ -308,7 +308,7 @@ recv_deflated_token(int f, char **data)
 				 */
 				if (!inflateSyncPoint(&rx_strm)) {
 					rprintf(FERROR, "decompressor lost sync!\n");
-					exit_cleanup(1);
+					exit_cleanup(RERR_STREAMIO);
 				}
 				rx_strm.avail_in = 4;
 				rx_strm.next_in = (Bytef *)cbuf;
@@ -343,7 +343,7 @@ recv_deflated_token(int f, char **data)
 			n = CHUNK_SIZE - rx_strm.avail_out;
 			if (r != Z_OK) {
 				rprintf(FERROR, "inflate returned %d (%d bytes)\n", r, n);
-				exit_cleanup(1);
+				exit_cleanup(RERR_STREAMIO);
 			}
 			if (rx_strm.avail_in == 0)
 				recv_state = r_inflated;
@@ -399,7 +399,7 @@ static void see_deflate_token(char *buf, int len)
 		r = inflate(&rx_strm, Z_SYNC_FLUSH);
 		if (r != Z_OK) {
 			rprintf(FERROR, "inflate (token) returned %d\n", r);
-			exit_cleanup(1);
+			exit_cleanup(RERR_STREAMIO);
 		}
 	} while (len || rx_strm.avail_out == 0);
 }

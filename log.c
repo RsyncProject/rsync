@@ -93,9 +93,9 @@ void log_open(void)
 	len = vslprintf(buf, sizeof(buf)-1, format, ap);
 	va_end(ap);
 
-	if (len < 0) exit_cleanup(1);
+	if (len < 0) exit_cleanup(RERR_MESSAGEIO);
 
-	if (len > sizeof(buf)-1) exit_cleanup(1);
+	if (len > sizeof(buf)-1) exit_cleanup(RERR_MESSAGEIO);
 
 	buf[len] = 0;
 
@@ -134,9 +134,9 @@ void log_open(void)
 			f = stdout;
 	} 
 
-	if (!f) exit_cleanup(1);
+	if (!f) exit_cleanup(RERR_MESSAGEIO);
 
-	if (fwrite(buf, len, 1, f) != 1) exit_cleanup(1);
+	if (fwrite(buf, len, 1, f) != 1) exit_cleanup(RERR_MESSAGEIO);
 
 	if (buf[len-1] == '\r' || buf[len-1] == '\n') fflush(f);
 }
@@ -166,7 +166,7 @@ void rflush(int fd)
 			f = stdout;
 	} 
 
-	if (!f) exit_cleanup(1);
+	if (!f) exit_cleanup(RERR_MESSAGEIO);
 	fflush(f);
 }
 
@@ -252,7 +252,7 @@ static void log_formatted(int fd,
 		if ((l-1) + ((int)(s - &buf[0])) > sizeof(buf)) {
 			rprintf(FERROR,"buffer overflow expanding %%%c - exiting\n",
 				p[0]);
-			exit_cleanup(1);
+			exit_cleanup(RERR_MESSAGEIO);
 		}
 
 		if (l != 2) {
@@ -304,7 +304,7 @@ void log_exit(int code)
 			(double)stats.total_read,
 			(double)stats.total_size);
 	} else {
-		rprintf(FLOG,"transfer interrupted\n");
+		rprintf(FLOG,"transfer interrupted (code %d)\n", code);
 	}
 }
 

@@ -118,7 +118,7 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 		if (i < 0 || i >= flist->count) {
 			rprintf(FERROR,"Invalid file index %d (count=%d)\n", 
 				i, flist->count);
-			exit_cleanup(1);
+			exit_cleanup(RERR_PROTOCOL);
 		}
 
 		file = flist->files[i];

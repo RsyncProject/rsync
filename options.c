@@ -361,7 +361,7 @@ int parse_arguments(int argc, char *argv[])
 		case OPT_SENDER:
 			if (!am_server) {
 				usage(FERROR);
-				exit_cleanup(1);
+				exit_cleanup(RERR_SYNTAX);
 			}
 			am_sender = 1;
 			break;

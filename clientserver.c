@@ -56,7 +56,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 
 	fd = open_socket_out(host, rsync_port);
 	if (fd == -1) {
-		exit_cleanup(1);
+		exit_cleanup(RERR_SOCKETIO);
 	}
 	
 	server_options(sargs,&sargc);
@@ -311,7 +311,7 @@ static int rsync_module(int fd, int i)
 
 	if (!ret) {
 		rprintf(FERROR,"Error parsing options (unsupported option?) - aborting\n");
-		exit_cleanup(1);
+		exit_cleanup(RERR_SYNTAX);
 	}
 
 	start_server(fd, fd, argc, argp);
@@ -343,7 +343,7 @@ static int start_daemon(int fd)
 	extern int remote_version;
 
 	if (!lp_load(config_file, 0)) {
-		exit_cleanup(1);
+		exit_cleanup(RERR_SYNTAX);
 	}
 
 	set_socket_options(fd,"SO_KEEPALIVE");
@@ -433,7 +433,7 @@ int daemon_main(void)
 
 	if (!lp_load(config_file, 1)) {
 		fprintf(stderr,"failed to load config file %s\n", config_file);
-		exit_cleanup(1);
+		exit_cleanup(RERR_SYNTAX);
 	}
 
 	log_open();
@@ -447,7 +447,7 @@ int daemon_main(void)
 		if ((f = fopen(lp_pid_file(), "w")) == NULL) {
 		    cleanup_set_pid(0);
 		    fprintf(stderr,"failed to create pid file %s\n", pid_file);
-		    exit_cleanup(1);
+		    exit_cleanup(RERR_FILEIO);
 		}
 		fprintf(f, "%d\n", pid);
 		fclose(f);

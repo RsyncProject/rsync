@@ -221,7 +221,7 @@ struct exclude_struct **make_exclude_list(char *fname,
 	if (!f) {
 		if (fatal) {
 			rprintf(FERROR,"%s : %s\n",fname,strerror(errno));
-			exit_cleanup(1);
+			exit_cleanup(RERR_FILEIO);
 		}
 		return list;
 	}
@@ -264,7 +264,7 @@ void send_exclude_list(int f)
 		if (exclude_list[i]->include) {
 			if (remote_version < 19) {
 				rprintf(FERROR,"remote rsync does not support include syntax - aborting\n");
-				exit_cleanup(1);
+				exit_cleanup(RERR_NOSUPPORT);
 			}
 			write_int(f,l+2);
 			write_buf(f,"+ ",2);

@@ -686,7 +686,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 			if (pop_dir(olddir) != 0) {
 				rprintf(FERROR,"pop_dir %s : %s\n",
 					dir,strerror(errno));
-				exit_cleanup(1);
+				exit_cleanup(RERR_FILESELECT);
 			}
 		}
 	}
