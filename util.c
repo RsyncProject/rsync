@@ -483,3 +483,20 @@ int name_to_gid(char *name, gid_t *gid)
 }
 
 
+/****************************************************************************
+check if a process exists. 
+****************************************************************************/
+int process_exists(int pid)
+{
+	return(kill(pid,0) == 0 || errno != ESRCH);
+}
+
+int lock_file(int fd)
+{
+	return flock(fd, LOCK_EX) == 0;
+}
+
+int unlock_file(int fd)
+{
+	return flock(fd, LOCK_UN) == 0;
+}

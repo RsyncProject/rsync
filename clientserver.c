@@ -108,6 +108,11 @@ static int rsync_module(int fd, int i)
 		return -1;
 	}
 
+	if (!claim_connection(lp_lock_file(), lp_max_connections())) {
+		rprintf(FERROR,"ERROR: max connections reached\n");
+		return -1;
+	}
+
 	rprintf(FINFO,"rsync on module %s from %s (%s)\n",
 		lp_name(i), host, addr);
 

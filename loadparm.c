@@ -98,7 +98,9 @@ static BOOL bLoaded = False;
 typedef struct
 {
 	char *motd_file;
+	char *lock_file;
 	int syslog_facility;
+	int max_connections;
 } global;
 
 static global Globals;
@@ -150,7 +152,9 @@ static BOOL bInGlobalSection = True;
 /* note that we do not initialise the defaults union - it is not allowed in ANSI C */
 static struct parm_struct parm_table[] =
 {
+  {"max connections",  P_INTEGER, P_GLOBAL, &Globals.max_connections,NULL, 0},
   {"motd file",        P_STRING,  P_GLOBAL, &Globals.motd_file,    NULL,   0},
+  {"lock file",        P_STRING,  P_GLOBAL, &Globals.lock_file,    NULL,   0},
   {"syslog facility",  P_INTEGER, P_GLOBAL, &Globals.syslog_facility, NULL,0},
   {"name",             P_STRING,  P_LOCAL,  &sDefault.name,        NULL,   0},
   {"comment",          P_STRING,  P_LOCAL,  &sDefault.comment,     NULL,   0},
@@ -173,6 +177,7 @@ static void init_globals(void)
 #ifdef LOG_DAEMON
 	Globals.syslog_facility = LOG_DAEMON;
 #endif
+	Globals.lock_file = "/var/run/rsyncd.lock";
 }
 
 /***************************************************************************
@@ -208,6 +213,8 @@ static void init_locals(void)
 
 
 FN_GLOBAL_STRING(lp_motd_file, &Globals.motd_file)
+FN_GLOBAL_STRING(lp_lock_file, &Globals.lock_file)
+FN_GLOBAL_INTEGER(lp_max_connections, &Globals.max_connections)
 FN_GLOBAL_INTEGER(lp_syslog_facility, &Globals.syslog_facility)
 FN_LOCAL_STRING(lp_name, name)
 FN_LOCAL_STRING(lp_comment, comment)
