@@ -1020,11 +1020,8 @@ static RETSIGTYPE rsync_panic_handler(UNUSED(int whatsig))
 int main(int argc,char *argv[])
 {
 	int ret;
-	int orig_argc;
-	char **orig_argv;
-
-	orig_argc = argc;
-	orig_argv = argv;
+	int orig_argc = argc;
+	char **orig_argv = argv;
 
 	signal(SIGUSR1, sigusr1_handler);
 	signal(SIGUSR2, sigusr2_handler);
@@ -1075,7 +1072,7 @@ int main(int argc,char *argv[])
 
 	if (write_batch || read_batch) {
 		if (write_batch)
-			write_batch_argvs_file(orig_argc, orig_argv);
+			write_batch_shell_file(orig_argc, orig_argv, argc);
 
 		if (read_batch && strcmp(batch_name, "-") == 0)
 			batch_fd = STDIN_FILENO;
