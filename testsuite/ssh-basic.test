@@ -12,7 +12,7 @@
 
 if [ "x$rsync_enable_ssh_tests" != xyes ]
 then
-    echo "Skipping SSH tests because $rsync_enable_ssh_tests is not set"
+    echo "Skipping SSH tests because \$rsync_enable_ssh_tests is not set"
     exit 77
 fi
 
