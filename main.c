@@ -301,7 +301,8 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 		ret = piped_child(args,f_in,f_out);
 	}
 
-	if (dir) free(dir);
+	if (dir)
+		free(dir);
 
 	return ret;
 
@@ -443,7 +444,8 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	if ((pid=do_fork()) == 0) {
 		close(error_pipe[0]);
-		if (f_in != f_out) close(f_out);
+		if (f_in != f_out)
+			close(f_out);
 
 		/* we can't let two processes write to the socket at one time */
 		io_multiplexing_close();
@@ -467,7 +469,8 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	am_generator = 1;
 
 	close(error_pipe[1]);
-	if (f_in != f_out) close(f_in);
+	if (f_in != f_out)
+		close(f_in);
 
 	io_start_buffering_out(f_out);
 
@@ -546,7 +549,8 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	if (argc > 0) {
 		if (strcmp(dir,".")) {
 			argv[0] += strlen(dir);
-			if (argv[0][0] == '/') argv[0]++;
+			if (argv[0][0] == '/')
+				argv[0]++;
 		}
 		local_name = get_local_name(flist,argv[0]);
 	}
