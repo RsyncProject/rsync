@@ -1,0 +1,15 @@
+To build and install rsync
+
+  $ ./configure
+  $ make
+  # make install
+
+You may set the installation directory and other parameters by options
+to ./configure.  To see them, use:
+
+  $ ./configure --help
+
+As of 2.4.7, rsync uses Eric Troan's popt option-parsing library.  A
+cut-down copy of release 1.5 is included in the rsync distribution,
+and will be used it there is no popt library on your build host, or if
+the --with-included-popt option is passed to ./configure.
