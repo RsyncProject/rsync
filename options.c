@@ -471,7 +471,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		case OPT_ADDRESS:
 			{
 				struct in_addr *ia;
-				if ((ia = ip_address(optarg))) {
+				if ((ia = ip_address (poptGetOptArg (pc)))) {
 					socket_address = *ia;
 				}
 			}
