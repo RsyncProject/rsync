@@ -828,6 +828,29 @@ showing the progress of the transfer. This gives a bored user
 something to watch.
 Implies --verbose without incrementing verbosity.
 
+When the file is transferring, the data looks like this:
+
+verb(
+      782448  63%  110.64kB/s    0:00:04
+)
+
+This tells you the current file size, the percentage of the transfer that
+is complete, the current calculated file-completion rate (including both
+data over the wire and data being matched locally), and the estimated time
+remaining in this transfer.
+
+After the a file is complete, it the data looks like this:
+
+verb(
+     1238099 100%  146.38kB/s    0:00:08  (5, 57.1% of 396)
+)
+
+This tells you the final file size, that it's 100% complete, the final
+transfer rate for the file, the amount of elapsed time it took to transfer
+the file, and the addition of a total-transfer summary in parentheses.
+These additional numbers tell you how many files have been updated, and
+what percent of the total number of files has been scanned.
+
 dit(bf(-P)) The -P option is equivalent to --partial --progress. I
 found myself typing that combination quite often so I created an
 option to make it easier.
