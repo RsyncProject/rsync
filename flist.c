@@ -531,7 +531,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 	static gid_t gid;
 	static char lastname[MAXPATHLEN], *lastdir;
 	static int lastdir_depth, lastdir_len = -1;
-	static unsigned int del_heir_name_len = -1;
+	static unsigned int del_heir_name_len = 0;
 	static int in_del_hier = 0;
 	char thisname[MAXPATHLEN];
 	unsigned int l1 = 0, l2 = 0;
@@ -546,7 +546,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 		rdev_major = 0;
 		uid = 0, gid = 0;
 		*lastname = '\0';
-		del_heir_name_len = lastdir_len = -1;
+		lastdir_len = -1;
 		in_del_hier = 0;
 		return;
 	}
