@@ -269,7 +269,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 		offset += len;
 	}
 
-	end_progress();
+	end_progress(total_size);
 
 	if (fd != -1 && offset > 0 && sparse_end(fd) != 0) {
 		rprintf(FERROR,"write failed on %s : %s\n",

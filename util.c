@@ -767,12 +767,12 @@ int u_strcmp(const char *cs1, const char *cs2)
 
 static OFF_T last_ofs;
 
-void end_progress(void)
+void end_progress(OFF_T size)
 {
 	extern int do_progress, am_server;
 
 	if (do_progress && !am_server) {
-		rprintf(FINFO,"\n");
+		rprintf(FINFO,"%.0f (100%%)\n", (double)size);
 	}
 	last_ofs = 0;
 }
