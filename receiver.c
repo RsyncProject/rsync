@@ -426,13 +426,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		if (server_exclude_list.head
 		    && check_exclude(&server_exclude_list, fname,
 				     S_ISDIR(file->mode)) < 0) {
-			if (verbose) {
-				rprintf(FINFO,
-					"skipping server-excluded update for \"%s\"\n",
-					safe_fname(fname));
-			}
-			discard_receive_data(f_in, file->length);
-			continue;
+			rprintf(FERROR, "attempt to hack rsync failed.\n");
+			exit_cleanup(RERR_PROTOCOL);
 		}
 
 		if (partial_dir) {
