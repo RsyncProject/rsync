@@ -538,7 +538,7 @@ static void receive_file_entry(struct file_struct **fptr,
 		    (flags & SAME_GID) ? last_gid : (gid_t) read_int(f);
 	if (preserve_devices && IS_DEVICE(file->mode))
 		file->rdev =
-		    (flags & SAME_RDEV) ? last_rdev : (dev_t) read_int(f);
+		    (flags & SAME_RDEV) ? last_rdev : (DEV64_T) read_int(f);
 
 	if (preserve_links && S_ISLNK(file->mode)) {
 		int l = read_int(f);
@@ -1151,7 +1151,9 @@ int flist_find(struct file_list *flist, struct file_struct *f)
 {
 	int low = 0, high = flist->count - 1;
 
-	if (flist->count <= 0)
+	while (high >= 0 && !flist->files[high]->basename) high--;
+
+	if (high < 0)
 		return -1;
 
 	while (low != high) {
