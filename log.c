@@ -409,6 +409,12 @@ static void log_formatted(enum logcode code,
 	extern int am_daemon;
 	int64 b;
 
+	/* We expand % codes one by one in place in buf.  We don't
+	 * copy in the terminating nul of the inserted strings, but
+	 * rather keep going until we reach the nul of the format.
+	 * Just to make sure we don't clobber that nul and therefore
+	 * accidentally keep going, we zero the buffer now. */
+	memset(buf, 0, sizeof buf);
 	strlcpy(buf, format, sizeof(buf));
 	
 	for (s=&buf[0]; 
@@ -466,7 +472,11 @@ static void log_formatted(enum logcode code,
 			break;
 		}
 
-		if (!n) continue;
+		/* n is the string to be inserted in place of this %
+		 * code; l is its length not including the trailing
+		 * NUL */
+		if (!n)
+			continue;
 
 		l = strlen(n);
 
@@ -476,11 +486,16 @@ static void log_formatted(enum logcode code,
 			exit_cleanup(RERR_MESSAGEIO);
 		}
 
+		/* Shuffle the rest of the string along to make space for n */
 		if (l != 2) {
 			memmove(s+(l-1), s+1, strlen(s+1)+1);
 		}
+
+		/* Copy in n but NOT its nul, because the format sting
+		 * probably continues after this. */
 		memcpy(p, n, l);
 
+		/* Skip over inserted string; continue looking */
 		s = p+l;
 	}
 
