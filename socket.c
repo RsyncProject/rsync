@@ -436,6 +436,7 @@ void start_accept_loop(int port, int (*fn)(int ))
 			 * accept again. */
 			sleep(2);
 		} else {
+			/* Parent doesn't need this fd anymore. */
 			close(fd);
 		}
 	}
