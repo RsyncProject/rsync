@@ -13,9 +13,20 @@ Changes since 2.6.3:
       being pushed (since the stats come from the sending side).
       (Requires protocol 29 for a pull.)
 
-    - The "%o" (operation) log format now has a third value (besides "send"
-      and "recv"):  "del." (with trailing dot to make it 4 chars).  This
-      changes the way deletions are logged in the daemon's log file.
+    - The "%o" (operation) log-format escape now has a third value (besides
+      "send" and "recv"):  "del." (with trailing dot to make it 4 chars).
+      This changes the way deletions are logged in the daemon's log file.
+
+    - When the --log-format option is combined with --verbose, rsync now
+      avoids outputting the name of the file twice in most circumstances.
+      As long as the --log-format item does not refer to any post-transfer
+      items (such as %b or %c), the --log-format message is output prior to
+      the transfer with --verbose being the equivalent of a --log-format of
+      '%n%L' (which outputs the name and any symlink info).  If the log
+      output must occur after the transfer to be complete, the only time
+      the name is also output prior to the transfer is when --progress was
+      specified (so that the name will precede the progress stats, and the
+      full --log-format output will come after).
   
   BUG FIXES:
 
