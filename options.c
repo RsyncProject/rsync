@@ -621,6 +621,17 @@ int parse_arguments(int argc, char *argv[], int frommain)
 			break;
 
 		default:
+                        /* FIXME: This can be confusing when the error message
+                         * is coming from a remote server which has an older
+                         * rsync version than the local version.  The user
+                         * sees the option documented in the local --help, but
+                         * then the program seems to refuse to execute it.  So
+                         * perhaps the message should give the hostname or
+                         * something.
+                         * 
+                         * In rsync 3.x, it might be nice if options which
+                         * only affect one end didn't have to bother the
+                         * remote end. */
 			slprintf(err_buf,sizeof(err_buf),"unrecognised option\n");
 			return 0;
 		}
