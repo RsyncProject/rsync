@@ -1,6 +1,6 @@
 /* -*- c-file-style: "linux" -*-
  *
- * Copyright (C) 2001 by Martin Pool <mbp@samba.org>
+ * Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version
@@ -117,9 +117,10 @@ static void list_file (const char *fname)
 	
 	/* NB: need to pass size as a double because it might be be
 	 * too large for a long. */
-	printf("%s %12.0f %6d.%-6d %s %s%s\n",
+	printf("%s %12.0f %6d.%-6d %6d %s %s%s\n",
 	       permbuf, (double) buf.st_size,
 	       buf.st_uid, buf.st_gid,
+	       buf.st_nlink,
 	       datebuf, fname, linkbuf);
 }
 
