@@ -256,9 +256,11 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #endif
 
 #if HAVE_SHORT_INO_T
-#define INO_T uint32
+#  define INO_T uint32
+#elif HAVE_INO_T
+#  define INO_T ino_t
 #else
-#define INO_T ino_t
+#  define INO_T unsigned
 #endif
 
 #ifndef MIN
