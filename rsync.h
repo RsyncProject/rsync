@@ -122,6 +122,10 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
+#else
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
 #endif
 
 #ifdef HAVE_SYS_SOCKET_H
@@ -130,10 +134,6 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 
 #ifdef HAVE_STRING_H
 #include <string.h>
-#endif
-
-#ifdef HAVE_MALLOC_H
-#include <malloc.h>
 #endif
 
 #ifdef TIME_WITH_SYS_TIME
