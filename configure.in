@@ -65,6 +65,17 @@ then
 fi
 
 
+# Specifically, this turns on panic_action handling.
+AC_ARG_ENABLE(maintainer-mode,
+	AC_HELP_STRING([--enable-maintainer-mode],	
+		[turn on extra debug features],
+		[], []))
+if test x"$enable_maintainer_mode" = xyes
+then
+	CFLAGS="$CFLAGS -DMAINTAINER_MODE"
+fi
+
+
 # This is needed for our included version of popt.  Kind of silly, but
 # I don't want our version too far out of sync.
 CFLAGS="$CFLAGS -DHAVE_CONFIG_H"

@@ -14,6 +14,9 @@ cut-down copy of release 1.5 is included in the rsync distribution,
 and will be used it there is no popt library on your build host, or if
 the --with-included-popt option is passed to ./configure.
 
+If you configure using --enable-maintainer-mode, then rsync will try
+to pop up an xterm on DISPLAY=:0 if it crashes.  You might find this
+useful, but it should be turned off for production builds.
 
 
 HP-UX NOTES

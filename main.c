@@ -796,6 +796,39 @@ static RETSIGTYPE sigchld_handler(int UNUSED(val)) {
 #endif
 }
 
+
+/**
+ * This routine catches signals and tries to send them to gdb.
+ *
+ * Because it's called from inside a signal handler it ought not to
+ * use too many library routines.
+ *
+ * @todo Perhaps use "screen -X" instead/as well, to help people
+ * debugging without easy access to X.  Perhaps use an environment
+ * variable, or just call a script?
+ *
+ * @todo The /proc/ magic probably only works on Linux (and
+ * Solaris?)  Can we be more portable?
+ **/
+#ifdef MAINTAINER_MODE
+static RETSIGTYPE rsync_panic_handler(int UNUSED(whatsig))
+{
+	char cmd_buf[300];
+	int ret;
+	sprintf(cmd_buf, 
+		"xterm -display :0 -T Panic -n Panic "
+		"-e gdb /proc/%d/exe %d", 
+		getpid(), getpid());
+
+	/* Unless we failed to execute gdb, we allow the process to
+	 * continue.  I'm not sure if that's right. */
+	ret = system(cmd_buf);
+	if (ret)
+		_exit(ret);
+}
+#endif
+
+
 int main(int argc,char *argv[])
 {       
 	extern int am_root;
@@ -814,6 +847,12 @@ int main(int argc,char *argv[])
 	signal(SIGUSR1, sigusr1_handler);
 	signal(SIGUSR2, sigusr2_handler);
 	signal(SIGCHLD, sigchld_handler);
+#ifdef MAINTAINER_MODE
+	signal(SIGSEGV, rsync_panic_handler);
+	signal(SIGFPE, rsync_panic_handler);
+	signal(SIGABRT, rsync_panic_handler);
+	signal(SIGBUS, rsync_panic_handler);
+#endif /* def MAINTAINER_MODE */
 
 	starttime = time(NULL);
 	am_root = (getuid() == 0);

@@ -9,6 +9,11 @@ rsync changes since last release
       accepts a DESTDIR variable for help in building binary packages.
       (Peter Breitenlohner, Greg Louis)
 
+    * If configured with --enable-maintainer-mode, then on receipt of
+      a fatal signal rsync will try to open an xterm running gdb,
+      similarly to Samba's "panic action" or GNOME's bug-buddy.
+      (Martin Pool)
+
 
   BUG FIXES:
 
