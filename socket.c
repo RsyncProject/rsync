@@ -120,7 +120,7 @@ void start_accept_loop(int port, int (*fn)(int ))
 {
 	int s;
 
-	signal(SIGCLD, SIG_IGN);
+	signal(SIGCHLD, SIG_IGN);
 
 	/* open an incoming socket */
 	s = open_socket_in(SOCK_STREAM, port);

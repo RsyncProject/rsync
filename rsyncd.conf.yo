@@ -8,7 +8,7 @@ rsyncd.conf
 manpagedescription()
 
 The rsyncd.conf file is the runtime configuration file for rsync when
-run with the -daemon option. When run in this way rsync becomes a
+run with the --daemon option. When run in this way rsync becomes a
 rsync server listening on TCP port 873. Connections from rsync clients
 are accepted for either anonymous or authenticated rsync sessions. 
 
@@ -33,7 +33,7 @@ within a parameter value is retained verbatim.
 Any line beginning with a hash (#) is ignored, as are lines containing 
 only whitespace.
 
-Any line ending in a \e is "continued" on the next line in the
+Any line ending in a \ is "continued" on the next line in the
 customary UNIX fashion.
 
 The values following the equals sign in parameters are all either a string
@@ -47,22 +47,22 @@ The rsync daemon is launched by specifying the --daemon option to
 rsync. The daemon must run with root privileges.
 
 You can launch it either via inetd or as a standalone daemon. If run
-as a daemon then just run the command "rsync -daemon" from a suitable
+as a daemon then just run the command "rsync --daemon" from a suitable
 startup script.
 
 When run via inetd you should add a line like this to /etc/services:
 
-     rsync           873/tcp
+quote(rsync           873/tcp)
 
-and a line something like this to /etc/inetd.conf:
+and a single line something like this to /etc/inetd.conf:
     
-    rsync   stream  tcp     nowait  root   /usr/bin/rsync rsyncd --daemon
+quote(rsync   stream  tcp     nowait  root   /usr/bin/rsync rsyncd --daemon)
 
 You will then need to send inetd a HUP signal to tell it to reread its
 config file.
 
 Note that you should not send the rsync server a HUP signal to force
-it to reread the /etc/rsyncd.conf. The file is re-read on each client
+it to reread the tt(/etc/rsyncd.conf). The file is re-read on each client
 connection. 
 
 manpagesection(GLOBAL OPTIONS)
@@ -89,7 +89,7 @@ The default is 0 which means no limit.
 dit(bf(lock file)) The "lock file" option specifies the file to use to
 support the "max connections" option. The rsync server uses record
 locking on this file to ensure that the max connections limit is not
-exceeded. The default is /var/run/rsyncd.lock
+exceeded. The default is tt(/var/run/rsyncd.lock).
 
 dit(bf(syslog facility)) The "syslog facility" option allows you to
 specify the syslog facility name to use when logging messages from the
@@ -118,7 +118,7 @@ of available modules. The default is no comment.
 dit(bf(path)) The "path" option specifies the directory in the servers
 filesystem to make available in this module. The rsync server will
 chroot to this path before starting the file transfer with the
-client. You must specify this option for each module in /etc/rsyncd.conf.
+client. You must specify this option for each module in tt(/etc/rsyncd.conf).
 
 dit(bf(read only)) The "read only" option determines whether clients
 will be able to upload files or not. If "read only" is true then any
@@ -163,7 +163,7 @@ you may find that passwords longer than 8 characters don't work.
 bf(You should make sure that the secrets file is not readable by anyone
 other than the system administrator.) There is no default for the
 "secrets file" option, you must choose a name (such as
-/etc/rsyncd.secrets).
+tt(/etc/rsyncd.secrets)).
 
 dit(bf(hosts allow)) The "hosts allow" option allows you to specify a
 list of patterns that are matched against a connecting clients
@@ -215,24 +215,23 @@ enddit()
 manpagesection(EXAMPLES)
 
 A simple rsyncd.conf file that allow anonymous rsync to a ftp area at
-/home/ftp would be:
+tt(/home/ftp) would be:
 
 verb(
 [ftp]
-	path = /home/ftp
-	comment = ftp export area
+        path = /home/ftp
+        comment = ftp export area
 )
 
 
 A more sophisticated example would be:
 
-verb(
-uid = nobody
-gid = nobody
-max connections = 4
-syslog facility = local5
+uid = nobody nl()
+gid = nobody nl()
+max connections = 4 nl()
+syslog facility = local5 nl()
 
-[ftp]
+verb([ftp]
         path = /var/ftp/pub
         comment = whole ftp area (approx 6.1 GB)
 
@@ -257,10 +256,8 @@ syslog facility = local5
 
 The /etc/rsyncd.secrets file would look something like this:
 
-verb(
-tridge:mypass
+tridge:mypass nl()
 susan:herpass
-)
 
 manpagefiles()
 
