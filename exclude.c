@@ -33,6 +33,7 @@ extern int eol_nulls;
 extern int list_only;
 extern int recurse;
 extern int io_error;
+extern int local_server;
 extern int delete_mode;
 extern int delete_excluded;
 extern int cvs_exclude;
@@ -992,7 +993,7 @@ static void send_rules(int f_out, struct filter_list_struct *flp)
 /* This is only called by the client. */
 void send_filter_list(int f_out)
 {
-	if (am_sender && (!delete_mode || delete_excluded))
+	if (local_server || (am_sender && (!delete_mode || delete_excluded)))
 		f_out = -1;
 	if (cvs_exclude && am_sender) {
 		if (protocol_version >= 29)
@@ -1025,7 +1026,7 @@ void recv_filter_list(int f_in)
 	int xflags = protocol_version >= 29 ? 0 : XFLG_OLD_PREFIXES;
 	unsigned int len;
 
-	if (am_sender || (delete_mode && !delete_excluded)) {
+	if (!local_server && (am_sender || (delete_mode && !delete_excluded))) {
 		while ((len = read_int(f_in)) != 0) {
 			if (len >= sizeof line)
 				overflow("recv_rules");
@@ -1035,9 +1036,9 @@ void recv_filter_list(int f_in)
 	}
 
 	if (cvs_exclude) {
-		if (am_sender || protocol_version < 29)
+		if (local_server || am_sender || protocol_version < 29)
 			parse_rule(&filter_list, ":C", 0, 0);
-		if (am_sender)
+		if (local_server || am_sender)
 			parse_rule(&filter_list, "-C", 0, 0);
 	}
 }
