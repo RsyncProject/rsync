@@ -353,6 +353,7 @@ verb(
      --max-size=SIZE         don't transfer any file larger than SIZE
      --partial               keep partially transferred files
      --partial-dir=DIR       put a partially transferred file into DIR
+     --delay-updates         update transferred files into place at end
      --numeric-ids           don't map uid/gid values by user/group name
      --timeout=TIME          set I/O timeout in seconds
  -I, --ignore-times          turn off mod time & file size quick check
@@ -549,9 +550,9 @@ or appended data, and also on systems that are disk bound, not network
 bound.
 
 The option implies --partial (since an interrupted transfer does not delete
-the file), but conflicts with --partial-dir.  Prior to rsync 2.6.4
---inplace was also incompatible with --compare-dest, --copy-dest, and
---link-dest.
+the file), but conflicts with --partial-dir and --delay-updates.
+Prior to rsync 2.6.4 --inplace was also incompatible with --compare-dest,
+--copy-dest, and --link-dest.
 
 WARNING: The file's data will be in an inconsistent state during the
 transfer (and possibly afterward if the transfer gets interrupted), so you
@@ -1028,13 +1029,34 @@ is a security risk.  E.g. AVOID "/tmp".
 
 You can also set the partial-dir value the RSYNC_PARTIAL_DIR environment
 variable.  Setting this in the environment does not force --partial to be
-enabled, but rather it effects where partial files go when --partial (or
--P) is used.  For instance, instead of specifying --partial-dir=.rsync-tmp
+enabled, but rather it effects where partial files go when --partial is
+specified.  For instance, instead of using --partial-dir=.rsync-tmp
 along with --progress, you could set RSYNC_PARTIAL_DIR=.rsync-tmp in your
 environment and then just use the -P option to turn on the use of the
-.rsync-tmp dir for partial transfers.  The only time the --partial option
-does not look for this environment value is when --inplace was also
-specified (since --inplace conflicts with --partial-dir).
+.rsync-tmp dir for partial transfers.  The only time that the --partial
+option does not look for this environment value is (1) when --inplace was
+specified (since --inplace conflicts with --partial-dir), or (2) when
+--delay-updates was specified (see below).
+
+dit(bf(--delay-updates)) This option puts the temporary file from each
+updated file into the file's partial-dir (see above) until the end of the
+transfer, at which time all the files are renamed into place in rapid
+succession.  This attempts to make the updating of the files a little more
+atomic.  If you don't specify the --partial-dir option, this option will
+cause it to default to ".~tmp~" (RSYNC_PARTIAL_DIR is not consulted for
+this value).  Conflicts with --inplace.
+
+This option uses more memory on the receiving side (one bit per file
+transferred) and also requires enough free disk space on the receiving
+side to hold an additional copy of all the updated files.  Note also that
+you should not use an absolute path to --partial-dir unless there is no
+chance of any of the files in the transfer having the same name (since all
+the updated files will be put into a single directory if the path is
+absolute).
+
+See also the "atomic-rsync" perl script in the "support" subdir for an
+update algorithm that is even more atomic (it uses --link-dest and a
+parallel hierarchy of files).
 
 dit(bf(--progress)) This option tells rsync to print information
 showing the progress of the transfer. This gives a bored user
