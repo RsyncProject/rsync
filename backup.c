@@ -25,6 +25,7 @@ extern int backup_suffix_len;
 extern int backup_dir_len;
 extern char *backup_suffix;
 extern char *backup_dir;
+extern struct file_struct **hlink_list;
 
 extern int am_root;
 extern int preserve_devices;
@@ -263,7 +264,7 @@ static int keep_backup(char *fname)
 	}
 #endif
 	if (!kept && preserve_hard_links && file->link_u.links
-	    && file->F_HEAD != file) {
+	    && hlink_list[file->F_HLINDEX] != file) {
 		if (verbose > 1)
 			rprintf(FINFO, "%s is a hard link\n", f_name(file));
 	}
