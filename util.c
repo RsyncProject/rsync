@@ -1224,3 +1224,110 @@ void *_realloc_array(void *ptr, unsigned int size, unsigned long num)
 		return malloc(size * num);
 	return realloc(ptr, size * num);
 }
+
+/* Take a filename and filename length and return the most significant
+ * filename suffix we can find.  This ignores suffixes such as "~",
+ * ".bak", ".orig", ".~1~", etc. */
+const char *find_filename_suffix(const char *fn, int fn_len, int *len_ptr)
+{
+	const char *suf, *s;
+	BOOL had_tilde;
+	int s_len;
+
+	/* One or more dots at the start aren't a suffix. */
+	while (fn_len && *fn == '.') fn++, fn_len--;
+
+	/* Ignore the ~ in a "foo~" filename. */
+	if (fn_len > 1 && fn[fn_len-1] == '~')
+		fn_len--, had_tilde = True;
+	else
+		had_tilde = False;
+
+	/* Assume we don't find an suffix. */
+	suf = "";
+	*len_ptr = 0;
+
+	/* Find the last significant suffix. */
+	for (s = fn + fn_len; fn_len > 1; ) {
+		while (*--s != '.' && s != fn) {}
+		if (s == fn)
+			break;
+		s_len = fn_len - (s - fn);
+		fn_len = s - fn;
+		if (s_len == 3) {
+			if (strcmp(s+1, "bak") == 0
+			 || strcmp(s+1, "old") == 0)
+				continue;
+		} else if (s_len == 4) {
+			if (strcmp(s+1, "orig") == 0)
+				continue;
+		} else if (s_len > 2 && had_tilde
+		    && s[1] == '~' && isdigit(s[2]))
+			continue;
+		*len_ptr = s_len;
+		suf = s;
+		if (s_len == 1)
+			break;
+		/* Determine if the suffix is all digits. */
+		for (s++, s_len--; s_len > 0; s++, s_len--) {
+			if (!isdigit(*s))
+				return suf;
+		}
+		/* An all-digit suffix may not be that signficant. */
+		s = suf;
+	}
+
+	return suf;
+}
+
+/* This is an implementation of the Levenshtein distance algorithm.  It
+ * was implemented to avoid needing a two-dimensional matrix (to save
+ * memory).  It was also tweaked to try to factor in the ASCII distance
+ * between changed characters as a minor distance quantity.  The normal
+ * Levenshtein units of distance (each signifying a single change between
+ * the two strings) are defined as a "UNIT". */
+
+#define UNIT (1 << 16)
+
+uint32 fuzzy_distance(const char *s1, int len1, const char *s2, int len2)
+{
+	uint32 a[MAXPATHLEN], diag, above, left, diag_inc, above_inc, left_inc;
+	int32 cost;
+	int i1, i2;
+
+	if (!len1 || !len2) {
+		if (!len1) {
+			s1 = s2;
+			len1 = len2;
+		}
+		for (i1 = 0, cost = 0; i1 < len1; i1++)
+			cost += s1[i1];
+		return (int32)len1 * UNIT + cost;
+	}
+
+	for (i2 = 0; i2 < len2; i2++)
+		a[i2] = (i2+1) * UNIT;
+
+	for (i1 = 0; i1 < len1; i1++) {
+		diag = i1 * UNIT;
+		above = (i1+1) * UNIT;
+		for (i2 = 0; i2 < len2; i2++) {
+			left = a[i2];
+			if ((cost = *((uchar*)s1+i1) - *((uchar*)s2+i2)) != 0) {
+				if (cost < 0)
+					cost = UNIT - cost;
+				else
+					cost = UNIT + cost;
+			}
+			diag_inc = diag + cost;
+			left_inc = left + UNIT + *((uchar*)s1+i1);
+			above_inc = above + UNIT + *((uchar*)s2+i2);
+			a[i2] = above = left < above
+			      ? (left_inc < diag_inc ? left_inc : diag_inc)
+			      : (above_inc < diag_inc ? above_inc : diag_inc);
+			diag = left;
+		}
+	}
+
+	return a[len2-1];
+}
