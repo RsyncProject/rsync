@@ -161,3 +161,13 @@
 	return 1;
 }
 #endif
+
+/* some systems don't take the 2nd argument */
+int sys_gettimeofday(struct timeval *tv)
+{
+#if HAVE_GETTIMEOFDAY_TZ
+	return gettimeofday(tv, NULL);
+#else
+	return gettimeofday(tv);
+#endif
+}

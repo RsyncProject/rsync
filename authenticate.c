@@ -56,7 +56,7 @@ static void gen_challenge(char *addr, char *challenge)
 	memset(input, 0, sizeof(input));
 
 	strlcpy((char *)input, addr, 17);
-	gettimeofday(&tv, NULL);
+	sys_gettimeofday(&tv);
 	SIVAL(input, 16, tv.tv_sec);
 	SIVAL(input, 20, tv.tv_usec);
 	SIVAL(input, 24, getpid());
