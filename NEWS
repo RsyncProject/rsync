@@ -81,12 +81,19 @@ Changes since 2.6.0:
       when trying to open the file.  It also no longer constructs names
       that start with a double slash (unless the user supplied them).
 
+    * Path-specifying options to a daemon should now work the same with
+      or without chroot turned on.  Previously, such an option (such as
+      --link-dest) would get munged into relative path if chroot was not
+      on, making the option fairly useless.  Rsync now transforms the
+      path into one that is based on the module's root dir, just as if
+      chroot were enabled.
+
     * Fixed compilation problem on Tru64 Unix (having to do with
       sockaddr.sa_len and sockaddr.sin_len).
 
     * Fixed a compatibility problem interacting with older rsync
-      versions that might send us an empty suffix without telling us
-      about the backup-dir.
+      versions that might send us an empty --suffix value without
+      telling us that --backup-dir was specified.
 
     * The "hosts allow" option for a daemon-over-remote-shell
       process now has improved support for IPv6 addresses and a fix
