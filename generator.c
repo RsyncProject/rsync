@@ -346,6 +346,8 @@ static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
  * modification-time repair. */
 static void recv_generator(char *fname, struct file_list *flist,
 			   struct file_struct *file, int ndx,
+			   int itemizing, int maybe_PERMS_REPORT,
+			   enum logcode code,
 			   int f_out, int f_out_name)
 {
 	static int missing_below = -1, excluded_below = -1;
@@ -358,30 +360,10 @@ static void recv_generator(char *fname, struct file_list *flist,
 	int statret, stat_errno;
 	char *fnamecmp, *partialptr, *backupptr = NULL;
 	char fnamecmpbuf[MAXPATHLEN];
-	int itemizing, maybe_PERMS_REPORT;
 	uchar fnamecmp_type;
-	enum logcode code;
 
 	if (list_only)
 		return;
-
-	if (protocol_version >= 29) {
-		itemizing = 1;
-		code = daemon_log_format_has_i ? 0 : FLOG;
-		maybe_PERMS_REPORT = log_format_has_i ? 0 : PERMS_REPORT;
-	} else if (am_daemon) {
-		itemizing = daemon_log_format_has_i && !dry_run;
-		code = itemizing || dry_run ? FCLIENT : FINFO;
-		maybe_PERMS_REPORT = PERMS_REPORT;
-	} else if (!am_server) {
-		itemizing = log_format_has_i;
-		code = itemizing ? 0 : FINFO;
-		maybe_PERMS_REPORT = log_format_has_i ? 0 : PERMS_REPORT;
-	} else {
-		itemizing = 0;
-		code = FINFO;
-		maybe_PERMS_REPORT = PERMS_REPORT;
-	}
 
 	if (!fname) {
 		if (fuzzy_dirlist) {
@@ -878,11 +860,31 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	int i;
 	int phase = 0;
 	char fbuf[MAXPATHLEN];
+	int itemizing, maybe_PERMS_REPORT;
+	enum logcode code;
 	int need_retouch_dir_times = preserve_times && !omit_dir_times;
 	int need_retouch_dir_perms = 0;
 	int save_only_existing = only_existing;
 	int save_opt_ignore_existing = opt_ignore_existing;
-	int allowed_lull = protocol_version >= 29 ? io_timeout / 2 : 0;
+	int allowed_lull = io_timeout / 2;
+
+	if (protocol_version >= 29) {
+		itemizing = 1;
+		maybe_PERMS_REPORT = log_format_has_i ? 0 : PERMS_REPORT;
+		code = daemon_log_format_has_i ? 0 : FLOG;
+	} else if (am_daemon) {
+		itemizing = daemon_log_format_has_i && !dry_run;
+		maybe_PERMS_REPORT = PERMS_REPORT;
+		code = itemizing || dry_run ? FCLIENT : FINFO;
+	} else if (!am_server) {
+		itemizing = log_format_has_i;
+		maybe_PERMS_REPORT = log_format_has_i ? 0 : PERMS_REPORT;
+		code = itemizing ? 0 : FINFO;
+	} else {
+		itemizing = 0;
+		maybe_PERMS_REPORT = PERMS_REPORT;
+		code = FINFO;
+	}
 
 	if (verbose > 2) {
 		rprintf(FINFO, "generator starting pid=%ld count=%d\n",
@@ -897,7 +899,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	}
 
 	if (protocol_version < 29)
-		io_timeout = 0; /* kluge for older protocol versions */
+		ignore_timeout = 1;
 
 	for (i = 0; i < flist->count; i++) {
 		struct file_struct *file = flist->files[i];
@@ -917,12 +919,13 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 		}
 
 		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
-			       flist, file, i, f_out, f_out_name);
+			       flist, file, i, itemizing, maybe_PERMS_REPORT,
+			       code, f_out, f_out_name);
 
 		if (allowed_lull && !(i % 100))
 			maybe_send_keepalive(allowed_lull, flist->count);
 	}
-	recv_generator(NULL, NULL, NULL, 0, -1, -1);
+	recv_generator(NULL, NULL, NULL, 0, 0, 0, code, -1, -1);
 	if (delete_during)
 		delete_in_dir(NULL, NULL, NULL);
 
@@ -946,7 +949,8 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	while ((i = get_redo_num()) != -1) {
 		struct file_struct *file = flist->files[i];
 		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
-			       flist, file, i, f_out, f_out_name);
+			       flist, file, i, itemizing, maybe_PERMS_REPORT,
+			       code, f_out, f_out_name);
 		if (allowed_lull)
 			maybe_send_keepalive(allowed_lull, flist->count);
 	}
@@ -978,10 +982,11 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 			if (!need_retouch_dir_times && file->mode & S_IWUSR)
 				continue;
 			recv_generator(local_name ? local_name : f_name(file),
-				       flist, file, i, -1, -1);
+				       flist, file, i, itemizing,
+				       maybe_PERMS_REPORT, code, -1, -1);
 		}
 	}
-	recv_generator(NULL, NULL, NULL, 0, -1, -1);
+	recv_generator(NULL, NULL, NULL, 0, 0, 0, code, -1, -1);
 
 	if (verbose > 2)
 		rprintf(FINFO,"generate_files finished\n");
