@@ -112,12 +112,16 @@ static int read_timeout(int fd, char *buf, int len)
 			continue;
 		}
 
+
 		if (n == 0) {
 			if (eof_error) {
 				rprintf(FERROR,"unexpected EOF in read_timeout\n");
 			}
 			exit_cleanup(RERR_STREAMIO);
 		}
+
+		/* this prevents us trying to write errors on a dead socket */
+		io_multiplexing_out = 0;
 
 		rprintf(FERROR,"read error: %s\n", strerror(errno));
 		exit_cleanup(RERR_STREAMIO);
