@@ -1,4 +1,5 @@
 dnl Process this file with autoconf to produce a configure script.
+
 AC_INIT(byteorder.h)
 AC_CONFIG_HEADER(config.h)
 AC_PREREQ(2.52)
@@ -39,6 +40,7 @@ AC_DEFINE_UNQUOTED(RSYNC_PATH, "$RSYNC_PATH", [ ])
 
 dnl Checks for programs.
 AC_PROG_CC
+AC_PROG_CPP
 AC_PROG_INSTALL
 AC_SUBST(SHELL)
 
@@ -82,6 +84,285 @@ if test x"$rsync_cv_HAVE_BROKEN_LARGEFILE" != x"yes"; then
    AC_SYS_LARGEFILE
 fi
 
+
+
+AC_DEFINE(ss_family, __ss_family)
+AC_DEFINE(ss_len, __ss_len)
+CFLAGS="$CFLAGS"
+AC_MSG_CHECKING([whether to enable ipv6])
+AC_ARG_ENABLE(ipv6,
+[  --enable-ipv6		Enable ipv6 (with ipv4) support
+  --disable-ipv6		Disable ipv6 support],
+[ case "$enableval" in
+  no)
+       AC_MSG_RESULT(no)
+       ipv6=no
+       ;;
+  *)   AC_MSG_RESULT(yes)
+       AC_DEFINE(ENABLE_IPV6)
+       ipv6=yes
+       ;;
+  esac ],
+
+  AC_TRY_COMPILE([ /* AF_INET6 avalable check */
+#include <sys/types.h>
+#include <sys/socket.h>
+main()
+{
+ if (socket(AF_INET6, SOCK_STREAM, 0) < 0)
+   exit(1);
+ else
+   exit(0);
+}
+],
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(ENABLE_IPV6)
+  ipv6=yes,
+  AC_MSG_RESULT(no)
+  ipv6=no,
+  AC_MSG_RESULT(no)
+  ipv6=no
+))
+
+ipv6type=unknown
+ipv6lib=none
+ipv6trylibc=no
+
+if test "$ipv6" = "yes"; then
+	AC_MSG_CHECKING([ipv6 stack type])
+	for i in inria kame linux-glibc linux-inet6 toshiba v6d zeta; do
+		case $i in
+		inria)
+			# http://www.kame.net/
+			AC_EGREP_CPP(yes, [
+#include <netinet/in.h>
+#ifdef IPV6_INRIA_VERSION
+yes
+#endif],
+				[ipv6type=$i;
+				CFLAGS="-DINET6 $CFLAGS"])
+			;;
+		kame)
+			# http://www.kame.net/
+			AC_EGREP_CPP(yes, [
+#include <netinet/in.h>
+#ifdef __KAME__
+yes
+#endif],
+				[ipv6type=$i;
+				CFLAGS="-DINET6 $CFLAGS"])
+			;;
+		linux-glibc)
+			# http://www.v6.linux.or.jp/
+			AC_EGREP_CPP(yes, [
+#include <features.h>
+#if defined(__GLIBC__) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 1
+yes
+#endif],
+				[ipv6type=$i;
+				CFLAGS="-DINET6 $CFLAGS"])
+			;;
+		linux-inet6)
+			# http://www.v6.linux.or.jp/
+			if test -d /usr/inet6 -o -f /usr/inet6/lib/libinet6.a; then
+				ipv6type=$i
+				ipv6lib=inet6
+				ipv6libdir=/usr/inet6/lib
+				ipv6trylibc=yes;
+				CFLAGS="-DINET6 -I/usr/inet6/include $CFLAGS"
+			fi
+			;;
+		toshiba)
+			AC_EGREP_CPP(yes, [
+#include <sys/param.h>
+#ifdef _TOSHIBA_INET6
+yes
+#endif],
+				[ipv6type=$i;
+				ipv6lib=inet6;
+				ipv6libdir=/usr/local/v6/lib;
+				CFLAGS="-DINET6 $CFLAGS"])
+			;;
+		v6d)
+			AC_EGREP_CPP(yes, [
+#include </usr/local/v6/include/sys/v6config.h>
+#ifdef __V6D__
+yes
+#endif],
+				[ipv6type=$i;
+				ipv6lib=v6;
+				ipv6libdir=/usr/local/v6/lib;
+				CFLAGS="-I/usr/local/v6/include $CFLAGS"])
+			;;
+		zeta)
+			AC_EGREP_CPP(yes, [
+#include <sys/param.h>
+#ifdef _ZETA_MINAMI_INET6
+yes
+#endif],
+				[ipv6type=$i;
+				ipv6lib=inet6;
+				ipv6libdir=/usr/local/v6/lib;
+				CFLAGS="-DINET6 $CFLAGS"])
+			;;
+		esac
+		if test "$ipv6type" != "unknown"; then
+			break
+		fi
+	done
+	AC_MSG_RESULT($ipv6type)
+fi
+
+if test "$ipv6" = "yes" -a -f /usr/local/v6/lib/libinet6.a; then
+	ac_inet6_LDFLAGS="inet6"
+	ipv6libdir=/usr/local/v6/lib
+ 	LDFLAGS="$LDFLAGS -L/usr/local/v6/lib"
+	AC_CHECK_LIB(inet6, getaddrinfo, , ipv6lib="$ac_inet6_LDFLAGS")
+fi
+
+if test "$ipv6" = "yes" -a -f /usr/lib/libinet6.a; then
+	ac_inet6_LDFLAGS="inet6"
+	AC_CHECK_LIB(inet6, getaddrinfo, , ipv6lib="$ac_inet6_LDFLAGS")
+fi
+
+if test "$ipv6" = "yes" -a "$ipv6lib" != "none"; then
+	if test -d $ipv6libdir -a -f $ipv6libdir/lib$ipv6lib.a; then
+		LIBS="-L$ipv6libdir -l$ipv6lib $LIBS"
+		echo "You have $ipv6lib library, using it"
+	else
+		if test "$ipv6trylibc" = "yes"; then
+			echo "You do not have $ipv6lib library, using libc"
+		else
+			echo 'Fatal: no $ipv6lib library found.  cannot continue.'
+			echo "You need to fetch lib$ipv6lib.a from appropriate"
+			echo 'ipv6 kit and compile beforehand.'
+			exit 1
+		fi
+	fi
+fi
+
+
+AC_MSG_CHECKING(getaddrinfo bug)
+AC_TRY_RUN([
+#include <sys/types.h>
+#include <netdb.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+main()
+{
+  int passive, gaierr, inet4 = 0, inet6 = 0;
+  struct addrinfo hints, *ai, *aitop;
+  char straddr[INET6_ADDRSTRLEN], strport[16];
+
+  for (passive = 0; passive <= 1; passive++) {
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_flags = passive ? AI_PASSIVE : 0;
+    hints.ai_socktype = SOCK_STREAM;
+    if ((gaierr = getaddrinfo(NULL, "54321", &hints, &aitop)) != 0) {
+      (void)gai_strerror(gaierr);
+      goto bad;
+    }
+    for (ai = aitop; ai; ai = ai->ai_next) {
+      if (ai->ai_addr == NULL ||
+          ai->ai_addrlen == 0 ||
+          getnameinfo(ai->ai_addr, ai->ai_addrlen,
+                      straddr, sizeof(straddr), strport, sizeof(strport),
+                      NI_NUMERICHOST|NI_NUMERICSERV) != 0) {
+        goto bad;
+      }
+      switch (ai->ai_family) {
+      case AF_INET:
+        if (strcmp(strport, "54321") != 0) {
+          goto bad;
+        }
+        if (passive) {
+          if (strcmp(straddr, "0.0.0.0") != 0) {
+            goto bad;
+          }
+        } else {
+          if (strcmp(straddr, "127.0.0.1") != 0) {
+            goto bad;
+          }
+        }
+        inet4++;
+        break;
+      case AF_INET6:
+        if (strcmp(strport, "54321") != 0) {
+          goto bad;
+        }
+        if (passive) {
+          if (strcmp(straddr, "::") != 0) {
+            goto bad;
+          }
+        } else {
+          if (strcmp(straddr, "::1") != 0) {
+            goto bad;
+          }
+        }
+        inet6++;
+        break;
+      case AF_UNSPEC:
+        goto bad;
+        break;
+      default:
+        /* another family support? */
+        break;
+      }
+    }
+  }
+
+  if (!(inet4 == 0 || inet4 == 2))
+    goto bad;
+  if (!(inet6 == 0 || inet6 == 2))
+    goto bad;
+
+  if (aitop)
+    freeaddrinfo(aitop);
+  exit(0);
+
+ bad:
+  if (aitop)
+    freeaddrinfo(aitop);
+  exit(1);
+}
+],
+AC_MSG_RESULT(good)
+buggygetaddrinfo=no,
+AC_MSG_RESULT(buggy)
+buggygetaddrinfo=yes,
+AC_MSG_RESULT(buggy)
+buggygetaddrinfo=yes)
+
+if test "$buggygetaddrinfo" = "yes"; then
+	if test "$ipv6" = "yes" -a "$ipv6type" != "linux"; then
+		echo 'Fatal: You must get working getaddrinfo() function.'
+		echo '       or you can specify "--disable-ipv6"'.
+		exit 1
+	elif test "$ipv6type" = "linux"; then
+		echo 'Warning: getaddrinfo() implementation on your system seems be buggy.'
+		echo '         Better upgreade your system library to newest version'
+		echo '         of GNU C library (aka glibc).'
+	fi
+fi
+AC_REPLACE_FUNCS(getaddrinfo getnameinfo)
+
+AC_MSG_CHECKING([whether struct sockaddr has sa_len])
+AC_TRY_COMPILE([
+#include <sys/types.h>
+#include <sys/socket.h>
+],[
+struct sockaddr s;
+int i = s.sa_len;
+],
+[	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SOCKADDR_LEN)],
+[	AC_MSG_RESULT(no),
+	],
+[	AC_MSG_RESULT(unknown),
+	])
 
 
 AC_C_BIGENDIAN

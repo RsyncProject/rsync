@@ -21,6 +21,7 @@ SHELL=/bin/sh
 .SUFFIXES: .c .o
 
 LIBOBJ=lib/fnmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o
+	@LIBOBJS@
 ZLIBOBJ=zlib/deflate.o zlib/infblock.o zlib/infcodes.o zlib/inffast.o \
 	zlib/inflate.o zlib/inftrees.o zlib/infutil.o zlib/trees.o \
 	zlib/zutil.o zlib/adler32.o 
@@ -86,6 +87,11 @@ clean:
 distclean: clean
 	rm -f config.h config.cache config.status Makefile
 
+# missing functions
+getaddrinfo.o:	lib/getaddrinfo.c
+	$(CC) -I. -I$(srcdir) -I$(srcdir)/lib $(CFLAGS) -c lib/getaddrinfo.c
+getnameinfo.o:	lib/getnameinfo.c
+	$(CC) -I. -I$(srcdir) -I$(srcdir)/lib $(CFLAGS) -c lib/getnameinfo.c
 
 # this target is really just for my use. It only works on a limited
 # range of machines and is used to produce a list of potentially

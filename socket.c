@@ -25,6 +25,11 @@
 
 #include "rsync.h"
 
+#ifndef HAVE_GETADDRINFO
+#include "lib/addrinfo.h"
+#endif
+
+extern int af;
 
 /* Establish a proxy connection on an open socket to a web roxy by
  * using the CONNECT method. */
@@ -91,20 +96,22 @@ static int establish_proxy_connection(int fd, char *host, int port)
 
 
 
-/* open a socket to a tcp remote host with the specified port 
-   based on code from Warren
-   proxy support by Stephen Rothwell */
-static int open_socket_out (char *host,
-			    int port,
-			    struct in_addr *address)
+/** Open a socket to a tcp remote host with the specified port .
+ *
+ * Based on code from Warren.   Proxy support by Stephen Rothwell
+ *
+ *
+ * @param bind_address Local address to use.  Normally NULL to get the stack default.
+ **/
+int open_socket_out(char *host, int port, const char *bind_address)
 {
 	int type = SOCK_STREAM;
-	struct sockaddr_in sock_out;
-	struct sockaddr_in sock;
-	int res;
-	struct hostent *hp;
+	int error;
+	int s;
+	int result;
+	struct addrinfo hints, *res0, *res;
+	char portbuf[10];
 	char *h;
-	unsigned p;
 	int proxied = 0;
 	char buffer[1024];
 	char *cp;
@@ -124,49 +131,67 @@ static int open_socket_out (char *host,
 			return -1;
 		}
 		*cp++ = '\0';
-		p = atoi(cp);
+		strcpy(portbuf, cp);
 		h = buffer;
 	} else {
+		snprintf(portbuf, sizeof(portbuf), "%d", port);
 		h = host;
-		p = port;
 	}
 
-	res = socket(PF_INET, type, 0);
-	if (res == -1) {
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = af;
+	hints.ai_socktype = type;
+	error = getaddrinfo(h, portbuf, &hints, &res0);
+	if (error) {
+		rprintf(FERROR, "getaddrinfo: %s\n", gai_strerror(error));
 		return -1;
 	}
 
-	hp = gethostbyname(h);
-	if (!hp) {
-		rprintf(FERROR,"unknown host: \"%s\"\n", h);
-		close(res);
+	s = -1;
+	for (res = res0; res; res = res->ai_next) {
+		s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		if (s < 0)
+			continue;
+
+		if (bind_address) {
+			struct addrinfo bhints, *bres;
+
+			memset(&bhints, 0, sizeof(bhints));
+			bhints.ai_family = res->ai_family;
+			bhints.ai_socktype = type;
+			bhints.ai_flags = AI_PASSIVE;
+			error = getaddrinfo(bind_address, NULL, &bhints, &bres);
+			if (error) {
+				rprintf(FERROR, "getaddrinfo: %s\n", gai_strerror(error));
+				continue;
+			}
+			if (bres->ai_next) {
+				rprintf(FERROR, "getaddrinfo: resolved to multiple hosts\n");
+				freeaddrinfo(bres);
+				continue;
+			}
+			bind(s, bres->ai_addr, bres->ai_addrlen);
+		}
+
+		if (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
+			close(s);
+			s = -1;
+			continue;
+		}
+		if (proxied &&
+		    establish_proxy_connection(s, host, port) != 0) {
+			close(s);
+			s = -1;
+			continue;
+		} else
+			break;
+	}
+	freeaddrinfo(res0);
+	if (s < 0) {
+		rprintf(FERROR, "failed to connect to %s - %s\n", h, strerror(errno));
 		return -1;
 	}
-
-	memcpy(&sock_out.sin_addr, hp->h_addr, hp->h_length);
-	sock_out.sin_port = htons(p);
-	sock_out.sin_family = PF_INET;
-
-	if (address) {
-		sock.sin_addr = *address;
-		sock.sin_port = 0;
-		sock.sin_family = hp->h_addrtype;
-		bind(res, (struct sockaddr * ) &sock,sizeof(sock));
-	}
-
-	if (connect(res,(struct sockaddr *)&sock_out,sizeof(sock_out))) {
-		rprintf (FERROR, RSYNC_NAME ": failed to connect to host %s: %s\n",
-			 h, strerror(errno));
-		close(res);
-		return -1;
-	}
-
-	if (proxied && establish_proxy_connection(res, host, port) != 0) {
-		close(res);
-		return -1;
-	}
-
-	return res;
+	return s;
 }
 
 
@@ -179,60 +204,71 @@ static int open_socket_out (char *host,
  * cause security problems by really opening remote connections.
  *
  * This is based on the Samba LIBSMB_PROG feature.
+ *
+ * @param bind_address Local address to use.  Normally NULL to get the stack default.
  **/
 int open_socket_out_wrapped (char *host,
 			     int port,
-			     struct in_addr *address)
+			     const char *bind_address)
 {
 	char *prog;
 
 	if ((prog = getenv ("RSYNC_CONNECT_PROG")) != NULL) 
 		return sock_exec (prog);
 	else 
-		return open_socket_out (host, port, address);
+		return open_socket_out (host, port, bind_address);
 }
 
 
 
-/****************************************************************************
-open a socket of the specified type, port and address for incoming data
-****************************************************************************/
-static int open_socket_in(int type, int port, struct in_addr *address)
+/**
+ * Open a socket of the specified type, port and address for incoming data
+ *
+ * @param bind_address Local address to bind, or NULL to allow it to
+ * default.
+ **/
+static int open_socket_in(int type, int port, const char *bind_address)
 {
-	struct sockaddr_in sock;
-	int res;
 	int one=1;
+	int s;
+	struct addrinfo hints, *res;
+	char portbuf[10];
+	int error;
 
-	memset((char *)&sock,0,sizeof(sock));
-	sock.sin_port = htons(port);
-	sock.sin_family = AF_INET;
-	if (address) {
-		sock.sin_addr = *address;
-	} else {
-		sock.sin_addr.s_addr = INADDR_ANY;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = af;
+	hints.ai_socktype = type;
+	hints.ai_flags = AI_PASSIVE;
+	snprintf(portbuf, sizeof(portbuf), "%d", port);
+	error = getaddrinfo(bind_address, portbuf, &hints, &res);
+	if (error) {
+		rprintf(FERROR, "getaddrinfo: %s\n", gai_strerror(error));
+		return -1;
 	}
-	res = socket(AF_INET, type, 0);
-	if (res == -1) { 
-		rprintf(FERROR, RSYNC_NAME ": socket failed: %s\n",
-			strerror(errno)); 
-		return -1; 
-	}
-
-	setsockopt(res,SOL_SOCKET,SO_REUSEADDR,(char *)&one,sizeof(one));
-
-	/* now we've got a socket - we need to bind it */
-	if (bind(res, (struct sockaddr * ) &sock,sizeof(sock)) == -1) { 
-		rprintf(FERROR,"bind failed on port %d: %s\n", port,
-			strerror(errno));
-		if (errno == EACCES && port < 1024) {
-			rprintf(FERROR, "Note: you must be root to bind "
-				"to low-numbered ports");
-		}
-		close(res); 
+	if (res->ai_next) {
+		rprintf(FERROR, "getaddrinfo: resolved to multiple hosts\n");
+		freeaddrinfo(res);
 		return -1;
 	}
 
-	return res;
+	s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+	if (s < 0) {
+		rprintf(FERROR, RSYNC_NAME ": socket failed\n"); 
+		freeaddrinfo(res);
+		return -1; 
+	}
+
+	setsockopt(s,SOL_SOCKET,SO_REUSEADDR,(char *)&one,sizeof(one));
+
+	/* now we've got a socket - we need to bind it */
+	if (bind(s, res->ai_addr, res->ai_addrlen) < 0) { 
+		rprintf(FERROR, RSYNC_NAME ": bind failed on port %d\n", port);
+		freeaddrinfo(res);
+		close(s); 
+		return -1;
+	}
+
+	return s;
 }
 
 
@@ -265,10 +301,10 @@ int is_a_socket(int fd)
 void start_accept_loop(int port, int (*fn)(int ))
 {
 	int s;
-	extern struct in_addr socket_address;
+	extern char *bind_address;
 
 	/* open an incoming socket */
-	s = open_socket_in(SOCK_STREAM, port, &socket_address);
+	s = open_socket_in(SOCK_STREAM, port, bind_address);
 	if (s == -1)
 		exit_cleanup(RERR_SOCKETIO);
 
@@ -284,8 +320,8 @@ void start_accept_loop(int port, int (*fn)(int ))
 	while (1) {
 		fd_set fds;
 		int fd;
-		struct sockaddr addr;
-		socklen_t in_addrlen = sizeof(addr);
+		struct sockaddr_storage addr;
+		int in_addrlen = sizeof(addr);
 
 		/* close log file before the potentially very long select so
 		   file can be trimmed by another process instead of growing
@@ -301,8 +337,7 @@ void start_accept_loop(int port, int (*fn)(int ))
 
 		if(!FD_ISSET(s, &fds)) continue;
 
-                /* See note above prototypes. */
-		fd = accept(s,&addr, &in_addrlen);
+		fd = accept(s,(struct sockaddr *)&addr,&in_addrlen);
 
 		if (fd == -1) continue;
 
@@ -317,11 +352,9 @@ void start_accept_loop(int port, int (*fn)(int ))
 
 		if (fork()==0) {
 			close(s);
-
 			/* open log file in child before possibly giving
 			   up privileges  */
 			log_open();
-
 			_exit(fn(fd));
 		}
 
@@ -470,9 +503,8 @@ void become_daemon(void)
  ******************************************************************/
 char *client_addr(int fd)
 {
-	struct sockaddr sa;
-	struct sockaddr_in *sockin = (struct sockaddr_in *) (&sa);
-	socklen_t length = sizeof(sa);
+	struct sockaddr_storage ss;
+	int     length = sizeof(ss);
 	static char addr_buf[100];
 	static int initialised;
 
@@ -480,11 +512,12 @@ char *client_addr(int fd)
 
 	initialised = 1;
 
-	if (getpeername(fd, &sa, &length)) {
+	if (getpeername(fd, (struct sockaddr *)&ss, &length)) {
 		exit_cleanup(RERR_SOCKETIO);
 	}
-	
-	strlcpy(addr_buf,(char *)inet_ntoa(sockin->sin_addr), sizeof(addr_buf));
+
+	getnameinfo((struct sockaddr *)&ss, length,
+		addr_buf, sizeof(addr_buf), NULL, 0, NI_NUMERICHOST);
 	return addr_buf;
 }
 
@@ -494,14 +527,14 @@ char *client_addr(int fd)
  ******************************************************************/
 char *client_name(int fd)
 {
-	struct sockaddr sa;
-	struct sockaddr_in *sockin = (struct sockaddr_in *) (&sa);
-	socklen_t length = sizeof(sa);
+	struct sockaddr_storage ss;
+	int     length = sizeof(ss);
 	static char name_buf[100];
-	struct hostent *hp;
-	char **p;
+	static char port_buf[100];
 	char *def = "UNKNOWN";
 	static int initialised;
+	struct addrinfo hints, *res, *res0;
+	int error;
 
 	if (initialised) return name_buf;
 
@@ -509,36 +542,69 @@ char *client_name(int fd)
 
 	strcpy(name_buf,def);
 
-	if (getpeername(fd, &sa, &length)) {
+	if (getpeername(fd, (struct sockaddr *)&ss, &length)) {
 		exit_cleanup(RERR_SOCKETIO);
 	}
 
-	/* Look up the remote host name. */
-	if ((hp = gethostbyaddr((char *) &sockin->sin_addr,
-				sizeof(sockin->sin_addr),
-				AF_INET))) {
-		strlcpy(name_buf,(char *)hp->h_name,sizeof(name_buf));
+#ifdef INET6
+        if (ss.ss_family == AF_INET6 && 
+	    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)&ss)->sin6_addr)) {
+		struct sockaddr_in6 sin6;
+		struct sockaddr_in *sin;
+
+		memcpy(&sin6, &ss, sizeof(sin6));
+		sin = (struct sockaddr_in *)&ss;
+		memset(sin, 0, sizeof(*sin));
+		sin->sin_family = AF_INET;
+		length = sizeof(struct sockaddr_in);
+#ifdef HAVE_SOCKADDR_LEN
+		sin->sin_len = length;
+#endif
+		sin->sin_port = sin6.sin6_port;
+		memcpy(&sin->sin_addr, &sin6.sin6_addr.s6_addr[12],
+			sizeof(sin->sin_addr));
+        }
+#endif
+
+	/* reverse lookup */
+	if (getnameinfo((struct sockaddr *)&ss, length,
+			name_buf, sizeof(name_buf), port_buf, sizeof(port_buf),
+			NI_NAMEREQD | NI_NUMERICSERV) != 0) {
+		strcpy(name_buf, def);
+		rprintf(FERROR, "reverse name lookup failed\n");
 	}
 
-
-	/* do a forward lookup as well to prevent spoofing */
-	hp = gethostbyname(name_buf);
-	if (!hp) {
-		strcpy (name_buf,def);
-		rprintf (FERROR, "reverse name lookup for \"%s\" failed\n",
-			name_buf);
-	} else {
-		for (p=hp->h_addr_list;*p;p++) {
-			if (memcmp(*p, &sockin->sin_addr, hp->h_length) == 0) {
-				break;
-			}
-		}
-		if (!*p) {
-			strcpy(name_buf,def);
-			rprintf(FERROR,"reverse name lookup mismatch - spoofed address?\n");
-		} 
+	/* forward lookup */
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_flags = AI_CANONNAME;
+	hints.ai_socktype = SOCK_STREAM;
+	error = getaddrinfo(name_buf, port_buf, &hints, &res0);
+	if (error) {
+		strcpy(name_buf, def);
+		rprintf(FERROR, "forward name lookup failed\n");
+		return name_buf;
 	}
 
+	/* XXX sin6_flowinfo and other fields */
+	for (res = res0; res; res = res->ai_next) {
+		if (res->ai_family != ss.ss_family)
+			continue;
+		if (res->ai_addrlen != length)
+			continue;
+		if (memcmp(res->ai_addr, &ss, res->ai_addrlen) == 0)
+			break;
+	}
+
+	/* TODO: Do a forward lookup as well to prevent spoofing */
+
+	if (res == NULL) {
+		strcpy(name_buf, def);
+		rprintf(FERROR,
+			"reverse name lookup mismatch - spoofed address?\n");
+	}
+
+	freeaddrinfo(res0);
 	return name_buf;
 }
 

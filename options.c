@@ -74,6 +74,9 @@ int modify_window=0;
 #endif
 int blocking_io=0;
 
+/** Network address family. **/
+int af = AF_INET;
+
 int read_batch=0;  /* dw */
 int write_batch=0; /* dw */
 
@@ -97,8 +100,10 @@ char *batch_ext = NULL;
 
 static int modify_window_set;
 
-
-struct in_addr socket_address = {INADDR_ANY};
+/** Local address to bind.  As a character string because it's
+ * interpreted by the IPv6 layer: should be a numeric IP4 or ip6
+ * address, or a hostname. **/
+char *bind_address;
 
 
 static void print_rsync_version(int f)
@@ -215,6 +220,10 @@ void usage(enum logcode F)
   rprintf(F," -f  --read-batch=EXT        read batch file\n");
   rprintf(F," -F  --write-batch           write batch file\n");
   rprintf(F," -h, --help                  show this help screen\n");
+#ifdef INET6
+  rprintf(F," -4                          prefer IPv4\n");
+  rprintf(F," -6                          prefer IPv6\n");
+#endif
 
   rprintf(F,"\n");
 
@@ -295,13 +304,18 @@ static struct poptOption long_options[] = {
   {"port",             0,  POPT_ARG_INT,    &rsync_port},
   {"log-format",       0,  POPT_ARG_STRING, &log_format},
   {"bwlimit",          0,  POPT_ARG_INT,    &bwlimit},
-  {"address",          0,  POPT_ARG_STRING, 0,               OPT_ADDRESS},
+  {"address",          0,  POPT_ARG_STRING, &bind_address, 0},
   {"backup-dir",       0,  POPT_ARG_STRING, &backup_dir},
   {"hard-links",      'H', POPT_ARG_NONE,   &preserve_hard_links},
   {"read-batch",      'f', POPT_ARG_STRING, &batch_ext, 'f'},
   {"write-batch",     'F', POPT_ARG_NONE,   &write_batch, 0},
+#ifdef INET6
+  {0,		      '4', POPT_ARG_VAL,    &af,         AF_INET },
+  {0,		      '6', POPT_ARG_VAL,    &af,         AF_INET6 },
+#endif
   {0,0,0,0}
 };
+
 
 static char err_buf[100];
 
@@ -473,14 +487,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			keep_partial = 1;
 			break;
 
-		case OPT_ADDRESS:
-			{
-				struct in_addr *ia;
-				if ((ia = ip_address (poptGetOptArg (pc)))) {
-					socket_address = *ia;
-				}
-			}
-			break;
 
 		case 'f':
 			/* The filename is stored for us by popt */

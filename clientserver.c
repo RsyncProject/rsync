@@ -42,10 +42,10 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	char *p, *user=NULL;
 	extern int remote_version;
 	extern int am_sender;
-	extern struct in_addr socket_address;
 	extern char *shell_cmd;
 	extern int kludge_around_eof;
-	
+	extern char *bind_address;
+       
 	if (argc == 0 && !am_sender) {
 		extern int list_only;
 		list_only = 1;
@@ -78,7 +78,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	if (!user) user = getenv("USER");
 	if (!user) user = getenv("LOGNAME");
 
-	fd = open_socket_out_wrapped (host, rsync_port, &socket_address);
+	fd = open_socket_out_wrapped (host, rsync_port, bind_address);
 	if (fd == -1) {
 		exit_cleanup(RERR_SOCKETIO);
 	}
