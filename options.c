@@ -65,6 +65,7 @@ int size_only=0;
 int bwlimit=0;
 int delete_after=0;
 int only_existing=0;
+int opt_ignore_existing=0;
 int max_delete=0;
 int ignore_errors=0;
 #ifdef _WIN32
@@ -208,6 +209,7 @@ void usage(enum logcode F)
   rprintf(F,"     --rsync-path=PATH       specify path to rsync on the remote machine\n");
   rprintf(F," -C, --cvs-exclude           auto ignore files in the same way CVS does\n");
   rprintf(F,"     --existing              only update files that already exist\n");
+  rprintf(F,"     --ignore-existing       ignore files that already exist on the receiving side\n");
   rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
   rprintf(F,"     --delete-excluded       also delete excluded files on the receiving side\n");
   rprintf(F,"     --delete-after          delete after transferring, not before\n");
@@ -262,7 +264,7 @@ enum {OPT_VERSION = 1000, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
       OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY, OPT_ADDRESS,
       OPT_DELETE_AFTER, OPT_EXISTING, OPT_MAX_DELETE, OPT_BACKUP_DIR, 
       OPT_IGNORE_ERRORS, OPT_BWLIMIT, OPT_BLOCKING_IO,
-      OPT_MODIFY_WINDOW, OPT_READ_BATCH, OPT_WRITE_BATCH};
+      OPT_MODIFY_WINDOW, OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_IGNORE_EXISTING};
 
 static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
@@ -276,6 +278,7 @@ static struct poptOption long_options[] = {
   {"one-file-system", 'x', POPT_ARG_NONE,   &one_file_system},
   {"delete",           0,  POPT_ARG_NONE,   &delete_mode},
   {"existing",         0,  POPT_ARG_NONE,   &only_existing},
+  {"ignore-existing",  0,  POPT_ARG_NONE,   &opt_ignore_existing},
   {"delete-after",     0,  POPT_ARG_NONE,   &delete_after},
   {"delete-excluded",  0,  POPT_ARG_NONE,   0,              OPT_DELETE_EXCLUDED},
   {"force",            0,  POPT_ARG_NONE,   &force_delete},
@@ -690,6 +693,9 @@ void server_options(char **args,int *argc)
 
 	if (only_existing && am_sender)
 		args[ac++] = "--existing";
+
+	if (opt_ignore_existing && am_sender) 
+		args[ac++] = "--ignore-existing";
 
 	if (tmpdir) {
 		args[ac++] = "--temp-dir";

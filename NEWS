@@ -34,3 +34,6 @@ rsync 2.5.2 (???)
 
     * Improvements to batch mode support.  This is still experimental
       but testing would be welcome.   (Jos Backus)
+ 
+    * New --ignore-existing option, patch previously distributed with
+      Vipul's Razor.  (Debian #124286)

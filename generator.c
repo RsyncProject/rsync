@@ -31,6 +31,7 @@ extern int am_root;
 extern int preserve_devices;
 extern int preserve_hard_links;
 extern int update_only;
+extern int opt_ignore_existing;
 extern int whole_file;
 extern int block_size;
 extern int csum_length;
@@ -382,6 +383,12 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 		if (!dry_run) send_sums(NULL,f_out);    
 		return;
 	}
+
+	if (opt_ignore_existing && fnamecmp == fname) { 
+		if (verbose > 1)
+			rprintf(FINFO,"%s exists\n",fname);
+		return;
+	} 
 
 	if (update_only && cmp_modtime(st.st_mtime,file->modtime)>0 && fnamecmp == fname) {
 		if (verbose > 1)

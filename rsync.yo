@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsync)(1)(14 Dec 2001)()()
+manpage(rsync)(1)(25 Jan 2002)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
@@ -245,6 +245,7 @@ verb(
      --rsync-path=PATH       specify path to rsync on the remote machine
  -C, --cvs-exclude           auto ignore files in the same way CVS does
      --existing              only update files that already exist
+     --ignore-existing       ignore files that already exist on the receiving side
      --delete                delete files that don't exist on the sending side
      --delete-excluded       also delete excluded files on the receiving side
      --delete-after          delete after transferring, not before
@@ -451,6 +452,10 @@ contents of only one filesystem.
 
 dit(bf(--existing)) This tells rsync not to create any new files -
 only update files that already exist on the destination.
+
+dit(bf(--ignore-existing))
+This tells rsync not to update files that already exist on 
+the destination. 
 
 dit(bf(--max-delete=NUM)) This tells rsync not to delete more than NUM
 files or directories. This is useful when mirroring very large trees
