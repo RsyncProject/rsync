@@ -14,11 +14,11 @@ test_unsafe() {
     fi
 }
 
-test_unsafe file from safe
-test_unsafe dir/file from safe
-test_unsafe dir/./file from safe
-test_unsafe dir/. from safe
-test_unsafe dir/ from safe
+test_unsafe file		from			safe
+test_unsafe dir/file		from			safe
+test_unsafe dir/./file		from			safe
+test_unsafe dir/.		from safe
+test_unsafe dir/		from safe
 
 test_unsafe /etc/passwd		from unsafe
 test_unsafe //../etc/passwd	from unsafe
