@@ -62,6 +62,7 @@ extern struct filter_list_struct server_filter_list;
 
 static uint32 **delayed_bits = NULL;
 static int delayed_slot_cnt = 0;
+static int phase = 0;
 
 static void init_delayed_bits(int max_ndx)
 {
@@ -266,7 +267,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 				continue;
 			}
 		}
-		if (fd != -1 && write_file(fd, map, len) != (int)len)
+		if (fd != -1 && map && write_file(fd, map, len) != (int)len)
 			goto report_write_error;
 		offset += len;
 	}
@@ -348,7 +349,8 @@ static int get_next_gen_i(int batch_gen_fd, int next_gen_i, int desired_i)
 	while (next_gen_i < desired_i) {
 		if (next_gen_i >= 0) {
 			rprintf(FINFO,
-				"(No batched update for \"%s\")\n",
+				"(No batched update for%s \"%s\")\n",
+				phase ? " resend of" : "",
 				safe_fname(f_name(the_file_list->files[next_gen_i])));
 		}
 		next_gen_i = read_int(batch_gen_fd);
@@ -380,7 +382,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 	int save_make_backups = make_backups;
 	int itemizing = am_daemon ? daemon_log_format_has_i
 		      : !am_server && log_format_has_i;
-	int phase = 0, max_phase = protocol_version >= 29 ? 2 : 1;
+	int max_phase = protocol_version >= 29 ? 2 : 1;
 	int i, recv_ok;
 
 	if (verbose > 2)
