@@ -19,9 +19,6 @@ int wildmatch_errors = 0;
 
 typedef char bool;
 
-#define false 0
-#define true 1
-
 int output_iterations = 0;
 
 static struct poptOption long_options[] = {
