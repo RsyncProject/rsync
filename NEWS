@@ -1,3 +1,32 @@
+NEWS for rsync 2.6.2 (UNRELEASED)
+Protocol: 28 (unchanged)
+Changes since 2.6.1:
+
+  BUG FIXES:
+
+    - Fixed a major bug in the sorting of the filenames when --relative
+      is used for some sources (probably just "/", but don't depend on
+      that).  This fix ensures that we ask for the right file-list item
+      when requesting changes from the sender.
+
+    - Rsync now checks the return value of the close() function to
+      better report disk-full problems on an NFS file system.
+
+    - Restored the old daemon-server behavior of logging error messages
+      rather than returning them to the user.  (A better long-term fix
+      will be sought in the future.)
+
+    - An obscure uninitialized-variable bug was fixed in the uid/gid
+      code.  (This bug probably had no ill effects.)
+
+    - Got rid of the configure check for sys/sysctl.h (it wasn't used
+      and was causing a problem on some systems).
+
+  ENHANCEMENTS:
+
+    - Two new diffs were added to the patches dir.
+
+
 NEWS for rsync 2.6.1 (26 Apr 2004)
 Protocol: 28 (changed)
 Changes since 2.6.0:
