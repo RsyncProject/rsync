@@ -135,6 +135,12 @@ installcheck: $(CHECK_PROGS)
 
 # TODO: Add 'dist' target; need to know which files will be included
 
+# Run the SPLINT (Secure Programming Lint) tool.  <www.splint.org>
+.PHONY: splint
+splint: 
+	splint +unixlib +gnuextensions -weak rsync.c
+
+
 rsync.dvi: doc/rsync.texinfo
 	texi2dvi -o $@ $<
 
