@@ -29,6 +29,9 @@ Changes since version 2.5.6:
       cause anyone problems since it makes the matching work more like
       what people are expecting. (Wayne Davison)
 
+      - A pattern with a "**" no longer causes a "*" to match slashes.
+        For example, with "/*/foo/**", "foo" must be 2 levels deep.
+
       - "**/foo" now matches at the base of the transfer (i.e. /foo).
 
       - An non-anchored wildcard term floats to match beyond the base of
