@@ -17,7 +17,11 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-/* compatability routines for older rsync protocol versions */
+/**
+ * @file compat.c
+ *
+ * Compatibility routines for older rsync protocol versions.
+ **/
 
 #include "rsync.h"
 
