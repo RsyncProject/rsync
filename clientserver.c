@@ -479,7 +479,7 @@ static int rsync_module(int f_in, int f_out, int i)
 
 	if (lp_timeout(i)) {
 		io_timeout = lp_timeout(i);
-		if (io_timeout && io_timeout < select_timeout)
+		if (io_timeout < select_timeout)
 			select_timeout = io_timeout;
 	}
 
