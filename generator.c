@@ -247,7 +247,9 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 					fname,strerror(errno));
 			}
 		}
-		if (set_perms(fname,file,NULL,0) && verbose) 
+		/* f_out is set to -1 when doing final directory 
+		   permission and modification time repair */
+		if (set_perms(fname,file,NULL,0) && verbose && (f_out != -1)) 
 			rprintf(FINFO,"%s/\n",fname);
 		return;
 	}
