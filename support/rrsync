@@ -1,12 +1,13 @@
 #!/usr/bin/perl
-# Name: /usr/local/bin/rrsync	Author: Joe Smith <js-cgi@inwap.com> 30-Sep-2004
+# Name: /usr/local/bin/rrsync (should also have a symlink in /usr/bin)
 # Purpose: Restricts rsync to subdirectory declared in .ssh/authorized_keys
-# (should have a symlink in /usr/bin)
+# Author: Joe Smith <js-cgi@inwap.com> 30-Sep-2004
+# Modified by Wayne Davison <wayned@samba.org> 12-Jan-2005
 
 use Socket;
 use constant LOGFILE => 'rrsync.log';
 my $Usage = <<EOM;
-Use 'command="$0 [-ro] subdir"'
+Use 'command="$0 [-ro] SUBDIR"'
 	in front of lines in $ENV{HOME}/.ssh/authorized_keys
 EOM
 
@@ -23,32 +24,49 @@ die "No subdirectory specified\n$Usage" unless defined $subdir;
 # Format of the envrionment variables set by sshd:
 # SSH_ORIGINAL_COMMAND=rsync --server          -vlogDtpr --partial . dir # push
 # SSH_ORIGINAL_COMMAND=rsync --server --sender -vlogDtpr --partial . dir # pull
-# SSH_CLIENT=client_addr client_port server_port
+# SSH_CONNECTION=client_addr client_port server_port
 
 my $command = $ENV{SSH_ORIGINAL_COMMAND};
 die "Not invoked via sshd\n$Usage"	unless defined $command;
+die "SSH_ORIGINAL_COMMAND='$command' is not rsync\n" unless $command =~ /^rsync\s/;
+die "$0 -ro: sending to read-only server not allowed\n"
+	if $ro and $command !~ /^rsync --server --sender /;
 
-my ($cmd,$dir) = $command =~ /(.* \.) ?(.*)/;
-die "SSH_ORIGINAL_COMMAND='$command' is not rsync\n" unless $cmd =~ /^rsync\s/;
-die "$0 -ro: sending to read-only directory $dir not allowed\n"
-	if $ro and $cmd !~ /^rsync --server --sender /;
+my ($cmd,$dir) = $command =~ /^(rsync\s+(?:-[-a-zA-Z]+\s+)+\.) ?("[^"]*"|[^\s"]*)$/;
+die "$0: invalid rsync-command syntax or options\n" if !defined $cmd;
 
+# Enforce default of $subdir instead of the normal $HOME default.
 my $orig = $dir;
-$dir =  $subdir if $dir eq '';		# Use subdir instead of $HOME
-$dir =~ s%^/%%;				# Don't allow absolute paths
-$dir =  "$subdir/$dir" unless $dir eq $subdir or $dir =~ m%^\Q$subdir/%;
-$dir =~ s%/\.\.(?=/)%__%g;		# Don't allow foo/../../etc
-$dir =~ tr|-_/a-zA-Z0-9.,|_|c;		# Don't allow ;|][}{*?
+my @dirs;
+$dir =~ s/^"(.*?)"$/$1/;
+$dir =~ s/^\s+//;
+$dir =~ s/\s+$//;
+foreach (split(/(?<!\\)\s+/, $dir)) {
+  s/\\(\s)/$1/g;			# Unescape any escaped whitespace
+  if ($subdir eq '/') {			# Less checking for '/' access
+    $dir = '/' if $dir eq '';
+  } else {
+    s#^/##;				# Don't allow absolute paths
+    $_ = "$subdir/$_" unless m#^\Q$subdir\E(/|$)#;
+    1 while s#/\.\.(/|$)#/__/#g;	# Don't allow foo/../../etc
+  }
+  tr#-_/a-zA-Z0-9.,+@^%: #_#c;		# Don't allow '"&;|!=()[]{}<>*?#\$
+  s/(\s)/\\$1/g;			# Re-escape whitespace
+  push(@dirs, $_);
+}
+push(@dirs, $subdir) unless @dirs;
+$dir = join(' ', @dirs);
 
 if (-f LOGFILE and open LOG,'>>',LOGFILE) {
   my ($mm,$hh) = (localtime)[1,2];
-  my $host = $ENV{SSH_CLIENT} || 'unknown';
+  my $host = $ENV{SSH_CONNECTION} || 'unknown';
   $host =~ s/ .*//;			# Keep only the client's IP addr
+  $host =~ s/^::ffff://;
   $host = gethostbyaddr(inet_aton($host),AF_INET) || $host;
-  $_ = sprintf "%-13s",$host;
-  print LOG "$hh:$mm $_ [$command] =",($dir eq $orig ? " OK" : "> $dir"),"\n";
+  my $dir_result = $dir eq $orig ? " OK" : "> \"$dir\"";
+  printf LOG "%02d:%02d %-13s [%s] =%s\n", $hh, $mm, $host, $command, $dir_result;
   close LOG;
 }
 
-exec "$cmd $dir" or die "exec($cmd $dir) failed: $? $!";
+exec "$cmd \"$dir\"" or die "exec($cmd \"$dir\") failed: $? $!";
 # Note: This assumes that the rsync protocol will not be maliciously hijacked.
