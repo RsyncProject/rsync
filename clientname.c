@@ -99,7 +99,10 @@ char *client_name(int fd)
 
 
 /**
- * Get the sockaddr for the client.  
+ * Get the sockaddr for the client.
+ *
+ * If it comes in as an ipv4 address mapped into IPv6 format then we
+ * convert it back to a regular IPv4.
  **/
 void client_sockaddr(int fd,
 		     struct sockaddr_storage *ss,
@@ -172,9 +175,12 @@ int lookup_name(int fd, const struct sockaddr_storage *ss,
 
 
 
-/* Do a forward lookup on name_buf and make sure it corresponds to ss
- * -- otherwise we may be being spoofed.  If we suspect we are, then
- * we don't abort the connection but just emit a warning. */
+/**
+ * Do a forward lookup on @p name_buf and make sure it corresponds to
+ * @p ss -- otherwise we may be being spoofed.  If we suspect we are,
+ * then we don't abort the connection but just emit a warning, and
+ * change @p name_buf to be "UNKNOWN".
+ **/
 int check_name(int fd,
 	       const struct sockaddr_storage *ss,
 	       socklen_t ss_len,
@@ -192,9 +198,8 @@ int check_name(int fd,
 	error = getaddrinfo(name_buf, port_buf, &hints, &res0);
 	if (error) {
 		rprintf(FERROR,
-			RSYNC_NAME ": forward name lookup for %s:%s failed: %s\n",
-			name_buf, port_buf,
-			gai_strerror(error));
+			RSYNC_NAME ": forward name lookup for %s failed: %s\n",
+			name_buf, gai_strerror(error));
 		strcpy(name_buf, default_name);
 		return error;
 	}
