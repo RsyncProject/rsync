@@ -4,12 +4,12 @@ Changes since 2.6.0:
 
   ENHANCEMENTS:
 
+    * Lower memory use and more optimal transfer of data over
+      the socket (see the INTERNAL section for details).
+
     * The RSYNC_PROXY environment variable can now contain a
       "USER:PASS@" prefix before the "HOST:PORT" information.
       (Bardur Arantsson)
-
-    * Lower memory use and more optimal transfer of file data.
-      (see the INTERNAL section).
 
   BUG FIXES:
 
@@ -26,10 +26,15 @@ Changes since 2.6.0:
     * Keep per-file track of the sending of literal data with
       --partial so that an interrupted transfer doesn't keep a
       shorter temp file when no new data has been transfered over
-      the wire.
+      the wire.  (Wayne Davison)
 
     * Fixed a byte-order problem in --batch-mode on big-endian
       machines.  (Jay Fenlason)
+
+    * Fixed configure bug when running "./configure --disable-ipv6".
+      (Wayne Davison)
+
+    * Fixed "make test" bug when build dir is not the source dir.
 
   INTERNAL:
 
@@ -37,23 +42,25 @@ Changes since 2.6.0:
       large speedup when running under MS Windows.  (Craig Barratt)
 
     * Optimizations to the name-handling/comparing code have made
-      some significant reductions in user CPU time for large file
+      some significant reductions in user-CPU time for large file
       sets.  (Wayne Davison)
 
     * Some variable-type cleanup that makes the code more consistent.
       (Wayne Davison)
 
     * Reduced memory requirements of hard link preservation.
-      (J.W.  Schultz)
+      (J.W. Schultz)
 
     * Got rid of support for protocol versions 17 and 18 (which are
-      both over 6 years old).
+      both over 6 years old).  (Wayne Davison)
 
     * More optimal data transmission for --hard-links (protocol 28).
 
     * More optimal data transmission for --checksum (protocol 28).
 
     * Less memory used for holding --checksum data.
+
+    * Less memory used per-file in the file list.
 
 
 NEWS for rsync 2.6.0 (1 Jan 2004)
