@@ -328,7 +328,7 @@ to the detailed description below for a complete description.  verb(
  -x, --one-file-system       don't cross filesystem boundaries
  -B, --block-size=SIZE       force a fixed checksum block-size
  -e, --rsh=COMMAND           specify the remote shell to use
-     --rsync-path=PATH       specify path to rsync on the remote machine
+     --rsync-path=PROGRAM    specify the rsync to run on remote machine
      --existing              only update files that already exist
      --ignore-existing       ignore files that already exist on receiver
      --remove-sent-files     sent files/symlinks are removed from sender
@@ -786,10 +786,18 @@ environment variable, which accepts the same range of values as bf(-e).
 
 See also the bf(--blocking-io) option which is affected by this option.
 
-dit(bf(--rsync-path=PATH)) Use this to specify the path to the copy of
-rsync on the remote machine. Useful when it's not in your path. Note
-that this is the full path to the binary, not just the directory that
-the binary is in.
+dit(bf(--rsync-path=PROGRAM)) Use this to specify what program is to be run
+on the remote machine to start-up rsync.  Often used when rsync is not in
+the default remote-shell's path (e.g. --rsync-path=/usr/local/bin/rsync).
+Note that PROGRAM is run with the help of a shell, so it can be any
+program, script, or command sequence you'd care to run, so long as it does
+not corrupt the standard-in & standard-out that rsync is using to
+communicate.
+
+One tricky example is to set a different default directory on the remote
+machine for use with the bf(--relative) option.  For instance:
+
+quote(tt(    rsync -avR --rsync-path="cd /a/b && rsync" hst:c/d /e/))
 
 dit(bf(-C, --cvs-exclude)) This is a useful shorthand for excluding a
 broad range of files that you often don't want to transfer between
