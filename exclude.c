@@ -311,7 +311,7 @@ void add_exclude(struct exclude_list_struct *listp, const char *pattern,
 
 		if (verbose > 2) {
 			rprintf(FINFO, "[%s] add_exclude(%.*s, %s%sclude)\n",
-				who_am_i(), pat_len, cp, listp->debug_type,
+				who_am_i(), (int)pat_len, cp, listp->debug_type,
 				mflags & MATCHFLG_INCLUDE ? "in" : "ex");
 		}
 	}
