@@ -596,6 +596,8 @@ prepare_to_open:
 
 notify_others:
 	write_int(f_out, i);
+	if (protocol_version >= 29 && inplace && !read_batch)
+		write_byte(f_out, fnamecmp_type);
 	if (f_out_name >= 0)
 		write_byte(f_out_name, fnamecmp_type);
 
