@@ -907,7 +907,9 @@ put a partially transferred file into DIR instead of writing out the
 file to the destination dir.  Rsync will also use a file found in this
 dir as data to speed up the transfer (i.e. when you redo the send after
 rsync creates a partial file) and delete such a file after it has served
-its purpose.
+its purpose.  Note that if --whole-file is specified (or implied) that an
+existing partial-dir file will not be used to speedup the transfer (since
+rsync is sending files without using the incremental rsync algorithm).
 
 Rsync will create the dir if it is missing (just the last dir -- not the
 whole path).  This makes it easy to use a relative path (such as
