@@ -33,6 +33,15 @@ Changes since 2.6.3:
 
     - Added the --max-size option (promoted from the patches dir).
 
+    - Added the "port" parameter to the rsyncd.conf file (promoted from the
+      patches dir).
+
+    - Added the --copy-dest option, which works like --link-dest except
+      that it copies identical files.
+
+    - Added support for multiple --*-dest options (promoted from the
+      patches dir).
+
     - The daemon-mode options were separated from the normal rsync options
       so that they can't be mixed together.  This makes it impossible for a
       user to start a daemon that had improper default option values that
