@@ -518,11 +518,6 @@ static int start_client(int argc, char *argv[])
 	
 	pid = do_cmd(shell_cmd,shell_machine,shell_user,shell_path,&f_in,&f_out);
 	
-#if HAVE_SETLINEBUF
-	setlinebuf(stdout);
-	setlinebuf(stderr);
-#endif
-
 	ret = client_run(f_in, f_out, pid, argc, argv);
 
 	fflush(stdout);

@@ -28,6 +28,7 @@ void log_open(void)
 {
 	static int initialised;
 	int options = LOG_PID;
+	time_t t;
 
 	if (initialised) return;
 	initialised = 1;
@@ -45,6 +46,12 @@ void log_open(void)
 #ifndef LOG_NDELAY
 	syslog(LOG_INFO,"rsyncd started\n");
 #endif
+
+	/* this looks pointless, but it is needed in order for the
+	   C library on some systems to fetch the timezone info
+	   before the chroot */
+	t = time(NULL);
+	localtime(&t);
 }
 		
 
@@ -102,7 +109,7 @@ void rprintf(int fd, const char *format, ...)
 
 	if (fwrite(buf, len, 1, f) != 1) exit_cleanup(1);
 
-	if (buf[len-1] == '\r') fflush(f);
+	if (buf[len-1] == '\r' || buf[len-1] == '\n') fflush(f);
 
 	depth--;
 }
