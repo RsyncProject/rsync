@@ -583,7 +583,7 @@ static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
        break;
 
      case P_GSTRING:
-       strcpy((char *)parm_ptr,parmvalue);
+       strlcpy((char *)parm_ptr,parmvalue,sizeof(pstring)-1);
        break;
 
      case P_ENUM:

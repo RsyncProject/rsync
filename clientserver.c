@@ -103,8 +103,8 @@ static int rsync_module(int fd, int i)
 	char *argv[MAX_ARGS];
 	char **argp;
 	char line[MAXPATHLEN];
-	uid_t uid;
-	gid_t gid;
+	uid_t uid = (uid_t)-2;
+	gid_t gid = (gid_t)-2;
 	char *p;
 	char *addr = client_addr(fd);
 	char *host = client_name(fd);
@@ -133,8 +133,6 @@ static int rsync_module(int fd, int i)
 		return -1;
 	}
 
-	rprintf(FINFO,"rsync on module %s from %s (%s)\n",
-		name, host, addr);
 	
 	module_id = i;
 
@@ -167,22 +165,28 @@ static int rsync_module(int fd, int i)
 	p = lp_exclude(i);
 	add_exclude_line(p);
 
+	log_open();
+
 	if (chroot(lp_path(i))) {
+		rprintf(FERROR,"chroot %s failed\n", lp_path(i));
 		io_printf(fd,"@ERROR: chroot failed\n");
 		return -1;
 	}
 
 	if (chdir("/")) {
+		rprintf(FERROR,"chdir %s failed\n", lp_path(i));
 		io_printf(fd,"@ERROR: chdir failed\n");
 		return -1;
 	}
 
-	if (setgid(gid)) {
+	if (setgid(gid) || getgid() != gid) {
+		rprintf(FERROR,"setgid %d failed\n", gid);
 		io_printf(fd,"@ERROR: setgid failed\n");
 		return -1;
 	}
 
-	if (setuid(uid)) {
+	if (setuid(uid) || getuid() != uid) {
+		rprintf(FERROR,"setuid %d failed\n", uid);
 		io_printf(fd,"@ERROR: setuid failed\n");
 		return -1;
 	}
@@ -206,7 +210,11 @@ static int rsync_module(int fd, int i)
 		}
 
 		if (start_glob) {
-			rprintf(FINFO,"transferring %s\n",p);
+			if (start_glob == 1) {
+				rprintf(FINFO,"rsync on %s from %s (%s)\n",
+					p, host, addr);
+				start_glob++;
+			}
 			glob_expand(name, argv, &argc, MAX_ARGS);
 		} else {
 			argc++;
@@ -319,6 +327,8 @@ static int start_daemon(int fd)
 
 int daemon_main(void)
 {
+	log_open();
+
 	if (is_a_socket(STDIN_FILENO)) {
 		/* we are running via inetd */
 		return start_daemon(STDIN_FILENO);

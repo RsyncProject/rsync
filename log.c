@@ -24,6 +24,30 @@
 #include "rsync.h"
 
 
+void log_open(void)
+{
+	static int initialised;
+	int options = LOG_PID;
+
+	if (initialised) return;
+	initialised = 1;
+
+#ifdef LOG_NDELAY
+	options |= LOG_NDELAY;
+#endif
+
+#ifdef LOG_DAEMON
+	openlog("rsyncd", options, lp_syslog_facility());
+#else
+	openlog("rsyncd", options);
+#endif
+
+#ifndef LOG_NDELAY
+	syslog(LOG_INFO,"rsyncd started\n");
+#endif
+}
+		
+
 /* this is the rsync debugging function. Call it with FINFO or FERROR */
 void rprintf(int fd, const char *format, ...)
 {
@@ -44,19 +68,10 @@ void rprintf(int fd, const char *format, ...)
 	buf[len] = 0;
 
 	if (am_daemon) {
-		static int initialised;
 		int priority = LOG_INFO;
 		if (fd == FERROR) priority = LOG_WARNING;
 
-		if (!initialised) {
-			initialised = 1;
-#ifdef LOG_DAEMON
-			openlog("rsyncd", LOG_PID, lp_syslog_facility());
-#else
-			openlog("rsyncd", LOG_PID);
-#endif
-		}
-		
+		log_open();
 		syslog(priority, "%s", buf);
 		return;
 	}

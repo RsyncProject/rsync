@@ -107,12 +107,7 @@ static int get_secret(int module, char *user, char *secret, int len)
 	close(fd);
 	if (!found) return 0;
 
-	if (strlen(pass) > len-1) {
-		memset(line, 0, sizeof(line));
-		return 0;
-	}
-
-	strcpy(secret, pass);
+	strlcpy(secret, pass, len);
 	return 1;
 }
 

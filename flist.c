@@ -616,7 +616,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 			   thus getting their permissions right */
 			*p = 0;
 			if (strcmp(lastpath,fname)) {
-				strcpy(lastpath, fname);
+				strlcpy(lastpath, fname, sizeof(lastpath)-1);
 				*p = '/';
 				for (p=fname+1; (p=strchr(p,'/')); p++) {
 					*p = 0;
