@@ -1,6 +1,7 @@
 /* 
    Copyright (C) Andrew Tridgell 1996
    Copyright (C) Paul Mackerras 1996
+   Copyright (C) 2001 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -111,24 +112,14 @@ static char *string_area_strdup(struct string_area **ap, const char *src)
 
 static void list_file_entry(struct file_struct *f)
 {
-	char perms[11] = "----------";
-	char *perm_map = "rwxrwxrwx";
-	int i;
+	char perms[11];
 
 	if (!f->basename)
 		/* this can happen if duplicate names were removed */
 		return;
 
-	for (i=0;i<9;i++) {
-		if (f->mode & (1<<i)) perms[9-i] = perm_map[8-i];
-	}
-	if (S_ISLNK(f->mode)) perms[0] = 'l';
-	if (S_ISDIR(f->mode)) perms[0] = 'd';
-	if (S_ISBLK(f->mode)) perms[0] = 'b';
-	if (S_ISCHR(f->mode)) perms[0] = 'c';
-	if (S_ISSOCK(f->mode)) perms[0] = 's';
-	if (S_ISFIFO(f->mode)) perms[0] = 'p';
-	
+	permstring(perms, f->mode);
+
 	if (preserve_links && S_ISLNK(f->mode)) {
 		rprintf(FINFO,"%s %11.0f %s %s -> %s\n", 
 			perms, 
