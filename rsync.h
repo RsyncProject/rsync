@@ -129,6 +129,11 @@
 #define FNAMECMP_PARTIAL_DIR	0x81
 #define FNAMECMP_BACKUP 	0x82
 
+/* For calling delete_file() */
+#define DEL_DIR			(1<<0)
+#define DEL_NO_RECURSE		(1<<1)
+#define DEL_TERSE		(1<<2)
+
 
 /* Log-message categories.  FLOG is only used on the daemon side to
  * output messages to the log file. */
