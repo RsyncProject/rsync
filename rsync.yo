@@ -269,6 +269,7 @@ verb(
      --address               bind to the specified address
      --config=FILE           specify alternate rsyncd.conf file
      --port=PORT             specify alternate rsyncd port number
+     --blocking-io           use blocking IO for the remote shell
      --stats                 give some file transfer stats
      --progress              show progress during transfer
      --log-format=FORMAT     log file transfers using specified format
@@ -610,6 +611,11 @@ specified.
 
 dit(bf(--port=PORT)) This specifies an alternate TCP port number to use
 rather than the default port 873.
+
+dit(bf(--blocking-io)) This specifies whether rsync will use blocking
+IO when launching a remote shell transport. You may find this is
+needed for some remote shells that can't handle the default
+non-blocking IO.
 
 dit(bf(--log-format=FORMAT)) This allows you to specify exactly what the
 rsync client logs to stdout on a per-file basis. The log format is
