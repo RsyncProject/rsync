@@ -22,6 +22,35 @@
 
 #define CC_EQ(class, len, litmatch) ((len) == sizeof (litmatch)-1 && strncmp(class, litmatch, len) == 0)
 
+#if defined STDC_HEADERS || !defined isascii
+# define ISASCII(c) 1
+#else
+# define ISASCII(c) isascii(c)
+#endif
+
+#ifdef isblank
+# define ISBLANK(c) (ISASCII(c) && isblank(c))
+#else
+# define ISBLANK(c) ((c) == ' ' || (c) == '\t')
+#endif
+
+#ifdef isgraph
+# define ISGRAPH(c) (ISASCII(c) && isgraph(c))
+#else
+# define ISGRAPH(c) (ISASCII(c) && isprint(c) && !isspace(c))
+#endif
+
+#define ISPRINT(c) (ISASCII(c) && isprint(c))
+#define ISDIGIT(c) (ISASCII(c) && isdigit(c))
+#define ISALNUM(c) (ISASCII(c) && isalnum(c))
+#define ISALPHA(c) (ISASCII(c) && isalpha(c))
+#define ISCNTRL(c) (ISASCII(c) && iscntrl(c))
+#define ISLOWER(c) (ISASCII(c) && islower(c))
+#define ISPUNCT(c) (ISASCII(c) && ispunct(c))
+#define ISSPACE(c) (ISASCII(c) && isspace(c))
+#define ISUPPER(c) (ISASCII(c) && isupper(c))
+#define ISXDIGIT(c) (ISASCII(c) && isxdigit(c))
+
 #ifdef WILD_TEST_ITERATIONS
 int wildmatch_iteration_count;
 #endif
@@ -117,18 +146,18 @@ static int domatch(const unsigned char *p, const unsigned char *text)
 			return FALSE;
 		    i = p - s;
 		    ch = *text;
-		    if ((CC_EQ(s,i, "alnum") && isalnum(ch))
-		     || (CC_EQ(s,i, "alpha") && isalpha(ch))
-		     || (CC_EQ(s,i, "blank") && isblank(ch))
-		     || (CC_EQ(s,i, "cntrl") && iscntrl(ch))
-		     || (CC_EQ(s,i, "digit") && isdigit(ch))
-		     || (CC_EQ(s,i, "graph") && isgraph(ch))
-		     || (CC_EQ(s,i, "lower") && islower(ch))
-		     || (CC_EQ(s,i, "print") && isprint(ch))
-		     || (CC_EQ(s,i, "punct") && ispunct(ch))
-		     || (CC_EQ(s,i, "space") && isspace(ch))
-		     || (CC_EQ(s,i, "upper") && isupper(ch))
-		     || (CC_EQ(s,i,"xdigit") && isxdigit(ch)))
+		    if ((CC_EQ(s,i, "alnum") && ISALNUM(ch))
+		     || (CC_EQ(s,i, "alpha") && ISALPHA(ch))
+		     || (CC_EQ(s,i, "blank") && ISBLANK(ch))
+		     || (CC_EQ(s,i, "cntrl") && ISCNTRL(ch))
+		     || (CC_EQ(s,i, "digit") && ISDIGIT(ch))
+		     || (CC_EQ(s,i, "graph") && ISGRAPH(ch))
+		     || (CC_EQ(s,i, "lower") && ISLOWER(ch))
+		     || (CC_EQ(s,i, "print") && ISPRINT(ch))
+		     || (CC_EQ(s,i, "punct") && ISPUNCT(ch))
+		     || (CC_EQ(s,i, "space") && ISSPACE(ch))
+		     || (CC_EQ(s,i, "upper") && ISUPPER(ch))
+		     || (CC_EQ(s,i,"xdigit") && ISXDIGIT(ch)))
 			matched = TRUE;
 		    p++;
 		    ch = 0; /* This makes "prev" get set to 0. */
