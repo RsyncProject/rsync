@@ -354,7 +354,7 @@ void read_batch_flist_info(struct file_struct **fptr)
 	}
 }
 
-void write_batch_csums_file(char *buff, int bytes_to_write)
+void write_batch_csums_file(void *buff, int bytes_to_write)
 {
 
 	static int fdb_open = 1;
@@ -404,16 +404,15 @@ void write_batch_csum_info(int *flist_entry, int flist_count,
 	/* Write csum info to batch file */
 
 	/* FIXME: This will break if s->count is ever not exactly an int. */
-	write_batch_csums_file((char *) flist_entry, sizeof(int));
+	write_batch_csums_file(flist_entry, sizeof(int));
 	if (s)
-		write_batch_csums_file((char *) &s->count, sizeof(int));
+		write_batch_csums_file(&s->count, sizeof(int));
 	else
-		write_batch_csums_file((char *) &int_zero, sizeof (int));
+		write_batch_csums_file(&int_zero, sizeof (int));
 	
 	if (s) {
 		for (i = 0; i < s->count; i++) {
-			write_batch_csums_file((char *) &s->sums[i].sum1,
-					       sizeof(uint32));
+			write_batch_csums_file(&s->sums[i].sum1, sizeof(uint32));
 			if ((*flist_entry == flist_count - 1)
 			    && (i == s->count - 1)) {
 				fdb_close = 1;
