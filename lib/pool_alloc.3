@@ -1,0 +1,199 @@
+.ds d \-\^\-
+.ds o \fR[\fP
+.ds c \fR]\fP
+.ds | \fR|\fP
+.de D
+\\.B \*d\\$1
+..
+.de DI
+\\.BI \*d\\$1 \\$2
+..
+.de DR
+\\.BR \*d\\$1 \\$2
+..
+.de Di
+\\.BI \*d\\$1 " \\$2"
+..
+.de Db
+\\.B \*d\\$1 " \\$2"
+..
+.de Df
+\\.B \*d\*ono\*c\\$1
+..
+.de See
+See \fB\\$1\fP for details.
+..
+.de SeeIn
+See \fB\\$1\fP in \fB\\$2\fP for details.
+..
+.TH POOL_ALLOC 3
+.SH NAME
+pool_alloc, pool_free, pool_talloc, pool_tfree, pool_create, pool_destroy
+\- Allocate and free memory in managed allocation pools.
+.SH SYNOPSIS
+.B #include "pool_alloc.h"
+
+\fBstruct alloc_pool *pool_create(size_t \fIsize\fB, size_t \fIquantum\fB, void (*\fIbomb\fB)(char *), int \fIflags\fB);
+
+\fBvoid pool_destroy(struct alloc_pool *\fIpool\fB);
+
+\fBvoid *pool_alloc(struct alloc_pool *\fIpool\fB, size_t \fIsize\fB, char *\fImsg\fB);
+
+\fBvoid pool_free(struct alloc_pool *\fIpool\fB, sise_t \fIsize\fB, void *\fIaddr\fB);
+
+\fBvoid *pool_talloc(struct alloc_pool *\fIpool\fB, \fItype\fB), int \fIcount\fB, char *\fImsg\fB);
+
+\fBvoid pool_tfree(struct alloc_pool *\fIpool\fB, \fItype\fB, int \fIcount\fB, void *\fIaddr\fB);
+.SH DESCRIPTION
+.P
+The pool allocation routines use
+.B malloc()
+for underlying memory management.
+What allocation pools do is cause
+memory within a given pool to be in large contigious blocks
+(called extents) that when freed will be reusable.  Unlike
+.B malloc()
+the allocations are not managed individually.
+Instead each extent tracks the total free memory within the
+extent.  Each extent can either be used to allocate memory
+or to manage the freeing of memory within that extent.
+When an extent has less free memory than a given
+allocation request or when the first request to free
+memory within that extent is received the extent ceases to
+be used for allocation.
+.P
+This form of memory management is suited to large numbers of small
+related allocations that are held for a while
+and then freed as a group.
+Because the
+underlying allocations are done in large contigious extents
+when an extent is freed it releases a large enough
+contigious block of memory to be useful to subsequent
+.B malloc()
+and
+.B pool_alloc()
+calls even if allocations from other pools or from
+.B malloc()
+are made between allocations from a given pool.
+.P
+.B pool_create()
+Creates an allocation pool for subsequent calls to the pool
+allocation functions.
+When an extent is created for allocations it will be
+.I size 
+bytes.
+Allocations from the pool have their sizes rounded up to a
+multiple of
+.I quantum
+bytes in length.
+Specifying
+.B 0
+for
+.I quantum
+Will produce a quantum that should meet maximal allignment
+on most platforms.
+If the
+.B POOL_QALIGN
+.I flag
+is set allocations will be aligned to addresses that are a
+multiple of
+.IR quantum .
+If the
+.B POOL_CLEAR
+.I flag
+is set all allocations from the pool will be zero filled.
+.P
+.B pool_destroy()
+destroys an allocation pool and frees all memory allocated
+in that pool.
+.P
+.B pool_alloc()
+allocates
+.I size
+bytes from the specified
+.IR pool .
+If
+.I size
+is
+.B 0
+.I quantum
+bytes will be freed.
+If the requested memory cannot be allocated
+.B pool_alloc()
+will call
+.I bomb()
+function, if defined, with
+.I msg
+as it's sole argument and
+.B NULL
+will be returned.
+.P
+.B pool_free()
+frees
+.I size
+bytes pointed to by
+.I addr
+previously allocated in the specified
+.IR pool .
+The memory freed within an extent will not be reusable until
+all of the memory in that extent has been freed but 
+depending on the order in which the
+allocations are freed some extents may be released for reuse
+while others are still in use.
+If
+.I size
+is
+.B 0
+.I quantum
+bytes will be freed.
+If
+.I addr
+is
+.B 0
+no memory will be freed but subsequent allocations will come
+from a new extent.
+.P
+.B pool_talloc()
+is a macro that take a
+.I type
+and
+.I count
+instead of
+.I size
+and will cast the return value to the correct type.
+.P
+.B pool_tfree
+is a macro to free memory previously allocated in the
+specified
+.IR pool .
+.SH RETURN VALUE
+.B pool_create()
+returns a pointer to
+.BR "struct alloc_pool" .
+.P
+.B pool_alloc()
+and
+.B pool_talloc()
+return pointers to the allocated memory,
+or NULL if the request fails.
+For each extent so long as no allocations are smaller than varaible
+allignment requirements this pointer will be suitably
+alligned for any kind of variable.
+The return type of
+.B pool_alloc()
+will normally require casting to the desired type but
+.B pool_talloc()
+will returns a pointer of the requested
+.IR type .
+.P
+.BR pool_free() ,
+.B pool_tfree()
+and
+.B pool_destroy()
+return no value.
+.SH SEE ALSO
+.nf
+malloc(3)
+.SH AUTHOR
+pool_alloc was created by J.W. Schultz of Pegasystems Technologies.
+.SH BUGS AND ISSUES
