@@ -219,7 +219,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 		    int *f_in, int *f_out)
 {
 	int i, argc = 0;
-	char *args[100];
+	char *args[MAX_ARGS];
 	pid_t ret;
 	char *tok, *dir = NULL;
 	int dash_l_set = 0;
@@ -234,8 +234,13 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 		if (!cmd)
 			goto oom;
 
-		for (tok = strtok(cmd, " "); tok; tok = strtok(NULL, " "))
+		for (tok = strtok(cmd, " "); tok; tok = strtok(NULL, " ")) {
+			if (argc >= MAX_ARGS) {
+				rprintf(FERROR, "Command is too long\n");
+				exit_cleanup(RERR_SYNTAX);
+			}
 			args[argc++] = tok;
+		}
 
 		/* check to see if we've already been given '-l user' in
 		 * the remote-shell command */
