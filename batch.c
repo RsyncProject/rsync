@@ -60,6 +60,8 @@ void write_batch_flist_file(char *buff, int bytes_to_write)
 	}
 }
 
+/* TODO: Someone please rewrite this!  Why in the world don't we use
+ * the send/receive code from flist.c for this? */
 void write_batch_flist_info(int flist_count, struct file_struct **fptr)
 {
 	int i;
@@ -68,7 +70,6 @@ void write_batch_flist_info(int flist_count, struct file_struct **fptr)
 	/* Write flist info to batch file */
 
 	bytes_to_write =
-	    sizeof(unsigned) +
 	    sizeof(time_t) +
 	    sizeof(OFF_T) +
 	    sizeof(mode_t) +
@@ -82,7 +83,8 @@ void write_batch_flist_info(int flist_count, struct file_struct **fptr)
 	fdb_close = 0;
 
 	for (i = 0; i < flist_count; i++) {
-		write_batch_flist_file((char *) fptr[i], bytes_to_write);
+		write_batch_flist_file((char*)&fptr[i]->flags, sizeof fptr[0]->flags);
+		write_batch_flist_file((char*)fptr[i], bytes_to_write);
 		write_char_bufs(fptr[i]->basename);
 		write_char_bufs(fptr[i]->dirname);
 		write_char_bufs(fptr[i]->basedir);
@@ -180,7 +182,7 @@ void write_batch_argvs_file(int argc, char *argv[])
 
 struct file_list *create_flist_from_batch(void)
 {
-	unsigned char flags;
+	unsigned short flags;
 
 	fdb_open = 1;
 	fdb_close = 0;
@@ -259,15 +261,13 @@ int read_batch_flist_file(char *buff, int len)
 	return bytes_read;
 }
 
-unsigned char read_batch_flags(void)
+unsigned short read_batch_flags(void)
 {
-	int flags;
+	unsigned short flags;
 
-	if (read_batch_flist_file((char *) &flags, 4)) {
+	if (read_batch_flist_file((char*)&flags, sizeof flags))
 		return 1;
-	} else {
-		return 0;
-	}
+	return 0;
 }
 
 void read_batch_flist_info(struct file_struct **fptr)
