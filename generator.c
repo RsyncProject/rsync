@@ -485,6 +485,13 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 		rprintf(FINFO,"generator starting pid=%d count=%d\n",
 			(int)getpid(),flist->count);
 
+	if (verbose >= 2) {
+		rprintf(FINFO,
+			disable_deltas_p() 
+			? "delta-transmission disabled for local transfer or --whole-file\n"
+			: "delta transmission enabled\n");
+	}
+	
 	/* we expect to just sit around now, so don't exit on a
 	   timeout. If we really get a timeout then the other process should
 	   exit */
