@@ -566,6 +566,11 @@ extern int verbose;
 extern struct global_opts {
 	/** Network address family. **/
 	int af_hint;
+	
+	/** Do not go into the background when run as --daemon.  Good
+	 * for debugging and required for running as a service on W32,
+	 * or under Unix process-monitors. **/
+	int no_detach;
 } global_opts;
 
 

@@ -212,6 +212,7 @@ void usage(enum logcode F)
   rprintf(F,"     --include-from=FILE     don't exclude patterns listed in FILE\n");
   rprintf(F,"     --version               print version number\n");  
   rprintf(F,"     --daemon                run as a rsync daemon\n");  
+  rprintf(F,"     --no-detach             do not detach from the parent\n");  
   rprintf(F,"     --address               bind to the specified address\n");  
   rprintf(F,"     --config=FILE           specify alternate rsyncd.conf file\n");  
   rprintf(F,"     --port=PORT             specify alternate rsyncd port number\n");
@@ -298,6 +299,7 @@ static struct poptOption long_options[] = {
   /* TODO: Should this take an optional int giving the compression level? */
   {"compress",        'z', POPT_ARG_NONE,   &do_compression},
   {"daemon",           0,  POPT_ARG_NONE,   &am_daemon},
+  {"no-detach",        0,  POPT_ARG_NONE,   &global_opts.no_detach},
   {"stats",            0,  POPT_ARG_NONE,   &do_stats},
   {"progress",         0,  POPT_ARG_NONE,   &do_progress},
   {"partial",          0,  POPT_ARG_NONE,   &keep_partial},

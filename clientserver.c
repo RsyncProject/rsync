@@ -501,7 +501,8 @@ int daemon_main(void)
 		return start_daemon(STDIN_FILENO);
 	}
 
-	become_daemon();
+	if (!global_opts.no_detach)
+	    become_daemon();
 
 	if (!lp_load(config_file, 1)) {
 		exit_cleanup(RERR_SYNTAX);
