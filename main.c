@@ -58,6 +58,8 @@ int force_delete = 0;
 int io_timeout = 0;
 int io_error = 0;
 
+static char *shell_cmd;
+
 extern int csum_length;
 
 int am_server = 0;
@@ -433,6 +435,115 @@ void start_server(int argc, char *argv[])
       exit_cleanup(0);
 }
 
+int start_client(int argc, char *argv[])
+{
+	char *p;
+	char *shell_machine = NULL;
+	char *shell_path = NULL;
+	char *shell_user = NULL;
+	int pid, status = 0, status2 = 0;
+	int f_in,f_out;
+	struct file_list *flist;
+	char *local_name = NULL;
+
+	p = strchr(argv[0],':');
+
+	if (p) {
+		am_sender = 0;
+		*p = 0;
+		shell_machine = argv[0];
+		shell_path = p+1;
+		argc--;
+		argv++;
+	} else {
+		am_sender = 1;
+		
+		p = strchr(argv[argc-1],':');
+		if (!p) {
+			local_server = 1;
+		}
+
+		if (local_server) {
+			shell_machine = NULL;
+			shell_path = argv[argc-1];
+		} else {
+			*p = 0;
+			shell_machine = argv[argc-1];
+			shell_path = p+1;
+		}
+		argc--;
+	}
+	
+	if (shell_machine) {
+		p = strchr(shell_machine,'@');
+		if (p) {
+			*p = 0;
+			shell_user = shell_machine;
+			shell_machine = p+1;
+		}
+	}
+
+	if (verbose > 3) {
+		fprintf(FINFO,"cmd=%s machine=%s user=%s path=%s\n",
+			shell_cmd?shell_cmd:"",
+			shell_machine?shell_machine:"",
+			shell_user?shell_user:"",
+			shell_path?shell_path:"");
+	}
+	
+	if (!am_sender && argc != 1) {
+		usage(FERROR);
+		exit_cleanup(1);
+	}
+	
+	pid = do_cmd(shell_cmd,shell_machine,shell_user,shell_path,&f_in,&f_out);
+	
+	setup_protocol(f_out,f_in);
+	
+#if HAVE_SETLINEBUF
+	setlinebuf(FINFO);
+	setlinebuf(FERROR);
+#endif
+	
+	if (verbose > 3) 
+		fprintf(FINFO,"parent=%d child=%d sender=%d recurse=%d\n",
+			(int)getpid(),pid,am_sender,recurse);
+	
+	if (am_sender) {
+		if (cvs_exclude)
+			add_cvs_excludes();
+		if (delete_mode) 
+			send_exclude_list(f_out);
+		flist = send_file_list(f_out,argc,argv);
+		if (verbose > 3) 
+			fprintf(FINFO,"file list sent\n");
+		send_files(flist,f_out,f_in);
+		if (verbose > 3)
+			fprintf(FINFO,"waiting on %d\n",pid);
+		waitpid(pid, &status, 0);
+		report(-1);
+		exit_cleanup(status);
+	}
+	
+	send_exclude_list(f_out);
+	
+	flist = recv_file_list(f_in);
+	if (!flist || flist->count == 0) {
+		fprintf(FINFO,"nothing to do\n");
+		exit_cleanup(0);
+	}
+	
+	local_name = get_local_name(flist,argv[0]);
+	
+	status2 = do_recv(f_in,f_out,flist,local_name);
+	
+	report(f_in);
+	
+	waitpid(pid, &status, 0);
+	
+	return status | status2;
+}
+
 
 static void usage(FILE *f)
 {
@@ -531,28 +642,11 @@ RETSIGTYPE sigusr1_handler(int val) {
 	exit_cleanup(1);
 }
 
-int main(int argc,char *argv[])
+
+static void parse_arguments(int argc, char *argv[])
 {
-    int pid, status = 0, status2 = 0;
     int opt;
     int option_index;
-    char *shell_cmd = NULL;
-    char *shell_machine = NULL;
-    char *shell_path = NULL;
-    char *shell_user = NULL;
-    char *p;
-    int f_in,f_out;
-    struct file_list *flist;
-    char *local_name = NULL;
-
-    signal(SIGUSR1, sigusr1_handler);
-
-    starttime = time(NULL);
-    am_root = (getuid() == 0);
-
-    /* we set a 0 umask so that correct file permissions can be
-       carried across */
-    orig_umask = (int)umask(0);
 
     while ((opt = getopt_long(argc, argv, 
 			      short_options, long_options, &option_index)) 
@@ -732,10 +826,26 @@ int main(int argc,char *argv[])
 	  exit_cleanup(1);
 	}
     }
+}
 
-    while (optind--) {
+int main(int argc,char *argv[])
+{
+
+    signal(SIGUSR1, sigusr1_handler);
+
+    starttime = time(NULL);
+    am_root = (getuid() == 0);
+
+    /* we set a 0 umask so that correct file permissions can be
+       carried across */
+    orig_umask = (int)umask(0);
+
+    parse_arguments(argc, argv);
+
+    while (optind) {
       argc--;
       argv++;
+      optind--;
     }
 
     signal(SIGCHLD,SIG_IGN);
@@ -762,101 +872,6 @@ int main(int argc,char *argv[])
       exit_cleanup(1);
     }
 
-    p = strchr(argv[0],':');
-
-    if (p) {
-      am_sender = 0;
-      *p = 0;
-      shell_machine = argv[0];
-      shell_path = p+1;
-      argc--;
-      argv++;
-    } else {
-      am_sender = 1;
-
-      p = strchr(argv[argc-1],':');
-      if (!p) {
-	local_server = 1;
-      }
-
-      if (local_server) {
-	shell_machine = NULL;
-	shell_path = argv[argc-1];
-      } else {
-	*p = 0;
-	shell_machine = argv[argc-1];
-	shell_path = p+1;
-      }
-      argc--;
-    }
-
-    if (shell_machine) {
-      p = strchr(shell_machine,'@');
-      if (p) {
-	*p = 0;
-	shell_user = shell_machine;
-	shell_machine = p+1;
-      }
-    }
-
-    if (verbose > 3) {
-      fprintf(FINFO,"cmd=%s machine=%s user=%s path=%s\n",
-	      shell_cmd?shell_cmd:"",
-	      shell_machine?shell_machine:"",
-	      shell_user?shell_user:"",
-	      shell_path?shell_path:"");
-    }
-    
-    if (!am_sender && argc != 1) {
-      usage(FERROR);
-      exit_cleanup(1);
-    }
-
-    pid = do_cmd(shell_cmd,shell_machine,shell_user,shell_path,&f_in,&f_out);
-
-    setup_protocol(f_out,f_in);
-
-#if HAVE_SETLINEBUF
-    setlinebuf(FINFO);
-    setlinebuf(FERROR);
-#endif
-
-    if (verbose > 3) 
-      fprintf(FINFO,"parent=%d child=%d sender=%d recurse=%d\n",
-	      (int)getpid(),pid,am_sender,recurse);
-
-    if (am_sender) {
-      if (cvs_exclude)
-	add_cvs_excludes();
-      if (delete_mode) 
-	send_exclude_list(f_out);
-      flist = send_file_list(f_out,argc,argv);
-      if (verbose > 3) 
-	fprintf(FINFO,"file list sent\n");
-      send_files(flist,f_out,f_in);
-      if (verbose > 3)
-	fprintf(FINFO,"waiting on %d\n",pid);
-      waitpid(pid, &status, 0);
-      report(-1);
-      exit_cleanup(status);
-    }
-
-    send_exclude_list(f_out);
-
-    flist = recv_file_list(f_in);
-    if (!flist || flist->count == 0) {
-      fprintf(FINFO,"nothing to do\n");
-      exit_cleanup(0);
-    }
-
-    local_name = get_local_name(flist,argv[0]);
-
-    status2 = do_recv(f_in,f_out,flist,local_name);
-
-    report(f_in);
-
-    waitpid(pid, &status, 0);
-
-    return status | status2;
+    return start_client(argc, argv);
 }
 
