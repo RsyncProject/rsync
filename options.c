@@ -623,7 +623,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				struct poptOption *op =
 				    &long_options[opt-OPT_REFUSED_BASE];
 				int n = snprintf(err_buf, sizeof err_buf,
-				    "This server does not support --%s\n",
+				    "The server is configured to refuse --%s\n",
 				    op->longName) - 1;
 				if (op->shortName) {
 					snprintf(err_buf+n, sizeof err_buf-n,
