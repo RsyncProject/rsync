@@ -38,16 +38,14 @@ extern int safe_symlinks;
 /* make a complete pathname for backup file */
 char *get_backup_name(char *fname)
 {
-	static char fnamebak[MAXPATHLEN];
-
 	if (backup_dir) {
 		if (stringjoin(backup_dir_buf + backup_dir_len, backup_dir_remainder,
 			       fname, backup_suffix, NULL) < backup_dir_remainder)
 			return backup_dir_buf;
 	} else {
-		if (stringjoin(fnamebak, sizeof fnamebak,
-			       fname, backup_suffix, NULL) < sizeof fnamebak)
-			return fnamebak;
+		if (stringjoin(backup_dir_buf, MAXPATHLEN,
+			       fname, backup_suffix, NULL) < MAXPATHLEN)
+			return backup_dir_buf;
 	}
 
 	rprintf(FERROR, "backup filename too long\n");
