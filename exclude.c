@@ -167,7 +167,7 @@ int check_exclude(char *name, struct exclude_struct **local_exclude_list,
 
 	if (local_exclude_list) {
 		for (n=0; local_exclude_list[n]; n++) {
-                        ent = exclude_list[n];
+                        ent = local_exclude_list[n];
 			if (check_one_exclude(name, ent, st)) {
                                 report_exclude_result(name, ent, st);
 				return !ent->include;
