@@ -502,6 +502,8 @@ int start_daemon(int f_in, int f_out)
 		exit_cleanup(RERR_SYNTAX);
 	}
 
+	log_init();
+
 	if (!am_server) {
 		set_socket_options(f_in, "SO_KEEPALIVE");
 		set_socket_options(f_in, lp_socket_options());

@@ -26,7 +26,8 @@
 #define RSYNC_RSH_ENV "RSYNC_RSH"
 
 #define RSYNC_NAME "rsync"
-#define RSYNCD_CONF "/etc/rsyncd.conf"
+#define RSYNCD_SYSCONF "/etc/rsyncd.conf"
+#define RSYNCD_USERCONF "rsyncd.conf"
 
 #define DEFAULT_LOCK_FILE "/var/run/rsyncd.lock"
 #define URL_PREFIX "rsync://"

@@ -68,7 +68,7 @@ your system.  You will then need to send inetd a HUP signal to tell it to
 reread its config file.
 
 Note that you should not send the rsync server a HUP signal to force
-it to reread the tt(/etc/rsyncd.conf). The file is re-read on each client
+it to reread the tt(rsyncd.conf) file. The file is re-read on each client
 connection. 
 
 manpagesection(GLOBAL OPTIONS)
@@ -127,7 +127,7 @@ of available modules. The default is no comment.
 
 dit(bf(path)) The "path" option specifies the directory in the servers
 filesystem to make available in this module.  You must specify this option
-for each module in tt(/etc/rsyncd.conf).
+for each module in tt(rsyncd.conf).
 
 dit(bf(use chroot)) If "use chroot" is true, the rsync server will chroot
 to the "path" before starting the file transfer with the client.  This has
@@ -438,7 +438,7 @@ susan:herpass
 
 manpagefiles()
 
-/etc/rsyncd.conf
+/etc/rsyncd.conf or rsyncd.conf
 
 manpageseealso()
 

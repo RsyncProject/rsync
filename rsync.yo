@@ -212,9 +212,12 @@ used to check against the rsyncd.conf on the remote host.
 
 manpagesection(RUNNING AN RSYNC SERVER)
 
-An rsync server is configured using a config file which by default is
-called /etc/rsyncd.conf. Please see the rsyncd.conf(5) man page for more
-information. 
+An rsync server is configured using a config file.  Please see the 
+rsyncd.conf(5) man page for more information.  By default the configuration
+file is called /etc/rsyncd.conf, unless rsync is running over a remote
+shell program and is not running as root; in that case, the default name
+is rsyncd.conf in the current directory on the remote computer 
+(typically $HOME).
 
 manpagesection(RUNNING AN RSYNC SERVER OVER A REMOTE SHELL PROGRAM)
 
@@ -234,7 +237,7 @@ quote(rsync --server --daemon .)
 
 NOTE: rsync's argument parsing expects the trailing ".", so make sure
 that it's there.  If you want to use a rsyncd.conf(5)-style
-configuration file other than /etc/rsyncd.conf, you can added a
+configuration file other than the default, you can added a
 --config-file option to the em(command):
 
 quote(rsync --server --daemon --config-file=em(file) .)
@@ -727,7 +730,7 @@ bf(rsync://host/module/) syntax.
 If standard input is a socket then rsync will assume that it is being
 run via inetd, otherwise it will detach from the current terminal and
 become a background daemon.  The daemon will read the config file
-(/etc/rsyncd.conf) on each connect made by a client and respond to
+(rsyncd.conf) on each connect made by a client and respond to
 requests accordingly.  See the rsyncd.conf(5) man page for more
 details.
 
@@ -747,8 +750,10 @@ address (or hostname) to bind to. This makes virtual hosting possible
 in conjunction with the --config option.
 
 dit(bf(--config=FILE)) This specifies an alternate config file than
-the default /etc/rsyncd.conf. This is only relevant when --daemon is
-specified. 
+the default.  This is only relevant when --daemon is specified. 
+The default is /etc/rsyncd.conf unless the daemon is running over
+a remote shell program and the remote user is not root; in that case
+the default is rsyncd.conf in the current directory (typically $HOME).
 
 dit(bf(--port=PORT)) This specifies an alternate TCP port number to use
 rather than the default port 873.
@@ -1093,7 +1098,7 @@ enddit()
 
 manpagefiles()
 
-/etc/rsyncd.conf
+/etc/rsyncd.conf or rsyncd.conf
 
 manpageseealso()
 

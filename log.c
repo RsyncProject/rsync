@@ -27,6 +27,7 @@
   */
 #include "rsync.h"
 
+static int log_initialised;
 static char *logfname;
 static FILE *logfile;
 static int log_error_fd = -1;
@@ -146,12 +147,11 @@ static void logit(int priority, char *buf)
 
 void log_init(void)
 {
-	static int initialised;
 	int options = LOG_PID;
 	time_t t;
 
-	if (initialised) return;
-	initialised = 1;
+	if (log_initialised) return;
+	log_initialised = 1;
 
 	/* this looks pointless, but it is needed in order for the
 	   C library on some systems to fetch the timezone info
@@ -238,16 +238,20 @@ void rwrite(enum logcode code, char *buf, int len)
 		return;
 	}
 
-	/* If that fails, try to pass it to the other end.
-	 *
-	 * io_multiplex_write can fail if we do not have a multiplexed
-	 * connection at the moment, in which case we fall through and
-	 * log locally instead. */
-	if (am_server && io_multiplex_write(code, buf, len)) {
+	/* next, if we are a server but not in daemon mode, and multiplexing
+	 *  is enabled, pass it to the other side.  */
+	if (am_server && !am_daemon && io_multiplex_write(code, buf, len)) {
 		return;
 	}
 
-	if (am_daemon) {
+	/* otherwise, if in daemon mode and either we are not a server
+	 *  (that is, we are not running --daemon over a remote shell) or
+	 *  the log has already been initialised, log the message on this
+	 *  side because we don't want the client to see most errors for
+	 *  security reasons.  We do want early messages when running daemon
+	 *  mode over a remote shell to go to the remote side; those will
+	 *  fall through to the next case. */
+	if (am_daemon && (!am_server || log_initialised)) {
 		static int depth;
 		int priority = LOG_INFO;
 		if (code == FERROR) priority = LOG_WARNING;

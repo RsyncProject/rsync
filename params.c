@@ -491,8 +491,8 @@ static FILE *OpenConfFile( char *FileName )
   OpenedFile = fopen( FileName, "r" );
   if( NULL == OpenedFile )
     {
-    rprintf(FERROR,"%s Unable to open configuration file \"%s\":\n\t%s\n",
-	    func, FileName, strerror(errno));
+    rprintf(FERROR,"rsync: unable to open configuration file \"%s\": %s\n",
+	    FileName, strerror(errno));
     }
 
   return( OpenedFile );
