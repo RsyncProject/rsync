@@ -173,6 +173,13 @@ static void print_rsync_version(enum logcode f)
 #ifdef NO_INT64
         rprintf(f, "WARNING: no 64-bit integers on this platform!\n");
 #endif
+
+	rprintf(f,
+"\n"
+"rsync comes with ABSOLUTELY NO WARRANTY.  This is free software, and you\n"
+"are welcome to redistribute it under certain conditions.  See the GNU\n"
+"General Public Licence for details.\n"
+		);
 }
 
 
