@@ -1,6 +1,7 @@
 /* -*- c-file-style: "linux" -*-
    
    Copyright (C) 1998-2001 by Andrew Tridgell <tridge@samba.org>
+   Copyright (C) 2001 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -134,7 +135,7 @@ int open_socket_out(char *host, int port, struct in_addr *address)
 
 	hp = gethostbyname(h);
 	if (!hp) {
-		rprintf(FERROR,"unknown host: %s\n", h);
+		rprintf(FERROR,"unknown host: \"%s\"\n", h);
 		close(res);
 		return -1;
 	}
@@ -537,7 +538,7 @@ struct in_addr *ip_address(const char *str)
 
 	/* otherwise assume it's a network name of some sort and use 
 	   gethostbyname */
-	if ((hp = gethostbyname(str)) == 0) {
+	if ((hp = gethostbyname (str)) == 0) {
 		rprintf(FERROR, "gethostbyname failed for \"%s\": unknown host?\n",str);
 		return NULL;
 	}
@@ -547,13 +548,28 @@ struct in_addr *ip_address(const char *str)
 		return NULL;
 	}
 
-	if (hp->h_length > sizeof(ret)) {
+	if (hp->h_length > sizeof ret) {
 		rprintf(FERROR, "gethostbyname: host address for \"%s\" is too large\n",
 			str);
 		return NULL;
 	}
 
-	memcpy(&ret.s_addr, hp->h_addr, hp->h_length);
+	if (hp->h_addrtype != AF_INET) {
+		rprintf (FERROR, "gethostname: host address for \"%s\" is not IPv4\n",
+			 str);
+		return NULL;
+	}
 
-	return(&ret);
+	/* This is kind of difficult.  The only field in ret is
+	   s_addr, which is the IP address as a 32-bit int.  On
+	   UNICOS, s_addr is in fact a *bitfield* for reasons best
+	   know to Cray.  This means we can't memcpy in to it.  On the
+	   other hand, h_addr is a char*, so we can't just assign.
+
+	   Since there's meant to be only one field inside the in_addr
+	   structure we will try just copying over the top and see how
+	   that goes. */
+	memcpy (&ret, hp->h_addr, hp->h_length);
+
+	return &ret;
 }
