@@ -112,8 +112,12 @@ makepath () {
 	# This will break if $1 contains a space.
 	for c in `echo $p | tr '/' ' '`
 	do 
-	    [ -d "$c" ] || mkdir "$c" || { echo "failed to create $c" >&2; return $? }
-	    cd "$c" || return $?
+	    if [ -d "$c" ] || mkdir "$c" 
+	    then
+		cd "$c" || return $?
+	    else
+		echo "failed to create $c" >&2; return $?
+	    fi
 	done
     )
 }
