@@ -50,6 +50,18 @@ IPv6
 
   which should just take a small change to the parser code.
 
+Errors
+
+  If we hang or get SIGINT, then explain where we were up to.  Perhaps
+  have a static buffer that contains the current function name, or
+  some kind of description of what we were trying to do.  This is a
+  little easier on people than needing to run strace/truss.
+
+  "The dungeon collapses!  You are killed."  Rather than "unexpected
+  eof" give a message that is more detailed if possible and also more
+  helpful.  
+
+
 PLATFORMS ------------------------------------------------------------
 
 Win32
@@ -74,6 +86,8 @@ Add machines
   Cygwin (on different versions of Win32?)
 
   HP-UX variants (via HP?)
+
+  SCO
 
 NICE -----------------------------------------------------------------
 
