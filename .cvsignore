@@ -1,9 +1,13 @@
 ID
 Makefile
+autom4te.cache
+confdefs.h
 config.cache
 config.h
 config.log
 config.status
+conftest.c
+conftest.log
 gmon.out
 rsync
 shconfig
@@ -13,6 +17,3 @@ testtmp
 testtmp.*
 tls
 zlib/dummy
-confdefs.h
-conftest.c
-conftest.log
