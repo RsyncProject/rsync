@@ -1236,6 +1236,8 @@ void server_options(char **args,int *argc)
 			args[ac++] = "--files-from=-";
 			args[ac++] = "--from0";
 		}
+		if (!relative_paths)
+			args[ac++] = "--no-relative";
 	}
 
 	*argc = ac;
