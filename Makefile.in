@@ -80,7 +80,7 @@ TRIMSLASH_OBJ = trimslash.o syscall.o
 trimslash: $(TRIMSLASH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TRIMSLASH_OBJ) $(LIBS)
 
-T_UNSAFE_OBJ = t_unsafe.o syscall.o util.o t_stub.o lib/compat.o
+T_UNSAFE_OBJ = t_unsafe.o syscall.o util.o t_stub.o lib/compat.o lib/snprintf.o
 t_unsafe: $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
 
