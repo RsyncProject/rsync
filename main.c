@@ -248,29 +248,27 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	io_flush();
 
 	if ((pid=do_fork()) == 0) {
-		close(recv_pipe[1]);
-		io_close_input(f_in);
-		if (f_in != f_out) close(f_in);
-		generate_files(f_out,flist,local_name,recv_pipe[0]);
+		close(recv_pipe[0]);
+		if (f_in != f_out) close(f_out);
+
+		recv_files(f_in,flist,local_name,recv_pipe[1]);
+		if (!am_server)
+			report(f_in);
+
+		if (verbose > 3)
+			rprintf(FINFO,"do_recv waiting on %d\n",pid);
 
 		io_flush();
 		_exit(0);
 	}
 
-
-	close(recv_pipe[0]);
-	if (f_in != f_out) close(f_out);
-
-	recv_files(f_in,flist,local_name,recv_pipe[1]);
-	if (!am_server)
-		report(f_in);
-
-	if (verbose > 3)
-		rprintf(FINFO,"do_recv waiting on %d\n",pid);
+	close(recv_pipe[1]);
+	io_close_input(f_in);
+	if (f_in != f_out) close(f_in);
+	generate_files(f_out,flist,local_name,recv_pipe[0]);
 
 	io_flush();
 	waitpid(pid, &status, 0);
-
 	return status;
 }
 
