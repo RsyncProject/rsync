@@ -1074,9 +1074,13 @@ int main(int argc,char *argv[])
 		if (write_batch)
 			write_batch_argvs_file(orig_argc, orig_argv);
 
-		batch_fd = do_open(batch_name,
+		if (read_batch && strcmp(batch_name, "-") == 0)
+			batch_fd = STDIN_FILENO;
+		else {
+			batch_fd = do_open(batch_name,
 				   write_batch ? O_WRONLY | O_CREAT | O_TRUNC
 				   : O_RDONLY, S_IRUSR | S_IWUSR);
+		}
 		if (batch_fd < 0) {
 			rsyserr(FERROR, errno, "Batch file %s open error",
 				batch_name);
