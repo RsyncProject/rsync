@@ -47,8 +47,10 @@ void permstring(char *perms,
 	if (mode & S_ISGID)
 		perms[6] = (mode & S_IXGRP) ? 's' : 'S';
 	
+#ifdef S_ISVTX
 	if (mode & S_ISVTX)
 		perms[9] = (mode & S_IXOTH) ? 't' : 'T';
+#endif
 		
 	if (S_ISLNK(mode)) perms[0] = 'l';
 	if (S_ISDIR(mode)) perms[0] = 'd';
