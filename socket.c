@@ -718,7 +718,7 @@ int check_name(int fd,
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_UNSPEC;
-	hints.ai_flags = AI_CANONNAME;
+	hints.ai_flags = get_sockaddr_family(ss);
 	hints.ai_socktype = SOCK_STREAM;
 	error = getaddrinfo(name_buf, port_buf, &hints, &res0);
 	if (error) {
