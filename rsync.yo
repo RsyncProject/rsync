@@ -679,7 +679,7 @@ selection of which files to transfer and which files to skip.
 rsync builds a ordered list of include/exclude options as specified on
 the command line. When a filename is encountered, rsync checks the
 name against each exclude/include pattern in turn. The first matching
-pattern is acted on. If it is an exclude pattern than that file is
+pattern is acted on. If it is an exclude pattern, then that file is
 skipped. If it is an include pattern then that filename is not
 skipped. If no matching include/exclude pattern is found then the
 filename is not skipped.
