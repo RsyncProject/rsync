@@ -54,8 +54,8 @@ static void check_timeout(void)
 
 	t = time(NULL);
 
-	if (last_io && io_timeout && (t-last_io)>io_timeout) {
-		rprintf(FERROR,"read timeout after %d second - exiting\n", 
+	if (last_io && io_timeout && (t-last_io) >= io_timeout) {
+		rprintf(FERROR,"io timeout after %d second - exiting\n", 
 			(int)(t-last_io));
 		exit_cleanup(1);
 	}
