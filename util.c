@@ -28,10 +28,7 @@ extern int verbose;
 
 
 /****************************************************************************
-Set a fd into nonblocking mode. Uses POSIX O_NONBLOCK if available,
-else
-if SYSV use O_NDELAY
-if BSD use FNDELAY
+Set a fd into nonblocking mode
 ****************************************************************************/
 void set_nonblocking(int fd)
 {
@@ -41,6 +38,21 @@ void set_nonblocking(int fd)
 		return;
 	if (!(val & NONBLOCK_FLAG)) {
 		val |= NONBLOCK_FLAG;
+		fcntl(fd, F_SETFL, val);
+	}
+}
+
+/****************************************************************************
+Set a fd into blocking mode
+****************************************************************************/
+void set_blocking(int fd)
+{
+	int val;
+
+	if((val = fcntl(fd, F_GETFL, 0)) == -1)
+		return;
+	if (val & NONBLOCK_FLAG) {
+		val &= ~NONBLOCK_FLAG;
 		fcntl(fd, F_SETFL, val);
 	}
 }
@@ -70,7 +82,7 @@ int fd_pair(int fd[2])
 }
 
 
-/* this is taken from CVS */
+/* this is derived from CVS code */
 int piped_child(char **command,int *f_in,int *f_out)
 {
   int pid;
@@ -103,6 +115,7 @@ int piped_child(char **command,int *f_in,int *f_out)
       if (to_child_pipe[0] != STDIN_FILENO) close(to_child_pipe[0]);
       if (from_child_pipe[1] != STDOUT_FILENO) close(from_child_pipe[1]);
       umask(orig_umask);
+      set_blocking(STDIN_FILENO);
       execvp(command[0], command);
       rprintf(FERROR,"Failed to exec %s : %s\n",
 	      command[0],strerror(errno));
