@@ -910,6 +910,10 @@ bf(--copy-unsafe-links) will cause any links to be copied as the file
 they point to on the destination.  Using bf(--safe-links) will cause
 unsafe links to be ommitted altogether.
 
+Symbolic links are considered unsafe if they are absolute symlinks
+(start with bf(/)), empty, or if they contain enough bf("..")
+components to ascend from the directory being copied.
+
 manpagesection(DIAGNOSTICS)
 
 rsync occasionally produces error messages that may seem a little
