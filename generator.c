@@ -205,7 +205,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
  *
  * Generate approximately one checksum every block_len bytes.
  */
-static void generate_and_send_sums(struct map_struct *buf, size_t len, int f_out)
+static void generate_and_send_sums(struct map_struct *buf, OFF_T len, int f_out)
 {
 	size_t i;
 	struct sum_struct sum;
