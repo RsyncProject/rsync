@@ -876,11 +876,11 @@ int pop_dir(char *dir)
 	return 1;
 }
 
-/**
- * Return the filename, turning any newlines into '?'s.  This ensures that
- * outputting it on a line of its own cannot generate an empty line.  This
- * function can handle only 2 names at a time!
- **/
+/* Return the filename, turning any non-printable characters into '?'s.
+ * This ensures that outputting it on a line of its own cannot generate an
+ * empty line.  This function can return only MAX_SAFE_NAMES values at a
+ * time!  The returned value can be longer than MAXPATHLEN (because we
+ * may be trying to output an error about a too-long filename)! */
 const char *safe_fname(const char *fname)
 {
 #define MAX_SAFE_NAMES 4
