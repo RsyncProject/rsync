@@ -16,6 +16,8 @@ HOME="$scratchdir"
 CVSIGNORE='*.junk'
 export HOME CVSIGNORE
 
+set -x
+
 # Build some files/dirs/links to copy
 
 makepath "$fromdir/foo/down/to/you"

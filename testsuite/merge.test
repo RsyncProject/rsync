@@ -9,6 +9,8 @@
 
 . "$suitedir/rsync.fns"
 
+set -x
+
 # Build some files/dirs/links to copy
 
 from1dir="${fromdir}1"

@@ -21,6 +21,8 @@
 
 . "$suitedir/rsync.fns"
 
+set -x
+
 # Build some hardlinks
 
 mkdir "$fromdir"
