@@ -203,7 +203,7 @@ static void generate_hash(char *in, char *challenge, char *out)
 
    otherwise return username
 */
-char *auth_server(int fd, int module, char *addr, char *leader)
+char *auth_server(int f_in, int f_out, int module, char *addr, char *leader)
 {
 	char *users = lp_auth_users(module);
 	char challenge[16];
@@ -222,9 +222,9 @@ char *auth_server(int fd, int module, char *addr, char *leader)
 	
 	base64_encode(challenge, 16, b64_challenge);
 
-	io_printf(fd,"%s%s\n", leader, b64_challenge);
+	io_printf(f_out, "%s%s\n", leader, b64_challenge);
 
-	if (!read_line(fd, line, sizeof(line)-1)) {
+	if (!read_line(f_in, line, sizeof(line)-1)) {
 		return NULL;
 	}
 
