@@ -131,7 +131,10 @@ itemize(
   it() %u for the authenticated username (or the null string)
 )
 
-The default log format is "%o %h [%a] %f %l"
+The default log format is "%o %h [%a] %m (%u) %f %l"
+
+A perl script called rsyncstats to summarise this format is included
+in the rsync source code distribution.
 
 dit(bf(socket options)) This option can provide endless fun for people
 who like to tune their systems to the utmost degree. You can set all
