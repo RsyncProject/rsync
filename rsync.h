@@ -435,18 +435,10 @@ struct file_struct {
 #define FLIST_START	(32 * 1024)
 #define FLIST_LINEAR	(FLIST_START * 512)
 
-struct string_area {
-	char *base;
-	char *end;
-	char *current;
-	struct string_area *next;
-};
-
 struct file_list {
 	int count;
 	int malloced;
 	struct file_struct **files;
-	struct string_area *string_area;
 };
 
 struct sum_buf {
