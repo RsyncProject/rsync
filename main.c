@@ -23,19 +23,18 @@
 
 time_t starttime = 0;
 
-extern struct stats stats;
+extern int verbose;
+extern int dry_run;
+extern int list_only;
 extern int am_root;
 extern int am_server;
 extern int am_sender;
 extern int am_generator;
 extern int am_daemon;
-extern int verbose;
 extern int blocking_io;
 extern int delete_before;
 extern int daemon_over_rsh;
 extern int do_stats;
-extern int dry_run;
-extern int list_only;
 extern int log_got_error;
 extern int module_id;
 extern int orig_umask;
@@ -54,6 +53,7 @@ extern int batch_fd;
 extern int batch_gen_fd;
 extern int filesfrom_fd;
 extern pid_t cleanup_child_pid;
+extern struct stats stats;
 extern char *files_from;
 extern char *remote_filesfrom_file;
 extern char *partial_dir;
