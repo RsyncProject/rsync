@@ -21,10 +21,6 @@
 /** @file flist.c
  * Generate and receive file lists
  *
- * @todo Get rid of the string_area optimization.  Efficiently
- * allocating blocks is the responsibility of the system's malloc
- * library, not of rsync.
- *
  * @sa http://lists.samba.org/pipermail/rsync/2000-June/002351.html
  *
  **/
@@ -72,7 +68,6 @@ extern struct exclude_struct **local_exclude_list;
 
 int io_error;
 
-static struct file_struct null_file;
 static char empty_sum[MD4_SUM_LENGTH];
 
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
@@ -120,60 +115,6 @@ void show_flist_stats(void)
 	/* Nothing yet */
 }
 
-
-static struct string_area *string_area_new(int size)
-{
-	struct string_area *a;
-
-	if (size <= 0)
-		size = ARENA_SIZE;
-	a = new(struct string_area);
-	if (!a)
-		out_of_memory("string_area_new");
-	a->current = a->base = new_array(char, size);
-	if (!a->current)
-		out_of_memory("string_area_new buffer");
-	a->end = a->base + size;
-	a->next = NULL;
-
-	return a;
-}
-
-static void string_area_free(struct string_area *a)
-{
-	struct string_area *next;
-
-	for (; a; a = next) {
-		next = a->next;
-		free(a->base);
-	}
-}
-
-static char *string_area_malloc(struct string_area **ap, int size)
-{
-	char *p;
-	struct string_area *a;
-
-	/* does the request fit into the current space? */
-	a = *ap;
-	if (a->current + size >= a->end) {
-		/* no; get space, move new string_area to front of the list */
-		a = string_area_new(size > ARENA_SIZE ? size : ARENA_SIZE);
-		a->next = *ap;
-		*ap = a;
-	}
-
-	/* have space; do the "allocation." */
-	p = a->current;
-	a->current += size;
-	return p;
-}
-
-static char *string_area_strdup(struct string_area **ap, const char *src)
-{
-	char *dest = string_area_malloc(ap, strlen(src) + 1);
-	return strcpy(dest, src);
-}
 
 static void list_file_entry(struct file_struct *f)
 {
@@ -427,6 +368,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 		flags |= XMIT_SAME_TIME;
 	else
 		modtime = file->modtime;
+
 #if SUPPORT_HARD_LINKS
 	if (file->link_u.idev) {
 		if (file->F_DEV == dev) {
@@ -551,10 +493,13 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 	static DEV64_T dev;
 	static uid_t uid;
 	static gid_t gid;
-	static char lastname[MAXPATHLEN];
+	static char lastname[MAXPATHLEN], *lastdir;
+	static int lastdir_len = -1;
 	char thisname[MAXPATHLEN];
 	unsigned int l1 = 0, l2 = 0;
-	char *p;
+	int alloc_len, basename_len, dirname_len, linkname_len, sum_len, idev_len;
+	OFF_T file_length;
+	char *basename, *dirname, *bp;
 	struct file_struct *file;
 
 	if (!fptr) {
@@ -572,12 +517,6 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 		l2 = read_int(f);
 	else
 		l2 = read_byte(f);
-
-	file = new(struct file_struct);
-	if (!file)
-		out_of_memory("receive_file_entry");
-	memset((char *) file, 0, sizeof(*file));
-	(*fptr) = file;
 
 	if (l2 >= MAXPATHLEN - l1) {
 		rprintf(FERROR,
@@ -597,49 +536,37 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 	if (sanitize_paths)
 		sanitize_path(thisname, NULL);
 
-	if ((p = strrchr(thisname, '/'))) {
-		static char *lastdir;
-		*p = 0;
-		if (lastdir && strcmp(thisname, lastdir) == 0)
-			file->dirname = lastdir;
-		else {
-			file->dirname = strdup(thisname);
-			lastdir = file->dirname;
-		}
-		file->basename = strdup(p + 1);
+	if ((basename = strrchr(thisname, '/')) != NULL) {
+		dirname_len = ++basename - thisname; /* counts future '\0' */
+		if (lastdir_len == dirname_len - 1
+		    && strncmp(thisname, lastdir, lastdir_len) == 0) {
+			dirname = lastdir;
+			dirname_len = 0; /* indicates no copy is needed */
+		} else
+			dirname = thisname;
 	} else {
-		file->dirname = NULL;
-		file->basename = strdup(thisname);
+		basename = thisname;
+		dirname = NULL;
+		dirname_len = 0;
 	}
+	basename_len = strlen(basename) + 1; /* count the '\0' */
 
-	if (!file->basename)
-		out_of_memory("receive_file_entry 1");
-
-	file->flags = flags & XMIT_TOP_DIR ? FLAG_TOP_DIR : 0;
-	file->length = read_longint(f);
+	file_length = read_longint(f);
 	if (!(flags & XMIT_SAME_TIME))
 		modtime = (time_t)read_int(f);
-	file->modtime = modtime;
 	if (!(flags & XMIT_SAME_MODE))
 		mode = from_wire_mode(read_int(f));
-	file->mode = mode;
 
-	if (preserve_uid) {
-		if (!(flags & XMIT_SAME_UID))
-			uid = (uid_t)read_int(f);
-		file->uid = uid;
-	}
-	if (preserve_gid) {
-		if (!(flags & XMIT_SAME_GID))
-			gid = (gid_t)read_int(f);
-		file->gid = gid;
-	}
+	if (preserve_uid && !(flags & XMIT_SAME_UID))
+		uid = (uid_t)read_int(f);
+	if (preserve_gid && !(flags & XMIT_SAME_GID))
+		gid = (gid_t)read_int(f);
+
 	if (preserve_devices) {
 		if (protocol_version < 28) {
 			if (IS_DEVICE(mode)) {
 				if (!(flags & XMIT_SAME_RDEV_pre28))
 					rdev = (DEV64_T)read_int(f);
-				file->u.rdev = rdev;
 			} else
 				rdev = 0;
 		} else if (IS_DEVICE(mode)) {
@@ -648,31 +575,78 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 				rdev_high = rdev & ~0xFF;
 			} else
 				rdev = rdev_high | (DEV64_T)read_byte(f);
-			file->u.rdev = rdev;
 		}
 	}
 
 #if SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(mode)) {
-		int len = read_int(f);
-		if (len < 0 || len >= MAXPATHLEN) {
-			rprintf(FERROR, "overflow: len=%d\n", len);
+		linkname_len = read_int(f) + 1; /* count the '\0' */
+		if (linkname_len <= 0 || linkname_len > MAXPATHLEN) {
+			rprintf(FERROR, "overflow: linkname_len=%d\n",
+				linkname_len - 1);
 			overflow("receive_file_entry");
 		}
-		if (!(file->u.link = new_array(char, len + 1)))
-			out_of_memory("receive_file_entry 2");
-		read_sbuf(f, file->u.link, len);
-		if (sanitize_paths)
-			sanitize_path(file->u.link, file->dirname);
 	}
+	else
 #endif
+		linkname_len = 0;
 
 #if SUPPORT_HARD_LINKS
 	if (preserve_hard_links && protocol_version < 28 && S_ISREG(mode))
 		flags |= XMIT_HAS_IDEV_DATA;
-	if (flags & XMIT_HAS_IDEV_DATA) {
-		if (!(file->link_u.idev = new(struct idev)))
-			out_of_memory("file inode data");
+	if (flags & XMIT_HAS_IDEV_DATA)
+		idev_len = sizeof (struct idev);
+	else
+#endif
+		idev_len = 0;
+
+	sum_len = always_checksum && S_ISREG(mode) ? MD4_SUM_LENGTH : 0;
+
+	alloc_len = sizeof file[0] + dirname_len + basename_len
+		  + linkname_len + sum_len + idev_len;
+	if (!(bp = new_array(char, alloc_len)))
+		out_of_memory("receive_file_entry");
+	file = *fptr = (struct file_struct *)bp;
+	memset(bp, 0, sizeof file[0]);
+	bp += sizeof file[0];
+
+	file->flags = flags & XMIT_TOP_DIR ? FLAG_TOP_DIR : 0;
+	file->modtime = modtime;
+	file->length = file_length;
+	file->mode = mode;
+	file->uid = uid;
+	file->gid = gid;
+
+	if (dirname_len) {
+		file->dirname = lastdir = bp;
+		lastdir_len = dirname_len - 1;
+		memcpy(bp, dirname, dirname_len - 1);
+		bp += dirname_len;
+		bp[-1] = '\0';
+	} else if (dirname)
+		file->dirname = dirname;
+
+	file->basename = bp;
+	memcpy(bp, basename, basename_len);
+	bp += basename_len;
+
+	if (preserve_devices && IS_DEVICE(mode))
+		file->u.rdev = rdev;
+
+#if SUPPORT_LINKS
+	if (linkname_len) {
+		file->u.link = bp;
+		read_sbuf(f, bp, linkname_len - 1);
+		if (sanitize_paths)
+			sanitize_path(bp, lastdir);
+		bp += linkname_len;
+	}
+#endif
+
+#if SUPPORT_HARD_LINKS
+	if (idev_len) {
+		file->link_u.idev = (struct idev *)bp;
+		bp += idev_len;
 		if (protocol_version < 26) {
 			dev = read_int(f);
 			file->F_INODE = read_int(f);
@@ -687,10 +661,9 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 
 	if (always_checksum) {
 		char *sum;
-		if (S_ISREG(mode)) {
-			sum = file->u.sum = new_array(char, MD4_SUM_LENGTH);
-			if (!sum)
-				out_of_memory("md4 sum");
+		if (sum_len) {
+			file->u.sum = sum = bp;
+			/*bp += sum_len;*/
 		} else if (protocol_version < 28) {
 			/* Prior to 28, we get a useless set of nulls. */
 			sum = empty_sum;
@@ -711,10 +684,6 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 }
 
 
-#define STRDUP(ap, p)	(ap ? string_area_strdup(ap, p) : strdup(p))
-/* IRIX cc cares that the operands to the ternary have the same type. */
-#define MALLOC(ap, i)	(ap ? (void*) string_area_malloc(ap, i) : malloc(i))
-
 /**
  * Create a file_struct for a named file by reading its stat()
  * information and performing extensive checks against global
@@ -730,15 +699,17 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
  * statting directories if we're not recursing, but this is not a very
  * important case.  Some systems may not have d_type.
  **/
-struct file_struct *make_file(char *fname, struct string_area **ap,
-			      int exclude_level)
+struct file_struct *make_file(char *fname, int exclude_level)
 {
+	static char *lastdir;
+	static int lastdir_len = -1;
 	struct file_struct *file;
 	STRUCT_STAT st;
 	char sum[SUM_LENGTH];
-	char *p;
 	char thisname[MAXPATHLEN];
 	char linkname[MAXPATHLEN];
+	int alloc_len, basename_len, dirname_len, linkname_len, sum_len, idev_len;
+	char *basename, *dirname, *bp;
 	unsigned short flags = 0;
 
 	if (strlcpy(thisname, fname, sizeof thisname)
@@ -799,33 +770,65 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 			who_am_i(), thisname, exclude_level);
 	}
 
-	file = new(struct file_struct);
-	if (!file)
-		out_of_memory("make_file");
-	memset((char *) file, 0, sizeof(*file));
-	file->flags = flags;
-
-	if ((p = strrchr(thisname, '/'))) {
-		static char *lastdir;
-		*p = 0;
-		if (lastdir && strcmp(thisname, lastdir) == 0)
-			file->dirname = lastdir;
-		else {
-			file->dirname = strdup(thisname);
-			lastdir = file->dirname;
-		}
-		file->basename = STRDUP(ap, p + 1);
-		*p = '/';
+	if ((basename = strrchr(thisname, '/')) != NULL) {
+		dirname_len = ++basename - thisname; /* counts future '\0' */
+		if (lastdir_len == dirname_len - 1
+		    && strncmp(thisname, lastdir, lastdir_len) == 0) {
+			dirname = lastdir;
+			dirname_len = 0; /* indicates no copy is needed */
+		} else
+			dirname = thisname;
 	} else {
-		file->dirname = NULL;
-		file->basename = STRDUP(ap, thisname);
+		basename = thisname;
+		dirname = NULL;
+		dirname_len = 0;
 	}
+	basename_len = strlen(basename) + 1; /* count the '\0' */
 
+#if SUPPORT_LINKS
+	linkname_len = S_ISLNK(st.st_mode) ? strlen(linkname) + 1 : 0;
+#else
+	linkname_len = 0;
+#endif
+
+#if SUPPORT_HARD_LINKS
+	if (preserve_hard_links) {
+		idev_len = (protocol_version < 28 ? S_ISREG(st.st_mode)
+			  : !S_ISDIR(st.st_mode) && st.st_nlink > 1)
+			 ? sizeof (struct idev) : 0;
+	} else
+#endif
+		idev_len = 0;
+
+	sum_len = always_checksum && S_ISREG(st.st_mode) ? MD4_SUM_LENGTH : 0;
+
+	alloc_len = sizeof file[0] + dirname_len + basename_len
+		  + linkname_len + sum_len + idev_len;
+	if (!(bp = new_array(char, alloc_len)))
+		out_of_memory("receive_file_entry");
+	file = (struct file_struct *)bp;
+	memset(bp, 0, sizeof file[0]);
+	bp += sizeof file[0];
+
+	file->flags = flags;
 	file->modtime = st.st_mtime;
 	file->length = st.st_size;
 	file->mode = st.st_mode;
 	file->uid = st.st_uid;
 	file->gid = st.st_gid;
+
+	if (dirname_len) {
+		file->dirname = lastdir = bp;
+		lastdir_len = dirname_len - 1;
+		memcpy(bp, dirname, dirname_len - 1);
+		bp += dirname_len;
+		bp[-1] = '\0';
+	} else if (dirname)
+		file->dirname = dirname;
+
+	file->basename = bp;
+	memcpy(bp, basename, basename_len);
+	bp += basename_len;
 
 #ifdef HAVE_STRUCT_STAT_ST_RDEV
 	if (preserve_devices && IS_DEVICE(st.st_mode))
@@ -833,26 +836,26 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 #endif
 
 #if SUPPORT_LINKS
-	if (S_ISLNK(st.st_mode))
-		file->u.link = STRDUP(ap, linkname);
-#endif
-
-#if SUPPORT_HARD_LINKS
-	if (preserve_hard_links) {
-		if (protocol_version < 28 ? S_ISREG(st.st_mode)
-		    : !S_ISDIR(st.st_mode) && st.st_nlink > 1) {
-			if (!(file->link_u.idev = new(struct idev)))
-				out_of_memory("file inode data");
-			file->F_DEV = st.st_dev;
-			file->F_INODE = st.st_ino;
-		}
+	if (linkname_len) {
+		file->u.link = bp;
+		memcpy(bp, linkname, linkname_len);
+		bp += linkname_len;
 	}
 #endif
 
-	if (always_checksum && S_ISREG(st.st_mode)) {
-		if (!(file->u.sum = (char*)MALLOC(ap, MD4_SUM_LENGTH)))
-			out_of_memory("md4 sum");
-		file_checksum(thisname, file->u.sum, st.st_size);
+#if SUPPORT_HARD_LINKS
+	if (idev_len) {
+		file->link_u.idev = (struct idev *)bp;
+		bp += idev_len;
+		file->F_DEV = st.st_dev;
+		file->F_INODE = st.st_ino;
+	}
+#endif
+
+	if (sum_len) {
+		file->u.sum = bp;
+		file_checksum(thisname, bp, st.st_size);
+		/*bp += sum_len;*/
 	}
 
 	file->basedir = flist_dir;
@@ -872,7 +875,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 	extern int delete_excluded;
 
 	/* f is set to -1 when calculating deletion file list */
-	file = make_file(fname, &flist->string_area,
+	file = make_file(fname,
 			 f == -1 && delete_excluded? SERVER_EXCLUDES
 						   : ALL_EXCLUDES);
 
@@ -1300,21 +1303,15 @@ int flist_find(struct file_list *flist, struct file_struct *f)
 
 
 /*
- * free up one file
+ * Free up any resources a file_struct has allocated, and optionally free
+ * it up as well.
  */
-void free_file(struct file_struct *file)
+void free_file(struct file_struct *file, int free_the_struct)
 {
-	if (!file)
-		return;
-	if (file->basename)
-		free(file->basename);
-	if (!IS_DEVICE(file->mode) && file->u.sum)
-		free(file->u.sum); /* Handles u.link too. */
-#if SUPPORT_HARD_LINKS
-	if (file->link_u.idev)
-		free((char*)file->link_u.idev); /* Handles link_u.links too. */
-#endif
-	*file = null_file;
+	if (free_the_struct)
+		free(file);
+	else
+		memset(file, 0, sizeof file[0]);
 }
 
 
@@ -1333,11 +1330,6 @@ struct file_list *flist_new(void)
 	flist->malloced = 0;
 	flist->files = NULL;
 
-#if ARENA_SIZE > 0
-	flist->string_area = string_area_new(0);
-#else
-	flist->string_area = NULL;
-#endif
 	return flist;
 }
 
@@ -1347,21 +1339,9 @@ struct file_list *flist_new(void)
 void flist_free(struct file_list *flist)
 {
 	int i;
-	for (i = 1; i < flist->count; i++) {
-		if (!flist->string_area)
-			free_file(flist->files[i]);
-		free(flist->files[i]);
-	}
-	/* FIXME: I don't think we generally need to blank the flist
-	 * since it's about to be freed.  This will just cause more
-	 * memory traffic.  If you want a freed-memory debugger, you
-	 * know where to get it. */
-	memset((char *) flist->files, 0,
-	       sizeof(flist->files[0]) * flist->count);
+	for (i = 1; i < flist->count; i++)
+		free_file(flist->files[i], FREE_STRUCT);
 	free(flist->files);
-	if (flist->string_area)
-		string_area_free(flist->string_area);
-	memset((char *) flist, 0, sizeof(*flist));
 	free(flist);
 }
 
@@ -1400,14 +1380,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			 * else deletions will mysteriously fail with -R). */
 			if (flist->files[i]->flags & FLAG_TOP_DIR)
 				flist->files[prev_i]->flags |= FLAG_TOP_DIR;
-			/* it's not great that the flist knows the semantics of
-			 * the file memory usage, but i'd rather not add a flag
-			 * byte to that struct.
-			 * XXX can i use a bit in the flags field? */
-			if (flist->string_area)
-				flist->files[i][0] = null_file;
-			else
-				free_file(flist->files[i]);
+			free_file(flist->files[i], CLEAR_STRUCT);
 		} else
 			prev_i = i;
 	}
