@@ -76,7 +76,7 @@ void delete_files(struct file_list *flist)
 {
 	struct file_list *local_file_list;
 	int i, j;
-	char *name, fbuf[MAXPATHLEN];
+	char *argv[1], fbuf[MAXPATHLEN];
 	extern int module_id;
 	extern int ignore_errors;
 	extern int max_delete;
@@ -94,13 +94,13 @@ void delete_files(struct file_list *flist)
 		if (!S_ISDIR(flist->files[j]->mode) ||
 		    !(flist->files[j]->flags & FLAG_DELETE)) continue;
 
-		name = f_name_to(flist->files[j], fbuf);
+		argv[0] = f_name_to(flist->files[j], fbuf);
 
-		if (!(local_file_list = send_file_list(-1,1,&name)))
+		if (!(local_file_list = send_file_list(-1, 1, argv)))
 			continue;
 
 		if (verbose > 1)
-			rprintf(FINFO,"deleting in %s\n", name);
+			rprintf(FINFO,"deleting in %s\n", fbuf);
 
 		for (i = local_file_list->count-1; i >= 0; i--) {
 			if (max_delete && deletion_count > max_delete) break;
@@ -151,6 +151,7 @@ static int get_tmpname(char *fnametmp, char *fname)
 	int	maxname;
 
 	if (tmpdir) {
+		/* Note: this can't overflow, so the return value is safe */
 		length = strlcpy(fnametmp, tmpdir, MAXPATHLEN - 2);
 		fnametmp[length++] = '/';
 		fnametmp[length] = '\0';	/* always NULL terminated */
