@@ -148,6 +148,10 @@ static void report(int f)
 			write_longint(f, total_read);
 			write_longint(f, total_written);
 			write_longint(f, stats.total_size);
+			if (protocol_version >= 29) {
+				write_longint(f, stats.flist_buildtime);
+				write_longint(f, stats.flist_xfertime);
+			}
 		}
 		return;
 	}
@@ -160,12 +164,20 @@ static void report(int f)
 		total_written = read_longint(f);
 		total_read = read_longint(f);
 		stats.total_size = read_longint(f);
+		if (protocol_version >= 29) {
+			stats.flist_buildtime = read_longint(f);
+			stats.flist_xfertime = read_longint(f);
+		}
 	} else if (write_batch) {
 		/* The --read-batch process is going to be a client
 		 * receiver, so we need to give it the stats. */
 		write_longint(batch_fd, total_read);
 		write_longint(batch_fd, total_written);
 		write_longint(batch_fd, stats.total_size);
+		if (protocol_version >= 29) {
+			write_longint(batch_fd, stats.flist_buildtime);
+			write_longint(batch_fd, stats.flist_xfertime);
+		}
 	}
 
 	if (do_stats) {
@@ -181,6 +193,14 @@ static void report(int f)
 		rprintf(FINFO,"Matched data: %.0f bytes\n",
 			(double)stats.matched_data);
 		rprintf(FINFO,"File list size: %d\n", stats.flist_size);
+		if (stats.flist_buildtime) {
+			rprintf(FINFO,
+				"File list generation time: %.3f seconds\n",
+				(double)stats.flist_buildtime / 1000);
+			rprintf(FINFO,
+				"File list transfer time: %.3f seconds\n",
+				(double)stats.flist_xfertime / 1000);
+		}
 		rprintf(FINFO,"Total bytes sent: %.0f\n",
 			(double)total_written);
 		rprintf(FINFO,"Total bytes received: %.0f\n",
