@@ -406,7 +406,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
     return;
   }
 
-  if (update_only && st.st_mtime >= file->modtime) {
+  if (update_only && st.st_mtime > file->modtime) {
     if (verbose > 1)
       fprintf(FERROR,"%s is newer\n",fname);
     return;
