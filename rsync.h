@@ -79,6 +79,13 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #define RSYNC_RSH "rsh"
 #endif
 
+/* This tries to turn on large file support on some Unix platforms,
+ * making off_t be a 64-bit type, and so on.
+ * 
+ * http://www.rs6000.ibm.com/doc_link/en_US/a_doc_lib/aixprggd/genprogc/prg_lrg_files.htm
+ */
+#define _LARGE_FILES 1
+
 #include <sys/types.h>
 
 #ifdef HAVE_UNISTD_H
