@@ -214,6 +214,11 @@ static void print_rsync_version(enum logcode f)
 #if SIZEOF_INT64 < 8
 	rprintf(f, "WARNING: no 64-bit integers on this platform!\n");
 #endif
+	if (sizeof (int64) != SIZEOF_INT64) {
+		rprintf(f,
+			"WARNING: size mismatch in SIZEOF_INT64 define (%d != %d)\n",
+			(int) SIZEOF_INT64, (int) sizeof (int64));
+	}
 
 	rprintf(f,
 "\n"
