@@ -27,12 +27,14 @@
   */
 #include "rsync.h"
 
+extern int dry_run;
 extern int am_daemon;
 extern int am_server;
 extern int am_sender;
 extern int quiet;
 extern int module_id;
 extern int msg_fd_out;
+extern int preserve_times;
 extern char *auth_user;
 extern char *log_format;
 
@@ -239,7 +241,7 @@ void rprintf(enum logcode code, const char *format, ...)
 	size_t len;
 
 	va_start(ap, format);
-	len = vsnprintf(buf, sizeof(buf), format, ap);
+	len = vsnprintf(buf, sizeof buf, format, ap);
 	va_end(ap);
 
 	/* Deal with buffer overruns.  Instead of panicking, just
@@ -249,20 +251,20 @@ void rprintf(enum logcode code, const char *format, ...)
 		const char ellipsis[] = "[...]";
 
 		/* Reset length, and zero-terminate the end of our buffer */
-		len = sizeof(buf)-1;
+		len = sizeof buf - 1;
 		buf[len] = '\0';
 
 		/* Copy the ellipsis to the end of the string, but give
 		 * us one extra character:
 		 *
-		 *                  v--- null byte at buf[sizeof(buf)-1]
+		 *                  v--- null byte at buf[sizeof buf - 1]
 		 *        abcdefghij0
 		 *     -> abcd[...]00  <-- now two null bytes at end
 		 *
 		 * If the input format string has a trailing newline,
 		 * we copy it into that extra null; if it doesn't, well,
 		 * all we lose is one byte.  */
-		strncpy(buf+len-sizeof(ellipsis), ellipsis, sizeof(ellipsis));
+		strncpy(buf+len-sizeof ellipsis, ellipsis, sizeof ellipsis);
 		if (format[strlen(format)-1] == '\n') {
 			buf[len-1] = '\n';
 		}
@@ -338,37 +340,32 @@ void rflush(enum logcode code)
  * substitiution */
 static void log_formatted(enum logcode code,
 			  char *format, char *op, struct file_struct *file,
-			  struct stats *initial_stats)
+			  struct stats *initial_stats, int iflags)
 {
-	char buf[1024];
+	char buf[MAXPATHLEN+1024];
 	char buf2[1024];
-	char *p, *s, *n;
-	size_t l;
+	char *p, *n;
+	size_t len, total;
 	int64 b;
 
 	/* We expand % codes one by one in place in buf.  We don't
 	 * copy in the terminating nul of the inserted strings, but
-	 * rather keep going until we reach the nul of the format.
-	 * Just to make sure we don't clobber that nul and therefore
-	 * accidentally keep going, we zero the buffer now. */
-	l = strlcpy(buf, format, sizeof buf);
-	if (l < sizeof buf)
-		memset(buf + l, 0, sizeof buf - l);
+	 * rather keep going until we reach the nul of the format. */
+	total = strlcpy(buf, format, sizeof buf);
 	
-	for (s = &buf[0]; s && (p = strchr(s,'%')); ) {
+	for (p = buf; (p = strchr(p, '%')) != NULL && p[1]; ) {
 		n = NULL;
-		s = p + 1;
 
 		switch (p[1]) {
 		case 'h': if (am_daemon) n = client_name(0); break;
 		case 'a': if (am_daemon) n = client_addr(0); break;
 		case 'l':
-			snprintf(buf2,sizeof(buf2),"%.0f",
+			snprintf(buf2, sizeof buf2, "%.0f",
 				 (double)file->length);
 			n = buf2;
 			break;
 		case 'p':
-			snprintf(buf2,sizeof(buf2),"%d",
+			snprintf(buf2, sizeof buf2, "%d",
 				 (int)getpid());
 			n = buf2;
 			break;
@@ -380,6 +377,17 @@ static void log_formatted(enum logcode code,
 			clean_fname(buf2, 0);
 			n = buf2;
 			if (*n == '/') n++;
+			break;
+		case 'n':
+			n = (char*)safe_fname(f_name(file));
+			break;
+		case 'L':
+			if (S_ISLNK(file->mode)) {
+				snprintf(buf2, sizeof buf2, " -> %s",
+					 safe_fname(file->u.link));
+				n = buf2;
+			} else
+				n = "";
 			break;
 		case 'm': n = lp_name(module_id); break;
 		case 't': n = timestring(time(NULL)); break;
@@ -393,7 +401,7 @@ static void log_formatted(enum logcode code,
 				b = stats.total_read -
 					initial_stats->total_read;
 			}
-			snprintf(buf2,sizeof(buf2),"%.0f", (double)b);
+			snprintf(buf2, sizeof buf2, "%.0f", (double)b);
 			n = buf2;
 			break;
 		case 'c':
@@ -404,20 +412,45 @@ static void log_formatted(enum logcode code,
 				b = stats.total_read -
 					initial_stats->total_read;
 			}
-			snprintf(buf2,sizeof(buf2),"%.0f", (double)b);
+			snprintf(buf2, sizeof buf2, "%.0f", (double)b);
 			n = buf2;
+			break;
+		case 'i':
+			n = buf2;
+			n[0] = !(iflags & ITEM_UPDATING) ? ' ' : dry_run
+			     ? '*' : *op == 's' ? '>' : '<';
+			n[1] = S_ISDIR(file->mode) ? 'd' : IS_DEVICE(file->mode) ? 'D'
+			     : S_ISLNK(file->mode) ? 'L' : 'f';
+			n[2] = !(iflags & ITEM_REPORT_CHECKSUM) ? '-' : 'c';
+			n[3] = !(iflags & ITEM_REPORT_SIZE) ? '-' : 's';
+			n[4] = !(iflags & ITEM_REPORT_TIME) ? '-'
+			     : !preserve_times || IS_DEVICE(file->mode)
+					       || S_ISLNK(file->mode) ? 'T' : 't';
+			n[5] = !(iflags & ITEM_REPORT_PERMS) ? '-' : 'p';
+			n[6] = !(iflags & ITEM_REPORT_OWNER) ? '-' : 'o';
+			n[7] = !(iflags & ITEM_REPORT_GROUP) ? '-' : 'g';
+			n[8] = '\0';
+
+			if (iflags & (ITEM_IS_NEW|ITEM_MISSING_DATA)) {
+				char ch = iflags & ITEM_IS_NEW ? '+' : '?';
+				int i;
+				for (i = 2; n[i]; i++)
+					n[i] = ch;
+			}
 			break;
 		}
 
 		/* n is the string to be inserted in place of this %
-		 * code; l is its length not including the trailing
+		 * code; len is its length not including the trailing
 		 * NUL */
-		if (!n)
+		if (!n) {
+			p += 2;
 			continue;
+		}
 
-		l = strlen(n);
+		len = strlen(n);
 
-		if (l + ((int)(s - &buf[0])) >= sizeof(buf)) {
+		if (len + total - 2 >= sizeof buf) {
 			rprintf(FERROR,
 				"buffer overflow expanding %%%c -- exiting\n",
 				p[0]);
@@ -425,38 +458,42 @@ static void log_formatted(enum logcode code,
 		}
 
 		/* Shuffle the rest of the string along to make space for n */
-		if (l != 2) {
-			memmove(s+(l-1), s+1, strlen(s+1)+1);
-		}
+		if (len != 2)
+			memmove(p + len, p + 2, total - (p + 2 - buf) + 1);
+		total += len - 2;
 
-		/* Copy in n but NOT its nul, because the format string
-		 * probably continues after this. */
-		memcpy(p, n, l);
+		/* Insert the contents of string "n", but NOT its nul. */
+		if (len)
+			memcpy(p, n, len);
 
 		/* Skip over inserted string; continue looking */
-		s = p+l;
+		p += len;
 	}
 
-	rprintf(code,"%s\n", buf);
+	rprintf(code, "%s\n", buf);
 }
 
 /* log the outgoing transfer of a file */
-void log_send(struct file_struct *file, struct stats *initial_stats)
+void log_send(struct file_struct *file, struct stats *initial_stats, int iflags)
 {
 	if (lp_transfer_logging(module_id)) {
-		log_formatted(FLOG, lp_log_format(module_id), "send", file, initial_stats);
+		log_formatted(FLOG, lp_log_format(module_id), "send",
+			      file, initial_stats, iflags);
 	} else if (log_format && !am_server) {
-		log_formatted(FINFO, log_format, "send", file, initial_stats);
+		log_formatted(FINFO, log_format, "send",
+			      file, initial_stats, iflags);
 	}
 }
 
 /* log the incoming transfer of a file */
-void log_recv(struct file_struct *file, struct stats *initial_stats)
+void log_recv(struct file_struct *file, struct stats *initial_stats, int iflags)
 {
 	if (lp_transfer_logging(module_id)) {
-		log_formatted(FLOG, lp_log_format(module_id), "recv", file, initial_stats);
+		log_formatted(FLOG, lp_log_format(module_id), "recv",
+			      file, initial_stats, iflags);
 	} else if (log_format && !am_server) {
-		log_formatted(FINFO, log_format, "recv", file, initial_stats);
+		log_formatted(FINFO, log_format, "recv",
+			      file, initial_stats, iflags);
 	}
 }
 
