@@ -402,7 +402,7 @@ bf(--itemize-changes) option in the rsync manpage.
 
 Note that some of the logged output changes when talking with older
 rsync versions.  For instance, deleted files were only logged as verbose
-messages prior to protocol 29.
+messages prior to rsync 2.6.4.
 
 dit(bf(timeout)) The "timeout" option allows you to override the
 clients choice for I/O timeout for this module. Using this option you
