@@ -108,7 +108,7 @@ void usage(int F)
   rprintf(F," -r, --recursive             recurse into directories\n");
   rprintf(F," -R, --relative              use relative path names\n");
   rprintf(F," -b, --backup                make backups (default %s suffix)\n",BACKUP_SUFFIX);
-  rprintf(F,"     --backup-dir            make backups into this directory");
+  rprintf(F,"     --backup-dir            make backups into this directory\n");
   rprintf(F,"     --suffix=SUFFIX         override backup suffix\n");  
   rprintf(F," -u, --update                update only (don't overwrite newer files)\n");
   rprintf(F," -l, --links                 preserve soft links\n");
@@ -460,10 +460,8 @@ int parse_arguments(int argc, char *argv[], int frommain)
 			preserve_perms=1;
 			preserve_times=1;
 			preserve_gid=1;
-			if (am_root) {
-				preserve_devices=1;
-				preserve_uid=1;
-			}
+			preserve_uid=1;
+			preserve_devices=1;
 			break;
 
 		case OPT_SERVER:
