@@ -557,11 +557,12 @@ static int start_client(int argc, char *argv[])
 	extern int am_sender;
 	extern char *shell_cmd;
 	extern int rsync_port;
+	char *argv0 = strdup(argv[0]);
 
-	if (strncasecmp(URL_PREFIX, argv[0], strlen(URL_PREFIX)) == 0) {
+	if (strncasecmp(URL_PREFIX, argv0, strlen(URL_PREFIX)) == 0) {
 		char *host, *path;
 
-		host = argv[0] + strlen(URL_PREFIX);
+		host = argv0 + strlen(URL_PREFIX);
 		p = strchr(host,'/');
 		if (p) {
 			*p = 0;
@@ -577,12 +578,12 @@ static int start_client(int argc, char *argv[])
 		return start_socket_client(host, path, argc-1, argv+1);
 	}
 
-	p = find_colon(argv[0]);
+	p = find_colon(argv0);
 
 	if (p) {
 		if (p[1] == ':') {
 			*p = 0;
-			return start_socket_client(argv[0], p+2, argc-1, argv+1);
+			return start_socket_client(argv0, p+2, argc-1, argv+1);
 		}
 
 		if (argc < 1) {
