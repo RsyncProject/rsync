@@ -80,6 +80,9 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	if (!user) user = getenv("LOGNAME");
 
 	if (verbose >= 2) {
+		/* FIXME: If we're going to use a socket program for
+		 * testing, then this message is wrong.  We need to
+		 * say something like "(except really using %s)" */
 		rprintf(FINFO, "opening tcp connection to %s port %d\n",
 			host, rsync_port);
 	}
