@@ -47,7 +47,7 @@ extern int protocol_version;
 extern int always_checksum;
 extern char *partial_dir;
 extern char *basis_dir[];
-extern int copy_dest;
+extern int compare_dest;
 extern int link_dest;
 extern int whole_file;
 extern int local_server;
@@ -467,13 +467,13 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 							safe_fname(fname));
 					}
 					fnamecmp = fnamecmpbuf;
-					fnamecmp_type = FNAMECMP_BASIS_DIR + i;
+					fnamecmp_type = i;
 				}
 			} else
 #endif
 			{
 				fnamecmp = fnamecmpbuf;
-				fnamecmp_type = FNAMECMP_BASIS_DIR + i;
+				fnamecmp_type = i;
 			}
 		}
 	}
@@ -519,7 +519,7 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		return;
 	}
 
-	if ((link_dest || copy_dest) && fnamecmp_type != FNAMECMP_FNAME)
+	if (!compare_dest && fnamecmp_type <= FNAMECMP_BASIS_DIR_HIGH)
 		;
 	else if (unchanged_file(fnamecmp, file, &st)) {
 		if (fnamecmp_type == FNAMECMP_FNAME)
