@@ -270,7 +270,7 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 {
 	int fd;
 	STRUCT_STAT st;
-	struct map_struct *buf;
+	struct map_struct *mapbuf;
 	int statret;
 	struct file_struct *file = flist->files[i];
 	char *fnamecmp;
@@ -506,11 +506,10 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 		return;
 	}
 
-	if (st.st_size > 0) {
-		buf = map_file(fd,st.st_size);
-	} else {
-		buf = NULL;
-	}
+	if (st.st_size > 0)
+		mapbuf = map_file(fd,st.st_size);
+	else
+		mapbuf = NULL;
 
 	if (verbose > 3)
 		rprintf(FINFO,"gen mapped %s of size %.0f\n",fnamecmp,(double)st.st_size);
@@ -519,10 +518,10 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 		rprintf(FINFO, "generating and sending sums for %d\n", i);
 
 	write_int(f_out,i);
-	generate_and_send_sums(buf, st.st_size, f_out);
+	generate_and_send_sums(mapbuf, st.st_size, f_out);
 
 	close(fd);
-	if (buf) unmap_file(buf);
+	if (mapbuf) unmap_file(mapbuf);
 }
 
 
@@ -531,7 +530,7 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 {
 	int i;
 	int phase=0;
-	char buf[MAXPATHLEN];
+	char fbuf[MAXPATHLEN];
 
 	if (verbose > 2)
 		rprintf(FINFO,"generator starting pid=%d count=%d\n",
@@ -564,7 +563,7 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 		}
 
 		recv_generator(local_name? local_name
-			     : f_name_to(file, buf, sizeof buf), flist, i, f);
+			     : f_name_to(file,fbuf,sizeof fbuf), flist, i, f);
 
 		file->mode = saved_mode;
 	}
@@ -583,7 +582,7 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 	for (i = read_int(f_recv); i != -1; i = read_int(f_recv)) {
 		struct file_struct *file = flist->files[i];
 		recv_generator(local_name? local_name
-			     : f_name_to(file, buf, sizeof buf), flist, i, f);
+			     : f_name_to(file,fbuf,sizeof fbuf), flist, i, f);
 	}
 
 	phase++;
