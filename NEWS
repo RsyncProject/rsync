@@ -152,6 +152,9 @@ Changes since 2.6.2:
     - The daemon's "refuse options" config item now allows you to match
       option names using wildcards and/or the single-letter option names.
 
+    - The finished file now gets its permissions and modified-time updated
+      before it gets movied into place.
+
   INTERNAL:
 
     - Some cleanup in the exclude code has saved some per-exclude memory
