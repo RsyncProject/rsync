@@ -403,6 +403,8 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 		return;
 	}
 
+	assert(whole_file == 0 || whole_file == 1);
+	/* We should have decided by now.* /
 	if (whole_file) {
 		write_int(f_out,i);
 		send_sums(NULL,f_out);    

@@ -14,3 +14,6 @@ rsync changes since last release
 
     * Fix minor memory leak in socket code.  (Dave Dykstra, Martin
       Pool.)
+
+    * Fix --whole-file problem that caused it to be the default even
+      for remote connections.  (Frank Schulz)

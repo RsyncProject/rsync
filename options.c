@@ -22,7 +22,18 @@
 #include "popt.h"
 
 int make_backups = 0;
+
+/**
+ * Should we send the whole file as literal data rather than trying to
+ * create an incremental diff?  This is on by default when both source
+ * and destination are local and we're not doing a batch delta,
+ * because there it's no cheaper to read the whole basis file than to
+ * just rewrite it.
+ *
+ * -1 means "unspecified", i.e. depend on is_local; 0 means off; 1 means on.
+ **/
 int whole_file = -1;
+
 int copy_links = 0;
 int preserve_links = 0;
 int preserve_hard_links = 0;
@@ -616,8 +627,13 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'l';
 	if (copy_links)
 		argstr[x++] = 'L';
+
+	assert(whole_file == 0 || whole_file == -1);
 	if (whole_file)
 		argstr[x++] = 'W';
+ 	else 
+ 		args[ac++] = "--no-whole-file";
+	
 	if (preserve_hard_links)
 		argstr[x++] = 'H';
 	if (preserve_uid)
@@ -757,7 +773,6 @@ void server_options(char **args,int *argc)
 		args[ac++] = "--compare-dest";
 		args[ac++] = compare_dest;
 	}
-
 
 	*argc = ac;
 }

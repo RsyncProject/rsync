@@ -217,6 +217,8 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #include <compat.h>
 #endif
 
+#include <assert.h>
+
 
 #define BOOL int
 
