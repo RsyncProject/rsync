@@ -679,7 +679,9 @@ send the whole directory (e.g. "dir" or "dir/") without using a wildcard
 for the directory's contents (e.g. "dir/*") since the wildcard is expanded
 by the shell and rsync thus gets a request to transfer individual files, not
 the files' parent directory.  Files that are excluded from transfer are
-excluded from being deleted unless you use bf(--delete-excluded).
+also excluded from being deleted unless you use the bf(--delete-excluded)
+option or mark the rules as only matching on the sending side (see the
+include/exclude modifiers in the FILTER RULES section).
 
 This option has no effect unless directory recursion is enabled.
 
@@ -726,6 +728,9 @@ See bf(--delete) (which is implied) for more details on file-deletion.
 dit(bf(--delete-excluded)) In addition to deleting the files on the
 receiving side that are not on the sending side, this tells rsync to also
 delete any files on the receiving side that are excluded (see bf(--exclude)).
+See the FILTER RULES section for a way to make individual exclusions behave
+this way on the receiver, and for a way to protect files from
+bf(--delete-excluded).
 See bf(--delete) (which is implied) for more details on file-deletion.
 
 dit(bf(--ignore-errors)) Tells bf(--delete) to go ahead and delete files
@@ -1255,6 +1260,10 @@ bf(exclude, -) specifies an exclude pattern. nl()
 bf(include, +) specifies an include pattern. nl()
 bf(merge, .) specifies a merge-file to read for more rules. nl()
 bf(dir-merge, :) specifies a per-directory merge-file. nl()
+bf(hide, H) specifies a pattern for hiding files from the transfer. nl()
+bf(show, S) files that match the pattern are not hidden. nl()
+bf(protect, P) specifies a pattern for protecting files from deletion. nl()
+bf(risk, R) files that match the pattern are not protected. nl()
 bf(clear, !) clears the current include/exclude list (takes no arg) nl()
 )
 
@@ -1279,8 +1288,8 @@ the bf(--include-from)/bf(--exclude-from) options.
 
 manpagesection(INCLUDE/EXCLUDE PATTERN RULES)
 
-You can include and exclude files by specifying patterns using the "+" and
-"-" filter rules (as introduced in the FILTER RULES section above).
+You can include and exclude files by specifying patterns using the "+",
+"-", etc. filter rules (as introduced in the FILTER RULES section above).
 The include/exclude rules each specify a pattern that is matched against
 the names of the files that are going to be transferred.  These patterns
 can take several forms:
@@ -1419,7 +1428,9 @@ itemize(
   it() You may also specify any of the modifiers for the "+" or "-" rules
   (below) in order  to have the rules that are read-in from the file
   default to having that modifier set.  For instance, "merge,-/ .excl" would
-  treat the contents of .excl as absolute-path excludes.
+  treat the contents of .excl as absolute-path excludes,
+  while "dir-merge,s .filt" and ":sC" would each make all their
+  per-directory rules apply only on the server side.
 )
 
 The following modifiers are accepted after a "+" or "-":
@@ -1435,7 +1446,18 @@ itemize(
   it() A bf(C) is used to indicate that all the global CVS-exclude rules
   should be inserted as excludes in place of the "-C".  No arg should
   follow.
-  )
+  it() An bf(s) is used to indicate that the rule applies to the sending
+  side.  When a rule affects the sending side, it prevents files from
+  being transferred.  The default is for a rule to affect both sides
+  unless bf(--delete-excluded) was specified, in which case default rules
+  become sender-side only.  See also the hide (H) and show (S) rules,
+  which are an alternate way to specify server-side includes/excludes.
+  it() An bf(r) is used to indicate that the rule applies to the receiving
+  side.  When a rule affects the receiving side, it prevents files from
+  being deleted.  See the bf(s) modifier for more info.  See also the
+  protect (P) and risk (R) rules, which are an alternate way to
+  specify receiver-side includes/excludes.
+)
 
 Per-directory rules are inherited in all subdirectories of the directory
 where the merge-file was found unless the 'n' modifier was used.  Each
