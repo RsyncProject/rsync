@@ -289,7 +289,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 
 	if (delay_updates) {
 		int sz = (flist->count + 7) / 8;
-		if (!(delayed_bits = new_array(char, sz)))
+		if (!(delayed_bits = new_array(uchar, sz)))
 			out_of_memory("recv_files");
 		memset(delayed_bits, 0, sz);
 	}
