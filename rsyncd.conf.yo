@@ -174,6 +174,11 @@ Any clients connecting when the maximum has been reached will receive a
 message telling them to try later.  The default is 0 which means no limit.
 See also the "lock file" option.
 
+dit(bf(max verbosity)) The "max verbosity" option allows you to control
+the maximum amount of verbose information that you'll allow the daemon to
+generate (since the information goes into the log file). The default is 1,
+which allows the client to request one level of verbosity.
+
 dit(bf(lock file)) The "lock file" option specifies the file to use to
 support the "max connections" option. The rsync server uses record
 locking on this file to ensure that the max connections limit is not
