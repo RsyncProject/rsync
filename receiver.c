@@ -21,15 +21,17 @@
 #include "rsync.h"
 
 extern int verbose;
+extern int dry_run;
 extern int log_before_transfer;
-extern int itemize_changes;
+extern int log_format_has_i;
+extern int daemon_log_format_has_i;
+extern int am_daemon;
+extern int am_server;
 extern int delete_after;
 extern int csum_length;
 extern struct stats stats;
-extern int dry_run;
 extern int read_batch;
 extern int batch_gen_fd;
-extern int am_server;
 extern int protocol_version;
 extern int relative_paths;
 extern int keep_dirlinks;
@@ -316,6 +318,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 	struct file_struct *file;
 	struct stats initial_stats;
 	int save_make_backups = make_backups;
+	int itemizing = am_daemon ? daemon_log_format_has_i
+		      : !am_server && log_format_has_i;
 	int i, recv_ok, phase = 0;
 
 	if (verbose > 2)
@@ -369,14 +373,19 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		}
 
 		file = flist->files[i];
+		fname = local_name ? local_name : f_name_to(file, fbuf);
+
+		if (verbose > 2)
+			rprintf(FINFO, "recv_files(%s)\n", safe_fname(fname));
 
 		if (protocol_version >= 29) {
 			iflags = read_shortint(f_in);
 			if (!(iflags & ITEM_UPDATING) || !S_ISREG(file->mode)) {
-				if (am_server)
-					; /* do nothing */
-				else if (itemize_changes || verbose > 1
-				    || iflags & ITEM_UPDATING
+				int see_item = itemizing && (iflags || verbose > 1);
+				if (am_server) {
+					if (am_daemon && !dry_run && see_item)
+						log_recv(file, &stats, iflags);
+				} else if (see_item || iflags & ITEM_UPDATING
 				    || (S_ISDIR(file->mode)
 				     && iflags & ITEM_REPORT_TIME))
 					log_recv(file, &stats, iflags);
@@ -396,16 +405,11 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		stats.total_transferred_size += file->length;
 		cleanup_got_literal = 0;
 
-		fname = local_name ? local_name : f_name_to(file, fbuf);
-
 		if (server_filter_list.head
 		    && check_filter(&server_filter_list, fname, 0) < 0) {
 			rprintf(FERROR, "attempt to hack rsync failed.\n");
 			exit_cleanup(RERR_PROTOCOL);
 		}
-
-		if (verbose > 2)
-			rprintf(FINFO, "recv_files(%s)\n", safe_fname(fname));
 
 		if (dry_run) { /* log the transfer */
 			if (!am_server && log_format)
