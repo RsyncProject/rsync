@@ -211,7 +211,7 @@ send_deflated_token(int f, int token,
 			write_byte(f, n >> 8);
 			if (write_batch) {
 				write_batch_delta_file((char *)&n,sizeof(char));
-				temp_byte = (char) n >> 8;
+				temp_byte = (char)(n >> 8);
 				write_batch_delta_file(&temp_byte,sizeof(temp_byte));
 			}
 		}
