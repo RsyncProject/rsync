@@ -380,6 +380,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 		int count;
 
 		FD_ZERO(&r_fds);
+		FD_ZERO(&w_fds);
 		FD_SET(fd, &r_fds);
 		if (msg_fd_in >= 0) {
 			FD_SET(msg_fd_in, &r_fds);
@@ -401,7 +402,6 @@ static int read_timeout(int fd, char *buf, size_t len)
 					new_fd = -1;
 				}
 			} else {
-				FD_ZERO(&w_fds);
 				FD_SET(io_filesfrom_f_out, &w_fds);
 				new_fd = io_filesfrom_f_out;
 			}
@@ -414,9 +414,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 
 		errno = 0;
 
-		count = select(maxfd + 1, &r_fds,
-			       io_filesfrom_buflen? &w_fds : NULL,
-			       NULL, &tv);
+		count = select(maxfd + 1, &r_fds, &w_fds, NULL, &tv);
 
 		if (count <= 0) {
 			if (errno == EBADF)
