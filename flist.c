@@ -355,12 +355,12 @@ static void send_file_entry(struct file_struct *file, int f,
 			    unsigned short base_flags)
 {
 	unsigned short flags;
-	static time_t last_time;
-	static mode_t last_mode;
+	static time_t modtime;
+	static mode_t mode;
 	static DEV64_T last_rdev;
-	static uid_t last_uid;
-	static gid_t last_gid;
-	static DEV64_T last_dev;
+	static uid_t uid;
+	static gid_t gid;
+	static DEV64_T dev;
 	static char lastname[MAXPATHLEN];
 	char *fname, fbuf[MAXPATHLEN];
 	int l1, l2;
@@ -379,42 +379,46 @@ static void send_file_entry(struct file_struct *file, int f,
 
 	flags = base_flags;
 
-	if (file->mode == last_mode)
+	if (file->mode == mode)
 		flags |= SAME_MODE;
 	else
-		last_mode = file->mode;
+		mode = file->mode;
 	if (preserve_devices) {
 		if (protocol_version < 28) {
-			if (IS_DEVICE(last_mode) && file->rdev == last_rdev)
-				flags |= OLD_SAME_RDEV|SAME_HIGH_RDEV;
+			if (IS_DEVICE(mode) && file->rdev == last_rdev) {
+				/* Set both flags so that the test when
+				 * writing the data is simpler. */
+				flags |= SAME_RDEV_pre28|SAME_HIGH_RDEV;
+			}
 			else
 				last_rdev = file->rdev;
 		}
-		else if (IS_DEVICE(last_mode)) {
-			if ((file->rdev & ~0xFF) == (last_rdev & ~0xFF))
+		else if (IS_DEVICE(mode)) {
+			if ((file->rdev & ~0xFF) == last_rdev)
 				flags |= SAME_HIGH_RDEV;
-			last_rdev = file->rdev;
+			else
+				last_rdev = file->rdev & ~0xFF;
 		}
 	}
-	if (file->uid == last_uid)
+	if (file->uid == uid)
 		flags |= SAME_UID;
 	else
-		last_uid = file->uid;
-	if (file->gid == last_gid)
+		uid = file->uid;
+	if (file->gid == gid)
 		flags |= SAME_GID;
 	else
-		last_gid = file->gid;
-	if (file->modtime == last_time)
+		gid = file->gid;
+	if (file->modtime == modtime)
 		flags |= SAME_TIME;
 	else
-		last_time = file->modtime;
+		modtime = file->modtime;
 	if (file->flags & HAS_INODE_DATA) {
-		if (file->dev == last_dev) {
+		if (file->dev == dev) {
 			if (protocol_version >= 28)
 				flags |= SAME_DEV;
 		}
 		else
-			last_dev = file->dev;
+			dev = file->dev;
 		flags |= HAS_INODE_DATA;
 	}
 
@@ -430,7 +434,7 @@ static void send_file_entry(struct file_struct *file, int f,
 
 	/* We must make sure we don't send a zero flags byte or
 	 * the other end will terminate the flist transfer. */
-	if (flags == 0 && !S_ISDIR(last_mode))
+	if (flags == 0 && !S_ISDIR(mode))
 		flags |= FLAG_DELETE; /* NOTE: no meaning for non-dir */
 	if (protocol_version >= 28) {
 		if ((flags & 0xFF00) || flags == 0) {
@@ -454,27 +458,27 @@ static void send_file_entry(struct file_struct *file, int f,
 
 	write_longint(f, file->length);
 	if (!(flags & SAME_TIME))
-		write_int(f, last_time);
+		write_int(f, modtime);
 	if (!(flags & SAME_MODE))
-		write_int(f, to_wire_mode(last_mode));
+		write_int(f, to_wire_mode(mode));
 	if (preserve_uid && !(flags & SAME_UID)) {
-		add_uid(last_uid);
-		write_int(f, last_uid);
+		add_uid(uid);
+		write_int(f, uid);
 	}
 	if (preserve_gid && !(flags & SAME_GID)) {
-		add_gid(last_gid);
-		write_int(f, last_gid);
+		add_gid(gid);
+		write_int(f, gid);
 	}
-	if (preserve_devices && IS_DEVICE(last_mode)) {
-		/* If SAME_HIGH_RDEV is off, OLD_SAME_RDEV is also off. */
+	if (preserve_devices && IS_DEVICE(mode)) {
+		/* If SAME_HIGH_RDEV is off, SAME_RDEV_pre28 is also off. */
 		if (!(flags & SAME_HIGH_RDEV))
-			write_int(f, last_rdev);
+			write_int(f, file->rdev);
 		else if (protocol_version >= 28)
-			write_byte(f, last_rdev);
+			write_byte(f, file->rdev);
 	}
 
 #if SUPPORT_LINKS
-	if (preserve_links && S_ISLNK(last_mode)) {
+	if (preserve_links && S_ISLNK(mode)) {
 		write_int(f, strlen(file->link));
 		write_buf(f, file->link, strlen(file->link));
 	}
@@ -484,12 +488,12 @@ static void send_file_entry(struct file_struct *file, int f,
 	if (flags & HAS_INODE_DATA) {
 		if (protocol_version < 26) {
 			/* 32-bit dev_t and ino_t */
-			write_int(f, last_dev);
+			write_int(f, dev);
 			write_int(f, file->inode);
 		} else {
 			/* 64-bit dev_t and ino_t */
 			if (!(flags & SAME_DEV))
-				write_longint(f, last_dev);
+				write_longint(f, dev);
 			write_longint(f, file->inode);
 		}
 	}
@@ -513,12 +517,12 @@ static void send_file_entry(struct file_struct *file, int f,
 static void receive_file_entry(struct file_struct **fptr,
 			       unsigned short flags, int f)
 {
-	static time_t last_time;
-	static mode_t last_mode;
-	static DEV64_T last_rdev;
-	static uid_t last_uid;
-	static gid_t last_gid;
-	static DEV64_T last_dev;
+	static time_t modtime;
+	static mode_t mode;
+	static DEV64_T rdev;
+	static uid_t uid;
+	static gid_t gid;
+	static DEV64_T dev;
 	static char lastname[MAXPATHLEN];
 	char thisname[MAXPATHLEN];
 	unsigned int l1 = 0, l2 = 0;
@@ -580,42 +584,40 @@ static void receive_file_entry(struct file_struct **fptr,
 	file->flags = flags;
 	file->length = read_longint(f);
 	if (!(flags & SAME_TIME))
-		last_time = (time_t)read_int(f);
-	file->modtime = last_time;
+		modtime = (time_t)read_int(f);
+	file->modtime = modtime;
 	if (!(flags & SAME_MODE))
-		last_mode = from_wire_mode(read_int(f));
-	file->mode = last_mode;
+		mode = from_wire_mode(read_int(f));
+	file->mode = mode;
 
 	if (preserve_uid) {
 		if (!(flags & SAME_UID))
-			last_uid = (uid_t)read_int(f);
-		file->uid = last_uid;
+			uid = (uid_t)read_int(f);
+		file->uid = uid;
 	}
 	if (preserve_gid) {
 		if (!(flags & SAME_GID))
-			last_gid = (gid_t)read_int(f);
-		file->gid = last_gid;
+			gid = (gid_t)read_int(f);
+		file->gid = gid;
 	}
 	if (preserve_devices) {
 		if (protocol_version < 28) {
-			if (IS_DEVICE(last_mode)) {
-				if (!(flags & OLD_SAME_RDEV))
-					last_rdev = (DEV64_T)read_int(f);
-				file->rdev = last_rdev;
+			if (IS_DEVICE(mode)) {
+				if (!(flags & SAME_RDEV_pre28))
+					rdev = (DEV64_T)read_int(f);
+				file->rdev = rdev;
 			} else
-				last_rdev = 0;
-		} else if (IS_DEVICE(last_mode)) {
-			if (!(flags & SAME_HIGH_RDEV))
-				last_rdev = (DEV64_T)read_int(f);
-			else {
-				last_rdev = (DEV64_T)((last_rdev & ~0xFF)
-							| read_byte(f));
-			}
-			file->rdev = last_rdev;
+				rdev = 0;
+		} else if (IS_DEVICE(mode)) {
+			if (!(flags & SAME_HIGH_RDEV)) {
+				file->rdev = (DEV64_T)read_int(f);
+				rdev = file->rdev & ~0xFF;
+			} else
+				file->rdev = (DEV64_T)(rdev | read_byte(f));
 		}
 	}
 
-	if (preserve_links && S_ISLNK(last_mode)) {
+	if (preserve_links && S_ISLNK(mode)) {
 		int l = read_int(f);
 		if (l < 0) {
 			rprintf(FERROR, "overflow: l=%d\n", l);
@@ -630,18 +632,18 @@ static void receive_file_entry(struct file_struct **fptr,
 	}
 #if SUPPORT_HARD_LINKS
 	if (preserve_hard_links && protocol_version < 28
-	    && S_ISREG(last_mode))
+	    && S_ISREG(mode))
 		file->flags |= HAS_INODE_DATA;
 	if (file->flags & HAS_INODE_DATA) {
 		if (protocol_version < 26) {
-			last_dev = read_int(f);
+			dev = read_int(f);
 			file->inode = read_int(f);
 		} else {
 			if (!(flags & SAME_DEV))
-				last_dev = read_longint(f);
+				dev = read_longint(f);
 			file->inode = read_longint(f);
 		}
-		file->dev = last_dev;
+		file->dev = dev;
 	}
 #endif
 
