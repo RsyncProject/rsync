@@ -173,6 +173,10 @@ int read_item_attrs(int f_in, int f_out, int ndx, uchar *type_ptr,
 	}
 	*len_ptr = len;
 
+	/* Temporary handling of 2.6.4pre3 */
+	if (iflags & ITEM_DUMMY_BIT && iflags & (ITEM_LOCAL_CHANGE|ITEM_TRANSFER))
+		iflags &= ~ITEM_DUMMY_BIT;
+
 	if (iflags & ITEM_TRANSFER) {
 		if (!S_ISREG(the_file_list->files[ndx]->mode)) {
 			rprintf(FERROR,
