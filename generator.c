@@ -32,7 +32,6 @@ extern int preserve_devices;
 extern int preserve_hard_links;
 extern int update_only;
 extern int opt_ignore_existing;
-extern int whole_file;
 extern int block_size;
 extern int csum_length;
 extern int ignore_times;
@@ -126,6 +125,39 @@ static void send_sums(struct sum_struct *s, int f_out)
 		write_int(f_out, 0);
 	}
 }
+
+
+/**
+ * Perhaps we want to just send an empty checksum set for this file,
+ * which will force the whole thing to be literally transferred.
+ *
+ * When do we do this?  If the user's explicitly said they
+ * want the whole thing, or if { they haven't explicitly
+ * requested a delta, and it's local but not batch mode.}
+ *
+ * Whew. */
+static BOOL disable_deltas_p(void)
+{
+	extern int whole_file, no_whole_file;
+	extern int local_server;
+	extern int write_batch;
+
+	assert(whole_file == 0 || whole_file == 1);
+
+	/* OK, we don't explicitly handle both whole_file and
+	 * no_whole_file; perhaps somebody will care to add an
+	 * error. */
+
+	if (whole_file)
+		return True;
+	else if (no_whole_file)
+		return False;
+	else if (write_batch)
+		return False;
+	else
+		return local_server;
+}
+
 
 /*
   generate a stream of signatures/checksums that describe a buffer
@@ -403,9 +435,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 		return;
 	}
 
-	assert(whole_file == 0 || whole_file == 1);
-	/* We should have decided by now. */
-	if (whole_file) {
+	if (disable_deltas_p()) {
 		write_int(f_out,i);
 		send_sums(NULL,f_out);    
 		return;

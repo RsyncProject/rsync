@@ -30,9 +30,11 @@ int make_backups = 0;
  * because there it's no cheaper to read the whole basis file than to
  * just rewrite it.
  *
- * -1 means "unspecified", i.e. depend on is_local; 0 means off; 1 means on.
+ * If both are 0, then look at whether we're local or remote and go by
+ * that.
  **/
-int whole_file = -1;
+int whole_file = 0;
+int no_whole_file = 0;
 
 int copy_links = 0;
 int preserve_links = 0;
@@ -310,7 +312,7 @@ static struct poptOption long_options[] = {
   {"links",           'l', POPT_ARG_NONE,   &preserve_links},
   {"copy-links",      'L', POPT_ARG_NONE,   &copy_links},
   {"whole-file",      'W', POPT_ARG_NONE,   &whole_file},
-  {"no-whole-file",    0,  POPT_ARG_NONE,   0, 		     OPT_NO_WHOLE_FILE},
+  {"no-whole-file",    0,  POPT_ARG_NONE,   &no_whole_file},
   {"copy-unsafe-links", 0, POPT_ARG_NONE,   &copy_unsafe_links},
   {"perms",           'p', POPT_ARG_NONE,   &preserve_perms},
   {"owner",           'o', POPT_ARG_NONE,   &preserve_uid},
@@ -474,10 +476,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			add_exclude_file(poptGetOptArg(pc), 1, 1);
 			break;
 
-		case OPT_NO_WHOLE_FILE:
-			whole_file = 0;
-			break;
-
 		case OPT_NO_BLOCKING_IO:
 			blocking_io = 0;
 			break;
@@ -601,8 +599,6 @@ void server_options(char **args,int *argc)
 
 	int i, x;
 
-	if (whole_file == -1)
-		whole_file = 0;
 	if (blocking_io == -1)
 		blocking_io = 0;
 
@@ -631,6 +627,9 @@ void server_options(char **args,int *argc)
 	assert(whole_file == 0 || whole_file == -1);
 	if (whole_file)
 		argstr[x++] = 'W';
+	/* We don't need to send --no-whole-file, because it's the
+	 * default for remote transfers, and in any case old versions
+	 * of rsync will not understand it. */
 	
 	if (preserve_hard_links)
 		argstr[x++] = 'H';

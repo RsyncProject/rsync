@@ -716,12 +716,6 @@ static int start_client(int argc, char *argv[])
 		p = find_colon(argv[argc-1]);
 		if (!p) {
 			local_server = 1;
-			/*
-			 * disable "rsync algorithm" when both sides local,
-			 * except when creating a batch update
-			 */
-			if (!write_batch && whole_file == -1)
-				whole_file = 1;
 		} else if (p[1] == ':') {
 			*p = 0;
 			return start_socket_client(argv[argc-1], p+2, argc-1, argv);
