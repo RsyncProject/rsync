@@ -1,24 +1,24 @@
-/* 
+/*
    Copyright (C) Andrew Tridgell 1998
    Copyright (C) 2002 by Martin Pool
-   
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 /*
-  File IO utilities used in rsync 
+  File IO utilities used in rsync
   */
 #include "rsync.h"
 
@@ -42,8 +42,8 @@ static int write_sparse(int f,char *buf,size_t len)
 	size_t l1=0, l2=0;
 	int ret;
 
-	for (l1=0;l1<len && buf[l1]==0;l1++) ;
-	for (l2=0;l2<(len-l1) && buf[len-(l2+1)]==0;l2++) ;
+	for (l1 = 0; l1 < len && buf[l1] == 0; l1++) {}
+	for (l2 = 0; l2 < len-l1 && buf[len-(l2+1)] == 0; l2++) {}
 
 	last_byte = buf[len-1];
 
@@ -51,21 +51,21 @@ static int write_sparse(int f,char *buf,size_t len)
 		last_sparse=1;
 
 	if (l1 > 0) {
-		do_lseek(f,l1,SEEK_CUR);  
+		do_lseek(f,l1,SEEK_CUR);
 	}
 
-	if (l1 == len) 
+	if (l1 == len)
 		return len;
 
 	ret = write(f, buf + l1, len - (l1+l2));
 	if (ret == -1 || ret == 0)
 		return ret;
-	else if (ret != (int) (len - (l1+l2))) 
+	else if (ret != (int) (len - (l1+l2)))
 		return (l1+ret);
 
 	if (l2 > 0)
 		do_lseek(f,l2,SEEK_CUR);
-	
+
 	return len;
 }
 
@@ -78,7 +78,7 @@ int flush_write_file(int f)
 {
 	int ret = 0;
 	char *bp = wf_writeBuf;
-	
+
 	while (wf_writeBufCnt > 0) {
 		if ((ret = write(f, bp, wf_writeBufCnt)) < 0) {
 			if (errno == EINTR)
@@ -176,7 +176,7 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 	}
 
 	/* in most cases the region will already be available */
-	if (offset >= map->p_offset && 
+	if (offset >= map->p_offset &&
 	    offset+len <= map->p_offset+map->p_len) {
 		return (map->p + (offset - map->p_offset));
 	}
@@ -245,8 +245,8 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 
 	map->p_offset = window_start;
 	map->p_len = window_size;
-  
-	return map->p + (offset - map->p_offset); 
+
+	return map->p + (offset - map->p_offset);
 }
 
 
