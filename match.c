@@ -26,7 +26,7 @@ extern int do_progress;
 typedef unsigned short tag;
 
 #define TABLESIZE (1<<16)
-#define NULL_TAG (-1)
+#define NULL_TAG ((size_t)-1)
 
 static int false_alarms;
 static int tag_hits;
@@ -41,12 +41,12 @@ extern struct stats stats;
 
 struct target {
 	tag t;
-	int i;
+	size_t i;
 };
 
 static struct target *targets;
 
-static int *tag_table;
+static size_t *tag_table;
 
 #define gettag2(s1,s2) (((s1) + (s2)) & 0xFFFF)
 #define gettag(sum) gettag2((sum)&0xFFFF,(sum)>>16)
@@ -59,16 +59,16 @@ static int compare_targets(struct target *t1,struct target *t2)
 
 static void build_hash_table(struct sum_struct *s)
 {
-	int i;
+	size_t i;
 
 	if (!tag_table)
-		tag_table = new_array(int, TABLESIZE);
+		tag_table = new_array(size_t, TABLESIZE);
 
 	targets = new_array(struct target, s->count);
 	if (!tag_table || !targets)
 		out_of_memory("build_hash_table");
 
-	for (i = 0; i < (int)s->count; i++) {
+	for (i = 0; i < s->count; i++) {
 		targets[i].i = i;
 		targets[i].t = gettag(s->sums[i].sum1);
 	}
@@ -78,7 +78,7 @@ static void build_hash_table(struct sum_struct *s)
 	for (i = 0; i < TABLESIZE; i++)
 		tag_table[i] = NULL_TAG;
 
-	for (i = s->count-1; i >= 0; i--)
+	for (i = s->count; i-- > 0; )
 		tag_table[targets[i].t] = i;
 }
 
@@ -130,7 +130,8 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 	if (buf && do_progress) {
 		show_progress(last_match, buf->file_size);
 
-		if (i == -1) end_progress(buf->file_size);
+		if (i == -1)
+			end_progress(buf->file_size);
 	}
 }
 
@@ -139,64 +140,68 @@ static void hash_search(int f,struct sum_struct *s,
 			struct map_struct *buf, OFF_T len)
 {
 	OFF_T offset, end;
-	int j,k, last_i;
+	unsigned int k;
+	size_t last_i;
 	char sum2[SUM_LENGTH];
 	uint32 s1, s2, sum;
 	schar *map;
 
 	/* last_i is used to encourage adjacent matches, allowing the RLL coding of the
 	   output to work more efficiently */
-	last_i = -1;
+	last_i = (size_t)-1;
 
-	if (verbose > 2)
-		rprintf(FINFO,"hash search b=%ld len=%.0f\n",
-			(long) s->blength, (double)len);
+	if (verbose > 2) {
+		rprintf(FINFO,"hash search b=%u len=%.0f\n",
+			s->blength, (double)len);
+	}
 
-	k = MIN(len, (OFF_T)s->blength);
+	k = MIN(len, s->blength);
 
-	map = (schar *)map_ptr(buf,0,k);
+	map = (schar *)map_ptr(buf, 0, k);
 
 	sum = get_checksum1((char *)map, k);
 	s1 = sum & 0xFFFF;
 	s2 = sum >> 16;
 	if (verbose > 3)
-		rprintf(FINFO, "sum=%.8x k=%d\n", sum, k);
+		rprintf(FINFO, "sum=%.8x k=%u\n", sum, k);
 
 	offset = 0;
 
 	end = len + 1 - s->sums[s->count-1].len;
 
-	if (verbose > 3)
-		rprintf(FINFO, "hash search s->blength=%ld len=%.0f count=%ld\n",
-			(long) s->blength, (double) len, (long) s->count);
+	if (verbose > 3) {
+		rprintf(FINFO, "hash search s->blength=%u len=%.0f count=%.0f\n",
+			s->blength, (double)len, (double)s->count);
+	}
 
 	do {
 		tag t = gettag2(s1,s2);
 		int done_csum2 = 0;
+		size_t j = tag_table[t];
 
-		j = tag_table[t];
 		if (verbose > 4)
 			rprintf(FINFO,"offset=%.0f sum=%08x\n",(double)offset,sum);
 
-		if (j == NULL_TAG) {
+		if (j == NULL_TAG)
 			goto null_tag;
-		}
 
 		sum = (s1 & 0xffff) | (s2 << 16);
 		tag_hits++;
-		for (; j < (int) s->count && targets[j].t == t; j++) {
+		for (; j < s->count && targets[j].t == t; j++) {
 			unsigned int l;
-			int i = targets[j].i;
+			size_t i = targets[j].i;
 
-			if (sum != s->sums[i].sum1) continue;
+			if (sum != s->sums[i].sum1)
+				continue;
 
 			/* also make sure the two blocks are the same length */
 			l = MIN((OFF_T)s->blength, len-offset);
-			if (l != s->sums[i].len) continue;
+			if (l != s->sums[i].len)
+				continue;
 
 			if (verbose > 3)
-				rprintf(FINFO,"potential match at %.0f target=%d %d sum=%08x\n",
-					(double)offset,j,i,sum);
+				rprintf(FINFO,"potential match at %.0f target=%.0f %.0f sum=%08x\n",
+					(double)offset,(double)j,(double)i,sum);
 
 			if (!done_csum2) {
 				map = (schar *)map_ptr(buf,offset,l);
@@ -211,11 +216,13 @@ static void hash_search(int f,struct sum_struct *s,
 
 			/* we've found a match, but now check to see
 			 * if last_i can hint at a better match */
-			for (j++; j < (int) s->count && targets[j].t == t; j++) {
-				int i2 = targets[j].i;
+			for (j++; j < s->count && targets[j].t == t; j++) {
+				size_t i2 = targets[j].i;
 				if (i2 == last_i + 1) {
-					if (sum != s->sums[i2].sum1) break;
-					if (memcmp(sum2,s->sums[i2].sum2,s->s2length) != 0) break;
+					if (sum != s->sums[i2].sum1)
+						break;
+					if (memcmp(sum2,s->sums[i2].sum2,s->s2length) != 0)
+						break;
 					/* we've found an adjacent match - the RLL coder
 					 * will be happy */
 					i = i2;
@@ -227,8 +234,8 @@ static void hash_search(int f,struct sum_struct *s,
 
 			matched(f,s,buf,offset,i);
 			offset += s->sums[i].len - 1;
-			k = MIN((OFF_T)s->blength, len-offset);
-			map = (schar *)map_ptr(buf,offset,k);
+			k = MIN(s->blength, len-offset);
+			map = (schar *)map_ptr(buf, offset, k);
 			sum = get_checksum1((char *)map, k);
 			s1 = sum & 0xFFFF;
 			s2 = sum >> 16;
@@ -238,7 +245,7 @@ static void hash_search(int f,struct sum_struct *s,
 
 	null_tag:
 		/* Trim off the first byte from the checksum */
-		map = (schar *)map_ptr(buf,offset,k+1);
+		map = (schar *)map_ptr(buf, offset, k+1);
 		s1 -= map[0] + CHAR_OFFSET;
 		s2 -= k * (map[0]+CHAR_OFFSET);
 
@@ -246,9 +253,8 @@ static void hash_search(int f,struct sum_struct *s,
 		if (k < (len-offset)) {
 			s1 += (map[k]+CHAR_OFFSET);
 			s2 += s1;
-		} else {
+		} else
 			--k;
-		}
 
 		/* By matching early we avoid re-reading the
 		   data 3 times in the case where a token

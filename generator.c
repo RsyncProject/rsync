@@ -99,9 +99,8 @@ static int skip_file(char *fname,
 
 
 /*
- * 	NULL sum_struct means we have no checksums
+ * NULL sum_struct means we have no checksums
  */
-
 void write_sum_head(int f, struct sum_struct *sum)
 {
 	static struct sum_struct null_sum;
@@ -192,8 +191,8 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 	sum->remainder	= (len % blength);
 
 	if (sum->count && verbose > 2) {
-		rprintf(FINFO, "count=%ld rem=%u blength=%u s2length=%d flength=%.0f\n",
-			(long)sum->count, sum->remainder, sum->blength,
+		rprintf(FINFO, "count=%.0f rem=%u blength=%u s2length=%d flength=%.0f\n",
+			(double)sum->count, sum->remainder, sum->blength,
 			sum->s2length, (double)sum->flength);
 	}
 }
@@ -237,7 +236,7 @@ static void generate_and_send_sums(struct map_struct *buf, size_t len, int f_out
 	write_sum_head(f_out, &sum);
 
 	for (i = 0; i < sum.count; i++) {
-		int n1 = MIN(len, sum.blength);
+		unsigned int n1 = MIN(len, sum.blength);
 		char *map = map_ptr(buf, offset, n1);
 		uint32 sum1 = get_checksum1(map, n1);
 		char sum2[SUM_LENGTH];
@@ -246,8 +245,9 @@ static void generate_and_send_sums(struct map_struct *buf, size_t len, int f_out
 
 		if (verbose > 3) {
 			rprintf(FINFO,
-				"chunk[%ld] offset=%.0f len=%d sum1=%08lx\n",
-				(long)i,(double)offset,n1,(unsigned long)sum1);
+				"chunk[%.0f] offset=%.0f len=%u sum1=%08lx\n",
+				(double)i, (double)offset, n1,
+				(unsigned long)sum1);
 		}
 		write_int(f_out, sum1);
 		write_buf(f_out, sum2, sum.s2length);
