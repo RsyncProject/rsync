@@ -310,8 +310,8 @@ Changes since 2.6.3:
       generator now transmits an index and a flag-word to indicate when
       dirs and symlinks have changed (instead of producing a message),
       which makes the outputting of the information more consistent and
-      less prone to screen corruption (because either the receiver or the
-      sender is now outputting all the file-change info).
+      less prone to screen corruption (because the local receiver/sender is
+      now outputting all the file-change info messages).
 
     - If a file is being hard-linked, the appropriate bit is enabled in
       the flag-word and the name of the file that was linked immediately
@@ -349,24 +349,25 @@ Changes since 2.6.3:
       build the file-list, and one for how long it took to send it over the
       wire (each expressed in thousandths of a second).
 
-    - When --delete-excluded is specified with some filter excludes, a
-      client sender will now initiate a send of the filter rules to the
-      receiver (older protocols used to omit the sending of excludes in
+    - When --delete-excluded is specified with some filter rules (AKA
+      excludes), a client sender will now initiate a send of the rules to
+      the receiver (older protocols used to omit the sending of excludes in
       this situation since there were no receiver-specific rules that
       survived --delete-excluded back then).  Note that, as with all the
       filter-list sending, only items that are significant to the other
       side will actually be sent over the wire, so the filter-rule list
-      is often empty in this scenario.
-
-    - A protocol-29 batch file includes a bit for the setting of the --dirs
-      option.  Also, the shell script created by --write-batch will use the
-      --filter option instead of --exclude-from to capture any filter rules.
+      that is sent in this scenario is often empty.
 
     - An index equal to the file-list count is sent as a keep-alive packet
       from the generator to the sender, which then forwards it on to the
       receiver.  This normally invalid index is only a valid keep-alive
       packet if the 16-bit flag-word that follows it contains a single bit
       (ITEM_IS_NEW, which is normally an illegal flag to appear alone).
+
+    - A protocol-29 batch file includes a bit for the setting of the --dirs
+      option and for the setting of the --compress option.  Also, the shell
+      script created by --write-batch will use the --filter option instead
+      of --exclude-from to capture any filter rules.
 
   BUILD CHANGES:
 
