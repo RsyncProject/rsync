@@ -108,6 +108,15 @@ static int read_timeout(int fd, char *buf, int len)
 			continue;
 		}
 
+		if (n == -1 && 
+		    (errno == EAGAIN || errno == EWOULDBLOCK)) {
+			/* this shouldn't happen, if it does then
+			   sleep for a short time to prevent us
+			   chewing too much CPU */
+			u_sleep(100);
+			continue;
+		}
+
 		if (n == 0) {
 			if (eof_error) {
 				rprintf(FERROR,"EOF in read_timeout\n");
@@ -344,6 +353,15 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 			int ret = write(fd,buf+total,len-total);
 
 			if (ret == -1 && errno == EINTR) {
+				continue;
+			}
+
+			if (ret == -1 && 
+			    (errno == EAGAIN || errno == EWOULDBLOCK)) {
+				/* this shouldn't happen, if it does then
+				   sleep for a short time to prevent us
+				   chewing too much CPU */
+				u_sleep(100);
 				continue;
 			}
 
