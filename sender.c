@@ -25,6 +25,8 @@ extern struct stats stats;
 extern int io_error;
 extern int dry_run;
 extern int am_server;
+extern int am_daemon;
+extern int protocol_version;
 
 
 /**
@@ -36,8 +38,6 @@ extern int am_server;
  **/
 void read_sum_head(int f, struct sum_struct *sum)
 {
-	extern int protocol_version;
-
 	sum->count = read_int(f);
 	sum->blength = read_int(f);
 	if (protocol_version < 27) {
@@ -198,8 +198,11 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			fd = do_open(fname, O_RDONLY, 0);
 			if (fd == -1) {
 				if (errno == ENOENT) {
+					enum logcode c = am_daemon
+					    && protocol_version < 28 ? FERROR
+								     : FINFO;
 					io_error |= IOERR_VANISHED;
-					rprintf(FINFO, "file has vanished: %s\n",
+					rprintf(c, "file has vanished: %s\n",
 						full_fname(fname));
 				} else {
 					io_error |= IOERR_GENERAL;
