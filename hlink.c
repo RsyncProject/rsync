@@ -1,18 +1,18 @@
-/* 
+/*
    Copyright (C) Andrew Tridgell 1996
    Copyright (C) Paul Mackerras 1996
    Copyright (C) 2002 by Martin Pool <mbp@samba.org>
-   
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -29,19 +29,11 @@ static int hlink_compare(struct file_struct **file1, struct file_struct **file2)
 	struct file_struct *f1 = *file1;
 	struct file_struct *f2 = *file2;
 
-	if (!S_ISREG(f1->mode) && !S_ISREG(f2->mode))
-		return 0;
-	if (!S_ISREG(f1->mode))
-		return -1;
-	if (!S_ISREG(f2->mode))
-		return 1;
-
 	if (f1->dev != f2->dev)
 		return (int) (f1->dev > f2->dev ? 1 : -1);
 
 	if (f1->inode != f2->inode)
 		return (int) (f1->inode > f2->inode ? 1 : -1);
-
 
 	return file_compare(file1, file2);
 }
@@ -63,7 +55,7 @@ void init_hard_links(struct file_list *flist)
 
 	if (!(hlink_list = new_array(struct file_struct *, flist->count)))
 		out_of_memory("init_hard_links");
-	
+
 /*	we'll want to restore the memcpy when we purge the
  *	hlink list after the sort.
  *	memcpy(hlink_list, flist->files, sizeof(hlink_list[0]) * flist->count);	
@@ -77,7 +69,10 @@ void init_hard_links(struct file_list *flist)
 	qsort(hlink_list, hlink_count,
 	      sizeof(hlink_list[0]), (int (*)()) hlink_compare);
 
-	if (!(hlink_list = realloc_array(hlink_list,
+	if (!hlink_count) {
+		free(hlink_list);
+		hlink_list = NULL;
+	} else if (!(hlink_list = realloc_array(hlink_list,
 					struct file_struct *, hlink_count)))
 		out_of_memory("init_hard_links");
 #endif
@@ -113,7 +108,6 @@ int check_hard_link(struct file_struct *file)
 		return 0;
 
 	if (low > 0 &&
-	    S_ISREG(hlink_list[low - 1]->mode) &&
 	    file->dev == hlink_list[low - 1]->dev &&
 	    file->inode == hlink_list[low - 1]->inode) {
 		if (verbose >= 2) {
@@ -178,9 +172,7 @@ void do_hard_links(void)
 		return;
 
 	for (i = 1; i < hlink_count; i++) {
-		if (S_ISREG(hlink_list[i]->mode) &&
-		    S_ISREG(hlink_list[i - 1]->mode) &&
-		    hlink_list[i]->basename && hlink_list[i - 1]->basename &&
+		if (hlink_list[i]->basename && hlink_list[i - 1]->basename &&
 		    hlink_list[i]->dev == hlink_list[i - 1]->dev &&
 		    hlink_list[i]->inode == hlink_list[i - 1]->inode) {
 			hard_link_one(i);
