@@ -109,9 +109,11 @@
 
 #define XFLG_FATAL_ERRORS	(1<<0)
 #define XFLG_DEF_INCLUDE	(1<<1)
-#define XFLG_WORDS_ONLY 	(1<<2)
+#define XFLG_DEF_EXCLUDE	(1<<2)
 #define XFLG_WORD_SPLIT 	(1<<3)
 #define XFLG_DIRECTORY	 	(1<<4)
+#define XFLG_NO_PREFIXES 	(1<<5)
+#define XFLG_ABS_PATH	 	(1<<6)
 
 #define PERMS_REPORT		(1<<0)
 #define PERMS_SKIP_MTIME	(1<<1)
@@ -507,11 +509,21 @@ struct map_struct {
 #define MATCHFLG_INCLUDE	(1<<4) /* this is an include, not an exclude */
 #define MATCHFLG_DIRECTORY	(1<<5) /* this matches only directories */
 #define MATCHFLG_CLEAR_LIST 	(1<<6) /* this item is the "!" token */
+#define MATCHFLG_WORD_SPLIT	(1<<7) /* split rules on whitespace */
+#define MATCHFLG_NO_INHERIT	(1<<8) /* don't inherit these rules */
+#define MATCHFLG_NO_PREFIXES	(1<<9) /* parse no prefixes from patterns */
+#define MATCHFLG_MERGE_FILE	(1<<10)/* specifies a file to merge */
+#define MATCHFLG_PERDIR_MERGE	(1<<11)/* merge-file is searched per-dir */
+#define MATCHFLG_EXCLUDE_SELF	(1<<12)/* merge-file name should be excluded */
+#define MATCHFLG_FINISH_SETUP	(1<<13)/* per-dir merge file needs setup */
 struct exclude_struct {
 	struct exclude_struct *next;
 	char *pattern;
 	unsigned int match_flags;
-	int slash_cnt;
+	union {
+		int slash_cnt;
+		struct exclude_list_struct *mergelist;
+	} u;
 };
 
 struct exclude_list_struct {
