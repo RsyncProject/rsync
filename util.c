@@ -835,9 +835,9 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 {
     int           pct  = (ofs == size) ? 100 : (int)((100.0*ofs)/size);
     unsigned long diff = msdiff(&start_time, now);
-    double        rate = diff ? ((ofs-start_ofs) / diff) * 1000.0/1024.0 : 0;
+    double        rate = diff ? (double) (ofs-start_ofs) * 1000.0 / diff / 1024.0 : 0;
     const char    *units, *rem_units;
-    double        remain = rate ? (size-ofs) / rate / 1000.0: 0.0;
+    double        remain = rate ? (double) (size-ofs) / rate / 1000.0: 0.0;
     int 	  remain_h, remain_m, remain_s;
 
     if (rate > 1024*1024) {
