@@ -213,7 +213,7 @@
    if (count == 0 && MDp->done) return;
    /* check to see if MD is already done and report error */
    if (MDp->done)
-          { printf("\nError: MDupdate MD already done."); return; }
+          { fprintf(FERROR,"\nError: MDupdate MD already done."); return; }
    /* Add count to MDp->count */
    tmp = count;
    p = MDp->count;
@@ -228,7 +228,7 @@
        MDblock(MDp,(unsigned int *)X);
      }
    else if (count > 512) /* Check for count too large */
-     { printf("\nError: MDupdate called with illegal count value %d."
+     { fprintf(FERROR,"\nError: MDupdate called with illegal count value %d."
               ,count);
        return;
      }
