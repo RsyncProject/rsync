@@ -531,7 +531,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 	static uid_t uid;
 	static gid_t gid;
 	static char lastname[MAXPATHLEN], *lastdir;
-	static int lastdir_len = -1;
+	static int lastdir_depth, lastdir_len = -1;
 	char thisname[MAXPATHLEN];
 	unsigned int l1 = 0, l2 = 0;
 	int alloc_len, basename_len, dirname_len, linkname_len, sum_len;
@@ -573,7 +573,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 	clean_fname(thisname);
 
 	if (sanitize_paths)
-		sanitize_path(thisname, thisname, NULL);
+		sanitize_path(thisname, thisname, "", 0);
 
 	if ((basename = strrchr(thisname, '/')) != NULL) {
 		dirname_len = ++basename - thisname; /* counts future '\0' */
@@ -656,6 +656,8 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 		memcpy(bp, dirname, dirname_len - 1);
 		bp += dirname_len;
 		bp[-1] = '\0';
+		if (sanitize_paths)
+			lastdir_depth = count_dir_elements(lastdir);
 	} else if (dirname)
 		file->dirname = dirname;
 
@@ -671,7 +673,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 		file->u.link = bp;
 		read_sbuf(f, bp, linkname_len - 1);
 		if (sanitize_paths)
-			sanitize_path(bp, bp, lastdir);
+			sanitize_path(bp, bp, "", lastdir_depth);
 		bp += linkname_len;
 	}
 #endif
@@ -761,7 +763,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	}
 	clean_fname(thisname);
 	if (sanitize_paths)
-		sanitize_path(thisname, thisname, NULL);
+		sanitize_path(thisname, thisname, "", 0);
 
 	memset(sum, 0, SUM_LENGTH);
 
@@ -1077,13 +1079,13 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (use_ff_fd) {
 			if (read_filesfrom_line(filesfrom_fd, fname) == 0)
 				break;
-			sanitize_path(fname, fname, NULL);
+			sanitize_path(fname, fname, "", 0);
 		} else {
 			if (argc-- == 0)
 				break;
 			strlcpy(fname, *argv++, MAXPATHLEN);
 			if (sanitize_paths)
-				sanitize_path(fname, fname, NULL);
+				sanitize_path(fname, fname, "", 0);
 		}
 
 		l = strlen(fname);
