@@ -138,8 +138,10 @@ of not being able to follow symbolic links outside of the new root path
 when reading, and of complicating the preservation of usernames and groups
 (see below).  When "use chroot" is false, for security reasons,
 symlinks may only be relative paths pointing to other files within the root
-path, and leading slashes are removed from absolute paths.  The default for
-"use chroot" is true.
+path, and leading slashes are removed from most absolute paths (options
+such as --backup-dir, --compare-dest, etc. interpret an absolute path as
+rooted in the module's "path" dir, just as if chroot was specified).
+The default for "use chroot" is true.
 
 In order to preserve usernames and groupnames, rsync needs to be able to
 use the standard library functions for looking up names and IDs (i.e.
