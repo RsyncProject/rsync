@@ -29,8 +29,8 @@ void write_batch_flist_info(int flist_count, struct file_struct **files)
 	int i, f, save_pv;
 	int64 save_written;
 
-	snprintf(filename, sizeof filename, "%s%s",
-		 batch_prefix, rsync_flist_file);
+	i = strlcpy(filename, batch_prefix, sizeof filename);
+	strlcpy(filename + i, rsync_flist_file, sizeof filename - i);
 
 	f = do_open(filename, O_WRONLY|O_CREAT|O_TRUNC, S_IREAD|S_IWRITE);
 	if (f < 0) {
@@ -64,8 +64,8 @@ void write_batch_argvs_file(int argc, char *argv[])
 	char buff2[MAXPATHLEN + 6];
 	char filename[MAXPATHLEN];
 
-	snprintf(filename, sizeof filename, "%s%s",
-		 batch_prefix, rsync_argvs_file);
+	i = strlcpy(filename, batch_prefix, sizeof filename);
+	strlcpy(filename+i, rsync_argvs_file, sizeof filename - i);
 
 	f = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 		    S_IREAD | S_IWRITE | S_IEXEC);
@@ -124,8 +124,8 @@ struct file_list *create_flist_from_batch(void)
 	int i, f, save_pv;
 	int64 save_read;
 
-	snprintf(filename, sizeof filename, "%s%s",
-		 batch_prefix, rsync_flist_file);
+	i = strlcpy(filename, batch_prefix, sizeof filename);
+	strlcpy(filename + i, rsync_flist_file, sizeof filename - i);
 
 	f = do_open(filename, O_RDONLY, 0);
 	if (f < 0) {
@@ -193,8 +193,8 @@ void write_batch_csum_info(int *flist_entry, struct sum_struct *s)
 	char filename[MAXPATHLEN];
 
 	if (f_csums < 0) {
-		snprintf(filename, sizeof filename, "%s%s",
-			 batch_prefix, rsync_csums_file);
+		int n = strlcpy(filename, batch_prefix, sizeof filename);
+		strlcpy(filename + n, rsync_csums_file, sizeof filename - n);
 
 		f_csums = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 				  S_IREAD | S_IWRITE);
@@ -242,8 +242,8 @@ void read_batch_csum_info(int flist_entry, struct sum_struct *s,
 	char filename[MAXPATHLEN];
 
 	if (f_csums < 0) {
-		snprintf(filename, sizeof filename, "%s%s",
-			 batch_prefix, rsync_csums_file);
+		int n = strlcpy(filename, batch_prefix, sizeof filename);
+		strlcpy(filename + n, rsync_csums_file, sizeof filename - n);
 
 		f_csums = do_open(filename, O_RDONLY, 0);
 		if (f_csums < 0) {
@@ -284,8 +284,8 @@ void write_batch_delta_file(char *buff, int bytes_to_write)
 	char filename[MAXPATHLEN];
 
 	if (f_delta < 0) {
-		snprintf(filename, sizeof filename, "%s%s",
-			 batch_prefix, rsync_delta_file);
+		int n = strlcpy(filename, batch_prefix, sizeof filename);
+		strlcpy(filename + n, rsync_delta_file, sizeof filename - n);
 
 		f_delta = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 				  S_IREAD | S_IWRITE);
@@ -316,8 +316,8 @@ int read_batch_delta_file(char *buff, int len)
 	char filename[MAXPATHLEN];
 
 	if (f_delta < 0) {
-		snprintf(filename, sizeof filename, "%s%s",
-			 batch_prefix, rsync_delta_file);
+		int n = strlcpy(filename, batch_prefix, sizeof filename);
+		strlcpy(filename + n, rsync_delta_file, sizeof filename - n);
 
 		f_delta = do_open(filename, O_RDONLY, 0);
 		if (f_delta < 0) {
