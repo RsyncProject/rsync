@@ -432,6 +432,20 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 	return status | status2;
 }
 
+static char *find_colon(char *s)
+{
+	char *p, *p2;
+
+	p = strchr(s,':');
+	if (!p) return NULL;
+	
+	/* now check to see if there is a / in the string before the : - if there is then
+	   discard the colon on the assumption that the : is part of a filename */
+	p2 = strchr(s,'/');
+	if (p2 && p2 < p) return NULL;
+
+	return p;
+}
 
 static int start_client(int argc, char *argv[])
 {
@@ -445,7 +459,7 @@ static int start_client(int argc, char *argv[])
 	extern int am_sender;
 	extern char *shell_cmd;
 
-	p = strchr(argv[0],':');
+	p = find_colon(argv[0]);
 
 	if (p) {
 		if (p[1] == ':') {
@@ -467,7 +481,7 @@ static int start_client(int argc, char *argv[])
 	} else {
 		am_sender = 1;
 
-		p = strchr(argv[argc-1],':');
+		p = find_colon(argv[argc-1]);
 		if (!p) {
 			local_server = 1;
 		} else if (p[1] == ':') {
