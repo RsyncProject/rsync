@@ -94,7 +94,7 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 		    OFF_T offset,int i)
 {
 	OFF_T n = offset - last_match;
-	int j;
+	OFF_T j;
 
 	if (verbose > 2 && i >= 0)
 		rprintf(FINFO,"match at %d last_match=%d j=%d len=%d n=%d\n",
