@@ -110,7 +110,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 {
 	int fd = -1;
 	struct sum_struct *s;
-	struct map_struct *buf = NULL;
+	struct map_struct *mbuf = NULL;
 	STRUCT_STAT st;
 	char fname[MAXPATHLEN];
 	int i;
@@ -217,15 +217,12 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				return;
 			}
 
-			if (st.st_size > 0) {
-				buf = map_file(fd, st.st_size);
-			} else {
-				buf = NULL;
-			}
+			mbuf = st.st_size ? map_file(fd, st.st_size) : NULL;
 
-			if (verbose > 2)
+			if (verbose > 2) {
 				rprintf(FINFO, "send_files mapped %s of size %.0f\n",
 					fname, (double)st.st_size);
+			}
 
 			write_int(f_out, i);
 
@@ -271,7 +268,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 							}
 						}
 					}  /* end while  */
-					read_batch_delta_file( buff, MD4_SUM_LENGTH);
+					read_batch_delta_file(buff, MD4_SUM_LENGTH);
 					write_buf(f_out, buff, MD4_SUM_LENGTH);
 
 				}  /* j=i */
@@ -281,13 +278,13 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				continue;
 			}
 		} else  {
-			match_sums(f_out, s, buf, st.st_size);
+			match_sums(f_out, s, mbuf, st.st_size);
 			log_send(file, &initial_stats);
 		}
 
 		if (!read_batch) {
-			if (buf) {
-				j = unmap_file(buf);
+			if (mbuf) {
+				j = unmap_file(mbuf);
 				if (j) {
 					io_error |= IOERR_GENERAL;
 					rprintf(FERROR,
