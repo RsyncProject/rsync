@@ -113,7 +113,7 @@
 #define XFLG_WORD_SPLIT 	(1<<3)
 #define XFLG_DIRECTORY	 	(1<<4)
 #define XFLG_NO_PREFIXES 	(1<<5)
-#define XFLG_ABS_PATH	 	(1<<6)
+#define XFLG_ANCHORED2ABS	(1<<6)
 
 #define PERMS_REPORT		(1<<0)
 #define PERMS_SKIP_MTIME	(1<<1)
