@@ -185,6 +185,10 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #include <glob.h>
 #endif
 
+#ifdef HAVE_MALLOC_H
+#  include <malloc.h>
+#endif
+
 /* these are needed for the uid/gid mapping code */
 #include <pwd.h>
 #include <grp.h>

@@ -2,7 +2,7 @@
    
    Copyright (C) 1996-2001 by Andrew Tridgell <tridge@samba.org>
    Copyright (C) Paul Mackerras 1996
-   Copyright (C) 2001 by Martin Pool <mbp@samba.org>
+   Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@ struct stats stats;
 
 extern int verbose;
 
+static void show_malloc_stats(void);
 
 /****************************************************************************
 wait for a process to exit, calling io_flush while waiting
@@ -119,10 +120,36 @@ static void report(int f)
 		rprintf(FINFO,"total size is %.0f  speedup is %.2f\n",
 		       (double)stats.total_size,
 		       (1.0*stats.total_size)/(stats.total_written+stats.total_read));
+		show_malloc_stats();
 	}
 
 	fflush(stdout);
 	fflush(stderr);
+}
+
+
+/**
+ * If our C library can get malloc statistics, then show them to FINFO
+ **/
+static void show_malloc_stats(void)
+{
+#ifdef HAVE_MALLINFO
+	struct mallinfo mi;
+
+	mi = mallinfo();
+
+	rprintf(FINFO, RSYNC_NAME " heap statistics:\n");
+	rprintf(FINFO, "  arena:     %10d   (bytes from sbrk)\n", mi.arena);
+	rprintf(FINFO, "  ordblks:   %10d   (chunks not in use)\n", mi.ordblks);
+	rprintf(FINFO, "  smblks:    %10d\n", mi.smblks);
+	rprintf(FINFO, "  hblks:     %10d   (chunks from mmap)\n", mi.hblks);
+	rprintf(FINFO, "  hblkhd:    %10d   (bytes from mmap)\n", mi.hblkhd);
+	rprintf(FINFO, "  usmblks:   %10d\n", mi.usmblks);
+	rprintf(FINFO, "  fsmblks:   %10d\n", mi.fsmblks);
+	rprintf(FINFO, "  uordblks:  %10d   (bytes used)\n", mi.uordblks);
+	rprintf(FINFO, "  fordblks:  %10d   (bytes free)\n", mi.fordblks);
+	rprintf(FINFO, "  keepcost:  %10d   (bytes in releasable chunk)\n", mi.keepcost);
+#endif /* HAVE_MALLINFO */
 }
 
 
