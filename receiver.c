@@ -597,7 +597,9 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		cleanup_disable();
 
 		if (recv_ok) {
-			if (remove_sent_files) {
+			if (delay_updates && delayed_bits[i/8] & (1 << (i % 8)))
+				;
+			else if (remove_sent_files) {
 				SIVAL(numbuf, 0, i);
 				send_msg(MSG_SUCCESS, numbuf, 4);
 			}
@@ -654,6 +656,10 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 						full_fname(fname),
 						safe_fname(partialptr));
 				} else {
+					if (remove_sent_files) {
+						SIVAL(numbuf, 0, i);
+						send_msg(MSG_SUCCESS,numbuf,4);
+					}
 					handle_partial_dir(partialptr,
 							   PDIR_DELETE);
 				}
