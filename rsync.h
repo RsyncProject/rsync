@@ -108,6 +108,7 @@
 #define XFLG_DEF_INCLUDE	(1<<1)
 #define XFLG_WORDS_ONLY 	(1<<2)
 #define XFLG_WORD_SPLIT 	(1<<3)
+#define XFLG_DIRECTORY	 	(1<<4)
 
 #define PERMS_REPORT		(1<<0)
 #define PERMS_SKIP_MTIME	(1<<1)
