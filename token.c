@@ -50,7 +50,8 @@ static int simple_recv_token(int f,char **data)
 
 
 /* non-compressing send token */
-static void simple_send_token(int f,int token,char *buf,int offset,int n)
+static void simple_send_token(int f,int token,
+			      struct map_struct *buf,int offset,int n)
 {
   if (n > 0) {
     int l = 0;
@@ -71,9 +72,8 @@ static void simple_send_token(int f,int token,char *buf,int offset,int n)
  * transmit a verbatim buffer of length n followed by a token 
  * If token == -1 then we have reached EOF 
  * If n == 0 then don't send a buffer
- * Note that "buf" must be used via map_ptr() starting at "offset"
  */
-void send_token(int f,int token,char *buf,int offset,int n)
+void send_token(int f,int token,struct map_struct *buf,int offset,int n)
 {
   if (!do_compression) {
     simple_send_token(f,token,buf,offset,n);

@@ -88,7 +88,8 @@ static void build_hash_table(struct sum_struct *s)
 static off_t last_match;
 
 
-static void matched(int f,struct sum_struct *s,char *buf,off_t len,
+static void matched(int f,struct sum_struct *s,struct map_struct *buf,
+		    off_t len,
 		    int offset,int i)
 {
   int n = offset - last_match;
@@ -112,7 +113,8 @@ static void matched(int f,struct sum_struct *s,char *buf,off_t len,
 }
 
 
-static void hash_search(int f,struct sum_struct *s,char *buf,off_t len)
+static void hash_search(int f,struct sum_struct *s,
+			struct map_struct *buf,off_t len)
 {
   int offset,j,k;
   int end;
@@ -204,7 +206,7 @@ static void hash_search(int f,struct sum_struct *s,char *buf,off_t len)
 }
 
 
-void match_sums(int f,struct sum_struct *s,char *buf,off_t len)
+void match_sums(int f,struct sum_struct *s,struct map_struct *buf,off_t len)
 {
   last_match = 0;
   false_alarms = 0;

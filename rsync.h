@@ -34,7 +34,7 @@
 #define SAME_TIME (1<<7)
 
 /* update this if you make incompatible changes */
-#define PROTOCOL_VERSION 12
+#define PROTOCOL_VERSION 13
 #define MIN_PROTOCOL_VERSION 10
 #define MAX_PROTOCOL_VERSION 20
 
@@ -213,6 +213,10 @@ struct sum_struct {
   struct sum_buf *sums;		/* points to info for each chunk */
 };
 
+struct map_struct {
+  char *map,*p;
+  int fd,size,p_size,p_offset,p_len;
+};
 
 #include "byteorder.h"
 #include "version.h"

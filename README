@@ -12,7 +12,7 @@ diffs between two files normally requires local access to both
 files. 
 
 A technical report describing the rsync algorithm is included with
-this package.
+this package. 
 
 
 USAGE

@@ -93,7 +93,7 @@ void file_checksum(char *fname,char *sum,off_t size)
 {
   int i;
   MDstruct MD;
-  char *buf;
+  struct map_struct *buf;
   int fd;
   int len = size;
   char tmpchunk[CSUM_CHUNK];
@@ -118,7 +118,7 @@ void file_checksum(char *fname,char *sum,off_t size)
   sum_put(&MD,sum);
 
   close(fd);
-  unmap_file(buf,size);
+  unmap_file(buf);
 }
 
 

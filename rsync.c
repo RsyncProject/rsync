@@ -26,6 +26,8 @@ extern int am_server;
 extern int always_checksum;
 extern time_t starttime;
 
+extern int remote_version;
+
 extern char *backup_suffix;
 
 extern int block_size;
@@ -81,7 +83,7 @@ static void send_sums(struct sum_struct *s,int f_out)
 
   generate approximately one checksum every n bytes
   */
-static struct sum_struct *generate_sums(char *buf,off_t len,int n)
+static struct sum_struct *generate_sums(struct map_struct *buf,off_t len,int n)
 {
   int i;
   struct sum_struct *s;
@@ -253,7 +255,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 {  
   int fd;
   struct stat st;
-  char *buf;
+  struct map_struct *buf;
   struct sum_struct *s;
   char sum[SUM_LENGTH];
   int statret;
@@ -390,14 +392,14 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
   write_flush(f_out);
 
   close(fd);
-  unmap_file(buf,st.st_size);
+  unmap_file(buf);
 
   free_sums(s);
 }
 
 
 
-static void receive_data(int f_in,char *buf,int fd,char *fname)
+static void receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
 {
   int i,n,remainder,len,count;
   off_t offset = 0;
@@ -498,15 +500,16 @@ void sig_int(void)
 }
 
 
-int recv_files(int f_in,struct file_list *flist,char *local_name)
+int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 {  
   int fd1,fd2;
   struct stat st;
   char *fname;
   char fnametmp[MAXPATHLEN];
-  char *buf;
+  struct map_struct *buf;
   int i;
   struct file_struct *file;
+  int phase=0;
 
   if (verbose > 2) {
     fprintf(FERROR,"recv_files(%d) starting\n",flist->count);
@@ -519,7 +522,15 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
   while (1) 
     {
       i = read_int(f_in);
-      if (i == -1) break;
+      if (i == -1) {
+	if (phase==0 && remote_version >= 13) {
+	  phase++;
+	  write_int(f_gen,-1);
+	  write_flush(f_gen);
+	  continue;
+	}
+	break;
+      }
 
       file = &flist->files[i];
       fname = file->name;
@@ -581,7 +592,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
       receive_data(f_in,buf,fd2,fname);
 
       if (fd1 != -1) {
-	unmap_file(buf,st.st_size);
+	unmap_file(buf);
 	close(fd1);
       }
       close(fd2);
@@ -621,12 +632,13 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
 { 
   int fd;
   struct sum_struct *s;
-  char *buf;
+  struct map_struct *buf;
   struct stat st;
   char fname[MAXPATHLEN];  
   off_t total=0;
   int i;
   struct file_struct *file;
+  int phase = 0;
 
   if (verbose > 2)
     fprintf(FERROR,"send_files starting\n");
@@ -636,7 +648,15 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
   while (1) 
     {
       i = read_int(f_in);
-      if (i == -1) break;
+      if (i == -1) {
+	if (phase==0 && remote_version >= 13) {
+	  phase++;
+	  write_int(f_out,-1);
+	  write_flush(f_out);
+	  continue;
+	}
+	break;
+      }
 
       file = &flist->files[i];
 
@@ -701,7 +721,7 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
       match_sums(f_out,s,buf,st.st_size);
       write_flush(f_out);
       
-      unmap_file(buf,st.st_size);
+      unmap_file(buf);
       close(fd);
 
       free_sums(s);
@@ -725,7 +745,7 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
 
 
 
-void generate_files(int f,struct file_list *flist,char *local_name)
+void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 {
   int i;
 
@@ -748,8 +768,25 @@ void generate_files(int f,struct file_list *flist,char *local_name)
     recv_generator(local_name?local_name:file->name,
 		   flist,i,f);
   }
+
   write_int(f,-1);
   write_flush(f);
+
+  if (remote_version >= 13) {
+    /* go to the full checksum if anything has failed so far */
+    csum_length = SUM_LENGTH;
+
+    for (i=read_int(f_recv); i != -1; i=read_int(f_recv)) {
+      struct file_struct *file = &flist->files[i];
+      recv_generator(local_name?local_name:file->name,
+		     flist,i,f);    
+    }
+
+    write_int(f,-1);
+    write_flush(f);
+  }
+
+
   if (verbose > 2)
     fprintf(FERROR,"generator wrote %d\n",write_total());
 }
