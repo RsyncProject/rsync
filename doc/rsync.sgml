@@ -94,23 +94,111 @@
 	The most commonly used arguments for rsync are
       </para>
 
-<!--
-@item -a 
-Reproduce the structure and attributes of the origin files as exactly
-as possible: this includes copying subdirectories, symlinks, special
-files, ownership and permissions.  (@xref{Attributes to copy}.)
+      <variablelist>
+	<varlistentry>
+	  <term><option>-v</term>
+	  <listitem>
+	    <para>Be verbose.  Primarily, display the name of each file as it is copied.</para>
+	  </listitem>
+	</varlistentry>
 
-@item -v 
-Be verbose.  Primarily, display the name of each file as it is copied.
 
-@item -z 
-Compress network traffic, using a modified version of the
-@command{zlib} library.
+	<varlistentry>
+	  <term><option>-a
+	  <listitem>
+	    <para>
+	      Reproduce the structure and attributes of the origin files as exactly
+	      as possible: this includes copying subdirectories, symlinks, special
+	      files, ownership and permissions.  (@xref{Attributes to
+	      copy}.)
+	    </para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
 
-@item -P
-Display a progress indicator while files are transferred.  This should
-normally be ommitted if rsync is not run on a terminal.
--->
+
+	
+      <para><option>-v </option>
+      
+      <para><option>-z</option>
+	Compress network traffic, using a modified version of the
+	@command{zlib} library.</para>
+      
+      <para><option>-P</option>
+	Display a progress indicator while files are transferred.  This should
+	normally be ommitted if rsync is not run on a terminal.
+      </para>
+    </section>
+
+
+
+
+    <section>
+      <title>Local and remote</title>
+      
+      <para>There are six different ways of using rsync. They
+      are:</para>
+
+      
+
+      <!-- one of (CALLOUTLIST GLOSSLIST ITEMIZEDLIST ORDEREDLIST SEGMENTEDLIST SIMPLELIST VARIABLELIST CAUTION IMPORTANT NOTE TIP WARNING LITERALLAYOUT PROGRAMLISTING PROGRAMLISTINGCO SCREEN SCREENCO SCREENSHOT SYNOPSIS CMDSYNOPSIS FUNCSYNOPSIS CLASSSYNOPSIS FIELDSYNOPSIS CONSTRUCTORSYNOPSIS DESTRUCTORSYNOPSIS METHODSYNOPSIS FORMALPARA PARA SIMPARA ADDRESS BLOCKQUOTE GRAPHIC GRAPHICCO MEDIAOBJECT MEDIAOBJECTCO INFORMALEQUATION INFORMALEXAMPLE INFORMALFIGURE INFORMALTABLE EQUATION EXAMPLE FIGURE TABLE MSGSET PROCEDURE SIDEBAR QANDASET ANCHOR BRIDGEHEAD REMARK HIGHLIGHTS ABSTRACT AUTHORBLURB EPIGRAPH INDEXTERM REFENTRY SECTION) -->
+      <orderedlist>
+	<listitem>
+	  <para>
+	    for copying local files. This is invoked when neither
+	    source nor destination path contains a @code{:} separator
+
+	<listitem>
+	  <para>
+	    for copying from the local machine to a remote machine using
+	    a remote shell program as the transport (such as rsh or
+	    ssh). This is invoked when the destination path contains a
+	    single @code{:} separator.
+
+	<listitem>
+	  <para>
+	    for copying from a remote machine to the local machine
+	    using a remote shell program. This is invoked when the source
+	    contains a @code{:} separator.
+
+	<listitem>
+	  <para>
+	    for copying from a remote rsync server to the local
+	    machine. This is invoked when the source path contains a @code{::}
+	    separator or a @code{rsync://} URL.
+
+	<listitem>
+	  <para>
+	    for copying from the local machine to a remote rsync
+	    server. This is invoked when the destination path contains a @code{::}
+	    separator.
+
+	<listitem>
+	  <para>
+	    for listing files on a remote machine. This is done the
+	    same way as rsync transfers except that you leave off the
+	    local destination.  
+
+	</listitem>
+      </orderedlist>
+	  <para>
+Note that in all cases (other than listing) at least one of the source
+and destination paths must be local.
+
+	  <para>
+Any one invocation of rsync makes a copy in a single direction.  rsync
+currently has no equivalent of @command{ftp}'s interactive mode.
+
+@cindex @sc{nfs}
+@cindex network filesystems
+@cindex remote filesystems
+
+	  <para>
+rsync's network protocol is generally faster at copying files than
+network filesystems such as @sc{nfs} or @sc{cifs}.  It is better to
+run rsync on the file server either as a daemon or over ssh than
+running rsync giving the network directory.
+      </para>
     </section>
   </chapter>
 </book>
