@@ -1,27 +1,26 @@
 /*  -*- c-file-style: "linux" -*-
-    
-    Copyright (C) 1996-2000 by Andrew Tridgell 
-    Copyright (C) Paul Mackerras 1996
-    Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
-   
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-   
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-   
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-*/
+ * 
+ * Copyright (C) 1996-2000 by Andrew Tridgell 
+ * Copyright (C) Paul Mackerras 1996
+ * Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
 
 /**
- *
- * @file util.c
+ * @file
  *
  * Utilities used in rsync 
  **/
@@ -30,15 +29,18 @@
 
 extern int verbose;
 
+int sanitize_paths = 0;
+
+
 
 /**
-   Set a fd into nonblocking mode
-**/
+ * Set a fd into nonblocking mode
+ **/
 void set_nonblocking(int fd)
 {
 	int val;
 
-	if((val = fcntl(fd, F_GETFL, 0)) == -1)
+	if ((val = fcntl(fd, F_GETFL, 0)) == -1)
 		return;
 	if (!(val & NONBLOCK_FLAG)) {
 		val |= NONBLOCK_FLAG;
@@ -47,13 +49,13 @@ void set_nonblocking(int fd)
 }
 
 /**
-Set a fd into blocking mode
-*/
+ * Set a fd into blocking mode
+ **/
 void set_blocking(int fd)
 {
 	int val;
 
-	if((val = fcntl(fd, F_GETFL, 0)) == -1)
+	if ((val = fcntl(fd, F_GETFL, 0)) == -1)
 		return;
 	if (val & NONBLOCK_FLAG) {
 		val &= ~NONBLOCK_FLAG;
@@ -63,10 +65,10 @@ void set_blocking(int fd)
 
 
 /**
-   Create a file descriptor pair - like pipe() but use socketpair if
-   possible (because of blocking issues on pipes).
-
-   Always set non-blocking.
+ * Create a file descriptor pair - like pipe() but use socketpair if
+ * possible (because of blocking issues on pipes).
+ * 
+ * Always set non-blocking.
  */
 int fd_pair(int fd[2])
 {
@@ -82,12 +84,12 @@ int fd_pair(int fd[2])
 		set_nonblocking(fd[0]);
 		set_nonblocking(fd[1]);
 	}
-	
+
 	return ret;
 }
 
 
-static void print_child_argv(char **cmd)
+void print_child_argv(char **cmd)
 {
 	rprintf(FINFO, "opening connection using ");
 	for (; *cmd; cmd++) {
@@ -105,132 +107,6 @@ static void print_child_argv(char **cmd)
 	}
 	rprintf(FINFO, "\n");
 }
-
-
-/**
- * Create a child connected to use on stdin/stdout.
- *
- * This is derived from CVS code 
- * 
- * Note that in the child STDIN is set to blocking and STDOUT
- * is set to non-blocking. This is necessary as rsh relies on stdin being blocking
- *  and ssh relies on stdout being non-blocking
- *
- * If blocking_io is set then use blocking io on both fds. That can be
- * used to cope with badly broken rsh implementations like the one on
- * Solaris.
- **/
-pid_t piped_child(char **command, int *f_in, int *f_out)
-{
-	pid_t pid;
-	int to_child_pipe[2];
-	int from_child_pipe[2];
-	extern int blocking_io;
-	
-	if (verbose >= 2) {
-		print_child_argv(command);
-	}
-
-	if (fd_pair(to_child_pipe) < 0 || fd_pair(from_child_pipe) < 0) {
-		rprintf(FERROR, "pipe: %s\n", strerror(errno));
-		exit_cleanup(RERR_IPC);
-	}
-
-
-	pid = do_fork();
-	if (pid == -1) {
-		rprintf(FERROR, "fork: %s\n", strerror(errno));
-		exit_cleanup(RERR_IPC);
-	}
-
-	if (pid == 0) {
-		extern int orig_umask;
-		if (dup2(to_child_pipe[0], STDIN_FILENO) < 0 ||
-		    close(to_child_pipe[1]) < 0 ||
-		    close(from_child_pipe[0]) < 0 ||
-		    dup2(from_child_pipe[1], STDOUT_FILENO) < 0) {
-			rprintf(FERROR, "Failed to dup/close : %s\n",
-				strerror(errno));
-			exit_cleanup(RERR_IPC);
-		}
-		if (to_child_pipe[0] != STDIN_FILENO)
-			close(to_child_pipe[0]);
-		if (from_child_pipe[1] != STDOUT_FILENO)
-			close(from_child_pipe[1]);
-		umask(orig_umask);
-		set_blocking(STDIN_FILENO);
-		if (blocking_io) {
-			set_blocking(STDOUT_FILENO);
-		}
-		execvp(command[0], command);
-		rprintf(FERROR, "Failed to exec %s : %s\n",
-			command[0], strerror(errno));
-		exit_cleanup(RERR_IPC);
-	}
-
-	if (close(from_child_pipe[1]) < 0 || close(to_child_pipe[0]) < 0) {
-		rprintf(FERROR, "Failed to close : %s\n", strerror(errno));
-		exit_cleanup(RERR_IPC);
-	}
-
-	*f_in = from_child_pipe[0];
-	*f_out = to_child_pipe[1];
-
-	return pid;
-}
-
-pid_t local_child(int argc, char **argv,int *f_in,int *f_out,
-		  int (*child_main)(int, char **))
-{
-	pid_t pid;
-	int to_child_pipe[2];
-	int from_child_pipe[2];
-	extern int read_batch;  /* dw */
-
-	if (fd_pair(to_child_pipe) < 0 ||
-	    fd_pair(from_child_pipe) < 0) {
-		rprintf(FERROR,"pipe: %s\n",strerror(errno));
-		exit_cleanup(RERR_IPC);
-	}
-
-
-	pid = do_fork();
-	if (pid == -1) {
-		rprintf(FERROR,"fork: %s\n",strerror(errno));
-		exit_cleanup(RERR_IPC);
-	}
-
-	if (pid == 0) {
-		extern int am_sender;
-		extern int am_server;
-
-		am_sender = read_batch ? 0 : !am_sender;
-		am_server = 1;		
-
-		if (dup2(to_child_pipe[0], STDIN_FILENO) < 0 ||
-		    close(to_child_pipe[1]) < 0 ||
-		    close(from_child_pipe[0]) < 0 ||
-		    dup2(from_child_pipe[1], STDOUT_FILENO) < 0) {
-			rprintf(FERROR,"Failed to dup/close : %s\n",strerror(errno));
-			exit_cleanup(RERR_IPC);
-		}
-		if (to_child_pipe[0] != STDIN_FILENO) close(to_child_pipe[0]);
-		if (from_child_pipe[1] != STDOUT_FILENO) close(from_child_pipe[1]);
-		child_main(argc, argv);
-	}
-
-	if (close(from_child_pipe[1]) < 0 ||
-	    close(to_child_pipe[0]) < 0) {
-		rprintf(FERROR,"Failed to close : %s\n",strerror(errno));   
-		exit_cleanup(RERR_IPC);
-	}
-
-	*f_in = from_child_pipe[0];
-	*f_out = to_child_pipe[1];
-  
-	return pid;
-}
-
 
 
 void out_of_memory(char *str)
@@ -287,9 +163,8 @@ int set_modtime(char *fname, time_t modtime)
    what perms to give the directory when this is called so we need to rely
    on the umask
 **/
-int create_directory_path(char *fname)
+int create_directory_path(char *fname, int base_umask)
 {
-	extern int orig_umask;
 	char *p;
 
 	while (*fname == '/') fname++;
@@ -298,7 +173,7 @@ int create_directory_path(char *fname)
 	p = fname;
 	while ((p=strchr(p,'/'))) {
 		*p = 0;
-		do_mkdir(fname,0777 & ~orig_umask); 
+		do_mkdir(fname, 0777 & ~base_umask); 
 		*p = '/';
 		p++;
 	}
@@ -888,100 +763,6 @@ int u_strcmp(const char *cs1, const char *cs2)
 	return (int)*s1 - (int)*s2;
 }
 
-static OFF_T  last_ofs;
-static struct timeval print_time;
-static struct timeval start_time;
-static OFF_T  start_ofs;
-
-static unsigned long msdiff(struct timeval *t1, struct timeval *t2)
-{
-    return (t2->tv_sec - t1->tv_sec) * 1000
-        + (t2->tv_usec - t1->tv_usec) / 1000;
-}
-
-
-/**
- * @param ofs Current position in file
- * @param size Total size of file
- * @param is_last True if this is the last time progress will be
- * printed for this file, so we should output a newline.  (Not
- * necessarily the same as all bytes being received.)
- **/
-static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
-			    int is_last)
-{
-    int           pct  = (ofs == size) ? 100 : (int)((100.0*ofs)/size);
-    unsigned long diff = msdiff(&start_time, now);
-    double        rate = diff ? (double) (ofs-start_ofs) * 1000.0 / diff / 1024.0 : 0;
-    const char    *units;
-    /* If we've finished transferring this file, show the time taken;
-     * otherwise show expected time to complete.  That's kind of
-     * inconsistent, but people can probably cope.  Hopefully we'll
-     * get more consistent and complete progress reporting soon. --
-     * mbp */
-    double        remain = is_last
-                        ? (double) diff / 1000.0
-                        : rate ? (double) (size-ofs) / rate / 1000.0 : 0.0;
-    int 	  remain_h, remain_m, remain_s;
-
-    if (rate > 1024*1024) {
-	    rate /= 1024.0 * 1024.0;
-	    units = "GB/s";
-    } else if (rate > 1024) {
-	    rate /= 1024.0;
-	    units = "MB/s";
-    } else {
-	    units = "kB/s";
-    }
-
-    remain_s = (int) remain % 60;
-    remain_m = (int) (remain / 60.0) % 60;
-    remain_h = (int) (remain / 3600.0);
-    
-    rprintf(FINFO, "%12.0f %3d%% %7.2f%s %4d:%02d:%02d%s",
-	    (double) ofs, pct, rate, units,
-	    remain_h, remain_m, remain_s,
-	    is_last ? "\n" : "\r");
-}
-
-void end_progress(OFF_T size)
-{
-	extern int do_progress, am_server;
-
-	if (do_progress && !am_server) {
-        	struct timeval now;
-                gettimeofday(&now, NULL);
-                rprint_progress(size, size, &now, True);
-	}
-	last_ofs   = 0;
-        start_ofs  = 0;
-        print_time.tv_sec  = print_time.tv_usec  = 0;
-        start_time.tv_sec  = start_time.tv_usec  = 0;
-}
-
-void show_progress(OFF_T ofs, OFF_T size)
-{
-	extern int do_progress, am_server;
-        struct timeval now;
-
-        gettimeofday(&now, NULL);
-
-        if (!start_time.tv_sec && !start_time.tv_usec) {
-        	start_time.tv_sec  = now.tv_sec;
-                start_time.tv_usec = now.tv_usec;
-                start_ofs          = ofs;
-        }
-
-	if (do_progress
-            && !am_server
-            && ofs > last_ofs + 1000
-            && msdiff(&print_time, &now) > 250) {
-        	rprint_progress(ofs, size, &now, False);
-                last_ofs = ofs;
-                print_time.tv_sec  = now.tv_sec;
-                print_time.tv_usec = now.tv_usec;
-	}
-}
 
 
 /**
