@@ -322,7 +322,7 @@ void add_exclude_file(struct exclude_list_struct *listp, const char *fname,
 {
 	FILE *fp;
 	char line[MAXPATHLEN+3]; /* Room for "x " prefix and trailing slash. */
-	char *eob = line + MAXPATHLEN - 1;
+	char *eob = line + sizeof line - 1;
 	int word_split = xflags & XFLG_WORD_SPLIT;
 
 	if (!fname || !*fname)
