@@ -96,11 +96,11 @@ t_unsafe: $(T_UNSAFE_OBJ)
 #configure: configure.in
 #	echo "WARNING: you need to rerun autoconf"
 
-rsync.1: rsync.yo
-	yodl2man -o rsync.1 rsync.yo
+$(srcdir)/rsync.1: $(srcdir)/rsync.yo
+	yodl2man -o $(srcdir)/rsync.1 $(srcdir)/rsync.yo
 
-rsyncd.conf.5: rsyncd.conf.yo
-	yodl2man -o rsyncd.conf.5 rsyncd.conf.yo
+$(srcdir)/rsyncd.conf.5: $(srcdir)/rsyncd.conf.yo
+	yodl2man -o $(srcdir)/rsyncd.conf.5 $(srcdir)/rsyncd.conf.yo
 
 proto:
 	cat $(srcdir)/*.c $(srcdir)/lib/compat.c | awk -f $(srcdir)/mkproto.awk > $(srcdir)/proto.h
