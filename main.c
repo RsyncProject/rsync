@@ -30,7 +30,6 @@ extern int am_sender;
 extern int am_generator;
 extern int am_daemon;
 extern int verbose;
-extern int itemize_changes;
 extern int blocking_io;
 extern int delete_before;
 extern int daemon_over_rsh;
@@ -1173,9 +1172,6 @@ int main(int argc,char *argv[])
 		usage(FERROR);
 		exit_cleanup(RERR_SYNTAX);
 	}
-
-	if (dry_run && !verbose && !itemize_changes)
-		verbose = 1;
 
 	if (am_server) {
 		set_nonblocking(STDIN_FILENO);
