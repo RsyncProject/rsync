@@ -425,7 +425,7 @@ then
     then
 	# this can be removed when/if we add an included alloca.c;
 	#  see autoconf documentation on AC_FUNC_ALLOCA
-	AC_MSG_WARN([included libpopt requires alloca which is not available])
+	AC_MSG_WARN([included libpopt will use malloc, not alloca (which wastes a small amount of memory)])
     fi
 else
     AC_MSG_RESULT(no)
