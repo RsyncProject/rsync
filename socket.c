@@ -90,6 +90,39 @@ static int establish_proxy_connection(int fd, char *host, int port)
 }
 
 
+/**
+ * Try to set the local address for a newly-created socket.  Return -1
+ * if this fails.
+ **/
+int try_bind_local(int s,
+		   int ai_family, int ai_socktype,
+		   const char *bind_address)
+{
+	int error;
+	struct addrinfo bhints, *bres_all, *r;
+
+	memset(&bhints, 0, sizeof(bhints));
+	bhints.ai_family = ai_family;
+	bhints.ai_socktype = ai_socktype;
+	bhints.ai_flags = AI_PASSIVE;
+	if (getaddrinfo(bind_address, NULL, &bhints, &bres_all) == -1) {
+		rprintf(FERROR, RSYNC_NAME ": getaddrinfo %s: %s\n",
+			bind_address, gai_strerror(error));
+		return -1;
+	}
+
+	for (r = bres_all; r; r = r->ai_next) {
+		if (bind(s, bres->ai_addr, bres->ai_addrlen) == -1)
+			continue;
+		return s;
+	}
+
+	/* no error message; there might be some problem that allows
+	 * creation of the socket but not binding, perhaps if the
+	 * machine has no ipv6 address of this name. */
+	return -1;
+}
+
 
 /**
  * Open a socket to a tcp remote host with the specified port .
@@ -167,31 +200,13 @@ int open_socket_out(char *host, int port, const char *bind_address,
 		if (s < 0)
 			continue;
 
-		if (bind_address) {
-			struct addrinfo bhints, *bres;
-
-			memset(&bhints, 0, sizeof(bhints));
-			bhints.ai_family = res->ai_family;
-			bhints.ai_socktype = type;
-			bhints.ai_flags = AI_PASSIVE;
-			error = getaddrinfo(bind_address, NULL, &bhints, &bres);
-			if (error) {
-				rprintf(FERROR, RSYNC_NAME ": getaddrinfo: "
-					"bind address %s <noport>: %s\n",
-					bind_address, gai_strerror(error));
+		if (bind_address)
+			if (try_bind_local(s, res->ai_family, type,
+					   bind_address) == -1) {
+				close(s);
+				s = -1;
 				continue;
 			}
-			if (bres->ai_next) {
-				/* I'm not at all sure that this is the right
-				 * response here... -- mbp */
-				rprintf(FERROR, RSYNC_NAME ": getaddrinfo: "
-					"bind address %s resolved to multiple hosts\n",
-					bind_address);
-				freeaddrinfo(bres);
-				continue;
-			}
-			bind(s, bres->ai_addr, bres->ai_addrlen);
-		}
 
 		if (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
 			close(s);
