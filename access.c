@@ -34,7 +34,7 @@ static int match_hostname(char *host, char *tok)
 static int match_address(char *addr, char *tok)
 {
 	char *p;
-	unsigned long a, t, mask = ~0;
+	unsigned long a, t, mask = (unsigned long)~0;
 
 	if (!addr || !*addr) return 0;
 
