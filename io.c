@@ -24,6 +24,9 @@
   */
 #include "rsync.h"
 
+/* if no timeout is specified then use a 60 second select timeout */
+#define SELECT_TIMEOUT 60
+
 static int io_multiplexing_out;
 static int io_multiplexing_in;
 static int multiplex_in_fd;
@@ -83,11 +86,10 @@ static int read_timeout(int fd, char *buf, int len)
 
 		FD_ZERO(&fds);
 		FD_SET(fd, &fds);
-		tv.tv_sec = io_timeout;
+		tv.tv_sec = io_timeout?io_timeout:SELECT_TIMEOUT;
 		tv.tv_usec = 0;
 
-		if (select(fd+1, &fds, NULL, NULL, 
-			   io_timeout?&tv:NULL) != 1) {
+		if (select(fd+1, &fds, NULL, NULL, &tv) != 1) {
 			check_timeout();
 			continue;
 		}
@@ -338,13 +340,13 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 				fd_count = buffer_f_in+1;
 		}
 
-		tv.tv_sec = io_timeout;
+		tv.tv_sec = io_timeout?io_timeout:SELECT_TIMEOUT;
 		tv.tv_usec = 0;
 
 		count = select(fd_count,
 			       reading?&r_fds:NULL,
 			       &w_fds,NULL,
-			       io_timeout?&tv:NULL);
+			       &tv);
 
 		if (count <= 0) {
 			check_timeout();
