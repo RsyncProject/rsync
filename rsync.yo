@@ -1019,24 +1019,79 @@ default.
 
 dit(bf(-i, --itemize-changes)) Requests a simple itemized list of the
 changes that are being made to each file, including attribute changes.
-This is equivalent to specifying bf(--log-format='%i %n%L').  (See the
-description of what the output of '%i' means in the rsyncd.conf manpage.)
-Rsync also mentions the delete action when an item replaces an item of a
-different type (e.g. a directory replaces a file of the same name).
+This is exactly the same as specifying bf(--log-format='%i %n%L').
+
+The "%i" escape has a cryptic output that is 8 letters long.  The general
+format is as follows:
+
+quote(tt(  =Xcstpog))
+
+The bf(=) is output as either a bf(<) (receive) or a bf(>) (send) if the
+item is being transferred, a bf(.) if only the attributes are being
+updated, or a bf(=) if the items are identical.  Note that when a symlink
+or a device gets its value changed, that is considered to be a transfer (as
+opposed to a change in permissions, ownership, etc.).
+
+The bf(X) will be replaced by one of the following: an "f" for a file, a
+"d" for a dir, an "L" for a symlink, or a "D" for a device.
+
+The rest of the letters in the string above are the actual letters that
+will be output if the associated attribute for the item is being updated or
+a "." for no change.  Three exceptions to this are: (1) a newly created
+item replaces each letter with a "+", (2) an identical item replaces each
+letter with a space, and (3) an unknown attribute replaces each letter with
+a "?" (this happens when talking to an older rsync).
+
+The attribute that is associated with each letter is as follows:
+
+quote(itemize(
+  it() A bf(c) means the checksum of the file is different and will be
+  updated by the file transfer (requries bf(--checksum)).
+  it() A bf(s) means the size of the file is different and will be updated
+  by the file transfer.
+  it() A bf(t) means the modification time is different and is being updated
+  to the server's value (requires bf(--times)).  An alternate value of bf(T)
+  means that the time will be set to the transfer time, which happens
+  anytime a symlink is transferred, or when a file or device is transferred
+  without bf(--times).
+  it() A bf(p) means the permissions are different and are being updated to
+  the server's value (requires bf(--perms)).
+  it() An bf(o) means the owner is being updated to the server's value
+  (requires bf(--owner) and root privileges).
+  it() A bf(g) means the group is being updated to the server's value
+  (requires bf(--group) and the authority to set the requested group).
+))
+
+One other output is possible:  when deleting files, the "%i" will output
+the string "deleting" for each item that is being removed (assuming that
+you are talking to a recent enough rsync that it logs deletions instead of
+outputting them as a verbose message).
 
 dit(bf(--log-format=FORMAT)) This allows you to specify exactly what the
-rsync client logs to stdout on a per-file basis. This format can be used
-without bf(--verbose) to enable just the outputting of the file-transfer
-information, or it can be used to change how the names are output when
-bf(--verbose) is enabled.  Rsync will log the name of an item prior to its
-transfer unless one of the transferred-byte-count values is requested, in
-which case the logging is done at the end of the item's transfer.  In this
-late-transfer state, if bf(--progress) is also specified, rsync will output
-just the name of the file prior to the progress information.
+rsync client outputs to the user on a per-file basis.  The format is a text
+string containing embedded single-character escape sequences prefixed with
+a percent (%) character.  For a list of the possible escape characters, see
+the "log format" setting in the rsyncd.conf manpage.  (Note that this
+option does not affect what a daemon logs to its logfile.)
 
-The log format is specified using the same format conventions as the
-"log format" option in rsyncd.conf, so see that manpage for details.
-(Note that this option does not affect what a daemon logs to its logfile.)
+Specifying this option will mention each file, dir, etc. that gets updated
+in a significant way (a transferred file, a recreated symlink/device, or a
+touched directory) unless the itemized-changes escape (%i) is included in
+the string, in which case the logging of names increases to mention any
+item that is updated in any way (as long as the receiving side is version
+2.6.4).  See the bf(--itemized-changes) option for a description of the
+output of "%i".
+
+The bf(--verbose) option implies a format of "%n%L", but you can use
+bf(--log-format) without bv(--verbose) if you like, or you can override
+the format of its per-file output using this option.
+
+Rsync will output the log-format string prior to a file's transfer unless
+one of the transfer-statistic escapes is requested, in which case the
+logging is done at the end of the file's transfer.  When this late logging
+is in effect and bf(--progress) is also specified, rsync will also output
+the name of the file being transferred prior to its progress information
+(followed, of course, by the log-format output).
 
 dit(bf(--stats)) This tells rsync to print a verbose set of statistics
 on the file transfer, allowing you to tell how effective the rsync
