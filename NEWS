@@ -19,6 +19,8 @@ Changes since 2.6.1:
     - An obscure uninitialized-variable bug was fixed in the uid/gid
       code.  (This bug probably had no ill effects.)
 
+  BUILD CHANGES:
+
     - Got rid of the configure check for sys/sysctl.h (it wasn't used
       and was causing a problem on some systems).  Also improved the
       broken-largefile-locking test to try to avoid failure due to an
@@ -30,7 +32,7 @@ Changes since 2.6.1:
     - Fixed a compile problem in the popt source for compilers that
       don't support __attribute__.
 
-  INTERNAL:
+  DEVELOPER RELATED:
 
     - Improved the testsuite's "merge" test to work on OSF1.
 
@@ -63,12 +65,6 @@ Changes since 2.6.0:
       shows better current-rate-of-transfer and remaining-transfer-time
       values.
 
-    - The configure script now accepts --with-rsyncd-conf=PATH to
-      override the default value of the /etc/rsyncd.conf file.
-
-    - Added a couple extra diffs in the "patches" dir, removed the ones
-      that got applied, and rebuilt the rest.
-
     - Documentation changes now attempt to describe some often mis-
       understood features more clearly.
 
@@ -95,10 +91,6 @@ Changes since 2.6.0:
 
     - Fixed a byte-order problem in --batch-mode on big-endian machines.
       (Jay Fenlason)
-
-    - Fixed configure bug when running "./configure --disable-ipv6".
-
-    - Fixed "make test" bug when build dir is not the source dir.
 
     - When using --cvs-exclude, the exclude items we get from a
       per-directory's .cvsignore file once again only affect that one
@@ -135,9 +127,6 @@ Changes since 2.6.0:
       one if chroot was not on, making that setting fairly useless.
       Rsync now transforms the path into one that is based on the
       module's base dir when chroot is not enabled.
-
-    - Fixed compilation problem on Tru64 Unix (having to do with
-      sockaddr.sa_len and sockaddr.sin_len).
 
     - Fixed a compatibility problem interacting with older rsync
       versions that might send us an empty --suffix value without
@@ -227,3 +216,21 @@ Changes since 2.6.0:
       handled by the same code that sends & receives the list over the
       wire.  This makes it much easier to maintain.  (Note that the
       batch code is still considered to be experimental.)
+
+  BUILD CHANGES:
+
+    - The configure script now accepts --with-rsyncd-conf=PATH to
+      override the default value of the /etc/rsyncd.conf file.
+
+    - Fixed configure bug when running "./configure --disable-ipv6".
+
+    - Fixed compilation problem on Tru64 Unix (having to do with
+      sockaddr.sa_len and sockaddr.sin_len).
+
+  DEVELOPER RELATED:
+
+    - Fixed "make test" bug when build dir is not the source dir.
+
+    - Added a couple extra diffs in the "patches" dir, removed the ones
+      that got applied, and rebuilt the rest.
+
