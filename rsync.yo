@@ -334,8 +334,13 @@ explicitly checked on the receiver and any files of the same name
 which already exist and have the same checksum and size on the
 receiver are skipped.  This option can be quite slow.
 
-dit(bf(-a, --archive)) This is equivalent to -rlptgoD. It is a quick way
-of saying you want recursion and want to preserve everything.
+dit(bf(-a, --archive)) This is equivalent to -rlptgoD. It is a quick
+way of saying you want recursion and want to preserve almost
+everything.  
+
+Note however that bf(-a) bf(does not preserve hardlinks), because
+finding multiply-linked files is expensive.  You must separately
+specify bf(-H).
 
 dit(bf(-r, --recursive)) This tells rsync to copy directories
 recursively. If you don't specify this then rsync won't copy
