@@ -474,3 +474,13 @@ extern int errno;
 #ifdef REPLACE_INET_NTOA
 #define inet_ntoa rep_inet_ntoa
 #endif
+
+
+#ifndef HAVE_STRLCPY
+size_t strlcpy(char *d, const char *s, size_t bufsize);
+#endif
+
+#ifndef HAVE_STRLCAT
+size_t strlcat(char *d, const char *s, size_t bufsize);
+#endif
+

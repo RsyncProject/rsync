@@ -36,7 +36,7 @@
 #endif
 
 #ifndef HAVE_GETCWD
-char *getcwd(char *buf, int size)
+ char *getcwd(char *buf, int size)
 {
 	return getwd(buf);
 }
@@ -44,7 +44,7 @@ char *getcwd(char *buf, int size)
 
 
 #ifndef HAVE_WAITPID
-pid_t waitpid(pid_t pid, int *statptr, int options)
+ pid_t waitpid(pid_t pid, int *statptr, int options)
 {
 	return wait4(pid, statptr, options, NULL);
 }
@@ -52,7 +52,7 @@ pid_t waitpid(pid_t pid, int *statptr, int options)
 
 
 #ifndef HAVE_MEMMOVE
-void *memmove(void *dest, const void *src, size_t n)
+ void *memmove(void *dest, const void *src, size_t n)
 {
 	memcpy(dest, src, n);
 	return dest;
@@ -63,7 +63,7 @@ void *memmove(void *dest, const void *src, size_t n)
 /* Find the first ocurrence in S of any character in ACCEPT.  
    derived from glibc 
 */
-char *strpbrk(const char *s, const char *accept)
+ char *strpbrk(const char *s, const char *accept)
 {
 	while (*s != '\0')  {
 		const char *a = accept;
@@ -78,7 +78,7 @@ char *strpbrk(const char *s, const char *accept)
 #endif
 
 #ifdef REPLACE_INET_NTOA
-char *rep_inet_ntoa(struct in_addr ip)
+ char *rep_inet_ntoa(struct in_addr ip)
 {
 	unsigned char *p = (unsigned char *)&ip.s_addr;
 	static char buf[18];
@@ -90,5 +90,40 @@ char *rep_inet_ntoa(struct in_addr ip)
 		 (int)p[3], (int)p[2], (int)p[1], (int)p[0]);
 #endif
 	return buf;
+}
+#endif
+
+#ifndef HAVE_STRLCPY
+/* like strncpy but does not 0 fill the buffer and always null 
+   terminates. bufsize is the size of the destination buffer */
+ size_t strlcpy(char *d, const char *s, size_t bufsize)
+{
+	size_t len = strlen(s);
+	size_t ret = len;
+	if (len >= bufsize) len = bufsize-1;
+	memcpy(d, s, len);
+	d[len] = 0;
+	return ret;
+}
+#endif
+
+#ifndef HAVE_STRLCAT
+/* like strncat but does not 0 fill the buffer and always null 
+   terminates. bufsize is the length of the buffer, which should
+   be one more than the maximum resulting string length */
+ size_t strlcat(char *d, const char *s, size_t bufsize)
+{
+	size_t len1 = strlen(d);
+	size_t len2 = strlen(s);
+	size_t ret = len1 + len2;
+
+	if (len1+len2 >= bufsize) {
+		len2 = bufsize - (len1+1);
+	}
+	if (len2 > 0) {
+		memcpy(d+len1, s, len2);
+		d[len1+len2] = 0;
+	}
+	return ret;
 }
 #endif

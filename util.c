@@ -358,37 +358,6 @@ void kill_all(int sig)
 	}
 }
 
-/* like strncpy but does not 0 fill the buffer and always null 
-   terminates. bufsize is the size of the destination buffer */
-size_t strlcpy(char *d, const char *s, size_t bufsize)
-{
-	size_t len = strlen(s);
-	size_t ret = len;
-	if (len >= bufsize) len = bufsize-1;
-	memcpy(d, s, len);
-	d[len] = 0;
-	return ret;
-}
-
-/* like strncat but does not 0 fill the buffer and always null 
-   terminates. bufsize is the length of the buffer, which should
-   be one more than the maximum resulting string length */
-size_t strlcat(char *d, const char *s, size_t bufsize)
-{
-	size_t len1 = strlen(d);
-	size_t len2 = strlen(s);
-	size_t ret = len1 + len2;
-
-	if (len1+len2 >= bufsize) {
-		len2 = bufsize - (len1+1);
-	}
-	if (len2 > 0) {
-		memcpy(d+len1, s, len2);
-		d[len1+len2] = 0;
-	}
-	return ret;
-}
-
 /* turn a user name into a uid */
 int name_to_uid(char *name, uid_t *uid)
 {
@@ -708,8 +677,8 @@ int pop_dir(char *dir)
    to ensure that signed/unsigned usage is consistent between machines. */
 int u_strcmp(const char *cs1, const char *cs2)
 {
-	const uchar *s1 = (uchar *)cs1;
-	const uchar *s2 = (uchar *)cs2;
+	const uchar *s1 = (const uchar *)cs1;
+	const uchar *s2 = (const uchar *)cs2;
 
 	while (*s1 && *s2 && (*s1 == *s2)) {
 		s1++; s2++;
