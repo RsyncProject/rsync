@@ -32,6 +32,7 @@
 # endif
 #endif
 
+extern int verbose;
 extern int preserve_uid;
 extern int preserve_gid;
 extern int numeric_ids;
@@ -140,6 +141,12 @@ static int is_in_group(gid_t gid)
 		}
 		if (n == ngroups)
 			gidset[ngroups++] = mygid;
+		if (verbose > 3) {
+			for (n = 0; n < ngroups; n++) {
+				rprintf(FINFO, "process gid %d: %ld\n",
+				    n, (long)gidset[n]);
+			}
+		}
 	}
 
 	last_in = gid;
@@ -260,7 +267,7 @@ void send_uid_list(int f)
 		}
 
 		/* terminate the uid list with a 0 uid. We explicitly exclude
-		   0 from the list */
+		 * 0 from the list */
 		write_int(f, 0);
 	}
 
@@ -278,7 +285,7 @@ void send_uid_list(int f)
 }
 
 /* recv a complete uid/gid mapping from the peer and map the uid/gid
-   in the file list to local names */
+ * in the file list to local names */
 void recv_uid_list(int f, struct file_list *flist)
 {
 	int id, i;
@@ -305,6 +312,13 @@ void recv_uid_list(int f, struct file_list *flist)
 			list->id2 = map_uid(id, name);
 			free(name);
 		}
+		if (verbose > 3) {
+			for (list = uidlist; list; list = list->next) {
+				rprintf(FINFO, "uid %s (%ld) maps to %ld\n",
+				    list->name, (long)list->id,
+				    (long)list->id2);
+			}
+		}
 	}
 
 
@@ -328,12 +342,19 @@ void recv_uid_list(int f, struct file_list *flist)
 				list->id2 = GID_NONE;
 			free(name);
 		}
+		if (verbose > 3) {
+			for (list = gidlist; list; list = list->next) {
+				rprintf(FINFO, "gid %s (%ld) maps to %ld\n",
+				    list->name, (long)list->id,
+				    (long)list->id2);
+			}
+		}
 	}
 
 	if (!(am_root && preserve_uid) && !preserve_gid) return;
 
 	/* now convert the uid/gid of all files in the list to the mapped
-	   uid/gid */
+	 * uid/gid */
 	for (i = 0; i < flist->count; i++) {
 		if (am_root && preserve_uid && flist->files[i]->uid != 0)
 			flist->files[i]->uid = match_uid(flist->files[i]->uid);
