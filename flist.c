@@ -766,13 +766,12 @@ struct file_struct *make_file(char *fname, int exclude_level)
 		return NULL;
 	}
 
-	if (one_file_system && st.st_dev != filesystem_dev) {
-		/* We allow a directory though to preserve the mount point.
-		 * However, flag it so that we don't recurse. */
-		if (!S_ISDIR(st.st_mode))
-			return NULL;
+	/* We only care about directories because we need to avoid recursing
+	 * into a mount-point directory, not to avoid copying a symlinked
+	 * file if -L (or similar) was specified. */
+	if (one_file_system && st.st_dev != filesystem_dev
+	    && S_ISDIR(st.st_mode))
 		flags |= FLAG_MOUNT_POINT;
-	}
 
 	if (check_exclude_file(thisname, S_ISDIR(st.st_mode) != 0, exclude_level))
 		return NULL;
