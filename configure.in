@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 AC_INIT(byteorder.h)
 AC_CONFIG_HEADER(config.h)
-AC_PREREQ(2.12)
+AC_PREREQ(2.52)
 
 LDFLAGS=${LDFLAGS-""}
 
@@ -27,13 +27,6 @@ else
 fi
 
 CFLAGS="$CFLAGS -DHAVE_CONFIG_H"
-
-# look for getconf early as this affects just about everything
-AC_CHECK_PROG(HAVE_GETCONF, getconf, "yes", "no")
-if test $HAVE_GETCONF = "yes"; then
-	CFLAGS=$CFLAGS" "`getconf LFS_CFLAGS 2> /dev/null`
-	LDFLAGS=$LDFLAGS" "`getconf LFS_LDFLAGS 2> /dev/null`
-fi
 
 AC_ARG_WITH(included-popt,
         [  --with-included-popt    use bundled popt library, not from system])
@@ -77,8 +70,7 @@ AC_TYPE_PID_T
 AC_TYPE_GETGROUPS
 AC_STRUCT_ST_RDEV
 AC_CHECK_TYPE([ino_t], [unsigned])
-dnl TYPE_SOCKLEN_T
-AC_CHECK_TYPE([socklen_t], [size_t])
+TYPE_SOCKLEN_T
 
 AC_CACHE_CHECK([for errno in errno.h],rsync_cv_errno, [
     AC_TRY_COMPILE([#include <errno.h>],[int i = errno],
