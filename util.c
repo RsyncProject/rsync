@@ -24,143 +24,12 @@
   */
 #include "rsync.h"
 
-static int total_written = 0;
-static int total_read = 0;
-
-extern int verbose;
-
-int write_total(void)
-{
-  return total_written;
-}
-
-int read_total(void)
-{
-  return total_read;
-}
-
-void write_int(int f,int x)
-{
-  char b[4];
-  SIVAL(b,0,x);
-  if (write(f,b,4) != 4) {
-    fprintf(stderr,"write_int failed : %s\n",strerror(errno));
-    exit(1);
-  }
-  total_written += 4;
-}
-
-void write_buf(int f,char *buf,int len)
-{
-  if (write(f,buf,len) != len) {
-    fprintf(stderr,"write_buf failed : %s\n",strerror(errno));
-    exit(1);
-  }
-  total_written += len;
-}
-
-static int num_waiting(int fd)
+int num_waiting(int fd)
 {
   int len=0;
-#ifdef FIONREAD
   ioctl(fd,FIONREAD,&len);
-#endif
   return(len);
 }
-
-void write_flush(int f)
-{
-}
-
-
-static char *read_buffer = NULL;
-static char *read_buffer_p = NULL;
-static int read_buffer_len = 0;
-static int read_buffer_size = 0;
-
-
-/* This function was added to overcome a deadlock problem when using
- * ssh.  It looks like we can't allow our receive queue to get full or
- * ssh will clag up. Uggh.  */
-void read_check(int f)
-{
-  int n;
-
-  if (read_buffer_len == 0) {
-    read_buffer_p = read_buffer;
-  }
-
-  if ((n=num_waiting(f)) <= 0)
-    return;
-
-  if (read_buffer_p != read_buffer) {
-    memmove(read_buffer,read_buffer_p,read_buffer_len);
-    read_buffer_p = read_buffer;
-  }
-
-  if (n > (read_buffer_size - read_buffer_len)) {
-    read_buffer_size += n; /* deliberately overdo it a bit */
-    if (!read_buffer)
-      read_buffer = (char *)malloc(read_buffer_size);
-    else
-      read_buffer = (char *)realloc(read_buffer,read_buffer_size);
-    if (!read_buffer) out_of_memory("read check");      
-    read_buffer_p = read_buffer;      
-  }
-
-  n = read(f,read_buffer+read_buffer_len,n);
-  if (n > 0) {
-    read_buffer_len += n;
-  }
-}
-
-
-static int readfd(int fd,char *buffer,int N)
-{
-  int  ret;
-  int total=0;  
- 
-  while (total < N)
-    {
-      if (read_buffer_len > 0) {
-	ret = MIN(read_buffer_len,N-total);
-	memcpy(buffer+total,read_buffer_p,ret);
-	read_buffer_p += ret;
-	read_buffer_len -= ret;
-      } else {
-	ret = read(fd,buffer + total,N - total);
-      }
-
-      if (ret <= 0)
-	return total;
-      total += ret;
-    }
-  return total;
-}
-
-
-int read_int(int f)
-{
-  char b[4];
-  if (readfd(f,b,4) != 4) {
-    if (verbose > 1) 
-      fprintf(stderr,"Error reading %d bytes : %s\n",4,strerror(errno));
-    exit(1);
-  }
-  total_read += 4;
-  return IVAL(b,0);
-}
-
-void read_buf(int f,char *buf,int len)
-{
-  if (readfd(f,buf,len) != len) {
-    if (verbose > 1) 
-      fprintf(stderr,"Error reading %d bytes : %s\n",len,strerror(errno));
-    exit(1);
-  }
-  total_read += len;
-}
-
 
 char *map_file(int fd,off_t len)
 {
@@ -172,28 +41,6 @@ void unmap_file(char *buf,off_t len)
 {
   if (len > 0 && buf)
     munmap(buf,len);
-}
-
-
-int read_write(int fd_in,int fd_out,int size)
-{
-  static char *buf=NULL;
-  static int bufsize = WRITE_BLOCK_SIZE;
-  int total=0;
-  
-  if (!buf) {
-    buf = (char *)malloc(bufsize);
-    if (!buf) out_of_memory("read_write");
-  }
-
-  while (total < size) {
-    int n = MIN(size-total,bufsize);
-    read_buf(fd_in,buf,n);
-    if (write(fd_out,buf,n) != n)
-      return total;
-    total += n;
-  }
-  return total;
 }
 
 
@@ -286,3 +133,33 @@ int set_modtime(char *fname,time_t modtime)
 #endif
 }
 
+
+
+/****************************************************************************
+Set a fd into blocking/nonblocking mode. Uses POSIX O_NONBLOCK if available,
+else
+if SYSV use O_NDELAY
+if BSD use FNDELAY
+****************************************************************************/
+int set_blocking(int fd, int set)
+{
+  int val;
+#ifdef O_NONBLOCK
+#define FLAG_TO_SET O_NONBLOCK
+#else
+#ifdef SYSV
+#define FLAG_TO_SET O_NDELAY
+#else /* BSD */
+#define FLAG_TO_SET FNDELAY
+#endif
+#endif
+
+  if((val = fcntl(fd, F_GETFL, 0)) == -1)
+	return -1;
+  if(set) /* Turn blocking on - ie. clear nonblock flag */
+	val &= ~FLAG_TO_SET;
+  else
+    val |= FLAG_TO_SET;
+  return fcntl( fd, F_SETFL, val);
+#undef FLAG_TO_SET
+}

@@ -236,3 +236,7 @@ extern int errno;
 #endif
 
 #define SIGNAL_CAST (RETSIGTYPE (*)())
+
+#ifndef EWOULDBLOCK
+#define EWOULDBLOCK EAGAIN
+#endif

@@ -35,7 +35,6 @@ static int is_regex(char *str)
 
 static int check_one_exclude(char *name,char *pattern)
 {
-  char *str;
   char *p;
 
   if (!strchr(pattern,'/') && (p=strrchr(name,'/')))

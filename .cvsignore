@@ -39,6 +39,9 @@ rsync-0.8
 rsync-0.8.tar.gz
 rsync-0.9
 rsync-0.9.tar.gz
+rsync-1.0
+rsync-1.1
+rsync-1.1.tar.gz
 rsync-ERSION
 rsync.aux
 rsync.dvi
@@ -48,4 +51,3 @@ tech_report.dvi
 tech_report.log
 tech_report.ps
 test
-rsync-1.0

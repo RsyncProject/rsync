@@ -20,7 +20,8 @@ SHELL=/bin/sh
 .SUFFIXES: .c .o
 
 LIBOBJ=lib/getopt.o lib/fnmatch.o 
-OBJS=rsync.o exclude.o util.o md4.o main.o checksum.o match.o flist.o $(LIBOBJ)
+OBJS1=rsync.o exclude.o util.o md4.o main.o checksum.o match.o 
+OBJS=$(OBJS1) flist.o io.o $(LIBOBJ)
 
 .c.o:
 	$(CC) $(CFLAGS) -c $*.c -o $*.o

@@ -38,9 +38,6 @@ static int total_matches=0;
 static int total_data_transfer=0;
 
 
-static int check_f_in;
-
-
 struct target {
   tag t;
   int i;
@@ -100,7 +97,6 @@ static void matched(int f,struct sum_struct *s,char *buf,off_t len,int offset,in
 	      (int)offset,(int)last_match,i,(int)s->sums[i].len,n);
 
   if (n > 0) {
-    read_check(check_f_in);
     write_int(f,n);
     write_buf(f,buf+last_match,n);
     data_transfer += n;
@@ -201,15 +197,13 @@ static void hash_search(int f,struct sum_struct *s,char *buf,off_t len)
 }
 
 
-void match_sums(int f,struct sum_struct *s,char *buf,off_t len,int f_in)
+void match_sums(int f,struct sum_struct *s,char *buf,off_t len)
 {
   last_match = 0;
   false_alarms = 0;
   tag_hits = 0;
   matches=0;
   data_transfer=0;
-
-  check_f_in = f_in;
 
   if (len > 0 && s->count>0) {
     build_hash_table(s);

@@ -611,10 +611,10 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
   if (verbose > 2)
     fprintf(stderr,"send_files starting\n");
 
+  setup_nonblocking(f_in,f_out);
+
   while (1) 
     {
-      read_check(f_in);
-
       i = read_int(f_in);
       if (i == -1) break;
 
@@ -680,7 +680,7 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
       if (!am_server && verbose)
 	printf("%s\n",fname);
       
-      match_sums(f_out,s,buf,st.st_size,f_in);
+      match_sums(f_out,s,buf,st.st_size);
       write_flush(f_out);
       
       unmap_file(buf,st.st_size);
