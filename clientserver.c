@@ -206,7 +206,7 @@ static int rsync_module(int fd, int i)
 	p = lp_exclude(i);
 	add_exclude_line(p);
 
-	log_open();
+	log_init();
 
 	if (use_chroot) {
 		if (chroot(lp_path(i))) {
@@ -449,7 +449,7 @@ int daemon_main(void)
 		exit_cleanup(RERR_SYNTAX);
 	}
 
-	log_open();
+	log_init();
 
 	rprintf(FINFO,"rsyncd version %s starting\n",VERSION);
 

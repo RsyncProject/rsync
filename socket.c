@@ -247,6 +247,8 @@ void start_accept_loop(int port, int (*fn)(int ))
 		struct sockaddr addr;
 		int in_addrlen = sizeof(addr);
 
+		log_release();
+
 		FD_ZERO(&fds);
 		FD_SET(s, &fds);
 

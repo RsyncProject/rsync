@@ -23,12 +23,19 @@
   */
 #include "rsync.h"
 
+static char *logfname;
 static FILE *logfile;
 static int log_error_fd = -1;
 
 static void logit(int priority, char *buf)
 {
-	if (logfile) {
+	if (logfname) {
+		if (!logfile) {
+			extern int orig_umask;
+			int old_umask = umask(022 | orig_umask);
+			logfile = fopen(logfname, "a");
+			umask(old_umask);
+		}
 		fprintf(logfile,"%s [%d] %s", 
 			timestring(time(NULL)), (int)getpid(), buf);
 		fflush(logfile);
@@ -37,12 +44,11 @@ static void logit(int priority, char *buf)
 	}
 }
 
-void log_open(void)
+void log_init(void)
 {
 	static int initialised;
 	int options = LOG_PID;
 	time_t t;
-	char *logf;
 
 	if (initialised) return;
 	initialised = 1;
@@ -54,13 +60,11 @@ void log_open(void)
 	localtime(&t);
 
 	/* optionally use a log file instead of syslog */
-	logf = lp_log_file();
-	if (logf && *logf) {
-		extern int orig_umask;
-		int old_umask = umask(022 | orig_umask);
-		logfile = fopen(logf, "a");
-		umask(old_umask);
-		return;
+	logfname = lp_log_file();
+	if (logfname) {
+		if (*logfname)
+			return;
+		logfname = NULL;
 	}
 
 #ifdef LOG_NDELAY
@@ -76,6 +80,16 @@ void log_open(void)
 #ifndef LOG_NDELAY
 	logit(LOG_INFO,"rsyncd started\n");
 #endif
+}
+
+/* for long runs when using a log file, close it before potential long waits
+   so it can be trimmed by another process instead of growing forever */
+void log_release()
+{
+	if (logfile) {
+		fclose(logfile);
+		logfile = NULL;
+	}
 }
 
 /* setup the error file descriptor - used when we are a server
@@ -125,7 +139,7 @@ void rwrite(enum logcode code, char *buf, int len)
 
 		depth++;
 
-		log_open();
+		log_init();
 		logit(priority, buf);
 
 		depth--;
