@@ -494,7 +494,7 @@ Please report bugs! The rsync bug tracking system is online at
 url(http://rsync.samba.org/)(http://rsync.samba.org/)
 
 manpagesection(VERSION)
-This man page is current for version 2.0 of rsync
+This man page is current for version 2.x of rsync.
 
 manpagesection(CREDITS)
 
