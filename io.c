@@ -419,9 +419,9 @@ static int read_timeout(int fd, char *buf, size_t len)
 			       NULL, &tv);
 
 		if (count <= 0) {
-			check_timeout();
 			if (errno == EBADF)
 				exit_cleanup(RERR_SOCKETIO);
+			check_timeout();
 			continue;
 		}
 
@@ -827,9 +827,9 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 			       &w_fds, NULL, &tv);
 
 		if (count <= 0) {
-			check_timeout();
 			if (count < 0 && errno == EBADF)
 				exit_cleanup(RERR_SOCKETIO);
+			check_timeout();
 			continue;
 		}
 
