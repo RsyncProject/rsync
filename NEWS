@@ -17,6 +17,9 @@ rsync 2.5.2 (???)
 
   ENHANCEMENTS:
 
+    * With -v, rsync now shows the command used to initiate an ssh/rsh
+      connection.
+
     * --statistics now shows memory heap usage on platforms that
         support mallinfo().
 

@@ -84,6 +84,26 @@ int fd_pair(int fd[2])
 }
 
 
+void print_child_argv(char **cmd)
+{
+	rprintf(FINFO, RSYNC_NAME ": open connection using ");
+	for (; *cmd; cmd++) {
+		/* Look for characters that ought to be quoted.  This
+		* is not a great quoting algorithm, but it's
+		* sufficient for a log message. */
+		if (strspn(*cmd, "abcdefghijklmnopqrstuvwxyz"
+			   "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+			   "0123456789"
+			   ",.-_=+@/") != strlen(*cmd)) {
+			rprintf(FINFO, "\"%s\" ", *cmd);
+		} else {
+			rprintf(FINFO, "%s ", *cmd);
+		}
+	}
+	rprintf(FINFO, "\n");
+}
+
+
 /* this is derived from CVS code 
 
    note that in the child STDIN is set to blocking and STDOUT
@@ -100,6 +120,10 @@ pid_t piped_child(char **command, int *f_in, int *f_out)
 	int to_child_pipe[2];
 	int from_child_pipe[2];
 	extern int blocking_io;
+	
+	if (verbose > 0) {
+		print_child_argv(command);
+	}
 
 	if (fd_pair(to_child_pipe) < 0 || fd_pair(from_child_pipe) < 0) {
 		rprintf(FERROR, "pipe: %s\n", strerror(errno));
