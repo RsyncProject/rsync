@@ -25,6 +25,7 @@ VERSION=@VERSION@
 .SUFFIXES:
 .SUFFIXES: .c .o
 
+HEADERS=byteorder.h config.h errcode.h proto.h rsync.h
 LIBOBJ=lib/fnmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o \
 	lib/permstring.o @LIBOBJS@
 ZLIBOBJ=zlib/deflate.o zlib/infblock.o zlib/infcodes.o zlib/inffast.o \
@@ -73,7 +74,7 @@ install-strip:
 rsync$(EXEEXT): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
-$(OBJS): config.h
+$(OBJS): $(HEADERS)
 
 tls$(EXEEXT): $(TLS_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TLS_OBJ) $(LIBS)
