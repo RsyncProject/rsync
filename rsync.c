@@ -179,7 +179,7 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	}
 
 	change_uid = am_root && preserve_uid && st->st_uid != file->uid;
-	change_gid = !am_daemon && preserve_gid && file->gid != (gid_t) -1 && \
+	change_gid = preserve_gid && file->gid != (gid_t) -1 && \
 				st->st_gid != file->gid;
 	if (change_gid && !am_root) {
 		/* enforce bsd-style group semantics: non-root can only
