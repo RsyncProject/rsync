@@ -123,6 +123,7 @@ typedef struct
 	char *hosts_deny;
 	char *auth_users;
 	char *secrets_file;
+	BOOL strict_modes;
 	char *exclude;
 	char *exclude_from;
 	char *include;
@@ -152,6 +153,7 @@ static service sDefault =
 	NULL,    /* hosts deny */
 	NULL,    /* auth users */
 	NULL,    /* secrets file */
+	True,   /* strict modes */
 	NULL,    /* exclude */
 	NULL,    /* exclude from */
 	NULL,    /* include */
@@ -264,6 +266,7 @@ static struct parm_struct parm_table[] =
   {"hosts deny",       P_STRING,  P_LOCAL,  &sDefault.hosts_deny,  NULL,   0},
   {"auth users",       P_STRING,  P_LOCAL,  &sDefault.auth_users,  NULL,   0},
   {"secrets file",     P_STRING,  P_LOCAL,  &sDefault.secrets_file,NULL,   0},
+  {"strict modes",     P_BOOL,    P_LOCAL,  &sDefault.strict_modes,NULL,   0},
   {"exclude",          P_STRING,  P_LOCAL,  &sDefault.exclude,     NULL,   0},
   {"exclude from",     P_STRING,  P_LOCAL,  &sDefault.exclude_from,NULL,   0},
   {"include",          P_STRING,  P_LOCAL,  &sDefault.include,     NULL,   0},
@@ -339,6 +342,7 @@ FN_LOCAL_STRING(lp_hosts_allow, hosts_allow)
 FN_LOCAL_STRING(lp_hosts_deny, hosts_deny)
 FN_LOCAL_STRING(lp_auth_users, auth_users)
 FN_LOCAL_STRING(lp_secrets_file, secrets_file)
+FN_LOCAL_BOOL(lp_strict_modes, strict_modes)
 FN_LOCAL_STRING(lp_exclude, exclude)
 FN_LOCAL_STRING(lp_exclude_from, exclude_from)
 FN_LOCAL_STRING(lp_include, include)

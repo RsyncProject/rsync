@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsyncd.conf)(5)(21 Jan 1999)()()
+manpage(rsyncd.conf)(5)(9 Feb 1999)()()
 manpagename(rsyncd.conf)(configuration file for rsync server)
 manpagesynopsis()
 
@@ -211,10 +211,15 @@ can contain any characters but be warned that many operating systems
 limit the length of passwords that can be typed at the client end, so
 you may find that passwords longer than 8 characters don't work. 
 
-bf(You should make sure that the secrets file is not readable by anyone
-other than the system administrator.) There is no default for the
-"secrets file" option, you must choose a name (such as
-tt(/etc/rsyncd.secrets)).
+There is no default for the "secrets file" option, you must choose a name
+(such as tt(/etc/rsyncd.secrets)).
+
+dit(bf(strict modes)) The "strict modes" option determines whether or not 
+the permissions on the secrets file will be checked.  If "strict modes" is
+true, then the secrets file must not be readable by any user id other
+than the one that the rsync daemon is running under.  If "strict modes" is
+false, the check is not performed.  The default is true.  This option
+was added to accommodate rsync running on the Windows operating system.
 
 dit(bf(hosts allow)) The "hosts allow" option allows you to specify a
 list of patterns that are matched against a connecting clients
