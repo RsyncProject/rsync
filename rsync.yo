@@ -1214,7 +1214,7 @@ password to a shell transport such as ssh.
 
 dit(bf(USER) or bf(LOGNAME)) The USER or LOGNAME environment variables
 are used to determine the default username sent to an rsync server.
-If neither is set, the username defaults to "guest".
+If neither is set, the username defaults to "nobody".
 
 dit(bf(HOME)) The HOME environment variable is used to find the user's
 default .cvsignore file.

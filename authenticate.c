@@ -270,7 +270,7 @@ void auth_client(int fd, char *user, char *challenge)
 	extern char *password_file;
 
 	if (!user || !*user)
-		user = "guest";
+		user = "nobody";
 
 	if (!(pass=getpassf(password_file)) && !(pass=getenv("RSYNC_PASSWORD"))) {
 		/* XXX: cyeoh says that getpass is deprecated, because
