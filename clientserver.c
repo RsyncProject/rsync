@@ -34,7 +34,7 @@ extern int am_server;
 extern int am_daemon;
 extern int am_root;
 extern int rsync_port;
-extern int kludge_around_eof;
+extern int kluge_around_eof;
 extern int daemon_over_rsh;
 extern int sanitize_paths;
 extern int filesfrom_fd;
@@ -171,7 +171,7 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out,
 
 	/* Old servers may just drop the connection here,
 	 rather than sending a proper EXIT command.  Yuck. */
-	kludge_around_eof = list_only && (protocol_version < 25);
+	kluge_around_eof = list_only && protocol_version < 25 ? 1 : 0;
 
 	while (1) {
 		if (!read_line(f_in, line, sizeof line - 1)) {
@@ -204,7 +204,7 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out,
 			rprintf(FINFO,"%s\n", line);
 		}
 	}
-	kludge_around_eof = False;
+	kluge_around_eof = 0;
 
 	for (i = 0; i < sargc; i++) {
 		io_printf(f_out, "%s\n", sargs[i]);
