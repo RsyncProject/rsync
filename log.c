@@ -533,7 +533,7 @@ void maybe_log_item(struct file_struct *file, int iflags, int itemizing,
 		if (am_daemon && !dry_run && see_item)
 			log_item(file, &stats, iflags, buf);
 	} else if (see_item || iflags & ITEM_LOCAL_CHANGE || *buf
-	    || (S_ISDIR(file->mode) && iflags & ITEM_REPORT_TIME))
+	    || (S_ISDIR(file->mode) && iflags & SIGNIFICANT_ITEM_FLAGS))
 		log_item(file, &stats, iflags, buf);
 }
 
