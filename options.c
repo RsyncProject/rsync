@@ -290,6 +290,7 @@ void usage(enum logcode F)
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth, KBytes per second\n");
   rprintf(F,"     --write-batch=PREFIX    write batch fileset starting with PREFIX\n");
   rprintf(F,"     --read-batch=PREFIX     read batch fileset starting with PREFIX\n");
+  rprintf(F,"     --checksum-seed=NUM     set block/file checksum seed\n");
 #ifdef INET6
   rprintf(F," -4  --ipv4                  prefer IPv4\n");
   rprintf(F," -6  --ipv6                  prefer IPv6\n");
@@ -386,6 +387,7 @@ static struct poptOption long_options[] = {
   {"from0",           '0', POPT_ARG_NONE,   &eol_nulls, 0, 0, 0},
   {"no-implied-dirs",  0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
+  {"checksum-seed",    0,  POPT_ARG_INT,    &checksum_seed, 0, 0, 0 },
 #ifdef INET6
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
@@ -907,6 +909,12 @@ void server_options(char **args,int *argc)
 
 	if (modify_window_set) {
 		if (asprintf(&arg, "--modify-window=%d", modify_window) < 0)
+			goto oom;
+		args[ac++] = arg;
+	}
+
+	if (checksum_seed) {
+		if (asprintf(&arg, "--checksum_seed=%d", checksum_seed) < 0)
 			goto oom;
 		args[ac++] = arg;
 	}

@@ -348,6 +348,7 @@ verb(
      --bwlimit=KBPS          limit I/O bandwidth, KBytes per second
      --write-batch=PREFIX    write batch fileset starting with PREFIX
      --read-batch=PREFIX     read batch fileset starting with PREFIX
+     --checksum-seed=NUM     set block/file checksum seed
  -4  --ipv4                  prefer IPv4
  -6  --ipv6                  prefer IPv6
  -h, --help                  show this help screen
@@ -907,6 +908,20 @@ listen for connections.  One of these options may be required in older
 versions of Linux to work around an IPv6 bug in the kernel (if you see
 an "address already in use" error when nothing else is using the port,
 try specifying --ipv6 or --ipv4 when starting the daemon).
+
+dit(bf(--checksum-seed=NUM)) Set the MD4 checksum seed to the integer
+NUM.  This 4 byte checksum seed is included in each block and file
+MD4 checksum calculation.  By default the checksum seed is generated
+by the server and defaults to the current time(), or 32761 if
+bf(--write-batch) or bf(--read-batch) are specified.  This option
+is used to set a specific checksum seed, which is useful for
+applications that want repeatable block and file checksums, or
+in the case where the user wants a more random checksum seed.
+Note that setting NUM to 0 causes rsync to use the default of time()
+for checksum seed.  Note also that bf(--write-batch) and bf(--read-batch)
+set the checksum seed to 32761, so bf(--checksum-seed=NUM) needs to
+follow these options if you want to specify a different checksum
+seed in batch mode.
 
 enddit()
 
