@@ -707,9 +707,12 @@ void sanitize_path(char *p, char *reldir)
 	int allowdotdot = 0;
 
 	if (reldir) {
-		depth++;
+		int new_component = 1;
 		while (*reldir) {
-			if (*reldir++ == '/') {
+			if (*reldir++ == '/')
+				new_component = 1;
+			else if (new_component) {
+				new_component = 0;
 				depth++;
 			}
 		}
