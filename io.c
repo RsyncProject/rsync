@@ -376,19 +376,19 @@ static int read_timeout(int fd, char *buf, size_t len)
 		/* until we manage to read *something* */
 		fd_set r_fds, w_fds;
 		struct timeval tv;
-		int fd_count = fd+1;
+		int maxfd = fd;
 		int count;
 
 		FD_ZERO(&r_fds);
 		FD_SET(fd, &r_fds);
 		if (msg_fd_in >= 0) {
 			FD_SET(msg_fd_in, &r_fds);
-			if (msg_fd_in >= fd_count)
-				fd_count = msg_fd_in+1;
+			if (msg_fd_in > maxfd)
+				maxfd = msg_fd_in;
 		} else if (msg_list_head) {
 			FD_SET(msg_fd_out, &w_fds);
-			if (msg_fd_out >= fd_count)
-				fd_count = msg_fd_out+1;
+			if (msg_fd_out > maxfd)
+				maxfd = msg_fd_out;
 		}
 		if (io_filesfrom_f_out >= 0) {
 			int new_fd;
@@ -405,8 +405,8 @@ static int read_timeout(int fd, char *buf, size_t len)
 				FD_SET(io_filesfrom_f_out, &w_fds);
 				new_fd = io_filesfrom_f_out;
 			}
-			if (new_fd >= fd_count)
-				fd_count = new_fd+1;
+			if (new_fd > maxfd)
+				maxfd = new_fd;
 		}
 
 		tv.tv_sec = select_timeout;
@@ -414,7 +414,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 
 		errno = 0;
 
-		count = select(fd_count, &r_fds,
+		count = select(maxfd + 1, &r_fds,
 			       io_filesfrom_buflen? &w_fds : NULL,
 			       NULL, &tv);
 
@@ -498,9 +498,9 @@ static int read_timeout(int fd, char *buf, size_t len)
 
 		n = read(fd, buf, len);
 
-		if (n == 0)
-			whine_about_eof(); /* Doesn't return. */
-		if (n < 0) {
+		if (n <= 0) {
+			if (n == 0)
+				whine_about_eof(); /* Doesn't return. */
 			if (errno == EINTR || errno == EWOULDBLOCK
 			    || errno == EAGAIN)
 				continue;
@@ -795,9 +795,9 @@ static void sleep_for_bwlimit(int bytes_written)
  **/
 static void writefd_unbuffered(int fd,char *buf,size_t len)
 {
-	size_t total = 0;
+	size_t n, total = 0;
 	fd_set w_fds, r_fds;
-	int fd_count, count;
+	int maxfd, count, ret;
 	struct timeval tv;
 
 	if (fd == msg_fd_out) {
@@ -810,25 +810,25 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 	while (total < len) {
 		FD_ZERO(&w_fds);
 		FD_SET(fd,&w_fds);
-		fd_count = fd;
+		maxfd = fd;
 
 		if (msg_fd_in >= 0) {
 			FD_ZERO(&r_fds);
 			FD_SET(msg_fd_in,&r_fds);
-			if (msg_fd_in > fd_count)
-				fd_count = msg_fd_in;
+			if (msg_fd_in > maxfd)
+				maxfd = msg_fd_in;
 		}
 
 		tv.tv_sec = select_timeout;
 		tv.tv_usec = 0;
 
 		errno = 0;
-		count = select(fd_count+1, msg_fd_in >= 0 ? &r_fds : NULL,
+		count = select(maxfd + 1, msg_fd_in >= 0 ? &r_fds : NULL,
 			       &w_fds, NULL, &tv);
 
 		if (count <= 0) {
 			check_timeout();
-			if (errno == EBADF)
+			if (count < 0 && errno == EBADF)
 				exit_cleanup(RERR_SOCKETIO);
 			continue;
 		}
@@ -836,13 +836,15 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 		if (msg_fd_in >= 0 && FD_ISSET(msg_fd_in, &r_fds))
 			read_msg_fd();
 
-		if (FD_ISSET(fd, &w_fds)) {
-			int ret;
-			size_t n = len-total;
-			if (bwlimit && n > bwlimit_writemax)
-				n = bwlimit_writemax;
-			ret = write(fd,buf+total,n);
+		if (!FD_ISSET(fd, &w_fds))
+			continue;
 
+		n = len - total;
+		if (bwlimit && n > bwlimit_writemax)
+			n = bwlimit_writemax;
+		ret = write(fd, buf + total, n);
+
+		if (ret <= 0) {
 			if (ret < 0) {
 				if (errno == EINTR)
 					continue;
@@ -852,23 +854,20 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 				}
 			}
 
-			if (ret <= 0) {
-				/* Don't try to write errors back
-				 * across the stream */
-				io_multiplexing_close();
-				rsyserr(FERROR, errno,
-					"writefd_unbuffered failed to write %ld bytes: phase \"%s\"",
-					(long)len, io_write_phase);
-				exit_cleanup(RERR_STREAMIO);
-			}
-
-			sleep_for_bwlimit(ret);
-
-			total += ret;
-
-			if (io_timeout)
-				last_io = time(NULL);
+			/* Don't try to write errors back across the stream. */
+			io_multiplexing_close();
+			rsyserr(FERROR, errno,
+				"writefd_unbuffered failed to write %ld bytes: phase \"%s\"",
+				(long)len, io_write_phase);
+			exit_cleanup(RERR_STREAMIO);
 		}
+
+		sleep_for_bwlimit(ret);
+
+		total += ret;
+
+		if (io_timeout)
+			last_io = time(NULL);
 	}
 
 	no_flush--;
@@ -915,9 +914,8 @@ static void mplex_write(int fd, enum msgcode code, char *buf, size_t len)
 	len -= n;
 	buf += n;
 
-	if (len) {
+	if (len)
 		writefd_unbuffered(fd, buf, len);
-	}
 }
 
 
