@@ -53,7 +53,8 @@ struct filter_list_struct server_filter_list = { 0, 0, " [server]" };
 #define MAX_RULE_PREFIX (16)
 
 #define MODIFIERS_MERGE_FILE "-+Cenw"
-#define MODIFIERS_INCL_EXCL "/!C"
+#define MODIFIERS_INCL_EXCL "/!Crs"
+#define MODIFIERS_HIDE_PROTECT "/!"
 
 /* The dirbuf is set by push_local_filters() to the current subdirectory
  * relative to curr_dir that is being processed.  The path always has a
@@ -678,6 +679,10 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 			if ((s = RULE_STRCMP(s, "exclude")) != NULL)
 				ch = '-';
 			break;
+		case 'h':
+			if ((s = RULE_STRCMP(s, "hide")) != NULL)
+				ch = 'H';
+			break;
 		case 'i':
 			if ((s = RULE_STRCMP(s, "include")) != NULL)
 				ch = '+';
@@ -686,6 +691,19 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 			if ((s = RULE_STRCMP(s, "merge")) != NULL)
 				ch = '.';
 			break;
+		case 'p':
+			if ((s = RULE_STRCMP(s, "protect")) != NULL)
+				ch = 'P';
+			break;
+		case 'r':
+			if ((s = RULE_STRCMP(s, "risk")) != NULL)
+				ch = 'R';
+			break;
+		case 's':
+			if ((s = RULE_STRCMP(s, "show")) != NULL)
+				ch = 'S';
+			break;
+
 		default:
 			ch = *s;
 			if (s[1] == ',')
@@ -706,6 +724,20 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 			/* FALL THROUGH */
 		case '-':
 			mods = MODIFIERS_INCL_EXCL;
+			break;
+		case 'S':
+			new_mflags |= MATCHFLG_INCLUDE;
+			/* FALL THROUGH */
+		case 'H':
+			new_mflags |= MATCHFLG_SENDER_SIDE;
+			mods = MODIFIERS_HIDE_PROTECT;
+			break;
+		case 'R':
+			new_mflags |= MATCHFLG_INCLUDE;
+			/* FALL THROUGH */
+		case 'P':
+			new_mflags |= MATCHFLG_RECEIVER_SIDE;
+			mods = MODIFIERS_HIDE_PROTECT;
 			break;
 		case '!':
 			new_mflags |= MATCHFLG_CLEAR_LIST;
@@ -758,6 +790,12 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 				break;
 			case 'n':
 				new_mflags |= MATCHFLG_NO_INHERIT;
+				break;
+			case 'r':
+				new_mflags |= MATCHFLG_RECEIVER_SIDE;
+				break;
+			case 's':
+				new_mflags |= MATCHFLG_SENDER_SIDE;
 				break;
 			case 'w':
 				new_mflags |= MATCHFLG_WORD_SPLIT;
@@ -1013,6 +1051,13 @@ char *get_rule_prefix(int match_flags, const char *pat, int for_xfer,
 	}
 	if (match_flags & MATCHFLG_EXCLUDE_SELF)
 		*op++ = 'e';
+	if (match_flags & MATCHFLG_SENDER_SIDE
+	    && (!for_xfer || protocol_version >= 29))
+		*op++ = 's';
+	if (match_flags & MATCHFLG_RECEIVER_SIDE
+	    && (!for_xfer || protocol_version >= 29
+	     || (delete_excluded && am_sender)))
+		*op++ = 'r';
 	if (legal_len)
 		*op++ = ' ';
 	if (op - buf > legal_len)
@@ -1025,18 +1070,34 @@ char *get_rule_prefix(int match_flags, const char *pat, int for_xfer,
 
 static void send_rules(int f_out, struct filter_list_struct *flp)
 {
-	struct filter_struct *ent;
+	struct filter_struct *ent, *prev = NULL;
 
 	for (ent = flp->head; ent; ent = ent->next) {
 		unsigned int len, plen, dlen;
+		int elide = 0;
 		char *p;
 
+		if (ent->match_flags & MATCHFLG_SENDER_SIDE)
+			elide = am_sender ? 1 : -1;
+		if (ent->match_flags & MATCHFLG_RECEIVER_SIDE)
+			elide = elide ? 0 : am_sender ? -1 : 1;
+		else if (delete_excluded && !elide)
+			elide = am_sender ? 1 : -1;
+		if (elide < 0) {
+			if (prev)
+				prev->next = ent->next;
+			else
+				flp->head = ent->next;
+		} else
+			prev = ent;
+		if (elide > 0)
+			continue;
 		if (ent->match_flags & MATCHFLG_CVS_IGNORE
 		    && !(ent->match_flags & MATCHFLG_MERGE_FILE)) {
-			if (am_sender || protocol_version < 29) {
-				send_rules(f_out, &cvs_filter_list);
+			int f = am_sender || protocol_version < 29 ? f_out : -1;
+			send_rules(f, &cvs_filter_list);
+			if (f >= 0)
 				continue;
-			}
 		}
 		p = get_rule_prefix(ent->match_flags, ent->pattern, 1, &plen);
 		if (!p) {
@@ -1044,6 +1105,8 @@ static void send_rules(int f_out, struct filter_list_struct *flp)
 				"filter rules are too modern for remote rsync.\n");
 			exit_cleanup(RERR_SYNTAX);
 		}
+		if (f_out < 0)
+			continue;
 		len = strlen(ent->pattern);
 		dlen = ent->match_flags & MATCHFLG_DIRECTORY ? 1 : 0;
 		if (!(plen + len + dlen))
@@ -1055,12 +1118,14 @@ static void send_rules(int f_out, struct filter_list_struct *flp)
 		if (dlen)
 			write_byte(f_out, '/');
 	}
+	flp->tail = prev;
 }
 
 /* This is only called by the client. */
 void send_filter_list(int f_out)
 {
-	int receiver_wants_list = delete_mode && !delete_excluded;
+	int receiver_wants_list = delete_mode
+		&& (!delete_excluded || protocol_version >= 29);
 
 	if (local_server || (am_sender && !receiver_wants_list))
 		f_out = -1;
@@ -1075,10 +1140,10 @@ void send_filter_list(int f_out)
 	if (list_only == 1 && !recurse)
 		parse_rule(&filter_list, "/*/*", MATCHFLG_NO_PREFIXES, 0);
 
-	if (f_out >= 0) {
-		send_rules(f_out, &filter_list);
+	send_rules(f_out, &filter_list);
+
+	if (f_out >= 0)
 		write_int(f_out, 0);
-	}
 
 	if (cvs_exclude) {
 		if (!am_sender || protocol_version < 29)
@@ -1093,8 +1158,9 @@ void recv_filter_list(int f_in)
 {
 	char line[MAXPATHLEN+MAX_RULE_PREFIX+1]; /* +1 for trailing slash. */
 	int xflags = protocol_version >= 29 ? 0 : XFLG_OLD_PREFIXES;
+	int receiver_wants_list = delete_mode
+		&& (!delete_excluded || protocol_version >= 29);
 	unsigned int len;
-	int receiver_wants_list = delete_mode && !delete_excluded;
 
 	if (!local_server && (am_sender || receiver_wants_list)) {
 		while ((len = read_int(f_in)) != 0) {
@@ -1111,4 +1177,7 @@ void recv_filter_list(int f_in)
 		if (local_server || am_sender)
 			parse_rule(&filter_list, "-C", 0, 0);
 	}
+
+	if (local_server) /* filter out any rules that aren't for us. */
+		send_rules(-1, &filter_list);
 }
