@@ -99,14 +99,14 @@ Changes since 2.6.3:
       is creating (e.g. dirs, symlinks) is now integrated into the progress
       output without overlapping it.  (Requires protocol 29.)
 
-    - When --timeout is specified, lulls in the transfer while the
-      generator scanning the file system (either looking for files to send
-      or files to delete) now generate a new keep-alive packet that will
-      keep the transfer going (as long as the generator continues to make
-      progress).  (Requires protocol 29.)
+    - When --timeout is specified, lulls that occur in the transfer while
+      the generator is scanning the file system (either looking for files
+      to generate or files to delete) cause a new keep-alive packet to be
+      sent that should keep the transfer going (as long as the generator
+      continues to make progress).  (Requires protocol 29.)
 
     - The stat size of a device is not added to the total file size of the
-      items we encounter since it might be undefined on some OSes.
+      items in the transfer since the size might be undefined on some OSes.
 
   ENHANCEMENTS:
 
