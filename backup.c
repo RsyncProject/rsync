@@ -21,6 +21,7 @@
 #include "rsync.h"
 
 extern int verbose;
+extern int suffix_specified;
 extern char *backup_suffix;
 extern char *backup_dir;
 
@@ -203,12 +204,17 @@ static int keep_backup(char *fname)
 	if (!file) return 1;
 
         /* make a complete pathname for backup file */
-        if (strlen(backup_dir) + strlen(fname) > (MAXPATHLEN - 1)) {
+        if (strlen(backup_dir) + strlen(fname) + 
+		(suffix_specified ? strlen(backup_suffix) : 0) > (MAXPATHLEN - 1)) {
                 rprintf (FERROR, "keep_backup filename too long\n");
                 return 0;
         }
 
-        snprintf(keep_name, sizeof (keep_name), "%s/%s", backup_dir, fname);
+	if (suffix_specified) {
+        	snprintf(keep_name, sizeof (keep_name), "%s/%s%s", backup_dir, fname, backup_suffix);
+		} else {
+        	snprintf(keep_name, sizeof (keep_name), "%s/%s", backup_dir, fname);
+		}
 
 
 #ifdef HAVE_MKNOD

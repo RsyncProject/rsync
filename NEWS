@@ -1,5 +1,12 @@
 rsync changes since last release
 
+  ENHANCEMENTS:
+
+    * The --delete-after option now implies --delete. (Wayne Davison)
+
+    * The --suffix option can now be used with --backup-dir. (Michael
+      Zimmerman)
+
   BUG FIXES:
   
     * Fix "forward name lookup failed" errors on AIX 4.3.3.  (John
@@ -14,8 +21,6 @@ rsync changes since last release
       Nottingham)
 
       http://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=62489
-
-    * The --delete-after option now implies --delete.
 
   INTERNAL:
 

@@ -102,6 +102,7 @@ int no_detach = 0;
 
 int write_batch = 0;
 int read_batch = 0;
+int suffix_specified = 0;
 
 char *backup_suffix = BACKUP_SUFFIX;
 char *tmpdir = NULL;
@@ -296,7 +297,7 @@ enum {OPT_VERSION = 1000, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
 static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
   {"version",          0,  POPT_ARG_NONE,   0,             OPT_VERSION, 0, 0},
-  {"suffix",           0,  POPT_ARG_STRING, &backup_suffix,	0, 0, 0 },
+  {"suffix",           0,  POPT_ARG_STRING, &backup_suffix,	OPT_SUFFIX, 0, 0 },
   {"rsync-path",       0,  POPT_ARG_STRING, &rsync_path,	0, 0, 0 },
   {"password-file",    0,  POPT_ARG_STRING, &password_file,	0, 0, 0 },
   {"ignore-times",    'I', POPT_ARG_NONE,   &ignore_times , 0, 0, 0 },
@@ -469,6 +470,13 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		case OPT_VERSION:
                         print_rsync_version(FINFO);
 			exit_cleanup(0);
+			
+		case OPT_SUFFIX:
+                        /* The value has already been set by popt, but
+                         * we need to remember that a suffix was specified
+                         * in case a backup-directory is used. */
+                        suffix_specified = 1;
+			break;
 			
 		case OPT_MODIFY_WINDOW:
                         /* The value has already been set by popt, but
