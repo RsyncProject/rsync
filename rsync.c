@@ -811,20 +811,24 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	      if (errno == EXDEV) {
 		      /* rename failed on cross-filesystem link.  
 			 Copy the file instead. */
-		      if (copy_file(fnametmp,fname, file->mode)) 
+		      if (copy_file(fnametmp,fname, file->mode)) {
 			      fprintf(FERROR,"copy %s -> %s : %s\n",
 				      fnametmp,fname,strerror(errno));
+		      } else {
+			      set_perms(fname,file,NULL,0);
+		      }
 		      unlink(fnametmp);
 	      } else {
 		      fprintf(FERROR,"rename %s -> %s : %s\n",
 			      fnametmp,fname,strerror(errno));
 		      unlink(fnametmp);
 	      }
+      } else {
+	      set_perms(fname,file,NULL,0);
       }
 
       cleanup_fname = NULL;
 
-      set_perms(fname,file,NULL,0);
 
       if (!recv_ok) {
 	if (verbose > 1)
