@@ -79,6 +79,11 @@ static int match_address(char *addr, char *tok)
 	p = strchr(tok,'/');
 	if (p) *p = 0;
 
+	/* skip if last char is not a digit (i.e. not an address) */
+	/* (don't check first char - might be 11.22.33.44.an.isp) */
+	if (!*tok) return 0;	/* nothing to check */
+	if (!isdigit(*(unsigned char*)tok+strlen(tok)-1)) return 0;
+
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
