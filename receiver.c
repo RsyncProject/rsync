@@ -60,8 +60,10 @@ static void delete_one(char *fn, int is_dir)
 		}
 	} else {
 		if (do_rmdir(fn) != 0) {
-			if (errno == ENOTDIR && keep_dirlinks)
-				return delete_one(fn, 0);
+			if (errno == ENOTDIR && keep_dirlinks) {
+				delete_one(fn, 0);
+				return;
+			}
 			if (errno != ENOTEMPTY && errno != EEXIST) {
 				rsyserr(FERROR, errno,
 					"delete_one: rmdir %s failed",
