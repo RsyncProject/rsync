@@ -19,19 +19,21 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-/*
-  Utilities used in rsync 
+/**
+ *
+ * @file util.c
+ *
+ * Utilities used in rsync 
+ **/
 
-  tridge, June 1996
-  */
 #include "rsync.h"
 
 extern int verbose;
 
 
-/****************************************************************************
-Set a fd into nonblocking mode
-****************************************************************************/
+/**
+   Set a fd into nonblocking mode
+**/
 void set_nonblocking(int fd)
 {
 	int val;
@@ -44,9 +46,9 @@ void set_nonblocking(int fd)
 	}
 }
 
-/****************************************************************************
+/**
 Set a fd into blocking mode
-****************************************************************************/
+*/
 void set_blocking(int fd)
 {
 	int val;
@@ -60,10 +62,11 @@ void set_blocking(int fd)
 }
 
 
-/* create a file descriptor pair - like pipe() but use socketpair if
-   possible (because of blocking issues on pipes)
+/**
+   Create a file descriptor pair - like pipe() but use socketpair if
+   possible (because of blocking issues on pipes).
 
-   always set non-blocking
+   Always set non-blocking.
  */
 int fd_pair(int fd[2])
 {
@@ -104,16 +107,19 @@ static void print_child_argv(char **cmd)
 }
 
 
-/* this is derived from CVS code 
-
-   note that in the child STDIN is set to blocking and STDOUT
-   is set to non-blocking. This is necessary as rsh relies on stdin being blocking
-   and ssh relies on stdout being non-blocking
-
-   if blocking_io is set then use blocking io on both fds. That can be
-   used to cope with badly broken rsh implementations like the one on
-   solaris.
- */
+/**
+ * Create a child connected to use on stdin/stdout.
+ *
+ * This is derived from CVS code 
+ * 
+ * Note that in the child STDIN is set to blocking and STDOUT
+ * is set to non-blocking. This is necessary as rsh relies on stdin being blocking
+ *  and ssh relies on stdout being non-blocking
+ *
+ * If blocking_io is set then use blocking io on both fds. That can be
+ * used to cope with badly broken rsh implementations like the one on
+ * Solaris.
+ **/
 pid_t piped_child(char **command, int *f_in, int *f_out)
 {
 	pid_t pid;
@@ -275,11 +281,11 @@ int set_modtime(char *fname, time_t modtime)
 }
 
 
-/****************************************************************************
-create any necessary directories in fname. Unfortunately we don't know
-what perms to give the directory when this is called so we need to rely
-on the umask
-****************************************************************************/
+/**
+   Create any necessary directories in fname. Unfortunately we don't know
+   what perms to give the directory when this is called so we need to rely
+   on the umask
+**/
 int create_directory_path(char *fname)
 {
 	extern int orig_umask;
@@ -299,11 +305,16 @@ int create_directory_path(char *fname)
 }
 
 
-/* Write LEN bytes at PTR to descriptor DESC, retrying if interrupted.
-   Return LEN upon success, write's (negative) error code otherwise.  
-
-   derived from GNU C's cccp.c.
-*/
+/**
+ * Write @p len bytes at @p ptr to descriptor @p desc, retrying if
+ * interrupted.
+ *
+ * @retval len upon success
+ *
+ * @retval <0 write's (negative) error code
+ *
+ * Derived from GNU C's cccp.c.
+ */
 static int full_write(int desc, char *ptr, size_t len)
 {
 	int total_written;
@@ -325,11 +336,18 @@ static int full_write(int desc, char *ptr, size_t len)
 	return total_written;
 }
 
-/* Read LEN bytes at PTR from descriptor DESC, retrying if interrupted.
-   Return the actual number of bytes read, zero for EOF, or negative
-   for an error.  
 
-   derived from GNU C's cccp.c. */
+/**
+ * Read @p len bytes at @p ptr from descriptor @p desc, retrying if
+ * interrupted.
+ *
+ * @retval >0 the actual number of bytes read
+ *
+ * @retval 0 for EOF
+ *
+ * @retval <0 for an error.
+ *
+ * Derived from GNU C's cccp.c. */
 static int safe_read(int desc, char *ptr, size_t len)
 {
 	int n_chars;
@@ -349,7 +367,9 @@ static int safe_read(int desc, char *ptr, size_t len)
 }
 
 
-/* copy a file - this is used in conjunction with the --temp-dir option */
+/** Copy a file.
+ *
+ * This is used in conjunction with the --temp-dir option */
 int copy_file(char *source, char *dest, mode_t mode)
 {
 	int ifd;
@@ -400,18 +420,21 @@ int copy_file(char *source, char *dest, mode_t mode)
 	return 0;
 }
 
-/*
-  Robust unlink: some OS'es (HPUX) refuse to unlink busy files, so
-  rename to <path>/.rsyncNNN instead. Note that successive rsync runs
-  will shuffle the filenames around a bit as long as the file is still
-  busy; this is because this function does not know if the unlink call
-  is due to a new file coming in, or --delete trying to remove old
-  .rsyncNNN files, hence it renames it each time.
-*/
 /* MAX_RENAMES should be 10**MAX_RENAMES_DIGITS */
 #define MAX_RENAMES_DIGITS 3
 #define MAX_RENAMES 1000
 
+/**
+ * 
+  Robust unlink: some OS'es (HPUX) refuse to unlink busy files, so
+  rename to <path>/.rsyncNNN instead.
+  
+  Note that successive rsync runs will shuffle the filenames around a
+  bit as long as the file is still busy; this is because this function
+  does not know if the unlink call is due to a new file coming in, or
+  --delete trying to remove old .rsyncNNN files, hence it renames it
+  each time.
+*/
 int robust_unlink(char *fname)
 {
 #ifndef ETXTBSY
@@ -519,7 +542,7 @@ void kill_all(int sig)
 }
 
 
-/* turn a user name into a uid */
+/** Turn a user name into a uid */
 int name_to_uid(char *name, uid_t *uid)
 {
 	struct passwd *pass;
@@ -532,7 +555,7 @@ int name_to_uid(char *name, uid_t *uid)
 	return 0;
 }
 
-/* turn a group name into a gid */
+/** Turn a group name into a gid */
 int name_to_gid(char *name, gid_t *gid)
 {
 	struct group *grp;
@@ -546,7 +569,7 @@ int name_to_gid(char *name, gid_t *gid)
 }
 
 
-/* lock a byte range in a open file */
+/** Lock a byte range in a open file */
 int lock_range(int fd, int offset, int len)
 {
 	struct flock lock;
@@ -628,9 +651,9 @@ void glob_expand(char *base1, char **argv, int *argc, int maxargs)
 	free(base);
 }
 
-/*******************************************************************
-  convert a string to lower case
-********************************************************************/
+/**
+ * Convert a string to lower case
+ **/
 void strlower(char *s)
 {
 	while (*s) {
@@ -688,15 +711,19 @@ void clean_fname(char *name)
 	}
 }
 
-/*
+/**
  * Make path appear as if a chroot had occurred:
+ *
  *    1. remove leading "/" (or replace with "." if at end)
  *    2. remove leading ".." components (except those allowed by "reldir")
  *    3. delete any other "<dir>/.." (recursively)
+ *
  * Can only shrink paths, so sanitizes in place.
+ *
  * While we're at it, remove double slashes and "." components like
  *   clean_fname does(), but DON'T remove a trailing slash because that
  *   is sometimes significant on command line arguments.
+ *
  * If "reldir" is non-null, it is a sanitized directory that the path will be
  *    relative to, so allow as many ".." at the beginning of the path as
  *    there are components in reldir.  This is used for symbolic link targets.
@@ -705,9 +732,9 @@ void clean_fname(char *name)
  *    path, but that would blow the assumption that the path doesn't grow and
  *    it is not likely to end up being a valid symlink anyway, so just do
  *    the normal removal of the leading "/" instead.
+ *
  * Contributed by Dave Dykstra <dwd@bell-labs.com>
  */
-
 void sanitize_path(char *p, char *reldir)
 {
 	char *start, *sanp;
@@ -796,7 +823,7 @@ void sanitize_path(char *p, char *reldir)
 
 static char curr_dir[MAXPATHLEN];
 
-/* like chdir() but can be reversed with pop_dir() if save is set. It
+/** like chdir() but can be reversed with pop_dir() if save is set. It
    is also much faster as it remembers where we have been */
 char *push_dir(char *dir, int save)
 {
@@ -828,7 +855,7 @@ char *push_dir(char *dir, int save)
 	return ret;
 }
 
-/* reverse a push_dir call */
+/** Reverse a push_dir call */
 int pop_dir(char *dir)
 {
 	int ret;
@@ -846,7 +873,7 @@ int pop_dir(char *dir)
 	return 0;
 }
 
-/* we need to supply our own strcmp function for file list comparisons
+/** We need to supply our own strcmp function for file list comparisons
    to ensure that signed/unsigned usage is consistent between machines. */
 int u_strcmp(const char *cs1, const char *cs2)
 {
@@ -955,7 +982,10 @@ void show_progress(OFF_T ofs, OFF_T size)
 	}
 }
 
-/* determine if a symlink points outside the current directory tree */
+
+/**
+ * Determine if a symlink points outside the current directory tree.
+ **/
 int unsafe_symlink(char *dest, char *src)
 {
 	char *tok;
@@ -1003,9 +1033,9 @@ int unsafe_symlink(char *dest, char *src)
 }
 
 
-/****************************************************************************
-  return the date and time as a string
-****************************************************************************/
+/**
+   Return the date and time as a string
+*/
 char *timestring(time_t t)
 {
 	static char TimeBuf[200];
@@ -1055,12 +1085,17 @@ int msleep(int t)
 }
 
 
-/*******************************************************************
- Determine if two file modification times are equivalent (either exact 
- or in the modification timestamp window established by --modify-window) 
- Returns 0 if the times should be treated as the same, 1 if the 
- first is later and -1 if the 2nd is later
- *******************************************************************/
+/**
+ * Determine if two file modification times are equivalent (either
+ * exact or in the modification timestamp window established by
+ * --modify-window).
+ *
+ * @retval 0 if the times should be treated as the same
+ *
+ * @retval +1 if the first is later
+ *
+ * @retval -1 if the 2nd is later
+ **/
 int cmp_modtime(time_t file1, time_t file2)
 {
 	extern int modify_window;
@@ -1077,11 +1112,11 @@ int cmp_modtime(time_t file1, time_t file2)
 #ifdef __INSURE__XX
 #include <dlfcn.h>
 
-/*******************************************************************
-This routine is a trick to immediately catch errors when debugging
-with insure. A xterm with a gdb is popped up when insure catches
-a error. It is Linux specific.
-********************************************************************/
+/**
+   This routine is a trick to immediately catch errors when debugging
+   with insure. A xterm with a gdb is popped up when insure catches
+   a error. It is Linux specific.
+**/
 int _Insure_trap_error(int a1, int a2, int a3, int a4, int a5, int a6)
 {
 	static int (*fn)();

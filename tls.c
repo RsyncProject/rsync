@@ -17,10 +17,9 @@
  */
 
 /**
- * \section tls
+ * @file tls.c
  *
- * tls -- Trivial recursive ls, for comparing two directories after
- * running an rsync.
+ * Trivial @c ls for comparing two directories after running an rsync.
  *
  * The problem with using the system's own ls is that some features
  * have little quirks that make directories look different when for
@@ -37,7 +36,6 @@
  * reproducible."  So we mask away information that can accidentally
  * change.
  **/
-
 
 
 #include "rsync.h"
