@@ -30,6 +30,7 @@ extern int remote_version;
 
 extern char *backup_suffix;
 
+extern int whole_file;
 extern int block_size;
 extern int update_only;
 extern int make_backups;
@@ -200,7 +201,7 @@ static int set_perms(char *fname,struct file_struct *file,struct stat *st,
   if (dry_run) return 0;
 
   if (!st) {
-    if (lstat(fname,&st2) != 0) {
+    if (link_stat(fname,&st2) != 0) {
       fprintf(FERROR,"stat %s : %s\n",fname,strerror(errno));
       return 0;
     }
@@ -264,7 +265,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
   if (verbose > 2)
     fprintf(FERROR,"recv_generator(%s,%d)\n",fname,i);
 
-  statret = lstat(fname,&st);
+  statret = link_stat(fname,&st);
 
   if (S_ISDIR(file->mode)) {
     if (dry_run) return;
@@ -404,6 +405,12 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
     return;
   }
 
+  if (whole_file) {
+    write_int(f_out,i);
+    send_sums(NULL,f_out);    
+    return;
+  }
+
   /* open the file */  
   fd = open(fname,O_RDONLY);
 
@@ -533,7 +540,6 @@ static void delete_one(struct file_struct *f)
 static void delete_files(struct file_list *flist)
 {
   struct file_list *local_file_list;
-  char *dot=".";
   int i, j;
   char *last_name=NULL;
 
@@ -566,9 +572,17 @@ static char *cleanup_fname = NULL;
 
 void exit_cleanup(int code)
 {
-  if (cleanup_fname)
-    unlink(cleanup_fname);
-  exit(code);
+	if (cleanup_fname)
+		unlink(cleanup_fname);
+	signal(SIGUSR1, SIG_IGN);
+	if (code) {
+#ifdef GETPGRP_VOID
+		kill(-getpgrp(), SIGUSR1);
+#else
+		kill(-getpgrp(getpid()), SIGUSR1);
+#endif
+	}
+	exit(code);
 }
 
 void sig_int(void)

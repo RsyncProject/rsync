@@ -42,11 +42,25 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_times;
 extern int relative_paths;
+extern int copy_links;
 
 static char **local_exclude_list = NULL;
 
 static void clean_fname(char *name);
 
+
+int link_stat(const char *Path, struct stat *Buffer) 
+{
+#if SUPPORT_LINKS
+    if (copy_links) {
+	return stat(Path, Buffer);
+    } else {
+	return lstat(Path, Buffer);
+    }
+#else
+    return stat(Path, Buffer);
+#endif
+}
 
 /*
   This function is used to check if a file should be included/excluded
@@ -68,7 +82,7 @@ static dev_t filesystem_dev;
 static void set_filesystem(char *fname)
 {
   struct stat st;
-  if (lstat(fname,&st) != 0) return;
+  if (link_stat(fname,&st) != 0) return;
   filesystem_dev = st.st_dev;
 }
 
@@ -241,7 +255,7 @@ static struct file_struct *make_file(char *fname)
 
   bzero(sum,SUM_LENGTH);
 
-  if (lstat(fname,&st) != 0) {
+  if (link_stat(fname,&st) != 0) {
     fprintf(FERROR,"%s: %s\n",
 	    fname,strerror(errno));
     return NULL;
@@ -416,7 +430,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
       strcat(fname,".");
     }
 
-    if (lstat(fname,&st) != 0) {
+    if (link_stat(fname,&st) != 0) {
       fprintf(FERROR,"%s : %s\n",fname,strerror(errno));
       continue;
     }

@@ -22,6 +22,7 @@ Basically you use rsync just like rcp, but rsync has many additional options.
 
 Here is a brief description of available options:
 
+Options:
 -v, --verbose            increase verbosity
 -c, --checksum           always checksum
 -a, --archive            archive mode (same as -rlptDog)
@@ -30,6 +31,7 @@ Here is a brief description of available options:
 -b, --backup             make backups (default ~ extension)
 -u, --update             update only (don't overwrite newer files)
 -l, --links              preserve soft links
+-L, --copy-links         treat soft links like regular files
 -H, --hard-links         preserve hard links
 -p, --perms              preserve permissions
 -o, --owner              preserve owner (root only)
@@ -38,6 +40,7 @@ Here is a brief description of available options:
 -t, --times              preserve times
 -S, --sparse             handle sparse files efficiently
 -n, --dry-run            show what would have been transferred
+-W, --whole-file         copy whole files, no incremental checks
 -x, --one-file-system    don't cross filesystem boundaries
 -B, --block-size SIZE    checksum blocking size
 -e, --rsh COMMAND        specify rsh replacement

@@ -293,10 +293,6 @@ extern int errno;
 #define SUPPORT_LINKS HAVE_READLINK
 #define SUPPORT_HARD_LINKS HAVE_LINK
 
-#if !SUPPORT_LINKS
-#define lstat stat
-#endif
-
 #ifndef HAVE_LCHOWN
 #define lchown chown
 #endif

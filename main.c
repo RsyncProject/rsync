@@ -30,6 +30,8 @@ char *backup_suffix = BACKUP_SUFFIX;
 static char *rsync_path = RSYNC_NAME;
 
 int make_backups = 0;
+int whole_file = 0;
+int copy_links = 0;
 int preserve_links = 0;
 int preserve_hard_links = 0;
 int preserve_perms = 0;
@@ -115,6 +117,10 @@ static void server_options(char **args,int *argc)
     argstr[x++] = 'n';
   if (preserve_links)
     argstr[x++] = 'l';
+  if (copy_links)
+    argstr[x++] = 'L';
+  if (whole_file)
+    argstr[x++] = 'W';
   if (preserve_hard_links)
     argstr[x++] = 'H';
   if (preserve_uid)
@@ -163,8 +169,8 @@ static void server_options(char **args,int *argc)
 int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f_out)
 {
   char *args[100];
-  int i,argc=0;
-  char *tok,*p;
+  int i,argc=0, ret;
+  char *tok,*p,*dir=NULL;
 
   if (!local_server) {
     if (!cmd)
@@ -200,7 +206,7 @@ int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f_out)
   server_options(args,&argc);
 
   if (path && *path) {
-    char *dir = strdup(path);
+    dir = strdup(path);
     p = strrchr(dir,'/');
     if (p && !relative_paths) {
       *p = 0;
@@ -226,7 +232,10 @@ int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f_out)
     fprintf(FERROR,"\n");
   }
 
-  return piped_child(args,f_in,f_out);
+  ret = piped_child(args,f_in,f_out);
+  if (dir) free(dir);
+
+  return ret;
 
 oom:
   out_of_memory("do_cmd");
@@ -404,6 +413,7 @@ static void usage(FILE *f)
   fprintf(f,"-b, --backup             make backups (default ~ extension)\n");
   fprintf(f,"-u, --update             update only (don't overwrite newer files)\n");
   fprintf(f,"-l, --links              preserve soft links\n");
+  fprintf(f,"-L, --copy-links         treat soft links like regular files\n");
   fprintf(f,"-H, --hard-links         preserve hard links\n");
   fprintf(f,"-p, --perms              preserve permissions\n");
   fprintf(f,"-o, --owner              preserve owner (root only)\n");
@@ -412,6 +422,7 @@ static void usage(FILE *f)
   fprintf(f,"-t, --times              preserve times\n");  
   fprintf(f,"-S, --sparse             handle sparse files efficiently\n");
   fprintf(f,"-n, --dry-run            show what would have been transferred\n");
+  fprintf(f,"-W, --whole-file         copy whole files, no incremental checks\n");
   fprintf(f,"-x, --one-file-system    don't cross filesystem boundaries\n");
   fprintf(f,"-B, --block-size SIZE    checksum blocking size\n");  
   fprintf(f,"-e, --rsh COMMAND        specify rsh replacement\n");
@@ -433,7 +444,7 @@ static void usage(FILE *f)
 enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
       OPT_EXCLUDE_FROM,OPT_DELETE,OPT_RSYNC_PATH};
 
-static char *short_options = "oblHpguDCtcahvrRIxnSe:B:z";
+static char *short_options = "oblLWHpguDCtcahvrRIxnSe:B:z";
 
 static struct option long_options[] = {
   {"version",     0,     0,    OPT_VERSION},
@@ -459,6 +470,8 @@ static struct option long_options[] = {
   {"devices",     0,     0,    'D'},
   {"perms",       0,     0,    'p'},
   {"links",       0,     0,    'l'},
+  {"copy-links",  0,     0,    'L'},
+  {"whole-file",  0,     0,    'W'},
   {"hard-links",  0,     0,    'H'},
   {"owner",       0,     0,    'o'},
   {"group",       0,     0,    'g'},
@@ -468,6 +481,10 @@ static struct option long_options[] = {
   {"block-size",  1,     0,    'B'},
   {"compress",	  0,	 0,    'z'},
   {0,0,0,0}};
+
+RETSIGTYPE sigusr1_handler(int val) {
+	exit_cleanup(1);
+}
 
 int main(int argc,char *argv[])
 {
@@ -482,6 +499,13 @@ int main(int argc,char *argv[])
     int f_in,f_out;
     struct file_list *flist;
     char *local_name = NULL;
+
+#ifdef SETPGRP_VOID
+    setpgrp();
+#else
+    setpgrp(0,0);
+#endif
+    signal(SIGUSR1, sigusr1_handler);
 
     starttime = time(NULL);
     am_root = (getuid() == 0);
@@ -554,6 +578,14 @@ int main(int argc,char *argv[])
 
 	case 'l':
 	  preserve_links=1;
+	  break;
+
+	case 'L':
+	  copy_links=1;
+	  break;
+
+	case 'W':
+	  whole_file=1;
 	  break;
 
 	case 'H':
@@ -781,3 +813,4 @@ int main(int argc,char *argv[])
 
     return status | status2;
 }
+
