@@ -119,40 +119,6 @@ int delete_file(char *fname)
 	return 0;
 }
 
-static int is_in_group(gid_t gid)
-{
-#ifdef GETGROUPS_T
-	static gid_t last_in = (gid_t) -2, last_out;
-	static int ngroups = -2;
-	static GETGROUPS_T *gidset;
-	int n;
-
-	if (gid == last_in)
-		return last_out;
-	if (ngroups < -1) {
-		/* treat failure (-1) as if not member of any group */
-		ngroups = getgroups(0, 0);
-		if (ngroups > 0) {
-			gidset = new_array(GETGROUPS_T, ngroups);
-			ngroups = getgroups(ngroups, gidset);
-		}
-	}
-
-	last_in = gid;
-	last_out = 0;
-	for (n = 0; n < ngroups; n++) {
-		if (gidset[n] == gid) {
-			last_out = 1;
-			break;
-		}
-	}
-	return last_out;
-
-#else
-	return 0;
-#endif
-}
-
 int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 		int report)
 {
@@ -186,13 +152,8 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	}
 
 	change_uid = am_root && preserve_uid && st->st_uid != file->uid;
-	change_gid = preserve_gid && file->gid != (gid_t) -1 && \
-				st->st_gid != file->gid;
-	if (change_gid && !am_root) {
-		/* enforce bsd-style group semantics: non-root can only
-		    change to groups that the user is a member of */
-		change_gid = is_in_group(file->gid);
-	}
+	change_gid = preserve_gid && file->gid != (gid_t)-1
+		&& st->st_gid != file->gid;
 	if (change_uid || change_gid) {
 		if (do_lchown(fname,
 			      change_uid?file->uid:st->st_uid,
