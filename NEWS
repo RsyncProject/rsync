@@ -1,5 +1,5 @@
 NEWS for rsync 2.6.1 (UNRELEASED)
-Protocol: 27 (unchanged)
+Protocol: 28 (changed)
 Changes since 2.6.0:
 
   ENHANCEMENTS:
@@ -15,7 +15,8 @@ Changes since 2.6.0:
       transfer we are, including both a count of files transferred
       and a percentage of the total file-count that we're processed.
       It was also improved to better show the current rate of
-      transfer and the estimated time left.
+      transfer (which is used to estimate the remaining transfer
+      time).
 
     * The configure script now accepts --with-rsyncd-conf=PATH
       to override the default value of the /etc/rsyncd.conf file.
@@ -29,24 +30,22 @@ Changes since 2.6.0:
     * The --link-dest code now works properly for a non-root user
       when the UIDs of the source and destination differ and -o was
       specified, and when the group of the source can't be used on
-      the destination and -g was specified.  (Wayne Davison)
+      the destination and -g was specified.
 
     * Fixed a bug in the handling of -H (hard-links) that might
       cause the expanded PATH/NAME value of the current item to
       get overwritten (due to an expanded-name caching bug).
-      (Wayne Davison)
       
     * We now reset the "new data has been sent" flag at the start
       of each file we send.  This makes sure that an interrupted
       transfer with the --partial option set doesn't keep a shorter
       temp file than the current basis file when no new data has been
-      transfered over the wire for that file.  (Wayne Davison)
+      transfered over the wire for that file.
 
     * Fixed a byte-order problem in --batch-mode on big-endian
       machines.  (Jay Fenlason)
 
     * Fixed configure bug when running "./configure --disable-ipv6".
-      (Wayne Davison)
 
     * Fixed "make test" bug when build dir is not the source dir.
 
@@ -71,9 +70,16 @@ Changes since 2.6.0:
 
     * Fixed the "refuse options" setting in the rsyncd.conf file.
 
+    * Improved the -x (--one-file-system) flag's handling of any
+      mount-point directories we encounter.  It is both more optimal
+      (in that it no longer does a useless scan of the contents of
+      the mount-point dirs) and also fixes a bug where a remaped
+      mount of the original filesystem could get discovered on a
+      disk we should be ignoring.
+
     * Rsync no longer discards a double-slash at the start of a filename
       when trying to open the file.  It also no longer constructs names
-      that start with a double slash (unless the user supplied both).
+      that start with a double slash (unless the user supplied them).
 
     * Fixed compilation problem on Tru64 Unix (having to do with
       sockaddr.sa_len and sockaddr.sin_len).
@@ -85,10 +91,9 @@ Changes since 2.6.0:
 
     * Optimizations to the name-handling/comparing code have made
       some significant reductions in user-CPU time for large file
-      sets.  (Wayne Davison)
+      sets.
 
     * Some variable-type cleanup that makes the code more consistent.
-      (Wayne Davison)
 
     * Reduced memory requirements of hard link preservation.
       (J.W. Schultz)
@@ -126,157 +131,11 @@ Changes since 2.6.0:
       have the "redo" pipe fill up and hang rsync, and (2) trailing
       messages from the receiver don't get lost on their way through
       the generator over to the sender (the latter mainly affected
-      hard-link messages).  (Wayne Davison)
+      hard-link messages and verbose --stats output).
 
     * The reading & writing of the file list in batch-mode is now
       handled by the same code that sends & receives the list over
       the wire.  This makes it much easier to maintain.
 
-    * Optimized the -x (--one-file-system) flag's handling of any
-      mount-point directories we encounter (it no longer scans the
-      contents of the mount-point dirs, just to throw away the data).
-
     * Improved the internal uid/gid code to be more portable and
       a little more optimized.
-
-
-NEWS for rsync 2.6.0 (1 Jan 2004)
-Protocol: 27 (changed)
-Changes since 2.5.7:
-
-  ENHANCEMENTS:
-
-    * "ssh" is now the default remote shell for rsync.  If you want to
-      change this, configure like this:  "./configure --with-rsh=rsh".
-
-    * Added --files-from, --no-relative, --no-implied-dirs, and --from0.
-      Note that --from0 affects the line-ending character for all the
-      files read by the --*-from options. (Wayne Davison)
-
-    * Length of csum2 is now per-file starting with protocol version
-      27. (J.W. Schultz)
-
-    * Per-file dynamic block size is now sqrt(file length).  The
-      per-file checksum size is determined according to an algorithm
-      provided by Donovan Baarda which reduces the probability of rsync
-      algorithm corrupting data and falling back using the whole md4
-      checksums. (J.W. Schultz, Donovan Baarda)
-
-    * The --stats option no longer includes the (debug) malloc summary
-      unless the verbose option was specified at least twice.
-
-    * Added a new error/warning code for when files vanish from the
-      sending side.  Made vanished source files not interfere with the
-      file-deletion pass when --delete-after was specified.
-
-    * Various trailing-info sections are now preceded by a newline.
-
-  BUG FIXES:
-
-    * Fixed several exclude/include matching bugs when using wild-cards.
-      This has a several user-visible effects, all of which make the
-      matching more consistent and intuitive.  This should hopefully not
-      cause anyone problems since it makes the matching work more like
-      what people are expecting. (Wayne Davison)
-
-      - A pattern with a "**" no longer causes a "*" to match slashes.
-        For example, with "/*/foo/**", "foo" must be 2 levels deep.
-	[If your string has BOTH "*" and "**" wildcards, changing the
-	"*" wildcards to "**" will provide the old behavior in all
-	versions.]
-
-      - "**/foo" now matches at the base of the transfer (like /foo
-        does).  [Use "/**/foo" to get the old behavior in all versions.]
-
-      - A non-anchored wildcard term floats to match beyond the base of
-        the transfer.  E.g. "CVS/R*" matches at the end of the path,
-        just like the non-wildcard term "CVS/Root" does. [Use "/CVS/R*"
-        to get the old behavior in all versions.]
-
-      - Including a "**" in the match term causes it to be matched
-        against the entire path, not just the name portion, even if
-        there aren't any interior slashes in the term.  E.g. "foo**bar"
-        would exclude "/path/foo-bar" (just like before) as well as
-        "/foo-path/baz-bar" (unlike before).  [Use "foo*bar" to get the
-        old behavior in all versions.]
-
-    * The exclude list specified in the daemon's config file is now
-      properly applied to the pulled items no matter how deep the
-      user's file-args are in the source tree.  (Wayne Davison)
-
-    * For protocol version >= 27, mdfour_tail() is called when the
-      block size (including checksum_seed) is a multiple of 64.
-      Previously it was not called, giving the wrong MD4 checksum.
-      (Craig Barratt)
-
-    * For protocol version >= 27, a 64 bit bit counter is used in
-      mdfour.c as required by the RFC.  Previously only a 32 bit bit
-      counter was used, causing incorrect MD4 file checksums for
-      file sizes >= 512MB - 4.  (Craig Barratt)
-
-    * Fixed a crash bug when interacting with older rsync versions and
-      multiple files of the same name are destined for the same dir.
-      (Wayne Davison)
-
-    * Keep tmp names from overflowing MAXPATHLEN.
-
-    * Make --link-dest honor the absence of -p, -o, and -g.
-
-    * Made rsync treat a trailing slash in the destination in a more
-      consistent manner.
-
-    * Fixed file I/O error detection.  (John Van Essen)
-
-    * Fixed bogus "malformed address {hostname}" message in rsyncd log
-      when checking IP address against hostnames from "hosts allow"
-      and "hosts deny" parameters in config file.
-
-    * Print heap statistics when verbose >= 2 instead of when >= 1.
-
-    * Fixed a compression (-z) bug when syncing a mostly-matching file
-      that contains already-compressed data.  (Yasuoka Masahiko and
-      Wayne Davison)
-
-    * Fixed a bug in the --backup code that could cause deleted files
-      to not get backed up.
-
-    * When the backup code makes new directories, create them with mode
-      0700 instead of 0755 (since the directory permissions in the
-      backup tree are not yet copied from the main tree).
-
-    * Call setgroups() in a more portable manner.
-
-    * Improved file-related error messages to better indicate exactly
-      what pathname failed. (Wayne Davison)
-
-    * Fixed some bugs in the handling of --delete and --exclude when
-      using the --relative (-R) option. (Wayne Davison)
-
-    * Fixed bug that prevented regular files from replacing
-      special files and caused a directory in --link-dest or
-      --compare-dest to block the creation of a file with the
-      same path.  A directory still cannot be replaced by a
-      regular file unless --delete specified.  (J.W. Schultz)
-
-    * Detect and report when open or opendir succeed but read and
-      readdir fail caused by network filesystem issues and truncated
-      files.  (David Norwood, Michael Brown, J.W. Schultz)
-
-    * Added a fix that should give ssh time to restore the tty settings
-      if the user presses Ctrl-C at an ssh password prompt.
-
-  INTERNAL:
-
-    * Eliminated vestigial support for old versions that we stopped
-      supporting. (J.W. Schultz)
-
-    * Simplified some of the option-parsing code. (Wayne Davison)
-
-    * Some cleanup made to the exclude code, as well as some new
-      defines added to enhance readability. (Wayne Davison)
-
-    * Changed the protocol-version code so that it can interact at a
-      lower protocol level than the maximum supported by both sides.
-      Added an undocumented option, --protocol=N, to force the value
-      we advertise to the other side (primarily for testing purposes).
-      (Wayne Davison)
