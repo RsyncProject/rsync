@@ -239,14 +239,14 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
 {
 	int ret;
 
-	if (make_backups && !make_backup(fname))
-		return;
-
 	if (inplace) {
 		if (verbose > 2)
 			rprintf(FINFO, "finishing %s\n", fname);
 		goto do_set_perms;
 	}
+
+	if (make_backups && !make_backup(fname))
+		return;
 
 	/* Change permissions before putting the file into place. */
 	set_perms(fnametmp, file, NULL, ok_to_set_time ? 0 : PERMS_SKIP_MTIME);
