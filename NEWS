@@ -99,6 +99,15 @@ Changes since 2.6.3:
       is creating (e.g. dirs, symlinks) is now integrated into the progress
       output without overlapping it.  (Requires protocol 29.)
 
+    - When --timeout is specified, lulls in the transfer while the
+      generator scanning the file system (either looking for files to send
+      or files to delete) now generate a new keep-alive packet that will
+      keep the transfer going (as long as the generator continues to make
+      progress).  (Requires protocol 29.)
+
+    - The stat size of a device is not added to the total file size of the
+      items we encounter since it might be undefined on some OSes.
+
   ENHANCEMENTS:
 
     - Rsync now supports popt's option aliases, which means that you can
@@ -306,6 +315,12 @@ Changes since 2.6.3:
     - A protocol-29 batch file includes a bit for the setting of the --dirs
       option.  Also, the shell script created by --write-batch will use the
       --filter option instead of --exclude-from to capture any filter rules.
+
+    - An index equal to the file-list count is sent as a keep-alive packet
+      from the generator to the sender, who then forwards it on to the
+      receiver.  This normally invalid index is only a valid keep-alive
+      packet if the 16-bit flag-word that follows it contains a single bit
+      (ITEM_IS_NEW, which is normally an illegal flag to appear alone).
 
   BUILD CHANGES:
 
