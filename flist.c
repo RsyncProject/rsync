@@ -315,6 +315,7 @@ static mode_t from_wire_mode(int mode)
 static void send_directory(int f, struct file_list *flist, char *dir);
 
 static char *flist_dir;
+static int flist_dir_len;
 
 
 /**
@@ -381,7 +382,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 
 	io_write_phase = "send_file_entry";
 
-	fname = f_name_to(file, fbuf, sizeof fbuf);
+	fname = f_name_to(file, fbuf);
 
 	flags = base_flags;
 
@@ -522,7 +523,6 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	}
 
 	strlcpy(lastname, fname, MAXPATHLEN);
-	lastname[MAXPATHLEN - 1] = 0;
 
 	io_write_phase = "unknown";
 }
@@ -750,8 +750,11 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 	char cleaned_name[MAXPATHLEN];
 	char linkbuf[MAXPATHLEN];
 
-	strlcpy(cleaned_name, fname, MAXPATHLEN);
-	cleaned_name[MAXPATHLEN - 1] = 0;
+	if (strlcpy(cleaned_name, fname, sizeof cleaned_name)
+	    >= sizeof cleaned_name - flist_dir_len) {
+		rprintf(FINFO, "skipping overly long name: %s\n", fname);
+		return NULL;
+	}
 	clean_fname(cleaned_name);
 	if (sanitize_paths)
 		sanitize_path(cleaned_name, NULL);
@@ -852,16 +855,7 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 		file_checksum(fname, file->u.sum, st.st_size);
 	}
 
-	if (flist_dir) {
-		static char *lastdir;
-		if (lastdir && strcmp(lastdir, flist_dir) == 0)
-			file->basedir = lastdir;
-		else {
-			file->basedir = strdup(flist_dir);
-			lastdir = file->basedir;
-		}
-	} else
-		file->basedir = NULL;
+	file->basedir = flist_dir;
 
 	if (!S_ISDIR(st.st_mode))
 		stats.total_size += st.st_size;
@@ -900,7 +894,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 	if (S_ISDIR(file->mode) && recursive) {
 		struct exclude_struct **last_exclude_list =
 		    local_exclude_list;
-		send_directory(f, flist, f_name_to(file, fbuf, sizeof fbuf));
+		send_directory(f, flist, f_name_to(file, fbuf));
 		local_exclude_list = last_exclude_list;
 		return;
 	}
@@ -1106,6 +1100,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			fname = ".";
 
 		if (dir && *dir) {
+			static char *lastdir;
+			static int lastdir_len;
+
 			strcpy(olddir, curr_dir); /* can't overflow */
 
 			if (!push_dir(dir)) {
@@ -1115,7 +1112,15 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				continue;
 			}
 
-			flist_dir = dir;
+			if (lastdir && strcmp(lastdir, dir) == 0) {
+				flist_dir = lastdir;
+				flist_dir_len = lastdir_len;
+			} else {
+				if (lastdir)
+					free(lastdir);
+				flist_dir = lastdir = strdup(dir);
+				flist_dir_len = lastdir_len = strlen(dir);
+			}
 		}
 
 		if (one_file_system)
@@ -1125,6 +1130,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 		if (olddir[0]) {
 			flist_dir = NULL;
+			flist_dir_len = 0;
 			if (!pop_dir(olddir)) {
 				rprintf(FERROR, "pop_dir %s failed: %s\n",
 					full_fname(dir), strerror(errno));
@@ -1510,19 +1516,21 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 
 
 /* Return a copy of the full filename of a flist entry, using the indicated
- * buffer.
+ * buffer.  No size-checking is done because we checked the size when creating
+ * the file_struct entry.
  */
-char *f_name_to(struct file_struct *f, char *fbuf, int bsize)
+char *f_name_to(struct file_struct *f, char *fbuf)
 {
 	if (!f || !f->basename)
 		return NULL;
 
 	if (f->dirname) {
-		int off = strlcpy(fbuf, f->dirname, bsize);
-		off += strlcpy(fbuf + off, "/", bsize - off);
-		strlcpy(fbuf + off, f->basename, bsize - off);
+		int len = strlen(f->dirname);
+		memcpy(fbuf, f->dirname, len);
+		fbuf[len] = '/';
+		strcpy(fbuf + len + 1, f->basename);
 	} else
-		strlcpy(fbuf, f->basename, bsize);
+		strcpy(fbuf, f->basename);
 	return fbuf;
 }
 
@@ -1536,5 +1544,5 @@ char *f_name(struct file_struct *f)
 
 	n = (n + 1) % (sizeof names / sizeof names[0]);
 
-	return f_name_to(f, names[n], sizeof names[0]);
+	return f_name_to(f, names[n]);
 }
