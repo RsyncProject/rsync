@@ -26,6 +26,9 @@ Changes since 2.6.3:
 
     - One place in the code wasn't checking if fork() failed.
 
+    - The "ignore nonreadable" daemon parameter no longer affects symlinks
+      that are being copied, even if they point nowhere.
+
   ENHANCEMENTS:
 
     - Rsync now supports popt's option aliases, which means that you can
