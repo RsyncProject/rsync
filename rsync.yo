@@ -1073,13 +1073,13 @@ quote(itemize(
 ))
 
 The file-types that replace the bf(X) are: bf(f) for a file, a bf(d) for a
-dir, an bf(L) for a symlink, and a bf(D) for a device.
+directory, an bf(L) for a symlink, and a bf(D) for a device.
 
 The other letters in the string above are the actual letters that
 will be output if the associated attribute for the item is being updated or
 a "." for no change.  Three exceptions to this are: (1) a newly created
-item replaces each letter with a "+", (2) an identical item replaces each
-letter with a space, and (3) an unknown attribute replaces each letter with
+item replaces each letter with a "+", (2) an identical item replaces the
+dots with spaces, and (3) an unknown attribute replaces each letter with
 a "?" (this happens when talking to an older rsync).
 
 The attribute that is associated with each letter is as follows:
