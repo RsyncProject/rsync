@@ -24,6 +24,8 @@ extern int csum_length;
 extern int verbose;
 extern int am_server;
 
+extern int remote_version;
+
 typedef unsigned short tag;
 
 #define TABLESIZE (1<<16)
@@ -93,23 +95,53 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 		    int offset,int i)
 {
   int n = offset - last_match;
-  
+  int j;
+
   if (verbose > 2)
     if (i != -1)
       fprintf(FERROR,"match at %d last_match=%d j=%d len=%d n=%d\n",
 	      (int)offset,(int)last_match,i,(int)s->sums[i].len,n);
 
-  send_token(f,i,buf,last_match,n);
-
+  send_token(f,i,buf,last_match,n,i==-1?0:s->sums[i].len);
   data_transfer += n;
 
-  if (i != -1)
-    last_match = offset + s->sums[i].len;
-  
-  if (i != -1)
-    last_match = offset + s->sums[i].len;
   if (n > 0)
     write_flush(f);
+
+  if (i != -1)
+    n += s->sums[i].len;
+  
+  for (j=0;j<n;j+=CHUNK_SIZE) {
+    int n1 = MIN(CHUNK_SIZE,n-j);
+    sum_update(map_ptr(buf,last_match+j,n1),n1);
+  }
+
+
+  if (i != -1)
+    last_match = offset + s->sums[i].len;
+
+}
+
+
+static inline char *window_ptr(struct map_struct *buf,int off,int len)
+{
+  static char *p=NULL;
+  static int p_len = 0;
+  static int p_off = 0;  
+
+  if (off == 0) {
+    p_off = 0;
+    p_len = CHUNK_SIZE;
+    p = map_ptr(buf,p_off,p_len);    
+  }
+
+  while (off+len > p_off+p_len) {
+    p_off += CHUNK_SIZE;
+    p_len = CHUNK_SIZE;
+    p = map_ptr(buf,p_off,p_len);  
+  }
+
+  return(p + (off-p_off));
 }
 
 
@@ -127,7 +159,7 @@ static void hash_search(int f,struct sum_struct *s,
 
   k = MIN(len, s->n);
 
-  map = map_ptr(buf,0,k);
+  map = window_ptr(buf,0,k);
 
   sum = get_checksum1(map, k);
   s1 = sum & 0xFFFF;
@@ -165,7 +197,7 @@ static void hash_search(int f,struct sum_struct *s,
 
 	  if (!done_csum2) {
 	    int l = MIN(s->n,len-offset);
-	    map = map_ptr(buf,offset,l);
+	    map = window_ptr(buf,offset,l);
 	    get_checksum2(map,l,sum2);
 	    done_csum2 = 1;
 	  }
@@ -173,7 +205,7 @@ static void hash_search(int f,struct sum_struct *s,
 	    matched(f,s,buf,len,offset,i);
 	    offset += s->sums[i].len - 1;
 	    k = MIN((len-offset), s->n);
-	    map = map_ptr(buf,offset,k);
+	    map = window_ptr(buf,offset,k);
 	    sum = get_checksum1(map, k);
 	    s1 = sum & 0xFFFF;
 	    s2 = sum >> 16;
@@ -188,7 +220,7 @@ static void hash_search(int f,struct sum_struct *s,
     }
 
     /* Trim off the first byte from the checksum */
-    map = map_ptr(buf,offset,k+1);
+    map = window_ptr(buf,offset,k+1);
     s1 -= map[0];
     s2 -= k * map[0];
 
@@ -203,16 +235,21 @@ static void hash_search(int f,struct sum_struct *s,
   } while (++offset < end);
 
   matched(f,s,buf,len,len,-1);
+  window_ptr(buf,len-1,1);
 }
 
 
 void match_sums(int f,struct sum_struct *s,struct map_struct *buf,off_t len)
 {
+  char file_sum[SUM_LENGTH];
+
   last_match = 0;
   false_alarms = 0;
   tag_hits = 0;
   matches=0;
   data_transfer=0;
+
+  sum_init();
 
   if (len > 0 && s->count>0) {
     build_hash_table(s);
@@ -226,6 +263,14 @@ void match_sums(int f,struct sum_struct *s,struct map_struct *buf,off_t len)
       fprintf(FERROR,"done hash search\n");
   } else {
     matched(f,s,buf,len,len,-1);
+  }
+
+  sum_end(file_sum);
+
+  if (remote_version >= 14) {
+    if (verbose > 2)
+      fprintf(FERROR,"sending file_sum\n");
+    write_buf(f,file_sum,SUM_LENGTH);
   }
 
   if (targets) {

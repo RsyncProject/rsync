@@ -83,7 +83,8 @@ void get_checksum2(char *buf,int len,char *sum)
   for(i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK) {
     MDupdate(&MD, buf1+i, CSUM_CHUNK*8);
   }
-  MDupdate(&MD, buf1+i, (len-i)*8);
+  if (len - i > 0)
+    MDupdate(&MD, buf1+i, (len-i)*8);
 
   sum_put(&MD,sum);
 }
@@ -112,8 +113,10 @@ void file_checksum(char *fname,char *sum,off_t size)
     MDupdate(&MD, tmpchunk, CSUM_CHUNK*8);
   }
 
-  bcopy(map_ptr(buf,i,len-i),tmpchunk,len-i);
-  MDupdate(&MD, tmpchunk, (len-i)*8);
+  if (len - i > 0) {
+    bcopy(map_ptr(buf,i,len-i),tmpchunk,len-i);
+    MDupdate(&MD, tmpchunk, (len-i)*8);
+  }
 
   sum_put(&MD,sum);
 
@@ -124,6 +127,53 @@ void file_checksum(char *fname,char *sum,off_t size)
 
 void checksum_init(void)
 {
+}
+
+
+
+static MDstruct sumMD;
+static int sumresidue;
+static char sumrbuf[CSUM_CHUNK];
+
+void sum_init(void)
+{
+  MDbegin(&sumMD);
+  sumresidue=0;
+}
+
+void sum_update(char *p,int len)
+{
+  int i;
+  if (sumresidue) {
+    i = MIN(CSUM_CHUNK-sumresidue,len);
+    bcopy(p,sumrbuf+sumresidue,i);
+    MDupdate(&sumMD, sumrbuf, (i+sumresidue)*8);
+    len -= i;
+    p += i;
+  }
+
+  for(i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK) {
+    bcopy(p+i,sumrbuf,CSUM_CHUNK);
+    MDupdate(&sumMD, sumrbuf, CSUM_CHUNK*8);
+  }
+
+  if (len - i > 0) {
+    sumresidue = len-i;
+    bcopy(p+i,sumrbuf,sumresidue);
+  } else {
+    sumresidue = 0;    
+  }
+}
+
+void sum_end(char *sum)
+{
+  if (sumresidue)
+    MDupdate(&sumMD, sumrbuf, sumresidue*8);
+
+  SIVAL(sum,0,sumMD.buffer[0]);
+  SIVAL(sum,4,sumMD.buffer[1]);
+  SIVAL(sum,8,sumMD.buffer[2]);
+  SIVAL(sum,12,sumMD.buffer[3]);  
 }
 
 

@@ -73,7 +73,8 @@ static void simple_send_token(int f,int token,
  * If token == -1 then we have reached EOF 
  * If n == 0 then don't send a buffer
  */
-void send_token(int f,int token,struct map_struct *buf,int offset,int n)
+void send_token(int f,int token,struct map_struct *buf,int offset,
+		int n,int toklen)
 {
   if (!do_compression) {
     simple_send_token(f,token,buf,offset,n);

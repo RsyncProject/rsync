@@ -129,8 +129,8 @@ int read_int(int f)
   char b[4];
   if ((ret=readfd(f,b,4)) != 4) {
     if (verbose > 1) 
-      fprintf(FERROR,"Error reading %d bytes : %s\n",
-	      4,ret==-1?strerror(errno):"EOF");
+      fprintf(FERROR,"(%d) Error reading %d bytes : %s\n",
+	      getpid(),4,ret==-1?strerror(errno):"EOF");
     exit_cleanup(1);
   }
   total_read += 4;
@@ -142,8 +142,8 @@ void read_buf(int f,char *buf,int len)
   int ret;
   if ((ret=readfd(f,buf,len)) != len) {
     if (verbose > 1) 
-      fprintf(FERROR,"Error reading %d bytes : %s\n",
-	      len,ret==-1?strerror(errno):"EOF");
+      fprintf(FERROR,"(%d) Error reading %d bytes : %s\n",
+	      getpid(),len,ret==-1?strerror(errno):"EOF");
     exit_cleanup(1);
   }
   total_read += len;

@@ -262,7 +262,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
   struct file_struct *file = &flist->files[i];
 
   if (verbose > 2)
-    fprintf(FERROR,"recv_generator(%s)\n",fname);
+    fprintf(FERROR,"recv_generator(%s,%d)\n",fname,i);
 
   statret = lstat(fname,&st);
 
@@ -383,9 +383,12 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
   }
 
   if (verbose > 3)
-    fprintf(FERROR,"mapped %s of size %d\n",fname,(int)st.st_size);
+    fprintf(FERROR,"gen mapped %s of size %d\n",fname,(int)st.st_size);
 
   s = generate_sums(buf,st.st_size,block_size);
+
+  if (verbose > 2)
+    fprintf(FERROR,"sending sums for %d\n",i);
 
   write_int(f_out,i);
   send_sums(s,f_out);
@@ -399,21 +402,28 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 
 
 
-static void receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
+static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
 {
   int i,n,remainder,len,count;
   off_t offset = 0;
   off_t offset2;
   char *data;
+  static char file_sum1[SUM_LENGTH];
+  static char file_sum2[SUM_LENGTH];
+  char *map=NULL;
 
   count = read_int(f_in);
   n = read_int(f_in);
   remainder = read_int(f_in);
 
+  sum_init();
+
   for (i=recv_token(f_in,&data); i != 0; i=recv_token(f_in,&data)) {
     if (i > 0) {
       if (verbose > 3)
 	fprintf(FERROR,"data recv %d at %d\n",i,(int)offset);
+
+      sum_update(data,i);
 
       if (write_sparse(fd,data,i) != i) {
 	fprintf(FERROR,"write failed on %s : %s\n",fname,strerror(errno));
@@ -431,7 +441,11 @@ static void receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
 	fprintf(FERROR,"chunk[%d] of size %d at %d offset=%d\n",
 		i,len,(int)offset2,(int)offset);
 
-      if (write_sparse(fd,map_ptr(buf,offset2,len),len) != len) {
+      map = map_ptr(buf,offset2,len);
+
+      sum_update(map,len);
+
+      if (write_sparse(fd,map,len) != len) {
 	fprintf(FERROR,"write failed on %s : %s\n",fname,strerror(errno));
 	exit_cleanup(1);
       }
@@ -443,6 +457,17 @@ static void receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
     fprintf(FERROR,"write failed on %s : %s\n",fname,strerror(errno));
     exit_cleanup(1);
   }
+
+  sum_end(file_sum1);
+
+  if (remote_version >= 14) {
+    read_buf(f_in,file_sum2,SUM_LENGTH);
+    if (verbose > 2)
+      fprintf(FERROR,"got file_sum\n");
+    if (memcmp(file_sum1,file_sum2,SUM_LENGTH) != 0)
+      return 0;
+  }
+  return 1;
 }
 
 
@@ -510,6 +535,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
   int i;
   struct file_struct *file;
   int phase=0;
+  int recv_ok;
 
   if (verbose > 2) {
     fprintf(FERROR,"recv_files(%d) starting\n",flist->count);
@@ -520,11 +546,14 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
   }
 
   while (1) 
-    {
+    {      
       i = read_int(f_in);
       if (i == -1) {
 	if (phase==0 && remote_version >= 13) {
 	  phase++;
+	  csum_length = SUM_LENGTH;
+	  if (verbose > 2)
+	    fprintf(FERROR,"recv_files phase=%d\n",phase);
 	  write_int(f_gen,-1);
 	  write_flush(f_gen);
 	  continue;
@@ -564,12 +593,11 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
       if (fd1 != -1 && st.st_size > 0) {
 	buf = map_file(fd1,st.st_size);
+	if (verbose > 2)
+	  fprintf(FERROR,"recv mapped %s of size %d\n",fname,(int)st.st_size);
       } else {
 	buf = NULL;
       }
-
-      if (verbose > 2)
-	fprintf(FERROR,"mapped %s of size %d\n",fname,(int)st.st_size);
 
       /* open tmp file */
       sprintf(fnametmp,"%s.XXXXXX",fname);
@@ -589,7 +617,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	printf("%s\n",fname);
 
       /* recv file data */
-      receive_data(f_in,buf,fd2,fname);
+      recv_ok = receive_data(f_in,buf,fd2,fname);
 
       if (fd1 != -1) {
 	unmap_file(buf);
@@ -618,6 +646,12 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
       cleanup_fname = NULL;
 
       set_perms(fname,file,NULL,0);
+
+      if (!recv_ok) {
+	if (verbose > 1)
+	  fprintf(FERROR,"redoing %s(%d)\n",fname,i);
+	write_int(f_gen,i);
+      }
     }
 
   if (verbose > 2)
@@ -651,8 +685,11 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
       if (i == -1) {
 	if (phase==0 && remote_version >= 13) {
 	  phase++;
+	  csum_length = SUM_LENGTH;
 	  write_int(f_out,-1);
 	  write_flush(f_out);
+	  if (verbose > 2)
+	    fprintf(FERROR,"send_files phase=%d\n",phase);
 	  continue;
 	}
 	break;
@@ -748,6 +785,7 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
 void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 {
   int i;
+  int phase=0;
 
   if (verbose > 2)
     fprintf(FERROR,"generator starting pid=%d count=%d\n",
@@ -769,18 +807,26 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 		   flist,i,f);
   }
 
+  phase++;
+  csum_length = SUM_LENGTH;
+  ignore_times=1;
+
+  if (verbose > 2)
+    fprintf(FERROR,"generate_files phase=%d\n",phase);
+
   write_int(f,-1);
   write_flush(f);
 
   if (remote_version >= 13) {
-    /* go to the full checksum if anything has failed so far */
-    csum_length = SUM_LENGTH;
-
     for (i=read_int(f_recv); i != -1; i=read_int(f_recv)) {
       struct file_struct *file = &flist->files[i];
       recv_generator(local_name?local_name:file->name,
 		     flist,i,f);    
     }
+
+    phase++;
+    if (verbose > 2)
+      fprintf(FERROR,"generate_files phase=%d\n",phase);
 
     write_int(f,-1);
     write_flush(f);
