@@ -315,11 +315,6 @@ option all symbolic links are skipped.
 dit(bf(-L, --copy-links)) This tells rsync to treat symbolic links just
 like  ordinary files.
 
-dit(bf(--safe-links)) This tells rsync to ignore any symbolic links
-which point outside the destination tree. All absolute symlinks are
-also ignored. Using this option in conjunction with --relative may
-give unexpecetd results. 
-
 dit(bf(-H, --hard-links)) This tells rsync to recreate hard  links  on
 the  remote system  to  be the same as the local system. Without this
 option hard links are treated like regular files.
