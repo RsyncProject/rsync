@@ -70,6 +70,7 @@ extern struct exclude_struct **local_exclude_list;
 int io_error;
 
 static struct file_struct null_file;
+static char empty_sum[MD4_SUM_LENGTH];
 
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
 
@@ -357,7 +358,7 @@ static void send_file_entry(struct file_struct *file, int f,
 	unsigned short flags;
 	static time_t modtime;
 	static mode_t mode;
-	static DEV64_T rdev;	/* just high bytes after p28 */
+	static DEV64_T rdev;	/* just high bytes in p28 onward */
 	static uid_t uid;
 	static gid_t gid;
 	static DEV64_T dev;
@@ -500,11 +501,10 @@ static void send_file_entry(struct file_struct *file, int f,
 	}
 #endif
 
-	if (always_checksum) {
-		if (protocol_version < 21)
-			write_buf(f, file->sum, 2);
-		else
-			write_buf(f, file->sum, MD4_SUM_LENGTH);
+	if (always_checksum && (protocol_version < 28 || S_ISREG(mode))) {
+		char *sum = file->sum? file->sum : empty_sum;
+		write_buf(f, sum, protocol_version < 21? 2
+						: MD4_SUM_LENGTH);
 	}
 
 	strlcpy(lastname, fname, MAXPATHLEN);
@@ -520,7 +520,7 @@ static void receive_file_entry(struct file_struct **fptr,
 {
 	static time_t modtime;
 	static mode_t mode;
-	static DEV64_T rdev;	/* just high bytes after p28 */
+	static DEV64_T rdev;	/* just high bytes in p28 onward */
 	static uid_t uid;
 	static gid_t gid;
 	static DEV64_T dev;
@@ -649,19 +649,26 @@ static void receive_file_entry(struct file_struct **fptr,
 #endif
 
 	if (always_checksum) {
-		file->sum = new_array(char, MD4_SUM_LENGTH);
-		if (!file->sum)
-			out_of_memory("md4 sum");
-		if (protocol_version < 21)
-			read_buf(f, file->sum, 2);
-		else
-			read_buf(f, file->sum, MD4_SUM_LENGTH);
+		char tmpsum[MD4_SUM_LENGTH], *sum;
+		if (S_ISREG(mode)) {
+			sum = file->sum = new_array(char, MD4_SUM_LENGTH);
+			if (!sum)
+				out_of_memory("md4 sum");
+		} else if (protocol_version < 28) {
+			/* Prior to 28, we get a useless set of nulls. */
+			sum = tmpsum;
+		} else
+			sum = NULL;
+		if (sum) {
+			read_buf(f, sum, protocol_version < 21? 2
+						: MD4_SUM_LENGTH);
+		}
 	}
 
 	if (!preserve_perms) {
 		extern int orig_umask;
 		/* set an appropriate set of permissions based on original
-		   permissions and umask. This emulates what GNU cp does */
+		 * permissions and umask. This emulates what GNU cp does */
 		file->mode &= ~orig_umask;
 	}
 }
@@ -817,18 +824,11 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 		file->link = STRDUP(ap, linkbuf);
 #endif
 
-	if (always_checksum) {
-		file->sum = (char *) MALLOC(ap, MD4_SUM_LENGTH);
+	if (always_checksum && S_ISREG(st.st_mode)) {
+		file->sum = (char*)MALLOC(ap, MD4_SUM_LENGTH);
 		if (!file->sum)
 			out_of_memory("md4 sum");
-		/* drat. we have to provide a null checksum for non-regular
-		   files in order to be compatible with earlier versions
-		   of rsync */
-		if (S_ISREG(st.st_mode)) {
-			file_checksum(fname, file->sum, st.st_size);
-		} else {
-			memset(file->sum, 0, MD4_SUM_LENGTH);
-		}
+		file_checksum(fname, file->sum, st.st_size);
 	}
 
 	if (flist_dir) {
