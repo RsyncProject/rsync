@@ -48,6 +48,8 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 
 	sargs[sargc] = NULL;
 
+	io_printf(fd,"@RSYNCD: %d\n", PROTOCOL_VERSION);
+
 	if (!read_line(fd, line, sizeof(line)-1)) {
 		return -1;
 	}
@@ -55,8 +57,6 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	if (sscanf(line,"@RSYNCD: %d", &remote_version) != 1) {
 		return -1;
 	}
-
-	io_printf(fd,"@RSYNCD: %d\n", PROTOCOL_VERSION);
 
 	p = strchr(path,'/');
 	if (p) *p = 0;
@@ -226,14 +226,6 @@ static int start_daemon(int fd)
 
 	io_printf(fd,"@RSYNCD: %d\n", PROTOCOL_VERSION);
 
-	if (!read_line(fd, line, sizeof(line)-1)) {
-		return -1;
-	}
-
-	if (sscanf(line,"@RSYNCD: %d", &remote_version) != 1) {
-		return -1;
-	}	
-
 	motd = lp_motd_file();
 	if (*motd) {
 		FILE *f = fopen(motd,"r");
@@ -247,6 +239,14 @@ static int start_daemon(int fd)
 		if (f) fclose(f);
 		io_printf(fd,"\n");
 	}
+
+	if (!read_line(fd, line, sizeof(line)-1)) {
+		return -1;
+	}
+
+	if (sscanf(line,"@RSYNCD: %d", &remote_version) != 1) {
+		return -1;
+	}	
 
 	while (i == -1) {
 
