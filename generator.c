@@ -1200,6 +1200,8 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 				       flist, file, i, itemizing,
 				       maybe_PERMS_REPORT, code, allowed_lull,
 				       -1, -1);
+			if (allowed_lull && !(i % 500))
+				maybe_send_keepalive(allowed_lull, flist->count);
 		}
 	}
 	recv_generator(NULL, NULL, NULL, 0, 0, 0, code, 0, -1, -1);
