@@ -17,9 +17,9 @@
 
 build_rsyncd_conf
 
-RSYNC_CONNECT_PROG="$rsync_bin --config=$conf --daemon"
+RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon"
 export RSYNC_CONNECT_PROG
 
 hands_setup
-checkit "$rsync_bin -avvz \"$FROM/\" localhost::test-to/" "$FROM" "$TO"
+checkit "$RSYNC -avvz \"$FROM/\" localhost::test-to/" "$FROM" "$TO"
 

@@ -35,20 +35,20 @@ ln -s ../../unsafe/unsafefile "from/safe/links/"
 set -x
 
 echo "rsync with relative path and just -a";
-rsync -avv from/safe/ to
+$RSYNC -avv from/safe/ to
 test_symlink to/links/file1
 test_symlink to/links/file2
 test_symlink to/links/unsafefile
 
 echo "rsync with relative path and -a --copy-links"
-rsync -avv --copy-links from/safe/ to
+$RSYNC -avv --copy-links from/safe/ to
 test_regular to/links/file1
 test_regular to/links/file2
 test_regular to/links/unsafefile
 
 #next rsync copy correctly
 echo "rsync with relative path and --copy-unsafe-links";
-rsync -avv --copy-unsafe-links from/safe/ to
+$RSYNC -avv --copy-unsafe-links from/safe/ to
 test_symlink to/links/file1
 test_symlink to/links/file2
 test_regular to/links/unsafefile
@@ -61,7 +61,7 @@ test_skipped "correct behaviour is unclear"
 rm -rf to
 #next rsync copy incorrectly - links are copied as files not as links
 echo "rsync with relative2 path";
-(cd from; rsync -avv --copy-unsafe-links safe/ ../to)
+(cd from; $RSYNC -avv --copy-unsafe-links safe/ ../to)
 test_symlink to/links/file1
 test_symlink to/links/file2
 test_regular to/links/unsafefile
@@ -69,7 +69,7 @@ test_regular to/links/unsafefile
 rm -rf to
 #next rsync copy uncorectly - all links are copied
 echo "rsync with absolute path";
-rsync -avv --copy-unsafe-links `pwd`/from/safe/ to
+$RSYNC -avv --copy-unsafe-links `pwd`/from/safe/ to
 test_symlink to/links/file1
 test_symlink to/links/file2
 test_regular to/links/unsafefile

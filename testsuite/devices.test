@@ -22,7 +22,7 @@ mkdir "$fromdir"
 mknod "$fromdir/char" c 42 69  || test_skipped "Can't create char device node unless root"
 mknod "$fromdir/block" b 42 69 || test_skipped "Can't create block device node unless root"
 
-checkit "rsync -aHvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+checkit "$RSYNC -aHvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
 exit 0
 # last [] may have failed but if we get here then we've won

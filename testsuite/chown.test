@@ -31,7 +31,7 @@ chown 5001 "$name2" || test_skipped "Can't chown (probably need root)"
 chgrp 5002 "$name1" || test_skipped "Can't chgrp (probably need root)"
 chgrp 5003 "$name2" || test_skipped "Can't chgrp (probably need root)"
 
-checkit "rsync -aHvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+checkit "$RSYNC -aHvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
 exit 0
 # last [] may have failed but if we get here then we've won

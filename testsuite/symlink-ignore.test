@@ -16,7 +16,7 @@ build_symlinks || test_fail "failed to build symlinks"
 
 # Copy recursively, but without -l or -L or -a, and all the symlinks
 # should be missing.
-"$rsync_bin" -r "$fromdir/" "$todir" || test_fail "rsync returned $?"
+$RSYNC -r "$fromdir/" "$todir" || test_fail "$RSYNC returned $?"
 
 [ -f "${todir}/referent" ] || test_fail "referent was not copied"
 [ -d "${todir}/from" ] && test_fail "extra level of directories"
