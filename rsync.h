@@ -344,6 +344,10 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #define MAXPATHLEN 1024
 #endif
 
+#ifndef NAME_MAX
+#define NAME_MAX 255
+#endif
+
 #ifndef INADDR_NONE
 #define INADDR_NONE 0xffffffff
 #endif

@@ -164,40 +164,63 @@ void delete_files(struct file_list *flist)
 }
 
 
+/*
+ * get_tmpname() - create a tmp filename for a given filename
+ *
+ *   If a tmpdir is defined, use that as the directory to
+ *   put it in.  Otherwise, the tmp filename is in the same
+ *   directory as the given name.  Note that there may be no
+ *   directory at all in the given name!
+ *      
+ *   The tmp filename is basically the given filename with a
+ *   dot prepended, and .XXXXXX appended (for mkstemp() to
+ *   put its unique gunk in).  Take care to not exceed
+ *   either the MAXPATHLEN or NAME_MAX, esp. the last, as
+ *   the basename basically becomes 8 chars longer. In that
+ *   case, the original name is shortened sufficiently to
+ *   make it all fit.
+ *      
+ *   Of course, there's no real reason for the tmp name to
+ *   look like the original, except to satisfy us humans.
+ *   As long as it's unique, rsync will work.
+ */
+
 static int get_tmpname(char *fnametmp, char *fname)
 {
 	char *f;
+	int     length = 0;
+	int	maxname;
 
-	/* open tmp file */
 	if (tmpdir) {
-		f = strrchr(fname,'/');
-		if (f == NULL) 
-			f = fname;
-		else 
-			f++;
-		if (strlen(tmpdir)+strlen(f)+10 > MAXPATHLEN) {
-			rprintf(FERROR,"filename too long\n");
-			return 0;
+		strlcpy(fnametmp, tmpdir, MAXPATHLEN - 2);
+		length = strlen(fnametmp);
+		fnametmp[length++] = '/';
+		fnametmp[length] = '\0';	/* always NULL terminated */
 		}
-		snprintf(fnametmp,MAXPATHLEN, "%s/.%s.XXXXXX",tmpdir,f);
-		return 1;
+
+	if ((f = strrchr(fname, '/'))) {	/* extra () for gcc */
+		++f;
+		if (!tmpdir) {
+			length = f - fname;
+			strlcpy(fnametmp, fname, length + 1);
+		}		/* copy up to and including the slash */
+	} else {
+		f = fname;
 	} 
+	fnametmp[length++] = '.';
+	fnametmp[length] = '\0';		/* always NULL terminated */
 
-	f = strrchr(fname,'/');
+	maxname = MIN(MAXPATHLEN - 7 - length, NAME_MAX - 8);
 
-	if (strlen(fname)+9 > MAXPATHLEN) {
-		rprintf(FERROR,"filename too long\n");
+	if (maxname < 1)
+	{
+		rprintf(FERROR, "temporary filename too long: %s\n", fname);
+		fnametmp[0] = '\0';
 		return 0;
 	}
 
-	if (f) {
-		*f = 0;
-		snprintf(fnametmp,MAXPATHLEN,"%s/.%s.XXXXXX",
-			 fname,f+1);
-		*f = '/';
-	} else {
-		snprintf(fnametmp,MAXPATHLEN,".%s.XXXXXX",fname);
-	}
+	strlcpy(fnametmp + length, f, maxname); 
+	strcat(fnametmp + length, ".XXXXXX");
 
 	return 1;
 }
