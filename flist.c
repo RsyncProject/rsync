@@ -1366,20 +1366,9 @@ oom:
 }
 
 
-int file_compare(struct file_struct **file1, struct file_struct **file2)
+static int file_compare(struct file_struct **file1, struct file_struct **file2)
 {
-	struct file_struct *f1 = *file1;
-	struct file_struct *f2 = *file2;
-
-	if (!f1->basename && !f2->basename)
-		return 0;
-	if (!f1->basename)
-		return -1;
-	if (!f2->basename)
-		return 1;
-	if (f1->dirname == f2->dirname)
-		return u_strcmp(f1->basename, f2->basename);
-	return f_name_cmp(f1, f2);
+	return f_name_cmp(*file1, *file2);
 }
 
 
@@ -1392,7 +1381,7 @@ static int flist_find(struct file_list *flist, struct file_struct *f)
 		mid = (low + high) / 2;
 		for (mid_up = mid; !flist->files[mid_up]->basename; mid_up++) {}
 		if (mid_up <= high)
-			ret = file_compare(&flist->files[mid_up], &f);
+			ret = f_name_cmp(flist->files[mid_up], f);
 		else
 			ret = 1;
 		if (ret == 0)
@@ -1537,9 +1526,11 @@ static void output_flist(struct file_list *flist, const char *whose_list)
 			*gidbuf = '\0';
 		if (!am_sender)
 			sprintf(depthbuf, "%d", file->dir.depth);
-		rprintf(FINFO, "[%s] i=%d %s %s %s mode=0%o len=%.0f%s%s (%x)\n",
+		rprintf(FINFO, "[%s] i=%d %s %s%s%s%s mode=0%o len=%.0f%s%s flags=%x\n",
 			whose_list, i, am_sender ? NS(file->dir.root) : depthbuf,
-			NS(file->dirname), NS(file->basename), (int)file->mode,
+			file->dirname ? file->dirname : "",
+			file->dirname ? "/" : "", NS(file->basename),
+			S_ISDIR(file->mode) ? "/" : "", (int)file->mode,
 			(double)file->length, uidbuf, gidbuf, file->flags);
 	}
 }
@@ -1565,7 +1556,11 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 	if (!f2 || !f2->basename)
 		return 1;
 
-	if (!(c1 = (uchar*)f1->dirname)) {
+	c1 = (uchar*)f1->dirname;
+	c2 = (uchar*)f2->dirname;
+	if (c1 == c2)
+		c1 = c2 = NULL;
+	if (!c1) {
 		state1 = fnc_BASE;
 		c1 = (uchar*)f1->basename;
 	} else if (!*c1) {
@@ -1573,7 +1568,7 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 		c1 = (uchar*)"/";
 	} else
 		state1 = fnc_DIR;
-	if (!(c2 = (uchar*)f2->dirname)) {
+	if (!c2) {
 		state2 = fnc_BASE;
 		c2 = (uchar*)f2->basename;
 	} else if (!*c2) {
@@ -1661,21 +1656,22 @@ static int is_backup_file(char *fn)
 
 
 /* This function is used to implement --delete-during. */
-void delete_in_dir(struct file_list *flist, char *fname)
+void delete_in_dir(struct file_list *flist, char *fbuf, int dlen, int new_depth)
 {
-	static void *filt_array[MAXPATHLEN/2];
-	static int fa_lvl = 0;
-	static char fbuf[MAXPATHLEN];
+	static int min_depth = MAXPATHLEN, cur_depth = -1;
+	static void *filt_array[MAXPATHLEN/2+1];
 	struct file_list *dir_list;
 	STRUCT_STAT st;
-	int dlen, j;
 
 	if (!flist) {
-		while (fa_lvl)
-			pop_local_filters(filt_array[--fa_lvl]);
-		*fbuf = '\0';
+		while (cur_depth >= min_depth)
+			pop_local_filters(filt_array[cur_depth--]);
+		min_depth = MAXPATHLEN;
+		cur_depth = -1;
 		return;
 	}
+	if (new_depth >= MAXPATHLEN/2+1)
+		return; /* Impossible... */
 
 	if (max_delete && deletion_count >= max_delete)
 		return;
@@ -1687,25 +1683,14 @@ void delete_in_dir(struct file_list *flist, char *fname)
 		return;
 	}
 
-	for (j = 0; fbuf[j]; j++) {
-		if (fbuf[j] != fname[j]) {
-			while (fa_lvl) {
-				if (fbuf[j] == '/')
-					pop_local_filters(filt_array[--fa_lvl]);
-				if (!fbuf[++j])
-					break;
-			}
-			break;
-		}
-	}
+	while (cur_depth >= new_depth && cur_depth >= min_depth)
+		pop_local_filters(filt_array[cur_depth--]);
+	cur_depth = new_depth;
+	if (min_depth > cur_depth)
+		min_depth = cur_depth;
+	filt_array[cur_depth] = push_local_filters(fbuf, dlen);
 
-	dlen = strlcpy(fbuf, fname, MAXPATHLEN);
-	if (dlen >= MAXPATHLEN - 1)
-		return;
-	if (fa_lvl >= MAXPATHLEN/2)
-		return; /* impossible... */
-
-	if (link_stat(fname, &st, keep_dirlinks) < 0)
+	if (link_stat(fbuf, &st, keep_dirlinks) < 0)
 		return;
 
 	if (one_file_system)
@@ -1714,19 +1699,14 @@ void delete_in_dir(struct file_list *flist, char *fname)
 	dir_list = flist_new(WITHOUT_HLINK, "delete_in_dir");
 
 	recurse = 0;
-	filt_array[fa_lvl++] = push_local_filters(fbuf, dlen);
 	send_directory(-1, dir_list, fbuf, dlen);
 	recurse = -1;
-
-	if (dlen == 1 && *fbuf == '.')
-		*fbuf = '\0';
-
-	clean_flist(dir_list, 0, 0);
+	fbuf[dlen] = '\0';
 
 	if (verbose > 3)
 		output_flist(dir_list, "delete");
 
-	delete_missing(flist, dir_list, fname);
+	delete_missing(flist, dir_list, fbuf);
 
 	flist_free(dir_list);
 }
@@ -1742,8 +1722,8 @@ void delete_missing(struct file_list *full_list, struct file_list *dir_list,
 	if (max_delete && deletion_count >= max_delete)
 		return;
 
-	if (verbose > 1)
-		rprintf(FINFO, "deleting in %s\n", safe_fname(dirname));
+	if (verbose > 2)
+		rprintf(FINFO, "delete_missing(%s)\n", safe_fname(dirname));
 
 	for (i = dir_list->count; i--; ) {
 		if (!dir_list->files[i]->basename)
