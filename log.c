@@ -240,7 +240,7 @@ void rwrite(enum logcode code, char *buf, int len)
 	if (buf[len-1] == '\r' || buf[len-1] == '\n')
 		fflush(f);
 }
-		
+
 
 /* This is the rsync debugging function. Call it with FINFO, FERROR or
  * FLOG. */
@@ -320,7 +320,7 @@ void rsyserr(enum logcode code, int errcode, const char *format, ...)
 void rflush(enum logcode code)
 {
 	FILE *f = NULL;
-	
+
 	if (am_daemon) {
 		return;
 	}
@@ -369,7 +369,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 	}
 	buf[total++] = '\n';
 	buf[total] = '\0';
-	
+
 	for (p = buf; (p = strchr(p, '%')) != NULL; ) {
 		s = p++;
 		n = fmt + 1;
@@ -382,7 +382,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 		*n = '\0';
 		n = NULL;
 
-		switch (*p++) {
+		switch (*p) {
 		case 'h': if (am_daemon) n = client_name(0); break;
 		case 'a': if (am_daemon) n = client_addr(0); break;
 		case 'l':
@@ -444,7 +444,6 @@ static void log_formatted(enum logcode code, char *format, char *op,
 		case 'P': n = lp_path(module_id); break;
 		case 'u': n = auth_user; break;
 		case 'b':
-			strlcat(fmt, ".0f", sizeof fmt);
 			if (am_sender) {
 				b = stats.total_written -
 					initial_stats->total_written;
@@ -452,11 +451,11 @@ static void log_formatted(enum logcode code, char *format, char *op,
 				b = stats.total_read -
 					initial_stats->total_read;
 			}
+			strlcat(fmt, ".0f", sizeof fmt);
 			snprintf(buf2, sizeof buf2, fmt, (double)b);
 			n = buf2;
 			break;
 		case 'c':
-			strlcat(fmt, ".0f", sizeof fmt);
 			if (!am_sender) {
 				b = stats.total_written -
 					initial_stats->total_written;
@@ -464,6 +463,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 				b = stats.total_read -
 					initial_stats->total_read;
 			}
+			strlcat(fmt, ".0f", sizeof fmt);
 			snprintf(buf2, sizeof buf2, fmt, (double)b);
 			n = buf2;
 			break;
@@ -521,18 +521,18 @@ static void log_formatted(enum logcode code, char *format, char *op,
 		len = strlen(n);
 
 		/* Subtract the length of the escape from the string's size. */
-		total -= p - s;
+		total -= p - s + 1;
 
 		if (len + total >= (size_t)sizeof buf) {
 			rprintf(FERROR,
 				"buffer overflow expanding %%%c -- exiting\n",
-				p[-1]);
+				p[0]);
 			exit_cleanup(RERR_MESSAGEIO);
 		}
 
 		/* Shuffle the rest of the string along to make space for n */
-		if (len != (size_t)(p - s))
-			memmove(s + len, p, total - (s - buf) + 1);
+		if (len != (size_t)(p - s + 1))
+			memmove(s + len, p + 1, total - (s - buf) + 1);
 		total += len;
 
 		/* Insert the contents of string "n", but NOT its null. */
@@ -546,6 +546,8 @@ static void log_formatted(enum logcode code, char *format, char *op,
 	rwrite(code, buf, total);
 }
 
+/* Return 1 if the format escape is in the log-format string (e.g. look for
+ * the 'b' in the "%9b" format escape). */
 int log_format_has(const char *format, char esc)
 {
 	const char *p;
