@@ -106,6 +106,10 @@ Cross-test versions
   some testing and also be the most common case for having different
   versions and not being able to upgrade.
 
+--no-blocking-io might be broken
+
+  in the same way as --no-whole-file; somebody needs to check.
+
 
 DAEMON --------------------------------------------------------------
 
