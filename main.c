@@ -784,8 +784,8 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			io_flush(FULL_FLUSH);
 			wait_process(pid, &status);
 		}
-		io_flush(FULL_FLUSH);
 		output_summary();
+		io_flush(FULL_FLUSH);
 		exit_cleanup(status);
 	}
 
