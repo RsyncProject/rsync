@@ -200,12 +200,18 @@ int compare_addrinfo_sockaddr(const struct addrinfo *ai,
 		sin1 = (const struct sockaddr_in *) ss;
 		sin2 = (const struct sockaddr_in *) ai->ai_addr;
 		
-		return memcmp(&sin1->sin_addr, &sin2->sin_addr, sizeof sin1->sin_addr);
+		return memcmp(&sin1->sin_addr, &sin2->sin_addr,
+			      sizeof sin1->sin_addr);
 	}
 #ifdef INET6
 	else if (ss_family == AF_INET6) {
-		/* XXXX */
-		return 1;
+		const struct sockaddr_in6 *sin1, *sin2;
+
+		sin1 = (const struct sockaddr_in6 *) ss;
+		sin2 = (const struct sockaddr_in6 *) ai->ai_addr;
+		
+		return memcmp(&sin1->sin6_addr, &sin2->sin6_addr,
+			      sizeof sin1->sin6_addr);
 	}
 #endif /* INET6 */
 	else {
