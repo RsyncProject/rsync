@@ -462,7 +462,7 @@ receiver are not transferred.  This option can be quite slow.
 dit(bf(-a, --archive)) This is equivalent to bf(-rlptgoD). It is a quick
 way of saying you want recursion and want to preserve almost
 everything.  The only exception to this is if bf(--files-from) was
-specified, in which case bf(-d) is implied instead of bf(-r).
+specified, in which case bf(-r) is not implied.
 
 Note that bf(-a) bf(does not preserve hardlinks), because
 finding multiply-linked files is expensive.  You must separately
