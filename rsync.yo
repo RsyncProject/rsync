@@ -616,11 +616,11 @@ itemize(
   only against the final component of the filename.
 
   it() if the pattern starts with "+ " (a plus followed by a space)
-  then it is always considered a include pattern, even if specified as
+  then it is always considered an include pattern, even if specified as
   part of an exclude option. The "+ " part is discarded before matching.
 
   it() if the pattern starts with "- " (a minus followed by a space)
-  then it is always considered a exclude pattern, even if specified as
+  then it is always considered an exclude pattern, even if specified as
   part of an include option. The "- " part is discarded before matching.
 
   it() if the pattern is a single exclamation mark ! then the current
