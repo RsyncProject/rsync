@@ -5,7 +5,7 @@ AC_CONFIG_SRCDIR([byteorder.h])
 AC_CONFIG_HEADER(config.h)
 AC_PREREQ(2.52)
 
-RSYNC_VERSION=2.5.2pre2
+RSYNC_VERSION=2.5.2pre3
 AC_SUBST(RSYNC_VERSION)
 AC_MSG_NOTICE([Configuring rsync $RSYNC_VERSION])
 
@@ -30,8 +30,7 @@ then
 	AC_MSG_WARN([rsync requires an ANSI C compiler and you don't seem to have one])
 fi
 
-# compile with optimisation and without debugging by default, unless
-# --debug is given.  We must decide this before testing the compiler.
+# We must decide this before testing the compiler.
 
 # Please allow this to default to yes, so that your users have more
 # chance of getting a useful stack trace if problems occur.
