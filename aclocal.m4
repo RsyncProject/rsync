@@ -96,3 +96,58 @@ AC_DEFUN([AC_SYS_LARGEFILE],
        [#include <stdio.h>], [return !ftello;])
    fi
   ])
+
+dnl Check for socklen_t: historically on BSD it is an int, and in
+dnl POSIX 1g it is a type of its own, but some platforms use different
+dnl types for the argument to getsockopt, getpeername, etc.  So we
+dnl have to test to find something that will work.
+
+dnl This test originally comes from lftp, by way of Albert Chin at The
+dnl Written Word.  Thanks!
+
+AC_DEFUN([TYPE_SOCKLEN_T],
+[
+   AC_MSG_CHECKING([for socklen_t])
+   AC_CACHE_VAL([lftp_cv_socklen_t],
+   [
+      lftp_cv_socklen_t=no
+      AC_TRY_COMPILE([
+         #include <sys/types.h>
+         #include <sys/socket.h>
+      ],
+      [
+         socklen_t len;
+         getpeername(0,0,&len);
+      ],
+      [
+         lftp_cv_socklen_t=yes
+      ])
+   ])
+   AC_MSG_RESULT($lftp_cv_socklen_t)
+   if test $lftp_cv_socklen_t = no; then
+      AC_MSG_CHECKING([for socklen_t equivalent])
+      AC_CACHE_VAL([lftp_cv_socklen_t_equiv],
+      [
+         lftp_cv_socklen_t_equiv=int
+         AC_LANG_SAVE
+         for t in int size_t unsigned long "unsigned long"; do
+            AC_TRY_COMPILE([
+               #include <sys/types.h>
+               #include <sys/socket.h>
+            ],
+            [
+               $t len;
+               getpeername(0,0,&len);
+            ],
+            [
+               lftp_cv_socklen_t_equiv="$t"
+               break
+            ])
+         done
+      ])
+      AC_MSG_RESULT($lftp_cv_socklen_t_equiv)
+      AC_DEFINE_UNQUOTED(socklen_t, $lftp_cv_socklen_t_equiv,
+			[type to use in place of socklen_t if not defined])
+   fi
+])
+
