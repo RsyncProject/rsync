@@ -697,32 +697,6 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 }
 
 
-/* determine if a file in a different filesystem should be skipped
-   when one_file_system is set. We bascally only want to include
-   the mount points - but they can be hard to find! */
-static int skip_filesystem(char *fname, STRUCT_STAT * st)
-{
-	STRUCT_STAT st2;
-	char *p = strrchr(fname, '/');
-
-	/* skip all but directories */
-	if (!S_ISDIR(st->st_mode))
-		return 1;
-
-	/* if its not a subdirectory then allow */
-	if (!p)
-		return 0;
-
-	*p = 0;
-	if (link_stat(fname, &st2)) {
-		*p = '/';
-		return 0;
-	}
-	*p = '/';
-
-	return (st2.st_dev != filesystem_dev);
-}
-
 #define STRDUP(ap, p)	(ap ? string_area_strdup(ap, p) : strdup(p))
 /* IRIX cc cares that the operands to the ternary have the same type. */
 #define MALLOC(ap, i)	(ap ? (void*) string_area_malloc(ap, i) : malloc(i))
@@ -751,6 +725,7 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 	char *p;
 	char cleaned_name[MAXPATHLEN];
 	char linkbuf[MAXPATHLEN];
+	unsigned short flags = 0;
 
 	if (strlcpy(cleaned_name, fname, sizeof cleaned_name)
 	    >= sizeof cleaned_name - flist_dir_len) {
@@ -791,8 +766,11 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 	}
 
 	if (one_file_system && st.st_dev != filesystem_dev) {
-		if (skip_filesystem(fname, &st))
+		/* We allow a directory though to preserve the mount point.
+		 * However, flag it so that we don't recurse. */
+		if (!S_ISDIR(st.st_mode))
 			return NULL;
+		flags |= FLAG_MOUNT_POINT;
 	}
 
 	if (check_exclude_file(fname, S_ISDIR(st.st_mode) != 0, exclude_level))
@@ -810,6 +788,7 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 	if (!file)
 		out_of_memory("make_file");
 	memset((char *) file, 0, sizeof(*file));
+	file->flags = flags;
 
 	if ((p = strrchr(fname, '/'))) {
 		static char *lastdir;
@@ -893,7 +872,8 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 		send_file_entry(file, f, base_flags);
 	}
 
-	if (S_ISDIR(file->mode) && recursive) {
+	if (recursive && S_ISDIR(file->mode)
+	    && !(file->flags & FLAG_MOUNT_POINT)) {
 		struct exclude_struct **last_exclude_list = local_exclude_list;
 		send_directory(f, flist, f_name_to(file, fbuf));
 		local_exclude_list = last_exclude_list;
