@@ -19,11 +19,22 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-/*
-  socket and pipe IO utilities used in rsync 
+/**
+ *
+ * @file io.c
+ *
+ * Socket and pipe IO utilities used in rsync.
+ *
+ * rsync provides its own multiplexing system, which is used to send
+ * stderr and stdout over a single socket.  We need this because
+ * stdout normally carries the binary data stream, and stderr all our
+ * error messages.
+ *
+ * For historical reasons this is off during the start of the
+ * connection, but it's switched on quite early using
+ * io_start_multiplex_out() and io_start_multiplex_in().
+ **/
 
-  tridge, June 1996
-  */
 #include "rsync.h"
 
 /* if no timeout is specified then use a 60 second select timeout */
@@ -377,7 +388,8 @@ unsigned char read_byte(int f)
 	return c;
 }
 
-/* write len bytes to fd */
+/* Write len bytes to fd.  This underlies the multiplexing system,
+ * which is always called by application code.  */
 static void writefd_unbuffered(int fd,char *buf,size_t len)
 {
 	size_t total = 0;
