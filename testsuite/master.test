@@ -21,11 +21,11 @@ missing=0
 passed=0
 failed=0
 
-cd "$testdir"
+testsrcdir="`pwd`"
 
 for testbase in $test_names
 do
-    testscript="$testdir/$testbase.test"
+    testscript="$testsrcdir/$testbase.test"
     if test \! -f "$testscript" 
     then
 	echo "$testscript does not exist" >&2
