@@ -464,8 +464,8 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 				 * across the stream */
 				io_multiplexing_close();
 				rprintf(FERROR, RSYNC_NAME
-					": error writing %d unbuffered bytes"
-					" - exiting: %s\n", len,
+					": writefd_unbuffered failed to write %ld bytes: %s\n",
+					(long) len, 
 					strerror(errno));
 				exit_cleanup(RERR_STREAMIO);
 			}
