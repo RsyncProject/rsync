@@ -160,7 +160,7 @@ missing=0
 passed=0
 failed=0
 
-scratchdir="`cd ./testtmp && pwd`"
+scratchdir="`pwd`"/testtmp
 echo "    scratchdir=$scratchdir"
 
 suitedir="$srcdir/testsuite"
