@@ -75,7 +75,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
          * See http://lists.samba.org/pipermail/rsync/2000-September/002744.html
          */
         if (shell_cmd) {
-                rprintf(FERROR, "WARNING: --rsh or -e option ignored when "
+                rprintf(FINFO, "WARNING: --rsh or -e option ignored when "
                         "connecting to rsync daemon\n");
                 /* continue */
         }

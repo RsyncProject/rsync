@@ -9,6 +9,12 @@ rsync changes since last release
 
     * Better handling of some client-server errors.  (Martin Pool)
 
+    * When -e is specified along with an rsyncd url, the client should
+      get a warning but it should not be treated as an error.  (Bill
+      Nottingham)
+
+      http://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=62489
+
   INTERNAL:
 
     * Many code cleanups and improved internal documentation.  (Martin 
