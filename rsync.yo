@@ -343,7 +343,8 @@ verb(
      --existing              only update files that already exist
      --ignore-existing       ignore files that already exist on receiver
      --delete                delete files that don't exist on sender
-     --delete-after          receiver deletes after transfer, not before
+     --delete-before         receiver deletes before xfer, not during
+     --delete-after          receiver deletes after transfer, not during
      --delete-excluded       also delete excluded files on receiver
      --ignore-errors         delete even if there are I/O errors
      --force                 force deletion of dirs even if not empty
@@ -694,14 +695,25 @@ prevent temporary filesystem failures (such as NFS errors) on the
 sending side causing a massive deletion of files on the
 destination.  You can override this with the --ignore-errors option.
 
-dit(bf(--delete-after)) By default rsync does file deletions on the
-receiving side before transferring files to try to ensure that there is
-sufficient space on the receiving filesystem. If you want to delete
-after transferring, use the --delete-after switch. Implies --delete.
+Beginning with 2.6.4, rsync does file deletions on the receiving side
+incrementally as each directory is being transferred (which makes the
+transfer more efficient than a separate delete pass before or after the
+transfer).  If you are sending files to an older rsync, --delete will
+behave as --delete-before (see below).  See also --delete-after.
 
-One reason to use --delete-after is to avoid a delay before the start of
-the transfer (while the receiving side is scanned for deletions) as this
-delay might cause the transfer to timeout.  
+dit(bf(--delete-before)) Request that the file-deletions on the receving
+side be done prior to starting the transfer, not incrementally as the
+transfer happens.  Implies --delete.
+
+One reason to use --delete-before is if the filesystem is tight for space
+and removing extraneous files would help to make the transfer possible.
+However, it does introduce a delay before the start of the transfer (while
+the receiving side is being scanned for deletions) and this delay might
+cause the transfer to timeout.  
+
+dit(bf(--delete-after)) Request that the file-deletions on the receving
+side be done after the transfer has completed, not incrementally as the
+transfer happens.  Implies --delete.
 
 dit(bf(--delete-excluded)) In addition to deleting the files on the
 receiving side that are not on the sending side, this tells rsync to also
