@@ -730,8 +730,10 @@ int main(int argc,char *argv[])
 
     setup_protocol(f_out,f_in);
 
+#if HAVE_SETLINEBUF
     setlinebuf(FINFO);
     setlinebuf(FERROR);
+#endif
 
     if (verbose > 3) 
       fprintf(FERROR,"parent=%d child=%d sender=%d recurse=%d\n",

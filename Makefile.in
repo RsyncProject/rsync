@@ -1,8 +1,10 @@
 # Makefile for rsync. This is processed by configure to produce the final
 # Makefile
 
-INSTALL_BIN=@prefix@/bin
-INSTALL_MAN=@prefix@/man
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+INSTALL_BIN=$(exec_prefix)/bin
+INSTALL_MAN=$(prefix)/man
 
 LIBS=@LIBS@
 CC=@CC@ 

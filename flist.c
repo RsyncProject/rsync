@@ -187,7 +187,7 @@ void receive_file_entry_v11(struct file_struct *file,
   bzero((char *)file,sizeof(*file));
 
   file->name = (char *)malloc(l1+l2+1);
-  if (!file->name) out_of_memory("receive_file_entry");
+  if (!file->name) out_of_memory("receive_file_entry 1");
 
   strncpy(file->name,lastname,l1);
   read_buf(f,file->name+l1,l2);
@@ -207,7 +207,7 @@ void receive_file_entry_v11(struct file_struct *file,
   if (preserve_links && S_ISLNK(file->mode)) {
     int l = read_int(f);
     file->link = (char *)malloc(l+1);
-    if (!file->link) out_of_memory("receive_file_entry");
+    if (!file->link) out_of_memory("receive_file_entry 2");
     read_buf(f,file->link,l);
     file->link[l] = 0;
   }
