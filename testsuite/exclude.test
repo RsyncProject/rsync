@@ -129,7 +129,7 @@ rm "$chkdir"/bar/down/to/foo/*.junk
 rm "$chkdir"/bar/down/to/home-cvs-exclude
 rm "$chkdir"/mid/one-in-one-out
 
-$RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
+$RSYNC -av --existing --filter='-! */' "$fromdir/" "$chkdir/"
 
 # Now, test if rsync excludes the same files, this time with --cvs-exclude
 # and --delete-excluded.
@@ -145,12 +145,12 @@ cp -p "$fromdir"/bar/down/to/foo/*.junk "$chkdir"/bar/down/to/foo
 cp -p "$fromdir"/bar/down/to/foo/to "$chkdir"/bar/down/to/foo
 
 $RSYNC -av --existing --delete-excluded \
-    --include='*/' --include='.excl*' --exclude='*' "$fromdir/" "$todir/"
+    --include='.excl*' --filter='-! */' "$fromdir/" "$todir/"
 
 echo retained >"$todir"/bar/down/to/bar/baz/nodel.deep
 cp -p "$todir"/bar/down/to/bar/baz/nodel.deep "$chkdir"/bar/down/to/bar/baz
 
-$RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
+$RSYNC -av --existing --filter='-! */' "$fromdir/" "$chkdir/"
 
 # Now, test if rsync excludes the same files, this time with a merge-exclude
 # file.
@@ -169,7 +169,7 @@ rm "$chkdir"/bar/down/to/bar/.excl2
 rm "$chkdir"/mid/.excl
 rm "$chkdir"/bar/down/to/bar/baz/nodel.deep
 
-$RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
+$RSYNC -av --existing --filter='-! */' "$fromdir/" "$chkdir/"
 
 # Finally, try the prior command with --delete-before and --delete-excluded.
 
