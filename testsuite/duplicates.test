@@ -1,0 +1,43 @@
+#! /bin/sh
+
+# Copyright (C) 2002 by Martin Pool <mbp@samba.org>
+
+# This program is distributable under the terms of the GNU GPL see
+# COPYING).
+
+# Test rsync handling of duplicate filenames.  
+
+# It's quite possible that the user might specify the same source file
+# more than once on the command line, perhaps through shell variables
+# or wildcard expansions.  It might cause problems for rsync if the
+# same name occurred more than once in the file list, because we might
+# be trying to update the first copy and generate checksums for the
+# second copy at the same time.  See clean_flist() for the implementation.
+
+# We don't need to worry about hardlinks or symlinks.  Because we
+# always rename-and-replace the new copy, they can't affect us.
+
+# This test is not great, because it is a timing-dependent bug.
+
+. $srcdir/testsuite/rsync.fns
+
+set -x
+
+# Build some hardlinks
+
+fromdir="$scratchdir/from"
+todir="$scratchdir/to"
+
+# TODO: Need to test whether hardlinks are possible on this OS/filesystem
+
+mkdir "$fromdir"
+name1="$fromdir/name1"
+name1="$fromdir/name2"
+echo "This is the file" > "$name1"
+ln -s "$name1" "$name2" || fail "can't create symlink"
+
+checkit "rsync -avv \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+
+exit 0
+# last [] may have failed but if we get here then we've won
+
