@@ -112,6 +112,24 @@ logging of downloads and uploads in a format somewhat similar to that
 used by ftp daemons. If you want to customise the log formats look at
 log_send, log_recv and log_transfer in log.c
 
+dit(bf(log format)) The "log format" option allows you to specify the
+format used for logging file transfers when transfer logging is
+enabled. The format is a text string containing embedded single
+character escape sequences prefixed with a percent (%) character.
+
+The prefixes that are understood are:
+
+itemize(
+  it() %h for the remote host name
+  it() %a for the remote IP address
+  it() %l for the length of the file in bytes
+  it() %p for the process id of this rsync session
+  it() %o for the operation, which is either "send" or "recv"
+  it() %f for the filename
+)
+
+The default log format is "%o %h [%a] %f %l"
+
 dit(bf(socket options)) This option can provide endless fun for people
 who like to tune their systems to the utmost degree. You can set all
 sorts of socket options which may make transfers faster (or

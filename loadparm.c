@@ -129,6 +129,7 @@ typedef struct
 	char *secrets_file;
 	char *exclude;
 	char *exclude_from;
+	char *log_format;
 } service;
 
 
@@ -150,6 +151,7 @@ static service sDefault =
 	NULL,    /* secrets file */
 	NULL,    /* exclude */
 	NULL,    /* exclude from */
+	"%o %h [%a] %f %l",    /* log format */
 };
 
 
@@ -255,6 +257,7 @@ static struct parm_struct parm_table[] =
   {"exclude",          P_STRING,  P_LOCAL,  &sDefault.exclude,     NULL,   0},
   {"exclude from",     P_STRING,  P_LOCAL,  &sDefault.exclude_from,NULL,   0},
   {"transfer logging", P_BOOL,    P_LOCAL,  &sDefault.transfer_logging,NULL,0},
+  {"log format",       P_STRING,  P_LOCAL,  &sDefault.log_format,  NULL,   0},
   {NULL,               P_BOOL,    P_NONE,   NULL,                  NULL,   0}
 };
 
@@ -326,6 +329,7 @@ FN_LOCAL_STRING(lp_auth_users, auth_users)
 FN_LOCAL_STRING(lp_secrets_file, secrets_file)
 FN_LOCAL_STRING(lp_exclude, exclude)
 FN_LOCAL_STRING(lp_exclude_from, exclude_from)
+FN_LOCAL_STRING(lp_log_format, log_format)
 
 /* local prototypes */
 static int    strwicmp( char *psz1, char *psz2 );

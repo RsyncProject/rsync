@@ -456,3 +456,13 @@ extern int errno;
 #ifndef ACCESSPERMS
 #define ACCESSPERMS 0777
 #endif
+
+/* handler for null strings in printf format */
+#define NS(s) ((s)?(s):"<NULL>")
+
+/* use magic gcc attributes to catch format errors */
+ void rprintf(int , const char *, ...)
+#ifdef __GNUC__
+     __attribute__ ((format (printf, 2, 3)))
+#endif
+;

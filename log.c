@@ -97,8 +97,8 @@ void log_open(void)
 }
 		
 
-/* this is the rsync debugging function. Call it with FINFO or FERROR */
-void rprintf(int fd, const char *format, ...)
+/* this is the rsync debugging function. Call it with FINFO, FERROR or FLOG */
+ void rprintf(int fd, const char *format, ...)
 {
 	va_list ap;  
 	char buf[1024];
@@ -171,6 +171,10 @@ void rflush(int fd)
 		return;
 	}
 
+	if (fd == FLOG) {
+		return;
+	} 
+
 	if (fd == FERROR) {
 		f = stderr;
 	} 
@@ -188,14 +192,68 @@ void rflush(int fd)
 }
 
 
+
+/* a generic logging routine for send/recv, with parameter
+   substitiution */
+static void log_formatted(char *op, struct file_struct *file)
+{
+	extern int module_id;
+	char buf[1024];
+	char *p, *s, *n;
+	char buf2[100];
+	int l;
+
+	strlcpy(buf, lp_log_format(module_id), sizeof(buf)-1);
+	
+	for (s=&buf[0]; 
+	     s && (p=strchr(s,'%')); ) {
+		n = NULL;
+		s = p + 1;
+
+		switch (p[1]) {
+		case 'h': n = client_name(0); break;
+		case 'a': n = client_addr(0); break;
+		case 'l': 
+			slprintf(buf2,sizeof(buf2)-1,"%.0f", 
+				 (double)file->length); 
+			n = buf2;
+			break;
+		case 'p': 
+			slprintf(buf2,sizeof(buf2)-1,"%d", 
+				 (int)getpid()); 
+			n = buf2;
+			break;
+		case 'o': n = op; break;
+		case 'f': n = f_name(file); break;
+		}
+
+		if (!n) continue;
+
+		l = strlen(n);
+
+		if ((l-1) + ((int)(s - &buf[0])) > sizeof(buf)) {
+			rprintf(FERROR,"buffer overflow expanding %%%c - exiting\n",
+				p[0]);
+			exit_cleanup(1);
+		}
+
+		if (l != 2) {
+			memmove(s+(l-1), s+1, strlen(s+1));
+		}
+		memcpy(p, n, l);
+
+		s = p+l;
+	}
+
+	rprintf(FLOG,"%s\n", buf);
+}
+
 /* log the outgoing transfer of a file */
 void log_send(struct file_struct *file)
 {
 	extern int module_id;
 	if (lp_transfer_logging(module_id)) {
-		rprintf(FLOG,"Sending %s [%s] %.0f %s\n",
-			client_name(0), client_addr(0),
-			(double)file->length, f_name(file));
+		log_formatted("send", file);
 	}
 }
 
@@ -204,9 +262,7 @@ void log_recv(struct file_struct *file)
 {
 	extern int module_id;
 	if (lp_transfer_logging(module_id)) {
-		rprintf(FLOG,"Receiving %s [%s] %.0f %s\n",
-			client_name(0), client_addr(0),
-			(double)file->length, f_name(file));
+		log_formatted("recv", file);
 	}
 }
 
