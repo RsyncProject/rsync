@@ -40,9 +40,30 @@ Performance
   start, which makes us use a lot of memory and also not pipeline
   network access as much as we could.
 
+  We need to be careful of duplicate names getting into the file list.
+  See clean_flist.  This could happen if multiple arguments include
+  the same file.  Bad.  
+
+  I think duplicates are only a problem if they're both flowing
+  through the pipeline at the same time.  For example we might have
+  updated the first occurrence after reading the checksums for the
+  second.  So possibly we just need to make sure that we don't have
+  both in the pipeline at the same time.  
+
+  Possibly if we did one directory at a time that would be sufficient.
+
+  Alternatively we could pre-process the arguments to make sure no
+  duplicates will ever be inserted.  
+
+  We could have a hash table.
+
 Memory accounting
 
   At exit, show how much memory was used for the file list, etc.
+
+  Also we do a wierd exponential-growth allocation in flist.c.  I'm
+  not sure this makes sense with modern mallocs.  At any rate it will
+  make us allocate a huge amount of memory for large file lists.
 
 Hard-link handling
 
@@ -238,3 +259,4 @@ rsyncsh
    current host, directory and so on.  We can probably even do
    completion of remote filenames.
 
+%K%
