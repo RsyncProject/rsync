@@ -23,7 +23,6 @@
 
 extern int sanitize_paths;
 extern int select_timeout;
-extern char curr_dir[MAXPATHLEN];
 extern struct exclude_list_struct exclude_list;
 extern struct exclude_list_struct server_exclude_list;
 
@@ -729,17 +728,17 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (sanitize_paths) {
 		int i;
 		for (i = *argc; i-- > 0; )
-			(*argv)[i] = alloc_sanitize_path((*argv)[i], NULL);
+			(*argv)[i] = sanitize_path(NULL, (*argv)[i], NULL);
 		if (tmpdir)
-			tmpdir = alloc_sanitize_path(tmpdir, curr_dir);
+			tmpdir = sanitize_path(NULL, tmpdir, "");
 		if (partial_dir)
-			partial_dir = alloc_sanitize_path(partial_dir, curr_dir);
+			partial_dir = sanitize_path(NULL, partial_dir, "");
 		if (compare_dest)
-			compare_dest = alloc_sanitize_path(compare_dest, curr_dir);
+			compare_dest = sanitize_path(NULL, compare_dest, "");
 		if (backup_dir)
-			backup_dir = alloc_sanitize_path(backup_dir, curr_dir);
+			backup_dir = sanitize_path(NULL, backup_dir, "");
 		if (files_from)
-			files_from = alloc_sanitize_path(files_from, curr_dir);
+			files_from = sanitize_path(NULL, files_from, "");
 	}
 	if (server_exclude_list.head && !am_sender) {
 		struct exclude_list_struct *elp = &server_exclude_list;

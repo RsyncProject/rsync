@@ -573,7 +573,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 	clean_fname(thisname);
 
 	if (sanitize_paths)
-		sanitize_path(thisname, NULL);
+		sanitize_path(thisname, thisname, NULL);
 
 	if ((basename = strrchr(thisname, '/')) != NULL) {
 		dirname_len = ++basename - thisname; /* counts future '\0' */
@@ -671,7 +671,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 		file->u.link = bp;
 		read_sbuf(f, bp, linkname_len - 1);
 		if (sanitize_paths)
-			sanitize_path(bp, lastdir);
+			sanitize_path(bp, bp, lastdir);
 		bp += linkname_len;
 	}
 #endif
@@ -761,7 +761,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	}
 	clean_fname(thisname);
 	if (sanitize_paths)
-		sanitize_path(thisname, NULL);
+		sanitize_path(thisname, thisname, NULL);
 
 	memset(sum, 0, SUM_LENGTH);
 
@@ -1077,13 +1077,13 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (use_ff_fd) {
 			if (read_filesfrom_line(filesfrom_fd, fname) == 0)
 				break;
-			sanitize_path(fname, NULL);
+			sanitize_path(fname, fname, NULL);
 		} else {
 			if (argc-- == 0)
 				break;
 			strlcpy(fname, *argv++, MAXPATHLEN);
 			if (sanitize_paths)
-				sanitize_path(fname, NULL);
+				sanitize_path(fname, fname, NULL);
 		}
 
 		l = strlen(fname);
