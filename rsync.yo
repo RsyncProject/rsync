@@ -507,8 +507,13 @@ the source and target are on the local machine.
 dit(bf(--no-whole-file)) Turn off --whole-file, for use when it is the
 default.
 
-dit(bf(-p, --perms)) This option causes rsync to update the remote
-permissions to be the same as the local permissions.
+dit(bf(-p, --perms)) This option causes rsync to set the destination
+permissions to be the same as the source permissions.
+
+Without this option, each new file gets its permissions set based on the
+source file's permissions and the umask at the receiving end, while all
+other files (including updated files) retain their existing permissions
+(which is the same behavior as other file-copy utilities, such as cp).
 
 dit(bf(-o, --owner)) This option causes rsync to set the owner of the
 destination file to be the same as the source file.  On most systems,
