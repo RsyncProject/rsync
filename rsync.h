@@ -317,18 +317,30 @@ enum msgcode {
 #define schar char
 #endif
 
+/* Find a variable that is either exactly 32-bits or longer.
+ * If some code depends on 32-bit truncation, it will need to
+ * take special action in a "#if SIZEOF_INT32 > 4" section. */
 #ifndef int32
-#if (SIZEOF_INT == 4)
-#define int32 int
-#elif (SIZEOF_LONG == 4)
-#define int32 long
-#elif (SIZEOF_SHORT == 4)
-#define int32 short
+#if SIZEOF_INT == 4
+# define int32 int
+# define SIZEOF_INT32 4
+#elif SIZEOF_LONG == 4
+# define int32 long
+# define SIZEOF_INT32 4
+#elif SIZEOF_SHORT == 4
+# define int32 short
+# define SIZEOF_INT32 4
+#elif SIZEOF_INT > 4
+# define int32 int
+# define SIZEOF_INT32 SIZEOF_INT
+#elif SIZEOF_LONG > 4
+# define int32 long
+# define SIZEOF_INT32 SIZEOF_LONG
 #else
-/* I hope this works */
-#define int32 int
-#define LARGE_INT32
+# error Could not find a 32-bit integer variable
 #endif
+#else
+# define SIZEOF_INT32 4
 #endif
 
 #ifndef uint32
