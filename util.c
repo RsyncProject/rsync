@@ -877,11 +877,12 @@ int pop_dir(char *dir)
 	return 1;
 }
 
-/* Return the filename, turning any non-printable characters into '?'s.
- * This ensures that outputting it on a line of its own cannot generate an
- * empty line.  This function can return only MAX_SAFE_NAMES values at a
- * time!  The returned value can be longer than MAXPATHLEN (because we
- * may be trying to output an error about a too-long filename)! */
+/* Return the filename, turning any non-printable characters into escaped
+ * characters (e.g. \n -> \012, \ -> \\).  This ensures that outputting it
+ * cannot generate an empty line nor corrupt the screen.  This function can
+ * return only MAX_SAFE_NAMES values at a time!  The returned value can be
+ * longer than MAXPATHLEN (because we may be trying to output an error about
+ * a too-long filename)! */
 char *safe_fname(const char *fname)
 {
 #define MAX_SAFE_NAMES 4
@@ -891,13 +892,21 @@ char *safe_fname(const char *fname)
 	char *t;
 
 	ndx = (ndx + 1) % MAX_SAFE_NAMES;
-	for (t = fbuf[ndx]; *fname; fname++) {
-		if (!isprint(*(uchar*)fname))
-			*t++ = '?';
-		else
+	for (t = fbuf[ndx]; *fname && limit; fname++) {
+		if (*fname == '\\') {
+			if ((limit -= 2) < 0)
+				break;
+			*t++ = '\\';
+			*t++ = '\\';
+		} else if (!isprint(*(uchar*)fname)) {
+			if ((limit -= 4) < 0)
+				break;
+			sprintf(t, "\\%03o", *(uchar*)fname);
+			t += 4;
+		} else {
+			limit--;
 			*t++ = *fname;
-		if (--limit == 0)
-			break;
+		}
 	}
 	*t = '\0';
 
