@@ -877,17 +877,20 @@ static int start_client(int argc, char *argv[])
 }
 
 
-static RETSIGTYPE sigusr1_handler(int UNUSED(val)) {
+static RETSIGTYPE sigusr1_handler(UNUSED(int val))
+{
 	exit_cleanup(RERR_SIGNAL);
 }
 
-static RETSIGTYPE sigusr2_handler(int UNUSED(val)) {
+static RETSIGTYPE sigusr2_handler(UNUSED(int val))
+{
 	extern int log_got_error;
 	if (log_got_error) _exit(RERR_PARTIAL);
 	_exit(0);
 }
 
-static RETSIGTYPE sigchld_handler(int UNUSED(val)) {
+static RETSIGTYPE sigchld_handler(UNUSED(int val))
+{
 #ifdef WNOHANG
 	int cnt, status;
 	pid_t pid;
@@ -945,7 +948,7 @@ const char *get_panic_action(void)
  * should just look at the environment variable, but I'm a bit leery
  * of a signal sending us into a busy loop.
  **/
-static RETSIGTYPE rsync_panic_handler(int UNUSED(whatsig))
+static RETSIGTYPE rsync_panic_handler(UNUSED(int whatsig))
 {
 	char cmd_buf[300];
 	int ret;

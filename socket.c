@@ -374,7 +374,8 @@ int is_a_socket(int fd)
 }
 
 
-static RETSIGTYPE sigchld_handler(int UNUSED(val)) {
+static RETSIGTYPE sigchld_handler(UNUSED(int val))
+{
 	signal(SIGCHLD, sigchld_handler);
 #ifdef WNOHANG
 	while (waitpid(-1, NULL, WNOHANG) > 0) {}
