@@ -176,7 +176,7 @@ int r;
           break;
         case 3:                         /* illegal */
           DUMPBITS(3)
-          s->mode = BAD;
+          s->mode = zBAD;
           z->msg = (char*)"invalid block type";
           r = Z_DATA_ERROR;
           LEAVE
@@ -186,7 +186,7 @@ int r;
       NEEDBITS(32)
       if ((((~b) >> 16) & 0xffff) != (b & 0xffff))
       {
-        s->mode = BAD;
+        s->mode = zBAD;
         z->msg = (char*)"invalid stored block lengths";
         r = Z_DATA_ERROR;
         LEAVE
@@ -219,7 +219,7 @@ int r;
 #ifndef PKZIP_BUG_WORKAROUND
       if ((t & 0x1f) > 29 || ((t >> 5) & 0x1f) > 29)
       {
-        s->mode = BAD;
+        s->mode = zBAD;
         z->msg = (char*)"too many length or distance symbols";
         r = Z_DATA_ERROR;
         LEAVE
@@ -252,7 +252,7 @@ int r;
         ZFREE(z, s->sub.trees.blens);
         r = t;
         if (r == Z_DATA_ERROR)
-          s->mode = BAD;
+          s->mode = zBAD;
         LEAVE
       }
       s->sub.trees.index = 0;
@@ -289,7 +289,7 @@ int r;
               (c == 16 && i < 1))
           {
             ZFREE(z, s->sub.trees.blens);
-            s->mode = BAD;
+            s->mode = zBAD;
             z->msg = (char*)"invalid bit length repeat";
             r = Z_DATA_ERROR;
             LEAVE
@@ -317,7 +317,7 @@ int r;
         if (t != Z_OK)
         {
           if (t == (uInt)Z_DATA_ERROR)
-            s->mode = BAD;
+            s->mode = zBAD;
           r = t;
           LEAVE
         }
@@ -361,7 +361,7 @@ int r;
     case DONE:
       r = Z_STREAM_END;
       LEAVE
-    case BAD:
+    case zBAD:
       r = Z_DATA_ERROR;
       LEAVE
     default:

@@ -21,7 +21,7 @@ typedef enum {
       CODES,    /* processing fixed or dynamic block */
       DRY,      /* output remaining window bytes */
       DONE,     /* finished last block, done */
-      BAD}      /* got a data error--stuck here */
+      zBAD}      /* got a data error--stuck here */
 inflate_block_mode;
 
 /* inflate blocks semi-private state */
