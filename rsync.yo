@@ -297,7 +297,6 @@ Here is a short summary of the options available in rsync. Please refer
 to the detailed description below for a complete description.  verb(
  -v, --verbose               increase verbosity
  -q, --quiet                 suppress non-error messages
- -c, --checksum              always checksum
  -c, --checksum              skip based on checksum, not mod-time & size
  -a, --archive               archive mode; same as -rlptgoD (no -H)
  -r, --recursive             recurse into directories
@@ -814,7 +813,7 @@ See the bf(cvs(1)) manual for more information.
 
 If you're combining bf(-C) with your own bf(--filter) rules, you should
 note that these CVS excludes are appended at the end of your own rules,
-regardless of where the -C was placed on the command-line.  This makes them
+regardless of where the bf(-C) was placed on the command-line.  This makes them
 a lower priority than any rules you specified explicitly.  If you want to
 control where these CVS excludes get inserted into your filter rules, you
 should omit the bf(-C) as a command-line option and use a combination of
