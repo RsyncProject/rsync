@@ -25,6 +25,9 @@ Changes since 2.6.0:
       shorter temp file when no new data has been transfered over
       the wire.
 
+    * Fixed a byte-order problem in --batch-mode on big-endian
+      machines.  (Jay Fenlason)
+
   INTERNAL:
 
     * Most of the I/O is now buffered, which results in a pretty
