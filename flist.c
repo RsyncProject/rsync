@@ -328,7 +328,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	static uid_t uid;
 	static gid_t gid;
 	static char lastname[MAXPATHLEN];
-	char *fname, fbuf[MAXPATHLEN];
+	char fname[MAXPATHLEN];
 	int l1, l2;
 
 	if (f == -1)
@@ -346,7 +346,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 
 	io_write_phase = "send_file_entry";
 
-	fname = f_name_to(file, fbuf);
+	f_name_to(file, fname);
 
 	flags = base_flags;
 
