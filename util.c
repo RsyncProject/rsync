@@ -734,7 +734,7 @@ void sanitize_path(char *p, char *reldir)
 		while (1) {
 			/* copy one component through next slash */
 			*sanp++ = *p++;
-			if (*p == '\0' || p[1] == '/') {
+			if (*p == '\0' || p[-1] == '/') {
 				while (*p == '/') {
 					/* skip multiple slashes */
 					p++;
