@@ -57,7 +57,7 @@ static void gen_challenge(char *addr, char *challenge)
 	char input[32];
 	struct timeval tv;
 
-	memset(input, 0, sizeof(input));
+	memset(input, 0, sizeof input);
 
 	strlcpy((char *)input, addr, 17);
 	sys_gettimeofday(&tv);
@@ -66,7 +66,7 @@ static void gen_challenge(char *addr, char *challenge)
 	SIVAL(input, 24, getpid());
 
 	sum_init();
-	sum_update(input, sizeof(input));
+	sum_update(input, sizeof input);
 	sum_end(challenge);
 }
 
@@ -229,7 +229,8 @@ char *auth_server(int f_in, int f_out, int module, char *addr, char *leader)
 	char *tok;
 
 	/* if no auth list then allow anyone in! */
-	if (!users || !*users) return "";
+	if (!users || !*users)
+		return "";
 
 	gen_challenge(addr, challenge);
 	
@@ -237,37 +238,36 @@ char *auth_server(int f_in, int f_out, int module, char *addr, char *leader)
 
 	io_printf(f_out, "%s%s\n", leader, b64_challenge);
 
-	if (!read_line(f_in, line, sizeof(line)-1)) {
+	if (!read_line(f_in, line, sizeof line - 1))
 		return NULL;
-	}
 
-	memset(user, 0, sizeof(user));
-	memset(pass, 0, sizeof(pass));
+	memset(user, 0, sizeof user);
+	memset(pass, 0, sizeof pass);
 
-	if (sscanf(line,"%99s %29s", user, pass) != 2) {
+	if (sscanf(line,"%99s %29s", user, pass) != 2)
 		return NULL;
-	}
 	
 	users = strdup(users);
-	if (!users) return NULL;
+	if (!users)
+		return NULL;
 
 	for (tok=strtok(users," ,\t"); tok; tok = strtok(NULL," ,\t")) {
-		if (wildmatch(tok, user)) break;
+		if (wildmatch(tok, user))
+			break;
 	}
 	free(users);
 
-	if (!tok) {
+	if (!tok)
 		return NULL;
-	}
 	
-	memset(secret, 0, sizeof(secret));
-	if (!get_secret(module, user, secret, sizeof(secret)-1)) {
-		memset(secret, 0, sizeof(secret));
+	memset(secret, 0, sizeof secret);
+	if (!get_secret(module, user, secret, sizeof secret - 1)) {
+		memset(secret, 0, sizeof secret);
 		return NULL;
 	}
 
 	generate_hash(secret, b64_challenge, pass2);
-	memset(secret, 0, sizeof(secret));
+	memset(secret, 0, sizeof secret);
 	
 	if (strcmp(pass, pass2) == 0)
 		return user;
@@ -284,7 +284,8 @@ void auth_client(int fd, char *user, char *challenge)
 	if (!user || !*user)
 		user = "nobody";
 
-	if (!(pass=getpassf(password_file)) && !(pass=getenv("RSYNC_PASSWORD"))) {
+	if (!(pass = getpassf(password_file))
+	 && !(pass = getenv("RSYNC_PASSWORD"))) {
 		/* XXX: cyeoh says that getpass is deprecated, because
 		 * it may return a truncated password on some systems,
 		 * and it is not in the LSB.
