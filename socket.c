@@ -830,6 +830,13 @@ static int socketpair_tcp(int fd[2])
 int sock_exec(const char *prog)
 {
 	int fd[2];
+
+	if (verbose > 0) {
+		rprintf(FINFO, RSYNC_NAME
+			": open connection using \"%s\"\n",
+			prog);
+	}
+	
 	if (socketpair_tcp(fd) != 0) {
 		rprintf (FERROR, RSYNC_NAME
 			 ": socketpair_tcp failed (%s)\n",
@@ -842,10 +849,12 @@ int sock_exec(const char *prog)
 		close(1);
 		dup(fd[1]);
 		dup(fd[1]);
-		if (verbose > 3)
+		if (verbose > 3) {
+			/* Can't use rprintf because we've forked. */
 			fprintf (stderr,
 				 RSYNC_NAME ": execute socket program \"%s\"\n",
 				 prog);
+		}
 		exit (system (prog));
 	}
 	close (fd[1]);
