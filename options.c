@@ -59,6 +59,7 @@ int delete_during = 0;
 int delete_before = 0;
 int delete_after = 0;
 int delete_excluded = 0;
+int remove_sent_files = 0;
 int one_file_system = 0;
 int protocol_version = PROTOCOL_VERSION;
 int sparse_files = 0;
@@ -93,6 +94,7 @@ int fuzzy_basis = 0;
 size_t bwlimit_writemax = 0;
 int only_existing = 0;
 int opt_ignore_existing = 0;
+int need_messages_from_generator = 0;
 int max_delete = 0;
 OFF_T max_size = 0;
 int ignore_errors = 0;
@@ -288,6 +290,7 @@ void usage(enum logcode F)
   rprintf(F,"     --rsync-path=PATH       specify path to rsync on the remote machine\n");
   rprintf(F,"     --existing              only update files that already exist on receiver\n");
   rprintf(F,"     --ignore-existing       ignore files that already exist on receiving side\n");
+  rprintf(F,"     --remove-sent-files     sent files/symlinks are removed from sending side\n");
   rprintf(F,"     --del                   an alias for --delete-during\n");
   rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
   rprintf(F,"     --delete-before         receiver deletes before transfer (default)\n");
@@ -371,6 +374,7 @@ static struct poptOption long_options[] = {
   {"delete-during",    0,  POPT_ARG_NONE,   &delete_during, 0, 0, 0 },
   {"delete-after",     0,  POPT_ARG_NONE,   &delete_after, 0, 0, 0 },
   {"delete-excluded",  0,  POPT_ARG_NONE,   &delete_excluded, 0, 0, 0 },
+  {"remove-sent-files",0,  POPT_ARG_NONE,   &remove_sent_files, 0, 0, 0 },
   {"force",            0,  POPT_ARG_NONE,   &force_delete, 0, 0, 0 },
   {"numeric-ids",      0,  POPT_ARG_NONE,   &numeric_ids, 0, 0, 0 },
   {"filter",          'f', POPT_ARG_STRING, 0, OPT_FILTER, 0, 0 },
@@ -978,6 +982,17 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		return 0;
 	}
 
+	if (remove_sent_files) {
+		/* We only want to infer this refusal of --remove-sent-files
+		 * via the refusal of "delete", not any of the "delete-FOO"
+		 * options. */
+		if (refused_delete && am_sender) {
+			create_refuse_error(refused_delete);
+			return 0;
+		}
+		need_messages_from_generator = 1;
+	}
+
 	*argv = poptGetArgs(pc);
 	*argc = count_args(*argv);
 
@@ -1434,6 +1449,9 @@ void server_options(char **args,int *argc)
 
 	if (fuzzy_basis && am_sender)
 		args[ac++] = "--fuzzy";
+
+	if (remove_sent_files)
+		args[ac++] = "--remove-sent-files";
 
 	*argc = ac;
 	return;
