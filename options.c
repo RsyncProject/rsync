@@ -145,7 +145,7 @@ static int daemon_opt;   /* sets am_daemon after option error-reporting */
 static int modify_window_set;
 static int compare_dest = 0;
 static int basis_dir_cnt = 0;
-static char *dest_option;
+static char *dest_option = NULL;
 static char *max_size_arg;
 
 /** Local address to bind.  As a character string because it's
@@ -958,7 +958,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			 am_server ? "server" : "client");
 		return 0;
 #endif
-		if (compare_dest || copy_dest || link_dest) {
+		if (dest_option) {
 			snprintf(err_buf, sizeof err_buf,
 				 "--inplace does not yet work with %s\n",
 				 dest_option);
