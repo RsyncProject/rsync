@@ -15,18 +15,8 @@
  * WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char rcsid[] =
-	"$Id$";
-#endif /* LIBC_SCCS and not lint */
 
-#include <config.h>
-
-#include <errno.h>
-#include <stdio.h>
-#include <string.h>
-
-#include <isc/net.h>
+#include "rsync.h"
 
 #define NS_INT16SZ	 2
 #define NS_IN6ADDRSZ	16
