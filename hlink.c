@@ -76,7 +76,7 @@ static void link_idev_data(void)
 	} else {
 		hlink_count = to;
 		if (!(hlink_list = realloc_array(hlink_list,
-					struct file_struct *, hlink_count)))
+		    struct file_struct *, hlink_count)))
 			out_of_memory("init_hard_links");
 	}
 }
@@ -103,7 +103,7 @@ void init_hard_links(struct file_list *flist)
 	}
 
 	qsort(hlink_list, hlink_count,
-	      sizeof(hlink_list[0]), (int (*)()) hlink_compare);
+	    sizeof hlink_list[0], (int (*)()) hlink_compare);
 
 	if (!hlink_count) {
 		free(hlink_list);
@@ -122,7 +122,7 @@ int hard_link_check(struct file_struct *file, int skip)
 	if (hlink_list[file->F_HLINDEX] != file) {
 		if (verbose > 1) {
 			rprintf(FINFO, "\"%s\" is a hard link\n",
-				f_name(file));
+			    f_name(file));
 		}
 		return 1;
 	}
@@ -133,12 +133,12 @@ int hard_link_check(struct file_struct *file, int skip)
 static void hard_link_one(char *hlink1, char *hlink2)
 {
 	if (do_link(hlink1, hlink2)) {
-		if (verbose > 0) {
+		if (verbose) {
 			rprintf(FINFO, "link %s => %s failed: %s\n",
-				hlink2, hlink1, strerror(errno));
+			    hlink2, hlink1, strerror(errno));
 		}
 	}
-	else if (verbose > 0)
+	else if (verbose)
 		rprintf(FINFO, "%s => %s\n", hlink2, hlink1);
 }
 #endif
@@ -174,9 +174,9 @@ void do_hard_links(void)
 				if (robust_unlink(hlink2)) {
 					if (verbose > 0) {
 						rprintf(FINFO,
-							"unlink %s failed: %s\n",
-							full_fname(hlink2), 
-							strerror(errno));
+						    "unlink %s failed: %s\n",
+						    full_fname(hlink2), 
+						    strerror(errno));
 					}
 					continue;
 				}
