@@ -102,11 +102,12 @@ int check_hard_link(struct file_struct *file)
 			low = mid + 1;
 	}
 
-	/* XXX: To me this looks kind of dodgy -- why do we use [low]
-	 * here and [low-1] below? -- mbp */
+	/* Check if we ended up finding the file struct or not. */
 	if (hlink_compare(&hlink_list[low], &file) != 0)
 		return 0;
 
+	/* Now check if the previous item shares the current one's device
+	 * and inode.  If so, we're not the "master", so return 1. */
 	if (low > 0 &&
 	    file->F_DEV == hlink_list[low - 1]->F_DEV &&
 	    file->F_INODE == hlink_list[low - 1]->F_INODE) {
