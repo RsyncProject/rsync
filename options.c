@@ -394,7 +394,7 @@ static struct poptOption long_options[] = {
 };
 
 
-static char err_buf[100];
+static char err_buf[200];
 
 
 /**
@@ -404,15 +404,17 @@ static char err_buf[100];
  **/
 void option_error(void)
 {
-	if (err_buf[0]) {
-		rprintf(FLOG, "%s", err_buf);
-		rprintf(FERROR, RSYNC_NAME ": %s", err_buf);
-	} else {
-		rprintf (FERROR, "Error parsing options: "
-			 "option may be supported on client but not on server?\n");
-		rprintf (FERROR, RSYNC_NAME ": Error parsing options: "
-			 "option may be supported on client but not on server?\n");
+	int save_daemon = am_daemon;
+
+	if (!err_buf[0]) {
+		strcpy(err_buf, "Error parsing options: "
+		    "option may be supported on client but not on server?\n");
 	}
+
+	rwrite(FLOG, err_buf, strlen(err_buf));
+	am_daemon = 0;
+	rprintf(FERROR, RSYNC_NAME ": %s", err_buf);
+	am_daemon = save_daemon;
 }
 
 
@@ -580,7 +582,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			snprintf(err_buf, sizeof err_buf,
 				 "hard links are not supported on this %s\n",
 				 am_server ? "server" : "client");
-			rprintf(FERROR, "ERROR: %s", err_buf);
 			return 0;
 #endif
 
@@ -613,7 +614,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		snprintf(err_buf, sizeof err_buf,
 			 "symlinks are not supported on this %s\n",
 			 am_server ? "server" : "client");
-		rprintf(FERROR, "ERROR: %s", err_buf);
 		return 0;
 	}
 #endif
@@ -623,7 +623,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		snprintf(err_buf, sizeof err_buf,
 			 "hard links are not supported on this %s\n",
 			 am_server ? "server" : "client");
-		rprintf(FERROR, "ERROR: %s", err_buf);
 		return 0;
 	}
 #endif
