@@ -66,7 +66,7 @@ char *map_ptr(char *buf,off_t offset,int len)
     return (p + (offset - p_offset));
   }
 
-  len = MAX(len,WRITE_BLOCK_SIZE);
+  len = MAX(len,CHUNK_SIZE);
   len = MIN(len,map_size - offset);  
 
   if (len > p_size) {
@@ -79,7 +79,7 @@ char *map_ptr(char *buf,off_t offset,int len)
   if (lseek(map_fd,offset,SEEK_SET) != offset ||
       read(map_fd,p,len) != len) {
     fprintf(stderr,"EOF in map_ptr!\n");
-    exit(1);
+    exit_cleanup(1);
   }
 
   p_offset = offset;
@@ -111,14 +111,14 @@ int piped_child(char **command,int *f_in,int *f_out)
   if (pipe(to_child_pipe) < 0 ||
       pipe(from_child_pipe) < 0) {
     fprintf(stderr,"pipe: %s\n",strerror(errno));
-    exit(1);
+    exit_cleanup(1);
   }
 
 
   pid = fork();
   if (pid < 0) {
     fprintf(stderr,"fork: %s\n",strerror(errno));
-    exit(1);
+    exit_cleanup(1);
   }
 
   if (pid == 0)
@@ -128,18 +128,18 @@ int piped_child(char **command,int *f_in,int *f_out)
 	  close(from_child_pipe[0]) < 0 ||
 	  dup2(from_child_pipe[1], STDOUT_FILENO) < 0) {
 	fprintf(stderr,"Failed to dup/close : %s\n",strerror(errno));
-	exit(1);
+	exit_cleanup(1);
       }
       execvp(command[0], command);
       fprintf(stderr,"Failed to exec %s : %s\n",
 	      command[0],strerror(errno));
-      exit(1);
+      exit_cleanup(1);
     }
 
   if (close(from_child_pipe[1]) < 0 ||
       close(to_child_pipe[0]) < 0) {
     fprintf(stderr,"Failed to close : %s\n",strerror(errno));   
-    exit(1);
+    exit_cleanup(1);
   }
 
   *f_in = from_child_pipe[0];
@@ -152,7 +152,7 @@ int piped_child(char **command,int *f_in,int *f_out)
 void out_of_memory(char *str)
 {
   fprintf(stderr,"out of memory in %s\n",str);
-  exit(1);
+  exit_cleanup(1);
 }
 
 

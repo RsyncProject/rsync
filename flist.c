@@ -411,7 +411,7 @@ struct file_list *send_file_list(int f,int recurse,int argc,char *argv[])
     if (dir && *dir) {
       if (getcwd(dbuf,MAXPATHLEN-1) == NULL) {
 	fprintf(stderr,"getwd : %s\n",strerror(errno));
-	exit(1);
+	exit_cleanup(1);
       }
       if (chdir(dir) != 0) {
 	fprintf(stderr,"chdir %s : %s\n",dir,strerror(errno));
@@ -424,7 +424,7 @@ struct file_list *send_file_list(int f,int recurse,int argc,char *argv[])
       flist_dir = NULL;
       if (chdir(dbuf) != 0) {
 	fprintf(stderr,"chdir %s : %s\n",dbuf,strerror(errno));
-	exit(1);
+	exit_cleanup(1);
       }
       continue;
     }

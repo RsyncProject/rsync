@@ -38,8 +38,7 @@
 #define MIN_PROTOCOL_VERSION 10
 #define MAX_PROTOCOL_VERSION 20
 
-/* block size to write files in */
-#define WRITE_BLOCK_SIZE (32*1024)
+#define CHUNK_SIZE (32*1024)
 #define MAX_MAP_SIZE (4*1024*1024)
 
 #define BLOCKING_TIMEOUT 10

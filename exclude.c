@@ -122,7 +122,7 @@ char **make_exclude_list(char *fname,char **list1,int fatal)
   if (!f) {
     if (fatal) {
       fprintf(stderr,"%s : %s\n",fname,strerror(errno));
-      exit(1);
+      exit_cleanup(1);
     }
     return list;
   }

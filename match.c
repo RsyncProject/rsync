@@ -103,7 +103,7 @@ static void matched(int f,struct sum_struct *s,char *buf,off_t len,
     int l = 0;
     write_int(f,n);
     while (l < n) {
-      int n1 = MIN(WRITE_BLOCK_SIZE,n-l);
+      int n1 = MIN(CHUNK_SIZE,n-l);
       write_buf(f,map_ptr(buf,last_match+l,n1),n1);
       l += n1;
     }

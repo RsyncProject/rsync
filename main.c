@@ -44,7 +44,7 @@ int ignore_times=0;
 int delete_mode=0;
 int one_file_system=0;
 int remote_version=0;
-int csum_length=SUM_LENGTH;
+extern int csum_length;
 
 int am_server = 0;
 static int sender = 0;
@@ -223,13 +223,13 @@ static char *get_local_name(struct file_list *flist,char *name)
     if (S_ISDIR(st.st_mode)) {
       if (chdir(name) != 0) {
 	fprintf(stderr,"chdir %s : %s\n",name,strerror(errno));
-	exit(1);
+	exit_cleanup(1);
       }
       return NULL;
     }
     if (flist->count > 1) {
       fprintf(stderr,"ERROR: destination must be a directory when copying more than 1 file\n");
-      exit(1);
+      exit_cleanup(1);
     }
     return name;
   }
@@ -242,14 +242,14 @@ static char *get_local_name(struct file_list *flist,char *name)
 
   if (mkdir(name,0777) != 0) {
     fprintf(stderr,"mkdir %s : %s\n",name,strerror(errno));
-    exit(1);
+    exit_cleanup(1);
   } else {
     fprintf(am_server?stderr:stdout,"created directory %s\n",name);
   }
 
   if (chdir(name) != 0) {
     fprintf(stderr,"chdir %s : %s\n",name,strerror(errno));
-    exit(1);
+    exit_cleanup(1);
   }
 
   return NULL;
@@ -269,7 +269,7 @@ void do_server_sender(int argc,char *argv[])
   
   if (chdir(dir) != 0) {
     fprintf(stderr,"chdir %s: %s\n",dir,strerror(errno));
-    exit(1);
+    exit_cleanup(1);
   }
   argc--;
   argv++;
@@ -290,7 +290,7 @@ void do_server_sender(int argc,char *argv[])
   flist = send_file_list(STDOUT_FILENO,recurse,argc,argv);
   send_files(flist,STDOUT_FILENO,STDIN_FILENO);
   report(STDOUT_FILENO);
-  exit(0);
+  exit_cleanup(0);
 }
 
 
@@ -311,7 +311,7 @@ void do_server_recv(int argc,char *argv[])
     argv++;
     if (chdir(dir) != 0) {
       fprintf(stderr,"chdir %s : %s\n",dir,strerror(errno));
-      exit(1);
+      exit_cleanup(1);
     }    
   }
 
@@ -321,7 +321,7 @@ void do_server_recv(int argc,char *argv[])
   flist = recv_file_list(STDIN_FILENO);
   if (!flist || flist->count == 0) {
     fprintf(stderr,"nothing to do\n");
-    exit(1);
+    exit_cleanup(1);
   }
 
   if (argc > 0) {    
@@ -336,13 +336,13 @@ void do_server_recv(int argc,char *argv[])
     recv_files(STDIN_FILENO,flist,local_name);
     if (verbose > 2)
       fprintf(stderr,"receiver read %d\n",read_total());
-    exit(0);
+    exit_cleanup(0);
   }
 
   generate_files(STDOUT_FILENO,flist,local_name);
 
   waitpid(pid, &status, 0);
-  exit(status);
+  exit_cleanup(status);
 }
 
 
@@ -436,6 +436,8 @@ int main(int argc,char *argv[])
 
     starttime = time(NULL);
 
+    checksum_init();
+
     while ((opt = getopt_long(argc, argv, 
 			      short_options, long_options, &option_index)) 
 	   != -1) {
@@ -444,7 +446,7 @@ int main(int argc,char *argv[])
 	case OPT_VERSION:
 	  printf("rsync version %s  protocol version %d\n",
 		 VERSION,PROTOCOL_VERSION);
-	  exit(0);
+	  exit_cleanup(0);
 
 	case OPT_SUFFIX:
 	  backup_suffix = optarg;
@@ -481,7 +483,7 @@ int main(int argc,char *argv[])
 
 	case 'h':
 	  usage(stdout);
-	  exit(0);
+	  exit_cleanup(0);
 
 	case 'b':
 	  make_backups=1;
@@ -514,7 +516,7 @@ int main(int argc,char *argv[])
 	    preserve_uid=1;
 	  } else {
 	    fprintf(stderr,"-o only allowed for root\n");
-	    exit(1);
+	    exit_cleanup(1);
 	  }
 	  break;
 
@@ -527,7 +529,7 @@ int main(int argc,char *argv[])
 	    preserve_devices=1;
 	  } else {
 	    fprintf(stderr,"-D only allowed for root\n");
-	    exit(1);
+	    exit_cleanup(1);
 	  }
 	  break;
 
@@ -564,7 +566,7 @@ int main(int argc,char *argv[])
 	case OPT_SENDER:
 	  if (!am_server) {
 	    usage(stderr);
-	    exit(1);
+	    exit_cleanup(1);
 	  }
 	  sender = 1;
 	  break;
@@ -583,7 +585,7 @@ int main(int argc,char *argv[])
 
 	default:
 	  fprintf(stderr,"bad option -%c\n",opt);
-	  exit(1);
+	  exit_cleanup(1);
 	}
     }
 
@@ -600,7 +602,7 @@ int main(int argc,char *argv[])
       if (remote_version < MIN_PROTOCOL_VERSION ||
 	  remote_version > MAX_PROTOCOL_VERSION) {
 	fprintf(stderr,"protocol version mismatch - is your shell clean?\n");
-	exit(1);
+	exit_cleanup(1);
       }
       write_int(STDOUT_FILENO,PROTOCOL_VERSION);
       write_flush(STDOUT_FILENO);
@@ -615,12 +617,12 @@ int main(int argc,char *argv[])
       } else {
 	do_server_recv(argc,argv);
       }
-      exit(0);
+      exit_cleanup(0);
     }
 
     if (argc < 2) {
       usage(stderr);
-      exit(1);
+      exit_cleanup(1);
     }
 
     p = strchr(argv[0],':');
@@ -674,7 +676,7 @@ int main(int argc,char *argv[])
 
     if (!sender && argc != 1) {
       usage(stderr);
-      exit(1);
+      exit_cleanup(1);
     }
 
     pid = do_cmd(shell_cmd,shell_machine,shell_user,shell_path,&f_in,&f_out);
@@ -686,7 +688,7 @@ int main(int argc,char *argv[])
       if (remote_version < MIN_PROTOCOL_VERSION ||
 	  remote_version > MAX_PROTOCOL_VERSION) {
 	fprintf(stderr,"protocol version mismatch - is your shell clean?\n");
-	exit(1);
+	exit_cleanup(1);
       }	
     }
 
@@ -709,7 +711,7 @@ int main(int argc,char *argv[])
 	fprintf(stderr,"waiting on %d\n",pid);
       waitpid(pid, &status, 0);
       report(-1);
-      exit(status);
+      exit_cleanup(status);
     }
 
     send_exclude_list(f_out);
@@ -717,7 +719,7 @@ int main(int argc,char *argv[])
     flist = recv_file_list(f_in);
     if (!flist || flist->count == 0) {
       fprintf(stderr,"nothing to do\n");
-      exit(0);
+      exit_cleanup(0);
     }
 
     local_name = get_local_name(flist,argv[0]);
@@ -726,7 +728,7 @@ int main(int argc,char *argv[])
       recv_files(f_in,flist,local_name);
       if (verbose > 1)
 	fprintf(stderr,"receiver read %d\n",read_total());
-      exit(0);
+      exit_cleanup(0);
     }
 
     generate_files(f_out,flist,local_name);

@@ -130,7 +130,7 @@ int read_int(int f)
     if (verbose > 1) 
       fprintf(stderr,"Error reading %d bytes : %s\n",
 	      4,ret==-1?strerror(errno):"EOF");
-    exit(1);
+    exit_cleanup(1);
   }
   total_read += 4;
   return IVAL(b,0);
@@ -143,7 +143,7 @@ void read_buf(int f,char *buf,int len)
     if (verbose > 1) 
       fprintf(stderr,"Error reading %d bytes : %s\n",
 	      len,ret==-1?strerror(errno):"EOF");
-    exit(1);
+    exit_cleanup(1);
   }
   total_read += len;
 }
@@ -196,7 +196,7 @@ int write_sparse(int f,char *buf,int len)
 int read_write(int fd_in,int fd_out,int size)
 {
   static char *buf=NULL;
-  static int bufsize = WRITE_BLOCK_SIZE;
+  static int bufsize = CHUNK_SIZE;
   int total=0;
   
   if (!buf) {
@@ -258,7 +258,7 @@ void write_int(int f,int x)
   if ((ret=writefd(f,b,4)) != 4) {
     fprintf(stderr,"write_int failed : %s\n",
 	    ret==-1?strerror(errno):"EOF");
-    exit(1);
+    exit_cleanup(1);
   }
   total_written += 4;
 }
@@ -269,7 +269,7 @@ void write_buf(int f,char *buf,int len)
   if ((ret=writefd(f,buf,len)) != len) {
     fprintf(stderr,"write_buf failed : %s\n",
 	    ret==-1?strerror(errno):"EOF");
-    exit(1);
+    exit_cleanup(1);
   }
   total_written += len;
 }

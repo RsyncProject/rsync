@@ -406,7 +406,7 @@ static void receive_data(int f_in,char *buf,int fd,char *fname)
 
       if (read_write(f_in,fd,i) != i) {
 	fprintf(stderr,"write failed on %s : %s\n",fname,strerror(errno));
-	exit(1);
+	exit_cleanup(1);
       }
       offset += i;
     } else {
@@ -422,7 +422,7 @@ static void receive_data(int f_in,char *buf,int fd,char *fname)
 
       if (write_sparse(fd,map_ptr(buf,offset2,len),len) != len) {
 	fprintf(stderr,"write failed on %s : %s\n",fname,strerror(errno));
-	exit(1);
+	exit_cleanup(1);
       }
       offset += len;
     }
@@ -430,7 +430,7 @@ static void receive_data(int f_in,char *buf,int fd,char *fname)
 
   if (offset > 0 && sparse_end(fd) != 0) {
     fprintf(stderr,"write failed on %s : %s\n",fname,strerror(errno));
-    exit(1);
+    exit_cleanup(1);
   }
 }
 
@@ -476,11 +476,16 @@ static void delete_files(struct file_list *flist)
 
 static char *cleanup_fname = NULL;
 
-void sig_int(void)
+void exit_cleanup(int code)
 {
   if (cleanup_fname)
     unlink(cleanup_fname);
-  exit(1);
+  exit(code);
+}
+
+void sig_int(void)
+{
+  exit_cleanup(1);
 }
 
 
@@ -578,7 +583,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 	sprintf(fnamebak,"%s%s",fname,backup_suffix);
 	if (rename(fname,fnamebak) != 0 && errno != ENOENT) {
 	  fprintf(stderr,"rename %s %s : %s\n",fname,fnamebak,strerror(errno));
-	  exit(1);
+	  exit_cleanup(1);
 	}
       }
 
