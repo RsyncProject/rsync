@@ -889,7 +889,7 @@ manpagesection(EXCLUDE PATTERNS)
 The exclude and include patterns specified to rsync allow for flexible
 selection of which files to transfer and which files to skip.
 
-rsync builds an ordered list of include/exclude options as specified on
+Rsync builds an ordered list of include/exclude options as specified on
 the command line. Rsync checks each file and directory 
 name against each exclude/include pattern in turn. The first matching
 pattern is acted on. If it is an exclude pattern, then that file is
@@ -928,13 +928,19 @@ verb(
    Source root: /home/me
    +/- pattern: /home/me/foo/bar      (note full path)
    Target file: /dest/home/me/foo/bar
+
+   Example cmd: cd /home; rsync -a --relative me/foo/ /dest
+   Source root: ./me/foo         (source is not absolute)
+   +/- pattern: /me/foo/bar      (only uses specified path)
+   Target file: /dest/me/foo/bar
 )
 
 The easiest way to see what name you should include/exclude is to just
 look at the output when using --verbose and put a / in front of the name
 (use the --dry-run option if you're not yet ready to copy any files).
 
-Note that when used with -r (which is implied by -a), every subcomponent of
+Note that, when using the --recursive (-r) option (which is implied by -a),
+every subcomponent of
 every path is visited from the top down, so include/exclude patterns get
 applied recursively to each subcomponent.
 
