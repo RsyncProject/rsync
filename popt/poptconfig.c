@@ -18,7 +18,7 @@ static void configLine(poptContext con, char * line)
     /*@=type@*/
     const char * entryType;
     const char * opt;
-    poptItem item = alloca(sizeof(*item));
+    poptItem item = (poptItem) alloca(sizeof(*item));
     int i, j;
     
     memset(item, 0, sizeof(*item));
