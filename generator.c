@@ -258,15 +258,16 @@ static void generate_and_send_sums(struct map_struct *buf, size_t len, int f_out
 
 
 
-/**
+/*
  * Acts on file number @p i from @p flist, whose name is @p fname.
  *
  * First fixes up permissions, then generates checksums for the file.
  *
  * @note This comment was added later by mbp who was trying to work it
  * out.  It might be wrong.
- **/
-void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
+ */
+static void recv_generator(char *fname, struct file_struct *file, int i,
+			   int f_out)
 {
 	int fd;
 	STRUCT_STAT st;
