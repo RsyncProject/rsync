@@ -46,6 +46,9 @@ struct filter_list_struct server_filter_list = { 0, 0, "server " };
 /* Need room enough for ":MODS " prefix plus some room to grow. */
 #define MAX_RULE_PREFIX (16)
 
+#define MODIFIERS_MERGE_FILE "-+Cens"
+#define MODIFIERS_INCL_EXCL "/!"
+
 /* The dirbuf is set by push_local_filters() to the current subdirectory
  * relative to curr_dir that is being processed.  The path always has a
  * trailing slash appended, and the variable dirbuf_len contains the length
@@ -109,7 +112,7 @@ static void free_filter(struct filter_struct *ex)
 /* Build a filter structure given a filter pattern.  The value in "pat"
  * is not null-terminated. */
 static void filter_rule(struct filter_list_struct *listp, const char *pat,
-			unsigned int pat_len, unsigned int mflags, int xflags)
+			unsigned int pat_len, unsigned mflags, int xflags)
 {
 	struct filter_struct *ret;
 	const char *cp;
@@ -328,7 +331,7 @@ void set_filter_dir(const char *dir, unsigned int dirlen)
  * dirs from that point through the parent dir of the transfer dir looking
  * for the per-dir merge-file in each one. */
 static BOOL setup_merge_file(struct filter_struct *ex,
-			     struct filter_list_struct *lp, int flags)
+			     struct filter_list_struct *lp)
 {
 	char buf[MAXPATHLEN];
 	char *x, *y, *pat = ex->pattern;
@@ -364,7 +367,7 @@ static BOOL setup_merge_file(struct filter_struct *ex,
 		*y = '\0';
 		dirbuf_len = y - dirbuf;
 		strlcpy(x, ex->pattern, MAXPATHLEN - (x - buf));
-		add_filter_file(lp, buf, flags | XFLG_ANCHORED2ABS);
+		add_filter_file(lp, buf, ex->match_flags, XFLG_ANCHORED2ABS);
 		if (ex->match_flags & MATCHFLG_NO_INHERIT)
 			lp->head = NULL;
 		lp->tail = NULL;
@@ -404,7 +407,6 @@ void *push_local_filters(const char *dir, unsigned int dirlen)
 	for (i = 0; i < mergelist_cnt; i++) {
 		struct filter_struct *ex = mergelist_parents[i];
 		struct filter_list_struct *lp = ex->u.mergelist;
-		int flags = 0;
 
 		if (verbose > 2) {
 			rprintf(FINFO, "[%s] pushing filter list%s\n",
@@ -414,25 +416,18 @@ void *push_local_filters(const char *dir, unsigned int dirlen)
 		lp->tail = NULL; /* Switch any local rules to inherited. */
 		if (ex->match_flags & MATCHFLG_NO_INHERIT)
 			lp->head = NULL;
-		if (ex->match_flags & MATCHFLG_WORD_SPLIT)
-			flags |= XFLG_WORD_SPLIT;
-		if (ex->match_flags & MATCHFLG_NO_PREFIXES)
-			flags |= XFLG_NO_PREFIXES;
-		if (ex->match_flags & MATCHFLG_INCLUDE)
-			flags |= XFLG_DEF_INCLUDE;
-		else if (ex->match_flags & MATCHFLG_NO_PREFIXES)
-			flags |= XFLG_DEF_EXCLUDE;
 
 		if (ex->match_flags & MATCHFLG_FINISH_SETUP) {
 			ex->match_flags &= ~MATCHFLG_FINISH_SETUP;
-			if (setup_merge_file(ex, lp, flags))
+			if (setup_merge_file(ex, lp))
 				set_filter_dir(dir, dirlen);
 		}
 
 		if (strlcpy(dirbuf + dirbuf_len, ex->pattern,
-		    MAXPATHLEN - dirbuf_len) < MAXPATHLEN - dirbuf_len)
-			add_filter_file(lp, dirbuf, flags | XFLG_ANCHORED2ABS);
-		else {
+		    MAXPATHLEN - dirbuf_len) < MAXPATHLEN - dirbuf_len) {
+			add_filter_file(lp, dirbuf, ex->match_flags,
+				        XFLG_ANCHORED2ABS);
+		} else {
 			io_error |= IOERR_GENERAL;
 			rprintf(FINFO,
 			    "cannot add local filter rules in long-named directory: %s\n",
@@ -603,18 +598,17 @@ int check_filter(struct filter_list_struct *listp, char *name, int name_is_dir)
  * be '\0' terminated, so use the returned length to limit the string.
  * Also, be sure to add this length to the returned pointer before passing
  * it back to ask for the next token.  This routine parses the "!" (list-
- * clearing) token and (if xflags does NOT contain XFLG_NO_PREFIXES) the
- * +/- prefixes for overriding the include/exclude mode.  The *flag_ptr
- * value will also be set to the MATCHFLG_* bits for the current token.
- */
-static const char *get_filter_tok(const char *p, int xflags,
-				unsigned int *len_ptr, unsigned int *flag_ptr)
+ * clearing) token and (depending on the mflags) the various prefixes.
+ * The *mflags_ptr value will be set on exit to the new MATCHFLG_* bits
+ * for the current token. */
+static const char *get_filter_tok(const char *p, unsigned mflags, int xflags,
+				unsigned int *len_ptr, unsigned int *mflags_ptr)
 {
 	const unsigned char *s = (const unsigned char *)p;
-	unsigned int len, mflags = 0;
+	unsigned int len, new_mflags;
 	int empty_pat_is_OK = 0;
 
-	if (xflags & XFLG_WORD_SPLIT) {
+	if (mflags & MATCHFLG_WORD_SPLIT) {
 		/* Skip over any initial whitespace. */
 		while (isspace(*s))
 			s++;
@@ -624,26 +618,46 @@ static const char *get_filter_tok(const char *p, int xflags,
 	if (!*s)
 		return NULL;
 
-	/* Figure out what kind of a filter rule "s" is pointing at. */
-	if (!(xflags & (XFLG_DEF_INCLUDE | XFLG_DEF_EXCLUDE))) {
+	new_mflags = mflags & MATCHFLGS_FROM_CONTAINER;
+
+	/* Figure out what kind of a filter rule "s" is pointing at.  Note
+	 * that if MATCHFLG_NO_PREFIXES is set, the rule is either an include
+	 * or an exclude based on the inheritance of the MATCHFLG_INCLUDE
+	 * flag (above).  XFLG_OLD_PREFIXES indicates a compatibility mode
+	 * for old include/exclude patterns where just "+ " and "- " are
+	 * allowed as optional prefixes.  */
+	if (mflags & MATCHFLG_NO_PREFIXES) {
+		if (*s == '!')
+			new_mflags |= MATCHFLG_CLEAR_LIST; /* Tentative! */
+	} else if (xflags & XFLG_OLD_PREFIXES) {
+		if (*s == '-' && s[1] == ' ') {
+			new_mflags &= ~MATCHFLG_INCLUDE;
+			s += 2;
+		} else if (*s == '+' && s[1] == ' ') {
+			new_mflags |= MATCHFLG_INCLUDE;
+			s += 2;
+		}
+		if (*s == '!')
+			new_mflags |= MATCHFLG_CLEAR_LIST; /* Tentative! */
+	} else {
 		char *mods = "";
 		switch (*s) {
 		case ':':
-			mflags |= MATCHFLG_PERDIR_MERGE
-				| MATCHFLG_FINISH_SETUP;
+			new_mflags |= MATCHFLG_PERDIR_MERGE
+				    | MATCHFLG_FINISH_SETUP;
 			/* FALL THROUGH */
 		case '.':
-			mflags |= MATCHFLG_MERGE_FILE;
-			mods = "-+Cens";
+			new_mflags |= MATCHFLG_MERGE_FILE;
+			mods = MODIFIERS_INCL_EXCL MODIFIERS_MERGE_FILE;
 			break;
 		case '+':
-			mflags |= MATCHFLG_INCLUDE;
+			new_mflags |= MATCHFLG_INCLUDE;
 			/* FALL THROUGH */
 		case '-':
-			mods = "!/";
+			mods = MODIFIERS_INCL_EXCL;
 			break;
 		case '!':
-			mflags |= MATCHFLG_CLEAR_LIST;
+			new_mflags |= MATCHFLG_CLEAR_LIST;
 			mods = NULL;
 			break;
 		default:
@@ -652,64 +666,58 @@ static const char *get_filter_tok(const char *p, int xflags,
 		}
 		while (mods && *++s && *s != ' ' && *s != '_') {
 			if (strchr(mods, *s) == NULL) {
-				if (xflags & XFLG_WORD_SPLIT && isspace(*s)) {
+				if (mflags & MATCHFLG_WORD_SPLIT && isspace(*s)) {
 					s--;
 					break;
 				}
+			    invalid:
 				rprintf(FERROR,
-					"unknown modifier '%c' in filter rule: %s\n",
+					"invalid modifier sequence at '%c' in filter rule: %s\n",
 					*s, p);
 				exit_cleanup(RERR_SYNTAX);
 			}
 			switch (*s) {
 			case '-':
-				mflags |= MATCHFLG_NO_PREFIXES;
+				if (new_mflags & MATCHFLG_NO_PREFIXES)
+				    goto invalid;
+				new_mflags |= MATCHFLG_NO_PREFIXES;
 				break;
 			case '+':
-				mflags |= MATCHFLG_NO_PREFIXES
-					| MATCHFLG_INCLUDE;
+				if (new_mflags & MATCHFLG_NO_PREFIXES)
+				    goto invalid;
+				new_mflags |= MATCHFLG_NO_PREFIXES
+					    | MATCHFLG_INCLUDE;
 				break;
 			case '/':
-				mflags |= MATCHFLG_ABS_PATH;
+				new_mflags |= MATCHFLG_ABS_PATH;
 				break;
 			case '!':
-				mflags |= MATCHFLG_NEGATE;
+				new_mflags |= MATCHFLG_NEGATE;
 				break;
 			case 'C':
+				if (new_mflags & MATCHFLG_NO_PREFIXES)
+				    goto invalid;
 				empty_pat_is_OK = 1;
-				mflags |= MATCHFLG_NO_PREFIXES
-					| MATCHFLG_WORD_SPLIT
-					| MATCHFLG_NO_INHERIT;
+				new_mflags |= MATCHFLG_NO_PREFIXES
+					    | MATCHFLG_WORD_SPLIT
+					    | MATCHFLG_NO_INHERIT;
 				break;
 			case 'e':
-				mflags |= MATCHFLG_EXCLUDE_SELF;
+				new_mflags |= MATCHFLG_EXCLUDE_SELF;
 				break;
 			case 'n':
-				mflags |= MATCHFLG_NO_INHERIT;
+				new_mflags |= MATCHFLG_NO_INHERIT;
 				break;
 			case 'w':
-				mflags |= MATCHFLG_WORD_SPLIT;
+				new_mflags |= MATCHFLG_WORD_SPLIT;
 				break;
 			}
 		}
 		if (*s)
 			s++;
-	} else if (!(xflags & XFLG_NO_PREFIXES)
-	    && (*s == '-' || *s == '+') && s[1] == ' ') {
-		if (*s == '+')
-			mflags |= MATCHFLG_INCLUDE;
-		s += 2;
-	} else {
-		if (xflags & XFLG_DEF_INCLUDE)
-			mflags |= MATCHFLG_INCLUDE;
-		if (*s == '!')
-			mflags |= MATCHFLG_CLEAR_LIST; /* Tentative! */
 	}
 
-	if (xflags & XFLG_DIRECTORY)
-		mflags |= MATCHFLG_DIRECTORY;
-
-	if (xflags & XFLG_WORD_SPLIT) {
+	if (mflags & MATCHFLG_WORD_SPLIT) {
 		const unsigned char *cp = s;
 		/* Token ends at whitespace or the end of the string. */
 		while (!isspace(*cp) && *cp != '\0')
@@ -718,29 +726,29 @@ static const char *get_filter_tok(const char *p, int xflags,
 	} else
 		len = strlen((char*)s);
 
-	if (mflags & MATCHFLG_CLEAR_LIST) {
-		if (!(xflags & (XFLG_DEF_INCLUDE | XFLG_DEF_EXCLUDE)) && len) {
+	if (new_mflags & MATCHFLG_CLEAR_LIST) {
+		if (!(xflags & XFLG_OLD_PREFIXES) && len) {
 			rprintf(FERROR,
 				"'!' rule has trailing characters: %s\n", p);
 			exit_cleanup(RERR_SYNTAX);
 		}
 		if (len > 1)
-			mflags &= ~MATCHFLG_CLEAR_LIST;
+			new_mflags &= ~MATCHFLG_CLEAR_LIST;
 	} else if (!len && !empty_pat_is_OK) {
 		rprintf(FERROR, "unexpected end of filter rule: %s\n", p);
 		exit_cleanup(RERR_SYNTAX);
 	}
 
 	*len_ptr = len;
-	*flag_ptr = mflags;
+	*mflags_ptr = new_mflags;
 	return (const char *)s;
 }
 
 
 void add_filter(struct filter_list_struct *listp, const char *pattern,
-		int xflags)
+		unsigned mflags, int xflags)
 {
-	unsigned int pat_len, mflags;
+	unsigned int pat_len, new_mflags;
 	const char *cp, *p;
 
 	if (!pattern)
@@ -748,7 +756,8 @@ void add_filter(struct filter_list_struct *listp, const char *pattern,
 
 	while (1) {
 		/* Remember that the returned string is NOT '\0' terminated! */
-		cp = get_filter_tok(pattern, xflags, &pat_len, &mflags);
+		cp = get_filter_tok(pattern, mflags, xflags,
+				    &pat_len, &new_mflags);
 		if (!cp)
 			break;
 		if (pat_len >= MAXPATHLEN) {
@@ -758,7 +767,7 @@ void add_filter(struct filter_list_struct *listp, const char *pattern,
 		}
 		pattern = cp + pat_len;
 
-		if (mflags & MATCHFLG_CLEAR_LIST) {
+		if (new_mflags & MATCHFLG_CLEAR_LIST) {
 			if (verbose > 2) {
 				rprintf(FINFO,
 					"[%s] clearing filter list%s\n",
@@ -773,50 +782,48 @@ void add_filter(struct filter_list_struct *listp, const char *pattern,
 			pat_len = 10;
 		}
 
-		if (mflags & MATCHFLG_MERGE_FILE) {
+		if (new_mflags & MATCHFLG_MERGE_FILE) {
 			unsigned int len = pat_len;
-			if (mflags & MATCHFLG_EXCLUDE_SELF) {
+			if (new_mflags & MATCHFLG_EXCLUDE_SELF) {
 				const char *name = strrchr(cp, '/');
 				if (name)
 					len -= ++name - cp;
 				else
 					name = cp;
 				filter_rule(listp, name, len, 0, 0);
-				mflags &= ~MATCHFLG_EXCLUDE_SELF;
+				new_mflags &= ~MATCHFLG_EXCLUDE_SELF;
 				len = pat_len;
 			}
-			if (mflags & MATCHFLG_PERDIR_MERGE) {
+			if (new_mflags & MATCHFLG_PERDIR_MERGE) {
 				if (parent_dirscan) {
-					if (!(p = parse_merge_name(cp, &len, module_dirlen)))
+					if (!(p = parse_merge_name(cp, &len,
+								module_dirlen)))
 						continue;
-					filter_rule(listp, p, len, mflags, 0);
+					filter_rule(listp, p, len,
+						    new_mflags, 0);
 					continue;
 				}
 			} else {
-				int flgs = XFLG_FATAL_ERRORS;
 				if (!(p = parse_merge_name(cp, &len, 0)))
 					continue;
-				if (mflags & MATCHFLG_INCLUDE)
-					flgs |= XFLG_DEF_INCLUDE;
-				else if (mflags & MATCHFLG_NO_PREFIXES)
-					flgs |= XFLG_DEF_EXCLUDE;
-				add_filter_file(listp, p, flgs);
+				add_filter_file(listp, p, new_mflags,
+						XFLG_FATAL_ERRORS);
 				continue;
 			}
 		}
 
-		filter_rule(listp, cp, pat_len, mflags, xflags);
+		filter_rule(listp, cp, pat_len, new_mflags, xflags);
 	}
 }
 
 
 void add_filter_file(struct filter_list_struct *listp, const char *fname,
-		     int xflags)
+		     unsigned mflags, int xflags)
 {
 	FILE *fp;
 	char line[MAXPATHLEN+MAX_RULE_PREFIX+1]; /* +1 for trailing slash. */
 	char *eob = line + sizeof line - 1;
-	int word_split = xflags & XFLG_WORD_SPLIT;
+	int word_split = mflags & MATCHFLG_WORD_SPLIT;
 
 	if (!fname || !*fname)
 		return;
@@ -835,8 +842,8 @@ void add_filter_file(struct filter_list_struct *listp, const char *fname,
 		fp = stdin;
 
 	if (verbose > 2) {
-		rprintf(FINFO, "[%s] add_filter_file(%s,%d)%s\n",
-			who_am_i(), safe_fname(fname), xflags,
+		rprintf(FINFO, "[%s] add_filter_file(%s,%x,%x)%s\n",
+			who_am_i(), safe_fname(fname), mflags, xflags,
 			fp ? "" : " [not found]");
 	}
 
@@ -844,7 +851,7 @@ void add_filter_file(struct filter_list_struct *listp, const char *fname,
 		if (xflags & XFLG_FATAL_ERRORS) {
 			rsyserr(FERROR, errno,
 				"failed to open %sclude file %s",
-				xflags & XFLG_DEF_INCLUDE ? "in" : "ex",
+				mflags & MATCHFLG_INCLUDE ? "in" : "ex",
 				safe_fname(fname));
 			exit_cleanup(RERR_FILEIO);
 		}
@@ -877,7 +884,7 @@ void add_filter_file(struct filter_list_struct *listp, const char *fname,
 		*s = '\0';
 		/* Skip an empty token and (when line parsing) comments. */
 		if (*line && (word_split || (*line != ';' && *line != '#')))
-			add_filter(listp, line, xflags);
+			add_filter(listp, line, mflags, xflags);
 		if (ch == EOF)
 			break;
 	}
@@ -927,7 +934,7 @@ void send_filter_list(int f)
 	/* This is a complete hack - blame Rusty.  FIXME!
 	 * Remove this hack when older rsyncs (below 2.6.4) are gone. */
 	if (list_only == 1 && !recurse)
-		add_filter(&filter_list, "/*/*", XFLG_DEF_EXCLUDE);
+		add_filter(&filter_list, "/*/*", MATCHFLG_NO_PREFIXES, 0);
 
 	for (ent = filter_list.head; ent; ent = ent->next) {
 		unsigned int len, plen, dlen;
@@ -961,14 +968,14 @@ void send_filter_list(int f)
 void recv_filter_list(int f)
 {
 	char line[MAXPATHLEN+MAX_RULE_PREFIX+1]; /* +1 for trailing slash. */
-	unsigned int xflags = protocol_version >= 29 ? 0 : XFLG_DEF_EXCLUDE;
+	unsigned int xflags = protocol_version >= 29 ? 0 : XFLG_OLD_PREFIXES;
 	unsigned int l;
 
 	while ((l = read_int(f)) != 0) {
 		if (l >= sizeof line)
 			overflow("recv_filter_list");
 		read_sbuf(f, line, l);
-		add_filter(&filter_list, line, xflags);
+		add_filter(&filter_list, line, 0, xflags);
 	}
 }
 
@@ -985,18 +992,16 @@ static char default_cvsignore[] =
 
 void add_cvs_excludes(void)
 {
-	static unsigned int cvs_flags = XFLG_WORD_SPLIT | XFLG_NO_PREFIXES
-				      | XFLG_DEF_EXCLUDE;
+	static unsigned cvs_mflags = MATCHFLG_WORD_SPLIT|MATCHFLG_NO_PREFIXES;
 	char fname[MAXPATHLEN];
 	char *p = module_id >= 0 && lp_use_chroot(module_id)
 		? "/" : getenv("HOME");
 
-	add_filter(&filter_list, ":C", 0);
-	add_filter(&filter_list, default_cvsignore, cvs_flags);
+	add_filter(&filter_list, ":C", 0, 0);
+	add_filter(&filter_list, default_cvsignore, cvs_mflags, 0);
 
-	if (p && pathjoin(fname, MAXPATHLEN, p, ".cvsignore") < MAXPATHLEN) {
-		add_filter_file(&filter_list, fname, cvs_flags);
-	}
+	if (p && pathjoin(fname, MAXPATHLEN, p, ".cvsignore") < MAXPATHLEN)
+		add_filter_file(&filter_list, fname, cvs_mflags, 0);
 
-	add_filter(&filter_list, getenv("CVSIGNORE"), cvs_flags);
+	add_filter(&filter_list, getenv("CVSIGNORE"), cvs_mflags, 0);
 }
