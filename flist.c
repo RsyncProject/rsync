@@ -367,11 +367,11 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 			} else
 				rdev = 0;
 		} else if (IS_DEVICE(mode)) {
-			if ((file->u.rdev & ~0xFF) == rdev_high)
+			if ((file->u.rdev & ~(DEV64_T)0xFF) == rdev_high)
 				flags |= XMIT_SAME_HIGH_RDEV;
 			else {
 				rdev = file->u.rdev;
-				rdev_high = rdev & ~0xFF;
+				rdev_high = rdev & ~(DEV64_T)0xFF;
 			}
 		}
 	}
@@ -594,7 +594,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 		} else if (IS_DEVICE(mode)) {
 			if (!(flags & XMIT_SAME_HIGH_RDEV)) {
 				rdev = (DEV64_T)read_int(f);
-				rdev_high = rdev & ~0xFF;
+				rdev_high = rdev & ~(DEV64_T)0xFF;
 			} else
 				rdev = rdev_high | (DEV64_T)read_byte(f);
 		}
