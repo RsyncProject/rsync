@@ -1006,7 +1006,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 {
 	size_t n, total = 0;
 	fd_set w_fds, r_fds;
-	int maxfd, count, ret;
+	int maxfd, count, ret, using_r_fds;
 	struct timeval tv;
 
 	no_flush++;
@@ -1021,7 +1021,9 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 			FD_SET(msg_fd_in,&r_fds);
 			if (msg_fd_in > maxfd)
 				maxfd = msg_fd_in;
-		}
+			using_r_fds = 1;
+		} else
+			using_r_fds = 0;
 		if (fd != sock_f_out && iobuf_out_cnt && no_flush == 1) {
 			FD_SET(sock_f_out, &w_fds);
 			if (sock_f_out > maxfd)
@@ -1032,7 +1034,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 		tv.tv_usec = 0;
 
 		errno = 0;
-		count = select(maxfd + 1, msg_fd_in >= 0 ? &r_fds : NULL,
+		count = select(maxfd + 1, using_r_fds ? &r_fds : NULL,
 			       &w_fds, NULL, &tv);
 
 		if (count <= 0) {
@@ -1042,7 +1044,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 			continue;
 		}
 
-		if (msg_fd_in >= 0 && FD_ISSET(msg_fd_in, &r_fds))
+		if (using_r_fds && FD_ISSET(msg_fd_in, &r_fds))
 			read_msg_fd();
 
 		if (!FD_ISSET(fd, &w_fds))
