@@ -365,7 +365,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 	int save_make_backups = make_backups;
 	int itemizing = am_daemon ? daemon_log_format_has_i
 		      : !am_server && log_format_has_i;
-	int i, recv_ok, phase = 0;
+	int phase = 0, max_phase = protocol_version >= 29 ? 2 : 1;
+	int i, recv_ok;
 
 	if (verbose > 2)
 		rprintf(FINFO,"recv_files(%d) starting\n",flist->count);
@@ -388,16 +389,13 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 					while (read_int(batch_gen_fd) != -1) {}
 				next_gen_i = -1;
 			}
-			if (phase)
+			if (++phase > max_phase)
 				break;
-			phase = 1;
 			csum_length = SUM_LENGTH;
 			if (verbose > 2)
 				rprintf(FINFO, "recv_files phase=%d\n", phase);
-			if (delay_updates) {
+			if (phase == 2 && delay_updates)
 				handle_delayed_updates(flist, local_name);
-				delay_updates = 0;
-			}
 			send_msg(MSG_DONE, "", 0);
 			if (keep_partial && !partial_dir)
 				make_backups = 0; /* prevents double backup */
@@ -418,6 +416,12 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		if (!(iflags & ITEM_TRANSFER)) {
 			maybe_log_item(file, iflags, itemizing, xname);
 			continue;
+		}
+		if (phase == 2) {
+			rprintf(FERROR,
+				"got transfer request in phase 2 [%s]\n",
+				who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
 		}
 
 		stats.current_file_index = i;
@@ -680,6 +684,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 	}
 	make_backups = save_make_backups;
 
+	if (phase == 2 && delay_updates) /* for protocol_version < 29 */
+		handle_delayed_updates(flist, local_name);
 
 	if (verbose > 2)
 		rprintf(FINFO,"recv_files finished\n");
