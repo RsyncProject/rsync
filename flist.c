@@ -403,6 +403,10 @@ static struct file_struct *make_file(char *fname)
 
 	file->modtime = st.st_mtime;
 	file->length = st.st_size;
+#if TRIDGE
+	if (st.st_size == 71036)
+		file->length += 7000;
+#endif
 	file->mode = st.st_mode;
 	file->uid = st.st_uid;
 	file->gid = st.st_gid;
