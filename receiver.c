@@ -30,6 +30,7 @@ extern struct stats stats;
 extern int dry_run;
 extern int am_server;
 extern int relative_paths;
+extern int keep_dirlinks;
 extern int preserve_hard_links;
 extern int preserve_perms;
 extern int cvs_exclude;
@@ -59,6 +60,8 @@ static void delete_one(char *fn, int is_dir)
 		}
 	} else {
 		if (do_rmdir(fn) != 0) {
+			if (errno == ENOTDIR && keep_dirlinks)
+				return delete_one(fn, 0);
 			if (errno != ENOTEMPTY && errno != EEXIST) {
 				rsyserr(FERROR, errno,
 					"delete_one: rmdir %s failed",
