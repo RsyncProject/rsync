@@ -215,8 +215,8 @@ static gid_t match_gid(gid_t gid)
 	static gid_t last_in = GID_NONE, last_out = GID_NONE;
 	struct idlist *list;
 
-	if (gid == 0)
-		return 0;
+	if (gid == GID_NONE)
+		return GID_NONE;
 
 	if (gid == last_in)
 		return last_out;
