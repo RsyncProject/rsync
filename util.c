@@ -46,7 +46,7 @@ struct map_struct *map_file(int fd,OFF_T len)
 	ret->p_offset = 0;
 	ret->p_len = 0;
 
-#ifdef HAVE_MMAP
+#ifdef USE_MMAP
 	len = MIN(len, MAX_MAP_SIZE);
 	ret->map = (char *)do_mmap(NULL,len,PROT_READ,MAP_SHARED,fd,0);
 	if (ret->map == (char *)-1) {
@@ -69,7 +69,7 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 	if (len > (map->size-offset))
 		len = map->size-offset;
 
-#ifdef HAVE_MMAP
+#ifdef USE_MMAP
 	if (map->map) {
 		if (offset >= map->p_offset && 
 		    offset+len <= map->p_offset+map->p_len) {
@@ -143,7 +143,7 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 
 void unmap_file(struct map_struct *map)
 {
-#ifdef HAVE_MMAP
+#ifdef USE_MMAP
 	if (map->map) {
 		munmap(map->map,map->p_len);
 		map->map = NULL;

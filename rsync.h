@@ -142,8 +142,9 @@
 #endif
 #include <errno.h>
 
-#ifdef HAVE_MMAP
+#if defined(HAVE_MMAP) && defined(HAVE_MUNMAP)
 #include <sys/mman.h>
+#define USE_MMAP 1
 #endif
 
 #ifdef HAVE_UTIME_H

@@ -149,7 +149,7 @@ OFF_T do_lseek(int fd, OFF_T offset, int whence)
 #endif
 }
 
-#if HAVE_MMAP
+#ifdef USE_MMAP
 void *do_mmap(void *start, int len, int prot, int flags, int fd, OFF_T offset)
 {
 #if HAVE_OFF64_T
