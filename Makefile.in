@@ -91,14 +91,18 @@ proto:
 clean: 
 	rm -f *~ $(OBJS) rsync $(TLS_OBJ) tls
 	rm -rf ./testtmp
-	rm -f config.cache 
 
 # We try to delete built files from both the source and build
 # directories, just in case somebody previously configured things in
 # the source directory.
 distclean: clean
 	rm -f Makefile config.h config.status 
-	rm -f $(srcdir)/Makefile $(srcdir)/config.h $(srcdir)/config.status
+	rm -f $(srcdir)/Makefile $(srcdir)/config.h $(srcdir)/config.status 
+
+	rm -f config.cache config.log
+	rm -f $(srcdir)/config.cache $(srcdir)/config.log
+
+	rm -f shconfig $(srcdir)/shconfig
 
 # this target is really just for my use. It only works on a limited
 # range of machines and is used to produce a list of potentially
