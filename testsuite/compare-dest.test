@@ -1,14 +1,11 @@
 #! /bin/sh
 
-# Copyright (C) 2003 by Wayne Davison <wayned@samba.org>
+# Copyright (C) 2004 by Wayne Davison <wayned@samba.org>
 
 # This program is distributable under the terms of the GNU GPL see
 # COPYING).
 
-# Test rsync handling of exclude/include directives.  
-
-# Test some of the more obscure wildcard handling of exclude/include
-# processing.
+# Test rsync handling of the --compare-dest option.
 
 . "$suitedir/rsync.fns"
 
