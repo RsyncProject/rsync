@@ -28,14 +28,14 @@
 
 extern int verbose;
 
-struct exclude_struct **exclude_list;
-struct exclude_struct **local_exclude_list;
-struct exclude_struct **server_exclude_list;
+struct exclude_list_struct exclude_list;
+struct exclude_list_struct local_exclude_list;
+struct exclude_list_struct server_exclude_list;
 char *exclude_path_prefix = NULL;
 
 /** Build an exclude structure given a exclude pattern */
-static struct exclude_struct *make_exclude(const char *pattern, int pat_len,
-					   int include)
+static void make_exclude(struct exclude_list_struct *listp, const char *pattern,
+			 int pat_len, int include)
 {
 	struct exclude_struct *ret;
 	const char *cp;
@@ -80,32 +80,33 @@ static struct exclude_struct *make_exclude(const char *pattern, int pat_len,
 	for (cp = ret->pattern; (cp = strchr(cp, '/')) != NULL; cp++)
 		ret->slash_cnt++;
 
-	return ret;
+	if (!listp->tail)
+		listp->head = listp->tail = ret;
+	else {
+		listp->tail->next = ret;
+		listp->tail = ret;
+	}
 }
 
 static void free_exclude(struct exclude_struct *ex)
 {
 	free(ex->pattern);
-	memset(ex, 0, sizeof ex[0]);
 	free(ex);
 }
 
-
-void free_exclude_list(struct exclude_struct ***listp)
+void free_exclude_list(struct exclude_list_struct *listp)
 {
-	struct exclude_struct **list = *listp;
+	struct exclude_struct *ent, *next;
 
 	if (verbose > 2)
 		rprintf(FINFO, "[%s] clearing exclude list\n", who_am_i());
 
-	if (!list)
-		return;
+	for (ent = listp->head; ent; ent = next) {
+		next = ent->next;
+		free_exclude(ent);
+	}
 
-	while (*list)
-		free_exclude(*list++);
-
-	free(*listp);
-	*listp = NULL;
+	memset(listp, 0, sizeof listp[0]);
 }
 
 static int check_one_exclude(char *name, struct exclude_struct *ex,
@@ -207,15 +208,15 @@ static void report_exclude_result(char const *name,
 
 
 /*
- * Return true if file NAME is defined to be excluded by either
- * LOCAL_EXCLUDE_LIST or the globals EXCLUDE_LIST.
+ * Return true if file NAME is defined to be excluded by the specified
+ * exclude list.
  */
-int check_exclude(struct exclude_struct **list, char *name, int name_is_dir,
+int check_exclude(struct exclude_list_struct *listp, char *name, int name_is_dir,
 		  const char *type)
 {
 	struct exclude_struct *ent;
 
-	while ((ent = *list++) != NULL) {
+	for (ent = listp->head; ent; ent = ent->next) {
 		if (check_one_exclude(name, ent, name_is_dir)) {
 			report_exclude_result(name, ent, name_is_dir, type);
 			return !ent->include;
@@ -273,67 +274,38 @@ static const char *get_exclude_tok(const char *p, int *len_ptr, int *incl_ptr,
 }
 
 
-void add_exclude(struct exclude_struct ***listp, const char *pattern, int xflags)
+void add_exclude(struct exclude_list_struct *listp, const char *pattern,
+		 int xflags)
 {
-	struct exclude_struct **list = *listp;
-	int pat_len, list_len = 0;
-	int incl, add_cnt = 1;
+	int pat_len, incl;
 	const char *cp;
 
 	if (!pattern)
 		return;
 
-	if (xflags & XFLG_WORD_SPLIT) {
-		int add = 0;
-		/* Count maximum extra tokens we might encounter. */
-		for (cp = pattern; *cp; cp++) {
-			if (isspace(*(unsigned char *)cp)) {
-				add_cnt += add;
-				add = 0;
-			} else
-				add = 1;
-		}
-	}
-
-	cp = get_exclude_tok(pattern, &pat_len, &incl, xflags);
-	if (!pat_len)
-		return;
-
-	/* Check for the special "!" token that clears the list.  Yes, we
-	 * only honor it at the start of a XFLG_WORD_SPLIT string. */
-	if (incl < 0) {
-		free_exclude_list(listp);
-		if (!--add_cnt)
-			return;
+	cp = pattern;
+	pat_len = 0;
+	while (1) {
 		cp = get_exclude_tok(cp + pat_len, &pat_len, &incl, xflags);
 		if (!pat_len)
-			return;
-	}
+			break;
+		/* If we got the special "!" token, clear the list. */
+		if (incl < 0)
+			free_exclude_list(listp);
+		else {
+			make_exclude(listp, cp, pat_len, incl);
 
-	if (list)
-		for ( ; list[list_len]; list_len++) {}
-
-	list = *listp = realloc_array(list, struct exclude_struct *,
-				      list_len + add_cnt + 1);
-	if (!list)
-		out_of_memory("add_exclude");
-
-	while (pat_len) {
-		list[list_len++] = make_exclude(cp, pat_len, incl);
-
-		if (verbose > 2) {
-			rprintf(FINFO, "[%s] add_exclude(%s,%s)\n",
-				who_am_i(), cp,
-				incl ? "include" : "exclude");
+			if (verbose > 2) {
+				rprintf(FINFO, "[%s] add_exclude(%s,%s)\n",
+					who_am_i(), cp,
+					incl ? "include" : "exclude");
+			}
 		}
-		cp = get_exclude_tok(cp + pat_len, &pat_len, &incl, xflags);
 	}
-
-	list[list_len] = NULL;
 }
 
 
-void add_exclude_file(struct exclude_struct ***listp, const char *fname,
+void add_exclude_file(struct exclude_list_struct *listp, const char *fname,
 		      int xflags)
 {
 	FILE *fp;
@@ -374,12 +346,9 @@ void add_exclude_file(struct exclude_struct ***listp, const char *fname,
 				*s++ = ch;
 		}
 		*s = '\0';
-		if (*line && *line != ';' && *line != '#') {
-			/* Skip lines starting with semicolon or pound.
-			 * It probably wouldn't cause any harm to not skip
-			 * them but there's no need to save them. */
+		/* Skip lines starting with semicolon or pound. */
+		if (*line && *line != ';' && *line != '#')
 			add_exclude(listp, line, xflags);
-		}
 		if (ch == EOF)
 			break;
 	}
@@ -389,7 +358,7 @@ void add_exclude_file(struct exclude_struct ***listp, const char *fname,
 
 void send_exclude_list(int f)
 {
-	int i;
+	struct exclude_struct *ent;
 	extern int list_only, recurse;
 
 	/* This is a complete hack - blame Rusty.
@@ -399,24 +368,19 @@ void send_exclude_list(int f)
 	if (list_only && !recurse)
 		add_exclude(&exclude_list, "/*/*", 0);
 
-	if (!exclude_list) {
-		write_int(f, 0);
-		return;
-	}
-
-	for (i = 0; exclude_list[i]; i++) {
+	for (ent = exclude_list.head; ent; ent = ent->next) {
 		unsigned int l;
 		char p[MAXPATHLEN+1];
 
-		l = strlcpy(p, exclude_list[i]->pattern, sizeof p);
+		l = strlcpy(p, ent->pattern, sizeof p);
 		if (l == 0 || l >= MAXPATHLEN)
 			continue;
-		if (exclude_list[i]->directory) {
+		if (ent->directory) {
 			p[l++] = '/';
 			p[l] = '\0';
 		}
 
-		if (exclude_list[i]->include) {
+		if (ent->include) {
 			write_int(f, l + 2);
 			write_buf(f, "+ ", 2);
 		} else if ((*p == '-' || *p == '+') && p[1] == ' ') {
