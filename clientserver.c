@@ -121,6 +121,7 @@ static int rsync_module(int fd, int i)
 	char *request=NULL;
 	extern int am_sender;
 	extern int remote_version;
+	extern int am_root;
 
 	if (!allow_access(addr, host, lp_hosts_allow(i), lp_hosts_deny(i))) {
 		rprintf(FERROR,"rsync denied on module %s from %s (%s)\n",
@@ -203,6 +204,8 @@ static int rsync_module(int fd, int i)
 		io_printf(fd,"@ERROR: setuid failed\n");
 		return -1;
 	}
+
+	am_root = (getuid() == 0);
 
 	io_printf(fd,"@RSYNCD: OK\n");
 

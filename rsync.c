@@ -267,6 +267,7 @@ static int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 {
   int updated = 0;
   STRUCT_STAT st2;
+  extern int am_daemon;
 
   if (dry_run) return 0;
 
@@ -300,8 +301,9 @@ static int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
   }
 #endif
 
-  if ((am_root && preserve_uid && st->st_uid != file->uid) || 
-      (preserve_gid && st->st_gid != file->gid)) {
+  if ((am_root || !am_daemon) &&
+      ((am_root && preserve_uid && st->st_uid != file->uid) || 
+       (preserve_gid && st->st_gid != file->gid))) {
 	  if (do_lchown(fname,
 			(am_root&&preserve_uid)?file->uid:-1,
 			preserve_gid?file->gid:-1) != 0) {
