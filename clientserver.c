@@ -244,10 +244,18 @@ static int rsync_module(int fd, int i)
 	log_init();
 
 	if (use_chroot) {
-		/* TODO: If we're not running as root, then we'll get
-		 * an error here.  I wonder if we should perhaps just
-		 * log a warning here, and continue anyhow using the
-		 * push_dir feature? -- mbp 2001-08-31 */
+		/*
+		 * XXX: The 'use chroot' flag is a fairly reliable
+		 * source of confusion, because it fails under two
+		 * important circumstances: running as non-root,
+		 * running on Win32 (or possibly others).  On the
+		 * other hand, if you are running as root, then it
+		 * might be better to always use chroot.
+		 *
+		 * So, perhaps if we can't chroot we should just issue
+		 * a warning, unless a "require chroot" flag is set,
+		 * in which case we fail.
+		 */
 		if (chroot(lp_path(i))) {
 			rsyserr(FERROR, errno, "chroot %s failed", lp_path(i));
 			io_printf(fd,"@ERROR: chroot failed\n");
