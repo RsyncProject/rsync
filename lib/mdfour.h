@@ -21,11 +21,12 @@
 
 struct mdfour {
 	uint32 A, B, C, D;
-	uint32 totalN;
+	uint32 totalN;          /* bit count, lower 32 bits */
+	uint32 totalN2;         /* bit count, upper 32 bits */
 };
 
 void mdfour_begin(struct mdfour *md);
-void mdfour_update(struct mdfour *md, unsigned char *in, int n);
+void mdfour_update(struct mdfour *md, unsigned char *in, uint32 n);
 void mdfour_result(struct mdfour *md, unsigned char *out);
 void mdfour(unsigned char *out, unsigned char *in, int n);
 

@@ -74,7 +74,13 @@ void get_checksum2(char *buf,int len,char *sum)
 	for(i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK) {
 		mdfour_update(&m, (uchar *)(buf1+i), CSUM_CHUNK);
 	}
-	if (len - i > 0) {
+	/*
+	 * Prior to version 27 an incorrect MD4 checksum was computed
+	 * by failing to call mdfour_tail() for block sizes that
+	 * are multiples of 64.  This is fixed by calling mdfour_update()
+	 * even when there are no more bytes.
+	 */
+	if (len - i > 0 || remote_version >= 27) {
 		mdfour_update(&m, (uchar *)(buf1+i), (len-i));
 	}
 	
@@ -105,8 +111,16 @@ void file_checksum(char *fname,char *sum,OFF_T size)
 		mdfour_update(&m, (uchar *)tmpchunk, CSUM_CHUNK);
 	}
 
+	/*
+	 * Prior to version 27 an incorrect MD4 checksum was computed
+	 * by failing to call mdfour_tail() for block sizes that
+	 * are multiples of 64.  This is fixed by calling mdfour_update()
+	 * even when there are no more bytes.
+	 */
 	if (len - i > 0) {
 		memcpy(tmpchunk, map_ptr(buf,i,len-i), len-i);
+	}
+	if (len - i > 0 || remote_version >= 27) {
 		mdfour_update(&m, (uchar *)tmpchunk, (len-i));
 	}
 
