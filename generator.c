@@ -31,6 +31,7 @@ extern int daemon_log_format_has_i;
 extern int am_root;
 extern int am_server;
 extern int am_daemon;
+extern int recurse;
 extern int relative_paths;
 extern int keep_dirlinks;
 extern int preserve_links;
@@ -41,7 +42,11 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_times;
 extern int omit_dir_times;
+extern int delete_before;
 extern int delete_during;
+extern int delete_after;
+extern int module_id;
+extern int ignore_errors;
 extern int remove_sent_files;
 extern int update_only;
 extern int opt_ignore_existing;
@@ -52,6 +57,7 @@ extern int ignore_times;
 extern int size_only;
 extern OFF_T max_size;
 extern int io_timeout;
+extern int io_error;
 extern int ignore_timeout;
 extern int protocol_version;
 extern int fuzzy_basis;
@@ -68,9 +74,214 @@ extern int only_existing;
 extern int orig_umask;
 extern int safe_symlinks;
 extern long block_size; /* "long" because popt can't set an int32. */
+extern int max_delete;
+extern int force_delete;
+extern int one_file_system;
 extern struct stats stats;
+extern dev_t filesystem_dev;
+extern char *backup_dir;
+extern char *backup_suffix;
+extern int backup_suffix_len;
 
 extern struct filter_list_struct server_filter_list;
+
+static int deletion_count = 0; /* used to implement --max-delete */
+
+
+static int is_backup_file(char *fn)
+{
+	int k = strlen(fn) - backup_suffix_len;
+	return k > 0 && strcmp(fn+k, backup_suffix) == 0;
+}
+
+
+/* Delete a file or directory.  If DEL_FORCE_RECURSE is set in the flags, or if
+ * force_delete is set, this will delete recursively as long as DEL_NO_RECURSE
+ * is not set in the flags. */
+static int delete_item(char *fname, int mode, int flags)
+{
+	struct file_list *dirlist;
+	char buf[MAXPATHLEN];
+	int j, dlen, zap_dir, ok;
+	void *save_filters;
+
+	if (max_delete && deletion_count >= max_delete)
+		return -1;
+
+	if (!S_ISDIR(mode)) {
+		if (make_backups && (backup_dir || !is_backup_file(fname)))
+			ok = make_backup(fname);
+		else
+			ok = robust_unlink(fname) == 0;
+		if (ok) {
+			if (!(flags & DEL_TERSE))
+				log_delete(fname, mode);
+			deletion_count++;
+			return 0;
+		}
+		if (errno == ENOENT)
+			return 0;
+		rsyserr(FERROR, errno, "delete_file: unlink %s failed",
+			full_fname(fname));
+		return -1;
+	}
+
+	zap_dir = (flags & DEL_FORCE_RECURSE || (force_delete && recurse))
+		&& !(flags & DEL_NO_RECURSE);
+	if (dry_run && zap_dir) {
+		ok = 0;
+		errno = ENOTEMPTY;
+	} else if (make_backups && !backup_dir && !is_backup_file(fname)
+	    && !(flags & DEL_FORCE_RECURSE))
+		ok = make_backup(fname);
+	else
+		ok = do_rmdir(fname) == 0;
+	if (ok) {
+		if (!(flags & DEL_TERSE))
+			log_delete(fname, mode);
+		deletion_count++;
+		return 0;
+	}
+	if (errno == ENOENT)
+		return 0;
+	if (!zap_dir || (errno != ENOTEMPTY && errno != EEXIST)) {
+		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
+			full_fname(fname));
+		return -1;
+	}
+	flags |= DEL_FORCE_RECURSE;
+
+	dlen = strlcpy(buf, fname, MAXPATHLEN);
+	save_filters = push_local_filters(buf, dlen);
+
+	dirlist = get_dirlist(buf, dlen, 0);
+	for (j = dirlist->count; j--; ) {
+		struct file_struct *fp = dirlist->files[j];
+
+		if (fp->flags & FLAG_MOUNT_POINT)
+			continue;
+
+		f_name_to(fp, buf);
+		if (delete_item(buf, fp->mode, flags & ~DEL_TERSE) != 0) {
+			flist_free(dirlist);
+			return -1;
+		}
+	}
+	flist_free(dirlist);
+
+	pop_local_filters(save_filters);
+
+	if (max_delete && deletion_count >= max_delete)
+		return -1;
+
+	if (do_rmdir(fname) == 0) {
+		if (!(flags & DEL_TERSE))
+			log_delete(fname, mode);
+		deletion_count++;
+	} else if (errno != ENOTEMPTY && errno != ENOENT) {
+		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
+			full_fname(fname));
+		return -1;
+	}
+
+	return 0;
+}
+
+
+/* This function is used to implement per-directory deletion, and is used by
+ * all the --delete-WHEN options.  Note that the fbuf pointer must point to a
+ * MAXPATHLEN buffer with the name of the directory in it (the functions we
+ * call will append names onto the end, but the old dir value will be restored
+ * on exit). */
+static void delete_in_dir(struct file_list *flist, char *fbuf,
+			  struct file_struct *file, int allowed_lull)
+{
+	static int min_depth = MAXPATHLEN, cur_depth = -1;
+	static void *filt_array[MAXPATHLEN/2+1];
+	struct file_list *dirlist;
+	char delbuf[MAXPATHLEN];
+	STRUCT_STAT st;
+	int dlen, i;
+
+	if (!flist) {
+		while (cur_depth >= min_depth)
+			pop_local_filters(filt_array[cur_depth--]);
+		min_depth = MAXPATHLEN;
+		cur_depth = -1;
+		return;
+	}
+
+	if (verbose > 2)
+		rprintf(FINFO, "delete_in_dir(%s)\n", safe_fname(fbuf));
+
+	if (allowed_lull)
+		maybe_send_keepalive(allowed_lull, flist->count);
+
+	if (file->dir.depth >= MAXPATHLEN/2+1)
+		return; /* Impossible... */
+
+	if (max_delete && deletion_count >= max_delete)
+		return;
+
+	if (io_error && !(lp_ignore_errors(module_id) || ignore_errors)) {
+		rprintf(FINFO,
+			"IO error encountered -- skipping file deletion\n");
+		max_delete = -1; /* avoid duplicating the above warning */
+		return;
+	}
+
+	while (cur_depth >= file->dir.depth && cur_depth >= min_depth)
+		pop_local_filters(filt_array[cur_depth--]);
+	cur_depth = file->dir.depth;
+	if (min_depth > cur_depth)
+		min_depth = cur_depth;
+	dlen = strlen(fbuf);
+	filt_array[cur_depth] = push_local_filters(fbuf, dlen);
+
+	if (link_stat(fbuf, &st, keep_dirlinks) < 0)
+		return;
+
+	if (one_file_system && file->flags & FLAG_TOP_DIR)
+		filesystem_dev = st.st_dev;
+
+	dirlist = get_dirlist(fbuf, dlen, 0);
+
+	/* If an item in dirlist is not found in flist, delete it
+	 * from the filesystem. */
+	for (i = dirlist->count; i--; ) {
+		if (!dirlist->files[i]->basename)
+			continue;
+		if (flist_find(flist, dirlist->files[i]) < 0) {
+			f_name_to(dirlist->files[i], delbuf);
+			int mode = dirlist->files[i]->mode;
+			if (delete_item(delbuf, mode, DEL_FORCE_RECURSE) < 0)
+				break;
+		}
+	}
+
+	flist_free(dirlist);
+}
+
+/* This deletes any files on the receiving side that are not present on the
+ * sending side.  This is used by --delete-before and --delete-after. */
+static void do_delete_pass(struct file_list *flist, int allowed_lull)
+{
+	char fbuf[MAXPATHLEN];
+	int j;
+
+	for (j = 0; j < flist->count; j++) {
+		struct file_struct *file = flist->files[j];
+
+		if (!(file->flags & FLAG_DEL_HERE))
+			continue;
+
+		f_name_to(file, fbuf);
+		if (verbose > 1 && file->flags & FLAG_TOP_DIR)
+			rprintf(FINFO, "deleting in %s\n", safe_fname(fbuf));
+
+		delete_in_dir(flist, fbuf, file, allowed_lull);
+	}
+}
 
 static int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
 {
@@ -347,7 +558,7 @@ static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
 static void recv_generator(char *fname, struct file_list *flist,
 			   struct file_struct *file, int ndx,
 			   int itemizing, int maybe_PERMS_REPORT,
-			   enum logcode code,
+			   enum logcode code, int allowed_lull,
 			   int f_out, int f_out_name)
 {
 	static int missing_below = -1, excluded_below = -1;
@@ -419,7 +630,8 @@ static void recv_generator(char *fname, struct file_list *flist,
 				if (fuzzy_dirlist)
 					flist_free(fuzzy_dirlist);
 				fuzzy_dirname = dn;
-				fuzzy_dirlist = get_dirlist(fuzzy_dirname, 1);
+				fuzzy_dirlist = get_dirlist(fuzzy_dirname, -1,
+							    1);
 			}
 		}
 
@@ -453,7 +665,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 		 * we need to delete it.  If it doesn't exist, then
 		 * (perhaps recursively) create it. */
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
-			delete_file(fname, st.st_mode, DEL_TERSE);
+			delete_item(fname, st.st_mode, DEL_TERSE);
 			statret = -1;
 		}
 		if (dry_run && statret != 0 && missing_below < 0) {
@@ -476,7 +688,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 			rprintf(code, "%s/\n", safe_fname(fname));
 		if (delete_during && f_out != -1 && csum_length != SUM_LENGTH
 		    && (file->flags & FLAG_DEL_HERE))
-			delete_in_dir(flist, fname, file);
+			delete_in_dir(flist, fname, file, allowed_lull);
 		return;
 	}
 
@@ -522,9 +734,9 @@ static void recv_generator(char *fname, struct file_list *flist,
 			/* Not the right symlink (or not a symlink), so
 			 * delete it. */
 			if (S_ISLNK(st.st_mode))
-				delete_file(fname, st.st_mode, DEL_TERSE);
+				delete_item(fname, st.st_mode, DEL_TERSE);
 			else {
-				delete_file(fname, st.st_mode, DEL_TERSE);
+				delete_item(fname, st.st_mode, DEL_TERSE);
 				statret = -1;
 			}
 		}
@@ -555,12 +767,9 @@ static void recv_generator(char *fname, struct file_list *flist,
 		if (statret != 0 ||
 		    st.st_mode != file->mode ||
 		    st.st_rdev != file->u.rdev) {
-			if (IS_DEVICE(st.st_mode))
-				delete_file(fname, st.st_mode, DEL_TERSE);
-			else {
-				delete_file(fname, st.st_mode, DEL_TERSE);
+			delete_item(fname, st.st_mode, DEL_TERSE);
+			if (!IS_DEVICE(st.st_mode))
 				statret = -1;
-			}
 			if (verbose > 2) {
 				rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",
 					safe_fname(fname),
@@ -658,7 +867,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 	}
 
 	if (statret == 0 && !S_ISREG(st.st_mode)) {
-		if (delete_file(fname, st.st_mode, DEL_TERSE) != 0)
+		if (delete_item(fname, st.st_mode, DEL_TERSE) != 0)
 			return;
 		statret = -1;
 		stat_errno = ENOENT;
@@ -891,6 +1100,9 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 			(long)getpid(), flist->count);
 	}
 
+	if (delete_before && !local_name && flist->count > 0)
+		do_delete_pass(flist, allowed_lull);
+
 	if (verbose >= 2) {
 		rprintf(FINFO, "delta-transmission %s\n",
 			whole_file > 0
@@ -920,14 +1132,14 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 
 		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
 			       flist, file, i, itemizing, maybe_PERMS_REPORT,
-			       code, f_out, f_out_name);
+			       code, allowed_lull, f_out, f_out_name);
 
 		if (allowed_lull && !(i % 100))
 			maybe_send_keepalive(allowed_lull, flist->count);
 	}
-	recv_generator(NULL, NULL, NULL, 0, 0, 0, code, -1, -1);
+	recv_generator(NULL, NULL, NULL, 0, 0, 0, code, 0, -1, -1);
 	if (delete_during)
-		delete_in_dir(NULL, NULL, NULL);
+		delete_in_dir(NULL, NULL, NULL, 0);
 
 	phase++;
 	csum_length = SUM_LENGTH;
@@ -950,7 +1162,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 		struct file_struct *file = flist->files[i];
 		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
 			       flist, file, i, itemizing, maybe_PERMS_REPORT,
-			       code, f_out, f_out_name);
+			       code, allowed_lull, f_out, f_out_name);
 		if (allowed_lull)
 			maybe_send_keepalive(allowed_lull, flist->count);
 	}
@@ -970,6 +1182,9 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	if (preserve_hard_links)
 		do_hard_links();
 
+	if (delete_after && !local_name && flist->count > 0)
+		do_delete_pass(flist, allowed_lull);
+
 	if ((need_retouch_dir_perms || need_retouch_dir_times)
 	    && !list_only && !local_name && !dry_run) {
 		/* Now we need to fix any directory permissions that were
@@ -983,10 +1198,11 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 				continue;
 			recv_generator(local_name ? local_name : f_name(file),
 				       flist, file, i, itemizing,
-				       maybe_PERMS_REPORT, code, -1, -1);
+				       maybe_PERMS_REPORT, code, allowed_lull,
+				       -1, -1);
 		}
 	}
-	recv_generator(NULL, NULL, NULL, 0, 0, 0, code, -1, -1);
+	recv_generator(NULL, NULL, NULL, 0, 0, 0, code, 0, -1, -1);
 
 	if (verbose > 2)
 		rprintf(FINFO,"generate_files finished\n");
