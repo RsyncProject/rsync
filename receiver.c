@@ -119,7 +119,7 @@ void delete_files(struct file_list *flist)
 {
 	struct file_list *local_file_list;
 	int i, j;
-	char *name;
+	char *name, fbuf[MAXPATHLEN];
 	extern int module_id;
 	extern int ignore_errors;
 	extern int max_delete;
@@ -133,24 +133,22 @@ void delete_files(struct file_list *flist)
 		return;
 	}
 
-	for (j=0;j<flist->count;j++) {
+	for (j = 0;j < flist->count; j++) {
 		if (!S_ISDIR(flist->files[j]->mode) ||
 		    !(flist->files[j]->flags & FLAG_DELETE)) continue;
 
 		if (protocol_version < 19 &&
 		    delete_already_done(flist, j)) continue;
 
-		name = strdup(f_name(flist->files[j]));
+		name = f_name_to(flist->files[j], fbuf, sizeof fbuf);
 
-		if (!(local_file_list = send_file_list(-1,1,&name))) {
-			free(name);
+		if (!(local_file_list = send_file_list(-1,1,&name)))
 			continue;
-		}
 
 		if (verbose > 1)
 			rprintf(FINFO,"deleting in %s\n", name);
 
-		for (i=local_file_list->count-1;i>=0;i--) {
+		for (i = local_file_list->count-1; i >= 0; i--) {
 			if (max_delete && deletion_count > max_delete) break;
 			if (!local_file_list->files[i]->basename) continue;
 			if (protocol_version < 19 &&
@@ -170,7 +168,6 @@ void delete_files(struct file_list *flist)
 			}
 		}
 		flist_free(local_file_list);
-		free(name);
 	}
 }
 
@@ -216,9 +213,8 @@ static int get_tmpname(char *fnametmp, char *fname)
 			/* copy up to and including the slash */
 			strlcpy(fnametmp, fname, length + 1);
 		}
-	} else {
+	} else
 		f = fname;
-	}
 	fnametmp[length++] = '.';
 	fnametmp[length] = '\0';		/* always NULL terminated */
 
@@ -237,7 +233,7 @@ static int get_tmpname(char *fnametmp, char *fname)
 }
 
 
-static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
+static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
 			OFF_T total_size)
 {
 	int i;
@@ -292,8 +288,8 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 			rprintf(FINFO,"chunk[%d] of size %d at %.0f offset=%.0f\n",
 				i,len,(double)offset2,(double)offset);
 
-		if (buf) {
-			map = map_ptr(buf,offset2,len);
+		if (mapbuf) {
+			map = map_ptr(mapbuf,offset2,len);
 
 			see_token(map, len);
 			sum_update(map,len);
@@ -337,12 +333,12 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 {
 	int fd1,fd2;
 	STRUCT_STAT st;
-	char *fname;
+	char *fname, fbuf[MAXPATHLEN];
 	char template[MAXPATHLEN];
 	char fnametmp[MAXPATHLEN];
 	char *fnamecmp;
 	char fnamecmpbuf[MAXPATHLEN];
-	struct map_struct *buf;
+	struct map_struct *mapbuf;
 	int i;
 	struct file_struct *file;
 	int phase=0;
@@ -380,13 +376,14 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		}
 
 		file = flist->files[i];
-		fname = f_name(file);
 
 		stats.num_transferred_files++;
 		stats.total_transferred_size += file->length;
 
 		if (local_name)
 			fname = local_name;
+		else
+			fname = f_name_to(file, fbuf, sizeof fbuf);
 
 		if (dry_run) {
 			if (!am_server && verbose) {	/* log transfer */
@@ -437,7 +434,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		if (fd1 != -1 && !S_ISREG(st.st_mode)) {
 			close(fd1);
 			fd1 = -1;
-			buf = NULL;
+			mapbuf = NULL;
 		}
 
 		if (fd1 != -1 && !preserve_perms) {
@@ -448,15 +445,14 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		}
 
 		if (fd1 != -1 && st.st_size > 0) {
-			buf = map_file(fd1,st.st_size);
+			mapbuf = map_file(fd1,st.st_size);
 			if (verbose > 2)
 				rprintf(FINFO,"recv mapped %s of size %.0f\n",fnamecmp,(double)st.st_size);
-		} else {
-			buf = NULL;
-		}
+		} else
+			mapbuf = NULL;
 
 		if (!get_tmpname(fnametmp,fname)) {
-			if (buf) unmap_file(buf);
+			if (mapbuf) unmap_file(mapbuf);
 			if (fd1 != -1) close(fd1);
 			continue;
 		}
@@ -482,24 +478,24 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		if (fd2 == -1) {
 			rprintf(FERROR, "mkstemp %s failed: %s\n",
 				full_fname(fnametmp), strerror(errno));
-			receive_data(f_in,buf,-1,NULL,file->length);
-			if (buf) unmap_file(buf);
+			receive_data(f_in,mapbuf,-1,NULL,file->length);
+			if (mapbuf) unmap_file(mapbuf);
 			if (fd1 != -1) close(fd1);
 			continue;
 		}
 
-		cleanup_set(fnametmp, fname, file, buf, fd1, fd2);
+		cleanup_set(fnametmp, fname, file, mapbuf, fd1, fd2);
 
 		if (!am_server && verbose) {	/* log transfer */
 			rprintf(FINFO, "%s\n", fname);
 		}
 
 		/* recv file data */
-		recv_ok = receive_data(f_in,buf,fd2,fname,file->length);
+		recv_ok = receive_data(f_in,mapbuf,fd2,fname,file->length);
 
 		log_recv(file, &initial_stats);
 
-		if (buf) unmap_file(buf);
+		if (mapbuf) unmap_file(mapbuf);
 		if (fd1 != -1) {
 			close(fd1);
 		}
@@ -538,7 +534,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	for (i = 0; i < flist->count; i++) {
 		file = flist->files[i];
 		if (!file->basename || !S_ISDIR(file->mode)) continue;
-		recv_generator(local_name?local_name:f_name(file),flist,i,-1);
+		recv_generator(local_name? local_name
+			     : f_name_to(file,fbuf,sizeof fbuf), flist, i, -1);
 	}
 
 	if (verbose > 2)
@@ -546,4 +543,3 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 	return 0;
 }
-
