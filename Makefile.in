@@ -160,7 +160,7 @@ check: all $(CHECK_PROGS)
 	POSIXLY_CORRECT=1 TOOLDIR=`pwd` rsync_bin=`pwd`/rsync$(EXEEXT) srcdir="$(srcdir)" $(srcdir)/runtests.sh
 
 wildtest$(EXEEXT): wildtest.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ wildtest.o $(LIBS)
 
 # This does *not* depend on building or installing: you can use it to
 # check a version installed from a binary or some other source tree,
