@@ -688,6 +688,8 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	if (am_sender) {
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
 		io_start_buffering_out();
+		if (!remote_filesfrom_file)
+			set_msg_fd_in(f_in);
 		if (cvs_exclude)
 			add_cvs_excludes();
 		if (delete_mode && !delete_excluded)
@@ -699,6 +701,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			start_write_batch(f_out);
 		if (!read_batch) /* don't write to pipe */
 			flist = send_file_list(f_out,argc,argv);
+		set_msg_fd_in(-1);
 		if (verbose > 3)
 			rprintf(FINFO,"file list sent\n");
 
