@@ -28,9 +28,9 @@ Changes since 2.6.0:
       if the referant file is on a different filesystem.
 
     * The --link-dest code now works properly for a non-root user
-      when the UIDs of the source and destination differ and -o was
-      specified, and when the group of the source can't be used on
-      the destination and -g was specified.
+      when (1) the UIDs of the source and destination differ and -o
+      was specified, or (2) when the group of the source can't be
+      used on the destination and -g was specified.
 
     * Fixed a bug in the handling of -H (hard-links) that might
       cause the expanded PATH/NAME value of the current item to
