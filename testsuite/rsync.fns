@@ -196,6 +196,7 @@ pid file = $pidfile
 use chroot = no
 hosts allow = localhost, 127.0.0.1
 log file = $logfile
+max verbosity = 9
 
 uid = 0
 gid = 0
