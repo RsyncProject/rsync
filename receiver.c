@@ -254,10 +254,12 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 			rprintf(FINFO,"chunk[%d] of size %d at %.0f offset=%.0f\n",
 				i,len,(double)offset2,(double)offset);
 		
-		map = map_ptr(buf,offset2,len);
+		if (buf) {
+			map = map_ptr(buf,offset2,len);
 		
-		see_token(map, len);
-		sum_update(map,len);
+			see_token(map, len);
+			sum_update(map,len);
+		}
 		
 		if (fd != -1 && write_file(fd,map,len) != len) {
 			rprintf(FERROR,"write failed on %s : %s\n",
