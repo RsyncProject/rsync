@@ -162,6 +162,14 @@ if test x"$ac_cv_func_connect" = x"no"; then
     fi
 fi
 
+# 
+# if we can't find strcasecmp, look in -lresolv (for Unixware at least)
+#
+AC_CHECK_FUNCS(strcasecmp)
+if test x"$ac_cv_func_strcasecmp" = x"no"; then
+    AC_CHECK_LIB(resolv, strcasecmp)
+fi
+
 #
 # The following test was mostly taken from the tcl/tk plus patches
 #
