@@ -216,17 +216,6 @@ Here is a short summary of the options available in rsync. Please refer
 to the detailed description below for a complete description.
 
 verb(
-Usage: rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST
-  or   rsync [OPTION]... [USER@]HOST:SRC DEST
-  or   rsync [OPTION]... SRC [SRC]... DEST
-  or   rsync [OPTION]... [USER@]HOST::SRC [DEST]
-  or   rsync [OPTION]... SRC [SRC]... [USER@]HOST::DEST
-  or   rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC [DEST]
-SRC on single-colon remote HOST will be expanded by remote shell
-SRC on server remote HOST may contain shell wildcards or multiple
-  sources separated by space as long as they have same top-level
-
-Options
  -v, --verbose               increase verbosity
  -q, --quiet                 decrease verbosity
  -c, --checksum              always checksum
@@ -254,8 +243,10 @@ Options
  -e, --rsh=COMMAND           specify rsh replacement
      --rsync-path=PATH       specify path to rsync on the remote machine
  -C, --cvs-exclude           auto ignore files in the same way CVS does
+     --existing              only update files that already exist
      --delete                delete files that don't exist on the sending side
      --delete-excluded       also delete excluded files on the receiving side
+     --delete-after          delete after transferring, not before
      --partial               keep partially transferred files
      --force                 force deletion of directories even if not empty
      --numeric-ids           don't map uid/gid values by user/group name
@@ -432,6 +423,9 @@ correctly and ends up corrupting the files.
 dit(bf(-x, --one-file-system)) This tells rsync not to cross filesystem
 boundaries  when recursing.  This  is useful for transferring the
 contents of only one filesystem.
+
+dit(bf(--existing)) This tells rsync not to create any new files -
+only update files that already exist on the destination.
 
 dit(bf(--delete)) This tells rsync to delete any files on the receiving
 side that aren't on the sending side.   Files that are excluded from

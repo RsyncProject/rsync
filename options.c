@@ -63,6 +63,7 @@ int copy_unsafe_links=0;
 int block_size=BLOCK_SIZE;
 int size_only=0;
 int delete_after=0;
+int only_existing=0;
 
 char *backup_suffix = BACKUP_SUFFIX;
 char *tmpdir = NULL;
@@ -125,6 +126,7 @@ void usage(int F)
   rprintf(F," -e, --rsh=COMMAND           specify rsh replacement\n");
   rprintf(F,"     --rsync-path=PATH       specify path to rsync on the remote machine\n");
   rprintf(F," -C, --cvs-exclude           auto ignore files in the same way CVS does\n");
+  rprintf(F,"     --existing              only update files that already exist\n");
   rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
   rprintf(F,"     --delete-excluded       also delete excluded files on the receiving side\n");
   rprintf(F,"     --delete-after          delete after transferring, not before\n");
@@ -165,7 +167,7 @@ enum {OPT_VERSION, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS,
       OPT_COPY_UNSAFE_LINKS, OPT_SAFE_LINKS, OPT_COMPARE_DEST,
       OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY, OPT_ADDRESS,
-      OPT_DELETE_AFTER};
+      OPT_DELETE_AFTER, OPT_EXISTING};
 
 static char *short_options = "oblLWHpguDCtcahvqrRIxnSe:B:T:zP";
 
@@ -173,6 +175,7 @@ static struct option long_options[] = {
   {"version",     0,     0,    OPT_VERSION},
   {"server",      0,     0,    OPT_SERVER},
   {"sender",      0,     0,    OPT_SENDER},
+  {"existing",    0,     0,    OPT_EXISTING},
   {"delete",      0,     0,    OPT_DELETE},
   {"delete-excluded", 0, 0,    OPT_DELETE_EXCLUDED},
   {"force",       0,     0,    OPT_FORCE},
@@ -318,6 +321,10 @@ int parse_arguments(int argc, char *argv[], int frommain)
 
 		case OPT_DELETE:
 			delete_mode = 1;
+			break;
+
+		case OPT_EXISTING:
+			only_existing = 1;
 			break;
 
 		case OPT_DELETE_AFTER:
@@ -651,6 +658,9 @@ void server_options(char **args,int *argc)
 
 	if (numeric_ids)
 		args[ac++] = "--numeric-ids";
+
+	if (only_existing)
+		args[ac++] = "--existing";
 
 	if (tmpdir) {
 		args[ac++] = "--temp-dir";
