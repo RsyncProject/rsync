@@ -638,16 +638,7 @@ int main(int argc,char *argv[])
       verbose = MAX(verbose,1);
 
     if (am_server) {
-      remote_version = read_int(STDIN_FILENO);
-      if (remote_version < MIN_PROTOCOL_VERSION ||
-	  remote_version > MAX_PROTOCOL_VERSION) {
-	fprintf(FERROR,"protocol version mismatch - is your shell clean?\n");
-	exit_cleanup(1);
-      }
-      write_int(STDOUT_FILENO,PROTOCOL_VERSION);
-      write_flush(STDOUT_FILENO);
-
-      setup_protocol();
+      setup_protocol(STDOUT_FILENO,STDIN_FILENO);
 	
       if (sender) {
 	recv_exclude_list(STDIN_FILENO);
@@ -717,18 +708,7 @@ int main(int argc,char *argv[])
 
     pid = do_cmd(shell_cmd,shell_machine,shell_user,shell_path,&f_in,&f_out);
 
-    write_int(f_out,PROTOCOL_VERSION);
-    write_flush(f_out);
-    {
-      remote_version = read_int(f_in);
-      if (remote_version < MIN_PROTOCOL_VERSION ||
-	  remote_version > MAX_PROTOCOL_VERSION) {
-	fprintf(FERROR,"protocol version mismatch - is your shell clean?\n");
-	exit_cleanup(1);
-      }	
-    }
-
-    setup_protocol();
+    setup_protocol(f_out,f_in);
 
     if (verbose > 3) 
       fprintf(FERROR,"parent=%d child=%d sender=%d recurse=%d\n",

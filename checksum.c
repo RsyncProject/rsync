@@ -23,8 +23,7 @@ int csum_length=SUM_LENGTH;
 
 #define CSUM_CHUNK 64
 
-static char *tmpchunk = NULL;
-
+int checksum_seed = 0;
 
 /*
   a simple 32 bit checksum that can be upadted from either end
@@ -63,16 +62,28 @@ void get_checksum2(char *buf,int len,char *sum)
 {
   int i;
   MDstruct MD;
+  static char *buf1 = NULL;
+  static int len1 = 0;
+
+  if (len > len1) {
+    if (buf1) free(buf1);
+    buf1 = (char *)malloc(len+sizeof(checksum_seed));
+    len1 = len;
+    if (!buf1) out_of_memory("get_checksum2");
+  }
 
   MDbegin(&MD);
 
-  for(i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK) {
-    bcopy(buf+i,tmpchunk,CSUM_CHUNK);
-    MDupdate(&MD, tmpchunk, CSUM_CHUNK*8);
+  bcopy(buf,buf1,len);
+  if (checksum_seed) {
+    bcopy((char *)&checksum_seed,buf1+len,sizeof(checksum_seed));
+    len += sizeof(checksum_seed);
   }
 
-  bcopy(buf+i,tmpchunk,len-i);
-  MDupdate(&MD, tmpchunk, (len-i)*8);
+  for(i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK) {
+    MDupdate(&MD, buf1+i, CSUM_CHUNK*8);
+  }
+  MDupdate(&MD, buf1+i, (len-i)*8);
 
   sum_put(&MD,sum);
 }
@@ -85,6 +96,7 @@ void file_checksum(char *fname,char *sum,off_t size)
   char *buf;
   int fd;
   int len = size;
+  char tmpchunk[CSUM_CHUNK];
 
   bzero(sum,csum_length);
 
@@ -112,8 +124,6 @@ void file_checksum(char *fname,char *sum,off_t size)
 
 void checksum_init(void)
 {
-  tmpchunk = (char *)malloc(CSUM_CHUNK);
-  if (!tmpchunk) out_of_memory("checksum_init");
 }
 
 
