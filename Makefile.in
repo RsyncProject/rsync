@@ -46,7 +46,7 @@ install: all
 	${INSTALLCMD} -m 644 $(srcdir)/rsyncd.conf.5 ${INSTALL_MAN}/man5
 
 rsync: $(OBJS)
-	$(CC) $(CFLAGS) -o rsync $(OBJS) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o rsync $(OBJS) $(LIBS)
 
 rsync.1: rsync.yo
 	yodl2man -o rsync.1 rsync.yo
