@@ -64,7 +64,9 @@ extern int sanitize_paths;
 extern int read_batch;
 extern int write_batch;
 
-static struct exclude_struct **local_exclude_list;
+extern struct exclude_struct **exclude_list;
+extern struct exclude_struct **server_exclude_list;
+extern struct exclude_struct **local_exclude_list;
 
 static struct file_struct null_file;
 
@@ -250,20 +252,30 @@ int link_stat(const char *path, STRUCT_STAT * buffer)
 }
 
 /*
-  This function is used to check if a file should be included/excluded
-  from the list of files based on its name and type etc
+ * This function is used to check if a file should be included/excluded
+ * from the list of files based on its name and type etc.  The value of
+ * exclude_level is set to either SERVER_EXCLUDES or ALL_EXCLUDES.
  */
-static int check_exclude_file(int f, char *fname, STRUCT_STAT * st)
+static int check_exclude_file(char *fname, int is_dir, int exclude_level)
 {
-	extern int delete_excluded;
-
-	/* f is set to -1 when calculating deletion file list */
-	if ((f == -1) && delete_excluded) {
+#if 0 // This currently never happens, so avoid a useless compare.
+	if (exclude_level == NO_EXCLUDES)
+		return 0;
+#endif
+	if (fname && fname[0] == '.' && !fname[1]) {
+		/* never exclude '.', even if somebody does --exclude '*' */
 		return 0;
 	}
-	if (check_exclude(fname, local_exclude_list, st)) {
+	if (server_exclude_list &&
+	    check_exclude(server_exclude_list, fname, is_dir))
 		return 1;
-	}
+	if (exclude_level != ALL_EXCLUDES)
+		return 0;
+	if (exclude_list && check_exclude(exclude_list, fname, is_dir))
+		return 1;
+	if (local_exclude_list &&
+	    check_exclude(local_exclude_list, fname, is_dir))
+		return 1;
 	return 0;
 }
 
@@ -641,8 +653,8 @@ static int skip_filesystem(char *fname, STRUCT_STAT * st)
  * statting directories if we're not recursing, but this is not a very
  * important case.  Some systems may not have d_type.
  **/
-struct file_struct *make_file(int f, char *fname, struct string_area **ap,
-			      int noexcludes)
+struct file_struct *make_file(char *fname, struct string_area **ap,
+			      int exclude_level)
 {
 	struct file_struct *file;
 	STRUCT_STAT st;
@@ -664,12 +676,11 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 
 	if (readlink_stat(fname, &st, linkbuf) != 0) {
 		int save_errno = errno;
-		if ((errno == ENOENT) && !noexcludes) {
+		if (errno == ENOENT && exclude_level != NO_EXCLUDES) {
 			/* either symlink pointing nowhere or file that
 			 * was removed during rsync run; see if excluded
 			 * before reporting an error */
-			memset((char *) &st, 0, sizeof(st));
-			if (check_exclude_file(f, fname, &st)) {
+			if (check_exclude_file(fname, 0, exclude_level)) {
 				/* file is excluded anyway, ignore silently */
 				return NULL;
 			}
@@ -680,8 +691,8 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 		return NULL;
 	}
 
-	/* we use noexcludes from backup.c */
-	if (noexcludes)
+	/* backup.c calls us with exclude_level set to NO_EXCLUDES. */
+	if (exclude_level == NO_EXCLUDES)
 		goto skip_excludes;
 
 	if (S_ISDIR(st.st_mode) && !recurse && !files_from) {
@@ -694,9 +705,8 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 			return NULL;
 	}
 
-	if (check_exclude_file(f, fname, &st))
+	if (check_exclude_file(fname, S_ISDIR(st.st_mode) != 0, exclude_level))
 		return NULL;
-
 
 	if (lp_ignore_nonreadable(module_id) && access(fname, R_OK) != 0)
 		return NULL;
@@ -704,7 +714,7 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
       skip_excludes:
 
 	if (verbose > 2)
-		rprintf(FINFO, "make_file(%d,%s)\n", f, fname);
+		rprintf(FINFO, "make_file(%s,*,%d)\n", fname, exclude_level);
 
 	file = (struct file_struct *) malloc(sizeof(*file));
 	if (!file)
@@ -782,8 +792,12 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 		    int recursive, unsigned base_flags)
 {
 	struct file_struct *file;
+	extern int delete_excluded;
 
-	file = make_file(f, fname, &flist->string_area, 0);
+	/* f is set to -1 when calculating deletion file list */
+	file = make_file(fname, &flist->string_area,
+			 f == -1 && delete_excluded? SERVER_EXCLUDES
+						   : ALL_EXCLUDES);
 
 	if (!file)
 		return;
@@ -847,8 +861,7 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 	if (cvs_exclude) {
 		if (strlen(fname) + strlen(".cvsignore") <= MAXPATHLEN - 1) {
 			strcpy(p, ".cvsignore");
-			local_exclude_list =
-			    make_exclude_list(fname, NULL, 0, 0);
+			add_exclude_file(&exclude_list,fname,MISSING_OK,ADD_EXCLUDE);
 		} else {
 			io_error = 1;
 			rprintf(FINFO,
@@ -866,18 +879,18 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 		send_file_name(f, flist, fname, recurse, 0);
 	}
 
-	if (local_exclude_list) {
-		add_exclude_list("!", &local_exclude_list, 0);
-	}
+	if (local_exclude_list)
+		free_exclude_list(&local_exclude_list); /* Zeros pointer too */
 
 	closedir(d);
 }
 
 
 /**
- *
- * I <b>think</b> f==-1 means that the list should just be built in
- * memory and not transmitted.  But who can tell? -- mbp
+ * The delete_files() function in receiver.c sets f to -1 so that we just
+ * construct the file list in memory without sending it over the wire.  It
+ * also has the side-effect of ignoring user-excludes if delete_excluded
+ * is set (so that the delete list includes user-excluded files).
  **/
 struct file_list *send_file_list(int f, int argc, char *argv[])
 {
