@@ -1,10 +1,10 @@
 Summary: Program for efficient remote updates of files.
 Name: rsync
-Version: 2.3.0
+Version: 2.3.1
 Release: 1
 Copyright: GPL
 Group: Applications/Networking
-Source:	ftp://samba.anu.edu.au/pub/rsync/rsync-2.3.0.tar.gz
+Source:	ftp://samba.anu.edu.au/pub/rsync/rsync-2.3.1.tar.gz
 URL: http://samba.anu.edu.au/rsync/
 Packager: Andrew Tridgell <tridge@samba.anu.edu.au>
 BuildRoot: /tmp/rsync
@@ -21,6 +21,8 @@ A technical report describing the rsync algorithm is included with
 this package. 
 
 %changelog
+* Mon Jan 25 1999 Stefan Hornburg <racke@linuxia.de>
+  quoted RPM_OPT_FLAGS for the sake of robustness  
 * Mon May 18 1998 Andrew Tridgell <tridge@samba.anu.edu.au>
   reworked for auto-building when I release rsync (tridge@samba.anu.edu.au)
 
@@ -58,7 +60,7 @@ previous package(s).)
 
 %build
 ./configure --prefix=/usr
-make CFLAGS=$RPM_OPT_FLAGS
+make CFLAGS="$RPM_OPT_FLAGS"
 strip rsync
 
 %install
