@@ -480,7 +480,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 			close(f_out);
 
 		/* we can't let two processes write to the socket at one time */
-		io_multiplexing_close();
+		close_multiplexing_out();
 
 		/* set place to send errors */
 		set_msg_fd_out(error_pipe[1]);
@@ -499,6 +499,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	}
 
 	am_generator = 1;
+	close_multiplexing_in();
 	if (write_batch)
 		stop_write_batch();
 
