@@ -252,8 +252,8 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 		if (!dirlist->files[i]->basename)
 			continue;
 		if (flist_find(flist, dirlist->files[i]) < 0) {
-			f_name_to(dirlist->files[i], delbuf);
 			int mode = dirlist->files[i]->mode;
+			f_name_to(dirlist->files[i], delbuf);
 			if (delete_item(delbuf, mode, DEL_FORCE_RECURSE) < 0)
 				break;
 		}
