@@ -1223,8 +1223,17 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 
 	write_int(f_out, -1);
 
-	/* Read post-redo-phase MSG_DONE and any prior messages. */
+	/* Read MSG_DONE for the redo phase (and any prior messages). */
 	get_redo_num(itemizing, code);
+
+	if (protocol_version >= 29) {
+		phase++;
+		if (verbose > 2)
+			rprintf(FINFO, "generate_files phase=%d\n", phase);
+		write_int(f_out, -1);
+		/* Read MSG_DONE for delay-update phase & prior messages. */
+		get_redo_num(itemizing, code);
+	}
 
 	if (delete_after && !local_name && flist->count > 0)
 		do_delete_pass(flist);
@@ -1254,12 +1263,6 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 			"Deletions stopped due to --max-delete limit (%d skipped)\n",
 			deletion_count - max_delete);
 		io_error |= IOERR_DEL_LIMIT;
-	}
-
-	if (protocol_version >= 29) {
-		write_int(f_out, -1);
-		/* Read post-delay-phase MSG_DONE and any prior messages. */
-		get_redo_num(itemizing, code);
 	}
 
 	if (verbose > 2)
