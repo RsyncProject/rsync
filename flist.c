@@ -603,7 +603,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 	if (!file->basename)
 		out_of_memory("receive_file_entry 1");
 
-	file->flags = flags;
+	file->flags = flags & LIVE_FLAGS;
 	file->length = read_longint(f);
 	if (!(flags & SAME_TIME))
 		modtime = (time_t)read_int(f);
