@@ -641,8 +641,8 @@ updated (though the rsync algorithm will make the update fairly efficient
 if the files haven't actually changed, you're much better off using -t).
 
 dit(bf(-O, --omit-dir-times)) This tells rsync to omit directories when
-the preserving of modification times is enabled (see --times).  If NFS
-is sharing the files on the receiving end, it is a good idea to use -O.
+it is preserving modification times (see --times).  If NFS is sharing
+the directories on the receiving side, it is a good idea to use -O.
 
 dit(bf(-n, --dry-run)) This tells rsync to not do any file transfers,
 instead it will just report the actions it would have taken.
