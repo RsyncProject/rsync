@@ -14,19 +14,18 @@
 /* What character marks an inverted character class? */
 #define NEGATE_CLASS '!'
 
-#define false 0
-#define true 1
+#define FALSE 0
+#define TRUE 1
+#define ABORT -1
 
-/* Look for pattern "p" in the "text" string. */
-int
-wildmatch(const char *p, const char *text)
+static int domatch(const char *p, const char *text)
 {
     int matched, special;
     char ch, prev;
 
     for ( ; (ch = *p) != '\0'; text++, p++) {
 	if (*text == '\0' && ch != '*')
-	    return false;
+	    return FALSE;
 	switch (ch) {
 	  case '\\':
 	    /* Literal match with following character.  Note that the test
@@ -35,62 +34,68 @@ wildmatch(const char *p, const char *text)
 	    /* FALLTHROUGH */
 	  default:
 	    if (*text != ch)
-		return false;
+		return FALSE;
 	    continue;
 	  case '?':
 	    /* Match anything but '/'. */
 	    if (*text == '/')
-		return false;
+		return FALSE;
 	    continue;
 	  case '*':
 	    if (*++p == '*') {
 		while (*++p == '*') {}
-		special = true;
+		special = TRUE;
 	    }
 	    else
-		special = false;
+		special = FALSE;
 	    if (*p == '\0') {
-		/* Trailing "**" matches everything. */
-		return special? true : strchr(text, '/') == 0;
+		/* Trailing "**" matches everything.  Trailing "*" matches
+		 * only if there are no more slash characters. */
+		return special? TRUE : strchr(text, '/') == 0;
 	    }
 	    for ( ; *text; text++) {
-		if (wildmatch(p, text))
-		    return true;
+		if ((matched = domatch(p, text)) != FALSE)
+		    return matched;
 		if (!special && *text == '/')
-		    return false;
+		    return FALSE;
 	    }
-	    return false;
+	    return ABORT;
 	  case '[':
-	    special = *++p == NEGATE_CLASS ? true : false;
+	    special = *++p == NEGATE_CLASS ? TRUE : FALSE;
 	    if (special) {
 		/* Inverted character class. */
 		p++;
 	    }
 	    prev = 0;
-	    matched = false;
+	    matched = FALSE;
 	    ch = *p;
 	    if (ch == ']' || ch == '-') {
 		if (*text == ch)
-		    matched = true;
+		    matched = TRUE;
 		prev = ch;
 		ch = *++p;
 	    }
 	    for ( ; ch != ']'; prev = ch, ch = *++p) {
 		if (!ch)
-		    return false;
+		    return FALSE;
 		if (ch == '-' && prev && p[1] && p[1] != ']') {
 		    if (*text <= *++p && *text >= prev)
-			matched = true;
+			matched = TRUE;
 		    ch = 0; /* This makes "prev" get set to 0. */
 		}
 		else if (*text == ch)
-		    matched = true;
+		    matched = TRUE;
 	    }
 	    if (matched == special)
-		return false;
+		return FALSE;
 	    continue;
 	}
     }
 
     return *text == '\0';
+}
+
+int wildmatch(const char *p, const char *text)
+{
+    return domatch(p, text) == TRUE;
 }
