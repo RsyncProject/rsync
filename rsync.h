@@ -365,7 +365,6 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #define GID_NONE (gid_t) -1
 
 struct file_struct {
-	unsigned flags;
 	time_t modtime;
 	OFF_T length;
 	mode_t mode;
@@ -383,6 +382,7 @@ struct file_struct {
 	char *basedir;
 	char *link;
 	char *sum;
+	unsigned short flags;
 };
 
 
