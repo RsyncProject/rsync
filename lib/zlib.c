@@ -3089,9 +3089,9 @@ struct inflate_blocks_state {
 /*   output bytes */
 #define WAVAIL (q<s->read?s->read-q-1:s->end-q)
 #define LOADOUT {q=s->write;m=WAVAIL;}
-#define WRAP {if(q==s->end&&s->read!=s->window){q=s->window;m=WAVAIL;}}
+#define ZWRAP {if(q==s->end&&s->read!=s->window){q=s->window;m=WAVAIL;}}
 #define FLUSH {UPDOUT r=inflate_flush(s,z,r); LOADOUT}
-#define NEEDOUT {if(m==0){WRAP if(m==0){FLUSH WRAP if(m==0) LEAVE}}r=Z_OK;}
+#define NEEDOUT {if(m==0){ZWRAP if(m==0){FLUSH ZWRAP if(m==0) LEAVE}}r=Z_OK;}
 #define OUTBYTE(a) {*q++=(Byte)(a);m--;}
 /*   load local pointers */
 #define LOAD {LOADIN LOADOUT}
@@ -3552,7 +3552,7 @@ z_stream *z;
 	n -= t;
 	z->total_out += t;
 	s->read = q;    /* drag read pointer forward */
-/*      WRAP  */ 	/* expand WRAP macro by hand to handle s->read */
+/*      ZWRAP  */ 	/* expand ZWRAP macro by hand to handle s->read */
 	if (q == s->end) {
 	    s->read = q = s->window;
 	    m = WAVAIL;
