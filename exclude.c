@@ -201,9 +201,11 @@ void add_exclude_list(const char *pattern, struct exclude_struct ***list, int in
 	if (!*list || !((*list)[len] = make_exclude(pattern, include)))
 		out_of_memory("add_exclude");
 	
-	if (verbose > 2)
-		rprintf(FINFO,"add_exclude(%s)\n",pattern);
-	
+	if (verbose > 2) {
+		rprintf(FINFO,"add_exclude(%s,%s)\n",pattern,
+			      include ? "include" : "exclude");
+	}
+
 	(*list)[len+1] = NULL;
 }
 
