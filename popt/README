@@ -5,7 +5,7 @@ to getopt(3), it contains a number of enhancements, including:
 	2) popt can parse arbitrary argv[] style arrays while 
 	   getopt(2) makes this quite difficult
 	3) popt allows users to alias command line arguments
-	4) popt provides convience functions for parsting strings
+	4) popt provides convience functions for parsing strings
 	   into argv[] style arrays
 
 popt is used by rpm, the Red Hat install program, and many other Red Hat
