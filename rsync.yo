@@ -285,7 +285,7 @@ verb(
  -v, --verbose               increase verbosity
  -q, --quiet                 decrease verbosity
  -c, --checksum              always checksum
- -a, --archive               archive mode
+ -a, --archive               archive mode, equivalent to -rlptgoD
  -r, --recursive             recurse into directories
  -R, --relative              use relative path names
  -b, --backup                make backups (default ~ suffix)
