@@ -1,3 +1,32 @@
+NEWS for rsync 2.6.4 (UNRELEASED)
+Protocol: 28 (unchanged)
+Changes since 2.6.3:
+
+  BUG FIXES:
+
+    - Restore the list-clearing behavior of "!" in a .cvsignore file (2.6.3
+      was only treating it as a special token in an rsync include/exclude
+      file).
+
+    - An OS that has a binary mode for its files (such as cygwin0 needed
+      setmode(fd, O_BINARY) called on the temp-file we opened with
+      mkstemp().
+
+    - We now check if the OS doesn't support using mknod() for creating
+      FIFOs and sockets, and compile-in using mkfifo() and socket() when
+      necessary.
+
+  ENHANCEMENTS:
+
+    - In _exit_cleanup(): when we are exiting with a partially-received
+      file, we now flush any data in the write-cache before closing the
+      partial file.
+
+  BUILD CHANGES:
+
+    - Support an OS that uses mkdev() instead of makedev().
+
+
 NEWS for rsync 2.6.3 (30 Sep 2004)
 Protocol: 28 (unchanged)
 Changes since 2.6.2:
