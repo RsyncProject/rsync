@@ -9,31 +9,53 @@
 
 . "$suitedir/rsync.fns"
 
-bakdir="$tmpdir/chk"
+bakdir="$tmpdir/bak"
 
 mkdir "$fromdir" "$bakdir"
 name1="$fromdir/name1"
 name2="$fromdir/name2"
-echo "This is the file" > "$name1"
-echo "This is the other file" > "$name2"
 
-checkit "$RSYNC -avv --backup --backup-dir=\"$bakdir\" \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+outfile="$scratchdir/rsync.out"
 
-$RSYNC -avv --backup "$todir/" "$chkdir/"
+cat $srcdir/[gr]*.[ch] > "$name1"
+cat $srcdir/[et]*.[ch] > "$name2"
 
-echo "Extending the file" >> "$name1"
-echo "Extending the other file" >> "$name2"
+checkit "$RSYNC -avv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
-checkit "$RSYNC -avv --backup --backup-dir=\"$bakdir\" \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+checkit "$RSYNC -avv \"$fromdir/\" \"$chkdir/\"" "$fromdir" "$chkdir"
+cat $srcdir/[fgpr]*.[ch] > "$name1"
+cat $srcdir/[etw]*.[ch] > "$name2"
 
-diff -r $diffopt "$chkdir" "$bakdir"
+$RSYNC -avv --no-whole-file --backup "$fromdir/" "$todir/" \
+    | tee "$outfile"
+for fn in name1 name2; do
+    grep "backed up $fn to $fn~" "$outfile" >/dev/null || test_fail "no backup message output for $fn"
+    diff $diffopt "$fromdir/$fn" "$todir" || test_fail "copy of $fn failed"
+    diff $diffopt "$chkdir/$fn" "$todir/$fn~" || test_fail "backup of $fn to $fn~ failed"
+    mv "$todir/$fn~" "$todir/$fn"
+done
 
-echo "Extending the file again" >> "$name1"
-echo "Extending the other file again" >> "$name2"
+checkit "$RSYNC -avv --no-whole-file --backup --backup-dir=\"$bakdir\" \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir" \
+    | tee "$outfile"
 
-checkit "$RSYNC -avv --inplace --backup --backup-dir=\"$bakdir\" \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+for fn in name1 name2; do
+    grep "backed up $fn to .*/$fn$" "$outfile" >/dev/null || test_fail "no backup message output for $fn"
+done
+diff -r $diffopt "$chkdir" "$bakdir" || test_fail "backup dir contents are bogus"
 
-diff -r $diffopt "$chkdir" "$bakdir"
+checkit "$RSYNC -avv \"$fromdir/\" \"$chkdir/\"" "$fromdir" "$chkdir"
+cat $srcdir/[efgr]*.[ch] > "$name1"
+cat $srcdir/[ew]*.[ch] > "$name2"
+
+checkit "$RSYNC -avv --inplace --no-whole-file --backup --backup-dir=\"$bakdir\" \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir" \
+    | tee "$outfile"
+
+for fn in name1 name2; do
+    grep "backed up $fn to .*/$fn$" "$outfile" >/dev/null || test_fail "no backup message output for $fn"
+done
+diff -r $diffopt "$chkdir" "$bakdir" || test_fail "backup dir contents are bogus"
+
+checkit "$RSYNC -avv --inplace --no-whole-file \"$fromdir/\" \"$bakdir/\"" "$fromdir" "$bakdir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
