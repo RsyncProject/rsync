@@ -1,6 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 AC_INIT(byteorder.h)
 AC_CONFIG_HEADER(config.h)
+AC_PREREQ(2.12)
 
 LDFLAGS=${LDFLAGS-""}
 
@@ -53,7 +54,7 @@ AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h unistd.h utime.h grp.h)
 AC_CHECK_HEADERS(compat.h sys/param.h ctype.h sys/wait.h sys/ioctl.h)
 AC_CHECK_HEADERS(sys/filio.h string.h stdlib.h sys/socket.h sys/mode.h)
-AC_CHECK_HEADERS(glob.h)
+AC_CHECK_HEADERS(glob.h alloca.h mcheck.h)
 
 AC_CHECK_SIZEOF(int)
 AC_CHECK_SIZEOF(long)
@@ -127,7 +128,7 @@ AC_FUNC_UTIME_NULL
 AC_CHECK_FUNCS(waitpid wait4 getcwd strdup strerror chown chmod mknod)
 AC_CHECK_FUNCS(fchmod fstat strchr readlink link utime utimes strftime)
 AC_CHECK_FUNCS(memmove lchown vsnprintf snprintf setsid glob strpbrk)
-AC_CHECK_FUNCS(strlcat strlcpy)
+AC_CHECK_FUNCS(strlcat strlcpy mtrace)
 
 AC_CACHE_CHECK([for working socketpair],rsync_cv_HAVE_SOCKETPAIR,[
 AC_TRY_RUN([#include <sys/types.h>
