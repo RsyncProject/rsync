@@ -372,6 +372,7 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 
 			if (ret == -1 && 
 			    (errno == EWOULDBLOCK || errno == EAGAIN)) {
+				msleep(1);
 				continue;
 			}
 
@@ -462,6 +463,17 @@ void io_end_buffering(int fd)
 		io_buffer = NULL;
 	}
 }
+
+/* some OSes have a bug where an exit causes the pending writes on
+   a socket to be flushed. Do an explicit shutdown to try to prevent this */
+void io_shutdown(void)
+{
+	if (multiplex_out_fd != -1) close(multiplex_out_fd);
+	if (io_error_fd != -1) close(io_error_fd);
+	multiplex_out_fd = -1;
+	io_error_fd = -1;
+}
+
 
 static void writefd(int fd,char *buf,int len)
 {
