@@ -429,19 +429,25 @@ static char *get_local_name(struct file_list *flist,char *name)
 }
 
 
+/* This is only called by the sender. */
 static void read_final_goodbye(int f_in, int f_out, int flist_count)
 {
-	if (protocol_version < 29) {
-		read_int(f_in);
-		return;
+	int i;
+
+	if (protocol_version < 29)
+		i = read_int(f_in);
+	else {
+		while ((i = read_int(f_in)) == flist_count
+		    && read_shortint(f_in) == ITEM_IS_NEW) {
+			/* Forward the keep-alive (no-op) to the receiver. */
+			write_int(f_out, flist_count);
+			write_shortint(f_out, ITEM_IS_NEW);
+		}
 	}
 
-	/* Handle any keep-alive messages from --delete-after processing. */
-	while (read_int(f_in) == flist_count) {
-		if (read_shortint(f_in) != ITEM_IS_NEW)
-			return; /* Complain? */
-		write_int(f_out, flist_count);
-		write_shortint(f_out, ITEM_IS_NEW);
+	if (i != -1) {
+		rprintf(FERROR, "Invalid packet from generator at end of run.\n");
+		exit_cleanup(RERR_PROTOCOL);
 	}
 }
 
@@ -564,10 +570,13 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		 * that the generator does. */
 		if (protocol_version >= 29) {
 			kluge_around_eof = -1;
-			while (read_int(f_in) == flist->count) {
-				if (read_shortint(f_in) != ITEM_IS_NEW)
-					break; /* Complain? */
-			}
+
+			/* This should only get stopped via a USR2 signal. */
+			while (read_int(f_in) == flist->count
+			    && read_shortint(f_in) == ITEM_IS_NEW) {}
+
+			rprintf(FERROR, "Invalid packet from server at end of run.\n");
+			exit_cleanup(RERR_PROTOCOL);
 		}
 
 		/* Finally, we hang around waiting for our parent to kills
