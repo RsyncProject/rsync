@@ -320,7 +320,7 @@ verb(
      --timeout=TIME          set IO timeout in seconds
  -I, --ignore-times          turn off mod time & file size quick check
      --size-only             ignore mod time for quick check (use size)
-     --modify-window=NUM     use if mod times have reduced accuracy
+     --modify-window=NUM     compare mod times with reduced accuracy
  -T  --temp-dir=DIR          create temporary files in directory DIR
      --compare-dest=DIR      also compare received files relative to DIR
      --link-dest=DIR         create hardlinks to DIR for unchanged files
