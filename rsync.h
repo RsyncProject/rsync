@@ -265,9 +265,13 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #define STRUCT_STAT struct stat
 #endif
 
-#if (SIZEOF_LONG == 8) 
+#if HAVE_OFF64_T
+#define int64 off64_t
+#define int64 unsigned off64_t
+#endif
+#elif (SIZEOF_LONG == 8) 
 #define int64 long
-#define uint64 unigned long
+#define uint64 unsigned long
 #elif (SIZEOF_INT == 8) 
 #define int64 int
 #define uint64 unsigned int
@@ -279,9 +283,6 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #define int64 off_t
 #define uint64 unsigned off_t
 #define NO_INT64
-#endif
-#if HAVE_OFF64_T
-#define int64 off64_t
 #endif
 
 /* Starting from protocol version 26, we always use 64-bit
