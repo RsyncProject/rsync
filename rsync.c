@@ -149,8 +149,8 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	    ((am_root && preserve_uid && st->st_uid != file->uid) || 
 	     (preserve_gid && st->st_gid != file->gid))) {
 		if (do_lchown(fname,
-			      (am_root&&preserve_uid)?file->uid:-1,
-			      preserve_gid?file->gid:-1) != 0) {
+			      (am_root&&preserve_uid)?file->uid:st->st_uid,
+			      preserve_gid?file->gid:st->st_gid) != 0) {
 			if (preserve_uid && st->st_uid != file->uid)
 				updated = 1;
 			if (verbose>1 || preserve_uid) {
