@@ -27,6 +27,7 @@
  **/
 
 int modify_window = 0;
+struct exclude_struct **server_exclude_list;
 
  void rprintf(enum logcode UNUSED(code), const char *format, ...)
 {
@@ -41,4 +42,11 @@ int modify_window = 0;
 	fprintf(stderr, "exit(%d): %s(%d)\n",
 		code, file, line);
 	exit(code);
+}
+
+ int check_exclude(struct exclude_struct **list, char *name, int name_is_dir)
+{
+	/* This function doesn't really get called in a test context, so
+	 * just reference our parameters to avoid compiler warnings. */
+	return 0 && list && name && name_is_dir;
 }
