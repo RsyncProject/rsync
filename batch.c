@@ -16,7 +16,7 @@ void write_batch_argvs_file(int argc, char *argv[])
 	char filename[MAXPATHLEN];
 
 	stringjoin(filename, sizeof filename,
-		   batch_name, ".rsync_argvs", NULL);
+		   batch_name, ".sh", NULL);
 	fd = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 		     S_IRUSR | S_IWUSR | S_IEXEC);
 	if (fd < 0) {
@@ -28,13 +28,16 @@ void write_batch_argvs_file(int argc, char *argv[])
 	for (i = 0; i < argc; i++) {
 		if (i == argc - 2) /* Skip source directory on cmdline */
 			continue;
-		if (strncmp(argv[i], "--files-from=", 13) == 0)
+		if (strncmp(argv[i], "--files-from", 12) == 0) {
+			if (strchr(argv[i], '=') == NULL)
+				i++;
 			continue;
+		}
 		if (i != 0)
 			write(fd, " ", 1);
-		if (strncmp(argv[i], "--write-batch=", 14) == 0) {
-			write(fd, "--read-batch=", 13);
-			write(fd, batch_name, strlen(batch_name));
+		if (strncmp(argv[i], "--write-batch", 13) == 0) {
+			write(fd, "--read", 6);
+			write(fd, argv[i] + 7, strlen(argv[i] + 7));
 		} else if (i == argc - 1) {
 			char *p = find_colon(argv[i]);
 			if (p) {
