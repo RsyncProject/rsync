@@ -80,8 +80,8 @@ Changes since version 2.5.6:
 
     * Call setgroups() in a more portable manner.
 
-    * Improved the mkstemp error message to always include the directory
-      info where the temp file is being created. (Wayne Davison)
+    * Improved file-related error messages to better indicate exactly
+      what pathname failed. (Wayne Davison)
 
     * Fixed some bugs in the handling of --delete and --exclude when
       using the --relative (-R) option. (Wayne Davison)
@@ -101,6 +101,12 @@ Changes since version 2.5.6:
 
     * Some cleanup made to the exclude code, as well as some new
       defines added to enhance readability. (Wayne Davison)
+
+    * Changed the protocol-version code so that it can interact at a
+      lower protocol level than the maximum supported by both sides.
+      Added an undocumented option, --protocol=N, to force the value
+      we advertise to the other side (primarily for testing purposes).
+      (Wayne Davison)
 
 
 NEWS for rsync version 2.5.6, aka the dwd-between-jobs release
