@@ -169,7 +169,8 @@ Changes since 2.6.3:
 
     - Added the --itemize-changes (-i) option that is a way to output the
       list of files that got transferred and/or changed in any way, and how
-      they changed.  Also works with --dry-run.
+      they changed.  The effect is the same as specifying --log-format
+      "%i %n%L" (see the rsyncd.conf manpage).  Works with --dry-run.
 
     - Added the --fuzzy option, which attempts to find a basis file for a
       file that is being created from scratch.  The current algorithm
