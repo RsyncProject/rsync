@@ -337,17 +337,6 @@ enum msgcode {
 #define INT64_IS_OFF_T
 #endif
 
-#if (SIZEOF_LONG == 8) 
-#define uint64 unsigned long
-#elif (SIZEOF_INT == 8) 
-#define uint64 unsigned int
-#elif HAVE_LONGLONG
-#define uint64 unsigned long long
-#else
-/* As long as it gets... */
-#define uint64 unsigned off_t
-#endif
-
 /* Starting from protocol version 26, we always use 64-bit
  * ino_t and dev_t internally, even if this platform does not
  * allow files to have 64-bit inums.  That's because the
@@ -375,8 +364,8 @@ enum msgcode {
  */ 
 
 struct idev {
-	uint64 inode;
-	uint64 dev;
+	int64 inode;
+	int64 dev;
 };
 
 #ifndef MIN
