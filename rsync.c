@@ -1,17 +1,17 @@
-/* 
+/*
    Copyright (C) Andrew Tridgell 1996
    Copyright (C) Paul Mackerras 1996
-   
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -43,8 +43,8 @@ void free_sums(struct sum_struct *s)
 
 
 /*
- * delete a file or directory. If force_delete is set then delete 
- * recursively 
+ * delete a file or directory. If force_delete is set then delete
+ * recursively
  */
 int delete_file(char *fname)
 {
@@ -73,7 +73,7 @@ int delete_file(char *fname)
 	}
 
 	if (do_rmdir(fname) == 0 || errno == ENOENT) return 0;
-	if (!force_delete || !recurse || 
+	if (!force_delete || !recurse ||
 	    (errno != ENOTEMPTY && errno != EEXIST)) {
 		rprintf(FERROR, "delete_file: rmdir %s failed: %s\n",
 			full_fname(fname), strerror(errno));
@@ -100,16 +100,16 @@ int delete_file(char *fname)
 			closedir(d);
 			return -1;
 		}
-	}	
+	}
 	if (errno) {
-		rprintf(FERROR, "delete_file: readdir(%s): (%d) %s\n",
-		    fname, errno, strerror(errno));
+		rprintf(FERROR, "delete_file: readdir %s failed: %s\n",
+			full_fname(fname), strerror(errno));
 		closedir(d);
 		return -1;
 	}
 
 	closedir(d);
-	
+
 	if (do_rmdir(fname) != 0) {
 		rprintf(FERROR, "delete_file: rmdir %s failed: %s\n",
 			full_fname(fname), strerror(errno));
