@@ -1046,8 +1046,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		send_uid_list(f);
 	}
 
-	/* if protocol version is >= 17 then send the io_error flag */
-	if (f != -1 && remote_version >= 17) {
+	/* send the io_error flag */
+	if (f != -1) {
 		extern int module_id;
 		write_int(f, lp_ignore_errors(module_id) ? 0 : io_error);
 	}
@@ -1126,8 +1126,8 @@ struct file_list *recv_file_list(int f)
 		recv_uid_list(f, flist);
 	}
 
-	/* if protocol version is >= 17 then recv the io_error flag */
-	if (f != -1 && remote_version >= 17 && !read_batch) {	/* dw-added readbatch */
+	/* recv the io_error flag */
+	if (f != -1 && !read_batch) {	/* dw-added readbatch */
 		extern int module_id;
 		extern int ignore_errors;
 		if (lp_ignore_errors(module_id) || ignore_errors) {

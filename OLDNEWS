@@ -302,17 +302,20 @@ protocol: 25 (changed)
       build farm.
 
 Partial Protocol History
-	DATE OF COMMIT*		RELEASE		PROTOCL VERSION
+	DATE			RELEASE		PROTOCOL
 	2003/01/26 20:11:16	release-2-5-6	26	
 	2002/02/23 00:17:50	release-2-5-3	26	
 	2002/01/25 23:00:21	release-2-5-2	26	
 	2001/12/18 06:47:40	release-2-5-1	25	
+				release-2-4-6	24	
 	2000/08/16 08:34:18	release-2-4-5	24	
 	2000/07/29 04:52:05	release-2-4-4	24	
 	2000/03/30 14:15:00	release-2-4-2	24	
 	2000/01/29 23:49:36	release-2-4-1	24	
 	2000/01/29 02:56:37	release-2-4-0	23	
+				release-2-3-3	21	
 	1999/06/26 01:06:38	release-2-3-2	21	
+				release-2-3-1	20	
 	1999/03/15 21:17:59	release-2-3-0	20	
 	1998/11/15 01:21:42	release-2-2-1	19	
 	1998/11/03 07:08:28	release-2-2-0	19	
@@ -330,8 +333,8 @@ Partial Protocol History
 	1998/05/13 15:44:11	release-2-0-0	17	
 	1998/04/17 06:07:26	release-1-7-4	17	
 	1998/04/05 06:43:55	release-1-7-2	17	
-	1998/03/26 04:18:57	release-1-7-0	17	
-	1998/01/13 15:57:32	release-1-6-9	15	
+	1998/03/26 04:18:57	release-1-7-0	17 MAX=30
+	1998/01/13 15:57:32	release-1-6-9	15 MAX=20
 	1997/12/17 11:07:30	release-1-6-7	14	
 	1997/12/15 18:36:21	release-1-6-4	14	
 

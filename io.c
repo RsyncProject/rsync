@@ -524,7 +524,6 @@ int32 read_int(int f)
 
 int64 read_longint(int f)
 {
-	extern int remote_version;
 	int64 ret;
 	char b[8];
 	ret = read_int(f);
@@ -537,10 +536,8 @@ int64 read_longint(int f)
 	rprintf(FERROR,"Integer overflow - attempted 64 bit offset\n");
 	exit_cleanup(RERR_UNSUPPORTED);
 #else
-	if (remote_version >= 16) {
-		readfd(f,b,8);
-		ret = IVAL(b,0) | (((int64)IVAL(b,4))<<32);
-	}
+	readfd(f,b,8);
+	ret = IVAL(b,0) | (((int64)IVAL(b,4))<<32);
 #endif
 
 	return ret;
@@ -797,10 +794,9 @@ void write_int_named(int f, int32 x, const char *phase)
  */
 void write_longint(int f, int64 x)
 {
-	extern int remote_version;
 	char b[8];
 
-	if (remote_version < 16 || x <= 0x7FFFFFFF) {
+	if (x <= 0x7FFFFFFF) {
 		write_int(f, (int)x);
 		return;
 	}
