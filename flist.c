@@ -352,9 +352,9 @@ static void flist_expand(struct file_list *flist)
 
 
 static void send_file_entry(struct file_struct *file, int f,
-			    unsigned base_flags)
+			    unsigned short base_flags)
 {
-	unsigned char flags;
+	unsigned short flags;
 	static time_t last_time;
 	static mode_t last_mode;
 	static DEV64_T last_rdev;
@@ -380,14 +380,24 @@ static void send_file_entry(struct file_struct *file, int f,
 
 	if (file->mode == last_mode)
 		flags |= SAME_MODE;
+	else
+		last_mode = file->mode;
 	if (file->rdev == last_rdev)
 		flags |= SAME_RDEV;
+	else
+		last_rdev = file->rdev;
 	if (file->uid == last_uid)
 		flags |= SAME_UID;
+	else
+		last_uid = file->uid;
 	if (file->gid == last_gid)
 		flags |= SAME_GID;
+	else
+		last_gid = file->gid;
 	if (file->modtime == last_time)
 		flags |= SAME_TIME;
+	else
+		last_time = file->modtime;
 
 	for (l1 = 0;
 	     lastname[l1] && (fname[l1] == lastname[l1]) && (l1 < 255);
@@ -401,7 +411,7 @@ static void send_file_entry(struct file_struct *file, int f,
 
 	/* we must make sure we don't send a zero flags byte or the other
 	   end will terminate the flist transfer */
-	if (flags == 0 && !S_ISDIR(file->mode))
+	if (flags == 0 && !S_ISDIR(last_mode))
 		flags |= FLAG_DELETE;
 	if (flags == 0)
 		flags |= LONG_NAME;
@@ -417,23 +427,23 @@ static void send_file_entry(struct file_struct *file, int f,
 
 	write_longint(f, file->length);
 	if (!(flags & SAME_TIME))
-		write_int(f, (int) file->modtime);
+		write_int(f, last_time);
 	if (!(flags & SAME_MODE))
-		write_int(f, to_wire_mode(file->mode));
+		write_int(f, to_wire_mode(last_mode));
 	if (preserve_uid && !(flags & SAME_UID)) {
-		add_uid(file->uid);
-		write_int(f, (int) file->uid);
+		add_uid(last_uid);
+		write_int(f, last_uid);
 	}
 	if (preserve_gid && !(flags & SAME_GID)) {
-		add_gid(file->gid);
-		write_int(f, (int) file->gid);
+		add_gid(last_gid);
+		write_int(f, last_gid);
 	}
-	if (preserve_devices && IS_DEVICE(file->mode)
+	if (preserve_devices && IS_DEVICE(last_mode)
 	    && !(flags & SAME_RDEV))
-		write_int(f, (int) file->rdev);
+		write_int(f, last_rdev);
 
 #if SUPPORT_LINKS
-	if (preserve_links && S_ISLNK(file->mode)) {
+	if (preserve_links && S_ISLNK(last_mode)) {
 		write_int(f, strlen(file->link));
 		write_buf(f, file->link, strlen(file->link));
 	}
@@ -460,12 +470,6 @@ static void send_file_entry(struct file_struct *file, int f,
 			write_buf(f, file->sum, MD4_SUM_LENGTH);
 	}
 
-	last_mode = file->mode;
-	last_rdev = file->rdev;
-	last_uid = file->uid;
-	last_gid = file->gid;
-	last_time = file->modtime;
-
 	strlcpy(lastname, fname, MAXPATHLEN);
 	lastname[MAXPATHLEN - 1] = 0;
 
@@ -475,7 +479,7 @@ static void send_file_entry(struct file_struct *file, int f,
 
 
 static void receive_file_entry(struct file_struct **fptr,
-			       unsigned flags, int f)
+			       unsigned short flags, int f)
 {
 	static time_t last_time;
 	static mode_t last_mode;
@@ -542,19 +546,34 @@ static void receive_file_entry(struct file_struct **fptr,
 
 	file->flags = flags;
 	file->length = read_longint(f);
-	file->modtime = (flags & SAME_TIME) ? last_time : (time_t)read_int(f);
-	file->mode = (flags & SAME_MODE) ? last_mode
-					 : from_wire_mode(read_int(f));
-	if (preserve_uid)
-		file->uid = (flags & SAME_UID) ? last_uid : (uid_t)read_int(f);
-	if (preserve_gid)
-		file->gid = (flags & SAME_GID) ? last_gid : (gid_t)read_int(f);
-	if (preserve_devices && IS_DEVICE(file->mode)) {
-		file->rdev = (flags & SAME_RDEV) ? last_rdev
-						 : (DEV64_T)read_int(f);
+	if (!(flags & SAME_TIME))
+		last_time = (time_t)read_int(f);
+	file->modtime = last_time;
+	if (!(flags & SAME_MODE))
+		last_mode = from_wire_mode(read_int(f));
+	file->mode = last_mode;
+
+	if (preserve_uid) {
+		if (!(flags & SAME_UID))
+			last_uid = (uid_t)read_int(f);
+		file->uid = last_uid;
+	}
+	if (preserve_gid) {
+		if (!(flags & SAME_GID))
+			last_gid = (gid_t)read_int(f);
+		file->gid = last_gid;
+	}
+	if (preserve_devices) {
+		if (IS_DEVICE(last_mode)) {
+			if (!(flags & SAME_RDEV))
+				last_rdev = (DEV64_T)read_int(f);
+			file->rdev = last_rdev;
+		}
+		else
+			last_rdev = 0;
 	}
 
-	if (preserve_links && S_ISLNK(file->mode)) {
+	if (preserve_links && S_ISLNK(last_mode)) {
 		int l = read_int(f);
 		if (l < 0) {
 			rprintf(FERROR, "overflow: l=%d\n", l);
@@ -588,12 +607,6 @@ static void receive_file_entry(struct file_struct **fptr,
 		else
 			read_buf(f, file->sum, MD4_SUM_LENGTH);
 	}
-
-	last_mode = file->mode;
-	last_rdev = file->rdev;
-	last_uid = file->uid;
-	last_gid = file->gid;
-	last_time = file->modtime;
 
 	if (!preserve_perms) {
 		extern int orig_umask;
@@ -781,7 +794,7 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 
 
 void send_file_name(int f, struct file_list *flist, char *fname,
-		    int recursive, unsigned base_flags)
+		    int recursive, unsigned short base_flags)
 {
 	struct file_struct *file;
 	char fbuf[MAXPATHLEN];
@@ -800,7 +813,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 	flist_expand(flist);
 
 	if (write_batch)
-		file->flags = FLAG_DELETE;
+		file->flags |= FLAG_DELETE;
 
 	if (file->basename[0]) {
 		flist->files[flist->count++] = file;
@@ -1074,7 +1087,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 struct file_list *recv_file_list(int f)
 {
 	struct file_list *flist;
-	unsigned char flags;
+	unsigned short flags;
 	int64 start_read;
 	extern int list_only;
 
@@ -1094,7 +1107,7 @@ struct file_list *recv_file_list(int f)
 		goto oom;
 
 
-	for (flags = read_byte(f); flags; flags = read_byte(f)) {
+	while ((flags = read_byte(f)) != 0) {
 		int i = flist->count;
 
 		flist_expand(flist);
@@ -1336,8 +1349,8 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 		return;
 
 	for (i = 0; i < flist->count; i++) {
-		rprintf(FINFO, "[%d] i=%d %s %s mode=0%o len=%.0f\n",
-			(int) getpid(), i,
+		rprintf(FINFO, "[%ld] i=%d %s %s mode=0%o len=%.0f\n",
+			(long) getpid(), i,
 			NS(flist->files[i]->dirname),
 			NS(flist->files[i]->basename),
 			(int) flist->files[i]->mode,
@@ -1356,7 +1369,7 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 {
 	int dif;
 	const uchar *c1, *c2;
-	enum fnc_state state1 = fnc_DIR, state2 = fnc_DIR;
+	enum fnc_state state1, state2;
 
 	if (!f1 || !f1->basename) {
 		if (!f2 || !f2->basename)
@@ -1370,10 +1383,14 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 		state1 = fnc_BASE;
 		c1 = (uchar*)f1->basename;
 	}
+	else
+		state1 = fnc_DIR;
 	if (!(c2 = (uchar*)f2->dirname)) {
 		state2 = fnc_BASE;
 		c2 = (uchar*)f2->basename;
 	}
+	else
+		state2 = fnc_DIR;
 
 	while (1) {
 		if ((dif = (int)*c1 - (int)*c2) != 0)
