@@ -164,6 +164,10 @@ dit(bf(port)) You can override the default port the daemon will listen on
 by specifying this value (defaults to 873).  This is ignored if the daemon
 is being run by inetd, and is superseded by the --port command-line option.
 
+dit(bf(address)) You can override the default IP address the daemon
+will listen on by specifying this value.  This is ignored if the daemon is
+being run by inetd, and is superseded by the --address command-line option.
+
 dit(bf(max connections)) The "max connections" option allows you to
 specify the maximum number of simultaneous connections you will allow.
 Any clients connecting when the maximum has been reached will receive a
