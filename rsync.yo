@@ -306,7 +306,7 @@ verb(
  -W, --whole-file            copy whole files, no incremental checks
      --no-whole-file         turn off --whole-file
  -x, --one-file-system       don't cross filesystem boundaries
- -B, --block-size=SIZE       checksum blocking size (default 700)
+ -B, --block-size=SIZE       force a fixed checksum block-size
  -e, --rsh=COMMAND           specify the remote shell
      --rsync-path=PATH       specify path to rsync on the remote machine
      --existing              only update files that already exist
@@ -633,8 +633,9 @@ they are not empty when they are to be replaced by non-directories.  This
 is only relevant without --delete because deletions are now done depth-first.
 Requires the --recursive option (which is implied by -a) to have any effect.
 
-dit(bf(-B, --block-size=BLOCKSIZE)) This controls the block size used in
-the rsync algorithm. See the technical report for details.
+dit(bf(-B, --block-size=BLOCKSIZE)) This forces the block size used in
+the rsync algorithm to a fixed value.  It is normally selected based on
+the size of each file being updated.  See the technical report for details.
 
 dit(bf(-e, --rsh=COMMAND)) This option allows you to choose an alternative
 remote shell program to use for communication between the local and
