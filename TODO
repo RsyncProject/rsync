@@ -591,13 +591,6 @@ Win32
 
   http://sources.redhat.com/ml/cygwin/2001-08/msg00234.html
 
-  According to "Effective TCP/IP Programming" (??) close() on a socket
-  has incorrect behaviour on Windows -- it sends a RST packet to the
-  other side, which gives a "connection reset by peer" error.  On that
-  platform we should probably do shutdown() instead.  However, on Unix
-  we are correct to call close(), because shutdown() discards
-  untransmitted data.
-
 
 DEVELOPMENT ----------------------------------------------------------
 
