@@ -33,8 +33,9 @@ extern int verbose;
 extern int blocking_io;
 extern int cvs_exclude;
 extern int delete_mode;
-extern int delete_excluded;
+extern int delete_before;
 extern int delete_after;
+extern int delete_excluded;
 extern int daemon_over_rsh;
 extern int do_stats;
 extern int dry_run;
@@ -44,6 +45,7 @@ extern int log_got_error;
 extern int module_id;
 extern int orig_umask;
 extern int copy_links;
+extern int keep_dirs;
 extern int keep_dirlinks;
 extern int preserve_hard_links;
 extern int protocol_version;
@@ -433,7 +435,7 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 			argv[i] += l+1;
 	}
 
-	if (argc == 0 && recurse) {
+	if (argc == 0 && (recurse || list_only)) {
 		argc = 1;
 		argv--;
 		argv[0] = ".";
@@ -473,9 +475,9 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	if (preserve_hard_links)
 		init_hard_links(flist);
 
-	if (!delete_after) {
+	if (delete_before) {
 		/* I moved this here from recv_files() to prevent a race condition */
-		if (recurse && delete_mode && !local_name && flist->count > 0)
+		if (keep_dirs && !local_name && flist->count > 0)
 			delete_files(flist);
 	}
 
@@ -730,8 +732,8 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		exit_cleanup(status);
 	}
 
-	if (argc == 0 && !list_only)
-		list_only = 1;
+	if (argc == 0)
+		list_only |= 1;
 
 	if (!read_batch)
 		send_exclude_list(f_out);
@@ -962,8 +964,8 @@ static int start_client(int argc, char *argv[])
 	}
 
 	/* ... or no dest at all */
-	if (!am_sender && argc == 0 && !list_only)
-		list_only = 1;
+	if (!am_sender && argc == 0)
+		list_only |= 1;
 
 	pid = do_cmd(shell_cmd,shell_machine,shell_user,shell_path,
 		     &f_in,&f_out);
