@@ -169,7 +169,8 @@ int read_iflags(int f_in, int f_out, int ndx, char *buf)
 		}
 	} else if (f_out >= 0) {
 		write_int(f_out, ndx);
-		write_shortint(f_out, isave /*XXX iflags */);
+		if (protocol_version >= 29)
+			write_shortint(f_out, isave /*XXX iflags */);
 		if (len >= 0)
 			write_vstring(f_out, buf, len);
 	}
