@@ -1172,7 +1172,8 @@ look at the output when using --verbose and put a / in front of the name
 Note that, when using the --recursive (-r) option (which is implied by -a),
 every subcomponent of
 every path is visited from the top down, so include/exclude patterns get
-applied recursively to each subcomponent.
+applied recursively to each subcomponent's full name (e.g. to include
+"/foo/bar/baz" the subcomponents "/foo" and "/foo/bar" must not be excluded).
 The exclude patterns actually short-circuit the directory traversal stage
 when rsync finds the files to send.  If a pattern excludes a particular
 parent directory, it can render a deeper include pattern ineffectual
