@@ -171,7 +171,7 @@ static void show_malloc_stats(void)
 
 	mi = mallinfo();
 
-	rprintf(FINFO, RSYNC_NAME "[%d] (%s%s%s) heap statistics:\n",
+	rprintf(FINFO, "\n" RSYNC_NAME "[%d] (%s%s%s) heap statistics:\n",
 		getpid(),
 		am_server ? "server " : "",
 		am_daemon ? "daemon " : "",
