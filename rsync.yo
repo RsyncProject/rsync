@@ -1127,22 +1127,32 @@ updating multiple destination trees. Multicast transport protocols can
 be used to transfer the batch update files in parallel to many hosts
 at once, instead of sending the same data to every host individually.
 
-Example:
+Examples:
 
 verb(
    $ rsync --write-batch=batch -a /source/dir/ /adest/dir/
-   $ rcp batch* remote:
+   $ ssh remote rsync --read-batch=- -a /bdest/dir/ <batch
+)
+
+verb(
+   $ rsync --write-batch=batch -a host:/source/dir/ /adest/dir/
+   $ scp batch remote:
    $ ssh remote rsync --read-batch=batch -a /bdest/dir/
-   # or alternatively
+)
+
+verb(
+   $ rsync --write-batch=batch -a /source/dir/ host:/adest/dir/
+   $ scp batch* remote:
    $ ssh remote ./batch.rsync_argvs /bdest/dir/
 )
 
-In this example, rsync is used to update /adest/dir/ with /source/dir/
+In these examples, rsync is used to update /adest/dir/ with /source/dir/
 and the information to repeat this operation is stored in "batch" and
-"batch.rsync_argvs". These files are then copied to the machine named
-"remote".  Rsync is then invoked on "remote" to update /bdest/dir/ the
-same way as /adest/dir/. The last line shows the rsync_argvs file
-being used to invoke rsync.
+"batch.rsync_argvs".  The host "remote" is then updated with the batched
+update going into the directory /bdest/dir.  The differences between the
+three examples is in how the batch gets to the remote machine (via remote
+stdin or by being copied first), whether the initial transfer was local or
+remote, and in how the batch-reading rsync command is invoked.
 
 Caveats:
 
