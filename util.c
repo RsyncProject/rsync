@@ -281,6 +281,14 @@ int copy_file(char *source, char *dest, mode_t mode)
 		}
 	}
 
+	if (len < 0) {
+		rprintf(FERROR, "read %s: %s\n",
+			full_fname(source), strerror(errno));
+		close(ifd);
+		close(ofd);
+		return -1;
+	}
+
 	if (close(ifd) < 0) {
 		rprintf(FINFO, "close failed on %s: %s\n",
 			full_fname(source), strerror(errno));
@@ -289,12 +297,6 @@ int copy_file(char *source, char *dest, mode_t mode)
 	if (close(ofd) < 0) {
 		rprintf(FERROR, "close failed on %s: %s\n",
 			full_fname(dest), strerror(errno));
-		return -1;
-	}
-
-	if (len < 0) {
-		rprintf(FERROR,"read %s: %s\n",
-			full_fname(source), strerror(errno));
 		return -1;
 	}
 
