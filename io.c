@@ -49,6 +49,9 @@ static int no_flush;
 extern int bwlimit;
 extern int verbose;
 extern int io_timeout;
+extern int am_server;
+extern int am_daemon;
+extern int am_sender;
 extern struct stats stats;
 
 
@@ -74,8 +77,9 @@ const char *io_read_phase = phase_unknown;
     version is 24 or less. */
 int kludge_around_eof = False;
 
+int msg_fd_in = -1;
+int msg_fd_out = -1;
 
-static int io_error_fd = -1;
 static int io_filesfrom_f_in = -1;
 static int io_filesfrom_f_out = -1;
 static char io_filesfrom_buf[2048];
@@ -85,14 +89,44 @@ static int io_filesfrom_buflen;
 
 static void read_loop(int fd, char *buf, size_t len);
 
+struct redo_list {
+	struct redo_list *next;
+	int num;
+};
+
+static struct redo_list *redo_list_head;
+static struct redo_list *redo_list_tail;
+
+struct msg_list {
+	struct msg_list *next;
+	char *buf;
+	int len;
+};
+
+static struct msg_list *msg_list_head;
+static struct msg_list *msg_list_tail;
+
+static void redo_list_add(int num)
+{
+	struct redo_list *rl;
+
+	if (!(rl = new(struct redo_list)))
+		exit_cleanup(RERR_MALLOC);
+	rl->next = NULL;
+	rl->num = num;
+	if (redo_list_tail)
+		redo_list_tail->next = rl;
+	else
+		redo_list_head = rl;
+	redo_list_tail = rl;
+}
+
 static void check_timeout(void)
 {
-	extern int am_server, am_daemon;
 	time_t t;
 
-	err_list_push();
-
-	if (!io_timeout) return;
+	if (!io_timeout)
+		return;
 
 	if (!last_io) {
 		last_io = time(NULL);
@@ -110,41 +144,155 @@ static void check_timeout(void)
 	}
 }
 
-/** Setup the fd used to propagate errors */
-void io_set_error_fd(int fd)
+/** Setup the fd used to receive MSG_* messages.  Only needed when
+ * we're the generator because the sender and receiver both use the
+ * multiplexed IO setup. */
+void set_msg_fd_in(int fd)
 {
-	io_error_fd = fd;
+	msg_fd_in = fd;
 }
 
-/** Read some data from the error fd and write it to the write log code */
-static void read_error_fd(void)
+/** Setup the fd used to send our MSG_* messages.  Only needed when
+ * we're the receiver because the generator and the sender both use
+ * the multiplexed IO setup. */
+void set_msg_fd_out(int fd)
+{
+	msg_fd_out = fd;
+	set_nonblocking(msg_fd_out);
+}
+
+/* Add a message to the pending MSG_* list. */
+static void msg_list_add(int code, char *buf, int len)
+{
+	struct msg_list *ml;
+
+	if (!(ml = new(struct msg_list)))
+		exit_cleanup(RERR_MALLOC);
+	ml->next = NULL;
+	if (!(ml->buf = new_array(char, len+4)))
+		exit_cleanup(RERR_MALLOC);
+	SIVAL(ml->buf, 0, ((code+MPLEX_BASE)<<24) | len);
+	memcpy(ml->buf+4, buf, len);
+	ml->len = len+4;
+	if (msg_list_tail)
+		msg_list_tail->next = ml;
+	else
+		msg_list_head = ml;
+	msg_list_tail = ml;
+}
+
+void send_msg(enum msgcode code, char *buf, int len)
+{
+	msg_list_add(code, buf, len);
+	msg_list_push(NORMAL_FLUSH);
+}
+
+/** Read a message from the MSG_* fd and dispatch it.  This is only
+ * called by the generator. */
+static void read_msg_fd(void)
 {
 	char buf[200];
 	size_t n;
-	int fd = io_error_fd;
+	int fd = msg_fd_in;
 	int tag, len;
 
-	/* io_error_fd is temporarily disabled -- is this meant to
-	 * prevent indefinite recursion? */
-	io_error_fd = -1;
+	/* Temporarily disable msg_fd_in.  This is needed because we
+	 * may call a write routine that could try to call us back. */
+	msg_fd_in = -1;
 
 	read_loop(fd, buf, 4);
 	tag = IVAL(buf, 0);
 
 	len = tag & 0xFFFFFF;
-	tag = tag >> 24;
-	tag -= MPLEX_BASE;
+	tag = (tag >> 24) - MPLEX_BASE;
 
-	while (len) {
-		n = len;
-		if (n > (sizeof buf - 1))
-			n = sizeof buf - 1;
-		read_loop(fd, buf, n);
-		rwrite((enum logcode)tag, buf, n);
-		len -= n;
+	switch (tag) {
+	case MSG_DONE:
+		if (len != 0)
+			exit_cleanup(RERR_STREAMIO);
+		redo_list_add(-1);
+		break;
+	case MSG_REDO:
+		if (len != 4)
+			exit_cleanup(RERR_STREAMIO);
+		read_loop(fd, buf, 4);
+		redo_list_add(IVAL(buf,0));
+		break;
+	case MSG_INFO:
+	case MSG_ERROR:
+	case MSG_LOG:
+		while (len) {
+			n = len;
+			if (n >= sizeof buf)
+				n = sizeof buf - 1;
+			read_loop(fd, buf, n);
+			rwrite((enum logcode)tag, buf, n);
+			len -= n;
+		}
+		break;
+	default:
+		exit_cleanup(RERR_STREAMIO);
 	}
 
-	io_error_fd = fd;
+	msg_fd_in = fd;
+}
+
+/* Try to push messages off the list onto the wire.  If we leave with more
+ * to do, return 0.  On error, return -1.  If everything flushed, return 1.
+ * This is only called by the receiver. */
+int msg_list_push(int flush_it_all)
+{
+	static int written = 0;
+	struct timeval tv;
+	fd_set fds;
+
+	if (msg_fd_out < 0)
+		return -1;
+
+	while (msg_list_head) {
+		struct msg_list *ml = msg_list_head;
+		int n = write(msg_fd_out, ml->buf + written, ml->len - written);
+		if (n < 0) {
+			if (errno == EINTR)
+				continue;
+			if (errno != EWOULDBLOCK && errno != EAGAIN)
+				return -1;
+			if (!flush_it_all)
+				return 0;
+			FD_ZERO(&fds);
+			FD_SET(msg_fd_out, &fds);
+			tv.tv_sec = io_timeout ? io_timeout : SELECT_TIMEOUT;
+			tv.tv_usec = 0;
+			if (!select(msg_fd_out+1, NULL, &fds, NULL, &tv))
+				check_timeout();
+		} else if ((written += n) == ml->len) {
+			free(ml->buf);
+			msg_list_head = ml->next;
+			if (!msg_list_head)
+				msg_list_tail = NULL;
+			free(ml);
+			written = 0;
+		}
+	}
+	return 1;
+}
+
+int get_redo_num(void)
+{
+	struct redo_list *next;
+	int num;
+
+	while (!redo_list_head)
+		read_msg_fd();
+
+	num = redo_list_head->num;
+	next = redo_list_head->next;
+	free(redo_list_head);
+	redo_list_head = next;
+	if (!next)
+		redo_list_tail = NULL;
+
+	return num;
 }
 
 /**
@@ -217,7 +365,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 {
 	int n, ret=0;
 
-	io_flush();
+	io_flush(NORMAL_FLUSH);
 
 	while (ret == 0) {
 		/* until we manage to read *something* */
@@ -228,9 +376,10 @@ static int read_timeout(int fd, char *buf, size_t len)
 
 		FD_ZERO(&r_fds);
 		FD_SET(fd, &r_fds);
-		if (io_error_fd >= 0) {
-			FD_SET(io_error_fd, &r_fds);
-			if (io_error_fd >= fd_count) fd_count = io_error_fd+1;
+		if (msg_fd_in >= 0) {
+			FD_SET(msg_fd_in, &r_fds);
+			if (msg_fd_in >= fd_count)
+				fd_count = msg_fd_in+1;
 		}
 		if (io_filesfrom_f_out >= 0) {
 			int new_fd;
@@ -247,7 +396,8 @@ static int read_timeout(int fd, char *buf, size_t len)
 				FD_SET(io_filesfrom_f_out, &w_fds);
 				new_fd = io_filesfrom_f_out;
 			}
-			if (new_fd >= fd_count) fd_count = new_fd+1;
+			if (new_fd >= fd_count)
+				fd_count = new_fd+1;
 		}
 
 		tv.tv_sec = io_timeout?io_timeout:SELECT_TIMEOUT;
@@ -260,6 +410,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 			       NULL, &tv);
 
 		if (count == 0) {
+			msg_list_push(NORMAL_FLUSH);
 			check_timeout();
 		}
 
@@ -270,9 +421,8 @@ static int read_timeout(int fd, char *buf, size_t len)
 			continue;
 		}
 
-		if (io_error_fd >= 0 && FD_ISSET(io_error_fd, &r_fds)) {
-			read_error_fd();
-		}
+		if (msg_fd_in >= 0 && FD_ISSET(msg_fd_in, &r_fds))
+			read_msg_fd();
 
 		if (io_filesfrom_f_out >= 0) {
 			if (io_filesfrom_buflen) {
@@ -471,9 +621,10 @@ static int read_unbuffered(int fd, char *buf, size_t len)
 		tag = IVAL(line, 0);
 
 		remaining = tag & 0xFFFFFF;
-		tag = tag >> 24;
+		tag = (tag >> 24) - MPLEX_BASE;
 
-		if (tag == MPLEX_BASE) {
+		switch (tag) {
+		case MSG_DATA:
 			if (!buffer || remaining > bufferSz) {
 				buffer = realloc_array(buffer, char, remaining);
 				if (!buffer) out_of_memory("read_unbuffered");
@@ -481,31 +632,26 @@ static int read_unbuffered(int fd, char *buf, size_t len)
 			}
 			read_loop(fd, buffer, remaining);
 			bufferIdx = 0;
-			continue;
-		}
-
-		tag -= MPLEX_BASE;
-
-		if (tag != FERROR && tag != FINFO) {
+			break;
+		case MSG_INFO:
+		case MSG_ERROR:
+			if (remaining >= sizeof line) {
+				rprintf(FERROR, "multiplexing overflow %d:%ld\n\n",
+					tag, (long)remaining);
+				exit_cleanup(RERR_STREAMIO);
+			}
+			read_loop(fd, line, remaining);
+			rwrite((enum logcode)tag, line, remaining);
+			remaining = 0;
+			break;
+		default:
 			rprintf(FERROR, "unexpected tag %d\n", tag);
 			exit_cleanup(RERR_STREAMIO);
 		}
-
-		if (remaining > sizeof line - 1) {
-			rprintf(FERROR, "multiplexing overflow %ld\n\n",
-				(long)remaining);
-			exit_cleanup(RERR_STREAMIO);
-		}
-
-		read_loop(fd, line, remaining);
-		line[remaining] = 0;
-
-		rprintf((enum logcode) tag, "%s", line);
-		remaining = 0;
 	}
 
 	if (remaining == 0)
-		io_flush();
+		io_flush(NORMAL_FLUSH);
 
 	return ret;
 }
@@ -622,7 +768,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 	int fd_count, count;
 	struct timeval tv;
 
-	err_list_push();
+	msg_list_push(NORMAL_FLUSH);
 
 	no_flush++;
 
@@ -631,24 +777,22 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 		FD_SET(fd,&w_fds);
 		fd_count = fd;
 
-		if (io_error_fd >= 0) {
+		if (msg_fd_in >= 0) {
 			FD_ZERO(&r_fds);
-			FD_SET(io_error_fd,&r_fds);
-			if (io_error_fd > fd_count) 
-				fd_count = io_error_fd;
+			FD_SET(msg_fd_in,&r_fds);
+			if (msg_fd_in > fd_count) 
+				fd_count = msg_fd_in;
 		}
 
 		tv.tv_sec = io_timeout?io_timeout:SELECT_TIMEOUT;
 		tv.tv_usec = 0;
 
 		errno = 0;
-
-		count = select(fd_count+1,
-			       io_error_fd >= 0?&r_fds:NULL,
-			       &w_fds,NULL,
-			       &tv);
+		count = select(fd_count+1, msg_fd_in >= 0 ? &r_fds : NULL,
+			       &w_fds, NULL, &tv);
 
 		if (count == 0) {
+			msg_list_push(NORMAL_FLUSH);
 			check_timeout();
 		}
 
@@ -659,9 +803,8 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 			continue;
 		}
 
-		if (io_error_fd >= 0 && FD_ISSET(io_error_fd, &r_fds)) {
-			read_error_fd();
-		}
+		if (msg_fd_in >= 0 && FD_ISSET(msg_fd_in, &r_fds))
+			read_msg_fd();
 
 		if (FD_ISSET(fd, &w_fds)) {
 			int ret;
@@ -722,7 +865,7 @@ void io_start_buffering_in(int fd)
  * Write an message to a multiplexed stream. If this fails then rsync
  * exits.
  **/
-static void mplex_write(int fd, enum logcode code, char *buf, size_t len)
+static void mplex_write(int fd, enum msgcode code, char *buf, size_t len)
 {
 	char buffer[4096];
 	size_t n = len;
@@ -745,26 +888,26 @@ static void mplex_write(int fd, enum logcode code, char *buf, size_t len)
 }
 
 
-void io_flush(void)
+void io_flush(int flush_it_all)
 {
 	int fd = multiplex_out_fd;
+	
+	msg_list_push(flush_it_all);
 
-	err_list_push();
+	if (!io_buffer_count || no_flush)
+		return;
 
-	if (!io_buffer_count || no_flush) return;
-
-	if (io_multiplexing_out) {
-		mplex_write(fd, FNONE, io_buffer, io_buffer_count);
-	} else {
+	if (io_multiplexing_out)
+		mplex_write(fd, MSG_DATA, io_buffer, io_buffer_count);
+	else
 		writefd_unbuffered(fd, io_buffer, io_buffer_count);
-	}
 	io_buffer_count = 0;
 }
 
 
 void io_end_buffering(void)
 {
-	io_flush();
+	io_flush(NORMAL_FLUSH);
 	if (!io_multiplexing_out) {
 		free(io_buffer);
 		io_buffer = NULL;
@@ -775,7 +918,7 @@ static void writefd(int fd,char *buf,size_t len)
 {
 	stats.total_written += len;
 
-	err_list_push();
+	msg_list_push(NORMAL_FLUSH);
 
 	if (!io_buffer || fd != multiplex_out_fd) {
 		writefd_unbuffered(fd, buf, len);
@@ -791,7 +934,8 @@ static void writefd(int fd,char *buf,size_t len)
 			io_buffer_count += n;
 		}
 
-		if (io_buffer_count == IO_BUFFER_SIZE) io_flush();
+		if (io_buffer_count == IO_BUFFER_SIZE)
+			io_flush(NORMAL_FLUSH);
 	}
 }
 
@@ -903,35 +1047,35 @@ void io_printf(int fd, const char *format, ...)
 }
 
 
-/** Setup for multiplexing an error stream with the data stream */
+/** Setup for multiplexing a MSG_* stream with the data stream. */
 void io_start_multiplex_out(int fd)
 {
 	multiplex_out_fd = fd;
-	io_flush();
+	io_flush(NORMAL_FLUSH);
 	io_start_buffering_out(fd);
 	io_multiplexing_out = 1;
 }
 
-/** Setup for multiplexing an error stream with the data stream */
+/** Setup for multiplexing a MSG_* stream with the data stream. */
 void io_start_multiplex_in(int fd)
 {
 	multiplex_in_fd = fd;
-	io_flush();
+	io_flush(NORMAL_FLUSH);
 	io_multiplexing_in = 1;
 }
 
-/** Write an message to the multiplexed error stream */
-int io_multiplex_write(enum logcode code, char *buf, size_t len)
+/** Write an message to the multiplexed data stream. */
+int io_multiplex_write(enum msgcode code, char *buf, size_t len)
 {
 	if (!io_multiplexing_out) return 0;
 
-	io_flush();
+	io_flush(NORMAL_FLUSH);
 	stats.total_written += (len+4);
 	mplex_write(multiplex_out_fd, code, buf, len);
 	return 1;
 }
 
-/** Stop output multiplexing */
+/** Stop output multiplexing. */
 void io_multiplexing_close(void)
 {
 	io_multiplexing_out = 0;
