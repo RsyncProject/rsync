@@ -29,7 +29,7 @@ int updating_basis_file;
 typedef unsigned short tag;
 
 #define TABLESIZE (1<<16)
-#define NULL_TAG ((size_t)-1)
+#define NULL_TAG (-1)
 
 static int false_alarms;
 static int tag_hits;
@@ -44,12 +44,12 @@ extern struct stats stats;
 
 struct target {
 	tag t;
-	size_t i;
+	int32 i;
 };
 
 static struct target *targets;
 
-static size_t *tag_table;
+static int32 *tag_table;
 
 #define gettag2(s1,s2) (((s1) + (s2)) & 0xFFFF)
 #define gettag(sum) gettag2((sum)&0xFFFF,(sum)>>16)
@@ -62,10 +62,10 @@ static int compare_targets(struct target *t1,struct target *t2)
 
 static void build_hash_table(struct sum_struct *s)
 {
-	size_t i;
+	int32 i;
 
 	if (!tag_table)
-		tag_table = new_array(size_t, TABLESIZE);
+		tag_table = new_array(int32, TABLESIZE);
 
 	targets = new_array(struct target, s->count);
 	if (!tag_table || !targets)
@@ -146,8 +146,7 @@ static void hash_search(int f,struct sum_struct *s,
 			struct map_struct *buf, OFF_T len)
 {
 	OFF_T offset, end, backup;
-	int32 k;
-	size_t want_i;
+	int32 k, want_i;
 	char sum2[SUM_LENGTH];
 	uint32 s1, s2, sum;
 	int more;
@@ -184,7 +183,7 @@ static void hash_search(int f,struct sum_struct *s,
 	do {
 		tag t = gettag2(s1,s2);
 		int done_csum2 = 0;
-		size_t j = tag_table[t];
+		int32 j = tag_table[t];
 
 		if (verbose > 4)
 			rprintf(FINFO,"offset=%.0f sum=%08x\n",(double)offset,sum);
@@ -195,8 +194,7 @@ static void hash_search(int f,struct sum_struct *s,
 		sum = (s1 & 0xffff) | (s2 << 16);
 		tag_hits++;
 		do {
-			int32 l;
-			size_t i = targets[j].i;
+			int32 l, i = targets[j].i;
 
 			if (sum != s->sums[i].sum1)
 				continue;
@@ -232,7 +230,7 @@ static void hash_search(int f,struct sum_struct *s,
 			 * the following want_i optimization. */
 			if (updating_basis_file) {
 				do {
-					size_t i2 = targets[j].i;
+					int32 i2 = targets[j].i;
 					if (s->sums[i2].offset != offset)
 						continue;
 					if (i2 != i) {
