@@ -1,10 +1,10 @@
 Summary: Program for efficient remote updates of files.
 Name: rsync
-Version: 2.5.4
+Version: 2.5.6
 Release: 1
 Copyright: GPL
 Group: Applications/Networking
-Source:	ftp://samba.anu.edu.au/pub/rsync/rsync-%{version}.tar.gz
+Source:	ftp://samba.anu.edu.au/pub/rsync/rsync-2.5.6.tar.gz
 URL: http://samba.anu.edu.au/rsync/
 Packager: Andrew Tridgell <tridge@samba.anu.edu.au>
 BuildRoot: /tmp/rsync
@@ -21,9 +21,6 @@ A technical report describing the rsync algorithm is included with
 this package. 
 
 %changelog
-* Mon Sep 11 2000 John H Terpstra <jht@turbolinux.com>
-  Changed target paths to be Linux Standards Base compliant
-
 * Mon Jan 25 1999 Stefan Hornburg <racke@linuxia.de>
   quoted RPM_OPT_FLAGS for the sake of robustness  
 * Mon May 18 1998 Andrew Tridgell <tridge@samba.anu.edu.au>
@@ -62,23 +59,23 @@ previous package(s).)
 %setup
 
 %build
-./configure --prefix=/usr --mandir=/usr/share/man
+./configure --prefix=/usr
 make CFLAGS="$RPM_OPT_FLAGS"
 strip rsync
 
 %install
-mkdir -p $RPM_BUILD_ROOT/usr/{bin,share/man/{man1,man5}}
+mkdir -p $RPM_BUILD_ROOT/usr/{bin,man/{man1,man5}}
 install -m755 rsync $RPM_BUILD_ROOT/usr/bin
-install -m644 rsync.1 $RPM_BUILD_ROOT/usr/share/man/man1
-install -m644 rsyncd.conf.5 $RPM_BUILD_ROOT/usr/share/man/man5
+install -m644 rsync.1* $RPM_BUILD_ROOT/usr/man/man1
+install -m644 rsyncd.conf.5* $RPM_BUILD_ROOT/usr/man/man5
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %files
 %attr(-,root,root) /usr/bin/rsync
-%attr(-,root,root) /usr/share/man/man1/rsync.1*
-%attr(-,root,root) /usr/share/man/man5/rsyncd.conf.5*
+%attr(-,root,root) /usr/man/man1/rsync.1*
+%attr(-,root,root) /usr/man/man5/rsyncd.conf.5*
 %attr(-,root,root) %doc tech_report.tex
 %attr(-,root,root) %doc README
 %attr(-,root,root) %doc COPYING
