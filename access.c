@@ -88,9 +88,13 @@ static int match_address(char *addr, char *tok)
 	/* Fail quietly if tok is a hostname (not an address) */
 	if (strspn(tok, ".0123456789") != len
 #ifdef INET6
-	 && !strchr(tok, ':')
+	    && strchr(tok, ':') == NULL
 #endif
-		) return 0;
+	) {
+		if (p)
+			*p = '/';
+		return 0;
+	}
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_UNSPEC;
@@ -99,17 +103,18 @@ static int match_address(char *addr, char *tok)
 	hints.ai_flags = AI_NUMERICHOST;
 #endif
 
-	gai = getaddrinfo(addr, NULL, &hints, &resa);
-	if (gai) return 0;
+	if (getaddrinfo(addr, NULL, &hints, &resa) != 0) {
+		if (p)
+			*p = '/';
+		return 0;
+	}
 
 	gai = getaddrinfo(tok, NULL, &hints, &rest);
 	if (p)
 		*p++ = '/';
-	if (gai) {
-		rprintf(FERROR,
-			"error matching address %s: %s\n",
-			tok,
-			gai_strerror(gai));
+	if (gai != 0) {
+		rprintf(FLOG, "error matching address %s: %s\n",
+			tok, gai_strerror(gai));
 		freeaddrinfo(resa);
 		return 0;
 	}
@@ -152,7 +157,7 @@ static int match_address(char *addr, char *tok)
 	    }
 #endif
 	default:
-	    rprintf(FERROR,"unknown family %u\n", rest->ai_family);
+	    rprintf(FLOG, "unknown family %u\n", rest->ai_family);
 	    ret = 0;
 	    goto out;
 	}
@@ -169,14 +174,14 @@ static int match_address(char *addr, char *tok)
 #ifdef HAVE_STRTOL
 			bits = strtol(p, &ep, 10);
 			if (!*p || *ep) {
-				rprintf(FERROR,"malformed mask in %s\n", tok);
+				rprintf(FLOG, "malformed mask in %s\n", tok);
 				ret = 0;
 				goto out;
 			}
 #else
 			for (pp = (unsigned char *)p; *pp; pp++) {
 				if (!isascii(*pp) || !isdigit(*pp)) {
-					rprintf(FERROR,"malformed mask in %s\n", tok);
+					rprintf(FLOG, "malformed mask in %s\n", tok);
 					ret = 0;
 					goto out;
 				}
@@ -188,7 +193,7 @@ static int match_address(char *addr, char *tok)
 				goto out;
 			}
 			if (bits < 0 || bits > (addrlen << 3)) {
-				rprintf(FERROR,"malformed mask in %s\n", tok);
+				rprintf(FLOG, "malformed mask in %s\n", tok);
 				ret = 0;
 				goto out;
 			}
