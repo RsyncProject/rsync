@@ -45,7 +45,11 @@ printmsg() {
 
 
 rsync_ls_lR() {
-    find "$@" -print | sort | xargs $TLS
+    find "$@" -print | sort | xargs "$TOOLDIR/tls"
+}
+
+rsync_getgroups() { 
+    "$TOOLDIR/getgroups"
 }
 
 
