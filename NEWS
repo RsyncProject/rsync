@@ -1,5 +1,5 @@
 NEWS for rsync 2.6.4 (UNRELEASED)
-Protocol: 28 (unchanged)
+Protocol: 29 (changed)
 Changes since 2.6.3:
 
   BUG FIXES:
@@ -69,10 +69,20 @@ Changes since 2.6.3:
       file, we now flush any data in the write-cache before closing the
       partial file.
 
+    - The --inplace support was enhanced to work with --compare-dest,
+      --link-dest, and (the new) --copy-dest options.
+
     - Added support/atomic-rsync -- a perl script that will transfer some
       files using rsync, and then move the updated files into place all at
       once at the end of the transfer.  Only works when pulling, and uses
       --link-dest.
+
+  INTERNAL:
+
+    - Added better checking of the checksum header values that come over
+      the socket.
+
+    - Improved the type of some variables for consistency and proper size.
 
   BUILD CHANGES:
 
