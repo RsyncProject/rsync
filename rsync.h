@@ -29,6 +29,8 @@
 /* block size to write files in */
 #define WRITE_BLOCK_SIZE (32*1024)
 
+#define BLOCKING_TIMEOUT 10
+
 #include "config.h"
 
 #include <sys/types.h>
