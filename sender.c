@@ -157,10 +157,11 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		stats.num_transferred_files++;
 		stats.total_transferred_size += file->length;
 
-		fname[0] = 0;
 		if (file->basedir) {
-			offset = stringjoin(fname, sizeof fname,
-					    file->basedir, "/", NULL);
+			/* N.B. We're sure that this fits, so offset is OK. */
+			offset = strlcpy(fname, file->basedir, sizeof fname);
+			if (!offset || fname[offset-1] != '/')
+				fname[offset++] = '/';
 		} else
 			offset = 0;
 		f_name_to(file, fname + offset);
