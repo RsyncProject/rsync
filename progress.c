@@ -79,39 +79,43 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 
 void end_progress(OFF_T size)
 {
-	extern int do_progress, am_server;
+	extern int am_server;
 
-	if (do_progress && !am_server) {
-        	struct timeval now;
-                gettimeofday(&now, NULL);
-                rprint_progress(size, size, &now, True);
+	if (!am_server) {
+		struct timeval now;
+		gettimeofday(&now, NULL);
+		rprint_progress(size, size, &now, True);
 	}
 	last_ofs   = 0;
-        start_ofs  = 0;
-        print_time.tv_sec  = print_time.tv_usec  = 0;
-        start_time.tv_sec  = start_time.tv_usec  = 0;
+	start_ofs  = 0;
+	print_time.tv_sec  = print_time.tv_usec  = 0;
+	start_time.tv_sec  = start_time.tv_usec  = 0;
 }
 
 void show_progress(OFF_T ofs, OFF_T size)
 {
-	extern int do_progress, am_server;
-        struct timeval now;
+	extern int am_server;
+	struct timeval now;
 
-        gettimeofday(&now, NULL);
+	if (!start_time.tv_sec) {
+		gettimeofday(&now, NULL);
+		start_time.tv_sec  = now.tv_sec;
+		start_time.tv_usec = now.tv_usec;
+		start_ofs          = ofs;
+		if (am_server)
+			return;
+	}
+	else {
+		if (am_server)
+			return;
+		gettimeofday(&now, NULL);
+	}
 
-        if (!start_time.tv_sec && !start_time.tv_usec) {
-        	start_time.tv_sec  = now.tv_sec;
-                start_time.tv_usec = now.tv_usec;
-                start_ofs          = ofs;
-        }
-
-	if (do_progress
-            && !am_server
-            && ofs > last_ofs + 1000
-            && msdiff(&print_time, &now) > 250) {
-        	rprint_progress(ofs, size, &now, False);
-                last_ofs = ofs;
-                print_time.tv_sec  = now.tv_sec;
-                print_time.tv_usec = now.tv_usec;
+	if (ofs > last_ofs + 1000
+	 && msdiff(&print_time, &now) > 250) {
+		rprint_progress(ofs, size, &now, False);
+		last_ofs = ofs;
+		print_time.tv_sec  = now.tv_sec;
+		print_time.tv_usec = now.tv_usec;
 	}
 }
