@@ -735,9 +735,9 @@ static int start_client(int argc, char *argv[])
 		return start_socket_client(host, path, argc-1, argv+1);
 	}
 
-	if (!read_batch) {
+	if (!read_batch) { /* for read_batch, NO source is specified */
 		p = find_colon(argv[0]);
-		if (p) {
+		if (p) { /* source is remote */
 			if (remote_filesfrom_file
 			 && remote_filesfrom_file != files_from + 1
 			 && strncmp(files_from, argv[0], p-argv[0]+1) != 0) {
@@ -755,7 +755,7 @@ static int start_client(int argc, char *argv[])
 				daemon_over_rsh = 1;
 			}
 
-			if (argc < 1) {
+			if (argc < 1) { /* destination required */
 				usage(FERROR);
 				exit_cleanup(RERR_SYNTAX);
 			}
@@ -764,9 +764,8 @@ static int start_client(int argc, char *argv[])
 			*p = 0;
 			shell_machine = argv[0];
 			shell_path = p+1;
-			argc--;
 			argv++;
-		} else {
+		} else { /* source is local */
 			am_sender = 1;
 
 			/* rsync:// destination uses rsync server over direct socket */
@@ -789,7 +788,7 @@ static int start_client(int argc, char *argv[])
 				return start_socket_client(host, path, argc-1, argv);
 			}
 
-			p = find_colon(argv[argc-1]);
+			p = find_colon(argv[argc-1]); /* look in dest arg */
 			if (p && remote_filesfrom_file
 			 && remote_filesfrom_file != files_from + 1
 			 && strncmp(files_from, argv[argc-1], p-argv[argc-1]+1) != 0) {
@@ -797,7 +796,7 @@ static int start_client(int argc, char *argv[])
 					"--files-from hostname is not transfer hostname\n");
 				exit_cleanup(RERR_SYNTAX);
 			}
-			if (!p) {
+			if (!p) { /* no colon found, so src & dest are local */
 				local_server = 1;
 				if (remote_filesfrom_file) {
 					rprintf(FERROR,
@@ -827,9 +826,9 @@ static int start_client(int argc, char *argv[])
 				shell_machine = argv[argc-1];
 				shell_path = p+1;
 			}
-			argc--;
 		}
-	} else {
+		argc--;
+	} else {  /* read_batch */
 		am_sender = 1;
 		local_server = 1;
 		shell_path = argv[argc-1];
@@ -852,12 +851,14 @@ static int start_client(int argc, char *argv[])
 			shell_path?shell_path:"");
 	}
 
+	/* for remote source, only single dest arg can remain ... */
 	if (!am_sender && argc > 1) {
 		usage(FERROR);
 		exit_cleanup(RERR_SYNTAX);
 	}
 
-	if (argc == 0 && !am_sender) {
+	/* ... or no dest at all */
+	if (!am_sender && argc == 0) {
 		list_only = 1;
 	}
 
