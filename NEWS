@@ -81,7 +81,13 @@ Changes since 2.6.3:
       --del option is implemented as an internally-defined popt alias, so
       an rsync daemon that refuses "delete" (which, for safety's sake,
       really matches "delete*") will still refuse all delete options.  The
-      default behavior is also explicitly selectable via --delete-before.
+      default --delete behavior is also explicitly selectable via
+      --delete-before.
+
+    - All the --delete-WHEN options are now more memory efficient:
+      Previously an entire duplicate set of file-list objects was created
+      on the receiving side for the entire destination hierarchy.  The new
+      algorithm only creates a single directory of objects at a time.
 
     - Added the --copy-dest option, which works like --link-dest except
       that it includes copies of identical files.
