@@ -403,7 +403,6 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	extern int module_id;
 	extern int am_sender;
 	extern int read_batch;   /* dw */
-	extern int write_batch;  /* dw */
 	extern struct file_list *batch_flist;  /* dw */
 
 	if (verbose > 2)
@@ -743,7 +742,6 @@ int main(int argc,char *argv[])
 	extern int read_batch;   /*  dw */
 	extern int write_batch;  /*  dw */
 	extern char *batch_ext;   /*  dw */
-	int i;          /*   dw */
 	int orig_argc;  /* dw */
 
 	orig_argc = argc;   /* dw */
