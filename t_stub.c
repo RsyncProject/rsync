@@ -38,6 +38,16 @@ struct exclude_list_struct server_exclude_list;
 	va_end(ap);
 }
 
+ void rsyserr(UNUSED(enum logcode code), int errcode, const char *format, ...)
+{
+	va_list ap;
+	fputs(RSYNC_NAME ": ", stderr);
+	va_start(ap, format);
+	vfprintf(stderr, format, ap);
+	va_end(ap);
+	fprintf(stderr, ": %s (%d)\n", strerror(errcode), errcode);
+}
+
  void _exit_cleanup(int code, const char *file, int line)
 {
 	fprintf(stderr, "exit(%d): %s(%d)\n",
