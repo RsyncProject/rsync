@@ -197,11 +197,11 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				write_shortint(f_out, iflags);
 				if (am_server) {
 					if (am_daemon && !dry_run && see_item)
-						log_send(file, &stats, iflags);
+						log_item(file, &stats, iflags, NULL);
 				} else if (see_item || iflags & ITEM_UPDATING
 				    || (S_ISDIR(file->mode)
 				     && iflags & ITEM_REPORT_TIME))
-					log_send(file, &stats, iflags);
+					log_item(file, &stats, iflags, NULL);
 				continue;
 			}
 		} else
@@ -224,7 +224,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		if (dry_run) { /* log the transfer */
 			if (!am_server && log_format)
-				log_send(file, &stats, iflags);
+				log_item(file, &stats, iflags, NULL);
 			write_int(f_out, i);
 			if (protocol_version >= 29)
 				write_shortint(f_out, iflags);
@@ -289,7 +289,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		}
 
 		if (log_before_transfer)
-			log_send(file, &initial_stats, iflags);
+			log_item(file, &initial_stats, iflags, NULL);
 		else if (!am_server && verbose && do_progress)
 			rprintf(FINFO, "%s\n", safe_fname(fname2));
 
@@ -297,7 +297,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		match_sums(f_out, s, mbuf, st.st_size);
 		if (!log_before_transfer)
-			log_send(file, &initial_stats, iflags);
+			log_item(file, &initial_stats, iflags, NULL);
 
 		if (mbuf) {
 			j = unmap_file(mbuf);
