@@ -1,5 +1,6 @@
 /* 
    Copyright (C) Andrew Tridgell 1998
+   Copyright (C) 2002 by Martin Pool
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -16,11 +17,15 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-/*
-  compatibility functions - replacing functions for platforms that don't
-  have them.
+/**
+ * @file compat.c
+ *
+ * Reimplementations of standard functions for platforms that don't
+ * have them.
+ **/
 
-  */
+
+
 #include "rsync.h"
 
 
@@ -78,9 +83,11 @@
 #endif
 
 #ifndef HAVE_STRPBRK
-/* Find the first ocurrence in S of any character in ACCEPT.  
-   derived from glibc 
-*/
+/**
+ * Find the first ocurrence in @p s of any character in @p accept.
+ *
+ * Derived from glibc 
+ **/
  char *strpbrk(const char *s, const char *accept)
 {
 	while (*s != '\0')  {
@@ -97,10 +104,14 @@
 
 
 #ifndef HAVE_STRLCPY
-/* Like strncpy but does not 0 fill the buffer and always null 
- * terminates. bufsize is the size of the destination buffer.
+/**
+ * Like strncpy but does not 0 fill the buffer and always null 
+ * terminates.
  *
- * Returns the index of the terminating byte. */
+ * @param bufsize is the size of the destination buffer.
+ *
+ * @return index of the terminating byte.
+ **/
  size_t strlcpy(char *d, const char *s, size_t bufsize)
 {
 	size_t len = strlen(s);
@@ -114,9 +125,13 @@
 #endif
 
 #ifndef HAVE_STRLCAT
-/* like strncat but does not 0 fill the buffer and always null 
-   terminates. bufsize is the length of the buffer, which should
-   be one more than the maximum resulting string length */
+/**
+ * Like strncat() but does not 0 fill the buffer and always null 
+ * terminates.
+ *
+ * @param bufsize length of the buffer, which should be one more than
+ * the maximum resulting string length.
+ **/
  size_t strlcat(char *d, const char *s, size_t bufsize)
 {
 	size_t len1 = strlen(d);

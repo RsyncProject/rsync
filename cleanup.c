@@ -2,6 +2,7 @@
    
    Copyright (C) 1996-2000 by Andrew Tridgell
    Copyright (C) Paul Mackerras 1996
+   Copyright (C) 2002 by Martin Pool
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -20,9 +21,24 @@
 
 #include "rsync.h"
 
-/* handling the cleanup when a transfer is interrupted is tricky when
-   --partial is selected. We need to ensure that the partial file is
-   kept if any real data has been transferred */
+/**
+ * @file cleanup.c
+ *
+ * Code for handling interrupted transfers.  Depending on the @c
+ * --partial option, we may either delete the temporary file, or go
+ * ahead and overwrite the destination.  This second behaviour only
+ * occurs if we've sent literal data and therefore hopefully made
+ * progress on the transfer.
+ **/
+
+/**
+ * Set to True once literal data has been sent across the link for the
+ * current file. (????)
+ *
+ * Handling the cleanup when a transfer is interrupted is tricky when
+ * --partial is selected.  We need to ensure that the partial file is
+ * kept if any real data has been transferred.
+ **/
 int cleanup_got_literal=0;
 
 static char *cleanup_fname;
@@ -35,9 +51,11 @@ extern int io_error;
 
 pid_t cleanup_child_pid = -1;
 
-/*
- * Code is one of the RERR_* codes from errcode.h.
- */
+/**
+ * Eventually calls exit(), therefore does not return.
+ *
+ * @param code one of the RERR_* codes from errcode.h.
+ **/
 void _exit_cleanup(int code, const char *file, int line)
 {
 	int ocode = code;
