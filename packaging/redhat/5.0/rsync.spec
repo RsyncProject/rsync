@@ -1,12 +1,12 @@
 Summary: Program for efficient remote updates of files.
 Name: rsync
-Version: 2.0.7
+Version: 2.0.8
 Release: 1
 Copyright: GPL
 Group: Applications/Networking
-Source:	ftp://samba.anu.edu.au/pub/rsync/
+Source:	ftp://samba.anu.edu.au/pub/rsync/rsync-2.0.8.tar.gz
 URL: http://samba.anu.edu.au/rsync/
-Packager: John H Terpstra <jht@samba.anu.edu.au>
+Packager: Andrew Tridgell <tridge@samba.anu.edu.au>
 BuildRoot: /tmp/rsync
 
 %description
@@ -21,6 +21,9 @@ A technical report describing the rsync algorithm is included with
 this package. 
 
 %changelog
+* Mon May 18 1998
+  reworked for auto-building when I release rsync (tridge@samba.anu.edu.au)
+
 * Sat May 16 1998 John H Terpstra <jht@aquasoft.com.au>
   Upgraded to Rsync 2.0.6
     -new feature anonymous rsync
@@ -57,8 +60,6 @@ previous package(s).)
 ./configure --prefix=/usr
 make CFLAGS=$RPM_OPT_FLAGS
 strip rsync
-latex tech_report
-dvips tech_report -o
 
 %install
 mkdir -p $RPM_BUILD_ROOT/usr/{bin,man/{man1,man5}}
@@ -73,7 +74,6 @@ rm -rf $RPM_BUILD_ROOT
 %attr(-,root,root) /usr/bin/rsync
 %attr(-,root,root) /usr/man/man1/rsync.1
 %attr(-,root,root) /usr/man/man5/rsyncd.conf.5
-%attr(-,root,root) %doc tech_report.ps
 %attr(-,root,root) %doc tech_report.tex
 %attr(-,root,root) %doc README
 %attr(-,root,root) %doc COPYING
