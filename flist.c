@@ -227,17 +227,14 @@ static int check_exclude_file(char *fname, int is_dir, int exclude_level)
 		}
 	}
 	if (server_exclude_list.head
-	 && check_exclude(&server_exclude_list, fname, is_dir,
-			  "server pattern"))
+	 && check_exclude(&server_exclude_list, fname, is_dir))
 		return 1;
 	if (exclude_level != ALL_EXCLUDES)
 		return 0;
-	if (exclude_list.head
-	    && check_exclude(&exclude_list, fname, is_dir, "pattern"))
+	if (exclude_list.head && check_exclude(&exclude_list, fname, is_dir))
 		return 1;
 	if (local_exclude_list.head
-	    && check_exclude(&local_exclude_list, fname, is_dir,
-			     "local-cvsignore"))
+	    && check_exclude(&local_exclude_list, fname, is_dir))
 		return 1;
 	return 0;
 }
@@ -947,7 +944,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 	if (recursive && S_ISDIR(file->mode)
 	    && !(file->flags & FLAG_MOUNT_POINT)) {
 		struct exclude_list_struct last_list = local_exclude_list;
-		memset(&local_exclude_list, 0, sizeof local_exclude_list);
+		local_exclude_list.head = local_exclude_list.tail = NULL;
 		send_directory(f, flist, f_name_to(file, fbuf));
 		free_exclude_list(&local_exclude_list);
 		local_exclude_list = last_list;
