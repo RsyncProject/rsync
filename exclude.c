@@ -132,8 +132,7 @@ static int check_one_exclude(char *name, struct exclude_struct *ex,
 		static char full_name[MAXPATHLEN];
 		extern char curr_dir[];
 		int plus = curr_dir[1] == '\0'? 1 : 0;
-		snprintf(full_name, sizeof full_name,
-			 "%s/%s", curr_dir+plus, name);
+		pathjoin(full_name, sizeof full_name, curr_dir+plus, name);
 		name = full_name;
 	}
 
@@ -443,10 +442,9 @@ void add_cvs_excludes(void)
 	for (i=0; cvs_ignore_list[i]; i++)
 		add_exclude(&exclude_list, cvs_ignore_list[i], ADD_EXCLUDE);
 
-	if ((p=getenv("HOME")) && strlen(p) < (MAXPATHLEN-12)) {
-		snprintf(fname,sizeof(fname), "%s/.cvsignore",p);
-		add_exclude_file(&exclude_list,fname,MISSING_OK,ADD_EXCLUDE);
-	}
+	if ((p = getenv("HOME"))
+	    && pathjoin(fname, sizeof fname, p, ".cvsignore") < sizeof fname)
+		add_exclude_file(&exclude_list, fname, MISSING_OK, ADD_EXCLUDE);
 
 	add_exclude_line(&exclude_list, getenv("CVSIGNORE"), ADD_EXCLUDE);
 }

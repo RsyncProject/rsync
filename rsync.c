@@ -93,7 +93,7 @@ int delete_file(char *fname)
 		if (strcmp(dname,".") == 0
 		    || strcmp(dname,"..") == 0)
 			continue;
-		snprintf(buf, sizeof(buf), "%s/%s", fname, dname);
+		pathjoin(buf, sizeof buf, fname, dname);
 		if (verbose > 0)
 			rprintf(FINFO,"deleting %s\n", buf);
 		if (delete_file(buf) != 0) {
