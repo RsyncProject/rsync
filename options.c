@@ -459,6 +459,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			add_exclude_file(poptGetOptArg(pc), 1, 0);
 			break;
 
+		case OPT_INCLUDE_FROM:
+			add_exclude_file(poptGetOptArg(pc), 1, 1);
+			break;
+
 		case OPT_NO_WHOLE_FILE:
 			whole_file = 0;
 			break;
