@@ -41,6 +41,8 @@ extern int always_checksum;
 extern int cvs_exclude;
 
 extern int recurse;
+extern char *files_from;
+extern int filesfrom_fd;
 
 extern int one_file_system;
 extern int make_backups;
@@ -52,6 +54,7 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_times;
 extern int relative_paths;
+extern int implied_dirs;
 extern int copy_links;
 extern int copy_unsafe_links;
 extern int remote_version;
@@ -70,7 +73,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
 
 static int show_filelist_p(void)
 {
-	return verbose && recurse && !am_server;
+	return verbose && (recurse || files_from) && !am_server;
 }
 
 static void start_filelist_progress(char *kind)
@@ -681,7 +684,7 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 	if (noexcludes)
 		goto skip_excludes;
 
-	if (S_ISDIR(st.st_mode) && !recurse) {
+	if (S_ISDIR(st.st_mode) && !recurse && !files_from) {
 		rprintf(FINFO, "skipping directory %s\n", fname);
 		return NULL;
 	}
@@ -877,12 +880,13 @@ static void send_directory(int f, struct file_list *flist, char *dir)
  **/
 struct file_list *send_file_list(int f, int argc, char *argv[])
 {
-	int i, l;
+	int l;
 	STRUCT_STAT st;
 	char *p, *dir, *olddir;
 	char lastpath[MAXPATHLEN] = "";
 	struct file_list *flist;
 	int64 start_write;
+	int use_ff_fd = 0;
 
 	if (show_filelist_p() && f != -1)
 		start_filelist_progress("building file list");
@@ -893,13 +897,31 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 	if (f != -1) {
 		io_start_buffering(f);
+		if (filesfrom_fd >= 0) {
+			if (argv[0] && !push_dir(argv[0], 0)) {
+				rprintf(FERROR, "push_dir %s : %s\n",
+					argv[0], strerror(errno));
+				exit_cleanup(RERR_FILESELECT);
+			}
+			use_ff_fd = 1;
+		}
 	}
 
-	for (i = 0; i < argc; i++) {
+	while (1) {
 		char fname2[MAXPATHLEN];
 		char *fname = fname2;
 
-		strlcpy(fname, argv[i], MAXPATHLEN);
+		if (use_ff_fd) {
+			if (read_filesfrom_line(filesfrom_fd, fname) == 0)
+				break;
+			sanitize_path(fname, NULL);
+		} else {
+			if (argc-- == 0)
+				break;
+			strlcpy(fname, *argv++, MAXPATHLEN);
+			if (sanitize_paths)
+				sanitize_path(fname, NULL);
+		}
 
 		l = strlen(fname);
 		if (l != 1 && fname[l - 1] == '/') {
@@ -924,7 +946,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			continue;
 		}
 
-		if (S_ISDIR(st.st_mode) && !recurse) {
+		if (S_ISDIR(st.st_mode) && !recurse && !files_from) {
 			rprintf(FINFO, "skipping directory %s\n", fname);
 			continue;
 		}
@@ -942,7 +964,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 					dir = fname;
 				fname = p + 1;
 			}
-		} else if (f != -1 && (p=strrchr(fname,'/')) && p != fname) {
+		} else if (f != -1 && implied_dirs && (p=strrchr(fname,'/')) && p != fname) {
 			/* this ensures we send the intermediate directories,
 			   thus getting their permissions right */
 			char *lp = lastpath, *fn = fname, *slash = fname;
