@@ -309,6 +309,16 @@ struct map_struct {
 	OFF_T size, p_offset;
 };
 
+struct exclude_struct {
+	char *orig;
+	char *pattern;
+	int regular_exp;
+	int include;
+	int directory;
+	int local;
+};
+
+
 /* we need this function because of the silly way in which duplicate
    entries are handled in the file lists - we can't change this
    without breaking existing versions */

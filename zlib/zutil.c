@@ -200,11 +200,6 @@ void  zcfree (voidpf opaque, voidpf ptr)
 
 #ifndef MY_ZCALLOC /* Any system without a special alloc function */
 
-#ifndef STDC
-extern voidp  calloc OF((uInt items, uInt size));
-extern void   free   OF((voidpf ptr));
-#endif
-
 voidpf zcalloc (opaque, items, size)
     voidpf opaque;
     unsigned items;

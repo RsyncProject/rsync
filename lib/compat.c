@@ -58,3 +58,21 @@ void *memmove(void *dest, const void *src, size_t n)
 	return dest;
 }
 #endif
+
+#ifndef HAVE_STRPBRK
+/* Find the first ocurrence in S of any character in ACCEPT.  
+   derived from glibc 
+*/
+char *strpbrk(const char *s, const char *accept)
+{
+	while (*s != '\0')  {
+		const char *a = accept;
+		while (*a != '\0') {
+			if (*a++ == *s)	return (char *)s;
+		}
+		++s;
+	}
+
+	return NULL;
+}
+#endif

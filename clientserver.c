@@ -174,7 +174,7 @@ static int rsync_module(int fd, int i)
 	}
 
 	p = lp_exclude_from(i);
-	add_exclude_file(p, 1);
+	add_exclude_file(p, 1, 0);
 
 	p = lp_exclude(i);
 	add_exclude_line(p);

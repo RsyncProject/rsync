@@ -46,7 +46,7 @@ extern int copy_links;
 extern int remote_version;
 extern int io_error;
 
-static char **local_exclude_list;
+static struct exclude_struct **local_exclude_list;
 
 int link_stat(const char *Path, STRUCT_STAT *Buffer) 
 {
@@ -67,7 +67,7 @@ int link_stat(const char *Path, STRUCT_STAT *Buffer)
  */
 static int match_file_name(char *fname,STRUCT_STAT *st)
 {
-  if (check_exclude(fname,local_exclude_list)) {
+  if (check_exclude(fname,local_exclude_list,st)) {
     if (verbose > 2)
       rprintf(FINFO,"excluding file %s\n",fname);
     return 0;
@@ -493,10 +493,10 @@ static void send_file_name(int f,struct file_list *flist,char *fname,
   }
 
   if (S_ISDIR(file->mode) && recursive) {
-    char **last_exclude_list = local_exclude_list;
-    send_directory(f,flist,f_name(file));
-    local_exclude_list = last_exclude_list;
-    return;
+	  struct exclude_struct **last_exclude_list = local_exclude_list;
+	  send_directory(f,flist,f_name(file));
+	  local_exclude_list = last_exclude_list;
+	  return;
   }
 }
 
@@ -535,7 +535,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 	if (cvs_exclude) {
 		if (strlen(fname) + strlen(".cvsignore") <= MAXPATHLEN-1) {
 			strcpy(p,".cvsignore");
-			local_exclude_list = make_exclude_list(fname,NULL,0);
+			local_exclude_list = make_exclude_list(fname,NULL,0,0);
 		} else {
 			io_error = 1;
 			rprintf(FINFO,"cannot cvs-exclude in long-named directory %s\n",fname);

@@ -41,7 +41,7 @@ AC_FUNC_MEMCMP
 AC_FUNC_UTIME_NULL
 AC_CHECK_FUNCS(mmap munmap waitpid getcwd strdup strerror chown chmod mknod)
 AC_CHECK_FUNCS(fchmod fstat strchr bcopy bzero readlink link utime utimes)
-AC_CHECK_FUNCS(memmove getopt_long lchown setlinebuf vsnprintf setsid glob)
+AC_CHECK_FUNCS(memmove getopt_long lchown setlinebuf vsnprintf setsid glob strpbrk)
 
 echo $ac_n "checking for working fnmatch... $ac_c"
 AC_TRY_RUN([#include <fnmatch.h>

@@ -109,6 +109,8 @@ void usage(int F)
   rprintf(F,"-z, --compress           compress file data\n");
   rprintf(F,"    --exclude FILE       exclude file FILE\n");
   rprintf(F,"    --exclude-from FILE  exclude files listed in FILE\n");
+  rprintf(F,"    --include FILE       don't exclude file FILE\n");
+  rprintf(F,"    --include-from FILE  don't exclude files listed in FILE\n");
   rprintf(F,"    --suffix SUFFIX      override backup suffix\n");  
   rprintf(F,"    --version            print version number\n");  
   rprintf(F,"    --daemon             run as a rsync daemon\n");  
@@ -122,7 +124,8 @@ void usage(int F)
 
 enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
       OPT_EXCLUDE_FROM,OPT_DELETE,OPT_NUMERIC_IDS,OPT_RSYNC_PATH,
-      OPT_FORCE,OPT_TIMEOUT,OPT_DAEMON,OPT_CONFIG,OPT_PORT};
+      OPT_FORCE,OPT_TIMEOUT,OPT_DAEMON,OPT_CONFIG,OPT_PORT,
+      OPT_INCLUDE, OPT_INCLUDE_FROM};
 
 static char *short_options = "oblLWHpguDCtcahvrRIxnSe:B:T:z";
 
@@ -135,6 +138,8 @@ static struct option long_options[] = {
   {"numeric-ids", 0,     0,    OPT_NUMERIC_IDS},
   {"exclude",     1,     0,    OPT_EXCLUDE},
   {"exclude-from",1,     0,    OPT_EXCLUDE_FROM},
+  {"include",     1,     0,    OPT_INCLUDE},
+  {"include-from",1,     0,    OPT_INCLUDE_FROM},
   {"rsync-path",  1,     0,    OPT_RSYNC_PATH},
   {"one-file-system",0,  0,    'x'},
   {"ignore-times",0,     0,    'I'},
@@ -213,11 +218,19 @@ void parse_arguments(int argc, char *argv[])
 	  break;
 
 	case OPT_EXCLUDE:
-	  add_exclude(optarg);
+	  add_exclude(optarg, 0);
+	  break;
+
+	case OPT_INCLUDE:
+	  add_exclude(optarg, 1);
 	  break;
 
 	case OPT_EXCLUDE_FROM:
-	  add_exclude_file(optarg,1);
+	  add_exclude_file(optarg,1, 0);
+	  break;
+
+	case OPT_INCLUDE_FROM:
+	  add_exclude_file(optarg,1, 1);
 	  break;
 
 	case 'h':
