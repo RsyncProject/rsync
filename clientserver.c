@@ -287,6 +287,7 @@ static int rsync_module(int fd, int i)
 	}
 
 	if (am_root) {
+#ifdef HAVE_SETGROUPS
 		/* Get rid of any supplementary groups this process
 		 * might have inheristed. */
 		if (setgroups(0, NULL)) {
@@ -294,6 +295,7 @@ static int rsync_module(int fd, int i)
 			io_printf(fd, "@ERROR: setgroups failed\n");
 			return -1;
 		}
+#endif
 
 		/* XXXX: You could argue that if the daemon is started
 		 * by a non-root user and they explicitly specify a
