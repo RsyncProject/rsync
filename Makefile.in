@@ -4,11 +4,10 @@
 INSTALL_BIN=@prefix@/bin
 INSTALL_MAN=@prefix@/man
 
-CCOPTFLAGS =      -O 
-
 LIBS=@LIBS@
-CC=@CC@ $(CCOPTFLAGS)
-
+CC=@CC@ 
+CFLAGS=@CFLAGS@
+ 
 INSTALLCMD=@INSTALL@
 
 SRC=@srcdir@
