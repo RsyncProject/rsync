@@ -110,8 +110,6 @@ void log_open(void)
 
 	if (depth) return;
 
-	depth++;
-
 	va_start(ap, format);
 	len = vslprintf(buf, sizeof(buf)-1, format, ap);
 	va_end(ap);
@@ -124,13 +122,14 @@ void log_open(void)
 
 	if (fd == FLOG) {
 		if (am_daemon) logit(LOG_INFO, buf);
-		depth--;
 		return;
 	}
 
 	if (am_daemon) {
 		int priority = LOG_INFO;
 		if (fd == FERROR) priority = LOG_WARNING;
+
+		depth++;
 
 		log_open();
 		if (!io_multiplex_write(fd, buf, strlen(buf))) {
@@ -158,8 +157,6 @@ void log_open(void)
 	if (fwrite(buf, len, 1, f) != 1) exit_cleanup(1);
 
 	if (buf[len-1] == '\r' || buf[len-1] == '\n') fflush(f);
-
-	depth--;
 }
 
 void rflush(int fd)
