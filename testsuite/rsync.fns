@@ -98,9 +98,17 @@ hands_setup() {
     mkdir "$fromdir/dir/subdir"
     echo some data > "$fromdir/dir/subdir/foobar.baz"
     mkdir "$fromdir/dir/subdir/subsubdir"
-    ls -ltr /etc > "$fromdir/dir/subdir/subsubdir/etc-ltr-list"
+    if [ -r /etc ]; then
+	ls -ltr /etc > "$fromdir/dir/subdir/subsubdir/etc-ltr-list"
+    else
+	ls -ltr / > "$fromdir/dir/subdir/subsubdir/etc-ltr-list"
+    fi
     mkdir "$fromdir/dir/subdir/subsubdir2"
-    ls -lt /bin > "$fromdir/dir/subdir/subsubdir2/bin-lt-list"
+    if [ -r /bin ]; then
+	ls -lt /bin > "$fromdir/dir/subdir/subsubdir2/bin-lt-list"
+    else
+	ls -lt / > "$fromdir/dir/subdir/subsubdir2/bin-lt-list"
+    fi
 
 #      echo testing head:
 #      ls -lR "$srcdir" | head -10 || echo failed
