@@ -52,6 +52,15 @@ extern int io_timeout;
 extern struct stats stats;
 
 
+/**
+ * The connection might be dropped at some point; perhaps because the
+ * remote instance crashed.  Just giving the offset on the stream is
+ * not very helpful.  So instead we try to make io_phase_name point to
+ * something useful.
+ **/
+const char *io_phase_name = "unknown";
+
+
 /** Ignore EOF errors while reading a module listing if the remote
     version is 24 or less. */
 int kludge_around_eof = False;
@@ -413,7 +422,7 @@ static void sleep_for_bwlimit(int bytes_written)
 	tv.tv_sec  = tv.tv_usec / 1000000;
 	tv.tv_usec = tv.tv_usec % 1000000;
 
-	select(0, NULL, NULL, NULL, tv);
+	select(0, NULL, NULL, NULL, &tv);
 }
 
 
@@ -491,8 +500,8 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 				 * across the stream */
 				io_multiplexing_close();
 				rprintf(FERROR, RSYNC_NAME
-					": writefd_unbuffered failed to write %ld bytes: %s\n",
-					(long) len, 
+					": writefd_unbuffered failed to write %ld bytes: phase \"%s\": %s\n",
+					(long) len, io_phase_name, 
 					strerror(errno));
 				exit_cleanup(RERR_STREAMIO);
 			}
