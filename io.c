@@ -76,9 +76,9 @@ int batch_gen_fd = -1;
 const char *io_write_phase = phase_unknown;
 const char *io_read_phase = phase_unknown;
 
-/* Ignore an EOF error if non-zero.  We exit if the value is 1 (used while
+/* Ignore an EOF error if non-zero.  We exit if the value is > 0 (used while
  * reading a module listing if the remote version is 24 or less) or go into a
- * sleep loop if the value is 2 (used by the receiver when it is reading a
+ * sleep loop if the value is < 0 (used by the receiver when it is reading a
  * potential end-of-transfer keep-alive message that may never come). */
 int kluge_around_eof = 0;
 
