@@ -42,7 +42,7 @@ static char *timestring(void )
 #endif
 
 	if (TimeBuf[strlen(TimeBuf)-1] == '\n') {
-		TimeBuf[strlen(TimeBuf)-1] == 0;
+		TimeBuf[strlen(TimeBuf)-1] = 0;
 	}
 
 	return(TimeBuf);
