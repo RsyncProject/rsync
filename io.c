@@ -208,13 +208,17 @@ static void read_msg_fd(void)
 
 	switch (tag) {
 	case MSG_DONE:
-		if (len != 0)
+		if (len != 0) {
+			rprintf(FERROR, "invalid message %d:%d\n", tag, len);
 			exit_cleanup(RERR_STREAMIO);
+		}
 		redo_list_add(-1);
 		break;
 	case MSG_REDO:
-		if (len != 4)
+		if (len != 4) {
+			rprintf(FERROR, "invalid message %d:%d\n", tag, len);
 			exit_cleanup(RERR_STREAMIO);
+		}
 		read_loop(fd, buf, 4);
 		redo_list_add(IVAL(buf,0));
 		break;
@@ -231,6 +235,7 @@ static void read_msg_fd(void)
 		}
 		break;
 	default:
+		rprintf(FERROR, "unknown message %d:%d\n", tag, len);
 		exit_cleanup(RERR_STREAMIO);
 	}
 
