@@ -30,17 +30,19 @@ extern int am_root;
 extern int preserve_devices;
 extern int preserve_links;
 extern int preserve_hard_links;
+extern int orig_umask;
 
 /* simple backup creates a backup with a suffix in the same directory */
 static int make_simple_backup(char *fname)
 {
 	char fnamebak[MAXPATHLEN];
-	if (strlen(fname) + backup_suffix_len > MAXPATHLEN-1) {
+
+	if (stringjoin(fnamebak, sizeof fnamebak, fname, backup_suffix, NULL)
+	    >= sizeof fnamebak) {
 		rprintf(FERROR, "backup filename too long\n");
 		return 0;
 	}
 
-	snprintf(fnamebak, sizeof(fnamebak), "%s%s", fname, backup_suffix);
 	if (do_rename(fname, fnamebak) != 0) {
 		/* cygwin (at least version b19) reports EINVAL */
 		if (errno != ENOENT && errno != EINVAL) {
@@ -87,20 +89,20 @@ static int make_bak_dir(char *fname, char *bak_path)
 	STRUCT_STAT st;
 	STRUCT_STAT *st2;
 	char fullpath[MAXPATHLEN];
-	extern int orig_umask;
 	char *p;
 	char *q;
 
 	while(strncmp(bak_path, "./", 2) == 0) bak_path += 2;
 
-	if (bak_path[strlen(bak_path)-1] != '/') {
-		snprintf(fullpath, sizeof(fullpath), "%s/", bak_path);
-	} else {
-		snprintf(fullpath, sizeof(fullpath), "%s", bak_path);
+	if (pathjoin(fullpath, sizeof fullpath, bak_path, fname)
+	    >= sizeof fullpath) {
+		rprintf(FERROR, "backup dirname too long\n");
+		return 0;
 	}
 	p = fullpath;
-	q = &fullpath[strlen(fullpath)];  /* End of bak_path string */
-	strcat(fullpath, fname);
+	q = fullpath + strlen(bak_path);
+	if (*q == '/')
+		q++; /* Point past the middle '/' added by pathjoin(). */
 
 	/* Make the directories */
 	while ((p = strchr(p, '/')) != NULL) {
@@ -125,8 +127,7 @@ static int make_bak_dir(char *fname, char *bak_path)
 				}
 			}
 		}
-		*p = '/';
-		p++;
+		*p++ = '/';
 	}
 	return 0;
 }
@@ -175,13 +176,10 @@ static int robust_move(char *src, char *dst)
    We will move the file to be deleted into a parallel directory tree */
 static int keep_backup(char *fname)
 {
-
 	static int initialised;
-
-	char keep_name [MAXPATHLEN];
+	char keep_name[MAXPATHLEN];
 	STRUCT_STAT st;
 	struct file_struct *file;
-
 	int kept = 0;
 	int ret_code;
 
@@ -206,13 +204,12 @@ static int keep_backup(char *fname)
 	if (!file) return 1;
 
 	/* make a complete pathname for backup file */
-	if (backup_dir_len+strlen(fname)+backup_suffix_len > MAXPATHLEN-1) {
+	if (stringjoin(keep_name, sizeof keep_name,
+		       backup_dir, "/", fname, backup_suffix, NULL)
+	    >= sizeof keep_name) {
 		rprintf(FERROR, "keep_backup filename too long\n");
 		return 0;
 	}
-
-	snprintf(keep_name, sizeof (keep_name), "%s/%s%s",
-	    backup_dir, fname, backup_suffix);
 
 #ifdef HAVE_MKNOD
 	/* Check to see if this is a device file, or link */
