@@ -27,6 +27,7 @@
   */
 #include "rsync.h"
 
+extern int dry_run;
 extern int am_daemon;
 extern int am_server;
 extern int am_sender;
@@ -534,7 +535,7 @@ void log_delete(char *fname, int mode)
 		if (S_ISDIR(mode))
 			len++; /* directories include trailing null */
 		send_msg(MSG_DELETED, fname, len);
-		if (!am_daemon)
+		if (!am_daemon || dry_run)
 			return;
 		fmt = lp_log_format(module_id);
 		code = FLOG;
@@ -556,7 +557,7 @@ void log_delete(char *fname, int mode)
 void log_exit(int code, const char *file, int line)
 {
 	if (code == 0) {
-		rprintf(FLOG,"wrote %.0f bytes  read %.0f bytes  total size %.0f\n",
+		rprintf(FLOG,"sent %.0f bytes  received %.0f bytes  total size %.0f\n",
 			(double)stats.total_written,
 			(double)stats.total_read,
 			(double)stats.total_size);
