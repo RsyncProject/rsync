@@ -199,7 +199,7 @@ static void hash_search(int f,struct sum_struct *s,
 			/* we've found a match, but now check to see
                            if last_i can hint at a better match */
 			for (j++; j<s->count && targets[j].t == t; j++) {
-				int i2 = targets[j].t;
+				int i2 = targets[j].i;
 				if (i2 == last_i + 1) {
 					if (sum != s->sums[i2].sum1) break;
 					if (memcmp(sum2,s->sums[i2].sum2,csum_length) != 0) break;
