@@ -308,7 +308,7 @@ static int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
 
 
 void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
-	     int32 iflags, char *hlink)
+	     int32 iflags, uchar fnamecmp_type, char *xname)
 {
 	if (statret == 0) {
 		if (S_ISREG(file->mode) && file->length != st->st_size)
@@ -329,23 +329,22 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 			    && st->st_gid != file->gid)
 				iflags |= ITEM_REPORT_GROUP;
 		}
-	} else {
+	} else
 		iflags |= ITEM_IS_NEW;
-		if (!(iflags & (ITEM_HARD_LINKED|ITEM_LOCAL_CHANGE)))
-			iflags |= ITEM_TRANSFER;
-	}
 
 	iflags &= 0xffff;
 	if ((iflags & SIGNIFICANT_ITEM_FLAGS || verbose > 1
-	  || (hlink && *hlink)) && !read_batch) {
+	  || (xname && *xname)) && !read_batch) {
 		if (protocol_version >= 29) {
 			if (ndx >= 0)
 				write_int(sock_f_out, ndx);
 			write_shortint(sock_f_out, iflags);
-			if (hlink)
-				write_vstring(sock_f_out, hlink, strlen(hlink));
+			if (iflags & ITEM_BASIS_TYPE_FOLLOWS)
+				write_byte(sock_f_out, fnamecmp_type);
+			if (iflags & ITEM_XNAME_FOLLOWS)
+				write_vstring(sock_f_out, xname, strlen(xname));
 		} else if (ndx >= 0)
-			log_item(file, &stats, iflags, hlink);
+			log_item(file, &stats, iflags, xname);
 	}
 }
 
@@ -582,7 +581,7 @@ static int phase = 0;
  * modification-time repair. */
 static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			   int itemizing, int maybe_PERMS_REPORT,
-			   enum logcode code, int f_out, int f_out_name)
+			   enum logcode code, int f_out)
 {
 	static int missing_below = -1, excluded_below = -1;
 	static char *fuzzy_dirname = NULL;
@@ -697,7 +696,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 		if (itemizing && f_out != -1) {
 			itemize(file, ndx, statret, &st,
-				statret ? ITEM_LOCAL_CHANGE : 0, NULL);
+				statret ? ITEM_LOCAL_CHANGE : 0, 0, NULL);
 		}
 		if (statret != 0 && do_mkdir(fname,file->mode) != 0 && errno != EEXIST) {
 			if (!relative_paths || errno != ENOENT
@@ -749,7 +748,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				if (strcmp(lnk, file->u.link) == 0) {
 					if (itemizing) {
 						itemize(file, ndx, 0, &st, 0,
-							NULL);
+							0, NULL);
 					}
 					set_perms(fname, file, &st,
 						  maybe_PERMS_REPORT);
@@ -772,7 +771,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			set_perms(fname,file,NULL,0);
 			if (itemizing) {
 				itemize(file, ndx, statret, &st,
-					ITEM_LOCAL_CHANGE, NULL);
+					ITEM_LOCAL_CHANGE, 0, NULL);
 			}
 			if (code && verbose) {
 				rprintf(code, "%s -> %s\n", safe_fname(fname),
@@ -807,7 +806,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				set_perms(fname,file,NULL,0);
 				if (itemizing) {
 					itemize(file, ndx, statret, &st,
-						ITEM_LOCAL_CHANGE, NULL);
+						ITEM_LOCAL_CHANGE, 0, NULL);
 				}
 				if (code && verbose) {
 					rprintf(code, "%s\n",
@@ -816,7 +815,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 		} else {
 			if (itemizing)
-				itemize(file, ndx, statret, &st, 0, NULL);
+				itemize(file, ndx, statret, &st, 0, 0, NULL);
 			set_perms(fname, file, &st, maybe_PERMS_REPORT);
 		}
 		return;
@@ -964,7 +963,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	else if (unchanged_file(fnamecmp, file, &st)) {
 		if (fnamecmp_type == FNAMECMP_FNAME) {
 			if (itemizing)
-				itemize(file, ndx, statret, &st, 0, NULL);
+				itemize(file, ndx, statret, &st, 0, 0, NULL);
 			set_perms(fname, file, &st, maybe_PERMS_REPORT);
 			if (preserve_hard_links && file->link_u.links)
 				hard_link_cluster(file, ndx, itemizing, code);
@@ -973,7 +972,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		/* Only --compare-dest gets here. */
 		if (unchanged_attrs(file, &st)) {
 			itemize(file, ndx, statret, &st,
-				ITEM_NO_DEST_AND_NO_UPDATE, NULL);
+				ITEM_NO_DEST_AND_NO_UPDATE, 0, NULL);
 			return;
 		}
 	}
@@ -1009,7 +1008,7 @@ prepare_to_open:
 		goto notify_others;
 	}
 
-	if (inplace && make_backups) {
+	if (inplace && make_backups && fnamecmp_type == FNAMECMP_FNAME) {
 		if (!(backupptr = get_backup_name(fname))) {
 			close(fd);
 			return;
@@ -1051,15 +1050,11 @@ notify_others:
 		if (always_checksum)
 			iflags |= ITEM_REPORT_CHECKSUM;
 		if (fnamecmp_type != FNAMECMP_FNAME)
-			iflags |= ITEM_USING_ALT_BASIS;
-		itemize(file, -1, statret, &st, iflags, NULL);
-	}
-	if (f_out_name >= 0) {
-		write_byte(f_out_name, fnamecmp_type);
-		if (fnamecmp_type == FNAMECMP_FUZZY) {
-			write_vstring(f_out_name, fuzzy_file->basename,
-				      strlen(fuzzy_file->basename));
-		}
+			iflags |= ITEM_BASIS_TYPE_FOLLOWS;
+		if (fnamecmp_type == FNAMECMP_FUZZY)
+			iflags |= ITEM_XNAME_FOLLOWS;
+		itemize(file, -1, statret, &st, iflags, fnamecmp_type,
+			fuzzy_file ? fuzzy_file->basename : NULL);
 	}
 
 	if (dry_run) {
@@ -1091,8 +1086,7 @@ notify_others:
 }
 
 
-void generate_files(int f_out, struct file_list *flist, char *local_name,
-		    int f_out_name)
+void generate_files(int f_out, struct file_list *flist, char *local_name)
 {
 	int i, lull_mod;
 	char fbuf[MAXPATHLEN];
@@ -1152,7 +1146,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 
 		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
 			       file, i, itemizing, maybe_PERMS_REPORT, code,
-			       f_out, f_out_name);
+			       f_out);
 
 		/* We need to ensure that any dirs we create have writeable
 		 * permissions during the time we are putting files within
@@ -1174,7 +1168,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 		if (allowed_lull && !(i % lull_mod))
 			maybe_send_keepalive();
 	}
-	recv_generator(NULL, NULL, 0, 0, 0, code, -1, -1);
+	recv_generator(NULL, NULL, 0, 0, 0, code, -1);
 	if (delete_during)
 		delete_in_dir(NULL, NULL, NULL);
 
@@ -1200,7 +1194,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 		struct file_struct *file = flist->files[i];
 		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
 			       file, i, itemizing, maybe_PERMS_REPORT, code,
-			       f_out, f_out_name);
+			       f_out);
 	}
 
 	phase++;
@@ -1232,12 +1226,12 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 				continue;
 			recv_generator(local_name ? local_name : f_name(file),
 				       file, i, itemizing, maybe_PERMS_REPORT,
-				       code, -1, -1);
+				       code, -1);
 			if (allowed_lull && !(j++ % lull_mod))
 				maybe_send_keepalive();
 		}
 	}
-	recv_generator(NULL, NULL, 0, 0, 0, code, -1, -1);
+	recv_generator(NULL, NULL, 0, 0, 0, code, -1);
 
 	if (max_delete > 0 && deletion_count > max_delete) {
 		rprintf(FINFO,
