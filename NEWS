@@ -17,11 +17,14 @@ Changes since 2.6.2:
       the password file (by the client):  the files no longer need to be
       terminated by a newline for their content to be read in.
 
-    - If a file has a read error on the sending side, the receiver will
-      no longer keep the resulting file unless the --partial option was
-      specified.  (Note:  both sides must be running 2.6.3 for this to
-      work -- older receivers always keep the file, and older senders
-      don't tell the receiver that the file was not read correctly.)
+    - If a file has a read error on the sending side or the reconstructed
+      data doesn't match the expected checksum (perhaps due to the basis
+      file changing during the transfer), the receiver will no longer
+      retain the resulting file unless the --partial option was specified.
+      (Note: for the read-error detection to work, neither side can be
+      older than 2.6.3 -- older receivers will always retain the file, and
+      older senders don't tell the receiver that the file had a read
+      error.)
 
     - If a file gets resent in a single transfer and the --backup option
       is enabled, rsync no longer performs a duplicate backup (losing the
@@ -73,7 +76,7 @@ Changes since 2.6.2:
       rename() behavior).
 
     - Avoid a bogus run-time complaint about a lack of 64-bit integers when
-      int64 is defined as an off_t and it actually has 64-bits.
+      the int64 type is defined as an off_t and it actually has 64-bits.
 
   ENHANCEMENTS:
 
@@ -88,8 +91,8 @@ Changes since 2.6.2:
     - Added the --inplace option that tells rsync to write each destination
       file without using a temporary file.  The matching of existing data
       in the destination file can be severely limited by this, but there
-      are cases where this is more efficient, such as appending data.  Use
-      only when needed (see the man page for more details).
+      are also cases where this is more efficient (such as appending data).
+      Use only when needed (see the man page for more details).
 
     - Added the "write only" option to the daemon's config file.
 
@@ -113,6 +116,13 @@ Changes since 2.6.2:
       file instead of three, which makes it possible to read the batch via
       stdin.  Also, the old requirement of using the same fixed checksum-
       seed for all batch processing has been removed.
+
+    - If an rsync daemon has a module set with "list = no" (which hides its
+      presence in the list of available modules), a user that fails to
+      authenticate gets the same "unknown module" error that they would get
+      if the module were actually unknown (while still logging the real
+      error to the daemon's log file).  This prevents fishing for modules
+      names.
 
   INTERNAL:
 
