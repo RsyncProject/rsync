@@ -58,8 +58,9 @@ and a single line something like this to /etc/inetd.conf:
     
 quote(rsync   stream  tcp     nowait  root   /usr/bin/rsync rsyncd --daemon)
 
-You will then need to send inetd a HUP signal to tell it to reread its
-config file.
+Replace "/usr/bin/rsync" with the path to where you have rsync installed on
+your system.  You will then need to send inetd a HUP signal to tell it to
+reread its config file.
 
 Note that you should not send the rsync server a HUP signal to force
 it to reread the tt(/etc/rsyncd.conf). The file is re-read on each client
