@@ -72,7 +72,7 @@ static char *cleanup_new_fname;
 static struct file_struct *cleanup_file;
 static int cleanup_fd1, cleanup_fd2;
 static struct map_struct *cleanup_buf;
-static int cleanup_pid = 0;
+static pid_t cleanup_pid = 0;
 extern int io_error;
 
 pid_t cleanup_child_pid = -1;
@@ -124,7 +124,7 @@ void _exit_cleanup(int code, const char *file, int line)
 	if (code) {
 		kill_all(SIGUSR1);
 	}
-	if ((cleanup_pid != 0) && (cleanup_pid == (int) getpid())) {
+	if (cleanup_pid && cleanup_pid == getpid()) {
 		char *pidf = lp_pid_file();
 		if (pidf && *pidf) {
 			unlink(lp_pid_file());
@@ -166,7 +166,7 @@ void cleanup_set(char *fnametmp, char *fname, struct file_struct *file,
 	cleanup_fd2 = fd2;
 }
 
-void cleanup_set_pid(int pid)
+void cleanup_set_pid(pid_t pid)
 {
 	cleanup_pid = pid;
 }
