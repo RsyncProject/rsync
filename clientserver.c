@@ -43,6 +43,7 @@ extern int filesfrom_fd;
 extern int remote_protocol;
 extern int protocol_version;
 extern int io_timeout;
+extern int select_timeout;
 extern int orig_umask;
 extern int no_detach;
 extern int default_af_hint;
@@ -476,8 +477,11 @@ static int rsync_module(int f_in, int f_out, int i)
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
 
-	if (lp_timeout(i))
+	if (lp_timeout(i)) {
 		io_timeout = lp_timeout(i);
+		if (io_timeout && io_timeout < select_timeout)
+			select_timeout = io_timeout;
+	}
 
 	start_server(f_in, f_out, argc, argp);
 
