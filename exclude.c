@@ -688,6 +688,8 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 			break;
 		default:
 			ch = *s;
+			if (s[1] == ',')
+				s++;
 			break;
 		}
 		switch (ch) {
