@@ -336,12 +336,16 @@ running rsync giving the network directory.
    This answer, formatted with "real" bullets, can be found at:
    -[4]http://twiki.org/cgi-bin/view/Wikilearn/RsyncingALargeFileFAQ*
 
-   Note: I modified this on Oct. 9. 2001 -- I marked the changes with asterisks. The only deletion
-   without a corresponding correction was the deletion of an "(IIRC)".
-   2001-Oct-09 7:47am rhkramerATfastDOTnet
 	  </para>
 	</answer>
       </qandaentry>
     </qandaset>
   </chapter>
+
+
+  <appendix>
+    <title>Other Resources</title>
+    
+    <para><ulink url="http://www.ccp14.ac.uk/ccp14admin/rsync/"></ulink></para>
+  </appendix>
 </book>
