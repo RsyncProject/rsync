@@ -23,12 +23,15 @@
 extern int verbose;
 extern int recurse;
 extern int delete_mode;
+extern int delete_after;
+extern int max_delete;
 extern int csum_length;
 extern struct stats stats;
 extern int dry_run;
 extern int am_server;
 extern int relative_paths;
 extern int preserve_hard_links;
+extern int preserve_perms;
 extern int cvs_exclude;
 extern int io_error;
 extern char *tmpdir;
@@ -39,6 +42,9 @@ extern char *backup_dir;
 extern char *backup_suffix;
 extern int backup_suffix_len;
 extern int cleanup_got_literal;
+extern int module_id;
+extern int ignore_errors;
+extern int orig_umask;
 
 static void delete_one(char *fn, int is_dir)
 {
@@ -76,9 +82,6 @@ void delete_files(struct file_list *flist)
 	struct file_list *local_file_list;
 	int i, j;
 	char *argv[1], fbuf[MAXPATHLEN];
-	extern int module_id;
-	extern int ignore_errors;
-	extern int max_delete;
 	static int deletion_count;
 
 	if (cvs_exclude)
@@ -100,12 +103,14 @@ void delete_files(struct file_list *flist)
 			continue;
 
 		if (verbose > 1)
-			rprintf(FINFO,"deleting in %s\n", fbuf);
+			rprintf(FINFO, "deleting in %s\n", fbuf);
 
 		for (i = local_file_list->count-1; i >= 0; i--) {
-			if (max_delete && deletion_count > max_delete) break;
-			if (!local_file_list->files[i]->basename) continue;
-			if (-1 == flist_find(flist,local_file_list->files[i])) {
+			if (max_delete && deletion_count > max_delete)
+				break;
+			if (!local_file_list->files[i]->basename)
+				continue;
+			if (flist_find(flist,local_file_list->files[i]) < 0) {
 				char *f = f_name(local_file_list->files[i]);
 				if (make_backups && (backup_dir || !is_backup_file(f))) {
 					(void) make_backup(f);
@@ -294,10 +299,6 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 	struct file_struct *file;
 	int phase=0;
 	int recv_ok;
-	extern struct stats stats;
-	extern int preserve_perms;
-	extern int delete_after;
-	extern int orig_umask;
 	struct stats initial_stats;
 
 	if (verbose > 2) {
