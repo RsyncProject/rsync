@@ -303,6 +303,12 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
 }
 
 
+static void discard_receive_data(int f_in, OFF_T length)
+{
+	receive_data(f_in, NULL, -1, NULL, length);
+}
+
+
 /**
  * main routine for receiver process.
  *
@@ -387,7 +393,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 					"skipping server-excluded update for \"%s\"\n",
 					fname);
 			}
-			receive_data(f_in,NULL,-1,NULL,file->length);
+			discard_receive_data(f_in, file->length);
 			continue;
 		}
 
@@ -405,7 +411,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		if (fd1 != -1 && do_fstat(fd1,&st) != 0) {
 			rsyserr(FERROR, errno, "fstat %s failed",
 				full_fname(fnamecmp));
-			receive_data(f_in,NULL,-1,NULL,file->length);
+			discard_receive_data(f_in, file->length);
 			close(fd1);
 			continue;
 		}
@@ -418,7 +424,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			 */
 			rprintf(FERROR,"recv_files: %s is a directory\n",
 				full_fname(fnamecmp));
-			receive_data(f_in, NULL, -1, NULL, file->length);
+			discard_receive_data(f_in, file->length);
 			close(fd1);
 			continue;
 		}
@@ -451,7 +457,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			if (fd2 == -1) {
 				rsyserr(FERROR, errno, "open %s failed",
 					full_fname(fnamecmp));
-				receive_data(f_in,mapbuf,-1,NULL,file->length);
+				discard_receive_data(f_in, file->length);
 				if (mapbuf)
 					unmap_file(mapbuf);
 				if (fd1 != -1)
@@ -460,7 +466,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			}
 		} else {
 			if (!get_tmpname(fnametmp,fname)) {
-				receive_data(f_in,mapbuf,-1,NULL,file->length);
+				discard_receive_data(f_in, file->length);
 				if (mapbuf)
 					unmap_file(mapbuf);
 				if (fd1 != -1)
@@ -489,7 +495,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			if (fd2 == -1) {
 				rsyserr(FERROR, errno, "mkstemp %s failed",
 					full_fname(fnametmp));
-				receive_data(f_in,mapbuf,-1,NULL,file->length);
+				discard_receive_data(f_in, file->length);
 				if (mapbuf)
 					unmap_file(mapbuf);
 				if (fd1 != -1)
