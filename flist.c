@@ -43,8 +43,8 @@ extern int numeric_ids;
 extern int cvs_exclude;
 
 extern int recurse;
+extern int keep_dirs;
 extern char curr_dir[MAXPATHLEN];
-extern char *files_from;
 extern int filesfrom_fd;
 
 extern int one_file_system;
@@ -89,7 +89,7 @@ void init_flist(void)
 
 static int show_filelist_p(void)
 {
-	return verbose && (recurse || files_from) && !am_server;
+	return verbose && keep_dirs && !am_server;
 }
 
 static void start_filelist_progress(char *kind)
@@ -804,7 +804,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	if (exclude_level == NO_EXCLUDES)
 		goto skip_excludes;
 
-	if (S_ISDIR(st.st_mode) && !recurse && !files_from) {
+	if (S_ISDIR(st.st_mode) && !keep_dirs) {
 		rprintf(FINFO, "skipping directory %s\n", thisname);
 		return NULL;
 	}
@@ -1043,9 +1043,9 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 		if (dname[0] == '.' && (dname[1] == '\0'
 		    || (dname[1] == '.' && dname[2] == '\0')))
 			continue;
-		if (strlcpy(p, dname, MAXPATHLEN - offset) < MAXPATHLEN - offset)
+		if (strlcpy(p, dname, MAXPATHLEN - offset) < MAXPATHLEN - offset) {
 			send_file_name(f, flist, fname, recurse, 0);
-		else {
+		} else {
 			io_error |= IOERR_GENERAL;
 			rprintf(FINFO,
 				"cannot send long-named file %s\n",
@@ -1135,7 +1135,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			continue;
 		}
 
-		if (S_ISDIR(st.st_mode) && !recurse && !files_from) {
+		if (S_ISDIR(st.st_mode) && !keep_dirs) {
 			rprintf(FINFO, "skipping directory %s\n", fname);
 			continue;
 		}
@@ -1167,21 +1167,17 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			}
 			*p = '/';
 			if (fn != p || (*lp && *lp != '/')) {
-				int copy_links_saved = copy_links;
-				int recurse_saved = recurse;
+				int save_copy_links = copy_links;
+				int save_keep_dirs = keep_dirs;
 				copy_links = copy_unsafe_links;
-				/* set recurse to 1 to prevent make_file
-				 * from ignoring directory, but still
-				 * turn off the recursive parameter to
-				 * send_file_name */
-				recurse = 1;
+				keep_dirs = 1;
 				while ((slash = strchr(slash+1, '/')) != 0) {
 					*slash = 0;
 					send_file_name(f, flist, fname, 0, 0);
 					*slash = '/';
 				}
-				copy_links = copy_links_saved;
-				recurse = recurse_saved;
+				copy_links = save_copy_links;
+				keep_dirs = save_keep_dirs;
 				*p = 0;
 				strlcpy(lastpath, fname, sizeof lastpath);
 				*p = '/';
