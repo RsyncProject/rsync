@@ -11,12 +11,11 @@
 
 hands_setup
 
-LONGDIR=${FROM}/This-is-a-directory-with-a-stupidly-long-name-created-in-an-attempt-to-provoke-an-error-found-in-2.0.11-that-should-hopefully-never-appear-again-if-this-test-does-its-job/This-is-a-directory-with-a-stupidly-long-name-created-in-an-attempt-to-provoke-an-error-found-in-2.0.11-that-should-hopefully-never-appear-again-if-this-test-does-its-job/This-is-a-directory-with-a-stupidly-long-name-created-in-an-attempt-to-provoke-an-error-found-in-2.0.11-that-should-hopefully-never-appear-again-if-this-test-does-its-job
+LONGNAME=This-is-a-directory-with-a-stupidly-long-name-created-in-an-attempt-to-provoke-an-error-found-in-2.0.11-that-should-hopefully-never-appear-again-if-this-test-does-its-job
+LONGDIR=$FROM/$LONGNAME/$LONGNAME/$LONGNAME
 
-# the parens around makepath shouldn't be necessary but appear to be
-#  needed on cygwin, presumably because makepath is a /bin/sh function
-makepath $LONGDIR
-[ -d $LONGDIR ] || test_skipped "unable to create long directory"
+mkdir $FROM/$LONGNAME || test_skipped "unable to create long directory"
+makepath ${LONGDIR}
 date > ${LONGDIR}/1
 ls -la / > ${LONGDIR}/2
 checkit "$RSYNC --delete -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}
