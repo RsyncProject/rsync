@@ -24,6 +24,9 @@
 time_t starttime = 0;
 
 extern struct stats stats;
+extern char *files_from;
+extern int filesfrom_fd;
+extern char *remote_filesfrom_file;
 extern int am_server;
 extern int am_sender;
 extern int am_daemon;
@@ -501,6 +504,15 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	if (delete_mode && !delete_excluded)
 		recv_exclude_list(f_in);
 
+	if (filesfrom_fd >= 0) {
+		/* We're receiving the file info from the sender, so we need
+		 * the IO routines to automatically write out the names onto
+		 * our f_out socket as we read the list info from the sender.
+		 * This avoids both deadlock and extra delays/buffers. */
+		io_set_filesfrom_fds(filesfrom_fd, f_out);
+		filesfrom_fd = -1;
+	}
+
 	if (read_batch)
 		flist = batch_flist;
 	else
@@ -593,6 +605,8 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			add_cvs_excludes();
 		if (delete_mode && !delete_excluded)
 			send_exclude_list(f_out);
+		if (remote_filesfrom_file)
+			filesfrom_fd = f_in;
 		if (!read_batch) /*  dw -- don't write to pipe */
 			flist = send_file_list(f_out,argc,argv);
 		if (verbose > 3)
@@ -621,6 +635,11 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	if (!write_batch)
 		send_exclude_list(f_out);
 
+	if (filesfrom_fd >= 0) {
+		io_set_filesfrom_fds(filesfrom_fd, f_out);
+		filesfrom_fd = -1;
+	}
+
 	flist = recv_file_list(f_in);
 	if (!flist || flist->count == 0) {
 		rprintf(FINFO, "client: nothing to do: "
@@ -642,22 +661,6 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 	return MAX(status, status2);
 }
-
-static char *find_colon(char *s)
-{
-	char *p, *p2;
-
-	p = strchr(s,':');
-	if (!p) return NULL;
-
-	/* now check to see if there is a / in the string before the : - if there is then
-	   discard the colon on the assumption that the : is part of a filename */
-	p2 = strchr(s,'/');
-	if (p2 && p2 < p) return NULL;
-
-	return p;
-}
-
 
 static int copy_argv (char *argv[])
 {
@@ -727,6 +730,13 @@ static int start_client(int argc, char *argv[])
 	if (!read_batch) {
 		p = find_colon(argv[0]);
 		if (p) {
+			if (remote_filesfrom_file
+			 && remote_filesfrom_file != files_from + 1
+			 && strncmp(files_from, argv[0], p-argv[0]+1) != 0) {
+				rprintf(FERROR,
+					"--files-from hostname is not transfer hostname\n");
+				exit_cleanup(RERR_SYNTAX);
+			}
 			if (p[1] == ':') { /* double colon */
 				*p = 0;
 				if (!shell_cmd) {
@@ -772,8 +782,20 @@ static int start_client(int argc, char *argv[])
 			}
 
 			p = find_colon(argv[argc-1]);
+			if (p && remote_filesfrom_file
+			 && remote_filesfrom_file != files_from + 1
+			 && strncmp(files_from, argv[argc-1], p-argv[argc-1]+1) != 0) {
+				rprintf(FERROR,
+					"--files-from hostname is not transfer hostname\n");
+				exit_cleanup(RERR_SYNTAX);
+			}
 			if (!p) {
 				local_server = 1;
+				if (remote_filesfrom_file) {
+					rprintf(FERROR,
+						"--files-from is remote but transfer is local\n");
+					exit_cleanup(RERR_SYNTAX);
+				}
 			} else if (p[1] == ':') { /* double colon */
 				*p = 0;
 				if (!shell_cmd) {

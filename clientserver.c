@@ -33,6 +33,7 @@ extern int verbose;
 extern int rsync_port;
 char *auth_user;
 extern int sanitize_paths;
+extern int filesfrom_fd;
 
 /**
  * Run a client connected to an rsyncd.  The alternative to this
@@ -423,6 +424,9 @@ static int rsync_module(int f_in, int f_out, int i)
 
         argp = argv;
 	ret = parse_arguments(&argc, (const char ***) &argp, 0);
+
+	if (filesfrom_fd == 0)
+		filesfrom_fd = f_in;
 
 	if (request) {
 		if (*auth_user) {
