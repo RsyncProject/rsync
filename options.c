@@ -133,8 +133,8 @@ int quiet = 0;
 int always_checksum = 0;
 int list_only = 0;
 
-#define MAX_BATCH_PREFIX_LEN 256	/* Must be less than MAXPATHLEN-13 */
-char *batch_prefix = NULL;
+#define MAX_BATCH_NAME_LEN 256	/* Must be less than MAXPATHLEN-13 */
+char *batch_name = NULL;
 
 static int daemon_opt;   /* sets am_daemon after option error-reporting */
 static int modify_window_set;
@@ -291,8 +291,8 @@ void usage(enum logcode F)
   rprintf(F,"     --log-format=FORMAT     log file transfers using specified format\n");
   rprintf(F,"     --password-file=FILE    get password from FILE\n");
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth, KBytes per second\n");
-  rprintf(F,"     --write-batch=PREFIX    write batch fileset starting with PREFIX\n");
-  rprintf(F,"     --read-batch=PREFIX     read batch fileset starting with PREFIX\n");
+  rprintf(F,"     --write-batch=FILE      write a batch to FILE\n");
+  rprintf(F,"     --read-batch=FILE       read a batch from FILE\n");
   rprintf(F,"     --checksum-seed=NUM     set block/file checksum seed\n");
 #ifdef INET6
   rprintf(F," -4  --ipv4                  prefer IPv4\n");
@@ -385,8 +385,8 @@ static struct poptOption long_options[] = {
   {"address",          0,  POPT_ARG_STRING, &bind_address, 0, 0, 0 },
   {"backup-dir",       0,  POPT_ARG_STRING, &backup_dir, 0, 0, 0 },
   {"hard-links",      'H', POPT_ARG_NONE,   &preserve_hard_links, 0, 0, 0 },
-  {"read-batch",       0,  POPT_ARG_STRING, &batch_prefix,  OPT_READ_BATCH, 0, 0 },
-  {"write-batch",      0,  POPT_ARG_STRING, &batch_prefix,  OPT_WRITE_BATCH, 0, 0 },
+  {"read-batch",       0,  POPT_ARG_STRING, &batch_name,  OPT_READ_BATCH, 0, 0 },
+  {"write-batch",      0,  POPT_ARG_STRING, &batch_name,  OPT_WRITE_BATCH, 0, 0 },
   {"files-from",       0,  POPT_ARG_STRING, &files_from, 0, 0, 0 },
   {"from0",           '0', POPT_ARG_NONE,   &eol_nulls, 0, 0, 0},
   {"no-implied-dirs",  0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
@@ -568,12 +568,12 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			break;
 
 		case OPT_WRITE_BATCH:
-			/* popt stores the filename in batch_prefix for us */
+			/* batch_name is already set */
 			write_batch = 1;
 			break;
 
 		case OPT_READ_BATCH:
-			/* popt stores the filename in batch_prefix for us */
+			/* batch_name is already set */
 			read_batch = 1;
 			break;
 
@@ -646,12 +646,12 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		/* We don't actually exit_cleanup(), so that we can still service
 		 * older version clients that still send batch args to server. */
 		read_batch = write_batch = 0;
-		batch_prefix = NULL;
+		batch_name = NULL;
 	}
-	if (batch_prefix && strlen(batch_prefix) > MAX_BATCH_PREFIX_LEN) {
+	if (batch_name && strlen(batch_name) > MAX_BATCH_NAME_LEN) {
 		rprintf(FERROR,
-			"the batch-file prefix must be %d characters or less.\n",
-			MAX_BATCH_PREFIX_LEN);
+			"the batch-file name must be %d characters or less.\n",
+			MAX_BATCH_NAME_LEN);
 		exit_cleanup(RERR_SYNTAX);
 	}
 

@@ -8,7 +8,7 @@
 #include "rsync.h"
 #include <time.h>
 
-extern char *batch_prefix;
+extern char *batch_name;
 
 void write_batch_argvs_file(int argc, char *argv[])
 {
@@ -16,7 +16,7 @@ void write_batch_argvs_file(int argc, char *argv[])
 	char filename[MAXPATHLEN];
 
 	stringjoin(filename, sizeof filename,
-		   batch_prefix, ".rsync_argvs", NULL);
+		   batch_name, ".rsync_argvs", NULL);
 	fd = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 		     S_IRUSR | S_IWUSR | S_IEXEC);
 	if (fd < 0) {
@@ -34,7 +34,7 @@ void write_batch_argvs_file(int argc, char *argv[])
 			write(fd, " ", 1);
 		if (strncmp(argv[i], "--write-batch=", 14) == 0) {
 			write(fd, "--read-batch=", 13);
-			write(fd, batch_prefix, strlen(batch_prefix));
+			write(fd, batch_name, strlen(batch_name));
 		} else if (i == argc - 1) {
 			char *p = find_colon(argv[i]);
 			if (p) {

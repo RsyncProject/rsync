@@ -59,7 +59,7 @@ extern char *files_from;
 extern char *remote_filesfrom_file;
 extern char *rsync_path;
 extern char *shell_cmd;
-extern char *batch_prefix;
+extern char *batch_name;
 
 
 /* there's probably never more than at most 2 outstanding child processes,
@@ -598,7 +598,7 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 
 	if (am_sender) {
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
-		
+
 		recv_exclude_list(f_in);
 		if (cvs_exclude)
 			add_cvs_excludes();
@@ -1074,12 +1074,12 @@ int main(int argc,char *argv[])
 		if (write_batch)
 			write_batch_argvs_file(orig_argc, orig_argv);
 
-		batch_fd = do_open(batch_prefix,
+		batch_fd = do_open(batch_name,
 				   write_batch ? O_WRONLY | O_CREAT | O_TRUNC
 				   : O_RDONLY, S_IRUSR | S_IWUSR);
 		if (batch_fd < 0) {
 			rsyserr(FERROR, errno, "Batch file %s open error",
-				batch_prefix);
+				batch_name);
 			exit_cleanup(RERR_FILEIO);
 		}
 	}
