@@ -13,12 +13,9 @@ Changes since 2.6.3:
       being pushed (since the stats come from the sending side).
       (Requires protocol 29 for a pull.)
 
-    - The default "log format" for a daemon rsync with "transfer logging"
-      enabled has changed to put the file size prior to the file name and
-      also to add the destination of a symlink (e.g. "foo -> bar").  The
-      rsyncstats perl script was updated to handle this (it's now in the
-      "support" directory).  If you depend on the old format, just set it
-      in your rsyncd.conf file.
+    - The "%o" (operation) value now has a third value besides "send" and
+      "recv": "del." (with trailing dot to make it 4 chars).  This changes
+      the way deletions are logged in the daemon's log file.
   
   BUG FIXES:
 
@@ -188,6 +185,9 @@ Changes since 2.6.3:
       name-matching algorithm.  This option requires protocol 29 because
       it needs the new file-sorting order.  (Promoted from patches dir
       and enhanced.)
+
+    - Added the --remove-sent-files option, which lets you move files
+      between systems.
 
     - Improved the option descriptions in the --help text.
 
