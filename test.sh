@@ -10,6 +10,14 @@
 #
 #
 
+cat <<EOF
+
+This set of tests is not completely portable. It is intended for developers
+not for end users. You may experience failures on some platforms that
+do not indicate a problem with rsync.
+
+EOF
+
 export PATH=.:$PATH
 TMP=/tmp/rsync-test.$$
 FROM=${TMP}/from
