@@ -21,6 +21,7 @@
 
 extern int verbose;
 extern int log_before_transfer;
+extern int itemize_changes;
 extern int csum_length;
 extern struct stats stats;
 extern int io_error;
@@ -144,14 +145,15 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		file = flist->files[i];
 
 		if (protocol_version >= 29) {
-			iflags = read_byte(f_in);
-			iflags |= read_byte(f_in) << 8;
+			iflags = read_short(f_in);
 			if (!(iflags & ITEM_UPDATING) || !S_ISREG(file->mode)) {
 				if (am_server) {
 					write_int(f_out, i);
-					write_byte(f_out, iflags);
-					write_byte(f_out, iflags >> 8);
-				} else
+					write_short(f_out, iflags);
+				} else if (itemize_changes
+				    || iflags & ITEM_UPDATING
+				    || (S_ISDIR(file->mode)
+				     && iflags & ITEM_REPORT_TIME))
 					log_send(file, &stats, iflags);
 				continue;
 			}
@@ -190,10 +192,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			if (!am_server && log_format)
 				log_send(file, &stats, iflags);
 			write_int(f_out, i);
-			if (protocol_version >= 29) {
-				write_byte(f_out, iflags);
-				write_byte(f_out, iflags >> 8);
-			}
+			if (protocol_version >= 29)
+				write_short(f_out, iflags);
 			continue;
 		}
 
@@ -245,10 +245,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		}
 
 		write_int(f_out, i);
-		if (protocol_version >= 29) {
-			write_byte(f_out, iflags);
-			write_byte(f_out, iflags >> 8);
-		}
+		if (protocol_version >= 29)
+			write_short(f_out, iflags);
 		write_sum_head(f_out, s);
 
 		if (verbose > 2) {

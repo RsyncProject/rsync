@@ -22,6 +22,7 @@
 
 extern int verbose;
 extern int log_before_transfer;
+extern int itemize_changes;
 extern int delete_after;
 extern int csum_length;
 extern struct stats stats;
@@ -370,10 +371,14 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		file = flist->files[i];
 
 		if (protocol_version >= 29) {
-			iflags = read_byte(f_in);
-			iflags |= read_byte(f_in) << 8;
+			iflags = read_short(f_in);
 			if (!(iflags & ITEM_UPDATING) || !S_ISREG(file->mode)) {
-				if (!dry_run || !am_server)
+				if (am_server)
+					; /* do nothing */
+				else if (itemize_changes
+				    || iflags & ITEM_UPDATING
+				    || (S_ISDIR(file->mode)
+				     && iflags & ITEM_REPORT_TIME))
 					log_recv(file, &stats, iflags);
 				continue;
 			}
