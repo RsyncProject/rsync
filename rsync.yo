@@ -1030,21 +1030,32 @@ dit(bf(-i, --itemize-changes)) Requests a simple itemized list of the
 changes that are being made to each file, including attribute changes.
 This is exactly the same as specifying bf(--log-format='%i %n%L').
 
-The "%i" escape has a cryptic output that is 8 letters long.  The general
-format is as follows:
+The "%i" escape has a cryptic output that is 9 letters long.  The general
+format is like the string bf(UXcstpoga)), where bf(U) is replaced by the
+kind of update being done, bf(X) is replaced by the file-type, and the
+other letters represent attributes that may be output if they are being
+updated.
 
-quote(tt(  =Xcstpog))
+The update types that replace the bf(U) are as follows:
 
-The bf(=) is output as either a bf(<) (receive) or a bf(>) (send) if the
-item is being transferred, a bf(.) if only the attributes are being
-updated, or a bf(=) if the items are identical.  Note that when a symlink
-or a device gets its value changed, that is considered to be a transfer (as
-opposed to a change in permissions, ownership, etc.).
+quote(itemize(
+  it() A bf(<) means that a file is being transferred to the local host
+  (received).
+  it() A bf(>) means that a file is being transferred to the remote host
+  (sent).
+  it() A bf(c) means that a local change/creation is occuring for the item
+  (such as the creation of a directory or a symlink).
+  it() A bf(h) means that a hard-link is being created for the item.
+  it() A bf(.) means that the item only has attributes that are being
+  changed.
+  it() A bf(=) means that the item is identical (this only only output for
+  higher levels of verbosity).
+))
 
-The bf(X) will be replaced by one of the following: an "f" for a file, a
-"d" for a dir, an "L" for a symlink, or a "D" for a device.
+The file-types that replace the bf(X) are: bf(f) for a file, a bf(d) for a
+dir, an bf(L) for a symlink, and a bf(D) for a device.
 
-The rest of the letters in the string above are the actual letters that
+The other letters in the string above are the actual letters that
 will be output if the associated attribute for the item is being updated or
 a "." for no change.  Three exceptions to this are: (1) a newly created
 item replaces each letter with a "+", (2) an identical item replaces each
@@ -1069,6 +1080,8 @@ quote(itemize(
   server's value (requires bf(--owner) and root privileges).
   it() A bf(g) means the group is different and is being updated to the
   server's value (requires bf(--group) and the authority to set the group).
+  it() The bf(a) is reserved for a future enhanced version that supports
+  extended file attributes, such as ACLs.
 ))
 
 One other output is possible:  when deleting files, the "%i" will output
