@@ -89,10 +89,11 @@ static int establish_proxy_connection(int fd, char *host, int port)
 /* open a socket to a tcp remote host with the specified port 
    based on code from Warren
    proxy support by Stephen Rothwell */
-int open_socket_out(char *host, int port)
+int open_socket_out(char *host, int port, struct in_addr *address)
 {
 	int type = SOCK_STREAM;
 	struct sockaddr_in sock_out;
+	struct sockaddr_in sock;
 	int res;
 	struct hostent *hp;
 	char *h;
@@ -136,6 +137,13 @@ int open_socket_out(char *host, int port)
 	memcpy(&sock_out.sin_addr, hp->h_addr, hp->h_length);
 	sock_out.sin_port = htons(p);
 	sock_out.sin_family = PF_INET;
+
+	if (address) {
+		sock.sin_addr = *address;
+		sock.sin_port = 0;
+		sock.sin_family = hp->h_addrtype;
+		bind(res, (struct sockaddr * ) &sock,sizeof(sock));
+	}
 
 	if (connect(res,(struct sockaddr *)&sock_out,sizeof(sock_out))) {
 		rprintf(FERROR,"failed to connect to %s - %s\n", h, strerror(errno));

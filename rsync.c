@@ -152,7 +152,6 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	int updated = 0;
 	STRUCT_STAT st2;
 	int change_uid, change_gid;
-	extern int am_daemon;
 
 	if (dry_run) return 0;
 
