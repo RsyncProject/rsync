@@ -253,7 +253,7 @@ static int rsync_module(int fd, int i)
 				request = strdup(p);
 				start_glob++;
 			}
-			glob_expand(name, argv, &argc, MAX_ARGS);
+			glob_expand(name, argv, &argc, MAX_ARGS, !use_chroot);
 		} else {
 			argc++;
 		}

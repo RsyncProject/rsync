@@ -400,7 +400,7 @@ int lock_range(int fd, int offset, int len)
 }
 
 
-static void glob_expand_one(char *s, char **argv, int *argc, int maxargs)
+static void glob_expand_one(char *s, char **argv, int *argc, int maxargs, int sanitize_paths)
 {
 #if !(defined(HAVE_GLOB) && defined(HAVE_GLOB_H))
 	if (!*s) s = ".";
@@ -413,7 +413,7 @@ static void glob_expand_one(char *s, char **argv, int *argc, int maxargs)
 
 	if (!*s) s = ".";
 
-	argv[*argc] = strdup(s);
+	argv[*argc] = sanitize_paths ? sanitize_path(s) : strdup(s);
 
 	memset(&globbuf, 0, sizeof(globbuf));
 	glob(argv[*argc], 0, NULL, &globbuf);
@@ -432,7 +432,7 @@ static void glob_expand_one(char *s, char **argv, int *argc, int maxargs)
 #endif
 }
 
-void glob_expand(char *base1, char **argv, int *argc, int maxargs)
+void glob_expand(char *base1, char **argv, int *argc, int maxargs, int sanitize_paths)
 {
 	char *s = argv[*argc];
 	char *p, *q;
@@ -456,11 +456,11 @@ void glob_expand(char *base1, char **argv, int *argc, int maxargs)
 	while ((p = strstr(q,base)) && ((*argc) < maxargs)) {
 		/* split it at this point */
 		*p = 0;
-		glob_expand_one(q, argv, argc, maxargs);
+		glob_expand_one(q, argv, argc, maxargs, sanitize_paths);
 		q = p+strlen(base);
 	}
 
-	if (*q && (*argc < maxargs)) glob_expand_one(q, argv, argc, maxargs);
+	if (*q && (*argc < maxargs)) glob_expand_one(q, argv, argc, maxargs, sanitize_paths);
 
 	free(s);
 	free(base);
