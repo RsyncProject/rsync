@@ -34,7 +34,10 @@ fi
 testdir=`cd $testdir && pwd`
 
 echo "srcdir is originally \"$srcdir\""
-srcdir=`cd "$srcdir" && pwd`
+if [ "$srcdir" != "" ]
+then
+    srcdir=`cd "$srcdir" && pwd`
+fi
 
 echo "============================================================"
 echo "$0 running in `pwd`"
