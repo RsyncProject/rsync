@@ -96,6 +96,17 @@
 # {", or it breaks on FreeBSD.
 
 
+
+# STILL TO DO:
+
+# We need a good protection against tests that hang indefinitely.
+# Perhaps some combination of starting them in the background, wait,
+# and kill?
+
+# Perhaps we need a common way to cleanup tests.  At the moment just
+# clobbering the directory when we're done should be enough.
+
+
 set -e
 
 . "./shconfig"
@@ -147,7 +158,12 @@ suitedir="$srcdir/testsuite"
 
 export scratchdir suitedir
 
-for testscript in $suitedir/*.test
+if [ "x$whichtests" = x ]
+then
+    whichtests="*.test"
+fi
+
+for testscript in $suitedir/$whichtests
 do
     testbase=`echo $testscript | sed 's!.*/!!'`
 
