@@ -270,7 +270,6 @@ static int read_timeout(int fd, char *buf, size_t len)
 			continue;
 		}
 
-
 		if (io_error_fd != -1 && FD_ISSET(io_error_fd, &r_fds)) {
 			read_error_fd();
 		}
