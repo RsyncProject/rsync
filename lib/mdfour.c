@@ -28,8 +28,6 @@
 
 static struct mdfour *m;
 
-typedef unsigned long long uint64;
-
 #define MASK32 (0xffffffff)
 
 #define F(X,Y,Z) ((((X)&(Y)) | ((~(X))&(Z))))
