@@ -902,17 +902,20 @@ int pop_dir(char *dir)
 
 /**
  * Return the filename, turning any newlines into '?'s.  This ensures that
- * outputting it on a line of its own cannot generate an empty line.
+ * outputting it on a line of its own cannot generate an empty line.  This
+ * function can handle only 2 names at a time!
  **/
 const char *safe_fname(const char *fname)
 {
-	static char fbuf[MAXPATHLEN];
+	static char fbuf1[MAXPATHLEN], fbuf2[MAXPATHLEN];
+	static char *fbuf = fbuf2;
 	char *nl = strchr(fname, '\n');
 
 	if (!nl)
 		return fname;
 
-	strlcpy(fbuf, fname, sizeof fbuf);
+	fbuf = fbuf == fbuf1 ? fbuf2 : fbuf1;
+	strlcpy(fbuf, fname, MAXPATHLEN);
 	nl = fbuf + (nl - (char *)fname);
 	do {
 		*nl = '?';
