@@ -207,7 +207,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 		rprintf(FINFO,"recv_generator(%s,%d)\n",fname,i);
 
 	statret = link_stat(fname,&st);
-read
+
 	if (only_existing && statret == -1 && errno == ENOENT) {
 		/* we only want to update existing files */
 		if (verbose > 1) rprintf(FINFO, RSYNC_NAME
