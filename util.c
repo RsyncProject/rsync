@@ -291,7 +291,7 @@ int copy_file(char *source, char *dest, mode_t mode)
 	}
 
 	ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode);
-	if (ofd < 0) {
+	if (ofd == -1) {
 		rprintf(FERROR,"open %s: %s\n",
 			dest,strerror(errno));
 		close(ifd);

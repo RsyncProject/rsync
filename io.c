@@ -70,6 +70,7 @@ static char *read_buffer_p;
 static int read_buffer_len;
 static int read_buffer_size;
 static int no_flush;
+static int no_flush_read;
 
 /* read from a socket with IO timeout. return the number of
    bytes read. If no bytes can be read then exit, never return
@@ -78,7 +79,9 @@ static int read_timeout(int fd, char *buf, int len)
 {
 	int n, ret=0;
 
+	no_flush_read++;
 	io_flush();
+	no_flush_read--;
 
 	while (ret == 0) {
 		fd_set fds;
@@ -254,7 +257,9 @@ static void readfd(int fd,char *buffer,int N)
 			continue;
 		} 
 
+		no_flush_read++;
 		io_flush();
+		no_flush_read--;
 
 		ret = read_unbuffered(fd,buffer + total,N-total);
 		total += ret;
@@ -320,7 +325,7 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 	fd_set w_fds, r_fds;
 	int fd_count, count;
 	struct timeval tv;
-	int reading;
+	int reading=0;
 	int blocked=0;
 
 	no_flush++;
@@ -331,8 +336,10 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 		FD_SET(fd,&w_fds);
 		fd_count = fd+1;
 
-		reading = (buffer_f_in != -1 && 
-			   read_buffer_len < MAX_READ_BUFFER);
+		if (!no_flush_read) {
+			reading = (buffer_f_in != -1 && 
+				   read_buffer_len < MAX_READ_BUFFER);
+		}
 
 		if (reading) {
 			FD_SET(buffer_f_in,&r_fds);

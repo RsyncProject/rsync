@@ -961,7 +961,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 		if (!get_tmpname(fnametmp,fname)) {
 			if (buf) unmap_file(buf);
-			close(fd1);
+			if (fd1 != -1) close(fd1);
 			continue;
 		}
 
@@ -969,7 +969,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			rprintf(FERROR,"mktemp %s failed\n",fnametmp);
 			receive_data(f_in,buf,-1,NULL,file->length);
 			if (buf) unmap_file(buf);
-			close(fd1);
+			if (fd1 != -1) close(fd1);
 			continue;
 		}
 
@@ -990,7 +990,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			rprintf(FERROR,"open %s : %s\n",fnametmp,strerror(errno));
 			receive_data(f_in,buf,-1,NULL,file->length);
 			if (buf) unmap_file(buf);
-			close(fd1);
+			if (fd1 != -1) close(fd1);
 			continue;
 		}
       

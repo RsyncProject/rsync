@@ -283,21 +283,19 @@ void become_daemon(void)
 {
 	int i;
 
-	if (fork())
+	if (fork()) {
 		_exit(0);
+	}
 
 	/* detach from the terminal */
 #ifdef HAVE_SETSID
 	setsid();
 #else
 #ifdef TIOCNOTTY
-	{
-		int i = open("/dev/tty", O_RDWR);
-		if (i >= 0) 
-			{
-				ioctl(i, (int) TIOCNOTTY, (char *)0);      
-				close(i);
-			}
+	i = open("/dev/tty", O_RDWR);
+	if (i >= 0) {
+		ioctl(i, (int) TIOCNOTTY, (char *)0);      
+		close(i);
 	}
 #endif /* TIOCNOTTY */
 #endif
