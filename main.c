@@ -171,7 +171,10 @@ static char *get_local_name(struct file_list *flist,char *name)
 
 	if (verbose > 2)
 		rprintf(FINFO,"get_local_name count=%d %s\n", 
-			flist->count, name);
+			flist->count, NS(name));
+
+	if (!name) 
+		return NULL;
 
 	if (do_stat(name,&st) == 0) {
 		if (S_ISDIR(st.st_mode)) {
@@ -191,9 +194,6 @@ static char *get_local_name(struct file_list *flist,char *name)
 
 	if (flist->count == 1)
 		return name;
-
-	if (!name) 
-		return NULL;
 
 	if (do_mkdir(name,0777 & ~orig_umask) != 0) {
 		rprintf(FERROR,"mkdir %s : %s (1)\n",name,strerror(errno));
