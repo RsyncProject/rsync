@@ -473,8 +473,8 @@ static int read_unbuffered(int fd, char *buf, size_t len)
 		}
 
 		if (remaining > sizeof(line) - 1) {
-			rprintf(FERROR, "multiplexing overflow %d\n\n",
-				remaining);
+			rprintf(FERROR, "multiplexing overflow %ld\n\n",
+				(long)remaining);
 			exit_cleanup(RERR_STREAMIO);
 		}
 

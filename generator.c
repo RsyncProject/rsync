@@ -247,8 +247,8 @@ static void generate_and_send_sums(struct map_struct *buf, OFF_T len, int f_out)
 
 		if (verbose > 3) {
 			rprintf(FINFO,
-				"chunk[%d] offset=%.0f len=%d sum1=%08lx\n",
-				i, (double) offset, n1, (unsigned long) sum1);
+				"chunk[%ld] offset=%.0f len=%d sum1=%08lx\n",
+				(long)i,(double)offset,n1,(unsigned long)sum1);
 		}
 		write_int(f_out, sum1);
 		write_buf(f_out, sum2, sum.s2length);
