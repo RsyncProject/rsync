@@ -312,7 +312,7 @@ enum msgcode {
 #else
 /* As long as it gets... */
 #define int64 off_t
-#define NO_INT64
+#define INT64_IS_OFF_T
 #endif
 
 #if (SIZEOF_LONG == 8) 

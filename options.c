@@ -197,8 +197,9 @@ static void print_rsync_version(enum logcode f)
 		get_panic_action());
 #endif
 
-#ifdef NO_INT64
-	rprintf(f, "WARNING: no 64-bit integers on this platform!\n");
+#ifdef INT64_IS_OFF_T
+	if (sizeof (int64) < 8)
+		rprintf(f, "WARNING: no 64-bit integers on this platform!\n");
 #endif
 
 	rprintf(f,

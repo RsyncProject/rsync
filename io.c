@@ -744,13 +744,14 @@ int64 read_longint(int f)
 	if ((int32)ret != (int32)0xffffffff)
 		return ret;
 
-#ifdef NO_INT64
-	rprintf(FERROR,"Integer overflow - attempted 64 bit offset\n");
-	exit_cleanup(RERR_UNSUPPORTED);
-#else
+#ifdef INT64_IS_OFF_T
+	if (sizeof (int64) < 8) {
+		rprintf(FERROR, "Integer overflow: attempted 64-bit offset\n");
+		exit_cleanup(RERR_UNSUPPORTED);
+	}
+#endif
 	readfd(f,b,8);
 	ret = IVAL(b,0) | (((int64)IVAL(b,4))<<32);
-#endif
 
 	return ret;
 }
@@ -1018,16 +1019,18 @@ void write_longint(int f, int64 x)
 		return;
 	}
 
-#ifdef NO_INT64
-	rprintf(FERROR,"Integer overflow - attempted 64 bit offset\n");
-	exit_cleanup(RERR_UNSUPPORTED);
-#else
+#ifdef INT64_IS_OFF_T
+	if (sizeof (int64) < 8) {
+		rprintf(FERROR, "Integer overflow: attempted 64-bit offset\n");
+		exit_cleanup(RERR_UNSUPPORTED);
+	}
+#endif
+
 	write_int(f, (int32)0xFFFFFFFF);
 	SIVAL(b,0,(x&0xFFFFFFFF));
 	SIVAL(b,4,((x>>32)&0xFFFFFFFF));
 
 	writefd(f,b,8);
-#endif
 }
 
 void write_buf(int f,char *buf,size_t len)
