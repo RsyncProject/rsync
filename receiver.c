@@ -419,11 +419,23 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			continue;
 		}
 
-		if (fd1 != -1 && !S_ISREG(st.st_mode)) {
-			rprintf(FERROR,"%s : not a regular file (recv_files)\n",fnamecmp);
-			receive_data(f_in,NULL,-1,NULL,file->length);
+		if (fd1 != -1 && S_ISDIR(st.st_mode) && fnamecmp == fname) {
+			/* this special handling for directories
+			 * wouldn't be necessary if robust_rename()
+			 * and the underlying robust_unlink could cope
+			 * with directories
+			 */
+			rprintf(FERROR,"%s : is a directory (recv_files)\n",
+			    fnamecmp);
+			receive_data(f_in, NULL, -1, NULL, file->length);
 			close(fd1);
 			continue;
+		}
+
+		if (fd1 != -1 && !S_ISREG(st.st_mode)) {
+			close(fd1);
+			fd1 = -1;
+			buf = NULL;
 		}
 
 		if (fd1 != -1 && !preserve_perms) {
