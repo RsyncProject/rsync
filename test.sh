@@ -98,14 +98,21 @@ cp ${FROM}/${F1} ${TO}/ThisShouldGo
 checkit "rsync --delete -avH ${FROM}/ ${TO}" ${FROM}/ ${TO} \
   5 " --delete"
 
+LONGDIR=${FROM}/This-is-a-directory-with-a-stupidly-long-name-created-in-an-attempt-to-provoke-an-error-found-in-2.0.11-that-should-hopefully-never-appear-again-if-this-test-does-its-job/This-is-a-directory-with-a-stupidly-long-name-created-in-an-attempt-to-provoke-an-error-found-in-2.0.11-that-should-hopefully-never-appear-again-if-this-test-does-its-job/This-is-a-directory-with-a-stupidly-long-name-created-in-an-attempt-to-provoke-an-error-found-in-2.0.11-that-should-hopefully-never-appear-again-if-this-test-does-its-job
+mkdir -p ${LONGDIR}
+date > ${LONGDIR}/1
+ls -la / > ${LONGDIR}/2
+checkit "rsync --delete -avH ${FROM}/ ${TO}" ${FROM}/ ${TO} \
+  6 "long paths"
+
 if type ssh >/dev/null ; then
 rm -rf ${TO}
   checkit "rsync -avH -e ssh ${FROM}/ localhost:${TO}" ${FROM}/ ${TO} \
-    6 "ssh: basic test"
+    7 "ssh: basic test"
 
   mv ${TO}/${F1} ${TO}/ThisShouldGo
   checkit "rsync --delete -avH -e ssh ${FROM}/ localhost:${TO}" ${FROM}/ ${TO}\
-    7 "ssh: renamed file"
+    8 "ssh: renamed file"
 else
   echo ""
   echo "**** Skipping SSH tests because ssh is not in the path ****"
@@ -113,4 +120,3 @@ else
 fi
 
 checkforlogs ${LOG}.?
-
