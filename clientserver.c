@@ -147,7 +147,13 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 
 		if (strcmp(line,"@RSYNCD: OK") == 0) break;
 
-		if (strcmp(line,"@RSYNCD: EXIT") == 0) exit(0);
+		if (strcmp(line,"@RSYNCD: EXIT") == 0) {
+			/* This is sent by recent versions of the
+			 * server to terminate the listing of modules.
+			 * We don't want to go on and transfer
+			 * anything; just exit. */
+			exit(0);
+		}
 
 		if (strncmp(line, "@ERROR", 6) == 0)
 			rprintf(FERROR,"%s\n", line);
