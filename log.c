@@ -30,12 +30,8 @@ static int log_error_fd = -1;
 static void logit(int priority, char *buf)
 {
 	if (logfname) {
-		if (!logfile) {
-			extern int orig_umask;
-			int old_umask = umask(022 | orig_umask);
-			logfile = fopen(logfname, "a");
-			umask(old_umask);
-		}
+		if (!logfile)
+			log_open();
 		fprintf(logfile,"%s [%d] %s", 
 			timestring(time(NULL)), (int)getpid(), buf);
 		fflush(logfile);
@@ -62,8 +58,10 @@ void log_init(void)
 	/* optionally use a log file instead of syslog */
 	logfname = lp_log_file();
 	if (logfname) {
-		if (*logfname)
+		if (*logfname) {
+			log_open();
 			return;
+		}
 		logfname = NULL;
 	}
 
@@ -82,9 +80,17 @@ void log_init(void)
 #endif
 }
 
-/* for long runs when using a log file, close it before potential long waits
-   so it can be trimmed by another process instead of growing forever */
-void log_release()
+void log_open()
+{
+	if (logfname && !logfile) {
+		extern int orig_umask;
+		int old_umask = umask(022 | orig_umask);
+		logfile = fopen(logfname, "a");
+		umask(old_umask);
+	}
+}
+
+void log_close()
 {
 	if (logfile) {
 		fclose(logfile);

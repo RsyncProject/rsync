@@ -247,7 +247,10 @@ void start_accept_loop(int port, int (*fn)(int ))
 		struct sockaddr addr;
 		int in_addrlen = sizeof(addr);
 
-		log_release();
+		/* close log file before the potentially very long select so
+		   file can be trimmed by another process instead of growing
+		   forever */
+		log_close();
 
 		FD_ZERO(&fds);
 		FD_SET(s, &fds);
@@ -273,6 +276,10 @@ void start_accept_loop(int port, int (*fn)(int ))
 
 		if (fork()==0) {
 			close(s);
+
+			/* open log file in child before possibly giving
+			   up privileges  */
+			log_open();
 
 			_exit(fn(fd));
 		}
