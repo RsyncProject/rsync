@@ -261,13 +261,13 @@ static int rsync_module(int fd, int i)
 
 	if (am_root) {
 		if (setgid(gid)) {
-			rsyserr(FERROR, errno, "setgid %d failed", gid);
+			rsyserr(FERROR, errno, "setgid %d failed", (int) gid);
 			io_printf(fd,"@ERROR: setgid failed\n");
 			return -1;
 		}
 
 		if (setuid(uid)) {
-			rsyserr(FERROR, errno, "setuid %d failed", uid);
+			rsyserr(FERROR, errno, "setuid %d failed", (int) uid);
 			io_printf(fd,"@ERROR: setuid failed\n");
 			return -1;
 		}

@@ -2,6 +2,7 @@
    
    Copyright (C) 1996-2001 by Andrew Tridgell <tridge@samba.org>
    Copyright (C) Paul Mackerras 1996
+   Copyright (C) 2001 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -528,7 +529,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		}
 		if (pid != -1) {
 			if (verbose > 3)
-				rprintf(FINFO,"client_run waiting on %d\n",pid);
+				rprintf(FINFO,"client_run waiting on %d\n", (int) pid);
 			io_flush();
 			wait_process(pid, &status);
 		}
@@ -558,7 +559,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	
 	if (pid != -1) {
 		if (verbose > 3)
-			rprintf(FINFO,"client_run2 waiting on %d\n",pid);
+			rprintf(FINFO,"client_run2 waiting on %d\n", (int) pid);
 		io_flush();
 		wait_process(pid, &status);
 	}

@@ -1104,10 +1104,10 @@ static void clean_flist(struct file_list *flist, int strip_root)
 
 	for (i=0;i<flist->count;i++) {
 		rprintf(FINFO,"[%d] i=%d %s %s mode=0%o len=%.0f\n",
-			getpid(), i, 
+			(int) getpid(), i, 
 			NS(flist->files[i]->dirname),
 			NS(flist->files[i]->basename),
-			flist->files[i]->mode,
+			(int) flist->files[i]->mode,
 			(double)flist->files[i]->length);
 	}
 }

@@ -1,6 +1,7 @@
-/* 
+/* -*- c-file-style: "linux" -*-
+   
    Weiss 1/1999
-   Batch utilities 
+   Batch utilities for rsync.
 
 */ 
 
@@ -379,7 +380,6 @@ void write_batch_csum_info(int *flist_entry, int flist_count, struct sum_struct 
 {
     int i;
     int int_zero = 0;
-    extern int block_size;
     extern int csum_length;
 
     fdb_open = 1;
@@ -545,15 +545,15 @@ void show_flist(int index, struct file_struct **fptr)
 
     int i;
     for (i=0;i<index;i++) {
-       rprintf(FINFO,"flist->flags=%x\n",fptr[i]->flags);  
-       rprintf(FINFO,"flist->modtime=%x\n",fptr[i]->modtime);  
-       rprintf(FINFO,"flist->length=%x\n",fptr[i]->length);  
-       rprintf(FINFO,"flist->mode=%x\n",fptr[i]->mode);  
-       rprintf(FINFO,"flist->basename=%s\n",fptr[i]->basename);
+       rprintf(FINFO, "flist->flags=%#x\n",fptr[i]->flags);  
+       rprintf(FINFO, "flist->modtime=%#x\n",fptr[i]->modtime);  
+       rprintf(FINFO, "flist->length=%.0f\n", (double) fptr[i]->length);  
+       rprintf(FINFO, "flist->mode=%#o\n", (int) fptr[i]->mode);  
+       rprintf(FINFO, "flist->basename=%s\n",fptr[i]->basename);
        if (fptr[i]->dirname) 
-       rprintf(FINFO,"flist->dirname=%s\n",fptr[i]->dirname);
+	       rprintf(FINFO, "flist->dirname=%s\n",fptr[i]->dirname);
        if (fptr[i]->basedir) 
-       rprintf(FINFO,"flist->basedir=%s\n",fptr[i]->basedir);
+	       rprintf(FINFO, "flist->basedir=%s\n",fptr[i]->basedir);
     }
 }
 
