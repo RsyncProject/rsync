@@ -1,15 +1,9 @@
 -*- indented-text -*-
 
 BUGS ---------------------------------------------------------------
-Fix progress indicator to not corrupt log
-lchmod question	
 Do not rely on having a group called "nobody"
-Incorrect timestamps (Debian #100295)
-Win32
 
 FEATURES ------------------------------------------------------------
-server-imposed bandwidth limits
-rsyncd over ssh
 Use chroot only if supported
 Allow supplementary groups in rsyncd.conf			2002/04/09
 Handling IPv6 on old machines
@@ -25,23 +19,18 @@ Add daemon --no-fork option
 Create more granular verbosity				jw	2003/05/15
 
 DOCUMENTATION --------------------------------------------------------
-Update README
 Keep list of open issues and todos on the web site
 Perhaps redo manual as SGML
 
 LOGGING --------------------------------------------------------------
-Make dry run list all updates					2002/04/03
 Memory accounting
 Improve error messages
 Better statistics:					Rasmus	2002/03/08
 Perhaps flush stdout like syslog
 Log deamon sessions that just list modules
 Log child death on signal
-Keep stderr and stdout properly separated (Debian #23626)
 Log errors with function that reports process of origin
 verbose output					David Stein	2001/12/20
-Add reason for transfer to file logging
-debugging of daemon						2002/04/08
 internationalization
 
 DEVELOPMENT --------------------------------------------------------
@@ -49,9 +38,6 @@ Handling duplicate names
 Use generic zlib						2002/02/25
 TDB:								2002/03/12
 Splint								2002/03/12
-Memory debugger
-Create release script
-Add machines to build farm
 
 PERFORMANCE ----------------------------------------------------------
 File list structure in memory
@@ -82,37 +68,6 @@ reverse rsync over HTTP Range
 
 BUGS ---------------------------------------------------------------
 
-Fix progress indicator to not corrupt log
-
-  Progress indicator can produce corrupt output when transferring directories:
-
-  main/binary-arm/
-  main/binary-arm/admin/
-  main/binary-arm/base/
-  main/binary-arm/comm/8.56kB/s    0:00:52
-  main/binary-arm/devel/
-  main/binary-arm/doc/
-  main/binary-arm/editors/
-  main/binary-arm/electronics/s    0:00:53
-  main/binary-arm/games/
-  main/binary-arm/graphics/
-  main/binary-arm/hamradio/
-  main/binary-arm/interpreters/
-  main/binary-arm/libs/6.61kB/s    0:00:54
-  main/binary-arm/mail/
-  main/binary-arm/math/
-  main/binary-arm/misc/
-
-                      --          --
-
-
-lchmod question	
-
-  I don't think we handle this properly on systems that don't have the
-  call.  Are there any such?
-
-                      --          --
-
 
 Do not rely on having a group called "nobody"
 
@@ -122,39 +77,7 @@ Do not rely on having a group called "nobody"
 
                       --          --
 
-
-Incorrect timestamps (Debian #100295)
-
-  A bit hard to believe, but apparently it happens.
-
-                      --          --
-
-
-Win32
-
-  Don't detach, because this messes up --srvany.
-
-  http://sources.redhat.com/ml/cygwin/2001-08/msg00234.html
-
-
-
-                      --          --
-
 FEATURES ------------------------------------------------------------
-
-server-imposed bandwidth limits
-
-                      --          --
-
-
-rsyncd over ssh
-
-  There are already some patches to do this.
-
-  BitKeeper uses a server whose login shell is set to bkd.  That's
-  probably a reasonable approach.
-
-                      --          --
 
 
 Use chroot only if supported
@@ -239,6 +162,7 @@ Add ACL support							2001/12/02
   Transfer ACLs.  Need to think of a standard representation.
   Probably better not to even try to convert between NT and POSIX.
   Possibly can share some code with Samba.
+  NOTE: there is a patch that implements this in the "patches" subdir.
 
                       --          --
 
@@ -307,6 +231,8 @@ Allow forcing arbitrary permissions				2002/03/12
 
   (Debian #23628)
 
+  NOTE: there is a patch that implements this in the "patches" subdir.
+
                       --          --
 
 
@@ -351,10 +277,6 @@ Create more granular verbosity				jw	2003/05/15
 
 DOCUMENTATION --------------------------------------------------------
 
-Update README
-
-                      --          --
-
 
 Keep list of open issues and todos on the web site
 
@@ -375,17 +297,6 @@ Perhaps redo manual as SGML
                       --          --
 
 LOGGING --------------------------------------------------------------
-
-Make dry run list all updates					2002/04/03
-
-  --dry-run is too dry
-
-  Mark Santcroos points out that -n fails to list files which have
-  only metadata changes, though it probably should.
-
-  There may be a Debian bug about this as well.
-
-                      --          --
 
 
 Memory accounting
@@ -468,11 +379,6 @@ Log child death on signal
                       --          --
 
 
-Keep stderr and stdout properly separated (Debian #23626)
-
-                      --          --
-
-
 Log errors with function that reports process of origin
 
   Use a separate function for reporting errors; prefix it with
@@ -484,25 +390,8 @@ Log errors with function that reports process of origin
 
 verbose output					David Stein	2001/12/20
   
-  Indicate whether files are new, updated, or deleted
-
   At end of transfer, show how many files were or were not transferred
   correctly.
-
-                      --          --
-
-
-Add reason for transfer to file logging
-
-  Explain *why* every file is transferred or not (e.g. "local mtime
-  123123 newer than 1283198")
-
-                      --          --
-
-
-debugging of daemon						2002/04/08
-
-  Add an rsyncd.conf parameter to turn on debugging on the server.
 
                       --          --
 
@@ -524,46 +413,16 @@ DEVELOPMENT --------------------------------------------------------
 
 Handling duplicate names
 
-  We need to be careful of duplicate names getting into the file list.
-  See clean_flist().  This could happen if multiple arguments include
-  the same file.  Bad.
-
-  I think duplicates are only a problem if they're both flowing
-  through the pipeline at the same time.  For example we might have
-  updated the first occurrence after reading the checksums for the
-  second.  So possibly we just need to make sure that we don't have
-  both in the pipeline at the same time.
-
-  Possibly if we did one directory at a time that would be sufficient.
-
-  Alternatively we could pre-process the arguments to make sure no
-  duplicates will ever be inserted.  There could be some bad cases
-  when we're collapsing symlinks.
-
-  We could have a hash table.
-
-  The root of the problem is that we do not want more than one file
-  list entry referring to the same file.  At first glance there are
-  several ways this could happen: symlinks, hardlinks, and repeated
-  names on the command line.
-
-  If names are repeated on the command line, they may be present in
-  different forms, perhaps by traversing directory paths in different
-  ways, traversing paths including symlinks.  Also we need to allow
-  for expansion of globs by rsync.
-
-  At the moment, clean_flist() requires having the entire file list in
-  memory.  Duplicate names are detected just by a string comparison.
-
-  We don't need to worry about hard links causing duplicates because
-  files are never updated in place.  Similarly for symlinks.
-
-  I think even if we're using a different symlink mode we don't need
-  to worry.
-
-  Unless we're really clever this will introduce a protocol
-  incompatibility, so we need to be able to accept the old format as
-  well.
+  Some folks would like rsync to be deterministic in how it handles
+  duplicate names that come from mering multiple source directories
+  into a single destination directory; e.g. the last name wins.  We
+  could do this by switching our sort algorithm to one that will
+  guarantee that the names won't be reordered.  Alternately, we could
+  assign an ever-increasing number to each item as we insert it into
+  the list and then make sure that we leave the largest number when
+  cleaning the file list (see clean_flist()).  Another solution would
+  be to add a hash table, and thus never put any duplicate names into
+  the file list (and bump the protocol to handle this).
 
                       --          --
 
@@ -619,45 +478,6 @@ Splint								2002/03/12
 
                       --          --
 
-
-Memory debugger
-
-  jra recommends Valgrind:
-
-    http://devel-home.kde.org/~sewardj/
-
-                      --          --
-
-
-Create release script
-  
-  Script would:
-
-     Update spec files
-
-     Build tar file; upload
-
-     Send announcement to mailing list and c.o.l.a.
-  
-     Make freshmeat announcement
-
-     Update web site
-
-                      --          --
-
-
-Add machines to build farm
-
-  Cygwin (on different versions of Win32?)
-
-  HP-UX variants (via HP?)
-
-  SCO
-
-
-
-                      --          --
-
 PERFORMANCE ----------------------------------------------------------
 
 File list structure in memory
@@ -692,14 +512,10 @@ Allow skipping MD4 file_sum					2002/04/08
   calculating MD4 checksums uses 90% of CPU and is unlikely to be
   useful.
 
-  Indeed for transfers over zlib or ssh we can also rely on the
-  transport to have quite strong protection against corruption.
-
-  Perhaps we should have an option to disable this,
-  analogous to --whole-file, although it would default to
-  disabled.  The file checksum takes up a definite space in
-  the protocol -- we can either set it to 0, or perhaps just
-  leave it out.
+  We should not allow it to be disabled separately from -W, though
+  as it is the only thing that lets us know when the rsync algorithm
+  got out of sync and messed the file up (i.e. if the basis file
+  changed between checksum generation and reception).
 
                       --          --
 
@@ -841,6 +657,10 @@ reverse rsync over HTTP Range
 
   Goswin Brederlow suggested this on Debian; I think tridge and I
   talked about it previous in relation to rproxy.
+
+  Addendum:  It looks like someone is working on a version of this:
+
+    http://zsync.moria.org.uk/
 
                       --          --
 
