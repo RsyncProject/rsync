@@ -88,6 +88,9 @@ static void report(int f)
 	printf("total size is %.0f  speedup is %.2f\n",
 	       (double)stats.total_size,
 	       (1.0*stats.total_size)/(stats.total_written+stats.total_read));
+
+	fflush(stdout);
+	fflush(stderr);
 }
 
 
@@ -412,13 +415,13 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 }
 
 
-int start_client(int argc, char *argv[])
+static int start_client(int argc, char *argv[])
 {
 	char *p;
 	char *shell_machine = NULL;
 	char *shell_path = NULL;
 	char *shell_user = NULL;
-	int pid;
+	int pid, ret;
 	int f_in,f_out;
 	extern int local_server;
 	extern int am_sender;
@@ -499,7 +502,12 @@ int start_client(int argc, char *argv[])
 	setlinebuf(stderr);
 #endif
 
-	return client_run(f_in, f_out, pid, argc, argv);
+	ret = client_run(f_in, f_out, pid, argc, argv);
+
+	fflush(stdout);
+	fflush(stderr);
+
+	return ret;
 }
 
 
