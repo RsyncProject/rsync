@@ -354,7 +354,8 @@ yes
 	AC_CHECK_FUNCS(getnameinfo, , AC_LIBOBJ(lib/getnameinfo))
 	],
 	[AC_MSG_RESULT(no)
-	AC_LIBOBJ(lib/getaddrinfo)])
+	AC_LIBOBJ(lib/getaddrinfo)
+	AC_LIBOBJ(lib/getnameinfo)])
 
 
 AC_CHECK_MEMBER([struct sockaddr.sa_len], 
