@@ -97,6 +97,8 @@ int check_hard_link(struct file_struct *file)
 			low = mid + 1;
 	}
 
+	/* XXX: To me this looks kind of dodgy -- why do we use [low]
+	 * here and [low-1] below? -- mbp */
 	if (hlink_compare(&hlink_list[low], file) != 0)
 		return 0;
 
