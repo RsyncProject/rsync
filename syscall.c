@@ -42,6 +42,12 @@ int do_link(char *fname1, char *fname2)
 	return link(fname1, fname2);
 }
 
+int do_lchown(const char *path, uid_t owner, gid_t group)
+{
+	if (dry_run) return 0;
+	return lchown(path, owner, group);
+}
+
 int do_mknod(char *pathname, mode_t mode, dev_t dev)
 {
 	if (dry_run) return 0;
@@ -58,4 +64,10 @@ int do_open(char *pathname, int flags, mode_t mode)
 {
 	if (dry_run) return -1;
 	return open(pathname, flags, mode);
+}
+
+int do_chmod(const char *path, mode_t mode)
+{
+	if (dry_run) return 0;
+	return chmod(path, mode);
 }

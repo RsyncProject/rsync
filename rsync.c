@@ -223,7 +223,7 @@ static int set_perms(char *fname,struct file_struct *file,struct stat *st,
   if (preserve_perms && !S_ISLNK(st->st_mode) &&
       st->st_mode != file->mode) {
     updated = 1;
-    if (chmod(fname,file->mode) != 0) {
+    if (do_chmod(fname,file->mode) != 0) {
       fprintf(FERROR,"failed to set permissions on %s : %s\n",
 	      fname,strerror(errno));
       return 0;
@@ -234,7 +234,7 @@ static int set_perms(char *fname,struct file_struct *file,struct stat *st,
   if ((am_root && preserve_uid && st->st_uid != file->uid) || 
       (preserve_gid && st->st_gid != file->gid)) {
     updated = 1;
-    if (lchown(fname,
+    if (do_lchown(fname,
 	       (am_root&&preserve_uid)?file->uid:-1,
 	       preserve_gid?file->gid:-1) != 0) {
       if (verbose>1 || preserve_uid)
