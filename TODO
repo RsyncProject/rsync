@@ -41,8 +41,8 @@ Performance
   network access as much as we could.
 
   We need to be careful of duplicate names getting into the file list.
-  See clean_flist.  This could happen if multiple arguments include
-  the same file.  Bad.  
+  See clean_flist().  This could happen if multiple arguments include
+  the same file.  Bad.
 
   I think duplicates are only a problem if they're both flowing
   through the pipeline at the same time.  For example we might have
@@ -57,6 +57,25 @@ Performance
   when we're collapsing symlinks.
 
   We could have a hash table.
+
+  The root of the problem is that we do not want more than one file
+  list entry referring to the same file.  At first glance there are
+  several ways this could happen: symlinks, hardlinks, and repeated
+  names on the command line.
+
+  If names are repeated on the command line, they may be present in
+  different forms, perhaps by traversing directory paths in different
+  ways, traversing paths including symlinks.  Also we need to allow
+  for expansion of globs by rsync.
+
+  At the moment, clean_flist() requires having the entire file list in
+  memory.  Duplicate names are detected just by a string comparison.
+
+  We don't need to worry about hard links causing duplicates because
+  files are never updated in place.  Similarly for symlinks.
+
+  I think even if we're using a different symlink mode we don't need
+  to worry.
 
 Memory accounting
 
