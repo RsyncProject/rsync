@@ -306,14 +306,19 @@ static struct poptOption long_options[] = {
 static char err_buf[100];
 
 
+/* We store the option error message, if any, so that we can log the
+   connection attempt (which requires parsing the options), and then
+   show the error later on. */
 void option_error(void)
 {
 	if (err_buf[0]) {
 		rprintf(FLOG, "%s", err_buf);
 		rprintf(FERROR, "%s: %s", RSYNC_NAME, err_buf);
 	} else {
-		rprintf(FLOG,"Error parsing options - unsupported option?\n");
-		rprintf(FERROR,"Error parsing options - unsupported option?\n");
+		rprintf (FERROR, "Error parsing options: "
+			 "option may be supported on client but not on server?\n");
+		rprintf (FERROR, RSYNC_NAME ": Error parsing options: "
+			 "option may be supported on client but not on server?\n");
 	}
 }
 
