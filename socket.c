@@ -1,6 +1,6 @@
 /* -*- c-file-style: "linux" -*-
    
-   Copyright (C) 1998-2000 by Andrew Tridgell 
+   Copyright (C) 1998-2001 by Andrew Tridgell 
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -25,8 +25,8 @@
 #include "rsync.h"
 
 
-/* establish a proxy connection on an open socket to a web roxy by using the CONNECT
-   method */
+/* Establish a proxy connection on an open socket to a web roxy by
+ * using the CONNECT method. */
 static int establish_proxy_connection(int fd, char *host, int port)
 {
 	char buffer[1024];
@@ -34,14 +34,15 @@ static int establish_proxy_connection(int fd, char *host, int port)
 
 	slprintf(buffer, sizeof(buffer), "CONNECT %s:%d HTTP/1.0\r\n\r\n", host, port);
 	if (write(fd, buffer, strlen(buffer)) != strlen(buffer)) {
-		rprintf(FERROR, "failed to write to proxy - %s\n",
+		rprintf(FERROR, "failed to write to proxy: %s\n",
 			strerror(errno));
 		return -1;
 	}
 
 	for (cp = buffer; cp < &buffer[sizeof(buffer) - 1]; cp++) {
 		if (read(fd, cp, 1) != 1) {
-			rprintf(FERROR, "failed to read from proxy\n");
+			rprintf(FERROR, "failed to read from proxy: %s\n",
+				strerror(errno));
 			return -1;
 		}
 		if (*cp == '\n')
@@ -72,7 +73,8 @@ static int establish_proxy_connection(int fd, char *host, int port)
 		for (cp = buffer; cp < &buffer[sizeof(buffer) - 1];
 		     cp++) {
 			if (read(fd, cp, 1) != 1) {
-				rprintf(FERROR, "failed to read from proxy\n");
+				rprintf(FERROR, "failed to read from proxy: %s\n",
+					strerror(errno));
 				return -1;
 			}
 			if (*cp == '\n')
@@ -103,8 +105,9 @@ int open_socket_out(char *host, int port, struct in_addr *address)
 	char buffer[1024];
 	char *cp;
 
-	/* if we have a RSYNC_PROXY env variable then redirect our connetcion via a web proxy
-	   at the given address. The format is hostname:port */
+	/* if we have a RSYNC_PROXY env variable then redirect our
+	 * connetcion via a web proxy at the given address. The format
+	 * is hostname:port */
 	h = getenv("RSYNC_PROXY");
 	proxied = (h != NULL) && (*h != '\0');
 
@@ -112,7 +115,8 @@ int open_socket_out(char *host, int port, struct in_addr *address)
 		strlcpy(buffer, h, sizeof(buffer));
 		cp = strchr(buffer, ':');
 		if (cp == NULL) {
-			rprintf(FERROR, "invalid proxy specification\n");
+			rprintf(FERROR,
+				"invalid proxy specification: should be HOST:PORT\n");
 			return -1;
 		}
 		*cp++ = '\0';
@@ -195,7 +199,8 @@ static int open_socket_in(int type, int port, struct in_addr *address)
 	}
 	res = socket(hp->h_addrtype, type, 0);
 	if (res == -1) { 
-		rprintf(FERROR,"socket failed\n"); 
+		rprintf(FERROR,"socket failed: %s\n",
+			strerror(errno)); 
 		return -1; 
 	}
 
@@ -203,7 +208,8 @@ static int open_socket_in(int type, int port, struct in_addr *address)
 
 	/* now we've got a socket - we need to bind it */
 	if (bind(res, (struct sockaddr * ) &sock,sizeof(sock)) == -1) { 
-		rprintf(FERROR,"bind failed on port %d\n", port);
+		rprintf(FERROR,"bind failed on port %d: %s\n", port,
+			strerror(errno));
 		close(res); 
 		return -1;
 	}
@@ -402,7 +408,8 @@ void set_socket_options(int fd, char *options)
 		}
 		
 		if (ret != 0)
-			rprintf(FERROR,"Failed to set socket option %s\n",tok);
+			rprintf(FERROR, "failed to set socket option %s: %s\n", tok,
+				strerror(errno));
 	}
 
 	free(options);
