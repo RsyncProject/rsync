@@ -14,6 +14,9 @@ rsync 2.5.3 (not released yet)
     * Fixed compilation errors on some systems caused by the use of
       "unsigned int64" in rsync.h.
 
+    * Fixed problem on systems such as Sunos4 that do not support realloc
+      on a NULL pointer; error was "out of memory in flist_expand".
+
   ENHANCEMENTS:
 
     * Command to initiate connections is only shown with -vv, rather
