@@ -340,4 +340,4 @@ AC_SUBST(OBJ_RESTORE)
 AC_SUBST(CC_SHOBJ_FLAG)
 AC_SUBST(BUILD_POPT)
 
-AC_OUTPUT(Makefile lib/dummy zlib/dummy)
+AC_OUTPUT(Makefile lib/dummy zlib/dummy testsuite/config.sh)

@@ -12,7 +12,7 @@
 RSYNC="$rsync_bin"
 
   runtest() {
-    echo -n "Test $1: "
+    echo $ECHO_N "Test $1: $ECHO_C"
     eval "$2"
   }
   printmsg() {
@@ -35,7 +35,9 @@ mkdir $TO
 touch ${FROM}/empty
 mkdir ${FROM}/emptydir
 ps ax > ${FROM}/pslist
-echo -n "This file has no trailing lf" > ${FROM}/nolf
+
+# This might fail on systems that don't have -n
+echo $ECHO_N "This file has no trailing lf$ECHO_C" > ${FROM}/nolf
 ln -s nolf ${FROM}/nolf-symlink
 cat /etc/inittab /etc/services /etc/resolv.conf > ${FROM}/${F1}
 mkdir ${FROM}/dir
@@ -68,7 +70,7 @@ checkit() {
   ( cd $3 ; ls -laR ) > ${TMP}/ls-to  2>>${log}
   diff -u ${TMP}/ls-from ${TMP}/ls-to >>${log} 2>&1 || failed=YES
   if [ -z "${failed}" ] ; then
-    echo "	done."
+    echo "${ECHO_T}	done."
     rm $log
     return 0
   else
@@ -76,7 +78,7 @@ checkit() {
       cat ${log}
       rm ${log}
     else
-      echo "	FAILED (test # ${testnum} status=$status)."
+      echo "${ECHO_T}	FAILED (test # ${testnum} status=$status)."
     fi
     return 1
   fi

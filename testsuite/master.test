@@ -53,6 +53,8 @@ suitedir="$srcdir/testsuite"
 cd "$suitedir"
 echo "    suitedir=$suitedir"
 
+. "$suitedir/config.sh"
+
 for testbase in $test_names
 do
     testscript="./$testbase.test"
