@@ -793,49 +793,42 @@ int u_strcmp(const char *cs1, const char *cs2)
  *
  * @sa t_unsafe.c
  **/
-int unsafe_symlink(const char *dest_path, const char *src_path)
+int unsafe_symlink(const char *dest, const char *src)
 {
-	char *tok, *src, *dest;
+	const char *name, *slash;
 	int depth = 0;
 
 	/* all absolute and null symlinks are unsafe */
-	if (!dest_path || !*dest_path || *dest_path == '/') return 1;
-
-	src = strdup(src_path);
-	if (!src) out_of_memory("unsafe_symlink");
+	if (!dest || !*dest || *dest == '/') return 1;
 
 	/* find out what our safety margin is */
-	for (tok=strtok(src,"/"); tok; tok=strtok(NULL,"/")) {
-		if (strcmp(tok,"..") == 0) {
+	for (name = src; (slash = strchr(name, '/')) != 0; name = slash+1) {
+		if (strncmp(name, "../", 3) == 0) {
 			depth=0;
-		} else if (strcmp(tok,".") == 0) {
+		} else if (strncmp(name, "./", 2) == 0) {
 			/* nothing */
 		} else {
 			depth++;
 		}
 	}
-	free(src);
+	if (strcmp(name, "..") == 0)
+		depth = 0;
 
-	/* drop by one to account for the filename portion */
-	depth--;
-
-	dest = strdup(dest_path);
-	if (!dest) out_of_memory("unsafe_symlink");
-
-	for (tok=strtok(dest,"/"); tok; tok=strtok(NULL,"/")) {
-		if (strcmp(tok,"..") == 0) {
-			depth--;
-		} else if (strcmp(tok,".") == 0) {
+	for (name = dest; (slash = strchr(name, '/')) != 0; name = slash+1) {
+		if (strncmp(name, "../", 3) == 0) {
+			/* if at any point we go outside the current directory
+			   then stop - it is unsafe */
+			if (--depth < 0)
+				return 1;
+		} else if (strncmp(name, "./", 2) == 0) {
 			/* nothing */
 		} else {
 			depth++;
 		}
-		/* if at any point we go outside the current directory then
-		   stop - it is unsafe */
-		if (depth < 0) break;
 	}
+	if (strcmp(name, "..") == 0)
+		depth--;
 
-	free(dest);
 	return (depth < 0);
 }
 
