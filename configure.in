@@ -10,10 +10,10 @@ AC_CANONICAL_SYSTEM
 AC_VALIDATE_CACHE_SYSTEM_TYPE
 
 # look for getconf early as this affects just about everything
-AC_CHECK_PROG(HAVE_GETCONF, getconf, 1, 0)
-if test $HAVE_GETCONF = 1; then
-	CFLAGS=$CFLAGS" "`getconf LFS_CFLAGS`
-	LDFLAGS=$LDFLAGS" "`getconf LFS_LDFLAGS`
+AC_CHECK_PROG(HAVE_GETCONF, getconf, "yes", "no")
+if test $HAVE_GETCONF = "yes"; then
+	CFLAGS=$CFLAGS" "`getconf LFS_CFLAGS 2> /dev/null`
+	LDFLAGS=$LDFLAGS" "`getconf LFS_LDFLAGS 2> /dev/null`
 fi
 
 dnl Checks for programs.
