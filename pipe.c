@@ -1,19 +1,19 @@
 /*  -*- c-file-style: "linux" -*-
- * 
- * Copyright (C) 1996-2000 by Andrew Tridgell 
+ *
+ * Copyright (C) 1996-2000 by Andrew Tridgell
  * Copyright (C) Paul Mackerras 1996
  * Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -31,8 +31,8 @@ extern int filesfrom_fd;
 /**
  * Create a child connected to use on stdin/stdout.
  *
- * This is derived from CVS code 
- * 
+ * This is derived from CVS code
+ *
  * Note that in the child STDIN is set to blocking and STDOUT
  * is set to non-blocking. This is necessary as rsh relies on stdin being blocking
  *  and ssh relies on stdout being non-blocking
@@ -46,7 +46,7 @@ pid_t piped_child(char **command, int *f_in, int *f_out)
 	pid_t pid;
 	int to_child_pipe[2];
 	int from_child_pipe[2];
-	
+
 	if (verbose >= 2) {
 		print_child_argv(command);
 	}
@@ -55,7 +55,6 @@ pid_t piped_child(char **command, int *f_in, int *f_out)
 		rsyserr(FERROR, errno, "pipe");
 		exit_cleanup(RERR_IPC);
 	}
-
 
 	pid = do_fork();
 	if (pid == -1) {
@@ -108,7 +107,6 @@ pid_t local_child(int argc, char **argv,int *f_in,int *f_out,
 		exit_cleanup(RERR_IPC);
 	}
 
-
 	pid = do_fork();
 	if (pid == -1) {
 		rsyserr(FERROR, errno, "fork");
@@ -117,7 +115,7 @@ pid_t local_child(int argc, char **argv,int *f_in,int *f_out,
 
 	if (pid == 0) {
 		am_sender = read_batch ? 0 : !am_sender;
-		am_server = 1;		
+		am_server = 1;
 
 		if (!am_sender)
 			filesfrom_fd = -1;
@@ -139,12 +137,12 @@ pid_t local_child(int argc, char **argv,int *f_in,int *f_out,
 
 	if (close(from_child_pipe[1]) < 0 ||
 	    close(to_child_pipe[0]) < 0) {
-		rsyserr(FERROR, errno, "Failed to close");   
+		rsyserr(FERROR, errno, "Failed to close");
 		exit_cleanup(RERR_IPC);
 	}
 
 	*f_in = from_child_pipe[0];
 	*f_out = to_child_pipe[1];
-  
+
 	return pid;
 }
