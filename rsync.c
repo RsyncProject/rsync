@@ -133,11 +133,15 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 
 	if (preserve_times && !S_ISLNK(st->st_mode) &&
 	    st->st_mtime != file->modtime) {
-		updated = 1;
-		if (set_modtime(fname,file->modtime) != 0) {
+		/* don't complain about not setting times on directories
+		   because some filesystems can't do it */
+		if (set_modtime(fname,file->modtime) != 0 &&
+		    !S_ISDIR(st->st_mode)) {
 			rprintf(FERROR,"failed to set times on %s : %s\n",
 				fname,strerror(errno));
 			return 0;
+		} else {
+			updated = 1;
 		}
 	}
 
