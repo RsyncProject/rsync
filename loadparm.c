@@ -366,12 +366,7 @@ static int add_a_service(service *pservice, char *name)
 
   i = iNumServices;
 
-  if (ServicePtrs) {
-	  ServicePtrs = (service **)realloc(ServicePtrs,
-					    sizeof(service *)*num_to_alloc);
-  } else {
-	  ServicePtrs = (service **)malloc(sizeof(service *)*num_to_alloc);
-  }
+  ServicePtrs = (service **)Realloc(ServicePtrs,sizeof(service *)*num_to_alloc);
 
   if (ServicePtrs)
 	  pSERVICE(iNumServices) = (service *)malloc(sizeof(service));

@@ -77,7 +77,6 @@
 #define BOOL int
 #define False 0
 #define True 1
-#define Realloc realloc
 
 /* -------------------------------------------------------------------------- **
  * Constants...
