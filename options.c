@@ -425,9 +425,15 @@ static void set_refuse_options(char *bp)
 	while (1) {
 		if ((cp = strchr(bp, ' ')) != NULL)
 			*cp= '\0';
-		for (op = long_options; op->longName; op++) {
+		for (op = long_options; ; op++) {
+			if (!op->longName) {
+				rprintf(FLOG,
+				    "Unknown option %s in \"refuse options\" setting\n",
+				    bp);
+				break;
+			}
 			if (strcmp(bp, op->longName) == 0) {
-				op->val = -(op - long_options) - 1;
+				op->val = (op - long_options) + 9000;
 				break;
 			}
 		}
@@ -571,10 +577,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 #endif
 
 		default:
-			/* A negative opt value means that set_refuse_options()
-			 * turned this option off (-opt-1 is its index). */
-			if (opt < 0) {
-				struct poptOption *op = &long_options[-opt-1];
+			/* A large opt value means that set_refuse_options()
+			 * turned this option off (opt-9000 is its index). */
+			if (opt >= 9000) {
+				struct poptOption *op = &long_options[opt-9000];
 				int n = snprintf(err_buf, sizeof err_buf,
 				    "This server does not support --%s\n",
 				    op->longName) - 1;
