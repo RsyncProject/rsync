@@ -27,13 +27,14 @@
   */
 #include "rsync.h"
 
-extern int dry_run;
+extern int itemize_changes;
 extern int am_daemon;
 extern int am_server;
 extern int am_sender;
 extern int quiet;
 extern int module_id;
 extern int msg_fd_out;
+extern int protocol_version;
 extern int preserve_times;
 extern char *auth_user;
 extern char *log_format;
@@ -387,7 +388,7 @@ static void log_formatted(enum logcode code,
 			}
 			break;
 		case 'L':
-			if (S_ISLNK(file->mode)) {
+			if (S_ISLNK(file->mode) && file->u.link) {
 				snprintf(buf2, sizeof buf2, " -> %s",
 					 safe_fname(file->u.link));
 				n = buf2;
@@ -421,11 +422,15 @@ static void log_formatted(enum logcode code,
 			n = buf2;
 			break;
 		case 'i':
+			if (iflags & ITEM_DELETED) {
+				n = "deleting";
+				break;
+			}
 			n = buf2;
-			n[0] = !(iflags & ITEM_UPDATING) ? ' '
-			     : dry_run ? '*'
+			n[0] = !(iflags & ITEM_UPDATING) ? '.'
 			     : *op == 's' ? '>' : '<';
-			n[1] = S_ISDIR(file->mode) ? 'd' : IS_DEVICE(file->mode) ? 'D'
+			n[1] = S_ISDIR(file->mode) ? 'd'
+			     : IS_DEVICE(file->mode) ? 'D'
 			     : S_ISLNK(file->mode) ? 'L' : 'f';
 			n[2] = !(iflags & ITEM_REPORT_CHECKSUM) ? '.' : 'c';
 			n[3] = !(iflags & ITEM_REPORT_SIZE) ? '.' : 's';
@@ -442,6 +447,17 @@ static void log_formatted(enum logcode code,
 				int i;
 				for (i = 2; n[i]; i++)
 					n[i] = ch;
+			} else if (!(iflags & ITEM_UPDATING)) {
+				int i;
+				for (i = 2; n[i]; i++) {
+					if (n[i] != '.')
+						break;
+				}
+				if (!n[i]) {
+					for (i = 2; n[i]; i++)
+						n[i] = ' ';
+					n[0] = '=';
+				}
 			}
 			break;
 		}
@@ -504,6 +520,31 @@ void log_recv(struct file_struct *file, struct stats *initial_stats, int iflags)
 }
 
 
+void log_delete(char *fname, int mode)
+{
+	static struct file_struct file;
+	int len = strlen(fname);
+	enum logcode code;
+	char *fmt;
+
+	file.mode = mode;
+	file.basename = fname;
+
+	if (am_server && protocol_version >= 29 && len < MAXPATHLEN) {
+		if (S_ISDIR(mode))
+			len++; /* directories include trailing null */
+		send_msg(MSG_DELETED, fname, len);
+		if (!am_daemon)
+			return;
+		fmt = lp_log_format(module_id);
+		code = FLOG;
+	} else {
+		fmt = log_format && itemize_changes ? log_format : "%i %n";
+		code = FINFO;
+	}
+
+	log_formatted(code, fmt, "del.", &file, &stats, ITEM_DELETED);
+}
 
 
 /*
