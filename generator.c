@@ -41,6 +41,7 @@ extern int make_backups;
 extern int csum_length;
 extern int ignore_times;
 extern int size_only;
+extern OFF_T max_size;
 extern int io_timeout;
 extern int protocol_version;
 extern int always_checksum;
@@ -339,6 +340,10 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		if (set_perms(fname, file, statret ? NULL : &st, 0)
 		    && verbose && f_out != -1)
 			rprintf(FINFO, "%s/\n", safe_fname(fname));
+		return;
+	} else if (max_size && file->length > max_size) {
+		if (verbose > 1)
+			rprintf(FINFO, "%s is over max-size\n", fname);
 		return;
 	}
 
