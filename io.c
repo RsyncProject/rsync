@@ -391,6 +391,33 @@ unsigned char read_byte(int f)
 
 
 /**
+ * Sleep after writing to limit I/O bandwidth usage.
+ *
+ * @todo Rather than sleeping after each write, it might be better to
+ * use some kind of averaging.  The current algorithm seems to always
+ * use a bit less bandwidth than specified, because it doesn't make up
+ * for slow periods.  But arguably this is a feature.  In addition, we
+ * ought to take the time used to write the data into account.
+ **/
+static void sleep_for_bwlimit(int bytes_written)
+{
+	struct timeval tv;
+
+	if (!bwlimit)
+		return;
+	
+	tv.tv_sec = 0;
+	tv.tv_usec = bytes_written * 1000 / bwlimit;
+
+	while (tv.tv_usec > 1000000) {
+		tv.tv_sec++;
+		tv.tv_usec -= 1000000;
+	}
+	select(0, NULL, NULL, NULL, tv);
+}
+
+
+/**
  * Write len bytes to the file descriptor @p fd.
  *
  * This function underlies the multiplexing system.  The body of the
@@ -470,18 +497,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 				exit_cleanup(RERR_STREAMIO);
 			}
 
-			/* Sleep after writing to limit I/O bandwidth */
-			if (bwlimit)
-			{
-			    tv.tv_sec = 0;
-			    tv.tv_usec = ret * 1000 / bwlimit;
-			    while (tv.tv_usec > 1000000)
-			    {
-				tv.tv_sec++;
-				tv.tv_usec -= 1000000;
-			    }
-			    select(0, NULL, NULL, NULL, &tv);
- 			}
+			sleep_for_bwlimit(ret);
  
 			total += ret;
 
