@@ -191,7 +191,6 @@ do
     testbase=`echo $testscript | sed 's!.*/!!' | sed -e 's/.test\$//'`
     scratchdir="$scratchbase.$testbase"
 
-    echo "----- $testbase starting"
     prep_scratch
 
     set +e
@@ -201,16 +200,17 @@ do
 
     case $result in
     0)
-	echo "----- $testbase completed successfully"
+	echo "PASS    $testbase"
 	passed=`expr $passed + 1`
 	discard_scratch
 	;;
     77)
-	echo "----- $testbase skipped"
+	echo "SKIP    $testbase"
 	skipped=`expr $skipped + 1`
 	discard_scratch
 	;;
     *)
+	echo "FAIL    $testbase"
 	echo "----- $testbase failed: log follows"
 	cat "$scratchdir/test.log"
 	echo "----- $testbase log ends"
