@@ -389,8 +389,8 @@ quote(itemize(
   it() %i an itemized list of what is being updated
 ))
 
-The default log format is "%o %h [%a] %m (%u) %f %l", and a "%t [%p] "
-is always added to the beginning when using the "log file" option.
+The default log format is "%o %h [%a] %m (%u) %l %f%L", and a "%t [%p] "
+is always prefixed when using the "log file" option.
 
 A perl script called rsyncstats to summarize this format is included
 in the rsync source code distribution.
@@ -400,14 +400,17 @@ The %i format is a set of cryptic characters that are output as follows:
 quote(tt(  *Xcstpog ITEM_NAME))
 
 The bf(*) is either bf(<) (receive), bf(>) (send), or bf(*) (--dry-run) if
-the item is being updated, otherwise it is a space.  The bf(X) will be
-replaced by one of the following: an "f" for a file, a "d" for a dir, an
-"L" for a symlink, or a "D" for a device.  The rest of the letters in the
-string above are the actual letters that will be output if the associated
-attribute for the item is being updated; otherwise the letter will be
-replaced by either a "-" for no change, a "+" for a new item, or a "?" if
-the attribute is not known (which happens when speaking to an older rsync).
-The meanings of the attribute letters are as follows:
+the item is being updated, otherwise it is a space.
+
+The bf(X) will be replaced by one of the following: an "f" for a file, a
+"d" for a dir, an "L" for a symlink, or a "D" for a device.
+
+The rest of the letters in the string above are the actual letters that
+will be output if the associated attribute for the item is being updated;
+otherwise the letter will be replaced by either a "." for no change, a "+"
+for a new item, or a "?" if the attribute is not known (which happens when
+talking to an older rsync).  The meanings of the attribute letters are as
+follows:
 
 quote(itemize(
   it() A bf(c) means the checksum of the file is different and will be
