@@ -232,7 +232,7 @@ void usage(enum logcode F)
   rprintf(F," -v, --verbose               increase verbosity\n");
   rprintf(F," -q, --quiet                 decrease verbosity\n");
   rprintf(F," -c, --checksum              always checksum\n");
-  rprintf(F," -a, --archive               archive mode, equivalent to -rlptgoD\n");
+  rprintf(F," -a, --archive               archive mode, equivalent to -rlptgoD (no -H)\n");
   rprintf(F," -r, --recursive             recurse into directories\n");
   rprintf(F," -R, --relative              use relative path names\n");
   rprintf(F,"     --no-relative           turn off --relative\n");
