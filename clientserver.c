@@ -423,19 +423,6 @@ static int rsync_module(int f_in, int f_out, int i)
 		}
 	}
 
-	if (sanitize_paths) {
-		/*
-		 * Note that this is applied to all parameters, whether or not
-		 *    they are filenames, but no other legal parameters contain
-		 *    the forms that need to be sanitized so it doesn't hurt;
-		 *    it is not known at this point which parameters are files
-		 *    and which aren't.
-		 */
-		for (i = 1; i < argc; i++) {
-			sanitize_path(argv[i], NULL);
-		}
-	}
-
 	argp = argv;
 	ret = parse_arguments(&argc, (const char ***) &argp, 0);
 
