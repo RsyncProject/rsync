@@ -126,12 +126,10 @@ set -e
 RUNSHFLAGS='-e'
 
 # for Solaris
-PATH="/usr/xpg4/bin/:$PATH"
+[ -d /usr/xpg4/bin ] && PATH="/usr/xpg4/bin/:$PATH"
 
-if [ -n "$loglevel" ] && [ "$loglevel" -gt 8 ]
-then
-    if set -x
-    then
+if [ "x$loglevel" != x ] && [ "$loglevel" -gt 8 ]; then
+    if set -x; then
 	# If it doesn't work the first time, don't keep trying.
 	RUNSHFLAGS="$RUNSHFLAGS -x"
     fi
@@ -142,34 +140,31 @@ echo "$0 running in `pwd`"
 echo "    rsync_bin=$rsync_bin"
 echo "    srcdir=$srcdir"
 
-if test -e /usr/bin/whoami; then
+if [ -f /usr/bin/whoami ]; then
     testuser=`/usr/bin/whoami`
-elif test -e /usr/ucb/whoami; then
+elif [ -f /usr/ucb/whoami ]; then
     testuser=`/usr/ucb/whoami`
 else
-    testuser=`id -un || whoami || echo UNKNOWN`
+    testuser=`id -un || whoami || echo ${LOGNAME:-${USERNAME:-${USER:-'UNKNOWN'}}}`
 fi
 
 echo "    testuser=$testuser"
 echo "    os=`uname -a`"
 
 # It must be "yes", not just nonnull
-if test "x$preserve_scratch" = xyes
-then
+if [ "x$preserve_scratch" = xyes ]; then
     echo "    preserve_scratch=yes"
 else
     echo "    preserve_scratch=no"
 fi    
 
 
-if test ! -f $rsync_bin
-then
+if [ ! -f "$rsync_bin" ]; then
     echo "rsync_bin $rsync_bin is not a file" >&2
     exit 2
 fi
 
-if test ! -d $srcdir
-then
+if [ ! -d "$srcdir" ]; then
     echo "srcdir $srcdir is not a directory" >&2
     exit 2
 fi
@@ -205,8 +200,7 @@ maybe_discard_scratch() {
     return 0
 }
 
-if [ "x$whichtests" = x ]
-then
+if [ "x$whichtests" = x ]; then
     whichtests="*.test"
 fi
 
@@ -257,8 +251,7 @@ do
     *)
 	echo "FAIL    $testbase"
 	failed=`expr $failed + 1`
-	if [ "x$nopersist" = "xyes" ]
-	then
+	if [ "x$nopersist" = xyes ]; then
 	    exit 1
 	fi
     esac
