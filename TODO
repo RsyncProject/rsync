@@ -32,6 +32,16 @@ use chroot
   for people who want to generate the file list using a find(1)
   command or a script.
 
+File list structure in memory
+
+  Rather than one big array, perhaps have a tree in memory mirroring
+  the directory tree.  
+
+  This might make sorting much faster!  (I'm not sure it's a big CPU
+  problem, mind you.)  
+
+  It might also reduce memory use in storing repeated directory names
+  -- again I'm not sure this is a problem.
 
 Performance
 
