@@ -227,14 +227,17 @@ static int check_exclude_file(char *fname, int is_dir, int exclude_level)
 		}
 	}
 	if (server_exclude_list
-	 && check_exclude(server_exclude_list, fname, is_dir))
+	 && check_exclude(server_exclude_list, fname, is_dir,
+	    "server pattern"))
 		return 1;
 	if (exclude_level != ALL_EXCLUDES)
 		return 0;
-	if (exclude_list && check_exclude(exclude_list, fname, is_dir))
+	if (exclude_list && check_exclude(exclude_list, fname, is_dir,
+	    "pattern"))
 		return 1;
 	if (local_exclude_list
-	 && check_exclude(local_exclude_list, fname, is_dir))
+	 && check_exclude(local_exclude_list, fname, is_dir,
+	    "local-cvsignore"))
 		return 1;
 	return 0;
 }
