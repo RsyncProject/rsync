@@ -1097,8 +1097,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				flist_dir = lastdir;
 				flist_dir_len = lastdir_len;
 			} else {
-				if (lastdir)
-					free(lastdir);
 				flist_dir = lastdir = strdup(dir);
 				flist_dir_len = lastdir_len = strlen(dir);
 			}
@@ -1416,8 +1414,9 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 		return;
 
 	for (i = 0; i < flist->count; i++) {
-		rprintf(FINFO, "[%ld] i=%d %s %s mode=0%o len=%.0f\n",
+		rprintf(FINFO, "[%ld] i=%d %s %s %s mode=0%o len=%.0f\n",
 			(long) getpid(), i,
+			NS(flist->files[i]->basedir),
 			NS(flist->files[i]->dirname),
 			NS(flist->files[i]->basename),
 			(int) flist->files[i]->mode,
