@@ -84,7 +84,7 @@ void wait_process(pid_t pid, int *status)
 		io_flush(FULL_FLUSH);
 	}
 
-	if ((waited_pid == -1) && (errno == ECHILD)) {
+	if (waited_pid == -1 && errno == ECHILD) {
 		/* status of requested child no longer available.
 		 * check to see if it was processed by the sigchld_handler.
 		 */
