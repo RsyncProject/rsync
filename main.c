@@ -209,6 +209,8 @@ static void show_malloc_stats(void)
 	rprintf(FINFO, "  smblks:    %10d\n", mi.smblks);
 	rprintf(FINFO, "  hblks:     %10d   (chunks from mmap)\n", mi.hblks);
 	rprintf(FINFO, "  hblkhd:    %10d   (bytes from mmap)\n", mi.hblkhd);
+	rprintf(FINFO, "  allmem:    %10d   (bytes from sbrk + mmap)\n",
+	    mi.arena + mi.hblkhd);
 	rprintf(FINFO, "  usmblks:   %10d\n", mi.usmblks);
 	rprintf(FINFO, "  fsmblks:   %10d\n", mi.fsmblks);
 	rprintf(FINFO, "  uordblks:  %10d   (bytes used)\n", mi.uordblks);
