@@ -13,3 +13,6 @@ testtmp
 testtmp.*
 tls
 zlib/dummy
+confdefs.h
+conftest.c
+conftest.log
