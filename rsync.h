@@ -502,6 +502,7 @@ struct exclude_struct {
 struct exclude_list_struct {
 	struct exclude_struct *head;
 	struct exclude_struct *tail;
+	char *debug_type;
 };
 
 struct stats {
