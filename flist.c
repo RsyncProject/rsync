@@ -311,7 +311,7 @@ static void send_file_entry(struct file_struct *file, int f,
 	unsigned char flags;
 	static time_t last_time;
 	static mode_t last_mode;
-	static dev_t last_rdev;
+	static DEV64_T last_rdev;
 	static uid_t last_uid;
 	static gid_t last_gid;
 	static char lastname[MAXPATHLEN];
@@ -430,7 +430,7 @@ static void receive_file_entry(struct file_struct **fptr,
 {
 	static time_t last_time;
 	static mode_t last_mode;
-	static dev_t last_rdev;
+	static DEV64_T last_rdev;
 	static uid_t last_uid;
 	static gid_t last_gid;
 	static char lastname[MAXPATHLEN];
