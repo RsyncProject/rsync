@@ -184,7 +184,7 @@ void sum_update(char *p, int len)
 
 void sum_end(char *sum)
 {
-	if (sumresidue) {
+	if (sumresidue || remote_version >= 27) {
 		mdfour_update(&md, (uchar *)sumrbuf, sumresidue);
 	}
 
