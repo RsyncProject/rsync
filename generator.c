@@ -285,14 +285,20 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 
 	if (server_exclude_list.head
 	    && check_exclude(&server_exclude_list, fname,
-			     S_ISDIR(file->mode)) < 0)
+			     S_ISDIR(file->mode)) < 0) {
+		if (verbose) {
+			rprintf(FINFO, "skipping server-excluded file \"%s\"\n",
+				fname);
+		}
 		return;
+	}
 
 	statret = link_stat(fname,&st);
 
 	if (only_existing && statret == -1 && errno == ENOENT) {
 		/* we only want to update existing files */
-		if (verbose > 1) rprintf(FINFO, "not creating new file \"%s\"\n",fname);
+		if (verbose > 1)
+			rprintf(FINFO, "not creating new file \"%s\"\n", fname);
 		return;
 	}
 
