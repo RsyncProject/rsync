@@ -373,7 +373,9 @@ If you want to customize the log lines, see the "log format" option.
 dit(bf(log format)) The "log format" option allows you to specify the
 format used for logging file transfers when transfer logging is enabled.
 The format is a text string containing embedded single-character escape
-sequences prefixed with a percent (%) character.
+sequences prefixed with a percent (%) character.  An optional numeric
+field width may also be specified between the percent and the escape
+letter (e.g. "%-50n %8l %07p").
 
 The default log format is "%o %h [%a] %m (%u) %f %l", and a "%t [%p] "
 is always prefixed when using the "log file" option.
@@ -408,7 +410,7 @@ For a list of what the characters mean that are output by "%i", see the
 bf(--itemize-changes) option in the rsync manpage.
 
 Note that some of the logged output changes when talking with older
-rsync versions.  For instance, deleted files were only logged as verbose
+rsync versions.  For instance, deleted files were only output as verbose
 messages prior to rsync 2.6.4.
 
 dit(bf(timeout)) The "timeout" option allows you to override the
