@@ -46,7 +46,8 @@ extern int io_timeout;
 extern int protocol_version;
 extern int always_checksum;
 extern char *partial_dir;
-extern char *compare_dest;
+extern char *basis_dir[];
+extern int copy_dest;
 extern int link_dest;
 extern int whole_file;
 extern int local_server;
@@ -59,30 +60,32 @@ extern unsigned int block_size;
 
 extern struct exclude_list_struct server_exclude_list;
 
+static int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
+{
+	if (preserve_perms
+	 && (st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS))
+		return 0;
 
-/* choose whether to skip a particular file */
-static int skip_file(char *fname, struct file_struct *file, STRUCT_STAT *st)
+	if (am_root && preserve_uid && st->st_uid != file->uid)
+		return 0;
+
+	if (preserve_gid && file->gid != GID_NONE && st->st_gid != file->gid)
+		return 0;
+
+	return 1;
+}
+
+/* Perform our quick-check heuristic for determining if a file is unchanged. */
+static int unchanged_file(char *fn, struct file_struct *file, STRUCT_STAT *st)
 {
 	if (st->st_size != file->length)
 		return 0;
-	if (link_dest) {
-		if (preserve_perms
-		    && (st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS))
-			return 0;
-
-		if (am_root && preserve_uid && st->st_uid != file->uid)
-			return 0;
-
-		if (preserve_gid && file->gid != GID_NONE
-		    && st->st_gid != file->gid)
-			return 0;
-	}
 
 	/* if always checksum is set then we use the checksum instead
 	   of the file time to determine whether to sync */
 	if (always_checksum && S_ISREG(st->st_mode)) {
 		char sum[MD4_SUM_LENGTH];
-		file_checksum(fname,sum,st->st_size);
+		file_checksum(fn, sum, st->st_size);
 		return memcmp(sum, file->u.sum, protocol_version < 21 ? 2
 							: MD4_SUM_LENGTH) == 0;
 	}
@@ -131,7 +134,6 @@ void write_sum_head(int f, struct sum_struct *sum)
  *
  * This might be made one of several selectable heuristics.
  */
-
 static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 {
 	unsigned int blength;
@@ -429,13 +431,42 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 	fnamecmp = fname;
 	fnamecmp_type = FNAMECMP_FNAME;
 
-	if (statret == -1 && compare_dest != NULL) {
-		/* try the file at compare_dest instead */
-		pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, compare_dest, fname);
-		if (link_stat(fnamecmpbuf, &st, 0) == 0
-		    && S_ISREG(st.st_mode)) {
+	if (statret == -1 && basis_dir[0] != NULL) {
+		int fallback_match = -1;
+		int match_level = 0;
+		int i = 0;
+		do {
+			pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
+				 basis_dir[i], fname);
+			if (link_stat(fnamecmpbuf, &st, 0) == 0
+			    && S_ISREG(st.st_mode)) {
+				statret = 0;
+				if (link_dest) {
+					if (!match_level) {
+						fallback_match = i;
+						match_level = 1;
+					} else if (match_level == 2
+					    && !unchanged_attrs(file, &st))
+						continue;
+					if (!unchanged_file(fnamecmpbuf, file, &st))
+						continue;
+					fallback_match = i;
+					match_level = 2;
+					if (!unchanged_attrs(file, &st))
+						continue;
+				}
+				match_level = 3;
+				break;
+			}
+		} while (basis_dir[++i] != NULL);
+		if (statret == 0) {
+			if (match_level < 3) {
+				i = fallback_match;
+				pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
+					 basis_dir[i], fname);
+			}
 #if HAVE_LINK
-			if (link_dest && !dry_run) {
+			if (link_dest && match_level == 3 && !dry_run) {
 				if (do_link(fnamecmpbuf, fname) < 0) {
 					if (verbose) {
 						rsyserr(FINFO, errno,
@@ -444,15 +475,14 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 							safe_fname(fname));
 					}
 					fnamecmp = fnamecmpbuf;
-					fnamecmp_type = FNAMECMP_CMPDEST;
+					fnamecmp_type = FNAMECMP_BASIS_DIR + i;
 				}
 			} else
 #endif
 			{
 				fnamecmp = fnamecmpbuf;
-				fnamecmp_type = FNAMECMP_CMPDEST;
+				fnamecmp_type = FNAMECMP_BASIS_DIR + i;
 			}
-			statret = 0;
 		}
 	}
 
@@ -497,7 +527,9 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		return;
 	}
 
-	if (skip_file(fnamecmp, file, &st)) {
+	if ((link_dest || copy_dest) && fnamecmp_type != FNAMECMP_FNAME)
+		;
+	else if (unchanged_file(fnamecmp, file, &st)) {
 		if (fnamecmp_type == FNAMECMP_FNAME)
 			set_perms(fname, file, &st, PERMS_REPORT);
 		return;
