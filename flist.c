@@ -988,8 +988,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		send_file_entry(NULL, f, 0);
 	}
 
-	if (show_filelist_p())
+	if (show_filelist_p() && f != -1) {
 		finish_filelist_progress(flist);
+	}
 
 	clean_flist(flist, 0);
 
