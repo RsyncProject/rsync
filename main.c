@@ -492,9 +492,10 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 }
 
 
-void child_main(int argc, char *argv[])
+int child_main(int argc, char *argv[])
 {
 	start_server(STDIN_FILENO, STDOUT_FILENO, argc, argv);
+	return 0;
 }
 
 
@@ -666,8 +667,6 @@ static int start_client(int argc, char *argv[])
 	extern int am_sender;
 	extern char *shell_cmd;
 	extern int rsync_port;
-	extern int whole_file;
-	extern int write_batch;
 	extern int read_batch;
 	int rc;
 
