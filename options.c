@@ -1223,7 +1223,7 @@ void server_options(char **args,int *argc)
 			args[ac++] = "--delete-excluded";
 		else if (delete_before == 1 || delete_after)
 			args[ac++] = "--delete";
-		if (delete_before == 2)
+		if (delete_before > 1)
 			args[ac++] = "--delete-before";
 		if (delete_during)
 			args[ac++] = "--delete-during";
