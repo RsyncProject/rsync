@@ -57,8 +57,12 @@ extern struct stats stats;
  * remote instance crashed.  Just giving the offset on the stream is
  * not very helpful.  So instead we try to make io_phase_name point to
  * something useful.
+ *
+ * @todo Perhaps we want some simple stack functionality, but there's
+ * no need to overdo it.
  **/
-const char *io_phase_name = "unknown";
+const char *io_write_phase = "unknown";
+const char *io_read_phase = "unknown";
 
 
 /** Ignore EOF errors while reading a module listing if the remote
@@ -501,7 +505,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 				io_multiplexing_close();
 				rprintf(FERROR, RSYNC_NAME
 					": writefd_unbuffered failed to write %ld bytes: phase \"%s\": %s\n",
-					(long) len, io_phase_name, 
+					(long) len, io_write_phase, 
 					strerror(errno));
 				exit_cleanup(RERR_STREAMIO);
 			}

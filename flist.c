@@ -354,6 +354,8 @@ static void send_file_entry(struct file_struct *file, int f,
 		return;
 	}
 
+	io_write_phase = "send_file_entry";
+
 	fname = f_name(file);
 
 	flags = base_flags;
@@ -449,6 +451,8 @@ static void send_file_entry(struct file_struct *file, int f,
 
 	strlcpy(lastname, fname, MAXPATHLEN);
 	lastname[MAXPATHLEN - 1] = 0;
+
+	io_write_phase = "unknown";
 }
 
 
