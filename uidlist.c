@@ -97,7 +97,8 @@ static uid_t match_uid(uid_t uid)
 	static uid_t last_in, last_out;
 	struct idlist *list = uidlist;
 
-	if (uid == last_in) return last_out;
+	if (uid == last_in)
+		return last_out;
 
 	last_in = uid;
 
@@ -116,7 +117,7 @@ static uid_t match_uid(uid_t uid)
 static int is_in_group(gid_t gid)
 {
 #ifdef GETGROUPS_T
-	static gid_t last_in = (gid_t) -2, last_out;
+	static gid_t last_in = GID_NONE, last_out;
 	static int ngroups = -2;
 	static GETGROUPS_T *gidset;
 	int n;
@@ -127,7 +128,7 @@ static int is_in_group(gid_t gid)
 		gid_t mygid = getgid();
 		ngroups = getgroups(0, 0);
 		/* If that didn't work, perhaps 0 isn't treated specially? */
-		if (ngroups < 0)
+		if (ngroups <= 0)
 			ngroups = NGROUPS_MAX;
 		gidset = new_array(GETGROUPS_T, ngroups+1);
 		if (ngroups > 0)
@@ -142,26 +143,27 @@ static int is_in_group(gid_t gid)
 	}
 
 	last_in = gid;
-	last_out = 0;
 	for (n = 0; n < ngroups; n++) {
-		if (gidset[n] == gid) {
-			last_out = 1;
-			break;
-		}
+		if (gidset[n] == gid)
+			return last_out = 1;
 	}
-	return last_out;
+	return last_out = 0;
 
 #else
-	return 0;
+	static gid_t mygid = GID_NONE;
+	if (mygid == GID_NONE)
+		mygid = getgid();
+	return gid == mygid;
 #endif
 }
 
 static gid_t match_gid(gid_t gid)
 {
-	static gid_t last_in = (gid_t) -2, last_out;
+	static gid_t last_in = GID_NONE, last_out = GID_NONE;
 	struct idlist *list = gidlist;
 
-	if (gid == last_in) return last_out;
+	if (gid == last_in)
+		return last_out;
 
 	last_in = gid;
 
