@@ -18,6 +18,11 @@ Changes since 2.6.3:
 
   ENHANCEMENTS:
 
+    - The daemon-mode options were separated from the normal rsync options
+      so that they can't be mixed together.  This makes it impossible for a
+      user to start a daemon that had improper default option values that
+      could cause problems (a hang or an exit) when a client connects.
+
     - In _exit_cleanup(): when we are exiting with a partially-received
       file, we now flush any data in the write-cache before closing the
       partial file.
