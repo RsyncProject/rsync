@@ -66,7 +66,6 @@ static void link_idev_data(void)
 			hlink_list[from]->flags |= FLAG_HLINK_EOL;
 			hlink_list[to++] = head;
 		} else {
-			free((char*)head->link_u.idev);
 			head->link_u.idev = NULL;
 		}
 	}
