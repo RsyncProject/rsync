@@ -2,6 +2,13 @@
 
 BUGS ---------------------------------------------------------------
 
+rsync-url barfs on upload
+
+  rsync foo rsync://localhost/transfer/
+
+  Fix the parser.
+
+
 There seems to be a bug with hardlinks
 
   mbp/2 build$ ls -l /tmp/a /tmp/b -i
