@@ -31,14 +31,6 @@ void rprintf(int fd, const char *format, ...)
 	int len;
 	FILE *f=NULL;
 	extern int am_daemon;
-	
-	if (am_daemon) {
-#ifdef LOG_DAEMON
-		openlog("rsyncd", LOG_PID, LOG_DAEMON);
-#else /* for old systems that have no facility codes. */
-		openlog("rsyncd", LOG_PID);
-#endif
-	}
 
 	va_start(ap, format);
 
@@ -51,11 +43,23 @@ void rprintf(int fd, const char *format, ...)
 
 	if (len < 0) exit_cleanup(1);
 
+	if (len > sizeof(buf)-1) exit_cleanup(1);
+
 	buf[len] = 0;
 
 	if (am_daemon) {
+		static int initialised;
 		int priority = LOG_INFO;
 		if (fd == FERROR) priority = LOG_WARNING;
+
+		if (!initialised) {
+			initialised = 1;
+#ifdef LOG_DAEMON
+			openlog("rsyncd", LOG_PID, LOG_DAEMON);
+#else
+			openlog("rsyncd", LOG_PID);
+#endif
+		}
 		
 		syslog(priority, "%s", buf);
 		return;

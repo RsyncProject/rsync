@@ -221,13 +221,12 @@ initialise a service to the defaults
 ***************************************************************************/
 static void init_service(service *pservice)
 {
-  bzero((char *)pservice,sizeof(service));
-  copy_service(pservice,&sDefault);
+	bzero((char *)pservice,sizeof(service));
+	copy_service(pservice,&sDefault);
 }
 
 static void string_set(char **s, char *v)
 {
-	if (*s) free(*s);
 	if (!v) {
 		*s = NULL;
 		return;
