@@ -68,15 +68,15 @@ static int num_waiting(int fd)
   return(len);
 }
 
+void write_flush(int f)
+{
+}
+
+
 static char *read_buffer = NULL;
 static char *read_buffer_p = NULL;
 static int read_buffer_len = 0;
 static int read_buffer_size = 0;
-
-
-void write_flush(int f)
-{
-}
 
 
 /* This function was added to overcome a deadlock problem when using
@@ -99,7 +99,7 @@ void read_check(int f)
   }
 
   if (n > (read_buffer_size - read_buffer_len)) {
-    read_buffer_size += n;
+    read_buffer_size += n; /* deliberately overdo it a bit */
     if (!read_buffer)
       read_buffer = (char *)malloc(read_buffer_size);
     else
