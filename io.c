@@ -22,7 +22,7 @@
 /**
  * @file io.c
  *
- * Socket and pipe IO utilities used in rsync.
+ * Socket and pipe I/O utilities used in rsync.
  *
  * rsync provides its own multiplexing system, which is used to send
  * stderr and stdout over a single socket.  We need this because
@@ -63,9 +63,9 @@ const char phase_unknown[] = "unknown";
  * not very helpful.  So instead we try to make io_phase_name point to
  * something useful.
  *
- * For buffered/multiplexed IO these names will be somewhat
+ * For buffered/multiplexed I/O these names will be somewhat
  * approximate; perhaps for ease of support we would rather make the
- * buffer always flush when a single application-level IO finishes.
+ * buffer always flush when a single application-level I/O finishes.
  *
  * @todo Perhaps we want some simple stack functionality, but there's
  * no need to overdo it.
@@ -146,7 +146,7 @@ static void check_timeout(void)
 
 /** Setup the fd used to receive MSG_* messages.  Only needed when
  * we're the generator because the sender and receiver both use the
- * multiplexed IO setup. */
+ * multiplexed I/O setup. */
 void set_msg_fd_in(int fd)
 {
 	msg_fd_in = fd;
@@ -154,7 +154,7 @@ void set_msg_fd_in(int fd)
 
 /** Setup the fd used to send our MSG_* messages.  Only needed when
  * we're the receiver because the generator and the sender both use
- * the multiplexed IO setup. */
+ * the multiplexed I/O setup. */
 void set_msg_fd_out(int fd)
 {
 	msg_fd_out = fd;
@@ -356,7 +356,7 @@ static void die_from_readerr(int err)
 
 
 /**
- * Read from a socket with IO timeout. return the number of bytes
+ * Read from a socket with I/O timeout. return the number of bytes
  * read. If no bytes can be read then exit, never return a number <= 0.
  *
  * TODO: If the remote shell connection fails, then current versions
@@ -1006,10 +1006,11 @@ void write_byte(int f,unsigned char c)
 
 
 /**
- * Read a line of up to @p maxlen characters into @p buf.  Does not
- * contain a trailing newline or carriage return.
+ * Read a line of up to @p maxlen characters into @p buf (not counting
+ * the trailing null).  Strips the (required) trailing newline and all
+ * carriage returns.
  *
- * @return 1 for success; 0 for io error or truncation.
+ * @return 1 for success; 0 for I/O error or truncation.
  **/
 int read_line(int f, char *buf, size_t maxlen)
 {
@@ -1018,21 +1019,15 @@ int read_line(int f, char *buf, size_t maxlen)
 		read_buf(f, buf, 1);
 		if (buf[0] == 0)
 			return 0;
-		if (buf[0] == '\n') {
-			buf[0] = 0;
+		if (buf[0] == '\n')
 			break;
-		}
 		if (buf[0] != '\r') {
 			buf++;
 			maxlen--;
 		}
 	}
-	if (maxlen == 0) {
-		*buf = 0;
-		return 0;
-	}
-
-	return 1;
+	*buf = '\0';
+	return maxlen > 0;
 }
 
 
