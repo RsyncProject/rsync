@@ -139,7 +139,7 @@
 #define LDOUBLE double
 #endif
 
-#ifdef HAVE_LONG_LONG
+#if SIZEOF_LONG_LONG
 #define LLONG long long
 #else
 #define LLONG long
