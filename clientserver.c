@@ -25,6 +25,7 @@ extern int read_only;
 extern int verbose;
 extern int rsync_port;
 char *auth_user;
+int sanitize_paths = 0;
 
 int start_socket_client(char *host, char *path, int argc, char *argv[])
 {
@@ -221,6 +222,7 @@ static int rsync_module(int fd, int i)
 			io_printf(fd,"@ERROR: chdir failed\n");
 			return -1;
 		}
+		sanitize_paths = 1;
 	}
 
 	if (am_root) {
@@ -262,7 +264,7 @@ static int rsync_module(int fd, int i)
 				request = strdup(p);
 				start_glob++;
 			}
-			glob_expand(name, argv, &argc, MAX_ARGS, !use_chroot);
+			glob_expand(name, argv, &argc, MAX_ARGS);
 		} else {
 			argc++;
 		}
@@ -276,7 +278,7 @@ static int rsync_module(int fd, int i)
 		}
 	}
 
-	if (!use_chroot) {
+	if (sanitize_paths) {
 		/*
 		 * Note that this is applied to all parameters, whether or not
 		 *    they are filenames, but no other legal parameters contain
@@ -285,7 +287,7 @@ static int rsync_module(int fd, int i)
 		 *    and which aren't.
 		 */
 		for (i = 1; i < argc; i++) {
-			sanitize_path(argv[i]);
+			sanitize_path(argv[i], NULL);
 		}
 	}
 

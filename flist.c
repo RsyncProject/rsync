@@ -45,6 +45,7 @@ extern int copy_links;
 extern int copy_unsafe_links;
 extern int remote_version;
 extern int io_error;
+extern int sanitize_paths;
 
 static char topsrcname[MAXPATHLEN];
 
@@ -309,6 +310,10 @@ static void receive_file_entry(struct file_struct **fptr,
 
 	clean_fname(thisname);
 
+	if (sanitize_paths) {
+		sanitize_path(thisname, NULL);
+	}
+
 	if ((p = strrchr(thisname,'/'))) {
 		static char *lastdir;
 		*p = 0;
@@ -343,6 +348,9 @@ static void receive_file_entry(struct file_struct **fptr,
 		file->link = (char *)malloc(l+1);
 		if (!file->link) out_of_memory("receive_file_entry 2");
 		read_sbuf(f,file->link,l);
+		if (sanitize_paths) {
+			sanitize_path(file->link, file->dirname);
+		}
 	}
 
 #if SUPPORT_HARD_LINKS
@@ -414,6 +422,9 @@ static struct file_struct *make_file(int f, char *fname)
 	strlcpy(cleaned_name, fname, MAXPATHLEN);
 	cleaned_name[MAXPATHLEN-1] = 0;
 	clean_fname(cleaned_name);
+	if (sanitize_paths) {
+		sanitize_path(cleaned_name, NULL);
+	}
 	fname = cleaned_name;
 
 	memset(sum,0,SUM_LENGTH);

@@ -477,7 +477,7 @@ int lock_range(int fd, int offset, int len)
 }
 
 
-static void glob_expand_one(char *s, char **argv, int *argc, int maxargs, int sanitize_paths)
+static void glob_expand_one(char *s, char **argv, int *argc, int maxargs)
 {
 #if !(defined(HAVE_GLOB) && defined(HAVE_GLOB_H))
 	if (!*s) s = ".";
@@ -485,14 +485,16 @@ static void glob_expand_one(char *s, char **argv, int *argc, int maxargs, int sa
 	(*argc)++;
 	return;
 #else
+	extern int sanitize_paths;
 	glob_t globbuf;
 	int i;
 
 	if (!*s) s = ".";
 
-	s = strdup(s);
-	sanitize_path(s);
-	argv[*argc] = s;
+	argv[*argc] = strdup(s);
+	if (sanitize_paths) {
+		sanitize_path(argv[*argc], NULL);
+	}
 
 	memset(&globbuf, 0, sizeof(globbuf));
 	glob(argv[*argc], 0, NULL, &globbuf);
@@ -511,7 +513,7 @@ static void glob_expand_one(char *s, char **argv, int *argc, int maxargs, int sa
 #endif
 }
 
-void glob_expand(char *base1, char **argv, int *argc, int maxargs, int sanitize_paths)
+void glob_expand(char *base1, char **argv, int *argc, int maxargs)
 {
 	char *s = argv[*argc];
 	char *p, *q;
@@ -535,11 +537,11 @@ void glob_expand(char *base1, char **argv, int *argc, int maxargs, int sanitize_
 	while ((p = strstr(q,base)) && ((*argc) < maxargs)) {
 		/* split it at this point */
 		*p = 0;
-		glob_expand_one(q, argv, argc, maxargs, sanitize_paths);
+		glob_expand_one(q, argv, argc, maxargs);
 		q = p+strlen(base);
 	}
 
-	if (*q && (*argc < maxargs)) glob_expand_one(q, argv, argc, maxargs, sanitize_paths);
+	if (*q && (*argc < maxargs)) glob_expand_one(q, argv, argc, maxargs);
 
 	free(s);
 	free(base);
@@ -635,8 +637,11 @@ void clean_fname(char *name)
 /*
  * Make path appear as if a chroot had occurred:
  *    1. remove leading "/" (or replace with "." if at end)
- *    2. remove leading ".." components
+ *    2. remove leading ".." components (except those allowed by "reldir")
  *    3. delete any other "<dir>/.." (recursively)
+ * If "reldir" is non-null, it is a sanitized directory that the path will be
+ *    relative to, so allow as many ".." at the beginning of the path as
+ *    there are components in reldir.
  * While we're at it, remove double slashes and "." components like
  *   clean_fname does(), but DON'T remove a trailing slash because that
  *   is sometimes significant on command line arguments.
@@ -644,10 +649,20 @@ void clean_fname(char *name)
  * Contributed by Dave Dykstra <dwd@bell-labs.com>
  */
 
-void sanitize_path(char *p)
+void sanitize_path(char *p, char *reldir)
 {
 	char *start, *sanp;
+	int depth = 0;
+	int allowdotdot = 0;
 
+	if (reldir) {
+		depth++;
+		while (*reldir) {
+			if (*reldir++ == '/') {
+				depth++;
+			}
+		}
+	}
 	start = p;
 	sanp = p;
 	while (*p == '/') {
@@ -665,35 +680,48 @@ void sanitize_path(char *p)
 				/* skip following slashes */
 				;
 			}
-		} else if ((*p == '.') && (*(p+1) == '.') &&
+			continue;
+		}
+		allowdotdot = 0;
+		if ((*p == '.') && (*(p+1) == '.') &&
 			    ((*(p+2) == '/') || (*(p+2) == '\0'))) {
-			/* skip ".." component followed by slash or end */
-			p += 2;
-			if (*p == '/')
-				p++;
-			if (sanp != start) {
-				/* back up sanp one level */
-				--sanp; /* now pointing at slash */
-				while ((sanp > start) && (*(sanp - 1) != '/')) {
-					/* skip back up to slash */
-					sanp--;
-				}
-			}
-		} else {
-			while (1) {
-				/* copy one component through next slash */
-				*sanp++ = *p++;
-				if ((*p == '\0') || (*(p-1) == '/')) {
-					while (*p == '/') {
-						/* skip multiple slashes */
-						p++;
+			/* ".." component followed by slash or end */
+			if ((depth > 0) && (sanp == start)) {
+				/* allow depth levels of .. at the beginning */
+				--depth;
+				allowdotdot = 1;
+			} else {
+				p += 2;
+				if (*p == '/')
+					p++;
+				if (sanp != start) {
+					/* back up sanp one level */
+					--sanp; /* now pointing at slash */
+					while ((sanp > start) && (*(sanp - 1) != '/')) {
+						/* skip back up to slash */
+						sanp--;
 					}
-					break;
 				}
+				continue;
 			}
 		}
+		while (1) {
+			/* copy one component through next slash */
+			*sanp++ = *p++;
+			if ((*p == '\0') || (*(p-1) == '/')) {
+				while (*p == '/') {
+					/* skip multiple slashes */
+					p++;
+				}
+				break;
+			}
+		}
+		if (allowdotdot) {
+			/* move the virtual beginning to leave the .. alone */
+			start = sanp;
+		}
 	}
-	if (sanp == start) {
+	if ((sanp == start) && !allowdotdot) {
 		/* ended up with nothing, so put in "." component */
 		*sanp++ = '.';
 	}
