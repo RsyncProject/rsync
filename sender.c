@@ -27,6 +27,7 @@ extern int dry_run;
 extern int am_server;
 extern int am_daemon;
 extern int protocol_version;
+extern int make_backups;
 extern struct stats stats;
 
 
@@ -120,6 +121,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 	struct file_struct *file;
 	int phase = 0;
 	struct stats initial_stats;
+	int save_make_backups = make_backups;
 	int j;
 
 	if (verbose > 2)
@@ -136,6 +138,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				write_int(f_out, -1);
 				if (verbose > 2)
 					rprintf(FINFO, "send_files phase=%d\n", phase);
+				/* inplace resends run without a backup file */
+				make_backups = 0;
 				continue;
 			}
 			break;
@@ -253,6 +257,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				safe_fname(fname));
 		}
 	}
+	make_backups = save_make_backups;
 
 	if (verbose > 2)
 		rprintf(FINFO, "send files finished\n");
