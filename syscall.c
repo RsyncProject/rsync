@@ -164,6 +164,9 @@ int do_mkstemp(char *template, mode_t perms)
 			errno = errno_save;
 			return -1;
 		}
+#if HAVE_SETMODE && O_BINARY
+		setmode(fd, O_BINARY);
+#endif
 		return fd;
 	}
 #else
