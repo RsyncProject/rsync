@@ -25,7 +25,6 @@
 
 extern int verbose;
 extern int dry_run;
-extern int itemize_changes;
 extern int relative_paths;
 extern int keep_dirlinks;
 extern int preserve_links;
@@ -114,6 +113,7 @@ static void itemize(struct file_struct *file, int statret, STRUCT_STAT *st,
 		if (ndx >= 0)
 			write_int(f_out, ndx);
 		write_byte(f_out, iflags);
+		write_byte(f_out, iflags >> 8);
 	}
 }
 
@@ -434,7 +434,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 			missing_below = file->dir.depth;
 			dry_run++;
 		}
-		if (itemize_changes && f_out != -1)
+		if (protocol_version >= 29 && f_out != -1)
 			itemize(file, statret, &st, 0, f_out, ndx);
 		if (statret != 0 && do_mkdir(fname,file->mode) != 0 && errno != EEXIST) {
 			if (!relative_paths || errno != ENOENT
@@ -446,7 +446,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 			}
 		}
 		if (set_perms(fname, file, statret ? NULL : &st, 0)
-		    && verbose && f_out != -1 && !itemize_changes)
+		    && verbose && protocol_version < 29 && f_out != -1)
 			rprintf(FINFO, "%s/\n", safe_fname(fname));
 		if (delete_during && f_out != -1 && csum_length != SUM_LENGTH
 		    && (file->flags & FLAG_DEL_HERE))
@@ -485,7 +485,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 				 * right place -- no further action
 				 * required. */
 				if (strcmp(lnk, file->u.link) == 0) {
-					if (itemize_changes) {
+					if (protocol_version >= 29) {
 						itemize(file, 0, &st, 0,
 							f_out, ndx);
 					}
@@ -503,7 +503,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 				full_fname(fname), safe_fname(file->u.link));
 		} else {
 			set_perms(fname,file,NULL,0);
-			if (itemize_changes) {
+			if (protocol_version >= 29) {
 				itemize(file, statret, &st, SID_UPDATING,
 					f_out, ndx);
 			} else if (verbose) {
@@ -520,7 +520,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 		    st.st_mode != file->mode ||
 		    st.st_rdev != file->u.rdev) {
 			int dflag = S_ISDIR(st.st_mode) ? DEL_DIR : 0;
-			if (itemize_changes) {
+			if (protocol_version >= 29) {
 				itemize(file, statret, &st, SID_UPDATING,
 					f_out, ndx);
 			}
@@ -535,13 +535,13 @@ static void recv_generator(char *fname, struct file_list *flist,
 					full_fname(fname));
 			} else {
 				set_perms(fname,file,NULL,0);
-				if (verbose && !itemize_changes) {
+				if (verbose && protocol_version < 29) {
 					rprintf(FINFO, "%s\n",
 						safe_fname(fname));
 				}
 			}
 		} else {
-			if (itemize_changes) {
+			if (protocol_version >= 29) {
 				itemize(file, statret, &st, 0,
 					f_out, ndx);
 			}
@@ -682,7 +682,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 	else if (fnamecmp_type == FNAMECMP_FUZZY)
 		;
 	else if (unchanged_file(fnamecmp, file, &st)) {
-		if (itemize_changes) {
+		if (protocol_version >= 29) {
 			itemize(file, statret, &st,
 				fnamecmp_type == FNAMECMP_FNAME
 					       ? 0 : SID_NO_DEST_AND_NO_UPDATE,
@@ -766,8 +766,13 @@ prepare_to_open:
 
 notify_others:
 	write_int(f_out, ndx);
-	if (protocol_version >= 29 && inplace && !read_batch)
-		write_byte(f_out, fnamecmp_type);
+	if (protocol_version >= 29) {
+		itemize(file, statret, &st, SID_UPDATING
+			| (always_checksum ? SID_REPORT_CHECKSUM : 0),
+			f_out, -1);
+		if (inplace && !read_batch)
+			write_byte(f_out, fnamecmp_type);
+	}
 	if (f_out_name >= 0) {
 		write_byte(f_out_name, fnamecmp_type);
 		if (fnamecmp_type == FNAMECMP_FUZZY) {
@@ -785,11 +790,6 @@ notify_others:
 			write_buf(f_out_name, lenbuf, lb - lenbuf + 1);
 			write_buf(f_out_name, fuzzy_file->basename, len);
 		}
-	}
-	if (itemize_changes) {
-		itemize(file, statret, &st, SID_UPDATING
-			| (always_checksum ? SID_REPORT_CHECKSUM : 0),
-			f_out, -1);
 	}
 
 	if (dry_run || read_batch)
