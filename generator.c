@@ -38,7 +38,6 @@ extern int size_only;
 extern int io_timeout;
 extern int protocol_version;
 extern int always_checksum;
-extern int modify_window;
 extern char *compare_dest;
 extern int link_dest;
 
@@ -55,8 +54,8 @@ static int skip_file(char *fname,
 		extern int preserve_uid;
 		extern int preserve_gid;
 
-		if(preserve_perms
-		    && (st->st_mode & ~_S_IFMT) !=  (file->mode & ~_S_IFMT))
+		if (preserve_perms
+		    && (st->st_mode & ~_S_IFMT) != (file->mode & ~_S_IFMT))
 			return 0;
 
 		if (preserve_uid && st->st_uid != file->uid)
@@ -404,8 +403,10 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 #endif
 
 	if (preserve_hard_links && check_hard_link(file)) {
-		if (verbose > 1)
-			rprintf(FINFO, "recv_generator: \"%s\" is a hard link\n",f_name(file));
+		if (verbose > 1) {
+			rprintf(FINFO, "recv_generator: \"%s\" is a hard link\n",
+				f_name(file));
+		}
 		return;
 	}
 
@@ -428,11 +429,11 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 #if HAVE_LINK
 		else if (link_dest && !dry_run) {
 			if (do_link(fnamecmpbuf, fname) != 0) {
-				if (verbose > 0)
+				if (verbose > 0) {
 					rprintf(FINFO,"link %s => %s : %s\n",
-						fnamecmpbuf,
-						fname,
+						fnamecmpbuf, fname,
 						strerror(errno));
+				}
 			}
 			fnamecmp = fnamecmpbuf;
 		}
@@ -530,6 +531,7 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 {
 	int i;
 	int phase=0;
+	char buf[MAXPATHLEN];
 
 	if (verbose > 2)
 		rprintf(FINFO,"generator starting pid=%d count=%d\n",
@@ -561,7 +563,8 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 			 * handling of permissions is strange? */
 		}
 
-		recv_generator(local_name?local_name:f_name(file), flist,i,f);
+		recv_generator(local_name? local_name
+			     : f_name_to(file, buf, sizeof buf), flist, i, f);
 
 		file->mode = saved_mode;
 	}
@@ -577,9 +580,10 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 
 	/* files can cycle through the system more than once
 	 * to catch initial checksum errors */
-	for (i=read_int(f_recv); i != -1; i=read_int(f_recv)) {
+	for (i = read_int(f_recv); i != -1; i = read_int(f_recv)) {
 		struct file_struct *file = flist->files[i];
-		recv_generator(local_name?local_name:f_name(file), flist,i,f);
+		recv_generator(local_name? local_name
+			     : f_name_to(file, buf, sizeof buf), flist, i, f);
 	}
 
 	phase++;
