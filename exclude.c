@@ -973,15 +973,13 @@ char *get_rule_prefix(int match_flags, const char *pat, int for_xfer,
 	}
 	if (match_flags & MATCHFLG_EXCLUDE_SELF)
 		*op++ = 'e';
-	if (op - buf > legal_len)
-		return NULL;
 	if (legal_len)
 		*op++ = ' ';
+	if (op - buf > legal_len)
+		return NULL;
 	*op = '\0';
 	if (plen_ptr)
 		*plen_ptr = op - buf;
-	if (op - buf > MAX_RULE_PREFIX)
-		overflow("get_rule_prefix");
 	return buf;
 }
 
@@ -1022,7 +1020,9 @@ static void send_rules(int f_out, struct filter_list_struct *flp)
 /* This is only called by the client. */
 void send_filter_list(int f_out)
 {
-	if (local_server || (am_sender && (!delete_mode || delete_excluded)))
+	int receiver_wants_list = delete_mode && !delete_excluded;
+
+	if (local_server || (am_sender && !receiver_wants_list))
 		f_out = -1;
 	if (cvs_exclude && am_sender) {
 		if (protocol_version >= 29)
@@ -1054,8 +1054,9 @@ void recv_filter_list(int f_in)
 	char line[MAXPATHLEN+MAX_RULE_PREFIX+1]; /* +1 for trailing slash. */
 	int xflags = protocol_version >= 29 ? 0 : XFLG_OLD_PREFIXES;
 	unsigned int len;
+	int receiver_wants_list = delete_mode && !delete_excluded;
 
-	if (!local_server && (am_sender || (delete_mode && !delete_excluded))) {
+	if (!local_server && (am_sender || receiver_wants_list)) {
 		while ((len = read_int(f_in)) != 0) {
 			if (len >= sizeof line)
 				overflow("recv_rules");
