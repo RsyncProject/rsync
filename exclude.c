@@ -27,6 +27,11 @@
 #include "rsync.h"
 
 extern int verbose;
+extern int eol_nulls;
+extern int list_only;
+extern int recurse;
+
+extern char curr_dir[];
 
 struct exclude_list_struct exclude_list;
 struct exclude_list_struct local_exclude_list;
@@ -125,7 +130,6 @@ static int check_one_exclude(char *name, struct exclude_struct *ex,
 	}
 	else if ((ex->match_flags & MATCHFLG_ABS_PATH) && *name != '/') {
 		static char full_name[MAXPATHLEN];
-		extern char curr_dir[];
 		int plus = curr_dir[1] == '\0'? 1 : 0;
 		pathjoin(full_name, sizeof full_name, curr_dir+plus, name);
 		name = full_name;
@@ -311,7 +315,7 @@ void add_exclude_file(struct exclude_list_struct *listp, const char *fname,
 	FILE *fp;
 	char line[MAXPATHLEN];
 	char *eob = line + MAXPATHLEN - 1;
-	extern int eol_nulls;
+	int word_split = xflags & XFLG_WORD_SPLIT;
 
 	if (!fname || !*fname)
 		return;
@@ -340,6 +344,8 @@ void add_exclude_file(struct exclude_list_struct *listp, const char *fname,
 					continue;
 				break;
 			}
+			if (word_split && isspace(ch))
+				break;
 			if (eol_nulls? !ch : (ch == '\n' || ch == '\r'))
 				break;
 			if (s < eob)
@@ -359,7 +365,6 @@ void add_exclude_file(struct exclude_list_struct *listp, const char *fname,
 void send_exclude_list(int f)
 {
 	struct exclude_struct *ent;
-	extern int list_only, recurse;
 
 	/* This is a complete hack - blame Rusty.
 	 *
