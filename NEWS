@@ -23,3 +23,8 @@ rsync changes since last release
 
     * Fix --whole-file problem that caused it to be the default even
       for remote connections.  (Martin Pool, Frank Schulz)
+
+    * Work around bug in Mac OS X mkdir(2), which cannot handle
+      trailing slashes.
+      <http://www.opensource.apple.com/bugs/X/BSD%20Kernel/2734739.html>
+      (Martin Pool)
