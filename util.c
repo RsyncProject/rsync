@@ -55,6 +55,8 @@ struct map_struct *map_file(int fd,off_t len)
 
 char *map_ptr(struct map_struct *map,off_t offset,int len)
 {
+  int nread = -2;
+
   if (map->map)
     return map->map+offset;
 
@@ -79,8 +81,9 @@ char *map_ptr(struct map_struct *map,off_t offset,int len)
   }
 
   if (lseek(map->fd,offset,SEEK_SET) != offset ||
-      read(map->fd,map->p,len) != len) {
-    fprintf(FERROR,"EOF in map_ptr!\n");
+      (nread=read(map->fd,map->p,len)) != len) {
+    fprintf(FERROR,"EOF in map_ptr! (offset=%d len=%d nread=%d errno=%d)\n",
+	    (int)offset, len, nread, errno);
     exit_cleanup(1);
   }
 
