@@ -4,7 +4,7 @@
 
 # Call directly into unsafe_symlink and test its handling of various filenames
 
-. $srcdir/testsuite/rsync.fns
+. "$suitedir/rsync.fns"
 
 test_unsafe() {
     # $1 is the target of a symlink

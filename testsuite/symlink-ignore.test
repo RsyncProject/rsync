@@ -8,7 +8,7 @@
 # Test rsync's somewhat over-featured symlink control: the default
 # behaviour is that symlinks should not be copied at all.
 
-. $srcdir/testsuite/rsync.fns
+. "$suitedir/rsync.fns"
 
 set -x
 
@@ -18,19 +18,19 @@ build_symlinks || test_fail "failed to build symlinks"
 # should be missing.
 $RSYNC -r "$fromdir/" "$todir" || test_fail "$RSYNC returned $?"
 
-[ -f "${todir}/referent" ] || test_fail "referent was not copied"
-[ -d "${todir}/from" ] && test_fail "extra level of directories"
-if is_a_link "${todir}/dangling" 
+[ -f "$todir/referent" ] || test_fail "referent was not copied"
+[ -d "$todir/from" ] && test_fail "extra level of directories"
+if is_a_link "$todir/dangling" 
 then 
     test_fail "dangling symlink was copied"
 fi
 
-if is_a_link "${todir}/relative" 
+if is_a_link "$todir/relative" 
 then
     test_fail "relative symlink was copied" 
 fi
 
-if is_a_link "${todir}/absolute" 
+if is_a_link "$todir/absolute" 
 then
     test_fail "absolute symlink was copied"
 fi

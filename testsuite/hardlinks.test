@@ -10,7 +10,7 @@
 # specify -H, then hard links are detected and recreated as hardlinks
 # on the other end.
 
-. $srcdir/testsuite/rsync.fns
+. "$suitedir/rsync.fns"
 
 set -x
 
