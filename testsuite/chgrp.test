@@ -27,8 +27,9 @@ do
     date > "$name"
     chgrp "$g" "$name" || fail "Can't chgrp"
 done
+sleep 2
 
-checkit "rsync -rgvvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+checkit "rsync -rtgvvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
 exit 0
 # last [] may have failed but if we get here then we've won
