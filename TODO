@@ -331,6 +331,12 @@ Cross-testing
 
   Run current rsync versions against significant past releases.
 
+Memory debugger
+
+  jra recommends:
+
+    http://devel-home.kde.org/~sewardj/
+
 DOCUMENTATION --------------------------------------------------------
 
 Update README
