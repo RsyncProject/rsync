@@ -84,7 +84,7 @@ getTableTranslationDomain(/*@null@*/ const struct poptOption *table)
 /*@observer@*/ /*@null@*/ static const char *
 getArgDescrip(const struct poptOption * opt,
 		/*@-paramuse@*/		/* FIX: wazzup? */
-		/*@null@*/ const char * translation_domain)
+		/*@null@*/ UNUSED(const char * translation_domain))
 		/*@=paramuse@*/
 	/*@*/
 {
@@ -115,7 +115,7 @@ static /*@only@*/ /*@null@*/ char *
 singleOptionDefaultValue(int lineLength,
 		const struct poptOption * opt,
 		/*@-paramuse@*/	/* FIX: i18n macros disable with lclint */
-		/*@null@*/ const char * translation_domain)
+		/*@null@*/ UNUSED(const char * translation_domain))
 		/*@=paramuse@*/
 	/*@*/
 {
