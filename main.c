@@ -34,14 +34,18 @@ static void report(int f)
 	extern int am_sender;
 	extern int am_daemon;
 	extern int do_stats;
+	extern int remote_version;
+	int send_stats;
 
 	if (am_daemon) {
 		log_exit(0, __FILE__, __LINE__);
 		if (f == -1 || !am_sender) return;
 	}
 
+	send_stats = verbose || 
+			((remote_version >= 20) && (PROTOCOL_VERSION >= 20));
 	if (am_server) {
-		if (verbose && am_sender) {
+		if (am_sender && send_stats) {
 			int64 w;
 			/* store total_written in a temporary
 			    because write_longint changes it */
@@ -55,12 +59,7 @@ static void report(int f)
 
 	/* this is the client */
 	    
-	if (!am_sender && verbose) {
-		/* note that if (!verbose && do_stats) then these values will
-		     be taken from the receiver side's copy.  The total size
-		     is identical but the bytes read and written are slightly
-		     different.  It's done this way to avoid modifying the
-		     protocol to support --stats without -v. */
+	if (!am_sender && send_stats) {
 		int64 r;
 		stats.total_written = read_longint(f);
 		/* store total_read in a temporary, read_longint changes it */
@@ -70,6 +69,12 @@ static void report(int f)
 	}
 
 	if (do_stats) {
+		if (!am_sender && !send_stats) {
+		    /* missing the bytes written by the generator */
+		    rprintf(FINFO, "\nCannot show stats as receiver because protocol version is less than 20\n");
+		    rprintf(FINFO, "Use --stats -v to show stats\n");
+		    return;
+		}
 		rprintf(FINFO,"\nNumber of files: %d\n", stats.num_files);
 		rprintf(FINFO,"Number of files transferred: %d\n", 
 		       stats.num_transferred_files);
