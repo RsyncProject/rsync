@@ -37,6 +37,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	extern int remote_version;
 	extern int am_sender;
 	extern struct in_addr socket_address;
+	extern int blocking_io;
 
 	if (*path == '/') {
 		rprintf(FERROR,"ERROR: The remote path must start with a module name\n");
@@ -52,6 +53,8 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 
 	if (!user) user = getenv("USER");
 	if (!user) user = getenv("LOGNAME");
+
+	blocking_io = 1;
 
 	fd = open_socket_out(host, rsync_port, &socket_address);
 	if (fd == -1) {
