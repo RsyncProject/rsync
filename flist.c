@@ -35,7 +35,6 @@ extern int am_root;
 extern int am_server;
 extern int am_daemon;
 extern int am_sender;
-extern int delete_during;
 extern int always_checksum;
 extern int module_id;
 extern int ignore_errors;
@@ -81,7 +80,6 @@ static struct file_list *received_flist;
 static dev_t filesystem_dev; /* used to implement -x */
 static int deletion_count = 0; /* used to implement --max-delete */
 
-static int flist_find(struct file_list *flist, struct file_struct *f);
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
 static void output_flist(struct file_list *flist, const char *whose_list);
 
@@ -1374,7 +1372,7 @@ static int file_compare(struct file_struct **file1, struct file_struct **file2)
 }
 
 
-static int flist_find(struct file_list *flist, struct file_struct *f)
+int flist_find(struct file_list *flist, struct file_struct *f)
 {
 	int low = flist->low, high = flist->high;
 	int ret, mid, mid_up;
@@ -1537,12 +1535,19 @@ static void output_flist(struct file_list *flist, const char *whose_list)
 }
 
 
-enum fnc_state { fnc_DIR, fnc_SLASH, fnc_BASE };
+enum fnc_state { fnc_DIR, fnc_SLASH, fnc_BASE, fnc_TRAILING };
 
-/* Compare the names of two file_struct entities, just like strcmp()
- * would do if it were operating on the joined strings.  We assume
- * that there are no 0-length strings.
- */
+/* Compare the names of two file_struct entities, similar to how strcmp()
+ * would do if it were operating on the joined strings.  The only difference
+ * is that, beginning with protocol_version 29, a directory name will always
+ * sort immediately prior to its contents (previously "foo." would sort in
+ * between directory "foo" and "foo/bar").  We do this by assuming that a dir
+ * has a trailing slash for comparison purposes, but only if we aren't about
+ * to match a file of the same name (because we need all identically named
+ * items to match each other).  The dirname component can be an empty string,
+ * but the basename component cannot (and never is in the current codebase).
+ * The basename component may be NULL, in which case it is sorted to the end
+ * of the list (as a removed item). */
 int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 {
 	int dif;
@@ -1592,6 +1597,11 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 				c1 = (uchar*)f1->basename;
 				break;
 			case fnc_BASE:
+				state1 = fnc_TRAILING;
+				if (protocol_version >= 29 && S_ISDIR(f1->mode))
+					c1 = (uchar*)"/";
+				break;
+			case fnc_TRAILING:
 				break;
 			}
 		}
@@ -1606,8 +1616,13 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 				c2 = (uchar*)f2->basename;
 				break;
 			case fnc_BASE:
-				if (!*c1)
+				if (state1 == fnc_TRAILING)
 					return 0;
+				state2 = fnc_TRAILING;
+				if (protocol_version >= 29 && S_ISDIR(f2->mode))
+					c2 = (uchar*)"/";
+				break;
+			case fnc_TRAILING:
 				break;
 			}
 		}
@@ -1738,8 +1753,7 @@ void delete_missing(struct file_list *full_list, struct file_list *dir_list,
 			continue;
 		mode = dir_list->files[i]->mode;
 		if ((j = flist_find(full_list, dir_list->files[i])) < 0
-		    || (delete_during && S_ISDIR(mode)
-		     && !S_ISDIR(full_list->files[j]->mode))) {
+		    || (S_ISDIR(mode) && !S_ISDIR(full_list->files[j]->mode))) {
 			char *f = f_name(dir_list->files[i]);
 			if (make_backups && (backup_dir || !is_backup_file(f))
 			  && !S_ISDIR(mode)) {
