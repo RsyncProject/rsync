@@ -107,9 +107,8 @@ static void finish_filelist_progress(const struct file_list *flist)
 		/* This overwrites the progress line */
 		rprintf(FINFO, "%d file%sto consider\n",
 			flist->count, flist->count == 1 ? " " : "s ");
-	} else {
+	} else
 		rprintf(FINFO, "done\n");
-	}
 }
 
 void show_flist_stats(void)
@@ -210,18 +209,15 @@ static void list_file_entry(struct file_struct *f)
  * @post @p buffer contains information about the link or the
  * referrent as appropriate, if they exist.
  **/
-int readlink_stat(const char *path, STRUCT_STAT * buffer, char *linkbuf)
+int readlink_stat(const char *path, STRUCT_STAT *buffer, char *linkbuf)
 {
 #if SUPPORT_LINKS
-	if (copy_links) {
+	if (copy_links)
 		return do_stat(path, buffer);
-	}
-	if (do_lstat(path, buffer) == -1) {
+	if (do_lstat(path, buffer) == -1)
 		return -1;
-	}
 	if (S_ISLNK(buffer->st_mode)) {
-		int l;
-		l = readlink((char *) path, linkbuf, MAXPATHLEN - 1);
+		int l = readlink((char *) path, linkbuf, MAXPATHLEN - 1);
 		if (l == -1)
 			return -1;
 		linkbuf[l] = 0;
@@ -242,11 +238,9 @@ int readlink_stat(const char *path, STRUCT_STAT * buffer, char *linkbuf)
 int link_stat(const char *path, STRUCT_STAT * buffer)
 {
 #if SUPPORT_LINKS
-	if (copy_links) {
+	if (copy_links)
 		return do_stat(path, buffer);
-	} else {
-		return do_lstat(path, buffer);
-	}
+	return do_lstat(path, buffer);
 #else
 	return do_stat(path, buffer);
 #endif
@@ -301,17 +295,15 @@ static void set_filesystem(char *fname)
 
 static int to_wire_mode(mode_t mode)
 {
-	if (S_ISLNK(mode) && (_S_IFLNK != 0120000)) {
+	if (S_ISLNK(mode) && (_S_IFLNK != 0120000))
 		return (mode & ~(_S_IFMT)) | 0120000;
-	}
 	return (int) mode;
 }
 
 static mode_t from_wire_mode(int mode)
 {
-	if ((mode & (_S_IFMT)) == 0120000 && (_S_IFLNK != 0120000)) {
+	if ((mode & (_S_IFMT)) == 0120000 && (_S_IFLNK != 0120000))
 		return (mode & ~(_S_IFMT)) | _S_IFLNK;
-	}
 	return (mode_t) mode;
 }
 
@@ -369,7 +361,7 @@ static void send_file_entry(struct file_struct *file, int f,
 	static uid_t last_uid;
 	static gid_t last_gid;
 	static char lastname[MAXPATHLEN];
-	char *fname, buf[MAXPATHLEN];
+	char *fname, fbuf[MAXPATHLEN];
 	int l1, l2;
 
 	if (f == -1)
@@ -382,7 +374,7 @@ static void send_file_entry(struct file_struct *file, int f,
 
 	io_write_phase = "send_file_entry";
 
-	fname = f_name_to(file, buf, sizeof buf);
+	fname = f_name_to(file, fbuf, sizeof fbuf);
 
 	flags = base_flags;
 
@@ -462,11 +454,10 @@ static void send_file_entry(struct file_struct *file, int f,
 #endif
 
 	if (always_checksum) {
-		if (protocol_version < 21) {
+		if (protocol_version < 21)
 			write_buf(f, file->sum, 2);
-		} else {
+		else
 			write_buf(f, file->sum, MD4_SUM_LENGTH);
-		}
 	}
 
 	last_mode = file->mode;
@@ -534,9 +525,9 @@ static void receive_file_entry(struct file_struct **fptr,
 	if ((p = strrchr(thisname, '/'))) {
 		static char *lastdir;
 		*p = 0;
-		if (lastdir && strcmp(thisname, lastdir) == 0) {
+		if (lastdir && strcmp(thisname, lastdir) == 0)
 			file->dirname = lastdir;
-		} else {
+		else {
 			file->dirname = strdup(thisname);
 			lastdir = file->dirname;
 		}
@@ -549,22 +540,19 @@ static void receive_file_entry(struct file_struct **fptr,
 	if (!file->basename)
 		out_of_memory("receive_file_entry 1");
 
-
 	file->flags = flags;
 	file->length = read_longint(f);
-	file->modtime =
-	    (flags & SAME_TIME) ? last_time : (time_t) read_int(f);
-	file->mode =
-	    (flags & SAME_MODE) ? last_mode : from_wire_mode(read_int(f));
+	file->modtime = (flags & SAME_TIME) ? last_time : (time_t)read_int(f);
+	file->mode = (flags & SAME_MODE) ? last_mode
+					 : from_wire_mode(read_int(f));
 	if (preserve_uid)
-		file->uid =
-		    (flags & SAME_UID) ? last_uid : (uid_t) read_int(f);
+		file->uid = (flags & SAME_UID) ? last_uid : (uid_t)read_int(f);
 	if (preserve_gid)
-		file->gid =
-		    (flags & SAME_GID) ? last_gid : (gid_t) read_int(f);
-	if (preserve_devices && IS_DEVICE(file->mode))
-		file->rdev =
-		    (flags & SAME_RDEV) ? last_rdev : (DEV64_T) read_int(f);
+		file->gid = (flags & SAME_GID) ? last_gid : (gid_t)read_int(f);
+	if (preserve_devices && IS_DEVICE(file->mode)) {
+		file->rdev = (flags & SAME_RDEV) ? last_rdev
+						 : (DEV64_T)read_int(f);
+	}
 
 	if (preserve_links && S_ISLNK(file->mode)) {
 		int l = read_int(f);
@@ -576,9 +564,8 @@ static void receive_file_entry(struct file_struct **fptr,
 		if (!file->link)
 			out_of_memory("receive_file_entry 2");
 		read_sbuf(f, file->link, l);
-		if (sanitize_paths) {
+		if (sanitize_paths)
 			sanitize_path(file->link, file->dirname);
-		}
 	}
 #if SUPPORT_HARD_LINKS
 	if (preserve_hard_links && S_ISREG(file->mode)) {
@@ -596,11 +583,10 @@ static void receive_file_entry(struct file_struct **fptr,
 		file->sum = new_array(char, MD4_SUM_LENGTH);
 		if (!file->sum)
 			out_of_memory("md4 sum");
-		if (protocol_version < 21) {
+		if (protocol_version < 21)
 			read_buf(f, file->sum, 2);
-		} else {
+		else
 			read_buf(f, file->sum, MD4_SUM_LENGTH);
-		}
 	}
 
 	last_mode = file->mode;
@@ -677,9 +663,8 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 	strlcpy(cleaned_name, fname, MAXPATHLEN);
 	cleaned_name[MAXPATHLEN - 1] = 0;
 	clean_fname(cleaned_name);
-	if (sanitize_paths) {
+	if (sanitize_paths)
 		sanitize_path(cleaned_name, NULL);
-	}
 	fname = cleaned_name;
 
 	memset(sum, 0, SUM_LENGTH);
@@ -734,9 +719,9 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 	if ((p = strrchr(fname, '/'))) {
 		static char *lastdir;
 		*p = 0;
-		if (lastdir && strcmp(fname, lastdir) == 0) {
+		if (lastdir && strcmp(fname, lastdir) == 0)
 			file->dirname = lastdir;
-		} else {
+		else {
 			file->dirname = strdup(fname);
 			lastdir = file->dirname;
 		}
@@ -759,9 +744,8 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 #endif
 
 #if SUPPORT_LINKS
-	if (S_ISLNK(st.st_mode)) {
+	if (S_ISLNK(st.st_mode))
 		file->link = STRDUP(ap, linkbuf);
-	}
 #endif
 
 	if (always_checksum) {
@@ -780,15 +764,14 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 
 	if (flist_dir) {
 		static char *lastdir;
-		if (lastdir && strcmp(lastdir, flist_dir) == 0) {
+		if (lastdir && strcmp(lastdir, flist_dir) == 0)
 			file->basedir = lastdir;
-		} else {
+		else {
 			file->basedir = strdup(flist_dir);
 			lastdir = file->basedir;
 		}
-	} else {
+	} else
 		file->basedir = NULL;
-	}
 
 	if (!S_ISDIR(st.st_mode))
 		stats.total_size += st.st_size;
@@ -801,7 +784,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 		    int recursive, unsigned base_flags)
 {
 	struct file_struct *file;
-	char buf[MAXPATHLEN];
+	char fbuf[MAXPATHLEN];
 	extern int delete_excluded;
 
 	/* f is set to -1 when calculating deletion file list */
@@ -827,7 +810,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 	if (S_ISDIR(file->mode) && recursive) {
 		struct exclude_struct **last_exclude_list =
 		    local_exclude_list;
-		send_directory(f, flist, f_name_to(file, buf, sizeof buf));
+		send_directory(f, flist, f_name_to(file, fbuf, sizeof fbuf));
 		local_exclude_list = last_exclude_list;
 		return;
 	}
@@ -1054,21 +1037,18 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		}
 	}
 
-	if (f != -1) {
+	if (f != -1)
 		send_file_entry(NULL, f, 0);
-	}
 
-	if (show_filelist_p() && f != -1) {
+	if (show_filelist_p() && f != -1)
 		finish_filelist_progress(flist);
-	}
 
 	clean_flist(flist, 0, 0);
 
 	/* now send the uid/gid list. This was introduced in protocol
 	   version 15 */
-	if (f != -1) {
+	if (f != -1)
 		send_uid_list(f);
-	}
 
 	/* send the io_error flag */
 	if (f != -1) {
@@ -1140,31 +1120,27 @@ struct file_list *recv_file_list(int f)
 
 	clean_flist(flist, relative_paths, 1);
 
-	if (show_filelist_p()) {
+	if (show_filelist_p())
 		finish_filelist_progress(flist);
-	}
 
 	/* now recv the uid/gid list. This was introduced in protocol version 15 */
-	if (f != -1) {
+	if (f != -1)
 		recv_uid_list(f, flist);
-	}
 
 	/* recv the io_error flag */
 	if (f != -1 && !read_batch) {	/* dw-added readbatch */
 		extern int module_id;
 		extern int ignore_errors;
-		if (lp_ignore_errors(module_id) || ignore_errors) {
+		if (lp_ignore_errors(module_id) || ignore_errors)
 			read_int(f);
-		} else {
+		else
 			io_error |= read_int(f);
-		}
 	}
 
 	if (list_only) {
 		int i;
-		for (i = 0; i < flist->count; i++) {
+		for (i = 0; i < flist->count; i++)
 			list_file_entry(flist->files[i]);
-		}
 	}
 
 
@@ -1207,15 +1183,13 @@ int flist_find(struct file_list *flist, struct file_struct *f)
 
 	while (low != high) {
 		int mid = (low + high) / 2;
-		int ret =
-		    file_compare(&flist->files[flist_up(flist, mid)], &f);
+		int ret = file_compare(&flist->files[flist_up(flist, mid)],&f);
 		if (ret == 0)
 			return flist_up(flist, mid);
-		if (ret > 0) {
+		if (ret > 0)
 			high = mid;
-		} else {
+		else
 			low = mid + 1;
-		}
 	}
 
 	if (file_compare(&flist->files[flist_up(flist, low)], &f) == 0)
@@ -1440,18 +1414,18 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 /* Return a copy of the full filename of a flist entry, using the indicated
  * buffer.
  */
-char *f_name_to(struct file_struct *f, char *buf, int bsize)
+char *f_name_to(struct file_struct *f, char *fbuf, int bsize)
 {
 	if (!f || !f->basename)
 		return NULL;
 
 	if (f->dirname) {
-		int off = strlcpy(buf, f->dirname, bsize);
-		off += strlcpy(buf + off, "/", bsize - off);
-		strlcpy(buf + off, f->basename, bsize - off);
+		int off = strlcpy(fbuf, f->dirname, bsize);
+		off += strlcpy(fbuf + off, "/", bsize - off);
+		strlcpy(fbuf + off, f->basename, bsize - off);
 	} else
-		strlcpy(buf, f->basename, bsize);
-	return buf;
+		strlcpy(fbuf, f->basename, bsize);
+	return fbuf;
 }
 
 
