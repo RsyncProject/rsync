@@ -543,7 +543,7 @@ AC_TRY_RUN([
 #include <unistd.h>
 main() { struct timeval tv; exit(gettimeofday(&tv, NULL));}],
            rsync_cv_HAVE_GETTIMEOFDAY_TZ=yes,rsync_cv_HAVE_GETTIMEOFDAY_TZ=no,rsync_cv_HAVE_GETTIMEOFDAY_TZ=cross)])
-if test x"$rsync_cv_HAVE_GETTIMEOFDAY_TZ" = x"yes"; then
+if test x"$rsync_cv_HAVE_GETTIMEOFDAY_TZ" != x"no"; then
     AC_DEFINE(HAVE_GETTIMEOFDAY_TZ, 1, [ ])
 fi
 
