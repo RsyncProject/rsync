@@ -234,6 +234,13 @@ Changes since 2.6.3:
       build the file-list, and one for how long it took to send it over the
       wire (each expressed in thousandths of a second).
 
+    - When --delete-excluded is specified with some filter rules (AKA
+      excludes), a client sender will still initiate a send of the filter
+      rules to the receiver, but it only includes those rules that are
+      receiver-specific.  Older protocols used to omit the sending of
+      excludes in this situation (since there were no receiver-specific
+      rules that survived --delete-excluded back then).
+
     - A protocol-29 batch file includes a bit for the setting of the --dirs
       option.  Also, the shell script created by --write-batch will use the
       --filter option instead of --exclude-from to capture any filter rules.
