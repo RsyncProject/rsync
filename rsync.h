@@ -50,9 +50,10 @@
 #define XMIT_SAME_NAME (1<<5)
 #define XMIT_LONG_NAME (1<<6)
 #define XMIT_SAME_TIME (1<<7)
-#define XMIT_SAME_HIGH_RDEV (1<<8)
+#define XMIT_SAME_RDEV_MAJOR (1<<8)
 #define XMIT_HAS_IDEV_DATA (1<<9)
 #define XMIT_SAME_DEV (1<<10)
+#define XMIT_RDEV_MINOR_IS_SMALL (1<<11)
 
 /* These flags are used in the live flist data. */
 
@@ -345,17 +346,11 @@ enum msgcode {
  * device numbers will be truncated.  But it's a kind of silly thing
  * to do anyhow.
  *
- * FIXME: In future, we should probable split the device number into
- * major/minor, and transfer the two parts as 32-bit ints.  That gives
- * you somewhat more of a chance that they'll come from a big machine
- * to a little one in a useful way.
- *
  * FIXME: Really we need an unsigned type, and we perhaps ought to
  * cope with platforms on which this is an unsigned int or even a
  * struct.  Later.
  */ 
 #define INO64_T uint64
-#define DEV64_T uint64
 
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
@@ -403,7 +398,7 @@ struct hlink {
 
 struct idev {
 	INO64_T inode;
-	DEV64_T dev;
+	dev_t dev;
 };
 
 #define F_DEV	link_u.idev->dev
@@ -414,9 +409,9 @@ struct idev {
 
 struct file_struct {
 	union {
-		DEV64_T rdev;	/* The device number, if this is a device */
+		dev_t rdev;	/* The device number, if this is a device */
 		char *sum;	/* Only a normal file can have a checksum */
-		char *link;	/* Holds symlink string, if a symlink */
+		char *link;	/* Points to symlink string, if a symlink */
 	} u;
 	OFF_T length;
 	char *basename;
