@@ -27,6 +27,7 @@
   */
 #include "rsync.h"
 
+extern int verbose;
 extern int dry_run;
 extern int am_daemon;
 extern int am_server;
@@ -534,7 +535,9 @@ void log_delete(char *fname, int mode)
 	file.mode = mode;
 	file.basename = fname;
 
-	if (am_server && protocol_version >= 29 && len < MAXPATHLEN) {
+	if (!verbose && !log_format)
+		;
+	else if (am_server && protocol_version >= 29 && len < MAXPATHLEN) {
 		if (S_ISDIR(mode))
 			len++; /* directories include trailing null */
 		send_msg(MSG_DELETED, fname, len);
@@ -543,7 +546,7 @@ void log_delete(char *fname, int mode)
 		log_formatted(FCLIENT, fmt, "del.", &file, &stats, ITEM_DELETED);
 	}
 
-	if (!am_daemon || dry_run)
+	if (!am_daemon || dry_run || !lp_transfer_logging(module_id))
 		return;
 
 	fmt = daemon_log_format_has_o_or_i ? lp_log_format(module_id) : "%i %n";
