@@ -5,7 +5,7 @@
 #include "rsync.h"
 #include "lib/wildmatch.h"
 
-#define COMPARE_WITH_FNMATCH
+/*#define COMPARE_WITH_FNMATCH*/
 
 #ifdef COMPARE_WITH_FNMATCH
 #include <fnmatch.h>
