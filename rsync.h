@@ -758,7 +758,7 @@ extern int errno;
 /* handler for null strings in printf format */
 #define NS(s) ((s)?safe_fname(s):"<NULL>")
 
-#if !defined __GNUC__ || defined APPLE
+#if !defined __GNUC__ || defined __APPLE__
 /* Apparently the OS X port of gcc gags on __attribute__.
  *
  * <http://www.opensource.apple.com/bugs/X/gcc/2512150.html> */
