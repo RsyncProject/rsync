@@ -453,10 +453,6 @@ logging
   that's a good tradeoff or not.
 
 
-rsyncd over ssh
-
-  There are already some patches to do this.
-
 proxy authentication
 
   Allow RSYNC_PROXY to be http://user:pass@proxy.foo:3128/, and do
@@ -724,8 +720,6 @@ Perhaps redo manual as SGML
 BUILD FARM -----------------------------------------------------------
 
 Add machines
-
-  AMDAHL UTS (Dave Dykstra)
 
   Cygwin (on different versions of Win32?)
 
