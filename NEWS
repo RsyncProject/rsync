@@ -36,6 +36,9 @@ Changes since version 2.5.6:
 
     * Keep tmp names from overflowing MAXPATHLEN.
 
+    * Make --link-dest honor the absence of -p -o and -g.
+
+
   INTERNAL:
 
     * Eliminated vestigial support for old versions that we stopped
