@@ -112,10 +112,10 @@ static void itemize(struct file_struct *file, int statret, STRUCT_STAT *st,
 	} else
 		iflags |= ITEM_IS_NEW | ITEM_UPDATING;
 
-	if (iflags && !read_batch) {
+	if ((iflags || verbose > 1) && !read_batch) {
 		if (ndx >= 0)
 			write_int(f_out, ndx);
-		write_short(f_out, iflags);
+		write_shortint(f_out, iflags);
 	}
 }
 
@@ -348,6 +348,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 	char fnamecmpbuf[MAXPATHLEN];
 	uchar fnamecmp_type;
 	int maybe_DEL_TERSE = itemize_changes ? 0 : DEL_TERSE;
+	int maybe_PERMS_REPORT = itemize_changes ? 0 : PERMS_REPORT;
 
 	if (list_only)
 		return;
@@ -430,7 +431,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 		 * we need to delete it.  If it doesn't exist, then
 		 * (perhaps recursively) create it. */
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
-			delete_file(fname, maybe_DEL_TERSE);
+			delete_file(fname, st.st_mode, maybe_DEL_TERSE);
 			statret = -1;
 		}
 		if (dry_run && statret != 0 && missing_below < 0) {
@@ -477,11 +478,10 @@ static void recv_generator(char *fname, struct file_list *flist,
 			return;
 		}
 		if (statret == 0) {
-			int dflag = S_ISDIR(st.st_mode) ? DEL_DIR : 0;
 			char lnk[MAXPATHLEN];
 			int len;
 
-			if (!dflag
+			if (!S_ISDIR(st.st_mode)
 			    && (len = readlink(fname, lnk, MAXPATHLEN-1)) > 0) {
 				lnk[len] = 0;
 				/* A link already pointing to the
@@ -493,16 +493,16 @@ static void recv_generator(char *fname, struct file_list *flist,
 							f_out, ndx);
 					}
 					set_perms(fname, file, &st,
-						  PERMS_REPORT);
+						  maybe_PERMS_REPORT);
 					return;
 				}
 			}
 			/* Not the right symlink (or not a symlink), so
 			 * delete it. */
 			if (S_ISLNK(st.st_mode))
-				delete_file(fname, dflag | DEL_TERSE);
+				delete_file(fname, st.st_mode, DEL_TERSE);
 			else {
-				delete_file(fname, dflag | maybe_DEL_TERSE);
+				delete_file(fname, st.st_mode, maybe_DEL_TERSE);
 				statret = -1;
 			}
 		}
@@ -527,11 +527,10 @@ static void recv_generator(char *fname, struct file_list *flist,
 		if (statret != 0 ||
 		    st.st_mode != file->mode ||
 		    st.st_rdev != file->u.rdev) {
-			int dflag = S_ISDIR(st.st_mode) ? DEL_DIR : 0;
 			if (IS_DEVICE(st.st_mode))
-				delete_file(fname, dflag | DEL_TERSE);
+				delete_file(fname, st.st_mode, DEL_TERSE);
 			else {
-				delete_file(fname, dflag | maybe_DEL_TERSE);
+				delete_file(fname, st.st_mode, maybe_DEL_TERSE);
 				statret = -1;
 			}
 			if (verbose > 2) {
@@ -557,7 +556,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 				itemize(file, statret, &st, 0,
 					f_out, ndx);
 			}
-			set_perms(fname, file, &st, PERMS_REPORT);
+			set_perms(fname, file, &st, maybe_PERMS_REPORT);
 		}
 		return;
 	}
@@ -630,8 +629,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 	}
 
 	if (statret == 0 && !S_ISREG(st.st_mode)) {
-		int dflag = S_ISDIR(st.st_mode) ? DEL_DIR : 0;
-		if (delete_file(fname, dflag | maybe_DEL_TERSE) != 0)
+		if (delete_file(fname, st.st_mode, maybe_DEL_TERSE) != 0)
 			return;
 		statret = -1;
 		stat_errno = ENOENT;
@@ -701,7 +699,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 				f_out, ndx);
 		}
 		if (fnamecmp_type == FNAMECMP_FNAME)
-			set_perms(fname, file, &st, PERMS_REPORT);
+			set_perms(fname, file, &st, maybe_PERMS_REPORT);
 		return;
 	}
 
