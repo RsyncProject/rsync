@@ -203,4 +203,6 @@ echo "      $passed passed"
 [ "$missing" -gt 0 ] && echo "      $missing missing"
 echo '------------------------------------------------------------'
 
-exit `expr $failed + $missing`
+result=`expr $failed + $missing`
+echo "(overall result is $result)"
+exit $result
