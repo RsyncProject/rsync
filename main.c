@@ -53,6 +53,7 @@ extern int whole_file;
 extern int read_batch;
 extern int write_batch;
 extern int batch_fd;
+extern int batch_gen_fd;
 extern int filesfrom_fd;
 extern pid_t cleanup_child_pid;
 extern char *files_from;
@@ -311,15 +312,24 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 		rprintf(FINFO,"\n");
 	}
 
-	if (local_server) {
+	if (read_batch) {
+		int from_gen_pipe[2];
+		if (fd_pair(from_gen_pipe) < 0) {
+			rsyserr(FERROR, errno, "pipe");
+			exit_cleanup(RERR_IPC);
+		}
+		batch_gen_fd = from_gen_pipe[0];
+		*f_out = from_gen_pipe[1];
+		*f_in = batch_fd;
+		ret = -1; /* no child pid */
+	} else if (local_server) {
 		/* If the user didn't request --[no-]whole-file, force
 		 * it on, but only if we're not batch processing. */
-		if (whole_file < 0 && !read_batch && !write_batch)
+		if (whole_file < 0 && !write_batch)
 			whole_file = 1;
 		ret = local_child(argc, args, f_in, f_out, child_main);
-	} else {
+	} else
 		ret = piped_child(args,f_in,f_out);
-	}
 
 	if (dir)
 		free(dir);
@@ -624,13 +634,6 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 	cleanup_child_pid = pid;
 	if (read_batch) {
-		/* This is the heart of the read_batch approach:
-		 * Switcher-roo the file descriptors, and
-		 * nobody's the wiser. */
-		close(f_in);
-		close(f_out);
-		f_in = batch_fd;
-		f_out = do_open("/dev/null", O_WRONLY, 0);
 		assert(am_sender == 0);
 	} else {
 		set_nonblocking(f_in);
@@ -655,8 +658,6 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 		if (write_batch)
 			start_write_batch(f_out);
-		/* Can be unconditional, but this is theoretically
-		 * more efficent for read_batch case. */
 		if (!read_batch) /* don't write to pipe */
 			flist = send_file_list(f_out,argc,argv);
 		if (verbose > 3)
@@ -683,8 +684,6 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	if (argc == 0)
 		list_only = 1;
 
-	/* Can be unconditional, but this is theoretically more
-	 * efficient for the read_batch case. */
 	if (!read_batch)
 		send_exclude_list(f_out);
 
