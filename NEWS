@@ -2,6 +2,12 @@ NEWS for rsync 2.6.4 (UNRELEASED)
 Protocol: 29 (changed)
 Changes since 2.6.3:
 
+  OUTPUT CHANGES:
+
+    - When rsync deletes a directory and outputs a verbose message about
+      it, it now appends a trailing slash to the name instead of (only
+      sometimes) outputting a preceding "directory " string.
+  
   BUG FIXES:
 
     - Restore the list-clearing behavior of "!" in a .cvsignore file (2.6.3
