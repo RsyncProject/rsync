@@ -159,6 +159,7 @@ test: check
 check: all $(CHECK_PROGS)
 	POSIXLY_CORRECT=1 TOOLDIR=`pwd` rsync_bin=`pwd`/rsync$(EXEEXT) srcdir="$(srcdir)" $(srcdir)/runtests.sh
 
+wildtest.o: wildtest.c lib/wildmatch.c rsync.h
 wildtest$(EXEEXT): wildtest.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ wildtest.o $(LIBS)
 
