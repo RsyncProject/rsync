@@ -85,6 +85,16 @@
 
 #define MPLEX_BASE 7
 
+#define NO_EXCLUDES	0
+#define SERVER_EXCLUDES	1
+#define ALL_EXCLUDES	2
+
+#define MISSING_OK    0
+#define MISSING_FATAL 1
+
+#define ADD_INCLUDE 1
+#define ADD_EXCLUDE 0
+
 /* Log values.  I *think* what these mean is: FLOG goes to the server
  * logfile; FERROR and FINFO try to end up on the client, with
  * different levels of filtering. */
@@ -424,6 +434,7 @@ struct map_struct {
 #define MATCHFLG_WILD		0x0001 /* pattern has '*', '[', and/or '?' */
 #define MATCHFLG_WILD2		0x0002 /* pattern has '**' */
 #define MATCHFLG_WILD2_PREFIX	0x0004 /* pattern starts with '**' */
+#define MATCHFLG_ABS_PATH	0x0008 /* path-match on absolute path */
 struct exclude_struct {
 	char *pattern;
 	int match_flags;
