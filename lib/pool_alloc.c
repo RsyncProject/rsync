@@ -32,7 +32,12 @@ struct pool_extent
 	struct pool_extent	*next;
 };
 
-#define MINALIGN	(sizeof (long))
+struct align_test {
+    void *foo;
+    uint64 bar;
+};
+
+#define MINALIGN	offsetof(struct align_test, bar)
 
 alloc_pool_t
 pool_create(size_t size, size_t quantum,
