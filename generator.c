@@ -1146,6 +1146,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	only_existing = max_size = opt_ignore_existing = 0;
 	update_only = always_checksum = size_only = 0;
 	ignore_times = 1;
+	make_backups = 0; /* avoid a duplicate backup for inplace processing */
 
 	/* We expect to just sit around now, so don't exit on a timeout.
 	 * If we really get a timeout then the other process should exit. */
