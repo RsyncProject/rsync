@@ -11,6 +11,7 @@ Changes since 2.6.3:
     - The --stats output will contain file-list time-statistics if both
       sides are 2.6.4, or if the local side is 2.6.4 and the files are
       being pushed (since the stats come from the sending side).
+      (Requires protocol 29.)
   
   BUG FIXES:
 
@@ -18,8 +19,9 @@ Changes since 2.6.3:
       was only treating it as a special token in an rsync include/exclude
       file).
 
-    - The --dry-run option (-n) now mentions changes in directories (w/-v).
-      It also now includes the normal uptodate output information for -vv.
+    - The combination of --verbose and --dry-run now mentions changes in
+      directories and it now includes the full update information that
+      would be output without --dry-run at higher levels of verbosity.
 
     - Avoid a mkdir warning when removing a directory in the destination
       that already exists in the --backup-dir.
@@ -90,7 +92,7 @@ Changes since 2.6.3:
     - All the --delete-WHEN options are now more memory efficient:
       Previously an entire duplicate set of file-list objects was created
       on the receiving side for the entire destination hierarchy.  The new
-      algorithm only creates a single directory of objects at a time.
+      algorithm only creates one directory of objects at a time.
 
     - Added the --copy-dest option, which works like --link-dest except
       that it includes copies of identical files.
@@ -111,14 +113,16 @@ Changes since 2.6.3:
       that cannot be exceeded by a user-specified --bwlimit option.
 
     - Added the "port" parameter to the rsyncd.conf file. (Promoted from
-      the patches dir.)  Also added "address".
+      the patches dir.)  Also added "address".  A command-line option
+      will take precedence over a config-file option, as expected.
 
     - In _exit_cleanup(): when we are exiting with a partially-received
       file, we now flush any data in the write-cache before closing the
       partial file.
 
     - The --inplace support was enhanced to work with --compare-dest,
-      --link-dest, and (the new) --copy-dest options.
+      --link-dest, and (the new) --copy-dest options. (Requires protocol
+      29.)
 
     - Added the --dirs (-d) option for an easier way to copy directories
       without recursion.
@@ -144,7 +148,8 @@ Changes since 2.6.3:
       filter files (like .cvsignore, but with full filter-rule parsing).
       This new option was chosen in order to ensure that all existing
       include/exclude processing remained 100% compatible with older
-      versions.
+      versions.  (Protocol 29 needed for full filter-rule support, but
+      backward-compatible rules work with earlier protocol versions.)
 
     - Added the --delay-updates option that puts all updated files into
       a temporary directory (by default ".~tmp~", but settable via the
@@ -201,6 +206,37 @@ Changes since 2.6.3:
 
     - Defined int32 in a way that ensures that the build dies if we can't
       find a variable with at least 32 bits.
+
+  PROTOCOL DIFFERENCES FOR VERSION 29:
+
+    - If --inplace is specified, the generator sends an extra byte after
+      each index integer indicating what kind of basis file is being used
+      for the transfer (see the FNAMECMP_* defines).
+
+    - The sending of exclude names is done using filter-rule syntax.  This
+      means that all names have a prefixed rule indicator, even excludes
+      (which used to be sent as a bare pattern, when possible).  The -C
+      option will include the per-dir .cvsignore merge file in the list of
+      filter rules so it is positioned correctly (unlike in some older
+      transfer scenarios).
+
+    - Rsync sorts the filename list in a slightly different way for some
+      rare sets of files:  it always puts a dir's contents immediately
+      after the dir in the list.  (Previously an item named "foo.txt" would
+      sort in between directory "foo" and "foo/bar".)
+
+    - When talking to a protocol 29 rsync daemon, a list-only request
+      is able to note this before the options are sent over the wire, and
+      the new --list-only option is enabled.
+
+    - When the --stats bytes are sent over the wire (or stored in a batch),
+      they now include two elapsed-time values: one for how long it took to
+      build the file-list, and one for how long it took to send it over the
+      wire (each expressed in thousandths of a second).
+
+    - A protocol-29 batch file includes a bit for the setting of the --dirs
+      option.  Also, the shell script created by --write-batch will use the
+      --filter option instead of --exclude-from to capture any filter rules.
 
   BUILD CHANGES:
 
