@@ -17,9 +17,9 @@
  * @param key		option(s)
  */
 static void displayArgs(poptContext con,
-		/*@unused@*/ UNUSED(enum poptCallbackReason foo),
+		/*@unused@*/ enum poptCallbackReason foo,
 		struct poptOption * key, 
-		/*@unused@*/ UNUSED(const char * arg), /*@unused@*/ UNUSED(void * data))
+		/*@unused@*/ const char * arg, /*@unused@*/ void * data)
 	/*@globals fileSystem@*/
 	/*@modifies fileSystem@*/
 {
@@ -84,7 +84,7 @@ getTableTranslationDomain(/*@null@*/ const struct poptOption *table)
 /*@observer@*/ /*@null@*/ static const char *const
 getArgDescrip(const struct poptOption * opt,
 		/*@-paramuse@*/		/* FIX: wazzup? */
-		/*@null@*/ UNUSED(const char * translation_domain))
+		/*@null@*/ const char * translation_domain)
 		/*@=paramuse@*/
 	/*@*/
 {
@@ -115,7 +115,7 @@ static /*@only@*/ /*@null@*/ char *
 singleOptionDefaultValue(int lineLength,
 		const struct poptOption * opt,
 		/*@-paramuse@*/	/* FIX: i18n macros disable with lclint */
-		/*@null@*/ UNUSED(const char * translation_domain))
+		/*@null@*/ const char * translation_domain)
 		/*@=paramuse@*/
 	/*@*/
 {
@@ -475,7 +475,7 @@ static int showHelpIntro(poptContext con, FILE * fp)
     return len;
 }
 
-void poptPrintHelp(poptContext con, FILE * fp, /*@unused@*/ UNUSED(int flags))
+void poptPrintHelp(poptContext con, FILE * fp, /*@unused@*/ int flags)
 {
     int leftColWidth;
 
@@ -634,7 +634,7 @@ static int showShortOptions(const struct poptOption * opt, FILE * fp,
     return strlen(s) + 4;
 }
 
-void poptPrintUsage(poptContext con, FILE * fp, /*@unused@*/ UNUSED(int flags))
+void poptPrintUsage(poptContext con, FILE * fp, /*@unused@*/ int flags)
 {
     int cursor;
 
