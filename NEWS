@@ -86,6 +86,12 @@ Changes since version 2.5.6:
     * Fixed some bugs in the handling of --delete and --exclude when
       using the --relative (-R) option. (Wayne Davison)
 
+    * Fixed bug that prevented regular files from replacing
+      special files and caused a directory in --link-dest or
+      --compare-dest to block the creation of a file with the
+      same path.  A directory still cannot be replaced by a
+      regular file unless --delete specified.  (J.W. Schultz)
+
   INTERNAL:
 
     * Eliminated vestigial support for old versions that we stopped
