@@ -112,15 +112,6 @@ static int read_timeout(int fd, char *buf, int len)
 			continue;
 		}
 
-		if (n == -1 && 
-		    (errno == EAGAIN || errno == EWOULDBLOCK)) {
-			/* this shouldn't happen, if it does then
-			   sleep for a short time to prevent us
-			   chewing too much CPU */
-			u_sleep(100);
-			continue;
-		}
-
 		if (n == 0) {
 			if (eof_error) {
 				rprintf(FERROR,"unexpected EOF in read_timeout\n");
@@ -333,7 +324,6 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 	int fd_count, count;
 	struct timeval tv;
 	int reading=0;
-	int blocked=0;
 
 	no_flush++;
 
@@ -371,16 +361,10 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 		}
 
 		if (FD_ISSET(fd, &w_fds)) {
-			int n = (len-total)>>blocked;
+			int n = len-total;
 			int ret = write(fd,buf+total,n?n:1);
 
 			if (ret == -1 && errno == EINTR) {
-				continue;
-			}
-
-			if (ret == -1 && 
-			    (errno == EAGAIN || errno == EWOULDBLOCK)) {
-				blocked++;
 				continue;
 			}
 
@@ -389,7 +373,6 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 				exit_cleanup(RERR_STREAMIO);
 			}
 
-			blocked = 0;
 			total += ret;
 
 			if (io_timeout)

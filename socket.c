@@ -148,8 +148,6 @@ int open_socket_out(char *host, int port)
 		return -1;
 	}
 
-	set_nonblocking(res);
-
 	return res;
 }
 
@@ -265,8 +263,6 @@ void start_accept_loop(int port, int (*fn)(int ))
 
 		if (fork()==0) {
 			close(s);
-
-			set_nonblocking(fd);
 
 			_exit(fn(fd));
 		}

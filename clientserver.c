@@ -433,8 +433,6 @@ int daemon_main(void)
 			open("/dev/null", O_RDWR);
 		}
 
-		set_nonblocking(STDIN_FILENO);
-
 		return start_daemon(STDIN_FILENO);
 	}
 
