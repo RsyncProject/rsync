@@ -829,7 +829,8 @@ static int start_client(int argc, char *argv[])
 		if (p) {
 			rsync_port = atoi(p+1);
 			*p = '\0';
-		}
+		} else
+			rsync_port = RSYNC_PORT;
 		return start_socket_client(host, path, argc-1, argv+1);
 	}
 
@@ -887,7 +888,8 @@ static int start_client(int argc, char *argv[])
 				if (p) {
 					rsync_port = atoi(p+1);
 					*p = '\0';
-				}
+				} else
+					rsync_port = RSYNC_PORT;
 				return start_socket_client(host, path, argc-1, argv);
 			}
 
