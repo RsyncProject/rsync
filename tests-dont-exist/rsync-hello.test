@@ -1,5 +1,0 @@
-#! /bin/sh
-
-. rsync.fns
-
-"$rsync" --version
