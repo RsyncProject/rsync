@@ -511,7 +511,7 @@ void log_exit(int code, const char *file, int line)
                 if (!name)
                         name = "unexplained error";
                 
-		rprintf(FERROR,"transfer error: %s (code %d) at %s(%d)\n", 
+		rprintf(FERROR,"rsync error: %s (code %d) at %s(%d)\n", 
 			name, code, file, line);
 	}
 }
