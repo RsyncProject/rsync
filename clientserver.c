@@ -227,8 +227,13 @@ static int rsync_module(int f_in, int f_out, int i)
 	if (!allow_access(addr, host, lp_hosts_allow(i), lp_hosts_deny(i))) {
 		rprintf(FLOG, "rsync denied on module %s from %s (%s)\n",
 			name, host, addr);
-		io_printf(f_out, "@ERROR: access denied to %s from %s (%s)\n",
-			  name, host, addr);
+		if (!lp_list(i))
+			io_printf(f_out, "@ERROR: Unknown module '%s'\n", name);
+		else {
+			io_printf(f_out,
+				  "@ERROR: access denied to %s from %s (%s)\n",
+				  name, host, addr);
+		}
 		return -1;
 	}
 
@@ -480,9 +485,10 @@ static void send_listing(int fd)
 	int n = lp_numservices();
 	int i;
 
-	for (i = 0; i < n; i++)
+	for (i = 0; i < n; i++) {
 		if (lp_list(i))
 			io_printf(fd, "%-15s\t%s\n", lp_name(i), lp_comment(i));
+	}
 
 	if (protocol_version >= 25)
 		io_printf(fd,"@RSYNCD: EXIT\n");
@@ -495,7 +501,7 @@ int start_daemon(int f_in, int f_out)
 {
 	char line[200];
 	char *motd;
-	int i = -1;
+	int i;
 
 	io_set_sock_fds(f_in, f_out);
 
@@ -537,27 +543,28 @@ int start_daemon(int f_in, int f_out)
 	if (protocol_version > remote_protocol)
 		protocol_version = remote_protocol;
 
-	while (i == -1) {
-		line[0] = 0;
-		if (!read_line(f_in, line, sizeof line - 1))
-			return -1;
+	line[0] = 0;
+	if (!read_line(f_in, line, sizeof line - 1))
+		return -1;
 
-		if (!*line || strcmp(line,"#list") == 0) {
-			send_listing(f_out);
-			return -1;
-		}
+	if (!*line || strcmp(line, "#list") == 0) {
+		send_listing(f_out);
+		return -1;
+	}
 
-		if (*line == '#') {
-			/* it's some sort of command that I don't understand */
-			io_printf(f_out, "@ERROR: Unknown command '%s'\n", line);
-			return -1;
-		}
+	if (*line == '#') {
+		/* it's some sort of command that I don't understand */
+		io_printf(f_out, "@ERROR: Unknown command '%s'\n", line);
+		return -1;
+	}
 
-		i = lp_number(line);
-		if (i == -1) {
-			io_printf(f_out, "@ERROR: Unknown module '%s'\n", line);
-			return -1;
-		}
+	if ((i = lp_number(line)) < 0) {
+		char *addr = client_addr(f_in);
+		char *host = client_name(f_in);
+		rprintf(FLOG, "unknown module '%s' tried from %s (%s)\n",
+			line, host, addr);
+		io_printf(f_out, "@ERROR: Unknown module '%s'\n", line);
+		return -1;
 	}
 
 	return rsync_module(f_in, f_out, i);
