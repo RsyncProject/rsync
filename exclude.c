@@ -34,7 +34,7 @@ extern int recurse;
 extern char curr_dir[];
 
 struct exclude_list_struct exclude_list = { 0, 0, "" };
-struct exclude_list_struct local_exclude_list = { 0, 0, "local-cvsignore " };
+struct exclude_list_struct local_exclude_list = { 0, 0, "per-dir .cvsignore " };
 struct exclude_list_struct server_exclude_list = { 0, 0, "server " };
 char *exclude_path_prefix = NULL;
 
