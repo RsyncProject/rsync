@@ -728,17 +728,17 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (sanitize_paths) {
 		int i;
 		for (i = *argc; i-- > 0; )
-			(*argv)[i] = sanitize_path(NULL, (*argv)[i], NULL);
+			(*argv)[i] = sanitize_path(NULL, (*argv)[i], "", 0);
 		if (tmpdir)
-			tmpdir = sanitize_path(NULL, tmpdir, "");
+			tmpdir = sanitize_path(NULL, tmpdir, NULL, 0);
 		if (partial_dir)
-			partial_dir = sanitize_path(NULL, partial_dir, "");
+			partial_dir = sanitize_path(NULL, partial_dir, NULL, 0);
 		if (compare_dest)
-			compare_dest = sanitize_path(NULL, compare_dest, "");
+			compare_dest = sanitize_path(NULL, compare_dest, NULL, 0);
 		if (backup_dir)
-			backup_dir = sanitize_path(NULL, backup_dir, "");
+			backup_dir = sanitize_path(NULL, backup_dir, NULL, 0);
 		if (files_from)
-			files_from = sanitize_path(NULL, files_from, "");
+			files_from = sanitize_path(NULL, files_from, NULL, 0);
 	}
 	if (server_exclude_list.head && !am_sender) {
 		struct exclude_list_struct *elp = &server_exclude_list;
