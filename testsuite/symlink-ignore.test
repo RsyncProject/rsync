@@ -18,11 +18,11 @@ build_symlinks || test_fail "failed to build symlinks"
 # should be missing.
 "$rsync_bin" -r "$fromdir/" "$todir" || test_fail "rsync returned $?"
 
-[ -e "$todir/referent" ] || test_fail "referent was not copied"
-[ -e "$todir/from" ] && test_fail "extra level of directories"
-[ -e "$todir/dangling" ] && test_fail "dangling symlink was copied"
-[ -e "$todir/relative" ] && test_fail "relative symlink was copied" 
-[ -e "$todir/absolute" ] && test_fail "absolute symlink was copied"
+[ -f "$todir/referent" ] || test_fail "referent was not copied"
+[ -d "$todir/from" ] && test_fail "extra level of directories"
+[ -L "$todir/dangling" ] && test_fail "dangling symlink was copied"
+[ -L "$todir/relative" ] && test_fail "relative symlink was copied" 
+[ -L "$todir/absolute" ] && test_fail "absolute symlink was copied"
 
 exit 0
 # last [] may have failed but if we get here then we've one
