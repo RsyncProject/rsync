@@ -404,9 +404,6 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 	}
 #endif
 
-	if (read_batch)
-		return;
-
 	if (preserve_hard_links && hard_link_check(file, HL_CHECK_MASTER))
 		return;
 
@@ -446,7 +443,7 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 			return;
 		if (errno == ENOENT) {
 			write_int(f_out,i);
-			if (!dry_run)
+			if (!dry_run && !read_batch)
 				write_sum_head(f_out, NULL);
 		} else if (verbose > 1) {
 			rsyserr(FERROR, errno,
@@ -465,7 +462,7 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		if (preserve_hard_links && hard_link_check(file, HL_SKIP))
 			return;
 		write_int(f_out,i);
-		if (!dry_run)
+		if (!dry_run && !read_batch)
 			write_sum_head(f_out, NULL);
 		return;
 	}
@@ -489,7 +486,7 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		return;
 	}
 
-	if (dry_run) {
+	if (dry_run || read_batch) {
 		write_int(f_out,i);
 		return;
 	}
