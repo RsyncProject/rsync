@@ -914,7 +914,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			"You may not combine multiple --delete-WHEN options.\n");
 		return 0;
 	}
-	if (delete_before || delete_during || delete_after)
+	if (!recurse) {
+		delete_before = delete_during = delete_after = 0;
+		delete_mode = delete_excluded = 0;
+	} else if (delete_before || delete_during || delete_after)
 		delete_mode = 1;
 	else if (delete_mode || delete_excluded)
 		delete_mode = delete_before = 1;
