@@ -1,7 +1,7 @@
 -*- indented-text -*-
 
 Notes towards a new version of rsync 
-Martin Pool <mbp@samba.org>
+Martin Pool <mbp@samba.org>, September 2001.
 
 
 Good things about the current implementation:
@@ -36,6 +36,12 @@ Good things about the current implementation:
   - You can easily push or pull simply by switching the order of
     files.
 
+  - The "modules" system has some neat features compared to
+    e.g. Apache's per-directory configuration.  In particular, because
+    you can set a userid and chroot directory, there is strong
+    protection between different modules.  I haven't seen any calls
+    for a more flexible system.
+
 
 Bad things about the current implementation:
 
@@ -63,6 +69,13 @@ Bad things about the current implementation:
   - People always get confused about ':' vs '::'
 
   - Error messages can be cryptic.
+
+  - Default behaviour is not intuitive: in too many cases rsync will
+    happily do nothing.  Perhaps -a should be the default?
+
+  - People get confused by trailing slashes, though it's hard to think
+    of another reasonable way to make this necessary distinction
+    between a directory and its contents.
 
 
 Protocol philosophy:
@@ -115,9 +128,47 @@ Desirable features:
     Unix.  It might be better to try to add O_NOATIME to kernels, and
     call that.
 
-  - VFS.  Useful?
-
   - Unicode.  Probably just use UTF-8 for everything.
+
+  - Open authentication system.  Can we use PAM?  Is SASL an adequate
+    mapping of PAM to the network, or useful in some other way?
+
+  - Resume interrupted transfers without the --partial flag.  We need
+    to leave the temporary file behind, and then know to use it.  This
+    leaves a risk of large temporary files accumulating, which is not
+    good.  Perhaps it should be off by default.
+
+  - tcpwrappers support.  Should be trivial; can already be done
+    through tcpd or inetd.
+
+  - Socks support built in.  It's not clear this is any better than
+    just linking against the socks library, though.
+
+  - When run over SSH, invoke with predictable command-line arguments,
+    so that people can restrict what commands sshd will run.  (Is this
+    really required?)
+
+  - Comparison mode: give a list of which files are new, gone, or
+    different.  Set return code depending on whether anything has
+    changed.
+
+  - Internationalized messages (gettext?)
+
+  - Optionally use real regexps rather than globs?
+
+  - Show overall progress.  Pretty hard to do, especially if we insist
+    on not scanning the directory tree up front.
+
+
+Regression testing:
+
+  - Support automatic testing.
+
+  - Have hard internal timeouts against hangs.
+
+  - Be deterministic.
+
+  - Measure performance.
 
 
 Hard links:
@@ -129,6 +180,14 @@ Hard links:
   that more efficiently by keeping a list of only files with
   linkcount>1, and removing files from that list as all their names
   become known.
+
+
+Command-line options:
+
+  We have rather a lot at the moment.  We might get more if the tool
+  becomes more flexible.  Do we need a .rc or configuration file?
+  That wouldn't really fit with its pattern of use: cp and tar don't
+  have them, though ssh does.
 
 
 Scripting issues:
@@ -143,6 +202,19 @@ Scripting issues:
   - There are security issues about running remote code, at least if
     it's not running in the users own account.  So we can either
     disallow it, or use some kind of sandbox system.
+
+  - Python is a good language, but the syntax is not so good for
+    giving small fragments on the command line.
+
+  - Tcl is broken Lisp.
+
+  - Lots of sysadmins know Perl, though Perl can give some bizarre or
+    confusing errors.  The built in stat operators and regexps might
+    be useful.
+
+  - Sadly probably not enough people know Scheme.
+
+  - sh is hard to embed.
 
 
 Scripting hooks:
@@ -159,6 +231,26 @@ Scripting hooks:
 
   - Locking
 
+  - Cache
+
+  - Generating backup path/name.
+
+  - Post-processing of backups, e.g. to do compression.
+
+  - After transfer, before replacement: so that we can spit out a diff
+    of what was changed, or kick off some kind of reconciliation
+    process.
+
+
+VFS:
+
+  Rather than talking straight to the filesystem, rsyncd talks through
+  an internal API.  Samba has one.  Is it useful?
+
+  - Could be a tidy way to implement cached signatures.
+
+  - Keep files compressed on disk?
+
 
 Interactive interface:
 
@@ -169,10 +261,14 @@ Interactive interface:
 
   - The standalone process needs to produce output in a form easily
     digestible by a calling program, like the --emacs feature some
-    have. 
+    have.  Same goes for output: rpm outputs a series of hash symbols,
+    which are easier for a GUI to handle than "\r30% complete"
+    strings.
 
   - Yow!  emacs support.  (You could probably build that already, of
-    course.)
+    course.)  I'd like to be able to write a simple script on a remote
+    machine that rsyncs it to my workstation, edits it there, then
+    pushes it back up.
 
 
 Pie-in-the-sky features:
@@ -202,6 +298,25 @@ Pie-in-the-sky features:
   - Replicate block devices.  Most of the difficulties here are to do
     with replication in place, though on some systems we will also
     have to do I/O on block boundaries.
+
+  - Peer to peer features.  Flavour of the year.  Can we think about
+    ways for clients to smoothly and voluntarily become servers for
+    content they receive?
+
+
+Unlikely features:
+
+  - Allow remote source and destination.  If this can be cleanly
+    designed into the protocol, perhaps with the remote machine acting
+    as a kind of echo, then it's good.  It's uncommon enough that we
+    don't want to shape the whole protocol around it, though.
+
+    In fact, in a triangle of machines there are two possibilities:
+    all traffic passes from remote1 to remote2 through local, or local
+    just sets up the transfer and then remote1 talks to remote2.  FTP
+    supports the second but it's not clearly good.  There are some
+    security problems with being able to instruct one machine to open
+    a connection to another.
 
 
 In favour of evolving the protocol:
@@ -274,7 +389,7 @@ Conflict resolution:
     would be useful.
 
 
-Moved files:
+Moved files: <http://rsync.samba.org/cgi-bin/rsync.fom?file=44>
 
   - There's no trivial way to detect renamed files, especially if they
     move between directories.
@@ -290,6 +405,12 @@ Moved files:
 
 Filesystem migration:
 
+  NFSv4 probably wants to migrate file locks, but that's not really
+  our problem.
+
+
+Atomic updates:
+
   The NFSv4 working group wants atomic migration.  Most of the
   responsibility for this lies on the NFS server or OS.  
 
@@ -297,8 +418,9 @@ Filesystem migration:
   at the end.  This ties in to having separate basis and destination
   files.
 
-  NFSv4 probably wants to migrate file locks, but that's not really
-  our problem.
+  There's no way in Unix to replace a whole set of files atomically.
+  However, if we get them all onto the destination machine and then do
+  the updates quickly it would greatly reduce the window.  
 
 
 Scalability:
@@ -314,6 +436,8 @@ Scalability:
   On the whole CPU usage is not normally a limiting factor, if only
   because running over SSH burns a lot of cycles on encryption.
 
+  Perhaps have resource throttling without relying on rlimit.
+
 
 Streaming:
 
@@ -322,3 +446,17 @@ Streaming:
   pipelined.  This is a problem with FTP, and NFS (at least up to
   v3).  NFSv4 can pipeline operations, but building on that is
   probably a bit complicated.
+
+
+Related work:
+
+  - mirror.pl http://freshmeat.net/project/mirror/
+
+  - ProFTPd
+
+  - Apache
+
+  - http://freshmeat.net/search/?site=Freshmeat&q=mirror&section=projects
+
+  - BitTorrent -- p2p mirroring
+    http://bitconjurer.org/BitTorrent/ 
