@@ -127,5 +127,30 @@ if test "$ac_cv_lib_socket_connect" = "yes" ||
   AC_DEFINE(HAVE_CONNECT)
 fi])
 
+#
+# The following test was mostly taken from the tcl/tk plus patches
+#
+echo $ac_n "checking whether -c -o works ... $ac_c"
+rm -rf conftest*
+cat > conftest.$ac_ext <<EOF
+int main() { return 0; }
+EOF
+${CC-cc} -c -o conftest..o conftest.$ac_ext
+if test -f conftest..o; then
+    OBJ_SAVE="#"
+    OBJ_RESTORE="#"
+    CC_SHOBJ_FLAG='-o $@'
+    echo yes
+else
+    OBJ_SAVE='	@b=`basename $@ .o`;rm -f $$b.o.sav;if test -f $$b.o; then mv $$b.o $$b.o.sav;fi;'
+    OBJ_RESTORE='	@b=`basename $@ .o`;if test "$$b.o" != "$@"; then mv $$b.o $@; if test -f $$b.o.sav; then mv $$b.o.sav $$b.o; fi; fi'
+    CC_SHOBJ_FLAG=""
+    echo no
+fi
+rm -rf conftest*
+AC_SUBST(OBJ_SAVE)
+AC_SUBST(OBJ_RESTORE)
+AC_SUBST(CC_SHOBJ_FLAG)
+
 
 AC_OUTPUT(Makefile lib/dummy zlib/dummy)

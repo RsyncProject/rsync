@@ -31,7 +31,9 @@ OBJS=$(OBJS1) $(OBJS2) $(DAEMON_OBJ) $(LIBOBJ) $(ZLIBOBJ)
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
-	$(CC) -I. -I$(srcdir) $(CFLAGS) -c $< -o $@
+@OBJ_SAVE@
+	$(CC) -I. -I$(srcdir) $(CFLAGS) -c $< @CC_SHOBJ_FLAG@
+@OBJ_RESTORE@
 
 all: rsync
 
