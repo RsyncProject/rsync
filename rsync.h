@@ -593,6 +593,10 @@ extern int errno;
 #define STDERR_FILENO 2
 #endif
 
+#ifndef S_IRUSR
+#define S_IRUSR 0400
+#endif
+
 #ifndef S_IWUSR
 #define S_IWUSR 0200
 #endif
