@@ -164,8 +164,8 @@ void delete_files(struct file_list *flist)
 				} else {
 					int mode = local_file_list->files[i]->mode;
 					delete_one(f, S_ISDIR(mode) != 0);
-					deletion_count++;
 				}
+				deletion_count++;
 			}
 		}
 		flist_free(local_file_list);
