@@ -52,33 +52,38 @@ void free_sums(struct sum_struct *s)
  * delete a file or directory. If force_delete is set then delete
  * recursively
  */
-int delete_file(char *fname)
+int delete_file(char *fname, int flags)
 {
 	DIR *d;
 	struct dirent *di;
 	char buf[MAXPATHLEN];
 	STRUCT_STAT st;
-	int ret;
 
-#if SUPPORT_LINKS
-	ret = do_lstat(fname, &st);
-#else
-	ret = do_stat(fname, &st);
-#endif
-	if (ret)
-		return -1;
-
-	if (!S_ISDIR(st.st_mode)) {
-		if (robust_unlink(fname) == 0 || errno == ENOENT)
+	if (!(flags & DEL_DIR)) {
+		if (robust_unlink(fname) == 0) {
+			if (verbose && !(flags & DEL_TERSE)) {
+				rprintf(FINFO, "deleting %s\n",
+					safe_fname(fname));
+			}
+			return 0;
+		}
+		if (errno == ENOENT)
 			return 0;
 		rsyserr(FERROR, errno, "delete_file: unlink %s failed",
 			full_fname(fname));
 		return -1;
 	}
 
-	if (do_rmdir(fname) == 0 || errno == ENOENT)
+	if (do_rmdir(fname) == 0) {
+		if (verbose && !(flags & DEL_TERSE)) {
+			rprintf(FINFO, "deleting %s/\n",
+				safe_fname(fname));
+		}
 		return 0;
-	if (!force_delete || !recurse
+	}
+	if (errno == ENOENT)
+		return 0;
+	if ((flags & DEL_NO_RECURSE) || !force_delete || !recurse
 	    || (errno != ENOTEMPTY && errno != EEXIST)) {
 		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
 			full_fname(fname));
@@ -92,15 +97,30 @@ int delete_file(char *fname)
 		return -1;
 	}
 
+	if (!(flags & DEL_TERSE)) {
+		if (verbose)
+			rprintf(FINFO, "deleting %s/\n", safe_fname(fname));
+		flags |= DEL_TERSE;
+	}
+
 	for (errno = 0, di = readdir(d); di; errno = 0, di = readdir(d)) {
 		char *dname = d_name(di);
 		if (dname[0] == '.' && (dname[1] == '\0'
 		    || (dname[1] == '.' && dname[2] == '\0')))
 			continue;
 		pathjoin(buf, sizeof buf, fname, dname);
-		if (verbose > 0)
-			rprintf(FINFO, "deleting %s\n", safe_fname(buf));
-		if (delete_file(buf) != 0) {
+
+		if (do_lstat(buf, &st) < 0)
+			continue;
+		if (S_ISDIR(st.st_mode))
+			flags |= DEL_DIR;
+		else
+			flags &= ~DEL_DIR;
+
+		if (verbose)
+			rprintf(FINFO, "deleting %s%s\n", safe_fname(buf),
+				flags & DEL_DIR ? "/" : "");
+		if (delete_file(buf, flags) != 0) {
 			closedir(d);
 			return -1;
 		}
@@ -114,7 +134,7 @@ int delete_file(char *fname)
 
 	closedir(d);
 
-	if (do_rmdir(fname) != 0) {
+	if (do_rmdir(fname) != 0 && errno != ENOENT) {
 		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
 			full_fname(fname));
 		return -1;
@@ -190,8 +210,8 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 			return 0;
 		}
 		/* a lchown had been done - we have to re-stat if the
-                 * destination had the setuid or setgid bits set due
-                 * to the side effect of the chown call */
+		 * destination had the setuid or setgid bits set due
+		 * to the side effect of the chown call */
 		if (st->st_mode & (S_ISUID | S_ISGID)) {
 			link_stat(fname, st,
 				  keep_dirlinks && S_ISDIR(st->st_mode));
