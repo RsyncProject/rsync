@@ -43,8 +43,8 @@ AC_DEFUN([TYPE_SOCKLEN_T],
          for arg2 in "struct sockaddr" void; do
             for t in int size_t unsigned long "unsigned long"; do
                AC_TRY_COMPILE([
-                  #include <sys/types.h>
-                  #include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
                   int getpeername (int, $arg2 *, $t *);
                ],[
