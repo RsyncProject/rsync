@@ -546,7 +546,7 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 void generate_files(int f, struct file_list *flist, char *local_name)
 {
 	int i;
-	int phase=0;
+	int phase = 0;
 	char fbuf[MAXPATHLEN];
 
 	if (verbose > 2) {
@@ -589,7 +589,7 @@ void generate_files(int f, struct file_list *flist, char *local_name)
 
 	phase++;
 	csum_length = SUM_LENGTH;
-	ignore_times=1;
+	ignore_times = 1;
 
 	if (verbose > 2)
 		rprintf(FINFO,"generate_files phase=%d\n",phase);

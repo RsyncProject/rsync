@@ -208,7 +208,7 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
 	char *data;
 	static char file_sum1[MD4_SUM_LENGTH];
 	static char file_sum2[MD4_SUM_LENGTH];
-	char *map=NULL;
+	char *map = NULL;
 
 	read_sum_head(f_in, &sum);
 

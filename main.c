@@ -401,7 +401,7 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 	}
 
 	if (argc == 0 && recurse) {
-		argc=1;
+		argc = 1;
 		argv--;
 		argv[0] = ".";
 	}
@@ -428,7 +428,7 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 {
 	int pid;
-	int status=0;
+	int status = 0;
 	int error_pipe[2];
 
 	if (preserve_hard_links)
@@ -448,7 +448,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	io_flush(NORMAL_FLUSH);
 
-	if ((pid=do_fork()) == 0) {
+	if ((pid = do_fork()) == 0) {
 		close(error_pipe[0]);
 		if (f_in != f_out)
 			close(f_out);
