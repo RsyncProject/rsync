@@ -220,10 +220,30 @@ Empty directories
   can end up with many empty directories.  We might avoid this by
   lazily creating such directories.
 
+
 zlib
 
-  Perhaps don't use our own zlib.  Will we actually be incompatible,
-  or just be slightly less efficient?
+  Perhaps don't use our own zlib.  
+
+  Advantages:
+   
+    - will automatically be up to date with bugfixes in zlib
+
+    - can leave it out for small rsync on e.g. recovery disks
+
+    - can use a shared library
+
+    - avoids people breaking rsync by trying to do this themselves and
+      messing up
+
+  Should we ship zlib for systems that don't have it, or require
+  people to install it separately?
+
+  Apparently this will make us incompatible with versions of rsync
+  that use the patched version of rsync.  Probably the simplest way to
+  do this is to just disable gzip (with a warning) when talking to old
+  versions.
+
 
 logging
 
