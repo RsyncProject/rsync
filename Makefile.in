@@ -146,9 +146,6 @@ test: check
 # There seems to be no standard way to specify some variables as
 # exported from a Makefile apart from listing them like this.
 
-# TODO: Tests that depend on built test aide programs like tls need to
-# know where the build directory is.
-
 # This depends on building rsync; if we need any helper programs it
 # should depend on them too.
 
