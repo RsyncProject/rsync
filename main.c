@@ -240,6 +240,7 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 	char *dir = argv[0];
 	extern int relative_paths;
 	extern int recurse;
+	extern int remote_version;
 
 	if (verbose > 2)
 		rprintf(FINFO,"server_sender starting pid=%d\n",(int)getpid());
@@ -273,6 +274,10 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 	send_files(flist,f_out,f_in);
 	io_flush();
 	report(f_out);
+	if (remote_version >= 24) {
+		/* final goodbye message */		
+ 		read_int(f_in);
+ 	}
 	io_flush();
 	exit_cleanup(0);
 }
