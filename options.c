@@ -130,6 +130,7 @@ char *rsync_path = RSYNC_PATH;
 char *backup_dir = NULL;
 char backup_dir_buf[MAXPATHLEN];
 int rsync_port = 0;
+int compare_dest = 0;
 int copy_dest = 0;
 int link_dest = 0;
 
@@ -143,7 +144,6 @@ char *batch_name = NULL;
 
 static int daemon_opt;   /* sets am_daemon after option error-reporting */
 static int modify_window_set;
-static int compare_dest = 0;
 static int basis_dir_cnt = 0;
 static char *dest_option = NULL;
 static char *max_size_arg;
