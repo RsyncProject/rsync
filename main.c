@@ -55,7 +55,7 @@ void wait_process(pid_t pid, int *status)
 
 	while ((waited_pid = waitpid(pid, status, WNOHANG)) == 0) {
 		msleep(20);
-		io_flush();
+		io_flush(FULL_FLUSH);
 	}
 
 	if ((waited_pid == -1) && (errno == ECHILD)) {
@@ -383,13 +383,13 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 	io_start_buffering_in(f_in);
 	io_start_buffering_out(f_out);
 	send_files(flist,f_out,f_in);
-	io_flush();
+	io_flush(FULL_FLUSH);
 	report(f_out);
 	if (protocol_version >= 24) {
 		/* final goodbye message */
 		read_int(f_in);
 	}
-	io_flush();
+	io_flush(FULL_FLUSH);
 	exit_cleanup(0);
 }
 
@@ -398,7 +398,6 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 {
 	int pid;
 	int status=0;
-	int recv_pipe[2];
 	int error_pipe[2];
 	extern int preserve_hard_links;
 	extern int delete_after;
@@ -415,20 +414,14 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		}
 	}
 
-	if (fd_pair(recv_pipe) < 0) {
-		rprintf(FERROR,"pipe failed in do_recv\n");
-		exit_cleanup(RERR_SOCKETIO);
-	}
-
 	if (fd_pair(error_pipe) < 0) {
 		rprintf(FERROR,"error pipe failed in do_recv\n");
 		exit_cleanup(RERR_SOCKETIO);
 	}
 
-	io_flush();
+	io_flush(NORMAL_FLUSH);
 
 	if ((pid=do_fork()) == 0) {
-		close(recv_pipe[0]);
 		close(error_pipe[0]);
 		if (f_in != f_out) close(f_out);
 
@@ -436,41 +429,39 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		io_multiplexing_close();
 
 		/* set place to send errors */
-		set_error_fd(error_pipe[1]);
+		set_msg_fd_out(error_pipe[1]);
 
-		recv_files(f_in,flist,local_name,recv_pipe[1]);
-		io_flush();
+		recv_files(f_in,flist,local_name);
+		io_flush(FULL_FLUSH);
 		report(f_in);
 
-		write_int(recv_pipe[1],1);
-		close(recv_pipe[1]);
-		io_flush();
+		send_msg(MSG_DONE, "", 0);
+		io_flush(FULL_FLUSH);
 		/* finally we go to sleep until our parent kills us
 		 * with a USR2 signal. We sleep for a short time as on
 		 * some OSes a signal won't interrupt a sleep! */
-		while (msleep(20))
-			;
+		while (1)
+			msleep(20);
 	}
 
-	close(recv_pipe[1]);
 	close(error_pipe[1]);
 	if (f_in != f_out) close(f_in);
 
 	io_start_buffering_out(f_out);
 
-	io_set_error_fd(error_pipe[0]);
+	set_msg_fd_in(error_pipe[0]);
 
-	generate_files(f_out,flist,local_name,recv_pipe[0]);
+	generate_files(f_out, flist, local_name);
 
-	read_int(recv_pipe[0]);
-	close(recv_pipe[0]);
+	get_redo_num(); /* Read final -1, and any prior messages. */
+	io_flush(FULL_FLUSH);
 	if (protocol_version >= 24) {
 		/* send a final goodbye message */
 		write_int(f_out, -1);
 	}
-	io_flush();
+	io_flush(FULL_FLUSH);
 
-	io_set_error_fd(-1);
+	set_msg_fd_in(-1);
 	kill(pid, SIGUSR2);
 	wait_process(pid, &status);
 	return status;
@@ -621,10 +612,10 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		if (verbose > 3)
 			rprintf(FINFO,"file list sent\n");
 
-		io_flush();
+		io_flush(NORMAL_FLUSH);
 		io_start_buffering_out(f_out);
 		send_files(flist,f_out,f_in);
-		io_flush();
+		io_flush(FULL_FLUSH);
 		if (protocol_version >= 24) {
 			/* final goodbye message */
 			read_int(f_in);
@@ -632,11 +623,11 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		if (pid != -1) {
 			if (verbose > 3)
 				rprintf(FINFO,"client_run waiting on %d\n", (int) pid);
-			io_flush();
+			io_flush(FULL_FLUSH);
 			wait_process(pid, &status);
 		}
 		report(-1);
-		io_flush();
+		io_flush(FULL_FLUSH);
 		exit_cleanup(status);
 	}
 
@@ -668,7 +659,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	if (pid != -1) {
 		if (verbose > 3)
 			rprintf(FINFO,"client_run2 waiting on %d\n", (int) pid);
-		io_flush();
+		io_flush(FULL_FLUSH);
 		wait_process(pid, &status);
 	}
 
