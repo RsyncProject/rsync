@@ -688,6 +688,12 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			files_from = alloc_sanitize_path(files_from, curr_dir);
 	}
 
+	if (daemon_opt) {
+		daemon_opt = 0;
+		am_daemon = 1;
+		return 1;
+	}
+
 	if (!backup_suffix)
 		backup_suffix = backup_dir ? "" : BACKUP_SUFFIX;
 	backup_suffix_len = strlen(backup_suffix);
@@ -749,9 +755,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			}
 		}
 	}
-
-	if (daemon_opt)
-		am_daemon = 1;
 
 	return 1;
 }
