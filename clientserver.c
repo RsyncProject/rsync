@@ -49,11 +49,13 @@ extern int no_detach;
 extern int default_af_hint;
 extern char *bind_address;
 extern struct exclude_list_struct server_exclude_list;
-extern char *exclude_path_prefix;
 extern char *config_file;
 extern char *files_from;
 
 char *auth_user;
+
+/* Length of lp_path() string when in daemon mode & not chrooted, else 0. */
+unsigned int module_dirlen = 0;
 
 /**
  * Run a client connected to an rsyncd.  The alternative to this
@@ -310,26 +312,33 @@ static int rsync_module(int f_in, int f_out, int i)
 	/* TODO: Perhaps take a list of gids, and make them into the
 	 * supplementary groups. */
 
-	exclude_path_prefix = use_chroot? "" : lp_path(i);
-	if (*exclude_path_prefix == '/' && !exclude_path_prefix[1])
-		exclude_path_prefix = "";
+	if (use_chroot) {
+		module_dirlen = 0;
+		set_excludes_dir("/", 1);
+	} else {
+		module_dirlen = strlen(lp_path(i));
+		set_excludes_dir(lp_path(i), module_dirlen);
+	}
+
+	p = lp_filter(i);
+	add_exclude(&server_exclude_list, p,
+		    XFLG_WORD_SPLIT | XFLG_ABS_PATH);
 
 	p = lp_include_from(i);
 	add_exclude_file(&server_exclude_list, p,
-			 XFLG_FATAL_ERRORS | XFLG_DEF_INCLUDE);
+			 XFLG_FATAL_ERRORS | XFLG_ABS_PATH | XFLG_DEF_INCLUDE);
 
 	p = lp_include(i);
 	add_exclude(&server_exclude_list, p,
-		    XFLG_WORD_SPLIT | XFLG_DEF_INCLUDE);
+		    XFLG_WORD_SPLIT | XFLG_ABS_PATH | XFLG_DEF_INCLUDE);
 
 	p = lp_exclude_from(i);
 	add_exclude_file(&server_exclude_list, p,
-			 XFLG_FATAL_ERRORS);
+			 XFLG_FATAL_ERRORS | XFLG_ABS_PATH | XFLG_DEF_EXCLUDE);
 
 	p = lp_exclude(i);
-	add_exclude(&server_exclude_list, p, XFLG_WORD_SPLIT);
-
-	exclude_path_prefix = NULL;
+	add_exclude(&server_exclude_list, p,
+		    XFLG_WORD_SPLIT | XFLG_ABS_PATH | XFLG_DEF_EXCLUDE);
 
 	log_init();
 
