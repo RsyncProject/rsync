@@ -29,10 +29,6 @@
 # if !defined(GETGROUPS_T)
 #  define GETGROUPS_T gid_t
 # endif
-# ifndef NGROUPS_MAX
-/* It ought to be defined, but just in case. */
-#  define NGROUPS_MAX 32
-# endif
 #endif
 
 extern int verbose;
@@ -110,9 +106,11 @@ static int is_in_group(gid_t gid)
 		return last_out;
 	if (ngroups < -1) {
 		gid_t mygid = MY_GID();
-		if ((ngroups = getgroups(0, 0)) < 0)
+		if ((ngroups = getgroups(0, NULL)) < 0)
 			ngroups = 0;
 		gidset = new_array(GETGROUPS_T, ngroups+1);
+		if (!gidset)
+			out_of_memory("is_in_group");
 		if (ngroups > 0)
 			ngroups = getgroups(ngroups, gidset);
 		/* The default gid might not be in the list on some systems. */
@@ -123,8 +121,10 @@ static int is_in_group(gid_t gid)
 		if (n == ngroups)
 			gidset[ngroups++] = mygid;
 		if (verbose > 3) {
-			char gidbuf[NGROUPS_MAX*16+32];
 			int pos;
+			char *gidbuf = new_array(char, ngroups*21+32);
+			if (!gidbuf)
+				out_of_memory("is_in_group");
 			sprintf(gidbuf, "process has %d gid%s: ",
 			    ngroups, ngroups == 1? "" : "s");
 			pos = strlen(gidbuf);
@@ -133,6 +133,7 @@ static int is_in_group(gid_t gid)
 				pos += strlen(gidbuf+pos);
 			}
 			rprintf(FINFO, "%s\n", gidbuf);
+			free(gidbuf);
 		}
 	}
 
