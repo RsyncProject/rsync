@@ -21,6 +21,8 @@
 #include "rsync.h"
 #include "popt.h"
 
+extern int sanitize_paths;
+extern char curr_dir[MAXPATHLEN];
 extern struct exclude_struct **exclude_list;
 
 int make_backups = 0;
@@ -359,7 +361,7 @@ static struct poptOption long_options[] = {
   {"timeout",          0,  POPT_ARG_INT,    &io_timeout, 0, 0, 0 },
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir, 0, 0, 0 },
   {"compare-dest",     0,  POPT_ARG_STRING, &compare_dest, 0, 0, 0 },
-  {"link-dest",        0,  POPT_ARG_STRING, 0,              OPT_LINK_DEST, 0, 0 },
+  {"link-dest",        0,  POPT_ARG_STRING, &compare_dest,  OPT_LINK_DEST, 0, 0 },
   /* TODO: Should this take an optional int giving the compression level? */
   {"compress",        'z', POPT_ARG_NONE,   &do_compression, 0, 0, 0 },
   {"daemon",           0,  POPT_ARG_NONE,   &daemon_opt, 0, 0, 0 },
@@ -469,6 +471,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 {
 	int opt;
 	char *ref = lp_refuse_options(module_id);
+	const char *arg;
 	poptContext pc;
 
 	if (ref && *ref)
@@ -517,12 +520,18 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			break;
 
 		case OPT_EXCLUDE_FROM:
-			add_exclude_file(&exclude_list, poptGetOptArg(pc),
+			arg = poptGetOptArg(pc);
+			if (sanitize_paths)
+				arg = alloc_sanitize_path(arg, curr_dir);
+			add_exclude_file(&exclude_list, arg,
 					 MISSING_FATAL, ADD_EXCLUDE);
 			break;
 
 		case OPT_INCLUDE_FROM:
-			add_exclude_file(&exclude_list, poptGetOptArg(pc),
+			arg = poptGetOptArg(pc);
+			if (sanitize_paths)
+				arg = alloc_sanitize_path(arg, curr_dir);
+			add_exclude_file(&exclude_list, arg,
 					 MISSING_FATAL, ADD_INCLUDE);
 			break;
 
@@ -566,7 +575,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 		case OPT_LINK_DEST:
 #if HAVE_LINK
-			compare_dest = (char *)poptGetOptArg(pc);
 			link_dest = 1;
 			break;
 #else
@@ -660,6 +668,27 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (relative_paths < 0)
 		relative_paths = files_from? 1 : 0;
 
+	*argv = poptGetArgs(pc);
+	if (*argv)
+		*argc = count_args(*argv);
+	else
+		*argc = 0;
+
+	if (sanitize_paths) {
+		int i;
+		for (i = *argc; i-- > 0; )
+			(*argv)[i] = alloc_sanitize_path((*argv)[i], NULL);
+		if (tmpdir)
+			tmpdir = alloc_sanitize_path(tmpdir, curr_dir);
+		if (compare_dest)
+			compare_dest = alloc_sanitize_path(compare_dest, curr_dir);
+		fprintf(stderr, "compare_dest=`%s'\n", compare_dest);
+		if (backup_dir)
+			backup_dir = alloc_sanitize_path(backup_dir, curr_dir);
+		if (files_from)
+			files_from = alloc_sanitize_path(files_from, curr_dir);
+	}
+
 	if (!backup_suffix)
 		backup_suffix = backup_dir ? "" : BACKUP_SUFFIX;
 	backup_suffix_len = strlen(backup_suffix);
@@ -690,12 +719,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (do_progress && !verbose)
 		verbose = 1;
 
-	*argv = poptGetArgs(pc);
-	if (*argv)
-		*argc = count_args(*argv);
-	else
-		*argc = 0;
-
 	if (files_from) {
 		char *colon;
 		if (*argc != 2) {
@@ -718,11 +741,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				exit_cleanup(RERR_SYNTAX);
 			}
 		} else {
-			extern int sanitize_paths;
-			if (sanitize_paths) {
-				files_from = strdup(files_from);
-				sanitize_path(files_from, NULL);
-			}
 			filesfrom_fd = open(files_from, O_RDONLY|O_BINARY);
 			if (filesfrom_fd < 0) {
 				rsyserr(FERROR, errno,
