@@ -1,6 +1,6 @@
 /* -*- c-file-style: "linux" -*-
    
-   Copyright (C) 1996-2000 by Andrew Tridgell 
+   Copyright (C) 1996-2001 by Andrew Tridgell 
    Copyright (C) Paul Mackerras 1996
    
    This program is free software; you can redistribute it and/or modify
@@ -60,7 +60,7 @@ static void check_timeout(void)
 
 	if (last_io && io_timeout && (t-last_io) >= io_timeout) {
 		if (!am_server && !am_daemon) {
-			rprintf(FERROR,"io timeout after %d second - exiting\n", 
+			rprintf(FERROR,"io timeout after %d seconds - exiting\n", 
 				(int)(t-last_io));
 		}
 		exit_cleanup(RERR_TIMEOUT);
@@ -384,7 +384,10 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 			}
 
 			if (ret <= 0) {
-				rprintf(FERROR,"erroring writing %d bytes - exiting\n", len);
+				rprintf(FERROR,
+					"error writing %d unbuffered bytes"
+					" - exiting: %s\n", len,
+					strerror(errno));
 				exit_cleanup(RERR_STREAMIO);
 			}
 
