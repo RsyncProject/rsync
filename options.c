@@ -611,6 +611,7 @@ void server_options(char **args,int *argc)
 	argstr[0] = '-';
 	for (i=0;i<verbose;i++)
 		argstr[x++] = 'v';
+
 	/* the -q option is intentionally left out */
 	if (make_backups)
 		argstr[x++] = 'b';
@@ -652,6 +653,14 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'S';
 	if (do_compression)
 		argstr[x++] = 'z';
+
+	/* this is a complete hack - blame Rusty 
+
+	   this is a hack to make the list_only (remote file list)
+	   more useful */
+	if (list_only && !recurse) 
+		argstr[x++] = 'r';
+
 	argstr[x] = 0;
 
 	if (x != 1) args[ac++] = argstr;
