@@ -241,5 +241,10 @@ test_xfail() {
     exit 78
 }
 
+# Test whether something is a link, allowing for shell peculiarities
+is_a_link() {
+    test -L "$1" || test -h "$1" || /usr/bin/test -L "$1" || /usr/bin/test -h "$1"
+}
+
 # be reproducible
 umask 077
