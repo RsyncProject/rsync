@@ -336,6 +336,9 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 		if (protocol_version >= 29) {
 			if (ndx >= 0)
 				write_int(sock_f_out, ndx);
+			/* XXX Temorary compatibility hack */
+			if (iflags & (ITEM_TRANSFER|ITEM_LOCAL_CHANGE))
+				iflags |= ITEM_REPORT_XATTRS; /* ITEM_UPDATE */
 			write_shortint(sock_f_out, iflags);
 			if (hlink)
 				write_vstring(sock_f_out, hlink, strlen(hlink));
