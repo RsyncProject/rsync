@@ -73,6 +73,7 @@ static char empty_sum[MD4_SUM_LENGTH];
 static unsigned int min_file_struct_len;
 
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
+static void output_flist(struct file_list *flist);
 
 
 void init_flist(void)
@@ -1190,6 +1191,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			write_batch_flist_info(flist->count, flist->files);
 	}
 
+	if (verbose > 3)
+		output_flist(flist);
+
 	if (verbose > 2)
 		rprintf(FINFO, "send_file_list done\n");
 
@@ -1264,6 +1268,9 @@ struct file_list *recv_file_list(int f)
 				io_error |= read_int(f);
 		}
 	}
+
+	if (verbose > 3)
+		output_flist(flist);
 
 	if (list_only) {
 		int i;
@@ -1429,18 +1436,21 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			}
 		}
 	}
+}
 
-	if (verbose <= 3)
-		return;
+static void output_flist(struct file_list *flist)
+{
+	char uidbuf[16], gidbuf[16];
+	struct file_struct *file;
+	int i;
 
 	for (i = 0; i < flist->count; i++) {
-		char uidbuf[16], gidbuf[16];
-		struct file_struct *file = flist->files[i];
+		file = flist->files[i];
 		if (am_root && preserve_uid)
 			sprintf(uidbuf, " uid=%ld", (long)file->uid);
 		else
 			*uidbuf = '\0';
-		if (preserve_gid)
+		if (preserve_gid && file->gid != GID_NONE)
 			sprintf(gidbuf, " gid=%ld", (long)file->gid);
 		else
 			*gidbuf = '\0';
