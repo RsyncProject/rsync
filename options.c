@@ -122,7 +122,7 @@ static void print_rsync_version(int f)
         rprintf(f, "%s  version %s  protocol version %d\n",
                 RSYNC_NAME, VERSION, PROTOCOL_VERSION);
         rprintf(f,
-                "Copyright (C) 1996-2001 by Andrew Tridgell, Paul Mackerras and others\n");
+                "Copyright (C) 1996-2001 by Andrew Tridgell and others\n");
 	rprintf(f, "<http://rsync.samba.org/>\n");
         rprintf(f, "Capabilities: %d-bit files, %ssocketpairs, "
                 "%shard links, %ssymlinks, batchfiles\n\n",
