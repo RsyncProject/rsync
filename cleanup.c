@@ -61,6 +61,13 @@ void _exit_cleanup(int code, const char *file, int line)
 	int ocode = code;
 	extern int keep_partial;
 	extern int log_got_error;
+	static int inside_cleanup = 0;
+
+	if (inside_cleanup != 0) {
+		/* prevent the occasional infinite recursion */
+		return;
+	}
+	inside_cleanup = 1;
 
 	signal(SIGUSR1, SIG_IGN);
 	signal(SIGUSR2, SIG_IGN);

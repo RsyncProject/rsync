@@ -55,6 +55,9 @@ rsync changes since last release
     * Fixed bug in --copy-unsafe-links that caused it to be completely
       broken.  (Dave Dykstra)
 
+    * Prevent infinite recursion in cleanup code under certain circumstances.
+      (Sviatoslav Sviridov)
+
   INTERNAL:
 
     * Many code cleanups and improved internal documentation.  (Martin 
