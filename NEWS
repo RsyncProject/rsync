@@ -32,16 +32,13 @@ Changes since 2.6.3:
       use /etc/popt and/or ~/.popt to create your own option aliases.
 
     - Added the --copy-dest option, which works like --link-dest except
-      that it copies identical files.
+      that it includes copies of identical files.
 
     - Added support for specifying multiple --compare-dest, --copy-dest, or
       --link-dest options, but only of a single type. (Promoted from the
-      patches dir)
+      patches dir and enhanced.)
 
-    - Added the --max-size option (promoted from the patches dir).
-
-    - Added the "port" parameter to the rsyncd.conf file. (Promoted from
-      the patches dir)
+    - Added the --max-size option. (Promoted from the patches dir.)
 
     - The daemon-mode options were separated from the normal rsync options
       so that they can't be mixed together.  This makes it impossible to
@@ -51,6 +48,9 @@ Changes since 2.6.3:
     - The --bwlimit option may now be used in combination with --daemon
       to specify a default value for the daemon side and also a value
       that cannot be exceeded by a user-specified --bwlimit option.
+
+    - Added the "port" parameter to the rsyncd.conf file. (Promoted from
+      the patches dir.)
 
     - In _exit_cleanup(): when we are exiting with a partially-received
       file, we now flush any data in the write-cache before closing the
