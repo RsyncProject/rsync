@@ -686,8 +686,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			}
 		} else {
 			extern int sanitize_paths;
-			if (sanitize_paths)
-				sanitize_path(strdup(files_from), NULL);
+			if (sanitize_paths) {
+				files_from = strdup(files_from);
+				sanitize_path(files_from, NULL);
+			}
 			filesfrom_fd = open(files_from, O_RDONLY|O_BINARY);
 			if (filesfrom_fd < 0) {
 				rsyserr(FERROR, errno,
