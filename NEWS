@@ -220,10 +220,11 @@ Changes since 2.6.3:
       filter rules so it is positioned correctly (unlike in some older
       transfer scenarios).
 
-    - Rsync sorts the filename list in a slightly different way for some
-      rare sets of files:  it always puts a dir's contents immediately
-      after the dir in the list.  (Previously an item named "foo.txt" would
-      sort in between directory "foo" and "foo/bar".)
+    - Rsync sorts the filename list in a different way:  it sorts the
+      subdir names after the non-subdir names for each dir's contents, and
+      it always puts a dir's contents immediately after the dir's name in
+      the list.  (Previously an item named "foo.txt" would sort in between
+      directory "foo/" and "foo/bar".)
 
     - When talking to a protocol 29 rsync daemon, a list-only request
       is able to note this before the options are sent over the wire, and
