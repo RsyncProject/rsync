@@ -179,6 +179,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <syslog.h>
+#include <sys/file.h>
 
 #ifndef S_IFLNK
 #define S_IFLNK  0120000
