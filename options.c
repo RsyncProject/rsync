@@ -314,8 +314,8 @@ static struct poptOption long_options[] = {
   {"read-batch",      'f', POPT_ARG_STRING, &batch_ext, 'f'},
   {"write-batch",     'F', POPT_ARG_NONE,   &write_batch, 0},
 #ifdef INET6
-  {0,		      '4', POPT_ARG_VAL,    &global_opts.af,   AF_INET },
-  {0,		      '6', POPT_ARG_VAL,    &global_opts.af,   AF_INET6 },
+  {0,		      '4', POPT_ARG_VAL,    &global_opts.af_hint,   AF_INET },
+  {0,		      '6', POPT_ARG_VAL,    &global_opts.af_hint,   AF_INET6 },
 #endif
   {0,0,0,0}
 };
