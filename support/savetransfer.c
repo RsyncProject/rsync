@@ -75,7 +75,7 @@ main(int argc, char *argv[])
 
     run_program(argv + 1);
 
-#if HAVE_SETMODE && O_BINARY
+#if defined HAVE_SETMODE && O_BINARY
     setmode(STDIN_FILENO, O_BINARY);
     setmode(STDOUT_FILENO, O_BINARY);
 #endif
