@@ -682,7 +682,7 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 	file->gid = st.st_gid;
 	file->dev = st.st_dev;
 	file->inode = st.st_ino;
-#ifdef HAVE_ST_RDEV
+#ifdef HAVE_STRUCT_STAT_ST_RDEV
 	file->rdev = st.st_rdev;
 #endif
 
