@@ -332,14 +332,14 @@ static int rsync_module(int f_in, int f_out, int i)
 			return -1;
 		}
 
-		if (!push_dir("/", 0)) {
+		if (!push_dir("/")) {
 			rsyserr(FERROR, errno, "chdir %s failed\n", lp_path(i));
 			io_printf(f_out, "@ERROR: chdir failed\n");
 			return -1;
 		}
 
 	} else {
-		if (!push_dir(lp_path(i), 0)) {
+		if (!push_dir(lp_path(i))) {
 			rsyserr(FERROR, errno, "chdir %s failed\n", lp_path(i));
 			io_printf(f_out, "@ERROR: chdir failed\n");
 			return -1;

@@ -321,7 +321,7 @@ static char *get_local_name(struct file_list *flist,char *name)
 
 	if (do_stat(name,&st) == 0) {
 		if (S_ISDIR(st.st_mode)) {
-			if (!push_dir(name, 0)) {
+			if (!push_dir(name)) {
 				rprintf(FERROR, "push_dir %s failed: %s (1)\n",
 					full_fname(name), strerror(errno));
 				exit_cleanup(RERR_FILESELECT);
@@ -347,7 +347,7 @@ static char *get_local_name(struct file_list *flist,char *name)
 			rprintf(FINFO,"created directory %s\n",name);
 	}
 
-	if (!push_dir(name, 0)) {
+	if (!push_dir(name)) {
 		rprintf(FERROR, "push_dir %s failed: %s (2)\n",
 			full_fname(name), strerror(errno));
 		exit_cleanup(RERR_FILESELECT);
@@ -366,7 +366,7 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 	if (verbose > 2)
 		rprintf(FINFO,"server_sender starting pid=%d\n",(int)getpid());
 
-	if (!relative_paths && !push_dir(dir, 0)) {
+	if (!relative_paths && !push_dir(dir)) {
 		rprintf(FERROR, "push_dir %s failed: %s (3)\n",
 			full_fname(dir), strerror(errno));
 		exit_cleanup(RERR_FILESELECT);
@@ -498,7 +498,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		dir = argv[0];
 		argc--;
 		argv++;
-		if (!am_daemon && !push_dir(dir, 0)) {
+		if (!am_daemon && !push_dir(dir)) {
 			rprintf(FERROR, "push_dir %s failed: %s (4)\n",
 				full_fname(dir), strerror(errno));
 			exit_cleanup(RERR_FILESELECT);
@@ -1005,7 +1005,7 @@ int main(int argc,char *argv[])
 	 * (implemented by forking "pwd" and reading its output) doesn't
 	 * work when there are other child processes.  Also, on all systems
 	 * that implement getcwd that way "pwd" can't be found after chroot. */
-	push_dir(NULL,0);
+	push_dir(NULL);
 
 	if (write_batch && !am_server) {
 		write_batch_argvs_file(orig_argc, orig_argv);
