@@ -243,8 +243,7 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
 	if (inplace) {
 		if (verbose > 2)
 			rprintf(FINFO, "finishing %s\n", fname);
-		set_perms(fname, file, NULL, 0);
-		return;
+		goto do_set_perms;
 	}
 
 	/* move tmp file over real file */
@@ -256,10 +255,10 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
 		    ret == -2 ? "copy" : "rename",
 		    full_fname(fnametmp), fname);
 		do_unlink(fnametmp);
-	} else {
-		set_perms(fname, file, NULL,
-			  ok_to_set_time ? 0 : PERMS_SKIP_MTIME);
+		return;
 	}
+    do_set_perms:
+	set_perms(fname, file, NULL, ok_to_set_time ? 0 : PERMS_SKIP_MTIME);
 }
 
 const char *who_am_i(void)
