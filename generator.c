@@ -1075,7 +1075,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	int need_retouch_dir_perms = 0;
 	int save_only_existing = only_existing;
 	int save_opt_ignore_existing = opt_ignore_existing;
-	int allowed_lull = read_batch ? 0 : io_timeout / 2;
+	int allowed_lull = read_batch ? 0 : (io_timeout + 1) / 2;
 	int lull_mod = allowed_lull * 5;
 
 	if (protocol_version >= 29) {
