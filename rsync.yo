@@ -871,18 +871,19 @@ The exclude and include patterns specified to rsync allow for flexible
 selection of which files to transfer and which files to skip.
 
 rsync builds an ordered list of include/exclude options as specified on
-the command line. When a filename is encountered, rsync checks the
+the command line. Rsync checks each file and directory 
 name against each exclude/include pattern in turn. The first matching
 pattern is acted on. If it is an exclude pattern, then that file is
 skipped. If it is an include pattern then that filename is not
 skipped. If no matching include/exclude pattern is found then the
 filename is not skipped.
 
-The filenames matched against the exclude/include patterns are
-relative to the base directories, so patterns should not
-include the path elements to those base directories.  The
-only way in which a pattern will match the absolute path of
-a file or directory is if the base path is the root directory.
+The filenames matched against the exclude/include patterns
+are relative to the destination directory, or "top
+directory", so patterns should not include the path elements
+of the source or destination directories.  The only way in
+which a pattern will match the absolute path of a file or
+directory is if the source path is the root directory.
 
 Note that when used with -r (which is implied by -a), every subcomponent of
 every path is visited from top down, so include/exclude patterns get
@@ -900,7 +901,7 @@ itemize(
   start of the filename, otherwise it is matched against the end of
   the filename.
   This is the equivalent of a leading ^ in regular expressions.
-  Thus "/foo" would match a file called "foo" at the base of the
+  Thus "/foo" would match a file called "foo" at the top of the
   transferred tree.
   On the other hand, "foo" would match any file called "foo"
   anywhere in the tree because the algorithm is applied recursively from
@@ -952,12 +953,12 @@ Here are some exclude/include examples:
 
 itemize(
   it() --exclude "*.o" would exclude all filenames matching *.o
-  it() --exclude "/foo" would exclude a file in the base directory called foo
+  it() --exclude "/foo" would exclude a file called foo in the top directory
   it() --exclude "foo/" would exclude any directory called foo
   it() --exclude "/foo/*/bar" would exclude any file called bar two
-  levels below a base directory called foo
+  levels below a directory called foo in the top directory
   it() --exclude "/foo/**/bar" would exclude any file called bar two
-  or more levels below a base directory called foo
+  or more levels below a directory called foo in the top directory
   it() --include "*/" --include "*.c" --exclude "*" would include all 
   directories and C source files
   it() --include "foo/" --include "foo/bar.c" --exclude "*" would include
