@@ -140,7 +140,7 @@ rsyncd over ssh
 FEATURES ------------------------------------------------------------
 
 
---dry-run is insufficiently dry
+--dry-run is too dry
 
   Mark Santcroos points out that -n fails to list files which have
   only metadata changes, though it probably should.  
