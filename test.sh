@@ -54,9 +54,13 @@ mkdir ${FROM}/emptydir
 ps ax > ${FROM}/pslist
 echo -n "This file has no trailing lf" > ${FROM}/nolf
 ln -s nolf ${FROM}/nolf-symlink
-cat /etc/inittab /etc/services /etc/resolv.conf > ${FROM}/${F1}
+
+# Gather some random text.  We need files that will exist and be
+# publicly readable on all platforms: hopefully this will work.
+cat /etc/*tab /etc/services /etc/*.conf /etc/*rc > ${FROM}/${F1}
+
 mkdir ${FROM}/dir
-cp ${FROM}/${F1} ${FROM}/dir
+cp ${FROM}/${F1} ${FROM}/dir/
 mkdir ${FROM}/dir/subdir
 mkdir ${FROM}/dir/subdir/subsubdir
 ls -ltr /etc > ${FROM}/dir/subdir/subsubdir/etc-ltr-list
