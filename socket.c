@@ -267,7 +267,7 @@ static int open_socket_in(int type, int port, const char *bind_address,
 {
 	int one=1;
 	int s;
-	struct addrinfo hints, *res, *resp;
+	struct addrinfo hints, *all_ai, *resp;
 	char portbuf[10];
 	int error;
 
@@ -276,54 +276,43 @@ static int open_socket_in(int type, int port, const char *bind_address,
 	hints.ai_socktype = type;
 	hints.ai_flags = AI_PASSIVE;
 	snprintf(portbuf, sizeof(portbuf), "%d", port);
-	error = getaddrinfo(bind_address, portbuf, &hints, &res);
+	error = getaddrinfo(bind_address, portbuf, &hints, &all_ai);
 	if (error) {
 		rprintf(FERROR, RSYNC_NAME ": getaddrinfo: bind address %s: %s\n",
 			bind_address, gai_strerror(error));
 		return -1;
 	}
-	/* XXX: Do we need to care about getting multiple results
-	 * back?  I think probably not; if the user passed
-	 * bind_address == NULL and we set AI_PASSIVE then we ought to
-	 * get a wildcard result. */
 
-	resp = res;
-	while (1) {
-		s = socket(resp->ai_family, resp->ai_socktype, resp->ai_protocol);
+	/* We may not be able to create the socket, if for example the
+	 * machine knows about IPv6 in the C library, but not in the
+	 * kernel. */
+	for (resp = all_ai; resp; resp = resp->ai_next) {
+		s = socket(resp->ai_family, resp->ai_socktype,
+			   resp->ai_protocol);
 
-		if (s >= 0) {
-			break;	/* got a socket */
-		} else if ((resp = resp->ai_next)) {
-			switch (errno) {
-			case EPROTONOSUPPORT:
-			case EAFNOSUPPORT:
-			case EPFNOSUPPORT:
-			case EINVAL:
-				/* See if there's another address that will work... */
-				continue;
-			}
+		if (s == -1) 
+			/* See if there's another address that will work... */
+			continue;
+		
+		setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
+			   (char *)&one, sizeof one);
+		
+		/* now we've got a socket - we need to bind it */
+		if (bind(s, all_ai->ai_addr, all_ai->ai_addrlen) < 0) {
+			/* Nope, try another */
+			close(s);
+			continue;
 		}
 		
-		rprintf(FERROR, RSYNC_NAME ": open inbound socket"
-			"(dom=%d, type=%d, proto=%d) failed: %s\n",
-			resp->ai_family, resp->ai_socktype, resp->ai_protocol,
-			strerror(errno));
-			goto fail;
+		return s;
 	}
 
-	setsockopt(s,SOL_SOCKET,SO_REUSEADDR,(char *)&one,sizeof(one));
+	rprintf(FERROR, RSYNC_NAME ": open inbound socket on port %d failed: "
+		"%s\n",
+		port, 
+		strerror(errno));
 
-	/* now we've got a socket - we need to bind it */
-	if (bind(s, res->ai_addr, res->ai_addrlen) < 0) { 
-		rprintf(FERROR, RSYNC_NAME ": bind failed on port %d\n", port);
-		close(s);
-		goto fail;
-	}
-
-	return s;
-
-fail:
-	freeaddrinfo(res);
+	freeaddrinfo(all_ai);
 	return -1; 
 }
 
@@ -358,10 +347,10 @@ void start_accept_loop(int port, int (*fn)(int ))
 {
 	int s;
 	extern char *bind_address;
+	extern int default_af_hint;
 
 	/* open an incoming socket */
-	s = open_socket_in(SOCK_STREAM, port, bind_address,
-			   global_opts.af_hint);
+	s = open_socket_in(SOCK_STREAM, port, bind_address, default_af_hint);
 	if (s == -1)
 		exit_cleanup(RERR_SOCKETIO);
 

@@ -74,18 +74,21 @@ int modify_window=0;
 #endif
 int blocking_io=0;
 
-/** Global options set from command line. **/
-struct global_opts global_opts = {
+/** Network address family. **/
 #ifdef INET6
-	0,			/* af_hint -- allow any protocol */
+int default_af_hint = 0;	/* Any protocol */
 #else
-	AF_INET,		/* af_hint -- prefer IPv4 */
+int default_af_hint = AF_INET;	/* Must use IPv4 */
 #endif
-	0,			/* no_detach */
-};
 
-int read_batch=0;  /* dw */
-int write_batch=0; /* dw */
+/** Do not go into the background when run as --daemon.  Good
+ * for debugging and required for running as a service on W32,
+ * or under Unix process-monitors. **/
+int no_detach = 0;
+
+
+int read_batch=0;
+int write_batch=0;
 
 char *backup_suffix = BACKUP_SUFFIX;
 char *tmpdir = NULL;
@@ -178,8 +181,8 @@ void usage(enum logcode F)
   rprintf(F,"     --backup-dir            make backups into this directory\n");
   rprintf(F,"     --suffix=SUFFIX         override backup suffix\n");  
   rprintf(F," -u, --update                update only (don't overwrite newer files)\n");
-  rprintf(F," -l, --links                 preserve soft links\n");
-  rprintf(F," -L, --copy-links            treat soft links like regular files\n");
+  rprintf(F," -l, --links                 copy symlinks as symlinks\n");
+  rprintf(F," -L, --copy-links            copy the referent of symlinks\n");
   rprintf(F,"     --copy-unsafe-links     copy links outside the source tree\n");
   rprintf(F,"     --safe-links            ignore links outside the destination tree\n");
   rprintf(F," -H, --hard-links            preserve hard links\n");
@@ -306,7 +309,7 @@ static struct poptOption long_options[] = {
   /* TODO: Should this take an optional int giving the compression level? */
   {"compress",        'z', POPT_ARG_NONE,   &do_compression},
   {"daemon",           0,  POPT_ARG_NONE,   &am_daemon},
-  {"no-detach",        0,  POPT_ARG_NONE,   &global_opts.no_detach},
+  {"no-detach",        0,  POPT_ARG_NONE,   &no_detach},
   {"stats",            0,  POPT_ARG_NONE,   &do_stats},
   {"progress",         0,  POPT_ARG_NONE,   &do_progress},
   {"partial",          0,  POPT_ARG_NONE,   &keep_partial},
@@ -323,8 +326,8 @@ static struct poptOption long_options[] = {
   {"read-batch",      'f', POPT_ARG_STRING, &batch_ext, 'f'},
   {"write-batch",     'F', POPT_ARG_NONE,   &write_batch, 0},
 #ifdef INET6
-  {0,		      '4', POPT_ARG_VAL,    &global_opts.af_hint,   AF_INET },
-  {0,		      '6', POPT_ARG_VAL,    &global_opts.af_hint,   AF_INET6 },
+  {0,		      '4', POPT_ARG_VAL,    &default_af_hint,   AF_INET },
+  {0,		      '6', POPT_ARG_VAL,    &default_af_hint,   AF_INET6 },
 #endif
   {0,0,0,0}
 };

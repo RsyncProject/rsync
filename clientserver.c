@@ -45,6 +45,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	extern char *shell_cmd;
 	extern int kludge_around_eof;
 	extern char *bind_address;
+	extern int default_af_hint;
        
 	if (argc == 0 && !am_sender) {
 		extern int list_only;
@@ -79,7 +80,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	if (!user) user = getenv("LOGNAME");
 
 	fd = open_socket_out_wrapped (host, rsync_port, bind_address,
-				      global_opts.af_hint);
+				      default_af_hint);
 	if (fd == -1) {
 		exit_cleanup(RERR_SOCKETIO);
 	}
@@ -486,6 +487,7 @@ int daemon_main(void)
 	extern char *config_file;
 	extern int orig_umask;
 	char *pid_file;
+	extern int no_detach;
 
 	if (is_a_socket(STDIN_FILENO)) {
 		int i;
@@ -501,7 +503,7 @@ int daemon_main(void)
 		return start_daemon(STDIN_FILENO);
 	}
 
-	if (!global_opts.no_detach)
+	if (!no_detach)
 	    become_daemon();
 
 	if (!lp_load(config_file, 1)) {
