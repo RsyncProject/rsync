@@ -25,6 +25,7 @@
 extern int verbose;
 extern int dry_run;
 extern int preserve_times;
+extern int omit_dir_times;
 extern int am_root;
 extern int am_sender;
 extern int am_generator;
@@ -165,14 +166,12 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	}
 
 	if (!preserve_times || S_ISLNK(st->st_mode)
-	    || (make_backups && !backup_dir && S_ISDIR(st->st_mode)))
+	 || (S_ISDIR(st->st_mode)
+	  && (omit_dir_times || (make_backups && !backup_dir))))
 		flags |= PERMS_SKIP_MTIME;
 	if (!(flags & PERMS_SKIP_MTIME)
 	    && cmp_modtime(st->st_mtime, file->modtime) != 0) {
-		/* don't complain about not setting times on directories
-		 * because some filesystems can't do it */
-		if (set_modtime(fname,file->modtime) != 0 &&
-		    !S_ISDIR(st->st_mode)) {
+		if (set_modtime(fname,file->modtime) != 0) {
 			rsyserr(FERROR, errno, "failed to set times on %s",
 				full_fname(fname));
 			return 0;
