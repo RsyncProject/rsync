@@ -1,0 +1,607 @@
+/* This is based on loadparm.c from Samba, written by Andrew Tridgell
+   and Karl Auer */
+
+/* 
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 2 of the License, or
+   (at your option) any later version.
+   
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+   
+   You should have received a copy of the GNU General Public License
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+*/
+
+/*
+ *  Load parameters.
+ *
+ *  This module provides suitable callback functions for the params
+ *  module. It builds the internal table of service details which is
+ *  then used by the rest of the server.
+ *
+ * To add a parameter:
+ *
+ * 1) add it to the global or service structure definition
+ * 2) add it to the parm_table
+ * 3) add it to the list of available functions (eg: using FN_GLOBAL_STRING())
+ * 4) If it's a global then initialise it in init_globals. If a local
+ *    (ie. service) parameter then initialise it in the sDefault structure
+ *  
+ *
+ * Notes:
+ *   The configuration file is processed sequentially for speed. It is NOT
+ *   accessed randomly as happens in 'real' Windows. For this reason, there
+ *   is a fair bit of sequence-dependent code here - ie., code which assumes
+ *   that certain things happen before others. In particular, the code which
+ *   happens at the boundary between sections is delicately poised, so be
+ *   careful!
+ *
+ */
+
+#include "rsync.h"
+#define BOOL int
+#define False 0
+#define True 1
+#define Realloc realloc
+#define PTR_DIFF(p1,p2) ((ptrdiff_t)(((char *)(p1)) - (char *)(p2)))
+#define strequal(a,b) (strcasecmp(a,b)==0)
+#define BOOLSTR(b) ((b) ? "Yes" : "No")
+typedef char pstring[1024];
+#define pstrcpy(a,b) strcpy(a,b)
+
+/* the following are used by loadparm for option lists */
+typedef enum
+{
+  P_BOOL,P_BOOLREV,P_CHAR,P_INTEGER,P_OCTAL,
+  P_STRING,P_GSTRING,P_ENUM,P_SEP
+} parm_type;
+
+typedef enum
+{
+  P_LOCAL,P_GLOBAL,P_SEPARATOR,P_NONE
+} parm_class;
+
+struct enum_list {
+	int value;
+	char *name;
+};
+
+struct parm_struct
+{
+	char *label;
+	parm_type type;
+	parm_class class;
+	void *ptr;
+	struct enum_list *enum_list;
+	unsigned flags;
+};
+
+static BOOL bLoaded = False;
+
+#ifndef GLOBAL_NAME
+#define GLOBAL_NAME "global"
+#endif
+
+/* some helpful bits */
+#define pSERVICE(i) ServicePtrs[i]
+#define iSERVICE(i) (*pSERVICE(i))
+#define LP_SNUM_OK(iService) (((iService) >= 0) && ((iService) < iNumServices))
+
+/* 
+ * This structure describes global (ie., server-wide) parameters.
+ */
+typedef struct
+{
+	char *motd_file;
+} global;
+
+static global Globals;
+
+
+
+/* 
+ * This structure describes a single service. 
+ */
+typedef struct
+{
+	char *name;
+	char *path;
+	char *comment;
+	BOOL read_only;
+	BOOL list;
+	int uid;
+	int gid;
+} service;
+
+
+/* This is a default service used to prime a services structure */
+static service sDefault = 
+{
+	NULL,    /* name */
+	NULL,    /* path */
+	NULL,    /* comment */
+	True,    /* read only */
+	True,    /* list */
+	-2,      /* uid */
+	-2,      /* gid */
+};
+
+
+
+/* local variables */
+static service **ServicePtrs = NULL;
+static int iNumServices = 0;
+static int iServiceIndex = 0;
+static BOOL bInGlobalSection = True;
+
+#define NUMPARAMETERS (sizeof(parm_table) / sizeof(struct parm_struct))
+
+
+/* note that we do not initialise the defaults union - it is not allowed in ANSI C */
+static struct parm_struct parm_table[] =
+{
+  {"motd file",        P_STRING,  P_GLOBAL, &Globals.motd_file,    NULL,   0},
+  {"name",             P_STRING,  P_LOCAL,  &sDefault.name,        NULL,   0},
+  {"comment",          P_STRING,  P_LOCAL,  &sDefault.comment,     NULL,   0},
+  {"path",             P_STRING,  P_LOCAL,  &sDefault.path,        NULL,   0},
+  {"read only",        P_BOOL,    P_LOCAL,  &sDefault.read_only,   NULL,   0},
+  {"list",             P_BOOL,    P_LOCAL,  &sDefault.list,        NULL,   0},
+  {"uid",              P_INTEGER, P_LOCAL,  &sDefault.uid,         NULL,   0},
+  {"gid",              P_INTEGER, P_LOCAL,  &sDefault.gid,         NULL,   0},
+  {NULL,               P_BOOL,    P_NONE,   NULL,                  NULL,   0}
+};
+
+
+/***************************************************************************
+Initialise the global parameter structure.
+***************************************************************************/
+static void init_globals(void)
+{
+}
+
+/***************************************************************************
+Initialise the sDefault parameter structure.
+***************************************************************************/
+static void init_locals(void)
+{
+}
+
+
+/*
+   In this section all the functions that are used to access the 
+   parameters from the rest of the program are defined 
+*/
+
+#define FN_GLOBAL_STRING(fn_name,ptr) \
+ char *fn_name(void) {return(*(char **)(ptr) ? *(char **)(ptr) : "");}
+#define FN_GLOBAL_BOOL(fn_name,ptr) \
+ BOOL fn_name(void) {return(*(BOOL *)(ptr));}
+#define FN_GLOBAL_CHAR(fn_name,ptr) \
+ char fn_name(void) {return(*(char *)(ptr));}
+#define FN_GLOBAL_INTEGER(fn_name,ptr) \
+ int fn_name(void) {return(*(int *)(ptr));}
+
+#define FN_LOCAL_STRING(fn_name,val) \
+ char *fn_name(int i) {return((LP_SNUM_OK(i)&&pSERVICE(i)->val)?pSERVICE(i)->val : (sDefault.val?sDefault.val:""));}
+#define FN_LOCAL_BOOL(fn_name,val) \
+ BOOL fn_name(int i) {return(LP_SNUM_OK(i)? pSERVICE(i)->val : sDefault.val);}
+#define FN_LOCAL_CHAR(fn_name,val) \
+ char fn_name(int i) {return(LP_SNUM_OK(i)? pSERVICE(i)->val : sDefault.val);}
+#define FN_LOCAL_INTEGER(fn_name,val) \
+ int fn_name(int i) {return(LP_SNUM_OK(i)? pSERVICE(i)->val : sDefault.val);}
+
+
+FN_GLOBAL_STRING(lp_motd_file, &Globals.motd_file)
+FN_LOCAL_STRING(lp_name, name)
+FN_LOCAL_STRING(lp_comment, comment)
+FN_LOCAL_STRING(lp_path, path)
+FN_LOCAL_BOOL(lp_read_only, read_only)
+FN_LOCAL_BOOL(lp_list, list)
+FN_LOCAL_INTEGER(lp_uid, uid)
+FN_LOCAL_INTEGER(lp_gid, gid)
+
+/* local prototypes */
+static int    strwicmp( char *psz1, char *psz2 );
+static int    map_parameter( char *parmname);
+static BOOL   set_boolean( BOOL *pb, char *parmvalue );
+static int    getservicebyname(char *name, service *pserviceDest);
+static void   copy_service( service *pserviceDest, 
+                            service *pserviceSource);
+static BOOL   do_parameter(char *parmname, char *parmvalue);
+static BOOL   do_section(char *sectionname);
+
+
+/***************************************************************************
+initialise a service to the defaults
+***************************************************************************/
+static void init_service(service *pservice)
+{
+  bzero((char *)pservice,sizeof(service));
+  copy_service(pservice,&sDefault);
+}
+
+static void string_set(char **s, char *v)
+{
+	if (*s) free(*s);
+	if (!v) {
+		*s = NULL;
+		return;
+	}
+	*s = strdup(v);
+	if (!*s) exit_cleanup(1);
+}
+
+
+/***************************************************************************
+add a new service to the services array initialising it with the given 
+service
+***************************************************************************/
+static int add_a_service(service *pservice, char *name)
+{
+  int i;
+  service tservice;
+  int num_to_alloc = iNumServices+1;
+
+  tservice = *pservice;
+
+  /* it might already exist */
+  if (name) 
+    {
+      i = getservicebyname(name,NULL);
+      if (i >= 0)
+	return(i);
+    }
+
+  i = iNumServices;
+
+  ServicePtrs = (service **)Realloc(ServicePtrs,sizeof(service *)*num_to_alloc);
+  if (ServicePtrs)
+	  pSERVICE(iNumServices) = (service *)malloc(sizeof(service));
+
+  if (!ServicePtrs || !pSERVICE(iNumServices))
+	  return(-1);
+
+  iNumServices++;
+
+  init_service(pSERVICE(i));
+  copy_service(pSERVICE(i),&tservice);
+  if (name)
+    string_set(&iSERVICE(i).name,name);  
+
+  return(i);
+}
+
+/***************************************************************************
+Do a case-insensitive, whitespace-ignoring string compare.
+***************************************************************************/
+static int strwicmp(char *psz1, char *psz2)
+{
+   /* if BOTH strings are NULL, return TRUE, if ONE is NULL return */
+   /* appropriate value. */
+   if (psz1 == psz2)
+      return (0);
+   else
+      if (psz1 == NULL)
+         return (-1);
+      else
+          if (psz2 == NULL)
+              return (1);
+
+   /* sync the strings on first non-whitespace */
+   while (1)
+   {
+      while (isspace(*psz1))
+         psz1++;
+      while (isspace(*psz2))
+         psz2++;
+      if (toupper(*psz1) != toupper(*psz2) || *psz1 == '\0' || *psz2 == '\0')
+         break;
+      psz1++;
+      psz2++;
+   }
+   return (*psz1 - *psz2);
+}
+
+/***************************************************************************
+Map a parameter's string representation to something we can use. 
+Returns False if the parameter string is not recognised, else TRUE.
+***************************************************************************/
+static int map_parameter(char *parmname)
+{
+   int iIndex;
+
+   if (*parmname == '-')
+     return(-1);
+
+   for (iIndex = 0; parm_table[iIndex].label; iIndex++) 
+      if (strwicmp(parm_table[iIndex].label, parmname) == 0)
+         return(iIndex);
+
+   rprintf(FERROR, "Unknown parameter encountered: \"%s\"\n", parmname);
+   return(-1);
+}
+
+
+/***************************************************************************
+Set a boolean variable from the text value stored in the passed string.
+Returns True in success, False if the passed string does not correctly 
+represent a boolean.
+***************************************************************************/
+static BOOL set_boolean(BOOL *pb, char *parmvalue)
+{
+   BOOL bRetval;
+
+   bRetval = True;
+   if (strwicmp(parmvalue, "yes") == 0 ||
+       strwicmp(parmvalue, "true") == 0 ||
+       strwicmp(parmvalue, "1") == 0)
+      *pb = True;
+   else
+      if (strwicmp(parmvalue, "no") == 0 ||
+          strwicmp(parmvalue, "False") == 0 ||
+          strwicmp(parmvalue, "0") == 0)
+         *pb = False;
+      else
+      {
+         rprintf(FERROR, "Badly formed boolean in configuration file: \"%s\".\n",
+               parmvalue);
+         bRetval = False;
+      }
+   return (bRetval);
+}
+
+/***************************************************************************
+Find a service by name. Otherwise works like get_service.
+***************************************************************************/
+static int getservicebyname(char *name, service *pserviceDest)
+{
+   int iService;
+
+   for (iService = iNumServices - 1; iService >= 0; iService--)
+      if (strwicmp(iSERVICE(iService).name, name) == 0) 
+      {
+         if (pserviceDest != NULL)
+	   copy_service(pserviceDest, pSERVICE(iService));
+         break;
+      }
+
+   return (iService);
+}
+
+
+
+/***************************************************************************
+Copy a service structure to another
+
+***************************************************************************/
+static void copy_service(service *pserviceDest, 
+                         service *pserviceSource)
+{
+  int i;
+
+  for (i=0;parm_table[i].label;i++)
+    if (parm_table[i].ptr && parm_table[i].class == P_LOCAL) {
+	void *def_ptr = parm_table[i].ptr;
+	void *src_ptr = 
+	  ((char *)pserviceSource) + PTR_DIFF(def_ptr,&sDefault);
+	void *dest_ptr = 
+	  ((char *)pserviceDest) + PTR_DIFF(def_ptr,&sDefault);
+
+	switch (parm_table[i].type)
+	  {
+	  case P_BOOL:
+	  case P_BOOLREV:
+	    *(BOOL *)dest_ptr = *(BOOL *)src_ptr;
+	    break;
+
+	  case P_INTEGER:
+	  case P_ENUM:
+	  case P_OCTAL:
+	    *(int *)dest_ptr = *(int *)src_ptr;
+	    break;
+
+	  case P_CHAR:
+	    *(char *)dest_ptr = *(char *)src_ptr;
+	    break;
+
+	  case P_STRING:
+	    string_set(dest_ptr,*(char **)src_ptr);
+	    break;
+
+	  default:
+	    break;
+	  }
+      }
+}
+
+
+/***************************************************************************
+Process a parameter for a particular service number. If snum < 0
+then assume we are in the globals
+***************************************************************************/
+static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
+{
+   int parmnum, i;
+   void *parm_ptr=NULL; /* where we are going to store the result */
+   void *def_ptr=NULL;
+
+   parmnum = map_parameter(parmname);
+
+   if (parmnum < 0)
+     {
+       rprintf(FERROR, "Ignoring unknown parameter \"%s\"\n", parmname);
+       return(True);
+     }
+
+   def_ptr = parm_table[parmnum].ptr;
+
+   /* we might point at a service, the default service or a global */
+   if (snum < 0) {
+     parm_ptr = def_ptr;
+   } else {
+       if (parm_table[parmnum].class == P_GLOBAL) {
+	   rprintf(FERROR, "Global parameter %s found in service section!\n",parmname);
+	   return(True);
+	 }
+       parm_ptr = ((char *)pSERVICE(snum)) + PTR_DIFF(def_ptr,&sDefault);
+   }
+
+   /* now switch on the type of variable it is */
+   switch (parm_table[parmnum].type)
+     {
+     case P_BOOL:
+       set_boolean(parm_ptr,parmvalue);
+       break;
+
+     case P_BOOLREV:
+       set_boolean(parm_ptr,parmvalue);
+       *(BOOL *)parm_ptr = ! *(BOOL *)parm_ptr;
+       break;
+
+     case P_INTEGER:
+       *(int *)parm_ptr = atoi(parmvalue);
+       break;
+
+     case P_CHAR:
+       *(char *)parm_ptr = *parmvalue;
+       break;
+
+     case P_OCTAL:
+       sscanf(parmvalue,"%o",(int *)parm_ptr);
+       break;
+
+     case P_STRING:
+       string_set(parm_ptr,parmvalue);
+       break;
+
+     case P_GSTRING:
+       strcpy((char *)parm_ptr,parmvalue);
+       break;
+
+     case P_ENUM:
+	     for (i=0;parm_table[parmnum].enum_list[i].name;i++) {
+		     if (strequal(parmvalue, parm_table[parmnum].enum_list[i].name)) {
+			     *(int *)parm_ptr = parm_table[parmnum].enum_list[i].value;
+			     break;
+		     }
+	     }
+	     break;
+     case P_SEP:
+	     break;
+     }
+
+   return(True);
+}
+
+/***************************************************************************
+Process a parameter.
+***************************************************************************/
+static BOOL do_parameter(char *parmname, char *parmvalue)
+{
+   return lp_do_parameter(bInGlobalSection?-2:iServiceIndex, parmname, parmvalue);
+}
+
+/***************************************************************************
+Process a new section (service). At this stage all sections are services.
+Later we'll have special sections that permit server parameters to be set.
+Returns True on success, False on failure.
+***************************************************************************/
+static BOOL do_section(char *sectionname)
+{
+   BOOL bRetval;
+   BOOL isglobal = (strwicmp(sectionname, GLOBAL_NAME) == 0);
+   bRetval = False;
+
+   /* if we were in a global section then do the local inits */
+   if (bInGlobalSection && !isglobal)
+     init_locals();
+
+   /* if we've just struck a global section, note the fact. */
+   bInGlobalSection = isglobal;   
+
+   /* check for multiple global sections */
+   if (bInGlobalSection)
+   {
+     return(True);
+   }
+
+   /* if we have a current service, tidy it up before moving on */
+   bRetval = True;
+
+   if (iServiceIndex >= 0)
+     bRetval = True;
+
+   /* if all is still well, move to the next record in the services array */
+   if (bRetval)
+     {
+       /* We put this here to avoid an odd message order if messages are */
+       /* issued by the post-processing of a previous section. */
+
+       if ((iServiceIndex=add_a_service(&sDefault,sectionname)) < 0)
+	 {
+	   rprintf(FERROR,"Failed to add a new service\n");
+	   return(False);
+	 }
+     }
+
+   return (bRetval);
+}
+
+
+/***************************************************************************
+Load the services array from the services file. Return True on success, 
+False on failure.
+***************************************************************************/
+BOOL lp_load(char *pszFname)
+{
+  pstring n2;
+  BOOL bRetval;
+ 
+  bRetval = False;
+
+  bInGlobalSection = True;
+  
+  init_globals();
+
+  pstrcpy(n2,pszFname);
+
+  /* We get sections first, so have to start 'behind' to make up */
+  iServiceIndex = -1;
+  bRetval = pm_process(n2, do_section, do_parameter);
+  
+  bLoaded = True;
+
+  return (bRetval);
+}
+
+
+/***************************************************************************
+return the max number of services
+***************************************************************************/
+int lp_numservices(void)
+{
+  return(iNumServices);
+}
+
+/***************************************************************************
+Return the number of the service with the given name, or -1 if it doesn't
+exist. Note that this is a DIFFERENT ANIMAL from the internal function
+getservicebyname()! This works ONLY if all services have been loaded, and
+does not copy the found service.
+***************************************************************************/
+int lp_number(char *name)
+{
+   int iService;
+
+   for (iService = iNumServices - 1; iService >= 0; iService--)
+      if (strequal(lp_name(iService), name)) 
+         break;
+
+   return (iService);
+}
+
