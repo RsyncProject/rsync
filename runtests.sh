@@ -144,15 +144,9 @@ suitedir="$srcdir/testsuite"
 
 export scratchdir suitedir
 
-for testbase in rsync-hello hands ssh-basic
+for testscript in $suitedir/*.test
 do
-    testscript="$suitedir/$testbase.test"
-    if test \! -f "$testscript" 
-    then
-	echo "$testscript does not exist" >&2
-	missing=`expr $missing + 1`
-	continue
-    fi
+    testbase=`echo $testscript | sed 's!.*/!!'`
 
     echo "----- $testbase starting"
 
