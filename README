@@ -143,9 +143,7 @@ This will give you access to the bug tracking system used by the
 developers of rsync and will allow you to look at other bug reports or
 submit a new bug report.
 
-If you don't have web access then mail bug reports to
-rsync-bugs@samba.org or (if you think it will be of interest to lots
-of people) send it to rsync@samba.org
+If you don't have web access then mail bug reports to rsync@samba.org.
 
 
 CVS TREE
@@ -167,11 +165,12 @@ details.
 COPYRIGHT
 ---------
 
-Rsync was written by Andrew Tridgell and Paul Mackerras, and is
-available under the GNU General Public License.
+rsync was originally written by Andrew Tridgell and has been improved
+by many developers around the world.  rsync may be used, modified and
+redistributed only under the terms of the GNU General Public License,
+found in the file COPYING in this distribution, or at 
 
-tridge@samba.org
-paulus@cs.anu.edu.au
+  http://www.fsf.org/licenses/gpl.html
 
 
 AVAILABILITY
