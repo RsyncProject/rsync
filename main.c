@@ -58,8 +58,7 @@ extern int batch_gen_fd;
 extern int filesfrom_fd;
 extern pid_t cleanup_child_pid;
 extern struct stats stats;
-extern char *files_from;
-extern char *remote_filesfrom_file;
+extern char *filesfrom_host;
 extern char *partial_dir;
 extern char *basis_dir[];
 extern char *rsync_path;
@@ -759,10 +758,10 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	if (am_sender) {
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
 		io_start_buffering_out();
-		if (!remote_filesfrom_file)
+		if (!filesfrom_host)
 			set_msg_fd_in(f_in);
 		send_filter_list(f_out);
-		if (remote_filesfrom_file)
+		if (filesfrom_host)
 			filesfrom_fd = f_in;
 
 		if (write_batch)
@@ -866,49 +865,21 @@ static int start_client(int argc, char *argv[])
 	if ((rc = copy_argv(argv)))
 		return rc;
 
-	/* rsync:// always uses rsync server over direct socket connection */
-	if (strncasecmp(URL_PREFIX, argv[0], strlen(URL_PREFIX)) == 0
-	    && !read_batch) {
-		char *host, *path;
-
-		host = argv[0] + strlen(URL_PREFIX);
-		p = strchr(host,'/');
-		if (p) {
-			*p = '\0';
-			path = p+1;
-		} else
-			path = "";
-		if (*host == '[' && (p = strchr(host, ']')) != NULL) {
-			host++;
-			*p++ = '\0';
-			if (*p != ':')
-				p = NULL;
-		} else
-			p = strchr(host, ':');
-		if (p) {
-			rsync_port = atoi(p+1);
-			*p = '\0';
-		}
-		return start_socket_client(host, path, argc-1, argv+1);
-	}
-
 	if (!read_batch) { /* for read_batch, NO source is specified */
-		p = find_colon(argv[0]);
-		if (p) { /* source is remote */
-			if (remote_filesfrom_file
-			 && remote_filesfrom_file != files_from + 1
-			 && strncmp(files_from, argv[0], p-argv[0]+1) != 0) {
+		shell_path = check_for_hostspec(argv[0], &shell_machine, &rsync_port);
+		if (shell_path) { /* source is remote */
+			if (filesfrom_host && *filesfrom_host
+			    && strcmp(filesfrom_host, shell_machine) != 0) {
 				rprintf(FERROR,
 					"--files-from hostname is not the same as the transfer hostname\n");
 				exit_cleanup(RERR_SYNTAX);
 			}
-			if (p[1] == ':') { /* double colon */
-				*p = 0;
+			if (rsync_port) {
 				if (!shell_cmd) {
-					return start_socket_client(argv[0], p+2,
+					return start_socket_client(shell_machine,
+								   shell_path,
 								   argc-1, argv+1);
 				}
-				p++;
 				daemon_over_rsh = 1;
 			}
 
@@ -918,60 +889,32 @@ static int start_client(int argc, char *argv[])
 			}
 
 			am_sender = 0;
-			*p = 0;
-			shell_machine = argv[0];
-			shell_path = p+1;
 			argv++;
-		} else { /* source is local */
+		} else { /* source is local, check dest arg */
 			am_sender = 1;
 
-			/* rsync:// destination uses rsync server over direct socket */
-			if (strncasecmp(URL_PREFIX, argv[argc-1], strlen(URL_PREFIX)) == 0) {
-				char *host, *path;
-
-				host = argv[argc-1] + strlen(URL_PREFIX);
-				p = strchr(host,'/');
-				if (p) {
-					*p = '\0';
-					path = p+1;
-				} else
-					path = "";
-				if (*host == '[' && (p = strchr(host, ']')) != NULL) {
-					host++;
-					*p++ = '\0';
-					if (*p != ':')
-						p = NULL;
-				} else
-					p = strchr(host, ':');
-				if (p) {
-					rsync_port = atoi(p+1);
-					*p = '\0';
-				}
-				return start_socket_client(host, path, argc-1, argv);
-			}
-
-			p = find_colon(argv[argc-1]); /* look in dest arg */
-			if (p && remote_filesfrom_file
-			 && remote_filesfrom_file != files_from + 1
-			 && strncmp(files_from, argv[argc-1], p-argv[argc-1]+1) != 0) {
+			shell_path = check_for_hostspec(argv[argc-1], &shell_machine, &rsync_port);
+			if (shell_path && filesfrom_host && *filesfrom_host
+			    && strcmp(filesfrom_host, shell_machine) != 0) {
 				rprintf(FERROR,
 					"--files-from hostname is not the same as the transfer hostname\n");
 				exit_cleanup(RERR_SYNTAX);
 			}
-			if (!p) { /* no colon found, so src & dest are local */
+			if (!shell_path) { /* no hostspec found, so src & dest are local */
 				local_server = 1;
-				if (remote_filesfrom_file) {
+				if (filesfrom_host) {
 					rprintf(FERROR,
 						"--files-from cannot be remote when the transfer is local\n");
 					exit_cleanup(RERR_SYNTAX);
 				}
-			} else if (p[1] == ':') { /* double colon */
-				*p = 0;
+				shell_machine = NULL;
+				shell_path = argv[argc-1];
+			} else if (rsync_port) {
 				if (!shell_cmd) {
-					return start_socket_client(argv[argc-1], p+2,
+					return start_socket_client(shell_machine,
+								   shell_path,
 								   argc-1, argv);
 				}
-				p++;
 				daemon_over_rsh = 1;
 			}
 
@@ -979,21 +922,12 @@ static int start_client(int argc, char *argv[])
 				usage(FERROR);
 				exit_cleanup(RERR_SYNTAX);
 			}
-
-			if (local_server) {
-				shell_machine = NULL;
-				shell_path = argv[argc-1];
-			} else {
-				*p = 0;
-				shell_machine = argv[argc-1];
-				shell_path = p+1;
-			}
 		}
 		argc--;
 	} else {  /* read_batch */
 		local_server = 1;
 		shell_path = argv[argc-1];
-		if (find_colon(shell_path)) {
+		if (check_for_hostspec(shell_path, &shell_machine, &rsync_port)) {
 			rprintf(FERROR, "remote destination is not allowed with --read-batch\n");
 			exit_cleanup(RERR_SYNTAX);
 		}
