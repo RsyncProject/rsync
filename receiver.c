@@ -303,11 +303,10 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 	char *fnamecmp;
 	char fnamecmpbuf[MAXPATHLEN];
 	struct map_struct *mapbuf;
-	int i;
 	struct file_struct *file;
-	int phase=0;
-	int recv_ok;
 	struct stats initial_stats;
+	int save_make_backups = make_backups;
+	int i, recv_ok, phase = 0;
 
 	if (verbose > 2) {
 		rprintf(FINFO,"recv_files(%d) starting\n",flist->count);
@@ -323,15 +322,16 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 
 		i = read_int(f_in);
 		if (i == -1) {
-			if (phase == 0) {
-				phase++;
-				csum_length = SUM_LENGTH;
-				if (verbose > 2)
-					rprintf(FINFO,"recv_files phase=%d\n",phase);
-				send_msg(MSG_DONE, "", 0);
-				continue;
-			}
-			break;
+			if (phase)
+				break;
+			phase = 1;
+			csum_length = SUM_LENGTH;
+			if (verbose > 2)
+				rprintf(FINFO, "recv_files phase=%d\n", phase);
+			send_msg(MSG_DONE, "", 0);
+			if (keep_partial)
+				make_backups = 0; /* prevents double backup */
+			continue;
 		}
 
 		if (i < 0 || i >= flist->count) {
@@ -495,6 +495,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 			}
 		}
 	}
+	make_backups = save_make_backups;
 
 	if (delete_after && recurse && delete_mode && !local_name
 	    && flist->count > 0)
