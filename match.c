@@ -178,7 +178,7 @@ static void hash_search(int f,struct sum_struct *s,
 		for (; j<s->count && targets[j].t == t; j++) {
 			int i = targets[j].i;
 			
-			if (sum != s->sums[i].sum1) continue;
+			if (sum != s->sums[i].sum1 || s->sums[i].len > (len-offset)) continue;
 			
 			if (verbose > 3)
 				rprintf(FINFO,"potential match at %d target=%d %d sum=%08x\n",
