@@ -512,9 +512,9 @@ This option can be quite slow, so only use it if you need it.
 dit(bf(-W, --whole-file)) With this option the incremental rsync algorithm
 is not used and the whole file is sent as-is instead.  The transfer may be
 faster if this option is used when the bandwidth between the source and
-target machines is higher than the bandwidth to disk (especially when the
+destination machines is higher than the bandwidth to disk (especially when the
 "disk" is actually a networked filesystem).  This is the default when both
-the source and target are on the local machine.
+the source and destination are specified as local paths.
 
 dit(bf(--no-whole-file)) Turn off --whole-file, for use when it is the
 default.
