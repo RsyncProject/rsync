@@ -1129,7 +1129,7 @@ using the information stored in the batch file.
 
 For convenience, one additional file is creating when the write-batch
 option is used.  This file's name is created by appending
-".rsync_argvs" to the batch filename.  The .rsync_argvs file contains
+".sh" to the batch filename.  The .sh file contains
 a command-line suitable for updating a destination tree using that
 batch file. It can be executed using a Bourne(-like) shell, optionally
 passing in an alternate destination tree pathname which is then used
@@ -1158,12 +1158,12 @@ verb(
 verb(
    $ rsync --write-batch=batch -a /source/dir/ host:/adest/dir/
    $ scp batch* remote:
-   $ ssh remote ./batch.rsync_argvs /bdest/dir/
+   $ ssh remote ./batch.sh /bdest/dir/
 )
 
 In these examples, rsync is used to update /adest/dir/ with /source/dir/
 and the information to repeat this operation is stored in "batch" and
-"batch.rsync_argvs".  The host "remote" is then updated with the batched
+"batch.sh".  The host "remote" is then updated with the batched
 update going into the directory /bdest/dir.  The differences between the
 three examples is in how the batch gets to the remote machine (via remote
 stdin or by being copied first), whether the initial transfer was local or
