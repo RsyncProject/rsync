@@ -220,15 +220,16 @@ struct exclude_struct **make_exclude_list(const char *fname,
 					  int fatal, int include)
 {
 	struct exclude_struct **list=list1;
-	FILE *f;
+	int fd;
 	char line[MAXPATHLEN];
+	char *eob = line + MAXPATHLEN - 1;
+	extern int eol_nulls;
 
-	if (strcmp(fname, "-")) {
-		f = fopen(fname,"r");
-	} else {
-		f = fdopen(0, "r");
-	}
-	if (!f) {
+	if (strcmp(fname, "-") != 0)
+		fd = open(fname, O_RDONLY|O_BINARY);
+	else
+		fd = 0;
+	if (fd < 0) {
 		if (fatal) {
 			rsyserr(FERROR, errno,
                                 "failed to open %s file %s",
@@ -239,18 +240,31 @@ struct exclude_struct **make_exclude_list(const char *fname,
 		return list;
 	}
 
-	while (fgets(line,MAXPATHLEN,f)) {
-		int l = strlen(line);
-		while (l && (line[l-1] == '\n' || line[l-1] == '\r')) l--;
-		line[l] = 0;
-		if (line[0] && (line[0] != ';') && (line[0] != '#')) {
+	while (1) {
+		char ch, *s = line;
+		int cnt;
+		while (1) {
+			if ((cnt = read(fd, &ch, 1)) <= 0) {
+				if (cnt < 0 && errno == EINTR)
+					continue;
+				break;
+			}
+			if (eol_nulls? !ch : (ch == '\n' || ch == '\r'))
+				break;
+			if (s < eob)
+				*s++ = ch;
+		}
+		*s = '\0';
+		if (*line && *line != ';' && *line != '#') {
 			/* Skip lines starting with semicolon or pound.
-			   It probably wouldn't cause any harm to not skip
-			     them but there's no need to save them. */
+			 * It probably wouldn't cause any harm to not skip
+			 * them but there's no need to save them. */
 			add_exclude_list(line,&list,include);
 		}
+		if (cnt <= 0)
+			break;
 	}
-	fclose(f);
+	close(fd);
 	return list;
 }
 
