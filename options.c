@@ -290,11 +290,11 @@ void usage(enum logcode F)
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth, KBytes per second\n");
   rprintf(F,"     --write-batch=PREFIX    write batch fileset starting with PREFIX\n");
   rprintf(F,"     --read-batch=PREFIX     read batch fileset starting with PREFIX\n");
-  rprintf(F," -h, --help                  show this help screen\n");
 #ifdef INET6
-  rprintf(F," -4                          prefer IPv4\n");
-  rprintf(F," -6                          prefer IPv6\n");
+  rprintf(F," -4  --ipv4                  prefer IPv4\n");
+  rprintf(F," -6  --ipv6                  prefer IPv6\n");
 #endif
+  rprintf(F," -h, --help                  show this help screen\n");
 
   rprintf(F,"\n");
 
@@ -312,8 +312,8 @@ static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
   {"version",          0,  POPT_ARG_NONE,   0,              OPT_VERSION, 0, 0},
   {"suffix",           0,  POPT_ARG_STRING, &backup_suffix, 0, 0, 0 },
-  {"rsync-path",       0,  POPT_ARG_STRING, &rsync_path,	0, 0, 0 },
-  {"password-file",    0,  POPT_ARG_STRING, &password_file,	0, 0, 0 },
+  {"rsync-path",       0,  POPT_ARG_STRING, &rsync_path, 0, 0, 0 },
+  {"password-file",    0,  POPT_ARG_STRING, &password_file, 0, 0, 0 },
   {"ignore-times",    'I', POPT_ARG_NONE,   &ignore_times, 0, 0, 0 },
   {"size-only",        0,  POPT_ARG_NONE,   &size_only, 0, 0, 0 },
   {"modify-window",    0,  POPT_ARG_INT,    &modify_window, OPT_MODIFY_WINDOW, 0, 0 },
@@ -387,8 +387,8 @@ static struct poptOption long_options[] = {
   {"no-implied-dirs",  0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
 #ifdef INET6
-  {0,		      '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
-  {0,		      '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
+  {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
+  {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
 #endif
   {0,0,0,0, 0, 0, 0}
 };
