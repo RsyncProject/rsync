@@ -141,13 +141,13 @@ static void list_file_entry(struct file_struct *f)
 	if (preserve_links && S_ISLNK(f->mode)) {
 		rprintf(FINFO, "%s %11.0f %s %s -> %s\n",
 			perms,
-			(double) f->length, timestring(f->modtime),
+			(double)f->length, timestring(f->modtime),
 			f_name(f), f->u.link);
 	} else
 #endif
 		rprintf(FINFO, "%s %11.0f %s %s\n",
 			perms,
-			(double) f->length, timestring(f->modtime),
+			(double)f->length, timestring(f->modtime),
 			f_name(f));
 }
 
@@ -174,7 +174,7 @@ int readlink_stat(const char *path, STRUCT_STAT *buffer, char *linkbuf)
 	if (do_lstat(path, buffer) == -1)
 		return -1;
 	if (S_ISLNK(buffer->st_mode)) {
-		int l = readlink((char *) path, linkbuf, MAXPATHLEN - 1);
+		int l = readlink((char *)path, linkbuf, MAXPATHLEN - 1);
 		if (l == -1)
 			return -1;
 		linkbuf[l] = 0;
@@ -192,7 +192,7 @@ int readlink_stat(const char *path, STRUCT_STAT *buffer, char *linkbuf)
 #endif
 }
 
-int link_stat(const char *path, STRUCT_STAT * buffer)
+int link_stat(const char *path, STRUCT_STAT *buffer)
 {
 #if SUPPORT_LINKS
 	if (copy_links)
@@ -259,14 +259,14 @@ static int to_wire_mode(mode_t mode)
 	if (S_ISLNK(mode) && (_S_IFLNK != 0120000))
 		return (mode & ~(_S_IFMT)) | 0120000;
 #endif
-	return (int) mode;
+	return (int)mode;
 }
 
 static mode_t from_wire_mode(int mode)
 {
 	if ((mode & (_S_IFMT)) == 0120000 && (_S_IFLNK != 0120000))
 		return (mode & ~(_S_IFMT)) | _S_IFLNK;
-	return (mode_t) mode;
+	return (mode_t)mode;
 }
 
 
@@ -307,7 +307,7 @@ void flist_expand(struct file_list *flist)
 	if (verbose >= 2) {
 		rprintf(FINFO, "[%s] expand file_list to %.0f bytes, did%s move\n",
 		    who_am_i(),
-		    (double) sizeof flist->files[0] * flist->malloced,
+		    (double)sizeof flist->files[0] * flist->malloced,
 		    (new_ptr == flist->files) ? " not" : "");
 	}
 
@@ -757,22 +757,25 @@ struct file_struct *make_file(char *fname,
 
 	if (readlink_stat(thisname, &st, linkname) != 0) {
 		int save_errno = errno;
-		if (errno == ENOENT) {
-			enum logcode c = am_daemon && protocol_version < 28
-			    ? FERROR : FINFO;
-			/* either symlink pointing nowhere or file that
-			 * was removed during rsync run; see if excluded
-			 * before reporting an error */
-			if (exclude_level != NO_EXCLUDES
-			    && check_exclude_file(thisname, 0, exclude_level)) {
-				/* file is excluded anyway, ignore silently */
-				return NULL;
+		/* See if file is excluded before reporting an error. */
+		if (exclude_level != NO_EXCLUDES
+		    && check_exclude_file(thisname, 0, exclude_level))
+			return NULL;
+		if (save_errno == ENOENT) {
+			/* Avoid "vanished" error if symlink points nowhere. */
+			if (copy_links && do_lstat(thisname, &st) == 0
+			    && S_ISLNK(st.st_mode)) {
+				io_error |= IOERR_GENERAL;
+				rprintf(FERROR, "symlink has no referent: %s\n",
+					full_fname(thisname));
+			} else {
+				enum logcode c = am_daemon && protocol_version < 28
+				    ? FERROR : FINFO;
+				io_error |= IOERR_VANISHED;
+				rprintf(c, "file has vanished: %s\n",
+					full_fname(thisname));
 			}
-			io_error |= IOERR_VANISHED;
-			rprintf(c, "file has vanished: %s\n",
-			    full_fname(thisname));
-		}
-		else {
+		} else {
 			io_error |= IOERR_GENERAL;
 			rsyserr(FERROR, save_errno, "readlink %s failed",
 				full_fname(thisname));
@@ -1420,7 +1423,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 		return;
 
 	qsort(flist->files, flist->count,
-	    sizeof flist->files[0], (int (*)()) file_compare);
+	    sizeof flist->files[0], (int (*)())file_compare);
 
 	for (i = no_dups? 0 : flist->count; i < flist->count; i++) {
 		if (flist->files[i]->basename) {
@@ -1486,8 +1489,8 @@ static void output_flist(struct file_list *flist)
 			*gidbuf = '\0';
 		rprintf(FINFO, "[%s] i=%d %s %s %s mode=0%o len=%.0f%s%s\n",
 			who_am_i(), i, NS(file->basedir), NS(file->dirname),
-			NS(file->basename), (int) file->mode,
-			(double) file->length, uidbuf, gidbuf);
+			NS(file->basename), (int)file->mode,
+			(double)file->length, uidbuf, gidbuf);
 	}
 }
 
