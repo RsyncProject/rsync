@@ -513,7 +513,8 @@ int daemon_main(void)
 		RSYNC_VERSION,
                 rsync_port);
         /* TODO: If listening on a particular address, then show that
-         * address too. */
+         * address too.  In fact, why not just do inet_ntop on the
+         * local address??? */
 
 	if (((pid_file = lp_pid_file()) != NULL) && (*pid_file != '\0')) {
 		char pidbuf[16];
