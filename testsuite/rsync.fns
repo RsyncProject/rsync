@@ -24,6 +24,9 @@ TO=${TMP}/to
 LOG=${TMP}/log
 RSYNC="$rsync_bin"
 
+# Berkley's nice.
+PATH="$PATH:/usr/ucb/bin"
+
 runtest() {
     echo $ECHO_N "Test $1: $ECHO_C"
     if eval "$2"
