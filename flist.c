@@ -185,12 +185,18 @@ int link_stat(const char *Path, STRUCT_STAT *Buffer)
   This function is used to check if a file should be included/excluded
   from the list of files based on its name and type etc
  */
-static int match_file_name(char *fname,STRUCT_STAT *st)
+static int check_exclude_file(int f,char *fname,STRUCT_STAT *st)
 {
-  if (check_exclude(fname,local_exclude_list,st)) {
-    return 0;
-  }
-  return 1;
+	extern int delete_excluded;
+
+	/* f is set to -1 when calculating deletion file list */
+	if ((f == -1) && delete_excluded) {
+		return 0;
+	}
+	if (check_exclude(fname,local_exclude_list,st)) {
+		return 1;
+	}
+	return 0;
 }
 
 /* used by the one_file_system code */
@@ -479,7 +485,6 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 	char *p;
 	char cleaned_name[MAXPATHLEN];
 	char linkbuf[MAXPATHLEN];
-	extern int delete_excluded;
 	extern int module_id;
 
 	strlcpy(cleaned_name, fname, MAXPATHLEN);
@@ -490,17 +495,21 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 	}
 	fname = cleaned_name;
 
-	/* f is set to -1 when calculating deletion file list */
-	if (((f != -1) || !delete_excluded) && !noexcludes && !match_file_name(fname,&st))
-		return NULL;
-
-
 	memset(sum,0,SUM_LENGTH);
 
 	if (readlink_stat(fname,&st,linkbuf) != 0) {
+		int save_errno = errno;
+		if ((errno == ENOENT) && copy_links && !noexcludes) {
+			/* symlink pointing nowhere, see if excluded */
+			memset((char *)&st, 0, sizeof(st));
+			if (check_exclude_file(f,fname,&st)) {
+				/* file is excluded anyway, ignore silently */
+				return NULL;
+			}
+		}
 		io_error = 1;
 		rprintf(FERROR,"readlink %s: %s\n",
-			fname,strerror(errno));
+			fname,strerror(save_errno));
 		return NULL;
 	}
 
@@ -517,6 +526,9 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 			return NULL;
 	}
 	
+	if (check_exclude_file(f,fname,&st))
+		return NULL;
+
 
 	if (lp_ignore_nonreadable(module_id) && access(fname, R_OK) != 0) 
 		return NULL;
