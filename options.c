@@ -48,6 +48,7 @@ int preserve_devices = 0;
 int preserve_uid = 0;
 int preserve_gid = 0;
 int preserve_times = 0;
+int omit_dir_times = 0;
 int update_only = 0;
 int cvs_exclude = 0;
 int dry_run = 0;
@@ -263,6 +264,7 @@ void usage(enum logcode F)
   rprintf(F," -g, --group                 preserve group\n");
   rprintf(F," -D, --devices               preserve devices (root only)\n");
   rprintf(F," -t, --times                 preserve times\n");
+  rprintf(F," -O, --omit-dir-times        omit directories when preserving times\n");
   rprintf(F," -S, --sparse                handle sparse files efficiently\n");
   rprintf(F," -n, --dry-run               show what would have been transferred\n");
   rprintf(F," -W, --whole-file            copy whole files, no incremental checks\n");
@@ -370,6 +372,7 @@ static struct poptOption long_options[] = {
   {"group",           'g', POPT_ARG_NONE,   &preserve_gid, 0, 0, 0 },
   {"devices",         'D', POPT_ARG_NONE,   &preserve_devices, 0, 0, 0 },
   {"times",           't', POPT_ARG_NONE,   &preserve_times, 0, 0, 0 },
+  {"omit-dir-times",  'O', POPT_ARG_NONE,   &omit_dir_times, 0, 0, 0 },
   {"checksum",        'c', POPT_ARG_NONE,   &always_checksum, 0, 0, 0 },
   {"verbose",         'v', POPT_ARG_NONE,   0, 'v', 0, 0 },
   {"quiet",           'q', POPT_ARG_NONE,   0, 'q', 0, 0 },
@@ -1082,6 +1085,8 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'D';
 	if (preserve_times)
 		argstr[x++] = 't';
+	if (omit_dir_times && am_sender)
+		argstr[x++] = 'O';
 	if (preserve_perms)
 		argstr[x++] = 'p';
 	if (recurse < 0)
