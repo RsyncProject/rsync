@@ -24,6 +24,7 @@
 extern int io_error;
 extern int keep_partial;
 extern int log_got_error;
+extern char *partial_dir;
 
 /**
  * Close all open sockets and files, allowing a (somewhat) graceful
@@ -121,7 +122,8 @@ void _exit_cleanup(int code, const char *file, int line)
 			flush_write_file(cleanup_fd_w);
 			close(cleanup_fd_w);
 		}
-		finish_transfer(cleanup_new_fname, fname, cleanup_file, 0);
+		finish_transfer(cleanup_new_fname, fname, cleanup_file, 0,
+				!partial_dir);
 	}
 	io_flush(FULL_FLUSH);
 	if (cleanup_fname)
