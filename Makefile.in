@@ -23,6 +23,7 @@ VERSION=@VERSION@
 .SUFFIXES: .c .o
 
 LIBOBJ=lib/fnmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o \
+	lib/permstring.o \
 	@LIBOBJS@
 ZLIBOBJ=zlib/deflate.o zlib/infblock.o zlib/infcodes.o zlib/inffast.o \
 	zlib/inflate.o zlib/inftrees.o zlib/infutil.o zlib/trees.o \
@@ -34,7 +35,7 @@ popt_OBJS=popt/findme.o  popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o
 OBJS=$(OBJS1) $(OBJS2) $(DAEMON_OBJ) $(LIBOBJ) $(ZLIBOBJ) @BUILD_POPT@
 
-tls_OBJ = tls.o syscall.o 
+tls_OBJ = tls.o syscall.o lib/permstring.o 
 
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync tls
@@ -83,18 +84,12 @@ proto:
 	cat *.c lib/compat.c | awk -f mkproto.awk > proto.h
 
 clean:
-	rm -f *~ $(OBJS) rsync 
+	rm -f *~ $(OBJS) rsync $(TLS_OBJ) tls
 	rm -rf ./testtmp
-	rm -f config.h config.cache config.status
+	rm -f config.cache 
 
 distclean: clean
-	rm -f Makefile
-
-# missing functions
-getaddrinfo.o:	lib/getaddrinfo.c
-	$(CC) -I. -I$(srcdir) -I$(srcdir)/lib $(CFLAGS) -c lib/getaddrinfo.c
-getnameinfo.o:	lib/getnameinfo.c
-	$(CC) -I. -I$(srcdir) -I$(srcdir)/lib $(CFLAGS) -c lib/getnameinfo.c
+	rm -f Makefile config.h config.status
 
 # this target is really just for my use. It only works on a limited
 # range of machines and is used to produce a list of potentially
