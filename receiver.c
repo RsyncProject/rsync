@@ -35,6 +35,7 @@ extern int io_error;
 extern char *tmpdir;
 extern char *compare_dest;
 extern int make_backups;
+extern int do_progress;
 extern char *backup_suffix;
 
 static struct delete_list {
@@ -244,8 +245,8 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 	sum_init();
 	
 	for (i=recv_token(f_in,&data); i != 0; i=recv_token(f_in,&data)) {
-
-		show_progress(offset, total_size);
+		if (do_progress)
+			show_progress(offset, total_size);
 
 		if (i > 0) {
 			extern int cleanup_got_literal;
@@ -295,7 +296,8 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 		offset += len;
 	}
 
-	end_progress(total_size);
+	if (do_progress)
+		end_progress(total_size);
 
 	if (fd != -1 && offset > 0 && sparse_end(fd) != 0) {
 		rprintf(FERROR,"write failed on %s : %s\n",
