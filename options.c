@@ -142,7 +142,6 @@ char *backup_dir = NULL;
 char backup_dir_buf[MAXPATHLEN];
 int rsync_port = 0;
 int compare_dest = 0;
-int copy_dest = 0;
 int link_dest = 0;
 int basis_dir_cnt = 0;
 
@@ -317,7 +316,6 @@ void usage(enum logcode F)
   rprintf(F," -T, --temp-dir=DIR          create temporary files in directory DIR\n");
   rprintf(F," -y, --fuzzy                 find similar file for basis if no dest file\n");
   rprintf(F,"     --compare-dest=DIR      also compare destination files relative to DIR\n");
-  rprintf(F,"     --copy-dest=DIR         ... and include copies of unchanged files\n");
   rprintf(F,"     --link-dest=DIR         hardlink to files in DIR when unchanged\n");
   rprintf(F," -z, --compress              compress file data during the transfer\n");
   rprintf(F," -C, --cvs-exclude           auto-ignore files the same way CVS does\n");
@@ -356,7 +354,7 @@ void usage(enum logcode F)
 }
 
 enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
-      OPT_FILTER, OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST,
+      OPT_FILTER, OPT_COMPARE_DEST, OPT_LINK_DEST,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_TIMEOUT, OPT_MAX_SIZE,
       OPT_REFUSED_BASE = 9000};
@@ -425,7 +423,6 @@ static struct poptOption long_options[] = {
   {"timeout",          0,  POPT_ARG_INT,    &io_timeout, OPT_TIMEOUT, 0, 0 },
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir, 0, 0, 0 },
   {"compare-dest",     0,  POPT_ARG_STRING, 0, OPT_COMPARE_DEST, 0, 0 },
-  {"copy-dest",        0,  POPT_ARG_STRING, 0, OPT_COPY_DEST, 0, 0 },
   {"link-dest",        0,  POPT_ARG_STRING, 0, OPT_LINK_DEST, 0, 0 },
   {"fuzzy",           'y', POPT_ARG_NONE,   &fuzzy_basis, 0, 0, 0 },
   /* TODO: Should this take an optional int giving the compression level? */
@@ -839,11 +836,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			return 0;
 #endif
 
-		case OPT_COPY_DEST:
-			copy_dest = 1;
-			dest_option = "--copy-dest";
-			goto set_dest_dir;
-
 		case OPT_COMPARE_DEST:
 			compare_dest = 1;
 			dest_option = "--compare-dest";
@@ -937,9 +929,9 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		return 0;
 	}
 
-	if (compare_dest + copy_dest + link_dest > 1) {
+	if (compare_dest + link_dest > 1) {
 		snprintf(err_buf, sizeof err_buf,
-			"You may not mix --compare-dest, --copy-dest, and --link-dest.\n");
+			"You may not mix --compare-dest and --link-dest.\n");
 		return 0;
 	}
 
