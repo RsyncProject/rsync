@@ -210,6 +210,10 @@ static int open_socket_in(int type, int port, struct in_addr *address)
 	if (bind(res, (struct sockaddr * ) &sock,sizeof(sock)) == -1) { 
 		rprintf(FERROR,"bind failed on port %d: %s\n", port,
 			strerror(errno));
+		if (errno == EACCES && port < 1024) {
+			rprintf(FERROR, "Note: you must be root to bind "
+				"to low-numbered ports");
+		}
 		close(res); 
 		return -1;
 	}
