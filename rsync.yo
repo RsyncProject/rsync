@@ -255,6 +255,7 @@ Options
      --numeric-ids           don't map uid/gid values by user/group name
      --timeout=TIME          set IO timeout in seconds
  -I, --ignore-times          don't exclude files that match length and time
+     --size-only             only use file size when determining if a file should be transferred
  -T  --temp-dir=DIR          create temporary files in directory DIR
      --compare-dest=DIR      also compare destination files relative to DIR
  -z, --compress              compress file data
@@ -303,6 +304,13 @@ cron.
 dit(bf(-I, --ignore-times)) Normally rsync will skip any files that are
 already the same length and have the same time-stamp. This option turns
 off this behavior.
+
+dit(bf(-I, --size-only)) Normally rsync will skip any files that are
+already the same length and have the same time-stamp. With the
+--size-only option files will be skipped if they have the same size,
+regardless of timestamp. This is useful when starting to use rsync
+after using another mirroring system which may not preserve timestamps
+exactly.
 
 dit(bf(-c, --checksum)) This forces the sender to checksum all files using
 a 128-bit MD4 checksum before transfer. The checksum is then

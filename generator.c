@@ -31,6 +31,7 @@ extern int whole_file;
 extern int block_size;
 extern int csum_length;
 extern int ignore_times;
+extern int size_only;
 extern int io_timeout;
 extern int remote_version;
 extern int always_checksum;
@@ -50,6 +51,10 @@ static int skip_file(char *fname,
 		char sum[MD4_SUM_LENGTH];
 		file_checksum(fname,sum,st->st_size);
 		return (memcmp(sum,file->sum,csum_length) == 0);
+	}
+
+	if (size_only) {
+		return 1;
 	}
 
 	if (ignore_times) {

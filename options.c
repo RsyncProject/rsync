@@ -61,6 +61,7 @@ int keep_partial=0;
 int safe_symlinks=0;
 int copy_unsafe_links=0;
 int block_size=BLOCK_SIZE;
+int size_only=0;
 
 char *backup_suffix = BACKUP_SUFFIX;
 char *tmpdir = NULL;
@@ -127,6 +128,7 @@ void usage(int F)
   rprintf(F,"     --numeric-ids           don't map uid/gid values by user/group name\n");
   rprintf(F,"     --timeout=TIME          set IO timeout in seconds\n");
   rprintf(F," -I, --ignore-times          don't exclude files that match length and time\n");
+  rprintf(F,"     --size-only             only use file size when determining if a file should be transferred\n");
   rprintf(F," -T  --temp-dir=DIR          create temporary files in directory DIR\n");
   rprintf(F,"     --compare-dest=DIR      also compare destination files relative to DIR\n");
   rprintf(F," -z, --compress              compress file data\n");
@@ -155,7 +157,7 @@ enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
       OPT_FORCE,OPT_TIMEOUT,OPT_DAEMON,OPT_CONFIG,OPT_PORT,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS,
       OPT_COPY_UNSAFE_LINKS, OPT_SAFE_LINKS, OPT_COMPARE_DEST,
-      OPT_LOG_FORMAT, OPT_PASSWORD_FILE};
+      OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY};
 
 static char *short_options = "oblLWHpguDCtcahvqrRIxnSe:B:T:z";
 
@@ -174,6 +176,7 @@ static struct option long_options[] = {
   {"password-file", 1,	0,     OPT_PASSWORD_FILE},
   {"one-file-system",0,  0,    'x'},
   {"ignore-times",0,     0,    'I'},
+  {"size-only",   0,     0,    OPT_SIZE_ONLY},
   {"help",        0,     0,    'h'},
   {"dry-run",     0,     0,    'n'},
   {"sparse",      0,     0,    'S'},
@@ -289,8 +292,13 @@ int parse_arguments(int argc, char *argv[], int frommain)
 		case OPT_PASSWORD_FILE:
 			password_file =optarg;
 			break;		
+
 		case 'I':
 			ignore_times = 1;
+			break;
+
+		case OPT_SIZE_ONLY:
+			size_only = 1;
 			break;
 
 		case 'x':
@@ -585,6 +593,9 @@ void server_options(char **args,int *argc)
 
 	if (delete_mode)
 		args[ac++] = "--delete";
+
+	if (size_only)
+		args[ac++] = "--size-only";
 
 	if (keep_partial)
 		args[ac++] = "--partial";
