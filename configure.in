@@ -52,20 +52,38 @@ AC_FUNC_MEMCMP
 AC_FUNC_UTIME_NULL
 AC_CHECK_FUNCS(waitpid wait4 getcwd strdup strerror chown chmod mknod)
 AC_CHECK_FUNCS(fchmod fstat strchr readlink link utime utimes strftime)
-AC_CHECK_FUNCS(memmove getopt_long lchown vsnprintf snprintf setsid glob strpbrk)
+AC_CHECK_FUNCS(memmove lchown vsnprintf snprintf setsid glob strpbrk)
 AC_CHECK_FUNCS(strlcat strlcpy)
 
-echo $ac_n "checking for working fnmatch... $ac_c"
+AC_CACHE_CHECK([for working fnmatch],rsync_cv_HAVE_FNMATCH,[
 AC_TRY_RUN([#include <fnmatch.h>
 main() { exit(fnmatch("*.o", "x.o", FNM_PATHNAME) == 0? 0: 1); }],
-echo yes;AC_DEFINE(HAVE_FNMATCH), 
-echo no)
+rsync_cv_HAVE_FNMATCH=yes,rsync_cv_HAVE_FNMATCH=no,rsync_cv_HAVE_FNMATCH=cross)])
+if test x"$rsync_cv_HAVE_FNMATCH" = x"yes"; then
+    AC_DEFINE(HAVE_FNMATCH)
+fi
 
-AC_CACHE_CHECK([for long long],rsync_cv_have_longlong,[
+# sometimes getopt_long cannot parse same arguments twice
+# e.g. on certain versions of CygWin32
+AC_CACHE_CHECK([for working getopt_long],rsync_cv_HAVE_GETOPT_LONG,[
+AC_TRY_RUN([#include <getopt.h>
+main() {
+    int i, x = 0; char *argv[] = { "x", "--xx" };
+    struct option o[] = {{"xx", 0, 0, 1}, {0,0,0,0}};
+    getopt_long(2, argv, "x", o, &i) == 1 ? x++ : 0; optind = 0;
+    getopt_long(2, argv, "x", o, &i) == 1 ? x++ : 0;
+    exit(x == 2 ? 0 : 1);
+}], rsync_cv_HAVE_GETOPT_LONG=yes,rsync_cv_HAVE_GETOPT_LONG=no,
+    rsync_cv_HAVE_GETOPT_LONG=cross)])
+if test x"$rsync_cv_HAVE_GETOPT_LONG" = x"yes"; then
+    AC_DEFINE(HAVE_GETOPT_LONG)
+fi
+
+AC_CACHE_CHECK([for long long],rsync_cv_HAVE_LONGLONG,[
 AC_TRY_RUN([#include <stdio.h>
 main() { long long x = 1000000; x *= x; exit(((x/1000000) == 1000000)? 0: 1); }],
-rsync_cv_have_longlong=yes,rsync_cv_have_longlong=no,rsync_cv_have_longlong=cross)])
-if test x"$rsync_cv_have_longlong" = x"yes"; then
+rsync_cv_HAVE_LONGLONG=yes,rsync_cv_HAVE_LONGLONG=no,rsync_cv_HAVE_LONGLONG=cross)])
+if test x"$rsync_cv_HAVE_LONGLONG" = x"yes"; then
     AC_DEFINE(HAVE_LONGLONG)
 fi
 
@@ -78,13 +96,15 @@ if test x"$rsync_cv_HAVE_OFF64_T" = x"yes"; then
     AC_DEFINE(HAVE_OFF64_T)
 fi
 
-echo $ac_n "checking for short ino_t ... $ac_c"
+AC_CACHE_CHECK([for short ino_t],rsync_cv_HAVE_SHORT_INO_T,[
 AC_TRY_RUN([#include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 main() { if (sizeof(ino_t) < sizeof(unsigned int)) return 0; return 1; }],
-echo yes;AC_DEFINE(HAVE_SHORT_INO_T), 
-echo no)
+rsync_cv_HAVE_SHORT_INO_T=yes,rsync_cv_HAVE_SHORT_INO_T=no,rsync_cv_HAVE_SHORT_INO_T=cross)])
+if test x"$rsync_cv_HAVE_SHORT_INO_T" = x"yes"; then
+    AC_DEFINE(HAVE_SHORT_INO_T)
+fi
 
 AC_CACHE_CHECK([for unsigned char],rsync_cv_HAVE_UNSIGNED_CHAR,[
 AC_TRY_RUN([#include <stdio.h>
@@ -174,24 +194,29 @@ fi
 #
 # The following test was mostly taken from the tcl/tk plus patches
 #
-echo $ac_n "checking whether -c -o works ... $ac_c"
+AC_CACHE_CHECK([whether -c -o works],rsync_cv_DASHC_WORKS_WITH_DASHO,[
 rm -rf conftest*
 cat > conftest.$ac_ext <<EOF
 int main() { return 0; }
 EOF
 ${CC-cc} -c -o conftest..o conftest.$ac_ext
 if test -f conftest..o; then
+    rsync_cv_DASHC_WORKS_WITH_DASHO=yes
+else
+    rsync_cv_DASHC_WORKS_WITH_DASHO=no
+fi
+rm -rf conftest*
+])
+if test x"$rsync_cv_DASHC_WORKS_WITH_DASHO" = x"yes"; then
     OBJ_SAVE="#"
     OBJ_RESTORE="#"
     CC_SHOBJ_FLAG='-o $@'
-    echo yes
 else
     OBJ_SAVE='	@b=`basename $@ .o`;rm -f $$b.o.sav;if test -f $$b.o; then mv $$b.o $$b.o.sav;fi;'
     OBJ_RESTORE='	@b=`basename $@ .o`;if test "$$b.o" != "$@"; then mv $$b.o $@; if test -f $$b.o.sav; then mv $$b.o.sav $$b.o; fi; fi'
     CC_SHOBJ_FLAG=""
-    echo no
 fi
-rm -rf conftest*
+
 AC_SUBST(OBJ_SAVE)
 AC_SUBST(OBJ_RESTORE)
 AC_SUBST(CC_SHOBJ_FLAG)
