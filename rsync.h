@@ -433,6 +433,7 @@ struct file_struct {
  */
 #define FLIST_START	(32 * 1024)
 #define FLIST_LINEAR	(FLIST_START * 512)
+
 /*
  * Extent size for allocation pools A minimum size of 128KB
  * is needed to mmap them so that freeing will release the
@@ -442,7 +443,6 @@ struct file_struct {
  * (when they happen) Smaller sizes increase the chance of
  * freed allocations freeing whole extents.
  */
-
 #define FILE_EXTENT	(256 * 1024)
 #define HLINK_EXTENT	(128 * 1024)
 
