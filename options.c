@@ -23,7 +23,7 @@
 
 extern int sanitize_paths;
 extern char curr_dir[MAXPATHLEN];
-extern struct exclude_struct **exclude_list;
+extern struct exclude_list_struct exclude_list;
 
 int make_backups = 0;
 

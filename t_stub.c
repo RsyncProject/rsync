@@ -28,7 +28,7 @@
 
 int modify_window = 0;
 int module_id = -1;
-struct exclude_struct **server_exclude_list;
+struct exclude_list_struct server_exclude_list;
 
  void rprintf(UNUSED(enum logcode code), const char *format, ...)
 {
@@ -45,7 +45,7 @@ struct exclude_struct **server_exclude_list;
 	exit(code);
 }
 
- int check_exclude(UNUSED(struct exclude_struct **list), UNUSED(char *name),
+ int check_exclude(UNUSED(struct exclude_list_struct *listp), UNUSED(char *name),
 		   UNUSED(int name_is_dir), UNUSED(const char *type))
 {
 	/* This function doesn't really get called in this test context, so

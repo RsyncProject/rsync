@@ -64,9 +64,9 @@ extern int sanitize_paths;
 extern int read_batch;
 extern int write_batch;
 
-extern struct exclude_struct **exclude_list;
-extern struct exclude_struct **server_exclude_list;
-extern struct exclude_struct **local_exclude_list;
+extern struct exclude_list_struct exclude_list;
+extern struct exclude_list_struct server_exclude_list;
+extern struct exclude_list_struct local_exclude_list;
 
 int io_error;
 
@@ -226,18 +226,18 @@ static int check_exclude_file(char *fname, int is_dir, int exclude_level)
 				return 0;
 		}
 	}
-	if (server_exclude_list
-	 && check_exclude(server_exclude_list, fname, is_dir,
-	    "server pattern"))
+	if (server_exclude_list.head
+	 && check_exclude(&server_exclude_list, fname, is_dir,
+			  "server pattern"))
 		return 1;
 	if (exclude_level != ALL_EXCLUDES)
 		return 0;
-	if (exclude_list && check_exclude(exclude_list, fname, is_dir,
-	    "pattern"))
+	if (exclude_list.head
+	    && check_exclude(&exclude_list, fname, is_dir, "pattern"))
 		return 1;
-	if (local_exclude_list
-	 && check_exclude(local_exclude_list, fname, is_dir,
-	    "local-cvsignore"))
+	if (local_exclude_list.head
+	    && check_exclude(&local_exclude_list, fname, is_dir,
+			     "local-cvsignore"))
 		return 1;
 	return 0;
 }
@@ -956,10 +956,11 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 
 	if (recursive && S_ISDIR(file->mode)
 	    && !(file->flags & FLAG_MOUNT_POINT)) {
-		struct exclude_struct **last_exclude_list = local_exclude_list;
+		struct exclude_list_struct last_list = local_exclude_list;
+		memset(&local_exclude_list, 0, sizeof local_exclude_list);
 		send_directory(f, flist, f_name_to(file, fbuf));
-		local_exclude_list = last_exclude_list;
-		return;
+		free_exclude_list(&local_exclude_list);
+		local_exclude_list = last_list;
 	}
 }
 
@@ -994,8 +995,6 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 		offset++;
 	}
 
-	local_exclude_list = NULL;
-
 	if (cvs_exclude) {
 		if (strlcpy(p, ".cvsignore", MAXPATHLEN - offset)
 		    < MAXPATHLEN - offset) {
@@ -1028,9 +1027,6 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 		rprintf(FERROR, "readdir(%s): (%d) %s\n",
 			dir, errno, strerror(errno));
 	}
-
-	if (local_exclude_list)
-		free_exclude_list(&local_exclude_list); /* Zeros pointer too */
 
 	closedir(d);
 }

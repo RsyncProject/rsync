@@ -28,6 +28,7 @@
 #include "rsync.h"
 
 extern int verbose;
+extern struct exclude_list_struct server_exclude_list;
 
 int sanitize_paths = 0;
 
@@ -471,12 +472,11 @@ int lock_range(int fd, int offset, int len)
 static int exclude_server_path(char *arg)
 {
 	char *s;
-	extern struct exclude_struct **server_exclude_list;
 
-	if (server_exclude_list) {
+	if (server_exclude_list.head) {
 		for (s = arg; (s = strchr(s, '/')) != NULL; ) {
 			*s = '\0';
-			if (check_exclude(server_exclude_list, arg, 1,
+			if (check_exclude(&server_exclude_list, arg, 1,
 			    "server pattern")) {
 				/* We must leave arg truncated! */
 				return 1;
