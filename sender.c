@@ -128,8 +128,10 @@ void successful_send(int ndx)
 /* This is also used by receive.c with f_out = -1. */
 int read_iflags(int f_in, int f_out, int ndx, char *buf)
 {
+	int len;
 	int iflags = protocol_version >= 29 ? read_shortint(f_in)
-		   : ITEM_UPDATING | ITEM_MISSING_DATA;
+		   : ITEM_TRANSFER | ITEM_MISSING_DATA;
+	int isave = iflags; /* XXX remove soon */
 
 	/* Handle the new keep-alive (no-op) packet. */
 	if (ndx == the_file_list->count && iflags == ITEM_IS_NEW)
@@ -144,11 +146,32 @@ int read_iflags(int f_in, int f_out, int ndx, char *buf)
 		exit_cleanup(RERR_PROTOCOL);
 	}
 
-	*buf = '\0';
+	if (iflags & ITEM_HARD_LINKED)
+		len = read_vstring(f_in, buf, MAXPATHLEN);
+	else {
+		*buf = '\0';
+		len = -1;
+	}
 
-	if ((!(iflags & ITEM_UPDATING) || !S_ISREG(the_file_list->files[ndx]->mode)) && f_out >= 0) {
+	/* XXX Temporary backward compatibility when talking to 2.6.4pre[12] */
+	if (protocol_version >= 29 && iflags & ITEM_TRANSFER
+	    && !S_ISREG(the_file_list->files[ndx]->mode)) {
+		iflags &= ~ITEM_TRANSFER;
+		iflags |= ITEM_LOCAL_CHANGE;
+	}
+
+	if (iflags & ITEM_TRANSFER) {
+		if (!S_ISREG(the_file_list->files[ndx]->mode)) {
+			rprintf(FERROR,
+				"received index of non-regular file: %d [%s]\n",
+				ndx, who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
+		}
+	} else if (f_out >= 0) {
 		write_int(f_out, ndx);
-		write_shortint(f_out, iflags);
+		write_shortint(f_out, isave /*XXX iflags */);
+		if (len >= 0)
+			write_vstring(f_out, buf, len);
 	}
 
 	return iflags;
@@ -210,7 +233,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		if (verbose > 2)
 			rprintf(FINFO, "send_files(%d, %s)\n", i, fname);
 
-		if (!(iflags & ITEM_UPDATING) || !S_ISREG(file->mode)) {
+		if (!(iflags & ITEM_TRANSFER)) {
 			maybe_log_item(file, iflags, itemizing, fnametmp);
 			continue;
 		}
@@ -219,12 +242,6 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			updating_basis_file = !(iflags & ITEM_USING_ALT_BASIS);
 		} else
 			updating_basis_file = inplace && !make_backups;
-
-		if (!S_ISREG(file->mode)) {
-			rprintf(FERROR, "[%s] got index of non-regular file: %d\n",
-				who_am_i(), i);
-			exit_cleanup(RERR_PROTOCOL);
-		}
 
 		stats.current_file_index = i;
 		stats.num_transferred_files++;
