@@ -635,6 +635,12 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 #endif
 
+	if (block_size > MAX_MAP_SIZE) {
+		rprintf(FINFO, "limiting block-size to %d bytes\n",
+			MAX_MAP_SIZE);
+		block_size = MAX_MAP_SIZE;
+	}
+
 	if (write_batch && read_batch) {
 		rprintf(FERROR,
 			"write-batch and read-batch can not be used together\n");
