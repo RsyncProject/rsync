@@ -492,6 +492,11 @@ int main(int argc,char *argv[])
 	argv += optind;
 	optind = 0;
 
+	if (argc < 1) {
+		usage(FERROR);
+		exit(1);
+	}
+
 	signal(SIGCHLD,SIG_IGN);
 	signal(SIGINT,SIGNAL_CAST sig_int);
 	signal(SIGPIPE,SIGNAL_CAST sig_int);
