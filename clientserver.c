@@ -52,7 +52,8 @@ extern char *files_from;
 
 char *auth_user;
 int read_only = 0;
-int itemize_daemon_changes = 0;
+int daemon_log_format_has_i = 0;
+int daemon_log_format_has_o_or_i = 0;
 int module_id = -1;
 
 /* Length of lp_path() string when in daemon mode & not chrooted, else 0. */
@@ -284,8 +285,13 @@ static int rsync_module(int f_in, int f_out, int i)
 	if (lp_read_only(i))
 		read_only = 1;
 
-	if (lp_transfer_logging(i) && strstr(lp_log_format(i), "%i") != NULL)
-		itemize_daemon_changes = 1;
+	if (lp_transfer_logging(i)) {
+		if (strstr(lp_log_format(i), "%i") != NULL)
+			daemon_log_format_has_i = 1;
+		if (daemon_log_format_has_i
+		    || strstr(lp_log_format(i), "%o") != NULL)
+			daemon_log_format_has_o_or_i = 1;
+	}
 
 	am_root = (MY_UID() == 0);
 
