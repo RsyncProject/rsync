@@ -1,14 +1,15 @@
-testtmp.*
 ID
 Makefile
 config.cache
 config.h
 config.log
 config.status
+gmon.out
 rsync
 shconfig
 testdir
 tests-dont-exist
 testtmp
+testtmp.*
 tls
 zlib/dummy
