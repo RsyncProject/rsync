@@ -58,6 +58,11 @@
 /* What flags above are relevant after the transfer of the flist? */
 #define LIVE_FLAGS FLAG_DELETE
 
+/* These flist flags can be set after the flist is transferred. */
+
+/*#define FLAG_DELETE (1<<0) -- from the above list */
+#define FLAG_HLINK_EOL (1<<1)
+
 /* update this if you make incompatible changes */
 #define PROTOCOL_VERSION 28
 
@@ -383,8 +388,11 @@ enum msgcode {
 
 #define GID_NONE (gid_t) -1
 
+#define HL_CHECK_MASTER	0
+#define HL_SKIP		1
+
 struct hlink {
-	struct file_struct *head;
+	int hlindex;
 	struct file_struct *next;
 };
 
@@ -396,7 +404,7 @@ struct idev {
 #define F_DEV	link_u.idev->dev
 #define F_INODE	link_u.idev->inode
 
-#define F_HEAD	link_u.links->head
+#define F_HLINDEX link_u.links->hlindex
 #define F_NEXT	link_u.links->next
 
 struct file_struct {
