@@ -2,7 +2,7 @@
    
    Copyright (C) 1996-2001 by Andrew Tridgell 
    Copyright (C) Paul Mackerras 1996
-   Copyright (C) 2001 by Martin Pool <mbp@samba.org>
+   Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -20,7 +20,6 @@
 */
 
 /**
- *
  * @file io.c
  *
  * Socket and pipe IO utilities used in rsync.
@@ -624,12 +623,19 @@ void write_byte(int f,unsigned char c)
 
 
 
+/**
+ * Read a line of up to @p maxlen characters into @p buf.  Does not
+ * contain a trailing newline or carriage return.
+ *
+ * @return 1 for success; 0 for io error or truncation.
+ **/
 int read_line(int f, char *buf, size_t maxlen)
 {
 	while (maxlen) {
 		buf[0] = 0;
 		read_buf(f, buf, 1);
-		if (buf[0] == 0) return 0;
+		if (buf[0] == 0)
+			return 0;
 		if (buf[0] == '\n') {
 			buf[0] = 0;
 			break;
