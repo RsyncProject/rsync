@@ -204,7 +204,7 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 {
 	static int min_depth = MAXPATHLEN, cur_depth = -1;
 	static void *filt_array[MAXPATHLEN/2+1];
-	static int already_output_warning = 0;
+	static int already_warned = 0;
 	struct file_list *dirlist;
 	char delbuf[MAXPATHLEN];
 	STRUCT_STAT st;
@@ -228,11 +228,11 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 		return; /* Impossible... */
 
 	if (io_error && !(lp_ignore_errors(module_id) || ignore_errors)) {
-		if (already_output_warning)
+		if (already_warned)
 			return;
 		rprintf(FINFO,
 			"IO error encountered -- skipping file deletion\n");
-		already_output_warning = 1;
+		already_warned = 1;
 		return;
 	}
 
