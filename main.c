@@ -560,9 +560,8 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		send_msg(MSG_DONE, "", 0);
 		io_flush(FULL_FLUSH);
 
-		/* Finally, we hang around until our parent kills us with a
-		 * USR2 signal.  If --delete-after was specified, we might get
-		 * a keep-alive message over the socket, so handle that too. */
+		/* Handle any keep-alive packets from the post-processing work
+		 * that the generator does. */
 		if (protocol_version >= 29) {
 			kluge_around_eof = -1;
 			while (read_int(f_in) == flist->count) {
@@ -571,6 +570,9 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 			}
 		}
 
+		/* Finally, we hang around waiting for our parent to kills
+		 * us with a USR2 signal.  We sleep for a short time, as on
+		 * some OSes a signal won't interrupt a sleep! */
 		while (1)
 			msleep(20);
 	}
@@ -1044,6 +1046,7 @@ static RETSIGTYPE sigusr1_handler(UNUSED(int val))
 
 static RETSIGTYPE sigusr2_handler(UNUSED(int val))
 {
+	close_all();
 	if (log_got_error) _exit(RERR_PARTIAL);
 	_exit(0);
 }
