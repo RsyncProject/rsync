@@ -115,6 +115,10 @@ Changes since 2.6.2:
       exist, rsync now produces a correct report of files that would be
       sent instead of dying with a chdir() error.
 
+    - The "backed up ..." message that is output when at least 2 --verbose
+      options are specified is now the same both with and without the
+      --backup-dir option.
+
   ENHANCEMENTS:
 
     - Added the --partial-dir=DIR option that lets you specify where to
@@ -153,7 +157,7 @@ Changes since 2.6.2:
       sprinkling the batch files into different dirs or even onto different
       systems), and is much less intrusive into the code (making it easier
       to maintain for the future).  The new code generates just one data
-      file instead of three, which makes it possible to read the batch via
+      file instead of three, which makes it possible to read the batch on
       stdin via a remote shell.  Also, the old requirement of forcing the
       same fixed checksum-seed for all batch processing has been removed.
 
@@ -171,9 +175,6 @@ Changes since 2.6.2:
       updated before the temp-file gets moved into place.  Previously, the
       finished file would have a very brief window where its permissions
       disallowed all group and world access.
-
-    - Support for literal IPv6 addresses was added to the URL parser for the
-      "rsync:" scheme (e.g. rsync://[2001:638:500:101::21]:873/module/dir).
 
     - Added the ability to parse a literal IPv6 address in an "rsync:" URL
       (e.g. rsync://[2001:638:500:101::21]:873/module/dir).
@@ -207,6 +208,10 @@ Changes since 2.6.2:
     - Got rid of alloc_sanitize_path() after adding a destination-buffer
       arg to sanitize_path() made it possible to put all the former's
       functionality into the latter.
+
+    - The file-list that is output when at least 4 verbose options are
+      specified reports the uid value on the sender even when rsync is
+      not running as root (since we might be sending to a root receiver).
 
   BUILD CHANGES:
 
