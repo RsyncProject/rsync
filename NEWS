@@ -28,6 +28,10 @@ rsync 2.5.3 (not released yet)
 
   ENHANCEMENTS:
 
+    * Merge in changes from zlib 1.1.2 to zlib 1.1.3.  (Note that
+      rsync still uses a custom version of zlib; you can not just link
+      against a system library.  See zlib/README.rsync)
+
     * Command to initiate connections is only shown with -vv, rather
       than -v as in 2.5.2.  Output from plain -v is more similar to
       what was historically used so as not to break scripts that try
