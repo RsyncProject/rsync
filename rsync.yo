@@ -512,15 +512,20 @@ other files (including updated files) retain their existing permissions
 
 dit(bf(-o, --owner)) This option causes rsync to set the owner of the
 destination file to be the same as the source file.  On most systems,
-only the super-user can set file ownership.  Note that if the remote system
-is a daemon using chroot, the --numeric-ids option is implied because the
-remote system cannot get access to the usernames from /etc/passwd.
+only the super-user can set file ownership.  The preservation is done
+primarily by name, but falls back to using the ID number if the ID has
+no name on the sending side or has no match on the receiving side.
+See also the --numeric-ids option and the "use chroot" setting in the
+rsyncd.conf manpage.
 
 dit(bf(-g, --group)) This option causes rsync to set the group of the
 destination file to be the same as the source file.  If the receiving
 program is not running as the super-user, only groups that the
-receiver is a member of will be preserved (by group name, not group ID
-number).
+receiver is a member of will be preserved.  The preservation is done
+primarily by name, but falls back to using the ID number if the ID has
+no name on the sending side or has no match on the receiving side.
+See also the --numeric-ids option and the "use chroot" setting in the
+rsyncd.conf manpage.
 
 dit(bf(-D, --devices)) This option causes rsync to transfer character and
 block device information to the remote system to recreate these
@@ -756,9 +761,10 @@ what ownership to give files. The special uid 0 and the special group
 0 are never mapped via user/group names even if the --numeric-ids
 option is not specified.
 
-If the source system is a daemon using chroot, or if a user or group
-name does not exist on the destination system, then the numeric ID
-from the source system is used instead.
+If a user or group has no name on the source system or it has no match
+on the destination system, then the numeric ID
+from the source system is used instead.  See also the comments on the
+"use chroot" setting in the rsyncd.conf manpage.
 
 dit(bf(--timeout=TIMEOUT)) This option allows you to set a maximum I/O
 timeout in seconds. If no data is transferred for the specified time
