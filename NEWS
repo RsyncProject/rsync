@@ -69,6 +69,11 @@ Changes since 2.6.2:
       onto another partition on the receiving side and have rsync treat it
       as matching a normal directory from the sender.
 
+    - Added the --inplace option that tells rsync to write each destination
+      file without using a temporary file.  The matching of existing data
+      in the destination file can be severely limited by this, but there
+      are cases where this is more efficient, such as appending data.
+
     - Added the "write only" option to the daemon's config file.
 
     - Added long-option names for -4 and -6 (namely --ipv4 and --ipv6)
@@ -90,7 +95,7 @@ Changes since 2.6.2:
       to maintain for the future).  The new code generates just one data
       file instead of three, which makes it possible to read the batch via
       stdin.  Also, the old requirement of using the same fixed checksum-
-      seed for all batch processing has been removed.  (Chris Shoemaker)
+      seed for all batch processing has been removed.
 
   INTERNAL:
 
