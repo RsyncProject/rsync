@@ -866,8 +866,10 @@ static int start_client(int argc, char *argv[])
 		return rc;
 
 	if (!read_batch) { /* for read_batch, NO source is specified */
+		argc--;
 		shell_path = check_for_hostspec(argv[0], &shell_machine, &rsync_port);
 		if (shell_path) { /* source is remote */
+			argv++;
 			if (filesfrom_host && *filesfrom_host
 			    && strcmp(filesfrom_host, shell_machine) != 0) {
 				rprintf(FERROR,
@@ -878,22 +880,21 @@ static int start_client(int argc, char *argv[])
 				if (!shell_cmd) {
 					return start_socket_client(shell_machine,
 								   shell_path,
-								   argc-1, argv+1);
+								   argc, argv);
 				}
 				daemon_over_rsh = 1;
 			}
+
+			am_sender = 0;
+		} else { /* source is local, check dest arg */
+			am_sender = 1;
 
 			if (argc < 1) { /* destination required */
 				usage(FERROR);
 				exit_cleanup(RERR_SYNTAX);
 			}
 
-			am_sender = 0;
-			argv++;
-		} else { /* source is local, check dest arg */
-			am_sender = 1;
-
-			shell_path = check_for_hostspec(argv[argc-1], &shell_machine, &rsync_port);
+			shell_path = check_for_hostspec(argv[argc], &shell_machine, &rsync_port);
 			if (shell_path && filesfrom_host && *filesfrom_host
 			    && strcmp(filesfrom_host, shell_machine) != 0) {
 				rprintf(FERROR,
@@ -908,22 +909,16 @@ static int start_client(int argc, char *argv[])
 					exit_cleanup(RERR_SYNTAX);
 				}
 				shell_machine = NULL;
-				shell_path = argv[argc-1];
+				shell_path = argv[argc];
 			} else if (rsync_port) {
 				if (!shell_cmd) {
 					return start_socket_client(shell_machine,
 								   shell_path,
-								   argc-1, argv);
+								   argc, argv);
 				}
 				daemon_over_rsh = 1;
 			}
-
-			if (argc < 2) {
-				usage(FERROR);
-				exit_cleanup(RERR_SYNTAX);
-			}
 		}
-		argc--;
 	} else {  /* read_batch */
 		local_server = 1;
 		shell_path = argv[argc-1];
