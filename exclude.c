@@ -261,6 +261,8 @@ static const char *get_exclude_tok(const char *p, unsigned int *len_ptr,
 		s += 2;
 	} else if (xflags & XFLG_DEF_INCLUDE)
 		mflags |= MATCHFLG_INCLUDE;
+	if (xflags & XFLG_DIRECTORY)
+		mflags |= MATCHFLG_DIRECTORY;
 
 	if (xflags & XFLG_WORD_SPLIT) {
 		const unsigned char *cp = s;
