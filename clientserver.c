@@ -207,7 +207,8 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out, int argc)
 static int rsync_module(int f_in, int f_out, int i)
 {
 	int argc = 0;
-	char *argv[MAX_ARGS];
+	int maxargs;
+	char **argv;
 	char **argp;
 	char line[MAXPATHLEN];
 	uid_t uid = (uid_t)-2;  /* canonically "nobody" */
@@ -385,6 +386,9 @@ static int rsync_module(int f_in, int f_out, int i)
 
 	io_printf(f_out, "@RSYNCD: OK\n");
 
+	maxargs = MAX_ARGS;
+	if (!(argv = new_array(char *, maxargs)))
+		out_of_memory("rsync_module");
 	argv[argc++] = "rsyncd";
 
 	while (1) {
@@ -396,23 +400,25 @@ static int rsync_module(int f_in, int f_out, int i)
 
 		p = line;
 
+		if (argc == maxargs) {
+			maxargs += MAX_ARGS;
+			if (!(argv = realloc_array(argv, char *, maxargs)))
+				out_of_memory("rsync_module");
+		}
 		if (!(argv[argc] = strdup(p)))
-			return -1;
+			out_of_memory("rsync_module");
 
 		if (start_glob) {
 			if (start_glob == 1) {
 				request = strdup(p);
 				start_glob++;
 			}
-			glob_expand(name, argv, &argc, MAX_ARGS);
+			glob_expand(name, &argv, &argc, &maxargs);
 		} else
 			argc++;
 
 		if (strcmp(line, ".") == 0)
 			start_glob = 1;
-
-		if (argc == MAX_ARGS)
-			return -1;
 	}
 
 	argp = argv;

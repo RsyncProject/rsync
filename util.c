@@ -495,12 +495,20 @@ static int exclude_server_path(char *arg)
 	return 0;
 }
 
-static void glob_expand_one(char *s, char **argv, int *argc_ptr, int maxargs)
+static void glob_expand_one(char *s, char ***argv_ptr, int *argc_ptr,
+			    int *maxargs_ptr)
 {
+	char **argv = *argv_ptr;
 	int argc = *argc_ptr;
+	int maxargs = *maxargs_ptr;
 #if !(defined(HAVE_GLOB) && defined(HAVE_GLOB_H))
-	if (maxargs <= argc)
-		return;
+	if (argc == maxargs) {
+		maxargs += MAX_ARGS;
+		if (!(argv = realloc_array(argv, char *, maxargs)))
+			out_of_memory("glob_expand_one");
+		*argv_ptr = argv;
+		*maxargs_ptr = maxargs;
+	}
 	if (!*s)
 		s = ".";
 	s = argv[argc++] = strdup(s);
@@ -521,12 +529,17 @@ static void glob_expand_one(char *s, char **argv, int *argc_ptr, int maxargs)
 	memset(&globbuf, 0, sizeof globbuf);
 	if (!exclude_server_path(s))
 		glob(s, 0, NULL, &globbuf);
+	if (MAX((int)globbuf.gl_pathc, 1) > maxargs - argc) {
+		maxargs += globbuf.gl_pathc + MAX_ARGS;
+		if (!(argv = realloc_array(argv, char *, maxargs)))
+			out_of_memory("glob_expand_one");
+		*argv_ptr = argv;
+		*maxargs_ptr = maxargs;
+	}
 	if (globbuf.gl_pathc == 0)
 		argv[argc++] = s;
 	else {
 		int j = globbuf.gl_pathc;
-		if (j > maxargs - argc)
-			j = maxargs - argc;
 		free(s);
 		for (i = 0; i < j; i++) {
 			if (!(argv[argc++] = strdup(globbuf.gl_pathv[i])))
@@ -539,9 +552,9 @@ static void glob_expand_one(char *s, char **argv, int *argc_ptr, int maxargs)
 }
 
 /* This routine is only used in daemon mode. */
-void glob_expand(char *base1, char **argv, int *argc_ptr, int maxargs)
+void glob_expand(char *base1, char ***argv_ptr, int *argc_ptr, int *maxargs_ptr)
 {
-	char *s = argv[*argc_ptr];
+	char *s = (*argv_ptr)[*argc_ptr];
 	char *p, *q;
 	char *base = base1;
 	int base_len = strlen(base);
@@ -562,7 +575,7 @@ void glob_expand(char *base1, char **argv, int *argc_ptr, int maxargs)
 	for (q = s; *q; q = p + base_len) {
 		if ((p = strstr(q, base)) != NULL)
 			*p = '\0'; /* split it at this point */
-		glob_expand_one(q, argv, argc_ptr, maxargs);
+		glob_expand_one(q, argv_ptr, argc_ptr, maxargs_ptr);
 		if (!p)
 			break;
 	}
