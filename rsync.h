@@ -567,3 +567,13 @@ extern struct global_opts {
 	/** Network address family. **/
 	int af_hint;
 } global_opts;
+
+
+#ifndef HAVE_INET_NTOP
+const char *                 
+inet_ntop(int af, const void *src, char *dst, size_t size);
+#endif /* !HAVE_INET_NTOP */
+
+#ifndef HAVE_INET_PTON
+int isc_net_pton(int af, const char *src, void *dst);
+#endif

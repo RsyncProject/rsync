@@ -15,7 +15,10 @@ rsync 2.4.7 (sometime in 2001, maybe :)		-*- indented-text -*-
       Backus.  <http://www.ils.unc.edu/i2dsi/unc_rsync+.html>
 
     * IPv6 support based on a patch from KAME.net, on systems
-      including modern versions of Linux, Solaris, and HP-UX.
+      including modern versions of Linux, Solaris, and HP-UX.  Also
+      includes IPv6 compatibility functions for old OSs by the
+      Internet Software Consortium, Paul Vixie, the OpenSSH
+      portability project, and OpenBSD.
 
   ENHANCEMENTS
 
