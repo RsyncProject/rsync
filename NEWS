@@ -69,6 +69,10 @@ Changes since 2.6.3:
       relative path), the backup code was erroneously trying to backup a
       file that was put into the partial-dir.
 
+    - If a file gets resent in a single transfer and the --backup option is
+      enabled along with --inplace, rsync no longer performs a duplicate
+      backup (it used to overwrite the first backup with the failed file).
+
     - One call to flush_write_file() was not being checked for an error.
 
     - The --no-relative option was not being sent from the client to a
@@ -279,7 +283,7 @@ Changes since 2.6.3:
 
     - If --inplace is specified, the generator flags any transfer that is
       using an alternate basis file so that the sender can use the entire
-      file in the rsync algorithm (unlike a normal --inplace update).
+      basis file in the rsync algorithm (unlike a normal --inplace update).
 
     - The sending of exclude names is done using filter-rule syntax.  This
       means that all names have a prefixed rule indicator, even excludes
