@@ -88,7 +88,7 @@ RSYNC SERVERS
 -------------
 
 rsync can also talk to "rsync servers" which can provide anonymous or
-authenticated rsync. See the rsync.conf(5) man page for details on how
+authenticated rsync. See the rsyncd.conf(5) man page for details on how
 to setup a rsync server. See the rsync(1) man page for info on how to
 connect to a rsync server.
 
