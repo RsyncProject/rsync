@@ -509,6 +509,8 @@ static void set_refuse_options(char *bp)
 				break;
 			if ((op->longName && wildmatch(bp, op->longName))
 			    || (*shortname && wildmatch(bp, shortname))) {
+				if (op->argInfo == POPT_ARG_VAL)
+					op->argInfo = POPT_ARG_NONE;
 				op->val = (op - long_options) + OPT_REFUSED_BASE;
 				found_match = 1;
 				if (!is_wild)
