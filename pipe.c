@@ -94,8 +94,7 @@ pid_t piped_child(char **command, int *f_in, int *f_out)
 	return pid;
 }
 
-/*
- * This function forks a child which calls child_main().  First,
+/* This function forks a child which calls child_main().  First,
  * however, it has to establish communication paths to and from the
  * newborn child.  It creates two socket pairs -- one for writing to
  * the child (from the parent) and one for reading from the child
@@ -104,8 +103,7 @@ pid_t piped_child(char **command, int *f_in, int *f_out)
  * two socket ends are retained for reading and writing.  In the
  * child, the STDIN and STDOUT file descriptors refer to these
  * sockets.  In the parent, the function arguments f_in and f_out are
- * set to refer to these sockets.
- */
+ * set to refer to these sockets. */
 pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 		  int (*child_main)(int, char*[]))
 {
@@ -119,9 +117,7 @@ pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 		exit_cleanup(RERR_IPC);
 	}
 
-	/* For read-batch, don't even fork. */
 	pid = do_fork();
-
 	if (pid == -1) {
 		rsyserr(FERROR, errno, "fork");
 		exit_cleanup(RERR_IPC);
