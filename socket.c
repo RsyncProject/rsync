@@ -155,7 +155,6 @@ int open_socket_out(char *host, int port, const char *bind_address,
 	int type = SOCK_STREAM;
 	int error;
 	int s;
-	int result;
 	struct addrinfo hints, *res0, *res;
 	char portbuf[10];
 	char *h;

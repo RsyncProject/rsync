@@ -2,7 +2,7 @@
     
     Copyright (C) 1996-2000 by Andrew Tridgell 
     Copyright (C) Paul Mackerras 1996
-    Copyright (C) 2001 by Martin Pool <mbp@samba.org>
+    Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -836,7 +836,7 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
     int           pct  = (ofs == size) ? 100 : (int)((100.0*ofs)/size);
     unsigned long diff = msdiff(&start_time, now);
     double        rate = diff ? (double) (ofs-start_ofs) * 1000.0 / diff / 1024.0 : 0;
-    const char    *units, *rem_units;
+    const char    *units;
     double        remain = rate ? (double) (size-ofs) / rate / 1000.0: 0.0;
     int 	  remain_h, remain_m, remain_s;
 
