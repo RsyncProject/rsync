@@ -169,8 +169,8 @@ Changes since 2.6.3:
 
     - Added the --itemize-changes (-i) option that is a way to output the
       list of files that got transferred and/or changed in any way, and how
-      they changed.  The effect is the same as specifying --log-format
-      "%i %n%L" (see the rsyncd.conf manpage).  Works with --dry-run.
+      they changed.  The effect is the same as specifying a --log-format of
+      "%i %n%L" (see the rsyncd.conf manpage).  Works with --dry-run too.
 
     - Added the --fuzzy option, which attempts to find a basis file for a
       file that is being created from scratch.  The current algorithm
@@ -228,9 +228,15 @@ Changes since 2.6.3:
 
   PROTOCOL DIFFERENCES FOR VERSION 29:
 
+    - A 16-bit flag-word is transmitted after every file-list index.  This
+      indicates what is changing between the sender and the receiver.  The
+      generator now transmits an index and a flag-word to indicate when
+      dirs and symlinks have changed (only outputting local change messages
+      for older protocols).
+
     - If --inplace is specified, the generator sends an extra byte after
-      each index integer indicating what kind of basis file is being used
-      for the transfer (see the FNAMECMP_* defines).
+      the flag-word indicating what kind of basis file is being used for
+      the transfer (see the FNAMECMP_* defines).
 
     - The sending of exclude names is done using filter-rule syntax.  This
       means that all names have a prefixed rule indicator, even excludes
