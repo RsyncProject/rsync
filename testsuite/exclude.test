@@ -166,7 +166,7 @@ rm "$chkdir"/bar/down/to/foo/.filt2
 rm "$chkdir"/bar/down/to/bar/.filt2
 rm "$chkdir"/mid/.filt
 
-$RSYNC -av --existing --filter='-! */' "$fromdir/" "$chkdir/"
+$RSYNC -av --protocol=28 --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
 
 # Now, try the prior command with --delete-before and some side-specific
 # rules.
