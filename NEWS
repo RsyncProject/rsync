@@ -120,6 +120,9 @@ Changes since 2.6.2:
     - Added the --partial-dir=DIR option that lets you specify where to
       (temporarily) put a partially transferred file (instead of over-
       writing the destination file).  E.g.  --partial-dir=.rsync-partial
+      Also added support for the RSYNC_PARTIAL_DIR environment variable
+      that, when found, transforms a regular --partial option (such as
+      the convenient -P option) into one that also specifies a directory.
 
     - Added --keep-dirlinks (-K), which allows you to symlink a directory
       onto another partition on the receiving side and have rsync treat it
