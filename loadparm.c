@@ -162,7 +162,7 @@ static service sDefault =
 	NULL,    /* include from */
 	"%o %h [%a] %m (%u) %f %l",    /* log format */
 	NULL,    /* refuse options */
-	"*.gz *.tgz *.zip *.z *.rpm *.deb",    /* dont compress */
+	"*.gz *.tgz *.zip *.z *.rpm *.deb *.iso",    /* dont compress */
 	0,        /* timeout */
 	0        /* max connections */
 };
