@@ -476,6 +476,7 @@ static int rule_matches(char *name, struct filter_struct *ex, int name_is_dir)
 {
 	char *p, full_name[MAXPATHLEN];
 	int match_start = 0;
+	int ret_match = ex->match_flags & MATCHFLG_NEGATE ? 0 : 1;
 	char *pattern = ex->pattern;
 
 	if (!*name)
@@ -496,7 +497,7 @@ static int rule_matches(char *name, struct filter_struct *ex, int name_is_dir)
 	}
 
 	if (ex->match_flags & MATCHFLG_DIRECTORY && !name_is_dir)
-		return 0;
+		return !ret_match;
 
 	if (*pattern == '/') {
 		match_start = 1;
@@ -518,13 +519,13 @@ static int rule_matches(char *name, struct filter_struct *ex, int name_is_dir)
 			name = p+1;
 		}
 		if (wildmatch(pattern, name))
-			return 1;
+			return ret_match;
 		if (ex->match_flags & MATCHFLG_WILD2_PREFIX) {
 			/* If the **-prefixed pattern has a '/' as the next
 			 * character, then try to match the rest of the
 			 * pattern at the root. */
 			if (pattern[2] == '/' && wildmatch(pattern+3, name))
-				return 1;
+				return ret_match;
 		}
 		else if (!match_start && ex->match_flags & MATCHFLG_WILD2) {
 			/* A non-anchored match with an infix or trailing "**"
@@ -533,23 +534,23 @@ static int rule_matches(char *name, struct filter_struct *ex, int name_is_dir)
 			while ((name = strchr(name, '/')) != NULL) {
 				name++;
 				if (wildmatch(pattern, name))
-					return 1;
+					return ret_match;
 			}
 		}
 	} else if (match_start) {
 		if (strcmp(name,pattern) == 0)
-			return 1;
+			return ret_match;
 	} else {
 		int l1 = strlen(name);
 		int l2 = strlen(pattern);
 		if (l2 <= l1 &&
 		    strcmp(name+(l1-l2),pattern) == 0 &&
 		    (l1==l2 || name[l1-(l2+1)] == '/')) {
-			return 1;
+			return ret_match;
 		}
 	}
 
-	return 0;
+	return !ret_match;
 }
 
 
@@ -639,7 +640,7 @@ static const char *get_filter_tok(const char *p, int xflags,
 			mflags |= MATCHFLG_INCLUDE;
 			/* FALL THROUGH */
 		case '-':
-			mods = "/";
+			mods = "!/";
 			break;
 		case '!':
 			mflags |= MATCHFLG_CLEAR_LIST;
@@ -670,6 +671,9 @@ static const char *get_filter_tok(const char *p, int xflags,
 				break;
 			case '/':
 				mflags |= MATCHFLG_ABS_PATH;
+				break;
+			case '!':
+				mflags |= MATCHFLG_NEGATE;
 				break;
 			case 'C':
 				empty_pat_is_OK = 1;
