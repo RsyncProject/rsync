@@ -281,6 +281,8 @@ become a daemon, discarding the controlling terminal
 ****************************************************************************/
 void become_daemon(void)
 {
+	int i;
+
 	if (fork())
 		_exit(0);
 
@@ -299,9 +301,12 @@ void become_daemon(void)
 	}
 #endif /* TIOCNOTTY */
 #endif
-	close(0);
-	close(1);
-	close(2);
+	/* make sure that stdin, stdout an stderr don't stuff things
+           up (library functions, for example) */
+	for (i=0;i<3;i++) {
+		close(i); 
+		open("/dev/null", O_RDWR);
+	}
 }
 
 /*******************************************************************

@@ -566,7 +566,9 @@ int main(int argc,char *argv[])
 	   carried across */
 	orig_umask = (int)umask(0);
 
-	parse_arguments(argc, argv);
+	if (!parse_arguments(argc, argv)) {
+		exit_cleanup(1);
+	}
 
 	argc -= optind;
 	argv += optind;

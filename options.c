@@ -197,7 +197,8 @@ static struct option long_options[] = {
   {"port",        1,     0,    OPT_PORT},
   {0,0,0,0}};
 
-void parse_arguments(int argc, char *argv[])
+
+int parse_arguments(int argc, char *argv[])
 {
 	int opt;
 	int option_index;
@@ -301,7 +302,7 @@ void parse_arguments(int argc, char *argv[])
 			preserve_hard_links=1;
 #else 
 			rprintf(FERROR,"ERROR: hard links not supported on this platform\n");
-			exit_cleanup(1);
+			return 0;
 #endif
 			break;
 
@@ -412,10 +413,10 @@ void parse_arguments(int argc, char *argv[])
 			break;
 
 		default:
-			/* rprintf(FERROR,"bad option -%c\n",opt); */
-			exit_cleanup(1);
+			return 0;
 		}
 	}
+	return 1;
 }
 
 
