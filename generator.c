@@ -34,6 +34,7 @@ extern int preserve_hard_links;
 extern int preserve_perms;
 extern int preserve_uid;
 extern int preserve_gid;
+extern int delete_during;
 extern int update_only;
 extern int opt_ignore_existing;
 extern int inplace;
@@ -233,7 +234,8 @@ static void generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
  * @note This comment was added later by mbp who was trying to work it
  * out.  It might be wrong.
  */
-static void recv_generator(char *fname, struct file_struct *file, int i,
+static void recv_generator(char *fname, struct file_list *flist,
+			   struct file_struct *file, int i,
 			   int f_out, int f_out_name)
 {
 	int fd = -1, f_copy = -1;
@@ -311,6 +313,9 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		if (set_perms(fname, file, statret ? NULL : &st, 0)
 		    && verbose && f_out != -1)
 			rprintf(FINFO, "%s/\n", safe_fname(fname));
+		if (delete_during && f_out != -1
+		    && (file->flags & FLAG_DEL_START))
+			delete_in_dir(flist, fname);
 		return;
 	} else if (max_size && file->length > max_size) {
 		if (verbose > 1)
@@ -641,7 +646,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 		}
 
 		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
-			       file, i, f_out, f_out_name);
+			       flist, file, i, f_out, f_out_name);
 	}
 
 	phase++;
@@ -658,7 +663,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	while ((i = get_redo_num()) != -1) {
 		struct file_struct *file = flist->files[i];
 		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
-			       file, i, f_out, f_out_name);
+			       flist, file, i, f_out, f_out_name);
 	}
 
 	phase++;
@@ -680,7 +685,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 		if (!file->basename || !S_ISDIR(file->mode))
 			continue;
 		recv_generator(local_name ? local_name : f_name(file),
-			       file, i, -1, -1);
+			       flist, file, i, -1, -1);
 	}
 
 	if (verbose > 2)
