@@ -10,12 +10,12 @@
 
 . "$suitedir/rsync.fns"
 
-if ! type ssh >/dev/null 2>&1; then
+if ! type ssh >/dev/null ; then
     echo "Skipping SSH tests because ssh is not in the path"
     exit 77
 fi
 
-if ! [ "`ssh -o'BatchMode yes' localhost echo yes 2>/dev/null`" = "yes" ]; then
+if ! [ "`ssh -o'BatchMode yes' localhost echo yes`" = "yes" ]; then
     echo "Skipping SSH tests because ssh conection to localhost not authorised"
     exit 77
 fi
