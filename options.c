@@ -77,7 +77,7 @@ int do_progress=0;
 int keep_partial=0;
 int safe_symlinks=0;
 int copy_unsafe_links=0;
-int block_size=BLOCK_SIZE;
+int block_size=0;
 int size_only=0;
 int bwlimit=0;
 int delete_after=0;
@@ -775,7 +775,7 @@ void server_options(char **args,int *argc)
 
 	if (x != 1) args[ac++] = argstr;
 
-	if (block_size != BLOCK_SIZE) {
+	if (block_size) {
 		snprintf(bsize,sizeof(bsize),"-B%d",block_size);
 		args[ac++] = bsize;
 	}

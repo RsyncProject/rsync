@@ -341,6 +341,8 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 /* the length of the md4 checksum */
 #define MD4_SUM_LENGTH 16
 #define SUM_LENGTH 16
+#define SHORT_SUM_LENGTH 2
+#define BLOCKSUM_BIAS 10
 
 #ifndef MAXPATHLEN
 #define MAXPATHLEN 1024

@@ -32,7 +32,6 @@ extern int preserve_devices;
 extern int preserve_hard_links;
 extern int update_only;
 extern int opt_ignore_existing;
-extern int block_size;
 extern int csum_length;
 extern int ignore_times;
 extern int size_only;
@@ -100,24 +99,9 @@ static int skip_file(char *fname,
 }
 
 
-/* use a larger block size for really big files */
-static int adapt_block_size(struct file_struct *file, int bsize)
-{
-	int ret;
-
-	if (bsize != BLOCK_SIZE) return bsize;
-
-	ret = file->length / (10000); /* rough heuristic */
-	ret = ret & ~15; /* multiple of 16 */
-	if (ret < bsize) ret = bsize;
-	if (ret > CHUNK_SIZE/2) ret = CHUNK_SIZE/2;
-	return ret;
-}
-
-
 /*
  * 	NULL sum_struct means we have no checksums
-  */
+ */
 
 void write_sum_head(int f, struct sum_struct *sum)
 {
@@ -133,7 +117,87 @@ void write_sum_head(int f, struct sum_struct *sum)
 	write_int(f, sum->remainder);
 }
 
+/* 
+ * set (initialize) the size entries in the per-file sum_struct
+ * calulating dynamic block ans checksum sizes.
+ *
+ * This is only called from generate_and_send_sums() but is a seperate
+ * function to encapsulate the logic.
+ *
+ * The block size is a rounded square root of file length.
+ *
+ * The checksum size is determined according to:
+ *     blocksum_bits = BLOCKSUM_EXP + 2*log2(file_len) - log2(block_len)
+ * provided by Donovan Baarda which gives a probability of rsync
+ * algorithm corrupting data and falling back using the whole md4
+ * checksums.
+ *
+ * This might be made one of several selectable heuristics.
+ */
 
+static void sum_sizes_sqroot_baarda(struct sum_struct *sum, uint64 len)
+{
+	extern int block_size;
+	int blength, s2length, b;
+	uint32 c;
+	uint64 l;
+
+	if (block_size) {
+		blength = block_size;
+	} else if (len <= BLOCK_SIZE * BLOCK_SIZE) {
+		blength = BLOCK_SIZE;
+	} else {
+		l = len;
+		c = 1;
+		while (l >>= 2) {
+			c <<= 1;
+		}
+		blength = 0;
+		do {
+			blength |= c;
+			if (len < (uint64)(blength * blength))
+				blength &= ~c;
+			c >>= 1;
+		} while (c >= 8);	/* round to multiple of 8 */
+		blength = MAX(blength, BLOCK_SIZE);
+	}
+
+	if (remote_version < 27) {
+		s2length = csum_length;
+	} else if (csum_length == SUM_LENGTH) {
+		s2length = SUM_LENGTH;
+	} else {
+		b = BLOCKSUM_BIAS;
+		l = len;
+		while (l >>= 1) {
+			b += 2;
+		}
+		c = blength;
+		while (c >>= 1 && b) {
+			b--;
+		}
+		s2length = (b + 1 - 32 + 7) / 8; /* add a bit,
+						  * subtract rollsum,
+						  * round up
+						  *    --optimize in compiler--
+						  */
+		s2length = MAX(s2length, csum_length);
+		s2length = MIN(s2length, SUM_LENGTH);
+	}
+
+	sum->flength	= len;
+	sum->blength	= blength;
+	sum->s2length	= s2length;
+	sum->count	= (len + (blength - 1)) / blength;
+	sum->remainder	= (len % blength);
+
+	if (sum->count && verbose > 2) {
+		rprintf(FINFO, "count=%ld rem=%ld blength=%ld s2length=%ld flength=%.0f\n",
+			(long) sum->count, (long) sum->remainder,
+			(long) sum->blength, (long) sum->s2length,
+			(double) sum->flength);
+	}
+}
 
 /**
  * Perhaps we want to just send an empty checksum set for this file,
@@ -163,30 +227,18 @@ static BOOL disable_deltas_p(void)
  *
  * Generate approximately one checksum every block_len bytes.
  */
-static void generate_and_send_sums(struct map_struct *buf, OFF_T len,
-				   int block_len, int f_out)
+static void generate_and_send_sums(struct map_struct *buf, OFF_T len, int f_out)
 {
 	size_t i;
 	struct sum_struct sum;
 	OFF_T offset = 0;
 
-	sum.count = (len + (block_len - 1)) / block_len;
-	sum.remainder = (len % block_len);
-	sum.blength	= block_len;
-	sum.flength = len;
-	sum.s2length	= csum_length;
-	/* not needed here  sum.sums = NULL; */
-
-	if (sum.count && verbose > 3) {
-		rprintf(FINFO, "count=%ld rem=%ld n=%ld flength=%.0f\n",
-			(long) sum.count, (long) sum.remainder,
-			(long) sum.blength, (double) sum.flength);
-	}
+	sum_sizes_sqroot_baarda(&sum, len);
 
 	write_sum_head(f_out, &sum);
 
 	for (i = 0; i < sum.count; i++) {
-		int n1 = MIN(len, block_len);
+		int n1 = MIN(len, sum.blength);
 		char *map = map_ptr(buf, offset, n1);
 		uint32 sum1 = get_checksum1(map, n1);
 		char sum2[SUM_LENGTH];
@@ -465,8 +517,7 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 		rprintf(FINFO, "generating and sending sums for %d\n", i);
 
 	write_int(f_out,i);
-	generate_and_send_sums(buf, st.st_size,
-			       adapt_block_size(file, block_size), f_out);
+	generate_and_send_sums(buf, st.st_size, f_out);
 
 	close(fd);
 	if (buf) unmap_file(buf);
