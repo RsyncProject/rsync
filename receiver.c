@@ -1,5 +1,6 @@
-/* 
-   Copyright (C) Andrew Tridgell 1996
+/* -*- c-file-style: "linux" -*-
+   
+   Copyright (C) 1996-2000 by Andrew Tridgell
    Copyright (C) Paul Mackerras 1996
    
    This program is free software; you can redistribute it and/or modify

@@ -67,21 +67,21 @@ int delete_file(char *fname)
 
 	if (!S_ISDIR(st.st_mode)) {
 		if (robust_unlink(fname) == 0 || errno == ENOENT) return 0;
-		rprintf(FERROR,"unlink(%s) : %s\n", fname, strerror(errno));
+		rprintf(FERROR,"delete_file: unlink(%s) : %s\n", fname, strerror(errno));
 		return -1;
 	}
 
 	if (do_rmdir(fname) == 0 || errno == ENOENT) return 0;
 	if (!force_delete || !recurse || 
 	    (errno != ENOTEMPTY && errno != EEXIST)) {
-		rprintf(FERROR,"rmdir(%s) : %s\n", fname, strerror(errno));
+		rprintf(FERROR,"delete_file: rmdir(%s) : %s\n", fname, strerror(errno));
 		return -1;
 	}
 
 	/* now we do a recsursive delete on the directory ... */
 	d = opendir(fname);
 	if (!d) {
-		rprintf(FERROR,"opendir(%s): %s\n",
+		rprintf(FERROR,"delete_file: opendir(%s): %s\n",
 			fname,strerror(errno));
 		return -1;
 	}
@@ -103,7 +103,7 @@ int delete_file(char *fname)
 	closedir(d);
 	
 	if (do_rmdir(fname) != 0) {
-		rprintf(FERROR,"rmdir(%s) : %s\n", fname, strerror(errno));
+		rprintf(FERROR,"delete_file: rmdir(%s) : %s\n", fname, strerror(errno));
 		return -1;
 	}
 
