@@ -52,7 +52,7 @@ int io_error = 0;
 int read_only = 0;
 int module_id = -1;
 int am_server = 0;
-int am_sender=0;
+int am_sender = 0;
 int recurse = 0;
 int am_daemon=0;
 int do_stats=0;
@@ -126,7 +126,7 @@ static void print_rsync_version(int f)
 	rprintf(f, "<http://rsync.samba.org/>\n");
         rprintf(f, "Capabilities: %d-bit files, %ssocketpairs, "
                 "%shard links, %ssymlinks, batchfiles\n\n",
-                (int) (sizeof(int64) * 8),
+                (int) (sizeof(OFF_T) * 8),
                 got_socketpair,
                 hardlinks, links);
 
