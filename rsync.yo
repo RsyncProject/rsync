@@ -832,9 +832,7 @@ make a subsequent transfer of the rest of the file much faster.
 dit(bf(--progress)) This option tells rsync to print information
 showing the progress of the transfer. This gives a bored user
 something to watch.
-
-This option is normally combined with -v. Using this option without
-the -v option will produce weird results on your display.
+Implies --verbose without incrementing verbosity.
 
 dit(bf(-P)) The -P option is equivalent to --partial --progress. I
 found myself typing that combination quite often so I created an

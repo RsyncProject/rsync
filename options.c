@@ -641,6 +641,9 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		exit_cleanup(RERR_SYNTAX);
 	}
 
+	if (do_progress && !verbose)
+		verbose = 1;
+
 	*argv = poptGetArgs(pc);
 	if (*argv)
 		*argc = count_args(*argv);
