@@ -143,6 +143,7 @@ int verbose = 0;
 int quiet = 0;
 int itemize_changes = 0;
 int log_before_transfer = 0;
+int log_format_has_o_or_i = 0;
 int always_checksum = 0;
 int list_only = 0;
 
@@ -1058,6 +1059,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (log_format) {
 		if (strstr(log_format, "%i") != NULL)
 			itemize_changes = 1;
+		else
+			itemize_changes = 0;
 		if (strstr(log_format, "%b") == NULL
 		 && strstr(log_format, "%c") == NULL)
 			log_before_transfer = !am_server;
@@ -1074,6 +1077,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		log_format = "%n%L";
 		log_before_transfer = !am_server;
 	}
+	if (itemize_changes || (log_format && strstr(log_format, "%o") != NULL))
+		log_format_has_o_or_i = 1;
 
 	if (daemon_bwlimit && (!bwlimit || bwlimit > daemon_bwlimit))
 		bwlimit = daemon_bwlimit;
@@ -1224,7 +1229,7 @@ void server_options(char **args,int *argc)
 	 * default for remote transfers, and in any case old versions
 	 * of rsync will not understand it. */
 
-	if (itemize_changes)
+	if (itemize_changes && am_sender)
 		argstr[x++] = 'i';
 	if (preserve_hard_links)
 		argstr[x++] = 'H';
@@ -1271,10 +1276,14 @@ void server_options(char **args,int *argc)
 	if (list_only > 1)
 		args[ac++] = "--list-only";
 
-	/* The server side doesn't use our log-format, but if verbose isn't
-	 * on, they may need to know that we want some extra messages. */
-	if (log_format && !verbose && !itemize_changes)
-		args[ac++] = "--log-format=specified";
+	/* The server side doesn't use our log-format, but in certain
+	 * circumstances they need to know a little about the option. */
+	if (log_format && am_sender && !itemize_changes) {
+		if (log_format_has_o_or_i)
+			args[ac++] = "--log-format=%o";
+		else if (!verbose)
+			args[ac++] = "--log-format=X";
+	}
 
 	if (block_size) {
 		if (asprintf(&arg, "-B%lu", block_size) < 0)
