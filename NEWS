@@ -44,6 +44,9 @@ Changes since 2.6.2:
       bursty, more accurate, and works properly over a larger range of
       values.
 
+    - The rsync daemon-over-ssh code now looks for SSH_CONNECTION and
+      SSH2_CLIENT in addition to SSH_CLIENT to figure out the IP address.
+
     - Added the --checksum-seed=N option for advanced users.
 
   INTERNAL:
