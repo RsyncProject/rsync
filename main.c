@@ -736,6 +736,8 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 	if (!read_batch)
 		send_exclude_list(f_out);
+	if (cvs_exclude)
+		add_cvs_excludes();
 
 	if (filesfrom_fd >= 0) {
 		io_set_filesfrom_fds(filesfrom_fd, f_out);
