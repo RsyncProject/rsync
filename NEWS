@@ -78,7 +78,7 @@ Changes since 2.6.3:
     - The --inplace support was enhanced to work with --compare-dest,
       --link-dest, and (the new) --copy-dest options.
 
-    - Added the --dirs option for an easier way to copy directories
+    - Added the --dirs (-d) option for an easier way to copy directories
       without recursion.
 
     - Added the --list-only option which is mainly a way for the client to
@@ -86,11 +86,24 @@ Changes since 2.6.3:
       option kluges (e.g. the age-old use of "-r --exclude="/*/*" for a
       non-recursive listing).
 
-    - Added the --omit-dir-times option which will avoid updating the
+    - Added the --omit-dir-times (-O) option which will avoid updating the
       modified time for directories when --times was specified.  For a
       really large transfer, this option will avoid an extra pass through
       the file-list at the end of the transfer to tweak all the directory
       times.
+
+    - Added the --delete-during (--del) option which will delete files
+      from on the receiving side incrementally as each directory in the
+      transfer is being processed (which makes it more efficient than
+      the default, before-the-transfer behavior of --delete).
+
+    - Added the --filter (-f) option and its helper option, -F.  Filter
+      rules are an extension to the existing include/exclude handling
+      that also supports nested filter files as well as per-directory
+      filter files (like .cvsignore, but with full filter-rule parsing).
+      This new option was chosen in order to ensure that all existing
+      include/exclude processing remained 100% compatible with older
+      versions.
 
     - Added support/atomic-rsync -- a perl script that will transfer some
       files using rsync, and then move the updated files into place all at
