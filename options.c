@@ -88,6 +88,7 @@ int max_delete = 0;
 int ignore_errors = 0;
 int modify_window = 0;
 int blocking_io = -1;
+int checksum_seed = 0;
 unsigned int block_size = 0;
 
 
@@ -125,6 +126,7 @@ int quiet = 0;
 int always_checksum = 0;
 int list_only = 0;
 
+#define FIXED_CHECKSUM_SEED 32761
 #define MAX_BATCH_PREFIX_LEN 256	/* Must be less than MAXPATHLEN-13 */
 char *batch_prefix = NULL;
 
@@ -551,11 +553,13 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		case OPT_WRITE_BATCH:
 			/* popt stores the filename in batch_prefix for us */
 			write_batch = 1;
+			checksum_seed = FIXED_CHECKSUM_SEED;
 			break;
 
 		case OPT_READ_BATCH:
 			/* popt stores the filename in batch_prefix for us */
 			read_batch = 1;
+			checksum_seed = FIXED_CHECKSUM_SEED;
 			break;
 
 		case OPT_LINK_DEST:
