@@ -260,6 +260,10 @@ logging
 
   Keep stderr and stdout properly separated (Debian #23626)
 
+  Use a separate function for reporting errors; prefix it with
+  "rsync:" or "rsync(remote)", or perhaps even "rsync(local
+  generator): ".
+
 
 rsyncd over ssh
 
@@ -351,6 +355,12 @@ Check "refuse options works"
   We need a test case for this...
 
   Was this broken when we changed to popt?
+
+
+String area code
+
+  Test whether this is actually faster than just using malloc().  If
+  it's not (anymore), throw it out.
 	  
 
 
@@ -424,6 +434,9 @@ Test daemon feature to disallow particular options.
 Pipe program that makes slow/jerky connections.
 
 Versions of read() and write() that corrupt the stream, or abruptly fail
+
+Separate makefile target to run rough tests -- or perhaps just run
+them every time?
 
 
 DOCUMENTATION --------------------------------------------------------
