@@ -24,9 +24,6 @@
   */
 #include "rsync.h"
 
-static int64 total_written;
-static int64 total_read;
-
 static int io_multiplexing_out;
 static int io_multiplexing_in;
 static int multiplex_in_fd;
@@ -35,17 +32,7 @@ static time_t last_io;
 static int eof_error=1;
 extern int verbose;
 extern int io_timeout;
-
-
-int64 write_total(void)
-{
-	return total_written;
-}
-
-int64 read_total(void)
-{
-	return total_read;
-}
+extern struct stats stats;
 
 static int buffer_f_in = -1;
 
@@ -108,6 +95,7 @@ static int read_timeout(int fd, char *buf, int len)
 		n = read(fd, buf, len);
 
 		if (n > 0) {
+			stats.total_read += n;
 			buf += n;
 			len -= n;
 			ret += n;
@@ -267,7 +255,6 @@ int32 read_int(int f)
 {
 	char b[4];
 	readfd(f,b,4);
-	total_read += 4;
 	return IVAL(b,0);
 }
 
@@ -286,7 +273,6 @@ int64 read_longint(int f)
 #else
 	if (remote_version >= 16) {
 		readfd(f,b,8);
-		total_read += 8;
 		ret = IVAL(b,0) | (((int64)IVAL(b,4))<<32);
 	}
 #endif
@@ -297,7 +283,6 @@ int64 read_longint(int f)
 void read_buf(int f,char *buf,int len)
 {
 	readfd(f,buf,len);
-	total_read += len;
 }
 
 void read_sbuf(int f,char *buf,int len)
@@ -368,6 +353,8 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 			}
 
 			total += ret;
+			stats.total_written += ret;
+
 			if (io_timeout)
 				last_io = time(NULL);
 			continue;
@@ -446,7 +433,6 @@ void write_int(int f,int32 x)
 	char b[4];
 	SIVAL(b,0,x);
 	writefd(f,b,4);
-	total_written += 4;
 }
 
 void write_longint(int f, int64 x)
@@ -464,13 +450,11 @@ void write_longint(int f, int64 x)
 	SIVAL(b,4,((x>>32)&0xFFFFFFFF));
 
 	writefd(f,b,8);
-	total_written += 8;
 }
 
 void write_buf(int f,char *buf,int len)
 {
 	writefd(f,buf,len);
-	total_written += len;
 }
 
 /* write a string to the connection */

@@ -21,12 +21,13 @@
 
 #include "rsync.h"
 
+extern struct stats stats;
+
 extern int csum_length;
 
 extern int verbose;
 extern int am_server;
 extern int always_checksum;
-extern int64 total_size;
 
 extern int cvs_exclude;
 
@@ -421,7 +422,7 @@ static struct file_struct *make_file(char *fname)
 	}
 
 	if (!S_ISDIR(st.st_mode))
-		total_size += st.st_size;
+		stats.total_size += st.st_size;
 
 	return file;
 }
@@ -525,11 +526,14 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 	char *p,*dir;
 	char lastpath[MAXPATHLEN]="";
 	struct file_list *flist;
+	int64 start_write;
 
 	if (verbose && recurse && !am_server && f != -1) {
 		rprintf(FINFO,"building file list ... ");
 		rflush(FINFO);
 	}
+
+	start_write = stats.total_written;
 
 	flist = (struct file_list *)malloc(sizeof(flist[0]));
 	if (!flist) out_of_memory("send_file_list");
@@ -651,6 +655,8 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 
 	if (f != -1) {
 		io_end_buffering(f);
+		stats.flist_size = stats.total_written - start_write;
+		stats.num_files = flist->count;
 	}
 
 	if (verbose > 2)
@@ -664,11 +670,14 @@ struct file_list *recv_file_list(int f)
 {
   struct file_list *flist;
   unsigned char flags;
+  int64 start_read;
 
   if (verbose && recurse && !am_server) {
     rprintf(FINFO,"receiving file list ... ");
     rflush(FINFO);
   }
+
+  start_read = stats.total_read;
 
   flist = (struct file_list *)malloc(sizeof(flist[0]));
   if (!flist)
@@ -700,7 +709,7 @@ struct file_list *recv_file_list(int f)
     receive_file_entry(&flist->files[i],flags,f);
 
     if (S_ISREG(flist->files[i]->mode))
-      total_size += flist->files[i]->length;
+	    stats.total_size += flist->files[i]->length;
 
     flist->count++;
 
@@ -730,6 +739,9 @@ struct file_list *recv_file_list(int f)
 
   if (verbose > 2)
     rprintf(FINFO,"recv_file_list done\n");
+
+  stats.flist_size = stats.total_read - start_read;
+  stats.num_files = flist->count;
 
   return flist;
 

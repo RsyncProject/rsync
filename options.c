@@ -55,6 +55,7 @@ int am_sender=0;
 int recurse = 0;
 int am_daemon=0;
 int am_client=0;
+int do_stats=0;
 
 int block_size=BLOCK_SIZE;
 
@@ -115,7 +116,8 @@ void usage(int F)
   rprintf(F,"    --version            print version number\n");  
   rprintf(F,"    --daemon             run as a rsync daemon\n");  
   rprintf(F,"    --config FILE        specify alternate rsyncd.conf file\n");  
-  rprintf(F,"    --port PORT          specify alternate rsyncd port number\n");  
+  rprintf(F,"    --port PORT          specify alternate rsyncd port number\n");
+  rprintf(F,"    --stats              give some file transfer stats\n");  
 
   rprintf(F,"\n");
   rprintf(F,"the backup suffix defaults to %s\n",BACKUP_SUFFIX);
@@ -125,7 +127,7 @@ void usage(int F)
 enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
       OPT_EXCLUDE_FROM,OPT_DELETE,OPT_NUMERIC_IDS,OPT_RSYNC_PATH,
       OPT_FORCE,OPT_TIMEOUT,OPT_DAEMON,OPT_CONFIG,OPT_PORT,
-      OPT_INCLUDE, OPT_INCLUDE_FROM};
+      OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS};
 
 static char *short_options = "oblLWHpguDCtcahvrRIxnSe:B:T:z";
 
@@ -170,6 +172,7 @@ static struct option long_options[] = {
   {"temp-dir",    1,     0,    'T'},
   {"compress",	  0,	 0,    'z'},
   {"daemon",      0,     0,    OPT_DAEMON},
+  {"stats",       0,     0,    OPT_STATS},
   {"config",      1,     0,    OPT_CONFIG},
   {"port",        1,     0,    OPT_PORT},
   {0,0,0,0}};
@@ -362,6 +365,10 @@ void parse_arguments(int argc, char *argv[])
 
 	case OPT_DAEMON:
 		am_daemon = 1;
+		break;
+
+	case OPT_STATS:
+		do_stats = 1;
 		break;
 
 	case OPT_CONFIG:

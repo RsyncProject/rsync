@@ -34,13 +34,13 @@ typedef unsigned short tag;
 static int false_alarms;
 static int tag_hits;
 static int matches;
-static int data_transfer;
+static int64 data_transfer;
 
 static int total_false_alarms;
 static int total_tag_hits;
 static int total_matches;
-static int64 total_data_transfer;
 
+extern struct stats stats;
 
 struct target {
   tag t;
@@ -103,8 +103,10 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 	send_token(f,i,buf,last_match,n,i<0?0:s->sums[i].len);
 	data_transfer += n;
 
-	if (i >= 0)
+	if (i >= 0) {
+		stats.matched_data += s->sums[i].len;
 		n += s->sums[i].len;
+	}
   
 	for (j=0;j<n;j+=CHUNK_SIZE) {
 		int n1 = MIN(CHUNK_SIZE,n-j);
@@ -273,7 +275,7 @@ void match_sums(int f,struct sum_struct *s,struct map_struct *buf,OFF_T len)
 	total_tag_hits += tag_hits;
 	total_false_alarms += false_alarms;
 	total_matches += matches;
-	total_data_transfer += data_transfer;
+	stats.literal_data += data_transfer;
 }
 
 void match_report(void)
@@ -282,7 +284,8 @@ void match_report(void)
 		return;
 
 	rprintf(FINFO,
-		"total: matches=%d  tag_hits=%d  false_alarms=%d  data=%ld\n",
+		"total: matches=%d  tag_hits=%d  false_alarms=%d data=%.0f\n",
 		total_matches,total_tag_hits,
-		total_false_alarms,(long)total_data_transfer);
+		total_false_alarms,
+		(double)stats.literal_data);
 }
