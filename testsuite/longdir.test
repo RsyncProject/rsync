@@ -18,7 +18,7 @@ makepath "$longdir" || test_skipped "unable to create long directory"
 touch "$longdir/1" || test_skipped "unable to create files in long directory"
 date > "$longdir/1"
 ls -la / > "$longdir/2"
-checkit "$RSYNC --delete -avH \"$fromdir/\" \"$todir\"" $fromdir/ $todir
+checkit "$RSYNC --delete -avH \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
