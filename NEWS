@@ -4,3 +4,5 @@ rsync changes since last release
   
     * Fix "forward name lookup failed" errors on AIX 4.3.3.  (John
       L. Allen, Martin Pool)
+
+    * Fix compilation on Tru64.  (Albert Chin, Zoong Pham)

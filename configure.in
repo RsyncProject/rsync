@@ -253,7 +253,7 @@ AC_HEADER_TIME
 AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h unistd.h utime.h grp.h)
 AC_CHECK_HEADERS(compat.h sys/param.h ctype.h sys/wait.h sys/ioctl.h)
-AC_CHECK_HEADERS(sys/filio.h string.h stdlib.h sys/socket.h sys/mode.h)
+AC_CHECK_HEADERS(sys/filio.h string.h stdlib.h sys/socket.h sys/mode.h sys/un.h)
 AC_CHECK_HEADERS(glob.h alloca.h mcheck.h sys/sysctl.h arpa/inet.h arpa/nameser.h)
 AC_CHECK_HEADERS(netdb.h)
 AC_CHECK_HEADERS(malloc.h)
@@ -326,7 +326,19 @@ dnl AC_MSG_NOTICE([Looking in libraries: $LIBS])
 AC_CHECK_FUNCS(inet_ntop, , AC_LIBOBJ(lib/inet_ntop)) 
 AC_CHECK_FUNCS(inet_pton, , AC_LIBOBJ(lib/inet_pton))
 
-AC_CHECK_FUNCS(getaddrinfo, , AC_LIBOBJ(lib/getaddrinfo))
+# Tru64 UNIX has getaddrinfo() but has it renamed in libc as
+# something else so we must include <netdb.h> to get the
+# redefinition.
+AC_CHECK_FUNCS(getaddrinfo, ,
+	[AC_MSG_CHECKING([for getaddrinfo by including <netdb.h>])
+	AC_TRY_LINK([#include <sys/types.h>
+	#include <sys/socket.h>
+	#include <netdb.h>],[getaddrinfo(NULL, NULL, NULL, NULL);],
+		[AC_MSG_RESULT([yes])
+		AC_DEFINE(HAVE_GETADDRINFO, 1,
+			[Define if you have the `getaddrinfo' function.])],
+		[AC_MSG_RESULT([no])
+		AC_LIBOBJ(lib/getaddrinfo)])])
 AC_CHECK_FUNCS(getnameinfo, , AC_LIBOBJ(lib/getnameinfo))
 
 AC_CHECK_MEMBER([struct sockaddr.sa_len], 
@@ -359,7 +371,7 @@ dnl every platform has a memcmp that can do at least that.
 dnl AC_FUNC_MEMCMP
 
 AC_FUNC_UTIME_NULL
-AC_CHECK_FUNCS(waitpid wait4 getcwd strdup strerror chown chmod mknod)
+AC_CHECK_FUNCS(waitpid wait4 getcwd strdup strerror chown chmod mknod mkfifo)
 AC_CHECK_FUNCS(fchmod fstat strchr readlink link utime utimes strftime)
 AC_CHECK_FUNCS(memmove lchown vsnprintf snprintf asprintf setsid glob strpbrk)
 AC_CHECK_FUNCS(strlcat strlcpy mtrace mallinfo setgroups)
