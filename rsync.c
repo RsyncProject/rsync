@@ -191,23 +191,33 @@ void sig_int(void)
 	exit_cleanup(RERR_SIGNAL);
 }
 
+int make_backup(char *fname)
+{
+	char fnamebak[MAXPATHLEN];
+	if (strlen(fname) + strlen(backup_suffix) > (MAXPATHLEN-1)) {
+		rprintf(FERROR,"backup filename too long\n");
+		return 0;
+	}
+
+	slprintf(fnamebak,sizeof(fnamebak)-1,"%s%s",fname,backup_suffix);
+	if (do_rename(fname,fnamebak) != 0) {
+		if (errno != ENOENT) {
+			rprintf(FERROR,"rename %s %s : s\n",fname,fnamebak,strerror(errno));
+			return 0;
+		}
+	} else if (verbose > 1) {
+		rprintf(FINFO,"backed up %s to %s\n",fname,fnamebak);
+	}
+	return 1;
+}
+
 
 /* finish off a file transfer, renaming the file and setting the permissions
    and ownership */
 void finish_transfer(char *fname, char *fnametmp, struct file_struct *file)
 {
-	if (make_backups) {
-		char fnamebak[MAXPATHLEN];
-		if (strlen(fname) + strlen(backup_suffix) > (MAXPATHLEN-1)) {
-			rprintf(FERROR,"backup filename too long\n");
-			return;
-		}
-		slprintf(fnamebak,sizeof(fnamebak),"%s%s",fname,backup_suffix);
-		if (do_rename(fname,fnamebak) != 0 && errno != ENOENT) {
-			rprintf(FERROR,"rename %s %s : %s\n",fname,fnamebak,strerror(errno));
-			return;
-		}
-	}
+	if (make_backups && !make_backup(fname))
+		return;
 
 	/* move tmp file over real file */
 	if (do_rename(fnametmp,fname) != 0) {

@@ -33,6 +33,8 @@ extern int cvs_exclude;
 extern int io_error;
 extern char *tmpdir;
 extern char *compare_dest;
+extern int make_backups;
+extern char *backup_suffix;
 
 
 static struct delete_list {
@@ -139,8 +141,15 @@ static void delete_files(struct file_list *flist)
 			    S_ISDIR(local_file_list->files[i]->mode))
 				add_delete_entry(local_file_list->files[i]);
 			if (-1 == flist_find(flist,local_file_list->files[i])) {
-				delete_one(local_file_list->files[i]);
-			}    
+				char *f = f_name(local_file_list->files[i]);
+				int k = strlen(f) - strlen(backup_suffix);
+				if (make_backups && ((k <= 0) ||
+					    (strcmp(f+k,backup_suffix) != 0))) {
+					(void) make_backup(f);
+				} else {
+					delete_one(local_file_list->files[i]);
+				}
+			}
 		}
 		flist_free(local_file_list);
 		free(name);
