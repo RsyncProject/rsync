@@ -486,8 +486,9 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
   char *buf;
   int i;
 
-  if (verbose > 2)
+  if (verbose > 2) {
     fprintf(stderr,"recv_files(%d) starting\n",flist->count);
+  }
 
   if (recurse && delete_mode && !local_name && flist->count>0) {
     delete_files(flist);
@@ -560,7 +561,10 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
       /* recv file data */
       receive_data(f_in,buf,fd2,fname);
 
-      if (fd1 != -1) close(fd1);
+      if (fd1 != -1) {
+	unmap_file(buf,st.st_size);
+	close(fd1);
+      }
       close(fd2);
 
       if (verbose > 2)
@@ -582,8 +586,6 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
       }
 
       cleanup_fname = NULL;
-
-      unmap_file(buf,st.st_size);
 
       set_perms(fname,&flist->files[i],NULL,0);
     }
