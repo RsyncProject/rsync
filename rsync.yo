@@ -290,9 +290,9 @@ verb(
  -R, --relative              use relative path names
      --no-relative           turn off --relative
      --no-implied-dirs       don't send implied dirs with -R
- -b, --backup                make backups (default ~ suffix)
+ -b, --backup                make backups (see --suffix)
      --backup-dir            make backups into this directory
-     --suffix=SUFFIX         define backup suffix
+     --suffix=SUFFIX         define backup suffix (default ~ w/o --backup-dir)
  -u, --update                update only (don't overwrite newer files)
  -l, --links                 copy symlinks as symlinks
  -L, --copy-links            copy the referent of symlinks
@@ -452,9 +452,10 @@ the --no-implied-dirs option would omit both of these implied dirs,
 which means that if "/path" was a real directory on one machine and a
 symlink of the other machine, rsync would not try to change this.
 
-dit(bf(-b, --backup)) With this option preexisting destination files are
-renamed with a ~ extension as each file is transferred.  You can
-control the backup suffix using the --suffix option.
+dit(bf(-b, --backup)) With this option, preexisting destination files are
+renamed as each file is transferred or deleted.  You can control where the
+backup file goes and what (if any) suffix gets appended using the
+--backup-dir and --suffix options.
 
 dit(bf(--backup-dir=DIR)) In combination with the --backup option, this
 tells rsync to store all backups in the specified directory. This is
@@ -464,9 +465,8 @@ specify a backup suffix using the --suffix option
 will keep their original filenames).
 
 dit(bf(--suffix=SUFFIX)) This option allows you to override the default
-backup suffix used with the -b option. The default is a ~.
-If --backup-dir and --suffix are both specified,
-the SUFFIX is appended to the filename even in the backup directory.
+backup suffix used with the --backup (-b) option. The default suffix is a ~
+if no --backup-dir was specified, otherwise it is an empty string.
 
 dit(bf(-u, --update)) This forces rsync to skip any files for which the
 destination file already exists and has a date later than the source
