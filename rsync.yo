@@ -318,7 +318,7 @@ verb(
      --backup-dir            make backups into this directory
      --suffix=SUFFIX         backup suffix (default ~ w/o --backup-dir)
  -u, --update                update only (don't overwrite newer files)
-     --inplace               update the destination files inplace
+     --inplace               update the destination files in-place
  -K, --keep-dirlinks         treat symlinked dir on receiver as dir
  -l, --links                 copy symlinks as symlinks
  -L, --copy-links            copy the referent of all symlinks
@@ -535,23 +535,25 @@ from the sender.
 
 dit(bf(--inplace)) This causes rsync not to create a new copy of the file
 and then move it into place.  Instead rsync will overwrite the existing
-file, meaning that the rsync algorithm can't extract the full amount of
-network reduction it might otherwise (since it does not yet try to sort
-data matches -- a future version may improve this).
+file, meaning that the rsync algorithm can't accomplish the full amount of
+network reduction it might be able to otherwise (since it does not yet try
+to sort data matches).  One exception to this is if you combine the option
+with --backup, since rsync is smart enough to use the backup file as the
+basis file for the transfer.
 
 This option is useful for transfer of large files with block-based changes
 or appended data, and also on systems that are disk bound, not network
 bound.
 
 The option implies --partial (since an interrupted transfer does not delete
-the file), but conflicts with --partial-dir, --compare-dest, --copy-dest, and
---link-dest (a future rsync version will hopefully update the protocol to
-remove some of these restrictions).
+the file), but conflicts with --partial-dir.  Prior to rsync 2.6.4
+--inplace was also incompatible with --compare-dest, --copy-dest, and
+--link-dest.
 
 WARNING: The file's data will be in an inconsistent state during the
 transfer (and possibly afterward if the transfer gets interrupted), so you
 should not use this option to update files that are in use.  Also note that
-rsync will be unable to update a file inplace that is not writable by the
+rsync will be unable to update a file in-place that is not writable by the
 receiving user.
 
 dit(bf(-l, --links)) When symlinks are encountered, recreate the
@@ -873,8 +875,8 @@ See also --compare-dest and --copy-dest.
 
 Note that rsync versions prior to 2.6.1 had a bug that could prevent
 --link-dest from working properly for a non-root user when -o was specified
-(or implied by -a).  If the receiving rsync is not new enough, you can work
-around this bug by avoiding the -o option.
+(or implied by -a).  You can work-around this bug by avoiding the -o option
+when sending to an old rsync.
 
 dit(bf(-z, --compress)) With this option, rsync compresses any data from
 the files that it sends to the destination machine.  This
