@@ -1515,7 +1515,7 @@ static void output_flist(struct file_list *flist, const char *whose_list)
 }
 
 
-enum fnc_state { fnc_DIR, fnc_SLASH, fnc_BASE, fnc_TRAILING };
+enum fnc_state { s_DIR, s_SLASH, s_BASE, s_TRAILING };
 
 /* Compare the names of two file_struct entities, similar to how strcmp()
  * would do if it were operating on the joined strings.  The only difference
@@ -1547,62 +1547,62 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 	if (c1 == c2)
 		c1 = c2 = NULL;
 	if (!c1) {
-		state1 = fnc_BASE;
+		state1 = s_BASE;
 		c1 = (uchar*)f1->basename;
 	} else if (!*c1) {
-		state1 = fnc_SLASH;
+		state1 = s_SLASH;
 		c1 = (uchar*)"/";
 	} else
-		state1 = fnc_DIR;
+		state1 = s_DIR;
 	if (!c2) {
-		state2 = fnc_BASE;
+		state2 = s_BASE;
 		c2 = (uchar*)f2->basename;
 	} else if (!*c2) {
-		state2 = fnc_SLASH;
+		state2 = s_SLASH;
 		c2 = (uchar*)"/";
 	} else
-		state2 = fnc_DIR;
+		state2 = s_DIR;
 
 	while (1) {
 		if ((dif = (int)*c1 - (int)*c2) != 0)
 			break;
 		if (!*++c1) {
 			switch (state1) {
-			case fnc_DIR:
-				state1 = fnc_SLASH;
+			case s_DIR:
+				state1 = s_SLASH;
 				c1 = (uchar*)"/";
 				break;
-			case fnc_SLASH:
-				state1 = fnc_BASE;
+			case s_SLASH:
+				state1 = s_BASE;
 				c1 = (uchar*)f1->basename;
 				break;
-			case fnc_BASE:
-				state1 = fnc_TRAILING;
+			case s_BASE:
+				state1 = s_TRAILING;
 				if (protocol_version >= 29 && S_ISDIR(f1->mode))
 					c1 = (uchar*)"/";
 				break;
-			case fnc_TRAILING:
+			case s_TRAILING:
 				break;
 			}
 		}
 		if (!*++c2) {
 			switch (state2) {
-			case fnc_DIR:
-				state2 = fnc_SLASH;
+			case s_DIR:
+				state2 = s_SLASH;
 				c2 = (uchar*)"/";
 				break;
-			case fnc_SLASH:
-				state2 = fnc_BASE;
+			case s_SLASH:
+				state2 = s_BASE;
 				c2 = (uchar*)f2->basename;
 				break;
-			case fnc_BASE:
-				if (state1 == fnc_TRAILING)
+			case s_BASE:
+				if (state1 == s_TRAILING)
 					return 0;
-				state2 = fnc_TRAILING;
+				state2 = s_TRAILING;
 				if (protocol_version >= 29 && S_ISDIR(f2->mode))
 					c2 = (uchar*)"/";
 				break;
-			case fnc_TRAILING:
+			case s_TRAILING:
 				break;
 			}
 		}
