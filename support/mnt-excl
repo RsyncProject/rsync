@@ -20,6 +20,7 @@
 use strict;
 use Cwd 'abs_path';
 
+my $file = '/proc/mounts';
 my $dir = shift || '/';
 $dir = abs_path($dir);
 $dir =~ s#([^/]*)$##;
@@ -27,7 +28,7 @@ my $trailing = $1;
 $trailing = '' if $trailing eq '.' || !-d "$dir$trailing";
 $trailing .= '/' if $trailing ne '';
 
-open(IN, '/proc/mounts') or die $!;
+open(IN, $file) or die "Unable to open $file: $!\n";
 while (<IN>) {
     $_ = (split)[1];
     next unless s#^\Q$dir$trailing\E##o && $_ ne '';
