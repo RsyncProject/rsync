@@ -98,6 +98,7 @@ static BOOL bLoaded = False;
 typedef struct
 {
 	char *motd_file;
+	int syslog_facility;
 } global;
 
 static global Globals;
@@ -150,6 +151,7 @@ static BOOL bInGlobalSection = True;
 static struct parm_struct parm_table[] =
 {
   {"motd file",        P_STRING,  P_GLOBAL, &Globals.motd_file,    NULL,   0},
+  {"syslog facility",  P_INTEGER, P_GLOBAL, &Globals.syslog_facility, NULL,0},
   {"name",             P_STRING,  P_LOCAL,  &sDefault.name,        NULL,   0},
   {"comment",          P_STRING,  P_LOCAL,  &sDefault.comment,     NULL,   0},
   {"path",             P_STRING,  P_LOCAL,  &sDefault.path,        NULL,   0},
@@ -168,6 +170,9 @@ Initialise the global parameter structure.
 ***************************************************************************/
 static void init_globals(void)
 {
+#ifdef LOG_DAEMON
+	Globals.syslog_facility = LOG_DAEMON;
+#endif
 }
 
 /***************************************************************************
@@ -203,6 +208,7 @@ static void init_locals(void)
 
 
 FN_GLOBAL_STRING(lp_motd_file, &Globals.motd_file)
+FN_GLOBAL_INTEGER(lp_syslog_facility, &Globals.syslog_facility)
 FN_LOCAL_STRING(lp_name, name)
 FN_LOCAL_STRING(lp_comment, comment)
 FN_LOCAL_STRING(lp_path, path)

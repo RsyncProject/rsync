@@ -55,7 +55,7 @@ void rprintf(int fd, const char *format, ...)
 		if (!initialised) {
 			initialised = 1;
 #ifdef LOG_DAEMON
-			openlog("rsyncd", LOG_PID, LOG_DAEMON);
+			openlog("rsyncd", LOG_PID, lp_syslog_facility());
 #else
 			openlog("rsyncd", LOG_PID);
 #endif
