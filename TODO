@@ -344,6 +344,13 @@ chmod:
 Incorrect timestamps (Debian #100295)
 
   A bit hard to believe, but apparently it happens.
+
+
+Check "refuse options works"
+
+  We need a test case for this...
+
+  Was this broken when we changed to popt?
 	  
 
 
