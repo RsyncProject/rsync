@@ -166,11 +166,11 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				write_shortint(f_out, iflags);
 				if (am_server) {
 					if (am_daemon && !dry_run && see_item)
-						log_recv(file, &stats, iflags);
+						log_send(file, &stats, iflags);
 				} else if (see_item || iflags & ITEM_UPDATING
 				    || (S_ISDIR(file->mode)
 				     && iflags & ITEM_REPORT_TIME))
-					log_recv(file, &stats, iflags);
+					log_send(file, &stats, iflags);
 				continue;
 			}
 		} else
