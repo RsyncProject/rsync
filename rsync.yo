@@ -1,19 +1,19 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsync)(1)(9 Feb 1999)()()
+manpage(rsync)(1)(10 Feb 1999)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
-rsync [options] [user@]host:path path
+rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST
 
-rsync [options] path [user@]host:path
+rsync [OPTION]... [USER@]HOST:SRC DEST
 
-rsync [options] path path
+rsync [OPTION]... SRC [SRC]... DEST
 
-rsync [options] [user@]host::module[/path] path
+rsync [OPTION]... [USER@]HOST::SRC [DEST]
 
-rsync [options] path [user@]host::module[/path]
+rsync [OPTION]... SRC [SRC]... [USER@]HOST::DEST
 
-rsync [options] rsync://[user@]host[:port]/module/path path
+rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC [DEST]
 
 manpagedescription()
 
@@ -211,12 +211,15 @@ Here is a short summary of the options available in rsync. Please refer
 to the detailed description below for a complete description.
 
 verb(
-Usage: rsync [OPTION]... SRC [USER@]HOST:DEST
+Usage: rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST
   or   rsync [OPTION]... [USER@]HOST:SRC DEST
-  or   rsync [OPTION]... SRC DEST
+  or   rsync [OPTION]... SRC [SRC]... DEST
   or   rsync [OPTION]... [USER@]HOST::SRC [DEST]
-  or   rsync [OPTION]... SRC [USER@]HOST::DEST
+  or   rsync [OPTION]... SRC [SRC]... [USER@]HOST::DEST
   or   rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC [DEST]
+SRC on single-colon remote HOST will be expanded by remote shell
+SRC on server remote HOST may contain shell wildcards or multiple
+  sources separated by space as long as they have same top-level
 
 Options
  -v, --verbose               increase verbosity
@@ -225,7 +228,8 @@ Options
  -a, --archive               archive mode
  -r, --recursive             recurse into directories
  -R, --relative              use relative path names
- -b, --backup                make backups (default ~ extension)
+ -b, --backup                make backups (default ~ suffix)
+     --suffix=SUFFIX         override backup suffix
  -u, --update                update only (don't overwrite newer files)
  -l, --links                 preserve soft links
  -L, --copy-links            treat soft links like regular files
@@ -240,7 +244,7 @@ Options
  -n, --dry-run               show what would have been transferred
  -W, --whole-file            copy whole files, no incremental checks
  -x, --one-file-system       don't cross filesystem boundaries
- -B, --block-size=SIZE       checksum blocking size
+ -B, --block-size=SIZE       checksum blocking size (default 700)
  -e, --rsh=COMMAND           specify rsh replacement
      --rsync-path=PATH       specify path to rsync on the remote machine
  -C, --cvs-exclude           auto ignore files in the same way CVS does
@@ -254,18 +258,17 @@ Options
      --compare-dest=DIR      also compare destination files relative to DIR
  -z, --compress              compress file data
      --exclude=PATTERN       exclude files matching PATTERN
-     --exclude-from=FILE     exclude files listed in FILE
+     --exclude-from=FILE     exclude patterns listed in FILE
      --include=PATTERN       don't exclude files matching PATTERN
-     --include-from=FILE     don't exclude files listed in FILE
-     --suffix=SUFFIX         override backup suffix
+     --include-from=FILE     don't exclude patterns listed in FILE
      --version               print version number
      --daemon                run as a rsync daemon
      --config=FILE           specify alternate rsyncd.conf file
      --port=PORT             specify alternate rsyncd port number
      --stats                 give some file transfer stats
      --progress              show progress during transfer
-     --password-file=FILE    get password from FILE
      --log-format=FORMAT     log file transfers using specified format
+     --password-file=FILE    get password from FILE
  -h, --help                  show this help screen
 )
 
@@ -331,6 +334,9 @@ machine. The full path name is preserved.
 dit(bf(-b, --backup)) With this option preexisting destination files are
 renamed with a ~ extension as each file is transferred.  You can
 control the backup suffix using the --suffix option.
+
+dit(bf(--suffix SUFFIX)) This option allows you to override the default
+backup suffix used with the -b option. The default is a ~.
 
 dit(bf(-u, --update)) This forces rsync to skip any files for which the
 destination file already exists and has a date later than the source
@@ -494,9 +500,6 @@ files listed in the CVSIGNORE environment variable (space delimited).
 
 Finally in each directory any files listed in the .cvsignore file in
 that directory are added to the list.
-
-dit(bf(--suffix SUFFIX)) This option allows you to override the default
-backup suffix used with the -b option. The default is a ~.
 
 dit(bf(--csum-length LENGTH)) By default the primary checksum used in
 rsync is a very strong 16 byte MD4 checksum. In most cases you will

@@ -83,12 +83,15 @@ void usage(int F)
 
   rprintf(F,"rsync is a file transfer program capable of efficient remote update\nvia a fast differencing algorithm.\n\n");
 
-  rprintf(F,"Usage: rsync [OPTION]... SRC [USER@]HOST:DEST\n");
+  rprintf(F,"Usage: rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST\n");
   rprintf(F,"  or   rsync [OPTION]... [USER@]HOST:SRC DEST\n");
-  rprintf(F,"  or   rsync [OPTION]... SRC DEST\n");
+  rprintf(F,"  or   rsync [OPTION]... SRC [SRC]... DEST\n");
   rprintf(F,"  or   rsync [OPTION]... [USER@]HOST::SRC [DEST]\n");
-  rprintf(F,"  or   rsync [OPTION]... SRC [USER@]HOST::DEST\n");
+  rprintf(F,"  or   rsync [OPTION]... SRC [SRC]... [USER@]HOST::DEST\n");
   rprintf(F,"  or   rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC [DEST]\n");
+  rprintf(F,"SRC on single-colon remote HOST will be expanded by remote shell\n");
+  rprintf(F,"SRC on server remote HOST may contain shell wildcards or multiple\n");
+  rprintf(F,"  sources separated by space as long as they have same top-level\n");
   rprintf(F,"\nOptions\n");
   rprintf(F," -v, --verbose               increase verbosity\n");
   rprintf(F," -q, --quiet                 decrease verbosity\n");
@@ -96,7 +99,8 @@ void usage(int F)
   rprintf(F," -a, --archive               archive mode\n");
   rprintf(F," -r, --recursive             recurse into directories\n");
   rprintf(F," -R, --relative              use relative path names\n");
-  rprintf(F," -b, --backup                make backups (default ~ extension)\n");
+  rprintf(F," -b, --backup                make backups (default %s suffix)\n",BACKUP_SUFFIX);
+  rprintf(F,"     --suffix=SUFFIX         override backup suffix\n");  
   rprintf(F," -u, --update                update only (don't overwrite newer files)\n");
   rprintf(F," -l, --links                 preserve soft links\n");
   rprintf(F," -L, --copy-links            treat soft links like regular files\n");
@@ -111,7 +115,7 @@ void usage(int F)
   rprintf(F," -n, --dry-run               show what would have been transferred\n");
   rprintf(F," -W, --whole-file            copy whole files, no incremental checks\n");
   rprintf(F," -x, --one-file-system       don't cross filesystem boundaries\n");
-  rprintf(F," -B, --block-size=SIZE       checksum blocking size\n");  
+  rprintf(F," -B, --block-size=SIZE       checksum blocking size (default %d)\n",BLOCK_SIZE);  
   rprintf(F," -e, --rsh=COMMAND           specify rsh replacement\n");
   rprintf(F,"     --rsync-path=PATH       specify path to rsync on the remote machine\n");
   rprintf(F," -C, --cvs-exclude           auto ignore files in the same way CVS does\n");
@@ -128,7 +132,6 @@ void usage(int F)
   rprintf(F,"     --exclude-from=FILE     exclude patterns listed in FILE\n");
   rprintf(F,"     --include=PATTERN       don't exclude files matching PATTERN\n");
   rprintf(F,"     --include-from=FILE     don't exclude patterns listed in FILE\n");
-  rprintf(F,"     --suffix=SUFFIX         override backup suffix\n");  
   rprintf(F,"     --version               print version number\n");  
   rprintf(F,"     --daemon                run as a rsync daemon\n");  
   rprintf(F,"     --config=FILE           specify alternate rsyncd.conf file\n");  
@@ -140,8 +143,6 @@ void usage(int F)
   rprintf(F," -h, --help                  show this help screen\n");
 
   rprintf(F,"\n");
-  rprintf(F,"the backup suffix defaults to %s\n",BACKUP_SUFFIX);
-  rprintf(F,"the block size defaults to %d\n",BLOCK_SIZE);  
 
   rprintf(F,"\nPlease see the rsync(1) and rsyncd.conf(5) man pages for full documentation\n");
   rprintf(F,"See http://rsync.samba.org/ for updates and bug reports\n");

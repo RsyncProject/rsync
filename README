@@ -22,20 +22,25 @@ Basically you use rsync just like rcp, but rsync has many additional options.
 
 Here is a brief description of rsync usage:
 
-Usage: rsync [OPTION]... SRC [USER@]HOST:DEST
+Usage: rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST
   or   rsync [OPTION]... [USER@]HOST:SRC DEST
-  or   rsync [OPTION]... SRC DEST
+  or   rsync [OPTION]... SRC [SRC]... DEST
   or   rsync [OPTION]... [USER@]HOST::SRC [DEST]
-  or   rsync [OPTION]... SRC [USER@]HOST::DEST
+  or   rsync [OPTION]... SRC [SRC]... [USER@]HOST::DEST
   or   rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC [DEST]
+SRC on single-colon remote HOST will be expanded by remote shell
+SRC on server remote HOST may contain shell wildcards or multiple
+  sources separated by space as long as they have same top-level
 
 Options
  -v, --verbose               increase verbosity
+ -q, --quiet                 decrease verbosity
  -c, --checksum              always checksum
  -a, --archive               archive mode
  -r, --recursive             recurse into directories
  -R, --relative              use relative path names
- -b, --backup                make backups (default ~ extension)
+ -b, --backup                make backups (default ~ suffix)
+     --suffix=SUFFIX         override backup suffix
  -u, --update                update only (don't overwrite newer files)
  -l, --links                 preserve soft links
  -L, --copy-links            treat soft links like regular files
@@ -50,7 +55,7 @@ Options
  -n, --dry-run               show what would have been transferred
  -W, --whole-file            copy whole files, no incremental checks
  -x, --one-file-system       don't cross filesystem boundaries
- -B, --block-size=SIZE       checksum blocking size
+ -B, --block-size=SIZE       checksum blocking size (default 700)
  -e, --rsh=COMMAND           specify rsh replacement
      --rsync-path=PATH       specify path to rsync on the remote machine
  -C, --cvs-exclude           auto ignore files in the same way CVS does
@@ -67,7 +72,6 @@ Options
      --exclude-from=FILE     exclude patterns listed in FILE
      --include=PATTERN       don't exclude files matching PATTERN
      --include-from=FILE     don't exclude patterns listed in FILE
-     --suffix=SUFFIX         override backup suffix
      --version               print version number
      --daemon                run as a rsync daemon
      --config=FILE           specify alternate rsyncd.conf file
@@ -75,7 +79,9 @@ Options
      --stats                 give some file transfer stats
      --progress              show progress during transfer
      --log-format=FORMAT     log file transfers using specified format
+     --password-file=FILE    get password from FILE
  -h, --help                  show this help screen
+
 
 
 SETUP
