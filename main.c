@@ -125,7 +125,7 @@ static void report(int f)
 }
 
 
-/* Start the remote shell. */
+/* Start the remote shell.   cmd may be NULL to use the default. */
 /* TODO: When the shell exits, look at its return value, as this may
  * well tell us if something went wrong in trying to connect to the
  * remote machine.  Although it doesn't seem to be specified anywhere,
