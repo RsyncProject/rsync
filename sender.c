@@ -38,22 +38,6 @@ extern struct stats stats;
  * and transmits them to the receiver.  The sender process runs on the
  * machine holding the source files.
  **/
-void read_sum_head(int f, struct sum_struct *sum)
-{
-	sum->count = read_int(f);
-	sum->blength = read_int(f);
-	if (protocol_version < 27) {
-		sum->s2length = csum_length;
-	} else {
-		sum->s2length = read_int(f);
-		if (sum->s2length > MD4_SUM_LENGTH) {
-			rprintf(FERROR, "Invalid checksum length %ld\n",
-			    (long)sum->s2length);
-			exit_cleanup(RERR_PROTOCOL);
-		}
-	}
-	sum->remainder = read_int(f);
-}
 
 /**
  * Receive the checksums for a buffer
@@ -214,8 +198,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		}
 
 		if (st.st_size) {
-			OFF_T map_size = MAX((OFF_T)s->blength * 3, MAX_MAP_SIZE);
-			mbuf = map_file(fd, st.st_size, map_size, s->blength);
+			int32 read_size = MAX(s->blength * 3, MAX_MAP_SIZE);
+			mbuf = map_file(fd, st.st_size, read_size, s->blength);
 		} else
 			mbuf = NULL;
 
