@@ -280,7 +280,8 @@ static char *get_local_name(struct file_list *flist,char *name)
 		return name;
 
 	if (do_mkdir(name,0777 & ~orig_umask) != 0) {
-		rprintf(FERROR,"mkdir %s : %s (1)\n",name,strerror(errno));
+		rprintf(FERROR, RSYNC_NAME ": mkdir %s: %s\n",
+			name, strerror(errno));
 		exit_cleanup(RERR_FILEIO);
 	} else {
 		if (verbose > 0)
@@ -288,8 +289,8 @@ static char *get_local_name(struct file_list *flist,char *name)
 	}
 
 	if (!push_dir(name, 0)) {
-		rprintf(FERROR,"push_dir %s : %s (2)\n",
-			name,strerror(errno));
+		rprintf(FERROR, RSYNC_NAME ": push_dir %s: %s\n",
+			name, strerror(errno));
 		exit_cleanup(RERR_FILESELECT);
 	}
 
