@@ -498,8 +498,24 @@ static int rsync_module(int f_in, int f_out, int i)
 		 * get the error back to the client.  This means getting
 		 * the protocol setup finished first in later versions. */
 		setup_protocol(f_out, f_in);
-		if (files_from && !am_sender && strcmp(files_from, "-") != 0)
-			write_byte(f_out, 0);
+		if (!am_sender) {
+			/* Since we failed in our option parsing, we may not
+			 * have finished parsing that the client sent us a
+			 * --files-from option, so look for it manually.
+			 * Without this, the socket would be in the wrong
+			 * state for the upcoming error message. */
+			if (!files_from) {
+				int i;
+				for (i = 0; i < argc; i++) {
+					if (strncmp(argv[i], "--files-from", 12) == 0) {
+						files_from = "";
+						break;
+					}
+				}
+			}
+			if (files_from)
+				write_byte(f_out, 0);
+		}
 		io_start_multiplex_out();
 	}
 
