@@ -597,7 +597,7 @@ char *client_name(int fd)
 	if (getpeername(fd, (struct sockaddr *)&ss, &length)) {
 		/* FIXME: Can we really not continue? */
 		rprintf(FERROR, RSYNC_NAME ": getpeername on fd%d failed: %s\n",
-			strerror(errno));			
+			fd, strerror(errno));
 		exit_cleanup(RERR_SOCKETIO);
 	}
 
