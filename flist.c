@@ -963,7 +963,7 @@ skip_filters:
 			file->mode = save_mode;
 	}
 
-	if (!S_ISDIR(st.st_mode))
+	if (S_ISREG(st.st_mode) || S_ISLNK(st.st_mode))
 		stats.total_size += st.st_size;
 
 	return file;
