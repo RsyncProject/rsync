@@ -46,6 +46,7 @@ extern int recurse;
 extern int delete_mode;
 extern int cvs_exclude;
 extern int am_root;
+extern int relative_paths;
 
 /*
   free a sums struct
@@ -277,8 +278,14 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
       }
       statret = -1;
     }
-    if (statret != 0 && mkdir(fname,file->mode) != 0 && errno != EEXIST)
-      fprintf(FERROR,"mkdir %s : %s\n",fname,strerror(errno));
+    if (statret != 0 && mkdir(fname,file->mode) != 0 && errno != EEXIST) {
+	    if (!(relative_paths && errno==ENOENT && 
+		  create_directory_path(fname)==0 && 
+		  mkdir(fname,file->mode)==0)) {
+		    fprintf(FERROR,"mkdir %s : %s (2)\n",
+			    fname,strerror(errno));
+	    }
+    }
     if (set_perms(fname,file,NULL,0) && verbose) 
       fprintf(FINFO,"%s/\n",fname);
     return;
@@ -644,6 +651,10 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	continue;
       }
       fd2 = open(fnametmp,O_WRONLY|O_CREAT,file->mode);
+      if (relative_paths && errno == ENOENT && 
+	  create_directory_path(fnametmp) == 0) {
+	      fd2 = open(fnametmp,O_WRONLY|O_CREAT,file->mode);
+      }
       if (fd2 == -1) {
 	fprintf(FERROR,"open %s : %s\n",fnametmp,strerror(errno));
 	receive_data(f_in,buf,-1,NULL);

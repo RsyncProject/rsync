@@ -49,6 +49,7 @@ int sparse_files=0;
 int do_compression=0;
 int am_root=0;
 int orig_umask=0;
+int relative_paths=0;
 
 extern int csum_length;
 
@@ -134,6 +135,8 @@ static void server_options(char **args,int *argc)
     argstr[x++] = 'C';
   if (ignore_times)
     argstr[x++] = 'I';
+  if (relative_paths)
+    argstr[x++] = 'R';
   if (one_file_system)
     argstr[x++] = 'x';
   if (sparse_files)
@@ -199,7 +202,7 @@ int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f_out)
   if (path && *path) {
     char *dir = strdup(path);
     p = strrchr(dir,'/');
-    if (p) {
+    if (p && !relative_paths) {
       *p = 0;
       if (!dir[0])
 	args[argc++] = "/";
@@ -240,7 +243,7 @@ static char *get_local_name(struct file_list *flist,char *name)
   if (stat(name,&st) == 0) {
     if (S_ISDIR(st.st_mode)) {
       if (chdir(name) != 0) {
-	fprintf(FERROR,"chdir %s : %s\n",name,strerror(errno));
+	fprintf(FERROR,"chdir %s : %s (1)\n",name,strerror(errno));
 	exit_cleanup(1);
       }
       return NULL;
@@ -259,14 +262,14 @@ static char *get_local_name(struct file_list *flist,char *name)
     return NULL;
 
   if (mkdir(name,0777 & ~orig_umask) != 0) {
-    fprintf(FERROR,"mkdir %s : %s\n",name,strerror(errno));
+    fprintf(FERROR,"mkdir %s : %s (1)\n",name,strerror(errno));
     exit_cleanup(1);
   } else {
     fprintf(FINFO,"created directory %s\n",name);
   }
 
   if (chdir(name) != 0) {
-    fprintf(FERROR,"chdir %s : %s\n",name,strerror(errno));
+    fprintf(FERROR,"chdir %s : %s (2)\n",name,strerror(errno));
     exit_cleanup(1);
   }
 
@@ -285,8 +288,8 @@ void do_server_sender(int argc,char *argv[])
   if (verbose > 2)
     fprintf(FERROR,"server_sender starting pid=%d\n",(int)getpid());
   
-  if (chdir(dir) != 0) {
-    fprintf(FERROR,"chdir %s: %s\n",dir,strerror(errno));
+  if (!relative_paths && chdir(dir) != 0) {
+    fprintf(FERROR,"chdir %s: %s (3)\n",dir,strerror(errno));
     exit_cleanup(1);
   }
   argc--;
@@ -361,7 +364,7 @@ void do_server_recv(int argc,char *argv[])
     argc--;
     argv++;
     if (chdir(dir) != 0) {
-      fprintf(FERROR,"chdir %s : %s\n",dir,strerror(errno));
+      fprintf(FERROR,"chdir %s : %s (4)\n",dir,strerror(errno));
       exit_cleanup(1);
     }    
   }
@@ -399,6 +402,7 @@ static void usage(FILE *f)
   fprintf(f,"-c, --checksum           always checksum\n");
   fprintf(f,"-a, --archive            archive mode (same as -rlptDog)\n");
   fprintf(f,"-r, --recursive          recurse into directories\n");
+  fprintf(f,"-R, --relative           use relative path names\n");
   fprintf(f,"-b, --backup             make backups (default ~ extension)\n");
   fprintf(f,"-u, --update             update only (don't overwrite newer files)\n");
   fprintf(f,"-l, --links              preserve soft links\n");
@@ -431,7 +435,7 @@ static void usage(FILE *f)
 enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
       OPT_EXCLUDE_FROM,OPT_DELETE,OPT_RSYNC_PATH};
 
-static char *short_options = "oblHpguDCtcahvrIxnSe:B:z";
+static char *short_options = "oblHpguDCtcahvrRIxnSe:B:z";
 
 static struct option long_options[] = {
   {"version",     0,     0,    OPT_VERSION},
@@ -453,6 +457,7 @@ static struct option long_options[] = {
   {"update",      0,     0,    'u'},
   {"verbose",     0,     0,    'v'},
   {"recursive",   0,     0,    'r'},
+  {"relative",    0,     0,    'R'},
   {"devices",     0,     0,    'D'},
   {"perms",       0,     0,    'p'},
   {"links",       0,     0,    'l'},
@@ -617,6 +622,10 @@ int main(int argc,char *argv[])
 
 	case 'r':
 	  recurse = 1;
+	  break;
+
+	case 'R':
+	  relative_paths = 1;
 	  break;
 
 	case 'e':

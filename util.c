@@ -127,6 +127,7 @@ int piped_child(char **command,int *f_in,int *f_out)
 
   if (pid == 0)
     {
+      extern int orig_umask;
       if (dup2(to_child_pipe[0], STDIN_FILENO) < 0 ||
 	  close(to_child_pipe[1]) < 0 ||
 	  close(from_child_pipe[0]) < 0 ||
@@ -136,6 +137,7 @@ int piped_child(char **command,int *f_in,int *f_out)
       }
       if (to_child_pipe[0] != STDIN_FILENO) close(to_child_pipe[0]);
       if (from_child_pipe[1] != STDOUT_FILENO) close(from_child_pipe[1]);
+      umask(orig_umask);
       execvp(command[0], command);
       fprintf(FERROR,"Failed to exec %s : %s\n",
 	      command[0],strerror(errno));
@@ -225,4 +227,27 @@ int set_blocking(int fd, int set)
     val |= FLAG_TO_SET;
   return fcntl( fd, F_SETFL, val);
 #undef FLAG_TO_SET
+}
+
+/****************************************************************************
+create any necessary directories in fname. Unfortunately we don't know
+what perms to give the directory when this is called so we need to rely
+on the umask
+****************************************************************************/
+int create_directory_path(char *fname)
+{
+	extern int orig_umask;
+	char *p;
+
+	while (*fname == '/') fname++;
+	while (strncmp(fname,"./",2)==0) fname += 2;
+
+	p = fname;
+	while ((p=strchr(p,'/'))) {
+		*p = 0;
+		mkdir(fname,0777 & ~orig_umask); 
+		*p = '/';
+		p++;
+	}
+	return 0;
 }

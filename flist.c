@@ -41,6 +41,7 @@ extern int preserve_devices;
 extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_times;
+extern int relative_paths;
 
 static char **local_exclude_list = NULL;
 
@@ -421,15 +422,19 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
     }
 
     dir = NULL;
-    p = strrchr(fname,'/');
-    if (p) {
-      *p = 0;
-      if (p == fname) 
-	dir = "/";
-      else
-	dir = fname;      
-      fname = p+1;      
+
+    if (!relative_paths) {
+	    p = strrchr(fname,'/');
+	    if (p) {
+		    *p = 0;
+		    if (p == fname) 
+			    dir = "/";
+		    else
+			    dir = fname;      
+		    fname = p+1;      
+	    }
     }
+
     if (!*fname)
       fname = ".";
 
