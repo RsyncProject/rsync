@@ -246,7 +246,7 @@ void add_exclude(struct exclude_struct ***listp, const char *pattern, int includ
 	if (list)
 		for (; list[len]; len++) {}
 
- 	list = *listp = realloc_array(list, struct exclude_struct *, len+2);
+	list = *listp = realloc_array(list, struct exclude_struct *, len+2);
 
 	if (!list || !(list[len] = make_exclude(pattern, include)))
 		out_of_memory("add_exclude");
