@@ -240,6 +240,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 			   struct file_struct *file, int ndx,
 			   int f_out, int f_out_name)
 {
+	static int missing_below = -1;
 	int fd = -1, f_copy = -1;
 	STRUCT_STAT st, partial_st;
 	struct file_struct *back_file = NULL;
@@ -266,6 +267,10 @@ static void recv_generator(char *fname, struct file_list *flist,
 		return;
 	}
 
+	if (dry_run && missing_below >= 0 && file->dir.depth <= missing_below) {
+		dry_run--;
+		missing_below = -1;
+	}
 	if (dry_run > 1) {
 		statret = -1;
 		stat_errno = ENOENT;
@@ -302,6 +307,10 @@ static void recv_generator(char *fname, struct file_list *flist,
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			delete_file(fname, DEL_TERSE);
 			statret = -1;
+		}
+		if (dry_run && statret != 0 && missing_below < 0) {
+			missing_below = file->dir.depth;
+			dry_run++;
 		}
 		if (statret != 0 && do_mkdir(fname,file->mode) != 0 && errno != EEXIST) {
 			if (!relative_paths || errno != ENOENT
