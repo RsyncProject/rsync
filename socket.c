@@ -637,7 +637,7 @@ void client_sockaddr(int fd,
 		     struct sockaddr_storage *ss,
 		     socklen_t *ss_len)
 {
-	if (getpeername(fd, (struct sockaddr *)&ss, ss_len)) {
+	if (getpeername(fd, (struct sockaddr *) ss, ss_len)) {
 		/* FIXME: Can we really not continue? */
 		rprintf(FERROR, RSYNC_NAME ": getpeername on fd%d failed: %s\n",
 			fd, strerror(errno));
