@@ -141,6 +141,7 @@ int basis_dir_cnt = 0;
 
 int verbose = 0;
 int quiet = 0;
+int what_has_changed = 0;
 int always_checksum = 0;
 int list_only = 0;
 
@@ -325,6 +326,7 @@ void usage(enum logcode F)
   rprintf(F,"     --stats                 give some file-transfer stats\n");
   rprintf(F,"     --progress              show progress during transfer\n");
   rprintf(F," -P                          same as --partial --progress\n");
+  rprintf(F," -w, --what-has-changed      output a change summary for all updates\n");
   rprintf(F,"     --log-format=FORMAT     log file-transfers using specified format\n");
   rprintf(F,"     --password-file=FILE    read password from FILE\n");
   rprintf(F,"     --list-only             list the files instead of copying them\n");
@@ -428,6 +430,7 @@ static struct poptOption long_options[] = {
   {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
   {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
   {"log-format",       0,  POPT_ARG_STRING, &log_format, 0, 0, 0 },
+  {"what-has-changed",'w', POPT_ARG_NONE,   &what_has_changed, 0, 0, 0 },
   {"bwlimit",          0,  POPT_ARG_INT,    &bwlimit, 0, 0, 0 },
   {"backup-dir",       0,  POPT_ARG_STRING, &backup_dir, 0, 0, 0 },
   {"hard-links",      'H', POPT_ARG_NONE,   &preserve_hard_links, 0, 0, 0 },
@@ -1047,7 +1050,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		return 0;
 	}
 
-	if (do_progress && !verbose) {
+	if (do_progress && !verbose && !what_has_changed) {
 		if (refused_verbose) {
 			create_refuse_error(refused_verbose);
 			return 0;
@@ -1204,6 +1207,8 @@ void server_options(char **args,int *argc)
 	 * default for remote transfers, and in any case old versions
 	 * of rsync will not understand it. */
 
+	if (what_has_changed && am_sender)
+		argstr[x++] = 'w';
 	if (preserve_hard_links)
 		argstr[x++] = 'H';
 	if (preserve_uid)
