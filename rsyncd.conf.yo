@@ -179,6 +179,12 @@ attempted uploads will fail. If "read only" is false then uploads will
 be possible if file permissions on the server allow them. The default
 is for all modules to be read only.
 
+dit(bf(write only)) The "write only" option determines whether clients
+will be able to download files or not. If "write only" is true then any
+attempted downloads will fail. If "write only" is false then downloads
+will be possible if file permissions on the server allow them.  The
+default is for this option to be disabled.
+
 dit(bf(list)) The "list" option determines if this module should be
 listed when the client asks for a listing of available modules. By
 setting this to false you can create hidden modules. The default is

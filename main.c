@@ -369,6 +369,12 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 			(long)getpid());
 	}
 
+	if (am_daemon && lp_write_only(module_id) && am_sender) {
+		rprintf(FERROR, "ERROR: module is write only\n");
+		exit_cleanup(RERR_SYNTAX);
+		return;
+	}
+
 	if (!relative_paths && !push_dir(dir)) {
 		rsyserr(FERROR, errno, "push_dir#3 %s failed",
 			full_fname(dir));

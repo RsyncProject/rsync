@@ -119,6 +119,7 @@ typedef struct
 	char *comment;
 	char *lock_file;
 	BOOL read_only;
+	BOOL write_only;
 	BOOL list;
 	BOOL use_chroot;
 	BOOL transfer_logging;
@@ -151,6 +152,7 @@ static service sDefault =
 	NULL,    /* comment */
 	DEFAULT_LOCK_FILE,    /* lock file */
 	True,    /* read only */
+	False,   /* write only */
 	True,    /* list */
 	True,    /* use chroot */
 	False,   /* transfer logging */
@@ -277,6 +279,7 @@ static struct parm_struct parm_table[] =
   {"lock file",        P_STRING,  P_LOCAL,  &sDefault.lock_file,   NULL,   0},
   {"path",             P_PATH,    P_LOCAL,  &sDefault.path,        NULL,   0},
   {"read only",        P_BOOL,    P_LOCAL,  &sDefault.read_only,   NULL,   0},
+  {"write only",       P_BOOL,    P_LOCAL,  &sDefault.write_only,  NULL,   0},
   {"list",             P_BOOL,    P_LOCAL,  &sDefault.list,        NULL,   0},
   {"use chroot",       P_BOOL,    P_LOCAL,  &sDefault.use_chroot,  NULL,   0},
   {"ignore nonreadable",P_BOOL,   P_LOCAL,  &sDefault.ignore_nonreadable,  NULL,   0},
@@ -356,6 +359,7 @@ FN_LOCAL_STRING(lp_comment, comment)
 FN_LOCAL_STRING(lp_path, path)
 FN_LOCAL_STRING(lp_lock_file, lock_file)
 FN_LOCAL_BOOL(lp_read_only, read_only)
+FN_LOCAL_BOOL(lp_write_only, write_only)
 FN_LOCAL_BOOL(lp_list, list)
 FN_LOCAL_BOOL(lp_use_chroot, use_chroot)
 FN_LOCAL_BOOL(lp_transfer_logging, transfer_logging)
