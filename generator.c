@@ -825,8 +825,6 @@ static void recv_generator(char *fname, struct file_list *flist,
 			case 0:
 				best_match = i;
 				match_level = 1;
-				if (compare_dest)
-					break;
 				/* FALL THROUGH */
 			case 1:
 				if (!unchanged_file(fnamecmpbuf, file, &st))
@@ -862,10 +860,10 @@ static void recv_generator(char *fname, struct file_list *flist,
 						full_fname(fnamecmpbuf),
 						safe_fname(fname));
 				}
-				match_level = 1;
+				match_level = 2;
 			}
 #endif
-			if (match_level && match_level < 3) {
+			if (compare_dest || (match_level && match_level < 3)) {
 				fnamecmp = fnamecmpbuf;
 				fnamecmp_type = i;
 			}
