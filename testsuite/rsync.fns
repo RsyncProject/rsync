@@ -222,6 +222,11 @@ test_fail() {
     exit 1
 }
 
+test_skipped() {
+    echo "$@" >&2
+    exit 77
+}
+
 # It failed, but we expected that.  don't dump out error logs, 
 # because most users won't want to see them.  But do leave
 # the working directory around.
