@@ -1,5 +1,110 @@
-rsync 2.5.5 "Snowy River" (2 April 2002)
-protocol: 26 (unchanged)
+NEWS for rsync 2.5.7 (4 Dec 2003)
+Protocol: 26 (unchanged)
+Changes since 2.5.6:
+
+  SECURITY FIXES:
+
+    * Fix buffer handling bugs.  (Andrew Tridgell, Martin Pool, Paul
+      Russell, Andrea Barisani)
+
+
+NEWS for rsync 2.5.6, aka "the dwd-between-jobs release" (26 Jan 2003)
+Protocol: 26 (unchanged)
+Changes since 2.5.5:
+
+  ENHANCEMENTS:
+
+    * The --delete-after option now implies --delete.  (Wayne Davison)
+
+    * The --suffix option can now be used with --backup-dir.  (Michael
+      Zimmerman)
+
+    * Combining "::" syntax with the -rsh/-e option now uses the
+      specified remote-shell as a transport to talk to a (newly-spawned)
+      server-daemon.  This allows someone to use daemon features, such
+      as modules, over a secure protocol, such as ssh.  (JD Paul)
+
+    * The rsync:// syntax for daemon connections is now accepted in the
+      destination field.
+
+    * If the file name given to --include-from or --exclude-from is "-",
+      rsync will read from standard input.  (J.W. Schultz)
+
+    * New option --link-dest which is like --compare-dest except that
+      unchanged files are hard-linked in to the destination directory.
+      (J.W. Schultz)
+
+    * Don't report an error if an excluded file disappears during an
+      rsync run.  (Eugene Chupriyanov and Bo Kersey)
+
+    * Added .svn to --cvs-exclude list to support subversion.  (Jon
+      Middleton)
+
+    * Properly support IPv6 addresses in the rsyncd.conf "hosts allow"
+      and "hosts deny" fields.  (Hideaki Yoshifuji)
+
+    * Changed exclude file handling to permit DOS or MAC style line
+      terminations.  (J.W. Schultz)
+
+    * Ignore errors from chmod when -p/-a/--preserve-perms is not set.
+      (Dave Dykstra)
+
+  BUG FIXES:
+
+    * Fix "forward name lookup failed" errors on AIX 4.3.3.  (John
+      L. Allen, Martin Pool)
+
+    * Generate each file's rolling-checksum data as we send it, not
+      in a separate (memory-eating) pass before hand.  This prevents
+      timeout errors on really large files. (Stefan Nehlsen)
+
+    * Fix compilation on Tru64.  (Albert Chin, Zoong Pham)
+
+    * Better handling of some client-server errors.  (Martin Pool)
+
+    * Fixed a crash that would occur when sending a list of files that
+      contains a duplicate name (if it sorts to the end of the file
+      list) and using --delete.  (Wayne Davison)
+
+    * Fixed the file-name duplicate-removal code when dealing with multiple
+      dups in a row. (Wayne Davison)
+
+    * Fixed a bug that caused rsync to lose the exit status of its child
+      processes and sometimes return an exit code of 0 instead of showing
+      an error.  (David R. Staples, Dave Dykstra)
+
+    * Fixed bug in --copy-unsafe-links that caused it to be completely
+      broken.  (Dave Dykstra)
+
+    * Prevent infinite recursion in cleanup code under certain circumstances.
+      (Sviatoslav Sviridov and Marc Espie)
+
+    * Fixed a bug that prevented rsync from creating intervening directories
+      when --relative-paths/-R is set.  (Craig Barratt)
+
+    * Prevent "Connection reset by peer" messages from Cygwin. (Randy O'Meara)
+
+  INTERNAL:
+
+    * Many code cleanups and improved internal documentation.  (Martin
+      Pool, Nelson Beebe)
+
+    * Portability fixes. (Dave Dykstra and Wayne Davison)
+
+    * More test cases.  (Martin Pool)
+
+    * Some test-case fixes.  (Brian Poole, Wayne Davison)
+
+    * Updated included popt to the latest vendor drop, version 1.6.4.
+      (Jos Backus)
+
+    * Updated config.guess and config.sub to latest versions; this
+      means rsync should build on more platforms.  (Paul Green)
+
+
+NEWS for rsync 2.5.5, aka Snowy River (2 Apr 2002)
+Protocol: 26 (unchanged)
+Changes since 2.5.4:
 
   ENHANCEMENTS:
 
@@ -38,16 +143,15 @@ protocol: 26 (unchanged)
     * Improved network error handling.  (Greg A. Woods)
 
 
-rsync 2.5.4 (13 March 2002)
-protocol: 26 (unchanged)
-
-  "Imitation lizard skin"
+NEWS for rsync 2.5.4, aka "Imitation lizard skin" (13 Mar 2002)
+Protocol: 26 (unchanged)
+Changes since 2.5.3:
 
   BUG FIXES:
 
     * Additional fix for zlib double-free bug.  (Martin Pool, Andrew
       Tridgell) (CVE CAN-2002-0059)
- 
+
   ENHANCEMENTS:
 
     * Merge in changes from zlib 1.1.3 to zlib 1.1.4.  (Jos Backus)
@@ -57,10 +161,9 @@ protocol: 26 (unchanged)
     * Additional test cases for --compress.  (Martin Pool)
 
 
-rsync 2.5.3 (11 March 2002)
-protocol: 26 (unchanged)
-
-  "Happy 26"
+NEWS for rsync 2.5.3, aka "Happy 26" (11 Mar 2002)
+Protocol: 26 (unchanged)
+Changes since 2.5.2:
 
   SECURITY FIXES:
 
@@ -73,7 +176,7 @@ protocol: 26 (unchanged)
     * Fix zlib double-free bug.  (Owen Taylor, Mark J Cox) (CVE
       CAN-2002-0059)
 
-    * Fixed problem that in many cases caused the error message 
+    * Fixed problem that in many cases caused the error message
 	unexpected read size of 0 in map_ptr
       and resulted in the wrong data being copied.
 
@@ -94,7 +197,7 @@ protocol: 26 (unchanged)
     * Merge in changes from zlib 1.1.2 to zlib 1.1.3.  (Note that
       rsync still uses a custom version of zlib; you can not just link
       against a system library.  See zlib/README.rsync)
- 
+
     * Command to initiate connections is only shown with -vv, rather
       than -v as in 2.5.2.  Output from plain -v is more similar to
       what was historically used so as not to break scripts that try
@@ -108,8 +211,10 @@ protocol: 26 (unchanged)
     * If the daemon is unable to fork a child to accept a connection,
       print an error message.  (Colin Walters)
 
-rsync 2.5.2 (26 Jan 2002)
-protocol: 26 (changed)
+
+NEWS for rsync 2.5.2 (26 Jan 2002)
+Protocol: 26 (changed)
+Changes since 2.5.1:
 
   SECURITY FIXES:
 
@@ -136,7 +241,7 @@ protocol: 26 (changed)
       connection.
 
     * --statistics now shows memory heap usage on platforms that
-        support mallinfo().
+      support mallinfo().
 
     * "The Ted T'so school of program optimization": make progress
       visible and people will think it's faster.  (With --progress,
@@ -145,15 +250,17 @@ protocol: 26 (changed)
 
     * Improvements to batch mode support.  This is still experimental
       but testing would be welcome.   (Jos Backus)
- 
+
     * New --ignore-existing option, patch previously distributed with
       Vipul's Razor.  (Debian #124286)
 
-rsync 2.5.1 (2002-01-03)
-protocol: 25 (unchanged)
+
+NEWS for rsync 2.5.1 (3 Jan 2002)
+Protocol: 25 (unchanged)
+Changes since 2.5.0:
 
-  BUG FIXES: 
-   
+  BUG FIXES:
+
     * Fix for segfault in --daemon mode configuration parser.  (Paul
       Mackerras)
 
@@ -175,18 +282,19 @@ protocol: 25 (unchanged)
   ENHANCEMENTS:
 
     * --progress and -P now show estimated data transfer rate (in a
-        multiple of bytes/s) and estimated time to completion.  (Rik
-        Faith)
-   
+      multiple of bytes/s) and estimated time to completion.  (Rik
+      Faith)
+
     * --no-detach option, required to run as a W32 service and also
-        useful when running on Unix under daemontools, AIX's SRC, or a
-        debugger.  (Max Bowsher, Jos Backus)
+      useful when running on Unix under daemontools, AIX's SRC, or a
+      debugger.  (Max Bowsher, Jos Backus)
 
     * Clearer error messages for some conditions.
 
 
-rsync 2.5.0 (2001-11-30)
-protocol: 25 (changed)
+NEWS for rsync 2.5.0 (30 Nov 2001)
+Protocol: 25 (changed)
+Changes since 2.4.6:
 
   ANNOUNCEMENTS
 
@@ -248,7 +356,7 @@ protocol: 25 (changed)
     * Attempt to fix error handling lockup bug.
 
     * Give a non-0 exit code if *any* of the files we have been asked
-      to transfer fail to transfer 
+      to transfer fail to transfer.
 
     * For log messages containing ridiculously long strings that might
       overflow a buffer rsync no longer aborts, but rather prints an
@@ -259,7 +367,7 @@ protocol: 25 (changed)
     * Improved support for UNICOS (tested on Cray T3E and Cray SV1)
 
     * autoconf2.52 (or later) is now required to rebuild the autoconf
-      scripts.	It is not required to simply build rsync.
+      scripts.  It is not required to simply build rsync.
 
     * Platforms thought to work in this release:
 
@@ -302,41 +410,46 @@ protocol: 25 (changed)
       build farm.
 
 Partial Protocol History
-	DATE			RELEASE		PROTOCOL
-	2003/01/26 20:11:16	release-2-5-6	26	
-	2002/02/23 00:17:50	release-2-5-3	26	
-	2002/01/25 23:00:21	release-2-5-2	26	
-	2001/12/18 06:47:40	release-2-5-1	25	
-				release-2-4-6	24	
-	2000/08/16 08:34:18	release-2-4-5	24	
-	2000/07/29 04:52:05	release-2-4-4	24	
-	2000/03/30 14:15:00	release-2-4-2	24	
-	2000/01/29 23:49:36	release-2-4-1	24	
-	2000/01/29 02:56:37	release-2-4-0	23	
-				release-2-3-3	21	
-	1999/06/26 01:06:38	release-2-3-2	21	
-				release-2-3-1	20	
-	1999/03/15 21:17:59	release-2-3-0	20	
-	1998/11/15 01:21:42	release-2-2-1	19	
-	1998/11/03 07:08:28	release-2-2-0	19	
-	1998/09/09 06:31:14	release-2-1-1	19	
-	1998/07/17 14:43:05	release-2-0-19	19	
-	1998/06/18 12:17:24	release-2-0-18	19	
-	1998/06/18 09:51:56	release-2-0-17	19	
-	1998/06/01 03:42:22	release-2-0-16	19	
-	1998/05/27 13:47:34	release-2-0-13	19	
-	1998/05/26 14:19:00	release-2-0-12	18	
-	1998/05/21 05:55:33	release-2-0-11	18	
-	1998/05/18 08:20:34	release-2-0-9	18	
-	1998/05/17 05:56:33	release-2-0-8	17	
-	1998/05/15 07:34:21	release-2-0-2	17	
-	1998/05/13 15:44:11	release-2-0-0	17	
-	1998/04/17 06:07:26	release-1-7-4	17	
-	1998/04/05 06:43:55	release-1-7-2	17	
-	1998/03/26 04:18:57	release-1-7-0	17 MAX=30
-	1998/01/13 15:57:32	release-1-6-9	15 MAX=20
-	1997/12/17 11:07:30	release-1-6-7	14	
-	1997/12/15 18:36:21	release-1-6-4	14	
+	RELEASE DATE	VER.	DATE OF COMMIT	PROTOCOL
+	01 Jan 2004	2.6.0	10 Apr 2003	27 (MAX=40)
+	04 Dec 2003	2.5.7			26
+	26 Jan 2003	2.5.6			26
+	02 Apr 2002	2.5.5			26
+	13 Mar 2002	2.5.4			26
+	11 Mar 2002	2.5.3			26
+	26 Jan 2002	2.5.2	11 Jan 2002	26
+	03 Jan 2002	2.5.1			25
+	30 Nov 2001	2.5.0	23 Aug 2001	25
+	06 Sep 2000	2.4.6			24
+	19 Aug 2000	2.4.5			24
+	29 Jul 2000	2.4.4			24
+	09 Apr 2000	2.4.3			24
+	30 Mar 2000	2.4.2			24
+	30 Jan 2000	2.4.1	29 Jan 2000	24
+	29 Jan 2000	2.4.0	28 Jan 2000	23
+	25 Jan 2000	2.3.3	23 Jan 2000	22
+	08 Nov 1999	2.3.2	26 Jun 1999	21
+	06 Apr 1999	2.3.1			20
+	15 Mar 1999	2.3.0	15 Mar 1999	20
+	25 Nov 1998	2.2.1			19
+	03 Nov 1998	2.2.0			19
+	09 Sep 1998	2.1.1			19
+	20 Jul 1998	2.1.0			19
+	17 Jul 1998	2.0.19			19
+	18 Jun 1998	2.0.17			19
+	01 Jun 1998	2.0.16			19
+	27 May 1998	2.0.13	27 May 1998	19
+	26 May 1998	2.0.12			18
+	22 May 1998	2.0.11			18
+	18 May 1998	2.0.9	18 May 1998	18
+	17 May 1998	2.0.8			17
+	15 May 1998	2.0.1			17
+	14 May 1998	2.0.0			17
+	17 Apr 1998	1.7.4			17
+	13 Apr 1998	1.7.3			17
+	05 Apr 1998	1.7.2			17
+	26 Mar 1998	1.7.1			17
+	26 Mar 1998	1.7.0	26 Mar 1998	17 (MAX=30)
+	13 Jan 1998	1.6.9	13 Jan 1998	15 (MAX=20)
 
-* DATE OF COMMIT is the date the protocl change was committed
-  to cvs, not the release date.
+* DATE OF COMMIT is the date the protocol change was committed to CVS.
