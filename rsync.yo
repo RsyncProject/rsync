@@ -341,14 +341,14 @@ verb(
      --existing              only update files that already exist
      --ignore-existing       ignore files that already exist on receiver
      --delete                delete files that don't exist on sender
-     --delete-excluded       also delete excluded files on receiver
      --delete-after          receiver deletes after transfer, not before
+     --delete-excluded       also delete excluded files on receiver
      --ignore-errors         delete even if there are I/O errors
+     --force                 force deletion of dirs even if not empty
      --max-delete=NUM        don't delete more than NUM files
      --max-size=SIZE         don't transfer any file larger than SIZE
      --partial               keep partially transferred files
      --partial-dir=DIR       put a partially transferred file into DIR
-     --force                 force deletion of dirs even if not empty
      --numeric-ids           don't map uid/gid values by user/group name
      --timeout=TIME          set I/O timeout in seconds
  -I, --ignore-times          turn off mod time & file size quick check
@@ -669,7 +669,7 @@ by the shell and rsync thus gets a request to transfer those files, not
 the files' parent directory.  Files that are excluded from transfer are
 excluded from being deleted unless you use --delete-excluded.
 
-This option has no effect if directory recursion is not selected.
+This option has no effect unless directory recursion is enabled.
 
 This option can be dangerous if used incorrectly!  It is a very good idea
 to run first using the --dry-run option (-n) to see what files would be
@@ -681,11 +681,6 @@ prevent temporary filesystem failures (such as NFS errors) on the
 sending side causing a massive deletion of files on the
 destination.  You can override this with the --ignore-errors option.
 
-dit(bf(--delete-excluded)) In addition to deleting the files on the
-receiving side that are not on the sending side, this tells rsync to also
-delete any files on the receiving side that are excluded (see --exclude).
-Implies --delete.
-
 dit(bf(--delete-after)) By default rsync does file deletions on the
 receiving side before transferring files to try to ensure that there is
 sufficient space on the receiving filesystem. If you want to delete
@@ -694,6 +689,11 @@ after transferring, use the --delete-after switch. Implies --delete.
 One reason to use --delete-after is to avoid a delay before the start of
 the transfer (while the receiving side is scanned for deletions) as this
 delay might cause the transfer to timeout.  
+
+dit(bf(--delete-excluded)) In addition to deleting the files on the
+receiving side that are not on the sending side, this tells rsync to also
+delete any files on the receiving side that are excluded (see --exclude).
+Implies --delete.
 
 dit(bf(--ignore-errors)) Tells --delete to go ahead and delete files
 even when there are I/O errors.
