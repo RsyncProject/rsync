@@ -52,6 +52,7 @@ extern int only_existing;
 extern int orig_umask;
 extern int safe_symlinks;
 extern unsigned int block_size;
+extern unsigned int max_map_size;
 
 extern struct exclude_list_struct server_exclude_list;
 
@@ -162,7 +163,9 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 			c >>= 1;
 		} while (c >= 8);	/* round to multiple of 8 */
 		blength = MAX(blength, BLOCK_SIZE);
+		blength = MIN(blength, MAX_MAP_SIZE);
 	}
+	max_map_size = MIN(MAX_MAP_SIZE, blength * 32);
 
 	if (protocol_version < 27) {
 		s2length = csum_length;
