@@ -29,6 +29,7 @@
 extern int dry_run;
 extern int read_only;
 extern int list_only;
+extern int preserve_perms;
 
 #define CHECK_RO if (read_only || list_only) {errno = EROFS; return -1;}
 
@@ -97,9 +98,13 @@ int do_open(char *pathname, int flags, mode_t mode)
 #if HAVE_CHMOD
 int do_chmod(const char *path, mode_t mode)
 {
+	int code;
 	if (dry_run) return 0;
 	CHECK_RO
-	return chmod(path, mode);
+	code = chmod(path, mode);
+	if ((code != 0) && preserve_perms)
+	    return code;
+	return 0;
 }
 #endif
 
@@ -150,7 +155,7 @@ int do_mkstemp(char *template, mode_t perms)
 	{
 		int fd = mkstemp(template);
 		if (fd == -1) return -1;
-		if (fchmod(fd, perms) != 0) {
+		if ((fchmod(fd, perms) != 0) && preserve_perms) {
 			close(fd);
 			unlink(template);
 			return -1;

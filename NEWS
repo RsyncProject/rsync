@@ -33,6 +33,9 @@ rsync changes since last release
 
     * Set the default value of --modify-window to 2 on Cygwin.  (Max Bowsher)
 
+    * Ignore errors from chmod when -p/-a/--preserve-perms is not set.
+      (Dave Dykstra)
+
   BUG FIXES:
   
     * Fix "forward name lookup failed" errors on AIX 4.3.3.  (John
