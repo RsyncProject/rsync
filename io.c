@@ -56,6 +56,7 @@ extern struct stats stats;
 
 const char phase_unknown[] = "unknown";
 int select_timeout = SELECT_TIMEOUT;
+int ignore_timeout = 0;
 int batch_fd = -1;
 int batch_gen_fd = -1;
 
@@ -137,7 +138,7 @@ static void check_timeout(void)
 {
 	time_t t;
 
-	if (!io_timeout)
+	if (!io_timeout || ignore_timeout)
 		return;
 
 	if (!last_io) {
@@ -634,6 +635,19 @@ void io_end_buffering(void)
 }
 
 
+void maybe_send_keepalive(int allowed_lull, int ndx)
+{
+	if (time(NULL) - last_io >= allowed_lull) {
+		if (!iobuf_out || !iobuf_out_cnt) {
+			write_int(sock_f_out, ndx);
+			write_shortint(sock_f_out, ITEM_IS_NEW);
+		}
+		if (iobuf_out)
+			io_flush(NORMAL_FLUSH);
+	}
+}
+
+
 /**
  * Continue trying to read len bytes - don't return until len has been
  * read.
@@ -1014,6 +1028,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 			 * to grab any messages they sent before they died. */
 			while (fd == sock_f_out && io_multiplexing_in) {
 				io_timeout = select_timeout = 30;
+				ignore_timeout = 0;
 				readfd_unbuffered(sock_f_in, io_filesfrom_buf,
 						  sizeof io_filesfrom_buf);
 			}
