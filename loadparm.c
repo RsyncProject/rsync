@@ -134,6 +134,7 @@ typedef struct
 	char *dont_compress;
 	int timeout;
 	int max_connections;
+	BOOL ignore_nonreadable;
 } service;
 
 
@@ -164,7 +165,8 @@ static service sDefault =
 	NULL,    /* refuse options */
 	"*.gz *.tgz *.zip *.z *.rpm *.deb *.iso *.bz2 *.tbz",    /* dont compress */
 	0,        /* timeout */
-	0        /* max connections */
+	0,        /* max connections */
+	False     /* ignore nonreadable */
 };
 
 
@@ -262,6 +264,7 @@ static struct parm_struct parm_table[] =
   {"read only",        P_BOOL,    P_LOCAL,  &sDefault.read_only,   NULL,   0},
   {"list",             P_BOOL,    P_LOCAL,  &sDefault.list,        NULL,   0},
   {"use chroot",       P_BOOL,    P_LOCAL,  &sDefault.use_chroot,  NULL,   0},
+  {"ignore nonreadable",P_BOOL,   P_LOCAL,  &sDefault.ignore_nonreadable,  NULL,   0},
   {"uid",              P_STRING,  P_LOCAL,  &sDefault.uid,         NULL,   0},
   {"gid",              P_STRING,  P_LOCAL,  &sDefault.gid,         NULL,   0},
   {"hosts allow",      P_STRING,  P_LOCAL,  &sDefault.hosts_allow, NULL,   0},
@@ -340,6 +343,7 @@ FN_LOCAL_BOOL(lp_list, list)
 FN_LOCAL_BOOL(lp_use_chroot, use_chroot)
 FN_LOCAL_BOOL(lp_transfer_logging, transfer_logging)
 FN_LOCAL_BOOL(lp_ignore_errors, ignore_errors)
+FN_LOCAL_BOOL(lp_ignore_nonreadable, ignore_nonreadable)
 FN_LOCAL_STRING(lp_uid, uid)
 FN_LOCAL_STRING(lp_gid, gid)
 FN_LOCAL_STRING(lp_hosts_allow, hosts_allow)
