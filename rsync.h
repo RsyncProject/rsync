@@ -179,6 +179,12 @@
 #define uchar unsigned char
 #endif
 
+#if HAVE_UNSIGNED_CHAR
+#define schar signed char
+#else
+#define schar char
+#endif
+
 #ifndef int32
 #if (SIZEOF_INT == 4)
 #define int32 int

@@ -130,14 +130,14 @@ static void hash_search(int f,struct sum_struct *s,
 	int end;
 	char sum2[SUM_LENGTH];
 	uint32 s1, s2, sum; 
-	signed char *map;
+	schar *map;
 
 	if (verbose > 2)
 		fprintf(FINFO,"hash search b=%d len=%d\n",s->n,(int)len);
 
 	k = MIN(len, s->n);
 	
-	map = (signed char *)map_ptr(buf,0,k);
+	map = (schar *)map_ptr(buf,0,k);
 	
 	sum = get_checksum1((char *)map, k);
 	s1 = sum & 0xFFFF;
@@ -178,7 +178,7 @@ static void hash_search(int f,struct sum_struct *s,
 			
 			if (!done_csum2) {
 				int l = MIN(s->n,len-offset);
-				map = (signed char *)map_ptr(buf,offset,l);
+				map = (schar *)map_ptr(buf,offset,l);
 				get_checksum2((char *)map,l,sum2);
 				done_csum2 = 1;
 			}
@@ -191,7 +191,7 @@ static void hash_search(int f,struct sum_struct *s,
 			matched(f,s,buf,offset,i);
 			offset += s->sums[i].len - 1;
 			k = MIN((len-offset), s->n);
-			map = (signed char *)map_ptr(buf,offset,k);
+			map = (schar *)map_ptr(buf,offset,k);
 			sum = get_checksum1((char *)map, k);
 			s1 = sum & 0xFFFF;
 			s2 = sum >> 16;
@@ -201,7 +201,7 @@ static void hash_search(int f,struct sum_struct *s,
 		
 	null_tag:
 		/* Trim off the first byte from the checksum */
-		map = (signed char *)map_ptr(buf,offset,k+1);
+		map = (schar *)map_ptr(buf,offset,k+1);
 		s1 -= map[0] + CHAR_OFFSET;
 		s2 -= k * (map[0]+CHAR_OFFSET);
 		

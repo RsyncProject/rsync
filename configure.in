@@ -60,7 +60,13 @@ echo $ac_n "checking for off64_t ... $ac_c"
 AC_TRY_RUN([#include <stdio.h>
 #include <sys/stat.h>
 main() { struct stat64 st; off64_t s; exit((lstat64("/dev/null", &st)==0)?0:1); }],
-echo yes;AC_DEFINE(HAVE_LONGLONG), 
+echo yes;AC_DEFINE(HAVE_OFF64_T), 
+echo no)
+
+echo $ac_n "checking for unsigned char ... $ac_c"
+AC_TRY_RUN([#include <stdio.h>
+main() { char c; c=250; exit((c > 0)?0:1); }],
+echo yes;AC_DEFINE(HAVE_UNSIGNED_CHAR), 
 echo no)
 
 echo $ac_n "checking for utimbuf ... $ac_c"

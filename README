@@ -72,6 +72,12 @@ To install rsync, first run the "configure" script. This will create a
 Makefile and config.h appropriate for your system. Then type
 "make". 
 
+Note that on some systems you will have to force configure not to use
+gcc because gcc may not support some features (such as 64 bit file
+offsets) that your system may support. Set the environment variable CC
+to the name of your native compiler before running configure in this
+case. 
+
 Once built put a copy of rsync in your search path on the local and
 remote systems (or use "make install"). That's it!
 

@@ -34,7 +34,7 @@ uint32 get_checksum1(char *buf1,int len)
 {
     int i;
     uint32 s1, s2;
-    signed char *buf = (signed char *)buf1;
+    schar *buf = (schar *)buf1;
 
     s1 = s2 = 0;
     for (i = 0; i < (len-4); i+=4) {
