@@ -76,6 +76,7 @@ int filesfrom_fd = -1;
 char *remote_filesfrom_file = NULL;
 int eol_nulls = 0;
 int recurse = 0;
+int keep_dirs = 0;
 int am_daemon = 0;
 int daemon_over_rsh = 0;
 int do_stats = 0;
@@ -850,9 +851,14 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		preserve_uid = 1;
 		preserve_devices = 1;
 	}
+	if (recurse) {
+		keep_dirs = 1;
+	}
 
 	if (relative_paths < 0)
 		relative_paths = files_from? 1 : 0;
+	if (!relative_paths)
+		implied_dirs = 0;
 
 	*argv = poptGetArgs(pc);
 	*argc = count_args(*argv);
@@ -1003,6 +1009,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				return 0;
 			}
 		}
+		keep_dirs = 1;
 	}
 
 	return 1;
@@ -1233,6 +1240,8 @@ void server_options(char **args,int *argc)
 		if (!relative_paths)
 			args[ac++] = "--no-relative";
 	}
+	if (relative_paths && !implied_dirs && !am_sender)
+		args[ac++] = "--no-implied-dirs";
 
 	*argc = ac;
 	return;
