@@ -376,9 +376,11 @@ void io_set_filesfrom_fds(int f_in, int f_out)
 static void whine_about_eof(int fd)
 {
 	if (kluge_around_eof && fd == sock_f_in) {
+		int i;
 		if (kluge_around_eof > 0)
 			exit_cleanup(0);
-		while (1)
+		/* If we're still here after 10 seconds, exit with an error. */
+		for (i = 10*1000/20; i--; )
 			msleep(20);
 	}
 
