@@ -158,6 +158,11 @@ static void server_options(char **args,int *argc)
     args[ac++] = bsize;
   }    
 
+  if (strcmp(backup_suffix, BACKUP_SUFFIX)) {
+	  args[ac++] = "--suffix";
+	  args[ac++] = backup_suffix;
+  }
+
   if (delete_mode)
     args[ac++] = "--delete";
 
