@@ -83,6 +83,9 @@ hands_setup() {
     ls -ltr /etc > ${FROM}/dir/subdir/subsubdir/etc-ltr-list
     mkdir ${FROM}/dir/subdir/subsubdir2
     ls -lt /bin > ${FROM}/dir/subdir/subsubdir2/bin-lt-list
+
+    which head
+    ls -lR ${srcdir} | head -10
 }
 
 
