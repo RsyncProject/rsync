@@ -115,6 +115,9 @@
 #define FULL_FLUSH	1
 #define NORMAL_FLUSH	0
 
+#define PDIR_CREATE	1
+#define PDIR_DELETE	0
+
 
 /* Log-message categories.  FLOG is only used on the daemon side to
  * output messages to the log file. */

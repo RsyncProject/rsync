@@ -42,6 +42,7 @@ extern int size_only;
 extern int io_timeout;
 extern int protocol_version;
 extern int always_checksum;
+extern char *partial_dir;
 extern char *compare_dest;
 extern int link_dest;
 extern int whole_file;
@@ -285,7 +286,7 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 	statret = link_stat(fname, &st, keep_dirlinks && S_ISDIR(file->mode));
 	stat_errno = errno;
 
-	if (only_existing && statret == -1 && errno == ENOENT) {
+	if (only_existing && statret == -1 && stat_errno == ENOENT) {
 		/* we only want to update existing files */
 		if (verbose > 1) {
 			rprintf(FINFO, "not creating new file \"%s\"\n",
@@ -494,6 +495,16 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		write_int(f_out,i);
 		write_sum_head(f_out, NULL);
 		return;
+	}
+
+	if (partial_dir) {
+		STRUCT_STAT st2;
+		char *partialptr = partial_dir_fname(fname);
+		if (partialptr && link_stat(partialptr, &st2, 0) == 0
+		    && S_ISREG(st2.st_mode)) {
+			st = st2;
+			fnamecmp = partialptr;
+		}
 	}
 
 	/* open the file */

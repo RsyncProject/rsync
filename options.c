@@ -118,6 +118,7 @@ unsigned int backup_dir_remainder;
 
 char *backup_suffix = NULL;
 char *tmpdir = NULL;
+char *partial_dir = NULL;
 char *compare_dest = NULL;
 char *config_file = NULL;
 char *shell_cmd = NULL;
@@ -268,6 +269,7 @@ void usage(enum logcode F)
   rprintf(F,"     --ignore-errors         delete even if there are I/O errors\n");
   rprintf(F,"     --max-delete=NUM        don't delete more than NUM files\n");
   rprintf(F,"     --partial               keep partially transferred files\n");
+  rprintf(F,"     --partial-dir=DIR       put a partially transferred file into DIR\n");
   rprintf(F,"     --force                 force deletion of directories even if not empty\n");
   rprintf(F,"     --numeric-ids           don't map uid/gid values by user/group name\n");
   rprintf(F,"     --timeout=TIME          set I/O timeout in seconds\n");
@@ -383,6 +385,7 @@ static struct poptOption long_options[] = {
   {"stats",            0,  POPT_ARG_NONE,   &do_stats, 0, 0, 0 },
   {"progress",         0,  POPT_ARG_NONE,   &do_progress, 0, 0, 0 },
   {"partial",          0,  POPT_ARG_NONE,   &keep_partial, 0, 0, 0 },
+  {"partial-dir",      0,  POPT_ARG_STRING, &partial_dir, 0, 0, 0 },
   {"ignore-errors",    0,  POPT_ARG_NONE,   &ignore_errors, 0, 0, 0 },
   {"blocking-io",      0,  POPT_ARG_VAL,    &blocking_io, 1, 0, 0 },
   {"no-blocking-io",   0,  POPT_ARG_VAL,    &blocking_io, 0, 0, 0 },
@@ -718,6 +721,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			(*argv)[i] = alloc_sanitize_path((*argv)[i], NULL);
 		if (tmpdir)
 			tmpdir = alloc_sanitize_path(tmpdir, curr_dir);
+		if (partial_dir)
+			partial_dir = alloc_sanitize_path(partial_dir, curr_dir);
 		if (compare_dest)
 			compare_dest = alloc_sanitize_path(compare_dest, curr_dir);
 		if (backup_dir)
@@ -770,6 +775,11 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 	if (inplace) {
 #if HAVE_FTRUNCATE
+		if (partial_dir) {
+			snprintf(err_buf, sizeof err_buf,
+				 "--inplace cannot be used with --partial-dir\n");
+			return 0;
+		}
 		keep_partial = 0;
 #else
 		snprintf(err_buf, sizeof err_buf,
@@ -777,6 +787,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			 am_server ? "server" : "client");
 		return 0;
 #endif
+	} else if (partial_dir) {
+		if (strcmp(partial_dir, ".") == 0)
+			partial_dir = NULL;
+		keep_partial = 1;
 	}
 
 	if (files_from) {
@@ -969,7 +983,10 @@ void server_options(char **args,int *argc)
 		args[ac++] = arg;
 	}
 
-	if (keep_partial)
+	if (partial_dir && am_sender) {
+		args[ac++] = "--partial-dir";
+		args[ac++] = partial_dir;
+	} else if (keep_partial)
 		args[ac++] = "--partial";
 
 	if (force_delete)

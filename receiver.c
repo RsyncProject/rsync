@@ -38,6 +38,7 @@ extern int preserve_perms;
 extern int cvs_exclude;
 extern int io_error;
 extern char *tmpdir;
+extern char *partial_dir;
 extern char *compare_dest;
 extern int make_backups;
 extern int do_progress;
@@ -340,7 +341,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 	char *fname, fbuf[MAXPATHLEN];
 	char template[MAXPATHLEN];
 	char fnametmp[MAXPATHLEN];
-	char *fnamecmp;
+	char *fnamecmp, *partialptr;
 	char fnamecmpbuf[MAXPATHLEN];
 	struct file_struct *file;
 	struct stats initial_stats;
@@ -408,8 +409,6 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		if (verbose > 2)
 			rprintf(FINFO, "recv_files(%s)\n", safe_fname(fname));
 
-		fnamecmp = fname;
-
 		if (read_batch) {
 			while (i > next_gen_i) {
 				next_gen_i = read_int(batch_gen_fd);
@@ -436,8 +435,21 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			continue;
 		}
 
+		if (partial_dir) {
+			if ((partialptr = partial_dir_fname(fname)) != NULL)
+				fnamecmp = partialptr;
+			else
+				fnamecmp = fname;
+		} else
+			fnamecmp = partialptr = fname;
+
 		/* open the file */
 		fd1 = do_open(fnamecmp, O_RDONLY, 0);
+
+		if (fd1 == -1 && fnamecmp != fname) {
+			fnamecmp = fname;
+			fd1 = do_open(fnamecmp, O_RDONLY, 0);
+		}
 
 		if (fd1 == -1 && compare_dest != NULL) {
 			/* try the file at compare_dest instead */
@@ -526,7 +538,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 				continue;
 			}
 
-			cleanup_set(fnametmp, fname, file, fd1, fd2);
+			if (partialptr)
+				cleanup_set(fnametmp, partialptr, file, fd1, fd2);
 		}
 
 		if (!am_server && verbose) /* log the transfer */
@@ -546,10 +559,20 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			exit_cleanup(RERR_FILEIO);
 		}
 
-		if (recv_ok || keep_partial || inplace)
+		if (recv_ok || inplace)
 			finish_transfer(fname, fnametmp, file, recv_ok);
-		else
+		else if (keep_partial && partialptr
+		    && handle_partial_dir(partialptr, PDIR_CREATE))
+			finish_transfer(partialptr, fnametmp, file, 0);
+		else {
+			partialptr = NULL;
 			do_unlink(fnametmp);
+		}
+
+		if (partialptr != fname && fnamecmp == partialptr && recv_ok) {
+			do_unlink(partialptr);
+			handle_partial_dir(partialptr, PDIR_DELETE);
+		}
 
 		cleanup_disable();
 
@@ -557,9 +580,13 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			int msgtype = csum_length == SUM_LENGTH || read_batch ?
 				FERROR : FINFO;
 			if (msgtype == FERROR || verbose) {
-				char *errstr, *redostr;
-				char *keptstr = keep_partial || inplace ?
-					"retain" : "discard";
+				char *errstr, *redostr, *keptstr;
+				if (!(keep_partial && partialptr) && !inplace)
+					keptstr = "discarded";
+				else if (partial_dir)
+					keptstr = "put into partial-dir";
+				else
+					keptstr = "retained";
 				if (msgtype == FERROR) {
 					errstr = "ERROR";
 					redostr = "";
@@ -568,7 +595,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 					redostr = " (will try again)";
 				}
 				rprintf(msgtype,
-					"%s: %s failed verification -- update %sed%s.\n",
+					"%s: %s failed verification -- update %s%s.\n",
 					errstr, safe_fname(fname),
 					keptstr, redostr);
 			}

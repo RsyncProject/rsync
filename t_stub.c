@@ -28,6 +28,7 @@
 
 int modify_window = 0;
 int module_id = -1;
+char *partial_dir;
 struct exclude_list_struct server_exclude_list;
 
  void rprintf(UNUSED(enum logcode code), const char *format, ...)

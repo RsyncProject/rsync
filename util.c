@@ -31,6 +31,7 @@ extern int verbose;
 extern int dry_run;
 extern int module_id;
 extern int modify_window;
+extern char *partial_dir;
 extern struct exclude_list_struct server_exclude_list;
 
 int sanitize_paths = 0;
@@ -968,6 +969,66 @@ char *full_fname(const char *fn)
 	asprintf(&result, "\"%s%s%s\"%s%s%s", p1, p2, fn, m1, m2, m3);
 
 	return result;
+}
+
+static char partial_fname[MAXPATHLEN];
+
+char *partial_dir_fname(const char *fname)
+{
+	char *t = partial_fname;
+	int sz = sizeof partial_fname;
+	const char *fn;
+
+	if ((fn = strrchr(fname, '/')) != NULL) {
+		fn++;
+		if (*partial_dir != '/') {
+			int len = fn - fname;
+			strncpy(t, fname, len); /* safe */
+			t += len;
+			sz -= len;
+		}
+	} else
+		fn = fname;
+	if ((int)pathjoin(t, sz, partial_dir, fn) >= sz)
+		return NULL;
+
+	return partial_fname;
+}
+
+/* If no --partial-dir option was specified, we don't need to do anything
+ * (the partial-dir is essentially '.'), so just return success. */
+int handle_partial_dir(const char *fname, int create)
+{
+	char *fn, *dir;
+
+	if (fname != partial_fname)
+		return 1;
+	if (!create && *partial_dir == '/')
+		return 1;
+	if (!(fn = strrchr(partial_fname, '/')))
+		return 1;
+
+	*fn = '\0';
+	dir = partial_fname;
+	if (create) {
+		STRUCT_STAT st;
+#if SUPPORT_LINKS
+		int statret = do_lstat(dir, &st);
+#else
+		int statret = do_stat(dir, &st);
+#endif
+		if (statret == 0 && !S_ISDIR(st.st_mode)) {
+			if (do_unlink(dir) < 0)
+				return 0;
+			statret = -1;
+		}
+		if (statret < 0 && do_mkdir(dir, 0700) < 0)
+			return 0;
+	} else
+		do_rmdir(dir);
+	*fn = '/';
+
+	return 1;
 }
 
 /** We need to supply our own strcmp function for file list comparisons

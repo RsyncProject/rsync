@@ -111,7 +111,8 @@ void _exit_cleanup(int code, const char *file, int line)
 		}
 	}
 
-	if (cleanup_got_literal && cleanup_fname && keep_partial) {
+	if (cleanup_got_literal && cleanup_fname && keep_partial
+	    && handle_partial_dir(cleanup_new_fname, PDIR_CREATE)) {
 		char *fname = cleanup_fname;
 		cleanup_fname = NULL;
 		if (cleanup_fd_r != -1)
