@@ -103,6 +103,9 @@ Changes since version 2.5.7:
       readdir fail caused by network filesystems issues and truncated
       files.  (David Norwood, Michael Brown, J.W. Schultz)
 
+    * Added a fix that should give ssh time to restore the tty settings
+      if the user presses Ctrl-C at an ssh password prompt.
+
   INTERNAL:
 
     * Eliminated vestigial support for old versions that we stopped
