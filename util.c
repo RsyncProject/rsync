@@ -1,8 +1,6 @@
-/*  -*- c-file-style: "linux" -*-
-    
-    Copyright (C) 1996-2000 by Andrew Tridgell 
-    Copyright (C) Paul Mackerras 1996
-    Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
+/* 
+   Copyright (C) Andrew Tridgell 1996
+   Copyright (C) Paul Mackerras 1996
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -84,26 +82,6 @@ int fd_pair(int fd[2])
 }
 
 
-void print_child_argv(char **cmd)
-{
-	rprintf(FINFO, RSYNC_NAME ": open connection using ");
-	for (; *cmd; cmd++) {
-		/* Look for characters that ought to be quoted.  This
-		* is not a great quoting algorithm, but it's
-		* sufficient for a log message. */
-		if (strspn(*cmd, "abcdefghijklmnopqrstuvwxyz"
-			   "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-			   "0123456789"
-			   ",.-_=+@/") != strlen(*cmd)) {
-			rprintf(FINFO, "\"%s\" ", *cmd);
-		} else {
-			rprintf(FINFO, "%s ", *cmd);
-		}
-	}
-	rprintf(FINFO, "\n");
-}
-
-
 /* this is derived from CVS code 
 
    note that in the child STDIN is set to blocking and STDOUT
@@ -114,71 +92,66 @@ void print_child_argv(char **cmd)
    used to cope with badly broken rsh implementations like the one on
    solaris.
  */
-pid_t piped_child(char **command, int *f_in, int *f_out)
+int piped_child(char **command,int *f_in,int *f_out)
 {
-	pid_t pid;
-	int to_child_pipe[2];
-	int from_child_pipe[2];
-	extern int blocking_io;
-	
-	if (verbose > 0) {
-		print_child_argv(command);
-	}
+  int pid;
+  int to_child_pipe[2];
+  int from_child_pipe[2];
+  extern int blocking_io;
 
-	if (fd_pair(to_child_pipe) < 0 || fd_pair(from_child_pipe) < 0) {
-		rprintf(FERROR, "pipe: %s\n", strerror(errno));
-		exit_cleanup(RERR_IPC);
-	}
+  if (fd_pair(to_child_pipe) < 0 ||
+      fd_pair(from_child_pipe) < 0) {
+    rprintf(FERROR,"pipe: %s\n",strerror(errno));
+    exit_cleanup(RERR_IPC);
+  }
 
 
-	pid = do_fork();
-	if (pid == -1) {
-		rprintf(FERROR, "fork: %s\n", strerror(errno));
-		exit_cleanup(RERR_IPC);
-	}
+  pid = do_fork();
+  if (pid < 0) {
+    rprintf(FERROR,"fork: %s\n",strerror(errno));
+    exit_cleanup(RERR_IPC);
+  }
 
-	if (pid == 0) {
-		extern int orig_umask;
-		if (dup2(to_child_pipe[0], STDIN_FILENO) < 0 ||
-		    close(to_child_pipe[1]) < 0 ||
-		    close(from_child_pipe[0]) < 0 ||
-		    dup2(from_child_pipe[1], STDOUT_FILENO) < 0) {
-			rprintf(FERROR, "Failed to dup/close : %s\n",
-				strerror(errno));
-			exit_cleanup(RERR_IPC);
-		}
-		if (to_child_pipe[0] != STDIN_FILENO)
-			close(to_child_pipe[0]);
-		if (from_child_pipe[1] != STDOUT_FILENO)
-			close(from_child_pipe[1]);
-		umask(orig_umask);
-		set_blocking(STDIN_FILENO);
-		if (blocking_io) {
-			set_blocking(STDOUT_FILENO);
-		}
-		execvp(command[0], command);
-		rprintf(FERROR, "Failed to exec %s : %s\n",
-			command[0], strerror(errno));
-		exit_cleanup(RERR_IPC);
-	}
+  if (pid == 0)
+    {
+      extern int orig_umask;
+      if (dup2(to_child_pipe[0], STDIN_FILENO) < 0 ||
+	  close(to_child_pipe[1]) < 0 ||
+	  close(from_child_pipe[0]) < 0 ||
+	  dup2(from_child_pipe[1], STDOUT_FILENO) < 0) {
+	rprintf(FERROR,"Failed to dup/close : %s\n",strerror(errno));
+	exit_cleanup(RERR_IPC);
+      }
+      if (to_child_pipe[0] != STDIN_FILENO) close(to_child_pipe[0]);
+      if (from_child_pipe[1] != STDOUT_FILENO) close(from_child_pipe[1]);
+      umask(orig_umask);
+      set_blocking(STDIN_FILENO);
+      if (blocking_io) {
+	set_blocking(STDOUT_FILENO);
+      }
+      execvp(command[0], command);
+      rprintf(FERROR,"Failed to exec %s : %s\n",
+	      command[0],strerror(errno));
+      exit_cleanup(RERR_IPC);
+    }
 
-	if (close(from_child_pipe[1]) < 0 || close(to_child_pipe[0]) < 0) {
-		rprintf(FERROR, "Failed to close : %s\n", strerror(errno));
-		exit_cleanup(RERR_IPC);
-	}
+  if (close(from_child_pipe[1]) < 0 ||
+      close(to_child_pipe[0]) < 0) {
+    rprintf(FERROR,"Failed to close : %s\n",strerror(errno));   
+    exit_cleanup(RERR_IPC);
+  }
 
-	*f_in = from_child_pipe[0];
-	*f_out = to_child_pipe[1];
+  *f_in = from_child_pipe[0];
+  *f_out = to_child_pipe[1];
 
-	return pid;
+  return pid;
 }
 
-pid_t local_child(int argc, char **argv,int *f_in,int *f_out)
+int local_child(int argc, char **argv,int *f_in,int *f_out)
 {
-	pid_t pid;
+	int pid;
 	int to_child_pipe[2];
 	int from_child_pipe[2];
-	extern int read_batch;  /* dw */
 
 	if (fd_pair(to_child_pipe) < 0 ||
 	    fd_pair(from_child_pipe) < 0) {
@@ -188,7 +161,7 @@ pid_t local_child(int argc, char **argv,int *f_in,int *f_out)
 
 
 	pid = do_fork();
-	if (pid == -1) {
+	if (pid < 0) {
 		rprintf(FERROR,"fork: %s\n",strerror(errno));
 		exit_cleanup(RERR_IPC);
 	}
@@ -197,7 +170,7 @@ pid_t local_child(int argc, char **argv,int *f_in,int *f_out)
 		extern int am_sender;
 		extern int am_server;
 
-		am_sender = read_batch ? 0 : !am_sender;
+		am_sender = !am_sender;
 		am_server = 1;		
 
 		if (dup2(to_child_pipe[0], STDIN_FILENO) < 0 ||
@@ -584,7 +557,10 @@ void glob_expand(char *base1, char **argv, int *argc, int maxargs)
 	s = strdup(s);
 	if (!s) out_of_memory("glob_expand");
 
-	if (asprintf(&base," %s/", base1) <= 0) out_of_memory("glob_expand");
+	base = (char *)malloc(strlen(base1)+3);
+	if (!base) out_of_memory("glob_expand");
+
+	sprintf(base," %s/", base1);
 
 	q = s;
 	while ((p = strstr(q,base)) && ((*argc) < maxargs)) {
@@ -610,6 +586,33 @@ void strlower(char *s)
 		s++;
 	}
 }
+
+/* this is like vsnprintf but it always null terminates, so you
+   can fit at most n-1 chars in */
+int vslprintf(char *str, int n, const char *format, va_list ap)
+{
+	int ret = vsnprintf(str, n, format, ap);
+	if (ret >= n || ret < 0) {
+		str[n-1] = 0;
+		return -1;
+	}
+	str[ret] = 0;
+	return ret;
+}
+
+
+/* like snprintf but always null terminates */
+int slprintf(char *str, int n, char *format, ...)
+{
+	va_list ap;  
+	int ret;
+
+	va_start(ap, format);
+	ret = vslprintf(str,n,format,ap);
+	va_end(ap);
+	return ret;
+}
+
 
 void *Realloc(void *p, int size)
 {
@@ -832,91 +835,28 @@ int u_strcmp(const char *cs1, const char *cs2)
 	return (int)*s1 - (int)*s2;
 }
 
-static OFF_T  last_ofs;
-static struct timeval print_time;
-static struct timeval start_time;
-static OFF_T  start_ofs;
-
-static unsigned long msdiff(struct timeval *t1, struct timeval *t2)
-{
-    return (t2->tv_sec - t1->tv_sec) * 1000
-        + (t2->tv_usec - t1->tv_usec) / 1000;
-}
-
-
-/**
- * @param ofs Current position in file
- * @param size Total size of file
- * @param is_last True if this is the last time progress will be
- * printed for this file, so we should output a newline.  (Not
- * necessarily the same as all bytes being received.)
- **/
-static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
-			    int is_last)
-{
-    int           pct  = (ofs == size) ? 100 : (int)((100.0*ofs)/size);
-    unsigned long diff = msdiff(&start_time, now);
-    double        rate = diff ? (double) (ofs-start_ofs) * 1000.0 / diff / 1024.0 : 0;
-    const char    *units;
-    double        remain = rate ? (double) (size-ofs) / rate / 1000.0: 0.0;
-    int 	  remain_h, remain_m, remain_s;
-
-    if (rate > 1024*1024) {
-	    rate /= 1024.0 * 1024.0;
-	    units = "GB/s";
-    } else if (rate > 1024) {
-	    rate /= 1024.0;
-	    units = "MB/s";
-    } else {
-	    units = "kB/s";
-    }
-
-    remain_s = (int) remain % 60;
-    remain_m = (int) (remain / 60.0) % 60;
-    remain_h = (int) (remain / 3600.0);
-    
-    rprintf(FINFO, "%12.0f %3d%% %7.2f%s %4d:%02d:%02d%s",
-	    (double) ofs, pct, rate, units,
-	    remain_h, remain_m, remain_s,
-	    is_last ? "\n" : "\r");
-}
+static OFF_T last_ofs;
 
 void end_progress(OFF_T size)
 {
 	extern int do_progress, am_server;
 
 	if (do_progress && !am_server) {
-        	struct timeval now;
-                gettimeofday(&now, NULL);
-                rprint_progress(size, size, &now, True);
+		rprintf(FINFO,"%.0f (100%%)\n", (double)size);
 	}
-	last_ofs   = 0;
-        start_ofs  = 0;
-        print_time.tv_sec  = print_time.tv_usec  = 0;
-        start_time.tv_sec  = start_time.tv_usec  = 0;
+	last_ofs = 0;
 }
 
 void show_progress(OFF_T ofs, OFF_T size)
 {
 	extern int do_progress, am_server;
-        struct timeval now;
 
-        gettimeofday(&now, NULL);
-
-        if (!start_time.tv_sec && !start_time.tv_usec) {
-        	start_time.tv_sec  = now.tv_sec;
-                start_time.tv_usec = now.tv_usec;
-                start_ofs          = ofs;
-        }
-
-	if (do_progress
-            && !am_server
-            && ofs > last_ofs + 1000
-            && msdiff(&print_time, &now) > 250) {
-        	rprint_progress(ofs, size, &now, False);
-                last_ofs = ofs;
-                print_time.tv_sec  = now.tv_sec;
-                print_time.tv_usec = now.tv_usec;
+	if (do_progress && !am_server) {
+		if (ofs > last_ofs + 1000) {
+			int pct = (int)((100.0*ofs)/size);
+			rprintf(FINFO,"%.0f (%d%%)\r", (double)ofs, pct);
+			last_ofs = ofs;
+		}
 	}
 }
 
@@ -990,13 +930,10 @@ char *timestring(time_t t)
 }
 
 
-/**
- * Sleep for a specified number of milliseconds.
- *
- * Always returns TRUE.  (In the future it might return FALSE if
- * interrupted.)
- **/
-int msleep(int t)
+/*******************************************************************
+sleep for a specified number of milliseconds
+********************************************************************/
+void msleep(int t)
 {
 	int tdiff=0;
 	struct timeval tval,t1,t2;  
@@ -1015,8 +952,6 @@ int msleep(int t)
 		tdiff = (t2.tv_sec - t1.tv_sec)*1000 + 
 			(t2.tv_usec - t1.tv_usec)/1000;
 	}
-
-	return True;
 }
 
 
@@ -1028,6 +963,7 @@ int msleep(int t)
  *******************************************************************/
 int cmp_modtime(time_t file1, time_t file2)
 {
+	time_t diff;
 	extern int modify_window;
 
 	if (file2 > file1) {
@@ -1051,9 +987,9 @@ int _Insure_trap_error(int a1, int a2, int a3, int a4, int a5, int a6)
 {
 	static int (*fn)();
 	int ret;
-	char *cmd;
+	char cmd[1024];
 
-	asprintf(&cmd, "/usr/X11R6/bin/xterm -display :0 -T Panic -n Panic -e /bin/sh -c 'cat /tmp/ierrs.*.%d ; gdb /proc/%d/exe %d'", 
+	sprintf(cmd, "/usr/X11R6/bin/xterm -display :0 -T Panic -n Panic -e /bin/sh -c 'cat /tmp/ierrs.*.%d ; gdb /proc/%d/exe %d'", 
 		getpid(), getpid(), getpid());
 
 	if (!fn) {
@@ -1065,8 +1001,6 @@ int _Insure_trap_error(int a1, int a2, int a3, int a4, int a5, int a6)
 	ret = fn(a1, a2, a3, a4, a5, a6);
 
 	system(cmd);
-
-	free(cmd);
 
 	return ret;
 }

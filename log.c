@@ -1,7 +1,5 @@
-/* -*- c-file-style: "linux"; -*-
-   
-   Copyright (C) 1998-2001 by Andrew Tridgell <tridge@samba.org>
-   Copyright (C) 2000-2001 by Martin Pool <mbp@samba.org>
+/* 
+   Copyright (C) Andrew Tridgell 1998
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,121 +17,18 @@
 */
 
 /*
-  Logging and utility functions.
-  tridge, May 1998
+  logging and utility functions
 
-  Mapping to human-readable messages added by Martin Pool
-  <mbp@samba.org>, Oct 2000.
+  tridge, May 1998
   */
 #include "rsync.h"
 
-static char *logfname;
 static FILE *logfile;
 static int log_error_fd = -1;
 
-int log_got_error=0;
-
-struct {
-        int code;
-        char const *name;
-} const rerr_names[] = {
-	{ RERR_SYNTAX     , "syntax or usage error" }, 
-	{ RERR_PROTOCOL   , "protocol incompatibility" }, 
-	{ RERR_FILESELECT , "errors selecting input/output files, dirs" }, 
-	{ RERR_UNSUPPORTED, "requested action not supported" }, 
-	{ RERR_SOCKETIO   , "error in socket IO" }, 
-	{ RERR_FILEIO     , "error in file IO" }, 
-	{ RERR_STREAMIO   , "error in rsync protocol data stream" }, 
-	{ RERR_MESSAGEIO  , "errors with program diagnostics" }, 
-	{ RERR_IPC        , "error in IPC code" }, 
-	{ RERR_SIGNAL     , "received SIGUSR1 or SIGINT" }, 
-	{ RERR_WAITCHILD  , "some error returned by waitpid()" }, 
-	{ RERR_MALLOC     , "error allocating core memory buffers" }, 
-	{ RERR_PARTIAL    , "partial transfer" }, 
-	{ RERR_TIMEOUT    , "timeout in data send/receive" }, 
-	{ RERR_CMD_FAILED , "remote shell failed" },
-	{ RERR_CMD_KILLED , "remote shell killed" },
-	{ RERR_CMD_RUN,     "remote command could not be run" },
-        { RERR_CMD_NOTFOUND, "remote command not found" },
-        { 0, NULL }
-};
-
-
-
-/*
- * Map from rsync error code to name, or return NULL.
- */
-static char const *rerr_name(int code)
-{
-        int i;
-        for (i = 0; rerr_names[i].name; i++) {
-                if (rerr_names[i].code == code)
-                        return rerr_names[i].name;
-        }
-        return NULL;
-}
-
-struct err_list {
-	struct err_list *next;
-	char *buf;
-	int len;
-	int written; /* how many bytes we have written so far */
-};
-
-static struct err_list *err_list_head;
-static struct err_list *err_list_tail;
-
-/* add an error message to the pending error list */
-static void err_list_add(int code, char *buf, int len)
-{
-	struct err_list *el;
-	el = (struct err_list *)malloc(sizeof(*el));
-	if (!el) exit_cleanup(RERR_MALLOC);
-	el->next = NULL;
-	el->buf = malloc(len+4);
-	if (!el->buf) exit_cleanup(RERR_MALLOC);
-	memcpy(el->buf+4, buf, len);
-	SIVAL(el->buf, 0, ((code+MPLEX_BASE)<<24) | len);
-	el->len = len+4;
-	el->written = 0;
-	if (err_list_tail) {
-		err_list_tail->next = el;
-	} else {
-		err_list_head = el;
-	}
-	err_list_tail = el;
-}
-
-
-/* try to push errors off the error list onto the wire */
-void err_list_push(void)
-{
-	if (log_error_fd == -1) return;
-
-	while (err_list_head) {
-		struct err_list *el = err_list_head;
-		int n = write(log_error_fd, el->buf+el->written, el->len - el->written);
-		/* don't check for an error if the best way of handling the error is
-		   to ignore it */
-		if (n == -1) break;
-		if (n > 0) {
-			el->written += n;
-		}
-		if (el->written == el->len) {
-			free(el->buf);
-			err_list_head = el->next;
-			if (!err_list_head) err_list_tail = NULL;
-			free(el);
-		}
-	}
-}
-
-
 static void logit(int priority, char *buf)
 {
-	if (logfname) {
-		if (!logfile)
-			log_open();
+	if (logfile) {
 		fprintf(logfile,"%s [%d] %s", 
 			timestring(time(NULL)), (int)getpid(), buf);
 		fflush(logfile);
@@ -142,11 +37,12 @@ static void logit(int priority, char *buf)
 	}
 }
 
-void log_init(void)
+void log_open(void)
 {
 	static int initialised;
 	int options = LOG_PID;
 	time_t t;
+	char *logf;
 
 	if (initialised) return;
 	initialised = 1;
@@ -158,13 +54,13 @@ void log_init(void)
 	localtime(&t);
 
 	/* optionally use a log file instead of syslog */
-	logfname = lp_log_file();
-	if (logfname) {
-		if (*logfname) {
-			log_open();
-			return;
-		}
-		logfname = NULL;
+	logf = lp_log_file();
+	if (logf && *logf) {
+		extern int orig_umask;
+		int old_umask = umask(022 | orig_umask);
+		logfile = fopen(logf, "a");
+		umask(old_umask);
+		return;
 	}
 
 #ifdef LOG_NDELAY
@@ -182,30 +78,11 @@ void log_init(void)
 #endif
 }
 
-void log_open()
-{
-	if (logfname && !logfile) {
-		extern int orig_umask;
-		int old_umask = umask(022 | orig_umask);
-		logfile = fopen(logfname, "a");
-		umask(old_umask);
-	}
-}
-
-void log_close()
-{
-	if (logfile) {
-		fclose(logfile);
-		logfile = NULL;
-	}
-}
-
 /* setup the error file descriptor - used when we are a server
    that is receiving files */
 void set_error_fd(int fd)
 {
 	log_error_fd = fd;
-	set_nonblocking(log_error_fd);
 }
 
 /* this is the underlying (unformatted) rsync debugging function. Call
@@ -229,14 +106,12 @@ void rwrite(enum logcode code, char *buf, int len)
 		return;
 	}
 
-	/* first try to pass it off to our sibling */
-	if (am_server && log_error_fd != -1) {
-		err_list_add(code, buf, len);
-		err_list_push();
+	/* first try to pass it off the our sibling */
+	if (am_server && io_error_write(log_error_fd, code, buf, len)) {
 		return;
 	}
 
-	/* if that fails, try to pass it to the other end */
+	/* then try to pass it to the other end */
 	if (am_server && io_multiplex_write(code, buf, len)) {
 		return;
 	}
@@ -250,7 +125,7 @@ void rwrite(enum logcode code, char *buf, int len)
 
 		depth++;
 
-		log_init();
+		log_open();
 		logit(priority, buf);
 
 		depth--;
@@ -258,7 +133,6 @@ void rwrite(enum logcode code, char *buf, int len)
 	}
 
 	if (code == FERROR) {
-		log_got_error = 1;
 		f = stderr;
 	} 
 
@@ -277,89 +151,21 @@ void rwrite(enum logcode code, char *buf, int len)
 }
 		
 
-/* This is the rsync debugging function. Call it with FINFO, FERROR or
- * FLOG. */
-void rprintf(enum logcode code, const char *format, ...)
+/* this is the rsync debugging function. Call it with FINFO, FERROR or FLOG */
+ void rprintf(enum logcode code, const char *format, ...)
 {
 	va_list ap;  
 	char buf[1024];
 	int len;
 
 	va_start(ap, format);
-	/* Note: might return -1 */
-	len = vsnprintf(buf, sizeof(buf), format, ap);
+	len = vslprintf(buf, sizeof(buf), format, ap);
 	va_end(ap);
 
-	/* Deal with buffer overruns.  Instead of panicking, just
-	 * truncate the resulting string.  Note that some vsnprintf()s
-	 * return -1 on truncation, e.g., glibc 2.0.6 and earlier. */
-	if ((size_t) len > sizeof(buf)-1  ||  len < 0) {
-		const char ellipsis[] = "[...]";
-
-		/* Reset length, and zero-terminate the end of our buffer */
-		len = sizeof(buf)-1;
-		buf[len] = '\0';
-
-		/* Copy the ellipsis to the end of the string, but give
-		 * us one extra character:
-		 *
-		 *                  v--- null byte at buf[sizeof(buf)-1]
-		 *        abcdefghij0
-		 *     -> abcd[...]00  <-- now two null bytes at end
-		 *
-		 * If the input format string has a trailing newline,
-		 * we copy it into that extra null; if it doesn't, well,
-		 * all we lose is one byte.  */
-		strncpy(buf+len-sizeof(ellipsis), ellipsis, sizeof(ellipsis));
-		if (format[strlen(format)-1] == '\n') {
-			buf[len-1] = '\n';
-		}
-	}
+	if (len > sizeof(buf)-1) exit_cleanup(RERR_MESSAGEIO);
 
 	rwrite(code, buf, len);
 }
-
-
-/* This is like rprintf, but it also tries to print some
- * representation of the error code.  Normally errcode = errno.
- *
- * Unlike rprintf, this always adds a newline and there should not be
- * one in the format string.
- *
- * Note that since strerror might involve dynamically loading a
- * message catalog we need to call it once before chroot-ing. */
-void rsyserr(enum logcode code, int errcode, const char *format, ...)
-{
-	va_list ap;  
-	char buf[1024];
-	int len;
-	size_t sys_len;
-        char *sysmsg;
-
-	va_start(ap, format);
-	/* Note: might return <0 */
-	len = vsnprintf(buf, sizeof(buf), format, ap);
-	va_end(ap);
-
-	if ((size_t) len > sizeof(buf)-1)
-		exit_cleanup(RERR_MESSAGEIO);
-
-        sysmsg = strerror(errcode);
-        sys_len = strlen(sysmsg);
-        if ((size_t) len + 3 + sys_len > sizeof(buf) - 1)
-                exit_cleanup(RERR_MESSAGEIO);
-
-        strcpy(buf + len, ": ");
-        len += 2;
-        strcpy(buf + len, sysmsg);
-        len += sys_len;
-        strcpy(buf + len, "\n");
-        len++;
-
-	rwrite(code, buf, len);
-}
-
-
 
 void rflush(enum logcode code)
 {
@@ -403,18 +209,14 @@ static void log_formatted(enum logcode code,
 	char buf[1024];
 	char buf2[1024];
 	char *p, *s, *n;
-	size_t l;
+	int l;
 	extern struct stats stats;		
 	extern int am_sender;
 	extern int am_daemon;
 	int64 b;
 
-	/* We expand % codes one by one in place in buf.  We don't
-	 * copy in the terminating nul of the inserted strings, but
-	 * rather keep going until we reach the nul of the format.
-	 * Just to make sure we don't clobber that nul and therefore
-	 * accidentally keep going, we zero the buffer now. */
-	memset(buf, 0, sizeof buf);
+	memset(buf,0,sizeof(buf));
+
 	strlcpy(buf, format, sizeof(buf));
 	
 	for (s=&buf[0]; 
@@ -426,18 +228,18 @@ static void log_formatted(enum logcode code,
 		case 'h': if (am_daemon) n = client_name(0); break;
 		case 'a': if (am_daemon) n = client_addr(0); break;
 		case 'l': 
-			snprintf(buf2,sizeof(buf2),"%.0f", 
+			slprintf(buf2,sizeof(buf2),"%.0f", 
 				 (double)file->length); 
 			n = buf2;
 			break;
 		case 'p': 
-			snprintf(buf2,sizeof(buf2),"%d", 
+			slprintf(buf2,sizeof(buf2),"%d", 
 				 (int)getpid()); 
 			n = buf2;
 			break;
 		case 'o': n = op; break;
 		case 'f': 
-			snprintf(buf2, sizeof(buf2), "%s/%s", 
+			slprintf(buf2, sizeof(buf2), "%s/%s", 
 				 file->basedir?file->basedir:"", 
 				 f_name(file));
 			clean_fname(buf2);
@@ -456,7 +258,7 @@ static void log_formatted(enum logcode code,
 				b = stats.total_read - 
 					initial_stats->total_read;
 			}
-			snprintf(buf2,sizeof(buf2),"%.0f", (double)b); 
+			slprintf(buf2,sizeof(buf2),"%.0f", (double)b); 
 			n = buf2;
 			break;
 		case 'c': 
@@ -467,35 +269,26 @@ static void log_formatted(enum logcode code,
 				b = stats.total_read - 
 					initial_stats->total_read;
 			}
-			snprintf(buf2,sizeof(buf2),"%.0f", (double)b); 
+			slprintf(buf2,sizeof(buf2),"%.0f", (double)b); 
 			n = buf2;
 			break;
 		}
 
-		/* n is the string to be inserted in place of this %
-		 * code; l is its length not including the trailing
-		 * NUL */
-		if (!n)
-			continue;
+		if (!n) continue;
 
 		l = strlen(n);
 
-		if (l + ((int)(s - &buf[0])) >= sizeof(buf)) {
+		if (l + ((int)(s - &buf[0])) > sizeof(buf)) {
 			rprintf(FERROR,"buffer overflow expanding %%%c - exiting\n",
 				p[0]);
 			exit_cleanup(RERR_MESSAGEIO);
 		}
 
-		/* Shuffle the rest of the string along to make space for n */
 		if (l != 2) {
 			memmove(s+(l-1), s+1, strlen(s+1)+1);
 		}
-
-		/* Copy in n but NOT its nul, because the format sting
-		 * probably continues after this. */
 		memcpy(p, n, l);
 
-		/* Skip over inserted string; continue looking */
 		s = p+l;
 	}
 
@@ -530,15 +323,7 @@ void log_recv(struct file_struct *file, struct stats *initial_stats)
 	}
 }
 
-
-
-
-/*
- * Called when the transfer is interrupted for some reason.
- *
- * Code is one of the RERR_* codes from errcode.h, or terminating
- * successfully.
- */
+/* called when the transfer is interrupted for some reason */
 void log_exit(int code, const char *file, int line)
 {
 	if (code == 0) {
@@ -548,19 +333,10 @@ void log_exit(int code, const char *file, int line)
 			(double)stats.total_read,
 			(double)stats.total_size);
 	} else {
-                const char *name;
-
-                name = rerr_name(code);
-                if (!name)
-                        name = "unexplained error";
-                
-		rprintf(FERROR,"rsync error: %s (code %d) at %s(%d)\n", 
-			name, code, file, line);
+		rprintf(FLOG,"transfer interrupted (code %d) at %s(%d)\n", 
+			code, file, line);
 	}
 }
-
-
-
 
 /* log the incoming transfer of a file for interactive use, this
    will be called at the end where the client was run 

@@ -1,34 +1,7 @@
-rsync 2.5.2 (???)
+rsync 2.4.7 (???)
 
   SECURITY FIXES:
 
     * Signedness security patch from Sebastian Krahmer
       <krahmer@suse.de> -- in some cases we were not sufficiently
       careful about reading integers from the network.
-
-  BUG FIXES:
-
-    * Fix possible string mangling in log files.
-
-    * Fix for setting local address of outgoing sockets.
-
-    * Better handling of hardlinks and devices on platforms with
-      64-bit dev_t or ino_t.
-
-    * Name resolution on machines supporting IPv6 is improved.
-
-  ENHANCEMENTS:
-
-    * With -v, rsync now shows the command used to initiate an ssh/rsh
-      connection.
-
-    * --statistics now shows memory heap usage on platforms that
-        support mallinfo().
-
-    * "The Ted T'so school of program optimization": make progress
-      visible and people will think it's faster.  (With --progress,
-      rsync will show you how many files it has seen as it builds the
-      file_list, giving some indication that it has not hung.)
-
-    * Improvements to batch mode support.  This is still experimental
-      but testing would be welcome.   (Jos Backus)

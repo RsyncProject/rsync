@@ -1,6 +1,5 @@
-/* -*- c-file-style: "linux" -*-
-   
-   Copyright (C) 1996-2000 by Andrew Tridgell
+/* 
+   Copyright (C) Andrew Tridgell 1996
    Copyright (C) Paul Mackerras 1996
    
    This program is free software; you can redistribute it and/or modify
@@ -38,8 +37,8 @@ extern int make_backups;
 extern char *backup_suffix;
 
 static struct delete_list {
-	DEV64_T dev;
-	INO64_T inode;
+	dev_t dev;
+	INO_T inode;
 } *delete_list;
 static int dlist_len, dlist_alloc_len;
 
@@ -83,15 +82,14 @@ static void delete_one(struct file_struct *f)
 {
 	if (!S_ISDIR(f->mode)) {
 		if (robust_unlink(f_name(f)) != 0) {
-			rprintf(FERROR,"delete_one: unlink %s: %s\n",f_name(f),strerror(errno));
+			rprintf(FERROR,"unlink %s : %s\n",f_name(f),strerror(errno));
 		} else if (verbose) {
 			rprintf(FINFO,"deleting %s\n",f_name(f));
 		}
 	} else {    
 		if (do_rmdir(f_name(f)) != 0) {
 			if (errno != ENOTEMPTY && errno != EEXIST)
-				rprintf(FERROR,"delete_one: rmdir %s: %s\n",
-                                        f_name(f), strerror(errno));
+				rprintf(FERROR,"rmdir %s : %s\n",f_name(f),strerror(errno));
 		} else if (verbose) {
 			rprintf(FINFO,"deleting directory %s\n",f_name(f));      
 		}
@@ -179,7 +177,7 @@ static int get_tmpname(char *fnametmp, char *fname)
 			rprintf(FERROR,"filename too long\n");
 			return 0;
 		}
-		snprintf(fnametmp,MAXPATHLEN, "%s/.%s.XXXXXX",tmpdir,f);
+		slprintf(fnametmp,MAXPATHLEN, "%s/.%s.XXXXXX",tmpdir,f);
 		return 1;
 	} 
 
@@ -192,11 +190,11 @@ static int get_tmpname(char *fnametmp, char *fname)
 
 	if (f) {
 		*f = 0;
-		snprintf(fnametmp,MAXPATHLEN,"%s/.%s.XXXXXX",
+		slprintf(fnametmp,MAXPATHLEN,"%s/.%s.XXXXXX",
 			 fname,f+1);
 		*f = '/';
 	} else {
-		snprintf(fnametmp,MAXPATHLEN,".%s.XXXXXX",fname);
+		slprintf(fnametmp,MAXPATHLEN,".%s.XXXXXX",fname);
 	}
 
 	return 1;
@@ -305,7 +303,6 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	int fd1,fd2;
 	STRUCT_STAT st;
 	char *fname;
-	char template[MAXPATHLEN];
 	char fnametmp[MAXPATHLEN];
 	char *fnamecmp;
 	char fnamecmpbuf[MAXPATHLEN];
@@ -373,7 +370,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 		if ((fd1 == -1) && (compare_dest != NULL)) {
 			/* try the file at compare_dest instead */
-			snprintf(fnamecmpbuf,MAXPATHLEN,"%s/%s",
+			slprintf(fnamecmpbuf,MAXPATHLEN,"%s/%s",
 						compare_dest,fname);
 			fnamecmp = fnamecmpbuf;
 			fd1 = do_open(fnamecmp, O_RDONLY, 0);
@@ -414,7 +411,17 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			continue;
 		}
 
-		strlcpy(template, fnametmp, sizeof(template));
+		/* mktemp is deliberately used here instead of mkstemp.
+		   because O_EXCL is used on the open, the race condition
+		   is not a problem or a security hole, and we want to
+		   control the access permissions on the created file. */
+		if (NULL == do_mktemp(fnametmp)) {
+			rprintf(FERROR,"mktemp %s failed\n",fnametmp);
+			receive_data(f_in,buf,-1,NULL,file->length);
+			if (buf) unmap_file(buf);
+			if (fd1 != -1) close(fd1);
+			continue;
+		}
 
 		/* we initially set the perms without the
 		   setuid/setgid bits to ensure that there is no race
@@ -422,21 +429,16 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		   the lchown. Thanks to snabb@epipe.fi for pointing
 		   this out.  We also set it initially without group
 		   access because of a similar race condition. */
-		fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
-		if (fd2 == -1) {
-			rprintf(FERROR,"mkstemp %s failed\n",fnametmp);
-			receive_data(f_in,buf,-1,NULL,file->length);
-			if (buf) unmap_file(buf);
-			continue;
-		}
+		fd2 = do_open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,
+			      file->mode & INITACCESSPERMS);
 
 		/* in most cases parent directories will already exist
 		   because their information should have been previously
 		   transferred, but that may not be the case with -R */
 		if (fd2 == -1 && relative_paths && errno == ENOENT && 
 		    create_directory_path(fnametmp) == 0) {
-			strlcpy(fnametmp, template, sizeof(fnametmp));
-			fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
+			fd2 = do_open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,
+				      file->mode & INITACCESSPERMS);
 		}
 		if (fd2 == -1) {
 			rprintf(FERROR,"cannot create %s : %s\n",fnametmp,strerror(errno));
@@ -489,7 +491,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	}
 
 	if (preserve_hard_links)
-		do_hard_links();
+		do_hard_links(flist);
 
 	/* now we need to fix any directory permissions that were 
 	   modified during the transfer */
