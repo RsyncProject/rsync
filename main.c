@@ -298,8 +298,8 @@ static char *get_local_name(struct file_list *flist,char *name)
 	if (do_stat(name,&st) == 0) {
 		if (S_ISDIR(st.st_mode)) {
 			if (!push_dir(name, 0)) {
-				rprintf(FERROR,"push_dir %s : %s (1)\n",
-					name,strerror(errno));
+				rprintf(FERROR, "push_dir %s failed: %s (1)\n",
+					full_fname(name), strerror(errno));
 				exit_cleanup(RERR_FILESELECT);
 			}
 			return NULL;
@@ -315,8 +315,8 @@ static char *get_local_name(struct file_list *flist,char *name)
 		return name;
 
 	if (do_mkdir(name,0777 & ~orig_umask) != 0) {
-		rprintf(FERROR, RSYNC_NAME ": mkdir %s: %s\n",
-			name, strerror(errno));
+		rprintf(FERROR, "mkdir %s failed: %s\n",
+			full_fname(name), strerror(errno));
 		exit_cleanup(RERR_FILEIO);
 	} else {
 		if (verbose > 0)
@@ -324,8 +324,8 @@ static char *get_local_name(struct file_list *flist,char *name)
 	}
 
 	if (!push_dir(name, 0)) {
-		rprintf(FERROR, RSYNC_NAME ": push_dir %s: %s\n",
-			name, strerror(errno));
+		rprintf(FERROR, "push_dir %s failed: %s (2)\n",
+			full_fname(name), strerror(errno));
 		exit_cleanup(RERR_FILESELECT);
 	}
 
@@ -347,7 +347,8 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 		rprintf(FINFO,"server_sender starting pid=%d\n",(int)getpid());
 
 	if (!relative_paths && !push_dir(dir, 0)) {
-		rprintf(FERROR,"push_dir %s: %s (3)\n",dir,strerror(errno));
+		rprintf(FERROR, "push_dir %s failed: %s (3)\n",
+			full_fname(dir), strerror(errno));
 		exit_cleanup(RERR_FILESELECT);
 	}
 	argc--;
@@ -494,8 +495,8 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		argc--;
 		argv++;
 		if (!am_daemon && !push_dir(dir, 0)) {
-			rprintf(FERROR,"push_dir %s : %s (4)\n",
-				dir,strerror(errno));
+			rprintf(FERROR, "push_dir %s failed: %s (4)\n",
+				full_fname(dir), strerror(errno));
 			exit_cleanup(RERR_FILESELECT);
 		}
 	}

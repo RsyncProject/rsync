@@ -158,7 +158,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			if (strlen(fname) == MAXPATHLEN-1) {
 				io_error = 1;
 				rprintf(FERROR, "send_files failed on long-named directory %s\n",
-					fname);
+					full_fname(fname));
 				return;
 			}
 			strlcat(fname, "/", MAXPATHLEN);
@@ -194,7 +194,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			if (fd == -1) {
 				io_error = 1;
 				rprintf(FERROR, "send_files failed to open %s: %s\n",
-					fname, strerror(errno));
+					full_fname(fname), strerror(errno));
 				free_sums(s);
 				continue;
 			}
@@ -202,7 +202,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			/* map the local file */
 			if (do_fstat(fd, &st) != 0) {
 				io_error = 1;
-				rprintf(FERROR, "fstat failed : %s\n", strerror(errno));
+				rprintf(FERROR, "fstat failed: %s\n", strerror(errno));
 				free_sums(s);
 				close(fd);
 				return;

@@ -86,16 +86,16 @@ static void delete_one(char *fn, int is_dir)
 {
 	if (!is_dir) {
 		if (robust_unlink(fn) != 0) {
-			rprintf(FERROR, "delete_one: unlink %s: %s\n",
-				fn, strerror(errno));
+			rprintf(FERROR, "delete_one: unlink %s failed: %s\n",
+				full_fname(fn), strerror(errno));
 		} else if (verbose) {
 			rprintf(FINFO, "deleting %s\n", fn);
 		}
 	} else {    
 		if (do_rmdir(fn) != 0) {
 			if (errno != ENOTEMPTY && errno != EEXIST) {
-				rprintf(FERROR, "delete_one: rmdir %s: %s\n",
-                                        fn, strerror(errno));
+				rprintf(FERROR, "delete_one: rmdir %s failed: %s\n",
+                                        full_fname(fn), strerror(errno));
 			}
 		} else if (verbose) {
 			rprintf(FINFO, "deleting directory %s\n", fn);
@@ -271,7 +271,8 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 			sum_update(data,i);
 
 			if (fd != -1 && write_file(fd,data,i) != i) {
-				rprintf(FERROR,"write failed on %s : %s\n",fname,strerror(errno));
+				rprintf(FERROR, "write failed on %s: %s\n",
+					full_fname(fname), strerror(errno));
 				exit_cleanup(RERR_FILEIO);
 			}
 			offset += i;
@@ -298,8 +299,8 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 		}
 		
 		if (fd != -1 && write_file(fd,map,len) != (int) len) {
-			rprintf(FERROR,"write failed on %s : %s\n",
-				fname,strerror(errno));
+			rprintf(FERROR, "write failed on %s: %s\n",
+				full_fname(fname), strerror(errno));
 			exit_cleanup(RERR_FILEIO);
 		}
 		offset += len;
@@ -309,8 +310,8 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 		end_progress(total_size);
 
 	if (fd != -1 && offset > 0 && sparse_end(fd) != 0) {
-		rprintf(FERROR,"write failed on %s : %s\n",
-			fname,strerror(errno));
+		rprintf(FERROR, "write failed on %s: %s\n",
+			full_fname(fname), strerror(errno));
 		exit_cleanup(RERR_FILEIO);
 	}
 
@@ -413,7 +414,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		}
 
 		if (fd1 != -1 && do_fstat(fd1,&st) != 0) {
-			rprintf(FERROR,"fstat %s : %s\n",fnamecmp,strerror(errno));
+			rprintf(FERROR, "fstat %s failed: %s\n",
+				full_fname(fnamecmp), strerror(errno));
 			receive_data(f_in,NULL,-1,NULL,file->length);
 			close(fd1);
 			continue;
@@ -425,8 +427,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			 * and the underlying robust_unlink could cope
 			 * with directories
 			 */
-			rprintf(FERROR,"%s : is a directory (recv_files)\n",
-			    fnamecmp);
+			rprintf(FERROR,"recv_files: %s is a directory\n",
+				full_fname(fnamecmp));
 			receive_data(f_in, NULL, -1, NULL, file->length);
 			close(fd1);
 			continue;
@@ -478,15 +480,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
 		}
 		if (fd2 == -1) {
-			extern char curr_dir[];
-			char *p1, *p2;
-			if (*fnametmp == '.') {
-				p1 = curr_dir;
-				p2 = "/";
-			} else
-				p1 = p2 = "";
-			rprintf(FERROR, "mkstemp %s%s%s failed: %s\n",
-				p1, p2, fnametmp, strerror(errno));
+			rprintf(FERROR, "mkstemp %s failed: %s\n",
+				full_fname(fnametmp), strerror(errno));
 			receive_data(f_in,buf,-1,NULL,file->length);
 			if (buf) unmap_file(buf);
 			if (fd1 != -1) close(fd1);
@@ -520,7 +515,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		if (!recv_ok) {
 			if (csum_length == SUM_LENGTH) {
 				rprintf(FERROR,"ERROR: file corruption in %s. File changed during transfer?\n",
-					fname);
+					full_fname(fname));
 			} else {
 				if (verbose > 1)
 					rprintf(FINFO,"redoing %s(%d)\n",fname,i);

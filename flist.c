@@ -693,8 +693,8 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 			}
 		}
 		io_error = 1;
-		rprintf(FERROR, "readlink %s: %s\n",
-			fname, strerror(save_errno));
+		rprintf(FERROR, "readlink %s failed: %s\n",
+			full_fname(fname), strerror(save_errno));
 		return NULL;
 	}
 
@@ -843,7 +843,8 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 	d = opendir(dir);
 	if (!d) {
 		io_error = 1;
-		rprintf(FERROR, "opendir(%s): %s\n", dir, strerror(errno));
+		rprintf(FERROR, "opendir %s failed: %s\n",
+			full_fname(dir), strerror(errno));
 		return;
 	}
 
@@ -852,9 +853,8 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 	if (fname[l - 1] != '/') {
 		if (l == MAXPATHLEN - 1) {
 			io_error = 1;
-			rprintf(FERROR,
-				"skipping long-named directory %s\n",
-				fname);
+			rprintf(FERROR, "skipping long-named directory: %s\n",
+				full_fname(fname));
 			closedir(d);
 			return;
 		}
@@ -873,7 +873,7 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 			io_error = 1;
 			rprintf(FINFO,
 				"cannot cvs-exclude in long-named directory %s\n",
-				fname);
+				full_fname(fname));
 		}
 	}
 
@@ -920,8 +920,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		io_start_buffering(f);
 		if (filesfrom_fd >= 0) {
 			if (argv[0] && !push_dir(argv[0], 0)) {
-				rprintf(FERROR, "push_dir %s : %s\n",
-					argv[0], strerror(errno));
+				rprintf(FERROR, "push_dir %s failed: %s\n",
+					full_fname(argv[0]), strerror(errno));
 				exit_cleanup(RERR_FILESELECT);
 			}
 			use_ff_fd = 1;
@@ -957,8 +957,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (link_stat(fname, &st) != 0) {
 			if (f != -1) {
 				io_error = 1;
-				rprintf(FERROR, "link_stat %s : %s\n",
-					fname, strerror(errno));
+				rprintf(FERROR, "link_stat %s failed: %s\n",
+					full_fname(fname), strerror(errno));
 			}
 			continue;
 		}
@@ -1024,8 +1024,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 			if (!olddir) {
 				io_error = 1;
-				rprintf(FERROR, "push_dir %s : %s\n",
-					dir, strerror(errno));
+				rprintf(FERROR, "push_dir %s failed: %s\n",
+					full_fname(dir), strerror(errno));
 				continue;
 			}
 
@@ -1040,8 +1040,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (olddir != NULL) {
 			flist_dir = NULL;
 			if (pop_dir(olddir) != 0) {
-				rprintf(FERROR, "pop_dir %s : %s\n",
-					dir, strerror(errno));
+				rprintf(FERROR, "pop_dir %s failed: %s\n",
+					full_fname(dir), strerror(errno));
 				exit_cleanup(RERR_FILESELECT);
 			}
 		}

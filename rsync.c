@@ -67,22 +67,24 @@ int delete_file(char *fname)
 
 	if (!S_ISDIR(st.st_mode)) {
 		if (robust_unlink(fname) == 0 || errno == ENOENT) return 0;
-		rprintf(FERROR,"delete_file: unlink(%s) : %s\n", fname, strerror(errno));
+		rprintf(FERROR, "delete_file: unlink %s failed: %s\n",
+			full_fname(fname), strerror(errno));
 		return -1;
 	}
 
 	if (do_rmdir(fname) == 0 || errno == ENOENT) return 0;
 	if (!force_delete || !recurse || 
 	    (errno != ENOTEMPTY && errno != EEXIST)) {
-		rprintf(FERROR,"delete_file: rmdir(%s) : %s\n", fname, strerror(errno));
+		rprintf(FERROR, "delete_file: rmdir %s failed: %s\n",
+			full_fname(fname), strerror(errno));
 		return -1;
 	}
 
 	/* now we do a recsursive delete on the directory ... */
 	d = opendir(fname);
 	if (!d) {
-		rprintf(FERROR,"delete_file: opendir(%s): %s\n",
-			fname,strerror(errno));
+		rprintf(FERROR, "delete_file: opendir %s failed: %s\n",
+			full_fname(fname), strerror(errno));
 		return -1;
 	}
 
@@ -103,7 +105,8 @@ int delete_file(char *fname)
 	closedir(d);
 	
 	if (do_rmdir(fname) != 0) {
-		rprintf(FERROR,"delete_file: rmdir(%s) : %s\n", fname, strerror(errno));
+		rprintf(FERROR, "delete_file: rmdir %s failed: %s\n",
+			full_fname(fname), strerror(errno));
 		return -1;
 	}
 
@@ -155,7 +158,8 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 
 	if (!st) {
 		if (link_stat(fname,&st2) != 0) {
-			rprintf(FERROR,"stat %s : %s\n",fname,strerror(errno));
+			rprintf(FERROR, "stat %s failed: %s\n",
+				full_fname(fname), strerror(errno));
 			return 0;
 		}
 		st = &st2;
@@ -167,8 +171,8 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 		   because some filesystems can't do it */
 		if (set_modtime(fname,file->modtime) != 0 &&
 		    !S_ISDIR(st->st_mode)) {
-			rprintf(FERROR,"failed to set times on %s : %s\n",
-				fname,strerror(errno));
+			rprintf(FERROR, "failed to set times on %s: %s\n",
+				full_fname(fname), strerror(errno));
 			return 0;
 		} else {
 			updated = 1;
@@ -189,7 +193,8 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 			      change_gid?file->gid:st->st_gid) != 0) {
 			/* shouldn't have attempted to change uid or gid
 			     unless have the privilege */
-			rprintf(FERROR,"chown %s : %s\n", fname,strerror(errno));
+			rprintf(FERROR, "chown %s failed: %s\n",
+				full_fname(fname), strerror(errno));
 			return 0;
 		}
 		/* a lchown had been done - we have to re-stat if the
@@ -206,8 +211,8 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 		if ((st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS)) {
 			updated = 1;
 			if (do_chmod(fname,(file->mode & CHMOD_BITS)) != 0) {
-				rprintf(FERROR,"failed to set permissions on %s : %s\n",
-					fname,strerror(errno));
+				rprintf(FERROR, "failed to set permissions on %s: %s\n",
+					full_fname(fname), strerror(errno));
 				return 0;
 			}
 		}
@@ -243,14 +248,15 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file)
 			/* rename failed on cross-filesystem link.  
 			   Copy the file instead. */
 			if (copy_file(fnametmp,fname, file->mode & INITACCESSPERMS)) {
-				rprintf(FERROR,"copy %s -> %s : %s\n",
-					fnametmp,fname,strerror(errno));
+				rprintf(FERROR, "copy %s -> \"%s\": %s\n",
+					full_fname(fnametmp), fname,
+					strerror(errno));
 			} else {
 				set_perms(fname,file,NULL,0);
 			}
 		} else {
-			rprintf(FERROR,"rename %s -> %s : %s\n",
-				fnametmp,fname,strerror(errno));
+			rprintf(FERROR,"rename %s -> \"%s\": %s\n",
+				full_fname(fnametmp), fname, strerror(errno));
 		}
 		do_unlink(fnametmp);
 	} else {

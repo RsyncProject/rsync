@@ -314,9 +314,9 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 		if (dry_run) return; /* XXXX -- might cause inaccuracies?? -- mbp */
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			if (robust_unlink(fname) != 0) {
-				rprintf(FERROR, RSYNC_NAME
-					": recv_generator: unlink \"%s\" to make room for directory: %s\n",
-					fname,strerror(errno));
+				rprintf(FERROR,
+					"recv_generator: unlink %s to make room for directory: %s\n",
+					full_fname(fname), strerror(errno));
 				return;
 			}
 			statret = -1;
@@ -325,8 +325,8 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 			if (!(relative_paths && errno==ENOENT &&
 			      create_directory_path(fname, orig_umask)==0 &&
 			      do_mkdir(fname,file->mode)==0)) {
-				rprintf(FERROR, RSYNC_NAME ": recv_generator: mkdir \"%s\": %s (2)\n",
-					fname,strerror(errno));
+				rprintf(FERROR, "recv_generator: mkdir %s failed: %s\n",
+					full_fname(fname), strerror(errno));
 			}
 		}
 		/* f_out is set to -1 when doing final directory
@@ -344,8 +344,8 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 
 		if (safe_symlinks && unsafe_symlink(file->link, fname)) {
 			if (verbose) {
-				rprintf(FINFO,"ignoring unsafe symlink \"%s\" -> \"%s\"\n",
-					fname,file->link);
+				rprintf(FINFO, "ignoring unsafe symlink %s -> \"%s\"\n",
+					full_fname(fname), file->link);
 			}
 			return;
 		}
@@ -367,8 +367,8 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 			delete_file(fname);
 		}
 		if (do_symlink(file->link,fname) != 0) {
-			rprintf(FERROR,RSYNC_NAME": symlink \"%s\" -> \"%s\": %s\n",
-				fname,file->link,strerror(errno));
+			rprintf(FERROR, "symlink %s -> \"%s\" failed: %s\n",
+				full_fname(fname), file->link, strerror(errno));
 		} else {
 			set_perms(fname,file,NULL,0);
 			if (verbose) {
@@ -389,7 +389,8 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 				rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",
 					fname,(int)file->mode,(int)file->rdev);
 			if (do_mknod(fname,file->mode,file->rdev) != 0) {
-				rprintf(FERROR,"mknod %s : %s\n",fname,strerror(errno));
+				rprintf(FERROR, "mknod %s failed: %s\n",
+					full_fname(fname), strerror(errno));
 			} else {
 				set_perms(fname,file,NULL,0);
 				if (verbose)
@@ -444,11 +445,10 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 		if (errno == ENOENT) {
 			write_int(f_out,i);
 			if (!dry_run) write_sum_head(f_out, NULL);
-		} else {
-			if (verbose > 1)
-				rprintf(FERROR, RSYNC_NAME
-					": recv_generator failed to open \"%s\": %s\n",
-					fname, strerror(errno));
+		} else if (verbose > 1) {
+			rprintf(FERROR,
+				"recv_generator: failed to open %s: %s\n",
+				full_fname(fname), strerror(errno));
 		}
 		return;
 	}
@@ -497,7 +497,8 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 	fd = do_open(fnamecmp, O_RDONLY, 0);
 
 	if (fd == -1) {
-		rprintf(FERROR,RSYNC_NAME": failed to open \"%s\", continuing : %s\n",fnamecmp,strerror(errno));
+		rprintf(FERROR, "failed to open %s, continuing: %s\n",
+			full_fname(fnamecmp), strerror(errno));
 		/* pretend the file didn't exist */
 		write_int(f_out,i);
 		write_sum_head(f_out, NULL);
