@@ -199,7 +199,7 @@ static int keep_backup(char *fname)
 	if (do_stat(fname, &st)) return 1;
 #endif
 
-	file = make_file(fname, NULL, NO_EXCLUDES);
+	file = make_file(fname, NO_EXCLUDES);
 
 	/* the file could have disappeared */
 	if (!file) return 1;
@@ -282,8 +282,7 @@ static int keep_backup(char *fname)
 		}
 	}
 	set_perms(keep_name, file, NULL, 0);
-	free_file(file);
-	free(file);
+	free_file(file, FREE_STRUCT);
 
 	if (verbose > 1)
 		rprintf(FINFO, "keep_backup %s -> %s\n", fname, keep_name);
