@@ -299,9 +299,14 @@ int open_socket_out(char *host, int port, const char *bind_address,
 int open_socket_out_wrapped(char *host, int port, const char *bind_address,
 			    int af_hint)
 {
-	char *prog;
+	char *prog = getenv("RSYNC_CONNECT_PROG");
 
-	if ((prog = getenv("RSYNC_CONNECT_PROG")) != NULL)
+	if (verbose >= 2) {
+		rprintf(FINFO, "%sopening tcp connection to %s port %d\n",
+			prog ? "Using RSYNC_CONNECT_PROG instead of " : "",
+			host, port);
+	}
+	if (prog)
 		return sock_exec(prog);
 	return open_socket_out(host, port, bind_address, af_hint);
 }
@@ -769,18 +774,14 @@ int sock_exec(const char *prog)
 			strerror(errno));
 		return -1;
 	}
+	if (verbose >= 2)
+		rprintf(FINFO, "Running socket program: \"%s\"\n", prog);
 	if (fork() == 0) {
 		close(fd[0]);
 		close(0);
 		close(1);
 		dup(fd[1]);
 		dup(fd[1]);
-		if (verbose > 3) {
-			/* Can't use rprintf because we've forked. */
-			fprintf(stderr,
-				RSYNC_NAME ": execute socket program \"%s\"\n",
-				prog);
-		}
 		exit(system(prog));
 	}
 	close(fd[1]);

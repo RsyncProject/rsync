@@ -87,18 +87,10 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 		*p = 0;
 	}
 
-	if (verbose >= 2) {
-		/* FIXME: If we're going to use a socket program for
-		 * testing, then this message is wrong.  We need to
-		 * say something like "(except really using %s)" */
-		rprintf(FINFO, "opening tcp connection to %s port %d\n",
-			host, rsync_port);
-	}
 	fd = open_socket_out_wrapped(host, rsync_port, bind_address,
 				     default_af_hint);
-	if (fd == -1) {
+	if (fd == -1)
 		exit_cleanup(RERR_SOCKETIO);
-	}
 
 	ret = start_inband_exchange(user, path, fd, fd, argc);
 
