@@ -1,5 +1,5 @@
 /* infblock.c -- interpret and process block types to last block
- * Copyright (C) 1995-1998 Mark Adler
+ * Copyright (C) 1995-2002 Mark Adler
  * For conditions of distribution and use, see copyright notice in zlib.h 
  */
 
