@@ -969,9 +969,17 @@ char *partial_dir_fname(const char *fname)
 		fn = fname;
 	if ((int)pathjoin(t, sz, partial_dir, fn) >= sz)
 		return NULL;
-	if (server_filter_list.head
-	    && check_filter(&server_filter_list, partial_fname, 0) < 0)
-		return NULL;
+	if (server_filter_list.head) {
+		static int len;
+		if (!len)
+			len = strlen(partial_dir);
+		t[len] = '\0';
+		if (check_filter(&server_filter_list, partial_fname, 1) < 0)
+			return NULL;
+		t[len] = '/';
+		if (check_filter(&server_filter_list, partial_fname, 0) < 0)
+			return NULL;
+	}
 
 	return partial_fname;
 }
