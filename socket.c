@@ -506,6 +506,9 @@ void start_accept_loop(int port, int (*fn)(int, int))
 			int ret;
 			for (i = 0; sp[i] >= 0; i++)
 				close(sp[i]);
+			/* Re-open log file in child before possibly giving
+			 * up privileges (see log_close() above). */
+			log_open();
 			ret = fn(fd, fd);
 			close_all();
 			_exit(ret);
