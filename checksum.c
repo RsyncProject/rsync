@@ -1,17 +1,17 @@
-/* 
+/*
    Copyright (C) Andrew Tridgell 1996
    Copyright (C) Paul Mackerras 1996
-   
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -38,9 +38,9 @@ uint32 get_checksum1(char *buf1,int len)
 
     s1 = s2 = 0;
     for (i = 0; i < (len-4); i+=4) {
-	s2 += 4*(s1 + buf[i]) + 3*buf[i+1] + 2*buf[i+2] + buf[i+3] + 
+	s2 += 4*(s1 + buf[i]) + 3*buf[i+1] + 2*buf[i+2] + buf[i+3] +
 	  10*CHAR_OFFSET;
-	s1 += (buf[i+0] + buf[i+1] + buf[i+2] + buf[i+3] + 4*CHAR_OFFSET); 
+	s1 += (buf[i+0] + buf[i+1] + buf[i+2] + buf[i+3] + 4*CHAR_OFFSET);
     }
     for (; i < len; i++) {
 	s1 += (buf[i]+CHAR_OFFSET); s2 += s1;
@@ -62,15 +62,15 @@ void get_checksum2(char *buf,int len,char *sum)
 		len1 = len;
 		if (!buf1) out_of_memory("get_checksum2");
 	}
-	
+
 	mdfour_begin(&m);
-	
+
 	memcpy(buf1,buf,len);
 	if (checksum_seed) {
 		SIVAL(buf1,len,checksum_seed);
 		len += 4;
 	}
-	
+
 	for(i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK) {
 		mdfour_update(&m, (uchar *)(buf1+i), CSUM_CHUNK);
 	}
@@ -83,7 +83,7 @@ void get_checksum2(char *buf,int len,char *sum)
 	if (len - i > 0 || protocol_version >= 27) {
 		mdfour_update(&m, (uchar *)(buf1+i), (len-i));
 	}
-	
+
 	mdfour_result(&m, (uchar *)sum);
 }
 
@@ -95,15 +95,15 @@ void file_checksum(char *fname,char *sum,OFF_T size)
 	int fd;
 	OFF_T len = size;
 	struct mdfour m;
-	
+
 	memset(sum,0,MD4_SUM_LENGTH);
-	
+
 	fd = do_open(fname, O_RDONLY, 0);
 	if (fd == -1)
 		return;
-	
+
 	buf = map_file(fd, size, CSUM_CHUNK);
-	
+
 	mdfour_begin(&m);
 
 	for(i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK) {
@@ -172,7 +172,7 @@ void sum_update(char *p, int len)
 		sumresidue = len-i;
 		memcpy(sumrbuf,p+i,sumresidue);
 	} else {
-		sumresidue = 0;    
+		sumresidue = 0;
 	}
 }
 
