@@ -292,9 +292,6 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		recv_files(f_in,flist,local_name,recv_pipe[1]);
 		report(f_in);
 
-		if (verbose > 3)
-			rprintf(FINFO,"do_recv waiting on %d\n",pid);
-
 		io_flush();
 		_exit(0);
 	}
