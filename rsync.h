@@ -18,6 +18,7 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
+
 #define False 0
 #define True 1
 
@@ -389,6 +390,25 @@ static inline int flist_up(struct file_list *flist, int i)
 #include "version.h"
 #include "proto.h"
 #include "lib/mdfour.h"
+
+
+/* We have replacement versions of these if they're missing. */
+#ifndef HAVE_ASPRINTF
+int asprintf(char **ptr, const char *format, ...);
+#endif
+
+#ifndef HAVE_VASPRINTF
+int vasprintf(char **ptr, const char *format, va_list ap);
+#endif
+
+#if !defined(HAVE_VSNPRINTF) || !defined(HAVE_C99_VSNPRINTF)
+int vsnprintf (char *str, size_t count, const char *fmt, va_list args);
+#endif
+
+#if !defined(HAVE_SNPRINTF) || !defined(HAVE_C99_VSNPRINTF)
+int snprintf(char *str,size_t count,const char *fmt,...);
+#endif
+
 
 #if !HAVE_STRERROR
 extern char *sys_errlist[];
