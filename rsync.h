@@ -51,7 +51,7 @@
 #define WRITE_SIZE (32*1024)
 #define CHUNK_SIZE (32*1024)
 #define MAX_MAP_SIZE (1*1024*1024)
-#define IO_BUFFER_SIZE (4096)
+#define IO_BUFFER_SIZE (4092)
 #define MAX_READ_BUFFER (1024*1024)
 
 #define MAX_ARGS 1000
