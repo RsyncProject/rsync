@@ -50,3 +50,11 @@ pid_t waitpid(pid_t pid, int *statptr, int options)
 }
 #endif
 
+
+#ifndef HAVE_MEMMOVE
+void *memmove(void *dest, const void *src, size_t n)
+{
+	bcopy(src, dest, n);
+	return dest;
+}
+#endif
