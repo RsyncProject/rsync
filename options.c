@@ -289,11 +289,6 @@ void usage(enum logcode F)
   rprintf(F,"     --files-from=FILE       read FILE for list of source-file names\n");
   rprintf(F," -0, --from0                 all *-from file lists are delimited by nulls\n");
   rprintf(F,"     --version               print version number\n");
-  rprintf(F,"     --daemon                run as an rsync daemon\n");
-  rprintf(F,"     --no-detach             do not detach from the parent\n");
-  rprintf(F,"     --address=ADDRESS       bind to the specified address\n");
-  rprintf(F,"     --config=FILE           specify alternate rsyncd.conf file\n");
-  rprintf(F,"     --port=PORT             specify alternate rsyncd port number\n");
   rprintf(F,"     --blocking-io           use blocking I/O for the remote shell\n");
   rprintf(F,"     --no-blocking-io        turn off --blocking-io\n");
   rprintf(F,"     --stats                 give some file transfer stats\n");
@@ -303,20 +298,18 @@ void usage(enum logcode F)
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth, KBytes per second\n");
   rprintf(F,"     --write-batch=FILE      write a batch to FILE\n");
   rprintf(F,"     --read-batch=FILE       read a batch from FILE\n");
-  rprintf(F,"     --checksum-seed=NUM     set block/file checksum seed\n");
 #ifdef INET6
   rprintf(F," -4, --ipv4                  prefer IPv4\n");
   rprintf(F," -6, --ipv6                  prefer IPv6\n");
 #endif
   rprintf(F," -h, --help                  show this help screen\n");
 
-  rprintf(F,"\n");
-
-  rprintf(F,"\nPlease see the rsync(1) and rsyncd.conf(5) man pages for full documentation\n");
+  rprintf(F,"\nUse \"rsync --daemon --help\" to see the daemon-mode command-line options.\n");
+  rprintf(F,"Please see the rsync(1) and rsyncd.conf(5) man pages for full documentation.\n");
   rprintf(F,"See http://rsync.samba.org/ for updates, bug reports, and answers\n");
 }
 
-enum {OPT_VERSION = 1000, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
+enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_DELETE_AFTER, OPT_DELETE_EXCLUDED, OPT_LINK_DEST,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_TIMEOUT,
@@ -380,8 +373,6 @@ static struct poptOption long_options[] = {
   {"link-dest",        0,  POPT_ARG_STRING, &compare_dest, OPT_LINK_DEST, 0, 0 },
   /* TODO: Should this take an optional int giving the compression level? */
   {"compress",        'z', POPT_ARG_NONE,   &do_compression, 0, 0, 0 },
-  {"daemon",           0,  POPT_ARG_NONE,   &daemon_opt, 0, 0, 0 },
-  {"no-detach",        0,  POPT_ARG_NONE,   &no_detach, 0, 0, 0 },
   {"stats",            0,  POPT_ARG_NONE,   &do_stats, 0, 0, 0 },
   {"progress",         0,  POPT_ARG_NONE,   &do_progress, 0, 0, 0 },
   {"partial",          0,  POPT_ARG_NONE,   &keep_partial, 0, 0, 0 },
@@ -390,11 +381,8 @@ static struct poptOption long_options[] = {
   {"blocking-io",      0,  POPT_ARG_VAL,    &blocking_io, 1, 0, 0 },
   {"no-blocking-io",   0,  POPT_ARG_VAL,    &blocking_io, 0, 0, 0 },
   {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
-  {"config",           0,  POPT_ARG_STRING, &config_file, 0, 0, 0 },
-  {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
   {"log-format",       0,  POPT_ARG_STRING, &log_format, 0, 0, 0 },
   {"bwlimit",          0,  POPT_ARG_INT,    &bwlimit, 0, 0, 0 },
-  {"address",          0,  POPT_ARG_STRING, &bind_address, 0, 0, 0 },
   {"backup-dir",       0,  POPT_ARG_STRING, &backup_dir, 0, 0, 0 },
   {"hard-links",      'H', POPT_ARG_NONE,   &preserve_hard_links, 0, 0, 0 },
   {"read-batch",       0,  POPT_ARG_STRING, &batch_name, OPT_READ_BATCH, 0, 0 },
@@ -408,6 +396,48 @@ static struct poptOption long_options[] = {
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
 #endif
+  /* All these options switch us into daemon-mode option-parsing. */
+  {"address",          0,  POPT_ARG_STRING, 0, OPT_DAEMON, 0, 0 },
+  {"config",           0,  POPT_ARG_STRING, 0, OPT_DAEMON, 0, 0 },
+  {"daemon",           0,  POPT_ARG_NONE,   0, OPT_DAEMON, 0, 0 },
+  {"no-detach",        0,  POPT_ARG_NONE,   0, OPT_DAEMON, 0, 0 },
+  {"port",             0,  POPT_ARG_INT,    0, OPT_DAEMON, 0, 0 },
+  {0,0,0,0, 0, 0, 0}
+};
+
+static void daemon_usage(enum logcode F)
+{
+  print_rsync_version(F);
+
+  rprintf(F,"\nUsage: rsync --daemon [OPTION]...\n");
+  rprintf(F,"     --address=ADDRESS       bind to the specified address\n");
+  rprintf(F,"     --config=FILE           specify alternate rsyncd.conf file\n");
+  rprintf(F,"     --no-detach             do not detach from the parent\n");
+  rprintf(F,"     --port=PORT             specify alternate rsyncd port number\n");
+#ifdef INET6
+  rprintf(F," -4, --ipv4                  prefer IPv4\n");
+  rprintf(F," -6, --ipv6                  prefer IPv6\n");
+#endif
+  rprintf(F," -h, --help                  show this help screen\n");
+
+  rprintf(F,"\nIf you were not trying to invoke rsync as a daemon, avoid using any of the\n");
+  rprintf(F,"daemon-specific rsync options.  See also the rsyncd.conf(5) man page.\n");
+}
+
+static struct poptOption long_daemon_options[] = {
+  /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
+  {"address",          0,  POPT_ARG_STRING, &bind_address, 0, 0, 0 },
+  {"config",           0,  POPT_ARG_STRING, &config_file, 0, 0, 0 },
+  {"daemon",           0,  POPT_ARG_NONE,   &daemon_opt, 0, 0, 0 },
+#ifdef INET6
+  {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
+  {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
+#endif
+  {"no-detach",        0,  POPT_ARG_NONE,   &no_detach, 0, 0, 0 },
+  {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
+  {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
+  {"server",           0,  POPT_ARG_NONE,   &am_server, 0, 0, 0 },
+  {"help",            'h', POPT_ARG_NONE,   0, 'h', 0, 0 },
   {0,0,0,0, 0, 0, 0}
 };
 
@@ -523,6 +553,41 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		case OPT_VERSION:
 			print_rsync_version(FINFO);
 			exit_cleanup(0);
+
+		case OPT_DAEMON:
+			if (am_daemon) {
+				strcpy(err_buf, "Attempt to hack rsync thwarted!\n");
+				return 0;
+			}
+			poptFreeContext(pc);
+			pc = poptGetContext(RSYNC_NAME, *argc, *argv,
+					    long_daemon_options, 0);
+			while ((opt = poptGetNextOpt(pc)) != -1) {
+				switch (opt) {
+				case 'h':
+					daemon_usage(FINFO);
+					exit_cleanup(0);
+
+				default:
+					rprintf(FERROR,
+					    "rsync: %s: %s (in daemon mode)\n",
+					    poptBadOption(pc, POPT_BADOPTION_NOALIAS),
+					    poptStrerror(opt));
+					goto daemon_error;
+				}
+			}
+			if (!daemon_opt) {
+				rprintf(FERROR, "Daemon option(s) used without --daemon.\n");
+			    daemon_error:
+				rprintf(FERROR,
+				    "(Type \"rsync --daemon --help\" for assistance with daemon mode.)\n");
+				exit_cleanup(RERR_SYNTAX);
+			}
+			*argv = poptGetArgs(pc);
+			*argc = count_args(*argv);
+			daemon_opt = 0;
+			am_daemon = 1;
+			return 1;
 
 		case OPT_MODIFY_WINDOW:
 			/* The value has already been set by popt, but
@@ -765,12 +830,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			    "Your options have been rejected by the server.\n");
 			return 0;
 		}
-	}
-
-	if (daemon_opt) {
-		daemon_opt = 0;
-		am_daemon = 1;
-		return 1;
 	}
 
 	if (!backup_suffix)
