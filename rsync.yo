@@ -514,6 +514,8 @@ dit(bf(-b, --backup)) With this option, preexisting destination files are
 renamed as each file is transferred or deleted.  You can control where the
 backup file goes and what (if any) suffix gets appended using the
 bf(--backup-dir) and bf(--suffix) options.
+Note that if you don't specify bf(--backup-dir), the bf(--omit-dir-times)
+option will be enabled.
 
 dit(bf(--backup-dir=DIR)) In combination with the bf(--backup) option, this
 tells rsync to store all backups in the specified directory. This is
@@ -521,8 +523,6 @@ very useful for incremental backups.  You can additionally
 specify a backup suffix using the bf(--suffix) option
 (otherwise the files backed up in the specified directory
 will keep their original filenames).
-If DIR is a relative path, it is relative to the destination directory
-(which changes in a recursive transfer).
 
 dit(bf(--suffix=SUFFIX)) This option allows you to override the default
 backup suffix used with the bf(--backup) (bf(-b)) option. The default suffix is a ~
@@ -652,6 +652,7 @@ if the files haven't actually changed, you're much better off using bf(-t)).
 dit(bf(-O, --omit-dir-times)) This tells rsync to omit directories when
 it is preserving modification times (see bf(--times)).  If NFS is sharing
 the directories on the receiving side, it is a good idea to use bf(-O).
+This option is inferred if you use bf(--backup) without bf(--backup-dir).
 
 dit(bf(-n, --dry-run)) This tells rsync to not do any file transfers,
 instead it will just report the actions it would have taken.
