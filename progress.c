@@ -21,6 +21,7 @@
 
 #include "rsync.h"
 
+extern struct stats stats;
 extern int am_server;
 
 static OFF_T  last_ofs;
@@ -45,6 +46,7 @@ static unsigned long msdiff(struct timeval *t1, struct timeval *t2)
 static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 			    int is_last)
 {
+	char eol[256];
 	int pct = (ofs == size) ? 100 : (int)((100.0*ofs)/size);
 	unsigned long diff = msdiff(&start_time, now);
 	double rate = diff ? (double) (ofs-start_ofs) * 1000.0 / diff / 1024.0 : 0;
@@ -72,10 +74,16 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 	remain_m = (int) (remain / 60.0) % 60;
 	remain_h = (int) (remain / 3600.0);
 
+	if (is_last) {
+		snprintf(eol, sizeof eol, "  (%d, %.1f%% of %d)\n",
+			stats.num_transferred_files,
+			(float)(stats.current_file_index * 100) / stats.num_files,
+			stats.num_files);
+	} else
+		strcpy(eol, "\r");
 	rprintf(FINFO, "%12.0f %3d%% %7.2f%s %4d:%02d:%02d%s",
 		(double) ofs, pct, rate, units,
-		remain_h, remain_m, remain_s,
-		is_last ? "\n" : "\r");
+		remain_h, remain_m, remain_s, eol);
 }
 
 void end_progress(OFF_T size)
