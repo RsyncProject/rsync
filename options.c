@@ -254,6 +254,7 @@ void usage(enum logcode F)
   rprintf(F,"     --modify-window=NUM     Timestamp window (seconds) for file match (default=%d)\n",modify_window);
   rprintf(F," -T  --temp-dir=DIR          create temporary files in directory DIR\n");
   rprintf(F,"     --compare-dest=DIR      also compare destination files relative to DIR\n");
+  rprintf(F,"     --link-dest=DIR         create hardlinks to DIR for unchanged files\n");
   rprintf(F," -P                          equivalent to --partial --progress\n");
   rprintf(F," -z, --compress              compress file data\n");
   rprintf(F," -C, --cvs-exclude           auto ignore files in the same way CVS does\n");
