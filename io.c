@@ -888,7 +888,7 @@ int read_vstring(int f, char *buf, int bufsize)
 	if (len >= bufsize) {
 		rprintf(FERROR, "over-long vstring received (%d > %d)\n",
 			len, bufsize - 1);
-		exit_cleanup(RERR_PROTOCOL);
+		return -1;
 	}
 
 	if (len)
@@ -1045,14 +1045,8 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 		if (msg_fd_in >= 0 && FD_ISSET(msg_fd_in, &r_fds))
 			read_msg_fd();
 
-		if (!FD_ISSET(fd, &w_fds)) {
-			if (fd != sock_f_out && iobuf_out_cnt) {
-				no_flush--;
-				io_flush(NORMAL_FLUSH);
-				no_flush++;
-			}
+		if (!FD_ISSET(fd, &w_fds))
 			continue;
-		}
 
 		n = len - total;
 		if (bwlimit && n > bwlimit_writemax)
