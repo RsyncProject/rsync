@@ -23,6 +23,8 @@ RPM NOTES
 ---------
 
 Under packaging you will find .spec files for several distributions.
+The .spec file in packaging/lsb can be used for Linux systems that
+adhere to the Linux Standards Base (e.g., RedHat and others).
 
 HP-UX NOTES
 -----------
