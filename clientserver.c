@@ -271,6 +271,8 @@ static int start_daemon(int fd)
 	}
 
 	set_socket_options(fd,"SO_KEEPALIVE");
+	set_socket_options(fd,lp_socket_options());
+	
 
 	io_printf(fd,"@RSYNCD: %d\n", PROTOCOL_VERSION);
 

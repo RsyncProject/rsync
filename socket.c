@@ -216,6 +216,8 @@ set user socket options
 void set_socket_options(int fd, char *options)
 {
 	char *tok;
+	if (!options || !*options) return;
+
 	options = strdup(options);
 	
 	if (!options) out_of_memory("set_socket_options");

@@ -101,6 +101,7 @@ typedef struct
 	char *lock_file;
 	int syslog_facility;
 	int max_connections;
+	char *socket_options;
 } global;
 
 static global Globals;
@@ -230,6 +231,7 @@ static struct parm_struct parm_table[] =
   {"motd file",        P_STRING,  P_GLOBAL, &Globals.motd_file,    NULL,   0},
   {"lock file",        P_STRING,  P_GLOBAL, &Globals.lock_file,    NULL,   0},
   {"syslog facility",  P_ENUM,    P_GLOBAL, &Globals.syslog_facility, enum_facilities,0},
+  {"socket options",   P_STRING,  P_GLOBAL, &Globals.socket_options,NULL,  0},
 
   {"name",             P_STRING,  P_LOCAL,  &sDefault.name,        NULL,   0},
   {"comment",          P_STRING,  P_LOCAL,  &sDefault.comment,     NULL,   0},
@@ -294,8 +296,10 @@ static void init_locals(void)
 
 FN_GLOBAL_STRING(lp_motd_file, &Globals.motd_file)
 FN_GLOBAL_STRING(lp_lock_file, &Globals.lock_file)
+FN_GLOBAL_STRING(lp_socket_options, &Globals.socket_options)
 FN_GLOBAL_INTEGER(lp_max_connections, &Globals.max_connections)
 FN_GLOBAL_INTEGER(lp_syslog_facility, &Globals.syslog_facility)
+
 FN_LOCAL_STRING(lp_name, name)
 FN_LOCAL_STRING(lp_comment, comment)
 FN_LOCAL_STRING(lp_path, path)
