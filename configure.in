@@ -214,15 +214,12 @@ fi
 if test "$ipv6" = "yes" -a "$ipv6lib" != "none"; then
 	if test -d $ipv6libdir -a -f $ipv6libdir/lib$ipv6lib.a; then
 		LIBS="-L$ipv6libdir -l$ipv6lib $LIBS"
-		echo "You have $ipv6lib library, using it"
+		AC_MSG_NOTICE([You have $ipv6lib library, using it])
 	else
 		if test "$ipv6trylibc" = "yes"; then
-			echo "You do not have $ipv6lib library, using libc"
+			AC_MSG_WARN([You do not have $ipv6lib library, using libc])
 		else
-			echo 'Fatal: no $ipv6lib library found.  cannot continue.'
-			echo "You need to fetch lib$ipv6lib.a from appropriate"
-			echo 'ipv6 kit and compile beforehand.'
-			exit 1
+			AC_MSG_ERROR([No $ipv6lib library found.  cannot continue.  You need to fetch lib$ipv6lib.a from appropriate ipv6 kit and compile beforehand.])
 		fi
 	fi
 fi
@@ -324,13 +321,9 @@ buggygetaddrinfo=yes)
 
 if test "$buggygetaddrinfo" = "yes"; then
 	if test "$ipv6" = "yes" -a "$ipv6type" != "linux"; then
-		echo 'Fatal: You must get working getaddrinfo() function.'
-		echo '       or you can specify "--disable-ipv6"'.
-		exit 1
+		AC_MSG_ERROR([You must get working getaddrinfo() function or you can specify "--disable-ipv6"])
 	elif test "$ipv6type" = "linux"; then
-		echo 'Warning: getaddrinfo() implementation on your system seems be buggy.'
-		echo '         Better upgreade your system library to newest version'
-		echo '         of GNU C library (aka glibc).'
+		AC_MSG_ERROR([getaddrinfo() implementation on your system seems be buggy.  Better upgrade your system library to newest version of GNU C library (aka glibc).])
 	fi
 fi
 AC_REPLACE_FUNCS(getaddrinfo getnameinfo)
