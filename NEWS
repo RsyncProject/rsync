@@ -73,6 +73,9 @@ Changes since 2.6.0:
       when trying to open the file.  It also no longer constructs names
       that start with a double slash (unless the user supplied both).
 
+    * Fixed compilation problem on Tru64 Unix (having to do with
+      sockaddr.sa_len and sockaddr.sin_len).
+
   INTERNAL:
 
     * Most of the I/O is now buffered, which results in a pretty
