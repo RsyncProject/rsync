@@ -661,8 +661,6 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 		flags |= XMIT_HAS_IDEV_DATA;
 	if (flags & XMIT_HAS_IDEV_DATA) {
 		INO64_T inode;
-		file->link_u.idev = pool_talloc(flist->hlink_pool,
-		    struct idev, 1, "inode_table");
 		if (protocol_version < 26) {
 			dev = read_int(f);
 			inode = read_int(f);
@@ -672,6 +670,8 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 			inode = read_longint(f);
 		}
 		if (flist->hlink_pool) {
+			file->link_u.idev = pool_talloc(flist->hlink_pool,
+			    struct idev, 1, "inode_table");
 			file->F_INODE = inode;
 			file->F_DEV = dev;
 		}
