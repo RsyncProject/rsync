@@ -50,6 +50,9 @@ extern int keep_partial;
 extern int checksum_seed;
 extern int inplace;
 
+extern struct exclude_list_struct server_exclude_list;
+
+
 static void delete_one(char *fn, int is_dir)
 {
 	if (!is_dir) {
@@ -334,6 +337,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		if (i == -1) {
 			if (phase)
 				break;
+
 			phase = 1;
 			csum_length = SUM_LENGTH;
 			if (verbose > 2)
@@ -374,6 +378,18 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			rprintf(FINFO,"recv_files(%s)\n",fname);
 
 		fnamecmp = fname;
+
+		if (server_exclude_list.head
+		    && check_exclude(&server_exclude_list, fname,
+				     S_ISDIR(file->mode)) < 0) {
+			if (verbose) {
+				rprintf(FINFO,
+					"skipping server-excluded update for \"%s\"\n",
+					fname);
+			}
+			receive_data(f_in,NULL,-1,NULL,file->length);
+			continue;
+		}
 
 		/* open the file */
 		fd1 = do_open(fnamecmp, O_RDONLY, 0);
@@ -444,6 +460,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			}
 		} else {
 			if (!get_tmpname(fnametmp,fname)) {
+				receive_data(f_in,mapbuf,-1,NULL,file->length);
 				if (mapbuf)
 					unmap_file(mapbuf);
 				if (fd1 != -1)
