@@ -414,35 +414,28 @@ void option_error(void)
 
 
 /**
- * Check to see if we should refuse this option
+ * Tweak the option table to disable all options that the rsyncd.conf
+ * file has told us to refuse.
  **/
-static int check_refuse_options(char *ref, int opt)
+static void set_refuse_options(char *bp)
 {
-	int i, len;
-	char *p;
-	const char *name;
+	struct poptOption *op;
+	char *cp;
 
-	for (i = 0; long_options[i].longName; i++) {
-		if (long_options[i].val == opt)
-			break;
-	}
-
-	if (!long_options[i].longName)
-		return 0;
-
-	name = long_options[i].longName;
-	len = strlen(name);
-
-	while ((p = strstr(ref,name))) {
-		if ((p==ref || p[-1]==' ') &&
-		    (p[len] == ' ' || p[len] == 0)) {
-			snprintf(err_buf, sizeof err_buf,
-				 "The '%s' option is not supported by this server\n", name);
-			return 1;
+	while (1) {
+		if ((cp = strchr(bp, ' ')) != NULL)
+			*cp= '\0';
+		for (op = long_options; op->longName; op++) {
+			if (strcmp(bp, op->longName) == 0) {
+				op->val = -(op - long_options) - 1;
+				break;
+			}
 		}
-		ref += len;
+		if (!cp)
+			break;
+		*cp = ' ';
+		bp = cp + 1;
 	}
-	return 0;
 }
 
 
@@ -471,6 +464,9 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	char *ref = lp_refuse_options(module_id);
 	poptContext pc;
 
+	if (ref && *ref)
+		set_refuse_options(ref);
+
 	/* TODO: Call poptReadDefaultConfig; handle errors. */
 
 	/* The context leaks in case of an error, but if there's a
@@ -478,9 +474,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	pc = poptGetContext(RSYNC_NAME, *argc, *argv, long_options, 0);
 
 	while ((opt = poptGetNextOpt(pc)) != -1) {
-		if (ref && check_refuse_options(ref, opt))
-			return 0;
-
 		/* most options are handled automatically by popt;
 		 * only special cases are returned and listed here. */
 
@@ -577,13 +570,25 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			return 0;
 #endif
 
-
 		default:
-			snprintf(err_buf, sizeof err_buf,
-				 "%s%s: %s\n",
-				 am_server ? "on remote machine: " : "",
-				 poptBadOption(pc, POPT_BADOPTION_NOALIAS),
-				 poptStrerror(opt));
+			/* A negative opt value means that set_refuse_options()
+			 * turned this option off (-opt-1 is its index). */
+			if (opt < 0) {
+				struct poptOption *op = &long_options[-opt-1];
+				int n = snprintf(err_buf, sizeof err_buf,
+				    "This server does not support --%s\n",
+				    op->longName) - 1;
+				if (op->shortName) {
+					snprintf(err_buf+n, sizeof err_buf-n,
+					    " (-%c)\n", op->shortName);
+				}
+			} else {
+				snprintf(err_buf, sizeof err_buf,
+				    "%s%s: %s\n",
+				    am_server ? "on remote machine: " : "",
+				    poptBadOption(pc, POPT_BADOPTION_NOALIAS),
+				    poptStrerror(opt));
+			}
 			return 0;
 		}
 	}
