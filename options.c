@@ -124,6 +124,7 @@ int quiet = 0;
 int always_checksum = 0;
 int list_only = 0;
 
+#define MAX_BATCH_PREFIX_LEN 256	/* Must be less than MAXPATHLEN-13 */
 char *batch_prefix = NULL;
 
 static int modify_window_set;
@@ -602,6 +603,12 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			"write-batch and read-batch can not be used together\n");
 		exit_cleanup(RERR_SYNTAX);
 	}
+	if (batch_prefix && strlen(batch_prefix) > MAX_BATCH_PREFIX_LEN) {
+		rprintf(FERROR,
+			"the batch_prefix string must be %d characters or less.\n",
+			MAX_BATCH_PREFIX_LEN);
+		exit_cleanup(RERR_SYNTAX);
+	}
 
 	if (do_compression && (write_batch || read_batch)) {
 		rprintf(FERROR,
@@ -707,7 +714,7 @@ void server_options(char **args,int *argc)
 	static char mwindow[30];
 	static char bw[50];
 	/* Leave room for ``--(write|read)-batch='' */
-	static char fext[MAXPATHLEN + 15];
+	static char fext[MAX_BATCH_PREFIX_LEN + 15];
 
 	int i, x;
 
