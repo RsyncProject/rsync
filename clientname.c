@@ -74,6 +74,9 @@ static int get_sockaddr_family(const struct sockaddr_storage *ss)
  * If anything goes wrong, including the name->addr->name check, then
  * we just use "UNKNOWN", so you can use that value in hosts allow
  * lines.
+ *
+ * After translation from sockaddr to name we do a forward lookup to
+ * make sure nobody is spoofing PTR records.
  **/
 char *client_name(int fd)
 {
@@ -90,8 +93,9 @@ char *client_name(int fd)
 
 	client_sockaddr(fd, &ss, &ss_len);
 
-	if (!lookup_name(fd, &ss, ss_len, name_buf, sizeof name_buf, port_buf, sizeof port_buf))
-		check_name(fd, &ss, name_buf, port_buf);
+	if (!lookup_name(fd, &ss, ss_len, name_buf, sizeof name_buf,
+			 port_buf, sizeof port_buf))
+		check_name(fd, &ss, name_buf);
 
 	return name_buf;
 }
@@ -149,6 +153,8 @@ void client_sockaddr(int fd,
 
 /**
  * Look up a name from @p ss into @p name_buf.
+ *
+ * @param fd file descriptor for client socket.
  **/
 int lookup_name(int fd, const struct sockaddr_storage *ss,
 		socklen_t ss_len,
@@ -226,11 +232,14 @@ int compare_addrinfo_sockaddr(const struct addrinfo *ai,
  * @p ss -- otherwise we may be being spoofed.  If we suspect we are,
  * then we don't abort the connection but just emit a warning, and
  * change @p name_buf to be "UNKNOWN".
+ *
+ * We don't do anything with the service when checking the name,
+ * because it doesn't seem that it could be spoofed in any way, and
+ * getaddrinfo on random service names seems to cause problems on AIX.
  **/
 int check_name(int fd,
 	       const struct sockaddr_storage *ss,
-	       char *name_buf,
-	       const char *port_buf)
+	       char *name_buf)
 {
 	struct addrinfo hints, *res, *res0;
 	int error;
@@ -240,7 +249,7 @@ int check_name(int fd,
 	hints.ai_family = ss_family;
 	hints.ai_flags = AI_CANONNAME;
 	hints.ai_socktype = SOCK_STREAM;
-	error = getaddrinfo(name_buf, port_buf, &hints, &res0);
+	error = getaddrinfo(name_buf, NULL, &hints, &res0);
 	if (error) {
 		rprintf(FERROR,
 			RSYNC_NAME ": forward name lookup for %s failed: %s\n",

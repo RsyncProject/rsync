@@ -1,1 +1,6 @@
 rsync changes since last release
+
+  BUG FIXES:
+  
+    * Fix "forward name lookup failed" errors on AIX 4.3.3.  (John
+      L. Allen, Martin Pool)
