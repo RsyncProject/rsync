@@ -11,6 +11,10 @@ Changes since 2.6.0:
       "USER:PASS@" prefix before the "HOST:PORT" information.
       (Bardur Arantsson)
 
+    * The --progress output now mentions how far along in the
+      transfer we are, including both a count of files transferred
+      and a percentage of the total file-count that we're processed.
+
   BUG FIXES:
 
     * The --link-dest code now works properly for a non-root user
@@ -39,6 +43,10 @@ Changes since 2.6.0:
     * When using --cvs-exclude, the exclude items we get from a
       directory's .cvsignore file once again only affect that one
       directory (and not all following directories too).
+
+    * When transferring a file that has group 0 with -g specified
+      (typically via -a) and not enough privs to retain the group,
+      rsync no longer complains about chown failing.
 
     * When specifying the USER@HOST: prefix for a file, the USER
       part can now contain an '@', if needed (i.e. the last '@'
@@ -74,11 +82,16 @@ Changes since 2.6.0:
     * Less memory used per-file in the file list.
 
     * The 2 pipes used between the receiver and generator processes
-      (which are forked on the same machine) were reduced to 1 pipe and
-      the protocol improved so that (1) it is now impossible to have the
-      "redo" pipe fill up and hang rsync, and (2) trailing messages from
-      the receiver don't get lost on their way to through generator over
-      to the sender.  (Wayne Davison)
+      (which are forked on the same machine) were reduced to 1 pipe
+      and the protocol improved so that (1) it is now impossible to
+      have the "redo" pipe fill up and hang rsync, and (2) trailing
+      messages from the receiver don't get lost on their way through
+      the generator over to the sender (the latter mainly affected
+      hard-link messages).  (Wayne Davison)
+
+    * The reading & writing of the file list in batch-mode is now
+      handled by the same code that sends & receives the list over
+      the wire.  This makes it much easier to maintain.
 
 
 NEWS for rsync 2.6.0 (1 Jan 2004)
