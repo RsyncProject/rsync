@@ -1,16 +1,16 @@
-/* 
+/*
    Copyright (C) Andrew Tridgell 1999
-   
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -69,9 +69,10 @@ static int make_dir(char *name, int mask)
 	*p = 0;
 
 	/* make the new directory, if that fails then make its parent */
-	while (do_mkdir (newdir, mask) != 0)
-		if ((errno != ENOENT) || !make_dir (newdir, mask))
+	while (do_mkdir(newdir, mask) != 0) {
+		if (errno != ENOENT || !make_dir(newdir, mask))
 			return 0;
+	}
 
 	return 1;
 } /* make_dir */
@@ -92,7 +93,7 @@ static int make_bak_dir(char *fname, char *bak_path)
 
 	while(strncmp(bak_path, "./", 2) == 0) bak_path += 2;
 
-	if(bak_path[strlen(bak_path)-1] != '/') {
+	if (bak_path[strlen(bak_path)-1] != '/') {
 		snprintf(fullpath, sizeof(fullpath), "%s/", bak_path);
 	} else {
 		snprintf(fullpath, sizeof(fullpath), "%s", bak_path);
@@ -102,22 +103,22 @@ static int make_bak_dir(char *fname, char *bak_path)
 	strcat(fullpath, fname);
 
 	/* Make the directories */
-	while ((p = strchr(p, '/'))) {
+	while ((p = strchr(p, '/')) != NULL) {
 		*p = 0;
-		if(do_lstat(fullpath, &st) != 0) {
+		if (do_lstat(fullpath, &st) != 0) {
 			do_mkdir(fullpath, 0777 & ~orig_umask);
-			if(p>q) {
-				if(do_lstat(q, &st) != 0) {
+			if (p > q) {
+				if (do_lstat(q, &st) != 0) {
 					rprintf(FERROR, "make_bak_dir stat %s failed: %s\n",
 						full_fname(fullpath), strerror(errno));
 				} else {
 					st2 = &st;
 					set_modtime(fullpath, st2->st_mtime);
-					if(do_lchown(fullpath, st2->st_uid, st2->st_gid) != 0) {
+					if (do_lchown(fullpath, st2->st_uid, st2->st_gid) != 0) {
 						rprintf(FERROR, "make_bak_dir chown %s failed: %s\n",
 							full_fname(fullpath), strerror(errno));
 					}
-					if(do_chmod(fullpath, st2->st_mode) != 0) {
+					if (do_chmod(fullpath, st2->st_mode) != 0) {
 						rprintf(FERROR, "make_bak_dir failed to set permissions on %s: %s\n",
 							full_fname(fullpath), strerror(errno));
 					}
@@ -140,35 +141,33 @@ static int robust_move(char *src, char *dst)
 	while (keep_trying) {
 		if (keep_path_extfs) {
 			failed = copy_file(src, dst, 0755);
-			if (!failed) {
+			if (!failed)
 				do_unlink(src);
-			}
-		} else {
-			failed = robust_rename (src, dst);
-		}
+		} else
+			failed = robust_rename(src, dst);
 
 		if (failed) {
-			if (verbose > 2)
-				rprintf (FERROR, "robust_move failed: %s(%d)\n",
-				    strerror (errno), errno);
+			if (verbose > 2) {
+				rprintf(FERROR, "robust_move failed: %s(%d)\n",
+					strerror(errno), errno);
+			}
 			switch (errno) {
-				/* external filesystem */
-				case EXDEV:
-					keep_path_extfs = 1;
-					keep_trying--;
-					break;
-				/* no directory to write to */
-				case ENOENT:
-					make_dir(dst, 0700);
-					keep_trying--;
-					break;
-				default:
-					keep_trying = 0;
-			} /* switch */
+			case EXDEV:	/* external filesystem */
+				keep_path_extfs = 1;
+				keep_trying--;
+				break;
+			case ENOENT:	/* no directory to write to */
+				make_dir(dst, 0700);
+				keep_trying--;
+				break;
+			default:
+				keep_trying = 0;
+				break;
+			}
 		} else
 			keep_trying = 0;
 	} /* while */
-	return (!failed);
+	return !failed;
 } /* robust_move */
 
 
@@ -190,15 +189,15 @@ static int keep_backup(char *fname)
 		if (backup_dir_len && backup_dir[backup_dir_len - 1] == '/')
 			backup_dir[--backup_dir_len] = '\0';
 		if (verbose > 0)
-			rprintf (FINFO, "backup_dir is %s\n", backup_dir);
+			rprintf(FINFO, "backup_dir is %s\n", backup_dir);
 		initialised = 1;
 	}
 
 	/* return if no file to keep */
 #if SUPPORT_LINKS
-	if (do_lstat (fname, &st)) return 1;
+	if (do_lstat(fname, &st)) return 1;
 #else
-	if (do_stat (fname, &st)) return 1;
+	if (do_stat(fname, &st)) return 1;
 #endif
 
 	file = make_file(fname, NULL, NO_EXCLUDES);
@@ -208,7 +207,7 @@ static int keep_backup(char *fname)
 
 	/* make a complete pathname for backup file */
 	if (backup_dir_len+strlen(fname)+backup_suffix_len > MAXPATHLEN-1) {
-		rprintf (FERROR, "keep_backup filename too long\n");
+		rprintf(FERROR, "keep_backup filename too long\n");
 		return 0;
 	}
 
@@ -217,14 +216,16 @@ static int keep_backup(char *fname)
 
 #ifdef HAVE_MKNOD
 	/* Check to see if this is a device file, or link */
-	if(IS_DEVICE(file->mode)) {
-		if(am_root && preserve_devices) {
+	if (IS_DEVICE(file->mode)) {
+		if (am_root && preserve_devices) {
 			make_bak_dir(fname, backup_dir);
-			if(do_mknod(keep_name, file->mode, file->rdev) != 0) {
+			if (do_mknod(keep_name, file->mode, file->rdev) != 0) {
 				rprintf(FERROR, "mknod %s failed: %s\n",
 					full_fname(keep_name), strerror(errno));
-			} else if(verbose>2) {
-				rprintf(FINFO, "make_backup: DEVICE %s successful.\n", fname);
+			} else if (verbose > 2) {
+				rprintf(FINFO,
+					"make_backup: DEVICE %s successful.\n",
+					fname);
 			}
 		}
 		kept = 1;
@@ -232,13 +233,13 @@ static int keep_backup(char *fname)
 	}
 #endif
 
-	if(!kept && S_ISDIR(file->mode)) {
+	if (!kept && S_ISDIR(file->mode)) {
 		/* make an empty directory */
 		make_bak_dir(fname, backup_dir);
 		do_mkdir(keep_name, file->mode);
 		ret_code = do_rmdir(fname);
 
-		if(verbose>2) {
+		if (verbose > 2) {
 			rprintf(FINFO, "make_backup: RMDIR %s returns %i\n",
 				full_fname(fname), ret_code);
 		}
@@ -246,7 +247,7 @@ static int keep_backup(char *fname)
 	}
 
 #if SUPPORT_LINKS
-	if(!kept && preserve_links && S_ISLNK(file->mode)) {
+	if (!kept && preserve_links && S_ISLNK(file->mode)) {
 		extern int safe_symlinks;
 		if (safe_symlinks && unsafe_symlink(file->link, keep_name)) {
 			if (verbose) {
@@ -256,7 +257,7 @@ static int keep_backup(char *fname)
 			kept = 1;
 		}
 		make_bak_dir(fname, backup_dir);
-		if(do_symlink(file->link, keep_name) != 0) {
+		if (do_symlink(file->link, keep_name) != 0) {
 			rprintf(FERROR, "link %s -> %s : %s\n",
 				full_fname(keep_name), file->link, strerror(errno));
 		}
@@ -264,29 +265,29 @@ static int keep_backup(char *fname)
 		kept = 1;
 	}
 #endif
-	if(!kept && preserve_hard_links && check_hard_link(file)) {
-		if(verbose > 1)
+	if (!kept && preserve_hard_links && check_hard_link(file)) {
+		if (verbose > 1)
 			rprintf(FINFO, "%s is a hard link\n", f_name(file));
 	}
 
-	if(!kept && !S_ISREG(file->mode)) {
+	if (!kept && !S_ISREG(file->mode)) {
 		rprintf(FINFO, "make_bak: skipping non-regular file %s\n",
-		    fname);
+			fname);
 	}
 
 	/* move to keep tree if a file */
-	if(!kept) {
-		if (!robust_move (fname, keep_name)) {
+	if (!kept) {
+		if (!robust_move(fname, keep_name)) {
 			rprintf(FERROR, "keep_backup failed: %s -> \"%s\": %s\n",
 				full_fname(fname), keep_name, strerror(errno));
 		}
 	}
-	set_perms (keep_name, file, NULL, 0);
-	free_file (file);
-	free (file);
+	set_perms(keep_name, file, NULL, 0);
+	free_file(file);
+	free(file);
 
 	if (verbose > 1)
-		rprintf (FINFO, "keep_backup %s -> %s\n", fname, keep_name);
+		rprintf(FINFO, "keep_backup %s -> %s\n", fname, keep_name);
 	return 1;
 } /* keep_backup */
 
@@ -295,7 +296,6 @@ static int keep_backup(char *fname)
 int make_backup(char *fname)
 {
 	if (backup_dir)
-		return (keep_backup(fname));
-	else
-		return (make_simple_backup(fname));
+		return keep_backup(fname);
+	return make_simple_backup(fname);
 }
