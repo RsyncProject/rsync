@@ -55,6 +55,7 @@ int dry_run = 0;
 int local_server = 0;
 int ignore_times = 0;
 int delete_mode = 0;
+int delete_during = 0;
 int delete_before = 0;
 int delete_after = 0;
 int delete_excluded = 0;
@@ -276,7 +277,8 @@ void usage(enum logcode F)
   rprintf(F,"     --existing              only update files that already exist\n");
   rprintf(F,"     --ignore-existing       ignore files that already exist on receiving side\n");
   rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
-  rprintf(F,"     --delete-after          receiver deletes after transferring, not before\n");
+  rprintf(F,"     --delete-before         receiver deletes before transfer, not during\n");
+  rprintf(F,"     --delete-after          receiver deletes after transfer, not during\n");
   rprintf(F,"     --delete-excluded       also delete excluded files on the receiving side\n");
   rprintf(F,"     --ignore-errors         delete even if there are I/O errors\n");
   rprintf(F,"     --force                 force deletion of directories even if not empty\n");
@@ -343,7 +345,8 @@ static struct poptOption long_options[] = {
   {"one-file-system", 'x', POPT_ARG_NONE,   &one_file_system, 0, 0, 0 },
   {"existing",         0,  POPT_ARG_NONE,   &only_existing, 0, 0, 0 },
   {"ignore-existing",  0,  POPT_ARG_NONE,   &opt_ignore_existing, 0, 0, 0 },
-  {"delete",           0,  POPT_ARG_NONE,   &delete_before, 0, 0, 0 },
+  {"delete",           0,  POPT_ARG_NONE,   &delete_during, 0, 0, 0 },
+  {"delete-before",    0,  POPT_ARG_NONE,   &delete_before, 0, 0, 0 },
   {"delete-after",     0,  POPT_ARG_NONE,   &delete_after, 0, 0, 0 },
   {"delete-excluded",  0,  POPT_ARG_NONE,   &delete_excluded, 0, 0, 0 },
   {"force",            0,  POPT_ARG_NONE,   &force_delete, 0, 0, 0 },
@@ -857,10 +860,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (relative_paths < 0)
 		relative_paths = files_from? 1 : 0;
 
-	if (delete_before || delete_after)
+	if (delete_during || delete_before || delete_after)
 		delete_mode = 1;
 	if (delete_excluded && !delete_mode)
-		delete_mode = delete_before = 1;
+		delete_mode = delete_during = 1;
 
 	*argv = poptGetArgs(pc);
 	*argc = count_args(*argv);
@@ -1165,7 +1168,9 @@ void server_options(char **args,int *argc)
 	if (am_sender) {
 		if (delete_excluded)
 			args[ac++] = "--delete-excluded";
-		else if (delete_before || delete_after)
+		else if (delete_before)
+			args[ac++] = "--delete-before";
+		else if (delete_during || delete_after)
 			args[ac++] = "--delete";
 
 		if (delete_after)
