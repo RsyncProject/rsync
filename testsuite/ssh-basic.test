@@ -28,7 +28,7 @@ fi
 # nothing to do.
 hands_setup
 
-runtest "ssh: basic test" 'checkit "$RSYNC -avH -e ssh --rsync-path=$RSYNC \"$fromdir/\" \"localhost:$todir\"" "$fromdir/" "$todir"'
+runtest "ssh: basic test" 'checkit "$RSYNC -avH -e ssh --rsync-path=\"$RSYNC\" \"$fromdir/\" \"localhost:$todir\"" "$fromdir/" "$todir"'
 
 # Added by Steve Bonds Feb 2 2003
 # I assumed that "F1" was intended to hold a single file for testing if
@@ -40,4 +40,4 @@ F1=`ls "$todir" | head -5 | tail -1`
 
 mv "$todir/$F1" "$todir/ThisShouldGo"
 
-runtest "ssh: renamed file" 'checkit "$RSYNC --delete -avH -e ssh --rsync-path=$RSYNC \"$fromdir/\" \"localhost:$todir\"" "$fromdir/" "$todir"'
+runtest "ssh: renamed file" 'checkit "$RSYNC --delete -avH -e ssh --rsync-path=\"$RSYNC\" \"$fromdir/\" \"localhost:$todir\"" "$fromdir/" "$todir"'
