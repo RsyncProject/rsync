@@ -315,6 +315,11 @@ option all symbolic links are skipped.
 dit(bf(-L, --copy-links)) This tells rsync to treat symbolic links just
 like  ordinary files.
 
+dit(bf(--safe-links)) This tells rsync to ignore any symbolic links
+which point outside the destination tree. All absolute symlinks are
+also ignored. Using this option in conjunction with --relative may
+give unexpecetd results. 
+
 dit(bf(-H, --hard-links)) This tells rsync to recreate hard  links  on
 the  remote system  to  be the same as the local system. Without this
 option hard links are treated like regular files.
@@ -356,6 +361,10 @@ instead it will just report the actions it would have taken.
 
 dit(bf(-S, --sparse)) Try to handle sparse files efficiently so they take
 up less space on the destination.
+
+NOTE: Don't use this option when the destination is a Solaris "tmpfs"
+filesystem. It doesn't seem to handle seeks over null regions
+correctly and ends up corrupting the files.
 
 dit(bf(-x, --one-file-system)) This tells rsync not to cross filesystem
 boundaries  when recursing.  This  is useful for transferring the
@@ -584,6 +593,29 @@ itemize(
   it() --include "*/" --include "*.c" --exclude "*" would include all 
   directories and C source files.
 )
+
+manpagesection(DIAGNOSTICS)
+
+rsync occasinally produces error messages that may seem a little
+cryptic. The one that seems to cause the most confusion is "protocol
+version mismatch - is your shell clean?".
+
+This message is usually caused by your startup scripts or remote shell
+facility producing unwanted garbage on the stream that rsync is using
+for its transport. The way ot diagnose this problem is to run your
+remote shell like this:
+
+verb(
+   rsh remotehost /bin/true > out.dat
+)
+       
+then look at out.dat. If everything is working correctly then out.dat
+should be a zero length file. You you are getting the above error from
+rsync then you will probably find that out.dat contains some text or
+data. Look at the contents and try to work out what is producing
+it. The most common cause is incorrectly configued shell startup
+scripts (such as .cshrc or .profile) that contain output statements
+for non-interactive logins.
 
 manpagesection(ENVIRONMENT VARIABLES)
 
