@@ -108,6 +108,7 @@ int write_batch = 0;
 int read_batch = 0;
 int backup_dir_len = 0;
 int backup_suffix_len;
+unsigned int backup_dir_remainder;
 
 char *backup_suffix = NULL;
 char *tmpdir = NULL;
@@ -118,6 +119,7 @@ char *log_format = NULL;
 char *password_file = NULL;
 char *rsync_path = RSYNC_PATH;
 char *backup_dir = NULL;
+char backup_dir_buf[MAXPATHLEN];
 int rsync_port = RSYNC_PORT;
 int link_dest = 0;
 
@@ -646,16 +648,27 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		relative_paths = files_from? 1 : 0;
 
 	if (!backup_suffix)
-		backup_suffix = backup_dir? "" : BACKUP_SUFFIX;
+		backup_suffix = backup_dir ? "" : BACKUP_SUFFIX;
 	backup_suffix_len = strlen(backup_suffix);
 	if (strchr(backup_suffix, '/') != NULL) {
 		rprintf(FERROR, "--suffix cannot contain slashes: %s\n",
 			backup_suffix);
 		exit_cleanup(RERR_SYNTAX);
 	}
-	if (backup_dir)
-		backup_dir_len = strlen(backup_dir);
-	else if (!backup_suffix_len) {
+	if (backup_dir) {
+		backup_dir_len = strlcpy(backup_dir_buf, backup_dir, sizeof backup_dir_buf);
+		backup_dir_remainder = sizeof backup_dir_buf - backup_dir_len;
+		if (backup_dir_remainder < 32) {
+			rprintf(FERROR, "the --backup-dir path is WAY too long.\n");
+			exit_cleanup(RERR_SYNTAX);
+		}
+		if (backup_dir_buf[backup_dir_len - 1] != '/') {
+			backup_dir_buf[backup_dir_len++] = '/';
+			backup_dir_buf[backup_dir_len] = '\0';
+		}
+		if (verbose > 1)
+			rprintf(FINFO, "backup_dir is %s\n", backup_dir_buf);
+	} else if (!backup_suffix_len) {
 		rprintf(FERROR,
 			"--suffix cannot be a null string without --backup-dir\n");
 		exit_cleanup(RERR_SYNTAX);
