@@ -45,7 +45,6 @@ void write_batch_flist_info(int flist_count, struct file_struct **files)
 	write_int(f, protocol_version);
 	write_int(f, flist_count);
 
-	reset_file_entry_vars();
 	for (i = 0; i < flist_count; i++)
 		send_file_entry(files[i], f, files[i]->flags & LIVE_FLAGS);
 	send_file_entry(NULL, f, 0);
@@ -157,7 +156,7 @@ struct file_list *create_flist_from_batch(void)
 			flags |= read_byte(f) << 8;
 		receive_file_entry(&batch_flist->files[i], flags, f);
 	}
-	reset_file_entry_vars();
+	receive_file_entry(NULL, 0, 0); /* Signal that we're done. */
 
 	protocol_version = save_pv;
 	stats.total_read = save_read;
