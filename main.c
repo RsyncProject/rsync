@@ -607,7 +607,6 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			rprintf(FINFO,"file list sent\n");
 
 		io_flush(NORMAL_FLUSH);
-		io_start_buffering_out(f_out);
 		send_files(flist,f_out,f_in);
 		io_flush(FULL_FLUSH);
 		if (protocol_version >= 24) {
