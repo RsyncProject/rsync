@@ -9,8 +9,6 @@
 #include <time.h>
 
 extern char *batch_name;
-extern int delete_mode;
-extern int delete_excluded;
 extern int eol_nulls;
 extern int recurse;
 extern int preserve_links;

@@ -22,7 +22,6 @@
 
 extern int verbose;
 extern int recurse;
-extern int delete_mode;
 extern int delete_after;
 extern int max_delete;
 extern int csum_length;
