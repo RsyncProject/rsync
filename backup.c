@@ -98,7 +98,7 @@ static int make_bak_dir(char *fullpath)
 		if (p >= rel) {
 			/* Try to transfer the directory settings of the
 			 * actual dir that the files are coming from. */
-			if (do_lstat(rel, &st) != 0) {
+			if (do_stat(rel, &st) < 0) {
 				rsyserr(FERROR, errno,
 					"make_bak_dir stat %s failed",
 					full_fname(rel));
@@ -148,10 +148,12 @@ static int keep_backup(char *fname)
 
 	/* return if no file to keep */
 #if SUPPORT_LINKS
-	if (do_lstat(fname, &st)) return 1;
+	ret_code = do_lstat(fname, &st);
 #else
-	if (do_stat(fname, &st)) return 1;
+	ret_code = do_stat(fname, &st);
 #endif
+	if (ret_code < 0)
+		return 1;
 
 	file = make_file(fname, NULL, NO_EXCLUDES);
 
