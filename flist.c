@@ -58,14 +58,7 @@ extern int copy_links;
 extern int copy_unsafe_links;
 extern int protocol_version;
 extern int sanitize_paths;
-extern int max_delete;
-extern int force_delete;
 extern int orig_umask;
-extern int make_backups;
-extern unsigned int curr_dir_len;
-extern char *backup_dir;
-extern char *backup_suffix;
-extern int backup_suffix_len;
 
 extern char curr_dir[MAXPATHLEN];
 
@@ -73,14 +66,14 @@ extern struct filter_list_struct filter_list;
 extern struct filter_list_struct server_filter_list;
 
 int io_error;
+dev_t filesystem_dev; /* used to implement -x */
 
 static char empty_sum[MD4_SUM_LENGTH];
 static unsigned int file_struct_len;
 static struct file_list *received_flist, *sorting_flist;
-static dev_t filesystem_dev; /* used to implement -x */
 
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
-static void output_flist(struct file_list *flist, const char *whose_list);
+static void output_flist(struct file_list *flist);
 
 void init_flist(void)
 {
@@ -269,7 +262,7 @@ static mode_t from_wire_mode(int mode)
 
 
 static void send_directory(int f, struct file_list *flist,
-			   char *fbuf, unsigned int offset);
+			   char *fbuf, int len);
 
 static char *flist_dir;
 static int flist_dir_len;
@@ -1007,17 +1000,18 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 }
 
 
-/* Note that the "recurse" value either contains -1, for infinite recursion,
- * or a number >= 0 indicating how many levels of recursion we will allow.
- * This function is normally called by the sender, but the receiving side
- * also calls it from delete_in_dir() with f set to -1 so that we just
- * construct the file list in memory without sending it over the wire.  Also,
- * get_dirlist() calls this with f set to -2, which indicates that local
- * filter rules should be ignored. */
+/* Note that the "recurse" value either contains -1, for infinite recursion, or
+ * a number >= 0 indicating how many levels of recursion we will allow.  This
+ * function is normally called by the sender, but the receiving side also calls
+ * it from delete_in_dir() with f set to -1 so that we just construct the file
+ * list in memory without sending it over the wire.  Also, get_dirlist() might
+ * call this with f set to -2, which indicates that local filter rules should
+ * be ignored. */
 static void send_directory(int f, struct file_list *flist,
-			   char *fbuf, unsigned int len)
+			   char *fbuf, int len)
 {
 	struct dirent *di;
+	unsigned remainder;
 	char *p;
 	DIR *d;
 
@@ -1031,13 +1025,14 @@ static void send_directory(int f, struct file_list *flist,
 	if (len != 1 || *fbuf != '/')
 		*p++ = '/';
 	*p = '\0';
+	remainder = MAXPATHLEN - (p - fbuf);
 
 	for (errno = 0, di = readdir(d); di; errno = 0, di = readdir(d)) {
 		char *dname = d_name(di);
 		if (dname[0] == '.' && (dname[1] == '\0'
 		    || (dname[1] == '.' && dname[2] == '\0')))
 			continue;
-		if (strlcpy(p, dname, MAXPATHLEN - len) < MAXPATHLEN - len) {
+		if (strlcpy(p, dname, remainder) < remainder) {
 			int do_subdirs = recurse >= 1 ? recurse-- : recurse;
 			send_file_name(f, flist, fbuf, do_subdirs, 0);
 		} else {
@@ -1047,9 +1042,11 @@ static void send_directory(int f, struct file_list *flist,
 				full_fname(fbuf));
 		}
 	}
+
+	fbuf[len] = '\0';
+
 	if (errno) {
 		io_error |= IOERR_GENERAL;
-		*p = '\0';
 		rsyserr(FERROR, errno, "readdir(%s)", full_fname(fbuf));
 	}
 
@@ -1257,7 +1254,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	stats.num_files = flist->count;
 
 	if (verbose > 3)
-		output_flist(flist, who_am_i());
+		output_flist(flist);
 
 	if (verbose > 2)
 		rprintf(FINFO, "send_file_list done\n");
@@ -1331,7 +1328,7 @@ struct file_list *recv_file_list(int f)
 	}
 
 	if (verbose > 3)
-		output_flist(flist, who_am_i());
+		output_flist(flist);
 
 	if (list_only) {
 		int i;
@@ -1541,10 +1538,12 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 	}
 }
 
-static void output_flist(struct file_list *flist, const char *whose_list)
+
+static void output_flist(struct file_list *flist)
 {
 	char uidbuf[16], gidbuf[16], depthbuf[16];
 	struct file_struct *file;
+	const char *who = who_am_i();
 	int i;
 
 	for (i = 0; i < flist->count; i++) {
@@ -1560,7 +1559,7 @@ static void output_flist(struct file_list *flist, const char *whose_list)
 		if (!am_sender)
 			sprintf(depthbuf, "%d", file->dir.depth);
 		rprintf(FINFO, "[%s] i=%d %s %s%s%s%s mode=0%o len=%.0f%s%s flags=%x\n",
-			whose_list, i, am_sender ? NS(file->dir.root) : depthbuf,
+			who, i, am_sender ? NS(file->dir.root) : depthbuf,
 			file->dirname ? safe_fname(file->dirname) : "",
 			file->dirname ? "/" : "", NS(file->basename),
 			S_ISDIR(file->mode) ? "/" : "", (int)file->mode,
@@ -1750,213 +1749,35 @@ char *f_name(struct file_struct *f)
 }
 
 
-struct file_list *get_dirlist(const char *dirname, int ignore_filter_rules)
+/* Do a non-recursive scan of the named directory, possibly ignoring all
+ * exclude rules except for the daemon's.  If "dlen" is >=0, it is the length
+ * of the dirname string, and also indicates that "dirname" is a MAXPATHLEN
+ * buffer (the functions we call will append names onto the end, but the old
+ * dir value will be restored on exit). */
+struct file_list *get_dirlist(char *dirname, int dlen,
+			      int ignore_filter_rules)
 {
 	struct file_list *dirlist;
 	char dirbuf[MAXPATHLEN];
-	int dlen;
 	int save_recurse = recurse;
 
-	dlen = strlcpy(dirbuf, dirname, MAXPATHLEN);
-	if (dlen >= MAXPATHLEN)
-		return NULL;
+	if (dlen < 0) {
+		dlen = strlcpy(dirbuf, dirname, MAXPATHLEN);
+		if (dlen >= MAXPATHLEN)
+			return NULL;
+		dirname = dirbuf;
+	}
 
 	dirlist = flist_new(WITHOUT_HLINK, "get_dirlist");
+
 	recurse = 0;
-	send_directory(ignore_filter_rules ? -2 : -1, dirlist, dirbuf, dlen);
+	send_directory(ignore_filter_rules ? -2 : -1, dirlist, dirname, dlen);
 	recurse = save_recurse;
 
 	clean_flist(dirlist, 0, 0);
 
-	return dirlist;
-}
-
-
-static int deletion_count = 0; /* used to implement --max-delete */
-
-static int is_backup_file(char *fn)
-{
-	int k = strlen(fn) - backup_suffix_len;
-	return k > 0 && strcmp(fn+k, backup_suffix) == 0;
-}
-
-
-/* Delete a file or directory.  If DEL_FORCE_RECURSE is set in the flags, or if
- * force_delete is set, this will delete recursively as long as DEL_NO_RECURSE
- * is not set in the flags. */
-int delete_file(char *fname, int mode, int flags)
-{
-	struct file_list *dirlist;
-	char buf[MAXPATHLEN];
-	int j, zap_dir, ok;
-	void *save_filters;
-
-	if (max_delete && deletion_count >= max_delete)
-		return -1;
-
-	if (!S_ISDIR(mode)) {
-		if (make_backups && (backup_dir || !is_backup_file(fname)))
-			ok = make_backup(fname);
-		else
-			ok = robust_unlink(fname) == 0;
-		if (ok) {
-			if (!(flags & DEL_TERSE))
-				log_delete(fname, mode);
-			deletion_count++;
-			return 0;
-		}
-		if (errno == ENOENT)
-			return 0;
-		rsyserr(FERROR, errno, "delete_file: unlink %s failed",
-			full_fname(fname));
-		return -1;
-	}
-
-	zap_dir = (flags & DEL_FORCE_RECURSE || (force_delete && recurse))
-		&& !(flags & DEL_NO_RECURSE);
-	if (dry_run && zap_dir) {
-		ok = 0;
-		errno = ENOTEMPTY;
-	} else if (make_backups && !backup_dir && !is_backup_file(fname)
-	    && !(flags & DEL_FORCE_RECURSE))
-		ok = make_backup(fname);
-	else
-		ok = do_rmdir(fname) == 0;
-	if (ok) {
-		if (!(flags & DEL_TERSE))
-			log_delete(fname, mode);
-		deletion_count++;
-		return 0;
-	}
-	if (errno == ENOENT)
-		return 0;
-	if (!zap_dir || (errno != ENOTEMPTY && errno != EEXIST)) {
-		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
-			full_fname(fname));
-		return -1;
-	}
-	flags |= DEL_FORCE_RECURSE;
-
-	save_filters = push_local_filters(fname, strlen(fname));
-
-	dirlist = get_dirlist(fname, 0);
-	for (j = dirlist->count; j--; ) {
-		struct file_struct *fp = dirlist->files[j];
-		f_name_to(fp, buf);
-		if (delete_file(buf, fp->mode, flags & ~DEL_TERSE) != 0) {
-			flist_free(dirlist);
-			return -1;
-		}
-	}
-	flist_free(dirlist);
-
-	pop_local_filters(save_filters);
-
-	if (max_delete && deletion_count >= max_delete)
-		return -1;
-
-	if (do_rmdir(fname) == 0) {
-		if (!(flags & DEL_TERSE))
-			log_delete(fname, mode);
-		deletion_count++;
-	} else if (errno != ENOTEMPTY && errno != ENOENT) {
-		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
-			full_fname(fname));
-		return -1;
-	}
-
-	return 0;
-}
-
-
-/* If an item in dir_list is not found in full_list, delete it from the
- * filesystem. */
-static void delete_missing(struct file_list *full_list,
-			   struct file_list *dir_list, const char *dirname)
-{
-	char fbuf[MAXPATHLEN];
-	int i;
-
-	if (max_delete && deletion_count >= max_delete)
-		return;
-
-	if (verbose > 2)
-		rprintf(FINFO, "delete_missing(%s)\n", safe_fname(dirname));
-
-	for (i = dir_list->count; i--; ) {
-		if (!dir_list->files[i]->basename)
-			continue;
-		if (flist_find(full_list, dir_list->files[i]) < 0) {
-			char *fn = f_name_to(dir_list->files[i], fbuf);
-			int mode = dir_list->files[i]->mode;
-			if (delete_file(fn, mode, DEL_FORCE_RECURSE) < 0)
-				break;
-		}
-	}
-}
-
-
-/* This function is used to implement per-directory deletion, and
- * is used by all the --delete-WHEN options.  Note that the fbuf
- * pointer must point to a MAXPATHLEN buffer with the name of the
- * directory in it (the functions we call will append names onto
- * the end, but the old dir value will be restored on exit). */
-void delete_in_dir(struct file_list *flist, char *fbuf,
-		   struct file_struct *file)
-{
-	static int min_depth = MAXPATHLEN, cur_depth = -1;
-	static void *filt_array[MAXPATHLEN/2+1];
-	struct file_list *dir_list;
-	STRUCT_STAT st;
-	int dlen;
-
-	if (!flist) {
-		while (cur_depth >= min_depth)
-			pop_local_filters(filt_array[cur_depth--]);
-		min_depth = MAXPATHLEN;
-		cur_depth = -1;
-		return;
-	}
-	if (file->dir.depth >= MAXPATHLEN/2+1)
-		return; /* Impossible... */
-
-	if (max_delete && deletion_count >= max_delete)
-		return;
-
-	if (io_error && !(lp_ignore_errors(module_id) || ignore_errors)) {
-		rprintf(FINFO,
-			"IO error encountered -- skipping file deletion\n");
-		max_delete = -1; /* avoid duplicating the above warning */
-		return;
-	}
-
-	while (cur_depth >= file->dir.depth && cur_depth >= min_depth)
-		pop_local_filters(filt_array[cur_depth--]);
-	cur_depth = file->dir.depth;
-	if (min_depth > cur_depth)
-		min_depth = cur_depth;
-	dlen = strlen(fbuf);
-	filt_array[cur_depth] = push_local_filters(fbuf, dlen);
-
-	if (link_stat(fbuf, &st, keep_dirlinks) < 0)
-		return;
-
-	if (one_file_system && file->flags & FLAG_TOP_DIR)
-		filesystem_dev = st.st_dev;
-
-	dir_list = flist_new(WITHOUT_HLINK, "delete_in_dir");
-
-	recurse = 0;
-	send_directory(-1, dir_list, fbuf, dlen);
-	recurse = -1;
-	fbuf[dlen] = '\0';
-
-	clean_flist(dir_list, 0, 0);
-
 	if (verbose > 3)
-		output_flist(dir_list, "delete");
+		output_flist(dirlist);
 
-	delete_missing(flist, dir_list, fbuf);
-
-	flist_free(dir_list);
+	return dirlist;
 }
