@@ -43,6 +43,7 @@ extern int preserve_gid;
 extern int preserve_times;
 extern int relative_paths;
 extern int copy_links;
+extern int remote_version;
 
 static char **local_exclude_list = NULL;
 
@@ -142,10 +143,14 @@ void send_file_entry_v11(struct file_struct *file,int f)
     write_int(f,(int)file->modtime);
   if (!(flags & SAME_MODE))
     write_int(f,(int)file->mode);
-  if (preserve_uid && !(flags & SAME_UID))
-    write_int(f,(int)file->uid);
-  if (preserve_gid && !(flags & SAME_GID))
-    write_int(f,(int)file->gid);
+  if (preserve_uid && !(flags & SAME_UID)) {
+	  add_uid(file->uid);
+	  write_int(f,(int)file->uid);
+  }
+  if (preserve_gid && !(flags & SAME_GID)) {
+	  add_gid(file->gid);
+	  write_int(f,(int)file->gid);
+  }
   if (preserve_devices && IS_DEVICE(file->mode) && !(flags & SAME_RDEV))
     write_int(f,(int)file->rdev);
 
@@ -502,6 +507,11 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 
   clean_flist(flist);
 
+  /* now send the uid/gid list. This was introduced in protocol version 15 */
+  if (f != -1 && remote_version >= 15) {
+	  send_uid_list(f);
+  }
+
   return flist;
 }
 
@@ -562,6 +572,11 @@ struct file_list *recv_file_list(int f)
 
   if (verbose && recurse && !am_server) {
     fprintf(FINFO,"done\n");
+  }
+
+  /* now recv the uid/gid list. This was introduced in protocol version 15 */
+  if (f != -1 && remote_version >= 15) {
+	  recv_uid_list(f, flist);
   }
 
   return flist;

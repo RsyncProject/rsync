@@ -39,7 +39,7 @@
 #define SAME_TIME (1<<7)
 
 /* update this if you make incompatible changes */
-#define PROTOCOL_VERSION 14
+#define PROTOCOL_VERSION 15
 #define MIN_PROTOCOL_VERSION 10
 #define MAX_PROTOCOL_VERSION 20
 
@@ -162,6 +162,10 @@
 #else
 #include "lib/getopt.h"
 #endif
+
+/* these are needed for the uid/gid mapping code */
+#include <pwd.h>
+#include <grp.h>
 
 #ifndef S_IFLNK
 #define S_IFLNK  0120000

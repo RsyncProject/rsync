@@ -52,6 +52,7 @@ int do_compression=0;
 int am_root=0;
 int orig_umask=0;
 int relative_paths=0;
+int numeric_ids = 0;
 
 extern int csum_length;
 
@@ -165,6 +166,9 @@ static void server_options(char **args,int *argc)
 
   if (delete_mode)
     args[ac++] = "--delete";
+
+  if (numeric_ids)
+    args[ac++] = "--numeric-ids";
 
   *argc = ac;
 }
@@ -434,6 +438,7 @@ static void usage(FILE *f)
   fprintf(f,"    --rsync-path PATH    specify path to rsync on the remote machine\n");
   fprintf(f,"-C, --cvs-exclude        auto ignore files in the same way CVS does\n");
   fprintf(f,"    --delete             delete files that don't exist on the sending side\n");
+  fprintf(f,"    --numeric-ids        don't map uid/gid values by user/group name\n");
   fprintf(f,"-I, --ignore-times       don't exclude files that match length and time\n");
   fprintf(f,"-z, --compress           compress file data\n");
   fprintf(f,"    --exclude FILE       exclude file FILE\n");
@@ -447,7 +452,7 @@ static void usage(FILE *f)
 }
 
 enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
-      OPT_EXCLUDE_FROM,OPT_DELETE,OPT_RSYNC_PATH};
+      OPT_EXCLUDE_FROM,OPT_DELETE,OPT_NUMERIC_IDS,OPT_RSYNC_PATH};
 
 static char *short_options = "oblLWHpguDCtcahvrRIxnSe:B:z";
 
@@ -456,6 +461,7 @@ static struct option long_options[] = {
   {"server",      0,     0,    OPT_SERVER},
   {"sender",      0,     0,    OPT_SENDER},
   {"delete",      0,     0,    OPT_DELETE},
+  {"numeric-ids", 0,     0,    OPT_NUMERIC_IDS},
   {"exclude",     1,     0,    OPT_EXCLUDE},
   {"exclude-from",1,     0,    OPT_EXCLUDE_FROM},
   {"rsync-path",  1,     0,    OPT_RSYNC_PATH},
@@ -547,6 +553,10 @@ int main(int argc,char *argv[])
 
 	case OPT_DELETE:
 	  delete_mode = 1;
+	  break;
+
+	case OPT_NUMERIC_IDS:
+	  numeric_ids = 1;
 	  break;
 
 	case OPT_EXCLUDE:
