@@ -31,6 +31,7 @@ extern struct stats stats;
 
 extern int verbose;
 extern int do_progress;
+extern int am_root;
 extern int am_server;
 extern int always_checksum;
 extern int module_id;
@@ -1433,13 +1434,20 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 		return;
 
 	for (i = 0; i < flist->count; i++) {
-		rprintf(FINFO, "[%s] i=%d %s %s %s mode=0%o len=%.0f\n",
-			who_am_i(), i,
-			NS(flist->files[i]->basedir),
-			NS(flist->files[i]->dirname),
-			NS(flist->files[i]->basename),
-			(int) flist->files[i]->mode,
-			(double) flist->files[i]->length);
+		char uidbuf[16], gidbuf[16];
+		struct file_struct *file = flist->files[i];
+		if (am_root && preserve_uid)
+			sprintf(uidbuf, " uid=%ld", (long)file->uid);
+		else
+			*uidbuf = '\0';
+		if (preserve_gid)
+			sprintf(gidbuf, " gid=%ld", (long)file->gid);
+		else
+			*gidbuf = '\0';
+		rprintf(FINFO, "[%s] i=%d %s %s %s mode=0%o len=%.0f%s%s\n",
+			who_am_i(), i, NS(file->basedir), NS(file->dirname),
+			NS(file->basename), (int) file->mode,
+			(double) file->length, uidbuf, gidbuf);
 	}
 }
 
