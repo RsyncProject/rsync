@@ -13,6 +13,8 @@ rsync [options] [user@]host::module[/path] path
 
 rsync [options] path [user@]host::module[/path]
 
+rsync [options] rsync://host/module/path path
+
 manpagedescription()
 
 rsync is a program that behaves in much the same way that rcp does,
@@ -40,7 +42,7 @@ itemize(
 
 manpagesection(GENERAL)
 
-There are five different ways of using rsync. They are:
+There are six different ways of using rsync. They are:
 
 itemize(
 	it() for copying local files. This is invoked when neither
@@ -57,11 +59,16 @@ itemize(
 
 	it() for copying from a remote rsync server to the local
 	machine. This is invoked when the source path contains a ::
-	separator. 
+	separator. You can also use a rsync:// URL if no username
+	is required.
 
 	it() for copying from the local machine to a remote rsync
 	server. This is invoked when the destination path contains a ::
 	separator. 
+
+	it() for listing files on a remote machine. This is done the
+	same way as rsync transfers except that you leave off the
+	local destination.  
 )
 
 Note that in all cases at least one of the source and destination
