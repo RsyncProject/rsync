@@ -91,9 +91,11 @@ rsyncd.conf.5: rsyncd.conf.yo
 proto:
 	cat $(srcdir)/*.c $(srcdir)/lib/compat.c | awk -f $(srcdir)/mkproto.awk > $(srcdir)/proto.h
 
-clean: 
+clean: cleantests
 	rm -f *~ $(OBJS) rsync $(TLS_OBJ) tls
-	rm -rf ./testtmp
+
+cleantests:
+	rm -rf ./testtmp*
 
 # We try to delete built files from both the source and build
 # directories, just in case somebody previously configured things in
