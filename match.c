@@ -322,6 +322,9 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	}
 
 	sum_end(file_sum);
+	/* If we had a read error, send a bad checksum. */
+	if (buf && buf->status != 0)
+		file_sum[0]++;
 
 	if (verbose > 2)
 		rprintf(FINFO,"sending file_sum\n");
