@@ -1,6 +1,7 @@
 /* -*- c-file-style: "linux"; -*-
    
-   Copyright (C) 1998-2001 by Andrew Tridgell
+   Copyright (C) 1998-2001 by Andrew Tridgell <mbp@samba.org>
+   Copyright (C) 2000-2001 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -170,7 +171,7 @@ void rwrite(enum logcode code, char *buf, int len)
 		return;
 	}
 
-	/* then try to pass it to the other end */
+	/* if that fails, try to pass it to the other end */
 	if (am_server && io_multiplex_write(code, buf, len)) {
 		return;
 	}

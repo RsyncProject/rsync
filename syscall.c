@@ -117,6 +117,9 @@ char *do_mktemp(char *template)
 {
 	if (dry_run) return NULL;
 	if (read_only) {errno = EROFS; return NULL;}
+	
+        /* TODO: Replace this with a good builtin mkstemp, perhaps
+	 * from OpenBSD.  Some glibc versions are buggy.  */
 	return mktemp(template);
 }
 
