@@ -84,8 +84,14 @@ main(int argc, char **argv)
 	}
     }
 
-    if ((fp = fopen("wildtest.txt", "r")) == NULL) {
-	fprintf(stderr, "Unable to open wildtest.txt.\n");
+    argv = (char**)poptGetArgs(pc);
+    if (!argv || argv[1]) {
+	fprintf(stderr, "Usage: wildtest TESTFILE\n");
+	exit(1);
+    }
+
+    if ((fp = fopen(*argv, "r")) == NULL) {
+	fprintf(stderr, "Unable to open %s\n", *argv);
 	exit(1);
     }
 
@@ -104,8 +110,8 @@ main(int argc, char **argv)
 	    if (*++s != ' ' && *s != '\t')
 		flag[i] = -1;
 	    if (flag[i] < 0) {
-		fprintf(stderr, "Invalid flag syntax on line %d of wildtest.txt:%s\n",
-			line, buf);
+		fprintf(stderr, "Invalid flag syntax on line %d of %s:\n%s",
+			line, *argv, buf);
 		exit(1);
 	    }
 	    while (*++s == ' ' || *s == '\t') {}
@@ -116,16 +122,16 @@ main(int argc, char **argv)
 		string[i] = s;
 		while (*s && *s != quote) s++;
 		if (!*s) {
-		    fprintf(stderr, "Unmatched quote on line %d of wildtest.txt:%s\n",
-			    line, buf);
+		    fprintf(stderr, "Unmatched quote on line %d of %s:\n%s",
+			    line, *argv, buf);
 		    exit(1);
 		}
 		end[i] = s;
 	    }
 	    else {
 		if (!*s || *s == '\n') {
-		    fprintf(stderr, "Not enough strings on line %d of wildtest.txt:%s\n",
-			    line, buf);
+		    fprintf(stderr, "Not enough strings on line %d of %s:\n%s",
+			    line, *argv, buf);
 		    exit(1);
 		}
 		string[i] = s;
