@@ -996,6 +996,8 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 }
 
 
+/* Note that the "recurse" value either contains -1, for infinite recursion,
+ * or a number >= 0 indicating how many levels of recursion we will allow. */
 static void send_directory(int f, struct file_list *flist, char *dir)
 {
 	DIR *d;
@@ -1044,7 +1046,8 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 		    || (dname[1] == '.' && dname[2] == '\0')))
 			continue;
 		if (strlcpy(p, dname, MAXPATHLEN - offset) < MAXPATHLEN - offset) {
-			send_file_name(f, flist, fname, recurse, 0);
+			int do_subdirs = recurse >= 1 ? recurse-- : recurse;
+			send_file_name(f, flist, fname, do_subdirs, 0);
 		} else {
 			io_error |= IOERR_GENERAL;
 			rprintf(FINFO,
@@ -1085,7 +1088,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	start_write = stats.total_written;
 
 	flist = flist_new(f == -1 ? WITHOUT_HLINK : WITH_HLINK,
-	    "send_file_list");
+			  "send_file_list");
 
 	if (f != -1) {
 		io_start_buffering_out();
@@ -1102,6 +1105,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	while (1) {
 		char fname2[MAXPATHLEN];
 		char *fname = fname2;
+		int do_subdirs;
 
 		if (use_ff_fd) {
 			if (read_filesfrom_line(filesfrom_fd, fname) == 0)
@@ -1116,7 +1120,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		}
 
 		l = strlen(fname);
-		if (fname[l - 1] == '/') {
+		if (!l || fname[l - 1] == '/') {
 			if (l == 2 && fname[0] == '.') {
 				/* Turn "./" into just "." rather than "./." */
 				fname[1] = '\0';
@@ -1125,6 +1129,11 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				fname[l] = '\0';
 			}
 		}
+		if (fname[l-1] == '.' && (l == 1 || fname[l-2] == '/')) {
+			if (!recurse && keep_dirs)
+				recurse = 1; /* allow one level */
+		} else if (recurse > 0)
+			recurse = 0;
 
 		if (link_stat(fname, &st, keep_dirlinks) != 0) {
 			if (f != -1) {
@@ -1212,7 +1221,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (one_file_system)
 			set_filesystem(fname);
 
-		send_file_name(f, flist, fname, recurse, XMIT_DEL_START);
+		do_subdirs = recurse >= 1 ? recurse-- : recurse;
+		send_file_name(f, flist, fname, do_subdirs, XMIT_DEL_START);
 
 		if (olddir[0]) {
 			flist_dir = NULL;
