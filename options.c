@@ -25,6 +25,7 @@ extern int sanitize_paths;
 extern int select_timeout;
 extern char curr_dir[MAXPATHLEN];
 extern struct exclude_list_struct exclude_list;
+extern struct exclude_list_struct server_exclude_list;
 
 int make_backups = 0;
 
@@ -654,16 +655,16 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 
 	if (write_batch && read_batch) {
-		rprintf(FERROR,
+		snprintf(err_buf, sizeof err_buf,
 			"--write-batch and --read-batch can not be used together\n");
-		exit_cleanup(RERR_SYNTAX);
+		return 0;
 	}
 	if (write_batch || read_batch) {
 		if (dry_run) {
-			rprintf(FERROR,
+			snprintf(err_buf, sizeof err_buf,
 				"--%s-batch cannot be used with --dry_run (-n)\n",
 				write_batch ? "write" : "read");
-			exit_cleanup(RERR_SYNTAX);
+			return 0;
 		}
 		if (am_server) {
 			rprintf(FINFO,
@@ -677,20 +678,21 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		}
 	}
 	if (read_batch && files_from) {
-		rprintf(FERROR,
+		snprintf(err_buf, sizeof err_buf,
 			"--read-batch cannot be used with --files-from\n");
-		exit_cleanup(RERR_SYNTAX);
+		return 0;
 	}
 	if (batch_name && strlen(batch_name) > MAX_BATCH_NAME_LEN) {
-		rprintf(FERROR,
+		snprintf(err_buf, sizeof err_buf,
 			"the batch-file name must be %d characters or less.\n",
 			MAX_BATCH_NAME_LEN);
-		exit_cleanup(RERR_SYNTAX);
+		return 0;
 	}
 
 	if (tmpdir && strlen(tmpdir) >= MAXPATHLEN - 10) {
-		rprintf(FERROR, "the --temp-dir path is WAY too long.\n");
-		exit_cleanup(RERR_SYNTAX);
+		snprintf(err_buf, sizeof err_buf,
+			 "the --temp-dir path is WAY too long.\n");
+		return 0;
 	}
 
 	if (archive_mode) {
@@ -730,6 +732,38 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		if (files_from)
 			files_from = alloc_sanitize_path(files_from, curr_dir);
 	}
+	if (server_exclude_list.head && !am_sender) {
+		struct exclude_list_struct *elp = &server_exclude_list;
+		if (tmpdir) {
+			clean_fname(tmpdir);
+			if (check_exclude(elp, tmpdir, 1) < 0)
+				goto options_rejected;
+		}
+		if (partial_dir) {
+			clean_fname(partial_dir);
+			if (check_exclude(elp, partial_dir, 1) < 0)
+				goto options_rejected;
+		}
+		if (compare_dest) {
+			clean_fname(compare_dest);
+			if (check_exclude(elp, compare_dest, 1) < 0)
+				goto options_rejected;
+		}
+		if (backup_dir) {
+			clean_fname(backup_dir);
+			if (check_exclude(elp, backup_dir, 1) < 0)
+				goto options_rejected;
+		}
+	}
+	if (server_exclude_list.head && files_from) {
+		clean_fname(files_from);
+		if (check_exclude(&server_exclude_list, files_from, 0) < 0) {
+		    options_rejected:
+			snprintf(err_buf, sizeof err_buf,
+			    "Your options have been rejected by the server.\n");
+			return 0;
+		}
+	}
 
 	if (daemon_opt) {
 		daemon_opt = 0;
@@ -741,16 +775,18 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		backup_suffix = backup_dir ? "" : BACKUP_SUFFIX;
 	backup_suffix_len = strlen(backup_suffix);
 	if (strchr(backup_suffix, '/') != NULL) {
-		rprintf(FERROR, "--suffix cannot contain slashes: %s\n",
+		snprintf(err_buf, sizeof err_buf,
+			"--suffix cannot contain slashes: %s\n",
 			backup_suffix);
-		exit_cleanup(RERR_SYNTAX);
+		return 0;
 	}
 	if (backup_dir) {
 		backup_dir_len = strlcpy(backup_dir_buf, backup_dir, sizeof backup_dir_buf);
 		backup_dir_remainder = sizeof backup_dir_buf - backup_dir_len;
 		if (backup_dir_remainder < 32) {
-			rprintf(FERROR, "the --backup-dir path is WAY too long.\n");
-			exit_cleanup(RERR_SYNTAX);
+			snprintf(err_buf, sizeof err_buf,
+				"the --backup-dir path is WAY too long.\n");
+			return 0;
 		}
 		if (backup_dir_buf[backup_dir_len - 1] != '/') {
 			backup_dir_buf[backup_dir_len++] = '/';
@@ -759,9 +795,9 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		if (verbose > 1 && !am_sender)
 			rprintf(FINFO, "backup_dir is %s\n", backup_dir_buf);
 	} else if (!backup_suffix_len && (!am_server || !am_sender)) {
-		rprintf(FERROR,
+		snprintf(err_buf, sizeof err_buf,
 			"--suffix cannot be a null string without --backup-dir\n");
-		exit_cleanup(RERR_SYNTAX);
+		return 0;
 	}
 
 	if (do_progress && !verbose)
@@ -795,7 +831,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 	if (files_from) {
 		char *colon;
-		if (*argc != 2 && !(am_server && am_sender && *argc == 1)) {
+		if (*argc > 2 || (!am_daemon && *argc == 1)) {
 			usage(FERROR);
 			exit_cleanup(RERR_SYNTAX);
 		}
@@ -811,16 +847,17 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			}
 			remote_filesfrom_file = colon+1 + (colon[1] == ':');
 			if (strcmp(remote_filesfrom_file, "-") == 0) {
-				rprintf(FERROR, "Invalid --files-from remote filename\n");
-				exit_cleanup(RERR_SYNTAX);
+				snprintf(err_buf, sizeof err_buf,
+					"Invalid --files-from remote filename\n");
+				return 0;
 			}
 		} else {
 			filesfrom_fd = open(files_from, O_RDONLY|O_BINARY);
 			if (filesfrom_fd < 0) {
-				rsyserr(FERROR, errno,
-					"failed to open files-from file %s",
-					files_from);
-				exit_cleanup(RERR_FILEIO);
+				snprintf(err_buf, sizeof err_buf,
+					"failed to open files-from file %s: %s\n",
+					files_from, strerror(errno));
+				return 0;
 			}
 		}
 	}
