@@ -221,12 +221,13 @@ static void show_malloc_stats(void)
 
 
 /* Start the remote shell.   cmd may be NULL to use the default. */
-static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f_out)
+static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
+		    int *f_in, int *f_out)
 {
+	int i, argc = 0;
 	char *args[100];
-	int i,argc=0;
 	pid_t ret;
-	char *tok,*dir=NULL;
+	char *tok, *dir = NULL;
 	int dash_l_set = 0;
 
 	if (!read_batch && !local_server) {
@@ -239,9 +240,8 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 		if (!cmd)
 			goto oom;
 
-		for (tok=strtok(cmd," ");tok;tok=strtok(NULL," ")) {
+		for (tok = strtok(cmd, " "); tok; tok = strtok(NULL, " "))
 			args[argc++] = tok;
-		}
 
 		/* check to see if we've already been given '-l user' in
 		 * the remote-shell command */
@@ -284,6 +284,11 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 
 	if (!daemon_over_rsh && path && *path)
 		args[argc++] = path;
+
+	if (argc >= (int)(sizeof args / sizeof args[0])) {
+		rprintf(FERROR, "internal: args[] overflowed in do_cmd()\n");
+		exit_cleanup(RERR_MALLOC); /* XXX Need better RERR? */
+	}
 
 	args[argc] = NULL;
 
@@ -491,7 +496,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 {
 	int status;
 	struct file_list *flist;
-	char *local_name=NULL;
+	char *local_name = NULL;
 	char *dir = NULL;
 
 	if (verbose > 2) {
