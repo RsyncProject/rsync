@@ -120,10 +120,10 @@ enum logcode { FERROR=1, FINFO=2, FLOG=3 };
 /* Messages types that are sent over the message channel.  The logcode
  * values must all be present here with identical numbers. */
 enum msgcode {
-	MSG_DATA=0,	/* raw data on the multiplexed stream */
-	MSG_ERROR=FERROR, MSG_INFO=FINFO, MSG_LOG=FLOG, /* remote logging */
+	MSG_DONE=5,	/* current phase is done */
 	MSG_REDO=4,	/* reprocess indicated flist index */
-	MSG_DONE=5	/* current phase is done */
+	MSG_ERROR=FERROR, MSG_INFO=FINFO, MSG_LOG=FLOG, /* remote logging */
+	MSG_DATA=0	/* raw data on the multiplexed stream */
 };
 
 #include "errcode.h"
