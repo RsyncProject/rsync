@@ -428,7 +428,9 @@ permissions to be the same as the local permissions.
 
 dit(bf(-o, --owner)) This option causes rsync to set the owner of the
 destination file to be the same as the source file.  On most systems,
-only the super-user can set file ownership.  
+only the super-user can set file ownership.  Note that if the remote system
+is a daemon using chroot, the --numeric-ids option is implied because the
+remote system cannot get access to the usernames from /etc/passwd.
 
 dit(bf(-g, --group)) This option causes rsync to set the group of the
 destination file to be the same as the source file.  If the receiving
