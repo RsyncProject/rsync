@@ -30,10 +30,11 @@ extern int remote_version;
   a simple 32 bit checksum that can be upadted from either end
   (inspired by Mark Adler's Adler-32 checksum)
   */
-uint32 get_checksum1(char *buf,int len)
+uint32 get_checksum1(char *buf1,int len)
 {
     int i;
     uint32 s1, s2;
+    signed char *buf = (signed char *)buf1;
 
     s1 = s2 = 0;
     for (i = 0; i < (len-4); i+=4) {

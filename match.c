@@ -130,16 +130,16 @@ static void hash_search(int f,struct sum_struct *s,
   int end;
   char sum2[SUM_LENGTH];
   uint32 s1, s2, sum; 
-  char *map;
+  signed char *map;
 
   if (verbose > 2)
     fprintf(FERROR,"hash search b=%d len=%d\n",s->n,(int)len);
 
   k = MIN(len, s->n);
 
-  map = map_ptr(buf,0,k);
+  map = (signed char *)map_ptr(buf,0,k);
 
-  sum = get_checksum1(map, k);
+  sum = get_checksum1((char *)map, k);
   s1 = sum & 0xFFFF;
   s2 = sum >> 16;
   if (verbose > 3)
@@ -175,16 +175,16 @@ static void hash_search(int f,struct sum_struct *s,
 
 	  if (!done_csum2) {
 	    int l = MIN(s->n,len-offset);
-	    map = map_ptr(buf,offset,l);
-	    get_checksum2(map,l,sum2);
+	    map = (signed char *)map_ptr(buf,offset,l);
+	    get_checksum2((char *)map,l,sum2);
 	    done_csum2 = 1;
 	  }
 	  if (memcmp(sum2,s->sums[i].sum2,csum_length) == 0) {
 	    matched(f,s,buf,len,offset,i);
 	    offset += s->sums[i].len - 1;
 	    k = MIN((len-offset), s->n);
-	    map = map_ptr(buf,offset,k);
-	    sum = get_checksum1(map, k);
+	    map = (signed char *)map_ptr(buf,offset,k);
+	    sum = get_checksum1((char *)map, k);
 	    s1 = sum & 0xFFFF;
 	    s2 = sum >> 16;
 	    ++matches;
@@ -198,7 +198,7 @@ static void hash_search(int f,struct sum_struct *s,
     }
 
     /* Trim off the first byte from the checksum */
-    map = map_ptr(buf,offset,k+1);
+    map = (signed char *)map_ptr(buf,offset,k+1);
     s1 -= map[0] + CHAR_OFFSET;
     s2 -= k * (map[0]+CHAR_OFFSET);
 
