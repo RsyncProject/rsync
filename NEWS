@@ -186,6 +186,10 @@ Changes since 2.6.2:
     - Added the ability to parse a literal IPv6 address in an "rsync:" URL
       (e.g. rsync://[2001:638:500:101::21]:873/module/dir).
 
+    - The daemon's wildcard expanding code can now handle more than 1000
+      filenames (it's now limited by memory instead of having a hard-wired
+      limit).
+
   INTERNAL:
 
     - Some cleanup in the exclude code has saved some per-exclude memory
