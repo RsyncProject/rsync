@@ -98,6 +98,8 @@
 
 #define MAX_ARGS 1000
 
+#define MAX_BASIS_DIRS 20
+
 #define MPLEX_BASE 7
 
 #define NO_EXCLUDES	0
@@ -119,7 +121,7 @@
 #define PDIR_CREATE	1
 #define PDIR_DELETE	0
 
-#define FNAMECMP_CMPDEST	0x00
+#define FNAMECMP_BASIS_DIR	0x00
 #define FNAMECMP_FNAME		0x80
 #define FNAMECMP_PARTIAL_DIR	0x81
 #define FNAMECMP_BACKUP 	0x82
