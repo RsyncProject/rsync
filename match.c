@@ -29,7 +29,7 @@ extern int remote_version;
 typedef unsigned short tag;
 
 #define TABLESIZE (1<<16)
-#define NULL_TAG ((tag)-1)
+#define NULL_TAG (-1)
 
 static int false_alarms;
 static int tag_hits;
@@ -49,7 +49,7 @@ struct target {
 
 static struct target *targets;
 
-static tag *tag_table;
+static int *tag_table;
 
 #define gettag2(s1,s2) (((s1) + (s2)) & 0xFFFF)
 #define gettag(sum) gettag2((sum)&0xFFFF,(sum)>>16)
@@ -65,7 +65,7 @@ static void build_hash_table(struct sum_struct *s)
   int i;
 
   if (!tag_table)
-    tag_table = (tag *)malloc(sizeof(tag)*TABLESIZE);
+    tag_table = (int *)malloc(sizeof(tag_table[0])*TABLESIZE);
 
   targets = (struct target *)malloc(sizeof(targets[0])*s->count);
   if (!tag_table || !targets) 
