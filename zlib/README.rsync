@@ -1,0 +1,19 @@
+zlib has been adapted slightly for use in rsync. Please don't bother
+the zlib authors with problems related to the use of zlib in rsync as
+any bugs are likely to be our fault and not theirs.
+
+Specific changes that have been made to zlib for rsync include:
+
+- add Z_INSERT_ONLY to allow for efficient history updating without
+  actually emitting any data. This is used to compress the matched
+  blocks that don't cross the wire, which gives better compression
+  ratios on the literal data.
+
+- fixed a number of minor compilation issues. (redefinition of MAX and
+  other such trivial things)
+
+- include rsync.h to ensure that we get a consistent set of includes
+  for all C code in rsync and to take advantage of autoconf
+
+--
+Paul Mackerras and Andrew Tridgell
