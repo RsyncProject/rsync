@@ -301,7 +301,10 @@ static void flist_expand(struct file_list *flist)
 
 		new_bytes = sizeof(flist->files[0]) * flist->malloced;
 		
-		new_ptr = realloc(flist->files, new_bytes);
+		if (flist->files)
+			new_ptr = realloc(flist->files, new_bytes);
+		else
+			new_ptr = malloc(new_bytes);
 
 		if (verbose >= 2) {
 			rprintf(FINFO, "expand file_list to %.0f bytes, did%s move\n",
