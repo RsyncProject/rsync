@@ -657,8 +657,11 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			usage(FERROR);
 			exit_cleanup(RERR_SYNTAX);
 		}
-		if (strcmp(files_from, "-") == 0)
+		if (strcmp(files_from, "-") == 0) {
 			filesfrom_fd = 0;
+			if (am_server)
+				remote_filesfrom_file = "-";
+		}
 		else if ((colon = find_colon(files_from)) != 0) {
 			if (am_server) {
 				usage(FERROR);
