@@ -116,7 +116,12 @@ int default_af_hint = AF_INET;	/* Must use IPv4 */
 /** Do not go into the background when run as --daemon.  Good
  * for debugging and required for running as a service on W32,
  * or under Unix process-monitors. **/
-int no_detach = 0;
+int no_detach
+#if defined _WIN32 || defined __WIN32__
+	= 1;
+#else
+	= 0;
+#endif
 
 int write_batch = 0;
 int read_batch = 0;
@@ -456,6 +461,7 @@ static struct poptOption long_options[] = {
   {"address",          0,  POPT_ARG_STRING, 0, OPT_DAEMON, 0, 0 },
   {"config",           0,  POPT_ARG_STRING, 0, OPT_DAEMON, 0, 0 },
   {"daemon",           0,  POPT_ARG_NONE,   0, OPT_DAEMON, 0, 0 },
+  {"detach",           0,  POPT_ARG_NONE,   0, OPT_DAEMON, 0, 0 },
   {"no-detach",        0,  POPT_ARG_NONE,   0, OPT_DAEMON, 0, 0 },
   {0,0,0,0, 0, 0, 0}
 };
@@ -491,7 +497,8 @@ static struct poptOption long_daemon_options[] = {
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
 #endif
-  {"no-detach",        0,  POPT_ARG_NONE,   &no_detach, 0, 0, 0 },
+  {"detach",           0,  POPT_ARG_VAL,    &no_detach, 0, 0, 0 },
+  {"no-detach",        0,  POPT_ARG_VAL,    &no_detach, 1, 0, 0 },
   {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
   {"server",           0,  POPT_ARG_NONE,   &am_server, 0, 0, 0 },
