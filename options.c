@@ -1126,7 +1126,7 @@ void server_options(char **args,int *argc)
 	if (copy_links)
 		argstr[x++] = 'L';
 	if (xfer_dirs > 1)
-		argstr[x++] = 'k';
+		argstr[x++] = 'd';
 	if (keep_dirlinks && am_sender)
 		argstr[x++] = 'K';
 
