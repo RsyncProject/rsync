@@ -112,7 +112,7 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out,
 	char *p;
 
 	if (argc == 0 && !am_sender)
-		list_only = 1;
+		list_only |= 1;
 
 	if (*path == '/') {
 		rprintf(FERROR,
@@ -124,19 +124,6 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out,
 		user = getenv("USER");
 	if (!user)
 		user = getenv("LOGNAME");
-
-	/* set daemon_over_rsh to false since we need to build the
-	 * true set of args passed through the rsh/ssh connection;
-	 * this is a no-op for direct-socket-connection mode */
-	daemon_over_rsh = 0;
-	server_options(sargs, &sargc);
-
-	sargs[sargc++] = ".";
-
-	if (path && *path)
-		sargs[sargc++] = path;
-
-	sargs[sargc] = NULL;
 
 	io_printf(f_out, "@RSYNCD: %d\n", protocol_version);
 
@@ -153,6 +140,25 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out,
 	}
 	if (protocol_version > remote_protocol)
 		protocol_version = remote_protocol;
+
+	if (list_only && protocol_version >= 29)
+		list_only |= 2;
+
+	/* set daemon_over_rsh to false since we need to build the
+	 * true set of args passed through the rsh/ssh connection;
+	 * this is a no-op for direct-socket-connection mode */
+	daemon_over_rsh = 0;
+	server_options(sargs, &sargc);
+
+	sargs[sargc++] = ".";
+
+	if (path && *path)
+		sargs[sargc++] = path;
+
+	sargs[sargc] = NULL;
+
+	if (verbose > 1)
+		print_child_argv(sargs);
 
 	p = strchr(path,'/');
 	if (p) *p = 0;
