@@ -238,9 +238,9 @@ void rwrite(enum logcode code, char *buf, int len)
 		return;
 	}
 
-	/* next, if we are a server but not in daemon mode, and multiplexing
-	 *  is enabled, pass it to the other side.  */
-	if (am_server && !am_daemon && io_multiplex_write(code, buf, len)) {
+	/* next, if we are a server and multiplexing is enabled, 
+	 * pass it to the other side.  */
+	if (am_server && io_multiplex_write(code, buf, len)) {
 		return;
 	}
 
@@ -250,7 +250,9 @@ void rwrite(enum logcode code, char *buf, int len)
 	 *  side because we don't want the client to see most errors for
 	 *  security reasons.  We do want early messages when running daemon
 	 *  mode over a remote shell to go to the remote side; those will
-	 *  fall through to the next case. */
+	 *  fall through to the next case.
+	 * Note that this is only for the time before multiplexing is enabled.
+	 */
 	if (am_daemon && (!am_server || log_initialised)) {
 		static int depth;
 		int priority = LOG_INFO;
