@@ -21,6 +21,7 @@
 #include "rsync.h"
 
 extern int verbose;
+extern int recurse;
 extern int delete_after;
 extern int max_delete;
 extern int csum_length;
@@ -31,7 +32,6 @@ extern int batch_gen_fd;
 extern int am_server;
 extern int protocol_version;
 extern int relative_paths;
-extern int keep_dirs;
 extern int keep_dirlinks;
 extern int preserve_hard_links;
 extern int preserve_perms;
@@ -600,7 +600,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 	}
 	make_backups = save_make_backups;
 
-	if (delete_after && keep_dirs && !local_name && flist->count > 0)
+	if (delete_after && recurse && !local_name && flist->count > 0)
 		delete_files(flist);
 
 	if (verbose > 2)

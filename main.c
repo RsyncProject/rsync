@@ -45,7 +45,6 @@ extern int log_got_error;
 extern int module_id;
 extern int orig_umask;
 extern int copy_links;
-extern int keep_dirs;
 extern int keep_dirlinks;
 extern int preserve_hard_links;
 extern int protocol_version;
@@ -477,7 +476,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	if (delete_before) {
 		/* I moved this here from recv_files() to prevent a race condition */
-		if (keep_dirs && !local_name && flist->count > 0)
+		if (recurse && !local_name && flist->count > 0)
 			delete_files(flist);
 	}
 
