@@ -42,9 +42,8 @@ void close_all(void)
 	for (fd = max_fd; fd >= 0; fd--) {
 		ret = fstat(fd,&st);
 		if (fstat(fd,&st) == 0) {
-			if (is_a_socket(fd)) {
+			if (is_a_socket(fd))
 				ret = shutdown(fd, 2);
-			}
 			ret = close(fd);
 		}
 	}
@@ -69,7 +68,7 @@ void close_all(void)
  * --partial is selected.  We need to ensure that the partial file is
  * kept if any real data has been transferred.
  **/
-int cleanup_got_literal=0;
+int cleanup_got_literal = 0;
 
 static char *cleanup_fname;
 static char *cleanup_new_fname;
@@ -108,29 +107,31 @@ void _exit_cleanup(int code, const char *file, int line)
 		int status;
 		if (waitpid(cleanup_child_pid, &status, WNOHANG) == cleanup_child_pid) {
 			status = WEXITSTATUS(status);
-			if (status > code) code = status;
+			if (status > code)
+				code = status;
 		}
 	}
 
 	if (cleanup_got_literal && cleanup_fname && keep_partial) {
 		char *fname = cleanup_fname;
 		cleanup_fname = NULL;
-		if (cleanup_buf) unmap_file(cleanup_buf);
-		if (cleanup_fd1 != -1) close(cleanup_fd1);
-		if (cleanup_fd2 != -1) close(cleanup_fd2);
+		if (cleanup_buf)
+			unmap_file(cleanup_buf);
+		if (cleanup_fd1 != -1)
+			close(cleanup_fd1);
+		if (cleanup_fd2 != -1)
+			close(cleanup_fd2);
 		finish_transfer(cleanup_new_fname, fname, cleanup_file, 0);
 	}
 	io_flush(FULL_FLUSH);
 	if (cleanup_fname)
 		do_unlink(cleanup_fname);
-	if (code) {
+	if (code)
 		kill_all(SIGUSR1);
-	}
 	if (cleanup_pid && cleanup_pid == getpid()) {
 		char *pidf = lp_pid_file();
-		if (pidf && *pidf) {
+		if (pidf && *pidf)
 			unlink(lp_pid_file());
-		}
 	}
 
 	if (code == 0) {
@@ -140,7 +141,8 @@ void _exit_cleanup(int code, const char *file, int line)
 			code = RERR_VANISHED;
 	}
 
-	if (code) log_exit(code, file, line);
+	if (code)
+		log_exit(code, file, line);
 
 	if (verbose > 2) {
 		rprintf(FINFO,"_exit_cleanup(code=%d, file=%s, line=%d): about to call exit(%d)\n",
