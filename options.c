@@ -66,7 +66,8 @@ int module_id = -1;
 int am_server = 0;
 int am_sender = 0;
 int recurse = 0;
-int am_daemon=0;
+int am_daemon = 0;
+int daemon_over_rsh = 0;
 int do_stats=0;
 int do_progress=0;
 int keep_partial=0;
@@ -654,6 +655,13 @@ void server_options(char **args,int *argc)
 		blocking_io = 0;
 
 	args[ac++] = "--server";
+
+	if (daemon_over_rsh) {
+		args[ac++] = "--daemon";
+		*argc = ac;
+		/* if we're passing --daemon, we're done */
+		return;
+	}
 
 	if (!am_sender)
 		args[ac++] = "--sender";
