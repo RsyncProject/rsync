@@ -48,6 +48,7 @@ extern int delete_after;
 extern int module_id;
 extern int ignore_errors;
 extern int remove_sent_files;
+extern int delay_updates;
 extern int update_only;
 extern int opt_ignore_existing;
 extern int inplace;
@@ -1220,6 +1221,9 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		rprintf(FINFO,"generate_files phase=%d\n",phase);
 
 	write_int(f_out, -1);
+	/* Reduce round-trip lag-time for a useless delay-updates phase. */
+	if (protocol_version >= 29 && !delay_updates)
+		write_int(f_out, -1);
 
 	/* Read MSG_DONE for the redo phase (and any prior messages). */
 	get_redo_num(itemizing, code);
@@ -1228,8 +1232,9 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		phase++;
 		if (verbose > 2)
 			rprintf(FINFO, "generate_files phase=%d\n", phase);
-		write_int(f_out, -1);
-		/* Read MSG_DONE for delay-update phase & prior messages. */
+		if (delay_updates)
+			write_int(f_out, -1);
+		/* Read MSG_DONE for delay-updates phase & prior messages. */
 		get_redo_num(itemizing, code);
 	}
 
