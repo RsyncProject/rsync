@@ -756,6 +756,35 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 }
 
 
+static char default_cvsignore[] = 
+	/* These default ignored items come from the CVS manual. */
+	"RCS SCCS CVS CVS.adm RCSLOG cvslog.* tags TAGS"
+	" .make.state .nse_depinfo *~ #* .#* ,* _$* *$"
+	" *.old *.bak *.BAK *.orig *.rej .del-*"
+	" *.a *.olb *.o *.obj *.so *.exe"
+	" *.Z *.elc *.ln core"
+	/* The rest we added to suit ourself. */
+	" .svn/";
+
+static void get_cvs_excludes(uint32 mflags)
+{
+	char *p, fname[MAXPATHLEN];
+	static int initialized = 0;
+
+	if (initialized)
+		return;
+	initialized = 1;
+
+	parse_rule(&cvs_filter_list, default_cvsignore, mflags, 0);
+
+	p = module_id >= 0 && lp_use_chroot(module_id) ? "/" : getenv("HOME");
+	if (p && pathjoin(fname, MAXPATHLEN, p, ".cvsignore") < MAXPATHLEN)
+		parse_filter_file(&cvs_filter_list, fname, mflags, 0);
+
+	parse_rule(&cvs_filter_list, getenv("CVSIGNORE"), mflags, 0);
+}
+
+
 void parse_rule(struct filter_list_struct *listp, const char *pattern,
 		uint32 mflags, int xflags)
 {
@@ -827,7 +856,7 @@ void parse_rule(struct filter_list_struct *listp, const char *pattern,
 
 		if (new_mflags & MATCHFLG_CVS_IGNORE
 		    && !(new_mflags & MATCHFLG_MERGE_FILE))
-			get_cvs_excludes();
+			get_cvs_excludes(new_mflags);
 	}
 }
 
@@ -928,8 +957,6 @@ char *get_rule_prefix(int match_flags, const char *pat, int sending,
 	else
 		legal_len = 0;
 
-	if (match_flags & MATCHFLG_EXCLUDE_SELF)
-		*op++ = 'e';
 	if (match_flags & MATCHFLG_CVS_IGNORE)
 		*op++ = 'C';
 	else {
@@ -944,6 +971,8 @@ char *get_rule_prefix(int match_flags, const char *pat, int sending,
 				*op++ = '-';
 		}
 	}
+	if (match_flags & MATCHFLG_EXCLUDE_SELF)
+		*op++ = 'e';
 	if (op - buf > legal_len)
 		return NULL;
 	if (legal_len)
@@ -1041,34 +1070,4 @@ void recv_filter_list(int f_in)
 		if (local_server || am_sender)
 			parse_rule(&filter_list, "-C", 0, 0);
 	}
-}
-
-
-static char default_cvsignore[] = 
-	/* These default ignored items come from the CVS manual. */
-	"RCS SCCS CVS CVS.adm RCSLOG cvslog.* tags TAGS"
-	" .make.state .nse_depinfo *~ #* .#* ,* _$* *$"
-	" *.old *.bak *.BAK *.orig *.rej .del-*"
-	" *.a *.olb *.o *.obj *.so *.exe"
-	" *.Z *.elc *.ln core"
-	/* The rest we added to suit ourself. */
-	" .svn/";
-
-void get_cvs_excludes(void)
-{
-	static unsigned cvs_mflags = MATCHFLG_WORD_SPLIT|MATCHFLG_NO_PREFIXES;
-	char *p, fname[MAXPATHLEN];
-	static int initialized = 0;
-
-	if (initialized)
-		return;
-	initialized = 1;
-
-	parse_rule(&cvs_filter_list, default_cvsignore, cvs_mflags, 0);
-
-	p = module_id >= 0 && lp_use_chroot(module_id) ? "/" : getenv("HOME");
-	if (p && pathjoin(fname, MAXPATHLEN, p, ".cvsignore") < MAXPATHLEN)
-		parse_filter_file(&cvs_filter_list, fname, cvs_mflags, 0);
-
-	parse_rule(&cvs_filter_list, getenv("CVSIGNORE"), cvs_mflags, 0);
 }
