@@ -71,7 +71,7 @@ static char *gid_to_name(gid_t gid)
 static int map_uid(int id, char *name)
 {
 	uid_t uid;
-	if (name_to_uid(name, &uid) && uid != 0)
+	if (uid != 0 && name_to_uid(name, &uid))
 		return uid;
 	return id;
 }
@@ -79,7 +79,7 @@ static int map_uid(int id, char *name)
 static int map_gid(int id, char *name)
 {
 	gid_t gid;
-	if (name_to_gid(name, &gid) && gid != 0)
+	if (gid != 0 && name_to_gid(name, &gid))
 		return gid;
 	return id;
 }
@@ -316,12 +316,10 @@ void recv_uid_list(int f, struct file_list *flist)
 
 	/* now convert the uid/gid of all files in the list to the mapped
 	   uid/gid */
-	for (i=0;i<flist->count;i++) {
-		if (am_root && preserve_uid && flist->files[i]->uid != 0) {
+	for (i = 0; i < flist->count; i++) {
+		if (am_root && preserve_uid && flist->files[i]->uid != 0)
 			flist->files[i]->uid = match_uid(flist->files[i]->uid);
-		}
-		if (preserve_gid && flist->files[i]->gid != 0) {
+		if (preserve_gid && (!am_root || flist->files[i]->gid != 0))
 			flist->files[i]->gid = match_gid(flist->files[i]->gid);
-		}
 	}
 }
