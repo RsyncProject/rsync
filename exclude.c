@@ -77,8 +77,6 @@ static struct exclude_struct *make_exclude(char *pattern, int include)
 
 	memset(ret, 0, sizeof(*ret));
 
-	ret->orig = strdup(pattern);
-
 	if (strncmp(pattern,"- ",2) == 0) {
 		pattern += 2;
 	} else if (strncmp(pattern,"+ ",2) == 0) {
@@ -90,7 +88,7 @@ static struct exclude_struct *make_exclude(char *pattern, int include)
 
 	ret->pattern = strdup(pattern);
 
-	if (!ret->orig || !ret->pattern) out_of_memory("make_exclude");
+	if (!ret->pattern) out_of_memory("make_exclude");
 
 	if (strpbrk(pattern, "*[?")) {
 	    if (!ret->include && (*pattern == '*') && (*(pattern+1) == '\0')) {
@@ -117,7 +115,6 @@ static struct exclude_struct *make_exclude(char *pattern, int include)
 
 static void free_exclude(struct exclude_struct *ex)
 {
-	free(ex->orig);
 	free(ex->pattern);
 	memset(ex,0,sizeof(*ex));
 	free(ex);
@@ -259,23 +256,21 @@ void send_exclude_list(int f)
 	}
 
 	for (i=0;exclude_list[i];i++) {
-		char *pattern = exclude_list[i]->orig; 
+		char *pattern = exclude_list[i]->pattern; 
 		int l;
 
-		if (remote_version < 19) {
-			if (strncmp(pattern,"+ ", 2)==0) {
+		l = strlen(pattern);
+		if (l == 0) continue;
+		if (exclude_list[i]->include) {
+			if (remote_version < 19) {
 				rprintf(FERROR,"remote rsync does not support include syntax - aborting\n");
 				exit_cleanup(1);
 			}
-			
-			if (strncmp(pattern,"- ", 2) == 0) {
-				pattern += 2;
-			}
+			write_int(f,l+2);
+			write_buf(f,"+ ",2);
+		} else {
+			write_int(f,l);
 		}
-		
-		l = strlen(pattern);
-		if (l == 0) continue;
-		write_int(f,l);
 		write_buf(f,pattern,l);
 	}    
 
