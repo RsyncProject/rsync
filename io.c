@@ -199,8 +199,8 @@ static void read_msg_fd(void)
 	int fd = msg_fd_in;
 	int tag, len;
 
-	/* Temporarily disable msg_fd_in.  This is needed because we
-	 * may call a write routine that could try to call us back. */
+	/* Temporarily disable msg_fd_in.  This is needed to avoid looping back
+	 * to this routine from read_timeout() and writefd_unbuffered(). */
 	msg_fd_in = -1;
 
 	read_loop(fd, buf, 4);
@@ -336,13 +336,12 @@ static void whine_about_eof(void)
 {
 	if (kludge_around_eof)
 		exit_cleanup(0);
-	else {
-		rprintf(FERROR, RSYNC_NAME ": connection unexpectedly closed "
-			"(%.0f bytes read so far)\n",
-			(double)stats.total_read);
 
-		exit_cleanup(RERR_STREAMIO);
-	}
+	rprintf(FERROR, RSYNC_NAME ": connection unexpectedly closed "
+		"(%.0f bytes read so far)\n",
+		(double)stats.total_read);
+
+	exit_cleanup(RERR_STREAMIO);
 }
 
 
@@ -499,22 +498,20 @@ static int read_timeout(int fd, char *buf, size_t len)
 
 		n = read(fd, buf, len);
 
-		if (n > 0) {
-			buf += n;
-			len -= n;
-			ret += n;
-			if (io_timeout)
-				last_io = time(NULL);
-			continue;
-		} else if (n == 0) {
-			whine_about_eof();
-			return -1; /* doesn't return */
-		} else if (n < 0) {
+		if (n == 0)
+			whine_about_eof(); /* Doesn't return. */
+		if (n < 0) {
 			if (errno == EINTR || errno == EWOULDBLOCK
 			    || errno == EAGAIN)
 				continue;
-			die_from_readerr(errno);
+			die_from_readerr(errno); /* Doesn't return. */
 		}
+
+		buf += n;
+		len -= n;
+		ret += n;
+		if (io_timeout)
+			last_io = time(NULL);
 	}
 
 	return ret;
