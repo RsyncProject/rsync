@@ -105,6 +105,7 @@ int do_stat(const char *fname, STRUCT_STAT *st)
 #endif
 }
 
+#if SUPPORT_LINKS
 int do_lstat(const char *fname, STRUCT_STAT *st)
 {
 #if HAVE_OFF64_T
@@ -113,6 +114,7 @@ int do_lstat(const char *fname, STRUCT_STAT *st)
 	return lstat(fname, st);
 #endif
 }
+#endif
 
 int do_fstat(int fd, STRUCT_STAT *st)
 {

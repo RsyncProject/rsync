@@ -52,7 +52,7 @@ echo no)
 
 echo $ac_n "checking for long long ... $ac_c"
 AC_TRY_RUN([#include <stdio.h>
-main() { long long x = 1000000; char b[20]; x *= x; sprintf(b,"%lld", x); exit(strcmp("1000000000000", b) == 0? 0: 1); }],
+main() { long long x = 1000000; x *= x; exit(((x/1000000) == 1000000)? 0: 1); }],
 echo yes;AC_DEFINE(HAVE_LONGLONG), 
 echo no)
 
