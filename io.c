@@ -255,7 +255,7 @@ static void read_loop (int fd, char *buf, size_t len)
  */
 static int read_unbuffered(int fd, char *buf, size_t len)
 {
-	static int remaining;
+	static size_t remaining;
 	int tag, ret = 0;
 	char line[1024];
 
