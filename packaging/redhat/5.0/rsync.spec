@@ -1,10 +1,10 @@
 Summary: Program for efficient remote updates of files.
 Name: rsync
-Version: 2.0.12
+Version: 2.0.13
 Release: 1
 Copyright: GPL
 Group: Applications/Networking
-Source:	ftp://samba.anu.edu.au/pub/rsync/rsync-2.0.12.tar.gz
+Source:	ftp://samba.anu.edu.au/pub/rsync/rsync-2.0.13.tar.gz
 URL: http://samba.anu.edu.au/rsync/
 Packager: Andrew Tridgell <tridge@samba.anu.edu.au>
 BuildRoot: /tmp/rsync
