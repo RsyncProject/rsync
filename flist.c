@@ -1059,7 +1059,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	    "send_file_list");
 
 	if (f != -1) {
-		io_start_buffering_out(f);
+		io_start_buffering_out();
 		if (filesfrom_fd >= 0) {
 			if (argv[0] && !push_dir(argv[0])) {
 				rsyserr(FERROR, errno, "push_dir %s failed",
