@@ -1,25 +1,29 @@
 /* -*- c-file-style: "linux" -*-
-   
+
    Copyright (C) 1996-2000 by Andrew Tridgell
    Copyright (C) Paul Mackerras 1996
    Copyright (C) 2002 by Martin Pool
-   
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "rsync.h"
+
+extern int io_error;
+extern int keep_partial;
+extern int log_got_error;
 
 /**
  * Close all open sockets and files, allowing a (somewhat) graceful
@@ -73,7 +77,6 @@ static struct file_struct *cleanup_file;
 static int cleanup_fd1, cleanup_fd2;
 static struct map_struct *cleanup_buf;
 static pid_t cleanup_pid = 0;
-extern int io_error;
 
 pid_t cleanup_child_pid = -1;
 
@@ -85,8 +88,6 @@ pid_t cleanup_child_pid = -1;
 void _exit_cleanup(int code, const char *file, int line)
 {
 	int ocode = code;
-	extern int keep_partial;
-	extern int log_got_error;
 	static int inside_cleanup = 0;
 
 	if (inside_cleanup > 10) {
@@ -98,9 +99,10 @@ void _exit_cleanup(int code, const char *file, int line)
 	signal(SIGUSR1, SIG_IGN);
 	signal(SIGUSR2, SIG_IGN);
 
-	if (verbose > 3)
-		rprintf(FINFO,"_exit_cleanup(code=%d, file=%s, line=%d): entered\n", 
+	if (verbose > 3) {
+		rprintf(FINFO,"_exit_cleanup(code=%d, file=%s, line=%d): entered\n",
 			code, file, line);
+	}
 
 	if (cleanup_child_pid != -1) {
 		int status;
@@ -116,7 +118,7 @@ void _exit_cleanup(int code, const char *file, int line)
 		if (cleanup_buf) unmap_file(cleanup_buf);
 		if (cleanup_fd1 != -1) close(cleanup_fd1);
 		if (cleanup_fd2 != -1) close(cleanup_fd2);
-		finish_transfer(cleanup_new_fname, fname, cleanup_file);
+		finish_transfer(cleanup_new_fname, fname, cleanup_file, 0);
 	}
 	io_flush(FULL_FLUSH);
 	if (cleanup_fname)
@@ -140,9 +142,10 @@ void _exit_cleanup(int code, const char *file, int line)
 
 	if (code) log_exit(code, file, line);
 
-	if (verbose > 2)
-		rprintf(FINFO,"_exit_cleanup(code=%d, file=%s, line=%d): about to call exit(%d)\n", 
+	if (verbose > 2) {
+		rprintf(FINFO,"_exit_cleanup(code=%d, file=%s, line=%d): about to call exit(%d)\n",
 			ocode, file, line, code);
+	}
 
 	close_all();
 	exit(code);
