@@ -413,8 +413,10 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 
 		if (fd1 != -1 && st.st_size > 0) {
 			mapbuf = map_file(fd1,st.st_size);
-			if (verbose > 2)
-				rprintf(FINFO,"recv mapped %s of size %.0f\n",fnamecmp,(double)st.st_size);
+			if (verbose > 2) {
+				rprintf(FINFO, "recv mapped %s of size %.0f\n",
+					fnamecmp, (double)st.st_size);
+			}
 		} else
 			mapbuf = NULL;
 
