@@ -537,7 +537,7 @@ bound.
 The option implies --partial (since an interrupted transfer does not delete
 the file), but conflicts with --partial-dir, --compare-dest, --copy-dest, and
 --link-dest (a future rsync version will hopefully update the protocol to
-remove these restrictions).
+remove some of these restrictions).
 
 WARNING: The file's data will be in an inconsistent state during the
 transfer (and possibly afterward if the transfer gets interrupted), so you
@@ -810,36 +810,48 @@ transferred on the receiving side.  The default behavior is to create
 the temporary files in the receiving directory.
 
 dit(bf(--compare-dest=DIR)) This option instructs rsync to use em(DIR) on
-the destination machine as an additional directory to compare destination
-files against when doing transfers if the files are missing in the
-destination directory.  Files that are identical to one of the specified
-directories are not transferred.  This is useful for creating a sparse
-backup into a new hierarchy.  If em(DIR) is a relative path, it is relative
-to the destination directory.  See also --copy-dest and --link-dest.
+the destination machine as an additional hierarchy to compare destination
+files against doing transfers (if the files are missing in the destination
+directory).  If a file is found in em(DIR) that is identical to the
+sender's file, the file will NOT be transferred to the destination
+directory.  This is useful for creating a sparse backup of just files that
+have changed from an earlier backup.
+
+Beginning in version 2.6.4, multiple --compare-dest directories may be
+provided and rsync will search the list in the order specified until it
+finds an existing file.  That first discovery is used as the basis file,
+and also determines if the transfer needs to happen.
+
+If em(DIR) is a relative path, it is relative to the destination directory.
+See also --copy-dest and --link-dest.
 
 dit(bf(--copy-dest=DIR)) This option behaves like bf(--compare-dest), but
 rsync will also copy unchanged files found in em(DIR) to the destination
 directory (using the data in the em(DIR) for an efficient copy).  This is
 useful for doing transfers to a new destination while leaving existing
 files intact, and then doing a flash-cutover when all files have been
-successfully transferred.  If em(DIR) is a relative path, it is relative to
-the destination directory.  See also --compare-dest and --link-dest.
+successfully transferred.
+
+If em(DIR) is a relative path, it is relative to the destination directory.
+See also --compare-dest and --link-dest.
 
 dit(bf(--link-dest=DIR)) This option behaves like bf(--copy-dest), but
-unchanged files are hard linked from em(DIR) to the destination directory
-(The files must be identical in ownership and permissions--if those items
-are being preserved--in order for the files to be linked together.  If
-em(DIR) is a relative path, it is relative to the destination directory.
+unchanged files are hard linked from em(DIR) to the destination directory.
+The files must be identical in all preserved attributes (e.g. permissions,
+possibly ownership) in order for the files to be linked together.
 An example:
 
 verb(
     rsync -av --link-dest=$PWD/prior_dir host:src_dir/ new_dir/
 )
 
-If more than one --link-dest option is specified, rsync will try to find an
-exact match to link with (searching the list in the order specified), and
-if not found, a basis file from one of the em(DIR)s will be selected to try
-to speed up the transfer.  See also --compare-dest and --copy-dest.
+Beginning with version 2.6.4, if more than one --link-dest option is
+specified, rsync will try to find an exact match to link with (searching
+the list in the order specified), and if not found, a basis file from one
+of the em(DIR)s will be selected to try to speed up the transfer.
+
+If em(DIR) is a relative path, it is relative to the destination directory.
+See also --compare-dest and --copy-dest.
 
 Note that rsync versions prior to 2.6.1 had a bug that could prevent
 --link-dest from working properly for a non-root user when -o was specified
