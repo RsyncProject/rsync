@@ -27,7 +27,9 @@ extern int dry_run;
 extern int am_server;
 extern int am_daemon;
 extern int protocol_version;
+extern int updating_basis_file;
 extern int make_backups;
+extern int inplace;
 extern struct stats stats;
 
 
@@ -150,6 +152,11 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		} else
 			offset = 0;
 		fname2 = f_name_to(file, fname + offset);
+		if (inplace && protocol_version >= 29) {
+			uchar fnamecmp_type = read_byte(f_in);
+			updating_basis_file = fnamecmp_type == FNAMECMP_FNAME;
+		} else
+			updating_basis_file = inplace && !make_backups;
 
 		if (verbose > 2)
 			rprintf(FINFO, "send_files(%d, %s)\n", i, fname);
