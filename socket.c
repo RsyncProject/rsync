@@ -26,10 +26,6 @@
 
 #include "rsync.h"
 
-#ifndef HAVE_GETADDRINFO
-#include "lib/addrinfo.h"
-#endif
-
 /* Establish a proxy connection on an open socket to a web roxy by
  * using the CONNECT method. */
 static int establish_proxy_connection(int fd, char *host, int port)
