@@ -8,6 +8,9 @@ Changes since 2.6.3:
       was only treating it as a special token in an rsync include/exclude
       file).
 
+    - Avoid a mkdir warning when removing a directory in the destination
+      that already exists in the --backup-dir.
+
     - An OS that has a binary mode for its files (such as cygwin0 needed
       setmode(fd, O_BINARY) called on the temp-file we opened with
       mkstemp().
