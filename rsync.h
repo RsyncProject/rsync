@@ -112,6 +112,9 @@
 #define FULL_FLUSH	1
 #define NORMAL_FLUSH	0
 
+#define CLEAR_STRUCT	0
+#define FREE_STRUCT	1
+
 /* Log-message categories.  FLOG is only used on the daemon side to
  * output messages to the log file. */
 enum logcode { FERROR=1, FINFO=2, FLOG=3 };
