@@ -19,7 +19,7 @@
 
 /* handle the mapping of uid/gid and user/group names between systems.
    If the source username/group does not exist on the target then use
-   the numeric ids. Never do any mapping for uid=0 or gid=0 as these
+   the numeric IDs. Never do any mapping for uid=0 or gid=0 as these
    are special.
 */
 
@@ -50,24 +50,26 @@ struct idlist {
 static struct idlist *uidlist;
 static struct idlist *gidlist;
 
-static struct idlist *add_list(int id, char *name)
+static struct idlist *add_to_list(struct idlist **root, int id, char *name,
+				  int id2)
 {
-	struct idlist *list = new(struct idlist);
-	if (!list) out_of_memory("add_list");
-	list->next = NULL;
-	list->name = strdup(name);
-	if (!list->name) out_of_memory("add_list");
-	list->id = (int)id;
-	return list;
+	struct idlist *node = new(struct idlist);
+	if (!node)
+		out_of_memory("add_to_list");
+	node->next = *root;
+	node->name = name;
+	node->id = id;
+	node->id2 = id2;
+	*root = node;
+	return node;
 }
-
-
 
 /* turn a uid into a user name */
 static char *uid_to_name(uid_t uid)
 {
 	struct passwd *pass = getpwuid(uid);
-	if (pass) return(pass->pw_name);
+	if (pass)
+		return strdup(pass->pw_name);
 	return NULL;
 }
 
@@ -75,7 +77,8 @@ static char *uid_to_name(uid_t uid)
 static char *gid_to_name(gid_t gid)
 {
 	struct group *grp = getgrgid(gid);
-	if (grp) return(grp->gr_name);
+	if (grp)
+		return strdup(grp->gr_name);
 	return NULL;
 }
 
@@ -126,7 +129,7 @@ static int is_in_group(gid_t gid)
 			    ngroups, ngroups == 1? "" : "s");
 			pos = strlen(gidbuf);
 			for (n = 0; n < ngroups; n++) {
-				sprintf(gidbuf+pos, " %ld", (long)gidset[n]);
+				sprintf(gidbuf+pos, " %d", (int)gidset[n]);
 				pos += strlen(gidbuf+pos);
 			}
 			rprintf(FINFO, "%s\n", gidbuf);
@@ -145,116 +148,120 @@ static int is_in_group(gid_t gid)
 	if (mygid == GID_NONE) {
 		mygid = MY_GID();
 		if (verbose > 3)
-			rprintf(FINFO, "process has gid %ld\n", (long)mygid);
+			rprintf(FINFO, "process has gid %d\n", (int)mygid);
 	}
 	return gid == mygid;
 #endif
+}
+
+/* Add a uid to the list of uids.  Only called on receiving side. */
+static struct idlist *recv_add_uid(int id, char *name)
+{
+	int id2 = name ? map_uid(id, name) : id;
+	struct idlist *node;
+
+	node = add_to_list(&uidlist, id, name, map_uid(id, name));
+
+	if (verbose > 3) {
+		rprintf(FINFO, "uid %d(%s) maps to %d\n",
+		    id, name ? name : "", id2);
+	}
+
+	return node;
+}
+
+/* Add a gid to the list of gids.  Only called on receiving side. */
+static struct idlist *recv_add_gid(int id, char *name)
+{
+	int id2 = name ? map_gid(id, name) : id;
+	struct idlist *node;
+
+	if (!am_root && !is_in_group(id2))
+		id2 = GID_NONE;
+	node = add_to_list(&gidlist, id, name, id2);
+
+	if (verbose > 3) {
+		rprintf(FINFO, "gid %d(%s) maps to %d\n",
+		    id, name ? name : "", id2);
+	}
+
+	return node;
 }
 
 /* this function is a definate candidate for a faster algorithm */
 static uid_t match_uid(uid_t uid)
 {
 	static uid_t last_in, last_out;
-	struct idlist *list = uidlist;
+	struct idlist *list;
+
+	if (uid == 0)
+		return 0;
 
 	if (uid == last_in)
 		return last_out;
 
 	last_in = uid;
 
-	while (list) {
-		if (list->id == (int)uid) {
-			last_out = (uid_t)list->id2;
-			return last_out;
-		}
-		list = list->next;
+	for (list = uidlist; list; list = list->next) {
+		if (list->id == (int)uid)
+			return last_out = (uid_t)list->id2;
 	}
 
-	last_out = uid;
-	return last_out;
+	return last_out = uid;
 }
 
 static gid_t match_gid(gid_t gid)
 {
 	static gid_t last_in = GID_NONE, last_out = GID_NONE;
-	struct idlist *list = gidlist;
+	struct idlist *list;
+
+	if (gid == 0)
+		return 0;
 
 	if (gid == last_in)
 		return last_out;
 
 	last_in = gid;
 
-	while (list) {
-		if (list->id == (int)gid) {
-			last_out = (gid_t)list->id2;
-			return last_out;
-		}
-		list = list->next;
+	for (list = gidlist; list; list = list->next) {
+		if (list->id == (int)gid)
+			return last_out = (gid_t)list->id2;
 	}
-	
-	if (am_root || is_in_group(gid))
-		last_out = gid;
-	else
-		last_out = GID_NONE;
-	return last_out;
+
+	list = recv_add_gid(gid, NULL);
+	return last_out = list->id2;
 }
 
-/* add a uid to the list of uids */
+/* Add a uid to the list of uids.  Only called on sending side. */
 void add_uid(uid_t uid)
 {
-	struct idlist *list = uidlist;
-	char *name;
+	struct idlist *list;
 
-	if (numeric_ids) return;
-
-	/* don't map root */
-	if (uid==0) return;
-
-	if (!list) {
-		if (!(name = uid_to_name(uid))) return;
-		uidlist = add_list((int)uid, name);
+	if (uid == 0)	/* don't map root */
 		return;
+
+	for (list = uidlist; list; list = list->next) {
+		if (list->id == (int)uid)
+			return;
 	}
 
-	while (list->next) {
-		if (list->id == (int)uid) return;
-		list = list->next;
-	}
-
-	if (list->id == (int)uid) return;
-
-	if (!(name = uid_to_name(uid))) return;
-
-	list->next = add_list((int)uid, name);
+	add_to_list(&uidlist, (int)uid, uid_to_name(uid), 0);
 }
 
-/* add a gid to the list of gids */
+/* Add a gid to the list of gids.  Only called on sending side. */
 void add_gid(gid_t gid)
 {
-	struct idlist *list = gidlist;
-	char *name;
+	struct idlist *list;
 
-	if (numeric_ids) return;
-
-	/* don't map root */
-	if (gid==0) return;
-
-	if (!list) {
-		if (!(name = gid_to_name(gid))) return;
-		gidlist = add_list((int)gid, name);
+	if (gid == 0)	/* don't map root */
 		return;
+
+	for (list = gidlist; list; list = list->next) {
+		if (list->id == (int)gid)
+			return;
 	}
 
-	while (list->next) {
-		if (list->id == (int)gid) return;
-		list = list->next;
-	}
-
-	if (list->id == (int)gid) return;
-
-	if (!(name = gid_to_name(gid))) return;
-
-	list->next = add_list((int)gid, name);
+	add_to_list(&gidlist, (int)gid, gid_to_name(gid), 0);
 }
 
 
@@ -263,17 +270,19 @@ void send_uid_list(int f)
 {
 	struct idlist *list;
 
-	if (numeric_ids) return;
+	if (numeric_ids)
+		return;
 
 	if (preserve_uid) {
+		int len;
 		/* we send sequences of uid/byte-length/name */
-		list = uidlist;
-		while (list) {
-			int len = strlen(list->name);
+		for (list = uidlist; list; list = list->next) {
+			if (!list->name)
+				continue;
+			len = strlen(list->name);
 			write_int(f, list->id);
 			write_byte(f, len);
 			write_buf(f, list->name, len);
-			list = list->next;
 		}
 
 		/* terminate the uid list with a 0 uid. We explicitly exclude
@@ -282,13 +291,14 @@ void send_uid_list(int f)
 	}
 
 	if (preserve_gid) {
-		list = gidlist;
-		while (list) {
-			int len = strlen(list->name);
+		int len;
+		for (list = gidlist; list; list = list->next) {
+			if (!list->name)
+				continue;
+			len = strlen(list->name);
 			write_int(f, list->id);
 			write_byte(f, len);
 			write_buf(f, list->name, len);
-			list = list->next;
 		}
 		write_int(f, 0);
 	}
@@ -300,75 +310,40 @@ void recv_uid_list(int f, struct file_list *flist)
 {
 	int id, i;
 	char *name;
-	struct idlist *list;
 
-	if (numeric_ids) return;
-
-	if (preserve_uid) {
+	if (preserve_uid && !numeric_ids) {
 		/* read the uid list */
-		list = uidlist;
 		while ((id = read_int(f)) != 0) {
 			int len = read_byte(f);
 			name = new_array(char, len+1);
-			if (!name) out_of_memory("recv_uid_list");
+			if (!name)
+				out_of_memory("recv_uid_list");
 			read_sbuf(f, name, len);
-			if (!list) {
-				uidlist = add_list(id, name);
-				list = uidlist;
-			} else {
-				list->next = add_list(id, name);
-				list = list->next;
-			}
-			list->id2 = map_uid(id, name);
-			free(name);
-		}
-		if (verbose > 3) {
-			for (list = uidlist; list; list = list->next) {
-				rprintf(FINFO, "uid %ld (%s) maps to %ld\n",
-				    (long)list->id, list->name,
-				    (long)list->id2);
-			}
+			recv_add_uid(id, name); /* node keeps name's memory */
 		}
 	}
 
 
-	if (preserve_gid) {
-		/* and the gid list */
-		list = gidlist;
+	if (preserve_gid && !numeric_ids) {
+		/* read the gid list */
 		while ((id = read_int(f)) != 0) {
 			int len = read_byte(f);
 			name = new_array(char, len+1);
-			if (!name) out_of_memory("recv_uid_list");
+			if (!name)
+				out_of_memory("recv_uid_list");
 			read_sbuf(f, name, len);
-			if (!list) {
-				gidlist = add_list(id, name);
-				list = gidlist;
-			} else {
-				list->next = add_list(id, name);
-				list = list->next;
-			}
-			list->id2 = map_gid(id, name);
-			if (!am_root && !is_in_group(list->id2))
-				list->id2 = GID_NONE;
-			free(name);
-		}
-		if (verbose > 3) {
-			for (list = gidlist; list; list = list->next) {
-				rprintf(FINFO, "gid %ld (%s) maps to %ld\n",
-				    (long)list->id, list->name,
-				    (long)list->id2);
-			}
+			recv_add_gid(id, name); /* node keeps name's memory */
 		}
 	}
-
-	if (!(am_root && preserve_uid) && !preserve_gid) return;
 
 	/* now convert the uid/gid of all files in the list to the mapped
 	 * uid/gid */
-	for (i = 0; i < flist->count; i++) {
-		if (am_root && preserve_uid && flist->files[i]->uid != 0)
+	if (am_root && preserve_uid && !numeric_ids) {
+		for (i = 0; i < flist->count; i++)
 			flist->files[i]->uid = match_uid(flist->files[i]->uid);
-		if (preserve_gid && (!am_root || flist->files[i]->gid != 0))
+	}
+	if (preserve_gid && (!am_root || !numeric_ids)) {
+		for (i = 0; i < flist->count; i++)
 			flist->files[i]->gid = match_gid(flist->files[i]->gid);
 	}
 }
