@@ -20,4 +20,5 @@ testtmp.*
 tls
 trimslash
 t_unsafe
+wildtest
 zlib/dummy
