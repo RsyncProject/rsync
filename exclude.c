@@ -870,6 +870,41 @@ void add_filter_file(struct filter_list_struct *listp, const char *fname,
 	fclose(fp);
 }
 
+char *get_rule_prefix(int match_flags, const char *pat, unsigned int *plen_ptr)
+{
+	static char buf[MAX_RULE_PREFIX+1];
+	char *op = buf;
+
+	if (match_flags & MATCHFLG_PERDIR_MERGE) {
+		*op++ = ':';
+		if (match_flags & MATCHFLG_WORD_SPLIT)
+			*op++ = 's';
+		if (match_flags & MATCHFLG_NO_INHERIT)
+			*op++ = 'n';
+		if (match_flags & MATCHFLG_EXCLUDE_SELF)
+			*op++ = 'e';
+		if (match_flags & MATCHFLG_NO_PREFIXES) {
+			if (match_flags & MATCHFLG_INCLUDE)
+				*op++ = '+';
+			else
+				*op++ = '-';
+		}
+		*op++ = ' ';
+	} else if (match_flags & MATCHFLG_INCLUDE) {
+		*op++ = '+';
+		*op++ = ' ';
+	} else if (protocol_version >= 29
+	    || ((*pat == '-' || *pat == '+') && pat[1] == ' ')) {
+		*op++ = '-';
+		*op++ = ' ';
+	}
+	*op = '\0';
+	if (plen_ptr)
+		*plen_ptr = op - buf;
+	if (op - buf > MAX_RULE_PREFIX)
+		overflow("get_rule_prefix");
+	return buf;
+}
 
 void send_filter_list(int f)
 {
@@ -881,52 +916,28 @@ void send_filter_list(int f)
 		add_filter(&filter_list, "/*/*", XFLG_DEF_EXCLUDE);
 
 	for (ent = filter_list.head; ent; ent = ent->next) {
-		unsigned int l;
-		char p[MAXPATHLEN+MAX_RULE_PREFIX+1];
+		unsigned int len, plen, dlen;
+		char *p;
 
-		l = strlcpy(p, ent->pattern, sizeof p);
-		if (l == 0 || l >= MAXPATHLEN)
+		len = strlen(ent->pattern);
+		if (len == 0 || len >= MAXPATHLEN)
 			continue;
-		if (ent->match_flags & MATCHFLG_DIRECTORY) {
-			p[l++] = '/';
-			p[l] = '\0';
+		p = get_rule_prefix(ent->match_flags, ent->pattern, &plen);
+		if (protocol_version < 29 && *p == ':') {
+			if (strcmp(p, ":sn- ") == 0
+			    && strcmp(ent->pattern, ".cvsignore") == 0)
+				continue;
+			rprintf(FERROR,
+				"remote rsync is too old to understand per-directory merge files.\n");
+			exit_cleanup(RERR_SYNTAX);
 		}
-
-		if (ent->match_flags & MATCHFLG_PERDIR_MERGE) {
-			char buf[MAX_RULE_PREFIX], *op = buf;
-			if (protocol_version < 29) {
-				rprintf(FERROR,
-					"remote rsync is too old to understand per-directory merge files.\n");
-				exit_cleanup(RERR_SYNTAX);
-			}
-			*op++ = ':';
-			if (ent->match_flags & MATCHFLG_WORD_SPLIT)
-				*op++ = 's';
-			if (ent->match_flags & MATCHFLG_NO_INHERIT)
-				*op++ = 'n';
-			if (ent->match_flags & MATCHFLG_EXCLUDE_SELF)
-				*op++ = 'e';
-			if (ent->match_flags & MATCHFLG_NO_PREFIXES) {
-				if (ent->match_flags & MATCHFLG_INCLUDE)
-					*op++ = '+';
-				else
-					*op++ = '-';
-			}
-			*op++ = ' ';
-			if (op - buf > MAX_RULE_PREFIX)
-				overflow("send_filter_list");
-			write_int(f, l + (op - buf));
-			write_buf(f, buf, op - buf);
-		} else if (ent->match_flags & MATCHFLG_INCLUDE) {
-			write_int(f, l + 2);
-			write_buf(f, "+ ", 2);
-		} else if (protocol_version >= 29
-		    || ((*p == '-' || *p == '+') && p[1] == ' ')) {
-			write_int(f, l + 2);
-			write_buf(f, "- ", 2);
-		} else
-			write_int(f, l);
-		write_buf(f, p, l);
+		dlen = ent->match_flags & MATCHFLG_DIRECTORY ? 1 : 0;
+		write_int(f, plen + len + dlen);
+		if (plen)
+			write_buf(f, p, plen);
+		write_buf(f, ent->pattern, len);
+		if (dlen)
+			write_byte(f, '/');
 	}
 
 	write_int(f, 0);
