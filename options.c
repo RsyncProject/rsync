@@ -106,7 +106,7 @@ static int modify_window_set;
 char *bind_address;
 
 
-static void print_rsync_version(int f)
+static void print_rsync_version(enum logcode f)
 {
         char const *got_socketpair = "no ";
         char const *hardlinks = "no ";
