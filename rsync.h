@@ -762,6 +762,10 @@ int inet_pton(int af, const char *src, void *dst);
 const char *get_panic_action(void);
 #endif
 
+#ifndef _AIX
 #define UNUSED(x) x __attribute__((__unused__))
+#else
+#define UNUSED(x) x
+#endif
 
 extern const char *io_write_phase, *io_read_phase;
