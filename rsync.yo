@@ -161,6 +161,9 @@ you will receive a password prompt when you connect. You can avoid the
 password prompt by setting the environment variable RSYNC_PASSWORD to
 the password you want to use. This may be useful when scripting rsync.
 
+WARNING: On some systems environment variables are visible to all
+users. 
+
 manpagesection(RUNNING AN RSYNC SERVER)
 
 An rsync server is configured using a config file which by default is
