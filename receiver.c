@@ -552,15 +552,25 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		cleanup_disable();
 
 		if (!recv_ok) {
-			if (csum_length == SUM_LENGTH) {
-				rprintf(FERROR,"ERROR: file corruption in %s. File changed during transfer?\n",
-					full_fname(fname));
-			} else {
+			int msgtype;
+			char *redostr;
+			if (csum_length != SUM_LENGTH) {
 				char buf[4];
-				if (verbose > 1)
-					rprintf(FINFO,"redoing %s(%d)\n",fname,i);
 				SIVAL(buf, 0, i);
 				send_msg(MSG_REDO, buf, 4);
+				msgtype = read_batch ? FERROR : FINFO;
+				redostr = read_batch ? " Redo doubtful."
+						     : " Redo pending.";
+			} else {
+				msgtype = FERROR;
+				redostr = "";
+			}
+			if (verbose || read_batch) {
+				rprintf(msgtype,
+					"%s: %s failed verification. Update %sed.%s\n",
+					msgtype == FERROR ? "ERROR" : "WARNING",
+					fname, keep_partial || inplace ?
+					"retain" : "discard", redostr);
 			}
 		}
 	}
