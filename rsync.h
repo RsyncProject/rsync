@@ -121,7 +121,9 @@
 #define PDIR_CREATE	1
 #define PDIR_DELETE	0
 
-#define FNAMECMP_BASIS_DIR	0x00
+/* Note: 0x00 - 0x7F are used for basis_dir[] indexes! */
+#define FNAMECMP_BASIS_DIR_LOW	0x00 /* Must remain 0! */
+#define FNAMECMP_BASIS_DIR_HIGH 0x7F
 #define FNAMECMP_FNAME		0x80
 #define FNAMECMP_PARTIAL_DIR	0x81
 #define FNAMECMP_BACKUP 	0x82
