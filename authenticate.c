@@ -1,17 +1,17 @@
 /* -*- c-file-style: "linux"; -*-
-   
-   Copyright (C) 1998-2000 by Andrew Tridgell 
-   
+
+   Copyright (C) 1998-2000 by Andrew Tridgell
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -158,10 +158,10 @@ static char *getpassf(char *filename)
 	if ((fd = open(filename,O_RDONLY)) < 0) {
 		rsyserr(FERROR, errno, "could not open password file \"%s\"",filename);
 		if (envpw)
-			rprintf(FERROR, "falling back to RSYNC_PASSWORD environment variable.\n");	
+			rprintf(FERROR, "falling back to RSYNC_PASSWORD environment variable.\n");
 		return NULL;
 	}
-	
+
 	if (do_stat(filename, &st) == -1) {
 		rsyserr(FERROR, errno, "stat(%s)", filename);
 		ok = 0;
@@ -189,7 +189,7 @@ static char *getpassf(char *filename)
 		buffer[n] = '\0';
 		if ((p = strtok(buffer, "\n\r")) != NULL)
 			return strdup(p);
-	}	
+	}
 
 	return NULL;
 }
@@ -207,15 +207,12 @@ static void generate_hash(char *in, char *challenge, char *out)
 	base64_encode(buf, 16, out);
 }
 
-/* possible negotiate authentication with the client. Use "leader" to
-   start off the auth if necessary 
-
-   return NULL if authentication failed
-
-   return "" if anonymous access
-
-   otherwise return username
-*/
+/* Possibly negotiate authentication with the client.  Use "leader" to
+ * start off the auth if necessary.
+ *
+ * Return NULL if authentication failed.  Return "" if anonymous access.
+ * Otherwise return username.
+ */
 char *auth_server(int f_in, int f_out, int module, char *addr, char *leader)
 {
 	char *users = lp_auth_users(module);
@@ -233,7 +230,7 @@ char *auth_server(int f_in, int f_out, int module, char *addr, char *leader)
 		return "";
 
 	gen_challenge(addr, challenge);
-	
+
 	base64_encode(challenge, 16, b64_challenge);
 
 	io_printf(f_out, "%s%s\n", leader, b64_challenge);
@@ -246,7 +243,7 @@ char *auth_server(int f_in, int f_out, int module, char *addr, char *leader)
 
 	if (sscanf(line,"%99s %29s", user, pass) != 2)
 		return NULL;
-	
+
 	users = strdup(users);
 	if (!users)
 		return NULL;
@@ -259,7 +256,7 @@ char *auth_server(int f_in, int f_out, int module, char *addr, char *leader)
 
 	if (!tok)
 		return NULL;
-	
+
 	memset(secret, 0, sizeof secret);
 	if (!get_secret(module, user, secret, sizeof secret - 1)) {
 		memset(secret, 0, sizeof secret);
@@ -268,7 +265,7 @@ char *auth_server(int f_in, int f_out, int module, char *addr, char *leader)
 
 	generate_hash(secret, b64_challenge, pass2);
 	memset(secret, 0, sizeof secret);
-	
+
 	if (strcmp(pass, pass2) == 0)
 		return user;
 
