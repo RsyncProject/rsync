@@ -425,7 +425,9 @@ Improve error messages
   our load?  (Debian #28416) Probably fixed now, but a test case would
   be good.
 
-
+  When running as a daemon, some errors should both be returned to the
+  user and logged.  This will make interacting with a daemon less
+  cryptic.
 
                       --          --
 
