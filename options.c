@@ -70,7 +70,6 @@ int implied_dirs = 1;
 int numeric_ids = 0;
 int force_delete = 0;
 int io_timeout = 0;
-int read_only = 0;
 int module_id = -1;
 int am_server = 0;
 int am_sender = 0;
@@ -455,6 +454,7 @@ static void daemon_usage(enum logcode F)
   rprintf(F,"     --config=FILE           specify alternate rsyncd.conf file\n");
   rprintf(F,"     --no-detach             do not detach from the parent\n");
   rprintf(F,"     --port=PORT             listen on alternate port number\n");
+  rprintf(F," -v, --verbose               increase verbosity\n");
 #ifdef INET6
   rprintf(F," -4, --ipv4                  prefer IPv4\n");
   rprintf(F," -6, --ipv6                  prefer IPv6\n");
@@ -479,6 +479,7 @@ static struct poptOption long_daemon_options[] = {
   {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
   {"server",           0,  POPT_ARG_NONE,   &am_server, 0, 0, 0 },
+  {"verbose",         'v', POPT_ARG_NONE,   0, 'v', 0, 0 },
   {"help",            'h', POPT_ARG_NONE,   0, 'h', 0, 0 },
   {0,0,0,0, 0, 0, 0}
 };
@@ -622,6 +623,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				case 'h':
 					daemon_usage(FINFO);
 					exit_cleanup(0);
+
+				case 'v':
+					verbose++;
+					break;
 
 				default:
 					rprintf(FERROR,
