@@ -238,7 +238,7 @@ static int last_sparse;
 int sparse_end(int f)
 {
 	if (last_sparse) {
-		lseek(f,-1,SEEK_CUR);
+		do_lseek(f,-1,SEEK_CUR);
 		return (write(f,&last_byte,1) == 1 ? 0 : -1);
 	}
 	last_sparse = 0;
@@ -260,7 +260,7 @@ static int write_sparse(int f,char *buf,int len)
 		last_sparse=1;
 
 	if (l1 > 0)
-		lseek(f,l1,SEEK_CUR);  
+		do_lseek(f,l1,SEEK_CUR);  
 
 	if (l1 == len) 
 		return len;
@@ -271,7 +271,7 @@ static int write_sparse(int f,char *buf,int len)
 	}
 
 	if (l2 > 0)
-		lseek(f,l2,SEEK_CUR);
+		do_lseek(f,l2,SEEK_CUR);
 	
 	return len;
 }

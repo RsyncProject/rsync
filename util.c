@@ -83,7 +83,7 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
     map->p_size = len;
   }
 
-  if (lseek(map->fd,offset,SEEK_SET) != offset ||
+  if (do_lseek(map->fd,offset,SEEK_SET) != offset ||
       (nread=read(map->fd,map->p,len)) != len) {
 	  fprintf(FERROR,"EOF in map_ptr! (offset=%d len=%d nread=%d errno=%d)\n",
 		  (int)offset, len, nread, errno);

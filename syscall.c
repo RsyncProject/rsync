@@ -124,3 +124,12 @@ int do_fstat(int fd, STRUCT_STAT *st)
 	return fstat(fd, st);
 #endif
 }
+
+OFF_T do_lseek(int fd, OFF_T offset, int whence)
+{
+#if HAVE_OFF64_T
+	return lseek64(fd, offset, whence);
+#else
+	return lseek(fd, offset, whence);
+#endif
+}

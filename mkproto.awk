@@ -23,7 +23,7 @@ BEGIN {
   next;
 }
 
-!/^off_t|^pid_t|^unsigned|^mode_t|^DIR|^user|^int|^char|^uint|^struct|^BOOL|^void|^time/ {
+!/^OFF_T|^off_t|^pid_t|^unsigned|^mode_t|^DIR|^user|^int|^char|^uint|^struct|^BOOL|^void|^time/ {
   next;
 }
 
