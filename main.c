@@ -93,7 +93,6 @@ static void server_options(char **args,int *argc)
   int ac = *argc;
   static char argstr[50];
   static char bsize[30];
-  static char slength[30];
   int i, x;
 
   args[ac++] = "--server";
@@ -146,11 +145,6 @@ static void server_options(char **args,int *argc)
     args[ac++] = bsize;
   }    
 
-  if (csum_length != SUM_LENGTH) {
-    sprintf(slength,"--csum-length=%d",csum_length);
-    args[ac++] = slength;
-  }    
-  
   if (delete_mode)
     args[ac++] = "--delete";
 
@@ -417,7 +411,7 @@ static void usage(FILE *f)
 }
 
 enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
-      OPT_EXCLUDE_FROM,OPT_DELETE,OPT_RSYNC_PATH,OPT_CSUM_LENGTH};
+      OPT_EXCLUDE_FROM,OPT_DELETE,OPT_RSYNC_PATH};
 
 static char *short_options = "oblHpguDCtcahvrIxnSe:B:";
 
@@ -429,7 +423,6 @@ static struct option long_options[] = {
   {"exclude",     1,     0,    OPT_EXCLUDE},
   {"exclude-from",1,     0,    OPT_EXCLUDE_FROM},
   {"rsync-path",  1,     0,    OPT_RSYNC_PATH},
-  {"csum-length", 1,     0,    OPT_CSUM_LENGTH},
   {"one-file-system",0,  0,    'x'},
   {"ignore-times",0,     0,    'I'},
   {"help",        0,     0,    'h'},
@@ -470,8 +463,6 @@ int main(int argc,char *argv[])
 
     starttime = time(NULL);
 
-    checksum_init();
-
     while ((opt = getopt_long(argc, argv, 
 			      short_options, long_options, &option_index)) 
 	   != -1) {
@@ -488,11 +479,6 @@ int main(int argc,char *argv[])
 
 	case OPT_RSYNC_PATH:
 	  rsync_path = optarg;
-	  break;
-
-	case OPT_CSUM_LENGTH:
-	  csum_length = atoi(optarg);
-	  csum_length = MIN(csum_length,SUM_LENGTH);
 	  break;
 
 	case 'I':

@@ -24,6 +24,7 @@ int csum_length=SUM_LENGTH;
 #define CSUM_CHUNK 64
 
 int checksum_seed = 0;
+extern int remote_version;
 
 /*
   a simple 32 bit checksum that can be upadted from either end
@@ -127,6 +128,10 @@ void file_checksum(char *fname,char *sum,off_t size)
 
 void checksum_init(void)
 {
+  if (remote_version >= 14)
+    csum_length = 2; /* adaptive */
+  else
+    csum_length = SUM_LENGTH;
 }
 
 
@@ -180,22 +185,3 @@ void sum_end(char *sum)
 }
 
 
-#ifdef CHECKSUM_MAIN
- int main(int argc,char *argv[])
-{
-  char sum[SUM_LENGTH];
-  int i,j;
-
-  checksum_init();
-
-  for (i=1;i<argc;i++) {
-    struct stat st;
-    if (stat(argv[i],&st) == 0) {
-      file_checksum(argv[i],sum,st.st_size);
-      for (j=0;j<SUM_LENGTH;j++)
-	printf("%02X",(unsigned char)sum[j]);
-      printf("  %s\n",argv[i]);
-    }
-  }
-}
-#endif

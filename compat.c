@@ -217,5 +217,7 @@ void setup_protocol(int f_out,int f_in)
       checksum_seed = read_int(f_in);
     }
   }
+
+  checksum_init();
 }
 
