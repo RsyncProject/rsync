@@ -514,7 +514,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 			exit_cleanup(RERR_FILEIO);
 		}
 
-		if ((recv_ok && !delay_updates) || inplace) {
+		if ((recv_ok && (!delay_updates || !partialptr)) || inplace) {
 			finish_transfer(fname, fnametmp, file, recv_ok, 1);
 			if (partialptr != fname && fnamecmp == partialptr) {
 				do_unlink(partialptr);
