@@ -255,7 +255,7 @@ void start_accept_loop(int port, int (*fn)(int ))
 		   but I have had reports that on Digital Unix zombies
 		   are produced, so this ensures that they are reaped */
 #ifdef WNOHANG
-		waitpid(-1, NULL, WNOHANG);
+                while (waitpid(-1, NULL, WNOHANG) > 0);
 #endif
 
 		if (fork()==0) {
