@@ -458,7 +458,11 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 		if (fd1 != -1) {
 			close(fd1);
 		}
-		close(fd2);
+		if (close(fd2) < 0) {
+			rprintf(FERROR, "close failed on %s: %s\n",
+				full_fname(fnametmp), strerror(errno));
+			exit_cleanup(RERR_FILEIO);
+		}
 
 		if (verbose > 2)
 			rprintf(FINFO,"renaming %s to %s\n",fnametmp,fname);
