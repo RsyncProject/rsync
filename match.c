@@ -130,11 +130,15 @@ static void hash_search(int f,struct sum_struct *s,
 			struct map_struct *buf,OFF_T len)
 {
 	OFF_T offset;
-	int j,k;
+	int j,k, last_i;
 	int end;
 	char sum2[SUM_LENGTH];
 	uint32 s1, s2, sum; 
 	schar *map;
+
+	/* last_i is used to encourage adjacent matches, allowing the RLL coding of the
+	   output to work more efficiently */
+	last_i = -1;
 
 	if (verbose > 2)
 		rprintf(FINFO,"hash search b=%d len=%d\n",s->n,(int)len);
@@ -191,6 +195,22 @@ static void hash_search(int f,struct sum_struct *s,
 				false_alarms++;
 				continue;
 			}
+
+			/* we've found a match, but now check to see
+                           if last_i can hint at a better match */
+			for (j++; j<s->count && targets[j].t == t; j++) {
+				int i2 = targets[j].t;
+				if (i2 == last_i + 1) {
+					if (sum != s->sums[i2].sum1) break;
+					if (memcmp(sum2,s->sums[i2].sum2,csum_length) != 0) break;
+					/* we've found an adjacent match - the RLL coder 
+					   will be happy */
+					i = i2;
+					break;
+				}
+			}
+
+			last_i = i;
 			
 			matched(f,s,buf,offset,i);
 			offset += s->sums[i].len - 1;
