@@ -731,6 +731,8 @@ struct file_struct *make_file(char *fname,
 	char *basename, *dirname, *bp;
 	unsigned short flags = 0;
 
+	if (!flist)	/* lastdir isn't valid if flist is NULL */
+		lastdir_len = -1;
 
 	if (strlcpy(thisname, fname, sizeof thisname)
 	    >= sizeof thisname - flist_dir_len) {
