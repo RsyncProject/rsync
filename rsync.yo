@@ -497,9 +497,9 @@ See the section on exclude patterns for information on the syntax of
 this option.
 
 dit(bf(--exclude-from=FILE)) This option is similar to the --exclude
-option, but instead it adds all filenames listed in the file FILE to
-the exclude list.  Blank lines in FILE and lines starting with ';' or '#'
-are ignored.
+option, but instead it adds all exclude patterns listed in the file
+FILE to the exclude list.  Blank lines in FILE and lines starting with
+';' or '#' are ignored.
 
 dit(bf(--include=PATTERN)) This option tells rsync to not exclude the
 specified pattern of filenames. This is useful as it allows you to
