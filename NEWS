@@ -63,6 +63,11 @@ Changes since 2.6.3:
       file, we now flush any data in the write-cache before closing the
       partial file.
 
+    - Added support/atomic-rsync -- a perl script that will transfer some
+      files using rsync, and then move the updated files into place all at
+      once at the end of the transfer.  Only works when pulling, and uses
+      --link-dest.
+
   BUILD CHANGES:
 
     - Handle an operating system that use mkdev() in place of makedev().
