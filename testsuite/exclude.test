@@ -190,6 +190,7 @@ $RSYNC -av --del "$fromdir/" "$chkdir/"
 rm "$chkdir/bar/down/to/foo/file1.bak"
 rm "$chkdir/bar/down/to/foo/file3"
 rm "$chkdir/bar/down/to/foo/+ file3"
+$RSYNC -av --existing --filter='-! */' "$fromdir/" "$chkdir/"
 $RSYNC -av --delete-excluded --exclude='*' "$fromdir/" "$todir/"
 
 checkit "$RSYNC -avv -f dir-merge,-_.excl \
