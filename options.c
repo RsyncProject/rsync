@@ -720,7 +720,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 	if (files_from) {
 		char *colon;
-		if (*argc != 2) {
+		if (*argc != 2 && !(am_server && am_sender && *argc == 1)) {
 			usage(FERROR);
 			exit_cleanup(RERR_SYNTAX);
 		}
