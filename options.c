@@ -171,6 +171,10 @@ static void print_rsync_version(enum logcode f)
 		ipv6, 
 		(int) (sizeof(dumstat->st_ino) * 8),
 		(int) (sizeof(INO64_T) * 8));
+#ifdef MAINTAINER_MODE
+	rprintf(f, "              panic action: \"%s\"\n",
+		get_panic_action());
+#endif
 
 #ifdef NO_INT64
         rprintf(f, "WARNING: no 64-bit integers on this platform!\n");
