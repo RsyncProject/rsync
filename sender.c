@@ -20,14 +20,15 @@
 #include "rsync.h"
 
 extern int verbose;
+extern int dry_run;
 extern int log_before_transfer;
-extern int itemize_changes;
+extern int log_format_has_i;
+extern int daemon_log_format_has_i;
+extern int am_server;
+extern int am_daemon;
 extern int csum_length;
 extern struct stats stats;
 extern int io_error;
-extern int dry_run;
-extern int am_server;
-extern int am_daemon;
 extern int protocol_version;
 extern int updating_basis_file;
 extern int make_backups;
@@ -112,6 +113,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 	int phase = 0;
 	struct stats initial_stats;
 	int save_make_backups = make_backups;
+	int itemizing = am_daemon ? daemon_log_format_has_i
+		      : !am_server && log_format_has_i;
 	int i, j;
 
 	if (verbose > 2)
@@ -143,18 +146,31 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		}
 
 		file = flist->files[i];
+		if (file->dir.root) {
+			/* N.B. We're sure that this fits, so offset is OK. */
+			offset = strlcpy(fname, file->dir.root, sizeof fname);
+			if (!offset || fname[offset-1] != '/')
+				fname[offset++] = '/';
+		} else
+			offset = 0;
+		fname2 = f_name_to(file, fname + offset);
+
+		if (verbose > 2)
+			rprintf(FINFO, "send_files(%d, %s)\n", i, fname);
 
 		if (protocol_version >= 29) {
 			iflags = read_shortint(f_in);
 			if (!(iflags & ITEM_UPDATING) || !S_ISREG(file->mode)) {
+				int see_item = itemizing && (iflags || verbose > 1);
+				write_int(f_out, i);
+				write_shortint(f_out, iflags);
 				if (am_server) {
-					write_int(f_out, i);
-					write_shortint(f_out, iflags);
-				} else if (itemize_changes || verbose > 1
-				    || iflags & ITEM_UPDATING
+					if (am_daemon && !dry_run && see_item)
+						log_recv(file, &stats, iflags);
+				} else if (see_item || iflags & ITEM_UPDATING
 				    || (S_ISDIR(file->mode)
 				     && iflags & ITEM_REPORT_TIME))
-					log_send(file, &stats, iflags);
+					log_recv(file, &stats, iflags);
 				continue;
 			}
 		} else
@@ -175,18 +191,6 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		stats.current_file_index = i;
 		stats.num_transferred_files++;
 		stats.total_transferred_size += file->length;
-
-		if (file->dir.root) {
-			/* N.B. We're sure that this fits, so offset is OK. */
-			offset = strlcpy(fname, file->dir.root, sizeof fname);
-			if (!offset || fname[offset-1] != '/')
-				fname[offset++] = '/';
-		} else
-			offset = 0;
-		fname2 = f_name_to(file, fname + offset);
-
-		if (verbose > 2)
-			rprintf(FINFO, "send_files(%d, %s)\n", i, fname);
 
 		if (dry_run) { /* log the transfer */
 			if (!am_server && log_format)
