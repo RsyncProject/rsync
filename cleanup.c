@@ -30,10 +30,13 @@ static struct file_struct *cleanup_file;
 static int cleanup_fd1, cleanup_fd2;
 static struct map_struct *cleanup_buf;
 static int cleanup_pid = 0;
+extern int io_error;
 
 void _exit_cleanup(int code, const char *file, int line)
 {
 	extern int keep_partial;
+
+	if (code == 0 && io_error) code = RERR_FILEIO;
 
 	signal(SIGUSR1, SIG_IGN);
 
