@@ -55,10 +55,6 @@ Changes since 2.6.0:
       directory's .cvsignore file once again only affect that one
       directory (and not all following directories too).
 
-    * When transferring a file that has group 0 with -g specified
-      (typically via -a) and not enough privs to retain the group,
-      rsync no longer complains about "chown" failing.
-
     * When specifying the USER@HOST: prefix for a file, the USER
       part can now contain an '@', if needed (i.e. the last '@'
       is used to find the HOST, not the first).
@@ -123,6 +119,15 @@ Changes since 2.6.0:
 
     * Less memory is used in the file list (a per-file savings).
 
+    * The generator is now better about not modifying the file list
+      during the transfer in order to avoid a copy-on-write memory
+      bifurcation (on systems where fork() uses shared memory).
+      Previously, rsync's shared memory would slowly become unshared,
+      resulting in real memory usage nearly doubling on the receiving
+      side by the end of the transfer.  Now, as long as permissions
+      are being preserved, the shared memory should remain that way
+      for the entire transfer.
+
     * Changed hardlink info and file_struct + strings to use
       allocation pools.  This reduces memory use for large
       filesets and permits freeing memory to the OS.  (J.W. Schultz) 
@@ -135,7 +140,7 @@ Changes since 2.6.0:
       the generator over to the sender (the latter mainly affected
       hard-link messages and verbose --stats output).
 
-    * The reading & writing of the file list in batch-mode is now
+    * The reading & writing of the file-list in batch-mode is now
       handled by the same code that sends & receives the list over
       the wire.  This makes it much easier to maintain.
 
