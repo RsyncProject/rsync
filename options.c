@@ -125,7 +125,7 @@ static void print_rsync_version(int f)
                 hardlinks, links);
 
 #ifdef NO_INT64
-        rprintf(logcode, "WARNING: no 64-bit integers on this platform!\n");
+        rprintf(f, "WARNING: no 64-bit integers on this platform!\n");
 #endif
 }
 
@@ -361,8 +361,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
         /* The context leaks in case of an error, but if there's a
          * problem we always exit anyhow. */
-        pc = poptGetContext(RSYNC_NAME, *argc, (const char **) *argv,
-                            long_options, 0);
+        pc = poptGetContext(RSYNC_NAME, *argc, *argv, long_options, 0);
 
 	while ((opt = poptGetNextOpt(pc)) != -1) {
 		if (ref) {
