@@ -357,8 +357,9 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 			if (!dry_run) send_sums(NULL,f_out);
 		} else {
 			if (verbose > 1)
-				rprintf(FERROR,RSYNC_NAME": recv_generator failed to open \%s\": %s\n",fname,
-					strerror(errno));
+				rprintf(FERROR, RSYNC_NAME
+					": recv_generator failed to open \"%s\": %s\n",
+					fname, strerror(errno));
 		}
 		return;
 	}
