@@ -166,16 +166,22 @@ checkit() {
     fi
 
     echo "-------------"
-    echo "check how the files compare with diff:"
-    echo ""
-    diff -r $diffopt "$2" "$3" || failed=YES
-
-    echo "-------------"
     echo "check how the directory listings compare with diff:"
     echo ""
     ( cd "$2" && rsync_ls_lR . ) > "$tmpdir/ls-from"
     ( cd "$3" && rsync_ls_lR . ) > "$tmpdir/ls-to"
     diff $diffopt "$tmpdir/ls-from" "$tmpdir/ls-to" || failed=YES
+
+    echo "-------------"
+    echo "check how the files compare with diff:"
+    echo ""
+    if [ "x$4" != x ]; then
+	echo "  === Skipping (as directed) ==="
+    else
+	diff -r $diffopt "$2" "$3" || failed=YES
+    fi
+
+    echo "-------------"
     if [ -z "$failed" ] ; then
 	return 0
     else
