@@ -637,22 +637,15 @@ int vslprintf(char *str, int n, const char *format, va_list ap)
 		}
 	}
 
-	ret = vsprintf(buf, format, ap);
-
-	if (ret < 0) {
-		str[0] = 0;
-		return -1;
+	vsprintf(buf, format, ap);
+	ret = strlen(buf);
+	if (ret > n) {
+		/* yikes! */
+		exit(1);
 	}
-
-	if (ret < n) {
-		n = ret;
-	} else if (ret > n) {
-		ret = -1;
-	}
-
-	buf[n] = 0;
+	buf[ret] = 0;
 	
-	memcpy(str, buf, n+1);
+	memcpy(str, buf, ret+1);
 
 	return ret;
 #endif
