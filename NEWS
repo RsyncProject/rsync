@@ -21,6 +21,9 @@ Changes since 2.6.0:
     * The configure script now accepts --with-rsyncd-conf=PATH
       to override the default value of the /etc/rsyncd.conf file.
 
+    * Added a couple extra diffs in the "patches" dir, removed the
+      ones that got applied, and rebuilt the rest.
+
   BUG FIXES:
 
     * When -x (--one-file-system) is combined with -L (--copy-links)
