@@ -51,7 +51,8 @@ static void make_mask(char *mask, int plen, int addrlen) {
 
 	if (w)
 		memset(mask, 0xff, w);
-	mask[w] = 0xff & (0xff<<(8-b));
+	if (w < addrlen)
+		mask[w] = 0xff & (0xff<<(8-b));
 	if (w+1 < addrlen)
 		memset(mask+w+1, 0, addrlen-w-1);
 
@@ -121,6 +122,8 @@ static int match_address(char *addr, char *tok)
 		a = (char *)&sin6a->sin6_addr;
 		t = (char *)&sin6t->sin6_addr;
 
+		addrlen = 16;
+
 #ifdef HAVE_SOCKADDR_IN6_SCOPE_ID
 		if (sin6t->sin6_scope_id &&
 		    sin6a->sin6_scope_id != sin6t->sin6_scope_id) {
@@ -128,10 +131,6 @@ static int match_address(char *addr, char *tok)
 			goto out;
 		}
 #endif
-
-		a = (char *)&sin6a->sin6_addr;
-		t = (char *)&sin6t->sin6_addr;
-		addrlen = 16;
 
 		break;
 	    }
