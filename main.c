@@ -1013,6 +1013,8 @@ int main(int argc,char *argv[])
 	 * that implement getcwd that way "pwd" can't be found after chroot. */
 	push_dir(NULL);
 
+	init_flist();
+
 	if (write_batch && !am_server) {
 		write_batch_argvs_file(orig_argc, orig_argv);
 	}
@@ -1027,13 +1029,6 @@ int main(int argc,char *argv[])
 
 	if (dry_run)
 		verbose = MAX(verbose,1);
-
-#ifndef SUPPORT_LINKS
-	if (!am_server && preserve_links) {
-		rprintf(FERROR,"ERROR: symbolic links not supported\n");
-		exit_cleanup(RERR_UNSUPPORTED);
-	}
-#endif
 
 	if (am_server) {
 		set_nonblocking(STDIN_FILENO);
