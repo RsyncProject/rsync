@@ -25,6 +25,7 @@
 extern int verbose;
 extern int dry_run;
 extern int preserve_times;
+extern int preserve_dir_times;
 extern int am_root;
 extern int am_server;
 extern int am_sender;
@@ -123,7 +124,7 @@ int delete_file(char *fname)
 }
 
 int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
-		int report)
+	      int flags)
 {
 	int updated = 0;
 	STRUCT_STAT st2;
@@ -140,8 +141,10 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 		st = &st2;
 	}
 
-	if (preserve_times && !S_ISLNK(st->st_mode) &&
-	    cmp_modtime(st->st_mtime, file->modtime) != 0) {
+	if (!preserve_times || S_ISLNK(st->st_mode))
+		flags |= PERMS_SKIP_TIME;
+	if (!(flags & PERMS_SKIP_TIME)
+	    && cmp_modtime(st->st_mtime, file->modtime) != 0) {
 		/* don't complain about not setting times on directories
 		 * because some filesystems can't do it */
 		if (set_modtime(fname,file->modtime) != 0 &&
@@ -201,7 +204,7 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	}
 #endif
 
-	if (verbose > 1 && report) {
+	if (verbose > 1 && flags & PERMS_REPORT) {
 		if (updated)
 			rprintf(FINFO,"%s\n",fname);
 		else
@@ -228,7 +231,8 @@ void sig_int(void)
 
 /* finish off a file transfer, renaming the file and setting the permissions
    and ownership */
-void finish_transfer(char *fname, char *fnametmp, struct file_struct *file)
+void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
+		     int ok_to_set_time)
 {
 	int ret;
 
@@ -243,7 +247,8 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file)
 		    full_fname(fnametmp), fname, strerror(errno));
 		do_unlink(fnametmp);
 	} else {
-		set_perms(fname,file,NULL,0);
+		set_perms(fname, file, NULL,
+			  ok_to_set_time ? 0 : PERMS_SKIP_TIME);
 	}
 }
 
