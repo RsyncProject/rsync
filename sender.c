@@ -137,7 +137,6 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 			offset = strlen(file->basedir)+1;
 		}
 		strlcat(fname,f_name(file),MAXPATHLEN-strlen(fname));
-		clean_fname(fname);
 	  
 		if (verbose > 2) 
 			rprintf(FINFO,"send_files(%d,%s)\n",i,fname);
