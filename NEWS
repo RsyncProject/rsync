@@ -12,6 +12,13 @@ Changes since 2.6.3:
       sides are 2.6.4, or if the local side is 2.6.4 and the files are
       being pushed (since the stats come from the sending side).
       (Requires protocol 29 for a pull.)
+
+    - The default "log format" for a daemon rsync with "transfer logging"
+      enabled has changed to put the file size prior to the file name and
+      also to add the destination of a symlink (e.g. "foo -> bar").  The
+      rsyncstats perl script was updated to handle this (it's now in the
+      "support" directory).  If you depend on the old format, just set it
+      in your rsyncd.conf file.
   
   BUG FIXES:
 
