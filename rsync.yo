@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsync)(1)(1 Mar 1999)()()
+manpage(rsync)(1)(5 Jan 2001)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
@@ -489,6 +489,8 @@ like to instead use ssh because of its high security.
 You can also choose the remote shell program using the RSYNC_RSH
 environment variable.
 
+See also the --blocking-io option which is affected by this option.
+
 dit(bf(--rsync-path=PATH)) Use this to specify the path to the copy of
 rsync on the remote machine. Useful when it's not in your path. Note
 that this is the full path to the binary, not just the directory that
@@ -620,10 +622,11 @@ specified.
 dit(bf(--port=PORT)) This specifies an alternate TCP port number to use
 rather than the default port 873.
 
-dit(bf(--blocking-io)) This specifies whether rsync will use blocking
-IO when launching a remote shell transport. You may find this is
-needed for some remote shells that can't handle the default
-non-blocking IO.
+dit(bf(--blocking-io)) This tells rsync to use blocking IO when launching
+a remote shell transport.  If -e or --rsh are not specified or are set to
+the default "rsh", this defaults to blocking IO, otherwise it defaults to
+non-blocking IO.  You may find the --blocking-io option is needed for some
+remote shells that can't handle non-blocking IO.  Ssh prefers blocking IO.
 
 dit(bf(--log-format=FORMAT)) This allows you to specify exactly what the
 rsync client logs to stdout on a per-file basis. The log format is
