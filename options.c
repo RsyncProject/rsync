@@ -65,15 +65,16 @@ int protocol_version = PROTOCOL_VERSION;
 int sparse_files = 0;
 int do_compression = 0;
 int am_root = 0;
+int am_server = 0;
+int am_sender = 0;
+int am_generator = 0;
+int am_starting_up = 1;
 int orig_umask = 0;
 int relative_paths = -1;
 int implied_dirs = 1;
 int numeric_ids = 0;
 int force_delete = 0;
 int io_timeout = 0;
-int am_server = 0;
-int am_sender = -1;
-int am_generator = 0;
 char *files_from = NULL;
 int filesfrom_fd = -1;
 char *remote_filesfrom_file = NULL;
@@ -695,6 +696,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			}
 			*argv = poptGetArgs(pc);
 			*argc = count_args(*argv);
+			am_starting_up = 0;
 			daemon_opt = 0;
 			am_daemon = 1;
 			return 1;
@@ -866,9 +868,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			return 0;
 		}
 	}
-
-	if (am_sender < 0)
-		am_sender = 0;
 
 #ifndef SUPPORT_LINKS
 	if (preserve_links && !am_sender) {
@@ -1193,6 +1192,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			}
 		}
 	}
+
+	am_starting_up = 0;
 
 	return 1;
 }
