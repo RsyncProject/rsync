@@ -803,6 +803,11 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
       if (file->dir) {
 	strncpy(fname,file->dir,MAXPATHLEN-1);
 	fname[MAXPATHLEN-1] = 0;
+      if (strlen(fname) == MAXPATHLEN-1) {
+        fprintf(FERROR, "send_files failed on long-named directory %s\n",
+                fname);
+        return -1;
+      }
 	strcat(fname,"/");
       }
       strncat(fname,file->name,MAXPATHLEN-strlen(fname));
