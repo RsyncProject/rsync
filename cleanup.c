@@ -118,7 +118,7 @@ void _exit_cleanup(int code, const char *file, int line)
 		if (cleanup_fd2 != -1) close(cleanup_fd2);
 		finish_transfer(cleanup_new_fname, fname, cleanup_file);
 	}
-	io_flush();
+	io_flush(FULL_FLUSH);
 	if (cleanup_fname)
 		do_unlink(cleanup_fname);
 	if (code) {
