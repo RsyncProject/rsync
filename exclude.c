@@ -270,8 +270,11 @@ void send_exclude_list(int f)
 	}
 
 	for (i=0;exclude_list[i];i++) {
-		char *pattern = exclude_list[i]->pattern; 
 		int l;
+		char pattern[MAXPATHLEN];
+
+		strlcpy(pattern,exclude_list[i]->pattern,sizeof(pattern)); 
+		if (exclude_list[i]->directory) strlcat(pattern,"/", sizeof(pattern));
 
 		l = strlen(pattern);
 		if (l == 0) continue;

@@ -650,6 +650,10 @@ skipped. If it is an include pattern then that filename is not
 skipped. If no matching include/exclude pattern is found then the
 filename is not skipped.
 
+Note that the --include and --exclude options take one pattern
+each. To add multiple patterns use the --include-from and
+--exclude-from options or multiple --include and --exclude options. 
+
 The patterns can take several forms. The rules are:
 
 itemize(
