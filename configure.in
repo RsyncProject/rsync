@@ -28,6 +28,7 @@ AC_TYPE_OFF_T
 AC_TYPE_SIZE_T
 AC_TYPE_PID_T
 AC_STRUCT_ST_RDEV
+AC_CHECK_TYPE(ino_t,unsigned)
 
 echo $ac_n "checking for errno in errno.h... $ac_c"
 AC_TRY_COMPILE([#include <errno.h>],[int i = errno],
@@ -38,7 +39,7 @@ AC_FUNC_MEMCMP
 AC_FUNC_MMAP
 AC_FUNC_UTIME_NULL
 AC_CHECK_FUNCS(waitpid strtok pipe getcwd mkdir strdup strerror chown chmod mknod)
-AC_CHECK_FUNCS(fchmod fstat strchr bcopy bzero readlink utime utimes)
+AC_CHECK_FUNCS(fchmod fstat strchr bcopy bzero readlink link utime utimes)
 AC_CHECK_FUNCS(memmove getopt_long)
 
 echo $ac_n "checking for working fnmatch... $ac_c"

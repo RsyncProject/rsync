@@ -43,7 +43,7 @@ void send_file_entry_v10(struct file_struct *file,int f)
 {
   unsigned char flags;
   static mode_t last_mode=0;
-  static dev_t last_dev=0;
+  static dev_t last_rdev=0;
   static uid_t last_uid=0;
   static gid_t last_gid=0;
   static char lastdir[MAXPATHLEN]="";
@@ -59,7 +59,7 @@ void send_file_entry_v10(struct file_struct *file,int f)
   flags = FILE_VALID;
 
   if (file->mode == last_mode) flags |= SAME_MODE;
-  if (file->dev == last_dev) flags |= SAME_DEV;
+  if (file->rdev == last_rdev) flags |= SAME_RDEV;
   if (file->uid == last_uid) flags |= SAME_UID;
   if (file->gid == last_gid) flags |= SAME_GID;
     
@@ -84,8 +84,8 @@ void send_file_entry_v10(struct file_struct *file,int f)
     write_int(f,(int)file->uid);
   if (preserve_gid && !(flags & SAME_GID))
     write_int(f,(int)file->gid);
-  if (preserve_devices && IS_DEVICE(file->mode) && !(flags & SAME_DEV))
-    write_int(f,(int)file->dev);
+  if (preserve_devices && IS_DEVICE(file->mode) && !(flags & SAME_RDEV))
+    write_int(f,(int)file->rdev);
 
 #if SUPPORT_LINKS
   if (preserve_links && S_ISLNK(file->mode)) {
@@ -99,7 +99,7 @@ void send_file_entry_v10(struct file_struct *file,int f)
   }       
 
   last_mode = file->mode;
-  last_dev = file->dev;
+  last_rdev = file->rdev;
   last_uid = file->uid;
   last_gid = file->gid;
   p = strrchr(file->name,'/');
@@ -118,7 +118,7 @@ void receive_file_entry_v10(struct file_struct *file,
 			    unsigned char flags,int f)
 {
   static mode_t last_mode=0;
-  static dev_t last_dev=0;
+  static dev_t last_rdev=0;
   static uid_t last_uid=0;
   static gid_t last_gid=0;
   static char lastdir[MAXPATHLEN]="";
@@ -148,7 +148,7 @@ void receive_file_entry_v10(struct file_struct *file,
   if (preserve_gid)
     file->gid = (flags & SAME_GID) ? last_gid : (gid_t)read_int(f);
   if (preserve_devices && IS_DEVICE(file->mode))
-    file->dev = (flags & SAME_DEV) ? last_dev : (dev_t)read_int(f);
+    file->rdev = (flags & SAME_RDEV) ? last_rdev : (dev_t)read_int(f);
 
 #if SUPPORT_LINKS
   if (preserve_links && S_ISLNK(file->mode)) {
@@ -164,7 +164,7 @@ void receive_file_entry_v10(struct file_struct *file,
     read_buf(f,file->sum,csum_length);
   
   last_mode = file->mode;
-  last_dev = file->dev;
+  last_rdev = file->rdev;
   last_uid = file->uid;
   last_gid = file->gid;
   p = strrchr(file->name,'/');

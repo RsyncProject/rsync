@@ -86,7 +86,7 @@ void add_exclude_list(char *pattern,char ***list)
 
   if (strcmp(pattern,"!") == 0) {
     if (verbose > 2)
-      fprintf(stderr,"clearing exclude list\n");
+      fprintf(FERROR,"clearing exclude list\n");
     while ((len)--) 
       free((*list)[len]);
     free((*list));
@@ -104,7 +104,7 @@ void add_exclude_list(char *pattern,char ***list)
     out_of_memory("add_exclude");
 
   if (verbose > 2)
-    fprintf(stderr,"add_exclude(%s)\n",pattern);
+    fprintf(FERROR,"add_exclude(%s)\n",pattern);
   
   (*list)[len+1] = NULL;
 }
@@ -121,7 +121,7 @@ char **make_exclude_list(char *fname,char **list1,int fatal)
   char line[MAXPATHLEN];
   if (!f) {
     if (fatal) {
-      fprintf(stderr,"%s : %s\n",fname,strerror(errno));
+      fprintf(FERROR,"%s : %s\n",fname,strerror(errno));
       exit_cleanup(1);
     }
     return list;

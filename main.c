@@ -31,6 +31,7 @@ static char *rsync_path = RSYNC_NAME;
 
 int make_backups = 0;
 int preserve_links = 0;
+int preserve_hard_links = 0;
 int preserve_perms = 0;
 int preserve_devices = 0;
 int preserve_uid = 0;
@@ -44,6 +45,7 @@ int ignore_times=0;
 int delete_mode=0;
 int one_file_system=0;
 int remote_version=0;
+int sparse_files=0;
 extern int csum_length;
 
 int am_server = 0;
@@ -109,6 +111,8 @@ static void server_options(char **args,int *argc)
     argstr[x++] = 'n';
   if (preserve_links)
     argstr[x++] = 'l';
+  if (preserve_hard_links)
+    argstr[x++] = 'H';
   if (preserve_uid)
     argstr[x++] = 'o';
   if (preserve_gid)
@@ -129,6 +133,8 @@ static void server_options(char **args,int *argc)
     argstr[x++] = 'I';
   if (one_file_system)
     argstr[x++] = 'x';
+  if (sparse_files)
+    argstr[x++] = 'S';
   argstr[x] = 0;
 
   if (x != 1) args[ac++] = argstr;
@@ -199,10 +205,10 @@ int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f_out)
   args[argc] = NULL;
 
   if (verbose > 3) {
-    fprintf(stderr,"cmd=");
+    fprintf(FERROR,"cmd=");
     for (i=0;i<argc;i++)
-      fprintf(stderr,"%s ",args[i]);
-    fprintf(stderr,"\n");
+      fprintf(FERROR,"%s ",args[i]);
+    fprintf(FERROR,"\n");
   }
 
   return piped_child(args,f_in,f_out);
@@ -222,13 +228,13 @@ static char *get_local_name(struct file_list *flist,char *name)
   if (stat(name,&st) == 0) {
     if (S_ISDIR(st.st_mode)) {
       if (chdir(name) != 0) {
-	fprintf(stderr,"chdir %s : %s\n",name,strerror(errno));
+	fprintf(FERROR,"chdir %s : %s\n",name,strerror(errno));
 	exit_cleanup(1);
       }
       return NULL;
     }
     if (flist->count > 1) {
-      fprintf(stderr,"ERROR: destination must be a directory when copying more than 1 file\n");
+      fprintf(FERROR,"ERROR: destination must be a directory when copying more than 1 file\n");
       exit_cleanup(1);
     }
     return name;
@@ -241,14 +247,14 @@ static char *get_local_name(struct file_list *flist,char *name)
     return NULL;
 
   if (mkdir(name,0777) != 0) {
-    fprintf(stderr,"mkdir %s : %s\n",name,strerror(errno));
+    fprintf(FERROR,"mkdir %s : %s\n",name,strerror(errno));
     exit_cleanup(1);
   } else {
-    fprintf(am_server?stderr:stdout,"created directory %s\n",name);
+    fprintf(FINFO,"created directory %s\n",name);
   }
 
   if (chdir(name) != 0) {
-    fprintf(stderr,"chdir %s : %s\n",name,strerror(errno));
+    fprintf(FERROR,"chdir %s : %s\n",name,strerror(errno));
     exit_cleanup(1);
   }
 
@@ -265,10 +271,10 @@ void do_server_sender(int argc,char *argv[])
   struct file_list *flist;
 
   if (verbose > 2)
-    fprintf(stderr,"server_sender starting pid=%d\n",(int)getpid());
+    fprintf(FERROR,"server_sender starting pid=%d\n",(int)getpid());
   
   if (chdir(dir) != 0) {
-    fprintf(stderr,"chdir %s: %s\n",dir,strerror(errno));
+    fprintf(FERROR,"chdir %s: %s\n",dir,strerror(errno));
     exit_cleanup(1);
   }
   argc--;
@@ -294,23 +300,47 @@ void do_server_sender(int argc,char *argv[])
 }
 
 
+static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
+{
+  int pid;
+  int status=0;
+
+  if (preserve_hard_links)
+    init_hard_links(flist);
+
+  if ((pid=fork()) == 0) {
+    recv_files(f_in,flist,local_name);
+    if (preserve_hard_links)
+      do_hard_links(flist);
+    if (verbose > 2)
+      fprintf(FERROR,"receiver read %d\n",read_total());
+    exit_cleanup(0);
+  }
+
+  generate_files(f_out,flist,local_name);
+
+  waitpid(pid, &status, 0);
+
+  return status;
+}
+
 
 void do_server_recv(int argc,char *argv[])
 {
-  int pid,status;
+  int status;
   char *dir = NULL;
   struct file_list *flist;
   char *local_name=NULL;
   
   if (verbose > 2)
-    fprintf(stderr,"server_recv(%d) starting pid=%d\n",argc,(int)getpid());
+    fprintf(FERROR,"server_recv(%d) starting pid=%d\n",argc,(int)getpid());
 
   if (argc > 0) {
     dir = argv[0];
     argc--;
     argv++;
     if (chdir(dir) != 0) {
-      fprintf(stderr,"chdir %s : %s\n",dir,strerror(errno));
+      fprintf(FERROR,"chdir %s : %s\n",dir,strerror(errno));
       exit_cleanup(1);
     }    
   }
@@ -320,7 +350,7 @@ void do_server_recv(int argc,char *argv[])
 
   flist = recv_file_list(STDIN_FILENO);
   if (!flist || flist->count == 0) {
-    fprintf(stderr,"nothing to do\n");
+    fprintf(FERROR,"nothing to do\n");
     exit_cleanup(1);
   }
 
@@ -332,16 +362,7 @@ void do_server_recv(int argc,char *argv[])
     local_name = get_local_name(flist,argv[0]);
   }
 
-  if ((pid=fork()) == 0) {
-    recv_files(STDIN_FILENO,flist,local_name);
-    if (verbose > 2)
-      fprintf(stderr,"receiver read %d\n",read_total());
-    exit_cleanup(0);
-  }
-
-  generate_files(STDOUT_FILENO,flist,local_name);
-
-  waitpid(pid, &status, 0);
+  status = do_recv(STDIN_FILENO,STDOUT_FILENO,flist,local_name);
   exit_cleanup(status);
 }
 
@@ -360,11 +381,13 @@ static void usage(FILE *f)
   fprintf(f,"-b, --backup             make backups (default ~ extension)\n");
   fprintf(f,"-u, --update             update only (don't overwrite newer files)\n");
   fprintf(f,"-l, --links              preserve soft links\n");
+  fprintf(f,"-H, --hard-links         preserve hard links\n");
   fprintf(f,"-p, --perms              preserve permissions\n");
   fprintf(f,"-o, --owner              preserve owner (root only)\n");
   fprintf(f,"-g, --group              preserve group\n");
   fprintf(f,"-D, --devices            preserve devices (root only)\n");
   fprintf(f,"-t, --times              preserve times\n");  
+  fprintf(f,"-S, --sparse             handle sparse files efficiently\n");
   fprintf(f,"-n, --dry-run            show what would have been transferred\n");
   fprintf(f,"-x, --one-file-system    don't cross filesystem boundaries\n");
   fprintf(f,"-B, --block-size SIZE    checksum blocking size\n");  
@@ -387,7 +410,7 @@ static void usage(FILE *f)
 enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
       OPT_EXCLUDE_FROM,OPT_DELETE,OPT_RSYNC_PATH,OPT_CSUM_LENGTH};
 
-static char *short_options = "oblpguDCtcahvrIxne:B:";
+static char *short_options = "oblHpguDCtcahvrIxnSe:B:";
 
 static struct option long_options[] = {
   {"version",     0,     0,    OPT_VERSION},
@@ -402,6 +425,7 @@ static struct option long_options[] = {
   {"ignore-times",0,     0,    'I'},
   {"help",        0,     0,    'h'},
   {"dry-run",     0,     0,    'n'},
+  {"sparse",      0,     0,    'S'},
   {"cvs-exclude", 0,     0,    'C'},
   {"archive",     0,     0,    'a'},
   {"checksum",    0,     0,    'c'},
@@ -412,6 +436,7 @@ static struct option long_options[] = {
   {"devices",     0,     0,    'D'},
   {"perms",       0,     0,    'p'},
   {"links",       0,     0,    'l'},
+  {"hard-links",  0,     0,    'H'},
   {"owner",       0,     0,    'o'},
   {"group",       0,     0,    'g'},
   {"times",       0,     0,    't'},
@@ -422,7 +447,7 @@ static struct option long_options[] = {
 
 int main(int argc,char *argv[])
 {
-    int pid, status, pid2, status2;
+    int pid, status, status2;
     int opt;
     int option_index;
     char *shell_cmd = NULL;
@@ -482,7 +507,7 @@ int main(int argc,char *argv[])
 	  break;
 
 	case 'h':
-	  usage(stdout);
+	  usage(FINFO);
 	  exit_cleanup(0);
 
 	case 'b':
@@ -493,6 +518,10 @@ int main(int argc,char *argv[])
 	  dry_run=1;
 	  break;
 
+	case 'S':
+	  sparse_files=1;
+	  break;
+
 	case 'C':
 	  cvs_exclude=1;
 	  break;
@@ -501,11 +530,17 @@ int main(int argc,char *argv[])
 	  update_only=1;
 	  break;
 
-#if SUPPORT_LINKS
 	case 'l':
+#if SUPPORT_LINKS
 	  preserve_links=1;
-	  break;
 #endif
+	  break;
+
+	case 'H':
+#if SUPPORT_HARD_LINKS
+	  preserve_hard_links=1;
+#endif
+	  break;
 
 	case 'p':
 	  preserve_perms=1;
@@ -515,7 +550,7 @@ int main(int argc,char *argv[])
 	  if (getuid() == 0) {
 	    preserve_uid=1;
 	  } else {
-	    fprintf(stderr,"-o only allowed for root\n");
+	    fprintf(FERROR,"-o only allowed for root\n");
 	    exit_cleanup(1);
 	  }
 	  break;
@@ -528,7 +563,7 @@ int main(int argc,char *argv[])
 	  if (getuid() == 0) {
 	    preserve_devices=1;
 	  } else {
-	    fprintf(stderr,"-D only allowed for root\n");
+	    fprintf(FERROR,"-D only allowed for root\n");
 	    exit_cleanup(1);
 	  }
 	  break;
@@ -565,7 +600,7 @@ int main(int argc,char *argv[])
 
 	case OPT_SENDER:
 	  if (!am_server) {
-	    usage(stderr);
+	    usage(FERROR);
 	    exit_cleanup(1);
 	  }
 	  sender = 1;
@@ -584,7 +619,7 @@ int main(int argc,char *argv[])
 	  break;
 
 	default:
-	  fprintf(stderr,"bad option -%c\n",opt);
+	  fprintf(FERROR,"bad option -%c\n",opt);
 	  exit_cleanup(1);
 	}
     }
@@ -606,7 +641,7 @@ int main(int argc,char *argv[])
       remote_version = read_int(STDIN_FILENO);
       if (remote_version < MIN_PROTOCOL_VERSION ||
 	  remote_version > MAX_PROTOCOL_VERSION) {
-	fprintf(stderr,"protocol version mismatch - is your shell clean?\n");
+	fprintf(FERROR,"protocol version mismatch - is your shell clean?\n");
 	exit_cleanup(1);
       }
       write_int(STDOUT_FILENO,PROTOCOL_VERSION);
@@ -626,7 +661,7 @@ int main(int argc,char *argv[])
     }
 
     if (argc < 2) {
-      usage(stderr);
+      usage(FERROR);
       exit_cleanup(1);
     }
 
@@ -668,7 +703,7 @@ int main(int argc,char *argv[])
     }
 
     if (verbose > 3) {
-      fprintf(stderr,"cmd=%s machine=%s user=%s path=%s\n",
+      fprintf(FERROR,"cmd=%s machine=%s user=%s path=%s\n",
 	      shell_cmd?shell_cmd:"",
 	      shell_machine?shell_machine:"",
 	      shell_user?shell_user:"",
@@ -676,7 +711,7 @@ int main(int argc,char *argv[])
     }
     
     if (!sender && argc != 1) {
-      usage(stderr);
+      usage(FERROR);
       exit_cleanup(1);
     }
 
@@ -688,7 +723,7 @@ int main(int argc,char *argv[])
       remote_version = read_int(f_in);
       if (remote_version < MIN_PROTOCOL_VERSION ||
 	  remote_version > MAX_PROTOCOL_VERSION) {
-	fprintf(stderr,"protocol version mismatch - is your shell clean?\n");
+	fprintf(FERROR,"protocol version mismatch - is your shell clean?\n");
 	exit_cleanup(1);
       }	
     }
@@ -696,7 +731,7 @@ int main(int argc,char *argv[])
     setup_protocol();
 
     if (verbose > 3) 
-      fprintf(stderr,"parent=%d child=%d sender=%d recurse=%d\n",
+      fprintf(FERROR,"parent=%d child=%d sender=%d recurse=%d\n",
 	      (int)getpid(),pid,sender,recurse);
 
     if (sender) {
@@ -706,10 +741,10 @@ int main(int argc,char *argv[])
 	send_exclude_list(f_out);
       flist = send_file_list(f_out,recurse,argc,argv);
       if (verbose > 3) 
-	fprintf(stderr,"file list sent\n");
+	fprintf(FERROR,"file list sent\n");
       send_files(flist,f_out,f_in);
       if (verbose > 3)
-	fprintf(stderr,"waiting on %d\n",pid);
+	fprintf(FERROR,"waiting on %d\n",pid);
       waitpid(pid, &status, 0);
       report(-1);
       exit_cleanup(status);
@@ -719,22 +754,13 @@ int main(int argc,char *argv[])
 
     flist = recv_file_list(f_in);
     if (!flist || flist->count == 0) {
-      fprintf(stderr,"nothing to do\n");
+      fprintf(FERROR,"nothing to do\n");
       exit_cleanup(0);
     }
 
     local_name = get_local_name(flist,argv[0]);
 
-    if ((pid2=fork()) == 0) {
-      recv_files(f_in,flist,local_name);
-      if (verbose > 1)
-	fprintf(stderr,"receiver read %d\n",read_total());
-      exit_cleanup(0);
-    }
-
-    generate_files(f_out,flist,local_name);
-
-    waitpid(pid2, &status2, 0);
+    status2 = do_recv(f_in,f_out,flist,local_name);
 
     report(f_in);
 

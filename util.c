@@ -78,7 +78,7 @@ char *map_ptr(char *buf,off_t offset,int len)
 
   if (lseek(map_fd,offset,SEEK_SET) != offset ||
       read(map_fd,p,len) != len) {
-    fprintf(stderr,"EOF in map_ptr!\n");
+    fprintf(FERROR,"EOF in map_ptr!\n");
     exit_cleanup(1);
   }
 
@@ -110,14 +110,14 @@ int piped_child(char **command,int *f_in,int *f_out)
 
   if (pipe(to_child_pipe) < 0 ||
       pipe(from_child_pipe) < 0) {
-    fprintf(stderr,"pipe: %s\n",strerror(errno));
+    fprintf(FERROR,"pipe: %s\n",strerror(errno));
     exit_cleanup(1);
   }
 
 
   pid = fork();
   if (pid < 0) {
-    fprintf(stderr,"fork: %s\n",strerror(errno));
+    fprintf(FERROR,"fork: %s\n",strerror(errno));
     exit_cleanup(1);
   }
 
@@ -127,18 +127,18 @@ int piped_child(char **command,int *f_in,int *f_out)
 	  close(to_child_pipe[1]) < 0 ||
 	  close(from_child_pipe[0]) < 0 ||
 	  dup2(from_child_pipe[1], STDOUT_FILENO) < 0) {
-	fprintf(stderr,"Failed to dup/close : %s\n",strerror(errno));
+	fprintf(FERROR,"Failed to dup/close : %s\n",strerror(errno));
 	exit_cleanup(1);
       }
       execvp(command[0], command);
-      fprintf(stderr,"Failed to exec %s : %s\n",
+      fprintf(FERROR,"Failed to exec %s : %s\n",
 	      command[0],strerror(errno));
       exit_cleanup(1);
     }
 
   if (close(from_child_pipe[1]) < 0 ||
       close(to_child_pipe[0]) < 0) {
-    fprintf(stderr,"Failed to close : %s\n",strerror(errno));   
+    fprintf(FERROR,"Failed to close : %s\n",strerror(errno));   
     exit_cleanup(1);
   }
 
@@ -151,7 +151,7 @@ int piped_child(char **command,int *f_in,int *f_out)
 
 void out_of_memory(char *str)
 {
-  fprintf(stderr,"out of memory in %s\n",str);
+  fprintf(FERROR,"out of memory in %s\n",str);
   exit_cleanup(1);
 }
 

@@ -33,6 +33,7 @@ extern int cvs_exclude;
 extern int one_file_system;
 extern int make_backups;
 extern int preserve_links;
+extern int preserve_hard_links;
 extern int preserve_perms;
 extern int preserve_devices;
 extern int preserve_uid;
@@ -52,7 +53,7 @@ static int match_file_name(char *fname,struct stat *st)
 {
   if (check_exclude(fname,local_exclude_list)) {
     if (verbose > 2)
-      fprintf(stderr,"excluding file %s\n",fname);
+      fprintf(FERROR,"excluding file %s\n",fname);
     return 0;
   }
   return 1;
@@ -83,7 +84,7 @@ void send_file_entry_v11(struct file_struct *file,int f)
   unsigned char flags;
   static time_t last_time=0;
   static mode_t last_mode=0;
-  static dev_t last_dev=0;
+  static dev_t last_rdev=0;
   static uid_t last_uid=0;
   static gid_t last_gid=0;
   static char lastname[MAXPATHLEN]="";
@@ -99,7 +100,7 @@ void send_file_entry_v11(struct file_struct *file,int f)
   flags = FILE_VALID;
 
   if (file->mode == last_mode) flags |= SAME_MODE;
-  if (file->dev == last_dev) flags |= SAME_DEV;
+  if (file->rdev == last_rdev) flags |= SAME_RDEV;
   if (file->uid == last_uid) flags |= SAME_UID;
   if (file->gid == last_gid) flags |= SAME_GID;
   if (file->modtime == last_time) flags |= SAME_TIME;
@@ -128,8 +129,8 @@ void send_file_entry_v11(struct file_struct *file,int f)
     write_int(f,(int)file->uid);
   if (preserve_gid && !(flags & SAME_GID))
     write_int(f,(int)file->gid);
-  if (preserve_devices && IS_DEVICE(file->mode) && !(flags & SAME_DEV))
-    write_int(f,(int)file->dev);
+  if (preserve_devices && IS_DEVICE(file->mode) && !(flags & SAME_RDEV))
+    write_int(f,(int)file->rdev);
 
 #if SUPPORT_LINKS
   if (preserve_links && S_ISLNK(file->mode)) {
@@ -138,12 +139,19 @@ void send_file_entry_v11(struct file_struct *file,int f)
   }
 #endif
 
+#if SUPPORT_HARD_LINKS
+  if (preserve_hard_links && S_ISREG(file->mode)) {
+    write_int(f,file->dev);
+    write_int(f,file->inode);
+  }
+#endif
+
   if (always_checksum) {
     write_buf(f,file->sum,csum_length);
   }       
 
   last_mode = file->mode;
-  last_dev = file->dev;
+  last_rdev = file->rdev;
   last_uid = file->uid;
   last_gid = file->gid;
   last_time = file->modtime;
@@ -159,7 +167,7 @@ void receive_file_entry_v11(struct file_struct *file,
 {
   static mode_t last_time=0;
   static mode_t last_mode=0;
-  static dev_t last_dev=0;
+  static dev_t last_rdev=0;
   static uid_t last_uid=0;
   static gid_t last_gid=0;
   static char lastname[MAXPATHLEN]="";
@@ -172,6 +180,8 @@ void receive_file_entry_v11(struct file_struct *file,
     l2 = read_int(f);
   else
     l2 = read_byte(f);
+
+  bzero((char *)file,sizeof(*file));
 
   file->name = (char *)malloc(l1+l2+1);
   if (!file->name) out_of_memory("receive_file_entry");
@@ -188,7 +198,7 @@ void receive_file_entry_v11(struct file_struct *file,
   if (preserve_gid)
     file->gid = (flags & SAME_GID) ? last_gid : (gid_t)read_int(f);
   if (preserve_devices && IS_DEVICE(file->mode))
-    file->dev = (flags & SAME_DEV) ? last_dev : (dev_t)read_int(f);
+    file->rdev = (flags & SAME_RDEV) ? last_rdev : (dev_t)read_int(f);
 
 #if SUPPORT_LINKS
   if (preserve_links && S_ISLNK(file->mode)) {
@@ -199,12 +209,19 @@ void receive_file_entry_v11(struct file_struct *file,
     file->link[l] = 0;
   }
 #endif
+
+#if SUPPORT_HARD_LINKS
+  if (preserve_hard_links && S_ISREG(file->mode)) {
+    file->dev = read_int(f);
+    file->inode = read_int(f);
+  }
+#endif
   
   if (always_checksum)
     read_buf(f,file->sum,csum_length);
   
   last_mode = file->mode;
-  last_dev = file->dev;
+  last_rdev = file->rdev;
   last_uid = file->uid;
   last_gid = file->gid;
   last_time = file->modtime;
@@ -224,13 +241,13 @@ static struct file_struct *make_file(int recurse,char *fname)
   bzero(sum,SUM_LENGTH);
 
   if (lstat(fname,&st) != 0) {
-    fprintf(stderr,"%s: %s\n",
+    fprintf(FERROR,"%s: %s\n",
 	    fname,strerror(errno));
     return NULL;
   }
 
   if (S_ISDIR(st.st_mode) && !recurse) {
-    fprintf(stderr,"skipping directory %s\n",fname);
+    fprintf(FERROR,"skipping directory %s\n",fname);
     return NULL;
   }
 
@@ -241,7 +258,9 @@ static struct file_struct *make_file(int recurse,char *fname)
     return NULL;
 
   if (verbose > 2)
-    fprintf(stderr,"make_file(%s)\n",fname);
+    fprintf(FERROR,"make_file(%s)\n",fname);
+
+  bzero((char *)&file,sizeof(file));
 
   file.name = strdup(fname);
   file.modtime = st.st_mtime;
@@ -249,8 +268,10 @@ static struct file_struct *make_file(int recurse,char *fname)
   file.mode = st.st_mode;
   file.uid = st.st_uid;
   file.gid = st.st_gid;
+  file.dev = st.st_dev;
+  file.inode = st.st_ino;
 #ifdef HAVE_ST_RDEV
-  file.dev = st.st_rdev;
+  file.rdev = st.st_rdev;
 #endif
 
 #if SUPPORT_LINKS
@@ -258,7 +279,7 @@ static struct file_struct *make_file(int recurse,char *fname)
     int l;
     char lnk[MAXPATHLEN];
     if ((l=readlink(fname,lnk,MAXPATHLEN-1)) == -1) {
-      fprintf(stderr,"readlink %s : %s\n",fname,strerror(errno));
+      fprintf(FERROR,"readlink %s : %s\n",fname,strerror(errno));
       return NULL;
     }
     lnk[l] = 0;
@@ -326,7 +347,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 
   d = opendir(dir);
   if (!d) {
-    fprintf(stderr,"%s: %s\n",
+    fprintf(FERROR,"%s: %s\n",
 	    dir,strerror(errno));
     return;
   }
@@ -364,8 +385,8 @@ struct file_list *send_file_list(int f,int recurse,int argc,char *argv[])
   struct file_list *flist;
 
   if (verbose && recurse) {
-    fprintf(am_server?stderr:stdout,"building file list ... ");
-    fflush(am_server?stderr:stdout);
+    fprintf(FINFO,"building file list ... ");
+    fflush(FINFO);
   }
 
   flist = (struct file_list *)malloc(sizeof(flist[0]));
@@ -389,12 +410,12 @@ struct file_list *send_file_list(int f,int recurse,int argc,char *argv[])
     }
 
     if (lstat(fname,&st) != 0) {
-      fprintf(stderr,"%s : %s\n",fname,strerror(errno));
+      fprintf(FERROR,"%s : %s\n",fname,strerror(errno));
       continue;
     }
 
     if (S_ISDIR(st.st_mode) && !recurse) {
-      fprintf(stderr,"skipping directory %s\n",fname);
+      fprintf(FERROR,"skipping directory %s\n",fname);
       continue;
     }
 
@@ -410,11 +431,11 @@ struct file_list *send_file_list(int f,int recurse,int argc,char *argv[])
 
     if (dir && *dir) {
       if (getcwd(dbuf,MAXPATHLEN-1) == NULL) {
-	fprintf(stderr,"getwd : %s\n",strerror(errno));
+	fprintf(FERROR,"getwd : %s\n",strerror(errno));
 	exit_cleanup(1);
       }
       if (chdir(dir) != 0) {
-	fprintf(stderr,"chdir %s : %s\n",dir,strerror(errno));
+	fprintf(FERROR,"chdir %s : %s\n",dir,strerror(errno));
 	continue;
       }
       flist_dir = dir;
@@ -423,7 +444,7 @@ struct file_list *send_file_list(int f,int recurse,int argc,char *argv[])
       send_file_name(f,flist,recurse,fname);
       flist_dir = NULL;
       if (chdir(dbuf) != 0) {
-	fprintf(stderr,"chdir %s : %s\n",dbuf,strerror(errno));
+	fprintf(FERROR,"chdir %s : %s\n",dbuf,strerror(errno));
 	exit_cleanup(1);
       }
       continue;
@@ -439,10 +460,10 @@ struct file_list *send_file_list(int f,int recurse,int argc,char *argv[])
     write_flush(f);
   }
 
-  clean_flist(flist);
-
   if (verbose && recurse)
-    fprintf(am_server?stderr:stdout,"done\n");
+    fprintf(FINFO,"done\n");
+
+  clean_flist(flist);
 
   return flist;
 }
@@ -454,7 +475,7 @@ struct file_list *recv_file_list(int f)
   unsigned char flags;
 
   if (verbose > 2)
-    fprintf(stderr,"recv_file_list starting\n");
+    fprintf(FERROR,"recv_file_list starting\n");
 
   flist = (struct file_list *)malloc(sizeof(flist[0]));
   if (!flist)
@@ -488,12 +509,12 @@ struct file_list *recv_file_list(int f)
     flist->count++;
 
     if (verbose > 2)
-      fprintf(stderr,"recv_file_name(%s)\n",flist->files[i].name);
+      fprintf(FERROR,"recv_file_name(%s)\n",flist->files[i].name);
   }
 
 
   if (verbose > 2)
-    fprintf(stderr,"received %d names\n",flist->count);
+    fprintf(FERROR,"received %d names\n",flist->count);
 
   clean_flist(flist);
 
@@ -505,7 +526,7 @@ oom:
 }
 
 
-static int flist_compare(struct file_struct *f1,struct file_struct *f2)
+int file_compare(struct file_struct *f1,struct file_struct *f2)
 {
   if (!f1->name && !f2->name) return 0;
   if (!f1->name) return -1;
@@ -520,14 +541,14 @@ int flist_find(struct file_list *flist,struct file_struct *f)
 
   while (low != high) {
     int mid = (low+high)/2;
-    int ret = flist_compare(&flist->files[mid],f);
+    int ret = file_compare(&flist->files[mid],f);
     if (ret == 0) return mid;
     if (ret > 0) 
       high=mid;
     else
       low=mid+1;
   }
-  if (flist_compare(&flist->files[low],f) == 0)
+  if (file_compare(&flist->files[low],f) == 0)
     return low;
   return -1;
 }
@@ -594,17 +615,17 @@ void clean_flist(struct file_list *flist)
       
   qsort(flist->files,flist->count,
 	sizeof(flist->files[0]),
-	(int (*)())flist_compare);
+	(int (*)())file_compare);
 
   for (i=1;i<flist->count;i++) {
     if (flist->files[i].name &&
 	strcmp(flist->files[i].name,flist->files[i-1].name) == 0) {
       if (verbose > 1 && !am_server)
-	fprintf(stderr,"removing duplicate name %s from file list\n",
-		flist->files[i].name);
+	fprintf(FERROR,"removing duplicate name %s from file list %d\n",
+		flist->files[i-1].name,i-1);
       free(flist->files[i-1].name);
-      flist->files[i-1].name = NULL;
-    }
+      bzero((char *)&flist->files[i-1],sizeof(flist->files[i-1]));
+    } 
   }
 }
 

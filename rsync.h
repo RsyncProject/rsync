@@ -25,7 +25,7 @@
 
 #define FILE_VALID 1
 #define SAME_MODE (1<<1)
-#define SAME_DEV (1<<2)
+#define SAME_RDEV (1<<2)
 #define SAME_UID (1<<3)
 #define SAME_GID (1<<4)
 #define SAME_DIR (1<<5)
@@ -38,13 +38,15 @@
 #define MIN_PROTOCOL_VERSION 10
 #define MAX_PROTOCOL_VERSION 20
 
+#define SPARSE_WRITE_SIZE (4*1024)
+#define WRITE_SIZE (32*1024)
 #define CHUNK_SIZE (32*1024)
 #define MAX_MAP_SIZE (4*1024*1024)
 
 #define BLOCKING_TIMEOUT 10
 
-/* do we try to create sparse files */
-#define SPARSE_FILES 1
+#define FERROR stderr
+#define FINFO (am_server?stderr:stdout)
 
 #include "config.h"
 
@@ -175,7 +177,9 @@ struct file_struct {
   time_t modtime;
   off_t length;
   mode_t mode;
+  ino_t inode;
   dev_t dev;
+  dev_t rdev;
   uid_t uid;
   gid_t gid;
   char *name;
@@ -250,6 +254,7 @@ extern int errno;
 #endif
 
 #define SUPPORT_LINKS (HAVE_READLINK && defined(S_ISLNK))
+#define SUPPORT_HARD_LINKS HAVE_LINK
 
 #ifndef S_ISLNK
 #define S_ISLNK(x) 0

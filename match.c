@@ -95,7 +95,7 @@ static void matched(int f,struct sum_struct *s,char *buf,off_t len,
   
   if (verbose > 2)
     if (i != -1)
-      fprintf(stderr,"match at %d last_match=%d j=%d len=%d n=%d\n",
+      fprintf(FERROR,"match at %d last_match=%d j=%d len=%d n=%d\n",
 	      (int)offset,(int)last_match,i,(int)s->sums[i].len,n);
 
   if (n > 0) {
@@ -125,7 +125,7 @@ static void hash_search(int f,struct sum_struct *s,char *buf,off_t len)
   char *map;
 
   if (verbose > 2)
-    fprintf(stderr,"hash search b=%d len=%d\n",s->n,(int)len);
+    fprintf(FERROR,"hash search b=%d len=%d\n",s->n,(int)len);
 
   k = MIN(len, s->n);
 
@@ -135,21 +135,21 @@ static void hash_search(int f,struct sum_struct *s,char *buf,off_t len)
   s1 = sum & 0xFFFF;
   s2 = sum >> 16;
   if (verbose > 3)
-    fprintf(stderr, "sum=%.8x k=%d\n", sum, k);
+    fprintf(FERROR, "sum=%.8x k=%d\n", sum, k);
 
   offset = 0;
 
   end = len + 1 - s->sums[s->count-1].len;
 
   if (verbose > 3)
-    fprintf(stderr,"hash search s->n=%d len=%d count=%d\n",
+    fprintf(FERROR,"hash search s->n=%d len=%d count=%d\n",
 	    s->n,(int)len,s->count);
 
   do {
     tag t = gettag2(s1,s2);
     j = tag_table[t];
     if (verbose > 4)
-      fprintf(stderr,"offset=%d sum=%08x\n",
+      fprintf(FERROR,"offset=%d sum=%08x\n",
 	      offset,sum);
 
     if (j != NULL_TAG) {
@@ -162,7 +162,7 @@ static void hash_search(int f,struct sum_struct *s,char *buf,off_t len)
 
 	if (sum == s->sums[i].sum1) {
 	  if (verbose > 3)
-	    fprintf(stderr,"potential match at %d target=%d %d sum=%08x\n",
+	    fprintf(FERROR,"potential match at %d target=%d %d sum=%08x\n",
 		    offset,j,i,sum);
 
 	  if (!done_csum2) {
@@ -220,12 +220,12 @@ void match_sums(int f,struct sum_struct *s,char *buf,off_t len)
     build_hash_table(s);
 
     if (verbose > 2) 
-      fprintf(stderr,"built hash table\n");
+      fprintf(FERROR,"built hash table\n");
 
     hash_search(f,s,buf,len);
 
     if (verbose > 2) 
-      fprintf(stderr,"done hash search\n");
+      fprintf(FERROR,"done hash search\n");
   } else {
     matched(f,s,buf,len,len,-1);
   }
@@ -236,7 +236,7 @@ void match_sums(int f,struct sum_struct *s,char *buf,off_t len)
   }
 
   if (verbose > 2)
-    fprintf(stderr, "false_alarms=%d tag_hits=%d matches=%d\n",
+    fprintf(FERROR, "false_alarms=%d tag_hits=%d matches=%d\n",
 	    false_alarms, tag_hits, matches);
 
   total_tag_hits += tag_hits;
@@ -250,7 +250,7 @@ void match_report(void)
   if (verbose <= 1)
     return;
 
-  fprintf(am_server?stderr:stdout,
+  fprintf(FINFO,
 	  "total: matches=%d  tag_hits=%d  false_alarms=%d  data=%d\n",
 	  total_matches,total_tag_hits,
 	  total_false_alarms,total_data_transfer);

@@ -32,6 +32,7 @@ extern int block_size;
 extern int update_only;
 extern int make_backups;
 extern int preserve_links;
+extern int preserve_hard_links;
 extern int preserve_perms;
 extern int preserve_devices;
 extern int preserve_uid;
@@ -105,7 +106,7 @@ static struct sum_struct *generate_sums(char *buf,off_t len,int n)
   }
 
   if (verbose > 3)
-    fprintf(stderr,"count=%d rem=%d n=%d flength=%d\n",
+    fprintf(FERROR,"count=%d rem=%d n=%d flength=%d\n",
 	    s->count,s->remainder,s->n,(int)s->flength);
 
   s->sums = (struct sum_buf *)malloc(sizeof(s->sums[0])*s->count);
@@ -123,7 +124,7 @@ static struct sum_struct *generate_sums(char *buf,off_t len,int n)
     s->sums[i].i = i;
 
     if (verbose > 3)
-      fprintf(stderr,"chunk[%d] offset=%d len=%d sum1=%08x\n",
+      fprintf(FERROR,"chunk[%d] offset=%d len=%d sum1=%08x\n",
 	      i,(int)s->sums[i].offset,s->sums[i].len,s->sums[i].sum1);
 
     len -= n1;
@@ -153,7 +154,7 @@ static struct sum_struct *receive_sums(int f)
   s->sums = NULL;
 
   if (verbose > 3)
-    fprintf(stderr,"count=%d n=%d rem=%d\n",
+    fprintf(FERROR,"count=%d n=%d rem=%d\n",
 	    s->count,s->n,s->remainder);
 
   block_len = s->n;
@@ -179,7 +180,7 @@ static struct sum_struct *receive_sums(int f)
     offset += s->sums[i].len;
 
     if (verbose > 3)
-      fprintf(stderr,"chunk[%d] len=%d offset=%d sum1=%08x\n",
+      fprintf(FERROR,"chunk[%d] len=%d offset=%d sum1=%08x\n",
 	      i,s->sums[i].len,(int)s->sums[i].offset,s->sums[i].sum1);
   }
 
@@ -199,7 +200,7 @@ static void set_perms(char *fname,struct file_struct *file,struct stat *st,
 
   if (!st) {
     if (stat(fname,&st2) != 0) {
-      fprintf(stderr,"stat %s : %s\n",fname,strerror(errno));
+      fprintf(FERROR,"stat %s : %s\n",fname,strerror(errno));
       return;
     }
     st = &st2;
@@ -209,7 +210,7 @@ static void set_perms(char *fname,struct file_struct *file,struct stat *st,
       st->st_mtime != file->modtime) {
     updated = 1;
     if (set_modtime(fname,file->modtime) != 0) {
-      fprintf(stderr,"failed to set times on %s : %s\n",
+      fprintf(FERROR,"failed to set times on %s : %s\n",
 	      fname,strerror(errno));
       return;
     }
@@ -220,7 +221,7 @@ static void set_perms(char *fname,struct file_struct *file,struct stat *st,
       st->st_mode != file->mode) {
     updated = 1;
     if (chmod(fname,file->mode) != 0) {
-      fprintf(stderr,"failed to set permissions on %s : %s\n",
+      fprintf(FERROR,"failed to set permissions on %s : %s\n",
 	      fname,strerror(errno));
       return;
     }
@@ -234,16 +235,16 @@ static void set_perms(char *fname,struct file_struct *file,struct stat *st,
 	      preserve_uid?file->uid:-1,
 	      preserve_gid?file->gid:-1) != 0) {
       if (verbose>1 || preserve_uid)
-	fprintf(stderr,"chown %s : %s\n",fname,strerror(errno));
+	fprintf(FERROR,"chown %s : %s\n",fname,strerror(errno));
       return;
     }
   }
     
   if (verbose > 1 && report) {
     if (updated)
-      fprintf(am_server?stderr:stdout,"%s\n",fname);
+      fprintf(FINFO,"%s\n",fname);
     else
-      fprintf(am_server?stderr:stdout,"%s is uptodate\n",fname);
+      fprintf(FINFO,"%s is uptodate\n",fname);
   }
 }
 
@@ -256,66 +257,73 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
   struct sum_struct *s;
   char sum[SUM_LENGTH];
   int statret;
+  struct file_struct *file = &flist->files[i];
 
   if (verbose > 2)
-    fprintf(stderr,"recv_generator(%s)\n",fname);
+    fprintf(FERROR,"recv_generator(%s)\n",fname);
 
   statret = lstat(fname,&st);
 
 #if SUPPORT_LINKS
-  if (preserve_links && S_ISLNK(flist->files[i].mode)) {
+  if (preserve_links && S_ISLNK(file->mode)) {
     char lnk[MAXPATHLEN];
     int l;
     if (statret == 0) {
       l = readlink(fname,lnk,MAXPATHLEN-1);
       if (l > 0) {
 	lnk[l] = 0;
-	if (strcmp(lnk,flist->files[i].link) == 0) {
-	  set_perms(fname,&flist->files[i],&st,1);
+	if (strcmp(lnk,file->link) == 0) {
+	  set_perms(fname,file,&st,1);
 	  return;
 	}
       }
     }
     if (!dry_run) unlink(fname);
-    if (!dry_run && symlink(flist->files[i].link,fname) != 0) {
-      fprintf(stderr,"link %s -> %s : %s\n",
-	      fname,flist->files[i].link,strerror(errno));
+    if (!dry_run && symlink(file->link,fname) != 0) {
+      fprintf(FERROR,"link %s -> %s : %s\n",
+	      fname,file->link,strerror(errno));
     } else {
-      set_perms(fname,&flist->files[i],NULL,0);
+      set_perms(fname,file,NULL,0);
       if (verbose) 
-	fprintf(am_server?stderr:stdout,"%s -> %s\n",
-		fname,flist->files[i].link);
+	fprintf(FINFO,"%s -> %s\n",
+		fname,file->link);
     }
     return;
   }
 #endif
 
 #ifdef HAVE_MKNOD
-  if (preserve_devices && IS_DEVICE(flist->files[i].mode)) {
+  if (preserve_devices && IS_DEVICE(file->mode)) {
     if (statret != 0 || 
-	st.st_mode != flist->files[i].mode ||
-	st.st_rdev != flist->files[i].dev) {	
+	st.st_mode != file->mode ||
+	st.st_rdev != file->rdev) {	
       if (!dry_run) unlink(fname);
       if (verbose > 2)
-	fprintf(stderr,"mknod(%s,0%o,0x%x)\n",
-		fname,(int)flist->files[i].mode,(int)flist->files[i].dev);
+	fprintf(FERROR,"mknod(%s,0%o,0x%x)\n",
+		fname,(int)file->mode,(int)file->rdev);
       if (!dry_run && 
-	  mknod(fname,flist->files[i].mode,flist->files[i].dev) != 0) {
-	fprintf(stderr,"mknod %s : %s\n",fname,strerror(errno));
+	  mknod(fname,file->mode,file->rdev) != 0) {
+	fprintf(FERROR,"mknod %s : %s\n",fname,strerror(errno));
       } else {
-	set_perms(fname,&flist->files[i],NULL,0);
+	set_perms(fname,file,NULL,0);
 	if (verbose)
-	  fprintf(am_server?stderr:stdout,"%s\n",fname);
+	  fprintf(FINFO,"%s\n",fname);
       }
     } else {
-      set_perms(fname,&flist->files[i],&st,1);
+      set_perms(fname,file,&st,1);
     }
     return;
   }
 #endif
 
-  if (!S_ISREG(flist->files[i].mode)) {
-    fprintf(stderr,"skipping non-regular file %s\n",fname);
+  if (preserve_hard_links && check_hard_link(file)) {
+    if (verbose > 1)
+      fprintf(FINFO,"%s is a hard link\n",file->name);
+    return;
+  }
+
+  if (!S_ISREG(file->mode)) {
+    fprintf(FERROR,"skipping non-regular file %s\n",fname);
     return;
   }
 
@@ -325,19 +333,19 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
       if (!dry_run) send_sums(NULL,f_out);
     } else {
       if (verbose > 1)
-	fprintf(stderr,"recv_generator failed to open %s\n",fname);
+	fprintf(FERROR,"recv_generator failed to open %s\n",fname);
     }
     return;
   }
 
   if (!S_ISREG(st.st_mode)) {
-    fprintf(stderr,"%s : not a regular file\n",fname);
+    fprintf(FERROR,"%s : not a regular file\n",fname);
     return;
   }
 
-  if (update_only && st.st_mtime >= flist->files[i].modtime) {
+  if (update_only && st.st_mtime >= file->modtime) {
     if (verbose > 1)
-      fprintf(stderr,"%s is newer\n",fname);
+      fprintf(FERROR,"%s is newer\n",fname);
     return;
   }
 
@@ -345,11 +353,11 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
     file_checksum(fname,sum,st.st_size);
   }
 
-  if (st.st_size == flist->files[i].length &&
-      ((!ignore_times && st.st_mtime == flist->files[i].modtime) ||
+  if (st.st_size == file->length &&
+      ((!ignore_times && st.st_mtime == file->modtime) ||
        (always_checksum && S_ISREG(st.st_mode) && 	  
-	memcmp(sum,flist->files[i].sum,csum_length) == 0))) {
-    set_perms(fname,&flist->files[i],&st,1);
+	memcmp(sum,file->sum,csum_length) == 0))) {
+    set_perms(fname,file,&st,1);
     return;
   }
 
@@ -362,7 +370,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
   fd = open(fname,O_RDONLY);
 
   if (fd == -1) {
-    fprintf(stderr,"failed to open %s : %s\n",fname,strerror(errno));
+    fprintf(FERROR,"failed to open %s : %s\n",fname,strerror(errno));
     return;
   }
 
@@ -373,7 +381,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
   }
 
   if (verbose > 3)
-    fprintf(stderr,"mapped %s of size %d\n",fname,(int)st.st_size);
+    fprintf(FERROR,"mapped %s of size %d\n",fname,(int)st.st_size);
 
   s = generate_sums(buf,st.st_size,block_size);
 
@@ -402,10 +410,10 @@ static void receive_data(int f_in,char *buf,int fd,char *fname)
   for (i=read_int(f_in); i != 0; i=read_int(f_in)) {
     if (i > 0) {
       if (verbose > 3)
-	fprintf(stderr,"data recv %d at %d\n",i,(int)offset);
+	fprintf(FERROR,"data recv %d at %d\n",i,(int)offset);
 
       if (read_write(f_in,fd,i) != i) {
-	fprintf(stderr,"write failed on %s : %s\n",fname,strerror(errno));
+	fprintf(FERROR,"write failed on %s : %s\n",fname,strerror(errno));
 	exit_cleanup(1);
       }
       offset += i;
@@ -417,11 +425,11 @@ static void receive_data(int f_in,char *buf,int fd,char *fname)
 	len = remainder;
 
       if (verbose > 3)
-	fprintf(stderr,"chunk[%d] of size %d at %d offset=%d\n",
+	fprintf(FERROR,"chunk[%d] of size %d at %d offset=%d\n",
 		i,len,(int)offset2,(int)offset);
 
       if (write_sparse(fd,map_ptr(buf,offset2,len),len) != len) {
-	fprintf(stderr,"write failed on %s : %s\n",fname,strerror(errno));
+	fprintf(FERROR,"write failed on %s : %s\n",fname,strerror(errno));
 	exit_cleanup(1);
       }
       offset += len;
@@ -429,7 +437,7 @@ static void receive_data(int f_in,char *buf,int fd,char *fname)
   }
 
   if (offset > 0 && sparse_end(fd) != 0) {
-    fprintf(stderr,"write failed on %s : %s\n",fname,strerror(errno));
+    fprintf(FERROR,"write failed on %s : %s\n",fname,strerror(errno));
     exit_cleanup(1);
   }
 }
@@ -439,16 +447,16 @@ static void delete_one(struct file_struct *f)
 {
   if (!S_ISDIR(f->mode)) {
     if (!dry_run && unlink(f->name) != 0) {
-      fprintf(stderr,"unlink %s : %s\n",f->name,strerror(errno));
+      fprintf(FERROR,"unlink %s : %s\n",f->name,strerror(errno));
     } else if (verbose) {
-      fprintf(stderr,"deleting %s\n",f->name);
+      fprintf(FERROR,"deleting %s\n",f->name);
     }
   } else {    
     if (!dry_run && rmdir(f->name) != 0) {
       if (errno != ENOTEMPTY)
-	fprintf(stderr,"rmdir %s : %s\n",f->name,strerror(errno));
+	fprintf(FERROR,"rmdir %s : %s\n",f->name,strerror(errno));
     } else if (verbose) {
-      fprintf(stderr,"deleting directory %s\n",f->name);      
+      fprintf(FERROR,"deleting directory %s\n",f->name);      
     }
   }
 }
@@ -497,9 +505,10 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
   char fnametmp[MAXPATHLEN];
   char *buf;
   int i;
+  struct file_struct *file;
 
   if (verbose > 2) {
-    fprintf(stderr,"recv_files(%d) starting\n",flist->count);
+    fprintf(FERROR,"recv_files(%d) starting\n",flist->count);
   }
 
   if (recurse && delete_mode && !local_name && flist->count>0) {
@@ -511,7 +520,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
       i = read_int(f_in);
       if (i == -1) break;
 
-      fname = flist->files[i].name;
+      file = &flist->files[i];
+      fname = file->name;
 
       if (local_name)
 	fname = local_name;
@@ -523,19 +533,19 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
       }
 
       if (verbose > 2)
-	fprintf(stderr,"recv_files(%s)\n",fname);
+	fprintf(FERROR,"recv_files(%s)\n",fname);
 
       /* open the file */  
       fd1 = open(fname,O_RDONLY);
 
       if (fd1 != -1 && fstat(fd1,&st) != 0) {
-	fprintf(stderr,"fstat %s : %s\n",fname,strerror(errno));
+	fprintf(FERROR,"fstat %s : %s\n",fname,strerror(errno));
 	close(fd1);
 	return -1;
       }
 
       if (fd1 != -1 && !S_ISREG(st.st_mode)) {
-	fprintf(stderr,"%s : not a regular file\n",fname);
+	fprintf(FERROR,"%s : not a regular file\n",fname);
 	close(fd1);
 	return -1;
       }
@@ -547,17 +557,17 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
       }
 
       if (verbose > 2)
-	fprintf(stderr,"mapped %s of size %d\n",fname,(int)st.st_size);
+	fprintf(FERROR,"mapped %s of size %d\n",fname,(int)st.st_size);
 
       /* open tmp file */
       sprintf(fnametmp,"%s.XXXXXX",fname);
       if (NULL == mktemp(fnametmp)) {
-	fprintf(stderr,"mktemp %s failed\n",fnametmp);
+	fprintf(FERROR,"mktemp %s failed\n",fnametmp);
 	return -1;
       }
-      fd2 = open(fnametmp,O_WRONLY|O_CREAT,flist->files[i].mode);
+      fd2 = open(fnametmp,O_WRONLY|O_CREAT,file->mode);
       if (fd2 == -1) {
-	fprintf(stderr,"open %s : %s\n",fnametmp,strerror(errno));
+	fprintf(FERROR,"open %s : %s\n",fnametmp,strerror(errno));
 	return -1;
       }
       
@@ -576,30 +586,30 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
       close(fd2);
 
       if (verbose > 2)
-	fprintf(stderr,"renaming %s to %s\n",fnametmp,fname);
+	fprintf(FERROR,"renaming %s to %s\n",fnametmp,fname);
 
       if (make_backups) {
 	char fnamebak[MAXPATHLEN];
 	sprintf(fnamebak,"%s%s",fname,backup_suffix);
 	if (rename(fname,fnamebak) != 0 && errno != ENOENT) {
-	  fprintf(stderr,"rename %s %s : %s\n",fname,fnamebak,strerror(errno));
+	  fprintf(FERROR,"rename %s %s : %s\n",fname,fnamebak,strerror(errno));
 	  exit_cleanup(1);
 	}
       }
 
       /* move tmp file over real file */
       if (rename(fnametmp,fname) != 0) {
-	fprintf(stderr,"rename %s -> %s : %s\n",
+	fprintf(FERROR,"rename %s -> %s : %s\n",
 		fnametmp,fname,strerror(errno));
       }
 
       cleanup_fname = NULL;
 
-      set_perms(fname,&flist->files[i],NULL,0);
+      set_perms(fname,file,NULL,0);
     }
 
   if (verbose > 2)
-    fprintf(stderr,"recv_files finished\n");
+    fprintf(FERROR,"recv_files finished\n");
   
   return 0;
 }
@@ -615,9 +625,10 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
   char fname[MAXPATHLEN];  
   off_t total=0;
   int i;
+  struct file_struct *file;
 
   if (verbose > 2)
-    fprintf(stderr,"send_files starting\n");
+    fprintf(FERROR,"send_files starting\n");
 
   setup_nonblocking(f_in,f_out);
 
@@ -626,15 +637,17 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
       i = read_int(f_in);
       if (i == -1) break;
 
+      file = &flist->files[i];
+
       fname[0] = 0;
-      if (flist->files[i].dir) {
-	strcpy(fname,flist->files[i].dir);
+      if (file->dir) {
+	strcpy(fname,file->dir);
 	strcat(fname,"/");
       }
-      strcat(fname,flist->files[i].name);
+      strcat(fname,file->name);
 
       if (verbose > 2) 
-	fprintf(stderr,"send_files(%d,%s)\n",i,fname);
+	fprintf(FERROR,"send_files(%d,%s)\n",i,fname);
 
       if (dry_run) {	
 	if (!am_server && verbose)
@@ -645,20 +658,20 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
 
       s = receive_sums(f_in);
       if (!s) {
-	fprintf(stderr,"receive_sums failed\n");
+	fprintf(FERROR,"receive_sums failed\n");
 	return -1;
       }
 
       fd = open(fname,O_RDONLY);
       if (fd == -1) {
-	fprintf(stderr,"send_files failed to open %s: %s\n",
+	fprintf(FERROR,"send_files failed to open %s: %s\n",
 		fname,strerror(errno));
 	continue;
       }
   
       /* map the local file */
       if (fstat(fd,&st) != 0) {
-	fprintf(stderr,"fstat failed : %s\n",strerror(errno));
+	fprintf(FERROR,"fstat failed : %s\n",strerror(errno));
 	return -1;
       }
       
@@ -669,7 +682,7 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
       }
 
       if (verbose > 2)
-	fprintf(stderr,"send_files mapped %s of size %d\n",
+	fprintf(FERROR,"send_files mapped %s of size %d\n",
 		fname,(int)st.st_size);
 
       write_int(f_out,i);
@@ -679,7 +692,7 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
       write_int(f_out,s->remainder);
 
       if (verbose > 2)
-	fprintf(stderr,"calling match_sums %s\n",fname);
+	fprintf(FERROR,"calling match_sums %s\n",fname);
 
       if (!am_server && verbose)
 	printf("%s\n",fname);
@@ -693,10 +706,13 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
       free_sums(s);
 
       if (verbose > 2)
-	fprintf(stderr,"sender finished %s\n",fname);
+	fprintf(FERROR,"sender finished %s\n",fname);
 
       total += st.st_size;
     }
+
+  if (verbose > 2)
+    fprintf(FERROR,"send files finished\n");
 
   match_report();
 
@@ -713,25 +729,28 @@ void generate_files(int f,struct file_list *flist,char *local_name)
   int i;
 
   if (verbose > 2)
-    fprintf(stderr,"generator starting pid=%d count=%d\n",
+    fprintf(FERROR,"generator starting pid=%d count=%d\n",
 	    (int)getpid(),flist->count);
 
   for (i = 0; i < flist->count; i++) {
-    if (!flist->files[i].name) continue;
-    if (S_ISDIR(flist->files[i].mode)) {
+    struct file_struct *file = &flist->files[i];
+    if (!file->name) continue;
+    if (S_ISDIR(file->mode)) {
       if (dry_run) continue;
-      if (mkdir(flist->files[i].name,flist->files[i].mode) != 0 &&
+      if (mkdir(file->name,file->mode) != 0 &&
 	  errno != EEXIST) {
-	fprintf(stderr,"mkdir %s : %s\n",
-		flist->files[i].name,strerror(errno));
+	fprintf(FERROR,"mkdir %s : %s\n",
+		file->name,strerror(errno));
       }
       continue;
     }
-    recv_generator(local_name?local_name:flist->files[i].name,
+    recv_generator(local_name?local_name:file->name,
 		   flist,i,f);
   }
   write_int(f,-1);
   write_flush(f);
   if (verbose > 2)
-    fprintf(stderr,"generator wrote %d\n",write_total());
+    fprintf(FERROR,"generator wrote %d\n",write_total());
 }
+
+

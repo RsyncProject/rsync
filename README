@@ -29,11 +29,13 @@ Here is a brief description of available options:
 -b, --backup             make backups (default ~ extension)
 -u, --update             update only (don't overwrite newer files)
 -l, --links              preserve soft links
+-H, --hard-links         preserve hard links
 -p, --perms              preserve permissions
 -o, --owner              preserve owner (root only)
 -g, --group              preserve group
 -D, --devices            preserve devices (root only)
 -t, --times              preserve times
+-S, --sparse             handle sparse files efficiently
 -n, --dry-run            show what would have been transferred
 -x, --one-file-system    don't cross filesystem boundaries
 -B, --block-size SIZE    checksum blocking size
@@ -45,8 +47,8 @@ Here is a brief description of available options:
     --exclude FILE       exclude file FILE
     --exclude-from FILE  exclude files listed in FILE
     --suffix SUFFIX      override backup suffix
+    --csum-length LENGTH set the checksum length
     --version            print version number
-
 
 
 SETUP
