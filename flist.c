@@ -548,7 +548,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 		    strcmp(dname,"..")==0)
 			continue;
 		strlcpy(p,dname,MAXPATHLEN-(l+1));
-		send_file_name(f,flist,fname,recurse,FLAG_DELETE);
+		send_file_name(f,flist,fname,recurse,0);
 	}
 
 	closedir(d);
