@@ -264,11 +264,8 @@ static int keep_backup(char *fname)
 		kept = 1;
 	}
 #endif
-	if (!kept && preserve_hard_links && file->link_u.links
-	    && hlink_list[file->F_HLINDEX] != file) {
-		if (verbose > 1)
-			rprintf(FINFO, "%s is a hard link\n", f_name(file));
-	}
+	if (!kept && preserve_hard_links && file->link_u.links && verbose > 1)
+		rprintf(FINFO, "%s was a hard link\n", f_name(file));
 
 	if (!kept && !S_ISREG(file->mode)) {
 		rprintf(FINFO, "make_bak: skipping non-regular file %s\n",
