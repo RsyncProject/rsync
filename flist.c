@@ -634,10 +634,9 @@ static void clean_fname(char *name)
 
     if (strncmp(p=name,"./",2) == 0) {      
       modified = 1;
-      while (*p) {
+      do {
 	p[0] = p[2];
-	p++;
-      }
+      } while (*p++);
     }
 
     l = strlen(p=name);

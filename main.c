@@ -166,7 +166,7 @@ static void server_options(char **args,int *argc)
 
 
 
-int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f_out)
+static int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f_out)
 {
   char *args[100];
   int i,argc=0, ret;
