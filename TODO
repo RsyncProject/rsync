@@ -1,6 +1,76 @@
 -*- indented-text -*-
 
-URGENT ---------------------------------------------------------------
+BUGS ---------------------------------------------------------------
+
+There seems to be a bug with hardlinks
+
+  mbp/2 build$ ls -l /tmp/a /tmp/b -i
+  /tmp/a:
+  total 32
+  2568307 -rw-rw-r--    3 mbp      mbp            29 Mar 25 17:30 a1
+  2568307 -rw-rw-r--    3 mbp      mbp            29 Mar 25 17:30 a2
+  2568307 -rw-rw-r--    3 mbp      mbp            29 Mar 25 17:30 a3
+  2568310 -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 a4
+  2568310 -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 a5
+  2568310 -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 b1
+  2568310 -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 b2
+  2568310 -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 b3
+
+  /tmp/b:
+  total 32
+  2568309 -rw-rw-r--    3 mbp      mbp            29 Mar 25 17:30 a1
+  2568309 -rw-rw-r--    3 mbp      mbp            29 Mar 25 17:30 a2
+  2568309 -rw-rw-r--    3 mbp      mbp            29 Mar 25 17:30 a3
+  2568311 -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 a4
+  2568311 -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 a5
+  2568311 -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 b1
+  2568311 -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 b2
+  2568311 -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 b3
+  mbp/2 build$ rm -r /tmp/b && ./rsync -avH /tmp/a/ /tmp/b
+  building file list ... done
+  created directory /tmp/b
+  ./
+  a1
+  a4
+  a2 => a1
+  a3 => a2
+  wrote 350 bytes  read 52 bytes  804.00 bytes/sec
+  total size is 232  speedup is 0.58
+  mbp/2 build$ rm -r /tmp/b
+  mbp/2 build$ ls -l /tmp/b
+  ls: /tmp/b: No such file or directory
+  mbp/2 build$ rm -r /tmp/b && ./rsync -avH /tmp/a/ /tmp/b
+  rm: cannot remove `/tmp/b': No such file or directory
+  mbp/2 build$ rm -f -r /tmp/b && ./rsync -avH /tmp/a/ /tmp/b
+  building file list ... done
+  created directory /tmp/b
+  ./
+  a1
+  a4
+  a2 => a1
+  a3 => a2
+  wrote 350 bytes  read 52 bytes  804.00 bytes/sec
+  total size is 232  speedup is 0.58
+  mbp/2 build$ ls -l /tmp/b
+  total 32
+  -rw-rw-r--    3 mbp      mbp            29 Mar 25 17:30 a1
+  -rw-rw-r--    3 mbp      mbp            29 Mar 25 17:30 a2
+  -rw-rw-r--    3 mbp      mbp            29 Mar 25 17:30 a3
+  -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 a4
+  -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 a5
+  -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 b1
+  -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 b2
+  -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 b3
+  mbp/2 build$ ls -l /tmp/a
+  total 32
+  -rw-rw-r--    3 mbp      mbp            29 Mar 25 17:30 a1
+  -rw-rw-r--    3 mbp      mbp            29 Mar 25 17:30 a2
+  -rw-rw-r--    3 mbp      mbp            29 Mar 25 17:30 a3
+  -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 a4
+  -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 a5
+  -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 b1
+  -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 b2
+  -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 b3
 
 
 IMPORTANT ------------------------------------------------------------
