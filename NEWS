@@ -3,3 +3,7 @@ rsync changes since last release
   ENHANCEMENTS:
 
     * "make install-strip" works.  (Greg Louis)
+
+  BUG FIXES:
+
+    * Fix test suite on Solaris.  (Jos Backus)
