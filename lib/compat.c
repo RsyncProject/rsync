@@ -145,3 +145,19 @@
 	return ret;
 }
 #endif
+
+#ifndef HAVE_INET_ATON
+ int inet_aton(const char *cp, struct in_addr *inp)
+{
+	if (strcmp(cp, "255.255.255.255") == 0) {
+		inp->s_addr = (unsigned) -1;
+		return 1;
+	}
+
+	inp->s_addr = inet_addr(cp);
+	if (inp->s_addr == (unsigned) -1) {
+		return 0;
+	}
+	return 1;
+}
+#endif
