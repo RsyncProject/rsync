@@ -45,6 +45,7 @@ extern int cleanup_got_literal;
 extern int module_id;
 extern int ignore_errors;
 extern int orig_umask;
+extern int keep_partial;
 
 static void delete_one(char *fn, int is_dir)
 {
@@ -467,7 +468,10 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 		if (verbose > 2)
 			rprintf(FINFO,"renaming %s to %s\n",fnametmp,fname);
 
-		finish_transfer(fname, fnametmp, file);
+		if (recv_ok || keep_partial)
+			finish_transfer(fname, fnametmp, file, recv_ok);
+		else
+			do_unlink(fnametmp);
 
 		cleanup_disable();
 
