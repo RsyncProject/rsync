@@ -1,4 +1,4 @@
-NEWS for rsync 2.6.3 (UNRELEASED)
+NEWS for rsync 2.6.3 (30 Sep 2004)
 Protocol: 28 (unchanged)
 Changes since 2.6.2:
 
@@ -25,6 +25,10 @@ Changes since 2.6.2:
     - Rsync ensures that a filename that contains a newline gets mentioned
       with each newline transformed into a question mark (which prevents a
       filename from causing an empty line to be output).
+
+    - The "backed up ..." message that is output when at least 2 --verbose
+      options are specified is now the same both with and without the
+      --backup-dir option.
 
   BUG FIXES:
 
@@ -115,12 +119,12 @@ Changes since 2.6.2:
       exist, rsync now produces a correct report of files that would be
       sent instead of dying with a chdir() error.
 
-    - The "backed up ..." message that is output when at least 2 --verbose
-      options are specified is now the same both with and without the
-      --backup-dir option.
-
     - Fixed a bug that could cause a slow-to-connect rsync daemon to die
       with an error instead of waiting for the connection to finish.
+
+    - Fixed an ssh interaction that could cause output to be lost when the
+      user chose to combine the output of rsync's stdout and stderr (e.g.
+      using the "2>&1").
 
   ENHANCEMENTS:
 
