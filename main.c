@@ -24,14 +24,38 @@
 time_t starttime = 0;
 
 extern struct stats stats;
-extern char *files_from;
-extern int filesfrom_fd;
-extern char *remote_filesfrom_file;
+extern int am_root;
 extern int am_server;
 extern int am_sender;
 extern int am_daemon;
 extern int verbose;
+extern int blocking_io;
+extern int cvs_exclude;
+extern int delete_mode;
+extern int delete_excluded;
+extern int delete_after;
+extern int daemon_over_rsh;
+extern int do_stats;
+extern int dry_run;
+extern int list_only;
+extern int local_server;
+extern int log_got_error;
+extern int module_id;
+extern int orig_umask;
+extern int preserve_hard_links;
 extern int protocol_version;
+extern int recurse;
+extern int relative_paths;
+extern int rsync_port;
+extern int read_batch;
+extern int write_batch;
+extern int filesfrom_fd;
+extern pid_t cleanup_child_pid;
+extern char *files_from;
+extern char *remote_filesfrom_file;
+extern char *rsync_path;
+extern char *shell_cmd;
+extern struct file_list *batch_flist;
 
 /* there's probably never more than at most 2 outstanding child processes,
  * but set it higher just in case.
@@ -82,7 +106,6 @@ void wait_process(pid_t pid, int *status)
 static void report(int f)
 {
 	time_t t = time(NULL);
-	extern int do_stats;
 	int send_stats;
 
 	if (do_stats && verbose > 1) {
@@ -198,11 +221,6 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 	pid_t ret;
 	char *tok,*dir=NULL;
 	int dash_l_set = 0;
-	extern int local_server;
-	extern char *rsync_path;
-	extern int blocking_io;
-	extern int daemon_over_rsh;
-	extern int read_batch;
 
 	if (!read_batch && !local_server) {
 		char *rsh_env = getenv(RSYNC_RSH_ENV);
@@ -293,7 +311,6 @@ static char *get_local_name(struct file_list *flist,char *name)
 {
 	STRUCT_STAT st;
 	int e;
-	extern int orig_umask;
 
 	if (verbose > 2)
 		rprintf(FINFO,"get_local_name count=%d %s\n",
@@ -340,15 +357,11 @@ static char *get_local_name(struct file_list *flist,char *name)
 }
 
 
-
-
 static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 {
 	int i;
 	struct file_list *flist;
 	char *dir = argv[0];
-	extern int relative_paths;
-	extern int recurse;
 
 	if (verbose > 2)
 		rprintf(FINFO,"server_sender starting pid=%d\n",(int)getpid());
@@ -399,10 +412,6 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	int pid;
 	int status=0;
 	int error_pipe[2];
-	extern int preserve_hard_links;
-	extern int delete_after;
-	extern int recurse;
-	extern int delete_mode;
 
 	if (preserve_hard_links)
 		init_hard_links(flist);
@@ -474,11 +483,6 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	struct file_list *flist;
 	char *local_name=NULL;
 	char *dir = NULL;
-	extern int delete_mode;
-	extern int delete_excluded;
-	extern int module_id;
-	extern int read_batch;
-	extern struct file_list *batch_flist;
 
 	if (verbose > 2)
 		rprintf(FINFO,"server_recv(%d) starting pid=%d\n",argc,(int)getpid());
@@ -545,9 +549,6 @@ int child_main(int argc, char *argv[])
 
 void start_server(int f_in, int f_out, int argc, char *argv[])
 {
-	extern int cvs_exclude;
-	extern int read_batch;
-
 	setup_protocol(f_out, f_in);
 
 	set_nonblocking(f_in);
@@ -579,10 +580,6 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	struct file_list *flist = NULL;
 	int status = 0, status2 = 0;
 	char *local_name = NULL;
-	extern pid_t cleanup_child_pid;
-	extern int write_batch;
-	extern int read_batch;
-	extern struct file_list *batch_flist;
 
 	cleanup_child_pid = pid;
 	if (read_batch)
@@ -597,9 +594,6 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		io_start_multiplex_in(f_in);
 
 	if (am_sender) {
-		extern int cvs_exclude;
-		extern int delete_mode;
-		extern int delete_excluded;
 		io_start_buffering_out(f_out);
 		if (cvs_exclude)
 			add_cvs_excludes();
@@ -632,7 +626,6 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	}
 
 	if (argc == 0) {
-		extern int list_only;
 		list_only = 1;
 	}
 
@@ -699,11 +692,6 @@ static int start_client(int argc, char *argv[])
 	int ret;
 	pid_t pid;
 	int f_in,f_out;
-	extern int local_server;
-	extern char *shell_cmd;
-	extern int rsync_port;
-	extern int daemon_over_rsh;
-	extern int read_batch;
 	int rc;
 
 	/* Don't clobber argv[] so that ps(1) can still show the right
@@ -854,7 +842,6 @@ static int start_client(int argc, char *argv[])
 	}
 
 	if (argc == 0 && !am_sender) {
-		extern int list_only;
 		list_only = 1;
 	}
 
@@ -887,7 +874,6 @@ static RETSIGTYPE sigusr1_handler(UNUSED(int val))
 
 static RETSIGTYPE sigusr2_handler(UNUSED(int val))
 {
-	extern int log_got_error;
 	if (log_got_error) _exit(RERR_PARTIAL);
 	_exit(0);
 }
@@ -970,11 +956,7 @@ static RETSIGTYPE rsync_panic_handler(UNUSED(int whatsig))
 
 int main(int argc,char *argv[])
 {
-	extern int am_root;
-	extern int orig_umask;
-	extern int dry_run;
 	int ret;
-	extern int write_batch;
 	int orig_argc;
 	char **orig_argv;
 
