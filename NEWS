@@ -81,8 +81,8 @@ rsync 2.4.7 (sometime in 2001, maybe :)		-*- indented-text -*-
 		FreeBSD 3.3-RELEASE i386 cc
 		FreeBSD 4.1.1-RELEASE i386 cc
 		FreeBSD 4.3-STABLE i386 cc
-		HP-UX 10.10 gcc
-		HP-UX 11.11 cc
+		HP PA-RISC HP-UX 10.20 gcc
+		HP PA-RISC HP-UX 11.11 cc
 		IRIX 6.5 MIPS cc
 		IRIX 6.5 MIPS gcc
 		Mac OS X PPC (--disable-ipv6) cc

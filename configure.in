@@ -5,6 +5,12 @@ AC_CONFIG_SRCDIR([byteorder.h])
 AC_CONFIG_HEADER(config.h)
 AC_PREREQ(2.52)
 
+RSYNC_VERSION=2.4.7pre5
+AC_SUBST(RSYNC_VERSION)
+AC_MSG_NOTICE([Configuring rsync $RSYNC_VERSION])
+
+AC_DEFINE_UNQUOTED(RSYNC_VERSION, ["$RSYNC_VERSION"], [rsync release version])
+
 LDFLAGS=${LDFLAGS-""}
 
 AC_CANONICAL_TARGET([])
@@ -13,11 +19,13 @@ dnl Checks for programs.
 AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_INSTALL
+AC_PROG_CC_STDC
 AC_SUBST(SHELL)
 
-RSYNC_VERSION=2.4.7pre4
-AC_SUBST(RSYNC_VERSION)
-AC_DEFINE_UNQUOTED(RSYNC_VERSION, ["$RSYNC_VERSION"], [rsync release version])
+if test "$xac_cv_prog_cc_stdc" = xno
+then
+	AC_MSG_WARN([rsync requires an ANSI C compiler and you don't seem to have one])
+fi
 
 # compile with optimisation and without debugging by default, unless
 # --debug is given.  We must decide this before testing the compiler.
