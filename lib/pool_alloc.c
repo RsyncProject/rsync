@@ -17,10 +17,10 @@ struct alloc_pool
 	/* statistical data */
 	unsigned long		e_created;	/* extents created	*/
 	unsigned long		e_freed;	/* extents detroyed	*/
-	uint64			n_allocated;	/* calls to alloc	*/
-	uint64			n_freed;	/* calls to free	*/
-	uint64			b_allocated;	/* cum. bytes allocated	*/
-	uint64			b_freed;	/* cum. bytes freed	*/
+	int64			n_allocated;	/* calls to alloc	*/
+	int64			n_freed;	/* calls to free	*/
+	int64			b_allocated;	/* cum. bytes allocated	*/
+	int64			b_freed;	/* cum. bytes freed	*/
 };
 
 struct pool_extent
@@ -34,7 +34,7 @@ struct pool_extent
 
 struct align_test {
     void *foo;
-    uint64 bar;
+    int64 bar;
 };
 
 #define MINALIGN	offsetof(struct align_test, bar)
