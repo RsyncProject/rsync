@@ -222,6 +222,12 @@ void send_exclude_list(int f)
 {
 	int i;
 	extern int remote_version;
+	extern int list_only, recurse;
+
+	/* this is a complete hack - blame Rusty */
+	if (list_only && !recurse) {
+		add_exclude("/*/*", 0);
+	}
 
 	if (!exclude_list) {
 		write_int(f,0);
