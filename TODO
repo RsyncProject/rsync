@@ -296,6 +296,9 @@ verbose output
   
   Indicate whether files are new, updated, or deleted
 
+  At end of transfer, show how many files were or were not transferred
+  correctly.
+
 internationalization
 
   Change to using gettext().  Probably need to ship this for platforms
