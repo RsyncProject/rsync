@@ -23,26 +23,31 @@ Changes since version 2.5.6:
 
   BUG FIXES:
 
-    * for protocol version >= 27, mdfour_tail() is called when the
+    * For protocol version >= 27, mdfour_tail() is called when the
       block size (including checksum_seed) is a multiple of 64.
       Previously it was not called, giving the wrong MD4 checksum.
       (Craig Barratt)
   
-    * for protocol version >= 27, a 64 bit bit counter is used in
+    * For protocol version >= 27, a 64 bit bit counter is used in
       mdfour.c as required by the RFC.  Previously only a 32 bit bit
       counter was used, causing incorrect MD4 file checksums for
       file sizes >= 512MB - 4.  (Craig Barratt)
 
-    * Fixed a crash bug when interacting with older rsync versios and
+    * Fixed a crash bug when interacting with older rsync versions and
       multiple files of the same name are destined for the same dir.
       (Wayne Davison)
 
     * Keep tmp names from overflowing MAXPATHLEN.
 
-    * Make --link-dest honor the absence of -p -o and -g.
+    * Make --link-dest honor the absence of -p, -o, and -g.
 
     * Made rsync treat a trailing slash in the destination in a more
       consistent manner.
+
+    * Fixed some exclude/include matching bugs when using wild-cards.
+      For instance, "**/foo" now matches at the root, "CVS/R*" now
+      matches beyond the root, and "foo**bar" is matched against the
+      path, not just the trailing name.  (Wayne Davison)
 
 
   INTERNAL:
