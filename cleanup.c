@@ -39,6 +39,7 @@ void _exit_cleanup(int code, const char *file, int line)
 	if (code == 0 && io_error) code = RERR_FILEIO;
 
 	signal(SIGUSR1, SIG_IGN);
+	signal(SIGUSR2, SIG_IGN);
 
 	if (cleanup_got_literal && cleanup_fname && keep_partial) {
 		char *fname = cleanup_fname;

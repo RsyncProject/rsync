@@ -24,7 +24,9 @@ not for end users. You may experience failures on some platforms that
 do not indicate a problem with rsync.
 
 EOF
-  export PATH=.:$PATH
+
+RSYNC=`pwd`/rsync
+
   runtest() {
     echo -n "Test $1: "
     eval "$2"
@@ -123,33 +125,33 @@ EOF
 
 # Main script starts here
 
-runtest "basic operation" 'checkit "rsync -av ${FROM}/ ${TO}" ${FROM}/ ${TO}'
+runtest "basic operation" 'checkit "$RSYNC -av ${FROM}/ ${TO}" ${FROM}/ ${TO}'
 
 ln ${FROM}/pslist ${FROM}/dir
-runtest "hard links" 'checkit "rsync -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
+runtest "hard links" 'checkit "$RSYNC -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
 
 rm ${TO}/${F1}
-runtest "one file" 'checkit "rsync -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
+runtest "one file" 'checkit "$RSYNC -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
 
 echo "extra line" >> ${TO}/${F1}
-runtest "extra data" 'checkit "rsync -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
+runtest "extra data" 'checkit "$RSYNC -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
 
 cp ${FROM}/${F1} ${TO}/ThisShouldGo
-runtest " --delete" 'checkit "rsync --delete -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
+runtest " --delete" 'checkit "$RSYNC --delete -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
 
 LONGDIR=${FROM}/This-is-a-directory-with-a-stupidly-long-name-created-in-an-attempt-to-provoke-an-error-found-in-2.0.11-that-should-hopefully-never-appear-again-if-this-test-does-its-job/This-is-a-directory-with-a-stupidly-long-name-created-in-an-attempt-to-provoke-an-error-found-in-2.0.11-that-should-hopefully-never-appear-again-if-this-test-does-its-job/This-is-a-directory-with-a-stupidly-long-name-created-in-an-attempt-to-provoke-an-error-found-in-2.0.11-that-should-hopefully-never-appear-again-if-this-test-does-its-job
 mkdir -p ${LONGDIR}
 date > ${LONGDIR}/1
 ls -la / > ${LONGDIR}/2
-runtest "long paths" 'checkit "rsync --delete -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
+runtest "long paths" 'checkit "$RSYNC --delete -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
 
 if type ssh >/dev/null 2>&1; then
   if [ "`ssh -o'BatchMode yes' localhost echo yes 2>/dev/null`" = "yes" ]; then
   rm -rf ${TO}
-    runtest "ssh: basic test" 'checkit "rsync -avH -e ssh ${FROM}/ localhost:${TO}" ${FROM}/ ${TO}'
+    runtest "ssh: basic test" 'checkit "$RSYNC -avH -e ssh --rsync-path=$RSYNC ${FROM}/ localhost:${TO}" ${FROM}/ ${TO}'
 
     mv ${TO}/${F1} ${TO}/ThisShouldGo
-    runtest "ssh: renamed file" 'checkit "rsync --delete -avH -e ssh ${FROM}/ localhost:${TO}" ${FROM}/ ${TO}'
+    runtest "ssh: renamed file" 'checkit "$RSYNC --delete -avH -e ssh --rsync-path=$RSYNC ${FROM}/ localhost:${TO}" ${FROM}/ ${TO}'
   else
   printmsg "Skipping SSH tests because ssh conection to localhost not authorised"
   fi
@@ -161,7 +163,7 @@ rm -rf ${TO}
 mkdir -p ${FROM}2/dir/subdir
 cp -a ${FROM}/dir/subdir/subsubdir ${FROM}2/dir/subdir
 cp ${FROM}/dir/* ${FROM}2/dir 2>/dev/null
-runtest "excludes" 'checkit "rsync -vv -Hlrt --delete --include /dir/ --include /dir/\* --include /dir/\*/subsubdir  --include /dir/\*/subsubdir/\*\* --exclude \*\* ${FROM}/dir ${TO}" ${FROM}2/ ${TO}'
+runtest "excludes" 'checkit "$RSYNC -vv -Hlrt --delete --include /dir/ --include /dir/\* --include /dir/\*/subsubdir  --include /dir/\*/subsubdir/\*\* --exclude \*\* ${FROM}/dir ${TO}" ${FROM}2/ ${TO}'
 rm -r ${FROM}2
 
 checkforlogs ${LOG}.?

@@ -321,9 +321,12 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		recv_files(f_in,flist,local_name,recv_pipe[1]);
 		report(f_in);
 
-		write_int(recv_pipe[1],-1);
+		write_int(recv_pipe[1],1);
+		close(recv_pipe[1]);
 		io_flush();
-		_exit(0);
+		/* finally we go to sleep until our parent kills us with
+		   a USR2 signal */
+		while (1) sleep(60);
 	}
 
 	close(recv_pipe[1]);
@@ -337,13 +340,15 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	generate_files(f_out,flist,local_name,recv_pipe[0]);
 
-	read_int(recv_pipe[1]);
+	read_int(recv_pipe[0]);
+	close(recv_pipe[0]);
 	if (remote_version >= 24) {
 		/* send a final goodbye message */
 		write_int(f_out, -1);
 	}
 	io_flush();
 
+	kill(pid, SIGUSR2);
 	wait_process(pid, &status);
 	return status;
 }
@@ -621,6 +626,10 @@ static RETSIGTYPE sigusr1_handler(int val) {
 	exit_cleanup(RERR_SIGNAL);
 }
 
+static RETSIGTYPE sigusr2_handler(int val) {
+	_exit(0);
+}
+
 int main(int argc,char *argv[])
 {       
 	extern int am_root;
@@ -630,6 +639,7 @@ int main(int argc,char *argv[])
 	extern int am_server;
 
 	signal(SIGUSR1, sigusr1_handler);
+	signal(SIGUSR2, sigusr2_handler);
 
 	starttime = time(NULL);
 	am_root = (getuid() == 0);
