@@ -301,16 +301,15 @@ int copy_file(char *source, char *dest, mode_t mode)
 #define MAX_RENAMES 1000
 
 /**
- * 
-  Robust unlink: some OS'es (HPUX) refuse to unlink busy files, so
-  rename to <path>/.rsyncNNN instead.
-  
-  Note that successive rsync runs will shuffle the filenames around a
-  bit as long as the file is still busy; this is because this function
-  does not know if the unlink call is due to a new file coming in, or
-  --delete trying to remove old .rsyncNNN files, hence it renames it
-  each time.
-*/
+ * Robust unlink: some OS'es (HPUX) refuse to unlink busy files, so
+ * rename to <path>/.rsyncNNN instead.
+ *
+ * Note that successive rsync runs will shuffle the filenames around a
+ * bit as long as the file is still busy; this is because this function
+ * does not know if the unlink call is due to a new file coming in, or
+ * --delete trying to remove old .rsyncNNN files, hence it renames it
+ * each time.
+ **/
 int robust_unlink(char *fname)
 {
 #ifndef ETXTBSY
@@ -590,17 +589,19 @@ void clean_fname(char *name)
 /**
  * Make path appear as if a chroot had occurred:
  *
- *    1. remove leading "/" (or replace with "." if at end)
- *    2. remove leading ".." components (except those allowed by "reldir")
- *    3. delete any other "<dir>/.." (recursively)
+ * @li 1. remove leading "/" (or replace with "." if at end)
+ *
+ * @li 2. remove leading ".." components (except those allowed by @p reldir)
+ *
+ * @li 3. delete any other "<dir>/.." (recursively)
  *
  * Can only shrink paths, so sanitizes in place.
  *
  * While we're at it, remove double slashes and "." components like
- *   clean_fname does(), but DON'T remove a trailing slash because that
+ *   clean_fname() does, but DON'T remove a trailing slash because that
  *   is sometimes significant on command line arguments.
  *
- * If "reldir" is non-null, it is a sanitized directory that the path will be
+ * If @p reldir is non-null, it is a sanitized directory that the path will be
  *    relative to, so allow as many ".." at the beginning of the path as
  *    there are components in reldir.  This is used for symbolic link targets.
  *    If reldir is non-null and the path began with "/", to be completely like
@@ -828,8 +829,8 @@ int unsafe_symlink(char *dest, char *src)
 
 
 /**
-   Return the date and time as a string
-*/
+ * Return the date and time as a string
+ **/
 char *timestring(time_t t)
 {
 	static char TimeBuf[200];
