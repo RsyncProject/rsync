@@ -790,6 +790,7 @@ Changes since 2.4.6:
 
 Partial Protocol History
 	RELEASE DATE	VER.	DATE OF COMMIT	PROTOCOL
+	30 Sep 2004	2.6.3			28
 	30 Apr 2004	2.6.2			28
 	26 Apr 2004	2.6.1	08 Jan 2004	28
 	01 Jan 2004	2.6.0	10 Apr 2003	27 (MAX=40)
