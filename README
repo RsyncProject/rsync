@@ -1,0 +1,82 @@
+WHAT IS RSYNC?
+--------------
+
+rsync is a replacement for rcp that has many more features.
+
+rsyns uses the "rsync algorithm" which provides a very fast method for
+bringing remote files into sync. It does this by sending just the
+differences in the files across the link, without requiring that both
+sets of files are present at one of the ends of the link beforehand.
+At first glance this may seem impossible because the calculation of
+diffs between two files normally requires local access to both
+files. 
+
+A technical report describing the rsync algorithm is included with
+this package.
+
+
+USAGE
+-----
+
+Basically you use rsync just like rcp, but rsync has many additional options.
+
+Here is a brief description of available options:
+
+-v, --verbose            increase verbosity
+-c, --checksum           always checksum
+-a, --archive            archive mode (same as -rlptDog)
+-r, --recursive          recurse into directories
+-b, --backup             make backups (default ~ extension)
+-u, --update             update only (don't overwrite newer files)
+-l, --links              preserve soft links
+-p, --perms              preserve permissions
+-o, --owner              preserve owner (root only)
+-g, --group              preserve group
+-D, --devices            preserve devices (root only)
+-t, --times              preserve times
+-n, --dry-run            show what would have been transferred
+-x, --one-file-system    don't cross filesystem boundaries
+-B, --block-size SIZE    checksum blocking size
+-e, --rsh COMMAND        specify rsh replacement
+    --rsync-path PATH    specify path to rsync on the remote machine
+-C, --cvs-exclude        auto ignore files in the same way CVS does
+    --delete             delete files that don't exist on the sending side
+-I, --ignore-times       don't exclude files that match length and time
+    --exclude FILE       exclude file FILE
+    --exclude-from FILE  exclude files listed in FILE
+    --suffix SUFFIX      override backup suffix
+    --version            print version number
+
+
+
+SETUP
+-----
+
+Rsync uses rsh or ssh for communication. It does not need to be setuid
+and requires no special privilages for installation. It does not
+require a inetd entry or a daemon. You must, however, have a working
+rsh or ssh system. Using ssh is recommended for its security and
+compression features.
+
+To install rsync, first run the "configure" script. This will create a
+Makefile and config.h appropriate for your system. Then type
+"make". 
+
+Once built put a copy of rsync in your search path on the local and
+remote systems (or use "make install"). That's it!
+
+
+COPYRIGHT
+---------
+
+Rsync was written by Andrew Tridgell and Paul Mackerras, and is
+available under the GPL.
+
+Andrew.Tridgell@anu.edu.au
+paulus@cs.anu.edu.au
+
+
+AVAILABILITY
+------------
+
+The main ftp site for rsync is ftp://samba.anu.edu.au/pub/rsync
