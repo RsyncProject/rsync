@@ -1,22 +1,23 @@
 /* -*- c-file-style: "linux" -*-
-     
-   Copyright (C) 1996-2001 by Andrew Tridgell <tridge@samba.org>
-   Copyright (C) 1996 by Paul Mackerras
-   
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-   
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-   
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-*/
+ * 
+ * Copyright (C) 1996-2001 by Andrew Tridgell <tridge@samba.org>
+ * Copyright (C) 1996 by Paul Mackerras
+ * Copyright (C) 2002 by Martin Pool
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
 
 /* a lot of this stuff was originally derived from GNU tar, although
    it has now changed so much that it is hard to tell :) */
@@ -30,7 +31,7 @@ extern int delete_mode;
 
 static struct exclude_struct **exclude_list;
 
-/* build an exclude structure given a exclude pattern */
+/** Build an exclude structure given a exclude pattern */
 static struct exclude_struct *make_exclude(const char *pattern, int include)
 {
 	struct exclude_struct *ret;
@@ -334,7 +335,7 @@ char *get_exclude_tok(char *p)
 		return(NULL);
 
 	/* Skip over any initial spaces */
-	while(isspace(*s))
+	while(isspace((int) *s))
 		s++;
 
 	/* Are we at the end of the string? */
@@ -347,7 +348,7 @@ char *get_exclude_tok(char *p)
 			s+=2;
 	
 		/* Skip to the next space or the end of the string */
-		while(!isspace(*s) && *s!='\0')
+		while(!isspace((int) *s) && *s != '\0')
 			s++;
 	} else {
 		t=NULL;

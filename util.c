@@ -532,7 +532,8 @@ void glob_expand(char *base1, char **argv, int *argc, int maxargs)
 void strlower(char *s)
 {
 	while (*s) {
-		if (isupper(*s)) *s = tolower(*s);
+		if (isupper((int) *s))
+			*s = tolower((int) *s);
 		s++;
 	}
 }
