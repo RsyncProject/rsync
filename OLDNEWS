@@ -1042,7 +1042,8 @@ Changes since 2.4.6:
       build farm.
 
 Partial Protocol History
-	RELEASE DATE	VER.	DATE OF COMMIT	PROTOCOL
+	RELEASE DATE	VER.	DATE OF COMMIT*	PROTOCOL
+	30 Mar 2005	2.6.4	17 Jan 2005	29
 	30 Sep 2004	2.6.3			28
 	30 Apr 2004	2.6.2			28
 	26 Apr 2004	2.6.1	08 Jan 2004	28
