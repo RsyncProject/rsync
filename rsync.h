@@ -106,7 +106,7 @@
 
 #define XFLG_FATAL_ERRORS	(1<<0)
 #define XFLG_DEF_INCLUDE	(1<<1)
-#define XFLG_NO_PREFIXES	(1<<2)
+#define XFLG_WORDS_ONLY 	(1<<2)
 #define XFLG_WORD_SPLIT 	(1<<3)
 
 #define FULL_FLUSH	1
@@ -761,10 +761,6 @@ int inet_pton(int af, const char *src, void *dst);
 const char *get_panic_action(void);
 #endif
 
-#if !(defined(__hpux) || defined(_hpux) || defined (hpux))
 #define UNUSED(x) x __attribute__((__unused__))
-#else
-#define UNUSED(x) x
-#endif
 
 extern const char *io_write_phase, *io_read_phase;
