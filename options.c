@@ -1013,8 +1013,7 @@ void server_options(char **args,int *argc)
 	if (am_sender) {
 		if (delete_excluded)
 			args[ac++] = "--delete-excluded";
-		else if (delete_mode
-		    && (!delete_after || protocol_version < 27))
+		else if (delete_mode)
 			args[ac++] = "--delete";
 
 		if (delete_after)
