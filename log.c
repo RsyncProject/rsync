@@ -345,9 +345,9 @@ void rflush(enum logcode code)
 
 /* a generic logging routine for send/recv, with parameter
  * substitiution */
-static void log_formatted(enum logcode code,
-			  char *format, char *op, struct file_struct *file,
-			  struct stats *initial_stats, int iflags)
+static void log_formatted(enum logcode code, char *format, char *op,
+			  struct file_struct *file, struct stats *initial_stats,
+			  int iflags, char *hlink)
 {
 	char buf[MAXPATHLEN+1024];
 	char buf2[MAXPATHLEN];
@@ -394,7 +394,11 @@ static void log_formatted(enum logcode code,
 			}
 			break;
 		case 'L':
-			if (S_ISLNK(file->mode) && file->u.link) {
+			if (hlink && *hlink) {
+				snprintf(buf2, sizeof buf2, " => %s",
+					 safe_fname(hlink));
+				n = buf2;
+			} else if (S_ISLNK(file->mode) && file->u.link) {
 				snprintf(buf2, sizeof buf2, " -> %s",
 					 safe_fname(file->u.link));
 				n = buf2;
@@ -446,7 +450,8 @@ static void log_formatted(enum logcode code,
 			n[5] = !(iflags & ITEM_REPORT_PERMS) ? '.' : 'p';
 			n[6] = !(iflags & ITEM_REPORT_OWNER) ? '.' : 'o';
 			n[7] = !(iflags & ITEM_REPORT_GROUP) ? '.' : 'g';
-			n[8] = '\0';
+			n[8] = '.';
+			n[9] = '\0';
 
 			if (iflags & (ITEM_IS_NEW|ITEM_MISSING_DATA)) {
 				char ch = iflags & ITEM_IS_NEW ? '+' : '?';
@@ -501,30 +506,20 @@ static void log_formatted(enum logcode code,
 	rprintf(code, "%s\n", buf);
 }
 
-/* log the outgoing transfer of a file */
-void log_send(struct file_struct *file, struct stats *initial_stats, int iflags)
+/* log the transfer of a file */
+void log_item(struct file_struct *file, struct stats *initial_stats,
+	      int iflags, char *hlink)
 {
+	char *s_or_r = am_sender ? "send" : "recv";
+
 	if (lp_transfer_logging(module_id)) {
-		log_formatted(FLOG, lp_log_format(module_id), "send",
-			      file, initial_stats, iflags);
+		log_formatted(FLOG, lp_log_format(module_id), s_or_r,
+			      file, initial_stats, iflags, hlink);
 	} else if (log_format && !am_server) {
-		log_formatted(FINFO, log_format, "send",
-			      file, initial_stats, iflags);
+		log_formatted(FINFO, log_format, s_or_r,
+			      file, initial_stats, iflags, hlink);
 	}
 }
-
-/* log the incoming transfer of a file */
-void log_recv(struct file_struct *file, struct stats *initial_stats, int iflags)
-{
-	if (lp_transfer_logging(module_id)) {
-		log_formatted(FLOG, lp_log_format(module_id), "recv",
-			      file, initial_stats, iflags);
-	} else if (log_format && !am_server) {
-		log_formatted(FINFO, log_format, "recv",
-			      file, initial_stats, iflags);
-	}
-}
-
 
 void log_delete(char *fname, int mode)
 {
@@ -543,14 +538,15 @@ void log_delete(char *fname, int mode)
 		send_msg(MSG_DELETED, fname, len);
 	} else {
 		fmt = log_format_has_o_or_i ? log_format : "%i %n";
-		log_formatted(FCLIENT, fmt, "del.", &file, &stats, ITEM_DELETED);
+		log_formatted(FCLIENT, fmt, "del.", &file, &stats,
+			      ITEM_DELETED, NULL);
 	}
 
 	if (!am_daemon || dry_run || !lp_transfer_logging(module_id))
 		return;
 
 	fmt = daemon_log_format_has_o_or_i ? lp_log_format(module_id) : "%i %n";
-	log_formatted(FLOG, fmt, "del.", &file, &stats, ITEM_DELETED);
+	log_formatted(FLOG, fmt, "del.", &file, &stats, ITEM_DELETED, NULL);
 }
 
 
