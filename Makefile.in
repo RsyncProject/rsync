@@ -53,15 +53,15 @@ all: rsync
 man: rsync.1 rsyncd.conf.5
 
 install: all
-	-mkdir -p ${bindir}
-	${INSTALLCMD} -m 755 rsync ${bindir}
-	-mkdir -p ${mandir}/man1
-	-mkdir -p ${mandir}/man5
-	${INSTALLMAN} -m 644 $(srcdir)/rsync.1 ${mandir}/man1
-	${INSTALLMAN} -m 644 $(srcdir)/rsyncd.conf.5 ${mandir}/man5
+	-mkdir -p ${DESTDIR}${bindir}
+	${INSTALLCMD} ${STRIP} -m 755 rsync ${DESTDIR}${bindir}
+	-mkdir -p ${DESTDIR}${mandir}/man1
+	-mkdir -p ${DESTDIR}${mandir}/man5
+	${INSTALLMAN} -m 644 $(srcdir)/rsync.1 ${DESTDIR}${mandir}/man1
+	${INSTALLMAN} -m 644 $(srcdir)/rsyncd.conf.5 ${DESTDIR}${mandir}/man5
 
 install-strip:
-	$(MAKE) INSTALLCMD='$(INSTALLCMD) -s' install
+	$(MAKE) STRIP='-s' install
 
 rsync: $(OBJS)
 	@echo "Please ignore warnings below about mktemp -- it is used in a safe way"

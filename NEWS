@@ -8,6 +8,11 @@ rsync changes since last release
       time taken; otherwise show expected time to complete. (Cameron
       Simpson)
 
+    * Make "make install-strip" works properly, and "make install"
+      accepts a DESTDIR variable for help in building binary packages.
+      (Peter Breitenlohner)
+
+
   BUG FIXES:
 
     * Fix situation where failure to fork (e.g. because out of process
