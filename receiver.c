@@ -387,6 +387,10 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			continue;
 		}
 
+		/* mktemp is deliberately used here instead of mkstemp.
+		   because O_EXCL is used on the open, the race condition
+		   is not a problem or a security hole, and we want to
+		   control the access permissions on the created file. */
 		if (NULL == do_mktemp(fnametmp)) {
 			rprintf(FERROR,"mktemp %s failed\n",fnametmp);
 			receive_data(f_in,buf,-1,NULL,file->length);
