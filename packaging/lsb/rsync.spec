@@ -4,7 +4,7 @@ Version: 2.6.0pre1
 Release: 1
 Copyright: GPL
 Group: Applications/Networking
-Source:	ftp://samba.anu.edu.au/pub/rsync/rsync-2.6.0pre1.tar.gz
+Source:	ftp://samba.anu.edu.au/pub/rsync/rsync-%{version}.tar.gz
 URL: http://samba.anu.edu.au/rsync/
 Packager: Andrew Tridgell <tridge@samba.anu.edu.au>
 BuildRoot: /tmp/rsync
