@@ -31,6 +31,8 @@ rsync changes since last release
     * Properly support IPv6 addresses in the rsyncd.conf "hosts allow"
       and "hosts deny" fields.  (Hideaki Yoshifuji)
 
+    * Set the default value of --modify-window to 2 on Cygwin.  (Max Bowsher)
+
   BUG FIXES:
   
     * Fix "forward name lookup failed" errors on AIX 4.3.3.  (John

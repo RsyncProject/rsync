@@ -81,11 +81,7 @@ int only_existing=0;
 int opt_ignore_existing=0;
 int max_delete=0;
 int ignore_errors=0;
-#ifdef _WIN32
-int modify_window=2;
-#else
-int modify_window=0;
-#endif
+int modify_window=DEFAULT_MODIFY_WINDOW;
 int blocking_io=-1;
 
 
