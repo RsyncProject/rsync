@@ -39,6 +39,10 @@ struct align_test {
 
 #define MINALIGN	offsetof(struct align_test, bar)
 
+/* Temporarily cast a void* var into a char* var when adding an offset (to
+ * keep some compilers from complaining about the pointer arithmetic). */
+#define PTR_ADD(b,o)	( (void*) ((char*)(b) + (o)) )
+
 alloc_pool_t
 pool_create(size_t size, size_t quantum,
     void (*bomb)(char *), int flags)
@@ -134,14 +138,14 @@ pool_alloc(alloc_pool_t p, size_t len, char *bomb)
 
 		if (pool->flags & POOL_APPEND)
 		{
-			pool->live = start + free;
+			pool->live = PTR_ADD(start, free);
 		}
 		else if (!(pool->live = (struct pool_extent *) malloc(sizeof (struct pool_extent))))
 		{
 			goto bomb;
 		}
 		if (pool->flags & POOL_QALIGN && pool->quantum > 1
-		    && (sqew = (size_t)(start + free) % pool->quantum))
+		    && (sqew = (size_t)PTR_ADD(start, free) % pool->quantum))
 		{
 			bound  += sqew;
 			free -= sqew;
@@ -159,7 +163,7 @@ pool_alloc(alloc_pool_t p, size_t len, char *bomb)
 
 	pool->live->free -= len;
 
-	return pool->live->start + pool->live->free;
+	return PTR_ADD(pool->live->start, pool->live->free);
 
 bomb:
 	if (pool->bomb)
@@ -195,9 +199,9 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 	cur = pool->live;
 	if (cur
 	    && addr >= cur->start
-	    && addr < cur->start + pool->size)
+	    && addr < PTR_ADD(cur->start, pool->size))
 	{
-		if (addr == cur->start + cur->free)
+		if (addr == PTR_ADD(cur->start, cur->free))
 		{
 			if (pool->flags & POOL_CLEAR)
 				memset(addr, 0, len);
@@ -212,7 +216,7 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 			cur->free = pool->size;
 			cur->bound = 0;
 			if (pool->flags & POOL_QALIGN && pool->quantum > 1
-			    && (sqew = (size_t)(cur->start + cur->free) % pool->quantum))
+			    && (sqew = (size_t)PTR_ADD(cur->start, cur->free) % pool->quantum))
 			{
 				cur->bound += sqew;
 				cur->free -= sqew;
