@@ -83,6 +83,11 @@ Changes since 2.6.2:
 
     - Added the --checksum-seed=N option for advanced users.
 
+    - Batch writing/reading has a brand-new implementation that is
+      simpler, fixes a few weird problems with the old code, and is much
+      less intrusive into the code (making it easier to maintain for the
+      future).  (Chris Shoemaker)
+
   INTERNAL:
 
     - Some cleanup in the exclude code has saved some per-exclude memory
