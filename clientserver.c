@@ -32,7 +32,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	int sargc=0;
 	char line[1024];
 	char *p;
-	int version;
+	extern int remote_version;
 
 	fd = open_socket_out(host, rsync_port);
 	if (fd == -1) {
@@ -52,7 +52,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 		return -1;
 	}
 
-	if (sscanf(line,"@RSYNCD: %d", &version) != 1) {
+	if (sscanf(line,"@RSYNCD: %d", &remote_version) != 1) {
 		return -1;
 	}
 
@@ -214,9 +214,9 @@ static int start_daemon(int fd)
 {
 	char line[200];
 	char *motd;
-	int version;
 	int i = -1;
 	extern char *config_file;
+	extern int remote_version;
 
 	if (!lp_load(config_file)) {
 		exit_cleanup(1);
@@ -230,7 +230,7 @@ static int start_daemon(int fd)
 		return -1;
 	}
 
-	if (sscanf(line,"@RSYNCD: %d", &version) != 1) {
+	if (sscanf(line,"@RSYNCD: %d", &remote_version) != 1) {
 		return -1;
 	}	
 
