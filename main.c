@@ -151,6 +151,8 @@ static void report(int f)
 	/* this is the client */
 
 	if (!am_sender) {
+		/* Read the first two in opposite order because the meaning of
+		 * read/write swaps when switching from sender to receiver. */
 		total_written = read_longint(f);
 		total_read = read_longint(f);
 		stats.total_size = read_longint(f);
@@ -461,9 +463,8 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	if (!delete_after) {
 		/* I moved this here from recv_files() to prevent a race condition */
-		if (recurse && delete_mode && !local_name && flist->count>0) {
+		if (recurse && delete_mode && !local_name && flist->count > 0)
 			delete_files(flist);
-		}
 	}
 
 	if (fd_pair(error_pipe) < 0) {
