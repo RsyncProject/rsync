@@ -553,6 +553,58 @@ void strlower(char *s)
 	}
 }
 
+/* Join strings p1 & p2 into "dest" with a guaranteed '/' between them.  (If
+ * p1 ends with a '/', no extra '/' is inserted.)  Returns the length of both
+ * strings + 1 (if '/' was inserted), regardless of whether the whole thing
+ * fits into destsize (including the terminating '\0'). */
+size_t pathjoin(char *dest, size_t destsize, const char *p1, const char *p2)
+{
+	size_t len = strlcpy(dest, p1, destsize);
+	if (len < destsize - 1) {
+		if (!len || dest[len-1] != '/')
+			dest[len++] = '/';
+		if (len < destsize - 1)
+			len += strlcpy(dest + len, p2, destsize - len);
+		else {
+			dest[len] = '\0';
+			len += strlen(p2);
+		}
+	}
+	else
+		len += strlen(p2) + 1; /* Assume we'd insert a '/'. */
+	return len;
+}
+
+/* Join any number of strings together, putting them in "dest".  The return
+ * value is the length of all the strings, regardless of whether they fit in
+ * destsize (including the terminating '\0').  Your list of string pointers
+ * should end with a NULL to indicate the end of the list. */
+size_t stringjoin(char *dest, size_t destsize, ...)
+{
+	va_list ap;  
+	size_t len, ret = 0;
+	const char *src;
+
+	va_start(ap, destsize);
+	while (1) {
+		if (!(src = va_arg(ap, const char *)))
+			break;
+		len = strlen(src);
+		ret += len;
+		if (destsize > 1) {
+			if (len >= destsize)
+				len = destsize - 1;
+			memcpy(dest, src, len);
+			destsize -= len;
+			dest += len;
+		}
+	}
+	*dest = '\0';
+	va_end(ap);
+
+	return ret;
+}
+
 void clean_fname(char *name)
 {
 	char *p;
