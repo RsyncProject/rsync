@@ -1,4 +1,4 @@
-#!/bin/sh =
+#!/bin/sh
 
 #
 # Copyright (C) 1998 Philip Hands <http://www.hands.com/~phil/>
@@ -53,7 +53,7 @@ checkit() {
     echo "	done."
     rm $log
   else
-    echo "	FAILED.=07"
+    echo "	FAILED."
   fi
 }
 
@@ -108,7 +108,7 @@ rm -rf ${TO}
     7 "ssh: renamed file"
 else
   echo ""
-  echo "**** Skipping SSH tests because ssh is not in the path=07 ****"
+  echo "**** Skipping SSH tests because ssh is not in the path ****"
   echo ""
 fi
 
