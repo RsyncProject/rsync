@@ -360,8 +360,10 @@ directories, and the sysadmin doesn't want those files to be seen at all.
 
 dit(bf(transfer logging)) The "transfer logging" option enables per-file 
 logging of downloads and uploads in a format somewhat similar to that
-used by ftp daemons. If you want to customize the log formats look at
-the log format option.
+used by ftp daemons.  The server always logs the transfer at the end, so
+if a transfer is aborted, no mention will be made in the log file.
+
+If you want to customize the log lines, see the "log format" option.
 
 dit(bf(log format)) The "log format" option allows you to specify the
 format used for logging file transfers when transfer logging is
@@ -376,8 +378,8 @@ quote(itemize(
   it() %l for the length of the file in bytes
   it() %p for the process ID of this rsync session
   it() %o for the operation, which is either "send" or "recv"
-  it() %f for the filename (long form)
-  it() %n for the filename (short form)
+  it() %f for the filename (long form on server; no trailing "/")
+  it() %n for the filename (short form; trailing "/" on dir)
   it() %L either the string " -> SYMLINK" or "" if not a symlink
   it() %P for the module path
   it() %m for the module name
@@ -393,21 +395,24 @@ The default log format is "%o %h [%a] %m (%u) %l %f%L", and a "%t [%p] "
 is always prefixed when using the "log file" option.
 
 A perl script called rsyncstats to summarize this format is included
-in the rsync source code distribution.
+in the rsync source code distribution in the "support" subdirectory.
 
 The %i format is a set of cryptic characters that are output as follows:
 
 quote(tt(  *Xcstpog ITEM_NAME))
 
 The bf(*) is either bf(<) (receive), bf(>) (send), or bf(*) (--dry-run) if
-the item is being updated, otherwise it is a space.
+the item is being transferred, otherwise it is a space.  This lets you
+distinguish between a file that is getting its attributes changed and a
+file whose content is being updated.  Note that when a symlink or a device
+gets its value changed, that is considered to be a transfer.
 
 The bf(X) will be replaced by one of the following: an "f" for a file, a
 "d" for a dir, an "L" for a symlink, or a "D" for a device.
 
 The rest of the letters in the string above are the actual letters that
 will be output if the associated attribute for the item is being updated;
-otherwise the letter will be replaced by either a "." for no change, a "+"
+otherwise the letter will be replaced by a "." for no change, a "+"
 for a new item, or a "?" if the attribute is not known (which happens when
 talking to an older rsync).  The meanings of the attribute letters are as
 follows:
@@ -417,15 +422,17 @@ quote(itemize(
   updated by the file transfer (requries bf(--checksum)).
   it() A bf(s) means the size of the file is different and will be updated
   by the file transfer.
-  it() A bf(t) means the modified time is being updated to the server's
-  value (requires --times).  An alternate value of bf(T) means that the
-  time is being set to the transfer time, which happens when symlinks are
-  updated, or when a file or device is updated without --times.
-  it() A bf(p) means the permissions are being updated (requires
-  bf(--perms)).
+  it() A bf(t) means the modified time is different and is being updated to
+  the server's value (requires bf(--times)).  An alternate value of bf(T)
+  means that the time will be set to the transfer time, which happens
+  anytime a symlink is transferred, or when a file or device is transferred
+  without bf(--times).
+  it() A bf(p) means the permissions are different and are being updated to
+  the server's value (requires bf(--perms)).
   it() An bf(o) means the owner is being updated (requires bf(--owner) and
   root privileges).
-  it() A bf(g) means the group is being updated (requires bf(--group)).
+  it() A bf(g) means the group is being updated (requires bf(--group) and
+  the authority to set the requested group).
 ))
 
 dit(bf(timeout)) The "timeout" option allows you to override the
