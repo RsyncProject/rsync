@@ -34,6 +34,7 @@ extern int recurse;
 extern int io_error;
 extern int sanitize_paths;
 extern int protocol_version;
+extern int module_id;
 
 extern char curr_dir[];
 extern unsigned int curr_dir_len;
@@ -107,15 +108,15 @@ static void free_filter(struct filter_struct *ex)
 
 /* Build a filter structure given a filter pattern.  The value in "pat"
  * is not null-terminated. */
-static void make_filter(struct filter_list_struct *listp, const char *pat,
-			unsigned int pat_len, unsigned int mflags)
+static void filter_rule(struct filter_list_struct *listp, const char *pat,
+			unsigned int pat_len, unsigned int mflags, int xflags)
 {
 	struct filter_struct *ret;
 	const char *cp;
 	unsigned int ex_len;
 
 	if (verbose > 2) {
-		rprintf(FINFO, "[%s] make_filter(%.*s, %s%s)\n",
+		rprintf(FINFO, "[%s] filter_rule(%.*s, %s%s)\n",
 			who_am_i(), (int)pat_len, pat,
 			mflags & MATCHFLG_PERDIR_MERGE ? "per-dir-merge"
 			: mflags & MATCHFLG_INCLUDE ? "include" : "exclude",
@@ -124,21 +125,18 @@ static void make_filter(struct filter_list_struct *listp, const char *pat,
 
 	ret = new(struct filter_struct);
 	if (!ret)
-		out_of_memory("make_filter");
-
+		out_of_memory("filter_rule");
 	memset(ret, 0, sizeof ret[0]);
 
-	if (mflags & MATCHFLG_ABS_PATH) {
-		if (*pat != '/') {
-			mflags &= ~MATCHFLG_ABS_PATH;
-			ex_len = 0;
-		} else
-			ex_len = dirbuf_len - module_dirlen - 1;
+	if (xflags & XFLG_ANCHORED2ABS && *pat == '/'
+	    && !(mflags & (MATCHFLG_ABS_PATH | MATCHFLG_MERGE_FILE))) {
+		mflags |= MATCHFLG_ABS_PATH;
+		ex_len = dirbuf_len - module_dirlen - 1;
 	} else
 		ex_len = 0;
 	ret->pattern = new_array(char, ex_len + pat_len + 1);
 	if (!ret->pattern)
-		out_of_memory("make_filter");
+		out_of_memory("filter_rule");
 	if (ex_len)
 		memcpy(ret->pattern, dirbuf + module_dirlen, ex_len);
 	strlcpy(ret->pattern + ex_len, pat, pat_len + 1);
@@ -175,9 +173,9 @@ static void make_filter(struct filter_list_struct *listp, const char *pat,
 			struct filter_struct *ex = mergelist_parents[i];
 			const char *s = strrchr(ex->pattern, '/');
 			if (s)
-				    s++;
+				s++;
 			else
-				    s = ex->pattern;
+				s = ex->pattern;
 			len = strlen(s);
 			if (len == pat_len - (cp - ret->pattern)
 			    && memcmp(s, cp, len) == 0) {
@@ -187,10 +185,10 @@ static void make_filter(struct filter_list_struct *listp, const char *pat,
 		}
 
 		if (!(lp = new_array(struct filter_list_struct, 1)))
-			out_of_memory("make_filter");
+			out_of_memory("filter_rule");
 		lp->head = lp->tail = NULL;
 		if (asprintf(&lp->debug_type, " (per-dir %s)", cp) < 0)
-			out_of_memory("make_filter");
+			out_of_memory("filter_rule");
 		ret->u.mergelist = lp;
 
 		if (mergelist_cnt == mergelist_size) {
@@ -199,7 +197,7 @@ static void make_filter(struct filter_list_struct *listp, const char *pat,
 						struct filter_struct *,
 						mergelist_size);
 			if (!mergelist_parents)
-				out_of_memory("make_filter");
+				out_of_memory("filter_rule");
 		}
 		mergelist_parents[mergelist_cnt++] = ret;
 	} else {
@@ -366,7 +364,7 @@ static BOOL setup_merge_file(struct filter_struct *ex,
 		*y = '\0';
 		dirbuf_len = y - dirbuf;
 		strlcpy(x, ex->pattern, MAXPATHLEN - (x - buf));
-		add_filter_file(lp, buf, flags | XFLG_ABS_PATH);
+		add_filter_file(lp, buf, flags | XFLG_ANCHORED2ABS);
 		if (ex->match_flags & MATCHFLG_NO_INHERIT)
 			lp->head = NULL;
 		lp->tail = NULL;
@@ -433,7 +431,7 @@ void *push_local_filters(const char *dir, unsigned int dirlen)
 
 		if (strlcpy(dirbuf + dirbuf_len, ex->pattern,
 		    MAXPATHLEN - dirbuf_len) < MAXPATHLEN - dirbuf_len)
-			add_filter_file(lp, dirbuf, flags | XFLG_ABS_PATH);
+			add_filter_file(lp, dirbuf, flags | XFLG_ANCHORED2ABS);
 		else {
 			io_error |= IOERR_GENERAL;
 			rprintf(FINFO,
@@ -560,7 +558,7 @@ static void report_filter_result(char const *name,
                                  int name_is_dir, const char *type)
 {
 	/* If a trailing slash is present to match only directories,
-	 * then it is stripped out by make_filter.  So as a special
+	 * then it is stripped out by filter_rule.  So as a special
 	 * case we add it back in here. */
 
 	if (verbose >= 2) {
@@ -639,8 +637,9 @@ static const char *get_filter_tok(const char *p, int xflags,
 			break;
 		case '+':
 			mflags |= MATCHFLG_INCLUDE;
-			break;
+			/* FALL THROUGH */
 		case '-':
+			mods = "/";
 			break;
 		case '!':
 			mflags |= MATCHFLG_CLEAR_LIST;
@@ -650,14 +649,14 @@ static const char *get_filter_tok(const char *p, int xflags,
 			rprintf(FERROR, "Unknown filter rule: %s\n", p);
 			exit_cleanup(RERR_SYNTAX);
 		}
-		while (mods && *++s && *s != ' ' && *s != '=' && *s != '_') {
+		while (mods && *++s && *s != ' ' && *s != '_') {
 			if (strchr(mods, *s) == NULL) {
 				if (xflags & XFLG_WORD_SPLIT && isspace(*s)) {
 					s--;
 					break;
 				}
 				rprintf(FERROR,
-					"unknown option '%c' in filter rule: %s\n",
+					"unknown modifier '%c' in filter rule: %s\n",
 					*s, p);
 				exit_cleanup(RERR_SYNTAX);
 			}
@@ -668,6 +667,9 @@ static const char *get_filter_tok(const char *p, int xflags,
 			case '+':
 				mflags |= MATCHFLG_NO_PREFIXES
 					| MATCHFLG_INCLUDE;
+				break;
+			case '/':
+				mflags |= MATCHFLG_ABS_PATH;
 				break;
 			case 'C':
 				empty_pat_is_OK = 1;
@@ -725,9 +727,6 @@ static const char *get_filter_tok(const char *p, int xflags,
 		exit_cleanup(RERR_SYNTAX);
 	}
 
-	if (xflags & XFLG_ABS_PATH)
-		mflags |= MATCHFLG_ABS_PATH;
-
 	*len_ptr = len;
 	*flag_ptr = mflags;
 	return (const char *)s;
@@ -778,7 +777,7 @@ void add_filter(struct filter_list_struct *listp, const char *pattern,
 					len -= ++name - cp;
 				else
 					name = cp;
-				make_filter(listp, name, len, 0);
+				filter_rule(listp, name, len, 0, 0);
 				mflags &= ~MATCHFLG_EXCLUDE_SELF;
 				len = pat_len;
 			}
@@ -786,7 +785,7 @@ void add_filter(struct filter_list_struct *listp, const char *pattern,
 				if (parent_dirscan) {
 					if (!(p = parse_merge_name(cp, &len, module_dirlen)))
 						continue;
-					make_filter(listp, p, len, mflags);
+					filter_rule(listp, p, len, mflags, 0);
 					continue;
 				}
 			} else {
@@ -802,7 +801,7 @@ void add_filter(struct filter_list_struct *listp, const char *pattern,
 			}
 		}
 
-		make_filter(listp, cp, pat_len, mflags);
+		filter_rule(listp, cp, pat_len, mflags, xflags);
 	}
 }
 
@@ -830,6 +829,13 @@ void add_filter_file(struct filter_list_struct *listp, const char *fname,
 			fp = fopen(fname, "rb");
 	} else
 		fp = stdin;
+
+	if (verbose > 2) {
+		rprintf(FINFO, "[%s] add_filter_file(%s,%d)%s\n",
+			who_am_i(), safe_fname(fname), xflags,
+			fp ? "" : " [not found]");
+	}
+
 	if (!fp) {
 		if (xflags & XFLG_FATAL_ERRORS) {
 			rsyserr(FERROR, errno,
@@ -841,11 +847,6 @@ void add_filter_file(struct filter_list_struct *listp, const char *fname,
 		return;
 	}
 	dirbuf[dirbuf_len] = '\0';
-
-	if (verbose > 2) {
-		rprintf(FINFO, "[%s] add_filter_file(%s,%d)\n",
-			who_am_i(), safe_fname(fname), xflags);
-	}
 
 	while (1) {
 		char *s = line;
@@ -983,13 +984,13 @@ void add_cvs_excludes(void)
 	static unsigned int cvs_flags = XFLG_WORD_SPLIT | XFLG_NO_PREFIXES
 				      | XFLG_DEF_EXCLUDE;
 	char fname[MAXPATHLEN];
-	char *p;
+	char *p = module_id >= 0 && lp_use_chroot(module_id)
+		? "/" : getenv("HOME");
 
 	add_filter(&filter_list, ":C", 0);
 	add_filter(&filter_list, default_cvsignore, cvs_flags);
 
-	if ((p = getenv("HOME"))
-	    && pathjoin(fname, sizeof fname, p, ".cvsignore") < sizeof fname) {
+	if (p && pathjoin(fname, MAXPATHLEN, p, ".cvsignore") < MAXPATHLEN) {
 		add_filter_file(&filter_list, fname, cvs_flags);
 	}
 
