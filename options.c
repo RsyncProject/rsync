@@ -633,6 +633,11 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (!backup_suffix)
 		backup_suffix = backup_dir? "" : BACKUP_SUFFIX;
 	backup_suffix_len = strlen(backup_suffix);
+	if (strchr(backup_suffix, '/') != NULL) {
+		rprintf(FERROR, "--suffix cannot contain slashes: %s\n",
+			backup_suffix);
+		exit_cleanup(RERR_SYNTAX);
+	}
 	if (backup_dir)
 		backup_dir_len = strlen(backup_dir);
 	else if (!backup_suffix_len) {
