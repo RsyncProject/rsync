@@ -161,6 +161,11 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	change_uid = am_root && preserve_uid && st->st_uid != file->uid;
 	change_gid = preserve_gid && file->gid != GID_NONE
 		&& st->st_gid != file->gid;
+#if !HAVE_LCHOWN
+	if (S_ISLNK(st->st_mode))
+		;
+	else
+#endif
 	if (change_uid || change_gid) {
 		if (verbose > 2) {
 			if (change_uid) {
