@@ -1,3 +1,4 @@
 #! /bin/sh
 
-rsync="$prefix/bin/$sync"
+rsync="$prefix/bin/rsync"
+
