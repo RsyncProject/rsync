@@ -227,23 +227,10 @@ static int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f
 
   server_options(args,&argc);
 
-  if (path && *path) {
-    dir = strdup(path);
-    p = strrchr(dir,'/');
-    if (p && !relative_paths) {
-      *p = 0;
-      if (!dir[0])
-	args[argc++] = "/";
-      else
-	args[argc++] = dir;
-      p++;
-    } else {
-      args[argc++] = ".";
-      p = dir;
-    }
-    if (p[0])
-      args[argc++] = path;
-  }
+  args[argc++] = ".";
+
+  if (path && *path) 
+	  args[argc++] = path;
 
   args[argc] = NULL;
 
@@ -313,31 +300,31 @@ static char *get_local_name(struct file_list *flist,char *name)
 void do_server_sender(int argc,char *argv[])
 {
   int i;
-  char *dir = argv[0];
   struct file_list *flist;
+  char *dir = argv[0];
 
   if (verbose > 2)
     fprintf(FERROR,"server_sender starting pid=%d\n",(int)getpid());
   
   if (!relative_paths && chdir(dir) != 0) {
-    fprintf(FERROR,"chdir %s: %s (3)\n",dir,strerror(errno));
-    exit_cleanup(1);
+	  fprintf(FERROR,"chdir %s: %s (3)\n",dir,strerror(errno));
+	  exit_cleanup(1);
   }
   argc--;
   argv++;
   
   if (strcmp(dir,".")) {
-    int l = strlen(dir);
-    if (strcmp(dir,"/") == 0) 
-      l = 0;
-    for (i=0;i<argc;i++)
-      argv[i] += l+1;
+	  int l = strlen(dir);
+	  if (strcmp(dir,"/") == 0) 
+		  l = 0;
+	  for (i=0;i<argc;i++)
+		  argv[i] += l+1;
   }
 
   if (argc == 0 && recurse) {
-    argc=1;
-    argv--;
-    argv[0] = ".";
+	  argc=1;
+	  argv--;
+	  argv[0] = ".";
   }
     
 
@@ -381,21 +368,22 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 void do_server_recv(int argc,char *argv[])
 {
   int status;
-  char *dir = NULL;
   struct file_list *flist;
   char *local_name=NULL;
+  char *dir = NULL;
   
   if (verbose > 2)
     fprintf(FERROR,"server_recv(%d) starting pid=%d\n",argc,(int)getpid());
 
   if (argc > 0) {
-    dir = argv[0];
-    argc--;
-    argv++;
-    if (chdir(dir) != 0) {
-      fprintf(FERROR,"chdir %s : %s (4)\n",dir,strerror(errno));
-      exit_cleanup(1);
-    }    
+	  dir = argv[0];
+	  argc--;
+	  argv++;
+	  if (chdir(dir) != 0) {
+		  fprintf(FERROR,"chdir %s : %s (4)\n",
+			  dir,strerror(errno));
+		  exit_cleanup(1);
+	  }    
   }
 
   if (delete_mode)
@@ -408,11 +396,11 @@ void do_server_recv(int argc,char *argv[])
   }
 
   if (argc > 0) {    
-    if (strcmp(dir,".")) {
-      argv[0] += strlen(dir);
-      if (argv[0][0] == '/') argv[0]++;
-    }
-    local_name = get_local_name(flist,argv[0]);
+	  if (strcmp(dir,".")) {
+		  argv[0] += strlen(dir);
+		  if (argv[0][0] == '/') argv[0]++;
+	  }
+	  local_name = get_local_name(flist,argv[0]);
   }
 
   status = do_recv(STDIN_FILENO,STDOUT_FILENO,flist,local_name);

@@ -36,6 +36,7 @@ extern int checksum_seed;
 
 
 extern int remote_version;
+extern int verbose;
 
 void setup_protocol(int f_out,int f_in)
 {
@@ -54,6 +55,10 @@ void setup_protocol(int f_out,int f_in)
     fprintf(FERROR,"protocol version mismatch - is your shell clean?\n");
     exit_cleanup(1);
   }	
+
+  if (verbose > 2)
+	  fprintf(FINFO, "local_version=%d remote_version=%d\n",
+		  PROTOCOL_VERSION, remote_version);
 
   if (remote_version >= 12) {
     if (am_server) {
