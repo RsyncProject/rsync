@@ -1,11 +1,8 @@
-/* This is taken from cvslock. The same code is used in several
- * freeware and GPLd applications. I contacted the email addresses
- * listed in the header and have been told that the code is probably
- * public domain, but I am still seeking confirmation from Patrick
- * Powell. The original code was posted to BugTraq by Patrick in 1995
- * but without any notice as to the copyright or license status.
- *
- * October 1998, Andrew Tridgell (tridge@samba.anu.edu.au)
+/*
+ * Copyright Patrick Powell 1995
+ * This code is based on code written by Patrick Powell (papowell@astart.com)
+ * It may be used for any purpose as long as this notice remains intact
+ * on all source code distributions
  */
 
 /**************************************************************
@@ -278,9 +275,9 @@ static void dopr (char *buffer, size_t maxlen, const char *format, va_list args)
 	if (cflags == DP_C_SHORT)
 	  value = va_arg (args, unsigned short int);
 	else if (cflags == DP_C_LONG)
-	  value = va_arg (args, unsigned long int);
+	  value = (long)va_arg (args, unsigned long int);
 	else
-	  value = va_arg (args, unsigned int);
+	  value = (long)va_arg (args, unsigned int);
 	fmtint (buffer, &currlen, maxlen, value, 8, min, max, flags);
 	break;
       case 'u':
@@ -288,9 +285,9 @@ static void dopr (char *buffer, size_t maxlen, const char *format, va_list args)
 	if (cflags == DP_C_SHORT)
 	  value = va_arg (args, unsigned short int);
 	else if (cflags == DP_C_LONG)
-	  value = va_arg (args, unsigned long int);
+	  value = (long)va_arg (args, unsigned long int);
 	else
-	  value = va_arg (args, unsigned int);
+	  value = (long)va_arg (args, unsigned int);
 	fmtint (buffer, &currlen, maxlen, value, 10, min, max, flags);
 	break;
       case 'X':
@@ -300,9 +297,9 @@ static void dopr (char *buffer, size_t maxlen, const char *format, va_list args)
 	if (cflags == DP_C_SHORT)
 	  value = va_arg (args, unsigned short int);
 	else if (cflags == DP_C_LONG)
-	  value = va_arg (args, unsigned long int);
+	  value = (long)va_arg (args, unsigned long int);
 	else
-	  value = va_arg (args, unsigned int);
+	  value = (long)va_arg (args, unsigned int);
 	fmtint (buffer, &currlen, maxlen, value, 16, min, max, flags);
 	break;
       case 'f':
@@ -353,7 +350,7 @@ static void dopr (char *buffer, size_t maxlen, const char *format, va_list args)
 	{
 	  long int *num;
 	  num = va_arg (args, long int *);
-	  *num = currlen;
+	  *num = (long int)currlen;
         } 
 	else 
 	{
@@ -547,7 +544,7 @@ static long round (LDOUBLE value)
 {
   long intpart;
 
-  intpart = value;
+  intpart = (long)value;
   value = value - intpart;
   if (value >= 0.5)
     intpart++;
@@ -592,7 +589,7 @@ static void fmtfp (char *buffer, size_t *currlen, size_t maxlen,
   if (flags & DP_F_UP) caps = 1; /* Should characters be upper case? */
 #endif
 
-  intpart = ufvalue;
+  intpart = (long)ufvalue;
 
   /* 
    * Sorry, we only support 9 digits past the decimal because of our 
@@ -707,7 +704,7 @@ static void dopr_outch (char *buffer, size_t *currlen, size_t maxlen, char c)
 #endif /* !defined(HAVE_SNPRINTF) || !defined(HAVE_VSNPRINTF) */
 
 #ifndef HAVE_VSNPRINTF
-int vsnprintf (char *str, size_t count, const char *fmt, va_list args)
+ int vsnprintf (char *str, size_t count, const char *fmt, va_list args)
 {
   str[0] = 0;
   dopr(str, count, fmt, args);
@@ -718,9 +715,9 @@ int vsnprintf (char *str, size_t count, const char *fmt, va_list args)
 #ifndef HAVE_SNPRINTF
 /* VARARGS3 */
 #ifdef HAVE_STDARGS
-int snprintf (char *str,size_t count,const char *fmt,...)
+ int snprintf (char *str,size_t count,const char *fmt,...)
 #else
-int snprintf (va_alist) va_dcl
+ int snprintf (va_alist) va_dcl
 #endif
 {
 #ifndef HAVE_STDARGS
@@ -749,7 +746,7 @@ int snprintf (va_alist) va_dcl
 #ifndef LONG_STRING
 #define LONG_STRING 1024
 #endif
-int main (void)
+ int main (void)
 {
   char buf1[LONG_STRING];
   char buf2[LONG_STRING];
