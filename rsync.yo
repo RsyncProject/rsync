@@ -1127,7 +1127,7 @@ dit(bf(2)) Protocol incompatibility
 dit(bf(3)) Errors selecting input/output files, dirs
 dit(bf(4)) Requested action not supported: an attempt
 was made to manipulate 64-bit files on a platform that cannot support
-them; or an option was speciifed that is supported by the client and
+them; or an option was specifed that is supported by the client and
 not by the server.
 dit(bf(5)) Error starting client-server protocol
 dit(bf(10)) Error in socket IO 
@@ -1186,7 +1186,7 @@ manpagebugs()
 
 times are transferred as unix time_t values
 
-When transferring to FAT filesystmes rsync may resync
+When transferring to FAT filesystems rsync may resync
 unmodified files.
 See the comments on the --modify-window option.
 
