@@ -285,6 +285,11 @@ to a temporary resource shortage or other IO error. In some cases this
 test is counter productive so you can use this option to turn off this
 behaviour. 
 
+dit(bf(ignore nonreadable)) This tells the rsync server to completely
+ignore files that are not readable by the user. This is useful for
+public archives that may have some non-readable files among the
+directories, and the sysadmin doesn't want those files to be seen at all.
+
 dit(bf(transfer logging)) The "transfer logging" option enables per-file 
 logging of downloads and uploads in a format somewhat similar to that
 used by ftp daemons. If you want to customize the log formats look at
