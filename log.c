@@ -437,7 +437,9 @@ static void log_formatted(enum logcode code, char *format, char *op,
 				break;
 			}
 			n = buf2;
-			n[0] = !(iflags & ITEM_UPDATING) ? '.'
+			n[0] = iflags & ITEM_HARD_LINKED ? 'h'
+			     : iflags & ITEM_LOCAL_CHANGE ? 'c'
+			     : !(iflags & ITEM_TRANSFER) ? '.'
 			     : *op == 's' ? '>' : '<';
 			n[1] = S_ISDIR(file->mode) ? 'd'
 			     : IS_DEVICE(file->mode) ? 'D'
@@ -450,7 +452,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			n[5] = !(iflags & ITEM_REPORT_PERMS) ? '.' : 'p';
 			n[6] = !(iflags & ITEM_REPORT_OWNER) ? '.' : 'o';
 			n[7] = !(iflags & ITEM_REPORT_GROUP) ? '.' : 'g';
-			n[8] = '.';
+			n[8] = !(iflags & ITEM_REPORT_XATTRS) ? '.' : 'a';
 			n[9] = '\0';
 
 			if (iflags & (ITEM_IS_NEW|ITEM_MISSING_DATA)) {
@@ -458,7 +460,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 				int i;
 				for (i = 2; n[i]; i++)
 					n[i] = ch;
-			} else if (!(iflags & ITEM_UPDATING)) {
+			} else if (!(iflags & (ITEM_TRANSFER|ITEM_LOCAL_CHANGE))) {
 				int i;
 				for (i = 2; n[i]; i++) {
 					if (n[i] != '.')
@@ -467,7 +469,8 @@ static void log_formatted(enum logcode code, char *format, char *op,
 				if (!n[i]) {
 					for (i = 2; n[i]; i++)
 						n[i] = ' ';
-					n[0] = '=';
+					if (n[0] == '.')
+						n[0] = '=';
 				}
 			}
 			break;
@@ -528,7 +531,7 @@ void maybe_log_item(struct file_struct *file, int iflags, int itemizing,
 	if (am_server) {
 		if (am_daemon && !dry_run && see_item)
 			log_item(file, &stats, iflags, buf);
-	} else if (see_item || iflags & ITEM_UPDATING || *buf
+	} else if (see_item || iflags & ITEM_LOCAL_CHANGE || *buf
 	    || (S_ISDIR(file->mode) && iflags & ITEM_REPORT_TIME))
 		log_item(file, &stats, iflags, buf);
 }
