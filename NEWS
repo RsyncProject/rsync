@@ -264,6 +264,9 @@ Changes since 2.6.3:
       variable that makes extra sure that no write/delete calls on the
       read-only side can succeed.
 
+    - The log-format % escapes can now have a numeric field width in
+      between the % and the escape letter (e.g. "%-40n %08p").
+
     - Improved the option descriptions in the --help text.
 
   SUPPORT FILES:
