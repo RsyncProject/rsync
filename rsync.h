@@ -1,18 +1,18 @@
-/* 
+/*
    Copyright (C) by Andrew Tridgell 1996, 2000
    Copyright (C) Paul Mackerras 1996
    Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
-   
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -332,18 +332,34 @@ enum msgcode {
  * to ensure that any code that really requires a 64-bit integer has
  * it (e.g. the checksum code uses two 32-bit integers for its 64-bit
  * counter). */
-#if HAVE_OFF64_T
-#define int64 off64_t
-#elif (SIZEOF_LONG == 8) 
-#define int64 long
-#elif (SIZEOF_INT == 8) 
-#define int64 int
-#elif HAVE_LONGLONG
-#define int64 long long
+#if SIZEOF_OFF64_T == 8
+# define int64 off64_t
+# define SIZEOF_INT64 8
+#elif SIZEOF_LONG == 8
+# define int64 long
+# define SIZEOF_INT64 8
+#elif SIZEOF_INT == 8
+# define int64 int
+# define SIZEOF_INT64 8
+#elif SIZEOF_LONG_LONG == 8
+# define int64 long long
+# define SIZEOF_INT64 8
+#elif SIZEOF_OFF_T == 8
+# define int64 off_t
+# define SIZEOF_INT64 8
+#elif SIZEOF_INT > 8
+# define int64 int
+# define SIZEOF_INT64 SIZEOF_INT
+#elif SIZEOF_LONG > 8
+# define int64 long
+# define SIZEOF_INT64 SIZEOF_LONG
+#elif SIZEOF_LONG_LONG > 8
+# define int64 long long
+# define SIZEOF_INT64 SIZEOF_LONG_LONG
 #else
 /* As long as it gets... */
-#define int64 off_t
-#define INT64_IS_OFF_T
+# define int64 off_t
+# define SIZEOF_INT64 SIZEOF_OFF_T
 #endif
 
 /* Starting from protocol version 26, we always use 64-bit
@@ -370,7 +386,7 @@ enum msgcode {
  *
  * FIXME: I don't think the code in flist.c has ever worked on a system
  * where dev_t is a struct.
- */ 
+ */
 
 struct idev {
 	int64 inode;
@@ -694,7 +710,7 @@ extern int errno;
 # define NONBLOCK_FLAG O_NONBLOCK
 #elif defined(SYSV)
 # define NONBLOCK_FLAG O_NDELAY
-#else 
+#else
 # define NONBLOCK_FLAG FNDELAY
 #endif
 
@@ -720,7 +736,7 @@ extern int errno;
 /* Apparently the OS X port of gcc gags on __attribute__.
  *
  * <http://www.opensource.apple.com/bugs/X/gcc/2512150.html> */
-#define __attribute__(x) 
+#define __attribute__(x)
 
 #endif
 
@@ -778,8 +794,7 @@ size_t strlcat(char *d, const char *s, size_t bufsize);
 extern int verbose;
 
 #ifndef HAVE_INET_NTOP
-const char *                 
-inet_ntop(int af, const void *src, char *dst, size_t size);
+const char *inet_ntop(int af, const void *src, char *dst, size_t size);
 #endif /* !HAVE_INET_NTOP */
 
 #ifndef HAVE_INET_PTON
