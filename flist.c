@@ -490,6 +490,11 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 	}
 	fname = cleaned_name;
 
+	/* f is set to -1 when calculating deletion file list */
+	if (((f != -1) || !delete_excluded) && !noexcludes && !match_file_name(fname,&st))
+		return NULL;
+
+
 	memset(sum,0,SUM_LENGTH);
 
 	if (readlink_stat(fname,&st,linkbuf) != 0) {
@@ -512,10 +517,6 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 			return NULL;
 	}
 	
-	/* f is set to -1 when calculating deletion file list */
-	if (((f != -1) || !delete_excluded) && !match_file_name(fname,&st))
-		return NULL;
-
 
 	if (lp_ignore_nonreadable(module_id) && access(fname, R_OK) != 0) 
 		return NULL;
