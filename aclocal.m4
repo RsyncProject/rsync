@@ -102,8 +102,9 @@ dnl POSIX 1g it is a type of its own, but some platforms use different
 dnl types for the argument to getsockopt, getpeername, etc.  So we
 dnl have to test to find something that will work.
 
-dnl This test originally comes from lftp, by way of Albert Chin at The
-dnl Written Word.  Thanks!
+dnl This is no good, because passing the wrong pointer on C compilers is
+dnl likely to only generate a warning, not an error.  We don't call this at
+dnl the moment.
 
 AC_DEFUN([TYPE_SOCKLEN_T],
 [
@@ -116,8 +117,8 @@ AC_DEFUN([TYPE_SOCKLEN_T],
          #include <sys/socket.h>
       ],
       [
-         socklen_t len;
-         getpeername(0,0,&len);
+        socklen_t len;
+        getpeername(0,0,&len);
       ],
       [
          lftp_cv_socklen_t=yes
@@ -136,13 +137,16 @@ AC_DEFUN([TYPE_SOCKLEN_T],
                #include <sys/socket.h>
             ],
             [
-               $t len;
-               getpeername(0,0,&len);
+              $t len;
+              getpeername(0,0,&len);
             ],
             [
                lftp_cv_socklen_t_equiv="$t"
                break
-            ])
+            ],
+	    [
+		AC_MSG_ERROR([Cannot find a type to use in place of socklen_t])
+	    ])
          done
       ])
       AC_MSG_RESULT($lftp_cv_socklen_t_equiv)

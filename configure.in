@@ -77,7 +77,8 @@ AC_TYPE_PID_T
 AC_TYPE_GETGROUPS
 AC_STRUCT_ST_RDEV
 AC_CHECK_TYPE([ino_t], [unsigned])
-TYPE_SOCKLEN_T
+dnl TYPE_SOCKLEN_T
+AC_CHECK_TYPE([socklen_t], [size_t])
 
 AC_CACHE_CHECK([for errno in errno.h],rsync_cv_errno, [
     AC_TRY_COMPILE([#include <errno.h>],[int i = errno],
