@@ -404,19 +404,18 @@ specify a space-separated list of rsync command line options that will
 be refused by your rsync server.
 You may specify the full option name, its one-letter abbreviation, or a
 wild-card string that matches multiple options.
-For example, this would refuse bf(--checksum) (bf(-c)) and all the options that
-start with "delete":
+For example, this would refuse bf(--checksum) (bf(-c)) and all the various
+delete options:
 
-quote(tt(    refuse options = c delete*))
+quote(tt(    refuse options = c delete))
+
+The reason the above refuses all delete options is that the options imply
+bf(--delete), and implied options are refused just like explicit options.
 
 When an option is refused, the server prints an error message and exits.
 To prevent all compression, you can use "dont compress = *" (see below)
 instead of "refuse options = compress" to avoid returning an error to a
 client that requests compression.
-
-Note that rsync's bf(--del) option is implemented as a popt alias, so there
-is no need (an indeed, no way) to refuse "del" by name -- just matching
-the bf(--delete-during) option (e.g. "delete*") will refuse bf(--del) as well.
 
 dit(bf(dont compress)) The "dont compress" option allows you to select
 filenames based on wildcard patterns that should not be compressed
