@@ -26,6 +26,9 @@ extern int verbose;
 extern int dry_run;
 extern int preserve_times;
 extern int am_root;
+extern int am_server;
+extern int am_sender;
+extern int am_generator;
 extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_perms;
@@ -239,4 +242,9 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file)
 	} else {
 		set_perms(fname,file,NULL,0);
 	}
+}
+
+const char *who_am_i(void)
+{
+    return am_sender ? "sender" : am_generator ? "generator" : "receiver";
 }
