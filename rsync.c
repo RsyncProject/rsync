@@ -654,6 +654,10 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
       }
 
       /* open tmp file */
+      if (strlen(fname) > (MAXPATHLEN-8)) {
+	fprintf(FERROR,"filename too long\n");
+	continue;
+      }
       sprintf(fnametmp,"%s.XXXXXX",fname);
       if (NULL == mktemp(fnametmp)) {
 	fprintf(FERROR,"mktemp %s failed\n",fnametmp);
@@ -694,6 +698,10 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
       if (make_backups) {
 	char fnamebak[MAXPATHLEN];
+	if (strlen(fname) + strlen(backup_suffix) > (MAXPATHLEN-1)) {
+		fprintf(FERROR,"backup filename too long\n");
+		continue;
+	}
 	sprintf(fnamebak,"%s%s",fname,backup_suffix);
 	if (rename(fname,fnamebak) != 0 && errno != ENOENT) {
 	  fprintf(FERROR,"rename %s %s : %s\n",fname,fnamebak,strerror(errno));
@@ -777,10 +785,11 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
 
       fname[0] = 0;
       if (file->dir) {
-	strcpy(fname,file->dir);
+	strncpy(fname,file->dir,MAXPATHLEN-1);
+	fname[MAXPATHLEN-1] = 0;
 	strcat(fname,"/");
       }
-      strcat(fname,file->name);
+      strncat(fname,file->name,MAXPATHLEN-strlen(fname));
 
       if (verbose > 2) 
 	fprintf(FERROR,"send_files(%d,%s)\n",i,fname);

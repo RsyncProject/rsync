@@ -159,8 +159,8 @@ void send_file_entry_v11(struct file_struct *file,int f)
   last_gid = file->gid;
   last_time = file->modtime;
 
-  strcpy(lastname,file->name);
-  lastname[255] = 0;
+  strncpy(lastname,file->name,MAXPATHLEN-1);
+  lastname[MAXPATHLEN-1] = 0;
 }
 
 
@@ -229,8 +229,8 @@ void receive_file_entry_v11(struct file_struct *file,
   last_gid = file->gid;
   last_time = file->modtime;
 
-  strcpy(lastname,file->name);
-  lastname[255] = 0;
+  strncpy(lastname,file->name,MAXPATHLEN-1);
+  lastname[MAXPATHLEN-1] = 0;
 }
 
 
@@ -357,7 +357,8 @@ static void send_directory(int f,struct file_list *flist,char *dir)
     return;
   }
 
-  strcpy(fname,dir);
+  strncpy(fname,dir,MAXPATHLEN-1);
+  fname[MAXPATHLEN-1]=0;
   l = strlen(fname);
   if (fname[l-1] != '/')
     strcat(fname,"/");
@@ -372,7 +373,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
     if (strcmp(di->d_name,".")==0 ||
 	strcmp(di->d_name,"..")==0)
       continue;
-    strcpy(p,di->d_name);
+    strncpy(p,di->d_name,MAXPATHLEN-l);
     send_file_name(f,flist,fname);
   }
 
@@ -407,7 +408,8 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
     char fname2[MAXPATHLEN];
     char *fname = fname2;
 
-    strcpy(fname,argv[i]);
+    strncpy(fname,argv[i],MAXPATHLEN-1);
+    fname[MAXPATHLEN-1] = 0;
 
     l = strlen(fname);
     if (l != 1 && fname[l-1] == '/') {
