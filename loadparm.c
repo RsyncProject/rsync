@@ -77,8 +77,6 @@ struct parm_struct
 	unsigned flags;
 };
 
-static BOOL bLoaded = False;
-
 #ifndef GLOBAL_NAME
 #define GLOBAL_NAME "global"
 #endif
@@ -734,8 +732,6 @@ BOOL lp_load(char *pszFname, int globals_only)
 	iServiceIndex = -1;
 	bRetval = pm_process(n2, globals_only?NULL:do_section, do_parameter);
   
-	bLoaded = True;
-
 	return (bRetval);
 }
 

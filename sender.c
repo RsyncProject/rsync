@@ -97,8 +97,6 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 	if (verbose > 2)
 		rprintf(FINFO,"send_files starting\n");
 
-	setup_readbuffer(f_in);
-
 	while (1) {
 		int offset=0;
 

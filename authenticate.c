@@ -135,7 +135,6 @@ static int get_secret(int module, char *user, char *secret, int len)
 static char *getpassf(char *filename)
 {
 	char buffer[100];
-	int len=0;
 	int fd=0;
 	STRUCT_STAT st;
 	int ok = 1;
@@ -170,7 +169,7 @@ static char *getpassf(char *filename)
 	if (envpw) rprintf(FERROR,"RSYNC_PASSWORD environment variable ignored\n");
 
 	buffer[sizeof(buffer)-1]='\0';
-	if ( (len=read(fd,buffer,sizeof(buffer)-1)) > 0)
+	if (read(fd,buffer,sizeof(buffer)-1) > 0)
 	{
 		char *p = strtok(buffer,"\n\r");
 		close(fd);

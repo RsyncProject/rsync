@@ -356,7 +356,6 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	close(recv_pipe[1]);
 	close(error_pipe[1]);
-	io_close_input(f_in);
 	if (f_in != f_out) close(f_in);
 
 	io_start_buffering(f_out);

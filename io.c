@@ -39,15 +39,9 @@ extern int verbose;
 extern int io_timeout;
 extern struct stats stats;
 
-static int buffer_f_in = -1;
 static int io_error_fd = -1;
 
 static void read_loop(int fd, char *buf, int len);
-
-void setup_readbuffer(int f_in)
-{
-	buffer_f_in = f_in;
-}
 
 static void check_timeout(void)
 {
@@ -323,11 +317,7 @@ unsigned char read_byte(int f)
 	return c;
 }
 
-
-
-/* write len bytes to fd, possibly reading from buffer_f_in if set
-   in order to unclog the pipe. don't return until all len
-   bytes have been written */
+/* write len bytes to fd */
 static void writefd_unbuffered(int fd,char *buf,int len)
 {
 	int total = 0;
@@ -621,10 +611,5 @@ int io_error_write(int f, enum logcode code, char *buf, int len)
 void io_multiplexing_close(void)
 {
 	io_multiplexing_out = 0;
-}
-
-void io_close_input(int fd)
-{
-	buffer_f_in = -1;
 }
 
