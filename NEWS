@@ -148,8 +148,9 @@ Changes since 2.6.3:
       filter files (like .cvsignore, but with full filter-rule parsing).
       This new option was chosen in order to ensure that all existing
       include/exclude processing remained 100% compatible with older
-      versions.  (Protocol 29 needed for full filter-rule support, but
-      backward-compatible rules work with earlier protocol versions.)
+      versions.  Protocol 29 is needed for full filter-rule support, but
+      backward-compatible rules work with earlier protocol versions.
+      (Promoted from the patches dir.)
 
     - Added the --delay-updates option that puts all updated files into
       a temporary directory (by default ".~tmp~", but settable via the
@@ -165,6 +166,15 @@ Changes since 2.6.3:
     - The sender and the generator now double-check the file-list index
       they are given, and refuse to operate on a directory index (since
       that would indicate that something had gone very wrong).
+
+    - Added the --fuzzy option, which attempts to find a basis file for a
+      file that is being created from scratch.  The current algorithm
+      only looks in the destination directory for the created file, but
+      it does attempt to find a match based on size/mod-time (in case the
+      file was renamed with no other changes) as well as based on a fuzzy
+      name-matching algorithm.  This option requires protocol 29 because
+      it needs the new file-sorting order.  (Promoted from patches dir
+      and enhanced.)
 
   SUPPORT FILES:
 
