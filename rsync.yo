@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsync)(1)(29 May 2001)()()
+manpage(rsync)(1)(14 Dec 2001)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
@@ -943,10 +943,9 @@ probably missed some people, my apologies if I have.
 
 manpageauthor()
 
-rsync was written by Andrew Tridgell and Paul Mackerras.  They may be
-contacted via email at tridge@samba.org and
-Paul.Mackerras@cs.anu.edu.au
+rsync was written by Andrew Tridgell and Paul Mackerras.  
 
-rsync is now also maintained by Martin Pool <mbp@samba.org>
+rsync is now maintained by Martin Pool <mbp@samba.org>.
 
-
+Mailing lists for support and development are available at
+url(http://lists.samba.org)(lists.samba.org)
