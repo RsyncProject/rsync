@@ -490,8 +490,9 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 
 #if SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(mode)) {
-		write_int(f, strlen(file->u.link));
-		write_buf(f, file->u.link, strlen(file->u.link));
+		int len = strlen(file->u.link);
+		write_int(f, len);
+		write_buf(f, file->u.link, len);
 	}
 #endif
 
@@ -643,14 +644,14 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 	}
 
 	if (preserve_links && S_ISLNK(mode)) {
-		int l = read_int(f);
-		if (l < 0) {
-			rprintf(FERROR, "overflow: l=%d\n", l);
+		int len = read_int(f);
+		if (len < 0 || len >= MAXPATHLEN) {
+			rprintf(FERROR, "overflow: len=%d\n", len);
 			overflow("receive_file_entry");
 		}
-		if (!(file->u.link = new_array(char, l + 1)))
+		if (!(file->u.link = new_array(char, len + 1)))
 			out_of_memory("receive_file_entry 2");
-		read_sbuf(f, file->u.link, l);
+		read_sbuf(f, file->u.link, len);
 		if (sanitize_paths)
 			sanitize_path(file->u.link, file->dirname);
 	}
