@@ -353,6 +353,7 @@ to the detailed description below for a complete description.  verb(
  -T, --temp-dir=DIR          create temporary files in directory DIR
  -y, --fuzzy                 find similar file for basis if no dest file
      --compare-dest=DIR      also compare received files relative to DIR
+     --copy-dest=DIR         ... and include copies of unchanged files
      --link-dest=DIR         hardlink to files in DIR when unchanged
  -z, --compress              compress file data during the transfer
  -C, --cvs-exclude           auto-ignore files in the same way CVS does
@@ -954,13 +955,30 @@ have changed from an earlier backup.
 Beginning in version 2.6.4, multiple bf(--compare-dest) directories may be
 provided, which will cause rsync to search the list in the order specified
 for an exact match.
+If a match is found that differs only in attributes, a local copy is made
+and the attributes updated.
 If a match is not found, a basis file from one of the em(DIR)s will be
 selected to try to speed up the transfer.
 
 If em(DIR) is a relative path, it is relative to the destination directory.
-See also bf(--link-dest).
+See also bf(--copy-dest) and bf(--link-dest).
 
-dit(bf(--link-dest=DIR)) This option behaves like bf(--compare-dest), but
+dit(bf(--copy-dest=DIR)) This option behaves like bf(--compare-dest), but
+rsync will also copy unchanged files found in em(DIR) to the destination
+directory using a local copy.
+This is useful for doing transfers to a new destination while leaving
+existing files intact, and then doing a flash-cutover when all files have
+been successfully transferred.
+
+Multiple bf(--copy-dest) directories may be provided, which will cause
+rsync to search the list in the order specified for an unchanged file.
+If a match is not found, a basis file from one of the em(DIR)s will be
+selected to try to speed up the transfer.
+
+If em(DIR) is a relative path, it is relative to the destination directory.
+See also bf(--compare-dest) and bf(--link-dest).
+
+dit(bf(--link-dest=DIR)) This option behaves like bf(--copy-dest), but
 unchanged files are hard linked from em(DIR) to the destination directory.
 The files must be identical in all preserved attributes (e.g. permissions,
 possibly ownership) in order for the files to be linked together.
@@ -971,11 +989,13 @@ quote(tt(  rsync -av --link-dest=$PWD/prior_dir host:src_dir/ new_dir/))
 Beginning in version 2.6.4, multiple bf(--link-dest) directories may be
 provided, which will cause rsync to search the list in the order specified
 for an exact match.
+If a match is found that differs only in attributes, a local copy is made
+and the attributes updated.
 If a match is not found, a basis file from one of the em(DIR)s will be
 selected to try to speed up the transfer.
 
 If em(DIR) is a relative path, it is relative to the destination directory.
-See also bf(--compare-dest).
+See also bf(--compare-dest) and bf(--copy-dest).
 
 Note that rsync versions prior to 2.6.1 had a bug that could prevent
 bf(--link-dest) from working properly for a non-root user when bf(-o) was specified
