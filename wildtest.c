@@ -22,7 +22,7 @@ int output_iterations = 0;
 
 static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
-  {"count",          'c', POPT_ARG_NONE,   &output_iterations, 0, 0, 0},
+  {"iterations",     'i', POPT_ARG_NONE,   &output_iterations, 0, 0, 0},
   {0,0,0,0, 0, 0, 0}
 };
 
@@ -66,7 +66,9 @@ main(int argc, char **argv)
     while ((opt = poptGetNextOpt(pc)) != -1) {
 	switch (opt) {
 	  default:
-	    fprintf(stderr, "Unknown option: `%c'\n", opt);
+	    fprintf(stderr, "%s: %s\n",
+		    poptBadOption(pc, POPT_BADOPTION_NOALIAS),
+		    poptStrerror(opt));
 	    exit(1);
 	}
     }
