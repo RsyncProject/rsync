@@ -252,6 +252,10 @@
 #define MAXPATHLEN 1024
 #endif
 
+#ifndef INADDR_NONE
+#define INADDR_NONE 0xffffffff
+#endif
+
 struct file_struct {
 	unsigned flags;
 	time_t modtime;
