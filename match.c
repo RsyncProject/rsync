@@ -275,6 +275,10 @@ static void hash_search(int f,struct sum_struct *s,
  * checksums from the generator, and transmit either literal or token
  * data.
  *
+ * Also calculates the MD4 checksum of the whole file, using the md
+ * accumulator.  This is transmitted with the file as protection
+ * against corruption on the wire.
+ *
  * @param s Checksums received from the generator.  If <tt>s->count ==
  * 0</tt>, then there are actually no checksums for this file.
  *
