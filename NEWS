@@ -39,18 +39,23 @@ Changes since 2.5.7:
 
       - A pattern with a "**" no longer causes a "*" to match slashes.
         For example, with "/*/foo/**", "foo" must be 2 levels deep.
+	[Upgrade any "*" wildcards to "**" to get the old behavior in
+	all versions.]
 
-      - "**/foo" now matches at the base of the transfer (i.e. /foo).
+      - "**/foo" now matches at the base of the transfer (like /foo
+        does).  [Use "/**/foo" to get the old behavior in all versions.]
 
-      - An non-anchored wildcard term floats to match beyond the base of
+      - A non-anchored wildcard term floats to match beyond the base of
         the transfer.  E.g. "CVS/R*" matches at the end of the path,
-        just like the non-wildcard term "CVS/Root" does.
+        just like the non-wildcard term "CVS/Root" does. [Use "/CVS/R*"
+        to get the old behavior in all versions.]
 
       - Including a "**" in the match term causes it to be matched
         against the entire path, not just the name portion, even if
         there aren't any interior slashes in the term.  E.g. "foo**bar"
         would exclude "/path/foo-bar" (just like before) as well as
-        "/foo-path/baz-bar" (unlike before).
+        "/foo-path/baz-bar" (unlike before).  [Use "foo*bar" to get the
+        old behavior in all versions.]
 
     * The exclude list specified in the daemon's config file is now
       properly applied to the pulled items no matter how deep the
@@ -111,7 +116,7 @@ Changes since 2.5.7:
       regular file unless --delete specified.  (J.W. Schultz)
 
     * Detect and report when open or opendir succeed but read and
-      readdir fail caused by network filesystems issues and truncated
+      readdir fail caused by network filesystem issues and truncated
       files.  (David Norwood, Michael Brown, J.W. Schultz)
 
     * Added a fix that should give ssh time to restore the tty settings
