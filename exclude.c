@@ -237,7 +237,7 @@ int check_exclude(struct exclude_list_struct *listp, char *name, int name_is_dir
  * be '\0' terminated, so use the returned length to limit the string.
  * Also, be sure to add this length to the returned pointer before passing
  * it back to ask for the next token.  This routine will not parse the +/-
- * prefixes or the "!" token when xflags contains XFLG_NO_PREFIXES.  The
+ * prefixes or the "!" token when xflags contains XFLG_WORDS_ONLY.  The
  * *incl_ptr value will be 1 for an include, 0 for an exclude, and -1 for
  * the list-clearing "!" token.
  */
@@ -256,7 +256,7 @@ static const char *get_exclude_tok(const char *p, int *len_ptr, int *incl_ptr,
 	}
 
 	/* Is this a '+' or '-' followed by a space (not whitespace)? */
-	if (!(xflags & XFLG_NO_PREFIXES)
+	if (!(xflags & XFLG_WORDS_ONLY)
 	    && (*s == '-' || *s == '+') && s[1] == ' ') {
 		*incl_ptr = *s == '+';
 		s += 2;
@@ -272,7 +272,7 @@ static const char *get_exclude_tok(const char *p, int *len_ptr, int *incl_ptr,
 	} else
 		len = strlen(s);
 
-	if (*p == '!' && len == 1 && !(xflags & XFLG_NO_PREFIXES))
+	if (*p == '!' && len == 1 && !(xflags & XFLG_WORDS_ONLY))
 		*incl_ptr = -1;
 
 	*len_ptr = len;
@@ -355,8 +355,8 @@ void add_exclude_file(struct exclude_list_struct *listp, const char *fname,
 				*s++ = ch;
 		}
 		*s = '\0';
-		/* Skip lines starting with semicolon or pound. */
-		if (*line && *line != ';' && *line != '#')
+		/* Skip an empty token and (when line parsing) comments. */
+		if (*line && (word_split || (*line != ';' && *line != '#')))
 			add_exclude(listp, line, xflags);
 		if (ch == EOF)
 			break;
@@ -433,14 +433,14 @@ void add_cvs_excludes(void)
 	char *p;
 
 	add_exclude(&exclude_list, default_cvsignore,
-		    XFLG_WORD_SPLIT | XFLG_NO_PREFIXES);
+		    XFLG_WORD_SPLIT | XFLG_WORDS_ONLY);
 
 	if ((p = getenv("HOME"))
 	    && pathjoin(fname, sizeof fname, p, ".cvsignore") < sizeof fname) {
 		add_exclude_file(&exclude_list, fname,
-				 XFLG_WORD_SPLIT | XFLG_NO_PREFIXES);
+				 XFLG_WORD_SPLIT | XFLG_WORDS_ONLY);
 	}
 
 	add_exclude(&exclude_list, getenv("CVSIGNORE"),
-		    XFLG_WORD_SPLIT | XFLG_NO_PREFIXES);
+		    XFLG_WORD_SPLIT | XFLG_WORDS_ONLY);
 }
