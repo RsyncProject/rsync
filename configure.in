@@ -48,6 +48,50 @@ if test x"$rsync_cv_errno" = x"yes"; then
    AC_DEFINE(HAVE_ERRNO_DECL)
 fi
 
+# The following test taken from the cvs sources
+# If we can't find connect, try looking in -lsocket, -lnsl, and -linet.
+# These need checks to be before checks for any other functions that
+#    might be in the same libraries.
+# The Irix 5 libc.so has connect and gethostbyname, but Irix 5 also has
+# libsocket.so which has a bad implementation of gethostbyname (it
+# only looks in /etc/hosts), so we only look for -lsocket if we need
+# it.
+AC_CHECK_FUNCS(connect)
+if test x"$ac_cv_func_connect" = x"no"; then
+    case "$LIBS" in
+    *-lnsl*) ;;
+    *) AC_CHECK_LIB(nsl_s, printf) ;;
+    esac
+    case "$LIBS" in
+    *-lnsl*) ;;
+    *) AC_CHECK_LIB(nsl, printf) ;;
+    esac
+    case "$LIBS" in
+    *-lsocket*) ;;
+    *) AC_CHECK_LIB(socket, connect) ;;
+    esac
+    case "$LIBS" in
+    *-linet*) ;;
+    *) AC_CHECK_LIB(inet, connect) ;;
+    esac
+    dnl We can't just call AC_CHECK_FUNCS(connect) here, because the value
+    dnl has been cached.
+    if test x"$ac_cv_lib_socket_connect" = x"yes" || 
+       test x"$ac_cv_lib_inet_connect" = x"yes"; then
+        # ac_cv_func_connect=yes
+        # don't!  it would cause AC_CHECK_FUNC to succeed next time configure is run
+        AC_DEFINE(HAVE_CONNECT)
+    fi
+fi
+
+# 
+# if we can't find strcasecmp, look in -lresolv (for Unixware at least)
+#
+AC_CHECK_FUNCS(strcasecmp)
+if test x"$ac_cv_func_strcasecmp" = x"no"; then
+    AC_CHECK_LIB(resolv, strcasecmp)
+fi
+
 AC_FUNC_MEMCMP
 AC_FUNC_UTIME_NULL
 AC_CHECK_FUNCS(waitpid wait4 getcwd strdup strerror chown chmod mknod)
@@ -159,48 +203,6 @@ exit(1);}],
            rsync_cv_REPLACE_INET_NTOA=yes,rsync_cv_REPLACE_INET_NTOA=no,rsync_cv_REPLACE_INET_NTOA=cross)])
 if test x"$rsync_cv_REPLACE_INET_NTOA" = x"yes"; then
     AC_DEFINE(REPLACE_INET_NTOA)
-fi
-
-# The following test taken from the cvs sources
-# If we can't find connect, try looking in -lsocket, -lnsl, and -linet.
-# The Irix 5 libc.so has connect and gethostbyname, but Irix 5 also has
-# libsocket.so which has a bad implementation of gethostbyname (it
-# only looks in /etc/hosts), so we only look for -lsocket if we need
-# it.
-AC_CHECK_FUNCS(connect)
-if test x"$ac_cv_func_connect" = x"no"; then
-    case "$LIBS" in
-    *-lnsl*) ;;
-    *) AC_CHECK_LIB(nsl_s, printf) ;;
-    esac
-    case "$LIBS" in
-    *-lnsl*) ;;
-    *) AC_CHECK_LIB(nsl, printf) ;;
-    esac
-    case "$LIBS" in
-    *-lsocket*) ;;
-    *) AC_CHECK_LIB(socket, connect) ;;
-    esac
-    case "$LIBS" in
-    *-linet*) ;;
-    *) AC_CHECK_LIB(inet, connect) ;;
-    esac
-    dnl We can't just call AC_CHECK_FUNCS(connect) here, because the value
-    dnl has been cached.
-    if test x"$ac_cv_lib_socket_connect" = x"yes" || 
-       test x"$ac_cv_lib_inet_connect" = x"yes"; then
-        # ac_cv_func_connect=yes
-        # don't!  it would cause AC_CHECK_FUNC to succeed next time configure is run
-        AC_DEFINE(HAVE_CONNECT)
-    fi
-fi
-
-# 
-# if we can't find strcasecmp, look in -lresolv (for Unixware at least)
-#
-AC_CHECK_FUNCS(strcasecmp)
-if test x"$ac_cv_func_strcasecmp" = x"no"; then
-    AC_CHECK_LIB(resolv, strcasecmp)
 fi
 
 #
