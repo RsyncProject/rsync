@@ -52,7 +52,7 @@ extern int io_timeout;
 extern struct stats stats;
 
 
-const char * const phase_unknown = "unknown";
+const char phase_unknown[] = "unknown";
 
 /**
  * The connection might be dropped at some point; perhaps because the
