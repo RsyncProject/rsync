@@ -31,7 +31,7 @@ rsync changes since last release
     * Properly support IPv6 addresses in the rsyncd.conf "hosts allow"
       and "hosts deny" fields.  (Hideaki Yoshifuji)
 
-    * Set the default value of --modify-window to 2 on Cygwin.  (Lapo
+    * Set the default value of --modify-window to 1 on Cygwin.  (Lapo
       Luchini)
 
     * Ignore errors from chmod when -p/-a/--preserve-perms is not set.
