@@ -251,10 +251,10 @@ Changes since 2.6.3:
     - A 16-bit flag-word is transmitted after every file-list index.  This
       indicates what is changing between the sender and the receiver.  The
       generator now transmits an index and a flag-word to indicate when
-      dirs and symlinks have changed, which makes the outputting of the
-      information more consistent and less prone to screen corruption (it
-      resorts to the old-style outputting of generator-created change-
-      messages for older protocol versions).
+      dirs and symlinks have changed (instead of producing a message),
+      which makes the outputting of the information more consistent and
+      less prone to screen corruption (because either the receiver or the
+      sender is now outputting all the file-change info).
 
     - If --inplace is specified, the generator flags any transfer that is
       using an alternate basis file so that the sender can use the entire
