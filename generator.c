@@ -25,6 +25,7 @@
 
 extern int verbose;
 extern int dry_run;
+extern int what_has_changed;
 extern int relative_paths;
 extern int keep_dirlinks;
 extern int preserve_links;
@@ -78,6 +79,57 @@ static int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
 
 	return 1;
 }
+
+
+#define SC_CHECKSUM_CHANGED (1<<0)
+#define SC_SYMLINK_CHANGED (1<<1)
+#define SC_SENDING_FILE (1<<2)
+#define SC_NO_BASIS (1<<3)
+#define SC_NO_NL (1<<4)
+
+static void showchg(const char *fname, struct file_struct *file, int statret,
+		    STRUCT_STAT *st, int flags)
+{
+	static char ch[] = "*XcstpogDL";
+	int keep_time;
+	char *s;
+
+	ch[0] = flags & SC_SENDING_FILE ? '*' : ' ';
+	ch[1] = S_ISDIR(file->mode) ? 'd' : IS_DEVICE(file->mode) ? 'D'
+	      : S_ISLNK(file->mode) ? 'L' : 'f';
+
+	if (statret < 0) {
+		for (s = ch + 2; *s; ) *s++ = '+';
+		goto print_it;
+	}
+
+	keep_time = !preserve_times ? 0
+		: S_ISDIR(file->mode) ? !omit_dir_times : !S_ISLNK(file->mode);
+
+	ch[2] = !(flags & SC_CHECKSUM_CHANGED) ? '-' : 'c';
+	ch[3] = !S_ISREG(file->mode) || file->length == st->st_size ? '-' : 's';
+	ch[4] = flags & SC_SENDING_FILE && !keep_time ? 'T'
+	    : !keep_time || file->modtime == st->st_mtime ? '-' : 't';
+	ch[5] = !preserve_perms || file->mode == st->st_mode ? '-' : 'p';
+	ch[6] = !am_root || !preserve_uid || file->uid == st->st_uid ? '-' : 'o';
+	ch[7] = preserve_gid && file->gid != GID_NONE && st->st_gid != file->gid  ? 'g' : '-';
+	ch[8] = IS_DEVICE(file->mode) && file->u.rdev != st->st_rdev ? 'D' : '-';
+	ch[9] = flags & SC_SYMLINK_CHANGED ? 'L' : '-';
+
+	if (flags & SC_NO_BASIS)
+	    ch[4] = ch[5] = ch[6] = ch[7] = '-';
+
+	s = ch + 2;
+	if (!(flags & SC_SENDING_FILE))
+		while (*s == '-') s++;
+	if (*s) {
+	    print_it:
+		rprintf(FINFO, "%s %s%s%s", ch, fname,
+			ch[1] == 'd' ? "/" : "",
+			flags & SC_NO_NL ? "" : "\n");
+	}
+}
+
 
 /* Perform our quick-check heuristic for determining if a file is unchanged. */
 static int unchanged_file(char *fn, struct file_struct *file, STRUCT_STAT *st)
@@ -227,6 +279,7 @@ static void generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 	if (mapbuf)
 		unmap_file(mapbuf);
 }
+
 
 /* Try to find a filename in the same dir as "fname" with a similar name. */
 static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
@@ -394,6 +447,8 @@ static void recv_generator(char *fname, struct file_list *flist,
 			missing_below = file->dir.depth;
 			dry_run++;
 		}
+		if (what_has_changed && f_out != -1)
+			showchg(fname, file, statret, &st, 0);
 		if (statret != 0 && do_mkdir(fname,file->mode) != 0 && errno != EEXIST) {
 			if (!relative_paths || errno != ENOENT
 			    || create_directory_path(fname, orig_umask) < 0
@@ -404,13 +459,15 @@ static void recv_generator(char *fname, struct file_list *flist,
 			}
 		}
 		if (set_perms(fname, file, statret ? NULL : &st, 0)
-		    && verbose && f_out != -1)
+		    && verbose && f_out != -1 && !what_has_changed)
 			rprintf(FINFO, "%s/\n", safe_fname(fname));
 		if (delete_during && f_out != -1 && csum_length != SUM_LENGTH
 		    && (file->flags & FLAG_DEL_HERE))
 			delete_in_dir(flist, fname, file);
 		return;
-	} else if (max_size && file->length > max_size) {
+	}
+	
+	if (max_size && file->length > max_size) {
 		if (verbose > 1) {
 			rprintf(FINFO, "%s is over max-size\n",
 				safe_fname(fname));
@@ -441,6 +498,8 @@ static void recv_generator(char *fname, struct file_list *flist,
 				 * right place -- no further action
 				 * required. */
 				if (strcmp(lnk, file->u.link) == 0) {
+					if (what_has_changed)
+						showchg(fname, file, 0, &st, 0);
 					set_perms(fname, file, &st,
 						  PERMS_REPORT);
 					return;
@@ -455,9 +514,15 @@ static void recv_generator(char *fname, struct file_list *flist,
 				full_fname(fname), safe_fname(file->u.link));
 		} else {
 			set_perms(fname,file,NULL,0);
+			if (what_has_changed) {
+				showchg(fname, file, statret, &st,
+					SC_SYMLINK_CHANGED
+					| (verbose ? SC_NO_NL : 0));
+			}
 			if (verbose) {
-				rprintf(FINFO, "%s -> %s\n", safe_fname(fname),
-					safe_fname(file->u.link));
+				rprintf(FINFO, "%s -> %s\n",
+				    what_has_changed ? "" : safe_fname(fname),
+				    safe_fname(file->u.link));
 			}
 		}
 #endif
@@ -465,6 +530,8 @@ static void recv_generator(char *fname, struct file_list *flist,
 	}
 
 	if (am_root && preserve_devices && IS_DEVICE(file->mode)) {
+		if (what_has_changed)
+			showchg(fname, file, statret, &st, 0);
 		if (statret != 0 ||
 		    st.st_mode != file->mode ||
 		    st.st_rdev != file->u.rdev) {
@@ -480,7 +547,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 					full_fname(fname));
 			} else {
 				set_perms(fname,file,NULL,0);
-				if (verbose) {
+				if (verbose && !what_has_changed) {
 					rprintf(FINFO, "%s\n",
 						safe_fname(fname));
 				}
@@ -503,7 +570,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 	fnamecmp = fname;
 	fnamecmp_type = FNAMECMP_FNAME;
 
-	if (statret == -1 && basis_dir[0] != NULL) {
+	if (statret != 0 && basis_dir[0] != NULL) {
 		int fallback_match = -1;
 		int match_level = 0;
 		int i = 0;
@@ -569,12 +636,12 @@ static void recv_generator(char *fname, struct file_list *flist,
 	if (partial_dir && (partialptr = partial_dir_fname(fname)) != NULL
 	    && link_stat(partialptr, &partial_st, 0) == 0
 	    && S_ISREG(partial_st.st_mode)) {
-		if (statret == -1)
+		if (statret != 0)
 			goto prepare_to_open;
 	} else
 		partialptr = NULL;
 
-	if (statret == -1 && fuzzy_basis && dry_run <= 1) {
+	if (statret != 0 && fuzzy_basis && dry_run <= 1) {
 		int j = find_fuzzy(file, fuzzy_dirlist);
 		if (j >= 0) {
 			fuzzy_file = fuzzy_dirlist->files[j];
@@ -592,7 +659,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 		}
 	}
 
-	if (statret == -1) {
+	if (statret != 0) {
 		if (preserve_hard_links && hard_link_check(file, HL_SKIP))
 			return;
 		if (stat_errno == ENOENT)
@@ -623,6 +690,11 @@ static void recv_generator(char *fname, struct file_list *flist,
 	else if (fnamecmp_type == FNAMECMP_FUZZY)
 		;
 	else if (unchanged_file(fnamecmp, file, &st)) {
+		if (what_has_changed) {
+			showchg(fname, file, statret, &st,
+				fnamecmp_type == FNAMECMP_FNAME ? 0
+				: SC_NO_BASIS);
+		}
 		if (fnamecmp_type == FNAMECMP_FNAME)
 			set_perms(fname, file, &st, PERMS_REPORT);
 		return;
@@ -639,7 +711,8 @@ prepare_to_open:
 	if (dry_run || read_batch)
 		goto notify_others;
 	if (whole_file > 0) {
-		statret = -1;
+		if (statret == 0)
+			statret = 1;
 		goto notify_others;
 	}
 
@@ -719,6 +792,11 @@ notify_others:
 			write_buf(f_out_name, lenbuf, lb - lenbuf + 1);
 			write_buf(f_out_name, fuzzy_file->basename, len);
 		}
+	}
+	if (what_has_changed) {
+		showchg(fname, file, statret, &st,
+			(always_checksum ? SC_CHECKSUM_CHANGED : 0)
+			| SC_SENDING_FILE);
 	}
 
 	if (dry_run || read_batch)
