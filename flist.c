@@ -83,6 +83,14 @@ static void start_filelist_progress(char *kind)
 	rflush(FINFO);
 }
 
+
+static void maybe_emit_filelist_progress(const struct file_list *flist)
+{
+	if (do_progress && show_filelist_p() && ((flist->count % 100) == 0))
+		emit_filelist_progress(flist);
+}
+
+
 static void emit_filelist_progress(const struct file_list *flist)
 {
 	rprintf(FINFO, " %d files...\r", flist->count);
@@ -594,7 +602,21 @@ static int skip_filesystem(char *fname, STRUCT_STAT * st)
 /* IRIX cc cares that the operands to the ternary have the same type. */
 #define MALLOC(ap, i)	(ap ? (void*) string_area_malloc(ap, i) : malloc(i))
 
-/* create a file_struct for a named file */
+/**
+ * Create a file_struct for a named file by reading its stat()
+ * information and performing extensive checks against global
+ * options.
+ *
+ * @return the new file, or NULL if there was an error or this file
+ * should be excluded.
+ *
+ * @todo There is a small optimization opportunity here to avoid
+ * stat()ing the file in some circumstances, which has a certain cost.
+ * We are called immediately after doing readdir(), and so we may
+ * already know the d_type of the file.  We could for example avoid
+ * statting directories if we're not recursing, but this is not a very
+ * important case.  Some systems may not have d_type.
+ **/
 struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 			      int noexcludes)
 {
@@ -740,8 +762,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 	if (!file)
 		return;
 
-	if (do_progress && show_filelist_p() && ((flist->count % 100) == 0))
-		emit_filelist_progress(flist);
+	maybe_emit_filelist_progress(flist);
 
 	flist_expand(flist);
 
@@ -1032,8 +1053,7 @@ struct file_list *recv_file_list(int f)
 
 		flist->count++;
 
-		if (do_progress && show_filelist_p() && ((flist->count % 100) == 0))
-			emit_filelist_progress(flist);
+		maybe_emit_filelist_progress(flist);
 
 		if (verbose > 2)
 			rprintf(FINFO, "recv_file_name(%s)\n",
