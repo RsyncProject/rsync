@@ -99,6 +99,10 @@ hands_setup() {
 
 #      echo testing head:
 #      ls -lR ${srcdir} | head -10 || echo failed
+
+    # sleep here to prevent a copy from being made within the
+    #  default --modify-window time on Cygwin
+    sleep 2
 }
 
 
