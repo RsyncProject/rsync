@@ -53,7 +53,7 @@ static int skip_file(char *fname, struct file_struct *file, STRUCT_STAT *st)
 	}
 	if (link_dest) {
 		if (preserve_perms
-		    && (st->st_mode & ~_S_IFMT) != (file->mode & ~_S_IFMT))
+		    && (st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS))
 			return 0;
 
 		if (am_root && preserve_uid && st->st_uid != file->uid)
@@ -295,7 +295,8 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 		/* if the file exists already and we aren't perserving
 		 * permissions then act as though the remote end sent
 		 * us the file permissions we already have */
-		file->mode = (file->mode & _S_IFMT) | (st.st_mode & ~_S_IFMT);
+		file->mode = (file->mode & ~CHMOD_BITS)
+			   | (st.st_mode & CHMOD_BITS);
 	}
 
 	if (S_ISDIR(file->mode)) {
