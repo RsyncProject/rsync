@@ -119,7 +119,7 @@ static int read_timeout(int fd, char *buf, int len)
 
 		if (n == 0) {
 			if (eof_error) {
-				rprintf(FERROR,"EOF in read_timeout\n");
+				rprintf(FERROR,"unexpected EOF in read_timeout\n");
 			}
 			exit_cleanup(1);
 		}
