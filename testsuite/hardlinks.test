@@ -1,0 +1,38 @@
+#! /bin/sh
+
+# Copyright (C) 2002 by Martin Pool <mbp@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test rsync handling of hardlinks.  By default (in 2.5.1) rsync does
+# not detect symlinks and they get split into different files.  If you
+# specify -H, then hard links are detected and recreated as hardlinks
+# on the other end.
+
+. $srcdir/testsuite/rsync.fns
+
+set -x
+
+# Build some hardlinks
+
+fromdir="$scratchdir/from"
+todir="$scratchdir/to"
+
+# TODO: Need to test whether hardlinks are possible on this OS/filesystem
+
+mkdir "$fromdir"
+name1="$fromdir/name1"
+name2="$fromdir/name2"
+name3="$fromdir/name3"
+name4="$fromdir/name4"
+echo "This is the file" > "$name1"
+ln "$name1" "$name2" || fail "Can't create hardlink"
+ln "$name2" "$name3" || fail "Can't create hardlink"
+cp "$name2" "$name4" || fail "Can't copy file"
+
+checkit "rsync -aH \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+
+exit 0
+# last [] may have failed but if we get here then we've won
+
