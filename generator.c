@@ -149,7 +149,7 @@ static int delete_item(char *fname, int mode, int flags)
 			full_fname(fname));
 		return -1;
 	}
-	flags |= DEL_FORCE_RECURSE;
+	flags |= DEL_FORCE_RECURSE; /* mark subdir dels as not "in the way" */
 
 	dlen = strlcpy(buf, fname, MAXPATHLEN);
 	save_filters = push_local_filters(buf, dlen);
@@ -821,17 +821,20 @@ static void recv_generator(char *fname, struct file_list *flist,
 			if (link_stat(fnamecmpbuf, &st, 0) == 0
 			    && S_ISREG(st.st_mode)) {
 				statret = 0;
-				if (link_dest) {
-					if (!match_level) {
-						fallback_match = i;
-						match_level = 1;
-					} else if (match_level == 2
-					    && !unchanged_attrs(file, &st))
-						continue;
+				switch (match_level) {
+				case 0:
+					if (compare_dest)
+						break;
+					fallback_match = i;
+					match_level = 1;
+					/* FALL THROUGH */
+				case 1:
 					if (!unchanged_file(fnamecmpbuf, file, &st))
 						continue;
 					fallback_match = i;
 					match_level = 2;
+					/* FALL THROUGH */
+				case 2:
 					if (!unchanged_attrs(file, &st))
 						continue;
 				}
