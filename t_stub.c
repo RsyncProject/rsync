@@ -29,7 +29,7 @@
 int modify_window = 0;
 struct exclude_struct **server_exclude_list;
 
- void rprintf(enum logcode UNUSED(code), const char *format, ...)
+ void rprintf(UNUSED(enum logcode code), const char *format, ...)
 {
 	va_list ap;
 	va_start(ap, format);
@@ -44,9 +44,10 @@ struct exclude_struct **server_exclude_list;
 	exit(code);
 }
 
- int check_exclude(struct exclude_struct **list, char *name, int name_is_dir)
+ int check_exclude(UNUSED(struct exclude_struct **list), UNUSED(char *name),
+		   UNUSED(int name_is_dir))
 {
-	/* This function doesn't really get called in a test context, so
-	 * just reference our parameters to avoid compiler warnings. */
-	return 0 && list && name && name_is_dir;
+	/* This function doesn't really get called in this test context, so
+	 * just return 0. */
+	return 0;
 }

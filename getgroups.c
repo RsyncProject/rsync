@@ -31,7 +31,7 @@
 #  define NGROUPS 32
 #endif
 
-int main(int argc, char *argv[])
+int main(UNUSED(int argc), UNUSED(char *argv[]))
 {
 	int n, i;
 	gid_t list[NGROUPS];
