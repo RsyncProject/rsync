@@ -80,7 +80,6 @@ void init_flist(void)
 
     /* Figure out how big the file_struct is without trailing padding */
     min_file_struct_len = ((char*)&f.flags - (char*)&f) + sizeof f.flags;
-    min_file_struct_len = sizeof f; /* XXX test for build-farm */
 }
 
 
@@ -1331,7 +1330,7 @@ void free_file(struct file_struct *file, int free_the_struct)
 	if (free_the_struct)
 		free(file);
 	else
-		memset(file, 0, sizeof file[0]);
+		memset(file, 0, min_file_struct_len);
 }
 
 
