@@ -388,7 +388,7 @@ static int skip_file(char *fname,
 
 
 /* use a larger block size for really big files */
-int adapt_block_size(struct file_struct *file, int bsize)
+static int adapt_block_size(struct file_struct *file, int bsize)
 {
 	int ret;
 
