@@ -344,16 +344,6 @@ static int rsync_module(int f_in, int f_out, int i)
 	}
 
 	if (am_root) {
-#ifdef HAVE_SETGROUPS
-		/* Get rid of any supplementary groups this process
-		 * might have inheristed. */
-		if (setgroups(0, NULL)) {
-			rsyserr(FERROR, errno, "setgroups failed");
-			io_printf(f_out, "@ERROR: setgroups failed\n");
-			return -1;
-		}
-#endif
-
 		/* XXXX: You could argue that if the daemon is started
 		 * by a non-root user and they explicitly specify a
 		 * gid, then we should try to change to that gid --
@@ -369,6 +359,15 @@ static int rsync_module(int f_in, int f_out, int i)
 			io_printf(f_out, "@ERROR: setgid failed\n");
 			return -1;
 		}
+#ifdef HAVE_SETGROUPS
+		/* Get rid of any supplementary groups this process
+		 * might have inheristed. */
+		if (setgroups(1, &gid)) {
+			rsyserr(FERROR, errno, "setgroups failed");
+			io_printf(f_out, "@ERROR: setgroups failed\n");
+			return -1;
+		}
+#endif
 
 		if (setuid(uid)) {
 			rsyserr(FERROR, errno, "setuid %d failed", (int) uid);
