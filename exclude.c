@@ -46,7 +46,7 @@ struct filter_list_struct server_filter_list = { 0, 0, "server " };
 /* Need room enough for ":MODS " prefix plus some room to grow. */
 #define MAX_RULE_PREFIX (16)
 
-#define MODIFIERS_MERGE_FILE "-+Cens"
+#define MODIFIERS_MERGE_FILE "-+Cenw"
 #define MODIFIERS_INCL_EXCL "/!"
 
 /* The dirbuf is set by push_local_filters() to the current subdirectory
