@@ -26,24 +26,32 @@
 
 #include "rsync.h"
 
-#ifndef NGROUPS
+#ifndef NGROUPS_MAX
 /* It ought to be defined, but just in case. */
-#  define NGROUPS 32
+#  define NGROUPS_MAX 32
 #endif
 
 int
 main(UNUSED(int argc), UNUSED(char *argv[]))
 {
 	int n, i;
-	gid_t list[NGROUPS];
+	gid_t list[NGROUPS_MAX];
+	gid_t gid = getgid();
+	int gid_in_list = 0;
 
-	if ((n = getgroups(NGROUPS, list)) == -1) {
+	if ((n = getgroups(NGROUPS_MAX, list)) < 0) {
 		perror("getgroups");
 		return 1;
 	}
 
-	for (i = 0; i < n; i++) 
+	for (i = 0; i < n; i++)  {
 		printf("%lu ", (unsigned long)list[i]);
+		if (list[i] == gid)
+			gid_in_list = 1;
+	}
+	/* The default gid might not be in the list on some systems. */
+	if (!gid_in_list)
+		printf("%lu", (unsigned long)gid);
 	printf("\n");
 		
 	return 0;
