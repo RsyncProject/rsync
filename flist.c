@@ -185,8 +185,6 @@ int link_stat(const char *Path, STRUCT_STAT *Buffer)
 static int match_file_name(char *fname,STRUCT_STAT *st)
 {
   if (check_exclude(fname,local_exclude_list,st)) {
-    if (verbose > 2)
-      rprintf(FINFO,"excluding file %s\n",fname);
     return 0;
   }
   return 1;
@@ -700,6 +698,8 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 
 	if (verbose && recurse && !am_server && f != -1) {
 		rprintf(FINFO,"building file list ... ");
+                if (verbose > 1)
+                        rprintf(FINFO, "\n");
 		rflush(FINFO);
 	}
 

@@ -20,6 +20,8 @@
 /* a lot of this stuff was originally derived from GNU tar, although
    it has now changed so much that it is hard to tell :) */
 
+/* include/exclude cluestick added by Martin Pool <mbp@samba.org> */
+
 #include "rsync.h"
 
 extern int verbose;
@@ -84,8 +86,8 @@ static void free_exclude(struct exclude_struct *ex)
 	free(ex);
 }
 
-static int check_one_exclude(char *name,struct exclude_struct *ex,
-			     STRUCT_STAT *st)
+static int check_one_exclude(char *name, struct exclude_struct *ex,
+                             STRUCT_STAT *st)
 {
 	char *p;
 	int match_start=0;
@@ -121,25 +123,55 @@ static int check_one_exclude(char *name,struct exclude_struct *ex,
 }
 
 
-int check_exclude(char *name,struct exclude_struct **local_exclude_list,
+static void report_exclude_result(char const *name,
+                                  struct exclude_struct const *ent,
+                                  STRUCT_STAT const *st)
+{
+        /* If a trailing slash is present to match only directories,
+         * then it is stripped out by make_exclude.  So as a special
+         * case we add it back in here. */
+        
+        if (verbose >= 2)
+                rprintf(FINFO, "%s %s %s because of pattern %s%s\n",
+                        ent->include ? "including" : "excluding",
+                        S_ISDIR(st->st_mode) ? "directory" : "file",
+                        name, ent->pattern,
+                        ent->directory ? "/" : "");
+}
+
+
+/*
+ * Return true if file NAME is defined to be excluded by either
+ * LOCAL_EXCLUDE_LIST or the globals EXCLUDE_LIST.
+ */
+int check_exclude(char *name, struct exclude_struct **local_exclude_list,
 		  STRUCT_STAT *st)
 {
 	int n;
+        struct exclude_struct const *ent;
 
 	if (name && (name[0] == '.') && !name[1])
 		/* never exclude '.', even if somebody does --exclude '*' */
 		return 0;
 
 	if (exclude_list) {
-		for (n=0; exclude_list[n]; n++)
-			if (check_one_exclude(name,exclude_list[n],st))
-				return !exclude_list[n]->include;
+		for (n=0; exclude_list[n]; n++) {
+                        ent = exclude_list[n];
+			if (check_one_exclude(name, ent, st)) {
+                                report_exclude_result(name, ent, st);
+				return !ent->include;
+                        }
+                }
 	}
 
 	if (local_exclude_list) {
-		for (n=0; local_exclude_list[n]; n++)
-			if (check_one_exclude(name,local_exclude_list[n],st))
-				return !local_exclude_list[n]->include;
+		for (n=0; local_exclude_list[n]; n++) {
+                        ent = exclude_list[n];
+			if (check_one_exclude(name, ent, st)) {
+                                report_exclude_result(name, ent, st);
+				return !ent->include;
+                        }
+                }
 	}
 
 	return 0;
