@@ -253,10 +253,27 @@ running rsync giving the network directory.
       </qandaentry>
 
 
+      <qandaentry>
+	<question>
+	  <para>
+	    Why is rsync so much bigger when I build it with
+	    <command>gcc</command>?
+	  </para>
+	</question>
+	<answer>
+	  <para>
+	    On gcc, rsync builds by default with debug symbols
+	    included.  If you strip both executables, they should end
+	    up about the same size.  (Use <command>make
+	    install-strip</command>.)
+	  </para>
+	</answer>
+      </qandaentry>
+
       
       <qandaentry>
 	<question>
-	  Is rsync useful for a single large file like an ISO image?
+	  <para>Is rsync useful for a single large file like an ISO image?</para>
 	</question>
 	<answer>
 	  <para>
