@@ -146,9 +146,11 @@
 #define ITEM_REPORT_GROUP (1<<6)
 #define ITEM_IS_NEW (1<<7)
 #define ITEM_USING_ALT_BASIS (1<<8)
+/* These are outside the range of the transmitted flags. */
+#define ITEM_NO_DEST_AND_NO_UPDATE (1<<16) /* used by itemize() */
+#define ITEM_MISSING_DATA (1<<16)	   /* used by log_formatted() */
+#define ITEM_DELETED (1<<17)		   /* used by log_formatted() */
 
-#define ITEM_MISSING_DATA (1<<16) /* these are outside the transmitted flags */
-#define ITEM_DELETED (1<<17)
 
 /* Log-message categories.  FLOG and FCLIENT are only used on the daemon
  * side for custom logging -- they don't get sent over the socket. */
