@@ -310,7 +310,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	generate_files(f_out,flist,local_name,recv_pipe[0]);
 
 	io_flush();
-	waitpid(pid, &status, 0);
+	wait_process(pid, &status);
 	return status;
 }
 
@@ -406,7 +406,7 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 			if (verbose > 3)
 				rprintf(FINFO,"client_run waiting on %d\n",pid);
 			io_flush();
-			waitpid(pid, &status, 0);
+			wait_process(pid, &status);
 		}
 		report(-1);
 		exit_cleanup(status);
@@ -430,7 +430,7 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 		if (verbose > 3)
 			rprintf(FINFO,"client_run2 waiting on %d\n",pid);
 		io_flush();
-		waitpid(pid, &status, 0);
+		wait_process(pid, &status);
 	}
 	
 	return status | status2;

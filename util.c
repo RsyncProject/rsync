@@ -870,3 +870,12 @@ char *timestring(time_t t)
 	return(TimeBuf);
 }
 
+
+/****************************************************************************
+ like waitpid but does the WEXITSTATUS
+****************************************************************************/
+void wait_process(pid_t pid, int *status)
+{
+	waitpid(pid, status, 0);
+	*status = WEXITSTATUS(*status);
+}
