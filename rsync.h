@@ -510,4 +510,8 @@ size_t strlcpy(char *d, const char *s, size_t bufsize);
 size_t strlcat(char *d, const char *s, size_t bufsize);
 #endif
 
+#ifndef WEXITSTATUS
+#define	WEXITSTATUS(stat)	((int)(((stat)>>8)&0xFF))
+#endif
+
 #define exit_cleanup(code) _exit_cleanup(code, __FILE__, __LINE__)

@@ -25,6 +25,19 @@ struct stats stats;
 
 extern int verbose;
 
+
+/****************************************************************************
+wait for a process to exit, calling io_flush while waiting
+****************************************************************************/
+void wait_process(pid_t pid, int *status)
+{
+	while (waitpid(pid, status, WNOHANG) == 0) {
+		sleep(1);
+		io_flush();
+	}
+	*status = WEXITSTATUS(*status);
+}
+
 static void report(int f)
 {
 	time_t t = time(NULL);
