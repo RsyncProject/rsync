@@ -25,6 +25,9 @@ rsync changes since last release
     * Don't report an error if an excluded file disappears during an
       rsync run. (Eugene Chupriyanov and Bo Kersey)
 
+    * Added .svn to --cvs-exclude list to support subversion.  (Jon
+      Middleton)
+
   BUG FIXES:
   
     * Fix "forward name lookup failed" errors on AIX 4.3.3.  (John
@@ -41,6 +44,10 @@ rsync changes since last release
     * Fixed a crash that would occur when sending a list of files that
       contains a duplicate name (if it sorts to the end of the file
       list) and using --delete.  (Wayne Davison)
+
+    * Fixed a bug that caused rsync to lose the exit status of its child
+      processes and sometimes return an exit code of 0 instead of showing
+      an error.  (David R. Staples, Dave Dykstra)
 
   INTERNAL:
 

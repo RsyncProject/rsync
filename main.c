@@ -26,6 +26,16 @@ time_t starttime = 0;
 extern struct stats stats;
 extern int verbose;
 
+/* there's probably never more than at most 2 outstanding child processes,
+ * but set it higher just in case.
+ */
+#define MAXCHILDPROCS 5
+
+struct pid_status {
+	pid_t pid;
+	int   status;
+} pid_stat_table[MAXCHILDPROCS];
+
 static void show_malloc_stats(void);
 
 /****************************************************************************
@@ -33,11 +43,27 @@ wait for a process to exit, calling io_flush while waiting
 ****************************************************************************/
 void wait_process(pid_t pid, int *status)
 {
-	while (waitpid(pid, status, WNOHANG) == 0) {
+	pid_t waited_pid;
+	int cnt;
+
+	while ((waited_pid = waitpid(pid, status, WNOHANG)) == 0) {
 		msleep(20);
 		io_flush();
 	}
         
+	if ((waited_pid == -1) && (errno == ECHILD)) {
+		/* status of requested child no longer available.
+		 * check to see if it was processed by the sigchld_handler.
+		 */
+		for (cnt = 0;  cnt < MAXCHILDPROCS; cnt++) {
+			if (pid == pid_stat_table[cnt].pid) {
+				*status = pid_stat_table[cnt].status;
+				pid_stat_table[cnt].pid = 0;
+				break;
+			}
+		}
+	}
+
         /* TODO: If the child exited on a signal, then log an
          * appropriate error message.  Perhaps we should also accept a
          * message describing the purpose of the child.  Also indicate
@@ -848,7 +874,24 @@ static RETSIGTYPE sigusr2_handler(int UNUSED(val)) {
 
 static RETSIGTYPE sigchld_handler(int UNUSED(val)) {
 #ifdef WNOHANG
-	while (waitpid(-1, NULL, WNOHANG) > 0) ;
+	int cnt, status;
+	pid_t pid;
+	/* An empty waitpid() loop was put here by Tridge and we could never
+	 * get him to explain why he put it in, so rather than taking it 
+	 * out we're instead saving the child exit statuses for later use.
+	 * The waitpid() loop presumably eliminates all possibility of leaving
+	 * zombie children, maybe that's why he did it.
+	 */
+	while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+		 /* save the child's exit status */
+		 for (cnt = 0; cnt < MAXCHILDPROCS; cnt++) {
+			  if (pid_stat_table[cnt].pid == 0) {
+				   pid_stat_table[cnt].pid = pid;
+				   pid_stat_table[cnt].status = status;
+				   break;
+			  }
+		 }
+	}
 #endif
 }
 
