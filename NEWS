@@ -56,8 +56,15 @@ rsync 2.4.7 (sometime in 2001, maybe :)
 
     * Applied "simple nohang patch" from Wayne Davison.
 
-    * Update to work with autoconf2.50 and 2.13.
-
   PLATFORMS:
 
     * Improved support for UNICOS (tested on Cray T3E and Cray SV1)
+
+    * autoconf2.52 (or later) is now required to rebuild the autoconf
+      scripts.  It is not required to simply build rsync.
+
+  TESTING:
+
+    * The existing test.sh script by Phil Hands has been merged into a
+      test framework that works from both "make check" and the Samba
+      build farm.
