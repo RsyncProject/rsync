@@ -86,6 +86,9 @@ static int access_match(char *list, char *addr, char *host)
 
 	if (!list2) out_of_memory("access_match");
 
+	strlower(list2);
+	if (host) strlower(host);
+
 	for (tok=strtok(list2," ,\t"); tok; tok=strtok(NULL," ,\t")) {
 		if (match_hostname(host, tok) || match_address(addr, tok)) {
 			free(list2);
