@@ -460,6 +460,7 @@ static int rsync_module(int f_in, int f_out, int i)
 
 	if (!ret) {
 		option_error();
+		msleep(400);
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
 
