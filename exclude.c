@@ -709,7 +709,7 @@ static const char *get_filter_tok(const char *p, int xflags,
 			cp++;
 		len = cp - s;
 	} else
-		len = strlen(s);
+		len = strlen((char*)s);
 
 	if (mflags & MATCHFLG_CLEAR_LIST) {
 		if (!(xflags & (XFLG_DEF_INCLUDE | XFLG_DEF_EXCLUDE)) && len) {
