@@ -375,8 +375,8 @@ static void log_formatted(enum logcode code,
 		case 'o': n = op; break;
 		case 'f':
 			pathjoin(buf2, sizeof buf2,
-				 file->dir.root ? file->dir.root : "",
-				 f_name(file));
+			    am_sender && file->dir.root ? file->dir.root : "",
+			    f_name(file));
 			clean_fname(buf2, 0);
 			n = buf2;
 			if (*n == '/') n++;
