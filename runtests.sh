@@ -97,6 +97,9 @@
 
 # BSD machines tend not to have "head" or "seq".
 
+# You cannot do "export VAR=VALUE" all on one line; the export must be
+# separate from the assignment.  (SCO SysV)
+
 
 
 # STILL TO DO:

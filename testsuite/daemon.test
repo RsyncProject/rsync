@@ -26,6 +26,7 @@
 
 build_rsyncd_conf
 
-export RSYNC_CONNECT_PROG="$rsync_bin --config=$conf --daemon"
+RSYNC_CONNECT_PROG="$rsync_bin --config=$conf --daemon"
+export RSYNC_CONNECT_PROG
 
 $rsync_bin -v localhost::
