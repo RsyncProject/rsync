@@ -88,13 +88,17 @@ rsyncd.conf.5: rsyncd.conf.yo
 proto:
 	cat $(srcdir)/*.c $(srcdir)/lib/compat.c | awk -f $(srcdir)/mkproto.awk > $(srcdir)/proto.h
 
-clean:
+clean: 
 	rm -f *~ $(OBJS) rsync $(TLS_OBJ) tls
 	rm -rf ./testtmp
 	rm -f config.cache 
 
+# We try to delete built files from both the source and build
+# directories, just in case somebody previously configured things in
+# the source directory.
 distclean: clean
-	rm -f Makefile config.h config.status
+	rm -f Makefile config.h config.status 
+	rm -f $(srcdir)/Makefile $(srcdir)/config.h $(srcdir)/config.status
 
 # this target is really just for my use. It only works on a limited
 # range of machines and is used to produce a list of potentially
