@@ -5,8 +5,8 @@
 **  Written by Rich $alz, mirror!rs, Wed Nov 26 19:03:17 EST 1986.
 **  Rich $alz is now <rsalz@bbn.com>.
 **
-**  Modified by Wayne Davison to special-case '/' matching and to fix
-**  the character-class code.
+**  Modified by Wayne Davison to special-case '/' matching, to make '**'
+**  work differently than '*', and to fix the character-class code.
 */
 
 #include "rsync.h"
@@ -81,7 +81,7 @@ wildmatch(const char *p, const char *text)
 		if (ch == '-' && prev && p[1] && p[1] != ']') {
 		    if (*text <= *++p && *text >= prev)
 			matched = true;
-		    ch = 0;
+		    ch = 0; /* This makes "prev" get set to 0. */
 		}
 		else if (*text == ch)
 		    matched = true;
