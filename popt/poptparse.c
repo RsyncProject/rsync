@@ -51,10 +51,10 @@ int poptDupArgv(int argc, const char **argv,
     return 0;
 }
 
-int poptParseArgvString(const char * s, int * argcPtr, const char *** argvPtr)
+int poptParseArgvString(const unsigned char * s, int * argcPtr, const char *** argvPtr)
 {
-    const char * src;
-    char quote = '\0';
+    const unsigned char * src;
+    unsigned char quote = '\0';
     int argvAlloced = POPT_ARGV_ARRAY_GROW_DELTA;
     const char ** argv = malloc(sizeof(*argv) * argvAlloced);
     int argc = 0;

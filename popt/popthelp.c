@@ -17,9 +17,9 @@
  * @param key		option(s)
  */
 static void displayArgs(poptContext con,
-		/*@unused@*/ enum poptCallbackReason foo,
+		/*@unused@*/ UNUSED(enum poptCallbackReason foo),
 		struct poptOption * key, 
-		/*@unused@*/ const char * arg, /*@unused@*/ void * data)
+		/*@unused@*/ UNUSED(const char * arg), /*@unused@*/ UNUSED(void * data))
 	/*@globals fileSystem@*/
 	/*@modifies fileSystem@*/
 {
@@ -84,7 +84,7 @@ getTableTranslationDomain(/*@null@*/ const struct poptOption *table)
 /*@observer@*/ /*@null@*/ static const char *const
 getArgDescrip(const struct poptOption * opt,
 		/*@-paramuse@*/		/* FIX: wazzup? */
-		/*@null@*/ const char * translation_domain)
+		/*@null@*/ UNUSED(const char * translation_domain))
 		/*@=paramuse@*/
 	/*@*/
 {
@@ -115,7 +115,7 @@ static /*@only@*/ /*@null@*/ char *
 singleOptionDefaultValue(int lineLength,
 		const struct poptOption * opt,
 		/*@-paramuse@*/	/* FIX: i18n macros disable with lclint */
-		/*@null@*/ const char * translation_domain)
+		/*@null@*/ UNUSED(const char * translation_domain))
 		/*@=paramuse@*/
 	/*@*/
 {
@@ -191,11 +191,11 @@ static void singleOptionHelp(FILE * fp, int maxLeftCol,
 {
     int indentLength = maxLeftCol + 5;
     int lineLength = 79 - indentLength;
-    const char * help = D_(translation_domain, opt->descrip);
+    const unsigned char * help = D_(translation_domain, opt->descrip);
     const char * argDescrip = getArgDescrip(opt, translation_domain);
     int helpLength;
-    char * defs = NULL;
-    char * left;
+    unsigned char * defs = NULL;
+    unsigned char * left;
     int nb = maxLeftCol + 1;
 
     /* Make sure there's more than enough room in target buffer. */
@@ -314,7 +314,7 @@ static void singleOptionHelp(FILE * fp, int maxLeftCol,
 
     helpLength = strlen(help);
     while (helpLength > lineLength) {
-	const char * ch;
+	const unsigned char * ch;
 	char format[10];
 
 	ch = help + lineLength - 1;
@@ -475,7 +475,7 @@ static int showHelpIntro(poptContext con, FILE * fp)
     return len;
 }
 
-void poptPrintHelp(poptContext con, FILE * fp, /*@unused@*/ int flags)
+void poptPrintHelp(poptContext con, FILE * fp, /*@unused@*/ UNUSED(int flags))
 {
     int leftColWidth;
 
@@ -634,7 +634,7 @@ static int showShortOptions(const struct poptOption * opt, FILE * fp,
     return strlen(s) + 4;
 }
 
-void poptPrintUsage(poptContext con, FILE * fp, /*@unused@*/ int flags)
+void poptPrintUsage(poptContext con, FILE * fp, /*@unused@*/ UNUSED(int flags))
 {
     int cursor;
 

@@ -10,7 +10,7 @@
 #include "poptint.h"
 
 /*@-compmempass@*/	/* FIX: item->option.longName kept, not dependent. */
-static void configLine(poptContext con, char * line)
+static void configLine(poptContext con, unsigned char * line)
 	/*@modifies con @*/
 {
     /*@-type@*/
@@ -159,7 +159,8 @@ int poptReadConfigFile(poptContext con, const char * fn)
     return 0;
 }
 
-int poptReadDefaultConfig(poptContext con, /*@unused@*/ int useEnv) {
+int poptReadDefaultConfig(poptContext con, /*@unused@*/ UNUSED(int useEnv))
+{
     char * fn, * home;
     int rc;
 

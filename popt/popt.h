@@ -363,7 +363,7 @@ int poptDupArgv(int argc, /*@null@*/ const char **argv,
  * @retval argcPtr	address of returned no. of arguments
  * @retval argvPtr	address of returned argument array
  */
-int poptParseArgvString(const char * s,
+int poptParseArgvString(const unsigned char * s,
 		/*@out@*/ int * argcPtr, /*@out@*/ const char *** argvPtr)
 	/*@modifies *argcPtr, *argvPtr @*/;
 

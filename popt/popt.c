@@ -907,10 +907,10 @@ int poptGetNextOpt(poptContext con)
 #ifndef DBL_EPSILON
 #define DBL_EPSILON 2.2204460492503131e-16
 #endif
-#define _ABS(a)	((((a) - 0.0) < DBL_EPSILON) ? -(a) : (a))
-			if ((_ABS(aDouble) - FLT_MAX) > DBL_EPSILON)
+#define MY_ABS(a) ((((a) - 0.0) < DBL_EPSILON) ? -(a) : (a))
+			if ((MY_ABS(aDouble) - FLT_MAX) > DBL_EPSILON)
 			    return POPT_ERROR_OVERFLOW;
-			if ((FLT_MIN - _ABS(aDouble)) > DBL_EPSILON)
+			if ((FLT_MIN - MY_ABS(aDouble)) > DBL_EPSILON)
 			    return POPT_ERROR_OVERFLOW;
 			*((float *) opt->arg) = aDouble;
 		    }
@@ -1055,7 +1055,7 @@ poptContext poptFreeContext(poptContext con)
 }
 
 int poptAddAlias(poptContext con, struct poptAlias alias,
-		/*@unused@*/ int flags)
+		/*@unused@*/ UNUSED(int flags))
 {
     poptItem item = (poptItem) alloca(sizeof(*item));
     memset(item, 0, sizeof(*item));
