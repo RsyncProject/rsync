@@ -25,7 +25,10 @@
 
 #include "rsync.h"
 
-#ifdef GETGROUPS_T
+#ifdef HAVE_GETGROUPS
+# if !defined(GETGROUPS_T)
+#  define GETGROUPS_T gid_t
+# endif
 # ifndef NGROUPS_MAX
 /* It ought to be defined, but just in case. */
 #  define NGROUPS_MAX 32
@@ -117,7 +120,7 @@ static uid_t match_uid(uid_t uid)
 
 static int is_in_group(gid_t gid)
 {
-#ifdef GETGROUPS_T
+#ifdef HAVE_GETGROUPS
 	static gid_t last_in = GID_NONE, last_out;
 	static int ngroups = -2;
 	static GETGROUPS_T *gidset;

@@ -39,10 +39,14 @@ main(UNUSED(int argc), UNUSED(char *argv[]))
 	gid_t gid = MY_GID();
 	int gid_in_list = 0;
 
+#ifdef HAVE_GETGROUPS
 	if ((n = getgroups(NGROUPS_MAX, list)) < 0) {
 		perror("getgroups");
 		return 1;
 	}
+#else
+	n = 0;
+#endif
 
 	for (i = 0; i < n; i++)  {
 		printf("%lu ", (unsigned long)list[i]);
