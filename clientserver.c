@@ -109,6 +109,7 @@ static int rsync_module(int fd, int i)
 	char *addr = client_addr(fd);
 	char *host = client_name(fd);
 	char *name = lp_name(i);
+	char *user;
 	int start_glob=0;
 	char *request=NULL;
 	extern int am_sender;
@@ -121,13 +122,6 @@ static int rsync_module(int fd, int i)
 		return -1;
 	}
 
-	if (!auth_server(fd, i, addr, "@RSYNCD: AUTHREQD ")) {
-		rprintf(FERROR,"auth failed on module %s from %s (%s)\n",
-			name, client_name(fd), client_addr(fd));
-		io_printf(fd,"@ERROR: auth failed on module %s\n",name);
-		return -1;		
-	}
-
 	if (!claim_connection(lp_lock_file(), lp_max_connections())) {
 		rprintf(FERROR,"max connections (%d) reached\n",
 			lp_max_connections());
@@ -136,6 +130,15 @@ static int rsync_module(int fd, int i)
 	}
 
 	
+	user = auth_server(fd, i, addr, "@RSYNCD: AUTHREQD ");
+
+	if (!user) {
+		rprintf(FERROR,"auth failed on module %s from %s (%s)\n",
+			name, client_name(fd), client_addr(fd));
+		io_printf(fd,"@ERROR: auth failed on module %s\n",name);
+		return -1;		
+	}
+
 	module_id = i;
 
 	if (lp_read_only(i))
@@ -233,9 +236,15 @@ static int rsync_module(int fd, int i)
 	parse_arguments(argc, argv);
 
 	if (request) {
-		rprintf(FINFO,"rsync %s %s from %s (%s)\n",
-			am_sender?"on":"to",
-			request, host, addr);
+		if (*user) {
+			rprintf(FINFO,"rsync %s %s from %s@%s (%s)\n",
+				am_sender?"on":"to",
+				request, user, host, addr);
+		} else {
+			rprintf(FINFO,"rsync %s %s from %s (%s)\n",
+				am_sender?"on":"to",
+				request, host, addr);
+		}
 		free(request);
 	}
 
