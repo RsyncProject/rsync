@@ -42,6 +42,15 @@ extern int make_backups;
 extern struct stats stats;
 extern char *backup_dir;
 extern char *log_format;
+extern char *backup_suffix;
+extern int backup_suffix_len;
+
+
+static int is_backup_file(char *fn)
+{
+	int k = strlen(fn) - backup_suffix_len;
+	return k > 0 && strcmp(fn+k, backup_suffix) == 0;
+}
 
 
 /*
@@ -72,7 +81,12 @@ int delete_file(char *fname, int mode, int flags)
 		return -1;
 
 	if (!S_ISDIR(mode)) {
-		if (robust_unlink(fname) == 0) {
+		int ok;
+		if (make_backups && (backup_dir || !is_backup_file(fname)))
+			ok = make_backup(fname);
+		else
+			ok = robust_unlink(fname) == 0;
+		if (ok) {
 			if ((verbose || log_format) && !(flags & DEL_TERSE))
 				log_delete(fname, mode);
 			deletion_count++;
