@@ -25,7 +25,7 @@ LOG=${TMP}/log
 RSYNC="$rsync_bin"
 
 # Berkley's nice.
-PATH="$PATH:/usr/ucb/bin"
+PATH="$PATH:/usr/ucb"
 
 runtest() {
     echo $ECHO_N "Test $1: $ECHO_C"
