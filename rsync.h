@@ -224,6 +224,9 @@
 #define int32 long
 #elif (SIZEOF_SHORT == 4)
 #define int32 short
+#else
+/* I hope this works */
+#define int32 int
 #endif
 #endif
 
@@ -357,7 +360,7 @@ static inline int flist_up(struct file_list *flist, int i)
 #include "byteorder.h"
 #include "version.h"
 #include "proto.h"
-#include "md4.h"
+#include "lib/mdfour.h"
 
 #if !HAVE_STRERROR
 extern char *sys_errlist[];

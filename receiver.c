@@ -292,7 +292,6 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	struct file_struct *file;
 	int phase=0;
 	int recv_ok;
-	extern int module_id;
 
 	if (verbose > 2) {
 		rprintf(FINFO,"recv_files(%d) starting\n",flist->count);

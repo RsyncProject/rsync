@@ -281,7 +281,9 @@ int64 read_longint(int f)
 	char b[8];
 	ret = read_int(f);
 
-	if ((int32)ret != (int32)0xffffffff) return ret;
+	if ((int32)ret != (int32)0xffffffff) {
+		return ret;
+	}
 
 #ifdef NO_INT64
 	rprintf(FERROR,"Integer overflow - attempted 64 bit offset\n");
@@ -471,7 +473,7 @@ void write_longint(int f, int64 x)
 		return;
 	}
 
-	write_int(f, -1);
+	write_int(f, (int32)0xFFFFFFFF);
 	SIVAL(b,0,(x&0xFFFFFFFF));
 	SIVAL(b,4,((x>>32)&0xFFFFFFFF));
 
