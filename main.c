@@ -730,7 +730,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		exit_cleanup(status);
 	}
 
-	if (argc == 0)
+	if (argc == 0 && !list_only)
 		list_only = 1;
 
 	if (!read_batch)
@@ -962,9 +962,8 @@ static int start_client(int argc, char *argv[])
 	}
 
 	/* ... or no dest at all */
-	if (!am_sender && argc == 0) {
+	if (!am_sender && argc == 0 && !list_only)
 		list_only = 1;
-	}
 
 	pid = do_cmd(shell_cmd,shell_machine,shell_user,shell_path,
 		     &f_in,&f_out);
