@@ -139,21 +139,25 @@ int write_file(int f,char *buf,size_t len)
 }
 
 
-/* this provides functionality somewhat similar to mmap() but using
-   read(). It gives sliding window access to a file. mmap() is not
-   used because of the possibility of another program (such as a
-   mailer) truncating the file thus giving us a SIGBUS */
-struct map_struct *map_file(int fd, OFF_T len, size_t block_size)
+/* This provides functionality somewhat similar to mmap() but using read().
+ * It gives sliding window access to a file.  mmap() is not used because of
+ * the possibility of another program (such as a mailer) truncating the
+ * file thus giving us a SIGBUS. */
+struct map_struct *map_file(int fd, OFF_T len, OFF_T map_size,
+			    size_t block_size)
 {
 	struct map_struct *map;
 
 	if (!(map = new(struct map_struct)))
 		out_of_memory("map_file");
 
+	if (block_size && (map_size % block_size))
+		map_size += block_size - (map_size % block_size);
+
 	memset(map, 0, sizeof map[0]);
 	map->fd = fd;
 	map->file_size = len;
-	map->def_window_size = MAX(MAX_MAP_SIZE, block_size * 32);
+	map->def_window_size = map_size;
 
 	return map;
 }
@@ -181,12 +185,7 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 	}
 
 	/* nope, we are going to have to do a read. Work out our desired window */
-	if (offset > 2*CHUNK_SIZE) {
-		window_start = offset - 2*CHUNK_SIZE;
-		window_start &= ~((OFF_T)(CHUNK_SIZE-1)); /* assumes power of 2 */
-	} else {
-		window_start = 0;
-	}
+	window_start = offset;
 	window_size = map->def_window_size;
 	if (window_start + window_size > map->file_size) {
 		window_size = map->file_size - window_start;
