@@ -291,7 +291,7 @@ void do_server_sender(int argc,char *argv[])
   }
     
 
-  flist = send_file_list(STDOUT_FILENO,recurse,argc,argv);
+  flist = send_file_list(STDOUT_FILENO,argc,argv);
   send_files(flist,STDOUT_FILENO,STDIN_FILENO);
   report(STDOUT_FILENO);
   exit_cleanup(0);
@@ -721,7 +721,7 @@ int main(int argc,char *argv[])
 	add_cvs_excludes();
       if (delete_mode) 
 	send_exclude_list(f_out);
-      flist = send_file_list(f_out,recurse,argc,argv);
+      flist = send_file_list(f_out,argc,argv);
       if (verbose > 3) 
 	fprintf(FERROR,"file list sent\n");
       send_files(flist,f_out,f_in);

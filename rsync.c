@@ -500,7 +500,7 @@ static void delete_files(struct file_list *flist)
   if (cvs_exclude)
     add_cvs_excludes();
 
-  if (!(local_file_list = send_file_list(-1,recurse,1,&dot)))
+  if (!(local_file_list = send_file_list(-1,1,&dot)))
     return;
 
   for (i=local_file_list->count;i>=0;i--) {

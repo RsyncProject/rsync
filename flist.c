@@ -30,6 +30,8 @@ extern off_t total_size;
 
 extern int cvs_exclude;
 
+extern int recurse;
+
 extern int one_file_system;
 extern int make_backups;
 extern int preserve_links;
@@ -232,7 +234,7 @@ void receive_file_entry_v11(struct file_struct *file,
 
 
 
-static struct file_struct *make_file(int recurse,char *fname)
+static struct file_struct *make_file(char *fname)
 {
   static struct file_struct file;
   struct stat st;
@@ -304,12 +306,11 @@ static struct file_struct *make_file(int recurse,char *fname)
 
 
 
-static void send_file_name(int f,struct file_list *flist,
-			   int recurse,char *fname)
+static void send_file_name(int f,struct file_list *flist,char *fname)
 {
   struct file_struct *file;
 
-  file = make_file(recurse,fname);
+  file = make_file(fname);
 
   if (!file) return;  
   
@@ -368,7 +369,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 	strcmp(di->d_name,"..")==0)
       continue;
     strcpy(p,di->d_name);
-    send_file_name(f,flist,1,fname);
+    send_file_name(f,flist,fname);
   }
 
   closedir(d);
@@ -376,7 +377,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 
 
 
-struct file_list *send_file_list(int f,int recurse,int argc,char *argv[])
+struct file_list *send_file_list(int f,int argc,char *argv[])
 {
   int i,l;
   struct stat st;
@@ -384,7 +385,7 @@ struct file_list *send_file_list(int f,int recurse,int argc,char *argv[])
   char dbuf[MAXPATHLEN];
   struct file_list *flist;
 
-  if (verbose && recurse) {
+  if (verbose && recurse && !am_server) {
     fprintf(FINFO,"building file list ... ");
     fflush(FINFO);
   }
@@ -441,7 +442,7 @@ struct file_list *send_file_list(int f,int recurse,int argc,char *argv[])
       flist_dir = dir;
       if (one_file_system)
 	set_filesystem(fname);
-      send_file_name(f,flist,recurse,fname);
+      send_file_name(f,flist,fname);
       flist_dir = NULL;
       if (chdir(dbuf) != 0) {
 	fprintf(FERROR,"chdir %s : %s\n",dbuf,strerror(errno));
@@ -452,7 +453,7 @@ struct file_list *send_file_list(int f,int recurse,int argc,char *argv[])
 
     if (one_file_system)
       set_filesystem(fname);
-    send_file_name(f,flist,recurse,fname);
+    send_file_name(f,flist,fname);
   }
 
   if (f != -1) {
@@ -460,7 +461,7 @@ struct file_list *send_file_list(int f,int recurse,int argc,char *argv[])
     write_flush(f);
   }
 
-  if (verbose && recurse)
+  if (verbose && recurse && !am_server)
     fprintf(FINFO,"done\n");
 
   clean_flist(flist);
@@ -474,8 +475,10 @@ struct file_list *recv_file_list(int f)
   struct file_list *flist;
   unsigned char flags;
 
-  if (verbose > 2)
-    fprintf(FERROR,"recv_file_list starting\n");
+  if (verbose && recurse && !am_server) {
+    fprintf(FINFO,"receiving file list ... ");
+    fflush(FINFO);
+  }
 
   flist = (struct file_list *)malloc(sizeof(flist[0]));
   if (!flist)
@@ -517,6 +520,10 @@ struct file_list *recv_file_list(int f)
     fprintf(FERROR,"received %d names\n",flist->count);
 
   clean_flist(flist);
+
+  if (verbose && recurse && !am_server) {
+    fprintf(FINFO,"done\n");
+  }
 
   return flist;
 
