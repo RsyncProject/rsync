@@ -204,14 +204,6 @@
 #endif
 
 
-#ifndef S_IFLNK
-#define S_IFLNK  0120000
-#endif
-
-#ifndef S_ISLNK
-#define S_ISLNK(mode) (((mode) & S_IFLNK) == S_IFLNK)
-#endif
-
 #define BOOL int
 
 #ifndef uchar
@@ -407,6 +399,18 @@ extern int errno;
 
 #ifndef S_IWUSR
 #define S_IWUSR 0200
+#endif
+
+#ifndef _S_IFMT
+#define _S_IFMT        0170000
+#endif
+
+#ifndef _S_IFLNK
+#define _S_IFLNK  0120000
+#endif
+
+#ifndef S_ISLNK
+#define S_ISLNK(mode) (((mode) & (_S_IFMT)) == (_S_IFLNK))
 #endif
 
 #ifndef S_ISBLK

@@ -89,6 +89,23 @@ static void set_filesystem(char *fname)
 }
 
 
+static int to_wire_mode(mode_t mode)
+{
+	if (S_ISLNK(mode) && (S_IFLNK != 0120000)) {
+		return (mode & ~(_S_IFMT)) | 0120000;
+	}
+	return (int)mode;
+}
+
+static mode_t from_wire_mode(int mode)
+{
+	if ((mode & (_S_IFMT)) == 0120000 && (S_IFLNK != 0120000)) {
+		return (mode & ~(_S_IFMT)) | S_IFLNK;
+	}
+	return (mode_t)mode;
+}
+
+
 static void send_directory(int f,struct file_list *flist,char *dir);
 
 static char *flist_dir;
@@ -147,7 +164,7 @@ static void send_file_entry(struct file_struct *file,int f,unsigned base_flags)
 	if (!(flags & SAME_TIME))
 		write_int(f,(int)file->modtime);
 	if (!(flags & SAME_MODE))
-		write_int(f,(int)file->mode);
+		write_int(f,to_wire_mode(file->mode));
 	if (preserve_uid && !(flags & SAME_UID)) {
 		add_uid(file->uid);
 		write_int(f,(int)file->uid);
@@ -248,7 +265,7 @@ static void receive_file_entry(struct file_struct **fptr,
 	file->flags = flags;
 	file->length = read_longint(f);
 	file->modtime = (flags & SAME_TIME) ? last_time : (time_t)read_int(f);
-	file->mode = (flags & SAME_MODE) ? last_mode : (mode_t)read_int(f);
+	file->mode = (flags & SAME_MODE) ? last_mode : from_wire_mode(read_int(f));
 	if (preserve_uid)
 		file->uid = (flags & SAME_UID) ? last_uid : (uid_t)read_int(f);
 	if (preserve_gid)
