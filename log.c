@@ -521,6 +521,18 @@ void log_item(struct file_struct *file, struct stats *initial_stats,
 	}
 }
 
+void maybe_log_item(struct file_struct *file, int iflags, int itemizing,
+		    char *buf)
+{
+	int see_item = itemizing && (iflags || verbose > 1);
+	if (am_server) {
+		if (am_daemon && !dry_run && see_item)
+			log_item(file, &stats, iflags, buf);
+	} else if (see_item || iflags & ITEM_UPDATING || *buf
+	    || (S_ISDIR(file->mode) && iflags & ITEM_REPORT_TIME))
+		log_item(file, &stats, iflags, buf);
+}
+
 void log_delete(char *fname, int mode)
 {
 	static struct file_struct file;
