@@ -451,6 +451,30 @@ Check "refuse options works"
   Was this broken when we changed to popt?
 
 
+PERFORMANCE ----------------------------------------------------------
+
+MD4 file_sum
+
+  If we're doing a local transfer, or using -W, then perhaps don't
+  send the file checksum.  If we're doing a local transfer, then
+  calculating MD4 checksums uses 90% of CPU and is unlikely to be
+  useful.
+
+  Indeed for transfers over zlib or ssh we can also rely on the
+  transport to have quite strong protection against corruption.
+
+  Perhaps we should have an option to disable this, analogous to
+  --whole-file, although it would default to disabled.  The file
+  checksum takes up a definite space in the protocol -- we can either
+  set it to 0, or perhaps just leave it out.
+
+MD4
+
+  Perhaps borrow an assembler MD4 from someone?
+
+  Make sure we call MD4 with properly-sized blocks whenever possible
+  to avoid copying into the residue region?
+
 String area code
 
   Test whether this is actually faster than just using malloc().  If
