@@ -134,10 +134,14 @@ static int robust_move(char *src, char *dst)
 	int failed;
 
 	while (keep_trying) {
-		if (keep_path_extfs)
-			failed = copy_file (src, dst, 0755);
-		else
+		if (keep_path_extfs) {
+			failed = copy_file(src, dst, 0755);
+			if (!failed) {
+				do_unlink(src);
+			}
+		} else {
 			failed = robust_rename (src, dst);
+		}
 
 		if (failed) {
 			if (verbose > 2)
