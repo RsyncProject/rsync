@@ -31,6 +31,7 @@ extern int daemon_log_format_has_i;
 extern int am_root;
 extern int am_server;
 extern int am_daemon;
+extern int do_progress;
 extern int recurse;
 extern int relative_paths;
 extern int keep_dirlinks;
@@ -1112,6 +1113,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	int need_retouch_dir_perms = 0;
 	int save_only_existing = only_existing;
 	int save_opt_ignore_existing = opt_ignore_existing;
+	int save_do_progress = do_progress;
 
 	allowed_lull = read_batch ? 0 : (io_timeout + 1) / 2;
 	lull_mod = allowed_lull * 5;
@@ -1141,6 +1143,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 
 	if (delete_before && !local_name && flist->count > 0)
 		do_delete_pass(flist);
+	do_progress = 0;
 
 	if (whole_file < 0)
 		whole_file = 0;
@@ -1238,6 +1241,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		get_redo_num(itemizing, code);
 	}
 
+	do_progress = save_do_progress;
 	if (delete_after && !local_name && flist->count > 0)
 		do_delete_pass(flist);
 
