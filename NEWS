@@ -5,6 +5,15 @@ rsync 2.5.3 (not released yet)
     * Make sure that supplementary groups are removed from a server
       process after changing uid and gid. (Ethan Benson)
 
+  BUG FIXES:
+
+    * Fixed problem that in many cases caused the error message 
+	unexpected read size of 0 in map_ptr
+      and resulted in the wrong data being copied.
+
+    * Fixed compilation errors on some systems caused by the use of
+      "unsigned int64" in rsync.h.
+
   ENHANCEMENTS:
 
     * Command to initiate connections is only shown with -vv, rather
