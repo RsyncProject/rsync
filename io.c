@@ -648,11 +648,16 @@ void write_longint(int f, int64 x)
 		return;
 	}
 
+#ifdef NO_INT64
+	rprintf(FERROR,"Integer overflow - attempted 64 bit offset\n");
+	exit_cleanup(RERR_UNSUPPORTED);
+#else
 	write_int(f, (int32)0xFFFFFFFF);
 	SIVAL(b,0,(x&0xFFFFFFFF));
 	SIVAL(b,4,((x>>32)&0xFFFFFFFF));
 
 	writefd(f,b,8);
+#endif
 }
 
 void write_buf(int f,char *buf,size_t len)
