@@ -41,7 +41,6 @@ ENABLED_SECTIONS       =
 MAX_INITIALIZER_LINES  = 30
 OPTIMIZE_OUTPUT_FOR_C  = YES
 SHOW_USED_FILES        = YES
-REFERENCED_RELATION    = YES
 REFERENCED_BY_RELATION = YES
 #---------------------------------------------------------------------------
 # configuration options related to warning and progress messages
@@ -69,7 +68,7 @@ FILTER_SOURCE_FILES    = NO
 # configuration options related to the alphabetical class index
 #---------------------------------------------------------------------------
 ALPHABETICAL_INDEX     = YES
-COLS_IN_ALPHA_INDEX    = 1
+COLS_IN_ALPHA_INDEX    = 3
 IGNORE_PREFIX          = 
 #---------------------------------------------------------------------------
 # configuration options related to the HTML output
