@@ -724,36 +724,35 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 	STRUCT_STAT st;
 	char sum[SUM_LENGTH];
 	char *p;
-	char cleaned_name[MAXPATHLEN];
+	char thisname[MAXPATHLEN];
 	char linkbuf[MAXPATHLEN];
 	unsigned short flags = 0;
 
-	if (strlcpy(cleaned_name, fname, sizeof cleaned_name)
-	    >= sizeof cleaned_name - flist_dir_len) {
+	if (strlcpy(thisname, fname, sizeof thisname)
+	    >= sizeof thisname - flist_dir_len) {
 		rprintf(FINFO, "skipping overly long name: %s\n", fname);
 		return NULL;
 	}
-	clean_fname(cleaned_name);
+	clean_fname(thisname);
 	if (sanitize_paths)
-		sanitize_path(cleaned_name, NULL);
-	fname = cleaned_name;
+		sanitize_path(thisname, NULL);
 
 	memset(sum, 0, SUM_LENGTH);
 
-	if (readlink_stat(fname, &st, linkbuf) != 0) {
+	if (readlink_stat(thisname, &st, linkbuf) != 0) {
 		int save_errno = errno;
 		if (errno == ENOENT && exclude_level != NO_EXCLUDES) {
 			/* either symlink pointing nowhere or file that
 			 * was removed during rsync run; see if excluded
 			 * before reporting an error */
-			if (check_exclude_file(fname, 0, exclude_level)) {
+			if (check_exclude_file(thisname, 0, exclude_level)) {
 				/* file is excluded anyway, ignore silently */
 				return NULL;
 			}
 		}
 		io_error |= IOERR_GENERAL;
 		rprintf(FERROR, "readlink %s failed: %s\n",
-			full_fname(fname), strerror(save_errno));
+			full_fname(thisname), strerror(save_errno));
 		return NULL;
 	}
 
@@ -762,7 +761,7 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 		goto skip_excludes;
 
 	if (S_ISDIR(st.st_mode) && !recurse && !files_from) {
-		rprintf(FINFO, "skipping directory %s\n", fname);
+		rprintf(FINFO, "skipping directory %s\n", thisname);
 		return NULL;
 	}
 
@@ -774,17 +773,17 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 		flags |= FLAG_MOUNT_POINT;
 	}
 
-	if (check_exclude_file(fname, S_ISDIR(st.st_mode) != 0, exclude_level))
+	if (check_exclude_file(thisname, S_ISDIR(st.st_mode) != 0, exclude_level))
 		return NULL;
 
-	if (lp_ignore_nonreadable(module_id) && access(fname, R_OK) != 0)
+	if (lp_ignore_nonreadable(module_id) && access(thisname, R_OK) != 0)
 		return NULL;
 
       skip_excludes:
 
 	if (verbose > 2) {
 		rprintf(FINFO, "[%s] make_file(%s,*,%d)\n",
-			who_am_i(), fname, exclude_level);
+			who_am_i(), thisname, exclude_level);
 	}
 
 	file = new(struct file_struct);
@@ -793,20 +792,20 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 	memset((char *) file, 0, sizeof(*file));
 	file->flags = flags;
 
-	if ((p = strrchr(fname, '/'))) {
+	if ((p = strrchr(thisname, '/'))) {
 		static char *lastdir;
 		*p = 0;
-		if (lastdir && strcmp(fname, lastdir) == 0)
+		if (lastdir && strcmp(thisname, lastdir) == 0)
 			file->dirname = lastdir;
 		else {
-			file->dirname = strdup(fname);
+			file->dirname = strdup(thisname);
 			lastdir = file->dirname;
 		}
 		file->basename = STRDUP(ap, p + 1);
 		*p = '/';
 	} else {
 		file->dirname = NULL;
-		file->basename = STRDUP(ap, fname);
+		file->basename = STRDUP(ap, thisname);
 	}
 
 	file->modtime = st.st_mtime;
@@ -836,7 +835,7 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 	if (always_checksum && S_ISREG(st.st_mode)) {
 		if (!(file->u.sum = (char*)MALLOC(ap, MD4_SUM_LENGTH)))
 			out_of_memory("md4 sum");
-		file_checksum(fname, file->u.sum, st.st_size);
+		file_checksum(thisname, file->u.sum, st.st_size);
 	}
 
 	file->basedir = flist_dir;
