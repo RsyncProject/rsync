@@ -428,6 +428,23 @@ static char *get_local_name(struct file_list *flist,char *name)
 }
 
 
+static void read_final_goodbye(int f_in, int f_out, int flist_count)
+{
+	if (protocol_version < 29) {
+		read_int(f_in);
+		return;
+	}
+
+	/* Handle any keep-alive messages from --delete-after processing. */
+	while (read_int(f_in) == flist_count) {
+		if (read_shortint(f_in) != ITEM_IS_NEW)
+			return; /* Complain? */
+		write_int(f_out, flist_count);
+		write_shortint(f_out, ITEM_IS_NEW);
+	}
+}
+
+
 static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 {
 	int i;
@@ -484,10 +501,8 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 	send_files(flist,f_out,f_in);
 	io_flush(FULL_FLUSH);
 	report(f_out);
-	if (protocol_version >= 24) {
-		/* final goodbye message */
-		read_int(f_in);
-	}
+	if (protocol_version >= 24)
+		read_final_goodbye(f_in, f_out, flist->count);
 	io_flush(FULL_FLUSH);
 	exit_cleanup(0);
 }
@@ -543,9 +558,17 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 		send_msg(MSG_DONE, "", 0);
 		io_flush(FULL_FLUSH);
-		/* finally we go to sleep until our parent kills us
-		 * with a USR2 signal. We sleep for a short time as on
-		 * some OSes a signal won't interrupt a sleep! */
+
+		/* Finally, we hang around until our parent kills us with a
+		 * USR2 signal.  If --delete-after was specified, we might get
+		 * a keep-alive message over the socket, so handle that too. */
+		if (protocol_version >= 29) {
+			while (read_int(f_in) == flist->count) {
+				if (read_shortint(f_in) != ITEM_IS_NEW)
+					break; /* Complain? */
+			}
+		}
+
 		while (1)
 			msleep(20);
 	}
@@ -740,10 +763,8 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		io_flush(NORMAL_FLUSH);
 		send_files(flist,f_out,f_in);
 		io_flush(FULL_FLUSH);
-		if (protocol_version >= 24) {
-			/* final goodbye message */
-			read_int(f_in);
-		}
+		if (protocol_version >= 24)
+			read_final_goodbye(f_in, f_out, flist->count);
 		if (pid != -1) {
 			if (verbose > 3)
 				rprintf(FINFO,"client_run waiting on %d\n", (int) pid);
