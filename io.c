@@ -228,14 +228,14 @@ static int read_timeout(int fd, char *buf, size_t len)
 
 		FD_ZERO(&r_fds);
 		FD_SET(fd, &r_fds);
-		if (io_error_fd != -1) {
+		if (io_error_fd >= 0) {
 			FD_SET(io_error_fd, &r_fds);
 			if (io_error_fd >= fd_count) fd_count = io_error_fd+1;
 		}
-		if (io_filesfrom_f_out != -1) {
+		if (io_filesfrom_f_out >= 0) {
 			int new_fd;
 			if (io_filesfrom_buflen == 0) {
-				if (io_filesfrom_f_in != -1) {
+				if (io_filesfrom_f_in >= 0) {
 					FD_SET(io_filesfrom_f_in, &r_fds);
 					new_fd = io_filesfrom_f_in;
 				} else {
@@ -270,11 +270,11 @@ static int read_timeout(int fd, char *buf, size_t len)
 			continue;
 		}
 
-		if (io_error_fd != -1 && FD_ISSET(io_error_fd, &r_fds)) {
+		if (io_error_fd >= 0 && FD_ISSET(io_error_fd, &r_fds)) {
 			read_error_fd();
 		}
 
-		if (io_filesfrom_f_out != -1) {
+		if (io_filesfrom_f_out >= 0) {
 			if (io_filesfrom_buflen) {
 				if (FD_ISSET(io_filesfrom_f_out, &w_fds)) {
 					int l = write(io_filesfrom_f_out,
@@ -290,7 +290,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 						io_filesfrom_f_out = -1;
 					}
 				}
-			} else if (io_filesfrom_f_in != -1) {
+			} else if (io_filesfrom_f_in >= 0) {
 				if (FD_ISSET(io_filesfrom_f_in, &r_fds)) {
 					int l = read(io_filesfrom_f_in,
 						     io_filesfrom_buf,
@@ -352,7 +352,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 		} else if (n == 0) {
 			whine_about_eof();
 			return -1; /* doesn't return */
-		} else if (n == -1) {
+		} else if (n < 0) {
 			if (errno == EINTR || errno == EWOULDBLOCK ||
 			    errno == EAGAIN) 
 				continue;
@@ -631,7 +631,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 		FD_SET(fd,&w_fds);
 		fd_count = fd;
 
-		if (io_error_fd != -1) {
+		if (io_error_fd >= 0) {
 			FD_ZERO(&r_fds);
 			FD_SET(io_error_fd,&r_fds);
 			if (io_error_fd > fd_count) 
@@ -644,7 +644,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 		errno = 0;
 
 		count = select(fd_count+1,
-			       io_error_fd != -1?&r_fds:NULL,
+			       io_error_fd >= 0?&r_fds:NULL,
 			       &w_fds,NULL,
 			       &tv);
 
@@ -659,7 +659,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 			continue;
 		}
 
-		if (io_error_fd != -1 && FD_ISSET(io_error_fd, &r_fds)) {
+		if (io_error_fd >= 0 && FD_ISSET(io_error_fd, &r_fds)) {
 			read_error_fd();
 		}
 
@@ -668,14 +668,13 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 			size_t n = len-total;
 			ret = write(fd,buf+total,n);
 
-			if (ret == -1 && errno == EINTR) {
-				continue;
-			}
-
-			if (ret == -1 && 
-			    (errno == EWOULDBLOCK || errno == EAGAIN)) {
-				msleep(1);
-				continue;
+			if (ret < 0) {
+				if (errno == EINTR)
+					continue;
+				if (errno == EWOULDBLOCK || errno == EAGAIN) {
+					msleep(1);
+					continue;
+				}
 			}
 
 			if (ret <= 0) {
