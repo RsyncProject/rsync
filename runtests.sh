@@ -144,8 +144,10 @@ if [ -f /usr/bin/whoami ]; then
     testuser=`/usr/bin/whoami`
 elif [ -f /usr/ucb/whoami ]; then
     testuser=`/usr/ucb/whoami`
+elif [ -f /bin/whoami ]; then
+    testuser=`/bin/whoami`
 else
-    testuser=`id -un || whoami || echo ${LOGNAME:-${USERNAME:-${USER:-'UNKNOWN'}}}`
+    testuser=`id -un 2>/dev/null || echo ${LOGNAME:-${USERNAME:-${USER:-'UNKNOWN'}}}`
 fi
 
 echo "    testuser=$testuser"
