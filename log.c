@@ -367,6 +367,8 @@ static void log_formatted(enum logcode code, char *format, char *op,
 	for (p = buf; (p = strchr(p, '%')) != NULL && p[1]; ) {
 		s = p++;
 		n = fmt + 1;
+		if (*p == '-')
+			*n++ = *p++;
 		while (isdigit(*(uchar*)p) && n - fmt < 16)
 			*n++ = *p++;
 		*n = '\0';
@@ -389,15 +391,20 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			break;
 		case 'o': n = op; break;
 		case 'f':
-			pathjoin(buf2, sizeof buf2,
-			    am_sender && file->dir.root ? file->dir.root : "",
-			    safe_fname(f_name(file)));
-			clean_fname(buf2, 0);
-			n = buf2;
-			if (*n == '/') n++;
+			n = safe_fname(f_name(file));
+			if (am_sender && file->dir.root) {
+				pathjoin(buf2, sizeof buf2,
+					 file->dir.root, n);
+				/* The buffer from safe_fname() has more
+				 * room than MAXPATHLEN, so this is safe. */
+				strcpy(n, buf2);
+			}
+			clean_fname(n, 0);
+			if (*n == '/')
+				n++;
 			break;
 		case 'n':
-			n = (char*)safe_fname(f_name(file));
+			n = safe_fname(f_name(file));
 			if (S_ISDIR(file->mode)) {
 				/* The buffer from safe_fname() has more
 				 * room than MAXPATHLEN, so this is safe. */
@@ -493,6 +500,11 @@ static void log_formatted(enum logcode code, char *format, char *op,
 		/* "n" is the string to be inserted in place of this % code. */
 		if (!n)
 			continue;
+		if (n != buf2 && fmt[1]) {
+			strlcat(fmt, "s", sizeof fmt);
+			snprintf(buf2, sizeof buf2, fmt, n);
+			n = buf2;
+		}
 		len = strlen(n);
 
 		if (len + total >= sizeof buf) {
