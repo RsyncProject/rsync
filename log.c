@@ -106,9 +106,6 @@ void log_open(void)
 	FILE *f=NULL;
 	extern int am_daemon;
 	/* recursion can happen with certain fatal conditions */
-	static int depth;
-
-	if (depth) return;
 
 	va_start(ap, format);
 	len = vslprintf(buf, sizeof(buf)-1, format, ap);
@@ -126,8 +123,11 @@ void log_open(void)
 	}
 
 	if (am_daemon) {
+		static int depth;
 		int priority = LOG_INFO;
 		if (fd == FERROR) priority = LOG_WARNING;
+
+		if (depth) return;
 
 		depth++;
 
