@@ -91,6 +91,7 @@ void rwrite(enum logcode code, char *buf, int len)
 {
 	FILE *f=NULL;
 	extern int am_daemon;
+	extern int am_server;
 	extern int quiet;
 	/* recursion can happen with certain fatal conditions */
 
@@ -105,11 +106,13 @@ void rwrite(enum logcode code, char *buf, int len)
 		return;
 	}
 
-	if (io_error_write(log_error_fd, code, buf, strlen(buf))) {
+	/* first try to pass it off the our sibling */
+	if (am_server && io_error_write(log_error_fd, code, buf, len)) {
 		return;
 	}
 
-	if (io_multiplex_write(code, buf, strlen(buf))) {
+	/* then try to pass it to the other end */
+	if (am_server && io_multiplex_write(code, buf, len)) {
 		return;
 	}
 
@@ -134,7 +137,6 @@ void rwrite(enum logcode code, char *buf, int len)
 	} 
 
 	if (code == FINFO) {
-		extern int am_server;
 		if (am_server) 
 			f = stderr;
 		else
