@@ -266,6 +266,26 @@ static void send_directory(int f, struct file_list *flist, char *dir);
 static char *flist_dir;
 
 
+/**
+ * Make sure @p flist is big enough to hold at least @p flist->count
+ * entries.
+ **/
+static void flist_expand(struct file_list *flist)
+{
+	if (flist->count >= flist->malloced) {
+		if (flist->malloced < 1000)
+			flist->malloced += 1000;
+		else
+			flist->malloced *= 2;
+		flist->files = (struct file_struct **)
+			realloc(flist->files,
+				sizeof(flist->files[0]) * flist->malloced);
+		if (!flist->files)
+			out_of_memory("flist_expand");
+	}
+}
+
+
 static void send_file_entry(struct file_struct *file, int f,
 			    unsigned base_flags)
 {
@@ -700,19 +720,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 	if (show_build_progress_p() & !(flist->count % 100))
 		emit_build_progress(flist);
 
-	if (flist->count >= flist->malloced) {
-		if (flist->malloced < 1000)
-			flist->malloced += 1000;
-		else
-			flist->malloced *= 2;
-		flist->files =
-		    (struct file_struct **) realloc(flist->files,
-						    sizeof(flist->
-							   files[0]) *
-						    flist->malloced);
-		if (!flist->files)
-			out_of_memory("send_file_name");
-	}
+	flist_expand(flist);
 
 	if (write_batch)	/*  dw  */
 		file->flags = FLAG_DELETE;
@@ -995,23 +1003,7 @@ struct file_list *recv_file_list(int f)
 
 
 	for (flags = read_byte(f); flags; flags = read_byte(f)) {
-		int i = flist->count;
-
-		if (i >= flist->malloced) {
-			if (flist->malloced < 1000)
-				flist->malloced += 1000;
-			else
-				flist->malloced *= 2;
-			flist->files =
-			    (struct file_struct **) realloc(flist->files,
-							    sizeof(flist->
-								   files
-								   [0]) *
-							    flist->
-							    malloced);
-			if (!flist->files)
-				goto oom;
-		}
+		flist_expand(flist);
 
 		receive_file_entry(&flist->files[i], flags, f);
 
@@ -1146,12 +1138,9 @@ struct file_list *flist_new()
 		out_of_memory("send_file_list");
 
 	flist->count = 0;
-	flist->malloced = 1000;
-	flist->files =
-	    (struct file_struct **) malloc(sizeof(flist->files[0]) *
-					   flist->malloced);
-	if (!flist->files)
-		out_of_memory("send_file_list");
+	flist->malloced = 0;
+	flist->files = NULL;
+
 #if ARENA_SIZE > 0
 	flist->string_area = string_area_new(0);
 #else
@@ -1171,6 +1160,10 @@ void flist_free(struct file_list *flist)
 			free_file(flist->files[i]);
 		free(flist->files[i]);
 	}
+	/* FIXME: I don't think we generally need to blank the flist
+	 * since it's about to be freed.  This will just cause more
+	 * memory traffic.  If you want a freed-memory debugger, you
+	 * know where to get it. */
 	memset((char *) flist->files, 0,
 	       sizeof(flist->files[0]) * flist->count);
 	free(flist->files);
