@@ -69,6 +69,9 @@ Changes since 2.6.3:
       about the failure (which will only be seen if --no-detach was
       specified).
 
+    - A local transfer no longer duplicates all its include/exclude options
+      by sending the forked process a copy of the list it already has.
+
   ENHANCEMENTS:
 
     - Rsync now supports popt's option aliases, which means that you can
@@ -132,7 +135,8 @@ Changes since 2.6.3:
       modified time for directories when --times was specified.  This
       option will avoid an extra pass through the file-list at the end of
       the transfer (to tweak all the directory times), which can result in
-      an appreciable speedup for a really large transfer.
+      an appreciable speedup for a really large transfer. (Promoted from
+      the patches dir.)
 
     - Added the --filter (-f) option and its helper option, -F.  Filter
       rules are an extension to the existing include/exclude handling
@@ -152,6 +156,10 @@ Changes since 2.6.3:
 
     - Documented the "max verbosity" setting for rsyncd.conf.  (This
       setting was added a couple releases ago, but left undocumented.)
+
+    - The sender and the generator now double-check the file-list index
+      they are given, and refuse to operate on a directory index (since
+      that would indicate that something had gone very wrong).
 
   SUPPORT FILES:
 
