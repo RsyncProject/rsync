@@ -130,42 +130,10 @@ failure:
 /* robustly move a file, creating new directory structures if necessary */
 static int robust_move(char *src, char *dst)
 {
-	int keep_trying = 4;
-	int keep_path_extfs = 0;
-	int failed;
-
-	while (keep_trying) {
-		if (keep_path_extfs) {
-			failed = copy_file(src, dst, 0755);
-			if (!failed)
-				do_unlink(src);
-		} else
-			failed = robust_rename(src, dst);
-
-		if (failed) {
-			if (verbose > 2) {
-				rprintf(FERROR, "robust_move failed: %s(%d)\n",
-					strerror(errno), errno);
-			}
-			switch (errno) {
-			case EXDEV:	/* external filesystem */
-				keep_path_extfs = 1;
-				keep_trying--;
-				break;
-			case ENOENT:	/* no directory to write to */
-				if (make_bak_dir(dst) < 0)
-					keep_trying = 0;
-				else
-					keep_trying--;
-				break;
-			default:
-				keep_trying = 0;
-				break;
-			}
-		} else
-			keep_trying = 0;
-	}
-	return !failed;
+	if (robust_rename(src, dst, 0755) != 0 || errno != ENOENT
+	    || make_bak_dir(dst) < 0 || robust_rename(src, dst, 0755) != 0)
+		return -1;
+	return 0;
 }
 
 

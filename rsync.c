@@ -158,7 +158,7 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	change_gid = preserve_gid && file->gid != GID_NONE
 		&& st->st_gid != file->gid;
 	if (change_uid || change_gid) {
-		if (verbose > 2 && !dry_run) {
+		if (verbose > 2) {
 			if (change_uid) {
 				rprintf(FINFO,
 				    "set uid of %s from %ld to %ld\n",
@@ -231,25 +231,17 @@ void sig_int(void)
    and ownership */
 void finish_transfer(char *fname, char *fnametmp, struct file_struct *file)
 {
+	int ret;
+
 	if (make_backups && !make_backup(fname))
 		return;
 
 	/* move tmp file over real file */
-	if (robust_rename(fnametmp,fname) != 0) {
-		if (errno == EXDEV) {
-			/* rename failed on cross-filesystem link.
-			   Copy the file instead. */
-			if (copy_file(fnametmp,fname, file->mode & INITACCESSPERMS)) {
-				rprintf(FERROR, "copy %s -> \"%s\": %s\n",
-					full_fname(fnametmp), fname,
-					strerror(errno));
-			} else {
-				set_perms(fname,file,NULL,0);
-			}
-		} else {
-			rprintf(FERROR,"rename %s -> \"%s\": %s\n",
-				full_fname(fnametmp), fname, strerror(errno));
-		}
+	ret = robust_rename(fnametmp, fname, file->mode & INITACCESSPERMS);
+	if (ret != 0) {
+		rprintf(FERROR, "%s %s -> \"%s\": %s\n",
+		    ret == -2 ? "copy" : "rename",
+		    full_fname(fnametmp), fname, strerror(errno));
 		do_unlink(fnametmp);
 	} else {
 		set_perms(fname,file,NULL,0);
