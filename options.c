@@ -213,7 +213,7 @@ void usage(enum logcode F)
   rprintf(F,"     --version               print version number\n");  
   rprintf(F,"     --daemon                run as a rsync daemon\n");  
   rprintf(F,"     --no-detach             do not detach from the parent\n");  
-  rprintf(F,"     --address               bind to the specified address\n");  
+  rprintf(F,"     --address=ADDRESS       bind to the specified address\n");  
   rprintf(F,"     --config=FILE           specify alternate rsyncd.conf file\n");  
   rprintf(F,"     --port=PORT             specify alternate rsyncd port number\n");
   rprintf(F,"     --blocking-io           use blocking IO for the remote shell\n");  

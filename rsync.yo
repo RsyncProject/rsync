@@ -267,7 +267,7 @@ verb(
      --include-from=FILE     don't exclude patterns listed in FILE
      --version               print version number
      --daemon                run as a rsync daemon
-     --address               bind to the specified address
+     --address=ADDRESS       bind to the specified address
      --config=FILE           specify alternate rsyncd.conf file
      --port=PORT             specify alternate rsyncd port number
      --blocking-io           use blocking IO for the remote shell
