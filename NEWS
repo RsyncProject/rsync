@@ -78,6 +78,9 @@ Changes since version 2.5.6:
     * Fixed a bug in the --backup code that could cause deleted files
       to not get backed up.
 
+    * Improved the mkstemp error message to always include the directory
+      info where the temp file is being created.
+
   INTERNAL:
 
     * Eliminated vestigial support for old versions that we stopped
