@@ -100,6 +100,7 @@ static struct exclude_struct *make_exclude(char *pattern, int include)
 		    only_included_files = 0;
 	    }
 	    ret->regular_exp = 1;
+	    ret->fnmatch_flags = strstr(pattern, "**") ? 0 : FNM_PATHNAME;
 	} else if (!ret->include) {
 		only_included_files = 0;
 	}
@@ -143,7 +144,7 @@ static int check_one_exclude(char *name,struct exclude_struct *ex,
 	}
 
 	if (ex->regular_exp) {
-		if (fnmatch(pattern, name, 0) == 0)
+		if (fnmatch(pattern, name, ex->fnmatch_flags) == 0)
 			return 1;
 	} else {
 		int l1 = strlen(name);

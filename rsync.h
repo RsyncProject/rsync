@@ -339,6 +339,7 @@ struct exclude_struct {
 	char *orig;
 	char *pattern;
 	int regular_exp;
+	int fnmatch_flags;
 	int include;
 	int directory;
 	int local;

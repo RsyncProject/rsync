@@ -66,6 +66,7 @@ Options
      --numeric-ids           don't map uid/gid values by user/group name
      --timeout=TIME          set IO timeout in seconds
  -I, --ignore-times          don't exclude files that match length and time
+     --size-only             only use file size when determining if a file should be transferred
  -T  --temp-dir=DIR          create temporary files in directory DIR
      --compare-dest=DIR      also compare destination files relative to DIR
  -z, --compress              compress file data

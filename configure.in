@@ -56,7 +56,7 @@ AC_CHECK_FUNCS(strlcat strlcpy)
 
 echo $ac_n "checking for working fnmatch... $ac_c"
 AC_TRY_RUN([#include <fnmatch.h>
-main() { exit(fnmatch("*.o", "x.o", 0) == 0? 0: 1); }],
+main() { exit(fnmatch("*.o", "x.o", FNM_PATHNAME) == 0? 0: 1); }],
 echo yes;AC_DEFINE(HAVE_FNMATCH), 
 echo no)
 

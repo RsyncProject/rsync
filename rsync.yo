@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsync)(1)(17 Feb 1999)()()
+manpage(rsync)(1)(18 Feb 1999)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
@@ -641,14 +641,15 @@ itemize(
   directory, not a file, link or device.
 
   it() if the pattern contains a wildcard character from the set
-  *?[ then regular expression matching is applied using the
-  normal shell filename matching rules. Otherwise a simple string
-  match is used.
+  *?[ then expression matching is applied using the shell filename
+  matching rules. Otherwise a simple string match is used.
 
   it() if the pattern contains a / (not counting a trailing /) then it
   is matched against the full filename, including any leading
   directory. If the pattern doesn't contain a / then it is matched
-  only against the final component of the filename.
+  only against the final component of the filename.  Furthermore, if
+  the pattern includes a double asterisk "**" then all wildcards in
+  the pattern will match slashes, otherwise they will stop at slashes.
 
   it() if the pattern starts with "+ " (a plus followed by a space)
   then it is always considered an include pattern, even if specified as
@@ -671,6 +672,10 @@ itemize(
   it() --exclude "*.o" would exclude all filenames matching *.o
   it() --exclude "/foo" would exclude a file in the base directory called foo
   it() --exclude "foo/" would exclude any directory called foo
+  it() --exclude "/foo/*/bar" would exclude any file called bar two
+  levels below a base directory called foo
+  it() --exclude "/foo/**/bar" would exclude any file called bar two
+  or more levels below a base directory called foo
   it() --include "*/" --include "*.c" --exclude "*" would include all 
   directories and C source files
   it() --include "foo/" --include "foo/bar.c" --exclude "*" would include
