@@ -75,9 +75,12 @@ void usage(int F)
 {
   rprintf(F,"rsync version %s Copyright Andrew Tridgell and Paul Mackerras\n\n",
 	  VERSION);
-  rprintf(F,"Usage:\t%s [options] src user@host:dest\nOR",RSYNC_NAME);
-  rprintf(F,"\t%s [options] user@host:src dest\n\n",RSYNC_NAME);
-  rprintf(F,"Options:\n");
+  rprintf(F,"Usage:\t%s [options] src user@host:dest\n",RSYNC_NAME);
+  rprintf(F,"OR\t%s [options] user@host:src dest\n",RSYNC_NAME);
+  rprintf(F,"OR\t%s [options] src dest\n",RSYNC_NAME);
+  rprintf(F,"OR\t%s [options] user@host::src dest\n",RSYNC_NAME);
+  rprintf(F,"OR\t%s [options] src user@host::dest\n",RSYNC_NAME);
+  rprintf(F,"\nOptions:\n");
   rprintf(F,"-v, --verbose            increase verbosity\n");
   rprintf(F,"-c, --checksum           always checksum\n");
   rprintf(F,"-a, --archive            archive mode\n");
@@ -122,6 +125,9 @@ void usage(int F)
   rprintf(F,"\n");
   rprintf(F,"the backup suffix defaults to %s\n",BACKUP_SUFFIX);
   rprintf(F,"the block size defaults to %d\n",BLOCK_SIZE);  
+
+  rprintf(F,"\nPlease see the rsync(1) and rsyncd.conf(5) man pages for full documentation\n");
+  rprintf(F,"See http://samba.anu.edu.au/rsync/ for updates and bug reports\n");
 }
 
 enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,

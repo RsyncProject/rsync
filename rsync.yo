@@ -444,6 +444,10 @@ specified.
 dit(bf(--port PORT)) This specifies an alternate TCP port number to use
 rather than the default port 873. 
 
+dit(bf(--stats)) This tells rsync to print a verbose set of statistics
+on the file transfer, allowing you to tell how effective the rsync
+algorithm is for your data.
+
 enddit()
 
 manpagesection(EXCLUDE PATTERNS)
