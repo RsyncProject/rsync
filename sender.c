@@ -125,10 +125,27 @@ void successful_send(int ndx)
 	}
 }
 
+static void write_item_attrs(int f_out, int ndx, int iflags, char *buf,
+			     uchar fnamecmp_type, int len)
+{
+	write_int(f_out, ndx);
+	if (protocol_version < 29)
+		return;
+	write_shortint(f_out, iflags);
+	if (iflags & ITEM_BASIS_TYPE_FOLLOWS)
+		write_byte(f_out, fnamecmp_type);
+	if (iflags & ITEM_XNAME_FOLLOWS) {
+		if (len < 0)
+			len = strlen(buf);
+		write_vstring(f_out, buf, len);
+	}
+}
+
 /* This is also used by receive.c with f_out = -1. */
-int read_iflags(int f_in, int f_out, int ndx, char *buf)
+int read_item_attrs(int f_in, int f_out, int ndx, char *buf, uchar *type_ptr)
 {
 	int len;
+	uchar fnamecmp_type = FNAMECMP_FNAME;
 	int iflags = protocol_version >= 29 ? read_shortint(f_in)
 		   : ITEM_TRANSFER | ITEM_MISSING_DATA;
 	int isave = iflags; /* XXX remove soon */
@@ -146,9 +163,14 @@ int read_iflags(int f_in, int f_out, int ndx, char *buf)
 		exit_cleanup(RERR_PROTOCOL);
 	}
 
-	if (iflags & ITEM_HARD_LINKED)
-		len = read_vstring(f_in, buf, MAXPATHLEN);
-	else {
+	if (iflags & ITEM_BASIS_TYPE_FOLLOWS)
+		fnamecmp_type = read_byte(f_in);
+	*type_ptr = fnamecmp_type;
+
+	if (iflags & ITEM_XNAME_FOLLOWS) {
+		if ((len = read_vstring(f_in, buf, MAXPATHLEN)) < 0)
+			exit_cleanup(RERR_PROTOCOL);
+	} else {
 		*buf = '\0';
 		len = -1;
 	}
@@ -168,11 +190,8 @@ int read_iflags(int f_in, int f_out, int ndx, char *buf)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 	} else if (f_out >= 0) {
-		write_int(f_out, ndx);
-		if (protocol_version >= 29)
-			write_shortint(f_out, isave /*XXX iflags */);
-		if (len >= 0)
-			write_vstring(f_out, buf, len);
+		write_item_attrs(f_out, ndx, isave /*XXX iflags */,
+				 buf, fnamecmp_type, len);
 	}
 
 	return iflags;
@@ -186,6 +205,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 	STRUCT_STAT st;
 	char *fname2, fname[MAXPATHLEN];
 	char fnametmp[MAXPATHLEN];
+	uchar fnamecmp_type;
 	int iflags;
 	struct file_struct *file;
 	int phase = 0;
@@ -217,7 +237,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			break;
 		}
 
-		iflags = read_iflags(f_in, f_out, i, fnametmp);
+		iflags = read_item_attrs(f_in, f_out, i, fnametmp,
+					 &fnamecmp_type);
 		if (iflags == ITEM_IS_NEW) /* no-op packet */
 			continue;
 
@@ -239,8 +260,9 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			continue;
 		}
 
-		if (inplace && protocol_version >= 29) {
-			updating_basis_file = !(iflags & ITEM_USING_ALT_BASIS);
+		if (protocol_version >= 29) {
+			updating_basis_file = inplace
+					   && fnamecmp_type == FNAMECMP_FNAME;
 		} else
 			updating_basis_file = inplace && !make_backups;
 
@@ -251,9 +273,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		if (dry_run) { /* log the transfer */
 			if (!am_server && log_format)
 				log_item(file, &stats, iflags, NULL);
-			write_int(f_out, i);
-			if (protocol_version >= 29)
-				write_shortint(f_out, iflags);
+			write_item_attrs(f_out, i, iflags, fnametmp,
+					 fnamecmp_type, -1);
 			continue;
 		}
 
@@ -304,9 +325,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				safe_fname(fname), (double)st.st_size);
 		}
 
-		write_int(f_out, i);
-		if (protocol_version >= 29)
-			write_shortint(f_out, iflags);
+		write_item_attrs(f_out, i, iflags, fnametmp, fnamecmp_type, -1);
 		write_sum_head(f_out, s);
 
 		if (verbose > 2) {
