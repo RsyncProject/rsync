@@ -59,7 +59,7 @@ Changes since version 2.5.7:
       block size (including checksum_seed) is a multiple of 64.
       Previously it was not called, giving the wrong MD4 checksum.
       (Craig Barratt)
-  
+
     * For protocol version >= 27, a 64 bit bit counter is used in
       mdfour.c as required by the RFC.  Previously only a 32 bit bit
       counter was used, causing incorrect MD4 file checksums for
@@ -77,6 +77,12 @@ Changes since version 2.5.7:
       consistent manner.
 
     * Fixed file I/O error detection.  (John Van Essen)
+
+    * Fixed bogus "malformed address {hostname}" message in rsyncd log
+      when checking IP address against hostnames from "hosts allow"
+      and "hosts deny" parameters in config file.
+
+    * Print heap statistics when verbose >= 2 instead of when >= 1.
 
     * Fixed a compression (-z) bug when syncing a mostly-matching file
       that contains already-compressed data.  (Yasuoka Masahiko and
