@@ -640,14 +640,14 @@ static int copy_argv (char *argv[])
 }
 
 
-/*
+/**
  * Start a client for either type of remote connection.  Work out
  * whether the arguments request a remote shell or rsyncd connection,
  * and call the appropriate connection function, then run_client.
  *
  * Calls either start_socket_client (for sockets) or do_cmd and
  * client_run (for ssh).
- */
+ **/
 static int start_client(int argc, char *argv[])
 {
 	char *p;
@@ -694,7 +694,7 @@ static int start_client(int argc, char *argv[])
 	    p = find_colon(argv[0]);
 
 	if (p) {
-		if (p[1] == ':') {
+		if (p[1] == ':') { /* double colon */
 			*p = 0;
 			return start_socket_client(argv[0], p+2, argc-1, argv+1);
 		}
