@@ -31,10 +31,10 @@ static int hlink_compare(struct file_struct *f1,struct file_struct *f2)
   if (!S_ISREG(f2->mode)) return 1;
 
   if (f1->dev != f2->dev) 
-    return (int)(f1->dev - f2->dev);
+    return (int)(f1->dev>f2->dev?1:-1);
 
   if (f1->inode != f2->inode) 
-    return (f1->inode - f2->inode);
+    return (int)(f1->inode>f2->inode?1:-1);
 
   return file_compare(&f1,&f2);
 }
@@ -103,47 +103,55 @@ int check_hard_link(struct file_struct *file)
 }
 
 
+#if SUPPORT_HARD_LINKS
+static void hard_link_one(int i)
+{
+	struct stat st1,st2;
+
+	if (link_stat(f_name(&hlink_list[i-1]),&st1) != 0) return;
+
+	if (link_stat(f_name(&hlink_list[i]),&st2) != 0) {
+		if (do_link(f_name(&hlink_list[i-1]),f_name(&hlink_list[i])) != 0) {
+			if (verbose > 0)
+				fprintf(FINFO,"link %s => %s : %s\n",
+					f_name(&hlink_list[i]),
+					f_name(&hlink_list[i-1]),strerror(errno));
+			return;
+		}
+	} else {
+		if (st2.st_dev == st1.st_dev && st2.st_ino == st1.st_ino) return;
+		
+		if (do_unlink(f_name(&hlink_list[i])) != 0 ||
+		    do_link(f_name(&hlink_list[i-1]),f_name(&hlink_list[i])) != 0) {
+			if (verbose > 0)
+				fprintf(FINFO,"link %s => %s : %s\n",
+					f_name(&hlink_list[i]),
+					f_name(&hlink_list[i-1]),strerror(errno));
+			return;
+		}
+	}
+	if (verbose > 0)
+		fprintf(FINFO,"%s => %s\n",
+			f_name(&hlink_list[i]),f_name(&hlink_list[i-1]));
+}
+#endif
+
 /* create any hard links in the flist */
 void do_hard_links(struct file_list *flist)
 {
 #if SUPPORT_HARD_LINKS
-  int i;
+	int i;
   
-  if (!hlink_list) return;
+	if (!hlink_list) return;
 
-  for (i=1;i<hlink_count;i++) {
-    if (S_ISREG(hlink_list[i].mode) &&
-	S_ISREG(hlink_list[i-1].mode) &&
-	hlink_list[i].basename && hlink_list[i-1].basename &&
-	hlink_list[i].dev == hlink_list[i-1].dev &&
-	hlink_list[i].inode == hlink_list[i-1].inode) {
-      struct stat st1,st2;
-
-      if (link_stat(f_name(&hlink_list[i-1]),&st1) != 0) continue;
-      if (link_stat(f_name(&hlink_list[i]),&st2) != 0) {
-	if (do_link(f_name(&hlink_list[i-1]),f_name(&hlink_list[i])) != 0) {
-		if (verbose > 0)
-			fprintf(FINFO,"link %s => %s : %s\n",
-				f_name(&hlink_list[i]),
-				f_name(&hlink_list[i-1]),strerror(errno));
-	  continue;
+	for (i=1;i<hlink_count;i++) {
+		if (S_ISREG(hlink_list[i].mode) &&
+		    S_ISREG(hlink_list[i-1].mode) &&
+		    hlink_list[i].basename && hlink_list[i-1].basename &&
+		    hlink_list[i].dev == hlink_list[i-1].dev &&
+		    hlink_list[i].inode == hlink_list[i-1].inode) {
+			hard_link_one(i);
+		}	
 	}
-      } else {
-	if (st2.st_dev == st1.st_dev && st2.st_ino == st1.st_ino) continue;
-	
-	if (do_unlink(f_name(&hlink_list[i])) != 0 ||
-	    do_link(f_name(&hlink_list[i-1]),f_name(&hlink_list[i])) != 0) {
-		if (verbose > 0)
-			fprintf(FINFO,"link %s => %s : %s\n",
-				f_name(&hlink_list[i]),
-				f_name(&hlink_list[i-1]),strerror(errno));
-	  continue;
-	}
-      }
-      if (verbose > 0)
-	      fprintf(FINFO,"%s => %s\n",
-		      f_name(&hlink_list[i]),f_name(&hlink_list[i-1]));
-    }	
-  }
 #endif
 }
