@@ -5,7 +5,7 @@ AC_CONFIG_SRCDIR([byteorder.h])
 AC_CONFIG_HEADER(config.h)
 AC_PREREQ(2.59)
 
-RSYNC_VERSION=2.6.4
+RSYNC_VERSION=2.6.5cvs
 AC_SUBST(RSYNC_VERSION)
 AC_MSG_NOTICE([Configuring rsync $RSYNC_VERSION])
 
@@ -181,6 +181,17 @@ ipv6trylibc=yes
 AC_ARG_ENABLE(ipv6,
 	AC_HELP_STRING([--disable-ipv6], [don't even try to use IPv6]))
 
+dnl Do you want to disable use of locale functions
+AH_TEMPLATE([CONFIG_LOCALE],
+[Undefine if you don't want locale features.  By default this is defined.])
+AC_ARG_ENABLE([locale],
+	AC_HELP_STRING([--disable-locale], [turn off locale features]),
+[if test x$enableval = xyes; then
+  AC_DEFINE(CONFIG_LOCALE)
+fi],
+AC_DEFINE(CONFIG_LOCALE)
+)
+
 if test "x$enable_ipv6" != xno
 then
 	AC_MSG_CHECKING([ipv6 stack type])
@@ -287,7 +298,7 @@ AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     unistd.h utime.h grp.h compat.h sys/param.h ctype.h sys/wait.h \
     sys/ioctl.h sys/filio.h string.h stdlib.h sys/socket.h sys/mode.h \
-    sys/un.h glob.h mcheck.h arpa/inet.h arpa/nameser.h \
+    sys/un.h glob.h mcheck.h arpa/inet.h arpa/nameser.h locale.h \
     netdb.h malloc.h float.h)
 AC_HEADER_MAJOR
 
@@ -478,7 +489,7 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd strdup strerror chown chmod mknod mkfifo \
     fchmod fstat strchr readlink link utime utimes strftime mtrace ftruncate \
     memmove lchown vsnprintf snprintf vasprintf asprintf setsid glob strpbrk \
     strlcat strlcpy strtol mallinfo getgroups setgroups geteuid getegid \
-    setmode open64 mkstemp64 va_copy __va_copy)
+    setlocale setmode open64 mkstemp64 va_copy __va_copy)
 
 AC_CHECK_FUNCS(getpgrp tcgetpgrp)
 if test $ac_cv_func_getpgrp = yes; then
