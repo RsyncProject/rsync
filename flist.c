@@ -33,6 +33,7 @@ extern int verbose;
 extern int do_progress;
 extern int am_root;
 extern int am_server;
+extern int am_daemon;
 extern int always_checksum;
 extern int module_id;
 extern int ignore_errors;
@@ -747,18 +748,26 @@ struct file_struct *make_file(char *fname,
 
 	if (readlink_stat(thisname, &st, linkname) != 0) {
 		int save_errno = errno;
-		if (errno == ENOENT && exclude_level != NO_EXCLUDES) {
+		if (errno == ENOENT) {
+			enum logcode c = am_daemon && protocol_version < 28
+			    ? FERROR : FINFO;
 			/* either symlink pointing nowhere or file that
 			 * was removed during rsync run; see if excluded
 			 * before reporting an error */
-			if (check_exclude_file(thisname, 0, exclude_level)) {
+			if (exclude_level != NO_EXCLUDES
+			    && check_exclude_file(thisname, 0, exclude_level)) {
 				/* file is excluded anyway, ignore silently */
 				return NULL;
 			}
+			io_error |= IOERR_VANISHED;
+			rprintf(c, "file has vanished: %s\n",
+			    full_fname(thisname));
 		}
-		io_error |= IOERR_GENERAL;
-		rprintf(FERROR, "readlink %s failed: %s\n",
-			full_fname(thisname), strerror(save_errno));
+		else {
+			io_error |= IOERR_GENERAL;
+			rprintf(FERROR, "readlink %s failed: %s\n",
+			    full_fname(thisname), strerror(save_errno));
+		}
 		return NULL;
 	}
 
