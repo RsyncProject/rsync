@@ -134,6 +134,7 @@ static int readfd(int fd,char *buffer,int N)
 			memcpy(buffer+total,read_buffer_p,ret);
 			read_buffer_p += ret;
 			read_buffer_len -= ret;
+			total += ret;
 			continue;
 		} 
 
