@@ -44,7 +44,7 @@ OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) $(ZLIBOBJ) @BUILD_POPT@
 TLS_OBJ = tls.o syscall.o lib/permstring.o
 
 # Programs we must have to run the test cases
-CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) \
+CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
 	trimslash$(EXEEXT) t_unsafe$(EXEEXT) wildtest$(EXEEXT)
 
 # Objects for CHECK_PROGS to clean
@@ -79,6 +79,9 @@ tls$(EXEEXT): $(TLS_OBJ)
 
 getgroups$(EXEEXT): getgroups.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ getgroups.o $(LIBS)
+
+getfsdev$(EXEEXT): getfsdev.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ getfsdev.c
 
 TRIMSLASH_OBJ = trimslash.o syscall.o
 trimslash$(EXEEXT): $(TRIMSLASH_OBJ)
