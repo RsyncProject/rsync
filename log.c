@@ -186,6 +186,7 @@ static void log_formatted(int fd,
 	int l;
 	extern struct stats stats;		
 	extern int am_sender;
+	extern int am_daemon;
 	int64 b;
 
 	strlcpy(buf, format, sizeof(buf));
@@ -196,8 +197,8 @@ static void log_formatted(int fd,
 		s = p + 1;
 
 		switch (p[1]) {
-		case 'h': n = client_name(0); break;
-		case 'a': n = client_addr(0); break;
+		case 'h': if (am_daemon) n = client_name(0); break;
+		case 'a': if (am_daemon) n = client_addr(0); break;
 		case 'l': 
 			slprintf(buf2,sizeof(buf2),"%.0f", 
 				 (double)file->length); 
