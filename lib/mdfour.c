@@ -28,30 +28,14 @@
 
 static struct mdfour *m;
 
-static inline uint32 F(uint32 X, uint32 Y, uint32 Z)
-{
-	return (X&Y) | ((~X)&Z);
-}
-
-static inline uint32 G(uint32 X, uint32 Y, uint32 Z)
-{
-	return (X&Y) | (X&Z) | (Y&Z); 
-}
-
-static inline uint32 H(uint32 X, uint32 Y, uint32 Z)
-{
-	return X^Y^Z;
-}
-
-static inline uint32 lshift(uint32 x, int s)
-{
+#define F(X,Y,Z) (((X)&(Y)) | ((~(X))&(Z)))
+#define G(X,Y,Z) (((X)&(Y)) | ((X)&(Z)) | ((Y)&(Z)))
+#define H(X,Y,Z) ((X)^(Y)^(Z))
 #ifdef LARGE_INT32
-	x &= 0xFFFFFFFF;
-	return ((x<<s)&0xFFFFFFFF) | (x>>(32-s));
+#define lshift(x,s) ((((x)<<(s))&0xFFFFFFFF) | (((x)>>(32-(s)))&0xFFFFFFFF))
 #else
-	return ((x<<s) | (x>>(32-s)));
+#define lshift(x,s) (((x)<<(s)) | ((x)>>(32-(s))))
 #endif
-}
 
 #define ROUND1(a,b,c,d,k,s) a = lshift(a + F(b,c,d) + X[k], s)
 #define ROUND2(a,b,c,d,k,s) a = lshift(a + G(b,c,d) + X[k] + 0x5A827999,s)
@@ -209,8 +193,8 @@ static void file_checksum1(char *fname)
 {
 	int fd, i;
 	struct mdfour md;
-	unsigned char buf[64], sum[16];
-
+	unsigned char buf[64*1024], sum[16];
+	
 	fd = open(fname,O_RDONLY);
 	if (fd == -1) {
 		perror("fname");
@@ -234,6 +218,7 @@ static void file_checksum1(char *fname)
 	printf("\n");
 }
 
+#if 0
 #include "../md4.h"
 
 static void file_checksum2(char *fname)
@@ -268,11 +253,14 @@ static void file_checksum2(char *fname)
 		printf("%02X", sum[i]);
 	printf("\n");
 }
+#endif
 
  int main(int argc, char *argv[])
 {
 	file_checksum1(argv[1]);
+#if 0
 	file_checksum2(argv[1]);
+#endif
 	return 0;
 }
 #endif
