@@ -304,14 +304,17 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	int recv_ok;
 	extern struct stats stats;		
 	extern int preserve_perms;
+	extern int delete_after;
 	struct stats initial_stats;
 
 	if (verbose > 2) {
 		rprintf(FINFO,"recv_files(%d) starting\n",flist->count);
 	}
 
-	if (recurse && delete_mode && !local_name && flist->count>0) {
-		delete_files(flist);
+	if (!delete_after) {
+		if (recurse && delete_mode && !local_name && flist->count>0) {
+			delete_files(flist);
+		}
 	}
 
 	while (1) {      
@@ -475,6 +478,12 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 					rprintf(FINFO,"redoing %s(%d)\n",fname,i);
 				write_int(f_gen,i);
 			}
+		}
+	}
+
+	if (delete_after) {
+		if (recurse && delete_mode && !local_name && flist->count>0) {
+			delete_files(flist);
 		}
 	}
 

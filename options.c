@@ -62,6 +62,7 @@ int safe_symlinks=0;
 int copy_unsafe_links=0;
 int block_size=BLOCK_SIZE;
 int size_only=0;
+int delete_after=0;
 
 char *backup_suffix = BACKUP_SUFFIX;
 char *tmpdir = NULL;
@@ -126,6 +127,7 @@ void usage(int F)
   rprintf(F," -C, --cvs-exclude           auto ignore files in the same way CVS does\n");
   rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
   rprintf(F,"     --delete-excluded       also delete excluded files on the receiving side\n");
+  rprintf(F,"     --delete-after          delete after transferring, not before\n");
   rprintf(F,"     --partial               keep partially transferred files\n");
   rprintf(F,"     --force                 force deletion of directories even if not empty\n");
   rprintf(F,"     --numeric-ids           don't map uid/gid values by user/group name\n");
@@ -162,7 +164,8 @@ enum {OPT_VERSION, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
       OPT_RSYNC_PATH, OPT_FORCE, OPT_TIMEOUT, OPT_DAEMON, OPT_CONFIG, OPT_PORT,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS,
       OPT_COPY_UNSAFE_LINKS, OPT_SAFE_LINKS, OPT_COMPARE_DEST,
-      OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY, OPT_ADDRESS};
+      OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY, OPT_ADDRESS,
+      OPT_DELETE_AFTER};
 
 static char *short_options = "oblLWHpguDCtcahvqrRIxnSe:B:T:zP";
 
@@ -217,6 +220,7 @@ static struct option long_options[] = {
   {"stats",       0,     0,    OPT_STATS},
   {"progress",    0,     0,    OPT_PROGRESS},
   {"partial",     0,     0,    OPT_PARTIAL},
+  {"delete-after",0,     0,    OPT_DELETE_AFTER},
   {"config",      1,     0,    OPT_CONFIG},
   {"port",        1,     0,    OPT_PORT},
   {"log-format",  1,     0,    OPT_LOG_FORMAT},
@@ -314,6 +318,10 @@ int parse_arguments(int argc, char *argv[], int frommain)
 
 		case OPT_DELETE:
 			delete_mode = 1;
+			break;
+
+		case OPT_DELETE_AFTER:
+			delete_after = 1;
 			break;
 
 		case OPT_DELETE_EXCLUDED:
@@ -631,6 +639,9 @@ void server_options(char **args,int *argc)
 
 	if (force_delete)
 		args[ac++] = "--force";
+
+	if (delete_after)
+		args[ac++] = "--delete-after";
 
 	if (copy_unsafe_links)
 		args[ac++] = "--copy-unsafe-links";
