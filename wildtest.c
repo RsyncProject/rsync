@@ -3,6 +3,7 @@
 */
 
 #include "rsync.h"
+#include "lib/wildmatch.h"
 
 #define COMPARE_WITH_FNMATCH
 
