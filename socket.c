@@ -44,7 +44,7 @@ static int establish_proxy_connection(int fd, char *host, int port)
 	char *cp;
 
 	snprintf(buffer, sizeof(buffer), "CONNECT %s:%d HTTP/1.0\r\n\r\n", host, port);
-	if (write(fd, buffer, strlen(buffer)) != strlen(buffer)) {
+	if (write(fd, buffer, strlen(buffer)) != (int) strlen(buffer)) {
 		rprintf(FERROR, "failed to write to proxy: %s\n",
 			strerror(errno));
 		return -1;
