@@ -64,11 +64,13 @@ static int make_simple_backup(char *fname)
 		/* cygwin (at least version b19) reports EINVAL */
 		if (errno != ENOENT && errno != EINVAL) {
 			rsyserr(FERROR, errno,
-				"rename %s to backup %s", fname, fnamebak);
+				"rename %s to backup %s",
+				safe_fname(fname), safe_fname(fnamebak));
 			return 0;
 		}
 	} else if (verbose > 1) {
-		rprintf(FINFO, "backed up %s to %s\n", fname, fnamebak);
+		rprintf(FINFO, "backed up %s to %s\n",
+			safe_fname(fname), safe_fname(fnamebak));
 	}
 	return 1;
 }
@@ -182,7 +184,7 @@ static int keep_backup(char *fname)
 			} else if (verbose > 2) {
 				rprintf(FINFO,
 					"make_backup: DEVICE %s successful.\n",
-					fname);
+					safe_fname(fname));
 			}
 		}
 		kept = 1;
@@ -219,7 +221,7 @@ static int keep_backup(char *fname)
 		    && (errno != ENOENT || make_bak_dir(buf) < 0
 		     || do_symlink(file->u.link, buf) < 0)) {
 			rsyserr(FERROR, errno, "link %s -> \"%s\"",
-				full_fname(buf), file->u.link);
+				full_fname(buf), safe_fname(file->u.link));
 		}
 		do_unlink(fname);
 		kept = 1;
@@ -228,7 +230,7 @@ static int keep_backup(char *fname)
 
 	if (!kept && !S_ISREG(file->mode)) {
 		rprintf(FINFO, "make_bak: skipping non-regular file %s\n",
-			fname);
+			safe_fname(fname));
 		return 1;
 	}
 
@@ -236,7 +238,7 @@ static int keep_backup(char *fname)
 	if (!kept) {
 		if (robust_move(fname, buf) != 0) {
 			rsyserr(FERROR, errno, "keep_backup failed: %s -> \"%s\"",
-				full_fname(fname), buf);
+				full_fname(fname), safe_fname(buf));
 		} else if (st.st_nlink > 1) {
 			/* If someone has hard-linked the file into the backup
 			 * dir, rename() might return success but do nothing! */
@@ -246,8 +248,10 @@ static int keep_backup(char *fname)
 	set_perms(buf, file, NULL, 0);
 	free(file);
 
-	if (verbose > 1)
-		rprintf(FINFO, "backed up %s to %s\n", fname, buf);
+	if (verbose > 1) {
+		rprintf(FINFO, "backed up %s to %s\n",
+			safe_fname(fname), safe_fname(buf));
+	}
 	return 1;
 }
 

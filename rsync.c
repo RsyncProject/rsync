@@ -123,9 +123,10 @@ int delete_file(char *fname, int flags)
 		else
 			flags &= ~DEL_DIR;
 
-		if (verbose)
+		if (verbose) {
 			rprintf(FINFO, "deleting %s%s\n", safe_fname(buf),
 				flags & DEL_DIR ? "/" : "");
+		}
 		if (delete_file(buf, flags) != 0) {
 			closedir(d);
 			return -1;
@@ -193,13 +194,15 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 		if (verbose > 2) {
 			if (change_uid) {
 				rprintf(FINFO,
-				    "set uid of %s from %ld to %ld\n",
-				    fname, (long)st->st_uid, (long)file->uid);
+					"set uid of %s from %ld to %ld\n",
+					safe_fname(fname),
+					(long)st->st_uid, (long)file->uid);
 			}
 			if (change_gid) {
 				rprintf(FINFO,
-				    "set gid of %s from %ld to %ld\n",
-				    fname, (long)st->st_gid, (long)file->gid);
+					"set gid of %s from %ld to %ld\n",
+					safe_fname(fname),
+					(long)st->st_gid, (long)file->gid);
 			}
 		}
 		if (do_lchown(fname,
@@ -237,9 +240,9 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 
 	if (verbose > 1 && flags & PERMS_REPORT) {
 		if (updated)
-			rprintf(FINFO,"%s\n",fname);
+			rprintf(FINFO, "%s\n", safe_fname(fname));
 		else
-			rprintf(FINFO,"%s is uptodate\n",fname);
+			rprintf(FINFO, "%s is uptodate\n", safe_fname(fname));
 	}
 	return updated;
 }
@@ -269,7 +272,7 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
 
 	if (inplace) {
 		if (verbose > 2)
-			rprintf(FINFO, "finishing %s\n", fname);
+			rprintf(FINFO, "finishing %s\n", safe_fname(fname));
 		goto do_set_perms;
 	}
 
@@ -280,13 +283,15 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
 	set_perms(fnametmp, file, NULL, ok_to_set_time ? 0 : PERMS_SKIP_MTIME);
 
 	/* move tmp file over real file */
-	if (verbose > 2)
-		rprintf(FINFO, "renaming %s to %s\n", fnametmp, fname);
+	if (verbose > 2) {
+		rprintf(FINFO, "renaming %s to %s\n",
+			safe_fname(fnametmp), safe_fname(fname));
+	}
 	ret = robust_rename(fnametmp, fname, file->mode & INITACCESSPERMS);
 	if (ret < 0) {
 		rsyserr(FERROR, errno, "%s %s -> \"%s\"",
 		    ret == -2 ? "copy" : "rename",
-		    full_fname(fnametmp), fname);
+		    full_fname(fnametmp), safe_fname(fname));
 		do_unlink(fnametmp);
 		return;
 	}

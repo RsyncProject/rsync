@@ -492,7 +492,7 @@ static FILE *OpenConfFile( char *FileName )
   if( NULL == OpenedFile )
     {
     rsyserr(FERROR, errno, "rsync: unable to open configuration file \"%s\"",
-	    FileName);
+	    safe_fname(FileName));
     }
 
   return( OpenedFile );

@@ -993,8 +993,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			backup_dir_buf[backup_dir_len++] = '/';
 			backup_dir_buf[backup_dir_len] = '\0';
 		}
-		if (verbose > 1 && !am_sender)
-			rprintf(FINFO, "backup_dir is %s\n", backup_dir_buf);
+		if (verbose > 1 && !am_sender) {
+			rprintf(FINFO, "backup_dir is %s\n",
+				safe_fname(backup_dir_buf));
+		}
 	} else if (!backup_suffix_len && (!am_server || !am_sender)) {
 		snprintf(err_buf, sizeof err_buf,
 			"--suffix cannot be a null string without --backup-dir\n");

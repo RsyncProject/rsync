@@ -79,7 +79,8 @@ pid_t piped_child(char **command, int *f_in, int *f_out)
 		if (blocking_io > 0)
 			set_blocking(STDOUT_FILENO);
 		execvp(command[0], command);
-		rsyserr(FERROR, errno, "Failed to exec %s", command[0]);
+		rsyserr(FERROR, errno, "Failed to exec %s",
+			safe_fname(command[0]));
 		exit_cleanup(RERR_IPC);
 	}
 

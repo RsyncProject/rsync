@@ -251,8 +251,10 @@ static void recv_generator(char *fname, struct file_list *flist,
 	if (list_only)
 		return;
 
-	if (verbose > 2)
-		rprintf(FINFO, "recv_generator(%s,%d)\n", safe_fname(fname), ndx);
+	if (verbose > 2) {
+		rprintf(FINFO, "recv_generator(%s,%d)\n",
+			safe_fname(fname), ndx);
+	}
 
 	if (server_filter_list.head
 	    && check_filter(&server_filter_list, fname,
@@ -318,8 +320,10 @@ static void recv_generator(char *fname, struct file_list *flist,
 			delete_in_dir(flist, fname, file);
 		return;
 	} else if (max_size && file->length > max_size) {
-		if (verbose > 1)
-			rprintf(FINFO, "%s is over max-size\n", fname);
+		if (verbose > 1) {
+			rprintf(FINFO, "%s is over max-size\n",
+				safe_fname(fname));
+		}
 		return;
 	}
 
@@ -327,8 +331,10 @@ static void recv_generator(char *fname, struct file_list *flist,
 #if SUPPORT_LINKS
 		if (safe_symlinks && unsafe_symlink(file->u.link, fname)) {
 			if (verbose) {
-				rprintf(FINFO, "ignoring unsafe symlink %s -> \"%s\"\n",
-					full_fname(fname), file->u.link);
+				rprintf(FINFO,
+					"ignoring unsafe symlink %s -> \"%s\"\n",
+					full_fname(fname),
+					safe_fname(file->u.link));
 			}
 			return;
 		}
@@ -446,7 +452,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 					if (verbose) {
 						rsyserr(FINFO, errno,
 							"link %s => %s",
-							fnamecmpbuf,
+							full_fname(fnamecmpbuf),
 							safe_fname(fname));
 					}
 					fnamecmp = fnamecmpbuf;
@@ -593,7 +599,7 @@ notify_others:
 			set_perms(backupptr, back_file, NULL, 0);
 			if (verbose > 1) {
 				rprintf(FINFO, "backed up %s to %s\n",
-					fname, backupptr);
+					safe_fname(fname), safe_fname(backupptr));
 			}
 			free(back_file);
 		}
