@@ -510,13 +510,12 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			break;
 
 		case OPT_EXCLUDE:
-			add_exclude(&exclude_list, poptGetOptArg(pc),
-				    ADD_EXCLUDE);
+			add_exclude(&exclude_list, poptGetOptArg(pc), 0);
 			break;
 
 		case OPT_INCLUDE:
 			add_exclude(&exclude_list, poptGetOptArg(pc),
-				    ADD_INCLUDE);
+				    XFLG_DEF_INCLUDE);
 			break;
 
 		case OPT_EXCLUDE_FROM:
@@ -524,7 +523,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			if (sanitize_paths)
 				arg = alloc_sanitize_path(arg, curr_dir);
 			add_exclude_file(&exclude_list, arg,
-					 MISSING_FATAL, ADD_EXCLUDE);
+					 XFLG_FATAL_ERRORS);
 			break;
 
 		case OPT_INCLUDE_FROM:
@@ -532,7 +531,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			if (sanitize_paths)
 				arg = alloc_sanitize_path(arg, curr_dir);
 			add_exclude_file(&exclude_list, arg,
-					 MISSING_FATAL, ADD_INCLUDE);
+					 XFLG_FATAL_ERRORS | XFLG_DEF_INCLUDE);
 			break;
 
 		case 'h':

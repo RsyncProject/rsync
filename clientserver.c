@@ -302,16 +302,19 @@ static int rsync_module(int f_in, int f_out, int i)
 		exclude_path_prefix = "";
 
 	p = lp_include_from(i);
-	add_exclude_file(&server_exclude_list, p, MISSING_FATAL, ADD_INCLUDE);
+	add_exclude_file(&server_exclude_list, p,
+			 XFLG_FATAL_ERRORS | XFLG_DEF_INCLUDE);
 
 	p = lp_include(i);
-	add_exclude_line(&server_exclude_list, p, ADD_INCLUDE);
+	add_exclude(&server_exclude_list, p,
+		    XFLG_WORD_SPLIT | XFLG_DEF_INCLUDE);
 
 	p = lp_exclude_from(i);
-	add_exclude_file(&server_exclude_list, p, MISSING_FATAL, ADD_EXCLUDE);
+	add_exclude_file(&server_exclude_list, p,
+			 XFLG_FATAL_ERRORS);
 
 	p = lp_exclude(i);
-	add_exclude_line(&server_exclude_list, p, ADD_EXCLUDE);
+	add_exclude(&server_exclude_list, p, XFLG_WORD_SPLIT);
 
 	exclude_path_prefix = NULL;
 
