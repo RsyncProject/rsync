@@ -31,13 +31,13 @@
  * on the command line must be directories rather than files; you
  * can't give wildcards either.
  *
- * At the moment we don't sort the output, but all the files have full
- * names, so you can run it through sort(1).
- *
  * We need to recurse downwards and show all the interesting
  * information and no more.
  *
  * \todo Use readdir64 if available?
+ *
+ * \todo Sort directory entries.  Either that, or output file listing
+ * in such a format that we can just pipe the whole lot through sort.
  */
 
 

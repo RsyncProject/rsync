@@ -111,6 +111,13 @@
 # Perhaps we need a common way to cleanup tests.  At the moment just
 # clobbering the directory when we're done should be enough.
 
+# If any of the targets fail, then (GNU?) Make returns 2, instead of
+# the return code from the failing command.  This is fine, but it
+# means that the build farm just shows "2" for failed tests, not the
+# number of tests that actually failed.  For more details we might
+# need to grovel through the log files to find a line saying how many
+# failed.
+
 
 set -e
 
