@@ -435,9 +435,9 @@ void start_accept_loop(int port, int (*fn)(int ))
 			 * overloaded.  Sleep briefly before trying to
 			 * accept again. */
 			sleep(2);
+		} else {
+			close(fd);
 		}
-
-		close(fd);
 	}
 }
 
