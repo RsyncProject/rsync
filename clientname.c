@@ -185,7 +185,6 @@ int compare_addrinfo_sockaddr(const struct addrinfo *ai,
 {
 	int ss_family = get_sockaddr_family(ss);
 	const char fn[] = "compare_addrinfo_sockaddr";
-	size_t valid_len;
 		      
 	if (ai->ai_family != ss_family) {
 		rprintf(FERROR,
@@ -194,21 +193,25 @@ int compare_addrinfo_sockaddr(const struct addrinfo *ai,
 		return 1;
 	}
 
-	switch (ss_family) {
-	case AF_INET:
-		valid_len = sizeof (struct sockaddr_in);
-		break;
+	/* The comparison method depends on the particular AF. */
+	if (ss_family == AF_INET) {
+		const struct sockaddr_in *sin1, *sin2;
+
+		sin1 = (const struct sockaddr_in *) ss;
+		sin2 = (const struct sockaddr_in *) ai->ai_addr;
+		
+		return memcmp(&sin1->sin_addr, &sin2->sin_addr, sizeof sin1->sin_addr);
+	}
 #ifdef INET6
-	case AF_INET6:
-		valid_len = sizeof (struct sockaddr_in6);
-		break;
-#endif
-	default:
-		/* Don't know what to do! */
+	else if (ss_family == AF_INET6) {
+		/* XXXX */
 		return 1;
 	}
-
-	return memcmp(ss, ai->ai_addr, valid_len);
+#endif /* INET6 */
+	else {
+		/* don't know */
+		return 1;
+	}
 }
 
 
@@ -229,8 +232,8 @@ int check_name(int fd,
 	int ss_family = get_sockaddr_family(ss);
 
 	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = PF_UNSPEC;
-	hints.ai_flags = ss_family;
+	hints.ai_family = ss_family;
+	hints.ai_flags = AI_CANONNAME;
 	hints.ai_socktype = SOCK_STREAM;
 	error = getaddrinfo(name_buf, port_buf, &hints, &res0);
 	if (error) {
