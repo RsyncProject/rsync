@@ -8,7 +8,7 @@ Changes since 2.6.3:
       it, it now appends a trailing slash to the name instead of (only
       sometimes) outputting a preceding "directory " string.
 
-    - The --stats output will contain file-list time statistics if both
+    - The --stats output will contain file-list time-statistics if both
       sides are 2.6.4, or if the local side is 2.6.4 and the files are
       being pushed (since the stats come from the sending side).
   
@@ -64,6 +64,11 @@ Changes since 2.6.3:
       if the block-size for a file was large enough (i.e. rsync might have
       exited with an error for large files).
 
+    - If a daemon can't open the specified log file (i.e. syslog is not
+      being used), die without crashing.  We also try to output an error
+      about the failure (which will only be seen if --no-detach was
+      specified).
+
   ENHANCEMENTS:
 
     - Rsync now supports popt's option aliases, which means that you can
@@ -75,7 +80,8 @@ Changes since 2.6.3:
       default, before-the-transfer behavior of --delete).  Note that the
       --del option is implemented as an internally-defined popt alias, so
       an rsync daemon that refuses "delete" (which, for safety's sake,
-      really matches "delete*") will still refuse all delete options.
+      really matches "delete*") will still refuse all delete options.  The
+      default behavior is also explicitly selectable via --delete-before.
 
     - Added the --copy-dest option, which works like --link-dest except
       that it includes copies of identical files.
@@ -138,6 +144,9 @@ Changes since 2.6.3:
     - If rsync is put into the background, any output from --progress is
       reduced.
 
+    - Documented the "max verbosity" setting for rsyncd.conf.  (This
+      setting was added a couple releases ago, but left undocumented.)
+
   SUPPORT FILES:
 
     - Added support/atomic-rsync -- a perl script that will transfer some
@@ -159,6 +168,8 @@ Changes since 2.6.3:
       perl script.  This helps to ensure that only certain rsync commands
       can be run by an ssh invocation.
 
+    - Improved the option descriptions in the --help text.
+
   INTERNAL:
 
     - Added better checking of the checksum-header values that come over
@@ -171,6 +182,11 @@ Changes since 2.6.3:
       consistency and proper size.
 
     - Got rid of the uint64 type (which we didn't need).
+
+    - Use a slightly more compatible set of core #include directives.
+
+    - Defined int32 in a way that ensures that the build dies if we can't
+      find a variable with at least 32 bits.
 
   BUILD CHANGES:
 
