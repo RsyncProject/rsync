@@ -75,6 +75,8 @@ rsync changes since last release
 
     * Prevent "Connection reset by peer" messages from Cygwin. (Randy O'Meara)
 
+    * Prevent some hangs at the end of a run on Cygwin. (Anthony Heading)
+
   INTERNAL:
 
     * Many code cleanups and improved internal documentation.  (Martin 

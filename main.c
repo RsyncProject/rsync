@@ -462,6 +462,8 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	io_flush();
 
 	io_set_error_fd(-1);
+	/* workaround for cygwin hangs; wait to make sure child is ready */
+	msleep(100); 
 	kill(pid, SIGUSR2);
 	wait_process(pid, &status);
 	return status;
