@@ -127,8 +127,10 @@ pid_t local_child(int argc, char **argv,int *f_in,int *f_out,
 			rsyserr(FERROR, errno, "Failed to dup/close");
 			exit_cleanup(RERR_IPC);
 		}
-		if (to_child_pipe[0] != STDIN_FILENO) close(to_child_pipe[0]);
-		if (from_child_pipe[1] != STDOUT_FILENO) close(from_child_pipe[1]);
+		if (to_child_pipe[0] != STDIN_FILENO)
+			close(to_child_pipe[0]);
+		if (from_child_pipe[1] != STDOUT_FILENO)
+			close(from_child_pipe[1]);
 		child_main(argc, argv);
 	}
 
