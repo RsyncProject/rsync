@@ -1008,7 +1008,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 /* Note that the "recurse" value either contains -1, for infinite recursion,
  * or a number >= 0 indicating how many levels of recursion we will allow. */
 static void send_directory(int f, struct file_list *flist,
-			   char *fbuf, unsigned int dirlen)
+			   char *fbuf, unsigned int len)
 {
 	struct dirent *di;
 	char *p;
@@ -1020,8 +1020,8 @@ static void send_directory(int f, struct file_list *flist,
 		return;
 	}
 
-	p = fbuf + dirlen;
-	if (dirlen != 1 || *fbuf != '/')
+	p = fbuf + len;
+	if (len != 1 || *fbuf != '/')
 		*p++ = '/';
 	*p = '\0';
 
@@ -1030,7 +1030,7 @@ static void send_directory(int f, struct file_list *flist,
 		if (dname[0] == '.' && (dname[1] == '\0'
 		    || (dname[1] == '.' && dname[2] == '\0')))
 			continue;
-		if (strlcpy(p, dname, MAXPATHLEN - dirlen) < MAXPATHLEN - dirlen) {
+		if (strlcpy(p, dname, MAXPATHLEN - len) < MAXPATHLEN - len) {
 			int do_subdirs = recurse >= 1 ? recurse-- : recurse;
 			send_file_name(f, flist, fbuf, do_subdirs, 0);
 		} else {
@@ -1669,11 +1669,19 @@ static int is_backup_file(char *fn)
 /* This function is used to implement --delete-during. */
 void delete_in_dir(struct file_list *flist, char *fname)
 {
+	static void *filt_array[MAXPATHLEN/2];
+	static int fa_lvl = 0;
+	static char fbuf[MAXPATHLEN];
 	struct file_list *dir_list;
-	char dirbuf[MAXPATHLEN];
-	void *save_filters;
 	STRUCT_STAT st;
-	int dirlen;
+	int dlen, j;
+
+	if (!flist) {
+		while (fa_lvl)
+			pop_local_filters(filt_array[--fa_lvl]);
+		*fbuf = '\0';
+		return;
+	}
 
 	if (max_delete && deletion_count >= max_delete)
 		return;
@@ -1691,17 +1699,33 @@ void delete_in_dir(struct file_list *flist, char *fname)
 	if (one_file_system)
 		filesystem_dev = st.st_dev;
 
-	dirlen = strlcpy(dirbuf, fname, MAXPATHLEN);
-	if (dirlen >= MAXPATHLEN - 1)
+	for (j = 0; fbuf[j]; j++) {
+		if (fbuf[j] != fname[j]) {
+			while (fa_lvl) {
+				if (fbuf[j] == '/')
+					pop_local_filters(filt_array[--fa_lvl]);
+				if (!fbuf[++j])
+					break;
+			}
+			break;
+		}
+	}
+
+	dlen = strlcpy(fbuf, fname, MAXPATHLEN);
+	if (dlen >= MAXPATHLEN - 1)
 		return;
+	if (fa_lvl >= MAXPATHLEN/2)
+		return; /* impossible... */
 
 	dir_list = flist_new(WITHOUT_HLINK, "delete_in_dir");
 
 	recurse = 0;
-	save_filters = push_local_filters(dirbuf, dirlen);
-	send_directory(-1, dir_list, dirbuf, dirlen);
-	pop_local_filters(save_filters);
+	filt_array[fa_lvl++] = push_local_filters(fbuf, dlen);
+	send_directory(-1, dir_list, fbuf, dlen);
 	recurse = -1;
+
+	if (dlen == 1 && *fbuf == '.')
+		*fbuf = '\0';
 
 	clean_flist(dir_list, 0, 0);
 
