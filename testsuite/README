@@ -1,7 +1,0 @@
-This directory contains automatic test cases for rsync.  You can run
-them yourself if you want, preferably by doing "make check" in the
-top-level source directory.  (Not implemented yet.)
-
-They also run automatically on the build farm, and you can see the
-results on http://build.samba.org/.  That's controlled by the file
-./runlist.
