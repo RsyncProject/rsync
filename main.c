@@ -379,9 +379,13 @@ static char *get_local_name(struct file_list *flist,char *name)
 	if (do_mkdir(name,0777 & ~orig_umask) != 0) {
 		rsyserr(FERROR, errno, "mkdir %s failed", full_fname(name));
 		exit_cleanup(RERR_FILEIO);
-	} else {
-		if (verbose > 0)
-			rprintf(FINFO,"created directory %s\n",name);
+	}
+	if (verbose > 0)
+		rprintf(FINFO, "created directory %s\n", name);
+
+	if (dry_run) {
+		dry_run++;
+		return NULL;
 	}
 
 	if (!push_dir(name)) {
