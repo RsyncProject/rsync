@@ -142,10 +142,16 @@ static int is_in_group(gid_t gid)
 		if (n == ngroups)
 			gidset[ngroups++] = mygid;
 		if (verbose > 3) {
+			char gidbuf[NGROUPS_MAX*16+32];
+			int pos;
+			sprintf(gidbuf, "process has %d gid%s: ",
+			    ngroups, ngroups == 1? "" : "s");
+			pos = strlen(gidbuf);
 			for (n = 0; n < ngroups; n++) {
-				rprintf(FINFO, "process has gid %ld\n",
-				    (long)gidset[n]);
+				sprintf(gidbuf+pos, " %ld", (long)gidset[n]);
+				pos += strlen(gidbuf+pos);
 			}
+			rprintf(FINFO, "%s\n", gidbuf);
 		}
 	}
 
@@ -158,8 +164,11 @@ static int is_in_group(gid_t gid)
 
 #else
 	static gid_t mygid = GID_NONE;
-	if (mygid == GID_NONE)
+	if (mygid == GID_NONE) {
 		mygid = getgid();
+		if (verbose > 3)
+			rprintf(FINFO, "process has gid %ld\n", (long)mygid);
+	}
 	return gid == mygid;
 #endif
 }
