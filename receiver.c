@@ -417,8 +417,10 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		fd2 = do_open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,
 			      file->mode & INITACCESSPERMS);
 
-		if (fd2 == -1 && errno == ENOENT && 
-		    (relative_paths || (compare_dest != NULL)) &&
+		/* in most cases parent directories will already exist
+		   because their information should have been previously
+		   transferred, but that may not be the case with -R */
+		if (fd2 == -1 && relative_paths && errno == ENOENT && 
 		    create_directory_path(fnametmp) == 0) {
 			fd2 = do_open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,
 				      file->mode & INITACCESSPERMS);
