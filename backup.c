@@ -21,10 +21,10 @@
 #include "rsync.h"
 
 extern int verbose;
-extern int suffix_specified;
+extern int backup_suffix_len;
+extern int backup_dir_len;
 extern char *backup_suffix;
 extern char *backup_dir;
-
 
 extern int am_root;
 extern int preserve_devices;
@@ -35,7 +35,7 @@ extern int preserve_hard_links;
 static int make_simple_backup(char *fname)
 {
 	char fnamebak[MAXPATHLEN];
-	if (strlen(fname) + strlen(backup_suffix) > (MAXPATHLEN-1)) {
+	if (strlen(fname) + backup_suffix_len > MAXPATHLEN-1) {
 		rprintf(FERROR, "backup filename too long\n");
 		return 0;
 	}
@@ -184,8 +184,8 @@ static int keep_backup(char *fname)
 	int ret_code;
 
 	if (!initialised) {
-		if (backup_dir[strlen(backup_dir) - 1] == '/')
-			backup_dir[strlen(backup_dir) - 1] = 0;
+		if (backup_dir_len && backup_dir[backup_dir_len - 1] == '/')
+			backup_dir[--backup_dir_len] = '\0';
 		if (verbose > 0)
 			rprintf (FINFO, "backup_dir is %s\n", backup_dir);
 		initialised = 1;
@@ -204,20 +204,13 @@ static int keep_backup(char *fname)
 	if (!file) return 1;
 
 	/* make a complete pathname for backup file */
-	if (strlen(backup_dir) + strlen(fname) +
-		(suffix_specified ? strlen(backup_suffix) : 0) > (MAXPATHLEN - 1)) {
+	if (backup_dir_len+strlen(fname)+backup_suffix_len > MAXPATHLEN-1) {
 		rprintf (FERROR, "keep_backup filename too long\n");
 		return 0;
 	}
 
-	if (suffix_specified) {
-		snprintf(keep_name, sizeof (keep_name), "%s/%s%s",
-		    backup_dir, fname, backup_suffix);
-	} else {
-		snprintf(keep_name, sizeof (keep_name), "%s/%s",
-		    backup_dir, fname);
-	}
-
+	snprintf(keep_name, sizeof (keep_name), "%s/%s%s",
+	    backup_dir, fname, backup_suffix);
 
 #ifdef HAVE_MKNOD
 	/* Check to see if this is a device file, or link */
