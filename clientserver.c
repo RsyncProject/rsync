@@ -31,7 +31,6 @@ extern int am_sender;
 extern int am_server;
 extern int am_daemon;
 extern int am_root;
-extern int module_id;
 extern int verbose;
 extern int rsync_port;
 extern int kludge_around_eof;
@@ -53,6 +52,7 @@ extern char *files_from;
 
 char *auth_user;
 int read_only = 0;
+int module_id = -1;
 
 /* Length of lp_path() string when in daemon mode & not chrooted, else 0. */
 unsigned int module_dirlen = 0;
@@ -281,7 +281,7 @@ static int rsync_module(int f_in, int f_out, int i)
 
 	module_id = i;
 
-	if (lp_read_only(module_id))
+	if (lp_read_only(i))
 		read_only = 1;
 
 	am_root = (MY_UID() == 0);
@@ -325,23 +325,23 @@ static int rsync_module(int f_in, int f_out, int i)
 
 	p = lp_filter(i);
 	add_filter(&server_filter_list, p,
-		   XFLG_WORD_SPLIT | XFLG_ABS_PATH);
+	    XFLG_WORD_SPLIT | XFLG_ANCHORED2ABS);
 
 	p = lp_include_from(i);
 	add_filter_file(&server_filter_list, p,
-			XFLG_FATAL_ERRORS | XFLG_ABS_PATH | XFLG_DEF_INCLUDE);
+	    XFLG_FATAL_ERRORS | XFLG_ANCHORED2ABS | XFLG_DEF_INCLUDE);
 
 	p = lp_include(i);
 	add_filter(&server_filter_list, p,
-		   XFLG_WORD_SPLIT | XFLG_ABS_PATH | XFLG_DEF_INCLUDE);
+	    XFLG_WORD_SPLIT | XFLG_ANCHORED2ABS | XFLG_DEF_INCLUDE);
 
 	p = lp_exclude_from(i);
 	add_filter_file(&server_filter_list, p,
-			XFLG_FATAL_ERRORS | XFLG_ABS_PATH | XFLG_DEF_EXCLUDE);
+	    XFLG_FATAL_ERRORS | XFLG_ANCHORED2ABS | XFLG_DEF_EXCLUDE);
 
 	p = lp_exclude(i);
 	add_filter(&server_filter_list, p,
-		   XFLG_WORD_SPLIT | XFLG_ABS_PATH | XFLG_DEF_EXCLUDE);
+	    XFLG_WORD_SPLIT | XFLG_ANCHORED2ABS | XFLG_DEF_EXCLUDE);
 
 	log_init();
 
