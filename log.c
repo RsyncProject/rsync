@@ -41,7 +41,7 @@ static char *logfname;
 static FILE *logfile;
 struct stats stats;
 
-int log_got_error=0;
+int log_got_error = 0;
 
 struct {
         int code;
@@ -160,7 +160,7 @@ void log_close(void)
  * it with FINFO, FERROR or FLOG */
 void rwrite(enum logcode code, char *buf, int len)
 {
-	FILE *f=NULL;
+	FILE *f = NULL;
 	/* recursion can happen with certain fatal conditions */
 
 	if (quiet && code == FINFO)
@@ -237,18 +237,17 @@ void rwrite(enum logcode code, char *buf, int len)
 void rprintf(enum logcode code, const char *format, ...)
 {
 	va_list ap;
-	char buf[1024];
-	int len;
+	char buf[MAXPATHLEN+512];
+	size_t len;
 
 	va_start(ap, format);
-	/* Note: might return -1 */
 	len = vsnprintf(buf, sizeof(buf), format, ap);
 	va_end(ap);
 
 	/* Deal with buffer overruns.  Instead of panicking, just
-	 * truncate the resulting string.  Note that some vsnprintf()s
-	 * return -1 on truncation, e.g., glibc 2.0.6 and earlier. */
-	if ((size_t) len > sizeof(buf)-1  ||  len < 0) {
+	 * truncate the resulting string.  (Note that configure ensures
+	 * that we have a vsnprintf() that doesn't ever return -1.) */
+	if (len > sizeof buf - 1) {
 		const char ellipsis[] = "[...]";
 
 		/* Reset length, and zero-terminate the end of our buffer */
@@ -286,32 +285,22 @@ void rprintf(enum logcode code, const char *format, ...)
 void rsyserr(enum logcode code, int errcode, const char *format, ...)
 {
 	va_list ap;
-	char buf[1024];
-	int len;
-	size_t sys_len;
-	char *sysmsg;
+	char buf[MAXPATHLEN+512];
+	size_t len;
+
+	strcpy(buf, RSYNC_NAME ": ");
+	len = (sizeof RSYNC_NAME ": ") - 1;
 
 	va_start(ap, format);
-	/* Note: might return <0 */
-	len = vsnprintf(buf, sizeof(buf), format, ap);
+	len += vsnprintf(buf + len, sizeof buf - len, format, ap);
 	va_end(ap);
 
-	/* TODO: Put in RSYNC_NAME at the start. */
-
-	if ((size_t) len > sizeof(buf)-1)
+	if (len < sizeof buf) {
+		len += snprintf(buf + len, sizeof buf - len,
+				": %s (%d)\n", strerror(errcode), errcode);
+	}
+	if (len >= sizeof buf)
 		exit_cleanup(RERR_MESSAGEIO);
-
-	sysmsg = strerror(errcode);
-	sys_len = strlen(sysmsg);
-	if ((size_t) len + 3 + sys_len > sizeof(buf) - 1)
-		exit_cleanup(RERR_MESSAGEIO);
-
-	strcpy(buf + len, ": ");
-	len += 2;
-	strcpy(buf + len, sysmsg);
-	len += sys_len;
-	strcpy(buf + len, "\n");
-	len++;
 
 	rwrite(code, buf, len);
 }
@@ -364,8 +353,9 @@ static void log_formatted(enum logcode code,
 	 * rather keep going until we reach the nul of the format.
 	 * Just to make sure we don't clobber that nul and therefore
 	 * accidentally keep going, we zero the buffer now. */
-	memset(buf, 0, sizeof buf);
-	strlcpy(buf, format, sizeof(buf));
+	l = strlcpy(buf, format, sizeof buf);
+	if (l < sizeof buf)
+		memset(buf + l, 0, sizeof buf - l);
 	
 	for (s = &buf[0]; s && (p = strchr(s,'%')); ) {
 		n = NULL;
