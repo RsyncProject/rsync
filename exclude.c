@@ -300,8 +300,8 @@ void add_exclude(struct exclude_list_struct *listp, const char *pattern,
 			make_exclude(listp, cp, pat_len, incl);
 
 			if (verbose > 2) {
-				rprintf(FINFO, "[%s] add_exclude(%s,%s)\n",
-					who_am_i(), cp,
+				rprintf(FINFO, "[%s] add_exclude(%.*s,%s)\n",
+					who_am_i(), pat_len, cp,
 					incl ? "include" : "exclude");
 			}
 		}
