@@ -77,7 +77,7 @@ BUG REPORTS
 
 If you have web access then please look at
 
-  http://rsync.samba.org
+  http://rsync.samba.org/
 
 That page contains links to the current bug list, and information on
 how to report a bug well.  You might also like to try searching the
@@ -86,9 +86,8 @@ mailing list archives at
 
   http://mail-archive.com/rsync@lists.samba.org/
 
-Please send bug reports to 
-
-  rsync@lists.samba.org
+To send a bug report, follow the instructions on the bug-tracking
+page of the web site.
 
 
 CVS TREE
