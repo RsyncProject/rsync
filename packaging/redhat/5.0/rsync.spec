@@ -4,7 +4,7 @@ Version: 2.0.7
 Release: 1
 Copyright: GPL
 Group: Applications/Networking
-Source:	ftp://samba.anu.edu.au/pub/rsync/rsync-2.0.7.tar.gz
+Source:	ftp://samba.anu.edu.au/pub/rsync/
 URL: http://samba.anu.edu.au/rsync/
 Packager: John H Terpstra <jht@samba.anu.edu.au>
 BuildRoot: /tmp/rsync
