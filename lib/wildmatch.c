@@ -22,7 +22,7 @@
 
 #define CC_EQ(class, len, litmatch) ((len) == sizeof (litmatch)-1 \
 				    && *(class) == *(litmatch) \
-				    && strncmp(class, litmatch, len) == 0)
+				    && strncmp((char*)class, litmatch, len) == 0)
 
 #if defined STDC_HEADERS || !defined isascii
 # define ISASCII(c) 1
@@ -94,7 +94,7 @@ static int domatch(const unsigned char *p, const unsigned char *text)
 	    if (*p == '\0') {
 		/* Trailing "**" matches everything.  Trailing "*" matches
 		 * only if there are no more slash characters. */
-		return special? TRUE : strchr(text, '/') == NULL;
+		return special? TRUE : strchr((char*)text, '/') == NULL;
 	    }
 	    for ( ; *text; text++) {
 		if ((matched = domatch(p, text)) != FALSE) {
@@ -141,7 +141,7 @@ static int domatch(const unsigned char *p, const unsigned char *text)
 		    ch = 0; /* This makes "prev" get set to 0. */
 		}
 		else if (ch == '[' && p[1] == ':') {
-		    unsigned const char *s = p += 2;
+		    const unsigned char *s = p += 2;
 		    int i;
 		    while ((ch = *p) && ch != ']') p++;
 		    if (!ch)
