@@ -138,7 +138,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				write_int(f_out, -1);
 				if (verbose > 2)
 					rprintf(FINFO, "send_files phase=%d\n", phase);
-				/* inplace resends run without a backup file */
+				/* For inplace: redo phase turns off the backup
+				 * flag so that we do a regular inplace send. */
 				make_backups = 0;
 				continue;
 			}
