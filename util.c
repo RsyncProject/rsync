@@ -874,6 +874,9 @@ char *timestring(time_t t)
 /****************************************************************************
  like waitpid but does the WEXITSTATUS
 ****************************************************************************/
+#ifndef WEXITSTATUS
+#define	WEXITSTATUS(stat)	((int)(((stat)>>8)&0xFF))
+#endif
 void wait_process(pid_t pid, int *status)
 {
 	waitpid(pid, status, 0);
