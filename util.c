@@ -111,14 +111,14 @@ void print_child_argv(char **cmd)
 
 void out_of_memory(char *str)
 {
-  rprintf(FERROR,"ERROR: out of memory in %s\n",str);
-  exit_cleanup(RERR_MALLOC);
+	rprintf(FERROR, "ERROR: out of memory in %s\n", str);
+	exit_cleanup(RERR_MALLOC);
 }
 
 void overflow(char *str)
 {
-  rprintf(FERROR,"ERROR: buffer overflow in %s\n",str);
-  exit_cleanup(RERR_MALLOC);
+	rprintf(FERROR, "ERROR: buffer overflow in %s\n", str);
+	exit_cleanup(RERR_MALLOC);
 }
 
 
@@ -167,11 +167,13 @@ int create_directory_path(char *fname, int base_umask)
 {
 	char *p;
 
-	while (*fname == '/') fname++;
-	while (strncmp(fname,"./",2)==0) fname += 2;
+	while (*fname == '/')
+		fname++;
+	while (strncmp(fname, "./", 2) == 0)
+		fname += 2;
 
 	p = fname;
-	while ((p=strchr(p,'/'))) {
+	while ((p = strchr(p,'/')) != NULL) {
 		*p = 0;
 		do_mkdir(fname, 0777 & ~base_umask);
 		*p = '/';
@@ -314,15 +316,14 @@ int robust_unlink(char *fname)
 	char path[MAXPATHLEN];
 
 	rc = do_unlink(fname);
-	if ((rc == 0) || (errno != ETXTBSY))
+	if (rc == 0 || errno != ETXTBSY)
 		return rc;
 
-	strlcpy(path, fname, MAXPATHLEN);
+	if ((pos = strlcpy(path, fname, MAXPATHLEN)) >= MAXPATHLEN)
+		pos = MAXPATHLEN - 1;
 
-	pos = strlen(path);
-	while((path[--pos] != '/') && (pos >= 0))
-		;
-	++pos;
+	while (pos > 0 && path[pos-1] != '/')
+		pos--;
 	pos += strlcpy(path+pos, ".rsync", MAXPATHLEN-pos);
 
 	if (pos > (MAXPATHLEN-MAX_RENAMES_DIGITS-1)) {
@@ -336,7 +337,7 @@ int robust_unlink(char *fname)
 		sprintf(&path[pos], "%03d", counter);
 		if (++counter >= MAX_RENAMES)
 			counter = 1;
-	} while (((rc = access(path, 0)) == 0) && (counter != start));
+	} while ((rc = access(path, 0)) == 0 && counter != start);
 
 	if (verbose > 0) {
 		rprintf(FINFO,"renaming %s to %s because of text busy\n",
@@ -358,7 +359,7 @@ int robust_rename(char *from, char *to)
 	return do_rename(from, to);
 #else
 	int rc = do_rename(from, to);
-	if ((rc == 0) || (errno != ETXTBSY))
+	if (rc == 0 || errno != ETXTBSY)
 		return rc;
 	if (robust_unlink(to) != 0)
 		return -1;
@@ -497,13 +498,15 @@ static void glob_expand_one(char *s, char **argv, int *argc, int maxargs)
 		globfree(&globbuf);
 		return;
 	}
-	for (i=0; i<(maxargs - (*argc)) && i < (int) globbuf.gl_pathc;i++) {
-		if (i == 0) free(s);
-		argv[(*argc) + i] = strdup(globbuf.gl_pathv[i]);
-		if (!argv[(*argc) + i]) out_of_memory("glob_expand");
+	for (i = 0; i < maxargs - *argc && i < (int)globbuf.gl_pathc; i++) {
+		if (i == 0)
+			free(s);
+		argv[*argc + i] = strdup(globbuf.gl_pathv[i]);
+		if (!argv[*argc + i])
+			out_of_memory("glob_expand");
 	}
 	globfree(&globbuf);
-	(*argc) += i;
+	*argc += i;
 #endif
 }
 
@@ -527,14 +530,15 @@ void glob_expand(char *base1, char **argv, int *argc, int maxargs)
 	base_len++;
 
 	q = s;
-	while ((p = strstr(q,base)) && ((*argc) < maxargs)) {
+	while ((p = strstr(q,base)) != NULL && *argc < maxargs) {
 		/* split it at this point */
 		*p = 0;
 		glob_expand_one(q, argv, argc, maxargs);
 		q = p + base_len;
 	}
 
-	if (*q && (*argc < maxargs)) glob_expand_one(q, argv, argc, maxargs);
+	if (*q && *argc < maxargs)
+		glob_expand_one(q, argv, argc, maxargs);
 
 	free(s);
 	free(base);
@@ -615,7 +619,7 @@ void clean_fname(char *name)
 	while (modified) {
 		modified = 0;
 
-		if ((p=strstr(name,"/./"))) {
+		if ((p = strstr(name,"/./")) != NULL) {
 			modified = 1;
 			while (*p) {
 				p[0] = p[2];
@@ -623,7 +627,7 @@ void clean_fname(char *name)
 			}
 		}
 
-		if ((p=strstr(name,"//"))) {
+		if ((p = strstr(name,"//")) != NULL) {
 			modified = 1;
 			while (*p) {
 				p[0] = p[1];
@@ -631,14 +635,14 @@ void clean_fname(char *name)
 			}
 		}
 
-		if (strncmp(p=name,"./",2) == 0) {
+		if (strncmp(p = name, "./", 2) == 0) {
 			modified = 1;
 			do {
 				p[0] = p[2];
 			} while (*p++);
 		}
 
-		l = strlen(p=name);
+		l = strlen(p = name);
 		if (l > 1 && p[l-1] == '/') {
 			modified = 1;
 			p[l-1] = 0;
@@ -697,7 +701,7 @@ void sanitize_path(char *p, char *reldir)
 		 * both p (and sanp if the original had a slash) should
 		 * always be left pointing after a slash
 		 */
-		if ((*p == '.') && ((*(p+1) == '/') || (*(p+1) == '\0'))) {
+		if (*p == '.' && (p[1] == '/' || p[1] == '\0')) {
 			/* skip "." component */
 			while (*++p == '/') {
 				/* skip following slashes */
@@ -706,10 +710,9 @@ void sanitize_path(char *p, char *reldir)
 			continue;
 		}
 		allowdotdot = 0;
-		if ((*p == '.') && (*(p+1) == '.') &&
-		    ((*(p+2) == '/') || (*(p+2) == '\0'))) {
+		if (*p == '.' && p[1] == '.' && (p[2] == '/' || p[2] == '\0')) {
 			/* ".." component followed by slash or end */
-			if ((depth > 0) && (sanp == start)) {
+			if (depth > 0 && sanp == start) {
 				/* allow depth levels of .. at the beginning */
 				--depth;
 				allowdotdot = 1;
@@ -720,7 +723,7 @@ void sanitize_path(char *p, char *reldir)
 				if (sanp != start) {
 					/* back up sanp one level */
 					--sanp; /* now pointing at slash */
-					while ((sanp > start) && (*(sanp - 1) != '/')) {
+					while (sanp > start && sanp[-1] != '/') {
 						/* skip back up to slash */
 						sanp--;
 					}
@@ -731,7 +734,7 @@ void sanitize_path(char *p, char *reldir)
 		while (1) {
 			/* copy one component through next slash */
 			*sanp++ = *p++;
-			if ((*p == '\0') || (*(p-1) == '/')) {
+			if (*p == '\0' || p[1] == '/') {
 				while (*p == '/') {
 					/* skip multiple slashes */
 					p++;
@@ -744,7 +747,7 @@ void sanitize_path(char *p, char *reldir)
 			start = sanp;
 		}
 	}
-	if ((sanp == start) && !allowdotdot) {
+	if (sanp == start && !allowdotdot) {
 		/* ended up with nothing, so put in "." component */
 		/*
 		 * note that the !allowdotdot doesn't prevent this from
@@ -917,7 +920,7 @@ int unsafe_symlink(const char *dest, const char *src)
 	/* find out what our safety margin is */
 	for (name = src; (slash = strchr(name, '/')) != 0; name = slash+1) {
 		if (strncmp(name, "../", 3) == 0) {
-			depth=0;
+			depth = 0;
 		} else if (strncmp(name, "./", 2) == 0) {
 			/* nothing */
 		} else {
@@ -976,8 +979,8 @@ char *timestring(time_t t)
  **/
 int msleep(int t)
 {
-	int tdiff=0;
-	struct timeval tval,t1,t2;
+	int tdiff = 0;
+	struct timeval tval, t1, t2;
 
 	gettimeofday(&t1, NULL);
 	gettimeofday(&t2, NULL);
