@@ -396,8 +396,8 @@ dit(bf(--modify-window)) When comparing two timestamps rsync treats
 the timestamps as being equal if they are within the value of
 modify_window. This is normally zero, but you may find it useful to
 set this to a larger value in some situations. In particular, when
-transferring to/from FAT filesystems which cannot represent times with
-a 1 second resolution this option is useful.
+transferring to Windows FAT filesystems which cannot represent times
+with a 1 second resolution --modify-window=1 is useful.
 
 dit(bf(-c, --checksum)) This forces the sender to checksum all files using
 a 128-bit MD4 checksum before transfer. The checksum is then
@@ -1110,16 +1110,17 @@ manpagebugs()
 
 times are transferred as unix time_t values
 
+When transferring to FAT filesystmes rsync may resync
+unmodified files.
+See the comments on the --modify-window option.
+
 file permissions, devices etc are transferred as native numerical
 values
 
 see also the comments on the --delete option
 
-Please report bugs! The rsync bug tracking system is online at
-url(http://rsync.samba.org/rsync/)(http://rsync.samba.org/rsync/)
-
-manpagesection(VERSION)
-This man page is current for version 2.0 of rsync
+Please report bugs! See the website at
+url(http://rsync.samba.org/)(http://rsync.samba.org/)
 
 manpagesection(CREDITS)
 

@@ -247,15 +247,6 @@ yes
 	AC_SEARCH_LIBS(getaddrinfo, inet6)
 fi
 
-AC_MSG_CHECKING([default value for --modify-window])
-case $host_os in
-	*cygwin* ) DEFAULT_MODIFY_WINDOW=${DEFAULT_MODIFY_WINDOW:-1};;
-	       * ) DEFAULT_MODIFY_WINDOW=${DEFAULT_MODIFY_WINDOW:-0};;
-esac
-AC_MSG_RESULT($DEFAULT_MODIFY_WINDOW)
-AC_DEFINE_UNQUOTED(DEFAULT_MODIFY_WINDOW, $DEFAULT_MODIFY_WINDOW,
-	[Set to the default value for the --modify-window option])
-
 AC_MSG_CHECKING([whether to call shutdown on all sockets])
 case $host_os in
 	*cygwin* ) AC_MSG_RESULT(yes)

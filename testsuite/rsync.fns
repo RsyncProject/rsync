@@ -140,10 +140,6 @@ makepath () {
 # should be excluded, you might need to use something else.
 
 checkit() {
-    # sleep here to prevent a copy from being made within the
-    #  default --modify-window time on Cygwin
-    sleep 2
-
     failed=
 
     # We can just write everything to stdout/stderr, because the

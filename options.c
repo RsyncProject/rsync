@@ -81,7 +81,7 @@ int only_existing=0;
 int opt_ignore_existing=0;
 int max_delete=0;
 int ignore_errors=0;
-int modify_window=DEFAULT_MODIFY_WINDOW;
+int modify_window=0;
 int blocking_io=-1;
 
 
