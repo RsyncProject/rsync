@@ -6,4 +6,4 @@
 
 echo "$0 running" 
 
-TEST_ALL="rsync-version"
+TEST_ALL="rsync-hello"
