@@ -78,6 +78,8 @@ int io_error;
 static char empty_sum[MD4_SUM_LENGTH];
 static unsigned int file_struct_len;
 static struct file_list *received_flist;
+static dev_t filesystem_dev; /* used to implement -x */
+static int deletion_count = 0; /* used to implement --max-delete */
 
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
 static void output_flist(struct file_list *flist, const char *whose_list);
@@ -250,18 +252,6 @@ static int is_excluded(char *fname, int is_dir, int filter_level)
 		return 1;
 	return 0;
 }
-
-/* used by the one_file_system code */
-static dev_t filesystem_dev;
-
-static void set_filesystem(char *fname)
-{
-	STRUCT_STAT st;
-	if (do_stat(fname, &st) != 0)
-		return;
-	filesystem_dev = st.st_dev;
-}
-
 
 static int to_wire_mode(mode_t mode)
 {
@@ -1064,12 +1054,11 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 
 /* This function is normally called by the sender, but the receiving side
  * also uses it to construct one or more file lists if one of the --delete
- * options have been specified.  The delete_in_dir() function sets f to -1
+ * options have been specified.  The delete_files() function sets f to -1
  * so that we just construct the file list in memory without sending it
  * over the wire.  It also has the side-effect of ignoring user-excludes if
  * delete_excluded is set (so that the delete list includes user-excluded
- * files) and it avoids some per-arg init code for limited recursion (since
- * delete_in_dir() sets recurse before calling this function). */
+ * files). */
 struct file_list *send_file_list(int f, int argc, char *argv[])
 {
 	int l;
@@ -1134,9 +1123,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				fname[l] = '\0';
 			}
 		}
-		if (f == -1)
-			; /* recurse is pre-set */
-		else if (fname[l-1] == '.' && (l == 1 || fname[l-2] == '/')) {
+		if (fname[l-1] == '.' && (l == 1 || fname[l-2] == '/')) {
 			if (!recurse && xfer_dirs)
 				recurse = 1; /* allow one level */
 		} else if (recurse > 0)
@@ -1235,7 +1222,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		}
 
 		if (one_file_system)
-			set_filesystem(fname);
+			filesystem_dev = st.st_dev;
 
 		do_subdirs = recurse >= 1 ? recurse-- : recurse;
 		send_file_name(f, flist, fname, do_subdirs, XMIT_DEL_START);
@@ -1662,8 +1649,7 @@ char *f_name_to(struct file_struct *f, char *fbuf)
 }
 
 
-/* Like f_name_to(), but we rotate through 5 static buffers of our own.
- */
+/* Like f_name_to(), but we rotate through 5 static buffers of our own. */
 char *f_name(struct file_struct *f)
 {
 	static char names[5][MAXPATHLEN];
@@ -1674,22 +1660,20 @@ char *f_name(struct file_struct *f)
 	return f_name_to(f, names[n]);
 }
 
+
 static int is_backup_file(char *fn)
 {
 	int k = strlen(fn) - backup_suffix_len;
 	return k > 0 && strcmp(fn+k, backup_suffix) == 0;
 }
 
+
+/* This function is used to implement --delete-during. */
 void delete_in_dir(struct file_list *flist, char *fname)
 {
-	static int deletion_count = 0;
-	struct file_list *del_flist;
+	struct file_list *dir_list;
+	STRUCT_STAT st;
 	int save_recurse = recurse;
-	int save_xfer_dirs = xfer_dirs;
-	int save_implied_dirs = implied_dirs;
-	int save_relative_paths = relative_paths;
-	char *argv[1];
-	int i, j, mode;
 
 	if (max_delete && deletion_count >= max_delete)
 		return;
@@ -1700,37 +1684,48 @@ void delete_in_dir(struct file_list *flist, char *fname)
 		return;
 	}
 
-	if (delete_during) {
-		recurse = 1; /* allow one level only */
-		xfer_dirs = 1;
-		implied_dirs = 0;
-		relative_paths = 1;
-	}
+	if (link_stat(fname, &st, keep_dirlinks) < 0)
+		return;
 
-	argv[0] = fname;
-	del_flist = send_file_list(-1, 1, argv);
+	if (one_file_system)
+		filesystem_dev = st.st_dev;
 
-	relative_paths = save_relative_paths;
-	implied_dirs = save_implied_dirs;
-	xfer_dirs = save_xfer_dirs;
+	dir_list = flist_new(WITHOUT_HLINK, "delete_in_dir");
+	recurse = 1; /* allow only one level */
+	send_file_name(-1, dir_list, fname, 1, XMIT_DEL_START);
 	recurse = save_recurse;
+	clean_flist(dir_list, 0, 0);
 
-	if (!del_flist)
+	if (verbose > 3)
+		output_flist(dir_list, "delete");
+
+	delete_missing(flist, dir_list, fname);
+
+	flist_free(dir_list);
+}
+
+
+/* If an item in dir_list is not found in full_list, delete it from the
+ * filesystem. */
+void delete_missing(struct file_list *full_list, struct file_list *dir_list,
+		    const char *dirname)
+{
+	int i, j, mode;
+
+	if (max_delete && deletion_count >= max_delete)
 		return;
 
 	if (verbose > 1)
-		rprintf(FINFO, "deleting in %s\n", safe_fname(fname));
+		rprintf(FINFO, "deleting in %s\n", safe_fname(dirname));
 
-	for (i = del_flist->count-1; i >= 0; i--) {
-		if (max_delete && deletion_count >= max_delete)
-			break;
-		if (!del_flist->files[i]->basename)
+	for (i = dir_list->count-1; i >= 0; i--) {
+		if (!dir_list->files[i]->basename)
 			continue;
-		mode = del_flist->files[i]->mode;
-		if ((j = flist_find(flist, del_flist->files[i])) < 0
+		mode = dir_list->files[i]->mode;
+		if ((j = flist_find(full_list, dir_list->files[i])) < 0
 		    || (delete_during && S_ISDIR(mode)
-		     && !S_ISDIR(flist->files[j]->mode))) {
-			char *f = f_name(del_flist->files[i]);
+		     && !S_ISDIR(full_list->files[j]->mode))) {
+			char *f = f_name(dir_list->files[i]);
 			if (make_backups && (backup_dir || !is_backup_file(f))
 			  && !S_ISDIR(mode)) {
 				make_backup(f);
@@ -1745,7 +1740,8 @@ void delete_in_dir(struct file_list *flist, char *fname)
 				delete_file(f, S_ISDIR(mode) ? dflags : 0);
 			}
 			deletion_count++;
+			if (max_delete && deletion_count >= max_delete)
+				break;
 		}
 	}
-	flist_free(del_flist);
 }
