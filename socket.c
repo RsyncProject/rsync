@@ -687,7 +687,7 @@ static int socketpair_tcp(int fd[2])
 	struct sockaddr_in sock;
 	struct sockaddr_in sock2;
 	socklen_t socklen = sizeof sock;
-	int connect_done = 0;
+	int errno_save, connect_done = 0;
 
 	fd[0] = fd[1] = listener = -1;
 
@@ -727,24 +727,28 @@ static int socketpair_tcp(int fd[2])
 		goto failed;
 
 	close(listener);
+	listener = -1;
+
+	set_blocking(fd[1]);
+
 	if (connect_done == 0) {
 		if (connect(fd[1], (struct sockaddr *)&sock, sizeof sock) != 0
 		    && errno != EISCONN)
 			goto failed;
 	}
 
-	set_blocking(fd[1]);
-
 	/* all OK! */
 	return 0;
 
  failed:
+	errno_save = errno;
 	if (fd[0] != -1)
 		close(fd[0]);
 	if (fd[1] != -1)
 		close(fd[1]);
 	if (listener != -1)
 		close(listener);
+	errno = errno_save;
 	return -1;
 }
 
