@@ -5,10 +5,11 @@ Changes since 2.6.2:
   SECURITY FIXES:
 
     - A bug in the sanitize_path routine (which affects a non-chrooted
-      rsync daemon) could allow a user to specify an absolute path for
-      certain options (but not for file-transfer names).  If you're running
-      a rsync daemon with chroot disabled, *please upgrade*, ESPECIALLY if
-      the user privs you run rsync under is anything above "nobody".
+      rsync daemon) could allow a user to craft a pathname that would get
+      transformed into an absolute path for certain options (but not for
+      file-transfer names).  If you're running a rsync daemon with chroot
+      disabled, *please upgrade*, ESPECIALLY if the user privs you run
+      rsync under is anything above "nobody".
 
   OUTPUT CHANGES (ATTN: those using a script to parse the verbose output):
 
