@@ -393,12 +393,11 @@ void add_include_line(char *p)
 
 
 static char *cvs_ignore_list[] = {
-  "RCS","SCCS","CVS","CVS.adm","RCSLOG","cvslog.*",
-  "tags","TAGS",".make.state",".nse_depinfo",
-  "*~", "#*", ".#*", ",*", "*.old", "*.bak", "*.BAK", "*.orig",
+  "RCS/", "SCCS/", "CVS/", ".svn/", "CVS.adm", "RCSLOG", "cvslog.*",
+  "tags", "TAGS", ".make.state", ".nse_depinfo",
+  "*~", "#*", ".#*", ", *", "*.old", "*.bak", "*.BAK", "*.orig",
   "*.rej", ".del-*", "*.a", "*.o", "*.obj", "*.so", "*.Z", "*.elc", "*.ln",
-  "core",NULL};
-
+  "core", NULL};
 
 
 void add_cvs_excludes(void)
