@@ -106,6 +106,40 @@ static uid_t match_uid(uid_t uid)
 	return last_out;
 }
 
+static int is_in_group(gid_t gid)
+{
+#ifdef GETGROUPS_T
+	static gid_t last_in = (gid_t) -2, last_out;
+	static int ngroups = -2;
+	static GETGROUPS_T *gidset;
+	int n;
+
+	if (gid == last_in)
+		return last_out;
+	if (ngroups < -1) {
+		/* treat failure (-1) as if not member of any group */
+		ngroups = getgroups(0, 0);
+		if (ngroups > 0) {
+			gidset = new_array(GETGROUPS_T, ngroups);
+			ngroups = getgroups(ngroups, gidset);
+		}
+	}
+
+	last_in = gid;
+	last_out = 0;
+	for (n = 0; n < ngroups; n++) {
+		if (gidset[n] == gid) {
+			last_out = 1;
+			break;
+		}
+	}
+	return last_out;
+
+#else
+	return 0;
+#endif
+}
+
 static gid_t match_gid(gid_t gid)
 {
 	static gid_t last_in, last_out;
@@ -126,7 +160,7 @@ static gid_t match_gid(gid_t gid)
 	if (am_root)
 		last_out = gid;
 	else
-		last_out = (gid_t) -1;
+		last_out = (gid_t)-1;
 	return last_out;
 }
 
@@ -238,8 +272,7 @@ void recv_uid_list(int f, struct file_list *flist)
 	if (preserve_uid) {
 		/* read the uid list */
 		list = uidlist;
-		id = read_int(f);
-		while (id != 0) {
+		while ((id = read_int(f)) != 0) {
 			int len = read_byte(f);
 			name = new_array(char, len+1);
 			if (!name) out_of_memory("recv_uid_list");
@@ -253,7 +286,6 @@ void recv_uid_list(int f, struct file_list *flist)
 			}
 			list->id2 = map_uid(id, name);
 			free(name);
-			id = read_int(f);
 		}
 	}
 
@@ -261,8 +293,7 @@ void recv_uid_list(int f, struct file_list *flist)
 	if (preserve_gid) {
 		/* and the gid list */
 		list = gidlist;
-		id = read_int(f);
-		while (id != 0) {
+		while ((id = read_int(f)) != 0) {
 			int len = read_byte(f);
 			name = new_array(char, len+1);
 			if (!name) out_of_memory("recv_uid_list");
@@ -275,8 +306,9 @@ void recv_uid_list(int f, struct file_list *flist)
 				list = list->next;
 			}
 			list->id2 = map_gid(id, name);
+			if (!am_root && !is_in_group(list->id2))
+				list->id2 = (gid_t)-1;
 			free(name);
-			id = read_int(f);
 		}
 	}
 
