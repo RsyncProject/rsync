@@ -82,19 +82,18 @@ static int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
 
 
 #define SC_CHECKSUM_CHANGED (1<<0)
-#define SC_SYMLINK_CHANGED (1<<1)
-#define SC_SENDING_FILE (1<<2)
-#define SC_NO_BASIS (1<<3)
-#define SC_NO_NL (1<<4)
+#define SC_UPDATING (1<<1)
+#define SC_NO_DEST_AND_NO_UPDATE (1<<2)
+#define SC_SKIP_NL (1<<3)
 
 static void showchg(const char *fname, struct file_struct *file, int statret,
 		    STRUCT_STAT *st, int flags)
 {
-	static char ch[] = "*XcstpogDL";
+	static char ch[] = "*Xcstpog";
 	int keep_time;
 	char *s;
 
-	ch[0] = flags & SC_SENDING_FILE ? '*' : ' ';
+	ch[0] = flags & SC_UPDATING ? '*' : ' ';
 	ch[1] = S_ISDIR(file->mode) ? 'd' : IS_DEVICE(file->mode) ? 'D'
 	      : S_ISLNK(file->mode) ? 'L' : 'f';
 
@@ -108,26 +107,25 @@ static void showchg(const char *fname, struct file_struct *file, int statret,
 
 	ch[2] = !(flags & SC_CHECKSUM_CHANGED) ? '-' : 'c';
 	ch[3] = !S_ISREG(file->mode) || file->length == st->st_size ? '-' : 's';
-	ch[4] = flags & SC_SENDING_FILE && !keep_time ? 'T'
+	ch[4] = flags & SC_UPDATING && !keep_time ? 'T'
 	    : !keep_time || file->modtime == st->st_mtime ? '-' : 't';
 	ch[5] = !preserve_perms || file->mode == st->st_mode ? '-' : 'p';
 	ch[6] = !am_root || !preserve_uid || file->uid == st->st_uid ? '-' : 'o';
 	ch[7] = preserve_gid && file->gid != GID_NONE && st->st_gid != file->gid  ? 'g' : '-';
-	ch[8] = IS_DEVICE(file->mode) && file->u.rdev != st->st_rdev ? 'D' : '-';
-	ch[9] = flags & SC_SYMLINK_CHANGED ? 'L' : '-';
 
-	if (flags & SC_NO_BASIS)
+	if (flags & SC_NO_DEST_AND_NO_UPDATE)
 	    ch[4] = ch[5] = ch[6] = ch[7] = '-';
 
-	s = ch + 2;
-	if (!(flags & SC_SENDING_FILE))
-		while (*s == '-') s++;
-	if (*s) {
-	    print_it:
-		rprintf(FINFO, "%s %s%s%s", ch, safe_fname(fname),
-			ch[1] == 'd' ? "/" : "",
-			flags & SC_NO_NL ? "" : "\n");
+	if (!(flags & SC_UPDATING)) {
+		for (s = ch + 2; *s == '-'; s++) {}
+		if (!*s)
+			return;
 	}
+
+    print_it:
+	rprintf(FINFO, "%s %s%s%s", ch, safe_fname(fname),
+		ch[1] == 'd' ? "/" : "",
+		flags & SC_SKIP_NL ? "" : "\n");
 }
 
 
@@ -516,8 +514,8 @@ static void recv_generator(char *fname, struct file_list *flist,
 			set_perms(fname,file,NULL,0);
 			if (itemize_changes) {
 				showchg(fname, file, statret, &st,
-					SC_SYMLINK_CHANGED
-					| (verbose ? SC_NO_NL : 0));
+					SC_UPDATING
+					| (verbose ? SC_SKIP_NL : 0));
 			}
 			if (verbose) {
 				rprintf(FINFO, "%s -> %s\n",
@@ -530,12 +528,12 @@ static void recv_generator(char *fname, struct file_list *flist,
 	}
 
 	if (am_root && preserve_devices && IS_DEVICE(file->mode)) {
-		if (itemize_changes)
-			showchg(fname, file, statret, &st, 0);
 		if (statret != 0 ||
 		    st.st_mode != file->mode ||
 		    st.st_rdev != file->u.rdev) {
 			int dflag = S_ISDIR(st.st_mode) ? DEL_DIR : 0;
+			if (itemize_changes)
+				showchg(fname, file, statret, &st, SC_UPDATING);
 			delete_file(fname, dflag | DEL_TERSE);
 			if (verbose > 2) {
 				rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",
@@ -553,6 +551,8 @@ static void recv_generator(char *fname, struct file_list *flist,
 				}
 			}
 		} else {
+			if (itemize_changes)
+				showchg(fname, file, statret, &st, 0);
 			set_perms(fname, file, &st, PERMS_REPORT);
 		}
 		return;
@@ -693,7 +693,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 		if (itemize_changes) {
 			showchg(fname, file, statret, &st,
 				fnamecmp_type == FNAMECMP_FNAME ? 0
-				: SC_NO_BASIS);
+				: SC_NO_DEST_AND_NO_UPDATE);
 		}
 		if (fnamecmp_type == FNAMECMP_FNAME)
 			set_perms(fname, file, &st, PERMS_REPORT);
@@ -796,7 +796,7 @@ notify_others:
 	if (itemize_changes) {
 		showchg(fname, file, statret, &st,
 			(always_checksum ? SC_CHECKSUM_CHANGED : 0)
-			| SC_SENDING_FILE);
+			| SC_UPDATING);
 	}
 
 	if (dry_run || read_batch)
