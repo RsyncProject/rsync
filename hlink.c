@@ -38,8 +38,8 @@ static int hlink_compare(struct file_struct **file1, struct file_struct **file2)
 	return file_compare(file1, file2);
 }
 
-static struct file_struct **hlink_list;
-static int hlink_count;
+struct file_struct **hlink_list;
+int hlink_count;
 
 #define LINKED(p1,p2) ((p1)->F_DEV == (p2)->F_DEV \
 		    && (p1)->F_INODE == (p2)->F_INODE)
@@ -56,13 +56,14 @@ static void link_idev_data(void)
 		head = hlink_list[start];
 		while (from < hlink_count-1
 		    && LINKED(hlink_list[from], hlink_list[from+1])) {
-			hlink_list[from]->F_HEAD = head;
+			hlink_list[from]->F_HLINDEX = to;
 			hlink_list[from]->F_NEXT = hlink_list[from+1];
 			from++;
 		}
 		if (from > start) {
-			hlink_list[from]->F_HEAD = head;
-			hlink_list[from]->F_NEXT = NULL;
+			hlink_list[from]->F_HLINDEX = to;
+			hlink_list[from]->F_NEXT = head;
+			hlink_list[from]->flags |= FLAG_HLINK_EOL;
 			hlink_list[to++] = head;
 		} else {
 			free((char*)head->link_u.idev);
@@ -113,6 +114,22 @@ void init_hard_links(struct file_list *flist)
 #endif
 }
 
+int hard_link_check(struct file_struct *file, int skip)
+{
+	if (!file->link_u.links)
+		return 0;
+	if (skip && !(file->flags & FLAG_HLINK_EOL))
+		hlink_list[file->F_HLINDEX] = file->F_NEXT;
+	if (hlink_list[file->F_HLINDEX] != file) {
+		if (verbose > 1) {
+			rprintf(FINFO, "\"%s\" is a hard link\n",
+				f_name(file));
+		}
+		return 1;
+	}
+	return 0;
+}
+
 #if SUPPORT_HARD_LINKS
 static void hard_link_one(char *hlink1, char *hlink2)
 {
@@ -136,7 +153,7 @@ static void hard_link_one(char *hlink1, char *hlink2)
 void do_hard_links(void)
 {
 #if SUPPORT_HARD_LINKS
-	struct file_struct *file;
+	struct file_struct *file, *first;
 	char hlink1[MAXPATHLEN];
 	char *hlink2;
 	STRUCT_STAT st1, st2;
@@ -146,10 +163,10 @@ void do_hard_links(void)
 		return;
 
 	for (i = 0; i < hlink_count; i++) {
-		file = hlink_list[i];
-		if (link_stat(f_name_to(file, hlink1), &st1) != 0)
+		first = file = hlink_list[i];
+		if (link_stat(f_name_to(first, hlink1), &st1) != 0)
 			continue;
-		while ((file = file->F_NEXT) != NULL) {
+		while ((file = file->F_NEXT) != first) {
 			hlink2 = f_name(file);
 			if (link_stat(hlink2, &st2) == 0) {
 				if (st2.st_dev == st1.st_dev
