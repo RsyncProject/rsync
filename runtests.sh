@@ -110,13 +110,13 @@ echo "$0 running in `pwd`"
 echo "    rsync_bin=$rsync_bin"
 echo "    srcdir=$srcdir"
 
-if ! test -f $rsync_bin
+if test ! -f $rsync_bin
 then
     echo "rsync_bin $rsync_bin is not a file" >&2
     exit 2
 fi
 
-if ! test -d $srcdir
+if test ! -d $srcdir
 then
     echo "srcdir $srcdir is not a directory" >&2
     exit 2
