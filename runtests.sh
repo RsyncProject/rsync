@@ -220,6 +220,11 @@ do
 	echo "----- $testbase log follows"
 	cat "$scratchdir/test.log"
 	echo "----- $testbase log ends"
+	if [ -f "$scratchdir/rsyncd.log" ]; then
+	    echo "----- $testbase rsyncd.log follows"
+	    cat "$scratchdir/rsyncd.log"
+	    echo "----- $testbase rsyncd.log ends"
+	fi
     fi
 
     case $result in
