@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsync)(1)(10 Feb 1999)()()
+manpage(rsync)(1)(15 Feb 1999)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
@@ -277,6 +277,8 @@ manpageoptions()
 rsync uses the GNU long options package. Many of the command line
 options have two variants, one short and one long.  These are shown
 below, separated by commas. Some options only have a long variant.
+The '=' for options that take a parameter is optional; whitespace
+can be used instead.
 
 startdit()
 dit(bf(-h, --help)) Print a short help page describing the options
@@ -335,7 +337,7 @@ dit(bf(-b, --backup)) With this option preexisting destination files are
 renamed with a ~ extension as each file is transferred.  You can
 control the backup suffix using the --suffix option.
 
-dit(bf(--suffix SUFFIX)) This option allows you to override the default
+dit(bf(--suffix=SUFFIX)) This option allows you to override the default
 backup suffix used with the -b option. The default is a ~.
 
 dit(bf(-u, --update)) This forces rsync to skip any files for which the
@@ -445,10 +447,10 @@ the recursive deletion will be done.
 
 Use this option with caution!
 
-dit(bf(-B , --block_size BLOCKSIZE)) This controls the block size used in
+dit(bf(-B , --block_size=BLOCKSIZE)) This controls the block size used in
 the rsync algorithm. See the technical report for details.
 
-dit(bf(-e, --rsh COMMAND)) This option allows you to choose an alternative
+dit(bf(-e, --rsh=COMMAND)) This option allows you to choose an alternative
 remote shell program to use for communication between the local and
 remote copies of rsync. By default, rsync will use rsh, but you may
 like to instead use ssh because of its high security.
@@ -456,10 +458,10 @@ like to instead use ssh because of its high security.
 You can also choose the remote shell program using the RSYNC_RSH
 environment variable.
 
-dit(bf(--rsync-path PATH)) Use this to specify the path to the copy of
+dit(bf(--rsync-path=PATH)) Use this to specify the path to the copy of
 rsync on the remote machine. Useful when it's not in your path.
 
-dit(bf(--exclude pattern)) This option allows you to selectively exclude
+dit(bf(--exclude=PATTERN)) This option allows you to selectively exclude
 certain files from the list of files to be transferred. This is most
 useful in combination with a recursive transfer.
 
@@ -469,19 +471,19 @@ to build up the list of files to exclude.
 See the section on exclude patterns for information on the syntax of 
 this option.
 
-dit(bf(--exclude-from FILE)) This option is similar to the --exclude
+dit(bf(--exclude-from=FILE)) This option is similar to the --exclude
 option, but instead it adds all filenames listed in the file FILE to
 the exclude list.  Blank lines in FILE and lines starting with ';' or '#'
 are ignored.
 
-dit(bf(--include pattern)) This option tells rsync to not exclude the
+dit(bf(--include=PATTERN)) This option tells rsync to not exclude the
 specified pattern of filenames. This is useful as it allows you to
 build up quite complex exclude/include rules.
 
 See the section of exclude patterns for information on the syntax of 
 this option.
 
-dit(bf(--include-from FILE)) This specifies a list of include patterns
+dit(bf(--include-from=FILE)) This specifies a list of include patterns
 from a file.
 
 dit(bf(-C, --cvs-exclude)) This is a useful shorthand for excluding a
@@ -501,7 +503,7 @@ files listed in the CVSIGNORE environment variable (space delimited).
 Finally in each directory any files listed in the .cvsignore file in
 that directory are added to the list.
 
-dit(bf(--csum-length LENGTH)) By default the primary checksum used in
+dit(bf(--csum-length=LENGTH)) By default the primary checksum used in
 rsync is a very strong 16 byte MD4 checksum. In most cases you will
 find that a truncated version of this checksum is quite efficient, and
 this will decrease the size of the checksum data sent over the link,
@@ -520,12 +522,12 @@ checksum length by default, using a 16 byte file checksum to determine
 if a 2nd pass is required with a longer block checksum. Only use this
 option if you have read the source code and know what you are doing.
 
-dit(bf(-T, --temp-dir DIR)) This option instructs rsync to use DIR as a
+dit(bf(-T, --temp-dir=DIR)) This option instructs rsync to use DIR as a
 scratch directory when creating temporary copies of the files
 transferred on the receiving side.  The default behavior is to create
 the temporary files in the receiving directory.
 
-dit(bf(--compare-dest DIR)) This option instructs rsync to use DIR as an
+dit(bf(--compare-dest=DIR)) This option instructs rsync to use DIR as an
 additional directory to compare destination files against when doing
 transfers.  This is useful for doing transfers to a new destination while
 leaving existing files intact, and then doing a flash-cutover when all
@@ -572,11 +574,11 @@ config file (/etc/rsyncd.conf) on each connect made by a client and
 respond to requests accordingly. See the rsyncd.conf(5) man page for more
 details. 
 
-dit(bf(--config FILE)) This specifies an alternate config file than
+dit(bf(--config=FILE)) This specifies an alternate config file than
 the default /etc/rsyncd.conf. This is only relevant when --daemon is
 specified. 
 
-dit(bf(--port PORT)) This specifies an alternate TCP port number to use
+dit(bf(--port=PORT)) This specifies an alternate TCP port number to use
 rather than the default port 873.
 
 dit(bf(--log-format=FORMAT)) This allows you to specify exactly what the
