@@ -60,6 +60,7 @@ static void report(int f)
 	if (do_stats) {
 		/* These come out from every process */
 		show_malloc_stats();
+		show_flist_stats();
 	}
 
 	if (am_daemon) {

@@ -95,6 +95,12 @@ static void finish_build_progress(const struct file_list *flist)
 }
 
 
+void show_flist_stats(void)
+{
+	/* Nothing yet */
+}
+
+
 static struct string_area *string_area_new(int size)
 {
 	struct string_area *a;
