@@ -169,7 +169,7 @@
 #include "lib/fnmatch.h"
 #endif
 
-#ifdef HAVE_GLOB
+#ifdef HAVE_GLOB_H
 #include <glob.h>
 #endif
 

@@ -427,7 +427,7 @@ int lock_range(int fd, int offset, int len)
 
 static void glob_expand_one(char *s, char **argv, int *argc, int maxargs)
 {
-#ifndef HAVE_GLOB
+#if !(defined(HAVE_GLOB) && defined(HAVE_GLOB_H))
 	if (!*s) s = ".";
 	argv[*argc] = strdup(s);
 	(*argc)++;
