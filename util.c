@@ -524,7 +524,7 @@ static void glob_expand_one(char *s, char ***argv_ptr, int *argc_ptr,
 		s = ".";
 
 	if (sanitize_paths)
-		s = sanitize_path(NULL, s, NULL);
+		s = sanitize_path(NULL, s, "", 0);
 	else
 		s = strdup(s);
 
@@ -650,6 +650,24 @@ size_t stringjoin(char *dest, size_t destsize, ...)
 	return ret;
 }
 
+int count_dir_elements(const char *p)
+{
+	int cnt = 0, new_component = 1;
+	while (*p) {
+		if (*p++ == '/')
+			new_component = 1;
+		else if (new_component) {
+			new_component = 0;
+			cnt++;
+		}
+	}
+	return cnt;
+}
+
+/* Turns multiple adjacent slashes into a single slash, gets rid of "./"
+ * elements, collapses ".." elements except for those at the start of
+ * the string. If the resulting path would be empty, change it into a
+ * ".". */
 unsigned int clean_fname(char *name)
 {
 	char *limit = name - 1, *t = name, *f = name;
@@ -706,37 +724,32 @@ unsigned int clean_fname(char *name)
  * "/" (either removing it or expanding it) and any leading or embedded
  * ".." components that attempt to escape past the module's top dir.
  *
- * If dest is NULL, a buffer is allocated to hold the result.  If dest is
- * the same buffer as p (the path) OR if reldir is NULL, a leading slash
- * is dropped instead of being expanded to be the module's top dir.
+ * If dest is NULL, a buffer is allocated to hold the result.  It is legal
+ * to call with the dest and the path (p) pointing to the same buffer, but
+ * rootdir will be ignored to avoid expansion of the string.
  *
- * If reldir is non-NULL (and non-empty), it is a sanitized directory that
- * the path will be relative to, so allow as many '..'s at the beginning of
- * the path as there are components in reldir.  This is used for symbolic
- * link targets.  If reldir is non-null and the path began with "/", to be
- * completely like a chroot we should add in depth levels of ".." at the
- * beginning of the path, but that would blow the assumption that the path
- * doesn't grow and it is not likely to end up being a valid symlink
- * anyway, so just do the normal removal of the leading "/" instead.
+ * The rootdir string contains a value to use in place of a leading slash.
+ * Specify NULL to get the default of lp_path(module_id).
  *
- * While we're at it, remove double slashes and "." components like
- * clean_fname() does, but DON'T remove a trailing slash because that is
- * sometimes significant on command line arguments.
+ * If depth is > 0, it is a count of how many '..'s to allow at the start
+ * of the path.
  *
- * If the resulting path would be empty, change it into ".".
+ * We call clean_fname() to clean up the path, but we preserve a trailing
+ * slash because that is sometimes significant on command-line arguments.
  */
-char *sanitize_path(char *dest, const char *p, const char *reldir)
+char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
 {
 	char *start, *sanp;
-	int depth = 0;
 	int allowdotdot = 0;
 	int rlen = 0;
 
 	if (dest != p) {
 		int plen = strlen(p);
-		if (*p == '/' && reldir) {
-			rlen = strlen(lp_path(module_id));
-			reldir = NULL;
+		if (*p == '/') {
+			if (!rootdir)
+				rootdir = lp_path(module_id);
+			rlen = strlen(rootdir);
+			depth = 0;
 			p++;
 		}
 		if (dest) {
@@ -745,21 +758,9 @@ char *sanitize_path(char *dest, const char *p, const char *reldir)
 		} else if (!(dest = new_array(char, rlen + plen + 1)))
 			out_of_memory("sanitize_path");
 		if (rlen) {
-			memcpy(dest, lp_path(module_id), rlen);
+			memcpy(dest, rootdir, rlen);
 			if (rlen > 1)
 				dest[rlen++] = '/';
-		}
-	}
-
-	if (reldir) {
-		int new_component = 1;
-		while (*reldir) {
-			if (*reldir++ == '/')
-				new_component = 1;
-			else if (new_component) {
-				new_component = 0;
-				depth++;
-			}
 		}
 	}
 
@@ -790,8 +791,7 @@ char *sanitize_path(char *dest, const char *p, const char *reldir)
 				allowdotdot = 1;
 			} else {
 				p += 2;
-				if (*p == '/')
-					p++;
+				while (*p == '/') p++;
 				if (sanp != start) {
 					/* back up sanp one level */
 					--sanp; /* now pointing at slash */
