@@ -7,6 +7,11 @@
 . $srcdir/testsuite/rsync.fns
 
 test_unsafe() {
+    # $1 is the target of a symlink
+    # $2 is the directory we're copying
+    # $3 is the expected outcome: "safe" if the link lies within $2,
+    # or "unsafe" otherwise
+
     result=`"$TOOLDIR/t_unsafe" "$1" "$2"` || test_fail "Failed to check $1 $2"
     if [ "$result" != "$3" ]
     then
@@ -24,9 +29,11 @@ test_unsafe /etc/passwd		from unsafe
 test_unsafe //../etc/passwd	from unsafe
 test_unsafe //./etc/passwd	from unsafe
 
-test_unsafe ./foo		from safe
-test_unsafe ../foo		from unsafe
-test_unsafe ../dest		from/dir safe
+test_unsafe ./foo		from			safe
+test_unsafe ../foo		from			unsafe
+test_unsafe ../dest		from/dir		safe
+
+test_unsafe ''                  from			unsafe
 
 # Based on tests from unsafe-links by Vladimír Michl
 test_unsafe ../../unsafe/unsafefile    from/safe	unsafe
