@@ -3,7 +3,7 @@ WHAT IS RSYNC?
 
 rsync is a replacement for rcp that has many more features.
 
-rsyns uses the "rsync algorithm" which provides a very fast method for
+rsync uses the "rsync algorithm" which provides a very fast method for
 bringing remote files into sync. It does this by sending just the
 differences in the files across the link, without requiring that both
 sets of files are present at one of the ends of the link beforehand.
