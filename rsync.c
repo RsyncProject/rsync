@@ -88,10 +88,10 @@ int delete_file(char *fname)
 		return -1;
 	}
 
-	for (di=readdir(d); di; di=readdir(d)) {
+	for (errno = 0, di = readdir(d); di; errno = 0, di = readdir(d)) {
 		char *dname = d_name(di);
-		if (strcmp(dname,".")==0 ||
-		    strcmp(dname,"..")==0)
+		if (strcmp(dname,".") == 0
+		    || strcmp(dname,"..") == 0)
 			continue;
 		snprintf(buf, sizeof(buf), "%s/%s", fname, dname);
 		if (verbose > 0)
@@ -101,6 +101,12 @@ int delete_file(char *fname)
 			return -1;
 		}
 	}	
+	if (errno) {
+		rprintf(FERROR, "delete_file: readdir(%s): (%d) %s\n",
+		    fname, errno, strerror(errno));
+		closedir(d);
+		return -1;
+	}
 
 	closedir(d);
 	
@@ -148,7 +154,7 @@ static int is_in_group(gid_t gid)
 }
 
 int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
-	      int report)
+		int report)
 {
 	int updated = 0;
 	STRUCT_STAT st2;
@@ -218,7 +224,7 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 		}
 	}
 #endif
-    
+
 	if (verbose > 1 && report) {
 		if (updated)
 			rprintf(FINFO,"%s\n",fname);
@@ -245,7 +251,7 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file)
 	/* move tmp file over real file */
 	if (robust_rename(fnametmp,fname) != 0) {
 		if (errno == EXDEV) {
-			/* rename failed on cross-filesystem link.  
+			/* rename failed on cross-filesystem link.
 			   Copy the file instead. */
 			if (copy_file(fnametmp,fname, file->mode & INITACCESSPERMS)) {
 				rprintf(FERROR, "copy %s -> \"%s\": %s\n",

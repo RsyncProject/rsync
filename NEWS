@@ -92,6 +92,10 @@ Changes since version 2.5.6:
       same path.  A directory still cannot be replaced by a
       regular file unless --delete specified.  (J.W. Schultz)
 
+    * Detect and report when open or opendir succeed but read and
+      readdir fail caused by network filesystems issues and truncated
+      files.  (David Norwood, Michael Brown, J.W. Schultz)
+
   INTERNAL:
 
     * Eliminated vestigial support for old versions that we stopped

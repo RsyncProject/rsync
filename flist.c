@@ -877,13 +877,18 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 		}
 	}
 
-	for (di = readdir(d); di; di = readdir(d)) {
+	for (errno = 0, di = readdir(d); di; errno = 0, di = readdir(d)) {
 		char *dname = d_name(di);
-		if (dname[0] == '.' && (dname[1] == '\0' ||
-		    (dname[1] == '.' && dname[2] == '\0')))
+		if (dname[0] == '.' && (dname[1] == '\0'
+		    || (dname[1] == '.' && dname[2] == '\0')))
 			continue;
 		strlcpy(p, dname, MAXPATHLEN - l);
 		send_file_name(f, flist, fname, recurse, 0);
+	}
+	if (errno) {
+		io_error = 1;
+		rprintf(FERROR, "readdir(%s): (%d) %s\n",
+		    dir, errno, strerror(errno));
 	}
 
 	if (local_exclude_list)

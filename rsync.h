@@ -416,9 +416,17 @@ struct sum_struct {
 };
 
 struct map_struct {
-	char *p;
-	int fd,p_size,p_len;
-	OFF_T file_size, p_offset, p_fd_offset;
+	char *p;		/* Window pointer			*/
+	int fd;			/* File Descriptor			*/
+	int p_size;		/* Window size at allocation		*/
+	int p_len;		/* Window size after fill		*/
+				/*    p_size and p_len could be
+				 *    consolodated by using a local
+				 *    variable in map_ptr()		*/
+	int status;		/* first errno from read errors		*/
+	OFF_T file_size;	/* File size (from stat)		*/
+	OFF_T p_offset;		/* Window start				*/
+	OFF_T p_fd_offset;	/* offset of cursor in fd ala lseek	*/
 };
 
 #define MATCHFLG_WILD		0x0001 /* pattern has '*', '[', and/or '?' */

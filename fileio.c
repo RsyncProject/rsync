@@ -115,6 +115,7 @@ struct map_struct *map_file(int fd,OFF_T len)
 	map->p_offset = 0;
 	map->p_fd_offset = 0;
 	map->p_len = 0;
+	map->status = 0;
 
 	return map;
 }
@@ -191,7 +192,11 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 		}
 
 		if ((nread=read(map->fd,map->p + read_offset,read_size)) != read_size) {
-			if (nread < 0) nread = 0;
+			if (nread < 0) {
+				nread = 0;
+				if (!map->status)
+					map->status = errno;
+			}
 			/* the best we can do is zero the buffer - the file
 			   has changed mid transfer! */
 			memset(map->p+read_offset+nread, 0, read_size - nread);
@@ -206,13 +211,18 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 }
 
 
-void unmap_file(struct map_struct *map)
+int unmap_file(struct map_struct *map)
 {
+	int	ret;
+
 	if (map->p) {
 		free(map->p);
 		map->p = NULL;
 	}
+	ret = map->status;
 	memset(map, 0, sizeof(*map));
 	free(map);
+
+	return ret;
 }
 

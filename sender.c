@@ -277,7 +277,17 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		}
 
 		if (!read_batch) { /* dw */
-			if (buf) unmap_file(buf);
+			if (buf) {
+				j = unmap_file(buf);
+				if (j) {
+					io_error = 1;
+					rprintf(FERROR,
+					    "read errors mapping %s: (%d) %s\n",
+					    full_fname(fname),
+					    j,
+					    strerror(j));
+				}
+			}
 			close(fd);
 		}
 
