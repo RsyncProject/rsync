@@ -75,11 +75,30 @@ static int get_secret(int module, char *user, char *secret, int len)
 	int fd, found=0;
 	char line[MAXPATHLEN];
 	char *p, *pass=NULL;
+	STRUCT_STAT st;
+	int ok = 1;
+	extern int am_root;
 
 	if (!fname || !*fname) return 0;
 
 	fd = open(fname,O_RDONLY);
 	if (fd == -1) return 0;
+
+	if (do_stat(fname, &st) == -1) {
+		rprintf(FERROR,"stat(%s) : %s\n", fname, strerror(errno));
+		ok = 0;
+	} else if ((st.st_mode & 06) != 0) {
+		rprintf(FERROR,"secrets file must not be other-accessible\n");
+		ok = 0;
+	} else if (am_root && (st.st_uid != 0)) {
+		rprintf(FERROR,"secrets file must be owned by root when running as root\n");
+		ok = 0;
+	}
+	if (!ok) {
+		rprintf(FERROR,"continuing without secrets file\n");
+		close(fd);
+		return 0;
+	}
 
 	while (!found) {
 		int i = 0;
