@@ -90,7 +90,7 @@ static int establish_proxy_connection(int fd, char *host, int port,
 	if (*cp == '\r')
 		*cp = '\0';
 	if (strncmp(buffer, "HTTP/", 5) != 0) {
-		rprintf(FERROR, "bad response from proxy - %s\n",
+		rprintf(FERROR, "bad response from proxy -- %s\n",
 			buffer);
 		return -1;
 	}
@@ -98,7 +98,7 @@ static int establish_proxy_connection(int fd, char *host, int port,
 	while (*cp == ' ')
 		cp++;
 	if (*cp != '2') {
-		rprintf(FERROR, "bad response from proxy - %s\n",
+		rprintf(FERROR, "bad response from proxy -- %s\n",
 			buffer);
 		return -1;
 	}
@@ -616,7 +616,7 @@ void set_socket_options(int fd, char *options)
 
 		case OPT_ON:
 			if (got_value)
-				rprintf(FERROR,"syntax error - %s does not take a value\n",tok);
+				rprintf(FERROR,"syntax error -- %s does not take a value\n",tok);
 
 			{
 				int on = socket_options[i].value;

@@ -62,7 +62,7 @@ void delete_files(struct file_list *flist)
 
 	if (io_error && !(lp_ignore_errors(module_id) || ignore_errors)) {
 		rprintf(FINFO,
-			"IO error encountered - skipping file deletion\n");
+			"IO error encountered -- skipping file deletion\n");
 		return;
 	}
 

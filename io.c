@@ -149,7 +149,7 @@ static void check_timeout(void)
 
 	if (t - last_io >= io_timeout) {
 		if (!am_server && !am_daemon) {
-			rprintf(FERROR, "io timeout after %d seconds - exiting\n",
+			rprintf(FERROR, "io timeout after %d seconds -- exiting\n",
 				(int)(t-last_io));
 		}
 		exit_cleanup(RERR_TIMEOUT);

@@ -264,7 +264,7 @@ static int rsync_module(int f_in, int f_out, int i)
 		} else {
 			rprintf(FLOG, "max connections (%d) reached\n",
 				lp_max_connections(i));
-			io_printf(f_out, "@ERROR: max connections (%d) reached - try again later\n",
+			io_printf(f_out, "@ERROR: max connections (%d) reached -- try again later\n",
 				lp_max_connections(i));
 		}
 		return -1;

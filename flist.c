@@ -1690,7 +1690,7 @@ void delete_in_dir(struct file_list *flist, char *fname)
 
 	if (io_error && !(lp_ignore_errors(module_id) || ignore_errors)) {
 		rprintf(FINFO,
-			"IO error encountered - skipping file deletion\n");
+			"IO error encountered -- skipping file deletion\n");
 		max_delete = -1; /* avoid duplicating the above warning */
 		return;
 	}
