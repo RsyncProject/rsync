@@ -175,8 +175,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		initial_stats = stats;
 
-		s = receive_sums(f_in);
-		if (!s) {
+		if (!(s = receive_sums(f_in))) {
 			io_error |= IOERR_GENERAL;
 			rprintf(FERROR, "receive_sums failed\n");
 			return;
@@ -210,7 +209,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			return;
 		}
 
-		mbuf = st.st_size ? map_file(fd, st.st_size) : NULL;
+		mbuf = st.st_size ? map_file(fd, st.st_size, s->blength) : NULL;
 
 		if (verbose > 2) {
 			rprintf(FINFO, "send_files mapped %s of size %.0f\n",

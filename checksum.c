@@ -99,9 +99,10 @@ void file_checksum(char *fname,char *sum,OFF_T size)
 	memset(sum,0,MD4_SUM_LENGTH);
 	
 	fd = do_open(fname, O_RDONLY, 0);
-	if (fd == -1) return;
+	if (fd == -1)
+		return;
 	
-	buf = map_file(fd,size);
+	buf = map_file(fd, size, CSUM_CHUNK);
 	
 	mdfour_begin(&m);
 
