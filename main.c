@@ -33,7 +33,9 @@ extern int am_generator;
 extern int am_daemon;
 extern int blocking_io;
 extern int delete_before;
+extern int remove_sent_files;
 extern int daemon_over_rsh;
+extern int need_messages_from_generator;
 extern int do_stats;
 extern int log_got_error;
 extern int module_id;
@@ -441,6 +443,12 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 		exit_cleanup(RERR_SYNTAX);
 		return;
 	}
+	if (am_daemon && lp_read_only(module_id) && remove_sent_files) {
+		rprintf(FERROR,
+		    "ERROR: --remove-sent-files cannot be used with a read-only module\n");
+		exit_cleanup(RERR_SYNTAX);
+		return;
+	}
 
 	if (!relative_paths && !push_dir(dir)) {
 		rsyserr(FERROR, errno, "push_dir#3 %s failed",
@@ -672,6 +680,8 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 
 	if (am_sender) {
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
+		if (need_messages_from_generator)
+			io_start_multiplex_in();
 
 		recv_filter_list(f_in);
 		do_server_sender(f_in, f_out, argc, argv);
@@ -748,6 +758,9 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		io_flush(FULL_FLUSH);
 		exit_cleanup(status);
 	}
+
+	if (need_messages_from_generator && !read_batch)
+		io_start_multiplex_out();
 
 	if (argc == 0)
 		list_only |= 1;
