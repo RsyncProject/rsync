@@ -1042,7 +1042,6 @@ int msleep(int t)
 	struct timeval tval, t1, t2;
 
 	gettimeofday(&t1, NULL);
-	gettimeofday(&t2, NULL);
 
 	while (tdiff < t) {
 		tval.tv_sec = (t-tdiff)/1000;
