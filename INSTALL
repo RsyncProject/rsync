@@ -19,6 +19,11 @@ to pop up an xterm on DISPLAY=:0 if it crashes.  You might find this
 useful, but it should be turned off for production builds.
 
 
+RPM NOTES
+---------
+
+Under packaging you will find .spec files for several distributions.
+
 HP-UX NOTES
 -----------
 
