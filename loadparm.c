@@ -104,6 +104,7 @@ typedef struct
 	char *socket_options;
 	int syslog_facility;
 	int max_verbosity;
+	int rsync_port;
 } global;
 
 static global Globals;
@@ -271,6 +272,7 @@ static struct parm_struct parm_table[] =
   {"log file",         P_STRING,  P_GLOBAL, &Globals.log_file,      NULL,  0},
   {"pid file",         P_STRING,  P_GLOBAL, &Globals.pid_file,      NULL,  0},
   {"max verbosity",    P_INTEGER, P_GLOBAL, &Globals.max_verbosity, NULL,  0},
+  {"port",             P_INTEGER, P_GLOBAL, &Globals.rsync_port,    NULL,  0},
 
   {"timeout",          P_INTEGER, P_LOCAL,  &sDefault.timeout,     NULL,  0},
   {"max connections",  P_INTEGER, P_LOCAL,  &sDefault.max_connections,NULL, 0},
@@ -353,6 +355,7 @@ FN_GLOBAL_STRING(lp_pid_file, &Globals.pid_file)
 FN_GLOBAL_STRING(lp_socket_options, &Globals.socket_options)
 FN_GLOBAL_INTEGER(lp_syslog_facility, &Globals.syslog_facility)
 FN_GLOBAL_INTEGER(lp_max_verbosity, &Globals.max_verbosity)
+FN_GLOBAL_INTEGER(lp_rsync_port, &Globals.rsync_port)
 
 FN_LOCAL_STRING(lp_name, name)
 FN_LOCAL_STRING(lp_comment, comment)

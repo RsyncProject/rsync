@@ -129,7 +129,7 @@ char *password_file = NULL;
 char *rsync_path = RSYNC_PATH;
 char *backup_dir = NULL;
 char backup_dir_buf[MAXPATHLEN];
-int rsync_port = RSYNC_PORT;
+int rsync_port = 0;
 int copy_dest = 0;
 int link_dest = 0;
 

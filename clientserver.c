@@ -598,6 +598,9 @@ int daemon_main(void)
 	if (!lp_load(config_file, 1))
 		exit_cleanup(RERR_SYNTAX);
 
+	if (rsync_port == 0 && (rsync_port = lp_rsync_port()) == 0)
+		rsync_port = RSYNC_PORT;
+
 	log_init();
 
 	rprintf(FLOG, "rsyncd version %s starting, listening on port %d\n",
