@@ -302,6 +302,26 @@ TDB:
   structures.
 
 
+chmod:
+
+  On 12 Mar 2002, Dave Dykstra <dwd@bell-labs.com> wrote:
+  > If we would add an option to do that functionality, I would vote for one
+  > that was more general which could mask off any set of permission bits and
+  > possibly add any set of bits.  Perhaps a chmod-like syntax if it could be
+  > implemented simply.
+
+  I think that would be good too.  For example, people uploading files   
+  to a web server might like to say
+
+  rsync -avzP --chmod a+rX ./ sourcefrog.net:/home/www/sourcefrog/
+
+  Ideally the patch would implement as many of the gnu chmod semantics
+  as possible.  I think the mode parser should be a separate function
+  that passes back something like (mask,set) description to the rest of
+  the program.  For bonus points there would be a test case for the  
+  parser.
+
+
 PLATFORMS ------------------------------------------------------------
 
 Win32
