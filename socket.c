@@ -596,7 +596,10 @@ static int get_sockaddr_family(const struct sockaddr_storage *ss)
 
 
 /**
- * Return the DNS name of the client 
+ * Return the DNS name of the client.
+ *
+ * The name is statically cached so that repeated lookups are quick,
+ * so there is a limit of one lookup per customer.
  **/
 char *client_name(int fd)
 {
