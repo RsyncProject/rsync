@@ -32,6 +32,7 @@ extern int dry_run;
 extern int am_daemon;
 extern int am_server;
 extern int am_sender;
+extern int local_server;
 extern int quiet;
 extern int module_id;
 extern int msg_fd_out;
@@ -442,7 +443,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			n[0] = iflags & ITEM_LOCAL_CHANGE
 			      ? iflags & ITEM_XNAME_FOLLOWS ? 'h' : 'c'
 			     : !(iflags & ITEM_TRANSFER) ? '.'
-			     : *op == 's' ? '<' : '>';
+			     : !local_server && *op == 's' ? '<' : '>';
 			n[1] = S_ISDIR(file->mode) ? 'd'
 			     : IS_DEVICE(file->mode) ? 'D'
 			     : S_ISLNK(file->mode) ? 'L' : 'f';
