@@ -34,6 +34,8 @@ extern int preserve_hard_links;
 extern int preserve_perms;
 extern int preserve_uid;
 extern int preserve_gid;
+extern int preserve_times;
+extern int omit_dir_times;
 extern int delete_during;
 extern int update_only;
 extern int opt_ignore_existing;
@@ -610,6 +612,8 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	int i;
 	int phase = 0;
 	char fbuf[MAXPATHLEN];
+	int need_retouch_dir_times = preserve_times && !omit_dir_times;
+	int need_retouch_dir_perms = 0;
 
 	if (verbose > 2) {
 		rprintf(FINFO, "generator starting pid=%ld count=%d\n",
@@ -639,10 +643,9 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 		   them. This is then fixed after the files are transferred */
 		if (!am_root && S_ISDIR(file->mode) && !(file->mode & S_IWUSR)) {
 			copy = *file;
-			/* XXX: Could this be causing a problem on SCO?  Perhaps their
-			 * handling of permissions is strange? */
 			copy.mode |= S_IWUSR; /* user write */
 			file = &copy;
+			need_retouch_dir_perms = 1;
 		}
 
 		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
@@ -678,14 +681,19 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	if (preserve_hard_links)
 		do_hard_links();
 
-	/* now we need to fix any directory permissions that were
-	 * modified during the transfer */
-	for (i = 0; i < flist->count; i++) {
-		struct file_struct *file = flist->files[i];
-		if (!file->basename || !S_ISDIR(file->mode))
-			continue;
-		recv_generator(local_name ? local_name : f_name(file),
-			       flist, file, i, -1, -1);
+	if (need_retouch_dir_perms || need_retouch_dir_times) {
+		/* Now we need to fix any directory permissions that were
+		 * modified during the transfer and/or re-set any tweaked
+		 * modified-time values. */
+		for (i = 0; i < flist->count; i++) {
+			struct file_struct *file = flist->files[i];
+			if (!file->basename || !S_ISDIR(file->mode))
+				continue;
+			if (!need_retouch_dir_times && file->mode & S_IWUSR)
+				continue;
+			recv_generator(local_name ? local_name : f_name(file),
+				       flist, file, i, -1, -1);
+		}
 	}
 
 	if (verbose > 2)
