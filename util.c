@@ -130,14 +130,14 @@ void overflow(char *str)
 
 int set_modtime(char *fname, time_t modtime)
 {
-	if (dry_run)
-		return 0;
-
 	if (verbose > 2) {
 		rprintf(FINFO, "set modtime of %s to (%ld) %s",
 			fname, (long)modtime,
 			asctime(localtime(&modtime)));
 	}
+
+	if (dry_run)
+		return 0;
 
 	{
 #ifdef HAVE_UTIMBUF
