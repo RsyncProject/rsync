@@ -257,6 +257,7 @@ AC_CHECK_HEADERS(sys/filio.h string.h stdlib.h sys/socket.h sys/mode.h sys/un.h)
 AC_CHECK_HEADERS(glob.h alloca.h mcheck.h sys/sysctl.h arpa/inet.h arpa/nameser.h)
 AC_CHECK_HEADERS(netdb.h)
 AC_CHECK_HEADERS(malloc.h)
+AC_CHECK_HEADERS(float.h)
 
 AC_CHECK_SIZEOF(int)
 AC_CHECK_SIZEOF(long)
