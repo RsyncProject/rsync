@@ -1,3 +1,29 @@
+NEWS for rsync version 2.5.7
+Protocol: 26 (unchanged)
+Changes since version 2.5.6:
+
+  ENHANCEMENTS:
+
+    - Added --files-from, --no-relative, --no-implied-dirs, and --from0.
+      Note that --from0 affects the line-ending character for all the
+      --*-from options. (Wayne Davison)
+
+  BUG FIXES:
+
+    - Fixed a crash bug when interacting with older rsync versions and
+      multiple files of the same name are destined for the same dir.
+      (Wayne Davison)
+
+    - Keep tmp names from overflowing MAXPATH.
+
+  INTERNAL:
+
+    - Eliminated vestigial support for old versions that we stopped
+      supporting. (J.W. Schultz)
+
+    - Simplified some of the option-parsing code. (Wayne Davison)
+
+
 NEWS for rsync version 2.5.6, aka the dwd-between-jobs release
 Protocol: 26 (unchanged)
 Changes since version 2.5.5:
@@ -40,7 +66,7 @@ Changes since version 2.5.5:
       (Dave Dykstra)
 
   BUG FIXES:
-  
+
     * Fix "forward name lookup failed" errors on AIX 4.3.3.  (John
       L. Allen, Martin Pool)
 
@@ -76,7 +102,7 @@ Changes since version 2.5.5:
 
   INTERNAL:
 
-    * Many code cleanups and improved internal documentation.  (Martin 
+    * Many code cleanups and improved internal documentation.  (Martin
       Pool, Nelson Beebe)
 
     * Portability fixes. (Dave Dykstra and Wayne Davison)
