@@ -15,7 +15,8 @@ LONGDIR=${FROM}/This-is-a-directory-with-a-stupidly-long-name-created-in-an-atte
 
 # the parens around makepath shouldn't be necessary but appear to be
 #  needed on cygwin, presumably because makepath is a /bin/sh function
-(makepath ${LONGDIR}) || test_skipped "unable to create long directory"
+makepath $LONGDIR
+[ -d $LONGDIR ] || test_skipped "unable to create long directory"
 date > ${LONGDIR}/1
 ls -la / > ${LONGDIR}/2
 checkit "$RSYNC --delete -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}
