@@ -98,6 +98,7 @@ static char io_filesfrom_buf[2048];
 static char *io_filesfrom_bp;
 static char io_filesfrom_lastchar;
 static int io_filesfrom_buflen;
+static size_t contiguous_write_len = 0;
 
 static void read_loop(int fd, char *buf, size_t len);
 
@@ -223,7 +224,7 @@ static void read_msg_fd(void)
 	int tag, len;
 
 	/* Temporarily disable msg_fd_in.  This is needed to avoid looping back
-	 * to this routine from read_timeout() and writefd_unbuffered(). */
+	 * to this routine from writefd_unbuffered(). */
 	msg_fd_in = -1;
 
 	read_loop(fd, buf, 4);
@@ -419,11 +420,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 		FD_ZERO(&r_fds);
 		FD_ZERO(&w_fds);
 		FD_SET(fd, &r_fds);
-		if (msg_fd_in >= 0) {
-			FD_SET(msg_fd_in, &r_fds);
-			if (msg_fd_in > maxfd)
-				maxfd = msg_fd_in;
-		} else if (msg_list_head) {
+		if (msg_list_head) {
 			FD_SET(msg_fd_out, &w_fds);
 			if (msg_fd_out > maxfd)
 				maxfd = msg_fd_out;
@@ -460,9 +457,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 			continue;
 		}
 
-		if (msg_fd_in >= 0 && FD_ISSET(msg_fd_in, &r_fds))
-			read_msg_fd();
-		else if (msg_list_head && FD_ISSET(msg_fd_out, &w_fds))
+		if (msg_list_head && FD_ISSET(msg_fd_out, &w_fds))
 			msg_list_push(NORMAL_FLUSH);
 
 		if (io_filesfrom_f_out >= 0) {
@@ -845,7 +840,7 @@ void read_buf(int f,char *buf,size_t len)
 void read_sbuf(int f,char *buf,size_t len)
 {
 	readfd(f, buf, len);
-	buf[len] = 0;
+	buf[len] = '\0';
 }
 
 uchar read_byte(int f)
@@ -955,8 +950,8 @@ static void sleep_for_bwlimit(int bytes_written)
 
 
 /* Write len bytes to the file descriptor fd, looping as necessary to get
- * the job done and also (in the generator) reading any data on msg_fd_in
- * (to avoid deadlock).
+ * the job done and also (in certain circumstnces) reading any data on
+ * msg_fd_in to avoid deadlock.
  *
  * This function underlies the multiplexing system.  The body of the
  * application never calls this function directly. */
@@ -974,7 +969,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 		FD_SET(fd,&w_fds);
 		maxfd = fd;
 
-		if (msg_fd_in >= 0) {
+		if (msg_fd_in >= 0 && len-total >= contiguous_write_len) {
 			FD_ZERO(&r_fds);
 			FD_SET(msg_fd_in,&r_fds);
 			if (msg_fd_in > maxfd)
@@ -1068,6 +1063,13 @@ static void mplex_write(enum msgcode code, char *buf, size_t len)
 
 	SIVAL(buffer, 0, ((MPLEX_BASE + (int)code)<<24) + len);
 
+	/* When the generator reads messages from the msg_fd_in pipe, it can
+	 * cause output to occur down the socket.  Setting contiguous_write_len
+	 * prevents the reading of msg_fd_in once we actually start to write
+	 * this sequence of data (though we might read it before the start). */
+	if (am_generator && msg_fd_in >= 0)
+		contiguous_write_len = len + 4;
+
 	if (n > sizeof buffer - 4)
 		n = sizeof buffer - 4;
 
@@ -1079,6 +1081,9 @@ static void mplex_write(enum msgcode code, char *buf, size_t len)
 
 	if (len)
 		writefd_unbuffered(sock_f_out, buf, len);
+
+	if (am_generator && msg_fd_in >= 0)
+		contiguous_write_len = 0;
 }
 
 
@@ -1187,13 +1192,11 @@ void write_buf(int f,char *buf,size_t len)
 	writefd(f,buf,len);
 }
 
-
 /** Write a string to the connection */
 void write_sbuf(int f, char *buf)
 {
 	writefd(f, buf, strlen(buf));
 }
-
 
 void write_byte(int f, uchar c)
 {
