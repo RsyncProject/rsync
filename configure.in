@@ -94,6 +94,11 @@ ipv6type=unknown
 ipv6lib=none
 ipv6trylibc=yes
 
+AC_ARG_ENABLE(ipv6, 
+	AC_HELP_STRING([--disable-ipv6], [don't even try to use IPv6]))
+
+if test "x$enable_ipv6" != xno
+then
 	AC_MSG_CHECKING([ipv6 stack type])
 	for i in inria kame linux-glibc linux-inet6 toshiba v6d zeta; do
 		case $i in
@@ -179,7 +184,8 @@ yes
 	done
 	AC_MSG_RESULT($ipv6type)
 
-AC_SEARCH_LIBS(getaddrinfo, inet6)
+	AC_SEARCH_LIBS(getaddrinfo, inet6)
+fi
 
 AC_C_BIGENDIAN
 AC_HEADER_DIRENT
