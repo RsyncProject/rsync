@@ -302,8 +302,11 @@ void receive_file_entry(struct file_struct **fptr,
   }
 #endif
   
-  if (always_checksum)
-    read_buf(f,file->sum,csum_length);
+  if (always_checksum) {
+	  file->sum = (char *)malloc(MD4_SUM_LENGTH);
+	  if (!file->sum) out_of_memory("md4 sum");
+	  read_buf(f,file->sum,csum_length);
+  }
   
   last_mode = file->mode;
   last_rdev = file->rdev;
@@ -395,6 +398,8 @@ static struct file_struct *make_file(char *fname)
 #endif
 
 	if (always_checksum && S_ISREG(st.st_mode)) {
+		file->sum = (char *)malloc(MD4_SUM_LENGTH);
+		if (!file->sum) out_of_memory("md4 sum");
 		file_checksum(fname,file->sum,st.st_size);
 	}       
 

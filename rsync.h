@@ -223,7 +223,7 @@ struct file_struct {
 	char *dirname;
 	char *basedir;
 	char *link;
-	char sum[MD4_SUM_LENGTH];
+	char *sum;
 };
 
 struct file_list {
