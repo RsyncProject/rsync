@@ -244,6 +244,10 @@ static int rsync_module(int fd, int i)
 	log_init();
 
 	if (use_chroot) {
+		/* TODO: If we're not running as root, then we'll get
+		 * an error here.  I wonder if we should perhaps just
+		 * log a warning here, and continue anyhow using the
+		 * push_dir feature? -- mbp 2001-08-31 */
 		if (chroot(lp_path(i))) {
 			rsyserr(FERROR, errno, "chroot %s failed", lp_path(i));
 			io_printf(fd,"@ERROR: chroot failed\n");
