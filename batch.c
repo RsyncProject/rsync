@@ -395,7 +395,7 @@ void close_batch_csums_file()
 void write_batch_csum_info(int *flist_entry, int flist_count,
 			   struct sum_struct *s)
 {
-	int i;
+	size_t i;
 	unsigned int int_zero = 0;
 	extern int csum_length;
 
