@@ -345,11 +345,14 @@ enum msgcode {
  * device numbers will be truncated.  But it's a kind of silly thing
  * to do anyhow.
  *
- * FIXME: Really we need an unsigned type, and we perhaps ought to
- * cope with platforms on which this is an unsigned int or even a
- * struct.  Later.
+ * FIXME: I don't think the code in flist.c has ever worked on a system
+ * where dev_t is a struct.
  */ 
-#define INO64_T uint64
+
+struct idev {
+	uint64 inode;
+	uint64 dev;
+};
 
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
@@ -393,11 +396,6 @@ enum msgcode {
 struct hlink {
 	int hlindex;
 	struct file_struct *next;
-};
-
-struct idev {
-	INO64_T inode;
-	dev_t dev;
 };
 
 #define F_DEV	link_u.idev->dev
