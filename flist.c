@@ -69,6 +69,7 @@ int io_error;
 dev_t filesystem_dev; /* used to implement -x */
 
 static char empty_sum[MD4_SUM_LENGTH];
+static int flist_count_offset;
 static unsigned int file_struct_len;
 static struct file_list *sorting_flist;
 
@@ -98,16 +99,16 @@ static void start_filelist_progress(char *kind)
 }
 
 
-static void emit_filelist_progress(const struct file_list *flist)
+static void emit_filelist_progress(int count)
 {
-	rprintf(FINFO, " %d files...\r", flist->count);
+	rprintf(FINFO, " %d files...\r", count);
 }
 
 
-static void maybe_emit_filelist_progress(const struct file_list *flist)
+static void maybe_emit_filelist_progress(int count)
 {
-	if (do_progress && show_filelist_p() && (flist->count % 100) == 0)
-		emit_filelist_progress(flist);
+	if (do_progress && show_filelist_p() && (count % 100) == 0)
+		emit_filelist_progress(count);
 }
 
 
@@ -971,7 +972,7 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 	if (!file)
 		return NULL;
 
-	maybe_emit_filelist_progress(flist);
+	maybe_emit_filelist_progress(flist->count + flist_count_offset);
 
 	flist_expand(flist);
 
@@ -1309,7 +1310,7 @@ struct file_list *recv_file_list(int f)
 
 		flist->files[flist->count++] = file;
 
-		maybe_emit_filelist_progress(flist);
+		maybe_emit_filelist_progress(flist->count);
 
 		if (verbose > 2) {
 			rprintf(FINFO, "recv_file_name(%s)\n",
@@ -1772,6 +1773,8 @@ struct file_list *get_dirlist(char *dirname, int dlen,
 	recurse = 0;
 	send_directory(ignore_filter_rules ? -2 : -1, dirlist, dirname, dlen);
 	recurse = save_recurse;
+	if (do_progress)
+		flist_count_offset += dirlist->count;
 
 	clean_flist(dirlist, 0, 0);
 
