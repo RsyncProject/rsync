@@ -885,10 +885,10 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	}
 
 	if (verbose >= 2) {
-		rprintf(FINFO,
+		rprintf(FINFO, "delta-transmission %s\n",
 			whole_file > 0
-			? "delta-transmission disabled for local transfer or --whole-file\n"
-			: "delta transmission enabled\n");
+			? "disabled for local transfer or --whole-file"
+			: "enabled");
 	}
 
 	/* We expect to just sit around now, so don't exit on a timeout.
