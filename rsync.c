@@ -53,6 +53,37 @@ extern int io_timeout;
 extern int io_error;
 extern struct stats stats;
 
+
+/* handling the cleanup when a transfer is interrupted is tricky when
+   --partial is selected. We need to ensure that the partial file is
+   kept if any real data has been transferred */
+static int cleanup_got_literal;
+static char *cleanup_fname;
+static char *cleanup_new_fname;
+static struct file_struct *cleanup_file;
+static void finish_transfer(char *fname, char *fnametmp, struct file_struct *file);
+
+void exit_cleanup(int code)
+{
+	extern int keep_partial;
+
+	signal(SIGUSR1, SIG_IGN);
+
+	if (cleanup_got_literal && cleanup_fname && keep_partial) {
+		char *fname = cleanup_fname;
+		cleanup_fname = NULL;
+		finish_transfer(cleanup_new_fname, fname, cleanup_file);
+	}
+	io_flush();
+	if (cleanup_fname)
+		do_unlink(cleanup_fname);
+	if (code) {
+		kill_all(SIGUSR1);
+	}
+	exit(code);
+}
+
+
 /*
   free a sums struct
   */
@@ -568,6 +599,8 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
 	rprintf(FINFO,"data recv %d at %d\n",i,(int)offset);
 
       stats.literal_data += i;
+      cleanup_got_literal = 1;
+      
       sum_update(data,i);
 
       if (fd != -1 && write_file(fd,data,i) != i) {
@@ -730,28 +763,6 @@ static void delete_files(struct file_list *flist)
 	}
 }
 
-static char *cleanup_fname;
-static char *cleanup_new_fname;
-static struct file_struct *cleanup_file;
-static void finish_transfer(char *fname, char *fnametmp, struct file_struct *file);
-
-void exit_cleanup(int code)
-{
-	extern int keep_partial;
-
-	if (cleanup_fname && keep_partial) {
-		finish_transfer(cleanup_new_fname, cleanup_fname, cleanup_file);
-	}
-	io_flush();
-	if (cleanup_fname && !keep_partial)
-		do_unlink(cleanup_fname);
-	signal(SIGUSR1, SIG_IGN);
-	if (code) {
-		kill_all(SIGUSR1);
-	}
-	exit(code);
-}
-
 void sig_int(void)
 {
   exit_cleanup(1);
@@ -860,7 +871,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 	while (1) {      
 		cleanup_fname = NULL;
-		cleanup_new_fname = NULL;
+		cleanup_got_literal = 0;
 
 		i = read_int(f_in);
 		if (i == -1) {
@@ -981,8 +992,6 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		finish_transfer(fname, fnametmp, file);
 		
 		cleanup_fname = NULL;
-		cleanup_new_fname = NULL;
-		cleanup_file = NULL;
 		
 		if (!recv_ok) {
 			if (csum_length == SUM_LENGTH) {
