@@ -177,15 +177,15 @@ static void report(int f)
 		rprintf(FINFO,"Matched data: %.0f bytes\n",
 			(double)stats.matched_data);
 		rprintf(FINFO,"File list size: %d\n", stats.flist_size);
-		rprintf(FINFO,"Total bytes written: %.0f\n",
+		rprintf(FINFO,"Total bytes sent: %.0f\n",
 			(double)total_written);
-		rprintf(FINFO,"Total bytes read: %.0f\n",
+		rprintf(FINFO,"Total bytes received: %.0f\n",
 			(double)total_read);
 	}
 
 	if (verbose || do_stats) {
 		rprintf(FINFO,
-			"\nwrote %.0f bytes  read %.0f bytes  %.2f bytes/sec\n",
+			"\nsent %.0f bytes  received %.0f bytes  %.2f bytes/sec\n",
 			(double)total_written, (double)total_read,
 			(total_written + total_read)/(0.5 + (t - starttime)));
 		rprintf(FINFO, "total size is %.0f  speedup is %.2f\n",
