@@ -13,8 +13,12 @@
 
 case `id -u` in
 '') ;; # If "id" failed, try to continue...
-0) ;;
-*) test_skipped "Rsync won't copy devices unless we're root" ;;
+0)  ;;
+*)  if [ -f /usr/bin/fakeroot ]; then
+	exec /usr/bin/fakeroot /bin/sh "$0"
+    fi
+    test_skipped "Rsync won't copy devices unless we're root"
+    ;;
 esac
 
 # TODO: Need to test whether hardlinks are possible on this OS/filesystem
