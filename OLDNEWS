@@ -1,3 +1,37 @@
+rsync 2.5.1 (2002-01-03)
+
+  BUG FIXES: 
+   
+    * Fix for segfault in --daemon mode configuration parser.  (Paul
+      Mackerras)
+
+    * Correct string<->address parsing for both IPv4 and 6.
+      (YOSHIFUJI Hideaki, SUMIKAWA Munechika and Jun-ichiro "itojun"
+      Hagino)
+
+    * Various fixes for IPv6 support.  (Dave Dykstra)
+
+    * rsync.1 typo fix.  (Matt Kraai)
+
+    * Test suite typo fixes.  (Tom Schmidt)
+
+    * rsync.1 grammar and clarity improvements.  (Edward
+      Welbourne)
+
+    * Correction to ./configure tests for inet_ntop.  (Jeff Garzik)
+
+  ENHANCEMENTS:
+
+    * --progress and -P now show estimated data transfer rate (in a
+        multiple of bytes/s) and estimated time to completion.  (Rik
+        Faith)
+   
+    * --no-detach option, required to run as a W32 service and also
+        useful when running on Unix under daemontools, AIX's SRC, or a
+        debugger.  (Max Bowsher, Jos Backus)
+
+    * Clearer error messages for some conditions.
+
 rsync 2.5.0 (2001-11-30)
 
   ANNOUNCEMENTS

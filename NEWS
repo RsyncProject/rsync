@@ -1,33 +1,18 @@
-rsync 2.5.1 (2002-01-03)
+rsync 2.5.2 (???)
 
-  BUG FIXES: 
-   
-    * Fix for segfault in --daemon mode configuration parser.  (Paul
-      Mackerras)
+  BUG FIXES:
 
-    * Correct string<->address parsing for both IPv4 and 6.
-      (YOSHIFUJI Hideaki, SUMIKAWA Munechika and Jun-ichiro "itojun"
-      Hagino)
+    * Fix for setting local address of outgoing sockets.
 
-    * Various fixes for IPv6 support.  (Dave Dykstra)
-
-    * rsync.1 typo fix.  (Matt Kraai)
-
-    * Test suite typo fixes.  (Tom Schmidt)
-
-    * rsync.1 grammar and clarity improvements.  (Edward
-      Welbourne)
-
-    * Correction to ./configure tests for inet_ntop.  (Jeff Garzik)
+    * Better handling of hardlinks and devices on platforms with
+      64-bit dev_t or ino_t.
 
   ENHANCEMENTS:
 
-    * --progress and -P now show estimated data transfer rate (in a
-        multiple of bytes/s) and estimated time to completion.  (Rik
-        Faith)
-   
-    * --no-detach option, required to run as a W32 service and also
-        useful when running on Unix under daemontools, AIX's SRC, or a
-        debugger.  (Max Bowsher, Jos Backus)
+    * --statistics now shows memory heap usage on platforms that
+        support mallinfo().
 
-    * Clearer error messages for some conditions.
+    * "The Ted T'so school of program optimization": make progress
+      visible and people will think it's faster.  (With --progress,
+      rsync will show you how many files it has seen as it builds the
+      file_list, giving some indication that it has not hung.)
