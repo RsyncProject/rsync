@@ -58,6 +58,7 @@
 
 #define FLAG_TOP_DIR (1<<0)
 #define FLAG_HLINK_EOL (1<<1)	/* generator only */
+#define FLAG_MOUNT_POINT (1<<2)	/* sender only */
 
 /* update this if you make incompatible changes */
 #define PROTOCOL_VERSION 28
