@@ -280,9 +280,19 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	int recv_pipe[2];
 	int error_pipe[2];
 	extern int preserve_hard_links;
+	extern int delete_after;
+	extern int recurse;
+	extern int delete_mode;
 
 	if (preserve_hard_links)
 		init_hard_links(flist);
+
+	if (!delete_after) {
+		/* I moved this here from recv_files() to prevent a race condition */
+		if (recurse && delete_mode && !local_name && flist->count>0) {
+			delete_files(flist);
+		}
+	}
 
 	if (pipe(recv_pipe) < 0) {
 		rprintf(FERROR,"pipe failed in do_recv\n");

@@ -102,7 +102,7 @@ static void delete_one(struct file_struct *f)
 /* this deletes any files on the receiving side that are not present
    on the sending side. For version 1.6.4 I have changed the behaviour
    to match more closely what most people seem to expect of this option */
-static void delete_files(struct file_list *flist)
+void delete_files(struct file_list *flist)
 {
 	struct file_list *local_file_list;
 	int i, j;
@@ -314,12 +314,6 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 	if (verbose > 2) {
 		rprintf(FINFO,"recv_files(%d) starting\n",flist->count);
-	}
-
-	if (!delete_after) {
-		if (recurse && delete_mode && !local_name && flist->count>0) {
-			delete_files(flist);
-		}
 	}
 
 	while (1) {      
