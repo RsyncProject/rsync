@@ -48,10 +48,6 @@ completely implement the "New Sockets" API.
 <http://www.ipv6.org/impl/mac.html> says that Apple do not support
 IPv6 yet.  If your build fails, try again with --disable-ipv6.
 
-There is an unresolved problem with the OSX implimentation
-of setgroups causing rsyncd to fail.  The workaround is to
-#undef HAVE_SETGROUPS in config.h
-
 IBM AIX NOTES
 -------------
 
