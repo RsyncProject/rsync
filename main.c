@@ -174,6 +174,7 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 	extern int local_server;
 	extern char *rsync_path;
 	extern int blocking_io;
+	extern int daemon_over_rsh;
 	extern int read_batch;
 
 	if (!read_batch && !local_server) {
@@ -215,7 +216,7 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 
 	args[argc++] = ".";
 
-	if (path && *path) 
+	if (!daemon_over_rsh && path && *path) 
 		args[argc++] = path;
 
 	args[argc] = NULL;
@@ -667,14 +668,16 @@ static int start_client(int argc, char *argv[])
 	extern int am_sender;
 	extern char *shell_cmd;
 	extern int rsync_port;
+	extern int daemon_over_rsh;
 	extern int read_batch;
 	int rc;
 
 	/* Don't clobber argv[] so that ps(1) can still show the right
            command line. */
-	if ((rc = copy_argv (argv)))
+	if ((rc = copy_argv(argv)))
 		return rc;
 
+	/* rsync:// always uses rsync server over direct socket connection */
 	if (strncasecmp(URL_PREFIX, argv[0], strlen(URL_PREFIX)) == 0) {
 		char *host, *path;
 
@@ -700,7 +703,12 @@ static int start_client(int argc, char *argv[])
 	if (p) {
 		if (p[1] == ':') { /* double colon */
 			*p = 0;
-			return start_socket_client(argv[0], p+2, argc-1, argv+1);
+			if (!shell_cmd) {
+				return start_socket_client(argv[0], p+2,
+							   argc-1, argv+1);
+			}
+			p++;
+			daemon_over_rsh = 1;
 		}
 
 		if (argc < 1) {
@@ -720,9 +728,14 @@ static int start_client(int argc, char *argv[])
 		p = find_colon(argv[argc-1]);
 		if (!p) {
 			local_server = 1;
-		} else if (p[1] == ':') {
+		} else if (p[1] == ':') { /* double colon */
 			*p = 0;
-			return start_socket_client(argv[argc-1], p+2, argc-1, argv);
+			if (!shell_cmd) {
+				return start_socket_client(argv[argc-1], p+2,
+							   argc-1, argv);
+			}
+			p++;
+			daemon_over_rsh = 1;
 		}
 
 		if (argc < 2) {
@@ -773,8 +786,19 @@ static int start_client(int argc, char *argv[])
 		list_only = 1;
 	}
 	
-	pid = do_cmd(shell_cmd,shell_machine,shell_user,shell_path,&f_in,&f_out);
-	
+	pid = do_cmd(shell_cmd,shell_machine,shell_user,shell_path,
+		     &f_in,&f_out);
+
+	/* if we're running an rsync server on the remote host over a
+	   remote shell command, we need to do the RSYNCD protocol first */
+	if (daemon_over_rsh) {
+		int tmpret;
+		tmpret = start_inband_exchange(shell_user, shell_path,
+					       f_in, f_out, argc);
+		if (tmpret < 0)
+			return tmpret;
+	}
+
 	ret = client_run(f_in, f_out, pid, argc, argv);
 
 	fflush(stdout);
@@ -916,9 +940,8 @@ int main(int argc,char *argv[])
 	    write_batch_argvs_file(orig_argc, orig_argv);
 	}
 
-	if (am_daemon) {
+	if (am_daemon && !am_server)
 		return daemon_main();
-	}
 
 	if (argc < 1) {
 		usage(FERROR);
@@ -938,6 +961,8 @@ int main(int argc,char *argv[])
 	if (am_server) {
 		set_nonblocking(STDIN_FILENO);
 		set_nonblocking(STDOUT_FILENO);
+		if (am_daemon)
+			return start_daemon(STDIN_FILENO, STDOUT_FILENO);
 		start_server(STDIN_FILENO, STDOUT_FILENO, argc, argv);
 	}
 
