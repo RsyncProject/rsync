@@ -220,8 +220,14 @@ struct exclude_struct **make_exclude_list(const char *fname,
 					  int fatal, int include)
 {
 	struct exclude_struct **list=list1;
-	FILE *f = fopen(fname,"r");
+	FILE *f;
 	char line[MAXPATHLEN];
+
+	if (strcmp(fname, "-")) {
+		f = fopen(fname,"r");
+	} else {
+		f = fdopen(0, "r");
+	}
 	if (!f) {
 		if (fatal) {
 			rsyserr(FERROR, errno,
