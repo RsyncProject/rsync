@@ -25,6 +25,8 @@
  * allocating blocks is the responsibility of the system's malloc
  * library, not of rsync.
  *
+ * @sa http://lists.samba.org/pipermail/rsync/2000-June/002351.html
+ *
  **/
 
 #include "rsync.h"
