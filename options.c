@@ -411,17 +411,12 @@ static char err_buf[200];
  **/
 void option_error(void)
 {
-	int save_daemon = am_daemon;
-
 	if (!err_buf[0]) {
 		strcpy(err_buf, "Error parsing options: "
 		    "option may be supported on client but not on server?\n");
 	}
 
-	rwrite(FLOG, err_buf, strlen(err_buf));
-	am_daemon = 0;
 	rprintf(FERROR, RSYNC_NAME ": %s", err_buf);
-	am_daemon = save_daemon;
 }
 
 
