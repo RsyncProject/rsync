@@ -221,6 +221,7 @@ recv_deflated_token(int f, char **data)
 {
     int n, r, flag;
     static int init_done = 0;
+    static int saved_flag = 0;
 
     for (;;) {
 	switch (recv_state) {
@@ -246,7 +247,11 @@ recv_deflated_token(int f, char **data)
 	    
 	case r_idle:
 	case r_inflated:
-	    flag = read_byte(f);
+	    if (saved_flag) {
+		flag = saved_flag & 0xff;
+		saved_flag = 0;
+	    } else
+		flag = read_byte(f);
 	    if ((flag & 0xC0) == DEFLATED_DATA) {
 		n = ((flag & 0x3f) << 8) + read_byte(f);
 		read_buf(f, cbuf, n);
@@ -262,10 +267,19 @@ recv_deflated_token(int f, char **data)
 		rx_strm.avail_out = CHUNK_SIZE;
 		r = inflate(&rx_strm, Z_PACKET_FLUSH);
 		n = CHUNK_SIZE - rx_strm.avail_out;
-		if (r != Z_OK || n != 0) {
+		if (r != Z_OK) {
 		    fprintf(FERROR, "inflate flush returned %d (%d bytes)\n",
 			    r, n);
 		    exit_cleanup(1);
+		}
+		if (n != 0) {
+		    /* have to return some more data and
+		       save the flag for later. */
+		    saved_flag = flag + 0x10000;
+		    if (rx_strm.avail_out != 0)
+			recv_state = r_idle;
+		    *data = dbuf;
+		    return n;
 		}
 		recv_state = r_idle;
 	    }
@@ -297,7 +311,7 @@ recv_deflated_token(int f, char **data)
 		fprintf(FERROR, "inflate returned %d (%d bytes)\n", r, n);
 		exit_cleanup(1);
 	    }
-	    if (rx_strm.avail_out != 0)
+	    if (rx_strm.avail_in == 0)
 		recv_state = r_inflated;
 	    if (n != 0) {
 		*data = dbuf;
