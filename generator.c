@@ -294,7 +294,7 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 		return;
 	}
 
-	statret = link_stat(fname,&st);
+	statret = link_stat(fname, &st, keep_dirlinks && S_ISDIR(file->mode));
 
 	if (only_existing && statret == -1 && errno == ENOENT) {
 		/* we only want to update existing files */
@@ -302,15 +302,6 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 			rprintf(FINFO, "not creating new file \"%s\"\n", fname);
 		return;
 	}
-
-#if SUPPORT_LINKS
-	if (statret == 0 && keep_dirlinks
-	    && S_ISLNK(st.st_mode) && S_ISDIR(file->mode)) {
-		STRUCT_STAT st2;
-		if (do_stat(fname, &st2) == 0 && S_ISDIR(st2.st_mode))
-		    st = st2;
-	}
-#endif
 
 	if (statret == 0 &&
 	    !preserve_perms &&
@@ -438,7 +429,7 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 		/* try the file at compare_dest instead */
 		int saveerrno = errno;
 		pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, compare_dest, fname);
-		statret = link_stat(fnamecmpbuf,&st);
+		statret = link_stat(fnamecmpbuf, &st, 0);
 		if (!S_ISREG(st.st_mode))
 			statret = -1;
 		if (statret == -1)
