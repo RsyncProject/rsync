@@ -1389,13 +1389,13 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 	if (!f2 || !f2->basename)
 		return 1;
 
-	if (!(c1 = f1->dirname)) {
+	if (!(c1 = (uchar*)f1->dirname)) {
 		state1 = fnc_BASE;
-		c1 = f1->basename;
+		c1 = (uchar*)f1->basename;
 	}
-	if (!(c2 = f2->dirname)) {
+	if (!(c2 = (uchar*)f2->dirname)) {
 		state2 = fnc_BASE;
-		c2 = f2->basename;
+		c2 = (uchar*)f2->basename;
 	}
 
 	while (1) {
@@ -1405,11 +1405,11 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 			switch (state1) {
 			case fnc_DIR:
 				state1 = fnc_SLASH;
-				c1 = "/";
+				c1 = (uchar*)"/";
 				break;
 			case fnc_SLASH:
 				state1 = fnc_BASE;
-				c1 = f1->basename;
+				c1 = (uchar*)f1->basename;
 				break;
 			case fnc_BASE:
 				break;
@@ -1419,11 +1419,11 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 			switch (state2) {
 			case fnc_DIR:
 				state2 = fnc_SLASH;
-				c2 = "/";
+				c2 = (uchar*)"/";
 				break;
 			case fnc_SLASH:
 				state2 = fnc_BASE;
-				c2 = f2->basename;
+				c2 = (uchar*)f2->basename;
 				break;
 			case fnc_BASE:
 				if (!*c1)
