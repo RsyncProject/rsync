@@ -291,6 +291,8 @@ static void do_delete_pass(struct file_list *flist)
 
 		delete_in_dir(flist, fbuf, file);
 	}
+	if (do_progress && !am_server)
+		rprintf(FINFO, "                    \r");
 }
 
 static int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
