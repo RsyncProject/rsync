@@ -27,6 +27,7 @@
 #include "rsync.h"
 
 extern int verbose;
+extern int am_server;
 extern int eol_nulls;
 extern int list_only;
 extern int recurse;
@@ -817,9 +818,17 @@ void add_filter_file(struct filter_list_struct *listp, const char *fname,
 	if (!fname || !*fname)
 		return;
 
-	if (*fname != '-' || fname[1])
-		fp = fopen(fname, "rb");
-	else
+	if (*fname != '-' || fname[1] || am_server) {
+		if (server_filter_list.head) {
+			strlcpy(line, fname, sizeof line);
+			clean_fname(line, 1);
+			if (check_filter(&server_filter_list, line, 0) < 0)
+				fp = NULL;
+			else
+				fp = fopen(line, "rb");
+		} else
+			fp = fopen(fname, "rb");
+	} else
 		fp = stdin;
 	if (!fp) {
 		if (xflags & XFLG_FATAL_ERRORS) {
