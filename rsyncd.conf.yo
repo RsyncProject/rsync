@@ -225,7 +225,7 @@ connect.
 
 The default is no "hosts allow" option, which means all hosts can connect.
 
-dit(bf(hosts allow)) The "hosts deny" option allows you to specify a
+dit(bf(hosts deny)) The "hosts deny" option allows you to specify a
 list of patterns that are matched against a connecting clients
 hostname and IP address. If the pattern matches then the connection is
 rejected. See the "hosts allow" option for more information.

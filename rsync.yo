@@ -388,7 +388,7 @@ dit(bf(--csum-length LENGTH)) By default the primary checksum used in
 rsync is a very strong 16 byte MD4 checksum. In most cases you will
 find that a truncated version of this checksum is quite efficient, and
 this will decrease the size of the checksum data sent over the link,
-making things faster.
+making things faster. 
 
 You can choose the number of bytes in the truncated checksum using the
 --csum-length option. Any value less than or equal to 16 is valid.
@@ -397,6 +397,11 @@ Note that if you use this option then you run the risk of ending up
 with an incorrect target file. The risk with a value of 16 is
 microscopic and can be safely ignored (the universe will probably end
 before it fails) but with smaller values the risk is higher.
+
+Current versions of rsync actually use an adaptive algorithm for the
+checksum length by default, using a 16 byte file checksum to determine
+if a 2nd pass is required with a longer block checksum. Only use this
+option if you have read the source code and know what you are doing.
 
 dit(bf(-T, --temp-dir DIR)) This options instructs rsync to use DIR as a
 scratch directory when creating a temporary copies of the files
@@ -425,9 +430,9 @@ option is not specified.
 If a user or group name does not exist on the destination system then
 the numeric id from the source system is used instead.
 
-dit(bf(--timeout)) This option allows you to set a maximum IO timeout in
-seconds. If no data is transferred for the specified time then rsync
-will exit. The default is 0, which means no timeout.
+dit(bf(--timeout=TIMEOUT)) This option allows you to set a maximum IO
+timeout in seconds. If no data is transferred for the specified time
+then rsync will exit. The default is 0, which means no timeout.
 
 dit(bf(--daemon)) This tells rsync that it is to run as a rsync
 daemon. If standard input is a socket then rsync will assume that it
@@ -493,6 +498,9 @@ itemize(
   it() if the pattern starts with "- " (a minus followed by a space)
   then it is always considered a exclude pattern, even if specified as
   part of an include option. The "- " part is discarded before matching.
+
+  it() if the pattern is a single exclamation mark ! then the current
+  exclude list is reset, removing all previous exclude patterns.
 )
 
 The +/- rules are most useful in exclude lists, allowing you to have a
@@ -507,6 +515,31 @@ itemize(
   it() --include "*/" --include "*.c" --exclude "*" would include all 
   directories and C source files.
 )
+
+manpagesection(ENVIRONMENT VARIABLES)
+
+startdit()
+
+dit(bf(CVSIGNORE)) The CVSIGNORE environment variable supplements any
+ignore patterns in .cvsignore files. See the --cvs-exclude option for
+more details.
+
+dit(bf(RSYNC_RSH)) The RSYNC_RSH environment variable allows you to
+override the default shell used as the transport for rsync. This can
+be used instead of the -e option.
+
+dit(bf(RSYNC_PASSWORD)) Setting RSYNC_PASSWORD to the required
+password allows you to run authenticated rsync connections to a rsync
+daemon without user intervention. Note that this does not supply a
+password to a shell transport such as ssh.
+
+dit(bf(USER) or bf(LOGNAME)) The USER or LOGNAME environment variables
+are used to determine the default username sent to a rsync server.
+
+dit(bf(HOME)) The HOME environment variable is used to find the users
+default .cvsignore file.
+
+enddit()
 
 manpagefiles()
 
