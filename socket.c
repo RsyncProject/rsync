@@ -318,15 +318,11 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_address,
  *
  * Try to be better about handling the results of getaddrinfo(): when
  * opening an inbound socket, we might get several address results,
- * e.g. for the machine's ipv4 and ipv6 name.
+ * e.g. for the machine's IPv4 and IPv6 name.
  *
- * If binding a wildcard, then any one of them should do.  If an address
- * was specified but it's insufficiently specific then that's not our
- * fault.
- *
- * However, some of the advertized addresses may not work because e.g. we
- * don't have IPv6 support in the kernel.  In that case go on and try all
- * addresses until one succeeds.
+ * We return an array of socket file-descriptors, with the length of
+ * the array stored as the first element of the list.  This allows
+ * the caller to listen on all of them.
  *
  * @param bind_address Local address to bind, or NULL to allow it to
  * default.
@@ -379,8 +375,11 @@ static int *open_socket_in(int type, int port, const char *bind_address,
 
 #ifdef IPV6_V6ONLY
 		if (resp->ai_family == AF_INET6) {
-			setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY,
-				   (char *)&one, sizeof one);
+			if (setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY,
+				       (char *)&one, sizeof one) < 0) {
+				close(s);
+				continue;
+			}
 		}
 #endif
 
@@ -446,7 +445,7 @@ static RETSIGTYPE sigchld_handler(UNUSED(int val))
 void start_accept_loop(int port, int (*fn)(int, int))
 {
 	fd_set deffds;
-	int *sp, maxfd, i, j;
+	int *sp, maxfd, i;
 	extern char *bind_address;
 	extern int default_af_hint;
 
@@ -460,9 +459,6 @@ void start_accept_loop(int port, int (*fn)(int, int))
 	maxfd = -1;
 	for (i = 1; i <= *sp; i++) {
 		if (listen(sp[i], 5) == -1) {
-			for (j = 1; j <= i; j++)
-				close(sp[j]);
-			free(sp);
 			exit_cleanup(RERR_SOCKETIO);
 		}
 		FD_SET(sp[i], &deffds);
