@@ -33,6 +33,16 @@
 
 #include "rsync.h"
 
+static int lookup_name(const struct sockaddr_storage *ss,
+		       socklen_t ss_len,
+		       char *name_buf, size_t name_buf_len,
+		       char *port_buf, size_t port_buf_len);
+
+static int check_name(const struct sockaddr_storage *ss,
+		      socklen_t ss_len,
+		      const char *name_buf,
+		      const char *port_buf);
+
 /* Establish a proxy connection on an open socket to a web roxy by
  * using the CONNECT method. */
 static int establish_proxy_connection(int fd, char *host, int port)
@@ -604,30 +614,43 @@ static int get_sockaddr_family(const struct sockaddr_storage *ss)
 char *client_name(int fd)
 {
 	struct sockaddr_storage ss;
-	socklen_t length = sizeof ss;
+	socklen_t ss_len = sizeof ss;
 	static char name_buf[100];
 	static char port_buf[100];
-	char *def = "UNKNOWN";
 	static int initialised;
-	struct addrinfo hints, *res, *res0;
-	int error;
 
 	if (initialised) return name_buf;
 
 	initialised = 1;
 
-	strcpy(name_buf,def);
-
-	if (getpeername(fd, (struct sockaddr *)&ss, &length)) {
+	if (getpeername(fd, (struct sockaddr *)&ss, &ss_len)) {
 		/* FIXME: Can we really not continue? */
 		rprintf(FERROR, RSYNC_NAME ": getpeername on fd%d failed: %s\n",
 			fd, strerror(errno));
 		exit_cleanup(RERR_SOCKETIO);
 	}
 
+	if (!lookup_name(&ss, ss_len, name_buf, sizeof name_buf, port_buf, sizeof port_buf))
+		check_name(&ss, ss_len, name_buf, port_buf);
+
+	return name_buf;
+}
+
+
+/**
+ * Look up a name from @p ss into @p name_buf.
+ **/
+static int lookup_name(const struct sockaddr_storage *ss,
+		       socklen_t ss_len,
+		       char *name_buf, size_t name_buf_len,
+		       char *port_buf, size_t port_buf_len)
+{
+	int name_err;
+	const char *def = "UNKNOWN";
+	
 #ifdef INET6
-        if (get_sockaddr_family(&ss) == AF_INET6 && 
-	    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)&ss)->sin6_addr)) {
+        if (get_sockaddr_family(ss) == AF_INET6 && 
+	    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)ss)->sin6_addr)) {
 		/* OK, so ss is in the IPv6 family, but it is really
 		 * an IPv4 address: something like
 		 * "::ffff:10.130.1.2".  If we use it as-is, then the
@@ -637,13 +660,13 @@ char *client_name(int fd)
 		struct sockaddr_in6 sin6;
 		struct sockaddr_in *sin;
 
-		memcpy(&sin6, &ss, sizeof(sin6));
-		sin = (struct sockaddr_in *)&ss;
+		memcpy(&sin6, ss, sizeof(sin6));
+		sin = (struct sockaddr_in *)ss;
 		memset(sin, 0, sizeof(*sin));
 		sin->sin_family = AF_INET;
-		length = sizeof(struct sockaddr_in);
+		ss_len = sizeof(struct sockaddr_in);
 #ifdef HAVE_SOCKADDR_LEN
-		sin->sin_len = length;
+		sin->sin_len = ss_len;
 #endif
 		sin->sin_port = sin6.sin6_port;
 		/* FIXME: Isn't there a macro we can use here rather
@@ -655,47 +678,68 @@ char *client_name(int fd)
 #endif
 
 	/* reverse lookup */
-	if (getnameinfo((struct sockaddr *)&ss, length,
-			name_buf, sizeof(name_buf), port_buf, sizeof(port_buf),
-			NI_NAMEREQD | NI_NUMERICSERV) != 0) {
+	if (!(name_err = getnameinfo((struct sockaddr *) ss, ss_len,
+				     name_buf, name_buf_len,
+				     port_buf, port_buf_len,
+				     NI_NAMEREQD | NI_NUMERICSERV))) {
 		strcpy(name_buf, def);
-		rprintf(FERROR, "reverse name lookup failed\n");
+		rprintf(FERROR, RSYNC_NAME ": reverse name lookup failed: %s\n",
+			gai_strerror(name_err));
+		return name_err;
 	}
 
-	/* forward lookup */
+	return 0;
+}
+
+
+
+/* Do a forward lookup on name_buf and make sure it corresponds to ss
+ * -- otherwise we may be being spoofed.  If we suspect we are, then
+ * we don't abort the connection but just emit a warning. */
+static int check_name(const struct sockaddr_storage *ss,
+		      socklen_t ss_len,
+		      const char *name_buf,
+		      const char *port_buf)
+{
+	struct addrinfo hints, *res, *res0;
+	int error;
+
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_UNSPEC;
 	hints.ai_flags = AI_CANONNAME;
 	hints.ai_socktype = SOCK_STREAM;
 	error = getaddrinfo(name_buf, port_buf, &hints, &res0);
 	if (error) {
-		strcpy(name_buf, def);
+		/* We still use the name found by the reverse lookup,
+		 * but emit a warning. */
 		rprintf(FERROR,
-			RSYNC_NAME ": forward name lookup for %s failed: %s\n",
-			port_buf,
+			RSYNC_NAME ": forward name lookup for %s:%s failed: %s\n",
+			name_buf, port_buf,
 			gai_strerror(error));
-		return name_buf;
+		return error;
 	}
 
-	/* XXX sin6_flowinfo and other fields */
+
+	/* We expect that one of the results will be the same as ss. */
 	for (res = res0; res; res = res->ai_next) {
-		if (res->ai_family != get_sockaddr_family(&ss))
+		if (res->ai_family != get_sockaddr_family(ss))
 			continue;
-		if (res->ai_addrlen != length)
+		if (res->ai_addrlen != ss_len)
 			continue;
-		if (memcmp(res->ai_addr, &ss, res->ai_addrlen) == 0)
+		if (memcmp(res->ai_addr, ss, res->ai_addrlen) == 0)
 			break;
 	}
 
 	if (res == NULL) {
-		strcpy(name_buf, def);
-		rprintf(FERROR, RSYNC_NAME ": "
-			"reverse name lookup for \"%s\" failed on fd%d - spoofed address? \n",
-			name_buf, fd);
+		/* We hit the end of the list without finding an
+		 * address that was the same as ss. */
+		rprintf(FERROR, RSYNC_NAME
+			": no address record for \"%s\" corresponds to peer name: spoofed address?\n",
+			name_buf);
 	}
 
 	freeaddrinfo(res0);
-	return name_buf;
+	return 0;
 }
 
 
