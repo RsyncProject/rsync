@@ -98,6 +98,9 @@ int piped_child(char **command,int *f_in,int *f_out)
 
   *f_in = from_child_pipe[0];
   *f_out = to_child_pipe[1];
+
+  set_nonblocking(*f_in);
+  set_nonblocking(*f_out);
   
   return pid;
 }

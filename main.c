@@ -250,15 +250,15 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 		argv[0] = ".";
 	}
 	
+	set_nonblocking(f_out);
+	if (f_in != f_out)
+		set_nonblocking(f_in);
+		
 	flist = send_file_list(f_out,argc,argv);
 	if (!flist || flist->count == 0) {
 		exit_cleanup(0);
 	}
 
-	set_nonblocking(f_out);
-	if (f_in != f_out)
-		set_nonblocking(f_in);
-		
 	send_files(flist,f_out,f_in);
 	report(f_out);
 	io_flush();
@@ -288,6 +288,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		if (f_in != f_out) close(f_out);
 
 		set_nonblocking(f_in);
+		set_nonblocking(recv_pipe[1]);
 
 		recv_files(f_in,flist,local_name,recv_pipe[1]);
 		report(f_in);
@@ -301,6 +302,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	if (f_in != f_out) close(f_in);
 
 	set_nonblocking(f_out);
+	set_nonblocking(recv_pipe[0]);
 
 	io_start_buffering(f_out);
 
@@ -362,8 +364,12 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 	extern int cvs_exclude;
 	extern int am_sender;
 
+	set_nonblocking(f_out);
+	if (f_in != f_out)
+		set_nonblocking(f_in);
+			
 	setup_protocol(f_out, f_in);
-	
+
 	if (am_sender) {
 		recv_exclude_list(f_in);
 		if (cvs_exclude)

@@ -392,6 +392,9 @@ int daemon_main(void)
 			close(i); 
 			open("/dev/null", O_RDWR);
 		}
+
+		set_nonblocking(STDIN_FILENO);
+
 		return start_daemon(STDIN_FILENO);
 	}
 

@@ -54,6 +54,8 @@ int open_socket_out(char *host, int port)
 		return -1;
 	}
 
+	set_nonblocking(res);
+
 	return res;
 }
 
@@ -110,9 +112,9 @@ determine if a file descriptor is in fact a socket
 ****************************************************************************/
 int is_a_socket(int fd)
 {
-  int v,l;
-  l = sizeof(int);
-  return(getsockopt(fd, SOL_SOCKET, SO_TYPE, (char *)&v, &l) == 0);
+	int v,l;
+	l = sizeof(int);
+	return(getsockopt(fd, SOL_SOCKET, SO_TYPE, (char *)&v, &l) == 0);
 }
 
 
@@ -164,6 +166,8 @@ void start_accept_loop(int port, int (*fn)(int ))
 
 		if (fork()==0) {
 			close(s);
+
+			set_nonblocking(fd);
 
 			_exit(fn(fd));
 		}
