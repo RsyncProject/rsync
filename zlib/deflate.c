@@ -1092,6 +1092,11 @@ local block_state deflate_stored(s, flush)
         max_block_size = s->pending_buf_size - 5;
     }
 
+    if (flush == Z_INSERT_ONLY) {
+	s->block_start = s->strstart;
+	return need_more;
+    }
+
     /* Copy as much as possible from input to output: */
     for (;;) {
         /* Fill the window as much as possible: */
