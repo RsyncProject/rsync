@@ -411,11 +411,11 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 
 	/* We must make sure we don't send a zero flag byte or the
 	 * other end will terminate the flist transfer.  Note that
-	 * the use of XMIT_DEL_START on a non-dir has no meaning, so
+	 * the use of XMIT_TOP_DIR on a non-dir has no meaning, so
 	 * it's harmless way to add a bit to the first flag byte. */
 	if (protocol_version >= 28) {
 		if (!flags && !S_ISDIR(mode))
-			flags |= XMIT_DEL_START;
+			flags |= XMIT_TOP_DIR;
 		if ((flags & 0xFF00) || !flags) {
 			flags |= XMIT_EXTENDED_FLAGS;
 			write_byte(f, flags);
@@ -424,7 +424,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 			write_byte(f, flags);
 	} else {
 		if (!(flags & 0xFF) && !S_ISDIR(mode))
-			flags |= XMIT_DEL_START;
+			flags |= XMIT_TOP_DIR;
 		if (!(flags & 0xFF))
 			flags |= XMIT_LONG_NAME;
 		write_byte(f, flags);
@@ -659,17 +659,17 @@ static void receive_file_entry(struct file_list *flist, int ndx,
 		file->dir.depth = 1;
 
 	if (S_ISDIR(mode)) {
-		if (basename_len == 1+1 && *basename == '.') /* N.B. null */
+		if (basename_len == 1+1 && *basename == '.') /* +1 for '\0' */
 			file->dir.depth--;
-		if (flags & XMIT_DEL_START) {
+		if (flags & XMIT_TOP_DIR) {
 			in_del_hier = 1;
 			del_hier_name_len = file->dir.depth == 0 ? 0 : l1 + l2;
-			file->flags |= FLAG_DEL_START;
-		} else if (delete_during && in_del_hier) {
+			file->flags |= FLAG_TOP_DIR | FLAG_DEL_HERE;
+		} else if (in_del_hier) {
 			if (!relative_paths || !del_hier_name_len
 			 || (l1 >= del_hier_name_len
 			  && thisname[del_hier_name_len] == '/'))
-				file->flags |= FLAG_DEL_START;
+				file->flags |= FLAG_DEL_HERE;
 			else
 				in_del_hier = 0;
 		}
@@ -1216,7 +1216,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			filesystem_dev = st.st_dev;
 
 		do_subdirs = recurse >= 1 ? recurse-- : recurse;
-		send_file_name(f, flist, fname, do_subdirs, XMIT_DEL_START);
+		send_file_name(f, flist, fname, do_subdirs, XMIT_TOP_DIR);
 
 		if (olddir[0]) {
 			flist_dir = NULL;
@@ -1477,10 +1477,9 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 					f_name(flist->files[i]), i);
 			}
 			/* Make sure that if we unduplicate '.', that we don't
-			 * lose track of a user-specified starting point (or
-			 * else deletions will mysteriously fail with -R). */
-			if (flist->files[i]->flags & FLAG_DEL_START)
-				flist->files[prev_i]->flags |= FLAG_DEL_START;
+			 * lose track of a user-specified top directory. */
+			if (flist->files[i]->flags & FLAG_TOP_DIR)
+				flist->files[prev_i]->flags |= FLAG_TOP_DIR;
 
 			clear_file(i, flist);
 		} else
@@ -1655,13 +1654,19 @@ static int is_backup_file(char *fn)
 }
 
 
-/* This function is used to implement --delete-during. */
-void delete_in_dir(struct file_list *flist, char *fbuf, int dlen, int new_depth)
+/* This function is used to implement per-directory deletion, and
+ * is used by all the --delete-WHEN options.  Note that the fbuf
+ * pointer must point to a MAXPATHLEN buffer with the name of the
+ * directory in it (the functions we call will append names onto
+ * the end, but the old dir value will be restored on exit). */
+void delete_in_dir(struct file_list *flist, char *fbuf,
+		   struct file_struct *file)
 {
 	static int min_depth = MAXPATHLEN, cur_depth = -1;
 	static void *filt_array[MAXPATHLEN/2+1];
 	struct file_list *dir_list;
 	STRUCT_STAT st;
+	int dlen;
 
 	if (!flist) {
 		while (cur_depth >= min_depth)
@@ -1670,7 +1675,7 @@ void delete_in_dir(struct file_list *flist, char *fbuf, int dlen, int new_depth)
 		cur_depth = -1;
 		return;
 	}
-	if (new_depth >= MAXPATHLEN/2+1)
+	if (file->dir.depth >= MAXPATHLEN/2+1)
 		return; /* Impossible... */
 
 	if (max_delete && deletion_count >= max_delete)
@@ -1683,17 +1688,18 @@ void delete_in_dir(struct file_list *flist, char *fbuf, int dlen, int new_depth)
 		return;
 	}
 
-	while (cur_depth >= new_depth && cur_depth >= min_depth)
+	while (cur_depth >= file->dir.depth && cur_depth >= min_depth)
 		pop_local_filters(filt_array[cur_depth--]);
-	cur_depth = new_depth;
+	cur_depth = file->dir.depth;
 	if (min_depth > cur_depth)
 		min_depth = cur_depth;
+	dlen = strlen(fbuf);
 	filt_array[cur_depth] = push_local_filters(fbuf, dlen);
 
 	if (link_stat(fbuf, &st, keep_dirlinks) < 0)
 		return;
 
-	if (one_file_system)
+	if (one_file_system && file->flags & FLAG_TOP_DIR)
 		filesystem_dev = st.st_dev;
 
 	dir_list = flist_new(WITHOUT_HLINK, "delete_in_dir");
