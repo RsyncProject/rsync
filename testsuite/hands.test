@@ -1,38 +1,19 @@
 #!/bin/sh
 
 # Copyright (C) 1998,1999 Philip Hands <phil@hands.com>
+# Copyright (C) 2001 by Martin Pool <mbp@samba.org>
 #
 # This program is distributable under the terms of the GNU GPL (see COPYING)
-#
-# This is a simple test script that tests a few rsync
-# features to make sure I haven't broken them before a release.
-#
-#
 
 . "$suitedir/rsync.fns"
 
 hands_setup
 
-
-checkforlogs() {
-  # skip it if we're under debian-test
-  if test -n "${Debian}" ; then return 0 ; fi
-
-  if [ -f $1 -a -s $1 ] ; then
-	echo "Failures have occurred.  $1 follows:" >&2
-	cat $1 >&2
-	exit 1
-  else
-    echo ""
-    echo "Tests Completed Successfully :-)"
-  fi
-}
-
 # Main script starts here
 
 runtest "basic operation" 'checkit "$RSYNC -av ${FROM}/ ${TO}" ${FROM}/ ${TO}'
 
-ln ${FROM}/pslist ${FROM}/dir
+ln ${FROM}/filelist ${FROM}/dir
 runtest "hard links" 'checkit "$RSYNC -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
 
 rm ${TO}/${F1}

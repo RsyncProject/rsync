@@ -27,7 +27,9 @@ hands_setup() {
     # set up test data
     touch ${FROM}/empty
     mkdir ${FROM}/emptydir
-    ps ax > ${FROM}/pslist
+
+    # a few hundred lines of test
+    ls -lR / | head -200 > ${FROM}/filelist
 
     # This might fail on systems that don't have -n
     echo $ECHO_N "This file has no trailing lf$ECHO_C" > ${FROM}/nolf
