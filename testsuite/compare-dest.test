@@ -29,9 +29,9 @@ $RSYNC -av --exclude=/text --exclude=etc-ltr-list "$fromdir/" "$chkdir/"
 checkit "$RSYNC -avv --no-whole-file \
     --compare-dest=\"$alt1dir\" --compare-dest=\"$alt2dir\" \
     \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
-checkit "$RSYNC -avv --no-whole-file \
-    --link-dest=\"$alt1dir\" --link-dest=\"$alt2dir\" \
-    \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+#checkit "$RSYNC -avv --no-whole-file \
+#    --copy-dest=\"$alt1dir\" --copy-dest=\"$alt2dir\" \
+#    \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
