@@ -456,6 +456,31 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd strdup strerror chown chmod mknod mkfifo \
     strlcat strlcpy strtol mallinfo getgroups setgroups geteuid getegid \
     open64 mkstemp64)
 
+AC_CHECK_FUNCS(getpgrp tcgetpgrp)
+if test $ac_cv_func_getpgrp = yes; then
+    AC_FUNC_GETPGRP
+fi
+
+# Determine whether chown follows symlinks (it should).
+AC_CACHE_CHECK([whether chown() dereferences symlinks],rsync_cv_chown_follows_symlink,[
+  AC_TRY_RUN([
+#if HAVE_UNISTD_H
+# include <unistd.h>
+#endif
+#include <stdlib.h>
+#include <errno.h>
+    main() {
+	char const *dangling_symlink = "conftest.dangle";
+	unlink(dangling_symlink);
+	if (symlink("conftest.no-such", dangling_symlink) < 0) abort();
+	if (chown(dangling_symlink, getuid(), getgid()) < 0 && errno == ENOENT) exit(0);
+	exit(1);
+    }],
+  rsync_cv_chown_follows_symlink=yes,rsync_cv_chown_follows_symlink=no,rsync_cv_chown_follows_symlink=no)])
+if test $rsync_cv_chown_follows_symlink = no; then
+  AC_DEFINE(CHOWN_MODIFIES_SYMLINK, 1, [Define if chown modifies symlinks.])
+fi
+
 AC_CACHE_CHECK([for working socketpair],rsync_cv_HAVE_SOCKETPAIR,[
 AC_TRY_RUN([
 #include <sys/types.h>
