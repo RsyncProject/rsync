@@ -202,6 +202,7 @@ void usage(enum logcode F)
   rprintf(F,"  or   rsync [OPTION]... [USER@]HOST::SRC [DEST]\n");
   rprintf(F,"  or   rsync [OPTION]... SRC [SRC]... [USER@]HOST::DEST\n");
   rprintf(F,"  or   rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC [DEST]\n");
+  rprintf(F,"  or   rsync [OPTION]... SRC [SRC]... rsync://[USER@]HOST[:PORT]/DEST\n");
   rprintf(F,"SRC on single-colon remote HOST will be expanded by remote shell\n");
   rprintf(F,"SRC on server remote HOST may contain shell wildcards or multiple\n");
   rprintf(F,"  sources separated by space as long as they have same top-level\n");
