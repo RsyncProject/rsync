@@ -3,3 +3,40 @@
 # Copyright (C) 2001 by Martin Pool <mbp@samba.org>
 
 # General-purpose test functions for rsync.
+
+TMP="$scratchdir"
+FROM=${TMP}/from
+TO=${TMP}/to
+F1=text1
+LOG=${TMP}/log
+
+runtest() {
+    echo $ECHO_N "Test $1: $ECHO_C"
+    eval "$2"
+}
+
+printmsg() {
+    echo "$1"
+}
+
+hands_setup() {
+    [ -d $FROM ] || mkdir $FROM
+    [ -d $TO ] || mkdir $TO
+
+    # set up test data
+    touch ${FROM}/empty
+    mkdir ${FROM}/emptydir
+    ps ax > ${FROM}/pslist
+
+    # This might fail on systems that don't have -n
+    echo $ECHO_N "This file has no trailing lf$ECHO_C" > ${FROM}/nolf
+    ln -s nolf ${FROM}/nolf-symlink
+    cat /etc/inittab /etc/services /etc/resolv.conf > ${FROM}/${F1}
+    mkdir ${FROM}/dir
+    cp ${FROM}/${F1} ${FROM}/dir
+    mkdir ${FROM}/dir/subdir
+    mkdir ${FROM}/dir/subdir/subsubdir
+    ls -ltr /etc > ${FROM}/dir/subdir/subsubdir/etc-ltr-list
+    mkdir ${FROM}/dir/subdir/subsubdir2
+    ls -lt /bin > ${FROM}/dir/subdir/subsubdir2/bin-lt-list
+}

@@ -98,8 +98,15 @@ test: check
 # TODO: These targets both ought to depend on a set of test programs
 # to build, if any.
 
-check:
+# This depends on building rsync; if we need any helper programs it
+# should depend on them too.
+
+check: all
 	rsync_bin=./rsync srcdir="$(srcdir)" $(srcdir)/runtests.sh
+
+# This does *not* depend on building or installing: you can use it to
+# check a version installed from a binary or some other source tree,
+# if you want.
 
 installcheck:
 	rsync_bin="$(bindir)/rsync" srcdir="$(srcdir)" $(srcdir)/runtests.sh

@@ -52,19 +52,51 @@
 # A scratch directory, 'testtmp', is created in the build directory to
 # hold working files.
 
-# Both this script and the Makefile have to be pretty conservative
-# about which Unix features they use.  
+# This script also uses the $loglevel environment variable.  1 is the
+# default value, and 10 the most verbose.  You can set this from the
+# Make command line.  It's also set by the build farm to give more
+# detail for failing builds.
+
+
+# NOTES FOR TEST CASES:
+
+# Each test case runs in its own shell. 
 
 # Exit codes: (passed back to build farm):
 
 #    1  tests failed
 #    2  error in starting tests
+#   77  this test skipped (random value unlikely to happen by chance, same as
+#       automake)
+
+# rsync.fns contains some general setup functions and definitions.
+
+
+# NOTES ON PORTABILITY:
+
+# Both this script and the Makefile have to be pretty conservative
+# about which Unix features they use.
+
+# We cannot count on Make exporting variables to commands, unless
+# they're explicitly given on the command line.
+
+# Also, we can't count on 'cp -a' or 'mkdir -p', although they're
+# pretty handy.
+
+# Eventually we would like to not count on shell functions.
 
 
 set -e
 
 . "./shconfig"
 
+RUNSHFLAGS='-e'
+
+if [ -n "$loglevel" ] && [ "$loglevel" -gt 8 ]
+then
+    RUNSHFLAGS="$RUNSHFLAGS -x"
+    set -x
+fi
 
 echo "============================================================"
 echo "$0 running in `pwd`"
@@ -98,7 +130,9 @@ mkdir "$scratchdir"
 echo "    scratchdir=$scratchdir"
 suitedir="$srcdir/testsuite"
 
-for testbase in rsync-hello hands
+export scratchdir suitedir
+
+for testbase in rsync-hello hands ssh-basic
 do
     testscript="$suitedir/$testbase.test"
     if test \! -f "$testscript" 
@@ -111,14 +145,21 @@ do
     echo "------------------------------------------------------------"
     echo "----- $testbase running"
 
-    if sh "$testscript"
+    if sh $RUNSHFLAGS "$testscript"
     then
 	echo "----- $testbase completed succesfully"
 	passed=`expr $passed + 1`
-    else
-	echo "----- $testbase failed!"
-	failed=`expr $failed + 1`
-    fi	
+    else 
+	case $? in
+	77)
+	    echo "----- $testbase skipped"
+	    skipped=`expr $skipped + 1`
+	    ;;
+	*)
+	    echo "----- $testbase failed!"
+	    failed=`expr $failed + 1`
+	esac
+    fi
 done
 
 echo '------------------------------------------------------------'
