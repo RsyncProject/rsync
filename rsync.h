@@ -293,6 +293,11 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
  * Solaris) to a 32-bit-devt machine (say, Linux-2.2/x86) then the
  * device numbers will be truncated.  But it's a kind of silly thing
  * to do anyhow.
+ *
+ * FIXME: In future, we should probable split the device number into
+ * major/minor, and transfer the two parts as 32-bit ints.  That gives
+ * you somewhat more of a chance that they'll come from a big machine
+ * to a little one in a useful way.
  */ 
 #define INO64_T int64
 #define DEV64_T int64
