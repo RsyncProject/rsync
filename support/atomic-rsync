@@ -1,0 +1,74 @@
+#!/usr/bin/perl
+
+use strict;
+use Cwd 'abs_path';
+
+my $RSYNC = '/usr/bin/rsync';
+
+my $dest_dir = $ARGV[-1];
+usage(1) if $dest_dir eq '' || $dest_dir =~ /^--/;
+
+if (!-d $dest_dir) {
+    print STDERR "$dest_dir is not a directory.\n\n";
+    usage(1);
+}
+
+if (@_ = grep(/^--(link|compare)-dest/, @ARGV)) {
+    $_ = join(' or ', @_);
+    print STDERR "You may not use $_ as an rsync option.\n\n";
+    usage(1);
+}
+
+$dest_dir = abs_path($dest_dir);
+if ($dest_dir eq '/') {
+    print STDERR 'You must not use "/" as the destination directory.', "\n\n";
+    usage(1);
+}
+
+my $old_dir = "$dest_dir~old~";
+my $new_dir = $ARGV[-1] = "$dest_dir~new~";
+
+if (-d $old_dir) {
+    rename($old_dir, $new_dir) or die "Unable to rename $old_dir to $new_dir: $!";
+}
+
+if (system($RSYNC, "--link-dest=$dest_dir", @ARGV)) {
+    if ($? == -1) {
+	print "failed to execute $RSYNC: $!\n";
+    } elsif ($? & 127) {
+	printf "child died with signal %d, %s coredump\n",
+	    ($? & 127),  ($? & 128) ? 'with' : 'without';
+    } else {
+	printf "child exited with value %d\n", $? >> 8;
+    }
+    exit $?;
+}
+
+rename($dest_dir, $old_dir) or die "Unable to rename $new_dir to $old_dir: $!";
+rename($new_dir, $dest_dir) or die "Unable to rename $new_dir to $dest_dir: $!";
+
+exit;
+
+
+sub usage
+{
+    my($ret) = @_;
+    my $fh = $ret ? *STDERR : *STDOUT;
+    print $fh <<EOT;
+Usage: atomic-rsync [RSYNC-OPTIONS] HOST:SOURCE DEST
+
+This script allows you to pull some files into DEST on the local system
+(which must exist) in an atomic manner.  It does this by first pulling
+files to DEST~new~ (using hard-links to unchanged files in order to keep
+the space requirements down), and then, at the end of the transfer, it
+renames DEST to DEST~old~ and renames DEST~new~ to DEST to effect the
+atomic update.  The DEST~old~ hierarchy will be preserved until the next
+run of this script, at which point it will be renamed to DEST~new~ and
+used in the copy.
+
+See the "rsync" command for its list of options.  You may not use the
+--link-dest or --compare-dest options (since this script uses --link-dest
+to effect the atomic transfer).  Also, DEST cannot be "/".
+EOT
+    exit $ret;
+}
