@@ -285,6 +285,10 @@
 #define MAXPATHLEN 1024
 #endif
 
+#ifndef PIPE_BUF
+#define PIPE_BUF 512
+#endif
+
 #ifndef INADDR_NONE
 #define INADDR_NONE 0xffffffff
 #endif
