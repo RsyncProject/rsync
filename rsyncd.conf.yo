@@ -377,7 +377,7 @@ quote(itemize(
   it() %a for the remote IP address
   it() %l for the length of the file in bytes
   it() %p for the process ID of this rsync session
-  it() %o for the operation, which is either "send" or "recv"
+  it() %o for the operation, which is "send", "recv", or "del."
   it() %f for the filename (long form on server; no trailing "/")
   it() %n for the filename (short form; trailing "/" on dir)
   it() %L either the string " -> SYMLINK" or "" if not a symlink
@@ -399,23 +399,25 @@ in the rsync source code distribution in the "support" subdirectory.
 
 The %i format is a set of cryptic characters that are output as follows:
 
-quote(tt(  *Xcstpog ITEM_NAME))
+quote(tt(  =Xcstpog ITEM_NAME))
 
-The bf(*) is either bf(<) (receive), bf(>) (send), or bf(*) (--dry-run) if
-the item is being transferred, otherwise it is a space.  This lets you
-distinguish between a file that is getting its attributes changed and a
-file whose content is being updated.  Note that when a symlink or a device
-gets its value changed, that is considered to be a transfer.
+The bf(=) is output as either a bf(<) (receive) or a bf(>) (send) if the
+item is being transferred, a bf(.) if only the attributes are being
+updated, or a bf(=) if the items are identical.  Note that when a symlink
+or a device gets its value changed, that is considered to be a transfer (as
+opposed to a change in permissions or ownership).
 
 The bf(X) will be replaced by one of the following: an "f" for a file, a
 "d" for a dir, an "L" for a symlink, or a "D" for a device.
 
 The rest of the letters in the string above are the actual letters that
-will be output if the associated attribute for the item is being updated;
-otherwise the letter will be replaced by a "." for no change, a "+"
-for a new item, or a "?" if the attribute is not known (which happens when
-talking to an older rsync).  The meanings of the attribute letters are as
-follows:
+will be output if the associated attribute for the item is being updated or
+a "." for no change.  Three exceptions to this are: (1) a newly created
+item replaces each letter with a "+", (2) an identical item replaces each
+letter with a space, and (3) an unknown attribute replaces each letter with
+a "?" (this happens when talking to an older rsync).
+
+The attribute that is associated with each letter is as follows:
 
 quote(itemize(
   it() A bf(c) means the checksum of the file is different and will be
@@ -434,6 +436,9 @@ quote(itemize(
   it() A bf(g) means the group is being updated (requires bf(--group) and
   the authority to set the requested group).
 ))
+
+One other output is possible: when deleting files, each deleted file will
+be logged with the "%i" taking on a value of "deleting".
 
 dit(bf(timeout)) The "timeout" option allows you to override the
 clients choice for I/O timeout for this module. Using this option you
