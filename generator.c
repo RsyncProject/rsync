@@ -525,12 +525,12 @@ prepare_to_open:
 		statret = 0;
 	}
 
-	if (dry_run || whole_file > 0) {
+	if (dry_run || read_batch)
+		goto notify_others;
+	if (whole_file > 0) {
 		statret = -1;
 		goto notify_others;
 	}
-	if (read_batch)
-		goto notify_others;
 
 	/* open the file */
 	fd = do_open(fnamecmp, O_RDONLY, 0);
