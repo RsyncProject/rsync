@@ -1956,6 +1956,7 @@ was made to manipulate 64-bit files on a platform that cannot support
 them; or an option was specified that is supported by the client and
 not by the server.
 dit(bf(5)) Error starting client-server protocol
+dit(bf(6)) Daemon unable to append to log-file
 dit(bf(10)) Error in socket I/O
 dit(bf(11)) Error in file I/O
 dit(bf(12)) Error in rsync protocol data stream
@@ -1966,6 +1967,7 @@ dit(bf(21)) Some error returned by waitpid()
 dit(bf(22)) Error allocating core memory buffers
 dit(bf(23)) Partial transfer due to error
 dit(bf(24)) Partial transfer due to vanished source files
+dit(bf(25)) The --max-delete limit stopped deletions
 dit(bf(30)) Timeout in data send/receive
 enddit()
 
