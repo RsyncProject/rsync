@@ -37,6 +37,7 @@ extern int msg_fd_out;
 extern int protocol_version;
 extern int preserve_times;
 extern int log_format_has_o_or_i;
+extern int daemon_log_format_has_o_or_i;
 extern char *auth_user;
 extern char *log_format;
 
@@ -186,7 +187,9 @@ void rwrite(enum logcode code, char *buf, int len)
 		return;
 	}
 
-	if (am_daemon) {
+	if (code == FCLIENT)
+		code = FINFO;
+	else if (am_daemon) {
 		static int in_block;
 		char msg[2048];
 		int priority = code == FERROR ? LOG_WARNING : LOG_INFO;
@@ -525,7 +528,6 @@ void log_delete(char *fname, int mode)
 {
 	static struct file_struct file;
 	int len = strlen(fname);
-	enum logcode code;
 	char *fmt;
 
 	file.mode = mode;
@@ -535,16 +537,16 @@ void log_delete(char *fname, int mode)
 		if (S_ISDIR(mode))
 			len++; /* directories include trailing null */
 		send_msg(MSG_DELETED, fname, len);
-		if (!am_daemon || dry_run)
-			return;
-		fmt = lp_log_format(module_id);
-		code = FLOG;
 	} else {
 		fmt = log_format_has_o_or_i ? log_format : "%i %n";
-		code = FINFO;
+		log_formatted(FCLIENT, fmt, "del.", &file, &stats, ITEM_DELETED);
 	}
 
-	log_formatted(code, fmt, "del.", &file, &stats, ITEM_DELETED);
+	if (!am_daemon || dry_run)
+		return;
+
+	fmt = daemon_log_format_has_o_or_i ? lp_log_format(module_id) : "%i %n";
+	log_formatted(FLOG, fmt, "del.", &file, &stats, ITEM_DELETED);
 }
 
 
