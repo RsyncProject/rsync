@@ -76,10 +76,7 @@ int batch_gen_fd = -1;
 const char *io_write_phase = phase_unknown;
 const char *io_read_phase = phase_unknown;
 
-/* Ignore an EOF error if non-zero.  We exit if the value is > 0 (used while
- * reading a module listing if the remote version is 24 or less) or go into a
- * sleep loop if the value is < 0 (used by the receiver when it is reading a
- * potential end-of-transfer keep-alive message that may never come). */
+/* Ignore an EOF error if non-zero. See whine_about_eof(). */
 int kluge_around_eof = 0;
 
 int msg_fd_in = -1;
@@ -364,16 +361,18 @@ void io_set_filesfrom_fds(int f_in, int f_out)
 	io_filesfrom_buflen = 0;
 }
 
-/**
- * It's almost always an error to get an EOF when we're trying to read
- * from the network, because the protocol is self-terminating.
+/* It's almost always an error to get an EOF when we're trying to read from the
+ * network, because the protocol is (for the most part) self-terminating.
  *
- * However, there is one unfortunate cases where it is not, which is
- * rsync <2.4.6 sending a list of modules on a server, since the list
- * is terminated by closing the socket. So, for the section of the
- * program where that is a problem (start_socket_client),
- * kluge_around_eof is True and we just exit.
- */
+ * There is one case for the receiver when it is at the end of the transfer
+ * (hanging around reading any keep-alive packets that might come its way): if
+ * the sender dies before the generator's kill-signal comes through, we can end
+ * up here needing to loop until the kill-signal arrives.  In this situation,
+ * kluge_around_eof will be < 0.
+ *
+ * There is another case for older protocol versions (< 24) where the module
+ * listing was not terminated, so we must ignore an EOF error in that case and
+ * exit.  In this situation, kluge_around_eof will be > 0. */
 static void whine_about_eof(int fd)
 {
 	if (kluge_around_eof && fd == sock_f_in) {
