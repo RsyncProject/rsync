@@ -769,7 +769,8 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 
 	/* if protocol version is >= 17 then send the io_error flag */
 	if (f != -1 && remote_version >= 17) {
-		write_int(f, io_error);
+		extern int module_id;
+		write_int(f, lp_ignore_errors(module_id)? 0 : io_error);
 	}
 
 	if (f != -1) {
@@ -854,7 +855,12 @@ struct file_list *recv_file_list(int f)
 
   /* if protocol version is >= 17 then recv the io_error flag */
   if (f != -1 && remote_version >= 17) {
-	  io_error |= read_int(f);
+	  extern int module_id;
+	  if (lp_ignore_errors(module_id)) {
+		  read_int(f);
+	  } else {
+		  io_error |= read_int(f);
+	  }
   }
 
   if (list_only) {

@@ -109,11 +109,12 @@ static void delete_files(struct file_list *flist)
 	struct file_list *local_file_list;
 	int i, j;
 	char *name;
+	extern int module_id;
 
 	if (cvs_exclude)
 		add_cvs_excludes();
 
-	if (io_error) {
+	if (io_error && !lp_ignore_errors(module_id)) {
 		rprintf(FINFO,"IO error encountered - skipping file deletion\n");
 		return;
 	}

@@ -117,6 +117,7 @@ typedef struct
 	BOOL list;
 	BOOL use_chroot;
 	BOOL transfer_logging;
+	BOOL ignore_errors;
 	char *uid;
 	char *gid;
 	char *hosts_allow;
@@ -147,6 +148,7 @@ static service sDefault =
 	True,    /* list */
 	True,    /* use chroot */
 	False,   /* transfer logging */
+	False,   /* ignore errors */
 	"nobody",/* uid */
 	"nobody",/* gid */
 	NULL,    /* hosts allow */
@@ -272,6 +274,7 @@ static struct parm_struct parm_table[] =
   {"include",          P_STRING,  P_LOCAL,  &sDefault.include,     NULL,   0},
   {"include from",     P_STRING,  P_LOCAL,  &sDefault.include_from,NULL,   0},
   {"transfer logging", P_BOOL,    P_LOCAL,  &sDefault.transfer_logging,NULL,0},
+  {"ignore errors",    P_BOOL,    P_LOCAL,  &sDefault.ignore_errors,NULL,0},
   {"log format",       P_STRING,  P_LOCAL,  &sDefault.log_format,  NULL,   0},
   {"refuse options",   P_STRING,  P_LOCAL,  &sDefault.refuse_options,NULL, 0},
   {"dont compress",    P_STRING,  P_LOCAL,  &sDefault.dont_compress,NULL,  0},
@@ -336,6 +339,7 @@ FN_LOCAL_BOOL(lp_read_only, read_only)
 FN_LOCAL_BOOL(lp_list, list)
 FN_LOCAL_BOOL(lp_use_chroot, use_chroot)
 FN_LOCAL_BOOL(lp_transfer_logging, transfer_logging)
+FN_LOCAL_BOOL(lp_ignore_errors, ignore_errors)
 FN_LOCAL_STRING(lp_uid, uid)
 FN_LOCAL_STRING(lp_gid, gid)
 FN_LOCAL_STRING(lp_hosts_allow, hosts_allow)

@@ -274,6 +274,14 @@ rejected. See the "hosts allow" option for more information.
 
 The default is no "hosts deny" option, which means all hosts can connect.
 
+dit(bf(ignore errors)) The "ignore errors" option tells rsyncd to
+ignore IO errors on the server when deciding whether to run the delete
+phase of the transfer. Normally rsync skips the --delete step if any
+IO errors have occurred in order to prevent disasterous deletion due
+to a temporary resource shortage or other IO error. In some cases this
+test is counter productive so you can use this option to turn off this
+behaviour. 
+
 dit(bf(transfer logging)) The "transfer logging" option enables per-file 
 logging of downloads and uploads in a format somewhat similar to that
 used by ftp daemons. If you want to customize the log formats look at
