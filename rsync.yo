@@ -345,6 +345,7 @@ verb(
      --delete-after          receiver deletes after transfer, not before
      --ignore-errors         delete even if there are I/O errors
      --max-delete=NUM        don't delete more than NUM files
+     --max-size=SIZE         don't transfer any file larger than SIZE
      --partial               keep partially transferred files
      --partial-dir=DIR       put a partially transferred file into DIR
      --force                 force deletion of dirs even if not empty
@@ -634,6 +635,11 @@ the destination.
 dit(bf(--max-delete=NUM)) This tells rsync not to delete more than NUM
 files or directories. This is useful when mirroring very large trees
 to prevent disasters.
+
+dit(bf(--max-size=SIZE)) This tells rsync to avoid transferring any
+file that is larger than the specified SIZE. The SIZE value can be
+suffixed with a letter to indicate a size multiplier (K, M, or G) and
+may be a fractional value (e.g. "--max-size=1.5m").
 
 dit(bf(--delete)) This tells rsync to delete any files on the receiving
 side that aren't on the sending side.   Files that are excluded from
