@@ -1,6 +1,7 @@
-/* 
-   Copyright (C) Andrew Tridgell 1996
-   Copyright (C) Paul Mackerras 1996
+/*  -*- c-file-style: "linux" -*-
+    
+    Copyright (C) 1996-2000 by Andrew Tridgell 
+    Copyright (C) Paul Mackerras 1996
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -963,7 +964,6 @@ void msleep(int t)
  *******************************************************************/
 int cmp_modtime(time_t file1, time_t file2)
 {
-	time_t diff;
 	extern int modify_window;
 
 	if (file2 > file1) {
