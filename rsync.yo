@@ -373,6 +373,7 @@ to the detailed description below for a complete description.  verb(
      --stats                 give some file-transfer stats
      --progress              show progress during transfer
  -P                          same as --partial --progress
+ -w, --what-has-changed      output a change summary for all updates
      --log-format=FORMAT     log file-transfers using specified format
      --password-file=FILE    read password from FILE
      --list-only             list the files instead of copying them
@@ -1010,6 +1011,39 @@ ssh prefers non-blocking I/O.)
 
 dit(bf(--no-blocking-io)) Turn off bf(--blocking-io), for use when it is the
 default.
+
+dit(bf(--what-has-changed)) Outputs a change-summary for each updated
+item.  The format is as follows:
+
+quote(tt(  *XcstpogDL ITEM_NAME))
+
+The bf(*) will be present if this is a file that is being transferred,
+otherwise it will be replaced with a space.  The bf(X) will be replaced by
+one of the following: an "f" for a file, a "d" for a dir, an "L" for a
+symlink, or a "D" for a device.  The rest of the letters in the string
+above are the actual letters that will be output if the associated
+attribute for the item is being updated; if not the letter will be replaced
+by either a "-" if no change is occurring, or a "+" if this is a new item.
+The meanings of the attribute letters are as follows:
+
+itemize(
+  it() The bf(c) means the checksum of the file is different and will be
+  updated by the file transfer (requries bf(--checksum)).
+  it() A bf(s) means the size of the file is different and will be updated
+  by the file transfer.
+  it() A bf(t) means the modified time is being updated to the server's
+  value (requires --times, but transferred files without --times will be
+  marked with a bf(T) because the time is updated to the transfer time).
+  it() A bf(p) means the permissions are being updated (requires
+  bf(--perms)).
+  it() The bf(o) means the owner is being updated (requires bf(--owner) and
+  root privileges).
+  it() The bf(g) means the group is being updated (requires bf(--group)).
+  it() The bf(D) means the device is being updated (requires bf(--devices)
+  and root privileges).
+  it() The bf(L) means the symlink value is being updated (requires
+  --links).
+)
 
 dit(bf(--log-format=FORMAT)) This allows you to specify exactly what the
 rsync client logs to stdout on a per-file basis. The log format is
