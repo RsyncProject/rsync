@@ -213,8 +213,6 @@ EOF
 
 
 build_symlinks() {
-    fromdir="$scratchdir/from"
-    todir="$scratchdir/to"
     mkdir "$fromdir"
     date >"$fromdir/referent"
     ln -s referent "$fromdir/relative"
