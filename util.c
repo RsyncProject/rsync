@@ -78,6 +78,10 @@ void write_flush(int f)
 {
 }
 
+
+/* This function was added to overcome a deadlock problem when using
+ * ssh.  It looks like we can't allow our receive queue to get full or
+ * ssh will clag up. Uggh.  */
 void read_check(int f)
 {
   int n;
