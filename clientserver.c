@@ -167,24 +167,28 @@ static int rsync_module(int fd, int i)
 	if (lp_read_only(i))
 		read_only = 1;
 
-	p = lp_uid(i);
-	if (!name_to_uid(p, &uid)) {
-		if (!isdigit(*p)) {
-			rprintf(FERROR,"Invalid uid %s\n", p);
-			io_printf(fd,"@ERROR: invalid uid\n");
-			return -1;
-		} 
-		uid = atoi(p);
-	}
+	am_root = (getuid() == 0);
 
-	p = lp_gid(i);
-	if (!name_to_gid(p, &gid)) {
-		if (!isdigit(*p)) {
-			rprintf(FERROR,"Invalid gid %s\n", p);
-			io_printf(fd,"@ERROR: invalid gid\n");
-			return -1;
-		} 
-		gid = atoi(p);
+	if (am_root) {
+		p = lp_uid(i);
+		if (!name_to_uid(p, &uid)) {
+			if (!isdigit(*p)) {
+				rprintf(FERROR,"Invalid uid %s\n", p);
+				io_printf(fd,"@ERROR: invalid uid\n");
+				return -1;
+			} 
+			uid = atoi(p);
+		}
+
+		p = lp_gid(i);
+		if (!name_to_gid(p, &gid)) {
+			if (!isdigit(*p)) {
+				rprintf(FERROR,"Invalid gid %s\n", p);
+				io_printf(fd,"@ERROR: invalid gid\n");
+				return -1;
+			} 
+			gid = atoi(p);
+		}
 	}
 
 	p = lp_include_from(i);
@@ -214,18 +218,6 @@ static int rsync_module(int fd, int i)
 			return -1;
 		}
 
-		if (setgid(gid) || getgid() != gid) {
-			rprintf(FERROR,"setgid %d failed\n", gid);
-			io_printf(fd,"@ERROR: setgid failed\n");
-			return -1;
-		}
-
-		if (setuid(uid) || getuid() != uid) {
-			rprintf(FERROR,"setuid %d failed\n", uid);
-			io_printf(fd,"@ERROR: setuid failed\n");
-			return -1;
-		}
-
 	} else {
 		if (!push_dir(lp_path(i), 0)) {
 			rprintf(FERROR,"chdir %s failed\n", lp_path(i));
@@ -234,7 +226,21 @@ static int rsync_module(int fd, int i)
 		}
 	}
 
-	am_root = (getuid() == 0);
+	if (am_root) {
+		if (setgid(gid)) {
+			rprintf(FERROR,"setgid %d failed\n", gid);
+			io_printf(fd,"@ERROR: setgid failed\n");
+			return -1;
+		}
+
+		if (setuid(uid)) {
+			rprintf(FERROR,"setuid %d failed\n", uid);
+			io_printf(fd,"@ERROR: setuid failed\n");
+			return -1;
+		}
+
+		am_root = (getuid() == 0);
+	}
 
 	io_printf(fd,"@RSYNCD: OK\n");
 

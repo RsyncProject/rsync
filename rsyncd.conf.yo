@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsyncd.conf)(5)(20 Jan 1999)()()
+manpage(rsyncd.conf)(5)(21 Jan 1999)()()
 manpagename(rsyncd.conf)(configuration file for rsync server)
 manpagesynopsis()
 
@@ -153,13 +153,14 @@ setting this to false you can create hidden modules. The default is
 for modules to be listable.
 
 dit(bf(uid)) The "uid" option specifies the user name or user id that
-file transfers to and from that module should take place as. In
-combination with the "gid" option this determines what file
-permissions are available. The default is the user "nobody".
+file transfers to and from that module should take place as when the daemon
+was run as root. In combination with the "gid" option this determines what
+file permissions are available. The default is the user "nobody".
 
 dit(bf(gid)) The "gid" option specifies the group name or group id that
-file transfers to and from that module should take place as. This
-complements the "uid" option. The default is the group "nobody".
+file transfers to and from that module should take place as when the daemon
+was run as root. This complements the "uid" option. The default is the
+group "nobody".
 
 dit(bf(exclude)) The "exclude" option allows you to specify a space
 separated list of patterns to add to the exclude list. This is
