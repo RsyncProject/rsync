@@ -451,10 +451,11 @@ static BOOL Parse( FILE *InFile,
         break;
 
       case '[':                         /* Section Header. */
-        if( !Section( InFile, sfunc ) )
-          return( False );
-        c = EatWhitespace( InFile );
-        break;
+	      if (!sfunc) return True;
+	      if( !Section( InFile, sfunc ) )
+		      return( False );
+	      c = EatWhitespace( InFile );
+	      break;
 
       case '\\':                        /* Bogus backslash. */
         c = EatWhitespace( InFile );
@@ -558,3 +559,4 @@ BOOL pm_process( char *FileName,
   } /* pm_process */
 
 /* -------------------------------------------------------------------------- */
+

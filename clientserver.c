@@ -266,7 +266,7 @@ static int start_daemon(int fd)
 	extern char *config_file;
 	extern int remote_version;
 
-	if (!lp_load(config_file)) {
+	if (!lp_load(config_file, 0)) {
 		exit_cleanup(1);
 	}
 
@@ -327,7 +327,7 @@ static int start_daemon(int fd)
 
 int daemon_main(void)
 {
-	log_open();
+	extern char *config_file;
 
 	if (is_a_socket(STDIN_FILENO)) {
 		/* we are running via inetd */
@@ -335,6 +335,13 @@ int daemon_main(void)
 	}
 
 	become_daemon();
+
+	if (!lp_load(config_file, 1)) {
+		fprintf(stderr,"failed to load config file %s\n", config_file);
+		exit_cleanup(1);
+	}
+
+	log_open();
 
 	rprintf(FINFO,"rsyncd version %s starting\n",VERSION);
 

@@ -253,6 +253,7 @@ Initialise the global parameter structure.
 ***************************************************************************/
 static void init_globals(void)
 {
+	memset(&Globals, 0, sizeof(Globals));
 #ifdef LOG_DAEMON
 	Globals.syslog_facility = LOG_DAEMON;
 #endif
@@ -664,26 +665,26 @@ static BOOL do_section(char *sectionname)
 Load the services array from the services file. Return True on success, 
 False on failure.
 ***************************************************************************/
-BOOL lp_load(char *pszFname)
+BOOL lp_load(char *pszFname, int globals_only)
 {
-  pstring n2;
-  BOOL bRetval;
+	pstring n2;
+	BOOL bRetval;
  
-  bRetval = False;
+	bRetval = False;
 
-  bInGlobalSection = True;
+	bInGlobalSection = True;
   
-  init_globals();
+	init_globals();
 
-  pstrcpy(n2,pszFname);
+	pstrcpy(n2,pszFname);
 
-  /* We get sections first, so have to start 'behind' to make up */
-  iServiceIndex = -1;
-  bRetval = pm_process(n2, do_section, do_parameter);
+	/* We get sections first, so have to start 'behind' to make up */
+	iServiceIndex = -1;
+	bRetval = pm_process(n2, globals_only?NULL:do_section, do_parameter);
   
-  bLoaded = True;
+	bLoaded = True;
 
-  return (bRetval);
+	return (bRetval);
 }
 
 
