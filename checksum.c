@@ -137,8 +137,11 @@ static char sumrbuf[CSUM_CHUNK];
 
 void sum_init(void)
 {
-  MDbegin(&sumMD);
+  char s[4];
+  MDbegin(&sumMD);  
   sumresidue=0;
+  SIVAL(s,0,checksum_seed);
+  sum_update(s,4);
 }
 
 void sum_update(char *p,int len)
