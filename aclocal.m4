@@ -40,7 +40,7 @@ AC_DEFUN(AC_SYS_LARGEFILE_TEST_INCLUDES,
 
 dnl Internal subroutine of AC_SYS_LARGEFILE.
 dnl AC_SYS_LARGEFILE_MACRO_VALUE(C-MACRO, VALUE, CACHE-VAR, COMMENT, INCLUDES, FUNCTION-BODY)
-AC_DEFUN(AC_SYS_LARGEFILE_MACRO_VALUE,
+AC_DEFUN([AC_SYS_LARGEFILE_MACRO_VALUE],
   [AC_CACHE_CHECK([for $1 value needed for large files], $3,
      [$3=no
       AC_TRY_COMPILE(AC_SYS_LARGEFILE_TEST_INCLUDES
@@ -58,7 +58,7 @@ $5
      AC_DEFINE_UNQUOTED([$1], [$]$3, [$4])
    fi])
 
-AC_DEFUN(AC_SYS_LARGEFILE,
+AC_DEFUN([AC_SYS_LARGEFILE],
   [AC_ARG_ENABLE(largefile,
      [  --disable-largefile     omit support for large files])
    if test "$enable_largefile" != no; then
