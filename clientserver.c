@@ -47,7 +47,7 @@ extern int orig_umask;
 extern int no_detach;
 extern int default_af_hint;
 extern char *bind_address;
-extern struct exclude_struct **server_exclude_list;
+extern struct exclude_list_struct server_exclude_list;
 extern char *exclude_path_prefix;
 extern char *config_file;
 
