@@ -108,10 +108,9 @@ static int delete_item(char *fname, int mode, int flags)
 	int j, dlen, zap_dir, ok;
 	void *save_filters;
 
-	if (max_delete && deletion_count >= max_delete)
-		return -1;
-
 	if (!S_ISDIR(mode)) {
+		if (max_delete && ++deletion_count > max_delete)
+			return 0;
 		if (make_backups && (backup_dir || !is_backup_file(fname)))
 			ok = make_backup(fname);
 		else
@@ -119,11 +118,12 @@ static int delete_item(char *fname, int mode, int flags)
 		if (ok) {
 			if (!(flags & DEL_TERSE))
 				log_delete(fname, mode);
-			deletion_count++;
 			return 0;
 		}
-		if (errno == ENOENT)
+		if (errno == ENOENT) {
+			deletion_count--;
 			return 0;
+		}
 		rsyserr(FERROR, errno, "delete_file: unlink %s failed",
 			full_fname(fname));
 		return -1;
@@ -131,7 +131,8 @@ static int delete_item(char *fname, int mode, int flags)
 
 	zap_dir = (flags & DEL_FORCE_RECURSE || (force_delete && recurse))
 		&& !(flags & DEL_NO_RECURSE);
-	if (dry_run && zap_dir) {
+	if ((max_delete && ++deletion_count > max_delete)
+	    || (dry_run && zap_dir)) {
 		ok = 0;
 		errno = ENOTEMPTY;
 	} else if (make_backups && !backup_dir && !is_backup_file(fname)
@@ -142,17 +143,19 @@ static int delete_item(char *fname, int mode, int flags)
 	if (ok) {
 		if (!(flags & DEL_TERSE))
 			log_delete(fname, mode);
-		deletion_count++;
 		return 0;
 	}
-	if (errno == ENOENT)
+	if (errno == ENOENT) {
+		deletion_count--;
 		return 0;
+	}
 	if (!zap_dir || (errno != ENOTEMPTY && errno != EEXIST)) {
 		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
 			full_fname(fname));
 		return -1;
 	}
 	flags |= DEL_FORCE_RECURSE; /* mark subdir dels as not "in the way" */
+	deletion_count--;
 
 	dlen = strlcpy(buf, fname, MAXPATHLEN);
 	save_filters = push_local_filters(buf, dlen);
@@ -174,13 +177,12 @@ static int delete_item(char *fname, int mode, int flags)
 
 	pop_local_filters(save_filters);
 
-	if (max_delete && deletion_count >= max_delete)
-		return -1;
+	if (max_delete && ++deletion_count > max_delete)
+		return 0;
 
 	if (do_rmdir(fname) == 0) {
 		if (!(flags & DEL_TERSE))
 			log_delete(fname, mode);
-		deletion_count++;
 	} else if (errno != ENOTEMPTY && errno != ENOENT) {
 		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
 			full_fname(fname));
@@ -201,6 +203,7 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 {
 	static int min_depth = MAXPATHLEN, cur_depth = -1;
 	static void *filt_array[MAXPATHLEN/2+1];
+	static int already_output_warning = 0;
 	struct file_list *dirlist;
 	char delbuf[MAXPATHLEN];
 	STRUCT_STAT st;
@@ -223,13 +226,12 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 	if (file->dir.depth >= MAXPATHLEN/2+1)
 		return; /* Impossible... */
 
-	if (max_delete && deletion_count >= max_delete)
-		return;
-
 	if (io_error && !(lp_ignore_errors(module_id) || ignore_errors)) {
+		if (already_output_warning)
+			return;
 		rprintf(FINFO,
 			"IO error encountered -- skipping file deletion\n");
-		max_delete = -1; /* avoid duplicating the above warning */
+		already_output_warning = 1;
 		return;
 	}
 
@@ -271,6 +273,9 @@ static void do_delete_pass(struct file_list *flist)
 {
 	char fbuf[MAXPATHLEN];
 	int j;
+
+	if (dry_run > 1) /* destination doesn't exist yet */
+		return;
 
 	for (j = 0; j < flist->count; j++) {
 		struct file_struct *file = flist->files[j];
@@ -709,7 +714,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (set_perms(fname, file, statret ? NULL : &st, 0)
 		    && verbose && code && f_out != -1)
 			rprintf(code, "%s/\n", safe_fname(fname));
-		if (delete_during && f_out != -1 && !phase
+		if (delete_during && f_out != -1 && !phase && dry_run < 2
 		    && (file->flags & FLAG_DEL_HERE))
 			delete_in_dir(the_file_list, fname, file);
 		return;
@@ -1232,6 +1237,13 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 		}
 	}
 	recv_generator(NULL, NULL, 0, 0, 0, code, -1, -1);
+
+	if (max_delete > 0 && deletion_count > max_delete) {
+		rprintf(FINFO,
+			"Deletions stopped due to --max-delete limit (%d skipped)\n",
+			deletion_count - max_delete);
+		io_error |= IOERR_DEL_LIMIT;
+	}
 
 	if (verbose > 2)
 		rprintf(FINFO,"generate_files finished\n");
