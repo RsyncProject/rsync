@@ -78,6 +78,14 @@ Changes since 2.6.3:
     - The --inplace support was enhanced to work with --compare-dest,
       --link-dest, and (the new) --copy-dest options.
 
+    - Added the --dirs option for an easier way to copy directories
+      without recursion.
+
+    - Added the --list-only option which is mainly a way for the client to
+      put the server into listing mode without needing to resort to any
+      option kluges (e.g. the age-old use of "-r --exclude="/*/*" for a
+      non-recursive listing).
+
     - Added support/atomic-rsync -- a perl script that will transfer some
       files using rsync, and then move the updated files into place all at
       once at the end of the transfer.  Only works when pulling, and uses
