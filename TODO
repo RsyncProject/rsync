@@ -151,6 +151,10 @@ hang/timeout friendliness
 
   On 
 
+verbose output
+  
+  Indicate whether files are new, updated, or deleted
+
 internationalization
 
   Change to using gettext().  Probably need to ship this for platforms
