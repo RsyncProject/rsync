@@ -396,7 +396,7 @@ void write_batch_csum_info(int *flist_entry, int flist_count,
 			   struct sum_struct *s)
 {
 	int i;
-	int int_zero = 0;
+	unsigned int int_zero = 0;
 	extern int csum_length;
 
 	fdb_open = 1;
