@@ -1,5 +1,10 @@
 rsync 2.5.3 (not released yet)
 
+  SECURITY FIXES:
+
+    * Make sure that supplementary groups are removed from a server
+      process after changing uid and gid. (Ethan Benson)
+
   ENHANCEMENTS:
 
     * Command to initiate connections is only shown with -vv, rather

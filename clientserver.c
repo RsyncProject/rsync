@@ -294,6 +294,16 @@ static int rsync_module(int fd, int i)
 			return -1;
 		}
 
+#ifdef HAVE_SETGROUPS
+		/* Get rid of any supplementary groups this process
+		 * might have inheristed. */
+		if (setgroups(0, NULL)) {
+			rsyserr(FERROR, errno, "setgroups failed");
+			io_printf(fd, "@ERROR: setgroups failed\n");
+			return -1;
+		}
+#endif
+
 		am_root = (getuid() == 0);
 	}
 

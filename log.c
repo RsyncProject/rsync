@@ -342,6 +342,8 @@ void rsyserr(enum logcode code, int errcode, const char *format, ...)
 	len = vsnprintf(buf, sizeof(buf), format, ap);
 	va_end(ap);
 
+	/* TODO: Put in RSYNC_NAME at the start. */
+
 	if ((size_t) len > sizeof(buf)-1)
 		exit_cleanup(RERR_MESSAGEIO);
 
