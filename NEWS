@@ -1,4 +1,5 @@
 NEWS for rsync version 2.5.6, aka the dwd-between-jobs release
+Protocol: 26 (unchanged)
 Changes since version 2.5.5:
 
   ENHANCEMENTS:
