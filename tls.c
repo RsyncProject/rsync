@@ -1,16 +1,16 @@
 /* -*- c-file-style: "linux" -*-
  *
  * Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version
  * 2 as published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -86,7 +86,7 @@ static void list_file (const char *fname)
 		strcpy(linkbuf, " -> ");
 		/* const-cast required for silly UNICOS headers */
 		len = readlink((char *) fname, linkbuf+4, sizeof(linkbuf) - 4);
-		if (len == -1) 
+		if (len == -1)
 			failed("readlink", fname);
 		else
 			/* it's not nul-terminated */
@@ -99,7 +99,7 @@ static void list_file (const char *fname)
 
 	if (buf.st_mtime) {
 		mt = gmtime(&buf.st_mtime);
-		
+
 		sprintf(datebuf, "%04d-%02d-%02d %02d:%02d:%02d",
 			mt->tm_year + 1900,
 			mt->tm_mon + 1,
@@ -110,15 +110,16 @@ static void list_file (const char *fname)
 	} else {
 		strcpy(datebuf, "                   ");
 	}
-	
+
 	/* TODO: Perhaps escape special characters in fname? */
-	
-	
-	/* NB: need to pass size as a double because it might be be
-	 * too large for a long. */
-	printf("%s %12.0f %6ld.%-6ld %6ld %s %s%s\n",
-	       permbuf, (double)buf.st_size, (long)buf.st_uid,
-	       (long)buf.st_gid, (long)buf.st_nlink,
+
+	printf("%s ", permbuf);
+	if (IS_DEVICE(buf.st_mode))
+		printf("%6d,%5d", major(buf.st_rdev), minor(buf.st_rdev));
+	else /* NB: use double for size because it might not fit in a long. */
+		printf("%12.0f", (double)buf.st_size);
+	printf(" %6ld.%-6ld %6ld %s %s%s\n",
+	       (long)buf.st_uid, (long)buf.st_gid, (long)buf.st_nlink,
 	       datebuf, fname, linkbuf);
 }
 
