@@ -44,7 +44,12 @@ in string values.
 manpagesection(LAUNCHING THE RSYNC DAEMON)
 
 The rsync daemon is launched by specifying the --daemon option to
-rsync. The daemon must run with root privileges.
+rsync. 
+
+The daemon must run with root privileges if you wish to use chroot, to
+bind to a port numbered under 1024 (as is the default 873), or to set
+file ownership.  Otherwise, it must just have permission to read and
+write the appropriate data, log, and lock files.
 
 You can launch it either via inetd or as a stand-alone daemon. If run
 as a daemon then just run the command "rsync --daemon" from a suitable

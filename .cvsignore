@@ -1,5 +1,7 @@
-.ignore
+
 .cvsignore
+.ignore
+ID
 Makefile
 a
 b
@@ -18,4 +20,3 @@ tech_report.dvi
 tech_report.log
 tech_report.ps
 test
-
