@@ -246,8 +246,8 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 					return;
 				}
 			}
+			delete_file(fname);
 		}
-		delete_file(fname);
 		if (do_symlink(file->link,fname) != 0) {
 			rprintf(FERROR,"symlink %s -> %s : %s\n",
 				fname,file->link,strerror(errno));
