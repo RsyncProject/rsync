@@ -137,13 +137,15 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 			offset = strlen(file->basedir)+1;
 		}
 		strlcat(fname,f_name(file),MAXPATHLEN-strlen(fname));
+		clean_fname(fname);
 	  
 		if (verbose > 2) 
 			rprintf(FINFO,"send_files(%d,%s)\n",i,fname);
 	  
 		if (dry_run) {	
-			if (!am_server && verbose)
-				rprintf(FINFO,"%s\n",fname);
+			if (!am_server) {
+				log_transfer(file, fname+offset);
+			}
 			write_int(f_out,i);
 			continue;
 		}
@@ -182,6 +184,8 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 		if (verbose > 2)
 			rprintf(FINFO,"send_files mapped %s of size %d\n",
 				fname,(int)st.st_size);
+
+		log_send(file);
 	  
 		write_int(f_out,i);
 	  
@@ -192,8 +196,9 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 		if (verbose > 2)
 			rprintf(FINFO,"calling match_sums %s\n",fname);
 	  
-		if (!am_server && verbose)
-			rprintf(FINFO,"%s\n",fname+offset);
+		if (!am_server) {
+			log_transfer(file, fname+offset);
+		}
 	  
 		match_sums(f_out,s,buf,st.st_size);
 	  

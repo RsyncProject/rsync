@@ -119,6 +119,12 @@ void rprintf(int fd, const char *format, ...)
 
 	buf[len] = 0;
 
+	if (fd == FLOG) {
+		if (am_daemon) logit(LOG_INFO, buf);
+		depth--;
+		return;
+	}
+
 	if (am_daemon) {
 		int priority = LOG_INFO;
 		if (fd == FERROR) priority = LOG_WARNING;
@@ -178,3 +184,36 @@ void rflush(int fd)
 	fflush(f);
 }
 
+
+/* log the outgoing transfer of a file */
+void log_send(struct file_struct *file)
+{
+	extern int module_id;
+	if (lp_transfer_logging(module_id)) {
+		rprintf(FLOG,"Sending %s [%s] %.0f %s\n",
+			client_name(0), client_addr(0),
+			(double)file->length, f_name(file));
+	}
+}
+
+/* log the incoming transfer of a file */
+void log_recv(struct file_struct *file)
+{
+	extern int module_id;
+	if (lp_transfer_logging(module_id)) {
+		rprintf(FLOG,"Receiving %s [%s] %.0f %s\n",
+			client_name(0), client_addr(0),
+			(double)file->length, f_name(file));
+	}
+}
+
+/* log the incoming transfer of a file for interactive use, this
+   will be called at the end where the client was run */
+void log_transfer(struct file_struct *file, char *fname)
+{
+	extern int verbose;
+
+	if (!verbose) return;
+
+	rprintf(FINFO,"%s\n", fname);
+}

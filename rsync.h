@@ -59,6 +59,7 @@
 #define MPLEX_BASE 7
 #define FERROR 1
 #define FINFO 2
+#define FLOG 3
 
 #include "config.h"
 

@@ -292,7 +292,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	struct file_struct *file;
 	int phase=0;
 	int recv_ok;
-	
+	extern int module_id;
+
 	if (verbose > 2) {
 		rprintf(FINFO,"recv_files(%d) starting\n",flist->count);
 	}
@@ -333,8 +334,9 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			fname = local_name;
 
 		if (dry_run) {
-			if (!am_server && verbose)
-				rprintf(FINFO,"%s\n",fname);
+			if (!am_server) {
+				log_transfer(file, fname);
+			}
 			continue;
 		}
 
@@ -413,8 +415,11 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
       
 		cleanup_set(fnametmp, fname, file, buf, fd1, fd2);
 
-		if (!am_server && verbose)
-			rprintf(FINFO,"%s\n",fname);
+		if (!am_server) {
+			log_transfer(file, fname);
+		}
+
+		log_recv(file);
 		
 		/* recv file data */
 		recv_ok = receive_data(f_in,buf,fd2,fname,file->length);

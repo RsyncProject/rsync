@@ -107,6 +107,11 @@ ftp, kern, lpr, mail, news, security, syslog, user, uucp, local0,
 local1, local2, local3, local4, local5, local6 and local7. The default
 is daemon. 
 
+dit(bf(transfer file)) The "transfer logging" option enables per-file 
+logging of downloads and uploads in a format somewhat similar to that
+used by ftp daemons. If you want to customise the log formats look at
+log_send, log_recv and log_transfer in log.c
+
 dit(bf(socket options)) This option can provide endless fun for people
 who like to tune their systems to the utmost degree. You can set all
 sorts of socket options which may make transfers faster (or

@@ -36,7 +36,7 @@ static void report(int f)
 	extern int do_stats;
 
 	if (am_daemon) {
-		syslog(LOG_INFO,"wrote %.0f bytes  read %.0f bytes  total size %.0f\n",
+		rprintf(FLOG,"wrote %.0f bytes  read %.0f bytes  total size %.0f\n",
 		       (double)stats.total_written,
 		       (double)stats.total_read,
 		       (double)stats.total_size);

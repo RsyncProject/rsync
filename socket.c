@@ -320,13 +320,17 @@ char *client_addr(int fd)
 	struct sockaddr_in *sockin = (struct sockaddr_in *) (&sa);
 	int     length = sizeof(sa);
 	static char addr_buf[100];
+	static int initialised;
+
+	if (initialised) return addr_buf;
+
+	initialised = 1;
 
 	if (getpeername(fd, &sa, &length)) {
 		exit_cleanup(1);
 	}
-
+	
 	strlcpy(addr_buf,(char *)inet_ntoa(sockin->sin_addr), sizeof(addr_buf)-1);
-
 	return addr_buf;
 }
 
@@ -343,6 +347,11 @@ char *client_name(int fd)
 	struct hostent *hp;
 	char **p;
 	char *def = "UNKNOWN";
+	static int initialised;
+
+	if (initialised) return name_buf;
+
+	initialised = 1;
 
 	strcpy(name_buf,def);
 

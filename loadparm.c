@@ -120,6 +120,7 @@ typedef struct
 	BOOL read_only;
 	BOOL list;
 	BOOL use_chroot;
+	BOOL transfer_logging;
 	char *uid;
 	char *gid;
 	char *hosts_allow;
@@ -140,6 +141,7 @@ static service sDefault =
 	True,    /* read only */
 	True,    /* list */
 	True,    /* use chroot */
+	False,   /* transfer logging */
 	"nobody",/* uid */
 	"nobody",/* gid */
 	NULL,    /* hosts allow */
@@ -252,6 +254,7 @@ static struct parm_struct parm_table[] =
   {"secrets file",     P_STRING,  P_LOCAL,  &sDefault.secrets_file,NULL,   0},
   {"exclude",          P_STRING,  P_LOCAL,  &sDefault.exclude,     NULL,   0},
   {"exclude from",     P_STRING,  P_LOCAL,  &sDefault.exclude_from,NULL,   0},
+  {"transfer logging", P_BOOL,    P_LOCAL,  &sDefault.transfer_logging,NULL,0},
   {NULL,               P_BOOL,    P_NONE,   NULL,                  NULL,   0}
 };
 
@@ -314,6 +317,7 @@ FN_LOCAL_STRING(lp_path, path)
 FN_LOCAL_BOOL(lp_read_only, read_only)
 FN_LOCAL_BOOL(lp_list, list)
 FN_LOCAL_BOOL(lp_use_chroot, use_chroot)
+FN_LOCAL_BOOL(lp_transfer_logging, transfer_logging)
 FN_LOCAL_STRING(lp_uid, uid)
 FN_LOCAL_STRING(lp_gid, gid)
 FN_LOCAL_STRING(lp_hosts_allow, hosts_allow)
