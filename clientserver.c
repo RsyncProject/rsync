@@ -233,10 +233,10 @@ static int rsync_module(int f_in, int f_out, int i)
 
 	if (!claim_connection(lp_lock_file(i), lp_max_connections(i))) {
 		if (errno) {
-			rprintf(FERROR,"failed to open lock file %s : %s\n",
-				lp_lock_file(i), strerror(errno));
-			io_printf(f_out, "@ERROR: failed to open lock file %s : %s\n",
-				  lp_lock_file(i), strerror(errno));
+			rsyserr(FERROR, errno, "failed to open lock file %s",
+				lp_lock_file(i));
+			io_printf(f_out, "@ERROR: failed to open lock file %s\n",
+				  lp_lock_file(i));
 		} else {
 			rprintf(FERROR,"max connections (%d) reached\n",
 				lp_max_connections(i));

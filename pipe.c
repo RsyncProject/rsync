@@ -52,14 +52,14 @@ pid_t piped_child(char **command, int *f_in, int *f_out)
 	}
 
 	if (fd_pair(to_child_pipe) < 0 || fd_pair(from_child_pipe) < 0) {
-		rprintf(FERROR, "pipe: %s\n", strerror(errno));
+		rsyserr(FERROR, errno, "pipe");
 		exit_cleanup(RERR_IPC);
 	}
 
 
 	pid = do_fork();
 	if (pid == -1) {
-		rprintf(FERROR, "fork: %s\n", strerror(errno));
+		rsyserr(FERROR, errno, "fork");
 		exit_cleanup(RERR_IPC);
 	}
 
@@ -68,8 +68,7 @@ pid_t piped_child(char **command, int *f_in, int *f_out)
 		    close(to_child_pipe[1]) < 0 ||
 		    close(from_child_pipe[0]) < 0 ||
 		    dup2(from_child_pipe[1], STDOUT_FILENO) < 0) {
-			rprintf(FERROR, "Failed to dup/close : %s\n",
-				strerror(errno));
+			rsyserr(FERROR, errno, "Failed to dup/close");
 			exit_cleanup(RERR_IPC);
 		}
 		if (to_child_pipe[0] != STDIN_FILENO)
@@ -81,13 +80,12 @@ pid_t piped_child(char **command, int *f_in, int *f_out)
 		if (blocking_io > 0)
 			set_blocking(STDOUT_FILENO);
 		execvp(command[0], command);
-		rprintf(FERROR, "Failed to exec %s : %s\n",
-			command[0], strerror(errno));
+		rsyserr(FERROR, errno, "Failed to exec %s", command[0]);
 		exit_cleanup(RERR_IPC);
 	}
 
 	if (close(from_child_pipe[1]) < 0 || close(to_child_pipe[0]) < 0) {
-		rprintf(FERROR, "Failed to close : %s\n", strerror(errno));
+		rsyserr(FERROR, errno, "Failed to close");
 		exit_cleanup(RERR_IPC);
 	}
 
@@ -106,14 +104,14 @@ pid_t local_child(int argc, char **argv,int *f_in,int *f_out,
 
 	if (fd_pair(to_child_pipe) < 0 ||
 	    fd_pair(from_child_pipe) < 0) {
-		rprintf(FERROR,"pipe: %s\n",strerror(errno));
+		rsyserr(FERROR, errno, "pipe");
 		exit_cleanup(RERR_IPC);
 	}
 
 
 	pid = do_fork();
 	if (pid == -1) {
-		rprintf(FERROR,"fork: %s\n",strerror(errno));
+		rsyserr(FERROR, errno, "fork");
 		exit_cleanup(RERR_IPC);
 	}
 
@@ -128,7 +126,7 @@ pid_t local_child(int argc, char **argv,int *f_in,int *f_out,
 		    close(to_child_pipe[1]) < 0 ||
 		    close(from_child_pipe[0]) < 0 ||
 		    dup2(from_child_pipe[1], STDOUT_FILENO) < 0) {
-			rprintf(FERROR,"Failed to dup/close : %s\n",strerror(errno));
+			rsyserr(FERROR, errno, "Failed to dup/close");
 			exit_cleanup(RERR_IPC);
 		}
 		if (to_child_pipe[0] != STDIN_FILENO) close(to_child_pipe[0]);
@@ -141,7 +139,7 @@ pid_t local_child(int argc, char **argv,int *f_in,int *f_out,
 
 	if (close(from_child_pipe[1]) < 0 ||
 	    close(to_child_pipe[0]) < 0) {
-		rprintf(FERROR,"Failed to close : %s\n",strerror(errno));   
+		rsyserr(FERROR, errno, "Failed to close");   
 		exit_cleanup(RERR_IPC);
 	}
 

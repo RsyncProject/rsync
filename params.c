@@ -491,8 +491,8 @@ static FILE *OpenConfFile( char *FileName )
   OpenedFile = fopen( FileName, "r" );
   if( NULL == OpenedFile )
     {
-    rprintf(FERROR,"rsync: unable to open configuration file \"%s\": %s\n",
-	    FileName, strerror(errno));
+    rsyserr(FERROR, errno, "rsync: unable to open configuration file \"%s\"",
+	    FileName);
     }
 
   return( OpenedFile );

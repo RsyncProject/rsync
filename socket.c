@@ -71,15 +71,13 @@ static int establish_proxy_connection(int fd, char *host, int port,
 		 host, port, authhdr, authbuf);
 	len = strlen(buffer);
 	if (write(fd, buffer, len) != len) {
-		rprintf(FERROR, "failed to write to proxy: %s\n",
-			strerror(errno));
+		rsyserr(FERROR, errno, "failed to write to proxy");
 		return -1;
 	}
 
 	for (cp = buffer; cp < &buffer[sizeof buffer - 1]; cp++) {
 		if (read(fd, cp, 1) != 1) {
-			rprintf(FERROR, "failed to read from proxy: %s\n",
-				strerror(errno));
+			rsyserr(FERROR, errno, "failed to read from proxy");
 			return -1;
 		}
 		if (*cp == '\n')
@@ -108,8 +106,8 @@ static int establish_proxy_connection(int fd, char *host, int port,
 	while (1) {
 		for (cp = buffer; cp < &buffer[sizeof buffer - 1]; cp++) {
 			if (read(fd, cp, 1) != 1) {
-				rprintf(FERROR, "failed to read from proxy: %s\n",
-					strerror(errno));
+				rsyserr(FERROR, errno,
+					"failed to read from proxy");
 				return -1;
 			}
 			if (*cp == '\n')
@@ -278,8 +276,7 @@ int open_socket_out(char *host, int port, const char *bind_address,
 	}
 	freeaddrinfo(res0);
 	if (s < 0) {
-		rprintf(FERROR, RSYNC_NAME ": failed to connect to %s: %s\n",
-			h, strerror(errno));
+		rsyserr(FERROR, errno, "failed to connect to %s", h);
 		return -1;
 	}
 	return s;
@@ -450,8 +447,7 @@ void start_accept_loop(int port, int (*fn)(int, int))
 	FD_ZERO(&deffds);
 	for (i = 0, maxfd = -1; sp[i] >= 0; i++) {
 		if (listen(sp[i], 5) < 0) {
-			rprintf(FERROR, "listen() on socket failed: %s\n",
-				strerror(errno));
+			rsyserr(FERROR, errno, "listen() on socket failed");
 #ifdef INET6
 			if (errno == EADDRINUSE && i > 0) {
 				rprintf(FINFO,
@@ -513,10 +509,8 @@ void start_accept_loop(int port, int (*fn)(int, int))
 			close_all();
 			_exit(ret);
 		} else if (pid < 0) {
-			rprintf(FERROR,
-				RSYNC_NAME
-				": could not create child server process: %s\n",
-				strerror(errno));
+			rsyserr(FERROR, errno,
+				"could not create child server process");
 			close(fd);
 			/* This might have happened because we're
 			 * overloaded.  Sleep briefly before trying to
@@ -633,9 +627,10 @@ void set_socket_options(int fd, char *options)
 			break;
 		}
 
-		if (ret != 0)
-			rprintf(FERROR, "failed to set socket option %s: %s\n", tok,
-				strerror(errno));
+		if (ret != 0) {
+			rsyserr(FERROR, errno,
+				"failed to set socket option %s", tok);
+		}
 	}
 
 	free(options);
@@ -765,8 +760,7 @@ int sock_exec(const char *prog)
 	int fd[2];
 
 	if (socketpair_tcp(fd) != 0) {
-		rprintf(FERROR, RSYNC_NAME ": socketpair_tcp failed (%s)\n",
-			strerror(errno));
+		rsyserr(FERROR, errno, "socketpair_tcp failed");
 		return -1;
 	}
 	if (verbose >= 2)

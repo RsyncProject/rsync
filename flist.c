@@ -778,8 +778,8 @@ struct file_struct *make_file(char *fname,
 		}
 		else {
 			io_error |= IOERR_GENERAL;
-			rprintf(FERROR, "readlink %s failed: %s\n",
-			    full_fname(thisname), strerror(save_errno));
+			rsyserr(FERROR, save_errno, "readlink %s failed",
+				full_fname(thisname));
 		}
 		return NULL;
 	}
@@ -970,8 +970,7 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 	d = opendir(dir);
 	if (!d) {
 		io_error |= IOERR_GENERAL;
-		rprintf(FERROR, "opendir %s failed: %s\n",
-			full_fname(dir), strerror(errno));
+		rsyserr(FERROR, errno, "opendir %s failed", full_fname(dir));
 		return;
 	}
 
@@ -1018,8 +1017,7 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 	}
 	if (errno) {
 		io_error |= IOERR_GENERAL;
-		rprintf(FERROR, "readdir(%s): (%d) %s\n",
-			dir, errno, strerror(errno));
+		rsyserr(FERROR, errno, "readdir(%s)", dir);
 	}
 
 	closedir(d);
@@ -1054,8 +1052,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		io_start_buffering_out(f);
 		if (filesfrom_fd >= 0) {
 			if (argv[0] && !push_dir(argv[0])) {
-				rprintf(FERROR, "push_dir %s failed: %s\n",
-					full_fname(argv[0]), strerror(errno));
+				rsyserr(FERROR, errno, "push_dir %s failed",
+					full_fname(argv[0]));
 				exit_cleanup(RERR_FILESELECT);
 			}
 			use_ff_fd = 1;
@@ -1092,8 +1090,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (link_stat(fname, &st) != 0) {
 			if (f != -1) {
 				io_error |= IOERR_GENERAL;
-				rprintf(FERROR, "link_stat %s failed: %s\n",
-					full_fname(fname), strerror(errno));
+				rsyserr(FERROR, errno, "link_stat %s failed",
+					full_fname(fname));
 			}
 			continue;
 		}
@@ -1162,8 +1160,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 			if (!push_dir(dir)) {
 				io_error |= IOERR_GENERAL;
-				rprintf(FERROR, "push_dir %s failed: %s\n",
-					full_fname(dir), strerror(errno));
+				rsyserr(FERROR, errno, "push_dir %s failed",
+					full_fname(dir));
 				continue;
 			}
 
@@ -1185,8 +1183,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			flist_dir = NULL;
 			flist_dir_len = 0;
 			if (!pop_dir(olddir)) {
-				rprintf(FERROR, "pop_dir %s failed: %s\n",
-					full_fname(dir), strerror(errno));
+				rsyserr(FERROR, errno, "pop_dir %s failed",
+					full_fname(dir));
 				exit_cleanup(RERR_FILESELECT);
 			}
 		}

@@ -34,8 +34,7 @@ void write_batch_flist_info(int flist_count, struct file_struct **files)
 
 	f = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
 	if (f < 0) {
-		rprintf(FERROR, "Batch file %s open error: %s\n",
-		    filename, strerror(errno));
+		rsyserr(FERROR, errno, "Batch file %s open error", filename);
 		exit_cleanup(1);
 	}
 
@@ -72,8 +71,7 @@ void write_batch_argvs_file(int argc, char *argv[])
 	f = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 	    S_IRUSR | S_IWUSR | S_IEXEC);
 	if (f < 0) {
-		rprintf(FERROR, "Batch file %s open error: %s\n",
-		    filename, strerror(errno));
+		rsyserr(FERROR, errno, "Batch file %s open error", filename);
 		exit_cleanup(1);
 	}
 	buff[0] = '\0';
@@ -111,8 +109,7 @@ void write_batch_argvs_file(int argc, char *argv[])
 	}
 	strlcat(buff, "\n", sizeof buff);
 	if (!write(f, buff, strlen(buff))) {
-		rprintf(FERROR, "Batch file %s write error: %s\n",
-		    filename, strerror(errno));
+		rsyserr(FERROR, errno, "Batch file %s write error", filename);
 		close(f);
 		exit_cleanup(1);
 	}
@@ -131,8 +128,7 @@ struct file_list *create_flist_from_batch(void)
 
 	f = do_open(filename, O_RDONLY, 0);
 	if (f < 0) {
-		rprintf(FERROR, "Batch file %s open error: %s\n",
-		    filename, strerror(errno));
+		rsyserr(FERROR, errno, "Batch file %s open error", filename);
 		exit_cleanup(1);
 	}
 
@@ -161,8 +157,7 @@ struct file_list *create_flist_from_batch(void)
 void write_batch_csums_file(void *buff, int bytes_to_write)
 {
 	if (write(f_csums, buff, bytes_to_write) < 0) {
-		rprintf(FERROR, "Batch file write error: %s\n",
-		    strerror(errno));
+		rsyserr(FERROR, errno, "Batch file write error");
 		close(f_csums);
 		exit_cleanup(1);
 	}
@@ -196,8 +191,8 @@ void write_batch_csum_info(int *flist_entry, struct sum_struct *s)
 		f_csums = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 		    S_IRUSR | S_IWUSR);
 		if (f_csums < 0) {
-			rprintf(FERROR, "Batch file %s open error: %s\n",
-			    filename, strerror(errno));
+			rsyserr(FERROR, errno, "Batch file %s open error",
+				filename);
 			close(f_csums);
 			exit_cleanup(1);
 		}
@@ -221,7 +216,7 @@ int read_batch_csums_file(char *buff, int len)
 	int bytes_read;
 
 	if ((bytes_read = read(f_csums, buff, len)) < 0) {
-		rprintf(FERROR, "Batch file read error: %s\n", strerror(errno));
+		rsyserr(FERROR, errno, "Batch file read error");
 		close(f_csums);
 		exit_cleanup(1);
 	}
@@ -244,8 +239,8 @@ void read_batch_csum_info(int flist_entry, struct sum_struct *s,
 
 		f_csums = do_open(filename, O_RDONLY, 0);
 		if (f_csums < 0) {
-			rprintf(FERROR, "Batch file %s open error: %s\n",
-			    filename, strerror(errno));
+			rsyserr(FERROR, errno, "Batch file %s open error",
+				filename);
 			close(f_csums);
 			exit_cleanup(1);
 		}
@@ -284,15 +279,14 @@ void write_batch_delta_file(char *buff, int bytes_to_write)
 		f_delta = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 				  S_IRUSR | S_IWUSR);
 		if (f_delta < 0) {
-			rprintf(FERROR, "Batch file %s open error: %s\n",
-				filename, strerror(errno));
+			rsyserr(FERROR, errno, "Batch file %s open error",
+				filename);
 			exit_cleanup(1);
 		}
 	}
 
 	if (write(f_delta, buff, bytes_to_write) < 0) {
-		rprintf(FERROR, "Batch file %s write error: %s\n",
-		    filename, strerror(errno));
+		rsyserr(FERROR, errno, "Batch file %s write error", filename);
 		close(f_delta);
 		exit_cleanup(1);
 	}
@@ -315,8 +309,8 @@ int read_batch_delta_file(char *buff, int len)
 
 		f_delta = do_open(filename, O_RDONLY, 0);
 		if (f_delta < 0) {
-			rprintf(FERROR, "Batch file %s open error: %s\n",
-			    filename, strerror(errno));
+			rsyserr(FERROR, errno, "Batch file %s open error",
+				filename);
 			close(f_delta);
 			exit_cleanup(1);
 		}
@@ -324,8 +318,7 @@ int read_batch_delta_file(char *buff, int len)
 
 	bytes_read = read(f_delta, buff, len);
 	if (bytes_read < 0) {
-		rprintf(FERROR, "Batch file %s read error: %s\n",
-		    filename, strerror(errno));
+		rsyserr(FERROR, errno, "Batch file %s read error", filename);
 		close(f_delta);
 		exit_cleanup(1);
 	}

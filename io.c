@@ -1,19 +1,19 @@
 /* -*- c-file-style: "linux" -*-
- * 
- * Copyright (C) 1996-2001 by Andrew Tridgell 
+ *
+ * Copyright (C) 1996-2001 by Andrew Tridgell
  * Copyright (C) Paul Mackerras 1996
  * Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -137,7 +137,7 @@ static void check_timeout(void)
 
 	if (last_io && io_timeout && (t-last_io) >= io_timeout) {
 		if (!am_server && !am_daemon) {
-			rprintf(FERROR,"io timeout after %d seconds - exiting\n", 
+			rprintf(FERROR, "io timeout after %d seconds - exiting\n",
 				(int)(t-last_io));
 		}
 		exit_cleanup(RERR_TIMEOUT);
@@ -334,10 +334,9 @@ static void whine_about_eof(void)
 	if (kludge_around_eof)
 		exit_cleanup(0);
 	else {
-		rprintf(FERROR,
-			"%s: connection unexpectedly closed "
+		rprintf(FERROR, RSYNC_NAME ": connection unexpectedly closed "
 			"(%.0f bytes read so far)\n",
-			RSYNC_NAME, (double)stats.total_read);
+			(double)stats.total_read);
 
 		exit_cleanup(RERR_STREAMIO);
 	}
@@ -349,8 +348,7 @@ static void die_from_readerr(int err)
 	/* this prevents us trying to write errors on a dead socket */
 	io_multiplexing_close();
 
-	rprintf(FERROR, "%s: read error: %s\n",
-		RSYNC_NAME, strerror(err));
+	rsyserr(FERROR, err, "read error");
 	exit_cleanup(RERR_STREAMIO);
 }
 
@@ -368,7 +366,7 @@ static void die_from_readerr(int err)
  */
 static int read_timeout(int fd, char *buf, size_t len)
 {
-	int n, ret=0;
+	int n, ret = 0;
 
 	io_flush(NORMAL_FLUSH);
 
@@ -508,8 +506,8 @@ static int read_timeout(int fd, char *buf, size_t len)
 			whine_about_eof();
 			return -1; /* doesn't return */
 		} else if (n < 0) {
-			if (errno == EINTR || errno == EWOULDBLOCK ||
-			    errno == EAGAIN) 
+			if (errno == EINTR || errno == EWOULDBLOCK
+			    || errno == EAGAIN)
 				continue;
 			die_from_readerr(errno);
 		}
@@ -587,8 +585,8 @@ static void read_loop(int fd, char *buf, size_t len)
 /**
  * Read from the file descriptor handling multiplexing - return number
  * of bytes read.
- * 
- * Never returns <= 0. 
+ *
+ * Never returns <= 0.
  */
 static int read_unbuffered(int fd, char *buf, size_t len)
 {
@@ -671,7 +669,7 @@ static int read_unbuffered(int fd, char *buf, size_t len)
 static void readfd(int fd, char *buffer, size_t N)
 {
 	int  ret;
-	size_t total=0;  
+	size_t total = 0;
 
 	while (total < N) {
 		ret = read_unbuffered(fd, buffer + total, N-total);
@@ -785,7 +783,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 		if (msg_fd_in >= 0) {
 			FD_ZERO(&r_fds);
 			FD_SET(msg_fd_in,&r_fds);
-			if (msg_fd_in > fd_count) 
+			if (msg_fd_in > fd_count)
 				fd_count = msg_fd_in;
 		}
 
@@ -829,15 +827,14 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 				/* Don't try to write errors back
 				 * across the stream */
 				io_multiplexing_close();
-				rprintf(FERROR, RSYNC_NAME
-					": writefd_unbuffered failed to write %ld bytes: phase \"%s\": %s\n",
-					(long) len, io_write_phase, 
-					strerror(errno));
+				rsyserr(FERROR, errno,
+					"writefd_unbuffered failed to write %ld bytes: phase \"%s\"",
+					(long) len, io_write_phase);
 				exit_cleanup(RERR_STREAMIO);
 			}
 
 			sleep_for_bwlimit(ret);
- 
+
 			total += ret;
 
 			if (io_timeout)
@@ -896,7 +893,7 @@ static void mplex_write(int fd, enum msgcode code, char *buf, size_t len)
 void io_flush(int flush_it_all)
 {
 	int fd = multiplex_out_fd;
-	
+
 	msg_list_push(flush_it_all);
 
 	if (!io_buffer_count || no_flush)
@@ -1033,7 +1030,7 @@ int read_line(int f, char *buf, size_t maxlen)
 
 void io_printf(int fd, const char *format, ...)
 {
-	va_list ap;  
+	va_list ap;
 	char buf[1024];
 	int len;
 

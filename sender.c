@@ -201,8 +201,9 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 						full_fname(fname));
 				} else {
 					io_error |= IOERR_GENERAL;
-					rprintf(FERROR, "send_files failed to open %s: %s\n",
-						full_fname(fname), strerror(errno));
+					rsyserr(FERROR, errno,
+						"send_files failed to open %s",
+						full_fname(fname));
 				}
 				free_sums(s);
 				continue;
@@ -211,7 +212,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			/* map the local file */
 			if (do_fstat(fd, &st) != 0) {
 				io_error |= IOERR_GENERAL;
-				rprintf(FERROR, "fstat failed: %s\n", strerror(errno));
+				rsyserr(FERROR, errno, "fstat failed");
 				free_sums(s);
 				close(fd);
 				return;
@@ -287,9 +288,9 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				j = unmap_file(mbuf);
 				if (j) {
 					io_error |= IOERR_GENERAL;
-					rprintf(FERROR,
-					    "read errors mapping %s: (%d) %s\n",
-					    full_fname(fname), j, strerror(j));
+					rsyserr(FERROR, j,
+						"read errors mapping %s",
+						full_fname(fname));
 				}
 			}
 			close(fd);

@@ -154,8 +154,8 @@ static void hard_link_one(char *hlink1, char *hlink2)
 {
 	if (do_link(hlink1, hlink2)) {
 		if (verbose) {
-			rprintf(FINFO, "link %s => %s failed: %s\n",
-			    hlink2, hlink1, strerror(errno));
+			rsyserr(FINFO, errno, "link %s => %s failed",
+				hlink2, hlink1);
 		}
 	}
 	else if (verbose)
@@ -196,10 +196,9 @@ void do_hard_links(void)
 						continue;
 				} else if (robust_unlink(hlink2)) {
 					if (verbose > 0) {
-						rprintf(FINFO,
-						    "unlink %s failed: %s\n",
-						    full_fname(hlink2), 
-						    strerror(errno));
+						rsyserr(FINFO, errno,
+							"unlink %s failed",
+							full_fname(hlink2));
 					}
 					continue;
 				}

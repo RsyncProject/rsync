@@ -170,8 +170,7 @@ void client_sockaddr(int fd,
 
 	if (getpeername(fd, (struct sockaddr *) ss, ss_len)) {
 		/* FIXME: Can we really not continue? */
-		rprintf(FERROR, RSYNC_NAME ": getpeername on fd%d failed: %s\n",
-			fd, strerror(errno));
+		rsyserr(FERROR, errno, "getpeername on fd%d failed", fd);
 		exit_cleanup(RERR_SOCKETIO);
 	}
 

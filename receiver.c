@@ -51,16 +51,17 @@ static void delete_one(char *fn, int is_dir)
 {
 	if (!is_dir) {
 		if (robust_unlink(fn) != 0) {
-			rprintf(FERROR, "delete_one: unlink %s failed: %s\n",
-				full_fname(fn), strerror(errno));
+			rsyserr(FERROR, errno, "delete_one: unlink %s failed",
+				full_fname(fn));
 		} else if (verbose) {
 			rprintf(FINFO, "deleting %s\n", fn);
 		}
 	} else {
 		if (do_rmdir(fn) != 0) {
 			if (errno != ENOTEMPTY && errno != EEXIST) {
-				rprintf(FERROR, "delete_one: rmdir %s failed: %s\n",
-					full_fname(fn), strerror(errno));
+				rsyserr(FERROR, errno,
+					"delete_one: rmdir %s failed",
+					full_fname(fn));
 			}
 		} else if (verbose) {
 			rprintf(FINFO, "deleting directory %s\n", fn);
@@ -223,8 +224,8 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
 			sum_update(data,i);
 
 			if (fd != -1 && write_file(fd,data,i) != i) {
-				rprintf(FERROR, "write failed on %s: %s\n",
-					full_fname(fname), strerror(errno));
+				rsyserr(FERROR, errno, "write failed on %s",
+					full_fname(fname));
 				exit_cleanup(RERR_FILEIO);
 			}
 			offset += i;
@@ -251,8 +252,8 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
 		}
 
 		if (fd != -1 && write_file(fd,map,len) != (int) len) {
-			rprintf(FERROR, "write failed on %s: %s\n",
-				full_fname(fname), strerror(errno));
+			rsyserr(FERROR, errno, "write failed on %s",
+				full_fname(fname));
 			exit_cleanup(RERR_FILEIO);
 		}
 		offset += len;
@@ -264,8 +265,8 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
 		end_progress(total_size);
 
 	if (fd != -1 && offset > 0 && sparse_end(fd) != 0) {
-		rprintf(FERROR, "write failed on %s: %s\n",
-			full_fname(fname), strerror(errno));
+		rsyserr(FERROR, errno, "write failed on %s",
+			full_fname(fname));
 		exit_cleanup(RERR_FILEIO);
 	}
 
@@ -371,8 +372,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 		}
 
 		if (fd1 != -1 && do_fstat(fd1,&st) != 0) {
-			rprintf(FERROR, "fstat %s failed: %s\n",
-				full_fname(fnamecmp), strerror(errno));
+			rsyserr(FERROR, errno, "fstat %s failed",
+				full_fname(fnamecmp));
 			receive_data(f_in,NULL,-1,NULL,file->length);
 			close(fd1);
 			continue;
@@ -436,8 +437,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 			fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
 		}
 		if (fd2 == -1) {
-			rprintf(FERROR, "mkstemp %s failed: %s\n",
-				full_fname(fnametmp), strerror(errno));
+			rsyserr(FERROR, errno, "mkstemp %s failed",
+				full_fname(fnametmp));
 			receive_data(f_in,mapbuf,-1,NULL,file->length);
 			if (mapbuf) unmap_file(mapbuf);
 			if (fd1 != -1) close(fd1);
@@ -460,8 +461,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 			close(fd1);
 		}
 		if (close(fd2) < 0) {
-			rprintf(FERROR, "close failed on %s: %s\n",
-				full_fname(fnametmp), strerror(errno));
+			rsyserr(FERROR, errno, "close failed on %s",
+				full_fname(fnametmp));
 			exit_cleanup(RERR_FILEIO);
 		}
 
