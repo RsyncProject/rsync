@@ -170,10 +170,10 @@ main(int argc, char **argv)
 
     /* Additional tests, including some malformed wildmats. */
     /* TEST, "text",		"pattern",		MATCH?, SAME-AS-FNMATCH? */
-    beg(500, "]",		"[\\-_]",		true,	false);
+    beg(500, "]",		"[\\-_]",		true,	true);
     beg(501, "[",		"[\\-_]",		false,	true);
     beg(502, ".",		"[\\\\-_]",		false,	true);
-    beg(503, "^",		"[\\\\-_]",		true,	false);
+    beg(503, "^",		"[\\\\-_]",		true,	true);
     beg(504, "Z",		"[\\\\-_]",		false,	true);
     beg(505, "\\",		"[\\]]",		false,	true);
     beg(506, "ab",		"a[]b",			false,	true);
@@ -202,15 +202,15 @@ main(int argc, char **argv)
     beg(529, "[",		"[!]-a]",		true,	true);
     beg(530, "^",		"[a^bc]",		true,	true);
     beg(531, "-b]",		"[a-]b]",		true,	true);
-    beg(532, "\\]",		"[\\]]",		true,	false);
-    beg(533, "\\",		"[\\]",			true,	false);
-    beg(534, "\\",		"[!\\]",		false,	false); /*FN?*/
-    beg(535, "G",		"[A-\\]",		true,	false);
+    beg(532, "\\]",		"[\\]]",		true,	true);
+    beg(533, "\\",		"[\\]",			true,	true);
+    beg(534, "\\",		"[!\\]",		false,	true);
+    beg(535, "G",		"[A-\\]",		true,	true);
     beg(536, "aaabbb",		"b*a",			false,	true);
     beg(537, "aabcaa",		"*ba*",			false,	true);
     beg(538, ",",		"[,]",			true,	true);
     beg(539, ",",		"[\\,]",		true,	true);
-    beg(540, "\\",		"[\\,]",		true,	false);
+    beg(540, "\\",		"[\\,]",		true,	true);
     beg(541, "-",		"[,-.]",		true,	true);
     beg(542, "+",		"[,-.]",		false,	true);
     beg(543, "-.]",		"[,-.]",		false,	true);
