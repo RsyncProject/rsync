@@ -65,6 +65,8 @@ rsync: $(OBJS)
 	@echo "Please ignore warnings below about mktemp -- it is used in a safe way"
 	$(CC) $(CFLAGS) $(LDFLAGS) -o rsync $(OBJS) $(LIBS)
 
+$(OBJS): config.h
+
 tls: $(tls_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(tls_OBJ) $(LIBS)
 
