@@ -72,8 +72,8 @@ static int skip_file(char *fname, struct file_struct *file, STRUCT_STAT *st)
 
 		if (compare_dest != NULL) {
 			if (access(fname, 0) != 0) {
-				snprintf(fnamecmpdest,MAXPATHLEN,"%s/%s",
-					 compare_dest,fname);
+				pathjoin(fnamecmpdest, sizeof fnamecmpdest,
+					 compare_dest, fname);
 				fname = fnamecmpdest;
 			}
 		}
@@ -415,7 +415,7 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 	if ((statret == -1) && (compare_dest != NULL)) {
 		/* try the file at compare_dest instead */
 		int saveerrno = errno;
-		snprintf(fnamecmpbuf,MAXPATHLEN,"%s/%s",compare_dest,fname);
+		pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, compare_dest, fname);
 		statret = link_stat(fnamecmpbuf,&st);
 		if (!S_ISREG(st.st_mode))
 			statret = -1;
