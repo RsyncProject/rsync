@@ -115,7 +115,7 @@ Perhaps the best way to explain the syntax is some examples:
 
 quote(rsync *.c foo:src/)
 
-this would transfer all files matching the pattern *.c from the
+This would transfer all files matching the pattern *.c from the
 current directory to the directory src on the machine foo. If any of
 the files already exist on the remote system then the rsync
 remote-update protocol is used to update the file by sending only the
@@ -123,7 +123,7 @@ differences. See the tech report for details.
 
 quote(rsync -avz foo:src/bar /data/tmp)
 
-this would recursively transfer all files from the directory src/bar on the
+This would recursively transfer all files from the directory src/bar on the
 machine foo into the /data/tmp/bar directory on the local machine. The
 files are transferred in "archive" mode, which ensures that symbolic
 links, devices, attributes, permissions, ownerships etc are preserved
@@ -132,12 +132,17 @@ size of data portions of the transfer.
 
 quote(rsync -avz foo:src/bar/ /data/tmp)
 
-a trailing slash on the source changes this behavior to transfer
-all files from the directory src/bar on the machine foo into the
-/data/tmp/.  A trailing / on a source name means "copy the
-contents of this directory".  Without a trailing slash it means "copy
-the directory". This difference becomes particularly important when
-using the --delete option.
+A trailing slash on the source changes this behavior to avoid creating an
+additional directory level at the destination.  You can think of a trailing
+/ on a source as meaning "copy the contents of this directory" as opposed
+to "copy the directory by name", but in both cases the attributes of the
+containing directory are transferred to the containing directory on the
+destination.  In other words, each of the following commands copies the
+files in the same way, including their setting of the attributes of
+/dest/foo:
+
+quote(rsync -avz /src/foo /dest)
+quote(rsync -avz /src/foo/ /dest/foo)
 
 You can also use rsync in local-only mode, where both the source and
 destination don't have a ':' in the name. In this case it behaves like
@@ -145,7 +150,7 @@ an improved copy command.
 
 quote(rsync somehost.mydomain.com::)
 
-this would list all the anonymous rsync modules available on the host
+This would list all the anonymous rsync modules available on the host
 somehost.mydomain.com.  (See the following section for more details.)
 
 
