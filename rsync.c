@@ -57,7 +57,7 @@ int delete_file(char *fname)
 	int ret;
 	extern int recurse;
 
-	if (do_unlink(fname) == 0 || errno == ENOENT) return 0;
+	if (robust_unlink(fname) == 0 || errno == ENOENT) return 0;
 
 #if SUPPORT_LINKS
 	ret = do_lstat(fname, &st);
@@ -262,7 +262,7 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file)
 		return;
 
 	/* move tmp file over real file */
-	if (do_rename(fnametmp,fname) != 0) {
+	if (robust_rename(fnametmp,fname) != 0) {
 		if (errno == EXDEV) {
 			/* rename failed on cross-filesystem link.  
 			   Copy the file instead. */
@@ -272,12 +272,11 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file)
 			} else {
 				set_perms(fname,file,NULL,0);
 			}
-			do_unlink(fnametmp);
 		} else {
 			rprintf(FERROR,"rename %s -> %s : %s\n",
 				fnametmp,fname,strerror(errno));
-			do_unlink(fnametmp);
 		}
+		do_unlink(fnametmp);
 	} else {
 		set_perms(fname,file,NULL,0);
 	}

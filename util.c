@@ -24,6 +24,8 @@
   */
 #include "rsync.h"
 
+extern int verbose;
+
 /****************************************************************************
 Set a fd into nonblocking mode. Uses POSIX O_NONBLOCK if available,
 else
@@ -287,7 +289,7 @@ int copy_file(char *source, char *dest, mode_t mode)
 		return -1;
 	}
 
-	if (do_unlink(dest) && errno != ENOENT) {
+	if (robust_unlink(dest) && errno != ENOENT) {
 		rprintf(FERROR,"unlink %s: %s\n",
 			dest,strerror(errno));
 		return -1;
@@ -322,6 +324,81 @@ int copy_file(char *source, char *dest, mode_t mode)
 
 	return 0;
 }
+
+/*
+  Robust unlink: some OS'es (HPUX) refuse to unlink busy files, so
+  rename to <path>/.rsyncNNN instead. Note that successive rsync runs
+  will shuffle the filenames around a bit as long as the file is still
+  busy; this is because this function does not know if the unlink call
+  is due to a new file coming in, or --delete trying to remove old
+  .rsyncNNN files, hence it renames it each time.
+*/
+/* MAX_RENAMES should be 10**MAX_RENAMES_DIGITS */
+#define MAX_RENAMES_DIGITS 3
+#define MAX_RENAMES 1000
+
+int robust_unlink(char *fname)
+{
+#ifndef ETXTBSY
+	return do_unlink(fname);
+#else
+	static int counter = 1;
+	int rc, pos, start;
+	char path[MAXPATHLEN];
+
+	rc = do_unlink(fname);
+	if ((rc == 0) || (errno != ETXTBSY))
+		return rc;
+
+	strlcpy(path, fname, MAXPATHLEN);
+
+	pos = strlen(path);
+	while((path[--pos] != '/') && (pos >= 0))
+		;
+	++pos;
+	strlcpy(&path[pos], ".rsync", MAXPATHLEN-pos);
+	pos += sizeof(".rsync")-1;
+
+	if (pos > (MAXPATHLEN-MAX_RENAMES_DIGITS-1)) {
+		errno = ETXTBSY;
+		return -1;
+	}
+
+	/* start where the last one left off to reduce chance of clashes */
+	start = counter;
+	do {
+		sprintf(&path[pos], "%03d", counter);
+		if (++counter >= MAX_RENAMES)
+			counter = 1;
+	} while (((rc = access(path, 0)) == 0) && (counter != start));
+
+	if (verbose > 0)
+		rprintf(FINFO,"renaming %s to %s because of text busy\n",
+					    fname, path);
+
+	/* maybe we should return rename()'s exit status? Nah. */
+	if (do_rename(fname, path) != 0) {
+		errno = ETXTBSY;
+		return -1;
+	}
+	return 0;
+#endif
+}
+
+int robust_rename(char *from, char *to)
+{
+#ifndef ETXTBSY
+	return do_rename(from, to);
+#else
+	int rc = do_rename(from, to);
+	if ((rc == 0) || (errno != ETXTBSY))
+		return rc;
+	if (robust_unlink(to) != 0)
+		return -1;
+	return do_rename(from, to);
+#endif
+    }
+
 
 /* sleep for a while via select */
 void u_sleep(int usec)
