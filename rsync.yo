@@ -21,8 +21,8 @@ manpagedescription()
 
 rsync is a program that behaves in much the same way that rcp does,
 but has many more options and uses the rsync remote-update protocol to
-greatly speed up file transfers when the destination file already
-exists.
+greatly speed up file transfers when the destination file is being
+updated.
 
 The rsync remote-update protocol allows rsync to transfer just the
 differences between two sets of files across the network connection, using
@@ -113,7 +113,7 @@ and a destination, one of which may be remote.
 
 Perhaps the best way to explain the syntax is with some examples:
 
-quote(rsync *.c foo:src/)
+quote(rsync -t *.c foo:src/)
 
 This would transfer all files matching the pattern *.c from the
 current directory to the directory src on the machine foo. If any of
@@ -141,8 +141,8 @@ destination.  In other words, each of the following commands copies the
 files in the same way, including their setting of the attributes of
 /dest/foo:
 
-quote(rsync -avz /src/foo /dest)
-quote(rsync -avz /src/foo/ /dest/foo)
+quote(rsync -av /src/foo /dest)
+quote(rsync -av /src/foo/ /dest/foo)
 
 You can also use rsync in local-only mode, where both the source and
 destination don't have a ':' in the name. In this case it behaves like
@@ -152,6 +152,35 @@ quote(rsync somehost.mydomain.com::)
 
 This would list all the anonymous rsync modules available on the host
 somehost.mydomain.com.  (See the following section for more details.)
+
+
+manpagesection(ADVANCED USAGE)
+
+The syntax for requesting multiple files from a remote host involves using
+quoted spaces in the SRC.  Some examples:
+
+quote(rsync host::'modname/dir1/file1 modname/dir2/file2' /dest)
+
+This would copy file1 and file2 into /dest from an rsync daemon.  Each
+additional arg must include the same "modname/" prefix as the first one,
+and must be preceded by a single space.  All other spaces are assumed
+to be a part of the filenames.
+
+quote(rsync -av host:'dir1/file1 dir2/file2' /dest)
+
+This would copy file1 and file2 into /dest using a remote shell.  This
+word-splitting is done by the remote shell, so if it doesn't work it means
+that the remote shell isn't configured to split its args based on
+whitespace (a very rare setting, but not unknown).  If you need to transfer
+a filename that contains whitespace, you'll need to either escape the
+whitespace in a way that the remote shell will understand, or use wildcards
+in place of the spaces.  Two examples of this are:
+
+quote(rsync -av host:'file\ name\ with\ spaces' /dest)
+quote(rsync -av host:file?name?with?spaces /dest)
+
+This latter example assumes that your shell passes through unmatched
+wildcards.  If it complains about "no match", put the name in quotes.
 
 
 manpagesection(CONNECTING TO AN RSYNC SERVER)
