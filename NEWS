@@ -7,6 +7,8 @@ rsync changes since last release
 
     * Fix compilation on Tru64.  (Albert Chin, Zoong Pham)
 
+    * Better handling of some client-server errors.  (Martin Pool)
+
   INTERNAL:
 
     * Many code cleanups and improved internal documentation.  (Martin Pool, Nelson
