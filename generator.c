@@ -353,8 +353,10 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 	fd = do_open(fnamecmp, O_RDONLY, 0);
 
 	if (fd == -1) {
-		rprintf(FERROR,"failed to open %s : %s\n",fnamecmp,strerror(errno));
-		rprintf(FERROR,"skipping %s\n",fname);
+		rprintf(FERROR,"failed to open %s, continuing : %s\n",fnamecmp,strerror(errno));
+		/* pretend the file didn't exist */
+		write_int(f_out,i);
+		send_sums(NULL,f_out);
 		return;
 	}
 
