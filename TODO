@@ -146,14 +146,6 @@ Other IPv6 stuff:
   multiple passive addresses.  This might be a bit harder, because we
   may need to select on all of them.  Hm.
 
-  Define a syntax for IPv6 literal addresses.  Since they include
-  colons, they tend to break most naming systems, including ours.
-  Based on the HTTP IPv6 syntax, I think we should use
- 
-     rsync://[::1]/foo/bar [::1]::bar
-
-  which should just take a small change to the parser code.
-
                       --          --
 
 
