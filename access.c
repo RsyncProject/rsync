@@ -38,7 +38,7 @@ static int match_address(char *addr, char *tok)
 
 	if (!addr || !*addr) return 0;
 
-	if (!isdigit(tok[0])) return 0;
+	if (!isdigit(* (unsigned char *) tok)) return 0;
 
 	p = strchr(tok,'/');
 	if (p) *p = 0;

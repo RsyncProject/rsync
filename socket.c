@@ -70,7 +70,7 @@ static int establish_proxy_connection(int fd, char *host, int port)
 			buffer);
 		return -1;
 	}
-	for (cp = &buffer[5]; isdigit((int) *cp) || (*cp == '.'); cp++)
+	for (cp = &buffer[5]; isdigit(* (unsigned char *) cp) || (*cp == '.'); cp++)
 		;
 	while (*cp == ' ')
 		cp++;

@@ -335,7 +335,7 @@ char *get_exclude_tok(char *p)
 		return(NULL);
 
 	/* Skip over any initial spaces */
-	while(isspace((int) *s))
+	while (isspace(* (unsigned char *) s))
 		s++;
 
 	/* Are we at the end of the string? */
@@ -348,7 +348,7 @@ char *get_exclude_tok(char *p)
 			s+=2;
 	
 		/* Skip to the next space or the end of the string */
-		while(!isspace((int) *s) && *s != '\0')
+		while (!isspace(* (unsigned char *) s) && *s != '\0')
 			s++;
 	} else {
 		t=NULL;
