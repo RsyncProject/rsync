@@ -168,9 +168,9 @@ static int rsync_module(int fd, int i)
 
 	if (!allow_access(addr, host, lp_hosts_allow(i), lp_hosts_deny(i))) {
 		rprintf(FERROR,"rsync denied on module %s from %s (%s)\n",
-			name, client_name(fd), client_addr(fd));
+			name, host, addr);
 		io_printf(fd,"@ERROR: access denied to %s from %s (%s)\n",
-			  name, client_name(fd), client_addr(fd));
+			  name, host, addr);
 		return -1;
 	}
 
