@@ -371,11 +371,11 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		file = flist->files[i];
 
 		if (protocol_version >= 29) {
-			iflags = read_short(f_in);
+			iflags = read_shortint(f_in);
 			if (!(iflags & ITEM_UPDATING) || !S_ISREG(file->mode)) {
 				if (am_server)
 					; /* do nothing */
-				else if (itemize_changes
+				else if (itemize_changes || verbose > 1
 				    || iflags & ITEM_UPDATING
 				    || (S_ISDIR(file->mode)
 				     && iflags & ITEM_REPORT_TIME))

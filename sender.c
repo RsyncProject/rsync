@@ -145,12 +145,12 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		file = flist->files[i];
 
 		if (protocol_version >= 29) {
-			iflags = read_short(f_in);
+			iflags = read_shortint(f_in);
 			if (!(iflags & ITEM_UPDATING) || !S_ISREG(file->mode)) {
 				if (am_server) {
 					write_int(f_out, i);
-					write_short(f_out, iflags);
-				} else if (itemize_changes
+					write_shortint(f_out, iflags);
+				} else if (itemize_changes || verbose > 1
 				    || iflags & ITEM_UPDATING
 				    || (S_ISDIR(file->mode)
 				     && iflags & ITEM_REPORT_TIME))
@@ -193,7 +193,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				log_send(file, &stats, iflags);
 			write_int(f_out, i);
 			if (protocol_version >= 29)
-				write_short(f_out, iflags);
+				write_shortint(f_out, iflags);
 			continue;
 		}
 
@@ -246,7 +246,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		write_int(f_out, i);
 		if (protocol_version >= 29)
-			write_short(f_out, iflags);
+			write_shortint(f_out, iflags);
 		write_sum_head(f_out, s);
 
 		if (verbose > 2) {
