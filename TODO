@@ -70,6 +70,23 @@ File attributes
   Probably better not to even try to convert between NT and POSIX.
   Possibly can share some code with Samba.
 
+Empty directories
+
+  With the current common --include '*/' --exclude '*' pattern, people
+  can end up with many empty directories.  We might avoid this by
+  lazily creating such directories.
+
+zlib
+
+  Perhaps don't use our own zlib.  Will we actually be incompatible,
+  or just be slightly less efficient?
+
+logging
+
+  Perhaps flush stdout after each filename, so that people trying to
+  monitor progress in a log file can do so more easily.  See
+  http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=48108
+
 PLATFORMS ------------------------------------------------------------
 
 Win32
