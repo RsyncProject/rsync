@@ -869,7 +869,9 @@ rsync is distributed under the GNU public license.  See the file
 COPYING for details.
 
 A WEB site is available at
-url(http://rsync.samba.org/)(http://rsync.samba.org/)
+url(http://rsync.samba.org/)(http://rsync.samba.org/).  The site
+includes an FAQ-O-Matic which may cover questions unanswered by this
+manual page.
 
 The primary ftp site for rsync is
 url(ftp://rsync.samba.org/pub/rsync)(ftp://rsync.samba.org/pub/rsync).
@@ -891,4 +893,7 @@ manpageauthor()
 rsync was written by Andrew Tridgell and Paul Mackerras.  They may be
 contacted via email at tridge@samba.org and
 Paul.Mackerras@cs.anu.edu.au
+
+rsync is now also maintained by Martin Pool <mbp@samba.org>
+
 
