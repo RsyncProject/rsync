@@ -21,7 +21,13 @@ A technical report describing the rsync algorithm is included with
 this package. 
 
 %changelog
-* Mon Sept 11 2000 John H Terpstra <jht@turbolinux.com>
+* Tue Jan 26 2003 Horst von Brand <vonbrand@inf.utfsm.cl>
+  Fixed "Sept" date in %changelog here
+  Use %{_mandir} to point at manpages
+  Some distributions compress manpages, add '*' to cover this
+  Add doc/README-SGML and doc/rsync.sgml to %doc
+  
+* Mon Sep 11 2000 John H Terpstra <jht@turbolinux.com>
   Changed target paths to be Linux Standards Base compliant
 
 * Mon Jan 25 1999 Stefan Hornburg <racke@linuxia.de>
@@ -62,23 +68,25 @@ previous package(s).)
 %setup
 
 %build
-./configure --prefix=/usr --mandir=/usr/share/man
+./configure --prefix=/usr --mandir=%{_mandir}
 make CFLAGS="$RPM_OPT_FLAGS"
 strip rsync
 
 %install
-mkdir -p $RPM_BUILD_ROOT/usr/{bin,share/man/{man1,man5}}
+mkdir -p $RPM_BUILD_ROOT/usr/bin
+mkdir -p $RPM_BUILD_ROOT/%{_mandir}/man{1,5}
 install -m755 rsync $RPM_BUILD_ROOT/usr/bin
-install -m644 rsync.1 $RPM_BUILD_ROOT/usr/share/man/man1
-install -m644 rsyncd.conf.5 $RPM_BUILD_ROOT/usr/share/man/man5
+install -m644 rsync.1 $RPM_BUILD_ROOT%{_mandir}/man1
+install -m644 rsyncd.conf.5 $RPM_BUILD_ROOT%{_mandir}/man5
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %files
 %attr(-,root,root) /usr/bin/rsync
-%attr(-,root,root) /usr/share/man/man1/rsync.1
-%attr(-,root,root) /usr/share/man/man5/rsyncd.conf.5
+%attr(-,root,root) %{_mandir}/man1/rsync.1*
+%attr(-,root,root) %{_mandir}/man5/rsyncd.conf.5*
 %attr(-,root,root) %doc tech_report.tex
 %attr(-,root,root) %doc README
 %attr(-,root,root) %doc COPYING
+%attr(-,root,root) %doc doc/README-SGML doc/rsync.sgml
