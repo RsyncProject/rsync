@@ -8,6 +8,9 @@ Changes since 2.6.0:
       "USER:PASS@" prefix before the "HOST:PORT" information.
       (Bardur Arantsson)
 
+    * Lower memory use and more optimal transfer of file data.
+      (see the INTERNAL section).
+
   BUG FIXES:
 
     * The --link-dest code now works properly for a non-root user
@@ -43,8 +46,14 @@ Changes since 2.6.0:
     * Reduced memory requirements of hard link preservation.
       (J.W.  Schultz)
 
-    * Got rid of support for protocol versions 17 and 8 (which are
+    * Got rid of support for protocol versions 17 and 18 (which are
       both over 6 years old).
+
+    * More optimal data transmission for --hard-links (protocol 28).
+
+    * More optimal data transmission for --checksum (protocol 28).
+
+    * Less memory used for holding --checksum data.
 
 
 NEWS for rsync 2.6.0 (1 Jan 2004)
