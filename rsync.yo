@@ -344,6 +344,7 @@ verb(
      --ignore-existing       ignore files that already exist on receiver
      --del                   an alias for --delete-during
      --delete                delete files that don't exist on sender
+     --delete-before         receiver deletes before transfer (default)
      --delete-during         receiver deletes during xfer, not before
      --delete-after          receiver deletes after transfer, not before
      --delete-excluded       also delete excluded files on receiver
@@ -679,7 +680,7 @@ file that is larger than the specified SIZE. The SIZE value can be
 suffixed with a letter to indicate a size multiplier (K, M, or G) and
 may be a fractional value (e.g. "--max-size=1.5m").
 
-dit(bf(--delete)) This tells rsync to delete extraneous files from the
+dit(bf(--delete, --delete-before)) This tells rsync to delete extraneous files from the
 receiving side (ones that aren't on the sending side), but only for the
 directories that are being synchronized.  You must have asked rsync to
 send the whole directory (e.g. "dir" or "dir/") without using a wildcard
