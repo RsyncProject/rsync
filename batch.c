@@ -45,8 +45,10 @@ void write_batch_flist_info(int flist_count, struct file_struct **files)
 	write_int(f, protocol_version);
 	write_int(f, flist_count);
 
-	for (i = 0; i < flist_count; i++)
-		send_file_entry(files[i], f, files[i]->flags & LIVE_FLAGS);
+	for (i = 0; i < flist_count; i++) {
+		send_file_entry(files[i], f, files[i]->flags & FLAG_TOP_DIR ?
+				XMIT_TOP_DIR : 0);
+	}
 	send_file_entry(NULL, f, 0);
 
 	protocol_version = save_pv;
@@ -149,7 +151,7 @@ struct file_list *create_flist_from_batch(void)
 		out_of_memory("create_flist_from_batch");
 
 	for (i = 0; (flags = read_byte(f)) != 0; i++) {
-		if (protocol_version >= 28 && (flags & EXTENDED_FLAGS))
+		if (protocol_version >= 28 && (flags & XMIT_EXTENDED_FLAGS))
 			flags |= read_byte(f) << 8;
 		receive_file_entry(&batch_flist->files[i], flags, f);
 	}

@@ -91,8 +91,9 @@ void delete_files(struct file_list *flist)
 	}
 
 	for (j = 0;j < flist->count; j++) {
-		if (!S_ISDIR(flist->files[j]->mode) ||
-		    !(flist->files[j]->flags & FLAG_DELETE)) continue;
+		if (!(flist->files[j]->flags & FLAG_TOP_DIR)
+		    || !S_ISDIR(flist->files[j]->mode))
+			continue;
 
 		argv[0] = f_name_to(flist->files[j], fbuf);
 
