@@ -677,15 +677,16 @@ the temporary files in the receiving directory.
 
 dit(bf(--compare-dest=DIR)) This option instructs rsync to use DIR on
 the destination machine as an additional directory to compare destination
-files against when doing transfers.  This is useful for doing transfers to
-a new destination while leaving existing files intact, and then doing a
+files against when doing transfers if the files are missing in the
+destination directory.  This is useful for doing transfers to a new
+destination while leaving existing files intact, and then doing a
 flash-cutover when all files have been successfully transferred (for
 example by moving directories around and removing the old directory,
-although this requires also doing the transfer with -I to avoid skipping
-files that haven't changed).  This option increases the usefulness of
---partial because partially transferred files will remain in the new
-temporary destination until they have a chance to be completed.  If DIR is
-a relative path, it is relative to the destination directory.
+although this skips files that haven't changed; see also --link-dest).
+This option increases the usefulness of --partial because partially
+transferred files will remain in the new temporary destination until they
+have a chance to be completed.  If DIR is a relative path, it is relative
+to the destination directory.
 
 dit(bf(--link-dest=DIR)) This option behaves like bf(--compare-dest) but
 also will create hard links from em(DIR) to the destination directory for
