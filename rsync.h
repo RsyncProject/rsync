@@ -109,12 +109,8 @@
 #define ALL_FILTERS	2
 
 #define XFLG_FATAL_ERRORS	(1<<0)
-#define XFLG_DEF_INCLUDE	(1<<1)
-#define XFLG_DEF_EXCLUDE	(1<<2)
-#define XFLG_WORD_SPLIT 	(1<<3)
-#define XFLG_DIRECTORY	 	(1<<4)
-#define XFLG_NO_PREFIXES 	(1<<5)
-#define XFLG_ANCHORED2ABS	(1<<6)
+#define XFLG_OLD_PREFIXES	(1<<1)
+#define XFLG_ANCHORED2ABS	(1<<2)
 
 #define PERMS_REPORT		(1<<0)
 #define PERMS_SKIP_MTIME	(1<<1)
@@ -568,6 +564,9 @@ struct map_struct {
 #define MATCHFLG_EXCLUDE_SELF	(1<<12)/* merge-file name should be excluded */
 #define MATCHFLG_FINISH_SETUP	(1<<13)/* per-dir merge file needs setup */
 #define MATCHFLG_NEGATE		(1<<14)/* rule matches when pattern does not */
+
+#define MATCHFLGS_FROM_CONTAINER (MATCHFLG_ABS_PATH | MATCHFLG_INCLUDE \
+				| MATCHFLG_DIRECTORY | MATCHFLG_NEGATE)
 
 struct filter_struct {
 	struct filter_struct *next;
