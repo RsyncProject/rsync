@@ -811,28 +811,84 @@ int u_strcmp(const char *cs1, const char *cs2)
 	return (int)*s1 - (int)*s2;
 }
 
-static OFF_T last_ofs;
+static OFF_T  last_ofs;
+static struct timeval print_time;
+static struct timeval start_time;
+static OFF_T  start_ofs;
+
+static unsigned long msdiff(struct timeval *t1, struct timeval *t2)
+{
+    return (t2->tv_sec - t1->tv_sec) * 1000
+        + (t2->tv_usec - t1->tv_usec) / 1000;
+}
+
+
+/**
+ * @param is_last True if this is the last time progress will be
+ * printed for this file, so we should output a newline.  (Not
+ * necessarily the same as all bytes being received.)
+ **/
+static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
+			    int is_last)
+{
+    int           pct  = (int)((100.0*ofs)/size);
+    unsigned long diff = msdiff(&start_time, now);
+    double        rate = diff ? ((ofs-start_ofs) / diff) * 1000.0/1024.0 : 0;
+    const char    *units;
+
+    if (ofs == size) pct = 100;
+    
+    if (rate > 1024*1024) {
+	    rate /= 1024.0 * 1024.0;
+	    units = "GB/s";
+    } else if (rate > 1024) {
+	    rate /= 1024.0;
+	    units = "MB/s";
+    } else {
+	    units = "kB/s";
+    }
+    
+    rprintf(FINFO, "%12.0f %3d%% %7.2f%s%s",
+	    (double) ofs, pct, rate, units,
+	    is_last ? "\n" : "\r");
+}
 
 void end_progress(OFF_T size)
 {
 	extern int do_progress, am_server;
 
 	if (do_progress && !am_server) {
-		rprintf(FINFO,"%.0f (100%%)\n", (double)size);
+        	struct timeval now;
+                gettimeofday(&now, NULL);
+                rprint_progress(size, size, &now, True);
 	}
-	last_ofs = 0;
+	last_ofs   = 0;
+        start_ofs  = 0;
+        print_time.tv_sec  = print_time.tv_usec  = 0;
+        start_time.tv_sec  = start_time.tv_usec  = 0;
 }
 
 void show_progress(OFF_T ofs, OFF_T size)
 {
 	extern int do_progress, am_server;
+        struct timeval now;
 
-	if (do_progress && !am_server) {
-		if (ofs > last_ofs + 1000) {
-			int pct = (int)((100.0*ofs)/size);
-			rprintf(FINFO,"%.0f (%d%%)\r", (double)ofs, pct);
-			last_ofs = ofs;
-		}
+        gettimeofday(&now, NULL);
+
+        if (!start_time.tv_sec && !start_time.tv_usec) {
+        	start_time.tv_sec  = now.tv_sec;
+                start_time.tv_usec = now.tv_usec;
+                start_ofs          = ofs;
+        }
+
+	if (do_progress
+            && !am_server
+            && ofs > last_ofs + 1000
+            && msdiff(&print_time, &now) > 250) {
+        	rprint_progress(ofs, size, &now, False);
+                last_ofs = ofs;
+                print_time.tv_sec  = now.tv_sec;
+                print_time.tv_usec = now.tv_usec;
 	}
 }
 
