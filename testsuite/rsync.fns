@@ -27,6 +27,12 @@ RSYNC="$rsync_bin"
 # Berkley's nice.
 PATH="$PATH:/usr/ucb"
 
+if diff -u $srcdir/testsuite/rsync.fns $srcdir/testsuite/rsync.fns >/dev/null 2>&1; then
+    diffopt="-u"
+else
+    diffopt="-c"
+fi
+
 runtest() {
     echo $ECHO_N "Test $1: $ECHO_C"
     if eval "$2"
@@ -157,7 +163,7 @@ checkit() {
     echo ""
     for f in `cd "$2"; find . -type f -print `
     do 
-        diff -c "$2"/"$f" "$3"/"$f" || failed=YES
+        diff $diffopt "$2"/"$f" "$3"/"$f" || failed=YES
     done
 
     echo "-------------"
@@ -165,7 +171,7 @@ checkit() {
     echo ""
     ( cd "$2" && rsync_ls_lR . ) > ${TMP}/ls-from 
     ( cd "$3" && rsync_ls_lR . ) > ${TMP}/ls-to 
-    diff -c ${TMP}/ls-from ${TMP}/ls-to || failed=YES
+    diff $diffopt ${TMP}/ls-from ${TMP}/ls-to || failed=YES
     if [ -z "${failed}" ] ; then
 	return 0
     else

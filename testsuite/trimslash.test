@@ -15,7 +15,7 @@ set -x
 	"//a//" "////" \
         "/Users/Wierd Macintosh Name/// Ooh, translucent plastic/" \
 	> "$scratchdir/slash.out"
-diff -c "$scratchdir/slash.out" - <<EOF
+diff $diffopt "$scratchdir/slash.out" - <<EOF
 /usr/local/bin
 /usr/local/bin
 /usr/local/bin
@@ -25,5 +25,3 @@ diff -c "$scratchdir/slash.out" - <<EOF
 EOF
 
 exit 0
-# last [] may have failed but if we get here then we've won
-

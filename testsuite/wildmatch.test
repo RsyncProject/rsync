@@ -12,7 +12,7 @@
 set -x
 
 "$TOOLDIR/wildtest" >"$scratchdir/wild.out"
-diff -c "$scratchdir/wild.out" - <<EOF
+diff $diffopt "$scratchdir/wild.out" - <<EOF
 EOF
 
 exit 0
