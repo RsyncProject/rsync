@@ -104,11 +104,10 @@
 #define SERVER_EXCLUDES	1
 #define ALL_EXCLUDES	2
 
-#define MISSING_OK    0
-#define MISSING_FATAL 1
-
-#define ADD_INCLUDE 1
-#define ADD_EXCLUDE 0
+#define XFLG_FATAL_ERRORS	(1<<0)
+#define XFLG_DEF_INCLUDE	(1<<1)
+#define XFLG_NO_PREFIXES	(1<<2)
+#define XFLG_WORD_SPLIT 	(1<<3)
 
 #define FULL_FLUSH	1
 #define NORMAL_FLUSH	0
