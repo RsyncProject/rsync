@@ -40,6 +40,10 @@ Changes since 2.6.0:
       directory's .cvsignore file once again only affect that one
       directory (and not all following directories too).
 
+    * When specifying the USER@HOST: prefix for a file, the USER
+      part can now contain an '@', if needed (i.e. the last '@'
+      is used to find the HOST, not the first).
+
   INTERNAL:
 
     * Most of the I/O is now buffered, which results in a pretty
