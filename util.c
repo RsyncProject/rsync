@@ -28,6 +28,9 @@
 #include "rsync.h"
 
 extern int verbose;
+extern int dry_run;
+extern int module_id;
+extern int modify_window;
 extern struct exclude_list_struct server_exclude_list;
 
 int sanitize_paths = 0;
@@ -126,7 +129,6 @@ void overflow(char *str)
 
 int set_modtime(char *fname, time_t modtime)
 {
-	extern int dry_run;
 	if (dry_run)
 		return 0;
 
@@ -502,7 +504,6 @@ static void glob_expand_one(char *s, char **argv, int *argc, int maxargs)
 	exclude_server_path(s);
 	(*argc)++;
 #else
-	extern int sanitize_paths;
 	glob_t globbuf;
 	int i;
 
@@ -886,7 +887,6 @@ int pop_dir(char *dir)
  **/
 char *full_fname(char *fn)
 {
-	extern int module_id;
 	static char *result = NULL;
 	char *m1, *m2, *m3;
 	char *p1, *p2;
@@ -1070,13 +1070,13 @@ int msleep(int t)
  **/
 int cmp_modtime(time_t file1, time_t file2)
 {
-	extern int modify_window;
-
 	if (file2 > file1) {
-		if (file2 - file1 <= modify_window) return 0;
+		if (file2 - file1 <= modify_window)
+			return 0;
 		return -1;
 	}
-	if (file1 - file2 <= modify_window) return 0;
+	if (file1 - file2 <= modify_window)
+		return 0;
 	return 1;
 }
 
