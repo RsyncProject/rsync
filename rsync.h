@@ -149,19 +149,20 @@
 #define ITEM_MISSING_DATA (1<<16) /* these are outside the transmitted flags */
 #define ITEM_DELETED (1<<17)
 
-/* Log-message categories.  FLOG is only used on the daemon side to
- * output messages to the log file. */
-enum logcode { FERROR=1, FINFO=2, FLOG=3 };
+/* Log-message categories.  FLOG and FCLIENT are only used on the daemon
+ * side for custom logging -- they don't get sent over the socket. */
+enum logcode { FERROR=1, FINFO=2, FLOG=3, FCLIENT=4 };
 
 /* Messages types that are sent over the message channel.  The logcode
  * values must all be present here with identical numbers. */
 enum msgcode {
-	MSG_DELETED=7,	/* successfully deleted a file on receiving side */
-	MSG_SUCCESS=6,	/* successfully updated indicated flist index */
-	MSG_DONE=5,	/* current phase is done */
-	MSG_REDO=4,	/* reprocess indicated flist index */
-	MSG_ERROR=FERROR, MSG_INFO=FINFO, MSG_LOG=FLOG, /* remote logging */
-	MSG_DATA=0	/* raw data on the multiplexed stream */
+	MSG_DATA=0,	/* raw data on the multiplexed stream */
+	MSG_ERROR=FERROR, MSG_INFO=FINFO, /* remote logging */
+	MSG_LOG=FLOG, MSG_FCLIENT=FCLIENT, /* sibling logging */
+	MSG_REDO=9,	/* reprocess indicated flist index */
+	MSG_SUCCESS=100,/* successfully updated indicated flist index */
+	MSG_DELETED=101,/* successfully deleted a file on receiving side */
+	MSG_DONE=86	/* current phase is done */
 };
 
 #include "errcode.h"
