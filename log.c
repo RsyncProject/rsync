@@ -371,6 +371,8 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			*n++ = *p++;
 		while (isdigit(*(uchar*)p) && n - fmt < (int)(sizeof fmt) - 8)
 			*n++ = *p++;
+		if (!*p)
+			break;
 		*n = '\0';
 		n = NULL;
 
@@ -497,9 +499,6 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			break;
 		}
 
-		/* Subtract the length of the escape from the string's size. */
-		total -= p - s;
-
 		/* "n" is the string to be inserted in place of this % code. */
 		if (!n)
 			continue;
@@ -509,6 +508,9 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			n = buf2;
 		}
 		len = strlen(n);
+
+		/* Subtract the length of the escape from the string's size. */
+		total -= p - s;
 
 		if (len + total >= sizeof buf) {
 			rprintf(FERROR,
