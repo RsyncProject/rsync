@@ -1460,33 +1460,57 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 	}
 	flist->low = prev_i;
 	while (++i < flist->count) {
-		int is_dup;
+		int j;
 		struct file_struct *file = flist->files[i];
 
 		if (!file->basename)
 			continue;
-		is_dup = f_name_cmp(file, flist->files[prev_i]) == 0;
-		if (!is_dup && protocol_version >= 29 && S_ISDIR(file->mode)) {
+		if (f_name_cmp(file, flist->files[prev_i]) == 0)
+			j = prev_i;
+		else if (protocol_version >= 29 && S_ISDIR(file->mode)) {
 			int save_mode = file->mode;
 			/* Make sure that this directory doesn't duplicate a
 			 * non-directory earlier in the list. */
-			file->mode = S_IFREG;
 			flist->high = prev_i;
-			is_dup = flist_find(flist, file) >= 0;
+			file->mode = S_IFREG;
+			j = flist_find(flist, file);
 			file->mode = save_mode;
-		}
-		if (is_dup) {
+		} else
+			j = -1;
+		if (j >= 0) {
+			struct file_struct *fp = flist->files[j];
+			int keep, drop;
+			/* If one is a dir and the other is not, we want to
+			 * keep the dir because it might have contents in the
+			 * list. */
+			if (S_ISDIR(file->mode) != S_ISDIR(fp->mode)) {
+				if (S_ISDIR(file->mode))
+					keep = i, drop = j;
+				else
+					keep = j, drop = i;
+			} else
+				keep = j, drop = i;
 			if (verbose > 1 && !am_server) {
 				rprintf(FINFO,
-					"removing duplicate name %s from file list %d\n",
-					safe_fname(f_name(file)), i);
+					"removing duplicate name %s from file list (%d)\n",
+					safe_fname(f_name(file)), drop);
 			}
 			/* Make sure that if we unduplicate '.', that we don't
 			 * lose track of a user-specified top directory. */
-			if (file->flags & FLAG_TOP_DIR)
-				flist->files[prev_i]->flags |= FLAG_TOP_DIR;
+			if (flist->files[drop]->flags & FLAG_TOP_DIR)
+				flist->files[keep]->flags |= FLAG_TOP_DIR;
 
-			clear_file(i, flist);
+			clear_file(drop, flist);
+
+			if (keep == i) {
+				if (flist->low == drop) {
+					for (j = drop + 1;
+					     j < i && !flist->files[j]->basename;
+					     j++) {}
+					flist->low = j;
+				}
+				prev_i = i;
+			}
 		} else
 			prev_i = i;
 	}
