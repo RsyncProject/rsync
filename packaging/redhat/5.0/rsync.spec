@@ -58,7 +58,7 @@ previous package(s).)
 
 %build
 ./configure --prefix=/usr
-make CFLAGS=$RPM_OPT_FLAGS
+make "CFLAGS=$RPM_OPT_FLAGS"
 strip rsync
 
 %install
