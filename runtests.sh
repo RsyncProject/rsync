@@ -118,8 +118,9 @@ then
     exit 2
 fi
 
+RSYNC="$rsync_bin"
 
-export rsync_bin
+export rsync_bin RSYNC
 
 skipped=0
 missing=0
@@ -129,8 +130,9 @@ failed=0
 scratchdir=./testtmp
 [ -d "$scratchdir" ] && rm -r "$scratchdir"
 mkdir "$scratchdir"
-
+scratchdir=`cd $scratchdir && pwd`
 echo "    scratchdir=$scratchdir"
+
 suitedir="$srcdir/testsuite"
 
 export scratchdir suitedir
@@ -161,6 +163,7 @@ do
 	*)
 	    echo "----- $testbase failed!"
 	    failed=`expr $failed + 1`
+	    [ "$nopersist" = "yes" ] && exit 1
 	esac
     fi
 done
