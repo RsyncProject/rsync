@@ -20,15 +20,15 @@ cd "$testdir"
 
 for testbase in $test_names
 do
-    echo "------------------------------------------------------------"
-    echo "----- $testbase running"
-
     testscript="$testbase.test"
     if test \! -f "$testscript" 
     then
 	echo "$testscript does not exist" >&2
 	continue
     fi
+
+    echo "------------------------------------------------------------"
+    echo "----- $testbase running"
 
     if sh $testscript
     then
