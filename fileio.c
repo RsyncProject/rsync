@@ -136,7 +136,6 @@ int write_file(int f,char *buf,size_t len)
 }
 
 
-
 /* this provides functionality somewhat similar to mmap() but using
    read(). It gives sliding window access to a file. mmap() is not
    used because of the possibility of another program (such as a
@@ -144,17 +143,13 @@ int write_file(int f,char *buf,size_t len)
 struct map_struct *map_file(int fd,OFF_T len)
 {
 	struct map_struct *map;
-	map = new(struct map_struct);
-	if (!map) out_of_memory("map_file");
 
+	if (!(map = new(struct map_struct)))
+		out_of_memory("map_file");
+
+	memset(map, 0, sizeof map[0]);
 	map->fd = fd;
 	map->file_size = len;
-	map->p = NULL;
-	map->p_size = 0;
-	map->p_offset = 0;
-	map->p_fd_offset = 0;
-	map->p_len = 0;
-	map->status = 0;
 
 	return map;
 }
@@ -259,7 +254,7 @@ int unmap_file(struct map_struct *map)
 		map->p = NULL;
 	}
 	ret = map->status;
-	memset(map, 0, sizeof(*map));
+	memset(map, 0, sizeof map[0]);
 	free(map);
 
 	return ret;
