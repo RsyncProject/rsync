@@ -146,7 +146,6 @@ int read_item_attrs(int f_in, int f_out, int ndx, uchar *type_ptr,
 	uchar fnamecmp_type = FNAMECMP_FNAME;
 	int iflags = protocol_version >= 29 ? read_shortint(f_in)
 		   : ITEM_TRANSFER | ITEM_MISSING_DATA;
-	int isave = iflags; /* XXX remove soon */
 
 	/* Handle the new keep-alive (no-op) packet. */
 	if (ndx == the_file_list->count && iflags == ITEM_IS_NEW)
@@ -174,12 +173,17 @@ int read_item_attrs(int f_in, int f_out, int ndx, uchar *type_ptr,
 	}
 	*len_ptr = len;
 
-	/* XXX Temporary backward compatibility when talking to 2.6.4pre[12] */
-	if (protocol_version >= 29 && iflags & ITEM_TRANSFER
-	    && !S_ISREG(the_file_list->files[ndx]->mode)) {
-		iflags &= ~ITEM_TRANSFER;
-		iflags |= ITEM_LOCAL_CHANGE;
-	}
+	/* XXX Temporary rejection of 2.6.4pre1 & pre2 */
+	if (iflags & ITEM_DUMMY_BIT) {
+		extern int am_sender;
+		if (!am_sender || !(iflags & (ITEM_LOCAL_CHANGE|ITEM_TRANSFER))) {
+			rprintf(FERROR,
+				"The %s side is running 2.6.4pre[12] -- upgrade it or use --protocol=28!\n",
+				am_sender ? "receiving" : "sending");
+			exit_cleanup(RERR_PROTOCOL);
+		}
+		iflags &= ~ITEM_DUMMY_BIT;
+	} /* XXX */
 
 	if (iflags & ITEM_TRANSFER) {
 		if (!S_ISREG(the_file_list->files[ndx]->mode)) {
@@ -189,7 +193,7 @@ int read_item_attrs(int f_in, int f_out, int ndx, uchar *type_ptr,
 			exit_cleanup(RERR_PROTOCOL);
 		}
 	} else if (f_out >= 0) {
-		write_ndx_and_attrs(f_out, ndx, isave /*XXX iflags */,
+		write_ndx_and_attrs(f_out, ndx, iflags,
 				    fnamecmp_type, buf, len);
 	}
 
@@ -207,7 +211,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 	uchar fnamecmp_type;
 	int iflags, xlen;
 	struct file_struct *file;
-	int phase = 0;
+	int phase = 0, max_phase = protocol_version >= 29 ? 2 : 1;
 	struct stats initial_stats;
 	int save_make_backups = make_backups;
 	int itemizing = am_daemon ? daemon_log_format_has_i
@@ -222,9 +226,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		i = read_int(f_in);
 		if (i == -1) {
-			if (phase)
+			if (++phase > max_phase)
 				break;
-			phase = 1;
 			csum_length = SUM_LENGTH;
 			if (verbose > 2)
 				rprintf(FINFO, "send_files phase=%d\n", phase);
@@ -256,6 +259,12 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		if (!(iflags & ITEM_TRANSFER)) {
 			maybe_log_item(file, iflags, itemizing, xname);
 			continue;
+		}
+		if (phase == 2) {
+			rprintf(FERROR,
+				"got transfer request in phase 2 [%s]\n",
+				who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
 		}
 
 		updating_basis_file = inplace && (protocol_version >= 29
