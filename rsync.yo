@@ -325,7 +325,9 @@ of saying you want recursion and want to preserve everything.
 Note: if the user launching rsync is root then the -o (preserve
 uid) and -D (preserve devices) options are also implied.
 
-dit(bf(-r, --recursive)) This tells rsync to copy directories recursively.
+dit(bf(-r, --recursive)) This tells rsync to copy directories
+recursively. If you don't specify this then rsync won't copy
+directories at all.
 
 dit(bf(-R, --relative)) Use relative paths. This means that the full path
 names specified on the command line are sent to the server rather than
@@ -433,6 +435,8 @@ contents of only one filesystem.
 dit(bf(--delete)) This tells rsync to delete any files on the receiving
 side that aren't on the sending side.   Files that are excluded from
 transfer are excluded from being deleted unless you use --delete-excluded.
+
+This option has no effect if directory recursion is not selected.
 
 This option can be dangerous if used incorrectly!  It is a very good idea
 to run first using the dry run option (-n) to see what files would be
