@@ -623,7 +623,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	if (delete_mode && !delete_excluded)
 		recv_filter_list(f_in);
 	if (cvs_exclude && protocol_version < 29)
-		add_filter(&filter_list, ":C", 0);
+		add_filter(&filter_list, ":C", 0, 0);
 
 	if (filesfrom_fd >= 0) {
 		/* We need to send the files-from names to the sender at the

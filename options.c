@@ -657,17 +657,17 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			break;
 
 		case OPT_FILTER:
-			add_filter(&filter_list, poptGetOptArg(pc), 0);
+			add_filter(&filter_list, poptGetOptArg(pc), 0, 0);
 			break;
 
 		case OPT_EXCLUDE:
 			add_filter(&filter_list, poptGetOptArg(pc),
-				   XFLG_DEF_EXCLUDE);
+				   0, XFLG_OLD_PREFIXES);
 			break;
 
 		case OPT_INCLUDE:
 			add_filter(&filter_list, poptGetOptArg(pc),
-				   XFLG_DEF_INCLUDE);
+				   MATCHFLG_INCLUDE, XFLG_OLD_PREFIXES);
 			break;
 
 		case OPT_EXCLUDE_FROM:
@@ -681,9 +681,9 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				if (check_filter(&server_filter_list, cp, 0) < 0)
 					goto options_rejected;
 			}
-			add_filter_file(&filter_list, arg, XFLG_FATAL_ERRORS
-				| (opt == OPT_INCLUDE_FROM ? XFLG_DEF_INCLUDE
-							   : XFLG_DEF_EXCLUDE));
+			add_filter_file(&filter_list, arg,
+			    opt == OPT_INCLUDE_FROM ? MATCHFLG_INCLUDE : 0,
+			    XFLG_FATAL_ERRORS | XFLG_OLD_PREFIXES);
 			break;
 
 		case 'h':
@@ -710,12 +710,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		case 'F':
 			switch (++F_option_cnt) {
 			case 1:
-				add_filter(&filter_list,
-					    ": /.rsync-filter", 0);
+				add_filter(&filter_list,": /.rsync-filter",0,0);
 				break;
 			case 2:
-				add_filter(&filter_list,
-				 	    "- .rsync-filter", 0);
+				add_filter(&filter_list,"- .rsync-filter",0,0);
 				break;
 			}
 			break;
@@ -1041,7 +1039,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				partial_dir = NULL;
 			else if (*partial_dir != '/') {
 				add_filter(&filter_list, partial_dir,
-					    XFLG_DIRECTORY | XFLG_DEF_EXCLUDE);
+				    MATCHFLG_NO_PREFIXES|MATCHFLG_DIRECTORY, 0);
 			}
 			keep_partial = 1;
 		}
