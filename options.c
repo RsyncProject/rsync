@@ -53,7 +53,6 @@ int omit_dir_times = 0;
 int update_only = 0;
 int cvs_exclude = 0;
 int dry_run = 0;
-int local_server = 0;
 int ignore_times = 0;
 int delete_mode = 0;
 int delete_during = 0;
@@ -657,16 +656,16 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			break;
 
 		case OPT_FILTER:
-			add_filter(&filter_list, poptGetOptArg(pc), 0, 0);
+			parse_rule(&filter_list, poptGetOptArg(pc), 0, 0);
 			break;
 
 		case OPT_EXCLUDE:
-			add_filter(&filter_list, poptGetOptArg(pc),
+			parse_rule(&filter_list, poptGetOptArg(pc),
 				   0, XFLG_OLD_PREFIXES);
 			break;
 
 		case OPT_INCLUDE:
-			add_filter(&filter_list, poptGetOptArg(pc),
+			parse_rule(&filter_list, poptGetOptArg(pc),
 				   MATCHFLG_INCLUDE, XFLG_OLD_PREFIXES);
 			break;
 
@@ -681,9 +680,9 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				if (check_filter(&server_filter_list, cp, 0) < 0)
 					goto options_rejected;
 			}
-			add_filter_file(&filter_list, arg,
-			    opt == OPT_INCLUDE_FROM ? MATCHFLG_INCLUDE : 0,
-			    XFLG_FATAL_ERRORS | XFLG_OLD_PREFIXES);
+			parse_filter_file(&filter_list, arg,
+				opt == OPT_INCLUDE_FROM ? MATCHFLG_INCLUDE : 0,
+				XFLG_FATAL_ERRORS | XFLG_OLD_PREFIXES);
 			break;
 
 		case 'h':
@@ -710,10 +709,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		case 'F':
 			switch (++F_option_cnt) {
 			case 1:
-				add_filter(&filter_list,": /.rsync-filter",0,0);
+				parse_rule(&filter_list,": /.rsync-filter",0,0);
 				break;
 			case 2:
-				add_filter(&filter_list,"- .rsync-filter",0,0);
+				parse_rule(&filter_list,"- .rsync-filter",0,0);
 				break;
 			}
 			break;
@@ -1038,7 +1037,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			if (!*partial_dir || strcmp(partial_dir, ".") == 0)
 				partial_dir = NULL;
 			else if (*partial_dir != '/') {
-				add_filter(&filter_list, partial_dir,
+				parse_rule(&filter_list, partial_dir,
 				    MATCHFLG_NO_PREFIXES|MATCHFLG_DIRECTORY, 0);
 			}
 			keep_partial = 1;
