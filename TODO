@@ -313,24 +313,39 @@ Hard-link handling
   might need a little program to check whether several names refer to
   the same file.
 
-IPv6
 
-  Perhaps put back the old socket code; if on a machine that does not
-  properly support the getaddrinfo API, then use it.  This is probably
-  much simpler than reimplementing it.
 
-  Alternatively, have two different files implementing the same
-  interface, and choose either the new or the old API.  This is
-  probably necessary for systems that e.g. have IPv6, but
-  gethostbyaddr() can't handle it.  The Linux manpage claims this is
-  currently the case.
+Handling IPv6 on old machines
 
-  This might get us working again on RedHat 5 and similar systems.
-  Although the Kame patch seems like a good idea, in fact it is a much
-  broader interface than the relatively narrow "open by name", "accept
-  and log" interface that rsync uses internally, and it has the
-  disadvantage of clashing with half-arsed implementations of the API.
+  The KAME IPv6 patch is nice in theory but has proved a bit of a
+  nightmare in practice.  The basic idea of their patch is that rsync
+  is rewritten to use the new getaddrinfo()/getnameinfo() interface,
+  rather than gethostbyname()/gethostbyaddr() as in rsync 2.4.6.
+  Systems that don't have the new interface are handled by providing
+  our own implementation in lib/, which is selectively linked in.
 
+  The problem with this is that it is really hard to get right on
+  platforms that have a half-working implementation, so redefining
+  these functions clashes with system headers, and leaving them out
+  breaks.  This affects at least OSF/1, RedHat 5, and Cobalt, which
+  are moderately improtant.
+
+  Perhaps the simplest solution would be to have two different files
+  implementing the same interface, and choose either the new or the
+  old API.  This is probably necessary for systems that e.g. have
+  IPv6, but gethostbyaddr() can't handle it.  The Linux manpage claims
+  this is currently the case.
+
+  In fact, our internal sockets interface (things like
+  open_socket_out(), etc) is much narrower than the getaddrinfo()
+  interface, and so probably simpler to get right.  In addition, the
+  old code is known to work well on old machines.
+
+  We could drop the rather large lib/getaddrinfo files.
+
+
+Other IPv6 stuff:
+  
   Implement suggestions from http://www.kame.net/newsletter/19980604/
   and ftp://ftp.iij.ad.jp/pub/RFC/rfc2553.txt
 
