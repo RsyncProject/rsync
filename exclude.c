@@ -27,15 +27,18 @@
 #include "rsync.h"
 
 extern int verbose;
-extern int delete_mode;
 
-static struct exclude_struct **exclude_list;
+struct exclude_struct **exclude_list;
+struct exclude_struct **local_exclude_list;
+struct exclude_struct **server_exclude_list;
+char *exclude_path_prefix = NULL;
 
 /** Build an exclude structure given a exclude pattern */
 static struct exclude_struct *make_exclude(const char *pattern, int include)
 {
 	struct exclude_struct *ret;
 	char *cp;
+	int pat_len;
 
 	ret = (struct exclude_struct *)malloc(sizeof(*ret));
 	if (!ret) out_of_memory("make_exclude");
@@ -51,9 +54,18 @@ static struct exclude_struct *make_exclude(const char *pattern, int include)
 		ret->include = include;
 	}
 
-	ret->pattern = strdup(pattern);
-
-	if (!ret->pattern) out_of_memory("make_exclude");
+	if (exclude_path_prefix)
+		ret->match_flags |= MATCHFLG_ABS_PATH;
+	if (exclude_path_prefix && *pattern == '/') {
+		ret->pattern = malloc(strlen(exclude_path_prefix)
+				+ strlen(pattern) + 1);
+		if (!ret->pattern) out_of_memory("make_exclude");
+		sprintf(ret->pattern, "%s%s", exclude_path_prefix, pattern);
+	}
+	else {
+		ret->pattern = strdup(pattern);
+		if (!ret->pattern) out_of_memory("make_exclude");
+	}
 
 	if (strpbrk(pattern, "*[?")) {
 		ret->match_flags |= MATCHFLG_WILD;
@@ -71,8 +83,9 @@ static struct exclude_struct *make_exclude(const char *pattern, int include)
 		}
 	}
 
-	if (strlen(pattern) > 1 && pattern[strlen(pattern)-1] == '/') {
-		ret->pattern[strlen(pattern)-1] = 0;
+	pat_len = strlen(ret->pattern);
+	if (pat_len > 1 && ret->pattern[pat_len-1] == '/') {
+		ret->pattern[pat_len-1] = 0;
 		ret->directory = 1;
 	}
 
@@ -89,8 +102,26 @@ static void free_exclude(struct exclude_struct *ex)
 	free(ex);
 }
 
+
+void free_exclude_list(struct exclude_struct ***listp)
+{
+	struct exclude_struct **list = *listp;
+
+	if (verbose > 2)
+		rprintf(FINFO,"clearing exclude list\n");
+
+	if (!list)
+		return;
+
+	while (*list)
+		free_exclude(*list++);
+
+	free(*listp);
+	*listp = NULL;
+}
+
 static int check_one_exclude(char *name, struct exclude_struct *ex,
-                             STRUCT_STAT *st)
+                             int name_is_dir)
 {
 	char *p;
 	int match_start = 0;
@@ -99,13 +130,22 @@ static int check_one_exclude(char *name, struct exclude_struct *ex,
 	/* If the pattern does not have any slashes AND it does not have
 	 * a "**" (which could match a slash), then we just match the
 	 * name portion of the path. */
-	if (!ex->slash_cnt && !(ex->match_flags & MATCHFLG_WILD2) &&
-	    (p = strrchr(name,'/')) != NULL)
-		name = p+1;
+	if (!ex->slash_cnt && !(ex->match_flags & MATCHFLG_WILD2)) {
+		if ((p = strrchr(name,'/')) != NULL)
+			name = p+1;
+	}
+	else if ((ex->match_flags & MATCHFLG_ABS_PATH) && *name != '/') {
+		static char full_name[MAXPATHLEN];
+		extern char curr_dir[];
+		int plus = curr_dir[1] == '\0'? 1 : 0;
+		snprintf(full_name, sizeof full_name,
+			 "%s/%s", curr_dir+plus, name);
+		name = full_name;
+	}
 
 	if (!name[0]) return 0;
 
-	if (ex->directory && !S_ISDIR(st->st_mode)) return 0;
+	if (ex->directory && !name_is_dir) return 0;
 
 	if (*pattern == '/') {
 		match_start = 1;
@@ -167,7 +207,7 @@ static int check_one_exclude(char *name, struct exclude_struct *ex,
 
 static void report_exclude_result(char const *name,
                                   struct exclude_struct const *ent,
-                                  STRUCT_STAT const *st)
+                                  int name_is_dir)
 {
 	/* If a trailing slash is present to match only directories,
 	 * then it is stripped out by make_exclude.  So as a special
@@ -176,7 +216,7 @@ static void report_exclude_result(char const *name,
 	if (verbose >= 2)
 		rprintf(FINFO, "%s %s %s because of pattern %s%s\n",
 			ent->include ? "including" : "excluding",
-			S_ISDIR(st->st_mode) ? "directory" : "file",
+			name_is_dir ? "directory" : "file",
 			name, ent->pattern,
 			ent->directory ? "/" : "");
 }
@@ -186,33 +226,14 @@ static void report_exclude_result(char const *name,
  * Return true if file NAME is defined to be excluded by either
  * LOCAL_EXCLUDE_LIST or the globals EXCLUDE_LIST.
  */
-int check_exclude(char *name, struct exclude_struct **local_exclude_list,
-		  STRUCT_STAT *st)
+int check_exclude(struct exclude_struct **list, char *name, int name_is_dir)
 {
-	int n;
 	struct exclude_struct *ent;
 
-	if (name && (name[0] == '.') && !name[1])
-		/* never exclude '.', even if somebody does --exclude '*' */
-		return 0;
-
-	if (exclude_list) {
-		for (n=0; exclude_list[n]; n++) {
-			ent = exclude_list[n];
-			if (check_one_exclude(name, ent, st)) {
-				report_exclude_result(name, ent, st);
-				return !ent->include;
-			}
-		}
-	}
-
-	if (local_exclude_list) {
-		for (n=0; local_exclude_list[n]; n++) {
-			ent = local_exclude_list[n];
-			if (check_one_exclude(name, ent, st)) {
-				report_exclude_result(name, ent, st);
-				return !ent->include;
-			}
+	while ((ent = *list++) != NULL) {
+		if (check_one_exclude(name, ent, name_is_dir)) {
+			report_exclude_result(name, ent, name_is_dir);
+			return !ent->include;
 		}
 	}
 
@@ -220,26 +241,22 @@ int check_exclude(char *name, struct exclude_struct **local_exclude_list,
 }
 
 
-void add_exclude_list(const char *pattern, struct exclude_struct ***list, int include)
+void add_exclude(struct exclude_struct ***listp, const char *pattern, int include)
 {
-	int len=0;
-	if (list && *list)
-		for (; (*list)[len]; len++) ;
+	struct exclude_struct **list = *listp;
+	int len = 0;
 
-	if (strcmp(pattern,"!") == 0) {
-		if (verbose > 2)
-			rprintf(FINFO,"clearing exclude list\n");
-		while ((len)--) {
-			free_exclude((*list)[len]);
-		}
-		free((*list));
-		*list = NULL;
-		return;
+	if (*pattern == '!' && !pattern[1]) {
+	    free_exclude_list(listp);
+	    return;
 	}
 
-	*list = (struct exclude_struct **)Realloc(*list,sizeof(struct exclude_struct *)*(len+2));
+	if (list)
+		for (; list[len]; len++) {}
 
-	if (!*list || !((*list)[len] = make_exclude(pattern, include)))
+	list = *listp = (struct exclude_struct **)Realloc(list,sizeof(struct exclude_struct *)*(len+2));
+
+	if (!list || !(list[len] = make_exclude(pattern, include)))
 		out_of_memory("add_exclude");
 
 	if (verbose > 2) {
@@ -247,25 +264,22 @@ void add_exclude_list(const char *pattern, struct exclude_struct ***list, int in
 			include ? "include" : "exclude");
 	}
 
-	(*list)[len+1] = NULL;
+	list[len+1] = NULL;
 }
 
-void add_exclude(const char *pattern, int include)
-{
-	add_exclude_list(pattern,&exclude_list, include);
-}
 
-struct exclude_struct **make_exclude_list(const char *fname,
-					  struct exclude_struct **list1,
-					  int fatal, int include)
+void add_exclude_file(struct exclude_struct ***listp, const char *fname,
+		      int fatal, int include)
 {
-	struct exclude_struct **list=list1;
 	int fd;
 	char line[MAXPATHLEN];
 	char *eob = line + MAXPATHLEN - 1;
 	extern int eol_nulls;
 
-	if (strcmp(fname, "-") != 0)
+	if (!fname || !*fname)
+		return;
+
+	if (*fname != '-' || fname[1])
 		fd = open(fname, O_RDONLY|O_BINARY);
 	else
 		fd = 0;
@@ -277,7 +291,7 @@ struct exclude_struct **make_exclude_list(const char *fname,
 				fname);
 			exit_cleanup(RERR_FILEIO);
 		}
-		return list;
+		return;
 	}
 
 	while (1) {
@@ -299,21 +313,12 @@ struct exclude_struct **make_exclude_list(const char *fname,
 			/* Skip lines starting with semicolon or pound.
 			 * It probably wouldn't cause any harm to not skip
 			 * them but there's no need to save them. */
-			add_exclude_list(line,&list,include);
+			add_exclude(listp, line, include);
 		}
 		if (cnt <= 0)
 			break;
 	}
 	close(fd);
-	return list;
-}
-
-
-void add_exclude_file(const char *fname, int fatal, int include)
-{
-	if (!fname || !*fname) return;
-
-	exclude_list = make_exclude_list(fname,exclude_list,fatal,include);
 }
 
 
@@ -327,9 +332,8 @@ void send_exclude_list(int f)
 	 *
 	 * FIXME: This pattern shows up in the output of
 	 * report_exclude_result(), which is not ideal. */
-	if (list_only && !recurse) {
-		add_exclude("/*/*", 0);
-	}
+	if (list_only && !recurse)
+		add_exclude(&exclude_list, "/*/*", ADD_EXCLUDE);
 
 	if (!exclude_list) {
 		write_int(f,0);
@@ -370,7 +374,7 @@ void recv_exclude_list(int f)
 	while ((l=read_int(f))) {
 		if (l >= MAXPATHLEN) overflow("recv_exclude_list");
 		read_sbuf(f,line,l);
-		add_exclude(line,0);
+		add_exclude(&exclude_list, line, ADD_EXCLUDE);
 	}
 }
 
@@ -423,25 +427,15 @@ char *get_exclude_tok(char *p)
 }
 
 
-void add_exclude_line(char *p)
+void add_exclude_line(struct exclude_struct ***listp,
+		      const char *line, int include)
 {
-	char *tok;
-	if (!p || !*p) return;
-	p = strdup(p);
+	char *tok, *p;
+	if (!line || !*line) return;
+	p = strdup(line);
 	if (!p) out_of_memory("add_exclude_line");
 	for (tok=get_exclude_tok(p); tok; tok=get_exclude_tok(NULL))
-		add_exclude(tok, 0);
-	free(p);
-}
-
-void add_include_line(char *p)
-{
-	char *tok;
-	if (!p || !*p) return;
-	p = strdup(p);
-	if (!p) out_of_memory("add_include_line");
-	for (tok=get_exclude_tok(p); tok; tok=get_exclude_tok(NULL))
-		add_exclude(tok, 1);
+		add_exclude(listp, tok, include);
 	free(p);
 }
 
@@ -461,12 +455,12 @@ void add_cvs_excludes(void)
 	int i;
 
 	for (i=0; cvs_ignore_list[i]; i++)
-		add_exclude(cvs_ignore_list[i], 0);
+		add_exclude(&exclude_list, cvs_ignore_list[i], ADD_EXCLUDE);
 
 	if ((p=getenv("HOME")) && strlen(p) < (MAXPATHLEN-12)) {
 		snprintf(fname,sizeof(fname), "%s/.cvsignore",p);
-		add_exclude_file(fname,0,0);
+		add_exclude_file(&exclude_list,fname,MISSING_OK,ADD_EXCLUDE);
 	}
 
-	add_exclude_line(getenv("CVSIGNORE"));
+	add_exclude_line(&exclude_list, getenv("CVSIGNORE"), ADD_EXCLUDE);
 }
