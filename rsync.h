@@ -298,7 +298,7 @@ enum msgcode {
 
 #ifdef MAJOR_IN_MKDEV
 #include <sys/mkdev.h>
-# if !defined makedev && defined mkdev
+# if !defined makedev && (defined mkdev || defined _WIN32 || defined __WIN32__)
 #  define makedev mkdev
 # endif
 #elif defined MAJOR_IN_SYSMACROS
