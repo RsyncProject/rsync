@@ -117,5 +117,4 @@ if test "$ac_cv_lib_socket_connect" = "yes" ||
 fi])
 
 
-AC_OUTPUT(Makefile lib/dummy)
-AC_OUTPUT(Makefile zlib/dummy)
+AC_OUTPUT(Makefile lib/dummy zlib/dummy)
