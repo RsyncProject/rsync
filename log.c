@@ -30,6 +30,7 @@
 static char *logfname;
 static FILE *logfile;
 static int log_error_fd = -1;
+struct stats stats;
 
 int log_got_error=0;
 

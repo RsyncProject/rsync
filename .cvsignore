@@ -8,6 +8,7 @@ config.log
 config.status
 conftest.c
 conftest.log
+dox
 gmon.out
 rsync
 shconfig

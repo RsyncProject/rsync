@@ -23,8 +23,7 @@
 
 time_t starttime = 0;
 
-struct stats stats;
-
+extern struct stats stats;
 extern int verbose;
 
 static void show_malloc_stats(void);

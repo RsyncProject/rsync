@@ -297,9 +297,10 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 }
 
 
-/* main routine for receiver process. Receiver process runs on the
-	same host as the generator process. */
-
+/**
+ * main routine for receiver process.
+ *
+ * Receiver process runs on the same host as the generator process. */
 int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 {  
 	int fd1,fd2;
@@ -317,6 +318,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	extern struct stats stats;		
 	extern int preserve_perms;
 	extern int delete_after;
+	extern int orig_umask;
 	struct stats initial_stats;
 
 	if (verbose > 2) {
@@ -434,7 +436,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		   because their information should have been previously
 		   transferred, but that may not be the case with -R */
 		if (fd2 == -1 && relative_paths && errno == ENOENT && 
-		    create_directory_path(fnametmp) == 0) {
+		    create_directory_path(fnametmp, orig_umask) == 0) {
 			strlcpy(fnametmp, template, sizeof(fnametmp));
 			fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
 		}

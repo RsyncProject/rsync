@@ -239,6 +239,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 	extern int list_only;
 	extern int preserve_perms;
 	extern int only_existing;
+	extern int orig_umask;
 
 	if (list_only) return;
 
@@ -281,7 +282,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 		}
 		if (statret != 0 && do_mkdir(fname,file->mode) != 0 && errno != EEXIST) {
 			if (!(relative_paths && errno==ENOENT && 
-			      create_directory_path(fname)==0 && 
+			      create_directory_path(fname, orig_umask)==0 && 
 			      do_mkdir(fname,file->mode)==0)) {
 				rprintf(FERROR, RSYNC_NAME ": recv_generator: mkdir \"%s\": %s (2)\n",
 					fname,strerror(errno));

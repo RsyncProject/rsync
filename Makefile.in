@@ -32,15 +32,16 @@ ZLIBOBJ=zlib/deflate.o zlib/infblock.o zlib/infcodes.o zlib/inffast.o \
 OBJS1=rsync.o generator.o receiver.o cleanup.o sender.o exclude.o util.o main.o checksum.o match.o syscall.o log.o backup.o
 OBJS2=options.o flist.o io.o compat.o hlink.o token.o uidlist.o socket.o fileio.o batch.o \
 	clientname.o
+OBJS3=progress.o pipe.o
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS=popt/findme.o  popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o
-OBJS=$(OBJS1) $(OBJS2) $(DAEMON_OBJ) $(LIBOBJ) $(ZLIBOBJ) @BUILD_POPT@
+OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) $(ZLIBOBJ) @BUILD_POPT@
 
 TLS_OBJ = tls.o syscall.o lib/permstring.o 
 
 # Programs we must have to run the test cases
-CHECK_PROGS = rsync tls getgroups trimslash
+CHECK_PROGS = rsync tls getgroups trimslash t_unsafe
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
@@ -78,6 +79,10 @@ getgroups: getgroups.o
 TRIMSLASH_OBJ = trimslash.o syscall.o
 trimslash: $(TRIMSLASH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TRIMSLASH_OBJ) $(LIBS)
+
+T_UNSAFE_OBJ = t_unsafe.o syscall.o util.o t_stub.o lib/compat.o
+t_unsafe: $(T_UNSAFE_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
 
 # I don't like these rules because CVS can skew the timestamps and
 # produce spurious warnings, and also make "make install" fail if the
@@ -171,3 +176,12 @@ rsync.ps: rsync.dvi
 
 rsync.pdf: doc/rsync.texinfo
 	texi2dvi -o $@ --pdf $<
+
+
+doxygen: 
+	cd $(srcdir) && rm dox/html/* && doxygen
+
+# for maintainers only
+doxygen-upload: 
+	rsync -avzv $(srcdir)/dox/html/ --delete \
+	samba.org:/home/httpd/html/rsync/doxygen/head/

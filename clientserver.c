@@ -27,7 +27,7 @@ extern int read_only;
 extern int verbose;
 extern int rsync_port;
 char *auth_user;
-int sanitize_paths = 0;
+extern int sanitize_paths;
 
 /**
  * Run a client connected to an rsyncd.  The alternative to this

@@ -88,6 +88,7 @@ int modify_window=0;
 #endif
 int blocking_io=-1;
 
+
 /** Network address family. **/
 #ifdef INET6
 int default_af_hint = 0;	/* Any protocol */
