@@ -24,8 +24,9 @@
 
 extern int dry_run;
 extern int read_only;
+extern int list_only;
 
-#define CHECK_RO if (read_only) {errno = EROFS; return -1;}
+#define CHECK_RO if (read_only || list_only) {errno = EROFS; return -1;}
 
 int do_unlink(char *fname)
 {
