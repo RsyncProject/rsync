@@ -775,15 +775,20 @@ static int start_client(int argc, char *argv[])
 		host = argv[0] + strlen(URL_PREFIX);
 		p = strchr(host,'/');
 		if (p) {
-			*p = 0;
+			*p = '\0';
 			path = p+1;
-		} else {
+		} else
 			path = "";
-		}
-		p = strchr(host,':');
+		if (*host == '[' && (p = strchr(host, ']')) != NULL) {
+			host++;
+			*p++ = '\0';
+			if (*p != ':')
+				p = NULL;
+		} else
+			p = strchr(host, ':');
 		if (p) {
 			rsync_port = atoi(p+1);
-			*p = 0;
+			*p = '\0';
 		}
 		return start_socket_client(host, path, argc-1, argv+1);
 	}
@@ -795,7 +800,7 @@ static int start_client(int argc, char *argv[])
 			 && remote_filesfrom_file != files_from + 1
 			 && strncmp(files_from, argv[0], p-argv[0]+1) != 0) {
 				rprintf(FERROR,
-					"--files-from hostname is not transfer hostname\n");
+					"--files-from hostname is not the same as the transfer hostname\n");
 				exit_cleanup(RERR_SYNTAX);
 			}
 			if (p[1] == ':') { /* double colon */
@@ -828,15 +833,20 @@ static int start_client(int argc, char *argv[])
 				host = argv[argc-1] + strlen(URL_PREFIX);
 				p = strchr(host,'/');
 				if (p) {
-					*p = 0;
+					*p = '\0';
 					path = p+1;
-				} else {
+				} else
 					path = "";
-				}
-				p = strchr(host,':');
+				if (*host == '[' && (p = strchr(host, ']')) != NULL) {
+					host++;
+					*p++ = '\0';
+					if (*p != ':')
+						p = NULL;
+				} else
+					p = strchr(host, ':');
 				if (p) {
 					rsync_port = atoi(p+1);
-					*p = 0;
+					*p = '\0';
 				}
 				return start_socket_client(host, path, argc-1, argv);
 			}
@@ -846,14 +856,14 @@ static int start_client(int argc, char *argv[])
 			 && remote_filesfrom_file != files_from + 1
 			 && strncmp(files_from, argv[argc-1], p-argv[argc-1]+1) != 0) {
 				rprintf(FERROR,
-					"--files-from hostname is not transfer hostname\n");
+					"--files-from hostname is not the same as the transfer hostname\n");
 				exit_cleanup(RERR_SYNTAX);
 			}
 			if (!p) { /* no colon found, so src & dest are local */
 				local_server = 1;
 				if (remote_filesfrom_file) {
 					rprintf(FERROR,
-						"--files-from is remote but transfer is local\n");
+						"--files-from cannot be remote when the transfer is local\n");
 					exit_cleanup(RERR_SYNTAX);
 				}
 			} else if (p[1] == ':') { /* double colon */
