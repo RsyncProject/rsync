@@ -59,8 +59,10 @@ run_test(int line, bool matches, bool same_as_fnmatch,
 	fnmatch_errors++;
     }
 #endif
-    if (output_iterations)
-	printf("[%s] iterations = %d\n", pattern, wildmatch_iteration_count);
+    if (output_iterations) {
+	printf("%d: \"%s\" iterations = %d\n", line, pattern,
+	       wildmatch_iteration_count);
+    }
 }
 
 int
