@@ -21,6 +21,7 @@
 #include "rsync.h"
 #include "popt.h"
 
+extern int module_id;
 extern int sanitize_paths;
 extern int select_timeout;
 extern struct filter_list_struct filter_list;
@@ -70,7 +71,6 @@ int implied_dirs = 1;
 int numeric_ids = 0;
 int force_delete = 0;
 int io_timeout = 0;
-int module_id = -1;
 int am_server = 0;
 int am_sender = 0;
 int am_generator = 0;
