@@ -222,11 +222,11 @@ static void hash_search(int f,struct sum_struct *s,
     /* Trim off the first byte from the checksum */
     map = window_ptr(buf,offset,k+1);
     s1 -= map[0] + 1;
-    s2 -= k * (map[0]+1);
+    s2 -= k * (map[0]+CHAR_OFFSET);
 
     /* Add on the next byte (if there is one) to the checksum */
     if (k < (len-offset)) {
-      s1 += (map[k]+1);
+      s1 += (map[k]+CHAR_OFFSET);
       s2 += s1;
     } else {
       --k;

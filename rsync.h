@@ -23,6 +23,11 @@
 #define RSYNC_NAME "rsync"
 #define BACKUP_SUFFIX "~"
 
+/* a non-zero CHAR_OFFSET makes the rolling sum stronger, but is
+   imcompatible with older versions :-( */
+#define CHAR_OFFSET 0
+
+
 #define FILE_VALID 1
 #define SAME_MODE (1<<1)
 #define SAME_RDEV (1<<2)
