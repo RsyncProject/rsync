@@ -34,6 +34,8 @@ extern int rsync_port;
 char *auth_user;
 extern int sanitize_paths;
 extern int filesfrom_fd;
+extern struct exclude_struct **server_exclude_list;
+extern char *exclude_path_prefix;
 
 /**
  * Run a client connected to an rsyncd.  The alternative to this
@@ -78,8 +80,8 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 		rprintf(FINFO, "opening tcp connection to %s port %d\n",
 			host, rsync_port);
 	}
-	fd = open_socket_out_wrapped (host, rsync_port, bind_address,
-						default_af_hint);
+	fd = open_socket_out_wrapped(host, rsync_port, bind_address,
+				     default_af_hint);
 	if (fd == -1) {
 		exit_cleanup(RERR_SOCKETIO);
 	}
@@ -240,7 +242,8 @@ static int rsync_module(int f_in, int f_out, int i)
 		} else {
 			rprintf(FERROR,"max connections (%d) reached\n",
 				lp_max_connections(i));
-			io_printf(f_out, "@ERROR: max connections (%d) reached - try again later\n", lp_max_connections(i));
+			io_printf(f_out, "@ERROR: max connections (%d) reached - try again later\n",
+				lp_max_connections(i));
 		}
 		return -1;
 	}
@@ -288,17 +291,21 @@ static int rsync_module(int f_in, int f_out, int i)
 	/* TODO: Perhaps take a list of gids, and make them into the
 	 * supplementary groups. */
 
+	exclude_path_prefix = use_chroot? "" : lp_path(i);
+
 	p = lp_include_from(i);
-	add_exclude_file(p, 1, 1);
+	add_exclude_file(&server_exclude_list, p, MISSING_FATAL, ADD_INCLUDE);
 
 	p = lp_include(i);
-	add_include_line(p);
+	add_exclude_line(&server_exclude_list, p, ADD_INCLUDE);
 
 	p = lp_exclude_from(i);
-	add_exclude_file(p, 1, 0);
+	add_exclude_file(&server_exclude_list, p, MISSING_FATAL, ADD_EXCLUDE);
 
 	p = lp_exclude(i);
-	add_exclude_line(p);
+	add_exclude_line(&server_exclude_list, p, ADD_EXCLUDE);
+
+	exclude_path_prefix = NULL;
 
 	log_init();
 
@@ -622,4 +629,3 @@ int daemon_main(void)
 	start_accept_loop(rsync_port, start_daemon);
 	return -1;
 }
-
