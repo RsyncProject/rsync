@@ -1008,7 +1008,7 @@ static void send_if_directory(int f, struct file_list *flist,
 
 
 /* This function is normally called by the sender, but the receiving side also
- * calls it from delete_in_dir() with f set to -1 so that we just construct the
+ * calls it from get_dirlist() with f set to -1 so that we just construct the
  * file list in memory without sending it over the wire.  Also, get_dirlist()
  * might call this with f set to -2, which also indicates that local filter
  * rules should be ignored. */
