@@ -1387,13 +1387,16 @@ itemize(
   specified to turn off the parsing of prefixes).
 )
 
-The following modifier is accepted after a "+" or "-":
+The following modifiers are accepted after a "+" or "-":
 
 itemize(
   it() A "/" specifies that the include/exclude should be treated as an
   absolute path, relative to the root of the filesystem.  For example,
   "-/_/etc/passwd" would exclude the passwd file any time the transfer
   was sending files from the "/etc" directory.
+  it() A "!" specifies that the include/exclude should take effect if
+  the pattern fails to match.  For instance, "-! */" would exclude all
+  non-directories.
 )
 
 Per-directory rules are inherited in all subdirectories of the directory
