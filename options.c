@@ -1,22 +1,22 @@
 /*  -*- c-file-style: "linux" -*-
-    
-    Copyright (C) 1998-2001 by Andrew Tridgell <tridge@samba.org>
-    Copyright (C) 2000, 2001, 2002 by Martin Pool <mbp@samba.org>
-   
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-   
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-   
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-*/
+ * 
+ * Copyright (C) 1998-2001 by Andrew Tridgell <tridge@samba.org>
+ * Copyright (C) 2000, 2001, 2002 by Martin Pool <mbp@samba.org>
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
 
 #include "rsync.h"
 #include "popt.h"
@@ -24,14 +24,13 @@
 int make_backups = 0;
 
 /**
- * Should we send the whole file as literal data rather than trying to
- * create an incremental diff?  This is on by default when both source
- * and destination are local and we're not doing a batch delta,
- * because there it's no cheaper to read the whole basis file than to
- * just rewrite it.
+ * If True, send the whole file as literal data rather than trying to
+ * create an incremental diff.
  *
  * If both are 0, then look at whether we're local or remote and go by
  * that.
+ *
+ * @sa disable_deltas_p()
  **/
 int whole_file = 0;
 int no_whole_file = 0;
@@ -377,9 +376,11 @@ static struct poptOption long_options[] = {
 static char err_buf[100];
 
 
-/* We store the option error message, if any, so that we can log the
-   connection attempt (which requires parsing the options), and then
-   show the error later on. */
+/**
+ * Store the option error message, if any, so that we can log the
+ * connection attempt (which requires parsing the options), and then
+ * show the error later on.
+ **/
 void option_error(void)
 {
 	if (err_buf[0]) {
@@ -393,7 +394,10 @@ void option_error(void)
 	}
 }
 
-/* check to see if we should refuse this option */
+
+/**
+ * Check to see if we should refuse this option
+ **/
 static int check_refuse_options(char *ref, int opt)
 {
 	int i, len;
@@ -433,9 +437,14 @@ static int count_args(char const **argv)
 }
 
 
-/* Process command line arguments.  Called on both local and remote.
- * Returns if all options are OK, otherwise fills in err_buf and
- * returns 0. */
+/**
+ * Process command line arguments.  Called on both local and remote.
+ *
+ * @retval 1 if all options are OK; with globals set to appropriate
+ * values
+ *
+ * @retval 0 on error, with err_buf containing an explanation
+ **/
 int parse_arguments(int *argc, const char ***argv, int frommain)
 {
 	int opt;
@@ -606,8 +615,14 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 }
 
 
-/* Construct a filtered list of options to pass through from the
- * client to the server */
+/**
+ * Construct a filtered list of options to pass through from the
+ * client to the server.
+ *
+ * This involves setting options that will tell the server how to
+ * behave, and also filtering out options that are processed only
+ * locally.
+ **/
 void server_options(char **args,int *argc)
 {
 	int ac = *argc;
