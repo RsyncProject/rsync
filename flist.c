@@ -1135,12 +1135,11 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 	clean_flist(flist, 0, 0);
 
-	/* now send the uid/gid list. This was introduced in protocol
-	 * version 15 */
-	if (f != -1)
+	if (f != -1) {
+		/* Now send the uid/gid list. This was introduced in
+		 * protocol version 15 */
 		send_uid_list(f);
 
-	if (f != -1) {
 		/* send the io_error flag */
 		write_int(f, lp_ignore_errors(module_id) ? 0 : io_error);
 
@@ -1212,16 +1211,18 @@ struct file_list *recv_file_list(int f)
 
 	clean_flist(flist, relative_paths, 1);
 
-	/* now recv the uid/gid list. This was introduced in protocol version 15 */
-	if (f != -1)
+	if (f != -1) {
+		/* Now send the uid/gid list. This was introduced in
+		 * protocol version 15 */
 		recv_uid_list(f, flist);
 
-	/* recv the io_error flag */
-	if (f != -1 && !read_batch) {	/* dw-added readbatch */
-		if (lp_ignore_errors(module_id) || ignore_errors)
-			read_int(f);
-		else
-			io_error |= read_int(f);
+		if (!read_batch) {
+			/* Recv the io_error flag */
+			if (lp_ignore_errors(module_id) || ignore_errors)
+				read_int(f);
+			else
+				io_error |= read_int(f);
+		}
 	}
 
 	if (list_only) {
@@ -1229,7 +1230,6 @@ struct file_list *recv_file_list(int f)
 		for (i = 0; i < flist->count; i++)
 			list_file_entry(flist->files[i]);
 	}
-
 
 	if (verbose > 2)
 		rprintf(FINFO, "recv_file_list done\n");
