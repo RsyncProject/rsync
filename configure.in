@@ -90,14 +90,14 @@ AC_ARG_WITH(included-popt,
         [  --with-included-popt    use bundled popt library, not from system])
 
 AC_ARG_WITH(rsync-path,
-	[  --with-rsync-path=PATH  set default --rsync-path to PATH (default: \"rsync\")],
+	[  --with-rsync-path=PATH  set default --rsync-path to PATH (default: rsync)],
 	[ RSYNC_PATH="$with_rsync_path" ],
 	[ RSYNC_PATH="rsync" ])
 
 AC_DEFINE_UNQUOTED(RSYNC_PATH, "$RSYNC_PATH", [location of rsync on remote machine])
 
 AC_ARG_WITH(rsh,
-	AC_HELP_STRING([--with-rsh=CMD], [set rsh command to CMD (default: \"remsh\" or \"rsh\")]))
+	AC_HELP_STRING([--with-rsh=CMD], [set remote shell command to CMD (default: ssh)]))
 
 AC_CHECK_PROG(HAVE_REMSH, remsh, 1, 0)
 AC_DEFINE_UNQUOTED(HAVE_REMSH, $HAVE_REMSH, [remote shell is remsh not rsh])
@@ -105,11 +105,8 @@ AC_DEFINE_UNQUOTED(HAVE_REMSH, $HAVE_REMSH, [remote shell is remsh not rsh])
 if test x"$with_rsh" != x
 then
 	RSYNC_RSH="$with_rsh"
-elif test x"$HAVE_REMSH" = x1
-then 
-	RSYNC_RSH="remsh"
 else
-	RSYNC_RSH="rsh"
+	RSYNC_RSH="ssh"
 fi
 
 AC_DEFINE_UNQUOTED(RSYNC_RSH, "$RSYNC_RSH", [default -e command])
