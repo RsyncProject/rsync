@@ -20,6 +20,7 @@
 #include "rsync.h"
 
 extern int verbose;
+extern int what_has_changed;
 extern int csum_length;
 extern struct stats stats;
 extern int io_error;
@@ -167,8 +168,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		if (verbose > 2)
 			rprintf(FINFO, "send_files(%d, %s)\n", i, fname);
 
-		if (dry_run) {
-			if (!am_server && verbose) /* log the transfer */
+		if (dry_run) { /* log the transfer */
+			if (!am_server && verbose && !what_has_changed)
 				rprintf(FINFO, "%s\n", safe_fname(fname2));
 			write_int(f_out, i);
 			continue;
@@ -229,7 +230,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				safe_fname(fname));
 		}
 
-		if (!am_server && verbose) /* log the transfer */
+		/* log the transfer */
+		if (!am_server && verbose && !what_has_changed)
 			rprintf(FINFO, "%s\n", safe_fname(fname2));
 
 		set_compression(fname);

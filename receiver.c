@@ -21,6 +21,7 @@
 #include "rsync.h"
 
 extern int verbose;
+extern int what_has_changed;
 extern int delete_after;
 extern int csum_length;
 extern struct stats stats;
@@ -387,8 +388,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		if (verbose > 2)
 			rprintf(FINFO, "recv_files(%s)\n", safe_fname(fname));
 
-		if (dry_run) {
-			if (!am_server && verbose) /* log the transfer */
+		if (dry_run) { /* log the transfer */
+			if (!am_server && verbose && !what_has_changed)
 				rprintf(FINFO, "%s\n", safe_fname(fname));
 			continue;
 		}
@@ -531,7 +532,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 				cleanup_set(fnametmp, partialptr, file, fd1, fd2);
 		}
 
-		if (!am_server && verbose) /* log the transfer */
+		/* log the transfer */
+		if (!am_server && verbose && !what_has_changed)
 			rprintf(FINFO, "%s\n", safe_fname(fname));
 
 		/* recv file data */
