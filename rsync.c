@@ -24,7 +24,7 @@
 
 extern int verbose;
 extern int dry_run;
-extern int itemize_changes;
+extern int daemon_log_format_has_i;
 extern int preserve_times;
 extern int omit_dir_times;
 extern int am_root;
@@ -231,10 +231,12 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 #endif
 
 	if (verbose > 1 && flags & PERMS_REPORT) {
+		enum logcode code = daemon_log_format_has_i || dry_run
+				  ? FCLIENT : FINFO;
 		if (updated)
-			rprintf(FINFO, "%s\n", safe_fname(fname));
+			rprintf(code, "%s\n", safe_fname(fname));
 		else
-			rprintf(FINFO, "%s is uptodate\n", safe_fname(fname));
+			rprintf(code, "%s is uptodate\n", safe_fname(fname));
 	}
 	return updated;
 }
