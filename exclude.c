@@ -234,7 +234,12 @@ struct exclude_struct **make_exclude_list(char *fname,
 		int l = strlen(line);
 		if (l && line[l-1] == '\n') l--;
 		line[l] = 0;
-		if (line[0]) add_exclude_list(line,&list,include);
+		if (line[0] && (line[0] != ';') && (line[0] != '#')) {
+			/* Skip lines starting with semicolon or pound.
+			   It probably wouldn't cause any harm to not skip
+			     them but there's no need to save them. */
+			add_exclude_list(line,&list,include);
+		}
 	}
 	fclose(f);
 	return list;
