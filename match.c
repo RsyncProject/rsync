@@ -246,7 +246,8 @@ static void hash_search(int f,struct sum_struct *s,
 		   match. The 3 reads are caused by the
 		   running match, the checksum update and the
 		   literal send. */
-		if (offset-last_match >= CHUNK_SIZE+s->n && 
+		if (offset > last_match &&
+		    offset-last_match >= CHUNK_SIZE+s->n && 
 		    (end-offset > CHUNK_SIZE)) {
 			matched(f,s,buf,offset - s->n, -2);
 		}
