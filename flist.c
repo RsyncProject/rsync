@@ -1,7 +1,6 @@
 /* 
    Copyright (C) Andrew Tridgell 1996
    Copyright (C) Paul Mackerras 1996
-   Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -18,14 +17,7 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-/** @file flist.c
- * Generate and receive file lists
- *
- * @todo Get rid of the string_area optimization.  Efficiently
- * allocating blocks is the responsibility of the system's malloc
- * library, not of rsync.
- *
- **/
+/* generate and receive file lists */
 
 #include "rsync.h"
 
@@ -55,107 +47,33 @@ extern int remote_version;
 extern int io_error;
 extern int sanitize_paths;
 
-extern int read_batch;
-extern int write_batch;
-
 static char topsrcname[MAXPATHLEN];
 
 static struct exclude_struct **local_exclude_list;
 
-static struct file_struct null_file;
-
 static void clean_flist(struct file_list *flist, int strip_root);
 
 
-static int show_build_progress_p(void)
-{
-	extern int do_progress;
-	
-	return do_progress && verbose && recurse && !am_server;
-}
-
-/**
- * True if we're local, etc, and should emit progress emssages.
- **/
-static void emit_build_progress(const struct file_list *flist)
-{
-	rprintf(FINFO,
-		" %d files...\r",
-		flist->count);
-}
-
-
-static void finish_build_progress(const struct file_list *flist)
-{
-	if (verbose && recurse && !am_server) {
-		/* This overwrites the progress line, if any. */
-		rprintf(FINFO, RSYNC_NAME ": %d files to consider.\n",
-			flist->count);
-	}
-}
-
-
-static struct string_area *string_area_new(int size)
-{
-	struct string_area *a;
-
-	if (size <= 0) size = ARENA_SIZE;
-	a = malloc(sizeof(*a));
-	if (!a) out_of_memory("string_area_new");
-	a->current = a->base = malloc(size);
-	if (!a->current) out_of_memory("string_area_new buffer");
-	a->end = a->base + size;
-	a->next = NULL;
-
-	return a;
-}
-
-static void string_area_free(struct string_area *a)
-{
-	struct string_area *next;
-
-	for ( ; a ; a = next) {
-		next = a->next;
-		free(a->base);
-	}
-}
-
-static char *string_area_malloc(struct string_area **ap, int size)
-{
-	char *p;
-	struct string_area *a;
-
-	/* does the request fit into the current space? */
-	a = *ap;
-	if (a->current + size >= a->end) {
-		/* no; get space, move new string_area to front of the list */
-		a = string_area_new(size > ARENA_SIZE ? size : ARENA_SIZE);
-		a->next = *ap;
-		*ap = a;
-	}
-
-	/* have space; do the "allocation." */
-	p = a->current;
-	a->current += size;
-	return p;
-}
-
-static char *string_area_strdup(struct string_area **ap, const char *src)
-{
-	char* dest = string_area_malloc(ap, strlen(src) + 1);
-	return strcpy(dest, src);
-}
-
 static void list_file_entry(struct file_struct *f)
 {
-	char perms[11];
+	char perms[11] = "----------";
+	char *perm_map = "rwxrwxrwx";
+	int i;
 
 	if (!f->basename)
 		/* this can happen if duplicate names were removed */
 		return;
 
-	permstring(perms, f->mode);
-
+	for (i=0;i<9;i++) {
+		if (f->mode & (1<<i)) perms[9-i] = perm_map[8-i];
+	}
+	if (S_ISLNK(f->mode)) perms[0] = 'l';
+	if (S_ISDIR(f->mode)) perms[0] = 'd';
+	if (S_ISBLK(f->mode)) perms[0] = 'b';
+	if (S_ISCHR(f->mode)) perms[0] = 'c';
+	if (S_ISSOCK(f->mode)) perms[0] = 's';
+	if (S_ISFIFO(f->mode)) perms[0] = 'p';
+	
 	if (preserve_links && S_ISLNK(f->mode)) {
 		rprintf(FINFO,"%s %11.0f %s %s -> %s\n", 
 			perms, 
@@ -180,7 +98,7 @@ int readlink_stat(const char *Path, STRUCT_STAT *Buffer, char *Linkbuf)
 	}
 	if (S_ISLNK(Buffer->st_mode)) {
 		int l;
-		if ((l = readlink((char *) Path, Linkbuf, MAXPATHLEN-1))== -1) {
+		if ((l = readlink(Path,Linkbuf,MAXPATHLEN-1)) == -1) {
 			return -1;
 		}
 		Linkbuf[l] = 0;
@@ -212,18 +130,14 @@ int link_stat(const char *Path, STRUCT_STAT *Buffer)
   This function is used to check if a file should be included/excluded
   from the list of files based on its name and type etc
  */
-static int check_exclude_file(int f,char *fname,STRUCT_STAT *st)
+static int match_file_name(char *fname,STRUCT_STAT *st)
 {
-	extern int delete_excluded;
-
-	/* f is set to -1 when calculating deletion file list */
-	if ((f == -1) && delete_excluded) {
-		return 0;
-	}
-	if (check_exclude(fname,local_exclude_list,st)) {
-		return 1;
-	}
-	return 0;
+  if (check_exclude(fname,local_exclude_list,st)) {
+    if (verbose > 2)
+      rprintf(FINFO,"excluding file %s\n",fname);
+    return 0;
+  }
+  return 1;
 }
 
 /* used by the one_file_system code */
@@ -239,7 +153,7 @@ static void set_filesystem(char *fname)
 
 static int to_wire_mode(mode_t mode)
 {
-	if (S_ISLNK(mode) && (_S_IFLNK != 0120000)) {
+	if (S_ISLNK(mode) && (S_IFLNK != 0120000)) {
 		return (mode & ~(_S_IFMT)) | 0120000;
 	}
 	return (int)mode;
@@ -247,8 +161,8 @@ static int to_wire_mode(mode_t mode)
 
 static mode_t from_wire_mode(int mode)
 {
-	if ((mode & (_S_IFMT)) == 0120000 && (_S_IFLNK != 0120000)) {
-		return (mode & ~(_S_IFMT)) | _S_IFLNK;
+	if ((mode & (_S_IFMT)) == 0120000 && (S_IFLNK != 0120000)) {
+		return (mode & ~(_S_IFMT)) | S_IFLNK;
 	}
 	return (mode_t)mode;
 }
@@ -333,15 +247,8 @@ static void send_file_entry(struct file_struct *file,int f,unsigned base_flags)
 
 #if SUPPORT_HARD_LINKS
 	if (preserve_hard_links && S_ISREG(file->mode)) {
-		if (remote_version < 26) {
-			/* 32-bit dev_t and ino_t */
-			write_int(f,(int)file->dev);
-			write_int(f,(int)file->inode);
-		} else {
-			/* 64-bit dev_t and ino_t */
-			write_longint(f, file->dev);
-			write_longint(f, file->inode);
-		}
+		write_int(f,(int)file->dev);
+		write_int(f,(int)file->inode);
 	}
 #endif
 
@@ -392,11 +299,7 @@ static void receive_file_entry(struct file_struct **fptr,
 	memset((char *)file, 0, sizeof(*file));
 	(*fptr) = file;
 
-	if (l2 >= MAXPATHLEN-l1) {
-		rprintf(FERROR,"overflow: flags=0x%x l1=%d l2=%d lastname=%s\n",
-			flags, l1, l2, lastname);
-		overflow("receive_file_entry");
-	}
+	if (l2 >= MAXPATHLEN-l1) overflow("receive_file_entry");
 
 	strlcpy(thisname,lastname,l1+1);
 	read_sbuf(f,&thisname[l1],l2);
@@ -456,13 +359,8 @@ static void receive_file_entry(struct file_struct **fptr,
 
 #if SUPPORT_HARD_LINKS
 	if (preserve_hard_links && S_ISREG(file->mode)) {
-		if (remote_version < 26) {
-			file->dev = read_int(f);
-			file->inode = read_int(f);
-		} else {
-			file->dev = read_longint(f);
-			file->inode = read_longint(f);
-		}
+		file->dev = read_int(f);
+		file->inode = read_int(f);
 	}
 #endif
   
@@ -515,13 +413,7 @@ static int skip_filesystem(char *fname, STRUCT_STAT *st)
 	return (st2.st_dev != filesystem_dev);
 }
 
-#define STRDUP(ap, p)	(ap ? string_area_strdup(ap, p) : strdup(p))
-/* IRIX cc cares that the operands to the ternary have the same type. */
-#define MALLOC(ap, i)	(ap ? (void*) string_area_malloc(ap, i) : malloc(i))
-
-/* create a file_struct for a named file */
-struct file_struct *make_file(int f, char *fname, struct string_area **ap,
-			      int noexcludes)
+static struct file_struct *make_file(int f, char *fname)
 {
 	struct file_struct *file;
 	STRUCT_STAT st;
@@ -529,7 +421,7 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 	char *p;
 	char cleaned_name[MAXPATHLEN];
 	char linkbuf[MAXPATHLEN];
-	extern int module_id;
+	extern int delete_excluded;
 
 	strlcpy(cleaned_name, fname, MAXPATHLEN);
 	cleaned_name[MAXPATHLEN-1] = 0;
@@ -542,23 +434,11 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 	memset(sum,0,SUM_LENGTH);
 
 	if (readlink_stat(fname,&st,linkbuf) != 0) {
-		int save_errno = errno;
-		if ((errno == ENOENT) && copy_links && !noexcludes) {
-			/* symlink pointing nowhere, see if excluded */
-			memset((char *)&st, 0, sizeof(st));
-			if (check_exclude_file(f,fname,&st)) {
-				/* file is excluded anyway, ignore silently */
-				return NULL;
-			}
-		}
 		io_error = 1;
-		rprintf(FERROR,"readlink %s: %s\n",
-			fname,strerror(save_errno));
+		rprintf(FERROR,"%s: %s\n",
+			fname,strerror(errno));
 		return NULL;
 	}
-
-	/* we use noexcludes from backup.c */
-	if (noexcludes) goto skip_excludes;
 
 	if (S_ISDIR(st.st_mode) && !recurse) {
 		rprintf(FINFO,"skipping directory %s\n",fname);
@@ -570,15 +450,10 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 			return NULL;
 	}
 	
-	if (check_exclude_file(f,fname,&st))
+	/* f is set to -1 when calculating deletion file list */
+	if (((f != -1) || !delete_excluded) && !match_file_name(fname,&st))
 		return NULL;
-
-
-	if (lp_ignore_nonreadable(module_id) && access(fname, R_OK) != 0) 
-		return NULL;
-
- skip_excludes:
-
+	
 	if (verbose > 2)
 		rprintf(FINFO,"make_file(%d,%s)\n",f,fname);
 	
@@ -595,11 +470,11 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 			file->dirname = strdup(fname);
 			lastdir = file->dirname;
 		}
-		file->basename = STRDUP(ap, p+1);
+		file->basename = strdup(p+1);
 		*p = '/';
 	} else {
 		file->dirname = NULL;
-		file->basename = STRDUP(ap, fname);
+		file->basename = strdup(fname);
 	}
 
 	file->modtime = st.st_mtime;
@@ -615,12 +490,12 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 
 #if SUPPORT_LINKS
 	if (S_ISLNK(st.st_mode)) {
-		file->link = STRDUP(ap, linkbuf);
+		file->link = strdup(linkbuf);
 	}
 #endif
 
 	if (always_checksum) {
-		file->sum = (char *)MALLOC(ap, MD4_SUM_LENGTH);
+		file->sum = (char *)malloc(MD4_SUM_LENGTH);
 		if (!file->sum) out_of_memory("md4 sum");
 		/* drat. we have to provide a null checksum for non-regular
 		   files in order to be compatible with earlier versions
@@ -657,12 +532,9 @@ void send_file_name(int f,struct file_list *flist,char *fname,
 {
   struct file_struct *file;
 
-  file = make_file(f,fname, &flist->string_area, 0);
+  file = make_file(f,fname);
 
-  if (!file) return;
-
-  if (show_build_progress_p() & !(flist->count % 100))
-	  emit_build_progress(flist);
+  if (!file) return;  
   
   if (flist->count >= flist->malloced) {
 	  if (flist->malloced < 1000)
@@ -675,9 +547,6 @@ void send_file_name(int f,struct file_list *flist,char *fname,
 	  if (!flist->files)
 		  out_of_memory("send_file_name");
   }
-
-  if (write_batch) /*  dw  */
-    file->flags = FLAG_DELETE;
 
   if (strcmp(file->basename,"")) {
     flist->files[flist->count++] = file;
@@ -753,11 +622,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 }
 
 
-/*
- *
- * I *think* f==-1 means that the list should just be built in memory
- * and not transmitted.  But who can tell? -- mbp
- */
+
 struct file_list *send_file_list(int f,int argc,char *argv[])
 {
 	int i,l;
@@ -768,15 +633,20 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 	int64 start_write;
 
 	if (verbose && recurse && !am_server && f != -1) {
-		rprintf(FINFO, RSYNC_NAME ": building file list...\n");
-                if (verbose > 1)
-                        rprintf(FINFO, "\n");
+		rprintf(FINFO,"building file list ... ");
 		rflush(FINFO);
 	}
 
 	start_write = stats.total_written;
 
-	flist = flist_new();
+	flist = (struct file_list *)malloc(sizeof(flist[0]));
+	if (!flist) out_of_memory("send_file_list");
+
+	flist->count=0;
+	flist->malloced = 1000;
+	flist->files = (struct file_struct **)malloc(sizeof(flist->files[0])*
+						     flist->malloced);
+	if (!flist->files) out_of_memory("send_file_list");
 
 	if (f != -1) {
 		io_start_buffering(f);
@@ -802,10 +672,8 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 		}
 
 		if (link_stat(fname,&st) != 0) {
-			if (f != -1) {
-				io_error=1;
-				rprintf(FERROR,"link_stat %s : %s\n",fname,strerror(errno));
-			}
+			io_error=1;
+			rprintf(FERROR,"%s : %s\n",fname,strerror(errno));
 			continue;
 		}
 
@@ -873,7 +741,8 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 		if (one_file_system)
 			set_filesystem(fname);
 
-		send_file_name(f,flist,fname,recurse,FLAG_DELETE);
+		if (!recurse || !send_included_file_names(f,flist))
+			send_file_name(f,flist,fname,recurse,FLAG_DELETE);
 
 		if (olddir != NULL) {
 			flist_dir = NULL;
@@ -891,7 +760,8 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 		send_file_entry(NULL,f,0);
 	}
 
-	finish_build_progress(flist);
+	if (verbose && recurse && !am_server && f != -1)
+		rprintf(FINFO,"done\n");
 	
 	clean_flist(flist, 0);
 	
@@ -911,8 +781,6 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 		io_end_buffering(f);
 		stats.flist_size = stats.total_written - start_write;
 		stats.num_files = flist->count;
-		if (write_batch) /*  dw  */
-		    write_batch_flist_info(flist->count, flist->files);
 	}
 
 	if (verbose > 2)
@@ -990,10 +858,9 @@ struct file_list *recv_file_list(int f)
   }
 
   /* if protocol version is >= 17 then recv the io_error flag */
-  if (f != -1 && remote_version >= 17  && !read_batch) {  /* dw-added readbatch */
+  if (f != -1 && remote_version >= 17) {
 	  extern int module_id;
-	  extern int ignore_errors;
-	  if (lp_ignore_errors(module_id) || ignore_errors) {
+	  if (lp_ignore_errors(module_id)) {
 		  read_int(f);
 	  } else {
 		  io_error |= read_int(f);
@@ -1022,10 +889,6 @@ oom:
 }
 
 
-/*
- * XXX: This is currently the hottest function while building the file
- * list, because building f_name()s every time is expensive.
- **/
 int file_compare(struct file_struct **f1,struct file_struct **f2)
 {
 	if (!(*f1)->basename && !(*f2)->basename) return 0;
@@ -1063,38 +926,16 @@ int flist_find(struct file_list *flist,struct file_struct *f)
 /*
  * free up one file
  */
-void free_file(struct file_struct *file)
+static void free_file(struct file_struct *file)
 {
 	if (!file) return;
 	if (file->basename) free(file->basename);
 	if (file->link) free(file->link);
 	if (file->sum) free(file->sum);
-	*file = null_file;
+	memset((char *)file, 0, sizeof(*file));
 }
 
 
-/*
- * allocate a new file list
- */
-struct file_list *flist_new()
-{
-	struct file_list *flist;
-
-	flist = (struct file_list *)malloc(sizeof(flist[0]));
-	if (!flist) out_of_memory("send_file_list");
-
-	flist->count=0;
-	flist->malloced = 1000;
-	flist->files = (struct file_struct **)malloc(sizeof(flist->files[0])*
-						     flist->malloced);
-	if (!flist->files) out_of_memory("send_file_list");
-#if ARENA_SIZE > 0
-	flist->string_area = string_area_new(0);
-#else
-	flist->string_area = NULL;
-#endif
-	return flist;
-}
 /*
  * free up all elements in a flist
  */
@@ -1102,14 +943,11 @@ void flist_free(struct file_list *flist)
 {
 	int i;
 	for (i=1;i<flist->count;i++) {
-		if (!flist->string_area)
-			free_file(flist->files[i]);
+		free_file(flist->files[i]);
 		free(flist->files[i]);
 	}	
 	memset((char *)flist->files, 0, sizeof(flist->files[0])*flist->count);
 	free(flist->files);
-	if (flist->string_area)
-		string_area_free(flist->string_area);
 	memset((char *)flist, 0, sizeof(*flist));
 	free(flist);
 }
@@ -1138,19 +976,9 @@ static void clean_flist(struct file_list *flist, int strip_root)
 			if (verbose > 1 && !am_server)
 				rprintf(FINFO,"removing duplicate name %s from file list %d\n",
 					f_name(flist->files[i-1]),i-1);
-			/* it's not great that the flist knows the semantics of the
-			 * file memory usage, but i'd rather not add a flag byte
-			 * to that struct. XXX can i use a bit in the flags field? */
-			if (flist->string_area)
-				flist->files[i][0] = null_file;
-			else
-				free_file(flist->files[i]);
+			free_file(flist->files[i]);
 		} 
 	}
-
-	/* FIXME: There is a bug here when filenames are repeated more
-	 * than once, because we don't handle freed files when doing
-	 * the comparison. */
 
 	if (strip_root) {
 		/* we need to strip off the root directory in the case
@@ -1175,22 +1003,18 @@ static void clean_flist(struct file_list *flist, int strip_root)
 	if (verbose <= 3) return;
 
 	for (i=0;i<flist->count;i++) {
-		rprintf(FINFO,"[%d] i=%d %s %s mode=0%o len=%.0f\n",
-			(int) getpid(), i, 
+		rprintf(FINFO,"[%d] i=%d %s %s mode=0%o len=%d\n",
+			getpid(), i, 
 			NS(flist->files[i]->dirname),
 			NS(flist->files[i]->basename),
-			(int) flist->files[i]->mode,
-			(double)flist->files[i]->length);
+			flist->files[i]->mode,
+			(int)flist->files[i]->length);
 	}
 }
 
 
 /*
  * return the full filename of a flist entry
- *
- * This function is too expensive at the moment, because it copies
- * strings when often we only want to compare them.  In any case,
- * using strlcat is silly because it will walk the string repeatedly.
  */
 char *f_name(struct file_struct *f)
 {
@@ -1203,11 +1027,9 @@ char *f_name(struct file_struct *f)
 	n = (n+1)%10;
 
 	if (f->dirname) {
-		int off;
-
-		off = strlcpy(p, f->dirname, MAXPATHLEN);
-		off += strlcpy(p+off, "/", MAXPATHLEN-off);
-		off += strlcpy(p+off, f->basename, MAXPATHLEN-off);
+		strlcpy(p, f->dirname, MAXPATHLEN);
+		strlcat(p, "/", MAXPATHLEN);
+		strlcat(p, f->basename, MAXPATHLEN);
 	} else {
 		strlcpy(p, f->basename, MAXPATHLEN);
 	}

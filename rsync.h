@@ -1,7 +1,6 @@
 /* 
-   Copyright (C) by Andrew Tridgell 1996, 2000
+   Copyright (C) Andrew Tridgell 1996
    Copyright (C) Paul Mackerras 1996
-   Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,7 +16,6 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
-
 
 #define False 0
 #define True 1
@@ -49,19 +47,8 @@
 #define SAME_TIME (1<<7)
 
 /* update this if you make incompatible changes */
-#define PROTOCOL_VERSION 26
-
-/* We refuse to interoperate with versions that are not in this range.
- * Note that we assume we'll work with later versions: the onus is on
- * people writing them to make sure that they don't send us anything
- * we won't understand.
- *
- * There are two possible explanations for the limit at thirty: either
- * to allow new major-rev versions that do not interoperate with us,
- * and (more likely) so that we can detect an attempt to connect rsync
- * to a non-rsync server, which is unlikely to begin by sending a byte
- * between 15 and 30. */
-#define MIN_PROTOCOL_VERSION 15
+#define PROTOCOL_VERSION 21
+#define MIN_PROTOCOL_VERSION 11
 #define MAX_PROTOCOL_VERSION 30
 
 #define RSYNC_PORT 873
@@ -71,15 +58,14 @@
 #define CHUNK_SIZE (32*1024)
 #define MAX_MAP_SIZE (256*1024)
 #define IO_BUFFER_SIZE (4092)
+#define MAX_READ_BUFFER (1024*1024)
 
 #define MAX_ARGS 1000
 
 #define MPLEX_BASE 7
-
-/* Log values.  I *think* what these mean is: FLOG goes to the server
- * logfile; FERROR and FINFO try to end up on the client, with
- * different levels of filtering. */
-enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
+#define FERROR 1
+#define FINFO 2
+#define FLOG 3
 
 #include "errcode.h"
 
@@ -92,6 +78,12 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #endif
 
 #include <sys/types.h>
+
+#ifdef HAVE_GETOPT_LONG
+#include <getopt.h>
+#else
+#include "lib/getopt.h"
+#endif
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -185,10 +177,6 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #include <glob.h>
 #endif
 
-#ifdef HAVE_MALLOC_H
-#  include <malloc.h>
-#endif
-
 /* these are needed for the uid/gid mapping code */
 #include <pwd.h>
 #include <grp.h>
@@ -267,44 +255,15 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #elif HAVE_LONGLONG
 #define int64 long long
 #else
-/* As long as it gets... */
 #define int64 off_t
 #define NO_INT64
 #endif
 
-/* Starting from protocol version 26, we always use 64-bit
- * ino_t and dev_t internally, even if this platform does not
- * allow files to have 64-bit inums.  That's because the
- * receiver needs to find duplicate (dev,ino) tuples to detect
- * hardlinks, and it might have files coming from a platform
- * that has 64-bit inums.
- *
- * The only exception is if we're on a platform with no 64-bit type at
- * all.
- *
- * Because we use read_longint() to get these off the wire, if you
- * transfer devices or hardlinks with dev or inum > 2**32 to a machine
- * with no 64-bit types then you will get an overflow error.  Probably
- * not many people have that combination of machines, and you can
- * avoid it by not preserving hardlinks or not transferring device
- * nodes.  It's not clear that any other behaviour is better.
- *
- * Note that if you transfer devices from a 64-bit-devt machine (say,
- * Solaris) to a 32-bit-devt machine (say, Linux-2.2/x86) then the
- * device numbers will be truncated.  But it's a kind of silly thing
- * to do anyhow.
- *
- * FIXME: In future, we should probable split the device number into
- * major/minor, and transfer the two parts as 32-bit ints.  That gives
- * you somewhat more of a chance that they'll come from a big machine
- * to a little one in a useful way.
- *
- * FIXME: Really we need an unsigned type, and we perhaps ought to
- * cope with platforms on which this is an unsigned int or even a
- * struct.  Later.
- */ 
-#define INO64_T int64
-#define DEV64_T int64
+#if HAVE_SHORT_INO_T
+#define INO_T uint32
+#else
+#define INO_T ino_t
+#endif
 
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
@@ -335,13 +294,9 @@ struct file_struct {
 	time_t modtime;
 	OFF_T length;
 	mode_t mode;
-
-	INO64_T inode;
-	/** Device this file lives upon */
-	DEV64_T dev;
-
-	/** If this is a device node, the device number. */
-	DEV64_T rdev;
+	INO_T inode;
+	dev_t dev;
+	dev_t rdev;
 	uid_t uid;
 	gid_t gid;
 	char *basename;
@@ -352,20 +307,10 @@ struct file_struct {
 };
 
 
-#define ARENA_SIZE	(32 * 1024)
-
-struct string_area {
-	char *base;
-	char *end;
-	char *current;
-	struct string_area *next;
-};
-
 struct file_list {
 	int count;
 	int malloced;
 	struct file_struct **files;
-	struct string_area *string_area;
 };
 
 struct sum_buf {
@@ -377,11 +322,11 @@ struct sum_buf {
 };
 
 struct sum_struct {
-	OFF_T flength;		/* total file length */
-	size_t count;		/* how many chunks */
-	size_t remainder;	/* flength % block_length */
-	size_t n;		/* block_length */
-	struct sum_buf *sums;	/* points to info for each chunk */
+  OFF_T flength;		/* total file length */
+  size_t count;			/* how many chunks */
+  size_t remainder;		/* flength % block_length */
+  size_t n;			/* block_length */
+  struct sum_buf *sums;		/* points to info for each chunk */
 };
 
 struct map_struct {
@@ -391,6 +336,7 @@ struct map_struct {
 };
 
 struct exclude_struct {
+	char *orig;
 	char *pattern;
 	int regular_exp;
 	int fnmatch_flags;
@@ -422,29 +368,9 @@ static inline int flist_up(struct file_list *flist, int i)
 }
 
 #include "byteorder.h"
-#include "lib/mdfour.h"
-#include "lib/permstring.h"
-#include "lib/addrinfo.h"
-
+#include "version.h"
 #include "proto.h"
-
-/* We have replacement versions of these if they're missing. */
-#ifndef HAVE_ASPRINTF
-int asprintf(char **ptr, const char *format, ...);
-#endif
-
-#ifndef HAVE_VASPRINTF
-int vasprintf(char **ptr, const char *format, va_list ap);
-#endif
-
-#if !defined(HAVE_VSNPRINTF) && !defined(HAVE_C99_VSNPRINTF)
-int vsnprintf (char *str, size_t count, const char *fmt, va_list args);
-#endif
-
-#if !defined(HAVE_SNPRINTF) && !defined(HAVE_C99_VSNPRINTF)
-int snprintf(char *str,size_t count,const char *fmt,...);
-#endif
-
+#include "lib/mdfour.h"
 
 #if !HAVE_STRERROR
 extern char *sys_errlist[];
@@ -533,22 +459,6 @@ extern int errno;
 #define S_ISREG(mode) (((mode) & (_S_IFMT)) == (_S_IFREG))
 #endif
 
-/* work out what fcntl flag to use for non-blocking */
-#ifdef O_NONBLOCK
-# define NONBLOCK_FLAG O_NONBLOCK
-#elif defined(SYSV)
-# define NONBLOCK_FLAG O_NDELAY
-#else 
-# define NONBLOCK_FLAG FNDELAY
-#endif
-
-#ifndef INADDR_LOOPBACK
-#define INADDR_LOOPBACK 0x7f000001
-#endif
-
-#ifndef INADDR_NONE
-#define INADDR_NONE 0xffffffff
-#endif
 
 #define IS_DEVICE(mode) (S_ISCHR(mode) || S_ISBLK(mode) || S_ISSOCK(mode) || S_ISFIFO(mode))
 
@@ -564,19 +474,11 @@ extern int errno;
 #define NS(s) ((s)?(s):"<NULL>")
 
 /* use magic gcc attributes to catch format errors */
- void rprintf(enum logcode , const char *, ...)
+ void rprintf(int , const char *, ...)
 #ifdef __GNUC__
      __attribute__ ((format (printf, 2, 3)))
 #endif
 ;
-
-/* This is just like rprintf, but it also tries to print some
- * representation of the error code.  Normally errcode = errno. */
-void rsyserr(enum logcode, int, const char *, ...)
-#ifdef __GNUC__
-     __attribute__ ((format (printf, 3, 4)))
-#endif
-     ;
 
 #ifdef REPLACE_INET_NTOA
 #define inet_ntoa rep_inet_ntoa
@@ -591,20 +493,4 @@ size_t strlcpy(char *d, const char *s, size_t bufsize);
 size_t strlcat(char *d, const char *s, size_t bufsize);
 #endif
 
-#ifndef WEXITSTATUS
-#define	WEXITSTATUS(stat)	((int)(((stat)>>8)&0xFF))
-#endif
-
 #define exit_cleanup(code) _exit_cleanup(code, __FILE__, __LINE__)
-
-
-extern int verbose;
-
-#ifndef HAVE_INET_NTOP
-const char *                 
-inet_ntop(int af, const void *src, char *dst, size_t size);
-#endif /* !HAVE_INET_NTOP */
-
-#ifndef HAVE_INET_PTON
-int isc_net_pton(int af, const char *src, void *dst);
-#endif

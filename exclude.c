@@ -1,7 +1,6 @@
-/* -*- c-file-style: "linux" -*-
-     
-   Copyright (C) 1996-2001 by Andrew Tridgell <tridge@samba.org>
-   Copyright (C) 1996 by Paul Mackerras
+/* 
+   Copyright (C) Andrew Tridgell 1996
+   Copyright (C) Paul Mackerras 1996
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -21,8 +20,6 @@
 /* a lot of this stuff was originally derived from GNU tar, although
    it has now changed so much that it is hard to tell :) */
 
-/* include/exclude cluestick added by Martin Pool <mbp@samba.org> */
-
 #include "rsync.h"
 
 extern int verbose;
@@ -30,8 +27,52 @@ extern int delete_mode;
 
 static struct exclude_struct **exclude_list;
 
+/*
+ * Optimization for special case when all included files are explicitly
+ *   listed without wildcards in the "exclude" list followed by a "- *"
+ *   to exclude the rest.
+ * Contributed by Dave Dykstra <dwd@bell-labs.com>
+ */
+static int only_included_files = 1;
+static struct exclude_struct *exclude_the_rest;
+
+int send_included_file_names(int f,struct file_list *flist)
+{
+	struct exclude_struct *ex, **ex_list;
+	int n;
+	char *p;
+
+	if (!only_included_files || (exclude_the_rest == NULL) || delete_mode)
+		return 0;
+
+	if (verbose > 1) {
+		rprintf(FINFO,"(using include-only optimization) ");
+	}
+
+	/* set exclude_list to NULL temporarily so check_exclude */
+	/*   will always return true */
+	ex_list = exclude_list;
+	exclude_list = NULL;
+	for (n=0; (ex = ex_list[n]) != NULL; n++) {
+		if (ex == exclude_the_rest)
+			break;
+		p = ex->pattern;
+		while (*p == '/') {
+			/* skip the allowed beginning slashes */
+			p++;
+		}
+		/* silently skip files that don't exist to
+		   be more like non-optimized case */
+		if (access(p,0) == 0)
+			send_file_name(f,flist,p,0,0);
+	}
+	exclude_list = ex_list;
+	
+	return 1;
+}
+
 /* build an exclude structure given a exclude pattern */
-static struct exclude_struct *make_exclude(const char *pattern, int include)
+static struct exclude_struct *make_exclude(char *pattern, int include)
 {
 	struct exclude_struct *ret;
 
@@ -54,18 +95,15 @@ static struct exclude_struct *make_exclude(const char *pattern, int include)
 	if (!ret->pattern) out_of_memory("make_exclude");
 
 	if (strpbrk(pattern, "*[?")) {
-	    ret->regular_exp = 1;
-	    ret->fnmatch_flags = FNM_PATHNAME;
-	    if (strstr(pattern, "**")) {
-		    static int tested;
-		    if (!tested) {
-			    tested = 1;
-			    if (fnmatch("a/b/*", "a/b/c/d", FNM_PATHNAME)==0) {
-				    rprintf(FERROR,"WARNING: fnmatch FNM_PATHNAME is broken on your system\n");
-			    }
-		    }
-		    ret->fnmatch_flags = 0;
+	    if (!ret->include && (*pattern == '*') && (*(pattern+1) == '\0')) {
+		    exclude_the_rest = ret;
+	    } else {
+		    only_included_files = 0;
 	    }
+	    ret->regular_exp = 1;
+	    ret->fnmatch_flags = strstr(pattern, "**") ? 0 : FNM_PATHNAME;
+	} else if (!ret->include) {
+		only_included_files = 0;
 	}
 
 	if (strlen(pattern) > 1 && pattern[strlen(pattern)-1] == '/') {
@@ -87,8 +125,8 @@ static void free_exclude(struct exclude_struct *ex)
 	free(ex);
 }
 
-static int check_one_exclude(char *name, struct exclude_struct *ex,
-                             STRUCT_STAT *st)
+static int check_one_exclude(char *name,struct exclude_struct *ex,
+			     STRUCT_STAT *st)
 {
 	char *p;
 	int match_start=0;
@@ -107,79 +145,47 @@ static int check_one_exclude(char *name, struct exclude_struct *ex,
 	}
 
 	if (ex->regular_exp) {
-		if (fnmatch(pattern, name, ex->fnmatch_flags) == 0) {
+		if (fnmatch(pattern, name, ex->fnmatch_flags) == 0)
 			return 1;
-		}
 	} else {
 		int l1 = strlen(name);
 		int l2 = strlen(pattern);
 		if (l2 <= l1 && 
 		    strcmp(name+(l1-l2),pattern) == 0 &&
-		    (l1==l2 || (!match_start && name[l1-(l2+1)] == '/'))) {
+		    (l1==l2 || (!match_start && name[l1-(l2+1)] == '/')))
 			return 1;
-		}
 	}
 
 	return 0;
 }
 
 
-static void report_exclude_result(char const *name,
-                                  struct exclude_struct const *ent,
-                                  STRUCT_STAT const *st)
-{
-        /* If a trailing slash is present to match only directories,
-         * then it is stripped out by make_exclude.  So as a special
-         * case we add it back in here. */
-        
-        if (verbose >= 2)
-                rprintf(FINFO, "%s %s %s because of pattern %s%s\n",
-                        ent->include ? "including" : "excluding",
-                        S_ISDIR(st->st_mode) ? "directory" : "file",
-                        name, ent->pattern,
-                        ent->directory ? "/" : "");
-}
-
-
-/*
- * Return true if file NAME is defined to be excluded by either
- * LOCAL_EXCLUDE_LIST or the globals EXCLUDE_LIST.
- */
-int check_exclude(char *name, struct exclude_struct **local_exclude_list,
+int check_exclude(char *name,struct exclude_struct **local_exclude_list,
 		  STRUCT_STAT *st)
 {
 	int n;
-        struct exclude_struct *ent;
 
 	if (name && (name[0] == '.') && !name[1])
 		/* never exclude '.', even if somebody does --exclude '*' */
 		return 0;
 
 	if (exclude_list) {
-		for (n=0; exclude_list[n]; n++) {
-                        ent = exclude_list[n];
-			if (check_one_exclude(name, ent, st)) {
-                                report_exclude_result(name, ent, st);
-				return !ent->include;
-                        }
-                }
+		for (n=0; exclude_list[n]; n++)
+			if (check_one_exclude(name,exclude_list[n],st))
+				return !exclude_list[n]->include;
 	}
 
 	if (local_exclude_list) {
-		for (n=0; local_exclude_list[n]; n++) {
-                        ent = local_exclude_list[n];
-			if (check_one_exclude(name, ent, st)) {
-                                report_exclude_result(name, ent, st);
-				return !ent->include;
-                        }
-                }
+		for (n=0; local_exclude_list[n]; n++)
+			if (check_one_exclude(name,local_exclude_list[n],st))
+				return !local_exclude_list[n]->include;
 	}
 
 	return 0;
 }
 
 
-void add_exclude_list(const char *pattern, struct exclude_struct ***list, int include)
+void add_exclude_list(char *pattern,struct exclude_struct ***list, int include)
 {
 	int len=0;
 	if (list && *list)
@@ -193,6 +199,8 @@ void add_exclude_list(const char *pattern, struct exclude_struct ***list, int in
 		}
 		free((*list));
 		*list = NULL;
+		only_included_files = 1;
+		exclude_the_rest = NULL;
 		return;
 	}
 
@@ -207,12 +215,12 @@ void add_exclude_list(const char *pattern, struct exclude_struct ***list, int in
 	(*list)[len+1] = NULL;
 }
 
-void add_exclude(const char *pattern, int include)
+void add_exclude(char *pattern, int include)
 {
 	add_exclude_list(pattern,&exclude_list, include);
 }
 
-struct exclude_struct **make_exclude_list(const char *fname,
+struct exclude_struct **make_exclude_list(char *fname,
 					  struct exclude_struct **list1,
 					  int fatal, int include)
 {
@@ -221,10 +229,7 @@ struct exclude_struct **make_exclude_list(const char *fname,
 	char line[MAXPATHLEN];
 	if (!f) {
 		if (fatal) {
-			rsyserr(FERROR, errno,
-                                "failed to open %s file %s",
-                                include ? "include" : "exclude",
-                                fname);
+			rprintf(FERROR,"%s : %s\n",fname,strerror(errno));
 			exit_cleanup(RERR_FILEIO);
 		}
 		return list;
@@ -246,7 +251,7 @@ struct exclude_struct **make_exclude_list(const char *fname,
 }
 
 
-void add_exclude_file(const char *fname, int fatal, int include)
+void add_exclude_file(char *fname,int fatal,int include)
 {
 	if (!fname || !*fname) return;
 
@@ -258,12 +263,6 @@ void send_exclude_list(int f)
 {
 	int i;
 	extern int remote_version;
-	extern int list_only, recurse;
-
-	/* this is a complete hack - blame Rusty */
-	if (list_only && !recurse) {
-		add_exclude("/*/*", 0);
-	}
 
 	if (!exclude_list) {
 		write_int(f,0);
@@ -399,7 +398,7 @@ void add_cvs_excludes(void)
 		add_exclude(cvs_ignore_list[i], 0);
 
 	if ((p=getenv("HOME")) && strlen(p) < (MAXPATHLEN-12)) {
-		snprintf(fname,sizeof(fname), "%s/.cvsignore",p);
+		slprintf(fname,sizeof(fname), "%s/.cvsignore",p);
 		add_exclude_file(fname,0,0);
 	}
 
