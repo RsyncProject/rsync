@@ -476,9 +476,9 @@ AC_FUNC_UTIME_NULL
 AC_FUNC_ALLOCA
 AC_CHECK_FUNCS(waitpid wait4 getcwd strdup strerror chown chmod mknod mkfifo \
     fchmod fstat strchr readlink link utime utimes strftime mtrace ftruncate \
-    memmove lchown vsnprintf snprintf asprintf setsid glob strpbrk setmode \
+    memmove lchown vsnprintf snprintf vasprintf asprintf setsid glob strpbrk \
     strlcat strlcpy strtol mallinfo getgroups setgroups geteuid getegid \
-    open64 mkstemp64 va_copy __va_copy)
+    setmode open64 mkstemp64 va_copy __va_copy)
 
 AC_CHECK_FUNCS(getpgrp tcgetpgrp)
 if test $ac_cv_func_getpgrp = yes; then
