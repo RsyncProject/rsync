@@ -248,6 +248,7 @@ verb(
      --delete                delete files that don't exist on the sending side
      --delete-excluded       also delete excluded files on the receiving side
      --delete-after          delete after transferring, not before
+     --ignore-errors         delete even if there are IO errors
      --max-delete=NUM        don't delete more than NUM files
      --partial               keep partially transferred files
      --force                 force deletion of directories even if not empty

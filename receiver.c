@@ -108,13 +108,14 @@ void delete_files(struct file_list *flist)
 	int i, j;
 	char *name;
 	extern int module_id;
+	extern int ignore_errors;
 	extern int max_delete;
 	static int deletion_count;
 
 	if (cvs_exclude)
 		add_cvs_excludes();
 
-	if (io_error && !lp_ignore_errors(module_id)) {
+	if (io_error && !(lp_ignore_errors(module_id) || ignore_errors)) {
 		rprintf(FINFO,"IO error encountered - skipping file deletion\n");
 		return;
 	}

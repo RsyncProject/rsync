@@ -65,6 +65,7 @@ int size_only=0;
 int delete_after=0;
 int only_existing=0;
 int max_delete=0;
+int ignore_errors=0;
 
 char *backup_suffix = BACKUP_SUFFIX;
 char *tmpdir = NULL;
@@ -133,6 +134,7 @@ void usage(enum logcode F)
   rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
   rprintf(F,"     --delete-excluded       also delete excluded files on the receiving side\n");
   rprintf(F,"     --delete-after          delete after transferring, not before\n");
+  rprintf(F,"     --ignore-errors         delete even if there are IO errors\n");
   rprintf(F,"     --max-delete=NUM        don't delete more than NUM files\n");
   rprintf(F,"     --partial               keep partially transferred files\n");
   rprintf(F,"     --force                 force deletion of directories even if not empty\n");
@@ -171,7 +173,8 @@ enum {OPT_VERSION, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS,
       OPT_COPY_UNSAFE_LINKS, OPT_SAFE_LINKS, OPT_COMPARE_DEST,
       OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY, OPT_ADDRESS,
-      OPT_DELETE_AFTER, OPT_EXISTING, OPT_MAX_DELETE, OPT_BACKUP_DIR};
+      OPT_DELETE_AFTER, OPT_EXISTING, OPT_MAX_DELETE, OPT_BACKUP_DIR, 
+      OPT_IGNORE_ERRORS};
 
 static char *short_options = "oblLWHpguDCtcahvqrRIxnSe:B:T:zP";
 
@@ -228,6 +231,7 @@ static struct option long_options[] = {
   {"progress",    0,     0,    OPT_PROGRESS},
   {"partial",     0,     0,    OPT_PARTIAL},
   {"delete-after",0,     0,    OPT_DELETE_AFTER},
+  {"ignore-errors",0,     0,   OPT_IGNORE_ERRORS},
   {"config",      1,     0,    OPT_CONFIG},
   {"port",        1,     0,    OPT_PORT},
   {"log-format",  1,     0,    OPT_LOG_FORMAT},
@@ -528,6 +532,10 @@ int parse_arguments(int argc, char *argv[], int frommain)
 			keep_partial = 1;
 			break;
 
+		case OPT_IGNORE_ERRORS:
+			ignore_errors = 1;
+			break;
+
 		case 'P':
 			do_progress = 1;
 			keep_partial = 1;
@@ -669,6 +677,9 @@ void server_options(char **args,int *argc)
 
 	if (delete_after)
 		args[ac++] = "--delete-after";
+
+	if (ignore_errors)
+		args[ac++] = "--ignore-errors";
 
 	if (copy_unsafe_links)
 		args[ac++] = "--copy-unsafe-links";

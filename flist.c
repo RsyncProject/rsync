@@ -862,7 +862,8 @@ struct file_list *recv_file_list(int f)
   /* if protocol version is >= 17 then recv the io_error flag */
   if (f != -1 && remote_version >= 17) {
 	  extern int module_id;
-	  if (lp_ignore_errors(module_id)) {
+	  extern int ignore_errors;
+	  if (lp_ignore_errors(module_id) || ignore_errors) {
 		  read_int(f);
 	  } else {
 		  io_error |= read_int(f);
