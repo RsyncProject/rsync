@@ -90,8 +90,8 @@ static int simple_recv_token(int f,char **data)
 static void simple_send_token(int f,int token,
 			      struct map_struct *buf,OFF_T offset,int n)
 {
-	extern int write_batch; /* dw */
-	int hold_int; /* dw */
+	extern int write_batch;
+	int hold_int;
 
 	if (n > 0) {
 		int l = 0;
@@ -100,8 +100,8 @@ static void simple_send_token(int f,int token,
 			write_int(f,n1);
 			write_buf(f,map_ptr(buf,offset+l,n1),n1);
 			if (write_batch) {
-			    write_batch_delta_file( (char *) &n1, sizeof(int) );
-			    write_batch_delta_file(map_ptr(buf,offset+l,n1),n1);
+				write_batch_delta_file( (char *) &n1, sizeof(int) );
+				write_batch_delta_file(map_ptr(buf,offset+l,n1),n1);
 			}
 			l += n1;
 		}
@@ -110,8 +110,8 @@ static void simple_send_token(int f,int token,
 	if (token != -2) {
 		write_int(f,-(token+1));
 		if (write_batch) {
-		    hold_int = -(token+1);
-		    write_batch_delta_file( (char *) &hold_int, sizeof(int) );
+			hold_int = -(token+1);
+			write_batch_delta_file( (char *) &hold_int, sizeof(int) );
 		}
 	}
 }
@@ -159,8 +159,8 @@ send_deflated_token(int f, int token,
 {
 	int n, r;
 	static int init_done, flush_pending;
-	extern int write_batch;  /* dw */
-	char temp_byte;   /* dw */
+	extern int write_batch;
+	char temp_byte;
 
 	if (last_token == -1) {
 		/* initialization */
@@ -193,26 +193,26 @@ send_deflated_token(int f, int token,
 		n = last_token - run_start;
 		if (r >= 0 && r <= 63) {
 			write_byte(f, (n==0? TOKEN_REL: TOKENRUN_REL) + r);
-			if (write_batch) { /* dw */
-			    temp_byte = (char)( (n==0? TOKEN_REL: TOKENRUN_REL) + r);
-			    write_batch_delta_file(&temp_byte,sizeof(char));
+			if (write_batch) {
+				temp_byte = (char)( (n==0? TOKEN_REL: TOKENRUN_REL) + r);
+				write_batch_delta_file(&temp_byte,sizeof(char));
 			}
 		} else {
 			write_byte(f, (n==0? TOKEN_LONG: TOKENRUN_LONG));
 			write_int(f, run_start);
-			if (write_batch) { /* dw */
-			    temp_byte = (char)(n==0? TOKEN_LONG: TOKENRUN_LONG);
-			    write_batch_delta_file(&temp_byte,sizeof(temp_byte));
-			    write_batch_delta_file((char *)&run_start,sizeof(run_start));
+			if (write_batch) {
+				temp_byte = (char)(n==0? TOKEN_LONG: TOKENRUN_LONG);
+				write_batch_delta_file(&temp_byte,sizeof(temp_byte));
+				write_batch_delta_file((char *)&run_start,sizeof(run_start));
 			}
 		}
 		if (n != 0) {
 			write_byte(f, n);
 			write_byte(f, n >> 8);
-			if (write_batch) { /* dw */
-			    write_batch_delta_file((char *)&n,sizeof(char));
-			    temp_byte = (char) n >> 8;
-			    write_batch_delta_file(&temp_byte,sizeof(temp_byte));
+			if (write_batch) {
+				write_batch_delta_file((char *)&n,sizeof(char));
+				temp_byte = (char) n >> 8;
+				write_batch_delta_file(&temp_byte,sizeof(temp_byte));
 			}
 		}
 		last_run_end = last_token;
@@ -272,8 +272,8 @@ send_deflated_token(int f, int token,
 					obuf[0] = DEFLATED_DATA + (n >> 8);
 					obuf[1] = n;
 					write_buf(f, obuf, n+2);
-					if (write_batch) /* dw */
-					    write_batch_delta_file(obuf,n+2);
+					if (write_batch)
+						write_batch_delta_file(obuf,n+2);
 				}
 			}
 		} while (nb != 0 || tx_strm.avail_out == 0);
@@ -283,9 +283,9 @@ send_deflated_token(int f, int token,
 	if (token == -1) {
 		/* end of file - clean up */
 		write_byte(f, END_FLAG);
-		if (write_batch) { /* dw */
-		    temp_byte = END_FLAG;
-		    write_batch_delta_file((char *)&temp_byte,sizeof(temp_byte));
+		if (write_batch) {
+			temp_byte = END_FLAG;
+			write_batch_delta_file((char *)&temp_byte,sizeof(temp_byte));
 		}
 
 	} else if (token != -2) {
