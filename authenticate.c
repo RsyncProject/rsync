@@ -1,5 +1,6 @@
-/* 
-   Copyright (C) Andrew Tridgell 1998
+/* -*- c-file-style: "linux"; -*-
+   
+   Copyright (C) 1998-2000 by Andrew Tridgell 
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -144,7 +145,7 @@ static char *getpassf(char *filename)
 	if (!filename) return NULL;
 
 	if ( (fd=open(filename,O_RDONLY)) == -1) {
-		rprintf(FERROR,"could not open password file \"%s\"\n",filename);
+		rsyserr(FERROR, errno, "could not open password file \"%s\"",filename);
 		if (envpw) rprintf(FERROR,"falling back to RSYNC_PASSWORD environment variable.\n");	
 		return NULL;
 	}
