@@ -1,0 +1,9 @@
+-*- outline -*-
+
+* Merge IPv6 support
+
+A patch is available at
+
+        ftp://ftp.kame.net/pub/kame/misc/rsync-244-v6-20000802.diff.gz
+
+but tridge reckons it needs to be cleaned up before it can be accepted.
