@@ -800,8 +800,8 @@ dit(bf(--port=PORT)) This specifies an alternate TCP port number to use
 rather than the default port 873.
 
 dit(bf(--blocking-io)) This tells rsync to use blocking IO when launching
-a remote shell transport.  If the remote shell is either rsh or remsh (and
-assuming the RSYNC_RSH_IO value does not apply), rsync defaults to using
+a remote shell transport.  If the remote shell is either rsh or remsh,
+rsync defaults to using
 blocking IO, otherwise it defaults to using non-blocking IO.  (Note that
 ssh prefers non-blocking IO.)
 
@@ -1131,13 +1131,6 @@ more details.
 dit(bf(RSYNC_RSH)) The RSYNC_RSH environment variable allows you to
 override the default shell used as the transport for rsync.  Command line
 options are permitted after the command name, just as in the -e option.
-
-dit(bf(RSYNC_RSH_IO)) The RSYNC_RSH_IO environment variable allows you to
-override the blocking IO default for the shell specified in RSYNC_RSH.  Set
-it to either "blocking" or "non-blocking".  This value is only used if the
-remote-shell choice exactly matches the value of the RSYNC_RSH variable.
-Otherwise the default blocking-IO value will be used, as mentioned in
-the --blocking-io option's description above.
 
 dit(bf(RSYNC_PROXY)) The RSYNC_PROXY environment variable allows you to
 redirect your rsync client to use a web proxy when connecting to a
