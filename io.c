@@ -706,7 +706,11 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 	static size_t remaining;
 	static size_t iobuf_in_ndx;
 	int tag, ret = 0;
-	char line[MAXPATHLEN+1];
+#if MAXPATHLEN < 4096
+	char line[4096+1024];
+#else
+	char line[MAXPATHLEN+1024];
+#endif
 
 	if (!iobuf_in || fd != sock_f_in)
 		return read_timeout(fd, buf, len);
