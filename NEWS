@@ -7,6 +7,9 @@ Changes since 2.6.2:
     - Fixed a crash bug that might appear when --delete was used and
       multiple source directories were specified.
 
+    - Fixed the 32-bit truncation of the file length when generating the
+      checksums.
+
     - The --backup code no longer attempts to create some directories
       over and over again (generating warnings along the way).
 
@@ -96,6 +99,8 @@ Changes since 2.6.2:
       handles after we accept a connection (we used to close just one of
       them).
 
+    - Optimized away a loop in hash_search().
+
   BUILD CHANGES:
 
     - Added a "gen" target to rebuild most of the generated files,
@@ -108,6 +113,8 @@ Changes since 2.6.2:
     - The variable $STRIP (that is optionally set by the install-strip
       target's rule) was changed to $INSTALL_STRIP because some systems
       have $STRIP set in the environment.
+
+    - Fixed a build problem when SUPPORT_HARD_LINKS isn't defined.
 
   DEVELOPER RELATED:
 
