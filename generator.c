@@ -56,7 +56,7 @@ extern int read_batch;
 extern int only_existing;
 extern int orig_umask;
 extern int safe_symlinks;
-extern unsigned int block_size;
+extern long block_size; /* "long" because popt can't set an int32. */
 
 extern struct exclude_list_struct server_exclude_list;
 
@@ -136,20 +136,18 @@ void write_sum_head(int f, struct sum_struct *sum)
  */
 static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 {
-	unsigned int blength;
+	int32 blength;
 	int s2length;
-	uint32 c;
-	uint64 l;
 
-	if (block_size) {
+	if (block_size)
 		blength = block_size;
-	} else if (len <= BLOCK_SIZE * BLOCK_SIZE) {
+	else if (len <= BLOCK_SIZE * BLOCK_SIZE)
 		blength = BLOCK_SIZE;
-	} else {
-		l = len;
-		c = 1;
-		while (l >>= 2) {
-			c <<= 1;
+	else {
+		int32 c;
+		uint64 l;
+		for (c = 1, l = len; l >>= 2; c <<= 1) {
+		    assert(c > 0);
 		}
 		blength = 0;
 		do {
@@ -166,20 +164,13 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 	} else if (csum_length == SUM_LENGTH) {
 		s2length = SUM_LENGTH;
 	} else {
+		int32 c;
+		uint64 l;
 		int b = BLOCKSUM_BIAS;
-		l = len;
-		while (l >>= 1) {
-			b += 2;
-		}
-		c = blength;
-		while (c >>= 1 && b) {
-			b--;
-		}
-		s2length = (b + 1 - 32 + 7) / 8; /* add a bit,
-						  * subtract rollsum,
-						  * round up
-						  *    --optimize in compiler--
-						  */
+		for (l = len; l >>= 1; b += 2) {}
+		for (c = blength; c >>= 1 && b; b--) {}
+		/* add a bit, subtract rollsum, round up. */
+		s2length = (b + 1 - 32 + 7) / 8; /* --optimize in compiler-- */
 		s2length = MAX(s2length, csum_length);
 		s2length = MIN(s2length, SUM_LENGTH);
 	}
@@ -191,8 +182,9 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 	sum->remainder	= (len % blength);
 
 	if (sum->count && verbose > 2) {
-		rprintf(FINFO, "count=%.0f rem=%u blength=%u s2length=%d flength=%.0f\n",
-			(double)sum->count, sum->remainder, sum->blength,
+		rprintf(FINFO,
+			"count=%.0f rem=%ld blength=%ld s2length=%d flength=%.0f\n",
+			(double)sum->count, (long)sum->remainder, (long)sum->blength,
 			sum->s2length, (double)sum->flength);
 	}
 }
@@ -220,7 +212,7 @@ static void generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 	write_sum_head(f_out, &sum);
 
 	for (i = 0; i < sum.count; i++) {
-		unsigned int n1 = MIN(len, sum.blength);
+		int32 n1 = (int32)MIN(len, (OFF_T)sum.blength);
 		char *map = map_ptr(mapbuf, offset, n1);
 		uint32 sum1 = get_checksum1(map, n1);
 		char sum2[SUM_LENGTH];
@@ -232,8 +224,8 @@ static void generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 
 		if (verbose > 3) {
 			rprintf(FINFO,
-				"chunk[%.0f] offset=%.0f len=%u sum1=%08lx\n",
-				(double)i, (double)offset, n1,
+				"chunk[%.0f] offset=%.0f len=%ld sum1=%08lx\n",
+				(double)i, (double)offset, (long)n1,
 				(unsigned long)sum1);
 		}
 		write_int(f_out, sum1);
