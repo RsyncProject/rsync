@@ -73,8 +73,7 @@ int cleanup_got_literal = 0;
 static char *cleanup_fname;
 static char *cleanup_new_fname;
 static struct file_struct *cleanup_file;
-static int cleanup_fd1, cleanup_fd2;
-static struct map_struct *cleanup_buf;
+static int cleanup_fd_r, cleanup_fd_w;
 static pid_t cleanup_pid = 0;
 
 pid_t cleanup_child_pid = -1;
@@ -115,12 +114,10 @@ void _exit_cleanup(int code, const char *file, int line)
 	if (cleanup_got_literal && cleanup_fname && keep_partial) {
 		char *fname = cleanup_fname;
 		cleanup_fname = NULL;
-		if (cleanup_buf)
-			unmap_file(cleanup_buf);
-		if (cleanup_fd1 != -1)
-			close(cleanup_fd1);
-		if (cleanup_fd2 != -1)
-			close(cleanup_fd2);
+		if (cleanup_fd_r != -1)
+			close(cleanup_fd_r);
+		if (cleanup_fd_w != -1)
+			close(cleanup_fd_w);
 		finish_transfer(cleanup_new_fname, fname, cleanup_file, 0);
 	}
 	io_flush(FULL_FLUSH);
@@ -161,14 +158,13 @@ void cleanup_disable(void)
 
 
 void cleanup_set(char *fnametmp, char *fname, struct file_struct *file,
-		 struct map_struct *buf, int fd1, int fd2)
+		 int fd_r, int fd_w)
 {
 	cleanup_fname = fnametmp;
 	cleanup_new_fname = fname;
 	cleanup_file = file;
-	cleanup_buf = buf;
-	cleanup_fd1 = fd1;
-	cleanup_fd2 = fd2;
+	cleanup_fd_r = fd_r;
+	cleanup_fd_w = fd_w;
 }
 
 void cleanup_set_pid(pid_t pid)
