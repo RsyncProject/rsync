@@ -23,7 +23,6 @@
 extern int verbose;
 extern int recurse;
 extern int delete_after;
-extern int max_delete;
 extern int csum_length;
 extern struct stats stats;
 extern int dry_run;
@@ -35,7 +34,6 @@ extern int relative_paths;
 extern int keep_dirlinks;
 extern int preserve_hard_links;
 extern int preserve_perms;
-extern int cvs_exclude;
 extern int io_error;
 extern char *tmpdir;
 extern char *partial_dir;
@@ -43,9 +41,6 @@ extern char *basis_dir[];
 extern int basis_dir_cnt;
 extern int make_backups;
 extern int do_progress;
-extern char *backup_dir;
-extern char *backup_suffix;
-extern int backup_suffix_len;
 extern int cleanup_got_literal;
 extern int module_id;
 extern int ignore_errors;
@@ -57,66 +52,19 @@ extern int inplace;
 extern struct exclude_list_struct server_exclude_list;
 
 
-static int is_backup_file(char *fn)
-{
-	int k = strlen(fn) - backup_suffix_len;
-	return k > 0 && strcmp(fn+k, backup_suffix) == 0;
-}
-
-
-/* This deletes any files on the receiving side that are not present
- * on the sending side. */
+/* This deletes any files on the receiving side that are not present on the
+ * sending side.  This is used by --delete-before and --delete-after. */
 void delete_files(struct file_list *flist)
 {
-	struct file_list *local_file_list;
-	int i, j;
-	char *argv[1], fbuf[MAXPATHLEN];
-	static int deletion_count;
-
-	if (cvs_exclude)
-		add_cvs_excludes();
-
-	if (io_error && !(lp_ignore_errors(module_id) || ignore_errors)) {
-		rprintf(FINFO,"IO error encountered - skipping file deletion\n");
-		return;
-	}
+	char fbuf[MAXPATHLEN];
+	int j;
 
 	for (j = 0; j < flist->count; j++) {
 		if (!(flist->files[j]->flags & FLAG_DEL_START)
 		    || !S_ISDIR(flist->files[j]->mode))
 			continue;
 
-		argv[0] = f_name_to(flist->files[j], fbuf);
-
-		if (!(local_file_list = send_file_list(-1, 1, argv)))
-			continue;
-
-		if (verbose > 1)
-			rprintf(FINFO, "deleting in %s\n", safe_fname(fbuf));
-
-		for (i = local_file_list->count-1; i >= 0; i--) {
-			if (max_delete && deletion_count >= max_delete)
-				break;
-			if (!local_file_list->files[i]->basename)
-				continue;
-			if (flist_find(flist,local_file_list->files[i]) < 0) {
-				char *f = f_name(local_file_list->files[i]);
-				int mode = local_file_list->files[i]->mode;
-				if (make_backups && (backup_dir || !is_backup_file(f))
-				  && !S_ISDIR(mode)) {
-					make_backup(f);
-					if (verbose) {
-						rprintf(FINFO, "deleting %s\n",
-							safe_fname(f));
-					}
-				} else {
-					delete_file(f, S_ISDIR(mode)
-						? DEL_DIR | DEL_RECURSE : 0);
-				}
-				deletion_count++;
-			}
-		}
-		flist_free(local_file_list);
+		delete_in_dir(flist, f_name_to(flist->files[j], fbuf));
 	}
 }
 
