@@ -414,12 +414,12 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		   the lchown. Thanks to snabb@epipe.fi for pointing
 		   this out */
 		fd2 = do_open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,
-			      file->mode & ACCESSPERMS);
+			      file->mode & INITPERMMASK);
 
 		if (fd2 == -1 && relative_paths && errno == ENOENT && 
 		    create_directory_path(fnametmp) == 0) {
 			fd2 = do_open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,
-				      file->mode & ACCESSPERMS);
+				      file->mode & INITPERMMASK);
 		}
 		if (fd2 == -1) {
 			rprintf(FERROR,"cannot create %s : %s\n",fnametmp,strerror(errno));

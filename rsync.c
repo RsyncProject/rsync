@@ -202,7 +202,7 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 #ifdef HAVE_CHMOD
 	if (preserve_perms && !S_ISLNK(st->st_mode) &&
 	    (st->st_mode != file->mode || 
-	     (updated && (file->mode & ~ACCESSPERMS)))) {
+	     (updated && (file->mode & ~INITPERMMASK)))) {
 		updated = 1;
 		if (do_chmod(fname,file->mode) != 0) {
 			rprintf(FERROR,"failed to set permissions on %s : %s\n",
@@ -260,7 +260,7 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file)
 		if (errno == EXDEV) {
 			/* rename failed on cross-filesystem link.  
 			   Copy the file instead. */
-			if (copy_file(fnametmp,fname, file->mode & ACCESSPERMS)) {
+			if (copy_file(fnametmp,fname, file->mode & INITPERMMASK)) {
 				rprintf(FERROR,"copy %s -> %s : %s\n",
 					fnametmp,fname,strerror(errno));
 			} else {
