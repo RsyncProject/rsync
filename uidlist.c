@@ -130,10 +130,8 @@ static int is_in_group(gid_t gid)
 		return last_out;
 	if (ngroups < -1) {
 		gid_t mygid = MY_GID();
-		ngroups = getgroups(0, 0);
-		/* If that didn't work, perhaps 0 isn't treated specially? */
-		if (ngroups <= 0)
-			ngroups = NGROUPS_MAX;
+		if ((ngroups = getgroups(0, 0)) < 0)
+			ngroups = 0;
 		gidset = new_array(GETGROUPS_T, ngroups+1);
 		if (ngroups > 0)
 			ngroups = getgroups(ngroups, gidset);
@@ -194,7 +192,7 @@ static gid_t match_gid(gid_t gid)
 		list = list->next;
 	}
 	
-	if (am_root)
+	if (am_root || is_in_group(gid))
 		last_out = gid;
 	else
 		last_out = GID_NONE;
