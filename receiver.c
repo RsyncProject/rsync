@@ -199,20 +199,30 @@ static int get_tmpname(char *fnametmp, char *fname)
 }
 
 
-static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
-			OFF_T total_size)
+static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
+			char *fname, int fd, OFF_T total_size)
 {
-	int i;
+	static char file_sum1[MD4_SUM_LENGTH];
+	static char file_sum2[MD4_SUM_LENGTH];
+	struct map_struct *mapbuf;
 	struct sum_struct sum;
 	unsigned int len;
 	OFF_T offset = 0;
 	OFF_T offset2;
 	char *data;
-	static char file_sum1[MD4_SUM_LENGTH];
-	static char file_sum2[MD4_SUM_LENGTH];
+	int i;
 	char *map = NULL;
 
 	read_sum_head(f_in, &sum);
+
+	if (fd_r >= 0 && size_r > 0) {
+		mapbuf = map_file(fd_r, size_r, sum.blength);
+		if (verbose > 2) {
+			rprintf(FINFO, "recv mapped %s of size %.0f\n",
+				fname_r, (double)size_r);
+		}
+	} else
+		mapbuf = NULL;
 
 	sum_init(checksum_seed);
 
@@ -269,7 +279,9 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
 			flush_write_file(fd);
 			if (do_lseek(fd,(OFF_T)len,SEEK_CUR) != offset+len) {
 				rprintf(FERROR, "lseek failed on %s: %s, %lli, %lli, %i\n",
-					full_fname(fname), strerror(errno), do_lseek(fd,0,SEEK_CUR), (offset+len), i);
+					full_fname(fname), strerror(errno),
+					do_lseek(fd, 0, SEEK_CUR),
+					offset + len, i);
 				exit_cleanup(RERR_FILEIO);
 			}
 		}
@@ -294,6 +306,9 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
 
 	sum_end(file_sum1);
 
+	if (mapbuf)
+		unmap_file(mapbuf);
+
 	read_buf(f_in,file_sum2,MD4_SUM_LENGTH);
 	if (verbose > 2)
 		rprintf(FINFO,"got file_sum\n");
@@ -305,7 +320,7 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
 
 static void discard_receive_data(int f_in, OFF_T length)
 {
-	receive_data(f_in, NULL, -1, NULL, length);
+	receive_data(f_in, NULL, -1, 0, NULL, -1, length);
 }
 
 
@@ -322,7 +337,6 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 	char fnametmp[MAXPATHLEN];
 	char *fnamecmp;
 	char fnamecmpbuf[MAXPATHLEN];
-	struct map_struct *mapbuf;
 	struct file_struct *file;
 	struct stats initial_stats;
 	int save_make_backups = make_backups;
@@ -432,7 +446,6 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		if (fd1 != -1 && !S_ISREG(st.st_mode)) {
 			close(fd1);
 			fd1 = -1;
-			mapbuf = NULL;
 		}
 
 		if (fd1 != -1 && !preserve_perms) {
@@ -442,15 +455,6 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			file->mode = st.st_mode;
 		}
 
-		if (fd1 != -1 && st.st_size > 0) {
-			mapbuf = map_file(fd1,st.st_size);
-			if (verbose > 2) {
-				rprintf(FINFO, "recv mapped %s of size %.0f\n",
-					fnamecmp, (double)st.st_size);
-			}
-		} else
-			mapbuf = NULL;
-
 		/* We now check to see if we are writing file "inplace" */
 		if (inplace)  {
 			fd2 = do_open(fnamecmp, O_WRONLY|O_CREAT, 0);
@@ -458,8 +462,6 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 				rsyserr(FERROR, errno, "open %s failed",
 					full_fname(fnamecmp));
 				discard_receive_data(f_in, file->length);
-				if (mapbuf)
-					unmap_file(mapbuf);
 				if (fd1 != -1)
 					close(fd1);
 				continue;
@@ -467,8 +469,6 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		} else {
 			if (!get_tmpname(fnametmp,fname)) {
 				discard_receive_data(f_in, file->length);
-				if (mapbuf)
-					unmap_file(mapbuf);
 				if (fd1 != -1)
 					close(fd1);
 				continue;
@@ -496,26 +496,23 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 				rsyserr(FERROR, errno, "mkstemp %s failed",
 					full_fname(fnametmp));
 				discard_receive_data(f_in, file->length);
-				if (mapbuf)
-					unmap_file(mapbuf);
 				if (fd1 != -1)
 					close(fd1);
 				continue;
 			}
 
-			cleanup_set(fnametmp, fname, file, mapbuf, fd1, fd2);
+			cleanup_set(fnametmp, fname, file, fd1, fd2);
 		}
 
 		if (!am_server && verbose)
 			rprintf(FINFO, "%s\n", fname);
 
 		/* recv file data */
-		recv_ok = receive_data(f_in,mapbuf,fd2,fname,file->length);
+		recv_ok = receive_data(f_in, fnamecmp, fd1, st.st_size,
+				       fname, fd2, file->length);
 
 		log_recv(file, &initial_stats);
 
-		if (mapbuf)
-			unmap_file(mapbuf);
 		if (fd1 != -1)
 			close(fd1);
 		if (close(fd2) < 0) {
