@@ -374,7 +374,7 @@ int is_a_socket(int fd)
 }
 
 
-void start_accept_loop(int port, int (*fn)(int ))
+void start_accept_loop(int port, int (*fn)(int, int))
 {
 	int s;
 	extern char *bind_address;
@@ -433,7 +433,7 @@ void start_accept_loop(int port, int (*fn)(int ))
 			/* open log file in child before possibly giving
 			   up privileges  */
 			log_open();
-			_exit(fn(fd));
+			_exit(fn(fd, fd));
 		} else if (pid < 0) {
 			rprintf(FERROR,
 				RSYNC_NAME
