@@ -42,6 +42,7 @@ extern int preserve_gid;
 extern int preserve_times;
 extern int omit_dir_times;
 extern int delete_during;
+extern int remove_sent_files;
 extern int update_only;
 extern int opt_ignore_existing;
 extern int inplace;
@@ -554,6 +555,11 @@ static void recv_generator(char *fname, struct file_list *flist,
 			if (code && verbose) {
 				rprintf(code, "%s -> %s\n", safe_fname(fname),
 					safe_fname(file->u.link));
+			}
+			if (remove_sent_files && !dry_run) {
+				char numbuf[4];
+				SIVAL(numbuf, 0, ndx);
+				send_msg(MSG_SUCCESS, numbuf, 4);
 			}
 		}
 #endif
