@@ -642,6 +642,12 @@ Versions of read() and write() that corrupt the stream, or abruptly fail
 Separate makefile target to run rough tests -- or perhaps just run
 them every time?
 
+Test "refuse options" works
+
+  What about for --recursive?
+
+  If you specify an unrecognized option here, you should get an error.
+
 
 DOCUMENTATION --------------------------------------------------------
 
