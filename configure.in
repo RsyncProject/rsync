@@ -109,8 +109,8 @@ case "$LIBS" in
 esac
 dnl We can't just call AC_CHECK_FUNCS(connect) here, because the value
 dnl has been cached.
-if test "$ac_cv_lib_socket_connect" = "yes" || test "$ac_cv_lib_inet_connect" = 
-"yes"; then
+if test "$ac_cv_lib_socket_connect" = "yes" || 
+   test "$ac_cv_lib_inet_connect" = "yes"; then
   ac_cv_func_connect=yes
   AC_DEFINE(HAVE_CONNECT)
 fi])
