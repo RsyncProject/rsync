@@ -230,7 +230,8 @@ do
 	;;
     77)
 	# backticks will fill the whole file onto one line, which is a feature
-	echo "SKIP    $testbase (`cat \"$scratchdir/whyskipped\"`)"
+	whyskipped=`cat "$scratchdir/whyskipped"`
+	echo "SKIP    $testbase ($whyskipped)"
 	skipped=`expr $skipped + 1`
 	maybe_discard_scratch
 	;;
