@@ -91,9 +91,7 @@ T_UNSAFE_OBJ = t_unsafe.o syscall.o util.o t_stub.o lib/compat.o lib/snprintf.o
 t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
 
-gen: build_gen man
-
-build_gen: $(srcdir)/configure $(srcdir)/config.h.in proto
+gen: $(srcdir)/configure $(srcdir)/config.h.in proto man
 
 man: $(srcdir)/rsync.1 $(srcdir)/rsyncd.conf.5
 
