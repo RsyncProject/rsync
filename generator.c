@@ -30,6 +30,9 @@ extern int preserve_links;
 extern int am_root;
 extern int preserve_devices;
 extern int preserve_hard_links;
+extern int preserve_perms;
+extern int preserve_uid;
+extern int preserve_gid;
 extern int update_only;
 extern int opt_ignore_existing;
 extern int csum_length;
@@ -50,18 +53,15 @@ static int skip_file(char *fname,
 		return 0;
 	}
 	if (link_dest) {
-		extern int preserve_perms;
-		extern int preserve_uid;
-		extern int preserve_gid;
-
 		if (preserve_perms
-		    && (st->st_mode & ~_S_IFMT) != (file->mode & ~_S_IFMT))
+		 && (st->st_mode & ~_S_IFMT) != (file->mode & ~_S_IFMT))
 			return 0;
 
-		if (preserve_uid && st->st_uid != file->uid)
+		if (am_root && preserve_uid && st->st_uid != file->uid)
 			return 0;
 
-		if (preserve_gid && st->st_gid != file->gid)
+		if (preserve_gid && file->gid != (gid_t)-1
+		 && st->st_gid != file->gid)
 			return 0;
 	}
 
@@ -277,7 +277,6 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 	char fnamecmpbuf[MAXPATHLEN];
 	extern char *compare_dest;
 	extern int list_only;
-	extern int preserve_perms;
 	extern int only_existing;
 	extern int orig_umask;
 
