@@ -258,7 +258,7 @@ int link_stat(const char *path, STRUCT_STAT * buffer)
  */
 static int check_exclude_file(char *fname, int is_dir, int exclude_level)
 {
-#if 0 // This currently never happens, so avoid a useless compare.
+#if 0 /* This currently never happens, so avoid a useless compare. */
 	if (exclude_level == NO_EXCLUDES)
 		return 0;
 #endif
