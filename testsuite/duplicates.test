@@ -28,15 +28,26 @@ set -x
 fromdir="$scratchdir/from"
 todir="$scratchdir/to"
 
-# TODO: Need to test whether hardlinks are possible on this OS/filesystem
-
 mkdir "$fromdir"
 name1="$fromdir/name1"
-name1="$fromdir/name2"
+name2="$fromdir/name2"
 echo "This is the file" > "$name1"
 ln -s "$name1" "$name2" || fail "can't create symlink"
 
-checkit "rsync -avv \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+outfile="$scratchdir/rsync.out"
+
+checkit "rsync -avv \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir" \
+    | tee "$outfile"
+
+# Make sure each file was only copied once...
+if [ `grep -c '^name1$' "$outfile"` != 1 ]
+then
+    test_fail "name1 was not copied exactly once"
+fi
+if [ `grep -c '^name2$' "$outfile"` != 1 ]
+then
+    test_fail "name2 was not copied exactly once"
+fi
 
 exit 0
 # last [] may have failed but if we get here then we've won
