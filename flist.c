@@ -199,44 +199,42 @@ static void list_file_entry(struct file_struct *f)
  * @return -1 on error; or 0.  If a symlink, then @p Linkbuf (of size
  * MAXPATHLEN) contains the symlink target.
  **/
-int readlink_stat(const char *Path, STRUCT_STAT * Buffer, char *Linkbuf)
+int readlink_stat(const char *path, STRUCT_STAT * buffer, char *linkbuf)
 {
 #if SUPPORT_LINKS
 	if (copy_links) {
-		return do_stat(Path, Buffer);
+		return do_stat(path, buffer);
 	}
-	if (do_lstat(Path, Buffer) == -1) {
+	if (do_lstat(path, buffer) == -1) {
 		return -1;
 	}
-	if (S_ISLNK(Buffer->st_mode)) {
+	if (S_ISLNK(buffer->st_mode)) {
 		int l;
-		if ((l =
-		     readlink((char *) Path, Linkbuf,
-			      MAXPATHLEN - 1)) == -1) {
+		l = readlink((char *) path, linkbuf, MAXPATHLEN - 1);
+		if (l == -1) 
 			return -1;
-		}
-		Linkbuf[l] = 0;
+		linkbuf[l] = 0;
 		if (copy_unsafe_links && (topsrcname[0] != '\0') &&
-		    unsafe_symlink(Linkbuf, topsrcname)) {
-			return do_stat(Path, Buffer);
+		    unsafe_symlink(linkbuf, topsrcname)) {
+			return do_stat(path, buffer);
 		}
 	}
 	return 0;
 #else
-	return do_stat(Path, Buffer);
+	return do_stat(path, buffer);
 #endif
 }
 
-int link_stat(const char *Path, STRUCT_STAT * Buffer)
+int link_stat(const char *path, STRUCT_STAT * buffer)
 {
 #if SUPPORT_LINKS
 	if (copy_links) {
-		return do_stat(Path, Buffer);
+		return do_stat(path, buffer);
 	} else {
-		return do_lstat(Path, Buffer);
+		return do_lstat(path, buffer);
 	}
 #else
-	return do_stat(Path, Buffer);
+	return do_stat(path, buffer);
 #endif
 }
 
