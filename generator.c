@@ -207,10 +207,11 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 		rprintf(FINFO,"recv_generator(%s,%d)\n",fname,i);
 
 	statret = link_stat(fname,&st);
-
+read
 	if (only_existing && statret == -1 && errno == ENOENT) {
 		/* we only want to update existing files */
-		if (verbose > 1) rprintf(FINFO,"not creating %s\n",fname);
+		if (verbose > 1) rprintf(FINFO, RSYNC_NAME
+					 ": not creating new file \"%s\"\n",fname);
 		return;
 	}
 
@@ -230,10 +231,11 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
                  * we need to delete it.  If it doesn't exist, then
                  * recursively create it. */
           
-		if (dry_run) return;
+		if (dry_run) return; /* XXXX -- might cause inaccuracies?? -- mbp */
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			if (robust_unlink(fname) != 0) {
-				rprintf(FERROR,"recv_generator: unlink %s: %s\n",
+				rprintf(FERROR, RSYNC_NAME
+					": recv_generator: unlink \"%s\" to make room for directory: %s\n",
                                         fname,strerror(errno));
 				return;
 			}
@@ -243,7 +245,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 			if (!(relative_paths && errno==ENOENT && 
 			      create_directory_path(fname)==0 && 
 			      do_mkdir(fname,file->mode)==0)) {
-				rprintf(FERROR,"recv_generator: mkdir %s: %s (2)\n",
+				rprintf(FERROR, RSYNC_NAME ": recv_generator: mkdir \"%s\": %s (2)\n",
 					fname,strerror(errno));
 			}
 		}
@@ -262,7 +264,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 
 		if (safe_symlinks && unsafe_symlink(file->link, fname)) {
 			if (verbose) {
-				rprintf(FINFO,"ignoring unsafe symlink %s -> %s\n",
+				rprintf(FINFO,RSYNC_NAME ": ignoring unsafe symlink \"%s\" -> \"%s\"\n",
 					fname,file->link);
 			}
 			return;
@@ -271,20 +273,26 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 			l = readlink(fname,lnk,MAXPATHLEN-1);
 			if (l > 0) {
 				lnk[l] = 0;
+				/* A link already pointing to the
+				 * right place -- no further action
+				 * required. */
 				if (strcmp(lnk,file->link) == 0) {
 					set_perms(fname,file,&st,1);
 					return;
 				}
-			}
+			}  
+			/* Not a symlink, so delete whatever's
+			 * already there and put a new symlink
+			 * in place. */			   
 			delete_file(fname);
 		}
 		if (do_symlink(file->link,fname) != 0) {
-			rprintf(FERROR,"symlink %s -> %s : %s\n",
+			rprintf(FERROR,RSYNC_NAME": symlink \"%s\" -> \"%s\": %s\n",
 				fname,file->link,strerror(errno));
 		} else {
 			set_perms(fname,file,NULL,0);
 			if (verbose) {
-				rprintf(FINFO,"%s -> %s\n",
+				rprintf(FINFO,RSYNC_NAME": %s -> %s\n",
 					fname,file->link);
 			}
 		}
@@ -317,12 +325,14 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 
 	if (preserve_hard_links && check_hard_link(file)) {
 		if (verbose > 1)
-			rprintf(FINFO,"%s is a hard link\n",f_name(file));
+			rprintf(FINFO, RSYNC_NAME
+				": \"%s\" is a hard link\n",f_name(file));
 		return;
 	}
 
 	if (!S_ISREG(file->mode)) {
-		rprintf(FINFO,"skipping non-regular file %s\n",fname);
+		rprintf(FINFO, RSYNC_NAME
+			": skipping non-regular file \"%s\"\n",fname);
 		return;
 	}
 
@@ -347,7 +357,8 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 			if (!dry_run) send_sums(NULL,f_out);
 		} else {
 			if (verbose > 1)
-				rprintf(FERROR,"recv_generator failed to open %s\n",fname);
+				rprintf(FERROR,RSYNC_NAME": recv_generator failed to open \%s\": %s\n",fname,
+					strerror(errno));
 		}
 		return;
 	}
@@ -390,7 +401,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 	fd = do_open(fnamecmp, O_RDONLY, 0);
 
 	if (fd == -1) {
-		rprintf(FERROR,"failed to open %s, continuing : %s\n",fnamecmp,strerror(errno));
+		rprintf(FERROR,RSYNC_NAME": failed to open \"%s\", continuing : %s\n",fnamecmp,strerror(errno));
 		/* pretend the file didn't exist */
 		write_int(f_out,i);
 		send_sums(NULL,f_out);
