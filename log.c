@@ -343,7 +343,7 @@ static void log_formatted(enum logcode code,
 			  struct stats *initial_stats, int iflags)
 {
 	char buf[MAXPATHLEN+1024];
-	char buf2[1024];
+	char buf2[MAXPATHLEN];
 	char *p, *n;
 	size_t len, total;
 	int64 b;
@@ -380,6 +380,11 @@ static void log_formatted(enum logcode code,
 			break;
 		case 'n':
 			n = (char*)safe_fname(f_name(file));
+			if (S_ISDIR(file->mode)) {
+				/* The buffer from safe_fname() has more
+				 * room than MAXPATHLEN, so this is safe. */
+				strcat(n, "/");
+			}
 			break;
 		case 'L':
 			if (S_ISLNK(file->mode)) {
