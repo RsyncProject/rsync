@@ -935,6 +935,7 @@ char *full_fname(const char *fn)
 	if (result)
 		free(result);
 
+	fn = safe_fname(fn);
 	if (*fn == '/')
 		p1 = p2 = "";
 	else {
