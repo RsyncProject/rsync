@@ -219,8 +219,11 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 		exit_cleanup(RERR_FILEIO);
 	} else {
 		if (map->p_fd_offset != read_start) {
-			if (do_lseek(map->fd,read_start,SEEK_SET) != read_start) {
-				rprintf(FERROR,"lseek failed in map_ptr\n");
+			OFF_T ret = do_lseek(map->fd, read_start, SEEK_SET);
+			if (ret != read_start) {
+				rsyserr(FERROR, errno,
+					"lseek returned %.0f, not %.0f",
+					(double)ret, (double)read_start);
 				exit_cleanup(RERR_FILEIO);
 			}
 			map->p_fd_offset = read_start;
