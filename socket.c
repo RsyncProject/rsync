@@ -443,7 +443,7 @@ char *client_addr(int fd)
 {
 	struct sockaddr sa;
 	struct sockaddr_in *sockin = (struct sockaddr_in *) (&sa);
-	int     length = sizeof(sa);
+	socklen_t length = sizeof(sa);
 	static char addr_buf[100];
 	static int initialised;
 
