@@ -27,6 +27,8 @@
 /* if no timeout is specified then use a 60 second select timeout */
 #define SELECT_TIMEOUT 60
 
+extern int bwlimit;
+
 static int io_multiplexing_out;
 static int io_multiplexing_in;
 static int multiplex_in_fd;
@@ -388,6 +390,19 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 				exit_cleanup(RERR_STREAMIO);
 			}
 
+			/* Sleep after writing to limit I/O bandwidth */
+			if (bwlimit)
+			{
+			    tv.tv_sec = 0;
+			    tv.tv_usec = ret * 1000 / bwlimit;
+			    while (tv.tv_usec > 1000000)
+			    {
+				tv.tv_sec++;
+				tv.tv_usec -= 1000000;
+			    }
+			    select(0, NULL, NULL, NULL, &tv);
+ 			}
+ 
 			total += ret;
 
 			if (io_timeout)

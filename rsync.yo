@@ -273,6 +273,7 @@ verb(
      --progress              show progress during transfer
      --log-format=FORMAT     log file transfers using specified format
      --password-file=FILE    get password from FILE
+     --bwlimit=KBPS          limit I/O bandwidth, KBytes per second
  -h, --help                  show this help screen
 )
 
@@ -642,6 +643,14 @@ is only useful when accessing a rsync server using the built in
 transport, not when using a remote shell as the transport. The file
 must not be world readable. It should contain just the password as a
 single line.
+
+dit(bf(--bwlimit=KBPS)) This option allows you to specify a maximum
+transfer rate in kilobytes per second. This option is most effective when
+using rsync with large files (several megabytes and up). Due to the nature
+of rsync transfers, blocks of data are sent, then if rsync determines the
+transfer was too fast, it will wait before sending the next data block. The
+result is an average transfer rate equalling the specified limit. A value
+of zero specifies no limit.
 
 enddit()
 

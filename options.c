@@ -62,6 +62,7 @@ int safe_symlinks=0;
 int copy_unsafe_links=0;
 int block_size=BLOCK_SIZE;
 int size_only=0;
+int bwlimit=0;
 int delete_after=0;
 int only_existing=0;
 int max_delete=0;
@@ -159,6 +160,7 @@ void usage(enum logcode F)
   rprintf(F,"     --progress              show progress during transfer\n");  
   rprintf(F,"     --log-format=FORMAT     log file transfers using specified format\n");  
   rprintf(F,"     --password-file=FILE    get password from FILE\n");
+  rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth, KBytes per second\n");
   rprintf(F," -h, --help                  show this help screen\n");
 
   rprintf(F,"\n");
@@ -174,7 +176,7 @@ enum {OPT_VERSION, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
       OPT_COPY_UNSAFE_LINKS, OPT_SAFE_LINKS, OPT_COMPARE_DEST,
       OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY, OPT_ADDRESS,
       OPT_DELETE_AFTER, OPT_EXISTING, OPT_MAX_DELETE, OPT_BACKUP_DIR, 
-      OPT_IGNORE_ERRORS};
+      OPT_IGNORE_ERRORS, OPT_BWLIMIT};
 
 static char *short_options = "oblLWHpguDCtcahvqrRIxnSe:B:T:zP";
 
@@ -235,6 +237,7 @@ static struct option long_options[] = {
   {"config",      1,     0,    OPT_CONFIG},
   {"port",        1,     0,    OPT_PORT},
   {"log-format",  1,     0,    OPT_LOG_FORMAT},
+  {"bwlimit",	  1,	 0,    OPT_BWLIMIT},
   {"address",     1,     0,    OPT_ADDRESS},
   {"max-delete",  1,     0,    OPT_MAX_DELETE},
   {"backup-dir",  1,     0,    OPT_BACKUP_DIR},
@@ -552,6 +555,10 @@ int parse_arguments(int argc, char *argv[], int frommain)
 		case OPT_LOG_FORMAT:
 			log_format = optarg;
 			break;
+	
+		case OPT_BWLIMIT:
+			bwlimit = atoi(optarg);
+			break;
 
 		case OPT_ADDRESS:
 			{
@@ -584,6 +591,8 @@ void server_options(char **args,int *argc)
 	static char bsize[30];
 	static char iotime[30];
 	static char mdelete[30];
+	static char bw[50];
+
 	int i, x;
 
 	args[ac++] = "--server";
@@ -654,6 +663,11 @@ void server_options(char **args,int *argc)
 		slprintf(iotime,sizeof(iotime),"--timeout=%d",io_timeout);
 		args[ac++] = iotime;
 	}    
+
+	if (bwlimit) {
+		slprintf(bw,sizeof(bw),"--bwlimit=%d",bwlimit);
+		args[ac++] = bw;
+	}
 
 	if (strcmp(backup_suffix, BACKUP_SUFFIX)) {
 		args[ac++] = "--suffix";
