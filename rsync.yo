@@ -799,19 +799,24 @@ although this skips files that haven't changed; see also --link-dest).
 This option increases the usefulness of --partial because partially
 transferred files will remain in the new temporary destination until they
 have a chance to be completed.  If DIR is a relative path, it is relative
-to the destination directory (which changes in a recursive transfer).
+to the destination directory.
 
 dit(bf(--link-dest=DIR)) This option behaves like bf(--compare-dest) but
 also will create hard links from em(DIR) to the destination directory for
 unchanged files.  Files with changed ownership or permissions will not be
 linked.
-Like bf(--compare-dest) if DIR is a relative path, it is relative
-to the destination directory (which changes in a recursive transfer).
 An example:
 
 verb(
     rsync -av --link-dest=$PWD/prior_dir host:src_dir/ new_dir/
 )
+
+Like bf(--compare-dest) if DIR is a relative path, it is relative to the
+destination directory.
+Note that rsync versions prior to 2.6.1 had a bug that could prevent
+--link-dest from working properly for a non-root user when -o was specified
+(or implied by -a).  If the receiving rsync is not new enough, you can work
+around this bug by avoiding the -o option.
 
 dit(bf(-z, --compress)) With this option, rsync compresses any data from
 the files that it sends to the destination machine.  This
