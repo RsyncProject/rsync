@@ -69,7 +69,7 @@ char *alloca ();
 #define	xstrdup(_str)	strdup(_str)
 #endif  /* HAVE_MCHECK_H && defined(__GNUC__) */
 
-#if defined(__GNUC__) || !(defined(__hpux) || defined(_hpux) || defined (hpux))
+#ifdef __GNUC__
 #define UNUSED(x) x __attribute__((__unused__))
 #else
 #define UNUSED(x) x
