@@ -163,10 +163,12 @@ was run as root. This complements the "uid" option. The default is the
 group "nobody".
 
 dit(bf(exclude)) The "exclude" option allows you to specify a space
-separated list of patterns to add to the exclude list. This is equivalent
-to the client specifying these patterns with the --exclude option.  Only
-one "exclude" option may be specified, but you can use "-" and "+" before
-patterns to specify exclude/include.
+separated list of patterns to add to the exclude list. This is
+equivalent to the client specifying these patterns with the --exclude
+option except that the exclude list is not passed to the client and
+thus only apply on the server.  Only one "exclude" option may be
+specified, but you can use "-" and "+" before patterns to specify
+exclude/include.
 
 Note that this option is not designed with strong security in
 mind, it is quite possible that a client may find a way to bypass this
@@ -177,8 +179,9 @@ file permissions.
 dit(bf(exclude from)) The "exclude from" option specifies a filename
 on the server that contains exclude patterns, one per line. This is
 equivalent to the client specifying the --exclude-from option with a
-equivalent file. See also the note about security for the exclude
-option above.
+equivalent file except that the resulting exclude patterns are not
+passed to the client and thus only apply on the server. See also the
+note about security for the exclude option above.
 
 dit(bf(include)) The "include" option allows you to specify a space
 separated list of patterns which rsync should not exclude. This is
