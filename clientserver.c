@@ -196,7 +196,7 @@ static int rsync_module(int fd, int i)
 		if (!name_to_uid(p, &uid)) {
 			if (!isdigit(*p)) {
 				rprintf(FERROR,"Invalid uid %s\n", p);
-				io_printf(fd,"@ERROR: invalid uid\n");
+				io_printf(fd,"@ERROR: invalid uid %s\n", p);
 				return -1;
 			} 
 			uid = atoi(p);
@@ -206,7 +206,7 @@ static int rsync_module(int fd, int i)
 		if (!name_to_gid(p, &gid)) {
 			if (!isdigit(*p)) {
 				rprintf(FERROR,"Invalid gid %s\n", p);
-				io_printf(fd,"@ERROR: invalid gid\n");
+				io_printf(fd,"@ERROR: invalid gid %s\n", p);
 				return -1;
 			} 
 			gid = atoi(p);
