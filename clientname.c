@@ -67,11 +67,11 @@ char *client_addr(int fd)
 				*(addr_buf + len) = '\0';
 			}
 		}
-	} else
+	} else {
 		client_sockaddr(fd, &ss, &length);
-
-	getnameinfo((struct sockaddr *)&ss, length,
-		addr_buf, sizeof(addr_buf), NULL, 0, NI_NUMERICHOST);
+		getnameinfo((struct sockaddr *)&ss, length,
+			    addr_buf, sizeof addr_buf, NULL, 0, NI_NUMERICHOST);
+	}
 
 	return addr_buf;
 }
@@ -101,7 +101,11 @@ char *client_name(int fd)
 	static char name_buf[100];
 	static char port_buf[100];
 	static int initialised;
-	struct sockaddr_storage *ssp;
+	struct sockaddr_storage ss, *ssp;
+	struct sockaddr_in sin;
+#ifdef INET6
+	struct sockaddr_in6 sin6;
+#endif
 	socklen_t ss_len;
 
 	if (initialised) return name_buf;
@@ -113,13 +117,11 @@ char *client_name(int fd)
 		/* daemon over --rsh mode */
 
 		char *addr = client_addr(fd);
-		struct sockaddr_in sin;
 #ifdef INET6
 		int dots = 0;
 		char *p;
-		struct sockaddr_in6 sin6;
 
-		for (p = addr; *p && (dots < 3); p++) {
+		for (p = addr; *p && (dots <= 3); p++) {
 		    if (*p == '.')
 			dots++;
 		}
@@ -141,8 +143,6 @@ char *client_name(int fd)
 		}
 
 	} else {
-		struct sockaddr_storage ss;
-
 		ss_len = sizeof ss;
 		ssp = &ss;
 
