@@ -498,6 +498,8 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 	}
 	p = fname + strlen(fname);
 
+	local_exclude_list = NULL;
+
 	if (cvs_exclude) {
 		if (strlen(fname) + strlen(".cvsignore") <= MAXPATHLEN-1) {
 			strcpy(p,".cvsignore");
@@ -515,6 +517,10 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 			continue;
 		strlcpy(p,dname,MAXPATHLEN-(l+1));
 		send_file_name(f,flist,fname,recurse,0);
+	}
+
+	if (local_exclude_list) {
+		add_exclude_list("!", &local_exclude_list, 0);
 	}
 
 	closedir(d);
