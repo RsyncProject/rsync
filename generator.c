@@ -292,18 +292,15 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		 * to prepare appropriately.  If there is already a
 		 * file of that name and it is *not* a directory, then
 		 * we need to delete it.  If it doesn't exist, then
-		 * recursively create it. */
-
-		if (dry_run)
-			return; /* TODO: causes inaccuracies -- fix */
+		 * (perhaps recursively) create it. */
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			delete_file(fname, DEL_TERSE);
 			statret = -1;
 		}
 		if (statret != 0 && do_mkdir(fname,file->mode) != 0 && errno != EEXIST) {
-			if (!(relative_paths && errno == ENOENT
-			    && create_directory_path(fname, orig_umask) == 0
-			    && do_mkdir(fname, file->mode) == 0)) {
+			if (!relative_paths || errno != ENOENT
+			    || create_directory_path(fname, orig_umask) < 0
+			    || do_mkdir(fname, file->mode) < 0) {
 				rsyserr(FERROR, errno,
 					"recv_generator: mkdir %s failed",
 					full_fname(fname));
