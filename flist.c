@@ -725,7 +725,7 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 	char sum[SUM_LENGTH];
 	char *p;
 	char thisname[MAXPATHLEN];
-	char linkbuf[MAXPATHLEN];
+	char linkname[MAXPATHLEN];
 	unsigned short flags = 0;
 
 	if (strlcpy(thisname, fname, sizeof thisname)
@@ -739,7 +739,7 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 
 	memset(sum, 0, SUM_LENGTH);
 
-	if (readlink_stat(thisname, &st, linkbuf) != 0) {
+	if (readlink_stat(thisname, &st, linkname) != 0) {
 		int save_errno = errno;
 		if (errno == ENOENT && exclude_level != NO_EXCLUDES) {
 			/* either symlink pointing nowhere or file that
@@ -829,7 +829,7 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 
 #if SUPPORT_LINKS
 	if (S_ISLNK(st.st_mode))
-		file->u.link = STRDUP(ap, linkbuf);
+		file->u.link = STRDUP(ap, linkname);
 #endif
 
 	if (always_checksum && S_ISREG(st.st_mode)) {
