@@ -302,7 +302,7 @@ static int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
 static void itemize(struct file_struct *file, int statret, STRUCT_STAT *st,
 		    int32 iflags, int f_out, int ndx)
 {
-	if (statret >= 0) {
+	if (statret == 0) {
 		if (S_ISREG(file->mode) && file->length != st->st_size)
 			iflags |= ITEM_REPORT_SIZE;
 		if (!(iflags & ITEM_NO_DEST_AND_NO_UPDATE)) {
@@ -950,13 +950,8 @@ prepare_to_open:
 		statret = 0;
 	}
 
-	if (dry_run || read_batch)
+	if (dry_run || read_batch || whole_file > 0)
 		goto notify_others;
-	if (whole_file > 0) {
-		if (statret == 0)
-			statret = 1;
-		goto notify_others;
-	}
 
 	if (fuzzy_basis) {
 		int j = flist_find(fuzzy_dirlist, file);
@@ -1045,22 +1040,24 @@ notify_others:
 	if (dry_run || read_batch)
 		return;
 
-	if (statret == 0) {
-		generate_and_send_sums(fd, st.st_size, f_out, f_copy);
-
-		if (f_copy >= 0) {
-			close(f_copy);
-			set_perms(backupptr, back_file, NULL, 0);
-			if (verbose > 1) {
-				rprintf(FINFO, "backed up %s to %s\n",
-					safe_fname(fname), safe_fname(backupptr));
-			}
-			free(back_file);
-		}
-
-		close(fd);
-	} else
+	if (statret != 0 || whole_file > 0) {
 		write_sum_head(f_out, NULL);
+		return;
+	}
+
+	generate_and_send_sums(fd, st.st_size, f_out, f_copy);
+
+	if (f_copy >= 0) {
+		close(f_copy);
+		set_perms(backupptr, back_file, NULL, 0);
+		if (verbose > 1) {
+			rprintf(FINFO, "backed up %s to %s\n",
+				safe_fname(fname), safe_fname(backupptr));
+		}
+		free(back_file);
+	}
+
+	close(fd);
 }
 
 
