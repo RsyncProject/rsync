@@ -167,6 +167,13 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		}
 
 		if (i < 0 || i >= flist->count) {
+			/* Handle the new keep-alive (no-op) packet. */
+			if (i == flist->count && protocol_version >= 29
+	 		    && read_shortint(f_in) == ITEM_IS_NEW) {
+				write_int(f_out, i);
+				write_shortint(f_out, ITEM_IS_NEW);
+				continue;
+			}
 			rprintf(FERROR, "Invalid file index %d (count=%d)\n",
 				i, flist->count);
 			exit_cleanup(RERR_PROTOCOL);

@@ -426,6 +426,10 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		}
 
 		if (i < 0 || i >= flist->count) {
+			/* Handle the new keep-alive (no-op) packet. */
+			if (i == flist->count && protocol_version >= 29
+	 		    && read_shortint(f_in) == ITEM_IS_NEW)
+				continue;
 			rprintf(FERROR,"Invalid file index %d in recv_files (count=%d)\n",
 				i, flist->count);
 			exit_cleanup(RERR_PROTOCOL);
