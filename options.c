@@ -901,12 +901,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		return 0;
 	}
 	if (write_batch || read_batch) {
-		if (dry_run) {
-			snprintf(err_buf, sizeof err_buf,
-				"--%s-batch cannot be used with --dry_run (-n)\n",
-				write_batch ? "write" : "read");
-			return 0;
-		}
 		if (am_server) {
 			rprintf(FINFO,
 				"ignoring --%s-batch option sent to server\n",
@@ -916,7 +910,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			 * batch args to server. */
 			read_batch = write_batch = 0;
 			batch_name = NULL;
-		}
+		} else if (dry_run)
+			write_batch = 0;
 	}
 	if (read_batch && files_from) {
 		snprintf(err_buf, sizeof err_buf,
