@@ -14,7 +14,8 @@ rsync 2.4.7 (sometime in 2001, maybe :)
       sets.  By Bert J. Dempsey and Debra Weiss, updated by Jos
       Backus.  <http://www.ils.unc.edu/i2dsi/unc_rsync+.html>
 
-    * Merged IPv6 patch from KAME.net.  
+    * Merged IPv6 patch from KAME.net.  This is off by default, but
+      can be enabled with ./configure --enable-ipv6.
 
   ENHANCEMENTS
 
