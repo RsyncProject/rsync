@@ -25,7 +25,7 @@
 
 extern int verbose;
 extern int dry_run;
-extern int what_has_changed;
+extern int itemize_changes;
 extern int relative_paths;
 extern int keep_dirlinks;
 extern int preserve_links;
@@ -447,7 +447,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 			missing_below = file->dir.depth;
 			dry_run++;
 		}
-		if (what_has_changed && f_out != -1)
+		if (itemize_changes && f_out != -1)
 			showchg(fname, file, statret, &st, 0);
 		if (statret != 0 && do_mkdir(fname,file->mode) != 0 && errno != EEXIST) {
 			if (!relative_paths || errno != ENOENT
@@ -459,7 +459,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 			}
 		}
 		if (set_perms(fname, file, statret ? NULL : &st, 0)
-		    && verbose && f_out != -1 && !what_has_changed)
+		    && verbose && f_out != -1 && !itemize_changes)
 			rprintf(FINFO, "%s/\n", safe_fname(fname));
 		if (delete_during && f_out != -1 && csum_length != SUM_LENGTH
 		    && (file->flags & FLAG_DEL_HERE))
@@ -498,7 +498,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 				 * right place -- no further action
 				 * required. */
 				if (strcmp(lnk, file->u.link) == 0) {
-					if (what_has_changed)
+					if (itemize_changes)
 						showchg(fname, file, 0, &st, 0);
 					set_perms(fname, file, &st,
 						  PERMS_REPORT);
@@ -514,14 +514,14 @@ static void recv_generator(char *fname, struct file_list *flist,
 				full_fname(fname), safe_fname(file->u.link));
 		} else {
 			set_perms(fname,file,NULL,0);
-			if (what_has_changed) {
+			if (itemize_changes) {
 				showchg(fname, file, statret, &st,
 					SC_SYMLINK_CHANGED
 					| (verbose ? SC_NO_NL : 0));
 			}
 			if (verbose) {
 				rprintf(FINFO, "%s -> %s\n",
-				    what_has_changed ? "" : safe_fname(fname),
+				    itemize_changes ? "" : safe_fname(fname),
 				    safe_fname(file->u.link));
 			}
 		}
@@ -530,7 +530,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 	}
 
 	if (am_root && preserve_devices && IS_DEVICE(file->mode)) {
-		if (what_has_changed)
+		if (itemize_changes)
 			showchg(fname, file, statret, &st, 0);
 		if (statret != 0 ||
 		    st.st_mode != file->mode ||
@@ -547,7 +547,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 					full_fname(fname));
 			} else {
 				set_perms(fname,file,NULL,0);
-				if (verbose && !what_has_changed) {
+				if (verbose && !itemize_changes) {
 					rprintf(FINFO, "%s\n",
 						safe_fname(fname));
 				}
@@ -690,7 +690,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 	else if (fnamecmp_type == FNAMECMP_FUZZY)
 		;
 	else if (unchanged_file(fnamecmp, file, &st)) {
-		if (what_has_changed) {
+		if (itemize_changes) {
 			showchg(fname, file, statret, &st,
 				fnamecmp_type == FNAMECMP_FNAME ? 0
 				: SC_NO_BASIS);
@@ -793,7 +793,7 @@ notify_others:
 			write_buf(f_out_name, fuzzy_file->basename, len);
 		}
 	}
-	if (what_has_changed) {
+	if (itemize_changes) {
 		showchg(fname, file, statret, &st,
 			(always_checksum ? SC_CHECKSUM_CHANGED : 0)
 			| SC_SENDING_FILE);
