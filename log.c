@@ -56,6 +56,12 @@ void rprintf(int fd, const char *format, ...)
 	int len;
 	FILE *f=NULL;
 	extern int am_daemon;
+	/* recursion can happen with certain fatal conditions */
+	static int depth;
+
+	if (depth) return;
+
+	depth++;
 
 	va_start(ap, format);
 	len = vslprintf(buf, sizeof(buf)-1, format, ap);
@@ -72,7 +78,11 @@ void rprintf(int fd, const char *format, ...)
 		if (fd == FERROR) priority = LOG_WARNING;
 
 		log_open();
-		syslog(priority, "%s", buf);
+		if (!io_multiplex_write(fd, buf, strlen(buf))) {
+			syslog(priority, "%s", buf);
+		}
+
+		depth--;
 		return;
 	}
 
@@ -91,6 +101,8 @@ void rprintf(int fd, const char *format, ...)
 	if (!f) exit_cleanup(1);
 
 	if (fwrite(buf, len, 1, f) != 1) exit_cleanup(1);
+
+	depth--;
 }
 
 void rflush(int fd)

@@ -35,9 +35,9 @@ static void report(int f)
 	extern int am_daemon;
 
 	if (am_daemon) {
-		rprintf(FINFO, "wrote %.0f bytes  read %.0f bytes  total size %.0f\n",
-			(double)write_total(),(double)read_total(),
-			(double)total_size);
+		syslog(LOG_INFO,"wrote %.0f bytes  read %.0f bytes  total size %.0f\n",
+		       (double)write_total(),(double)read_total(),
+		       (double)total_size);
 		if (f == -1 || !am_sender) return;
 	}
 
@@ -218,8 +218,13 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 	}
 	
 	flist = send_file_list(f_out,argc,argv);
+	if (!flist || flist->count == 0) {
+		exit_cleanup(0);
+	}
+
 	send_files(flist,f_out,f_in);
 	report(f_out);
+	io_flush();
 	exit_cleanup(0);
 }
 
@@ -230,29 +235,40 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	int status=0;
 	int recv_pipe[2];
 	extern int preserve_hard_links;
-	extern int am_daemon;
+	extern int am_server;
 
 	if (preserve_hard_links)
 		init_hard_links(flist);
 
 	if (pipe(recv_pipe) < 0) {
 		rprintf(FERROR,"pipe failed in do_recv\n");
-		exit(1);
+		exit_cleanup(1);
 	}
   
+	io_flush();
 
 	if ((pid=do_fork()) == 0) {
-		close(recv_pipe[0]);
-		if (f_in != f_out) close(f_out);
-		recv_files(f_in,flist,local_name,recv_pipe[1]);
-		if (am_daemon) report(-1);
-		exit_cleanup(0);
+		close(recv_pipe[1]);
+		io_close_input(f_in);
+		if (f_in != f_out) close(f_in);
+		generate_files(f_out,flist,local_name,recv_pipe[0]);
+
+		io_flush();
+		_exit(0);
 	}
 
-	close(recv_pipe[1]);
-	if (f_in != f_out) close(f_in);
-	generate_files(f_out,flist,local_name,recv_pipe[0]);
 
+	close(recv_pipe[0]);
+	if (f_in != f_out) close(f_out);
+
+	recv_files(f_in,flist,local_name,recv_pipe[1]);
+	if (!am_server)
+		report(f_in);
+
+	if (verbose > 3)
+		rprintf(FINFO,"do_recv waiting on %d\n",pid);
+
+	io_flush();
 	waitpid(pid, &status, 0);
 
 	return status;
@@ -287,7 +303,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 
 	flist = recv_file_list(f_in);
 	if (!flist || flist->count == 0) {
-		rprintf(FERROR,"nothing to do\n");
+		rprintf(FERROR,"server_recv: nothing to do\n");
 		exit_cleanup(1);
 	}
 	
@@ -344,7 +360,8 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 		send_files(flist,f_out,f_in);
 		if (pid != -1) {
 			if (verbose > 3)
-				rprintf(FINFO,"waiting on %d\n",pid);
+				rprintf(FINFO,"client_run waiting on %d\n",pid);
+			io_flush();
 			waitpid(pid, &status, 0);
 		}
 		report(-1);
@@ -355,7 +372,7 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 	
 	flist = recv_file_list(f_in);
 	if (!flist || flist->count == 0) {
-		rprintf(FINFO,"nothing to do\n");
+		rprintf(FINFO,"client: nothing to do\n");
 		exit_cleanup(0);
 	}
 	
@@ -363,9 +380,10 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 	
 	status2 = do_recv(f_in,f_out,flist,local_name);
 	
-	report(f_in);
-	
 	if (pid != -1) {
+		if (verbose > 3)
+			rprintf(FINFO,"client_run2 waiting on %d\n",pid);
+		io_flush();
 		waitpid(pid, &status, 0);
 	}
 	
@@ -483,7 +501,7 @@ int main(int argc,char *argv[])
 
 	if (argc < 2) {
 		usage(FERROR);
-		exit(1);
+		exit_cleanup(1);
 	}
 
 	/* we set a 0 umask so that correct file permissions can be
@@ -507,7 +525,7 @@ int main(int argc,char *argv[])
 
 	if (argc < 1) {
 		usage(FERROR);
-		exit(1);
+		exit_cleanup(1);
 	}
 
 	if (dry_run)

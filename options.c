@@ -54,6 +54,7 @@ int am_server = 0;
 int am_sender=0;
 int recurse = 0;
 int am_daemon=0;
+int am_client=0;
 
 int block_size=BLOCK_SIZE;
 

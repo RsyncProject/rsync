@@ -125,12 +125,12 @@ void start_accept_loop(int port, int (*fn)(int ))
 	/* open an incoming socket */
 	s = open_socket_in(SOCK_STREAM, port);
 	if (s == -1)
-		exit(1);
+		exit_cleanup(1);
 
 	/* ready to listen */
 	if (listen(s, 5) == -1) {
 		close(s);
-		exit(1);
+		exit_cleanup(1);
 	}
 
 
@@ -308,7 +308,7 @@ char *client_addr(int fd)
 	static char addr_buf[100];
 
 	if (getpeername(fd, &sa, &length)) {
-		exit(1);
+		exit_cleanup(1);
 	}
 
 	strlcpy(addr_buf,(char *)inet_ntoa(sockin->sin_addr), sizeof(addr_buf)-1);
@@ -331,7 +331,7 @@ char *client_name(int fd)
 	strcpy(name_buf,"UNKNOWN");
 
 	if (getpeername(fd, &sa, &length)) {
-		exit(1);
+		exit_cleanup(1);
 	}
 
 	/* Look up the remote host name. */

@@ -33,6 +33,8 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	char line[MAXPATHLEN];
 	char *p, *user=NULL;
 	extern int remote_version;
+	extern int am_client;
+	extern int am_sender;
 
 	p = strchr(host, '@');
 	if (p) {
@@ -43,6 +45,8 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 
 	if (!user) user = getenv("USER");
 	if (!user) user = getenv("LOGNAME");
+
+	am_client = 1;
 
 	fd = open_socket_out(host, rsync_port);
 	if (fd == -1) {
@@ -92,6 +96,9 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	}
 	io_printf(fd,"\n");
 
+	if (remote_version > 17 && !am_sender)
+		io_start_multiplex_in(fd);
+
 	return client_run(fd, fd, -1, argc, argv);
 }
 
@@ -113,6 +120,7 @@ static int rsync_module(int fd, int i)
 	int start_glob=0;
 	char *request=NULL;
 	extern int am_sender;
+	extern int remote_version;
 
 	if (!allow_access(addr, host, lp_hosts_allow(i), lp_hosts_deny(i))) {
 		rprintf(FERROR,"rsync denied on module %s from %s (%s)\n",
@@ -254,6 +262,9 @@ static int rsync_module(int fd, int i)
 	argc -= optind;
 	argp = argv + optind;
 	optind = 0;
+
+	if (remote_version > 17 && am_sender)
+		io_start_multiplex_out(fd);
 
 	start_server(fd, fd, argc, argp);
 

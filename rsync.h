@@ -41,7 +41,7 @@
 #define SAME_TIME (1<<7)
 
 /* update this if you make incompatible changes */
-#define PROTOCOL_VERSION 17
+#define PROTOCOL_VERSION 18
 #define MIN_PROTOCOL_VERSION 11
 #define MAX_PROTOCOL_VERSION 30
 
@@ -58,6 +58,7 @@
 
 #define BLOCKING_TIMEOUT 10
 
+#define MPLEX_BASE 7
 #define FERROR 1
 #define FINFO 2
 

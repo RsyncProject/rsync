@@ -633,7 +633,7 @@ int vslprintf(char *str, int n, const char *format, va_list ap)
 		buf = malloc(len);
 		if (!buf) {
 			/* can't call debug or we would recurse */
-			exit(1);
+			exit_cleanup(1);
 		}
 	}
 
@@ -641,7 +641,7 @@ int vslprintf(char *str, int n, const char *format, va_list ap)
 	ret = strlen(buf);
 	if (ret > n) {
 		/* yikes! */
-		exit(1);
+		exit_cleanup(1);
 	}
 	buf[ret] = 0;
 	
@@ -663,3 +663,4 @@ int slprintf(char *str, int n, char *format, ...)
 	va_end(ap);
 	return ret;
 }
+
