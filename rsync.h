@@ -122,10 +122,10 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
-#else
-#ifdef HAVE_MALLOC_H
-#include <malloc.h>
 #endif
+
+#if defined(HAVE_MALLOC_H) && (defined(HAVE_MALLINFO) || !defined(HAVE_STDLIB_H))
+#include <malloc.h>
 #endif
 
 #ifdef HAVE_SYS_SOCKET_H
@@ -194,10 +194,6 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 
 #ifdef HAVE_GLOB_H
 #include <glob.h>
-#endif
-
-#ifdef HAVE_MALLOC_H
-#  include <malloc.h>
 #endif
 
 /* these are needed for the uid/gid mapping code */
