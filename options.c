@@ -99,11 +99,19 @@ struct in_addr socket_address = {INADDR_ANY};
 
 static void print_rsync_version(void)
 {
-        rprintf(FINFO, "rsync version %s  protocol version %d (%d-bit files)\n\n",
-                VERSION, PROTOCOL_VERSION,
-                sizeof(int64) * 8);
-        rprintf(FINFO, "Written by Andrew Tridgell and Paul Mackerras\n");
-        rprintf(FINFO, "http://rsync.samba.org/\n");
+        char const *got_socketpair = "no ";
+
+#ifdef HAVE_SOCKETPAIR
+        got_socketpair = "";
+#endif
+        
+        rprintf(FINFO, "rsync version %s  protocol version %d\n",
+                VERSION, PROTOCOL_VERSION);
+        rprintf(FINFO, "Configuration: %d-bit files, %ssocketpairs\n\n",
+                sizeof(int64) * 8,
+                got_socketpair);
+        rprintf(FINFO, "Written by Andrew Tridgell and Paul Mackerras "
+                "<http://rsync.samba.org/>\n\n");
 #ifdef NO_INT64
         rprintf(FINFO, "WARNING: no 64-bit integers on this platform!\n");
 #endif
