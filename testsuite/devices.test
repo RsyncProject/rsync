@@ -28,6 +28,8 @@ mknod "$fromdir/block2" b 42 73 || test_skipped "Can't create block device node 
 mknod "$fromdir/block3" b 105 73 || test_skipped "Can't create block device node unless root"
 mkfifo "$fromdir/fifo" || test_skipped "Can't run mkfifo"
 
+touch "$tmpdir/do_not_diff_the_files"
+
 checkit "$RSYNC -aHvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
