@@ -110,7 +110,7 @@ int try_bind_local(int s,
 	bhints.ai_family = ai_family;
 	bhints.ai_socktype = ai_socktype;
 	bhints.ai_flags = AI_PASSIVE;
-	if (getaddrinfo(bind_address, NULL, &bhints, &bres_all) == -1) {
+	if ((error = getaddrinfo(bind_address, NULL, &bhints, &bres_all))) {
 		rprintf(FERROR, RSYNC_NAME ": getaddrinfo %s: %s\n",
 			bind_address, gai_strerror(error));
 		return -1;
