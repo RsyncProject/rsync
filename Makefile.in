@@ -86,3 +86,11 @@ finddead:
 	nm *.o */*.o |grep 'U ' | awk '{print $$2}' | sort -u > nmused.txt
 	nm *.o */*.o |grep 'T ' | awk '{print $$3}' | sort -u > nmfns.txt
 	comm -13 nmused.txt nmfns.txt 
+
+# 'check' is the GNU name, 'test' is the name for everybody else :-)
+.PHONY: check test
+
+test: check
+
+check:
+	rsync_bin=`pwd`/rsync testdir=$(srcdir)/testsuite $(srcdir)/testsuite/master.test

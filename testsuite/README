@@ -5,6 +5,3 @@ top-level source directory.  (Not implemented yet.)
 They also run automatically on the build farm, and you can see the
 results on http://build.samba.org/.  That's controlled by the file
 ./runlist.
-
-TEST_ALL="rsync-hello"
-

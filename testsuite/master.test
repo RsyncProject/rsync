@@ -1,0 +1,41 @@
+#! /bin/sh
+
+# Copyright (C) 2001 by Martin Pool <mbp@samba.org>
+
+# rsync top-level test script -- this invokes all the other more
+# detailed tests in order.  This script can either be called by 'make
+# check' or through 'runlist' from the build farm.
+
+# We need a few environment variables to know what to test.
+
+echo "============================================================"
+echo "$0 running"
+
+test_names="rsync-hello"
+
+export rsync_bin
+export testdir
+
+cd "$testdir"
+
+for testbase in $test_names
+do
+    echo "------------------------------------------------------------"
+    echo "----- $testbase running"
+
+    testscript="$testbase.test"
+    if test \! -f "$testscript" 
+    then
+	echo "$testscript does not exist" >&2
+	continue
+    fi
+
+    if sh $testscript
+    then
+	echo "----- $testbase completed succesfully"
+    else
+	echo "----- $testbase failed!"
+    fi	
+done
+
+echo '------------------------------------------------------------'

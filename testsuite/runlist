@@ -6,4 +6,12 @@
 
 echo "$0 running" 
 
-TEST_ALL="rsync-hello"
+TEST_ALL="master"
+
+# Also, we need a little bit of special set up when running from the
+# build farm.
+
+# It's already been installed in a scratch copy of /usr.
+
+rsync_bin="$prefix/bin/rsync"
+

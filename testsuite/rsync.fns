@@ -1,4 +1,0 @@
-#! /bin/sh
-
-rsync="$prefix/bin/rsync"
-

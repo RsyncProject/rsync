@@ -1,7 +1,3 @@
 #! /bin/sh
 
-set -x
-
-. rsync.fns
-
-"$rsync" --version || exit 1
+"$rsync_bin" --version || exit 1
