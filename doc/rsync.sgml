@@ -96,7 +96,7 @@
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-v</term>
+	  <term><option>-v</option></term>
 	  <listitem>
 	    <para>Be verbose.  Primarily, display the name of each file as it is copied.</para>
 	  </listitem>
@@ -104,7 +104,7 @@
 
 
 	<varlistentry>
-	  <term><option>-a
+	  <term><option>-a</option></term>
 	  <listitem>
 	    <para>
 	      Reproduce the structure and attributes of the origin files as exactly
@@ -200,5 +200,131 @@ run rsync on the file server either as a daemon or over ssh than
 running rsync giving the network directory.
       </para>
     </section>
+  </chapter>
+
+
+
+  <chapter>
+    <title>Frequently asked questions</title>
+
+    
+    <!-- one of (CALLOUTLIST GLOSSLIST ITEMIZEDLIST ORDEREDLIST SEGMENTEDLIST SIMPLELIST VARIABLELIST CAUTION IMPORTANT NOTE TIP WARNING LITERALLAYOUT PROGRAMLISTING PROGRAMLISTINGCO SCREEN SCREENCO SCREENSHOT SYNOPSIS CMDSYNOPSIS FUNCSYNOPSIS CLASSSYNOPSIS FIELDSYNOPSIS CONSTRUCTORSYNOPSIS DESTRUCTORSYNOPSIS METHODSYNOPSIS FORMALPARA PARA SIMPARA ADDRESS BLOCKQUOTE GRAPHIC GRAPHICCO MEDIAOBJECT MEDIAOBJECTCO INFORMALEQUATION INFORMALEXAMPLE INFORMALFIGURE INFORMALTABLE EQUATION EXAMPLE FIGURE TABLE MSGSET PROCEDURE SIDEBAR QANDASET ANCHOR BRIDGEHEAD REMARK HIGHLIGHTS ABSTRACT AUTHORBLURB EPIGRAPH INDEXTERM SECTION SIMPLESECT REFENTRY SECT1) -->
+    <qandaset>
+      <!-- one of (QANDADIV QANDAENTRY) -->
+
+      <qandaentry>
+	<question>
+	  <!-- one of (CALLOUTLIST GLOSSLIST ITEMIZEDLIST ORDEREDLIST
+	  SEGMENTEDLIST SIMPLELIST VARIABLELIST CAUTION IMPORTANT NOTE
+	  TIP WARNING LITERALLAYOUT PROGRAMLISTING PROGRAMLISTINGCO
+	  SCREEN SCREENCO SCREENSHOT SYNOPSIS CMDSYNOPSIS FUNCSYNOPSIS
+	  CLASSSYNOPSIS FIELDSYNOPSIS CONSTRUCTORSYNOPSIS
+	  DESTRUCTORSYNOPSIS METHODSYNOPSIS FORMALPARA PARA SIMPARA
+	  ADDRESS BLOCKQUOTE GRAPHIC GRAPHICCO MEDIAOBJECT
+	  MEDIAOBJECTCO INFORMALEQUATION INFORMALEXAMPLE
+	  INFORMALFIGURE INFORMALTABLE EQUATION EXAMPLE FIGURE TABLE
+	  PROCEDURE ANCHOR BRIDGEHEAD REMARK HIGHLIGHTS INDEXTERM) -->
+	  <para>Are there mailing lists for rsync?
+	</question>
+
+	<answer>
+	  <para>Yes, and you can subscribe and unsubscribe through a
+	  web interface at
+	    <ulink
+	      url="http://lists.samba.org/">http://lists.samba.org/</ulink>
+	  </para>
+
+	  <para>
+	    If you are having trouble with the mailing list, please
+	    send mail to the administrator
+	    
+	    <email>rsync-admin@lists.samba.org</email>
+
+	    not to the list itself.
+	  </para>
+
+	  <para>
+	    The mailing list archives are searchable.  Use 
+	    <ulink url="http://google.com/">Google</ulink> and prepend
+	    the search with <userinput>site:lists.samba.org
+	    rsync</userinput>, plus relevant keywords.
+	  </para>
+	</answer>
+      </qandaentry>
+
+
+      
+      <qandaentry>
+	<question>
+	  Is rsync useful for a single large file like an ISO image?
+	</question>
+	<answer>
+	  <para>
+	    Yes, but note the following:
+
+	  <para>
+   Background: A common use of rsync is to update a file (or set of files) in one location from a more
+   correct or up-to-date copy in another location, taking advantage of portions of the files that are
+   identical to speed up the process. (Note that rsync will transfer a file in its entirety if no copy
+   exists at the destination.)
+
+	  <para>
+   (This discussion is written in terms of updating a local copy of a file from a correct file in a
+   remote location, although rsync can work in either direction.)
+
+	  <para>
+   The file to be updated (the local file) must be in a destination directory that has enough space for
+   two copies of the file. (In addition, keep an extra copy of the file to be updated in a different
+   location for safety -- see the discussion (below) about rsync's behavior when the rsync process is
+   interrupted before completion.)
+
+	  <para>
+   The local file must have the same name as the remote file being sync'd to (I think?). If you are
+   trying to upgrade an iso from, for example, beta1 to beta2, rename the local file to the same name
+   as the beta2 file. *(This is a useful thing to do -- only the changed portions will be
+   transmitted.)*
+
+	  <para>
+   The extra copy of the local file kept in a different location is because of rsync's behavior if
+   interrupted before completion:
+
+	  <para>
+   * If you specify the --partial option and rsync is interrupted, rsync will save the partially
+   rsync'd file and throw away the original local copy. (The partially rsync'd file is correct but
+   truncated.) If rsync is restarted, it will not have a local copy of the file to check for duplicate
+   blocks beyond the section of the file that has already been rsync'd, thus the remainder of the rsync
+   process will be a "pure transfer" of the file rather than taking advantage of the rsync algorithm.
+
+	  <para>
+   * If you don't specify the --partial option and rsync is interrupted, rsync will throw away the
+   partially rsync'd file, and, when rsync is restarted starts the rsync process over from the
+   beginning.
+
+	  <para>
+   Which of these is most desirable depends on the degree of commonality between the local and remote
+   copies of the file *and how much progress was made before the interruption*.
+
+	  <para>
+   The ideal approach after an interruption would be to create a new file by taking the original file
+   and deleting a portion equal in size to the portion already rsync'd and then appending *the
+   remaining* portion to the portion of the file that has already been rsync'd. (There has been some
+   discussion about creating an option to do this automatically.)
+
+   The --compare-dest option is useful when transferring multiple files, but is of no benefit in
+   transferring a single file. (AFAIK)
+
+   *Other potentially useful information can be found at:
+   -[3]http://twiki.org/cgi-bin/view/Wikilearn/RsyncingALargeFile
+
+   This answer, formatted with "real" bullets, can be found at:
+   -[4]http://twiki.org/cgi-bin/view/Wikilearn/RsyncingALargeFileFAQ*
+
+   Note: I modified this on Oct. 9. 2001 -- I marked the changes with asterisks. The only deletion
+   without a corresponding correction was the deletion of an "(IIRC)".
+   2001-Oct-09 7:47am rhkramerATfastDOTnet
+	  </para>
+	</answer>
+      </qandaentry>
+    </qandaset>
   </chapter>
 </book>
