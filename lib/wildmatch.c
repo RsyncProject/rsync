@@ -57,10 +57,10 @@
 int wildmatch_iteration_count;
 #endif
 
-static int domatch(const unsigned char *p, const unsigned char *text)
+static int domatch(const uchar *p, const uchar *text)
 {
     int matched, special;
-    unsigned char ch, prev;
+    uchar ch, prev;
 
 #ifdef WILD_TEST_ITERATIONS
     wildmatch_iteration_count++;
@@ -141,9 +141,9 @@ static int domatch(const unsigned char *p, const unsigned char *text)
 		    ch = 0; /* This makes "prev" get set to 0. */
 		}
 		else if (ch == '[' && p[1] == ':') {
-		    const unsigned char *s = p += 2;
+		    const uchar *s;
 		    int i;
-		    while ((ch = *p) && ch != ']') p++;
+		    for (s = p += 2; (ch = *p) && ch != ']'; p++) {}
 		    if (!ch)
 			return ABORT_ALL;
 		    i = p - s - 1;
@@ -225,5 +225,5 @@ int wildmatch(const char *p, const char *t)
 #ifdef WILD_TEST_ITERATIONS
     wildmatch_iteration_count = 0;
 #endif
-    return domatch((const unsigned char*)p, (const unsigned char*)t) == TRUE;
+    return domatch((const uchar*)p, (const uchar*)t) == TRUE;
 }
