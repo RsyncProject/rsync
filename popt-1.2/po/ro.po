@@ -1,0 +1,72 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR Free Software Foundation, Inc.
+# Cristian Gafton <gafton@redhat.com>, 1998.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: POPT\n"
+"POT-Creation-Date: 1998-10-22 14:44-0400\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: Cristian Gafton <gafton@redhat.com>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=ISO-8859-2\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: ../popt.c:34
+msgid "unknown errno"
+msgstr "eroare necunoscuta"
+
+#: ../popt.c:407
+#, c-format
+msgid "option type (%d) not implemented in popt\n"
+msgstr "optiunea de tipul (%d) nu este implementata in popt\n"
+
+#: ../popt.c:531
+msgid "missing argument"
+msgstr "argument lipsa"
+
+#: ../popt.c:533
+msgid "unknown option"
+msgstr "optiune necunoscuta"
+
+#: ../popt.c:535
+msgid "aliases nested too deeply"
+msgstr "recursivitate infinita la optiunile sinonime"
+
+#: ../popt.c:537
+msgid "error in paramter quoting"
+msgstr "eroare la insertie parametru"
+
+#: ../popt.c:539
+msgid "invalid numeric value"
+msgstr "valoare numarica invalida"
+
+#: ../popt.c:541
+msgid "number too large or too small"
+msgstr "numar prea mare sau prea mic"
+
+#: ../popt.c:545
+msgid "unknown error"
+msgstr "eroare necuinoscuta"
+
+#: ../popthelp.c:29
+msgid "Show this help message"
+msgstr "Afisare mesaj de help"
+
+#: ../popthelp.c:30
+msgid "Display brief usage message"
+msgstr "Afisare mesaj sintaxa sumar"
+
+#: ../popthelp.c:41
+msgid "ARG"
+msgstr ""
+
+#: ../popthelp.c:148
+msgid "Usage:"
+msgstr "Sintaxa:"
+
+#: ../popthelp.c:166
+msgid "[OPTION...]"
+msgstr "[OPTIUNE...]"

@@ -1,0 +1,6 @@
+	../findme.c \
+	../popt.c \
+	../poptconfig.c \
+	../popthelp.c \
+	../poptparse.c \
+	../test1.c \

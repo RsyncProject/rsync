@@ -1,0 +1,9 @@
+test1 alias --simple --arg2
+test1 alias --two --arg1 --arg2 alias
+test1 alias --takerest --
+test1 alias -T --arg2
+test1 alias -O --arg1
+
+test1 exec --echo-args echo
+test1 alias -e --echo-args
+test1 exec -a /bin/echo
