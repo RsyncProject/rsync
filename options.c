@@ -38,6 +38,7 @@ int make_backups = 0;
 int whole_file = -1;
 
 int archive_mode = 0;
+int keep_dirlinks = 0;
 int copy_links = 0;
 int preserve_links = 0;
 int preserve_hard_links = 0;
@@ -232,6 +233,7 @@ void usage(enum logcode F)
   rprintf(F,"     --backup-dir            make backups into this directory\n");
   rprintf(F,"     --suffix=SUFFIX         backup suffix (default %s w/o --backup-dir)\n",BACKUP_SUFFIX);
   rprintf(F," -u, --update                update only (don't overwrite newer files)\n");
+  rprintf(F," -K, --keep-dirlinks         treat symlinked dir on receiver as dir\n");
   rprintf(F," -l, --links                 copy symlinks as symlinks\n");
   rprintf(F," -L, --copy-links            copy the referent of all symlinks\n");
   rprintf(F,"     --copy-unsafe-links     copy the referent of \"unsafe\" symlinks\n");
@@ -338,6 +340,7 @@ static struct poptOption long_options[] = {
   {"sparse",          'S', POPT_ARG_NONE,   &sparse_files, 0, 0, 0 },
   {"cvs-exclude",     'C', POPT_ARG_NONE,   &cvs_exclude, 0, 0, 0 },
   {"update",          'u', POPT_ARG_NONE,   &update_only, 0, 0, 0 },
+  {"keep-dirlinks",   'K', POPT_ARG_NONE,   &keep_dirlinks, 0, 0, 0 },
   {"links",           'l', POPT_ARG_NONE,   &preserve_links, 0, 0, 0 },
   {"copy-links",      'L', POPT_ARG_NONE,   &copy_links, 0, 0, 0 },
   {"whole-file",      'W', POPT_ARG_VAL,    &whole_file, 1, 0, 0 },
@@ -818,6 +821,8 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'l';
 	if (copy_links)
 		argstr[x++] = 'L';
+	if (keep_dirlinks && am_sender)
+		argstr[x++] = 'K';
 
 	if (whole_file > 0)
 		argstr[x++] = 'W';

@@ -26,6 +26,7 @@
 extern int verbose;
 extern int dry_run;
 extern int relative_paths;
+extern int keep_dirlinks;
 extern int preserve_links;
 extern int am_root;
 extern int preserve_devices;
@@ -302,6 +303,15 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 		return;
 	}
 
+#if SUPPORT_LINKS
+	if (statret == 0 && keep_dirlinks
+	    && S_ISLNK(st.st_mode) && S_ISDIR(file->mode)) {
+		STRUCT_STAT st2;
+		if (do_stat(fname, &st2) == 0 && S_ISDIR(st2.st_mode))
+		    st = st2;
+	}
+#endif
+
 	if (statret == 0 &&
 	    !preserve_perms &&
 	    (S_ISDIR(st.st_mode) == S_ISDIR(file->mode))) {
@@ -338,9 +348,10 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 					full_fname(fname));
 			}
 		}
-		/* f_out is set to -1 when doing final directory
-		   permission and modification time repair */
-		if (set_perms(fname,file,NULL,0) && verbose && (f_out != -1))
+		/* f_out is set to -1 when doing final directory-permission
+		 * and modification-time repair. */
+		if (set_perms(fname, file, statret ? NULL : &st, 0)
+		    && verbose && f_out != -1)
 			rprintf(FINFO,"%s/\n",fname);
 		return;
 	}

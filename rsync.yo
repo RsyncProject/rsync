@@ -289,6 +289,7 @@ verb(
      --backup-dir            make backups into this directory
      --suffix=SUFFIX         backup suffix (default ~ w/o --backup-dir)
  -u, --update                update only (don't overwrite newer files)
+ -K, --keep-dirlinks         treat symlinked dir on receiver as dir
  -l, --links                 copy symlinks as symlinks
  -L, --copy-links            copy the referent of all symlinks
      --copy-unsafe-links     copy the referent of "unsafe" symlinks
@@ -478,6 +479,10 @@ is on the objects.  In other words, if the source has a directory or a
 symlink where the destination has a file, the transfer would occur
 regardless of the timestamps.  This might change in the future (feel
 free to comment on this on the mailing list if you have an opinion).
+
+dit(bf(-K, --keep-dirlinks)) On the receiving side, if a symlink is
+pointing to a directory, it will be treated as matching a directory
+from the sender.
 
 dit(bf(-l, --links)) When symlinks are encountered, recreate the
 symlink on the destination.
