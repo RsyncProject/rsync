@@ -17,7 +17,7 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-/* the socket based protocol for setting up a connection wit rsyncd */
+/* the socket based protocol for setting up a connection with rsyncd */
 
 #include "rsync.h"
 
@@ -28,6 +28,11 @@ extern int rsync_port;
 char *auth_user;
 int sanitize_paths = 0;
 
+
+/*
+ * Run a client connected to an rsyncd.  The alternative to this
+ * function for remote-shell connections is do_cmd.
+ */
 int start_socket_client(char *host, char *path, int argc, char *argv[])
 {
 	int fd, i;
@@ -38,12 +43,25 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	extern int remote_version;
 	extern int am_sender;
 	extern struct in_addr socket_address;
+	extern char *shell_cmd;
 
 	if (argc == 0 && !am_sender) {
 		extern int list_only;
 		list_only = 1;
 	}
 
+        /* This is just a friendliness enhancement: if the connection
+         * is to an rsyncd then there is no point specifying the -e option.
+         * Note that this is only set if the -e was explicitly specified,
+         * not if the environment variable just happens to be set.
+         * See http://lists.samba.org/pipermail/rsync/2000-September/002744.html
+         */
+        if (shell_cmd) {
+                rprintf(FERROR, "WARNING: --rsh or -e option ignored when "
+                        "connecting to rsync daemon\n");
+                /* continue */
+        }
+        
 	if (*path == '/') {
 		rprintf(FERROR,"ERROR: The remote path must start with a module name\n");
 		return -1;
