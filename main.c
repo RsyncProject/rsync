@@ -31,6 +31,7 @@ extern int am_server;
 extern int am_sender;
 extern int am_daemon;
 extern int verbose;
+extern int protocol_version;
 
 /* there's probably never more than at most 2 outstanding child processes,
  * but set it higher just in case.
@@ -82,7 +83,6 @@ static void report(int f)
 {
 	time_t t = time(NULL);
 	extern int do_stats;
-	extern int remote_version;
 	int send_stats;
 
 	if (do_stats && verbose > 1) {
@@ -96,7 +96,7 @@ static void report(int f)
 		if (f == -1 || !am_sender) return;
 	}
 
-	send_stats = verbose || (remote_version >= 20);
+	send_stats = verbose || protocol_version >= 20;
 	if (am_server) {
 		if (am_sender && send_stats) {
 			int64 w;
@@ -342,7 +342,6 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 	char *dir = argv[0];
 	extern int relative_paths;
 	extern int recurse;
-	extern int remote_version;
 
 	if (verbose > 2)
 		rprintf(FINFO,"server_sender starting pid=%d\n",(int)getpid());
@@ -376,7 +375,7 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 	send_files(flist,f_out,f_in);
 	io_flush();
 	report(f_out);
-	if (remote_version >= 24) {
+	if (protocol_version >= 24) {
 		/* final goodbye message */
  		read_int(f_in);
  	}
@@ -395,7 +394,6 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	extern int delete_after;
 	extern int recurse;
 	extern int delete_mode;
-	extern int remote_version;
 
 	if (preserve_hard_links)
 		init_hard_links(flist);
@@ -456,7 +454,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	read_int(recv_pipe[0]);
 	close(recv_pipe[0]);
-	if (remote_version >= 24) {
+	if (protocol_version >= 24) {
 		/* send a final goodbye message */
 		write_int(f_out, -1);
 	}
@@ -546,7 +544,6 @@ int child_main(int argc, char *argv[])
 void start_server(int f_in, int f_out, int argc, char *argv[])
 {
 	extern int cvs_exclude;
-	extern int remote_version;
 	extern int read_batch;
 
 	setup_protocol(f_out, f_in);
@@ -554,7 +551,7 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 	set_nonblocking(f_in);
 	set_nonblocking(f_out);
 
-	if (remote_version >= 23)
+	if (protocol_version >= 23)
 		io_start_multiplex_out(f_out);
 
 	if (am_sender) {
@@ -580,7 +577,6 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	struct file_list *flist = NULL;
 	int status = 0, status2 = 0;
 	char *local_name = NULL;
-	extern int remote_version;
 	extern pid_t cleanup_child_pid;
 	extern int write_batch;
 	extern int read_batch;
@@ -595,7 +591,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 	setup_protocol(f_out,f_in);
 
-	if (remote_version >= 23)
+	if (protocol_version >= 23)
 		io_start_multiplex_in(f_in);
 
 	if (am_sender) {
@@ -614,7 +610,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			rprintf(FINFO,"file list sent\n");
 
 		send_files(flist,f_out,f_in);
-		if (remote_version >= 24) {
+		if (protocol_version >= 24) {
 			/* final goodbye message */
 			read_int(f_in);
 		}

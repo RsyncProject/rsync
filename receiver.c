@@ -23,7 +23,7 @@
 extern int verbose;
 extern int recurse;
 extern int delete_mode;
-extern int remote_version;
+extern int protocol_version;
 extern int csum_length;
 extern struct stats stats;
 extern int dry_run;
@@ -136,7 +136,7 @@ void delete_files(struct file_list *flist)
 		if (!S_ISDIR(flist->files[j]->mode) || 
 		    !(flist->files[j]->flags & FLAG_DELETE)) continue;
 
-		if (remote_version < 19 &&
+		if (protocol_version < 19 &&
 		    delete_already_done(flist, j)) continue;
 
 		name = strdup(f_name(flist->files[j]));
@@ -152,7 +152,7 @@ void delete_files(struct file_list *flist)
 		for (i=local_file_list->count-1;i>=0;i--) {
 			if (max_delete && deletion_count > max_delete) break;
 			if (!local_file_list->files[i]->basename) continue;
-			if (remote_version < 19 &&
+			if (protocol_version < 19 &&
 			    S_ISDIR(local_file_list->files[i]->mode))
 				add_delete_entry(local_file_list->files[i]);
 			if (-1 == flist_find(flist,local_file_list->files[i])) {

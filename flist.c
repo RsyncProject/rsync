@@ -57,7 +57,7 @@ extern int relative_paths;
 extern int implied_dirs;
 extern int copy_links;
 extern int copy_unsafe_links;
-extern int remote_version;
+extern int protocol_version;
 extern int io_error;
 extern int sanitize_paths;
 
@@ -446,7 +446,7 @@ static void send_file_entry(struct file_struct *file, int f,
 
 #if SUPPORT_HARD_LINKS
 	if (preserve_hard_links && S_ISREG(file->mode)) {
-		if (remote_version < 26) {
+		if (protocol_version < 26) {
 			/* 32-bit dev_t and ino_t */
 			write_int(f, (int) file->dev);
 			write_int(f, (int) file->inode);
@@ -459,7 +459,7 @@ static void send_file_entry(struct file_struct *file, int f,
 #endif
 
 	if (always_checksum) {
-		if (remote_version < 21) {
+		if (protocol_version < 21) {
 			write_buf(f, file->sum, 2);
 		} else {
 			write_buf(f, file->sum, MD4_SUM_LENGTH);
@@ -579,7 +579,7 @@ static void receive_file_entry(struct file_struct **fptr,
 	}
 #if SUPPORT_HARD_LINKS
 	if (preserve_hard_links && S_ISREG(file->mode)) {
-		if (remote_version < 26) {
+		if (protocol_version < 26) {
 			file->dev = read_int(f);
 			file->inode = read_int(f);
 		} else {
@@ -593,7 +593,7 @@ static void receive_file_entry(struct file_struct **fptr,
 		file->sum = (char *) malloc(MD4_SUM_LENGTH);
 		if (!file->sum)
 			out_of_memory("md4 sum");
-		if (remote_version < 21) {
+		if (protocol_version < 21) {
 			read_buf(f, file->sum, 2);
 		} else {
 			read_buf(f, file->sum, MD4_SUM_LENGTH);

@@ -38,16 +38,14 @@ extern int am_server;
 
 void read_sum_head(int f, struct sum_struct *sum)
 {
-	extern int remote_version;
+	extern int protocol_version;
 
 	sum->count = read_int(f);
 	sum->blength = read_int(f);
-	if (remote_version < 27)
-	{
+	if (protocol_version < 27)
 		sum->s2length = csum_length;
-	} else {
+	else
 		sum->s2length = read_int(f);
-	}
 	sum->remainder = read_int(f);
 }
 

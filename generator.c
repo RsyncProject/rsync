@@ -36,7 +36,7 @@ extern int csum_length;
 extern int ignore_times;
 extern int size_only;
 extern int io_timeout;
-extern int remote_version;
+extern int protocol_version;
 extern int always_checksum;
 extern int modify_window;
 extern char *compare_dest;
@@ -80,7 +80,7 @@ static int skip_file(char *fname,
 			}
 		}
 		file_checksum(fname,sum,st->st_size);
-		if (remote_version < 21) {
+		if (protocol_version < 21) {
 			return (memcmp(sum,file->sum,2) == 0);
 		} else {
 			return (memcmp(sum,file->sum,MD4_SUM_LENGTH) == 0);
@@ -112,7 +112,7 @@ void write_sum_head(int f, struct sum_struct *sum)
 
 	write_int(f, sum->count);
 	write_int(f, sum->blength);
-	if (remote_version >= 27)
+	if (protocol_version >= 27)
 		write_int(f, sum->s2length);
 	write_int(f, sum->remainder);
 }
@@ -162,7 +162,7 @@ static void sum_sizes_sqroot_baarda(struct sum_struct *sum, uint64 len)
 		blength = MAX(blength, BLOCK_SIZE);
 	}
 
-	if (remote_version < 27) {
+	if (protocol_version < 27) {
 		s2length = csum_length;
 	} else if (csum_length == SUM_LENGTH) {
 		s2length = SUM_LENGTH;

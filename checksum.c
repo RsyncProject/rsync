@@ -24,7 +24,7 @@ int csum_length=2; /* initial value */
 #define CSUM_CHUNK 64
 
 int checksum_seed = 0;
-extern int remote_version;
+extern int protocol_version;
 
 /*
   a simple 32 bit checksum that can be upadted from either end
@@ -80,7 +80,7 @@ void get_checksum2(char *buf,int len,char *sum)
 	 * are multiples of 64.  This is fixed by calling mdfour_update()
 	 * even when there are no more bytes.
 	 */
-	if (len - i > 0 || remote_version >= 27) {
+	if (len - i > 0 || protocol_version >= 27) {
 		mdfour_update(&m, (uchar *)(buf1+i), (len-i));
 	}
 	
@@ -120,7 +120,7 @@ void file_checksum(char *fname,char *sum,OFF_T size)
 	if (len - i > 0) {
 		memcpy(tmpchunk, map_ptr(buf,i,len-i), len-i);
 	}
-	if (len - i > 0 || remote_version >= 27) {
+	if (len - i > 0 || protocol_version >= 27) {
 		mdfour_update(&m, (uchar *)tmpchunk, (len-i));
 	}
 
@@ -184,7 +184,7 @@ void sum_update(char *p, int len)
 
 void sum_end(char *sum)
 {
-	if (sumresidue || remote_version >= 27) {
+	if (sumresidue || protocol_version >= 27) {
 		mdfour_update(&md, (uchar *)sumrbuf, sumresidue);
 	}
 

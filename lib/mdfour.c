@@ -117,7 +117,7 @@ static void mdfour_tail(unsigned char *in, uint32 n)
 {
 	unsigned char buf[128];
 	uint32 M[16];
-	extern int remote_version;
+	extern int protocol_version;
 
 	/*
 	 * Count total number of bits, modulo 2^64
@@ -140,7 +140,7 @@ static void mdfour_tail(unsigned char *in, uint32 n)
 		 * of bits modulo 2^64, which was fixed starting with
 		 * protocol version 27.
 		 */
-		if (remote_version >= 27) {
+		if (protocol_version >= 27) {
 			copy4(buf+60, m->totalN2);
 		}
 		copy64(M, buf);
@@ -153,7 +153,7 @@ static void mdfour_tail(unsigned char *in, uint32 n)
 		 * of bits modulo 2^64, which was fixed starting with
 		 * protocol version 27.
 		 */
-		if (remote_version >= 27) {
+		if (protocol_version >= 27) {
 			copy4(buf+124, m->totalN2); 
 		}
 		copy64(M, buf);
