@@ -363,7 +363,7 @@ static int start_daemon(int fd)
 
 	set_socket_options(fd,"SO_KEEPALIVE");
 	set_socket_options(fd,lp_socket_options());
-	
+	set_nonblocking(fd);
 
 	io_printf(fd,"@RSYNCD: %d\n", PROTOCOL_VERSION);
 

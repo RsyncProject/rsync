@@ -417,6 +417,9 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 
 	setup_protocol(f_out, f_in);
 
+	set_nonblocking(f_in);
+	set_nonblocking(f_out);
+
 	if (remote_version >= 23)
 		io_start_multiplex_out(f_out);
 
@@ -439,6 +442,9 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 	extern int am_sender;
 	extern int list_only;
 	extern int remote_version;
+
+	set_nonblocking(f_in);
+	set_nonblocking(f_out);
 
 	setup_protocol(f_out,f_in);
 
@@ -695,6 +701,8 @@ int main(int argc,char *argv[])
 #endif
 
 	if (am_server) {
+		set_nonblocking(STDIN_FILENO);
+		set_nonblocking(STDOUT_FILENO);
 		start_server(STDIN_FILENO, STDOUT_FILENO, argc, argv);
 	}
 

@@ -457,6 +457,15 @@ extern int errno;
 #define S_ISREG(mode) (((mode) & (_S_IFMT)) == (_S_IFREG))
 #endif
 
+/* work out what fcntl flag to use for non-blocking */
+#ifdef O_NONBLOCK
+# define NONBLOCK_FLAG O_NONBLOCK
+#elif defined(SYSV)
+# define NONBLOCK_FLAG O_NDELAY
+#else 
+# define NONBLOCK_FLAG FNDELAY
+#endif
+
 
 #define IS_DEVICE(mode) (S_ISCHR(mode) || S_ISBLK(mode) || S_ISSOCK(mode) || S_ISFIFO(mode))
 

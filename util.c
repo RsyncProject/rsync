@@ -26,15 +26,47 @@
 
 extern int verbose;
 
-/* create a file descriptor - like pipe() but use socketpair if
-   possible (because of blocking issues on pipes */
+
+/****************************************************************************
+Set a fd into nonblocking mode. Uses POSIX O_NONBLOCK if available,
+else
+if SYSV use O_NDELAY
+if BSD use FNDELAY
+****************************************************************************/
+void set_nonblocking(int fd)
+{
+	int val;
+
+	if((val = fcntl(fd, F_GETFL, 0)) == -1)
+		return;
+	if (!(val & NONBLOCK_FLAG)) {
+		val |= NONBLOCK_FLAG;
+		fcntl(fd, F_SETFL, val);
+	}
+}
+
+
+/* create a file descriptor pair - like pipe() but use socketpair if
+   possible (because of blocking issues on pipes)
+
+   always set non-blocking
+ */
 int fd_pair(int fd[2])
 {
+	int ret;
+
 #if HAVE_SOCKETPAIR
-	return socketpair(AF_UNIX, SOCK_STREAM, 0, fd);
+	ret = socketpair(AF_UNIX, SOCK_STREAM, 0, fd);
 #else
-	return pipe(fd);
+	ret = pipe(fd);
 #endif
+
+	if (ret == 0) {
+		set_nonblocking(fd[0]);
+		set_nonblocking(fd[1]);
+	}
+	
+	return ret;
 }
 
 

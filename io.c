@@ -159,6 +159,11 @@ static int read_timeout(int fd, char *buf, int len)
 			continue;
 		}
 
+		if (n == -1 && 
+		    (errno == EWOULDBLOCK || errno == EAGAIN)) {
+			continue;
+		}
+
 
 		if (n == 0) {
 			if (eof_error) {
@@ -364,9 +369,14 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 		if (FD_ISSET(fd, &w_fds)) {
 			int ret, n = len-total;
 			
-			ret = write(fd,buf+total,n?n:1);
+			ret = write(fd,buf+total,n);
 
 			if (ret == -1 && errno == EINTR) {
+				continue;
+			}
+
+			if (ret == -1 && 
+			    (errno == EWOULDBLOCK || errno == EAGAIN)) {
 				continue;
 			}
 
