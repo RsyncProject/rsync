@@ -174,7 +174,8 @@ void rflush(int fd)
 
 /* a generic logging routine for send/recv, with parameter
    substitiution */
-static void log_formatted(char *op, struct file_struct *file,
+static void log_formatted(int fd,
+			  char *format, char *op, struct file_struct *file,
 			  struct stats *initial_stats)
 {
 	extern int module_id;
@@ -187,7 +188,7 @@ static void log_formatted(char *op, struct file_struct *file,
 	extern int am_sender;
 	int64 b;
 
-	strlcpy(buf, lp_log_format(module_id), sizeof(buf)-1);
+	strlcpy(buf, format, sizeof(buf)-1);
 	
 	for (s=&buf[0]; 
 	     s && (p=strchr(s,'%')); ) {
@@ -214,8 +215,10 @@ static void log_formatted(char *op, struct file_struct *file,
 				 f_name(file));
 			clean_fname(buf2);
 			n = buf2; 
+			if (*n == '/') n++;
 			break;
 		case 'm': n = lp_name(module_id); break;
+		case 't': n = timestring(time(NULL)); break;
 		case 'P': n = lp_path(module_id); break;
 		case 'u': n = auth_user; break;
 		case 'b': 
@@ -260,15 +263,20 @@ static void log_formatted(char *op, struct file_struct *file,
 		s = p+l;
 	}
 
-	rprintf(FLOG,"%s\n", buf);
+	rprintf(fd,"%s\n", buf);
 }
 
 /* log the outgoing transfer of a file */
 void log_send(struct file_struct *file, struct stats *initial_stats)
 {
 	extern int module_id;
+	extern int am_server;
+	extern char *log_format;
+
 	if (lp_transfer_logging(module_id)) {
-		log_formatted("send", file, initial_stats);
+		log_formatted(FLOG, lp_log_format(module_id), "send", file, initial_stats);
+	} else if (log_format && !am_server) {
+		log_formatted(FINFO, log_format, "send", file, initial_stats);
 	}
 }
 
@@ -276,8 +284,13 @@ void log_send(struct file_struct *file, struct stats *initial_stats)
 void log_recv(struct file_struct *file, struct stats *initial_stats)
 {
 	extern int module_id;
+	extern int am_server;
+	extern char *log_format;
+
 	if (lp_transfer_logging(module_id)) {
-		log_formatted("recv", file, initial_stats);
+		log_formatted(FLOG, lp_log_format(module_id), "send", file, initial_stats);
+	} else if (log_format && !am_server) {
+		log_formatted(FINFO, log_format, "send", file, initial_stats);
 	}
 }
 
@@ -296,7 +309,10 @@ void log_exit(int code)
 }
 
 /* log the incoming transfer of a file for interactive use, this
-   will be called at the end where the client was run */
+   will be called at the end where the client was run 
+   
+   it i called when a file starts to be transferred
+*/
 void log_transfer(struct file_struct *file, char *fname)
 {
 	extern int verbose;

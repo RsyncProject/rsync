@@ -67,6 +67,7 @@ char *tmpdir = NULL;
 char *compare_dest = NULL;
 char *config_file = RSYNCD_CONF;
 char *shell_cmd = NULL;
+char *log_format = NULL;
 
 char *rsync_path = RSYNC_NAME;
 int rsync_port = RSYNC_PORT;
@@ -132,6 +133,7 @@ void usage(int F)
   rprintf(F,"     --port=PORT             specify alternate rsyncd port number\n");
   rprintf(F,"     --stats                 give some file transfer stats\n");  
   rprintf(F,"     --progress              show progress during transfer\n");  
+  rprintf(F,"     --log-format=FORMAT     log file transfers using specified format\n");  
   rprintf(F," -h, --help                  show this help screen\n");
 
   rprintf(F,"\n");
@@ -146,7 +148,7 @@ enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
       OPT_EXCLUDE_FROM,OPT_DELETE,OPT_NUMERIC_IDS,OPT_RSYNC_PATH,
       OPT_FORCE,OPT_TIMEOUT,OPT_DAEMON,OPT_CONFIG,OPT_PORT,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS,
-      OPT_SAFE_LINKS, OPT_COMPARE_DEST};
+      OPT_SAFE_LINKS, OPT_COMPARE_DEST, OPT_LOG_FORMAT};
 
 static char *short_options = "oblLWHpguDCtcahvrRIxnSe:B:T:z";
 
@@ -198,6 +200,7 @@ static struct option long_options[] = {
   {"partial",     0,     0,    OPT_PARTIAL},
   {"config",      1,     0,    OPT_CONFIG},
   {"port",        1,     0,    OPT_PORT},
+  {"log-format",  1,     0,    OPT_LOG_FORMAT},
   {0,0,0,0}};
 
 
@@ -417,6 +420,10 @@ int parse_arguments(int argc, char *argv[])
 
 		case OPT_PORT:
 			rsync_port = atoi(optarg);
+			break;
+
+		case OPT_LOG_FORMAT:
+			log_format = optarg;
 			break;
 
 		default:

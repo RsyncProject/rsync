@@ -128,6 +128,7 @@ itemize(
   it() %f for the filename
   it() %P for the module path
   it() %m for the module name
+  it() %t for the current time
   it() %u for the authenticated username (or the null string)
   it() %b for the number of bytes actually transferred 
   it() %c when sending files this gives the number of checksum bytes
