@@ -292,7 +292,7 @@ be refused by your rsync server. When an option is refused the server
 prints an error message and exits.
 
 The full names of the options must be used (ie. you must use
-"compress" not "z" to disable compression).
+"checksum" not "c" to disable checksumming).
 
 dit(bf(dont compress)) The "dont compress" option allows you to select
 filenames based on wildcard patterns that should not be compressed
