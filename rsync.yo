@@ -487,14 +487,14 @@ from the sender.
 
 dit(bf(--inplace)) This causes rsync not to create a new copy of the file
 and then move it into place.  Instead rsync will overwrite the existing
-file, meaning that the rsync algorithm can't extract the full ammount of
+file, meaning that the rsync algorithm can't extract the full amount of
 network reduction it might otherwise.
 
 This option is useful for transfer of large files with block based changes
 and also on systems that are disk bound not network bound.
 
 WARNING: The file's data will be in an inconsistent state during the
-transfer (and possibly afterwards if the transfer gets interrupted), so you
+transfer (and possibly afterward if the transfer gets interrupted), so you
 should not use this option to update files that are in use.  Also note that
 rsync will not update a file inplace that is not writable by the receiving
 user.
@@ -913,7 +913,7 @@ result is an average transfer rate equaling the specified limit. A value
 of zero specifies no limit.
 
 dit(bf(--write-batch=FILE)) Record a file that can later be applied to
-anonther identical destination with --read-batch. See the "BATCH MODE"
+another identical destination with --read-batch. See the "BATCH MODE"
 section for details.
 
 dit(bf(--read-batch=FILE)) Apply all of the changes stored in FILE, a
@@ -1145,36 +1145,46 @@ at once, instead of sending the same data to every host individually.
 Examples:
 
 verb(
-   $ rsync --write-batch=batch -a /source/dir/ /adest/dir/
-   $ ssh remote rsync --read-batch=- -a /bdest/dir/ <batch
+   $ rsync --write-batch=foo -a host:/source/dir/ /adest/dir/
+   $ scp foo* remote:
+   $ ssh remote ./foo.sh /bdest/dir/
 )
 
 verb(
-   $ rsync --write-batch=batch -a host:/source/dir/ /adest/dir/
-   $ scp batch remote:
-   $ ssh remote rsync --read-batch=batch -a /bdest/dir/
+   $ rsync --write-batch=foo -a /source/dir/ /adest/dir/
+   $ ssh remote rsync --read-batch=- -a /bdest/dir/ <foo
 )
 
-verb(
-   $ rsync --write-batch=batch -a /source/dir/ host:/adest/dir/
-   $ scp batch* remote:
-   $ ssh remote ./batch.sh /bdest/dir/
-)
+In these examples, rsync is used to update /adest/dir/ from /source/dir/
+and the information to repeat this operation is stored in "foo" and
+"foo.sh".  The host "remote" is then updated with the batched data going
+into the directory /bdest/dir.  The differences between the two examples
+reveals some of the flexibility you have in how you deal with batches:
 
-In these examples, rsync is used to update /adest/dir/ with /source/dir/
-and the information to repeat this operation is stored in "batch" and
-"batch.sh".  The host "remote" is then updated with the batched
-update going into the directory /bdest/dir.  The differences between the
-three examples is in how the batch gets to the remote machine (via remote
-stdin or by being copied first), whether the initial transfer was local or
-remote, and in how the batch-reading rsync command is invoked.
+itemize(
+
+  it() The first example shows that the initial copy doesn't have to be
+  local -- you can push or pull data to/from a remote host using either the
+  remote-shell syntax or rsync daemon syntax, as desired.
+
+  it() The first example uses the created "foo.sh" file to get the right
+  rsync options when running the read-batch command on the remote host.
+
+  it() The second example reads the batch data via standard input so that
+  the batch file doesn't need to be copied to the remote machine first.
+  This example avoids the foo.sh script because it needed to use a modified
+  --read-batch option, but you could edit the script file if you wished to
+  make use of it (just be sure that no other option is trying to use
+  standard input, such as the "--exclude-from=-" option).
+
+)
 
 Caveats:
 
-The read-batch option expects the destination tree it is meant to update
+The read-batch option expects the destination tree that it is updating
 to be identical to the destination tree that was used to create the
 batch update fileset.  When a difference between the destination trees
-is encountered the update will fail at that point, leaving the
+is encountered the update might fail at that point, leaving the
 destination tree in a partially updated state. In that case, rsync can
 be used in its regular (non-batch) mode of operation to fix up the
 destination tree.
@@ -1182,7 +1192,7 @@ destination tree.
 The rsync version used on all destinations must be at least as new as the
 one used to generate the batch file.
 
-The -n/--dryrun option does not work in batch mode and yields a runtime
+The --dry-run (-n) option does not work in batch mode and yields a runtime
 error.
 
 You should use an equivalent set of options when reading a batch file that
@@ -1195,6 +1205,13 @@ into expecting a different data stream than the one that is contained in
 the batch file.  For example, it would not work to change the setting of
 the -H or -c option, but it would work to add or remove the --delete
 option.
+
+The code that creates the BATCH.sh file transforms any include/exclude
+options into a single list that is appended as a "here" document to the
+shell script file.  An advanced user can use this to modify the exclude
+list if a change in what gets deleted by --delete is desired.  A normal
+user can ignore this detail and just use the shell script as an easy way
+to run the appropriate --read-batch command for the batched data.
 
 See bf(http://www.ils.unc.edu/i2dsi/unc_rsync+.html) for papers and technical
 reports.
@@ -1359,7 +1376,7 @@ and David Bell for helpful suggestions, patches and testing of rsync.
 I've probably missed some people, my apologies if I have.
 
 Especial thanks also to: David Dykstra, Jos Backus, Sebastian Krahmer,
-Martin Pool, Wayne Davison.
+Martin Pool, Wayne Davison, J.W. Schultz.
 
 manpageauthor()
 
