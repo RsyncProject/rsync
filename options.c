@@ -128,6 +128,7 @@ int list_only = 0;
 #define MAX_BATCH_PREFIX_LEN 256	/* Must be less than MAXPATHLEN-13 */
 char *batch_prefix = NULL;
 
+static int daemon_opt;   /* sets am_daemon after option error-reporting */
 static int modify_window_set;
 
 /** Local address to bind.  As a character string because it's
@@ -356,7 +357,7 @@ static struct poptOption long_options[] = {
   {"link-dest",        0,  POPT_ARG_STRING, 0,              OPT_LINK_DEST, 0, 0 },
   /* TODO: Should this take an optional int giving the compression level? */
   {"compress",        'z', POPT_ARG_NONE,   &do_compression, 0, 0, 0 },
-  {"daemon",           0,  POPT_ARG_NONE,   &am_daemon, 0, 0, 0 },
+  {"daemon",           0,  POPT_ARG_NONE,   &daemon_opt, 0, 0, 0 },
   {"no-detach",        0,  POPT_ARG_NONE,   &no_detach, 0, 0, 0 },
   {"stats",            0,  POPT_ARG_NONE,   &do_stats, 0, 0, 0 },
   {"progress",         0,  POPT_ARG_NONE,   &do_progress, 0, 0, 0 },
@@ -524,24 +525,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			usage(FINFO);
 			exit_cleanup(0);
 
-		case 'H':
-#if SUPPORT_HARD_LINKS
-			preserve_hard_links=1;
-#else
-			/* FIXME: Don't say "server" if this is
-			 * happening on the client. */
-			/* FIXME: Why do we have the duplicated
-			 * rprintf?  Everybody who gets this message
-			 * ought to send it to the client and also to
-			 * the logs. */
-			snprintf(err_buf, sizeof err_buf,
-				 "hard links are not supported on this %s\n",
-				 am_server ? "server" : "client");
-			rprintf(FERROR, "ERROR: %s", err_buf);
-			return 0;
-#endif /* SUPPORT_HARD_LINKS */
-			break;
-
 		case 'v':
 			verbose++;
 			break;
@@ -588,8 +571,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 
 		default:
-			/* FIXME: If --daemon is specified, then errors for later
-			 * parameters seem to disappear. */
 			snprintf(err_buf, sizeof(err_buf),
 				 "%s%s: %s\n",
 				 am_server ? "on remote machine: " : "",
@@ -598,6 +579,26 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			return 0;
 		}
 	}
+
+#if !SUPPORT_LINKS
+	if (preserve_links) {
+		snprintf(err_buf, sizeof err_buf,
+			 "symlinks are not supported on this %s\n",
+			 am_server ? "server" : "client");
+		rprintf(FERROR, "ERROR: %s", err_buf);
+		return 0;
+	}
+#endif
+
+#if !SUPPORT_HARD_LINKS
+	if (preserve_hard_links) {
+		snprintf(err_buf, sizeof err_buf,
+			 "hard links are not supported on this %s\n",
+			 am_server ? "server" : "client");
+		rprintf(FERROR, "ERROR: %s", err_buf);
+		return 0;
+	}
+#endif
 
 	if (write_batch && read_batch) {
 		rprintf(FERROR,
@@ -699,6 +700,9 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			}
 		}
 	}
+
+	if (daemon_opt)
+		am_daemon = 1;
 
 	return 1;
 }
