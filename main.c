@@ -49,6 +49,7 @@ extern int fuzzy_basis;
 extern int relative_paths;
 extern int rsync_port;
 extern int inplace;
+extern int make_backups;
 extern int whole_file;
 extern int read_batch;
 extern int write_batch;
@@ -499,7 +500,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	int status = 0;
 	int error_pipe[2], name_pipe[2];
 	BOOL need_name_pipe = (basis_dir[0] || partial_dir || fuzzy_basis
-			    || inplace) && !dry_run;
+			    || (inplace && make_backups)) && !dry_run;
 
 	/* The receiving side mustn't obey this, or an existing symlink that
 	 * points to an identical file won't be replaced by the referent. */
