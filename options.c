@@ -281,7 +281,7 @@ static struct poptOption long_options[] = {
   {"max-delete",       0,  POPT_ARG_INT,    &max_delete},
   {"timeout",          0,  POPT_ARG_INT,    &io_timeout},
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir},
-  {"compare-dest",     0,  POPT_ARG_NONE,   &compare_dest},
+  {"compare-dest",     0,  POPT_ARG_STRING, &compare_dest},
   /* TODO: Should this take an optional int giving the compression level? */
   {"compress",        'z', POPT_ARG_NONE,   &do_compression},
   {"daemon",           0,  POPT_ARG_NONE,   &am_daemon},
