@@ -25,12 +25,6 @@ runtest "extra data" 'checkit "$RSYNC -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
 cp ${FROM}/${F1} ${TO}/ThisShouldGo
 runtest " --delete" 'checkit "$RSYNC --delete -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
 
-LONGDIR=${FROM}/This-is-a-directory-with-a-stupidly-long-name-created-in-an-attempt-to-provoke-an-error-found-in-2.0.11-that-should-hopefully-never-appear-again-if-this-test-does-its-job/This-is-a-directory-with-a-stupidly-long-name-created-in-an-attempt-to-provoke-an-error-found-in-2.0.11-that-should-hopefully-never-appear-again-if-this-test-does-its-job/This-is-a-directory-with-a-stupidly-long-name-created-in-an-attempt-to-provoke-an-error-found-in-2.0.11-that-should-hopefully-never-appear-again-if-this-test-does-its-job
-mkdir -p ${LONGDIR}
-date > ${LONGDIR}/1
-ls -la / > ${LONGDIR}/2
-runtest "long paths" 'checkit "$RSYNC --delete -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
-
 rm -rf ${TO}
 mkdir -p ${FROM}2/dir/subdir
 cp -a ${FROM}/dir/subdir/subsubdir ${FROM}2/dir/subdir

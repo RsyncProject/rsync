@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# Copyright (C) 1998,1999 Philip Hands <phil@hands.com>
+# Copyright (C) 2001 by Martin Pool <mbp@samba.org>
+#
+# This program is distributable under the terms of the GNU GPL (see COPYING)
+
+
+. "$suitedir/rsync.fns"
+
+hands_setup
+
+LONGDIR=${FROM}/This-is-a-directory-with-a-stupidly-long-name-created-in-an-attempt-to-provoke-an-error-found-in-2.0.11-that-should-hopefully-never-appear-again-if-this-test-does-its-job/This-is-a-directory-with-a-stupidly-long-name-created-in-an-attempt-to-provoke-an-error-found-in-2.0.11-that-should-hopefully-never-appear-again-if-this-test-does-its-job/This-is-a-directory-with-a-stupidly-long-name-created-in-an-attempt-to-provoke-an-error-found-in-2.0.11-that-should-hopefully-never-appear-again-if-this-test-does-its-job
+
+makepath ${LONGDIR}
+date > ${LONGDIR}/1
+ls -la / > ${LONGDIR}/2
+checkit "$RSYNC --delete -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}

@@ -27,7 +27,14 @@ RSYNC="$rsync_bin"
 
 runtest() {
     echo $ECHO_N "Test $1: $ECHO_C"
-    eval "$2"
+    if eval "$2"
+    then
+	echo "${ECHO_T}	done."
+	return 0
+    else
+	echo "${ECHO_T} failed!"
+	return 1
+    fi
 }
 
 printmsg() {
@@ -39,6 +46,10 @@ printmsg() {
 # Build test directories TO and FROM, with FROM full of files.
 
 hands_setup() {
+    # Clean before creation
+    rm -rf $FROM
+    rm -rf $TO
+    
     [ -d $FROM ] || mkdir $FROM
     [ -d $TO ] || mkdir $TO
 
@@ -130,11 +141,9 @@ checkit() {
     ( cd $3 ; ls -laR ) > ${TMP}/ls-to  2>>${log}
     diff -c ${TMP}/ls-from ${TMP}/ls-to >>${log} 2>&1 || failed=YES
     if [ -z "${failed}" ] ; then
-	echo "${ECHO_T}	done."
 	rm $log
 	return 0
     else
-	echo "${ECHO_T} failed!"
 	cat ${log}
 	rm ${log}
 	return 1
