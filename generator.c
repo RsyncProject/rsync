@@ -99,24 +99,24 @@ static int adapt_block_size(struct file_struct *file, int bsize)
 /*
   send a sums struct down a fd
   */
-static void send_sums(struct sum_struct *s,int f_out)
+static void send_sums(struct sum_struct *s, int f_out)
 {
 	int i;
-	
+
 	/* tell the other guy how many we are going to be doing and how many
 	   bytes there are in the last chunk */
-	write_int(f_out,s?s->count:0);
-	write_int(f_out,s?s->n:block_size);
-	write_int(f_out,s?s->remainder:0);
+	write_int(f_out, s ? s->count : 0);
+	write_int(f_out, s ? s->n : block_size);
+	write_int(f_out, s ? s->remainder : 0);
 
-	if (!s) return;
+	if (!s)
+		return;
 
-	for (i=0;i<s->count;i++) {
-		write_int(f_out,s->sums[i].sum1);
-		write_buf(f_out,s->sums[i].sum2,csum_length);
+	for (i = 0; i < s->count; i++) {
+		write_int(f_out, s->sums[i].sum1);
+		write_buf(f_out, s->sums[i].sum2, csum_length);
 	}
 }
-
 
 /*
   generate a stream of signatures/checksums that describe a buffer
