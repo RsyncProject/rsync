@@ -121,7 +121,7 @@ AC_TRY_RUN([
 #include <sys/types.h>
 #include <sys/wait.h>
 
-int main(void) 
+int main(void)
 {
 	struct flock lock;
         int status;
@@ -151,7 +151,7 @@ ipv6type=unknown
 ipv6lib=none
 ipv6trylibc=yes
 
-AC_ARG_ENABLE(ipv6, 
+AC_ARG_ENABLE(ipv6,
 	AC_HELP_STRING([--disable-ipv6], [don't even try to use IPv6]))
 
 if test "x$enable_ipv6" != xno
@@ -177,7 +177,7 @@ yes
 #ifdef __KAME__
 yes
 #endif],
-				[ipv6type=$i; 
+				[ipv6type=$i;
 				AC_DEFINE(INET6, 1, [true if you have IPv6])])
 			;;
 		linux-glibc)
@@ -247,7 +247,7 @@ fi
 AC_MSG_CHECKING([whether to call shutdown on all sockets])
 case $host_os in
 	*cygwin* ) AC_MSG_RESULT(yes)
-                   AC_DEFINE(SHUTDOWN_ALL_SOCKETS, 1, 
+                   AC_DEFINE(SHUTDOWN_ALL_SOCKETS, 1,
 			    [Define if sockets need to be shutdown])
 		   ;;
 	       * ) AC_MSG_RESULT(no);;
@@ -318,7 +318,7 @@ if test x"$ac_cv_func_connect" = x"no"; then
     esac
     dnl We can't just call AC_CHECK_FUNCS(connect) here, because the value
     dnl has been cached.
-    if test x"$ac_cv_lib_socket_connect" = x"yes" || 
+    if test x"$ac_cv_lib_socket_connect" = x"yes" ||
        test x"$ac_cv_lib_inet_connect" = x"yes"; then
         # ac_cv_func_connect=yes
         # don't!  it would cause AC_CHECK_FUNC to succeed next time configure is run
@@ -330,8 +330,8 @@ AC_CHECK_LIB(resolv, inet_ntop)
 
 dnl AC_MSG_NOTICE([Looking in libraries: $LIBS])
 
-AC_CHECK_FUNCS(inet_ntop, , AC_LIBOBJ(lib/inet_ntop)) 
-AC_CHECK_FUNCS(inet_pton, , AC_LIBOBJ(lib/inet_pton))
+AC_CHECK_FUNCS(inet_ntop, , [AC_LIBOBJ(lib/inet_ntop)])
+AC_CHECK_FUNCS(inet_pton, , [AC_LIBOBJ(lib/inet_pton)])
 
 # Irix 6.5 has getaddrinfo but not the corresponding defines, so use
 #   builtin getaddrinfo if one of the defines don't exist
@@ -343,7 +343,7 @@ AC_CACHE_CHECK([whether defines needed by getaddrinfo exist],
 			#include <netdb.h>
 			#ifdef AI_PASSIVE
 			yes
-			#endif], 
+			#endif],
 			rsync_cv_HAVE_GETADDR_DEFINES=yes,
 			rsync_cv_HAVE_GETADDR_DEFINES=no)])
 if test x"$rsync_cv_HAVE_GETADDR_DEFINES" = x"yes"; then
@@ -360,14 +360,14 @@ if test x"$rsync_cv_HAVE_GETADDR_DEFINES" = x"yes"; then
 				[Define if you have the `getaddrinfo' function.])],
 			[AC_MSG_RESULT([no])
 			AC_LIBOBJ(lib/getaddrinfo)])])
-	AC_CHECK_FUNCS(getnameinfo, , AC_LIBOBJ(lib/getnameinfo))
+	AC_CHECK_FUNCS(getnameinfo, , [AC_LIBOBJ(lib/getnameinfo)])
 else
 	AC_LIBOBJ(lib/getaddrinfo)
 	AC_LIBOBJ(lib/getnameinfo)
 fi
 
 
-AC_CHECK_MEMBER([struct sockaddr.sa_len], 
+AC_CHECK_MEMBER([struct sockaddr.sa_len],
 		[ AC_DEFINE(HAVE_SOCKADDR_LEN) ],
 		[],
 		[
@@ -380,7 +380,7 @@ AC_TRY_COMPILE([#include <sys/types.h>
 #include <sys/socket.h>],
 [struct sockaddr_storage x;],
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_SOCKADDR_STORAGE, 1, 
+	AC_DEFINE(HAVE_SOCKADDR_STORAGE, 1,
 		[Define if you have strct sockaddr_storage.] ),
 	AC_MSG_RESULT(no))
 
@@ -402,7 +402,7 @@ fi
 
 dnl At the moment we don't test for a broken memcmp(), because all we
 dnl need to do is test for equality, not comparison, and it seems that
-dnl every platform has a memcmp that can do at least that.  
+dnl every platform has a memcmp that can do at least that.
 dnl AC_FUNC_MEMCMP
 
 AC_FUNC_UTIME_NULL
@@ -516,7 +516,7 @@ AC_CACHE_CHECK([for C99 vsnprintf],rsync_cv_HAVE_C99_VSNPRINTF,[
 AC_TRY_RUN([
 #include <sys/types.h>
 #include <stdarg.h>
-void foo(const char *format, ...) { 
+void foo(const char *format, ...) {
        va_list ap;
        int len;
        char buf[5];
@@ -543,10 +543,10 @@ AC_TRY_RUN([#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-main() { 
+main() {
   struct stat st;
-  char tpl[20]="/tmp/test.XXXXXX"; 
-  int fd = mkstemp(tpl); 
+  char tpl[20]="/tmp/test.XXXXXX";
+  int fd = mkstemp(tpl);
   if (fd == -1) exit(1);
   unlink(tpl);
   if (fstat(fd, &st) != 0) exit(1);
@@ -569,7 +569,7 @@ AC_TRY_RUN([
 #include <arpa/inet.h>
 main() { struct in_addr ip; ip.s_addr = 0x12345678;
 if (strcmp(inet_ntoa(ip),"18.52.86.120") &&
-    strcmp(inet_ntoa(ip),"120.86.52.18")) { exit(1); } 
+    strcmp(inet_ntoa(ip),"120.86.52.18")) { exit(1); }
 exit(0);}],
            rsync_cv_REPLACE_INET_NTOA=no,rsync_cv_REPLACE_INET_NTOA=yes,rsync_cv_REPLACE_INET_NTOA=cross)])
 if test x"$rsync_cv_REPLACE_INET_NTOA" = x"yes"; then
@@ -583,7 +583,7 @@ AC_TRY_RUN([
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-main() { struct in_addr ip; 
+main() { struct in_addr ip;
 if (inet_aton("example", &ip) == 0) exit(0); exit(1);}],
            rsync_cv_REPLACE_INET_ATON=no,rsync_cv_REPLACE_INET_ATON=yes,rsync_cv_REPLACE_INET_ATON=cross)])
 if test x"$rsync_cv_REPLACE_INET_ATON" = x"yes"; then
