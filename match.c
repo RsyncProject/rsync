@@ -131,7 +131,6 @@ static void hash_search(int f,struct sum_struct *s,
 	char sum2[SUM_LENGTH];
 	uint32 s1, s2, sum; 
 	schar *map;
-	extern int do_compression;
 
 	if (verbose > 2)
 		rprintf(FINFO,"hash search b=%d len=%d\n",s->n,(int)len);
