@@ -23,7 +23,7 @@ int csum_length=2; /* initial value */
 
 #define CSUM_CHUNK 64
 
-int checksum_seed = 0;
+extern int checksum_seed;
 extern int protocol_version;
 
 /*
