@@ -8,7 +8,6 @@
 #include "rsync.h"
 #include <time.h>
 
-extern int itemize_changes;
 extern int am_sender;
 extern int eol_nulls;
 extern int recurse;
@@ -34,7 +33,6 @@ static int *flag_ptr[] = {
 	&preserve_devices,
 	&preserve_hard_links,
 	&always_checksum,
-	&itemize_changes,
 	NULL
 };
 
@@ -47,7 +45,6 @@ static char *flag_name[] = {
 	"--hard-links (-H)",
 	"--checksum (-c)",
 	"--dirs (-d)",
-	"--itemize-changes (-i)",
 	NULL
 };
 
