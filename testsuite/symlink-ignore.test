@@ -20,9 +20,20 @@ build_symlinks || test_fail "failed to build symlinks"
 
 [ -f "${todir}/referent" ] || test_fail "referent was not copied"
 [ -d "${todir}/from" ] && test_fail "extra level of directories"
-[ -L "${todir}/dangling" ] && test_fail "dangling symlink was copied"
-[ -L "${todir}/relative" ] && test_fail "relative symlink was copied" 
-[ -L "${todir}/absolute" ] && test_fail "absolute symlink was copied"
+if [ -L "${todir}/dangling" ] 
+then 
+    test_fail "dangling symlink was copied"
+fi
+
+if [ -L "${todir}/relative" ] 
+then
+    test_fail "relative symlink was copied" 
+fi
+
+if [ -L "${todir}/absolute" ]
+then
+    test_fail "absolute symlink was copied"
+fi
 
 exit 0
 # last [] may have failed but if we get here then we've one
