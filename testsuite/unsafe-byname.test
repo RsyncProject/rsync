@@ -1,0 +1,20 @@
+#! /bin/sh
+
+# Copyright (C) 2002 by Martin Pool
+
+# Call directly into unsafe_symlink and test its handling of various filenames
+
+. $srcdir/testsuite/rsync.fns
+
+test_unsafe() {
+    result=`"$TOOLDIR/t_unsafe" "$1" "$2"` || test_fail "Failed to check $1 $2"
+    if [ "$result" != "$3" ]
+    then
+	test_fail "t_unsafe $1 $2 returned \"$result\", expected \"$3\""
+    fi
+}
+
+set -x
+
+test_unsafe foo foo safe
+test_unsafe ../foo foo unsafe
