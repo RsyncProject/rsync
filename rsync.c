@@ -561,7 +561,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
 
       sum_update(data,i);
 
-      if (fd != -1 && write_sparse(fd,data,i) != i) {
+      if (fd != -1 && write_file(fd,data,i) != i) {
 	fprintf(FERROR,"write failed on %s : %s\n",fname,strerror(errno));
 	exit_cleanup(1);
       }
@@ -582,7 +582,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
       see_token(map, len);
       sum_update(map,len);
 
-      if (fd != -1 && write_sparse(fd,map,len) != len) {
+      if (fd != -1 && write_file(fd,map,len) != len) {
 	fprintf(FERROR,"write failed on %s : %s\n",fname,strerror(errno));
 	exit_cleanup(1);
       }
