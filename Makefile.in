@@ -12,7 +12,8 @@ CFLAGS=@CFLAGS@
 
 INSTALLCMD=@INSTALL@
 
-SRC=@srcdir@
+VPATH=@srcdir@
+srcdir=@srcdir@
 SHELL=/bin/sh
 
 
@@ -24,13 +25,13 @@ OBJS1=rsync.o exclude.o util.o md4.o main.o checksum.o match.o
 OBJS=$(OBJS1) flist.o io.o compat.o hlink.o token.o uidlist.o $(LIBOBJ)
 
 .c.o:
-	$(CC) $(CFLAGS) -c $*.c -o $*.o
+	$(CC) -I$(srcdir) $(CFLAGS) -c $*.c -o $*.o
 
 all: rsync
 
 install: all
 	${INSTALLCMD} -m 755 rsync ${INSTALL_BIN}
-	${INSTALLCMD} -m 644 rsync.1 ${INSTALL_MAN}/man1
+	${INSTALLCMD} -m 644 $(srcdir)/rsync.1 ${INSTALL_MAN}/man1
 
 rsync: $(OBJS)
 	$(CC) $(CFLAGS) -o rsync $(OBJS) $(LIBS)
