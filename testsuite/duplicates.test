@@ -19,14 +19,11 @@
 
 # This test is not great, because it is a timing-dependent bug.
 
-. $srcdir/testsuite/rsync.fns
+. "$suitedir/rsync.fns"
 
 set -x
 
 # Build some hardlinks
-
-fromdir="$scratchdir/from"
-todir="$scratchdir/to"
 
 mkdir "$fromdir"
 name1="$fromdir/name1"

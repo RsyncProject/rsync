@@ -11,14 +11,11 @@
 # We don't know what users will be present on this system, so we just
 # use random numeric uids and gids.
 
-. $srcdir/testsuite/rsync.fns
+. "$suitedir/rsync.fns"
 
 set -x
 
 # Build some hardlinks
-
-fromdir="$scratchdir/from"
-todir="$scratchdir/to"
 
 mkdir "$fromdir"
 name1="$fromdir/name1"
