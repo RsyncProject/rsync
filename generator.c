@@ -101,7 +101,7 @@ void write_sum_head(int f, struct sum_struct *sum)
 {
 	static struct sum_struct null_sum;
 
-	if (sum == (struct sum_struct *)NULL)
+	if (sum == NULL)
 		sum = &null_sum;
 
 	write_int(f, sum->count);
@@ -407,7 +407,7 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 
 	fnamecmp = fname;
 
-	if ((statret == -1) && (compare_dest != NULL)) {
+	if (statret == -1 && compare_dest != NULL) {
 		/* try the file at compare_dest instead */
 		int saveerrno = errno;
 		pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, compare_dest, fname);

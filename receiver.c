@@ -361,7 +361,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 		/* open the file */
 		fd1 = do_open(fnamecmp, O_RDONLY, 0);
 
-		if ((fd1 == -1) && (compare_dest != NULL)) {
+		if (fd1 == -1 && compare_dest != NULL) {
 			/* try the file at compare_dest instead */
 			pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
 				 compare_dest, fname);
