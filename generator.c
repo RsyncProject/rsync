@@ -224,10 +224,17 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 	}
 
 	if (S_ISDIR(file->mode)) {
+                /* The file to be received is a directory, so we need
+                 * to prepare appropriately.  If there is already a
+                 * file of that name and it is *not* a directory, then
+                 * we need to delete it.  If it doesn't exist, then
+                 * recursively create it. */
+          
 		if (dry_run) return;
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			if (robust_unlink(fname) != 0) {
-				rprintf(FERROR,"recv_generator: unlink %s: %s\n",fname,strerror(errno));
+				rprintf(FERROR,"recv_generator: unlink %s: %s\n",
+                                        fname,strerror(errno));
 				return;
 			}
 			statret = -1;
@@ -432,6 +439,8 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 		   them. This is then fixed after the files are transferred */
 		if (!am_root && S_ISDIR(file->mode)) {
 			file->mode |= S_IWUSR; /* user write */
+                        /* XXX: Could this be causing a problem on SCO?  Perhaps their
+                         * handling of permissions is strange? */
 		}
 
 		recv_generator(local_name?local_name:f_name(file),
