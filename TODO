@@ -99,9 +99,11 @@ Progress indicator can produce corrupt output when transferring directories:
   main/binary-arm/math/
   main/binary-arm/misc/
 
+
 lchmod
   I don't think we handle this properly on systems that don't have the
-  call.
+  call.  Are there any such?
+
 
 Cross-test versions
   Part of the regression suite should be making sure that we don't
