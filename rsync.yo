@@ -793,6 +793,9 @@ itemize(
 
 manpagesection(BATCH MODE)
 
+bf(Note:) Batch mode should be considered experimental in this version
+of rsync.  The interface or behaviour may change before it stabilizes.
+
 The following call generates 4 files that encapsulate the information
 for synchronizing the contents of bf(target_dir) with the updates found in
 bf(src_dir)
