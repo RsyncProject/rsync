@@ -13,7 +13,7 @@ rsync [options] [user@]host::module[/path] path
 
 rsync [options] path [user@]host::module[/path]
 
-rsync [options] rsync://host/module/path path
+rsync [options] rsync://host[:port]/module/path path
 
 manpagedescription()
 
@@ -208,6 +208,7 @@ Usage: rsync [OPTION]... SRC [USER@]HOST:DEST
   or   rsync [OPTION]... SRC DEST
   or   rsync [OPTION]... [USER@]HOST::SRC DEST
   or   rsync [OPTION]... SRC [USER@]HOST::DEST
+  or   rsync [OPTION]... rsync://HOST[:PORT]/SRC DEST
 
 Options
  -v, --verbose               increase verbosity
@@ -243,10 +244,10 @@ Options
  -T  --temp-dir=DIR          create temporary files in directory DIR
      --compare-dest=DIR      also compare destination files relative to DIR
  -z, --compress              compress file data
-     --exclude=PATTERN       exclude file FILE
-     --exclude-from=PATTERN  exclude files listed in FILE
-     --include=PATTERN       don't exclude file FILE
-     --include-from=PATTERN  don't exclude files listed in FILE
+     --exclude=PATTERN       exclude files matching PATTERN
+     --exclude-from=FILE     exclude files listed in FILE
+     --include=PATTERN       don't exclude files matching PATTERN
+     --include-from=FILE     don't exclude files listed in FILE
      --suffix=SUFFIX         override backup suffix
      --version               print version number
      --daemon                run as a rsync daemon

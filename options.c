@@ -88,6 +88,7 @@ void usage(int F)
   rprintf(F,"  or   rsync [OPTION]... SRC DEST\n");
   rprintf(F,"  or   rsync [OPTION]... [USER@]HOST::SRC DEST\n");
   rprintf(F,"  or   rsync [OPTION]... SRC [USER@]HOST::DEST\n");
+  rprintf(F,"  or   rsync [OPTION]... rsync://HOST[:PORT]/SRC DEST\n");
   rprintf(F,"\nOptions\n");
   rprintf(F," -v, --verbose               increase verbosity\n");
   rprintf(F," -c, --checksum              always checksum\n");
@@ -122,9 +123,9 @@ void usage(int F)
   rprintf(F," -T  --temp-dir=DIR          create temporary files in directory DIR\n");
   rprintf(F,"     --compare-dest=DIR      also compare destination files relative to DIR\n");
   rprintf(F," -z, --compress              compress file data\n");
-  rprintf(F,"     --exclude=PATTERN       exclude file FILE\n");
+  rprintf(F,"     --exclude=PATTERN       exclude files matching PATTERN\n");
   rprintf(F,"     --exclude-from=FILE     exclude patterns listed in FILE\n");
-  rprintf(F,"     --include=PATTERN       don't exclude file FILE\n");
+  rprintf(F,"     --include=PATTERN       don't exclude files matching PATTERN\n");
   rprintf(F,"     --include-from=FILE     don't exclude patterns listed in FILE\n");
   rprintf(F,"     --suffix=SUFFIX         override backup suffix\n");  
   rprintf(F,"     --version               print version number\n");  

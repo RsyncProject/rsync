@@ -464,6 +464,7 @@ static int start_client(int argc, char *argv[])
 	extern int local_server;
 	extern int am_sender;
 	extern char *shell_cmd;
+	extern int rsync_port;
 
 	if (strncasecmp(URL_PREFIX, argv[0], strlen(URL_PREFIX)) == 0) {
 		char *host, *path;
@@ -475,6 +476,11 @@ static int start_client(int argc, char *argv[])
 			path = p+1;
 		} else {
 			path="";
+		}
+		p = strchr(host,':');
+		if (p) {
+			rsync_port = atoi(p+1);
+			*p = 0;
 		}
 		return start_socket_client(host, path, argc-1, argv+1);
 	}
