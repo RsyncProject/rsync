@@ -683,10 +683,17 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 				*p = '/';
 				for (p=fname+1; (p=strchr(p,'/')); p++) {
 					int copy_links_saved = copy_links;
+					int recurse_saved = recurse;
 					*p = 0;
 					copy_links = copy_unsafe_links;
+					/* set recurse to 1 to prevent make_file
+					   from ignoring directory, but still
+					   turn off the recursive parameter to
+					   send_file_name */
+					recurse = 1;
 					send_file_name(f, flist, fname, 0, 0);
 					copy_links = copy_links_saved;
+					recurse = recurse_saved;
 					*p = '/';
 				}
 			} else {
