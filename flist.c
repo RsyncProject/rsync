@@ -34,6 +34,7 @@ extern int do_progress;
 extern int am_root;
 extern int am_server;
 extern int am_daemon;
+extern int am_sender;
 extern int always_checksum;
 extern int module_id;
 extern int ignore_errors;
@@ -1487,7 +1488,7 @@ static void output_flist(struct file_list *flist)
 
 	for (i = 0; i < flist->count; i++) {
 		file = flist->files[i];
-		if (am_root && preserve_uid)
+		if ((am_root || am_sender) && preserve_uid)
 			sprintf(uidbuf, " uid=%ld", (long)file->uid);
 		else
 			*uidbuf = '\0';
