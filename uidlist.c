@@ -143,8 +143,8 @@ static int is_in_group(gid_t gid)
 			gidset[ngroups++] = mygid;
 		if (verbose > 3) {
 			for (n = 0; n < ngroups; n++) {
-				rprintf(FINFO, "process gid %d: %ld\n",
-				    n, (long)gidset[n]);
+				rprintf(FINFO, "process has gid %ld\n",
+				    (long)gidset[n]);
 			}
 		}
 	}
@@ -314,8 +314,8 @@ void recv_uid_list(int f, struct file_list *flist)
 		}
 		if (verbose > 3) {
 			for (list = uidlist; list; list = list->next) {
-				rprintf(FINFO, "uid %s (%ld) maps to %ld\n",
-				    list->name, (long)list->id,
+				rprintf(FINFO, "uid %ld (%s) maps to %ld\n",
+				    (long)list->id, list->name,
 				    (long)list->id2);
 			}
 		}
@@ -344,8 +344,8 @@ void recv_uid_list(int f, struct file_list *flist)
 		}
 		if (verbose > 3) {
 			for (list = gidlist; list; list = list->next) {
-				rprintf(FINFO, "gid %s (%ld) maps to %ld\n",
-				    list->name, (long)list->id,
+				rprintf(FINFO, "gid %ld (%s) maps to %ld\n",
+				    (long)list->id, list->name,
 				    (long)list->id2);
 			}
 		}
