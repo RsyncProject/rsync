@@ -323,7 +323,7 @@ static void send_file_name(int f,struct file_list *flist,char *fname)
       out_of_memory("send_file_name");
   }
 
-  if (strcmp(file->name,".") && strcmp(file->name,"/")) {
+  if (strcmp(file->name,"/")) {
     flist->files[flist->count++] = *file;    
     send_file_entry(file,f);
   }
