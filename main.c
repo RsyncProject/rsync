@@ -979,7 +979,7 @@ int main(int argc,char *argv[])
 #endif /* def MAINTAINER_MODE */
 
 	starttime = time(NULL);
-	am_root = (getuid() == 0);
+	am_root = (MY_UID() == 0);
 
 	memset(&stats, 0, sizeof(stats));
 

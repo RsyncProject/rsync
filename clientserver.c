@@ -266,7 +266,7 @@ static int rsync_module(int f_in, int f_out, int i)
 
 	module_id = i;
 
-	am_root = (getuid() == 0);
+	am_root = (MY_UID() == 0);
 
 	if (am_root) {
 		p = lp_uid(i);
@@ -383,7 +383,7 @@ static int rsync_module(int f_in, int f_out, int i)
 			return -1;
 		}
 
-		am_root = (getuid() == 0);
+		am_root = (MY_UID() == 0);
 	}
 
 	io_printf(f_out, "@RSYNCD: OK\n");
