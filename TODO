@@ -125,6 +125,16 @@ Do not rely on having a group called "nobody"
 
   On Debian it's "nogroup"
 
+Temporary file names can exceed max name length
+
+  Rsync creates temporary file names that are 10 characters longer
+  than the length of the file being transferred.  This creates
+  problems for operating systems have fairly short maximum lengths
+  (e.g., 32 characters for Stratus VOS). Even on operating systems
+  with long max lengths it can still be a problem as it is perfectly
+  reasonable to be using files with long names.
+
+
 DAEMON --------------------------------------------------------------
 
 server-imposed bandwidth limits
@@ -143,7 +153,7 @@ FEATURES ------------------------------------------------------------
 --dry-run is too dry
 
   Mark Santcroos points out that -n fails to list files which have
-  only metadata changes, though it probably should.  
+  only metadata changes, though it probably should.
 
   There may be a Debian bug about this as well.
 
@@ -176,13 +186,13 @@ supplementary groups
 File list structure in memory
 
   Rather than one big array, perhaps have a tree in memory mirroring
-  the directory tree.  
+  the directory tree.
 
   This might make sorting much faster!  (I'm not sure it's a big CPU
-  problem, mind you.)  
+  problem, mind you.)
 
   It might also reduce memory use in storing repeated directory names
-  -- again I'm not sure this is a problem.
+-- again I'm not sure this is a problem.
 
 Performance
 
@@ -203,7 +213,7 @@ Handling duplicate names
   through the pipeline at the same time.  For example we might have
   updated the first occurrence after reading the checksums for the
   second.  So possibly we just need to make sure that we don't have
-  both in the pipeline at the same time.  
+  both in the pipeline at the same time.
 
   Possibly if we did one directory at a time that would be sufficient.
 
@@ -249,7 +259,7 @@ Memory accounting
 Hard-link handling
 
   At the moment hardlink handling is very expensive, so it's off by
-  default.  It does not need to be so.  
+  default.  It does not need to be so.
 
   Since most of the solutions are rather intertwined with the file
   list it is probably better to fix that first, although fixing
@@ -263,7 +273,7 @@ Hard-link handling
   but I have not seen them.
 
   When trying to reproduce hard links, we only need to worry about
-  files that have more than one name (nlinks>1 && !S_ISDIR). 
+  files that have more than one name (nlinks>1 && !S_ISDIR).
 
   The basic point of this is to discover alternate names that refer to
   the same file.  All operations, including creating the file and
@@ -361,8 +371,7 @@ Other IPv6 stuff:
   colons, they tend to break most naming systems, including ours.
   Based on the HTTP IPv6 syntax, I think we should use
  
-     rsync://[::1]/foo/bar
-     [::1]::bar
+     rsync://[::1]/foo/bar [::1]::bar
 
   which should just take a small change to the parser code.
 
@@ -376,7 +385,7 @@ Errors
 
   "The dungeon collapses!  You are killed."  Rather than "unexpected
   eof" give a message that is more detailed if possible and also more
-  helpful.  
+  helpful.
 
   If we get an error writing to a socket, then we should perhaps
   continue trying to read to see if an error message comes across
@@ -384,8 +393,8 @@ Errors
   work, but it would certainly make our messages more helpful.
 
   What happens if a directory is missing -x attributes.  Do we lose
-  our load?  (Debian #28416)  Probably fixed now, but a test case
-  would be good.
+  our load?  (Debian #28416) Probably fixed now, but a test case would
+  be good.
 
 
 File attributes
@@ -406,7 +415,7 @@ Empty directories
 
 zlib
 
-  Perhaps don't use our own zlib.  
+  Perhaps don't use our own zlib.
 
   Advantages:
    
@@ -444,7 +453,7 @@ logging
 
   After we get the @RSYNCD greeting from the server, we know it's
   version but we have not yet sent the command line, so we could just
-  remove the -z option if the server is too old.  
+  remove the -z option if the server is too old.
 
   For ssh invocation it's not so simple, because we actually use the
   command line to start the remote process.  However, we only actually
@@ -456,7 +465,7 @@ logging
 proxy authentication
 
   Allow RSYNC_PROXY to be http://user:pass@proxy.foo:3128/, and do
-  HTTP Basic Proxy-Authentication.  
+  HTTP Basic Proxy-Authentication.
 
   Multiple schemes are possible, up to and including the insanity that
   is NTLM, but Basic probably covers most cases.
@@ -468,12 +477,12 @@ SOCKS
 
 FAT support
 
-  rsync to a FAT partition on a Unix machine doesn't work very well
-  at the moment.  I think we get errors about invalid filenames and 
+  rsync to a FAT partition on a Unix machine doesn't work very well at
+  the moment.  I think we get errors about invalid filenames and
   perhaps also trying to do atomic renames.
 
-  I guess the code to do this is currently #ifdef'd on Windows; perhaps
-  we ought to intelligently fall back to it on Unix too.
+  I guess the code to do this is currently #ifdef'd on Windows;
+  perhaps we ought to intelligently fall back to it on Unix too.
 
 
 Better statistics:
@@ -481,13 +490,10 @@ Better statistics:
   <Rasmus> mbp: hey, how about an rsync option that just gives you the
   summary without the list of files?  And perhaps gives more
   information like the number of new files, number of changed,
-  deleted, etc. ?
-  <mbp> Rasmus: nice idea
-  <mbp> there is --stats
-  <mbp> but at the moment it's very tridge-oriented
-  <mbp> rather than user-friendly
-  <mbp> it would be nice to improve it
-  <mbp> that would also work well with --dryrun
+  deleted, etc. ?  <mbp> Rasmus: nice idea <mbp> there is --stats
+  <mbp> but at the moment it's very tridge-oriented <mbp> rather than
+  user-friendly <mbp> it would be nice to improve it <mbp> that would
+  also work well with --dryrun
 
 TDB:
 
@@ -504,21 +510,21 @@ TDB:
 
 chmod:
 
-  On 12 Mar 2002, Dave Dykstra <dwd@bell-labs.com> wrote:
-  > If we would add an option to do that functionality, I would vote for one
-  > that was more general which could mask off any set of permission bits and
-  > possibly add any set of bits.  Perhaps a chmod-like syntax if it could be
-  > implemented simply.
+  On 12 Mar 2002, Dave Dykstra <dwd@bell-labs.com> wrote: > If we
+would add an option to do that functionality, I would vote for one >
+that was more general which could mask off any set of permission bits
+and > possibly add any set of bits.  Perhaps a chmod-like syntax if it
+could be > implemented simply.
 
-  I think that would be good too.  For example, people uploading files   
+  I think that would be good too.  For example, people uploading files
   to a web server might like to say
 
   rsync -avzP --chmod a+rX ./ sourcefrog.net:/home/www/sourcefrog/
 
   Ideally the patch would implement as many of the gnu chmod semantics
   as possible.  I think the mode parser should be a separate function
-  that passes back something like (mask,set) description to the rest of
-  the program.  For bonus points there would be a test case for the  
+  that passes back something like (mask,set) description to the rest
+  of the program.  For bonus points there would be a test case for the
   parser.
 
   Possibly also --chown
@@ -566,9 +572,9 @@ MD4 file_sum
   transport to have quite strong protection against corruption.
 
   Perhaps we should have an option to disable this, analogous to
-  --whole-file, although it would default to disabled.  The file
-  checksum takes up a definite space in the protocol -- we can either
-  set it to 0, or perhaps just leave it out.
+--whole-file, although it would default to disabled.  The file
+checksum takes up a definite space in the protocol -- we can either
+set it to 0, or perhaps just leave it out.
 
 MD4
 
@@ -636,9 +642,9 @@ TESTING --------------------------------------------------------------
 Cross-test versions
 
   Part of the regression suite should be making sure that we don't
-  break backwards compatibility: old clients vs new servers and so
-  on.  Ideally we would test both up and down from the current release
-  to all old versions.
+  break backwards compatibility: old clients vs new servers and so on.
+  Ideally we would test both up and down from the current release to
+  all old versions.
 
   We might need to omit broken old versions, or versions in which
   particular functionality is broken
@@ -677,7 +683,8 @@ Test daemon feature to disallow particular options.
 
 Pipe program that makes slow/jerky connections.
 
-Versions of read() and write() that corrupt the stream, or abruptly fail
+Versions of read() and write() that corrupt the stream, or abruptly
+fail
 
 Separate makefile target to run rough tests -- or perhaps just run
 them every time?
@@ -771,7 +778,7 @@ hang/timeout friendliness
 internationalization
 
   Change to using gettext().  Probably need to ship this for platforms
-  that don't have it.  
+  that don't have it.
 
   Solicit translations.
 
@@ -779,7 +786,7 @@ internationalization
   get the manual translated first, because that's possibly more useful
   and at any rate demonstrates desire.
 
-rsyncsh 
+rsyncsh
 
    Write a small emulation of interactive ftp as a Pythonn program
    that calls rsync.  Commands such as "cd", "ls", "ls *.c" etc map
@@ -804,3 +811,5 @@ reverse rsync over HTTP Range
 
   Goswin Brederlow suggested this on Debian; I think tridge and I
   talked about it previous in relation to rproxy.
+
+
