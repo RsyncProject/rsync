@@ -749,8 +749,8 @@ is only relevant without bf(--delete) because deletions are now done depth-first
 Requires the bf(--recursive) option (which is implied by bf(-a)) to have any effect.
 
 dit(bf(--max-delete=NUM)) This tells rsync not to delete more than NUM
-files or directories. This is useful when mirroring very large trees
-to prevent disasters.
+files or directories (NUM must be non-zero).
+This is useful when mirroring very large trees to prevent disasters.
 
 dit(bf(--max-size=SIZE)) This tells rsync to avoid transferring any
 file that is larger than the specified SIZE. The SIZE value can be
