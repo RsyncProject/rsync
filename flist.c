@@ -469,7 +469,8 @@ static int skip_filesystem(char *fname, STRUCT_STAT *st)
 #define MALLOC(ap, i)	(ap ? string_area_malloc(ap, i) : malloc(i))
 
 /* create a file_struct for a named file */
-struct file_struct *make_file(int f, char *fname, struct string_area **ap)
+struct file_struct *make_file(int f, char *fname, struct string_area **ap,
+			      int noexcludes)
 {
 	struct file_struct *file;
 	STRUCT_STAT st;
@@ -478,6 +479,7 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap)
 	char cleaned_name[MAXPATHLEN];
 	char linkbuf[MAXPATHLEN];
 	extern int delete_excluded;
+	extern int module_id;
 
 	strlcpy(cleaned_name, fname, MAXPATHLEN);
 	cleaned_name[MAXPATHLEN-1] = 0;
@@ -496,6 +498,9 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap)
 		return NULL;
 	}
 
+	/* we use noexcludes from backup.c */
+	if (noexcludes) goto skip_excludes;
+
 	if (S_ISDIR(st.st_mode) && !recurse) {
 		rprintf(FINFO,"skipping directory %s\n",fname);
 		return NULL;
@@ -509,7 +514,13 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap)
 	/* f is set to -1 when calculating deletion file list */
 	if (((f != -1) || !delete_excluded) && !match_file_name(fname,&st))
 		return NULL;
-	
+
+
+	if (lp_ignore_nonreadable(module_id) && access(fname, R_OK) != 0) 
+		return NULL;
+
+ skip_excludes:
+
 	if (verbose > 2)
 		rprintf(FINFO,"make_file(%d,%s)\n",f,fname);
 	
@@ -588,7 +599,7 @@ void send_file_name(int f,struct file_list *flist,char *fname,
 {
   struct file_struct *file;
 
-  file = make_file(f,fname, &flist->string_area);
+  file = make_file(f,fname, &flist->string_area, 0);
 
   if (!file) return;  
   
