@@ -63,7 +63,23 @@ Changes since 2.6.2:
       suggest that the user specify --ipv4 or --ipv6 (if we think it will
       help).
 
+    - When the remote rsync dies, make a better effort to recover any error
+      messages it may have sent instead of just dying with a write error
+      trying to send data over the socket.
+
+    - When using --delete and a --backup-dir that contains files that are
+      hard-linked to their destination equivalents, rsync now makes sure
+      that removed files really get removed (works around a really weird
+      rename() behavior).
+
+    - Avoid a bogus run-time complaint about a lack of 64-bit integers when
+      int64 is defined as an off_t and it actually has 64-bits.
+
   ENHANCEMENTS:
+
+    - Added the --partial-dir=DIR option that lets you specify where to
+      (temporarily) put a partially transferred file (instead of over-
+      writing the destination file).  E.g.  --partial-dir=.rsync-partial
 
     - Added --keep-dirlinks (-K), which allows you to symlink a directory
       onto another partition on the receiving side and have rsync treat it
@@ -72,7 +88,8 @@ Changes since 2.6.2:
     - Added the --inplace option that tells rsync to write each destination
       file without using a temporary file.  The matching of existing data
       in the destination file can be severely limited by this, but there
-      are cases where this is more efficient, such as appending data.
+      are cases where this is more efficient, such as appending data.  Use
+      only when needed (see the man page for more details).
 
     - Added the "write only" option to the daemon's config file.
 
@@ -113,7 +130,14 @@ Changes since 2.6.2:
       handles after we accept a connection (we used to close just one of
       them).
 
+    - Optimized the handling of larger block sizes (rsync used to slow to
+      a crawl if the block size got too large).  Also cap the block size.
+
     - Optimized away a loop in hash_search().
+
+    - Make sure that a filename that contains a newline gets mentioned with
+      each newline transformed into a question mark (which makes parsing
+      the verbose output via script more dependable).
 
   BUILD CHANGES:
 
