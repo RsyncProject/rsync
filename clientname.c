@@ -50,7 +50,8 @@ char *client_addr(int fd)
 	static char addr_buf[100];
 	static int initialised;
 
-	if (initialised) return addr_buf;
+	if (initialised)
+		return addr_buf;
 
 	initialised = 1;
 
@@ -108,7 +109,8 @@ char *client_name(int fd)
 #endif
 	socklen_t ss_len;
 
-	if (initialised) return name_buf;
+	if (initialised)
+		return name_buf;
 
 	strcpy(name_buf, default_name);
 	initialised = 1;
@@ -221,7 +223,7 @@ int lookup_name(int fd, const struct sockaddr_storage *ss,
 		char *port_buf, size_t port_buf_len)
 {
 	int name_err;
-	
+
 	/* reverse lookup */
 	name_err = getnameinfo((struct sockaddr *) ss, ss_len,
 			       name_buf, name_buf_len,
@@ -264,7 +266,7 @@ int compare_addrinfo_sockaddr(const struct addrinfo *ai,
 
 		sin1 = (const struct sockaddr_in *) ss;
 		sin2 = (const struct sockaddr_in *) ai->ai_addr;
-		
+
 		return memcmp(&sin1->sin_addr, &sin2->sin_addr,
 			      sizeof sin1->sin_addr);
 	}
