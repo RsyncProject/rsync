@@ -303,25 +303,6 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 }
 
 
-static char *read_gen_name(int fd, char *dirname, char *buf)
-{
-	int dlen;
-
-	if (dirname) {
-		dlen = strlcpy(buf, dirname, MAXPATHLEN);
-		if (dlen != 1 || *buf != '/')
-			buf[dlen++] = '/';
-	} else
-		dlen = 0;
-
-	if (read_vstring(fd, buf + dlen, MAXPATHLEN - dlen) < 0)
-		return NULL;
-	if (strchr(buf + dlen, '/') != NULL)
-		return NULL;
-	return buf;
-}
-
-
 static void discard_receive_data(int f_in, OFF_T length)
 {
 	receive_data(f_in, NULL, -1, 0, NULL, -1, length);
@@ -337,9 +318,9 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 	int next_gen_i = -1;
 	int fd1,fd2;
 	STRUCT_STAT st;
-	int iflags;
+	int iflags, xlen;
 	char *fname, fbuf[MAXPATHLEN];
-	char template[MAXPATHLEN];
+	char xname[MAXPATHLEN];
 	char fnametmp[MAXPATHLEN];
 	char *fnamecmp, *partialptr, numbuf[4];
 	char fnamecmpbuf[MAXPATHLEN];
@@ -386,7 +367,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			continue;
 		}
 
-		iflags = read_item_attrs(f_in, -1, i, fnametmp, &fnamecmp_type);
+		iflags = read_item_attrs(f_in, -1, i, &fnamecmp_type,
+					 xname, &xlen);
 		if (iflags == ITEM_IS_NEW) /* no-op packet */
 			continue;
 
@@ -397,7 +379,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			rprintf(FINFO, "recv_files(%s)\n", safe_fname(fname));
 
 		if (!(iflags & ITEM_TRANSFER)) {
-			maybe_log_item(file, iflags, itemizing, fnametmp);
+			maybe_log_item(file, iflags, itemizing, xname);
 			continue;
 		}
 
@@ -447,8 +429,12 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 				fnamecmp = get_backup_name(fname);
 				break;
 			case FNAMECMP_FUZZY:
-				fnamecmp = read_gen_name(f_in, file->dirname,
-							 fnamecmpbuf);
+				if (file->dirname) {
+					pathjoin(fnamecmpbuf, MAXPATHLEN,
+						 file->dirname, xname);
+					fnamecmp = fnamecmpbuf;
+				} else
+					fnamecmp = xname;
 				break;
 			default:
 				if (fnamecmp_type >= basis_dir_cnt) {
@@ -549,8 +535,6 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 				continue;
 			}
 
-			strlcpy(template, fnametmp, sizeof template);
-
 			/* we initially set the perms without the
 			 * setuid/setgid bits to ensure that there is no race
 			 * condition. They are then correctly updated after
@@ -564,7 +548,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			 * transferred, but that may not be the case with -R */
 			if (fd2 == -1 && relative_paths && errno == ENOENT
 			    && create_directory_path(fnametmp, orig_umask) == 0) {
-				strlcpy(fnametmp, template, sizeof fnametmp);
+				/* Get back to name with XXXXXX in it. */
+				get_tmpname(fnametmp, fname);
 				fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
 			}
 			if (fd2 == -1) {
