@@ -15,6 +15,8 @@ rsync 2.5.2 (???)
     * Better handling of hardlinks and devices on platforms with
       64-bit dev_t or ino_t.
 
+    * Name resolution on machines supporting IPv6 is improved.
+
   ENHANCEMENTS:
 
     * With -v, rsync now shows the command used to initiate an ssh/rsh
