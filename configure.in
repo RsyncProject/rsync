@@ -315,7 +315,18 @@ dnl AC_MSG_NOTICE([Looking in libraries: $LIBS])
 AC_CHECK_FUNCS(inet_ntop, , AC_LIBOBJ(lib/inet_ntop)) 
 AC_CHECK_FUNCS(inet_pton, , AC_LIBOBJ(lib/inet_pton))
 
-AC_CHECK_FUNCS(getaddrinfo, , AC_LIBOBJ(lib/getaddrinfo)) 
+# Tru64 UNIX has getaddrinfo() but has it renamed in libc as
+# something else so we must include <netdb.h> to get the
+# redefinition.
+AC_MSG_CHECKING([for getaddrinfo])
+AC_TRY_LINK([#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>],[getaddrinfo(NULL, NULL, NULL, NULL);],
+	[AC_MSG_RESULT([yes])
+	AC_DEFINE(HAVE_GETADDRINFO, 1,
+		[Define if you have the `getaddrinfo' function.])],
+	[AC_MSG_RESULT([no])
+	AC_LIBOBJ(lib/getaddrinfo)])
 AC_CHECK_FUNCS(getnameinfo, , AC_LIBOBJ(lib/getnameinfo))
 
 AC_CHECK_MEMBER([struct sockaddr.sa_len], 
