@@ -61,7 +61,7 @@ struct {
 	{ RERR_WAITCHILD  , "some error returned by waitpid()" },
 	{ RERR_MALLOC     , "error allocating core memory buffers" },
 	{ RERR_PARTIAL    , "some files could not be transferred" },
-	{ RERR_VANISHED   , "some files vanished before they could be transfered" },
+	{ RERR_VANISHED   , "some files vanished before they could be transferred" },
 	{ RERR_TIMEOUT    , "timeout in data send/receive" },
 	{ RERR_CMD_FAILED , "remote shell failed" },
 	{ RERR_CMD_KILLED , "remote shell killed" },
