@@ -79,10 +79,10 @@ static void output_flist(struct file_list *flist);
 
 void init_flist(void)
 {
-    struct file_struct f;
+	struct file_struct f;
 
-    /* Figure out how big the file_struct is without trailing padding */
-    min_file_struct_len = ((char*)&f.flags - (char*)&f) + sizeof f.flags;
+	/* Figure out how big the file_struct is without trailing padding */
+	min_file_struct_len = ((char*)&f.flags - (char*)&f) + sizeof f.flags;
 }
 
 
