@@ -651,6 +651,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
       if (!recv_ok) {
 	if (verbose > 1)
 	  fprintf(FERROR,"redoing %s(%d)\n",fname,i);
+        if (csum_length == SUM_LENGTH)
+	  fprintf(FERROR,"ERROR: file corruption in %s\n",fname);
 	write_int(f_gen,i);
       }
     }
