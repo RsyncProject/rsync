@@ -28,6 +28,7 @@ mknod "$fromdir/char3" c 42 69  || test_skipped "Can't create char device node u
 mknod "$fromdir/block" b 42 69 || test_skipped "Can't create block device node unless root"
 mknod "$fromdir/block2" b 42 73 || test_skipped "Can't create block device node unless root"
 mknod "$fromdir/block3" b 105 73 || test_skipped "Can't create block device node unless root"
+mkfifo "$fromdir/fifo" || test_skipped "Can't run mkfifo"
 
 checkit "$RSYNC -aHvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
