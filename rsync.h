@@ -36,12 +36,16 @@
 /* update this if you make incompatible changes */
 #define PROTOCOL_VERSION 11
 #define MIN_PROTOCOL_VERSION 10
+#define MAX_PROTOCOL_VERSION 20
 
 /* block size to write files in */
 #define WRITE_BLOCK_SIZE (32*1024)
 #define MAX_MAP_SIZE (4*1024*1024)
 
 #define BLOCKING_TIMEOUT 10
+
+/* do we try to create sparse files */
+#define SPARSE_FILES 1
 
 #include "config.h"
 
@@ -109,7 +113,10 @@
 #endif
 #include <errno.h>
 
+#ifdef HAVE_MMAP
 #include <sys/mman.h>
+#endif
+
 #ifdef HAVE_UTIME_H
 #include <utime.h>
 #endif
@@ -245,6 +252,10 @@ extern int errno;
 
 #define SUPPORT_LINKS (HAVE_READLINK && defined(S_ISLNK))
 
+#ifndef S_ISLNK
+#define S_ISLNK(x) 0
+#endif
+
 #if !SUPPORT_LINKS
 #define lstat stat
 #endif
@@ -256,3 +267,4 @@ extern int errno;
 #endif
 
 #define IS_DEVICE(mode) (S_ISCHR(mode) || S_ISBLK(mode))
+

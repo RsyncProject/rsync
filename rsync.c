@@ -205,7 +205,8 @@ static void set_perms(char *fname,struct file_struct *file,struct stat *st,
     st = &st2;
   }
 
-  if (preserve_times && st->st_mtime != file->modtime) {
+  if (preserve_times && !S_ISLNK(st->st_mode) &&
+      st->st_mtime != file->modtime) {
     updated = 1;
     if (set_modtime(fname,file->modtime) != 0) {
       fprintf(stderr,"failed to set times on %s : %s\n",
@@ -215,7 +216,8 @@ static void set_perms(char *fname,struct file_struct *file,struct stat *st,
   }
 
 #ifdef HAVE_CHMOD
-  if (preserve_perms && st->st_mode != file->mode) {
+  if (preserve_perms && !S_ISLNK(st->st_mode) &&
+      st->st_mode != file->mode) {
     updated = 1;
     if (chmod(fname,file->mode) != 0) {
       fprintf(stderr,"failed to set permissions on %s : %s\n",
@@ -269,8 +271,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
       if (l > 0) {
 	lnk[l] = 0;
 	if (strcmp(lnk,flist->files[i].link) == 0) {
-	  if (verbose > 1) 
-	    fprintf(am_server?stderr:stdout,"%s is uptodate\n",fname);
+	  set_perms(fname,&flist->files[i],&st,1);
 	  return;
 	}
       }
@@ -280,8 +281,10 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
       fprintf(stderr,"link %s -> %s : %s\n",
 	      fname,flist->files[i].link,strerror(errno));
     } else {
+      set_perms(fname,&flist->files[i],NULL,0);
       if (verbose) 
-	fprintf(am_server?stderr:stdout,"%s -> %s\n",fname,flist->files[i].link);
+	fprintf(am_server?stderr:stdout,"%s -> %s\n",
+		fname,flist->files[i].link);
     }
     return;
   }
@@ -417,12 +420,17 @@ static void receive_data(int f_in,char *buf,int fd,char *fname)
 	fprintf(stderr,"chunk[%d] of size %d at %d offset=%d\n",
 		i,len,(int)offset2,(int)offset);
 
-      if (write(fd,map_ptr(buf,offset2,len),len) != len) {
+      if (write_sparse(fd,map_ptr(buf,offset2,len),len) != len) {
 	fprintf(stderr,"write failed on %s : %s\n",fname,strerror(errno));
 	exit(1);
       }
       offset += len;
     }
+  }
+
+  if (offset > 0 && sparse_end(fd) != 0) {
+    fprintf(stderr,"write failed on %s : %s\n",fname,strerror(errno));
+    exit(1);
   }
 }
 

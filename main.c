@@ -597,9 +597,9 @@ int main(int argc,char *argv[])
 
     if (am_server) {
       remote_version = read_int(STDIN_FILENO);
-      if (remote_version < MIN_PROTOCOL_VERSION) {
-	fprintf(stderr,"protocol version mismatch %d %d\n",
-		remote_version,PROTOCOL_VERSION);
+      if (remote_version < MIN_PROTOCOL_VERSION ||
+	  remote_version > MAX_PROTOCOL_VERSION) {
+	fprintf(stderr,"protocol version mismatch - is your shell clean?\n");
 	exit(1);
       }
       write_int(STDOUT_FILENO,PROTOCOL_VERSION);
@@ -683,8 +683,9 @@ int main(int argc,char *argv[])
     write_flush(f_out);
     {
       remote_version = read_int(f_in);
-      if (remote_version < MIN_PROTOCOL_VERSION) {
-	fprintf(stderr,"protocol version mismatch\n");
+      if (remote_version < MIN_PROTOCOL_VERSION ||
+	  remote_version > MAX_PROTOCOL_VERSION) {
+	fprintf(stderr,"protocol version mismatch - is your shell clean?\n");
 	exit(1);
       }	
     }

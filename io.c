@@ -155,6 +155,44 @@ unsigned char read_byte(int f)
   return (unsigned char)c;
 }
 
+
+static char last_byte=0;
+static int last_sparse = 0;
+
+int sparse_end(int f)
+{
+#if SPARSE_FILES
+  if (last_sparse) {
+    lseek(f,-1,SEEK_CUR);
+    return (write(f,&last_byte,1) == 1 ? 0 : -1);
+  }
+#endif  
+  return 0;
+}
+
+int write_sparse(int f,char *buf,int len)
+{
+  int l=0;
+
+#if SPARSE_FILES
+  for (l=0;l<len && buf[l]==0;l++) ;
+
+  if (l > 0)
+    lseek(f,l,SEEK_CUR);
+
+  last_byte = buf[len-1];
+#endif
+
+  if (l == len) {
+    last_sparse = 1;
+    return len;
+  } 
+
+  last_sparse = 0;
+
+  return (l + write(f,buf+l,len-l));
+}
+
 int read_write(int fd_in,int fd_out,int size)
 {
   static char *buf=NULL;
@@ -169,7 +207,7 @@ int read_write(int fd_in,int fd_out,int size)
   while (total < size) {
     int n = MIN(size-total,bufsize);
     read_buf(fd_in,buf,n);
-    if (write(fd_out,buf,n) != n)
+    if (write_sparse(fd_out,buf,n) != n)
       return total;
     total += n;
   }
