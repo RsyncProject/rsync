@@ -23,7 +23,6 @@
 extern int verbose;
 extern int recurse;
 extern int delete_mode;
-extern int protocol_version;
 extern int csum_length;
 extern struct stats stats;
 extern int dry_run;
@@ -40,49 +39,6 @@ extern char *backup_dir;
 extern char *backup_suffix;
 extern int backup_suffix_len;
 extern int cleanup_got_literal;
-
-static struct delete_list {
-	DEV64_T dev;
-	INO64_T inode;
-} *delete_list;
-static int dlist_len, dlist_alloc_len;
-
-/* yuck! This function wouldn't have been necessary if I had the sorting
- * algorithm right. Unfortunately fixing the sorting algorithm would introduce
- * a backward incompatibility as file list indexes are sent over the link.
- */
-static int delete_already_done(struct file_list *flist,int j)
-{
-	int i;
-	STRUCT_STAT st;
-
-	if (link_stat(f_name(flist->files[j]), &st)) return 1;
-
-	for (i = 0; i < dlist_len; i++) {
-		if (st.st_ino == delete_list[i].inode &&
-		    (DEV64_T)st.st_dev == delete_list[i].dev)
-			return 1;
-	}
-
-	return 0;
-}
-
-static void add_delete_entry(struct file_struct *file)
-{
-	if (dlist_len == dlist_alloc_len) {
-		dlist_alloc_len += 1024;
-		delete_list = realloc_array(delete_list, struct delete_list,
-					    dlist_alloc_len);
-		if (!delete_list) out_of_memory("add_delete_entry");
-	}
-
-	delete_list[dlist_len].dev = file->dev;
-	delete_list[dlist_len].inode = file->inode;
-	dlist_len++;
-
-	if (verbose > 3)
-		rprintf(FINFO,"added %s to delete list\n", f_name(file));
-}
 
 static void delete_one(char *fn, int is_dir)
 {
@@ -138,9 +94,6 @@ void delete_files(struct file_list *flist)
 		if (!S_ISDIR(flist->files[j]->mode) ||
 		    !(flist->files[j]->flags & FLAG_DELETE)) continue;
 
-		if (protocol_version < 19 &&
-		    delete_already_done(flist, j)) continue;
-
 		name = f_name_to(flist->files[j], fbuf, sizeof fbuf);
 
 		if (!(local_file_list = send_file_list(-1,1,&name)))
@@ -152,9 +105,6 @@ void delete_files(struct file_list *flist)
 		for (i = local_file_list->count-1; i >= 0; i--) {
 			if (max_delete && deletion_count > max_delete) break;
 			if (!local_file_list->files[i]->basename) continue;
-			if (protocol_version < 19 &&
-			    S_ISDIR(local_file_list->files[i]->mode))
-				add_delete_entry(local_file_list->files[i]);
 			if (-1 == flist_find(flist,local_file_list->files[i])) {
 				char *f = f_name(local_file_list->files[i]);
 				if (make_backups && (backup_dir || !is_backup_file(f))) {
@@ -251,7 +201,7 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
 
 	sum_init();
 
-	for (i=recv_token(f_in,&data); i != 0; i=recv_token(f_in,&data)) {
+	while ((i = recv_token(f_in, &data)) != 0) {
 		if (do_progress)
 			show_progress(offset, total_size);
 
@@ -522,11 +472,9 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		}
 	}
 
-	if (delete_after) {
-		if (recurse && delete_mode && !local_name && flist->count>0) {
-			delete_files(flist);
-		}
-	}
+	if (delete_after && recurse && delete_mode && !local_name
+	    && flist->count > 0)
+		delete_files(flist);
 
 	if (preserve_hard_links)
 		do_hard_links();

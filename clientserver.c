@@ -192,7 +192,7 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out, int argc)
 	io_printf(f_out, "\n");
 
 	if (protocol_version < 23) {
-		if (protocol_version == 22 || (protocol_version > 17 && !am_sender))
+		if (protocol_version == 22 || !am_sender)
 			io_start_multiplex_in(f_in);
 	}
 
@@ -457,7 +457,7 @@ static int rsync_module(int f_in, int f_out, int i)
 #endif
 
 	if (protocol_version < 23) {
-		if (protocol_version == 22 || (protocol_version > 17 && am_sender))
+		if (protocol_version == 22 || am_sender)
 			io_start_multiplex_out(f_out);
 	}
 

@@ -316,7 +316,6 @@ void add_exclude_file(struct exclude_struct ***listp, const char *fname,
 void send_exclude_list(int f)
 {
 	int i;
-	extern int protocol_version;
 	extern int list_only, recurse;
 
 	/* This is a complete hack - blame Rusty.
@@ -341,10 +340,6 @@ void send_exclude_list(int f)
 		l = strlen(pattern);
 		if (l == 0) continue;
 		if (exclude_list[i]->include) {
-			if (protocol_version < 19) {
-				rprintf(FERROR,"remote rsync does not support include syntax - aborting\n");
-				exit_cleanup(RERR_UNSUPPORTED);
-			}
 			write_int(f,l+2);
 			write_buf(f,"+ ",2);
 		} else {
