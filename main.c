@@ -494,11 +494,6 @@ int main(int argc,char *argv[])
 	argv += optind;
 	optind = 0;
 
-	if (argc < 1) {
-		usage(FERROR);
-		exit(1);
-	}
-
 	signal(SIGCHLD,SIG_IGN);
 	signal(SIGINT,SIGNAL_CAST sig_int);
 	signal(SIGPIPE,SIGNAL_CAST sig_int);
@@ -506,6 +501,11 @@ int main(int argc,char *argv[])
 
 	if (am_daemon) {
 		return daemon_main();
+	}
+
+	if (argc < 1) {
+		usage(FERROR);
+		exit(1);
 	}
 
 	if (dry_run)
