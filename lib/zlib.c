@@ -600,6 +600,7 @@ int deflateInit2 (strm, level, method, windowBits, memLevel, strategy)
     }
     s = (deflate_state *) ZALLOC(strm, 1, sizeof(deflate_state));
     if (s == Z_NULL) return Z_MEM_ERROR;
+    bzero(s, sizeof(*s));
     strm->state = (struct internal_state FAR *)s;
     s->strm = strm;
 
