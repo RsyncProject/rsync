@@ -212,7 +212,7 @@ int do_mkstemp(char *template, mode_t perms)
 
 int do_stat(const char *fname, STRUCT_STAT *st)
 {
-#if HAVE_OFF64_T
+#if SIZEOF_OFF64_T
 	return stat64(fname, st);
 #else
 	return stat(fname, st);
@@ -222,7 +222,7 @@ int do_stat(const char *fname, STRUCT_STAT *st)
 int do_lstat(const char *fname, STRUCT_STAT *st)
 {
 #if SUPPORT_LINKS
-# if HAVE_OFF64_T
+# if SIZEOF_OFF64_T
 	return lstat64(fname, st);
 # else
 	return lstat(fname, st);
@@ -234,7 +234,7 @@ int do_lstat(const char *fname, STRUCT_STAT *st)
 
 int do_fstat(int fd, STRUCT_STAT *st)
 {
-#if HAVE_OFF64_T
+#if SIZEOF_OFF64_T
 	return fstat64(fd, st);
 #else
 	return fstat(fd, st);
@@ -243,7 +243,7 @@ int do_fstat(int fd, STRUCT_STAT *st)
 
 OFF_T do_lseek(int fd, OFF_T offset, int whence)
 {
-#if HAVE_OFF64_T
+#if SIZEOF_OFF64_T
 	off64_t lseek64();
 	return lseek64(fd, offset, whence);
 #else
@@ -254,7 +254,7 @@ OFF_T do_lseek(int fd, OFF_T offset, int whence)
 #ifdef USE_MMAP
 void *do_mmap(void *start, int len, int prot, int flags, int fd, OFF_T offset)
 {
-#if HAVE_OFF64_T
+#if SIZEOF_OFF64_T
 	return mmap64(start, len, prot, flags, fd, offset);
 #else
 	return mmap(start, len, prot, flags, fd, offset);
