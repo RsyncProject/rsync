@@ -48,6 +48,7 @@ extern int orig_umask;
 extern int keep_partial;
 extern int checksum_seed;
 extern int inplace;
+extern int delay_updates;
 
 extern struct filter_list_struct server_filter_list;
 
@@ -272,6 +273,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 	char fnametmp[MAXPATHLEN];
 	char *fnamecmp, *partialptr;
 	char fnamecmpbuf[MAXPATHLEN];
+	uchar *delayed_bits = NULL;
 	struct file_struct *file;
 	struct stats initial_stats;
 	int save_make_backups = make_backups;
@@ -283,6 +285,13 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 	if (flist->hlink_pool) {
 		pool_destroy(flist->hlink_pool);
 		flist->hlink_pool = NULL;
+	}
+
+	if (delay_updates) {
+		int sz = (flist->count + 7) / 8;
+		if (!(delayed_bits = new_array(char, sz)))
+			out_of_memory("recv_files");
+		memset(delayed_bits, 0, sz);
 	}
 
 	while (1) {
@@ -499,7 +508,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 			exit_cleanup(RERR_FILEIO);
 		}
 
-		if (recv_ok || inplace) {
+		if ((recv_ok && !delay_updates) || inplace) {
 			finish_transfer(fname, fnametmp, file, recv_ok, 1);
 			if (partialptr != fname && fnamecmp == partialptr) {
 				do_unlink(partialptr);
@@ -509,6 +518,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		    && handle_partial_dir(partialptr, PDIR_CREATE)) {
 			finish_transfer(partialptr, fnametmp, file, recv_ok,
 					!partial_dir);
+			if (delay_updates && recv_ok)
+				delayed_bits[i/8] |= 1 << (i % 8);
 		} else {
 			partialptr = NULL;
 			do_unlink(fnametmp);
@@ -547,6 +558,33 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		}
 	}
 	make_backups = save_make_backups;
+
+	if (delay_updates) {
+		for (i = 0; i < flist->count; i++) {
+			struct file_struct *file = flist->files[i];
+			if (!file->basename
+			 || !(delayed_bits[i/8] & (1 << (i % 8))))
+				continue;
+			fname = local_name ? local_name : f_name(file);
+			partialptr = partial_dir_fname(fname);
+			if (partialptr) {
+				if (make_backups && !make_backup(fname))
+					continue;
+				if (verbose > 2) {
+					rprintf(FINFO, "renaming %s to %s\n",
+						partialptr, fname);
+				}
+				if (do_rename(partialptr, fname) < 0) {
+					rsyserr(FERROR, errno,
+						"rename failed for %s (from %s)",
+						fname, partialptr);
+				} else {
+					handle_partial_dir(partialptr,
+							   PDIR_DELETE);
+				}
+			}
+		}
+	}
 
 	if (delete_after && recurse && !local_name && flist->count > 0)
 		delete_files(flist);
