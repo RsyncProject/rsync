@@ -70,6 +70,13 @@ Changes since 2.6.0:
     * Implemented a new algorithm for hard-link handling that speeds
       up the code significantly.  (J.W. Schultz and Wayne Davison)
 
+    * The --hard-link option now uses the first existing file in the
+      group of linked files as the basis for the transfer.  This
+      prevents the sub-optimal transfer of a file's data when a new
+      hardlink is added on the sending side and it sorts alphabetically
+      earlier in the list than the files that are already present on the
+      receiving side.
+
     * Got rid of support for protocol versions 17 and 18 (which are
       both over 6 years old).  (Wayne Davison)
 
@@ -77,9 +84,9 @@ Changes since 2.6.0:
 
     * More optimal data transmission for --checksum (protocol 28).
 
-    * Less memory used for holding --checksum data.
+    * Less memory is used when --checksum is specified.
 
-    * Less memory used per-file in the file list.
+    * Less memory is used in the file list (a per-file savings).
 
     * The 2 pipes used between the receiver and generator processes
       (which are forked on the same machine) were reduced to 1 pipe
