@@ -87,7 +87,7 @@ static char const *rerr_name(int code)
 	return NULL;
 }
 
-static void log_open(void)
+void log_open(void)
 {
 	if (logfname && !logfile) {
 		extern int orig_umask;
@@ -99,6 +99,14 @@ static void log_open(void)
 			rsyserr(FERROR, errno, "fopen() of log-file failed");
 			exit_cleanup(RERR_FILESELECT);
 		}
+	}
+}
+
+void log_close(void)
+{
+	if (logfile) {
+		fclose(logfile);
+		logfile = NULL;
 	}
 }
 
@@ -153,14 +161,6 @@ void log_init(void)
 #ifndef LOG_NDELAY
 	logit(LOG_INFO,"rsyncd started\n");
 #endif
-}
-
-void log_close(void)
-{
-	if (logfile) {
-		fclose(logfile);
-		logfile = NULL;
-	}
 }
 
 /* this is the underlying (unformatted) rsync debugging function. Call
