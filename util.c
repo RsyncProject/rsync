@@ -47,8 +47,12 @@ struct map_struct *map_file(int fd,OFF_T len)
   ret->p_len = 0;
 
 #ifdef HAVE_MMAP
-  if (len < MAX_MAP_SIZE)
-    ret->map = (char *)mmap(NULL,len,PROT_READ,MAP_SHARED,fd,0);
+  if (len < MAX_MAP_SIZE) {
+	  ret->map = (char *)mmap(NULL,len,PROT_READ,MAP_SHARED,fd,0);
+	  if (ret->map == (char *)-1) {
+		  ret->map = NULL;
+	  }
+  }
 #endif
   return ret;
 }
