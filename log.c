@@ -71,8 +71,9 @@ struct {
 	{ RERR_TIMEOUT    , "timeout in data send/receive" },
 	{ RERR_CMD_FAILED , "remote shell failed" },
 	{ RERR_CMD_KILLED , "remote shell killed" },
-	{ RERR_CMD_RUN,     "remote command could not be run" },
-	{ RERR_CMD_NOTFOUND, "remote command not found" },
+	{ RERR_CMD_RUN    , "remote command could not be run" },
+	{ RERR_CMD_NOTFOUND,"remote command not found" },
+	{ RERR_DEL_LIMIT  , "--max-delete limit stopped deletions" },
 	{ 0, NULL }
 };
 
