@@ -36,10 +36,10 @@ AC_TYPE_PID_T
 AC_STRUCT_ST_RDEV
 AC_CHECK_TYPE(ino_t,unsigned)
 
-AC_CACHE_CHECK([for errno in errno.h],samba_cv_errno, [
+AC_CACHE_CHECK([for errno in errno.h],rsync_cv_errno, [
     AC_TRY_COMPILE([#include <errno.h>],[int i = errno],
-	samba_cv_errno=yes,samba_cv_have_errno_decl=no)])
-if test x"$samba_cv_errno" = x"yes"; then
+	rsync_cv_errno=yes,rsync_cv_have_errno_decl=no)])
+if test x"$rsync_cv_errno" = x"yes"; then
    AC_DEFINE(HAVE_ERRNO_DECL)
 fi
 
@@ -55,20 +55,20 @@ main() { exit(fnmatch("*.o", "x.o", 0) == 0? 0: 1); }],
 echo yes;AC_DEFINE(HAVE_FNMATCH), 
 echo no)
 
-AC_CACHE_CHECK([for long long],samba_cv_have_longlong,[
+AC_CACHE_CHECK([for long long],rsync_cv_have_longlong,[
 AC_TRY_RUN([#include <stdio.h>
 main() { long long x = 1000000; x *= x; exit(((x/1000000) == 1000000)? 0: 1); }],
-samba_cv_have_longlong=yes,samba_cv_have_longlong=no,samba_cv_have_longlong=cross)])
-if test x"$samba_cv_have_longlong" = x"yes"; then
+rsync_cv_have_longlong=yes,rsync_cv_have_longlong=no,rsync_cv_have_longlong=cross)])
+if test x"$rsync_cv_have_longlong" = x"yes"; then
     AC_DEFINE(HAVE_LONGLONG)
 fi
 
-AC_CACHE_CHECK([for off64_t],samba_cv_HAVE_OFF64_T,[
+AC_CACHE_CHECK([for off64_t],rsync_cv_HAVE_OFF64_T,[
 AC_TRY_RUN([#include <stdio.h>
 #include <sys/stat.h>
 main() { struct stat64 st; off64_t s; if (sizeof(off_t) == sizeof(off64_t)) exit(1); exit((lstat64("/dev/null", &st)==0)?0:1); }],
-samba_cv_HAVE_OFF64_T=yes,samba_cv_HAVE_OFF64_T=no,samba_cv_HAVE_OFF64_T=cross)])
-if test x"$samba_cv_HAVE_OFF64_T" = x"yes"; then
+rsync_cv_HAVE_OFF64_T=yes,rsync_cv_HAVE_OFF64_T=no,rsync_cv_HAVE_OFF64_T=cross)])
+if test x"$rsync_cv_HAVE_OFF64_T" = x"yes"; then
     AC_DEFINE(HAVE_OFF64_T)
 fi
 
@@ -80,32 +80,47 @@ main() { if (sizeof(ino_t) < sizeof(unsigned int)) return 0; return 1; }],
 echo yes;AC_DEFINE(HAVE_SHORT_INO_T), 
 echo no)
 
-AC_CACHE_CHECK([for unsigned char],samba_cv_HAVE_UNSIGNED_CHAR,[
+AC_CACHE_CHECK([for unsigned char],rsync_cv_HAVE_UNSIGNED_CHAR,[
 AC_TRY_RUN([#include <stdio.h>
 main() { char c; c=250; exit((c > 0)?0:1); }],
-samba_cv_HAVE_UNSIGNED_CHAR=yes,samba_cv_HAVE_UNSIGNED_CHAR=no,samba_cv_HAVE_UNSIGNED_CHAR=cross)])
-if test x"$samba_cv_HAVE_UNSIGNED_CHAR" = x"yes"; then
+rsync_cv_HAVE_UNSIGNED_CHAR=yes,rsync_cv_HAVE_UNSIGNED_CHAR=no,rsync_cv_HAVE_UNSIGNED_CHAR=cross)])
+if test x"$rsync_cv_HAVE_UNSIGNED_CHAR" = x"yes"; then
     AC_DEFINE(HAVE_UNSIGNED_CHAR)
 fi
 
-AC_CACHE_CHECK([for broken readdir],samba_cv_HAVE_BROKEN_READDIR,[
+AC_CACHE_CHECK([for broken readdir],rsync_cv_HAVE_BROKEN_READDIR,[
 AC_TRY_RUN([#include <sys/types.h>
 #include <dirent.h>
 main() { struct dirent *di; DIR *d = opendir("."); di = readdir(d);
 if (di && di->d_name[-2] == '.' && di->d_name[-1] == 0 &&
 di->d_name[0] == 0) exit(0); exit(1);} ],
-samba_cv_HAVE_BROKEN_READDIR=yes,samba_cv_HAVE_BROKEN_READDIR=no,samba_cv_HAVE_BROKEN_READDIR=cross)])
-if test x"$samba_cv_HAVE_BROKEN_READDIR" = x"yes"; then
+rsync_cv_HAVE_BROKEN_READDIR=yes,rsync_cv_HAVE_BROKEN_READDIR=no,rsync_cv_HAVE_BROKEN_READDIR=cross)])
+if test x"$rsync_cv_HAVE_BROKEN_READDIR" = x"yes"; then
     AC_DEFINE(HAVE_BROKEN_READDIR)
 fi
 
-AC_CACHE_CHECK([for utimbuf],samba_cv_HAVE_UTIMBUF,[
+AC_CACHE_CHECK([for utimbuf],rsync_cv_HAVE_UTIMBUF,[
 AC_TRY_COMPILE([#include <sys/types.h>
 #include <utime.h>],
 [struct utimbuf tbuf;  tbuf.actime = 0; tbuf.modtime = 1; exit(utime("foo.c",&tbuf));],
-samba_cv_HAVE_UTIMBUF=yes,samba_cv_HAVE_UTIMBUF=no,samba_cv_HAVE_UTIMBUF=cross)])
-if test x"$samba_cv_HAVE_UTIMBUF" = x"yes"; then
+rsync_cv_HAVE_UTIMBUF=yes,rsync_cv_HAVE_UTIMBUF=no,rsync_cv_HAVE_UTIMBUF=cross)])
+if test x"$rsync_cv_HAVE_UTIMBUF" = x"yes"; then
     AC_DEFINE(HAVE_UTIMBUF)
+fi
+
+AC_CACHE_CHECK([for broken inet_ntoa],rsync_cv_REPLACE_INET_NTOA,[
+AC_TRY_RUN([
+#include <stdio.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+main() { struct in_addr ip; ip.s_addr = 0x12345678;
+if (strcmp(inet_ntoa(ip),"18.52.86.120") &&
+    strcmp(inet_ntoa(ip),"120.86.52.18")) { exit(0); } 
+exit(1);}],
+           rsync_cv_REPLACE_INET_NTOA=yes,rsync_cv_REPLACE_INET_NTOA=no,rsync_cv_REPLACE_INET_NTOA=cross)])
+if test x"$rsync_cv_REPLACE_INET_NTOA" = x"yes"; then
+    AC_DEFINE(REPLACE_INET_NTOA)
 fi
 
 # The following test taken from the cvs sources

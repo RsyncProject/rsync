@@ -8,3 +8,4 @@
 #undef ino_t
 #undef HAVE_CONNECT
 #undef HAVE_SHORT_INO_T
+#undef REPLACE_INET_NTOA
