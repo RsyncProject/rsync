@@ -942,31 +942,37 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 					dir = fname;
 				fname = p + 1;
 			}
-		} else if (f != -1 && (p = strrchr(fname, '/'))) {
+		} else if (f != -1 && (p=strrchr(fname,'/')) && p != fname) {
 			/* this ensures we send the intermediate directories,
 			   thus getting their permissions right */
+			char *lp = lastpath, *fn = fname, *slash = fname;
 			*p = 0;
-			if (strcmp(lastpath, fname)) {
-				strlcpy(lastpath, fname, sizeof(lastpath));
-				*p = '/';
-				for (p = fname + 1; (p = strchr(p, '/'));
-				     p++) {
-					int copy_links_saved = copy_links;
-					int recurse_saved = recurse;
-					*p = 0;
-					copy_links = copy_unsafe_links;
-					/* set recurse to 1 to prevent make_file
-					   from ignoring directory, but still
-					   turn off the recursive parameter to
-					   send_file_name */
-					recurse = 1;
-					send_file_name(f, flist, fname, 0,
-						       0);
-					copy_links = copy_links_saved;
-					recurse = recurse_saved;
-					*p = '/';
+			/* Skip any initial directories in our path that we
+			 * have in common with lastpath. */
+			while (*fn && *lp == *fn) {
+				if (*fn == '/')
+					slash = fn;
+				lp++, fn++;
+			}
+			*p = '/';
+			if (fn != p || (*lp && *lp != '/')) {
+				int copy_links_saved = copy_links;
+				int recurse_saved = recurse;
+				copy_links = copy_unsafe_links;
+				/* set recurse to 1 to prevent make_file
+				 * from ignoring directory, but still
+				 * turn off the recursive parameter to
+				 * send_file_name */
+				recurse = 1;
+				while ((slash = strchr(slash+1, '/')) != 0) {
+					*slash = 0;
+					send_file_name(f, flist, fname, 0, 0);
+					*slash = '/';
 				}
-			} else {
+				copy_links = copy_links_saved;
+				recurse = recurse_saved;
+				*p = 0;
+				strlcpy(lastpath, fname, sizeof lastpath);
 				*p = '/';
 			}
 		}
