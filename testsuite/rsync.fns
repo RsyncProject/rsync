@@ -67,8 +67,8 @@ hands_setup() {
     touch ${FROM}/empty
     mkdir ${FROM}/emptydir
 
-    # a few hundred lines of test
-    ls -lR / | head -200 > ${FROM}/filelist
+    # a hundred lines of text or so
+    ls -lR $(srcdir) >${FROM}/filelist
 
     # This might fail on systems that don't have -n
     echo $ECHO_N "This file has no trailing lf$ECHO_C" > ${FROM}/nolf
@@ -76,7 +76,7 @@ hands_setup() {
     ln -s nolf ${FROM}/nolf-symlink
     umask 077
 
-    cat $srcdir/*.c | head -2000 > ${FROM}/${F1}
+    cat $srcdir/*.c > ${FROM}/${F1}
     mkdir ${FROM}/dir
     cp ${FROM}/${F1} ${FROM}/dir
     mkdir ${FROM}/dir/subdir

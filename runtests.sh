@@ -95,6 +95,8 @@
 # You cannot use "function foo {" syntax, but must instead say "foo()
 # {", or it breaks on FreeBSD.
 
+# BSD machines tend not to have "head" or "seq".
+
 
 
 # STILL TO DO:
