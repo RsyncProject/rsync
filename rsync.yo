@@ -15,6 +15,8 @@ rsync [OPTION]... SRC [SRC]... [USER@]HOST::DEST
 
 rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC [DEST]
 
+rsync [OPTION]... SRC [SRC]... rsync://[USER@]HOST[:PORT]/DEST
+
 manpagedescription()
 
 rsync is a program that behaves in much the same way that rcp does,
@@ -63,7 +65,7 @@ itemize(
 
 	it() for copying from the local machine to a remote rsync
 	server. This is invoked when the destination path contains a ::
-	separator. 
+	separator or a rsync:// URL.
 
 	it() for copying from a remote machine using a remote shell
 	program as the transport, using rsync server on the remote
@@ -163,7 +165,7 @@ that:
 
 itemize(
 	it() you use a double colon :: instead of a single colon to
-	separate the hostname from the path. 
+	separate the hostname from the path or a rsync:// URL.
 
 	it() the remote server may print a message of the day when you
 	connect.
