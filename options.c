@@ -142,6 +142,7 @@ int basis_dir_cnt = 0;
 int verbose = 0;
 int quiet = 0;
 int itemize_changes = 0;
+int log_before_transfer = 0;
 int always_checksum = 0;
 int list_only = 0;
 
@@ -1057,7 +1058,17 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		return 0;
 	}
 
-	if (do_progress && !verbose && !itemize_changes) {
+	if (log_format) {
+		if (strstr(log_format, "%i") != NULL)
+			itemize_changes = 1;
+		if (strstr(log_format, "%b") == NULL
+		 && strstr(log_format, "%c") == NULL)
+			log_before_transfer = !am_server;
+	} else if (itemize_changes) {
+		log_format = "%i %n%L";
+		log_before_transfer = !am_server;
+	}
+	if (do_progress && !verbose && !log_before_transfer) {
 		if (refused_verbose) {
 			create_refuse_error(refused_verbose);
 			return 0;
@@ -1214,7 +1225,7 @@ void server_options(char **args,int *argc)
 	 * default for remote transfers, and in any case old versions
 	 * of rsync will not understand it. */
 
-	if (itemize_changes && am_sender)
+	if (itemize_changes)
 		argstr[x++] = 'i';
 	if (preserve_hard_links)
 		argstr[x++] = 'H';
