@@ -398,7 +398,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			continue;
 		}
       
-		cleanup_set(fnametmp, fname, file);
+		cleanup_set(fnametmp, fname, file, buf, fd1, fd2);
 
 		if (!am_server && verbose)
 			rprintf(FINFO,"%s\n",fname);
@@ -416,9 +416,9 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			rprintf(FINFO,"renaming %s to %s\n",fnametmp,fname);
 
 		finish_transfer(fname, fnametmp, file);
-		
+
 		cleanup_disable();
-		
+				
 		if (!recv_ok) {
 			if (csum_length == SUM_LENGTH) {
 				rprintf(FERROR,"ERROR: file corruption in %s. File changed during transfer?\n",

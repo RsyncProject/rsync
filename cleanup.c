@@ -27,6 +27,8 @@ int cleanup_got_literal=0;
 static char *cleanup_fname;
 static char *cleanup_new_fname;
 static struct file_struct *cleanup_file;
+static int cleanup_fd1, cleanup_fd2;
+static struct map_struct *cleanup_buf;
 
 void exit_cleanup(int code)
 {
@@ -37,6 +39,9 @@ void exit_cleanup(int code)
 	if (cleanup_got_literal && cleanup_fname && keep_partial) {
 		char *fname = cleanup_fname;
 		cleanup_fname = NULL;
+		if (cleanup_buf) unmap_file(cleanup_buf);
+		if (cleanup_fd1 != -1) close(cleanup_fd1);
+		if (cleanup_fd2 != -1) close(cleanup_fd2);
 		finish_transfer(cleanup_new_fname, fname, cleanup_file);
 	}
 	io_flush();
@@ -55,9 +60,13 @@ void cleanup_disable(void)
 }
 
 
-void cleanup_set(char *fnametmp, char *fname, struct file_struct *file)
+void cleanup_set(char *fnametmp, char *fname, struct file_struct *file,
+		 struct map_struct *buf, int fd1, int fd2)
 {
 	cleanup_fname = fnametmp;
 	cleanup_new_fname = fname;
 	cleanup_file = file;
+	cleanup_buf = buf;
+	cleanup_fd1 = fd1;
+	cleanup_fd2 = fd2;
 }
