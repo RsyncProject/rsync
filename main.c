@@ -285,6 +285,7 @@ oom:
 static char *get_local_name(struct file_list *flist,char *name)
 {
 	STRUCT_STAT st;
+	int len;
 	extern int orig_umask;
 
 	if (verbose > 2)
@@ -310,7 +311,8 @@ static char *get_local_name(struct file_list *flist,char *name)
 		return name;
 	}
 
-	if (flist->count <= 1)
+	len = strlen(name);
+	if ((len <= 1 || name[len-1] != '/') && flist->count <= 1)
 		return name;
 
 	if (do_mkdir(name,0777 & ~orig_umask) != 0) {
