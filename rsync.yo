@@ -351,6 +351,7 @@ to the detailed description below for a complete description.  verb(
      --size-only             skip files that match in size
      --modify-window=NUM     compare mod-times with reduced accuracy
  -T, --temp-dir=DIR          create temporary files in directory DIR
+ -y, --fuzzy                 find similar file for basis if no dest file
      --compare-dest=DIR      also compare received files relative to DIR
      --copy-dest=DIR         ... and include copies of unchanged files
      --link-dest=DIR         hardlink to files in DIR when unchanged
@@ -908,6 +909,16 @@ dit(bf(-T, --temp-dir=DIR)) This option instructs rsync to use DIR as a
 scratch directory when creating temporary copies of the files
 transferred on the receiving side.  The default behavior is to create
 the temporary files in the receiving directory.
+
+dit(bf(-y, --fuzzy)) This option tells rsync that it should look for a
+basis file for any destination file that is missing.  The current algorithm
+looks in the same directory as the destination file for either a file that
+has an identical size and modified-time, or a similarly-named file.  If
+found, rsync uses the fuzzy basis file to try to speed up the transfer.
+
+Note that the use of the bf(--delete) option might get rid of any potential
+fuzzy-match files, so either use bf(--delete-after) or specify some
+filename exclusions if you need to prevent this.
 
 dit(bf(--compare-dest=DIR)) This option instructs rsync to use em(DIR) on
 the destination machine as an additional hierarchy to compare destination
