@@ -22,5 +22,5 @@ build_symlinks || test_fail "failed to build symlinks"
 [ -e $todir/relative ] && test_fail "relative symlink was copied"
 [ -e $todir/absolute ] && test_fail "absolute symlink was copied"
 
-true # last [] may have failed but if we get here then we've one
+exit 0 # last [] may have failed but if we get here then we've one
 
