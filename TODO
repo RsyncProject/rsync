@@ -16,8 +16,85 @@ Cross-test versions
   some testing and also be the most common case for having different
   versions and not being able to upgrade.
 
+use chroot
+
+  If the platform doesn't support it, then don't even try.
+
+  If running as non-root, then don't fail, just give a warning.
+  (There was a thread about this a while ago?)
+
+    http://lists.samba.org/pipermail/rsync/2001-August/thread.html
+    http://lists.samba.org/pipermail/rsync/2001-September/thread.html
+
+--files-from
+
+  Avoids traversal.  Better option than a pile of --include statements
+  for people who want to generate the file list using a find(1)
+  command or a script.
+
+Performance
+
+  Traverse just one directory at a time.  Tridge says it's possible.
+ 
+  Can possibly also be smarter about memory use while looking for hard
+  links by reducing the refcount as we find alternative names.
+
+IPv6
+
+  Define a syntax for IPv6 literal addresses.  Since they include
+  colons, they tend to break most naming systems, including ours.
+  Based on the HTTP IPv6 syntax, I think we should use
+ 
+     rsync://[::1]/foo/bar
+     [::1]::bar
+
+  which should just take a small change to the parser code.
+
+PLATFORMS ------------------------------------------------------------
+
+Win32
+
+  Don't detach, because this messes up --srvany.
+
+  http://sources.redhat.com/ml/cygwin/2001-08/msg00234.html
+
+  According to "Effective TCP/IP Programming" (??) close() on a socket
+  has incorrect behaviour on Windows -- it sends a RST packet to the
+  other side, which gives a "connection reset by peer" error.  On that
+  platform we should probably do shutdown() instead.  However, on Unix
+  we are correct to call close(), because shutdown() discards
+  untransmitted data.
+
+BUILD FARM -----------------------------------------------------------
+
+Add machines
+
+  AMDAHL UTS (Dave Dykstra)
+
+  Cygwin (on different versions of Win32?)
+
+  HP-UX variants (via HP?)
 
 NICE -----------------------------------------------------------------
+
+--no-detach and --no-fork options
+
+  Very useful for debugging.  Also good when running under a
+  daemon-monitoring process that tries to restart the service when the
+  parent exits.
+
+hang/timeout friendliness
+
+  On 
+
+internationalization
+
+  Change to using gettext().  Probably need to ship this for platforms
+  that don't have it.  
+
+  Solicit translations.
+
+  Does anyone care?
 
 rsyncsh 
 
