@@ -383,11 +383,9 @@ void send_exclude_list(int f)
 {
 	struct exclude_struct *ent;
 
-	/* This is a complete hack - blame Rusty.
-	 *
-	 * FIXME: This pattern shows up in the output of
-	 * report_exclude_result(), which is not ideal. */
-	if (list_only && !recurse)
+	/* This is a complete hack - blame Rusty.  FIXME!
+	 * Remove this hack when older rsyncs (below 2.6.4) are gone. */
+	if (list_only == 1 && !recurse)
 		add_exclude(&exclude_list, "/*/*", 0);
 
 	for (ent = exclude_list.head; ent; ent = ent->next) {
