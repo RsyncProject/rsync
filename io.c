@@ -407,8 +407,8 @@ static void mplex_write(int fd, enum logcode code, char *buf, int len)
 
 	SIVAL(buffer, 0, ((MPLEX_BASE + (int)code)<<24) + len);
 
-	if (n > (sizeof(buf)-4)) {
-		n = sizeof(buf)-4;
+	if (n > (sizeof(buffer)-4)) {
+		n = sizeof(buffer)-4;
 	}
 
 	memcpy(&buffer[4], buf, n);
@@ -417,7 +417,9 @@ static void mplex_write(int fd, enum logcode code, char *buf, int len)
 	len -= n;
 	buf += n;
 
-	writefd_unbuffered(fd, buf, len);
+	if (len) {
+		writefd_unbuffered(fd, buf, len);
+	}
 }
 
 

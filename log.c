@@ -94,7 +94,7 @@ void rwrite(enum logcode code, char *buf, int len)
 	extern int quiet;
 	/* recursion can happen with certain fatal conditions */
 
-	if (quiet != 0 && code == FINFO) return;
+	if (quiet && code == FINFO) return;
 
 	if (len < 0) exit_cleanup(RERR_MESSAGEIO);
 
@@ -105,7 +105,13 @@ void rwrite(enum logcode code, char *buf, int len)
 		return;
 	}
 
-	if (io_error_write(log_error_fd, code, buf, strlen(buf))) return;
+	if (io_error_write(log_error_fd, code, buf, strlen(buf))) {
+		return;
+	}
+
+	if (io_multiplex_write(code, buf, strlen(buf))) {
+		return;
+	}
 
 	if (am_daemon) {
 		static int depth;
@@ -117,9 +123,7 @@ void rwrite(enum logcode code, char *buf, int len)
 		depth++;
 
 		log_open();
-		if (!io_multiplex_write(code, buf, strlen(buf))) {
-			logit(priority, buf);
-		}
+		logit(priority, buf);
 
 		depth--;
 		return;

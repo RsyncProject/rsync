@@ -393,10 +393,10 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 	extern int am_sender;
 	extern int remote_version;
 
+	setup_protocol(f_out, f_in);
+
 	if (remote_version >= 23)
 		io_start_multiplex_out(f_out);
-
-	setup_protocol(f_out, f_in);
 
 	if (am_sender) {
 		recv_exclude_list(f_in);
@@ -418,10 +418,10 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 	extern int list_only;
 	extern int remote_version;
 
+	setup_protocol(f_out,f_in);
+
 	if (remote_version >= 23)
 		io_start_multiplex_in(f_in);
-
-	setup_protocol(f_out,f_in);
 	
 	if (am_sender) {
 		extern int cvs_exclude;
