@@ -639,6 +639,8 @@ void maybe_send_keepalive(int allowed_lull, int ndx)
 {
 	if (time(NULL) - last_io >= allowed_lull) {
 		if (!iobuf_out || !iobuf_out_cnt) {
+			if (protocol_version < 29)
+				return; /* there's nothing we can do */
 			write_int(sock_f_out, ndx);
 			write_shortint(sock_f_out, ITEM_IS_NEW);
 		}
