@@ -162,7 +162,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		if (file->basedir) {
 			strlcpy(fname, file->basedir, MAXPATHLEN);
 			if (strlen(fname) == MAXPATHLEN-1) {
-				io_error = 1;
+				io_error |= IOERR_GENERAL;
 				rprintf(FERROR, "send_files failed on long-named directory %s\n",
 					full_fname(fname));
 				return;
@@ -187,7 +187,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		s = receive_sums(f_in);
 		if (!s) {
-			io_error = 1;
+			io_error |= IOERR_GENERAL;
 			rprintf(FERROR, "receive_sums failed\n");
 			return;
 		}
@@ -198,16 +198,22 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		if (!read_batch) {
 			fd = do_open(fname, O_RDONLY, 0);
 			if (fd == -1) {
-				io_error = 1;
-				rprintf(FERROR, "send_files failed to open %s: %s\n",
-					full_fname(fname), strerror(errno));
+				if (errno == ENOENT) {
+					io_error |= IOERR_VANISHED;
+					rprintf(FINFO, "file has vanished: %s\n",
+			 			full_fname(fname));
+				} else {
+					io_error |= IOERR_GENERAL;
+					rprintf(FERROR, "send_files failed to open %s: %s\n",
+						full_fname(fname), strerror(errno));
+				}
 				free_sums(s);
 				continue;
 			}
 
 			/* map the local file */
 			if (do_fstat(fd, &st) != 0) {
-				io_error = 1;
+				io_error |= IOERR_GENERAL;
 				rprintf(FERROR, "fstat failed: %s\n", strerror(errno));
 				free_sums(s);
 				close(fd);
@@ -286,12 +292,10 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			if (buf) {
 				j = unmap_file(buf);
 				if (j) {
-					io_error = 1;
+					io_error |= IOERR_GENERAL;
 					rprintf(FERROR,
 					    "read errors mapping %s: (%d) %s\n",
-					    full_fname(fname),
-					    j,
-					    strerror(j));
+					    full_fname(fname), j, strerror(j));
 				}
 			}
 			close(fd);

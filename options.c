@@ -62,7 +62,6 @@ int implied_dirs = 1;
 int numeric_ids = 0;
 int force_delete = 0;
 int io_timeout = 0;
-int io_error = 0;
 int read_only = 0;
 int module_id = -1;
 int am_server = 0;

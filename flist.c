@@ -58,7 +58,6 @@ extern int implied_dirs;
 extern int copy_links;
 extern int copy_unsafe_links;
 extern int protocol_version;
-extern int io_error;
 extern int sanitize_paths;
 
 extern int read_batch;
@@ -67,6 +66,8 @@ extern int write_batch;
 extern struct exclude_struct **exclude_list;
 extern struct exclude_struct **server_exclude_list;
 extern struct exclude_struct **local_exclude_list;
+
+int io_error;
 
 static struct file_struct null_file;
 
@@ -694,7 +695,7 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 				return NULL;
 			}
 		}
-		io_error = 1;
+		io_error |= IOERR_GENERAL;
 		rprintf(FERROR, "readlink %s failed: %s\n",
 			full_fname(fname), strerror(save_errno));
 		return NULL;
@@ -844,7 +845,7 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 
 	d = opendir(dir);
 	if (!d) {
-		io_error = 1;
+		io_error |= IOERR_GENERAL;
 		rprintf(FERROR, "opendir %s failed: %s\n",
 			full_fname(dir), strerror(errno));
 		return;
@@ -854,7 +855,7 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 	l = strlen(fname);
 	if (fname[l - 1] != '/') {
 		if (l == MAXPATHLEN - 1) {
-			io_error = 1;
+			io_error |= IOERR_GENERAL;
 			rprintf(FERROR, "skipping long-named directory: %s\n",
 				full_fname(fname));
 			closedir(d);
@@ -872,7 +873,7 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 			strcpy(p, ".cvsignore");
 			add_exclude_file(&exclude_list,fname,MISSING_OK,ADD_EXCLUDE);
 		} else {
-			io_error = 1;
+			io_error |= IOERR_GENERAL;
 			rprintf(FINFO,
 				"cannot cvs-exclude in long-named directory %s\n",
 				full_fname(fname));
@@ -888,7 +889,7 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 		send_file_name(f, flist, fname, recurse, 0);
 	}
 	if (errno) {
-		io_error = 1;
+		io_error |= IOERR_GENERAL;
 		rprintf(FERROR, "readdir(%s): (%d) %s\n",
 		    dir, errno, strerror(errno));
 	}
@@ -963,7 +964,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 		if (link_stat(fname, &st) != 0) {
 			if (f != -1) {
-				io_error = 1;
+				io_error |= IOERR_GENERAL;
 				rprintf(FERROR, "link_stat %s failed: %s\n",
 					full_fname(fname), strerror(errno));
 			}
@@ -1030,7 +1031,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			olddir = push_dir(dir, 1);
 
 			if (!olddir) {
-				io_error = 1;
+				io_error |= IOERR_GENERAL;
 				rprintf(FERROR, "push_dir %s failed: %s\n",
 					full_fname(dir), strerror(errno));
 				continue;
