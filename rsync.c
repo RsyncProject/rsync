@@ -150,10 +150,9 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	STRUCT_STAT st2;
 	int change_uid, change_gid;
 
-	if (dry_run)
-		return 0;
-
 	if (!st) {
+		if (dry_run)
+			return 1;
 		if (link_stat(fname, &st2, 0) < 0) {
 			rsyserr(FERROR, errno, "stat %s failed",
 				full_fname(fname));
