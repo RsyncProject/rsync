@@ -139,6 +139,13 @@ use chroot
   command or a script.
 
 
+supplementary groups
+
+  Perhaps allow supplementary groups to be specified in rsyncd.conf;
+  then make the first one the primary gid and all the rest be
+  supplementary gids.
+
+
 File list structure in memory
 
   Rather than one big array, perhaps have a tree in memory mirroring
@@ -361,6 +368,16 @@ zlib
   that use the patched version of rsync.  Probably the simplest way to
   do this is to just disable gzip (with a warning) when talking to old
   versions.
+
+  After we get the @RSYNCD greeting from the server, we know it's
+  version but we have not yet sent the command line, so we could just
+  remove the -z option if the server is too old.  
+
+  For ssh invocation it's not so simple, because we actually use the
+  command line to start the remote process.  However, we only actually
+  do compression in token.c, and we could therefore once we discover
+  the remote version emit an error if it's too old.  I'm not sure if
+  that's a good tradeoff or not.
 
 
 proxy authentication
