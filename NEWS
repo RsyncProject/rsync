@@ -160,14 +160,13 @@ Changes since 2.6.0:
     * Improved the internal uid/gid code to be more portable and
       a little more optimized.
 
-    * Device numbers are now sent as separate major/minor values
-      with 32-bit accuracy for each one (protocol 28).  Previously
-      hard-link device data was sent as a single 64-bit number, and
-      copied devices were sent as a single 32-bit number.  This will
-      make inter-operation of 64-bit binaries more compatible with
-      their 32-bit brethren.  Note that optimizations in the binary
-      protocol often sends the device data using fewer bytes than
-      before, even though more precision is now available.
+    * The device numbers sent when using --devices are now sent as
+      separate major/minor values with 32-bit accuracy (protocol 28).
+      Previously, the copied devices were sent as a single 32-bit
+      number.  This will make inter-operation of 64-bit binaries more
+      compatible with their 32-bit brethren.  Note that optimizations
+      in the binary protocol often sends the device data using fewer
+      bytes than before, even though more precision is now available.
 
     * Some cleanup of the exclude/include structures and its code
       made things clearer, simpler, and more efficient.
