@@ -24,6 +24,7 @@
 
 #define BLOCK_SIZE 700
 #define RSYNC_RSH_ENV "RSYNC_RSH"
+#define RSYNC_RSH_IO_ENV "RSYNC_RSH_IO"
 
 #define RSYNC_NAME "rsync"
 #define RSYNCD_SYSCONF "/etc/rsyncd.conf"
