@@ -293,7 +293,7 @@ static struct poptOption long_options[] = {
   {"update",          'u', POPT_ARG_NONE,   &update_only},
   {"links",           'l', POPT_ARG_NONE,   &preserve_links},
   {"copy-links",      'L', POPT_ARG_NONE,   &copy_links},
-  {"whole",           'W', POPT_ARG_NONE,   &whole_file},
+  {"whole-file",      'W', POPT_ARG_NONE,   &whole_file},
   {"copy-unsafe-links", 0, POPT_ARG_NONE,   &copy_unsafe_links},
   {"perms",           'p', POPT_ARG_NONE,   &preserve_perms},
   {"owner",           'o', POPT_ARG_NONE,   &preserve_uid},
