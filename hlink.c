@@ -168,7 +168,8 @@ int hard_link_one(struct file_struct *file, int ndx, char *fname,
 	}
 
 	if (itemizing) {
-		itemize(file, ndx, statret, st, ITEM_HARD_LINKED,
+		itemize(file, ndx, statret, st,
+			ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS, 0,
 			terse ? "" : toname);
 	}
 	if (code && verbose && !terse) {
@@ -207,8 +208,9 @@ void hard_link_cluster(struct file_struct *file, int master, int itemizing,
 			if (st2.st_dev == st1.st_dev
 			    && st2.st_ino == st1.st_ino) {
 				if (itemizing) {
-					itemize(file, ndx, statret,
-						&st2, ITEM_HARD_LINKED, "");
+					itemize(file, ndx, statret, &st2,
+						ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS,
+						0, "");
 				}
 				continue;
 			}
