@@ -106,10 +106,21 @@
 #define ADD_INCLUDE 1
 #define ADD_EXCLUDE 0
 
-/* Log values.  I *think* what these mean is: FLOG goes to the server
- * logfile; FERROR and FINFO try to end up on the client, with
- * different levels of filtering. */
-enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
+#define FULL_FLUSH	1
+#define NORMAL_FLUSH	0
+
+/* Log-message categories.  FLOG is only used on the daemon side to
+ * output messages to the log file. */
+enum logcode { FERROR=1, FINFO=2, FLOG=3 };
+
+/* Messages types that are sent over the message channel.  The logcode
+ * values must all be present here with identical numbers. */
+enum msgcode {
+	MSG_DATA=0,	/* raw data on the multiplexed stream */
+	MSG_ERROR=FERROR, MSG_INFO=FINFO, MSG_LOG=FLOG, /* remote logging */
+	MSG_REDO=4,	/* reprocess indicated flist index */
+	MSG_DONE=5,	/* current phase is done */
+};
 
 #include "errcode.h"
 
