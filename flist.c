@@ -432,7 +432,7 @@ static struct file_struct *make_file(char *fname)
 
 
 
-static void send_file_name(int f,struct file_list *flist,char *fname,
+void send_file_name(int f,struct file_list *flist,char *fname,
 			   int recursive, unsigned base_flags)
 {
   struct file_struct *file;
@@ -532,7 +532,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 {
 	int i,l;
 	STRUCT_STAT st;
-	char *p,*dir;
+	char *p,*dir,*olddir;
 	char lastpath[MAXPATHLEN]="";
 	struct file_list *flist;
 	int64 start_write;
@@ -580,6 +580,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 		}
 
 		dir = NULL;
+		olddir = NULL;
 
 		if (!relative_paths) {
 			p = strrchr(fname,'/');
@@ -615,7 +616,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 			fname = ".";
 		
 		if (dir && *dir) {
-			char *olddir = push_dir(dir, 1);
+			olddir = push_dir(dir, 1);
 
 			if (!olddir) {
 				io_error=1;
@@ -625,21 +626,22 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 			}
 
 			flist_dir = dir;
-			if (one_file_system)
-				set_filesystem(fname);
+		}
+		
+		if (one_file_system)
+			set_filesystem(fname);
+
+		if (!recurse || !send_included_file_names(f,flist))
 			send_file_name(f,flist,fname,recurse,FLAG_DELETE);
+
+		if (olddir != NULL) {
 			flist_dir = NULL;
 			if (pop_dir(olddir) != 0) {
 				rprintf(FERROR,"pop_dir %s : %s\n",
 					dir,strerror(errno));
 				exit_cleanup(1);
 			}
-			continue;
 		}
-		
-		if (one_file_system)
-			set_filesystem(fname);
-		send_file_name(f,flist,fname,recurse,FLAG_DELETE);
 	}
 
 	if (f != -1) {
