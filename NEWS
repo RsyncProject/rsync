@@ -2,13 +2,14 @@ rsync 2.5.3 (not released yet)
 
   SECURITY FIXES:
 
-    * (CVE CAN-2002-0059)
-
     * Make sure that supplementary groups are removed from a server
       process after changing uid and gid. (Ethan Benson) (Debian bug
       #132272, CVE CAN-2002-0080)
 
   BUG FIXES:
+
+    * Fix zlib double-free bug.  (Owen Taylor, Mark J Cox) (CVE
+      CAN-2002-0059)
 
     * Fixed problem that in many cases caused the error message 
 	unexpected read size of 0 in map_ptr
