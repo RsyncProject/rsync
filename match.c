@@ -217,20 +217,13 @@ static void hash_search(int f,struct sum_struct *s,
 
 			/* we've found a match, but now check to see
 			 * if last_i can hint at a better match */
-			for (j++; j < s->count && targets[j].t == t; j++) {
-				size_t i2 = targets[j].i;
-				if (i2 == last_i + 1) {
-					if (sum != s->sums[i2].sum1)
-						break;
-					if (memcmp(sum2,s->sums[i2].sum2,s->s2length) != 0)
-						break;
-					/* we've found an adjacent match - the RLL coder
-					 * will be happy */
-					i = i2;
-					break;
-				}
+			if (i != last_i + 1 && last_i + 1 < s->count
+			    && sum == s->sums[last_i+1].sum1
+			    && memcmp(sum2, s->sums[last_i+1].sum2, s->s2length) == 0) {
+				/* we've found an adjacent match - the RLL coder
+				 * will be happy */
+				i = last_i + 1;
 			}
-
 			last_i = i;
 
 			matched(f,s,buf,offset,i);
