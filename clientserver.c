@@ -32,7 +32,6 @@ extern int am_server;
 extern int am_daemon;
 extern int am_root;
 extern int module_id;
-extern int read_only;
 extern int verbose;
 extern int rsync_port;
 extern int kludge_around_eof;
@@ -53,6 +52,7 @@ extern char *config_file;
 extern char *files_from;
 
 char *auth_user;
+int read_only = 0;
 
 /* Length of lp_path() string when in daemon mode & not chrooted, else 0. */
 unsigned int module_dirlen = 0;
@@ -281,6 +281,9 @@ static int rsync_module(int f_in, int f_out, int i)
 
 	module_id = i;
 
+	if (lp_read_only(module_id))
+		read_only = 1;
+
 	am_root = (MY_UID() == 0);
 
 	if (am_root) {
@@ -448,6 +451,7 @@ static int rsync_module(int f_in, int f_out, int i)
 			start_glob = 1;
 	}
 
+	verbose = 0; /* future verbosity is controlled by client options */
 	argp = argv;
 	ret = parse_arguments(&argc, (const char ***) &argp, 0);
 
