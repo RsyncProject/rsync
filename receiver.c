@@ -477,7 +477,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	for (i = 0; i < flist->count; i++) {
 		file = flist->files[i];
 		if (!file->basename || !S_ISDIR(file->mode)) continue;
-		recv_generator(f_name(file),flist,i,-1);
+		recv_generator(local_name?local_name:f_name(file),flist,i,-1);
 	}
 
 	if (verbose > 2)
