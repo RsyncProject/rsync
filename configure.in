@@ -38,6 +38,13 @@ fi
 AC_ARG_WITH(included-popt,
         [  --with-included-popt    use bundled popt library, not from system])
 
+AC_ARG_WITH(rsync-path,
+	[  --with-rsync-path=PATH  set rsync path used on server to PATH (default: "rsync")],
+	[ RSYNC_PATH="$with_rsync_name" ],
+	[ RSYNC_PATH="rsync" ])
+RSYNC_PATH="\"$RSYNC_PATH\""
+AC_DEFINE_UNQUOTED(RSYNC_PATH, $RSYNC_PATH)
+
 dnl Checks for programs.
 AC_PROG_CC
 AC_PROG_INSTALL

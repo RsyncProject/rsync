@@ -81,7 +81,7 @@ char *config_file = RSYNCD_CONF;
 char *shell_cmd = NULL;
 char *log_format = NULL;
 char *password_file = NULL;
-char *rsync_path = RSYNC_NAME;
+char *rsync_path = RSYNC_PATH;
 char *backup_dir = NULL;
 int rsync_port = RSYNC_PORT;
 
