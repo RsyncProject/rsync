@@ -360,6 +360,7 @@ static void send_file_entry(struct file_struct *file, int f,
 	static DEV64_T last_rdev;
 	static uid_t last_uid;
 	static gid_t last_gid;
+	static DEV64_T last_dev;
 	static char lastname[MAXPATHLEN];
 	char *fname, fbuf[MAXPATHLEN];
 	int l1, l2;
@@ -407,6 +408,15 @@ static void send_file_entry(struct file_struct *file, int f,
 		flags |= SAME_TIME;
 	else
 		last_time = file->modtime;
+	if (file->flags & HAS_INODE_DATA) {
+		if (file->dev == last_dev) {
+			if (protocol_version >= 28)
+				flags |= SAME_DEV;
+		}
+		else
+			last_dev = file->dev;
+		flags |= HAS_INODE_DATA;
+	}
 
 	for (l1 = 0;
 	     lastname[l1] && (fname[l1] == lastname[l1]) && (l1 < 255);
@@ -471,14 +481,15 @@ static void send_file_entry(struct file_struct *file, int f,
 #endif
 
 #if SUPPORT_HARD_LINKS
-	if (preserve_hard_links && S_ISREG(file->mode)) {
+	if (flags & HAS_INODE_DATA) {
 		if (protocol_version < 26) {
 			/* 32-bit dev_t and ino_t */
-			write_int(f, (int) file->dev);
-			write_int(f, (int) file->inode);
+			write_int(f, last_dev);
+			write_int(f, file->inode);
 		} else {
 			/* 64-bit dev_t and ino_t */
-			write_longint(f, file->dev);
+			if (!(flags & SAME_DEV))
+				write_longint(f, last_dev);
 			write_longint(f, file->inode);
 		}
 	}
@@ -507,6 +518,7 @@ static void receive_file_entry(struct file_struct **fptr,
 	static DEV64_T last_rdev;
 	static uid_t last_uid;
 	static gid_t last_gid;
+	static DEV64_T last_dev;
 	static char lastname[MAXPATHLEN];
 	char thisname[MAXPATHLEN];
 	unsigned int l1 = 0, l2 = 0;
@@ -617,14 +629,19 @@ static void receive_file_entry(struct file_struct **fptr,
 			sanitize_path(file->link, file->dirname);
 	}
 #if SUPPORT_HARD_LINKS
-	if (preserve_hard_links && S_ISREG(file->mode)) {
+	if (preserve_hard_links && protocol_version < 28
+	    && S_ISREG(last_mode))
+		file->flags |= HAS_INODE_DATA;
+	if (file->flags & HAS_INODE_DATA) {
 		if (protocol_version < 26) {
-			file->dev = read_int(f);
+			last_dev = read_int(f);
 			file->inode = read_int(f);
 		} else {
-			file->dev = read_longint(f);
+			if (!(flags & SAME_DEV))
+				last_dev = read_longint(f);
 			file->inode = read_longint(f);
 		}
+		file->dev = last_dev;
 	}
 #endif
 
@@ -780,8 +797,14 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 	file->mode = st.st_mode;
 	file->uid = st.st_uid;
 	file->gid = st.st_gid;
-	file->dev = st.st_dev;
-	file->inode = st.st_ino;
+	if (preserve_hard_links) {
+		if (protocol_version < 28? S_ISREG(st.st_mode)
+		    : !S_ISDIR(st.st_mode) && st.st_nlink > 1) {
+			file->dev = st.st_dev;
+			file->inode = st.st_ino;
+			file->flags |= HAS_INODE_DATA;
+		}
+	}
 #ifdef HAVE_STRUCT_STAT_ST_RDEV
 	file->rdev = st.st_rdev;
 #endif

@@ -62,7 +62,7 @@ void init_hard_links(struct file_list *flist)
  */
 	hlink_count = 0;
 	for (i = 0; i < flist->count; i++) {
-		if (S_ISREG(flist->files[i]->mode))
+		if (flist->files[i]->flags & HAS_INODE_DATA)
 			hlink_list[hlink_count++] = flist->files[i];
 	}
 
@@ -86,7 +86,7 @@ int check_hard_link(struct file_struct *file)
 	int low = 0, high = hlink_count - 1;
 	int ret = 0;
 
-	if (!hlink_list || !S_ISREG(file->mode))
+	if (!hlink_list || !(file->flags & HAS_INODE_DATA))
 		return 0;
 
 	while (low != high) {
