@@ -1146,24 +1146,28 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 
 	for (i = 0; i < flist->count; i++) {
 		struct file_struct *file = flist->files[i];
-		struct file_struct copy;
 
 		if (!file->basename)
 			continue;
+
+		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
+			       file, i, itemizing, maybe_PERMS_REPORT, code,
+			       f_out, f_out_name);
 
 		/* We need to ensure that any dirs we create have writeable
 		 * permissions during the time we are putting files within
 		 * them.  This is then fixed after the transfer is done. */
 		if (!am_root && S_ISDIR(file->mode) && !(file->mode & S_IWUSR)) {
-			copy = *file;
-			copy.mode |= S_IWUSR; /* user write */
-			file = &copy;
+			int mode = file->mode | S_IWUSR; /* user write */
+			char *fname = local_name ? local_name : fbuf;
+			if (do_chmod(fname, mode & CHMOD_BITS) < 0) {
+				rsyserr(FERROR, errno,
+					"failed to modify permissions on %s",
+					full_fname(fname));
+			}
 			need_retouch_dir_perms = 1;
 		}
 
-		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
-			       file, i, itemizing, maybe_PERMS_REPORT, code,
-			       f_out, f_out_name);
 		if (preserve_hard_links)
 			check_for_finished_hlinks(itemizing, code);
 
