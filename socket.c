@@ -42,7 +42,7 @@ static int lookup_name(const struct sockaddr_storage *ss,
 
 static int check_name(const struct sockaddr_storage *ss,
 		      socklen_t ss_len,
-		      const char *name_buf,
+		      char *name_buf,
 		      const char *port_buf);
 
 /* Establish a proxy connection on an open socket to a web roxy by
@@ -705,7 +705,7 @@ static int lookup_name(const struct sockaddr_storage *ss,
  * we don't abort the connection but just emit a warning. */
 static int check_name(const struct sockaddr_storage *ss,
 		      socklen_t ss_len,
-		      const char *name_buf,
+		      char *name_buf,
 		      const char *port_buf)
 {
 	struct addrinfo hints, *res, *res0;
