@@ -2,13 +2,6 @@
 
 BUGS ---------------------------------------------------------------
 
-rsync-url barfs on upload
-
-  rsync foo rsync://localhost/transfer/
-
-  Fix the parser.
-
-
 There seems to be a bug with hardlinks
 
   mbp/2 build$ ls -l /tmp/a /tmp/b -i
@@ -114,10 +107,6 @@ Cross-test versions
   rsync servers running different versions of rsync.  This will give
   some testing and also be the most common case for having different
   versions and not being able to upgrade.
-
---no-blocking-io might be broken
-
-  in the same way as --no-whole-file; somebody needs to check.
 
 Do not rely on having a group called "nobody"
 
@@ -381,9 +370,6 @@ Errors
 
 
 File attributes
-
-  Device major/minor numbers should be at least 32 bits each.  See
-  http://lists.samba.org/pipermail/rsync/2001-November/005357.html
 
   Transfer ACLs.  Need to think of a standard representation.
   Probably better not to even try to convert between NT and POSIX.
