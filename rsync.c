@@ -879,6 +879,7 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
   int i;
   struct file_struct *file;
   int phase = 0;
+  int offset=0;
 
   if (verbose > 2)
     fprintf(FERROR,"send_files starting\n");
@@ -912,6 +913,7 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
 			  return -1;
 		  }
 		  strcat(fname,"/");
+		  offset = strlen(file->basedir)+1;
 	  }
 	  strncat(fname,f_name(file),MAXPATHLEN-strlen(fname));
 	  
@@ -967,7 +969,7 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
 		  fprintf(FERROR,"calling match_sums %s\n",fname);
 	  
 	  if (!am_server && verbose)
-		  printf("%s\n",fname);
+		  printf("%s\n",fname+offset);
 	  
 	  match_sums(f_out,s,buf,st.st_size);
 	  write_flush(f_out);
