@@ -81,51 +81,40 @@ static int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
 }
 
 
-#define SC_CHECKSUM_CHANGED (1<<0)
-#define SC_UPDATING (1<<1)
-#define SC_NO_DEST_AND_NO_UPDATE (1<<2)
-#define SC_SKIP_NL (1<<3)
+#define SID_UPDATING		  ITEM_UPDATING
+#define SID_REPORT_CHECKSUM	  ITEM_REPORT_CHECKSUM
+#define SID_NO_DEST_AND_NO_UPDATE (1<<16)
 
-static void showchg(const char *fname, struct file_struct *file, int statret,
-		    STRUCT_STAT *st, int flags)
+static void itemize(struct file_struct *file, int statret, STRUCT_STAT *st,
+		    int32 sflags, int f_out, int ndx)
 {
-	static char ch[] = "*Xcstpog";
-	int keep_time;
-	char *s;
+	int iflags = sflags & (SID_UPDATING | SID_REPORT_CHECKSUM);
 
-	ch[0] = flags & SC_UPDATING ? '*' : ' ';
-	ch[1] = S_ISDIR(file->mode) ? 'd' : IS_DEVICE(file->mode) ? 'D'
-	      : S_ISLNK(file->mode) ? 'L' : 'f';
+	if (statret >= 0) {
+		if (S_ISREG(file->mode) && file->length != st->st_size)
+			iflags |= ITEM_REPORT_SIZE;
+	} else
+		iflags |= ITEM_IS_NEW;
+	if (statret >= 0 && !(sflags & SID_NO_DEST_AND_NO_UPDATE)) {
+		int keep_time = !preserve_times ? 0
+		    : S_ISDIR(file->mode) ? !omit_dir_times : !S_ISLNK(file->mode);
 
-	if (statret < 0) {
-		for (s = ch + 2; *s; ) *s++ = '+';
-		goto print_it;
+		if ((iflags & ITEM_UPDATING && !keep_time)
+		    || (keep_time && file->modtime != st->st_mtime))
+			iflags |= ITEM_REPORT_TIME;
+		if (preserve_perms && file->mode != st->st_mode)
+			iflags |= ITEM_REPORT_PERMS;
+		if (preserve_uid && am_root && file->uid != st->st_uid)
+			iflags |= ITEM_REPORT_OWNER;
+		if (preserve_gid && file->gid != GID_NONE && st->st_gid != file->gid)
+			iflags |= ITEM_REPORT_GROUP;
 	}
 
-	keep_time = !preserve_times ? 0
-		: S_ISDIR(file->mode) ? !omit_dir_times : !S_ISLNK(file->mode);
-
-	ch[2] = !(flags & SC_CHECKSUM_CHANGED) ? '-' : 'c';
-	ch[3] = !S_ISREG(file->mode) || file->length == st->st_size ? '-' : 's';
-	ch[4] = flags & SC_UPDATING && !keep_time ? 'T'
-	    : !keep_time || file->modtime == st->st_mtime ? '-' : 't';
-	ch[5] = !preserve_perms || file->mode == st->st_mode ? '-' : 'p';
-	ch[6] = !am_root || !preserve_uid || file->uid == st->st_uid ? '-' : 'o';
-	ch[7] = preserve_gid && file->gid != GID_NONE && st->st_gid != file->gid  ? 'g' : '-';
-
-	if (flags & SC_NO_DEST_AND_NO_UPDATE)
-	    ch[4] = ch[5] = ch[6] = ch[7] = '-';
-
-	if (!(flags & SC_UPDATING)) {
-		for (s = ch + 2; *s == '-'; s++) {}
-		if (!*s)
-			return;
+	if (iflags && !read_batch) {
+		if (ndx >= 0)
+			write_int(f_out, ndx);
+		write_byte(f_out, iflags);
 	}
-
-    print_it:
-	rprintf(FINFO, "%s %s%s%s", ch, safe_fname(fname),
-		ch[1] == 'd' ? "/" : "",
-		flags & SC_SKIP_NL ? "" : "\n");
 }
 
 
@@ -446,7 +435,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 			dry_run++;
 		}
 		if (itemize_changes && f_out != -1)
-			showchg(fname, file, statret, &st, 0);
+			itemize(file, statret, &st, 0, f_out, ndx);
 		if (statret != 0 && do_mkdir(fname,file->mode) != 0 && errno != EEXIST) {
 			if (!relative_paths || errno != ENOENT
 			    || create_directory_path(fname, orig_umask) < 0
@@ -496,8 +485,10 @@ static void recv_generator(char *fname, struct file_list *flist,
 				 * right place -- no further action
 				 * required. */
 				if (strcmp(lnk, file->u.link) == 0) {
-					if (itemize_changes)
-						showchg(fname, file, 0, &st, 0);
+					if (itemize_changes) {
+						itemize(file, 0, &st, 0,
+							f_out, ndx);
+					}
 					set_perms(fname, file, &st,
 						  PERMS_REPORT);
 					return;
@@ -513,14 +504,11 @@ static void recv_generator(char *fname, struct file_list *flist,
 		} else {
 			set_perms(fname,file,NULL,0);
 			if (itemize_changes) {
-				showchg(fname, file, statret, &st,
-					SC_UPDATING
-					| (verbose ? SC_SKIP_NL : 0));
-			}
-			if (verbose) {
-				rprintf(FINFO, "%s -> %s\n",
-				    itemize_changes ? "" : safe_fname(fname),
-				    safe_fname(file->u.link));
+				itemize(file, statret, &st, SID_UPDATING,
+					f_out, ndx);
+			} else if (verbose) {
+				rprintf(FINFO, "%s -> %s\n", safe_fname(fname),
+					safe_fname(file->u.link));
 			}
 		}
 #endif
@@ -532,8 +520,10 @@ static void recv_generator(char *fname, struct file_list *flist,
 		    st.st_mode != file->mode ||
 		    st.st_rdev != file->u.rdev) {
 			int dflag = S_ISDIR(st.st_mode) ? DEL_DIR : 0;
-			if (itemize_changes)
-				showchg(fname, file, statret, &st, SC_UPDATING);
+			if (itemize_changes) {
+				itemize(file, statret, &st, SID_UPDATING,
+					f_out, ndx);
+			}
 			delete_file(fname, dflag | DEL_TERSE);
 			if (verbose > 2) {
 				rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",
@@ -551,8 +541,10 @@ static void recv_generator(char *fname, struct file_list *flist,
 				}
 			}
 		} else {
-			if (itemize_changes)
-				showchg(fname, file, statret, &st, 0);
+			if (itemize_changes) {
+				itemize(file, statret, &st, 0,
+					f_out, ndx);
+			}
 			set_perms(fname, file, &st, PERMS_REPORT);
 		}
 		return;
@@ -691,9 +683,10 @@ static void recv_generator(char *fname, struct file_list *flist,
 		;
 	else if (unchanged_file(fnamecmp, file, &st)) {
 		if (itemize_changes) {
-			showchg(fname, file, statret, &st,
-				fnamecmp_type == FNAMECMP_FNAME ? 0
-				: SC_NO_DEST_AND_NO_UPDATE);
+			itemize(file, statret, &st,
+				fnamecmp_type == FNAMECMP_FNAME
+					       ? 0 : SID_NO_DEST_AND_NO_UPDATE,
+				f_out, ndx);
 		}
 		if (fnamecmp_type == FNAMECMP_FNAME)
 			set_perms(fname, file, &st, PERMS_REPORT);
@@ -794,9 +787,9 @@ notify_others:
 		}
 	}
 	if (itemize_changes) {
-		showchg(fname, file, statret, &st,
-			(always_checksum ? SC_CHECKSUM_CHANGED : 0)
-			| SC_UPDATING);
+		itemize(file, statret, &st, SID_UPDATING
+			| (always_checksum ? SID_REPORT_CHECKSUM : 0),
+			f_out, -1);
 	}
 
 	if (dry_run || read_batch)
