@@ -12,6 +12,7 @@ CFLAGS=@CFLAGS@
 LDFLAGS=@LDFLAGS@
 
 INSTALLCMD=@INSTALL@
+INSTALLMAN=@INSTALL@
 
 srcdir=@srcdir@
 VPATH=$(srcdir)
@@ -56,8 +57,8 @@ install: all
 	${INSTALLCMD} -m 755 rsync ${bindir}
 	-mkdir -p ${mandir}/man1
 	-mkdir -p ${mandir}/man5
-	${INSTALLCMD} -m 644 $(srcdir)/rsync.1 ${mandir}/man1
-	${INSTALLCMD} -m 644 $(srcdir)/rsyncd.conf.5 ${mandir}/man5
+	${INSTALLMAN} -m 644 $(srcdir)/rsync.1 ${mandir}/man1
+	${INSTALLMAN} -m 644 $(srcdir)/rsyncd.conf.5 ${mandir}/man5
 
 install-strip:
 	$(MAKE) INSTALLCMD='$(INSTALLCMD) -s' install

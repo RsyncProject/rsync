@@ -1,0 +1,5 @@
+rsync changes since last release
+
+  ENHANCEMENTS:
+
+    * "make install-strip" works.  (Greg Louis)
