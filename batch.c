@@ -11,6 +11,9 @@
 extern char *batch_name;
 extern int delete_mode;
 extern int delete_excluded;
+extern int eol_nulls;
+
+extern struct exclude_list_struct exclude_list;
 
 static void write_arg(int fd, char *arg)
 {
@@ -35,6 +38,28 @@ static void write_arg(int fd, char *arg)
 	write(fd, arg, strlen(arg));
 }
 
+static void write_excludes(int fd)
+{
+	struct exclude_struct *ent;
+
+	write_sbuf(fd, " <<'#E#'\n");
+	for (ent = exclude_list.head; ent; ent = ent->next) {
+		char *p = ent->pattern;
+		if (ent->match_flags & MATCHFLG_INCLUDE)
+			write_buf(fd, "+ ", 2);
+		else if (((*p == '-' || *p == '+') && p[1] == ' ')
+		    || *p == '#' || *p == ';')
+			write_buf(fd, "- ", 2);
+		write_sbuf(fd, p);
+		if (ent->match_flags & MATCHFLG_DIRECTORY)
+			write_byte(fd, '/');
+		write_byte(fd, eol_nulls ? 0 : '\n');
+	}
+	if (eol_nulls)
+		write_sbuf(fd, ";\n");
+	write_sbuf(fd, "#E#");
+}
+
 /* This routine tries to write out an equivalent --read-batch command
  * given the user's --write-batch args.  However, it doesn't really
  * understand most of the options, so it uses some overly simple
@@ -44,7 +69,6 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 {
 	int fd, i;
 	char *p, filename[MAXPATHLEN];
-	int need_excludes = delete_mode && !delete_excluded;
 
 	stringjoin(filename, sizeof filename,
 		   batch_name, ".sh", NULL);
@@ -57,11 +81,13 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 
 	/* Write argvs info to BATCH.sh file */
 	write_arg(fd, argv[0]);
+	if (exclude_list.head)
+		write_sbuf(fd, " --exclude-from=-");
 	for (i = 1; i < argc - file_arg_cnt; i++) {
 		p = argv[i];
 		if (strncmp(p, "--files-from", 12) == 0
-		    || (!need_excludes && (strncmp(p, "--include", 9) == 0
-					|| strncmp(p, "--exclude", 9) == 0))) {
+		    || strncmp(p, "--include", 9) == 0
+		    || strncmp(p, "--exclude", 9) == 0) {
 			if (strchr(p, '=') == NULL)
 				i++;
 			continue;
@@ -83,7 +109,10 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 		p = argv[argc - 1];
 	write(fd, " ${1:-", 6);
 	write_arg(fd, p);
-	if (write(fd, "}\n", 2) != 2 || close(fd) < 0) {
+	write_byte(fd, '}');
+	if (exclude_list.head)
+		write_excludes(fd);
+	if (write(fd, "\n", 1) != 1 || close(fd) < 0) {
 		rsyserr(FERROR, errno, "Batch file %s write error", filename);
 		exit_cleanup(1);
 	}
