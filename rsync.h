@@ -425,7 +425,7 @@ struct file_struct {
 	char *basedir;
 	uid_t uid;
 	gid_t gid;
-	uchar flags;
+	uchar flags;	/* this item MUST remain last */
 };
 
 #define ARENA_SIZE	(32 * 1024)
