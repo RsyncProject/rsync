@@ -238,8 +238,8 @@ void add_exclude(struct exclude_struct ***listp, const char *pattern, int includ
 	int len = 0;
 
 	if (*pattern == '!' && !pattern[1]) {
-	    free_exclude_list(listp);
-	    return;
+		free_exclude_list(listp);
+		return;
 	}
 
 	if (list)
@@ -262,7 +262,7 @@ void add_exclude(struct exclude_struct ***listp, const char *pattern, int includ
 void add_exclude_file(struct exclude_struct ***listp, const char *fname,
 		      int fatal, int include)
 {
-	int fd;
+	FILE *fp;
 	char line[MAXPATHLEN];
 	char *eob = line + MAXPATHLEN - 1;
 	extern int eol_nulls;
@@ -271,10 +271,10 @@ void add_exclude_file(struct exclude_struct ***listp, const char *fname,
 		return;
 
 	if (*fname != '-' || fname[1])
-		fd = open(fname, O_RDONLY|O_BINARY);
+		fp = fopen(fname, "rb");
 	else
-		fd = 0;
-	if (fd < 0) {
+		fp = stdin;
+	if (!fp) {
 		if (fatal) {
 			rsyserr(FERROR, errno,
 				"failed to open %s file %s",
@@ -286,11 +286,11 @@ void add_exclude_file(struct exclude_struct ***listp, const char *fname,
 	}
 
 	while (1) {
-		char ch, *s = line;
-		int cnt;
+		char *s = line;
+		int ch;
 		while (1) {
-			if ((cnt = read(fd, &ch, 1)) <= 0) {
-				if (cnt < 0 && errno == EINTR)
+			if ((ch = getc(fp)) == EOF) {
+				if (ferror(fp) && errno == EINTR)
 					continue;
 				break;
 			}
@@ -306,10 +306,10 @@ void add_exclude_file(struct exclude_struct ***listp, const char *fname,
 			 * them but there's no need to save them. */
 			add_exclude(listp, line, include);
 		}
-		if (cnt <= 0)
+		if (ch == EOF)
 			break;
 	}
-	close(fd);
+	fclose(fp);
 }
 
 
