@@ -133,6 +133,19 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 			listp->debug_type);
 	}
 
+	/* This flag also indicates that we're reading a list that
+	 * needs to be filtered now, not post-filtered later. */
+	if (xflags & XFLG_ANCHORED2ABS) {
+		uint32 mf = mflags & (MATCHFLG_RECEIVER_SIDE|MATCHFLG_SENDER_SIDE);
+		if (am_sender) {
+			if (mf == MATCHFLG_RECEIVER_SIDE)
+				return;
+		} else {
+			if (mf == MATCHFLG_SENDER_SIDE)
+				return;
+		}
+	}
+
 	if (!(ret = new(struct filter_struct)))
 		out_of_memory("add_rule");
 	memset(ret, 0, sizeof ret[0]);
