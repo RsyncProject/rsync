@@ -176,15 +176,17 @@ was run as root. This complements the "uid" option. The default is gid -2,
 which is normally the group "nobody".
 
 dit(bf(exclude)) The "exclude" option allows you to specify a space
-separated list of patterns to add to the exclude list. This is equivalent
-to the client specifying these patterns with the --exclude option, except
-that the exclude list is not passed to the client and thus only applies on
+separated list of patterns to add to the exclude list.
+This is only superficially equivalent
+to the client specifying these patterns with the --exclude option.
+Only one "exclude" option may be specified, but
+you can use "-" and "+" before patterns to specify exclude/include.
+
+Because this exclude list is not passed to the client it only applies on
 the server: that is, it excludes files received by a client when receiving
 from a server and files deleted on a server when sending to a server, but
 it doesn't exclude files sent from a client when sending to a server or
 files deleted on a client when receiving from a server.  
-Only one "exclude" option may be specified, but
-you can use "-" and "+" before patterns to specify exclude/include.
 
 Note that this option is not designed with strong security in
 mind, it is quite possible that a client may find a way to bypass this
@@ -193,24 +195,25 @@ cannot be accessed then use the uid/gid options in combination with
 file permissions.
 
 dit(bf(exclude from)) The "exclude from" option specifies a filename
-on the server that contains exclude patterns, one per line. This is
-equivalent to the client specifying the --exclude-from option with a
-equivalent file except that it applies only on the server.  See also
-the "exclude" option above.
+on the server that contains exclude patterns, one per line.
+This is only superficially equivalent
+to the client specifying the --exclude-from option with an equivalent file.
+See the "exclude" option above.
 
 dit(bf(include)) The "include" option allows you to specify a space
 separated list of patterns which rsync should not exclude. This is
-equivalent to the client specifying these patterns with the --include
-option except that it applies only on the server.  This is useful as it
+only superficially equivalent to the client specifying these patterns
+with the --include option because it applies only on the server.
+This is useful as it
 allows you to build up quite complex exclude/include rules.  Only one
 "include" option may be specified, but you can use "+" and "-" before
-patterns to switch include/exclude.  See also the "exclude" option above.
+patterns to switch include/exclude.  See the "exclude" option above.
 
 dit(bf(include from)) The "include from" option specifies a filename
 on the server that contains include patterns, one per line. This is
-equivalent to the client specifying the --include-from option with a
-equivalent file except that it applies only on the server.  See also
-the "exclude" option above.
+only superficially equivalent to the client specifying the
+--include-from option with a equivalent file.
+See the "exclude" option above.
 
 dit(bf(auth users)) The "auth users" option specifies a comma and
 space separated list of usernames that will be allowed to connect to
