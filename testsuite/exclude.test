@@ -22,6 +22,7 @@ export HOME CVSIGNORE
 
 makepath "$fromdir/foo/down/to/you"
 makepath "$fromdir/bar/down/to/foo/too"
+makepath "$fromdir/bar/down/to/bar/baz"
 makepath "$fromdir/mid/for/foo/and/that/is/who"
 cat >"$fromdir/.excl" <<EOF
 - down
@@ -30,7 +31,6 @@ cat >"$fromdir/.excl" <<EOF
 - .excl
 - *.bak
 - *.old
-- *.junk
 EOF
 echo kept >"$fromdir/foo/file1"
 echo removed >"$fromdir/foo/file2"
@@ -48,15 +48,19 @@ echo cvsout >"$fromdir/bar/down/to/home-cvs-exclude"
 cat >"$fromdir/bar/down/to/.excl2" <<EOF
 - .excl2
 EOF
+cat >"$fromdir/bar/down/to/foo/.excl2" <<EOF
++ *.junk
+EOF
 echo keeper >"$fromdir/bar/down/to/foo/file1"
 echo cvsout >"$fromdir/bar/down/to/foo/file1.bak"
 echo gone >"$fromdir/bar/down/to/foo/file3"
 echo lost >"$fromdir/bar/down/to/foo/file4"
-echo cvsout >"$fromdir/bar/down/to/foo/file4.junk"
+echo cvsout-but-filtin >"$fromdir/bar/down/to/foo/file4.junk"
 echo smashed >"$fromdir/bar/down/to/foo/to"
-cat >"$fromdir/bar/down/to/foo/.excl2" <<EOF
-+ *.junk
+cat >"$fromdir/bar/down/to/bar/.excl2" <<EOF
+- *.deep
 EOF
+echo filtout >"$fromdir/bar/down/to/bar/baz/file5.deep"
 # This one should be ineffectual
 cat >"$fromdir/mid/.excl2" <<EOF
 - extra
@@ -115,7 +119,7 @@ $RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
 # Now, test if rsync excludes the same files.
 
 checkit "$RSYNC -avv --exclude-from=\"$excl\" \
-    --delete \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+    --delete-during \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
 
 # Modify the chk dir by removing cvs-ignored files and then tweaking the dir times.
 
@@ -130,27 +134,48 @@ $RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
 # Now, test if rsync excludes the same files, this time with --cvs-exclude
 # and --delete-excluded.
 
-checkit "$RSYNC -avvC --filter=\". $excl\" \
-    --delete-excluded \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+checkit "$RSYNC -avvC --filter=\". $excl\" --delete-excluded \
+    --delete-during \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
 
 # Modify the chk dir for our merge-exclude test and then tweak the dir times.
 
-rm "$chkdir"/.excl
 rm "$chkdir"/foo/file1
-rm "$chkdir"/bar/.excl
-rm "$chkdir"/bar/down/to/.excl2
-rm "$chkdir"/bar/down/to/foo/.excl2
-rm "$chkdir"/mid/.excl
+rm "$chkdir"/bar/down/to/bar/baz/*.deep
 cp -p "$fromdir"/bar/down/to/foo/*.junk "$chkdir"/bar/down/to/foo
 cp -p "$fromdir"/bar/down/to/foo/to "$chkdir"/bar/down/to/foo
+
+$RSYNC -av --existing --delete-excluded \
+    --include='*/' --include='.excl*' --exclude='*' "$fromdir/" "$todir/"
+
+echo retained >"$todir"/bar/down/to/bar/baz/nodel.deep
+cp -p "$todir"/bar/down/to/bar/baz/nodel.deep "$chkdir"/bar/down/to/bar/baz
 
 $RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
 
 # Now, test if rsync excludes the same files, this time with a merge-exclude
 # file.
 
-checkit "sed '/!/d' \"$excl\" | $RSYNC -avv -f :_.excl -f ._- \
-    --delete-excluded \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+checkit "sed '/!/d' \"$excl\" |
+    $RSYNC -avv -f :_.excl -f ._- \
+    --delete-during \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+
+# Remove the files that --delete-excluded will delete.
+
+rm "$chkdir"/.excl
+rm "$chkdir"/bar/.excl
+rm "$chkdir"/bar/down/to/.excl2
+rm "$chkdir"/bar/down/to/foo/.excl2
+rm "$chkdir"/bar/down/to/bar/.excl2
+rm "$chkdir"/mid/.excl
+rm "$chkdir"/bar/down/to/bar/baz/nodel.deep
+
+$RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
+
+# Finally, try the prior command with --delete-before and --delete-excluded.
+
+checkit "sed '/!/d' \"$excl\" |
+    $RSYNC -avv -f :_.excl -f ._- --delete-excluded \
+    --delete-before \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
