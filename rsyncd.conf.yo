@@ -380,8 +380,14 @@ a 10 minute timeout).
 
 dit(bf(refuse options)) The "refuse options" option allows you to
 specify a space-separated list of rsync command line options that will
-be refused by your rsync server.  The full names of the options must be
-used (i.e., you must use "checksum" not "c" to disable checksumming).  
+be refused by your rsync server.
+You may specify the full option name, its one-letter abbreviation, or a
+wild-card string that matches multiple options.
+For example, this would refuse --checksum (-c) and all the options that
+start with "delete":
+
+quote(refuse options = c delete*)
+
 When an option is refused, the server prints an error message and exits.
 To prevent all compression, you can use "dont compress = *" (see below)
 instead of "refuse options = compress" to avoid returning an error to a
