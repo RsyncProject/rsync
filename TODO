@@ -98,6 +98,10 @@ logging
   monitor progress in a log file can do so more easily.  See
   http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=48108
 
+rsyncd over ssh
+
+  There are already some patches to do this.
+
 PLATFORMS ------------------------------------------------------------
 
 Win32
@@ -112,6 +116,10 @@ Win32
   platform we should probably do shutdown() instead.  However, on Unix
   we are correct to call close(), because shutdown() discards
   untransmitted data.
+
+DOCUMENTATION --------------------------------------------------------
+
+Update README
 
 BUILD FARM -----------------------------------------------------------
 
