@@ -36,6 +36,7 @@ extern int am_server;
 extern int always_checksum;
 extern int module_id;
 extern int ignore_errors;
+extern int numeric_ids;
 
 extern int cvs_exclude;
 
