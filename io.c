@@ -256,7 +256,7 @@ static void read_loop (int fd, char *buf, size_t len)
 static int read_unbuffered(int fd, char *buf, size_t len)
 {
 	static int remaining;
-	int tag, ret=0;
+	int tag, ret = 0;
 	char line[1024];
 
 	if (!io_multiplexing_in || fd != multiplex_in_fd)
@@ -271,23 +271,24 @@ static int read_unbuffered(int fd, char *buf, size_t len)
 			continue;
 		}
 
-		read_loop (fd, line, 4);
+		read_loop(fd, line, 4);
 		tag = IVAL(line, 0);
 
 		remaining = tag & 0xFFFFFF;
 		tag = tag >> 24;
 
-		if (tag == MPLEX_BASE) continue;
+		if (tag == MPLEX_BASE)
+			continue;
 
 		tag -= MPLEX_BASE;
 
 		if (tag != FERROR && tag != FINFO) {
-			rprintf(FERROR,"unexpected tag %d\n", tag);
+			rprintf(FERROR, "unexpected tag %d\n", tag);
 			exit_cleanup(RERR_STREAMIO);
 		}
 
-		if (remaining > sizeof(line)-1) {
-			rprintf(FERROR,"multiplexing overflow %d\n\n", 
+		if (remaining > sizeof(line) - 1) {
+			rprintf(FERROR, "multiplexing overflow %d\n\n",
 				remaining);
 			exit_cleanup(RERR_STREAMIO);
 		}
@@ -295,12 +296,13 @@ static int read_unbuffered(int fd, char *buf, size_t len)
 		read_loop(fd, line, remaining);
 		line[remaining] = 0;
 
-		rprintf((enum logcode)tag,"%s", line);
+		rprintf((enum logcode) tag, "%s", line);
 		remaining = 0;
 	}
 
 	return ret;
 }
+
 
 
 /* do a buffered read from fd. don't return until all N bytes
