@@ -343,16 +343,27 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		}
 
 		file = flist->files[i];
+		if (S_ISDIR(file->mode)) {
+			rprintf(FERROR, "[%s] got index of directory: %d\n",
+				who_am_i(), i);
+			exit_cleanup(RERR_PROTOCOL);
+		}
 
 		stats.current_file_index = i;
 		stats.num_transferred_files++;
 		stats.total_transferred_size += file->length;
 		cleanup_got_literal = 0;
 
-		if (local_name)
-			fname = local_name;
-		else
-			fname = f_name_to(file, fbuf);
+		fname = local_name ? local_name : f_name_to(file, fbuf);
+
+		if (server_filter_list.head
+		    && check_filter(&server_filter_list, fname, 0) < 0) {
+			rprintf(FERROR, "attempt to hack rsync failed.\n");
+			exit_cleanup(RERR_PROTOCOL);
+		}
+
+		if (verbose > 2)
+			rprintf(FINFO, "recv_files(%s)\n", safe_fname(fname));
 
 		if (dry_run) {
 			if (!am_server && verbose) /* log the transfer */
@@ -361,9 +372,6 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		}
 
 		initial_stats = stats;
-
-		if (verbose > 2)
-			rprintf(FINFO, "recv_files(%s)\n", safe_fname(fname));
 
 		if (read_batch) {
 			while (i > next_gen_i) {
@@ -380,13 +388,6 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 				continue;
 			}
 			next_gen_i = -1;
-		}
-
-		if (server_filter_list.head
-		    && check_filter(&server_filter_list, fname,
-				     S_ISDIR(file->mode)) < 0) {
-			rprintf(FERROR, "attempt to hack rsync failed.\n");
-			exit_cleanup(RERR_PROTOCOL);
 		}
 
 		partialptr = partial_dir ? partial_dir_fname(fname) : fname;
