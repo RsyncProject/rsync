@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsync)(1)(3 Mar 2001)()()
+manpage(rsync)(1)(29 May 2001)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
@@ -395,8 +395,11 @@ are in the list of files being sent.
 This option can be quite slow, so only use it if you need it.
 
 dit(bf(-W, --whole-file)) With this option the incremental rsync algorithm
-is  not used  and  the whole file is sent as-is instead. This may be
-useful when using rsync with a local machine.
+is not used and the whole file is sent as-is instead.  The transfer may be
+faster if this option is used when the bandwidth between the source and
+target machines is higher than the bandwidth to disk (especially when the
+"disk" is actually a networked file system).  This is the default when both
+the source and target are on the local machine.
 
 dit(bf(-p, --perms)) This option causes rsync to update the remote
 permissions to be the same as the local permissions.

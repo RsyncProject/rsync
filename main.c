@@ -581,6 +581,7 @@ static int start_client(int argc, char *argv[])
 	extern int am_sender;
 	extern char *shell_cmd;
 	extern int rsync_port;
+	extern int whole_file;
 	char *argv0 = strdup(argv[0]);
 
 	if (strncasecmp(URL_PREFIX, argv0, strlen(URL_PREFIX)) == 0) {
@@ -627,6 +628,8 @@ static int start_client(int argc, char *argv[])
 		p = find_colon(argv[argc-1]);
 		if (!p) {
 			local_server = 1;
+			/* disable "rsync algorithm" when both sides local */
+			whole_file = 1;
 		} else if (p[1] == ':') {
 			*p = 0;
 			return start_socket_client(argv[argc-1], p+2, argc-1, argv);
