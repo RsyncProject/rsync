@@ -46,6 +46,7 @@
 int dry_run = 0;
 int read_only = 1;
 int list_only = 0;
+int preserve_perms = 0;
 
 
 static void failed (char const *what,
