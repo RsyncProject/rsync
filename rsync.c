@@ -89,8 +89,8 @@ void exit_cleanup(int code)
   */
 static void free_sums(struct sum_struct *s)
 {
-  if (s->sums) free(s->sums);
-  free(s);
+	if (s->sums) free(s->sums);
+	free(s);
 }
 
 
@@ -169,18 +169,18 @@ static int delete_file(char *fname)
   */
 static void send_sums(struct sum_struct *s,int f_out)
 {
-  int i;
+	int i;
 
   /* tell the other guy how many we are going to be doing and how many
      bytes there are in the last chunk */
-  write_int(f_out,s?s->count:0);
-  write_int(f_out,s?s->n:block_size);
-  write_int(f_out,s?s->remainder:0);
-  if (s)
-    for (i=0;i<s->count;i++) {
-      write_int(f_out,s->sums[i].sum1);
-      write_buf(f_out,s->sums[i].sum2,csum_length);
-    }
+	write_int(f_out,s?s->count:0);
+	write_int(f_out,s?s->n:block_size);
+	write_int(f_out,s?s->remainder:0);
+	if (s)
+		for (i=0;i<s->count;i++) {
+			write_int(f_out,s->sums[i].sum1);
+			write_buf(f_out,s->sums[i].sum2,csum_length);
+		}
 }
 
 
@@ -191,55 +191,55 @@ static void send_sums(struct sum_struct *s,int f_out)
   */
 static struct sum_struct *generate_sums(struct map_struct *buf,OFF_T len,int n)
 {
-  int i;
-  struct sum_struct *s;
-  int count;
-  int block_len = n;
-  int remainder = (len%block_len);
-  OFF_T offset = 0;
+	int i;
+	struct sum_struct *s;
+	int count;
+	int block_len = n;
+	int remainder = (len%block_len);
+	OFF_T offset = 0;
 
-  count = (len+(block_len-1))/block_len;
+	count = (len+(block_len-1))/block_len;
 
-  s = (struct sum_struct *)malloc(sizeof(*s));
-  if (!s) out_of_memory("generate_sums");
+	s = (struct sum_struct *)malloc(sizeof(*s));
+	if (!s) out_of_memory("generate_sums");
 
-  s->count = count;
-  s->remainder = remainder;
-  s->n = n;
-  s->flength = len;
+	s->count = count;
+	s->remainder = remainder;
+	s->n = n;
+	s->flength = len;
 
-  if (count==0) {
-    s->sums = NULL;
-    return s;
-  }
+	if (count==0) {
+		s->sums = NULL;
+		return s;
+	}
 
-  if (verbose > 3)
-    rprintf(FINFO,"count=%d rem=%d n=%d flength=%d\n",
-	    s->count,s->remainder,s->n,(int)s->flength);
+	if (verbose > 3)
+		rprintf(FINFO,"count=%d rem=%d n=%d flength=%d\n",
+			s->count,s->remainder,s->n,(int)s->flength);
 
-  s->sums = (struct sum_buf *)malloc(sizeof(s->sums[0])*s->count);
-  if (!s->sums) out_of_memory("generate_sums");
+	s->sums = (struct sum_buf *)malloc(sizeof(s->sums[0])*s->count);
+	if (!s->sums) out_of_memory("generate_sums");
   
-  for (i=0;i<count;i++) {
-    int n1 = MIN(len,n);
-    char *map = map_ptr(buf,offset,n1);
+	for (i=0;i<count;i++) {
+		int n1 = MIN(len,n);
+		char *map = map_ptr(buf,offset,n1);
 
-    s->sums[i].sum1 = get_checksum1(map,n1);
-    get_checksum2(map,n1,s->sums[i].sum2);
+		s->sums[i].sum1 = get_checksum1(map,n1);
+		get_checksum2(map,n1,s->sums[i].sum2);
 
-    s->sums[i].offset = offset;
-    s->sums[i].len = n1;
-    s->sums[i].i = i;
+		s->sums[i].offset = offset;
+		s->sums[i].len = n1;
+		s->sums[i].i = i;
 
-    if (verbose > 3)
-      rprintf(FINFO,"chunk[%d] offset=%d len=%d sum1=%08x\n",
-	      i,(int)s->sums[i].offset,s->sums[i].len,s->sums[i].sum1);
+		if (verbose > 3)
+			rprintf(FINFO,"chunk[%d] offset=%d len=%d sum1=%08x\n",
+				i,(int)s->sums[i].offset,s->sums[i].len,s->sums[i].sum1);
 
-    len -= n1;
-    offset += n1;
-  }
+		len -= n1;
+		offset += n1;
+	}
 
-  return s;
+	return s;
 }
 
 
@@ -248,50 +248,50 @@ static struct sum_struct *generate_sums(struct map_struct *buf,OFF_T len,int n)
   */
 static struct sum_struct *receive_sums(int f)
 {
-  struct sum_struct *s;
-  int i;
-  OFF_T offset = 0;
+	struct sum_struct *s;
+	int i;
+	OFF_T offset = 0;
 
-  s = (struct sum_struct *)malloc(sizeof(*s));
-  if (!s) out_of_memory("receive_sums");
+	s = (struct sum_struct *)malloc(sizeof(*s));
+	if (!s) out_of_memory("receive_sums");
 
-  s->count = read_int(f);
-  s->n = read_int(f);
-  s->remainder = read_int(f);  
-  s->sums = NULL;
+	s->count = read_int(f);
+	s->n = read_int(f);
+	s->remainder = read_int(f);  
+	s->sums = NULL;
 
-  if (verbose > 3)
-    rprintf(FINFO,"count=%d n=%d rem=%d\n",
-	    s->count,s->n,s->remainder);
+	if (verbose > 3)
+		rprintf(FINFO,"count=%d n=%d rem=%d\n",
+			s->count,s->n,s->remainder);
 
-  if (s->count == 0) 
-    return(s);
+	if (s->count == 0) 
+		return(s);
 
-  s->sums = (struct sum_buf *)malloc(sizeof(s->sums[0])*s->count);
-  if (!s->sums) out_of_memory("receive_sums");
+	s->sums = (struct sum_buf *)malloc(sizeof(s->sums[0])*s->count);
+	if (!s->sums) out_of_memory("receive_sums");
 
-  for (i=0;i<s->count;i++) {
-    s->sums[i].sum1 = read_int(f);
-    read_buf(f,s->sums[i].sum2,csum_length);
+	for (i=0;i<s->count;i++) {
+		s->sums[i].sum1 = read_int(f);
+		read_buf(f,s->sums[i].sum2,csum_length);
 
-    s->sums[i].offset = offset;
-    s->sums[i].i = i;
+		s->sums[i].offset = offset;
+		s->sums[i].i = i;
 
-    if (i == s->count-1 && s->remainder != 0) {
-      s->sums[i].len = s->remainder;
-    } else {
-      s->sums[i].len = s->n;
-    }
-    offset += s->sums[i].len;
+		if (i == s->count-1 && s->remainder != 0) {
+			s->sums[i].len = s->remainder;
+		} else {
+			s->sums[i].len = s->n;
+		}
+		offset += s->sums[i].len;
 
-    if (verbose > 3)
-      rprintf(FINFO,"chunk[%d] len=%d offset=%d sum1=%08x\n",
-	      i,s->sums[i].len,(int)s->sums[i].offset,s->sums[i].sum1);
-  }
+		if (verbose > 3)
+			rprintf(FINFO,"chunk[%d] len=%d offset=%d sum1=%08x\n",
+				i,s->sums[i].len,(int)s->sums[i].offset,s->sums[i].sum1);
+	}
 
-  s->flength = offset;
+	s->flength = offset;
 
-  return s;
+	return s;
 }
 
 
@@ -403,176 +403,176 @@ static int adapt_block_size(struct file_struct *file, int bsize)
 
 static void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 {  
-  int fd;
-  STRUCT_STAT st;
-  struct map_struct *buf;
-  struct sum_struct *s;
-  int statret;
-  struct file_struct *file = flist->files[i];
+	int fd;
+	STRUCT_STAT st;
+	struct map_struct *buf;
+	struct sum_struct *s;
+	int statret;
+	struct file_struct *file = flist->files[i];
 
-  if (verbose > 2)
-    rprintf(FINFO,"recv_generator(%s,%d)\n",fname,i);
+	if (verbose > 2)
+		rprintf(FINFO,"recv_generator(%s,%d)\n",fname,i);
 
-  statret = link_stat(fname,&st);
+	statret = link_stat(fname,&st);
 
-  if (S_ISDIR(file->mode)) {
-    if (dry_run) return;
-    if (statret == 0 && !S_ISDIR(st.st_mode)) {
-      if (do_unlink(fname) != 0) {
-	rprintf(FERROR,"unlink %s : %s\n",fname,strerror(errno));
-	return;
-      }
-      statret = -1;
-    }
-    if (statret != 0 && do_mkdir(fname,file->mode) != 0 && errno != EEXIST) {
-	    if (!(relative_paths && errno==ENOENT && 
-		  create_directory_path(fname)==0 && 
-		  do_mkdir(fname,file->mode)==0)) {
-		    rprintf(FERROR,"mkdir %s : %s (2)\n",
-			    fname,strerror(errno));
-	    }
-    }
-    if (set_perms(fname,file,NULL,0) && verbose) 
-      rprintf(FINFO,"%s/\n",fname);
-    return;
-  }
-
-  if (preserve_links && S_ISLNK(file->mode)) {
-#if SUPPORT_LINKS
-    char lnk[MAXPATHLEN];
-    int l;
-    if (statret == 0) {
-      l = readlink(fname,lnk,MAXPATHLEN-1);
-      if (l > 0) {
-	lnk[l] = 0;
-	if (strcmp(lnk,file->link) == 0) {
-	  set_perms(fname,file,&st,1);
-	  return;
+	if (S_ISDIR(file->mode)) {
+		if (dry_run) return;
+		if (statret == 0 && !S_ISDIR(st.st_mode)) {
+			if (do_unlink(fname) != 0) {
+				rprintf(FERROR,"unlink %s : %s\n",fname,strerror(errno));
+				return;
+			}
+			statret = -1;
+		}
+		if (statret != 0 && do_mkdir(fname,file->mode) != 0 && errno != EEXIST) {
+			if (!(relative_paths && errno==ENOENT && 
+			      create_directory_path(fname)==0 && 
+			      do_mkdir(fname,file->mode)==0)) {
+				rprintf(FERROR,"mkdir %s : %s (2)\n",
+					fname,strerror(errno));
+			}
+		}
+		if (set_perms(fname,file,NULL,0) && verbose) 
+			rprintf(FINFO,"%s/\n",fname);
+		return;
 	}
-      }
-    }
-    delete_file(fname);
-    if (do_symlink(file->link,fname) != 0) {
-      rprintf(FERROR,"link %s -> %s : %s\n",
-	      fname,file->link,strerror(errno));
-    } else {
-      set_perms(fname,file,NULL,0);
-      if (verbose) 
-	rprintf(FINFO,"%s -> %s\n",
-		fname,file->link);
-    }
+
+	if (preserve_links && S_ISLNK(file->mode)) {
+#if SUPPORT_LINKS
+		char lnk[MAXPATHLEN];
+		int l;
+		if (statret == 0) {
+			l = readlink(fname,lnk,MAXPATHLEN-1);
+			if (l > 0) {
+				lnk[l] = 0;
+				if (strcmp(lnk,file->link) == 0) {
+					set_perms(fname,file,&st,1);
+					return;
+				}
+			}
+		}
+		delete_file(fname);
+		if (do_symlink(file->link,fname) != 0) {
+			rprintf(FERROR,"link %s -> %s : %s\n",
+				fname,file->link,strerror(errno));
+		} else {
+			set_perms(fname,file,NULL,0);
+			if (verbose) 
+				rprintf(FINFO,"%s -> %s\n",
+					fname,file->link);
+		}
 #endif
-    return;
-  }
+		return;
+	}
 
 #ifdef HAVE_MKNOD
-  if (am_root && preserve_devices && IS_DEVICE(file->mode)) {
-    if (statret != 0 || 
-	st.st_mode != file->mode ||
-	st.st_rdev != file->rdev) {	
-      delete_file(fname);
-      if (verbose > 2)
-	rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",
-		fname,(int)file->mode,(int)file->rdev);
-      if (do_mknod(fname,file->mode,file->rdev) != 0) {
-	rprintf(FERROR,"mknod %s : %s\n",fname,strerror(errno));
-      } else {
-	set_perms(fname,file,NULL,0);
-	if (verbose)
-	  rprintf(FINFO,"%s\n",fname);
-      }
-    } else {
-      set_perms(fname,file,&st,1);
-    }
-    return;
-  }
+	if (am_root && preserve_devices && IS_DEVICE(file->mode)) {
+		if (statret != 0 || 
+		    st.st_mode != file->mode ||
+		    st.st_rdev != file->rdev) {	
+			delete_file(fname);
+			if (verbose > 2)
+				rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",
+					fname,(int)file->mode,(int)file->rdev);
+			if (do_mknod(fname,file->mode,file->rdev) != 0) {
+				rprintf(FERROR,"mknod %s : %s\n",fname,strerror(errno));
+			} else {
+				set_perms(fname,file,NULL,0);
+				if (verbose)
+					rprintf(FINFO,"%s\n",fname);
+			}
+		} else {
+			set_perms(fname,file,&st,1);
+		}
+		return;
+	}
 #endif
 
-  if (preserve_hard_links && check_hard_link(file)) {
-    if (verbose > 1)
-      rprintf(FINFO,"%s is a hard link\n",f_name(file));
-    return;
-  }
+	if (preserve_hard_links && check_hard_link(file)) {
+		if (verbose > 1)
+			rprintf(FINFO,"%s is a hard link\n",f_name(file));
+		return;
+	}
 
-  if (!S_ISREG(file->mode)) {
-    rprintf(FINFO,"skipping non-regular file %s\n",fname);
-    return;
-  }
+	if (!S_ISREG(file->mode)) {
+		rprintf(FINFO,"skipping non-regular file %s\n",fname);
+		return;
+	}
 
-  if (statret == -1) {
-    if (errno == ENOENT) {
-      write_int(f_out,i);
-      if (!dry_run) send_sums(NULL,f_out);
-    } else {
-      if (verbose > 1)
-	rprintf(FERROR,"recv_generator failed to open %s\n",fname);
-    }
-    return;
-  }
+	if (statret == -1) {
+		if (errno == ENOENT) {
+			write_int(f_out,i);
+			if (!dry_run) send_sums(NULL,f_out);
+		} else {
+			if (verbose > 1)
+				rprintf(FERROR,"recv_generator failed to open %s\n",fname);
+		}
+		return;
+	}
 
-  if (!S_ISREG(st.st_mode)) {
-    if (delete_file(fname) != 0) {
-      return;
-    }
+	if (!S_ISREG(st.st_mode)) {
+		if (delete_file(fname) != 0) {
+			return;
+		}
 
-    /* now pretend the file didn't exist */
-    write_int(f_out,i);
-    if (!dry_run) send_sums(NULL,f_out);    
-    return;
-  }
+		/* now pretend the file didn't exist */
+		write_int(f_out,i);
+		if (!dry_run) send_sums(NULL,f_out);    
+		return;
+	}
 
-  if (update_only && st.st_mtime > file->modtime) {
-    if (verbose > 1)
-      rprintf(FINFO,"%s is newer\n",fname);
-    return;
-  }
+	if (update_only && st.st_mtime > file->modtime) {
+		if (verbose > 1)
+			rprintf(FINFO,"%s is newer\n",fname);
+		return;
+	}
 
-  if (skip_file(fname, file, &st)) {
-    set_perms(fname,file,&st,1);
-    return;
-  }
+	if (skip_file(fname, file, &st)) {
+		set_perms(fname,file,&st,1);
+		return;
+	}
 
-  if (dry_run) {
-    write_int(f_out,i);
-    return;
-  }
+	if (dry_run) {
+		write_int(f_out,i);
+		return;
+	}
 
-  if (whole_file) {
-    write_int(f_out,i);
-    send_sums(NULL,f_out);    
-    return;
-  }
+	if (whole_file) {
+		write_int(f_out,i);
+		send_sums(NULL,f_out);    
+		return;
+	}
 
-  /* open the file */  
-  fd = open(fname,O_RDONLY);
+	/* open the file */  
+	fd = open(fname,O_RDONLY);
 
-  if (fd == -1) {
-    rprintf(FERROR,"failed to open %s : %s\n",fname,strerror(errno));
-    rprintf(FERROR,"skipping %s\n",fname);
-    return;
-  }
+	if (fd == -1) {
+		rprintf(FERROR,"failed to open %s : %s\n",fname,strerror(errno));
+		rprintf(FERROR,"skipping %s\n",fname);
+		return;
+	}
 
-  if (st.st_size > 0) {
-    buf = map_file(fd,st.st_size);
-  } else {
-    buf = NULL;
-  }
+	if (st.st_size > 0) {
+		buf = map_file(fd,st.st_size);
+	} else {
+		buf = NULL;
+	}
 
-  if (verbose > 3)
-    rprintf(FINFO,"gen mapped %s of size %d\n",fname,(int)st.st_size);
+	if (verbose > 3)
+		rprintf(FINFO,"gen mapped %s of size %d\n",fname,(int)st.st_size);
 
-  s = generate_sums(buf,st.st_size,adapt_block_size(file, block_size));
+	s = generate_sums(buf,st.st_size,adapt_block_size(file, block_size));
 
-  if (verbose > 2)
-    rprintf(FINFO,"sending sums for %d\n",i);
+	if (verbose > 2)
+		rprintf(FINFO,"sending sums for %d\n",i);
 
-  write_int(f_out,i);
-  send_sums(s,f_out);
+	write_int(f_out,i);
+	send_sums(s,f_out);
 
-  close(fd);
-  if (buf) unmap_file(buf);
+	close(fd);
+	if (buf) unmap_file(buf);
 
-  free_sums(s);
+	free_sums(s);
 }
 
 
@@ -668,20 +668,20 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 
 static void delete_one(struct file_struct *f)
 {
-  if (!S_ISDIR(f->mode)) {
-    if (do_unlink(f_name(f)) != 0) {
-      rprintf(FERROR,"unlink %s : %s\n",f_name(f),strerror(errno));
-    } else if (verbose) {
-      rprintf(FINFO,"deleting %s\n",f_name(f));
-    }
-  } else {    
-    if (do_rmdir(f_name(f)) != 0) {
-      if (errno != ENOTEMPTY && errno != EEXIST)
-	rprintf(FERROR,"rmdir %s : %s\n",f_name(f),strerror(errno));
-    } else if (verbose) {
-      rprintf(FINFO,"deleting directory %s\n",f_name(f));      
-    }
-  }
+	if (!S_ISDIR(f->mode)) {
+		if (do_unlink(f_name(f)) != 0) {
+			rprintf(FERROR,"unlink %s : %s\n",f_name(f),strerror(errno));
+		} else if (verbose) {
+			rprintf(FINFO,"deleting %s\n",f_name(f));
+		}
+	} else {    
+		if (do_rmdir(f_name(f)) != 0) {
+			if (errno != ENOTEMPTY && errno != EEXIST)
+				rprintf(FERROR,"rmdir %s : %s\n",f_name(f),strerror(errno));
+		} else if (verbose) {
+			rprintf(FINFO,"deleting directory %s\n",f_name(f));      
+		}
+	}
 }
 
 
@@ -779,7 +779,7 @@ static void delete_files(struct file_list *flist)
 
 void sig_int(void)
 {
-  exit_cleanup(1);
+	exit_cleanup(1);
 }
 
 
@@ -1040,194 +1040,195 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 void send_files(struct file_list *flist,int f_out,int f_in)
 { 
-  int fd;
-  struct sum_struct *s;
-  struct map_struct *buf;
-  STRUCT_STAT st;
-  char fname[MAXPATHLEN];  
-  int i;
-  struct file_struct *file;
-  int phase = 0;
+	int fd;
+	struct sum_struct *s;
+	struct map_struct *buf;
+	STRUCT_STAT st;
+	char fname[MAXPATHLEN];  
+	int i;
+	struct file_struct *file;
+	int phase = 0;
 
-  if (verbose > 2)
-    rprintf(FINFO,"send_files starting\n");
+	if (verbose > 2)
+		rprintf(FINFO,"send_files starting\n");
 
-  setup_readbuffer(f_in);
+	setup_readbuffer(f_in);
 
-  while (1) {
-	  int offset=0;
+	while (1) {
+		int offset=0;
 
-	  i = read_int(f_in);
-	  if (i == -1) {
-		  if (phase==0 && remote_version >= 13) {
-			  phase++;
-			  csum_length = SUM_LENGTH;
-			  write_int(f_out,-1);
-			  if (verbose > 2)
-				  rprintf(FINFO,"send_files phase=%d\n",phase);
-			  continue;
-		  }
-		  break;
-	  }
+		i = read_int(f_in);
+		if (i == -1) {
+			if (phase==0 && remote_version >= 13) {
+				phase++;
+				csum_length = SUM_LENGTH;
+				write_int(f_out,-1);
+				if (verbose > 2)
+					rprintf(FINFO,"send_files phase=%d\n",phase);
+				continue;
+			}
+			break;
+		}
 
-	  if (i < 0 || i >= flist->count) {
-		  rprintf(FERROR,"Invalid file index %d (count=%d)\n", 
-			  i, flist->count);
-		  exit_cleanup(1);
-	  }
+		if (i < 0 || i >= flist->count) {
+			rprintf(FERROR,"Invalid file index %d (count=%d)\n", 
+				i, flist->count);
+			exit_cleanup(1);
+		}
 
-	  file = flist->files[i];
+		file = flist->files[i];
 
-	  stats.num_transferred_files++;
-	  stats.total_transferred_size += file->length;
+		stats.num_transferred_files++;
+		stats.total_transferred_size += file->length;
 
-	  fname[0] = 0;
-	  if (file->basedir) {
-		  strlcpy(fname,file->basedir,MAXPATHLEN-1);
-		  if (strlen(fname) == MAXPATHLEN-1) {
-			  io_error = 1;
-			  rprintf(FERROR, "send_files failed on long-named directory %s\n",
-				  fname);
-			  return;
-		  }
-		  strlcat(fname,"/",MAXPATHLEN-1);
-		  offset = strlen(file->basedir)+1;
-	  }
-	  strlcat(fname,f_name(file),MAXPATHLEN-strlen(fname));
+		fname[0] = 0;
+		if (file->basedir) {
+			strlcpy(fname,file->basedir,MAXPATHLEN-1);
+			if (strlen(fname) == MAXPATHLEN-1) {
+				io_error = 1;
+				rprintf(FERROR, "send_files failed on long-named directory %s\n",
+					fname);
+				return;
+			}
+			strlcat(fname,"/",MAXPATHLEN-1);
+			offset = strlen(file->basedir)+1;
+		}
+		strlcat(fname,f_name(file),MAXPATHLEN-strlen(fname));
 	  
-	  if (verbose > 2) 
-		  rprintf(FINFO,"send_files(%d,%s)\n",i,fname);
+		if (verbose > 2) 
+			rprintf(FINFO,"send_files(%d,%s)\n",i,fname);
 	  
-	  if (dry_run) {	
-		  if (!am_server && verbose)
-			  rprintf(FINFO,"%s\n",fname);
-		  write_int(f_out,i);
-		  continue;
-	  }
+		if (dry_run) {	
+			if (!am_server && verbose)
+				rprintf(FINFO,"%s\n",fname);
+			write_int(f_out,i);
+			continue;
+		}
 
-	  s = receive_sums(f_in);
-	  if (!s) {
-		  io_error = 1;
-		  rprintf(FERROR,"receive_sums failed\n");
-		  return;
-	  }
+		s = receive_sums(f_in);
+		if (!s) {
+			io_error = 1;
+			rprintf(FERROR,"receive_sums failed\n");
+			return;
+		}
 	  
-	  fd = open(fname,O_RDONLY);
-	  if (fd == -1) {
-		  io_error = 1;
-		  rprintf(FERROR,"send_files failed to open %s: %s\n",
-			  fname,strerror(errno));
-		  free_sums(s);
-		  continue;
-	  }
+		fd = open(fname,O_RDONLY);
+		if (fd == -1) {
+			io_error = 1;
+			rprintf(FERROR,"send_files failed to open %s: %s\n",
+				fname,strerror(errno));
+			free_sums(s);
+			continue;
+		}
 	  
-	  /* map the local file */
-	  if (do_fstat(fd,&st) != 0) {
-		  io_error = 1;
-		  rprintf(FERROR,"fstat failed : %s\n",strerror(errno));
-		  free_sums(s);
-		  close(fd);
-		  return;
-	  }
+		/* map the local file */
+		if (do_fstat(fd,&st) != 0) {
+			io_error = 1;
+			rprintf(FERROR,"fstat failed : %s\n",strerror(errno));
+			free_sums(s);
+			close(fd);
+			return;
+		}
 	  
-	  if (st.st_size > 0) {
-		  buf = map_file(fd,st.st_size);
-	  } else {
-		  buf = NULL;
-	  }
+		if (st.st_size > 0) {
+			buf = map_file(fd,st.st_size);
+		} else {
+			buf = NULL;
+		}
 	  
-	  if (verbose > 2)
-		  rprintf(FINFO,"send_files mapped %s of size %d\n",
-			  fname,(int)st.st_size);
+		if (verbose > 2)
+			rprintf(FINFO,"send_files mapped %s of size %d\n",
+				fname,(int)st.st_size);
 	  
-	  write_int(f_out,i);
+		write_int(f_out,i);
 	  
-	  write_int(f_out,s->count);
-	  write_int(f_out,s->n);
-	  write_int(f_out,s->remainder);
+		write_int(f_out,s->count);
+		write_int(f_out,s->n);
+		write_int(f_out,s->remainder);
 	  
-	  if (verbose > 2)
-		  rprintf(FINFO,"calling match_sums %s\n",fname);
+		if (verbose > 2)
+			rprintf(FINFO,"calling match_sums %s\n",fname);
 	  
-	  if (!am_server && verbose)
-		  rprintf(FINFO,"%s\n",fname+offset);
+		if (!am_server && verbose)
+			rprintf(FINFO,"%s\n",fname+offset);
 	  
-	  match_sums(f_out,s,buf,st.st_size);
+		match_sums(f_out,s,buf,st.st_size);
 	  
-	  if (buf) unmap_file(buf);
-	  close(fd);
+		if (buf) unmap_file(buf);
+		close(fd);
 	  
-	  free_sums(s);
+		free_sums(s);
 	  
-	  if (verbose > 2)
-		  rprintf(FINFO,"sender finished %s\n",fname);
-  }
+		if (verbose > 2)
+			rprintf(FINFO,"sender finished %s\n",fname);
+	}
 
-  if (verbose > 2)
-	  rprintf(FINFO,"send files finished\n");
+	if (verbose > 2)
+		rprintf(FINFO,"send files finished\n");
 
-  match_report();
+	match_report();
 
-  write_int(f_out,-1);
+	write_int(f_out,-1);
 }
 
 
 
 void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 {
-  int i;
-  int phase=0;
+	int i;
+	int phase=0;
 
-  if (verbose > 2)
-    rprintf(FINFO,"generator starting pid=%d count=%d\n",
-	    (int)getpid(),flist->count);
+	if (verbose > 2)
+		rprintf(FINFO,"generator starting pid=%d count=%d\n",
+			(int)getpid(),flist->count);
 
-  for (i = 0; i < flist->count; i++) {
-    struct file_struct *file = flist->files[i];
-    mode_t saved_mode = file->mode;
-    if (!file->basename) continue;
+	for (i = 0; i < flist->count; i++) {
+		struct file_struct *file = flist->files[i];
+		mode_t saved_mode = file->mode;
+		if (!file->basename) continue;
 
-    /* we need to ensure that any directories we create have writeable
-       permissions initially so that we can create the files within
-       them. This is then fixed after the files are transferred */
-    if (!am_root && S_ISDIR(file->mode)) {
-      file->mode |= S_IWUSR; /* user write */
-    }
+		/* we need to ensure that any directories we create have writeable
+		   permissions initially so that we can create the files within
+		   them. This is then fixed after the files are transferred */
+		if (!am_root && S_ISDIR(file->mode)) {
+			file->mode |= S_IWUSR; /* user write */
+		}
 
-    recv_generator(local_name?local_name:f_name(file),
-		   flist,i,f);
+		recv_generator(local_name?local_name:f_name(file),
+			       flist,i,f);
 
-    file->mode = saved_mode;
-  }
+		file->mode = saved_mode;
+	}
 
-  phase++;
-  csum_length = SUM_LENGTH;
-  ignore_times=1;
+	phase++;
+	csum_length = SUM_LENGTH;
+	ignore_times=1;
 
-  if (verbose > 2)
-    rprintf(FINFO,"generate_files phase=%d\n",phase);
+	if (verbose > 2)
+		rprintf(FINFO,"generate_files phase=%d\n",phase);
 
-  write_int(f,-1);
+	write_int(f,-1);
 
-  /* we expect to just sit around now, so don't exit on a timeout. If we
-     really get a timeout then the other process should exit */
-  io_timeout = 0;
+	/* we expect to just sit around now, so don't exit on a
+	   timeout. If we really get a timeout then the other process should
+	   exit */
+	io_timeout = 0;
 
-  if (remote_version >= 13) {
-    /* in newer versions of the protocol the files can cycle through
-       the system more than once to catch initial checksum errors */
-    for (i=read_int(f_recv); i != -1; i=read_int(f_recv)) {
-      struct file_struct *file = flist->files[i];
-      recv_generator(local_name?local_name:f_name(file),
-		     flist,i,f);    
-    }
+	if (remote_version >= 13) {
+		/* in newer versions of the protocol the files can cycle through
+		   the system more than once to catch initial checksum errors */
+		for (i=read_int(f_recv); i != -1; i=read_int(f_recv)) {
+			struct file_struct *file = flist->files[i];
+			recv_generator(local_name?local_name:f_name(file),
+				       flist,i,f);    
+		}
 
-    phase++;
-    if (verbose > 2)
-      rprintf(FINFO,"generate_files phase=%d\n",phase);
+		phase++;
+		if (verbose > 2)
+			rprintf(FINFO,"generate_files phase=%d\n",phase);
 
-    write_int(f,-1);
-  }
+		write_int(f,-1);
+	}
 }
 
 
