@@ -152,7 +152,7 @@ int do_mkstemp(char *template, mode_t perms)
 	RETURN_ERROR_IF(dry_run, 0);
 	RETURN_ERROR_IF(read_only, EROFS);
 
-#if defined(HAVE_SECURE_MKSTEMP) && defined(HAVE_FCHMOD)
+#if HAVE_SECURE_MKSTEMP && HAVE_FCHMOD && (!HAVE_OPEN64 || HAVE_MKSTEMP64)
 	{
 		int fd = mkstemp(template);
 		if (fd == -1)
