@@ -69,8 +69,18 @@ extern struct exclude_struct **local_exclude_list;
 int io_error;
 
 static char empty_sum[MD4_SUM_LENGTH];
+static unsigned int min_file_struct_len;
 
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
+
+
+void init_flist(void)
+{
+    struct file_struct f;
+
+    /* Figure out how big the file_struct is without trailing padding */
+    min_file_struct_len = ((char*)&f.flags - (char*)&f) + sizeof f.flags;
+}
 
 
 static int show_filelist_p(void)
@@ -498,6 +508,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 	char thisname[MAXPATHLEN];
 	unsigned int l1 = 0, l2 = 0;
 	int alloc_len, basename_len, dirname_len, linkname_len, sum_len;
+	int file_struct_len, idev_len;
 	OFF_T file_length;
 	char *basename, *dirname, *bp;
 	struct file_struct *file;
@@ -591,15 +602,25 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 #endif
 		linkname_len = 0;
 
-	sum_len = always_checksum && S_ISREG(mode) ? MD4_SUM_LENGTH : 0;
+#if SUPPORT_HARD_LINKS
+	if (preserve_hard_links && protocol_version < 28 && S_ISREG(mode))
+		flags |= XMIT_HAS_IDEV_DATA;
+	if (flags & XMIT_HAS_IDEV_DATA)
+		idev_len = sizeof (struct idev);
+	else
+#endif
+		idev_len = 0;
 
-	alloc_len = sizeof file[0] + dirname_len + basename_len
-		  + linkname_len + sum_len;
+	sum_len = always_checksum && S_ISREG(mode) ? MD4_SUM_LENGTH : 0;
+	file_struct_len = idev_len? sizeof file[0] : min_file_struct_len;
+
+	alloc_len = file_struct_len + dirname_len + basename_len
+		  + linkname_len + sum_len + idev_len;
 	if (!(bp = new_array(char, alloc_len)))
 		out_of_memory("receive_file_entry");
 	file = *fptr = (struct file_struct *)bp;
-	memset(bp, 0, sizeof file[0]);
-	bp += sizeof file[0];
+	memset(bp, 0, min_file_struct_len);
+	bp += file_struct_len;
 
 	file->flags = flags & XMIT_TOP_DIR ? FLAG_TOP_DIR : 0;
 	file->modtime = modtime;
@@ -607,6 +628,13 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 	file->mode = mode;
 	file->uid = uid;
 	file->gid = gid;
+
+#if SUPPORT_HARD_LINKS
+	if (idev_len) {
+		file->link_u.idev = (struct idev *)bp;
+		bp += idev_len;
+	}
+#endif
 
 	if (dirname_len) {
 		file->dirname = lastdir = bp;
@@ -635,11 +663,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 #endif
 
 #if SUPPORT_HARD_LINKS
-	if (preserve_hard_links && protocol_version < 28 && S_ISREG(mode))
-		flags |= XMIT_HAS_IDEV_DATA;
-	if (flags & XMIT_HAS_IDEV_DATA) {
-		if (!(file->link_u.idev = new(struct idev)))
-			out_of_memory("file inode data");
+	if (idev_len) {
 		if (protocol_version < 26) {
 			dev = read_int(f);
 			file->F_INODE = read_int(f);
@@ -702,6 +726,7 @@ struct file_struct *make_file(char *fname, int exclude_level)
 	char thisname[MAXPATHLEN];
 	char linkname[MAXPATHLEN];
 	int alloc_len, basename_len, dirname_len, linkname_len, sum_len;
+	int file_struct_len, idev_len;
 	char *basename, *dirname, *bp;
 	unsigned short flags = 0;
 
@@ -784,15 +809,25 @@ struct file_struct *make_file(char *fname, int exclude_level)
 	linkname_len = 0;
 #endif
 
-	sum_len = always_checksum && S_ISREG(st.st_mode) ? MD4_SUM_LENGTH : 0;
+#if SUPPORT_HARD_LINKS
+	if (preserve_hard_links) {
+		idev_len = (protocol_version < 28 ? S_ISREG(st.st_mode)
+			  : !S_ISDIR(st.st_mode) && st.st_nlink > 1)
+			 ? sizeof (struct idev) : 0;
+	} else
+#endif
+		idev_len = 0;
 
-	alloc_len = sizeof file[0] + dirname_len + basename_len
-		  + linkname_len + sum_len;
+	sum_len = always_checksum && S_ISREG(st.st_mode) ? MD4_SUM_LENGTH : 0;
+	file_struct_len = idev_len? sizeof file[0] : min_file_struct_len;
+
+	alloc_len = file_struct_len + dirname_len + basename_len
+		  + linkname_len + sum_len + idev_len;
 	if (!(bp = new_array(char, alloc_len)))
 		out_of_memory("receive_file_entry");
 	file = (struct file_struct *)bp;
-	memset(bp, 0, sizeof file[0]);
-	bp += sizeof file[0];
+	memset(bp, 0, min_file_struct_len);
+	bp += file_struct_len;
 
 	file->flags = flags;
 	file->modtime = st.st_mtime;
@@ -800,6 +835,15 @@ struct file_struct *make_file(char *fname, int exclude_level)
 	file->mode = st.st_mode;
 	file->uid = st.st_uid;
 	file->gid = st.st_gid;
+
+#if SUPPORT_HARD_LINKS
+	if (idev_len) {
+		file->link_u.idev = (struct idev *)bp;
+		bp += idev_len;
+		file->F_DEV = st.st_dev;
+		file->F_INODE = st.st_ino;
+	}
+#endif
 
 	if (dirname_len) {
 		file->dirname = lastdir = bp;
@@ -824,18 +868,6 @@ struct file_struct *make_file(char *fname, int exclude_level)
 		file->u.link = bp;
 		memcpy(bp, linkname, linkname_len);
 		bp += linkname_len;
-	}
-#endif
-
-#if SUPPORT_HARD_LINKS
-	if (preserve_hard_links) {
-		if (protocol_version < 28 ? S_ISREG(st.st_mode)
-		    : !S_ISDIR(st.st_mode) && st.st_nlink > 1) {
-			if (!(file->link_u.idev = new(struct idev)))
-				out_of_memory("file inode data");
-			file->F_DEV = st.st_dev;
-			file->F_INODE = st.st_ino;
-		}
 	}
 #endif
 
@@ -1295,10 +1327,6 @@ int flist_find(struct file_list *flist, struct file_struct *f)
  */
 void free_file(struct file_struct *file, int free_the_struct)
 {
-#if SUPPORT_HARD_LINKS
-	if (file->link_u.idev)
-		free((char*)file->link_u.idev); /* Handles link_u.links too. */
-#endif
 	if (free_the_struct)
 		free(file);
 	else
