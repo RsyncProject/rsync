@@ -411,6 +411,10 @@ To prevent all compression, you can use "dont compress = *" (see below)
 instead of "refuse options = compress" to avoid returning an error to a
 client that requests compression.
 
+Note that rsync's --del option is implemented as a popt alias, so there
+is no need (an indeed, no way) to refuse "del" by name -- just matching
+the --delete-during option (e.g. "delete*") will refuse --del as well.
+
 dit(bf(dont compress)) The "dont compress" option allows you to select
 filenames based on wildcard patterns that should not be compressed
 during transfer. Compression is expensive in terms of CPU usage so it
