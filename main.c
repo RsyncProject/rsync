@@ -1056,6 +1056,5 @@ int main(int argc,char *argv[])
 	else
 		exit_cleanup(ret);
 
-	exit(ret);
-	/* NOTREACHED */
+	return ret;
 }
