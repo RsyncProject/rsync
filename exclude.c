@@ -191,17 +191,17 @@ static int check_one_exclude(char *name, struct exclude_struct *ex,
 
 static void report_exclude_result(char const *name,
                                   struct exclude_struct const *ent,
-                                  int name_is_dir)
+                                  int name_is_dir, const char *type)
 {
 	/* If a trailing slash is present to match only directories,
 	 * then it is stripped out by make_exclude.  So as a special
 	 * case we add it back in here. */
 
 	if (verbose >= 2) {
-		rprintf(FINFO, "[%s] %scluding %s %s because of pattern %s%s\n",
+		rprintf(FINFO, "[%s] %scluding %s %s because of %s %s%s\n",
 			who_am_i(), ent->include ? "in" : "ex",
-			name_is_dir ? "directory" : "file", name, ent->pattern,
-			ent->directory ? "/" : "");
+			name_is_dir ? "directory" : "file", name, type,
+			ent->pattern, ent->directory ? "/" : "");
 	}
 }
 
@@ -210,13 +210,14 @@ static void report_exclude_result(char const *name,
  * Return true if file NAME is defined to be excluded by either
  * LOCAL_EXCLUDE_LIST or the globals EXCLUDE_LIST.
  */
-int check_exclude(struct exclude_struct **list, char *name, int name_is_dir)
+int check_exclude(struct exclude_struct **list, char *name, int name_is_dir,
+		  const char *type)
 {
 	struct exclude_struct *ent;
 
 	while ((ent = *list++) != NULL) {
 		if (check_one_exclude(name, ent, name_is_dir)) {
-			report_exclude_result(name, ent, name_is_dir);
+			report_exclude_result(name, ent, name_is_dir, type);
 			return !ent->include;
 		}
 	}
