@@ -43,6 +43,9 @@ TLS_OBJ = tls.o syscall.o lib/permstring.o
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync tls getgroups trimslash t_unsafe
 
+# Objects for CHECK_PROGS to clean
+CHECK_OBJS=getgroups.o t_stub.o t_unsafe.o trimslash.o
+
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
 @OBJ_SAVE@
@@ -106,7 +109,7 @@ proto:
 	cat $(srcdir)/*.c $(srcdir)/lib/compat.c | awk -f $(srcdir)/mkproto.awk > $(srcdir)/proto.h
 
 clean: cleantests
-	rm -f *~ $(OBJS) rsync $(TLS_OBJ) $(CHECK_PROGS)
+	rm -f *~ $(OBJS) rsync $(TLS_OBJ) $(CHECK_PROGS) $(CHECK_OBJS)
 
 cleantests:
 	rm -rf ./testtmp*

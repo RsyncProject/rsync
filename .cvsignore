@@ -9,6 +9,7 @@ config.status
 conftest.c
 conftest.log
 dox
+getgroups
 gmon.out
 rsync
 shconfig
@@ -17,4 +18,6 @@ tests-dont-exist
 testtmp
 testtmp.*
 tls
+trimslash
+t_unsafe
 zlib/dummy
