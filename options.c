@@ -236,7 +236,8 @@ static int check_refuse_options(char *ref, int opt)
 	len = strlen(name);
 
 	while ((p = strstr(ref,name))) {
-		if (p[len] == ' ' || p[len] == 0) {
+		if ((p==ref || p[-1]==' ') &&
+		    (p[len] == ' ' || p[len] == 0)) {
 			slprintf(err_buf,sizeof(err_buf),
 				 "The '%s' option is not supported by this server\n", name);
 			return 1;
