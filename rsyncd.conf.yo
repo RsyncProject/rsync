@@ -208,13 +208,14 @@ on the server that contains include patterns, one per line. This is
 equivalent to the client specifying the --include-from option with a
 equivalent file.
 
-dit(bf(auth users)) The "auth users" option specifies a comma
-and space separated list of usernames that will be allowed to connect
-to this module. The usernames do not need to exist on the local
-system. If "auth users" is set then the client will be challenged to
-supply a username and password to connect to the module. A challenge
-response authentication protocol is used for this exchange. The plain
-text usernames are passwords are stored in the file specified by the
+dit(bf(auth users)) The "auth users" option specifies a comma and
+space separated list of usernames that will be allowed to connect to
+this module. The usernames do not need to exist on the local
+system. The usernames may also contain shell wildcard characters. If
+"auth users" is set then the client will be challenged to supply a
+username and password to connect to the module. A challenge response
+authentication protocol is used for this exchange. The plain text
+usernames are passwords are stored in the file specified by the
 "secrets file" option. The default is for all users to be able to
 connect without a password (this is called "anonymous rsync").
 

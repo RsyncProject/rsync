@@ -234,12 +234,12 @@ char *auth_server(int fd, int module, char *addr, char *leader)
 	if (sscanf(line,"%99s %29s", user, pass) != 2) {
 		return NULL;
 	}
-
+	
 	users = strdup(users);
 	if (!users) return NULL;
 
 	for (tok=strtok(users," ,\t"); tok; tok = strtok(NULL," ,\t")) {
-		if (strcmp(tok, user) == 0) break;
+		if (fnmatch(tok, user, 0) == 0) break;
 	}
 	free(users);
 
