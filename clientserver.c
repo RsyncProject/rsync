@@ -212,6 +212,13 @@ static int rsync_module(int fd, int i)
 			gid = atoi(p);
 		}
 	}
+        
+        /* TODO: If we're not root, but the configuration requests
+         * that we change to some uid other than the current one, then
+         * log a warning. */
+
+        /* TODO: Perhaps take a list of gids, and make them into the
+         * supplementary groups. */
 
 	p = lp_include_from(i);
 	add_exclude_file(p, 1, 1);
