@@ -150,7 +150,11 @@ checkit() {
     echo "-------------"
     echo "check how the files compare with diff:"
     echo ""
-    diff -cr $2 $3 || failed=YES
+    for f in `cd "$2"; find . -type f -print `
+    do 
+        diff -u "$2"/"$f" "$3"/"$f" || failed=YES
+    done
+
     echo "-------------"
     echo "check how the directory listings compare with diff:"
     echo ""
