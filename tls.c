@@ -84,7 +84,8 @@ static void list_file (const char *fname)
 		buf.st_mtime = (time_t)0;
 		buf.st_uid = buf.st_gid = 0;
 		strcpy(linkbuf, " -> ");
-		readlink(fname, linkbuf+4, sizeof(linkbuf) - 4);
+		/* const-cast required for silly UNICOS headers */
+		readlink((char *) fname, linkbuf+4, sizeof(linkbuf) - 4);
 	} else {
 		linkbuf[0] = 0;
 	}
