@@ -51,8 +51,7 @@ char *client_addr(int fd)
 
 	initialised = 1;
 
-	ssh_client = getenv("SSH_CLIENT");
-	if (ssh_client != NULL) {
+	if ((ssh_client = getenv("SSH_CLIENT")) != NULL) {
 		strlcpy(addr_buf, ssh_client, sizeof(addr_buf));
 		/* truncate SSH_CLIENT to just IP address */
 		p = strchr(addr_buf, ' ');
@@ -112,8 +111,14 @@ char *client_name(int fd)
 		socklen_t sin_len = sizeof sin;
 
 		memset(&sin, 0, sin_len);
+
+#ifdef INET6
+		sin.sin6_family = af;
+		inet_pton(af, client_addr(fd), &sin.sin6_addr.s6_addr);
+#else
 		sin.sin_family = af;
 		inet_pton(af, client_addr(fd), &sin.sin_addr.s_addr);
+#endif
 
 		if (!lookup_name(fd, (struct sockaddr_storage *)&sin, sin_len, 
 				name_buf, sizeof name_buf, port_buf, sizeof port_buf))
