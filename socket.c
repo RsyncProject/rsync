@@ -170,34 +170,19 @@ open a socket of the specified type, port and address for incoming data
 ****************************************************************************/
 static int open_socket_in(int type, int port, struct in_addr *address)
 {
-	struct hostent *hp;
 	struct sockaddr_in sock;
-	char host_name[MAXHOSTNAMELEN];
 	int res;
 	int one=1;
 
-	/* get my host name */
-	if (gethostname(host_name, sizeof(host_name)) == -1) { 
-		rprintf(FERROR,"gethostname failed\n"); 
-		return -1; 
-	} 
-
-	/* get host info */
-	if ((hp = gethostbyname(host_name)) == 0) {
-		rprintf(FERROR,"gethostbyname: Unknown host %s\n",host_name);
-		return -1;
-	}
-  
 	memset((char *)&sock,0,sizeof(sock));
-	memcpy((char *)&sock.sin_addr,(char *)hp->h_addr, hp->h_length);
 	sock.sin_port = htons(port);
-	sock.sin_family = hp->h_addrtype;
+	sock.sin_family = AF_INET;
 	if (address) {
 		sock.sin_addr = *address;
 	} else {
 		sock.sin_addr.s_addr = INADDR_ANY;
 	}
-	res = socket(hp->h_addrtype, type, 0);
+	res = socket(AF_INET, type, 0);
 	if (res == -1) { 
 		rprintf(FERROR,"socket failed: %s\n",
 			strerror(errno)); 
