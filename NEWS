@@ -7,6 +7,10 @@ Changes since 2.6.3:
     - When rsync deletes a directory and outputs a verbose message about
       it, it now appends a trailing slash to the name instead of (only
       sometimes) outputting a preceding "directory " string.
+
+    - The --stats output will contain time file-list time statistics if
+      both sides are 2.6.4, or if the local side is 2.6.4 and the files
+      are being pushed (since the stats come from the sending side).
   
   BUG FIXES:
 
@@ -19,7 +23,7 @@ Changes since 2.6.3:
 
     - An OS that has a binary mode for its files (such as cygwin0 needed
       setmode(fd, O_BINARY) called on the temp-file we opened with
-      mkstemp().  (Fix picked up from the cygwin package.)
+      mkstemp().  (Fix derived from the cygwin's rsync package.)
 
     - Fixed a potential hang when verbosity is high, the client side is
       the sender, and the file-list is large.
@@ -42,13 +46,22 @@ Changes since 2.6.3:
     - The generator now properly runs the hard-link loop and the dir-time
       rewriting loop after we're sure that the redo phase is complete.
 
-    - When --backup was specified with --partial-dir=DIR, don't try to
-      backup a file in DIR when DIR is relative.
+    - When --backup was specified with --partial-dir=DIR (where DIR is a
+      relative path), the backup code was erroneously trying to backup a
+      file that was put into the partial-dir.
 
   ENHANCEMENTS:
 
     - Rsync now supports popt's option aliases, which means that you can
       use /etc/popt and/or ~/.popt to create your own option aliases.
+
+    - Added the --delete-during (--del) option which will delete files
+      from on the receiving side incrementally as each directory in the
+      transfer is being processed (which makes it more efficient than the
+      default, before-the-transfer behavior of --delete).  Note that the
+      --del option is implemented as an internally-defined popt alias, so
+      an rsync daemon that refuses "delete" (which, for safety's sake,
+      really matches "delete*") will still refuse all delete options.
 
     - Added the --copy-dest option, which works like --link-dest except
       that it includes copies of identical files.
@@ -92,11 +105,6 @@ Changes since 2.6.3:
       the file-list at the end of the transfer to tweak all the directory
       times.
 
-    - Added the --delete-during (--del) option which will delete files
-      from on the receiving side incrementally as each directory in the
-      transfer is being processed (which makes it more efficient than
-      the default, before-the-transfer behavior of --delete).
-
     - Added the --filter (-f) option and its helper option, -F.  Filter
       rules are an extension to the existing include/exclude handling
       that also supports nested filter files as well as per-directory
@@ -105,10 +113,31 @@ Changes since 2.6.3:
       include/exclude processing remained 100% compatible with older
       versions.
 
+    - Added the --delay-updates option that puts all updated files into
+      a temporary directory (by default ".~tmp~", but settable via the
+      --partial-dir=DIR option) until the end of the transfer.  This
+      makes the updates a little more atomic for a large transfer.
+
+  SUPPORT FILES:
+
     - Added support/atomic-rsync -- a perl script that will transfer some
       files using rsync, and then move the updated files into place all at
       once at the end of the transfer.  Only works when pulling, and uses
-      --link-dest.
+      --link-dest and a parallel hierarchy of files to effect its update.
+
+    - Added support/mnt-excl that takes the /proc/mounts file and
+      translates it into a set of excludes that will exclude all mount
+      points (even mapped mounts to the same disk).  The excludes are made
+      relative to the specified source dir and properly anchored.
+
+    - Added support/savetransfer.c -- a C program that can make a copy of
+      all the data that flows over the wire.  This lets you test for data
+      corruption (by saving the data on both the sending side and the
+      receiving side) or provides a way to help debug a protocol error.
+
+    - Added support/rrsync -- my version of Joe Smith's restricted rsync
+      perl script.  This helps to ensure that only certain rsync commands
+      can be run by an ssh invocation.
 
   INTERNAL:
 
