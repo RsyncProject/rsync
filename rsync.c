@@ -936,12 +936,14 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
 	  if (fd == -1) {
 		  fprintf(FERROR,"send_files failed to open %s: %s\n",
 			  fname,strerror(errno));
+		  free_sums(s);
 		  continue;
 	  }
 	  
 	  /* map the local file */
 	  if (fstat(fd,&st) != 0) {
 		  fprintf(FERROR,"fstat failed : %s\n",strerror(errno));
+		  free_sums(s);
 		  close(fd);
 		  return -1;
 	  }

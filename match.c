@@ -91,14 +91,14 @@ static off_t last_match;
 
 
 static void matched(int f,struct sum_struct *s,struct map_struct *buf,
-		    int offset,int i)
+		    off_t offset,int i)
 {
-	int n = offset - last_match;
+	off_t n = offset - last_match;
 	int j;
 
 	if (verbose > 2 && i != -1)
 		fprintf(FERROR,"match at %d last_match=%d j=%d len=%d n=%d\n",
-			(int)offset,(int)last_match,i,(int)s->sums[i].len,n);
+			(int)offset,(int)last_match,i,(int)s->sums[i].len,(int)n);
 
 	send_token(f,i,buf,last_match,n,i==-1?0:s->sums[i].len);
 	data_transfer += n;
@@ -123,7 +123,8 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 static void hash_search(int f,struct sum_struct *s,
 			struct map_struct *buf,off_t len)
 {
-	int offset,j,k;
+	off_t offset;
+	int j,k;
 	int end;
 	char sum2[SUM_LENGTH];
 	uint32 s1, s2, sum; 
@@ -156,8 +157,7 @@ static void hash_search(int f,struct sum_struct *s,
 			
 		j = tag_table[t];
 		if (verbose > 4)
-			fprintf(FERROR,"offset=%d sum=%08x\n",
-				offset,sum);
+			fprintf(FERROR,"offset=%d sum=%08x\n",(int)offset,sum);
 		
 		if (j == NULL_TAG) {
 			goto null_tag;
@@ -172,7 +172,7 @@ static void hash_search(int f,struct sum_struct *s,
 			
 			if (verbose > 3)
 				fprintf(FERROR,"potential match at %d target=%d %d sum=%08x\n",
-					offset,j,i,sum);
+					(int)offset,j,i,sum);
 			
 			if (!done_csum2) {
 				int l = MIN(s->n,len-offset);

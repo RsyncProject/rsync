@@ -53,6 +53,7 @@ struct map_struct *map_file(int fd,off_t len)
   return ret;
 }
 
+
 char *map_ptr(struct map_struct *map,off_t offset,int len)
 {
   int nread = -2;
@@ -63,7 +64,8 @@ char *map_ptr(struct map_struct *map,off_t offset,int len)
   if (len == 0) 
     return NULL;
 
-  len = MIN(len,map->size-offset);
+  if (len > (map->size-offset))
+      len = map->size-offset;
 
   if (offset >= map->p_offset && 
       offset+len <= map->p_offset+map->p_len) {
@@ -71,7 +73,8 @@ char *map_ptr(struct map_struct *map,off_t offset,int len)
   }
 
   len = MAX(len,CHUNK_SIZE);
-  len = MIN(len,map->size - offset);  
+  if (len > (map->size-offset))
+      len = map->size-offset;
 
   if (len > map->p_size) {
     if (map->p) free(map->p);

@@ -249,8 +249,9 @@ struct sum_struct {
 };
 
 struct map_struct {
-  char *map,*p;
-  int fd,size,p_size,p_offset,p_len;
+	char *map,*p;
+	int fd,p_size,p_len;
+	off_t size, p_offset;
 };
 
 /* we need this function because of the silly way in which duplicate
