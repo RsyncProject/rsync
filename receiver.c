@@ -429,6 +429,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			rprintf(FERROR,"mkstemp %s failed: %s\n",fnametmp,strerror(errno));
 			receive_data(f_in,buf,-1,NULL,file->length);
 			if (buf) unmap_file(buf);
+			if (fd1 != -1) close(fd1);
 			continue;
 		}
 
