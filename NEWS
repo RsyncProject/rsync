@@ -69,6 +69,12 @@ Changes since 2.6.3:
       if the block-size for a file was large enough (i.e. rsync might have
       exited with an error for large files).
 
+    - Fixed a bug that would sometimes surface when using --compress and
+      sending a file with a block-size larger than 64K (either manually
+      specified, or computed due to the file being really large).  Prior
+      versions of rsync would sometimes fail to to decompress the data
+      properly, and thus the transferred file would fail its verification.
+
     - If a daemon can't open the specified log file (i.e. syslog is not
       being used), die without crashing.  We also output an error about
       the failure on stderr (which will only be seen if --no-detach was
