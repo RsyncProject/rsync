@@ -390,7 +390,7 @@ fi
 
 
 AC_CHECK_MEMBER([struct sockaddr.sa_len],
-		[ AC_DEFINE(HAVE_SOCKADDR_LEN) ],
+		[ AC_DEFINE(HAVE_SOCKADDR_LEN, 1, [Do we have sockaddr.sa_len?]) ],
 		[],
 		[
 #include <sys/types.h>
@@ -407,7 +407,7 @@ AC_TRY_COMPILE([#include <sys/types.h>
 	AC_MSG_RESULT(no))
 
 AC_CHECK_MEMBER([struct sockaddr_in6.sin6_scope_id],
-		[ AC_DEFINE(HAVE_SOCKADDR_IN6_SCOPE_ID) ],
+		[ AC_DEFINE(HAVE_SOCKADDR_IN6_SCOPE_ID, 1, [Do we have sockaddr_in6.sin6_scope_id?]) ],
 		[],
 		[
 #include <sys/types.h>
