@@ -472,7 +472,8 @@ void io_printf(int fd, const char *format, ...)
 #if HAVE_VSNPRINTF
 	len = vsnprintf(buf, sizeof(buf)-1, format, ap);
 #else
-	len = vsprintf(buf, format, ap);
+	vsprintf(buf, format, ap);
+	len = strlen(buf);
 #endif
 	va_end(ap);
 
