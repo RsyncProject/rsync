@@ -521,9 +521,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 {
 	int pid;
 	int status = 0;
-	int error_pipe[2], name_pipe[2];
-	BOOL need_name_pipe = (basis_dir[0] || partial_dir || fuzzy_basis
-			    || (inplace && make_backups)) && !dry_run;
+	int error_pipe[2];
 
 	/* The receiving side mustn't obey this, or an existing symlink that
 	 * points to an identical file won't be replaced by the referent. */
@@ -532,8 +530,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	if (preserve_hard_links)
 		init_hard_links();
 
-	if (fd_pair(error_pipe) < 0
-	    || (need_name_pipe && fd_pair(name_pipe) < 0)) {
+	if (fd_pair(error_pipe) < 0) {
 		rsyserr(FERROR, errno, "pipe failed in do_recv");
 		exit_cleanup(RERR_IPC);
 	}
@@ -547,11 +544,6 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	if (pid == 0) {
 		close(error_pipe[0]);
-		if (need_name_pipe) {
-			close(name_pipe[1]);
-			set_blocking(name_pipe[0]);
-		} else
-			name_pipe[0] = -1;
 		if (f_in != f_out)
 			close(f_out);
 
@@ -561,7 +553,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		/* set place to send errors */
 		set_msg_fd_out(error_pipe[1]);
 
-		recv_files(f_in, flist, local_name, name_pipe[0]);
+		recv_files(f_in, flist, local_name);
 		io_flush(FULL_FLUSH);
 		report(f_in);
 
@@ -595,11 +587,6 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		stop_write_batch();
 
 	close(error_pipe[1]);
-	if (need_name_pipe) {
-		close(name_pipe[0]);
-		set_nonblocking(name_pipe[1]);
-	} else
-		name_pipe[1] = -1;
 	if (f_in != f_out)
 		close(f_in);
 
@@ -607,7 +594,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	set_msg_fd_in(error_pipe[0]);
 
-	generate_files(f_out, flist, local_name, name_pipe[1]);
+	generate_files(f_out, flist, local_name);
 
 	report(-1);
 	io_flush(FULL_FLUSH);
