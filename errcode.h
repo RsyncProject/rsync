@@ -19,7 +19,7 @@
 
 /*
  * error codes returned by rsync.  If you change these, please also update the
- * string mappings in log.c
+ * string mappings in log.c and the EXIT VALUES in rsync.yo
  */
 
 #define RERR_OK         0
