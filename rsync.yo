@@ -367,6 +367,7 @@ to the detailed description below for a complete description.  verb(
      --files-from=FILE       read list of source-file names from FILE
  -0, --from0                 all *from file lists are delimited by nulls
      --version               print version number
+     --address=ADDRESS       bind address for outgoing socket to daemon
      --port=PORT             specify double-colon alternate port number
      --blocking-io           use blocking I/O for the remote shell
      --no-blocking-io        turn off blocking I/O when it is default
@@ -1032,6 +1033,11 @@ dit(bf(--timeout=TIMEOUT)) This option allows you to set a maximum I/O
 timeout in seconds. If no data is transferred for the specified time
 then rsync will exit. The default is 0, which means no timeout.
 
+dit(bf(--address)) By default rsync will bind to the wildcard address when
+connecting to an rsync daemon.  The bf(--address) option allows you to
+specify a specific IP address (or hostname) to bind to.  See also this
+option in the bf(--daemon) mode section.
+
 dit(bf(--port=PORT)) This specifies an alternate TCP port number to use
 rather than the default of 873.  This is only needed if you are using the
 double-colon (::) syntax to connect with an rsync daemon (since the URL
@@ -1316,12 +1322,11 @@ become a background daemon.  The daemon will read the config file
 requests accordingly.  See the rsyncd.conf(5) man page for more
 details.
 
-dit(bf(--address)) By default rsync will bind to the wildcard address
-when run as a daemon with the bf(--daemon) option or when connecting to a
-rsync server. The bf(--address) option allows you to specify a specific IP
-address (or hostname) to bind to. This makes virtual hosting possible
-in conjunction with the bf(--config) option.  See also the "address" global
-option in the rsyncd.conf manpage.
+dit(bf(--address)) By default rsync will bind to the wildcard address when
+run as a daemon with the bf(--daemon) option.  The bf(--address) option
+allows you to specify a specific IP address (or hostname) to bind to.  This
+makes virtual hosting possible in conjunction with the bf(--config) option.
+See also the "address" global option in the rsyncd.conf manpage.
 
 dit(bf(--bwlimit=KBPS)) This option allows you to specify a maximum
 transfer rate in kilobytes per second for the data the daemon sends.
