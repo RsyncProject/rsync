@@ -482,7 +482,8 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 		return;
 	}
 
-	if (update_only && cmp_modtime(st.st_mtime,file->modtime)>0 && fnamecmp == fname) {
+	if (update_only && fnamecmp == fname
+	    && cmp_modtime(st.st_mtime, file->modtime) > 0) {
 		if (verbose > 1)
 			rprintf(FINFO,"%s is newer\n",fname);
 		return;
