@@ -43,6 +43,7 @@ extern int local_server;
 extern int log_got_error;
 extern int module_id;
 extern int orig_umask;
+extern int keep_dirlinks;
 extern int preserve_hard_links;
 extern int protocol_version;
 extern int recurse;
@@ -120,7 +121,8 @@ static void report(int f)
 
 	if (am_daemon) {
 		log_exit(0, __FILE__, __LINE__);
-		if (f == -1 || !am_sender) return;
+		if (f == -1 || !am_sender)
+			return;
 	}
 
 	if (am_server) {
@@ -572,6 +574,7 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 		io_start_multiplex_out(f_out);
 
 	if (am_sender) {
+		keep_dirlinks = 0; /* Must be disabled on the sender. */
 		if (!read_batch) {
 			recv_exclude_list(f_in);
 			if (cvs_exclude)
@@ -608,6 +611,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		io_start_multiplex_in(f_in);
 
 	if (am_sender) {
+		keep_dirlinks = 0; /* Must be disabled on the sender. */
 		io_start_buffering_out(f_out);
 		if (cvs_exclude)
 			add_cvs_excludes();
