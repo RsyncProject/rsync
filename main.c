@@ -202,7 +202,8 @@ static char *get_local_name(struct file_list *flist,char *name)
 		rprintf(FERROR,"mkdir %s : %s (1)\n",name,strerror(errno));
 		exit_cleanup(1);
 	} else {
-		rprintf(FINFO,"created directory %s\n",name);
+		if (verbose > 0)
+			rprintf(FINFO,"created directory %s\n",name);
 	}
 
 	if (!push_dir(name, 0)) {
