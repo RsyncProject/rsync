@@ -75,7 +75,14 @@ int modify_window=0;
 int blocking_io=0;
 
 /** Global options set from command line. **/
-struct global_opts global_opts;
+struct global_opts global_opts = {
+#ifdef INET6
+	0,			/* af_hint -- allow any protocol */
+#else
+	AF_INET,		/* af_hint -- prefer IPv4 */
+#endif
+	0,			/* no_detach */
+};
 
 int read_batch=0;  /* dw */
 int write_batch=0; /* dw */
