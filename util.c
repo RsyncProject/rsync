@@ -170,24 +170,28 @@ void out_of_memory(char *str)
 
 int set_modtime(char *fname,time_t modtime)
 {
+	extern int dry_run;
+	if (dry_run) return 0;
+	{
 #ifdef HAVE_UTIMBUF
-  struct utimbuf tbuf;  
-  tbuf.actime = time(NULL);
-  tbuf.modtime = modtime;
-  return utime(fname,&tbuf);
+		struct utimbuf tbuf;  
+		tbuf.actime = time(NULL);
+		tbuf.modtime = modtime;
+		return utime(fname,&tbuf);
 #elif defined(HAVE_UTIME)
-  time_t t[2];
-  t[0] = time(NULL);
-  t[1] = modtime;
-  return utime(fname,t);
+		time_t t[2];
+		t[0] = time(NULL);
+		t[1] = modtime;
+		return utime(fname,t);
 #else
-  struct timeval t[2];
-  t[0].tv_sec = time(NULL);
-  t[0].tv_usec = 0;
-  t[1].tv_sec = modtime;
-  t[1].tv_usec = 0;
-  return utimes(fname,t);
+		struct timeval t[2];
+		t[0].tv_sec = time(NULL);
+		t[0].tv_usec = 0;
+		t[1].tv_sec = modtime;
+		t[1].tv_usec = 0;
+		return utimes(fname,t);
 #endif
+	}
 }
 
 
@@ -310,13 +314,13 @@ int copy_file(char *source, char *dest, mode_t mode)
 		return -1;
 	}
 
-	if (unlink(dest) && errno != ENOENT) {
+	if (do_unlink(dest) && errno != ENOENT) {
 		fprintf(FERROR,"unlink %s: %s\n",
 			dest,strerror(errno));
 		return -1;
 	}
 
-	ofd = open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode);
+	ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode);
 	if (ofd < 0) {
 		fprintf(FERROR,"open %s: %s\n",
 			dest,strerror(errno));

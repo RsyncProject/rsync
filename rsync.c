@@ -304,7 +304,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
   if (S_ISDIR(file->mode)) {
     if (dry_run) return;
     if (statret == 0 && !S_ISDIR(st.st_mode)) {
-      if (unlink(fname) != 0) {
+      if (do_unlink(fname) != 0) {
 	fprintf(FERROR,"unlink %s : %s\n",fname,strerror(errno));
 	return;
       }
@@ -337,8 +337,8 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 	}
       }
     }
-    if (!dry_run) unlink(fname);
-    if (!dry_run && symlink(file->link,fname) != 0) {
+    do_unlink(fname);
+    if (do_symlink(file->link,fname) != 0) {
       fprintf(FERROR,"link %s -> %s : %s\n",
 	      fname,file->link,strerror(errno));
     } else {
@@ -356,12 +356,11 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
     if (statret != 0 || 
 	st.st_mode != file->mode ||
 	st.st_rdev != file->rdev) {	
-      if (!dry_run) unlink(fname);
+      do_unlink(fname);
       if (verbose > 2)
 	fprintf(FERROR,"mknod(%s,0%o,0x%x)\n",
 		fname,(int)file->mode,(int)file->rdev);
-      if (!dry_run && 
-	  mknod(fname,file->mode,file->rdev) != 0) {
+      if (do_mknod(fname,file->mode,file->rdev) != 0) {
 	fprintf(FERROR,"mknod %s : %s\n",fname,strerror(errno));
       } else {
 	set_perms(fname,file,NULL,0);
@@ -405,7 +404,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
       fprintf(FERROR,"ERROR: %s is a directory\n",fname);
       return;
     }
-    if (unlink(fname) != 0) {
+    if (do_unlink(fname) != 0) {
       fprintf(FERROR,"%s : not a regular file (generator)\n",fname);
       return;
     }
@@ -546,13 +545,13 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
 static void delete_one(struct file_struct *f)
 {
   if (!S_ISDIR(f->mode)) {
-    if (!dry_run && unlink(f_name(f)) != 0) {
+    if (do_unlink(f_name(f)) != 0) {
       fprintf(FERROR,"unlink %s : %s\n",f_name(f),strerror(errno));
     } else if (verbose) {
       fprintf(FERROR,"deleting %s\n",f_name(f));
     }
   } else {    
-    if (!dry_run && rmdir(f_name(f)) != 0) {
+    if (do_rmdir(f_name(f)) != 0) {
       if (errno != ENOTEMPTY)
 	fprintf(FERROR,"rmdir %s : %s\n",f_name(f),strerror(errno));
     } else if (verbose) {
@@ -656,7 +655,7 @@ static char *cleanup_fname;
 void exit_cleanup(int code)
 {
 	if (cleanup_fname)
-		unlink(cleanup_fname);
+		do_unlink(cleanup_fname);
 	signal(SIGUSR1, SIG_IGN);
 	if (code) {
 		kill_all(SIGUSR1);
@@ -771,10 +770,10 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	close(fd1);
 	continue;
       }
-      fd2 = open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,file->mode);
+      fd2 = do_open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,file->mode);
       if (fd2 == -1 && relative_paths && errno == ENOENT && 
 	  create_directory_path(fnametmp) == 0) {
-	      fd2 = open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,file->mode);
+	      fd2 = do_open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,file->mode);
       }
       if (fd2 == -1) {
 	fprintf(FERROR,"open %s : %s\n",fnametmp,strerror(errno));
@@ -825,11 +824,11 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		      } else {
 			      set_perms(fname,file,NULL,0);
 		      }
-		      unlink(fnametmp);
+		      do_unlink(fnametmp);
 	      } else {
 		      fprintf(FERROR,"rename %s -> %s : %s\n",
 			      fnametmp,fname,strerror(errno));
-		      unlink(fnametmp);
+		      do_unlink(fnametmp);
 	      }
       } else {
 	      set_perms(fname,file,NULL,0);

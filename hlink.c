@@ -121,7 +121,7 @@ void do_hard_links(struct file_list *flist)
 
       if (link_stat(f_name(&hlink_list[i-1]),&st1) != 0) continue;
       if (link_stat(f_name(&hlink_list[i]),&st2) != 0) {
-	if (!dry_run && link(f_name(&hlink_list[i-1]),f_name(&hlink_list[i])) != 0) {
+	if (do_link(f_name(&hlink_list[i-1]),f_name(&hlink_list[i])) != 0) {
 		if (verbose > 0)
 			fprintf(FINFO,"link %s => %s : %s\n",
 				f_name(&hlink_list[i]),
@@ -131,8 +131,8 @@ void do_hard_links(struct file_list *flist)
       } else {
 	if (st2.st_dev == st1.st_dev && st2.st_ino == st1.st_ino) continue;
 	
-	if (!dry_run && (unlink(f_name(&hlink_list[i])) != 0 ||
-			 link(f_name(&hlink_list[i-1]),f_name(&hlink_list[i])) != 0)) {
+	if (do_unlink(f_name(&hlink_list[i])) != 0 ||
+	    do_link(f_name(&hlink_list[i-1]),f_name(&hlink_list[i])) != 0) {
 		if (verbose > 0)
 			fprintf(FINFO,"link %s => %s : %s\n",
 				f_name(&hlink_list[i]),
