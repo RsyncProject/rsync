@@ -582,12 +582,11 @@ char *client_addr(int fd)
 
 	initialised = 1;
 
-	if (getpeername(fd, (struct sockaddr *)&ss, &length)) {
-		exit_cleanup(RERR_SOCKETIO);
-	}
+	client_sockaddr(fd, &ss, &length);
 
 	getnameinfo((struct sockaddr *)&ss, length,
-		addr_buf, sizeof(addr_buf), NULL, 0, NI_NUMERICHOST);
+		    addr_buf, sizeof(addr_buf), NULL, 0, NI_NUMERICHOST);
+	
 	return addr_buf;
 }
 
@@ -621,12 +620,7 @@ char *client_name(int fd)
 	strcpy(name_buf, default_name);
 	initialised = 1;
 
-	if (getpeername(fd, (struct sockaddr *)&ss, &ss_len)) {
-		/* FIXME: Can we really not continue? */
-		rprintf(FERROR, RSYNC_NAME ": getpeername on fd%d failed: %s\n",
-			fd, strerror(errno));
-		exit_cleanup(RERR_SOCKETIO);
-	}
+	client_sockaddr(fd, &ss, &ss_len);
 
 	if (!lookup_name(fd, &ss, ss_len, name_buf, sizeof name_buf, port_buf, sizeof port_buf))
 		check_name(fd, &ss, ss_len, name_buf, port_buf);
@@ -635,16 +629,21 @@ char *client_name(int fd)
 }
 
 
+
 /**
- * Look up a name from @p ss into @p name_buf.
+ * Get the sockaddr for the client.  
  **/
-int lookup_name(int fd, const struct sockaddr_storage *ss,
-		socklen_t ss_len,
-		char *name_buf, size_t name_buf_len,
-		char *port_buf, size_t port_buf_len)
+void client_sockaddr(int fd,
+		     struct sockaddr_storage *ss,
+		     socklen_t *ss_len)
 {
-	int name_err;
-	
+	if (getpeername(fd, (struct sockaddr *)&ss, ss_len)) {
+		/* FIXME: Can we really not continue? */
+		rprintf(FERROR, RSYNC_NAME ": getpeername on fd%d failed: %s\n",
+			fd, strerror(errno));
+		exit_cleanup(RERR_SOCKETIO);
+	}
+
 #ifdef INET6
         if (get_sockaddr_family(ss) == AF_INET6 && 
 	    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)ss)->sin6_addr)) {
@@ -661,19 +660,32 @@ int lookup_name(int fd, const struct sockaddr_storage *ss,
 		sin = (struct sockaddr_in *)ss;
 		memset(sin, 0, sizeof(*sin));
 		sin->sin_family = AF_INET;
-		ss_len = sizeof(struct sockaddr_in);
+		*ss_len = sizeof(struct sockaddr_in);
 #ifdef HAVE_SOCKADDR_LEN
-		sin->sin_len = ss_len;
+		sin->sin_len = *ss_len;
 #endif
 		sin->sin_port = sin6.sin6_port;
-		/* FIXME: Isn't there a macro we can use here rather
-		 * than grovelling through the struct?  It might be
-		 * wrong on some systems. */
+
+		/* There is a macro to extract the mapped part
+		 * (IN6_V4MAPPED_TO_SINADDR ?), but it does not seem
+		 * to be present in the Linux headers. */
 		memcpy(&sin->sin_addr, &sin6.sin6_addr.s6_addr[12],
 			sizeof(sin->sin_addr));
         }
 #endif
+}
 
+
+/**
+ * Look up a name from @p ss into @p name_buf.
+ **/
+int lookup_name(int fd, const struct sockaddr_storage *ss,
+		socklen_t ss_len,
+		char *name_buf, size_t name_buf_len,
+		char *port_buf, size_t port_buf_len)
+{
+	int name_err;
+	
 	/* reverse lookup */
 	name_err = getnameinfo((struct sockaddr *) ss, ss_len,
 			       name_buf, name_buf_len,
