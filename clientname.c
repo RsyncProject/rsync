@@ -169,6 +169,8 @@ void client_sockaddr(int fd,
 		     struct sockaddr_storage *ss,
 		     socklen_t *ss_len)
 {
+	memset(ss, 0, sizeof(*ss));
+
 	if (getpeername(fd, (struct sockaddr *) ss, ss_len)) {
 		/* FIXME: Can we really not continue? */
 		rprintf(FERROR, RSYNC_NAME ": getpeername on fd%d failed: %s\n",
@@ -272,9 +274,23 @@ int compare_addrinfo_sockaddr(const struct addrinfo *ai,
 
 		sin1 = (const struct sockaddr_in6 *) ss;
 		sin2 = (const struct sockaddr_in6 *) ai->ai_addr;
-		
-		return memcmp(&sin1->sin6_addr, &sin2->sin6_addr,
-			      sizeof sin1->sin6_addr);
+
+		if (ai->ai_addrlen < sizeof(struct sockaddr_in6)) {
+			rprintf(FERROR,
+				"%s: too short sockaddr_in6; length=%d\n",
+				fn, ai->ai_addrlen);
+			return 1;
+		}
+
+		if (memcmp(&sin1->sin6_addr, &sin2->sin6_addr,
+			   sizeof sin1->sin6_addr))
+			return 1;
+
+#ifdef HAVE_SOCKADDR_IN6_SCOPE_ID
+		if (sin1->sin6_scope_id != sin2->sin6_scope_id)
+			return 1;
+#endif
+		return 0;
 	}
 #endif /* INET6 */
 	else {

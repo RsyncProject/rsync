@@ -256,16 +256,19 @@ connection is rejected.
 Each pattern can be in one of five forms:
 
 itemize(
-  it() a dotted decimal IP address. In this case the incoming machines
-  IP address must match exactly.
+  it() a dotted decimal IP address of the form a.b.c.d for IPv4 and 
+  a.b.c.d.e.f for IPv6. In this case the incoming machine's IP address
+  must match exactly.
 
-  it() a address/mask in the form a.b.c.d/n were n is the number of
-  one bits in in the netmask. All IP addresses which match the masked
-  IP address will be allowed in.
+  it() a address/mask in the form ipaddr/n where ipaddr is the IP
+  address in dotted decimal notation and n is the number of one bits in
+  the netmask.  All IP addresses which match the masked IP address will
+  be allowed in.
 
-  it() a address/mask in the form a.b.c.d/e.f.g.h where e.f.g.h is a
-  netmask in dotted decimal notation. All IP addresses which match the masked
-  IP address will be allowed in.
+  it() a address/mask in the form ipaddr/maskaddr where ipaddr is the
+  IP address in dotted decimal notation and maskaddr is the netmask in
+  dotted decimal notation.  All IP addresses which match the masked IP
+  address will be allowed in.
 
   it() a hostname. The hostname as determined by a reverse lookup will
   be matched (case insensitive) against the pattern. Only an exact

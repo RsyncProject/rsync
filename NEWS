@@ -2,31 +2,34 @@ rsync changes since last release
 
   ENHANCEMENTS:
 
-    * The --delete-after option now implies --delete. (Wayne Davison)
+    * The --delete-after option now implies --delete.  (Wayne Davison)
 
-    * The --suffix option can now be used with --backup-dir. (Michael
+    * The --suffix option can now be used with --backup-dir.  (Michael
       Zimmerman)
 
     * Combining "::" syntax with the -rsh/-e option now uses the
       specified remote-shell as a transport to talk to a (newly-spawned)
       server-daemon.  This allows someone to use daemon features, such
-      as modules, over a secure protocol, such as ssh. (JD Paul)
+      as modules, over a secure protocol, such as ssh.  (JD Paul)
 
     * The rsync:// syntax for daemon connections is now accepted in the
       destination field.
 
     * If the file name given to --include-from or --exclude-from is "-",
-      rsync will read from standard input. (J.W. Schultz)
+      rsync will read from standard input.  (J.W. Schultz)
 
     * New option --link-dest which is like --compare-dest except that
       unchanged files are hard-linked in to the destination directory.
       (J.W. Schultz)
 
     * Don't report an error if an excluded file disappears during an
-      rsync run. (Eugene Chupriyanov and Bo Kersey)
+      rsync run.  (Eugene Chupriyanov and Bo Kersey)
 
     * Added .svn to --cvs-exclude list to support subversion.  (Jon
       Middleton)
+
+    * Properly support IPv6 addresses in the rsyncd.conf "hosts allow"
+      and "hosts deny" fields.  (Hideaki Yoshifuji)
 
   BUG FIXES:
   
