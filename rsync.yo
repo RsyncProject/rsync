@@ -357,7 +357,7 @@ to the detailed description below for a complete description.  verb(
  -z, --compress              compress file data during the transfer
  -C, --cvs-exclude           auto-ignore files in the same way CVS does
  -f, --filter=RULE           add a file-filtering RULE
- -F                          same as --filter=': /.rsync-filter'
+ -F                          same as --filter='dir-merge /.rsync-filter'
                              repeated: --filter='- .rsync-filter'
      --exclude=PATTERN       exclude files matching PATTERN
      --exclude-from=FILE     read exclude patterns from FILE
