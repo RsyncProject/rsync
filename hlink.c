@@ -40,6 +40,46 @@ static int hlink_compare(struct file_struct **file1, struct file_struct **file2)
 
 static struct file_struct **hlink_list;
 static int hlink_count;
+
+#define LINKED(p1,p2) ((p1)->F_DEV == (p2)->F_DEV \
+		    && (p1)->F_INODE == (p2)->F_INODE)
+
+/* Analyze the data in the hlink_list[], remove items that aren't multiply
+ * linked, and replace the dev+inode data with the head+next linked list. */
+static void link_idev_data(void)
+{
+	struct file_struct *head;
+	int from, to, start;
+
+	for (from = to = 0; from < hlink_count; from++) {
+		start = from;
+		head = hlink_list[start];
+		while (from < hlink_count-1
+		    && LINKED(hlink_list[from], hlink_list[from+1])) {
+			hlink_list[from]->F_HEAD = head;
+			hlink_list[from]->F_NEXT = hlink_list[from+1];
+			from++;
+		}
+		if (from > start) {
+			hlink_list[from]->F_HEAD = head;
+			hlink_list[from]->F_NEXT = NULL;
+			hlink_list[to++] = head;
+		} else {
+			free((char*)head->link_u.idev);
+			head->link_u.idev = NULL;
+		}
+	}
+
+	if (!to) {
+		free(hlink_list);
+		hlink_list = NULL;
+	} else {
+		hlink_count = to;
+		if (!(hlink_list = realloc_array(hlink_list,
+					struct file_struct *, hlink_count)))
+			out_of_memory("init_hard_links");
+	}
+}
 #endif
 
 void init_hard_links(struct file_list *flist)
@@ -56,10 +96,6 @@ void init_hard_links(struct file_list *flist)
 	if (!(hlink_list = new_array(struct file_struct *, flist->count)))
 		out_of_memory("init_hard_links");
 
-/*	we'll want to restore the memcpy when we purge the
- *	hlink list after the sort.
- *	memcpy(hlink_list, flist->files, sizeof(hlink_list[0]) * flist->count);	
- */
 	hlink_count = 0;
 	for (i = 0; i < flist->count; i++) {
 		if (flist->files[i]->link_u.idev)
@@ -72,88 +108,21 @@ void init_hard_links(struct file_list *flist)
 	if (!hlink_count) {
 		free(hlink_list);
 		hlink_list = NULL;
-	} else if (!(hlink_list = realloc_array(hlink_list,
-					struct file_struct *, hlink_count)))
-		out_of_memory("init_hard_links");
+	} else
+		link_idev_data();
 #endif
 }
 
-/* check if a file should be skipped because it is the same as an
-   earlier hard link */
-int check_hard_link(struct file_struct *file)
-{
 #if SUPPORT_HARD_LINKS
-	int low = 0, high = hlink_count - 1;
-	int ret = 0;
-
-	if (!hlink_list || !file->link_u.idev)
-		return 0;
-
-	while (low != high) {
-		int mid = (low + high) / 2;
-		ret = hlink_compare(&hlink_list[mid], &file);
-		if (ret == 0) {
-			low = mid;
-			break;
-		}
-		if (ret > 0)
-			high = mid;
-		else
-			low = mid + 1;
-	}
-
-	/* Check if we ended up finding the file struct or not. */
-	if (hlink_compare(&hlink_list[low], &file) != 0)
-		return 0;
-
-	/* Now check if the previous item shares the current one's device
-	 * and inode.  If so, we're not the "master", so return 1. */
-	if (low > 0 &&
-	    file->F_DEV == hlink_list[low - 1]->F_DEV &&
-	    file->F_INODE == hlink_list[low - 1]->F_INODE) {
-		if (verbose >= 2) {
-			rprintf(FINFO, "check_hard_link: \"%s\" is a hard link to file %d, \"%s\"\n",
-				f_name(file), low-1, f_name(hlink_list[low-1]));
-		}
-		return 1;
-	}
-#endif
-
-	return 0;
-}
-
-
-#if SUPPORT_HARD_LINKS
-static void hard_link_one(int i)
+static void hard_link_one(char *hlink1, char *hlink2)
 {
-	STRUCT_STAT st1, st2;
-	char *hlink2, *hlink1 = f_name(hlink_list[i - 1]);
-
-	if (link_stat(hlink1, &st1) != 0)
-		return;
-
-	hlink2 = f_name(hlink_list[i]);
-	if (link_stat(hlink2, &st2) != 0) {
-		if (do_link(hlink1, hlink2)) {
-			if (verbose > 0) {
-				rprintf(FINFO, "link %s => %s : %s\n",
-					hlink2, hlink1, strerror(errno));
-			}
-			return;
-		}
-	} else {
-		if (st2.st_dev == st1.st_dev && st2.st_ino == st1.st_ino)
-			return;
-
-		if (robust_unlink(hlink2) || do_link(hlink1, hlink2)) {
-			if (verbose > 0) {
-				rprintf(FINFO, "link %s => %s : %s\n",
-					hlink2, hlink1, strerror(errno));
-			}
-			return;
+	if (do_link(hlink1, hlink2)) {
+		if (verbose > 0) {
+			rprintf(FINFO, "link %s => %s failed: %s\n",
+				hlink2, hlink1, strerror(errno));
 		}
 	}
-	if (verbose > 0)
+	else if (verbose > 0)
 		rprintf(FINFO, "%s => %s\n", hlink2, hlink1);
 }
 #endif
@@ -167,16 +136,37 @@ static void hard_link_one(int i)
 void do_hard_links(void)
 {
 #if SUPPORT_HARD_LINKS
+	struct file_struct *file;
+	char fbuf[MAXPATHLEN];
+	char *hlink1, *hlink2;
+	STRUCT_STAT st1, st2;
 	int i;
 
 	if (!hlink_list)
 		return;
 
-	for (i = 1; i < hlink_count; i++) {
-		if (hlink_list[i]->basename && hlink_list[i - 1]->basename &&
-		    hlink_list[i]->F_DEV == hlink_list[i - 1]->F_DEV &&
-		    hlink_list[i]->F_INODE == hlink_list[i - 1]->F_INODE) {
-			hard_link_one(i);
+	for (i = 0; i < hlink_count; i++) {
+		file = hlink_list[i];
+		hlink1 = f_name_to(file, fbuf, sizeof fbuf);
+		if (link_stat(hlink1, &st1) != 0)
+			continue;
+		while ((file = file->F_NEXT) != NULL) {
+			hlink2 = f_name(file);
+			if (link_stat(hlink2, &st2) == 0) {
+				if (st2.st_dev == st1.st_dev
+				    && st2.st_ino == st1.st_ino)
+					continue;
+				if (robust_unlink(hlink2)) {
+					if (verbose > 0) {
+						rprintf(FINFO,
+							"unlink %s failed: %s\n",
+							full_fname(hlink2), 
+							strerror(errno));
+					}
+					continue;
+				}
+			}
+			hard_link_one(hlink1, hlink2);
 		}
 	}
 #endif
