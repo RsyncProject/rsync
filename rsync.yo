@@ -81,6 +81,9 @@ command line option, or by setting the RSYNC_RSH environment variable.
 One common substitute is to use ssh, which offers a high degree of
 security.
 
+Note that rsync must be installed on both the source and destination
+machines. 
+
 manpagesection(USAGE)
 
 You use rsync in the same way you use rcp. You must specify a source
