@@ -24,28 +24,29 @@ Changes since 2.6.3:
 
     - Fixed an off-by-one error in the handling of --max-delete=N.
 
-    - One fork() call needed to check for and handle a failure.
+    - One place in the code wasn't checking if fork() failed.
 
   ENHANCEMENTS:
 
     - Rsync now supports popt's option aliases, which means that you can
       use /etc/popt and/or ~/.popt to create your own option aliases.
 
-    - Added the --max-size option (promoted from the patches dir).
-
-    - Added the "port" parameter to the rsyncd.conf file (promoted from the
-      patches dir).
-
     - Added the --copy-dest option, which works like --link-dest except
       that it copies identical files.
 
-    - Added support for multiple --*-dest options (promoted from the
-      patches dir).
+    - Added support for specifying multiple --compare-dest, --copy-dest, or
+      --link-dest options, but only of a single type. (Promoted from the
+      patches dir)
+
+    - Added the --max-size option (promoted from the patches dir).
+
+    - Added the "port" parameter to the rsyncd.conf file. (Promoted from
+      the patches dir)
 
     - The daemon-mode options were separated from the normal rsync options
-      so that they can't be mixed together.  This makes it impossible for a
-      user to start a daemon that had improper default option values that
-      could cause problems (a hang or an exit) when a client connects.
+      so that they can't be mixed together.  This makes it impossible to
+      start a daemon that had improper default option values that could
+      cause problems (such as a hang or an abort) when a client connects.
 
     - The --bwlimit option may now be used in combination with --daemon
       to specify a default value for the daemon side and also a value
