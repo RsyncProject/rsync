@@ -18,7 +18,7 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-#include <sys/stat.h>
+#include "rsync.h"
 
 /**
  * Produce a string representation of Unix mode bits like that used by
