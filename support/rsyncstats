@@ -73,6 +73,8 @@ line: while (<LOG>) {
 
    $file = $module . "/" . $file;
 
+   $file =~ s|//|/|mg;
+
    @path = split(/\//, $file);
 
    $pathkey = "";
