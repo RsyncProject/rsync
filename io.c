@@ -29,6 +29,8 @@ static int64 total_read;
 
 static int io_multiplexing_out;
 static int io_multiplexing_in;
+static int multiplex_in_fd;
+static int multiplex_out_fd;
 static time_t last_io;
 
 extern int verbose;
@@ -124,7 +126,8 @@ static int read_unbuffered(int fd, char *buf, int len)
 	int tag, ret=0;
 	char line[1024];
 
-	if (!io_multiplexing_in) return read(fd, buf, len);
+	if (!io_multiplexing_in || fd != multiplex_in_fd) 
+		return read(fd, buf, len);
 
 	while (ret == 0) {
 		if (remaining) {
@@ -137,6 +140,7 @@ static int read_unbuffered(int fd, char *buf, int len)
 
 		read_loop(fd, ibuf, 4);
 		tag = IVAL(ibuf, 0);
+
 		remaining = tag & 0xFFFFFF;
 		tag = tag >> 24;
 
@@ -467,12 +471,11 @@ static int writefd_unbuffered(int fd,char *buf,int len)
 
 static char *io_buffer;
 static int io_buffer_count;
-static int io_out_fd;
 
 void io_start_buffering(int fd)
 {
 	if (io_buffer) return;
-	io_out_fd = fd;
+	multiplex_out_fd = fd;
 	io_buffer = (char *)malloc(IO_BUFFER_SIZE+4);
 	if (!io_buffer) out_of_memory("writefd");
 	io_buffer_count = 0;
@@ -483,7 +486,7 @@ void io_start_buffering(int fd)
 
 void io_flush(void)
 {
-	int fd = io_out_fd;
+	int fd = multiplex_out_fd;
 	if (!io_buffer_count) return;
 
 	if (io_multiplexing_out) {
@@ -638,6 +641,8 @@ void io_printf(int fd, const char *format, ...)
 /* setup for multiplexing an error stream with the data stream */
 void io_start_multiplex_out(int fd)
 {
+	multiplex_out_fd = fd;
+	io_flush();
 	io_start_buffering(fd);
 	io_multiplexing_out = 1;
 }
@@ -645,6 +650,8 @@ void io_start_multiplex_out(int fd)
 /* setup for multiplexing an error stream with the data stream */
 void io_start_multiplex_in(int fd)
 {
+	multiplex_in_fd = fd;
+	io_flush();
 	if (read_buffer_len) {
 		fprintf(stderr,"ERROR: data in read buffer at mplx start\n");
 		exit_cleanup(1);
@@ -663,7 +670,7 @@ int io_multiplex_write(int f, char *buf, int len)
 	SIVAL(io_buffer-4, 0, ((MPLEX_BASE + f)<<24) + len);
 	memcpy(io_buffer, buf, len);
 
-	writefd_unbuffered(io_out_fd, io_buffer-4, len+4);
+	writefd_unbuffered(multiplex_out_fd, io_buffer-4, len+4);
 	return 1;
 }
 
