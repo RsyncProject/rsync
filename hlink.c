@@ -171,7 +171,7 @@ static void hard_link_one(char *hlink1, char *hlink2)
  * Create any hard links in the global hlink_list.  They were put
  * there by running init_hard_links on the filelist.
  **/
-void do_hard_links(void)
+void do_hard_links(int allowed_lull, int flist_count)
 {
 #ifdef SUPPORT_HARD_LINKS
 	struct file_struct *file, *first;
@@ -207,6 +207,8 @@ void do_hard_links(void)
 			}
 			hard_link_one(hlink1, hlink2);
 		}
+		if (allowed_lull)
+			maybe_send_keepalive(allowed_lull, flist_count);
 	}
 #endif
 }
