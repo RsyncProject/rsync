@@ -459,7 +459,7 @@ If the sending side detects any IO errors then the deletion of any
 files at the destination will be automatically disabled. This is to
 prevent temporary filesystem failures (such as NFS errors) on the
 sending side causing a massive deletion of files on the
-destination. 
+destination.  You can override this with the --ignore-errors option.
 
 dit(bf(--delete-excluded)) In addition to deleting the files on the
 receiving side that are not on the sending side, this tells rsync to also
@@ -469,6 +469,9 @@ dit(bf(--delete-after)) By default rsync does file deletions before
 transferring files to try to ensure that there is sufficient space on
 the receiving filesystem. If you want to delete after transferring
 then use the --delete-after switch.
+
+dit(bf(--ignore-errors)) Tells --delete to go ahead and delete files
+even when there are IO errors.
 
 dit(bf(--force)) This options tells rsync to delete directories even if
 they are not empty.  This applies to both the --delete option and to
