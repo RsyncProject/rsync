@@ -8,15 +8,18 @@ Changes since 2.6.3:
       it, it now appends a trailing slash to the name instead of (only
       sometimes) outputting a preceding "directory " string.
 
-    - The --stats output will contain time file-list time statistics if
-      both sides are 2.6.4, or if the local side is 2.6.4 and the files
-      are being pushed (since the stats come from the sending side).
+    - The --stats output will contain file-list time statistics if both
+      sides are 2.6.4, or if the local side is 2.6.4 and the files are
+      being pushed (since the stats come from the sending side).
   
   BUG FIXES:
 
     - Restore the list-clearing behavior of "!" in a .cvsignore file (2.6.3
       was only treating it as a special token in an rsync include/exclude
       file).
+
+    - The --dry-run option (-n) now mentions changes in directories (w/-v).
+      It also now includes the normal uptodate output information for -vv.
 
     - Avoid a mkdir warning when removing a directory in the destination
       that already exists in the --backup-dir.
@@ -50,6 +53,17 @@ Changes since 2.6.3:
       relative path), the backup code was erroneously trying to backup a
       file that was put into the partial-dir.
 
+    - One call to flush_write_file() was not being checked for an error.
+
+    - The --no-relative option was not being sent from the client to a
+      server sender.
+
+    - If an rsync daemon specified "dont compress = ..." for a file and the
+      client tried to specify --compress, the libz code was not handling a
+      compression level of 0 properly.  This could cause a transfer failure
+      if the block-size for a file was large enough (i.e. rsync might have
+      exited with an error for large files).
+
   ENHANCEMENTS:
 
     - Rsync now supports popt's option aliases, which means that you can
@@ -78,11 +92,11 @@ Changes since 2.6.3:
       cause problems (such as a hang or an abort) when a client connects.
 
     - The --bwlimit option may now be used in combination with --daemon
-      to specify a default value for the daemon side and also a value
+      to specify both a default value for the daemon side and a value
       that cannot be exceeded by a user-specified --bwlimit option.
 
     - Added the "port" parameter to the rsyncd.conf file. (Promoted from
-      the patches dir.)
+      the patches dir.)  Also added "address".
 
     - In _exit_cleanup(): when we are exiting with a partially-received
       file, we now flush any data in the write-cache before closing the
@@ -97,13 +111,16 @@ Changes since 2.6.3:
     - Added the --list-only option which is mainly a way for the client to
       put the server into listing mode without needing to resort to any
       option kluges (e.g. the age-old use of "-r --exclude="/*/*" for a
-      non-recursive listing).
+      non-recursive listing).  This option is used automatically when a
+      modern rsync speaks to a modern daemon, but may also be specified
+      manually if you want to force the use of the --list-only option over
+      a remote-shell connection.
 
     - Added the --omit-dir-times (-O) option which will avoid updating the
-      modified time for directories when --times was specified.  For a
-      really large transfer, this option will avoid an extra pass through
-      the file-list at the end of the transfer to tweak all the directory
-      times.
+      modified time for directories when --times was specified.  This
+      option will avoid an extra pass through the file-list at the end of
+      the transfer (to tweak all the directory times), which can result in
+      an appreciable speedup for a really large transfer.
 
     - Added the --filter (-f) option and its helper option, -F.  Filter
       rules are an extension to the existing include/exclude handling
@@ -117,6 +134,9 @@ Changes since 2.6.3:
       a temporary directory (by default ".~tmp~", but settable via the
       --partial-dir=DIR option) until the end of the transfer.  This
       makes the updates a little more atomic for a large transfer.
+
+    - If rsync is put into the background, any output from --progress is
+      reduced.
 
   SUPPORT FILES:
 
@@ -141,11 +161,19 @@ Changes since 2.6.3:
 
   INTERNAL:
 
-    - Added better checking of the checksum header values that come over
+    - Added better checking of the checksum-header values that come over
       the socket.
 
-    - Improved the type of some variables for consistency and proper size.
+    - Merged the various delete-file functions into a single function so
+      that it is easier to maintain.
+
+    - Improved the type of some variables (particularly blocksize vars) for
+      consistency and proper size.
+
+    - Got rid of the uint64 type (which we didn't need).
 
   BUILD CHANGES:
 
     - Handle an operating system that use mkdev() in place of makedev().
+
+    - Improved configure to better handle cross-compiling.
