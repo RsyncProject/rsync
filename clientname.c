@@ -132,7 +132,7 @@ char *client_name(int fd)
 			ss_len = sizeof (struct sockaddr_in);
 			memcpy(&ss, answer->ai_addr, ss_len);
 			break;
-#ifdef INET6
+#if INET6
 		case AF_INET6:
 			ss_len = sizeof (struct sockaddr_in6);
 			memcpy(&ss, answer->ai_addr, ss_len);
@@ -172,7 +172,7 @@ void client_sockaddr(int fd,
 		exit_cleanup(RERR_SOCKETIO);
 	}
 
-#ifdef INET6
+#if INET6
 	if (get_sockaddr_family(ss) == AF_INET6 &&
 	    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)ss)->sin6_addr)) {
 		/* OK, so ss is in the IPv6 family, but it is really
@@ -261,7 +261,7 @@ int compare_addrinfo_sockaddr(const struct addrinfo *ai,
 			      sizeof sin1->sin_addr);
 	}
 
-#ifdef INET6
+#if INET6
 	if (ss_family == AF_INET6) {
 		const struct sockaddr_in6 *sin1, *sin2;
 
@@ -278,7 +278,7 @@ int compare_addrinfo_sockaddr(const struct addrinfo *ai,
 			   sizeof sin1->sin6_addr))
 			return 1;
 
-#ifdef HAVE_SOCKADDR_IN6_SCOPE_ID
+#if HAVE_SOCKADDR_IN6_SCOPE_ID
 		if (sin1->sin6_scope_id != sin2->sin6_scope_id)
 			return 1;
 #endif

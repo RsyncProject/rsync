@@ -221,7 +221,7 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 		updated = 1;
 	}
 
-#ifdef HAVE_CHMOD
+#if HAVE_CHMOD
 	if (!S_ISLNK(st->st_mode)) {
 		if ((st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS)) {
 			updated = 1;

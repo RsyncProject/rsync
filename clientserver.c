@@ -395,7 +395,7 @@ static int rsync_module(int f_in, int f_out, int i)
 			io_printf(f_out, "@ERROR: setgid failed\n");
 			return -1;
 		}
-#ifdef HAVE_SETGROUPS
+#if HAVE_SETGROUPS
 		/* Get rid of any supplementary groups this process
 		 * might have inheristed. */
 		if (setgroups(1, &gid)) {

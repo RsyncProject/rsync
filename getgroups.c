@@ -34,7 +34,7 @@ main(UNUSED(int argc), UNUSED(char *argv[]))
 	gid_t gid = MY_GID();
 	int gid_in_list = 0;
 
-#ifdef HAVE_GETGROUPS
+#if HAVE_GETGROUPS
 	if ((n = getgroups(0, NULL)) < 0) {
 		perror("getgroups");
 		return 1;
@@ -49,7 +49,7 @@ main(UNUSED(int argc), UNUSED(char *argv[]))
 		exit(1);
 	}
 
-#ifdef HAVE_GETGROUPS
+#if HAVE_GETGROUPS
 	if (n > 0)
 		n = getgroups(n, list);
 #endif

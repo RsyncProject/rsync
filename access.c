@@ -67,7 +67,7 @@ static int match_address(char *addr, char *tok)
 	int gai;
 	int ret = 0;
 	int addrlen = 0;
-#ifdef HAVE_STRTOL
+#if HAVE_STRTOL
 	long int bits;
 #else
 	int bits;
@@ -88,7 +88,7 @@ static int match_address(char *addr, char *tok)
 
 	/* Fail quietly if tok is a hostname (not an address) */
 	if (strspn(tok, ".0123456789") != len
-#ifdef INET6
+#if INET6
 	    && strchr(tok, ':') == NULL
 #endif
 	) {
@@ -133,7 +133,7 @@ static int match_address(char *addr, char *tok)
 
 		break;
 
-#ifdef INET6
+#if INET6
 	case PF_INET6:
 	    {
 		struct sockaddr_in6 *sin6a, *sin6t;
@@ -146,7 +146,7 @@ static int match_address(char *addr, char *tok)
 
 		addrlen = 16;
 
-#ifdef HAVE_SOCKADDR_IN6_SCOPE_ID
+#if HAVE_SOCKADDR_IN6_SCOPE_ID
 		if (sin6t->sin6_scope_id &&
 		    sin6a->sin6_scope_id != sin6t->sin6_scope_id) {
 			ret = 0;
@@ -166,13 +166,13 @@ static int match_address(char *addr, char *tok)
 	bits = -1;
 	if (p) {
 		if (inet_pton(resa->ai_addr->sa_family, p, mask) <= 0) {
-#ifdef HAVE_STRTOL
+#if HAVE_STRTOL
 			char *ep = NULL;
 #else
 			unsigned char *pp;
 #endif
 
-#ifdef HAVE_STRTOL
+#if HAVE_STRTOL
 			bits = strtol(p, &ep, 10);
 			if (!*p || *ep) {
 				rprintf(FLOG, "malformed mask in %s\n", tok);

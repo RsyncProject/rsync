@@ -105,7 +105,7 @@ long block_size = 0; /* "long" because popt can't set an int32. */
 
 
 /** Network address family. **/
-#ifdef INET6
+#if INET6
 int default_af_hint = 0;	/* Any protocol */
 #else
 int default_af_hint = AF_INET;	/* Must use IPv4 */
@@ -168,7 +168,7 @@ static void print_rsync_version(enum logcode f)
 	char const *ipv6 = "no ";
 	STRUCT_STAT *dumstat;
 
-#ifdef HAVE_SOCKETPAIR
+#if HAVE_SOCKETPAIR
 	got_socketpair = "";
 #endif
 
@@ -327,7 +327,7 @@ void usage(enum logcode F)
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth; KBytes per second\n");
   rprintf(F,"     --write-batch=FILE      write a batched update to FILE\n");
   rprintf(F,"     --read-batch=FILE       read a batched update from FILE\n");
-#ifdef INET6
+#if INET6
   rprintf(F," -4, --ipv4                  prefer IPv4\n");
   rprintf(F," -6, --ipv6                  prefer IPv6\n");
 #endif
@@ -432,7 +432,7 @@ static struct poptOption long_options[] = {
   {"no-implied-dirs",  0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
   {"checksum-seed",    0,  POPT_ARG_INT,    &checksum_seed, 0, 0, 0 },
-#ifdef INET6
+#if INET6
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
 #endif
@@ -455,7 +455,7 @@ static void daemon_usage(enum logcode F)
   rprintf(F,"     --no-detach             do not detach from the parent\n");
   rprintf(F,"     --port=PORT             listen on alternate port number\n");
   rprintf(F," -v, --verbose               increase verbosity\n");
-#ifdef INET6
+#if INET6
   rprintf(F," -4, --ipv4                  prefer IPv4\n");
   rprintf(F," -6, --ipv6                  prefer IPv6\n");
 #endif
@@ -471,7 +471,7 @@ static struct poptOption long_daemon_options[] = {
   {"bwlimit",          0,  POPT_ARG_INT,    &daemon_bwlimit, 0, 0, 0 },
   {"config",           0,  POPT_ARG_STRING, &config_file, 0, 0, 0 },
   {"daemon",           0,  POPT_ARG_NONE,   &daemon_opt, 0, 0, 0 },
-#ifdef INET6
+#if INET6
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
 #endif

@@ -925,7 +925,7 @@ skip_filters:
 	memcpy(bp, basename, basename_len);
 	bp += basename_len;
 
-#ifdef HAVE_STRUCT_STAT_ST_RDEV
+#if HAVE_STRUCT_STAT_ST_RDEV
 	if (preserve_devices && IS_DEVICE(st.st_mode))
 		file->u.rdev = st.st_rdev;
 #endif

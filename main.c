@@ -227,7 +227,7 @@ static void report(int f)
  **/
 static void show_malloc_stats(void)
 {
-#ifdef HAVE_MALLINFO
+#if HAVE_MALLINFO
 	struct mallinfo mi;
 
 	mi = mallinfo();

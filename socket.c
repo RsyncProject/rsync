@@ -452,7 +452,7 @@ void start_accept_loop(int port, int (*fn)(int, int))
 	for (i = 0, maxfd = -1; sp[i] >= 0; i++) {
 		if (listen(sp[i], 5) < 0) {
 			rsyserr(FERROR, errno, "listen() on socket failed");
-#ifdef INET6
+#if INET6
 			if (errno == EADDRINUSE && i > 0) {
 				rprintf(FINFO,
 				    "Try using --ipv4 or --ipv6 to avoid this listen() error.\n");
@@ -649,7 +649,7 @@ void become_daemon(void)
 	}
 
 	/* detach from the terminal */
-#ifdef HAVE_SETSID
+#if HAVE_SETSID
 	setsid();
 #else
 #ifdef TIOCNOTTY
