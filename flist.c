@@ -37,6 +37,8 @@ extern int verbose;
 extern int do_progress;
 extern int am_server;
 extern int always_checksum;
+extern int module_id;
+extern int ignore_errors;
 
 extern int cvs_exclude;
 
@@ -746,7 +748,6 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 	char *p;
 	char cleaned_name[MAXPATHLEN];
 	char linkbuf[MAXPATHLEN];
-	extern int module_id;
 
 	strlcpy(cleaned_name, fname, MAXPATHLEN);
 	cleaned_name[MAXPATHLEN - 1] = 0;
@@ -1125,26 +1126,24 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		}
 	}
 
-	if (f != -1)
+	if (f != -1) {
 		send_file_entry(NULL, f, 0);
 
-	if (show_filelist_p() && f != -1)
-		finish_filelist_progress(flist);
+		if (show_filelist_p())
+			finish_filelist_progress(flist);
+	}
 
 	clean_flist(flist, 0, 0);
 
 	/* now send the uid/gid list. This was introduced in protocol
-	   version 15 */
+	 * version 15 */
 	if (f != -1)
 		send_uid_list(f);
 
-	/* send the io_error flag */
 	if (f != -1) {
-		extern int module_id;
+		/* send the io_error flag */
 		write_int(f, lp_ignore_errors(module_id) ? 0 : io_error);
-	}
 
-	if (f != -1) {
 		io_end_buffering();
 		stats.flist_size = stats.total_written - start_write;
 		stats.num_files = flist->count;
@@ -1208,10 +1207,10 @@ struct file_list *recv_file_list(int f)
 	if (verbose > 2)
 		rprintf(FINFO, "received %d names\n", flist->count);
 
-	clean_flist(flist, relative_paths, 1);
-
 	if (show_filelist_p())
 		finish_filelist_progress(flist);
+
+	clean_flist(flist, relative_paths, 1);
 
 	/* now recv the uid/gid list. This was introduced in protocol version 15 */
 	if (f != -1)
@@ -1219,8 +1218,6 @@ struct file_list *recv_file_list(int f)
 
 	/* recv the io_error flag */
 	if (f != -1 && !read_batch) {	/* dw-added readbatch */
-		extern int module_id;
-		extern int ignore_errors;
 		if (lp_ignore_errors(module_id) || ignore_errors)
 			read_int(f);
 		else
