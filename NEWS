@@ -54,8 +54,6 @@ rsync 2.4.7 (sometime in 2001, maybe :)
     * Give a non-0 exit code if *any* of the files we have been asked
       to transfer fail to transfer 
 
-    * Fix --cvs-exclude sigsegv bug.
-
     * Applied "simple nohang patch" from Wayne Davison.
 
     * Update to work with autoconf2.50 and 2.13.
