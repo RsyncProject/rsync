@@ -36,7 +36,7 @@ popt_OBJS=popt/findme.o  popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o
 OBJS=$(OBJS1) $(OBJS2) $(DAEMON_OBJ) $(LIBOBJ) $(ZLIBOBJ) @BUILD_POPT@
 
-tls_OBJ = tls.o syscall.o lib/permstring.o 
+TLS_OBJ = tls.o syscall.o lib/permstring.o 
 
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync tls
@@ -68,8 +68,8 @@ rsync: $(OBJS)
 
 $(OBJS): config.h
 
-tls: $(tls_OBJ)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(tls_OBJ) $(LIBS)
+tls: $(TLS_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TLS_OBJ) $(LIBS)
 
 Makefile: Makefile.in configure config.status
 	echo "WARNING: You need to run ./config.status --recheck"
