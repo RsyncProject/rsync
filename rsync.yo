@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsync)(1)(24 Nov 1998)()()
+manpage(rsync)(1)(1 Dec 1998)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
@@ -54,7 +54,7 @@ itemize(
 	single : separator.
 
 	it() for copying from a remote machine to the local machine
-	using a remote shell program. This is invoked when the local path
+	using a remote shell program. This is invoked when the source
 	contains a : separator.
 
 	it() for copying from a remote rsync server to the local
