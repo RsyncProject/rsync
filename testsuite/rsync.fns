@@ -21,7 +21,6 @@
 TMP="$scratchdir"
 FROM=${TMP}/from
 TO=${TMP}/to
-F1=text1
 LOG=${TMP}/log
 RSYNC="$rsync_bin"
 
@@ -68,17 +67,17 @@ hands_setup() {
     mkdir ${FROM}/emptydir
 
     # a hundred lines of text or so
-    ls -lR $(srcdir) >${FROM}/filelist
+    ls -lR ${srcdir} > ${FROM}/filelist
 
     # This might fail on systems that don't have -n
     echo $ECHO_N "This file has no trailing lf$ECHO_C" > ${FROM}/nolf
     umask 0
     ln -s nolf ${FROM}/nolf-symlink
-    umask 077
+    umask 022
 
-    cat $srcdir/*.c > ${FROM}/${F1}
+    cat $srcdir/*.c > ${FROM}/text
     mkdir ${FROM}/dir
-    cp ${FROM}/${F1} ${FROM}/dir
+    cp ${FROM}/text ${FROM}/dir
     mkdir ${FROM}/dir/subdir
     mkdir ${FROM}/dir/subdir/subsubdir
     ls -ltr /etc > ${FROM}/dir/subdir/subsubdir/etc-ltr-list
