@@ -729,6 +729,14 @@ static void readfd(int fd, char *buffer, size_t N)
 }
 
 
+unsigned short read_short(int f)
+{
+	uchar b[2];
+	readfd(f, (char *)b, 2);
+	return (b[1] << 8) + b[0];
+}
+
+
 int32 read_int(int f)
 {
 	char b[4];
@@ -772,9 +780,9 @@ void read_sbuf(int f,char *buf,size_t len)
 	buf[len] = 0;
 }
 
-unsigned char read_byte(int f)
+uchar read_byte(int f)
 {
-	unsigned char c;
+	uchar c;
 	readfd(f, (char *)&c, 1);
 	return c;
 }
@@ -1055,6 +1063,15 @@ static void writefd(int fd,char *buf,size_t len)
 }
 
 
+void write_short(int f, unsigned short x)
+{
+	uchar b[2];
+	b[0] = x;
+	b[1] = x >> 8;
+	writefd(f, (char *)b, 2);
+}
+
+
 void write_int(int f,int32 x)
 {
 	char b[4];
@@ -1101,17 +1118,18 @@ void write_buf(int f,char *buf,size_t len)
 	writefd(f,buf,len);
 }
 
+
 /** Write a string to the connection */
 void write_sbuf(int f, char *buf)
 {
 	writefd(f, buf, strlen(buf));
 }
 
-void write_byte(int f,unsigned char c)
+
+void write_byte(int f, uchar c)
 {
 	writefd(f, (char *)&c, 1);
 }
-
 
 
 /**
