@@ -108,7 +108,6 @@ void wait_process(pid_t pid, int *status)
 static void report(int f)
 {
 	time_t t = time(NULL);
-	int send_stats;
 
 	if (do_stats && verbose > 1) {
 		/* These come out from every process */
@@ -124,9 +123,8 @@ static void report(int f)
 		if (f == -1 || !am_sender) return;
 	}
 
-	send_stats = verbose || protocol_version >= 20;
 	if (am_server) {
-		if (am_sender && send_stats) {
+		if (am_sender) {
 			int64 w;
 			/* store total_written in a temporary
 			 * because write_longint changes it */
@@ -140,7 +138,7 @@ static void report(int f)
 
 	/* this is the client */
 
-	if (!am_sender && send_stats) {
+	if (!am_sender) {
 		int64 r;
 		stats.total_written = read_longint(f);
 		/* store total_read in a temporary, read_longint changes it */
@@ -150,12 +148,6 @@ static void report(int f)
 	}
 
 	if (do_stats) {
-		if (!am_sender && !send_stats) {
-			/* missing the bytes written by the generator */
-			rprintf(FINFO, "\nCannot show stats as receiver because remote protocol version is less than 20\n");
-			rprintf(FINFO, "Use --stats -v to show stats\n");
-			return;
-		}
 		rprintf(FINFO,"\nNumber of files: %d\n", stats.num_files);
 		rprintf(FINFO,"Number of files transferred: %d\n",
 			stats.num_transferred_files);

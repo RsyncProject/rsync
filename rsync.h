@@ -80,8 +80,8 @@
  * unlikely to begin by sending a byte between MIN_PROTOCL_VERSION and
  * MAX_PROTOCOL_VERSION. */
 
-#define MIN_PROTOCOL_VERSION 19
-#define OLD_PROTOCOL_VERSION 20
+#define MIN_PROTOCOL_VERSION 20
+#define OLD_PROTOCOL_VERSION 25
 #define MAX_PROTOCOL_VERSION 40
 
 #define RSYNC_PORT 873

@@ -89,8 +89,10 @@ Changes since 2.6.0:
       earlier in the list than the files that are already present on the
       receiving side.
 
-    * Got rid of support for protocol versions 17 and 18 (which are
-      both over 6 years old).  (Wayne Davison)
+    * Dropped support for protocol versions less than 20
+      (2.3.0 released 15 Mar 1999) and activated warnings for
+      protocols less than 25 (2.5.0 released 23 Aug 2001)
+          (Wayne Davison and J.W. Schultz, severally)
 
     * More optimal data transmission for --hard-links (protocol 28).
 

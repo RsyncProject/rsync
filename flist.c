@@ -361,7 +361,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 					/* Set both flags to simplify the test
 					 * when writing the data. */
 					flags |= XMIT_SAME_RDEV_pre28
-					       | XMIT_SAME_HIGH_RDEV;
+					    | XMIT_SAME_HIGH_RDEV;
 				} else
 					rdev = file->u.rdev;
 			} else
@@ -400,8 +400,8 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 #endif
 
 	for (l1 = 0;
-	     lastname[l1] && (fname[l1] == lastname[l1]) && (l1 < 255);
-	     l1++) {}
+	    lastname[l1] && (fname[l1] == lastname[l1]) && (l1 < 255);
+	    l1++) {}
 	l2 = strlen(fname+l1);
 
 	if (l1 > 0)
@@ -494,8 +494,8 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 		} else
 			sum = NULL;
 		if (sum) {
-			write_buf(f, sum, protocol_version < 21? 2
-							: MD4_SUM_LENGTH);
+			write_buf(f, sum,
+			    protocol_version < 21 ? 2 : MD4_SUM_LENGTH);
 		}
 	}
 
@@ -689,8 +689,8 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 		} else
 			sum = NULL;
 		if (sum) {
-			read_buf(f, sum, protocol_version < 21? 2
-						: MD4_SUM_LENGTH);
+			read_buf(f, sum,
+			    protocol_version < 21 ? 2 : MD4_SUM_LENGTH);
 		}
 	}
 
@@ -783,7 +783,7 @@ struct file_struct *make_file(char *fname,
 	if (lp_ignore_nonreadable(module_id) && access(thisname, R_OK) != 0)
 		return NULL;
 
-      skip_excludes:
+skip_excludes:
 
 	if (verbose > 2) {
 		rprintf(FINFO, "[%s] make_file(%s,*,%d)\n",
@@ -1291,7 +1291,7 @@ struct file_list *recv_file_list(int f)
 
 	return flist;
 
-      oom:
+oom:
 	out_of_memory("recv_file_list");
 	return NULL;		/* not reached */
 }
@@ -1370,7 +1370,7 @@ struct file_list *flist_new(int with_hlink, char *msg)
 
 #if SUPPORT_HARD_LINKS
 	if (with_hlink && preserve_hard_links) {
-		if (!(flist->hlink_pool = pool_create(HLINK_EXTENT, 
+		if (!(flist->hlink_pool = pool_create(HLINK_EXTENT,
 		    sizeof (struct idev), out_of_memory, POOL_INTERN)))
 			out_of_memory(msg);
 	}
@@ -1403,7 +1403,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 		return;
 
 	qsort(flist->files, flist->count,
-	      sizeof flist->files[0], (int (*)()) file_compare);
+	    sizeof flist->files[0], (int (*)()) file_compare);
 
 	for (i = no_dups? 0 : flist->count; i < flist->count; i++) {
 		if (flist->files[i]->basename) {
