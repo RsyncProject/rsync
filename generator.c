@@ -1,21 +1,21 @@
 /* -*- c-file-style: "linux" -*-
 
    rsync -- fast file replication program
-   
-   Copyright (C) 1996-2000 by Andrew Tridgell 
+
+   Copyright (C) 1996-2000 by Andrew Tridgell
    Copyright (C) Paul Mackerras 1996
    Copyright (C) 2002 by Martin Pool <mbp@samba.org>
-   
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -60,8 +60,7 @@ static int skip_file(char *fname,
 		}
 	}
 
-	
-	/* if always checksum is set then we use the checksum instead 
+	/* if always checksum is set then we use the checksum instead
 	   of the file time to determine whether to sync */
 	if (always_checksum && S_ISREG(st->st_mode)) {
 		char sum[MD4_SUM_LENGTH];
@@ -70,7 +69,7 @@ static int skip_file(char *fname,
 		if (compare_dest != NULL) {
 			if (access(fname, 0) != 0) {
 				snprintf(fnamecmpdest,MAXPATHLEN,"%s/%s",
-						    compare_dest,fname);
+					 compare_dest,fname);
 				fname = fnamecmpdest;
 			}
 		}
@@ -132,22 +131,15 @@ static void send_null_sums(int f_out)
  * Whew. */
 static BOOL disable_deltas_p(void)
 {
-	extern int whole_file, no_whole_file;
+	extern int whole_file;
 	extern int local_server;
 	extern int write_batch;
 
-	assert(whole_file == 0 || whole_file == 1);
-
-	/* whole_file and no_whole_file are never both on at the same time */
-
-	if (whole_file)
+	if (whole_file > 0)
 		return True;
-	else if (no_whole_file)
+	if (whole_file == 0 || write_batch)
 		return False;
-	else if (write_batch)
-		return False;
-	else
-		return local_server;
+	return local_server;
 }
 
 
@@ -208,9 +200,9 @@ static void generate_and_send_sums(struct map_struct *buf, OFF_T len,
  *
  * @note This comment was added later by mbp who was trying to work it
  * out.  It might be wrong.
- **/ 
+ **/
 void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
-{  
+{
 	int fd;
 	STRUCT_STAT st;
 	struct map_struct *buf;
@@ -237,43 +229,43 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 		return;
 	}
 
-	if (statret == 0 && 
-	    !preserve_perms && 
+	if (statret == 0 &&
+	    !preserve_perms &&
 	    (S_ISDIR(st.st_mode) == S_ISDIR(file->mode))) {
 		/* if the file exists already and we aren't perserving
-                   permissions then act as though the remote end sent
-                   us the file permissions we already have */
+		 * permissions then act as though the remote end sent
+		 * us the file permissions we already have */
 		file->mode = (file->mode & _S_IFMT) | (st.st_mode & ~_S_IFMT);
 	}
 
 	if (S_ISDIR(file->mode)) {
-                /* The file to be received is a directory, so we need
-                 * to prepare appropriately.  If there is already a
-                 * file of that name and it is *not* a directory, then
-                 * we need to delete it.  If it doesn't exist, then
-                 * recursively create it. */
-          
+		/* The file to be received is a directory, so we need
+		 * to prepare appropriately.  If there is already a
+		 * file of that name and it is *not* a directory, then
+		 * we need to delete it.  If it doesn't exist, then
+		 * recursively create it. */
+
 		if (dry_run) return; /* XXXX -- might cause inaccuracies?? -- mbp */
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			if (robust_unlink(fname) != 0) {
 				rprintf(FERROR, RSYNC_NAME
 					": recv_generator: unlink \"%s\" to make room for directory: %s\n",
-                                        fname,strerror(errno));
+					fname,strerror(errno));
 				return;
 			}
 			statret = -1;
 		}
 		if (statret != 0 && do_mkdir(fname,file->mode) != 0 && errno != EEXIST) {
-			if (!(relative_paths && errno==ENOENT && 
-			      create_directory_path(fname, orig_umask)==0 && 
+			if (!(relative_paths && errno==ENOENT &&
+			      create_directory_path(fname, orig_umask)==0 &&
 			      do_mkdir(fname,file->mode)==0)) {
 				rprintf(FERROR, RSYNC_NAME ": recv_generator: mkdir \"%s\": %s (2)\n",
 					fname,strerror(errno));
 			}
 		}
-		/* f_out is set to -1 when doing final directory 
+		/* f_out is set to -1 when doing final directory
 		   permission and modification time repair */
-		if (set_perms(fname,file,NULL,0) && verbose && (f_out != -1)) 
+		if (set_perms(fname,file,NULL,0) && verbose && (f_out != -1))
 			rprintf(FINFO,"%s/\n",fname);
 		return;
 	}
@@ -302,10 +294,10 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 					set_perms(fname,file,&st,1);
 					return;
 				}
-			}  
+			}
 			/* Not a symlink, so delete whatever's
 			 * already there and put a new symlink
-			 * in place. */			   
+			 * in place. */
 			delete_file(fname);
 		}
 		if (do_symlink(file->link,fname) != 0) {
@@ -323,9 +315,9 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 
 #ifdef HAVE_MKNOD
 	if (am_root && preserve_devices && IS_DEVICE(file->mode)) {
-		if (statret != 0 || 
+		if (statret != 0 ||
 		    st.st_mode != file->mode ||
-		    st.st_rdev != file->rdev) {	
+		    st.st_rdev != file->rdev) {
 			delete_file(fname);
 			if (verbose > 2)
 				rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",
@@ -406,11 +398,11 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 		return;
 	}
 
-	if (opt_ignore_existing && fnamecmp == fname) { 
+	if (opt_ignore_existing && fnamecmp == fname) {
 		if (verbose > 1)
 			rprintf(FINFO,"%s exists\n",fname);
 		return;
-	} 
+	}
 
 	if (update_only && cmp_modtime(st.st_mtime,file->modtime)>0 && fnamecmp == fname) {
 		if (verbose > 1)
@@ -435,7 +427,7 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 		return;
 	}
 
-	/* open the file */  
+	/* open the file */
 	fd = do_open(fnamecmp, O_RDONLY, 0);
 
 	if (fd == -1) {
@@ -479,11 +471,11 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 
 	if (verbose >= 2) {
 		rprintf(FINFO,
-			disable_deltas_p() 
+			disable_deltas_p()
 			? "delta-transmission disabled for local transfer or --whole-file\n"
 			: "delta transmission enabled\n");
 	}
-	
+
 	/* we expect to just sit around now, so don't exit on a
 	   timeout. If we really get a timeout then the other process should
 	   exit */
@@ -499,12 +491,11 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 		   them. This is then fixed after the files are transferred */
 		if (!am_root && S_ISDIR(file->mode)) {
 			file->mode |= S_IWUSR; /* user write */
-                        /* XXX: Could this be causing a problem on SCO?  Perhaps their
-                         * handling of permissions is strange? */
+			/* XXX: Could this be causing a problem on SCO?  Perhaps their
+			 * handling of permissions is strange? */
 		}
 
-		recv_generator(local_name?local_name:f_name(file),
-			       flist,i,f);
+		recv_generator(local_name?local_name:f_name(file), flist,i,f);
 
 		file->mode = saved_mode;
 	}
@@ -524,7 +515,7 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 		for (i=read_int(f_recv); i != -1; i=read_int(f_recv)) {
 			struct file_struct *file = flist->files[i];
 			recv_generator(local_name?local_name:f_name(file),
-				       flist,i,f);    
+				       flist,i,f);
 		}
 
 		phase++;
