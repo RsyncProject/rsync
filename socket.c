@@ -35,15 +35,6 @@
 
 static const char default_name[] = "UNKNOWN";
 
-static int lookup_name(const struct sockaddr_storage *ss,
-		       socklen_t ss_len,
-		       char *name_buf, size_t name_buf_len,
-		       char *port_buf, size_t port_buf_len);
-
-static int check_name(const struct sockaddr_storage *ss,
-		      socklen_t ss_len,
-		      char *name_buf,
-		      const char *port_buf);
 
 /* Establish a proxy connection on an open socket to a web roxy by
  * using the CONNECT method. */
@@ -637,8 +628,8 @@ char *client_name(int fd)
 		exit_cleanup(RERR_SOCKETIO);
 	}
 
-	if (!lookup_name(&ss, ss_len, name_buf, sizeof name_buf, port_buf, sizeof port_buf))
-		check_name(&ss, ss_len, name_buf, port_buf);
+	if (!lookup_name(fd, &ss, ss_len, name_buf, sizeof name_buf, port_buf, sizeof port_buf))
+		check_name(fd, &ss, ss_len, name_buf, port_buf);
 
 	return name_buf;
 }
@@ -647,10 +638,10 @@ char *client_name(int fd)
 /**
  * Look up a name from @p ss into @p name_buf.
  **/
-static int lookup_name(const struct sockaddr_storage *ss,
-		       socklen_t ss_len,
-		       char *name_buf, size_t name_buf_len,
-		       char *port_buf, size_t port_buf_len)
+int lookup_name(int fd, const struct sockaddr_storage *ss,
+		socklen_t ss_len,
+		char *name_buf, size_t name_buf_len,
+		char *port_buf, size_t port_buf_len)
 {
 	int name_err;
 	
@@ -690,7 +681,8 @@ static int lookup_name(const struct sockaddr_storage *ss,
 			       NI_NAMEREQD | NI_NUMERICSERV);
 	if (name_err != 0) {
 		strcpy(name_buf, default_name);
-		rprintf(FERROR, RSYNC_NAME ": name lookup failed: %s\n",
+		rprintf(FERROR, RSYNC_NAME ": name lookup failed for %s: %s\n",
+			client_addr(fd),
 			gai_strerror(name_err));
 		return name_err;
 	}
@@ -703,10 +695,11 @@ static int lookup_name(const struct sockaddr_storage *ss,
 /* Do a forward lookup on name_buf and make sure it corresponds to ss
  * -- otherwise we may be being spoofed.  If we suspect we are, then
  * we don't abort the connection but just emit a warning. */
-static int check_name(const struct sockaddr_storage *ss,
-		      socklen_t ss_len,
-		      char *name_buf,
-		      const char *port_buf)
+int check_name(int fd,
+	       const struct sockaddr_storage *ss,
+	       socklen_t ss_len,
+	       char *name_buf,
+	       const char *port_buf)
 {
 	struct addrinfo hints, *res, *res0;
 	int error;
@@ -741,8 +734,10 @@ static int check_name(const struct sockaddr_storage *ss,
 		/* We hit the end of the list without finding an
 		 * address that was the same as ss. */
 		rprintf(FERROR, RSYNC_NAME
-			": no address record for \"%s\" corresponds to peer name: spoofed address?\n",
-			name_buf);
+			": no address record for \"%s\" corresponds to address %s: "
+			"spoofed address?\n",
+			name_buf,
+			client_addr(fd));
 	}
 
 	freeaddrinfo(res0);
