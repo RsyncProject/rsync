@@ -438,6 +438,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		if (dry_run) { /* log the transfer */
 			if (!am_server && log_format)
 				log_item(file, &stats, iflags, NULL);
+			if (read_batch)
+				discard_receive_data(f_in, file->length);
 			continue;
 		}
 
