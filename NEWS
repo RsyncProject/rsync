@@ -57,3 +57,7 @@ rsync 2.4.7 (sometime in 2001, maybe :)
     * Applied "simple nohang patch" from Wayne Davison.
 
     * Update to work with autoconf2.50 and 2.13.
+
+  PLATFORMS:
+
+    * Improved support for UNICOS (tested on Cray T3E and Cray SV1)
