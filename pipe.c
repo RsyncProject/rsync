@@ -25,7 +25,6 @@ extern int am_sender;
 extern int am_server;
 extern int blocking_io;
 extern int orig_umask;
-extern int read_batch;
 extern int write_batch;
 extern int filesfrom_fd;
 
@@ -121,7 +120,7 @@ pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 	}
 
 	/* For read-batch, don't even fork. */
-	pid = read_batch ? getpid() : do_fork();
+	pid = do_fork();
 
 	if (pid == -1) {
 		rsyserr(FERROR, errno, "fork");
