@@ -138,7 +138,7 @@
 #define DEL_TERSE		(1<<3)
 
 /* For use by the itemize_changes code */
-#define ITEM_TRANSFER (1<<0)
+#define ITEM_REPORT_XATTRS (1<<0)
 #define ITEM_REPORT_CHECKSUM (1<<1)
 #define ITEM_REPORT_SIZE (1<<2)
 #define ITEM_REPORT_TIME (1<<3)
@@ -149,7 +149,7 @@
 #define ITEM_USING_ALT_BASIS (1<<8)
 #define ITEM_HARD_LINKED (1<<9)
 #define ITEM_LOCAL_CHANGE (1<<10)
-#define ITEM_REPORT_XATTRS (1<<11)
+#define ITEM_TRANSFER (1<<11)
 /* These are outside the range of the transmitted flags. */
 #define ITEM_NO_DEST_AND_NO_UPDATE (1<<16) /* used by itemize() */
 #define ITEM_MISSING_DATA (1<<16)	   /* used by log_formatted() */
