@@ -76,7 +76,7 @@ static unsigned int file_struct_len;
 static struct file_list *received_flist;
 
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
-static void output_flist(struct file_list *flist);
+static void output_flist(struct file_list *flist, const char *whose_list);
 
 void init_flist(void)
 {
@@ -1253,7 +1253,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	}
 
 	if (verbose > 3)
-		output_flist(flist);
+		output_flist(flist, f < 0 ? "delete" : who_am_i());
 
 	if (verbose > 2)
 		rprintf(FINFO, "send_file_list done\n");
@@ -1327,7 +1327,7 @@ struct file_list *recv_file_list(int f)
 	}
 
 	if (verbose > 3)
-		output_flist(flist);
+		output_flist(flist, who_am_i());
 
 	if (list_only) {
 		int i;
@@ -1503,7 +1503,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 	}
 }
 
-static void output_flist(struct file_list *flist)
+static void output_flist(struct file_list *flist, const char *whose_list)
 {
 	char uidbuf[16], gidbuf[16];
 	struct file_struct *file;
@@ -1520,7 +1520,7 @@ static void output_flist(struct file_list *flist)
 		else
 			*gidbuf = '\0';
 		rprintf(FINFO, "[%s] i=%d %s %s %s mode=0%o len=%.0f%s%s\n",
-			who_am_i(), i, NS(file->basedir), NS(file->dirname),
+			whose_list, i, NS(file->basedir), NS(file->dirname),
 			NS(file->basename), (int)file->mode,
 			(double)file->length, uidbuf, gidbuf);
 	}
