@@ -252,6 +252,8 @@ logging
   If a child of the rsync daemon dies with a signal, we should notice
   that when we reap it and log a message.
 
+  Keep stderr and stdout properly separated (Debian #23626)
+
 
 rsyncd over ssh
 
