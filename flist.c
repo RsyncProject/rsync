@@ -638,7 +638,16 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 
 		l = strlen(fname);
 		if (l != 1 && fname[l-1] == '/') {
-			strlcat(fname,".",MAXPATHLEN);
+			if ((l == 2) && (fname[0] == '.')) {
+				/*  Turn ./ into just . rather than ./.
+				    This was put in to avoid a problem with
+				      rsync -aR --delete from ./
+				    The send_file_name() below of ./ was
+				    mysteriously preventing deletes */
+				fname[1] = 0;
+			} else {
+				strlcat(fname,".",MAXPATHLEN);
+			}
 		}
 
 		if (link_stat(fname,&st) != 0) {
