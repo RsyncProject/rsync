@@ -540,7 +540,6 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	generate_files(f_out, flist, local_name, name_pipe[1]);
 
-	get_redo_num(); /* Read final MSG_DONE and any prior messages. */
 	report(-1);
 	io_flush(FULL_FLUSH);
 	if (protocol_version >= 24) {
