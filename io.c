@@ -103,8 +103,15 @@ static int readfd(int fd,char *buffer,int N)
 	read_buffer_p += ret;
 	read_buffer_len -= ret;
       } else {
-	if ((ret = read(fd,buffer + total,N - total)) == -1)
-	  return -1;
+	while ((ret = read(fd,buffer + total,N - total)) == -1) {
+	  fd_set fds;
+
+	  if (errno != EAGAIN && errno != EWOULDBLOCK)
+	    return -1;
+	  FD_ZERO(&fds);
+	  FD_SET(fd, &fds);
+	  select(fd+1, &fds, NULL, NULL, NULL);
+	}
       }
 
       if (ret <= 0)
@@ -194,7 +201,7 @@ static int writefd(int fd,char *buf,int len)
       FD_SET(fd,&fds);
       tv.tv_sec = BLOCKING_TIMEOUT;
       tv.tv_usec = 0;
-      select(16,NULL,&fds,NULL,&tv);
+      select(fd+1,NULL,&fds,NULL,&tv);
     } else {
       total += ret;
     }
