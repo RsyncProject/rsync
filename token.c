@@ -67,7 +67,7 @@ void set_compression(char *fname)
 /* non-compressing recv token */
 static int32 simple_recv_token(int f, char **data)
 {
-	static int residue;
+	static int32 residue;
 	static char *buf;
 	int32 n;
 
@@ -93,7 +93,7 @@ static int32 simple_recv_token(int f, char **data)
 
 
 /* non-compressing send token */
-static void simple_send_token(int f, int token, struct map_struct *buf,
+static void simple_send_token(int f, int32 token, struct map_struct *buf,
 			      OFF_T offset, int32 n)
 {
 	if (n > 0) {
@@ -128,9 +128,9 @@ static void simple_send_token(int f, int token, struct map_struct *buf,
 #define AVAIL_OUT_SIZE(avail_in_size) ((avail_in_size)*1001/1000+16)
 
 /* For coding runs of tokens */
-static int last_token = -1;
-static int run_start;
-static int last_run_end;
+static int32 last_token = -1;
+static int32 run_start;
+static int32 last_run_end;
 
 /* Deflation state */
 static z_stream tx_strm;
@@ -148,7 +148,7 @@ static char *obuf;
 
 /* Send a deflated token */
 static void
-send_deflated_token(int f, int token, struct map_struct *buf, OFF_T offset,
+send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 		    int32 nb, int32 toklen)
 {
 	int32 n, r;
@@ -260,8 +260,8 @@ send_deflated_token(int f, int token, struct map_struct *buf, OFF_T offset,
 		/* end of file - clean up */
 		write_byte(f, END_FLAG);
 	} else if (token != -2) {
-		/* add the data in the current block to the compressor's
-		   history and hash table */
+		/* Add the data in the current block to the compressor's
+		 * history and hash table. */
 		tx_strm.next_in = (Bytef *) map_ptr(buf, offset, toklen);
 		tx_strm.avail_in = toklen;
 		tx_strm.next_out = (Bytef *) obuf;
@@ -292,9 +292,9 @@ static int32 rx_run;
 static int32 recv_deflated_token(int f, char **data)
 {
 	static int init_done;
-	static int saved_flag;
-	int r, flag;
-	int32 n;
+	static int32 saved_flag;
+	int32 n, flag;
+	int r;
 
 	for (;;) {
 		switch (recv_state) {
@@ -423,7 +423,8 @@ static int32 recv_deflated_token(int f, char **data)
  */
 static void see_deflate_token(char *buf, int32 len)
 {
-	int r, blklen;
+	int r;
+	int32 blklen;
 	unsigned char hdr[5];
 
 	rx_strm.avail_in = 0;
@@ -464,7 +465,7 @@ static void see_deflate_token(char *buf, int32 len)
  * If token == -1 then we have reached EOF
  * If n == 0 then don't send a buffer
  */
-void send_token(int f, int token, struct map_struct *buf, OFF_T offset,
+void send_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 		int32 n, int32 toklen)
 {
 	if (!do_compression)
