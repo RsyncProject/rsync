@@ -57,7 +57,7 @@ fi
 
 
 AC_ARG_ENABLE(profile,
-	AC_HELP_STRING([--enable-profile],	
+	AC_HELP_STRING([--enable-profile],
 		[turn on CPU profiling (default no)],
 		[], []))
 if test x"$enable_profile" = xyes
@@ -68,7 +68,7 @@ fi
 
 # Specifically, this turns on panic_action handling.
 AC_ARG_ENABLE(maintainer-mode,
-	AC_HELP_STRING([--enable-maintainer-mode],	
+	AC_HELP_STRING([--enable-maintainer-mode],
 		[turn on extra debug features],
 		[], []))
 if test x"$enable_maintainer_mode" = xyes
@@ -438,6 +438,27 @@ AC_CHECK_MEMBER([struct sockaddr_in6.sin6_scope_id],
 #include <sys/socket.h>
 #include <netinet/in.h>
 ])
+
+AC_MSG_CHECKING(struct stat64)
+AC_TRY_COMPILE([#include <stdio.h>
+#if HAVE_SYS_TYPES_H
+# include <sys/types.h>
+#endif
+#if HAVE_SYS_STAT_H
+# include <sys/stat.h>
+#endif
+#if STDC_HEADERS
+# include <stdlib.h>
+# include <stddef.h>
+#else
+# if HAVE_STDLIB_H
+#  include <stdlib.h>
+# endif
+#endif
+],[struct stat64 st;],
+    AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_STRUCT_STAT64,1,[Define to 1 if you have struct stat64.]),
+    AC_MSG_RESULT(no))
 
 # if we can't find strcasecmp, look in -lresolv (for Unixware at least)
 #
