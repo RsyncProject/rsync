@@ -314,6 +314,11 @@ static int rsync_module(int fd, int i)
 		exit_cleanup(RERR_SYNTAX);
 	}
 
+	if (lp_timeout(i)) {
+		extern int io_timeout;
+		io_timeout = lp_timeout(i);
+	}
+
 	start_server(fd, fd, argc, argp);
 
 	return 0;

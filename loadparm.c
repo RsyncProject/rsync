@@ -130,6 +130,7 @@ typedef struct
 	char *exclude;
 	char *exclude_from;
 	char *log_format;
+	int timeout;
 } service;
 
 
@@ -152,6 +153,7 @@ static service sDefault =
 	NULL,    /* exclude */
 	NULL,    /* exclude from */
 	"%o %h [%a] %m (%u) %f %l",    /* log format */
+	0        /* timeout */
 };
 
 
@@ -242,6 +244,7 @@ static struct parm_struct parm_table[] =
   {"log file",         P_STRING,  P_GLOBAL, &Globals.log_file,      NULL,  0},
   {"pid file",         P_STRING,  P_GLOBAL, &Globals.pid_file,      NULL,  0},
 
+  {"timeout",          P_INTEGER, P_LOCAL,  &sDefault.timeout,     NULL,  0},
   {"name",             P_STRING,  P_LOCAL,  &sDefault.name,        NULL,   0},
   {"comment",          P_STRING,  P_LOCAL,  &sDefault.comment,     NULL,   0},
   {"path",             P_STRING,  P_LOCAL,  &sDefault.path,        NULL,   0},
@@ -330,6 +333,7 @@ FN_LOCAL_STRING(lp_secrets_file, secrets_file)
 FN_LOCAL_STRING(lp_exclude, exclude)
 FN_LOCAL_STRING(lp_exclude_from, exclude_from)
 FN_LOCAL_STRING(lp_log_format, log_format)
+FN_LOCAL_INTEGER(lp_timeout, timeout)
 
 /* local prototypes */
 static int    strwicmp( char *psz1, char *psz2 );

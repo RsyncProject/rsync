@@ -107,39 +107,6 @@ ftp, kern, lpr, mail, news, security, syslog, user, uucp, local0,
 local1, local2, local3, local4, local5, local6 and local7. The default
 is daemon. 
 
-dit(bf(transfer logging)) The "transfer logging" option enables per-file 
-logging of downloads and uploads in a format somewhat similar to that
-used by ftp daemons. If you want to customise the log formats look at
-log_send, log_recv and log_transfer in log.c
-
-dit(bf(log format)) The "log format" option allows you to specify the
-format used for logging file transfers when transfer logging is
-enabled. The format is a text string containing embedded single
-character escape sequences prefixed with a percent (%) character.
-
-The prefixes that are understood are:
-
-itemize(
-  it() %h for the remote host name
-  it() %a for the remote IP address
-  it() %l for the length of the file in bytes
-  it() %p for the process id of this rsync session
-  it() %o for the operation, which is either "send" or "recv"
-  it() %f for the filename
-  it() %P for the module path
-  it() %m for the module name
-  it() %t for the current time
-  it() %u for the authenticated username (or the null string)
-  it() %b for the number of bytes actually transferred 
-  it() %c when sending files this gives the number of checksum bytes
-    received for this file
-)
-
-The default log format is "%o %h [%a] %m (%u) %f %l"
-
-A perl script called rsyncstats to summarise this format is included
-in the rsync source code distribution.
-
 dit(bf(socket options)) This option can provide endless fun for people
 who like to tune their systems to the utmost degree. You can set all
 sorts of socket options which may make transfers faster (or
@@ -278,6 +245,46 @@ hostname and IP address. If the pattern matches then the connection is
 rejected. See the "hosts allow" option for more information.
 
 The default is no "hosts deny" option, which means all hosts can connect.
+
+dit(bf(transfer logging)) The "transfer logging" option enables per-file 
+logging of downloads and uploads in a format somewhat similar to that
+used by ftp daemons. If you want to customise the log formats look at
+the log format option.
+
+dit(bf(log format)) The "log format" option allows you to specify the
+format used for logging file transfers when transfer logging is
+enabled. The format is a text string containing embedded single
+character escape sequences prefixed with a percent (%) character.
+
+The prefixes that are understood are:
+
+itemize(
+  it() %h for the remote host name
+  it() %a for the remote IP address
+  it() %l for the length of the file in bytes
+  it() %p for the process id of this rsync session
+  it() %o for the operation, which is either "send" or "recv"
+  it() %f for the filename
+  it() %P for the module path
+  it() %m for the module name
+  it() %t for the current time
+  it() %u for the authenticated username (or the null string)
+  it() %b for the number of bytes actually transferred 
+  it() %c when sending files this gives the number of checksum bytes
+    received for this file
+)
+
+The default log format is "%o %h [%a] %m (%u) %f %l"
+
+A perl script called rsyncstats to summarise this format is included
+in the rsync source code distribution.
+
+dit(bf(timeout)) The "timeout" option allows you to override the
+clients choice for IO timoeut for this module. Using this option you
+can ensure that rsync won't wait on a dead client forever. The timeout
+is specified in seconds. A value of zero means no timeout and is the
+default. A good choice for anonymous rsync servers may be 600 (giving
+a 10 minute timeout).
 
 enddit()
 
