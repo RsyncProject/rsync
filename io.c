@@ -786,19 +786,20 @@ void read_sum_head(int f, struct sum_struct *sum)
 	sum->count = read_int(f);
 	sum->blength = read_int(f);
 	if (sum->blength < 0 || sum->blength > MAX_BLOCK_SIZE) {
-		rprintf(FERROR, "Invalid block length %ld\n",
-		    (long)sum->blength);
+		rprintf(FERROR, "[%s] Invalid block length %ld\n",
+			who_am_i(), (long)sum->blength);
 		exit_cleanup(RERR_PROTOCOL);
 	}
 	sum->s2length = protocol_version < 27 ? csum_length : (int)read_int(f);
 	if (sum->s2length < 0 || sum->s2length > MD4_SUM_LENGTH) {
-		rprintf(FERROR, "Invalid checksum length %d\n", sum->s2length);
+		rprintf(FERROR, "[%s] Invalid checksum length %d\n",
+			who_am_i(), sum->s2length);
 		exit_cleanup(RERR_PROTOCOL);
 	}
 	sum->remainder = read_int(f);
 	if (sum->remainder < 0 || sum->remainder > sum->blength) {
-		rprintf(FERROR, "Invalid remainder length %ld\n",
-		    (long)sum->remainder);
+		rprintf(FERROR, "[%s] Invalid remainder length %ld\n",
+			who_am_i(), (long)sum->remainder);
 		exit_cleanup(RERR_PROTOCOL);
 	}
 }
