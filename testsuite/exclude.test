@@ -54,10 +54,10 @@ cat >"$excl" <<EOF
 EOF
 
 # Create the chk dir with what we expect to be excluded
+
 checkit "$RSYNC -avv \"$fromdir/\" \"$chkdir/\"" "$fromdir" "$chkdir"
 
-# Ensure that the following removes will tweak the directory times.
-sleep 1
+sleep 1 # Ensures that the rm commands will tweak the directory times.
 
 # XXX Note modified to work with current broken behavior (to be fixed soon!)
 rm -r "$chkdir"/foo/down
@@ -67,12 +67,12 @@ rm "$chkdir"/foo/file[235-9]
 rm -r "$chkdir"/bar # XXX
 rm "$chkdir"/mid/for/foo/extra
 
-# Make sure that the tweaked dirs times migrate back but nothing else.
-$RSYNC -av --include='*/' --exclude='*' "$chkdir/" "$fromdir/"
+# Un-tweak the directory times in our first (weak) exclude test (though
+# it's a good test of the --existing option).
+$RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
 
-# Now, test if rsync excludes the same files
+# Now, test if rsync excludes the same files.
 
 checkit "$RSYNC -avv --exclude-from=$excl \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
 
 exit 0
-# last [] may have failed but if we get here then we've won
