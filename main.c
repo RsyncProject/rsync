@@ -92,14 +92,14 @@ static void report(int f)
   }
 
 #if HAVE_LONGLONG
-  printf("wrote %lld bytes  read %lld bytes  %g bytes/sec\n",
+  printf("wrote %lld bytes  read %lld bytes  %.2f bytes/sec\n",
 	 (long long)out,(long long)in,(in+out)/(0.5 + (t-starttime)));
-  printf("total size is %lld  speedup is %g\n",
+  printf("total size is %lld  speedup is %.2f\n",
 	 (long long)tsize,(1.0*tsize)/(in+out));
 #else
-  printf("wrote %ld bytes  read %ld bytes  %g bytes/sec\n",
+  printf("wrote %ld bytes  read %ld bytes  %.2f bytes/sec\n",
 	 (long)out,(long)in,(in+out)/(0.5 + (t-starttime)));
-  printf("total size is %ld  speedup is %g\n",
+  printf("total size is %ld  speedup is %.2f\n",
 	 (long)tsize,(1.0*tsize)/(in+out));
 #endif
 }
