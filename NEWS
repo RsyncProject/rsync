@@ -5,6 +5,10 @@ rsync 2.5.1 (sometime in 2001?)
     * --progress and -P now show estimated data transfer rate (in a
         multiple of bytes/s) and estimated time to completion.  Based
         on a patch by Rik Faith.
+   
+    * --no-detach option, required to run as a W32 service and also
+        useful when running on Unix under daemontools, AIX's SRC, or a
+        debugger.  Thanks to Max Bowsher and Jos Backus.
 
   BUG FIXES: 
    
