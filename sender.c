@@ -153,15 +153,11 @@ int read_iflags(int f_in, int f_out, int ndx, char *buf)
 		len = -1;
 	}
 
-	/* XXX Temporary compatibility hack */
-	if (iflags & ITEM_REPORT_XATTRS) { /* old ITEM_UPDATE */
-		iflags &= ~ITEM_REPORT_XATTRS;
-		if (!(iflags & (ITEM_TRANSFER|ITEM_LOCAL_CHANGE))) {
-			if (S_ISREG(the_file_list->files[ndx]->mode))
-				iflags |= ITEM_TRANSFER;
-			else
-				iflags |= ITEM_LOCAL_CHANGE;
-		}
+	/* XXX Temporary backward compatibility when talking to 2.6.4pre[12] */
+	if (protocol_version >= 29 && iflags & ITEM_TRANSFER
+	    && !S_ISREG(the_file_list->files[ndx]->mode)) {
+		iflags &= ~ITEM_TRANSFER;
+		iflags |= ITEM_LOCAL_CHANGE;
 	}
 
 	if (iflags & ITEM_TRANSFER) {
@@ -256,7 +252,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				log_item(file, &stats, iflags, NULL);
 			write_int(f_out, i);
 			if (protocol_version >= 29)
-				write_shortint(f_out, iflags | ITEM_REPORT_XATTRS);
+				write_shortint(f_out, iflags);
 			continue;
 		}
 
@@ -309,7 +305,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		write_int(f_out, i);
 		if (protocol_version >= 29)
-			write_shortint(f_out, iflags | ITEM_REPORT_XATTRS);
+			write_shortint(f_out, iflags);
 		write_sum_head(f_out, s);
 
 		if (verbose > 2) {
