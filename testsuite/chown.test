@@ -19,6 +19,7 @@ case `id -u` in
 '') ;; # If "id" failed, try to continue...
 0)  ;;
 *)  if [ -f /usr/bin/fakeroot ]; then
+	echo "Let's try re-running the script under fakeroot..."
 	exec /usr/bin/fakeroot /bin/sh "$0"
     fi
     ;;
