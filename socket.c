@@ -455,7 +455,7 @@ void start_accept_loop(int port, int (*fn)(int, int))
 #ifdef INET6
 			if (errno == EADDRINUSE && i > 0) {
 				rprintf(FINFO,
-				    "Try using --ipv4 or --ipv6 to avoid this listen() error.");
+				    "Try using --ipv4 or --ipv6 to avoid this listen() error.\n");
 			}
 #endif
 			exit_cleanup(RERR_SOCKETIO);
