@@ -97,6 +97,21 @@ rsync-bugs@samba.anu.edu.au or (if you think it will be of interest to
 lots of people) send it to rsync@samba.anu.edu.au
 
 
+CVS TREE
+--------
+
+If you want to get the very latest version of rsync direct from the
+source code repository then you can use anonymous cvs. You will need a
+recent version of cvs then use the following commands:
+
+	cvs -d :pserver:cvs@samba.anu.edu.au:/cvsroot login
+	Password: cvs
+
+	cvs -d :pserver:cvs@samba.anu.edu.au:/cvsroot co rsync
+
+Look at the cvs documentation for more details.
+
+
 COPYRIGHT
 ---------
 

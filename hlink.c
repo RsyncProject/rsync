@@ -71,7 +71,7 @@ void init_hard_links(struct file_list *flist)
 int check_hard_link(struct file_struct *file)
 {
 #if SUPPORT_HARD_LINKS
-  int low=0,high=hlink_count;
+  int low=0,high=hlink_count-1;
   int mid=0,ret=0;
 
   if (!hlink_list || !S_ISREG(file->mode)) return 0;
