@@ -66,6 +66,35 @@ static struct file_struct null_file;
 
 static void clean_flist(struct file_list *flist, int strip_root);
 
+
+static int show_build_progress_p(void)
+{
+	extern int do_progress;
+	
+	return do_progress && verbose && recurse && !am_server;
+}
+
+/**
+ * True if we're local, etc, and should emit progress emssages.
+ **/
+static void emit_build_progress(const struct file_list *flist)
+{
+	rprintf(FINFO,
+		" %d files...\r",
+		flist->count);
+}
+
+
+static void finish_build_progress(const struct file_list *flist)
+{
+	if (verbose && recurse && !am_server) {
+		/* This overwrites the progress line, if any. */
+		rprintf(FINFO, RSYNC_NAME ": %d files to consider.\n",
+			flist->count);
+	}
+}
+
+
 static struct string_area *string_area_new(int size)
 {
 	struct string_area *a;
@@ -626,7 +655,10 @@ void send_file_name(int f,struct file_list *flist,char *fname,
 
   file = make_file(f,fname, &flist->string_area, 0);
 
-  if (!file) return;  
+  if (!file) return;
+
+  if (show_build_progress_p() & !(flist->count % 100))
+	  emit_build_progress(flist);
   
   if (flist->count >= flist->malloced) {
 	  if (flist->malloced < 1000)
@@ -717,6 +749,11 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 }
 
 
+/*
+ *
+ * I *think* f==-1 means that the list should just be built in memory
+ * and not transmitted.  But who can tell? -- mbp
+ */
 struct file_list *send_file_list(int f,int argc,char *argv[])
 {
 	int i,l;
@@ -727,7 +764,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 	int64 start_write;
 
 	if (verbose && recurse && !am_server && f != -1) {
-		rprintf(FINFO,"building file list ... ");
+		rprintf(FINFO, RSYNC_NAME ": building file list...\n");
                 if (verbose > 1)
                         rprintf(FINFO, "\n");
 		rflush(FINFO);
@@ -850,8 +887,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 		send_file_entry(NULL,f,0);
 	}
 
-	if (verbose && recurse && !am_server && f != -1)
-		rprintf(FINFO,"done\n");
+	finish_build_progress(flist);
 	
 	clean_flist(flist, 0);
 	
