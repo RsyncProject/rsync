@@ -434,12 +434,13 @@ regardless of timestamp. This is useful when starting to use rsync
 after using another mirroring system which may not preserve timestamps
 exactly.
 
-dit(bf(--modify-window)) When comparing two timestamps rsync treats
-the timestamps as being equal if they are within the value of
-modify_window. This is normally zero, but you may find it useful to
-set this to a larger value in some situations. In particular, when
-transferring to Windows FAT filesystems which cannot represent times
-with a 1 second resolution bf(--modify-window=1) is useful.
+dit(bf(--modify-window)) When comparing two timestamps, rsync treats the
+timestamps as being equal if they differ by no more than the modify-window
+value.  This is normally 0 (for an exact match), but you may find it useful
+to set this to a larger value in some situations.  In particular, when
+transferring to or from an MS Windows FAT filesystem (which represents
+times with a 2-second resolution), bf(--modify-window=1) is useful
+(allowing times to differ by up to 1 second).
 
 dit(bf(-c, --checksum)) This forces the sender to checksum all files using
 a 128-bit MD4 checksum before transfer. The checksum is then
