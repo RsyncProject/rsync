@@ -147,6 +147,15 @@ testuser=`whoami || echo UNKNOWN`
 echo "    testuser=$testuser"
 echo "    os=`uname -a`"
 
+# It must be "yes", not just nonnull
+if test "x$preserve_scratch" = xyes
+then
+    echo "    preserve_scratch=yes"
+else
+    echo "    preserve_scratch=no"
+fi    
+
+
 if test ! -f $rsync_bin
 then
     echo "rsync_bin $rsync_bin is not a file" >&2

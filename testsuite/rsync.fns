@@ -260,9 +260,35 @@ test_xfail() {
     exit 78
 }
 
+# Determine what shell command will appropriately test for links.
+ln -s foo "$scratchdir/testlink"
+for cmd in test /bin/test /usr/bin/test /usr/ucb/bin/test /usr/ucb/test
+do
+    for switch in -h -L
+    do
+        if $cmd $switch "$scratchdir/testlink" 2>/dev/null
+	then
+	    # how nice
+	    TEST_SYMLINK_CMD="$cmd $switch"
+	    # i wonder if break 2 is portable?
+	    break 2
+	fi
+   done
+done
+
+
+if [ "x$TEST_SYMLINK_CMD" = 'x' ]
+then
+    test_fail "Couldn't determine how to test for symlinks"
+else
+    echo "Testing for symlinks using '$TEST_SYMLINK_CMD'"
+fi
+	
+
 # Test whether something is a link, allowing for shell peculiarities
 is_a_link() {
-    test -L "$1" || test -h "$1" || /usr/bin/test -L "$1" || /usr/bin/test -h "$1"
+    # note the variable contains the first option and therefore is not quoted
+    $TEST_SYMLINK_CMD "$1"
 }
 
 

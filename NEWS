@@ -1,4 +1,4 @@
-rsync release candidate 2.5.5rc1 (26 March 2002)
+rsync changes since last release
 
   ENHANCEMENTS:
 
@@ -16,7 +16,7 @@ rsync release candidate 2.5.5rc1 (26 March 2002)
       slots) would cause rsync to kill all processes owned by the
       current user.  Yes, really!  (Paul Haas, Martin Pool)
 
-    * Fix test suite on Solaris.  (Jos Backus)
+    * Fix test suite on Solaris.  (Jos Backus, Martin Pool)
 
     * Fix minor memory leak in socket code.  (Dave Dykstra, Martin
       Pool.)
