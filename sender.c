@@ -204,7 +204,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			iflags = ITEM_UPDATING | ITEM_MISSING_DATA;
 
 		if (inplace && protocol_version >= 29) {
-			updating_basis_file = iflags & ITEM_USING_ALT_BASIS;
+			updating_basis_file = !(iflags & ITEM_USING_ALT_BASIS);
 		} else
 			updating_basis_file = inplace && !make_backups;
 
