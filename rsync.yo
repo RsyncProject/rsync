@@ -1045,7 +1045,8 @@ quote(itemize(
   (sent).
   it() A bf(c) means that a local change/creation is occuring for the item
   (such as the creation of a directory or a symlink).
-  it() A bf(h) means that a hard-link is being created for the item.
+  it() A bf(h) means that the item is a hard-link to another item (requires
+  bf(--hard-links)).
   it() A bf(.) means that the item only has attributes that are being
   changed.
   it() A bf(=) means that the item is identical (this only only output for
