@@ -33,7 +33,7 @@ AC_ARG_WITH(included-popt,
 
 AC_ARG_WITH(rsync-path,
 	[  --with-rsync-path=PATH  set default --rsync-path to PATH (default: \"rsync\")],
-	[ RSYNC_PATH="$with_rsync_name" ],
+	[ RSYNC_PATH="$with_rsync_path" ],
 	[ RSYNC_PATH="rsync" ])
 AC_DEFINE_UNQUOTED(RSYNC_PATH, "$RSYNC_PATH", [ ])
 
