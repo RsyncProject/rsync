@@ -438,8 +438,8 @@ static void log_formatted(enum logcode code, char *format, char *op,
 				break;
 			}
 			n = buf2;
-			n[0] = iflags & ITEM_HARD_LINKED ? 'h'
-			     : iflags & ITEM_LOCAL_CHANGE ? 'c'
+			n[0] = iflags & ITEM_LOCAL_CHANGE
+			      ? iflags & ITEM_XNAME_FOLLOWS ? 'h' : 'c'
 			     : !(iflags & ITEM_TRANSFER) ? '.'
 			     : *op == 's' ? '>' : '<';
 			n[1] = S_ISDIR(file->mode) ? 'd'
