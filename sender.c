@@ -193,7 +193,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		}
 
 		if (write_batch)
-			write_batch_csum_info(&i, flist->count, s);
+			write_batch_csum_info(&i, s);
 
 		if (!read_batch) {
 			fd = do_open(fname, O_RDONLY, 0);
