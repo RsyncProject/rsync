@@ -111,7 +111,7 @@ void delete_files(struct file_list *flist)
 					}
 				} else {
 					delete_file(f, S_ISDIR(mode)
-					    ? DEL_DIR | DEL_NO_RECURSE : 0);
+						? DEL_DIR | DEL_RECURSE : 0);
 				}
 				deletion_count++;
 			}
