@@ -36,6 +36,21 @@ extern int am_server;
  **/
 
 
+void read_sum_head(int f, struct sum_struct *sum)
+{
+	extern int remote_version;
+
+	sum->count = read_int(f);
+	sum->blength = read_int(f);
+	if (remote_version < 27)
+	{
+		sum->s2length = csum_length;
+	} else {
+		sum->s2length = read_int(f);  
+	}
+	sum->remainder = read_int(f);  
+}
+
 /**
  * Receive the checksums for a buffer
  **/
@@ -48,14 +63,14 @@ static struct sum_struct *receive_sums(int f)
 	s = (struct sum_struct *)malloc(sizeof(*s));
 	if (!s) out_of_memory("receive_sums");
 
-	s->count = read_int(f);
-	s->n = read_int(f);
-	s->remainder = read_int(f);  
+	read_sum_head(f, s);
+
 	s->sums = NULL;
 
 	if (verbose > 3)
 		rprintf(FINFO,"count=%ld n=%ld rem=%ld\n",
-			(long) s->count, (long) s->n, (long) s->remainder);
+			(long) s->count, (long) s->blength,
+			(long) s->remainder);
 
 	if (s->count == 0) 
 		return(s);
@@ -65,7 +80,7 @@ static struct sum_struct *receive_sums(int f)
 
 	for (i=0; i < (int) s->count;i++) {
 		s->sums[i].sum1 = read_int(f);
-		read_buf(f,s->sums[i].sum2,csum_length);
+		read_buf(f,s->sums[i].sum2,s->s2length);
 
 		s->sums[i].offset = offset;
 		s->sums[i].i = i;
@@ -73,7 +88,7 @@ static struct sum_struct *receive_sums(int f)
 		if (i == (int) s->count-1 && s->remainder != 0) {
 			s->sums[i].len = s->remainder;
 		} else {
-			s->sums[i].len = s->n;
+			s->sums[i].len = s->blength;
 		}
 		offset += s->sums[i].len;
 
@@ -210,9 +225,7 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 			if (write_batch)
 				write_batch_delta_file((char *)&i,sizeof(i));
 
-			write_int(f_out,s->count);
-			write_int(f_out,s->n);
-			write_int(f_out,s->remainder);
+			write_sum_head(f_out, s);
 		}
 	  
 		if (verbose > 2)
@@ -239,9 +252,7 @@ void send_files(struct file_list *flist,int f_out,int f_in)
                        }
                        else {
                          write_int(f_out,j);
-                         write_int(f_out,s->count);
-                         write_int(f_out,s->n);
-                         write_int(f_out,s->remainder);
+			 write_sum_head(f_out, s);
                          done=0;
                          while (!done) {
                             read_batch_delta_file( (char *) &buff_len, sizeof(int) );

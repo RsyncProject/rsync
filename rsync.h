@@ -50,7 +50,7 @@
 #define SAME_TIME (1<<7)
 
 /* update this if you make incompatible changes */
-#define PROTOCOL_VERSION 26
+#define PROTOCOL_VERSION 27
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
@@ -408,7 +408,8 @@ struct sum_struct {
 	OFF_T flength;		/**< total file length */
 	size_t count;		/**< how many chunks */
 	size_t remainder;	/**< flength % block_length */
-	size_t n;		/**< block_length */
+	size_t blength;		/**< block_length */
+	size_t s2length;	/**< sum2_length */
 	struct sum_buf *sums;	/**< points to info for each chunk */
 };
 

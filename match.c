@@ -19,8 +19,6 @@
 
 #include "rsync.h"
 
-extern int csum_length;
-
 extern int verbose;
 extern int am_server;
 
@@ -152,11 +150,11 @@ static void hash_search(int f,struct sum_struct *s,
 
 	if (verbose > 2)
 		rprintf(FINFO,"hash search b=%ld len=%.0f\n",
-			(long) s->n, (double)len);
+			(long) s->blength, (double)len);
 
-	/* cast is to make s->n signed; it should always be reasonably
+	/* cast is to make s->blength signed; it should always be reasonably
 	 * small */
-	k = MIN(len, (OFF_T) s->n);
+	k = MIN(len, (OFF_T) s->blength);
 	
 	map = (schar *)map_ptr(buf,0,k);
 	
@@ -171,8 +169,8 @@ static void hash_search(int f,struct sum_struct *s,
 	end = len + 1 - s->sums[s->count-1].len;
 	
 	if (verbose > 3)
-		rprintf(FINFO, "hash search s->n=%ld len=%.0f count=%ld\n",
-			(long) s->n, (double) len, (long) s->count);
+		rprintf(FINFO, "hash search s->blength=%ld len=%.0f count=%ld\n",
+			(long) s->blength, (double) len, (long) s->count);
 	
 	do {
 		tag t = gettag2(s1,s2);
@@ -194,7 +192,7 @@ static void hash_search(int f,struct sum_struct *s,
 			if (sum != s->sums[i].sum1) continue;
 			
 			/* also make sure the two blocks are the same length */
-			l = MIN(s->n,len-offset);
+			l = MIN(s->blength,len-offset);
 			if (l != s->sums[i].len) continue;			
 
 			if (verbose > 3)
@@ -207,7 +205,7 @@ static void hash_search(int f,struct sum_struct *s,
 				done_csum2 = 1;
 			}
 			
-			if (memcmp(sum2,s->sums[i].sum2,csum_length) != 0) {
+			if (memcmp(sum2,s->sums[i].sum2,s->s2length) != 0) {
 				false_alarms++;
 				continue;
 			}
@@ -218,7 +216,7 @@ static void hash_search(int f,struct sum_struct *s,
 				int i2 = targets[j].i;
 				if (i2 == last_i + 1) {
 					if (sum != s->sums[i2].sum1) break;
-					if (memcmp(sum2,s->sums[i2].sum2,csum_length) != 0) break;
+					if (memcmp(sum2,s->sums[i2].sum2,s->s2length) != 0) break;
 					/* we've found an adjacent match - the RLL coder 
 					   will be happy */
 					i = i2;
@@ -230,7 +228,7 @@ static void hash_search(int f,struct sum_struct *s,
 			
 			matched(f,s,buf,offset,i);
 			offset += s->sums[i].len - 1;
-			k = MIN((len-offset), s->n);
+			k = MIN((len-offset), s->blength);
 			map = (schar *)map_ptr(buf,offset,k);
 			sum = get_checksum1((char *)map, k);
 			s1 = sum & 0xFFFF;
@@ -260,9 +258,9 @@ static void hash_search(int f,struct sum_struct *s,
 		   running match, the checksum update and the
 		   literal send. */
 		if (offset > last_match &&
-		    offset-last_match >= CHUNK_SIZE+s->n && 
+		    offset-last_match >= CHUNK_SIZE+s->blength && 
 		    (end-offset > CHUNK_SIZE)) {
-			matched(f,s,buf,offset - s->n, -2);
+			matched(f,s,buf,offset - s->blength, -2);
 		}
 	} while (++offset < end);
 	

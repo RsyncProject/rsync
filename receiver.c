@@ -230,7 +230,8 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 			OFF_T total_size)
 {
 	int i;
-	unsigned int n,remainder,len,count;
+	struct sum_struct sum;
+	unsigned int len;
 	OFF_T offset = 0;
 	OFF_T offset2;
 	char *data;
@@ -238,9 +239,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 	static char file_sum2[MD4_SUM_LENGTH];
 	char *map=NULL;
 	
-	count = read_int(f_in);
-	n = read_int(f_in);
-	remainder = read_int(f_in);
+	read_sum_head(f_in, &sum);
 	
 	sum_init();
 	
@@ -270,10 +269,10 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 		} 
 
 		i = -(i+1);
-		offset2 = i*(OFF_T)n;
-		len = n;
-		if (i == (int) count-1 && remainder != 0)
-			len = remainder;
+		offset2 = i*(OFF_T)sum.blength;
+		len = sum.blength;
+		if (i == (int) sum.count-1 && sum.remainder != 0)
+			len = sum.remainder;
 		
 		stats.matched_data += len;
 		

@@ -116,13 +116,21 @@ static int adapt_block_size(struct file_struct *file, int bsize)
 
 
 /*
-  send a header that says "we have no checksums" down the f_out fd
+ * 	NULL sum_struct means we have no checksums
   */
-static void send_null_sums(int f_out)
+
+void write_sum_head(int f, struct sum_struct *sum)
 {
-	write_int(f_out, 0);
-	write_int(f_out, block_size);
-	write_int(f_out, 0);
+	static struct sum_struct null_sum;
+
+	if (sum == (struct sum_struct *)NULL)
+		sum = &null_sum;
+
+	write_int(f, sum->count);
+	write_int(f, sum->blength);
+	if (remote_version >= 27)
+		write_int(f, sum->s2length);
+	write_int(f, sum->remainder);
 }
 
 
@@ -164,19 +172,18 @@ static void generate_and_send_sums(struct map_struct *buf, OFF_T len,
 
 	sum.count = (len + (block_len - 1)) / block_len;
 	sum.remainder = (len % block_len);
-	sum.n = block_len;
+	sum.blength	= block_len;
 	sum.flength = len;
+	sum.s2length	= csum_length;
 	/* not needed here  sum.sums = NULL; */
 
 	if (sum.count && verbose > 3) {
 		rprintf(FINFO, "count=%ld rem=%ld n=%ld flength=%.0f\n",
 			(long) sum.count, (long) sum.remainder,
-			(long) sum.n, (double) sum.flength);
+			(long) sum.blength, (double) sum.flength);
 	}
 
-	write_int(f_out, sum.count);
-	write_int(f_out, sum.n);
-	write_int(f_out, sum.remainder);
+	write_sum_head(f_out, &sum);
 
 	for (i = 0; i < sum.count; i++) {
 		int n1 = MIN(len, block_len);
@@ -192,7 +199,7 @@ static void generate_and_send_sums(struct map_struct *buf, OFF_T len,
 				i, (double) offset, n1, (unsigned long) sum1);
 		}
 		write_int(f_out, sum1);
-		write_buf(f_out, sum2, csum_length);
+		write_buf(f_out, sum2, sum.s2length);
 		len -= n1;
 		offset += n1;
 	}
@@ -384,7 +391,7 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 	if (statret == -1) {
 		if (errno == ENOENT) {
 			write_int(f_out,i);
-			if (!dry_run) send_null_sums(f_out);
+			if (!dry_run) write_sum_head(f_out, NULL);
 		} else {
 			if (verbose > 1)
 				rprintf(FERROR, RSYNC_NAME
@@ -401,7 +408,7 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 
 		/* now pretend the file didn't exist */
 		write_int(f_out,i);
-		if (!dry_run) send_null_sums(f_out);
+		if (!dry_run) write_sum_head(f_out, NULL);
 		return;
 	}
 
@@ -430,7 +437,7 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 
 	if (disable_deltas_p()) {
 		write_int(f_out,i);
-		send_null_sums(f_out);
+		write_sum_head(f_out, NULL);
 		return;
 	}
 
@@ -441,7 +448,7 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 		rprintf(FERROR,RSYNC_NAME": failed to open \"%s\", continuing : %s\n",fnamecmp,strerror(errno));
 		/* pretend the file didn't exist */
 		write_int(f_out,i);
-		send_null_sums(f_out);
+		write_sum_head(f_out, NULL);
 		return;
 	}
 
