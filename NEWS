@@ -6,7 +6,7 @@ Changes since version 2.5.7:
 
     * Added --files-from, --no-relative, --no-implied-dirs, and --from0.
       Note that --from0 affects the line-ending character for all the
-      --*-from options. (Wayne Davison)
+      files read by the --*-from options. (Wayne Davison)
 
     * Length of csum2 is now per-file starting with protocol verison
       27. (J.W. Schultz)
@@ -20,6 +20,10 @@ Changes since version 2.5.7:
 
     * The --stats option no longer includes the (debug) malloc summary
       unless the verbose option was specified at least twice.
+
+    * Added a new error/warning code for when files vanish from the
+      sending side.  Made vanished source files not interfere with the
+      file-deletion pass when --delete-after was specified.
 
   BUG FIXES:
 
@@ -46,7 +50,7 @@ Changes since version 2.5.7:
 
     * The exclude list specified in the daemon's config file is now
       properly applied to the pulled items no matter how deep the
-      user's file args are in the source tree.  (Wayne Davison)
+      user's file-args are in the source tree.  (Wayne Davison)
 
     * For protocol version >= 27, mdfour_tail() is called when the
       block size (including checksum_seed) is a multiple of 64.
