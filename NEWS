@@ -3,7 +3,8 @@ rsync 2.5.3 (not released yet)
   SECURITY FIXES:
 
     * Make sure that supplementary groups are removed from a server
-      process after changing uid and gid. (Ethan Benson)
+      process after changing uid and gid. (Ethan Benson) (Debian bug
+      #132272)
 
   BUG FIXES:
 
