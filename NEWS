@@ -1,4 +1,4 @@
-rsync 2.4.7 (sometime in 2001, maybe :)
+rsync 2.4.7 (sometime in 2001, maybe :)		-*- indented-text -*- 
 
   ANNOUNCEMENTS
 
@@ -14,8 +14,8 @@ rsync 2.4.7 (sometime in 2001, maybe :)
       sets.  By Bert J. Dempsey and Debra Weiss, updated by Jos
       Backus.  <http://www.ils.unc.edu/i2dsi/unc_rsync+.html>
 
-    * Merged IPv6 patch from KAME.net.  This is off by default, but
-      can be enabled with ./configure --enable-ipv6.
+    * IPv6 support based on a patch from KAME.net, on systems
+      including modern versions of Linux, Solaris, and HP-UX.
 
   ENHANCEMENTS
 
