@@ -572,6 +572,8 @@ prepare_to_open:
 	if (f_copy >= 0) {
 		close(f_copy);
 		set_perms(backupptr, back_file, NULL, 0);
+		if (verbose > 1)
+			rprintf(FINFO, "backed up %s to %s\n", fname, backupptr);
 		free(back_file);
 	}
 
