@@ -14,7 +14,7 @@ Changes since version 2.5.6:
       multiple files of the same name are destined for the same dir.
       (Wayne Davison)
 
-    - Keep tmp names from overflowing MAXPATH.
+    - Keep tmp names from overflowing MAXPATHLEN.
 
   INTERNAL:
 
