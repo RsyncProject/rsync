@@ -14,6 +14,8 @@ rsync 2.4.7 (sometime in 2001, maybe :)
       sets.  By Bert J. Dempsey and Debra Weiss, updated by Jos
       Backus.  <http://www.ils.unc.edu/i2dsi/unc_rsync+.html>
 
+    * Merged IPv6 patch from KAME.net.  
+
   ENHANCEMENTS
 
     * Include/exclude cluestick: with -vv, print out whether files are
@@ -47,14 +49,14 @@ rsync 2.4.7 (sometime in 2001, maybe :)
 
   BUG FIXES:
 
+    * Fix for various bugs causing rsync to hang.
+
     * Attempt to fix Large File Summit support on AIX.
 
     * Attempt to fix error handling lockup bug.
 
     * Give a non-0 exit code if *any* of the files we have been asked
       to transfer fail to transfer 
-
-    * Applied "simple nohang patch" from Wayne Davison.
 
     * For log messages containing ridiculously long strings that might
       overflow a buffer rsync no longer aborts, but rather prints an
