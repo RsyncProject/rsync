@@ -27,7 +27,6 @@
   */
 #include "rsync.h"
 
-extern int itemize_changes;
 extern int am_daemon;
 extern int am_server;
 extern int am_sender;
@@ -36,6 +35,7 @@ extern int module_id;
 extern int msg_fd_out;
 extern int protocol_version;
 extern int preserve_times;
+extern int log_format_has_o_or_i;
 extern char *auth_user;
 extern char *log_format;
 
@@ -539,7 +539,7 @@ void log_delete(char *fname, int mode)
 		fmt = lp_log_format(module_id);
 		code = FLOG;
 	} else {
-		fmt = log_format && itemize_changes ? log_format : "%i %n";
+		fmt = log_format_has_o_or_i ? log_format : "%i %n";
 		code = FINFO;
 	}
 
