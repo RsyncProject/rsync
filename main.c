@@ -34,7 +34,6 @@ extern int blocking_io;
 extern int cvs_exclude;
 extern int delete_mode;
 extern int delete_before;
-extern int delete_after;
 extern int delete_excluded;
 extern int daemon_over_rsh;
 extern int do_stats;
@@ -501,10 +500,9 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	if (preserve_hard_links)
 		init_hard_links(flist);
 
-	if (delete_before) {
-		/* I moved this here from recv_files() to prevent a race condition */
-		if (recurse && !local_name && flist->count > 0)
-			delete_files(flist);
+	if (delete_before && !local_name && flist->count > 0) {
+		/* Moved here from recv_files() to prevent a race condition */
+		delete_files(flist);
 	}
 
 	if (fd_pair(error_pipe) < 0
