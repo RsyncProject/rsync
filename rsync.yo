@@ -1010,9 +1010,9 @@ once, instead of sending the same data to every host individually.
 Example:
 
 verb(
-$ rsync --write_batch=pfx -a /source/dir/ /adest/dir/
+$ rsync --write-batch=pfx -a /source/dir/ /adest/dir/
 $ rcp pfx.rsync_* remote:
-$ rsh remote rsync --read_batch=pfx -a /bdest/dir/
+$ rsh remote rsync --read-batch=pfx -a /bdest/dir/
 # or alternatively
 $ rsh remote ./pfx.rsync_argvs /bdest/dir/
 )
