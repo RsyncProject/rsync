@@ -26,7 +26,7 @@ ZLIBOBJ=zlib/deflate.o zlib/infblock.o zlib/infcodes.o zlib/inffast.o \
 	zlib/inflate.o zlib/inftrees.o zlib/infutil.o zlib/trees.o \
 	zlib/zutil.o zlib/adler32.o 
 OBJS1=rsync.o generator.o receiver.o cleanup.o sender.o exclude.o util.o main.o checksum.o match.o syscall.o log.o backup.o
-OBJS2=options.o flist.o io.o compat.o hlink.o token.o uidlist.o socket.o fileio.o
+OBJS2=options.o flist.o io.o compat.o hlink.o token.o uidlist.o socket.o fileio.o batch.o
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS=popt/findme.o  popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o

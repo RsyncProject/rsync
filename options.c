@@ -74,6 +74,9 @@ int modify_window=0;
 #endif
 int blocking_io=0;
 
+int read_batch=0;  /* dw */
+int write_batch=0; /* dw */
+
 char *backup_suffix = BACKUP_SUFFIX;
 char *tmpdir = NULL;
 char *compare_dest = NULL;
@@ -89,6 +92,8 @@ int verbose = 0;
 int quiet = 0;
 int always_checksum = 0;
 int list_only = 0;
+
+char *batch_ext = NULL;
 
 static int modify_window_set;
 
@@ -206,6 +211,8 @@ void usage(enum logcode F)
   rprintf(F,"     --log-format=FORMAT     log file transfers using specified format\n");  
   rprintf(F,"     --password-file=FILE    get password from FILE\n");
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth, KBytes per second\n");
+  rprintf(F," -f  --read-batch=FILE       read batch file\n");
+  rprintf(F," -F  --write-batch           write batch file\n");
   rprintf(F," -h, --help                  show this help screen\n");
 
   rprintf(F,"\n");
@@ -290,9 +297,10 @@ static struct poptOption long_options[] = {
   {"address",          0,  POPT_ARG_STRING, 0,               OPT_ADDRESS},
   {"backup-dir",       0,  POPT_ARG_STRING, &backup_dir},
   {"hard-links",      'H', POPT_ARG_NONE,   &preserve_hard_links},
+  {"read-batch",      'f', POPT_ARG_STRING, &batch_ext, 'f'},
+  {"write-batch",     'F', POPT_ARG_NONE,   &write_batch, 0},
   {0,0,0,0}
 };
-
 
 static char err_buf[100];
 
@@ -468,6 +476,11 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			}
 			break;
 
+		case 'f':
+			/* The filename is stored for us by popt */
+			read_batch = 1;
+			break;
+
 		default:
                         /* FIXME: If --daemon is specified, then errors for later
                          * parameters seem to disappear. */
@@ -501,6 +514,7 @@ void server_options(char **args,int *argc)
 	static char mdelete[30];
 	static char mwindow[30];
 	static char bw[50];
+	static char fext[20]; /* dw */
 
 	int i, x;
 
@@ -555,6 +569,8 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'S';
 	if (do_compression)
 		argstr[x++] = 'z';
+	if (write_batch)
+	    argstr[x++] = 'F'; /* dw */
 
 	/* this is a complete hack - blame Rusty 
 
@@ -576,6 +592,11 @@ void server_options(char **args,int *argc)
 		snprintf(mdelete,sizeof(mdelete),"--max-delete=%d",max_delete);
 		args[ac++] = mdelete;
 	}    
+	
+	if (batch_ext != NULL) {
+		sprintf(fext,"-f%s",batch_ext);
+		args[ac++] = fext;
+	}
 
 	if (io_timeout) {
 		snprintf(iotime,sizeof(iotime),"--timeout=%d",io_timeout);

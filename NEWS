@@ -10,6 +10,10 @@ rsync 2.4.7 (sometime in 2001, maybe :)
 
     * Shell wildcards are allowed in "auth users" lines.
 
+    * Merged UNC rsync+ patch to support creation of standalone patch
+      sets.  By Bert J. Dempsey and Debra Weiss, updated by Jos
+      Backus.  <http://www.ils.unc.edu/i2dsi/unc_rsync+.html>
+
   ENHANCEMENTS
 
     * Include/exclude cluestick: with -vv, print out whether files are

@@ -276,7 +276,11 @@ verb(
      --log-format=FORMAT     log file transfers using specified format
      --password-file=FILE    get password from FILE
      --bwlimit=KBPS          limit I/O bandwidth, KBytes per second
+ -f, --read-batch=FILE       read batch file
+ -F, --write-batch           write batch file
  -h, --help                  show this help screen
+
+
 )
 
 manpageoptions()
@@ -675,6 +679,11 @@ transfer was too fast, it will wait before sending the next data block. The
 result is an average transfer rate equalling the specified limit. A value
 of zero specifies no limit.
 
+dit(bf(--read-batch)) Apply a previously generated change batch.
+
+dit(bf(--write-batch)) Generate a set of files that can be transferred
+as a batch update.
+
 enddit()
 
 manpagesection(EXCLUDE PATTERNS)
@@ -764,6 +773,29 @@ itemize(
   only foo/bar.c (the foo/ directory must be explicitly included or
   it would be excluded by the "*")
 )
+
+manpagesection(BATCH MODE)
+
+The following call generates 4 files that encapsulate the information
+for synchronizing the contents of bf(target_dir) with the updates found in
+bf(src_dir)
+
+quote(
+$ rsync -F [other rsync options here] \nl()
+           /somewhere/src_dir /somewhere/target_dir
+)
+
+The generated files are labeled with a common timestamp:
+
+itemize(
+it() bf(rsync_argvs.<timestamp>) command-line arguments
+it() bf(rsync_flist.<timestamp>) rsync internal file metadata
+it() bf(rsync_csums.<timestamp>) rsync checksums
+it() bf(rsync_delta.<timestamp>) data blocks for file update & change
+)
+
+See bf(http://www.ils.unc.edu/i2dsi/unc_rsync+.html) for papers and technical
+reports.
 
 manpagesection(DIAGNOSTICS)
 

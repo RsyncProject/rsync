@@ -154,6 +154,7 @@ pid_t local_child(int argc, char **argv,int *f_in,int *f_out)
 	pid_t pid;
 	int to_child_pipe[2];
 	int from_child_pipe[2];
+	extern int read_batch;  /* dw */
 
 	if (fd_pair(to_child_pipe) < 0 ||
 	    fd_pair(from_child_pipe) < 0) {
@@ -172,7 +173,10 @@ pid_t local_child(int argc, char **argv,int *f_in,int *f_out)
 		extern int am_sender;
 		extern int am_server;
 
-		am_sender = !am_sender;
+		if (read_batch)
+		    am_sender = 0;
+		else
+		    am_sender = !am_sender;
 		am_server = 1;		
 
 		if (dup2(to_child_pipe[0], STDIN_FILENO) < 0 ||

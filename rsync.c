@@ -226,6 +226,7 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 
 void sig_int(void)
 {
+	rprintf(FINFO,"\nrsync.c:sig_int() called.\n");
 	exit_cleanup(RERR_SIGNAL);
 }
 

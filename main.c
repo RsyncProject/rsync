@@ -135,8 +135,9 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 	extern int local_server;
 	extern char *rsync_path;
 	extern int blocking_io;
+	extern int read_batch;
 
-	if (!local_server) {
+	if (!read_batch && !local_server) { /* dw -- added read_batch */
 		if (!cmd)
 			cmd = getenv(RSYNC_RSH_ENV);
 		if (!cmd)
@@ -187,6 +188,8 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 	}
 
 	if (local_server) {
+		if (read_batch)
+		    create_flist_from_batch();
 		ret = local_child(argc, args, f_in, f_out);
 	} else {
 		ret = piped_child(args,f_in,f_out);
@@ -399,6 +402,9 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	extern int am_daemon;
 	extern int module_id;
 	extern int am_sender;
+	extern int read_batch;   /* dw */
+	extern int write_batch;  /* dw */
+	extern struct file_list *batch_flist;  /* dw */
 
 	if (verbose > 2)
 		rprintf(FINFO,"server_recv(%d) starting pid=%d\n",argc,(int)getpid());
@@ -424,7 +430,10 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	if (delete_mode && !delete_excluded)
 		recv_exclude_list(f_in);
 
-	flist = recv_file_list(f_in);
+	if (read_batch) /*  dw  */
+	    flist = batch_flist;
+	else
+	    flist = recv_file_list(f_in);
 	if (!flist) {
 		rprintf(FERROR,"server_recv: recv_file_list error\n");
 		exit_cleanup(RERR_FILESELECT);
@@ -448,6 +457,7 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 	extern int cvs_exclude;
 	extern int am_sender;
 	extern int remote_version;
+	extern int read_batch; /* dw */
 
 	setup_protocol(f_out, f_in);
 
@@ -458,9 +468,11 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 		io_start_multiplex_out(f_out);
 
 	if (am_sender) {
-		recv_exclude_list(f_in);
-		if (cvs_exclude)
+		if (!read_batch) { /* dw */
+		    recv_exclude_list(f_in);
+		    if (cvs_exclude)
 			add_cvs_excludes();
+		}
 		do_server_sender(f_in, f_out, argc, argv);
 	} else {
 		do_server_recv(f_in, f_out, argc, argv);
@@ -481,8 +493,13 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	extern int am_sender;
 	extern int remote_version;
 	extern pid_t cleanup_child_pid;
+	extern int write_batch; /* dw */
+	extern int read_batch; /* dw */
+	extern struct file_list *batch_flist; /*  dw */
 
 	cleanup_child_pid = pid;
+	if (read_batch)
+	    flist = batch_flist;  /* dw */
 
 	set_nonblocking(f_in);
 	set_nonblocking(f_out);
@@ -500,7 +517,8 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			add_cvs_excludes();
 		if (delete_mode && !delete_excluded) 
 			send_exclude_list(f_out);
-		flist = send_file_list(f_out,argc,argv);
+		if (!read_batch) /*  dw -- don't write to pipe */
+		    flist = send_file_list(f_out,argc,argv);
 		if (verbose > 3) 
 			rprintf(FINFO,"file list sent\n");
 
@@ -524,7 +542,8 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		list_only = 1;
 	}
 	
-	send_exclude_list(f_out);
+	if (!write_batch) /* dw */
+	    send_exclude_list(f_out);
 	
 	flist = recv_file_list(f_in);
 	if (!flist || flist->count == 0) {
@@ -584,6 +603,7 @@ static int start_client(int argc, char *argv[])
 	extern int rsync_port;
 	extern int whole_file;
 	char *argv0 = strdup(argv[0]);
+	extern int read_batch;
 
 	if (strncasecmp(URL_PREFIX, argv0, strlen(URL_PREFIX)) == 0) {
 		char *host, *path;
@@ -604,7 +624,8 @@ static int start_client(int argc, char *argv[])
 		return start_socket_client(host, path, argc-1, argv+1);
 	}
 
-	p = find_colon(argv0);
+	if (!read_batch) { /* dw */
+	    p = find_colon(argv[0]);
 
 	if (p) {
 		if (p[1] == ':') {
@@ -651,7 +672,12 @@ static int start_client(int argc, char *argv[])
 		}
 		argc--;
 	}
-	
+	} else {
+	    am_sender = 1;  /*  dw */
+	    local_server = 1;  /* dw */
+	    shell_path = argv[argc-1];  /* dw */
+	}
+
 	if (shell_machine) {
 		p = strchr(shell_machine,'@');
 		if (p) {
@@ -714,6 +740,13 @@ int main(int argc,char *argv[])
 	extern int am_daemon;
 	extern int am_server;
 	int ret;
+	extern int read_batch;   /*  dw */
+	extern int write_batch;  /*  dw */
+	extern char *batch_ext;   /*  dw */
+	int i;          /*   dw */
+	int orig_argc;  /* dw */
+
+	orig_argc = argc;   /* dw */
 
 	signal(SIGUSR1, sigusr1_handler);
 	signal(SIGUSR2, sigusr2_handler);
@@ -750,6 +783,15 @@ int main(int argc,char *argv[])
 	   work when there are other child processes.  Also, on all systems
 	   that implement getcwd that way "pwd" can't be found after chroot. */
 	push_dir(NULL,0);
+
+	if (write_batch) { /* dw */
+	    create_batch_file_ext();
+	    write_batch_argvs_file(orig_argc, argc, argv);
+	}
+
+	if (read_batch) { /* dw */
+	    set_batch_file_ext(batch_ext);
+	}
 
 	if (am_daemon) {
 		return daemon_main();

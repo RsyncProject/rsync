@@ -36,6 +36,9 @@ extern int checksum_seed;
 extern int remote_version;
 extern int verbose;
 
+extern int read_batch;  /* dw */
+extern int write_batch;  /* dw */
+
 void setup_protocol(int f_out,int f_in)
 {
 	if (remote_version == 0) {
@@ -57,6 +60,9 @@ void setup_protocol(int f_out,int f_in)
 	
 	if (remote_version >= 12) {
 		if (am_server) {
+		    if (read_batch || write_batch) /* dw */
+			checksum_seed = 32761;
+		    else
 			checksum_seed = time(NULL);
 			write_int(f_out,checksum_seed);
 		} else {
