@@ -30,6 +30,7 @@
 
 #define _Z_UTIL_H
 
+#include "../rsync.h"
 #include "zlib.h"
 
 #ifndef local
@@ -80,22 +81,8 @@ extern char *z_errmsg[]; /* indexed by 1-zlib_error */
 /* The minimum and maximum match lengths */
 
          /* functions */
-
-#if defined(KERNEL) || defined(_KERNEL)
-#  define zmemcpy(d, s, n)	bcopy((s), (d), (n))
-#  define zmemzero		bzero
-#else
-#if defined(STDC) && !defined(HAVE_MEMCPY) && !defined(NO_MEMCPY)
-#  define HAVE_MEMCPY
-#endif
-#ifdef HAVE_MEMCPY
-#    define zmemcpy memcpy
-#    define zmemzero(dest, len) memset(dest, 0, len)
-#else
-   extern void zmemcpy  OF((Bytef* dest, Bytef* source, uInt len));
-   extern void zmemzero OF((Bytef* dest, uInt len));
-#endif
-#endif
+#define zmemcpy(d, s, n)	bcopy((s), (d), (n))
+#define zmemzero		bzero
 
 /* Diagnostic functions */
 #ifdef DEBUG_ZLIB
@@ -468,7 +455,7 @@ local void ct_stored_type_only OF((deflate_state *s));
 
 /* From: deflate.c,v 1.8 1995/05/03 17:27:08 jloup Exp */
 
-local char zlib_copyright[] = " deflate Copyright 1995 Jean-loup Gailly ";
+char zlib_copyright[] = " deflate Copyright 1995 Jean-loup Gailly ";
 /*
   If you use the zlib library in a product, an acknowledgment is welcome
   in the documentation of your product. If for some reason you cannot
@@ -535,7 +522,7 @@ local void lm_init       OF((deflate_state *s));
 local int longest_match  OF((deflate_state *s, IPos cur_match));
 local void putShortMSB   OF((deflate_state *s, uInt b));
 local void flush_pending OF((z_stream *strm));
-local int read_buf       OF((z_stream *strm, charf *buf, unsigned size));
+local int zread_buf       OF((z_stream *strm, charf *buf, unsigned size));
 #ifdef ASMV
       void match_init OF((void)); /* asm code initialization */
 #endif
@@ -874,7 +861,7 @@ int deflateEnd (strm)
  * Read a new buffer from the current input stream, update the adler32
  * and total number of bytes read.
  */
-local int read_buf(strm, buf, size)
+local int zread_buf(strm, buf, size)
     z_stream *strm;
     charf *buf;
     unsigned size;
@@ -1179,7 +1166,7 @@ local void fill_window(s)
          */
         Assert(more >= 2, "more < 2");
 
-        n = read_buf(s->strm, (charf *)s->window + s->strstart + s->lookahead,
+        n = zread_buf(s->strm, (charf *)s->window + s->strstart + s->lookahead,
                      more);
         s->lookahead += n;
 
@@ -1671,7 +1658,6 @@ local void send_bits(s, value, length)
 #endif /* DEBUG_ZLIB */
 
 
-#define MAX(a,b) (a >= b ? a : b)
 /* the arguments must not have side effects */
 
 /* ===========================================================================

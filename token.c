@@ -367,8 +367,6 @@ int recv_token(int f,char **data)
  */
 void see_token(char *data, int toklen)
 {
-    int r;
-
     if (do_compression)
 	see_deflate_token(data, toklen);
 }
