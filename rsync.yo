@@ -447,15 +447,6 @@ This option can be dangerous if used incorrectly!  It is a very good idea
 to run first using the dry run option (-n) to see what files would be
 deleted to make sure important files aren't listed.
 
-rsync 1.6.4 changed the behavior of --delete to make it less
-dangerous.  rsync now only scans directories on the receiving side
-that are explicitly transferred from the sending side.  Only files in
-these directories are deleted.
-
-Still, it is probably easy to get burnt with this option.  The moral
-of the story is to use the -n option until you get used to the
-behavior of --delete.
-
 If the sending side detects any IO errors then the deletion of any
 files at the destination will be automatically disabled. This is to
 prevent temporary filesystem failures (such as NFS errors) on the
@@ -620,6 +611,9 @@ algorithm is for your data.
 dit(bf(--progress)) This option tells rsync to print information
 showing the progress of the transfer. This gives a bored user
 something to watch.
+
+This option is normally combined with -v. Using this option without
+the -v option will produce weird results on your display.
 
 dit(bf(--password-file)) This option allows you to provide a password
 in a file for accessing a remote rsync server. Note that this option
