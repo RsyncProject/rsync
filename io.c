@@ -76,11 +76,11 @@ int batch_gen_fd = -1;
 const char *io_write_phase = phase_unknown;
 const char *io_read_phase = phase_unknown;
 
-/* Ignore EOF errors while reading a module listing if the remote
- * version is 24 or less.  Also used by the receiver when it is
- * reading a potential end-of-transfer keep-alive message that
- * may never come. */
-int kludge_around_eof = False;
+/* Ignore an EOF error if non-zero.  We exit if the value is 1 (used while
+ * reading a module listing if the remote version is 24 or less) or go into a
+ * sleep loop if the value is 2 (used by the receiver when it is reading a
+ * potential end-of-transfer keep-alive message that may never come). */
+int kluge_around_eof = 0;
 
 int msg_fd_in = -1;
 int msg_fd_out = -1;
@@ -372,12 +372,16 @@ void io_set_filesfrom_fds(int f_in, int f_out)
  * rsync <2.4.6 sending a list of modules on a server, since the list
  * is terminated by closing the socket. So, for the section of the
  * program where that is a problem (start_socket_client),
- * kludge_around_eof is True and we just exit.
+ * kluge_around_eof is True and we just exit.
  */
 static void whine_about_eof(int fd)
 {
-	if (kludge_around_eof && fd == sock_f_in)
-		exit_cleanup(0);
+	if (kluge_around_eof && fd == sock_f_in) {
+		if (kluge_around_eof > 0)
+			exit_cleanup(0);
+		while (1)
+			msleep(20);
+	}
 
 	rprintf(FERROR, RSYNC_NAME ": connection unexpectedly closed "
 		"(%.0f bytes received so far) [%s]\n",
