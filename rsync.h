@@ -42,13 +42,15 @@
 
 #define FLAG_DELETE (1<<0)
 #define SAME_MODE (1<<1)
-#define SAME_RDEV (1<<2)
+#define EXTENDED_FLAGS (1<<2)
+#define OLD_SAME_RDEV EXTENDED_FLAGS
 #define SAME_UID (1<<3)
 #define SAME_GID (1<<4)
 #define SAME_DIR (1<<5)
 #define SAME_NAME SAME_DIR
 #define LONG_NAME (1<<6)
 #define SAME_TIME (1<<7)
+#define SAME_HIGH_RDEV (1<<8)
 
 /* update this if you make incompatible changes */
 #define PROTOCOL_VERSION 27
