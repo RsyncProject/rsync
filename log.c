@@ -182,7 +182,8 @@ void rwrite(enum logcode code, char *buf, int len)
 			send_msg((enum msgcode)code, buf, len);
 			return;
 		}
-		if (io_multiplex_write((enum msgcode)code, buf, len))
+		if (!am_daemon
+		    && io_multiplex_write((enum msgcode)code, buf, len))
 			return;
 	}
 
