@@ -64,12 +64,9 @@ void write_batch_argvs_file(int argc, char *argv[])
 	char buff2[MAXPATHLEN + 6];
 	char filename[MAXPATHLEN];
 
-	/* Set up file extension */
-	strlcpy(filename, batch_prefix, sizeof(filename));
-	strlcat(filename, rsync_argvs_file, sizeof(filename));
+	snprintf(filename, sizeof filename, "%s%s",
+		 batch_prefix, rsync_argvs_file);
 
-	/* Open batch argvs file for writing;
-	 * create it if it doesn't exist. */
 	f = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 		    S_IREAD | S_IWRITE | S_IEXEC);
 	if (f < 0) {
@@ -287,8 +284,8 @@ void write_batch_delta_file(char *buff, int bytes_to_write)
 	char filename[MAXPATHLEN];
 
 	if (f_delta < 0) {
-		strlcpy(filename, batch_prefix, sizeof(filename));
-		strlcat(filename, rsync_delta_file, sizeof(filename));
+		snprintf(filename, sizeof filename, "%s%s",
+			 batch_prefix, rsync_delta_file);
 
 		f_delta = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 				  S_IREAD | S_IWRITE);
@@ -319,8 +316,8 @@ int read_batch_delta_file(char *buff, int len)
 	char filename[MAXPATHLEN];
 
 	if (f_delta < 0) {
-		strlcpy(filename, batch_prefix, sizeof(filename));
-		strlcat(filename, rsync_delta_file, sizeof(filename));
+		snprintf(filename, sizeof filename, "%s%s",
+			 batch_prefix, rsync_delta_file);
 
 		f_delta = do_open(filename, O_RDONLY, 0);
 		if (f_delta < 0) {
