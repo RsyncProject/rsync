@@ -135,6 +135,7 @@ void init_hard_links(struct file_list *flist)
 
 int hard_link_check(struct file_struct *file, int skip)
 {
+#if SUPPORT_HARD_LINKS
 	if (!hlink_list || !file->link_u.links)
 		return 0;
 	if (skip && !(file->flags & FLAG_HLINK_EOL))
@@ -146,6 +147,7 @@ int hard_link_check(struct file_struct *file, int skip)
 		}
 		return 1;
 	}
+#endif
 	return 0;
 }
 
