@@ -252,7 +252,7 @@ typedef struct deflate_state {
      *   hash_shift * MIN_MATCH >= hash_bits
      */
 
-    long block_start;
+    Long block_start;
     /* Window position at the beginning of the current output block. Gets
      * negative when the window is moved backwards.
      */
@@ -1122,7 +1122,7 @@ local void fill_window(s)
             s->match_start -= wsize;
             s->strstart    -= wsize; /* we now have strstart >= MAX_DIST */
 
-            s->block_start -= (long) wsize;
+            s->block_start -= (Long) wsize;
 
             /* Slide the hash table (could be avoided with 32 bit values
                at the expense of memory usage):
@@ -1187,7 +1187,7 @@ local void fill_window(s)
 #define FLUSH_BLOCK_ONLY(s, flush) { \
    ct_flush_block(s, (s->block_start >= 0L ? \
            (charf *)&s->window[(unsigned)s->block_start] : \
-           (charf *)Z_NULL), (long)s->strstart - s->block_start, (flush)); \
+           (charf *)Z_NULL), (Long)s->strstart - s->block_start, (flush)); \
    s->block_start = s->strstart; \
    flush_pending(s->strm); \
    Tracev((stderr,"[FLUSH]")); \
@@ -1907,8 +1907,8 @@ local void gen_bitlen(s, desc)
             if (m > max_code) continue;
             if (tree[m].Len != (unsigned) bits) {
                 Trace((stderr,"code %d bits %d->%d\n", m, tree[m].Len, bits));
-                s->opt_len += ((long)bits - (long)tree[m].Len)
-                              *(long)tree[m].Freq;
+                s->opt_len += ((Long)bits - (Long)tree[m].Len)
+                              *(Long)tree[m].Freq;
                 tree[m].Len = (ush)bits;
             }
             n--;
@@ -4578,8 +4578,8 @@ uLong adler32(adler, buf, len)
     Bytef *buf;
     uInt len;
 {
-    unsigned long s1 = adler & 0xffff;
-    unsigned long s2 = (adler >> 16) & 0xffff;
+    uLong s1 = adler & 0xffff;
+    uLong s2 = (adler >> 16) & 0xffff;
     int k;
 
     if (buf == Z_NULL) return 1L;
