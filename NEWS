@@ -18,6 +18,9 @@ Changes since version 2.5.6:
       corrupting data and falling back using the whole md4
       checksums. (J.W. Schultz, Donovan Baarda)
 
+    * The --stats option no longer includes the (debug) malloc summary
+      unless the verbose option was specified at least twice.
+
   BUG FIXES:
 
     * for protocol version >= 27, mdfour_tail() is called when the
