@@ -132,7 +132,7 @@ int do_mkstemp(char *template, mode_t perms)
 	}
 #else
 	if (!mktemp(template)) return -1;
-	return open(template, O_RDWR|O_EXCL|O_CREAT, perms);
+	return do_open(template, O_RDWR|O_EXCL|O_CREAT, perms);
 #endif
 }
 
