@@ -574,7 +574,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 		len -= n;
 		ret += n;
 
-		if (io_timeout && fd == sock_f_in)
+		if (fd == sock_f_in && (io_timeout || am_generator))
 			last_io = time(NULL);
 	}
 
@@ -662,6 +662,13 @@ void io_end_buffering(void)
 		free(iobuf_out);
 		iobuf_out = NULL;
 	}
+}
+
+
+void maybe_flush_socket(void)
+{
+	if (iobuf_out && iobuf_out_cnt && time(NULL) - last_io >= 5)
+		io_flush(NORMAL_FLUSH);
 }
 
 
@@ -1089,7 +1096,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 		total += ret;
 
 		if (fd == sock_f_out) {
-			if (io_timeout)
+			if (io_timeout || am_generator)
 				last_io = time(NULL);
 			sleep_for_bwlimit(ret);
 		}
