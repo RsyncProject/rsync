@@ -1,0 +1,39 @@
+#! /bin/sh
+
+# Copyright (C) 2004 by Wayne Davison <wayned@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test that the --backup option works right.
+
+. "$suitedir/rsync.fns"
+
+bakdir="$tmpdir/chk"
+
+mkdir "$fromdir" "$bakdir"
+name1="$fromdir/name1"
+name2="$fromdir/name2"
+echo "This is the file" > "$name1"
+echo "This is the other file" > "$name2"
+
+checkit "$RSYNC -avv --backup --backup-dir=\"$bakdir\" \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+
+$RSYNC -avv --backup "$todir/" "$chkdir/"
+
+echo "Extending the file" >> "$name1"
+echo "Extending the other file" >> "$name2"
+
+checkit "$RSYNC -avv --backup --backup-dir=\"$bakdir\" \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+
+diff -ru "$chkdir" "$bakdir"
+
+echo "Extending the file again" >> "$name1"
+echo "Extending the other file again" >> "$name2"
+
+checkit "$RSYNC -avv --inplace --backup --backup-dir=\"$bakdir\" \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+
+diff -ru "$chkdir" "$bakdir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0
