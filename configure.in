@@ -57,7 +57,8 @@ AC_CHECK_FUNCS(strlcat strlcpy)
 
 AC_CACHE_CHECK([for working fnmatch],rsync_cv_HAVE_FNMATCH,[
 AC_TRY_RUN([#include <fnmatch.h>
-main() { exit(fnmatch("*.o", "x.o", FNM_PATHNAME) == 0? 0: 1); }],
+main() { exit((fnmatch("*.o", "x.o", FNM_PATHNAME) == 0 &&
+               fnmatch("a/b/*", "a/b/c/d", FNM_PATHNAME) != 0) ? 0: 1); }],
 rsync_cv_HAVE_FNMATCH=yes,rsync_cv_HAVE_FNMATCH=no,rsync_cv_HAVE_FNMATCH=cross)])
 if test x"$rsync_cv_HAVE_FNMATCH" = x"yes"; then
     AC_DEFINE(HAVE_FNMATCH)
