@@ -259,7 +259,7 @@ void usage(enum logcode F)
   rprintf(F," -W, --whole-file            copy whole files, no incremental checks\n");
   rprintf(F,"     --no-whole-file         turn off --whole-file\n");
   rprintf(F," -x, --one-file-system       don't cross filesystem boundaries\n");
-  rprintf(F," -B, --block-size=SIZE       checksum blocking size (default %d)\n",BLOCK_SIZE);
+  rprintf(F," -B, --block-size=SIZE       force a fixed checksum block-size\n");
   rprintf(F," -e, --rsh=COMMAND           specify the remote shell\n");
   rprintf(F,"     --rsync-path=PATH       specify path to rsync on the remote machine\n");
   rprintf(F,"     --existing              only update files that already exist\n");
@@ -660,10 +660,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 #endif
 
-	if (block_size > MAX_MAP_SIZE) {
+	if (block_size > MAX_BLOCK_SIZE) {
 		rprintf(FINFO, "limiting block-size to %d bytes\n",
-			MAX_MAP_SIZE);
-		block_size = MAX_MAP_SIZE;
+			MAX_BLOCK_SIZE);
+		block_size = MAX_BLOCK_SIZE;
 	}
 
 	if (write_batch && read_batch) {
