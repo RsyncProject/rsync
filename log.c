@@ -63,12 +63,14 @@ void log_open(void)
 	static int initialised;
 	int options = LOG_PID;
 	time_t t;
+	char *logf;
 
 	if (initialised) return;
 	initialised = 1;
 
-	if (lp_log_file()) {
-		logfile = fopen(lp_log_file(), "a");
+	logf = lp_log_file();
+	if (logf && *logf) {
+		logfile = fopen(logf, "a");
 		return;
 	}
 

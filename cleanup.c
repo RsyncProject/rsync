@@ -51,8 +51,12 @@ void exit_cleanup(int code)
 	if (code) {
 		kill_all(SIGUSR1);
 	}
-	if ((cleanup_pid != 0) && (cleanup_pid == (int) getpid()))
-		unlink(lp_pid_file());
+	if ((cleanup_pid != 0) && (cleanup_pid == (int) getpid())) {
+		char *pidf = lp_pid_file();
+		if (pidf && *pidf) {
+			unlink(lp_pid_file());
+		}
+	}
 	exit(code);
 }
 

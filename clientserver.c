@@ -353,7 +353,7 @@ static int start_daemon(int fd)
 	io_printf(fd,"@RSYNCD: %d\n", PROTOCOL_VERSION);
 
 	motd = lp_motd_file();
-	if (*motd) {
+	if (motd && *motd) {
 		FILE *f = fopen(motd,"r");
 		while (f && !feof(f)) {
 			int len = fread(line, 1, sizeof(line)-1, f);
