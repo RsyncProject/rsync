@@ -408,7 +408,7 @@ static struct poptOption long_options[] = {
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
 #endif
-  POPT_TABLEEND
+  {0,0,0,0, 0, 0, 0}
 };
 
 
