@@ -330,7 +330,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	char fname[MAXPATHLEN];
 	int l1, l2;
 
-	if (f == -1)
+	if (f < 0)
 		return;
 
 	if (!file) {
@@ -975,7 +975,8 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 	struct file_struct *file;
 	char fbuf[MAXPATHLEN];
 
-	if (!(file = make_file(fname, flist, ALL_FILTERS)))
+	file = make_file(fname, flist, f == -2 ? SERVER_FILTERS : ALL_FILTERS);
+	if (!file)
 		return;
 
 	maybe_emit_filelist_progress(flist);
@@ -1010,7 +1011,9 @@ void send_file_name(int f, struct file_list *flist, char *fname,
  * or a number >= 0 indicating how many levels of recursion we will allow.
  * This function is normally called by the sender, but the receiving side
  * also calls it from delete_in_dir() with f set to -1 so that we just
- * construct the file list in memory without sending it over the wire. */
+ * construct the file list in memory without sending it over the wire.  Also,
+ * get_dirlist() calls this with f set to -2, which indicates that local
+ * filter rules should be ignored. */
 static void send_directory(int f, struct file_list *flist,
 			   char *fbuf, unsigned int len)
 {
@@ -1315,7 +1318,7 @@ struct file_list *recv_file_list(int f)
 
 	clean_flist(flist, relative_paths, 1);
 
-	if (f != -1) {
+	if (f >= 0) {
 		/* Now send the uid/gid list. This was introduced in
 		 * protocol version 15 */
 		recv_uid_list(f, flist);
@@ -1751,6 +1754,25 @@ static int is_backup_file(char *fn)
 {
 	int k = strlen(fn) - backup_suffix_len;
 	return k > 0 && strcmp(fn+k, backup_suffix) == 0;
+}
+
+struct file_list *get_dirlist(const char *dirname, int ignore_filter_rules)
+{
+	struct file_list *dirlist;
+	char dirbuf[MAXPATHLEN];
+	int dlen;
+	int save_recurse = recurse;
+
+	dlen = strlcpy(dirbuf, dirname, MAXPATHLEN);
+	if (dlen >= MAXPATHLEN)
+		return NULL;
+
+	dirlist = flist_new(WITHOUT_HLINK, "get_dirlist");
+	recurse = 0;
+	send_directory(ignore_filter_rules ? -2 : -1, dirlist, dirbuf, dlen);
+	recurse = save_recurse;
+
+	return dirlist;
 }
 
 
