@@ -47,6 +47,7 @@ extern char *files_from;
 extern int filesfrom_fd;
 
 extern int one_file_system;
+extern int keep_dirlinks;
 extern int preserve_links;
 extern int preserve_hard_links;
 extern int preserve_perms;
@@ -59,6 +60,9 @@ extern int copy_links;
 extern int copy_unsafe_links;
 extern int protocol_version;
 extern int sanitize_paths;
+extern int delete_excluded;
+extern int orig_umask;
+extern int list_only;
 
 extern int read_batch;
 extern int write_batch;
@@ -174,7 +178,7 @@ int readlink_stat(const char *path, STRUCT_STAT *buffer, char *linkbuf)
 #if SUPPORT_LINKS
 	if (copy_links)
 		return do_stat(path, buffer);
-	if (do_lstat(path, buffer) == -1)
+	if (link_stat(path, buffer, keep_dirlinks) < 0)
 		return -1;
 	if (S_ISLNK(buffer->st_mode)) {
 		int l = readlink((char *)path, linkbuf, MAXPATHLEN - 1);
@@ -195,12 +199,19 @@ int readlink_stat(const char *path, STRUCT_STAT *buffer, char *linkbuf)
 #endif
 }
 
-int link_stat(const char *path, STRUCT_STAT *buffer)
+int link_stat(const char *path, STRUCT_STAT *buffer, int follow_dirlinks)
 {
 #if SUPPORT_LINKS
 	if (copy_links)
 		return do_stat(path, buffer);
-	return do_lstat(path, buffer);
+	if (do_lstat(path, buffer) < 0)
+		return -1;
+	if (follow_dirlinks && S_ISLNK(buffer->st_mode)) {
+		STRUCT_STAT st;
+		if (do_stat(path, &st) == 0 && S_ISDIR(st.st_mode))
+			*buffer = st;
+	}
+	return 0;
 #else
 	return do_stat(path, buffer);
 #endif
@@ -513,7 +524,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 
 
 void receive_file_entry(struct file_struct **fptr, unsigned short flags,
-    struct file_list *flist, int f)
+			struct file_list *flist, int f)
 {
 	static time_t modtime;
 	static mode_t mode;
@@ -707,7 +718,6 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 	}
 
 	if (!preserve_perms) {
-		extern int orig_umask;
 		/* set an appropriate set of permissions based on original
 		 * permissions and umask. This emulates what GNU cp does */
 		file->mode &= ~orig_umask;
@@ -730,8 +740,8 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
  * statting directories if we're not recursing, but this is not a very
  * important case.  Some systems may not have d_type.
  **/
-struct file_struct *make_file(char *fname,
-    struct file_list *flist, int exclude_level)
+struct file_struct *make_file(char *fname, struct file_list *flist,
+			      int exclude_level)
 {
 	static char *lastdir;
 	static int lastdir_len = -1;
@@ -928,7 +938,6 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 {
 	struct file_struct *file;
 	char fbuf[MAXPATHLEN];
-	extern int delete_excluded;
 
 	/* f is set to -1 when calculating deletion file list */
 	file = make_file(fname, flist,
@@ -1092,7 +1101,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			}
 		}
 
-		if (link_stat(fname, &st) != 0) {
+		if (link_stat(fname, &st, keep_dirlinks) != 0) {
 			if (f != -1) {
 				io_error |= IOERR_GENERAL;
 				rsyserr(FERROR, errno, "link_stat %s failed",
@@ -1239,7 +1248,6 @@ struct file_list *recv_file_list(int f)
 	struct file_list *flist;
 	unsigned short flags;
 	int64 start_read;
-	extern int list_only;
 
 	if (show_filelist_p())
 		start_filelist_progress("receiving file list");
