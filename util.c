@@ -112,7 +112,7 @@ char *map_file(int fd,off_t len)
 
 void unmap_file(char *buf,off_t len)
 {
-  if (len > 0)
+  if (len > 0 && buf)
     munmap(buf,len);
 }
 
