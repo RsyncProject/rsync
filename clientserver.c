@@ -72,19 +72,19 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	int fd, ret;
 	char *p, *user = NULL;
 
-	/* this is redundant with code in start_inband_exchange(), but
-	 * this short-circuits a problem before we open a socket, and
-	 * the extra check won't hurt */
+	/* This is redundant with code in start_inband_exchange(), but this
+	 * short-circuits a problem in the client before we open a socket,
+	 * and the extra check won't hurt. */
 	if (*path == '/') {
-		rprintf(FERROR,"ERROR: The remote path must start with a module name not a /\n");
+		rprintf(FERROR,
+			"ERROR: The remote path must start with a module name not a /\n");
 		return -1;
 	}
 
-	p = strchr(host, '@');
-	if (p) {
+	if ((p = strchr(host, '@')) != NULL) {
 		user = host;
 		host = p+1;
-		*p = 0;
+		*p = '\0';
 	}
 
 	fd = open_socket_out_wrapped(host, rsync_port, bind_address,
@@ -109,7 +109,8 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out, int argc)
 		list_only = 1;
 
 	if (*path == '/') {
-		rprintf(FERROR, "ERROR: The remote path must start with a module name\n");
+		rprintf(FERROR,
+			"ERROR: The remote path must start with a module name\n");
 		return -1;
 	}
 
@@ -179,7 +180,7 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out, int argc)
 		}
 
 		if (strncmp(line, "@ERROR", 6) == 0) {
-			rprintf(FERROR,"%s\n", line);
+			rprintf(FERROR, "%s\n", line);
 			/* This is always fatal; the server will now
 			 * close the socket. */
 			return RERR_STARTCLIENT;
@@ -223,7 +224,7 @@ static int rsync_module(int f_in, int f_out, int i)
 	char *request = NULL;
 
 	if (!allow_access(addr, host, lp_hosts_allow(i), lp_hosts_deny(i))) {
-		rprintf(FERROR,"rsync denied on module %s from %s (%s)\n",
+		rprintf(FLOG, "rsync denied on module %s from %s (%s)\n",
 			name, host, addr);
 		io_printf(f_out, "@ERROR: access denied to %s from %s (%s)\n",
 			  name, host, addr);
@@ -237,12 +238,12 @@ static int rsync_module(int f_in, int f_out, int i)
 
 	if (!claim_connection(lp_lock_file(i), lp_max_connections(i))) {
 		if (errno) {
-			rsyserr(FERROR, errno, "failed to open lock file %s",
+			rsyserr(FLOG, errno, "failed to open lock file %s",
 				lp_lock_file(i));
 			io_printf(f_out, "@ERROR: failed to open lock file %s\n",
 				  lp_lock_file(i));
 		} else {
-			rprintf(FERROR,"max connections (%d) reached\n",
+			rprintf(FLOG, "max connections (%d) reached\n",
 				lp_max_connections(i));
 			io_printf(f_out, "@ERROR: max connections (%d) reached - try again later\n",
 				lp_max_connections(i));
@@ -253,7 +254,7 @@ static int rsync_module(int f_in, int f_out, int i)
 	auth_user = auth_server(f_in, f_out, i, addr, "@RSYNCD: AUTHREQD ");
 
 	if (!auth_user) {
-		rprintf(FERROR,"auth failed on module %s from %s (%s)\n",
+		rprintf(FLOG, "auth failed on module %s from %s (%s)\n",
 			name, host, addr);
 		io_printf(f_out, "@ERROR: auth failed on module %s\n", name);
 		return -1;
@@ -267,7 +268,7 @@ static int rsync_module(int f_in, int f_out, int i)
 		p = lp_uid(i);
 		if (!name_to_uid(p, &uid)) {
 			if (!isdigit(*(unsigned char *)p)) {
-				rprintf(FERROR,"Invalid uid %s\n", p);
+				rprintf(FLOG, "Invalid uid %s\n", p);
 				io_printf(f_out, "@ERROR: invalid uid %s\n", p);
 				return -1;
 			}
@@ -277,7 +278,7 @@ static int rsync_module(int f_in, int f_out, int i)
 		p = lp_gid(i);
 		if (!name_to_gid(p, &gid)) {
 			if (!isdigit(*(unsigned char *)p)) {
-				rprintf(FERROR,"Invalid gid %s\n", p);
+				rprintf(FLOG, "Invalid gid %s\n", p);
 				io_printf(f_out, "@ERROR: invalid gid %s\n", p);
 				return -1;
 			}
@@ -329,20 +330,20 @@ static int rsync_module(int f_in, int f_out, int i)
 		 * in which case we fail.
 		 */
 		if (chroot(lp_path(i))) {
-			rsyserr(FERROR, errno, "chroot %s failed", lp_path(i));
+			rsyserr(FLOG, errno, "chroot %s failed", lp_path(i));
 			io_printf(f_out, "@ERROR: chroot failed\n");
 			return -1;
 		}
 
 		if (!push_dir("/")) {
-			rsyserr(FERROR, errno, "chdir %s failed\n", lp_path(i));
+			rsyserr(FLOG, errno, "chdir %s failed\n", lp_path(i));
 			io_printf(f_out, "@ERROR: chdir failed\n");
 			return -1;
 		}
 
 	} else {
 		if (!push_dir(lp_path(i))) {
-			rsyserr(FERROR, errno, "chdir %s failed\n", lp_path(i));
+			rsyserr(FLOG, errno, "chdir %s failed\n", lp_path(i));
 			io_printf(f_out, "@ERROR: chdir failed\n");
 			return -1;
 		}
@@ -361,7 +362,7 @@ static int rsync_module(int f_in, int f_out, int i)
 		 * all their supplementary groups. */
 
 		if (setgid(gid)) {
-			rsyserr(FERROR, errno, "setgid %d failed", (int)gid);
+			rsyserr(FLOG, errno, "setgid %d failed", (int)gid);
 			io_printf(f_out, "@ERROR: setgid failed\n");
 			return -1;
 		}
@@ -369,14 +370,14 @@ static int rsync_module(int f_in, int f_out, int i)
 		/* Get rid of any supplementary groups this process
 		 * might have inheristed. */
 		if (setgroups(1, &gid)) {
-			rsyserr(FERROR, errno, "setgroups failed");
+			rsyserr(FLOG, errno, "setgroups failed");
 			io_printf(f_out, "@ERROR: setgroups failed\n");
 			return -1;
 		}
 #endif
 
 		if (setuid(uid)) {
-			rsyserr(FERROR, errno, "setuid %d failed", (int)uid);
+			rsyserr(FLOG, errno, "setuid %d failed", (int)uid);
 			io_printf(f_out, "@ERROR: setuid failed\n");
 			return -1;
 		}
@@ -446,19 +447,17 @@ static int rsync_module(int f_in, int f_out, int i)
 		verbose = lp_max_verbosity();
 #endif
 
-	if (protocol_version < 23) {
-		if (protocol_version == 22 || am_sender)
-			io_start_multiplex_out(f_out);
+	if (protocol_version < 23
+	    && (protocol_version == 22 || am_sender))
+		io_start_multiplex_out(f_out);
+	else if (!ret) {
+		/* We have to get I/O multiplexing started so that we can
+		 * get the error back to the client.  This means getting
+		 * the protocol setup finished first in later versions. */
+		setup_protocol(f_out, f_in);
+		io_start_multiplex_out(f_out);
 	}
 
-	/* For later protocol versions, we don't start multiplexing
-	 * until we've configured nonblocking in start_server.  That
-	 * means we're in a sticky situation now: there's no way to
-	 * convey errors to the client. */
-
-	/* FIXME: Hold off on reporting option processing errors until
-	 * we've set up nonblocking and multiplexed IO and can get the
-	 * message back to them. */
 	if (!ret) {
 		option_error();
 		exit_cleanup(RERR_UNSUPPORTED);
