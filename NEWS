@@ -15,10 +15,10 @@ Changes since 2.6.0:
       specified, and when the group of the source can't be used on
       the destination and -g was specified.  (Wayne Davison)
 
-    * Fixed the caching of the full PATH/NAME strings to avoid the
-      current name getting lost if too many other names were
-      expanded during the processing (such as when -H was
-      specified).  (Wayne Davison)
+    * Fixed a bug in the handling of -H (hard-links) that might
+      cause the expanded PATH/NAME value of the current item to
+      get overwritten (due to an expanded-name caching bug).
+      (Wayne Davison)
       
     * Keep per-file track of the sending of literal data with
       --partial so that an interrupted transfer doesn't keep a
@@ -28,8 +28,7 @@ Changes since 2.6.0:
   INTERNAL:
 
     * Most of the I/O is now buffered, which results in a pretty
-      large speedup when running under MS Windows.  (Craig Barratt
-      and Wayne Davison)
+      large speedup when running under MS Windows.  (Craig Barratt)
 
     * Optimizations to the name-handling/comparing code have made
       some significant reductions in user CPU time for large file
