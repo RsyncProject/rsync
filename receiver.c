@@ -303,6 +303,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	int phase=0;
 	int recv_ok;
 	extern struct stats stats;		
+	extern int preserve_perms;
 	struct stats initial_stats;
 
 	if (verbose > 2) {
@@ -381,6 +382,13 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			receive_data(f_in,NULL,-1,NULL,file->length);
 			close(fd1);
 			continue;
+		}
+
+		if (fd1 != -1 && !preserve_perms) {
+			/* if the file exists already and we aren't perserving
+			   presmissions then act as though the remote end sent
+			   us the file permissions we already have */
+			file->mode = st.st_mode;
 		}
 
 		if (fd1 != -1 && st.st_size > 0) {

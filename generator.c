@@ -177,6 +177,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 	char fnamecmpbuf[MAXPATHLEN];
 	extern char *compare_dest;
 	extern int list_only;
+	extern int preserve_perms;
 
 	if (list_only) return;
 
@@ -184,6 +185,15 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 		rprintf(FINFO,"recv_generator(%s,%d)\n",fname,i);
 
 	statret = link_stat(fname,&st);
+
+	if (statret == 0 && 
+	    !preserve_perms && 
+	    (S_ISDIR(st.st_mode) == S_ISDIR(file->mode))) {
+		/* if the file exists already and we aren't perserving
+                   presmissions then act as though the remote end sent
+                   us the file permissions we already have */
+		file->mode = st.st_mode;
+	}
 
 	if (S_ISDIR(file->mode)) {
 		if (dry_run) return;
