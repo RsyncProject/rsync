@@ -418,7 +418,8 @@ static void log_formatted(enum logcode code,
 		l = strlen(n);
 
 		if (l + ((int)(s - &buf[0])) >= sizeof(buf)) {
-			rprintf(FERROR,"buffer overflow expanding %%%c -- exiting\n",
+			rprintf(FERROR,
+				"buffer overflow expanding %%%c -- exiting\n",
 				p[0]);
 			exit_cleanup(RERR_MESSAGEIO);
 		}
@@ -428,7 +429,7 @@ static void log_formatted(enum logcode code,
 			memmove(s+(l-1), s+1, strlen(s+1)+1);
 		}
 
-		/* Copy in n but NOT its nul, because the format sting
+		/* Copy in n but NOT its nul, because the format string
 		 * probably continues after this. */
 		memcpy(p, n, l);
 
