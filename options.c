@@ -67,6 +67,11 @@ int delete_after=0;
 int only_existing=0;
 int max_delete=0;
 int ignore_errors=0;
+#ifdef _WIN32
+int modify_window=2;
+#else
+int modify_window=0;
+#endif
 int blocking_io=0;
 
 char *backup_suffix = BACKUP_SUFFIX;
@@ -84,6 +89,9 @@ int verbose = 0;
 int quiet = 0;
 int always_checksum = 0;
 int list_only = 0;
+
+static int modify_window_set;
+
 
 struct in_addr socket_address = {INADDR_ANY};
 
@@ -144,6 +152,7 @@ void usage(enum logcode F)
   rprintf(F,"     --timeout=TIME          set IO timeout in seconds\n");
   rprintf(F," -I, --ignore-times          don't exclude files that match length and time\n");
   rprintf(F,"     --size-only             only use file size when determining if a file should be transferred\n");
+  rprintf(F,"     --modify-window=NUM     Timestamp window (seconds) for file match (default=%d)\n",modify_window);
   rprintf(F," -T  --temp-dir=DIR          create temporary files in directory DIR\n");
   rprintf(F,"     --compare-dest=DIR      also compare destination files relative to DIR\n");
   rprintf(F," -P                          equivalent to --partial --progress\n");
@@ -178,7 +187,8 @@ enum {OPT_VERSION, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
       OPT_COPY_UNSAFE_LINKS, OPT_SAFE_LINKS, OPT_COMPARE_DEST,
       OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY, OPT_ADDRESS,
       OPT_DELETE_AFTER, OPT_EXISTING, OPT_MAX_DELETE, OPT_BACKUP_DIR, 
-      OPT_IGNORE_ERRORS, OPT_BWLIMIT, OPT_BLOCKING_IO};
+      OPT_IGNORE_ERRORS, OPT_BWLIMIT, OPT_BLOCKING_IO,
+      OPT_MODIFY_WINDOW};
 
 static char *short_options = "oblLWHpguDCtcahvqrRIxnSe:B:T:zP";
 
@@ -200,6 +210,7 @@ static struct option long_options[] = {
   {"one-file-system",0,  0,    'x'},
   {"ignore-times",0,     0,    'I'},
   {"size-only",   0,     0,    OPT_SIZE_ONLY},
+  {"modify-window",1,    0,    OPT_MODIFY_WINDOW},
   {"help",        0,     0,    'h'},
   {"dry-run",     0,     0,    'n'},
   {"sparse",      0,     0,    'S'},
@@ -331,6 +342,11 @@ int parse_arguments(int argc, char *argv[], int frommain)
 			size_only = 1;
 			break;
 
+		case OPT_MODIFY_WINDOW:
+			modify_window = atoi(optarg);
+			modify_window_set = 1;
+			break;
+			
 		case 'x':
 			one_file_system=1;
 			break;
@@ -598,6 +614,7 @@ void server_options(char **args,int *argc)
 	static char bsize[30];
 	static char iotime[30];
 	static char mdelete[30];
+	static char mwindow[30];
 	static char bw[50];
 
 	int i, x;
@@ -698,6 +715,12 @@ void server_options(char **args,int *argc)
 
 	if (size_only)
 		args[ac++] = "--size-only";
+
+	if (modify_window_set) {
+	        slprintf(mwindow,sizeof(mwindow),"--modify-window=%d",
+			 modify_window);
+		args[ac++] = mwindow;
+	}
 
 	if (keep_partial)
 		args[ac++] = "--partial";

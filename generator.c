@@ -35,6 +35,7 @@ extern int size_only;
 extern int io_timeout;
 extern int remote_version;
 extern int always_checksum;
+extern int modify_window;
 extern char *compare_dest;
 
 
@@ -75,7 +76,7 @@ static int skip_file(char *fname,
 		return 0;
 	}
 
-	return (st->st_mtime == file->modtime);
+	return (cmp_modtime(st->st_mtime,file->modtime) == 0);
 }
 
 
@@ -343,7 +344,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 		return;
 	}
 
-	if (update_only && st.st_mtime > file->modtime && fnamecmp == fname) {
+	if (update_only && cmp_modtime(st.st_mtime,file->modtime)>0 && fnamecmp == fname) {
 		if (verbose > 1)
 			rprintf(FINFO,"%s is newer\n",fname);
 		return;

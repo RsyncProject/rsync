@@ -955,7 +955,27 @@ void msleep(int t)
 }
 
 
-#ifdef __INSURE__
+/*******************************************************************
+ Determine if two file modification times are equivalent (either exact 
+ or in the modification timestamp window established by --modify-window) 
+ Returns 0 if the times should be treated as the same, 1 if the 
+ first is later and -1 if the 2nd is later
+ *******************************************************************/
+int cmp_modtime(time_t file1, time_t file2)
+{
+	time_t diff;
+	extern int modify_window;
+
+	if (file2 > file1) {
+		if (file2 - file1 <= modify_window) return 0;
+		return -1;
+	}
+	if (file1 - file2 <= modify_window) return 0;
+	return 1;
+}
+
+
+#ifdef __INSURE__XX
 #include <dlfcn.h>
 
 /*******************************************************************

@@ -223,7 +223,7 @@ verb(
  -r, --recursive             recurse into directories
  -R, --relative              use relative path names
  -b, --backup                make backups (default ~ suffix)
-     --backup-dir=DIR        put backups in the specified directory
+     --backup-dir            make backups into this directory
      --suffix=SUFFIX         override backup suffix
  -u, --update                update only (don't overwrite newer files)
  -l, --links                 preserve soft links
@@ -256,6 +256,7 @@ verb(
      --timeout=TIME          set IO timeout in seconds
  -I, --ignore-times          don't exclude files that match length and time
      --size-only             only use file size when determining if a file should be transferred
+     --modify-window=NUM     Timestamp window (seconds) for file match (default=0)
  -T  --temp-dir=DIR          create temporary files in directory DIR
      --compare-dest=DIR      also compare destination files relative to DIR
  -P                          equivalent to --partial --progress
@@ -315,6 +316,13 @@ already the same length and have the same time-stamp. With the
 regardless of timestamp. This is useful when starting to use rsync
 after using another mirroring system which may not preserve timestamps
 exactly.
+
+dit(bf(--modify-window)) When comparing two timestamps rsync treats
+the timestamps as being equal if they are within the value of
+modify_window. This is normally zero, but you may find it useful to
+set this to a larger value in some situations. In particular, when
+transferring to/from FAT filesystems which cannot represent times with
+a 1 second resolution this option is useful.
 
 dit(bf(-c, --checksum)) This forces the sender to checksum all files using
 a 128-bit MD4 checksum before transfer. The checksum is then
