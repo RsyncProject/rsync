@@ -83,6 +83,7 @@ int safe_symlinks = 0;
 int copy_unsafe_links = 0;
 int size_only = 0;
 int bwlimit = 0;
+size_t bwlimit_writemax = 0;
 int delete_after = 0;
 int only_existing = 0;
 int opt_ignore_existing = 0;
@@ -727,6 +728,12 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 	if (do_progress && !verbose)
 		verbose = 1;
+
+	if (bwlimit) {
+		bwlimit_writemax = (size_t)bwlimit * 128;
+		if (bwlimit_writemax < 512)
+			bwlimit_writemax = 512;
+	}
 
 	if (files_from) {
 		char *colon;
