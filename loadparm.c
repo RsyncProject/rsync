@@ -129,6 +129,8 @@ typedef struct
 	char *secrets_file;
 	char *exclude;
 	char *exclude_from;
+	char *include;
+	char *include_from;
 	char *log_format;
 	char *refuse_options;
 	char *dont_compress;
@@ -154,6 +156,8 @@ static service sDefault =
 	NULL,    /* secrets file */
 	NULL,    /* exclude */
 	NULL,    /* exclude from */
+	NULL,    /* include */
+	NULL,    /* include from */
 	"%o %h [%a] %m (%u) %f %l",    /* log format */
 	NULL,    /* refuse options */
 	"*.gz *.tgz *.zip *.z *.rpm *.deb",    /* dont compress */
@@ -263,6 +267,8 @@ static struct parm_struct parm_table[] =
   {"secrets file",     P_STRING,  P_LOCAL,  &sDefault.secrets_file,NULL,   0},
   {"exclude",          P_STRING,  P_LOCAL,  &sDefault.exclude,     NULL,   0},
   {"exclude from",     P_STRING,  P_LOCAL,  &sDefault.exclude_from,NULL,   0},
+  {"include",          P_STRING,  P_LOCAL,  &sDefault.include,     NULL,   0},
+  {"include from",     P_STRING,  P_LOCAL,  &sDefault.include_from,NULL,   0},
   {"transfer logging", P_BOOL,    P_LOCAL,  &sDefault.transfer_logging,NULL,0},
   {"log format",       P_STRING,  P_LOCAL,  &sDefault.log_format,  NULL,   0},
   {"refuse options",   P_STRING,  P_LOCAL,  &sDefault.refuse_options,NULL, 0},
@@ -338,6 +344,8 @@ FN_LOCAL_STRING(lp_auth_users, auth_users)
 FN_LOCAL_STRING(lp_secrets_file, secrets_file)
 FN_LOCAL_STRING(lp_exclude, exclude)
 FN_LOCAL_STRING(lp_exclude_from, exclude_from)
+FN_LOCAL_STRING(lp_include, include)
+FN_LOCAL_STRING(lp_include_from, include_from)
 FN_LOCAL_STRING(lp_log_format, log_format)
 FN_LOCAL_STRING(lp_refuse_options, refuse_options)
 FN_LOCAL_STRING(lp_dont_compress, dont_compress)
@@ -460,7 +468,7 @@ static int map_parameter(char *parmname)
       if (strwicmp(parm_table[iIndex].label, parmname) == 0)
          return(iIndex);
 
-   rprintf(FERROR, "Unknown parameter encountered: \"%s\"\n", parmname);
+   rprintf(FERROR, "Unknown Parameter encountered: \"%s\"\n", parmname);
    return(-1);
 }
 
@@ -572,7 +580,7 @@ static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
 
    if (parmnum < 0)
      {
-       rprintf(FERROR, "Ignoring unknown parameter \"%s\"\n", parmname);
+       rprintf(FERROR, "IGNORING unknown parameter \"%s\"\n", parmname);
        return(True);
      }
 

@@ -176,6 +176,20 @@ equivalent to the client specifying the --exclude-from option with a
 equivalent file. See also the note about security for the exclude
 option above.
 
+dit(bf(include)) The "include" option allows you to specify a space
+separated list of patterns which rsync should not exclude. This is
+equivalent to the client specifying these patterns with the --include
+option. This is useful as it allows you to build up quite complex
+exclude/include rules.
+
+See the section of exclude patterns for information  on the syntax of
+this option.
+
+dit(bf(include from)) The "include from" option specifies a filename
+on the server that contains include patterns, one per line. This is
+equivalent to the client specifying the --include-from option with a
+equivalent file.
+
 dit(bf(auth users)) The "auth users" option specifies a comma
 and space separated list of usernames that will be allowed to connect
 to this module. The usernames do not need to exist on the local
