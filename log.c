@@ -385,8 +385,8 @@ static void log_formatted(enum logcode code,
 			break;
 		case 'o': n = op; break;
 		case 'f':
-			snprintf(buf2, sizeof(buf2), "%s/%s",
-				 file->basedir?file->basedir:"",
+			pathjoin(buf2, sizeof buf2,
+				 file->basedir ? file->basedir : "",
 				 f_name(file));
 			clean_fname(buf2);
 			n = buf2;
