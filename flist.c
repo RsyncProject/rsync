@@ -149,8 +149,7 @@ int readlink_stat(const char *Path, STRUCT_STAT *Buffer, char *Linkbuf)
 		return -1;
 	}
 	if (S_ISLNK(Buffer->st_mode)) {
-		int l;
-		if ((l = readlink(Path,Linkbuf,MAXPATHLEN-1)) == -1) {
+		if (readlink((char *) Path, Linkbuf, MAXPATHLEN-1) == -1) {
 			return -1;
 		}
 		Linkbuf[l] = 0;
