@@ -77,11 +77,13 @@ manpagesection(SETUP)
 
 See the file README for installation instructions.
 
-Once installed you can use rsync to any machine that you can use rsh
-to.  rsync uses rsh for its communications, unless both the source and
-destination are local.
+Once installed, you can use rsync to any machine that you can access via
+a remote shell (as well as some that you can access using the rsync
+daemon-mode protocol).  For remote transfers, rsync typically uses rsh
+for its communications, but it may have been configured to use a
+different remote shell by default, such as ssh.
 
-You can also specify an alternative to rsh, either by using the -e
+You can also specify any remote shell you like, either by using the -e
 command line option, or by setting the RSYNC_RSH environment variable.
 
 One common substitute is to use ssh, which offers a high degree of
@@ -135,7 +137,7 @@ somehost.mydomain.com.  (See the following section for more details.)
 
 manpagesection(CONNECTING TO AN RSYNC SERVER)
 
-It is also possible to use rsync without using rsh or ssh as the
+It is also possible to use rsync without a remote shell as the
 transport. In this case you will connect to a remote rsync server
 running on TCP port 873. 
 
@@ -144,7 +146,7 @@ environment variable RSYNC_PROXY to a hostname:port pair pointing to
 your web proxy.  Note that your web proxy's configuration must allow
 proxying to port 873.
 
-Using rsync in this way is the same as using it with rsh or ssh except
+Using rsync in this way is the same as using it with a remote shell except
 that:
 
 itemize(
@@ -242,7 +244,7 @@ verb(
      --no-whole-file         turn off --whole-file
  -x, --one-file-system       don't cross filesystem boundaries
  -B, --block-size=SIZE       checksum blocking size (default 700)
- -e, --rsh=COMMAND           specify rsh replacement
+ -e, --rsh=COMMAND           specify the remote shell to use
      --rsync-path=PATH       specify path to rsync on the remote machine
  -C, --cvs-exclude           auto ignore files in the same way CVS does
      --existing              only update files that already exist
@@ -505,8 +507,8 @@ the rsync algorithm. See the technical report for details.
 
 dit(bf(-e, --rsh=COMMAND)) This option allows you to choose an alternative
 remote shell program to use for communication between the local and
-remote copies of rsync. By default, rsync will use rsh, but you may
-like to instead use ssh because of its high security.
+remote copies of rsync. Typically, rsync is configured to use rsh by
+default, but you may prefer to use ssh because of its high security.
 
 You can also choose the remote shell program using the RSYNC_RSH
 environment variable.
@@ -661,7 +663,8 @@ dit(bf(--blocking-io)) This tells rsync to use blocking IO when launching
 a remote shell transport.  If -e or --rsh are not specified or are set to
 the default "rsh", this defaults to blocking IO, otherwise it defaults to
 non-blocking IO.  You may find the --blocking-io option is needed for some
-remote shells that can't handle non-blocking IO.  Ssh prefers blocking IO.
+remote shells that can't handle non-blocking IO.  (Note that ssh prefers
+non-blocking IO.)
 
 dit(bf(--no-blocking-io)) Turn off --blocking-io, for use when it is the
 default.
