@@ -258,7 +258,7 @@ foreach $hour ( sort keys(xfertbytes) ) {
 exit(0);
 
 sub datecompare {
-    $a lt $b;
+    $a gt $b;
 }
 
 sub domnamcompare {
