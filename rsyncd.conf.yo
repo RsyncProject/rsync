@@ -399,6 +399,32 @@ encryption.
 Future versions of rsync may support SSL for better authentication and
 encryption, but that is still being investigated.
 
+manpagesection(RUNNING AN RSYNC SERVER OVER A REMOTE SHELL PROGRAM)
+
+If rsync is run with both the --daemon and --rsh (-e) options, it will
+spawn an rsync daemon using a remote shell connection.  Several
+configuration options will not be available unless the remote user is
+root (e.g. chroot, setuid/setgid, etc.).  There is no need to configure
+inetd or the services map to include the rsync server port if you run an
+rsync server only via a remote shell program.
+
+ADVANCED: To run an rsync server out of a single-use ssh key, use the
+"command=em(COMMAND)" syntax in the remote user's authorized_keys entry,
+where command would be
+
+quote(rsync --server --daemon .)
+
+NOTE: rsync's argument parsing expects the trailing ".", so make sure
+that it's there.  If you want to use a rsyncd.conf(5)-style
+configuration file other than the default, you can added a
+--config option to the em(command):
+
+quote(rsync --server --daemon --config=em(file) .)
+
+Note that the "--server" here is the internal option that rsync uses to
+run the remote version of rsync that it communicates with, and thus you
+should not be using the --server option under normal circumstances.
+
 manpagesection(EXAMPLES)
 
 A simple rsyncd.conf file that allow anonymous rsync to a ftp area at

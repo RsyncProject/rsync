@@ -234,18 +234,8 @@ user is root (e.g. chroot, setuid/setgid, etc.).  There is no need to
 configure inetd or the services map to include the rsync server port
 if you run an rsync server only via a remote shell program.
 
-To run an rsync server out of a single-use ssh key, use the
-"command=em(COMMAND)" syntax in the remote user's
-authorized_keys entry, where command would be
-
-quote(rsync --server --daemon .)
-
-NOTE: rsync's argument parsing expects the trailing ".", so make sure
-that it's there.  If you want to use a rsyncd.conf(5)-style
-configuration file other than the default, you can added a
---config option to the em(command):
-
-quote(rsync --server --daemon --config=em(file) .)
+To run an rsync server out of a single-use ssh key, see this section
+in the rsyncd.conf(5) man page.
 
 manpagesection(EXAMPLES)
 
