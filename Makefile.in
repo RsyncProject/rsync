@@ -58,6 +58,8 @@ CHECK_OBJS=getgroups.o t_stub.o t_unsafe.o trimslash.o wildtest.o
 
 all: rsync$(EXEEXT)
 
+gen: configure config.h.in proto man
+
 man: rsync.1 rsyncd.conf.5
 
 install: all
@@ -90,17 +92,11 @@ T_UNSAFE_OBJ = t_unsafe.o syscall.o util.o t_stub.o lib/compat.o lib/snprintf.o
 t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
 
-# I don't like these rules because CVS can skew the timestamps and
-# produce spurious warnings, and also make "make install" fail if the
-# source directory can no longer be found.  Since we don't rebuild
-# automatically they're kind of lame anyhow.
+configure: configure.in aclocal.m4
+	autoconf
 
-#Makefile: Makefile.in configure config.status
-#	echo "WARNING: You need to run ./config.status --recheck"
-
-# don't actually run autoconf, just issue a warning
-#configure: configure.in
-#	echo "WARNING: you need to rerun autoconf"
+config.h.in: configure.in aclocal.m4
+	autoheader
 
 $(srcdir)/rsync.1: $(srcdir)/rsync.yo
 	yodl2man -o $(srcdir)/rsync.1 $(srcdir)/rsync.yo
@@ -109,7 +105,12 @@ $(srcdir)/rsyncd.conf.5: $(srcdir)/rsyncd.conf.yo
 	yodl2man -o $(srcdir)/rsyncd.conf.5 $(srcdir)/rsyncd.conf.yo
 
 proto:
-	cat $(srcdir)/*.c $(srcdir)/lib/compat.c | awk -f $(srcdir)/mkproto.awk > $(srcdir)/proto.h
+	cat $(srcdir)/*.c $(srcdir)/lib/compat.c | awk -f $(srcdir)/mkproto.awk >$(srcdir)/proto.h.new
+	if diff $(srcdir)/proto.h $(srcdir)/proto.h.new >/dev/null; then \
+	  rm $(srcdir)/proto.h.new; \
+	else \
+	  mv $(srcdir)/proto.h.new $(srcdir)/proto.h; \
+	fi
 
 clean: cleantests
 	rm -f *~ $(OBJS) $(TLS_OBJ) $(CHECK_PROGS) $(CHECK_OBJS)
