@@ -91,6 +91,11 @@ support the "max connections" option. The rsync server uses record
 locking on this file to ensure that the max connections limit is not
 exceeded. The default is tt(/var/run/rsyncd.lock).
 
+dit(bf(log file)) The "log file" option tells the rsync daemon to log
+messages to that file rather than using syslog. This is particularly
+useful on systems (such as AIX) where syslog() doesn't work for
+chrooted programs like rsync.
+
 dit(bf(syslog facility)) The "syslog facility" option allows you to
 specify the syslog facility name to use when logging messages from the
 rsync server. You may use any standard syslog facility name which is

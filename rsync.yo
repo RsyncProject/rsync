@@ -9,9 +9,9 @@ rsync [options] path [user@]host:path
 
 rsync [options] path path
 
-rsync [options] [user@]host::path path
+rsync [options] [user@]host::module[/path] path
 
-rsync [options] path [user@]host::path
+rsync [options] path [user@]host::module[/path]
 
 manpagedescription()
 
