@@ -11,3 +11,6 @@ rsync changes since last release
   BUG FIXES:
 
     * Fix test suite on Solaris.  (Jos Backus)
+
+    * Fix minor memory leak in socket code.  (Dave Dykstra, Martin
+      Pool.)

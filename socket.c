@@ -119,17 +119,17 @@ int try_bind_local(int s,
 		return -1;
 	}
 
-	/* FIXME: Call freeaddrinfo() on all return paths! */
-
 	for (r = bres_all; r; r = r->ai_next) {
 		if (bind(s, r->ai_addr, r->ai_addrlen) == -1)
 			continue;
+		freeaddrinfo(bres_all);
 		return s;
 	}
 
 	/* no error message; there might be some problem that allows
 	 * creation of the socket but not binding, perhaps if the
 	 * machine has no ipv6 address of this name. */
+	freeaddrinfo(bres_all);
 	return -1;
 }
 
@@ -332,7 +332,7 @@ static int open_socket_in(int type, int port, const char *bind_address,
 			continue;
 		}
 
-		/* FIXME: Call freeaddrinfo? */
+		freeaddrinfo(all_ai);
 		return s;
 	}
 
