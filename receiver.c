@@ -56,29 +56,20 @@ extern struct filter_list_struct server_filter_list;
  * sending side.  This is used by --delete-before and --delete-after. */
 void delete_files(struct file_list *flist)
 {
- 	struct file_list *dir_list;
-	char *argv[1], fbuf[MAXPATHLEN];
+	char fbuf[MAXPATHLEN];
 	int j;
 
-	if (io_error && !(lp_ignore_errors(module_id) || ignore_errors)) {
-		rprintf(FINFO,
-			"IO error encountered -- skipping file deletion\n");
-		return;
-	}
-
 	for (j = 0; j < flist->count; j++) {
-		if (!(flist->files[j]->flags & FLAG_DEL_START)
-		    || !S_ISDIR(flist->files[j]->mode))
+		struct file_struct *file = flist->files[j];
+
+		if (!(file->flags & FLAG_DEL_HERE))
 			continue;
 
-		argv[0] = f_name_to(flist->files[j], fbuf);
+		f_name_to(file, fbuf);
+		if (verbose > 1 && file->flags & FLAG_TOP_DIR)
+			rprintf(FINFO, "deleting in %s\n", safe_fname(fbuf));
 
-		if (!(dir_list = send_file_list(-1, 1, argv)))
-			continue;
-
-		delete_missing(flist, dir_list, fbuf);
-
-		flist_free(dir_list);
+		delete_in_dir(flist, fbuf, file);
 	}
 }
 
