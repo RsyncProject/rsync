@@ -833,10 +833,14 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				 link_dest ? "--link-dest" : "--compare-dest");
 			return 0;
 		}
-	} else if (partial_dir) {
-		if (strcmp(partial_dir, ".") == 0)
-			partial_dir = NULL;
-		keep_partial = 1;
+	} else {
+		if (keep_partial && !partial_dir)
+			partial_dir = getenv("RSYNC_PARTIAL_DIR");
+		if (partial_dir) {
+			if (!*partial_dir || strcmp(partial_dir, ".") == 0)
+				partial_dir = NULL;
+			keep_partial = 1;
+		}
 	}
 
 	if (files_from) {
