@@ -1,17 +1,17 @@
-/* 
+/*
    Copyright (C) Andrew Tridgell 1996
    Copyright (C) Paul Mackerras 1996
-   
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -95,29 +95,6 @@ static int map_gid(int id, char *name)
 	return id;
 }
 
-/* this function is a definate candidate for a faster algorithm */
-static uid_t match_uid(uid_t uid)
-{
-	static uid_t last_in, last_out;
-	struct idlist *list = uidlist;
-
-	if (uid == last_in)
-		return last_out;
-
-	last_in = uid;
-
-	while (list) {
-		if (list->id == (int)uid) {
-			last_out = (uid_t)list->id2;
-			return last_out;
-		}
-		list = list->next;
-	}
-	
-	last_out = uid;
-	return last_out;
-}
-
 static int is_in_group(gid_t gid)
 {
 #ifdef HAVE_GETGROUPS
@@ -172,6 +149,29 @@ static int is_in_group(gid_t gid)
 	}
 	return gid == mygid;
 #endif
+}
+
+/* this function is a definate candidate for a faster algorithm */
+static uid_t match_uid(uid_t uid)
+{
+	static uid_t last_in, last_out;
+	struct idlist *list = uidlist;
+
+	if (uid == last_in)
+		return last_out;
+
+	last_in = uid;
+
+	while (list) {
+		if (list->id == (int)uid) {
+			last_out = (uid_t)list->id2;
+			return last_out;
+		}
+		list = list->next;
+	}
+
+	last_out = uid;
+	return last_out;
 }
 
 static gid_t match_gid(gid_t gid)
