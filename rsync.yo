@@ -785,8 +785,21 @@ files listed in the CVSIGNORE environment variable (all cvsignore names
 are delimited by whitespace).
 
 Finally, any file is ignored if it is in the same directory as a
-.cvsignore file and matches one of the patterns listed therein.
+.cvsignore file and matches one of the patterns listed therein.  Unlike
+rsync's filter/exclude files, these patterns are split on whitespace.
 See the bf(cvs(1)) manual for more information.
+
+If you're combining bf(-C) with your own bf(--filter) rules, you should
+note that these CVS excludes are appended at the end of your own rules,
+regardless of where the -C was placed on the command-line.  This makes them
+a lower priority than any rules you specified explicitly.  If you want to
+control where these CVS excludes get inserted into your filter rules, you
+should omit the bf(-C) as a command-line option and use a combination of
+bf(--filter=:C) and bf(--filter=-C) (either on your command-line or by
+putting the ":C" and "-C" rules into a filter file with your other rules).
+The first option turns on the per-directory scanning for the .cvsignore
+file.  The second option does a one-time import of the CVS excludes
+mentioned above.
 
 dit(bf(-f, --filter=RULE)) This option allows you to add rules to selectively
 exclude certain files from the list of files to be transferred. This is
@@ -1481,10 +1494,11 @@ tt(rsync -avC --include=foo.o -f :C --exclude='*.old' a/ b)nl()
 Both of the above rsync commands are identical.  Each one will merge all
 the per-directory .cvsignore rules in the middle of the list rather than
 at the end.  This allows their dir-specific rules to supersede the rules
-that follow the :C instead of being subservient to all your rules.  (The
-global rules taken from the $HOME/.cvsignore file and from $CVSIGNORE are
-not repositioned from their spot at the end of your rules, however -- feel
-free to manually include $HOME/.cvsignore elsewhere in your rules.)
+that follow the :C instead of being subservient to all your rules.  To
+affect the other CVS exclude rules (i.e. the default list of exclusions,
+the contents of $HOME/.cvsignore, and the value of $CVSIGNORE) you should
+omit the bf(-C) command-line option and instead insert a "-C" rule into
+your filter rules; e.g. "--filter=-C".
 
 manpagesection(LIST-CLEARING FILTER RULE)
 
