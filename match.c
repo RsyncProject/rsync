@@ -188,7 +188,7 @@ static void hash_search(int f,struct sum_struct *s,
 
 		sum = (s1 & 0xffff) | (s2 << 16);
 		tag_hits++;
-		for (; j < s->count && targets[j].t == t; j++) {
+		do {
 			unsigned int l;
 			size_t i = targets[j].i;
 
@@ -235,7 +235,7 @@ static void hash_search(int f,struct sum_struct *s,
 			s2 = sum >> 16;
 			matches++;
 			break;
-		}
+		} while (++j < s->count && targets[j].t == t);
 
 	null_tag:
 		/* Trim off the first byte from the checksum */
