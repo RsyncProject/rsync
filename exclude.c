@@ -236,13 +236,15 @@ int check_exclude(struct exclude_struct **list, char *name, int name_is_dir)
 static const char *get_exclude_tok(const char *p, int *len_ptr, int *incl_ptr,
 				   int xflags)
 {
-	const unsigned char *s = (unsigned char *)p;
+	const unsigned char *s = (const unsigned char *)p;
 	int len;
 
 	if (xflags & XFLG_WORD_SPLIT) {
 		/* Skip over any initial whitespace. */
 		while (isspace(*s))
 			s++;
+		/* Update for "!" check. */
+		p = (const char *)s;
 	}
 
 	/* Is this a '+' or '-' followed by a space (not whitespace)? */
@@ -262,8 +264,7 @@ static const char *get_exclude_tok(const char *p, int *len_ptr, int *incl_ptr,
 	} else
 		len = strlen(s);
 
-	if (*s == '!' && len == 1 && !(xflags & XFLG_NO_PREFIXES)
-	    && (const char *)s == p)
+	if (*p == '!' && len == 1 && !(xflags & XFLG_NO_PREFIXES))
 		*incl_ptr = -1;
 
 	*len_ptr = len;
