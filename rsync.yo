@@ -324,6 +324,7 @@ verb(
      --modify-window=NUM     Timestamp window (seconds) for file match (default=0)
  -T  --temp-dir=DIR          create temporary files in directory DIR
      --compare-dest=DIR      also compare destination files relative to DIR
+     --link-dest=DIR         create hardlinks to DIR for unchanged files
  -P                          equivalent to --partial --progress
  -z, --compress              compress file data
      --exclude=PATTERN       exclude files matching PATTERN
@@ -685,6 +686,11 @@ files that haven't changed).  This option increases the usefulness of
 --partial because partially transferred files will remain in the new
 temporary destination until they have a chance to be completed.  If DIR is
 a relative path, it is relative to the destination directory.
+
+dit(bf(--link-dest=DIR)) This option behaves like bf(--compare-dest) but
+also will create hard links from em(DIR) to the destination directory for
+unchanged files.  Files with changed ownership or permissions will not be
+linked.
 
 dit(bf(-z, --compress)) With this option, rsync compresses any data from
 the files that it sends to the destination machine.  This

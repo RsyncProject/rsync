@@ -115,6 +115,7 @@ char *password_file = NULL;
 char *rsync_path = RSYNC_PATH;
 char *backup_dir = NULL;
 int rsync_port = RSYNC_PORT;
+int link_dest = 0;
 
 int verbose = 0;
 int quiet = 0;
@@ -289,7 +290,7 @@ enum {OPT_VERSION = 1000, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
       OPT_EXCLUDE_FROM, OPT_DELETE, OPT_DELETE_EXCLUDED, OPT_NUMERIC_IDS,
       OPT_RSYNC_PATH, OPT_FORCE, OPT_TIMEOUT, OPT_DAEMON, OPT_CONFIG, OPT_PORT,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS,
-      OPT_COPY_UNSAFE_LINKS, OPT_SAFE_LINKS, OPT_COMPARE_DEST,
+      OPT_COPY_UNSAFE_LINKS, OPT_SAFE_LINKS, OPT_COMPARE_DEST, OPT_LINK_DEST,
       OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY, OPT_ADDRESS,
       OPT_DELETE_AFTER, OPT_EXISTING, OPT_MAX_DELETE, OPT_BACKUP_DIR, 
       OPT_IGNORE_ERRORS, OPT_BWLIMIT, OPT_BLOCKING_IO,
@@ -348,6 +349,7 @@ static struct poptOption long_options[] = {
   {"timeout",          0,  POPT_ARG_INT,    &io_timeout , 0, 0, 0 },
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir , 0, 0, 0 },
   {"compare-dest",     0,  POPT_ARG_STRING, &compare_dest , 0, 0, 0 },
+  {"link-dest",        0,  POPT_ARG_STRING, 0,               OPT_LINK_DEST, 0, 0 },
   /* TODO: Should this take an optional int giving the compression level? */
   {"compress",        'z', POPT_ARG_NONE,   &do_compression , 0, 0, 0 },
   {"daemon",           0,  POPT_ARG_NONE,   &am_daemon , 0, 0, 0 },
@@ -591,6 +593,19 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			/* popt stores the filename in batch_prefix for us */
 			read_batch = 1;
 			break;
+		case OPT_LINK_DEST:
+#if HAVE_LINK
+			compare_dest = poptGetOptArg(pc);
+			link_dest = 1;
+			break;
+#else
+			snprintf(err_buf,sizeof(err_buf),
+                                 "hard links are not supported on this %s\n",
+				 am_server ? "server" : "client");
+			rprintf(FERROR,"ERROR: hard links not supported on this platform\n");
+			return 0;
+#endif
+
 
 		default:
                         /* FIXME: If --daemon is specified, then errors for later
@@ -827,7 +842,7 @@ void server_options(char **args,int *argc)
 		 *   and it may be an older version that doesn't know this
 		 *   option, so don't send it if client is the sender.
 		 */
-		args[ac++] = "--compare-dest";
+		args[ac++] = link_dest ? "--link-dest" : "--compare-dest";
 		args[ac++] = compare_dest;
 	}
 

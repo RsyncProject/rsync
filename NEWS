@@ -18,6 +18,10 @@ rsync changes since last release
     * If the file name given to --include-from or --exclude-from is "-",
       rsync will read from standard input. (J.W. Schultz)
 
+    * New option --link-dest which is like --compare-dest except that
+      unchanged files are hard-linked in to the destination directory.
+      (J.W. Schultz)
+
   BUG FIXES:
   
     * Fix "forward name lookup failed" errors on AIX 4.3.3.  (John

@@ -41,6 +41,7 @@ extern int remote_version;
 extern int always_checksum;
 extern int modify_window;
 extern char *compare_dest;
+extern int link_dest;
 
 
 /* choose whether to skip a particular file */
@@ -50,6 +51,15 @@ static int skip_file(char *fname,
 	if (st->st_size != file->length) {
 		return 0;
 	}
+	if (link_dest) {
+		if((st->st_mode & ~_S_IFMT) !=  (file->mode & ~_S_IFMT)) {
+			return 0;
+		}
+		if (st->st_uid != file->uid || st->st_gid != file->gid) {
+			return 0;
+		}
+	}
+
 	
 	/* if always checksum is set then we use the checksum instead 
 	   of the file time to determine whether to sync */
@@ -356,6 +366,18 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 			statret = -1;
 		if (statret == -1)
 			errno = saveerrno;
+#if HAVE_LINK
+		else if (link_dest && !dry_run) {
+			if (do_link(fnamecmpbuf, fname) != 0) {
+				if (verbose > 0)
+					rprintf(FINFO,"link %s => %s : %s\n",
+						fnamecmpbuf,
+						fname,
+						strerror(errno));
+			}
+			fnamecmp = fnamecmpbuf;
+		}
+#endif
 		else
 			fnamecmp = fnamecmpbuf;
 	}
