@@ -395,7 +395,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
   write_flush(f_out);
 
   close(fd);
-  unmap_file(buf);
+  if (buf) unmap_file(buf);
 
   free_sums(s);
 }
@@ -620,7 +620,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
       recv_ok = receive_data(f_in,buf,fd2,fname);
 
       if (fd1 != -1) {
-	unmap_file(buf);
+	if (buf) unmap_file(buf);
 	close(fd1);
       }
       close(fd2);
@@ -758,7 +758,7 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
       match_sums(f_out,s,buf,st.st_size);
       write_flush(f_out);
       
-      unmap_file(buf);
+      if (buf) unmap_file(buf);
       close(fd);
 
       free_sums(s);
