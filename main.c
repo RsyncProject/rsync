@@ -241,8 +241,15 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 
 		args[argc++] = rsync_path;
 
-		if ((blocking_io == -1) && (strcmp(cmd, RSYNC_RSH) == 0))
-			blocking_io = 1;
+		if (blocking_io == -1) {
+			char *cp = strrchr(cmd, '/');
+			if (cp)
+				cp++;
+			else
+				cp = cmd;
+			if (strcmp(cp, "rsh") == 0 || strcmp(cp, "remsh") == 0)
+				blocking_io = 1;
+		}
 
 		server_options(args,&argc);
 
