@@ -25,7 +25,6 @@ extern int backup_suffix_len;
 extern int backup_dir_len;
 extern char *backup_suffix;
 extern char *backup_dir;
-extern struct file_struct **hlink_list;
 
 extern int am_root;
 extern int preserve_devices;
@@ -264,8 +263,6 @@ static int keep_backup(char *fname)
 		kept = 1;
 	}
 #endif
-	if (!kept && preserve_hard_links && file->link_u.links && verbose > 1)
-		rprintf(FINFO, "%s was a hard link\n", f_name(file));
 
 	if (!kept && !S_ISREG(file->mode)) {
 		rprintf(FINFO, "make_bak: skipping non-regular file %s\n",
