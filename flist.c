@@ -1012,7 +1012,10 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 
 
 /* Note that the "recurse" value either contains -1, for infinite recursion,
- * or a number >= 0 indicating how many levels of recursion we will allow. */
+ * or a number >= 0 indicating how many levels of recursion we will allow.
+ * This function is normally called by the sender, but the receiving side
+ * also calls it from delete_in_dir() with f set to -1 so that we just
+ * construct the file list in memory without sending it over the wire. */
 static void send_directory(int f, struct file_list *flist,
 			   char *fbuf, unsigned int len)
 {
@@ -1056,13 +1059,6 @@ static void send_directory(int f, struct file_list *flist,
 }
 
 
-/* This function is normally called by the sender, but the receiving side
- * also uses it to construct one or more file lists if one of the --delete
- * options have been specified.  The delete_files() function sets f to -1
- * so that we just construct the file list in memory without sending it
- * over the wire.  It also has the side-effect of ignoring user-excludes if
- * delete_excluded is set (so that the delete list includes user-excluded
- * files). */
 struct file_list *send_file_list(int f, int argc, char *argv[])
 {
 	int l;
@@ -1074,25 +1070,22 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	int64 start_write;
 	int use_ff_fd = 0;
 
-	if (show_filelist_p() && f != -1)
+	if (show_filelist_p())
 		start_filelist_progress("building file list");
 
 	start_write = stats.total_written;
 	gettimeofday(&start_tv, NULL);
 
-	flist = flist_new(f == -1 ? WITHOUT_HLINK : WITH_HLINK,
-			  "send_file_list");
+	flist = flist_new(WITH_HLINK, "send_file_list");
 
-	if (f != -1) {
-		io_start_buffering_out();
-		if (filesfrom_fd >= 0) {
-			if (argv[0] && !push_dir(argv[0])) {
-				rsyserr(FERROR, errno, "push_dir %s failed",
-					full_fname(argv[0]));
-				exit_cleanup(RERR_FILESELECT);
-			}
-			use_ff_fd = 1;
+	io_start_buffering_out();
+	if (filesfrom_fd >= 0) {
+		if (argv[0] && !push_dir(argv[0])) {
+			rsyserr(FERROR, errno, "push_dir %s failed",
+				full_fname(argv[0]));
+			exit_cleanup(RERR_FILESELECT);
 		}
+		use_ff_fd = 1;
 	}
 
 	while (1) {
@@ -1129,11 +1122,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			recurse = 0;
 
 		if (link_stat(fname, &st, keep_dirlinks) != 0) {
-			if (f != -1) {
-				io_error |= IOERR_GENERAL;
-				rsyserr(FERROR, errno, "link_stat %s failed",
-					full_fname(fname));
-			}
+			io_error |= IOERR_GENERAL;
+			rsyserr(FERROR, errno, "link_stat %s failed",
+				full_fname(fname));
 			continue;
 		}
 
@@ -1156,7 +1147,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 					dir = fname;
 				fname = p + 1;
 			}
-		} else if (f != -1 && implied_dirs && (p=strrchr(fname,'/')) && p != fname) {
+		} else if (implied_dirs && (p=strrchr(fname,'/')) && p != fname) {
 			/* this ensures we send the intermediate directories,
 			   thus getting their permissions right */
 			char *lp = lastpath, *fn = fname, *slash = fname;
@@ -1229,25 +1220,21 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		}
 	}
 
-	if (f != -1) {
-		gettimeofday(&end_tv, NULL);
-		stats.flist_buildtime =
-		    (int64)(end_tv.tv_sec - start_tv.tv_sec) * 1000
-			 + (end_tv.tv_usec - start_tv.tv_usec) / 1000;
-		if (stats.flist_buildtime == 0)
-			stats.flist_buildtime = 1;
-		start_tv = end_tv;
+	gettimeofday(&end_tv, NULL);
+	stats.flist_buildtime = (int64)(end_tv.tv_sec - start_tv.tv_sec) * 1000
+			      + (end_tv.tv_usec - start_tv.tv_usec) / 1000;
+	if (stats.flist_buildtime == 0)
+		stats.flist_buildtime = 1;
+	start_tv = end_tv;
 
-		send_file_entry(NULL, f, 0);
+	send_file_entry(NULL, f, 0);
 
-		if (show_filelist_p())
-			finish_filelist_progress(flist);
+	if (show_filelist_p())
+		finish_filelist_progress(flist);
 
-		gettimeofday(&end_tv, NULL);
-		stats.flist_xfertime =
-		    (int64)(end_tv.tv_sec - start_tv.tv_sec) * 1000
-			 + (end_tv.tv_usec - start_tv.tv_usec) / 1000;
-	}
+	gettimeofday(&end_tv, NULL);
+	stats.flist_xfertime = (int64)(end_tv.tv_sec - start_tv.tv_sec) * 1000
+			     + (end_tv.tv_usec - start_tv.tv_usec) / 1000;
 
 	if (flist->hlink_pool) {
 		pool_destroy(flist->hlink_pool);
@@ -1256,21 +1243,19 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 	clean_flist(flist, 0, 0);
 
-	if (f != -1) {
-		/* Now send the uid/gid list. This was introduced in
-		 * protocol version 15 */
-		send_uid_list(f);
+	/* Now send the uid/gid list. This was introduced in
+	 * protocol version 15 */
+	send_uid_list(f);
 
-		/* send the io_error flag */
-		write_int(f, lp_ignore_errors(module_id) ? 0 : io_error);
+	/* send the io_error flag */
+	write_int(f, lp_ignore_errors(module_id) ? 0 : io_error);
 
-		io_end_buffering();
-		stats.flist_size = stats.total_written - start_write;
-		stats.num_files = flist->count;
-	}
+	io_end_buffering();
+	stats.flist_size = stats.total_written - start_write;
+	stats.num_files = flist->count;
 
 	if (verbose > 3)
-		output_flist(flist, f < 0 ? "delete" : who_am_i());
+		output_flist(flist, who_am_i());
 
 	if (verbose > 2)
 		rprintf(FINFO, "send_file_list done\n");
