@@ -173,18 +173,6 @@ int read_item_attrs(int f_in, int f_out, int ndx, uchar *type_ptr,
 	}
 	*len_ptr = len;
 
-	/* XXX Temporary rejection of 2.6.4pre1 & pre2 */
-	if (iflags & ITEM_DUMMY_BIT) {
-		extern int am_sender;
-		if (!am_sender || !(iflags & (ITEM_LOCAL_CHANGE|ITEM_TRANSFER))) {
-			rprintf(FERROR,
-				"Incompatible 2.6.4 pre-release on %s -- upgrade it or use --protocol=28!\n",
-				am_sender ? "receiver" : "sender");
-			exit_cleanup(RERR_PROTOCOL);
-		}
-		iflags &= ~ITEM_DUMMY_BIT;
-	} /* XXX */
-
 	if (iflags & ITEM_TRANSFER) {
 		if (!S_ISREG(the_file_list->files[ndx]->mode)) {
 			rprintf(FERROR,
