@@ -107,11 +107,11 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	io_printf(fd,"%s\n",path);
 	if (p) *p = '/';
 
-	while (1) {
-		/* Old servers may just drop the connection here,
-		   rather than sending a proper EXIT command.  Yuck. */
-		kludge_around_eof= True;
+	/* Old servers may just drop the connection here,
+	 rather than sending a proper EXIT command.  Yuck. */
+	kludge_around_eof = remote_version < 25;
 
+	while (1) {
 		if (!read_line(fd, line, sizeof(line)-1)) {
 			return -1;
 		}
@@ -386,12 +386,14 @@ static void send_listing(int fd)
 {
 	int n = lp_numservices();
 	int i;
-	
+	extern int remote_version;
+
 	for (i=0;i<n;i++)
 		if (lp_list(i))
 		    io_printf(fd, "%-15s\t%s\n", lp_name(i), lp_comment(i));
 
-	io_printf(fd, "@RSYNCD: EXIT\n");
+	if (remote_version >= 25)
+		io_printf(fd,"@RSYNCD: EXIT\n");
 }
 
 /* this is called when a socket connection is established to a client

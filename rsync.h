@@ -48,7 +48,18 @@
 #define SAME_TIME (1<<7)
 
 /* update this if you make incompatible changes */
-#define PROTOCOL_VERSION 24
+#define PROTOCOL_VERSION 25
+
+/* We refuse to interoperate with versions that are not in this range.
+ * Note that we assume we'll work with later versions: the onus is on
+ * people writing them to make sure that they don't send us anything
+ * we won't understand.
+ *
+ * There are two possible explanations for the limit at thirty: either
+ * to allow new major-rev versions that do not interoperate with us,
+ * and (more likely) so that we can detect an attempt to connect rsync
+ * to a non-rsync server, which is unlikely to begin by sending a byte
+ * between 15 and 30. */
 #define MIN_PROTOCOL_VERSION 15
 #define MAX_PROTOCOL_VERSION 30
 

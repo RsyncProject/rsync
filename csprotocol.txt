@@ -72,3 +72,11 @@ stay tuned (or write it yourself!).
 
 
 
+------------
+Protocol version changes
+
+25	 (2001-08-20, 2.4.7pre2) 
+
+	 Send an explicit "@RSYNC EXIT" command at the end of the
+	 module listing.  We never intentionally end the transmission
+	 by just closing the socket anymore.
