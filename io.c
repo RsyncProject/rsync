@@ -91,7 +91,7 @@ static void check_timeout(void)
 	time_t t;
 
 	err_list_push();
-	
+
 	if (!io_timeout) return;
 
 	if (!last_io) {
@@ -137,8 +137,8 @@ static void read_error_fd(void)
 
 	while (len) {
 		n = len;
-		if (n > (sizeof(buf)-1))
-			n = sizeof(buf)-1;
+		if (n > (sizeof buf - 1))
+			n = sizeof buf - 1;
 		read_loop(fd, buf, n);
 		rwrite((enum logcode)tag, buf, n);
 		len -= n;
@@ -176,28 +176,28 @@ void io_set_filesfrom_fds(int f_in, int f_out)
  * program where that is a problem (start_socket_client),
  * kludge_around_eof is True and we just exit.
  */
-static void whine_about_eof (void)
+static void whine_about_eof(void)
 {
 	if (kludge_around_eof)
-		exit_cleanup (0);
+		exit_cleanup(0);
 	else {
-		rprintf (FERROR,
-			 "%s: connection unexpectedly closed "
-			 "(%.0f bytes read so far)\n",
-			 RSYNC_NAME, (double)stats.total_read);
-	
-		exit_cleanup (RERR_STREAMIO);
+		rprintf(FERROR,
+			"%s: connection unexpectedly closed "
+			"(%.0f bytes read so far)\n",
+			RSYNC_NAME, (double)stats.total_read);
+
+		exit_cleanup(RERR_STREAMIO);
 	}
 }
 
 
-static void die_from_readerr (int err)
+static void die_from_readerr(int err)
 {
 	/* this prevents us trying to write errors on a dead socket */
 	io_multiplexing_close();
-				
+
 	rprintf(FERROR, "%s: read error: %s\n",
-		RSYNC_NAME, strerror (err));
+		RSYNC_NAME, strerror(err));
 	exit_cleanup(RERR_STREAMIO);
 }
 
@@ -213,7 +213,7 @@ static void die_from_readerr (int err)
  * give a better explanation.  We can tell whether the connection has
  * started by looking e.g. at whether the remote version is known yet.
  */
-static int read_timeout (int fd, char *buf, size_t len)
+static int read_timeout(int fd, char *buf, size_t len)
 {
 	int n, ret=0;
 
@@ -351,14 +351,13 @@ static int read_timeout (int fd, char *buf, size_t len)
 				last_io = time(NULL);
 			continue;
 		} else if (n == 0) {
-			whine_about_eof ();
+			whine_about_eof();
 			return -1; /* doesn't return */
 		} else if (n == -1) {
 			if (errno == EINTR || errno == EWOULDBLOCK ||
 			    errno == EAGAIN) 
 				continue;
-			else
-				die_from_readerr (errno);
+			die_from_readerr(errno);
 		}
 	}
 
@@ -421,7 +420,7 @@ int read_filesfrom_line(int fd, char *fname)
  * Continue trying to read len bytes - don't return until len has been
  * read.
  **/
-static void read_loop (int fd, char *buf, size_t len)
+static void read_loop(int fd, char *buf, size_t len)
 {
 	while (len) {
 		int n = read_timeout(fd, buf, len);
@@ -472,7 +471,7 @@ static int read_unbuffered(int fd, char *buf, size_t len)
 			exit_cleanup(RERR_STREAMIO);
 		}
 
-		if (remaining > sizeof(line) - 1) {
+		if (remaining > sizeof line - 1) {
 			rprintf(FERROR, "multiplexing overflow %ld\n\n",
 				(long)remaining);
 			exit_cleanup(RERR_STREAMIO);
@@ -495,15 +494,15 @@ static int read_unbuffered(int fd, char *buf, size_t len)
  * have been read.  If all @p n can't be read then exit with an
  * error.
  **/
-static void readfd (int fd, char *buffer, size_t N)
+static void readfd(int fd, char *buffer, size_t N)
 {
 	int  ret;
 	size_t total=0;  
-	
+
 	while (total < N) {
 		io_flush();
 
-		ret = read_unbuffered (fd, buffer + total, N-total);
+		ret = read_unbuffered(fd, buffer + total, N-total);
 		total += ret;
 	}
 
@@ -550,14 +549,14 @@ void read_buf(int f,char *buf,size_t len)
 
 void read_sbuf(int f,char *buf,size_t len)
 {
-	read_buf (f,buf,len);
+	read_buf(f,buf,len);
 	buf[len] = 0;
 }
 
 unsigned char read_byte(int f)
 {
 	unsigned char c;
-	read_buf (f, (char *)&c, 1);
+	read_buf(f, (char *)&c, 1);
 	return c;
 }
 
@@ -580,7 +579,7 @@ static void sleep_for_bwlimit(int bytes_written)
 
 	assert(bytes_written > 0);
 	assert(bwlimit > 0);
-	
+
 	tv.tv_usec = bytes_written * 1000 / bwlimit;
 	tv.tv_sec  = tv.tv_usec / 1000000;
 	tv.tv_usec = tv.tv_usec % 1000000;
@@ -705,8 +704,8 @@ static void mplex_write(int fd, enum logcode code, char *buf, size_t len)
 
 	SIVAL(buffer, 0, ((MPLEX_BASE + (int)code)<<24) + len);
 
-	if (n > (sizeof(buffer)-4)) {
-		n = sizeof(buffer)-4;
+	if (n > (sizeof buffer - 4)) {
+		n = sizeof buffer - 4;
 	}
 
 	memcpy(&buffer[4], buf, n);
@@ -766,7 +765,7 @@ static void writefd(int fd,char *buf,size_t len)
 			len -= n;
 			io_buffer_count += n;
 		}
-		
+
 		if (io_buffer_count == IO_BUFFER_SIZE) io_flush();
 	}
 }
@@ -868,9 +867,9 @@ void io_printf(int fd, const char *format, ...)
 	va_list ap;  
 	char buf[1024];
 	int len;
-	
+
 	va_start(ap, format);
-	len = vsnprintf(buf, sizeof(buf), format, ap);
+	len = vsnprintf(buf, sizeof buf, format, ap);
 	va_end(ap);
 
 	if (len < 0) exit_cleanup(RERR_STREAMIO);
