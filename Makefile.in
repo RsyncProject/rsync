@@ -161,7 +161,7 @@ check: all $(CHECK_PROGS)
 
 wildtest.o: wildtest.c lib/wildmatch.c rsync.h
 wildtest$(EXEEXT): wildtest.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ wildtest.o $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ wildtest.o @BUILD_POPT@ $(LIBS)
 
 # This does *not* depend on building or installing: you can use it to
 # check a version installed from a binary or some other source tree,
