@@ -146,21 +146,26 @@ AC_TRY_RUN([
 int main(void)
 {
 	struct flock lock;
-        int status;
-	int fd = open("conftest.dat", O_CREAT|O_RDWR, 0600);
+	int status;
+	char tpl[32] = "/tmp/locktest.XXXXXX";
+	int fd = mkstemp(tpl);
+	if (fd < 0) {
+		strcpy(tpl, "conftest.dat");
+		fd = open(tpl, O_CREAT|O_RDWR, 0600);
+	}
+
 	lock.l_type = F_WRLCK;
 	lock.l_whence = SEEK_SET;
 	lock.l_start = 0;
 	lock.l_len = 1;
 	lock.l_pid = 0;
-	
 	fcntl(fd,F_SETLK,&lock);
 	if (fork() == 0) {
-		lock.l_start = 1;		
-		exit(fcntl(fd,F_SETLK,&lock) == 0);
-        }
-        wait(&status);
-	unlink("conftest.dat");
+		lock.l_start = 1;
+		_exit(fcntl(fd,F_SETLK,&lock) == 0);
+	}
+	wait(&status);
+	unlink(tpl);
 	exit(WEXITSTATUS(status));
 }
 ],
