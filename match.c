@@ -102,7 +102,7 @@ static OFF_T last_match;
  * have only literal data.
  **/
 static void matched(int f, struct sum_struct *s, struct map_struct *buf,
-		    OFF_T offset, int i)
+		    OFF_T offset, int32 i)
 {
 	int32 n = offset - last_match; /* max value: block_size (int32) */
 	int32 j;
