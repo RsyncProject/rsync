@@ -46,8 +46,6 @@ extern char *compare_dest;
 extern int link_dest;
 extern int whole_file;
 extern int local_server;
-extern int read_batch;
-extern int write_batch;
 extern int list_only;
 extern int only_existing;
 extern int orig_umask;
@@ -199,24 +197,6 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 			(double)sum->count, sum->remainder, sum->blength,
 			sum->s2length, (double)sum->flength);
 	}
-}
-
-/**
- * Perhaps we want to just send an empty checksum set for this file,
- * which will force the whole thing to be literally transferred.
- *
- * When do we do this?  If the user's explicitly said they
- * want the whole thing, or if { they haven't explicitly
- * requested a delta, and it's local but not batch mode.}
- *
- * Whew. */
-static BOOL disable_deltas_p(void)
-{
-	if (whole_file > 0)
-		return True;
-	if (whole_file == 0 || write_batch || read_batch)
-		return False;
-	return local_server;
 }
 
 
@@ -501,7 +481,7 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		return;
 	}
 
-	if (disable_deltas_p()) {
+	if (whole_file > 0) {
 		write_int(f_out,i);
 		write_sum_head(f_out, NULL);
 		return;
@@ -556,7 +536,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 
 	if (verbose >= 2) {
 		rprintf(FINFO,
-			disable_deltas_p()
+			whole_file > 0
 			? "delta-transmission disabled for local transfer or --whole-file\n"
 			: "delta transmission enabled\n");
 	}
