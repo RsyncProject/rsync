@@ -51,7 +51,8 @@ static char *timestring(void )
 static void logit(int priority, char *buf)
 {
 	if (logfile) {
-		fprintf(logfile,"%s  %s", timestring(), buf);
+		fprintf(logfile,"%s [%d] %s", 
+			timestring(), (int)getpid(), buf);
 		fflush(logfile);
 	} else {
 		syslog(priority, "%s", buf);
@@ -192,8 +193,8 @@ void log_send(struct file_struct *file)
 {
 	extern int module_id;
 	if (lp_transfer_logging(module_id)) {
-		rprintf(FLOG,"%d Sending %s [%s] %.0f %s\n",
-			(int)getpid(), client_name(0), client_addr(0),
+		rprintf(FLOG,"Sending %s [%s] %.0f %s\n",
+			client_name(0), client_addr(0),
 			(double)file->length, f_name(file));
 	}
 }
@@ -203,8 +204,8 @@ void log_recv(struct file_struct *file)
 {
 	extern int module_id;
 	if (lp_transfer_logging(module_id)) {
-		rprintf(FLOG,"%d Receiving %s [%s] %.0f %s\n",
-			(int)getpid(), client_name(0), client_addr(0),
+		rprintf(FLOG,"Receiving %s [%s] %.0f %s\n",
+			client_name(0), client_addr(0),
 			(double)file->length, f_name(file));
 	}
 }
@@ -214,13 +215,12 @@ void log_exit(int code)
 {
 	if (code == 0) {
 		extern struct stats stats;		
-		rprintf(FLOG,"%d wrote %.0f bytes  read %.0f bytes  total size %.0f\n",
-			(int)getpid(),
+		rprintf(FLOG,"wrote %.0f bytes  read %.0f bytes  total size %.0f\n",
 			(double)stats.total_written,
 			(double)stats.total_read,
 			(double)stats.total_size);
 	} else {
-		rprintf(FLOG,"%d transfer interrupted\n", (int)getpid());
+		rprintf(FLOG,"transfer interrupted\n");
 	}
 }
 
