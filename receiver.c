@@ -306,15 +306,13 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 
 	sum_end(file_sum1);
 
-	if (remote_version >= 14) {
-		read_buf(f_in,file_sum2,MD4_SUM_LENGTH);
-		if (verbose > 2) {
-			rprintf(FINFO,"got file_sum\n");
-		}
-		if (fd != -1 && 
-		    memcmp(file_sum1,file_sum2,MD4_SUM_LENGTH) != 0) {
-			return 0;
-		}
+	read_buf(f_in,file_sum2,MD4_SUM_LENGTH);
+	if (verbose > 2) {
+		rprintf(FINFO,"got file_sum\n");
+	}
+	if (fd != -1
+	    && memcmp(file_sum1,file_sum2,MD4_SUM_LENGTH) != 0) {
+		return 0;
 	}
 	return 1;
 }
@@ -353,7 +351,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 		i = read_int(f_in);
 		if (i == -1) {
-			if (phase==0 && remote_version >= 13) {
+			if (phase==0) {
 				phase++;
 				csum_length = SUM_LENGTH;
 				if (verbose > 2)

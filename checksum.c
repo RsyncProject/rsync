@@ -117,16 +117,6 @@ void file_checksum(char *fname,char *sum,OFF_T size)
 }
 
 
-void checksum_init(void)
-{
-  if (remote_version >= 14)
-    csum_length = 2; /* adaptive */
-  else
-    csum_length = SUM_LENGTH;
-}
-
-
-
 static int sumresidue;
 static char sumrbuf[CSUM_CHUNK];
 static struct mdfour md;

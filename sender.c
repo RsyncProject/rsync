@@ -20,7 +20,6 @@
 #include "rsync.h"
 
 extern int verbose;
-extern int remote_version;
 extern int csum_length;
 extern struct stats stats;
 extern int io_error;
@@ -118,7 +117,7 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 
 		i = read_int(f_in);
 		if (i == -1) {
-			if (phase==0 && remote_version >= 13) {
+			if (phase==0) {
 				phase++;
 				csum_length = SUM_LENGTH;
 				write_int(f_out,-1);

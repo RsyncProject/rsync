@@ -516,19 +516,16 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 
 	write_int(f,-1);
 
-	if (remote_version >= 13) {
-		/* in newer versions of the protocol the files can cycle through
-		   the system more than once to catch initial checksum errors */
-		for (i=read_int(f_recv); i != -1; i=read_int(f_recv)) {
-			struct file_struct *file = flist->files[i];
-			recv_generator(local_name?local_name:f_name(file),
-				       flist,i,f);
-		}
-
-		phase++;
-		if (verbose > 2)
-			rprintf(FINFO,"generate_files phase=%d\n",phase);
-
-		write_int(f,-1);
+	/* files can cycle through the system more than once
+	 * to catch initial checksum errors */
+	for (i=read_int(f_recv); i != -1; i=read_int(f_recv)) {
+		struct file_struct *file = flist->files[i];
+		recv_generator(local_name?local_name:f_name(file), flist,i,f);
 	}
+
+	phase++;
+	if (verbose > 2)
+		rprintf(FINFO,"generate_files phase=%d\n",phase);
+
+	write_int(f,-1);
 }

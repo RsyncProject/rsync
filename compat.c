@@ -65,18 +65,14 @@ void setup_protocol(int f_out,int f_in)
 		rprintf(FINFO,"%s is very old version of rsync, upgrade recommended.\n",
 			am_server ? "Server" : "Client");
 
-	if (remote_version >= 12) {
-		if (am_server) {
-		    if (read_batch || write_batch) /* dw */
+	if (am_server) {
+		if (read_batch || write_batch) /* dw */
 			checksum_seed = 32761;
-		    else
+		else
 			checksum_seed = time(NULL);
-			write_int(f_out,checksum_seed);
-		} else {
-			checksum_seed = read_int(f_in);
-		}
+		write_int(f_out,checksum_seed);
+	} else {
+		checksum_seed = read_int(f_in);
 	}
-	
-	checksum_init();
 }
 

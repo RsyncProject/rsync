@@ -1042,7 +1042,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 	/* now send the uid/gid list. This was introduced in protocol
 	   version 15 */
-	if (f != -1 && remote_version >= 15) {
+	if (f != -1) {
 		send_uid_list(f);
 	}
 
@@ -1122,7 +1122,7 @@ struct file_list *recv_file_list(int f)
 	}
 
 	/* now recv the uid/gid list. This was introduced in protocol version 15 */
-	if (f != -1 && remote_version >= 15) {
+	if (f != -1) {
 		recv_uid_list(f, flist);
 	}
 

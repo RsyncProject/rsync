@@ -24,8 +24,6 @@ extern int csum_length;
 extern int verbose;
 extern int am_server;
 
-extern int remote_version;
-
 typedef unsigned short tag;
 
 #define TABLESIZE (1<<16)
@@ -322,13 +320,11 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 
 	sum_end(file_sum);
 
-	if (remote_version >= 14) {
-		if (verbose > 2)
-			rprintf(FINFO,"sending file_sum\n");
-		write_buf(f,file_sum,MD4_SUM_LENGTH);
-		if (write_batch) /* dw */
-		    write_batch_delta_file(file_sum, MD4_SUM_LENGTH);
-	}
+	if (verbose > 2)
+		rprintf(FINFO,"sending file_sum\n");
+	write_buf(f,file_sum,MD4_SUM_LENGTH);
+	if (write_batch) /* dw */
+		write_batch_delta_file(file_sum, MD4_SUM_LENGTH);
 
 	if (targets) {
 		free(targets);
