@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsyncd.conf)(5)(26 Jan 2003)()()
+manpage(rsyncd.conf)(5)(1 Jan 2004)()()
 manpagename(rsyncd.conf)(configuration file for rsync server)
 manpagesynopsis()
 
