@@ -60,20 +60,19 @@ extern struct exclude_list_struct server_exclude_list;
 /* choose whether to skip a particular file */
 static int skip_file(char *fname, struct file_struct *file, STRUCT_STAT *st)
 {
-	if (st->st_size != file->length) {
-		return 0;
-	}
+	if (st->st_size != file->length)
+		return 1;
 	if (link_dest) {
 		if (preserve_perms
 		    && (st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS))
-			return 0;
+			return 1;
 
 		if (am_root && preserve_uid && st->st_uid != file->uid)
-			return 0;
+			return 1;
 
 		if (preserve_gid && file->gid != GID_NONE
 		    && st->st_gid != file->gid)
-			return 0;
+			return 1;
 	}
 
 	/* if always checksum is set then we use the checksum instead
@@ -91,18 +90,16 @@ static int skip_file(char *fname, struct file_struct *file, STRUCT_STAT *st)
 		}
 		file_checksum(fname,sum,st->st_size);
 		return memcmp(sum, file->u.sum, protocol_version < 21 ? 2
-							: MD4_SUM_LENGTH) == 0;
+							: MD4_SUM_LENGTH) != 0;
 	}
 
-	if (size_only) {
-		return 1;
-	}
-
-	if (ignore_times) {
+	if (size_only)
 		return 0;
-	}
 
-	return (cmp_modtime(st->st_mtime,file->modtime) == 0);
+	if (ignore_times)
+		return 1;
+
+	return cmp_modtime(st->st_mtime, file->modtime) != 0;
 }
 
 
@@ -491,7 +488,7 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 		return;
 	}
 
-	if (skip_file(fname, file, &st)) {
+	if (!skip_file(fname, file, &st)) {
 		if (fnamecmp == fname)
 			set_perms(fname, file, &st, PERMS_REPORT);
 		return;
