@@ -30,6 +30,9 @@ fi
 # compile with optimisation and without debugging by default, unless
 # --debug is given.  We must decide this before testing the compiler.
 
+# Please allow this to default to yes, so that your users have more
+# chance of getting a useful stack trace if problems occur.
+
 AC_MSG_CHECKING([whether to include debugging symbols])
 AC_ARG_ENABLE(debug,
 	AC_HELP_STRING([--enable-debug],
@@ -48,6 +51,12 @@ else
 fi
 
 CFLAGS="$CFLAGS -DHAVE_CONFIG_H"
+
+# If GCC, turn on warnings.
+if test "x$GCC" = "xyes"
+then
+	CFLAGS="$CFLAGS -Wall"
+fi
 
 AC_ARG_WITH(included-popt,
         [  --with-included-popt    use bundled popt library, not from system])
