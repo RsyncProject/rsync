@@ -58,10 +58,6 @@ CHECK_OBJS=getgroups.o t_stub.o t_unsafe.o trimslash.o wildtest.o
 
 all: rsync$(EXEEXT)
 
-gen: configure config.h.in proto man
-
-man: rsync.1 rsyncd.conf.5
-
 install: all
 	-mkdir -p ${DESTDIR}${bindir}
 	${INSTALLCMD} ${INSTALL_STRIP} -m 755 rsync$(EXEEXT) ${DESTDIR}${bindir}
@@ -92,11 +88,15 @@ T_UNSAFE_OBJ = t_unsafe.o syscall.o util.o t_stub.o lib/compat.o lib/snprintf.o
 t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
 
-configure: configure.in aclocal.m4
-	autoconf
+gen: $(srcdir)/configure $(srcdir)/config.h.in proto man
 
-config.h.in: configure.in aclocal.m4
-	autoheader
+man: $(srcdir)/rsync.1 $(srcdir)/rsyncd.conf.5
+
+$(srcdir)/configure: $(srcdir)/configure.in $(srcdir)/aclocal.m4
+	cd $(srcdir); autoconf
+
+$(srcdir)/config.h.in: $(srcdir)/configure.in $(srcdir)/aclocal.m4
+	cd $(srcdir); autoheader
 
 $(srcdir)/rsync.1: $(srcdir)/rsync.yo
 	yodl2man -o $(srcdir)/rsync.1 $(srcdir)/rsync.yo
