@@ -184,7 +184,7 @@ do
     echo "----- $testbase starting"
     clean_scratch
 
-    if sh $RUNSHFLAGS "$testscript"
+    if sh $RUNSHFLAGS "$testscript" >"$scratchdir/test.log"  2>&1
     then
 	echo "----- $testbase completed successfully"
 	passed=`expr $passed + 1`
@@ -195,7 +195,9 @@ do
 	    skipped=`expr $skipped + 1`
 	    ;;
 	*)
-	    echo "----- $testbase failed!"
+	    echo "----- $testbase failed: log follows"
+	    cat "$scratchdir/test.log"
+	    echo "----- $testbase log ends"
 	    failed=`expr $failed + 1`
 	    if [ "x$nopersist" = "xyes" ]
 	    then
