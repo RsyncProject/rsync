@@ -671,9 +671,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	char *local_name = NULL;
 
 	cleanup_child_pid = pid;
-	if (read_batch) {
-		assert(am_sender == 0);
-	} else {
+	if (!read_batch) {
 		set_nonblocking(f_in);
 		set_nonblocking(f_out);
 	}
