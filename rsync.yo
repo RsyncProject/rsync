@@ -252,7 +252,7 @@ Options
  -x, --one-file-system       don't cross filesystem boundaries
  -B, --block-size=SIZE       checksum blocking size (default 700)
  -e, --rsh=COMMAND           specify rsh replacement
-     --rsync-path=PATH       specify full path to rsync on the remote machine
+     --rsync-path=PATH       specify path to rsync on the remote machine
  -C, --cvs-exclude           auto ignore files in the same way CVS does
      --delete                delete files that don't exist on the sending side
      --delete-excluded       also delete excluded files on the receiving side
@@ -264,6 +264,7 @@ Options
      --size-only             only use file size when determining if a file should be transferred
  -T  --temp-dir=DIR          create temporary files in directory DIR
      --compare-dest=DIR      also compare destination files relative to DIR
+ -P                          equivalent to --partial --progress
  -z, --compress              compress file data
      --exclude=PATTERN       exclude files matching PATTERN
      --exclude-from=FILE     exclude patterns listed in FILE
@@ -390,12 +391,6 @@ This option can be quite slow, so only use it if you need it.
 dit(bf(-W, --whole-file)) With this option the incremental rsync algorithm
 is  not used  and  the whole file is sent as-is instead. This may be
 useful when using rsync with a local machine.
-
-dit(bf(--partial)) By default, rsync will delete any partially
-transferred file if the transfer is interrupted. In some circumstances
-it is more desirable to keep partially transferred files. Using the
---partial option tells rsync to keep the partial file which should
-make a subsequent transfer of the rest of the file much faster.
 
 dit(bf(-p, --perms)) This option causes rsync to update the remote
 permissions to be the same as the local permissions.
@@ -610,12 +605,22 @@ dit(bf(--stats)) This tells rsync to print a verbose set of statistics
 on the file transfer, allowing you to tell how effective the rsync
 algorithm is for your data.
 
+dit(bf(--partial)) By default, rsync will delete any partially
+transferred file if the transfer is interrupted. In some circumstances
+it is more desirable to keep partially transferred files. Using the
+--partial option tells rsync to keep the partial file which should
+make a subsequent transfer of the rest of the file much faster.
+
 dit(bf(--progress)) This option tells rsync to print information
 showing the progress of the transfer. This gives a bored user
 something to watch.
 
 This option is normally combined with -v. Using this option without
 the -v option will produce weird results on your display.
+
+dit(bf(-P)) The -P option is equivalent to --partial --progress. I
+found myself typing that combination quite often so I created an
+option to make it easier.
 
 dit(bf(--password-file)) This option allows you to provide a password
 in a file for accessing a remote rsync server. Note that this option

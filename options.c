@@ -132,6 +132,7 @@ void usage(int F)
   rprintf(F,"     --size-only             only use file size when determining if a file should be transferred\n");
   rprintf(F," -T  --temp-dir=DIR          create temporary files in directory DIR\n");
   rprintf(F,"     --compare-dest=DIR      also compare destination files relative to DIR\n");
+  rprintf(F," -P                          equivalent to --partial --progress\n");
   rprintf(F," -z, --compress              compress file data\n");
   rprintf(F,"     --exclude=PATTERN       exclude files matching PATTERN\n");
   rprintf(F,"     --exclude-from=FILE     exclude patterns listed in FILE\n");
@@ -160,7 +161,7 @@ enum {OPT_VERSION, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
       OPT_COPY_UNSAFE_LINKS, OPT_SAFE_LINKS, OPT_COMPARE_DEST,
       OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY};
 
-static char *short_options = "oblLWHpguDCtcahvqrRIxnSe:B:T:z";
+static char *short_options = "oblLWHpguDCtcahvqrRIxnSe:B:T:zP";
 
 static struct option long_options[] = {
   {"version",     0,     0,    OPT_VERSION},
@@ -497,6 +498,11 @@ int parse_arguments(int argc, char *argv[], int frommain)
 			break;
 
 		case OPT_PARTIAL:
+			keep_partial = 1;
+			break;
+
+		case 'P':
+			do_progress = 1;
 			keep_partial = 1;
 			break;
 
