@@ -24,11 +24,11 @@ if ! [ "`ssh -o'BatchMode yes' localhost echo yes`" = "yes" ]; then
 fi
 
 # Added by Steve Bonds Feb 2 2003
-# Without this, there are no files in the ${FROM} directory, so rsync has
+# Without this, there are no files in the $fromdir directory, so rsync has
 # nothing to do.
 hands_setup
 
-runtest "ssh: basic test" 'checkit "$RSYNC -avH -e ssh --rsync-path=$RSYNC ${FROM}/ localhost:${TO}" ${FROM}/ ${TO}'
+runtest "ssh: basic test" 'checkit "$RSYNC -avH -e ssh --rsync-path=$RSYNC \"$fromdir/\" \"localhost:$todir\"" "$fromdir/" "$todir"'
 
 # Added by Steve Bonds Feb 2 2003
 # I assumed that "F1" was intended to hold a single file for testing if
@@ -36,8 +36,8 @@ runtest "ssh: basic test" 'checkit "$RSYNC -avH -e ssh --rsync-path=$RSYNC ${FRO
 # it was unset so the "mv" tried to move a parent directory into a
 # subdirectory of itself.  There is probably a better way of pulling out
 # a sample file to rename.
-F1=`ls ${TO} | head -5 | tail -1`
+F1=`ls "$todir" | head -5 | tail -1`
 
-mv ${TO}/${F1} ${TO}/ThisShouldGo
+mv "$todir/$F1" "$todir/ThisShouldGo"
 
-runtest "ssh: renamed file" 'checkit "$RSYNC --delete -avH -e ssh --rsync-path=$RSYNC ${FROM}/ localhost:${TO}" ${FROM}/ ${TO}'
+runtest "ssh: renamed file" 'checkit "$RSYNC --delete -avH -e ssh --rsync-path=$RSYNC \"$fromdir/\" \"localhost:$todir\"" "$fromdir/" "$todir"'

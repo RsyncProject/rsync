@@ -11,19 +11,19 @@ hands_setup
 
 # Main script starts here
 
-runtest "basic operation" 'checkit "$RSYNC -av ${FROM}/ ${TO}" ${FROM}/ ${TO}'
+runtest "basic operation" 'checkit "$RSYNC -av \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
 
-ln ${FROM}/filelist ${FROM}/dir
-runtest "hard links" 'checkit "$RSYNC -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
+ln "$fromdir/filelist" "$fromdir/dir"
+runtest "hard links" 'checkit "$RSYNC -avH \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
 
-rm ${TO}/text
-runtest "one file" 'checkit "$RSYNC -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
+rm "$todir/text"
+runtest "one file" 'checkit "$RSYNC -avH \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
 
-echo "extra line" >> ${TO}/text
-runtest "extra data" 'checkit "$RSYNC -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
+echo "extra line" >> "$todir/text"
+runtest "extra data" 'checkit "$RSYNC -avH \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
 
-cp ${FROM}/text ${TO}/ThisShouldGo
-runtest " --delete" 'checkit "$RSYNC --delete -avH ${FROM}/ ${TO}" ${FROM}/ ${TO}'
+cp "$fromdir/text" "$todir/ThisShouldGo"
+runtest " --delete" 'checkit "$RSYNC --delete -avH \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
