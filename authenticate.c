@@ -82,7 +82,7 @@ static int get_secret(int module, char *user, char *secret, int len)
 
 	if (!fname || !*fname) return 0;
 
-	fd = open(fname,O_RDONLY | O_TEXT);
+	fd = open(fname,O_RDONLY);
 	if (fd == -1) return 0;
 
 	if (do_stat(fname, &st) == -1) {
@@ -144,7 +144,7 @@ static char *getpassf(char *filename)
 
 	if (!filename) return NULL;
 
-	if ( (fd=open(filename,O_RDONLY | O_TEXT)) == -1) {
+	if ( (fd=open(filename,O_RDONLY)) == -1) {
 		rsyserr(FERROR, errno, "could not open password file \"%s\"",filename);
 		if (envpw) rprintf(FERROR,"falling back to RSYNC_PASSWORD environment variable.\n");	
 		return NULL;
