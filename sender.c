@@ -222,18 +222,17 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		i = read_int(f_in);
 		if (i == -1) {
-			if (phase == 0) {
-				phase++;
-				csum_length = SUM_LENGTH;
-				write_int(f_out, -1);
-				if (verbose > 2)
-					rprintf(FINFO, "send_files phase=%d\n", phase);
-				/* For inplace: redo phase turns off the backup
-				 * flag so that we do a regular inplace send. */
-				make_backups = 0;
-				continue;
-			}
-			break;
+			if (phase)
+				break;
+			phase = 1;
+			csum_length = SUM_LENGTH;
+			if (verbose > 2)
+				rprintf(FINFO, "send_files phase=%d\n", phase);
+			write_int(f_out, -1);
+			/* For inplace: redo phase turns off the backup
+			 * flag so that we do a regular inplace send. */
+			make_backups = 0;
+			continue;
 		}
 
 		iflags = read_item_attrs(f_in, f_out, i, &fnamecmp_type,
