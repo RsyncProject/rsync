@@ -21,13 +21,12 @@ SOCKS								2002/01/23
 FAT support
 Allow forcing arbitrary permissions				2002/03/12
 --diff						david.e.sewell	2002/03/15
-Add daemon --no-detach and --no-fork options
+Add daemon --no-fork option
 Create more granular verbosity				jw	2003/05/15
 
 DOCUMENTATION --------------------------------------------------------
 Update README
 Keep list of open issues and todos on the web site
-Update web site from CVS
 Perhaps redo manual as SGML
 
 LOGGING --------------------------------------------------------------
@@ -326,7 +325,7 @@ Allow forcing arbitrary permissions				2002/03/12
                       --          --
 
 
-Add daemon --no-detach and --no-fork options
+Add daemon --no-fork option
 
   Very useful for debugging.  Also good when running under a
   daemon-monitoring process that tries to restart the service when the
@@ -358,11 +357,6 @@ Update README
 
 
 Keep list of open issues and todos on the web site
-
-                      --          --
-
-
-Update web site from CVS
 
                       --          --
 
