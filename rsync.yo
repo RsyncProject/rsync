@@ -1339,8 +1339,8 @@ tt(- *)nl()
 This fails because the parent directory "some" is excluded by the '*'
 rule, so rsync never visits any of the files in the "some" or "some/path"
 directories.  One solution is to ask for all directories in the hierarchy
-to be included by using a single rule: "+_*/" (put it somewhere before the
-"-_*" rule).  Another solution is to add specific include rules for all
+to be included by using a single rule: "+ */" (put it somewhere before the
+"- *" rule).  Another solution is to add specific include rules for all
 the parent dirs that need to be visited.  For instance, this set of rules
 works fine:
 
@@ -1409,7 +1409,7 @@ itemize(
   allows the list-clearing token (!) to be specified.  If no filename is
   provided, ".cvsignore" is assumed.
   it() A bf(e) will exclude the merge-file name from the transfer; e.g.
-  "dir-merge,e_.rules" is like "dir-merge,_.rules" and "-_.rules".
+  "dir-merge,e .rules" is like "dir-merge .rules" and "- .rules".
   it() An bf(n) specifies that the rules are not inherited by subdirectories.
   it() A bf(w) specifies that the rules are word-split on whitespace instead
   of the normal line-splitting.  This also turns off comments.  Note: the
@@ -1418,7 +1418,7 @@ itemize(
   also disabled).
   it() You may also specify any of the modifiers for the "+" or "-" rules
   (below) in order  to have the rules that are read-in from the file
-  default to having that modifier set.  For instance, "merge,-/_.excl" would
+  default to having that modifier set.  For instance, "merge,-/ .excl" would
   treat the contents of .excl as absolute-path excludes.
 )
 
@@ -1427,7 +1427,7 @@ The following modifiers are accepted after a "+" or "-":
 itemize(
   it() A "/" specifies that the include/exclude should be treated as an
   absolute path, relative to the root of the filesystem.  For example,
-  "-/_/etc/passwd" would exclude the passwd file any time the transfer
+  "-/ /etc/passwd" would exclude the passwd file any time the transfer
   was sending files from the "/etc" directory.
   it() A "!" specifies that the include/exclude should take effect if
   the pattern fails to match.  For instance, "-! */" would exclude all
