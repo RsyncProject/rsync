@@ -710,11 +710,11 @@ int check_name(int fd,
 	hints.ai_socktype = SOCK_STREAM;
 	error = getaddrinfo(name_buf, port_buf, &hints, &res0);
 	if (error) {
-		strcpy(name_buf, default_name);
 		rprintf(FERROR,
 			RSYNC_NAME ": forward name lookup for %s:%s failed: %s\n",
 			name_buf, port_buf,
 			gai_strerror(error));
+		strcpy(name_buf, default_name);
 		return error;
 	}
 
@@ -730,14 +730,14 @@ int check_name(int fd,
 	}
 
 	if (res == NULL) {
-		strcpy(name_buf, default_name);
 		/* We hit the end of the list without finding an
 		 * address that was the same as ss. */
 		rprintf(FERROR, RSYNC_NAME
-			": no address record for \"%s\" corresponds to address %s: "
+			": %s is not a known address for \"%s\": "
 			"spoofed address?\n",
-			name_buf,
-			client_addr(fd));
+			client_addr(fd),
+			name_buf);
+		strcpy(name_buf, default_name);
 	}
 
 	freeaddrinfo(res0);
