@@ -56,8 +56,8 @@ static int skip_file(char *fname,
 		extern int preserve_uid;
 		extern int preserve_gid;
 
-		if((preserve_perms
-		    && st->st_mode & ~_S_IFMT) !=  (file->mode & ~_S_IFMT))
+		if(preserve_perms
+		    && (st->st_mode & ~_S_IFMT) !=  (file->mode & ~_S_IFMT))
 			return 0;
 
 		if (preserve_uid && st->st_uid != file->uid)
