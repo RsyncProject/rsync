@@ -25,11 +25,15 @@
 
 extern int verbose;
 extern int dry_run;
-extern int itemize_changes;
+extern int log_format_has_i;
+extern int log_format_has_o_or_i;
+extern int daemon_log_format_has_i;
+extern int am_root;
+extern int am_server;
+extern int am_daemon;
 extern int relative_paths;
 extern int keep_dirlinks;
 extern int preserve_links;
-extern int am_root;
 extern int preserve_devices;
 extern int preserve_hard_links;
 extern int preserve_perms;
@@ -62,6 +66,7 @@ extern int only_existing;
 extern int orig_umask;
 extern int safe_symlinks;
 extern long block_size; /* "long" because popt can't set an int32. */
+extern struct stats stats;
 
 extern struct filter_list_struct server_filter_list;
 
@@ -113,9 +118,12 @@ static void itemize(struct file_struct *file, int statret, STRUCT_STAT *st,
 		iflags |= ITEM_IS_NEW | ITEM_UPDATING;
 
 	if ((iflags || verbose > 1) && !read_batch) {
-		if (ndx >= 0)
-			write_int(f_out, ndx);
-		write_shortint(f_out, iflags);
+		if (protocol_version >= 29) {
+			if (ndx >= 0)
+				write_int(f_out, ndx);
+			write_shortint(f_out, iflags);
+		} else if (ndx >= 0)
+			log_recv(file, &stats, iflags);
 	}
 }
 
@@ -346,12 +354,34 @@ static void recv_generator(char *fname, struct file_list *flist,
 	int statret, stat_errno;
 	char *fnamecmp, *partialptr, *backupptr = NULL;
 	char fnamecmpbuf[MAXPATHLEN];
+	int itemizing, maybe_DEL_TERSE, maybe_PERMS_REPORT;
 	uchar fnamecmp_type;
-	int maybe_DEL_TERSE = itemize_changes ? 0 : DEL_TERSE;
-	int maybe_PERMS_REPORT = itemize_changes ? 0 : PERMS_REPORT;
+	enum logcode code;
 
 	if (list_only)
 		return;
+
+	if (protocol_version >= 29) {
+		itemizing = 1;
+		code = daemon_log_format_has_i ? 0 : FLOG;
+		maybe_DEL_TERSE = log_format_has_o_or_i ? 0 : DEL_TERSE;
+		maybe_PERMS_REPORT = log_format_has_i ? 0 : PERMS_REPORT;
+	} else if (am_daemon) {
+		itemizing = daemon_log_format_has_i && !dry_run;
+		code = itemizing || dry_run ? FCLIENT : FINFO;
+		maybe_DEL_TERSE = DEL_TERSE;
+		maybe_PERMS_REPORT = PERMS_REPORT;
+	} else if (!am_server) {
+		itemizing = log_format_has_i;
+		code = itemizing ? 0 : FINFO;
+		maybe_DEL_TERSE = log_format_has_o_or_i ? 0 : DEL_TERSE;
+		maybe_PERMS_REPORT = log_format_has_i ? 0 : PERMS_REPORT;
+	} else {
+		itemizing = 0;
+		code = FINFO;
+		maybe_DEL_TERSE = DEL_TERSE;
+		maybe_PERMS_REPORT = PERMS_REPORT;
+	}
 
 	if (!fname) {
 		if (fuzzy_dirlist) {
@@ -438,7 +468,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 			missing_below = file->dir.depth;
 			dry_run++;
 		}
-		if (protocol_version >= 29 && f_out != -1)
+		if (itemizing && f_out != -1)
 			itemize(file, statret, &st, 0, f_out, ndx);
 		if (statret != 0 && do_mkdir(fname,file->mode) != 0 && errno != EEXIST) {
 			if (!relative_paths || errno != ENOENT
@@ -450,14 +480,14 @@ static void recv_generator(char *fname, struct file_list *flist,
 			}
 		}
 		if (set_perms(fname, file, statret ? NULL : &st, 0)
-		    && verbose && protocol_version < 29 && f_out != -1)
-			rprintf(FINFO, "%s/\n", safe_fname(fname));
+		    && verbose && code && f_out != -1)
+			rprintf(code, "%s/\n", safe_fname(fname));
 		if (delete_during && f_out != -1 && csum_length != SUM_LENGTH
 		    && (file->flags & FLAG_DEL_HERE))
 			delete_in_dir(flist, fname, file);
 		return;
 	}
-	
+
 	if (max_size && file->length > max_size) {
 		if (verbose > 1) {
 			rprintf(FINFO, "%s is over max-size\n",
@@ -488,7 +518,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 				 * right place -- no further action
 				 * required. */
 				if (strcmp(lnk, file->u.link) == 0) {
-					if (protocol_version >= 29) {
+					if (itemizing) {
 						itemize(file, 0, &st, 0,
 							f_out, ndx);
 					}
@@ -511,11 +541,12 @@ static void recv_generator(char *fname, struct file_list *flist,
 				full_fname(fname), safe_fname(file->u.link));
 		} else {
 			set_perms(fname,file,NULL,0);
-			if (protocol_version >= 29) {
+			if (itemizing) {
 				itemize(file, statret, &st, SID_UPDATING,
 					f_out, ndx);
-			} else if (verbose) {
-				rprintf(FINFO, "%s -> %s\n", safe_fname(fname),
+			}
+			if (code && verbose) {
+				rprintf(code, "%s -> %s\n", safe_fname(fname),
 					safe_fname(file->u.link));
 			}
 		}
@@ -543,16 +574,17 @@ static void recv_generator(char *fname, struct file_list *flist,
 					full_fname(fname));
 			} else {
 				set_perms(fname,file,NULL,0);
-				if (protocol_version >= 29) {
+				if (itemizing) {
 					itemize(file, statret, &st, SID_UPDATING,
 						f_out, ndx);
-				} else if (verbose) {
-					rprintf(FINFO, "%s\n",
+				}
+				if (code && verbose) {
+					rprintf(code, "%s\n",
 						safe_fname(fname));
 				}
 			}
 		} else {
-			if (protocol_version >= 29) {
+			if (itemizing) {
 				itemize(file, statret, &st, 0,
 					f_out, ndx);
 			}
@@ -692,7 +724,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 	else if (fnamecmp_type == FNAMECMP_FUZZY)
 		;
 	else if (unchanged_file(fnamecmp, file, &st)) {
-		if (protocol_version >= 29) {
+		if (itemizing) {
 			itemize(file, statret, &st,
 				fnamecmp_type == FNAMECMP_FNAME
 					       ? 0 : SID_NO_DEST_AND_NO_UPDATE,
@@ -776,7 +808,7 @@ prepare_to_open:
 
 notify_others:
 	write_int(f_out, ndx);
-	if (protocol_version >= 29) {
+	if (itemizing) {
 		itemize(file, statret, &st, SID_UPDATING
 			| (always_checksum ? SID_REPORT_CHECKSUM : 0),
 			f_out, -1);
