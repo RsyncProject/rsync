@@ -1,3 +1,256 @@
+NEWS for rsync 2.6.3 (30 Sep 2004)
+Protocol: 28 (unchanged)
+Changes since 2.6.2:
+
+  SECURITY FIXES:
+
+    - A bug in the sanitize_path routine (which affects a non-chrooted
+      rsync daemon) could allow a user to craft a pathname that would get
+      transformed into an absolute path for certain options (but not for
+      file-transfer names).  If you're running an rsync daemon with chroot
+      disabled, *please upgrade*, ESPECIALLY if the user privs you run
+      rsync under is anything above "nobody".
+
+  OUTPUT CHANGES (ATTN: those using a script to parse the verbose output):
+
+    - Please note that the 2-line footer (output when verbose) now uses the
+      term "sent" instead of "wrote" and "received" instead of "read".  If
+      you are not parsing the numeric values out of this footer, a script
+      would be better off using the empty line prior to the footer as the
+      indicator that the verbose output is over.
+      
+    - The output from the --stats option was similarly affected to change
+      "written" to "sent" and "read" to "received".
+
+    - Rsync ensures that a filename that contains a newline gets mentioned
+      with each newline transformed into a question mark (which prevents a
+      filename from causing an empty line to be output).
+
+    - The "backed up ..." message that is output when at least 2 --verbose
+      options are specified is now the same both with and without the
+      --backup-dir option.
+
+  BUG FIXES:
+
+    - Fixed a crash bug that might appear when --delete was used and
+      multiple source directories were specified.
+
+    - Fixed a 32-bit truncation of the file length when generating the
+      checksums.
+
+    - The --backup code no longer attempts to create some directories
+      over and over again (generating warnings along the way).
+
+    - Fixed a bug in the reading of the secrets file (by the daemon) and
+      the password file (by the client):  the files no longer need to be
+      terminated by a newline for their content to be read in.
+
+    - If a file has a read error on the sending side or the reconstructed
+      data doesn't match the expected checksum (perhaps due to the basis
+      file changing during the transfer), the receiver will no longer
+      retain the resulting file unless the --partial option was specified.
+      (Note: for the read-error detection to work, neither side can be
+      older than 2.6.3 -- older receivers will always retain the file, and
+      older senders don't tell the receiver that the file had a read
+      error.)
+
+    - If a file gets resent in a single transfer and the --backup option
+      is enabled, rsync no longer performs a duplicate backup (it used to
+      overwrite the original file in the backup area).
+
+    - Files specified in the daemon's "exclude" or "exclude from" config
+      items are now excluded from being uploaded (assuming that the module
+      allows uploading at all) in addition to the old download exclusion.
+
+    - Got rid of a potential hang in the receiver when near the end of a
+      phase.
+
+    - When using --backup without a --backup-dir, rsync no longer preserves
+      the modify time on directories.  This avoids confusing NFS.
+
+    - When --copy-links (-L) is specified, we now output a separate error
+      for a symlink that has no referent instead of claiming that a file
+      "vanished".
+
+    - The --copy-links (-L) option no longer has the side-effect of telling
+      the receiving side to follow symlinks.  See the --keep-dirlinks
+      option (mentioned below) for a way to specify that behavior.
+
+    - Error messages from the daemon server's option-parsing (such as
+      refused options) are now successfully transferred back to the client
+      (the server used to fail to send the message because the socket
+      wasn't in the right state for the message to get through).
+
+    - Most transfer errors that occur during a daemon transfer are now
+      returned to the user in addition to being logged (some messages are
+      intended to be daemon-only and are not affected by this).
+
+    - Fixed a bug in the daemon authentication code when using one of the
+      batch-processing options.
+
+    - We try to work around some buggy IPv6 implementations that fail to
+      implement IPV6_V6ONLY.  This should fix the "address in use" error
+      that some daemons get when running on an OS with a buggy IPv6
+      implementation.  Also, if the new code gets this error, we might
+      suggest that the user specify --ipv4 or --ipv6 (if we think it will
+      help).
+
+    - When the remote rsync dies, make a better effort to recover any error
+      messages it may have sent before dying (the local rsync used to just
+      die with a socket-write error).
+
+    - When using --delete and a --backup-dir that contains files that are
+      hard-linked to their destination equivalents, rsync now makes sure
+      that removed files really get removed (avoids a really weird rename()
+      behavior).
+
+    - Avoid a bogus run-time complaint about a lack of 64-bit integers when
+      the int64 type is defined as an off_t and it actually has 64-bits.
+
+    - Added a configure check for open64() without mkstemp64() so that we
+      can avoid using mkstemp() when such a combination is encountered.
+      This bypasses a problem writing out large temp files on OSes such as
+      AIX and HP-UX.
+
+    - Fixed an age-old crash problem with --read-batch on a local copy
+      (rsync was improperly assuming --whole-file for the local copy).
+
+    - When --dry-run (-n) is used and the destination directory does not
+      exist, rsync now produces a correct report of files that would be
+      sent instead of dying with a chdir() error.
+
+    - Fixed a bug that could cause a slow-to-connect rsync daemon to die
+      with an error instead of waiting for the connection to finish.
+
+    - Fixed an ssh interaction that could cause output to be lost when the
+      user chose to combine the output of rsync's stdout and stderr (e.g.
+      using the "2>&1").
+
+  ENHANCEMENTS:
+
+    - Added the --partial-dir=DIR option that lets you specify where to
+      (temporarily) put a partially transferred file (instead of over-
+      writing the destination file).  E.g.  --partial-dir=.rsync-partial
+      Also added support for the RSYNC_PARTIAL_DIR environment variable
+      that, when found, transforms a regular --partial option (such as
+      the convenient -P option) into one that also specifies a directory.
+
+    - Added --keep-dirlinks (-K), which allows you to symlink a directory
+      onto another partition on the receiving side and have rsync treat it
+      as matching a normal directory from the sender.
+
+    - Added the --inplace option that tells rsync to write each destination
+      file without using a temporary file.  The matching of existing data
+      in the destination file can be severely limited by this, but there
+      are also cases where this is more efficient (such as appending data).
+      Use only when needed (see the man page for more details).
+
+    - Added the "write only" option for the daemon's config file.
+
+    - Added long-option names for -4 and -6 (namely --ipv4 and --ipv6)
+      and documented all these options in the man page.
+
+    - Improved the handling of the --bwlimit option so that it's less
+      bursty, more accurate, and works properly over a larger range of
+      values.
+
+    - The rsync daemon-over-ssh code now looks for SSH_CONNECTION and
+      SSH2_CLIENT in addition to SSH_CLIENT to figure out the IP address.
+
+    - Added the --checksum-seed=N option for advanced users.
+
+    - Batch writing/reading has a brand-new implementation that is simpler,
+      fixes a few weird problems with the old code (such as no longer
+      sprinkling the batch files into different dirs or even onto different
+      systems), and is much less intrusive into the code (making it easier
+      to maintain for the future).  The new code generates just one data
+      file instead of three, which makes it possible to read the batch on
+      stdin via a remote shell.  Also, the old requirement of forcing the
+      same fixed checksum-seed for all batch processing has been removed.
+
+    - If an rsync daemon has a module set with "list = no" (which hides its
+      presence in the list of available modules), a user that fails to
+      authenticate gets the same "unknown module" error that they would get
+      if the module were actually unknown (while still logging the real
+      error to the daemon's log file).  This prevents fishing for module
+      names.
+
+    - The daemon's "refuse options" config item now allows you to match
+      option names using wildcards and/or the single-letter option names.
+
+    - Each transferred file now gets its permissions and modified-time
+      updated before the temp-file gets moved into place.  Previously, the
+      finished file would have a very brief window where its permissions
+      disallowed all group and world access.
+
+    - Added the ability to parse a literal IPv6 address in an "rsync:" URL
+      (e.g. rsync://[2001:638:500:101::21]:873/module/dir).
+
+    - The daemon's wildcard expanding code can now handle more than 1000
+      filenames (it's now limited by memory instead of having a hard-wired
+      limit).
+
+  INTERNAL:
+
+    - Some cleanup in the exclude code has saved some per-exclude memory
+      and made the code easier to maintain.
+
+    - Improved the argv-overflow checking for a remote command that has a
+      lot of args.
+
+    - Use rsyserr() in the various places that were still calling rprintf()
+      with strerror() as an arg.
+
+    - If an rsync daemon is listening on multiple sockets (to handle both
+      IPv4 and IPv6 to a single port), we now close all the unneeded file
+      handles after we accept a connection (we used to close just one of
+      them).
+
+    - Optimized the handling of larger block sizes (rsync used to slow to a
+      crawl if the block size got too large).
+
+    - Optimized away a loop in hash_search().
+
+    - Some improvements to the sanitize_path() and clean_fname() functions
+      makes them more efficient and produce better results (while still
+      being compatible with the file-name cleaning that gets done on both
+      sides when sending the file-list).
+
+    - Got rid of alloc_sanitize_path() after adding a destination-buffer
+      arg to sanitize_path() made it possible to put all the former's
+      functionality into the latter.
+
+    - The file-list that is output when at least 4 verbose options are
+      specified reports the uid value on the sender even when rsync is
+      not running as root (since we might be sending to a root receiver).
+
+  BUILD CHANGES:
+
+    - Added a "gen" target to rebuild most of the generated files,
+      including configure, config.h.in, the man pages, and proto.h.
+
+    - If "make proto" doesn't find some changes in the prototypes, the
+      proto.h file is left untouched (its time-stamp used to always be
+      updated).
+
+    - The variable $STRIP (that is optionally set by the install-strip
+      target's rule) was changed to $INSTALL_STRIP because some systems
+      have $STRIP already set in the environment.
+
+    - Fixed a build problem when SUPPORT_HARD_LINKS isn't defined.
+
+    - When cross-compiling, the gettimeofday() function is now assumed to
+      be a modern version that takes two-args (since we can't test it).
+
+  DEVELOPER RELATED:
+
+    - The scripts in the testsuite dir were cleaned up a bit and a few
+      new tests added.
+
+    - Some new diffs were added to the patches dir, and some accepted
+      ones were removed.
+
+
 NEWS for rsync 2.6.2 (30 Apr 2004)
 Protocol: 28 (unchanged)
 Changes since 2.6.1:
