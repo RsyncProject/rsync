@@ -1767,6 +1767,8 @@ struct file_list *get_dirlist(const char *dirname, int ignore_filter_rules)
 	send_directory(ignore_filter_rules ? -2 : -1, dirlist, dirbuf, dlen);
 	recurse = save_recurse;
 
+	clean_flist(dirlist, 0, 0);
+
 	return dirlist;
 }
 
@@ -1836,7 +1838,7 @@ int delete_file(char *fname, int mode, int flags)
 	flags |= DEL_FORCE_RECURSE;
 
 	dirlist = get_dirlist(fname, 0);
-	for (j = dirlist->count; j-- > 0; ) {
+	for (j = dirlist->count; j--; ) {
 		struct file_struct *fp = dirlist->files[j];
 		f_name_to(fp, buf);
 		if (delete_file(buf, fp->mode, flags & ~DEL_TERSE) != 0) {
@@ -1944,6 +1946,8 @@ void delete_in_dir(struct file_list *flist, char *fbuf,
 	send_directory(-1, dir_list, fbuf, dlen);
 	recurse = -1;
 	fbuf[dlen] = '\0';
+
+	clean_flist(dir_list, 0, 0);
 
 	if (verbose > 3)
 		output_flist(dir_list, "delete");
