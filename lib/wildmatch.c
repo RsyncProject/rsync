@@ -60,7 +60,7 @@ static int domatch(const char *p, const char *text)
 	    if (*p == '\0') {
 		/* Trailing "**" matches everything.  Trailing "*" matches
 		 * only if there are no more slash characters. */
-		return special? TRUE : strchr(text, '/') == 0;
+		return special? TRUE : strchr(text, '/') == NULL;
 	    }
 	    for ( ; *text; text++) {
 		if ((matched = domatch(p, text)) != FALSE) {
@@ -72,21 +72,16 @@ static int domatch(const char *p, const char *text)
 	    }
 	    return ABORT_ALL;
 	  case '[':
-	    special = *++p == NEGATE_CLASS ? TRUE : FALSE;
+	    ch = *++p;
+	    /* Assign literal TRUE/FALSE because of "matched" comparison. */
+	    special = ch == NEGATE_CLASS? TRUE : FALSE;
 	    if (special) {
 		/* Inverted character class. */
-		p++;
+		ch = *++p;
 	    }
 	    prev = 0;
 	    matched = FALSE;
-	    ch = *p;
-	    if (ch == ']' || ch == '-') {
-		if (*text == ch)
-		    matched = TRUE;
-		prev = ch;
-		ch = *++p;
-	    }
-	    for ( ; ch != ']'; prev = ch, ch = *++p) {
+	    do {
 		if (!ch)
 		    return FALSE;
 		if (ch == '-' && prev && p[1] && p[1] != ']') {
@@ -96,7 +91,7 @@ static int domatch(const char *p, const char *text)
 		}
 		else if (*text == ch)
 		    matched = TRUE;
-	    }
+	    } while (prev = ch, (ch = *++p) != ']');
 	    if (matched == special)
 		return FALSE;
 	    continue;
