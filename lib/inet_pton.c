@@ -49,8 +49,10 @@ isc_net_pton(af, src, dst)
 	switch (af) {
 	case AF_INET:
 		return (inet_pton4(src, dst));
+#ifdef INET6
 	case AF_INET6:
 		return (inet_pton6(src, dst));
+#endif
 	default:
 		errno = EAFNOSUPPORT;
 		return (-1);
@@ -121,6 +123,7 @@ inet_pton4(src, dst)
  * author:
  *	Paul Vixie, 1996.
  */
+#ifdef INET6
 static int
 inet_pton6(src, dst)
 	const char *src;
@@ -205,3 +208,4 @@ inet_pton6(src, dst)
 	memcpy(dst, tmp, NS_IN6ADDRSZ);
 	return (1);
 }
+#endif
