@@ -36,7 +36,7 @@ static void report(int f)
 	extern int do_stats;
 
 	if (am_daemon) {
-		log_exit(0);
+		log_exit(0, __FILE__, __LINE__);
 		if (f == -1 || !am_sender) return;
 	}
 

@@ -295,7 +295,7 @@ void log_recv(struct file_struct *file, struct stats *initial_stats)
 }
 
 /* called when the transfer is interrupted for some reason */
-void log_exit(int code)
+void log_exit(int code, const char *file, int line)
 {
 	if (code == 0) {
 		extern struct stats stats;		
@@ -304,7 +304,8 @@ void log_exit(int code)
 			(double)stats.total_read,
 			(double)stats.total_size);
 	} else {
-		rprintf(FLOG,"transfer interrupted (code %d)\n", code);
+		rprintf(FLOG,"transfer interrupted (code %d) at %s(%d)\n", 
+			code, file, line);
 	}
 }
 
@@ -313,7 +314,7 @@ void log_exit(int code)
    
    it i called when a file starts to be transferred
 */
-void log_transfer(struct file_struct *file, char *fname)
+void log_transfer(struct file_struct *file, const char *fname)
 {
 	extern int verbose;
 

@@ -31,7 +31,7 @@ static int cleanup_fd1, cleanup_fd2;
 static struct map_struct *cleanup_buf;
 static int cleanup_pid = 0;
 
-void exit_cleanup(int code)
+void _exit_cleanup(int code, const char *file, int line)
 {
 	extern int keep_partial;
 
@@ -58,7 +58,7 @@ void exit_cleanup(int code)
 		}
 	}
 
-	if (code) log_exit(code);
+	if (code) log_exit(code, file, line);
 
 	exit(code);
 }
