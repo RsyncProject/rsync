@@ -466,15 +466,21 @@ just the last parts of the filenames. This is particularly useful when
 you want to send several different directories at the same time. For
 example, if you used the command
 
-verb(rsync foo/bar/foo.c remote:/tmp/)
+verb(rsync /foo/bar/foo.c remote:/tmp/)
 
 then this would create a file called foo.c in /tmp/ on the remote
 machine. If instead you used
 
-verb(rsync -R foo/bar/foo.c remote:/tmp/)
+verb(rsync -R /foo/bar/foo.c remote:/tmp/)
 
 then a file called /tmp/foo/bar/foo.c would be created on the remote
-machine -- the full path name is preserved.
+machine -- the full path name is preserved.  To limit the amount of
+path information that is sent, do something like this:
+
+verb(cd /foo
+rsync -R bar/foo.c remote:/tmp/)
+
+That would create /tmp/bar/foo.c on the remote machine.
 
 dit(bf(--no-relative)) Turn off the --relative option.  This is only
 needed if you want to use --files-from without its implied --relative
