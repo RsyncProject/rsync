@@ -226,9 +226,9 @@ void usage(enum logcode F)
   rprintf(F,"     --suffix=SUFFIX         backup suffix (default %s w/o --backup-dir)\n",BACKUP_SUFFIX);
   rprintf(F," -u, --update                update only (don't overwrite newer files)\n");
   rprintf(F," -l, --links                 copy symlinks as symlinks\n");
-  rprintf(F," -L, --copy-links            copy the referent of symlinks\n");
-  rprintf(F,"     --copy-unsafe-links     copy links outside the source tree\n");
-  rprintf(F,"     --safe-links            ignore links outside the destination tree\n");
+  rprintf(F," -L, --copy-links            copy the referent of all symlinks\n");
+  rprintf(F,"     --copy-unsafe-links     copy the referent of \"unsafe\" symlinks\n");
+  rprintf(F,"     --safe-links            ignore \"unsafe\" symlinks\n");
   rprintf(F," -H, --hard-links            preserve hard links\n");
   rprintf(F," -p, --perms                 preserve permissions\n");
   rprintf(F," -o, --owner                 preserve owner (root only)\n");
