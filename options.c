@@ -581,7 +581,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 
 #if !SUPPORT_LINKS
-	if (preserve_links) {
+	if (preserve_links && !am_sender) {
 		snprintf(err_buf, sizeof err_buf,
 			 "symlinks are not supported on this %s\n",
 			 am_server ? "server" : "client");
