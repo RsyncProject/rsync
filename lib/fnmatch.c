@@ -2,7 +2,7 @@
 #ifndef HAVE_FNMATCH
 
 /* ----- THE FOLLOWING UP TO 'END' is glibc-2.1.2 posix/fnmatch.c
-     except for the part with the '#if 0' */
+     except for the parts with '#if 0' */
 
 /* Copyright (C) 1991, 92, 93, 96, 97, 98, 99 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
@@ -21,6 +21,8 @@
    License along with this library; see the file COPYING.LIB.  If not,
    write to the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
    Boston, MA 02111-1307, USA.  */
+
+#if 0	/* header files included better by ../rsync.h */
 
 #if HAVE_CONFIG_H
 # include <config.h>
@@ -44,6 +46,8 @@
 #if defined STDC_HEADERS || defined _LIBC
 # include <stdlib.h>
 #endif
+
+#endif /* 0 */
 
 /* For platform which support the ISO C amendement 1 functionality we
    support user defined character classes.  */
