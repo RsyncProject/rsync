@@ -1,7 +1,7 @@
 /* -*- c-file-style: "linux"; -*-
    
    Copyright (C) 1998-2001 by Andrew Tridgell <tridge@samba.org>
-   Copyright (C) 2001 by Martin Pool <mbp@samba.org>
+   Copyright (C) 2001-2002 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -29,10 +29,14 @@ extern int rsync_port;
 char *auth_user;
 int sanitize_paths = 0;
 
-/*
+/**
  * Run a client connected to an rsyncd.  The alternative to this
- * function for remote-shell connections is do_cmd.
- */
+ * function for remote-shell connections is do_cmd().
+ *
+ * After initial server startup, hands over to client_run().
+ *
+ * @return -1 for error in startup, or the result of client_run().
+ **/
 int start_socket_client(char *host, char *path, int argc, char *argv[])
 {
 	int fd, i;
@@ -104,10 +108,14 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	io_printf(fd,"@RSYNCD: %d\n", PROTOCOL_VERSION);
 
 	if (!read_line(fd, line, sizeof(line)-1)) {
+		rprintf(FERROR, "rsync: did not see server greeting\n");
 		return -1;
 	}
 
 	if (sscanf(line,"@RSYNCD: %d", &remote_version) != 1) {
+		/* note that read_line strips of \n or \r */
+		rprintf(FERROR, "rsync: server sent \"%s\" rather than greeting\n",
+			line);
 		return -1;
 	}
 
@@ -122,6 +130,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 
 	while (1) {
 		if (!read_line(fd, line, sizeof(line)-1)) {
+			rprintf(FERROR, "rsync: didn't get server startup line\n");
 			return -1;
 		}
 
