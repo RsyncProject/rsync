@@ -761,14 +761,14 @@ void read_buf(int f,char *buf,size_t len)
 
 void read_sbuf(int f,char *buf,size_t len)
 {
-	read_buf(f,buf,len);
+	readfd(f, buf, len);
 	buf[len] = 0;
 }
 
 unsigned char read_byte(int f)
 {
 	unsigned char c;
-	read_buf(f, (char *)&c, 1);
+	readfd(f, (char *)&c, 1);
 	return c;
 }
 
@@ -1037,13 +1037,13 @@ void write_buf(int f,char *buf,size_t len)
 /** Write a string to the connection */
 static void write_sbuf(int f,char *buf)
 {
-	write_buf(f, buf, strlen(buf));
+	writefd(f, buf, strlen(buf));
 }
 
 
 void write_byte(int f,unsigned char c)
 {
-	write_buf(f,(char *)&c,1);
+	writefd(f, (char *)&c, 1);
 }
 
 
