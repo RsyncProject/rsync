@@ -86,9 +86,9 @@ void usage(int F)
   rprintf(F,"Usage: rsync [OPTION]... SRC [USER@]HOST:DEST\n");
   rprintf(F,"  or   rsync [OPTION]... [USER@]HOST:SRC DEST\n");
   rprintf(F,"  or   rsync [OPTION]... SRC DEST\n");
-  rprintf(F,"  or   rsync [OPTION]... [USER@]HOST::SRC DEST\n");
+  rprintf(F,"  or   rsync [OPTION]... [USER@]HOST::SRC [DEST]\n");
   rprintf(F,"  or   rsync [OPTION]... SRC [USER@]HOST::DEST\n");
-  rprintf(F,"  or   rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC DEST\n");
+  rprintf(F,"  or   rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC [DEST]\n");
   rprintf(F,"\nOptions\n");
   rprintf(F," -v, --verbose               increase verbosity\n");
   rprintf(F," -c, --checksum              always checksum\n");

@@ -70,8 +70,8 @@ itemize(
 	local destination.  
 )
 
-Note that in all cases at least one of the source and destination
-paths must be local.
+Note that in all cases (other than listing) at least one of the source
+and destination paths must be local.
 
 manpagesection(SETUP)
 
@@ -81,7 +81,7 @@ Once installed you can use rsync to any machine that you can use rsh
 to.  rsync uses rsh for its communications, unless both the source and
 destination are local.
 
-You can also specify a alternative to rsh, by either using the -e
+You can also specify an alternative to rsh, by either using the -e
 command line option, or by setting the RSYNC_RSH environment variable.
 
 One common substitute is to use ssh, which offers a high degree of
@@ -107,18 +107,18 @@ differences. See the tech report for details.
 
 quote(rsync -avz foo:src/bar /data/tmp)
 
-recursively transfer all files from the directory src/bar on the
+this would recursively transfer all files from the directory src/bar on the
 machine foo into the /data/tmp/bar directory on the local machine. The
 files are transferred in "archive" mode, which ensures that symbolic
 links, devices, attributes, permissions, ownerships etc are preserved
-in the transfer.  Additionally compression will be used to reduce the
+in the transfer.  Additionally, compression will be used to reduce the
 size of data portions of the transfer.
 
 quote(rsync -avz foo:src/bar/ /data/tmp)
 
-With a trailing slash on the source this behavior changes to transfer
+a trailing slash on the source changes this behavior to transfer
 all files from the directory src/bar on the machine foo into the
-/data/tmp/.  With a trailing / on a source name it means "copy the
+/data/tmp/.  A trailing / on a source name means "copy the
 contents of this directory".  Without a trailing slash it means "copy
 the directory". This difference becomes particularly important when
 using the --delete option.
@@ -127,6 +127,11 @@ You can also use rsync in local-only mode, where both the source and
 destination don't have a ':' in the name. In this case it behaves like
 an improved copy command.
 
+quote(rsync somehost.mydomain.com::)
+
+this would list all the anonymous rsync modules available on the host
+somehost.mydomain.com.  (See the following section for more details.)
+
 
 manpagesection(CONNECTING TO AN RSYNC SERVER)
 
@@ -134,7 +139,7 @@ It is also possible to use rsync without using rsh or ssh as the
 transport. In this case you will connect to a remote rsync server
 running on TCP port 873. 
 
-Using rsync in this was is the same as using it with rsh or ssh except
+Using rsync in this way is the same as using it with rsh or ssh except
 that:
 
 itemize(
@@ -142,13 +147,13 @@ itemize(
 	separate the hostname from the path. 
 
 	it() the remote server may print a message of the day when you
-	connect
+	connect.
 
 	it() if you specify no path name on the remote server then the
 	list of accessible paths on the server will be shown.
-	
+
 	it() if you specify no local destination then a listing of the
-	specified files on the remote server is provided
+	specified files on the remote server is provided.
 )
 
 Some paths on the remote server may require authentication. If so then
@@ -166,8 +171,8 @@ manpagesection(EXAMPLES)
 
 Here are some examples of how I use rsync.
 
-To backup my wife's home directory, which consists of large MS word
-files and mail folders I use a cron job that runs
+To backup my wife's home directory, which consists of large MS Word
+files and mail folders, I use a cron job that runs
 
 quote(rsync -Cavz . arvidsjaur:backup)
 
@@ -198,16 +203,16 @@ this is launched from cron every few hours.
 
 manpagesection(OPTIONS SUMMARY)
 
-Here is a short summary of the options avalable in rsync. Please refer
+Here is a short summary of the options available in rsync. Please refer
 to the detailed description below for a complete description.
 
 verb(
 Usage: rsync [OPTION]... SRC [USER@]HOST:DEST
   or   rsync [OPTION]... [USER@]HOST:SRC DEST
   or   rsync [OPTION]... SRC DEST
-  or   rsync [OPTION]... [USER@]HOST::SRC DEST
+  or   rsync [OPTION]... [USER@]HOST::SRC [DEST]
   or   rsync [OPTION]... SRC [USER@]HOST::DEST
-  or   rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC DEST
+  or   rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC [DEST]
 
 Options
  -v, --verbose               increase verbosity
@@ -262,7 +267,7 @@ manpageoptions()
 
 rsync uses the GNU long options package. Many of the command line
 options have two variants, one short and one long.  These are shown
-below separated by commas. Some options only have a long variant.
+below, separated by commas. Some options only have a long variant.
 
 startdit()
 dit(bf(-h, --help)) Print a short help page describing the options
@@ -271,12 +276,12 @@ available in rsync
 dit(bf(--version)) print the rsync version number and exit
 
 dit(bf(-v, --verbose)) This option increases the amount of information you
-are given during the transfer.  By default rsync works silently. A
+are given during the transfer.  By default, rsync works silently. A
 single -v will give you information about what files are being
 transferred and a brief summary at the end. Two -v flags will give you
 information on what files are being skipped and slightly more
 information at the end. More than two -v flags should only be used if
-you are debugging rsync
+you are debugging rsync.
 
 dit(bf(-I, --ignore-times)) Normally rsync will skip any files that are
 already the same length and have the same time-stamp. This option turns
@@ -289,18 +294,18 @@ which already exist and have the same checksum and size on the
 receiver are skipped.  This option can be quite slow.
 
 dit(bf(-a, --archive)) This is equivalent to -rlptDg. It is a quick way
-of saying I want recursion and want to preserve everything.
+of saying you want recursion and want to preserve everything.
 
 Note: if the user launching rsync is root then the -o option (preserve
 uid) is also implied.
 
-dit(bf(-r, --recursive)) This tells rsync to copy directories recursively
+dit(bf(-r, --recursive)) This tells rsync to copy directories recursively.
 
 dit(bf(-R, --relative)) Use relative paths. This means that the full path
 names specified on the command line are sent to the server rather than
 just the last parts of the filenames. This is particularly useful when
-you want to sent several different directories at the same time. For
-example if you used the command
+you want to send several different directories at the same time. For
+example, if you used the command
 
 verb(rsync foo/bar/foo.c remote:/tmp/)
 
@@ -322,7 +327,7 @@ file.
 
 dit(bf(-l, --links)) This tells rsync to recreate symbolic links on the
 remote system  to  be the same as the local system. Without this
-option all symbolic links are skipped.
+option, all symbolic links are skipped.
 
 dit(bf(-L, --copy-links)) This tells rsync to treat symbolic links just
 like  ordinary files.
@@ -330,7 +335,7 @@ like  ordinary files.
 dit(bf(--safe-links)) This tells rsync to ignore any symbolic links
 which point outside the destination tree. All absolute symlinks are
 also ignored. Using this option in conjunction with --relative may
-give unexpecetd results. 
+give unexpected results. 
 
 dit(bf(-H, --hard-links)) This tells rsync to recreate hard  links  on
 the  remote system  to  be the same as the local system. Without this
@@ -345,7 +350,7 @@ dit(bf(-W, --whole-file)) With this option the incremental rsync algorithm
 is  not used  and  the whole file is sent as-is instead. This may be
 useful when using rsync with a local machine.
 
-dit(bf(--partial)) By default rsync will delete any partially
+dit(bf(--partial)) By default, rsync will delete any partially
 transferred file if the transfer is interrupted. In some circumstances
 it is more desirable to keep partially transferred files. Using the
 --partial option tells rsync to keep the partial file which should
@@ -358,7 +363,7 @@ dit(bf(-o, --owner)) This option causes rsync to update the  remote  owner
 of the  file to be the same as the local owner. This is only available
 to the super-user.  Note that if the source system is a daemon using chroot,
 the --numeric-ids option is implied because the source system cannot get
-access to the user names.
+access to the usernames.
 
 dit(bf(-g, --group)) This option causes rsync to update the  remote  group
 of the file to be the same as the local group.  Note that if the source
@@ -428,14 +433,14 @@ the rsync algorithm. See the technical report for details.
 
 dit(bf(-e, --rsh COMMAND)) This option allows you to choose an alternative
 remote shell program to use for communication between the local and
-remote copies of rsync. By default rsync will use rsh, but you may
+remote copies of rsync. By default, rsync will use rsh, but you may
 like to instead use ssh because of its high security.
 
 You can also choose the remote shell program using the RSYNC_RSH
 environment variable.
 
 dit(bf(--rsync-path PATH)) Use this to specify the path to the copy of
-rsync on the remote machine. Useful when its not in your path.
+rsync on the remote machine. Useful when it's not in your path.
 
 dit(bf(--exclude pattern)) This option allows you to selectively exclude
 certain files from the list of files to be transferred. This is most
@@ -444,7 +449,7 @@ useful in combination with a recursive transfer.
 You may use as many --exclude options on the command line as you like
 to build up the list of files to exclude.
 
-See the section of exclude patterns for information on the syntax of 
+See the section on exclude patterns for information on the syntax of 
 this option.
 
 dit(bf(--exclude-from FILE)) This option is similar to the --exclude
@@ -509,7 +514,7 @@ dit(bf(--compare-dest DIR)) This option instructs rsync to use DIR as an
 additional directory to compare destination files against when doing
 transfers.  This is useful for doing transfers to a new destination while
 leaving existing files intact, and then doing a flash-cutover when all
-files have been successfully transfered (for example by moving directories
+files have been successfully transferred (for example by moving directories
 around and removing the old directory, although this requires also doing
 the transfer with -I to avoid skipping files that haven't changed).  This
 option increases the usefulness of --partial because partially transferred
@@ -533,7 +538,7 @@ at both ends.
 
 By default rsync will use the user name and group name to determine
 what ownership to give files. The special uid 0 and the special group
-0 and never mapped via user/group names even if the --numeric-ids
+0 are never mapped via user/group names even if the --numeric-ids
 option is not specified.
 
 If the source system is a daemon using chroot, or if a user or group name
@@ -557,10 +562,10 @@ the default /etc/rsyncd.conf. This is only relevant when --daemon is
 specified. 
 
 dit(bf(--port PORT)) This specifies an alternate TCP port number to use
-rather than the default port 873. 
+rather than the default port 873.
 
 dit(bf(--log-format=FORMAT)) This allows you to specify exactly what the
-rsync client logs to stdout on a per file basis. The log format is
+rsync client logs to stdout on a per-file basis. The log format is
 specified using the same format conventions as the log format option in
 rsyncd.conf.
 
@@ -578,17 +583,17 @@ enddit()
 manpagesection(EXCLUDE PATTERNS)
 
 The exclude and include patterns specified to rsync allow for flexible
-selection of what files to transfer and what files to skip.
+selection of which files to transfer and which files to skip.
 
-rsync build a ordered list of include/exclude options as specified on
-the command line. When a filename is encountered rsync then checks the
+rsync builds a ordered list of include/exclude options as specified on
+the command line. When a filename is encountered, rsync checks the
 name against each exclude/include pattern in turn. The first matching
 pattern is acted on. If it is an exclude pattern than that file is
 skipped. If it is an include pattern then that filename is not
 skipped. If no matching include/exclude pattern is found then the
 filename is not skipped.
 
-The patterns themselves can take several forms. The rules are:
+The patterns can take several forms. The rules are:
 
 itemize(
   it() if the pattern starts with a / then it is matched against the
@@ -637,13 +642,13 @@ itemize(
 
 manpagesection(DIAGNOSTICS)
 
-rsync occasinally produces error messages that may seem a little
+rsync occasionally produces error messages that may seem a little
 cryptic. The one that seems to cause the most confusion is "protocol
 version mismatch - is your shell clean?".
 
 This message is usually caused by your startup scripts or remote shell
 facility producing unwanted garbage on the stream that rsync is using
-for its transport. The way ot diagnose this problem is to run your
+for its transport. The way to diagnose this problem is to run your
 remote shell like this:
 
 verb(
@@ -654,7 +659,7 @@ then look at out.dat. If everything is working correctly then out.dat
 should be a zero length file. You you are getting the above error from
 rsync then you will probably find that out.dat contains some text or
 data. Look at the contents and try to work out what is producing
-it. The most common cause is incorrectly configued shell startup
+it. The most common cause is incorrectly configured shell startup
 scripts (such as .cshrc or .profile) that contain output statements
 for non-interactive logins.
 
@@ -678,7 +683,7 @@ password to a shell transport such as ssh.
 dit(bf(USER) or bf(LOGNAME)) The USER or LOGNAME environment variables
 are used to determine the default username sent to a rsync server.
 
-dit(bf(HOME)) The HOME environment variable is used to find the users
+dit(bf(HOME)) The HOME environment variable is used to find the user's
 default .cvsignore file.
 
 enddit()

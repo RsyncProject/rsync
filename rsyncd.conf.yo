@@ -46,7 +46,7 @@ manpagesection(LAUNCHING THE RSYNC DAEMON)
 The rsync daemon is launched by specifying the --daemon option to
 rsync. The daemon must run with root privileges.
 
-You can launch it either via inetd or as a standalone daemon. If run
+You can launch it either via inetd or as a stand-alone daemon. If run
 as a daemon then just run the command "rsync --daemon" from a suitable
 startup script.
 
@@ -248,7 +248,7 @@ The default is no "hosts deny" option, which means all hosts can connect.
 
 dit(bf(transfer logging)) The "transfer logging" option enables per-file 
 logging of downloads and uploads in a format somewhat similar to that
-used by ftp daemons. If you want to customise the log formats look at
+used by ftp daemons. If you want to customize the log formats look at
 the log format option.
 
 dit(bf(log format)) The "log format" option allows you to specify the
@@ -276,11 +276,11 @@ itemize(
 
 The default log format is "%o %h [%a] %m (%u) %f %l"
 
-A perl script called rsyncstats to summarise this format is included
+A perl script called rsyncstats to summarize this format is included
 in the rsync source code distribution.
 
 dit(bf(timeout)) The "timeout" option allows you to override the
-clients choice for IO timoeut for this module. Using this option you
+clients choice for IO timeout for this module. Using this option you
 can ensure that rsync won't wait on a dead client forever. The timeout
 is specified in seconds. A value of zero means no timeout and is the
 default. A good choice for anonymous rsync servers may be 600 (giving
@@ -293,7 +293,7 @@ manpagesection(AUTHENTICATION STRENGTH)
 The authentication protocol used in rsync is a 128 bit MD4 based
 challenge response system. Although I believe that no one has ever
 demonstrated a brute-force break of this sort of system you should
-realise that this is not a "military strength" authentication system.
+realize that this is not a "military strength" authentication system.
 It should be good enough for most purposes but if you want really top
 quality security then I recommend that you run rsync over ssh.
 

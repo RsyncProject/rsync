@@ -31,7 +31,7 @@ Imagine you have two files, $A$ and $B$, and you wish to update $B$ to be
 the same as $A$. The obvious method is to copy $A$ onto $B$.
 
 Now imagine that the two files are on machines connected by a slow
-communications link, for example a dial up IP link.  If $A$ is large,
+communications link, for example a dialup IP link.  If $A$ is large,
 copying $A$ onto $B$ will be slow.  To make it faster you could
 compress $A$ before sending it, but that will usually only gain a
 factor of 2 to 4.
@@ -133,7 +133,7 @@ possible offsets within a file in a ``rolling'' fashion, with very
 little computation at each point.
 
 Despite its simplicity, this checksum was found to be quite adequate as
-a first level check for a match of two file blocks.  We have found in
+a first-level check for a match of two file blocks.  We have found in
 practice that the probability of this checksum matching when the
 blocks are not equal is quite low.  This is important because the much
 more expensive strong checksum must be calculated for each block where
@@ -158,16 +158,16 @@ contains a null value if no element of the list has that hash value.
 
 At each offset in the file the 32-bit rolling checksum and its 16-bit
 hash are calculated.  If the hash table entry for that hash value is
-not a null value, the second level check is invoked.
+not a null value, the second-level check is invoked.
 
-The second level check involves scanning the sorted checksum list
+The second-level check involves scanning the sorted checksum list
 starting with the entry pointed to by the hash table entry, looking
 for an entry whose 32-bit rolling checksum matches the current value.
 The scan terminates when it reaches an entry whose 16-bit hash
-differs.  If this search finds a match, the third level check is
+differs.  If this search finds a match, the third-level check is
 invoked.
 
-The third level check involves calculating the strong checksum for the
+The third-level check involves calculating the strong checksum for the
 current offset in the file and comparing it with the strong checksum
 value in the current list entry.  If the two strong checksums match,
 we assume that we have found a block of $A$ which matches a block of
@@ -246,14 +246,14 @@ The columns in the table are as follows:
 \begin{description}
 \item [block size] The size in bytes of the checksummed blocks.
 \item [matches] The number of times a block of $B$ was found in $A$.
-\item [tag hits] The number of times the 16 bit hash of the rolling
+\item [tag hits] The number of times the 16-bit hash of the rolling
   checksum matched a hash of one of the checksums from $B$.
-\item [false alarms] The number of times the 32 bit rolling checksum
+\item [false alarms] The number of times the 32-bit rolling checksum
   matched but the strong checksum didn't.
 \item [data] The amount of file data transferred verbatim, in bytes.
-\item [written] The total number of bytes written by $\alpha$
+\item [written] The total number of bytes written by $\alpha$,
   including protocol overheads. This is almost all file data.
-\item [read] The total number of bytes read by $\alpha$ including
+\item [read] The total number of bytes read by $\alpha$, including
   protocol overheads. This is almost all checksum information.
 \end{description}
 
@@ -269,7 +269,7 @@ case. Each pair of checksums consumes 20 bytes: 4 bytes for the
 rolling checksum plus 16 bytes for the 128-bit MD4 checksum.
 
 The number of false alarms was less than $1/1000$ of the number of
-true matches, indicating that the 32 bit rolling checksum is quite
+true matches, indicating that the 32-bit rolling checksum is quite
 good at screening out false matches. 
 
 The number of tag hits indicates that the second level of the

@@ -66,7 +66,7 @@ SETUP
 -----
 
 Rsync uses rsh or ssh for communication. It does not need to be setuid
-and requires no special privilages for installation. It does not
+and requires no special privileges for installation. It does not
 require a inetd entry or a daemon. You must, however, have a working
 rsh or ssh system. Using ssh is recommended for its security
 features. 
