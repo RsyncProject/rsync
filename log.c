@@ -27,6 +27,14 @@
   */
 #include "rsync.h"
 
+extern int am_daemon;
+extern int am_server;
+extern int am_sender;
+extern int quiet;
+extern int module_id;
+extern char *auth_user;
+extern char *log_format;
+
 static int log_initialised;
 static char *logfname;
 static FILE *logfile;
@@ -216,9 +224,6 @@ void set_error_fd(int fd)
 void rwrite(enum logcode code, char *buf, int len)
 {
 	FILE *f=NULL;
-	extern int am_daemon;
-	extern int am_server;
-	extern int quiet;
 	/* recursion can happen with certain fatal conditions */
 
 	if (quiet && code == FINFO) return;
@@ -379,7 +384,6 @@ void rsyserr(enum logcode code, int errcode, const char *format, ...)
 void rflush(enum logcode code)
 {
 	FILE *f = NULL;
-	extern int am_daemon;
 	
 	if (am_daemon) {
 		return;
@@ -394,7 +398,6 @@ void rflush(enum logcode code)
 	}
 
 	if (code == FINFO) {
-		extern int am_server;
 		if (am_server)
 			f = stderr;
 		else
@@ -413,15 +416,10 @@ static void log_formatted(enum logcode code,
 			  char *format, char *op, struct file_struct *file,
 			  struct stats *initial_stats)
 {
-	extern int module_id;
-	extern char *auth_user;
 	char buf[1024];
 	char buf2[1024];
 	char *p, *s, *n;
 	size_t l;
-	extern struct stats stats;		
-	extern int am_sender;
-	extern int am_daemon;
 	int64 b;
 
 	/* We expand % codes one by one in place in buf.  We don't
@@ -519,10 +517,6 @@ static void log_formatted(enum logcode code,
 /* log the outgoing transfer of a file */
 void log_send(struct file_struct *file, struct stats *initial_stats)
 {
-	extern int module_id;
-	extern int am_server;
-	extern char *log_format;
-
 	if (lp_transfer_logging(module_id)) {
 		log_formatted(FLOG, lp_log_format(module_id), "send", file, initial_stats);
 	} else if (log_format && !am_server) {
@@ -533,10 +527,6 @@ void log_send(struct file_struct *file, struct stats *initial_stats)
 /* log the incoming transfer of a file */
 void log_recv(struct file_struct *file, struct stats *initial_stats)
 {
-	extern int module_id;
-	extern int am_server;
-	extern char *log_format;
-
 	if (lp_transfer_logging(module_id)) {
 		log_formatted(FLOG, lp_log_format(module_id), "recv", file, initial_stats);
 	} else if (log_format && !am_server) {
@@ -556,7 +546,6 @@ void log_recv(struct file_struct *file, struct stats *initial_stats)
 void log_exit(int code, const char *file, int line)
 {
 	if (code == 0) {
-		extern struct stats stats;		
 		rprintf(FLOG,"wrote %.0f bytes  read %.0f bytes  total size %.0f\n",
 			(double)stats.total_written,
 			(double)stats.total_read,
