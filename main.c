@@ -816,13 +816,24 @@ static RETSIGTYPE sigchld_handler(int UNUSED(val)) {
  * Solaris?)  Can we be more portable?
  **/
 #ifdef MAINTAINER_MODE
+const char *get_panic_action(void)
+{
+	const char *cmd_fmt = getenv("RSYNC_PANIC_ACTION");
+
+	if (cmd_fmt)
+		return cmd_fmt;
+	else
+		return "xterm -display :0 -T Panic -n Panic "
+			"-e gdb /proc/%d/exe %d";
+}
+
+
 static RETSIGTYPE rsync_panic_handler(int UNUSED(whatsig))
 {
 	char cmd_buf[300];
 	int ret;
-	sprintf(cmd_buf, 
-		"xterm -display :0 -T Panic -n Panic "
-		"-e gdb /proc/%d/exe %d", 
+
+	sprintf(cmd_buf, get_panic_action(),
 		getpid(), getpid());
 
 	/* Unless we failed to execute gdb, we allow the process to
