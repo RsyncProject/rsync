@@ -34,6 +34,8 @@ extern int rsync_port;
 char *auth_user;
 extern int sanitize_paths;
 extern int filesfrom_fd;
+extern int remote_protocol;
+extern int protocol_version;
 extern struct exclude_struct **server_exclude_list;
 extern char *exclude_path_prefix;
 
@@ -98,7 +100,6 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out, int argc)
 	int sargc = 0;
 	char line[MAXPATHLEN];
 	char *p;
-	extern int remote_version;
 	extern int kludge_around_eof;
 	extern int am_sender;
 	extern int daemon_over_rsh;
@@ -135,12 +136,14 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out, int argc)
 		return -1;
 	}
 
-	if (sscanf(line,"@RSYNCD: %d", &remote_version) != 1) {
+	if (sscanf(line,"@RSYNCD: %d", &remote_protocol) != 1) {
 		/* note that read_line strips of \n or \r */
 		rprintf(FERROR, "rsync: server sent \"%s\" rather than greeting\n",
 			line);
 		return -1;
 	}
+	if (protocol_version > remote_protocol)
+		protocol_version = remote_protocol;
 
 	p = strchr(path,'/');
 	if (p) *p = 0;
@@ -149,7 +152,7 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out, int argc)
 
 	/* Old servers may just drop the connection here,
 	 rather than sending a proper EXIT command.  Yuck. */
-	kludge_around_eof = list_only && (remote_version < 25);
+	kludge_around_eof = list_only && (protocol_version < 25);
 
 	while (1) {
 		if (!read_line(f_in, line, sizeof(line)-1)) {
@@ -188,8 +191,8 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out, int argc)
 	}
 	io_printf(f_out, "\n");
 
-	if (remote_version < 23) {
-		if (remote_version == 22 || (remote_version > 17 && !am_sender))
+	if (protocol_version < 23) {
+		if (protocol_version == 22 || (protocol_version > 17 && !am_sender))
 			io_start_multiplex_in(f_in);
 	}
 
@@ -217,7 +220,6 @@ static int rsync_module(int f_in, int f_out, int i)
 	extern int am_sender;
 	extern int am_server;
 	extern int am_daemon;
-	extern int remote_version;
 	extern int am_root;
 
 	if (!allow_access(addr, host, lp_hosts_allow(i), lp_hosts_deny(i))) {
@@ -452,8 +454,8 @@ static int rsync_module(int f_in, int f_out, int i)
 	if (verbose > 1) verbose = 1;
 #endif
 
-	if (remote_version < 23) {
-		if (remote_version == 22 || (remote_version > 17 && am_sender))
+	if (protocol_version < 23) {
+		if (protocol_version == 22 || (protocol_version > 17 && am_sender))
 			io_start_multiplex_out(f_out);
 	}
 
@@ -486,13 +488,12 @@ static void send_listing(int fd)
 {
 	int n = lp_numservices();
 	int i;
-	extern int remote_version;
 
 	for (i=0;i<n;i++)
 		if (lp_list(i))
 			io_printf(fd, "%-15s\t%s\n", lp_name(i), lp_comment(i));
 
-	if (remote_version >= 25)
+	if (protocol_version >= 25)
 		io_printf(fd,"@RSYNCD: EXIT\n");
 }
 
@@ -505,7 +506,6 @@ int start_daemon(int f_in, int f_out)
 	char *motd;
 	int i = -1;
 	extern char *config_file;
-	extern int remote_version;
 	extern int am_server;
 
 	if (!lp_load(config_file, 0)) {
@@ -540,10 +540,12 @@ int start_daemon(int f_in, int f_out)
 		return -1;
 	}
 
-	if (sscanf(line,"@RSYNCD: %d", &remote_version) != 1) {
+	if (sscanf(line,"@RSYNCD: %d", &remote_protocol) != 1) {
 		io_printf(f_out, "@ERROR: protocol startup error\n");
 		return -1;
 	}
+	if (protocol_version > remote_protocol)
+		protocol_version = remote_protocol;
 
 	while (i == -1) {
 		line[0] = 0;
