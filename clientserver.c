@@ -198,7 +198,7 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out,
 
 	if (protocol_version < 23) {
 		if (protocol_version == 22 || !am_sender)
-			io_start_multiplex_in(f_in);
+			io_start_multiplex_in();
 	}
 
 	return 0;
@@ -450,13 +450,13 @@ static int rsync_module(int f_in, int f_out, int i)
 
 	if (protocol_version < 23
 	    && (protocol_version == 22 || am_sender))
-		io_start_multiplex_out(f_out);
+		io_start_multiplex_out();
 	else if (!ret) {
 		/* We have to get I/O multiplexing started so that we can
 		 * get the error back to the client.  This means getting
 		 * the protocol setup finished first in later versions. */
 		setup_protocol(f_out, f_in);
-		io_start_multiplex_out(f_out);
+		io_start_multiplex_out();
 	}
 
 	if (!ret) {
@@ -496,6 +496,8 @@ int start_daemon(int f_in, int f_out)
 	char line[200];
 	char *motd;
 	int i = -1;
+
+	io_set_sock_fds(f_in, f_out);
 
 	if (!lp_load(config_file, 0))
 		exit_cleanup(RERR_SYNTAX);

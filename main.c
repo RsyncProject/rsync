@@ -425,8 +425,9 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 		exit_cleanup(0);
 	}
 
-	io_start_buffering_in(f_in);
-	io_start_buffering_out(f_out);
+	io_start_buffering_in();
+	io_start_buffering_out();
+
 	send_files(flist,f_out,f_in);
 	io_flush(FULL_FLUSH);
 	report(f_out);
@@ -494,7 +495,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	if (f_in != f_out)
 		close(f_in);
 
-	io_start_buffering_out(f_out);
+	io_start_buffering_out();
 
 	set_msg_fd_in(error_pipe[0]);
 
@@ -546,7 +547,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		}
 	}
 
-	io_start_buffering_in(f_in);
+	io_start_buffering_in();
 	if (delete_mode && !delete_excluded)
 		recv_exclude_list(f_in);
 
@@ -588,13 +589,14 @@ int child_main(int argc, char *argv[])
 
 void start_server(int f_in, int f_out, int argc, char *argv[])
 {
-	setup_protocol(f_out, f_in);
-
 	set_nonblocking(f_in);
 	set_nonblocking(f_out);
 
+	io_set_sock_fds(f_in, f_out);
+	setup_protocol(f_out, f_in);
+
 	if (protocol_version >= 23)
-		io_start_multiplex_out(f_out);
+		io_start_multiplex_out();
 
 	if (am_sender) {
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
@@ -635,14 +637,15 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		set_nonblocking(f_out);
 	}
 
+	io_set_sock_fds(f_in, f_out);
 	setup_protocol(f_out,f_in);
 
 	if (protocol_version >= 23 && !read_batch)
-		io_start_multiplex_in(f_in);
+		io_start_multiplex_in();
 
 	if (am_sender) {
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
-		io_start_buffering_out(f_out);
+		io_start_buffering_out();
 		if (cvs_exclude)
 			add_cvs_excludes();
 		if (delete_mode && !delete_excluded)
