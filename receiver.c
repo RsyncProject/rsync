@@ -412,14 +412,15 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		   setuid/setgid bits to ensure that there is no race
 		   condition. They are then correctly updated after
 		   the lchown. Thanks to snabb@epipe.fi for pointing
-		   this out */
+		   this out.  We also set it initially without group
+		   access because of a similar race condition. */
 		fd2 = do_open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,
-			      file->mode & INITPERMMASK);
+			      file->mode & INITACCESSPERMS);
 
 		if (fd2 == -1 && relative_paths && errno == ENOENT && 
 		    create_directory_path(fnametmp) == 0) {
 			fd2 = do_open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,
-				      file->mode & INITPERMMASK);
+				      file->mode & INITACCESSPERMS);
 		}
 		if (fd2 == -1) {
 			rprintf(FERROR,"cannot create %s : %s\n",fnametmp,strerror(errno));

@@ -462,10 +462,13 @@ extern int errno;
 
 #define IS_DEVICE(mode) (S_ISCHR(mode) || S_ISBLK(mode) || S_ISSOCK(mode) || S_ISFIFO(mode))
 
+#ifndef ACCESSPERMS
+#define ACCESSPERMS 0777
+#endif
 /* Initial mask on permissions given to temporary files.  Mask off setuid
      bits and group access because of potential race-condition security
      holes, and mask other access because mode 707 is bizarre */
-#define INITPERMMASK 0700
+#define INITACCESSPERMS 0700
 
 /* handler for null strings in printf format */
 #define NS(s) ((s)?(s):"<NULL>")
