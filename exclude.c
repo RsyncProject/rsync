@@ -236,8 +236,8 @@ int check_exclude(struct exclude_list_struct *listp, char *name, int name_is_dir
 /* Get the next include/exclude arg from the string.  The token will not
  * be '\0' terminated, so use the returned length to limit the string.
  * Also, be sure to add this length to the returned pointer before passing
- * it back to ask for the next token.  This routine will not split off a
- * prefix of "+ " or "- " unless xflags contains XFLG_NO_PREFIXES.  The
+ * it back to ask for the next token.  This routine will not parse the +/-
+ * prefixes or the "!" token when xflags contains XFLG_NO_PREFIXES.  The
  * *incl_ptr value will be 1 for an include, 0 for an exclude, and -1 for
  * the list-clearing "!" token.
  */
