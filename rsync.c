@@ -416,6 +416,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 
   if (fd == -1) {
     fprintf(FERROR,"failed to open %s : %s\n",fname,strerror(errno));
+    fprintf(FERROR,"skipping %s\n",fname);
     return;
   }
 
