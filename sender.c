@@ -125,6 +125,33 @@ void successful_send(int ndx)
 	}
 }
 
+/* This is also used by receive.c with f_out = -1. */
+int read_iflags(int f_in, int f_out, int ndx, char *buf)
+{
+	int iflags = protocol_version >= 29 ? read_shortint(f_in)
+		   : ITEM_UPDATING | ITEM_MISSING_DATA;
+
+	/* Handle the new keep-alive (no-op) packet. */
+	if (ndx == the_file_list->count && iflags == ITEM_IS_NEW)
+		;
+	else if (ndx < 0 || ndx >= the_file_list->count) {
+		rprintf(FERROR, "Invalid file index %d (count=%d) [%s]\n",
+			ndx, the_file_list->count, who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	} else if (iflags == ITEM_IS_NEW) {
+		rprintf(FERROR, "Invalid itemized flag word [%s]\n",
+			who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	}
+
+	if ((!(iflags & ITEM_UPDATING) || !S_ISREG(the_file_list->files[ndx]->mode)) && f_out >= 0) {
+		write_int(f_out, ndx);
+		write_shortint(f_out, iflags);
+	}
+
+	return iflags;
+}
+
 void send_files(struct file_list *flist, int f_out, int f_in)
 {
 	int fd = -1;
@@ -132,6 +159,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 	struct map_struct *mbuf = NULL;
 	STRUCT_STAT st;
 	char *fname2, fname[MAXPATHLEN];
+	char fnametmp[MAXPATHLEN];
 	int iflags;
 	struct file_struct *file;
 	int phase = 0;
@@ -163,18 +191,9 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			break;
 		}
 
-		if (i < 0 || i >= flist->count) {
-			/* Handle the new keep-alive (no-op) packet. */
-			if (i == flist->count && protocol_version >= 29
-	 		    && read_shortint(f_in) == ITEM_IS_NEW) {
-				write_int(f_out, i);
-				write_shortint(f_out, ITEM_IS_NEW);
-				continue;
-			}
-			rprintf(FERROR, "Invalid file index %d (count=%d)\n",
-				i, flist->count);
-			exit_cleanup(RERR_PROTOCOL);
-		}
+		iflags = read_iflags(f_in, f_out, i, fnametmp);
+		if (iflags == ITEM_IS_NEW) /* no-op packet */
+			continue;
 
 		file = flist->files[i];
 		if (file->dir.root) {
@@ -189,23 +208,10 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		if (verbose > 2)
 			rprintf(FINFO, "send_files(%d, %s)\n", i, fname);
 
-		if (protocol_version >= 29) {
-			iflags = read_shortint(f_in);
-			if (!(iflags & ITEM_UPDATING) || !S_ISREG(file->mode)) {
-				int see_item = itemizing && (iflags || verbose > 1);
-				write_int(f_out, i);
-				write_shortint(f_out, iflags);
-				if (am_server) {
-					if (am_daemon && !dry_run && see_item)
-						log_item(file, &stats, iflags, NULL);
-				} else if (see_item || iflags & ITEM_UPDATING
-				    || (S_ISDIR(file->mode)
-				     && iflags & ITEM_REPORT_TIME))
-					log_item(file, &stats, iflags, NULL);
-				continue;
-			}
-		} else
-			iflags = ITEM_UPDATING | ITEM_MISSING_DATA;
+		if (!(iflags & ITEM_UPDATING) || !S_ISREG(file->mode)) {
+			maybe_log_item(file, iflags, itemizing, fnametmp);
+			continue;
+		}
 
 		if (inplace && protocol_version >= 29) {
 			updating_basis_file = !(iflags & ITEM_USING_ALT_BASIS);
