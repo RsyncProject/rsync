@@ -470,7 +470,8 @@ static void send_file_entry(struct file_struct *file, int f,
 		write_int(f, gid);
 	}
 	if (preserve_devices && IS_DEVICE(mode)) {
-		/* If SAME_HIGH_RDEV is off, SAME_RDEV_pre28 is also off. */
+		/* If SAME_HIGH_RDEV is off, SAME_RDEV_pre28 is also off.
+		 * Also, avoid using "rdev" because it may be incomplete. */
 		if (!(flags & SAME_HIGH_RDEV))
 			write_int(f, file->rdev);
 		else if (protocol_version >= 28)
