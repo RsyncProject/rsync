@@ -204,9 +204,9 @@ void parse_arguments(int argc, char *argv[])
       switch (opt) 
 	{
 	case OPT_VERSION:
-	  printf("rsync version %s  protocol version %d\n\n",
+	  rprintf(FINFO,"rsync version %s  protocol version %d\n\n",
 		 VERSION,PROTOCOL_VERSION);
-	  printf("Written by Andrew Tridgell and Paul Mackerras\n");
+	  rprintf(FINFO,"Written by Andrew Tridgell and Paul Mackerras\n");
 	  exit_cleanup(0);
 
 	case OPT_SUFFIX:

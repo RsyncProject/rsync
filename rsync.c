@@ -917,7 +917,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 		if (dry_run) {
 			if (!am_server && verbose)
-				printf("%s\n",fname);
+				rprintf(FINFO,"%s\n",fname);
 			continue;
 		}
 
@@ -989,7 +989,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		cleanup_file = file;
 
 		if (!am_server && verbose)
-			printf("%s\n",fname);
+			rprintf(FINFO,"%s\n",fname);
 		
 		/* recv file data */
 		recv_ok = receive_data(f_in,buf,fd2,fname,file->length);
@@ -1100,7 +1100,7 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 	  
 	  if (dry_run) {	
 		  if (!am_server && verbose)
-			  printf("%s\n",fname);
+			  rprintf(FINFO,"%s\n",fname);
 		  write_int(f_out,i);
 		  continue;
 	  }
@@ -1150,7 +1150,7 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 		  rprintf(FINFO,"calling match_sums %s\n",fname);
 	  
 	  if (!am_server && verbose)
-		  printf("%s\n",fname+offset);
+		  rprintf(FINFO,"%s\n",fname+offset);
 	  
 	  match_sums(f_out,s,buf,st.st_size);
 	  
