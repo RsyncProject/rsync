@@ -243,12 +243,14 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	if ((pid=do_fork()) == 0) {
 		close(recv_pipe[0]);
+		close(f_out);
 		recv_files(f_in,flist,local_name,recv_pipe[1]);
 		if (am_daemon) report(-1);
 		exit_cleanup(0);
 	}
 
 	close(recv_pipe[1]);
+	close(f_in);
 	generate_files(f_out,flist,local_name,recv_pipe[0]);
 
 	waitpid(pid, &status, 0);
