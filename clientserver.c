@@ -96,11 +96,32 @@ static int rsync_module(int fd, int i)
 	char *argv[MAX_ARGS];
 	char **argp;
 	char line[1024];
+	uid_t uid;
+	gid_t gid;
+	char *p;
 
 	module_id = i;
 
 	if (lp_read_only(i))
 		read_only = 1;
+
+	p = lp_uid(i);
+	if (!name_to_uid(p, &uid)) {
+		if (!isdigit(*p)) {
+			rprintf(FERROR,"Invalid uid %s\n", p);
+			return -1;
+		} 
+		uid = atoi(p);
+	}
+
+	p = lp_gid(i);
+	if (!name_to_gid(p, &gid)) {
+		if (!isdigit(*p)) {
+			rprintf(FERROR,"Invalid gid %s\n", p);
+			return -1;
+		} 
+		gid = atoi(p);
+	}
 
 	rprintf(FERROR,"rsyncd starting\n");
 
@@ -114,12 +135,12 @@ static int rsync_module(int fd, int i)
 		return -1;
 	}
 
-	if (setgid(lp_gid(i))) {
+	if (setgid(gid)) {
 		io_printf(fd,"@ERROR: setgid failed\n");
 		return -1;
 	}
 
-	if (setuid(lp_uid(i))) {
+	if (setuid(uid)) {
 		io_printf(fd,"@ERROR: setuid failed\n");
 		return -1;
 	}
@@ -180,6 +201,7 @@ static int start_daemon(int fd)
 	char line[200];
 	char *motd;
 	int version;
+	int i = -1;
 
 	set_socket_options(fd,"SO_KEEPALIVE");
 
@@ -207,8 +229,7 @@ static int start_daemon(int fd)
 		io_printf(fd,"\n");
 	}
 
-	while (1) {
-		int i;
+	while (i == -1) {
 
 		line[0] = 0;
 		if (!read_line(fd, line, sizeof(line)-1)) {
@@ -231,11 +252,9 @@ static int start_daemon(int fd)
 			io_printf(fd,"ERROR: Unknown module '%s'\n", line);
 			return -1;
 		}
-
-		return rsync_module(fd, i);
 	}
 
-	return 0;
+	return rsync_module(fd, i);
 }
 
 
@@ -254,6 +273,7 @@ int daemon_main(void)
 
 	become_daemon();
 
-	return start_accept_loop(rsync_port, start_daemon);
+	start_accept_loop(rsync_port, start_daemon);
+	return -1;
 }
 

@@ -67,38 +67,19 @@ static char *gid_to_name(gid_t gid)
 	return NULL;
 }
 
-
-/* turn a user name into a uid */
-static uid_t name_to_uid(char *name)
-{
-	struct passwd *pass;
-	if (!name || !*name) return 0;
-	pass = getpwnam(name);
-	if (pass) return(pass->pw_uid);
-	return 0;
-}
-
-/* turn a group name into a gid */
-static gid_t name_to_gid(char *name)
-{
-	struct group *grp;
-	if (!name || !*name) return 0;
-	grp = getgrnam(name);
-	if (grp) return(grp->gr_gid);
-	return 0;
-}
-
 static int map_uid(int id, char *name)
 {
-	uid_t uid = name_to_uid(name);
-	if (uid != 0) return uid;
+	uid_t uid;
+	if (name_to_uid(name, &uid) && uid != 0)
+		return uid;
 	return id;
 }
 
 static int map_gid(int id, char *name)
 {
-	gid_t gid = name_to_gid(name);
-	if (gid != 0) return gid;
+	gid_t gid;
+	if (name_to_gid(name, &gid) && gid != 0)
+		return gid;
 	return id;
 }
 

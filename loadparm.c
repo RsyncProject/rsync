@@ -114,8 +114,8 @@ typedef struct
 	char *comment;
 	BOOL read_only;
 	BOOL list;
-	int uid;
-	int gid;
+	char *uid;
+	char *gid;
 } service;
 
 
@@ -127,8 +127,8 @@ static service sDefault =
 	NULL,    /* comment */
 	True,    /* read only */
 	True,    /* list */
-	-2,      /* uid */
-	-2,      /* gid */
+	"nobody",/* uid */
+	"nobody",/* gid */
 };
 
 
@@ -151,8 +151,8 @@ static struct parm_struct parm_table[] =
   {"path",             P_STRING,  P_LOCAL,  &sDefault.path,        NULL,   0},
   {"read only",        P_BOOL,    P_LOCAL,  &sDefault.read_only,   NULL,   0},
   {"list",             P_BOOL,    P_LOCAL,  &sDefault.list,        NULL,   0},
-  {"uid",              P_INTEGER, P_LOCAL,  &sDefault.uid,         NULL,   0},
-  {"gid",              P_INTEGER, P_LOCAL,  &sDefault.gid,         NULL,   0},
+  {"uid",              P_STRING,  P_LOCAL,  &sDefault.uid,         NULL,   0},
+  {"gid",              P_STRING,  P_LOCAL,  &sDefault.gid,         NULL,   0},
   {NULL,               P_BOOL,    P_NONE,   NULL,                  NULL,   0}
 };
 
@@ -202,8 +202,8 @@ FN_LOCAL_STRING(lp_comment, comment)
 FN_LOCAL_STRING(lp_path, path)
 FN_LOCAL_BOOL(lp_read_only, read_only)
 FN_LOCAL_BOOL(lp_list, list)
-FN_LOCAL_INTEGER(lp_uid, uid)
-FN_LOCAL_INTEGER(lp_gid, gid)
+FN_LOCAL_STRING(lp_uid, uid)
+FN_LOCAL_STRING(lp_gid, gid)
 
 /* local prototypes */
 static int    strwicmp( char *psz1, char *psz2 );

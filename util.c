@@ -455,3 +455,30 @@ void strlcpy(char *d, char *s, int maxlen)
 	memcpy(d, s, len);
 	d[len] = 0;
 }
+
+/* turn a user name into a uid */
+int name_to_uid(char *name, uid_t *uid)
+{
+	struct passwd *pass;
+	if (!name || !*name) return 0;
+	pass = getpwnam(name);
+	if (pass) {
+		*uid = pass->pw_uid;
+		return 1;
+	}
+	return 0;
+}
+
+/* turn a group name into a gid */
+int name_to_gid(char *name, gid_t *gid)
+{
+	struct group *grp;
+	if (!name || !*name) return 0;
+	grp = getgrnam(name);
+	if (grp) {
+		*gid = grp->gr_gid;
+		return 1;
+	}
+	return 0;
+}
+

@@ -85,6 +85,7 @@ AC_TRY_COMPILE([#include <sys/types.h>
 echo yes;AC_DEFINE(HAVE_UTIMBUF), 
 echo no)
 
+# The following test taken from the cvs sources
 # If we can't find connect, try looking in -lsocket, -lnsl, and -linet.
 # The Irix 5 libc.so has connect and gethostbyname, but Irix 5 also has
 # libsocket.so which has a bad implementation of gethostbyname (it

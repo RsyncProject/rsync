@@ -116,7 +116,7 @@ int is_a_socket(int fd)
 }
 
 
-int start_accept_loop(int port, int (*fn)(int ))
+void start_accept_loop(int port, int (*fn)(int ))
 {
 	int s;
 
@@ -125,12 +125,12 @@ int start_accept_loop(int port, int (*fn)(int ))
 	/* open an incoming socket */
 	s = open_socket_in(SOCK_STREAM, port);
 	if (s == -1)
-		return(-1);
+		exit(1);
 
 	/* ready to listen */
 	if (listen(s, 5) == -1) {
 		close(s);
-		return -1;
+		exit(1);
 	}
 
 
@@ -163,7 +163,6 @@ int start_accept_loop(int port, int (*fn)(int ))
 
 		close(fd);
 	}
-	return 0;
 }
 
 
