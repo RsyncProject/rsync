@@ -204,18 +204,6 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 			argv[i] += l+1;
 	}
 
-	if (am_daemon) {
-		extern int module_id;
-		char *name = lp_name(module_id);
-		int l = strlen(name);
-		for (i=0;i<argc;i++) {
-			if (strncmp(argv[i], name, l) == 0) {
-				argv[i] += l;
-				if (!*argv[i]) argv[i] = ".";
-			}
-		}
-	}
-	
 	if (argc == 0 && recurse) {
 		argc=1;
 		argv--;
@@ -272,18 +260,6 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	if (verbose > 2)
 		rprintf(FINFO,"server_recv(%d) starting pid=%d\n",argc,(int)getpid());
 	
-	if (am_daemon) {
-		extern int module_id;
-		char *name = lp_name(module_id);
-		int i, l = strlen(name);
-		for (i=0;i<argc;i++) {
-			if (strncmp(argv[i], name, l) == 0) {
-				argv[i] += l;
-				if (!*argv[i]) argv[i] = ".";
-			}
-		}
-	}
-
 	if (argc > 0) {
 		dir = argv[0];
 		argc--;

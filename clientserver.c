@@ -109,19 +109,21 @@ static int rsync_module(int fd, int i)
 	char *addr = client_addr(fd);
 	char *host = client_name(fd);
 	char *auth;
+	char *name = lp_name(i);
+	int start_glob=0;
 
 	if (!allow_access(addr, host, lp_hosts_allow(i), lp_hosts_deny(i))) {
 		rprintf(FERROR,"rsync denied on module %s from %s (%s)\n",
-			lp_name(i), client_name(fd), client_addr(fd));
+			name, client_name(fd), client_addr(fd));
 		io_printf(fd,"@ERROR: access denied to %s from %s (%s)\n",
-			  lp_name(i), client_name(fd), client_addr(fd));
+			  name, client_name(fd), client_addr(fd));
 		return -1;
 	}
 
 	if (!auth_server(fd, i, addr, "@RSYNCD: AUTHREQD ")) {
 		rprintf(FERROR,"auth failed on module %s from %s (%s)\n",
-			lp_name(i), client_name(fd), client_addr(fd));
-		io_printf(fd,"@ERROR: auth failed on module %s\n",lp_name(i));
+			name, client_name(fd), client_addr(fd));
+		io_printf(fd,"@ERROR: auth failed on module %s\n",name);
 		return -1;		
 	}
 
@@ -133,7 +135,7 @@ static int rsync_module(int fd, int i)
 	}
 
 	rprintf(FINFO,"rsync on module %s from %s (%s)\n",
-		lp_name(i), host, addr);
+		name, host, addr);
 	
 	module_id = i;
 
@@ -191,12 +193,28 @@ static int rsync_module(int fd, int i)
 
 		if (!*line) break;
 
-		argv[argc] = strdup(line);
+		p = line;
+
+		if (start_glob && strncmp(p, name, strlen(name)) == 0) {
+			p += strlen(name);
+			if (!*p) p = ".";
+		}
+
+		argv[argc] = strdup(p);
 		if (!argv[argc]) {
 			return -1;
 		}
 
-		argc++;
+		if (start_glob) {
+			glob_expand(argv, &argc, MAX_ARGS);
+		} else {
+			argc++;
+		}
+
+		if (strcmp(line,".") == 0) {
+			start_glob = 1;
+		}
+
 		if (argc == MAX_ARGS) {
 			return -1;
 		}

@@ -52,7 +52,7 @@
 #define CHUNK_SIZE (32*1024)
 #define MAX_MAP_SIZE (4*1024*1024)
 
-#define MAX_ARGS 100
+#define MAX_ARGS 1000
 
 #define BLOCKING_TIMEOUT 10
 
@@ -168,6 +168,10 @@
 #include <getopt.h>
 #else
 #include "lib/getopt.h"
+#endif
+
+#ifdef HAVE_GLOB
+#include <glob.h>
 #endif
 
 /* these are needed for the uid/gid mapping code */
