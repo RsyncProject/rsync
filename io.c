@@ -323,13 +323,14 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 
 	no_flush++;
 
-	reading = (buffer_f_in != -1 && read_buffer_len < MAX_READ_BUFFER);
-
 	while (total < len) {
 		FD_ZERO(&w_fds);
 		FD_ZERO(&r_fds);
 		FD_SET(fd,&w_fds);
 		fd_count = fd+1;
+
+		reading = (buffer_f_in != -1 && 
+			   read_buffer_len < MAX_READ_BUFFER);
 
 		if (reading) {
 			FD_SET(buffer_f_in,&r_fds);
@@ -348,6 +349,10 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 		if (count <= 0) {
 			check_timeout();
 			continue;
+		}
+
+		if (reading && FD_ISSET(buffer_f_in, &r_fds)) {
+			read_check(buffer_f_in);
 		}
 
 		if (FD_ISSET(fd, &w_fds)) {
@@ -376,10 +381,6 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 			if (io_timeout)
 				last_io = time(NULL);
 			continue;
-		}
-
-		if (reading && FD_ISSET(buffer_f_in, &r_fds)) {
-			read_check(buffer_f_in);
 		}
 	}
 
