@@ -369,7 +369,7 @@ static void send_file_entry(struct file_struct *file, int f,
 	static uid_t last_uid;
 	static gid_t last_gid;
 	static char lastname[MAXPATHLEN];
-	char *fname;
+	char *fname, buf[MAXPATHLEN];
 	int l1, l2;
 
 	if (f == -1)
@@ -382,7 +382,7 @@ static void send_file_entry(struct file_struct *file, int f,
 
 	io_write_phase = "send_file_entry";
 
-	fname = f_name(file);
+	fname = f_name_to(file, buf, sizeof buf);
 
 	flags = base_flags;
 
@@ -797,11 +797,11 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 }
 
 
-
 void send_file_name(int f, struct file_list *flist, char *fname,
 		    int recursive, unsigned base_flags)
 {
 	struct file_struct *file;
+	char buf[MAXPATHLEN];
 	extern int delete_excluded;
 
 	/* f is set to -1 when calculating deletion file list */
@@ -827,12 +827,11 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 	if (S_ISDIR(file->mode) && recursive) {
 		struct exclude_struct **last_exclude_list =
 		    local_exclude_list;
-		send_directory(f, flist, f_name(file));
+		send_directory(f, flist, f_name_to(file, buf, sizeof buf));
 		local_exclude_list = last_exclude_list;
 		return;
 	}
 }
-
 
 
 static void send_directory(int f, struct file_list *flist, char *dir)
@@ -1129,9 +1128,10 @@ struct file_list *recv_file_list(int f)
 
 		maybe_emit_filelist_progress(flist);
 
-		if (verbose > 2)
+		if (verbose > 2) {
 			rprintf(FINFO, "recv_file_name(%s)\n",
 				f_name(flist->files[i]));
+		}
 	}
 
 
@@ -1182,10 +1182,6 @@ struct file_list *recv_file_list(int f)
 }
 
 
-/*
- * XXX: This is currently the hottest function while building the file
- * list, because building f_name()s every time is expensive.
- **/
 int file_compare(struct file_struct **f1, struct file_struct **f2)
 {
 	if (!(*f1)->basename && !(*f2)->basename)
@@ -1196,7 +1192,7 @@ int file_compare(struct file_struct **f1, struct file_struct **f2)
 		return 1;
 	if ((*f1)->dirname == (*f2)->dirname)
 		return u_strcmp((*f1)->basename, (*f2)->basename);
-	return u_strcmp(f_name(*f1), f_name(*f2));
+	return f_name_cmp(*f1, *f2);
 }
 
 
@@ -1300,7 +1296,6 @@ void flist_free(struct file_list *flist)
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 {
 	int i, prev_i = 0;
-	char *name, *prev_name = NULL;
 
 	if (!flist || flist->count == 0)
 		return;
@@ -1311,19 +1306,17 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 	for (i = no_dups? 0 : flist->count; i < flist->count; i++) {
 		if (flist->files[i]->basename) {
 			prev_i = i;
-			prev_name = f_name(flist->files[i]);
 			break;
 		}
 	}
 	while (++i < flist->count) {
 		if (!flist->files[i]->basename)
 			continue;
-		name = f_name(flist->files[i]);
-		if (strcmp(name, prev_name) == 0) {
+		if (f_name_cmp(flist->files[i], flist->files[prev_i]) == 0) {
 			if (verbose > 1 && !am_server) {
 				rprintf(FINFO,
 					"removing duplicate name %s from file list %d\n",
-					name, i);
+					f_name(flist->files[i]), i);
 			}
 			/* Make sure that if we unduplicate '.', that we don't
 			 * lose track of a user-specified starting point (or
@@ -1341,9 +1334,6 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 		}
 		else
 			prev_i = i;
-		/* We set prev_name every iteration to avoid it becoming
-		 * invalid when names[][] in f_name() wraps around. */
-		prev_name = name;
 	}
 
 	if (strip_root) {
@@ -1379,33 +1369,100 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 }
 
 
-/*
- * return the full filename of a flist entry
- *
- * This function is too expensive at the moment, because it copies
- * strings when often we only want to compare them.  In any case,
- * using strlcat is silly because it will walk the string repeatedly.
- */
-char *f_name(struct file_struct *f)
-{
-	static char names[10][MAXPATHLEN];
-	static int n;
-	char *p = names[n];
+enum fnc_state { fnc_DIR, fnc_SLASH, fnc_BASE };
 
+/* Compare the names of two file_struct entities, just like strcmp()
+ * would do if it were operating on the joined strings.  We assume
+ * that there are no 0-length strings.
+ */
+int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
+{
+	int dif;
+	const uchar *c1, *c2;
+	enum fnc_state state1 = fnc_DIR, state2 = fnc_DIR;
+
+	if (!f1 || !f1->basename) {
+		if (!f2 || !f2->basename)
+			return 0;
+		return -1;
+	}
+	if (!f2 || !f2->basename)
+		return 1;
+
+	if (!(c1 = f1->dirname)) {
+		state1 = fnc_BASE;
+		c1 = f1->basename;
+	}
+	if (!(c2 = f2->dirname)) {
+		state2 = fnc_BASE;
+		c2 = f2->basename;
+	}
+
+	while (1) {
+		if ((dif = (int)*c1 - (int)*c2) != 0)
+			break;
+		if (!*++c1) {
+			switch (state1) {
+			case fnc_DIR:
+				state1 = fnc_SLASH;
+				c1 = "/";
+				break;
+			case fnc_SLASH:
+				state1 = fnc_BASE;
+				c1 = f1->basename;
+				break;
+			case fnc_BASE:
+				break;
+			}
+		}
+		if (!*++c2) {
+			switch (state2) {
+			case fnc_DIR:
+				state2 = fnc_SLASH;
+				c2 = "/";
+				break;
+			case fnc_SLASH:
+				state2 = fnc_BASE;
+				c2 = f2->basename;
+				break;
+			case fnc_BASE:
+				if (!*c1)
+					return 0;
+				break;
+			}
+		}
+	}
+
+	return dif;
+}
+
+
+/* Return a copy of the full filename of a flist entry, using the indicated
+ * buffer.
+ */
+char *f_name_to(struct file_struct *f, char *buf, int bsize)
+{
 	if (!f || !f->basename)
 		return NULL;
 
-	n = (n + 1) % 10;
-
 	if (f->dirname) {
-		int off;
+		int off = strlcpy(buf, f->dirname, bsize);
+		off += strlcpy(buf + off, "/", bsize - off);
+		strlcpy(buf + off, f->basename, bsize - off);
+	} else
+		strlcpy(buf, f->basename, bsize);
+	return buf;
+}
 
-		off = strlcpy(p, f->dirname, MAXPATHLEN);
-		off += strlcpy(p + off, "/", MAXPATHLEN - off);
-		off += strlcpy(p + off, f->basename, MAXPATHLEN - off);
-	} else {
-		strlcpy(p, f->basename, MAXPATHLEN);
-	}
 
-	return p;
+/* Like f_name_to(), but we rotate through 5 static buffers of our own.
+ */
+char *f_name(struct file_struct *f)
+{
+	static char names[5][MAXPATHLEN];
+	static unsigned int n;
+
+	n = (n + 1) % (sizeof names / sizeof names[0]);
+
+	return f_name_to(f, names[n], sizeof names[0]);
 }
