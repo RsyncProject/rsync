@@ -682,7 +682,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			tmpdir = alloc_sanitize_path(tmpdir, curr_dir);
 		if (compare_dest)
 			compare_dest = alloc_sanitize_path(compare_dest, curr_dir);
-		fprintf(stderr, "compare_dest=`%s'\n", compare_dest);
 		if (backup_dir)
 			backup_dir = alloc_sanitize_path(backup_dir, curr_dir);
 		if (files_from)
