@@ -212,7 +212,7 @@ static int rsync_module(int fd, int i)
 		}
 
 		if (start_glob) {
-			glob_expand(argv, &argc, MAX_ARGS);
+			glob_expand(name, argv, &argc, MAX_ARGS);
 		} else {
 			argc++;
 		}
