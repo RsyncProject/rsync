@@ -6,3 +6,11 @@ rsync changes since last release
       L. Allen, Martin Pool)
 
     * Fix compilation on Tru64.  (Albert Chin, Zoong Pham)
+
+  INTERNAL:
+
+    * Many code cleanups and improved internal documentation.  (Martin Pool, Nelson
+      Beebe)
+
+    * More test cases.  (Martin Pool)
+
