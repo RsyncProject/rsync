@@ -454,6 +454,9 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 			}
 
 			if (ret <= 0) {
+				/* Don't try to write errors back
+				 * across the stream */
+				io_multiplexing_close();
 				rprintf(FERROR,
 					"error writing %d unbuffered bytes"
 					" - exiting: %s\n", len,

@@ -17,6 +17,9 @@ rsync 2.5.3 (not released yet)
     * Fixed problem on systems such as Sunos4 that do not support realloc
       on a NULL pointer; error was "out of memory in flist_expand".
 
+    * Fix for rsync server processes hanging around after the client
+      unexpectedly disconnects.  (Colin Walters) (Debian bug #128632)
+
   ENHANCEMENTS:
 
     * Command to initiate connections is only shown with -vv, rather
