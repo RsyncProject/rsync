@@ -54,6 +54,8 @@ int dry_run = 0;
 int local_server = 0;
 int ignore_times = 0;
 int delete_mode = 0;
+int delete_before = 0;
+int delete_after = 0;
 int delete_excluded = 0;
 int one_file_system = 0;
 int protocol_version = PROTOCOL_VERSION;
@@ -88,7 +90,6 @@ int size_only = 0;
 int daemon_bwlimit = 0;
 int bwlimit = 0;
 size_t bwlimit_writemax = 0;
-int delete_after = 0;
 int only_existing = 0;
 int opt_ignore_existing = 0;
 int max_delete = 0;
@@ -250,6 +251,7 @@ void usage(enum logcode F)
   rprintf(F,"     --suffix=SUFFIX         backup suffix (default %s w/o --backup-dir)\n",BACKUP_SUFFIX);
   rprintf(F," -u, --update                update only (don't overwrite newer files)\n");
   rprintf(F,"     --inplace               update destination files in-place (SEE MAN PAGE)\n");
+  rprintf(F," -k, --keep-dirs             transfer a directory without recursing\n");
   rprintf(F," -K, --keep-dirlinks         treat symlinked dir on receiver as dir\n");
   rprintf(F," -l, --links                 copy symlinks as symlinks\n");
   rprintf(F," -L, --copy-links            copy the referent of all symlinks\n");
@@ -272,14 +274,14 @@ void usage(enum logcode F)
   rprintf(F,"     --existing              only update files that already exist\n");
   rprintf(F,"     --ignore-existing       ignore files that already exist on receiving side\n");
   rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
-  rprintf(F,"     --delete-excluded       also delete excluded files on the receiving side\n");
   rprintf(F,"     --delete-after          receiver deletes after transferring, not before\n");
+  rprintf(F,"     --delete-excluded       also delete excluded files on the receiving side\n");
   rprintf(F,"     --ignore-errors         delete even if there are I/O errors\n");
+  rprintf(F,"     --force                 force deletion of directories even if not empty\n");
   rprintf(F,"     --max-delete=NUM        don't delete more than NUM files\n");
   rprintf(F,"     --max-size=SIZE         don't transfer any file larger than SIZE\n");
   rprintf(F,"     --partial               keep partially transferred files\n");
   rprintf(F,"     --partial-dir=DIR       put a partially transferred file into DIR\n");
-  rprintf(F,"     --force                 force deletion of directories even if not empty\n");
   rprintf(F,"     --numeric-ids           don't map uid/gid values by user/group name\n");
   rprintf(F,"     --timeout=TIME          set I/O timeout in seconds\n");
   rprintf(F," -I, --ignore-times          turn off mod time & file size quick check\n");
@@ -321,7 +323,6 @@ void usage(enum logcode F)
 }
 
 enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
-      OPT_DELETE_AFTER, OPT_DELETE_EXCLUDED,
       OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_TIMEOUT, OPT_MAX_SIZE,
@@ -337,11 +338,11 @@ static struct poptOption long_options[] = {
   {"size-only",        0,  POPT_ARG_NONE,   &size_only, 0, 0, 0 },
   {"modify-window",    0,  POPT_ARG_INT,    &modify_window, OPT_MODIFY_WINDOW, 0, 0 },
   {"one-file-system", 'x', POPT_ARG_NONE,   &one_file_system, 0, 0, 0 },
-  {"delete",           0,  POPT_ARG_NONE,   &delete_mode, 0, 0, 0 },
   {"existing",         0,  POPT_ARG_NONE,   &only_existing, 0, 0, 0 },
   {"ignore-existing",  0,  POPT_ARG_NONE,   &opt_ignore_existing, 0, 0, 0 },
-  {"delete-after",     0,  POPT_ARG_NONE,   0, OPT_DELETE_AFTER, 0, 0 },
-  {"delete-excluded",  0,  POPT_ARG_NONE,   0, OPT_DELETE_EXCLUDED, 0, 0 },
+  {"delete",           0,  POPT_ARG_NONE,   &delete_before, 0, 0, 0 },
+  {"delete-after",     0,  POPT_ARG_NONE,   &delete_after, 0, 0, 0 },
+  {"delete-excluded",  0,  POPT_ARG_NONE,   &delete_excluded, 0, 0, 0 },
   {"force",            0,  POPT_ARG_NONE,   &force_delete, 0, 0, 0 },
   {"numeric-ids",      0,  POPT_ARG_NONE,   &numeric_ids, 0, 0, 0 },
   {"exclude",          0,  POPT_ARG_STRING, 0, OPT_EXCLUDE, 0, 0 },
@@ -356,6 +357,7 @@ static struct poptOption long_options[] = {
   {"cvs-exclude",     'C', POPT_ARG_NONE,   &cvs_exclude, 0, 0, 0 },
   {"update",          'u', POPT_ARG_NONE,   &update_only, 0, 0, 0 },
   {"inplace",          0,  POPT_ARG_NONE,   &inplace, 0, 0, 0 },
+  {"keep-dirs",       'k', POPT_ARG_VAL,    &keep_dirs, 2, 0, 0 },
   {"keep-dirlinks",   'K', POPT_ARG_NONE,   &keep_dirlinks, 0, 0, 0 },
   {"links",           'l', POPT_ARG_NONE,   &preserve_links, 0, 0, 0 },
   {"copy-links",      'L', POPT_ARG_NONE,   &copy_links, 0, 0, 0 },
@@ -373,7 +375,8 @@ static struct poptOption long_options[] = {
   {"archive",         'a', POPT_ARG_NONE,   &archive_mode, 0, 0, 0 },
   {"server",           0,  POPT_ARG_NONE,   &am_server, 0, 0, 0 },
   {"sender",           0,  POPT_ARG_NONE,   0, OPT_SENDER, 0, 0 },
-  {"recursive",       'r', POPT_ARG_NONE,   &recurse, 0, 0, 0 },
+  {"recursive",       'r', POPT_ARG_VAL,    &recurse, -1, 0, 0 },
+  {"list-only",        0,  POPT_ARG_VAL,    &list_only, 2, 0, 0 },
   {"relative",        'R', POPT_ARG_VAL,    &relative_paths, 1, 0, 0 },
   {"no-relative",      0,  POPT_ARG_VAL,    &relative_paths, 0, 0, 0 },
   {"rsh",             'e', POPT_ARG_STRING, &shell_cmd, 0, 0, 0 },
@@ -613,16 +616,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			modify_window_set = 1;
 			break;
 
-		case OPT_DELETE_AFTER:
-			delete_after = 1;
-			delete_mode = 1;
-			break;
-
-		case OPT_DELETE_EXCLUDED:
-			delete_excluded = 1;
-			delete_mode = 1;
-			break;
-
 		case OPT_EXCLUDE:
 			add_exclude(&exclude_list, poptGetOptArg(pc), 0);
 			break;
@@ -841,7 +834,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 	if (archive_mode) {
 		if (!files_from)
-			recurse = 1;
+			recurse = -1; /* infinite recursion */
 #if SUPPORT_LINKS
 		preserve_links = 1;
 #endif
@@ -851,12 +844,17 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		preserve_uid = 1;
 		preserve_devices = 1;
 	}
-	if (recurse) {
-		keep_dirs = 1;
-	}
+
+	if (recurse || list_only || files_from)
+		keep_dirs |= 1;
 
 	if (relative_paths < 0)
 		relative_paths = files_from? 1 : 0;
+
+	if (delete_before || delete_after)
+		delete_mode = 1;
+	if (delete_excluded && !delete_mode)
+		delete_mode = delete_before = 1;
 
 	*argv = poptGetArgs(pc);
 	*argc = count_args(*argv);
@@ -1007,7 +1005,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				return 0;
 			}
 		}
-		keep_dirs = 1;
 	}
 
 	return 1;
@@ -1061,6 +1058,8 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'l';
 	if (copy_links)
 		argstr[x++] = 'L';
+	if (keep_dirs > 1)
+		argstr[x++] = 'k';
 	if (keep_dirlinks && am_sender)
 		argstr[x++] = 'K';
 
@@ -1082,7 +1081,7 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 't';
 	if (preserve_perms)
 		argstr[x++] = 'p';
-	if (recurse)
+	if (recurse < 0)
 		argstr[x++] = 'r';
 	if (always_checksum)
 		argstr[x++] = 'c';
@@ -1099,17 +1098,19 @@ void server_options(char **args,int *argc)
 	if (do_compression)
 		argstr[x++] = 'z';
 
-	/* this is a complete hack - blame Rusty
-
-	   this is a hack to make the list_only (remote file list)
-	   more useful */
-	if (list_only && !recurse)
+	/* This is a complete hack - blame Rusty.  FIXME!
+	 * This hack is only needed for older rsync versions that
+	 * don't understand the --list-only option. */
+	if (list_only == 1 && recurse >= 0)
 		argstr[x++] = 'r';
 
 	argstr[x] = 0;
 
 	if (x != 1)
 		args[ac++] = argstr;
+
+	if (list_only > 1)
+		args[ac++] = "--list-only";
 
 	if (block_size) {
 		if (asprintf(&arg, "-B%lu", block_size) < 0)
@@ -1156,7 +1157,7 @@ void server_options(char **args,int *argc)
 	if (am_sender) {
 		if (delete_excluded)
 			args[ac++] = "--delete-excluded";
-		else if (delete_mode)
+		else if (delete_before || delete_after)
 			args[ac++] = "--delete";
 
 		if (delete_after)
