@@ -817,13 +817,16 @@ static int socketpair_tcp(int fd[2])
 }
 
 
-/*******************************************************************
-run a program on a local tcp socket, this is used to launch smbd
-when regression testing
-the return value is a socket which is attached to a subprocess
-running "prog". stdin and stdout are attached. stderr is left
-attached to the original stderr
- ******************************************************************/
+
+/**
+ * Run a program on a local tcp socket, so that we can talk to it's
+ * stdin and stdout.  This is used to launch ssh and similar
+ * connection helper programs for rsync.
+ *
+ * @return a socket which is attached to a subprocess running
+ * "prog". stdin and stdout are attached. stderr is left attached to
+ * the original stderr
+ **/
 int sock_exec(const char *prog)
 {
 	int fd[2];
