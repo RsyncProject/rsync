@@ -102,7 +102,6 @@ static int make_bak_dir(char *fullpath)
 				    "make_bak_dir stat %s failed: %s\n",
 				    full_fname(rel), strerror(errno));
 			} else {
-				set_modtime(fullpath, st.st_mtime);
 				do_lchown(fullpath, st.st_uid, st.st_gid);
 				do_chmod(fullpath, st.st_mode);
 			}
