@@ -224,108 +224,6 @@ if test "$ipv6" = "yes" -a "$ipv6lib" != "none"; then
 	fi
 fi
 
-
-AC_MSG_CHECKING(getaddrinfo bug)
-AC_TRY_RUN([
-#include <sys/types.h>
-#include <netdb.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-
-main()
-{
-  int passive, gaierr, inet4 = 0, inet6 = 0;
-  struct addrinfo hints, *ai, *aitop;
-  char straddr[INET6_ADDRSTRLEN], strport[16];
-
-  for (passive = 0; passive <= 1; passive++) {
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_flags = passive ? AI_PASSIVE : 0;
-    hints.ai_socktype = SOCK_STREAM;
-    if ((gaierr = getaddrinfo(NULL, "54321", &hints, &aitop)) != 0) {
-      (void)gai_strerror(gaierr);
-      goto bad;
-    }
-    for (ai = aitop; ai; ai = ai->ai_next) {
-      if (ai->ai_addr == NULL ||
-          ai->ai_addrlen == 0 ||
-          getnameinfo(ai->ai_addr, ai->ai_addrlen,
-                      straddr, sizeof(straddr), strport, sizeof(strport),
-                      NI_NUMERICHOST|NI_NUMERICSERV) != 0) {
-        goto bad;
-      }
-      switch (ai->ai_family) {
-      case AF_INET:
-        if (strcmp(strport, "54321") != 0) {
-          goto bad;
-        }
-        if (passive) {
-          if (strcmp(straddr, "0.0.0.0") != 0) {
-            goto bad;
-          }
-        } else {
-          if (strcmp(straddr, "127.0.0.1") != 0) {
-            goto bad;
-          }
-        }
-        inet4++;
-        break;
-      case AF_INET6:
-        if (strcmp(strport, "54321") != 0) {
-          goto bad;
-        }
-        if (passive) {
-          if (strcmp(straddr, "::") != 0) {
-            goto bad;
-          }
-        } else {
-          if (strcmp(straddr, "::1") != 0) {
-            goto bad;
-          }
-        }
-        inet6++;
-        break;
-      case AF_UNSPEC:
-        goto bad;
-        break;
-      default:
-        /* another family support? */
-        break;
-      }
-    }
-  }
-
-  if (!(inet4 == 0 || inet4 == 2))
-    goto bad;
-  if (!(inet6 == 0 || inet6 == 2))
-    goto bad;
-
-  if (aitop)
-    freeaddrinfo(aitop);
-  exit(0);
-
- bad:
-  if (aitop)
-    freeaddrinfo(aitop);
-  exit(1);
-}
-],
-AC_MSG_RESULT(good)
-buggygetaddrinfo=no,
-AC_MSG_RESULT(buggy)
-buggygetaddrinfo=yes,
-AC_MSG_RESULT(buggy)
-buggygetaddrinfo=yes)
-
-if test "$buggygetaddrinfo" = "yes"; then
-	if test "$ipv6" = "yes" -a "$ipv6type" != "linux"; then
-		AC_MSG_ERROR([You must get working getaddrinfo() function or you can specify "--disable-ipv6"])
-	elif test "$ipv6type" = "linux"; then
-		AC_MSG_ERROR([getaddrinfo() implementation on your system seems be buggy.  Better upgrade your system library to newest version of GNU C library (aka glibc).])
-	fi
-fi
 AC_REPLACE_FUNCS(getaddrinfo getnameinfo)
 
 AC_CHECK_MEMBER([struct sockaddr.sa_len], 
@@ -344,6 +242,7 @@ AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h unistd
 AC_CHECK_HEADERS(compat.h sys/param.h ctype.h sys/wait.h sys/ioctl.h)
 AC_CHECK_HEADERS(sys/filio.h string.h stdlib.h sys/socket.h sys/mode.h)
 AC_CHECK_HEADERS(glob.h alloca.h mcheck.h sys/sysctl.h arpa/inet.h arpa/nameser.h)
+AC_CHECK_HEADERS(netdb.h)
 
 AC_CHECK_SIZEOF(int)
 AC_CHECK_SIZEOF(long)
