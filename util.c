@@ -650,13 +650,13 @@ size_t stringjoin(char *dest, size_t destsize, ...)
 	return ret;
 }
 
-void clean_fname(char *name)
+unsigned int clean_fname(char *name)
 {
 	char *limit = name, *t = name, *f = name;
 	int anchored;
 
 	if (!name)
-		return;
+		return 0;
 
 	if ((anchored = *f == '/') != 0)
 		*t++ = *f++;
@@ -698,6 +698,8 @@ void clean_fname(char *name)
 	if (t == name)
 		*t++ = '.';
 	*t = '\0';
+
+	return t - name;
 }
 
 /* Make path appear as if a chroot had occurred.  This handles a leading
@@ -867,7 +869,7 @@ int push_dir(char *dir)
 		curr_dir_len += len;
 	}
 
-	clean_fname(curr_dir);
+	curr_dir_len = clean_fname(curr_dir);
 
 	return 1;
 }
