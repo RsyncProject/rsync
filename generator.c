@@ -155,7 +155,7 @@ static void sum_sizes_sqroot_baarda(struct sum_struct *sum, uint64 len)
 		blength = 0;
 		do {
 			blength |= c;
-			if (len < (uint64)(blength * blength))
+			if (len < (uint64)blength * blength)
 				blength &= ~c;
 			c >>= 1;
 		} while (c >= 8);	/* round to multiple of 8 */
