@@ -77,6 +77,30 @@ hands_setup() {
 
 
 
+
+####################
+# Many machines do not have "mkdir -p", so we have to build up long paths.
+# How boring.  
+makepath () {
+    p="$1"
+    (
+	# Absolut Unix.
+	if echo $p | grep '^/' >/dev/null
+	then
+	    cd /
+	fi
+    
+	# This will break if $1 contains a space.
+	for c in `echo $p | tr '/' ' '`
+	do 
+	    [ -d "$c" ] || mkdir "$c" || return $? 
+	    cd "$c" || return $?
+	done
+    )
+}
+
+
+
 ###########################
 # Run a test (in '$1') then compare directories $2 and $3 to see if
 # there are any difference.  If there are, explain them.
