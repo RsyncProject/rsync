@@ -43,6 +43,13 @@ extern int protocol_version;
 extern int always_checksum;
 extern char *compare_dest;
 extern int link_dest;
+extern int whole_file;
+extern int local_server;
+extern int write_batch;
+extern int list_only;
+extern int only_existing;
+extern int orig_umask;
+extern int safe_symlinks;
 
 
 /* choose whether to skip a particular file */
@@ -204,10 +211,6 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
  * Whew. */
 static BOOL disable_deltas_p(void)
 {
-	extern int whole_file;
-	extern int local_server;
-	extern int write_batch;
-
 	if (whole_file > 0)
 		return True;
 	if (whole_file == 0 || write_batch)
@@ -270,10 +273,6 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 	int statret;
 	char *fnamecmp;
 	char fnamecmpbuf[MAXPATHLEN];
-	extern char *compare_dest;
-	extern int list_only;
-	extern int only_existing;
-	extern int orig_umask;
 
 	if (list_only)
 		return;
@@ -335,7 +334,6 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 #if SUPPORT_LINKS
 		char lnk[MAXPATHLEN];
 		int l;
-		extern int safe_symlinks;
 
 		if (safe_symlinks && unsafe_symlink(file->u.link, fname)) {
 			if (verbose) {
