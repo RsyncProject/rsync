@@ -27,6 +27,7 @@ extern struct stats stats;
 extern int am_root;
 extern int am_server;
 extern int am_sender;
+extern int am_generator;
 extern int am_daemon;
 extern int verbose;
 extern int blocking_io;
@@ -56,6 +57,7 @@ extern char *remote_filesfrom_file;
 extern char *rsync_path;
 extern char *shell_cmd;
 extern struct file_list *batch_flist;
+
 
 /* there's probably never more than at most 2 outstanding child processes,
  * but set it higher just in case.
@@ -198,7 +200,7 @@ static void show_malloc_stats(void)
 		getpid(),
 		am_server ? "server " : "",
 		am_daemon ? "daemon " : "",
-		am_sender ? "sender" : "receiver");
+		who_am_i());
 	rprintf(FINFO, "  arena:     %10d   (bytes from sbrk)\n", mi.arena);
 	rprintf(FINFO, "  ordblks:   %10d   (chunks not in use)\n", mi.ordblks);
 	rprintf(FINFO, "  smblks:    %10d\n", mi.smblks);
@@ -303,8 +305,6 @@ oom:
 	out_of_memory("do_cmd");
 	return 0; /* not reached */
 }
-
-
 
 
 static char *get_local_name(struct file_list *flist,char *name)
@@ -454,6 +454,8 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		while (1)
 			msleep(20);
 	}
+
+	am_generator = 1;
 
 	close(error_pipe[1]);
 	if (f_in != f_out) close(f_in);
