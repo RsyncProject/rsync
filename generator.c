@@ -507,7 +507,7 @@ static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
 {
 	int fname_len, fname_suf_len;
 	const char *fname_suf, *fname = file->basename;
-	uint32 lowest_dist = 0x7FFFFFFF;
+	uint32 lowest_dist = 25 << 16; /* ignore a distance greater than 25 */
 	int j, lowest_j = -1;
 
 	fname_len = strlen(fname);
