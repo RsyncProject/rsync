@@ -15,7 +15,7 @@ AC_HEADER_TIME
 AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h unistd.h utime.h grp.h)
 AC_CHECK_HEADERS(compat.h sys/param.h ctype.h sys/wait.h sys/ioctl.h)
-AC_CHECK_HEADERS(sys/filio.h string.h stdlib.h)
+AC_CHECK_HEADERS(sys/filio.h string.h stdlib.h sys/mode.h)
 
 AC_CHECK_SIZEOF(int)
 AC_CHECK_SIZEOF(long)

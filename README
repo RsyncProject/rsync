@@ -96,6 +96,7 @@ AVAILABILITY
 
 The main ftp site for rsync is ftp://samba.anu.edu.au/pub/rsync
 
-A european mirror of this directory is available at
-ftp://sunsite.auc.dk/pub/unix/rsync
+Mirrors are available at:
 
+ftp://sunsite.auc.dk/pub/unix/rsync
+ftp://ftp.sunet.se/pub/unix/admin/rsync

@@ -131,6 +131,8 @@ int piped_child(char **command,int *f_in,int *f_out)
 	fprintf(FERROR,"Failed to dup/close : %s\n",strerror(errno));
 	exit_cleanup(1);
       }
+      if (to_child_pipe[0] != STDIN_FILENO) close(to_child_pipe[0]);
+      if (from_child_pipe[1] != STDOUT_FILENO) close(from_child_pipe[1]);
       execvp(command[0], command);
       fprintf(FERROR,"Failed to exec %s : %s\n",
 	      command[0],strerror(errno));
