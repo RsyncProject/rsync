@@ -94,7 +94,6 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 	extern struct stats stats;		
 	struct stats initial_stats;
 	extern int write_batch;   /* dw */
-	int negative_one;  /* dw */
 	extern int read_batch;    /* dw */
 	int checksums_match;   /* dw */
 	int buff_len;  /* dw */
@@ -255,8 +254,9 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 
                        }  /* j=i */
                    } else {  /* not checksum match */
-                      rprintf(FINFO,"readbatch & checksums don't match\n");
-                      rprintf(FINFO,"filename=%s is being skipped\n");
+                      rprintf (FINFO,"readbatch & checksums don't match\n");
+                      rprintf (FINFO,"filename=%s is being skipped\n",
+			       fname);
                       continue;
                    }
                 } else  {
