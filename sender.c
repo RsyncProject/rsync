@@ -145,6 +145,11 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			updating_basis_file = inplace && !make_backups;
 
 		file = flist->files[i];
+		if (S_ISDIR(file->mode)) {
+			rprintf(FERROR, "[%s] got index of directory: %d\n",
+				who_am_i(), i);
+			exit_cleanup(RERR_PROTOCOL);
+		}
 
 		stats.current_file_index = i;
 		stats.num_transferred_files++;
