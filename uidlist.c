@@ -158,7 +158,7 @@ static int is_in_group(gid_t gid)
 
 static gid_t match_gid(gid_t gid)
 {
-	static gid_t last_in, last_out;
+	static gid_t last_in = (gid_t) -2, last_out;
 	struct idlist *list = gidlist;
 
 	if (gid == last_in) return last_out;
