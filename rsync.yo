@@ -580,7 +580,8 @@ If this option is used with bf([user@]host::module/path), then the
 remote shell em(COMMMAND) will be used to run an rsync server on the
 remote host, and all data will be transmitted through that remote
 shell connection, rather than through a direct socket connection to a
-running rsync server on the remote host.
+running rsync server on the remote host.  See the section "CONNECTING
+TO AN RSYNC SERVER OVER A REMOTE SHELL PROGRAM" above.
 
 Command-line arguments are permitted in COMMAND provided that COMMAND is
 presented to rsync as a single argument.  For example:
