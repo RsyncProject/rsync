@@ -146,7 +146,9 @@
 
 #ifdef HAVE_SYS_MODE_H
 /* apparently AIX needs this for S_ISLNK */
+#ifndef S_ISLNK
 #include <sys/mode.h>
+#endif
 #endif
 
 #ifdef HAVE_FNMATCH
