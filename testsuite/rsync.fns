@@ -222,5 +222,13 @@ test_fail() {
     exit 1
 }
 
+# It failed, but we expected that.  don't dump out error logs, 
+# because most users won't want to see them.  But do leave
+# the working directory around.
+test_xfail() {
+    echo "$@" >&2
+    exit 78
+}
+
 # be reproducible
 umask 077

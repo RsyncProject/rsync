@@ -209,6 +209,13 @@ do
 	skipped=`expr $skipped + 1`
 	discard_scratch
 	;;
+    78)
+        # It failed, but we expected that.  don't dump out error logs, 
+	# because most users won't want to see them.  But do leave
+	# the working directory around.
+	echo "XFAIL   $testbase"
+	failed=`expr $failed + 1`
+	;;
     *)
 	echo "FAIL    $testbase"
 	echo "----- $testbase failed: log follows"
