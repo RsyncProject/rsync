@@ -53,3 +53,5 @@ rsync 2.4.7 (sometime in 2001, maybe :)
     * Fix --cvs-exclude sigsegv bug.
 
     * Applied "simple nohang patch" from Wayne Davison.
+
+    * Update to work with autoconf2.50 and 2.13.
