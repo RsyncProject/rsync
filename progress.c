@@ -24,14 +24,20 @@
 extern struct stats stats;
 extern int am_server;
 
-static OFF_T  last_ofs;
-static struct timeval print_time;
-static struct timeval start_time;
-static OFF_T  start_ofs;
+#define PROGRESS_HISTORY_SECS 5
+
+struct progress_history {
+	struct timeval time;
+	OFF_T ofs;
+};
+
+static struct progress_history ph_start;
+static struct progress_history ph_list[PROGRESS_HISTORY_SECS];
+static int newest_hpos, oldest_hpos;
 
 static unsigned long msdiff(struct timeval *t1, struct timeval *t2)
 {
-	return (t2->tv_sec - t1->tv_sec) * 1000
+	return (t2->tv_sec - t1->tv_sec) * 1000L
 	     + (t2->tv_usec - t1->tv_usec) / 1000;
 }
 
@@ -47,18 +53,27 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 			    int is_last)
 {
 	char eol[256];
-	int pct = (ofs == size) ? 100 : (int)((100.0*ofs)/size);
-	unsigned long diff = msdiff(&start_time, now);
-	double rate = diff ? (double) (ofs-start_ofs) * 1000.0 / diff / 1024.0 : 0;
 	const char *units;
-	/* If we've finished transferring this file, show the time taken;
-	 * otherwise show expected time to complete.  That's kind of
-	 * inconsistent, but people can probably cope.  Hopefully we'll
-	 * get more consistent and complete progress reporting soon. --
-	 * mbp */
-	double remain = is_last ? (double) diff / 1000.0
-	              : rate ? (double) (size-ofs) / rate / 1000.0 : 0.0;
+	int pct = ofs == size ? 100 : (int) (100.0 * ofs / size);
+	unsigned long diff;
+	double rate, remain;
 	int remain_h, remain_m, remain_s;
+
+	if (is_last) {
+		/* Compute stats based on the starting info. */
+		diff = msdiff(&ph_start.time, now);
+		if (!diff)
+			diff = 1;
+		rate = (double) (ofs - ph_start.ofs) * 1000.0 / diff / 1024.0;
+		/* Switch to total time taken for our last update. */
+		remain = (double) diff / 1000.0;
+	} else {
+		/* Compute stats based on recent progress. */
+		diff = msdiff(&ph_list[oldest_hpos].time, now);
+		rate = diff ? (double) (ofs - ph_list[oldest_hpos].ofs) * 1000.0
+		    / diff / 1024.0 : 0;
+		remain = rate ? (double) (size - ofs) / rate / 1000.0 : 0.0;
+	}
 
 	if (rate > 1024*1024) {
 		rate /= 1024.0 * 1024.0;
@@ -94,34 +109,46 @@ void end_progress(OFF_T size)
 		gettimeofday(&now, NULL);
 		rprint_progress(size, size, &now, True);
 	}
-	last_ofs = 0;
-	start_ofs = 0;
-	print_time.tv_sec = print_time.tv_usec = 0;
-	start_time.tv_sec = start_time.tv_usec = 0;
+	memset(&ph_start, 0, sizeof ph_start);
 }
 
 void show_progress(OFF_T ofs, OFF_T size)
 {
 	struct timeval now;
 
-	if (!start_time.tv_sec) {
-		gettimeofday(&now, NULL);
-		start_time.tv_sec = now.tv_sec;
-		start_time.tv_usec = now.tv_usec;
-		start_ofs = ofs;
-		if (am_server)
-			return;
+	if (am_server)
+		return;
+
+	gettimeofday(&now, NULL);
+
+	if (!ph_start.time.tv_sec) {
+		int i;
+
+		/* Try to guess the real starting time when the sender started
+		 * to send us data by using the time we last received some data
+		 * in the last file (if it was recent enough). */
+		if (msdiff(&ph_list[newest_hpos].time, &now) <= 1500) {
+			ph_start.time = ph_list[newest_hpos].time;
+			ph_start.ofs = 0;
+		} else {
+			ph_start.time.tv_sec = now.tv_sec;
+			ph_start.time.tv_usec = now.tv_usec;
+			ph_start.ofs = ofs;
+		}
+
+		for (i = 0; i < PROGRESS_HISTORY_SECS; i++)
+			ph_list[i] = ph_start;
 	}
 	else {
-		if (am_server)
+		if (msdiff(&ph_list[newest_hpos].time, &now) < 1000)
 			return;
-		gettimeofday(&now, NULL);
+
+		newest_hpos = oldest_hpos;
+		oldest_hpos = (oldest_hpos + 1) % PROGRESS_HISTORY_SECS;
+		ph_list[newest_hpos].time.tv_sec = now.tv_sec;
+		ph_list[newest_hpos].time.tv_usec = now.tv_usec;
+		ph_list[newest_hpos].ofs = ofs;
 	}
 
-	if (ofs > last_ofs + 1000 && msdiff(&print_time, &now) > 250) {
-		rprint_progress(ofs, size, &now, False);
-		last_ofs = ofs;
-		print_time.tv_sec = now.tv_sec;
-		print_time.tv_usec = now.tv_usec;
-	}
+	rprint_progress(ofs, size, &now, False);
 }
