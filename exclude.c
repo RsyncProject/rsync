@@ -102,7 +102,7 @@ void free_exclude_list(struct exclude_struct ***listp)
 	struct exclude_struct **list = *listp;
 
 	if (verbose > 2)
-		rprintf(FINFO,"clearing exclude list\n");
+		rprintf(FINFO, "[%s] clearing exclude list\n", who_am_i());
 
 	if (!list)
 		return;
@@ -203,12 +203,14 @@ static void report_exclude_result(char const *name,
 	 * then it is stripped out by make_exclude.  So as a special
 	 * case we add it back in here. */
 
-	if (verbose >= 2)
-		rprintf(FINFO, "%s %s %s because of pattern %s%s\n",
+	if (verbose >= 2) {
+		rprintf(FINFO, "[%s] %s %s %s because of pattern %s%s\n",
+			who_am_i(),
 			ent->include ? "including" : "excluding",
 			name_is_dir ? "directory" : "file",
 			name, ent->pattern,
 			ent->directory ? "/" : "");
+	}
 }
 
 
@@ -250,7 +252,8 @@ void add_exclude(struct exclude_struct ***listp, const char *pattern, int includ
 		out_of_memory("add_exclude");
 
 	if (verbose > 2) {
-		rprintf(FINFO,"add_exclude(%s,%s)\n",pattern,
+		rprintf(FINFO, "[%s] add_exclude(%s,%s)\n",
+			who_am_i(), pattern,
 			include ? "include" : "exclude");
 	}
 

@@ -342,7 +342,8 @@ static void flist_expand(struct file_list *flist)
 		}
 
 		if (verbose >= 2) {
-			rprintf(FINFO, "expand file_list to %.0f bytes, did%s move\n",
+			rprintf(FINFO, "[%s] expand file_list to %.0f bytes, did%s move\n",
+				who_am_i(),
 				(double)sizeof(flist->files[0])
 				* flist->malloced,
 				(new_ptr == flist->files) ? " not" : "");
@@ -781,8 +782,10 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 
       skip_excludes:
 
-	if (verbose > 2)
-		rprintf(FINFO, "make_file(%s,*,%d)\n", fname, exclude_level);
+	if (verbose > 2) {
+		rprintf(FINFO, "[%s] make_file(%s,*,%d)\n",
+			who_am_i(), fname, exclude_level);
+	}
 
 	file = new(struct file_struct);
 	if (!file)
@@ -1414,8 +1417,8 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 		return;
 
 	for (i = 0; i < flist->count; i++) {
-		rprintf(FINFO, "[%ld] i=%d %s %s %s mode=0%o len=%.0f\n",
-			(long) getpid(), i,
+		rprintf(FINFO, "[%s] i=%d %s %s %s mode=0%o len=%.0f\n",
+			who_am_i(), i,
 			NS(flist->files[i]->basedir),
 			NS(flist->files[i]->dirname),
 			NS(flist->files[i]->basename),
