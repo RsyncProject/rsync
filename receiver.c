@@ -303,17 +303,22 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 }
 
 
-static void read_gen_name(int fd, char *dirname, char *buf)
+static char *read_gen_name(int fd, char *dirname, char *buf)
 {
 	int dlen;
 
 	if (dirname) {
 		dlen = strlcpy(buf, dirname, MAXPATHLEN);
-		buf[dlen++] = '/';
+		if (dlen != 1 || *buf != '/')
+			buf[dlen++] = '/';
 	} else
 		dlen = 0;
 
-	read_vstring(fd, buf + dlen, MAXPATHLEN - dlen);
+	if (read_vstring(fd, buf + dlen, MAXPATHLEN - dlen) < 0)
+		return NULL;
+	if (strchr(buf + dlen, '/') != NULL)
+		return NULL;
+	return buf;
 }
 
 
@@ -327,8 +332,7 @@ static void discard_receive_data(int f_in, OFF_T length)
  * main routine for receiver process.
  *
  * Receiver process runs on the same host as the generator process. */
-int recv_files(int f_in, struct file_list *flist, char *local_name,
-	       int f_in_name)
+int recv_files(int f_in, struct file_list *flist, char *local_name)
 {
 	int next_gen_i = -1;
 	int fd1,fd2;
@@ -339,6 +343,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 	char fnametmp[MAXPATHLEN];
 	char *fnamecmp, *partialptr, numbuf[4];
 	char fnamecmpbuf[MAXPATHLEN];
+	uchar fnamecmp_type;
 	struct file_struct *file;
 	struct stats initial_stats;
 	int save_make_backups = make_backups;
@@ -363,13 +368,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		i = read_int(f_in);
 		if (i == -1) {
 			if (read_batch) {
-				if (next_gen_i != flist->count) {
-					do {
-						if (f_in_name >= 0
-						    && next_gen_i >= 0)
-							read_byte(f_in_name);
-					} while (read_int(batch_gen_fd) != -1);
-				}
+				if (next_gen_i != flist->count)
+					while (read_int(batch_gen_fd) != -1) {}
 				next_gen_i = -1;
 			}
 
@@ -386,7 +386,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 			continue;
 		}
 
-		iflags = read_iflags(f_in, -1, i, fnametmp);
+		iflags = read_item_attrs(f_in, -1, i, fnametmp, &fnamecmp_type);
 		if (iflags == ITEM_IS_NEW) /* no-op packet */
 			continue;
 
@@ -420,8 +420,6 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 
 		if (read_batch) {
 			while (i > next_gen_i) {
-				if (f_in_name >= 0 && next_gen_i >= 0)
-					read_byte(f_in_name);
 				next_gen_i = read_int(batch_gen_fd);
 				if (next_gen_i == -1)
 					next_gen_i = flist->count;
@@ -437,41 +435,67 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 
 		partialptr = partial_dir ? partial_dir_fname(fname) : fname;
 
-		if (f_in_name >= 0) {
-			uchar j;
-			switch (j = read_byte(f_in_name)) {
+		if (protocol_version >= 29) {
+			switch (fnamecmp_type) {
 			case FNAMECMP_FNAME:
 				fnamecmp = fname;
 				break;
 			case FNAMECMP_PARTIAL_DIR:
-				fnamecmp = partialptr ? partialptr : fname;
+				fnamecmp = partialptr;
 				break;
 			case FNAMECMP_BACKUP:
 				fnamecmp = get_backup_name(fname);
 				break;
 			case FNAMECMP_FUZZY:
-				read_gen_name(f_in_name, file->dirname, fnamecmpbuf);
-				fnamecmp = fnamecmpbuf;
+				fnamecmp = read_gen_name(f_in, file->dirname,
+							 fnamecmpbuf);
 				break;
 			default:
-				if (j >= basis_dir_cnt) {
+				if (fnamecmp_type >= basis_dir_cnt) {
 					rprintf(FERROR,
 						"invalid basis_dir index: %d.\n",
-						j);
+						fnamecmp_type);
 					exit_cleanup(RERR_PROTOCOL);
 				}
 				pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
-					 basis_dir[j], fname);
+					 basis_dir[fnamecmp_type], fname);
 				fnamecmp = fnamecmpbuf;
 				break;
 			}
-		} else
-			fnamecmp = fname;
+			if (!fnamecmp || (server_filter_list.head
+			  && check_filter(&server_filter_list, fname, 0) < 0))
+				fnamecmp = fname;
+		} else {
+			/* Reminder: --inplace && --partial-dir are never
+			 * enabled at the same time. */
+			if (inplace && make_backups) {
+				if (!(fnamecmp = get_backup_name(fname)))
+					fnamecmp = fname;
+			} else if (partial_dir && partialptr)
+				fnamecmp = partialptr;
+			else
+				fnamecmp = fname;
+		}
 
 		initial_stats = stats;
 
 		/* open the file */
 		fd1 = do_open(fnamecmp, O_RDONLY, 0);
+
+		if (fd1 == -1 && protocol_version < 29) {
+			if (fnamecmp != fname) {
+				fnamecmp = fname;
+				fd1 = do_open(fnamecmp, O_RDONLY, 0);
+			}
+
+			if (fd1 == -1 && basis_dir[0]) {
+				/* pre-29 allowed only one alternate basis */
+				pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
+					 basis_dir[0], fname);
+				fnamecmp = fnamecmpbuf;
+				fd1 = do_open(fnamecmp, O_RDONLY, 0);
+			}
+		}
 
 		if (fd1 != -1 && do_fstat(fd1,&st) != 0) {
 			rsyserr(FERROR, errno, "fstat %s failed",
