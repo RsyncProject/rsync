@@ -107,7 +107,7 @@ test: check
 # might lose in the future where POSIX diverges from old sh.
 
 check: all
-	POSIXLY_CORRECT=1 rsync_bin=./rsync srcdir="$(srcdir)" $(srcdir)/runtests.sh
+	POSIXLY_CORRECT=1 rsync_bin=`pwd`/rsync srcdir="$(srcdir)" $(srcdir)/runtests.sh
 
 # This does *not* depend on building or installing: you can use it to
 # check a version installed from a binary or some other source tree,
