@@ -161,10 +161,14 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 			exit(0);
 		}
 
-		if (strncmp(line, "@ERROR", 6) == 0)
+		if (strncmp(line, "@ERROR", 6) == 0) {
 			rprintf(FERROR,"%s\n", line);
-		else
+			/* This is always fatal; the server will now
+			 * close the socket. */
+			return RERR_STARTCLIENT;
+		} else {
 			rprintf(FINFO,"%s\n", line);
+		}
 	}
 	kludge_around_eof = False;
 
