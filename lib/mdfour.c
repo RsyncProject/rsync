@@ -28,29 +28,24 @@
 
 static struct mdfour *m;
 
-#define F(X,Y,Z) (((X)&(Y)) | ((~(X))&(Z)))
-#define G(X,Y,Z) (((X)&(Y)) | ((X)&(Z)) | ((Y)&(Z)))
-#define H(X,Y,Z) ((X)^(Y)^(Z))
-#ifdef LARGE_INT32
-#define lshift(x,s) ((((x)<<(s))&0xFFFFFFFF) | (((x)>>(32-(s)))&0xFFFFFFFF))
-#else
-#define lshift(x,s) (((x)<<(s)) | ((x)>>(32-(s))))
-#endif
+typedef unsigned long long uint64;
 
-#define ROUND1(a,b,c,d,k,s) a = lshift((uint32)(a + F(b,c,d) + X[k]), s)
-#define ROUND2(a,b,c,d,k,s) a = lshift((uint32)(a + G(b,c,d) + X[k] + 0x5A827999),s)
-#define ROUND3(a,b,c,d,k,s) a = lshift((uint32)(a + H(b,c,d) + X[k] + 0x6ED9EBA1),s)
+#define MASK32 (0xffffffff)
+
+#define F(X,Y,Z) ((((X)&(Y)) | ((~(X))&(Z))))
+#define G(X,Y,Z) ((((X)&(Y)) | ((X)&(Z)) | ((Y)&(Z))))
+#define H(X,Y,Z) (((X)^(Y)^(Z)))
+#define lshift(x,s) (((((x)<<(s))&MASK32) | (((x)>>(32-(s)))&MASK32)))
+
+#define ROUND1(a,b,c,d,k,s) a = lshift((a + F(b,c,d) + M[k])&MASK32, s)
+#define ROUND2(a,b,c,d,k,s) a = lshift((a + G(b,c,d) + M[k] + 0x5A827999)&MASK32,s)
+#define ROUND3(a,b,c,d,k,s) a = lshift((a + H(b,c,d) + M[k] + 0x6ED9EBA1)&MASK32,s)
 
 /* this applies md4 to 64 byte chunks */
 static void mdfour64(uint32 *M)
 {
-	int j;
 	uint32 AA, BB, CC, DD;
-	uint32 X[16];
 	uint32 A,B,C,D;
-
-	for (j=0;j<16;j++)
-		X[j] = M[j];
 
 	A = m->A; B = m->B; C = m->C; D = m->D; 
 	AA = A; BB = B; CC = C; DD = D;
@@ -63,6 +58,7 @@ static void mdfour64(uint32 *M)
 	ROUND1(C,D,A,B, 10, 11);  ROUND1(B,C,D,A, 11, 19);
         ROUND1(A,B,C,D, 12,  3);  ROUND1(D,A,B,C, 13,  7);  
 	ROUND1(C,D,A,B, 14, 11);  ROUND1(B,C,D,A, 15, 19);	
+
 
         ROUND2(A,B,C,D,  0,  3);  ROUND2(D,A,B,C,  4,  5);  
 	ROUND2(C,D,A,B,  8,  9);  ROUND2(B,C,D,A, 12, 13);
@@ -82,15 +78,11 @@ static void mdfour64(uint32 *M)
         ROUND3(A,B,C,D,  3,  3);  ROUND3(D,A,B,C, 11,  9);  
 	ROUND3(C,D,A,B,  7, 11);  ROUND3(B,C,D,A, 15, 15);
 
-	A += AA; B += BB; C += CC; D += DD;
+	A += AA; B += BB; 
+	C += CC; D += DD;
 	
-#ifdef LARGE_INT32
-	A &= 0xFFFFFFFF; B &= 0xFFFFFFFF;
-	C &= 0xFFFFFFFF; D &= 0xFFFFFFFF;
-#endif
-
-	for (j=0;j<16;j++)
-		X[j] = 0;
+	A &= MASK32; B &= MASK32; 
+	C &= MASK32; D &= MASK32;
 
 	m->A = A; m->B = B; m->C = C; m->D = D;
 }
