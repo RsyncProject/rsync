@@ -1674,18 +1674,6 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 		if (!*c2) {
 			switch (state2) {
 			case s_DIR:
-				if (state1 == s_SLASH && sorting_flist) {
-					int j;
-					/* Optimize for future comparisons. */
-					for (j = 0;
-					     j < sorting_flist->count;
-					     j++) {
-						struct file_struct *fp
-						    = sorting_flist->files[j];
-						if (fp->dirname == f2->dirname)
-							fp->dirname = f1->dirname;
-					}
-				}
 				state2 = s_SLASH;
 				c2 = (uchar*)"/";
 				break;
