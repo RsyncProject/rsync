@@ -33,6 +33,8 @@
 
 #include "rsync.h"
 
+extern char *bind_address;
+extern int default_af_hint;
 
 /**
  * Establish a proxy connection on an open socket to a web proxy by
@@ -314,15 +316,14 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_address,
 
 
 /**
- * Open a socket of the specified type, port and address for incoming data
+ * Open one or more sockets for incoming data using the specified type,
+ * port, and address.
  *
- * Try to be better about handling the results of getaddrinfo(): when
- * opening an inbound socket, we might get several address results,
- * e.g. for the machine's IPv4 and IPv6 name.
+ * The getaddrinfo() call may return several address results, e.g. for
+ * the machine's IPv4 and IPv6 name.
  *
- * We return an array of socket file-descriptors, with the length of
- * the array stored as the first element of the list.  This allows
- * the caller to listen on all of them.
+ * We return an array of file-descriptors to the sockets, with a trailing
+ * -1 value to indicate the end of the list.
  *
  * @param bind_address Local address to bind, or NULL to allow it to
  * default.
@@ -330,8 +331,8 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_address,
 static int *open_socket_in(int type, int port, const char *bind_address,
 			   int af_hint)
 {
-	int one=1;
-	int s, *sp, *socks, maxs;
+	int one = 1;
+	int s, *socks, maxs, i;
 	struct addrinfo hints, *all_ai, *resp;
 	char portbuf[10];
 	int error;
@@ -350,18 +351,14 @@ static int *open_socket_in(int type, int port, const char *bind_address,
 
 	/* Count max number of sockets we might open. */
 	for (maxs = 0, resp = all_ai; resp; resp = resp->ai_next, maxs++) {}
-	socks = new_array(int, maxs + 1);
-	if (!socks) {
-		rprintf(FERROR,
-			RSYNC_NAME "couldn't allocate memory for sockets");
-		return NULL;
-	}
+
+	if (!(socks = new_array(int, maxs + 1)))
+		out_of_memory("open_socket_in");
 
 	/* We may not be able to create the socket, if for example the
 	 * machine knows about IPv6 in the C library, but not in the
 	 * kernel. */
-	sp = socks + 1; /* Leave room for count at start of array. */
-	for (resp = all_ai; resp; resp = resp->ai_next) {
+	for (resp = all_ai, i = 0; resp; resp = resp->ai_next) {
 		s = socket(resp->ai_family, resp->ai_socktype,
 			   resp->ai_protocol);
 
@@ -375,11 +372,8 @@ static int *open_socket_in(int type, int port, const char *bind_address,
 
 #ifdef IPV6_V6ONLY
 		if (resp->ai_family == AF_INET6) {
-			if (setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY,
-				       (char *)&one, sizeof one) < 0) {
-				close(s);
-				continue;
-			}
+			setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY,
+				   (char *)&one, sizeof one) < 0;
 		}
 #endif
 
@@ -390,17 +384,17 @@ static int *open_socket_in(int type, int port, const char *bind_address,
 			continue;
 		}
 
-		*sp++ = s;
+		socks[i++] = s;
 	}
-	*socks = sp - socks - 1;   /* Save count. */
+	socks[i] = -1;
 
 	if (all_ai)
 		freeaddrinfo(all_ai);
 
-	if (*socks == 0) {
+	if (!i) {
 		rprintf(FERROR,
-			RSYNC_NAME ": open inbound socket on port %d failed: "
-			"%s\n", port, strerror(errno));
+			"unable to bind any inbound sockets on port %d\n",
+			port);
 		free(socks);
 		return NULL;
 	}
@@ -446,8 +440,6 @@ void start_accept_loop(int port, int (*fn)(int, int))
 {
 	fd_set deffds;
 	int *sp, maxfd, i;
-	extern char *bind_address;
-	extern int default_af_hint;
 
 	/* open an incoming socket */
 	sp = open_socket_in(SOCK_STREAM, port, bind_address, default_af_hint);
@@ -456,9 +448,16 @@ void start_accept_loop(int port, int (*fn)(int, int))
 
 	/* ready to listen */
 	FD_ZERO(&deffds);
-	maxfd = -1;
-	for (i = 1; i <= *sp; i++) {
-		if (listen(sp[i], 5) == -1) {
+	for (i = 0, maxfd = -1; sp[i] >= 0; i++) {
+		if (listen(sp[i], 5) < 0) {
+			rprintf(FERROR, "listen() on socket failed: %s\n",
+				strerror(errno));
+#ifdef INET6
+			if (errno == EADDRINUSE && i > 0) {
+				rprintf(FINFO,
+				    "Try using --ipv4 or --ipv6 to avoid this listen() error.");
+			}
+#endif
 			exit_cleanup(RERR_SOCKETIO);
 		}
 		FD_SET(sp[i], &deffds);
@@ -490,8 +489,7 @@ void start_accept_loop(int port, int (*fn)(int, int))
 		if (select(maxfd + 1, &fds, NULL, NULL, NULL) != 1)
 			continue;
 
-		fd = -1;
-		for (i = 1; i <= *sp; i++) {
+		for (i = 0, fd = -1; sp[i] >= 0; i++) {
 			if (FD_ISSET(sp[i], &fds)) {
 				fd = accept(sp[i], (struct sockaddr *)&addr,
 					    &addrlen);
@@ -506,7 +504,8 @@ void start_accept_loop(int port, int (*fn)(int, int))
 
 		if ((pid = fork()) == 0) {
 			int ret;
-			close(sp[i]);
+			for (i = 0; sp[i] >= 0; i++)
+				close(sp[i]);
 			/* open log file in child before possibly giving
 			 * up privileges  */
 			log_open();
