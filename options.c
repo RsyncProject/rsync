@@ -651,7 +651,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 	if (write_batch && read_batch) {
 		rprintf(FERROR,
-			"write-batch and read-batch can not be used together\n");
+			"--write-batch and --read-batch can not be used together\n");
 		exit_cleanup(RERR_SYNTAX);
 	}
 	if (write_batch || read_batch) {
@@ -671,6 +671,11 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			read_batch = write_batch = 0;
 			batch_name = NULL;
 		}
+	}
+	if (read_batch && files_from) {
+		rprintf(FERROR,
+			"--read-batch cannot be used with --files-from\n");
+		exit_cleanup(RERR_SYNTAX);
 	}
 	if (batch_name && strlen(batch_name) > MAX_BATCH_NAME_LEN) {
 		rprintf(FERROR,
