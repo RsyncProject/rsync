@@ -137,6 +137,11 @@ makepath () {
 # Run a test (in '$1') then compare directories $2 and $3 to see if
 # there are any difference.  If there are, explain them.
 
+# So normally basically $1 should be an rsync command, and $2 and $3
+# the source and destination directories.  This is only good when you
+# expect to transfer the whole directory exactly as is.  If some files
+# should be excluded, you might need to use something else.
+
 checkit() {
     failed=
 
