@@ -527,8 +527,7 @@ void io_flush(void)
 }
 
 
-/* XXX: fd is ignored, which seems a little strange. */
-void io_end_buffering(int fd)
+void io_end_buffering(void)
 {
 	io_flush();
 	if (!io_multiplexing_out) {
@@ -549,7 +548,7 @@ static void writefd(int fd,char *buf,size_t len)
 	}
 
 	while (len) {
-		int n = MIN(len, IO_BUFFER_SIZE-io_buffer_count);
+		int n = MIN((int) len, IO_BUFFER_SIZE-io_buffer_count);
 		if (n > 0) {
 			memcpy(io_buffer+io_buffer_count, buf, n);
 			buf += n;
