@@ -30,7 +30,10 @@ extern int am_sender;
 extern int am_generator;
 extern int preserve_uid;
 extern int preserve_gid;
+extern int force_delete;
+extern int recurse;
 extern int make_backups;
+extern char *backup_dir;
 
 
 /*
@@ -52,10 +55,8 @@ int delete_file(char *fname)
 	DIR *d;
 	struct dirent *di;
 	char buf[MAXPATHLEN];
-	extern int force_delete;
 	STRUCT_STAT st;
 	int ret;
-	extern int recurse;
 
 #if SUPPORT_LINKS
 	ret = do_lstat(fname, &st);
@@ -127,7 +128,8 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	STRUCT_STAT st2;
 	int change_uid, change_gid;
 
-	if (dry_run) return 0;
+	if (dry_run)
+		return 0;
 
 	if (!st) {
 		if (link_stat(fname,&st2) != 0) {
@@ -138,7 +140,8 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 		st = &st2;
 	}
 
-	if (!preserve_times || S_ISLNK(st->st_mode))
+	if (!preserve_times || S_ISLNK(st->st_mode)
+	    || (make_backups && !backup_dir && S_ISDIR(st->st_mode)))
 		flags |= PERMS_SKIP_MTIME;
 	if (!(flags & PERMS_SKIP_MTIME)
 	    && cmp_modtime(st->st_mtime, file->modtime) != 0) {
