@@ -609,3 +609,9 @@ inet_ntop(int af, const void *src, char *dst, size_t size);
 #ifndef HAVE_INET_PTON
 int isc_net_pton(int af, const char *src, void *dst);
 #endif
+
+#ifdef __GNUC__
+#  define UNUSED(x) x __attribute__((__unused__))
+#else
+#  define UNUSED(x) x
+#endif /* ndef __GNUC__ */

@@ -786,17 +786,17 @@ static int start_client(int argc, char *argv[])
 }
 
 
-static RETSIGTYPE sigusr1_handler(int val) {
+static RETSIGTYPE sigusr1_handler(int UNUSED(val)) {
 	exit_cleanup(RERR_SIGNAL);
 }
 
-static RETSIGTYPE sigusr2_handler(int val) {
+static RETSIGTYPE sigusr2_handler(int UNUSED(val)) {
 	extern int log_got_error;
 	if (log_got_error) _exit(RERR_PARTIAL);
 	_exit(0);
 }
 
-static RETSIGTYPE sigchld_handler(int val) {
+static RETSIGTYPE sigchld_handler(int UNUSED(val)) {
 #ifdef WNOHANG
 	while (waitpid(-1, NULL, WNOHANG) > 0) ;
 #endif
