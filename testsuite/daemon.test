@@ -5,10 +5,10 @@
 # This program is distributable under the terms of the GNU GPL (see
 # COPYING)
 
-# This test starts up an rsync daemon on a high-numbered port using a
-# configuration file from the test directory.  I can't think of a good
-# way to choose it dynamically at the moment, so we just use 2612.  If
-# that's in use then you lose.
+# We don't really want to start the server listening, because that
+# might interfere with the security or operation of the test machine.
+# Instead we use the fake-connect feature to dynamically assign a pair
+# of ports.
 
 # Having started the server we try some basic operations against it:
 
@@ -25,6 +25,7 @@
 . "$suitedir/rsync.fns"
 
 build_rsyncd_conf
-start_rsyncd
 
+export RSYNC_CONNECT_PROG="$rsync_bin --config=$conf --daemon"
 
+$rsync_bin -v localhost::

@@ -127,19 +127,3 @@ EOF
 }
 
 
-
-function start_rsyncd {
-    echo starting daemon
-    $rsync_bin --daemon --port $port --config $conf
-    sleep 2
-    pid=`cat "$pidfile"`
-    echo rsyncd running as process $pid
-
-
-    # We need to make sure that we always kill rsync, even if there's an
-    # error.  Otherwise it might hang around, and be insecure or at any
-    # rate keep the port bound and prevent the tests running in the
-    # future.
-
-    trap "echo killing off process $pid; kill $pid" EXIT
-}
