@@ -423,7 +423,8 @@ static struct file_struct *make_file(char *fname)
 
 
 
-static void send_file_name(int f,struct file_list *flist,char *fname)
+static void send_file_name(int f,struct file_list *flist,char *fname,
+			   int recursive)
 {
   struct file_struct *file;
 
@@ -448,7 +449,7 @@ static void send_file_name(int f,struct file_list *flist,char *fname)
     send_file_entry(file,f);
   }
 
-  if (S_ISDIR(file->mode) && recurse) {
+  if (S_ISDIR(file->mode) && recursive) {
     char **last_exclude_list = local_exclude_list;
     send_directory(f,flist,f_name(file));
     local_exclude_list = last_exclude_list;
@@ -501,7 +502,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 		    strcmp(di->d_name,"..")==0)
 			continue;
 		strncpy(p,di->d_name,MAXPATHLEN-(l+1));
-		send_file_name(f,flist,fname);
+		send_file_name(f,flist,fname,recurse);
 	}
 
 	closedir(d);
@@ -511,107 +512,126 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 
 struct file_list *send_file_list(int f,int argc,char *argv[])
 {
-  int i,l;
-  struct stat st;
-  char *p,*dir;
-  char dbuf[MAXPATHLEN];
-  struct file_list *flist;
+	int i,l;
+	struct stat st;
+	char *p,*dir;
+	char dbuf[MAXPATHLEN];
+	char lastpath[MAXPATHLEN]="";
+	struct file_list *flist;
 
-  if (verbose && recurse && !am_server && f != -1) {
-    fprintf(FINFO,"building file list ... ");
-    fflush(FINFO);
-  }
+	if (verbose && recurse && !am_server && f != -1) {
+		fprintf(FINFO,"building file list ... ");
+		fflush(FINFO);
+	}
 
-  flist = (struct file_list *)malloc(sizeof(flist[0]));
-  if (!flist) out_of_memory("send_file_list");
+	flist = (struct file_list *)malloc(sizeof(flist[0]));
+	if (!flist) out_of_memory("send_file_list");
 
-  flist->count=0;
-  flist->malloced = 1000;
-  flist->files = (struct file_struct **)malloc(sizeof(flist->files[0])*
-					       flist->malloced);
-  if (!flist->files) out_of_memory("send_file_list");
+	flist->count=0;
+	flist->malloced = 1000;
+	flist->files = (struct file_struct **)malloc(sizeof(flist->files[0])*
+						     flist->malloced);
+	if (!flist->files) out_of_memory("send_file_list");
 
-  for (i=0;i<argc;i++) {
-    char fname2[MAXPATHLEN];
-    char *fname = fname2;
+	for (i=0;i<argc;i++) {
+		char fname2[MAXPATHLEN];
+		char *fname = fname2;
 
-    strncpy(fname,argv[i],MAXPATHLEN-1);
-    fname[MAXPATHLEN-1] = 0;
+		strncpy(fname,argv[i],MAXPATHLEN-1);
+		fname[MAXPATHLEN-1] = 0;
 
-    l = strlen(fname);
-    if (l != 1 && fname[l-1] == '/') {
-      strcat(fname,".");
-    }
+		l = strlen(fname);
+		if (l != 1 && fname[l-1] == '/') {
+			strcat(fname,".");
+		}
 
-    if (link_stat(fname,&st) != 0) {
-      fprintf(FERROR,"%s : %s\n",fname,strerror(errno));
-      continue;
-    }
+		if (link_stat(fname,&st) != 0) {
+			fprintf(FERROR,"%s : %s\n",fname,strerror(errno));
+			continue;
+		}
 
-    if (S_ISDIR(st.st_mode) && !recurse) {
-      fprintf(FERROR,"skipping directory %s\n",fname);
-      continue;
-    }
+		if (S_ISDIR(st.st_mode) && !recurse) {
+			fprintf(FERROR,"skipping directory %s\n",fname);
+			continue;
+		}
 
-    dir = NULL;
+		dir = NULL;
 
-    if (!relative_paths) {
-	    p = strrchr(fname,'/');
-	    if (p) {
-		    *p = 0;
-		    if (p == fname) 
-			    dir = "/";
-		    else
-			    dir = fname;      
-		    fname = p+1;      
-	    }
-    }
+		if (!relative_paths) {
+			p = strrchr(fname,'/');
+			if (p) {
+				*p = 0;
+				if (p == fname) 
+					dir = "/";
+				else
+					dir = fname;      
+				fname = p+1;      
+			}
+		} else if (f != -1 && (p=strrchr(fname,'/'))) {
+			/* this ensures we send the intermediate directories,
+			   thus getting their permissions right */
+			*p = 0;
+			if (strcmp(lastpath,fname)) {
+				strcpy(lastpath, fname);
+				*p = '/';
+				for (p=fname+1; (p=strchr(p,'/')); p++) {
+					*p = 0;
+					send_file_name(f, flist, fname, 0);
+					*p = '/';
+				}
+			} else {
+				*p = '/';
+			}
+		}
+		
+		if (!*fname)
+			fname = ".";
+		
+		if (dir && *dir) {
+			if (getcwd(dbuf,MAXPATHLEN-1) == NULL) {
+				fprintf(FERROR,"getwd : %s\n",strerror(errno));
+				exit_cleanup(1);
+			}
+			if (chdir(dir) != 0) {
+				fprintf(FERROR,"chdir %s : %s\n",
+					dir,strerror(errno));
+				continue;
+			}
+			flist_dir = dir;
+			if (one_file_system)
+				set_filesystem(fname);
+			send_file_name(f,flist,fname,recurse);
+			flist_dir = NULL;
+			if (chdir(dbuf) != 0) {
+				fprintf(FERROR,"chdir %s : %s\n",
+					dbuf,strerror(errno));
+				exit_cleanup(1);
+			}
+			continue;
+		}
+		
+		if (one_file_system)
+			set_filesystem(fname);
+		send_file_name(f,flist,fname,recurse);
+	}
 
-    if (!*fname)
-      fname = ".";
+	if (f != -1) {
+		send_file_entry(NULL,f);
+		write_flush(f);
+	}
 
-    if (dir && *dir) {
-      if (getcwd(dbuf,MAXPATHLEN-1) == NULL) {
-	fprintf(FERROR,"getwd : %s\n",strerror(errno));
-	exit_cleanup(1);
-      }
-      if (chdir(dir) != 0) {
-	fprintf(FERROR,"chdir %s : %s\n",dir,strerror(errno));
-	continue;
-      }
-      flist_dir = dir;
-      if (one_file_system)
-	set_filesystem(fname);
-      send_file_name(f,flist,fname);
-      flist_dir = NULL;
-      if (chdir(dbuf) != 0) {
-	fprintf(FERROR,"chdir %s : %s\n",dbuf,strerror(errno));
-	exit_cleanup(1);
-      }
-      continue;
-    }
+	if (verbose && recurse && !am_server && f != -1)
+		fprintf(FINFO,"done\n");
+	
+	clean_flist(flist);
+	
+	/* now send the uid/gid list. This was introduced in protocol
+           version 15 */
+	if (f != -1 && remote_version >= 15) {
+		send_uid_list(f);
+	}
 
-    if (one_file_system)
-      set_filesystem(fname);
-    send_file_name(f,flist,fname);
-  }
-
-  if (f != -1) {
-    send_file_entry(NULL,f);
-    write_flush(f);
-  }
-
-  if (verbose && recurse && !am_server && f != -1)
-    fprintf(FINFO,"done\n");
-
-  clean_flist(flist);
-
-  /* now send the uid/gid list. This was introduced in protocol version 15 */
-  if (f != -1 && remote_version >= 15) {
-	  send_uid_list(f);
-  }
-
-  return flist;
+	return flist;
 }
 
 
@@ -730,7 +750,6 @@ static void free_file(struct file_struct *file)
 	if (file->link) free(file->link);
 	if (file->sum) free(file->sum);
 	bzero((char *)file, sizeof(*file));
-	free(file);
 }
 
 
@@ -742,6 +761,7 @@ void flist_free(struct file_list *flist)
 	int i;
 	for (i=1;i<flist->count;i++) {
 		free_file(flist->files[i]);
+		free(flist->files[i]);
 	}	
 	bzero((char *)flist->files, sizeof(flist->files[0])*flist->count);
 	free(flist->files);
@@ -767,13 +787,13 @@ void clean_flist(struct file_list *flist)
 
 	for (i=1;i<flist->count;i++) {
 		if (flist->files[i]->basename &&
+		    flist->files[i-1]->basename &&
 		    strcmp(f_name(flist->files[i]),
 			   f_name(flist->files[i-1])) == 0) {
 			if (verbose > 1 && !am_server)
 				fprintf(FERROR,"removing duplicate name %s from file list %d\n",
 					f_name(flist->files[i-1]),i-1);
 			free_file(flist->files[i]);
-			flist->files[i] = NULL;
 		} 
 	}
 }
@@ -788,7 +808,7 @@ char *f_name(struct file_struct *f)
 	static int n;
 	char *p = names[n];
 
-	if (!f) return NULL;
+	if (!f || !f->basename) return NULL;
 
 	n = (n+1)%10;
 
