@@ -21,12 +21,5 @@ RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon"
 export RSYNC_CONNECT_PROG
 
 hands_setup
-
-# If we are root, we must allow the rsyncd process (which runs under
-# a different uid/gid) to write to the destination directory. Source
-# directory must be chown'ed as well so that UIDs & GIDs match when 
-# the source & destination are compared after copying.
-chown -R $RSYNCD_UID:$RSYNCD_GID "$FROM" "$TO" 2>/dev/null || true
-
 checkit "$RSYNC -avvz \"$FROM/\" localhost::test-to/" "$FROM" "$TO"
 
