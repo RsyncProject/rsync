@@ -291,9 +291,8 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		return;
 	}
 
-	if (statret == 0 &&
-	    !preserve_perms &&
-	    (S_ISDIR(st.st_mode) == S_ISDIR(file->mode))) {
+	if (statret == 0 && !preserve_perms
+	    && S_ISDIR(st.st_mode) == S_ISDIR(file->mode)) {
 		/* if the file exists already and we aren't perserving
 		 * permissions then act as though the remote end sent
 		 * us the file permissions we already have */
