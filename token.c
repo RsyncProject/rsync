@@ -127,6 +127,12 @@ static void simple_send_token(int f,int token,
 
 #define MAX_DATA_COUNT	16383	/* fit 14 bit count into 2 bytes with flags */
 
+/* zlib.h says that if we want to be able to compress something in a single
+ * call, avail_out must be at least 0.1% larger than avail_in plus 12 bytes.
+ * We'll add in 0.1%+16, just to be safe (and we'll avoid floating point,
+ * to ensure that this is a compile-time value). */
+#define AVAIL_OUT_SIZE(avail_in_size) ((avail_in_size)*1001/1000+16)
+
 /* For coding runs of tokens */
 static int last_token = -1;
 static int run_start;
@@ -137,7 +143,14 @@ static z_stream tx_strm;
 
 /* Output buffer */
 static char *obuf;
-static int obuf_size;
+
+/* We want obuf to be able to hold both MAX_DATA_COUNT+2 bytes as well as
+ * AVAIL_OUT_SIZE(CHUNK_SIZE) bytes, so make sure that it's large enough. */
+#if MAX_DATA_COUNT+2 > AVAIL_OUT_SIZE(CHUNK_SIZE)
+#define OBUF_SIZE	(MAX_DATA_COUNT+2)
+#else
+#define OBUF_SIZE	AVAIL_OUT_SIZE(CHUNK_SIZE)
+#endif
 
 /* Send a deflated token */
 static void
@@ -161,12 +174,7 @@ send_deflated_token(int f, int token,
 				rprintf(FERROR, "compression init failed\n");
 				exit_cleanup(RERR_STREAMIO);
 			}
-#if MAX_DATA_COUNT+2 > CHUNK_SIZE+128 /* this shouldn't ever happen... */
-			obuf_size = MAX_DATA_COUNT+2;
-#else
-			obuf_size = CHUNK_SIZE+128;
-#endif
-			if ((obuf = malloc(obuf_size)) == NULL)
+			if ((obuf = malloc(OBUF_SIZE)) == NULL)
 				out_of_memory("send_deflated_token");
 			init_done = 1;
 		} else
@@ -286,7 +294,7 @@ send_deflated_token(int f, int token,
 		tx_strm.next_in = (Bytef *) map_ptr(buf, offset, toklen);
 		tx_strm.avail_in = toklen;
 		tx_strm.next_out = (Bytef *) obuf;
-		tx_strm.avail_out = obuf_size;
+		tx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
 		r = deflate(&tx_strm, Z_INSERT_ONLY);
 		if (r != Z_OK || tx_strm.avail_in != 0) {
 			rprintf(FERROR, "deflate on token returned %d (%d bytes left)\n",
