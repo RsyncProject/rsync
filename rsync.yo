@@ -139,6 +139,11 @@ It is also possible to use rsync without using rsh or ssh as the
 transport. In this case you will connect to a remote rsync server
 running on TCP port 873. 
 
+You may establish the connetcion via a web proxy by setting the
+environment variable RSYNC_PROXY to a hostname:port pair pointing to
+your web proxy. Note that your web proxy must allow proxying to port
+873, this must be configured in your proxy servers ruleset.
+
 Using rsync in this way is the same as using it with rsh or ssh except
 that:
 
@@ -726,6 +731,10 @@ more details.
 dit(bf(RSYNC_RSH)) The RSYNC_RSH environment variable allows you to
 override the default shell used as the transport for rsync. This can
 be used instead of the -e option.
+
+dit(bf(RSYNC_PROXY)) The RSYNC_PROXY environment variable allows you to
+redirect your rsync client to use a web proxy when connecting to a
+rsync daemon. You should set RSYNC_PROXY to a hostname:port pair.
 
 dit(bf(RSYNC_PASSWORD)) Setting RSYNC_PASSWORD to the required
 password allows you to run authenticated rsync connections to a rsync

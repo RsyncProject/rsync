@@ -23,34 +23,128 @@
 
 #include "rsync.h"
 
+
+/* establish a proxy connection on an open socket to a web roxy by using the CONNECT
+   method */
+static int establish_proxy_connection(int fd, char *host, int port)
+{
+	char buffer[1024];
+	char *cp;
+
+	slprintf(buffer, sizeof(buffer), "CONNECT %s:%d HTTP/1.0\r\n\r\n", host, port);
+	if (write(fd, buffer, strlen(buffer)) != strlen(buffer)) {
+		rprintf(FERROR, "failed to write to proxy - %s\n",
+			strerror(errno));
+		return -1;
+	}
+
+	for (cp = buffer; cp < &buffer[sizeof(buffer) - 1]; cp++) {
+		if (read(fd, cp, 1) != 1) {
+			rprintf(FERROR, "failed to read from proxy\n");
+			return -1;
+		}
+		if (*cp == '\n')
+			break;
+	}
+
+	if (*cp != '\n')
+		cp++;
+	*cp-- = '\0';
+	if (*cp == '\r')
+		*cp = '\0';
+	if (strncmp(buffer, "HTTP/", 5) != 0) {
+		rprintf(FERROR, "bad response from proxy - %s\n",
+			buffer);
+		return -1;
+	}
+	for (cp = &buffer[5]; isdigit(*cp) || (*cp == '.'); cp++)
+		;
+	while (*cp == ' ')
+		cp++;
+	if (*cp != '2') {
+		rprintf(FERROR, "bad response from proxy - %s\n",
+			buffer);
+		return -1;
+	}
+	/* throw away the rest of the HTTP header */
+	while (1) {
+		for (cp = buffer; cp < &buffer[sizeof(buffer) - 1];
+		     cp++) {
+			if (read(fd, cp, 1) != 1) {
+				rprintf(FERROR, "failed to read from proxy\n");
+				return -1;
+			}
+			if (*cp == '\n')
+				break;
+		}
+		if ((cp > buffer) && (*cp == '\n'))
+			cp--;
+		if ((cp == buffer) && ((*cp == '\n') || (*cp == '\r')))
+			break;
+	}
+	return 0;
+}
+
+
 /* open a socket to a tcp remote host with the specified port 
-   based on code from Warren */
+   based on code from Warren
+   proxy support by Stephen Rothwell */
 int open_socket_out(char *host, int port)
 {
 	int type = SOCK_STREAM;
 	struct sockaddr_in sock_out;
 	int res;
 	struct hostent *hp;
-  
+	char *h;
+	unsigned p;
+	int proxied = 0;
+	char buffer[1024];
+	char *cp;
+
+	/* if we have a RSYNC_PROXY env variable then redirect our connetcion via a web proxy
+	   at the given address. The format is hostname:port */
+	h = getenv("RSYNC_PROXY");
+	proxied = (h != NULL) && (*h != '\0');
+
+	if (proxied) {
+		strlcpy(buffer, h, sizeof(buffer));
+		cp = strchr(buffer, ':');
+		if (cp == NULL) {
+			rprintf(FERROR, "invalid proxy specification\n");
+			return -1;
+		}
+		*cp++ = '\0';
+		p = atoi(cp);
+		h = buffer;
+	} else {
+		h = host;
+		p = port;
+	}
 
 	res = socket(PF_INET, type, 0);
 	if (res == -1) {
 		return -1;
 	}
 
-	hp = gethostbyname(host);
+	hp = gethostbyname(h);
 	if (!hp) {
-		rprintf(FERROR,"unknown host: %s\n", host);
+		rprintf(FERROR,"unknown host: %s\n", h);
+		close(res);
 		return -1;
 	}
 
 	memcpy(&sock_out.sin_addr, hp->h_addr, hp->h_length);
-	sock_out.sin_port = htons(port);
+	sock_out.sin_port = htons(p);
 	sock_out.sin_family = PF_INET;
 
 	if (connect(res,(struct sockaddr *)&sock_out,sizeof(sock_out))) {
+		rprintf(FERROR,"failed to connect to %s - %s\n", h, strerror(errno));
 		close(res);
-		rprintf(FERROR,"failed to connect to %s - %s\n", host, strerror(errno));
+		return -1;
+	}
+
+	if (proxied && establish_proxy_connection(res, host, port) != 0) {
+		close(res);
 		return -1;
 	}
 
