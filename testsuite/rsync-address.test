@@ -1,0 +1,7 @@
+#! /bin/sh
+
+. rsync_fns
+
+echo $0 running
+
+"$rsync_bin" --version || exit 1

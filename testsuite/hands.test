@@ -9,65 +9,20 @@
 #
 #
 
-RSYNC="$rsync_bin"
-
 . "$suitedir/rsync.fns"
 
 hands_setup
-
-checkit() {
-  testnum=`expr 0${testnum} + 1`
-  log=${LOG}.${testnum}
-  failed=
-  echo "Running: \"$1\""  >${log}
-  echo "">>${log}
-  eval "$1"  >>${log} 2>&1
-  status=$?
-  if [ $status != 0 ]; then
-    failed="YES";
-  fi
-  echo "-------------">>${log}
-  echo "check how the files compare with diff:">>${log}
-  echo "">>${log}
-  diff -ur $2 $3 >>${log} 2>&1 || failed=YES
-  echo "-------------">>${log}
-  echo "check how the directory listings compare with diff:">>${log}
-  echo "">>${log}
-  ( cd $2 ; ls -laR ) > ${TMP}/ls-from 2>>${log}
-  ( cd $3 ; ls -laR ) > ${TMP}/ls-to  2>>${log}
-  diff -u ${TMP}/ls-from ${TMP}/ls-to >>${log} 2>&1 || failed=YES
-  if [ -z "${failed}" ] ; then
-    echo "${ECHO_T}	done."
-    rm $log
-    return 0
-  else
-    if test -n "${Debian}" ; then
-      cat ${log}
-      rm ${log}
-    else
-      echo "${ECHO_T}	FAILED (test # ${testnum} status=$status)."
-    fi
-    return 1
-  fi
-}
 
 
 checkforlogs() {
   # skip it if we're under debian-test
   if test -n "${Debian}" ; then return 0 ; fi
 
-  if [ -f $1 ] ; then
-    cat <<EOF
-
-Failures have occured.
-
-You can find the output of the tests in these files:
-  $@
-EOF
-    exit 1
+  if [ -f $1 -a -s $1 ] ; then
+	echo "Failures have occurred.  $1 follows:" >&2
+	cat $1 >&2
+	exit 1
   else
-
-    rm -rf ${TMP}
     echo ""
     echo "Tests Completed Successfully :-)"
   fi
@@ -98,7 +53,7 @@ runtest "long paths" 'checkit "$RSYNC --delete -avH ${FROM}/ ${TO}" ${FROM}/ ${T
 rm -rf ${TO}
 mkdir -p ${FROM}2/dir/subdir
 cp -a ${FROM}/dir/subdir/subsubdir ${FROM}2/dir/subdir
-cp ${FROM}/dir/* ${FROM}2/dir 2>/dev/null
+cp ${FROM}/dir/* ${FROM}2/dir  || :
 runtest "excludes" 'checkit "$RSYNC -vv -Hlrt --delete --include /dir/ --include /dir/\* --include /dir/\*/subsubdir  --include /dir/\*/subsubdir/\*\* --exclude \*\* ${FROM}/dir ${TO}" ${FROM}2/ ${TO}'
 rm -r ${FROM}2
 
