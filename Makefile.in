@@ -45,10 +45,10 @@ TLS_OBJ = tls.o syscall.o lib/permstring.o
 
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) \
-	trimslash$(EXEEXT) t_unsafe$(EXEEXT)
+	trimslash$(EXEEXT) t_unsafe$(EXEEXT) wildtest$(EXEEXT)
 
 # Objects for CHECK_PROGS to clean
-CHECK_OBJS=getgroups.o t_stub.o t_unsafe.o trimslash.o
+CHECK_OBJS=getgroups.o t_stub.o t_unsafe.o trimslash.o wildtest.o
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
@@ -158,6 +158,10 @@ test: check
 
 check: all $(CHECK_PROGS)
 	POSIXLY_CORRECT=1 TOOLDIR=`pwd` rsync_bin=`pwd`/rsync$(EXEEXT) srcdir="$(srcdir)" $(srcdir)/runtests.sh
+
+WILDTEST_OBJ = wildtest.o lib/wildmatch.o
+wildtest$(EXEEXT): $(WILDTEST_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@  $(WILDTEST_OBJ)
 
 # This does *not* depend on building or installing: you can use it to
 # check a version installed from a binary or some other source tree,
