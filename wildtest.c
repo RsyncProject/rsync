@@ -139,15 +139,17 @@ main(int argc, char **argv)
     }
 
     if (!wildmatch_errors)
-	printf("No wildmatch errors found.\n");
+	fputs("No", stdout);
     else
-	printf("Found %d wildmatch errors.\n", wildmatch_errors);
+	printf("%d", wildmatch_errors);
+    printf(" wildmatch error%s found.\n", wildmatch_errors == 1? "" : "s");
 
 #ifdef COMPARE_WITH_FNMATCH
     if (!fnmatch_errors)
-	printf("No fnmatch errors found.\n");
+	fputs("No", stdout);
     else
-	printf("Found %d fnmatch errors.\n", fnmatch_errors);
+	printf("%d", fnmatch_errors);
+    printf(" fnmatch error%s found.\n", fnmatch_errors == 1? "" : "s");
 
 #endif
 
