@@ -38,7 +38,12 @@ extern int sanitize_paths;
  * Run a client connected to an rsyncd.  The alternative to this
  * function for remote-shell connections is do_cmd().
  *
- * After initial server startup, hands over to client_run().
+ * After negotiating which module to use and reading the server's
+ * motd, this hands over to client_run().  Telling the server the
+ * module will cause it to chroot/setuid/etc.
+ *
+ * Instead of doing a transfer, the client may at this stage instead
+ * get a listing of remote modules and exit.
  *
  * @return -1 for error in startup, or the result of client_run().
  **/
