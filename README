@@ -68,6 +68,19 @@ Once built put a copy of rsync in your search path on the local and
 remote systems (or use "make install"). That's it!
 
 
+MAILING LIST
+------------
+
+There is a mailing list for the discussion of rsync and its
+applications. It is open to anyone to join. I will announce new
+versions on this list. 
+
+To join the mailing list send mail to listproc@samba.anu.edu.au with
+no subject and a body of "subscribe rsync Your Name".
+
+To send mail to everyone on the list send it to rsync@samba.anu.edu.au
+
+
 COPYRIGHT
 ---------
 
