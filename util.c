@@ -793,15 +793,15 @@ int u_strcmp(const char *cs1, const char *cs2)
  *
  * @sa t_unsafe.c
  **/
-int unsafe_symlink(char *dest, char *src)
+int unsafe_symlink(const char *dest_path, const char *src_path)
 {
-	char *tok;
+	char *tok, *src, *dest;
 	int depth = 0;
 
 	/* all absolute and null symlinks are unsafe */
-	if (!dest || !(*dest) || (*dest == '/')) return 1;
+	if (!dest_path || !*dest_path || *dest_path == '/') return 1;
 
-	src = strdup(src);
+	src = strdup(src_path);
 	if (!src) out_of_memory("unsafe_symlink");
 
 	/* find out what our safety margin is */
@@ -819,7 +819,7 @@ int unsafe_symlink(char *dest, char *src)
 	/* drop by one to account for the filename portion */
 	depth--;
 
-	dest = strdup(dest);
+	dest = strdup(dest_path);
 	if (!dest) out_of_memory("unsafe_symlink");
 
 	for (tok=strtok(dest,"/"); tok; tok=strtok(NULL,"/")) {
