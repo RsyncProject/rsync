@@ -3,6 +3,8 @@ basically a summary of clientserver.c and authenticate.c.
 
  -- Martin Pool <mbp@samba.org>
 
+$Id$
+
 
 
 
@@ -53,6 +55,11 @@ just been invoked with them, but they're added to the existing state.
 So if the client specifies a list of files to be included or excluded,
 they'll defer to existing limits specified in the server
 configuration.
+
+At this point the client and server both switch to using a
+multiplexing layer across the socket.  The main point of this is to
+allow the server to asynchronously pass errors back, while still
+allowing streamed and pipelined data.
 
 The server then talks to the client as normal across the socket,
 passing checksums, file lists and so on.  For documentation of that,
