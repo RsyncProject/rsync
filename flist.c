@@ -251,8 +251,10 @@ void receive_file_entry(struct file_struct **fptr,
   bzero((char *)file,sizeof(*file));
   (*fptr) = file;
 
+  if (l2 >= MAXPATHLEN-l1) overflow("receive_file_entry");
+
   strncpy(thisname,lastname,l1);
-  read_buf(f,&thisname[l1],l2);
+  read_sbuf(f,&thisname[l1],l2);
   thisname[l1+l2] = 0;
 
   strncpy(lastname,thisname,MAXPATHLEN-1);
@@ -292,8 +294,7 @@ void receive_file_entry(struct file_struct **fptr,
     int l = read_int(f);
     file->link = (char *)malloc(l+1);
     if (!file->link) out_of_memory("receive_file_entry 2");
-    read_buf(f,file->link,l);
-    file->link[l] = 0;
+    read_sbuf(f,file->link,l);
   }
 
 #if SUPPORT_HARD_LINKS

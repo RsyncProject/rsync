@@ -162,7 +162,13 @@ int piped_child(char **command,int *f_in,int *f_out)
 
 void out_of_memory(char *str)
 {
-  fprintf(FERROR,"out of memory in %s\n",str);
+  fprintf(FERROR,"ERROR: out of memory in %s\n",str);
+  exit_cleanup(1);
+}
+
+void overflow(char *str)
+{
+  fprintf(FERROR,"ERROR: buffer overflow in %s\n",str);
   exit_cleanup(1);
 }
 

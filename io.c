@@ -218,6 +218,12 @@ void read_buf(int f,char *buf,int len)
   total_read += len;
 }
 
+void read_sbuf(int f,char *buf,int len)
+{
+	read_buf(f,buf,len);
+	buf[len] = 0;
+}
+
 unsigned char read_byte(int f)
 {
   unsigned char c;
