@@ -841,7 +841,7 @@ notify_others:
 #endif
 			}
 			*lb = len;
-			write_buf(f_out_name, lenbuf, lb - lenbuf + 1);
+			write_buf(f_out_name, (char*)lenbuf, lb - lenbuf + 1);
 			write_buf(f_out_name, fuzzy_file->basename, len);
 		}
 	}
