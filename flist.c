@@ -953,7 +953,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 			rprintf(FINFO, "[%s] popping %sexclude list\n",
 				who_am_i(), local_exclude_list.debug_type);
 		}
-		free_exclude_list(&local_exclude_list);
+		clear_exclude_list(&local_exclude_list);
 		local_exclude_list = last_list;
 	}
 }

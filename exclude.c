@@ -100,7 +100,7 @@ static void free_exclude(struct exclude_struct *ex)
 	free(ex);
 }
 
-void free_exclude_list(struct exclude_list_struct *listp)
+void clear_exclude_list(struct exclude_list_struct *listp)
 {
 	struct exclude_struct *ent, *next;
 
@@ -303,7 +303,7 @@ void add_exclude(struct exclude_list_struct *listp, const char *pattern,
 					"[%s] clearing %sexclude list\n",
 					who_am_i(), listp->debug_type);
 			}
-			free_exclude_list(listp);
+			clear_exclude_list(listp);
 			continue;
 		}
 
