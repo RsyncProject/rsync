@@ -47,6 +47,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	extern int remote_version;
 	extern int am_sender;
 	extern char *shell_cmd;
+	extern int list_only;
 	extern int kludge_around_eof;
 	extern char *bind_address;
 	extern int default_af_hint;
@@ -126,7 +127,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 
 	/* Old servers may just drop the connection here,
 	 rather than sending a proper EXIT command.  Yuck. */
-	kludge_around_eof = remote_version < 25;
+	kludge_around_eof = list_only && (remote_version < 25);
 
 	while (1) {
 		if (!read_line(fd, line, sizeof(line)-1)) {

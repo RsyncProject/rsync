@@ -28,3 +28,5 @@ rsync changes since last release
       trailing slashes.
       <http://www.opensource.apple.com/bugs/X/BSD%20Kernel/2734739.html>
       (Martin Pool)
+
+    * Improved network error handling.  (Greg A. Woods)

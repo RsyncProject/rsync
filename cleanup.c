@@ -40,11 +40,16 @@ pid_t cleanup_child_pid = -1;
  */
 void _exit_cleanup(int code, const char *file, int line)
 {
+	int ocode = code;
 	extern int keep_partial;
 	extern int log_got_error;
 
 	signal(SIGUSR1, SIG_IGN);
 	signal(SIGUSR2, SIG_IGN);
+
+	if (verbose > 3)
+		rprintf(FINFO,"_exit_cleanup(code=%d, file=%s, line=%d): entered\n", 
+			code, file, line);
 
 	if (cleanup_child_pid != -1) {
 		int status;
@@ -80,6 +85,10 @@ void _exit_cleanup(int code, const char *file, int line)
 	}
 
 	if (code) log_exit(code, file, line);
+
+	if (verbose > 2)
+		rprintf(FINFO,"_exit_cleanup(code=%d, file=%s, line=%d): about to call exit(%d)\n", 
+			ocode, file, line, code);
 
 	exit(code);
 }

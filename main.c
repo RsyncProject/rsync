@@ -881,8 +881,10 @@ int main(int argc,char *argv[])
 
 	ret = start_client(argc, argv);
 	if (ret == -1) 
-	    exit_cleanup(RERR_STARTCLIENT);
+		exit_cleanup(RERR_STARTCLIENT);
 	else
-	    exit_cleanup(ret);
-	return ret;
+		exit_cleanup(ret);
+
+	exit(ret);
+	/* NOTREACHED */
 }
