@@ -18,8 +18,6 @@ set -x
 fromdir="$scratchdir/from"
 todir="$scratchdir/to"
 
-# TODO: I guess some systems will not have 'id', and therefore we have
-# to ship or emulate it.
 mygrps="`rsync_getgroups`" || fail "Can't get groups"
 mkdir "$fromdir"
 
@@ -35,4 +33,3 @@ checkit "$RSYNC -rtgvvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
 exit 0
 # last [] may have failed but if we get here then we've won
-
