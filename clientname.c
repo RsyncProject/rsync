@@ -176,6 +176,46 @@ int lookup_name(int fd, const struct sockaddr_storage *ss,
 
 
 /**
+ * Compare an addrinfo from the resolver to a sockinfo.
+ *
+ * Like strcmp, returns 0 for identical.
+ **/
+int compare_addrinfo_sockaddr(const struct addrinfo *ai,
+			      const struct sockaddr_storage *ss)
+{
+	int ss_family = get_sockaddr_family(ss);
+	const char fn[] = "compare_addrinfo_sockaddr";
+		      
+	if (ai->ai_family != ss_family) {
+		rprintf(FERROR,
+			"%s: response family %d != %d\n",
+			fn, ai->ai_family, ss_family);
+		return 1;
+	}
+
+	/* The comparison method depends on the particular AF. */
+	if (ss_family == AF_INET) {
+		const struct sockaddr_in *sin1, *sin2;
+
+		sin1 = (const struct sockaddr_in *) ss;
+		sin2 = (const struct sockaddr_in *) ai->ai_addr;
+		
+		return memcmp(sin1, sin2, sizeof *sin1);
+	}
+#ifdef INET6
+	else if (ss_family == AF_INET6) {
+		/* XXXX */
+		return 1;
+	}
+#endif /* INET6 */
+	else {
+		/* don't know */
+		return 1;
+	}
+}
+
+
+/**
  * Do a forward lookup on @p name_buf and make sure it corresponds to
  * @p ss -- otherwise we may be being spoofed.  If we suspect we are,
  * then we don't abort the connection but just emit a warning, and
@@ -205,30 +245,11 @@ int check_name(int fd,
 	}
 
 
-	/* We expect that one of the results will be the same as ss. */
+	/* Given all these results, we expect that one of them will be
+	 * the same as ss.  The comparison is a bit complicated. */
 	for (res = res0; res; res = res->ai_next) {
-		if (res->ai_family != ss_family) {
-			rprintf(FERROR,
-				"check_name: response family %d != %d\n",
-				res->ai_family, ss_family);
-			continue;
-		}
-		if (res->ai_addrlen != ss_len) {
-			rprintf(FERROR,
-				"check_name: addrlen %d != %d\n",
-				res->ai_addrlen, ss_len);
-			continue;
-		}
-		if (memcmp(res->ai_addr, ss, res->ai_addrlen) == 0) {
-			rprintf(FERROR,
-				"check_name: %d bytes of address identical\n",
-				res->ai_addrlen);
-			break;
-		} else{
-			rprintf(FERROR,
-				"check_name: %d bytes of address NOT identical\n",
-				res->ai_addrlen);
-		}
+		if (!compare_addrinfo_sockaddr(res, ss))
+			break;	/* OK, identical */
 	}
 
 	if (!res0) {
@@ -239,8 +260,7 @@ int check_name(int fd,
 			"spoofed address?\n",
 			name_buf);
 		strcpy(name_buf, default_name);
-	}
-	if (res == NULL) {
+	} else if (res == NULL) {
 		/* We hit the end of the list without finding an
 		 * address that was the same as ss. */
 		rprintf(FERROR, RSYNC_NAME
