@@ -419,9 +419,8 @@ static int read_timeout(int fd, char *buf, size_t len)
 		}
 
 		if (count <= 0) {
-			if (errno == EBADF) {
+			if (errno == EBADF)
 				exit_cleanup(RERR_SOCKETIO);
-			}
 			continue;
 		}
 
@@ -492,7 +491,8 @@ static int read_timeout(int fd, char *buf, size_t len)
 			}
 		}
 
-		if (!FD_ISSET(fd, &r_fds)) continue;
+		if (!FD_ISSET(fd, &r_fds))
+			continue;
 
 		n = read(fd, buf, len);
 
@@ -605,7 +605,8 @@ static int read_unbuffered(int fd, char *buf, size_t len)
 		if (!buffer) {
 			bufferSz = 2 * IO_BUFFER_SIZE;
 			buffer   = new_array(char, bufferSz);
-			if (!buffer) out_of_memory("read_unbuffered");
+			if (!buffer)
+				out_of_memory("read_unbuffered");
 		}
 		remaining = read_timeout(fd, buffer, bufferSz);
 		bufferIdx = 0;
@@ -631,7 +632,8 @@ static int read_unbuffered(int fd, char *buf, size_t len)
 		case MSG_DATA:
 			if (!buffer || remaining > bufferSz) {
 				buffer = realloc_array(buffer, char, remaining);
-				if (!buffer) out_of_memory("read_unbuffered");
+				if (!buffer)
+					out_of_memory("read_unbuffered");
 				bufferSz = remaining;
 			}
 			read_loop(fd, buffer, remaining);
@@ -688,7 +690,8 @@ int32 read_int(int f)
 
 	readfd(f,b,4);
 	ret = IVAL(b,0);
-	if (ret == (int32)0xffffffff) return -1;
+	if (ret == (int32)0xffffffff)
+		return -1;
 	return ret;
 }
 
@@ -698,9 +701,8 @@ int64 read_longint(int f)
 	char b[8];
 	ret = read_int(f);
 
-	if ((int32)ret != (int32)0xffffffff) {
+	if ((int32)ret != (int32)0xffffffff)
 		return ret;
-	}
 
 #ifdef NO_INT64
 	rprintf(FERROR,"Integer overflow - attempted 64 bit offset\n");
@@ -830,9 +832,8 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 		}
 
 		if (count <= 0) {
-			if (errno == EBADF) {
+			if (errno == EBADF)
 				exit_cleanup(RERR_SOCKETIO);
-			}
 			continue;
 		}
 
@@ -861,7 +862,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 				io_multiplexing_close();
 				rsyserr(FERROR, errno,
 					"writefd_unbuffered failed to write %ld bytes: phase \"%s\"",
-					(long) len, io_write_phase);
+					(long)len, io_write_phase);
 				exit_cleanup(RERR_STREAMIO);
 			}
 
@@ -883,10 +884,12 @@ static int io_buffer_count;
 
 void io_start_buffering_out(int fd)
 {
-	if (io_buffer) return;
+	if (io_buffer)
+		return;
 	multiplex_out_fd = fd;
 	io_buffer = new_array(char, IO_BUFFER_SIZE);
-	if (!io_buffer) out_of_memory("writefd");
+	if (!io_buffer)
+		out_of_memory("writefd");
 	io_buffer_count = 0;
 }
 
@@ -960,7 +963,7 @@ static void writefd(int fd,char *buf,size_t len)
 	}
 
 	while (len) {
-		int n = MIN((int) len, IO_BUFFER_SIZE-io_buffer_count);
+		int n = MIN((int)len, IO_BUFFER_SIZE-io_buffer_count);
 		if (n > 0) {
 			memcpy(io_buffer+io_buffer_count, buf, n);
 			buf += n;
@@ -1070,7 +1073,8 @@ void io_printf(int fd, const char *format, ...)
 	len = vsnprintf(buf, sizeof buf, format, ap);
 	va_end(ap);
 
-	if (len < 0) exit_cleanup(RERR_STREAMIO);
+	if (len < 0)
+		exit_cleanup(RERR_STREAMIO);
 
 	write_sbuf(fd, buf);
 }
@@ -1096,7 +1100,8 @@ void io_start_multiplex_in(int fd)
 /** Write an message to the multiplexed data stream. */
 int io_multiplex_write(enum msgcode code, char *buf, size_t len)
 {
-	if (!io_multiplexing_out) return 0;
+	if (!io_multiplexing_out)
+		return 0;
 
 	io_flush(NORMAL_FLUSH);
 	stats.total_written += (len+4);
