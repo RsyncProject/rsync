@@ -26,7 +26,8 @@
 
 static int match_hostname(char *host, char *tok)
 {
-	if (!host || !*host) return 0;
+	if (!host || !*host)
+		return 0;
 	return wildmatch(tok, host);
 }
 
@@ -34,16 +35,16 @@ static int match_binary(char *b1, char *b2, char *mask, int addrlen)
 {
 	int i;
 
-	for (i=0; i<addrlen; i++) {
-		if ((b1[i]^b2[i])&mask[i]) {
+	for (i = 0; i < addrlen; i++) {
+		if ((b1[i] ^ b2[i]) & mask[i])
 			return 0;
-		}
 	}
 
 	return 1;
 }
 
-static void make_mask(char *mask, int plen, int addrlen) {
+static void make_mask(char *mask, int plen, int addrlen)
+{
 	int w, b;
 
 	w = plen >> 3;
@@ -75,14 +76,14 @@ static int match_address(char *addr, char *tok)
 	char *a = NULL, *t = NULL;
 	unsigned int len;
 
-	if (!addr || !*addr) return 0;
+	if (!addr || !*addr)
+		return 0;
 
 	p = strchr(tok,'/');
 	if (p) {
 		*p = '\0';
 		len = p - tok;
-	}
-	else
+	} else
 		len = strlen(tok);
 
 	/* Fail quietly if tok is a hostname (not an address) */
@@ -218,12 +219,14 @@ static int access_match(char *list, char *addr, char *host)
 	char *tok;
 	char *list2 = strdup(list);
 
-	if (!list2) out_of_memory("access_match");
+	if (!list2)
+		out_of_memory("access_match");
 
 	strlower(list2);
-	if (host) strlower(host);
+	if (host)
+		strlower(host);
 
-	for (tok=strtok(list2," ,\t"); tok; tok=strtok(NULL," ,\t")) {
+	for (tok = strtok(list2, " ,\t"); tok; tok = strtok(NULL, " ,\t")) {
 		if (match_hostname(host, tok) || match_address(addr, tok)) {
 			free(list2);
 			return 1;
@@ -236,29 +239,25 @@ static int access_match(char *list, char *addr, char *host)
 
 int allow_access(char *addr, char *host, char *allow_list, char *deny_list)
 {
-	/* if theres no deny list and no allow list then allow access */
-	if ((!deny_list || !*deny_list) && (!allow_list || !*allow_list))
-		return 1;
+	if (allow_list && !*allow_list)
+		allow_list = NULL;
+	if (deny_list && !*deny_list)
+		deny_list = NULL;
 
-	/* if there is an allow list but no deny list then allow only hosts
-	   on the allow list */
-	if (!deny_list || !*deny_list)
-		return(access_match(allow_list, addr, host));
+	/* If we match an allow-list item, we always allow access. */
+	if (allow_list) {
+		if (access_match(allow_list, addr, host))
+			return 1;
+		/* For an allow-list w/o a deny-list, disallow non-matches. */
+		if (!deny_list)
+			return 0;
+	}
 
-	/* if theres a deny list but no allow list then allow
-	   all hosts not on the deny list */
-	if (!allow_list || !*allow_list)
-		return(!access_match(deny_list,addr,host));
-
-	/* if there are both type of list then allow all hosts on the
-           allow list */
-	if (access_match(allow_list,addr,host))
-		return 1;
-
-	/* if there are both type of list and it's not on the allow then
-	   allow it if its not on the deny */
-	if (access_match(deny_list,addr,host))
+	/* If we match a deny-list item (and got past any allow-list
+	 * items), we always disallow access. */
+	if (deny_list && access_match(deny_list, addr, host))
 		return 0;
 
+	/* Allow all other access. */
 	return 1;
 }
