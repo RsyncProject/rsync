@@ -698,7 +698,7 @@ static int socketpair_tcp(int fd[2])
 		goto failed;
 
 	memset(&sock2, 0, sizeof sock2);
-#ifdef HAVE_SOCKADDR_LEN
+#if HAVE_SOCKADDR_SIN_LEN
 	sock2.sin_len = sizeof sock2;
 #endif
 	sock2.sin_family = PF_INET;
