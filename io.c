@@ -256,6 +256,14 @@ static void read_msg_fd(void)
 		read_loop(fd, buf, len);
 		io_multiplex_write(MSG_DELETED, buf, len);
 		break;
+	case MSG_SUCCESS:
+		if (len != 4 || !am_generator) {
+			rprintf(FERROR, "invalid message %d:%d\n", tag, len);
+			exit_cleanup(RERR_STREAMIO);
+		}
+		read_loop(fd, buf, len);
+		io_multiplex_write(MSG_SUCCESS, buf, len);
+		break;
 	case MSG_INFO:
 	case MSG_ERROR:
 	case MSG_LOG:
@@ -702,6 +710,16 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 				log_delete(line, S_IFDIR);
 			else
 				log_delete(line, S_IFREG);
+			remaining = 0;
+			break;
+		case MSG_SUCCESS:
+			if (remaining != 4) {
+				rprintf(FERROR, "invalid multi-message %d:%ld\n",
+					tag, (long)remaining);
+				exit_cleanup(RERR_STREAMIO);
+			}
+			read_loop(fd, line, remaining);
+			successful_send(IVAL(line, 0));
 			remaining = 0;
 			break;
 		case MSG_INFO:
