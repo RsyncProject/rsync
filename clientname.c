@@ -118,7 +118,9 @@ char *client_name(int fd)
 
 		memset(&hint, 0, sizeof hint);
 
+#ifdef AI_NUMERICHOST
 		hint.ai_flags = AI_NUMERICHOST;
+#endif
 		hint.ai_socktype = SOCK_STREAM;
 
 		if ((err = getaddrinfo(addr, NULL, &hint, &answer)) != 0) {
