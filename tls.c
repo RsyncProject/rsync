@@ -65,8 +65,14 @@ static void list_file(const char *fname)
 	struct tm *mt;
 	char datebuf[50];
 	char linkbuf[4096];
+	int ret;
 
-	if (do_lstat(fname, &buf) == -1)
+#if SUPPORT_LINKS
+	ret = do_lstat(fname, &buf);
+#else
+	ret = do_stat(fname, &buf);
+#endif
+	if (ret < 0)
 		failed("stat", fname);
 
 	/* The size of anything but a regular file is probably not
