@@ -26,21 +26,21 @@ VERSION=@VERSION@
 .SUFFIXES: .c .o
 
 LIBOBJ=lib/fnmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o \
-	lib/permstring.o \
-	@LIBOBJS@
+	lib/permstring.o @LIBOBJS@
 ZLIBOBJ=zlib/deflate.o zlib/infblock.o zlib/infcodes.o zlib/inffast.o \
 	zlib/inflate.o zlib/inftrees.o zlib/infutil.o zlib/trees.o \
-	zlib/zutil.o zlib/adler32.o 
-OBJS1=rsync.o generator.o receiver.o cleanup.o sender.o exclude.o util.o main.o checksum.o match.o syscall.o log.o backup.o
-OBJS2=options.o flist.o io.o compat.o hlink.o token.o uidlist.o socket.o fileio.o batch.o \
-	clientname.o
+	zlib/zutil.o zlib/adler32.o
+OBJS1=rsync.o generator.o receiver.o cleanup.o sender.o exclude.o util.o \
+	main.o checksum.o match.o syscall.o log.o backup.o
+OBJS2=options.o flist.o io.o compat.o hlink.o token.o uidlist.o socket.o \
+	fileio.o batch.o clientname.o
 OBJS3=progress.o pipe.o
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS=popt/findme.o  popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o
 OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) $(ZLIBOBJ) @BUILD_POPT@
 
-TLS_OBJ = tls.o syscall.o lib/permstring.o 
+TLS_OBJ = tls.o syscall.o lib/permstring.o
 
 # Programs we must have to run the test cases
 RSYNC_EXE=rsync$(EXEEXT)
@@ -76,7 +76,6 @@ install-strip:
 	$(MAKE) STRIP='-s' install
 
 $(RSYNC_EXE): $(OBJS)
-	@echo "Please ignore warnings below about mktemp -- it is used in a safe way"
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
 $(OBJS): config.h
@@ -126,8 +125,8 @@ cleantests:
 # directories, just in case somebody previously configured things in
 # the source directory.
 distclean: clean
-	rm -f Makefile config.h config.status 
-	rm -f $(srcdir)/Makefile $(srcdir)/config.h $(srcdir)/config.status 
+	rm -f Makefile config.h config.status
+	rm -f $(srcdir)/Makefile $(srcdir)/config.h $(srcdir)/config.status
 
 	rm -f config.cache config.log
 	rm -f $(srcdir)/config.cache $(srcdir)/config.log
@@ -140,7 +139,7 @@ distclean: clean
 finddead:
 	nm *.o */*.o |grep 'U ' | awk '{print $$2}' | sort -u > nmused.txt
 	nm *.o */*.o |grep 'T ' | awk '{print $$3}' | sort -u > nmfns.txt
-	comm -13 nmused.txt nmfns.txt 
+	comm -13 nmused.txt nmfns.txt
 
 # 'check' is the GNU name, 'test' is the name for everybody else :-)
 .PHONY: check test
@@ -175,24 +174,24 @@ installcheck: $(CHECK_PROGS)
 
 # Run the SPLINT (Secure Programming Lint) tool.  <www.splint.org>
 .PHONY: splint
-splint: 
+splint:
 	splint +unixlib +gnuextensions -weak rsync.c
 
 
 rsync.dvi: doc/rsync.texinfo
 	texi2dvi -o $@ $<
 
-rsync.ps: rsync.dvi	
+rsync.ps: rsync.dvi
 	dvips -ta4 -o $@ $<
 
 rsync.pdf: doc/rsync.texinfo
 	texi2dvi -o $@ --pdf $<
 
 
-doxygen: 
+doxygen:
 	cd $(srcdir) && rm dox/html/* && doxygen
 
 # for maintainers only
-doxygen-upload: 
+doxygen-upload:
 	rsync -avzv $(srcdir)/dox/html/ --delete \
 	samba.org:/home/httpd/html/rsync/doxygen/head/
