@@ -154,7 +154,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 			c >>= 1;
 		} while (c >= 8);	/* round to multiple of 8 */
 		blength = MAX(blength, BLOCK_SIZE);
-		blength = MIN(blength, MAX_MAP_SIZE);
+		blength = MIN(blength, MAX_BLOCK_SIZE);
 	}
 
 	if (protocol_version < 27) {
@@ -209,7 +209,7 @@ static void generate_and_send_sums(int fd, OFF_T len, int f_out)
 	sum_sizes_sqroot(&sum, len);
 
 	if (len > 0)
-		mapbuf = map_file(fd, len, sum.blength);
+		mapbuf = map_file(fd, len, MAX_MAP_SIZE, sum.blength);
 	else
 		mapbuf = NULL;
 

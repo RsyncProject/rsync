@@ -222,7 +222,8 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	read_sum_head(f_in, &sum);
 
 	if (fd_r >= 0 && size_r > 0) {
-		mapbuf = map_file(fd_r, size_r, sum.blength);
+		OFF_T map_size = MAX(sum.blength * 2, 16*1024);
+		mapbuf = map_file(fd_r, size_r, map_size, sum.blength);
 		if (verbose > 2) {
 			rprintf(FINFO, "recv mapped %s of size %.0f\n",
 				safe_fname(fname_r), (double)size_r);

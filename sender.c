@@ -208,7 +208,11 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			return;
 		}
 
-		mbuf = st.st_size ? map_file(fd, st.st_size, s->blength) : NULL;
+		if (st.st_size) {
+			OFF_T map_size = MAX(s->blength * 3, MAX_MAP_SIZE);
+			mbuf = map_file(fd, st.st_size, map_size, s->blength);
+		} else
+			mbuf = NULL;
 
 		if (verbose > 2) {
 			rprintf(FINFO, "send_files mapped %s of size %.0f\n",
