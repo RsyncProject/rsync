@@ -32,7 +32,7 @@ struct pool_extent
 	struct pool_extent	*next;
 };
 
-#define MINALIGN	(sizeof (void *))
+#define MINALIGN	(sizeof (long))
 
 alloc_pool_t
 pool_create(size_t size, size_t quantum,
