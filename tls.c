@@ -49,17 +49,16 @@ int list_only = 0;
 int preserve_perms = 0;
 
 
-static void failed (char const *what,
-		    char const *where)
+static void failed(char const *what, char const *where)
 {
-	fprintf (stderr, PROGRAM ": %s %s: %s\n",
-		 what, where, strerror (errno));
-	exit (1);
+	fprintf(stderr, PROGRAM ": %s %s: %s\n",
+		what, where, strerror(errno));
+	exit(1);
 }
 
 
 
-static void list_file (const char *fname)
+static void list_file(const char *fname)
 {
 	STRUCT_STAT buf;
 	char permbuf[PERMSTRING_SIZE];
@@ -68,7 +67,7 @@ static void list_file (const char *fname)
 	char linkbuf[4096];
 
 	if (do_lstat(fname, &buf) == -1)
-		failed ("stat", fname);
+		failed("stat", fname);
 
 	/* The size of anything but a regular file is probably not
 	 * worth thinking about. */
@@ -130,13 +129,13 @@ int
 main(int argc, char *argv[])
 {
 	if (argc < 2) {
-		fprintf (stderr, "usage: " PROGRAM " DIR ...\n"
-			 "Trivial file listing program for portably checking rsync\n");
+		fprintf(stderr, "usage: " PROGRAM " DIR ...\n"
+			"Trivial file listing program for portably checking rsync\n");
 		return 1;
 	}
 
 	for (argv++; *argv; argv++) {
-		list_file (*argv);
+		list_file(*argv);
 	}
 
 	return 0;
