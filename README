@@ -29,9 +29,9 @@ and see the manual for more information.
 SETUP
 -----
 
-Rsync normally uses rsh or ssh for communication.  It does not need to
+Rsync normally uses ssh or rsh for communication.  It does not need to
 be setuid and requires no special privileges for installation.  You
-must, however, have a working rsh or ssh system. Using ssh is
+must, however, have a working ssh or rsh system. Using ssh is
 recommended for its security features.
 
 Alternatively, rsync can run in `daemon' mode, listening on a socket.
