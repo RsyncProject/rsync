@@ -41,6 +41,9 @@ Changes since version 2.5.6:
 
     * Make --link-dest honor the absence of -p -o and -g.
 
+    * Made rsync treat a trailing slash in the destination in a more
+      consistent manner.
+
 
   INTERNAL:
 
