@@ -121,7 +121,7 @@ pid_t piped_child(char **command, int *f_in, int *f_out)
 	int from_child_pipe[2];
 	extern int blocking_io;
 	
-	if (verbose > 0) {
+	if (verbose >= 2) {
 		print_child_argv(command);
 	}
 
