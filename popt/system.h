@@ -69,10 +69,6 @@ char *alloca ();
 #define	xstrdup(_str)	strdup(_str)
 #endif  /* HAVE_MCHECK_H && defined(__GNUC__) */
 
-#ifdef __GNUC__
 #define UNUSED(x) x __attribute__((__unused__))
-#else
-#define UNUSED(x) x
-#endif
 
 #include "popt.h"
