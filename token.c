@@ -157,13 +157,13 @@ send_deflated_token(int f, int token,
 	    if (tx_strm.avail_in == 0 && nb != 0) {
 		/* give it some more input */
 		n = MIN(nb, CHUNK_SIZE);
-		tx_strm.next_in = map_ptr(buf, offset, n);
+		tx_strm.next_in = (Bytef *)map_ptr(buf, offset, n);
 		tx_strm.avail_in = n;
 		nb -= n;
 		offset += n;
 	    }
 	    if (tx_strm.avail_out == 0) {
-		tx_strm.next_out = obuf + 2;
+		tx_strm.next_out = (Bytef *)(obuf + 2);
 		tx_strm.avail_out = MAX_DATA_COUNT;
 	    }
 	    r = deflate(&tx_strm, nb? Z_NO_FLUSH: Z_PACKET_FLUSH);
@@ -185,7 +185,7 @@ send_deflated_token(int f, int token,
     if (token != -1) {
 	/* add the data in the current block to the compressor's
 	   history and hash table */
-	tx_strm.next_in = map_ptr(buf, offset, toklen);
+	tx_strm.next_in = (Bytef *)map_ptr(buf, offset, toklen);
 	tx_strm.avail_in = toklen;
 	tx_strm.next_out = NULL;
 	tx_strm.avail_out = 2 * toklen;
@@ -255,7 +255,7 @@ recv_deflated_token(int f, char **data)
 	    if ((flag & 0xC0) == DEFLATED_DATA) {
 		n = ((flag & 0x3f) << 8) + read_byte(f);
 		read_buf(f, cbuf, n);
-		rx_strm.next_in = cbuf;
+		rx_strm.next_in = (Bytef *)cbuf;
 		rx_strm.avail_in = n;
 		recv_state = r_inflating;
 		break;
@@ -263,7 +263,7 @@ recv_deflated_token(int f, char **data)
 	    if (recv_state == r_inflated) {
 		/* check previous inflated stuff ended correctly */
 		rx_strm.avail_in = 0;
-		rx_strm.next_out = dbuf;
+		rx_strm.next_out = (Bytef *)dbuf;
 		rx_strm.avail_out = CHUNK_SIZE;
 		r = inflate(&rx_strm, Z_PACKET_FLUSH);
 		n = CHUNK_SIZE - rx_strm.avail_out;
@@ -303,7 +303,7 @@ recv_deflated_token(int f, char **data)
 	    return -1 - rx_token;
 
 	case r_inflating:
-	    rx_strm.next_out = dbuf;
+	    rx_strm.next_out = (Bytef *)dbuf;
 	    rx_strm.avail_out = CHUNK_SIZE;
 	    r = inflate(&rx_strm, Z_NO_FLUSH);
 	    n = CHUNK_SIZE - rx_strm.avail_out;
@@ -337,7 +337,7 @@ see_deflate_token(char *buf, int len)
 {
     int r;
 
-    rx_strm.next_in = buf;
+    rx_strm.next_in = (Bytef *)buf;
     rx_strm.avail_in = len;
     r = inflateIncomp(&rx_strm);
     if (r != Z_OK) {
