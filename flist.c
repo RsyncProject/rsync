@@ -1724,8 +1724,10 @@ void delete_in_dir(struct file_list *flist, char *fname)
 						safe_fname(f));
 				}
 			} else {
-				delete_file(f, S_ISDIR(mode)
-						? DEL_DIR | DEL_RECURSE : 0);
+				int dflags = delete_during
+				    ? DEL_DIR | DEL_FORCE_RECURSE
+				    : DEL_DIR | DEL_NO_RECURSE;
+				delete_file(f, S_ISDIR(mode) ? dflags : 0);
 			}
 			deletion_count++;
 		}
