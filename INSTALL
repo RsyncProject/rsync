@@ -11,7 +11,7 @@ to ./configure.  To see them, use:
 
 As of 2.4.7, rsync uses Eric Troan's popt option-parsing library.  A
 cut-down copy of release 1.5 is included in the rsync distribution,
-and will be used it there is no popt library on your build host, or if
+and will be used if there is no popt library on your build host, or if
 the --with-included-popt option is passed to ./configure.
 
 If you configure using --enable-maintainer-mode, then rsync will try
@@ -48,5 +48,15 @@ completely implement the "New Sockets" API.
 <http://www.ipv6.org/impl/mac.html> says that Apple do not support
 IPv6 yet.  If your build fails, try again with --disable-ipv6.
 
+There is an unresolved problem with the OSX implimentation
+of setgroups causing rsyncd to fail.  The workaround is to
+#undef HAVE_SETGROUPS in config.h
 
+IBM AIX NOTES
+-------------
 
+IBM AIX has a largefile problem with mkstemp.  See IBM PR-51921.
+The workaround is to append the below to config.h
+	#ifdef _LARGE_FILES
+	#undef HAVE_SECURE_MKSTEMP
+	#endif
