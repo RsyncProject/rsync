@@ -416,12 +416,12 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 		flags |= SAME_TIME;
 	else
 		modtime = file->modtime;
-	if (file->flags & HAS_INODE_DATA) {
-		if (file->dev == dev) {
+	if (file->link_u.idev) {
+		if (file->F_DEV == dev) {
 			if (protocol_version >= 28)
 				flags |= SAME_DEV;
 		} else
-			dev = file->dev;
+			dev = file->F_DEV;
 		flags |= HAS_INODE_DATA;
 	}
 
@@ -493,12 +493,12 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 		if (protocol_version < 26) {
 			/* 32-bit dev_t and ino_t */
 			write_int(f, dev);
-			write_int(f, file->inode);
+			write_int(f, file->F_INODE);
 		} else {
 			/* 64-bit dev_t and ino_t */
 			if (!(flags & SAME_DEV))
 				write_longint(f, dev);
-			write_longint(f, file->inode);
+			write_longint(f, file->F_INODE);
 		}
 	}
 #endif
@@ -649,19 +649,20 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 			sanitize_path(file->u.link, file->dirname);
 	}
 #if SUPPORT_HARD_LINKS
-	if (preserve_hard_links && protocol_version < 28
-	    && S_ISREG(mode))
-		file->flags |= HAS_INODE_DATA;
-	if (file->flags & HAS_INODE_DATA) {
+	if (preserve_hard_links && protocol_version < 28 && S_ISREG(mode))
+		flags |= HAS_INODE_DATA;
+	if (flags & HAS_INODE_DATA) {
+		if (!(file->link_u.idev = new(struct idev)))
+			out_of_memory("file inode data");
 		if (protocol_version < 26) {
 			dev = read_int(f);
-			file->inode = read_int(f);
+			file->F_INODE = read_int(f);
 		} else {
 			if (!(flags & SAME_DEV))
 				dev = read_longint(f);
-			file->inode = read_longint(f);
+			file->F_INODE = read_longint(f);
 		}
-		file->dev = dev;
+		file->F_DEV = dev;
 	}
 #endif
 
@@ -825,11 +826,12 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 	file->uid = st.st_uid;
 	file->gid = st.st_gid;
 	if (preserve_hard_links) {
-		if (protocol_version < 28? S_ISREG(st.st_mode)
+		if (protocol_version < 28 ? S_ISREG(st.st_mode)
 		    : !S_ISDIR(st.st_mode) && st.st_nlink > 1) {
-			file->dev = st.st_dev;
-			file->inode = st.st_ino;
-			file->flags |= HAS_INODE_DATA;
+			if (!(file->link_u.idev = new(struct idev)))
+				out_of_memory("file inode data");
+			file->F_DEV = st.st_dev;
+			file->F_INODE = st.st_ino;
 		}
 	}
 #ifdef HAVE_STRUCT_STAT_ST_RDEV
@@ -1300,6 +1302,8 @@ void free_file(struct file_struct *file)
 		free(file->basename);
 	if (!IS_DEVICE(file->mode) && file->u.link)
 		free(file->u.link); /* Handles u.sum too. */
+	if (file->link_u.idev)
+		free((char*)file->link_u.idev); /* Handles link_u.links too. */
 	*file = null_file;
 }
 

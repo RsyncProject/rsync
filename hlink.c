@@ -29,11 +29,11 @@ static int hlink_compare(struct file_struct **file1, struct file_struct **file2)
 	struct file_struct *f1 = *file1;
 	struct file_struct *f2 = *file2;
 
-	if (f1->dev != f2->dev)
-		return (int) (f1->dev > f2->dev ? 1 : -1);
+	if (f1->F_DEV != f2->F_DEV)
+		return (int) (f1->F_DEV > f2->F_DEV ? 1 : -1);
 
-	if (f1->inode != f2->inode)
-		return (int) (f1->inode > f2->inode ? 1 : -1);
+	if (f1->F_INODE != f2->F_INODE)
+		return (int) (f1->F_INODE > f2->F_INODE ? 1 : -1);
 
 	return file_compare(file1, file2);
 }
@@ -62,7 +62,7 @@ void init_hard_links(struct file_list *flist)
  */
 	hlink_count = 0;
 	for (i = 0; i < flist->count; i++) {
-		if (flist->files[i]->flags & HAS_INODE_DATA)
+		if (flist->files[i]->link_u.idev)
 			hlink_list[hlink_count++] = flist->files[i];
 	}
 
@@ -86,7 +86,7 @@ int check_hard_link(struct file_struct *file)
 	int low = 0, high = hlink_count - 1;
 	int ret = 0;
 
-	if (!hlink_list || !(file->flags & HAS_INODE_DATA))
+	if (!hlink_list || !file->link_u.idev)
 		return 0;
 
 	while (low != high) {
@@ -108,8 +108,8 @@ int check_hard_link(struct file_struct *file)
 		return 0;
 
 	if (low > 0 &&
-	    file->dev == hlink_list[low - 1]->dev &&
-	    file->inode == hlink_list[low - 1]->inode) {
+	    file->F_DEV == hlink_list[low - 1]->F_DEV &&
+	    file->F_INODE == hlink_list[low - 1]->F_INODE) {
 		if (verbose >= 2) {
 			rprintf(FINFO, "check_hard_link: \"%s\" is a hard link to file %d, \"%s\"\n",
 				f_name(file), low-1, f_name(hlink_list[low-1]));
@@ -173,8 +173,8 @@ void do_hard_links(void)
 
 	for (i = 1; i < hlink_count; i++) {
 		if (hlink_list[i]->basename && hlink_list[i - 1]->basename &&
-		    hlink_list[i]->dev == hlink_list[i - 1]->dev &&
-		    hlink_list[i]->inode == hlink_list[i - 1]->inode) {
+		    hlink_list[i]->F_DEV == hlink_list[i - 1]->F_DEV &&
+		    hlink_list[i]->F_INODE == hlink_list[i - 1]->F_INODE) {
 			hard_link_one(i);
 		}
 	}
