@@ -237,7 +237,11 @@ void rwrite(enum logcode code, char *buf, int len)
 		return;
 	}
 
-	/* if that fails, try to pass it to the other end */
+	/* If that fails, try to pass it to the other end.
+	 *
+	 * io_multiplex_write can fail if we do not have a multiplexed
+	 * connection at the moment, in which case we fall through and
+	 * log locally instead. */
 	if (am_server && io_multiplex_write(code, buf, len)) {
 		return;
 	}
