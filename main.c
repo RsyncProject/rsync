@@ -839,9 +839,12 @@ int main(int argc,char *argv[])
 	}
 
 	signal(SIGINT,SIGNAL_CAST sig_int);
-	signal(SIGPIPE,SIGNAL_CAST sig_int);
 	signal(SIGHUP,SIGNAL_CAST sig_int);
 	signal(SIGTERM,SIGNAL_CAST sig_int);
+
+	/* Ignore SIGPIPE; we consistently check error codes and will
+	 * see the EPIPE. */
+	signal(SIGPIPE, SIG_IGN);
 
 	/* Initialize push_dir here because on some old systems getcwd
 	   (implemented by forking "pwd" and reading its output) doesn't
