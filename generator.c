@@ -135,7 +135,7 @@ void write_sum_head(int f, struct sum_struct *sum)
  * This might be made one of several selectable heuristics.
  */
 
-static void sum_sizes_sqroot_baarda(struct sum_struct *sum, uint64 len)
+static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 {
 	extern int block_size;
 	int blength, s2length, b;
@@ -233,7 +233,7 @@ static void generate_and_send_sums(struct map_struct *buf, OFF_T len, int f_out)
 	struct sum_struct sum;
 	OFF_T offset = 0;
 
-	sum_sizes_sqroot_baarda(&sum, len);
+	sum_sizes_sqroot(&sum, len);
 
 	write_sum_head(f_out, &sum);
 
