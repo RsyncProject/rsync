@@ -51,7 +51,7 @@ void set_compression(char *fname)
 	strlower(fname);
 
 	for (tok=strtok(dont," ");tok;tok=strtok(NULL," ")) {
-		if (fnmatch(tok, fname, 0) == 0) {
+		if (wildmatch(tok, fname)) {
 			compression_level = 0;
 			break;
 		}

@@ -239,7 +239,7 @@ char *auth_server(int f_in, int f_out, int module, char *addr, char *leader)
 	if (!users) return NULL;
 
 	for (tok=strtok(users," ,\t"); tok; tok = strtok(NULL," ,\t")) {
-		if (fnmatch(tok, user, 0) == 0) break;
+		if (wildmatch(tok, user)) break;
 	}
 	free(users);
 

@@ -70,12 +70,6 @@ static struct exclude_struct *make_exclude(const char *pattern, int include)
 	if (strpbrk(pattern, "*[?")) {
 		ret->match_flags |= MATCHFLG_WILD;
 		if (strstr(pattern, "**")) {
-			static int tested;
-			if (!tested) {
-				tested = 1;
-				if (fnmatch("a/b/*","a/b/c/d",FNM_PATHNAME)==0)
-					rprintf(FERROR,"WARNING: fnmatch FNM_PATHNAME is broken on your system\n");
-			}
 			ret->match_flags |= MATCHFLG_WILD2;
 			/* If the pattern starts with **, note that. */
 			if (*pattern == '*' && pattern[1] == '*')
@@ -155,8 +149,6 @@ static int check_one_exclude(char *name, struct exclude_struct *ex,
 	}
 
 	if (ex->match_flags & MATCHFLG_WILD) {
-		int fnmatch_flags = (ex->match_flags & MATCHFLG_WILD2)?
-					0 : FNM_PATHNAME;
 		/* A non-anchored match with an infix slash and no "**"
 		 * needs to match the last slash_cnt+1 name elements. */
 		if (!match_start && ex->slash_cnt &&
@@ -168,14 +160,13 @@ static int check_one_exclude(char *name, struct exclude_struct *ex,
 			}
 			name = p+1;
 		}
-		if (fnmatch(pattern, name, fnmatch_flags) == 0)
+		if (wildmatch(pattern, name))
 			return 1;
 		if (ex->match_flags & MATCHFLG_WILD2_PREFIX) {
 			/* If the **-prefixed pattern has a '/' as the next
 			 * character, then try to match the rest of the
 			 * pattern at the root. */
-			if (pattern[2] == '/' &&
-			    fnmatch(pattern+3, name, fnmatch_flags) == 0)
+			if (pattern[2] == '/' && wildmatch(pattern+3, name))
 				return 1;
 		}
 		else if (!match_start && ex->match_flags & MATCHFLG_WILD2) {
@@ -184,7 +175,7 @@ static int check_one_exclude(char *name, struct exclude_struct *ex,
 			 * after every slash. */
 			while ((name = strchr(name, '/')) != NULL) {
 				name++;
-				if (fnmatch(pattern, name, fnmatch_flags) == 0)
+				if (wildmatch(pattern, name))
 					return 1;
 			}
 		}
