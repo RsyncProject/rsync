@@ -1,8 +1,94 @@
 -*- indented-text -*-
 
 BUGS ---------------------------------------------------------------
+Fix hardlink reporting						2002/03/25
+Fix progress indicator to not corrupt log
+lchmod question	
+Do not rely on having a group called "nobody"
+Incorrect timestamps (Debian #100295)
+Win32
 
-There seems to be a bug with hardlinks
+FEATURES ------------------------------------------------------------
+server-imposed bandwidth limits
+rsyncd over ssh
+Use chroot only if supported
+Allow supplementary groups in rsyncd.conf			2002/04/09
+Handling IPv6 on old machines
+Other IPv6 stuff:
+Add ACL support							2001/12/02
+Lazy directory creation
+Conditional -z for old protocols
+proxy authentication						2002/01/23
+SOCKS								2002/01/23
+FAT support
+Allow forcing arbitrary permissions				2002/03/12
+--diff						david.e.sewell	2002/03/15
+Add daemon --no-detach and --no-fork options
+
+DOCUMENTATION --------------------------------------------------------
+Update README
+Keep list of open issues and todos on the web site
+Update web site from CVS
+Perhaps redo manual as SGML
+
+LOGGING --------------------------------------------------------------
+Make dry run list all updates					2002/04/03
+Memory accounting
+Improve error messages
+Better statistics:					Rasmus	2002/03/08
+Perhaps flush stdout like syslog
+Log deamon sessions that just list modules
+Log child death on signal
+Keep stderr and stdout properly separated (Debian #23626)
+Log errors with function that reports process of origin
+verbose output					David Stein	2001/12/20
+Add reason for transfer to file logging
+debugging of daemon						2002/04/08
+internationalization
+
+DEVELOPMENT --------------------------------------------------------
+Handling duplicate names
+Use generic zlib						2002/02/25
+TDB:								2002/03/12
+Splint								2002/03/12
+Memory debugger
+Create release script
+Add machines to build farm
+
+PERFORMANCE ----------------------------------------------------------
+File list structure in memory
+Traverse just one directory at a time
+Hard-link handling
+Allow skipping MD4 file_sum					2002/04/08
+Accelerate MD4
+String area code
+
+TESTING --------------------------------------------------------------
+Torture test
+Cross-test versions						2001/08/22
+Test on kernel source
+Test large files
+Create mutator program for testing
+Create configure option to enable dangerous tests
+If tests are skipped, say why.
+Test daemon feature to disallow particular options.
+Create pipe program for testing
+Create test makefile target for some tests
+Test "refuse options" works
+
+RELATED PROJECTS -----------------------------------------------------
+rsyncsh
+http://rsync.samba.org/rsync-and-debian/
+rsyncable gzip patch
+rsyncsplit as alternative to real integration with gzip?
+reverse rsync over HTTP Range
+
+
+
+BUGS ---------------------------------------------------------------
+
+Fix hardlink reporting						2002/03/25
+  (was: There seems to be a bug with hardlinks)
 
   mbp/2 build$ ls -l /tmp/a /tmp/b -i
   /tmp/a:
@@ -72,8 +158,12 @@ There seems to be a bug with hardlinks
   -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 b2
   -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 b3
 
+                      --          --
 
-Progress indicator can produce corrupt output when transferring directories:
+
+Fix progress indicator to not corrupt log
+
+  Progress indicator can produce corrupt output when transferring directories:
 
   main/binary-arm/
   main/binary-arm/admin/
@@ -92,21 +182,16 @@ Progress indicator can produce corrupt output when transferring directories:
   main/binary-arm/math/
   main/binary-arm/misc/
 
+                      --          --
 
-lchmod
+
+lchmod question	
+
   I don't think we handle this properly on systems that don't have the
   call.  Are there any such?
 
+                      --          --
 
-Cross-test versions
-  Part of the regression suite should be making sure that we don't
-  break backwards compatibility: old clients vs new servers and so
-  on.  Ideally we would test the cross product of versions.  
-
-  It might be sufficient to test downloads from well-known public
-  rsync servers running different versions of rsync.  This will give
-  some testing and also be the most common case for having different
-  versions and not being able to upgrade.
 
 Do not rely on having a group called "nobody"
 
@@ -114,9 +199,32 @@ Do not rely on having a group called "nobody"
 
   On Debian it's "nogroup"
 
-DAEMON --------------------------------------------------------------
+                      --          --
+
+
+Incorrect timestamps (Debian #100295)
+
+  A bit hard to believe, but apparently it happens.
+
+                      --          --
+
+
+Win32
+
+  Don't detach, because this messes up --srvany.
+
+  http://sources.redhat.com/ml/cygwin/2001-08/msg00234.html
+
+
+
+                      --          --
+
+FEATURES ------------------------------------------------------------
 
 server-imposed bandwidth limits
+
+                      --          --
+
 
 rsyncd over ssh
 
@@ -125,19 +233,10 @@ rsyncd over ssh
   BitKeeper uses a server whose login shell is set to bkd.  That's
   probably a reasonable approach.
 
-
-FEATURES ------------------------------------------------------------
-
-
---dry-run is too dry
-
-  Mark Santcroos points out that -n fails to list files which have
-  only metadata changes, though it probably should.
-
-  There may be a Debian bug about this as well.
+                      --          --
 
 
-use chroot
+Use chroot only if supported
 
   If the platform doesn't support it, then don't even try.
 
@@ -147,33 +246,362 @@ use chroot
     http://lists.samba.org/pipermail/rsync/2001-August/thread.html
     http://lists.samba.org/pipermail/rsync/2001-September/thread.html
 
+                      --          --
 
-supplementary groups
+
+Allow supplementary groups in rsyncd.conf			2002/04/09
 
   Perhaps allow supplementary groups to be specified in rsyncd.conf;
   then make the first one the primary gid and all the rest be
   supplementary gids.
 
+                      --          --
 
-File list structure in memory
 
-  Rather than one big array, perhaps have a tree in memory mirroring
-  the directory tree.
+Handling IPv6 on old machines
 
-  This might make sorting much faster!  (I'm not sure it's a big CPU
-  problem, mind you.)
+  The KAME IPv6 patch is nice in theory but has proved a bit of a
+  nightmare in practice.  The basic idea of their patch is that rsync
+  is rewritten to use the new getaddrinfo()/getnameinfo() interface,
+  rather than gethostbyname()/gethostbyaddr() as in rsync 2.4.6.
+  Systems that don't have the new interface are handled by providing
+  our own implementation in lib/, which is selectively linked in.
 
-  It might also reduce memory use in storing repeated directory names
--- again I'm not sure this is a problem.
+  The problem with this is that it is really hard to get right on
+  platforms that have a half-working implementation, so redefining
+  these functions clashes with system headers, and leaving them out
+  breaks.  This affects at least OSF/1, RedHat 5, and Cobalt, which
+  are moderately improtant.
 
-Performance
+  Perhaps the simplest solution would be to have two different files
+  implementing the same interface, and choose either the new or the
+  old API.  This is probably necessary for systems that e.g. have
+  IPv6, but gethostbyaddr() can't handle it.  The Linux manpage claims
+  this is currently the case.
 
-  Traverse just one directory at a time.  Tridge says it's possible.
+  In fact, our internal sockets interface (things like
+  open_socket_out(), etc) is much narrower than the getaddrinfo()
+  interface, and so probably simpler to get right.  In addition, the
+  old code is known to work well on old machines.
 
-  At the moment rsync reads the whole file list into memory at the
-  start, which makes us use a lot of memory and also not pipeline
-  network access as much as we could.
+  We could drop the rather large lib/getaddrinfo files.
 
+                      --          --
+
+
+Other IPv6 stuff:
+  
+  Implement suggestions from http://www.kame.net/newsletter/19980604/
+  and ftp://ftp.iij.ad.jp/pub/RFC/rfc2553.txt
+
+  If a host has multiple addresses, then listen try to connect to all
+  in order until we get through.  (getaddrinfo may return multiple
+  addresses.)  This is kind of implemented already.
+
+  Possibly also when starting as a server we may need to listen on
+  multiple passive addresses.  This might be a bit harder, because we
+  may need to select on all of them.  Hm.
+
+  Define a syntax for IPv6 literal addresses.  Since they include
+  colons, they tend to break most naming systems, including ours.
+  Based on the HTTP IPv6 syntax, I think we should use
+ 
+     rsync://[::1]/foo/bar [::1]::bar
+
+  which should just take a small change to the parser code.
+
+                      --          --
+
+
+Add ACL support							2001/12/02
+
+  Transfer ACLs.  Need to think of a standard representation.
+  Probably better not to even try to convert between NT and POSIX.
+  Possibly can share some code with Samba.
+
+                      --          --
+
+
+Lazy directory creation
+
+  With the current common --include '*/' --exclude '*' pattern, people
+  can end up with many empty directories.  We might avoid this by
+  lazily creating such directories.
+
+                      --          --
+
+
+Conditional -z for old protocols
+
+  After we get the @RSYNCD greeting from the server, we know it's
+  version but we have not yet sent the command line, so we could just
+  remove the -z option if the server is too old.
+
+  For ssh invocation it's not so simple, because we actually use the
+  command line to start the remote process.  However, we only actually
+  do compression in token.c, and we could therefore once we discover
+  the remote version emit an error if it's too old.  I'm not sure if
+  that's a good tradeoff or not.
+
+                      --          --
+
+
+proxy authentication						2002/01/23
+
+  Allow RSYNC_PROXY to be http://user:pass@proxy.foo:3128/, and do
+  HTTP Basic Proxy-Authentication.
+
+  Multiple schemes are possible, up to and including the insanity that
+  is NTLM, but Basic probably covers most cases.
+
+                      --          --
+
+
+SOCKS								2002/01/23
+
+  Add --with-socks, and then perhaps a command-line option to put them
+  on or off.  This might be more reliable than LD_PRELOAD hacks.
+
+                      --          --
+
+
+FAT support
+
+  rsync to a FAT partition on a Unix machine doesn't work very well at
+  the moment.  I think we get errors about invalid filenames and
+  perhaps also trying to do atomic renames.
+
+  I guess the code to do this is currently #ifdef'd on Windows;
+  perhaps we ought to intelligently fall back to it on Unix too.
+
+                      --          --
+
+
+Allow forcing arbitrary permissions				2002/03/12
+
+  On 12 Mar 2002, Dave Dykstra <dwd@bell-labs.com> wrote:
+  > If we would add an option to do that functionality, I
+  > would vote for one that was more general which could mask
+  > off any set of permission bits and possibly add any set of
+  > bits.  Perhaps a chmod-like syntax if it could be
+  > implemented simply.
+
+  I think that would be good too.  For example, people uploading files
+  to a web server might like to say
+
+  rsync -avzP --chmod a+rX ./ sourcefrog.net:/home/www/sourcefrog/
+
+  Ideally the patch would implement as many of the gnu chmod semantics
+  as possible.  I think the mode parser should be a separate function
+  that passes back something like (mask,set) description to the rest
+  of the program.  For bonus points there would be a test case for the
+  parser.
+
+  Possibly also --chown
+
+  (Debian #23628)
+
+                      --          --
+
+
+--diff						david.e.sewell	2002/03/15
+
+  Allow people to specify the diff command.  (Might want to use wdiff,
+  gnudiff, etc.)
+
+  Just diff the temporary file with the destination file, and delete
+  the tmp file rather than moving it into place.
+
+  Interaction with --partial.
+
+  Security interactions with daemon mode?
+
+                      --          --
+
+
+Add daemon --no-detach and --no-fork options
+
+  Very useful for debugging.  Also good when running under a
+  daemon-monitoring process that tries to restart the service when the
+  parent exits.
+
+                      --          --
+
+DOCUMENTATION --------------------------------------------------------
+
+Update README
+
+                      --          --
+
+
+Keep list of open issues and todos on the web site
+
+                      --          --
+
+
+Update web site from CVS
+
+                      --          --
+
+
+Perhaps redo manual as SGML
+
+  The man page is getting rather large, and there is more information
+  that ought to be added.
+
+  TexInfo source is probably a dying format.
+
+  Linuxdoc looks like the most likely contender.  I know DocBook is
+  favoured by some people, but it's so bloody verbose, even with emacs
+  support.
+
+                      --          --
+
+LOGGING --------------------------------------------------------------
+
+Make dry run list all updates					2002/04/03
+
+  --dry-run is too dry
+
+  Mark Santcroos points out that -n fails to list files which have
+  only metadata changes, though it probably should.
+
+  There may be a Debian bug about this as well.
+
+                      --          --
+
+
+Memory accounting
+
+  At exit, show how much memory was used for the file list, etc.
+
+  Also we do a wierd exponential-growth allocation in flist.c.  I'm
+  not sure this makes sense with modern mallocs.  At any rate it will
+  make us allocate a huge amount of memory for large file lists.
+
+                      --          --
+
+
+Improve error messages
+
+  If we hang or get SIGINT, then explain where we were up to.  Perhaps
+  have a static buffer that contains the current function name, or
+  some kind of description of what we were trying to do.  This is a
+  little easier on people than needing to run strace/truss.
+
+  "The dungeon collapses!  You are killed."  Rather than "unexpected
+  eof" give a message that is more detailed if possible and also more
+  helpful.
+
+  If we get an error writing to a socket, then we should perhaps
+  continue trying to read to see if an error message comes across
+  explaining why the socket is closed.  I'm not sure if this would
+  work, but it would certainly make our messages more helpful.
+
+  What happens if a directory is missing -x attributes.  Do we lose
+  our load?  (Debian #28416) Probably fixed now, but a test case would
+  be good.
+
+
+
+                      --          --
+
+
+Better statistics:					Rasmus	2002/03/08
+
+  <Rasmus>
+      hey, how about an rsync option that just gives you the
+      summary without the list of files?  And perhaps gives
+      more information like the number of new files, number
+      of changed, deleted, etc. ?
+
+  <mbp>
+      nice idea there is --stats but at the moment it's very
+      tridge-oriented rather than user-friendly it would be
+      nice to improve it that would also work well with
+      --dryrun
+
+                      --          --
+
+
+Perhaps flush stdout like syslog
+
+  Perhaps flush stdout after each filename, so that people trying to
+  monitor progress in a log file can do so more easily.  See
+  http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=48108
+
+                      --          --
+
+
+Log deamon sessions that just list modules
+
+  At the connections that just get a list of modules are not logged,
+  but they should be.
+
+                      --          --
+
+
+Log child death on signal
+
+  If a child of the rsync daemon dies with a signal, we should notice
+  that when we reap it and log a message.
+
+                      --          --
+
+
+Keep stderr and stdout properly separated (Debian #23626)
+
+                      --          --
+
+
+Log errors with function that reports process of origin
+
+  Use a separate function for reporting errors; prefix it with
+  "rsync:" or "rsync(remote)", or perhaps even "rsync(local
+  generator): ".
+
+                      --          --
+
+
+verbose output					David Stein	2001/12/20
+  
+  Indicate whether files are new, updated, or deleted
+
+  At end of transfer, show how many files were or were not transferred
+  correctly.
+
+                      --          --
+
+
+Add reason for transfer to file logging
+
+  Explain *why* every file is transferred or not (e.g. "local mtime
+  123123 newer than 1283198")
+
+                      --          --
+
+
+debugging of daemon						2002/04/08
+
+  Add an rsyncd.conf parameter to turn on debugging on the server.
+
+                      --          --
+
+
+internationalization
+
+  Change to using gettext().  Probably need to ship this for platforms
+  that don't have it.
+
+  Solicit translations.
+
+  Does anyone care?  Before we bother modifying the code, we ought to
+  get the manual translated first, because that's possibly more useful
+  and at any rate demonstrates desire.
+
+                      --          --
+
+DEVELOPMENT --------------------------------------------------------
 
 Handling duplicate names
 
@@ -218,14 +646,124 @@ Handling duplicate names
   incompatibility, so we need to be able to accept the old format as
   well.
 
+                      --          --
 
-Memory accounting
 
-  At exit, show how much memory was used for the file list, etc.
+Use generic zlib						2002/02/25
 
-  Also we do a wierd exponential-growth allocation in flist.c.  I'm
-  not sure this makes sense with modern mallocs.  At any rate it will
-  make us allocate a huge amount of memory for large file lists.
+  Perhaps don't use our own zlib.
+
+  Advantages:
+   
+    - will automatically be up to date with bugfixes in zlib
+
+    - can leave it out for small rsync on e.g. recovery disks
+
+    - can use a shared library
+
+    - avoids people breaking rsync by trying to do this themselves and
+      messing up
+
+  Should we ship zlib for systems that don't have it, or require
+  people to install it separately?
+
+  Apparently this will make us incompatible with versions of rsync
+  that use the patched version of rsync.  Probably the simplest way to
+  do this is to just disable gzip (with a warning) when talking to old
+  versions.
+
+                      --          --
+
+
+TDB:								2002/03/12
+
+  Rather than storing the file list in memory, store it in a TDB.
+
+  This *might* make memory usage lower while building the file list.
+
+  Hashtable lookup will mean files are not transmitted in order,
+  though... hm.
+
+  This would neatly eliminate one of the major post-fork shared data
+  structures.
+
+                      --          --
+
+
+Splint								2002/03/12
+
+  Build rsync with SPLINT to try to find security holes.  Add
+  annotations as necessary.  Keep track of the number of warnings
+  found initially, and see how many of them are real bugs, or real
+  security bugs.  Knowing the percentage of likely hits would be
+  really interesting for other projects.
+
+                      --          --
+
+
+Memory debugger
+
+  jra recommends Valgrind:
+
+    http://devel-home.kde.org/~sewardj/
+
+                      --          --
+
+
+Create release script
+  
+  Script would:
+
+     Update spec files
+
+     Build tar file; upload
+
+     Send announcement to mailing list and c.o.l.a.
+  
+     Make freshmeat announcement
+
+     Update web site
+
+                      --          --
+
+
+Add machines to build farm
+
+  Cygwin (on different versions of Win32?)
+
+  HP-UX variants (via HP?)
+
+  SCO
+
+
+
+                      --          --
+
+PERFORMANCE ----------------------------------------------------------
+
+File list structure in memory
+
+  Rather than one big array, perhaps have a tree in memory mirroring
+  the directory tree.
+
+  This might make sorting much faster!  (I'm not sure it's a big CPU
+  problem, mind you.)
+
+  It might also reduce memory use in storing repeated directory names
+  -- again I'm not sure this is a problem.
+
+                      --          --
+
+
+Traverse just one directory at a time
+
+  Traverse just one directory at a time.  Tridge says it's possible.
+
+  At the moment rsync reads the whole file list into memory at the
+  start, which makes us use a lot of memory and also not pipeline
+  network access as much as we could.
+
+                      --          --
 
 
 Hard-link handling
@@ -295,242 +833,10 @@ Hard-link handling
   might need a little program to check whether several names refer to
   the same file.
 
+                      --          --
 
 
-Handling IPv6 on old machines
-
-  The KAME IPv6 patch is nice in theory but has proved a bit of a
-  nightmare in practice.  The basic idea of their patch is that rsync
-  is rewritten to use the new getaddrinfo()/getnameinfo() interface,
-  rather than gethostbyname()/gethostbyaddr() as in rsync 2.4.6.
-  Systems that don't have the new interface are handled by providing
-  our own implementation in lib/, which is selectively linked in.
-
-  The problem with this is that it is really hard to get right on
-  platforms that have a half-working implementation, so redefining
-  these functions clashes with system headers, and leaving them out
-  breaks.  This affects at least OSF/1, RedHat 5, and Cobalt, which
-  are moderately improtant.
-
-  Perhaps the simplest solution would be to have two different files
-  implementing the same interface, and choose either the new or the
-  old API.  This is probably necessary for systems that e.g. have
-  IPv6, but gethostbyaddr() can't handle it.  The Linux manpage claims
-  this is currently the case.
-
-  In fact, our internal sockets interface (things like
-  open_socket_out(), etc) is much narrower than the getaddrinfo()
-  interface, and so probably simpler to get right.  In addition, the
-  old code is known to work well on old machines.
-
-  We could drop the rather large lib/getaddrinfo files.
-
-
-Other IPv6 stuff:
-  
-  Implement suggestions from http://www.kame.net/newsletter/19980604/
-  and ftp://ftp.iij.ad.jp/pub/RFC/rfc2553.txt
-
-  If a host has multiple addresses, then listen try to connect to all
-  in order until we get through.  (getaddrinfo may return multiple
-  addresses.)  This is kind of implemented already.
-
-  Possibly also when starting as a server we may need to listen on
-  multiple passive addresses.  This might be a bit harder, because we
-  may need to select on all of them.  Hm.
-
-  Define a syntax for IPv6 literal addresses.  Since they include
-  colons, they tend to break most naming systems, including ours.
-  Based on the HTTP IPv6 syntax, I think we should use
- 
-     rsync://[::1]/foo/bar [::1]::bar
-
-  which should just take a small change to the parser code.
-
-
-Errors
-
-  If we hang or get SIGINT, then explain where we were up to.  Perhaps
-  have a static buffer that contains the current function name, or
-  some kind of description of what we were trying to do.  This is a
-  little easier on people than needing to run strace/truss.
-
-  "The dungeon collapses!  You are killed."  Rather than "unexpected
-  eof" give a message that is more detailed if possible and also more
-  helpful.
-
-  If we get an error writing to a socket, then we should perhaps
-  continue trying to read to see if an error message comes across
-  explaining why the socket is closed.  I'm not sure if this would
-  work, but it would certainly make our messages more helpful.
-
-  What happens if a directory is missing -x attributes.  Do we lose
-  our load?  (Debian #28416) Probably fixed now, but a test case would
-  be good.
-
-
-File attributes
-
-  Transfer ACLs.  Need to think of a standard representation.
-  Probably better not to even try to convert between NT and POSIX.
-  Possibly can share some code with Samba.
-
-Empty directories
-
-  With the current common --include '*/' --exclude '*' pattern, people
-  can end up with many empty directories.  We might avoid this by
-  lazily creating such directories.
-
-
-zlib
-
-  Perhaps don't use our own zlib.
-
-  Advantages:
-   
-    - will automatically be up to date with bugfixes in zlib
-
-    - can leave it out for small rsync on e.g. recovery disks
-
-    - can use a shared library
-
-    - avoids people breaking rsync by trying to do this themselves and
-      messing up
-
-  Should we ship zlib for systems that don't have it, or require
-  people to install it separately?
-
-  Apparently this will make us incompatible with versions of rsync
-  that use the patched version of rsync.  Probably the simplest way to
-  do this is to just disable gzip (with a warning) when talking to old
-  versions.
-
-
-logging
-
-  Perhaps flush stdout after each filename, so that people trying to
-  monitor progress in a log file can do so more easily.  See
-  http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=48108
-
-  At the connections that just get a list of modules are not logged,
-  but they should be.
-
-  If a child of the rsync daemon dies with a signal, we should notice
-  that when we reap it and log a message.
-
-  Keep stderr and stdout properly separated (Debian #23626)
-
-  After we get the @RSYNCD greeting from the server, we know it's
-  version but we have not yet sent the command line, so we could just
-  remove the -z option if the server is too old.
-
-  For ssh invocation it's not so simple, because we actually use the
-  command line to start the remote process.  However, we only actually
-  do compression in token.c, and we could therefore once we discover
-  the remote version emit an error if it's too old.  I'm not sure if
-  that's a good tradeoff or not.
-
-
-proxy authentication
-
-  Allow RSYNC_PROXY to be http://user:pass@proxy.foo:3128/, and do
-  HTTP Basic Proxy-Authentication.
-
-  Multiple schemes are possible, up to and including the insanity that
-  is NTLM, but Basic probably covers most cases.
-
-SOCKS
-
-  Add --with-socks, and then perhaps a command-line option to put them
-  on or off.  This might be more reliable than LD_PRELOAD hacks.
-
-FAT support
-
-  rsync to a FAT partition on a Unix machine doesn't work very well at
-  the moment.  I think we get errors about invalid filenames and
-  perhaps also trying to do atomic renames.
-
-  I guess the code to do this is currently #ifdef'd on Windows;
-  perhaps we ought to intelligently fall back to it on Unix too.
-
-
-Better statistics:
-
-  <Rasmus> mbp: hey, how about an rsync option that just gives you the
-  summary without the list of files?  And perhaps gives more
-  information like the number of new files, number of changed,
-  deleted, etc. ?  <mbp> Rasmus: nice idea <mbp> there is --stats
-  <mbp> but at the moment it's very tridge-oriented <mbp> rather than
-  user-friendly <mbp> it would be nice to improve it <mbp> that would
-  also work well with --dryrun
-
-TDB:
-
-  Rather than storing the file list in memory, store it in a TDB.
-
-  This *might* make memory usage lower while building the file list.
-
-  Hashtable lookup will mean files are not transmitted in order,
-  though... hm.
-
-  This would neatly eliminate one of the major post-fork shared data
-  structures.
-
-
-chmod:
-
-  On 12 Mar 2002, Dave Dykstra <dwd@bell-labs.com> wrote: > If we
-would add an option to do that functionality, I would vote for one >
-that was more general which could mask off any set of permission bits
-and > possibly add any set of bits.  Perhaps a chmod-like syntax if it
-could be > implemented simply.
-
-  I think that would be good too.  For example, people uploading files
-  to a web server might like to say
-
-  rsync -avzP --chmod a+rX ./ sourcefrog.net:/home/www/sourcefrog/
-
-  Ideally the patch would implement as many of the gnu chmod semantics
-  as possible.  I think the mode parser should be a separate function
-  that passes back something like (mask,set) description to the rest
-  of the program.  For bonus points there would be a test case for the
-  parser.
-
-  Possibly also --chown
-
-  (Debian #23628)
-
-
---diff
-
-  Allow people to specify the diff command.  (Might want to use wdiff,
-  gnudiff, etc.)
-
-  Just diff the temporary file with the destination file, and delete
-  the tmp file rather than moving it into place.
-
-  Interaction with --partial.
-
-  Security interactions with daemon mode?
-
-  (Suggestion from david.e.sewell)
-
-
-Incorrect timestamps (Debian #100295)
-
-  A bit hard to believe, but apparently it happens.
-
-
-Check "refuse options works"
-
-  We need a test case for this...
-
-  Was this broken when we changed to popt?
-
-
-PERFORMANCE ----------------------------------------------------------
-
-MD4 file_sum
+Allow skipping MD4 file_sum					2002/04/08
 
   If we're doing a local transfer, or using -W, then perhaps don't
   send the file checksum.  If we're doing a local transfer, then
@@ -540,80 +846,50 @@ MD4 file_sum
   Indeed for transfers over zlib or ssh we can also rely on the
   transport to have quite strong protection against corruption.
 
-  Perhaps we should have an option to disable this, analogous to
---whole-file, although it would default to disabled.  The file
-checksum takes up a definite space in the protocol -- we can either
-set it to 0, or perhaps just leave it out.
+  Perhaps we should have an option to disable this,
+  analogous to --whole-file, although it would default to
+  disabled.  The file checksum takes up a definite space in
+  the protocol -- we can either set it to 0, or perhaps just
+  leave it out.
 
-MD4
+                      --          --
+
+
+Accelerate MD4
 
   Perhaps borrow an assembler MD4 from someone?
 
   Make sure we call MD4 with properly-sized blocks whenever possible
   to avoid copying into the residue region?
 
+                      --          --
+
+
 String area code
 
   Test whether this is actually faster than just using malloc().  If
   it's not (anymore), throw it out.
-	  
 
-PLATFORMS ------------------------------------------------------------
+                      --          --
 
-Win32
-
-  Don't detach, because this messes up --srvany.
-
-  http://sources.redhat.com/ml/cygwin/2001-08/msg00234.html
-
-
-DEVELOPMENT ----------------------------------------------------------
-
-Splint
-
-  Build rsync with SPLINT to try to find security holes.  Add
-  annotations as necessary.  Keep track of the number of warnings
-  found initially, and see how many of them are real bugs, or real
-  security bugs.  Knowing the percentage of likely hits would be
-  really interesting for other projects.
+TESTING --------------------------------------------------------------
 
 Torture test
 
   Something that just keeps running rsync continuously over a data set
   likely to generate problems.
 
-Cross-testing
+                      --          --
+
+
+Cross-test versions						2001/08/22
+
+  Part of the regression suite should be making sure that we
+  don't break backwards compatibility: old clients vs new
+  servers and so on.  Ideally we would test both up and down
+  from the current release to all old versions.
 
   Run current rsync versions against significant past releases.
-
-Memory debugger
-
-  jra recommends Valgrind:
-
-    http://devel-home.kde.org/~sewardj/
-
-Release script
-  
-  Update spec files
-
-  Build tar file; upload
-
-  Send announcement to mailing list and c.o.l.a.
-  
-  Make freshmeat announcement
-
-  Update web site
-
-
-
-TESTING --------------------------------------------------------------
-
-Cross-test versions
-
-  Part of the regression suite should be making sure that we don't
-  break backwards compatibility: old clients vs new servers and so on.
-  Ideally we would test both up and down from the current release to
-  all old versions.
 
   We might need to omit broken old versions, or versions in which
   particular functionality is broken
@@ -622,6 +898,10 @@ Cross-test versions
   rsync servers running different versions of rsync.  This will give
   some testing and also be the most common case for having different
   versions and not being able to upgrade.
+
+  The new --protocol option may help in this.
+
+                      --          --
 
 
 Test on kernel source
@@ -635,28 +915,54 @@ Test on kernel source
   Use awk to pull out the 'speedup' number for each transfer.  Make
   sure it is >= x.
 
+                      --          --
+
 
 Test large files
 
   Sparse and non-sparse
 
-Mutator program
+                      --          --
+
+
+Create mutator program for testing
 
   Insert bytes, delete bytes, swap blocks, ...
 
-configure option to enable dangerous tests
+                      --          --
+
+
+Create configure option to enable dangerous tests
+
+                      --          --
+
 
 If tests are skipped, say why.
 
+                      --          --
+
+
 Test daemon feature to disallow particular options.
 
-Pipe program that makes slow/jerky connections.
+                      --          --
 
-Versions of read() and write() that corrupt the stream, or abruptly
-fail
 
-Separate makefile target to run rough tests -- or perhaps just run
-them every time?
+Create pipe program for testing
+
+  Create pipe program that makes slow/jerky connections for
+  testing Versions of read() and write() that corrupt the
+  stream, or abruptly fail
+
+                      --          --
+
+
+Create test makefile target for some tests
+
+  Separate makefile target to run rough tests -- or perhaps
+  just run them every time?
+
+                      --          --
+
 
 Test "refuse options" works
 
@@ -664,96 +970,13 @@ Test "refuse options" works
 
   If you specify an unrecognized option here, you should get an error.
 
+  We need a test case for this...
 
-DOCUMENTATION --------------------------------------------------------
+  Was this broken when we changed to popt?
 
-Update README
+                      --          --
 
-Keep list of open issues and todos on the web site
-
-Update web site from CVS
-
-
-Perhaps redo manual as SGML
-
-  The man page is getting rather large, and there is more information
-  that ought to be added.
-
-  TexInfo source is probably a dying format.
-
-  Linuxdoc looks like the most likely contender.  I know DocBook is
-  favoured by some people, but it's so bloody verbose, even with emacs
-  support.
-
-
-BUILD FARM -----------------------------------------------------------
-
-Add machines
-
-  Cygwin (on different versions of Win32?)
-
-  HP-UX variants (via HP?)
-
-  SCO
-
-
-LOGGING --------------------------------------------------------------
-
-  Perhaps flush stdout after each filename, so that people trying to
-  monitor progress in a log file can do so more easily.  See
-  http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=48108
-
-  At the connections that just get a list of modules are not logged,
-  but they should be.
-
-  If a child of the rsync daemon dies with a signal, we should notice
-  that when we reap it and log a message.
-
-  Keep stderr and stdout properly separated (Debian #23626)
-
-  Use a separate function for reporting errors; prefix it with
-  "rsync:" or "rsync(remote)", or perhaps even "rsync(local
-  generator): ".
-
-verbose output
-  
-  Indicate whether files are new, updated, or deleted
-
-  At end of transfer, show how many files were or were not transferred
-  correctly.
-
--vv
-
-  Explain *why* every file is transferred or not (e.g. "local mtime
-  123123 newer than 1283198")
-
-
-debugging of daemon
-
-  Add an rsyncd.conf parameter to turn on debugging on the server.
-
-
-
-NICE -----------------------------------------------------------------
-
---no-detach and --no-fork options
-
-  Very useful for debugging.  Also good when running under a
-  daemon-monitoring process that tries to restart the service when the
-  parent exits.
-
-hang/timeout friendliness
-
-internationalization
-
-  Change to using gettext().  Probably need to ship this for platforms
-  that don't have it.
-
-  Solicit translations.
-
-  Does anyone care?  Before we bother modifying the code, we ought to
-  get the manual translated first, because that's possibly more useful
-  and at any rate demonstrates desire.
+RELATED PROJECTS -----------------------------------------------------
 
 rsyncsh
 
@@ -763,10 +986,14 @@ rsyncsh
    current host, directory and so on.  We can probably even do
    completion of remote filenames.
 
+                      --          --
 
-RELATED PROJECTS -----------------------------------------------------
 
 http://rsync.samba.org/rsync-and-debian/
+
+
+                      --          --
+
 
 rsyncable gzip patch
 
@@ -774,11 +1001,18 @@ rsyncable gzip patch
 
   Cleanups?
 
+                      --          --
+
+
 rsyncsplit as alternative to real integration with gzip?
+
+                      --          --
+
 
 reverse rsync over HTTP Range
 
   Goswin Brederlow suggested this on Debian; I think tridge and I
   talked about it previous in relation to rproxy.
 
+                      --          --
 
