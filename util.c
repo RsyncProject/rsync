@@ -26,6 +26,18 @@
 
 extern int verbose;
 
+/* create a file descriptor - like pipe() but use socketpair if
+   possible (because of blocking issues on pipes */
+int fd_pair(int fd[2])
+{
+#if HAVE_SOCKETPAIR
+	return socketpair(AF_UNIX, SOCK_STREAM, 0, fd);
+#else
+	return pipe(fd);
+#endif
+}
+
+
 /* this is taken from CVS */
 int piped_child(char **command,int *f_in,int *f_out)
 {
@@ -33,8 +45,8 @@ int piped_child(char **command,int *f_in,int *f_out)
   int to_child_pipe[2];
   int from_child_pipe[2];
 
-  if (pipe(to_child_pipe) < 0 ||
-      pipe(from_child_pipe) < 0) {
+  if (fd_pair(to_child_pipe) < 0 ||
+      fd_pair(from_child_pipe) < 0) {
     rprintf(FERROR,"pipe: %s\n",strerror(errno));
     exit_cleanup(RERR_IPC);
   }
@@ -83,8 +95,8 @@ int local_child(int argc, char **argv,int *f_in,int *f_out)
 	int to_child_pipe[2];
 	int from_child_pipe[2];
 
-	if (pipe(to_child_pipe) < 0 ||
-	    pipe(from_child_pipe) < 0) {
+	if (fd_pair(to_child_pipe) < 0 ||
+	    fd_pair(from_child_pipe) < 0) {
 		rprintf(FERROR,"pipe: %s\n",strerror(errno));
 		exit_cleanup(RERR_IPC);
 	}

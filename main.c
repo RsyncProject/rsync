@@ -294,12 +294,12 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		}
 	}
 
-	if (pipe(recv_pipe) < 0) {
+	if (fd_pair(recv_pipe) < 0) {
 		rprintf(FERROR,"pipe failed in do_recv\n");
 		exit_cleanup(RERR_SOCKETIO);
 	}
 
-	if (pipe(error_pipe) < 0) {
+	if (fd_pair(error_pipe) < 0) {
 		rprintf(FERROR,"error pipe failed in do_recv\n");
 		exit_cleanup(RERR_SOCKETIO);
 	}

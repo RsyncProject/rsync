@@ -18,7 +18,7 @@
 */
 
 /*
-  Utilities used in rsync 
+  socket and pipe IO utilities used in rsync 
 
   tridge, June 1996
   */
@@ -39,7 +39,6 @@ extern struct stats stats;
 
 static int buffer_f_in = -1;
 static int io_error_fd = -1;
-static int in_read_check;
 
 void setup_readbuffer(int f_in)
 {
@@ -89,12 +88,7 @@ static void read_error_fd(void)
 }
 
 
-static char *read_buffer;
-static char *read_buffer_p;
-static int read_buffer_len;
-static int read_buffer_size;
 static int no_flush;
-static int no_flush_read;
 
 /* read from a socket with IO timeout. return the number of
    bytes read. If no bytes can be read then exit, never return
@@ -103,9 +97,7 @@ static int read_timeout(int fd, char *buf, int len)
 {
 	int n, ret=0;
 
-	no_flush_read++;
 	io_flush();
-	no_flush_read--;
 
 	while (ret == 0) {
 		fd_set fds;
@@ -231,46 +223,9 @@ static int read_unbuffered(int fd, char *buf, int len)
 
 		rprintf(tag,"%s", line);
 		remaining = 0;
-
-		if (in_read_check) break;
 	}
 
 	return ret;
-}
-
-
-
-/* This function was added to overcome a deadlock problem when using
- * ssh.  It looks like we can't allow our receive queue to get full or
- * ssh will clag up. Uggh.  */
-static void read_check(int f)
-{
-	int n = 8192;
-	
-	in_read_check = 1;
-
-	if (f == -1) return;
-
-	if (read_buffer_len == 0) {
-		read_buffer_p = read_buffer;
-	}
-
-	if (read_buffer_p != read_buffer) {
-		memmove(read_buffer,read_buffer_p,read_buffer_len);
-		read_buffer_p = read_buffer;
-	}
-
-	if (n > (read_buffer_size - read_buffer_len)) {
-		read_buffer_size += n;
-		read_buffer = (char *)Realloc(read_buffer,read_buffer_size);
-		if (!read_buffer) out_of_memory("read check");      
-		read_buffer_p = read_buffer;      
-	}
-
-	n = read_unbuffered(f,read_buffer+read_buffer_len,n);
-	read_buffer_len += n;
-
-	in_read_check = 0;
 }
 
 
@@ -281,23 +236,8 @@ static void readfd(int fd,char *buffer,int N)
 	int  ret;
 	int total=0;  
 	
-	if ((read_buffer_len < N) && (N < 1024)) {
-		read_check(buffer_f_in);
-	}
-	
 	while (total < N) {
-		if (read_buffer_len > 0 && buffer_f_in == fd) {
-			ret = MIN(read_buffer_len,N-total);
-			memcpy(buffer+total,read_buffer_p,ret);
-			read_buffer_p += ret;
-			read_buffer_len -= ret;
-			total += ret;
-			continue;
-		} 
-
-		no_flush_read++;
 		io_flush();
-		no_flush_read--;
 
 		ret = read_unbuffered(fd,buffer + total,N-total);
 		total += ret;
@@ -371,7 +311,6 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 	fd_set w_fds, r_fds;
 	int fd_count, count;
 	struct timeval tv;
-	int reading=0;
 
 	no_flush++;
 
@@ -380,17 +319,6 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 		FD_ZERO(&r_fds);
 		FD_SET(fd,&w_fds);
 		fd_count = fd;
-
-		if (!no_flush_read) {
-			reading = (buffer_f_in != -1) && 
-				(read_buffer_len < MAX_READ_BUFFER);
-		}
-
-		if (reading) {
-			FD_SET(buffer_f_in,&r_fds);
-			if (buffer_f_in > fd_count) 
-				fd_count = buffer_f_in;
-		}
 
 		if (io_error_fd != -1) {
 			FD_SET(io_error_fd,&r_fds);
@@ -404,7 +332,7 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 		errno = 0;
 
 		count = select(fd_count+1,
-			       (reading || io_error_fd != -1)?&r_fds:NULL,
+			       io_error_fd != -1?&r_fds:NULL,
 			       &w_fds,NULL,
 			       &tv);
 
@@ -414,10 +342,6 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 			}
 			check_timeout();
 			continue;
-		}
-
-		if (reading && FD_ISSET(buffer_f_in, &r_fds)) {
-			read_check(buffer_f_in);
 		}
 
 		if (io_error_fd != -1 && FD_ISSET(io_error_fd, &r_fds)) {
@@ -611,10 +535,6 @@ void io_start_multiplex_in(int fd)
 {
 	multiplex_in_fd = fd;
 	io_flush();
-	if (read_buffer_len) {
-		exit_cleanup(RERR_STREAMIO);
-	}
-
 	io_multiplexing_in = 1;
 }
 

@@ -53,7 +53,7 @@ AC_FUNC_UTIME_NULL
 AC_CHECK_FUNCS(waitpid wait4 getcwd strdup strerror chown chmod mknod)
 AC_CHECK_FUNCS(fchmod fstat strchr readlink link utime utimes strftime)
 AC_CHECK_FUNCS(memmove lchown vsnprintf snprintf setsid glob strpbrk)
-AC_CHECK_FUNCS(strlcat strlcpy inet_aton)
+AC_CHECK_FUNCS(strlcat strlcpy inet_aton socketpair)
 
 AC_CACHE_CHECK([for working fnmatch],rsync_cv_HAVE_FNMATCH,[
 AC_TRY_RUN([#include <fnmatch.h>
