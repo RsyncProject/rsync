@@ -52,7 +52,7 @@ extern int io_error;
 pid_t cleanup_child_pid = -1;
 
 /**
- * Eventually calls exit(), therefore does not return.
+ * Eventually calls exit(), passing @p code, therefore does not return.
  *
  * @param code one of the RERR_* codes from errcode.h.
  **/
