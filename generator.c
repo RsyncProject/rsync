@@ -647,15 +647,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	} else {
 		if (fuzzy_basis && S_ISREG(file->mode)) {
 			char *dn = file->dirname ? file->dirname : ".";
-			/* Yes, identical dirnames are guaranteed to have
-			 * identical pointers at this point. */
-			if (fuzzy_dirname != dn) {
+			if (fuzzy_dirname != dn
+			    && strcmp(fuzzy_dirname, dn) != 0) {
 				if (fuzzy_dirlist)
 					flist_free(fuzzy_dirlist);
-				fuzzy_dirname = dn;
-				fuzzy_dirlist = get_dirlist(fuzzy_dirname, -1,
-							    1);
+				fuzzy_dirlist = get_dirlist(dn, -1, 1);
 			}
+			fuzzy_dirname = dn;
 		}
 
 		statret = link_stat(fname, &st,
