@@ -18,19 +18,22 @@ extern int preserve_devices;
 extern int preserve_uid;
 extern int preserve_gid;
 extern int always_checksum;
+extern int do_compression;
 extern int protocol_version;
 extern char *batch_name;
 
 extern struct filter_list_struct filter_list;
 
 static int *flag_ptr[] = {
-	&recurse,
-	&preserve_uid,
-	&preserve_gid,
-	&preserve_links,
-	&preserve_devices,
-	&preserve_hard_links,
-	&always_checksum,
+	&recurse,		/* 0 */
+	&preserve_uid,		/* 1 */
+	&preserve_gid,		/* 2 */
+	&preserve_links,	/* 3 */
+	&preserve_devices,	/* 4 */
+	&preserve_hard_links,	/* 5 */
+	&always_checksum,	/* 6 */
+	&xfer_dirs,		/* 7 (protocol 29) */
+	&do_compression,	/* 8 (protocol 29) */
 	NULL
 };
 
@@ -43,6 +46,7 @@ static char *flag_name[] = {
 	"--hard-links (-H)",
 	"--checksum (-c)",
 	"--dirs (-d)",
+	"--compress (-z)",
 	NULL
 };
 
@@ -52,6 +56,8 @@ void write_stream_flags(int fd)
 
 	/* Start the batch file with a bitmap of data-stream-affecting
 	 * flags. */
+	if (protocol_version < 29)
+		flag_ptr[7] = NULL;
 	for (i = 0, flags = 0; flag_ptr[i]; i++) {
 		if (*flag_ptr[i])
 			flags |= 1 << i;
@@ -64,7 +70,7 @@ void read_stream_flags(int fd)
 	int i, flags;
 
 	if (protocol_version < 29)
-		xfer_dirs = 0;
+		flag_ptr[7] = NULL;
 	for (i = 0, flags = read_int(fd); flag_ptr[i]; i++) {
 		int set = flags & (1 << i) ? 1 : 0;
 		if (*flag_ptr[i] != set) {
@@ -76,8 +82,12 @@ void read_stream_flags(int fd)
 			*flag_ptr[i] = set;
 		}
 	}
-	if (protocol_version < 29)
-		xfer_dirs = recurse ? 1 : 0;
+	if (protocol_version < 29) {
+		if (recurse)
+			xfer_dirs |= 1;
+		else if (xfer_dirs < 2)
+			xfer_dirs = 0;
+	}
 }
 
 static void write_arg(int fd, char *arg)
