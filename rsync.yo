@@ -504,7 +504,13 @@ dit(bf(-l, --links)) When symlinks are encountered, recreate the
 symlink on the destination.
 
 dit(bf(-L, --copy-links)) When symlinks are encountered, the file that
-they point to (the referent) is copied, rather than the symlink.
+they point to (the referent) is copied, rather than the symlink.  In older
+versions of rsync, this option also had the side-effect of telling the
+receiving side to follow symlinks, such as symlinks to directories.  In a
+modern rsync such as this one, you'll need to specify --keep-dirlinks (-K)
+to get this extra behavior.  The only exception is when sending files to
+an rsync that is too old to understand -K -- in that case, the -L option
+will still have the side-effect of -K on that older receiving rsync.
 
 dit(bf(--copy-unsafe-links)) This tells rsync to copy the referent of
 symbolic links that point outside the copied tree.  Absolute symlinks
