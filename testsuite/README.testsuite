@@ -10,9 +10,11 @@ you do not need to do "make install" first.  Indeed, you probably
 should not install rsync before running the tests.
 
 If you instead type "make installcheck" then the suite will test the
-rsync binary found on the path.  You can use this to test a
-distribution build, or perhaps by setting $PATH to run a new test
-suite against an old version of rsync.
+rsync binary from its installed location (e.g. /usr/local/bin/rsync).
+You can use this to test a distribution build, or perhaps to run a new
+test suite against an old version of rsync.  Note that in accordance
+with the GNU Standards, installcheck does not look for rsync on the
+path.
 
 If the tests pass, you should see a report to that effect.  Some tests
 require being root or some other precondition, and so will normally be
