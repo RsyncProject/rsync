@@ -23,7 +23,20 @@ if ! [ "`ssh -o'BatchMode yes' localhost echo yes`" = "yes" ]; then
     test_skipped "Skipping SSH tests because ssh conection to localhost not authorised"
 fi
 
+# Added by Steve Bonds Feb 2 2003
+# Without this, there are no files in the ${FROM} directory, so rsync has
+# nothing to do.
+hands_setup
+
 runtest "ssh: basic test" 'checkit "$RSYNC -avH -e ssh --rsync-path=$RSYNC ${FROM}/ localhost:${TO}" ${FROM}/ ${TO}'
+
+# Added by Steve Bonds Feb 2 2003
+# I assumed that "F1" was intended to hold a single file for testing if
+# rsync could detect a renamed file over ssh.  Without this line below
+# it was unset so the "mv" tried to move a parent directory into a
+# subdirectory of itself.  There is probably a better way of pulling out
+# a sample file to rename.
+F1=`ls ${TO} | head -5 | tail -1`
 
 mv ${TO}/${F1} ${TO}/ThisShouldGo
 
