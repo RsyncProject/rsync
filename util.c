@@ -362,8 +362,8 @@ int robust_unlink(char *fname)
 #endif
 }
 
-/* Returns 0 on success, -1 on most errors, and -2 if we got an error
- * trying to copy the file across file systems. */
+/* Returns 0 on successful rename, 1 if we successfully copied the file
+ * across filesystems, -2 if copy_file() failed, and -1 on other errors. */
 int robust_rename(char *from, char *to, int mode)
 {
 	int tries = 4;
@@ -383,7 +383,7 @@ int robust_rename(char *from, char *to, int mode)
 			if (copy_file(from, to, mode) != 0)
 				return -2;
 			do_unlink(from);
-			return 0;
+			return 1;
 		default:
 			return -1;
 		}
