@@ -941,3 +941,35 @@ void wait_process(pid_t pid, int *status)
 	waitpid(pid, status, 0);
 	*status = WEXITSTATUS(*status);
 }
+
+
+#ifdef __INSURE__
+#include <dlfcn.h>
+
+/*******************************************************************
+This routine is a trick to immediately catch errors when debugging
+with insure. A xterm with a gdb is popped up when insure catches
+a error. It is Linux specific.
+********************************************************************/
+int _Insure_trap_error(int a1, int a2, int a3, int a4, int a5, int a6)
+{
+	static int (*fn)();
+	int ret;
+	char cmd[1024];
+
+	sprintf(cmd, "/usr/X11R6/bin/xterm -display :0 -T Panic -n Panic -e /bin/sh -c 'cat /tmp/ierrs.*.%d ; gdb /proc/%d/exe %d'", 
+		getpid(), getpid(), getpid());
+
+	if (!fn) {
+		static void *h;
+		h = dlopen("/usr/local/parasoft/insure++lite/lib.linux2/libinsure.so", RTLD_LAZY);
+		fn = dlsym(h, "_Insure_trap_error");
+	}
+
+	ret = fn(a1, a2, a3, a4, a5, a6);
+
+	system(cmd);
+
+	return ret;
+}
+#endif
