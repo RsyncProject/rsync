@@ -85,10 +85,9 @@ static void report(int f)
 	extern int remote_version;
 	int send_stats;
 
-	if (do_stats) {
+	if (do_stats && verbose > 1) {
 		/* These come out from every process */
-		if (verbose > 1)
-			show_malloc_stats();
+		show_malloc_stats();
 		show_flist_stats();
 	}
 
