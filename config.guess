@@ -977,6 +977,9 @@ EOF
     *:QNX:*:4*)
 	echo i386-qnx-qnx${UNAME_VERSION}
 	exit 0 ;;
+    *:"Mac OS":*:*)
+        echo `uname -p`-apple-macos${UNAME_RELEASE}
+        exit 0 ;;
 esac
 
 #echo '(No uname command or uname output not recognized.)' 1>&2
