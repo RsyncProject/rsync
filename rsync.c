@@ -242,7 +242,8 @@ int make_backup(char *fname)
 
 	slprintf(fnamebak,sizeof(fnamebak),"%s%s",fname,backup_suffix);
 	if (do_rename(fname,fnamebak) != 0) {
-		if (errno != ENOENT) {
+		/* cygwin (at least version b19) reports EINVAL */
+		if (errno != ENOENT && errno != EINVAL) {
 			rprintf(FERROR,"rename %s %s : %s\n",fname,fnamebak,strerror(errno));
 			return 0;
 		}
