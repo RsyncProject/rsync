@@ -85,11 +85,9 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 
 #include "config.h"
 
-#if HAVE_REMSH
-#define RSYNC_RSH "remsh"
-#else
-#define RSYNC_RSH "rsh"
-#endif
+/* The default RSYNC_RSH is always set in config.h, either to "remsh",
+ * "rsh", or otherwise something specified by the user.  HAVE_REMSH
+ * controls parameter munging for HP/UX, etc. */
 
 #include <sys/types.h>
 

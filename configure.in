@@ -5,7 +5,7 @@ AC_CONFIG_SRCDIR([byteorder.h])
 AC_CONFIG_HEADER(config.h)
 AC_PREREQ(2.52)
 
-RSYNC_VERSION=2.5.2
+RSYNC_VERSION=2.5.3pre
 AC_SUBST(RSYNC_VERSION)
 AC_MSG_NOTICE([Configuring rsync $RSYNC_VERSION])
 
@@ -82,11 +82,26 @@ AC_ARG_WITH(rsync-path,
 	[  --with-rsync-path=PATH  set default --rsync-path to PATH (default: \"rsync\")],
 	[ RSYNC_PATH="$with_rsync_path" ],
 	[ RSYNC_PATH="rsync" ])
-AC_DEFINE_UNQUOTED(RSYNC_PATH, "$RSYNC_PATH", [ ])
+
+AC_DEFINE_UNQUOTED(RSYNC_PATH, "$RSYNC_PATH", [location of rsync on remote machine])
+
+AC_ARG_WITH(rsh,
+	AC_HELP_STRING([--with-rsh=CMD], [set rsh command to CMD (default: \"remsh\" or \"rsh\")]))
 
 AC_CHECK_PROG(HAVE_REMSH, remsh, 1, 0)
-AC_DEFINE_UNQUOTED(HAVE_REMSH, $HAVE_REMSH, [ ])
+AC_DEFINE_UNQUOTED(HAVE_REMSH, $HAVE_REMSH, [remote shell is remsh not rsh])
 
+if test x"$with_rsh" != x
+then
+	RSYNC_RSH="$with_rsh"
+elif test x"$HAVE_REMSH" = x1
+then 
+	RSYNC_RSH="remsh"
+else
+	RSYNC_RSH="rsh"
+fi
+
+AC_DEFINE_UNQUOTED(RSYNC_RSH, "$RSYNC_RSH", [default -e command])
 
 # arrgh. libc in the current debian stable screws up the largefile
 # stuff, getting byte range locking wrong
