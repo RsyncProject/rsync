@@ -59,7 +59,7 @@ echo no)
 echo $ac_n "checking for off64_t ... $ac_c"
 AC_TRY_RUN([#include <stdio.h>
 #include <sys/stat.h>
-main() { struct stat64 st; off64_t s; exit((lstat64("/dev/null", &st)==0)?0:1); }],
+main() { struct stat64 st; off64_t s; if (sizeof(off_t) == sizeof(off64_t)) return 1; exit((lstat64("/dev/null", &st)==0)?0:1); }],
 echo yes;AC_DEFINE(HAVE_OFF64_T), 
 echo no)
 
