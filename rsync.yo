@@ -404,6 +404,7 @@ verb(
      --config=FILE           specify alternate rsyncd.conf file
      --no-detach             do not detach from the parent
      --port=PORT             listen on alternate port number
+ -v, --verbose               increase verbosity
  -4  --ipv4                  prefer IPv4
  -6  --ipv6                  prefer IPv6
  -h, --help                  show this help screen
@@ -1195,6 +1196,11 @@ sshd.
 dit(bf(--port=PORT)) This specifies an alternate TCP port number for the
 daemon to listen on rather than the default of 873.  See also the "port"
 global option in the rsyncd.conf manpage.
+
+dit(bf(-v, --verbose)) This option increases the amount of information the
+daemon logs during its startup phase.  After the client connects, the
+daemon's verbosity level will be controlled by the options that the client
+used and the "max verbosity" setting in the module's config section.
 
 dit(bf(-4, --ipv4) or bf(-6, --ipv6)) Tells rsync to prefer IPv4/IPv6
 when creating the incoming sockets that the rsync daemon will use to
