@@ -267,15 +267,20 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 
 #if HAVE_OFF64_T
 #define int64 off64_t
+#define uint64 unsigned off64_t
 #elif (SIZEOF_LONG == 8) 
 #define int64 long
+#define uint64 unigned long
 #elif (SIZEOF_INT == 8) 
 #define int64 int
+#define uint64 unsigned int
 #elif HAVE_LONGLONG
 #define int64 long long
+#define uint64 unsigned long long
 #else
 /* As long as it gets... */
 #define int64 off_t
+#define uint64 unsigned off_t
 #define NO_INT64
 #endif
 
@@ -310,8 +315,8 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
  * cope with platforms on which this is an unsigned int or even a
  * struct.  Later.
  */ 
-#define INO64_T int64
-#define DEV64_T int64
+#define INO64_T uint64
+#define DEV64_T uint64
 
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
