@@ -45,7 +45,7 @@ int hlink_count;
 		    && (p1)->F_INODE == (p2)->F_INODE)
 
 /* Analyze the data in the hlink_list[], remove items that aren't multiply
- * linked, and replace the dev+inode data with the head+next linked list. */
+ * linked, and replace the dev+inode data with the hlindex+next linked list. */
 static void link_idev_data(void)
 {
 	struct file_struct *head;
