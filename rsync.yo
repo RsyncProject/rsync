@@ -356,7 +356,8 @@ verb(
      --modify-window=NUM     compare mod times with reduced accuracy
  -T  --temp-dir=DIR          create temporary files in directory DIR
      --compare-dest=DIR      also compare received files relative to DIR
-     --link-dest=DIR         create hardlinks to DIR for unchanged files
+     --copy-dest=DIR         ... and include copies of unchanged files
+     --link-dest=DIR         hardlink to files in DIR when unchanged
  -P                          equivalent to --partial --progress
  -z, --compress              compress file data
  -C, --cvs-exclude           auto ignore files in the same way CVS does
@@ -534,7 +535,7 @@ or appended data, and also on systems that are disk bound, not network
 bound.
 
 The option implies --partial (since an interrupted transfer does not delete
-the file), but conflicts with --partial-dir, --compare-dest, and
+the file), but conflicts with --partial-dir, --compare-dest, --copy-dest, and
 --link-dest (a future rsync version will hopefully update the protocol to
 remove these restrictions).
 
@@ -808,31 +809,38 @@ scratch directory when creating temporary copies of the files
 transferred on the receiving side.  The default behavior is to create
 the temporary files in the receiving directory.
 
-dit(bf(--compare-dest=DIR)) This option instructs rsync to use DIR on
+dit(bf(--compare-dest=DIR)) This option instructs rsync to use em(DIR) on
 the destination machine as an additional directory to compare destination
 files against when doing transfers if the files are missing in the
-destination directory.  This is useful for doing transfers to a new
-destination while leaving existing files intact, and then doing a
-flash-cutover when all files have been successfully transferred (for
-example by moving directories around and removing the old directory,
-although this skips files that haven't changed; see also --link-dest).
-This option increases the usefulness of --partial because partially
-transferred files will remain in the new temporary destination until they
-have a chance to be completed.  If DIR is a relative path, it is relative
-to the destination directory.
+destination directory.  Files that are identical to one of the specified
+directories are not transferred.  This is useful for creating a sparse
+backup into a new hierarchy.  If em(DIR) is a relative path, it is relative
+to the destination directory.  See also --copy-dest and --link-dest.
 
-dit(bf(--link-dest=DIR)) This option behaves like bf(--compare-dest) but
-also will create hard links from em(DIR) to the destination directory for
-unchanged files.  Files with changed ownership or permissions will not be
-linked.
+dit(bf(--copy-dest=DIR)) This option behaves like bf(--compare-dest), but
+rsync will also copy unchanged files found in em(DIR) to the destination
+directory (using the data in the em(DIR) for an efficient copy).  This is
+useful for doing transfers to a new destination while leaving existing
+files intact, and then doing a flash-cutover when all files have been
+successfully transferred.  If em(DIR) is a relative path, it is relative to
+the destination directory.  See also --compare-dest and --link-dest.
+
+dit(bf(--link-dest=DIR)) This option behaves like bf(--copy-dest), but
+unchanged files are hard linked from em(DIR) to the destination directory
+(The files must be identical in ownership and permissions--if those items
+are being preserved--in order for the files to be linked together.  If
+em(DIR) is a relative path, it is relative to the destination directory.
 An example:
 
 verb(
     rsync -av --link-dest=$PWD/prior_dir host:src_dir/ new_dir/
 )
 
-Like bf(--compare-dest) if DIR is a relative path, it is relative to the
-destination directory.
+If more than one --link-dest option is specified, rsync will try to find an
+exact match to link with (searching the list in the order specified), and
+if not found, a basis file from one of the em(DIR)s will be selected to try
+to speed up the transfer.  See also --compare-dest and --copy-dest.
+
 Note that rsync versions prior to 2.6.1 had a bug that could prevent
 --link-dest from working properly for a non-root user when -o was specified
 (or implied by -a).  If the receiving rsync is not new enough, you can work
@@ -893,7 +901,7 @@ it is more desirable to keep partially transferred files. Using the
 make a subsequent transfer of the rest of the file much faster.
 
 dit(bf(--partial-dir=DIR)) Turns on --partial mode, but tells rsync to
-put a partially transferred file into DIR instead of writing out the
+put a partially transferred file into em(DIR) instead of writing out the
 file to the destination dir.  Rsync will also use a file found in this
 dir as data to speed up the transfer (i.e. when you redo the send after
 rsync creates a partial file) and delete such a file after it has served
@@ -904,7 +912,7 @@ rsync is sending files without using the incremental rsync algorithm).
 Rsync will create the dir if it is missing (just the last dir -- not the
 whole path).  This makes it easy to use a relative path (such as
 "--partial-dir=.rsync-partial") to have rsync create the partial-directory
-in the destination file's directory (rsync will also try to remove the DIR
+in the destination file's directory (rsync will also try to remove the em(DIR)
 if a partial file was found to exist at the start of the transfer and the
 DIR was specified as a relative path).
 
