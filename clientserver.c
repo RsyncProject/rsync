@@ -48,7 +48,7 @@ extern int orig_umask;
 extern int no_detach;
 extern int default_af_hint;
 extern char *bind_address;
-extern struct exclude_list_struct server_exclude_list;
+extern struct filter_list_struct server_filter_list;
 extern char *config_file;
 extern char *files_from;
 
@@ -314,31 +314,31 @@ static int rsync_module(int f_in, int f_out, int i)
 
 	if (use_chroot) {
 		module_dirlen = 0;
-		set_excludes_dir("/", 1);
+		set_filter_dir("/", 1);
 	} else {
 		module_dirlen = strlen(lp_path(i));
-		set_excludes_dir(lp_path(i), module_dirlen);
+		set_filter_dir(lp_path(i), module_dirlen);
 	}
 
 	p = lp_filter(i);
-	add_exclude(&server_exclude_list, p,
-		    XFLG_WORD_SPLIT | XFLG_ABS_PATH);
+	add_filter(&server_filter_list, p,
+		   XFLG_WORD_SPLIT | XFLG_ABS_PATH);
 
 	p = lp_include_from(i);
-	add_exclude_file(&server_exclude_list, p,
-			 XFLG_FATAL_ERRORS | XFLG_ABS_PATH | XFLG_DEF_INCLUDE);
+	add_filter_file(&server_filter_list, p,
+			XFLG_FATAL_ERRORS | XFLG_ABS_PATH | XFLG_DEF_INCLUDE);
 
 	p = lp_include(i);
-	add_exclude(&server_exclude_list, p,
-		    XFLG_WORD_SPLIT | XFLG_ABS_PATH | XFLG_DEF_INCLUDE);
+	add_filter(&server_filter_list, p,
+		   XFLG_WORD_SPLIT | XFLG_ABS_PATH | XFLG_DEF_INCLUDE);
 
 	p = lp_exclude_from(i);
-	add_exclude_file(&server_exclude_list, p,
-			 XFLG_FATAL_ERRORS | XFLG_ABS_PATH | XFLG_DEF_EXCLUDE);
+	add_filter_file(&server_filter_list, p,
+			XFLG_FATAL_ERRORS | XFLG_ABS_PATH | XFLG_DEF_EXCLUDE);
 
 	p = lp_exclude(i);
-	add_exclude(&server_exclude_list, p,
-		    XFLG_WORD_SPLIT | XFLG_ABS_PATH | XFLG_DEF_EXCLUDE);
+	add_filter(&server_filter_list, p,
+		   XFLG_WORD_SPLIT | XFLG_ABS_PATH | XFLG_DEF_EXCLUDE);
 
 	log_init();
 

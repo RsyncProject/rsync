@@ -70,8 +70,8 @@ extern int max_delete;
 extern int orig_umask;
 extern int list_only;
 
-extern struct exclude_list_struct exclude_list;
-extern struct exclude_list_struct server_exclude_list;
+extern struct filter_list_struct filter_list;
+extern struct filter_list_struct server_filter_list;
 
 int io_error;
 
@@ -220,15 +220,13 @@ int link_stat(const char *path, STRUCT_STAT *buffer, int follow_dirlinks)
 #endif
 }
 
-/*
- * This function is used to check if a file should be included/excluded
+/* This function is used to check if a file should be included/excluded
  * from the list of files based on its name and type etc.  The value of
- * exclude_level is set to either SERVER_EXCLUDES or ALL_EXCLUDES.
- */
-static int check_exclude_file(char *fname, int is_dir, int exclude_level)
+ * filter_level is set to either SERVER_FILTERS or ALL_FILTERS. */
+static int is_excluded(char *fname, int is_dir, int filter_level)
 {
 #if 0 /* This currently never happens, so avoid a useless compare. */
-	if (exclude_level == NO_EXCLUDES)
+	if (filter_level == NO_FILTERS)
 		return 0;
 #endif
 	if (fname) {
@@ -242,13 +240,13 @@ static int check_exclude_file(char *fname, int is_dir, int exclude_level)
 				return 0;
 		}
 	}
-	if (server_exclude_list.head
-	    && check_exclude(&server_exclude_list, fname, is_dir) < 0)
+	if (server_filter_list.head
+	    && check_filter(&server_filter_list, fname, is_dir) < 0)
 		return 1;
-	if (exclude_level != ALL_EXCLUDES)
+	if (filter_level != ALL_FILTERS)
 		return 0;
-	if (exclude_list.head
-	    && check_exclude(&exclude_list, fname, is_dir) < 0)
+	if (filter_list.head
+	    && check_filter(&filter_list, fname, is_dir) < 0)
 		return 1;
 	return 0;
 }
@@ -758,7 +756,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
  * important case.  Some systems may not have d_type.
  **/
 struct file_struct *make_file(char *fname, struct file_list *flist,
-			      int exclude_level)
+			      int filter_level)
 {
 	static char *lastdir;
 	static int lastdir_len = -1;
@@ -788,8 +786,8 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	if (readlink_stat(thisname, &st, linkname) != 0) {
 		int save_errno = errno;
 		/* See if file is excluded before reporting an error. */
-		if (exclude_level != NO_EXCLUDES
-		    && check_exclude_file(thisname, 0, exclude_level))
+		if (filter_level != NO_FILTERS
+		    && is_excluded(thisname, 0, filter_level))
 			return NULL;
 		if (save_errno == ENOENT) {
 #if SUPPORT_LINKS
@@ -816,9 +814,9 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 		return NULL;
 	}
 
-	/* backup.c calls us with exclude_level set to NO_EXCLUDES. */
-	if (exclude_level == NO_EXCLUDES)
-		goto skip_excludes;
+	/* backup.c calls us with filter_level set to NO_FILTERS. */
+	if (filter_level == NO_FILTERS)
+		goto skip_filters;
 
 	if (S_ISDIR(st.st_mode) && !xfer_dirs) {
 		rprintf(FINFO, "skipping directory %s\n", thisname);
@@ -832,7 +830,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	    && S_ISDIR(st.st_mode))
 		flags |= FLAG_MOUNT_POINT;
 
-	if (check_exclude_file(thisname, S_ISDIR(st.st_mode) != 0, exclude_level))
+	if (is_excluded(thisname, S_ISDIR(st.st_mode) != 0, filter_level))
 		return NULL;
 
 	if (lp_ignore_nonreadable(module_id)) {
@@ -843,11 +841,11 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 				return NULL;
 	}
 
-skip_excludes:
+skip_filters:
 
 	if (verbose > 2) {
 		rprintf(FINFO, "[%s] make_file(%s,*,%d)\n",
-			who_am_i(), thisname, exclude_level);
+			who_am_i(), thisname, filter_level);
 	}
 
 	if ((basename = strrchr(thisname, '/')) != NULL) {
@@ -983,7 +981,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 
 	/* f is set to -1 when calculating deletion file list */
 	file = make_file(fname, flist,
-	    f == -1 && delete_excluded? SERVER_EXCLUDES : ALL_EXCLUDES);
+	    f == -1 && delete_excluded? SERVER_FILTERS : ALL_FILTERS);
 
 	if (!file)
 		return;
@@ -1012,7 +1010,7 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 	struct dirent *di;
 	char fname[MAXPATHLEN];
 	unsigned int offset;
-	void *save_excludes;
+	void *save_filters;
 	char *p;
 
 	d = opendir(dir);
@@ -1036,7 +1034,7 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 		offset++;
 	}
 
-	save_excludes = push_local_excludes(fname, offset);
+	save_filters = push_local_filters(fname, offset);
 
 	for (errno = 0, di = readdir(d); di; errno = 0, di = readdir(d)) {
 		char *dname = d_name(di);
@@ -1058,7 +1056,7 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 		rsyserr(FERROR, errno, "readdir(%s)", dir);
 	}
 
-	pop_local_excludes(save_excludes);
+	pop_local_filters(save_filters);
 
 	closedir(d);
 }
@@ -1101,7 +1099,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			}
 			use_ff_fd = 1;
 			if (curr_dir_len < MAXPATHLEN - 1) {
-				push_local_excludes(curr_dir, curr_dir_len);
+				push_local_filters(curr_dir, curr_dir_len);
 				need_first_push = False;
 			}
 		}
@@ -1145,9 +1143,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (need_first_push) {
 			if ((p = strrchr(fname, '/')) != NULL) {
 				if (*++p && strcmp(p, ".") != 0)
-					push_local_excludes(fname, p - fname);
+					push_local_filters(fname, p - fname);
 			} else if (strcmp(fname, ".") != 0)
-				push_local_excludes(fname, 0);
+				push_local_filters(fname, 0);
 			need_first_push = False;
 		}
 

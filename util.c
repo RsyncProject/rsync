@@ -32,7 +32,7 @@ extern int dry_run;
 extern int module_id;
 extern int modify_window;
 extern char *partial_dir;
-extern struct exclude_list_struct server_exclude_list;
+extern struct filter_list_struct server_filter_list;
 
 int sanitize_paths = 0;
 
@@ -479,14 +479,14 @@ int lock_range(int fd, int offset, int len)
 	return fcntl(fd,F_SETLK,&lock) == 0;
 }
 
-static int exclude_server_path(char *arg)
+static int filter_server_path(char *arg)
 {
 	char *s;
 
-	if (server_exclude_list.head) {
+	if (server_filter_list.head) {
 		for (s = arg; (s = strchr(s, '/')) != NULL; ) {
 			*s = '\0';
-			if (check_exclude(&server_exclude_list, arg, 1) < 0) {
+			if (check_filter(&server_filter_list, arg, 1) < 0) {
 				/* We must leave arg truncated! */
 				return 1;
 			}
@@ -513,7 +513,7 @@ static void glob_expand_one(char *s, char ***argv_ptr, int *argc_ptr,
 	if (!*s)
 		s = ".";
 	s = argv[argc++] = strdup(s);
-	exclude_server_path(s);
+	filter_server_path(s);
 #else
 	glob_t globbuf;
 	int i;
@@ -529,7 +529,7 @@ static void glob_expand_one(char *s, char ***argv_ptr, int *argc_ptr,
 		s = strdup(s);
 
 	memset(&globbuf, 0, sizeof globbuf);
-	if (!exclude_server_path(s))
+	if (!filter_server_path(s))
 		glob(s, 0, NULL, &globbuf);
 	if (MAX((int)globbuf.gl_pathc, 1) > maxargs - argc) {
 		maxargs += globbuf.gl_pathc + MAX_ARGS;
@@ -966,8 +966,8 @@ char *partial_dir_fname(const char *fname)
 		fn = fname;
 	if ((int)pathjoin(t, sz, partial_dir, fn) >= sz)
 		return NULL;
-	if (server_exclude_list.head
-	    && check_exclude(&server_exclude_list, partial_fname, 0) < 0)
+	if (server_filter_list.head
+	    && check_filter(&server_filter_list, partial_fname, 0) < 0)
 		return NULL;
 
 	return partial_fname;

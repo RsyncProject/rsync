@@ -596,7 +596,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 
 	io_start_buffering_in();
 	if (delete_mode && !delete_excluded)
-		recv_exclude_list(f_in);
+		recv_filter_list(f_in);
 
 	if (filesfrom_fd >= 0) {
 		/* We need to send the files-from names to the sender at the
@@ -650,7 +650,7 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 	if (am_sender) {
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
 
-		recv_exclude_list(f_in);
+		recv_filter_list(f_in);
 		if (cvs_exclude)
 			add_cvs_excludes();
 		do_server_sender(f_in, f_out, argc, argv);
@@ -701,7 +701,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		if (cvs_exclude)
 			add_cvs_excludes();
 		if (delete_mode && !delete_excluded)
-			send_exclude_list(f_out);
+			send_filter_list(f_out);
 		if (remote_filesfrom_file)
 			filesfrom_fd = f_in;
 
@@ -735,7 +735,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		list_only |= 1;
 
 	if (!read_batch)
-		send_exclude_list(f_out);
+		send_filter_list(f_out);
 	if (cvs_exclude)
 		add_cvs_excludes();
 

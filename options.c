@@ -23,8 +23,8 @@
 
 extern int sanitize_paths;
 extern int select_timeout;
-extern struct exclude_list_struct exclude_list;
-extern struct exclude_list_struct server_exclude_list;
+extern struct filter_list_struct filter_list;
+extern struct filter_list_struct server_filter_list;
 
 int make_backups = 0;
 
@@ -643,17 +643,17 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			break;
 
 		case OPT_FILTER:
-			add_exclude(&exclude_list, poptGetOptArg(pc), 0);
+			add_filter(&filter_list, poptGetOptArg(pc), 0);
 			break;
 
 		case OPT_EXCLUDE:
-			add_exclude(&exclude_list, poptGetOptArg(pc),
-				    XFLG_DEF_EXCLUDE);
+			add_filter(&filter_list, poptGetOptArg(pc),
+				   XFLG_DEF_EXCLUDE);
 			break;
 
 		case OPT_INCLUDE:
-			add_exclude(&exclude_list, poptGetOptArg(pc),
-				    XFLG_DEF_INCLUDE);
+			add_filter(&filter_list, poptGetOptArg(pc),
+				   XFLG_DEF_INCLUDE);
 			break;
 
 		case OPT_EXCLUDE_FROM:
@@ -661,13 +661,13 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			arg = poptGetOptArg(pc);
 			if (sanitize_paths)
 				arg = sanitize_path(NULL, arg, NULL, 0);
-			if (server_exclude_list.head) {
+			if (server_filter_list.head) {
 				char *cp = (char *)arg;
 				clean_fname(cp, 1);
-				if (check_exclude(&server_exclude_list, cp, 0) < 0)
+				if (check_filter(&server_filter_list, cp, 0) < 0)
 					goto options_rejected;
 			}
-			add_exclude_file(&exclude_list, arg, XFLG_FATAL_ERRORS
+			add_filter_file(&filter_list, arg, XFLG_FATAL_ERRORS
 				| (opt == OPT_INCLUDE_FROM ? XFLG_DEF_INCLUDE
 							   : XFLG_DEF_EXCLUDE));
 			break;
@@ -696,11 +696,11 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		case 'F':
 			switch (++F_option_cnt) {
 			case 1:
-				add_exclude(&exclude_list,
+				add_filter(&filter_list,
 					    ": /.rsync-filter", 0);
 				break;
 			case 2:
-				add_exclude(&exclude_list,
+				add_filter(&filter_list,
 				 	    "- .rsync-filter", 0);
 				break;
 			}
@@ -921,33 +921,33 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		if (files_from)
 			files_from = sanitize_path(NULL, files_from, NULL, 0);
 	}
-	if (server_exclude_list.head && !am_sender) {
-		struct exclude_list_struct *elp = &server_exclude_list;
+	if (server_filter_list.head && !am_sender) {
+		struct filter_list_struct *elp = &server_filter_list;
 		int i;
 		if (tmpdir) {
 			clean_fname(tmpdir, 1);
-			if (check_exclude(elp, tmpdir, 1) < 0)
+			if (check_filter(elp, tmpdir, 1) < 0)
 				goto options_rejected;
 		}
 		if (partial_dir) {
 			clean_fname(partial_dir, 1);
-			if (check_exclude(elp, partial_dir, 1) < 0)
+			if (check_filter(elp, partial_dir, 1) < 0)
 				goto options_rejected;
 		}
 		for (i = 0; i < basis_dir_cnt; i++) {
 			clean_fname(basis_dir[i], 1);
-			if (check_exclude(elp, basis_dir[i], 1) < 0)
+			if (check_filter(elp, basis_dir[i], 1) < 0)
 				goto options_rejected;
 		}
 		if (backup_dir) {
 			clean_fname(backup_dir, 1);
-			if (check_exclude(elp, backup_dir, 1) < 0)
+			if (check_filter(elp, backup_dir, 1) < 0)
 				goto options_rejected;
 		}
 	}
-	if (server_exclude_list.head && files_from) {
+	if (server_filter_list.head && files_from) {
 		clean_fname(files_from, 1);
-		if (check_exclude(&server_exclude_list, files_from, 0) < 0) {
+		if (check_filter(&server_filter_list, files_from, 0) < 0) {
 		    options_rejected:
 			snprintf(err_buf, sizeof err_buf,
 			    "Your options have been rejected by the server.\n");
@@ -1016,7 +1016,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			if (!*partial_dir || strcmp(partial_dir, ".") == 0)
 				partial_dir = NULL;
 			else if (*partial_dir != '/') {
-				add_exclude(&exclude_list, partial_dir,
+				add_filter(&filter_list, partial_dir,
 					    XFLG_DIRECTORY | XFLG_DEF_EXCLUDE);
 			}
 			keep_partial = 1;

@@ -165,7 +165,7 @@ static int keep_backup(char *fname)
 	if (do_lstat(fname, &st) < 0)
 		return 1;
 
-	if (!(file = make_file(fname, NULL, NO_EXCLUDES)))
+	if (!(file = make_file(fname, NULL, NO_FILTERS)))
 		return 1; /* the file could have disappeared */
 
 	if (!(buf = get_backup_name(fname)))

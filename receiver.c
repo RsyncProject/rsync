@@ -49,7 +49,7 @@ extern int keep_partial;
 extern int checksum_seed;
 extern int inplace;
 
-extern struct exclude_list_struct server_exclude_list;
+extern struct filter_list_struct server_filter_list;
 
 
 /* This deletes any files on the receiving side that are not present on the
@@ -360,8 +360,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 			next_gen_i = -1;
 		}
 
-		if (server_exclude_list.head
-		    && check_exclude(&server_exclude_list, fname,
+		if (server_filter_list.head
+		    && check_filter(&server_filter_list, fname,
 				     S_ISDIR(file->mode)) < 0) {
 			rprintf(FERROR, "attempt to hack rsync failed.\n");
 			exit_cleanup(RERR_PROTOCOL);

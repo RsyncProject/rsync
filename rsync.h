@@ -103,9 +103,9 @@
 
 #define MPLEX_BASE 7
 
-#define NO_EXCLUDES	0
-#define SERVER_EXCLUDES	1
-#define ALL_EXCLUDES	2
+#define NO_FILTERS	0
+#define SERVER_FILTERS	1
+#define ALL_FILTERS	2
 
 #define XFLG_FATAL_ERRORS	(1<<0)
 #define XFLG_DEF_INCLUDE	(1<<1)
@@ -516,19 +516,19 @@ struct map_struct {
 #define MATCHFLG_PERDIR_MERGE	(1<<11)/* merge-file is searched per-dir */
 #define MATCHFLG_EXCLUDE_SELF	(1<<12)/* merge-file name should be excluded */
 #define MATCHFLG_FINISH_SETUP	(1<<13)/* per-dir merge file needs setup */
-struct exclude_struct {
-	struct exclude_struct *next;
+struct filter_struct {
+	struct filter_struct *next;
 	char *pattern;
 	unsigned int match_flags;
 	union {
 		int slash_cnt;
-		struct exclude_list_struct *mergelist;
+		struct filter_list_struct *mergelist;
 	} u;
 };
 
-struct exclude_list_struct {
-	struct exclude_struct *head;
-	struct exclude_struct *tail;
+struct filter_list_struct {
+	struct filter_struct *head;
+	struct filter_struct *tail;
 	char *debug_type;
 };
 

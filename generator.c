@@ -61,7 +61,7 @@ extern int orig_umask;
 extern int safe_symlinks;
 extern long block_size; /* "long" because popt can't set an int32. */
 
-extern struct exclude_list_struct server_exclude_list;
+extern struct filter_list_struct server_filter_list;
 
 static int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
 {
@@ -254,9 +254,9 @@ static void recv_generator(char *fname, struct file_list *flist,
 	if (verbose > 2)
 		rprintf(FINFO, "recv_generator(%s,%d)\n", safe_fname(fname), i);
 
-	if (server_exclude_list.head
-	    && check_exclude(&server_exclude_list, fname,
-			     S_ISDIR(file->mode)) < 0) {
+	if (server_filter_list.head
+	    && check_filter(&server_filter_list, fname,
+			    S_ISDIR(file->mode)) < 0) {
 		if (verbose) {
 			rprintf(FINFO, "skipping server-excluded file \"%s\"\n",
 				safe_fname(fname));
@@ -547,7 +547,7 @@ prepare_to_open:
 			close(fd);
 			return;
 		}
-		if (!(back_file = make_file(fname, NULL, NO_EXCLUDES))) {
+		if (!(back_file = make_file(fname, NULL, NO_FILTERS))) {
 			close(fd);
 			goto pretend_missing;
 		}

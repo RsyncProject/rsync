@@ -18,7 +18,7 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int always_checksum;
 
-extern struct exclude_list_struct exclude_list;
+extern struct filter_list_struct filter_list;
 
 static int *flag_ptr[] = {
 	&recurse,
@@ -95,12 +95,12 @@ static void write_arg(int fd, char *arg)
 	write(fd, arg, strlen(arg));
 }
 
-static void write_excludes(int fd)
+static void write_filters(int fd)
 {
-	struct exclude_struct *ent;
+	struct filter_struct *ent;
 
 	write_sbuf(fd, " <<'#E#'\n");
-	for (ent = exclude_list.head; ent; ent = ent->next) {
+	for (ent = filter_list.head; ent; ent = ent->next) {
 		char *p = ent->pattern;
 		if (ent->match_flags & MATCHFLG_INCLUDE)
 			write_buf(fd, "+ ", 2);
@@ -138,7 +138,7 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 
 	/* Write argvs info to BATCH.sh file */
 	write_arg(fd, argv[0]);
-	if (exclude_list.head)
+	if (filter_list.head)
 		write_sbuf(fd, " --exclude-from=-");
 	for (i = 1; i < argc - file_arg_cnt; i++) {
 		p = argv[i];
@@ -167,8 +167,8 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 	write(fd, " ${1:-", 6);
 	write_arg(fd, p);
 	write_byte(fd, '}');
-	if (exclude_list.head)
-		write_excludes(fd);
+	if (filter_list.head)
+		write_filters(fd);
 	if (write(fd, "\n", 1) != 1 || close(fd) < 0) {
 		rsyserr(FERROR, errno, "Batch file %s write error", filename);
 		exit_cleanup(1);
