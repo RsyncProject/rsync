@@ -891,7 +891,7 @@ const char *safe_fname(const char *fname)
 
 	ndx = (ndx + 1) % MAX_SAFE_NAMES;
 	for (t = fbuf[ndx]; *fname; fname++) {
-		if (!isprint(*fname))
+		if (!isprint(*(uchar*)fname))
 			*t++ = '?';
 		else
 			*t++ = *fname;
@@ -1262,7 +1262,7 @@ const char *find_filename_suffix(const char *fn, int fn_len, int *len_ptr)
 			if (strcmp(s+1, "orig") == 0)
 				continue;
 		} else if (s_len > 2 && had_tilde
-		    && s[1] == '~' && isdigit(s[2]))
+		    && s[1] == '~' && isdigit(*(uchar*)(s+2)))
 			continue;
 		*len_ptr = s_len;
 		suf = s;
@@ -1270,7 +1270,7 @@ const char *find_filename_suffix(const char *fn, int fn_len, int *len_ptr)
 			break;
 		/* Determine if the suffix is all digits. */
 		for (s++, s_len--; s_len > 0; s++, s_len--) {
-			if (!isdigit(*s))
+			if (!isdigit(*(uchar*)s))
 				return suf;
 		}
 		/* An all-digit suffix may not be that signficant. */
