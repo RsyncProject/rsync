@@ -264,7 +264,7 @@ void send_exclude_list(int f)
 		if (exclude_list[i]->include) {
 			if (remote_version < 19) {
 				rprintf(FERROR,"remote rsync does not support include syntax - aborting\n");
-				exit_cleanup(RERR_NOSUPPORT);
+				exit_cleanup(RERR_UNSUPPORTED);
 			}
 			write_int(f,l+2);
 			write_buf(f,"+ ",2);

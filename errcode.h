@@ -3,7 +3,7 @@
 #define RERR_SYNTAX     1       /* syntax or usage error */
 #define RERR_PROTOCOL   2       /* protocol incompatibility */
 #define RERR_FILESELECT 3       /* errors selecting input/output files, dirs */
-#define RERR_NOSUPPORT  4       /* requested action not supported */
+#define RERR_UNSUPPORTED 4       /* requested action not supported */
 
 #define RERR_SOCKETIO   10      /* error in socket IO */
 #define RERR_FILEIO     11      /* error in file IO */
