@@ -70,8 +70,8 @@ static struct sum_struct *receive_sums(int f)
 		offset += s->sums[i].len;
 
 		if (verbose > 3)
-			rprintf(FINFO,"chunk[%d] len=%d offset=%d sum1=%08x\n",
-				i,s->sums[i].len,(int)s->sums[i].offset,s->sums[i].sum1);
+			rprintf(FINFO,"chunk[%d] len=%d offset=%.0f sum1=%08x\n",
+				i,s->sums[i].len,(double)s->sums[i].offset,s->sums[i].sum1);
 	}
 
 	s->flength = offset;
@@ -185,8 +185,8 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 		}
 	  
 		if (verbose > 2)
-			rprintf(FINFO,"send_files mapped %s of size %d\n",
-				fname,(int)st.st_size);
+			rprintf(FINFO,"send_files mapped %s of size %.0f\n",
+				fname,(double)st.st_size);
 
 		write_int(f_out,i);
 	  

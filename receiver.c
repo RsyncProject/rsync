@@ -225,8 +225,8 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 			extern int cleanup_got_literal;
 
 			if (verbose > 3) {
-				rprintf(FINFO,"data recv %d at %d\n",
-					i,(int)offset);
+				rprintf(FINFO,"data recv %d at %.0f\n",
+					i,(double)offset);
 			}
 
 			stats.literal_data += i;
@@ -243,7 +243,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 		} 
 
 		i = -(i+1);
-		offset2 = i*n;
+		offset2 = i*(OFF_T)n;
 		len = n;
 		if (i == count-1 && remainder != 0)
 			len = remainder;
@@ -251,8 +251,8 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 		stats.matched_data += len;
 		
 		if (verbose > 3)
-			rprintf(FINFO,"chunk[%d] of size %d at %d offset=%d\n",
-				i,len,(int)offset2,(int)offset);
+			rprintf(FINFO,"chunk[%d] of size %d at %.0f offset=%.0f\n",
+				i,len,(double)offset2,(double)offset);
 		
 		map = map_ptr(buf,offset2,len);
 		
@@ -400,7 +400,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		if (fd1 != -1 && st.st_size > 0) {
 			buf = map_file(fd1,st.st_size);
 			if (verbose > 2)
-				rprintf(FINFO,"recv mapped %s of size %d\n",fnamecmp,(int)st.st_size);
+				rprintf(FINFO,"recv mapped %s of size %.0f\n",fnamecmp,(double)st.st_size);
 		} else {
 			buf = NULL;
 		}

@@ -136,8 +136,8 @@ static struct sum_struct *generate_sums(struct map_struct *buf,OFF_T len,int n)
 	}
 
 	if (verbose > 3)
-		rprintf(FINFO,"count=%d rem=%d n=%d flength=%d\n",
-			s->count,s->remainder,s->n,(int)s->flength);
+		rprintf(FINFO,"count=%d rem=%d n=%d flength=%.0f\n",
+			s->count,s->remainder,s->n,(double)s->flength);
 
 	s->sums = (struct sum_buf *)malloc(sizeof(s->sums[0])*s->count);
 	if (!s->sums) out_of_memory("generate_sums");
@@ -154,8 +154,8 @@ static struct sum_struct *generate_sums(struct map_struct *buf,OFF_T len,int n)
 		s->sums[i].i = i;
 
 		if (verbose > 3)
-			rprintf(FINFO,"chunk[%d] offset=%d len=%d sum1=%08x\n",
-				i,(int)s->sums[i].offset,s->sums[i].len,s->sums[i].sum1);
+			rprintf(FINFO,"chunk[%d] offset=%.0f len=%d sum1=%08x\n",
+				i,(double)s->sums[i].offset,s->sums[i].len,s->sums[i].sum1);
 
 		len -= n1;
 		offset += n1;
@@ -374,7 +374,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 	}
 
 	if (verbose > 3)
-		rprintf(FINFO,"gen mapped %s of size %d\n",fnamecmp,(int)st.st_size);
+		rprintf(FINFO,"gen mapped %s of size %.0f\n",fnamecmp,(double)st.st_size);
 
 	s = generate_sums(buf,st.st_size,adapt_block_size(file, block_size));
 
