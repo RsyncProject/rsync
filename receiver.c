@@ -422,7 +422,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 				      file->mode & ACCESSPERMS);
 		}
 		if (fd2 == -1) {
-			rprintf(FERROR,"open %s : %s\n",fnametmp,strerror(errno));
+			rprintf(FERROR,"cannot create %s : %s\n",fnametmp,strerror(errno));
 			receive_data(f_in,buf,-1,NULL,file->length);
 			if (buf) unmap_file(buf);
 			if (fd1 != -1) close(fd1);
