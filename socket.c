@@ -271,7 +271,7 @@ void start_accept_loop(int port, int (*fn)(int ))
 		fd_set fds;
 		int fd;
 		struct sockaddr addr;
-		int in_addrlen = sizeof(addr);
+		socklen_t in_addrlen = sizeof(addr);
 
 		/* close log file before the potentially very long select so
 		   file can be trimmed by another process instead of growing
@@ -288,7 +288,7 @@ void start_accept_loop(int port, int (*fn)(int ))
 		if(!FD_ISSET(s, &fds)) continue;
 
                 /* See note above prototypes. */
-		fd = accept(s,&addr,&in_addrlen);
+		fd = accept(s,&addr, &in_addrlen);
 
 		if (fd == -1) continue;
 
@@ -482,7 +482,7 @@ char *client_name(int fd)
 {
 	struct sockaddr sa;
 	struct sockaddr_in *sockin = (struct sockaddr_in *) (&sa);
-	int     length = sizeof(sa);
+	socklen_t length = sizeof(sa);
 	static char name_buf[100];
 	struct hostent *hp;
 	char **p;
