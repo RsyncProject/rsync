@@ -142,12 +142,22 @@ path, and leading slashes are removed from absolute paths.  The default for
 "use chroot" is true.
 
 In order to preserve usernames and groupnames, rsync needs to be able to
-lookup the IDs using getpuid() and getpgid().  This means that the chroot
-area will need to have copies of your user/group information (edited, if
-desired) inside the chroot tree for rsync to use (the traditional files
-are /etc/passwd and /etc/group).  If the needed files are not available,
-rsync will only be able to copy the IDs, just as if the --numeric-ids
-option had been specified.
+use the standard library functions for looking up names and IDs (i.e.
+getpwuid(), getgrgid(), getpwname(), and getgrnam()).  This means a
+process in the chroot namespace will need to have access to the resources
+used by these library functions (traditionally /etc/passwd and
+/etc/group).  If these resources are not available, rsync will only be
+able to copy the IDs, just as if the --numeric-ids option had been
+specified.
+
+Note that you are free to setup user/group information in the chroot area
+differently from your normal system.  For example, you could abbreviate
+the list of users and groups.  Also, you can protect this information
+from being downloaded by adding an exclude rule to the rsync.conf file
+(e.g. "exclude = /etc/").  To protect it from being changed by an upload
+(if the module is not read only), be sure to set the permissions (or
+owner) on the files and/or parent directories so that they cannot be
+written by the daemon.
 
 dit(bf(max connections)) The "max connections" option allows you to
 specify the maximum number of simultaneous connections you will allow.
