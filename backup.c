@@ -156,7 +156,7 @@ static int robust_move(char *src, char *dst)
 					break;
 				/* no directory to write to */
 				case ENOENT:
-					make_dir (dst, 0755);
+					make_dir(dst, 0700);
 					keep_trying--;
 					break;
 				default:
