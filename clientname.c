@@ -130,7 +130,7 @@ char *client_name(int fd)
 			ssp = (struct sockaddr_storage *) &sin6;
 			ss_len = sizeof sin6;
 			memset(ssp, 0, ss_len);
-			inet_pton(AF_INET6, addr, &sin6.sin6_addr.s6_addr);
+			inet_pton(AF_INET6, addr, &sin6.sin6_addr);
 			sin6.sin6_family = AF_INET6;
 		} else
 #endif
@@ -138,7 +138,7 @@ char *client_name(int fd)
 			ssp = (struct sockaddr_storage *) &sin;
 			ss_len = sizeof sin;
 			memset(ssp, 0, ss_len);
-			inet_pton(AF_INET, addr, &sin.sin_addr.s_addr);
+			inet_pton(AF_INET, addr, &sin.sin_addr);
 			sin.sin_family = AF_INET;
 		}
 
