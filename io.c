@@ -679,8 +679,9 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 		case MSG_INFO:
 		case MSG_ERROR:
 			if (remaining >= sizeof line) {
-				rprintf(FERROR, "multiplexing overflow %d:%ld\n\n",
-					tag, (long)remaining);
+				rprintf(FERROR,
+					"[%s] multiplexing overflow %d:%ld\n\n",
+					who_am_i(), tag, (long)remaining);
 				exit_cleanup(RERR_STREAMIO);
 			}
 			read_loop(fd, line, remaining);
@@ -688,7 +689,8 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 			remaining = 0;
 			break;
 		default:
-			rprintf(FERROR, "unexpected tag %d\n", tag);
+			rprintf(FERROR, "[%s] unexpected tag %d\n",
+				who_am_i(), tag);
 			exit_cleanup(RERR_STREAMIO);
 		}
 	}
