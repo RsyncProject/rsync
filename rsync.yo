@@ -126,7 +126,7 @@ quote(rsync -avz foo:src/bar /data/tmp)
 This would recursively transfer all files from the directory src/bar on the
 machine foo into the /data/tmp/bar directory on the local machine. The
 files are transferred in "archive" mode, which ensures that symbolic
-links, devices, attributes, permissions, ownerships etc are preserved
+links, devices, attributes, permissions, ownerships, etc. are preserved
 in the transfer.  Additionally, compression will be used to reduce the
 size of data portions of the transfer.
 
@@ -312,12 +312,12 @@ verb(
      --delete                delete files that don't exist on sender
      --delete-excluded       also delete excluded files on receiver
      --delete-after          receiver deletes after transfer, not before
-     --ignore-errors         delete even if there are IO errors
+     --ignore-errors         delete even if there are I/O errors
      --max-delete=NUM        don't delete more than NUM files
      --partial               keep partially transferred files
      --force                 force deletion of dirs even if not empty
      --numeric-ids           don't map uid/gid values by user/group name
-     --timeout=TIME          set IO timeout in seconds
+     --timeout=TIME          set I/O timeout in seconds
  -I, --ignore-times          turn off mod time & file size quick check
      --size-only             ignore mod time for quick check (use size)
      --modify-window=NUM     compare mod times with reduced accuracy
@@ -339,7 +339,7 @@ verb(
      --address=ADDRESS       bind to the specified address
      --config=FILE           specify alternate rsyncd.conf file
      --port=PORT             specify alternate rsyncd port number
-     --blocking-io           use blocking IO for the remote shell
+     --blocking-io           use blocking I/O for the remote shell
      --no-blocking-io        turn off --blocking-io
      --stats                 give some file transfer stats
      --progress              show progress during transfer
@@ -569,7 +569,7 @@ This option can be dangerous if used incorrectly!  It is a very good idea
 to run first using the dry run option (-n) to see what files would be
 deleted to make sure important files aren't listed.
 
-If the sending side detects any IO errors then the deletion of any
+If the sending side detects any I/O errors then the deletion of any
 files at the destination will be automatically disabled. This is to
 prevent temporary filesystem failures (such as NFS errors) on the
 sending side causing a massive deletion of files on the
@@ -586,7 +586,7 @@ sufficient space on the receiving filesystem. If you want to delete
 after transferring, use the --delete-after switch. Implies --delete.
 
 dit(bf(--ignore-errors)) Tells --delete to go ahead and delete files
-even when there are IO errors.
+even when there are I/O errors.
 
 dit(bf(--force)) This options tells rsync to delete directories even if
 they are not empty when they are to be replaced by non-directories.  This
@@ -760,7 +760,7 @@ If the source system is a daemon using chroot, or if a user or group
 name does not exist on the destination system, then the numeric ID
 from the source system is used instead.
 
-dit(bf(--timeout=TIMEOUT)) This option allows you to set a maximum IO
+dit(bf(--timeout=TIMEOUT)) This option allows you to set a maximum I/O
 timeout in seconds. If no data is transferred for the specified time
 then rsync will exit. The default is 0, which means no timeout.
 
@@ -799,11 +799,11 @@ the default is rsyncd.conf in the current directory (typically $HOME).
 dit(bf(--port=PORT)) This specifies an alternate TCP port number to use
 rather than the default port 873.
 
-dit(bf(--blocking-io)) This tells rsync to use blocking IO when launching
+dit(bf(--blocking-io)) This tells rsync to use blocking I/O when launching
 a remote shell transport.  If the remote shell is either rsh or remsh,
 rsync defaults to using
-blocking IO, otherwise it defaults to using non-blocking IO.  (Note that
-ssh prefers non-blocking IO.)
+blocking I/O, otherwise it defaults to using non-blocking I/O.  (Note that
+ssh prefers non-blocking I/O.)
 
 dit(bf(--no-blocking-io)) Turn off --blocking-io, for use when it is the
 default.
@@ -1130,8 +1130,8 @@ was made to manipulate 64-bit files on a platform that cannot support
 them; or an option was specifed that is supported by the client and
 not by the server.
 dit(bf(5)) Error starting client-server protocol
-dit(bf(10)) Error in socket IO 
-dit(bf(11)) Error in file IO 
+dit(bf(10)) Error in socket I/O 
+dit(bf(11)) Error in file I/O 
 dit(bf(12)) Error in rsync protocol data stream 
 dit(bf(13)) Errors with program diagnostics 
 dit(bf(14)) Error in IPC code 
@@ -1190,7 +1190,7 @@ When transferring to FAT filesystems rsync may resync
 unmodified files.
 See the comments on the --modify-window option.
 
-file permissions, devices etc are transferred as native numerical
+file permissions, devices, etc. are transferred as native numerical
 values
 
 see also the comments on the --delete option
