@@ -79,5 +79,7 @@ rsync changes since last release
 
     * More test cases.  (Martin Pool)
 
+    * Some test-case fixes.  (Brian Poole, Wayne Davison)
+
     * Updated included popt to the latest vendor drop, version 1.6.4.
       (Jos Backus)
