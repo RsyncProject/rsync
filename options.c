@@ -21,6 +21,8 @@
 #include "rsync.h"
 #include "popt.h"
 
+extern struct exclude_struct **exclude_list;
+
 int make_backups = 0;
 
 /**
@@ -508,19 +510,23 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			break;
 
 		case OPT_EXCLUDE:
-			add_exclude(poptGetOptArg(pc), 0);
+			add_exclude(&exclude_list, poptGetOptArg(pc),
+				    ADD_EXCLUDE);
 			break;
 
 		case OPT_INCLUDE:
-			add_exclude(poptGetOptArg(pc), 1);
+			add_exclude(&exclude_list, poptGetOptArg(pc),
+				    ADD_INCLUDE);
 			break;
 
 		case OPT_EXCLUDE_FROM:
-			add_exclude_file(poptGetOptArg(pc), 1, 0);
+			add_exclude_file(&exclude_list, poptGetOptArg(pc),
+					 MISSING_FATAL, ADD_EXCLUDE);
 			break;
 
 		case OPT_INCLUDE_FROM:
-			add_exclude_file(poptGetOptArg(pc), 1, 1);
+			add_exclude_file(&exclude_list, poptGetOptArg(pc),
+					 MISSING_FATAL, ADD_INCLUDE);
 			break;
 
 		case 'h':
@@ -909,5 +915,3 @@ char *find_colon(char *s)
 
 	return p;
 }
-
-
