@@ -17,6 +17,7 @@ extern int preserve_devices;
 extern int preserve_uid;
 extern int preserve_gid;
 extern int always_checksum;
+extern int protocol_version;
 
 extern struct filter_list_struct filter_list;
 
@@ -95,19 +96,16 @@ static void write_arg(int fd, char *arg)
 	write(fd, arg, strlen(arg));
 }
 
-static void write_filters(int fd)
+static void write_filter_rules(int fd)
 {
 	struct filter_struct *ent;
 
 	write_sbuf(fd, " <<'#E#'\n");
 	for (ent = filter_list.head; ent; ent = ent->next) {
-		char *p = ent->pattern;
-		if (ent->match_flags & MATCHFLG_INCLUDE)
-			write_buf(fd, "+ ", 2);
-		else if (((*p == '-' || *p == '+') && p[1] == ' ')
-		    || *p == '#' || *p == ';')
-			write_buf(fd, "- ", 2);
-		write_sbuf(fd, p);
+		unsigned int plen;
+		char *p = get_rule_prefix(ent->match_flags, "- ", &plen);
+		write_buf(fd, p, plen);
+		write_sbuf(fd, ent->pattern);
 		if (ent->match_flags & MATCHFLG_DIRECTORY)
 			write_byte(fd, '/');
 		write_byte(fd, eol_nulls ? 0 : '\n');
@@ -138,15 +136,24 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 
 	/* Write argvs info to BATCH.sh file */
 	write_arg(fd, argv[0]);
-	if (filter_list.head)
-		write_sbuf(fd, " --exclude-from=-");
+	if (filter_list.head) {
+		if (protocol_version >= 29)
+			write_sbuf(fd, " --filter=._-");
+		else
+			write_sbuf(fd, " --exclude-from=-");
+	}
 	for (i = 1; i < argc - file_arg_cnt; i++) {
 		p = argv[i];
 		if (strncmp(p, "--files-from", 12) == 0
+		    || strncmp(p, "--filter", 8) == 0
 		    || strncmp(p, "--include", 9) == 0
 		    || strncmp(p, "--exclude", 9) == 0) {
 			if (strchr(p, '=') == NULL)
 				i++;
+			continue;
+		}
+		if (strcmp(p, "-f") == 0) {
+			i++;
 			continue;
 		}
 		write(fd, " ", 1);
@@ -168,7 +175,7 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 	write_arg(fd, p);
 	write_byte(fd, '}');
 	if (filter_list.head)
-		write_filters(fd);
+		write_filter_rules(fd);
 	if (write(fd, "\n", 1) != 1 || close(fd) < 0) {
 		rsyserr(FERROR, errno, "Batch file %s write error", filename);
 		exit_cleanup(1);
