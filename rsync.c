@@ -818,12 +818,6 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
       }
 
       /* open tmp file */
-      if (strlen(fname) > (MAXPATHLEN-8)) {
-	rprintf(FERROR,"filename too long\n");
-	if (buf) unmap_file(buf);
-	close(fd1);
-	continue;
-      }
       if (tmpdir) {
 	      char *f;
 	      f = strrchr(fname,'/');
@@ -831,9 +825,22 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		      f = fname;
 	      else 
 		      f++;
-	      sprintf(fnametmp,"%s/%s.XXXXXX",tmpdir,f);
+	      if (strlen(tmpdir)+strlen(f)+10 > MAXPATHLEN) {
+		      rprintf(FERROR,"filename too long\n");
+		      if (buf) unmap_file(buf);
+		      close(fd1);
+		      continue;
+	      }
+	      sprintf(fnametmp,"%s/.%s.XXXXXX",tmpdir,f);
       } else {
-	      sprintf(fnametmp,"%s.XXXXXX",fname);
+	      if (strlen(fname)+9 > MAXPATHLEN) {
+		      rprintf(FERROR,"filename too long\n");
+		      if (buf) unmap_file(buf);
+		      close(fd1);
+		      continue;
+	      }
+
+	      sprintf(fnametmp,".%s.XXXXXX",fname);
       }
       if (NULL == do_mktemp(fnametmp)) {
 	rprintf(FERROR,"mktemp %s failed\n",fnametmp);
