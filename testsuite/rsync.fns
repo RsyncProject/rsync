@@ -152,7 +152,7 @@ checkit() {
     echo ""
     for f in `cd "$2"; find . -type f -print `
     do 
-        diff -u "$2"/"$f" "$3"/"$f" || failed=YES
+        diff -c "$2"/"$f" "$3"/"$f" || failed=YES
     done
 
     echo "-------------"
