@@ -77,7 +77,7 @@ int force_delete = 0;
 int io_timeout = 0;
 char *files_from = NULL;
 int filesfrom_fd = -1;
-char *remote_filesfrom_file = NULL;
+char *filesfrom_host = NULL;
 int eol_nulls = 0;
 int recurse = 0;
 int xfer_dirs = 0;
@@ -1004,8 +1004,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			partial_dir = sanitize_path(NULL, partial_dir, NULL, 0);
 		if (backup_dir)
 			backup_dir = sanitize_path(NULL, backup_dir, NULL, 0);
-		if (files_from)
-			files_from = sanitize_path(NULL, files_from, NULL, 0);
 	}
 	if (server_filter_list.head && !am_sender) {
 		struct filter_list_struct *elp = &server_filter_list;
@@ -1033,19 +1031,12 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			if (!*backup_dir)
 				goto options_rejected;
 			clean_fname(backup_dir, 1);
-			if (check_filter(elp, backup_dir, 1) < 0)
-				goto options_rejected;
-		}
-	}
-	if (server_filter_list.head && files_from) {
-		if (!*files_from)
-			goto options_rejected;
-		clean_fname(files_from, 1);
-		if (check_filter(&server_filter_list, files_from, 0) < 0) {
-		    options_rejected:
-			snprintf(err_buf, sizeof err_buf,
-			    "Your options have been rejected by the server.\n");
-			return 0;
+			if (check_filter(elp, backup_dir, 1) < 0) {
+			    options_rejected:
+				snprintf(err_buf, sizeof err_buf,
+				    "Your options have been rejected by the server.\n");
+				return 0;
+			}
 		}
 	}
 
@@ -1161,7 +1152,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 
 	if (files_from) {
-		char *colon;
+		char *h, *p;
+		int q;
 		if (*argc > 2 || (!am_daemon && *argc == 1)) {
 			usage(FERROR);
 			exit_cleanup(RERR_SYNTAX);
@@ -1169,20 +1161,30 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		if (strcmp(files_from, "-") == 0) {
 			filesfrom_fd = 0;
 			if (am_server)
-				remote_filesfrom_file = "-";
-		}
-		else if ((colon = find_colon(files_from)) != 0) {
+				filesfrom_host = ""; /* reading from socket */
+		} else if ((p = check_for_hostspec(files_from, &h, &q)) != 0) {
 			if (am_server) {
-				usage(FERROR);
-				exit_cleanup(RERR_SYNTAX);
+				snprintf(err_buf, sizeof err_buf,
+					"The --files-from sent to the server cannot specify a host.\n");
+				return 0;
 			}
-			remote_filesfrom_file = colon+1 + (colon[1] == ':');
-			if (strcmp(remote_filesfrom_file, "-") == 0) {
+			files_from = p;
+			filesfrom_host = h;
+			if (strcmp(files_from, "-") == 0) {
 				snprintf(err_buf, sizeof err_buf,
 					"Invalid --files-from remote filename\n");
 				return 0;
 			}
 		} else {
+			if (sanitize_paths)
+				files_from = sanitize_path(NULL, files_from, NULL, 0);
+			if (server_filter_list.head) {
+				if (!*files_from)
+					goto options_rejected;
+				clean_fname(files_from, 1);
+				if (check_filter(&server_filter_list, files_from, 0) < 0)
+					goto options_rejected;
+			}
 			filesfrom_fd = open(files_from, O_RDONLY|O_BINARY);
 			if (filesfrom_fd < 0) {
 				snprintf(err_buf, sizeof err_buf,
@@ -1433,10 +1435,10 @@ void server_options(char **args,int *argc)
 		}
 	}
 
-	if (files_from && (!am_sender || remote_filesfrom_file)) {
-		if (remote_filesfrom_file) {
+	if (files_from && (!am_sender || filesfrom_host)) {
+		if (filesfrom_host) {
 			args[ac++] = "--files-from";
-			args[ac++] = remote_filesfrom_file;
+			args[ac++] = files_from;
 			if (eol_nulls)
 				args[ac++] = "--from0";
 		} else {
@@ -1462,23 +1464,75 @@ void server_options(char **args,int *argc)
 	out_of_memory("server_options");
 }
 
-/**
- * Return the position of a ':' IF it is not part of a filename (i.e. as
- * long as it doesn't occur after a slash.
- */
-char *find_colon(char *s)
+/* Look for a HOST specfication of the form "HOST:PATH", "HOST::PATH", or
+ * "rsync://HOST:PORT/PATH".  If found, *host_ptr will be set to some allocated
+ * memory with the HOST.  If a daemon-accessing spec was specified, the value
+ * of *port_ptr will contain a non-0 port number, otherwise it will be set to
+ * 0.  The return value is a pointer to the PATH.  Note that the HOST spec can
+ * be an IPv6 literal address enclosed in '[' and ']' (such as "[::1]" or
+ * "[::ffff:127.0.0.1]") which is returned without the '[' and ']'. */
+char *check_for_hostspec(char *s, char **host_ptr, int *port_ptr)
 {
-	char *p, *p2;
+	char *p;
+	int not_host;
 
-	p = strchr(s,':');
-	if (!p)
-		return NULL;
+	if (port_ptr && strncasecmp(URL_PREFIX, s, strlen(URL_PREFIX)) == 0) {
+		char *path;
+		int hostlen;
+		s += strlen(URL_PREFIX);
+		if ((p = strchr(s, '/')) != NULL) {
+			hostlen = p - s;
+			path = p + 1;
+		} else {
+			hostlen = strlen(s);
+			path = "";
+		}
+		if (*s == '[' && (p = strchr(s, ']')) != NULL) {
+			s++;
+			hostlen = p - s;
+			if (*p == ':')
+				*port_ptr = atoi(p+1);
+			else if (!*port_ptr)
+				*port_ptr = RSYNC_PORT;
+		} else {
+			if ((p = strchr(s, ':')) != NULL) {
+				hostlen = p - s;
+				*port_ptr = atoi(p+1);
+			} else if (!*port_ptr)
+				*port_ptr = RSYNC_PORT;
+		}
+		*host_ptr = new_array(char, hostlen + 1);
+		strlcpy(*host_ptr, s, hostlen + 1);
+		return path;
+	}
 
-	/* now check to see if there is a / in the string before the : - if there is then
-	   discard the colon on the assumption that the : is part of a filename */
-	p2 = strchr(s,'/');
-	if (p2 && p2 < p)
-		return NULL;
+	if (*s == '[' && (p = strchr(s, ']')) != NULL && p[1] == ':') {
+		s++;
+		*p = '\0';
+		not_host = strchr(s, '/') || !strchr(s, ':');
+		*p = ']';
+		if (not_host)
+			return NULL;
+	} else {
+		if (!(p = strchr(s, ':')))
+			return NULL;
+		*p = '\0';
+		not_host = strchr(s, '/') != NULL;
+		*p = ':';
+		if (not_host)
+			return NULL;
+	}
 
-	return p;
+	*host_ptr = new_array(char, p - s + 1);
+	strlcpy(*host_ptr, s, p - s + 1);
+
+	if (p[1] == ':') {
+		if (port_ptr && !*port_ptr)
+			*port_ptr = RSYNC_PORT;
+		return p + 2;
+	}
+	if (port_ptr)
+		*port_ptr = 0;
+
+	return p + 1;
 }
