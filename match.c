@@ -90,6 +90,18 @@ static void build_hash_table(struct sum_struct *s)
 static OFF_T last_match;
 
 
+/**
+ * Transmit a literal and/or match token.
+ *
+ * This delightfully-named function is called either when we find a
+ * match and need to transmit all the unmatched data leading up to it,
+ * or when we get bored of accumulating literal data and just need to
+ * transmit it.  As a result of this second case, it is called even if
+ * we have not matched at all!
+ *
+ * @param i If >0, the number of a matched token.  If 0, indicates we
+ * have only literal data.
+ **/
 static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 		    OFF_T offset,int i)
 {
@@ -258,7 +270,17 @@ static void hash_search(int f,struct sum_struct *s,
 }
 
 
-void match_sums(int f,struct sum_struct *s,struct map_struct *buf,OFF_T len)
+/**
+ * Scan through a origin file, looking for sections that match
+ * checksums from the generator, and transmit either literal or token
+ * data.
+ *
+ * @param s Checksums received from the generator.  If <tt>s->count ==
+ * 0</tt>, then there are actually no checksums for this file.
+ *
+ * @param len Length of the file to send.
+ **/
+void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 {
 	char file_sum[MD4_SUM_LENGTH];
 	extern int write_batch;  /*  dw */
