@@ -165,7 +165,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 		blength = MAX(blength, BLOCK_SIZE);
 		blength = MIN(blength, MAX_MAP_SIZE);
 	}
-	max_map_size = MIN(MAX_MAP_SIZE, blength * 32);
+	max_map_size = MAX(MAX_MAP_SIZE, blength * 32);
 
 	if (protocol_version < 27) {
 		s2length = csum_length;
