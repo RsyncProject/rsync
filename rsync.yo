@@ -187,6 +187,56 @@ quote(rsync -az -e ssh --delete ~ftp/pub/samba/ nimbus:"~ftp/pub/tridge/samba")
 
 this is launched from cron every few hours.
 
+manpagesection(OPTIONS SUMMARY)
+
+Here is a short summary of the options avalable in rsync. Please refer
+to the detailed description below for a complete description.
+
+verb(
+ -v, --verbose               increase verbosity
+ -c, --checksum              always checksum
+ -a, --archive               archive mode
+ -r, --recursive             recurse into directories
+ -R, --relative              use relative path names
+ -b, --backup                make backups (default ~ extension)
+ -u, --update                update only (don't overwrite newer files)
+ -l, --links                 preserve soft links
+ -L, --copy-links            treat soft links like regular files
+ -H, --hard-links            preserve hard links
+ -p, --perms                 preserve permissions
+ -o, --owner                 preserve owner (root only)
+ -g, --group                 preserve group
+ -D, --devices               preserve devices (root only)
+ -t, --times                 preserve times
+ -S, --sparse                handle sparse files efficiently
+ -n, --dry-run               show what would have been transferred
+ -W, --whole-file            copy whole files, no incremental checks
+ -x, --one-file-system       don't cross filesystem boundaries
+ -B, --block-size=SIZE       checksum blocking size
+ -e, --rsh=COMMAND           specify rsh replacement
+     --rsync-path=PATH       specify path to rsync on the remote machine
+ -C, --cvs-exclude           auto ignore files in the same way CVS does
+     --delete                delete files that don't exist on the sending side
+     --partial               keep partially transferred files
+     --force                 force deletion of directories even if not empty
+     --numeric-ids           don't map uid/gid values by user/group name
+     --timeout=TIME          set IO timeout in seconds
+ -I, --ignore-times          don't exclude files that match length and time
+ -T  --temp-dir=DIR          create temporary files in directory DIR
+ -z, --compress              compress file data
+     --exclude=PATTERN       exclude file FILE
+     --exclude-from=PATTERN  exclude files listed in FILE
+     --include=PATTERN       don't exclude file FILE
+     --include-from=PATTERN  don't exclude files listed in FILE
+     --suffix=SUFFIX         override backup suffix
+     --version               print version number
+     --daemon                run as a rsync daemon
+     --config=FILE           specify alternate rsyncd.conf file
+     --port=PORT             specify alternate rsyncd port number
+     --stats                 give some file transfer stats
+ -h, --help                  show this help screen
+)
+
 manpageoptions()
 
 rsync uses the GNU long options package. Many of the command line
@@ -268,6 +318,12 @@ This option can be quite slow, so only use it if you need it.
 dit(bf(-W, --whole-file)) With this option the incremental rsync algorithm
 is  not used  and  the whole file is sent as-is instead. This may be
 useful when using rsync with a local machine.
+
+dit(bf(--partial)) By default rsync will delete any partially
+transferred file if the transfer is interrupted. In some circumstances
+it is more desirable to keep partially transferred files. Using the
+--partial option tells rsync to keep the partial file which should
+make a subsequent transfer of the rest of the file much faster.
 
 dit(bf(-p, --perms)) This option causes rsync to update the remote
 permissions to be the same as the local permissions.

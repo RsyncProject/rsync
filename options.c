@@ -56,6 +56,7 @@ int recurse = 0;
 int am_daemon=0;
 int am_client=0;
 int do_stats=0;
+int keep_partial=0;
 
 int block_size=BLOCK_SIZE;
 
@@ -108,6 +109,7 @@ void usage(int F)
   rprintf(F,"     --rsync-path=PATH       specify path to rsync on the remote machine\n");
   rprintf(F," -C, --cvs-exclude           auto ignore files in the same way CVS does\n");
   rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
+  rprintf(F,"     --partial               keep partially transferred files\n");
   rprintf(F,"     --force                 force deletion of directories even if not empty\n");
   rprintf(F,"     --numeric-ids           don't map uid/gid values by user/group name\n");
   rprintf(F,"     --timeout=TIME          set IO timeout in seconds\n");
@@ -137,7 +139,7 @@ void usage(int F)
 enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
       OPT_EXCLUDE_FROM,OPT_DELETE,OPT_NUMERIC_IDS,OPT_RSYNC_PATH,
       OPT_FORCE,OPT_TIMEOUT,OPT_DAEMON,OPT_CONFIG,OPT_PORT,
-      OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS};
+      OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL};
 
 static char *short_options = "oblLWHpguDCtcahvrRIxnSe:B:T:z";
 
@@ -183,6 +185,7 @@ static struct option long_options[] = {
   {"compress",	  0,	 0,    'z'},
   {"daemon",      0,     0,    OPT_DAEMON},
   {"stats",       0,     0,    OPT_STATS},
+  {"partial",     0,     0,    OPT_PARTIAL},
   {"config",      1,     0,    OPT_CONFIG},
   {"port",        1,     0,    OPT_PORT},
   {0,0,0,0}};
@@ -382,6 +385,10 @@ void parse_arguments(int argc, char *argv[])
 		do_stats = 1;
 		break;
 
+	case OPT_PARTIAL:
+		keep_partial = 1;
+		break;
+
 	case OPT_CONFIG:
 		config_file = optarg;
 		break;
@@ -476,6 +483,9 @@ void server_options(char **args,int *argc)
 
   if (delete_mode)
     args[ac++] = "--delete";
+
+  if (keep_partial)
+    args[ac++] = "--partial";
 
   if (force_delete)
     args[ac++] = "--force";

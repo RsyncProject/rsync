@@ -731,11 +731,19 @@ static void delete_files(struct file_list *flist)
 }
 
 static char *cleanup_fname;
+static char *cleanup_new_fname;
+static struct file_struct *cleanup_file;
+static void finish_transfer(char *fname, char *fnametmp, struct file_struct *file);
 
 void exit_cleanup(int code)
 {
+	extern int keep_partial;
+
+	if (cleanup_fname && keep_partial) {
+		finish_transfer(cleanup_new_fname, cleanup_fname, cleanup_file);
+	}
 	io_flush();
-	if (cleanup_fname)
+	if (cleanup_fname && !keep_partial)
 		do_unlink(cleanup_fname);
 	signal(SIGUSR1, SIG_IGN);
 	if (code) {
@@ -790,6 +798,46 @@ static int get_tmpname(char *fnametmp, char *fname)
 	return 1;
 }
 
+/* finish off a file transfer, renaming the file and setting the permissions
+   and ownership */
+static void finish_transfer(char *fname, char *fnametmp, struct file_struct *file)
+{
+	if (make_backups) {
+		char fnamebak[MAXPATHLEN];
+		if (strlen(fname) + strlen(backup_suffix) > (MAXPATHLEN-1)) {
+			rprintf(FERROR,"backup filename too long\n");
+			return;
+		}
+		slprintf(fnamebak,sizeof(fnamebak)-1,"%s%s",fname,backup_suffix);
+		if (do_rename(fname,fnamebak) != 0 && errno != ENOENT) {
+			rprintf(FERROR,"rename %s %s : %s\n",fname,fnamebak,strerror(errno));
+			return;
+		}
+	}
+
+	/* move tmp file over real file */
+	if (do_rename(fnametmp,fname) != 0) {
+		if (errno == EXDEV) {
+			/* rename failed on cross-filesystem link.  
+			   Copy the file instead. */
+			if (copy_file(fnametmp,fname, file->mode)) {
+				rprintf(FERROR,"copy %s -> %s : %s\n",
+					fnametmp,fname,strerror(errno));
+			} else {
+				set_perms(fname,file,NULL,0);
+			}
+			do_unlink(fnametmp);
+		} else {
+			rprintf(FERROR,"rename %s -> %s : %s\n",
+				fnametmp,fname,strerror(errno));
+			do_unlink(fnametmp);
+		}
+	} else {
+		set_perms(fname,file,NULL,0);
+	}
+}
+
+
 int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 {  
 	int fd1,fd2;
@@ -811,6 +859,9 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	}
 
 	while (1) {      
+		cleanup_fname = NULL;
+		cleanup_new_fname = NULL;
+
 		i = read_int(f_in);
 		if (i == -1) {
 			if (phase==0 && remote_version >= 13) {
@@ -909,6 +960,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		}
       
 		cleanup_fname = fnametmp;
+		cleanup_new_fname = fname;
+		cleanup_file = file;
 
 		if (!am_server && verbose)
 			printf("%s\n",fname);
@@ -924,43 +977,12 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 		
 		if (verbose > 2)
 			rprintf(FINFO,"renaming %s to %s\n",fnametmp,fname);
+
+		finish_transfer(fname, fnametmp, file);
 		
-		if (make_backups) {
-			char fnamebak[MAXPATHLEN];
-			if (strlen(fname) + strlen(backup_suffix) > (MAXPATHLEN-1)) {
-				rprintf(FERROR,"backup filename too long\n");
-				continue;
-			}
-			slprintf(fnamebak,sizeof(fnamebak)-1,"%s%s",fname,backup_suffix);
-			if (do_rename(fname,fnamebak) != 0 && errno != ENOENT) {
-				rprintf(FERROR,"rename %s %s : %s\n",fname,fnamebak,strerror(errno));
-				continue;
-			}
-		}
-
-		/* move tmp file over real file */
-		if (do_rename(fnametmp,fname) != 0) {
-			if (errno == EXDEV) {
-				/* rename failed on cross-filesystem link.  
-				   Copy the file instead. */
-				if (copy_file(fnametmp,fname, file->mode)) {
-					rprintf(FERROR,"copy %s -> %s : %s\n",
-						fnametmp,fname,strerror(errno));
-				} else {
-					set_perms(fname,file,NULL,0);
-				}
-				do_unlink(fnametmp);
-			} else {
-				rprintf(FERROR,"rename %s -> %s : %s\n",
-					fnametmp,fname,strerror(errno));
-				do_unlink(fnametmp);
-			}
-		} else {
-			set_perms(fname,file,NULL,0);
-		}
-
 		cleanup_fname = NULL;
-
+		cleanup_new_fname = NULL;
+		cleanup_file = NULL;
 		
 		if (!recv_ok) {
 			if (csum_length == SUM_LENGTH) {

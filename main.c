@@ -172,6 +172,10 @@ static char *get_local_name(struct file_list *flist,char *name)
 	STRUCT_STAT st;
 	extern int orig_umask;
 
+	if (verbose > 2)
+		rprintf(FINFO,"get_local_name count=%d %s\n", 
+			flist->count, name);
+
 	if (do_stat(name,&st) == 0) {
 		if (S_ISDIR(st.st_mode)) {
 			if (!push_dir(name, 0)) {
