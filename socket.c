@@ -127,7 +127,7 @@ static int establish_proxy_connection(int fd, char *host, int port,
  * if this fails.
  **/
 int try_bind_local(int s, int ai_family, int ai_socktype,
-		   const char *bind_address)
+		   const char *bind_addr)
 {
 	int error;
 	struct addrinfo bhints, *bres_all, *r;
@@ -136,9 +136,9 @@ int try_bind_local(int s, int ai_family, int ai_socktype,
 	bhints.ai_family = ai_family;
 	bhints.ai_socktype = ai_socktype;
 	bhints.ai_flags = AI_PASSIVE;
-	if ((error = getaddrinfo(bind_address, NULL, &bhints, &bres_all))) {
+	if ((error = getaddrinfo(bind_addr, NULL, &bhints, &bres_all))) {
 		rprintf(FERROR, RSYNC_NAME ": getaddrinfo %s: %s\n",
-			bind_address, gai_strerror(error));
+			bind_addr, gai_strerror(error));
 		return -1;
 	}
 
@@ -172,12 +172,12 @@ int try_bind_local(int s, int ai_family, int ai_socktype,
  * reachable, perhaps because we can't e.g. route ipv6 to that network
  * but we can get ip4 packets through.
  *
- * @param bind_address Local address to use.  Normally NULL to bind
+ * @param bind_addr Local address to use.  Normally NULL to bind
  * the wildcard address.
  *
  * @param af_hint Address family, e.g. AF_INET or AF_INET6.
  **/
-int open_socket_out(char *host, int port, const char *bind_address,
+int open_socket_out(char *host, int port, const char *bind_addr,
 		    int af_hint)
 {
 	int type = SOCK_STREAM;
@@ -253,9 +253,9 @@ int open_socket_out(char *host, int port, const char *bind_address,
 		if (s < 0)
 			continue;
 
-		if (bind_address
+		if (bind_addr
 		 && try_bind_local(s, res->ai_family, type,
-				   bind_address) == -1) {
+				   bind_addr) == -1) {
 			close(s);
 			s = -1;
 			continue;
@@ -293,9 +293,9 @@ int open_socket_out(char *host, int port, const char *bind_address,
  *
  * This is based on the Samba LIBSMB_PROG feature.
  *
- * @param bind_address Local address to use.  Normally NULL to get the stack default.
+ * @param bind_addr Local address to use.  Normally NULL to get the stack default.
  **/
-int open_socket_out_wrapped(char *host, int port, const char *bind_address,
+int open_socket_out_wrapped(char *host, int port, const char *bind_addr,
 			    int af_hint)
 {
 	char *prog = getenv("RSYNC_CONNECT_PROG");
@@ -307,7 +307,7 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_address,
 	}
 	if (prog)
 		return sock_exec(prog);
-	return open_socket_out(host, port, bind_address, af_hint);
+	return open_socket_out(host, port, bind_addr, af_hint);
 }
 
 
@@ -322,10 +322,10 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_address,
  * We return an array of file-descriptors to the sockets, with a trailing
  * -1 value to indicate the end of the list.
  *
- * @param bind_address Local address to bind, or NULL to allow it to
+ * @param bind_addr Local address to bind, or NULL to allow it to
  * default.
  **/
-static int *open_socket_in(int type, int port, const char *bind_address,
+static int *open_socket_in(int type, int port, const char *bind_addr,
 			   int af_hint)
 {
 	int one = 1;
@@ -339,10 +339,10 @@ static int *open_socket_in(int type, int port, const char *bind_address,
 	hints.ai_socktype = type;
 	hints.ai_flags = AI_PASSIVE;
 	snprintf(portbuf, sizeof portbuf, "%d", port);
-	error = getaddrinfo(bind_address, portbuf, &hints, &all_ai);
+	error = getaddrinfo(bind_addr, portbuf, &hints, &all_ai);
 	if (error) {
 		rprintf(FERROR, RSYNC_NAME ": getaddrinfo: bind address %s: %s\n",
-			bind_address, gai_strerror(error));
+			bind_addr, gai_strerror(error));
 		return NULL;
 	}
 
