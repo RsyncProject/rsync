@@ -1039,6 +1039,8 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 
 
 /**
+ * This function is normally called by the sender, but the receiver also
+ * uses it to construct its own file list if --delete has been specified.
  * The delete_files() function in receiver.c sets f to -1 so that we just
  * construct the file list in memory without sending it over the wire.  It
  * also has the side-effect of ignoring user-excludes if delete_excluded
