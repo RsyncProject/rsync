@@ -230,7 +230,9 @@ local void send_bits(s, value, length)
 #endif /* DEBUG */
 
 
-#define MAX(a,b) (a >= b ? a : b)
+#ifndef MAX
+#define MAX(a,b) ((a) >= (b) ? (a) : (b))
+#endif
 /* the arguments must not have side effects */
 
 /* ===========================================================================
@@ -497,7 +499,7 @@ local void gen_bitlen(s, desc)
     int bits;           /* bit length */
     int xbits;          /* extra bits */
     ush f;              /* frequency */
-    int overflow = 0;   /* number of elements with bit length too large */
+    int Overflow = 0;   /* number of elements with bit length too large */
 
     for (bits = 0; bits <= MAX_BITS; bits++) s->bl_count[bits] = 0;
 
@@ -509,7 +511,7 @@ local void gen_bitlen(s, desc)
     for (h = s->heap_max+1; h < HEAP_SIZE; h++) {
         n = s->heap[h];
         bits = tree[tree[n].Dad].Len + 1;
-        if (bits > max_length) bits = max_length, overflow++;
+        if (bits > max_length) bits = max_length, Overflow++;
         tree[n].Len = (ush)bits;
         /* We overwrite tree[n].Dad which is no longer needed */
 
@@ -522,7 +524,7 @@ local void gen_bitlen(s, desc)
         s->opt_len += (ulg)f * (bits + xbits);
         if (stree) s->static_len += (ulg)f * (stree[n].Len + xbits);
     }
-    if (overflow == 0) return;
+    if (Overflow == 0) return;
 
     Trace((stderr,"\nbit length overflow\n"));
     /* This happens for example on obj2 and pic of the Calgary corpus */
@@ -537,8 +539,8 @@ local void gen_bitlen(s, desc)
         /* The brother of the overflow item also moves one step up,
          * but this does not affect bl_count[max_length]
          */
-        overflow -= 2;
-    } while (overflow > 0);
+        Overflow -= 2;
+    } while (Overflow > 0);
 
     /* Now recompute all bit lengths, scanning in increasing frequency.
      * h is still equal to HEAP_SIZE. (It is simpler to reconstruct all
