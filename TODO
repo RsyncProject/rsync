@@ -184,6 +184,7 @@ IPv6
 
   which should just take a small change to the parser code.
 
+
 Errors
 
   If we hang or get SIGINT, then explain where we were up to.  Perhaps
@@ -199,6 +200,11 @@ Errors
   continue trying to read to see if an error message comes across
   explaining why the socket is closed.  I'm not sure if this would
   work, but it would certainly make our messages more helpful.
+
+  What happens if a directory is missing -x attributes.  Do we lose
+  our load?  (Debian #28416)  Probably fixed now, but a test case
+  would be good.
+
 
 File attributes
 
