@@ -1012,38 +1012,10 @@ ssh prefers non-blocking I/O.)
 dit(bf(--no-blocking-io)) Turn off bf(--blocking-io), for use when it is the
 default.
 
-dit(bf(-i, --itemize-changes)) Outputs a change-summary for each updated
-item.  The format is as follows:
-
-quote(tt(  *XcstpogDL ITEM_NAME))
-
-The bf(*) will be present if this is a file that is being transferred,
-otherwise it will be replaced with a space.  The bf(X) will be replaced by
-one of the following: an "f" for a file, a "d" for a dir, an "L" for a
-symlink, or a "D" for a device.  The rest of the letters in the string
-above are the actual letters that will be output if the associated
-attribute for the item is being updated; if not the letter will be replaced
-by either a "-" if no change is occurring, or a "+" if this is a new item.
-The meanings of the attribute letters are as follows:
-
-quote(itemize(
-  it() A bf(c) means the checksum of the file is different and will be
-  updated by the file transfer (requries bf(--checksum)).
-  it() A bf(s) means the size of the file is different and will be updated
-  by the file transfer.
-  it() A bf(t) means the modified time is being updated to the server's
-  value (requires --times, but transferred files without --times will be
-  marked with a bf(T) because the time is updated to the transfer time).
-  it() A bf(p) means the permissions are being updated (requires
-  bf(--perms)).
-  it() An bf(o) means the owner is being updated (requires bf(--owner) and
-  root privileges).
-  it() A bf(g) means the group is being updated (requires bf(--group)).
-  it() A bf(D) means the device is being updated (requires bf(--devices)
-  and root privileges).
-  it() An bf(L) means the symlink value is being updated (requires
-  --links).
-))
+dit(bf(-i, --itemize-changes)) Requests a simple itemized list of the
+changes that are being made to each file.  It is equivalent to specifying
+bf(--log-format='%i %n%L').  See the description of these items in the
+rsyncd.conf manpage.
 
 dit(bf(--log-format=FORMAT)) This allows you to specify exactly what the
 rsync client logs to stdout on a per-file basis. The log format is
