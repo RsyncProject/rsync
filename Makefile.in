@@ -20,6 +20,8 @@ SHELL=/bin/sh
 .SUFFIXES:
 .SUFFIXES: .c .o
 
+HEADS=byteorder.h config.h errcode.h proto.h rsync.h version.h \
+	lib/fnmatch.h lib/getopt.h lib/mdfour.h
 LIBOBJ=lib/getopt.o lib/fnmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o
 ZLIBOBJ=zlib/deflate.o zlib/infblock.o zlib/infcodes.o zlib/inffast.o \
 	zlib/inflate.o zlib/inftrees.o zlib/infutil.o zlib/trees.o \
@@ -52,6 +54,8 @@ install-strip:
 
 rsync: $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o rsync $(OBJS) $(LIBS)
+
+$(OBJS): $(HEADS)
 
 rsync.1: rsync.yo
 	yodl2man -o rsync.1 rsync.yo
