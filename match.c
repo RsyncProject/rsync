@@ -141,11 +141,12 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 static void hash_search(int f,struct sum_struct *s,
 			struct map_struct *buf, OFF_T len)
 {
-	OFF_T offset, end;
+	OFF_T offset, end, backup;
 	unsigned int k;
 	size_t want_i;
 	char sum2[SUM_LENGTH];
 	uint32 s1, s2, sum;
+	int more;
 	schar *map;
 
 	/* want_i is used to encourage adjacent matches, allowing the RLL
@@ -271,14 +272,21 @@ static void hash_search(int f,struct sum_struct *s,
 		} while (++j < s->count && targets[j].t == t);
 
 	null_tag:
+		backup = offset - last_match;
+		/* We sometimes read 1 byte prior to last_match... */
+		if (backup < 0)
+			backup = 0;
+
 		/* Trim off the first byte from the checksum */
-		map = (schar *)map_ptr(buf, offset, k+1);
+		more = offset + k < len;
+		map = (schar *)map_ptr(buf, offset - backup, k + more + backup)
+		    + backup;
 		s1 -= map[0] + CHAR_OFFSET;
 		s2 -= k * (map[0]+CHAR_OFFSET);
 
 		/* Add on the next byte (if there is one) to the checksum */
-		if (k < (len-offset)) {
-			s1 += (map[k]+CHAR_OFFSET);
+		if (more) {
+			s1 += map[k] + CHAR_OFFSET;
 			s2 += s1;
 		} else
 			--k;
@@ -289,9 +297,8 @@ static void hash_search(int f,struct sum_struct *s,
 		   match. The 3 reads are caused by the
 		   running match, the checksum update and the
 		   literal send. */
-		if (offset > last_match
-		 && offset-last_match >= CHUNK_SIZE+s->blength
-		 && end-offset > CHUNK_SIZE) {
+		if (backup >= CHUNK_SIZE + s->blength
+		    && end - offset > CHUNK_SIZE) {
 			matched(f,s,buf,offset - s->blength, -2);
 		}
 	} while (++offset < end);
