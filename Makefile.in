@@ -62,6 +62,7 @@ install-strip:
 	$(MAKE) INSTALLCMD='$(INSTALLCMD) -s' install
 
 rsync: $(OBJS)
+	@echo "Please ignore warnings below about mktemp -- it is used in a safe way"
 	$(CC) $(CFLAGS) $(LDFLAGS) -o rsync $(OBJS) $(LIBS)
 
 tls: $(tls_OBJ)
