@@ -405,7 +405,7 @@ void send_exclude_list(int f)
 		if (ent->match_flags & MATCHFLG_INCLUDE) {
 			write_int(f, l + 2);
 			write_buf(f, "+ ", 2);
-		} else if ((*p == '-' || *p == '+') && p[1] == ' ') {
+		} else if (*p == '-' || *p == '+') {
 			write_int(f, l + 2);
 			write_buf(f, "- ", 2);
 		} else
