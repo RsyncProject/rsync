@@ -1,6 +1,6 @@
 /* -*- c-file-style: "linux" -*-
    
-   Copyright (C) 1998-2001 by Andrew Tridgell <tridge@samba.org>
+   Copyright (C) 1992-2001 by Andrew Tridgell <tridge@samba.org>
    Copyright (C) 2001 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
@@ -90,10 +90,13 @@ static int establish_proxy_connection(int fd, char *host, int port)
 }
 
 
+
 /* open a socket to a tcp remote host with the specified port 
    based on code from Warren
    proxy support by Stephen Rothwell */
-int open_socket_out(char *host, int port, struct in_addr *address)
+static int open_socket_out (char *host,
+			    int port,
+			    struct in_addr *address)
 {
 	int type = SOCK_STREAM;
 	struct sockaddr_in sock_out;
@@ -152,7 +155,8 @@ int open_socket_out(char *host, int port, struct in_addr *address)
 	}
 
 	if (connect(res,(struct sockaddr *)&sock_out,sizeof(sock_out))) {
-		rprintf(FERROR,"failed to connect to %s - %s\n", h, strerror(errno));
+		rprintf (FERROR, RSYNC_NAME ": failed to connect to host %s: %s\n",
+			 h, strerror(errno));
 		close(res);
 		return -1;
 	}
@@ -164,6 +168,30 @@ int open_socket_out(char *host, int port, struct in_addr *address)
 
 	return res;
 }
+
+
+/**
+ * Open an outgoing socket, but allow for it to be intercepted by
+ * $RSYNC_CONNECT_PROG, which will execute a program across a TCP
+ * socketpair rather than really opening a socket.
+ *
+ * We use this primarily in testing to detect TCP flow bugs, but not
+ * cause security problems by really opening remote connections.
+ *
+ * This is based on the Samba LIBSMB_PROG feature.
+ **/
+int open_socket_out_wrapped (char *host,
+			     int port,
+			     struct in_addr *address)
+{
+	char *prog;
+
+	if ((prog = getenv ("RSYNC_CONNECT_PROG")) != NULL) 
+		return sock_exec (prog);
+	else 
+		return open_socket_out (host, port, address);
+}
+
 
 
 /****************************************************************************
@@ -185,7 +213,7 @@ static int open_socket_in(int type, int port, struct in_addr *address)
 	}
 	res = socket(AF_INET, type, 0);
 	if (res == -1) { 
-		rprintf(FERROR,"socket failed: %s\n",
+		rprintf(FERROR, RSYNC_NAME ": socket failed: %s\n",
 			strerror(errno)); 
 		return -1; 
 	}
@@ -573,3 +601,107 @@ struct in_addr *ip_address(const char *str)
 
 	return &ret;
 }
+
+
+
+/*******************************************************************
+this is like socketpair but uses tcp. It is used by the Samba
+regression test code
+The function guarantees that nobody else can attach to the socket,
+or if they do that this function fails and the socket gets closed
+returns 0 on success, -1 on failure
+the resulting file descriptors are symmetrical
+ ******************************************************************/
+static int socketpair_tcp(int fd[2])
+{
+	int listener;
+	struct sockaddr_in sock;
+	struct sockaddr_in sock2;
+	socklen_t socklen = sizeof(sock);
+	int connect_done = 0;
+	
+	fd[0] = fd[1] = listener = -1;
+
+	memset(&sock, 0, sizeof(sock));
+	
+	if ((listener = socket(PF_INET, SOCK_STREAM, 0)) == -1) goto failed;
+
+        memset(&sock2, 0, sizeof(sock2));
+#ifdef HAVE_SOCK_SIN_LEN
+        sock2.sin_len = sizeof(sock2);
+#endif
+        sock2.sin_family = PF_INET;
+
+        bind(listener, (struct sockaddr *)&sock2, sizeof(sock2));
+
+	if (listen(listener, 1) != 0) goto failed;
+
+	if (getsockname(listener, (struct sockaddr *)&sock, &socklen) != 0) goto failed;
+
+	if ((fd[1] = socket(PF_INET, SOCK_STREAM, 0)) == -1) goto failed;
+
+	set_nonblocking(fd[1]);
+
+	sock.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+	if (connect(fd[1],(struct sockaddr *)&sock,sizeof(sock)) == -1) {
+		if (errno != EINPROGRESS) goto failed;
+	} else {
+		connect_done = 1;
+	}
+
+	if ((fd[0] = accept(listener, (struct sockaddr *)&sock, &socklen)) == -1) goto failed;
+
+	close(listener);
+	if (connect_done == 0) {
+		if (connect(fd[1],(struct sockaddr *)&sock,sizeof(sock)) != 0
+		    && errno != EISCONN) goto failed;
+	}
+
+	set_blocking (fd[1]);
+
+	/* all OK! */
+	return 0;
+
+ failed:
+	if (fd[0] != -1) close(fd[0]);
+	if (fd[1] != -1) close(fd[1]);
+	if (listener != -1) close(listener);
+	return -1;
+}
+
+
+/*******************************************************************
+run a program on a local tcp socket, this is used to launch smbd
+when regression testing
+the return value is a socket which is attached to a subprocess
+running "prog". stdin and stdout are attached. stderr is left
+attached to the original stderr
+ ******************************************************************/
+int sock_exec(const char *prog)
+{
+	int fd[2];
+	if (socketpair_tcp(fd) != 0) {
+		rprintf (FERROR, RSYNC_NAME
+			 ": socketpair_tcp failed (%s)\n",
+			 strerror(errno));
+		return -1;
+	}
+	if (fork() == 0) {
+		close(fd[0]);
+		close(0);
+		close(1);
+		dup(fd[1]);
+		dup(fd[1]);
+		if (verbose > 3)
+			fprintf (stderr,
+				 RSYNC_NAME ": execute socket program \"%s\"\n",
+				 prog);
+		exit (system (prog));
+	}
+	close (fd[1]);
+	return fd[0];
+}
+
+
+
