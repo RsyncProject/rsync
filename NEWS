@@ -90,6 +90,9 @@ Changes since 2.6.0:
       process now has improved support for IPv6 addresses and a fix
       for systems that have a length field in their socket structs.
 
+    * Fixed the ability to request an empty backup suffix when
+      sending files to an rsync daemon.
+
   INTERNAL:
 
     * Most of the I/O is now buffered, which results in a pretty
