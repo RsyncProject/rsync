@@ -4,8 +4,8 @@ Changes since 2.6.2:
 
   BUG FIXES:
 
-    - Fixed a crash bug that could cause --delete to crash when multiple
-      source directories were specified.
+    - Fixed a crash bug that might appear when --delete was used and
+      multiple source directories were specified.
 
     - The --backup code no longer attempts to create some directories
       over and over again (generating warnings along the way).
@@ -24,7 +24,7 @@ Changes since 2.6.2:
   ENHANCEMENTS:
 
     - Added long-option names for -4 and -6 (namely --ipv4 and --ipv6)
-      and documented them in the man page.
+      and documented all these options in the man page.
 
   INTERNAL:
 
@@ -41,7 +41,7 @@ Changes since 2.6.2:
       proto.h.
 
     - The timestamp of the proto.h file is unaltered by "make proto"
-      if the contents didn't change.
+      if the contents don't change.
 
   DEVELOPER RELATED:
 
