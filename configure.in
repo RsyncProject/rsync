@@ -429,15 +429,6 @@ if test x"$rsync_cv_HAVE_SOCKETPAIR" = x"yes"; then
     AC_DEFINE(HAVE_SOCKETPAIR, 1, [ ])
 fi
 
-AC_CACHE_CHECK([for working fnmatch],rsync_cv_HAVE_FNMATCH,[
-AC_TRY_RUN([#include <fnmatch.h>
-main() { exit((fnmatch("*.o", "x.o", FNM_PATHNAME) == 0 &&
-               fnmatch("a/b/*", "a/b/c/d", FNM_PATHNAME) != 0) ? 0: 1); }],
-rsync_cv_HAVE_FNMATCH=yes,rsync_cv_HAVE_FNMATCH=no,rsync_cv_HAVE_FNMATCH=cross)])
-if test x"$rsync_cv_HAVE_FNMATCH" = x"yes"; then
-    AC_DEFINE(HAVE_FNMATCH, 1, [ ])
-fi
-
 if test x"$with_included_popt" != x"yes"
 then
     AC_CHECK_LIB(popt, poptGetContext, , [with_included_popt=yes])
