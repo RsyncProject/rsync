@@ -49,6 +49,7 @@ extern int protocol_version;
 extern int recurse;
 extern int relative_paths;
 extern int rsync_port;
+extern int whole_file;
 extern int read_batch;
 extern int write_batch;
 extern int filesfrom_fd;
@@ -302,6 +303,10 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 	if (local_server) {
 		if (read_batch)
 			create_flist_from_batch(); /* sets batch_flist */
+		/* If the user didn't request --[no-]whole-file, force
+		 * it on, but only if we're not batch processing. */
+		if (whole_file < 0 && !read_batch && !write_batch)
+			whole_file = 1;
 		ret = local_child(argc, args, f_in, f_out, child_main);
 	} else {
 		ret = piped_child(args,f_in,f_out);
