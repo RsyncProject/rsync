@@ -153,9 +153,12 @@ static void hash_search(int f,struct sum_struct *s,
 	last_i = -1;
 
 	if (verbose > 2)
-		rprintf(FINFO,"hash search b=%d len=%.0f\n",s->n,(double)len);
+		rprintf(FINFO,"hash search b=%ld len=%.0f\n",
+			(long) s->n, (double)len);
 
-	k = MIN(len, s->n);
+	/* cast is to make s->n signed; it should always be reasonably
+	 * small */
+	k = MIN(len, (OFF_T) s->n);
 	
 	map = (schar *)map_ptr(buf,0,k);
 	
@@ -170,8 +173,8 @@ static void hash_search(int f,struct sum_struct *s,
 	end = len + 1 - s->sums[s->count-1].len;
 	
 	if (verbose > 3)
-		rprintf(FINFO,"hash search s->n=%d len=%.0f count=%d\n",
-			s->n,(double)len,s->count);
+		rprintf(FINFO, "hash search s->n=%ld len=%.0f count=%ld\n",
+			(long) s->n, (double) len, (long) s->count);
 	
 	do {
 		tag t = gettag2(s1,s2);
