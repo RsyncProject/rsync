@@ -867,11 +867,11 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 }
 
 
-/*
+/**
  *
- * I *think* f==-1 means that the list should just be built in memory
- * and not transmitted.  But who can tell? -- mbp
- */
+ * I <b>think</b> f==-1 means that the list should just be built in
+ * memory and not transmitted.  But who can tell? -- mbp
+ **/
 struct file_list *send_file_list(int f, int argc, char *argv[])
 {
 	int i, l;
