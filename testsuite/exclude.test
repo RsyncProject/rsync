@@ -1,0 +1,78 @@
+#! /bin/sh
+
+# Copyright (C) 2003 by Wayne Davison <wayned@samba.org>
+
+# This program is distributable under the terms of the GNU GPL see
+# COPYING).
+
+# Test rsync handling of exclude/include directives.  
+
+# Test some of the more obscure wildcard handling of exclude/include
+# processing.
+
+. $srcdir/testsuite/rsync.fns
+
+set -x
+
+# Build some files/dirs/links to copy
+
+fromdir="$scratchdir/from"
+todir="$scratchdir/to"
+chkdir="$scratchdir/chk"
+
+makepath "$fromdir/foo/down/to/you"
+makepath "$fromdir/bar/down/to/foo/too"
+makepath "$fromdir/mid/for/foo/and/that/is/who"
+echo kept >"$fromdir/foo/file1"
+echo removed >"$fromdir/foo/file2"
+echo keeper >"$fromdir/bar/down/to/foo/file1"
+echo gone >"$fromdir/bar/down/to/foo/file3"
+echo lost >"$fromdir/bar/down/to/foo/file4"
+echo smashed >"$fromdir/bar/down/to/foo/to"
+echo expunged >"$fromdir/mid/for/foo/extra"
+echo retained >"$fromdir/mid/for/foo/keep"
+ln -s too "$fromdir/bar/down/to/foo/sym"
+
+# Setup our test exclude/include file.
+
+# XXX comments reflect up-coming fixed behavior!
+excl="$scratchdir/exclude-from"
+cat >"$excl" <<EOF
+# If the second line of these two lines does anything, it's a bug.
++ **/bar
+- /bar
+# This should match against the whole path, not just the name.
++ foo**too
+# This should float at the end of the path.
+- foo/*/
+# Test some normal excludes.  Competing lines are paired.
++ t[o]/
+- to
++ file4
+- file[2-9]
+- /mid/for/foo/extra
+EOF
+
+# Create the chk dir with what we expect to be excluded
+checkit "$RSYNC -avv \"$fromdir/\" \"$chkdir/\"" "$fromdir" "$chkdir"
+
+# Ensure that the following removes will tweak the directory times.
+sleep 1
+
+# XXX Note modified to work with current broken behavior (to be fixed soon!)
+rm -r "$chkdir"/foo/down
+#rm -r "$chkdir"/mid/for/foo/and
+rm "$chkdir"/foo/file[235-9]
+#rm "$chkdir"/bar/down/to/foo/to "$chkdir"/bar/down/to/foo/file[235-9]
+rm -r "$chkdir"/bar # XXX
+rm "$chkdir"/mid/for/foo/extra
+
+# Make sure that the tweaked dirs times migrate back but nothing else.
+$RSYNC -av --include='*/' --exclude='*' "$chkdir/" "$fromdir/"
+
+# Now, test if rsync excludes the same files
+
+checkit "$RSYNC -avv --exclude-from=$excl \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+
+exit 0
+# last [] may have failed but if we get here then we've won
