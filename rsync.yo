@@ -370,7 +370,12 @@ block device information to the remote system to recreate these
 devices. This option is only available to the super-user.
 
 dit(bf(-t, --times)) This tells rsync to transfer modification times along
-with the files and update them on the remote system
+with the files and update them on the remote system.  Note that if this
+option is not used, the optimization that excludes files that have not been
+modified cannot be effective; in other words, a missing -t or -a will
+cause the next transfer to behave as if it used -I, and all files will have
+their checksums compared and show up in log messages even if they haven't
+changed.
 
 dit(bf(-n, --dry-run)) This tells rsync to not do any file transfers,
 instead it will just report the actions it would have taken.
@@ -505,10 +510,12 @@ additional directory to compare destination files against when doing
 transfers.  This is useful for doing transfers to a new destination while
 leaving existing files intact, and then doing a flash-cutover when all
 files have been successfully transfered (for example by moving directories
-around and removing the old directory).  This option increases the
-usefulness of --partial because partially transferred files will remain in
-the new temporary destination until they have a chance to be completed.
-If DIR is a relative path, it is relative to the destination directory.
+around and removing the old directory, although this requires also doing
+the transfer with -I to avoid skipping files that haven't changed).  This
+option increases the usefulness of --partial because partially transferred
+files will remain in the new temporary destination until they have a chance
+to be completed.  If DIR is a relative path, it is relative to the
+destination directory.
 
 dit(bf(-z, --compress)) With this option, rsync compresses any data from
 the source file(s) which it sends to the destination machine.  This

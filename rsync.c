@@ -196,6 +196,7 @@ void sig_int(void)
    and ownership */
 void finish_transfer(char *fname, char *fnametmp, struct file_struct *file)
 {
+rprintf(FINFO,"finish_transfer(%s,%s)\n",fname,fnametmp);
 	if (make_backups) {
 		char fnamebak[MAXPATHLEN];
 		if (strlen(fname) + strlen(backup_suffix) > (MAXPATHLEN-1)) {
