@@ -25,6 +25,12 @@ Changes since 2.6.2:
       items are now excluded from being uploaded (if the module is not
       read-only) as well as downloaded.
 
+    - When using --backup without a --backup-dir, rsync no longer preserves
+      the modify time on directories.  This avoids confusing NFS.
+
+    - Fixed a bug in the daemon authentication code when using one of the
+      batch-processing options.
+
   ENHANCEMENTS:
 
     - Added the "write only" option to the daemon's config file.
