@@ -469,6 +469,13 @@ dit(bf(-u, --update)) This forces rsync to skip any files for which the
 destination file already exists and has a date later than the source
 file.
 
+In the currently implementation, a difference of file format is always
+considered to be important enough for an update, no matter what date
+is on the objects.  In other words, if the source has a directory or a
+symlink where the destination has a file, the transfer would occur
+regardless of the timestamps.  This might change in the future (feel
+free to comment on this on the mailing list if you have an opinion).
+
 dit(bf(-l, --links)) When symlinks are encountered, recreate the
 symlink on the destination.
 
