@@ -509,11 +509,13 @@ dit(bf(--suffix=SUFFIX)) This option allows you to override the default
 backup suffix used with the --backup (-b) option. The default suffix is a ~
 if no --backup-dir was specified, otherwise it is an empty string.
 
-dit(bf(-u, --update)) This forces rsync to skip any files for which the
-destination file already exists and has a date later than the source
-file.
+dit(bf(-u, --update)) This forces rsync to skip any files which exist on
+the destination and have a modified time that is newer than the source
+file.  (If an existing destination file has a modify time equal to the
+source file's, it will be updated if the sizes are different.)
 
-In the currently implementation, a difference of file format is always
+In the current implementation of --update, a difference of file format
+between the sender and receiver is always
 considered to be important enough for an update, no matter what date
 is on the objects.  In other words, if the source has a directory or a
 symlink where the destination has a file, the transfer would occur
