@@ -35,7 +35,7 @@ itemize(
   it() support for copying links, devices, owners, groups and permissions
   it() exclude and exclude-from options similar to GNU tar
   it() a CVS exclude mode for ignoring the same files that CVS would ignore
-  it() can use any transparent remote shell, including rsh or ssh
+  it() can use any transparent remote shell, including ssh or rsh
   it() does not require root privileges
   it() pipelining of file transfers to minimize latency costs
   it() support for anonymous or authenticated rsync servers (ideal for
@@ -51,8 +51,8 @@ itemize(
 	     source nor destination path contains a : separator
 
 	it() for copying from the local machine to a remote machine using
-	a remote shell program as the transport (such as rsh or
-	ssh). This is invoked when the destination path contains a
+	a remote shell program as the transport (such as ssh or
+	rsh). This is invoked when the destination path contains a
 	single : separator.
 
 	it() for copying from a remote machine to the local machine
@@ -93,9 +93,9 @@ See the file README for installation instructions.
 
 Once installed, you can use rsync to any machine that you can access via
 a remote shell (as well as some that you can access using the rsync
-daemon-mode protocol).  For remote transfers, rsync typically uses rsh
+daemon-mode protocol).  For remote transfers, a modern rsync uses ssh
 for its communications, but it may have been configured to use a
-different remote shell by default, such as ssh.
+different remote shell by default, such as rsh or remsh.
 
 You can also specify any remote shell you like, either by using the -e
 command line option, or by setting the RSYNC_RSH environment variable.
@@ -194,8 +194,8 @@ users. On those systems using --password-file is recommended.
 manpagesection(CONNECTING TO AN RSYNC SERVER OVER A REMOTE SHELL PROGRAM)
 
 It is sometimes useful to be able to set up file transfers using rsync
-server capabilities on the remote machine, while still using rsh or
-ssh for transport.  This is especially useful when you want to connect
+server capabilities on the remote machine, while still using ssh or
+rsh for transport.  This is especially useful when you want to connect
 to a remote machine via ssh (for encryption or to get through a
 firewall), but you still want to have access to the rsync server
 features (see RUNNING AN RSYNC SERVER OVER A REMOTE SHELL PROGRAM,
@@ -598,8 +598,8 @@ the rsync algorithm. See the technical report for details.
 
 dit(bf(-e, --rsh=COMMAND)) This option allows you to choose an alternative
 remote shell program to use for communication between the local and
-remote copies of rsync. Typically, rsync is configured to use rsh by
-default, but you may prefer to use ssh because of its high security.
+remote copies of rsync. Typically, rsync is configured to use ssh by
+default, but you may prefer to use rsh on a local network.
 
 If this option is used with bf([user@]host::module/path), then the
 remote shell em(COMMMAND) will be used to run an rsync server on the
@@ -800,11 +800,10 @@ dit(bf(--port=PORT)) This specifies an alternate TCP port number to use
 rather than the default port 873.
 
 dit(bf(--blocking-io)) This tells rsync to use blocking IO when launching
-a remote shell transport.  If -e or --rsh are not specified or are set to
-the default "rsh", this defaults to blocking IO, otherwise it defaults to
-non-blocking IO.  You may find the --blocking-io option is needed for some
-remote shells that can't handle non-blocking IO.  (Note that ssh prefers
-non-blocking IO.)
+a remote shell transport.  If the remote shell is either rsh or remsh (and
+assuming the RSYNC_RSH_IO value does not apply), rsync defaults to using
+blocking IO, otherwise it defaults to using non-blocking IO.  (Note that
+ssh prefers non-blocking IO.)
 
 dit(bf(--no-blocking-io)) Turn off --blocking-io, for use when it is the
 default.
@@ -1007,9 +1006,9 @@ Example:
 verb(
 $ rsync --write-batch=pfx -a /source/dir/ /adest/dir/
 $ rcp pfx.rsync_* remote:
-$ rsh remote rsync --read-batch=pfx -a /bdest/dir/
+$ ssh remote rsync --read-batch=pfx -a /bdest/dir/
 # or alternatively
-$ rsh remote ./pfx.rsync_argvs /bdest/dir/
+$ ssh remote ./pfx.rsync_argvs /bdest/dir/
 )
 
 In this example, rsync is used to update /adest/dir/ with /source/dir/
@@ -1081,7 +1080,7 @@ for its transport. The way to diagnose this problem is to run your
 remote shell like this:
 
 verb(
-   rsh remotehost /bin/true > out.dat
+   ssh remotehost /bin/true > out.dat
 )
        
 then look at out.dat. If everything is working correctly then out.dat
@@ -1132,6 +1131,13 @@ more details.
 dit(bf(RSYNC_RSH)) The RSYNC_RSH environment variable allows you to
 override the default shell used as the transport for rsync.  Command line
 options are permitted after the command name, just as in the -e option.
+
+dit(bf(RSYNC_RSH_IO)) The RSYNC_RSH_IO environment variable allows you to
+override the blocking IO default for the shell specified in RSYNC_RSH.  Set
+it to either "blocking" or "non-blocking".  This value is only used if the
+remote-shell choice exactly matches the value of the RSYNC_RSH variable.
+Otherwise the default blocking-IO value will be used, as mentioned in
+the --blocking-io option's description above.
 
 dit(bf(RSYNC_PROXY)) The RSYNC_PROXY environment variable allows you to
 redirect your rsync client to use a web proxy when connecting to a
