@@ -450,6 +450,8 @@ static void delete_files(struct file_list *flist)
   char *dot=".";
   int i;
 
+  if (!am_server && cvs_exclude)
+    add_cvs_excludes();
   if (!(local_file_list = send_file_list(-1,recurse,1,&dot)))
     return;
 
