@@ -5,7 +5,7 @@ AC_CONFIG_SRCDIR([byteorder.h])
 AC_CONFIG_HEADER(config.h)
 AC_PREREQ(2.52)
 
-RSYNC_VERSION=2.5.6
+RSYNC_VERSION=2.5.7
 AC_SUBST(RSYNC_VERSION)
 AC_MSG_NOTICE([Configuring rsync $RSYNC_VERSION])
 
@@ -427,6 +427,15 @@ main() {
 rsync_cv_HAVE_SOCKETPAIR=yes,rsync_cv_HAVE_SOCKETPAIR=no,rsync_cv_HAVE_SOCKETPAIR=cross)])
 if test x"$rsync_cv_HAVE_SOCKETPAIR" = x"yes"; then
     AC_DEFINE(HAVE_SOCKETPAIR, 1, [ ])
+fi
+
+AC_CACHE_CHECK([for working fnmatch],rsync_cv_HAVE_FNMATCH,[
+AC_TRY_RUN([#include <fnmatch.h>
+main() { exit((fnmatch("*.o", "x.o", FNM_PATHNAME) == 0 &&
+               fnmatch("a/b/*", "a/b/c/d", FNM_PATHNAME) != 0) ? 0: 1); }],
+rsync_cv_HAVE_FNMATCH=yes,rsync_cv_HAVE_FNMATCH=no,rsync_cv_HAVE_FNMATCH=cross)])
+if test x"$rsync_cv_HAVE_FNMATCH" = x"yes"; then
+    AC_DEFINE(HAVE_FNMATCH, 1, [ ])
 fi
 
 if test x"$with_included_popt" != x"yes"

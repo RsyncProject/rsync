@@ -90,10 +90,10 @@ static struct err_list *err_list_tail;
 static void err_list_add(int code, char *buf, int len)
 {
 	struct err_list *el;
-	el = (struct err_list *)malloc(sizeof(*el));
+	el = new(struct err_list);
 	if (!el) exit_cleanup(RERR_MALLOC);
 	el->next = NULL;
-	el->buf = malloc(len+4);
+	el->buf = new_array(char, len+4);
 	if (!el->buf) exit_cleanup(RERR_MALLOC);
 	memcpy(el->buf+4, buf, len);
 	SIVAL(el->buf, 0, ((code+MPLEX_BASE)<<24) | len);
@@ -238,9 +238,9 @@ void rwrite(enum logcode code, char *buf, int len)
 		return;
 	}
 
-	/* next, if we are a server and multiplexing is enabled, 
-	 * pass it to the other side.  */
-	if (am_server && io_multiplex_write(code, buf, len)) {
+	/* next, if we are a server but not in daemon mode, and multiplexing
+	 *  is enabled, pass it to the other side.  */
+	if (am_server && !am_daemon && io_multiplex_write(code, buf, len)) {
 		return;
 	}
 
@@ -250,9 +250,7 @@ void rwrite(enum logcode code, char *buf, int len)
 	 *  side because we don't want the client to see most errors for
 	 *  security reasons.  We do want early messages when running daemon
 	 *  mode over a remote shell to go to the remote side; those will
-	 *  fall through to the next case.
-	 * Note that this is only for the time before multiplexing is enabled.
-	 */
+	 *  fall through to the next case. */
 	if (am_daemon && (!am_server || log_initialised)) {
 		static int depth;
 		int priority = LOG_INFO;
@@ -571,4 +569,18 @@ void log_exit(int code, const char *file, int line)
 		rprintf(FERROR,"rsync error: %s (code %d) at %s(%d)\n", 
 			name, code, file, line);
 	}
+}
+
+/*
+ * Log the incoming transfer of a file for interactive use,
+ * this will be called at the end where the client was run.
+ * Called when a file starts to be transferred.
+ */
+void log_transfer(struct file_struct *file, const char *fname)
+{
+	extern int verbose;
+
+	if (!verbose) return;
+
+	rprintf(FINFO, "%s\n", fname);
 }

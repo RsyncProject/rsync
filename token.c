@@ -51,7 +51,7 @@ void set_compression(char *fname)
 	strlower(fname);
 
 	for (tok=strtok(dont," ");tok;tok=strtok(NULL," ")) {
-		if (wildmatch(tok, fname)) {
+		if (fnmatch(tok, fname, 0) == 0) {
 			compression_level = 0;
 			break;
 		}
@@ -68,7 +68,7 @@ static int simple_recv_token(int f,char **data)
 	int n;
 
 	if (!buf) {
-		buf = (char *)malloc(CHUNK_SIZE);
+		buf = new_array(char, CHUNK_SIZE);
 		if (!buf) out_of_memory("simple_recv_token");
 	}
 
@@ -90,8 +90,8 @@ static int simple_recv_token(int f,char **data)
 static void simple_send_token(int f,int token,
 			      struct map_struct *buf,OFF_T offset,int n)
 {
-	extern int write_batch;
-	int hold_int;
+	extern int write_batch; /* dw */
+	int hold_int; /* dw */
 
 	if (n > 0) {
 		int l = 0;
@@ -100,8 +100,8 @@ static void simple_send_token(int f,int token,
 			write_int(f,n1);
 			write_buf(f,map_ptr(buf,offset+l,n1),n1);
 			if (write_batch) {
-				write_batch_delta_file( (char *) &n1, sizeof(int) );
-				write_batch_delta_file(map_ptr(buf,offset+l,n1),n1);
+			    write_batch_delta_file( (char *) &n1, sizeof(int) );
+			    write_batch_delta_file(map_ptr(buf,offset+l,n1),n1);
 			}
 			l += n1;
 		}
@@ -110,8 +110,8 @@ static void simple_send_token(int f,int token,
 	if (token != -2) {
 		write_int(f,-(token+1));
 		if (write_batch) {
-			hold_int = -(token+1);
-			write_batch_delta_file( (char *) &hold_int, sizeof(int) );
+		    hold_int = -(token+1);
+		    write_batch_delta_file( (char *) &hold_int, sizeof(int) );
 		}
 	}
 }
@@ -127,12 +127,6 @@ static void simple_send_token(int f,int token,
 
 #define MAX_DATA_COUNT	16383	/* fit 14 bit count into 2 bytes with flags */
 
-/* zlib.h says that if we want to be able to compress something in a single
- * call, avail_out must be at least 0.1% larger than avail_in plus 12 bytes.
- * We'll add in 0.1%+16, just to be safe (and we'll avoid floating point,
- * to ensure that this is a compile-time value). */
-#define AVAIL_OUT_SIZE(avail_in_size) ((avail_in_size)*1001/1000+16)
-
 /* For coding runs of tokens */
 static int last_token = -1;
 static int run_start;
@@ -144,14 +138,6 @@ static z_stream tx_strm;
 /* Output buffer */
 static char *obuf;
 
-/* We want obuf to be able to hold both MAX_DATA_COUNT+2 bytes as well as
- * AVAIL_OUT_SIZE(CHUNK_SIZE) bytes, so make sure that it's large enough. */
-#if MAX_DATA_COUNT+2 > AVAIL_OUT_SIZE(CHUNK_SIZE)
-#define OBUF_SIZE	(MAX_DATA_COUNT+2)
-#else
-#define OBUF_SIZE	AVAIL_OUT_SIZE(CHUNK_SIZE)
-#endif
-
 /* Send a deflated token */
 static void
 send_deflated_token(int f, int token,
@@ -159,8 +145,8 @@ send_deflated_token(int f, int token,
 {
 	int n, r;
 	static int init_done, flush_pending;
-	extern int write_batch;
-	char temp_byte;
+	extern int write_batch;  /* dw */
+	char temp_byte;   /* dw */
 
 	if (last_token == -1) {
 		/* initialization */
@@ -174,7 +160,7 @@ send_deflated_token(int f, int token,
 				rprintf(FERROR, "compression init failed\n");
 				exit_cleanup(RERR_STREAMIO);
 			}
-			if ((obuf = malloc(OBUF_SIZE)) == NULL)
+			if ((obuf = new_array(char, MAX_DATA_COUNT+2)) == NULL)
 				out_of_memory("send_deflated_token");
 			init_done = 1;
 		} else
@@ -193,26 +179,26 @@ send_deflated_token(int f, int token,
 		n = last_token - run_start;
 		if (r >= 0 && r <= 63) {
 			write_byte(f, (n==0? TOKEN_REL: TOKENRUN_REL) + r);
-			if (write_batch) {
-				temp_byte = (char)( (n==0? TOKEN_REL: TOKENRUN_REL) + r);
-				write_batch_delta_file(&temp_byte,sizeof(char));
+			if (write_batch) { /* dw */
+			    temp_byte = (char)( (n==0? TOKEN_REL: TOKENRUN_REL) + r);
+			    write_batch_delta_file(&temp_byte,sizeof(char));
 			}
 		} else {
 			write_byte(f, (n==0? TOKEN_LONG: TOKENRUN_LONG));
 			write_int(f, run_start);
-			if (write_batch) {
-				temp_byte = (char)(n==0? TOKEN_LONG: TOKENRUN_LONG);
-				write_batch_delta_file(&temp_byte,sizeof(temp_byte));
-				write_batch_delta_file((char *)&run_start,sizeof(run_start));
+			if (write_batch) { /* dw */
+			    temp_byte = (char)(n==0? TOKEN_LONG: TOKENRUN_LONG);
+			    write_batch_delta_file(&temp_byte,sizeof(temp_byte));
+			    write_batch_delta_file((char *)&run_start,sizeof(run_start));
 			}
 		}
 		if (n != 0) {
 			write_byte(f, n);
 			write_byte(f, n >> 8);
-			if (write_batch) {
-				write_batch_delta_file((char *)&n,sizeof(char));
-				temp_byte = (char)(n >> 8);
-				write_batch_delta_file(&temp_byte,sizeof(temp_byte));
+			if (write_batch) { /* dw */
+			    write_batch_delta_file((char *)&n,sizeof(char));
+			    temp_byte = (char) n >> 8;
+			    write_batch_delta_file(&temp_byte,sizeof(temp_byte));
 			}
 		}
 		last_run_end = last_token;
@@ -272,8 +258,8 @@ send_deflated_token(int f, int token,
 					obuf[0] = DEFLATED_DATA + (n >> 8);
 					obuf[1] = n;
 					write_buf(f, obuf, n+2);
-					if (write_batch)
-						write_batch_delta_file(obuf,n+2);
+					if (write_batch) /* dw */
+					    write_batch_delta_file(obuf,n+2);
 				}
 			}
 		} while (nb != 0 || tx_strm.avail_out == 0);
@@ -283,9 +269,9 @@ send_deflated_token(int f, int token,
 	if (token == -1) {
 		/* end of file - clean up */
 		write_byte(f, END_FLAG);
-		if (write_batch) {
-			temp_byte = END_FLAG;
-			write_batch_delta_file((char *)&temp_byte,sizeof(temp_byte));
+		if (write_batch) { /* dw */
+		    temp_byte = END_FLAG;
+		    write_batch_delta_file((char *)&temp_byte,sizeof(temp_byte));
 		}
 
 	} else if (token != -2) {
@@ -294,7 +280,7 @@ send_deflated_token(int f, int token,
 		tx_strm.next_in = (Bytef *) map_ptr(buf, offset, toklen);
 		tx_strm.avail_in = toklen;
 		tx_strm.next_out = (Bytef *) obuf;
-		tx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
+		tx_strm.avail_out = MAX_DATA_COUNT;
 		r = deflate(&tx_strm, Z_INSERT_ONLY);
 		if (r != Z_OK || tx_strm.avail_in != 0) {
 			rprintf(FERROR, "deflate on token returned %d (%d bytes left)\n",
@@ -336,8 +322,8 @@ recv_deflated_token(int f, char **data)
 					rprintf(FERROR, "inflate init failed\n");
 					exit_cleanup(RERR_STREAMIO);
 				}
-				if ((cbuf = malloc(MAX_DATA_COUNT)) == NULL
-				    || (dbuf = malloc(AVAIL_OUT_SIZE(CHUNK_SIZE))) == NULL)
+				if (!(cbuf = new_array(char, MAX_DATA_COUNT))
+				    || !(dbuf = new_array(char, CHUNK_SIZE)))
 					out_of_memory("recv_deflated_token");
 				init_done = 1;
 			} else {
@@ -366,9 +352,9 @@ recv_deflated_token(int f, char **data)
 				/* check previous inflated stuff ended correctly */
 				rx_strm.avail_in = 0;
 				rx_strm.next_out = (Bytef *)dbuf;
-				rx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
+				rx_strm.avail_out = CHUNK_SIZE;
 				r = inflate(&rx_strm, Z_SYNC_FLUSH);
-				n = AVAIL_OUT_SIZE(CHUNK_SIZE) - rx_strm.avail_out;
+				n = CHUNK_SIZE - rx_strm.avail_out;
 				/*
 				 * Z_BUF_ERROR just means no progress was
 				 * made, i.e. the decompressor didn't have
@@ -422,9 +408,9 @@ recv_deflated_token(int f, char **data)
 
 		case r_inflating:
 			rx_strm.next_out = (Bytef *)dbuf;
-			rx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
+			rx_strm.avail_out = CHUNK_SIZE;
 			r = inflate(&rx_strm, Z_NO_FLUSH);
-			n = AVAIL_OUT_SIZE(CHUNK_SIZE) - rx_strm.avail_out;
+			n = CHUNK_SIZE - rx_strm.avail_out;
 			if (r != Z_OK) {
 				rprintf(FERROR, "inflate returned %d (%d bytes)\n", r, n);
 				exit_cleanup(RERR_STREAMIO);
@@ -479,7 +465,7 @@ static void see_deflate_token(char *buf, int len)
 			}
 		}
 		rx_strm.next_out = (Bytef *)dbuf;
-		rx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
+		rx_strm.avail_out = CHUNK_SIZE;
 		r = inflate(&rx_strm, Z_SYNC_FLUSH);
 		if (r != Z_OK) {
 			rprintf(FERROR, "inflate (token) returned %d\n", r);

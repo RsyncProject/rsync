@@ -6,17 +6,17 @@
  * Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
  */
 
-/*
+/* 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-
+   
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-
+   
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -36,7 +36,7 @@
  * 3) add it to the list of available functions (eg: using FN_GLOBAL_STRING())
  * 4) If it's a global then initialise it in init_globals. If a local
  *    (ie. service) parameter then initialise it in the sDefault structure
- *
+ *  
  *
  * Notes:
  *   The configuration file is processed sequentially for speed. It is NOT
@@ -61,7 +61,7 @@ typedef char pstring[1024];
 typedef enum
 {
 	P_BOOL,P_BOOLREV,P_CHAR,P_INTEGER,P_OCTAL,
-	P_PATH,P_STRING,P_GSTRING,P_ENUM,P_SEP
+	P_STRING,P_GSTRING,P_ENUM,P_SEP
 } parm_type;
 
 typedef enum
@@ -93,7 +93,7 @@ struct parm_struct
 #define iSERVICE(i) (*pSERVICE(i))
 #define LP_SNUM_OK(iService) (((iService) >= 0) && ((iService) < iNumServices))
 
-/*
+/* 
  * This structure describes global (ie., server-wide) parameters.
  */
 typedef struct
@@ -109,8 +109,8 @@ static global Globals;
 
 
 
-/*
- * This structure describes a single service.
+/* 
+ * This structure describes a single service. 
  */
 typedef struct
 {
@@ -144,7 +144,7 @@ typedef struct
 
 
 /* This is a default service used to prime a services structure */
-static service sDefault =
+static service sDefault = 
 {
 	NULL,    /* name */
 	NULL,    /* path */
@@ -156,7 +156,7 @@ static service sDefault =
 	False,   /* transfer logging */
 	False,   /* ignore errors */
 	"nobody",/* uid */
-
+	
 	/* TODO: This causes problems on Debian, where it is called
 	 * "nogroup".  Debian patch this in their version of the
 	 * package, but it would be nice to be consistent.  Possibly
@@ -165,7 +165,7 @@ static service sDefault =
 	 * What is the best behaviour?  Perhaps always using (gid_t)
 	 * -2? */
 	"nobody",/* gid */
-
+	
 	NULL,    /* hosts allow */
 	NULL,    /* hosts deny */
 	NULL,    /* auth users */
@@ -222,7 +222,7 @@ static struct enum_list enum_facilities[] = {
 	{ LOG_NEWS, "news" },
 #endif
 #ifdef LOG_AUTH
-	{ LOG_AUTH, "security" },
+	{ LOG_AUTH, "security" },		
 #endif
 #ifdef LOG_SYSLOG
 	{ LOG_SYSLOG, "syslog" },
@@ -274,7 +274,7 @@ static struct parm_struct parm_table[] =
   {"name",             P_STRING,  P_LOCAL,  &sDefault.name,        NULL,   0},
   {"comment",          P_STRING,  P_LOCAL,  &sDefault.comment,     NULL,   0},
   {"lock file",        P_STRING,  P_LOCAL,  &sDefault.lock_file,   NULL,   0},
-  {"path",             P_PATH,    P_LOCAL,  &sDefault.path,        NULL,   0},
+  {"path",             P_STRING,  P_LOCAL,  &sDefault.path,        NULL,   0},
   {"read only",        P_BOOL,    P_LOCAL,  &sDefault.read_only,   NULL,   0},
   {"list",             P_BOOL,    P_LOCAL,  &sDefault.list,        NULL,   0},
   {"use chroot",       P_BOOL,    P_LOCAL,  &sDefault.use_chroot,  NULL,   0},
@@ -319,8 +319,8 @@ static void init_locals(void)
 
 
 /*
-   In this section all the functions that are used to access the
-   parameters from the rest of the program are defined
+   In this section all the functions that are used to access the 
+   parameters from the rest of the program are defined 
 */
 
 #define FN_GLOBAL_STRING(fn_name,ptr) \
@@ -376,11 +376,12 @@ FN_LOCAL_INTEGER(lp_timeout, timeout)
 FN_LOCAL_INTEGER(lp_max_connections, max_connections)
 
 /* local prototypes */
-static int    strwicmp(char *psz1, char *psz2);
-static int    map_parameter(char *parmname);
-static BOOL   set_boolean(BOOL *pb, char *parmvalue);
+static int    strwicmp( char *psz1, char *psz2 );
+static int    map_parameter( char *parmname);
+static BOOL   set_boolean( BOOL *pb, char *parmvalue );
 static int    getservicebyname(char *name, service *pserviceDest);
-static void   copy_service(service *pserviceDest, service *pserviceSource);
+static void   copy_service( service *pserviceDest, 
+                            service *pserviceSource);
 static BOOL   do_parameter(char *parmname, char *parmvalue);
 static BOOL   do_section(char *sectionname);
 
@@ -420,7 +421,7 @@ static void string_set(char **s, const char *v)
 
 
 /***************************************************************************
-add a new service to the services array initialising it with the given
+add a new service to the services array initialising it with the given 
 service
 ***************************************************************************/
 static int add_a_service(service *pservice, char *name)
@@ -432,7 +433,7 @@ static int add_a_service(service *pservice, char *name)
   tservice = *pservice;
 
   /* it might already exist */
-  if (name)
+  if (name) 
     {
       i = getservicebyname(name,NULL);
       if (i >= 0)
@@ -441,10 +442,10 @@ static int add_a_service(service *pservice, char *name)
 
   i = iNumServices;
 
-  ServicePtrs = (service **)Realloc(ServicePtrs,sizeof(service *)*num_to_alloc);
+  ServicePtrs = realloc_array(ServicePtrs, service *, num_to_alloc);
 
   if (ServicePtrs)
-	  pSERVICE(iNumServices) = (service *)malloc(sizeof(service));
+	  pSERVICE(iNumServices) = new(service);
 
   if (!ServicePtrs || !pSERVICE(iNumServices))
 	  return(-1);
@@ -454,7 +455,7 @@ static int add_a_service(service *pservice, char *name)
   init_service(pSERVICE(i));
   copy_service(pSERVICE(i),&tservice);
   if (name)
-    string_set(&iSERVICE(i).name,name);
+    string_set(&iSERVICE(i).name,name);  
 
   return(i);
 }
@@ -492,7 +493,7 @@ static int strwicmp(char *psz1, char *psz2)
 }
 
 /***************************************************************************
-Map a parameter's string representation to something we can use.
+Map a parameter's string representation to something we can use. 
 Returns False if the parameter string is not recognised, else TRUE.
 ***************************************************************************/
 static int map_parameter(char *parmname)
@@ -502,7 +503,7 @@ static int map_parameter(char *parmname)
    if (*parmname == '-')
      return(-1);
 
-   for (iIndex = 0; parm_table[iIndex].label; iIndex++)
+   for (iIndex = 0; parm_table[iIndex].label; iIndex++) 
       if (strwicmp(parm_table[iIndex].label, parmname) == 0)
          return(iIndex);
 
@@ -513,7 +514,7 @@ static int map_parameter(char *parmname)
 
 /***************************************************************************
 Set a boolean variable from the text value stored in the passed string.
-Returns True in success, False if the passed string does not correctly
+Returns True in success, False if the passed string does not correctly 
 represent a boolean.
 ***************************************************************************/
 static BOOL set_boolean(BOOL *pb, char *parmvalue)
@@ -547,7 +548,7 @@ static int getservicebyname(char *name, service *pserviceDest)
    int iService;
 
    for (iService = iNumServices - 1; iService >= 0; iService--)
-      if (strwicmp(iSERVICE(iService).name, name) == 0)
+      if (strwicmp(iSERVICE(iService).name, name) == 0) 
       {
          if (pserviceDest != NULL)
 	   copy_service(pserviceDest, pSERVICE(iService));
@@ -563,7 +564,7 @@ static int getservicebyname(char *name, service *pserviceDest)
 Copy a service structure to another
 
 ***************************************************************************/
-static void copy_service(service *pserviceDest,
+static void copy_service(service *pserviceDest, 
                          service *pserviceSource)
 {
   int i;
@@ -571,9 +572,9 @@ static void copy_service(service *pserviceDest,
   for (i=0;parm_table[i].label;i++)
     if (parm_table[i].ptr && parm_table[i].class == P_LOCAL) {
 	void *def_ptr = parm_table[i].ptr;
-	void *src_ptr =
+	void *src_ptr = 
 	  ((char *)pserviceSource) + PTR_DIFF(def_ptr,&sDefault);
-	void *dest_ptr =
+	void *dest_ptr = 
 	  ((char *)pserviceDest) + PTR_DIFF(def_ptr,&sDefault);
 
 	switch (parm_table[i].type)
@@ -593,7 +594,6 @@ static void copy_service(service *pserviceDest,
 	    *(char *)dest_ptr = *(char *)src_ptr;
 	    break;
 
-	  case P_PATH:
 	  case P_STRING:
 	    string_set(dest_ptr,*(char **)src_ptr);
 	    break;
@@ -614,7 +614,6 @@ static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
    int parmnum, i;
    void *parm_ptr=NULL; /* where we are going to store the result */
    void *def_ptr=NULL;
-   char *cp;
 
    parmnum = map_parameter(parmname);
 
@@ -659,15 +658,6 @@ static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
 
      case P_OCTAL:
        sscanf(parmvalue,"%o",(int *)parm_ptr);
-       break;
-
-     case P_PATH:
-       string_set(parm_ptr,parmvalue);
-       if ((cp = *(char**)parm_ptr) != NULL) {
-	   int len = strlen(cp);
-	   while (len > 1 && cp[len-1] == '/') len--;
-	   cp[len] = '\0';
-       }
        break;
 
      case P_STRING:
@@ -721,7 +711,7 @@ static BOOL do_section(char *sectionname)
      init_locals();
 
    /* if we've just struck a global section, note the fact. */
-   bInGlobalSection = isglobal;
+   bInGlobalSection = isglobal;   
 
    /* check for multiple global sections */
    if (bInGlobalSection)
@@ -753,7 +743,7 @@ static BOOL do_section(char *sectionname)
 
 
 /***************************************************************************
-Load the services array from the services file. Return True on success,
+Load the services array from the services file. Return True on success, 
 False on failure.
 ***************************************************************************/
 BOOL lp_load(char *pszFname, int globals_only)
@@ -763,11 +753,11 @@ BOOL lp_load(char *pszFname, int globals_only)
 	extern int am_root;
 	pstring n2;
 	BOOL bRetval;
-
+ 
 	bRetval = False;
 
 	bInGlobalSection = True;
-
+  
 	init_globals();
 
 	if (pszFname)
@@ -780,7 +770,7 @@ BOOL lp_load(char *pszFname, int globals_only)
 	/* We get sections first, so have to start 'behind' to make up */
 	iServiceIndex = -1;
 	bRetval = pm_process(n2, globals_only?NULL:do_section, do_parameter);
-
+  
 	return (bRetval);
 }
 
@@ -804,7 +794,7 @@ int lp_number(char *name)
    int iService;
 
    for (iService = iNumServices - 1; iService >= 0; iService--)
-      if (strequal(lp_name(iService), name))
+      if (strequal(lp_name(iService), name)) 
          break;
 
    return (iService);

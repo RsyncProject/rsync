@@ -1,17 +1,17 @@
-/*
+/* 
    Copyright (C) Andrew Tridgell 1996
    Copyright (C) Paul Mackerras 1996
-
+   
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-
+   
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-
+   
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -43,8 +43,8 @@ void free_sums(struct sum_struct *s)
 
 
 /*
- * delete a file or directory. If force_delete is set then delete
- * recursively
+ * delete a file or directory. If force_delete is set then delete 
+ * recursively 
  */
 int delete_file(char *fname)
 {
@@ -67,31 +67,29 @@ int delete_file(char *fname)
 
 	if (!S_ISDIR(st.st_mode)) {
 		if (robust_unlink(fname) == 0 || errno == ENOENT) return 0;
-		rprintf(FERROR, "delete_file: unlink %s failed: %s\n",
-			full_fname(fname), strerror(errno));
+		rprintf(FERROR,"delete_file: unlink(%s) : %s\n", fname, strerror(errno));
 		return -1;
 	}
 
 	if (do_rmdir(fname) == 0 || errno == ENOENT) return 0;
-	if (!force_delete || !recurse ||
+	if (!force_delete || !recurse || 
 	    (errno != ENOTEMPTY && errno != EEXIST)) {
-		rprintf(FERROR, "delete_file: rmdir %s failed: %s\n",
-			full_fname(fname), strerror(errno));
+		rprintf(FERROR,"delete_file: rmdir(%s) : %s\n", fname, strerror(errno));
 		return -1;
 	}
 
 	/* now we do a recsursive delete on the directory ... */
 	d = opendir(fname);
 	if (!d) {
-		rprintf(FERROR, "delete_file: opendir %s failed: %s\n",
-			full_fname(fname), strerror(errno));
+		rprintf(FERROR,"delete_file: opendir(%s): %s\n",
+			fname,strerror(errno));
 		return -1;
 	}
 
-	for (errno = 0, di = readdir(d); di; errno = 0, di = readdir(d)) {
+	for (di=readdir(d); di; di=readdir(d)) {
 		char *dname = d_name(di);
-		if (strcmp(dname,".") == 0
-		    || strcmp(dname,"..") == 0)
+		if (strcmp(dname,".")==0 ||
+		    strcmp(dname,"..")==0)
 			continue;
 		snprintf(buf, sizeof(buf), "%s/%s", fname, dname);
 		if (verbose > 0)
@@ -100,19 +98,12 @@ int delete_file(char *fname)
 			closedir(d);
 			return -1;
 		}
-	}
-	if (errno) {
-		rprintf(FERROR, "delete_file: readdir %s failed: %s\n",
-			full_fname(fname), strerror(errno));
-		closedir(d);
-		return -1;
-	}
+	}	
 
 	closedir(d);
-
+	
 	if (do_rmdir(fname) != 0) {
-		rprintf(FERROR, "delete_file: rmdir %s failed: %s\n",
-			full_fname(fname), strerror(errno));
+		rprintf(FERROR,"delete_file: rmdir(%s) : %s\n", fname, strerror(errno));
 		return -1;
 	}
 
@@ -133,7 +124,7 @@ static int is_in_group(gid_t gid)
 		/* treat failure (-1) as if not member of any group */
 		ngroups = getgroups(0, 0);
 		if (ngroups > 0) {
-			gidset = (GETGROUPS_T *) malloc(ngroups * sizeof(GETGROUPS_T));
+			gidset = new_array(GETGROUPS_T, ngroups);
 			ngroups = getgroups(ngroups, gidset);
 		}
 	}
@@ -154,7 +145,7 @@ static int is_in_group(gid_t gid)
 }
 
 int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
-		int report)
+	      int report)
 {
 	int updated = 0;
 	STRUCT_STAT st2;
@@ -164,8 +155,7 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 
 	if (!st) {
 		if (link_stat(fname,&st2) != 0) {
-			rprintf(FERROR, "stat %s failed: %s\n",
-				full_fname(fname), strerror(errno));
+			rprintf(FERROR,"stat %s : %s\n",fname,strerror(errno));
 			return 0;
 		}
 		st = &st2;
@@ -177,8 +167,8 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 		   because some filesystems can't do it */
 		if (set_modtime(fname,file->modtime) != 0 &&
 		    !S_ISDIR(st->st_mode)) {
-			rprintf(FERROR, "failed to set times on %s: %s\n",
-				full_fname(fname), strerror(errno));
+			rprintf(FERROR,"failed to set times on %s : %s\n",
+				fname,strerror(errno));
 			return 0;
 		} else {
 			updated = 1;
@@ -199,8 +189,7 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 			      change_gid?file->gid:st->st_gid) != 0) {
 			/* shouldn't have attempted to change uid or gid
 			     unless have the privilege */
-			rprintf(FERROR, "chown %s failed: %s\n",
-				full_fname(fname), strerror(errno));
+			rprintf(FERROR,"chown %s : %s\n", fname,strerror(errno));
 			return 0;
 		}
 		/* a lchown had been done - we have to re-stat if the
@@ -214,17 +203,17 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 
 #ifdef HAVE_CHMOD
 	if (!S_ISLNK(st->st_mode)) {
-		if ((st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS)) {
+		if (st->st_mode != file->mode) {
 			updated = 1;
-			if (do_chmod(fname,(file->mode & CHMOD_BITS)) != 0) {
-				rprintf(FERROR, "failed to set permissions on %s: %s\n",
-					full_fname(fname), strerror(errno));
+			if (do_chmod(fname,file->mode) != 0) {
+				rprintf(FERROR,"failed to set permissions on %s : %s\n",
+					fname,strerror(errno));
 				return 0;
 			}
 		}
 	}
 #endif
-
+    
 	if (verbose > 1 && report) {
 		if (updated)
 			rprintf(FINFO,"%s\n",fname);
@@ -251,18 +240,17 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file)
 	/* move tmp file over real file */
 	if (robust_rename(fnametmp,fname) != 0) {
 		if (errno == EXDEV) {
-			/* rename failed on cross-filesystem link.
+			/* rename failed on cross-filesystem link.  
 			   Copy the file instead. */
 			if (copy_file(fnametmp,fname, file->mode & INITACCESSPERMS)) {
-				rprintf(FERROR, "copy %s -> \"%s\": %s\n",
-					full_fname(fnametmp), fname,
-					strerror(errno));
+				rprintf(FERROR,"copy %s -> %s : %s\n",
+					fnametmp,fname,strerror(errno));
 			} else {
 				set_perms(fname,file,NULL,0);
 			}
 		} else {
-			rprintf(FERROR,"rename %s -> \"%s\": %s\n",
-				full_fname(fnametmp), fname, strerror(errno));
+			rprintf(FERROR,"rename %s -> %s : %s\n",
+				fnametmp,fname,strerror(errno));
 		}
 		do_unlink(fnametmp);
 	} else {

@@ -207,7 +207,7 @@ static BOOL Section( FILE *InFile, BOOL (*sfunc)(char *) )
     if( i > (bSize - 2) )
       {
       bSize += BUFR_INC;
-      bufr   = Realloc( bufr, bSize );
+      bufr   = realloc_array( bufr, char, bSize );
       if( NULL == bufr )
         {
         rprintf(FERROR, "%s Memory re-allocation failure.", func);
@@ -301,7 +301,7 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
     if( i > (bSize - 2) )       /* Ensure there's space for next char.    */
       {
       bSize += BUFR_INC;
-      bufr   = Realloc( bufr, bSize );
+      bufr   = realloc_array( bufr, char, bSize );
       if( NULL == bufr )
         {
         rprintf(FERROR, "%s Memory re-allocation failure.", func) ;
@@ -366,7 +366,7 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
     if( i > (bSize - 2) )       /* Make sure there's enough room. */
       {
       bSize += BUFR_INC;
-      bufr   = Realloc( bufr, bSize );
+      bufr   = realloc_array( bufr, char, bSize );
       if( NULL == bufr )
         {
         rprintf(FERROR, "%s Memory re-allocation failure.", func) ;
@@ -530,7 +530,7 @@ BOOL pm_process( char *FileName,
   else                                        /* If we don't have a buffer   */
     {                                         /* allocate one, then parse,   */
     bSize = BUFR_INC;                         /* then free.                  */
-    bufr = (char *)malloc( bSize );
+    bufr = new_array( char, bSize );
     if( NULL == bufr )
       {
       rprintf(FERROR,"%s memory allocation failure.\n", func);

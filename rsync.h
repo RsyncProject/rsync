@@ -50,28 +50,20 @@
 #define SAME_TIME (1<<7)
 
 /* update this if you make incompatible changes */
-#define PROTOCOL_VERSION 27
+#define PROTOCOL_VERSION 26
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
  * people writing them to make sure that they don't send us anything
  * we won't understand.
  *
- * Interoperation with old but supported protocol versions
- * should cause a warning to be printed.  At a future date
- * the old protocol will become the minimum and
- * compatibility code removed.
- *
- * There are two possible explanations for the limit at
- * MAX_PROTOCOL_VERSION: either to allow new major-rev versions that
- * do not interoperate with us, and (more likely) so that we can
- * detect an attempt to connect rsync to a non-rsync server, which is
- * unlikely to begin by sending a byte between MIN_PROTOCL_VERSION and
- * MAX_PROTOCOL_VERSION. */
-
-#define MIN_PROTOCOL_VERSION 17
-#define OLD_PROTOCOL_VERSION 20
-#define MAX_PROTOCOL_VERSION 40
+ * There are two possible explanations for the limit at thirty: either
+ * to allow new major-rev versions that do not interoperate with us,
+ * and (more likely) so that we can detect an attempt to connect rsync
+ * to a non-rsync server, which is unlikely to begin by sending a byte
+ * between 15 and 30. */
+#define MIN_PROTOCOL_VERSION 15
+#define MAX_PROTOCOL_VERSION 30
 
 #define RSYNC_PORT 873
 
@@ -84,16 +76,6 @@
 #define MAX_ARGS 1000
 
 #define MPLEX_BASE 7
-
-#define NO_EXCLUDES	0
-#define SERVER_EXCLUDES	1
-#define ALL_EXCLUDES	2
-
-#define MISSING_OK    0
-#define MISSING_FATAL 1
-
-#define ADD_INCLUDE 1
-#define ADD_EXCLUDE 0
 
 /* Log values.  I *think* what these mean is: FLOG goes to the server
  * logfile; FERROR and FINFO try to end up on the client, with
@@ -124,16 +106,16 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #include <stdlib.h>
 #endif
 
-#if defined(HAVE_MALLOC_H) && (defined(HAVE_MALLINFO) || !defined(HAVE_STDLIB_H))
-#include <malloc.h>
-#endif
-
 #ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
 #endif
 
 #ifdef HAVE_STRING_H
 #include <string.h>
+#endif
+
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
 #endif
 
 #ifdef TIME_WITH_SYS_TIME
@@ -192,8 +174,18 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #endif
 #endif
 
+#ifdef HAVE_FNMATCH
+#include <fnmatch.h>
+#else
+#include "lib/fnmatch.h"
+#endif
+
 #ifdef HAVE_GLOB_H
 #include <glob.h>
+#endif
+
+#ifdef HAVE_MALLOC_H
+#  include <malloc.h>
 #endif
 
 /* these are needed for the uid/gid mapping code */
@@ -281,17 +273,6 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #define NO_INT64
 #endif
 
-#if (SIZEOF_LONG == 8) 
-#define uint64 unsigned long
-#elif (SIZEOF_INT == 8) 
-#define uint64 unsigned int
-#elif HAVE_LONGLONG
-#define uint64 unsigned long long
-#else
-/* As long as it gets... */
-#define uint64 unsigned off_t
-#endif
-
 /* Starting from protocol version 26, we always use 64-bit
  * ino_t and dev_t internally, even if this platform does not
  * allow files to have 64-bit inums.  That's because the
@@ -323,8 +304,8 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
  * cope with platforms on which this is an unsigned int or even a
  * struct.  Later.
  */ 
-#define INO64_T uint64
-#define DEV64_T uint64
+#define INO64_T int64
+#define DEV64_T int64
 
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
@@ -341,15 +322,9 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 /* the length of the md4 checksum */
 #define MD4_SUM_LENGTH 16
 #define SUM_LENGTH 16
-#define SHORT_SUM_LENGTH 2
-#define BLOCKSUM_BIAS 10
 
 #ifndef MAXPATHLEN
 #define MAXPATHLEN 1024
-#endif
-
-#ifndef NAME_MAX
-#define NAME_MAX 255
 #endif
 
 #ifndef INADDR_NONE
@@ -410,35 +385,23 @@ struct sum_struct {
 	OFF_T flength;		/**< total file length */
 	size_t count;		/**< how many chunks */
 	size_t remainder;	/**< flength % block_length */
-	size_t blength;		/**< block_length */
-	size_t s2length;	/**< sum2_length */
+	size_t n;		/**< block_length */
 	struct sum_buf *sums;	/**< points to info for each chunk */
 };
 
 struct map_struct {
-	char *p;		/* Window pointer			*/
-	int fd;			/* File Descriptor			*/
-	int p_size;		/* Window size at allocation		*/
-	int p_len;		/* Window size after fill		*/
-				/*    p_size and p_len could be
-				 *    consolodated by using a local
-				 *    variable in map_ptr()		*/
-	int status;		/* first errno from read errors		*/
-	OFF_T file_size;	/* File size (from stat)		*/
-	OFF_T p_offset;		/* Window start				*/
-	OFF_T p_fd_offset;	/* offset of cursor in fd ala lseek	*/
+	char *p;
+	int fd,p_size,p_len;
+	OFF_T file_size, p_offset, p_fd_offset;
 };
 
-#define MATCHFLG_WILD		0x0001 /* pattern has '*', '[', and/or '?' */
-#define MATCHFLG_WILD2		0x0002 /* pattern has '**' */
-#define MATCHFLG_WILD2_PREFIX	0x0004 /* pattern starts with '**' */
-#define MATCHFLG_ABS_PATH	0x0008 /* path-match on absolute path */
 struct exclude_struct {
 	char *pattern;
-	int match_flags;
+	int regular_exp;
+	int fnmatch_flags;
 	int include;
 	int directory;
-	int slash_cnt;
+	int local;
 };
 
 struct stats {
@@ -465,7 +428,6 @@ static inline int flist_up(struct file_list *flist, int i)
 
 #include "byteorder.h"
 #include "lib/mdfour.h"
-#include "lib/wildmatch.h"
 #include "lib/permstring.h"
 #include "lib/addrinfo.h"
 
@@ -480,13 +442,11 @@ int asprintf(char **ptr, const char *format, ...);
 int vasprintf(char **ptr, const char *format, va_list ap);
 #endif
 
-#if !defined(HAVE_VSNPRINTF) || !defined(HAVE_C99_VSNPRINTF)
-#define vsnprintf rsync_vsnprintf
-int vsnprintf(char *str, size_t count, const char *fmt, va_list args);
+#if !defined(HAVE_VSNPRINTF) && !defined(HAVE_C99_VSNPRINTF)
+int vsnprintf (char *str, size_t count, const char *fmt, va_list args);
 #endif
 
-#if !defined(HAVE_SNPRINTF) || !defined(HAVE_C99_VSNPRINTF)
-#define snprintf rsync_snprintf
+#if !defined(HAVE_SNPRINTF) && !defined(HAVE_C99_VSNPRINTF)
 int snprintf(char *str,size_t count,const char *fmt,...);
 #endif
 
@@ -536,16 +496,6 @@ extern int errno;
 #ifndef S_IWUSR
 #define S_IWUSR 0200
 #endif
-
-#ifndef ACCESSPERMS
-#define ACCESSPERMS 0777
-#endif
-
-#ifndef S_ISVTX
-#define S_ISVTX 0
-#endif
-
-#define CHMOD_BITS (S_ISUID | S_ISGID | S_ISVTX | ACCESSPERMS)
 
 #ifndef _S_IFMT
 #define _S_IFMT        0170000
@@ -610,6 +560,9 @@ extern int errno;
 
 #define IS_DEVICE(mode) (S_ISCHR(mode) || S_ISBLK(mode) || S_ISSOCK(mode) || S_ISFIFO(mode))
 
+#ifndef ACCESSPERMS
+#define ACCESSPERMS 0777
+#endif
 /* Initial mask on permissions given to temporary files.  Mask off setuid
      bits and group access because of potential race-condition security
      holes, and mask other access because mode 707 is bizarre */
@@ -626,6 +579,10 @@ extern int errno;
 
 #endif
 
+/* Convenient wrappers for malloc and realloc.  Use them. */
+#define new(type) ((type *)malloc(sizeof(type)))
+#define new_array(type, num) ((type *)_new_array(sizeof(type), (num)))
+#define realloc_array(ptr, type, num) ((type *)_realloc_array((ptr), sizeof(type), (num)))
 
 /* use magic gcc attributes to catch format errors */
  void rprintf(enum logcode , const char *, ...)
@@ -642,10 +599,6 @@ void rsyserr(enum logcode, int, const char *, ...)
 #define inet_ntoa rep_inet_ntoa
 #endif
 
-/* Make sure that the O_BINARY flag is defined. */
-#ifndef O_BINARY
-#define O_BINARY 0
-#endif
 
 #ifndef HAVE_STRLCPY
 size_t strlcpy(char *d, const char *s, size_t bufsize);

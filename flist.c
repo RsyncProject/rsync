@@ -1,18 +1,18 @@
-/*
+/* 
    Copyright (C) Andrew Tridgell 1996
    Copyright (C) Paul Mackerras 1996
    Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
-
+   
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-
+   
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-
+   
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -41,8 +41,6 @@ extern int always_checksum;
 extern int cvs_exclude;
 
 extern int recurse;
-extern char *files_from;
-extern int filesfrom_fd;
 
 extern int one_file_system;
 extern int make_backups;
@@ -54,28 +52,25 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_times;
 extern int relative_paths;
-extern int implied_dirs;
 extern int copy_links;
 extern int copy_unsafe_links;
-extern int protocol_version;
+extern int remote_version;
 extern int io_error;
 extern int sanitize_paths;
 
 extern int read_batch;
 extern int write_batch;
 
-extern struct exclude_struct **exclude_list;
-extern struct exclude_struct **server_exclude_list;
-extern struct exclude_struct **local_exclude_list;
+static struct exclude_struct **local_exclude_list;
 
 static struct file_struct null_file;
 
-static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
+static void clean_flist(struct file_list *flist, int strip_root);
 
 
 static int show_filelist_p(void)
 {
-	return verbose && (recurse || files_from) && !am_server;
+	return verbose && recurse && !am_server;
 }
 
 static void start_filelist_progress(char *kind)
@@ -123,10 +118,10 @@ static struct string_area *string_area_new(int size)
 
 	if (size <= 0)
 		size = ARENA_SIZE;
-	a = malloc(sizeof(*a));
+	a = new(struct string_area);
 	if (!a)
 		out_of_memory("string_area_new");
-	a->current = a->base = malloc(size);
+	a->current = a->base = new_array(char, size);
 	if (!a->current)
 		out_of_memory("string_area_new buffer");
 	a->end = a->base + size;
@@ -221,12 +216,12 @@ int readlink_stat(const char *path, STRUCT_STAT * buffer, char *linkbuf)
 	if (S_ISLNK(buffer->st_mode)) {
 		int l;
 		l = readlink((char *) path, linkbuf, MAXPATHLEN - 1);
-		if (l == -1)
+		if (l == -1) 
 			return -1;
 		linkbuf[l] = 0;
 		if (copy_unsafe_links && unsafe_symlink(linkbuf, path)) {
 			if (verbose > 1) {
-				rprintf(FINFO,"copying unsafe symlink \"%s\" -> \"%s\"\n",
+				rprintf(FINFO,"copying unsafe symlink \"%s\" -> \"%s\"\n", 
 					path, linkbuf);
 			}
 			return do_stat(path, buffer);
@@ -252,37 +247,20 @@ int link_stat(const char *path, STRUCT_STAT * buffer)
 }
 
 /*
- * This function is used to check if a file should be included/excluded
- * from the list of files based on its name and type etc.  The value of
- * exclude_level is set to either SERVER_EXCLUDES or ALL_EXCLUDES.
+  This function is used to check if a file should be included/excluded
+  from the list of files based on its name and type etc
  */
-static int check_exclude_file(char *fname, int is_dir, int exclude_level)
+static int check_exclude_file(int f, char *fname, STRUCT_STAT * st)
 {
-#if 0 /* This currently never happens, so avoid a useless compare. */
-	if (exclude_level == NO_EXCLUDES)
+	extern int delete_excluded;
+
+	/* f is set to -1 when calculating deletion file list */
+	if ((f == -1) && delete_excluded) {
 		return 0;
-#endif
-	if (fname) {
-		/* never exclude '.', even if somebody does --exclude '*' */
-		if (fname[0] == '.' && !fname[1])
-			return 0;
-		/* Handle the -R version of the '.' dir. */
-		if (fname[0] == '/') {
-			int len = strlen(fname);
-			if (fname[len-1] == '.' && fname[len-2] == '/')
-				return 0;
-		}
 	}
-	if (server_exclude_list
-	 && check_exclude(server_exclude_list, fname, is_dir))
+	if (check_exclude(fname, local_exclude_list, st)) {
 		return 1;
-	if (exclude_level != ALL_EXCLUDES)
-		return 0;
-	if (exclude_list && check_exclude(exclude_list, fname, is_dir))
-		return 1;
-	if (local_exclude_list
-	 && check_exclude(local_exclude_list, fname, is_dir))
-		return 1;
+	}
 	return 0;
 }
 
@@ -327,27 +305,28 @@ static char *flist_dir;
 static void flist_expand(struct file_list *flist)
 {
 	if (flist->count >= flist->malloced) {
-		size_t new_bytes;
 		void *new_ptr;
-
+		
 		if (flist->malloced < 1000)
 			flist->malloced += 1000;
 		else
 			flist->malloced *= 2;
 
-		new_bytes = sizeof(flist->files[0]) * flist->malloced;
-
 		if (flist->files)
-			new_ptr = realloc(flist->files, new_bytes);
+			new_ptr = realloc_array(flist->files,
+						struct file_struct *,
+						flist->malloced);
 		else
-			new_ptr = malloc(new_bytes);
+			new_ptr = new_array(struct file_struct *,
+					    flist->malloced);
 
 		if (verbose >= 2) {
 			rprintf(FINFO, "expand file_list to %.0f bytes, did%s move\n",
-				(double) new_bytes,
+				(double)sizeof(flist->files[0])
+				* flist->malloced,
 				(new_ptr == flist->files) ? " not" : "");
 		}
-
+		
 		flist->files = (struct file_struct **) new_ptr;
 
 		if (!flist->files)
@@ -396,7 +375,7 @@ static void send_file_entry(struct file_struct *file, int f,
 
 	for (l1 = 0;
 	     lastname[l1] && (fname[l1] == lastname[l1]) && (l1 < 255);
-	     l1++) {}
+	     l1++);
 	l2 = strlen(fname) - l1;
 
 	if (l1 > 0)
@@ -446,7 +425,7 @@ static void send_file_entry(struct file_struct *file, int f,
 
 #if SUPPORT_HARD_LINKS
 	if (preserve_hard_links && S_ISREG(file->mode)) {
-		if (protocol_version < 26) {
+		if (remote_version < 26) {
 			/* 32-bit dev_t and ino_t */
 			write_int(f, (int) file->dev);
 			write_int(f, (int) file->inode);
@@ -459,7 +438,7 @@ static void send_file_entry(struct file_struct *file, int f,
 #endif
 
 	if (always_checksum) {
-		if (protocol_version < 21) {
+		if (remote_version < 21) {
 			write_buf(f, file->sum, 2);
 		} else {
 			write_buf(f, file->sum, MD4_SUM_LENGTH);
@@ -502,7 +481,7 @@ static void receive_file_entry(struct file_struct **fptr,
 	else
 		l2 = read_byte(f);
 
-	file = (struct file_struct *) malloc(sizeof(*file));
+	file = new(struct file_struct);
 	if (!file)
 		out_of_memory("receive_file_entry");
 	memset((char *) file, 0, sizeof(*file));
@@ -569,7 +548,7 @@ static void receive_file_entry(struct file_struct **fptr,
 			rprintf(FERROR, "overflow: l=%d\n", l);
 			overflow("receive_file_entry");
 		}
-		file->link = (char *) malloc(l + 1);
+		file->link = new_array(char, l + 1);
 		if (!file->link)
 			out_of_memory("receive_file_entry 2");
 		read_sbuf(f, file->link, l);
@@ -579,7 +558,7 @@ static void receive_file_entry(struct file_struct **fptr,
 	}
 #if SUPPORT_HARD_LINKS
 	if (preserve_hard_links && S_ISREG(file->mode)) {
-		if (protocol_version < 26) {
+		if (remote_version < 26) {
 			file->dev = read_int(f);
 			file->inode = read_int(f);
 		} else {
@@ -590,10 +569,10 @@ static void receive_file_entry(struct file_struct **fptr,
 #endif
 
 	if (always_checksum) {
-		file->sum = (char *) malloc(MD4_SUM_LENGTH);
+		file->sum = new_array(char, MD4_SUM_LENGTH);
 		if (!file->sum)
 			out_of_memory("md4 sum");
-		if (protocol_version < 21) {
+		if (remote_version < 21) {
 			read_buf(f, file->sum, 2);
 		} else {
 			read_buf(f, file->sum, MD4_SUM_LENGTH);
@@ -660,8 +639,8 @@ static int skip_filesystem(char *fname, STRUCT_STAT * st)
  * statting directories if we're not recursing, but this is not a very
  * important case.  Some systems may not have d_type.
  **/
-struct file_struct *make_file(char *fname, struct string_area **ap,
-			      int exclude_level)
+struct file_struct *make_file(int f, char *fname, struct string_area **ap,
+			      int noexcludes)
 {
 	struct file_struct *file;
 	STRUCT_STAT st;
@@ -683,26 +662,27 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 
 	if (readlink_stat(fname, &st, linkbuf) != 0) {
 		int save_errno = errno;
-		if (errno == ENOENT && exclude_level != NO_EXCLUDES) {
-			/* either symlink pointing nowhere or file that
+		if ((errno == ENOENT) && !noexcludes) {
+			/* either symlink pointing nowhere or file that 
 			 * was removed during rsync run; see if excluded
 			 * before reporting an error */
-			if (check_exclude_file(fname, 0, exclude_level)) {
+			memset((char *) &st, 0, sizeof(st));
+			if (check_exclude_file(f, fname, &st)) {
 				/* file is excluded anyway, ignore silently */
 				return NULL;
 			}
 		}
 		io_error = 1;
-		rprintf(FERROR, "readlink %s failed: %s\n",
-			full_fname(fname), strerror(save_errno));
+		rprintf(FERROR, "readlink %s: %s\n",
+			fname, strerror(save_errno));
 		return NULL;
 	}
 
-	/* backup.c calls us with exclude_level set to NO_EXCLUDES. */
-	if (exclude_level == NO_EXCLUDES)
+	/* we use noexcludes from backup.c */
+	if (noexcludes)
 		goto skip_excludes;
 
-	if (S_ISDIR(st.st_mode) && !recurse && !files_from) {
+	if (S_ISDIR(st.st_mode) && !recurse) {
 		rprintf(FINFO, "skipping directory %s\n", fname);
 		return NULL;
 	}
@@ -712,8 +692,9 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 			return NULL;
 	}
 
-	if (check_exclude_file(fname, S_ISDIR(st.st_mode) != 0, exclude_level))
+	if (check_exclude_file(f, fname, &st))
 		return NULL;
+
 
 	if (lp_ignore_nonreadable(module_id) && access(fname, R_OK) != 0)
 		return NULL;
@@ -721,9 +702,9 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
       skip_excludes:
 
 	if (verbose > 2)
-		rprintf(FINFO, "make_file(%s,*,%d)\n", fname, exclude_level);
+		rprintf(FINFO, "make_file(%d,%s)\n", f, fname);
 
-	file = (struct file_struct *) malloc(sizeof(*file));
+	file = new(struct file_struct);
 	if (!file)
 		out_of_memory("make_file");
 	memset((char *) file, 0, sizeof(*file));
@@ -799,12 +780,8 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 		    int recursive, unsigned base_flags)
 {
 	struct file_struct *file;
-	extern int delete_excluded;
 
-	/* f is set to -1 when calculating deletion file list */
-	file = make_file(fname, &flist->string_area,
-			 f == -1 && delete_excluded? SERVER_EXCLUDES
-						   : ALL_EXCLUDES);
+	file = make_file(f, fname, &flist->string_area, 0);
 
 	if (!file)
 		return;
@@ -816,7 +793,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 	if (write_batch)	/*  dw  */
 		file->flags = FLAG_DELETE;
 
-	if (file->basename[0]) {
+	if (strcmp(file->basename, "")) {
 		flist->files[flist->count++] = file;
 		send_file_entry(file, f, base_flags);
 	}
@@ -843,8 +820,7 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 	d = opendir(dir);
 	if (!d) {
 		io_error = 1;
-		rprintf(FERROR, "opendir %s failed: %s\n",
-			full_fname(dir), strerror(errno));
+		rprintf(FERROR, "opendir(%s): %s\n", dir, strerror(errno));
 		return;
 	}
 
@@ -853,8 +829,9 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 	if (fname[l - 1] != '/') {
 		if (l == MAXPATHLEN - 1) {
 			io_error = 1;
-			rprintf(FERROR, "skipping long-named directory: %s\n",
-				full_fname(fname));
+			rprintf(FERROR,
+				"skipping long-named directory %s\n",
+				fname);
 			closedir(d);
 			return;
 		}
@@ -868,51 +845,45 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 	if (cvs_exclude) {
 		if (strlen(fname) + strlen(".cvsignore") <= MAXPATHLEN - 1) {
 			strcpy(p, ".cvsignore");
-			add_exclude_file(&exclude_list,fname,MISSING_OK,ADD_EXCLUDE);
+			local_exclude_list =
+			    make_exclude_list(fname, NULL, 0, 0);
 		} else {
 			io_error = 1;
 			rprintf(FINFO,
 				"cannot cvs-exclude in long-named directory %s\n",
-				full_fname(fname));
+				fname);
 		}
 	}
 
-	for (errno = 0, di = readdir(d); di; errno = 0, di = readdir(d)) {
+	for (di = readdir(d); di; di = readdir(d)) {
 		char *dname = d_name(di);
-		if (dname[0] == '.' && (dname[1] == '\0'
-		    || (dname[1] == '.' && dname[2] == '\0')))
+		if (strcmp(dname, ".") == 0 || strcmp(dname, "..") == 0)
 			continue;
 		strlcpy(p, dname, MAXPATHLEN - l);
 		send_file_name(f, flist, fname, recurse, 0);
 	}
-	if (errno) {
-		io_error = 1;
-		rprintf(FERROR, "readdir(%s): (%d) %s\n",
-		    dir, errno, strerror(errno));
-	}
 
-	if (local_exclude_list)
-		free_exclude_list(&local_exclude_list); /* Zeros pointer too */
+	if (local_exclude_list) {
+		add_exclude_list("!", &local_exclude_list, 0);
+	}
 
 	closedir(d);
 }
 
 
 /**
- * The delete_files() function in receiver.c sets f to -1 so that we just
- * construct the file list in memory without sending it over the wire.  It
- * also has the side-effect of ignoring user-excludes if delete_excluded
- * is set (so that the delete list includes user-excluded files).
+ *
+ * I <b>think</b> f==-1 means that the list should just be built in
+ * memory and not transmitted.  But who can tell? -- mbp
  **/
 struct file_list *send_file_list(int f, int argc, char *argv[])
 {
-	int l;
+	int i, l;
 	STRUCT_STAT st;
 	char *p, *dir, *olddir;
 	char lastpath[MAXPATHLEN] = "";
 	struct file_list *flist;
 	int64 start_write;
-	int use_ff_fd = 0;
 
 	if (show_filelist_p() && f != -1)
 		start_filelist_progress("building file list");
@@ -923,37 +894,23 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 	if (f != -1) {
 		io_start_buffering(f);
-		if (filesfrom_fd >= 0) {
-			if (argv[0] && !push_dir(argv[0], 0)) {
-				rprintf(FERROR, "push_dir %s failed: %s\n",
-					full_fname(argv[0]), strerror(errno));
-				exit_cleanup(RERR_FILESELECT);
-			}
-			use_ff_fd = 1;
-		}
 	}
 
-	while (1) {
+	for (i = 0; i < argc; i++) {
 		char fname2[MAXPATHLEN];
 		char *fname = fname2;
 
-		if (use_ff_fd) {
-			if (read_filesfrom_line(filesfrom_fd, fname) == 0)
-				break;
-			sanitize_path(fname, NULL);
-		} else {
-			if (argc-- == 0)
-				break;
-			strlcpy(fname, *argv++, MAXPATHLEN);
-			if (sanitize_paths)
-				sanitize_path(fname, NULL);
-		}
+		strlcpy(fname, argv[i], MAXPATHLEN);
 
 		l = strlen(fname);
-		if (fname[l - 1] == '/') {
-			if (l == 2 && fname[0] == '.') {
-				/* Turn "./" into just "." rather than "./." */
-				fname[1] = '\0';
+		if (l != 1 && fname[l - 1] == '/') {
+			if ((l == 2) && (fname[0] == '.')) {
+				/*  Turn ./ into just . rather than ./.
+				   This was put in to avoid a problem with
+				   rsync -aR --delete from ./
+				   The send_file_name() below of ./ was
+				   mysteriously preventing deletes */
+				fname[1] = 0;
 			} else {
 				strlcat(fname, ".", MAXPATHLEN);
 			}
@@ -962,13 +919,13 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (link_stat(fname, &st) != 0) {
 			if (f != -1) {
 				io_error = 1;
-				rprintf(FERROR, "link_stat %s failed: %s\n",
-					full_fname(fname), strerror(errno));
+				rprintf(FERROR, "link_stat %s : %s\n",
+					fname, strerror(errno));
 			}
 			continue;
 		}
 
-		if (S_ISDIR(st.st_mode) && !recurse && !files_from) {
+		if (S_ISDIR(st.st_mode) && !recurse) {
 			rprintf(FINFO, "skipping directory %s\n", fname);
 			continue;
 		}
@@ -986,37 +943,31 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 					dir = fname;
 				fname = p + 1;
 			}
-		} else if (f != -1 && implied_dirs && (p=strrchr(fname,'/')) && p != fname) {
+		} else if (f != -1 && (p = strrchr(fname, '/'))) {
 			/* this ensures we send the intermediate directories,
 			   thus getting their permissions right */
-			char *lp = lastpath, *fn = fname, *slash = fname;
 			*p = 0;
-			/* Skip any initial directories in our path that we
-			 * have in common with lastpath. */
-			while (*fn && *lp == *fn) {
-				if (*fn == '/')
-					slash = fn;
-				lp++, fn++;
-			}
-			*p = '/';
-			if (fn != p || (*lp && *lp != '/')) {
-				int copy_links_saved = copy_links;
-				int recurse_saved = recurse;
-				copy_links = copy_unsafe_links;
-				/* set recurse to 1 to prevent make_file
-				 * from ignoring directory, but still
-				 * turn off the recursive parameter to
-				 * send_file_name */
-				recurse = 1;
-				while ((slash = strchr(slash+1, '/')) != 0) {
-					*slash = 0;
-					send_file_name(f, flist, fname, 0, 0);
-					*slash = '/';
+			if (strcmp(lastpath, fname)) {
+				strlcpy(lastpath, fname, sizeof(lastpath));
+				*p = '/';
+				for (p = fname + 1; (p = strchr(p, '/'));
+				     p++) {
+					int copy_links_saved = copy_links;
+					int recurse_saved = recurse;
+					*p = 0;
+					copy_links = copy_unsafe_links;
+					/* set recurse to 1 to prevent make_file
+					   from ignoring directory, but still
+					   turn off the recursive parameter to
+					   send_file_name */
+					recurse = 1;
+					send_file_name(f, flist, fname, 0,
+						       0);
+					copy_links = copy_links_saved;
+					recurse = recurse_saved;
+					*p = '/';
 				}
-				copy_links = copy_links_saved;
-				recurse = recurse_saved;
-				*p = 0;
-				strlcpy(lastpath, fname, sizeof lastpath);
+			} else {
 				*p = '/';
 			}
 		}
@@ -1029,8 +980,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 			if (!olddir) {
 				io_error = 1;
-				rprintf(FERROR, "push_dir %s failed: %s\n",
-					full_fname(dir), strerror(errno));
+				rprintf(FERROR, "push_dir %s : %s\n",
+					dir, strerror(errno));
 				continue;
 			}
 
@@ -1045,8 +996,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (olddir != NULL) {
 			flist_dir = NULL;
 			if (pop_dir(olddir) != 0) {
-				rprintf(FERROR, "pop_dir %s failed: %s\n",
-					full_fname(dir), strerror(errno));
+				rprintf(FERROR, "pop_dir %s : %s\n",
+					dir, strerror(errno));
 				exit_cleanup(RERR_FILESELECT);
 			}
 		}
@@ -1060,16 +1011,16 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		finish_filelist_progress(flist);
 	}
 
-	clean_flist(flist, 0, 0);
+	clean_flist(flist, 0);
 
 	/* now send the uid/gid list. This was introduced in protocol
 	   version 15 */
-	if (f != -1) {
+	if (f != -1 && remote_version >= 15) {
 		send_uid_list(f);
 	}
 
-	/* send the io_error flag */
-	if (f != -1) {
+	/* if protocol version is >= 17 then send the io_error flag */
+	if (f != -1 && remote_version >= 17) {
 		extern int module_id;
 		write_int(f, lp_ignore_errors(module_id) ? 0 : io_error);
 	}
@@ -1101,22 +1052,20 @@ struct file_list *recv_file_list(int f)
 
 	start_read = stats.total_read;
 
-	flist = (struct file_list *) malloc(sizeof(flist[0]));
+	flist = new(struct file_list);
 	if (!flist)
 		goto oom;
 
 	flist->count = 0;
 	flist->malloced = 1000;
-	flist->files =
-	    (struct file_struct **) malloc(sizeof(flist->files[0]) *
-					   flist->malloced);
+	flist->files = new_array(struct file_struct *, flist->malloced);
 	if (!flist->files)
 		goto oom;
 
 
 	for (flags = read_byte(f); flags; flags = read_byte(f)) {
 		int i = flist->count;
-
+		
 		flist_expand(flist);
 
 		receive_file_entry(&flist->files[i], flags, f);
@@ -1137,19 +1086,19 @@ struct file_list *recv_file_list(int f)
 	if (verbose > 2)
 		rprintf(FINFO, "received %d names\n", flist->count);
 
-	clean_flist(flist, relative_paths, 1);
+	clean_flist(flist, relative_paths);
 
 	if (show_filelist_p()) {
 		finish_filelist_progress(flist);
 	}
 
 	/* now recv the uid/gid list. This was introduced in protocol version 15 */
-	if (f != -1) {
+	if (f != -1 && remote_version >= 15) {
 		recv_uid_list(f, flist);
 	}
 
-	/* recv the io_error flag */
-	if (f != -1 && !read_batch) {	/* dw-added readbatch */
+	/* if protocol version is >= 17 then recv the io_error flag */
+	if (f != -1 && remote_version >= 17 && !read_batch) {	/* dw-added readbatch */
 		extern int module_id;
 		extern int ignore_errors;
 		if (lp_ignore_errors(module_id) || ignore_errors) {
@@ -1251,7 +1200,7 @@ struct file_list *flist_new(void)
 {
 	struct file_list *flist;
 
-	flist = (struct file_list *) malloc(sizeof(flist[0]));
+	flist = new(struct file_list);
 	if (!flist)
 		out_of_memory("send_file_list");
 
@@ -1294,11 +1243,11 @@ void flist_free(struct file_list *flist)
 
 /*
  * This routine ensures we don't have any duplicate names in our file list.
- * duplicate names can cause corruption because of the pipelining
+ * duplicate names can cause corruption because of the pipelining 
  */
-static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
+static void clean_flist(struct file_list *flist, int strip_root)
 {
-	int i, prev_i = 0;
+	int i;
 	char *name, *prev_name = NULL;
 
 	if (!flist || flist->count == 0)
@@ -1307,9 +1256,8 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 	qsort(flist->files, flist->count,
 	      sizeof(flist->files[0]), (int (*)()) file_compare);
 
-	for (i = no_dups? 0 : flist->count; i < flist->count; i++) {
+	for (i = 0; i < flist->count; i++) {
 		if (flist->files[i]->basename) {
-			prev_i = i;
 			prev_name = f_name(flist->files[i]);
 			break;
 		}
@@ -1324,11 +1272,6 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 					"removing duplicate name %s from file list %d\n",
 					name, i);
 			}
-			/* Make sure that if we unduplicate '.', that we don't
-			 * lose track of a user-specified starting point (or
-			 * else deletions will mysteriously fail with -R). */
-			if (flist->files[i]->flags & FLAG_DELETE)
-				flist->files[prev_i]->flags |= FLAG_DELETE;
 			/* it's not great that the flist knows the semantics of
 			 * the file memory usage, but i'd rather not add a flag
 			 * byte to that struct.
@@ -1338,10 +1281,6 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			else
 				free_file(flist->files[i]);
 		}
-		else
-			prev_i = i;
-		/* We set prev_name every iteration to avoid it becoming
-		 * invalid when names[][] in f_name() wraps around. */
 		prev_name = name;
 	}
 
