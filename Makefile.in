@@ -28,18 +28,15 @@ ZLIBOBJ=zlib/deflate.o zlib/infblock.o zlib/infcodes.o zlib/inffast.o \
 OBJS1=rsync.o generator.o receiver.o cleanup.o sender.o exclude.o util.o main.o checksum.o match.o syscall.o log.o backup.o
 OBJS2=options.o flist.o io.o compat.o hlink.o token.o uidlist.o socket.o fileio.o
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
-OBJS=$(OBJS1) $(OBJS2) $(DAEMON_OBJ) $(LIBOBJ) $(ZLIBOBJ)
+popt_OBJS=popt/findme.o  popt/popt.o  popt/poptconfig.o \
+	popt/popthelp.o popt/poptparse.o
+OBJS=$(OBJS1) $(OBJS2) $(DAEMON_OBJ) $(LIBOBJ) $(ZLIBOBJ) @BUILD_POPT@
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
 @OBJ_SAVE@
 	$(CC) -I. -I$(srcdir) $(CFLAGS) -c $< @CC_SHOBJ_FLAG@
 @OBJ_RESTORE@
-
-rsync: @BUILD_LIBPOPT@
-
-popt-1.2/libpopt.a:
-	$(MAKE) -C popt-1.2 libpopt.a
 
 all: rsync
 
@@ -57,7 +54,7 @@ install-strip:
 	$(MAKE) INSTALLCMD='$(INSTALLCMD) -s' install
 
 rsync: $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o rsync $(OBJS) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o rsync $(OBJS) $(LIBS) 
 
 rsync.1: rsync.yo
 	yodl2man -o rsync.1 rsync.yo

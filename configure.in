@@ -25,6 +25,8 @@ else
     CFLAGS=${CFLAGS-"-O"}
 fi
 
+CFLAGS="$CFLAGS -DHAVE_CONFIG_H"
+
 # look for getconf early as this affects just about everything
 AC_CHECK_PROG(HAVE_GETCONF, getconf, "yes", "no")
 if test $HAVE_GETCONF = "yes"; then
@@ -39,7 +41,6 @@ dnl Checks for programs.
 AC_PROG_CC
 AC_PROG_INSTALL
 AC_SUBST(SHELL)
-
 
 AC_CHECK_PROG(HAVE_REMSH, remsh, 1, 0)
 AC_DEFINE_UNQUOTED(HAVE_REMSH, $HAVE_REMSH)
@@ -148,16 +149,17 @@ if test x"$rsync_cv_HAVE_FNMATCH" = x"yes"; then
     AC_DEFINE(HAVE_FNMATCH)
 fi
 
-AC_CONFIG_SUBDIRS(popt-1.2)
-AC_CHECK_LIB(popt, poptGetContext, , [with_included_popt=yes])
+if test x"$with_included_popt" != x"yes"
+then
+    AC_CHECK_LIB(popt, poptGetContext, , [with_included_popt=yes])
+fi
 
-AC_MSG_CHECKING("whether to use included libpopt...")
+AC_MSG_CHECKING("whether to use included libpopt")
 if test x"$with_included_popt" = x"yes"
 then
-    AC_MSG_RESULT("$srcdir/popt-1.2")
-    BUILD_LIBPOPT=popt-1.2/libpopt.a
-    LDFLAGS="$CFLAGS -L popt-1.2"
-    CFLAGS="$CFLAGS -I $srcdir/popt-1.2"
+    AC_MSG_RESULT("$srcdir/popt")
+    BUILD_POPT='$(popt_OBJS)'
+    CFLAGS="$CFLAGS -I $srcdir/popt"
 else
     AC_MSG_RESULT(no)
 fi
@@ -286,6 +288,6 @@ fi
 AC_SUBST(OBJ_SAVE)
 AC_SUBST(OBJ_RESTORE)
 AC_SUBST(CC_SHOBJ_FLAG)
-AC_SUBST(BUILD_LIBPOPT)
+AC_SUBST(BUILD_POPT)
 
 AC_OUTPUT(Makefile lib/dummy zlib/dummy)
