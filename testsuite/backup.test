@@ -26,14 +26,14 @@ echo "Extending the other file" >> "$name2"
 
 checkit "$RSYNC -avv --backup --backup-dir=\"$bakdir\" \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
-diff -ru "$chkdir" "$bakdir"
+diff -r $diffopt "$chkdir" "$bakdir"
 
 echo "Extending the file again" >> "$name1"
 echo "Extending the other file again" >> "$name2"
 
 checkit "$RSYNC -avv --inplace --backup --backup-dir=\"$bakdir\" \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
-diff -ru "$chkdir" "$bakdir"
+diff -r $diffopt "$chkdir" "$bakdir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
