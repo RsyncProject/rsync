@@ -152,9 +152,7 @@ static void hash_search(int f,struct sum_struct *s,
 		rprintf(FINFO,"hash search b=%ld len=%.0f\n",
 			(long) s->blength, (double)len);
 
-	/* cast is to make s->blength signed; it should always be reasonably
-	 * small */
-	k = MIN(len, (OFF_T) s->blength);
+	k = MIN(len, (OFF_T)s->blength);
 
 	map = (schar *)map_ptr(buf,0,k);
 
@@ -192,7 +190,7 @@ static void hash_search(int f,struct sum_struct *s,
 			if (sum != s->sums[i].sum1) continue;
 
 			/* also make sure the two blocks are the same length */
-			l = MIN(s->blength,len-offset);
+			l = MIN((OFF_T)s->blength, len-offset);
 			if (l != s->sums[i].len) continue;
 
 			if (verbose > 3)
@@ -228,7 +226,7 @@ static void hash_search(int f,struct sum_struct *s,
 
 			matched(f,s,buf,offset,i);
 			offset += s->sums[i].len - 1;
-			k = MIN((len-offset), s->blength);
+			k = MIN((OFF_T)s->blength, len-offset);
 			map = (schar *)map_ptr(buf,offset,k);
 			sum = get_checksum1((char *)map, k);
 			s1 = sum & 0xFFFF;
