@@ -218,6 +218,7 @@ build_symlinks() {
     ln -s referent "$fromdir/relative"
     ln -s "$fromdir/referent" "$fromdir/absolute"
     ln -s nonexistent "$fromdir/dangling"
+    ln -s "$srcdir/rsync.c" "$fromdir/unsafe"
 }
 
 test_fail() {
