@@ -57,6 +57,9 @@ void exit_cleanup(int code)
 			unlink(lp_pid_file());
 		}
 	}
+
+	if (code) log_exit(code);
+
 	exit(code);
 }
 

@@ -36,10 +36,7 @@ static void report(int f)
 	extern int do_stats;
 
 	if (am_daemon) {
-		rprintf(FLOG,"wrote %.0f bytes  read %.0f bytes  total size %.0f\n",
-		       (double)stats.total_written,
-		       (double)stats.total_read,
-		       (double)stats.total_size);
+		log_exit(0);
 		if (f == -1 || !am_sender) return;
 	}
 
