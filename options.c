@@ -827,6 +827,12 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			 am_server ? "server" : "client");
 		return 0;
 #endif
+		if (compare_dest) {
+			snprintf(err_buf, sizeof err_buf,
+				 "--inplace does not yet work with %s\n",
+				 link_dest ? "--link-dest" : "--compare-dest");
+			return 0;
+		}
 	} else if (partial_dir) {
 		if (strcmp(partial_dir, ".") == 0)
 			partial_dir = NULL;
