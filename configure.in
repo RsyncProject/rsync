@@ -29,7 +29,7 @@ AC_TYPE_SIZE_T
 AC_TYPE_PID_T
 AC_STRUCT_ST_RDEV
 
-echo -n "checking for errno in errno.h... "
+echo $ac_n "checking for errno in errno.h... $ac_c"
 AC_TRY_COMPILE([#include <errno.h>],[int i = errno],
 echo yes; AC_DEFINE(HAVE_ERRNO_DECL),
 echo no)
@@ -41,7 +41,7 @@ AC_CHECK_FUNCS(waitpid strtok pipe getcwd mkdir strdup strerror chown chmod mkno
 AC_CHECK_FUNCS(fchmod fstat strchr bcopy bzero readlink utime utimes)
 AC_CHECK_FUNCS(memmove getopt_long)
 
-echo -n "checking for working fnmatch... "
+echo $ac_n "checking for working fnmatch... $ac_c"
 AC_TRY_RUN([#include <fnmatch.h>
 main() { exit(fnmatch("*.o", "x.o", 0) == 0? 0: 1); }],
 echo yes;AC_DEFINE(HAVE_FNMATCH), 
