@@ -397,7 +397,7 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 	}
 #endif
 
-	if (preserve_hard_links && check_hard_link(file)) {
+	if (preserve_hard_links && file->link_u.links && file->F_HEAD != file) {
 		if (verbose > 1) {
 			rprintf(FINFO, "recv_generator: \"%s\" is a hard link\n",
 				f_name(file));

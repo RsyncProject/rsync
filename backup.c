@@ -265,7 +265,8 @@ static int keep_backup(char *fname)
 		kept = 1;
 	}
 #endif
-	if (!kept && preserve_hard_links && check_hard_link(file)) {
+	if (!kept && preserve_hard_links && file->link_u.links
+	    && file->F_HEAD != file) {
 		if (verbose > 1)
 			rprintf(FINFO, "%s is a hard link\n", f_name(file));
 	}
