@@ -510,7 +510,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 
 			/* Don't write errors on a dead socket. */
 			if (fd == sock_f_in)
-				io_multiplexing_close();
+				close_multiplexing_out();
 			rsyserr(FERROR, errno, "read error");
 			exit_cleanup(RERR_STREAMIO);
 		}
@@ -895,13 +895,13 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 
 			/* Don't try to write errors back across the stream. */
 			if (fd == sock_f_out)
-				io_multiplexing_close();
+				close_multiplexing_out();
 			rsyserr(FERROR, errno,
 				"writefd_unbuffered failed to write %ld bytes: phase \"%s\"",
 				(long)len, io_write_phase);
 			/* If the other side is sending us error messages, try
 			 * to grab any messages they sent before they died. */
-			while (fd == sock_f_out && am_sender) {
+			while (fd == sock_f_out && io_multiplexing_in) {
 				io_timeout = 30;
 				readfd_unbuffered(sock_f_in, io_filesfrom_buf,
 						  sizeof io_filesfrom_buf);
@@ -1129,8 +1129,13 @@ int io_multiplex_write(enum msgcode code, char *buf, size_t len)
 	return 1;
 }
 
+void close_multiplexing_in(void)
+{
+	io_multiplexing_in = 0;
+}
+
 /** Stop output multiplexing. */
-void io_multiplexing_close(void)
+void close_multiplexing_out(void)
 {
 	io_multiplexing_out = 0;
 }
