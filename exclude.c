@@ -316,7 +316,7 @@ void add_exclude_file(struct exclude_list_struct *listp, const char *fname,
 		      int xflags)
 {
 	FILE *fp;
-	char line[MAXPATHLEN];
+	char line[MAXPATHLEN+3]; /* Room for "x " prefix and trailing slash. */
 	char *eob = line + MAXPATHLEN - 1;
 	int word_split = xflags & XFLG_WORD_SPLIT;
 
@@ -340,7 +340,7 @@ void add_exclude_file(struct exclude_list_struct *listp, const char *fname,
 
 	while (1) {
 		char *s = line;
-		int ch;
+		int ch, overflow = 0;
 		while (1) {
 			if ((ch = getc(fp)) == EOF) {
 				if (ferror(fp) && errno == EINTR)
@@ -353,6 +353,12 @@ void add_exclude_file(struct exclude_list_struct *listp, const char *fname,
 				break;
 			if (s < eob)
 				*s++ = ch;
+			else
+				overflow = 1;
+		}
+		if (overflow) {
+			rprintf(FERROR, "discarding over-long exclude: %s...\n", line);
+			s = line;
 		}
 		*s = '\0';
 		/* Skip an empty token and (when line parsing) comments. */
@@ -405,7 +411,7 @@ void send_exclude_list(int f)
 
 void recv_exclude_list(int f)
 {
-	char line[MAXPATHLEN+1]; /* Allows a trailing slash on a max-len dir */
+	char line[MAXPATHLEN+3]; /* Room for "x " prefix and trailing slash. */
 	unsigned int l;
 
 	while ((l = read_int(f)) != 0) {
