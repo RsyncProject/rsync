@@ -494,9 +494,6 @@ void server_options(char **args,int *argc)
   if (keep_partial)
     args[ac++] = "--partial";
 
-  if (do_progress)
-    args[ac++] = "--progress";
-
   if (force_delete)
     args[ac++] = "--force";
 
