@@ -303,6 +303,13 @@ Pie-in-the-sky features:
     ways for clients to smoothly and voluntarily become servers for
     content they receive?
 
+  - Imagine a situation where the destination has a much faster link
+    to the cloud than the source.  In this case, Mojo Nation downloads
+    interleaved blocks from several slower servers.  The general
+    situation might be a way for a master rsync process to farm out
+    tasks to several subjobs.  In this particular case they'd need
+    different sockets.  This might be related to multicast.
+
 
 Unlikely features:
 
