@@ -24,6 +24,7 @@
 #include "rsync.h"
 
 extern int verbose;
+extern int am_server;
 
 static char **exclude_list;
 
@@ -86,7 +87,7 @@ void add_exclude_list(char *pattern,char ***list)
 
   if (strcmp(pattern,"!") == 0) {
     if (verbose > 2)
-      fprintf(FERROR,"clearing exclude list\n");
+      fprintf(FINFO,"clearing exclude list\n");
     while ((len)--) 
       free((*list)[len]);
     free((*list));
@@ -104,7 +105,7 @@ void add_exclude_list(char *pattern,char ***list)
     out_of_memory("add_exclude");
 
   if (verbose > 2)
-    fprintf(FERROR,"add_exclude(%s)\n",pattern);
+    fprintf(FINFO,"add_exclude(%s)\n",pattern);
   
   (*list)[len+1] = NULL;
 }

@@ -97,7 +97,7 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 	int j;
 
 	if (verbose > 2 && i >= 0)
-		fprintf(FERROR,"match at %d last_match=%d j=%d len=%d n=%d\n",
+		fprintf(FINFO,"match at %d last_match=%d j=%d len=%d n=%d\n",
 			(int)offset,(int)last_match,i,(int)s->sums[i].len,(int)n);
 
 	send_token(f,i,buf,last_match,n,i==-1?0:s->sums[i].len);
@@ -133,7 +133,7 @@ static void hash_search(int f,struct sum_struct *s,
 	signed char *map;
 
 	if (verbose > 2)
-		fprintf(FERROR,"hash search b=%d len=%d\n",s->n,(int)len);
+		fprintf(FINFO,"hash search b=%d len=%d\n",s->n,(int)len);
 
 	k = MIN(len, s->n);
 	
@@ -143,14 +143,14 @@ static void hash_search(int f,struct sum_struct *s,
 	s1 = sum & 0xFFFF;
 	s2 = sum >> 16;
 	if (verbose > 3)
-		fprintf(FERROR, "sum=%.8x k=%d\n", sum, k);
+		fprintf(FINFO, "sum=%.8x k=%d\n", sum, k);
 	
 	offset = 0;
 	
 	end = len + 1 - s->sums[s->count-1].len;
 	
 	if (verbose > 3)
-		fprintf(FERROR,"hash search s->n=%d len=%d count=%d\n",
+		fprintf(FINFO,"hash search s->n=%d len=%d count=%d\n",
 			s->n,(int)len,s->count);
 	
 	do {
@@ -159,7 +159,7 @@ static void hash_search(int f,struct sum_struct *s,
 			
 		j = tag_table[t];
 		if (verbose > 4)
-			fprintf(FERROR,"offset=%d sum=%08x\n",(int)offset,sum);
+			fprintf(FINFO,"offset=%d sum=%08x\n",(int)offset,sum);
 		
 		if (j == NULL_TAG) {
 			goto null_tag;
@@ -173,7 +173,7 @@ static void hash_search(int f,struct sum_struct *s,
 			if (sum != s->sums[i].sum1) continue;
 			
 			if (verbose > 3)
-				fprintf(FERROR,"potential match at %d target=%d %d sum=%08x\n",
+				fprintf(FINFO,"potential match at %d target=%d %d sum=%08x\n",
 					(int)offset,j,i,sum);
 			
 			if (!done_csum2) {
@@ -236,12 +236,12 @@ void match_sums(int f,struct sum_struct *s,struct map_struct *buf,off_t len)
 		build_hash_table(s);
 		
 		if (verbose > 2) 
-			fprintf(FERROR,"built hash table\n");
+			fprintf(FINFO,"built hash table\n");
 		
 		hash_search(f,s,buf,len);
 		
 		if (verbose > 2) 
-			fprintf(FERROR,"done hash search\n");
+			fprintf(FINFO,"done hash search\n");
 	} else {
 		matched(f,s,buf,len,-1);
 	}
@@ -250,7 +250,7 @@ void match_sums(int f,struct sum_struct *s,struct map_struct *buf,off_t len)
 
 	if (remote_version >= 14) {
 		if (verbose > 2)
-			fprintf(FERROR,"sending file_sum\n");
+			fprintf(FINFO,"sending file_sum\n");
 		write_buf(f,file_sum,MD4_SUM_LENGTH);
 	}
 
@@ -260,7 +260,7 @@ void match_sums(int f,struct sum_struct *s,struct map_struct *buf,off_t len)
 	}
 	
 	if (verbose > 2)
-		fprintf(FERROR, "false_alarms=%d tag_hits=%d matches=%d\n",
+		fprintf(FINFO, "false_alarms=%d tag_hits=%d matches=%d\n",
 			false_alarms, tag_hits, matches);
 	
 	total_tag_hits += tag_hits;

@@ -44,6 +44,7 @@ extern int preserve_times;
 extern int relative_paths;
 extern int copy_links;
 extern int remote_version;
+extern int io_error;
 
 static char **local_exclude_list;
 
@@ -68,7 +69,7 @@ static int match_file_name(char *fname,struct stat *st)
 {
   if (check_exclude(fname,local_exclude_list)) {
     if (verbose > 2)
-      fprintf(FERROR,"excluding file %s\n",fname);
+      fprintf(FINFO,"excluding file %s\n",fname);
     return 0;
   }
   return 1;
@@ -356,13 +357,14 @@ static struct file_struct *make_file(char *fname)
 	bzero(sum,SUM_LENGTH);
 
 	if (link_stat(fname,&st) != 0) {
+		io_error = 1;
 		fprintf(FERROR,"%s: %s\n",
 			fname,strerror(errno));
 		return NULL;
 	}
 
 	if (S_ISDIR(st.st_mode) && !recurse) {
-		fprintf(FERROR,"skipping directory %s\n",fname);
+		fprintf(FINFO,"skipping directory %s\n",fname);
 		return NULL;
 	}
 	
@@ -375,7 +377,7 @@ static struct file_struct *make_file(char *fname)
 		return NULL;
 	
 	if (verbose > 2)
-		fprintf(FERROR,"make_file(%s)\n",fname);
+		fprintf(FINFO,"make_file(%s)\n",fname);
 	
 	file = (struct file_struct *)malloc(sizeof(*file));
 	if (!file) out_of_memory("make_file");
@@ -413,6 +415,7 @@ static struct file_struct *make_file(char *fname)
 		int l;
 		char lnk[MAXPATHLEN];
 		if ((l=readlink(fname,lnk,MAXPATHLEN-1)) == -1) {
+			io_error=1;
 			fprintf(FERROR,"readlink %s : %s\n",
 				fname,strerror(errno));
 			return NULL;
@@ -494,6 +497,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 
 	d = opendir(dir);
 	if (!d) {
+		io_error = 1;
 		fprintf(FERROR,"%s: %s\n",
 			dir,strerror(errno));
 		return;
@@ -504,6 +508,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 	l = strlen(fname);
 	if (fname[l-1] != '/') {
 		if (l == MAXPATHLEN-1) {
+			io_error = 1;
 			fprintf(FERROR,"skipping long-named directory %s\n",fname);
 			closedir(d);
 			return;
@@ -518,7 +523,8 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 			strcpy(p,".cvsignore");
 			local_exclude_list = make_exclude_list(fname,NULL,0);
 		} else {
-			fprintf(FERROR,"cannot cvs-exclude in long-named directory %s\n",fname);
+			io_error = 1;
+			fprintf(FINFO,"cannot cvs-exclude in long-named directory %s\n",fname);
 		}
 	}  
 	
@@ -571,12 +577,13 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 		}
 
 		if (link_stat(fname,&st) != 0) {
+			io_error=1;
 			fprintf(FERROR,"%s : %s\n",fname,strerror(errno));
 			continue;
 		}
 
 		if (S_ISDIR(st.st_mode) && !recurse) {
-			fprintf(FERROR,"skipping directory %s\n",fname);
+			fprintf(FINFO,"skipping directory %s\n",fname);
 			continue;
 		}
 
@@ -618,6 +625,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 				exit_cleanup(1);
 			}
 			if (chdir(dir) != 0) {
+				io_error=1;
 				fprintf(FERROR,"chdir %s : %s\n",
 					dir,strerror(errno));
 				continue;
@@ -654,6 +662,11 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
            version 15 */
 	if (f != -1 && remote_version >= 15) {
 		send_uid_list(f);
+	}
+
+	/* if protocol version is >= 17 then send the io_error flag */
+	if (f != -1 && remote_version >= 17) {
+		write_int(f, io_error);
 	}
 
 	return flist;
@@ -705,12 +718,12 @@ struct file_list *recv_file_list(int f)
     flist->count++;
 
     if (verbose > 2)
-      fprintf(FERROR,"recv_file_name(%s)\n",f_name(flist->files[i]));
+      fprintf(FINFO,"recv_file_name(%s)\n",f_name(flist->files[i]));
   }
 
 
   if (verbose > 2)
-    fprintf(FERROR,"received %d names\n",flist->count);
+    fprintf(FINFO,"received %d names\n",flist->count);
 
   clean_flist(flist);
 
@@ -721,6 +734,11 @@ struct file_list *recv_file_list(int f)
   /* now recv the uid/gid list. This was introduced in protocol version 15 */
   if (f != -1 && remote_version >= 15) {
 	  recv_uid_list(f, flist);
+  }
+
+  /* if protocol version is >= 17 then recv the io_error flag */
+  if (f != -1 && remote_version >= 17) {
+	  io_error |= read_int(f);
   }
 
   return flist;
@@ -816,7 +834,7 @@ void clean_flist(struct file_list *flist)
 		    strcmp(f_name(flist->files[i]),
 			   f_name(flist->files[i-1])) == 0) {
 			if (verbose > 1 && !am_server)
-				fprintf(FERROR,"removing duplicate name %s from file list %d\n",
+				fprintf(FINFO,"removing duplicate name %s from file list %d\n",
 					f_name(flist->files[i-1]),i-1);
 			free_file(flist->files[i]);
 		} 

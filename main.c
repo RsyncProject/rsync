@@ -55,6 +55,8 @@ int orig_umask=0;
 int relative_paths=0;
 int numeric_ids = 0;
 int force_delete = 0;
+int io_timeout = 0;
+int io_error = 0;
 
 extern int csum_length;
 
@@ -108,6 +110,7 @@ static void server_options(char **args,int *argc)
   int ac = *argc;
   static char argstr[50];
   static char bsize[30];
+  static char iotime[30];
   int i, x;
 
   args[ac++] = "--server";
@@ -166,6 +169,11 @@ static void server_options(char **args,int *argc)
   if (block_size != BLOCK_SIZE) {
     sprintf(bsize,"-B%d",block_size);
     args[ac++] = bsize;
+  }    
+
+  if (io_timeout) {
+    sprintf(iotime,"--timeout=%d",io_timeout);
+    args[ac++] = iotime;
   }    
 
   if (strcmp(backup_suffix, BACKUP_SUFFIX)) {
@@ -239,10 +247,10 @@ static int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f
   args[argc] = NULL;
 
   if (verbose > 3) {
-    fprintf(FERROR,"cmd=");
+    fprintf(FINFO,"cmd=");
     for (i=0;i<argc;i++)
-      fprintf(FERROR,"%s ",args[i]);
-    fprintf(FERROR,"\n");
+      fprintf(FINFO,"%s ",args[i]);
+    fprintf(FINFO,"\n");
   }
 
   ret = piped_child(args,f_in,f_out);
@@ -308,7 +316,7 @@ void do_server_sender(int argc,char *argv[])
   char *dir = argv[0];
 
   if (verbose > 2)
-    fprintf(FERROR,"server_sender starting pid=%d\n",(int)getpid());
+    fprintf(FINFO,"server_sender starting pid=%d\n",(int)getpid());
   
   if (!relative_paths && chdir(dir) != 0) {
 	  fprintf(FERROR,"chdir %s: %s (3)\n",dir,strerror(errno));
@@ -357,7 +365,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
   if ((pid=do_fork()) == 0) {
     recv_files(f_in,flist,local_name,recv_pipe[1]);
     if (verbose > 2)
-      fprintf(FERROR,"receiver read %ld\n",(long)read_total());
+      fprintf(FINFO,"receiver read %ld\n",(long)read_total());
     exit_cleanup(0);
   }
 
@@ -377,7 +385,7 @@ void do_server_recv(int argc,char *argv[])
   char *dir = NULL;
   
   if (verbose > 2)
-    fprintf(FERROR,"server_recv(%d) starting pid=%d\n",argc,(int)getpid());
+    fprintf(FINFO,"server_recv(%d) starting pid=%d\n",argc,(int)getpid());
 
   if (argc > 0) {
 	  dir = argv[0];
@@ -445,6 +453,7 @@ static void usage(FILE *f)
   fprintf(f,"    --delete             delete files that don't exist on the sending side\n");
   fprintf(f,"    --force              force deletion of directories even if not empty\n");
   fprintf(f,"    --numeric-ids        don't map uid/gid values by user/group name\n");
+  fprintf(f,"    --timeout TIME       set IO timeout in seconds\n");
   fprintf(f,"-I, --ignore-times       don't exclude files that match length and time\n");
   fprintf(f,"-T  --temp-dir DIR       create temporary files in directory DIR\n");
   fprintf(f,"-z, --compress           compress file data\n");
@@ -459,7 +468,8 @@ static void usage(FILE *f)
 }
 
 enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
-      OPT_EXCLUDE_FROM,OPT_DELETE,OPT_NUMERIC_IDS,OPT_RSYNC_PATH,OPT_FORCE};
+      OPT_EXCLUDE_FROM,OPT_DELETE,OPT_NUMERIC_IDS,OPT_RSYNC_PATH,
+      OPT_FORCE,OPT_TIMEOUT};
 
 static char *short_options = "oblLWHpguDCtcahvrRIxnSe:B:T:z";
 
@@ -498,6 +508,7 @@ static struct option long_options[] = {
   {"rsh",         1,     0,    'e'},
   {"suffix",      1,     0,    OPT_SUFFIX},
   {"block-size",  1,     0,    'B'},
+  {"timeout",     1,     0,    OPT_TIMEOUT},
   {"temp-dir",    1,     0,    'T'},
   {"compress",	  0,	 0,    'z'},
   {0,0,0,0}};
@@ -690,6 +701,10 @@ int main(int argc,char *argv[])
 	  block_size = atoi(optarg);
 	  break;
 
+	case OPT_TIMEOUT:
+	  io_timeout = atoi(optarg);
+	  break;
+
 	case 'T':
 		tmpdir = optarg;
 		break;
@@ -781,7 +796,7 @@ int main(int argc,char *argv[])
     }
 
     if (verbose > 3) {
-      fprintf(FERROR,"cmd=%s machine=%s user=%s path=%s\n",
+      fprintf(FINFO,"cmd=%s machine=%s user=%s path=%s\n",
 	      shell_cmd?shell_cmd:"",
 	      shell_machine?shell_machine:"",
 	      shell_user?shell_user:"",
@@ -803,7 +818,7 @@ int main(int argc,char *argv[])
 #endif
 
     if (verbose > 3) 
-      fprintf(FERROR,"parent=%d child=%d sender=%d recurse=%d\n",
+      fprintf(FINFO,"parent=%d child=%d sender=%d recurse=%d\n",
 	      (int)getpid(),pid,sender,recurse);
 
     if (sender) {
@@ -813,10 +828,10 @@ int main(int argc,char *argv[])
 	send_exclude_list(f_out);
       flist = send_file_list(f_out,argc,argv);
       if (verbose > 3) 
-	fprintf(FERROR,"file list sent\n");
+	fprintf(FINFO,"file list sent\n");
       send_files(flist,f_out,f_in);
       if (verbose > 3)
-	fprintf(FERROR,"waiting on %d\n",pid);
+	fprintf(FINFO,"waiting on %d\n",pid);
       waitpid(pid, &status, 0);
       report(-1);
       exit_cleanup(status);
@@ -826,7 +841,7 @@ int main(int argc,char *argv[])
 
     flist = recv_file_list(f_in);
     if (!flist || flist->count == 0) {
-      fprintf(FERROR,"nothing to do\n");
+      fprintf(FINFO,"nothing to do\n");
       exit_cleanup(0);
     }
 
