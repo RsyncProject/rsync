@@ -22,3 +22,4 @@ trimslash
 t_unsafe
 wildtest
 getfsdev
+.rsync-filter
