@@ -136,10 +136,12 @@ void _exit_cleanup(int code, const char *file, int line)
 	}
 
 	if (code == 0) {
-		if ((io_error & ~IOERR_VANISHED) || log_got_error)
-			code = RERR_PARTIAL;
-		else if (io_error)
+		if (io_error & IOERR_DEL_LIMIT)
+			code = RERR_DEL_LIMIT;
+		if (io_error & IOERR_VANISHED)
 			code = RERR_VANISHED;
+		if (io_error & IOERR_GENERAL || log_got_error)
+			code = RERR_PARTIAL;
 	}
 
 	if (code)
