@@ -39,29 +39,25 @@
    incompatible with older versions :-( */
 #define CHAR_OFFSET 0
 
-/* These flags are used during the flist transfer. */
+/* These flags are only used during the flist transfer. */
 
-#define FLAG_DELETE (1<<0)
-#define SAME_MODE (1<<1)
-#define EXTENDED_FLAGS (1<<2)
-#define SAME_RDEV_pre28 EXTENDED_FLAGS /* Only use in protocols < 28 */
-#define SAME_UID (1<<3)
-#define SAME_GID (1<<4)
-#define SAME_DIR (1<<5)
-#define SAME_NAME SAME_DIR
-#define LONG_NAME (1<<6)
-#define SAME_TIME (1<<7)
-#define SAME_HIGH_RDEV (1<<8)
-#define HAS_INODE_DATA (1<<9)
-#define SAME_DEV (1<<10)
+#define XMIT_TOP_DIR (1<<0)
+#define XMIT_SAME_MODE (1<<1)
+#define XMIT_EXTENDED_FLAGS (1<<2)
+#define XMIT_SAME_RDEV_pre28 XMIT_EXTENDED_FLAGS /* Only in protocols < 28 */
+#define XMIT_SAME_UID (1<<3)
+#define XMIT_SAME_GID (1<<4)
+#define XMIT_SAME_NAME (1<<5)
+#define XMIT_LONG_NAME (1<<6)
+#define XMIT_SAME_TIME (1<<7)
+#define XMIT_SAME_HIGH_RDEV (1<<8)
+#define XMIT_HAS_IDEV_DATA (1<<9)
+#define XMIT_SAME_DEV (1<<10)
 
-/* What flags above are relevant after the transfer of the flist? */
-#define LIVE_FLAGS FLAG_DELETE
+/* These flags are used in the live flist data. */
 
-/* These flist flags can be set after the flist is transferred. */
-
-/*#define FLAG_DELETE (1<<0) -- from the above list */
-#define FLAG_HLINK_EOL (1<<1)
+#define FLAG_TOP_DIR (1<<0)
+#define FLAG_HLINK_EOL (1<<1)	/* generator only */
 
 /* update this if you make incompatible changes */
 #define PROTOCOL_VERSION 28
@@ -425,7 +421,7 @@ struct file_struct {
 	char *basedir;
 	uid_t uid;
 	gid_t gid;
-	unsigned short flags;
+	uchar flags;
 };
 
 #define ARENA_SIZE	(32 * 1024)
