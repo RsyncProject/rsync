@@ -430,23 +430,24 @@ static char *get_local_name(struct file_list *flist,char *name)
 
 
 /* This is only called by the sender. */
-static void read_final_goodbye(int f_in, int f_out, int flist_count)
+static void read_final_goodbye(int f_in, int f_out)
 {
 	int i;
 
 	if (protocol_version < 29)
 		i = read_int(f_in);
 	else {
-		while ((i = read_int(f_in)) == flist_count
+		while ((i = read_int(f_in)) == the_file_list->count
 		    && read_shortint(f_in) == ITEM_IS_NEW) {
 			/* Forward the keep-alive (no-op) to the receiver. */
-			write_int(f_out, flist_count);
+			write_int(f_out, the_file_list->count);
 			write_shortint(f_out, ITEM_IS_NEW);
 		}
 	}
 
 	if (i != -1) {
-		rprintf(FERROR, "Invalid packet from generator at end of run.\n");
+		rprintf(FERROR, "Invalid packet at end of run [%s]\n",
+			who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
 	}
 }
@@ -510,7 +511,7 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 	io_flush(FULL_FLUSH);
 	report(f_out);
 	if (protocol_version >= 24)
-		read_final_goodbye(f_in, f_out, flist->count);
+		read_final_goodbye(f_in, f_out);
 	io_flush(FULL_FLUSH);
 	exit_cleanup(0);
 }
@@ -529,7 +530,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	copy_links = 0;
 
 	if (preserve_hard_links)
-		init_hard_links(flist);
+		init_hard_links();
 
 	if (fd_pair(error_pipe) < 0
 	    || (need_name_pipe && fd_pair(name_pipe) < 0)) {
@@ -576,7 +577,8 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 			while (read_int(f_in) == flist->count
 			    && read_shortint(f_in) == ITEM_IS_NEW) {}
 
-			rprintf(FERROR, "Invalid packet from server at end of run.\n");
+			rprintf(FERROR, "Invalid packet at end of run [%s]\n",
+				who_am_i());
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
@@ -779,7 +781,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		send_files(flist,f_out,f_in);
 		io_flush(FULL_FLUSH);
 		if (protocol_version >= 24)
-			read_final_goodbye(f_in, f_out, flist->count);
+			read_final_goodbye(f_in, f_out);
 		if (pid != -1) {
 			if (verbose > 3)
 				rprintf(FINFO,"client_run waiting on %d\n", (int) pid);
