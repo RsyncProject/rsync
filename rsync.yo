@@ -1052,7 +1052,8 @@ dit(bf(--address)) By default rsync will bind to the wildcard address
 when run as a daemon with the --daemon option or when connecting to a
 rsync server. The --address option allows you to specify a specific IP
 address (or hostname) to bind to. This makes virtual hosting possible
-in conjunction with the --config option.
+in conjunction with the --config option.  See also the "address" global
+option in the rsyncd.conf manpage.
 
 dit(bf(--bwlimit=KBPS)) This option allows you to specify a maximum
 transfer rate in kilobytes per second for the data the daemon sends.
@@ -1076,7 +1077,8 @@ debugger.  This option has no effect if rsync is run from inetd or
 sshd.
 
 dit(bf(--port=PORT)) This specifies an alternate TCP port number to use
-rather than the default port 873.
+rather than the default port 873.  See also the "port" global option in
+the rsyncd.conf manpage.
 
 dit(bf(-4, --ipv4) or bf(-6, --ipv6)) Tells rsync to prefer IPv4/IPv6
 when creating the incoming sockets that the rsync daemon will use to
