@@ -5,9 +5,9 @@ Changes since 2.6.1:
   BUG FIXES:
 
     - Fixed a major bug in the sorting of the filenames when --relative
-      is used for some sources (probably just "/", but don't depend on
-      that).  This fix ensures that we ask for the right file-list item
-      when requesting changes from the sender.
+      is used for some sources (just sources such as "/" and "/*" were
+      affected).  This fix ensures that we ask for the right file-list
+      item when requesting changes from the sender.
 
     - Rsync now checks the return value of the close() function to
       better report disk-full problems on an NFS file system.
