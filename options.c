@@ -244,7 +244,7 @@ void usage(enum logcode F)
   rprintf(F,"     --ignore-existing       ignore files that already exist on receiving side\n");
   rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
   rprintf(F,"     --delete-excluded       also delete excluded files on the receiving side\n");
-  rprintf(F,"     --delete-after          delete after transferring, not before\n");
+  rprintf(F,"     --delete-after          receiver deletes after transferring, not before\n");
   rprintf(F,"     --ignore-errors         delete even if there are IO errors\n");
   rprintf(F,"     --max-delete=NUM        don't delete more than NUM files\n");
   rprintf(F,"     --partial               keep partially transferred files\n");
