@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsync)(1)(1 Dec 1998)()()
+manpage(rsync)(1)(7 Dec 1998)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
@@ -659,7 +659,7 @@ verb(
 )
        
 then look at out.dat. If everything is working correctly then out.dat
-should be a zero length file. You you are getting the above error from
+should be a zero length file. If you are getting the above error from
 rsync then you will probably find that out.dat contains some text or
 data. Look at the contents and try to work out what is producing
 it. The most common cause is incorrectly configured shell startup
