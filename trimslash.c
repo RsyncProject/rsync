@@ -29,7 +29,8 @@ int preserve_perms = 0;
  *
  * Test harness; not linked into release.
  **/
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
 	int i;
 	

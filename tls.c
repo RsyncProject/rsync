@@ -124,7 +124,8 @@ static void list_file (const char *fname)
 }
 
 
-int main (int argc, char *argv[])
+int
+main(int argc, char *argv[])
 {
 	if (argc < 2) {
 		fprintf (stderr, "usage: " PROGRAM " DIR ...\n"
