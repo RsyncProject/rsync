@@ -504,15 +504,15 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			rprintf(FINFO,"file list sent\n");
 
 		send_files(flist,f_out,f_in);
+		if (remote_version >= 24) {
+			/* final goodbye message */		
+			read_int(f_in);
+		}
 		if (pid != -1) {
 			if (verbose > 3)
 				rprintf(FINFO,"client_run waiting on %d\n",pid);
 			io_flush();
 			wait_process(pid, &status);
-		}
-		if (remote_version >= 24) {
-			/* final goodbye message */		
-			read_int(f_in);
 		}
 		report(-1);
 		exit_cleanup(status);
