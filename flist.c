@@ -1158,17 +1158,20 @@ struct file_list *recv_file_list(int f)
 }
 
 
-int file_compare(struct file_struct **f1, struct file_struct **f2)
+int file_compare(struct file_struct **file1, struct file_struct **file2)
 {
-	if (!(*f1)->basename && !(*f2)->basename)
+	struct file_struct *f1 = *file1;
+	struct file_struct *f2 = *file2;
+
+	if (!f1->basename && !f2->basename)
 		return 0;
-	if (!(*f1)->basename)
+	if (!f1->basename)
 		return -1;
-	if (!(*f2)->basename)
+	if (!f2->basename)
 		return 1;
-	if ((*f1)->dirname == (*f2)->dirname)
-		return u_strcmp((*f1)->basename, (*f2)->basename);
-	return f_name_cmp(*f1, *f2);
+	if (f1->dirname == f2->dirname)
+		return u_strcmp(f1->basename, f2->basename);
+	return f_name_cmp(f1, f2);
 }
 
 
