@@ -21,6 +21,8 @@
 
 # The pwd is undefined when this script starts.
 
+set -x
+
 set -e
 
 if ! [ -d "$testdir" ] && ! mkdir "$testdir"
