@@ -600,6 +600,8 @@ int daemon_main(void)
 
 	if (rsync_port == 0 && (rsync_port = lp_rsync_port()) == 0)
 		rsync_port = RSYNC_PORT;
+	if (bind_address == NULL)
+		bind_address = lp_bind_address();
 
 	log_init();
 
