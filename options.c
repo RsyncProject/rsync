@@ -149,8 +149,11 @@ char *batch_name = NULL;
 static int daemon_opt;   /* sets am_daemon after option error-reporting */
 static int F_option_cnt = 0;
 static int modify_window_set;
+static int refused_verbose, refused_delete, refused_archive_part;
+static int refused_partial, refused_progress;
 static char *dest_option = NULL;
 static char *max_size_arg;
+static char partialdir_for_delayupdate[] = ".~tmp~";
 
 /** Local address to bind.  As a character string because it's
  * interpreted by the IPv6 layer: should be a numeric IP4 or IP6
@@ -355,6 +358,7 @@ static struct poptOption long_options[] = {
   {"one-file-system", 'x', POPT_ARG_NONE,   &one_file_system, 0, 0, 0 },
   {"existing",         0,  POPT_ARG_NONE,   &only_existing, 0, 0, 0 },
   {"ignore-existing",  0,  POPT_ARG_NONE,   &opt_ignore_existing, 0, 0, 0 },
+  {"del",              0,  POPT_ARG_NONE,   &delete_during, 0, 0, 0 },
   {"delete",           0,  POPT_ARG_NONE,   &delete_mode, 0, 0, 0 },
   {"delete-before",    0,  POPT_ARG_VAL,    &delete_before, 2, 0, 0 },
   {"delete-during",    0,  POPT_ARG_NONE,   &delete_during, 0, 0, 0 },
@@ -521,9 +525,6 @@ static void set_refuse_options(char *bp)
 			break;
 		if ((cp = strchr(bp, ' ')) != NULL)
 			*cp= '\0';
-		/* If they specify "delete", reject all delete options. */
-		if (strcmp(bp, "delete") == 0)
-			bp = "delete*";
 		is_wild = strpbrk(bp, "*?[") != NULL;
 		found_match = 0;
 		for (op = long_options; ; op++) {
@@ -531,11 +532,31 @@ static void set_refuse_options(char *bp)
 			if (!op->longName && !*shortname)
 				break;
 			if ((op->longName && wildmatch(bp, op->longName))
-			    || (*shortname && wildmatch(bp, shortname))) {
+			    || (*shortname && wildmatch(bp, shortname))
+			    || op->val == OPT_DAEMON) {
 				if (op->argInfo == POPT_ARG_VAL)
 					op->argInfo = POPT_ARG_NONE;
 				op->val = (op - long_options) + OPT_REFUSED_BASE;
 				found_match = 1;
+				/* These flags are set to let us easily check
+				 * an implied option later in the code. */
+				switch (*shortname) {
+				case 'v':
+					refused_verbose = op->val;
+					break;
+				case 'r': case 'd': case 'l': case 'p':
+				case 't': case 'g': case 'o': case 'D':
+					refused_archive_part = op->val;
+					break;
+				case '\0':
+					if (wildmatch("delete", op->longName))
+						refused_delete = op->val;
+					else if (wildmatch("partial", op->longName))
+						refused_partial = op->val;
+					else if (wildmatch("progress", op->longName))
+						refused_progress = op->val;
+					break;
+				}
 				if (!is_wild)
 					break;
 			}
@@ -565,6 +586,20 @@ static int count_args(const char **argv)
 }
 
 
+static void create_refuse_error(int which)
+{
+	/* The "which" value is the index + OPT_REFUSED_BASE. */
+	struct poptOption *op = &long_options[which - OPT_REFUSED_BASE];
+	int n = snprintf(err_buf, sizeof err_buf,
+			 "The server is configured to refuse --%s\n",
+			 op->longName) - 1;
+	if (op->shortName) {
+		snprintf(err_buf + n, sizeof err_buf - n,
+			 " (-%c)\n", op->shortName);
+	}
+}
+
+
 /**
  * Process command line arguments.  Called on both local and remote.
  *
@@ -588,16 +623,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	/* The context leaks in case of an error, but if there's a
 	 * problem we always exit anyhow. */
 	pc = poptGetContext(RSYNC_NAME, *argc, *argv, long_options, 0);
-	{
-		struct poptAlias my_alias;
-		char **argv = new_array(char *, 1);
-		argv[0] = strdup("--delete-during");
-		my_alias.longName = "del", my_alias.shortName = '\0';
-		my_alias.argc = 1;
-		my_alias.argv = (const char **)argv;
-		if (argv && argv[0])
-			poptAddAlias(pc, my_alias, 0);
-	}
 	poptReadDefaultConfig(pc, 0);
 
 	while ((opt = poptGetNextOpt(pc)) != -1) {
@@ -676,6 +701,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				arg = sanitize_path(NULL, arg, NULL, 0);
 			if (server_filter_list.head) {
 				char *cp = (char *)arg;
+				if (!*cp)
+					goto options_rejected;
 				clean_fname(cp, 1);
 				if (check_filter(&server_filter_list, cp, 0) < 0)
 					goto options_rejected;
@@ -718,6 +745,11 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			break;
 
 		case 'P':
+			if (refused_partial || refused_progress) {
+				create_refuse_error(refused_partial
+				    ? refused_partial : refused_progress);
+				return 0;
+			}
 			do_progress = 1;
 			keep_partial = 1;
 			break;
@@ -801,23 +833,15 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 		default:
 			/* A large opt value means that set_refuse_options()
-			 * turned this option off (opt-BASE is its index). */
+			 * turned this option off. */
 			if (opt >= OPT_REFUSED_BASE) {
-				struct poptOption *op =
-				    &long_options[opt-OPT_REFUSED_BASE];
-				int n = snprintf(err_buf, sizeof err_buf,
-				    "The server is configured to refuse --%s\n",
-				    op->longName) - 1;
-				if (op->shortName) {
-					snprintf(err_buf+n, sizeof err_buf-n,
-					    " (-%c)\n", op->shortName);
-				}
-			} else {
-				snprintf(err_buf, sizeof err_buf, "%s%s: %s\n",
-				    am_server ? "on remote machine: " : "",
-				    poptBadOption(pc, POPT_BADOPTION_NOALIAS),
-				    poptStrerror(opt));
+				create_refuse_error(opt);
+				return 0;
 			}
+			snprintf(err_buf, sizeof err_buf, "%s%s: %s\n",
+				 am_server ? "on remote machine: " : "",
+				 poptBadOption(pc, POPT_BADOPTION_NOALIAS),
+				 poptStrerror(opt));
 			return 0;
 		}
 	}
@@ -891,6 +915,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 
 	if (archive_mode) {
+		if (refused_archive_part) {
+			create_refuse_error(refused_archive_part);
+			return 0;
+		}
 		if (!files_from)
 			recurse = -1; /* infinite recursion */
 #if SUPPORT_LINKS
@@ -922,6 +950,11 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	else if (delete_mode || delete_excluded)
 		delete_mode = delete_before = 1;
 
+	if (delete_mode && refused_delete) {
+		create_refuse_error(refused_delete);
+		return 0;
+	}
+
 	*argv = poptGetArgs(pc);
 	*argc = count_args(*argv);
 
@@ -942,27 +975,35 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		struct filter_list_struct *elp = &server_filter_list;
 		int i;
 		if (tmpdir) {
+			if (!*tmpdir)
+				goto options_rejected;
 			clean_fname(tmpdir, 1);
 			if (check_filter(elp, tmpdir, 1) < 0)
 				goto options_rejected;
 		}
-		if (partial_dir) {
+		if (partial_dir && *partial_dir) {
 			clean_fname(partial_dir, 1);
 			if (check_filter(elp, partial_dir, 1) < 0)
 				goto options_rejected;
 		}
 		for (i = 0; i < basis_dir_cnt; i++) {
+			if (!*basis_dir[i])
+				goto options_rejected;
 			clean_fname(basis_dir[i], 1);
 			if (check_filter(elp, basis_dir[i], 1) < 0)
 				goto options_rejected;
 		}
 		if (backup_dir) {
+			if (!*backup_dir)
+				goto options_rejected;
 			clean_fname(backup_dir, 1);
 			if (check_filter(elp, backup_dir, 1) < 0)
 				goto options_rejected;
 		}
 	}
 	if (server_filter_list.head && files_from) {
+		if (!*files_from)
+			goto options_rejected;
 		clean_fname(files_from, 1);
 		if (check_filter(&server_filter_list, files_from, 0) < 0) {
 		    options_rejected:
@@ -1003,8 +1044,13 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		return 0;
 	}
 
-	if (do_progress && !verbose)
+	if (do_progress && !verbose) {
+		if (refused_verbose) {
+			create_refuse_error(refused_verbose);
+			return 0;
+		}
 		verbose = 1;
+	}
 
 	if (daemon_bwlimit && (!bwlimit || bwlimit > daemon_bwlimit))
 		bwlimit = daemon_bwlimit;
@@ -1015,7 +1061,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 
 	if (delay_updates && !partial_dir)
-		partial_dir = ".~tmp~";
+		partial_dir = partialdir_for_delayupdate;
 
 	if (inplace) {
 #if HAVE_FTRUNCATE
@@ -1023,6 +1069,12 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			snprintf(err_buf, sizeof err_buf,
 				 "--inplace cannot be used with --%s\n",
 				 delay_updates ? "delay-updates" : "partial-dir");
+			return 0;
+		}
+		/* --inplace implies --partial for refusal purposes, but we
+		 * clear the keep_partial flag for internal logic purposes. */
+		if (refused_partial) {
+			create_refuse_error(refused_partial);
 			return 0;
 		}
 		keep_partial = 0;
@@ -1033,14 +1085,22 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		return 0;
 #endif
 	} else {
-		if (keep_partial && !partial_dir)
-			partial_dir = getenv("RSYNC_PARTIAL_DIR");
+		if (keep_partial && !partial_dir) {
+			if ((arg = getenv("RSYNC_PARTIAL_DIR")) != NULL && *arg)
+				partial_dir = strdup(arg);
+		}
 		if (partial_dir) {
+			if (*partial_dir)
+				clean_fname(partial_dir, 1);
 			if (!*partial_dir || strcmp(partial_dir, ".") == 0)
 				partial_dir = NULL;
 			else if (*partial_dir != '/') {
 				parse_rule(&filter_list, partial_dir,
 				    MATCHFLG_NO_PREFIXES|MATCHFLG_DIRECTORY, 0);
+			}
+			if (!partial_dir && refused_partial) {
+				create_refuse_error(refused_partial);
+				return 0;
 			}
 			keep_partial = 1;
 		}
@@ -1259,8 +1319,10 @@ void server_options(char **args,int *argc)
 	}
 
 	if (partial_dir && am_sender) {
-		args[ac++] = "--partial-dir";
-		args[ac++] = partial_dir;
+		if (partial_dir != partialdir_for_delayupdate) {
+			args[ac++] = "--partial-dir";
+			args[ac++] = partial_dir;
+		}
 		if (delay_updates)
 			args[ac++] = "--delay-updates";
 	} else if (keep_partial)
