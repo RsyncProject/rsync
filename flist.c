@@ -47,9 +47,6 @@ extern int remote_version;
 
 static char **local_exclude_list = NULL;
 
-static void clean_fname(char *name);
-
-
 int link_stat(const char *Path, struct stat *Buffer) 
 {
 #if SUPPORT_LINKS
@@ -92,12 +89,51 @@ static void send_directory(int f,struct file_list *flist,char *dir);
 
 static char *flist_dir = NULL;
 
-extern void (*send_file_entry)(struct file_struct *file,int f);
-extern void (*receive_file_entry)(struct file_struct *file,
-				  unsigned char flags,int f);
+static void clean_fname(char *name)
+{
+  char *p;
+  int l;
+  int modified = 1;
+
+  if (!name) return;
+
+  while (modified) {
+    modified = 0;
+
+    if ((p=strstr(name,"/./"))) {
+      modified = 1;
+      while (*p) {
+	p[0] = p[2];
+	p++;
+      }
+    }
+
+    if ((p=strstr(name,"//"))) {
+      modified = 1;
+      while (*p) {
+	p[0] = p[1];
+	p++;
+      }
+    }
+
+    if (strncmp(p=name,"./",2) == 0) {      
+      modified = 1;
+      do {
+	p[0] = p[2];
+      } while (*p++);
+    }
+
+    l = strlen(p=name);
+    if (l > 1 && p[l-1] == '/') {
+      modified = 1;
+      p[l-1] = 0;
+    }
+  }
+}
 
 
-void send_file_entry_v11(struct file_struct *file,int f)
+
+void send_file_entry(struct file_struct *file,int f)
 {
   unsigned char flags;
   static time_t last_time=0;
@@ -106,6 +142,7 @@ void send_file_entry_v11(struct file_struct *file,int f)
   static uid_t last_uid=0;
   static gid_t last_gid=0;
   static char lastname[MAXPATHLEN]="";
+  char *fname;
   int l1,l2;
 
   if (f == -1) return;
@@ -115,6 +152,8 @@ void send_file_entry_v11(struct file_struct *file,int f)
     return;
   }
 
+  fname = f_name(file);
+
   flags = FILE_VALID;
 
   if (file->mode == last_mode) flags |= SAME_MODE;
@@ -123,8 +162,8 @@ void send_file_entry_v11(struct file_struct *file,int f)
   if (file->gid == last_gid) flags |= SAME_GID;
   if (file->modtime == last_time) flags |= SAME_TIME;
 
-  for (l1=0;lastname[l1] && file->name[l1] == lastname[l1];l1++) ;
-  l2 = strlen(file->name) - l1;
+  for (l1=0;lastname[l1] && fname[l1] == lastname[l1];l1++) ;
+  l2 = strlen(fname) - l1;
 
   if (l1 > 0) flags |= SAME_NAME;
   if (l2 > 255) flags |= LONG_NAME;
@@ -136,7 +175,7 @@ void send_file_entry_v11(struct file_struct *file,int f)
     write_int(f,l2);
   else
     write_byte(f,l2);
-  write_buf(f,file->name+l1,l2);
+  write_buf(f,fname+l1,l2);
 
   write_int(f,(int)file->length);
   if (!(flags & SAME_TIME))
@@ -178,22 +217,25 @@ void send_file_entry_v11(struct file_struct *file,int f)
   last_gid = file->gid;
   last_time = file->modtime;
 
-  strncpy(lastname,file->name,MAXPATHLEN-1);
+  strncpy(lastname,fname,MAXPATHLEN-1);
   lastname[MAXPATHLEN-1] = 0;
 }
 
 
 
-void receive_file_entry_v11(struct file_struct *file,
-			    unsigned char flags,int f)
+void receive_file_entry(struct file_struct **fptr,
+			unsigned char flags,int f)
 {
   static time_t last_time=0;
   static mode_t last_mode=0;
   static dev_t last_rdev=0;
   static uid_t last_uid=0;
   static gid_t last_gid=0;
-  static char lastname[MAXPATHLEN]="";
+  static char lastname[MAXPATHLEN];
+  char thisname[MAXPATHLEN];
   int l1=0,l2=0;
+  char *p;
+  struct file_struct *file;
 
   if (flags & SAME_NAME)
     l1 = read_byte(f);
@@ -203,14 +245,37 @@ void receive_file_entry_v11(struct file_struct *file,
   else
     l2 = read_byte(f);
 
+  file = (struct file_struct *)malloc(sizeof(*file));
+  if (!file) out_of_memory("receive_file_entry");
   bzero((char *)file,sizeof(*file));
+  (*fptr) = file;
 
-  file->name = (char *)malloc(l1+l2+1);
-  if (!file->name) out_of_memory("receive_file_entry 1");
+  strncpy(thisname,lastname,l1);
+  read_buf(f,&thisname[l1],l2);
+  thisname[l1+l2] = 0;
 
-  strncpy(file->name,lastname,l1);
-  read_buf(f,file->name+l1,l2);
-  file->name[l1+l2] = 0;
+  strncpy(lastname,thisname,MAXPATHLEN-1);
+  lastname[MAXPATHLEN-1] = 0;
+
+  clean_fname(thisname);
+
+  if ((p = strrchr(thisname,'/'))) {
+	  static char *lastdir;
+	  *p = 0;
+	  if (lastdir && strcmp(thisname, lastdir)==0) {
+		  file->dirname = lastdir;
+	  } else {
+		  file->dirname = strdup(thisname);
+		  lastdir = file->dirname;
+	  }
+	  file->basename = strdup(p+1);
+  } else {
+	  file->dirname = NULL;
+	  file->basename = strdup(thisname);
+  }
+
+  if (!file->basename) out_of_memory("receive_file_entry 1");
+
 
   file->length = (off_t)read_int(f);
   file->modtime = (flags & SAME_TIME) ? last_time : (time_t)read_int(f);
@@ -245,81 +310,110 @@ void receive_file_entry_v11(struct file_struct *file,
   last_uid = file->uid;
   last_gid = file->gid;
   last_time = file->modtime;
-
-  strncpy(lastname,file->name,MAXPATHLEN-1);
-  lastname[MAXPATHLEN-1] = 0;
 }
 
 
 
 static struct file_struct *make_file(char *fname)
 {
-  static struct file_struct file;
-  struct stat st;
-  char sum[SUM_LENGTH];
+	struct file_struct *file;
+	struct stat st;
+	char sum[SUM_LENGTH];
+	char *p;
+	char cleaned_name[MAXPATHLEN];
 
-  bzero(sum,SUM_LENGTH);
+	strncpy(cleaned_name, fname, MAXPATHLEN-1);
+	cleaned_name[MAXPATHLEN-1] = 0;
+	clean_fname(cleaned_name);
+	fname = cleaned_name;
 
-  if (link_stat(fname,&st) != 0) {
-    fprintf(FERROR,"%s: %s\n",
-	    fname,strerror(errno));
-    return NULL;
-  }
+	bzero(sum,SUM_LENGTH);
 
-  if (S_ISDIR(st.st_mode) && !recurse) {
-    fprintf(FERROR,"skipping directory %s\n",fname);
-    return NULL;
-  }
+	if (link_stat(fname,&st) != 0) {
+		fprintf(FERROR,"%s: %s\n",
+			fname,strerror(errno));
+		return NULL;
+	}
 
-  if (one_file_system && st.st_dev != filesystem_dev)
-    return NULL;
+	if (S_ISDIR(st.st_mode) && !recurse) {
+		fprintf(FERROR,"skipping directory %s\n",fname);
+		return NULL;
+	}
+	
+	if (one_file_system && st.st_dev != filesystem_dev)
+		return NULL;
+	
+	if (!match_file_name(fname,&st))
+		return NULL;
+	
+	if (verbose > 2)
+		fprintf(FERROR,"make_file(%s)\n",fname);
+	
+	file = (struct file_struct *)malloc(sizeof(*file));
+	if (!file) out_of_memory("make_file");
+	bzero((char *)file,sizeof(*file));
 
-  if (!match_file_name(fname,&st))
-    return NULL;
+	if ((p = strrchr(fname,'/'))) {
+		static char *lastdir;
+		*p = 0;
+		if (lastdir && strcmp(fname, lastdir)==0) {
+			file->dirname = lastdir;
+		} else {
+			file->dirname = strdup(fname);
+			lastdir = file->dirname;
+		}
+		file->basename = strdup(p+1);
+		*p = '/';
+	} else {
+		file->dirname = NULL;
+		file->basename = strdup(fname);
+	}
 
-  if (verbose > 2)
-    fprintf(FERROR,"make_file(%s)\n",fname);
-
-  bzero((char *)&file,sizeof(file));
-
-  file.name = strdup(fname);
-  file.modtime = st.st_mtime;
-  file.length = st.st_size;
-  file.mode = st.st_mode;
-  file.uid = st.st_uid;
-  file.gid = st.st_gid;
-  file.dev = st.st_dev;
-  file.inode = st.st_ino;
+	file->modtime = st.st_mtime;
+	file->length = st.st_size;
+	file->mode = st.st_mode;
+	file->uid = st.st_uid;
+	file->gid = st.st_gid;
+	file->dev = st.st_dev;
+	file->inode = st.st_ino;
 #ifdef HAVE_ST_RDEV
-  file.rdev = st.st_rdev;
+	file->rdev = st.st_rdev;
 #endif
 
 #if SUPPORT_LINKS
-  if (S_ISLNK(st.st_mode)) {
-    int l;
-    char lnk[MAXPATHLEN];
-    if ((l=readlink(fname,lnk,MAXPATHLEN-1)) == -1) {
-      fprintf(FERROR,"readlink %s : %s\n",fname,strerror(errno));
-      return NULL;
-    }
-    lnk[l] = 0;
-    file.link = strdup(lnk);
-  }
+	if (S_ISLNK(st.st_mode)) {
+		int l;
+		char lnk[MAXPATHLEN];
+		if ((l=readlink(fname,lnk,MAXPATHLEN-1)) == -1) {
+			fprintf(FERROR,"readlink %s : %s\n",
+				fname,strerror(errno));
+			return NULL;
+		}
+		lnk[l] = 0;
+		file->link = strdup(lnk);
+	}
 #endif
 
-  if (always_checksum && S_ISREG(st.st_mode)) {
-    file_checksum(fname,file.sum,st.st_size);
-  }       
+	if (always_checksum && S_ISREG(st.st_mode)) {
+		file_checksum(fname,file->sum,st.st_size);
+	}       
 
-  if (flist_dir)
-    file.dir = strdup(flist_dir);
-  else
-    file.dir = NULL;
+	if (flist_dir) {
+		static char *lastdir;
+		if (lastdir && strcmp(lastdir, flist_dir)==0) {
+			file->basedir = lastdir;
+		} else {
+			file->basedir = strdup(flist_dir);
+			lastdir = file->basedir;
+		}
+	} else {
+		file->basedir = NULL;
+	}
 
-  if (!S_ISDIR(st.st_mode))
-    total_size += st.st_size;
+	if (!S_ISDIR(st.st_mode))
+		total_size += st.st_size;
 
-  return &file;
+	return file;
 }
 
 
@@ -333,25 +427,25 @@ static void send_file_name(int f,struct file_list *flist,char *fname)
   if (!file) return;  
   
   if (flist->count >= flist->malloced) {
-	  if (flist->malloced < 100)
-		  flist->malloced += 100;
+	  if (flist->malloced < 1000)
+		  flist->malloced += 1000;
 	  else
-		  flist->malloced *= 1.8;
-	  flist->files = (struct file_struct *)realloc(flist->files,
-						       sizeof(flist->files[0])*
-						       flist->malloced);
+		  flist->malloced *= 2;
+	  flist->files = (struct file_struct **)realloc(flist->files,
+							sizeof(flist->files[0])*
+							flist->malloced);
 	  if (!flist->files)
 		  out_of_memory("send_file_name");
   }
 
-  if (strcmp(file->name,"/")) {
-    flist->files[flist->count++] = *file;    
+  if (strcmp(file->basename,"")) {
+    flist->files[flist->count++] = file;
     send_file_entry(file,f);
   }
 
   if (S_ISDIR(file->mode) && recurse) {
     char **last_exclude_list = local_exclude_list;
-    send_directory(f,flist,file->name);
+    send_directory(f,flist,f_name(file));
     local_exclude_list = last_exclude_list;
     return;
   }
@@ -361,51 +455,51 @@ static void send_file_name(int f,struct file_list *flist,char *fname)
 
 static void send_directory(int f,struct file_list *flist,char *dir)
 {
-  DIR *d;
-  struct dirent *di;
-  char fname[MAXPATHLEN];
-  int l;
-  char *p;
+	DIR *d;
+	struct dirent *di;
+	char fname[MAXPATHLEN];
+	int l;
+	char *p;
 
-  d = opendir(dir);
-  if (!d) {
-    fprintf(FERROR,"%s: %s\n",
-	    dir,strerror(errno));
-    return;
-  }
+	d = opendir(dir);
+	if (!d) {
+		fprintf(FERROR,"%s: %s\n",
+			dir,strerror(errno));
+		return;
+	}
 
-  strncpy(fname,dir,MAXPATHLEN-1);
-  fname[MAXPATHLEN-1]=0;
-  l = strlen(fname);
-  if (fname[l-1] != '/') {
-        if (l == MAXPATHLEN-1) {
-              fprintf(FERROR,"skipping long-named directory %s\n",fname);
-              closedir(d);
-              return;
-        }
-	  strcat(fname,"/");
-	  l++;
-  }
-  p = fname + strlen(fname);
+	strncpy(fname,dir,MAXPATHLEN-1);
+	fname[MAXPATHLEN-1]=0;
+	l = strlen(fname);
+	if (fname[l-1] != '/') {
+		if (l == MAXPATHLEN-1) {
+			fprintf(FERROR,"skipping long-named directory %s\n",fname);
+			closedir(d);
+			return;
+		}
+		strcat(fname,"/");
+		l++;
+	}
+	p = fname + strlen(fname);
 
-  if (cvs_exclude) {
-    if (strlen(fname) + strlen(".cvsignore") <= MAXPATHLEN-1) {
-      strcpy(p,".cvsignore");
-      local_exclude_list = make_exclude_list(fname,NULL,0);
-    } else {
-      fprintf(FERROR,"cannot cvs-exclude in long-named directory %s\n",fname);
-    }
-  }  
+	if (cvs_exclude) {
+		if (strlen(fname) + strlen(".cvsignore") <= MAXPATHLEN-1) {
+			strcpy(p,".cvsignore");
+			local_exclude_list = make_exclude_list(fname,NULL,0);
+		} else {
+			fprintf(FERROR,"cannot cvs-exclude in long-named directory %s\n",fname);
+		}
+	}  
+	
+	for (di=readdir(d); di; di=readdir(d)) {
+		if (strcmp(di->d_name,".")==0 ||
+		    strcmp(di->d_name,"..")==0)
+			continue;
+		strncpy(p,di->d_name,MAXPATHLEN-(l+1));
+		send_file_name(f,flist,fname);
+	}
 
-  for (di=readdir(d); di; di=readdir(d)) {
-    if (strcmp(di->d_name,".")==0 ||
-	strcmp(di->d_name,"..")==0)
-      continue;
-    strncpy(p,di->d_name,MAXPATHLEN-(l+1));
-    send_file_name(f,flist,fname);
-  }
-
-  closedir(d);
+	closedir(d);
 }
 
 
@@ -427,9 +521,9 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
   if (!flist) out_of_memory("send_file_list");
 
   flist->count=0;
-  flist->malloced = 100;
-  flist->files = (struct file_struct *)malloc(sizeof(flist->files[0])*
-					      flist->malloced);
+  flist->malloced = 1000;
+  flist->files = (struct file_struct **)malloc(sizeof(flist->files[0])*
+					       flist->malloced);
   if (!flist->files) out_of_memory("send_file_list");
 
   for (i=0;i<argc;i++) {
@@ -531,9 +625,9 @@ struct file_list *recv_file_list(int f)
     goto oom;
 
   flist->count=0;
-  flist->malloced=100;
-  flist->files = (struct file_struct *)malloc(sizeof(flist->files[0])*
-					      flist->malloced);
+  flist->malloced=1000;
+  flist->files = (struct file_struct **)malloc(sizeof(flist->files[0])*
+					       flist->malloced);
   if (!flist->files)
     goto oom;
 
@@ -542,26 +636,26 @@ struct file_list *recv_file_list(int f)
     int i = flist->count;
 
     if (i >= flist->malloced) {
-	  if (flist->malloced < 100)
-		  flist->malloced += 100;
+	  if (flist->malloced < 1000)
+		  flist->malloced += 1000;
 	  else
-		  flist->malloced *= 1.8;
-	  flist->files =(struct file_struct *)realloc(flist->files,
-						      sizeof(flist->files[0])*
-						      flist->malloced);
+		  flist->malloced *= 2;
+	  flist->files =(struct file_struct **)realloc(flist->files,
+						       sizeof(flist->files[0])*
+						       flist->malloced);
 	  if (!flist->files)
 		  goto oom;
     }
 
     receive_file_entry(&flist->files[i],flags,f);
 
-    if (S_ISREG(flist->files[i].mode))
-      total_size += flist->files[i].length;
+    if (S_ISREG(flist->files[i]->mode))
+      total_size += flist->files[i]->length;
 
     flist->count++;
 
     if (verbose > 2)
-      fprintf(FERROR,"recv_file_name(%s)\n",flist->files[i].name);
+      fprintf(FERROR,"recv_file_name(%s)\n",f_name(flist->files[i]));
   }
 
 
@@ -587,12 +681,14 @@ oom:
 }
 
 
-int file_compare(struct file_struct *f1,struct file_struct *f2)
+int file_compare(struct file_struct **f1,struct file_struct **f2)
 {
-  if (!f1->name && !f2->name) return 0;
-  if (!f1->name) return -1;
-  if (!f2->name) return 1;
-  return strcmp(f1->name,f2->name);
+	if (!(*f1)->basename && !(*f2)->basename) return 0;
+	if (!(*f1)->basename) return -1;
+	if (!(*f2)->basename) return 1;
+	if ((*f1)->dirname == (*f2)->dirname)
+		return strcmp((*f1)->basename, (*f2)->basename);
+	return strcmp(f_name(*f1),f_name(*f2));
 }
 
 
@@ -604,7 +700,7 @@ int flist_find(struct file_list *flist,struct file_struct *f)
 
 	while (low != high) {
 		int mid = (low+high)/2;
-		int ret = file_compare(&flist->files[flist_up(flist, mid)],f);
+		int ret = file_compare(&flist->files[flist_up(flist, mid)],&f);
 		if (ret == 0) return flist_up(flist, mid);
 		if (ret > 0) {
 			high=mid;
@@ -613,52 +709,38 @@ int flist_find(struct file_list *flist,struct file_struct *f)
 		}
 	}
 
-	if (file_compare(&flist->files[flist_up(flist,low)],f) == 0)
+	if (file_compare(&flist->files[flist_up(flist,low)],&f) == 0)
 		return flist_up(flist,low);
 	return -1;
 }
 
 
-static void clean_fname(char *name)
+/*
+ * free up one file
+ */
+static void free_file(struct file_struct *file)
 {
-  char *p;
-  int l;
-  int modified = 1;
+	if (!file) return;
+	if (file->basename) free(file->basename);
+	if (file->link) free(file->link);
+	bzero((char *)file, sizeof(*file));
+	free(file);
+}
 
-  if (!name) return;
 
-  while (modified) {
-    modified = 0;
-
-    if ((p=strstr(name,"/./"))) {
-      modified = 1;
-      while (*p) {
-	p[0] = p[2];
-	p++;
-      }
-    }
-
-    if ((p=strstr(name,"//"))) {
-      modified = 1;
-      while (*p) {
-	p[0] = p[1];
-	p++;
-      }
-    }
-
-    if (strncmp(p=name,"./",2) == 0) {      
-      modified = 1;
-      do {
-	p[0] = p[2];
-      } while (*p++);
-    }
-
-    l = strlen(p=name);
-    if (l > 1 && p[l-1] == '/') {
-      modified = 1;
-      p[l-1] = 0;
-    }
-  }
+/*
+ * free up all elements in a flist
+ */
+void flist_free(struct file_list *flist)
+{
+	int i;
+	for (i=1;i<flist->count;i++) {
+		free_file(flist->files[i]);
+	}	
+	bzero((char *)flist->files, sizeof(flist->files[0])*flist->count);
+	free(flist->files);
+	bzero((char *)flist, sizeof(*flist));
+	free(flist);
 }
 
 
@@ -668,28 +750,48 @@ static void clean_fname(char *name)
  */
 void clean_flist(struct file_list *flist)
 {
-  int i;
+	int i;
 
-  if (!flist || flist->count == 0) 
-    return;
+	if (!flist || flist->count == 0) 
+		return;
   
-  for (i=0;i<flist->count;i++) {
-    clean_fname(flist->files[i].name);
-  }
-      
-  qsort(flist->files,flist->count,
-	sizeof(flist->files[0]),
-	(int (*)())file_compare);
+	qsort(flist->files,flist->count,
+	      sizeof(flist->files[0]),
+	      (int (*)())file_compare);
 
-  for (i=1;i<flist->count;i++) {
-    if (flist->files[i].name &&
-	strcmp(flist->files[i].name,flist->files[i-1].name) == 0) {
-      if (verbose > 1 && !am_server)
-	fprintf(FERROR,"removing duplicate name %s from file list %d\n",
-		flist->files[i-1].name,i-1);
-      free(flist->files[i-1].name);
-      bzero((char *)&flist->files[i-1],sizeof(flist->files[i-1]));
-    } 
-  }
+	for (i=1;i<flist->count;i++) {
+		if (flist->files[i]->basename &&
+		    strcmp(f_name(flist->files[i]),
+			   f_name(flist->files[i-1])) == 0) {
+			if (verbose > 1 && !am_server)
+				fprintf(FERROR,"removing duplicate name %s from file list %d\n",
+					f_name(flist->files[i-1]),i-1);
+			free_file(flist->files[i]);
+			flist->files[i] = NULL;
+		} 
+	}
+}
+
+
+/*
+ * return the full filename of a flist entry
+ */
+char *f_name(struct file_struct *f)
+{
+	static char names[10][MAXPATHLEN];
+	static int n;
+	char *p = names[n];
+
+	if (!f) return NULL;
+
+	n = (n+1)%10;
+
+	if (f->dirname) {
+		sprintf(p, "%s/%s", f->dirname, f->basename);
+	} else {
+		strcpy(p, f->basename);
+	}
+
+	return p;
 }
 

@@ -300,11 +300,11 @@ void recv_uid_list(int f, struct file_list *flist)
 	/* now convert the uid/gid of all files in the list to the mapped
 	   uid/gid */
 	for (i=0;i<flist->count;i++) {
-		if (preserve_uid && flist->files[i].uid != 0) {
-			flist->files[i].uid = match_uid(flist->files[i].uid);
+		if (preserve_uid && flist->files[i]->uid != 0) {
+			flist->files[i]->uid = match_uid(flist->files[i]->uid);
 		}
-		if (preserve_gid && flist->files[i].gid != 0) {
-			flist->files[i].gid = match_gid(flist->files[i].gid);
+		if (preserve_gid && flist->files[i]->gid != 0) {
+			flist->files[i]->gid = match_gid(flist->files[i]->gid);
 		}
 	}
 }

@@ -284,7 +284,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
   struct map_struct *buf;
   struct sum_struct *s;
   int statret;
-  struct file_struct *file = &flist->files[i];
+  struct file_struct *file = flist->files[i];
 
   if (verbose > 2)
     fprintf(FERROR,"recv_generator(%s,%d)\n",fname,i);
@@ -367,7 +367,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 
   if (preserve_hard_links && check_hard_link(file)) {
     if (verbose > 1)
-      fprintf(FINFO,"%s is a hard link\n",file->name);
+      fprintf(FINFO,"%s is a hard link\n",f_name(file));
     return;
   }
 
@@ -536,17 +536,17 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
 static void delete_one(struct file_struct *f)
 {
   if (!S_ISDIR(f->mode)) {
-    if (!dry_run && unlink(f->name) != 0) {
-      fprintf(FERROR,"unlink %s : %s\n",f->name,strerror(errno));
+    if (!dry_run && unlink(f_name(f)) != 0) {
+      fprintf(FERROR,"unlink %s : %s\n",f_name(f),strerror(errno));
     } else if (verbose) {
-      fprintf(FERROR,"deleting %s\n",f->name);
+      fprintf(FERROR,"deleting %s\n",f_name(f));
     }
   } else {    
-    if (!dry_run && rmdir(f->name) != 0) {
+    if (!dry_run && rmdir(f_name(f)) != 0) {
       if (errno != ENOTEMPTY)
-	fprintf(FERROR,"rmdir %s : %s\n",f->name,strerror(errno));
+	fprintf(FERROR,"rmdir %s : %s\n",f_name(f),strerror(errno));
     } else if (verbose) {
-      fprintf(FERROR,"deleting directory %s\n",f->name);      
+      fprintf(FERROR,"deleting directory %s\n",f_name(f));      
     }
   }
 }
@@ -567,7 +567,7 @@ static int delete_already_done(struct file_list *flist,int j)
 
 	if (j == 0) return 0;
 
-	name = strdup(flist->files[j].name);
+	name = strdup(f_name(flist->files[j]));
 
 	if (!name) {
 		fprintf(FERROR,"out of memory in delete_already_done");
@@ -583,7 +583,7 @@ static int delete_already_done(struct file_list *flist,int j)
 
 	while (low != high) {
 		int mid = (low+high)/2;
-		int ret = strcmp(flist->files[flist_up(flist, mid)].name,name);
+		int ret = strcmp(f_name(flist->files[flist_up(flist, mid)]),name);
 		if (ret == 0) {
 			free(name);
 			return 1;
@@ -597,7 +597,7 @@ static int delete_already_done(struct file_list *flist,int j)
 
 	low = flist_up(flist, low);
 
-	if (strcmp(flist->files[low].name,name) == 0) {
+	if (strcmp(f_name(flist->files[low]),name) == 0) {
 		free(name);
 		return 1;
 	}
@@ -619,9 +619,9 @@ static void delete_files(struct file_list *flist)
     add_cvs_excludes();
 
   for (j=0;j<flist->count;j++) {
-	  char *name = flist->files[j].name;
+	  char *name = f_name(flist->files[j]);
 
-	  if (!S_ISDIR(flist->files[j].mode)) continue;
+	  if (!S_ISDIR(flist->files[j]->mode)) continue;
 
 	  if (delete_already_done(flist, j)) continue;
 
@@ -632,11 +632,12 @@ static void delete_files(struct file_list *flist)
 		  fprintf(FINFO,"deleting in %s\n", name);
 
 	  for (i=local_file_list->count-1;i>=0;i--) {
-		  if (!local_file_list->files[i].name) continue;
-		  if (-1 == flist_find(flist,&local_file_list->files[i])) {
-			  delete_one(&local_file_list->files[i]);
+		  if (!local_file_list->files[i]->basename) continue;
+		  if (-1 == flist_find(flist,local_file_list->files[i])) {
+			  delete_one(local_file_list->files[i]);
 		  }    
 	  }
+	  flist_free(local_file_list);
   }
 }
 
@@ -699,8 +700,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	break;
       }
 
-      file = &flist->files[i];
-      fname = file->name;
+      file = flist->files[i];
+      fname = f_name(file);
 
       if (local_name)
 	fname = local_name;
@@ -742,6 +743,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
       /* open tmp file */
       if (strlen(fname) > (MAXPATHLEN-8)) {
 	fprintf(FERROR,"filename too long\n");
+	if (buf) unmap_file(buf);
 	close(fd1);
 	continue;
       }
@@ -784,8 +786,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
       /* recv file data */
       recv_ok = receive_data(f_in,buf,fd2,fname);
 
+      if (buf) unmap_file(buf);
       if (fd1 != -1) {
-	if (buf) unmap_file(buf);
 	close(fd1);
       }
       close(fd2);
@@ -845,9 +847,9 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
   /* now we need to fix any directory permissions that were 
      modified during the transfer */
   for (i = 0; i < flist->count; i++) {
-	  struct file_struct *file = &flist->files[i];
-	  if (!file->name || !S_ISDIR(file->mode)) continue;
-	  recv_generator(file->name,flist,i,-1);
+	  struct file_struct *file = flist->files[i];
+	  if (!file->basename || !S_ISDIR(file->mode)) continue;
+	  recv_generator(f_name(file),flist,i,-1);
   }
 
   if (verbose > 2)
@@ -891,20 +893,20 @@ off_t send_files(struct file_list *flist,int f_out,int f_in)
 	break;
       }
 
-      file = &flist->files[i];
+      file = flist->files[i];
 
       fname[0] = 0;
-      if (file->dir) {
-	strncpy(fname,file->dir,MAXPATHLEN-1);
-	fname[MAXPATHLEN-1] = 0;
-      if (strlen(fname) == MAXPATHLEN-1) {
-        fprintf(FERROR, "send_files failed on long-named directory %s\n",
-                fname);
-        return -1;
+      if (file->basedir) {
+	      strncpy(fname,file->basedir,MAXPATHLEN-1);
+	      fname[MAXPATHLEN-1] = 0;
+	      if (strlen(fname) == MAXPATHLEN-1) {
+		      fprintf(FERROR, "send_files failed on long-named directory %s\n",
+			      fname);
+		      return -1;
+	      }
+	      strcat(fname,"/");
       }
-	strcat(fname,"/");
-      }
-      strncat(fname,file->name,MAXPATHLEN-strlen(fname));
+      strncat(fname,f_name(file),MAXPATHLEN-strlen(fname));
 
       if (verbose > 2) 
 	fprintf(FERROR,"send_files(%d,%s)\n",i,fname);
@@ -995,9 +997,9 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 	    (int)getpid(),flist->count);
 
   for (i = 0; i < flist->count; i++) {
-    struct file_struct *file = &flist->files[i];
+    struct file_struct *file = flist->files[i];
     mode_t saved_mode = file->mode;
-    if (!file->name) continue;
+    if (!file->basename) continue;
 
     /* we need to ensure that any directories we create have writeable
        permissions initially so that we can create the files within
@@ -1006,7 +1008,7 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
       file->mode |= S_IWUSR; /* user write */
     }
 
-    recv_generator(local_name?local_name:file->name,
+    recv_generator(local_name?local_name:f_name(file),
 		   flist,i,f);
 
     file->mode = saved_mode;
@@ -1026,8 +1028,8 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
     /* in newer versions of the protocol the files can cycle through
        the system more than once to catch initial checksum errors */
     for (i=read_int(f_recv); i != -1; i=read_int(f_recv)) {
-      struct file_struct *file = &flist->files[i];
-      recv_generator(local_name?local_name:file->name,
+      struct file_struct *file = flist->files[i];
+      recv_generator(local_name?local_name:f_name(file),
 		     flist,i,f);    
     }
 

@@ -40,7 +40,7 @@
 
 /* update this if you make incompatible changes */
 #define PROTOCOL_VERSION 15
-#define MIN_PROTOCOL_VERSION 10
+#define MIN_PROTOCOL_VERSION 11
 #define MAX_PROTOCOL_VERSION 20
 
 #define SPARSE_WRITE_SIZE (4*1024)
@@ -211,24 +211,25 @@
 #endif
 
 struct file_struct {
-  time_t modtime;
-  off_t length;
-  mode_t mode;
-  ino_t inode;
-  dev_t dev;
-  dev_t rdev;
-  uid_t uid;
-  gid_t gid;
-  char *name;
-  char *dir;
-  char *link;
-  char sum[MD4_SUM_LENGTH];
+	time_t modtime;
+	off_t length;
+	mode_t mode;
+	ino_t inode;
+	dev_t dev;
+	dev_t rdev;
+	uid_t uid;
+	gid_t gid;
+	char *basename;
+	char *dirname;
+	char *basedir;
+	char *link;
+	char sum[MD4_SUM_LENGTH];
 };
 
 struct file_list {
   int count;
   int malloced;
-  struct file_struct *files;
+  struct file_struct **files;
 };
 
 struct sum_buf {
@@ -257,7 +258,7 @@ struct map_struct {
    without breaking existing versions */
 static int flist_up(struct file_list *flist, int i)
 {
-	while (!flist->files[i].name) i++;
+	while (!flist->files[i]->basename) i++;
 	return i;
 }
 
