@@ -270,7 +270,8 @@ static mode_t from_wire_mode(int mode)
 }
 
 
-static void send_directory(int f, struct file_list *flist, char *dir);
+static void send_directory(int f, struct file_list *flist,
+			   char *fbuf, unsigned int offset);
 
 static char *flist_dir;
 static int flist_dir_len;
@@ -986,67 +987,64 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 	}
 
 	if (recursive && S_ISDIR(file->mode)
-	    && !(file->flags & FLAG_MOUNT_POINT)) {
-		send_directory(f, flist, f_name_to(file, fbuf));
+	    && !(file->flags & FLAG_MOUNT_POINT) && f_name_to(file, fbuf)) {
+		void *save_filters;
+		unsigned int len = strlen(fbuf);
+		if (len > 1 && fbuf[len-1] == '/')
+			fbuf[--len] = '\0';
+		if (len >= MAXPATHLEN - 1) {
+			io_error |= IOERR_GENERAL;
+			rprintf(FERROR, "skipping long-named directory: %s\n",
+				full_fname(fbuf));
+			return;
+		}
+		save_filters = push_local_filters(fbuf, len);
+		send_directory(f, flist, fbuf, len);
+		pop_local_filters(save_filters);
 	}
 }
 
 
 /* Note that the "recurse" value either contains -1, for infinite recursion,
  * or a number >= 0 indicating how many levels of recursion we will allow. */
-static void send_directory(int f, struct file_list *flist, char *dir)
+static void send_directory(int f, struct file_list *flist,
+			   char *fbuf, unsigned int dirlen)
 {
-	DIR *d;
 	struct dirent *di;
-	char fname[MAXPATHLEN];
-	unsigned int offset;
-	void *save_filters;
 	char *p;
+	DIR *d;
 
-	d = opendir(dir);
-	if (!d) {
+	if (!(d = opendir(fbuf))) {
 		io_error |= IOERR_GENERAL;
-		rsyserr(FERROR, errno, "opendir %s failed", full_fname(dir));
+		rsyserr(FERROR, errno, "opendir %s failed", full_fname(fbuf));
 		return;
 	}
 
-	offset = strlcpy(fname, dir, MAXPATHLEN);
-	p = fname + offset;
-	if (offset >= MAXPATHLEN || p[-1] != '/') {
-		if (offset >= MAXPATHLEN - 1) {
-			io_error |= IOERR_GENERAL;
-			rprintf(FERROR, "skipping long-named directory: %s\n",
-				full_fname(fname));
-			closedir(d);
-			return;
-		}
+	p = fbuf + dirlen;
+	if (dirlen != 1 || *fbuf != '/')
 		*p++ = '/';
-		offset++;
-	}
-
-	save_filters = push_local_filters(fname, offset);
+	*p = '\0';
 
 	for (errno = 0, di = readdir(d); di; errno = 0, di = readdir(d)) {
 		char *dname = d_name(di);
 		if (dname[0] == '.' && (dname[1] == '\0'
 		    || (dname[1] == '.' && dname[2] == '\0')))
 			continue;
-		if (strlcpy(p, dname, MAXPATHLEN - offset) < MAXPATHLEN - offset) {
+		if (strlcpy(p, dname, MAXPATHLEN - dirlen) < MAXPATHLEN - dirlen) {
 			int do_subdirs = recurse >= 1 ? recurse-- : recurse;
-			send_file_name(f, flist, fname, do_subdirs, 0);
+			send_file_name(f, flist, fbuf, do_subdirs, 0);
 		} else {
 			io_error |= IOERR_GENERAL;
 			rprintf(FINFO,
 				"cannot send long-named file %s\n",
-				full_fname(fname));
+				full_fname(fbuf));
 		}
 	}
 	if (errno) {
 		io_error |= IOERR_GENERAL;
-		rsyserr(FERROR, errno, "readdir(%s)", dir);
+		*p = '\0';
+		rsyserr(FERROR, errno, "readdir(%s)", fbuf);
 	}
-
-	pop_local_filters(save_filters);
 
 	closedir(d);
 }
@@ -1672,14 +1670,17 @@ static int is_backup_file(char *fn)
 void delete_in_dir(struct file_list *flist, char *fname)
 {
 	struct file_list *dir_list;
+	char dirbuf[MAXPATHLEN];
+	void *save_filters;
 	STRUCT_STAT st;
-	int save_recurse = recurse;
+	int dirlen;
 
 	if (max_delete && deletion_count >= max_delete)
 		return;
 
 	if (io_error && !(lp_ignore_errors(module_id) || ignore_errors)) {
-		rprintf(FINFO, "IO error encountered - skipping file deletion\n");
+		rprintf(FINFO,
+			"IO error encountered - skipping file deletion\n");
 		max_delete = -1; /* avoid duplicating the above warning */
 		return;
 	}
@@ -1690,10 +1691,18 @@ void delete_in_dir(struct file_list *flist, char *fname)
 	if (one_file_system)
 		filesystem_dev = st.st_dev;
 
+	dirlen = strlcpy(dirbuf, fname, MAXPATHLEN);
+	if (dirlen >= MAXPATHLEN - 1)
+		return;
+
 	dir_list = flist_new(WITHOUT_HLINK, "delete_in_dir");
-	recurse = 1; /* allow only one level */
-	send_file_name(-1, dir_list, fname, 1, XMIT_DEL_START);
-	recurse = save_recurse;
+
+	recurse = 0;
+	save_filters = push_local_filters(dirbuf, dirlen);
+	send_directory(-1, dir_list, dirbuf, dirlen);
+	pop_local_filters(save_filters);
+	recurse = -1;
+
 	clean_flist(dir_list, 0, 0);
 
 	if (verbose > 3)
@@ -1718,7 +1727,7 @@ void delete_missing(struct file_list *full_list, struct file_list *dir_list,
 	if (verbose > 1)
 		rprintf(FINFO, "deleting in %s\n", safe_fname(dirname));
 
-	for (i = dir_list->count-1; i >= 0; i--) {
+	for (i = dir_list->count; i--; ) {
 		if (!dir_list->files[i]->basename)
 			continue;
 		mode = dir_list->files[i]->mode;
@@ -1733,11 +1742,12 @@ void delete_missing(struct file_list *full_list, struct file_list *dir_list,
 					rprintf(FINFO, "deleting %s\n",
 						safe_fname(f));
 				}
+			} else if (S_ISDIR(mode)) {
+				int dflag = delete_during ? DEL_FORCE_RECURSE
+							  : DEL_NO_RECURSE;
+				delete_file(f, DEL_DIR | dflag);
 			} else {
-				int dflags = delete_during
-				    ? DEL_DIR | DEL_FORCE_RECURSE
-				    : DEL_DIR | DEL_NO_RECURSE;
-				delete_file(f, S_ISDIR(mode) ? dflags : 0);
+				delete_file(f, 0);
 			}
 			deletion_count++;
 			if (max_delete && deletion_count >= max_delete)
