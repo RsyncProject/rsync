@@ -354,7 +354,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 	int statret, stat_errno;
 	char *fnamecmp, *partialptr, *backupptr = NULL;
 	char fnamecmpbuf[MAXPATHLEN];
-	int itemizing, maybe_DEL_TERSE, maybe_PERMS_REPORT;
+	int itemizing, maybe_PERMS_REPORT;
 	uchar fnamecmp_type;
 	enum logcode code;
 
@@ -364,22 +364,18 @@ static void recv_generator(char *fname, struct file_list *flist,
 	if (protocol_version >= 29) {
 		itemizing = 1;
 		code = daemon_log_format_has_i ? 0 : FLOG;
-		maybe_DEL_TERSE = log_format_has_o_or_i ? 0 : DEL_TERSE;
 		maybe_PERMS_REPORT = log_format_has_i ? 0 : PERMS_REPORT;
 	} else if (am_daemon) {
 		itemizing = daemon_log_format_has_i && !dry_run;
 		code = itemizing || dry_run ? FCLIENT : FINFO;
-		maybe_DEL_TERSE = DEL_TERSE;
 		maybe_PERMS_REPORT = PERMS_REPORT;
 	} else if (!am_server) {
 		itemizing = log_format_has_i;
 		code = itemizing ? 0 : FINFO;
-		maybe_DEL_TERSE = log_format_has_o_or_i ? 0 : DEL_TERSE;
 		maybe_PERMS_REPORT = log_format_has_i ? 0 : PERMS_REPORT;
 	} else {
 		itemizing = 0;
 		code = FINFO;
-		maybe_DEL_TERSE = DEL_TERSE;
 		maybe_PERMS_REPORT = PERMS_REPORT;
 	}
 
@@ -471,7 +467,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 		 * we need to delete it.  If it doesn't exist, then
 		 * (perhaps recursively) create it. */
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
-			delete_file(fname, st.st_mode, maybe_DEL_TERSE);
+			delete_file(fname, st.st_mode, DEL_TERSE);
 			statret = -1;
 		}
 		if (dry_run && statret != 0 && missing_below < 0) {
@@ -542,7 +538,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 			if (S_ISLNK(st.st_mode))
 				delete_file(fname, st.st_mode, DEL_TERSE);
 			else {
-				delete_file(fname, st.st_mode, maybe_DEL_TERSE);
+				delete_file(fname, st.st_mode, DEL_TERSE);
 				statret = -1;
 			}
 		}
@@ -571,7 +567,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 			if (IS_DEVICE(st.st_mode))
 				delete_file(fname, st.st_mode, DEL_TERSE);
 			else {
-				delete_file(fname, st.st_mode, maybe_DEL_TERSE);
+				delete_file(fname, st.st_mode, DEL_TERSE);
 				statret = -1;
 			}
 			if (verbose > 2) {
@@ -671,7 +667,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 	}
 
 	if (statret == 0 && !S_ISREG(st.st_mode)) {
-		if (delete_file(fname, st.st_mode, maybe_DEL_TERSE) != 0)
+		if (delete_file(fname, st.st_mode, DEL_TERSE) != 0)
 			return;
 		statret = -1;
 		stat_errno = ENOENT;
