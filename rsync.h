@@ -28,7 +28,7 @@
 #define CHAR_OFFSET 0
 
 
-#define FILE_VALID 1
+#define FLAG_DELETE (1<<0)
 #define SAME_MODE (1<<1)
 #define SAME_RDEV (1<<2)
 #define SAME_UID (1<<3)
@@ -216,6 +216,7 @@
 #endif
 
 struct file_struct {
+	unsigned flags;
 	time_t modtime;
 	off_t length;
 	mode_t mode;

@@ -134,7 +134,7 @@ static void clean_fname(char *name)
 
 
 
-void send_file_entry(struct file_struct *file,int f)
+void send_file_entry(struct file_struct *file,int f,unsigned base_flags)
 {
   unsigned char flags;
   static time_t last_time;
@@ -155,7 +155,7 @@ void send_file_entry(struct file_struct *file,int f)
 
   fname = f_name(file);
 
-  flags = FILE_VALID;
+  flags = base_flags;
 
   if (file->mode == last_mode) flags |= SAME_MODE;
   if (file->rdev == last_rdev) flags |= SAME_RDEV;
@@ -224,8 +224,8 @@ void send_file_entry(struct file_struct *file,int f)
 
 
 
-void receive_file_entry(struct file_struct **fptr,
-			unsigned char flags,int f)
+static void receive_file_entry(struct file_struct **fptr,
+			       unsigned flags,int f)
 {
   static time_t last_time;
   static mode_t last_mode;
@@ -280,6 +280,7 @@ void receive_file_entry(struct file_struct **fptr,
   if (!file->basename) out_of_memory("receive_file_entry 1");
 
 
+  file->flags = flags;
   file->length = read_longint(f);
   file->modtime = (flags & SAME_TIME) ? last_time : (time_t)read_int(f);
   file->mode = (flags & SAME_MODE) ? last_mode : (mode_t)read_int(f);
@@ -460,7 +461,7 @@ static struct file_struct *make_file(char *fname)
 
 
 static void send_file_name(int f,struct file_list *flist,char *fname,
-			   int recursive)
+			   int recursive, unsigned base_flags)
 {
   struct file_struct *file;
 
@@ -482,7 +483,7 @@ static void send_file_name(int f,struct file_list *flist,char *fname,
 
   if (strcmp(file->basename,"")) {
     flist->files[flist->count++] = file;
-    send_file_entry(file,f);
+    send_file_entry(file,f,base_flags);
   }
 
   if (S_ISDIR(file->mode) && recursive) {
@@ -541,7 +542,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 		    strcmp(di->d_name,"..")==0)
 			continue;
 		strncpy(p,di->d_name,MAXPATHLEN-(l+1));
-		send_file_name(f,flist,fname,recurse);
+		send_file_name(f,flist,fname,recurse,FLAG_DELETE);
 	}
 
 	closedir(d);
@@ -616,7 +617,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 				*p = '/';
 				for (p=fname+1; (p=strchr(p,'/')); p++) {
 					*p = 0;
-					send_file_name(f, flist, fname, 0);
+					send_file_name(f, flist, fname, 0, 0);
 					*p = '/';
 				}
 			} else {
@@ -641,7 +642,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 			flist_dir = dir;
 			if (one_file_system)
 				set_filesystem(fname);
-			send_file_name(f,flist,fname,recurse);
+			send_file_name(f,flist,fname,recurse,FLAG_DELETE);
 			flist_dir = NULL;
 			if (chdir(dbuf) != 0) {
 				fprintf(FERROR,"chdir %s : %s\n",
@@ -653,11 +654,11 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 		
 		if (one_file_system)
 			set_filesystem(fname);
-		send_file_name(f,flist,fname,recurse);
+		send_file_name(f,flist,fname,recurse,FLAG_DELETE);
 	}
 
 	if (f != -1) {
-		send_file_entry(NULL,f);
+		send_file_entry(NULL,f,0);
 		write_flush(f);
 	}
 
