@@ -1035,11 +1035,10 @@ void write_buf(int f,char *buf,size_t len)
 }
 
 /** Write a string to the connection */
-static void write_sbuf(int f,char *buf)
+void write_sbuf(int f, char *buf)
 {
 	writefd(f, buf, strlen(buf));
 }
-
 
 void write_byte(int f,unsigned char c)
 {
