@@ -90,6 +90,7 @@ int delete_after = 0;
 int only_existing = 0;
 int opt_ignore_existing = 0;
 int max_delete = 0;
+OFF_T max_size = 0;
 int ignore_errors = 0;
 int modify_window = 0;
 int blocking_io = -1;
@@ -140,6 +141,7 @@ char *batch_name = NULL;
 
 static int daemon_opt;   /* sets am_daemon after option error-reporting */
 static int modify_window_set;
+static char *max_size_arg;
 
 /** Local address to bind.  As a character string because it's
  * interpreted by the IPv6 layer: should be a numeric IP4 or IP6
@@ -268,6 +270,7 @@ void usage(enum logcode F)
   rprintf(F,"     --delete-after          receiver deletes after transferring, not before\n");
   rprintf(F,"     --ignore-errors         delete even if there are I/O errors\n");
   rprintf(F,"     --max-delete=NUM        don't delete more than NUM files\n");
+  rprintf(F,"     --max-size=SIZE         don't transfer any file larger than SIZE\n");
   rprintf(F,"     --partial               keep partially transferred files\n");
   rprintf(F,"     --partial-dir=DIR       put a partially transferred file into DIR\n");
   rprintf(F,"     --force                 force deletion of directories even if not empty\n");
@@ -312,7 +315,7 @@ void usage(enum logcode F)
 enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_DELETE_AFTER, OPT_DELETE_EXCLUDED, OPT_LINK_DEST,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW,
-      OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_TIMEOUT,
+      OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_TIMEOUT, OPT_MAX_SIZE,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -367,6 +370,7 @@ static struct poptOption long_options[] = {
   {"rsh",             'e', POPT_ARG_STRING, &shell_cmd, 0, 0, 0 },
   {"block-size",      'B', POPT_ARG_INT,    &block_size, 0, 0, 0 },
   {"max-delete",       0,  POPT_ARG_INT,    &max_delete, 0, 0, 0 },
+  {"max-size",         0,  POPT_ARG_STRING, &max_size_arg,  OPT_MAX_SIZE, 0, 0 },
   {"timeout",          0,  POPT_ARG_INT,    &io_timeout, OPT_TIMEOUT, 0, 0 },
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir, 0, 0, 0 },
   {"compare-dest",     0,  POPT_ARG_STRING, &compare_dest, 0, 0, 0 },
@@ -665,6 +669,35 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		case OPT_READ_BATCH:
 			/* batch_name is already set */
 			read_batch = 1;
+			break;
+
+		case OPT_MAX_SIZE:
+			for (arg = max_size_arg; isdigit(*arg); arg++) {}
+			if (*arg == '.')
+				for (arg++; isdigit(*arg); arg++) {}
+			switch (*arg) {
+			case 'k': case 'K':
+				max_size = atof(max_size_arg) * 1024;
+				break;
+			case 'm': case 'M':
+				max_size = atof(max_size_arg) * 1024*1024;
+				break;
+			case 'g': case 'G':
+				max_size = atof(max_size_arg) * 1024*1024*1024;
+				break;
+			case '\0':
+				max_size = atof(max_size_arg);
+				break;
+			default:
+				max_size = 0;
+				break;
+			}
+			if (max_size <= 0) {
+				rprintf(FERROR,
+					"--max-size value is invalid: %s\n",
+					max_size_arg);
+				exit_cleanup(RERR_SYNTAX);
+			}
 			break;
 
 		case OPT_TIMEOUT:
@@ -1048,6 +1081,11 @@ void server_options(char **args,int *argc)
 		if (asprintf(&arg, "--max-delete=%d", max_delete) < 0)
 			goto oom;
 		args[ac++] = arg;
+	}
+
+	if (max_size && am_sender) {
+		args[ac++] = "--max-size";
+		args[ac++] = max_size_arg;
 	}
 
 	if (io_timeout) {
