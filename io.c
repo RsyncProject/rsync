@@ -353,8 +353,8 @@ static void whine_about_eof(int fd)
 		exit_cleanup(0);
 
 	rprintf(FERROR, RSYNC_NAME ": connection unexpectedly closed "
-		"(%.0f bytes read so far)\n",
-		(double)stats.total_read);
+		"(%.0f bytes received so far) [%s]\n",
+		(double)stats.total_read, who_am_i());
 
 	exit_cleanup(RERR_STREAMIO);
 }
@@ -897,8 +897,8 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 			if (fd == sock_f_out)
 				close_multiplexing_out();
 			rsyserr(FERROR, errno,
-				"writefd_unbuffered failed to write %ld bytes: phase \"%s\"",
-				(long)len, io_write_phase);
+				"writefd_unbuffered failed to write %ld bytes: phase \"%s\" [%s]",
+				(long)len, io_write_phase, who_am_i());
 			/* If the other side is sending us error messages, try
 			 * to grab any messages they sent before they died. */
 			while (fd == sock_f_out && io_multiplexing_in) {
