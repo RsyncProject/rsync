@@ -102,13 +102,16 @@ static size_t contiguous_write_len = 0;
 
 static void read_loop(int fd, char *buf, size_t len);
 
-struct redo_list {
-	struct redo_list *next;
-	int num;
+struct flist_ndx_item {
+	struct flist_ndx_item *next;
+	int ndx;
 };
 
-static struct redo_list *redo_list_head;
-static struct redo_list *redo_list_tail;
+struct flist_ndx_list {
+	struct flist_ndx_item *head, *tail;
+};
+
+static struct flist_ndx_list redo_list;
 
 struct msg_list {
 	struct msg_list *next;
@@ -119,19 +122,37 @@ struct msg_list {
 static struct msg_list *msg_list_head;
 static struct msg_list *msg_list_tail;
 
-static void redo_list_add(int num)
+static void flist_ndx_push(struct flist_ndx_list *lp, int ndx)
 {
-	struct redo_list *rl;
+	struct flist_ndx_item *item;
 
-	if (!(rl = new(struct redo_list)))
-		exit_cleanup(RERR_MALLOC);
-	rl->next = NULL;
-	rl->num = num;
-	if (redo_list_tail)
-		redo_list_tail->next = rl;
+	if (!(item = new(struct flist_ndx_item)))
+		out_of_memory("flist_ndx_push");
+	item->next = NULL;
+	item->ndx = ndx;
+	if (lp->tail)
+		lp->tail->next = item;
 	else
-		redo_list_head = rl;
-	redo_list_tail = rl;
+		lp->head = item;
+	lp->tail = item;
+}
+
+static int flist_ndx_pop(struct flist_ndx_list *lp)
+{
+	struct flist_ndx_item *next;
+	int ndx;
+
+	if (!lp->head)
+		return -1;
+
+	ndx = lp->head->ndx;
+	next = lp->head->next;
+	free(lp->head);
+	lp->head = next;
+	if (!next)
+		lp->tail = NULL;
+
+	return ndx;
 }
 
 static void check_timeout(void)
@@ -188,10 +209,10 @@ static void msg_list_add(int code, char *buf, int len)
 	struct msg_list *ml;
 
 	if (!(ml = new(struct msg_list)))
-		exit_cleanup(RERR_MALLOC);
+		out_of_memory("msg_list_add");
 	ml->next = NULL;
 	if (!(ml->buf = new_array(char, len+4)))
-		exit_cleanup(RERR_MALLOC);
+		out_of_memory("msg_list_add");
 	SIVAL(ml->buf, 0, ((code+MPLEX_BASE)<<24) | len);
 	memcpy(ml->buf+4, buf, len);
 	ml->len = len+4;
@@ -239,7 +260,7 @@ static void read_msg_fd(void)
 			rprintf(FERROR, "invalid message %d:%d\n", tag, len);
 			exit_cleanup(RERR_STREAMIO);
 		}
-		redo_list_add(-1);
+		flist_ndx_push(&redo_list, -1);
 		break;
 	case MSG_REDO:
 		if (len != 4 || !am_generator) {
@@ -247,7 +268,7 @@ static void read_msg_fd(void)
 			exit_cleanup(RERR_STREAMIO);
 		}
 		read_loop(fd, buf, 4);
-		redo_list_add(IVAL(buf,0));
+		flist_ndx_push(&redo_list, IVAL(buf,0));
 		break;
 	case MSG_DELETED:
 		if (len >= (int)sizeof buf || !am_generator) {
@@ -327,20 +348,11 @@ int msg_list_push(int flush_it_all)
 
 int get_redo_num(void)
 {
-	struct redo_list *next;
-	int num;
-
-	while (!redo_list_head)
+	while (!redo_list.head) {
 		read_msg_fd();
+	}
 
-	num = redo_list_head->num;
-	next = redo_list_head->next;
-	free(redo_list_head);
-	redo_list_head = next;
-	if (!next)
-		redo_list_tail = NULL;
-
-	return num;
+	return flist_ndx_pop(&redo_list);
 }
 
 /**
