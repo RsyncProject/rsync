@@ -1056,10 +1056,10 @@ quote(itemize(
   without bf(--times).
   it() A bf(p) means the permissions are different and are being updated to
   the server's value (requires bf(--perms)).
-  it() An bf(o) means the owner is being updated to the server's value
-  (requires bf(--owner) and root privileges).
-  it() A bf(g) means the group is being updated to the server's value
-  (requires bf(--group) and the authority to set the requested group).
+  it() An bf(o) means the owner is different and is being updated to the
+  server's value (requires bf(--owner) and root privileges).
+  it() A bf(g) means the group is different and is being updated to the
+  server's value (requires bf(--group) and the authority to set the group).
 ))
 
 One other output is possible:  when deleting files, the "%i" will output
