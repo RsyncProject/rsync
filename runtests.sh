@@ -203,6 +203,12 @@ echo "      $passed passed"
 [ "$missing" -gt 0 ] && echo "      $missing missing"
 echo '------------------------------------------------------------'
 
-result=`expr $failed + $missing`
-echo "(overall result is $result)"
+# OK, so expr exits with 0 if the result is neither null nor zero; and
+# 1 if the expression is null or zero.  This is the opposite of what
+# we want, and if we just call expr then this script will always fail,
+# because -e is set.
+
+set -x
+result=`expr $failed + $missing || true`
+echo "overall result is $result"
 exit $result
