@@ -43,9 +43,10 @@ cp -p "$from2dir"/sub1/uno "$from3dir"/sub1/dos "$from2dir"/sub1/tres "$chkdir"/
 cp -p "$from3dir"/sub2/subby "$chkdir"/sub2
 
 # Get rid of any directory-time differences
-touch "$from1dir" "$from2dir" "$from3dir" \
-    "$from1dir"/dir-and-not-dir "$from2dir"/sub1 "$from3dir"/sub1 "$from3dir"/sub2 \
-    "$chkdir" "$chkdir"/dir-and-not-dir "$chkdir"/sub1 "$chkdir"/sub2
+$RSYNC -av --existing -f 'exclude,! */' "$from1dir/" "$from2dir/"
+$RSYNC -av --existing -f 'exclude,! */' "$from2dir/" "$from3dir/"
+$RSYNC -av --existing -f 'exclude,! */' "$from1dir/" "$chkdir/"
+$RSYNC -av --existing -f 'exclude,! */' "$from3dir/" "$chkdir/"
 
 checkit "$RSYNC -aHvv \"$from1dir/\" \"$from2dir/\" \"$from3dir/\" \"$todir/\"" "$chkdir" "$todir"
 
