@@ -81,7 +81,9 @@ static int match_address(char *addr, char *tok)
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
+#ifdef AI_NUMERICHOST
 	hints.ai_flags = AI_NUMERICHOST;
+#endif
 
 	gai = getaddrinfo(addr, NULL, &hints, &resa);
 	if (gai) return 0;
