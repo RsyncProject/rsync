@@ -198,7 +198,7 @@ int open_socket_out(char *host, int port, const char *bind_address,
 		strlcpy(buffer, h, sizeof buffer);
 
 		/* Is the USER:PASS@ prefix present? */
-		if ((cp = strchr(buffer, '@')) != NULL) {
+		if ((cp = strrchr(buffer, '@')) != NULL) {
 			*cp++ = '\0';
 			/* The remainder is the HOST:PORT part. */
 			h = cp;
