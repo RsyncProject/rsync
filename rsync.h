@@ -73,6 +73,7 @@
 #include <unistd.h>
 #endif
 #include <stdio.h>
+#include <stddef.h>
 
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>

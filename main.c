@@ -58,9 +58,9 @@ int force_delete = 0;
 int io_timeout = 0;
 int io_error = 0;
 int read_only = 0;
-static int module_id;
+int module_id = -1;
 
-static int port = RSYNC_PORT;
+int rsync_port = RSYNC_PORT;
 
 static char *shell_cmd;
 
@@ -105,7 +105,7 @@ static void report(int f)
 }
 
 
-static void server_options(char **args,int *argc)
+void server_options(char **args,int *argc)
 {
   int ac = *argc;
   static char argstr[50];
@@ -464,7 +464,7 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
       exit_cleanup(0);
 }
 
-static int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
+int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 {
 	struct file_list *flist;
 	int status = 0, status2 = 0;
@@ -512,67 +512,6 @@ static int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 }
 
 
-int start_socket_client(char *host, char *path, int argc, char *argv[])
-{
-	int fd, i;
-	char *sargs[MAX_ARGS];
-	int sargc=0;
-	char line[1024];
-	char *p;
-	int version;
-
-	fd = open_socket_out(host, port);
-	if (fd == -1) {
-		exit_cleanup(1);
-	}
-	
-	server_options(sargs,&sargc);
-
-	sargs[sargc++] = ".";
-
-	if (path && *path) 
-		sargs[sargc++] = path;
-
-	sargs[sargc] = NULL;
-
-	p = strchr(path,'/');
-	if (p) *p = 0;
-	io_printf(fd,"%s\n",path);
-	if (p) *p = '/';
-
-	if (!read_line(fd, line, sizeof(line)-1)) {
-		return -1;
-	}
-
-	if (sscanf(line,"RSYNCD %d", &version) != 1) {
-		return -1;
-	}
-
-	while (1) {
-		if (!read_line(fd, line, sizeof(line)-1)) {
-			return -1;
-		}
-		if (strcmp(line,"RSYNCD: OK") == 0) break;
-		rprintf(FINFO,"%s\n", line);
-	}
-
-	for (i=0;i<sargc;i++) {
-		io_printf(fd,"%s\n", sargs[i]);
-	}
-	io_printf(fd,"\n");
-
-#if 0
-	while (1) {
-		if (!read_line(fd, line, sizeof(line)-1)) {
-			return -1;
-		}
-		rprintf(FINFO,"%s\n", line);
-	}
-#endif
-
-	return client_run(fd, fd, -1, argc, argv);
-}
-
 int start_client(int argc, char *argv[])
 {
 	char *p;
@@ -589,6 +528,12 @@ int start_client(int argc, char *argv[])
 			*p = 0;
 			return start_socket_client(argv[0], p+2, argc-1, argv+1);
 		}
+
+		if (argc < 2) {
+			usage(FERROR);
+			exit_cleanup(1);
+		}
+
 		am_sender = 0;
 		*p = 0;
 		shell_machine = argv[0];
@@ -604,6 +549,11 @@ int start_client(int argc, char *argv[])
 		} else if (p[1] == ':') {
 			*p = 0;
 			return start_socket_client(argv[argc-1], p+2, argc-1, argv);
+		}
+
+		if (argc < 2) {
+			usage(FERROR);
+			exit_cleanup(1);
 		}
 		
 		if (local_server) {
@@ -749,7 +699,7 @@ RETSIGTYPE sigusr1_handler(int val) {
 }
 
 
-static void parse_arguments(int argc, char *argv[])
+void parse_arguments(int argc, char *argv[])
 {
     int opt;
     int option_index;
@@ -938,161 +888,6 @@ static void parse_arguments(int argc, char *argv[])
     }
 }
 
-static int rsync_module(int fd, int i)
-{
-	int argc=0;
-	char *argv[MAX_ARGS];
-	char **argp;
-	char line[1024];
-
-	module_id = i;
-
-	if (lp_read_only(i))
-		read_only = 1;
-
-	rprintf(FERROR,"rsyncd starting\n");
-
-	if (chroot(lp_path(i))) {
-		io_printf(fd,"ERROR: chroot failed\n");
-		return -1;
-	}
-
-	if (chdir("/")) {
-		io_printf(fd,"ERROR: chdir failed\n");
-		return -1;
-	}
-
-	if (setgid(lp_gid(i))) {
-		io_printf(fd,"ERROR: setgid failed\n");
-		return -1;
-	}
-
-	if (setuid(lp_uid(i))) {
-		io_printf(fd,"ERROR: setuid failed\n");
-		return -1;
-	}
-
-	io_printf(fd,"RSYNCD: OK\n");
-
-	argv[argc++] = "rsyncd";
-
-	while (1) {
-		if (!read_line(fd, line, sizeof(line)-1)) {
-			return -1;
-		}
-
-		if (!*line) break;
-
-		argv[argc] = strdup(line);
-		if (!argv[argc]) {
-			return -1;
-		}
-
-		argc++;
-		if (argc == MAX_ARGS) {
-			return -1;
-		}
-	}
-
-	parse_arguments(argc, argv);
-
-	/* don't allow the logs to be flooded too fast */
-	if (verbose > 1) verbose = 1;
-
-	argc -= optind;
-	argp = argv + optind;
-	optind = 0;
-
-	start_server(fd, fd, argc, argp);
-
-	return 0;
-}
-
-static void send_listing(int fd)
-{
-	int n = lp_numservices();
-	int i;
-	
-	for (i=0;i<n;i++)
-		if (lp_list(i))
-		    io_printf(fd, "%-15s\t%s\n", lp_name(i), lp_comment(i));
-}
-
-/* this is called when a socket connection is established to a client
-   and we want to start talking. The setup of the system is done from
-   here */
-static int start_daemon(int fd)
-{
-	char line[1024];
-	char *motd;
-
-	set_socket_options(fd,"SO_KEEPALIVE");
-
-	io_printf(fd,"RSYNCD %d\n", PROTOCOL_VERSION);
-
-	motd = lp_motd_file();
-	if (*motd) {
-		FILE *f = fopen(motd,"r");
-		while (f && !feof(f)) {
-			int len = fread(line, 1, sizeof(line)-1, f);
-			if (len > 0) {
-				line[len] = 0;
-				io_printf(fd,"%s", line);
-			}
-		}
-		if (f) fclose(f);
-		io_printf(fd,"\n");
-	}
-
-	/* read a single line indicating the resource that is wanted */
-	while (1) {
-		int i;
-
-		line[0] = 0;
-		if (!read_line(fd, line, sizeof(line)-1)) {
-			return -1;
-		}
-
-		if (!*line || strcmp(line,"#list")==0) {
-			send_listing(fd);
-			return -1;
-		} 
-
-		if (*line == '#') {
-			/* it's some sort of command that I don't understand */
-			io_printf(fd,"ERROR: Unknown command '%s'\n", line);
-			return -1;
-		}
-
-		i = lp_number(line);
-		if (i == -1) {
-			io_printf(fd,"ERROR: Unknown module '%s'\n", line);
-			return -1;
-		}
-
-		return rsync_module(fd, i);
-	}
-
-	return 0;
-}
-
-
-static int daemon_main(void)
-{
-	if (!lp_load(RSYNCD_CONF)) {
-		exit_cleanup(1);
-	}
-
-	if (is_a_socket(STDIN_FILENO)) {
-		/* we are running via inetd */
-		return start_daemon(STDIN_FILENO);
-	}
-
-	become_daemon();
-
-	return start_accept_loop(port, start_daemon);
-}
-
 int main(int argc,char *argv[])
 {
 
@@ -1132,11 +927,6 @@ int main(int argc,char *argv[])
 
     if (am_server) {
 	    start_server(STDIN_FILENO, STDOUT_FILENO, argc, argv);
-    }
-
-    if (argc < 2) {
-      usage(FERROR);
-      exit_cleanup(1);
     }
 
     return start_client(argc, argv);
