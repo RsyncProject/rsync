@@ -23,19 +23,50 @@ export HOME CVSIGNORE
 makepath "$fromdir/foo/down/to/you"
 makepath "$fromdir/bar/down/to/foo/too"
 makepath "$fromdir/mid/for/foo/and/that/is/who"
+cat >"$fromdir/.excl" <<EOF
+- down
+: .excl-temp
+!
+- .excl
+- *.bak
+- *.old
+- *.junk
+EOF
 echo kept >"$fromdir/foo/file1"
 echo removed >"$fromdir/foo/file2"
 echo cvsout >"$fromdir/foo/file2.old"
+cat >"$fromdir/foo/.excl" <<EOF
++ .excl
+- file1
+EOF
+cat >"$fromdir/bar/.excl" <<EOF
+- home-cvs-exclude
+: .excl2
++ to
+EOF
 echo cvsout >"$fromdir/bar/down/to/home-cvs-exclude"
+cat >"$fromdir/bar/down/to/.excl2" <<EOF
+- .excl2
+EOF
 echo keeper >"$fromdir/bar/down/to/foo/file1"
 echo cvsout >"$fromdir/bar/down/to/foo/file1.bak"
 echo gone >"$fromdir/bar/down/to/foo/file3"
 echo lost >"$fromdir/bar/down/to/foo/file4"
 echo cvsout >"$fromdir/bar/down/to/foo/file4.junk"
 echo smashed >"$fromdir/bar/down/to/foo/to"
+cat >"$fromdir/bar/down/to/foo/.excl2" <<EOF
++ *.junk
+EOF
+# This one should be ineffectual
+cat >"$fromdir/mid/.excl2" <<EOF
+- extra
+EOF
 echo cvsout >"$fromdir/mid/one-in-one-out"
 echo one-in-one-out >"$fromdir/mid/.cvsignore"
 echo cvsin >"$fromdir/mid/one-for-all"
+cat >"$fromdir/mid/.excl" <<EOF
+:C
+EOF
 echo cvsin >"$fromdir/mid/for/one-in-one-out"
 echo expunged >"$fromdir/mid/for/foo/extra"
 echo retained >"$fromdir/mid/for/foo/keep"
@@ -45,6 +76,7 @@ ln -s too "$fromdir/bar/down/to/foo/sym"
 
 excl="$scratchdir/exclude-from"
 cat >"$excl" <<EOF
+!
 # If the second line of these two lines does anything, it's a bug.
 + **/bar
 - /bar
@@ -82,7 +114,8 @@ $RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
 
 # Now, test if rsync excludes the same files.
 
-checkit "$RSYNC -avv --exclude-from=\"$excl\" \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+checkit "$RSYNC -avv --exclude-from=\"$excl\" \
+    --delete \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
 
 # Modify the chk dir by removing cvs-ignored files and then tweaking the dir times.
 
@@ -97,7 +130,26 @@ $RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
 # Now, test if rsync excludes the same files, this time with --cvs-exclude
 # and --delete-excluded.
 
-checkit "$RSYNC -avvC --exclude-from=\"$excl\" \
+checkit "$RSYNC -avvC --filter=\". $excl\" \
+    --delete-excluded \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+
+# Modify the chk dir for our merge-exclude test and then tweak the dir times.
+
+rm "$chkdir"/.excl
+rm "$chkdir"/foo/file1
+rm "$chkdir"/bar/.excl
+rm "$chkdir"/bar/down/to/.excl2
+rm "$chkdir"/bar/down/to/foo/.excl2
+rm "$chkdir"/mid/.excl
+cp -p "$fromdir"/bar/down/to/foo/*.junk "$chkdir"/bar/down/to/foo
+cp -p "$fromdir"/bar/down/to/foo/to "$chkdir"/bar/down/to/foo
+
+$RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
+
+# Now, test if rsync excludes the same files, this time with a merge-exclude
+# file.
+
+checkit "sed '/!/d' \"$excl\" | $RSYNC -avv -f :_.excl -f ._- \
     --delete-excluded \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
