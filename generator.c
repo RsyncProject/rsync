@@ -317,7 +317,8 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 	}
 
 	if (skip_file(fname, file, &st)) {
-		set_perms(fname,file,&st,1);
+		if (fnamecmp == fname)
+			set_perms(fname,file,&st,1);
 		return;
 	}
 
