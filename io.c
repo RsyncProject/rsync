@@ -43,6 +43,7 @@ extern int bwlimit;
 extern size_t bwlimit_writemax;
 extern int verbose;
 extern int io_timeout;
+extern int allowed_lull;
 extern int am_server;
 extern int am_daemon;
 extern int am_sender;
@@ -51,8 +52,11 @@ extern int eol_nulls;
 extern int csum_length;
 extern int checksum_seed;
 extern int protocol_version;
+extern int remove_sent_files;
+extern int preserve_hard_links;
 extern char *filesfrom_host;
 extern struct stats stats;
+extern struct file_list *the_file_list;
 
 const char phase_unknown[] = "unknown";
 int select_timeout = SELECT_TIMEOUT;
@@ -81,11 +85,11 @@ int kluge_around_eof = 0;
 
 int msg_fd_in = -1;
 int msg_fd_out = -1;
+int sock_f_in = -1;
+int sock_f_out = -1;
 
 static int io_multiplexing_out;
 static int io_multiplexing_in;
-static int sock_f_in = -1;
-static int sock_f_out = -1;
 static time_t last_io;
 static int no_flush;
 
@@ -111,7 +115,7 @@ struct flist_ndx_list {
 	struct flist_ndx_item *head, *tail;
 };
 
-static struct flist_ndx_list redo_list;
+static struct flist_ndx_list redo_list, hlink_list;
 
 struct msg_list {
 	struct msg_list *next;
@@ -284,7 +288,10 @@ static void read_msg_fd(void)
 			exit_cleanup(RERR_STREAMIO);
 		}
 		read_loop(fd, buf, len);
-		io_multiplex_write(MSG_SUCCESS, buf, len);
+		if (remove_sent_files)
+			io_multiplex_write(MSG_SUCCESS, buf, len);
+		if (preserve_hard_links)
+			flist_ndx_push(&hlink_list, IVAL(buf,0));
 		break;
 	case MSG_INFO:
 	case MSG_ERROR:
@@ -346,13 +353,22 @@ int msg_list_push(int flush_it_all)
 	return 1;
 }
 
-int get_redo_num(void)
+int get_redo_num(int itemizing, enum logcode code)
 {
-	while (!redo_list.head) {
+	while (1) {
+		if (hlink_list.head)
+			check_for_finished_hlinks(itemizing, code);
+		if (redo_list.head)
+			break;
 		read_msg_fd();
 	}
 
 	return flist_ndx_pop(&redo_list);
+}
+
+int get_hlink_num(void)
+{
+	return flist_ndx_pop(&hlink_list);
 }
 
 /**
@@ -649,13 +665,13 @@ void io_end_buffering(void)
 }
 
 
-void maybe_send_keepalive(int allowed_lull, int ndx)
+void maybe_send_keepalive(void)
 {
 	if (time(NULL) - last_io >= allowed_lull) {
 		if (!iobuf_out || !iobuf_out_cnt) {
 			if (protocol_version < 29)
 				return; /* there's nothing we can do */
-			write_int(sock_f_out, ndx);
+			write_int(sock_f_out, the_file_list->count);
 			write_shortint(sock_f_out, ITEM_IS_NEW);
 		}
 		if (iobuf_out)
@@ -744,8 +760,8 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 			break;
 		case MSG_SUCCESS:
 			if (remaining != 4) {
-				rprintf(FERROR, "invalid multi-message %d:%ld\n",
-					tag, (long)remaining);
+				rprintf(FERROR, "invalid multi-message %d:%ld [%s]\n",
+					tag, (long)remaining, who_am_i());
 				exit_cleanup(RERR_STREAMIO);
 			}
 			read_loop(fd, line, remaining);
@@ -756,8 +772,8 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 		case MSG_ERROR:
 			if (remaining >= sizeof line) {
 				rprintf(FERROR,
-					"[%s] multiplexing overflow %d:%ld\n\n",
-					who_am_i(), tag, (long)remaining);
+					"multiplexing overflow %d:%ld [%s]\n",
+					tag, (long)remaining, who_am_i());
 				exit_cleanup(RERR_STREAMIO);
 			}
 			read_loop(fd, line, remaining);
@@ -765,8 +781,8 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 			remaining = 0;
 			break;
 		default:
-			rprintf(FERROR, "[%s] unexpected tag %d\n",
-				who_am_i(), tag);
+			rprintf(FERROR, "unexpected tag %d [%s]\n",
+				tag, who_am_i());
 			exit_cleanup(RERR_STREAMIO);
 		}
 	}
@@ -888,20 +904,20 @@ void read_sum_head(int f, struct sum_struct *sum)
 	sum->count = read_int(f);
 	sum->blength = read_int(f);
 	if (sum->blength < 0 || sum->blength > MAX_BLOCK_SIZE) {
-		rprintf(FERROR, "[%s] Invalid block length %ld\n",
-			who_am_i(), (long)sum->blength);
+		rprintf(FERROR, "Invalid block length %ld [%s]\n",
+			(long)sum->blength, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
 	}
 	sum->s2length = protocol_version < 27 ? csum_length : (int)read_int(f);
 	if (sum->s2length < 0 || sum->s2length > MD4_SUM_LENGTH) {
-		rprintf(FERROR, "[%s] Invalid checksum length %d\n",
-			who_am_i(), sum->s2length);
+		rprintf(FERROR, "Invalid checksum length %d [%s]\n",
+			sum->s2length, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
 	}
 	sum->remainder = read_int(f);
 	if (sum->remainder < 0 || sum->remainder > sum->blength) {
-		rprintf(FERROR, "[%s] Invalid remainder length %ld\n",
-			who_am_i(), (long)sum->remainder);
+		rprintf(FERROR, "Invalid remainder length %ld [%s]\n",
+			(long)sum->remainder, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
 	}
 }
