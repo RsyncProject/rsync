@@ -1,6 +1,6 @@
 Summary: A program for synchronizing files over a network.
 Name: rsync
-Version: 2.6.4pre2
+Version: 2.6.4pre3
 Release: 1
 Group: Applications/Internet
 Source:	ftp://rsync.samba.org/pub/rsync/rsync-%{version}.tar.gz
