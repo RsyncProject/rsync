@@ -227,6 +227,7 @@
 #else
 /* I hope this works */
 #define int32 int
+#define LARGE_INT32
 #endif
 #endif
 

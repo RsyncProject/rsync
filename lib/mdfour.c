@@ -28,30 +28,34 @@
 
 static struct mdfour *m;
 
-static uint32 F(uint32 X, uint32 Y, uint32 Z)
+static inline uint32 F(uint32 X, uint32 Y, uint32 Z)
 {
 	return (X&Y) | ((~X)&Z);
 }
 
-static uint32 G(uint32 X, uint32 Y, uint32 Z)
+static inline uint32 G(uint32 X, uint32 Y, uint32 Z)
 {
 	return (X&Y) | (X&Z) | (Y&Z); 
 }
 
-static uint32 H(uint32 X, uint32 Y, uint32 Z)
+static inline uint32 H(uint32 X, uint32 Y, uint32 Z)
 {
 	return X^Y^Z;
 }
 
-static uint32 lshift(uint32 x, int s)
+static inline uint32 lshift(uint32 x, int s)
 {
+#ifdef LARGE_INT32
 	x &= 0xFFFFFFFF;
 	return ((x<<s)&0xFFFFFFFF) | (x>>(32-s));
+#else
+	return ((x<<s) | (x>>(32-s)));
+#endif
 }
 
 #define ROUND1(a,b,c,d,k,s) a = lshift(a + F(b,c,d) + X[k], s)
-#define ROUND2(a,b,c,d,k,s) a = lshift(a + G(b,c,d) + X[k] + (uint32)0x5A827999,s)
-#define ROUND3(a,b,c,d,k,s) a = lshift(a + H(b,c,d) + X[k] + (uint32)0x6ED9EBA1,s)
+#define ROUND2(a,b,c,d,k,s) a = lshift(a + G(b,c,d) + X[k] + 0x5A827999,s)
+#define ROUND3(a,b,c,d,k,s) a = lshift(a + H(b,c,d) + X[k] + 0x6ED9EBA1,s)
 
 /* this applies md4 to 64 byte chunks */
 static void mdfour64(uint32 *M)
@@ -96,8 +100,10 @@ static void mdfour64(uint32 *M)
 
 	A += AA; B += BB; C += CC; D += DD;
 	
+#ifdef LARGE_INT32
 	A &= 0xFFFFFFFF; B &= 0xFFFFFFFF;
 	C &= 0xFFFFFFFF; D &= 0xFFFFFFFF;
+#endif
 
 	for (j=0;j<16;j++)
 		X[j] = 0;
@@ -157,9 +163,6 @@ static void mdfour_tail(unsigned char *in, int n)
 		copy64(M, buf+64);
 		mdfour64(M);
 	}
-
-	memset(buf, 0, 128);
-	copy64(M, buf);	
 }
 
 void mdfour_update(struct mdfour *md, unsigned char *in, int n)
