@@ -143,7 +143,7 @@ int write_file(int f,char *buf,size_t len)
  * It gives sliding window access to a file.  mmap() is not used because of
  * the possibility of another program (such as a mailer) truncating the
  * file thus giving us a SIGBUS. */
-struct map_struct *map_file(int fd, OFF_T len, OFF_T map_size,
+struct map_struct *map_file(int fd, OFF_T len, int32 read_size,
 			    int32 blk_size)
 {
 	struct map_struct *map;
@@ -151,13 +151,13 @@ struct map_struct *map_file(int fd, OFF_T len, OFF_T map_size,
 	if (!(map = new(struct map_struct)))
 		out_of_memory("map_file");
 
-	if (blk_size && (map_size % blk_size))
-		map_size += blk_size - (map_size % blk_size);
+	if (blk_size && (read_size % blk_size))
+		read_size += blk_size - (read_size % blk_size);
 
 	memset(map, 0, sizeof map[0]);
 	map->fd = fd;
 	map->file_size = len;
-	map->def_window_size = map_size;
+	map->def_window_size = read_size;
 
 	return map;
 }
@@ -166,16 +166,17 @@ struct map_struct *map_file(int fd, OFF_T len, OFF_T map_size,
 /* slide the read window in the file */
 char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 {
-	int nread;
+	int32 nread;
 	OFF_T window_start, read_start;
-	int window_size, read_size, read_offset;
+	int32 window_size, read_size, read_offset;
 
 	if (len == 0)
 		return NULL;
-
-	/* can't go beyond the end of file */
-	if (len > map->file_size - offset)
-		len = map->file_size - offset;
+	if (len < 0) {
+		rprintf(FERROR, "invalid len passed to map_ptr: %ld\n",
+			(long)len);
+		exit_cleanup(RERR_FILEIO);
+	}
 
 	/* in most cases the region will already be available */
 	if (offset >= map->p_offset && offset+len <= map->p_offset+map->p_len)
@@ -184,11 +185,10 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 	/* nope, we are going to have to do a read. Work out our desired window */
 	window_start = offset;
 	window_size = map->def_window_size;
-	if (window_start + window_size > map->file_size) {
+	if (window_start + window_size > map->file_size)
 		window_size = map->file_size - window_start;
-	}
-	if (offset + len > window_start + window_size)
-		window_size = (offset+len) - window_start;
+	if (len > window_size)
+		window_size = len;
 
 	/* make sure we have allocated enough memory for the window */
 	if (window_size > map->p_size) {
@@ -198,8 +198,8 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 		map->p_size = window_size;
 	}
 
-	/* now try to avoid re-reading any bytes by reusing any bytes from the previous
-	   buffer. */
+	/* Now try to avoid re-reading any bytes by reusing any bytes
+	 * from the previous buffer. */
 	if (window_start >= map->p_offset &&
 	    window_start < map->p_offset + map->p_len &&
 	    window_start + window_size >= map->p_offset + map->p_len) {
@@ -214,7 +214,9 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 	}
 
 	if (read_size <= 0) {
-		rprintf(FINFO,"Warning: unexpected read size of %d in map_ptr\n", read_size);
+		rprintf(FERROR, "invalid read_size of %ld in map_ptr\n",
+			(long)read_size);
+		exit_cleanup(RERR_FILEIO);
 	} else {
 		if (map->p_fd_offset != read_start) {
 			if (do_lseek(map->fd,read_start,SEEK_SET) != read_start) {
@@ -240,7 +242,7 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 	map->p_offset = window_start;
 	map->p_len = window_size;
 
-	return map->p + (offset - map->p_offset);
+	return map->p;
 }
 
 
