@@ -73,7 +73,19 @@ There seems to be a bug with hardlinks
   -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 b3
 
 
-IMPORTANT ------------------------------------------------------------
+DAEMON --------------------------------------------------------------
+
+server-imposed bandwidth limits
+
+rsyncd over ssh
+
+  There are already some patches to do this.
+
+  BitKeeper uses a server whose login shell is set to bkd.  That's
+  probably a reasonable approach.
+
+
+FEATURES ------------------------------------------------------------
 
 
 --dry-run is insufficiently dry
@@ -345,10 +357,6 @@ logging
   generator): ".
 
 
-rsyncd over ssh
-
-  There are already some patches to do this.
-
 proxy authentication
 
   Allow RSYNC_PROXY to be http://user:pass@proxy.foo:3128/, and do
@@ -556,6 +564,7 @@ verbose output
   At end of transfer, show how many files were or were not transferred
   correctly.
 
+
 internationalization
 
   Change to using gettext().  Probably need to ship this for platforms
@@ -563,7 +572,10 @@ internationalization
 
   Solicit translations.
 
-  Does anyone care?
+  Does anyone care?  Before we bother modifying the code, we ought to
+  get the manual translated first, because that's possibly more useful
+  and at any rate demonstrates desire.
+
 
 rsyncsh 
 
