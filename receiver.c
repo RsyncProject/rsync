@@ -396,15 +396,9 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		if (verbose > 2)
 			rprintf(FINFO, "recv_files(%s)\n", safe_fname(fname));
 
-		if (!(iflags & ITEM_UPDATING) || !S_ISREG(file->mode)) {
+		if (!(iflags & ITEM_TRANSFER)) {
 			maybe_log_item(file, iflags, itemizing, fnametmp);
 			continue;
-		}
-
-		if (!S_ISREG(file->mode)) {
-			rprintf(FERROR, "[%s] got index of non-regular file: %d\n",
-				who_am_i(), i);
-			exit_cleanup(RERR_PROTOCOL);
 		}
 
 		stats.current_file_index = i;
@@ -604,12 +598,13 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 
 		cleanup_disable();
 
-		if (recv_ok) {
-			if (remove_sent_files && recv_ok > 0) {
+		if (recv_ok > 0) {
+			if (remove_sent_files
+			    || (preserve_hard_links && file->link_u.links)) {
 				SIVAL(numbuf, 0, i);
 				send_msg(MSG_SUCCESS, numbuf, 4);
 			}
-		} else {
+		} else if (!recv_ok) {
 			int msgtype = csum_length == SUM_LENGTH || read_batch ?
 				FERROR : FINFO;
 			if (msgtype == FERROR || verbose) {
@@ -659,7 +654,9 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 						full_fname(fname),
 						safe_fname(partialptr));
 				} else {
-					if (remove_sent_files) {
+					if (remove_sent_files
+					    || (preserve_hard_links
+					     && file->link_u.links)) {
 						SIVAL(numbuf, 0, i);
 						send_msg(MSG_SUCCESS,numbuf,4);
 					}
