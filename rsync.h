@@ -43,7 +43,7 @@
 #define FLAG_DELETE (1<<0)
 #define SAME_MODE (1<<1)
 #define EXTENDED_FLAGS (1<<2)
-#define OLD_SAME_RDEV EXTENDED_FLAGS
+#define SAME_RDEV_pre28 EXTENDED_FLAGS /* Only use in protocols < 28 */
 #define SAME_UID (1<<3)
 #define SAME_GID (1<<4)
 #define SAME_DIR (1<<5)
