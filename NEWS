@@ -252,6 +252,10 @@ Changes since 2.6.3:
       avoid detaching, requiring the new --detach option to force rsync
       to detach.
 
+    - The --dry-run option can now be combined with either --write-batch or
+      --read-batch, allowing you to run a do-nothing test command to see
+      what would happen without --dry-run.
+
     - Improved the option descriptions in the --help text.
 
   SUPPORT FILES:
