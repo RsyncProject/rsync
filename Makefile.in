@@ -24,8 +24,9 @@ LIBOBJ=lib/getopt.o lib/fnmatch.o lib/zlib.o lib/compat.o
 OBJS1=rsync.o exclude.o util.o md4.o main.o checksum.o match.o syscall.o
 OBJS=$(OBJS1) flist.o io.o compat.o hlink.o token.o uidlist.o $(LIBOBJ)
 
+# note that the -I. is needed to handle config.h when using VPATH
 .c.o:
-	$(CC) -I$(srcdir) $(CFLAGS) -c $*.c -o $*.o
+	$(CC) -I. -I$(srcdir) $(CFLAGS) -c $< -o $@
 
 all: rsync
 
