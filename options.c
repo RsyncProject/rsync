@@ -55,7 +55,8 @@ int sparse_files=0;
 int do_compression=0;
 int am_root=0;
 int orig_umask=0;
-int relative_paths=0;
+int relative_paths = -1;
+int implied_dirs = 1;
 int numeric_ids = 0;
 int force_delete = 0;
 int io_timeout = 0;
@@ -64,6 +65,10 @@ int read_only = 0;
 int module_id = -1;
 int am_server = 0;
 int am_sender = 0;
+char *files_from = NULL;
+int filesfrom_fd = -1;
+char *remote_filesfrom_file = NULL;
+int eol_nulls = 0;
 int recurse = 0;
 int am_daemon = 0;
 int daemon_over_rsh = 0;
@@ -209,6 +214,8 @@ void usage(enum logcode F)
   rprintf(F," -a, --archive               archive mode, equivalent to -rlptgoD\n");
   rprintf(F," -r, --recursive             recurse into directories\n");
   rprintf(F," -R, --relative              use relative path names\n");
+  rprintf(F,"     --no-relative           turn off --relative\n");
+  rprintf(F,"     --no-implied-dirs       don't send implied dirs with -R\n");
   rprintf(F," -b, --backup                make backups (default %s suffix)\n",BACKUP_SUFFIX);
   rprintf(F,"     --backup-dir            make backups into this directory\n");
   rprintf(F,"     --suffix=SUFFIX         override backup suffix\n");
@@ -231,7 +238,6 @@ void usage(enum logcode F)
   rprintf(F," -B, --block-size=SIZE       checksum blocking size (default %d)\n",BLOCK_SIZE);
   rprintf(F," -e, --rsh=COMMAND           specify the remote shell\n");
   rprintf(F,"     --rsync-path=PATH       specify path to rsync on the remote machine\n");
-  rprintf(F," -C, --cvs-exclude           auto ignore files in the same way CVS does\n");
   rprintf(F,"     --existing              only update files that already exist\n");
   rprintf(F,"     --ignore-existing       ignore files that already exist on the receiving side\n");
   rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
@@ -250,10 +256,13 @@ void usage(enum logcode F)
   rprintf(F,"     --compare-dest=DIR      also compare destination files relative to DIR\n");
   rprintf(F," -P                          equivalent to --partial --progress\n");
   rprintf(F," -z, --compress              compress file data\n");
+  rprintf(F," -C, --cvs-exclude           auto ignore files in the same way CVS does\n");
   rprintf(F,"     --exclude=PATTERN       exclude files matching PATTERN\n");
   rprintf(F,"     --exclude-from=FILE     exclude patterns listed in FILE\n");
   rprintf(F,"     --include=PATTERN       don't exclude files matching PATTERN\n");
   rprintf(F,"     --include-from=FILE     don't exclude patterns listed in FILE\n");
+  rprintf(F,"     --files-from=FILE       read FILE for list of source-file names\n");
+  rprintf(F," -0  --from0                 file names we read are separated by nulls, not newlines\n");
   rprintf(F,"     --version               print version number\n");
   rprintf(F,"     --daemon                run as a rsync daemon\n");
   rprintf(F,"     --no-detach             do not detach from the parent\n");
@@ -336,7 +345,8 @@ static struct poptOption long_options[] = {
   {"server",           0,  POPT_ARG_NONE,   &am_server, 0, 0, 0 },
   {"sender",           0,  POPT_ARG_NONE,   0,              OPT_SENDER, 0, 0 },
   {"recursive",       'r', POPT_ARG_NONE,   &recurse, 0, 0, 0 },
-  {"relative",        'R', POPT_ARG_NONE,   &relative_paths, 0, 0, 0 },
+  {"relative",        'R', POPT_ARG_VAL,    &relative_paths, 1, 0, 0 },
+  {"no-relative",      0,  POPT_ARG_VAL,    &relative_paths, 0, 0, 0 },
   {"rsh",             'e', POPT_ARG_STRING, &shell_cmd, 0, 0, 0 },
   {"block-size",      'B', POPT_ARG_INT,    &block_size, 0, 0, 0 },
   {"max-delete",       0,  POPT_ARG_INT,    &max_delete, 0, 0, 0 },
@@ -364,6 +374,9 @@ static struct poptOption long_options[] = {
   {"hard-links",      'H', POPT_ARG_NONE,   &preserve_hard_links, 0, 0, 0 },
   {"read-batch",       0,  POPT_ARG_STRING, &batch_prefix,  OPT_READ_BATCH, 0, 0 },
   {"write-batch",      0,  POPT_ARG_STRING, &batch_prefix,  OPT_WRITE_BATCH, 0, 0 },
+  {"files-from",       0,  POPT_ARG_STRING, &files_from, 0, 0, 0 },
+  {"from0",           '0', POPT_ARG_NONE,   &eol_nulls, 0, 0, 0},
+  {"no-implied-dirs",  0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
 #ifdef INET6
   {0,		      '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {0,		      '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
@@ -561,6 +574,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			/* popt stores the filename in batch_prefix for us */
 			read_batch = 1;
 			break;
+
 		case OPT_LINK_DEST:
 #if HAVE_LINK
 			compare_dest = (char *)poptGetOptArg(pc);
@@ -604,7 +618,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 
 	if (archive_mode) {
-		recurse = 1;
+		if (!files_from)
+			recurse = 1;
 #if SUPPORT_LINKS
 		preserve_links = 1;
 #endif
@@ -615,11 +630,46 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		preserve_devices = 1;
 	}
 
+	if (relative_paths < 0)
+		relative_paths = files_from? 1 : 0;
+
 	*argv = poptGetArgs(pc);
 	if (*argv)
 		*argc = count_args(*argv);
 	else
 		*argc = 0;
+
+	if (files_from) {
+		char *colon;
+		if (*argc != 2) {
+			usage(FERROR);
+			exit_cleanup(RERR_SYNTAX);
+		}
+		if (strcmp(files_from, "-") == 0)
+			filesfrom_fd = 0;
+		else if ((colon = find_colon(files_from)) != 0) {
+			if (am_server) {
+				usage(FERROR);
+				exit_cleanup(RERR_SYNTAX);
+			}
+			remote_filesfrom_file = colon+1 + (colon[1] == ':');
+			if (strcmp(remote_filesfrom_file, "-") == 0) {
+				rprintf(FERROR, "Invalid --files-from remote filename\n");
+				exit_cleanup(RERR_SYNTAX);
+			}
+		} else {
+			extern int sanitize_paths;
+			if (sanitize_paths)
+				sanitize_path(strdup(files_from), NULL);
+			filesfrom_fd = open(files_from, O_RDONLY|O_BINARY);
+			if (filesfrom_fd < 0) {
+				rsyserr(FERROR, errno,
+					"failed to open files-from file %s",
+					files_from);
+				exit_cleanup(RERR_FILEIO);
+			}
+		}
+	}
 
 	return 1;
 }
@@ -825,6 +875,38 @@ void server_options(char **args,int *argc)
 		args[ac++] = compare_dest;
 	}
 
+	if (files_from && (!am_sender || remote_filesfrom_file)) {
+		if (remote_filesfrom_file) {
+			args[ac++] = "--files-from";
+			args[ac++] = remote_filesfrom_file;
+			if (eol_nulls)
+				args[ac++] = "--from0";
+		} else {
+			args[ac++] = "--files-from=-";
+			args[ac++] = "--from0";
+		}
+	}
+
 	*argc = ac;
 }
+
+/**
+ * Return the position of a ':' IF it is not part of a filename (i.e. as
+ * long as it doesn't occur after a slash.
+ */
+char *find_colon(char *s)
+{
+	char *p, *p2;
+
+	p = strchr(s,':');
+	if (!p) return NULL;
+
+	/* now check to see if there is a / in the string before the : - if there is then
+	   discard the colon on the assumption that the : is part of a filename */
+	p2 = strchr(s,'/');
+	if (p2 && p2 < p) return NULL;
+
+	return p;
+}
+
 
