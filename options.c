@@ -52,7 +52,7 @@ int ignore_times=0;
 int delete_mode=0;
 int delete_excluded=0;
 int one_file_system=0;
-int remote_version=0;
+int protocol_version = PROTOCOL_VERSION;
 int sparse_files=0;
 int do_compression=0;
 int am_root=0;
@@ -376,6 +376,7 @@ static struct poptOption long_options[] = {
   {"files-from",       0,  POPT_ARG_STRING, &files_from, 0, 0, 0 },
   {"from0",           '0', POPT_ARG_NONE,   &eol_nulls, 0, 0, 0},
   {"no-implied-dirs",  0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
+  {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
 #ifdef INET6
   {0,		      '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {0,		      '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
