@@ -43,13 +43,8 @@ OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) $(ZLIBOBJ) @BUILD_POPT@
 TLS_OBJ = tls.o syscall.o lib/permstring.o
 
 # Programs we must have to run the test cases
-RSYNC_EXE=rsync$(EXEEXT)
-TLS_EXE=tls$(EXEEXT)
-GETGROUPS_EXE=getgroups$(EXEEXT)
-TRIMSLASH_EXE=trimslash$(EXEEXT)
-T_UNSAFE_EXE=t_unsafe$(EXEEXT)
-CHECK_PROGS=$(RSYNC_EXE) $(TLS_EXE) $(GETGROUPS_EXE) \
-	$(TRIMSLASH_EXE) $(T_UNSAFE_EXE)
+CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) \
+	trimslash$(EXEEXT) t_unsafe$(EXEEXT)
 
 # Objects for CHECK_PROGS to clean
 CHECK_OBJS=getgroups.o t_stub.o t_unsafe.o trimslash.o
@@ -60,13 +55,13 @@ CHECK_OBJS=getgroups.o t_stub.o t_unsafe.o trimslash.o
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -c $< @CC_SHOBJ_FLAG@
 @OBJ_RESTORE@
 
-all: $(RSYNC_EXE)
+all: rsync$(EXEEXT)
 
 man: rsync.1 rsyncd.conf.5
 
 install: all
 	-mkdir -p ${DESTDIR}${bindir}
-	${INSTALLCMD} ${STRIP} -m 755 $(RSYNC_EXE) ${DESTDIR}${bindir}
+	${INSTALLCMD} ${STRIP} -m 755 rsync$(EXEEXT) ${DESTDIR}${bindir}
 	-mkdir -p ${DESTDIR}${mandir}/man1
 	-mkdir -p ${DESTDIR}${mandir}/man5
 	${INSTALLMAN} -m 644 $(srcdir)/rsync.1 ${DESTDIR}${mandir}/man1
@@ -75,23 +70,23 @@ install: all
 install-strip:
 	$(MAKE) STRIP='-s' install
 
-$(RSYNC_EXE): $(OBJS)
+rsync$(EXEEXT): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
 $(OBJS): config.h
 
-$(TLS_EXE): $(TLS_OBJ)
+tls$(EXEEXT): $(TLS_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TLS_OBJ) $(LIBS)
 
-$(GETGROUPS_EXE): getgroups.o
+getgroups$(EXEEXT): getgroups.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ getgroups.o $(LIBS)
 
 TRIMSLASH_OBJ = trimslash.o syscall.o
-$(TRIMSLASH_EXE): $(TRIMSLASH_OBJ)
+trimslash$(EXEEXT): $(TRIMSLASH_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TRIMSLASH_OBJ) $(LIBS)
 
 T_UNSAFE_OBJ = t_unsafe.o syscall.o util.o t_stub.o lib/compat.o lib/snprintf.o
-$(T_UNSAFE_EXE): $(T_UNSAFE_OBJ)
+t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
 
 # I don't like these rules because CVS can skew the timestamps and
@@ -161,14 +156,14 @@ test: check
 # might lose in the future where POSIX diverges from old sh.
 
 check: all $(CHECK_PROGS)
-	POSIXLY_CORRECT=1 TOOLDIR=`pwd` rsync_bin=`pwd`/$(RSYNC_EXE) srcdir="$(srcdir)" $(srcdir)/runtests.sh
+	POSIXLY_CORRECT=1 TOOLDIR=`pwd` rsync_bin=`pwd`/rsync$(EXEEXT) srcdir="$(srcdir)" $(srcdir)/runtests.sh
 
 # This does *not* depend on building or installing: you can use it to
 # check a version installed from a binary or some other source tree,
 # if you want.
 
 installcheck: $(CHECK_PROGS)
-	POSIXLY_CORRECT=1 TOOLDIR=`pwd` rsync_bin="$(bindir)/$(RSYNC_EXE)" srcdir="$(srcdir)" $(srcdir)/runtests.sh
+	POSIXLY_CORRECT=1 TOOLDIR=`pwd` rsync_bin="$(bindir)/rsync$(EXEEXT)" srcdir="$(srcdir)" $(srcdir)/runtests.sh
 
 # TODO: Add 'dist' target; need to know which files will be included
 
