@@ -1109,26 +1109,25 @@ show why each individual file is included or excluded.
 manpagesection(EXIT VALUES)
 
 startdit()
-dit(bf(1))  Syntax or usage error 
-dit(bf(2))  Protocol incompatibility 
-dit(bf(3))  Errors selecting input/output files, dirs
-
-dit(bf(4))  Requested action not supported: an attempt
+dit(bf(0)) Success
+dit(bf(1)) Syntax or usage error 
+dit(bf(2)) Protocol incompatibility 
+dit(bf(3)) Errors selecting input/output files, dirs
+dit(bf(4)) Requested action not supported: an attempt
 was made to manipulate 64-bit files on a platform that cannot support
 them; or an option was speciifed that is supported by the client and
 not by the server.
-
-dit(bf(5))   Error starting client-server protocol
-dit(bf(10))  Error in socket IO 
-dit(bf(11))  Error in file IO 
-dit(bf(12))  Error in rsync protocol data stream 
-dit(bf(13))  Errors with program diagnostics 
-dit(bf(14))  Error in IPC code 
-dit(bf(20))  Received SIGUSR1 or SIGINT 
-dit(bf(21))  Some error returned by waitpid() 
-dit(bf(22))  Error allocating core memory buffers 
-dit(bf(23))  Partial transfer
-dit(bf(30))  Timeout in data send/receive 
+dit(bf(5)) Error starting client-server protocol
+dit(bf(10)) Error in socket IO 
+dit(bf(11)) Error in file IO 
+dit(bf(12)) Error in rsync protocol data stream 
+dit(bf(13)) Errors with program diagnostics 
+dit(bf(14)) Error in IPC code 
+dit(bf(20)) Received SIGUSR1 or SIGINT 
+dit(bf(21)) Some error returned by waitpid() 
+dit(bf(22)) Error allocating core memory buffers 
+dit(bf(23)) Partial transfer
+dit(bf(30)) Timeout in data send/receive 
 enddit()
 
 manpagesection(ENVIRONMENT VARIABLES)
