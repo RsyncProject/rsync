@@ -21,6 +21,8 @@ Changes since 2.6.3:
 
     - Fixed an off-by-one error in the handling of --max-delete=N.
 
+    - One fork() call needed to check for and handle a failure.
+
   ENHANCEMENTS:
 
     - Added the --max-size option (promoted from the patches dir).
