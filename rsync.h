@@ -100,6 +100,7 @@
 
 #define IOERR_GENERAL	(1<<0) /* For backward compatibility, this must == 1 */
 #define IOERR_VANISHED	(1<<1)
+#define IOERR_DEL_LIMIT (1<<2)
 
 #define MAX_ARGS 1000
 
