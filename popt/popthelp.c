@@ -134,19 +134,23 @@ singleOptionDefaultValue(int lineLength,
     case POPT_ARG_VAL:
     case POPT_ARG_INT:
     {	long aLong = *((int *)opt->arg);
-	le += sprintf(le, "%ld", aLong);
+	sprintf(le, "%ld", aLong);
+	le += strlen(le);
     }	break;
     case POPT_ARG_LONG:
     {	long aLong = *((long *)opt->arg);
-	le += sprintf(le, "%ld", aLong);
+	sprintf(le, "%ld", aLong);
+	le += strlen(le);
     }	break;
     case POPT_ARG_FLOAT:
     {	double aDouble = *((float *)opt->arg);
-	le += sprintf(le, "%g", aDouble);
+	sprintf(le, "%g", aDouble);
+	le += strlen(le);
     }	break;
     case POPT_ARG_DOUBLE:
     {	double aDouble = *((double *)opt->arg);
-	le += sprintf(le, "%g", aDouble);
+	sprintf(le, "%g", aDouble);
+	le += strlen(le);
     }	break;
     case POPT_ARG_STRING:
     {	const char * s = *(const char **)opt->arg;
@@ -271,7 +275,8 @@ static void singleOptionHelp(FILE * fp, int maxLeftCol,
 		*le++ = '=';
 		if (negate) *le++ = '~';
 		/*@-formatconst@*/
-		le += sprintf(le, (ops ? "0x%lx" : "%ld"), aLong);
+		sprintf(le, (ops ? "0x%lx" : "%ld"), aLong);
+		le += strlen(le);
 		/*@=formatconst@*/
 		*le++ = ']';
 	    }	break;
