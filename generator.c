@@ -262,7 +262,7 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 {
 	int fd;
 	STRUCT_STAT st;
-	int statret;
+	int statret, stat_errno;
 	char *fnamecmp;
 	char fnamecmpbuf[MAXPATHLEN];
 
@@ -283,6 +283,7 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 	}
 
 	statret = link_stat(fname, &st, keep_dirlinks && S_ISDIR(file->mode));
+	stat_errno = errno;
 
 	if (only_existing && statret == -1 && errno == ENOENT) {
 		/* we only want to update existing files */
@@ -422,54 +423,46 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 
 	if (statret == -1 && compare_dest != NULL) {
 		/* try the file at compare_dest instead */
-		int saveerrno = errno;
 		pathjoin(fnamecmpbuf, sizeof fnamecmpbuf, compare_dest, fname);
-		statret = link_stat(fnamecmpbuf, &st, 0);
-		if (!S_ISREG(st.st_mode))
-			statret = -1;
-		if (statret == -1)
-			errno = saveerrno;
+		if (link_stat(fnamecmpbuf, &st, 0) == 0
+		    && S_ISREG(st.st_mode)) {
 #if HAVE_LINK
-		else if (link_dest && !dry_run) {
-			if (do_link(fnamecmpbuf, fname) != 0) {
-				if (verbose > 0) {
-					rsyserr(FINFO, errno, "link %s => %s",
-						fnamecmpbuf, safe_fname(fname));
+			if (link_dest && !dry_run) {
+				if (do_link(fnamecmpbuf, fname) < 0) {
+					if (verbose) {
+						rsyserr(FINFO, errno,
+							"link %s => %s",
+							fnamecmpbuf,
+							safe_fname(fname));
+					}
+					fnamecmp = fnamecmpbuf;
 				}
-			}
-			fnamecmp = fnamecmpbuf;
-		}
+			} else
 #endif
-		else
-			fnamecmp = fnamecmpbuf;
+				fnamecmp = fnamecmpbuf;
+			statret = 0;
+		}
+	}
+
+	if (statret == 0 && !S_ISREG(st.st_mode)) {
+		if (delete_file(fname) != 0)
+			return;
+		statret = -1;
+		stat_errno = ENOENT;
 	}
 
 	if (statret == -1) {
 		if (preserve_hard_links && hard_link_check(file, HL_SKIP))
 			return;
-		if (errno == ENOENT) {
+		if (stat_errno == ENOENT) {
 			write_int(f_out,i);
 			if (!dry_run && !read_batch)
 				write_sum_head(f_out, NULL);
 		} else if (verbose > 1) {
-			rsyserr(FERROR, errno,
-				"recv_generator: failed to open %s",
+			rsyserr(FERROR, stat_errno,
+				"recv_generator: failed to stat %s",
 				full_fname(fname));
 		}
-		return;
-	}
-
-	if (!S_ISREG(st.st_mode)) {
-		if (delete_file(fname) != 0) {
-			return;
-		}
-
-		/* now pretend the file didn't exist */
-		if (preserve_hard_links && hard_link_check(file, HL_SKIP))
-			return;
-		write_int(f_out,i);
-		if (!dry_run && !read_batch)
-			write_sum_head(f_out, NULL);
 		return;
 	}
 
