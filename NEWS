@@ -1,4 +1,4 @@
-rsync 2.4.7 (sometime in 2001, maybe :)		-*- indented-text -*- 
+rsync 2.5.0 (2001-11-30)		-*- indented-text -*- 
 
   ANNOUNCEMENTS
 
@@ -36,7 +36,7 @@ rsync 2.4.7 (sometime in 2001, maybe :)		-*- indented-text -*-
       file to get cleaned out by another process.
 
     * Change to using libpopt rather than getopt for processing
-      options.  This makes the code cleaner and the behaviour more
+      options.	This makes the code cleaner and the behaviour more
       consistent across platforms.  popt is included and built if not
       installed on the platform.
 
@@ -49,7 +49,7 @@ rsync 2.4.7 (sometime in 2001, maybe :)		-*- indented-text -*-
       explain that we do it in a secure way.
 
     * --whole-file is the default when source and target are on the
-        local machine.
+	local machine.
 
   BUG FIXES:
 
@@ -71,7 +71,7 @@ rsync 2.4.7 (sometime in 2001, maybe :)		-*- indented-text -*-
     * Improved support for UNICOS (tested on Cray T3E and Cray SV1)
 
     * autoconf2.52 (or later) is now required to rebuild the autoconf
-      scripts.  It is not required to simply build rsync.
+      scripts.	It is not required to simply build rsync.
 
     * Platforms thought to work in this release:
 
@@ -101,6 +101,11 @@ rsync 2.4.7 (sometime in 2001, maybe :)		-*- indented-text -*-
 		Solaris 8 i386 gcc
 		SuSE 7.1 i386 gcc2.95.2
 		SuSE 7.1 ppc gcc2.95.2
+		i386-pc-sco3.2v5.0.5 cc
+		i386-pc-sco3.2v5.0.5 gcc
+		powerpc-ibm-aix4.3.3.0 cc
+		i686-unknown-sysv5UnixWare7.1.0 gcc
+		i686-unknown-sysv5UnixWare7.1.0 cc
 
   TESTING:
 
