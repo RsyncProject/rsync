@@ -22,7 +22,7 @@
 #include "popt.h"
 
 int make_backups = 0;
-int whole_file = 0;
+int whole_file = -1;
 int copy_links = 0;
 int preserve_links = 0;
 int preserve_hard_links = 0;
@@ -73,7 +73,7 @@ int modify_window=2;
 #else
 int modify_window=0;
 #endif
-int blocking_io=0;
+int blocking_io=-1;
 
 /** Network address family. **/
 #ifdef INET6
@@ -203,6 +203,7 @@ void usage(enum logcode F)
   rprintf(F," -S, --sparse                handle sparse files efficiently\n");
   rprintf(F," -n, --dry-run               show what would have been transferred\n");
   rprintf(F," -W, --whole-file            copy whole files, no incremental checks\n");
+  rprintf(F,"     --no-whole-file         turn off --whole-file\n");
   rprintf(F," -x, --one-file-system       don't cross filesystem boundaries\n");
   rprintf(F," -B, --block-size=SIZE       checksum blocking size (default %d)\n",BLOCK_SIZE);  
   rprintf(F," -e, --rsh=COMMAND           specify rsh replacement\n");
@@ -237,6 +238,7 @@ void usage(enum logcode F)
   rprintf(F,"     --config=FILE           specify alternate rsyncd.conf file\n");  
   rprintf(F,"     --port=PORT             specify alternate rsyncd port number\n");
   rprintf(F,"     --blocking-io           use blocking IO for the remote shell\n");  
+  rprintf(F,"     --no-blocking-io        turn off --blocking-io\n");  
   rprintf(F,"     --stats                 give some file transfer stats\n");  
   rprintf(F,"     --progress              show progress during transfer\n");  
   rprintf(F,"     --log-format=FORMAT     log file transfers using specified format\n");  
@@ -264,6 +266,7 @@ enum {OPT_VERSION = 1000, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
       OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY, OPT_ADDRESS,
       OPT_DELETE_AFTER, OPT_EXISTING, OPT_MAX_DELETE, OPT_BACKUP_DIR, 
       OPT_IGNORE_ERRORS, OPT_BWLIMIT, OPT_BLOCKING_IO,
+      OPT_NO_BLOCKING_IO, OPT_NO_WHOLE_FILE,
       OPT_MODIFY_WINDOW, OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_IGNORE_EXISTING};
 
 static struct poptOption long_options[] = {
@@ -297,6 +300,7 @@ static struct poptOption long_options[] = {
   {"links",           'l', POPT_ARG_NONE,   &preserve_links},
   {"copy-links",      'L', POPT_ARG_NONE,   &copy_links},
   {"whole-file",      'W', POPT_ARG_NONE,   &whole_file},
+  {"no-whole-file",    0,  POPT_ARG_NONE,   0, 		     OPT_NO_WHOLE_FILE},
   {"copy-unsafe-links", 0, POPT_ARG_NONE,   &copy_unsafe_links},
   {"perms",           'p', POPT_ARG_NONE,   &preserve_perms},
   {"owner",           'o', POPT_ARG_NONE,   &preserve_uid},
@@ -326,6 +330,7 @@ static struct poptOption long_options[] = {
   {"partial",          0,  POPT_ARG_NONE,   &keep_partial},
   {"ignore-errors",    0,  POPT_ARG_NONE,   &ignore_errors},
   {"blocking-io",      0,  POPT_ARG_NONE,   &blocking_io},
+  {"no-blocking-io",   0,  POPT_ARG_NONE,   0, 		     OPT_NO_BLOCKING_IO},
   {0,                 'P', POPT_ARG_NONE,   0,               'P'},
   {"config",           0,  POPT_ARG_STRING, &config_file},
   {"port",             0,  POPT_ARG_INT,    &rsync_port},
@@ -455,8 +460,12 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			add_exclude_file(poptGetOptArg(pc), 1, 0);
 			break;
 
-		case OPT_INCLUDE_FROM:
-			add_exclude_file(poptGetOptArg(pc), 1, 1);
+		case OPT_NO_WHOLE_FILE:
+			whole_file = 0;
+			break;
+
+		case OPT_NO_BLOCKING_IO:
+			blocking_io = 0;
 			break;
 
 		case 'h':
@@ -556,6 +565,11 @@ void server_options(char **args,int *argc)
 	static char wbatch[14];
 
 	int i, x;
+
+	if (whole_file == -1)
+		whole_file = 0;
+	if (blocking_io == -1)
+		blocking_io = 0;
 
 	args[ac++] = "--server";
 

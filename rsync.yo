@@ -239,6 +239,7 @@ verb(
  -S, --sparse                handle sparse files efficiently
  -n, --dry-run               show what would have been transferred
  -W, --whole-file            copy whole files, no incremental checks
+     --no-whole-file         turn off --whole-file
  -x, --one-file-system       don't cross filesystem boundaries
  -B, --block-size=SIZE       checksum blocking size (default 700)
  -e, --rsh=COMMAND           specify rsh replacement
@@ -273,6 +274,7 @@ verb(
      --config=FILE           specify alternate rsyncd.conf file
      --port=PORT             specify alternate rsyncd port number
      --blocking-io           use blocking IO for the remote shell
+     --no-blocking-io        turn off --blocking-io
      --stats                 give some file transfer stats
      --progress              show progress during transfer
      --log-format=FORMAT     log file transfers using specified format
@@ -410,6 +412,9 @@ faster if this option is used when the bandwidth between the source and
 target machines is higher than the bandwidth to disk (especially when the
 "disk" is actually a networked file system).  This is the default when both
 the source and target are on the local machine.
+
+dit(bf(--no-whole-file)) Turn off --whole-file, for use when it is the
+default.
 
 dit(bf(-p, --perms)) This option causes rsync to update the remote
 permissions to be the same as the local permissions.
@@ -656,6 +661,9 @@ a remote shell transport.  If -e or --rsh are not specified or are set to
 the default "rsh", this defaults to blocking IO, otherwise it defaults to
 non-blocking IO.  You may find the --blocking-io option is needed for some
 remote shells that can't handle non-blocking IO.  Ssh prefers blocking IO.
+
+dit(bf(--no-blocking-io)) Turn off --blocking-io, for use when it is the
+default.
 
 dit(bf(--log-format=FORMAT)) This allows you to specify exactly what the
 rsync client logs to stdout on a per-file basis. The log format is

@@ -7,3 +7,5 @@ rsync 2.5.3 (not released yet)
       what was historically used so as not to break scripts that try
       to parse the output.
 
+    * Added --no-whole-file and --no-blocking-io options
+

@@ -207,10 +207,11 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 
 		args[argc++] = rsync_path;
 
+		if ((blocking_io == -1) && (strcmp(cmd, RSYNC_RSH) == 0))
+			blocking_io = 1;
+
 		server_options(args,&argc);
 
-
-		if (strcmp(cmd, RSYNC_RSH) == 0) blocking_io = 1;
 	}
 
 	args[argc++] = ".";
@@ -711,7 +712,8 @@ static int start_client(int argc, char *argv[])
 		if (!p) {
 			local_server = 1;
 			/* disable "rsync algorithm" when both sides local */
-			whole_file = 1;
+			if (whole_file == -1)
+				whole_file = 1;
 		} else if (p[1] == ':') {
 			*p = 0;
 			return start_socket_client(argv[argc-1], p+2, argc-1, argv);
