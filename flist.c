@@ -299,7 +299,11 @@ static void receive_file_entry(struct file_struct **fptr,
 	memset((char *)file, 0, sizeof(*file));
 	(*fptr) = file;
 
-	if (l2 >= MAXPATHLEN-l1) overflow("receive_file_entry");
+	if (l2 >= MAXPATHLEN-l1) {
+		rprintf(FERROR,"overflow: flags=0x%x l1=%d l2=%d lastname=%s\n",
+			flags, l1, l2, lastname);
+		overflow("receive_file_entry");
+	}
 
 	strlcpy(thisname,lastname,l1+1);
 	read_sbuf(f,&thisname[l1],l2);
