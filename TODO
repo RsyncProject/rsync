@@ -117,6 +117,11 @@ Cross-test versions
 
   in the same way as --no-whole-file; somebody needs to check.
 
+Do not rely on having a group called "nobody"
+
+  http://www.linuxbase.org/spec/refspecs/LSB_1.1.0/gLSB/usernames.html
+
+  On Debian it's "nogroup"
 
 DAEMON --------------------------------------------------------------
 
@@ -495,6 +500,8 @@ chmod:
   that passes back something like (mask,set) description to the rest of
   the program.  For bonus points there would be a test case for the  
   parser.
+
+  Possibly also --chown
 
   (Debian #23628)
 
