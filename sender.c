@@ -170,7 +170,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			rprintf(FINFO, "send_files(%d, %s)\n", i, fname);
 
 		if (dry_run) {
-			if (!am_server && verbose) {	/* log transfer */
+			if (!am_server && verbose) {
 				rprintf(FINFO, "%s\n", fname+offset);
 			}
 			write_int(f_out, i);
@@ -236,7 +236,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		if (verbose > 2 && !read_batch)
 			rprintf(FINFO, "calling match_sums %s\n", fname);
 
-		if (!am_server && verbose) {	/* log transfer */
+		if (!am_server && verbose) {
 			rprintf(FINFO, "%s\n", fname+offset);
 		}
 
@@ -268,17 +268,17 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 								write_buf(f_out, buff, buff_len);
 							}
 						}
-					}  /* end while  */
+					}
 					read_batch_delta_file(buff, MD4_SUM_LENGTH);
 					write_buf(f_out, buff, MD4_SUM_LENGTH);
 
-				}  /* j=i */
+				}
 			} else {  /* not checksum match */
 				rprintf (FINFO, "readbatch & checksums don't match\n");
 				rprintf (FINFO, "filename=%s is being skipped\n", fname);
 				continue;
 			}
-		} else  {
+		} else  { /* not read_batch */
 			match_sums(f_out, s, mbuf, st.st_size);
 			log_send(file, &initial_stats);
 		}
