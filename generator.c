@@ -337,6 +337,8 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 	if ((iflags & SIGNIFICANT_ITEM_FLAGS || verbose > 1
 	  || (xname && *xname)) && !read_batch) {
 		if (protocol_version >= 29) {
+			if (iflags & (ITEM_LOCAL_CHANGE|ITEM_TRANSFER))/* XXX */
+				iflags |= ITEM_DUMMY_BIT; /* XXX Remove soon */
 			if (ndx >= 0)
 				write_int(sock_f_out, ndx);
 			write_shortint(sock_f_out, iflags);
@@ -1239,9 +1241,8 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 				continue;
 			if (!need_retouch_dir_times && file->mode & S_IWUSR)
 				continue;
-			recv_generator(local_name ? local_name : f_name(file),
-				       file, i, itemizing, maybe_PERMS_REPORT,
-				       code, -1);
+			recv_generator(f_name(file), file, i, itemizing,
+				       maybe_PERMS_REPORT, code, -1);
 			if (allowed_lull && !(j++ % lull_mod))
 				maybe_send_keepalive();
 		}
@@ -1253,6 +1254,12 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 			"Deletions stopped due to --max-delete limit (%d skipped)\n",
 			deletion_count - max_delete);
 		io_error |= IOERR_DEL_LIMIT;
+	}
+
+	if (protocol_version >= 29) {
+		write_int(f_out, -1);
+		/* Read post-delay-phase MSG_DONE and any prior messages. */
+		get_redo_num(itemizing, code);
 	}
 
 	if (verbose > 2)
