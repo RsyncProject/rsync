@@ -421,6 +421,8 @@ If tests are skipped, say why.
 
 Test daemon feature to disallow particular options.
 
+Pipe program that makes slow/jerky connections.
+
 
 DOCUMENTATION --------------------------------------------------------
 
