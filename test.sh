@@ -67,8 +67,11 @@ checkit() {
   failed=
   echo "Running: \"$1\""  >${log}
   echo "">>${log}
-  eval "$1 || failed=YES"  >>${log} 2>&1
-
+  eval "$1"  >>${log} 2>&1
+  status=$?
+  if [ $status != 0 ]; then
+    failed="YES";
+  fi
   echo "-------------">>${log}
   echo "check how the files compare with diff:">>${log}
   echo "">>${log}
@@ -88,7 +91,7 @@ checkit() {
       cat ${log}
       rm ${log}
     else
-      echo "	FAILED (test # ${testnum})."
+      echo "	FAILED (test # ${testnum} status=$status)."
     fi
     return 1
   fi
