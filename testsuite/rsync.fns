@@ -19,14 +19,14 @@
 
 
 tmpdir="$scratchdir"
-fromdir=$tmpdir/from
-todir=$tmpdir/to
-chkdir=$tmpdir/chk
+fromdir="$tmpdir/from"
+todir="$tmpdir/to"
+chkdir="$tmpdir/chk"
 
 # Berkley's nice.
 PATH="$PATH:/usr/ucb"
 
-if diff -u $srcdir/testsuite/rsync.fns $srcdir/testsuite/rsync.fns >/dev/null 2>&1; then
+if diff -u "$srcdir/testsuite/rsync.fns" "$srcdir/testsuite/rsync.fns" >/dev/null 2>&1; then
     diffopt="-u"
 else
     diffopt="-c"
@@ -66,9 +66,9 @@ hands_setup() {
     rm -rf "$fromdir"
     rm -rf "$todir"
 
-    [ -d $tmpdir ] || mkdir "$tmpdir"
-    [ -d $fromdir ] || mkdir "$fromdir"
-    [ -d $todir ] || mkdir "$todir"
+    [ -d "$tmpdir" ] || mkdir "$tmpdir"
+    [ -d "$fromdir" ] || mkdir "$fromdir"
+    [ -d "$todir" ] || mkdir "$todir"
 
     # On some BSD systems, the umask affects the mode of created
     # symlinks, even though the mode apparently has no effect on how
