@@ -357,7 +357,7 @@ static void send_file_entry(struct file_struct *file, int f,
 	unsigned short flags;
 	static time_t modtime;
 	static mode_t mode;
-	static DEV64_T last_rdev;
+	static DEV64_T rdev;	/* just high bytes after p28 */
 	static uid_t uid;
 	static gid_t gid;
 	static DEV64_T dev;
@@ -385,19 +385,19 @@ static void send_file_entry(struct file_struct *file, int f,
 		mode = file->mode;
 	if (preserve_devices) {
 		if (protocol_version < 28) {
-			if (IS_DEVICE(mode) && file->rdev == last_rdev) {
+			if (IS_DEVICE(mode) && file->rdev == rdev) {
 				/* Set both flags so that the test when
 				 * writing the data is simpler. */
 				flags |= SAME_RDEV_pre28|SAME_HIGH_RDEV;
 			}
 			else
-				last_rdev = file->rdev;
+				rdev = file->rdev;
 		}
 		else if (IS_DEVICE(mode)) {
-			if ((file->rdev & ~0xFF) == last_rdev)
+			if ((file->rdev & ~0xFF) == rdev)
 				flags |= SAME_HIGH_RDEV;
 			else
-				last_rdev = file->rdev & ~0xFF;
+				rdev = file->rdev & ~0xFF;
 		}
 	}
 	if (file->uid == uid)
@@ -519,7 +519,7 @@ static void receive_file_entry(struct file_struct **fptr,
 {
 	static time_t modtime;
 	static mode_t mode;
-	static DEV64_T rdev;
+	static DEV64_T rdev;	/* just high bytes after p28 */
 	static uid_t uid;
 	static gid_t gid;
 	static DEV64_T dev;
@@ -613,7 +613,7 @@ static void receive_file_entry(struct file_struct **fptr,
 				file->rdev = (DEV64_T)read_int(f);
 				rdev = file->rdev & ~0xFF;
 			} else
-				file->rdev = (DEV64_T)(rdev | read_byte(f));
+				file->rdev = rdev | (DEV64_T)read_byte(f);
 		}
 	}
 
