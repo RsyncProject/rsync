@@ -44,12 +44,3 @@ test_unsafe ../files/file1	       safe	unsafe
 
 test_unsafe ../../unsafe/unsafefile    `pwd`/from/safe	safe
 test_unsafe ../files/file1	       `pwd`/from/safe	safe
-
-# I think these are correct, but I don't really understand the code.
-# Waiting for an answer from dwd
-test_skipped "correct behaviour is unclear"
-
-# Test suspicious handling of '..' in srcdir
-test_unsafe ../../unsafe/unsafefile    from/safe/../safe	unsafe
-test_unsafe ../files/file1	       from/safe/../safe	safe
-

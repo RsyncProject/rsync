@@ -61,8 +61,6 @@ extern int sanitize_paths;
 extern int read_batch;
 extern int write_batch;
 
-static char topsrcname[MAXPATHLEN];
-
 static struct exclude_struct **local_exclude_list;
 
 static struct file_struct null_file;
@@ -221,8 +219,11 @@ int readlink_stat(const char *path, STRUCT_STAT * buffer, char *linkbuf)
 		if (l == -1) 
 			return -1;
 		linkbuf[l] = 0;
-		if (copy_unsafe_links && (topsrcname[0] != '\0') &&
-		    unsafe_symlink(linkbuf, topsrcname)) {
+		if (copy_unsafe_links && unsafe_symlink(linkbuf, path)) {
+			if (verbose > 1) {
+				rprintf(FINFO,"copying unsafe symlink \"%s\" -> \"%s\"\n", 
+					path, linkbuf);
+			}
 			return do_stat(path, buffer);
 		}
 	}
@@ -895,7 +896,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	}
 
 	for (i = 0; i < argc; i++) {
-		char *fname = topsrcname;
+		char fname2[MAXPATHLEN];
+		char *fname = fname2;
 
 		strlcpy(fname, argv[i], MAXPATHLEN);
 
@@ -999,8 +1001,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			}
 		}
 	}
-
-	topsrcname[0] = '\0';
 
 	if (f != -1) {
 		send_file_entry(NULL, f, 0);

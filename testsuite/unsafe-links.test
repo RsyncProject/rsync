@@ -46,20 +46,13 @@ test_regular to/links/file1
 test_regular to/links/file2
 test_regular to/links/unsafefile
 
-#next rsync copy correctly
 echo "rsync with relative path and --copy-unsafe-links";
 $RSYNC -avv --copy-unsafe-links from/safe/ to
 test_symlink to/links/file1
 test_symlink to/links/file2
 test_regular to/links/unsafefile
 
-# I think these are correct, but I don't really understand the code.
-# Waiting for an answer from dwd
-test_skipped "correct behaviour is unclear"
-
-
 rm -rf to
-#next rsync copy incorrectly - links are copied as files not as links
 echo "rsync with relative2 path";
 (cd from; $RSYNC -avv --copy-unsafe-links safe/ ../to)
 test_symlink to/links/file1
@@ -67,7 +60,6 @@ test_symlink to/links/file2
 test_regular to/links/unsafefile
 
 rm -rf to
-#next rsync copy uncorectly - all links are copied
 echo "rsync with absolute path";
 $RSYNC -avv --copy-unsafe-links `pwd`/from/safe/ to
 test_symlink to/links/file1
