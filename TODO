@@ -299,6 +299,16 @@ Win32
   we are correct to call close(), because shutdown() discards
   untransmitted data.
 
+DEVELOPMENT ----------------------------------------------------------
+
+Splint
+
+  Build rsync with SPLINT to try to find security holes.  Add
+  annotations as necessary.  Keep track of the number of warnings
+  found initially, and see how many of them are real bugs, or real
+  security bugs.  Knowing the percentage of likely hits would be
+  really interesting for other projects.
+
 DOCUMENTATION --------------------------------------------------------
 
 Update README
