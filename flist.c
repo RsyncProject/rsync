@@ -110,7 +110,10 @@ static void send_file_entry(struct file_struct *file,int f)
   }
 
   write_byte(f,flags);
-  write_byte(f,strlen(p));
+  if (flags & SAME_DIR)
+    write_byte(f,strlen(p));
+  else
+    write_int(f,strlen(p));
   write_buf(f,p,strlen(p));
   write_int(f,(int)file->modtime);
   write_int(f,(int)file->length);
@@ -161,11 +164,13 @@ static void receive_file_entry(struct file_struct *file,
   char *p=NULL;
   int l1,l2;
 
-  l1 = read_byte(f);
-  if (flags & SAME_DIR)
+  if (flags & SAME_DIR) {
+    l1 = read_byte(f);
     l2 = strlen(lastdir);
-  else
+  } else {
+    l1 = read_int(f);
     l2 = 0;
+  }
 
   file->name = (char *)malloc(l1+l2+1);
   if (!file->name) out_of_memory("receive_file_entry");
