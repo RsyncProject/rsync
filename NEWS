@@ -50,7 +50,7 @@ Changes since version 2.5.7:
         against the entire path, not just the name portion, even if
         there aren't any interior slashes in the term.  E.g. "foo**bar"
         would exclude "/path/foo-bar" (just like before) as well as
-        "/foo-path/baz-bar" (for instance).
+        "/foo-path/baz-bar" (unlike before).
 
     * The exclude list specified in the daemon's config file is now
       properly applied to the pulled items no matter how deep the
@@ -91,6 +91,10 @@ Changes since version 2.5.7:
 
     * Fixed a bug in the --backup code that could cause deleted files
       to not get backed up.
+
+    * When the backup code makes new directories, create them with mode
+      0700 instead of 0755 (since the directory permissions in the
+      backup tree are not yet copied from the main tree).
 
     * Call setgroups() in a more portable manner.
 
