@@ -73,6 +73,7 @@ int io_error;
 
 static char empty_sum[MD4_SUM_LENGTH];
 static unsigned int file_struct_len;
+static struct file_list *received_flist;
 
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
 static void output_flist(struct file_list *flist);
@@ -171,12 +172,12 @@ static void list_file_entry(struct file_struct *f)
  * @post @p buffer contains information about the link or the
  * referrent as appropriate, if they exist.
  **/
-int readlink_stat(const char *path, STRUCT_STAT *buffer, char *linkbuf)
+static int readlink_stat(const char *path, STRUCT_STAT *buffer, char *linkbuf)
 {
 #if SUPPORT_LINKS
 	if (copy_links)
 		return do_stat(path, buffer);
-	if (link_stat(path, buffer, keep_dirlinks) < 0)
+	if (link_stat(path, buffer, 0) < 0)
 		return -1;
 	if (S_ISLNK(buffer->st_mode)) {
 		int l = readlink((char *)path, linkbuf, MAXPATHLEN - 1);
@@ -926,6 +927,26 @@ skip_excludes:
 
 	file->basedir = flist_dir;
 
+	/* This code is only used by the receiver when it is building
+	 * a list of files for a delete pass. */
+	if (keep_dirlinks && linkname_len && flist) {
+		STRUCT_STAT st2;
+		int i = flist_find(received_flist, file);
+		if (i >= 0 && S_ISDIR(received_flist->files[i]->mode)
+		    && do_stat(thisname, &st2) == 0 && S_ISDIR(st2.st_mode)) {
+			file->modtime = st2.st_mtime;
+			file->length = st2.st_size;
+			file->mode = st2.st_mode;
+			file->uid = st2.st_uid;
+			file->gid = st2.st_gid;
+			file->u.link = NULL;
+			if (file->link_u.idev) {
+				pool_free(flist->hlink_pool, 0, file->link_u.idev);
+				file->link_u.idev = NULL;
+			}
+		}
+	}
+
 	if (!S_ISDIR(st.st_mode))
 		stats.total_size += st.st_size;
 
@@ -1252,6 +1273,7 @@ struct file_list *recv_file_list(int f)
 	start_read = stats.total_read;
 
 	flist = flist_new(WITH_HLINK, "recv_file_list");
+	received_flist = flist;
 
 	flist->count = 0;
 	flist->malloced = 1000;
