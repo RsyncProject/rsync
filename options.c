@@ -74,8 +74,8 @@ int modify_window=0;
 #endif
 int blocking_io=0;
 
-/** Network address family. **/
-int af = AF_INET;
+/** Global options set from command line. **/
+struct global_opts global_opts;
 
 int read_batch=0;  /* dw */
 int write_batch=0; /* dw */
@@ -314,8 +314,8 @@ static struct poptOption long_options[] = {
   {"read-batch",      'f', POPT_ARG_STRING, &batch_ext, 'f'},
   {"write-batch",     'F', POPT_ARG_NONE,   &write_batch, 0},
 #ifdef INET6
-  {0,		      '4', POPT_ARG_VAL,    &af,         AF_INET },
-  {0,		      '6', POPT_ARG_VAL,    &af,         AF_INET6 },
+  {0,		      '4', POPT_ARG_VAL,    &global_opts.af,   AF_INET },
+  {0,		      '6', POPT_ARG_VAL,    &global_opts.af,   AF_INET6 },
 #endif
   {0,0,0,0}
 };

@@ -562,3 +562,8 @@ size_t strlcat(char *d, const char *s, size_t bufsize);
 
 
 extern int verbose;
+
+extern struct global_opts {
+	/** Network address family. **/
+	int af_hint;
+} global_opts;

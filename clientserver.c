@@ -78,7 +78,8 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	if (!user) user = getenv("USER");
 	if (!user) user = getenv("LOGNAME");
 
-	fd = open_socket_out_wrapped (host, rsync_port, bind_address);
+	fd = open_socket_out_wrapped (host, rsync_port, bind_address,
+				      global_opts.af_hint);
 	if (fd == -1) {
 		exit_cleanup(RERR_SOCKETIO);
 	}

@@ -18,10 +18,11 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-/*
-  socket functions used in rsync 
-
-  */
+/**
+ * @file socket.c
+ * 
+ * Socket functions used in rsync.
+ **/
 
 #include "rsync.h"
 
@@ -29,7 +30,7 @@
 #include "lib/addrinfo.h"
 #endif
 
-extern int af;
+// extern int af;			/* NO MORE BLOODY GLOBALS! */
 
 /* Establish a proxy connection on an open socket to a web roxy by
  * using the CONNECT method. */
@@ -96,14 +97,28 @@ static int establish_proxy_connection(int fd, char *host, int port)
 
 
 
-/** Open a socket to a tcp remote host with the specified port .
+/**
+ * Open a socket to a tcp remote host with the specified port .
  *
- * Based on code from Warren.   Proxy support by Stephen Rothwell
+ * Based on code from Warren.  Proxy support by Stephen Rothwell.
+ * getaddrinfo() rewrite contributed by KAME.net.
  *
+ * Now that we support IPv6 we need to look up the remote machine's
+ * address first, using @p af_hint to set a preference for the type
+ * of address.  Then depending on whether it has v4 or v6 addresses we
+ * try to open a connection.
  *
- * @param bind_address Local address to use.  Normally NULL to get the stack default.
+ * The loop allows for machines with some addresses which may not be
+ * reachable, perhaps because we can't e.g. route ipv6 to that network
+ * but we can get ip4 packets through.
+ *
+ * @param bind_address Local address to use.  Normally NULL to bind
+ * the wildcard address.
+ *
+ * @param af_hint Address family, e.g. AF_INET or AF_INET6.
  **/
-int open_socket_out(char *host, int port, const char *bind_address)
+int open_socket_out(char *host, int port, const char *bind_address,
+		    int af_hint)
 {
 	int type = SOCK_STREAM;
 	int error;
@@ -139,11 +154,12 @@ int open_socket_out(char *host, int port, const char *bind_address)
 	}
 
 	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = af;
+	hints.ai_family = af_hint;
 	hints.ai_socktype = type;
 	error = getaddrinfo(h, portbuf, &hints, &res0);
 	if (error) {
-		rprintf(FERROR, RSYNC_NAME ": getaddrinfo: %s: %s\n", portbuf, gai_strerror(error));
+		rprintf(FERROR, RSYNC_NAME ": getaddrinfo: %s %s: %s\n",
+			h, portbuf, gai_strerror(error));
 		return -1;
 	}
 
@@ -162,7 +178,7 @@ int open_socket_out(char *host, int port, const char *bind_address)
 			bhints.ai_flags = AI_PASSIVE;
 			error = getaddrinfo(bind_address, NULL, &bhints, &bres);
 			if (error) {
-				rprintf(FERROR, RSYNC_NAME ": getaddrinfo: bind address %s: %s\n",
+				rprintf(FERROR, RSYNC_NAME ": getaddrinfo: bind address %s <noport>: %s\n",
 					bind_address, gai_strerror(error));
 				continue;
 			}
@@ -212,14 +228,16 @@ int open_socket_out(char *host, int port, const char *bind_address)
  **/
 int open_socket_out_wrapped (char *host,
 			     int port,
-			     const char *bind_address)
+			     const char *bind_address,
+			     int af_hint)
 {
 	char *prog;
 
 	if ((prog = getenv ("RSYNC_CONNECT_PROG")) != NULL) 
 		return sock_exec (prog);
 	else 
-		return open_socket_out (host, port, bind_address);
+		return open_socket_out (host, port, bind_address,
+					af_hint);
 }
 
 
@@ -230,7 +248,8 @@ int open_socket_out_wrapped (char *host,
  * @param bind_address Local address to bind, or NULL to allow it to
  * default.
  **/
-static int open_socket_in(int type, int port, const char *bind_address)
+static int open_socket_in(int type, int port, const char *bind_address,
+			  int af_hint)
 {
 	int one=1;
 	int s;
@@ -239,7 +258,7 @@ static int open_socket_in(int type, int port, const char *bind_address)
 	int error;
 
 	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = af;
+	hints.ai_family = af_hint;
 	hints.ai_socktype = type;
 	hints.ai_flags = AI_PASSIVE;
 	snprintf(portbuf, sizeof(portbuf), "%d", port);
@@ -311,7 +330,8 @@ void start_accept_loop(int port, int (*fn)(int ))
 	extern char *bind_address;
 
 	/* open an incoming socket */
-	s = open_socket_in(SOCK_STREAM, port, bind_address);
+	s = open_socket_in(SOCK_STREAM, port, bind_address,
+			   global_opts.af_hint);
 	if (s == -1)
 		exit_cleanup(RERR_SOCKETIO);
 
@@ -550,6 +570,9 @@ char *client_name(int fd)
 	strcpy(name_buf,def);
 
 	if (getpeername(fd, (struct sockaddr *)&ss, &length)) {
+		/* FIXME: Can we really not continue? */
+		rprintf(FERROR, RSYNC_NAME ": getpeername on fd%d failed: %s\n",
+			strerror(errno));			
 		exit_cleanup(RERR_SOCKETIO);
 	}
 
@@ -610,8 +633,9 @@ char *client_name(int fd)
 
 	if (res == NULL) {
 		strcpy(name_buf, def);
-		rprintf(FERROR,
-			"reverse name lookup mismatch - spoofed address?\n");
+		rprintf(FERROR, RSYNC_NAME ": "
+			"reverse name lookup mismatch on fd%d - spoofed address?\n",
+			fd);
 	}
 
 	freeaddrinfo(res0);
