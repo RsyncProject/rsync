@@ -170,8 +170,10 @@ static char *getpassf(char *filename)
 	buffer[sizeof(buffer)-1]='\0';
 	if ( (len=read(fd,buffer,sizeof(buffer)-1)) > 0)
 	{
+		char *p = strtok(buffer,"\n\r");
 		close(fd);
-		return strdup(strtok(buffer,"\n\r"));
+		if (p) p = strdup(p);
+		return p;
 	}	
 
 	return NULL;
