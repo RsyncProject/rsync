@@ -256,19 +256,18 @@ connection is rejected.
 Each pattern can be in one of five forms:
 
 itemize(
-  it() a dotted decimal IP address of the form a.b.c.d for IPv4 and 
-  a.b.c.d.e.f for IPv6. In this case the incoming machine's IP address
+  it() a dotted decimal IPv4 address of the form a.b.c.d, or an IPv6 address
+  of the form a:b:c::d:e:f. In this case the incoming machine's IP address
   must match exactly.
 
-  it() a address/mask in the form ipaddr/n where ipaddr is the IP
-  address in dotted decimal notation and n is the number of one bits in
-  the netmask.  All IP addresses which match the masked IP address will
-  be allowed in.
+  it() an address/mask in the form ipaddr/n where ipaddr is the IP address
+  and n is the number of one bits in the netmask.  All IP addresses which
+  match the masked IP address will be allowed in.
 
-  it() a address/mask in the form ipaddr/maskaddr where ipaddr is the
-  IP address in dotted decimal notation and maskaddr is the netmask in
-  dotted decimal notation.  All IP addresses which match the masked IP
-  address will be allowed in.
+  it() an address/mask in the form ipaddr/maskaddr where ipaddr is the
+  IP address and maskaddr is the netmask in dotted decimal notation for IPv4,
+  or similar for IPv6, e.g. ffff:ffff:ffff:ffff:: instead of /64. All IP
+  addresses which match the masked IP address will be allowed in.
 
   it() a hostname. The hostname as determined by a reverse lookup will
   be matched (case insensitive) against the pattern. Only an exact
@@ -278,6 +277,12 @@ itemize(
   same rules as normal unix filename matching. If the pattern matches
   then the client is allowed in.
 )
+
+Note IPv6 link-local addresses can have a scope in the address specification:
+
+quote(fe80::1%link1)
+quote(fe80::%link1/64)
+quote(fe80::%link1/ffff:ffff:ffff:ffff::)
 
 You can also combine "hosts allow" with a separate "hosts deny"
 option. If both options are specified then the "hosts allow" option s
