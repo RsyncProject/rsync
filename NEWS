@@ -86,6 +86,12 @@ Changes since 2.6.3:
       option kluges (e.g. the age-old use of "-r --exclude="/*/*" for a
       non-recursive listing).
 
+    - Added the --omit-dir-times option which will avoid updating the
+      modified time for directories when --times was specified.  For a
+      really large transfer, this option will avoid an extra pass through
+      the file-list at the end of the transfer to tweak all the directory
+      times.
+
     - Added support/atomic-rsync -- a perl script that will transfer some
       files using rsync, and then move the updated files into place all at
       once at the end of the transfer.  Only works when pulling, and uses
