@@ -101,8 +101,11 @@ RUNSHFLAGS='-e'
 
 if [ -n "$loglevel" ] && [ "$loglevel" -gt 8 ]
 then
-    RUNSHFLAGS="$RUNSHFLAGS -x"
-    set -x
+    if set -x
+    then
+	# If it doesn't work the first time, don't keep trying.
+	RUNSHFLAGS="$RUNSHFLAGS -x"
+    fi
 fi
 
 echo "============================================================"
