@@ -1,0 +1,396 @@
+\input texinfo
+@setfilename rsync.info
+@settitle rsync
+@c %** end of header
+
+@titlepage
+@sp 10
+@title rsync - fast, flexible file transfer program
+
+@c The copyright page
+@page
+@vskip 0pt plus 1filll
+Copyright @copyright{} 2002 by Martin Pool @email{mbp@@samba.org}
+
+Copyright @copyright{} 1996--2001 by Andrew Tridgell @email{tridge@@samba.org}
+@end titlepage
+
+@iftex
+@contents
+@end iftex
+
+@ifnottex
+@node Top, Overview, (dir), (dir)
+@top rsync
+
+rsync is a flexible program for efficiently copying files or directory
+trees.
+
+This manual documents rsync 2.5.  It is not yet complete and should be
+consulted in conjunction with the rsync manual page.
+
+Copyright @copyright{} 2002 by Martin Pool @email{mbp@@samba.org}.
+
+Copyright @copyright{} 1996--2001 by Andrew Tridgell @email{tridge@@samba.org}.
+
+@menu
+* Overview::                    Tutorial section
+* Invoking rsync::              
+* Daemon mode::                 rsync listens for connections on its own socket
+
+* Concept Index::               
+* Option Index::                
+@end menu
+
+@end ifnottex
+
+@node Overview, Invoking rsync, Top, Top
+@chapter Overview
+
+rsync is a program for efficiently copying files or directory trees.
+rsync has many options to select which files will be copied and how
+they are to be transferred.  It may be used as an alternative to @sc{ftp},
+@sc{http}, @command{scp} or @command{rcp}.
+
+The rsync remote-update protocol allows rsync to transfer just the
+differences between two sets of files across the network link, using
+an efficient checksum-search algorithm described in the technical
+report that accompanies this package.
+
+rsync's command line syntax is analogous to @command{cp},
+@command{rcp} and @command{scp}:
+
+@example
+rsync [@var{options}] @var{source} @var{destination}
+@end example
+
+Filenames may be prefixed by a hostname to indicate a remote file.
+(@xref{Local and remote}.)
+
+Some of the additional features of rsync are:
+
+@itemize @bullet
+
+@item support for copying links, devices, owners, groups and permissions
+
+@item exclude and exclude-from options similar to GNU tar
+
+@item a CVS exclude mode for ignoring the same files that CVS would ignore
+
+@item can use any transparent remote shell, including rsh or ssh
+
+@item does not require root privileges
+
+@item pipelining of file transfers to minimize latency costs
+
+@item support for anonymous or authenticated rsync servers (ideal for
+mirroring)
+
+@end itemize
+
+@menu
+* Introductory example::        60-second guide to rsync      
+* Local and remote::            Local, remote, and server mode
+* Setting up rsync::            
+@end menu
+
+
+
+@node Introductory example, Local and remote, Overview, Overview
+@section Introductory example
+
+Probably the most common case of rsync usage is to copy files to or
+from a remote machine using @command{ssh} as a network transport.  In
+this situation rsync is a good alternative to @command{scp}.
+
+The most commonly used arguments for rsync are
+
+@table @code
+
+@item -a 
+Reproduce the structure and attributes of the origin files as exactly
+as possible: this includes copying subdirectories, symlinks, special
+files, ownership and permissions.  (@xref{Attributes to copy}.)
+
+@item -v 
+Be verbose.  Primarily, display the name of each file as it is copied.
+
+@item -z 
+Compress network traffic, using a modified version of the
+@command{zlib} library.
+
+@item -P
+Display a progress indicator while files are transferred.  This should
+normally be ommitted if rsync is not run on a terminal.
+
+@end table
+
+To make a backup of your home directory to the @file{/bkup/mbp/}
+remote machine @file{foo.example.org}, preserving the directory
+structure, use this command:
+
+@example
+rsync -avP ~ foo.example.org:/bkup/mbp/
+@end example
+
+
+
+@node Local and remote, Setting up rsync, Introductory example, Overview
+@comment  node-name,  next,  previous,  up
+@section Local and remote
+
+There are six different ways of using rsync. They are:
+
+@enumerate
+
+@item for copying local files. This is invoked when neither
+source nor destination path contains a @code{:} separator
+
+@item for copying from the local machine to a remote machine using
+a remote shell program as the transport (such as rsh or
+ssh). This is invoked when the destination path contains a
+single @code{:} separator.
+
+@item for copying from a remote machine to the local machine
+using a remote shell program. This is invoked when the source
+contains a @code{:} separator.
+
+@item for copying from a remote rsync server to the local
+machine. This is invoked when the source path contains a @code{::}
+separator or a @code{rsync://} URL.
+
+@item for copying from the local machine to a remote rsync
+server. This is invoked when the destination path contains a @code{::}
+separator.
+
+@item for listing files on a remote machine. This is done the
+same way as rsync transfers except that you leave off the
+local destination.  
+@cindex listing files
+@end enumerate
+
+Note that in all cases (other than listing) at least one of the source
+and destination paths must be local.
+
+Any one invocation of rsync makes a copy in a single direction.  rsync
+currently has no equivalent of @command{ftp}'s interactive mode.
+
+@cindex @sc{nfs}
+@cindex network filesystems
+@cindex remote filesystems
+
+rsync's network protocol is generally faster at copying files than
+network filesystems such as @sc{nfs} or @sc{cifs}.  It is better to
+run rsync on the file server either as a daemon or over ssh than
+running rsync giving the network directory.
+
+
+@node Setting up rsync,  , Local and remote, Overview
+@comment  node-name,  next,  previous,  up
+@section Setting up rsync
+
+@cindex installation
+See the file @sc{install} that comes with the distribution for installation
+instructions.
+
+@cindex @command{rsh}
+@cindex @command{rsh}, alternatives to
+@cindex @command{ssh} 
+
+Once installed you can use rsync to any machine that you can use
+@command{rsh} to.  rsync uses @command{rsh} for its communications,
+unless both the source and destination are local.
+
+You can also specify an alternative to rsh, either by using the
+@option{-e} command line option, or by setting the
+@var{@sc{rsync_rsh}} environment variable.
+
+One common substitute is to use @command{ssh}, which offers a high
+degree of security.
+
+Note that rsync must be installed on both the source and destination
+machines. 
+
+
+
+@node Invoking rsync, Daemon mode, Overview, Top
+@comment  node-name,  next,  previous,  up
+@chapter Invoking rsync
+
+
+@menu
+* Controlling rsync messages::  
+* Attributes to copy::          
+* Exit values::                 
+@end menu
+
+
+
+@node  Controlling rsync messages, Attributes to copy, Invoking rsync, Invoking rsync
+@comment  node-name,  next,  previous,  up
+@section Controlling rsync messages
+
+@table @option
+
+@item --version
+@vindex --version
+Print the rsync version number and compilation information and exit
+
+@item --help
+@vindex --help
+Print a short help page describing the options available and exit.
+
+@item --stats
+@vindex --stats
+Print statistics about rsync perfomance.
+
+@item -v
+@itemx --verbose
+@vindex -v
+@vindex --verbose
+This option increases the amount of information you are given during
+the transfer.  By default, rsync works silently.  A single -v will
+give you information about what files are being transferred and a
+brief summary at the end.  Two -v flags will give you information on
+network connections, files skipped, and slightly more information at
+the end.  More than two -v flags should only be used if you are
+debugging rsync.
+@end table
+
+
+@node Attributes to copy, Exit values, Controlling rsync messages, Invoking rsync
+@comment  node-name,  next,  previous,  up
+@section Attributes to copy
+
+@table @option
+
+@item -a
+@vindex -a
+@vindex --archive
+@cindex archive mode
+
+Preserve as much as possible of the structure and attributes of the
+origin directory.
+
+On many systems, only the superuser can set the ownership of files,
+and users can only put files into a group to which that user belongs.
+rsync works within the operating system security model.  So on such a
+system, if you copy a file which you can read but that does not belong
+to you, the destination file will be owned by you.  The only way to
+change this behaviour is to copy the file as the superuser, or to
+adjust your operating system's security model if that is possible.
+
+@quotation
+@strong{Please note:} @option{--archive} does not detect files with
+multiple names.  If any exist, they will become multiple identical
+files on the destination.  To make the names all refer to the same
+file, use @option{--hard-links}.
+@end quotation     
+
+@end table
+
+
+
+@node  Exit values,  , Attributes to copy, Invoking rsync
+@comment  node-name,  next,  previous,  up
+@section Exit values
+
+@cindex exit code
+@cindex return code
+
+rsync's exit code may be examined by shell scripts to determine
+whether the transfer completed successfully or not.
+
+@table @code
+
+@item RERR_SYNTAX     1
+Syntax or usage error 
+
+@item RERR_PROTOCOL   2
+Protocol incompatibility 
+
+@item RERR_FILESELECT 3
+Errors selecting input/output files, dirs
+
+@item RERR_UNSUPPORTED 4
+Requested action not supported: an attempt
+was made to manipulate 64-bit files on a platform that cannot support
+them; or an option was speciifed that is supported by the client and
+not by the server.
+
+@item RERR_SOCKETIO   10
+Error in socket IO 
+
+@item RERR_FILEIO     11
+Error in file IO 
+
+@item RERR_STREAMIO   12
+Error in rsync protocol data stream 
+
+@item RERR_MESSAGEIO  13
+Errors with program diagnostics 
+
+@item RERR_IPC        14
+Error in @sc{ipc} code 
+
+@item RERR_SIGNAL     20
+Received @sc{sigusr1} or @sc{sigint}
+
+@item RERR_WAITCHILD  21
+Some error returned by @code{waitpid()}
+
+@item RERR_MALLOC     22
+Error allocating core memory buffers 
+
+@item RERR_TIMEOUT    30
+Timeout in data send/receive 
+
+@end table
+
+
+
+@node Daemon mode, Concept Index, Invoking rsync, Top
+@chapter Daemon mode
+
+@cindex daemon mode
+@cindex demon mode
+@cindex @command{rsyncd}
+@vindex --daemon
+
+Configuring rsync as a server is entirely optional.  If you just want
+to copy your own files between local directories or machines, then
+using rsync over @command{ssh} may well be sufficient.  Daemon mode
+may be useful if you wish to distribute files to a number of machines
+on a network, or to the public.
+
+@vindex --port
+@cindex port 873
+@cindex @sc{tcp} port 873
+
+@sc{Tcp} port 873 is reserved for rsync by the Internet Assigned
+Numbers Authority (@sc{iana}) and has the service name @code{rsync}.
+However, rsync may be run on any other port using the @option{--port}
+option.
+
+@menu
+* Daemon mode security::        
+@end menu
+
+@node  Daemon mode security,  , Daemon mode, Daemon mode
+@section Daemon mode security
+
+@node     Concept Index, Option Index, Daemon mode, Top
+@comment      node-name, next,       previous, up
+@unnumbered Concept Index
+
+@printindex cp
+
+
+
+@node  Option Index,  , Concept Index, Top
+@comment  node-name,  next,  previous,  up
+@unnumbered Option Index
+
+@printindex vr
+
+@bye
