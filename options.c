@@ -1,5 +1,6 @@
-/* 
-   Copyright (C) Andrew Tridgell 1998
+/*  -*- c-file-style: "linux" -*-
+    
+    Copyright (C) 1998-2000 by Andrew Tridgell 
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -95,10 +96,27 @@ static int modify_window_set;
 
 struct in_addr socket_address = {INADDR_ANY};
 
+
+static void print_rsync_version(void)
+{
+        rprintf(FINFO, "rsync version %s  protocol version %d (%d-bit files)\n\n",
+                VERSION, PROTOCOL_VERSION,
+                sizeof(int64) * 8);
+        rprintf(FINFO, "Written by Andrew Tridgell and Paul Mackerras\n");
+        rprintf(FINFO, "http://rsync.samba.org/\n");
+#ifdef NO_INT64
+        rprintf(FINFO, "WARNING: no 64-bit integers on this platform!\n");
+#endif
+}
+
+
 void usage(enum logcode F)
 {
   rprintf(F,"rsync version %s Copyright Andrew Tridgell and Paul Mackerras\n\n",
 	  VERSION);
+#ifdef NO_INT64
+  rprintf(F, "WARNING: no 64-bit integers on this platform!\n");
+#endif
 
   rprintf(F,"rsync is a file transfer program capable of efficient remote update\nvia a fast differencing algorithm.\n\n");
 
@@ -317,9 +335,7 @@ int parse_arguments(int argc, char *argv[], int frommain)
 
 		switch (opt) {
 		case OPT_VERSION:
-			rprintf(FINFO,"rsync version %s  protocol version %d\n\n",
-				VERSION,PROTOCOL_VERSION);
-			rprintf(FINFO,"Written by Andrew Tridgell and Paul Mackerras\n");
+                        print_rsync_version();
 			exit_cleanup(0);
 			
 		case OPT_SUFFIX:

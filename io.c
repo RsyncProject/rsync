@@ -1,5 +1,6 @@
-/* 
-   Copyright (C) Andrew Tridgell 1996
+/* -*- c-file-style: "linux" -*-
+   
+   Copyright (C) 1996-2000 by Andrew Tridgell 
    Copyright (C) Paul Mackerras 1996
    
    This program is free software; you can redistribute it and/or modify
@@ -507,6 +508,11 @@ void write_int(int f,int32 x)
 	writefd(f,b,4);
 }
 
+
+/*
+ * Note: int64 may actually be a 32-bit type if ./configure couldn't find any
+ * 64-bit types on this platform.
+ */
 void write_longint(int f, int64 x)
 {
 	extern int remote_version;
