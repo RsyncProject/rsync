@@ -24,6 +24,7 @@
 
 extern int verbose;
 extern int dry_run;
+extern int itemize_changes;
 extern int preserve_times;
 extern int omit_dir_times;
 extern int am_root;
@@ -33,11 +34,13 @@ extern int am_generator;
 extern int preserve_uid;
 extern int preserve_gid;
 extern int force_delete;
+extern int inplace;
 extern int recurse;
 extern int keep_dirlinks;
 extern int make_backups;
+extern struct stats stats;
 extern char *backup_dir;
-extern int inplace;
+extern char *log_format;
 
 
 /*
@@ -54,7 +57,7 @@ void free_sums(struct sum_struct *s)
  * delete a file or directory. If force_delete is set then delete
  * recursively
  */
-int delete_file(char *fname, int flags)
+int delete_file(char *fname, int mode, int flags)
 {
 	DIR *d;
 	struct dirent *di;
@@ -62,12 +65,10 @@ int delete_file(char *fname, int flags)
 	STRUCT_STAT st;
 	int zap_dir;
 
-	if (!(flags & DEL_DIR)) {
+	if (!S_ISDIR(mode)) {
 		if (robust_unlink(fname) == 0) {
-			if (verbose && !(flags & DEL_TERSE)) {
-				rprintf(FINFO, "deleting %s\n",
-					safe_fname(fname));
-			}
+			if ((verbose || log_format) && !(flags & DEL_TERSE))
+				log_delete(fname, mode);
 			return 0;
 		}
 		if (errno == ENOENT)
@@ -82,10 +83,8 @@ int delete_file(char *fname, int flags)
 	if (dry_run && zap_dir)
 		errno = ENOTEMPTY;
 	else if (do_rmdir(fname) == 0) {
-		if (verbose && !(flags & DEL_TERSE)) {
-			rprintf(FINFO, "deleting %s/\n",
-				safe_fname(fname));
-		}
+		if ((verbose || log_format) && !(flags & DEL_TERSE))
+			log_delete(fname, mode);
 		return 0;
 	}
 	if (errno == ENOENT)
@@ -104,8 +103,8 @@ int delete_file(char *fname, int flags)
 	}
 
 	if (!(flags & DEL_TERSE)) {
-		if (verbose)
-			rprintf(FINFO, "deleting %s/\n", safe_fname(fname));
+		if (verbose || log_format)
+			log_delete(fname, mode);
 		flags |= DEL_TERSE;
 	}
 
@@ -118,16 +117,9 @@ int delete_file(char *fname, int flags)
 
 		if (do_lstat(buf, &st) < 0)
 			continue;
-		if (S_ISDIR(st.st_mode))
-			flags |= DEL_DIR;
-		else
-			flags &= ~DEL_DIR;
-
-		if (verbose) {
-			rprintf(FINFO, "deleting %s%s\n", safe_fname(buf),
-				flags & DEL_DIR ? "/" : "");
-		}
-		if (delete_file(buf, flags) != 0) {
+		if (verbose || log_format)
+			log_delete(buf, st.st_mode);
+		if (delete_file(buf, st.st_mode, flags) != 0) {
 			closedir(d);
 			return -1;
 		}
