@@ -26,6 +26,11 @@
 
 #include "rsync.h"
 
+#ifndef NGROUPS
+/* It ought to be defined, but just in case. */
+#  define NGROUPS 32
+#endif
+
 int main(int argc, char *argv[])
 {
 	int n, i;
