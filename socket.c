@@ -820,8 +820,8 @@ static int socketpair_tcp(int fd[2])
 
 /**
  * Run a program on a local tcp socket, so that we can talk to it's
- * stdin and stdout.  This is used to launch ssh and similar
- * connection helper programs for rsync.
+ * stdin and stdout.  This is used to fake a connection to a daemon
+ * for testing -- not for the normal case of running SSH.
  *
  * @return a socket which is attached to a subprocess running
  * "prog". stdin and stdout are attached. stderr is left attached to
@@ -830,12 +830,6 @@ static int socketpair_tcp(int fd[2])
 int sock_exec(const char *prog)
 {
 	int fd[2];
-
-	if (verbose > 0) {
-		rprintf(FINFO, RSYNC_NAME
-			": open connection using \"%s\"\n",
-			prog);
-	}
 	
 	if (socketpair_tcp(fd) != 0) {
 		rprintf (FERROR, RSYNC_NAME
