@@ -134,7 +134,7 @@ to the "path" before starting the file transfer with the client.  This has
 the advantage of extra protection against possible implementation security
 holes, but it has the disadvantages of requiring super-user privileges and
 of not being able to follow symbolic links outside of the new root path
-when reading.  For writing when "use chroot" is false, for security reasons
+when reading.  When "use chroot" is false, for security reasons
 symlinks may only be relative paths pointing to other files within the
 root path, and leading slashes are removed from absolute paths.  The
 default for "use chroot" is true.
