@@ -578,6 +578,12 @@ char *client_addr(int fd)
 }
 
 
+static sa_family_t get_sockaddr_family(const struct sockaddr_storage *ss)
+{
+	return ((struct sockaddr *) ss)->sa_family;
+}
+
+
 /**
  * Return the DNS name of the client 
  **/
@@ -606,7 +612,7 @@ char *client_name(int fd)
 	}
 
 #ifdef INET6
-        if (ss.ss_family == AF_INET6 && 
+        if (get_sockaddr_family(&ss) == AF_INET6 && 
 	    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)&ss)->sin6_addr)) {
 		struct sockaddr_in6 sin6;
 		struct sockaddr_in *sin;
@@ -650,7 +656,7 @@ char *client_name(int fd)
 
 	/* XXX sin6_flowinfo and other fields */
 	for (res = res0; res; res = res->ai_next) {
-		if (res->ai_family != ss.ss_family)
+		if (res->ai_family != get_sockaddr_family(&ss))
 			continue;
 		if (res->ai_addrlen != length)
 			continue;
