@@ -147,7 +147,7 @@
 #define ITEM_REPORT_GROUP (1<<6)
 #define ITEM_IS_NEW (1<<7)
 
-#define ITEM_MISSING_DATA (1<<15)
+#define ITEM_MISSING_DATA (1<<16) /* this is outside the transmitted flags */
 
 /* Log-message categories.  FLOG is only used on the daemon side to
  * output messages to the log file. */
