@@ -11,7 +11,11 @@
 
 #ifdef COMPARE_WITH_FNMATCH
 #include <fnmatch.h>
+
+int fnmatch_errors = 0;
 #endif
+
+int wildmatch_errors = 0;
 
 typedef char bool;
 
@@ -28,7 +32,8 @@ static struct poptOption long_options[] = {
 
 /* match just at the start of string (anchored tests) */
 static void
-ok(int n, const char *text, const char *pattern, bool matches, bool same_as_fnmatch)
+run_test(int line, bool matches, bool same_as_fnmatch,
+	 const char *text, const char *pattern)
 {
     bool matched;
 #ifdef COMPARE_WITH_FNMATCH
@@ -43,13 +48,15 @@ ok(int n, const char *text, const char *pattern, bool matches, bool same_as_fnma
     fn_matched = !fnmatch(pattern, text, flags);
 #endif
     if (matched != matches) {
-	printf("wildmatch failure on #%d:\n  %s\n  %s\n  expected %s match\n",
-	       n, text, pattern, matches? "a" : "NO");
+	printf("wildmatch failure on line %d:\n  %s\n  %s\n  expected %s match\n",
+	       line, text, pattern, matches? "a" : "NO");
+	wildmatch_errors++;
     }
 #ifdef COMPARE_WITH_FNMATCH
     if (fn_matched != (matches ^ !same_as_fnmatch)) {
-	printf("fnmatch disagreement on #%d:\n  %s\n  %s\n  expected %s match\n",
-	       n, text, pattern, matches ^ !same_as_fnmatch? "a" : "NO");
+	printf("fnmatch disagreement on line %d:\n  %s\n  %s\n  expected %s match\n",
+	       line, text, pattern, matches ^ !same_as_fnmatch? "a" : "NO");
+	fnmatch_errors++;
     }
 #endif
     if (output_iterations)
@@ -59,7 +66,9 @@ ok(int n, const char *text, const char *pattern, bool matches, bool same_as_fnma
 int
 main(int argc, char **argv)
 {
-    int opt;
+    char buf[2048], *s, *string[2], *end[2];
+    FILE *fp;
+    int opt, line, i, flag[2];
     poptContext pc = poptGetContext("wildtest", argc, (const char**)argv,
 				    long_options, 0);
 
@@ -73,132 +82,72 @@ main(int argc, char **argv)
 	}
     }
 
-    /* Basic wildmat features. */
-    /* TEST, "text",		"pattern",		MATCH?, SAME-AS-FNMATCH? */
-    ok(100, "foo",		"foo",			true,	true);
-    ok(101, "foo",		"bar",			false,	true);
-    ok(102, "",			"",			true,	true);
-    ok(103, "foo",		"???",			true,	true);
-    ok(104, "foo",		"??",			false,	true);
-    ok(105, "foo",		"*",			true,	true);
-    ok(106, "foo",		"f*",			true,	true);
-    ok(107, "foo",		"*f",			false,	true);
-    ok(108, "foo",		"*foo*",		true,	true);
-    ok(109, "foobar",		"*ob*a*r*",		true,	true);
-    ok(110, "aaaaaaabababab",	"*ab",			true,	true);
-    ok(111, "foo*",		"foo\\*",		true,	true);
-    ok(112, "foobar",		"foo\\*bar",		false,	true);
-    ok(113, "f\\oo",		"f\\\\oo",		true,	true);
-    ok(114, "ball",		"*[al]?",		true,	true);
-    ok(115, "ten",		"[ten]",		false,	true);
-    ok(116, "ten",		"**[!te]",		true,	true);
-    ok(117, "ten",		"**[!ten]",		false,	true);
-    ok(118, "ten",		"t[a-g]n",		true,	true);
-    ok(119, "ten",		"t[!a-g]n",		false,	true);
-    ok(120, "ton",		"t[!a-g]n",		true,	true);
-    ok(121, "ton",		"t[^a-g]n",		true,	true);
-    ok(122, "a]b",		"a[]]b",		true,	true);
-    ok(123, "a-b",		"a[]-]b",		true,	true);
-    ok(124, "a]b",		"a[]-]b",		true,	true);
-    ok(125, "aab",		"a[]-]b",		false,	true);
-    ok(126, "aab",		"a[]a-]b",		true,	true);
-    ok(127, "]",		"]",			true,	true);
+    if ((fp = fopen("wildtest.txt", "r")) == NULL) {
+	fprintf(stderr, "Unable to open wildtest.txt.\n");
+	exit(1);
+    }
 
-    /* Extended slash-matching features */
-    /* TEST, "text",		"pattern",		MATCH?, SAME-AS-FNMATCH? */
-    ok(200, "foo/baz/bar",	"foo*bar",		false,	true);
-    ok(201, "foo/baz/bar",	"foo**bar",		true,	true);
-    ok(202, "foo/bar",		"foo?bar",		false,	true);
-    ok(203, "foo/bar",		"foo[/]bar",		true,	false);
-    ok(204, "foo",		"**/foo",		false,	true);
-    ok(205, "/foo",		"**/foo",		true,	true);
-    ok(206, "bar/baz/foo",	"**/foo",		true,	true);
-    ok(207, "bar/baz/foo",	"*/foo",		false,	true);
-    ok(208, "foo/bar/baz",	"**/bar*",		false,	false);
-    ok(209, "foo/bar/baz",	"**/bar**",		true,	true);
+    line = 0;
+    while (fgets(buf, sizeof buf, fp)) {
+	line++;
+	if (*buf == '#' || *buf == '\n')
+	    continue;
+	for (s = buf, i = 0; i <= 1; i++) {
+	    if (*s == '1')
+		flag[i] = 1;
+	    else if (*s == '0')
+		flag[i] = 0;
+	    else
+		flag[i] = -1;
+	    if (*++s != ' ' && *s != '\t')
+		flag[i] = -1;
+	    if (flag[i] < 0) {
+		fprintf(stderr, "Invalid flag syntax on line %d of wildtest.txt:%s\n",
+			line, buf);
+		exit(1);
+	    }
+	    while (*++s == ' ' || *s == '\t') {}
+	}
+	for (i = 0; i <= 1; i++) {
+	    if (*s == '\'' || *s == '"' || *s == '`') {
+		char quote = *s++;
+		string[i] = s;
+		while (*s && *s != quote) s++;
+		if (!*s) {
+		    fprintf(stderr, "Unmatched quote on line %d of wildtest.txt:%s\n",
+			    line, buf);
+		    exit(1);
+		}
+		end[i] = s;
+	    }
+	    else {
+		if (!*s || *s == '\n') {
+		    fprintf(stderr, "Not enough strings on line %d of wildtest.txt:%s\n",
+			    line, buf);
+		    exit(1);
+		}
+		string[i] = s;
+		while (*++s && *s != ' ' && *s != '\t' && *s != '\n') {}
+		end[i] = s;
+	    }
+	    while (*++s == ' ' || *s == '\t') {}
+	}
+	*end[0] = *end[1] = '\0';
+	run_test(line, flag[0], flag[1], string[0], string[1]);
+    }
 
-    /* Various additional tests. */
-    /* TEST, "text",		"pattern",		MATCH?, SAME-AS-FNMATCH? */
-    ok(300, "acrt",		"a[c-c]st",		false,	true);
-    ok(301, "]",		"[!]-]",		false,	true);
-    ok(302, "a",		"[!]-]",		true,	true);
-    ok(303, "",			"\\",			false,	true);
-    ok(304, "\\",		"\\",			false,	true);
-    ok(305, "foo",		"foo",			true,	true);
-    ok(306, "@foo",		"@foo",			true,	true);
-    ok(307, "foo",		"@foo",			false,	true);
-    ok(308, "[ab]",		"\\[ab]",		true,	true);
-    ok(309, "?a?b",		"\\??\\?b",		true,	true);
-    ok(310, "abc",		"\\a\\b\\c",		true,	true);
-    ok(311, "foo",		"",			false,	true);
-    ok(312, "foo/bar/baz/to",	"**/t[o]",		true,	true);
+    if (!wildmatch_errors)
+	printf("No wildmatch errors found.\n");
+    else
+	printf("Found %d wildmatch errors.\n", wildmatch_errors);
 
-    /* Character class tests. */
-    /* TEST, "txt","pattern",				MATCH?, SAME-AS-FNMATCH? */
-    ok(400, "a1B", "[[:alpha:]][[:digit:]][[:upper:]]",	true,	true);
-    ok(401, "a",   "[[:digit:][:upper:][:space:]]",	false,	true);
-    ok(402, "A",   "[[:digit:][:upper:][:space:]]",	true,	true);
-    ok(403, "1",   "[[:digit:][:upper:][:space:]]",	true,	true);
-    ok(404, " ",   "[[:digit:][:upper:][:space:]]",	true,	true);
-    ok(405, ".",   "[[:digit:][:upper:][:space:]]",	false,	true);
-    ok(406, "5",   "[[:xdigit:]]",			true,	true);
-    ok(407, "f",   "[[:xdigit:]]",			true,	true);
-    ok(408, "D",   "[[:xdigit:]]",			true,	true);
+#ifdef COMPARE_WITH_FNMATCH
+    if (!fnmatch_errors)
+	printf("No fnmatch errors found.\n");
+    else
+	printf("Found %d fnmatch errors.\n", fnmatch_errors);
 
-    /* Additional tests, including some malformed wildmats. */
-    /* TEST, "text",		"pattern",		MATCH?, SAME-AS-FNMATCH? */
-    ok(500, "]",		"[\\\\-^]",		true,	true);
-    ok(501, "[",		"[\\\\-^]",		false,	true);
-    ok(502, "-",		"[\\-_]",		true,	true);
-    ok(503, "]",		"[\\]]",		true,	true);
-    ok(504, "\\]",		"[\\]]",		false,	true);
-    ok(505, "\\",		"[\\]]",		false,	true);
-    ok(506, "ab",		"a[]b",			false,	true);
-    ok(507, "a[]b",		"a[]b",			false,	true);
-    ok(508, "ab[",		"ab[",			false,	true);
-    ok(509, "ab",		"[!",			false,	true);
-    ok(510, "ab",		"[-",			false,	true);
-    ok(511, "-",		"[-]",			true,	true);
-    ok(512, "-",		"[a-",			false,	true);
-    ok(513, "-",		"[!a-",			false,	true);
-    ok(514, "-",		"[--A]",		true,	true);
-    ok(515, "5",		"[--A]",		true,	true);
-    ok(516, "\303\206",		"[--A]",		false,	true);
-    ok(517, " ",		"[ --]",		true,	true);
-    ok(518, "$",		"[ --]",		true,	true);
-    ok(519, "-",		"[ --]",		true,	true);
-    ok(520, "0",		"[ --]",		false,	true);
-    ok(521, "-",		"[---]",		true,	true);
-    ok(522, "-",		"[------]",		true,	true);
-    ok(523, "j",		"[a-e-n]",		false,	true);
-    ok(524, "-",		"[a-e-n]",		true,	true);
-    ok(525, "a",		"[!------]",		true,	true);
-    ok(526, "[",		"[]-a]",		false,	true);
-    ok(527, "^",		"[]-a]",		true,	true);
-    ok(528, "^",		"[!]-a]",		false,	true);
-    ok(529, "[",		"[!]-a]",		true,	true);
-    ok(530, "^",		"[a^bc]",		true,	true);
-    ok(531, "-b]",		"[a-]b]",		true,	true);
-    ok(532, "\\",		"[\\]",			false,	true);
-    ok(533, "\\",		"[\\\\]",		true,	true);
-    ok(534, "\\",		"[!\\\\]",		false,	true);
-    ok(535, "G",		"[A-\\\\]",		true,	true);
-    ok(536, "aaabbb",		"b*a",			false,	true);
-    ok(537, "aabcaa",		"*ba*",			false,	true);
-    ok(538, ",",		"[,]",			true,	true);
-    ok(539, ",",		"[\\\\,]",		true,	true);
-    ok(540, "\\",		"[\\\\,]",		true,	true);
-    ok(541, "-",		"[,-.]",		true,	true);
-    ok(542, "+",		"[,-.]",		false,	true);
-    ok(543, "-.]",		"[,-.]",		false,	true);
-
-    /* Test recursive calls and the ABORT code. */
-    ok(600, "-adobe-courier-bold-o-normal--12-120-75-75-m-70-iso8859-1", "-*-*-*-*-*-*-12-*-*-*-m-*-*-*", true, true);
-    ok(601, "-adobe-courier-bold-o-normal--12-120-75-75-X-70-iso8859-1", "-*-*-*-*-*-*-12-*-*-*-m-*-*-*", false, true);
-    ok(601, "-adobe-courier-bold-o-normal--12-120-75-75-/-70-iso8859-1", "-*-*-*-*-*-*-12-*-*-*-m-*-*-*", false, true);
-    ok(602, "/adobe/courier/bold/o/normal//12/120/75/75/m/70/iso8859/1", "/*/*/*/*/*/*/12/*/*/*/m/*/*/*", true, true);
-    ok(603, "/adobe/courier/bold/o/normal//12/120/75/75/X/70/iso8859/1", "/*/*/*/*/*/*/12/*/*/*/m/*/*/*", false, true);
-    ok(604, "abcd/abcdefg/abcdefghijk/abcdefghijklmnop.txt", "**/*a*b*g*n*t", true, true);
+#endif
 
     return 0;
 }
