@@ -61,7 +61,14 @@ multiplexing layer across the socket.  The main point of this is to
 allow the server to asynchronously pass errors back, while still
 allowing streamed and pipelined data.
 
+Unfortunately, the multiplex protocol is not used at every stage.  We
+start up in plain socket mode and then change over by calling
+io_start_buffering.  Of course both the client and the server have to
+do this at the same point.
+
 The server then talks to the client as normal across the socket,
 passing checksums, file lists and so on.  For documentation of that,
 stay tuned (or write it yourself!).
+
+
 
