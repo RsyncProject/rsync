@@ -590,7 +590,7 @@ static int socketpair_tcp(int fd[2])
 	if ((listener = socket(PF_INET, SOCK_STREAM, 0)) == -1) goto failed;
 
         memset(&sock2, 0, sizeof(sock2));
-#ifdef HAVE_SOCK_SIN_LEN
+#ifdef HAVE_SOCKADDR_LEN
         sock2.sin_len = sizeof(sock2);
 #endif
         sock2.sin_family = PF_INET;
