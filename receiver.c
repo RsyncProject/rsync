@@ -39,6 +39,7 @@ extern int do_progress;
 extern char *backup_dir;
 extern char *backup_suffix;
 extern int backup_suffix_len;
+extern int cleanup_got_literal;
 
 static struct delete_list {
 	DEV64_T dev;
@@ -255,8 +256,6 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
 			show_progress(offset, total_size);
 
 		if (i > 0) {
-			extern int cleanup_got_literal;
-
 			if (verbose > 3) {
 				rprintf(FINFO,"data recv %d at %.0f\n",
 					i,(double)offset);
@@ -381,6 +380,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 		stats.num_transferred_files++;
 		stats.total_transferred_size += file->length;
+		cleanup_got_literal = 0;
 
 		if (local_name)
 			fname = local_name;
