@@ -477,6 +477,7 @@ struct stats {
 	int flist_size;
 	int num_files;
 	int num_transferred_files;
+	int current_file_index;
 };
 
 
