@@ -151,7 +151,7 @@ static service sDefault =
 	NULL,    /* secrets file */
 	NULL,    /* exclude */
 	NULL,    /* exclude from */
-	"%o %h [%a] %f %l",    /* log format */
+	"%o %h [%a] %m (%u) %f %l ",    /* log format */
 };
 
 

@@ -195,6 +195,7 @@ void rflush(int fd)
 static void log_formatted(char *op, struct file_struct *file)
 {
 	extern int module_id;
+	extern char *auth_user;
 	char buf[1024];
 	char *p, *s, *n;
 	char buf2[100];
@@ -222,6 +223,9 @@ static void log_formatted(char *op, struct file_struct *file)
 			break;
 		case 'o': n = op; break;
 		case 'f': n = f_name(file); break;
+		case 'm': n = lp_name(module_id); break;
+		case 'P': n = lp_path(module_id); break;
+		case 'u': n = auth_user; break;
 		}
 
 		if (!n) continue;

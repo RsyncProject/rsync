@@ -126,6 +126,9 @@ itemize(
   it() %p for the process id of this rsync session
   it() %o for the operation, which is either "send" or "recv"
   it() %f for the filename
+  it() %P for the module path
+  it() %m for the module name
+  it() %u for the authenticated username (or the null string)
 )
 
 The default log format is "%o %h [%a] %f %l"

@@ -24,6 +24,7 @@ extern int module_id;
 extern int read_only;
 extern int verbose;
 extern int rsync_port;
+char *auth_user;
 
 int start_socket_client(char *host, char *path, int argc, char *argv[])
 {
@@ -121,7 +122,6 @@ static int rsync_module(int fd, int i)
 	char *addr = client_addr(fd);
 	char *host = client_name(fd);
 	char *name = lp_name(i);
-	char *user;
 	int use_chroot = lp_use_chroot(i);
 	int start_glob=0;
 	int ret;
@@ -153,9 +153,9 @@ static int rsync_module(int fd, int i)
 	}
 
 	
-	user = auth_server(fd, i, addr, "@RSYNCD: AUTHREQD ");
+	auth_user = auth_server(fd, i, addr, "@RSYNCD: AUTHREQD ");
 
-	if (!user) {
+	if (!auth_user) {
 		rprintf(FERROR,"auth failed on module %s from %s (%s)\n",
 			name, client_name(fd), client_addr(fd));
 		io_printf(fd,"@ERROR: auth failed on module %s\n",name);
@@ -285,10 +285,10 @@ static int rsync_module(int fd, int i)
 	ret = parse_arguments(argc, argv);
 
 	if (request) {
-		if (*user) {
+		if (*auth_user) {
 			rprintf(FINFO,"rsync %s %s from %s@%s (%s)\n",
 				am_sender?"on":"to",
-				request, user, host, addr);
+				request, auth_user, host, addr);
 		} else {
 			rprintf(FINFO,"rsync %s %s from %s (%s)\n",
 				am_sender?"on":"to",
