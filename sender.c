@@ -83,9 +83,9 @@ static struct sum_struct *receive_sums(int f)
 
 void send_files(struct file_list *flist,int f_out,int f_in)
 { 
-	int fd;
+	int fd = -1;
 	struct sum_struct *s;
-	struct map_struct *buf;
+	struct map_struct *buf = NULL;
 	STRUCT_STAT st;
 	char fname[MAXPATHLEN];  
 	int i;
@@ -168,44 +168,42 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 		}
 	  
 		if (!read_batch) {
-		fd = do_open(fname, O_RDONLY, 0);
-		if (fd == -1) {
-			io_error = 1;
-			rprintf(FERROR,"send_files failed to open %s: %s\n",
-				fname,strerror(errno));
-			free_sums(s);
-			continue;
-		}
+			fd = do_open(fname, O_RDONLY, 0);
+			if (fd == -1) {
+				io_error = 1;
+				rprintf(FERROR,"send_files failed to open %s: %s\n",
+					fname,strerror(errno));
+				free_sums(s);
+				continue;
+			}
 	  
-		/* map the local file */
-		if (do_fstat(fd,&st) != 0) {
-			io_error = 1;
-			rprintf(FERROR,"fstat failed : %s\n",strerror(errno));
-			free_sums(s);
-			close(fd);
-			return;
-		}
+			/* map the local file */
+			if (do_fstat(fd,&st) != 0) {
+				io_error = 1;
+				rprintf(FERROR,"fstat failed : %s\n",strerror(errno));
+				free_sums(s);
+				close(fd);
+				return;
+			}
 	  
-		if (st.st_size > 0) {
-			buf = map_file(fd,st.st_size);
-		} else {
-			buf = NULL;
-		}
+			if (st.st_size > 0) {
+				buf = map_file(fd,st.st_size);
+			} else {
+				buf = NULL;
+			}
 	  
-		if (verbose > 2)
-			rprintf(FINFO,"send_files mapped %s of size %.0f\n",
-				fname,(double)st.st_size);
-		}
+			if (verbose > 2)
+				rprintf(FINFO,"send_files mapped %s of size %.0f\n",
+					fname,(double)st.st_size);
 
-		if (!read_batch) { /* dw */
-		    write_int(f_out,i);
+			write_int(f_out,i);
 	  
-		    if (write_batch)
-			write_batch_delta_file((char *)&i,sizeof(i));
+			if (write_batch)
+				write_batch_delta_file((char *)&i,sizeof(i));
 
-		    write_int(f_out,s->count);
-		    write_int(f_out,s->n);
-		    write_int(f_out,s->remainder);
+			write_int(f_out,s->count);
+			write_int(f_out,s->n);
+			write_int(f_out,s->remainder);
 		}
 	  
 		if (verbose > 2)
