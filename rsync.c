@@ -30,7 +30,6 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_perms;
 extern int make_backups;
-extern char *backup_suffix;
 
 
 /*
@@ -230,27 +229,6 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 void sig_int(void)
 {
 	exit_cleanup(RERR_SIGNAL);
-}
-
-int make_backup(char *fname)
-{
-	char fnamebak[MAXPATHLEN];
-	if (strlen(fname) + strlen(backup_suffix) > (MAXPATHLEN-1)) {
-		rprintf(FERROR,"backup filename too long\n");
-		return 0;
-	}
-
-	slprintf(fnamebak,sizeof(fnamebak),"%s%s",fname,backup_suffix);
-	if (do_rename(fname,fnamebak) != 0) {
-		/* cygwin (at least version b19) reports EINVAL */
-		if (errno != ENOENT && errno != EINVAL) {
-			rprintf(FERROR,"rename %s %s : %s\n",fname,fnamebak,strerror(errno));
-			return 0;
-		}
-	} else if (verbose > 1) {
-		rprintf(FINFO,"backed up %s to %s\n",fname,fnamebak);
-	}
-	return 1;
 }
 
 
