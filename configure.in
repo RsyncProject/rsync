@@ -259,7 +259,17 @@ AC_DEFINE_UNQUOTED(DEFAULT_MODIFY_WINDOW, $DEFAULT_MODIFY_WINDOW,
 AC_MSG_CHECKING([whether to call shutdown on all sockets])
 case $host_os in
 	*cygwin* ) AC_MSG_RESULT(yes)
-                   AC_DEFINE(SHUTDOWN_ALL_SOCKETS, 1, [Define if sockets need to be shutdown])
+                   AC_DEFINE(SHUTDOWN_ALL_SOCKETS, 1, 
+			    [Define if sockets need to be shutdown])
+		   ;;
+	       * ) AC_MSG_RESULT(no);;
+esac
+
+AC_MSG_CHECKING([whether generator should delay before signaling receiver])
+case $host_os in
+	*cygwin* ) AC_MSG_RESULT(yes)
+                   AC_DEFINE(DELAY_BEFORE_SIGNALING_RECEIVER, 1, 
+			    [Define if generator should delay before signaling receiver])
 		   ;;
 	       * ) AC_MSG_RESULT(no);;
 esac
