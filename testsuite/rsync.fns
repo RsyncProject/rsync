@@ -4,6 +4,20 @@
 
 # General-purpose test functions for rsync.
 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version
+# 2 as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+# 
+# You should have received a copy of the GNU Lesser General Public
+# License along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+
 TMP="$scratchdir"
 FROM=${TMP}/from
 TO=${TMP}/to
@@ -38,8 +52,6 @@ hands_setup() {
     # This causes a little problem that "ls -l" of the two will not be
     # the same.  So, we need to set our umask before doing any creations.
 
-    umask 0
-
     # set up test data
     touch ${FROM}/empty
     mkdir ${FROM}/emptydir
@@ -49,7 +61,10 @@ hands_setup() {
 
     # This might fail on systems that don't have -n
     echo $ECHO_N "This file has no trailing lf$ECHO_C" > ${FROM}/nolf
+    umask 0
     ln -s nolf ${FROM}/nolf-symlink
+    umask 077
+
     cat $srcdir/*.c | head -2000 > ${FROM}/${F1}
     mkdir ${FROM}/dir
     cp ${FROM}/${F1} ${FROM}/dir
@@ -58,8 +73,6 @@ hands_setup() {
     ls -ltr /etc > ${FROM}/dir/subdir/subsubdir/etc-ltr-list
     mkdir ${FROM}/dir/subdir/subsubdir2
     ls -lt /bin > ${FROM}/dir/subdir/subsubdir2/bin-lt-list
-
-    umask 077
 }
 
 
