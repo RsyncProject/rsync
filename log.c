@@ -369,7 +369,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 		n = fmt + 1;
 		if (*p == '-')
 			*n++ = *p++;
-		while (isdigit(*(uchar*)p) && n - fmt < 16)
+		while (isdigit(*(uchar*)p) && n - fmt < (int)(sizeof fmt) - 8)
 			*n++ = *p++;
 		*n = '\0';
 		n = NULL;
@@ -456,7 +456,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 				n = "*deleting";
 				break;
 			}
-			n = buf2;
+			n = buf2 + MAXPATHLEN - 32;
 			n[0] = iflags & ITEM_LOCAL_CHANGE
 			      ? iflags & ITEM_XNAME_FOLLOWS ? 'h' : 'c'
 			     : !(iflags & ITEM_TRANSFER) ? '.'
