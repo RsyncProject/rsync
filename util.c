@@ -652,7 +652,7 @@ size_t stringjoin(char *dest, size_t destsize, ...)
 
 unsigned int clean_fname(char *name)
 {
-	char *limit = name, *t = name, *f = name;
+	char *limit = name - 1, *t = name, *f = name;
 	int anchored;
 
 	if (!name)
@@ -669,7 +669,7 @@ unsigned int clean_fname(char *name)
 		if (*f == '.') {
 			/* discard "." dirs (but NOT a trailing '.'!) */
 			if (f[1] == '/') {
-				f++; /* not += 2! */
+				f += 2;
 				continue;
 			}
 			/* collapse ".." dirs */
@@ -680,7 +680,7 @@ unsigned int clean_fname(char *name)
 					continue;
 				}
 				while (s > limit && *--s != '/') {}
-				if (s != t - 1 && *s == '/') {
+				if (s != t - 1 && (s < name || *s == '/')) {
 					t = s + 1;
 					f += 2;
 					continue;
