@@ -819,8 +819,13 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	if (check_exclude_file(thisname, S_ISDIR(st.st_mode) != 0, exclude_level))
 		return NULL;
 
-	if (lp_ignore_nonreadable(module_id) && access(thisname, R_OK) != 0)
-		return NULL;
+	if (lp_ignore_nonreadable(module_id)) {
+#if SUPPORT_LINKS
+		if (!S_ISLNK(st.st_mode))
+#endif
+			if (access(thisname, R_OK) != 0)
+				return NULL;
+	}
 
 skip_excludes:
 
