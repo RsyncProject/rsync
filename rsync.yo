@@ -367,11 +367,6 @@ verb(
      --files-from=FILE       read FILE for list of source-file names
  -0  --from0                 all file lists are delimited by nulls
      --version               print version number
-     --daemon                run as an rsync daemon
-     --no-detach             do not detach from the parent
-     --address=ADDRESS       bind to the specified address
-     --config=FILE           specify alternate rsyncd.conf file
-     --port=PORT             specify alternate rsyncd port number
      --blocking-io           use blocking I/O for the remote shell
      --no-blocking-io        turn off --blocking-io
      --stats                 give some file transfer stats
@@ -385,8 +380,19 @@ verb(
  -4  --ipv4                  prefer IPv4
  -6  --ipv6                  prefer IPv6
  -h, --help                  show this help screen
+)
 
+Rsync can also be run as a daemon, in which case the following options are accepted:
 
+verb(
+     --daemon                run as an rsync daemon
+     --address=ADDRESS       bind to the specified address
+     --config=FILE           specify alternate rsyncd.conf file
+     --no-detach             do not detach from the parent
+     --port=PORT             specify alternate rsyncd port number
+ -4  --ipv4                  prefer IPv4
+ -6  --ipv6                  prefer IPv6
+ -h, --help                  show this help screen
 )
 
 manpageoptions()
@@ -399,9 +405,9 @@ can be used instead.
 
 startdit()
 dit(bf(-h, --help)) Print a short help page describing the options
-available in rsync
+available in rsync.
 
-dit(bf(--version)) print the rsync version number and exit
+dit(bf(--version)) print the rsync version number and exit.
 
 dit(bf(-v, --verbose)) This option increases the amount of information you
 are given during the transfer.  By default, rsync works silently. A
@@ -861,41 +867,6 @@ dit(bf(--timeout=TIMEOUT)) This option allows you to set a maximum I/O
 timeout in seconds. If no data is transferred for the specified time
 then rsync will exit. The default is 0, which means no timeout.
 
-dit(bf(--daemon)) This tells rsync that it is to run as a daemon.  The
-daemon may be accessed using the bf(host::module) or
-bf(rsync://host/module/) syntax.
-
-If standard input is a socket then rsync will assume that it is being
-run via inetd, otherwise it will detach from the current terminal and
-become a background daemon.  The daemon will read the config file
-(rsyncd.conf) on each connect made by a client and respond to
-requests accordingly.  See the rsyncd.conf(5) man page for more
-details.
-
-dit(bf(--no-detach)) When running as a daemon, this option instructs
-rsync to not detach itself and become a background process.  This
-option is required when running as a service on Cygwin, and may also
-be useful when rsync is supervised by a program such as
-bf(daemontools) or AIX's bf(System Resource Controller).
-bf(--no-detach) is also recommended when rsync is run under a
-debugger.  This option has no effect if rsync is run from inetd or
-sshd.
-
-dit(bf(--address)) By default rsync will bind to the wildcard address
-when run as a daemon with the --daemon option or when connecting to a
-rsync server. The --address option allows you to specify a specific IP
-address (or hostname) to bind to. This makes virtual hosting possible
-in conjunction with the --config option.
-
-dit(bf(--config=FILE)) This specifies an alternate config file than
-the default.  This is only relevant when --daemon is specified. 
-The default is /etc/rsyncd.conf unless the daemon is running over
-a remote shell program and the remote user is not root; in that case
-the default is rsyncd.conf in the current directory (typically $HOME).
-
-dit(bf(--port=PORT)) This specifies an alternate TCP port number to use
-rather than the default port 873.
-
 dit(bf(--blocking-io)) This tells rsync to use blocking I/O when launching
 a remote shell transport.  If the remote shell is either rsh or remsh,
 rsync defaults to using
@@ -1019,11 +990,7 @@ See the "BATCH MODE" section for details.
 dit(bf(-4, --ipv4) or bf(-6, --ipv6)) Tells rsync to prefer IPv4/IPv6
 when creating sockets.  This only affects sockets that rsync has direct
 control over, such as the outgoing socket when directly contacting an
-rsync daemon, or the incoming sockets that an rsync daemon uses to
-listen for connections.  One of these options may be required in older
-versions of Linux to work around an IPv6 bug in the kernel (if you see
-an "address already in use" error when nothing else is using the port,
-try specifying --ipv6 or --ipv4 when starting the daemon).
+rsync daemon (see also these options in the --daemon mode section).
 
 dit(bf(--checksum-seed=NUM)) Set the MD4 checksum seed to the integer
 NUM.  This 4 byte checksum seed is included in each block and file
@@ -1034,6 +1001,57 @@ applications that want repeatable block and file checksums, or
 in the case where the user wants a more random checksum seed.
 Note that setting NUM to 0 causes rsync to use the default of time()
 for checksum seed.
+
+enddit()
+
+The options allowed when starting an rsync daemon are as follows:
+
+startdit()
+
+dit(bf(--daemon)) This tells rsync that it is to run as a daemon.  The
+daemon may be accessed using the bf(host::module) or
+bf(rsync://host/module/) syntax.
+
+If standard input is a socket then rsync will assume that it is being
+run via inetd, otherwise it will detach from the current terminal and
+become a background daemon.  The daemon will read the config file
+(rsyncd.conf) on each connect made by a client and respond to
+requests accordingly.  See the rsyncd.conf(5) man page for more
+details.
+
+dit(bf(--address)) By default rsync will bind to the wildcard address
+when run as a daemon with the --daemon option or when connecting to a
+rsync server. The --address option allows you to specify a specific IP
+address (or hostname) to bind to. This makes virtual hosting possible
+in conjunction with the --config option.
+
+dit(bf(--config=FILE)) This specifies an alternate config file than
+the default.  This is only relevant when --daemon is specified. 
+The default is /etc/rsyncd.conf unless the daemon is running over
+a remote shell program and the remote user is not root; in that case
+the default is rsyncd.conf in the current directory (typically $HOME).
+
+dit(bf(--no-detach)) When running as a daemon, this option instructs
+rsync to not detach itself and become a background process.  This
+option is required when running as a service on Cygwin, and may also
+be useful when rsync is supervised by a program such as
+bf(daemontools) or AIX's bf(System Resource Controller).
+bf(--no-detach) is also recommended when rsync is run under a
+debugger.  This option has no effect if rsync is run from inetd or
+sshd.
+
+dit(bf(--port=PORT)) This specifies an alternate TCP port number to use
+rather than the default port 873.
+
+dit(bf(-4, --ipv4) or bf(-6, --ipv6)) Tells rsync to prefer IPv4/IPv6
+when creating the incoming sockets that the rsync daemon will use to
+listen for connections.  One of these options may be required in older
+versions of Linux to work around an IPv6 bug in the kernel (if you see
+an "address already in use" error when nothing else is using the port,
+try specifying --ipv6 or --ipv4 when starting the daemon).
+
+dit(bf(-h, --help)) When specified after --daemon, print a short help
+page describing the options available for starting an rsync daemon.
 
 enddit()
 
