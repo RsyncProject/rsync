@@ -252,7 +252,7 @@ Options
  -x, --one-file-system       don't cross filesystem boundaries
  -B, --block-size=SIZE       checksum blocking size (default 700)
  -e, --rsh=COMMAND           specify rsh replacement
-     --rsync-path=PATH       specify path to rsync on the remote machine
+     --rsync-path=PATH       specify full path to rsync on the remote machine
  -C, --cvs-exclude           auto ignore files in the same way CVS does
      --delete                delete files that don't exist on the sending side
      --delete-excluded       also delete excluded files on the receiving side
@@ -477,7 +477,9 @@ You can also choose the remote shell program using the RSYNC_RSH
 environment variable.
 
 dit(bf(--rsync-path=PATH)) Use this to specify the path to the copy of
-rsync on the remote machine. Useful when it's not in your path.
+rsync on the remote machine. Useful when it's not in your path. Note
+that this is the full path to the binary, not just the directory that
+the binary is in.
 
 dit(bf(--exclude=PATTERN)) This option allows you to selectively exclude
 certain files from the list of files to be transferred. This is most
