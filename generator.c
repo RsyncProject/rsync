@@ -383,7 +383,7 @@ void recv_generator(char *fname, struct file_list *flist, int i, int f_out)
 	if (am_root && preserve_devices && IS_DEVICE(file->mode)) {
 		if (statret != 0 ||
 		    st.st_mode != file->mode ||
-		    st.st_rdev != file->rdev) {
+		    (DEV64_T)st.st_rdev != file->rdev) {
 			delete_file(fname);
 			if (verbose > 2)
 				rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",
