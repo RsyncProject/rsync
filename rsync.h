@@ -340,12 +340,13 @@ enum msgcode {
 #define uint32 unsigned int32
 #endif
 
-#if SIZEOF_OFF64_T && HAVE_STRUCT_STAT64
-#define OFF_T off64_t
-#define STRUCT_STAT struct stat64
-#else
+#if SIZEOF_OFF_T == 8 || !SIZEOF_OFF64_T || !HAVE_STRUCT_STAT64
 #define OFF_T off_t
 #define STRUCT_STAT struct stat
+#else
+#define OFF_T off64_t
+#define STRUCT_STAT struct stat64
+#define USE_STAT64_FUNCS 1
 #endif
 
 /* CAVEAT: on some systems, int64 will really be a 32-bit integer IFF
