@@ -1035,7 +1035,7 @@ This fails because the parent directory "some" is excluded by the '*' rule,
 so rsync never visits any of the files in the "some" or "some/path"
 directories.  One solution is to ask for all directories in the hierarchy
 to be included by using a single rule: --include='*/' (put it somewhere
-before the --excludde='*' rule).  Another solution is to add specific
+before the --exclude='*' rule).  Another solution is to add specific
 include rules for all the parent dirs that need to be visited.  For
 instance, this set of rules works fine:
 
@@ -1067,7 +1067,7 @@ itemize(
 manpagesection(BATCH MODE)
 
 bf(Note:) Batch mode should be considered experimental in this version
-of rsync. The interface or behaviour may change before it stabilizes.
+of rsync. The interface or behavior may change before it stabilizes.
 
 Batch mode can be used to apply the same set of updates to many
 identical systems. Suppose one has a tree which is replicated on a
@@ -1149,7 +1149,7 @@ reports.
 
 manpagesection(SYMBOLIC LINKS)
 
-Three basic behaviours are possible when rsync encounters a symbolic
+Three basic behaviors are possible when rsync encounters a symbolic
 link in the source directory.
 
 By default, symbolic links are not transferred at all.  A message
@@ -1210,7 +1210,7 @@ dit(bf(2)) Protocol incompatibility
 dit(bf(3)) Errors selecting input/output files, dirs
 dit(bf(4)) Requested action not supported: an attempt
 was made to manipulate 64-bit files on a platform that cannot support
-them; or an option was specifed that is supported by the client and
+them; or an option was specified that is supported by the client and
 not by the server.
 dit(bf(5)) Error starting client-server protocol
 dit(bf(10)) Error in socket I/O 
@@ -1270,7 +1270,7 @@ manpagebugs()
 
 times are transferred as unix time_t values
 
-When transferring to FAT filesystems rsync may resync
+When transferring to FAT filesystems rsync may re-sync
 unmodified files.
 See the comments on the --modify-window option.
 
