@@ -192,12 +192,6 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #endif
 #endif
 
-#ifdef HAVE_FNMATCH
-#include <fnmatch.h>
-#else
-#include "lib/fnmatch.h"
-#endif
-
 #ifdef HAVE_GLOB_H
 #include <glob.h>
 #endif
@@ -467,6 +461,7 @@ static inline int flist_up(struct file_list *flist, int i)
 
 #include "byteorder.h"
 #include "lib/mdfour.h"
+#include "lib/wildmatch.h"
 #include "lib/permstring.h"
 #include "lib/addrinfo.h"
 
