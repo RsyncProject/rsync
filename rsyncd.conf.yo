@@ -378,7 +378,7 @@ quote(itemize(
   it() %l for the length of the file in bytes
   it() %p for the process ID of this rsync session
   it() %o for the operation, which is "send", "recv", or "del."
-  it() %f for the filename (long form on server; no trailing "/")
+  it() %f for the filename (long form on sender; no trailing "/")
   it() %n for the filename (short form; trailing "/" on dir)
   it() %L either the string " -> SYMLINK" or "" if not a symlink
   it() %P for the module path
@@ -391,7 +391,7 @@ quote(itemize(
   it() %i an itemized list of what is being updated
 ))
 
-The default log format is "%o %h [%a] %m (%u) %l %f%L", and a "%t [%p] "
+The default log format is "%o %h [%a] %m (%u) %f %l", and a "%t [%p] "
 is always prefixed when using the "log file" option.
 
 A perl script called rsyncstats to summarize this format is included
