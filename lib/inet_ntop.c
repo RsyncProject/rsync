@@ -43,7 +43,7 @@ static const char *inet_ntop6(const unsigned char *src, char *dst,
  *	Paul Vixie, 1996.
  */
 const char *
-isc_net_ntop(int af, const void *src, char *dst, size_t size)
+inet_ntop(int af, const void *src, char *dst, size_t size)
 {
 	switch (af) {
 	case AF_INET:

@@ -41,10 +41,9 @@ static int inet_pton6(const char *src, unsigned char *dst);
  *	Paul Vixie, 1996.
  */
 int
-isc_net_pton(af, src, dst)
-	int af;
-	const char *src;
-	void *dst;
+inet_pton(int af,
+	  const char *src,
+	  void *dst)
 {
 	switch (af) {
 	case AF_INET:
