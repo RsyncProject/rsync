@@ -664,10 +664,10 @@ int count_dir_elements(const char *p)
 	return cnt;
 }
 
-/* Turns multiple adjacent slashes into a single slash, gets rid of "./"
- * elements, collapses ".." elements except for those at the start of
- * the string. If the resulting path would be empty, change it into a
- * ".". */
+/* Turns multiple adjacent slashes into a single slash; gets rid of "./"
+ * elements; collapses ".." elements except for those at the start of the
+ * string; removes a trailing slash.  If the resulting name would be empty,
+ * change it into a ".". */
 unsigned int clean_fname(char *name)
 {
 	char *limit = name - 1, *t = name, *f = name;
