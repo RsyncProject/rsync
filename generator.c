@@ -217,7 +217,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 		if (dry_run) return;
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			if (robust_unlink(fname) != 0) {
-				rprintf(FERROR,"unlink %s : %s\n",fname,strerror(errno));
+				rprintf(FERROR,"recv_generator: unlink %s: %s\n",fname,strerror(errno));
 				return;
 			}
 			statret = -1;
