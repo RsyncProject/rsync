@@ -52,18 +52,23 @@ extern int io_timeout;
 extern struct stats stats;
 
 
+const char * const phase_unknown = "unknown";
+
 /**
  * The connection might be dropped at some point; perhaps because the
  * remote instance crashed.  Just giving the offset on the stream is
  * not very helpful.  So instead we try to make io_phase_name point to
  * something useful.
  *
+ * For buffered/multiplexed IO these names will be somewhat
+ * approximate; perhaps for ease of support we would rather make the
+ * buffer always flush when a single application-level IO finishes.
+ *
  * @todo Perhaps we want some simple stack functionality, but there's
  * no need to overdo it.
  **/
-const char *io_write_phase = "unknown";
-const char *io_read_phase = "unknown";
-
+const char *io_write_phase = phase_unknown;
+const char *io_read_phase = phase_unknown;
 
 /** Ignore EOF errors while reading a module listing if the remote
     version is 24 or less. */
@@ -618,6 +623,14 @@ void write_int(int f,int32 x)
 	char b[4];
 	SIVAL(b,0,x);
 	writefd(f,b,4);
+}
+
+
+void write_int_named(int f, int32 x, const char *phase)
+{
+	io_write_phase = phase;
+	write_int(f, x);
+	io_write_phase = phase_unknown;
 }
 
 
