@@ -330,9 +330,6 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		return;
 	}
 
-	if (read_batch)
-		return;
-
 	if (preserve_links && S_ISLNK(file->mode)) {
 #if SUPPORT_LINKS
 		char lnk[MAXPATHLEN];
@@ -400,6 +397,9 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		return;
 	}
 #endif
+
+	if (read_batch)
+		return;
 
 	if (preserve_hard_links && hard_link_check(file, HL_CHECK_MASTER))
 		return;
