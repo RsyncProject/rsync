@@ -952,9 +952,10 @@ directory.  This is useful for creating a sparse backup of just files that
 have changed from an earlier backup.
 
 Beginning in version 2.6.4, multiple bf(--compare-dest) directories may be
-provided and rsync will try to find an exact match (searching
-the list in the order specified), and if not found, a basis file from one
-of the em(DIR)s will be selected to try to speed up the transfer.
+provided, which will cause rsync to search the list in the order specified
+for an exact match.
+If a match is not found, a basis file from one of the em(DIR)s will be
+selected to try to speed up the transfer.
 
 If em(DIR) is a relative path, it is relative to the destination directory.
 See also bf(--link-dest).
@@ -967,10 +968,11 @@ An example:
 
 quote(tt(  rsync -av --link-dest=$PWD/prior_dir host:src_dir/ new_dir/))
 
-Beginning with version 2.6.4, if more than one bf(--link-dest) option is
-specified, rsync will try to find an exact match to link with (searching
-the list in the order specified), and if not found, a basis file from one
-of the em(DIR)s will be selected to try to speed up the transfer.
+Beginning in version 2.6.4, multiple bf(--link-dest) directories may be
+provided, which will cause rsync to search the list in the order specified
+for an exact match.
+If a match is not found, a basis file from one of the em(DIR)s will be
+selected to try to speed up the transfer.
 
 If em(DIR) is a relative path, it is relative to the destination directory.
 See also bf(--compare-dest).
