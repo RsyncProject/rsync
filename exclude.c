@@ -43,7 +43,7 @@ static struct exclude_struct *make_exclude(const char *pattern, int include)
 	ret = new(struct exclude_struct);
 	if (!ret) out_of_memory("make_exclude");
 
-	memset(ret, 0, sizeof(*ret));
+	memset(ret, 0, sizeof ret[0]);
 
 	if (strncmp(pattern,"- ",2) == 0) {
 		pattern += 2;
@@ -92,7 +92,7 @@ static struct exclude_struct *make_exclude(const char *pattern, int include)
 static void free_exclude(struct exclude_struct *ex)
 {
 	free(ex->pattern);
-	memset(ex,0,sizeof(*ex));
+	memset(ex, 0, sizeof ex[0]);
 	free(ex);
 }
 
@@ -332,15 +332,18 @@ void send_exclude_list(int f)
 		return;
 	}
 
-	for (i=0;exclude_list[i];i++) {
-		int l;
-		char pattern[MAXPATHLEN];
+	for (i = 0; exclude_list[i]; i++) {
+		unsigned int l;
+		char pattern[MAXPATHLEN+1];
 
-		strlcpy(pattern,exclude_list[i]->pattern,sizeof(pattern));
-		if (exclude_list[i]->directory) strlcat(pattern,"/", sizeof(pattern));
+		l = strlcpy(pattern, exclude_list[i]->pattern, sizeof pattern);
+		if (l == 0 || l >= MAXPATHLEN)
+			continue;
+		if (exclude_list[i]->directory) {
+			pattern[l++] = '/';
+			pattern[l] = '\0';
+		}
 
-		l = strlen(pattern);
-		if (l == 0) continue;
 		if (exclude_list[i]->include) {
 			write_int(f,l+2);
 			write_buf(f,"+ ",2);
@@ -356,12 +359,13 @@ void send_exclude_list(int f)
 
 void recv_exclude_list(int f)
 {
-	char line[MAXPATHLEN];
+	char line[MAXPATHLEN+1]; /* Allows a trailing slash on a max-len dir */
 	unsigned int l;
 
-	while ((l=read_int(f))) {
-		if (l >= MAXPATHLEN) overflow("recv_exclude_list");
-		read_sbuf(f,line,l);
+	while ((l = read_int(f)) != 0) {
+		if (l >= sizeof line)
+			overflow("recv_exclude_list");
+		read_sbuf(f, line, l);
 		add_exclude(&exclude_list, line, ADD_EXCLUDE);
 	}
 }
