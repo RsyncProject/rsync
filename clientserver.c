@@ -310,8 +310,7 @@ static int rsync_module(int fd, int i)
 		io_start_multiplex_out(fd);
 
 	if (!ret) {
-		rprintf(FERROR,"Error parsing options (unsupported option?) - aborting\n");
-		exit_cleanup(RERR_SYNTAX);
+		option_error();
 	}
 
 	if (lp_timeout(i)) {

@@ -286,6 +286,14 @@ is specified in seconds. A value of zero means no timeout and is the
 default. A good choice for anonymous rsync servers may be 600 (giving
 a 10 minute timeout).
 
+dit(bf(refuse options)) The "refuse options" option allows you to
+specify a space separated list of rsync command line options that will
+be refused by your rsync server. When an option is refused the server
+prints an error message and exits.
+
+The full names of the options must be used (ie. you must use
+"compress" not "z" to disable compression).
+
 enddit()
 
 manpagesection(AUTHENTICATION STRENGTH)

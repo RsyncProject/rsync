@@ -205,14 +205,62 @@ static struct option long_options[] = {
   {0,0,0,0}};
 
 
+static char err_buf[100];
+
+void option_error(void)
+{
+	if (err_buf[0]) {
+		rprintf(FLOG,"%s", err_buf);
+		rprintf(FERROR,"%s", err_buf);
+	} else {
+		rprintf(FLOG,"Error parsing options - unsupported option?\n");
+		rprintf(FERROR,"Error parsing options - unsupported option?\n");
+	}
+	exit_cleanup(RERR_UNSUPPORTED);
+}
+
+/* check to see if we should refuse this option */
+static int check_refuse_options(char *ref, int opt)
+{
+	int i, len;
+	char *p;
+	const char *name;
+
+	for (i=0; long_options[i].name; i++) {
+		if (long_options[i].val == opt) break;
+	}
+	
+	if (!long_options[i].name) return 0;
+
+	name = long_options[i].name;
+	len = strlen(name);
+
+	while ((p = strstr(ref,name))) {
+		if (p[len] == ' ' || p[len] == 0) {
+			slprintf(err_buf,sizeof(err_buf),
+				 "The '%s' option is not supported by this server\n", name);
+			return 1;
+		}
+		ref += len;
+	}
+	return 0;
+}
+
+
 int parse_arguments(int argc, char *argv[])
 {
 	int opt;
 	int option_index;
+	char *ref = lp_refuse_options(module_id);
 
 	while ((opt = getopt_long(argc, argv, 
 				  short_options, long_options, &option_index)) 
 	       != -1) {
+
+		if (ref) {
+			if (check_refuse_options(ref, opt)) return 0;
+		}
+
 		switch (opt) {
 		case OPT_VERSION:
 			rprintf(FINFO,"rsync version %s  protocol version %d\n\n",
@@ -308,6 +356,7 @@ int parse_arguments(int argc, char *argv[])
 #if SUPPORT_HARD_LINKS
 			preserve_hard_links=1;
 #else 
+			slprintf(err_buf,sizeof(err_buf),"hard links are not supported on this server\n");
 			rprintf(FERROR,"ERROR: hard links not supported on this platform\n");
 			return 0;
 #endif
@@ -428,6 +477,7 @@ int parse_arguments(int argc, char *argv[])
 			break;
 
 		default:
+			slprintf(err_buf,sizeof(err_buf),"unrecognised option\n");
 			return 0;
 		}
 	}
