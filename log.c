@@ -235,7 +235,7 @@ static void log_formatted(char *op, struct file_struct *file)
 		}
 
 		if (l != 2) {
-			memmove(s+(l-1), s+1, strlen(s+1));
+			memmove(s+(l-1), s+1, strlen(s+1)+1);
 		}
 		memcpy(p, n, l);
 
