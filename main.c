@@ -171,6 +171,7 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 	int i,argc=0;
 	pid_t ret;
 	char *tok,*dir=NULL;
+	int dash_l_set = 0;
 	extern int local_server;
 	extern char *rsync_path;
 	extern int blocking_io;
@@ -190,15 +191,22 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 			args[argc++] = tok;
 		}
 
+		/* check to see if we've already been given '-l user' in 
+		   the remote-shell command */
+		for (i = 0; i < argc-1; i++) {
+			if (!strcmp(args[i], "-l") && args[i+1][0] != '-')
+				dash_l_set = 1;
+		}
+
 #if HAVE_REMSH
 		/* remsh (on HPUX) takes the arguments the other way around */
 		args[argc++] = machine;
-		if (user) {
+		if (user && !(daemon_over_rsh && dash_l_set)) {
 			args[argc++] = "-l";
 			args[argc++] = user;
 		}
 #else
-		if (user) {
+		if (user && !(daemon_over_rsh && dash_l_set)) {
 			args[argc++] = "-l";
 			args[argc++] = user;
 		}
