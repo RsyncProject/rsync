@@ -1018,6 +1018,10 @@ oom:
 }
 
 
+/*
+ * XXX: This is currently the hottest function while building the file
+ * list, because building f_name()s every time is expensive.
+ **/
 int file_compare(struct file_struct **f1,struct file_struct **f2)
 {
 	if (!(*f1)->basename && !(*f2)->basename) return 0;
@@ -1179,6 +1183,10 @@ static void clean_flist(struct file_list *flist, int strip_root)
 
 /*
  * return the full filename of a flist entry
+ *
+ * This function is too expensive at the moment, because it copies
+ * strings when often we only want to compare them.  In any case,
+ * using strlcat is silly because it will walk the string repeatedly.
  */
 char *f_name(struct file_struct *f)
 {
@@ -1191,9 +1199,11 @@ char *f_name(struct file_struct *f)
 	n = (n+1)%10;
 
 	if (f->dirname) {
-		strlcpy(p, f->dirname, MAXPATHLEN);
-		strlcat(p, "/", MAXPATHLEN);
-		strlcat(p, f->basename, MAXPATHLEN);
+		int off;
+
+		off = strlcpy(p, f->dirname, MAXPATHLEN);
+		off += strlcpy(p+off, "/", MAXPATHLEN-off);
+		off += strlcpy(p+off, f->basename, MAXPATHLEN-off);
 	} else {
 		strlcpy(p, f->basename, MAXPATHLEN);
 	}
