@@ -585,7 +585,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			   enum logcode code, int f_out)
 {
 	static int missing_below = -1, excluded_below = -1;
-	static char *fuzzy_dirname = NULL;
+	static char *fuzzy_dirname = "";
 	static struct file_list *fuzzy_dirlist = NULL;
 	struct file_struct *fuzzy_file = NULL;
 	int fd = -1, f_copy = -1;
@@ -603,7 +603,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (fuzzy_dirlist) {
 			flist_free(fuzzy_dirlist);
 			fuzzy_dirlist = NULL;
-			fuzzy_dirname = NULL;
+			fuzzy_dirname = "";
 		}
 		if (missing_below >= 0) {
 			dry_run--;
