@@ -625,8 +625,11 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 				strlcpy(lastpath, fname, sizeof(lastpath)-1);
 				*p = '/';
 				for (p=fname+1; (p=strchr(p,'/')); p++) {
+					int copy_links_saved = copy_links;
 					*p = 0;
+					copy_links = 0;
 					send_file_name(f, flist, fname, 0, 0);
+					copy_links = copy_links_saved;
 					*p = '/';
 				}
 			} else {
