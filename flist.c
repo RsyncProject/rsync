@@ -81,6 +81,7 @@ static struct file_list *received_flist;
 static dev_t filesystem_dev; /* used to implement -x */
 static int deletion_count = 0; /* used to implement --max-delete */
 
+static int flist_find(struct file_list *flist, struct file_struct *f);
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
 static void output_flist(struct file_list *flist, const char *whose_list);
 
@@ -510,8 +511,8 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 
 
 
-void receive_file_entry(struct file_struct **fptr, unsigned short flags,
-			struct file_list *flist, int f)
+static void receive_file_entry(struct file_list *flist, int ndx,
+			       unsigned short flags, int f)
 {
 	static time_t modtime;
 	static mode_t mode;
@@ -531,7 +532,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 	char *basename, *dirname, *bp;
 	struct file_struct *file;
 
-	if (!fptr) {
+	if (!flist) {
 		modtime = 0, mode = 0;
 		dev = 0, rdev = makedev(0, 0);
 		rdev_major = 0;
@@ -632,7 +633,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 		  + linkname_len + sum_len;
 	bp = pool_alloc(flist->file_pool, alloc_len, "receive_file_entry");
 
-	file = *fptr = (struct file_struct *)bp;
+	file = flist->files[ndx] = (struct file_struct *)bp;
 	memset(bp, 0, file_struct_len);
 	bp += file_struct_len;
 
@@ -643,30 +644,36 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 	file->uid = uid;
 	file->gid = gid;
 
-	if (S_ISDIR(mode)) {
-		if (flags & XMIT_DEL_START) {
-			in_del_hier = 1;
-			del_hier_name_len = l1 + l2;
-			file->flags |= FLAG_DEL_START;
-		} else if (delete_during && in_del_hier) {
-			if (!relative_paths || (l1 >= del_hier_name_len
-			    && thisname[del_hier_name_len] == '/'))
-				file->flags |= FLAG_DEL_START;
-			else
-				in_del_hier = 0;
-		}
-	}
-
 	if (dirname_len) {
 		file->dirname = lastdir = bp;
 		lastdir_len = dirname_len - 1;
 		memcpy(bp, dirname, dirname_len - 1);
 		bp += dirname_len;
 		bp[-1] = '\0';
-		if (sanitize_paths)
-			lastdir_depth = count_dir_elements(lastdir);
-	} else if (dirname)
-		file->dirname = dirname;
+		lastdir_depth = count_dir_elements(lastdir);
+		file->dir.depth = lastdir_depth + 1;
+	} else if (dirname) {
+		file->dirname = dirname; /* we're reusing lastname */
+		file->dir.depth = lastdir_depth + 1;
+	} else
+		file->dir.depth = 1;
+
+	if (S_ISDIR(mode)) {
+		if (basename_len == 1+1 && *basename == '.') /* N.B. null */
+			file->dir.depth--;
+		if (flags & XMIT_DEL_START) {
+			in_del_hier = 1;
+			del_hier_name_len = file->dir.depth == 0 ? 0 : l1 + l2;
+			file->flags |= FLAG_DEL_START;
+		} else if (delete_during && in_del_hier) {
+			if (!relative_paths || !del_hier_name_len
+			 || (l1 >= del_hier_name_len
+			  && thisname[del_hier_name_len] == '/'))
+				file->flags |= FLAG_DEL_START;
+			else
+				in_del_hier = 0;
+		}
+	}
 
 	file->basename = bp;
 	memcpy(bp, basename, basename_len);
@@ -935,7 +942,7 @@ skip_filters:
 		/*bp += sum_len;*/
 	}
 
-	file->basedir = flist_dir;
+	file->dir.root = flist_dir;
 
 	/* This code is only used by the receiver when it is building
 	 * a list of files for a delete pass. */
@@ -1064,7 +1071,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	char *p, *dir, olddir[sizeof curr_dir];
 	char lastpath[MAXPATHLEN] = "";
 	struct file_list *flist;
-	BOOL need_first_push = True;
 	struct timeval start_tv, end_tv;
 	int64 start_write;
 	int use_ff_fd = 0;
@@ -1087,10 +1093,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				exit_cleanup(RERR_FILESELECT);
 			}
 			use_ff_fd = 1;
-			if (curr_dir_len < MAXPATHLEN - 1) {
-				push_local_filters(curr_dir, curr_dir_len);
-				need_first_push = False;
-			}
 		}
 	}
 
@@ -1126,15 +1128,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				recurse = 1; /* allow one level */
 		} else if (recurse > 0)
 			recurse = 0;
-
-		if (need_first_push) {
-			if ((p = strrchr(fname, '/')) != NULL) {
-				if (*++p && strcmp(p, ".") != 0)
-					push_local_filters(fname, p - fname);
-			} else if (strcmp(fname, ".") != 0)
-				push_local_filters(fname, 0);
-			need_first_push = False;
-		}
 
 		if (link_stat(fname, &st, keep_dirlinks) != 0) {
 			if (f != -1) {
@@ -1314,7 +1307,7 @@ struct file_list *recv_file_list(int f)
 
 		if (protocol_version >= 28 && (flags & XMIT_EXTENDED_FLAGS))
 			flags |= read_byte(f) << 8;
-		receive_file_entry(&flist->files[i], flags, flist, f);
+		receive_file_entry(flist, i, flags, f);
 
 		if (S_ISREG(flist->files[i]->mode))
 			stats.total_size += flist->files[i]->length;
@@ -1328,7 +1321,7 @@ struct file_list *recv_file_list(int f)
 				f_name(flist->files[i]));
 		}
 	}
-	receive_file_entry(NULL, 0, NULL, 0); /* Signal that we're done. */
+	receive_file_entry(NULL, 0, 0, 0); /* Signal that we're done. */
 
 	if (verbose > 2)
 		rprintf(FINFO, "received %d names\n", flist->count);
@@ -1390,28 +1383,25 @@ int file_compare(struct file_struct **file1, struct file_struct **file2)
 }
 
 
-int flist_find(struct file_list *flist, struct file_struct *f)
+static int flist_find(struct file_list *flist, struct file_struct *f)
 {
-	int low = 0, high = flist->count - 1;
+	int low = flist->low, high = flist->high;
+	int ret, mid, mid_up;
 
-	while (high >= 0 && !flist->files[high]->basename) high--;
-
-	if (high < 0)
-		return -1;
-
-	while (low != high) {
-		int mid = (low + high) / 2;
-		int ret = file_compare(&flist->files[flist_up(flist, mid)],&f);
-		if (ret == 0)
-			return flist_up(flist, mid);
-		if (ret > 0)
-			high = mid;
+	while (low <= high) {
+		mid = (low + high) / 2;
+		for (mid_up = mid; !flist->files[mid_up]->basename; mid_up++) {}
+		if (mid_up <= high)
+			ret = file_compare(&flist->files[mid_up], &f);
 		else
-			low = mid + 1;
+			ret = 1;
+		if (ret == 0)
+			return mid_up;
+		if (ret > 0)
+			high = mid - 1;
+		else
+			low = mid_up + 1;
 	}
-
-	if (file_compare(&flist->files[flist_up(flist, low)], &f) == 0)
-		return flist_up(flist, low);
 	return -1;
 }
 
@@ -1487,6 +1477,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			break;
 		}
 	}
+	flist->low = prev_i;
 	while (++i < flist->count) {
 		if (!flist->files[i]->basename)
 			continue;
@@ -1506,6 +1497,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 		} else
 			prev_i = i;
 	}
+	flist->high = prev_i;
 
 	if (strip_root) {
 		/* we need to strip off the root directory in the case
@@ -1529,7 +1521,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 
 static void output_flist(struct file_list *flist, const char *whose_list)
 {
-	char uidbuf[16], gidbuf[16];
+	char uidbuf[16], gidbuf[16], depthbuf[16];
 	struct file_struct *file;
 	int i;
 
@@ -1543,10 +1535,12 @@ static void output_flist(struct file_list *flist, const char *whose_list)
 			sprintf(gidbuf, " gid=%ld", (long)file->gid);
 		else
 			*gidbuf = '\0';
-		rprintf(FINFO, "[%s] i=%d %s %s %s mode=0%o len=%.0f%s%s\n",
-			whose_list, i, NS(file->basedir), NS(file->dirname),
-			NS(file->basename), (int)file->mode,
-			(double)file->length, uidbuf, gidbuf);
+		if (!am_sender)
+			sprintf(depthbuf, "%d", file->dir.depth);
+		rprintf(FINFO, "[%s] i=%d %s %s %s mode=0%o len=%.0f%s%s (%x)\n",
+			whose_list, i, am_sender ? NS(file->dir.root) : depthbuf,
+			NS(file->dirname), NS(file->basename), (int)file->mode,
+			(double)file->length, uidbuf, gidbuf, file->flags);
 	}
 }
 
@@ -1670,7 +1664,6 @@ static int is_backup_file(char *fn)
 void delete_in_dir(struct file_list *flist, char *fname)
 {
 	static void *filt_array[MAXPATHLEN/2];
-	static BOOL need_first_push = True;
 	static int fa_lvl = 0;
 	static char fbuf[MAXPATHLEN];
 	struct file_list *dir_list;
@@ -1680,7 +1673,6 @@ void delete_in_dir(struct file_list *flist, char *fname)
 	if (!flist) {
 		while (fa_lvl)
 			pop_local_filters(filt_array[--fa_lvl]);
-		need_first_push = True;
 		*fbuf = '\0';
 		return;
 	}
@@ -1708,22 +1700,6 @@ void delete_in_dir(struct file_list *flist, char *fname)
 	}
 
 	dlen = strlcpy(fbuf, fname, MAXPATHLEN);
-	if (need_first_push) {
-		if (dlen != 1 || fbuf[0] != '.') {
-			char *s = strrchr(fbuf, '/');
-			int first_dlen;
-			if (s)
-				first_dlen = s - fbuf;
-			else
-				first_dlen = 0;
-			if (!s || s[1] != '.' || s[2] != '\0') {
-				filt_array[fa_lvl++] = push_local_filters(fbuf,
-									  first_dlen);
-			}
-		}
-		need_first_push = False;
-	}
-
 	if (dlen >= MAXPATHLEN - 1)
 		return;
 	if (fa_lvl >= MAXPATHLEN/2)
