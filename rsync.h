@@ -480,11 +480,9 @@ struct sum_struct {
 struct map_struct {
 	char *p;		/* Window pointer			*/
 	int fd;			/* File Descriptor			*/
-	int p_size;		/* Window size at allocation		*/
-	int p_len;		/* Window size after fill		*/
-				/*    p_size and p_len could be
-				 *    consolodated by using a local
-				 *    variable in map_ptr()		*/
+	int p_size;		/* Largest window size we allocated	*/
+	int p_len;		/* Latest (rounded) window size		*/
+	int def_window_size;	/* Default window size			*/
 	int status;		/* first errno from read errors		*/
 	OFF_T file_size;	/* File size (from stat)		*/
 	OFF_T p_offset;		/* Window start				*/
