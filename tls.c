@@ -116,10 +116,9 @@ static void list_file (const char *fname)
 	
 	/* NB: need to pass size as a double because it might be be
 	 * too large for a long. */
-	printf("%s %12.0f %6ld.%-6ld %6d %s %s%s\n",
-	       permbuf, (double) buf.st_size,
-	       (long) buf.st_uid, (long) buf.st_gid,
-	       buf.st_nlink,
+	printf("%s %12.0f %6ld.%-6ld %6ld %s %s%s\n",
+	       permbuf, (double)buf.st_size, (long)buf.st_uid,
+	       (long)buf.st_gid, (long)buf.st_nlink,
 	       datebuf, fname, linkbuf);
 }
 

@@ -43,7 +43,7 @@ main(UNUSED(int argc), UNUSED(char *argv[]))
 	}
 
 	for (i = 0; i < n; i++) 
-		printf("%u ", list[i]);
+		printf("%lu ", (unsigned long)list[i]);
 	printf("\n");
 		
 	return 0;
