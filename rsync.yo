@@ -384,9 +384,9 @@ dit(bf(-I, --ignore-times)) Normally rsync will skip any files that are
 already the same size and have the same modification time-stamp.
 This option turns off this "quick check" behavior.
 
-dit(bf(--size-only)) Normally rsync will skip any files that are
+dit(bf(--size-only)) Normally rsync will not transfer any files that are
 already the same size and have the same modification time-stamp. With the
---size-only option files will be skipped if they have the same size,
+--size-only option, files will not be transferred if they have the same size,
 regardless of timestamp. This is useful when starting to use rsync
 after using another mirroring system which may not preserve timestamps
 exactly.
@@ -402,7 +402,7 @@ dit(bf(-c, --checksum)) This forces the sender to checksum all files using
 a 128-bit MD4 checksum before transfer. The checksum is then
 explicitly checked on the receiver and any files of the same name
 which already exist and have the same checksum and size on the
-receiver are skipped.  This option can be quite slow.
+receiver are not transferred.  This option can be quite slow.
 
 dit(bf(-a, --archive)) This is equivalent to -rlptgoD. It is a quick
 way of saying you want recursion and want to preserve almost
@@ -991,11 +991,11 @@ itemize(
 
   it() if the pattern starts with "+ " (a plus followed by a space)
   then it is always considered an include pattern, even if specified as
-  part of an exclude option. The "+ " part is discarded before matching.
+  part of an exclude option. The prefix is discarded before matching.
 
   it() if the pattern starts with "- " (a minus followed by a space)
   then it is always considered an exclude pattern, even if specified as
-  part of an include option. The "- " part is discarded before matching.
+  part of an include option. The prefix is discarded before matching.
 
   it() if the pattern is a single exclamation mark ! then the current
   include/exclude list is reset, removing all previously defined patterns.
