@@ -61,6 +61,14 @@ Errors
   eof" give a message that is more detailed if possible and also more
   helpful.  
 
+File attributes
+
+  Device major/minor numbers should be at least 32 bits each.  See
+  http://lists.samba.org/pipermail/rsync/2001-November/005357.html
+
+  Transfer ACLs.  Need to think of a standard representation.
+  Probably better not to even try to convert between NT and POSIX.
+  Possibly can share some code with Samba.
 
 PLATFORMS ------------------------------------------------------------
 
