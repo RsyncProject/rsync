@@ -36,7 +36,7 @@ main(UNUSED(int argc), UNUSED(char *argv[]))
 {
 	int n, i;
 	gid_t list[NGROUPS_MAX];
-	gid_t gid = getgid();
+	gid_t gid = MY_GID();
 	int gid_in_list = 0;
 
 	if ((n = getgroups(NGROUPS_MAX, list)) < 0) {

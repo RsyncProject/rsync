@@ -126,7 +126,7 @@ static int is_in_group(gid_t gid)
 	if (gid == last_in)
 		return last_out;
 	if (ngroups < -1) {
-		gid_t mygid = getgid();
+		gid_t mygid = MY_GID();
 		ngroups = getgroups(0, 0);
 		/* If that didn't work, perhaps 0 isn't treated specially? */
 		if (ngroups <= 0)
@@ -165,7 +165,7 @@ static int is_in_group(gid_t gid)
 #else
 	static gid_t mygid = GID_NONE;
 	if (mygid == GID_NONE) {
-		mygid = getgid();
+		mygid = MY_GID();
 		if (verbose > 3)
 			rprintf(FINFO, "process has gid %ld\n", (long)mygid);
 	}
