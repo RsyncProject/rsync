@@ -23,7 +23,7 @@ SHELL=/bin/sh
 LIBOBJ=lib/getopt.o lib/fnmatch.o lib/zlib.o lib/compat.o
 OBJS1=rsync.o exclude.o util.o md4.o main.o checksum.o match.o syscall.o log.o
 OBJS2=options.o flist.o io.o compat.o hlink.o token.o uidlist.o socket.o 
-DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o
+DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 OBJS=$(OBJS1) $(OBJS2) $(DAEMON_OBJ) $(LIBOBJ)
 
 # note that the -I. is needed to handle config.h when using VPATH

@@ -31,8 +31,18 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	char *sargs[MAX_ARGS];
 	int sargc=0;
 	char line[1024];
-	char *p;
+	char *p, *user=NULL;
 	extern int remote_version;
+
+	p = strchr(host, '@');
+	if (p) {
+		user = host;
+		host = p+1;
+		*p = 0;
+	}
+
+	if (!user) user = getenv("USER");
+	if (!user) user = getenv("LOGNAME");
 
 	fd = open_socket_out(host, rsync_port);
 	if (fd == -1) {
@@ -68,12 +78,10 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 			return -1;
 		}
 
-#if 0
 		if (strncmp(line,"@RSYNCD: AUTHREQD ",18) == 0) {
-			auth_client(fd, line+18);
+			auth_client(fd, user, line+18);
 			continue;
 		}
-#endif
 
 		if (strcmp(line,"@RSYNCD: OK") == 0) break;
 		rprintf(FINFO,"%s\n", line);
@@ -83,15 +91,6 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 		io_printf(fd,"%s\n", sargs[i]);
 	}
 	io_printf(fd,"\n");
-
-#if 0
-	while (1) {
-		if (!read_line(fd, line, sizeof(line)-1)) {
-			return -1;
-		}
-		rprintf(FINFO,"%s\n", line);
-	}
-#endif
 
 	return client_run(fd, fd, -1, argc, argv);
 }
@@ -117,13 +116,11 @@ static int rsync_module(int fd, int i)
 		return -1;
 	}
 
-#if 0
-	if (!auth_server(fd, "@RSYNCD: AUTHREQD ")) {
+	if (!auth_server(fd, i, addr, "@RSYNCD: AUTHREQD ")) {
 		rprintf(FERROR,"auth failed on module %s from %s (%s)\n",
 			lp_name(i), client_name(fd), client_addr(fd));
 		return -1;		
 	}
-#endif
 
 	if (!claim_connection(lp_lock_file(), lp_max_connections())) {
 		rprintf(FERROR,"ERROR: max connections reached\n");
@@ -266,7 +263,6 @@ static int start_daemon(int fd)
 	}	
 
 	while (i == -1) {
-
 		line[0] = 0;
 		if (!read_line(fd, line, sizeof(line)-1)) {
 			return -1;
