@@ -202,7 +202,7 @@ send_deflated_token(int f, int token,
 			write_int(f, run_start);
 			if (write_batch) {
 				temp_byte = (char)(n==0? TOKEN_LONG: TOKENRUN_LONG);
-				write_batch_delta_file(&temp_byte,sizeof(temp_byte));
+				write_batch_delta_file(&temp_byte,sizeof(char));
 				write_batch_delta_file((char *)&run_start,sizeof(run_start));
 			}
 		}
@@ -210,9 +210,10 @@ send_deflated_token(int f, int token,
 			write_byte(f, n);
 			write_byte(f, n >> 8);
 			if (write_batch) {
-				write_batch_delta_file((char *)&n,sizeof(char));
+				temp_byte = (char)n;
+				write_batch_delta_file(&temp_byte,sizeof(char));
 				temp_byte = (char)(n >> 8);
-				write_batch_delta_file(&temp_byte,sizeof(temp_byte));
+				write_batch_delta_file(&temp_byte,sizeof(char));
 			}
 		}
 		last_run_end = last_token;
@@ -285,7 +286,7 @@ send_deflated_token(int f, int token,
 		write_byte(f, END_FLAG);
 		if (write_batch) {
 			temp_byte = END_FLAG;
-			write_batch_delta_file((char *)&temp_byte,sizeof(temp_byte));
+			write_batch_delta_file(&temp_byte,sizeof(char));
 		}
 
 	} else if (token != -2) {
