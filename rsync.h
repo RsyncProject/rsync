@@ -326,6 +326,12 @@ enum msgcode {
 #define STRUCT_STAT struct stat
 #endif
 
+/* CAVEAT: on some systems, int64 will really be a 32-bit integer IFF
+ * that's the maximum size the file system can handle and there is no
+ * 64-bit type available.  The rsync source must therefore take steps
+ * to ensure that any code that really requires a 64-bit integer has
+ * it (e.g. the checksum code uses two 32-bit integers for its 64-bit
+ * counter). */
 #if HAVE_OFF64_T
 #define int64 off64_t
 #elif (SIZEOF_LONG == 8) 
@@ -540,6 +546,8 @@ struct stats {
 	int64 total_read;
 	int64 literal_data;
 	int64 matched_data;
+	int64 flist_buildtime;
+	int64 flist_xfertime;
 	int flist_size;
 	int num_files;
 	int num_transferred_files;
