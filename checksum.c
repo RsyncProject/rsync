@@ -152,6 +152,12 @@ void sum_init(void)
 void sum_update(char *p,int len)
 {
   int i;
+  if (len + sumresidue < CSUM_CHUNK) {
+    bcopy(p,sumrbuf+sumresidue,len);
+    sumresidue += len;
+    return;
+  }
+
   if (sumresidue) {
     i = MIN(CSUM_CHUNK-sumresidue,len);
     bcopy(p,sumrbuf+sumresidue,i);
