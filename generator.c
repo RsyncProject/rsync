@@ -47,6 +47,7 @@ extern int link_dest;
 extern int whole_file;
 extern int local_server;
 extern int list_only;
+extern int read_batch;
 extern int only_existing;
 extern int orig_umask;
 extern int safe_symlinks;
@@ -325,6 +326,9 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 			rprintf(FINFO,"%s/\n",fname);
 		return;
 	}
+
+	if (read_batch)
+		return;
 
 	if (preserve_links && S_ISLNK(file->mode)) {
 #if SUPPORT_LINKS

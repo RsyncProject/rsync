@@ -27,12 +27,12 @@
 
 int remote_protocol = 0;
 
-extern int am_server;
-
-extern int checksum_seed;
-
-extern int protocol_version;
 extern int verbose;
+extern int am_server;
+extern int am_sender;
+extern int read_batch;
+extern int checksum_seed;
+extern int protocol_version;
 
 void setup_protocol(int f_out,int f_in)
 {
@@ -46,6 +46,11 @@ void setup_protocol(int f_out,int f_in)
 		}
 		if (protocol_version > remote_protocol)
 			protocol_version = remote_protocol;
+	}
+	if (read_batch && remote_protocol > protocol_version) {
+	        rprintf(FERROR, "The protocol version in the batch file is too new (%d > %d).\n",
+			remote_protocol, protocol_version);
+		exit_cleanup(RERR_PROTOCOL);
 	}
 
 	if (verbose > 3) {

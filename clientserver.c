@@ -97,7 +97,8 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	return ret < 0? ret : client_run(fd, fd, -1, argc, argv);
 }
 
-int start_inband_exchange(char *user, char *path, int f_in, int f_out, int argc)
+int start_inband_exchange(char *user, char *path, int f_in, int f_out, 
+			  int argc)
 {
 	int i;
 	char *sargs[MAX_ARGS];

@@ -133,7 +133,6 @@ int quiet = 0;
 int always_checksum = 0;
 int list_only = 0;
 
-#define FIXED_CHECKSUM_SEED 32761
 #define MAX_BATCH_PREFIX_LEN 256	/* Must be less than MAXPATHLEN-13 */
 char *batch_prefix = NULL;
 
@@ -571,13 +570,11 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		case OPT_WRITE_BATCH:
 			/* popt stores the filename in batch_prefix for us */
 			write_batch = 1;
-			checksum_seed = FIXED_CHECKSUM_SEED;
 			break;
 
 		case OPT_READ_BATCH:
 			/* popt stores the filename in batch_prefix for us */
 			read_batch = 1;
-			checksum_seed = FIXED_CHECKSUM_SEED;
 			break;
 
 		case OPT_TIMEOUT:
@@ -643,6 +640,14 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			"write-batch and read-batch can not be used together\n");
 		exit_cleanup(RERR_SYNTAX);
 	}
+	if ((write_batch || read_batch) && am_server) {
+		rprintf(FERROR,
+			"batch-mode is incompatible with server mode\n");
+		/* We don't actually exit_cleanup(), so that we can still service
+		 * older version clients that still send batch args to server. */
+		read_batch = write_batch = 0;
+		batch_prefix = NULL;
+	}
 	if (batch_prefix && strlen(batch_prefix) > MAX_BATCH_PREFIX_LEN) {
 		rprintf(FERROR,
 			"the batch-file prefix must be %d characters or less.\n",
@@ -652,12 +657,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 	if (tmpdir && strlen(tmpdir) >= MAXPATHLEN - 10) {
 		rprintf(FERROR, "the --temp-dir path is WAY too long.\n");
-		exit_cleanup(RERR_SYNTAX);
-	}
-
-	if (do_compression && (write_batch || read_batch)) {
-		rprintf(FERROR,
-			"compress can not be used with write-batch or read-batch\n");
 		exit_cleanup(RERR_SYNTAX);
 	}
 
@@ -880,13 +879,6 @@ void server_options(char **args,int *argc)
 
 	if (max_delete && am_sender) {
 		if (asprintf(&arg, "--max-delete=%d", max_delete) < 0)
-			goto oom;
-		args[ac++] = arg;
-	}
-
-	if (batch_prefix) {
-		char *r_or_w = write_batch ? "write" : "read";
-		if (asprintf(&arg, "--%s-batch=%s", r_or_w, batch_prefix) < 0)
 			goto oom;
 		args[ac++] = arg;
 	}

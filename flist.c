@@ -64,9 +64,6 @@ extern int delete_excluded;
 extern int orig_umask;
 extern int list_only;
 
-extern int read_batch;
-extern int write_batch;
-
 extern struct exclude_list_struct exclude_list;
 extern struct exclude_list_struct server_exclude_list;
 extern struct exclude_list_struct local_exclude_list;
@@ -950,9 +947,6 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 
 	flist_expand(flist);
 
-	if (write_batch)
-		file->flags |= FLAG_TOP_DIR;
-
 	if (file->basename[0]) {
 		flist->files[flist->count++] = file;
 		send_file_entry(file, f, base_flags);
@@ -1231,8 +1225,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		io_end_buffering();
 		stats.flist_size = stats.total_written - start_write;
 		stats.num_files = flist->count;
-		if (write_batch)
-			write_batch_flist_info(flist->count, flist->files);
 	}
 
 	if (verbose > 3)
@@ -1301,13 +1293,11 @@ struct file_list *recv_file_list(int f)
 		 * protocol version 15 */
 		recv_uid_list(f, flist);
 
-		if (!read_batch) {
-			/* Recv the io_error flag */
-			if (lp_ignore_errors(module_id) || ignore_errors)
-				read_int(f);
-			else
-				io_error |= read_int(f);
-		}
+		/* Recv the io_error flag */
+		if (lp_ignore_errors(module_id) || ignore_errors)
+			read_int(f);
+		else
+			io_error |= read_int(f);
 	}
 
 	if (verbose > 3)

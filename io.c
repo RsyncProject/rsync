@@ -54,11 +54,14 @@ extern int am_server;
 extern int am_daemon;
 extern int am_sender;
 extern int eol_nulls;
+extern int checksum_seed;
+extern int protocol_version;
 extern char *remote_filesfrom_file;
 extern struct stats stats;
 
 const char phase_unknown[] = "unknown";
 int select_timeout = SELECT_TIMEOUT;
+int batch_fd = -1;
 
 /**
  * The connection might be dropped at some point; perhaps because the
@@ -82,6 +85,9 @@ int kludge_around_eof = False;
 
 int msg_fd_in = -1;
 int msg_fd_out = -1;
+
+static int write_batch_monitor_in = -1;
+static int write_batch_monitor_out = -1;
 
 static int io_filesfrom_f_in = -1;
 static int io_filesfrom_f_out = -1;
@@ -674,6 +680,11 @@ static void readfd(int fd, char *buffer, size_t N)
 		total += ret;
 	}
 
+	if (fd == write_batch_monitor_in) {
+		if ((size_t)write(batch_fd, buffer, total) != total)
+			exit_cleanup(RERR_FILEIO);
+	}
+	
 	stats.total_read += total;
 }
 
@@ -951,6 +962,11 @@ static void writefd(int fd,char *buf,size_t len)
 		exit_cleanup(RERR_PROTOCOL);
 	}
 
+	if (fd == write_batch_monitor_out) {
+		if ((size_t)write(batch_fd, buf, len) != len)
+			exit_cleanup(RERR_FILEIO);
+	}
+
 	if (!io_buffer || fd != multiplex_out_fd) {
 		writefd_unbuffered(fd, buf, len);
 		return;
@@ -1109,3 +1125,25 @@ void io_multiplexing_close(void)
 	io_multiplexing_out = 0;
 }
 
+void start_write_batch(int fd)
+{
+	/* Some communication has already taken place, but we don't
+	 * enable batch writing until here so that we can write a
+	 * canonical record of the communication even though the
+	 * actual communication so far depends on whether a daemon
+	 * is involved. */
+	write_int(batch_fd, protocol_version);
+	write_int(batch_fd, checksum_seed);
+	stats.total_written -= sizeof (int) * 2;
+
+	if (am_sender)
+		write_batch_monitor_out = fd;
+	else
+		write_batch_monitor_in = fd;
+}
+
+void stop_write_batch(void)
+{
+	write_batch_monitor_out = -1;
+	write_batch_monitor_in = -1;
+}

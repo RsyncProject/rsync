@@ -52,13 +52,14 @@ extern int rsync_port;
 extern int whole_file;
 extern int read_batch;
 extern int write_batch;
+extern int batch_fd;
 extern int filesfrom_fd;
 extern pid_t cleanup_child_pid;
 extern char *files_from;
 extern char *remote_filesfrom_file;
 extern char *rsync_path;
 extern char *shell_cmd;
-extern struct file_list *batch_flist;
+extern char *batch_prefix;
 
 
 /* there's probably never more than at most 2 outstanding child processes,
@@ -107,8 +108,19 @@ void wait_process(pid_t pid, int *status)
 	*status = WEXITSTATUS(*status);
 }
 
+/* This function gets called from all 3 processes.  We want the client side
+ * to actually output the text, but the sender is the only process that has
+ * all the stats we need.  So, if we're a client sender, we do the report.
+ * If we're a server sender, we write the stats on the supplied fd.  If
+ * we're the client receiver we read the stats from the supplied fd and do
+ * the report.  All processes might also generate a set of debug stats, if
+ * the verbose level is high enough (this is the only thing that the
+ * generator process and the server receiver ever do here). */
 static void report(int f)
 {
+	/* Cache two stats because the read/write code can change it. */
+	int64 total_read = stats.total_read;
+	int64 total_written = stats.total_written;
 	time_t t = time(NULL);
 
 	if (do_stats && verbose > 1) {
@@ -128,13 +140,9 @@ static void report(int f)
 
 	if (am_server) {
 		if (am_sender) {
-			int64 w;
-			/* store total_written in a temporary
-			 * because write_longint changes it */
-			w = stats.total_written;
-			write_longint(f,stats.total_read);
-			write_longint(f,w);
-			write_longint(f,stats.total_size);
+			write_longint(f, total_read);
+			write_longint(f, total_written);
+			write_longint(f, stats.total_size);
 		}
 		return;
 	}
@@ -142,12 +150,15 @@ static void report(int f)
 	/* this is the client */
 
 	if (!am_sender) {
-		int64 r;
-		stats.total_written = read_longint(f);
-		/* store total_read in a temporary, read_longint changes it */
-		r = read_longint(f);
+		total_written = read_longint(f);
+		total_read = read_longint(f);
 		stats.total_size = read_longint(f);
-		stats.total_read = r;
+	} else if (write_batch) {
+		/* The --read-batch process is going to be a client
+		 * receiver, so we need to give it the stats. */
+		write_longint(batch_fd, total_read);
+		write_longint(batch_fd, total_written);
+		write_longint(batch_fd, stats.total_size);
 	}
 
 	if (do_stats) {
@@ -164,19 +175,19 @@ static void report(int f)
 			(double)stats.matched_data);
 		rprintf(FINFO,"File list size: %d\n", stats.flist_size);
 		rprintf(FINFO,"Total bytes written: %.0f\n",
-			(double)stats.total_written);
+			(double)total_written);
 		rprintf(FINFO,"Total bytes read: %.0f\n",
-			(double)stats.total_read);
+			(double)total_read);
 	}
 
 	if (verbose || do_stats) {
-		rprintf(FINFO,"\nwrote %.0f bytes  read %.0f bytes  %.2f bytes/sec\n",
-			(double)stats.total_written,
-			(double)stats.total_read,
-			(stats.total_written+stats.total_read)/(0.5 + (t-starttime)));
-		rprintf(FINFO,"total size is %.0f  speedup is %.2f\n",
+		rprintf(FINFO,
+			"\nwrote %.0f bytes  read %.0f bytes  %.2f bytes/sec\n",
+			(double)total_written, (double)total_read,
+			(total_written + total_read)/(0.5 + (t - starttime)));
+		rprintf(FINFO, "total size is %.0f  speedup is %.2f\n",
 			(double)stats.total_size,
-			(1.0*stats.total_size)/(stats.total_written+stats.total_read));
+			(double)stats.total_size / (total_written+total_read));
 	}
 
 	fflush(stdout);
@@ -301,8 +312,6 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 	}
 
 	if (local_server) {
-		if (read_batch)
-			create_flist_from_batch(); /* sets batch_flist */
 		/* If the user didn't request --[no-]whole-file, force
 		 * it on, but only if we're not batch processing. */
 		if (whole_file < 0 && !read_batch && !write_batch)
@@ -478,6 +487,8 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	}
 
 	am_generator = 1;
+	if (write_batch)
+		stop_write_batch();
 
 	close(error_pipe[1]);
 	if (f_in != f_out)
@@ -548,10 +559,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		filesfrom_fd = -1;
 	}
 
-	if (read_batch)
-		flist = batch_flist;
-	else
-		flist = recv_file_list(f_in);
+	flist = recv_file_list(f_in);
 	if (!flist) {
 		rprintf(FERROR,"server_recv: recv_file_list error\n");
 		exit_cleanup(RERR_FILESELECT);
@@ -590,11 +598,10 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 
 	if (am_sender) {
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
-		if (!read_batch) {
-			recv_exclude_list(f_in);
-			if (cvs_exclude)
-				add_cvs_excludes();
-		}
+		
+		recv_exclude_list(f_in);
+		if (cvs_exclude)
+			add_cvs_excludes();
 		do_server_sender(f_in, f_out, argc, argv);
 	} else {
 		do_server_recv(f_in, f_out, argc, argv);
@@ -614,15 +621,23 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	char *local_name = NULL;
 
 	cleanup_child_pid = pid;
-	if (read_batch)
-		flist = batch_flist;
-
-	set_nonblocking(f_in);
-	set_nonblocking(f_out);
+	if (read_batch) {
+		/* This is the heart of the read_batch approach:
+		 * Switcher-roo the file descriptors, and
+		 * nobody's the wiser. */
+		close(f_in);
+		close(f_out);
+		f_in = batch_fd;
+		f_out = do_open("/dev/null", O_WRONLY, 0);
+		assert(am_sender == 0);
+	} else {
+		set_nonblocking(f_in);
+		set_nonblocking(f_out);
+	}
 
 	setup_protocol(f_out,f_in);
 
-	if (protocol_version >= 23)
+	if (protocol_version >= 23 && !read_batch)
 		io_start_multiplex_in(f_in);
 
 	if (am_sender) {
@@ -634,6 +649,11 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			send_exclude_list(f_out);
 		if (remote_filesfrom_file)
 			filesfrom_fd = f_in;
+
+		if (write_batch)
+			start_write_batch(f_out);
+		/* Can be unconditional, but this is theoretically
+		 * more efficent for read_batch case. */
 		if (!read_batch) /* don't write to pipe */
 			flist = send_file_list(f_out,argc,argv);
 		if (verbose > 3)
@@ -660,6 +680,8 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	if (argc == 0)
 		list_only = 1;
 
+	/* Can be unconditional, but this is theoretically more
+	 * efficient for the read_batch case. */
 	if (!read_batch)
 		send_exclude_list(f_out);
 
@@ -668,6 +690,8 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		filesfrom_fd = -1;
 	}
 
+	if (write_batch)
+		start_write_batch(f_in);
 	flist = recv_file_list(f_in);
 	if (!flist || flist->count == 0) {
 		rprintf(FINFO, "client: nothing to do: "
@@ -731,7 +755,8 @@ static int start_client(int argc, char *argv[])
 		return rc;
 
 	/* rsync:// always uses rsync server over direct socket connection */
-	if (strncasecmp(URL_PREFIX, argv[0], strlen(URL_PREFIX)) == 0) {
+	if (strncasecmp(URL_PREFIX, argv[0], strlen(URL_PREFIX)) == 0
+	    && !read_batch) {
 		char *host, *path;
 
 		host = argv[0] + strlen(URL_PREFIX);
@@ -844,9 +869,12 @@ static int start_client(int argc, char *argv[])
 		}
 		argc--;
 	} else {  /* read_batch */
-		am_sender = 1;
 		local_server = 1;
 		shell_path = argv[argc-1];
+		if (find_colon(shell_path)) {
+			rprintf(FERROR, "remote destination is not allowed with --read-batch\n");
+			exit_cleanup(RERR_SYNTAX);
+		}
 	}
 
 	if (shell_machine) {
@@ -1042,8 +1070,18 @@ int main(int argc,char *argv[])
 
 	init_flist();
 
-	if (write_batch && !am_server) {
-		write_batch_argvs_file(orig_argc, orig_argv);
+	if (write_batch || read_batch) {
+		if (write_batch)
+			write_batch_argvs_file(orig_argc, orig_argv);
+
+		batch_fd = do_open(batch_prefix,
+				   write_batch ? O_WRONLY | O_CREAT | O_TRUNC
+				   : O_RDONLY, S_IRUSR | S_IWUSR);
+		if (batch_fd < 0) {
+			rsyserr(FERROR, errno, "Batch file %s open error",
+				batch_prefix);
+			exit_cleanup(RERR_FILEIO);
+		}
 	}
 
 	if (am_daemon && !am_server)

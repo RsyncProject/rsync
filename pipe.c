@@ -26,6 +26,7 @@ extern int am_server;
 extern int blocking_io;
 extern int orig_umask;
 extern int read_batch;
+extern int write_batch;
 extern int filesfrom_fd;
 
 /**
@@ -94,7 +95,19 @@ pid_t piped_child(char **command, int *f_in, int *f_out)
 	return pid;
 }
 
-pid_t local_child(int argc, char **argv,int *f_in,int *f_out,
+/*
+ * This function forks a child which calls child_main().  First,
+ * however, it has to establish communication paths to and from the
+ * newborn child.  It creates two socket pairs -- one for writing to
+ * the child (from the parent) and one for reading from the child
+ * (writing to the parent).  Since that's four socket ends, each
+ * process has to close the two ends it doesn't need.  The remaining
+ * two socket ends are retained for reading and writing.  In the
+ * child, the STDIN and STDOUT file descriptors refer to these
+ * sockets.  In the parent, the function arguments f_in and f_out are
+ * set to refer to these sockets.
+ */
+pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 		  int (*child_main)(int, char*[]))
 {
 	pid_t pid;
@@ -107,15 +120,21 @@ pid_t local_child(int argc, char **argv,int *f_in,int *f_out,
 		exit_cleanup(RERR_IPC);
 	}
 
-	pid = do_fork();
+	/* For read-batch, don't even fork. */
+	pid = read_batch ? getpid() : do_fork();
+
 	if (pid == -1) {
 		rsyserr(FERROR, errno, "fork");
 		exit_cleanup(RERR_IPC);
 	}
 
 	if (pid == 0) {
-		am_sender = read_batch ? 0 : !am_sender;
+		am_sender = !am_sender;
 		am_server = 1;
+
+		/* The server side never writes the batch, even if it
+		 * is local (it makes the logic easier elsewhere). */
+		write_batch = 0;
 
 		if (!am_sender)
 			filesfrom_fd = -1;
