@@ -1,3 +1,40 @@
+NEWS for rsync 2.6.1 (UNRELEASED)
+Protocol: 27 (unchanged)
+Changes since 2.6.0:
+
+  ENHANCEMENTS:
+
+    * The RSYNC_PROXY environment variable can now contain a
+      "USER:PASS@" prefix before the "HOST:PORT" information.
+      (Bardur Arantsson)
+
+  BUG FIXES:
+
+    * The --link-dest code now works properly for a non-root user
+      when the UIDs of the source and destination differ and -u was
+      specified, and when the group of the source can't be used on
+      the destination and -g was specified.  (Wayne Davison)
+
+    * Fixed the caching of the full PATH/NAME strings to avoid the
+      current name getting lost if too many other names were
+      expanded during the processing (such as when -H was
+      specified).  (Wayne Davison)
+      
+    * Keep per-file track of the sending of literal data with
+      --partial so that an interrupted transfer doesn't keep a
+      shorter temp file when no new data has been transfered over
+      the wire.
+
+  INTERNAL:
+
+    * Most of the I/O is now buffered, which has a particularly
+      large effect under MS Windows.  (Craig Xxx and Wayne Davison)
+
+    * Optimizations to the name-handling/comparing code have made
+      some significant reductions in user CPU time for large file
+      sets.  (Wayne Davison)
+
+
 NEWS for rsync 2.6.0 (1 Jan 2004)
 Protocol: 27 (changed)
 Changes since 2.5.7:
