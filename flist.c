@@ -1078,6 +1078,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	char lastpath[MAXPATHLEN] = "";
 	struct file_list *flist;
 	BOOL need_first_push = True;
+	struct timeval start_tv, end_tv;
 	int64 start_write;
 	int use_ff_fd = 0;
 
@@ -1085,6 +1086,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		start_filelist_progress("building file list");
 
 	start_write = stats.total_written;
+	gettimeofday(&start_tv, NULL);
 
 	flist = flist_new(f == -1 ? WITHOUT_HLINK : WITH_HLINK,
 			  "send_file_list");
@@ -1250,10 +1252,23 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	}
 
 	if (f != -1) {
+		gettimeofday(&end_tv, NULL);
+		stats.flist_buildtime =
+		    (int64)(end_tv.tv_sec - start_tv.tv_sec) * 1000
+			 + (end_tv.tv_usec - start_tv.tv_usec) / 1000;
+		if (stats.flist_buildtime == 0)
+			stats.flist_buildtime = 1;
+		start_tv = end_tv;
+
 		send_file_entry(NULL, f, 0);
 
 		if (show_filelist_p())
 			finish_filelist_progress(flist);
+
+		gettimeofday(&end_tv, NULL);
+		stats.flist_xfertime =
+		    (int64)(end_tv.tv_sec - start_tv.tv_sec) * 1000
+			 + (end_tv.tv_usec - start_tv.tv_usec) / 1000;
 	}
 
 	if (flist->hlink_pool) {
