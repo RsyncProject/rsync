@@ -139,8 +139,8 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	}
 
 	if (!preserve_times || S_ISLNK(st->st_mode))
-		flags |= PERMS_SKIP_TIME;
-	if (!(flags & PERMS_SKIP_TIME)
+		flags |= PERMS_SKIP_MTIME;
+	if (!(flags & PERMS_SKIP_MTIME)
 	    && cmp_modtime(st->st_mtime, file->modtime) != 0) {
 		/* don't complain about not setting times on directories
 		 * because some filesystems can't do it */
@@ -245,7 +245,7 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
 		do_unlink(fnametmp);
 	} else {
 		set_perms(fname, file, NULL,
-			  ok_to_set_time ? 0 : PERMS_SKIP_TIME);
+			  ok_to_set_time ? 0 : PERMS_SKIP_MTIME);
 	}
 }
 

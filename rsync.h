@@ -109,8 +109,8 @@
 #define XFLG_WORDS_ONLY 	(1<<2)
 #define XFLG_WORD_SPLIT 	(1<<3)
 
-#define PERMS_REPORT	(1<<0)
-#define PERMS_SKIP_TIME	(1<<1)
+#define PERMS_REPORT		(1<<0)
+#define PERMS_SKIP_MTIME	(1<<1)
 
 #define FULL_FLUSH	1
 #define NORMAL_FLUSH	0
