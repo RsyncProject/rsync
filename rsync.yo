@@ -929,8 +929,18 @@ prevent the partial file from being deleted (it could get deleted at the
 end of the transfer when using --delete-after, or at the beginning of the
 transfer when using --delete).  E.g. "--exclude=.rsync-partial/".
 
-IMPORTANT: the --partial-dir should not be writable by other users to
-avoid a security risk.  E.g. AVOID "/tmp".
+IMPORTANT: the --partial-dir should not be writable by other users or it
+is a security risk.  E.g. AVOID "/tmp".
+
+You can also set the partial-dir value the RSYNC_PARTIAL_DIR environment
+variable.  Setting this in the environment does not force --partial to be
+enabled, but rather it effects where partial files go when --partial (or
+-P) is used.  For instance, instead of specifying --partial-dir=.rsync-tmp
+along with --progress, you could set RSYNC_PARTIAL_DIR=.rsync-tmp in your
+environment and then just use the -P option to turn on the use of the
+.rsync-tmp dir for partial transfers.  The only time the --partial option
+does not look for this environment value is when --inplace was also
+specified (since --inplace conflicts with --partial-dir).
 
 dit(bf(--progress)) This option tells rsync to print information
 showing the progress of the transfer. This gives a bored user
