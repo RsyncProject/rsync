@@ -857,8 +857,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 	if (relative_paths < 0)
 		relative_paths = files_from? 1 : 0;
-	if (!relative_paths)
-		implied_dirs = 0;
 
 	*argv = poptGetArgs(pc);
 	*argc = count_args(*argv);
@@ -1240,7 +1238,7 @@ void server_options(char **args,int *argc)
 		if (!relative_paths)
 			args[ac++] = "--no-relative";
 	}
-	if (relative_paths && !implied_dirs && !am_sender)
+	if (!implied_dirs && !am_sender)
 		args[ac++] = "--no-implied-dirs";
 
 	*argc = ac;
