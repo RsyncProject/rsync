@@ -148,7 +148,7 @@ int check_exclude(char *name, struct exclude_struct **local_exclude_list,
 		  STRUCT_STAT *st)
 {
 	int n;
-        struct exclude_struct const *ent;
+        struct exclude_struct *ent;
 
 	if (name && (name[0] == '.') && !name[1])
 		/* never exclude '.', even if somebody does --exclude '*' */
