@@ -76,8 +76,10 @@ int batch_gen_fd = -1;
 const char *io_write_phase = phase_unknown;
 const char *io_read_phase = phase_unknown;
 
-/** Ignore EOF errors while reading a module listing if the remote
-    version is 24 or less. */
+/* Ignore EOF errors while reading a module listing if the remote
+ * version is 24 or less.  Also used by the receiver when it is
+ * reading a potential end-of-transfer keep-alive message that
+ * may never come. */
 int kludge_around_eof = False;
 
 int msg_fd_in = -1;
