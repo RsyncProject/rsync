@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsync)(1)(7 Jan 1999)()()
+manpage(rsync)(1)(9 Feb 1999)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
@@ -220,6 +220,7 @@ Usage: rsync [OPTION]... SRC [USER@]HOST:DEST
 
 Options
  -v, --verbose               increase verbosity
+ -q, --quiet                 decrease verbosity
  -c, --checksum              always checksum
  -a, --archive               archive mode
  -r, --recursive             recurse into directories
@@ -287,6 +288,11 @@ transferred and a brief summary at the end. Two -v flags will give you
 information on what files are being skipped and slightly more
 information at the end. More than two -v flags should only be used if
 you are debugging rsync.
+
+dit(bf(-q, --quiet)) This option decreases the amount of information you
+are given during the transfer, notably suppressing information messages
+from the remote server. This flag is useful when invoking rsync from
+cron.
 
 dit(bf(-I, --ignore-times)) Normally rsync will skip any files that are
 already the same length and have the same time-stamp. This option turns

@@ -292,7 +292,7 @@ static int rsync_module(int fd, int i)
 		}
 	}
 
-	ret = parse_arguments(argc, argv);
+	ret = parse_arguments(argc, argv, 0);
 
 	if (request) {
 		if (*auth_user) {

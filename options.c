@@ -72,6 +72,7 @@ char *rsync_path = RSYNC_NAME;
 int rsync_port = RSYNC_PORT;
 
 int verbose = 0;
+int quiet = 0;
 int always_checksum = 0;
 int list_only = 0;
 
@@ -90,6 +91,7 @@ void usage(int F)
   rprintf(F,"  or   rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC [DEST]\n");
   rprintf(F,"\nOptions\n");
   rprintf(F," -v, --verbose               increase verbosity\n");
+  rprintf(F," -q, --quiet                 decrease verbosity\n");
   rprintf(F," -c, --checksum              always checksum\n");
   rprintf(F," -a, --archive               archive mode\n");
   rprintf(F," -r, --recursive             recurse into directories\n");
@@ -151,7 +153,7 @@ enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS,
       OPT_SAFE_LINKS, OPT_COMPARE_DEST, OPT_LOG_FORMAT,OPT_PASSWORD_FILE};
 
-static char *short_options = "oblLWHpguDCtcahvrRIxnSe:B:T:z";
+static char *short_options = "oblLWHpguDCtcahvqrRIxnSe:B:T:z";
 
 static struct option long_options[] = {
   {"version",     0,     0,    OPT_VERSION},
@@ -177,6 +179,7 @@ static struct option long_options[] = {
   {"backup",      0,     0,    'b'},
   {"update",      0,     0,    'u'},
   {"verbose",     0,     0,    'v'},
+  {"quiet",       0,     0,    'q'},
   {"recursive",   0,     0,    'r'},
   {"relative",    0,     0,    'R'},
   {"devices",     0,     0,    'D'},
@@ -249,7 +252,7 @@ static int check_refuse_options(char *ref, int opt)
 }
 
 
-int parse_arguments(int argc, char *argv[])
+int parse_arguments(int argc, char *argv[], int frommain)
 {
 	int opt;
 	int option_index;
@@ -395,6 +398,10 @@ int parse_arguments(int argc, char *argv[])
 			verbose++;
 			break;
 
+		case 'q':
+			if (frommain) quiet++;
+			break;
+
 		case 'a':
 			recurse=1;
 #if SUPPORT_LINKS
@@ -507,6 +514,7 @@ void server_options(char **args,int *argc)
 	argstr[0] = '-';
 	for (i=0;i<verbose;i++)
 		argstr[x++] = 'v';
+	/* the -q option is intentionally left out */
 	if (make_backups)
 		argstr[x++] = 'b';
 	if (update_only)

@@ -592,7 +592,7 @@ int main(int argc,char *argv[])
 	   carried across */
 	orig_umask = (int)umask(0);
 
-	if (!parse_arguments(argc, argv)) {
+	if (!parse_arguments(argc, argv, 1)) {
 		exit_cleanup(RERR_SYNTAX);
 	}
 

@@ -87,7 +87,10 @@ void log_open(void)
 	int len;
 	FILE *f=NULL;
 	extern int am_daemon;
+	extern int quiet;
 	/* recursion can happen with certain fatal conditions */
+
+	if (quiet != 0 && fd == FINFO) return;
 
 	va_start(ap, format);
 	len = vslprintf(buf, sizeof(buf), format, ap);
