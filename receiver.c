@@ -292,6 +292,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	struct file_struct *file;
 	int phase=0;
 	int recv_ok;
+	extern struct stats stats;		
+	struct stats initial_stats;
 
 	if (verbose > 2) {
 		rprintf(FINFO,"recv_files(%d) starting\n",flist->count);
@@ -338,6 +340,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			}
 			continue;
 		}
+
+		initial_stats = stats;
 
 		if (verbose > 2)
 			rprintf(FINFO,"recv_files(%s)\n",fname);
@@ -418,10 +422,10 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			log_transfer(file, fname);
 		}
 
-		log_recv(file);
-		
 		/* recv file data */
 		recv_ok = receive_data(f_in,buf,fd2,fname,file->length);
+
+		log_recv(file, &initial_stats);
 		
 		if (buf) unmap_file(buf);
 		if (fd1 != -1) {

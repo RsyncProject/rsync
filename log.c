@@ -174,7 +174,8 @@ void rflush(int fd)
 
 /* a generic logging routine for send/recv, with parameter
    substitiution */
-static void log_formatted(char *op, struct file_struct *file)
+static void log_formatted(char *op, struct file_struct *file,
+			  struct stats *initial_stats)
 {
 	extern int module_id;
 	extern char *auth_user;
@@ -182,6 +183,9 @@ static void log_formatted(char *op, struct file_struct *file)
 	char *p, *s, *n;
 	char buf2[100];
 	int l;
+	extern struct stats stats;		
+	extern int am_sender;
+	int64 b;
 
 	strlcpy(buf, lp_log_format(module_id), sizeof(buf)-1);
 	
@@ -208,6 +212,28 @@ static void log_formatted(char *op, struct file_struct *file)
 		case 'm': n = lp_name(module_id); break;
 		case 'P': n = lp_path(module_id); break;
 		case 'u': n = auth_user; break;
+		case 'b': 
+			if (am_sender) {
+				b = stats.total_written - 
+					initial_stats->total_written;
+			} else {
+				b = stats.total_read - 
+					initial_stats->total_read;
+			}
+			slprintf(buf2,sizeof(buf2)-1,"%.0f", (double)b); 
+			n = buf2;
+			break;
+		case 'c': 
+			if (!am_sender) {
+				b = stats.total_written - 
+					initial_stats->total_written;
+			} else {
+				b = stats.total_read - 
+					initial_stats->total_read;
+			}
+			slprintf(buf2,sizeof(buf2)-1,"%.0f", (double)b); 
+			n = buf2;
+			break;
 		}
 
 		if (!n) continue;
@@ -232,20 +258,20 @@ static void log_formatted(char *op, struct file_struct *file)
 }
 
 /* log the outgoing transfer of a file */
-void log_send(struct file_struct *file)
+void log_send(struct file_struct *file, struct stats *initial_stats)
 {
 	extern int module_id;
 	if (lp_transfer_logging(module_id)) {
-		log_formatted("send", file);
+		log_formatted("send", file, initial_stats);
 	}
 }
 
 /* log the incoming transfer of a file */
-void log_recv(struct file_struct *file)
+void log_recv(struct file_struct *file, struct stats *initial_stats)
 {
 	extern int module_id;
 	if (lp_transfer_logging(module_id)) {
-		log_formatted("recv", file);
+		log_formatted("recv", file, initial_stats);
 	}
 }
 

@@ -129,6 +129,9 @@ itemize(
   it() %P for the module path
   it() %m for the module name
   it() %u for the authenticated username (or the null string)
+  it() %b for the number of bytes actually transferred 
+  it() %c when sending files this gives the number of checksum bytes
+    received for this file
 )
 
 The default log format is "%o %h [%a] %m (%u) %f %l"

@@ -100,7 +100,6 @@ static int read_timeout(int fd, char *buf, int len)
 		n = read(fd, buf, len);
 
 		if (n > 0) {
-			stats.total_read += n;
 			buf += n;
 			len -= n;
 			ret += n;
@@ -264,6 +263,8 @@ static void readfd(int fd,char *buffer,int N)
 		ret = read_unbuffered(fd,buffer + total,N-total);
 		total += ret;
 	}
+
+	stats.total_read += total;
 }
 
 
@@ -390,7 +391,6 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 
 			blocked = 0;
 			total += ret;
-			stats.total_written += ret;
 
 			if (io_timeout)
 				last_io = time(NULL);
@@ -441,6 +441,8 @@ void io_end_buffering(int fd)
 
 static void writefd(int fd,char *buf,int len)
 {
+	stats.total_written += len;
+
 	if (!io_buffer) {
 		writefd_unbuffered(fd, buf, len);
 		return;
@@ -576,6 +578,8 @@ int io_multiplex_write(int f, char *buf, int len)
 
 	SIVAL(io_buffer-4, 0, ((MPLEX_BASE + f)<<24) + len);
 	memcpy(io_buffer, buf, len);
+
+	stats.total_written += (len+4);
 
 	writefd_unbuffered(multiplex_out_fd, io_buffer-4, len+4);
 	return 1;

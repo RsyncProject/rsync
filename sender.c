@@ -91,6 +91,8 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 	int i;
 	struct file_struct *file;
 	int phase = 0;
+	extern struct stats stats;		
+	struct stats initial_stats;
 
 	if (verbose > 2)
 		rprintf(FINFO,"send_files starting\n");
@@ -149,6 +151,8 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 			continue;
 		}
 
+		initial_stats = stats;
+
 		s = receive_sums(f_in);
 		if (!s) {
 			io_error = 1;
@@ -184,8 +188,6 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 			rprintf(FINFO,"send_files mapped %s of size %d\n",
 				fname,(int)st.st_size);
 
-		log_send(file);
-	  
 		write_int(f_out,i);
 	  
 		write_int(f_out,s->count);
@@ -200,7 +202,9 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 		}
 	  
 		match_sums(f_out,s,buf,st.st_size);
-	  
+
+		log_send(file, &initial_stats);
+	  	  
 		if (buf) unmap_file(buf);
 		close(fd);
 	  
