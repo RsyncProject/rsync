@@ -439,8 +439,10 @@ void option_error(void)
 static void set_refuse_options(char *bp)
 {
 	struct poptOption *op;
-	char *cp;
-	int match_short, is_wild;
+	char *cp, shortname[2];
+	int is_wild;
+
+	shortname[1] = '\0';
 
 	while (1) {
 		while (*bp == ' ') bp++;
@@ -451,8 +453,7 @@ static void set_refuse_options(char *bp)
 		/* If they specify "delete", reject all delete options. */
 		if (strcmp(bp, "delete") == 0)
 			bp = "delete*";
-		match_short = !bp[1] && *bp != '*';
-		is_wild = !match_short && strpbrk(bp, "*?[") != NULL;
+		is_wild = strpbrk(bp, "*?[") != NULL;
 		for (op = long_options; ; op++) {
 			if (!op->longName) {
 				rprintf(FLOG,
@@ -460,8 +461,8 @@ static void set_refuse_options(char *bp)
 				    bp);
 				break;
 			}
-			if (match_short ? *bp == op->shortName
-					: wildmatch(bp, op->longName)) {
+			*shortname = op->shortName;
+			if (wildmatch(bp, op->longName) || wildmatch(bp, shortname)) {
 				op->val = (op - long_options) + OPT_REFUSED_BASE;
 				if (!is_wild)
 					break;
