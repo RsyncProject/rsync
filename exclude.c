@@ -621,9 +621,9 @@ int check_filter(struct filter_list_struct *listp, char *name, int name_is_dir)
 
 #define RULE_STRCMP(s,r) rule_strcmp((s), (r), sizeof (r) - 1)
 
-static const char *rule_strcmp(const char *str, const char *rule, int rule_len)
+static const uchar *rule_strcmp(const uchar *str, const char *rule, int rule_len)
 {
-	if (strncmp(str, rule, rule_len) != 0)
+	if (strncmp((char*)str, rule, rule_len) != 0)
 		return NULL;
 	if (isspace(str[rule_len]) || str[rule_len] == '_' || !str[rule_len])
 		return str + rule_len - 1;
