@@ -148,6 +148,7 @@ int list_only = 0;
 char *batch_name = NULL;
 
 static int daemon_opt;   /* sets am_daemon after option error-reporting */
+static int F_option_cnt = 0;
 static int modify_window_set;
 static char *dest_option = NULL;
 static char *max_size_arg;
@@ -298,6 +299,9 @@ void usage(enum logcode F)
   rprintf(F," -P                          equivalent to --partial --progress\n");
   rprintf(F," -z, --compress              compress file data\n");
   rprintf(F," -C, --cvs-exclude           auto ignore files in the same way CVS does\n");
+  rprintf(F," -f, --filter=RULE           add a file-filtering RULE\n");
+  rprintf(F," -F                          same as --filter=': /.rsync-filter'\n");
+  rprintf(F,"                             repeated: --filter='- .rsync-filter'\n");
   rprintf(F,"     --exclude=PATTERN       exclude files matching PATTERN\n");
   rprintf(F,"     --exclude-from=FILE     exclude patterns listed in FILE\n");
   rprintf(F,"     --include=PATTERN       don't exclude files matching PATTERN\n");
@@ -328,7 +332,7 @@ void usage(enum logcode F)
 }
 
 enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
-      OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST,
+      OPT_FILTER, OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_TIMEOUT, OPT_MAX_SIZE,
       OPT_REFUSED_BASE = 9000};
@@ -351,6 +355,7 @@ static struct poptOption long_options[] = {
   {"delete-excluded",  0,  POPT_ARG_NONE,   &delete_excluded, 0, 0, 0 },
   {"force",            0,  POPT_ARG_NONE,   &force_delete, 0, 0, 0 },
   {"numeric-ids",      0,  POPT_ARG_NONE,   &numeric_ids, 0, 0, 0 },
+  {"filter",          'f', POPT_ARG_STRING, 0, OPT_FILTER, 0, 0 },
   {"exclude",          0,  POPT_ARG_STRING, 0, OPT_EXCLUDE, 0, 0 },
   {"include",          0,  POPT_ARG_STRING, 0, OPT_INCLUDE, 0, 0 },
   {"exclude-from",     0,  POPT_ARG_STRING, 0, OPT_EXCLUDE_FROM, 0, 0 },
@@ -404,6 +409,7 @@ static struct poptOption long_options[] = {
   {"ignore-errors",    0,  POPT_ARG_NONE,   &ignore_errors, 0, 0, 0 },
   {"blocking-io",      0,  POPT_ARG_VAL,    &blocking_io, 1, 0, 0 },
   {"no-blocking-io",   0,  POPT_ARG_VAL,    &blocking_io, 0, 0, 0 },
+  {0,                 'F', POPT_ARG_NONE,   0, 'F', 0, 0 },
   {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
   {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
   {"log-format",       0,  POPT_ARG_STRING, &log_format, 0, 0, 0 },
@@ -625,8 +631,13 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			modify_window_set = 1;
 			break;
 
-		case OPT_EXCLUDE:
+		case OPT_FILTER:
 			add_exclude(&exclude_list, poptGetOptArg(pc), 0);
+			break;
+
+		case OPT_EXCLUDE:
+			add_exclude(&exclude_list, poptGetOptArg(pc),
+				    XFLG_DEF_EXCLUDE);
 			break;
 
 		case OPT_INCLUDE:
@@ -646,8 +657,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 					goto options_rejected;
 			}
 			add_exclude_file(&exclude_list, arg, XFLG_FATAL_ERRORS
-					 | (opt == OPT_INCLUDE_FROM
-					  ? XFLG_DEF_INCLUDE : 0));
+				| (opt == OPT_INCLUDE_FROM ? XFLG_DEF_INCLUDE
+							   : XFLG_DEF_EXCLUDE));
 			break;
 
 		case 'h':
@@ -669,6 +680,19 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				exit_cleanup(RERR_SYNTAX);
 			}
 			am_sender = 1;
+			break;
+
+		case 'F':
+			switch (++F_option_cnt) {
+			case 1:
+				add_exclude(&exclude_list,
+					    ": /.rsync-filter", 0);
+				break;
+			case 2:
+				add_exclude(&exclude_list,
+				 	    "- .rsync-filter", 0);
+				break;
+			}
 			break;
 
 		case 'P':
@@ -977,7 +1001,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				partial_dir = NULL;
 			else if (*partial_dir != '/') {
 				add_exclude(&exclude_list, partial_dir,
-					    XFLG_DIRECTORY);
+					    XFLG_DIRECTORY | XFLG_DEF_EXCLUDE);
 			}
 			keep_partial = 1;
 		}
