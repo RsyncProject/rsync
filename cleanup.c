@@ -131,8 +131,11 @@ void _exit_cleanup(int code, const char *file, int line)
 		}
 	}
 
-	if (code == 0 && (io_error || log_got_error)) {
-		code = RERR_PARTIAL;
+	if (code == 0) {
+		if ((io_error & ~IOERR_VANISHED) || log_got_error)
+			code = RERR_PARTIAL;
+		else if (io_error)
+			code = RERR_VANISHED;
 	}
 
 	if (code) log_exit(code, file, line);
