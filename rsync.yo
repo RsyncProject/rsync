@@ -586,8 +586,7 @@ rsyncd.conf.
 
 dit(bf(--stats)) This tells rsync to print a verbose set of statistics
 on the file transfer, allowing you to tell how effective the rsync
-algorithm is for your data. This option only works in conjunction with
-the -v (verbose) option.
+algorithm is for your data.
 
 dit(bf(--progress)) This option tells rsync to print information
 showing the progress of the transfer. This gives a bored user

@@ -40,23 +40,32 @@ static void report(int f)
 		if (f == -1 || !am_sender) return;
 	}
 
-	if (!verbose) return;
-
-	if (am_server && !am_sender) return;
-
-	if (am_server && am_sender) {
-		write_longint(f,stats.total_read);
-		write_longint(f,stats.total_written);
-		write_longint(f,stats.total_size);
+	if (am_server) {
+		if (verbose && am_sender) {
+			write_longint(f,stats.total_read);
+			write_longint(f,stats.total_written);
+			write_longint(f,stats.total_size);
+		}
 		return;
 	}
-    
-	if (!am_sender) {
-		int64 r;
+
+	/* this is the client */
+	    
+	if (!am_sender && verbose) {
+		/* note that if (!verbose && do_stats) then these values will
+		     be taken from the receiver side's copy.  The total size
+		     is identical but the bytes read and written are slightly
+		     different.  It's done this way to avoid modifying the
+		     protocol to support --stats without -v. */
 		stats.total_written = read_longint(f);
-		r = read_longint(f);
+		stats.total_read = read_longint(f);
 		stats.total_size = read_longint(f);
-		stats.total_read = r;
+
+		/* when the total_read was set above just now it would not
+		     have included the last two longints, but the last
+		     read_longint would have compensated for one of them.
+		     Compensate for the other one too by adding 8. */
+		stats.total_read += sizeof(int64);
 	}
 
 	if (do_stats) {
@@ -78,13 +87,15 @@ static void report(int f)
 		       (double)stats.total_read);
 	}
 	
-	rprintf(FINFO,"wrote %.0f bytes  read %.0f bytes  %.2f bytes/sec\n",
-	       (double)stats.total_written,
-	       (double)stats.total_read,
-	       (stats.total_written+stats.total_read)/(0.5 + (t-starttime)));
-	rprintf(FINFO,"total size is %.0f  speedup is %.2f\n",
-	       (double)stats.total_size,
-	       (1.0*stats.total_size)/(stats.total_written+stats.total_read));
+	if (verbose || do_stats) {
+		rprintf(FINFO,"wrote %.0f bytes  read %.0f bytes  %.2f bytes/sec\n",
+		       (double)stats.total_written,
+		       (double)stats.total_read,
+		       (stats.total_written+stats.total_read)/(0.5 + (t-starttime)));
+		rprintf(FINFO,"total size is %.0f  speedup is %.2f\n",
+		       (double)stats.total_size,
+		       (1.0*stats.total_size)/(stats.total_written+stats.total_read));
+	}
 
 	fflush(stdout);
 	fflush(stderr);
