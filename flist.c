@@ -367,9 +367,10 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 			} else
 				rdev = 0;
 		} else if (IS_DEVICE(mode)) {
-			if ((file->u.rdev & ~(DEV64_T)0xFF) == rdev_high)
+			if ((file->u.rdev & ~(DEV64_T)0xFF) == rdev_high) {
 				flags |= XMIT_SAME_HIGH_RDEV;
-			else {
+				rdev = file->u.rdev;
+			} else {
 				rdev = file->u.rdev;
 				rdev_high = rdev & ~(DEV64_T)0xFF;
 			}
