@@ -990,11 +990,7 @@ int handle_partial_dir(const char *fname, int create)
 	dir = partial_fname;
 	if (create) {
 		STRUCT_STAT st;
-#if SUPPORT_LINKS
 		int statret = do_lstat(dir, &st);
-#else
-		int statret = do_stat(dir, &st);
-#endif
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			if (do_unlink(dir) < 0)
 				return 0;

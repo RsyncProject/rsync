@@ -162,12 +162,7 @@ static int keep_backup(char *fname)
 	int ret_code;
 
 	/* return if no file to keep */
-#if SUPPORT_LINKS
-	ret_code = do_lstat(fname, &st);
-#else
-	ret_code = do_stat(fname, &st);
-#endif
-	if (ret_code < 0)
+	if (do_lstat(fname, &st) < 0)
 		return 1;
 
 	if (!(file = make_file(fname, NULL, NO_EXCLUDES)))
