@@ -324,8 +324,8 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	unsigned short flags;
 	static time_t modtime;
 	static mode_t mode;
-	static DEV64_T rdev, rdev_high;
-	static DEV64_T dev;
+	static dev_t dev, rdev;
+	static uint32 rdev_major;
 	static uid_t uid;
 	static gid_t gid;
 	static char lastname[MAXPATHLEN];
@@ -338,7 +338,8 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	if (!file) {
 		write_byte(f, 0);
 		modtime = 0, mode = 0;
-		rdev = 0, rdev_high = 0, dev = 0;
+		dev = rdev = makedev(0, 0);
+		rdev_major = 0;
 		uid = 0, gid = 0;
 		*lastname = '\0';
 		return;
@@ -357,21 +358,20 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	if (preserve_devices) {
 		if (protocol_version < 28) {
 			if (IS_DEVICE(mode)) {
-				if (file->u.rdev == rdev) {
-					/* Set both flags to simplify the test
-					 * when writing the data. */
-					flags |= XMIT_SAME_RDEV_pre28
-					    | XMIT_SAME_HIGH_RDEV;
-				} else
+				if (file->u.rdev == rdev)
+					flags |= XMIT_SAME_RDEV_pre28;
+				else
 					rdev = file->u.rdev;
 			} else
-				rdev = 0;
+				rdev = makedev(0, 0);
 		} else if (IS_DEVICE(mode)) {
 			rdev = file->u.rdev;
-			if ((rdev & ~(DEV64_T)0xFF) == rdev_high)
-				flags |= XMIT_SAME_HIGH_RDEV;
+			if ((uint32)major(rdev) == rdev_major)
+				flags |= XMIT_SAME_RDEV_MAJOR;
 			else
-				rdev_high = rdev & ~(DEV64_T)0xFF;
+				rdev_major = major(rdev);
+			if ((uint32)minor(rdev) <= 0xFFu)
+				flags |= XMIT_RDEV_MINOR_IS_SMALL;
 		}
 	}
 	if (file->uid == uid)
@@ -452,12 +452,17 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 		write_int(f, gid);
 	}
 	if (preserve_devices && IS_DEVICE(mode)) {
-		/* If XMIT_SAME_HIGH_RDEV is off, XMIT_SAME_RDEV_pre28 is
-		 * also off. */
-		if (!(flags & XMIT_SAME_HIGH_RDEV))
-			write_int(f, rdev);
-		else if (protocol_version >= 28)
-			write_byte(f, rdev);
+		if (protocol_version < 28) {
+			if (!(flags & XMIT_SAME_RDEV_pre28))
+				write_int(f, (int)rdev);
+		} else {
+			if (!(flags & XMIT_SAME_RDEV_MAJOR))
+				write_int(f, major(rdev));
+			if (flags & XMIT_RDEV_MINOR_IS_SMALL)
+				write_byte(f, minor(rdev));
+			else
+				write_int(f, minor(rdev));
+		}
 	}
 
 #if SUPPORT_LINKS
@@ -470,14 +475,20 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 
 #if SUPPORT_HARD_LINKS
 	if (flags & XMIT_HAS_IDEV_DATA) {
-		if (protocol_version < 26) {
+		if (protocol_version >= 28) {
+			/* major/minor dev_t and 64-bit ino_t */
+			if (!(flags & XMIT_SAME_DEV)) {
+				write_int(f, major(dev));
+				write_int(f, minor(dev));
+			}
+			write_longint(f, file->F_INODE);
+		} else if (protocol_version < 26) {
 			/* 32-bit dev_t and ino_t */
 			write_int(f, dev);
 			write_int(f, file->F_INODE);
 		} else {
 			/* 64-bit dev_t and ino_t */
-			if (!(flags & XMIT_SAME_DEV))
-				write_longint(f, dev);
+			write_longint(f, dev);
 			write_longint(f, file->F_INODE);
 		}
 	}
@@ -510,8 +521,8 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 {
 	static time_t modtime;
 	static mode_t mode;
-	static DEV64_T rdev, rdev_high;
-	static DEV64_T dev;
+	static dev_t dev, rdev;
+	static uint32 rdev_major;
 	static uid_t uid;
 	static gid_t gid;
 	static char lastname[MAXPATHLEN], *lastdir;
@@ -525,7 +536,8 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 
 	if (!fptr) {
 		modtime = 0, mode = 0;
-		rdev = 0, rdev_high = 0, dev = 0;
+		dev = rdev = makedev(0, 0);
+		rdev_major = 0;
 		uid = 0, gid = 0;
 		*lastname = '\0';
 		return;
@@ -587,15 +599,18 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 		if (protocol_version < 28) {
 			if (IS_DEVICE(mode)) {
 				if (!(flags & XMIT_SAME_RDEV_pre28))
-					rdev = (DEV64_T)read_int(f);
+					rdev = (dev_t)read_int(f);
 			} else
-				rdev = 0;
+				rdev = makedev(0, 0);
 		} else if (IS_DEVICE(mode)) {
-			if (!(flags & XMIT_SAME_HIGH_RDEV)) {
-				rdev = (DEV64_T)read_int(f);
-				rdev_high = rdev & ~(DEV64_T)0xFF;
-			} else
-				rdev = rdev_high | (DEV64_T)read_byte(f);
+			uint32 rdev_minor;
+			if (!(flags & XMIT_SAME_RDEV_MAJOR))
+				rdev_major = read_int(f);
+			if (flags & XMIT_RDEV_MINOR_IS_SMALL)
+				rdev_minor = read_byte(f);
+			else
+				rdev_minor = read_int(f);
+			rdev = makedev(rdev_major, rdev_minor);
 		}
 	}
 
@@ -660,12 +675,18 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 		flags |= XMIT_HAS_IDEV_DATA;
 	if (flags & XMIT_HAS_IDEV_DATA) {
 		INO64_T inode;
-		if (protocol_version < 26) {
-			dev = read_int(f);
+		if (protocol_version >= 28) {
+			if (!(flags & XMIT_SAME_DEV)) {
+				uint32 dev_major = read_int(f);
+				uint32 dev_minor = read_int(f);
+				dev = makedev(dev_major, dev_minor);
+			}
+			inode = read_longint(f);
+		} else if (protocol_version < 26) {
+			dev = (dev_t)read_int(f);
 			inode = read_int(f);
 		} else {
-			if (!(flags & XMIT_SAME_DEV))
-				dev = read_longint(f);
+			dev = (dev_t)read_longint(f);
 			inode = read_longint(f);
 		}
 		if (flist->hlink_pool) {
@@ -974,9 +995,10 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 
 	if (cvs_exclude) {
 		if (strlcpy(p, ".cvsignore", MAXPATHLEN - offset)
-		    < MAXPATHLEN - offset)
-			add_exclude_file(&local_exclude_list,fname,MISSING_OK,ADD_EXCLUDE);
-		else {
+		    < MAXPATHLEN - offset) {
+			add_exclude_file(&local_exclude_list, fname,
+					 MISSING_OK, ADD_EXCLUDE);
+		} else {
 			io_error |= IOERR_GENERAL;
 			rprintf(FINFO,
 				"cannot cvs-exclude in long-named directory %s\n",
