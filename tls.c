@@ -113,7 +113,7 @@ static void list_file(const char *fname)
 	/* TODO: Perhaps escape special characters in fname? */
 
 	printf("%s ", permbuf);
-	if (IS_DEVICE(buf.st_mode)) {
+	if (S_ISCHR(buf.st_mode) || S_ISBLK(buf.st_mode)) {
 		printf("%5ld,%6ld",
 		    (long)major(buf.st_rdev),
 		    (long)minor(buf.st_rdev));
