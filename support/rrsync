@@ -1,0 +1,54 @@
+#!/usr/bin/perl
+# Name: /usr/local/bin/rrsync	Author: Joe Smith <js-cgi@inwap.com> 30-Sep-2004
+# Purpose: Restricts rsync to subdirectory declared in .ssh/authorized_keys
+# (should have a symlink in /usr/bin)
+
+use Socket;
+use constant LOGFILE => 'rrsync.log';
+my $Usage = <<EOM;
+Use 'command="$0 [-ro] subdir"'
+	in front of lines in $ENV{HOME}/.ssh/authorized_keys
+EOM
+
+my $ro = (@ARGV and $ARGV[0] eq '-ro') ? shift : '';	# -ro = Read-Only
+my $subdir = shift;
+die "No subdirectory specified\n$Usage" unless defined $subdir;
+
+# The client uses "rsync -av -e ssh src/ server:dir/", and sshd on the server
+# executes this program when .ssh/authorized_keys has 'command="..."'.
+# For example:
+# command="rrsync logs/client" ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAIEAzGhEeNlPr...
+# command="rrsync -ro results" ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAIEAmkHG1WCjC...
+#
+# Format of the envrionment variables set by sshd:
+# SSH_ORIGINAL_COMMAND=rsync --server          -vlogDtpr --partial . dir # push
+# SSH_ORIGINAL_COMMAND=rsync --server --sender -vlogDtpr --partial . dir # pull
+# SSH_CLIENT=client_addr client_port server_port
+
+my $command = $ENV{SSH_ORIGINAL_COMMAND};
+die "Not invoked via sshd\n$Usage"	unless defined $command;
+
+my ($cmd,$dir) = $command =~ /(.* \.) ?(.*)/;
+die "SSH_ORIGINAL_COMMAND='$command' is not rsync\n" unless $cmd =~ /^rsync\s/;
+die "$0 -ro: sending to read-only directory $dir not allowed\n"
+	if $ro and $cmd !~ /^rsync --server --sender /;
+
+my $orig = $dir;
+$dir =  $subdir if $dir eq '';		# Use subdir instead of $HOME
+$dir =~ s%^/%%;				# Don't allow absolute paths
+$dir =  "$subdir/$dir" unless $dir eq $subdir or $dir =~ m%^\Q$subdir/%;
+$dir =~ s%/\.\.(?=/)%__%g;		# Don't allow foo/../../etc
+$dir =~ tr|-_/a-zA-Z0-9.,|_|c;		# Don't allow ;|][}{*?
+
+if (-f LOGFILE and open LOG,'>>',LOGFILE) {
+  my ($mm,$hh) = (localtime)[1,2];
+  my $host = $ENV{SSH_CLIENT} || 'unknown';
+  $host =~ s/ .*//;			# Keep only the client's IP addr
+  $host = gethostbyaddr(inet_aton($host),AF_INET) || $host;
+  $_ = sprintf "%-13s",$host;
+  print LOG "$hh:$mm $_ [$command] =",($dir eq $orig ? " OK" : "> $dir"),"\n";
+  close LOG;
+}
+
+exec "$cmd $dir" or die "exec($cmd $dir) failed: $? $!";
+# Note: This assumes that the rsync protocol will not be maliciously hijacked.
