@@ -139,12 +139,7 @@ echo "$0 running in `pwd`"
 echo "    rsync_bin=$rsync_bin"
 echo "    srcdir=$srcdir"
 
-if testuser=`whoami`
-then
-    :
-else 
-    testuser='(unknown)'
-fi
+testuser=`whoami || echo UNKNOWN`
 
 echo "    testuser=$testuser"
 echo "    os=`uname -a`"
