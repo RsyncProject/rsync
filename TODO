@@ -104,9 +104,6 @@ Memory accounting
   not sure this makes sense with modern mallocs.  At any rate it will
   make us allocate a huge amount of memory for large file lists.
 
-  We can try using the GNU/SVID/XPG mallinfo() function to get some
-  heap statistics.
-
 
 Hard-link handling
 
