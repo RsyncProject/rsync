@@ -633,11 +633,10 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		exit_cleanup(status);
 	}
 
-	if (argc == 0) {
+	if (argc == 0)
 		list_only = 1;
-	}
 
-	if (!write_batch)
+	if (!read_batch)
 		send_exclude_list(f_out);
 
 	if (filesfrom_fd >= 0) {
