@@ -55,7 +55,7 @@
 #define SAME_DEV (1<<10)
 
 /* What flags are relevant after the transfer of the flist is complete? */
-#define LIVE_FLAGS (FLAG_DELETE|HAS_INODE_DATA)
+#define LIVE_FLAGS FLAG_DELETE
 
 /* update this if you make incompatible changes */
 #define PROTOCOL_VERSION 28
