@@ -40,7 +40,7 @@ struct {
 	{ RERR_SYNTAX     , "syntax or usage error" }, 
 	{ RERR_PROTOCOL   , "protocol incompatibility" }, 
 	{ RERR_FILESELECT , "errors selecting input/output files, dirs" }, 
-	{ RERR_UNSUPPORTED , "requested action not supported" }, 
+	{ RERR_UNSUPPORTED, "requested action not supported" }, 
 	{ RERR_SOCKETIO   , "error in socket IO" }, 
 	{ RERR_FILEIO     , "error in file IO" }, 
 	{ RERR_STREAMIO   , "error in rsync protocol data stream" }, 
@@ -49,7 +49,12 @@ struct {
 	{ RERR_SIGNAL     , "received SIGUSR1 or SIGINT" }, 
 	{ RERR_WAITCHILD  , "some error returned by waitpid()" }, 
 	{ RERR_MALLOC     , "error allocating core memory buffers" }, 
+	{ RERR_PARTIAL    , "partial transfer" }, 
 	{ RERR_TIMEOUT    , "timeout in data send/receive" }, 
+	{ RERR_CMD_FAILED , "remote shell failed" },
+	{ RERR_CMD_KILLED , "remote shell killed" },
+	{ RERR_CMD_RUN,     "remote command could not be run" },
+        { RERR_CMD_NOTFOUND, "remote command not found" },
         { 0, NULL }
 };
 
@@ -506,7 +511,7 @@ void log_exit(int code, const char *file, int line)
                 if (!name)
                         name = "unexplained error";
                 
-		rprintf(FLOG,"transfer interrupted: %s (code %d) at %s(%d)\n", 
+		rprintf(FERROR,"transfer error: %s (code %d) at %s(%d)\n", 
 			name, code, file, line);
 	}
 }

@@ -126,23 +126,11 @@ static void report(int f)
 
 
 /* Start the remote shell.   cmd may be NULL to use the default. */
-/* TODO: When the shell exits, look at its return value, as this may
- * well tell us if something went wrong in trying to connect to the
- * remote machine.  Although it doesn't seem to be specified anywhere,
- * ssh and the shell seem to return these values:
- *
- * 124 if the command exited with status 255
- * 125 if the command is killed by a signal
- * 126 if the command cannot be run
- * 127 if the command is not found
- *
- * and we could use this to give a better explanation if the remote
- * command is not found.
- */
-static int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f_out)
+static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f_out)
 {
 	char *args[100];
-	int i,argc=0, ret;
+	int i,argc=0;
+	pid_t ret;
 	char *tok,*dir=NULL;
 	extern int local_server;
 	extern char *rsync_path;
@@ -484,13 +472,16 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
  * This is called once the connection has been negotiated.  It is used
  * for rsyncd, remote-shell, and local connections.
  */
-int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
+int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 {
 	struct file_list *flist;
 	int status = 0, status2 = 0;
 	char *local_name = NULL;
 	extern int am_sender;
 	extern int remote_version;
+	extern pid_t cleanup_child_pid;
+
+	cleanup_child_pid = pid;
 
 	set_nonblocking(f_in);
 	set_nonblocking(f_out);
@@ -583,7 +574,8 @@ static int start_client(int argc, char *argv[])
 	char *shell_machine = NULL;
 	char *shell_path = NULL;
 	char *shell_user = NULL;
-	int pid, ret;
+	int ret;
+	pid_t pid;
 	int f_in,f_out;
 	extern int local_server;
 	extern int am_sender;
@@ -700,8 +692,11 @@ static RETSIGTYPE sigusr1_handler(int val) {
 
 static RETSIGTYPE sigusr2_handler(int val) {
 	extern int log_got_error;
-	if (log_got_error) _exit(RERR_FILEIO);
+	if (log_got_error) _exit(RERR_PARTIAL);
 	_exit(0);
+}
+
+static RETSIGTYPE sigchld_handler(int val) {
 }
 
 int main(int argc,char *argv[])
@@ -715,6 +710,7 @@ int main(int argc,char *argv[])
 
 	signal(SIGUSR1, sigusr1_handler);
 	signal(SIGUSR2, sigusr2_handler);
+	signal(SIGCHLD, sigchld_handler);
 
 	starttime = time(NULL);
 	am_root = (getuid() == 0);

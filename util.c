@@ -93,9 +93,9 @@ int fd_pair(int fd[2])
    used to cope with badly broken rsh implementations like the one on
    solaris.
  */
-int piped_child(char **command,int *f_in,int *f_out)
+pid_t piped_child(char **command,int *f_in,int *f_out)
 {
-  int pid;
+  pid_t pid;
   int to_child_pipe[2];
   int from_child_pipe[2];
   extern int blocking_io;
@@ -108,7 +108,7 @@ int piped_child(char **command,int *f_in,int *f_out)
 
 
   pid = do_fork();
-  if (pid < 0) {
+  if (pid == -1) {
     rprintf(FERROR,"fork: %s\n",strerror(errno));
     exit_cleanup(RERR_IPC);
   }
@@ -148,9 +148,9 @@ int piped_child(char **command,int *f_in,int *f_out)
   return pid;
 }
 
-int local_child(int argc, char **argv,int *f_in,int *f_out)
+pid_t local_child(int argc, char **argv,int *f_in,int *f_out)
 {
-	int pid;
+	pid_t pid;
 	int to_child_pipe[2];
 	int from_child_pipe[2];
 
@@ -162,7 +162,7 @@ int local_child(int argc, char **argv,int *f_in,int *f_out)
 
 
 	pid = do_fork();
-	if (pid < 0) {
+	if (pid == -1) {
 		rprintf(FERROR,"fork: %s\n",strerror(errno));
 		exit_cleanup(RERR_IPC);
 	}

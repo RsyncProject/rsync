@@ -36,5 +36,22 @@
 #define RERR_SIGNAL     20      /* status returned when sent SIGUSR1, SIGINT */
 #define RERR_WAITCHILD  21      /* some error returned by waitpid() */
 #define RERR_MALLOC     22      /* error allocating core memory buffers */
+#define RERR_PARTIAL    23      /* partial transfer */
 
 #define RERR_TIMEOUT    30      /* timeout in data send/receive */
+
+/* Although it doesn't seem to be specified anywhere,
+ * ssh and the shell seem to return these values:
+ *
+ * 124 if the command exited with status 255
+ * 125 if the command is killed by a signal
+ * 126 if the command cannot be run
+ * 127 if the command is not found
+ *
+ * and we could use this to give a better explanation if the remote
+ * command is not found.
+ */
+#define RERR_CMD_FAILED 124
+#define RERR_CMD_KILLED 125
+#define RERR_CMD_RUN 126
+#define RERR_CMD_NOTFOUND 127

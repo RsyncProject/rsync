@@ -33,6 +33,7 @@ static struct map_struct *cleanup_buf;
 static int cleanup_pid = 0;
 extern int io_error;
 
+pid_t cleanup_child_pid = -1;
 
 /*
  * Code is one of the RERR_* codes from errcode.h.
@@ -42,10 +43,16 @@ void _exit_cleanup(int code, const char *file, int line)
 	extern int keep_partial;
 	extern int log_got_error;
 
-	if (code == 0 && io_error) code = RERR_FILEIO;
-
 	signal(SIGUSR1, SIG_IGN);
 	signal(SIGUSR2, SIG_IGN);
+
+	if (cleanup_child_pid != -1) {
+		int status;
+		if (waitpid(cleanup_child_pid, &status, WNOHANG) == cleanup_child_pid) {
+			status = WEXITSTATUS(status);
+			if (status > code) code = status;
+		}
+	}
 
 	if (cleanup_got_literal && cleanup_fname && keep_partial) {
 		char *fname = cleanup_fname;
@@ -68,13 +75,11 @@ void _exit_cleanup(int code, const char *file, int line)
 		}
 	}
 
-	if (code) log_exit(code, file, line);
-
-	if (code == 0) {
-		if (log_got_error) {
-			code = RERR_FILEIO;
-		}
+	if (code == 0 && (io_error || log_got_error)) {
+		code = RERR_PARTIAL;
 	}
+
+	if (code) log_exit(code, file, line);
 
 	exit(code);
 }
