@@ -1812,9 +1812,15 @@ int delete_file(char *fname, int mode, int flags)
 
 	zap_dir = (flags & DEL_FORCE_RECURSE || (force_delete && recurse))
 		&& !(flags & DEL_NO_RECURSE);
-	if (dry_run && zap_dir)
+	if (dry_run && zap_dir) {
+		ok = 0;
 		errno = ENOTEMPTY;
-	else if (do_rmdir(fname) == 0) {
+	} else if (make_backups && !backup_dir && !is_backup_file(fname)
+	    && !zap_dir)
+		ok = make_backup(fname);
+	else
+		ok = do_rmdir(fname) == 0;
+	if (ok) {
 		if ((verbose || log_format) && !(flags & DEL_TERSE))
 			log_delete(fname, mode);
 		deletion_count++;
@@ -1842,11 +1848,7 @@ int delete_file(char *fname, int mode, int flags)
 	if (max_delete && deletion_count >= max_delete)
 		return -1;
 
-	if (make_backups && !backup_dir && !is_backup_file(fname))
-		ok = make_backup(fname);
-	else
-		ok = do_rmdir(fname) == 0;
-	if (ok) {
+	if (do_rmdir(fname) == 0) {
 		if ((verbose || log_format) && !(flags & DEL_TERSE))
 			log_delete(fname, mode);
 		deletion_count++;
