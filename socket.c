@@ -1,5 +1,7 @@
 /* -*- c-file-style: "linux" -*-
    
+   rsync -- fast file replication program
+   
    Copyright (C) 1992-2001 by Andrew Tridgell <tridge@samba.org>
    Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
    
@@ -386,7 +388,7 @@ void start_accept_loop(int port, int (*fn)(int ))
 		fd_set fds;
 		int fd;
 		struct sockaddr_storage addr;
-		int addrlen = sizeof(addr);
+		socklen_t addrlen = sizeof addr;
 
 		/* close log file before the potentially very long select so
 		   file can be trimmed by another process instead of growing
@@ -569,7 +571,7 @@ void become_daemon(void)
 char *client_addr(int fd)
 {
 	struct sockaddr_storage ss;
-	int     length = sizeof(ss);
+	socklen_t length = sizeof ss;
 	static char addr_buf[100];
 	static int initialised;
 
@@ -599,7 +601,7 @@ static int get_sockaddr_family(const struct sockaddr_storage *ss)
 char *client_name(int fd)
 {
 	struct sockaddr_storage ss;
-	int     length = sizeof(ss);
+	socklen_t length = sizeof ss;
 	static char name_buf[100];
 	static char port_buf[100];
 	char *def = "UNKNOWN";
