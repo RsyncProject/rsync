@@ -1,6 +1,6 @@
 /* -*- c-file-style: "linux" -*-
    
-   Copyright (C) 1998-2001 by Andrew Tridgell 
+   Copyright (C) 1998-2001 by Andrew Tridgell <tridge@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -495,8 +495,9 @@ char *client_name(int fd)
 	/* do a forward lookup as well to prevent spoofing */
 	hp = gethostbyname(name_buf);
 	if (!hp) {
-		strcpy(name_buf,def);
-		rprintf(FERROR,"reverse name lookup failed\n");
+		strcpy (name_buf,def);
+		rprint (FERROR, "reverse name lookup for \"%s\" failed\n",
+			name_buf);
 	} else {
 		for (p=hp->h_addr_list;*p;p++) {
 			if (memcmp(*p, &sockin->sin_addr, hp->h_length) == 0) {
@@ -512,14 +513,19 @@ char *client_name(int fd)
 	return name_buf;
 }
 
-/*******************************************************************
-convert a string to an IP address. The string can be a name or
-dotted decimal number
-  ******************************************************************/
+/**
+   Convert a string to an IP address. The string can be a name or
+   dotted decimal number.
+
+   Returns a pointer to a static in_addr struct -- if you call this
+   more than once then you should copy it.
+*/
 struct in_addr *ip_address(const char *str)
 {
 	static struct in_addr ret;
 	struct hostent *hp;
+
+	assert (str);
 
 	/* try as an IP address */
 	if (inet_aton(str, &ret) != 0) {
@@ -529,17 +535,18 @@ struct in_addr *ip_address(const char *str)
 	/* otherwise assume it's a network name of some sort and use 
 	   gethostbyname */
 	if ((hp = gethostbyname(str)) == 0) {
-		rprintf(FERROR, "gethostbyname: Unknown host. %s\n",str);
+		rprintf(FERROR, "gethostbyname failed for \"%s\": unknown host?\n",str);
 		return NULL;
 	}
 
 	if (hp->h_addr == NULL) {
-		rprintf(FERROR, "gethostbyname: host address is invalid for host %s\n",str);
+		rprintf(FERROR, "gethostbyname: host address is invalid for host \"%s\"\n",str);
 		return NULL;
 	}
 
 	if (hp->h_length > sizeof(ret)) {
-		rprintf(FERROR, "gethostbyname: host address is too large\n");
+		rprintf(FERROR, "gethostbyname: host address for \"%s\" is too large\n",
+			str);
 		return NULL;
 	}
 
