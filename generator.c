@@ -588,9 +588,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	static struct file_list *fuzzy_dirlist = NULL;
 	struct file_struct *fuzzy_file = NULL;
 	int fd = -1, f_copy = -1;
-	STRUCT_STAT st, partial_st;
+	STRUCT_STAT st, real_st, partial_st;
 	struct file_struct *back_file = NULL;
-	int statret, stat_errno;
+	int statret, real_ret, stat_errno;
 	char *fnamecmp, *partialptr, *backupptr = NULL;
 	char fnamecmpbuf[MAXPATHLEN];
 	uchar fnamecmp_type;
@@ -687,7 +687,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		 * we need to delete it.  If it doesn't exist, then
 		 * (perhaps recursively) create it. */
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
-			delete_item(fname, st.st_mode, DEL_TERSE);
+			if (delete_item(fname, st.st_mode, DEL_TERSE) < 0)
+				return;
 			statret = -1;
 		}
 		if (dry_run && statret != 0 && missing_below < 0) {
@@ -757,12 +758,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 			/* Not the right symlink (or not a symlink), so
 			 * delete it. */
-			if (S_ISLNK(st.st_mode))
-				delete_item(fname, st.st_mode, DEL_TERSE);
-			else {
-				delete_item(fname, st.st_mode, DEL_TERSE);
+			if (delete_item(fname, st.st_mode, DEL_TERSE) < 0)
+				return;
+			if (!S_ISLNK(st.st_mode))
 				statret = -1;
-			}
 		}
 		if (do_symlink(file->u.link,fname) != 0) {
 			rsyserr(FERROR, errno, "symlink %s -> \"%s\" failed",
@@ -791,7 +790,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (statret != 0 ||
 		    st.st_mode != file->mode ||
 		    st.st_rdev != file->u.rdev) {
-			delete_item(fname, st.st_mode, DEL_TERSE);
+			if (delete_item(fname, st.st_mode, DEL_TERSE) < 0)
+				return;
 			if (!IS_DEVICE(st.st_mode))
 				statret = -1;
 			if (verbose > 2) {
@@ -845,6 +845,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	fnamecmp = fname;
 	fnamecmp_type = FNAMECMP_FNAME;
+
+	if (statret == 0 && !S_ISREG(st.st_mode)) {
+		if (delete_item(fname, st.st_mode, DEL_TERSE) != 0)
+			return;
+		statret = -1;
+		stat_errno = ENOENT;
+	}
 
 	if (statret != 0 && basis_dir[0] != NULL) {
 		int best_match = -1;
@@ -910,12 +917,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 	}
 
-	if (statret == 0 && !S_ISREG(st.st_mode)) {
-		if (delete_item(fname, st.st_mode, DEL_TERSE) != 0)
-			return;
-		statret = -1;
-		stat_errno = ENOENT;
-	}
+	real_ret = statret;
+	real_st = st;
 
 	if (partial_dir && (partialptr = partial_dir_fname(fname)) != NULL
 	    && link_stat(partialptr, &partial_st, 0) == 0
@@ -934,9 +937,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				rprintf(FINFO, "fuzzy basis selected for %s: %s\n",
 					safe_fname(fname), safe_fname(fnamecmpbuf));
 			}
-			st.st_mode = fuzzy_file->mode;
 			st.st_size = fuzzy_file->length;
-			st.st_mtime = fuzzy_file->modtime;
 			statret = 0;
 			fnamecmp = fnamecmpbuf;
 			fnamecmp_type = FNAMECMP_FUZZY;
@@ -962,8 +963,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		;
 	else if (unchanged_file(fnamecmp, file, &st)) {
 		if (fnamecmp_type == FNAMECMP_FNAME) {
-			if (itemizing)
-				itemize(file, ndx, statret, &st, 0, 0, NULL);
+			if (itemizing) {
+				itemize(file, ndx, real_ret, &real_st,
+					0, 0, NULL);
+			}
 			set_perms(fname, file, &st, maybe_PERMS_REPORT);
 			if (preserve_hard_links && file->link_u.links)
 				hard_link_cluster(file, ndx, itemizing, code);
@@ -971,7 +974,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 		/* Only --compare-dest gets here. */
 		if (unchanged_attrs(file, &st)) {
-			itemize(file, ndx, statret, &st,
+			itemize(file, ndx, real_ret, &real_st,
 				ITEM_NO_DEST_AND_NO_UPDATE, 0, NULL);
 			return;
 		}
@@ -1004,7 +1007,7 @@ prepare_to_open:
 		/* pretend the file didn't exist */
 		if (preserve_hard_links && hard_link_check(file, ndx, HL_SKIP))
 			return;
-		statret = -1;
+		statret = real_ret = -1;
 		goto notify_others;
 	}
 
@@ -1053,7 +1056,7 @@ notify_others:
 			iflags |= ITEM_BASIS_TYPE_FOLLOWS;
 		if (fnamecmp_type == FNAMECMP_FUZZY)
 			iflags |= ITEM_XNAME_FOLLOWS;
-		itemize(file, -1, statret, &st, iflags, fnamecmp_type,
+		itemize(file, -1, real_ret, &real_st, iflags, fnamecmp_type,
 			fuzzy_file ? fuzzy_file->basename : NULL);
 	}
 
