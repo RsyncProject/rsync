@@ -52,6 +52,9 @@ rsync changes since last release
       processes and sometimes return an exit code of 0 instead of showing
       an error.  (David R. Staples, Dave Dykstra)
 
+    * Fixed bug in --copy-unsafe-links that caused it to be completely
+      broken.  (Dave Dykstra)
+
   INTERNAL:
 
     * Many code cleanups and improved internal documentation.  (Martin 
