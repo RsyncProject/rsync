@@ -35,11 +35,77 @@ use chroot
 Performance
 
   Traverse just one directory at a time.  Tridge says it's possible.
- 
-  Can possibly also be smarter about memory use while looking for hard
-  links by reducing the refcount as we find alternative names.  In
-  fact at the moment the code seems to make a whole second copy of the
-  file list, which seems unnecessary.
+
+  At the moment rsync reads the whole file list into memory at the
+  start, which makes us use a lot of memory and also not pipeline
+  network access as much as we could.
+
+Memory accounting
+
+  At exit, show how much memory was used for the file list, etc.
+
+Hard-link handling
+
+  At the moment hardlink handling is very expensive, so it's off by
+  default.  It does not need to be so.  
+
+  We can rule out hardlinked directories since they will probably
+  screw us up in all kinds of ways.  They simply should not be used.
+
+  At the moment rsync only cares about hardlinks to regular files.  I
+  guess you could also use them for sockets, devices and other beasts,
+  but I have not seen them.
+
+  When trying to reproduce hard links, we only need to worry about
+  files that have more than one name (nlinks>1 && !S_ISDIR). 
+
+  The basic point of this is to discover alternate names that refer to
+  the same file.  All operations, including creating the file and
+  writing modifications to it need only to be done for the first name.
+  For all later names, we just create the link and then leave it
+  alone.
+
+  If hard links are to be preserved:
+
+    Before the generator/receiver fork, the list of files is received
+    from the sender (recv_file_list), and a table for detecting hard
+    links is built.
+
+    The generator looks for hard links within the file list and does
+    not send checksums for them, though it does send other metadata.
+
+    The sender sends the device number and inode with file entries, so
+    that files are uniquely identified.
+
+    The receiver goes through and creates hard links (do_hard_links)
+    after all data has been written, but before directory permissions
+    are set.
+
+  At the moment device and inum are sent as 4-byte integers, which
+  will probably cause problems on large filesystems.  On Linux the
+  kernel uses 64-bit ino_t's internally, and people will soon have
+  filesystems big enough to use them.  We ought to follow NFS4 in
+  using 64-bit device and inode identification, perhaps with a
+  protocol version bump.
+
+  Once we've seen all the names for a particular file, we no longer
+  need to think about it and we can deallocate the memory.
+
+  We can also have the case where there are links to a file that are
+  not in the tree being transferred.  There's nothing we can do about
+  that.  Because we rename the destination into place after writing,
+  any hardlinks to the old file are always going to be orphaned.  In
+  fact that is almost necessary because otherwise we'd get really
+  confused if we were generating checksums for one name of a file and
+  modifying another.
+
+  At the moment the code seems to make a whole second copy of the file
+  list, which seems unnecessary.
+
+  We should have a test case that exercises hard links.  Since it
+  might be hard to compare ./tls output where the inodes change we
+  might need a little program to check whether several names refer to
+  the same file.
 
 IPv6
 
