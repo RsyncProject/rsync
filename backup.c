@@ -198,7 +198,7 @@ static int keep_backup(char *fname)
 	if (do_stat (fname, &st)) return 1;
 #endif
 
-	file = make_file(-1, fname, NULL, 1);
+	file = make_file(fname, NULL, NO_EXCLUDES);
 
 	/* the file could have disappeared */
 	if (!file) return 1;
@@ -294,4 +294,3 @@ int make_backup(char *fname)
 	else
 		return (make_simple_backup(fname));
 }
-
