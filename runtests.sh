@@ -92,6 +92,9 @@
 # they're in POSIX 1003.2, and since the build farm relies on them
 # they're probably working on most machines we really care about.
 
+# You cannot use "function foo {" syntax, but must instead say "foo()
+# {", or it breaks on FreeBSD.
+
 
 set -e
 
