@@ -51,6 +51,9 @@ Changes since 2.6.0:
     * Reduced memory requirements of hard link preservation.
       (J.W. Schultz)
 
+    * Implemented a new algorithm for hard-link handling that speeds
+      up the code significantly.  (J.W. Schultz and Wayne Davison)
+
     * Got rid of support for protocol versions 17 and 18 (which are
       both over 6 years old).  (Wayne Davison)
 
