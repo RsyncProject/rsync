@@ -646,8 +646,6 @@ are delimited by whitespace).
 
 Finally, any file is ignored if it is in the same directory as a
 .cvsignore file and matches one of the patterns listed therein.
-There is not currently a way to override an exclude rule read from
-a local .cvsignore file.
 See the bf(cvs(1)) manual for more information.
 
 dit(bf(--exclude=PATTERN)) This option allows you to selectively exclude
