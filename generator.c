@@ -273,8 +273,14 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		return;
 	}
 
-	statret = link_stat(fname, &st, keep_dirlinks && S_ISDIR(file->mode));
-	stat_errno = errno;
+	if (dry_run > 1) {
+		statret = -1;
+		stat_errno = ENOENT;
+	} else {
+		statret = link_stat(fname, &st,
+				    keep_dirlinks && S_ISDIR(file->mode));
+		stat_errno = errno;
+	}
 
 	if (only_existing && statret == -1 && stat_errno == ENOENT) {
 		/* we only want to update existing files */
