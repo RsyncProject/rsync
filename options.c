@@ -84,6 +84,7 @@ int keep_partial = 0;
 int safe_symlinks = 0;
 int copy_unsafe_links = 0;
 int size_only = 0;
+int daemon_bwlimit = 0;
 int bwlimit = 0;
 size_t bwlimit_writemax = 0;
 int delete_after = 0;
@@ -415,6 +416,7 @@ static void daemon_usage(enum logcode F)
 
   rprintf(F,"\nUsage: rsync --daemon [OPTION]...\n");
   rprintf(F,"     --address=ADDRESS       bind to the specified address\n");
+  rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth, KBytes per second\n");
   rprintf(F,"     --config=FILE           specify alternate rsyncd.conf file\n");
   rprintf(F,"     --no-detach             do not detach from the parent\n");
   rprintf(F,"     --port=PORT             specify alternate rsyncd port number\n");
@@ -431,6 +433,7 @@ static void daemon_usage(enum logcode F)
 static struct poptOption long_daemon_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
   {"address",          0,  POPT_ARG_STRING, &bind_address, 0, 0, 0 },
+  {"bwlimit",          0,  POPT_ARG_INT,    &daemon_bwlimit, 0, 0, 0 },
   {"config",           0,  POPT_ARG_STRING, &config_file, 0, 0, 0 },
   {"daemon",           0,  POPT_ARG_NONE,   &daemon_opt, 0, 0, 0 },
 #ifdef INET6
@@ -548,6 +551,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	/* The context leaks in case of an error, but if there's a
 	 * problem we always exit anyhow. */
 	pc = poptGetContext(RSYNC_NAME, *argc, *argv, long_options, 0);
+	poptReadDefaultConfig(pc, 0);
 
 	while ((opt = poptGetNextOpt(pc)) != -1) {
 		/* most options are handled automatically by popt;
@@ -897,6 +901,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (do_progress && !verbose)
 		verbose = 1;
 
+	if (daemon_bwlimit && (!bwlimit || bwlimit > daemon_bwlimit))
+		bwlimit = daemon_bwlimit;
 	if (bwlimit) {
 		bwlimit_writemax = (size_t)bwlimit * 128;
 		if (bwlimit_writemax < 512)
