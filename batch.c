@@ -23,10 +23,8 @@ extern char *batch_name;
 
 extern struct filter_list_struct filter_list;
 
-static int fudged_recurse;
-
 static int *flag_ptr[] = {
-	&fudged_recurse,
+	&recurse,
 	&preserve_uid,
 	&preserve_gid,
 	&preserve_links,
@@ -54,7 +52,6 @@ void write_stream_flags(int fd)
 
 	/* Start the batch file with a bitmap of data-stream-affecting
 	 * flags. */
-	fudged_recurse = recurse < 0;
 	for (i = 0, flags = 0; flag_ptr[i]; i++) {
 		if (*flag_ptr[i])
 			flags |= 1 << i;
@@ -66,7 +63,6 @@ void read_stream_flags(int fd)
 {
 	int i, flags;
 
-	fudged_recurse = recurse < 0;
 	if (protocol_version < 29)
 		xfer_dirs = 0;
 	for (i = 0, flags = read_int(fd); flag_ptr[i]; i++) {
@@ -80,7 +76,6 @@ void read_stream_flags(int fd)
 			*flag_ptr[i] = set;
 		}
 	}
-	recurse = fudged_recurse ? -1 : 0;
 	if (protocol_version < 29)
 		xfer_dirs = recurse ? 1 : 0;
 }
