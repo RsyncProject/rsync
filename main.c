@@ -594,6 +594,11 @@ int main(int argc,char *argv[])
       argv++;
     }
 
+    signal(SIGCHLD,SIG_IGN);
+    signal(SIGINT,SIGNAL_CAST sig_int);
+    signal(SIGPIPE,SIGNAL_CAST sig_int);
+    signal(SIGHUP,SIGNAL_CAST sig_int);
+
     if (dry_run)
       verbose = MAX(verbose,1);
 
@@ -670,10 +675,6 @@ int main(int argc,char *argv[])
 	      shell_path?shell_path:"");
     }
     
-    signal(SIGCHLD,SIG_IGN);
-    signal(SIGINT,SIGNAL_CAST sig_int);
-    signal(SIGPIPE,SIGNAL_CAST sig_int);
-
     if (!sender && argc != 1) {
       usage(stderr);
       exit_cleanup(1);
