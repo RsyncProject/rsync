@@ -59,7 +59,6 @@ int do_stats=0;
 int do_progress=0;
 int keep_partial=0;
 int safe_symlinks=0;
-
 int block_size=BLOCK_SIZE;
 
 char *backup_suffix = BACKUP_SUFFIX;
@@ -68,7 +67,7 @@ char *compare_dest = NULL;
 char *config_file = RSYNCD_CONF;
 char *shell_cmd = NULL;
 char *log_format = NULL;
-
+char *password_file = NULL;
 char *rsync_path = RSYNC_NAME;
 int rsync_port = RSYNC_PORT;
 
@@ -135,6 +134,7 @@ void usage(int F)
   rprintf(F,"     --stats                 give some file transfer stats\n");  
   rprintf(F,"     --progress              show progress during transfer\n");  
   rprintf(F,"     --log-format=FORMAT     log file transfers using specified format\n");  
+  rprintf(F,"     --password-file=FILE    get password from FILE\n");
   rprintf(F," -h, --help                  show this help screen\n");
 
   rprintf(F,"\n");
@@ -149,7 +149,7 @@ enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
       OPT_EXCLUDE_FROM,OPT_DELETE,OPT_NUMERIC_IDS,OPT_RSYNC_PATH,
       OPT_FORCE,OPT_TIMEOUT,OPT_DAEMON,OPT_CONFIG,OPT_PORT,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS,
-      OPT_SAFE_LINKS, OPT_COMPARE_DEST, OPT_LOG_FORMAT};
+      OPT_SAFE_LINKS, OPT_COMPARE_DEST, OPT_LOG_FORMAT,OPT_PASSWORD_FILE};
 
 static char *short_options = "oblLWHpguDCtcahvrRIxnSe:B:T:z";
 
@@ -165,6 +165,7 @@ static struct option long_options[] = {
   {"include",     1,     0,    OPT_INCLUDE},
   {"include-from",1,     0,    OPT_INCLUDE_FROM},
   {"rsync-path",  1,     0,    OPT_RSYNC_PATH},
+  {"password-file", 1,	0,     OPT_PASSWORD_FILE},
   {"one-file-system",0,  0,    'x'},
   {"ignore-times",0,     0,    'I'},
   {"help",        0,     0,    'h'},
@@ -276,7 +277,10 @@ int parse_arguments(int argc, char *argv[])
 		case OPT_RSYNC_PATH:
 			rsync_path = optarg;
 			break;
-			
+	
+		case OPT_PASSWORD_FILE:
+			password_file =optarg;
+			break;		
 		case 'I':
 			ignore_times = 1;
 			break;

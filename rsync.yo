@@ -159,10 +159,11 @@ itemize(
 Some paths on the remote server may require authentication. If so then
 you will receive a password prompt when you connect. You can avoid the
 password prompt by setting the environment variable RSYNC_PASSWORD to
-the password you want to use. This may be useful when scripting rsync.
+the password you want to use or using the --password-file option. This
+may be useful when scripting rsync.
 
 WARNING: On some systems environment variables are visible to all
-users. 
+users. On those systems using --password-file is recommended.
 
 manpagesection(RUNNING AN RSYNC SERVER)
 
@@ -262,6 +263,7 @@ Options
      --port=PORT             specify alternate rsyncd port number
      --stats                 give some file transfer stats
      --progress              show progress during transfer
+     --password-file=FILE    get password from FILE
      --log-format=FORMAT     log file transfers using specified format
  -h, --help                  show this help screen
 )
@@ -580,6 +582,12 @@ the -v (verbose) option.
 dit(bf(--progress)) This option tells rsync to print information
 showing the progress of the transfer. This gives a bored user
 something to watch.
+
+dit(bf(--password-file)) This option allows you to provide a password
+in a file for accessing a remote rsync server. Note that this option
+is only useful when accessing a rsync server using the built in
+transport, not when using a remote shell as the transport. The file
+must not be world readable.
 
 enddit()
 

@@ -130,6 +130,53 @@ static int get_secret(int module, char *user, char *secret, int len)
 	return 1;
 }
 
+static char *getpassf(char *filename)
+{
+	char buffer[100];
+	int len=0;
+	int fd=0;
+	STRUCT_STAT st;
+	int ok = 1;
+	extern int am_root;
+	char *envpw=getenv("RSYNC_PASSWORD");
+
+	if (!filename) return NULL;
+
+	if ( (fd=open(filename,O_RDONLY)) == -1) {
+		rprintf(FERROR,"could not open password file \"%s\"\n",filename);
+		if (envpw) rprintf(FERROR,"falling back to RSYNC_PASSWORD environment variable.\n");	
+		return NULL;
+	}
+	
+	if (do_stat(filename, &st) == -1) {
+		rprintf(FERROR,"stat(%s) : %s\n", filename, strerror(errno));
+		ok = 0;
+	} else if ((st.st_mode & 06) != 0) {
+		rprintf(FERROR,"password file must not be other-accessible\n");
+		ok = 0;
+	} else if (am_root && (st.st_uid != 0)) {
+		rprintf(FERROR,"password file must be owned by root when running as root\n");
+		ok = 0;
+	}
+	if (!ok) {
+		rprintf(FERROR,"continuing without password file\n");
+		if (envpw) rprintf(FERROR,"using RSYNC_PASSWORD environment variable.\n");
+		close(fd);
+		return NULL;
+	}
+
+	if (envpw) rprintf(FERROR,"RSYNC_PASSWORD environment variable ignored\n");
+
+	buffer[sizeof(buffer)-1]='\0';
+	if ( (len=read(fd,buffer,sizeof(buffer)-1)) > 0)
+	{
+		close(fd);
+		return strdup(strtok(buffer,"\n\r"));
+	}	
+
+	return NULL;
+}
+
 /* generate a 16 byte hash from a password and challenge */
 static void generate_hash(char *in, char *challenge, char *out)
 {
@@ -216,10 +263,11 @@ void auth_client(int fd, char *user, char *challenge)
 {
 	char *pass;
 	char pass2[30];
+	extern char *password_file;
 
 	if (!user || !*user) return;
 
-	if (!(pass=getenv("RSYNC_PASSWORD"))) {
+	if (!(pass=getpassf(password_file)) && !(pass=getenv("RSYNC_PASSWORD"))) {
 		pass = getpass("Password: ");
 	}
 
@@ -228,7 +276,7 @@ void auth_client(int fd, char *user, char *challenge)
 	}
 
 	generate_hash(pass, challenge, pass2);
-	
 	io_printf(fd, "%s %s\n", user, pass2);
 }
+
 
