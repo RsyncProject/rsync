@@ -112,6 +112,7 @@ static int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f
 	char *tok,*dir=NULL;
 	extern int local_server;
 	extern char *rsync_path;
+	extern int blocking_io;
 
 	if (!local_server) {
 		if (!cmd)
@@ -144,6 +145,9 @@ static int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f
 		args[argc++] = rsync_path;
 
 		server_options(args,&argc);
+
+
+		if (strcmp(cmd, RSYNC_RSH) == 0) blocking_io = 1;
 	}
 
 	args[argc++] = ".";
