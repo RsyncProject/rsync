@@ -36,10 +36,12 @@ AC_TYPE_PID_T
 AC_STRUCT_ST_RDEV
 AC_CHECK_TYPE(ino_t,unsigned)
 
-echo $ac_n "checking for errno in errno.h... $ac_c"
-AC_TRY_COMPILE([#include <errno.h>],[int i = errno],
-echo yes; AC_DEFINE(HAVE_ERRNO_DECL),
-echo no)
+AC_CACHE_CHECK([for errno in errno.h],samba_cv_errno, [
+    AC_TRY_COMPILE([#include <errno.h>],[int i = errno],
+	samba_cv_errno=yes,samba_cv_have_errno_decl=no)])
+if test x"$samba_cv_errno" = x"yes"; then
+   AC_DEFINE(HAVE_ERRNO_DECL)
+fi
 
 AC_FUNC_MEMCMP
 AC_FUNC_UTIME_NULL
@@ -53,18 +55,22 @@ main() { exit(fnmatch("*.o", "x.o", 0) == 0? 0: 1); }],
 echo yes;AC_DEFINE(HAVE_FNMATCH), 
 echo no)
 
-echo $ac_n "checking for long long ... $ac_c"
+AC_CACHE_CHECK([for long long],samba_cv_have_longlong,[
 AC_TRY_RUN([#include <stdio.h>
 main() { long long x = 1000000; x *= x; exit(((x/1000000) == 1000000)? 0: 1); }],
-echo yes;AC_DEFINE(HAVE_LONGLONG), 
-echo no)
+samba_cv_have_longlong=yes,samba_cv_have_longlong=no,samba_cv_have_longlong=cross)])
+if test x"$samba_cv_have_longlong" = x"yes"; then
+    AC_DEFINE(HAVE_LONGLONG)
+fi
 
-echo $ac_n "checking for off64_t ... $ac_c"
+AC_CACHE_CHECK([for off64_t],samba_cv_HAVE_OFF64_T,[
 AC_TRY_RUN([#include <stdio.h>
 #include <sys/stat.h>
-main() { struct stat64 st; off64_t s; if (sizeof(off_t) == sizeof(off64_t)) return 1; exit((lstat64("/dev/null", &st)==0)?0:1); }],
-echo yes;AC_DEFINE(HAVE_OFF64_T), 
-echo no)
+main() { struct stat64 st; off64_t s; if (sizeof(off_t) == sizeof(off64_t)) exit(1); exit((lstat64("/dev/null", &st)==0)?0:1); }],
+samba_cv_HAVE_OFF64_T=yes,samba_cv_HAVE_OFF64_T=no,samba_cv_HAVE_OFF64_T=cross)])
+if test x"$samba_cv_HAVE_OFF64_T" = x"yes"; then
+    AC_DEFINE(HAVE_OFF64_T)
+fi
 
 echo $ac_n "checking for short ino_t ... $ac_c"
 AC_TRY_RUN([#include <stdio.h>
@@ -74,27 +80,33 @@ main() { if (sizeof(ino_t) < sizeof(unsigned int)) return 0; return 1; }],
 echo yes;AC_DEFINE(HAVE_SHORT_INO_T), 
 echo no)
 
-echo $ac_n "checking for unsigned char ... $ac_c"
+AC_CACHE_CHECK([for unsigned char],samba_cv_HAVE_UNSIGNED_CHAR,[
 AC_TRY_RUN([#include <stdio.h>
 main() { char c; c=250; exit((c > 0)?0:1); }],
-echo yes;AC_DEFINE(HAVE_UNSIGNED_CHAR), 
-echo no)
+samba_cv_HAVE_UNSIGNED_CHAR=yes,samba_cv_HAVE_UNSIGNED_CHAR=no,samba_cv_HAVE_UNSIGNED_CHAR=cross)])
+if test x"$samba_cv_HAVE_UNSIGNED_CHAR" = x"yes"; then
+    AC_DEFINE(HAVE_UNSIGNED_CHAR)
+fi
 
-echo $ac_n "checking for broken readdir ... $ac_c"
+AC_CACHE_CHECK([for broken readdir],samba_cv_HAVE_BROKEN_READDIR,[
 AC_TRY_RUN([#include <sys/types.h>
 #include <dirent.h>
 main() { struct dirent *di; DIR *d = opendir("."); di = readdir(d);
 if (di && di->d_name[-2] == '.' && di->d_name[-1] == 0 &&
-di->d_name[0] == 0) return 0; return 1;} ],
-echo yes - you are using the broken /usr/ucb/cc;AC_DEFINE(HAVE_BROKEN_READDIR), 
-echo no)
+di->d_name[0] == 0) exit(0); exit(1);} ],
+samba_cv_HAVE_BROKEN_READDIR=yes,samba_cv_HAVE_BROKEN_READDIR=no,samba_cv_HAVE_BROKEN_READDIR=cross)])
+if test x"$samba_cv_HAVE_BROKEN_READDIR" = x"yes"; then
+    AC_DEFINE(HAVE_BROKEN_READDIR)
+fi
 
-echo $ac_n "checking for utimbuf ... $ac_c"
+AC_CACHE_CHECK([for utimbuf],samba_cv_HAVE_UTIMBUF,[
 AC_TRY_COMPILE([#include <sys/types.h>
 #include <utime.h>],
-[struct utimbuf tbuf;  tbuf.actime = 0; tbuf.modtime = 1; return utime("foo.c",&tbuf);],
-echo yes;AC_DEFINE(HAVE_UTIMBUF), 
-echo no)
+[struct utimbuf tbuf;  tbuf.actime = 0; tbuf.modtime = 1; exit(utime("foo.c",&tbuf));],
+samba_cv_HAVE_UTIMBUF=yes,samba_cv_HAVE_UTIMBUF=no,samba_cv_HAVE_UTIMBUF=cross)])
+if test x"$samba_cv_HAVE_UTIMBUF" = x"yes"; then
+    AC_DEFINE(HAVE_UTIMBUF)
+fi
 
 # The following test taken from the cvs sources
 # If we can't find connect, try looking in -lsocket, -lnsl, and -linet.
@@ -102,30 +114,33 @@ echo no)
 # libsocket.so which has a bad implementation of gethostbyname (it
 # only looks in /etc/hosts), so we only look for -lsocket if we need
 # it.
-AC_CHECK_FUNC(connect, :, 
-[case "$LIBS" in
-*-lnsl*) ;;
-*) AC_CHECK_LIB(nsl_s, printf) ;;
-esac
-case "$LIBS" in
-*-lnsl*) ;;
-*) AC_CHECK_LIB(nsl, printf) ;;
-esac
-case "$LIBS" in
-*-lsocket*) ;;
-*) AC_CHECK_LIB(socket, connect) ;;
-esac
-case "$LIBS" in
-*-linet*) ;;
-*) AC_CHECK_LIB(inet, connect) ;;
-esac
-dnl We can't just call AC_CHECK_FUNCS(connect) here, because the value
-dnl has been cached.
-if test "$ac_cv_lib_socket_connect" = "yes" || 
-   test "$ac_cv_lib_inet_connect" = "yes"; then
-  ac_cv_func_connect=yes
-  AC_DEFINE(HAVE_CONNECT)
-fi])
+AC_CHECK_FUNCS(connect)
+if test x"$ac_cv_func_connect" = x"no"; then
+    case "$LIBS" in
+    *-lnsl*) ;;
+    *) AC_CHECK_LIB(nsl_s, printf) ;;
+    esac
+    case "$LIBS" in
+    *-lnsl*) ;;
+    *) AC_CHECK_LIB(nsl, printf) ;;
+    esac
+    case "$LIBS" in
+    *-lsocket*) ;;
+    *) AC_CHECK_LIB(socket, connect) ;;
+    esac
+    case "$LIBS" in
+    *-linet*) ;;
+    *) AC_CHECK_LIB(inet, connect) ;;
+    esac
+    dnl We can't just call AC_CHECK_FUNCS(connect) here, because the value
+    dnl has been cached.
+    if test x"$ac_cv_lib_socket_connect" = x"yes" || 
+       test x"$ac_cv_lib_inet_connect" = x"yes"; then
+        # ac_cv_func_connect=yes
+        # don't!  it would cause AC_CHECK_FUNC to succeed next time configure is run
+        AC_DEFINE(HAVE_CONNECT)
+    fi
+fi
 
 #
 # The following test was mostly taken from the tcl/tk plus patches
