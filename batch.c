@@ -47,7 +47,7 @@ void write_batch_flist_info(int flist_count, struct file_struct **files)
 
 	reset_file_entry_vars();
 	for (i = 0; i < flist_count; i++)
-		send_file_entry(files[i], f, files[i]->flags & FLAG_DELETE);
+		send_file_entry(files[i], f, files[i]->flags & LIVE_FLAGS);
 	send_file_entry(NULL, f, 0);
 
 	protocol_version = save_pv;
