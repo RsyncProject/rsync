@@ -373,7 +373,7 @@ int poptParseArgvString(const unsigned char * s,
  * @return		error string
  */
 /*@-redecl@*/
-/*@observer@*/ const char *const poptStrerror(const int error)
+/*@observer@*/ const char * poptStrerror(const int error)
 	/*@*/;
 /*@=redecl@*/
 
