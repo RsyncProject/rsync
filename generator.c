@@ -385,7 +385,6 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		return;
 	}
 
-#ifdef HAVE_MKNOD
 	if (am_root && preserve_devices && IS_DEVICE(file->mode)) {
 		if (statret != 0 ||
 		    st.st_mode != file->mode ||
@@ -411,7 +410,6 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		}
 		return;
 	}
-#endif
 
 	if (preserve_hard_links && hard_link_check(file, HL_CHECK_MASTER))
 		return;

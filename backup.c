@@ -176,7 +176,6 @@ static int keep_backup(char *fname)
 	if (!(buf = get_backup_name(fname)))
 		return 0;
 
-#ifdef HAVE_MKNOD
 	/* Check to see if this is a device file, or link */
 	if (IS_DEVICE(file->mode)) {
 		if (am_root && preserve_devices) {
@@ -194,7 +193,6 @@ static int keep_backup(char *fname)
 		kept = 1;
 		do_unlink(fname);
 	}
-#endif
 
 	if (!kept && S_ISDIR(file->mode)) {
 		/* make an empty directory */
