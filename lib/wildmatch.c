@@ -210,7 +210,7 @@ static int domatch(const unsigned char *p, const unsigned char *text)
 		else if (*text == ch)
 		    matched = TRUE;
 	    } while (prev = ch, (ch = *++p) != ']');
-	    if (matched == special)
+	    if (matched == special || *text == '/')
 		return FALSE;
 	    continue;
 	}
