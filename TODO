@@ -363,25 +363,6 @@ zlib
   versions.
 
 
-logging
-
-  Perhaps flush stdout after each filename, so that people trying to
-  monitor progress in a log file can do so more easily.  See
-  http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=48108
-
-  At the connections that just get a list of modules are not logged,
-  but they should be.
-
-  If a child of the rsync daemon dies with a signal, we should notice
-  that when we reap it and log a message.
-
-  Keep stderr and stdout properly separated (Debian #23626)
-
-  Use a separate function for reporting errors; prefix it with
-  "rsync:" or "rsync(remote)", or perhaps even "rsync(local
-  generator): ".
-
-
 proxy authentication
 
   Allow RSYNC_PROXY to be http://user:pass@proxy.foo:3128/, and do
@@ -572,6 +553,39 @@ Add machines
 
   SCO
 
+
+LOGGING --------------------------------------------------------------
+
+  Perhaps flush stdout after each filename, so that people trying to
+  monitor progress in a log file can do so more easily.  See
+  http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=48108
+
+  At the connections that just get a list of modules are not logged,
+  but they should be.
+
+  If a child of the rsync daemon dies with a signal, we should notice
+  that when we reap it and log a message.
+
+  Keep stderr and stdout properly separated (Debian #23626)
+
+  Use a separate function for reporting errors; prefix it with
+  "rsync:" or "rsync(remote)", or perhaps even "rsync(local
+  generator): ".
+
+verbose output
+  
+  Indicate whether files are new, updated, or deleted
+
+  At end of transfer, show how many files were or were not transferred
+  correctly.
+
+-vv
+
+  Explain *why* every file is transferred or not (e.g. "local mtime
+  123123 newer than 1283198")
+
+
+
 NICE -----------------------------------------------------------------
 
 --no-detach and --no-fork options
@@ -581,14 +595,6 @@ NICE -----------------------------------------------------------------
   parent exits.
 
 hang/timeout friendliness
-
-verbose output
-  
-  Indicate whether files are new, updated, or deleted
-
-  At end of transfer, show how many files were or were not transferred
-  correctly.
-
 
 internationalization
 
