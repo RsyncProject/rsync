@@ -942,7 +942,7 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 	if (cvs_exclude) {
 		if (strlen(fname) + strlen(".cvsignore") <= MAXPATHLEN - 1) {
 			strcpy(p, ".cvsignore");
-			add_exclude_file(&exclude_list,fname,MISSING_OK,ADD_EXCLUDE);
+			add_exclude_file(&local_exclude_list,fname,MISSING_OK,ADD_EXCLUDE);
 		} else {
 			io_error |= IOERR_GENERAL;
 			rprintf(FINFO,
