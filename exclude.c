@@ -103,11 +103,6 @@ void free_exclude_list(struct exclude_list_struct *listp)
 {
 	struct exclude_struct *ent, *next;
 
-	if (verbose > 2) {
-		rprintf(FINFO, "[%s] clearing %sexclude list\n",
-			who_am_i(), listp->debug_type);
-	}
-
 	for (ent = listp->head; ent; ent = next) {
 		next = ent->next;
 		free_exclude(ent);
@@ -296,9 +291,14 @@ void add_exclude(struct exclude_list_struct *listp, const char *pattern,
 		if (!pat_len)
 			break;
 		/* If we got the special "!" token, clear the list. */
-		if (incl < 0)
+		if (incl < 0) {
+			if (verbose > 2) {
+				rprintf(FINFO,
+					"[%s] clearing %sexclude list\n",
+					who_am_i(), listp->debug_type);
+			}
 			free_exclude_list(listp);
-		else {
+		} else {
 			make_exclude(listp, cp, pat_len, incl);
 
 			if (verbose > 2) {

@@ -949,6 +949,10 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 		struct exclude_list_struct last_list = local_exclude_list;
 		local_exclude_list.head = local_exclude_list.tail = NULL;
 		send_directory(f, flist, f_name_to(file, fbuf));
+		if (verbose > 2) {
+			rprintf(FINFO, "[%s] popping %sexclude list\n",
+				who_am_i(), local_exclude_list.debug_type);
+		}
 		free_exclude_list(&local_exclude_list);
 		local_exclude_list = last_list;
 	}
