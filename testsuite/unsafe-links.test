@@ -2,7 +2,7 @@
 
 # Originally by Vladimír Michl <Vladimir.Michl@hlubocky.del.cz>
 
-. $srcdir/testsuite/rsync.fns
+. "$suitedir/rsync.fns"
 
 test_symlink() {
 	is_a_link "$1" || test_fail "File $1 is not a symlink"
@@ -14,7 +14,7 @@ test_regular() {
 	fi;
 };
 
-cd "$TMP"
+cd "$tmpdir"
 
 mkdir from
 
