@@ -144,15 +144,15 @@ int write_file(int f,char *buf,size_t len)
  * the possibility of another program (such as a mailer) truncating the
  * file thus giving us a SIGBUS. */
 struct map_struct *map_file(int fd, OFF_T len, OFF_T map_size,
-			    size_t block_size)
+			    int32 blk_size)
 {
 	struct map_struct *map;
 
 	if (!(map = new(struct map_struct)))
 		out_of_memory("map_file");
 
-	if (block_size && (map_size % block_size))
-		map_size += block_size - (map_size % block_size);
+	if (blk_size && (map_size % blk_size))
+		map_size += blk_size - (map_size % blk_size);
 
 	memset(map, 0, sizeof map[0]);
 	map->fd = fd;
@@ -164,7 +164,7 @@ struct map_struct *map_file(int fd, OFF_T len, OFF_T map_size,
 
 
 /* slide the read window in the file */
-char *map_ptr(struct map_struct *map,OFF_T offset,int len)
+char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 {
 	int nread;
 	OFF_T window_start, read_start;
@@ -174,15 +174,12 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 		return NULL;
 
 	/* can't go beyond the end of file */
-	if (len > (map->file_size - offset)) {
+	if (len > map->file_size - offset)
 		len = map->file_size - offset;
-	}
 
 	/* in most cases the region will already be available */
-	if (offset >= map->p_offset &&
-	    offset+len <= map->p_offset+map->p_len) {
-		return (map->p + (offset - map->p_offset));
-	}
+	if (offset >= map->p_offset && offset+len <= map->p_offset+map->p_len)
+		return map->p + (offset - map->p_offset);
 
 	/* nope, we are going to have to do a read. Work out our desired window */
 	window_start = offset;
@@ -190,9 +187,8 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 	if (window_start + window_size > map->file_size) {
 		window_size = map->file_size - window_start;
 	}
-	if (offset + len > window_start + window_size) {
+	if (offset + len > window_start + window_size)
 		window_size = (offset+len) - window_start;
-	}
 
 	/* make sure we have allocated enough memory for the window */
 	if (window_size > map->p_size) {
