@@ -233,22 +233,30 @@ static void show_malloc_stats(void)
 	mi = mallinfo();
 
 	rprintf(FINFO, "\n" RSYNC_NAME "[%d] (%s%s%s) heap statistics:\n",
-		getpid(),
-		am_server ? "server " : "",
-		am_daemon ? "daemon " : "",
-		who_am_i());
-	rprintf(FINFO, "  arena:     %10d   (bytes from sbrk)\n", mi.arena);
-	rprintf(FINFO, "  ordblks:   %10d   (chunks not in use)\n", mi.ordblks);
-	rprintf(FINFO, "  smblks:    %10d\n", mi.smblks);
-	rprintf(FINFO, "  hblks:     %10d   (chunks from mmap)\n", mi.hblks);
-	rprintf(FINFO, "  hblkhd:    %10d   (bytes from mmap)\n", mi.hblkhd);
-	rprintf(FINFO, "  allmem:    %10d   (bytes from sbrk + mmap)\n",
-	    mi.arena + mi.hblkhd);
-	rprintf(FINFO, "  usmblks:   %10d\n", mi.usmblks);
-	rprintf(FINFO, "  fsmblks:   %10d\n", mi.fsmblks);
-	rprintf(FINFO, "  uordblks:  %10d   (bytes used)\n", mi.uordblks);
-	rprintf(FINFO, "  fordblks:  %10d   (bytes free)\n", mi.fordblks);
-	rprintf(FINFO, "  keepcost:  %10d   (bytes in releasable chunk)\n", mi.keepcost);
+		getpid(), am_server ? "server " : "",
+		am_daemon ? "daemon " : "", who_am_i());
+	rprintf(FINFO, "  arena:     %10ld   (bytes from sbrk)\n",
+		(long)mi.arena);
+	rprintf(FINFO, "  ordblks:   %10ld   (chunks not in use)\n",
+		(long)mi.ordblks);
+	rprintf(FINFO, "  smblks:    %10ld\n",
+		(long)mi.smblks);
+	rprintf(FINFO, "  hblks:     %10ld   (chunks from mmap)\n",
+		(long)mi.hblks);
+	rprintf(FINFO, "  hblkhd:    %10ld   (bytes from mmap)\n",
+		(long)mi.hblkhd);
+	rprintf(FINFO, "  allmem:    %10ld   (bytes from sbrk + mmap)\n",
+		(long)mi.arena + mi.hblkhd);
+	rprintf(FINFO, "  usmblks:   %10ld\n",
+		(long)mi.usmblks);
+	rprintf(FINFO, "  fsmblks:   %10ld\n",
+		(long)mi.fsmblks);
+	rprintf(FINFO, "  uordblks:  %10ld   (bytes used)\n",
+		(long)mi.uordblks);
+	rprintf(FINFO, "  fordblks:  %10ld   (bytes free)\n",
+		(long)mi.fordblks);
+	rprintf(FINFO, "  keepcost:  %10ld   (bytes in releasable chunk)\n",
+		(long)mi.keepcost);
 #endif /* HAVE_MALLINFO */
 }
 
