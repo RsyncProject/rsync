@@ -55,7 +55,7 @@ missing=0
 passed=0
 failed=0
 
-suitedir=`cd ./testsuite && pwd`
+suitedir="$srcdir/testsuite"
 echo "    suitedir=$suitedir"
 
 . "$suitedir/config.sh"
