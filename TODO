@@ -309,6 +309,15 @@ Splint
   security bugs.  Knowing the percentage of likely hits would be
   really interesting for other projects.
 
+Torture test
+
+  Something that just keeps running rsync continuously over a data set
+  likely to generate problems.
+
+Cross-testing
+
+  Run current rsync versions against significant past releases.
+
 DOCUMENTATION --------------------------------------------------------
 
 Update README
