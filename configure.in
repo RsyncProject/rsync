@@ -624,6 +624,21 @@ AC_SUBST(BUILD_POPT)
 AC_CONFIG_FILES([Makefile lib/dummy zlib/dummy popt/dummy shconfig])
 AC_OUTPUT
 
+if test x"$with_rsh" = x; then
+	if test x"$HAVE_REMSH" = x1; then
+		rmsh1='remsh:'
+		rmsh2='=remsh'
+	else
+		rmsh1='rsh:  '
+		rmsh2='=rsh  '
+	fi
+	AC_MSG_RESULT()
+	AC_MSG_RESULT([    **********************************************************************])
+	AC_MSG_RESULT([    *   As of v2.6.0, the default remote shell is ssh instead of rsh!!   *])
+	AC_MSG_RESULT([    *   To use previous default of $rmsh1 ./configure --with-rsh$rmsh2   *])
+	AC_MSG_RESULT([    **********************************************************************])
+fi
+
 AC_MSG_RESULT()
 AC_MSG_RESULT([    rsync ${RSYNC_VERSION} configuration successful])
 AC_MSG_RESULT()
