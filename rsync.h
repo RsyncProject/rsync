@@ -130,8 +130,8 @@
 #define FNAMECMP_BACKUP 	0x82
 
 /* For calling delete_file() */
-#define DEL_DIR			(1<<0)
-#define DEL_NO_RECURSE		(1<<1)
+#define DEL_DIR 		(1<<0)
+#define DEL_RECURSE		(1<<1) /* recurse even w/o --force */
 #define DEL_TERSE		(1<<2)
 
 
