@@ -70,11 +70,14 @@ static void list_file (const char *fname)
 		failed ("stat", fname);
 
 	/* On some BSD platforms the mode bits of a symlink are
-	 * undefined.  The size of a link is also somewhat shaky. */
-	if (S_ISLNK(buf.st_mode)) {
+	 * undefined.  */
+	if (S_ISLNK(buf.st_mode))
 		buf.st_mode &= ~0777;
+		
+	/* The size of anything but a regular file is probably not
+	 * worth thinking about. */
+	if (!S_ISREG(buf.st_mode))
 		buf.st_size = 0;
-	}
 
 	permstring(permbuf, buf.st_mode);
 
