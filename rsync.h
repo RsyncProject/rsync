@@ -563,7 +563,8 @@ struct map_struct {
 #define MATCHFLG_PERDIR_MERGE	(1<<11)/* merge-file is searched per-dir */
 #define MATCHFLG_EXCLUDE_SELF	(1<<12)/* merge-file name should be excluded */
 #define MATCHFLG_FINISH_SETUP	(1<<13)/* per-dir merge file needs setup */
-#define MATCHFLG_NEGATE		(1<<14)/* rule matches when pattern does not */
+#define MATCHFLG_NEGATE 	(1<<14)/* rule matches when pattern does not */
+#define MATCHFLG_CVS_IGNORE	(1<<15)/* rule was -C or :C */
 
 #define MATCHFLGS_FROM_CONTAINER (MATCHFLG_ABS_PATH | MATCHFLG_INCLUDE \
 				| MATCHFLG_DIRECTORY | MATCHFLG_NEGATE)
@@ -571,7 +572,7 @@ struct map_struct {
 struct filter_struct {
 	struct filter_struct *next;
 	char *pattern;
-	unsigned int match_flags;
+	uint32 match_flags;
 	union {
 		int slash_cnt;
 		struct filter_list_struct *mergelist;
