@@ -136,12 +136,18 @@ the advantage of extra protection against possible implementation security
 holes, but it has the disadvantages of requiring super-user privileges, 
 of not being able to follow symbolic links outside of the new root path
 when reading, and of complicating the preservation of usernames and groups
-(you'll need to supply in-chroot versions of etc/passwd and etc/group if
-you want named-based user/group mapping to be performed).
-When "use chroot" is false, for security reasons,
+(see below).  When "use chroot" is false, for security reasons,
 symlinks may only be relative paths pointing to other files within the root
 path, and leading slashes are removed from absolute paths.  The default for
 "use chroot" is true.
+
+In order to preserve usernames and groupnames, rsync needs to be able to
+lookup the IDs using getpuid() and getpgid().  This means that the chroot
+area will need to have copies of your user/group information (edited, if
+desired) inside the chroot tree for rsync to use (the traditional files
+are /etc/passwd and /etc/group).  If the needed files are not available,
+rsync will only be able to copy the IDs, just as if the --numeric-ids
+option had been specified.
 
 dit(bf(max connections)) The "max connections" option allows you to
 specify the maximum number of simultaneous connections you will allow.
