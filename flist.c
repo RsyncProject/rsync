@@ -1816,7 +1816,7 @@ int delete_file(char *fname, int mode, int flags)
 		ok = 0;
 		errno = ENOTEMPTY;
 	} else if (make_backups && !backup_dir && !is_backup_file(fname)
-	    && !zap_dir)
+	    && !(flags & DEL_FORCE_RECURSE))
 		ok = make_backup(fname);
 	else
 		ok = do_rmdir(fname) == 0;
@@ -1833,9 +1833,10 @@ int delete_file(char *fname, int mode, int flags)
 			full_fname(fname));
 		return -1;
 	}
+	flags |= DEL_FORCE_RECURSE;
 
 	dirlist = get_dirlist(fname, 0);
-	for (j = 0; j < dirlist->count; j++) {
+	for (j = dirlist->count; j-- > 0; ) {
 		struct file_struct *fp = dirlist->files[j];
 		f_name_to(fp, buf);
 		if (delete_file(buf, fp->mode, flags & ~DEL_TERSE) != 0) {
@@ -1882,8 +1883,7 @@ static void delete_missing(struct file_list *full_list,
 		if (flist_find(full_list, dir_list->files[i]) < 0) {
 			char *fn = f_name_to(dir_list->files[i], fbuf);
 			int mode = dir_list->files[i]->mode;
-			int dflag = S_ISDIR(mode) ? DEL_FORCE_RECURSE : 0;
-			if (delete_file(fn, mode, dflag) < 0)
+			if (delete_file(fn, mode, DEL_FORCE_RECURSE) < 0)
 				break;
 		}
 	}
