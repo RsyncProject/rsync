@@ -20,7 +20,6 @@ export HOME CVSIGNORE
 
 # Build some files/dirs/links to copy
 
-echo home-cvs-exclude >"$scratchdir"/.cvsignore
 makepath "$fromdir/foo/down/to/you"
 makepath "$fromdir/bar/down/to/foo/too"
 makepath "$fromdir/mid/for/foo/and/that/is/who"
@@ -42,7 +41,7 @@ echo expunged >"$fromdir/mid/for/foo/extra"
 echo retained >"$fromdir/mid/for/foo/keep"
 ln -s too "$fromdir/bar/down/to/foo/sym"
 
-# Setup our test exclude/include file.
+# Setup our test exclude/include files.
 
 excl="$scratchdir/exclude-from"
 cat >"$excl" <<EOF
@@ -59,6 +58,10 @@ cat >"$excl" <<EOF
 + file4
 - file[2-9]
 - /mid/for/foo/extra
+EOF
+
+cat >"$scratchdir/.cvsignore" <<EOF
+home-cvs-exclude
 EOF
 
 # Create the chk dir with what we expect to be excluded
@@ -79,7 +82,7 @@ $RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
 
 # Now, test if rsync excludes the same files.
 
-checkit "$RSYNC -avv --exclude-from=$excl \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+checkit "$RSYNC -avv --exclude-from=\"$excl\" \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
 
 # Modify the chk dir by removing cvs-ignored files and then tweaking the dir times.
 
@@ -94,8 +97,8 @@ $RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
 # Now, test if rsync excludes the same files, this time with --cvs-exclude
 # and --delete-excluded.
 
-checkit "$RSYNC -avvC --delete-excluded --exclude-from=$excl \
-    \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+checkit "$RSYNC -avvC --exclude-from=\"$excl\" \
+    --delete-excluded \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
