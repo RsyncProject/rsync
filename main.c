@@ -494,6 +494,11 @@ int main(int argc,char *argv[])
 	starttime = time(NULL);
 	am_root = (getuid() == 0);
 
+	if (argc < 2) {
+		usage(FERROR);
+		exit(1);
+	}
+
 	/* we set a 0 umask so that correct file permissions can be
 	   carried across */
 	orig_umask = (int)umask(0);
