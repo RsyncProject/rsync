@@ -23,6 +23,17 @@
   */
 #include "rsync.h"
 
+static FILE *logfile;
+
+static void logit(int priority, char *buf)
+{
+	if (logfile) {
+		fprintf(logfile,"%s", buf);
+		fflush(logfile);
+	} else {
+		syslog(priority, "%s", buf);
+	}
+}
 
 void log_open(void)
 {
@@ -32,6 +43,11 @@ void log_open(void)
 
 	if (initialised) return;
 	initialised = 1;
+
+	if (lp_log_file()) {
+		logfile = fopen(lp_log_file(), "a");
+		return;
+	}
 
 #ifdef LOG_NDELAY
 	options |= LOG_NDELAY;
@@ -44,7 +60,7 @@ void log_open(void)
 #endif
 
 #ifndef LOG_NDELAY
-	syslog(LOG_INFO,"rsyncd started\n");
+	logit(LOG_INFO,"rsyncd started\n");
 #endif
 
 	/* this looks pointless, but it is needed in order for the
@@ -86,7 +102,7 @@ void rprintf(int fd, const char *format, ...)
 
 		log_open();
 		if (!io_multiplex_write(fd, buf, strlen(buf))) {
-			syslog(priority, "%s", buf);
+			logit(priority, buf);
 		}
 
 		depth--;
