@@ -342,9 +342,10 @@ verb(
      --rsync-path=PATH       specify path to rsync on the remote machine
      --existing              only update files that already exist
      --ignore-existing       ignore files that already exist on receiver
+     --del                   an alias for --delete-during
      --delete                delete files that don't exist on sender
-     --delete-before         receiver deletes before xfer, not during
-     --delete-after          receiver deletes after transfer, not during
+     --delete-during         receiver deletes during xfer, not before
+     --delete-after          receiver deletes after transfer, not before
      --delete-excluded       also delete excluded files on receiver
      --ignore-errors         delete even if there are I/O errors
      --force                 force deletion of dirs even if not empty
@@ -682,7 +683,7 @@ receiving side (ones that aren't on the sending side), but only for the
 directories that are being synchronized.  You must have asked rsync to
 send the whole directory (e.g. "dir" or "dir/") without using a wildcard
 for the directory's contents (e.g. "dir/*") since the wildcard is expanded
-by the shell and rsync thus gets a request to transfer those files, not
+by the shell and rsync thus gets a request to transfer individual files, not
 the files' parent directory.  Files that are excluded from transfer are
 excluded from being deleted unless you use --delete-excluded.
 
@@ -698,30 +699,31 @@ prevent temporary filesystem failures (such as NFS errors) on the
 sending side causing a massive deletion of files on the
 destination.  You can override this with the --ignore-errors option.
 
-Beginning with 2.6.4, rsync does file deletions on the receiving side
-incrementally as each directory is being transferred (which makes the
-transfer more efficient than a separate delete pass before or after the
-transfer).  If you are sending files to an older rsync, --delete will
-behave as --delete-before (see below).  See also --delete-after.
-
-dit(bf(--delete-before)) Request that the file-deletions on the receving
-side be done prior to starting the transfer, not incrementally as the
-transfer happens.  Implies --delete.
-
-One reason to use --delete-before is if the filesystem is tight for space
+If you don't specify --delete-during (--del) or --delete-after, the
+file deletions will be done before the first file is transferred.
+This is helpful if the filesystem is tight for space
 and removing extraneous files would help to make the transfer possible.
-However, it does introduce a delay before the start of the transfer (while
-the receiving side is being scanned for deletions) and this delay might
-cause the transfer to timeout.  
+However, it does introduce a delay before the start of the transfer,
+and this delay might cause the transfer to timeout (if --timeout was
+specified).
+
+dit(bf(--del, --delete-during)) Request that the file-deletions on the
+receving side be done incrementally as the transfer happens.  This is
+a faster method than chosing the before- or after-transfer processing,
+but it is only supported beginning with rsync version 2.6.4.
+See --delete (which is implied) for more details on file-deletion.
 
 dit(bf(--delete-after)) Request that the file-deletions on the receving
-side be done after the transfer has completed, not incrementally as the
-transfer happens.  Implies --delete.
+side be done after the transfer has completed.  This is useful if you
+are sending new per-directory merge files as a part of the transfer and
+you want their exclusions to take effect for the delete phase of the
+current transfer.
+See --delete (which is implied) for more details on file-deletion.
 
 dit(bf(--delete-excluded)) In addition to deleting the files on the
 receiving side that are not on the sending side, this tells rsync to also
 delete any files on the receiving side that are excluded (see --exclude).
-Implies --delete.
+See --delete (which is implied) for more details on file-deletion.
 
 dit(bf(--ignore-errors)) Tells --delete to go ahead and delete files
 even when there are I/O errors.
