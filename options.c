@@ -284,6 +284,7 @@ void usage(enum logcode F)
   rprintf(F,"     --ignore-existing       ignore files that already exist on receiving side\n");
   rprintf(F,"     --del                   an alias for --delete-during\n");
   rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
+  rprintf(F,"     --delete-before         receiver deletes before transfer (default)\n");
   rprintf(F,"     --delete-during         receiver deletes during transfer, not before\n");
   rprintf(F,"     --delete-after          receiver deletes after transfer, not before\n");
   rprintf(F,"     --delete-excluded       also delete excluded files on the receiving side\n");
@@ -357,6 +358,7 @@ static struct poptOption long_options[] = {
   {"existing",         0,  POPT_ARG_NONE,   &only_existing, 0, 0, 0 },
   {"ignore-existing",  0,  POPT_ARG_NONE,   &opt_ignore_existing, 0, 0, 0 },
   {"delete",           0,  POPT_ARG_NONE,   &delete_mode, 0, 0, 0 },
+  {"delete-before",    0,  POPT_ARG_VAL,    &delete_before, 2, 0, 0 },
   {"delete-during",    0,  POPT_ARG_NONE,   &delete_during, 0, 0, 0 },
   {"delete-after",     0,  POPT_ARG_NONE,   &delete_after, 0, 0, 0 },
   {"delete-excluded",  0,  POPT_ARG_NONE,   &delete_excluded, 0, 0, 0 },
@@ -902,12 +904,12 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (relative_paths < 0)
 		relative_paths = files_from? 1 : 0;
 
-	if (delete_during && delete_after) {
+	if (!!delete_before + delete_during + delete_after > 1) {
 		snprintf(err_buf, sizeof err_buf,
-			"You may not combine --delete-during (--del) and --delete-after.\n");
+			"You may not combine multiple --delete-WHEN options.\n");
 		return 0;
 	}
-	if (delete_during || delete_after)
+	if (delete_before || delete_during || delete_after)
 		delete_mode = 1;
 	else if (delete_mode || delete_excluded)
 		delete_mode = delete_before = 1;
@@ -1219,8 +1221,10 @@ void server_options(char **args,int *argc)
 	if (am_sender) {
 		if (delete_excluded)
 			args[ac++] = "--delete-excluded";
-		else if (delete_before || delete_after)
+		else if (delete_before == 1 || delete_after)
 			args[ac++] = "--delete";
+		if (delete_before == 2)
+			args[ac++] = "--delete-before";
 		if (delete_during)
 			args[ac++] = "--delete-during";
 		if (delete_after)
