@@ -685,6 +685,9 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 
 	write_int(f_out, -1);
 
+	/* Read post-redo-phase MSG_DONE and any prior messages. */
+	get_redo_num();
+
 	if (preserve_hard_links)
 		do_hard_links();
 
