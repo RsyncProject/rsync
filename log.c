@@ -360,8 +360,8 @@ static void log_formatted(enum logcode code, char *format, char *op,
 	*fmt = '%';
 
 	/* We expand % codes one by one in place in buf.  We don't
-	 * copy in the terminating nul of the inserted strings, but
-	 * rather keep going until we reach the nul of the format. */
+	 * copy in the terminating null of the inserted strings, but
+	 * rather keep going until we reach the null of the format. */
 	total = strlcpy(buf, format, sizeof buf);
 	
 	for (p = buf; (p = strchr(p, '%')) != NULL; ) {
@@ -386,9 +386,9 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			n = buf2;
 			break;
 		case 'p':
-			strlcat(fmt, "d", sizeof fmt);
+			strlcat(fmt, "ld", sizeof fmt);
 			snprintf(buf2, sizeof buf2, fmt,
-				 (int)getpid());
+				 (long)getpid());
 			n = buf2;
 			break;
 		case 'o': n = op; break;
@@ -418,15 +418,20 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			break;
 		case 'L':
 			if (hlink && *hlink) {
-				snprintf(buf2, sizeof buf2, " => %s",
-					 safe_fname(hlink));
-				n = buf2;
+				n = safe_fname(hlink);
+				strcpy(buf2, " => ");
 			} else if (S_ISLNK(file->mode) && file->u.link) {
-				snprintf(buf2, sizeof buf2, " -> %s",
-					 safe_fname(file->u.link));
-				n = buf2;
-			} else
+				n = safe_fname(file->u.link);
+				strcpy(buf2, " -> ");
+			} else {
 				n = "";
+				if (!fmt[1])
+					break;
+				strcpy(buf2, "    ");
+			}
+			strlcat(fmt, "s", sizeof fmt);
+			snprintf(buf2 + 4, sizeof buf2 - 4, fmt, n);
+			n = buf2;
 			break;
 		case 'm': n = lp_name(module_id); break;
 		case 't': n = timestring(time(NULL)); break;
