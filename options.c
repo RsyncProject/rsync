@@ -101,6 +101,7 @@ int modify_window = 0;
 int blocking_io = -1;
 int checksum_seed = 0;
 int inplace = 0;
+int delay_updates = 0;
 long block_size = 0; /* "long" because popt can't set an int32. */
 
 
@@ -288,6 +289,7 @@ void usage(enum logcode F)
   rprintf(F,"     --max-size=SIZE         don't transfer any file larger than SIZE\n");
   rprintf(F,"     --partial               keep partially transferred files\n");
   rprintf(F,"     --partial-dir=DIR       put a partially transferred file into DIR\n");
+  rprintf(F,"     --delay-updates         update all transferred files into place at end\n");
   rprintf(F,"     --numeric-ids           don't map uid/gid values by user/group name\n");
   rprintf(F,"     --timeout=TIME          set I/O timeout in seconds\n");
   rprintf(F," -I, --ignore-times          turn off mod time & file size quick check\n");
@@ -407,6 +409,7 @@ static struct poptOption long_options[] = {
   {"progress",         0,  POPT_ARG_NONE,   &do_progress, 0, 0, 0 },
   {"partial",          0,  POPT_ARG_NONE,   &keep_partial, 0, 0, 0 },
   {"partial-dir",      0,  POPT_ARG_STRING, &partial_dir, 0, 0, 0 },
+  {"delay-updates",    0,  POPT_ARG_NONE,   &delay_updates, 0, 0, 0 },
   {"ignore-errors",    0,  POPT_ARG_NONE,   &ignore_errors, 0, 0, 0 },
   {"blocking-io",      0,  POPT_ARG_VAL,    &blocking_io, 1, 0, 0 },
   {"no-blocking-io",   0,  POPT_ARG_VAL,    &blocking_io, 0, 0, 0 },
@@ -995,11 +998,15 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			bwlimit_writemax = 512;
 	}
 
+	if (delay_updates && !partial_dir)
+		partial_dir = ".~tmp~";
+
 	if (inplace) {
 #if HAVE_FTRUNCATE
 		if (partial_dir) {
 			snprintf(err_buf, sizeof err_buf,
-				 "--inplace cannot be used with --partial-dir\n");
+				 "--inplace cannot be used with --%s\n",
+				 delay_updates ? "delay-updates" : "partial-dir");
 			return 0;
 		}
 		keep_partial = 0;
@@ -1236,6 +1243,8 @@ void server_options(char **args,int *argc)
 	if (partial_dir && am_sender) {
 		args[ac++] = "--partial-dir";
 		args[ac++] = partial_dir;
+		if (delay_updates)
+			args[ac++] = "--delay-updates";
 	} else if (keep_partial)
 		args[ac++] = "--partial";
 
