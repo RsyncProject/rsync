@@ -84,7 +84,7 @@ int fd_pair(int fd[2])
 }
 
 
-void print_child_argv(char **cmd)
+static void print_child_argv(char **cmd)
 {
 	rprintf(FINFO, "opening connection using ");
 	for (; *cmd; cmd++) {
