@@ -24,7 +24,7 @@
 encode a buffer using base64 - simple and slow algorithm. null terminates
 the result.
   ***************************************************************************/
-static void base64_encode(char *buf, int len, char *out)
+void base64_encode(char *buf, int len, char *out)
 {
 	char *b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 	int bit_offset, byte_offset, idx, i;
@@ -33,7 +33,7 @@ static void base64_encode(char *buf, int len, char *out)
 
 	memset(out, 0, bytes+1);
 
-	for (i=0;i<bytes;i++) {
+	for (i = 0; i < bytes; i++) {
 		byte_offset = (i*6)/8;
 		bit_offset = (i*6)%8;
 		if (bit_offset < 3) {
