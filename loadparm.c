@@ -226,6 +226,7 @@ static struct parm_struct parm_table[] =
   {"motd file",        P_STRING,  P_GLOBAL, &Globals.motd_file,    NULL,   0},
   {"lock file",        P_STRING,  P_GLOBAL, &Globals.lock_file,    NULL,   0},
   {"syslog facility",  P_ENUM,    P_GLOBAL, &Globals.syslog_facility, enum_facilities,0},
+
   {"name",             P_STRING,  P_LOCAL,  &sDefault.name,        NULL,   0},
   {"comment",          P_STRING,  P_LOCAL,  &sDefault.comment,     NULL,   0},
   {"path",             P_STRING,  P_LOCAL,  &sDefault.path,        NULL,   0},
@@ -585,7 +586,8 @@ static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
 		     }
 	     }
 	     if (!parm_table[parmnum].enum_list[i].name) {
-		     *(int *)parm_ptr = atoi(parmvalue);
+		     if (atoi(parmvalue) > 0)
+			     *(int *)parm_ptr = atoi(parmvalue);
 	     }
 	     break;
      case P_SEP:
