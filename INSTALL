@@ -28,3 +28,15 @@ fails:
 Install gcc or HP's "ANSI/C Compiler".
 
 
+
+MAC OSX NOTES
+-------------
+
+Mac OS X (Darwin) seems to have an IPv6 stack, but it does not
+completely implement the "New Sockets" API.  
+
+<http://www.ipv6.org/impl/mac.html> says that Apple do not support
+IPv6 yet.  If your build fails, try again with --disable-ipv6.
+
+
+
