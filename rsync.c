@@ -962,7 +962,6 @@ void send_files(struct file_list *flist,int f_out,int f_in)
   int i;
   struct file_struct *file;
   int phase = 0;
-  int offset=0;
 
   if (verbose > 2)
     rprintf(FINFO,"send_files starting\n");
@@ -970,6 +969,8 @@ void send_files(struct file_list *flist,int f_out,int f_in)
   setup_readbuffer(f_in);
 
   while (1) {
+	  int offset=0;
+
 	  i = read_int(f_in);
 	  if (i == -1) {
 		  if (phase==0 && remote_version >= 13) {
