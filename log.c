@@ -1,6 +1,6 @@
 /* -*- c-file-style: "linux"; -*-
    
-   Copyright (C) 1998-2001 by Andrew Tridgell <mbp@samba.org>
+   Copyright (C) 1998-2001 by Andrew Tridgell <tridge@samba.org>
    Copyright (C) 2000-2001 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
@@ -20,6 +20,7 @@
 
 /*
   Logging and utility functions.
+  tridge, May 1998
 
   Mapping to human-readable messages added by Martin Pool
   <mbp@samba.org>, Oct 2000.
