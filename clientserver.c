@@ -34,7 +34,6 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	char line[MAXPATHLEN];
 	char *p, *user=NULL;
 	extern int remote_version;
-	extern int am_client;
 	extern int am_sender;
 
 	if (*path == '/') {
@@ -51,8 +50,6 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 
 	if (!user) user = getenv("USER");
 	if (!user) user = getenv("LOGNAME");
-
-	am_client = 1;
 
 	fd = open_socket_out(host, rsync_port);
 	if (fd == -1) {
