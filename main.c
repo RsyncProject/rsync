@@ -363,8 +363,10 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 	struct file_list *flist;
 	char *dir = argv[0];
 
-	if (verbose > 2)
-		rprintf(FINFO,"server_sender starting pid=%d\n",(int)getpid());
+	if (verbose > 2) {
+		rprintf(FINFO, "server_sender starting pid=%ld\n",
+			(long)getpid());
+	}
 
 	if (!relative_paths && !push_dir(dir)) {
 		rprintf(FERROR, "push_dir %s failed: %s (3)\n",
@@ -484,8 +486,10 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	char *local_name=NULL;
 	char *dir = NULL;
 
-	if (verbose > 2)
-		rprintf(FINFO,"server_recv(%d) starting pid=%d\n",argc,(int)getpid());
+	if (verbose > 2) {
+		rprintf(FINFO, "server_recv(%d) starting pid=%ld\n",
+			argc, (long)getpid());
+	}
 
 	if (am_daemon && lp_read_only(module_id) && !am_sender) {
 		rprintf(FERROR,"ERROR: module is read only\n");

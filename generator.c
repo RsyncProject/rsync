@@ -530,9 +530,10 @@ void generate_files(int f, struct file_list *flist, char *local_name)
 	int phase=0;
 	char fbuf[MAXPATHLEN];
 
-	if (verbose > 2)
-		rprintf(FINFO,"generator starting pid=%d count=%d\n",
-			(int)getpid(),flist->count);
+	if (verbose > 2) {
+		rprintf(FINFO, "generator starting pid=%ld count=%d\n",
+			(long)getpid(), flist->count);
+	}
 
 	if (verbose >= 2) {
 		rprintf(FINFO,
