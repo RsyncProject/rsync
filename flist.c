@@ -63,7 +63,6 @@ extern int force_delete;
 extern int orig_umask;
 extern int make_backups;
 extern unsigned int curr_dir_len;
-extern char *log_format;
 extern char *backup_dir;
 extern char *backup_suffix;
 extern int backup_suffix_len;
@@ -1801,7 +1800,7 @@ int delete_file(char *fname, int mode, int flags)
 		else
 			ok = robust_unlink(fname) == 0;
 		if (ok) {
-			if ((verbose || log_format) && !(flags & DEL_TERSE))
+			if (!(flags & DEL_TERSE))
 				log_delete(fname, mode);
 			deletion_count++;
 			return 0;
@@ -1824,7 +1823,7 @@ int delete_file(char *fname, int mode, int flags)
 	else
 		ok = do_rmdir(fname) == 0;
 	if (ok) {
-		if ((verbose || log_format) && !(flags & DEL_TERSE))
+		if (!(flags & DEL_TERSE))
 			log_delete(fname, mode);
 		deletion_count++;
 		return 0;
@@ -1857,7 +1856,7 @@ int delete_file(char *fname, int mode, int flags)
 		return -1;
 
 	if (do_rmdir(fname) == 0) {
-		if ((verbose || log_format) && !(flags & DEL_TERSE))
+		if (!(flags & DEL_TERSE))
 			log_delete(fname, mode);
 		deletion_count++;
 	} else if (errno != ENOTEMPTY && errno != ENOENT) {
