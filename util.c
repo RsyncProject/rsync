@@ -824,6 +824,8 @@ static unsigned long msdiff(struct timeval *t1, struct timeval *t2)
 
 
 /**
+ * @param ofs Current position in file
+ * @param size Total size of file
  * @param is_last True if this is the last time progress will be
  * printed for this file, so we should output a newline.  (Not
  * necessarily the same as all bytes being received.)
@@ -835,7 +837,7 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
     unsigned long diff = msdiff(&start_time, now);
     double        rate = diff ? ((ofs-start_ofs) / diff) * 1000.0/1024.0 : 0;
     const char    *units, *rem_units;
-    double        remain = pct ? ((100.0-pct) * diff / pct / 1000.0) : 0;
+    double        remain = rate ? (size-ofs) / rate : 0.0;
 
     if (rate > 1024*1024) {
 	    rate /= 1024.0 * 1024.0;
@@ -857,7 +859,7 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 	    rem_units = "s";
     }
     
-    rprintf(FINFO, "%12.0f %3d%% %7.2f%s %5.0f%s%s",
+    rprintf(FINFO, "%12.0f %3d%% %7.2f%s %6.0f%s%s",
 	    (double) ofs, pct, rate, units,
 	    remain, rem_units,
 	    is_last ? "\n" : "\r");
