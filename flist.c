@@ -558,7 +558,7 @@ int file_compare(struct file_struct *f1,struct file_struct *f2)
 
 int flist_find(struct file_list *flist,struct file_struct *f)
 {
-  int low=0,high=flist->count;
+  int low=0,high=flist->count-1;
 
   while (low != high) {
     int mid = (low+high)/2;
