@@ -1,6 +1,6 @@
 /* -*- c-file-style: "linux" -*-
    
-   Copyright (C) 1996-2000 by Andrew Tridgell 
+   Copyright (C) 1996-2001 by Andrew Tridgell 
    Copyright (C) Paul Mackerras 1996
    
    This program is free software; you can redistribute it and/or modify
@@ -119,6 +119,20 @@ static void report(int f)
 }
 
 
+/* Start the remote shell. */
+/* TODO: When the shell exits, look at its return value, as this may
+ * well tell us if something went wrong in trying to connect to the
+ * remote machine.  Although it doesn't seem to be specified anywhere,
+ * ssh and the shell seem to return these values:
+ *
+ * 124 if the command exited with status 255
+ * 125 if the command is killed by a signal
+ * 126 if the command cannot be run
+ * 127 if the command is not found
+ *
+ * and we could use this to give a better explanation if the remote
+ * command is not found.
+ */
 static int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f_out)
 {
 	char *args[100];
@@ -708,6 +722,9 @@ int main(int argc,char *argv[])
 	orig_umask = (int)umask(0);
 
 	if (!parse_arguments(argc, argv, 1)) {
+                /* FIXME: We ought to call the same error-handling
+                 * code here, rather than relying on getopt. */
+		/* option_error(); */
 		exit_cleanup(RERR_SYNTAX);
 	}
 
