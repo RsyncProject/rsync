@@ -515,6 +515,13 @@ remote shell program to use for communication between the local and
 remote copies of rsync. Typically, rsync is configured to use rsh by
 default, but you may prefer to use ssh because of its high security.
 
+Feel free to include options in the COMMAND.  For instance:
+
+quote(-e "ssh -1 -l joe")
+
+(Note that ssh users can alternately customize site-specific connect
+options in their .ssh/config file.)
+
 You can also choose the remote shell program using the RSYNC_RSH
 environment variable.
 
