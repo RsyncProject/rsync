@@ -130,8 +130,8 @@ failure:
 /* robustly move a file, creating new directory structures if necessary */
 static int robust_move(char *src, char *dst)
 {
-	if (robust_rename(src, dst, 0755) != 0 || errno != ENOENT
-	    || make_bak_dir(dst) < 0 || robust_rename(src, dst, 0755) != 0)
+	if (robust_rename(src, dst, 0755) != 0 && (errno != ENOENT
+	    || make_bak_dir(dst) < 0 || robust_rename(src, dst, 0755) != 0))
 		return -1;
 	return 0;
 }
@@ -224,7 +224,7 @@ static int keep_backup(char *fname)
 
 	/* move to keep tree if a file */
 	if (!kept) {
-		if (!robust_move(fname, backup_dir_buf)) {
+		if (robust_move(fname, backup_dir_buf) != 0) {
 			rprintf(FERROR, "keep_backup failed: %s -> \"%s\": %s\n",
 				full_fname(fname), backup_dir_buf, strerror(errno));
 		}
