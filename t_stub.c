@@ -46,7 +46,7 @@ struct exclude_list_struct server_exclude_list;
 }
 
  int check_exclude(UNUSED(struct exclude_list_struct *listp), UNUSED(char *name),
-		   UNUSED(int name_is_dir), UNUSED(const char *type))
+		   UNUSED(int name_is_dir))
 {
 	/* This function doesn't really get called in this test context, so
 	 * just return 0. */
