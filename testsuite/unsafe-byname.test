@@ -22,16 +22,21 @@ test_unsafe() {
 test_unsafe file		from			safe
 test_unsafe dir/file		from			safe
 test_unsafe dir/./file		from			safe
-test_unsafe dir/.		from safe
-test_unsafe dir/		from safe
+test_unsafe dir/.		from			safe
+test_unsafe dir/		from			safe
 
-test_unsafe /etc/passwd		from unsafe
-test_unsafe //../etc/passwd	from unsafe
-test_unsafe //./etc/passwd	from unsafe
+test_unsafe /etc/passwd		from			unsafe
+test_unsafe //../etc/passwd	from			unsafe
+test_unsafe //./etc/passwd	from			unsafe
 
 test_unsafe ./foo		from			safe
 test_unsafe ../foo		from			unsafe
 test_unsafe ../dest		from/dir		safe
+
+test_unsafe ..			from/file		safe
+test_unsafe ../..		from/file		unsafe
+test_unsafe dir/..		from			safe
+test_unsafe dir/../..		from			unsafe
 
 test_unsafe ''                  from			unsafe
 
