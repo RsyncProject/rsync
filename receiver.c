@@ -214,7 +214,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	struct sum_struct sum;
 	unsigned int len;
 	OFF_T offset = 0;
-	OFF_T offset2;
+	OFF_T offset2, seekto = 0;
 	char *data;
 	int i;
 	char *map = NULL;
@@ -275,21 +275,26 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 			sum_update(map,len);
 		}
 
-		if (!inplace || offset != offset2) {
-			if (fd != -1 && write_file(fd, map, len) != (int)len) {
-				rsyserr(FERROR, errno, "write failed on %s",
-					full_fname(fname));
-				exit_cleanup(RERR_FILEIO);
+		if (inplace) {
+			if (offset == offset2) {
+				seekto = offset += len;
+				continue;
 			}
-		} else {
-			flush_write_file(fd);
-			if (do_lseek(fd,(OFF_T)len,SEEK_CUR) != offset+len) {
-				rprintf(FERROR, "lseek failed on %s: %s, %lli, %lli, %i\n",
-					full_fname(fname), strerror(errno),
-					do_lseek(fd, 0, SEEK_CUR),
-					offset + len, i);
-				exit_cleanup(RERR_FILEIO);
+			if (seekto && fd != -1) {
+				flush_write_file(fd);
+				if (do_lseek(fd, seekto, SEEK_SET) != seekto) {
+					rsyserr(FERROR, errno,
+						"lseek failed on %s",
+						full_fname(fname));
+					exit_cleanup(RERR_FILEIO);
+				}
+				seekto = 0;
 			}
+		}
+		if (fd != -1 && write_file(fd, map, len) != (int)len) {
+			rsyserr(FERROR, errno, "write failed on %s",
+				full_fname(fname));
+			exit_cleanup(RERR_FILEIO);
 		}
 		offset += len;
 	}
@@ -297,7 +302,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	flush_write_file(fd);
 
 #ifdef HAVE_FTRUNCATE
-	if (inplace)
+	if (inplace && fd != -1)
 		ftruncate(fd, offset);
 #endif
 
