@@ -144,6 +144,8 @@ int read_iflags(int f_in, int f_out, int ndx, char *buf)
 		exit_cleanup(RERR_PROTOCOL);
 	}
 
+	*buf = '\0';
+
 	if ((!(iflags & ITEM_UPDATING) || !S_ISREG(the_file_list->files[ndx]->mode)) && f_out >= 0) {
 		write_int(f_out, ndx);
 		write_shortint(f_out, iflags);
