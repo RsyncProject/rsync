@@ -13,7 +13,10 @@ Changes since 2.6.3:
 
     - An OS that has a binary mode for its files (such as cygwin0 needed
       setmode(fd, O_BINARY) called on the temp-file we opened with
-      mkstemp().
+      mkstemp().  (Fix picked up from the cygwin package.)
+
+    - Fixed a potential hang when verbosity is high, the client side is
+      the sender, and the file-list is large.
 
     - We now check if the OS doesn't support using mknod() for creating
       FIFOs and sockets, and compile-in using mkfifo() and socket() when
