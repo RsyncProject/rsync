@@ -72,13 +72,13 @@ void get_checksum2(char *buf,int len,char *sum)
 	}
 	
 	for(i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK) {
-		mdfour_update(&m, buf1+i, CSUM_CHUNK);
+		mdfour_update(&m, (uchar *)(buf1+i), CSUM_CHUNK);
 	}
 	if (len - i > 0) {
-		mdfour_update(&m, buf1+i, (len-i));
+		mdfour_update(&m, (uchar *)(buf1+i), (len-i));
 	}
 	
-	mdfour_result(&m, sum);
+	mdfour_result(&m, (uchar *)sum);
 }
 
 
@@ -102,15 +102,15 @@ void file_checksum(char *fname,char *sum,OFF_T size)
 
 	for(i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK) {
 		memcpy(tmpchunk, map_ptr(buf,i,CSUM_CHUNK), CSUM_CHUNK);
-		mdfour_update(&m, tmpchunk, CSUM_CHUNK);
+		mdfour_update(&m, (uchar *)tmpchunk, CSUM_CHUNK);
 	}
 
 	if (len - i > 0) {
 		memcpy(tmpchunk, map_ptr(buf,i,len-i), len-i);
-		mdfour_update(&m, tmpchunk, (len-i));
+		mdfour_update(&m, (uchar *)tmpchunk, (len-i));
 	}
 
-	mdfour_result(&m, sum);
+	mdfour_result(&m, (uchar *)sum);
 
 	close(fd);
 	unmap_file(buf);
@@ -152,14 +152,14 @@ void sum_update(char *p,int len)
 	if (sumresidue) {
 		i = MIN(CSUM_CHUNK-sumresidue,len);
 		memcpy(sumrbuf+sumresidue,p,i);
-		mdfour_update(&md, sumrbuf, (i+sumresidue));
+		mdfour_update(&md, (uchar *)sumrbuf, (i+sumresidue));
 		len -= i;
 		p += i;
 	}
 
 	for(i = 0; i + CSUM_CHUNK <= len; i += CSUM_CHUNK) {
 		memcpy(sumrbuf,p+i,CSUM_CHUNK);
-		mdfour_update(&md, sumrbuf, CSUM_CHUNK);
+		mdfour_update(&md, (uchar *)sumrbuf, CSUM_CHUNK);
 	}
 
 	if (len - i > 0) {
@@ -173,8 +173,8 @@ void sum_update(char *p,int len)
 void sum_end(char *sum)
 {
 	if (sumresidue) {
-		mdfour_update(&md, sumrbuf, sumresidue);
+		mdfour_update(&md, (uchar *)sumrbuf, sumresidue);
 	}
 
-	mdfour_result(&md, sum);
+	mdfour_result(&md, (uchar *)sum);
 }
