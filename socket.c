@@ -369,8 +369,12 @@ static int *open_socket_in(int type, int port, const char *bind_address,
 
 #ifdef IPV6_V6ONLY
 		if (resp->ai_family == AF_INET6) {
-			setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY,
-				   (char *)&one, sizeof one);
+			if (setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY,
+				       (char *)&one, sizeof one) < 0
+			    && default_af_hint != AF_INET6) {
+				close(s);
+				continue;
+			}
 		}
 #endif
 
