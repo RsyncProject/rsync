@@ -34,6 +34,8 @@
 #include "rsync.h"
 
 static const char default_name[] = "UNKNOWN";
+extern int am_daemon;
+extern int am_server;
 
 
 /**
@@ -44,6 +46,7 @@ char *client_addr(int fd)
 	struct sockaddr_storage ss;
 	socklen_t length = sizeof ss;
 	char *ssh_client, *p;
+	int len;
 	static char addr_buf[100];
 	static int initialised;
 
@@ -51,14 +54,19 @@ char *client_addr(int fd)
 
 	initialised = 1;
 
-	if ((ssh_client = getenv("SSH_CLIENT")) != NULL) {
-		strlcpy(addr_buf, ssh_client, sizeof(addr_buf));
-		/* truncate SSH_CLIENT to just IP address */
-		p = strchr(addr_buf, ' ');
-		if (p)
-			*p = '\0';
-		else
-			strlcpy(addr_buf, "0.0.0.0", sizeof("0.0.0.0"));
+	if (am_server) {
+		/* daemon over --rsh mode */
+		strcpy(addr_buf, "0.0.0.0");
+		if ((ssh_client = getenv("SSH_CLIENT")) != NULL) {
+			/* truncate SSH_CLIENT to just IP address */
+			p = strchr(ssh_client, ' ');
+			if (p) {
+				len = MIN((unsigned int) (p - ssh_client), 
+						sizeof(addr_buf) - 1);
+				strncpy(addr_buf, ssh_client, len);
+				*(addr_buf + len) = '\0';
+			}
+		}
 	} else
 		client_sockaddr(fd, &ss, &length);
 
@@ -101,8 +109,9 @@ char *client_name(int fd)
 	strcpy(name_buf, default_name);
 	initialised = 1;
 
-	if (getenv("SSH_CLIENT") != NULL) {
-		/* Look up name of IP address given in $SSH_CLIENT */
+	if (am_server) {
+		/* daemon over --rsh mode */
+
 		char *addr = client_addr(fd);
 		struct sockaddr_in sin;
 #ifdef INET6
