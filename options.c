@@ -839,6 +839,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		if (partial_dir) {
 			if (!*partial_dir || strcmp(partial_dir, ".") == 0)
 				partial_dir = NULL;
+			else if (*partial_dir != '/') {
+				add_exclude(&exclude_list, partial_dir,
+					    XFLG_DIRECTORY);
+			}
 			keep_partial = 1;
 		}
 	}
