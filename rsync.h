@@ -268,7 +268,6 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #if HAVE_OFF64_T
 #define int64 off64_t
 #define int64 unsigned off64_t
-#endif
 #elif (SIZEOF_LONG == 8) 
 #define int64 long
 #define uint64 unsigned long
