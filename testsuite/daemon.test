@@ -22,7 +22,7 @@
 # TODO: Put the common framework in a common file, so that we can have
 # subtests fail and keep going.
 
-source "$suitedir/rsync.fns"
+. "$suitedir/rsync.fns"
 
 # Build an appropriate configuration file
 conf="$scratchdir/test-rsyncd.conf"
