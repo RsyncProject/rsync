@@ -94,7 +94,7 @@ int delete_file(char *fname)
 		if (strcmp(dname,".")==0 ||
 		    strcmp(dname,"..")==0)
 			continue;
-		slprintf(buf, sizeof(buf)-1, "%s/%s", fname, dname);
+		slprintf(buf, sizeof(buf), "%s/%s", fname, dname);
 		if (verbose > 0)
 			rprintf(FINFO,"deleting %s\n", buf);
 		if (delete_file(buf) != 0) {
@@ -202,7 +202,7 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file)
 			rprintf(FERROR,"backup filename too long\n");
 			return;
 		}
-		slprintf(fnamebak,sizeof(fnamebak)-1,"%s%s",fname,backup_suffix);
+		slprintf(fnamebak,sizeof(fnamebak),"%s%s",fname,backup_suffix);
 		if (do_rename(fname,fnamebak) != 0 && errno != ENOENT) {
 			rprintf(FERROR,"rename %s %s : %s\n",fname,fnamebak,strerror(errno));
 			return;

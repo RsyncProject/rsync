@@ -51,7 +51,7 @@
 #define strequal(a,b) (strcasecmp(a,b)==0)
 #define BOOLSTR(b) ((b) ? "Yes" : "No")
 typedef char pstring[1024];
-#define pstrcpy(a,b) strlcpy(a,b,sizeof(pstring)-1)
+#define pstrcpy(a,b) strlcpy(a,b,sizeof(pstring))
 
 /* the following are used by loadparm for option lists */
 typedef enum
@@ -610,7 +610,7 @@ static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
        break;
 
      case P_GSTRING:
-       strlcpy((char *)parm_ptr,parmvalue,sizeof(pstring)-1);
+       strlcpy((char *)parm_ptr,parmvalue,sizeof(pstring));
        break;
 
      case P_ENUM:

@@ -230,7 +230,7 @@ static void send_file_entry(struct file_struct *file,int f,unsigned base_flags)
 	last_gid = file->gid;
 	last_time = file->modtime;
 
-	strlcpy(lastname,fname,MAXPATHLEN-1);
+	strlcpy(lastname,fname,MAXPATHLEN);
 	lastname[MAXPATHLEN-1] = 0;
 }
 
@@ -265,11 +265,11 @@ static void receive_file_entry(struct file_struct **fptr,
 
 	if (l2 >= MAXPATHLEN-l1) overflow("receive_file_entry");
 
-	strlcpy(thisname,lastname,l1);
+	strlcpy(thisname,lastname,l1+1);
 	read_sbuf(f,&thisname[l1],l2);
 	thisname[l1+l2] = 0;
 
-	strlcpy(lastname,thisname,MAXPATHLEN-1);
+	strlcpy(lastname,thisname,MAXPATHLEN);
 	lastname[MAXPATHLEN-1] = 0;
 
 	clean_fname(thisname);
@@ -370,7 +370,7 @@ static struct file_struct *make_file(char *fname)
 	char *p;
 	char cleaned_name[MAXPATHLEN];
 
-	strlcpy(cleaned_name, fname, MAXPATHLEN-1);
+	strlcpy(cleaned_name, fname, MAXPATHLEN);
 	cleaned_name[MAXPATHLEN-1] = 0;
 	clean_fname(cleaned_name);
 	fname = cleaned_name;
@@ -531,7 +531,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 		return;
 	}
 
-	strlcpy(fname,dir,MAXPATHLEN-1);
+	strlcpy(fname,dir,MAXPATHLEN);
 	l = strlen(fname);
 	if (fname[l-1] != '/') {
 		if (l == MAXPATHLEN-1) {
@@ -540,7 +540,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 			closedir(d);
 			return;
 		}
-		strlcat(fname,"/", MAXPATHLEN-1);
+		strlcat(fname,"/", MAXPATHLEN);
 		l++;
 	}
 	p = fname + strlen(fname);
@@ -562,7 +562,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 		if (strcmp(dname,".")==0 ||
 		    strcmp(dname,"..")==0)
 			continue;
-		strlcpy(p,dname,MAXPATHLEN-(l+1));
+		strlcpy(p,dname,MAXPATHLEN-l);
 		send_file_name(f,flist,fname,recurse,0);
 	}
 
@@ -608,11 +608,11 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 		char fname2[MAXPATHLEN];
 		char *fname = fname2;
 
-		strlcpy(fname,argv[i],MAXPATHLEN-1);
+		strlcpy(fname,argv[i],MAXPATHLEN);
 
 		l = strlen(fname);
 		if (l != 1 && fname[l-1] == '/') {
-			strlcat(fname,".",MAXPATHLEN-1);
+			strlcat(fname,".",MAXPATHLEN);
 		}
 
 		if (link_stat(fname,&st) != 0) {
@@ -644,7 +644,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 			   thus getting their permissions right */
 			*p = 0;
 			if (strcmp(lastpath,fname)) {
-				strlcpy(lastpath, fname, sizeof(lastpath)-1);
+				strlcpy(lastpath, fname, sizeof(lastpath));
 				*p = '/';
 				for (p=fname+1; (p=strchr(p,'/')); p++) {
 					int copy_links_saved = copy_links;
@@ -956,11 +956,11 @@ char *f_name(struct file_struct *f)
 	n = (n+1)%10;
 
 	if (f->dirname) {
-		strlcpy(p, f->dirname, MAXPATHLEN-1);
-		strlcat(p, "/", MAXPATHLEN-1);
-		strlcat(p, f->basename, MAXPATHLEN-1);
+		strlcpy(p, f->dirname, MAXPATHLEN);
+		strlcat(p, "/", MAXPATHLEN);
+		strlcat(p, f->basename, MAXPATHLEN);
 	} else {
-		strlcpy(p, f->basename, MAXPATHLEN-1);
+		strlcpy(p, f->basename, MAXPATHLEN);
 	}
 
 	return p;

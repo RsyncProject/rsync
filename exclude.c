@@ -321,7 +321,7 @@ void add_cvs_excludes(void)
 		add_exclude(cvs_ignore_list[i], 0);
 
 	if ((p=getenv("HOME")) && strlen(p) < (MAXPATHLEN-12)) {
-		slprintf(fname,sizeof(fname)-1, "%s/.cvsignore",p);
+		slprintf(fname,sizeof(fname), "%s/.cvsignore",p);
 		add_exclude_file(fname,0,0);
 	}
 

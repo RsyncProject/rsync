@@ -538,7 +538,7 @@ void io_printf(int fd, const char *format, ...)
 	int len;
 	
 	va_start(ap, format);
-	len = vslprintf(buf, sizeof(buf)-1, format, ap);
+	len = vslprintf(buf, sizeof(buf), format, ap);
 	va_end(ap);
 
 	if (len < 0) exit_cleanup(RERR_STREAMIO);

@@ -163,7 +163,7 @@ static int get_tmpname(char *fnametmp, char *fname)
 			rprintf(FERROR,"filename too long\n");
 			return 0;
 		}
-		slprintf(fnametmp,MAXPATHLEN-1, "%s/.%s.XXXXXX",tmpdir,f);
+		slprintf(fnametmp,MAXPATHLEN, "%s/.%s.XXXXXX",tmpdir,f);
 		return 1;
 	} 
 
@@ -176,11 +176,11 @@ static int get_tmpname(char *fnametmp, char *fname)
 
 	if (f) {
 		*f = 0;
-		slprintf(fnametmp,MAXPATHLEN-1,"%s/.%s.XXXXXX",
+		slprintf(fnametmp,MAXPATHLEN,"%s/.%s.XXXXXX",
 			 fname,f+1);
 		*f = '/';
 	} else {
-		slprintf(fnametmp,MAXPATHLEN-1,".%s.XXXXXX",fname);
+		slprintf(fnametmp,MAXPATHLEN,".%s.XXXXXX",fname);
 	}
 
 	return 1;
@@ -353,7 +353,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
 		if ((fd1 == -1) && (compare_dest != NULL)) {
 			/* try the file at compare_dest instead */
-			slprintf(fnamecmpbuf,MAXPATHLEN-1,"%s/%s",
+			slprintf(fnamecmpbuf,MAXPATHLEN,"%s/%s",
 						compare_dest,fname);
 			fnamecmp = fnamecmpbuf;
 			fd1 = open(fnamecmp,O_RDONLY);

@@ -273,7 +273,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 	if ((statret == -1) && (compare_dest != NULL)) {
 		/* try the file at compare_dest instead */
 		int saveerrno = errno;
-		slprintf(fnamecmpbuf,MAXPATHLEN-1,"%s/%s",compare_dest,fname);
+		slprintf(fnamecmpbuf,MAXPATHLEN,"%s/%s",compare_dest,fname);
 		statret = link_stat(fnamecmpbuf,&st);
 		if (!S_ISREG(st.st_mode))
 			statret = -1;

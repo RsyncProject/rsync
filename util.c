@@ -359,28 +359,34 @@ void kill_all(int sig)
 }
 
 /* like strncpy but does not 0 fill the buffer and always null 
-   terminates (thus it can use maxlen+1 space in d) */
-void strlcpy(char *d, char *s, int maxlen)
+   terminates. bufsize is the size of the destination buffer */
+size_t strlcpy(char *d, const char *s, size_t bufsize)
 {
-	int len = strlen(s);
-	if (len > maxlen) len = maxlen;
+	size_t len = strlen(s);
+	size_t ret = len;
+	if (len >= bufsize) len = bufsize-1;
 	memcpy(d, s, len);
 	d[len] = 0;
+	return ret;
 }
 
 /* like strncat but does not 0 fill the buffer and always null 
-   terminates (thus it can use maxlen+1 space in d) */
-void strlcat(char *d, char *s, int maxlen)
+   terminates. bufsize is the length of the buffer, which should
+   be one more than the maximum resulting string length */
+size_t strlcat(char *d, const char *s, size_t bufsize)
 {
-	int len1 = strlen(d);
-	int len2 = strlen(s);
-	if (len1+len2 > maxlen) {
-		len2 = maxlen-len1;
+	size_t len1 = strlen(d);
+	size_t len2 = strlen(s);
+	size_t ret = len1 + len2;
+
+	if (len1+len2 >= bufsize) {
+		len2 = bufsize - (len1+1);
 	}
 	if (len2 > 0) {
 		memcpy(d+len1, s, len2);
 		d[len1+len2] = 0;
 	}
+	return ret;
 }
 
 /* turn a user name into a uid */
@@ -502,14 +508,13 @@ void strlower(char *s)
 	}
 }
 
-/* this is like vsnprintf but the 'n' limit does not include
-   the terminating null. So if you have a 1024 byte buffer then
-   pass 1023 for n */
+/* this is like vsnprintf but it always null terminates, so you
+   can fit at most n-1 chars in */
 int vslprintf(char *str, int n, const char *format, va_list ap)
 {
 	int ret = vsnprintf(str, n, format, ap);
-	if (ret > n || ret < 0) {
-		str[n] = 0;
+	if (ret >= n || ret < 0) {
+		str[n-1] = 0;
 		return -1;
 	}
 	str[ret] = 0;
@@ -670,10 +675,10 @@ char *push_dir(char *dir, int save)
 	}
 
 	if (*dir == '/') {
-		strlcpy(curr_dir, dir, sizeof(curr_dir)-1);
+		strlcpy(curr_dir, dir, sizeof(curr_dir));
 	} else {
-		strlcat(curr_dir,"/", sizeof(curr_dir)-1);
-		strlcat(curr_dir,dir, sizeof(curr_dir)-1);
+		strlcat(curr_dir,"/", sizeof(curr_dir));
+		strlcat(curr_dir,dir, sizeof(curr_dir));
 	}
 
 	clean_fname(curr_dir);
@@ -692,7 +697,7 @@ int pop_dir(char *dir)
 		return ret;
 	}
 
-	strlcpy(curr_dir, dir, sizeof(curr_dir)-1);
+	strlcpy(curr_dir, dir, sizeof(curr_dir));
 
 	free(dir);
 
@@ -797,7 +802,7 @@ char *timestring(time_t t)
 #ifdef HAVE_STRFTIME
 	strftime(TimeBuf,sizeof(TimeBuf)-1,"%Y/%m/%d %T",tm);
 #else
-	strlcpy(TimeBuf, asctime(tm), sizeof(TimeBuf)-1);
+	strlcpy(TimeBuf, asctime(tm), sizeof(TimeBuf));
 #endif
 
 	if (TimeBuf[strlen(TimeBuf)-1] == '\n') {

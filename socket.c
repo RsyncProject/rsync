@@ -330,7 +330,7 @@ char *client_addr(int fd)
 		exit_cleanup(RERR_SOCKETIO);
 	}
 	
-	strlcpy(addr_buf,(char *)inet_ntoa(sockin->sin_addr), sizeof(addr_buf)-1);
+	strlcpy(addr_buf,(char *)inet_ntoa(sockin->sin_addr), sizeof(addr_buf));
 	return addr_buf;
 }
 
@@ -363,7 +363,7 @@ char *client_name(int fd)
 	if ((hp = gethostbyaddr((char *) &sockin->sin_addr,
 				sizeof(sockin->sin_addr),
 				AF_INET))) {
-		strlcpy(name_buf,(char *)hp->h_name,sizeof(name_buf) - 1);
+		strlcpy(name_buf,(char *)hp->h_name,sizeof(name_buf));
 	}
 
 
