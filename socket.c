@@ -715,10 +715,11 @@ int check_name(int fd,
 {
 	struct addrinfo hints, *res, *res0;
 	int error;
+	int ss_family = get_sockaddr_family(ss);
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_UNSPEC;
-	hints.ai_flags = get_sockaddr_family(ss);
+	hints.ai_flags = ss_family;
 	hints.ai_socktype = SOCK_STREAM;
 	error = getaddrinfo(name_buf, port_buf, &hints, &res0);
 	if (error) {
@@ -733,14 +734,39 @@ int check_name(int fd,
 
 	/* We expect that one of the results will be the same as ss. */
 	for (res = res0; res; res = res->ai_next) {
-		if (res->ai_family != get_sockaddr_family(ss))
+		if (res->ai_family != ss_family) {
+			rprintf(FERROR,
+				"check_name: response family %d != %d\n",
+				res->ai_family, ss_family);
 			continue;
-		if (res->ai_addrlen != ss_len)
+		}
+		if (res->ai_addrlen != ss_len) {
+			rprintf(FERROR,
+				"check_name: addrlen %d != %d\n",
+				res->ai_addrlen, ss_len);
 			continue;
-		if (memcmp(res->ai_addr, ss, res->ai_addrlen) == 0)
+		}
+		if (memcmp(res->ai_addr, ss, res->ai_addrlen) == 0) {
+			rprintf(FERROR,
+				"check_name: %d bytes of address identical\n",
+				res->ai_addrlen);
 			break;
+		} else{
+			rprintf(FERROR,
+				"check_name: %d bytes of address NOT identical\n",
+				res->ai_addrlen);
+		}
 	}
 
+	if (!res0) {
+		/* We hit the end of the list without finding an
+		 * address that was the same as ss. */
+		rprintf(FERROR, RSYNC_NAME
+			": no known address for \"%s\": "
+			"spoofed address?\n",
+			name_buf);
+		strcpy(name_buf, default_name);
+	}
 	if (res == NULL) {
 		/* We hit the end of the list without finding an
 		 * address that was the same as ss. */
