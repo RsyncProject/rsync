@@ -181,7 +181,7 @@ static service sDefault =
 	NULL,    /* exclude from */
 	NULL,    /* include */
 	NULL,    /* include from */
-	"%o %h [%a] %m (%u) %f %l",    /* log format */
+	"%o %h [%a] %m (%u) %l %f%L",    /* log format */
 	NULL,    /* refuse options */
 	"*.gz *.tgz *.zip *.z *.rpm *.deb *.iso *.bz2 *.tbz",    /* dont compress */
 	0,        /* timeout */
