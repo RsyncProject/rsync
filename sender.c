@@ -120,13 +120,13 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 	int phase = 0;
 	extern struct stats stats;
 	struct stats initial_stats;
-	extern int write_batch;   /* dw */
-	extern int read_batch;    /* dw */
-	int checksums_match;   /* dw */
-	int buff_len;  /* dw */
-	char buff[CHUNK_SIZE];    /* dw */
-	int j;   /* dw */
-	int done;   /* dw */
+	extern int write_batch;
+	extern int read_batch;
+	int checksums_match;
+	int buff_len;
+	char buff[CHUNK_SIZE];
+	int j;
+	int done;
 
 	if (verbose > 2)
 		rprintf(FINFO, "send_files starting\n");
@@ -201,7 +201,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				if (errno == ENOENT) {
 					io_error |= IOERR_VANISHED;
 					rprintf(FINFO, "file has vanished: %s\n",
-			 			full_fname(fname));
+						full_fname(fname));
 				} else {
 					io_error |= IOERR_GENERAL;
 					rprintf(FERROR, "send_files failed to open %s: %s\n",
@@ -247,7 +247,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		set_compression(fname);
 
-		if (read_batch) { /* dw */
+		if (read_batch) {
 			/* read checksums originally computed on sender side */
 			read_batch_csum_info(i, s, &checksums_match);
 			if (checksums_match) {
@@ -288,7 +288,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			log_send(file, &initial_stats);
 		}
 
-		if (!read_batch) { /* dw */
+		if (!read_batch) {
 			if (buf) {
 				j = unmap_file(buf);
 				if (j) {
@@ -313,7 +313,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 	match_report();
 
 	write_int(f_out, -1);
-	if (write_batch || read_batch) { /* dw */
+	if (write_batch || read_batch) {
 		close_batch_csums_file();
 		close_batch_delta_file();
 	}

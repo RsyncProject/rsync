@@ -284,7 +284,7 @@ static void hash_search(int f,struct sum_struct *s,
 void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 {
 	char file_sum[MD4_SUM_LENGTH];
-	extern int write_batch;  /*  dw */
+	extern int write_batch;
 
 	last_match = 0;
 	false_alarms = 0;
@@ -319,7 +319,7 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	if (verbose > 2)
 		rprintf(FINFO,"sending file_sum\n");
 	write_buf(f,file_sum,MD4_SUM_LENGTH);
-	if (write_batch) /* dw */
+	if (write_batch)
 		write_batch_delta_file(file_sum, MD4_SUM_LENGTH);
 
 	if (targets) {

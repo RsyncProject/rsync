@@ -385,8 +385,8 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 	report(f_out);
 	if (protocol_version >= 24) {
 		/* final goodbye message */
- 		read_int(f_in);
- 	}
+		read_int(f_in);
+	}
 	io_flush();
 	exit_cleanup(0);
 }
@@ -612,7 +612,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			send_exclude_list(f_out);
 		if (remote_filesfrom_file)
 			filesfrom_fd = f_in;
-		if (!read_batch) /*  dw -- don't write to pipe */
+		if (!read_batch) /* don't write to pipe */
 			flist = send_file_list(f_out,argc,argv);
 		if (verbose > 3)
 			rprintf(FINFO,"file list sent\n");

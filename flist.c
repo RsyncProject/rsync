@@ -816,7 +816,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 
 	flist_expand(flist);
 
-	if (write_batch)	/*  dw  */
+	if (write_batch)
 		file->flags = FLAG_DELETE;
 
 	if (file->basename[0]) {
@@ -1081,7 +1081,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		io_end_buffering();
 		stats.flist_size = stats.total_written - start_write;
 		stats.num_files = flist->count;
-		if (write_batch)	/*  dw  */
+		if (write_batch)
 			write_batch_flist_info(flist->count, flist->files);
 	}
 
