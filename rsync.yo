@@ -654,25 +654,6 @@ Finally, any file is ignored if it is in the same directory as a
 .cvsignore file and matches one of the patterns listed therein.  See
 the bf(cvs(1)) manual for more information.
 
-dit(bf(--csum-length=LENGTH)) By default the primary checksum used in
-rsync is a very strong 16 byte MD4 checksum. In most cases you will
-find that a truncated version of this checksum is quite efficient, and
-this will decrease the size of the checksum data sent over the connection,
-making things faster. 
-
-You can choose the number of bytes in the truncated checksum using the
---csum-length option. Any value less than or equal to 16 is valid.
-
-Note that if you use this option then you run the risk of ending up
-with an incorrect target file. The risk with a value of 16 is
-microscopic and can be safely ignored (the universe will probably end
-before it fails) but with smaller values the risk is higher.
-
-Current versions of rsync actually use an adaptive algorithm for the
-checksum length by default, using a 16 byte file checksum to determine
-if a 2nd pass is required with a longer block checksum. Only use this
-option if you have read the source code and know what you are doing.
-
 dit(bf(-T, --temp-dir=DIR)) This option instructs rsync to use DIR as a
 scratch directory when creating temporary copies of the files
 transferred on the receiving side.  The default behavior is to create
