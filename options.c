@@ -126,7 +126,7 @@ static void print_rsync_version(int f)
 	rprintf(f, "<http://rsync.samba.org/>\n");
         rprintf(f, "Capabilities: %d-bit files, %ssocketpairs, "
                 "%shard links, %ssymlinks, batchfiles\n\n",
-                sizeof(int64) * 8,
+                (int) (sizeof(int64) * 8),
                 got_socketpair,
                 hardlinks, links);
 
