@@ -239,7 +239,7 @@ void usage(enum logcode F)
   rprintf(F,"     --backup-dir            make backups into this directory\n");
   rprintf(F,"     --suffix=SUFFIX         backup suffix (default %s w/o --backup-dir)\n",BACKUP_SUFFIX);
   rprintf(F," -u, --update                update only (don't overwrite newer files)\n");
-  rprintf(F,"     --inplace               update the destination file inplace (see man page)\n");
+  rprintf(F,"     --inplace               update destination files inplace (SEE MAN PAGE)\n");
   rprintf(F," -K, --keep-dirlinks         treat symlinked dir on receiver as dir\n");
   rprintf(F," -l, --links                 copy symlinks as symlinks\n");
   rprintf(F," -L, --copy-links            copy the referent of all symlinks\n");
@@ -273,7 +273,7 @@ void usage(enum logcode F)
   rprintf(F," -I, --ignore-times          turn off mod time & file size quick check\n");
   rprintf(F,"     --size-only             ignore mod time for quick check (use size)\n");
   rprintf(F,"     --modify-window=NUM     compare mod times with reduced accuracy\n");
-  rprintf(F," -T  --temp-dir=DIR          create temporary files in directory DIR\n");
+  rprintf(F," -T, --temp-dir=DIR          create temporary files in directory DIR\n");
   rprintf(F,"     --compare-dest=DIR      also compare destination files relative to DIR\n");
   rprintf(F,"     --link-dest=DIR         create hardlinks to DIR for unchanged files\n");
   rprintf(F," -P                          equivalent to --partial --progress\n");
@@ -284,7 +284,7 @@ void usage(enum logcode F)
   rprintf(F,"     --include=PATTERN       don't exclude files matching PATTERN\n");
   rprintf(F,"     --include-from=FILE     don't exclude patterns listed in FILE\n");
   rprintf(F,"     --files-from=FILE       read FILE for list of source-file names\n");
-  rprintf(F," -0  --from0                 all *-from file lists are delimited by nulls\n");
+  rprintf(F," -0, --from0                 all *-from file lists are delimited by nulls\n");
   rprintf(F,"     --version               print version number\n");
   rprintf(F,"     --daemon                run as an rsync daemon\n");
   rprintf(F,"     --no-detach             do not detach from the parent\n");
@@ -302,8 +302,8 @@ void usage(enum logcode F)
   rprintf(F,"     --read-batch=FILE       read a batch from FILE\n");
   rprintf(F,"     --checksum-seed=NUM     set block/file checksum seed\n");
 #ifdef INET6
-  rprintf(F," -4  --ipv4                  prefer IPv4\n");
-  rprintf(F," -6  --ipv6                  prefer IPv6\n");
+  rprintf(F," -4, --ipv4                  prefer IPv4\n");
+  rprintf(F," -6, --ipv6                  prefer IPv6\n");
 #endif
   rprintf(F," -h, --help                  show this help screen\n");
 
