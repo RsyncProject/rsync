@@ -1130,6 +1130,8 @@ void io_multiplexing_close(void)
 
 void start_write_batch(int fd)
 {
+	write_stream_flags(batch_fd);
+
 	/* Some communication has already taken place, but we don't
 	 * enable batch writing until here so that we can write a
 	 * canonical record of the communication even though the
