@@ -238,9 +238,9 @@ quote(rsync --server --daemon .)
 NOTE: rsync's argument parsing expects the trailing ".", so make sure
 that it's there.  If you want to use a rsyncd.conf(5)-style
 configuration file other than the default, you can added a
---config-file option to the em(command):
+--config option to the em(command):
 
-quote(rsync --server --daemon --config-file=em(file) .)
+quote(rsync --server --daemon --config=em(file) .)
 
 manpagesection(EXAMPLES)
 
