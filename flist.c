@@ -153,14 +153,14 @@ static void list_file_entry(struct file_struct *f)
 		rprintf(FINFO, "%s %11.0f %s %s -> %s\n",
 			perms,
 			(double)f->length, timestring(f->modtime),
-			f_name(f), f->u.link);
+			safe_fname(f_name(f)), f->u.link);
 	} else
 #endif
 	{
 		rprintf(FINFO, "%s %11.0f %s %s\n",
 			perms,
 			(double)f->length, timestring(f->modtime),
-			f_name(f));
+			safe_fname(f_name(f)));
 	}
 }
 
