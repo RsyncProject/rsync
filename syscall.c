@@ -31,19 +31,27 @@ extern int read_only;
 extern int list_only;
 extern int preserve_perms;
 
-#define CHECK_RO if (read_only || list_only) {errno = EROFS; return -1;}
+#define RETURN_ERROR_IF(x,e) \
+	do { \
+		if (x) { \
+			errno = (e); \
+			return -1; \
+		} \
+	} while (0)
+
+#define RETURN_ERROR_IF_RO_OR_LO RETURN_ERROR_IF(read_only || list_only, EROFS)
 
 int do_unlink(char *fname)
 {
 	if (dry_run) return 0;
-	CHECK_RO
+	RETURN_ERROR_IF_RO_OR_LO;
 	return unlink(fname);
 }
 
 int do_symlink(char *fname1, char *fname2)
 {
 	if (dry_run) return 0;
-	CHECK_RO
+	RETURN_ERROR_IF_RO_OR_LO;
 	return symlink(fname1, fname2);
 }
 
@@ -51,7 +59,7 @@ int do_symlink(char *fname1, char *fname2)
 int do_link(char *fname1, char *fname2)
 {
 	if (dry_run) return 0;
-	CHECK_RO
+	RETURN_ERROR_IF_RO_OR_LO;
 	return link(fname1, fname2);
 }
 #endif
@@ -59,7 +67,7 @@ int do_link(char *fname1, char *fname2)
 int do_lchown(const char *path, uid_t owner, gid_t group)
 {
 	if (dry_run) return 0;
-	CHECK_RO
+	RETURN_ERROR_IF_RO_OR_LO;
 	return lchown(path, owner, group);
 }
 
@@ -67,7 +75,7 @@ int do_lchown(const char *path, uid_t owner, gid_t group)
 int do_mknod(char *pathname, mode_t mode, dev_t dev)
 {
 	if (dry_run) return 0;
-	CHECK_RO
+	RETURN_ERROR_IF_RO_OR_LO;
 	return mknod(pathname, mode, dev);
 }
 #endif
@@ -75,15 +83,15 @@ int do_mknod(char *pathname, mode_t mode, dev_t dev)
 int do_rmdir(char *pathname)
 {
 	if (dry_run) return 0;
-	CHECK_RO
+	RETURN_ERROR_IF_RO_OR_LO;
 	return rmdir(pathname);
 }
 
 int do_open(char *pathname, int flags, mode_t mode)
 {
 	if (flags != O_RDONLY) {
-	    if (dry_run) return -1;
-	    CHECK_RO
+		RETURN_ERROR_IF(dry_run, ENOMSG);
+		RETURN_ERROR_IF_RO_OR_LO;
 	}
 
 	return open(pathname, flags | O_BINARY, mode);
@@ -94,9 +102,9 @@ int do_chmod(const char *path, mode_t mode)
 {
 	int code;
 	if (dry_run) return 0;
-	CHECK_RO
+	RETURN_ERROR_IF_RO_OR_LO;
 	code = chmod(path, mode);
-	if ((code != 0) && preserve_perms)
+	if (code != 0 && preserve_perms)
 	    return code;
 	return 0;
 }
@@ -105,7 +113,7 @@ int do_chmod(const char *path, mode_t mode)
 int do_rename(char *fname1, char *fname2)
 {
 	if (dry_run) return 0;
-	CHECK_RO
+	RETURN_ERROR_IF_RO_OR_LO;
 	return rename(fname1, fname2);
 }
 
@@ -131,9 +139,8 @@ void trim_trailing_slashes(char *name)
 
 int do_mkdir(char *fname, mode_t mode)
 {
-	if (dry_run)
-		return 0;
-	CHECK_RO;
+	if (dry_run) return 0;
+	RETURN_ERROR_IF_RO_OR_LO;
 	trim_trailing_slashes(fname);	
 	return mkdir(fname, mode);
 }
@@ -142,22 +149,26 @@ int do_mkdir(char *fname, mode_t mode)
 /* like mkstemp but forces permissions */
 int do_mkstemp(char *template, mode_t perms)
 {
-	if (dry_run) return -1;
-	if (read_only) {errno = EROFS; return -1;}
+	RETURN_ERROR_IF(dry_run, ENOMSG);
+	RETURN_ERROR_IF(read_only, EROFS);
 
 #if defined(HAVE_SECURE_MKSTEMP) && defined(HAVE_FCHMOD)
 	{
 		int fd = mkstemp(template);
-		if (fd == -1) return -1;
-		if ((fchmod(fd, perms) != 0) && preserve_perms) {
+		if (fd == -1)
+			return -1;
+		if (fchmod(fd, perms) != 0 && preserve_perms) {
+			int errno_save = errno;
 			close(fd);
 			unlink(template);
+			errno = errno_save;
 			return -1;
 		}
 		return fd;
 	}
 #else
-	if (!mktemp(template)) return -1;
+	if (!mktemp(template))
+		return -1;
 	return do_open(template, O_RDWR|O_EXCL|O_CREAT, perms);
 #endif
 }
