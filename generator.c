@@ -344,7 +344,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 			   struct file_struct *file, int ndx,
 			   int f_out, int f_out_name)
 {
-	static int missing_below = -1;
+	static int missing_below = -1, excluded_below = -1;
 	static char *fuzzy_dirname = NULL;
 	static struct file_list *fuzzy_dirlist = NULL;
 	struct file_struct *fuzzy_file = NULL;
@@ -401,14 +401,24 @@ static void recv_generator(char *fname, struct file_list *flist,
 			safe_fname(fname), ndx);
 	}
 
-	if (server_filter_list.head
-	    && check_filter(&server_filter_list, fname,
-			    S_ISDIR(file->mode)) < 0) {
-		if (verbose) {
-			rprintf(FINFO, "skipping server-excluded file \"%s\"\n",
-				safe_fname(fname));
+	if (server_filter_list.head) {
+		if (excluded_below >= 0) {
+			if (file->dir.depth > excluded_below)
+				goto skipping;
+			excluded_below = -1;
 		}
-		return;
+		if (check_filter(&server_filter_list, fname,
+				 S_ISDIR(file->mode)) < 0) {
+			if (S_ISDIR(file->mode))
+				excluded_below = file->dir.depth;
+		    skipping:
+			if (verbose) {
+				rprintf(FINFO,
+					"skipping server-excluded file \"%s\"\n",
+					safe_fname(fname));
+			}
+			return;
+		}
 	}
 
 	if (missing_below >= 0 && file->dir.depth <= missing_below) {
