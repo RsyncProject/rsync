@@ -92,8 +92,8 @@ fi
 
 
 
-AC_DEFINE(ss_family, __ss_family, [KAME hack])
-AC_DEFINE(ss_len, __ss_len, [KAME hack])
+dnl AC_DEFINE(ss_family, __ss_family, [KAME hack])
+dnl AC_DEFINE(ss_len, __ss_len, [KAME hack])
 
 CFLAGS="$CFLAGS"
 AC_ARG_ENABLE(ipv6,

@@ -327,7 +327,7 @@ void start_accept_loop(int port, int (*fn)(int ))
 	while (1) {
 		fd_set fds;
 		int fd;
-		struct sockaddr_storage addr;
+		struct sockaddr addr;
 		int in_addrlen = sizeof(addr);
 
 		/* close log file before the potentially very long select so
@@ -505,12 +505,12 @@ void become_daemon(void)
 	}
 }
 
-/*******************************************************************
- return the IP addr of the client as a string 
- ******************************************************************/
+/**
+ * Return the IP addr of the client as a string 
+ **/
 char *client_addr(int fd)
 {
-	struct sockaddr_storage ss;
+	struct sockaddr ss;
 	int     length = sizeof(ss);
 	static char addr_buf[100];
 	static int initialised;
@@ -519,22 +519,22 @@ char *client_addr(int fd)
 
 	initialised = 1;
 
-	if (getpeername(fd, (struct sockaddr *)&ss, &length)) {
+	if (getpeername(fd, &ss, &length)) {
 		exit_cleanup(RERR_SOCKETIO);
 	}
 
-	getnameinfo((struct sockaddr *)&ss, length,
+	getnameinfo(&ss, length,
 		addr_buf, sizeof(addr_buf), NULL, 0, NI_NUMERICHOST);
 	return addr_buf;
 }
 
 
-/*******************************************************************
- return the DNS name of the client 
- ******************************************************************/
+/**
+ * Return the DNS name of the client 
+ **/
 char *client_name(int fd)
 {
-	struct sockaddr_storage ss;
+	struct sockaddr ss;
 	int     length = sizeof(ss);
 	static char name_buf[100];
 	static char port_buf[100];
@@ -598,7 +598,7 @@ char *client_name(int fd)
 
 	/* XXX sin6_flowinfo and other fields */
 	for (res = res0; res; res = res->ai_next) {
-		if (res->ai_family != ss.ss_family)
+		if (res->ai_family != ss.sa_family)
 			continue;
 		if (res->ai_addrlen != length)
 			continue;
@@ -619,12 +619,14 @@ char *client_name(int fd)
 }
 
 /**
-   Convert a string to an IP address. The string can be a name or
-   dotted decimal number.
-
-   Returns a pointer to a static in_addr struct -- if you call this
-   more than once then you should copy it.
-*/
+ * Convert a string to an IP address. The string can be a name or
+ * dotted decimal number.
+ *
+ * Returns a pointer to a static in_addr struct -- if you call this
+ * more than once then you should copy it.
+ *
+ * TODO: Use getaddrinfo() instead, or make this function call getnameinfo
+ **/
 struct in_addr *ip_address(const char *str)
 {
 	static struct in_addr ret;
