@@ -314,10 +314,8 @@ static void recv_generator(char *fname, struct file_list *flist,
 		    && verbose && f_out != -1)
 			rprintf(FINFO, "%s/\n", safe_fname(fname));
 		if (delete_during && f_out != -1 && csum_length != SUM_LENGTH
-		    && (file->flags & FLAG_DEL_START)) {
-			delete_in_dir(flist, fname, strlen(fname),
-				      file->dir.depth);
-		}
+		    && (file->flags & FLAG_DEL_HERE))
+			delete_in_dir(flist, fname, file);
 		return;
 	} else if (max_size && file->length > max_size) {
 		if (verbose > 1)
@@ -654,7 +652,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 			       flist, file, i, f_out, f_out_name);
 	}
 	if (delete_during)
-		delete_in_dir(NULL, NULL, 0, 0);
+		delete_in_dir(NULL, NULL, NULL);
 
 	phase++;
 	csum_length = SUM_LENGTH;
