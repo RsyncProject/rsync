@@ -245,6 +245,9 @@ Changes since 2.6.3:
       enclosed in '[' and ']' (e.g. "[::1]").  (We already allowed IPv6
       literals in the rsync://HOST:PORT/PATH format.)
 
+    - When rsync recurses to build the file list, it no longer keeps open
+      the directory handles of all the parent dirs inside the transfer.
+
     - When building under windows, the default for --daemon is now to
       avoid detaching, requiring the new --detach option to force rsync
       to detach.
