@@ -85,7 +85,8 @@ pool_destroy(alloc_pool_t p)
 	free(pool);
 }
 
-void *pool_alloc(alloc_pool_t p, size_t len, char *bomb)
+void *
+pool_alloc(alloc_pool_t p, size_t len, char *bomb)
 {
 	struct alloc_pool *pool = (struct alloc_pool *) p;
 	if (!pool)
@@ -287,11 +288,8 @@ pool_stats(alloc_pool_t p, int fd, int summarize)
 	strcpy(buf, "   FREE    BOUND\n");
 	write(fd, buf, strlen(buf));
 
-	cur = pool->free;
-	while (cur)
+	for (cur = pool->free; cur; cur = cur->next)
 	{
 		FDEXTSTAT(cur);
-		cur = cur->next;
 	}
 }
-
