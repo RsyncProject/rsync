@@ -1,7 +1,7 @@
 /* 
    Copyright (C) by Andrew Tridgell 1996, 2000
    Copyright (C) Paul Mackerras 1996
-   Copyright (C) 2001 by Martin Pool <mbp@samba.org>
+   Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -49,7 +49,7 @@
 #define SAME_TIME (1<<7)
 
 /* update this if you make incompatible changes */
-#define PROTOCOL_VERSION 25
+#define PROTOCOL_VERSION 26
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
@@ -263,17 +263,17 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #elif HAVE_LONGLONG
 #define int64 long long
 #else
+/* As long as it gets... */
 #define int64 off_t
 #define NO_INT64
 #endif
 
-#if HAVE_SHORT_INO_T
-#  define INO_T uint32
-#elif HAVE_INO_T
-#  define INO_T ino_t
-#else
-#  define INO_T unsigned
-#endif
+/* We want to manipulate 64-bit inums.  On some systems
+ * STRUCT_STAT.st_ino can be bigger than an ino_t depending on the
+ * combination of largefile feature macros.  Rather than try to guess,
+ * we just internally store them in the largest know type.  Hopefully
+ * it's enough. */
+#define INO_T int64
 
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))

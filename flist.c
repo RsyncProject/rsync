@@ -1,7 +1,7 @@
 /* 
    Copyright (C) Andrew Tridgell 1996
    Copyright (C) Paul Mackerras 1996
-   Copyright (C) 2001 by Martin Pool <mbp@samba.org>
+   Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -18,7 +18,14 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-/* generate and receive file lists */
+/** @file flist.c
+ * Generate and receive file lists
+ *
+ * @todo Get rid of the string_area optimization.  Efficiently
+ * allocating blocks is the responsibility of the system's malloc
+ * library, not of rsync.
+ *
+ **/
 
 #include "rsync.h"
 
@@ -297,8 +304,15 @@ static void send_file_entry(struct file_struct *file,int f,unsigned base_flags)
 
 #if SUPPORT_HARD_LINKS
 	if (preserve_hard_links && S_ISREG(file->mode)) {
-		write_int(f,(int)file->dev);
-		write_int(f,(int)file->inode);
+		if (remote_version < 26) {
+			/* 32-bit dev_t and ino_t */
+			write_int(f,(int)file->dev);
+			write_int(f,(int)file->inode);
+		} else {
+			/* 64-bit dev_t and ino_t */
+			write_longint(f, (int64) file->dev);
+			write_longint(f, (int64) file->inode);
+		}
 	}
 #endif
 
@@ -409,8 +423,13 @@ static void receive_file_entry(struct file_struct **fptr,
 
 #if SUPPORT_HARD_LINKS
 	if (preserve_hard_links && S_ISREG(file->mode)) {
-		file->dev = read_int(f);
-		file->inode = read_int(f);
+		if (remote_version < 26) {
+			file->dev = read_int(f);
+			file->inode = read_int(f);
+		} else {
+			file->dev = read_longint(f);
+			file->inode = read_longint(f);
+		}
 	}
 #endif
   
@@ -1084,6 +1103,10 @@ static void clean_flist(struct file_list *flist, int strip_root)
 				free_file(flist->files[i]);
 		} 
 	}
+
+	/* FIXME: There is a bug here when filenames are repeated more
+	 * than once, because we don't handle freed files when doing
+	 * the comparison. */
 
 	if (strip_root) {
 		/* we need to strip off the root directory in the case

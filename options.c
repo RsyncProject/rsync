@@ -1,7 +1,7 @@
 /*  -*- c-file-style: "linux" -*-
     
     Copyright (C) 1998-2001 by Andrew Tridgell <tridge@samba.org>
-    Copyright (C) 2000-2001 by Martin Pool <mbp@samba.org>
+    Copyright (C) 2000, 2001, 2002 by Martin Pool <mbp@samba.org>
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -122,6 +122,7 @@ static void print_rsync_version(enum logcode f)
         char const *hardlinks = "no ";
         char const *links = "no ";
 	char const *ipv6 = "no ";
+	STRUCT_STAT *dumstat;
 
 #ifdef HAVE_SOCKETPAIR
         got_socketpair = "";
@@ -145,9 +146,16 @@ static void print_rsync_version(enum logcode f)
                 "Copyright (C) 1996-2001 by Andrew Tridgell and others\n");
 	rprintf(f, "<http://rsync.samba.org/>\n");
         rprintf(f, "Capabilities: %d-bit files, %ssocketpairs, "
-                "%shard links, %ssymlinks, batchfiles, %sIPv6\n\n",
+                "%shard links, %ssymlinks, batchfiles, %sIPv6,\n",
                 (int) (sizeof(OFF_T) * 8),
                 got_socketpair, hardlinks, links, ipv6);
+
+	/* Note that this field may not have type ino_t.  It depends
+	 * on the complicated interaction between largefile feature
+	 * macros. */
+	rprintf(f, "              %d-bit inums, %d-bit INO_T\n",
+		(int) (sizeof(dumstat->st_ino) * 8),
+		(int) (sizeof(INO_T) * 8));
 
 #ifdef NO_INT64
         rprintf(f, "WARNING: no 64-bit integers on this platform!\n");
