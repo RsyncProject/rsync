@@ -61,6 +61,7 @@ Options
      --rsync-path=PATH       specify path to rsync on the remote machine
  -C, --cvs-exclude           auto ignore files in the same way CVS does
      --delete                delete files that don't exist on the sending side
+     --delete-excluded       also delete excluded files on the receiving side
      --partial               keep partially transferred files
      --force                 force deletion of directories even if not empty
      --numeric-ids           don't map uid/gid values by user/group name

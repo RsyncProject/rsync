@@ -335,6 +335,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	char *local_name=NULL;
 	char *dir = NULL;
 	extern int delete_mode;
+	extern int delete_excluded;
 	extern int am_daemon;
 
 	if (verbose > 2)
@@ -351,7 +352,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		}    
 	}
 
-	if (delete_mode)
+	if (delete_mode && !delete_excluded)
 		recv_exclude_list(f_in);
 
 	flist = recv_file_list(f_in);
@@ -408,9 +409,10 @@ int client_run(int f_in, int f_out, int pid, int argc, char *argv[])
 	if (am_sender) {
 		extern int cvs_exclude;
 		extern int delete_mode;
+		extern int delete_excluded;
 		if (cvs_exclude)
 			add_cvs_excludes();
-		if (delete_mode) 
+		if (delete_mode && !delete_excluded) 
 			send_exclude_list(f_out);
 		flist = send_file_list(f_out,argc,argv);
 		if (verbose > 3) 

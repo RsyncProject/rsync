@@ -37,6 +37,7 @@ int dry_run=0;
 int local_server=0;
 int ignore_times=0;
 int delete_mode=0;
+int delete_excluded=0;
 int one_file_system=0;
 int remote_version=0;
 int sparse_files=0;
@@ -123,6 +124,7 @@ void usage(int F)
   rprintf(F,"     --rsync-path=PATH       specify path to rsync on the remote machine\n");
   rprintf(F," -C, --cvs-exclude           auto ignore files in the same way CVS does\n");
   rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
+  rprintf(F,"     --delete-excluded       also delete excluded files on the receiving side\n");
   rprintf(F,"     --partial               keep partially transferred files\n");
   rprintf(F,"     --force                 force deletion of directories even if not empty\n");
   rprintf(F,"     --numeric-ids           don't map uid/gid values by user/group name\n");
@@ -152,9 +154,9 @@ void usage(int F)
   rprintf(F,"See http://rsync.samba.org/ for updates and bug reports\n");
 }
 
-enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
-      OPT_EXCLUDE_FROM,OPT_DELETE,OPT_NUMERIC_IDS,OPT_RSYNC_PATH,
-      OPT_FORCE,OPT_TIMEOUT,OPT_DAEMON,OPT_CONFIG,OPT_PORT,
+enum {OPT_VERSION, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
+      OPT_EXCLUDE_FROM, OPT_DELETE, OPT_DELETE_EXCLUDED, OPT_NUMERIC_IDS,
+      OPT_RSYNC_PATH, OPT_FORCE, OPT_TIMEOUT, OPT_DAEMON, OPT_CONFIG, OPT_PORT,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS,
       OPT_COPY_UNSAFE_LINKS, OPT_SAFE_LINKS, OPT_COMPARE_DEST,
       OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY};
@@ -166,6 +168,7 @@ static struct option long_options[] = {
   {"server",      0,     0,    OPT_SERVER},
   {"sender",      0,     0,    OPT_SENDER},
   {"delete",      0,     0,    OPT_DELETE},
+  {"delete-excluded", 0, 0,    OPT_DELETE_EXCLUDED},
   {"force",       0,     0,    OPT_FORCE},
   {"numeric-ids", 0,     0,    OPT_NUMERIC_IDS},
   {"exclude",     1,     0,    OPT_EXCLUDE},
@@ -306,6 +309,11 @@ int parse_arguments(int argc, char *argv[], int frommain)
 			break;
 
 		case OPT_DELETE:
+			delete_mode = 1;
+			break;
+
+		case OPT_DELETE_EXCLUDED:
+			delete_excluded = 1;
 			delete_mode = 1;
 			break;
 
@@ -591,8 +599,11 @@ void server_options(char **args,int *argc)
 		args[ac++] = backup_suffix;
 	}
 
-	if (delete_mode)
+	if (delete_mode && !delete_excluded)
 		args[ac++] = "--delete";
+
+	if (delete_excluded)
+		args[ac++] = "--delete-excluded";
 
 	if (size_only)
 		args[ac++] = "--size-only";

@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsync)(1)(18 Feb 1999)()()
+manpage(rsync)(1)(22 Feb 1999)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
@@ -250,6 +250,7 @@ Options
      --rsync-path=PATH       specify path to rsync on the remote machine
  -C, --cvs-exclude           auto ignore files in the same way CVS does
      --delete                delete files that don't exist on the sending side
+     --delete-excluded       also delete excluded files on the receiving side
      --partial               keep partially transferred files
      --force                 force deletion of directories even if not empty
      --numeric-ids           don't map uid/gid values by user/group name
@@ -430,12 +431,12 @@ boundaries  when recursing.  This  is useful for transferring the
 contents of only one filesystem.
 
 dit(bf(--delete)) This tells rsync to delete any files on the receiving
-side that aren't on the sending side. This option can be dangerous if
-used incorrectly!
+side that aren't on the sending side.   Files that are excluded from
+transfer are excluded from being deleted unless you use --delete-excluded.
 
-It is a very good idea to run first using the dry run option (-n) to
-see what files would be deleted to make sure important files aren't
-listed.
+This option can be dangerous if used incorrectly!  It is a very good idea
+to run first using the dry run option (-n) to see what files would be
+deleted to make sure important files aren't listed.
 
 rsync 1.6.4 changed the behavior of --delete to make it less
 dangerous.  rsync now only scans directories on the receiving side
@@ -451,6 +452,10 @@ files at the destination will be automatically disabled. This is to
 prevent temporary filesystem failures (such as NFS errors) on the
 sending side causing a massive deletion of files on the
 destination. 
+
+dit(bf(--delete-excluded)) In addition to deleting the files on the
+receiving side that are not on the sending side, this tells rsync to also
+delete any files on the receiving side that are excluded (see --exclude).
 
 dit(bf(--force)) This options tells rsync to delete directories even if
 they are not empty.  This applies to both the --delete option and to

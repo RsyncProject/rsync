@@ -395,7 +395,7 @@ static int skip_filesystem(char *fname, STRUCT_STAT *st)
 	return (st2.st_dev != filesystem_dev);
 }
 
-static struct file_struct *make_file(char *fname)
+static struct file_struct *make_file(int f, char *fname)
 {
 	struct file_struct *file;
 	STRUCT_STAT st;
@@ -403,6 +403,7 @@ static struct file_struct *make_file(char *fname)
 	char *p;
 	char cleaned_name[MAXPATHLEN];
 	char linkbuf[MAXPATHLEN];
+	extern int delete_excluded;
 
 	strlcpy(cleaned_name, fname, MAXPATHLEN);
 	cleaned_name[MAXPATHLEN-1] = 0;
@@ -428,11 +429,12 @@ static struct file_struct *make_file(char *fname)
 			return NULL;
 	}
 	
-	if (!match_file_name(fname,&st))
+	/* f is set to -1 when calculating deletion file list */
+	if (((f != -1) || !delete_excluded) && !match_file_name(fname,&st))
 		return NULL;
 	
 	if (verbose > 2)
-		rprintf(FINFO,"make_file(%s)\n",fname);
+		rprintf(FINFO,"make_file(%d,%s)\n",f,fname);
 	
 	file = (struct file_struct *)malloc(sizeof(*file));
 	if (!file) out_of_memory("make_file");
@@ -509,7 +511,7 @@ void send_file_name(int f,struct file_list *flist,char *fname,
 {
   struct file_struct *file;
 
-  file = make_file(fname);
+  file = make_file(f,fname);
 
   if (!file) return;  
   
