@@ -72,7 +72,7 @@
 #ifndef HAVE_MEMMOVE
  void *memmove(void *dest, const void *src, size_t n)
 {
-	memcpy(dest, src, n);
+	bcopy((char *) src, (char *) dest, n);
 	return dest;
 }
 #endif
