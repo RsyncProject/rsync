@@ -46,17 +46,17 @@ int preserve_gid = 0;
 int preserve_times = 0;
 int update_only = 0;
 int cvs_exclude = 0;
-int dry_run=0;
-int local_server=0;
-int ignore_times=0;
-int delete_mode=0;
-int delete_excluded=0;
-int one_file_system=0;
+int dry_run = 0;
+int local_server = 0;
+int ignore_times = 0;
+int delete_mode = 0;
+int delete_excluded = 0;
+int one_file_system = 0;
 int protocol_version = PROTOCOL_VERSION;
-int sparse_files=0;
-int do_compression=0;
-int am_root=0;
-int orig_umask=0;
+int sparse_files = 0;
+int do_compression = 0;
+int am_root = 0;
+int orig_umask = 0;
 int relative_paths = -1;
 int implied_dirs = 1;
 int numeric_ids = 0;
@@ -74,20 +74,20 @@ int eol_nulls = 0;
 int recurse = 0;
 int am_daemon = 0;
 int daemon_over_rsh = 0;
-int do_stats=0;
-int do_progress=0;
-int keep_partial=0;
-int safe_symlinks=0;
-int copy_unsafe_links=0;
-int size_only=0;
-int bwlimit=0;
-int delete_after=0;
-int only_existing=0;
-int opt_ignore_existing=0;
-int max_delete=0;
-int ignore_errors=0;
-int modify_window=0;
-int blocking_io=-1;
+int do_stats = 0;
+int do_progress = 0;
+int keep_partial = 0;
+int safe_symlinks = 0;
+int copy_unsafe_links = 0;
+int size_only = 0;
+int bwlimit = 0;
+int delete_after = 0;
+int only_existing = 0;
+int opt_ignore_existing = 0;
+int max_delete = 0;
+int ignore_errors = 0;
+int modify_window = 0;
+int blocking_io = -1;
 unsigned int block_size = 0;
 
 
@@ -168,7 +168,7 @@ static void print_rsync_version(enum logcode f)
 	rprintf(f, "<http://rsync.samba.org/>\n");
 	rprintf(f, "Capabilities: %d-bit files, %ssocketpairs, "
 		"%shard links, %ssymlinks, batchfiles, \n",
-		(int) (sizeof(OFF_T) * 8),
+		(int) (sizeof (OFF_T) * 8),
 		got_socketpair, hardlinks, links);
 
 	/* Note that this field may not have type ino_t.  It depends
@@ -176,8 +176,8 @@ static void print_rsync_version(enum logcode f)
 	 * macros. */
 	rprintf(f, "              %sIPv6, %d-bit system inums, %d-bit internal inums\n",
 		ipv6,
-		(int) (sizeof(dumstat->st_ino) * 8),
-		(int) (sizeof(INO64_T) * 8));
+		(int) (sizeof dumstat->st_ino * 8),
+		(int) (sizeof (INO64_T) * 8));
 #ifdef MAINTAINER_MODE
 	rprintf(f, "              panic action: \"%s\"\n",
 		get_panic_action());
@@ -430,7 +430,7 @@ static int check_refuse_options(char *ref, int opt)
 	while ((p = strstr(ref,name))) {
 		if ((p==ref || p[-1]==' ') &&
 		    (p[len] == ' ' || p[len] == 0)) {
-			snprintf(err_buf,sizeof(err_buf),
+			snprintf(err_buf, sizeof err_buf,
 				 "The '%s' option is not supported by this server\n", name);
 			return 1;
 		}
@@ -571,7 +571,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 
 		default:
-			snprintf(err_buf, sizeof(err_buf),
+			snprintf(err_buf, sizeof err_buf,
 				 "%s%s: %s\n",
 				 am_server ? "on remote machine: " : "",
 				 poptBadOption(pc, POPT_BADOPTION_NOALIAS),
@@ -814,7 +814,8 @@ void server_options(char **args,int *argc)
 	}
 
 	if (max_delete && am_sender) {
-		snprintf(mdelete,sizeof(mdelete),"--max-delete=%d",max_delete);
+		snprintf(mdelete, sizeof mdelete, "--max-delete=%d",
+		    max_delete);
 		args[ac++] = mdelete;
 	}
 
@@ -825,17 +826,17 @@ void server_options(char **args,int *argc)
 		else
 		if (read_batch)
 			fmt = "--read-batch=%s";
-		snprintf(fext,sizeof(fext),fmt,batch_prefix);
+		snprintf(fext, sizeof fext, fmt, batch_prefix);
 		args[ac++] = fext;
 	}
 
 	if (io_timeout) {
-		snprintf(iotime,sizeof(iotime),"--timeout=%d",io_timeout);
+		snprintf(iotime, sizeof iotime, "--timeout=%d", io_timeout);
 		args[ac++] = iotime;
 	}
 
 	if (bwlimit) {
-		snprintf(bw,sizeof(bw),"--bwlimit=%d",bwlimit);
+		snprintf(bw, sizeof bw, "--bwlimit=%d", bwlimit);
 		args[ac++] = bw;
 	}
 
@@ -864,7 +865,7 @@ void server_options(char **args,int *argc)
 		args[ac++] = "--size-only";
 
 	if (modify_window_set) {
-		snprintf(mwindow,sizeof(mwindow),"--modify-window=%d",
+		snprintf(mwindow, sizeof mwindow, "--modify-window=%d",
 			 modify_window);
 		args[ac++] = mwindow;
 	}
