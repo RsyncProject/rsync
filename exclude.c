@@ -1,19 +1,19 @@
 /* -*- c-file-style: "linux" -*-
- * 
+ *
  * Copyright (C) 1996-2001 by Andrew Tridgell <tridge@samba.org>
  * Copyright (C) 1996 by Paul Mackerras
  * Copyright (C) 2002 by Martin Pool
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -55,18 +55,17 @@ static struct exclude_struct *make_exclude(const char *pattern, int include)
 	if (!ret->pattern) out_of_memory("make_exclude");
 
 	if (strpbrk(pattern, "*[?")) {
-	    ret->regular_exp = 1;
-	    ret->fnmatch_flags = FNM_PATHNAME;
-	    if (strstr(pattern, "**")) {
-		    static int tested;
-		    if (!tested) {
-			    tested = 1;
-			    if (fnmatch("a/b/*", "a/b/c/d", FNM_PATHNAME)==0) {
-				    rprintf(FERROR,"WARNING: fnmatch FNM_PATHNAME is broken on your system\n");
-			    }
-		    }
-		    ret->fnmatch_flags = 0;
-	    }
+		ret->regular_exp = 1;
+		ret->fnmatch_flags = FNM_PATHNAME;
+		if (strstr(pattern, "**")) {
+			static int tested;
+			if (!tested) {
+				tested = 1;
+				if (fnmatch("a/b/*","a/b/c/d",FNM_PATHNAME)==0)
+					rprintf(FERROR,"WARNING: fnmatch FNM_PATHNAME is broken on your system\n");
+			}
+			ret->fnmatch_flags = 0;
+		}
 	}
 
 	if (strlen(pattern) > 1 && pattern[strlen(pattern)-1] == '/') {
@@ -92,7 +91,7 @@ static int check_one_exclude(char *name, struct exclude_struct *ex,
                              STRUCT_STAT *st)
 {
 	char *p;
-	int match_start=0;
+	int match_start = 0;
 	char *pattern = ex->pattern;
 
 	if (ex->local && (p=strrchr(name,'/')))
@@ -114,7 +113,7 @@ static int check_one_exclude(char *name, struct exclude_struct *ex,
 	} else {
 		int l1 = strlen(name);
 		int l2 = strlen(pattern);
-		if (l2 <= l1 && 
+		if (l2 <= l1 &&
 		    strcmp(name+(l1-l2),pattern) == 0 &&
 		    (l1==l2 || (!match_start && name[l1-(l2+1)] == '/'))) {
 			return 1;
@@ -129,16 +128,16 @@ static void report_exclude_result(char const *name,
                                   struct exclude_struct const *ent,
                                   STRUCT_STAT const *st)
 {
-        /* If a trailing slash is present to match only directories,
-         * then it is stripped out by make_exclude.  So as a special
-         * case we add it back in here. */
-        
-        if (verbose >= 2)
-                rprintf(FINFO, "%s %s %s because of pattern %s%s\n",
-                        ent->include ? "including" : "excluding",
-                        S_ISDIR(st->st_mode) ? "directory" : "file",
-                        name, ent->pattern,
-                        ent->directory ? "/" : "");
+	/* If a trailing slash is present to match only directories,
+	 * then it is stripped out by make_exclude.  So as a special
+	 * case we add it back in here. */
+
+	if (verbose >= 2)
+		rprintf(FINFO, "%s %s %s because of pattern %s%s\n",
+			ent->include ? "including" : "excluding",
+			S_ISDIR(st->st_mode) ? "directory" : "file",
+			name, ent->pattern,
+			ent->directory ? "/" : "");
 }
 
 
@@ -150,7 +149,7 @@ int check_exclude(char *name, struct exclude_struct **local_exclude_list,
 		  STRUCT_STAT *st)
 {
 	int n;
-        struct exclude_struct *ent;
+	struct exclude_struct *ent;
 
 	if (name && (name[0] == '.') && !name[1])
 		/* never exclude '.', even if somebody does --exclude '*' */
@@ -158,22 +157,22 @@ int check_exclude(char *name, struct exclude_struct **local_exclude_list,
 
 	if (exclude_list) {
 		for (n=0; exclude_list[n]; n++) {
-                        ent = exclude_list[n];
+			ent = exclude_list[n];
 			if (check_one_exclude(name, ent, st)) {
-                                report_exclude_result(name, ent, st);
+				report_exclude_result(name, ent, st);
 				return !ent->include;
-                        }
-                }
+			}
+		}
 	}
 
 	if (local_exclude_list) {
 		for (n=0; local_exclude_list[n]; n++) {
-                        ent = local_exclude_list[n];
+			ent = local_exclude_list[n];
 			if (check_one_exclude(name, ent, st)) {
-                                report_exclude_result(name, ent, st);
+				report_exclude_result(name, ent, st);
 				return !ent->include;
-                        }
-                }
+			}
+		}
 	}
 
 	return 0;
@@ -198,13 +197,13 @@ void add_exclude_list(const char *pattern, struct exclude_struct ***list, int in
 	}
 
 	*list = (struct exclude_struct **)Realloc(*list,sizeof(struct exclude_struct *)*(len+2));
-	
+
 	if (!*list || !((*list)[len] = make_exclude(pattern, include)))
 		out_of_memory("add_exclude");
-	
+
 	if (verbose > 2) {
 		rprintf(FINFO,"add_exclude(%s,%s)\n",pattern,
-			      include ? "include" : "exclude");
+			include ? "include" : "exclude");
 	}
 
 	(*list)[len+1] = NULL;
@@ -232,9 +231,9 @@ struct exclude_struct **make_exclude_list(const char *fname,
 	if (fd < 0) {
 		if (fatal) {
 			rsyserr(FERROR, errno,
-                                "failed to open %s file %s",
-                                include ? "include" : "exclude",
-                                fname);
+				"failed to open %s file %s",
+				include ? "include" : "exclude",
+				fname);
 			exit_cleanup(RERR_FILEIO);
 		}
 		return list;
@@ -300,7 +299,7 @@ void send_exclude_list(int f)
 		int l;
 		char pattern[MAXPATHLEN];
 
-		strlcpy(pattern,exclude_list[i]->pattern,sizeof(pattern)); 
+		strlcpy(pattern,exclude_list[i]->pattern,sizeof(pattern));
 		if (exclude_list[i]->directory) strlcat(pattern,"/", sizeof(pattern));
 
 		l = strlen(pattern);
@@ -316,7 +315,7 @@ void send_exclude_list(int f)
 			write_int(f,l);
 		}
 		write_buf(f,pattern,l);
-	}    
+	}
 
 	write_int(f,0);
 }
@@ -366,7 +365,7 @@ char *get_exclude_tok(char *p)
 		/* Is this a '+' or '-' followed by a space (not whitespace)? */
 		if ((*s=='+' || *s=='-') && *(s+1)==' ')
 			s+=2;
-	
+
 		/* Skip to the next space or the end of the string */
 		while (!isspace(* (unsigned char *) s) && *s != '\0')
 			s++;
@@ -382,14 +381,14 @@ char *get_exclude_tok(char *p)
 	return(t);
 }
 
-	
+
 void add_exclude_line(char *p)
 {
 	char *tok;
 	if (!p || !*p) return;
 	p = strdup(p);
 	if (!p) out_of_memory("add_exclude_line");
- 	for (tok=get_exclude_tok(p); tok; tok=get_exclude_tok(NULL))
+	for (tok=get_exclude_tok(p); tok; tok=get_exclude_tok(NULL))
 		add_exclude(tok, 0);
 	free(p);
 }
@@ -419,7 +418,7 @@ void add_cvs_excludes(void)
 	char fname[MAXPATHLEN];
 	char *p;
 	int i;
-  
+
 	for (i=0; cvs_ignore_list[i]; i++)
 		add_exclude(cvs_ignore_list[i], 0);
 
