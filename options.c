@@ -1490,17 +1490,16 @@ char *check_for_hostspec(char *s, char **host_ptr, int *port_ptr)
 		if (*s == '[' && (p = strchr(s, ']')) != NULL) {
 			s++;
 			hostlen = p - s;
-			if (*p == ':')
-				*port_ptr = atoi(p+1);
-			else if (!*port_ptr)
-				*port_ptr = RSYNC_PORT;
+			if (p[1] == ':')
+				*port_ptr = atoi(p+2);
 		} else {
 			if ((p = strchr(s, ':')) != NULL) {
 				hostlen = p - s;
 				*port_ptr = atoi(p+1);
-			} else if (!*port_ptr)
-				*port_ptr = RSYNC_PORT;
+			}
 		}
+		if (!*port_ptr)
+			*port_ptr = RSYNC_PORT;
 		*host_ptr = new_array(char, hostlen + 1);
 		strlcpy(*host_ptr, s, hostlen + 1);
 		return path;
@@ -1513,6 +1512,7 @@ char *check_for_hostspec(char *s, char **host_ptr, int *port_ptr)
 		*p = ']';
 		if (not_host)
 			return NULL;
+		p++;
 	} else {
 		if (!(p = strchr(s, ':')))
 			return NULL;
