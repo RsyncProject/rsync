@@ -81,6 +81,9 @@
 #define MAX_MAP_SIZE (256*1024)
 #define IO_BUFFER_SIZE (4092)
 
+#define IOERR_GENERAL	(1<<0) /* For backward compatibility, this must == 1 */
+#define IOERR_VANISHED	(1<<1)
+
 #define MAX_ARGS 1000
 
 #define MPLEX_BASE 7
@@ -429,10 +432,10 @@ struct map_struct {
 	OFF_T p_fd_offset;	/* offset of cursor in fd ala lseek	*/
 };
 
-#define MATCHFLG_WILD		0x0001 /* pattern has '*', '[', and/or '?' */
-#define MATCHFLG_WILD2		0x0002 /* pattern has '**' */
-#define MATCHFLG_WILD2_PREFIX	0x0004 /* pattern starts with '**' */
-#define MATCHFLG_ABS_PATH	0x0008 /* path-match on absolute path */
+#define MATCHFLG_WILD		(1<<0) /* pattern has '*', '[', and/or '?' */
+#define MATCHFLG_WILD2		(1<<1) /* pattern has '**' */
+#define MATCHFLG_WILD2_PREFIX	(1<<2) /* pattern starts with '**' */
+#define MATCHFLG_ABS_PATH	(1<<3) /* path-match on absolute path */
 struct exclude_struct {
 	char *pattern;
 	int match_flags;
