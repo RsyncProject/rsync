@@ -11,6 +11,10 @@ Changes since 2.6.4:
     - Fixed a case where the generator might try to tweak the write
       permissions of a read-only directory in list-only mode.
 
+    - If --compare-dest or --link-dest uses a locally-copied file as the
+      basis for an updated version, log this better when --verbose or -i
+      in in effect.
+
   ENHANCEMENTS:
 
     - Changed the outputting of "safe" filenames to use backslash-escaped
