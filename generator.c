@@ -52,6 +52,7 @@ extern int list_only;
 extern int only_existing;
 extern int orig_umask;
 extern int safe_symlinks;
+extern unsigned int block_size;
 
 extern struct exclude_list_struct server_exclude_list;
 
@@ -122,11 +123,11 @@ void write_sum_head(int f, struct sum_struct *sum)
 	write_int(f, sum->remainder);
 }
 
-/* 
+/*
  * set (initialize) the size entries in the per-file sum_struct
- * calulating dynamic block ans checksum sizes.
+ * calculating dynamic block and checksum sizes.
  *
- * This is only called from generate_and_send_sums() but is a seperate
+ * This is only called from generate_and_send_sums() but is a separate
  * function to encapsulate the logic.
  *
  * The block size is a rounded square root of file length.
@@ -142,7 +143,6 @@ void write_sum_head(int f, struct sum_struct *sum)
 
 static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 {
-	extern unsigned int block_size;
 	unsigned int blength;
 	int s2length;
 	uint32 c;
@@ -320,7 +320,8 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 		 * we need to delete it.  If it doesn't exist, then
 		 * recursively create it. */
 
-		if (dry_run) return; /* XXXX -- might cause inaccuracies?? -- mbp */
+		if (dry_run)
+			return; /* TODO: causes inaccuracies -- fix */
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			if (robust_unlink(fname) != 0) {
 				rsyserr(FERROR, errno,
@@ -454,7 +455,8 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 			return;
 		if (errno == ENOENT) {
 			write_int(f_out,i);
-			if (!dry_run) write_sum_head(f_out, NULL);
+			if (!dry_run)
+				write_sum_head(f_out, NULL);
 		} else if (verbose > 1) {
 			rsyserr(FERROR, errno,
 				"recv_generator: failed to open %s",
@@ -472,7 +474,8 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 		if (preserve_hard_links && hard_link_check(file, HL_SKIP))
 			return;
 		write_int(f_out,i);
-		if (!dry_run) write_sum_head(f_out, NULL);
+		if (!dry_run)
+			write_sum_head(f_out, NULL);
 		return;
 	}
 
@@ -536,7 +539,8 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 	generate_and_send_sums(mapbuf, st.st_size, f_out);
 
 	close(fd);
-	if (mapbuf) unmap_file(mapbuf);
+	if (mapbuf)
+		unmap_file(mapbuf);
 }
 
 
@@ -614,7 +618,8 @@ void generate_files(int f, struct file_list *flist, char *local_name)
 	 * modified during the transfer */
 	for (i = 0; i < flist->count; i++) {
 		struct file_struct *file = flist->files[i];
-		if (!file->basename || !S_ISDIR(file->mode)) continue;
+		if (!file->basename || !S_ISDIR(file->mode))
+			continue;
 		recv_generator(local_name ? local_name : f_name(file),
 			       file, i, -1);
 	}
