@@ -222,8 +222,6 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 		argv[0] = ".";
 	}
 	
-	rprintf(FINFO,"sending file list\n");
-	
 	flist = send_file_list(f_out,argc,argv);
 	send_files(flist,f_out,f_in);
 	report(f_out);

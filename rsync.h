@@ -22,7 +22,6 @@
 
 #define RSYNC_NAME "rsync"
 #define RSYNCD_CONF "/etc/rsyncd.conf"
-#define RSYNCD_LOG "/var/adm/rsyncd.log"
 
 #define BACKUP_SUFFIX "~"
 
@@ -179,6 +178,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <syslog.h>
 
 #ifndef S_IFLNK
 #define S_IFLNK  0120000
