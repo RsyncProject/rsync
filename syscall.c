@@ -90,7 +90,7 @@ int do_rmdir(char *pathname)
 int do_open(char *pathname, int flags, mode_t mode)
 {
 	if (flags != O_RDONLY) {
-		RETURN_ERROR_IF(dry_run, ENOMSG);
+		RETURN_ERROR_IF(dry_run, 0);
 		RETURN_ERROR_IF_RO_OR_LO;
 	}
 
@@ -149,7 +149,7 @@ int do_mkdir(char *fname, mode_t mode)
 /* like mkstemp but forces permissions */
 int do_mkstemp(char *template, mode_t perms)
 {
-	RETURN_ERROR_IF(dry_run, ENOMSG);
+	RETURN_ERROR_IF(dry_run, 0);
 	RETURN_ERROR_IF(read_only, EROFS);
 
 #if defined(HAVE_SECURE_MKSTEMP) && defined(HAVE_FCHMOD)
