@@ -166,25 +166,9 @@ struct file_list *create_flist_from_batch(void)
 
 void write_batch_csums_file(void *buff, int bytes_to_write)
 {
-	char filename[MAXPATHLEN];
-
-	if (f_csums < 0) {
-		strlcpy(filename, batch_prefix, sizeof(filename));
-		strlcat(filename, rsync_csums_file, sizeof(filename));
-
-		f_csums = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
-				  S_IREAD | S_IWRITE);
-		if (f_csums < 0) {
-			rprintf(FERROR, "Batch file %s open error: %s\n",
-				filename, strerror(errno));
-			close(f_csums);
-			exit_cleanup(1);
-		}
-	}
-
 	if (write(f_csums, buff, bytes_to_write) < 0) {
-		rprintf(FERROR, "Batch file %s write error: %s\n",
-			filename, strerror(errno));
+		rprintf(FERROR, "Batch file write error: %s\n",
+			strerror(errno));
 		close(f_csums);
 		exit_cleanup(1);
 	}
@@ -209,6 +193,21 @@ void write_batch_csum_info(int *flist_entry, struct sum_struct *s)
 {
 	size_t i;
 	int int_count;
+	char filename[MAXPATHLEN];
+
+	if (f_csums < 0) {
+		snprintf(filename, sizeof filename, "%s%s",
+			 batch_prefix, rsync_csums_file);
+
+		f_csums = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
+				  S_IREAD | S_IWRITE);
+		if (f_csums < 0) {
+			rprintf(FERROR, "Batch file %s open error: %s\n",
+				filename, strerror(errno));
+			close(f_csums);
+			exit_cleanup(1);
+		}
+	}
 
 	write_batch_csums_file(flist_entry, sizeof(int));
 	int_count = s ? (int) s->count : 0;
@@ -225,29 +224,13 @@ void write_batch_csum_info(int *flist_entry, struct sum_struct *s)
 int read_batch_csums_file(char *buff, int len)
 {
 	int bytes_read;
-	char filename[MAXPATHLEN];
 
-	if (f_csums < 0) {
-		strlcpy(filename, batch_prefix, sizeof(filename));
-		strlcat(filename, rsync_csums_file, sizeof(filename));
-
-		f_csums = do_open(filename, O_RDONLY, 0);
-		if (f_csums < 0) {
-			rprintf(FERROR, "Batch file %s open error: %s\n",
-				filename, strerror(errno));
-			close(f_csums);
-			exit_cleanup(1);
-		}
-	}
-
-	bytes_read = read(f_csums, buff, len);
-	if (bytes_read < 0) {
-		rprintf(FERROR, "Batch file %s read error: %s\n",
-			filename, strerror(errno));
+	if ((bytes_read = read(f_csums, buff, len)) < 0) {
+		rprintf(FERROR, "Batch file read error: %s\n",
+			strerror(errno));
 		close(f_csums);
 		exit_cleanup(1);
 	}
-
 	return bytes_read;
 }
 
@@ -259,6 +242,20 @@ void read_batch_csum_info(int flist_entry, struct sum_struct *s,
 	int file_chunk_ct;
 	uint32 file_sum1;
 	char file_sum2[SUM_LENGTH];
+	char filename[MAXPATHLEN];
+
+	if (f_csums < 0) {
+		snprintf(filename, sizeof filename, "%s%s",
+			 batch_prefix, rsync_csums_file);
+
+		f_csums = do_open(filename, O_RDONLY, 0);
+		if (f_csums < 0) {
+			rprintf(FERROR, "Batch file %s open error: %s\n",
+				filename, strerror(errno));
+			close(f_csums);
+			exit_cleanup(1);
+		}
+	}
 
 	read_batch_csums_file((char *) &file_flist_entry, sizeof(int));
 	if (file_flist_entry != flist_entry) {
@@ -272,7 +269,6 @@ void read_batch_csum_info(int flist_entry, struct sum_struct *s,
 				      sizeof(int));
 		*checksums_match = 1;
 		for (i = 0; i < file_chunk_ct; i++) {
-
 			read_batch_csums_file((char *) &file_sum1,
 					      sizeof(uint32));
 			read_batch_csums_file(file_sum2, csum_length);
