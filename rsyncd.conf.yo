@@ -228,7 +228,8 @@ limit the length of passwords that can be typed at the client end, so
 you may find that passwords longer than 8 characters don't work. 
 
 There is no default for the "secrets file" option, you must choose a name
-(such as tt(/etc/rsyncd.secrets)).
+(such as tt(/etc/rsyncd.secrets)).  The file must normally not be readable
+by "other"; see "strict modes".
 
 dit(bf(strict modes)) The "strict modes" option determines whether or not 
 the permissions on the secrets file will be checked.  If "strict modes" is
