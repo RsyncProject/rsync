@@ -205,8 +205,9 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 	extern int read_batch;
 
 	if (!read_batch && !local_server) {
+		char *rsh_env = getenv(RSYNC_RSH_ENV);
 		if (!cmd)
-			cmd = getenv(RSYNC_RSH_ENV);
+			cmd = rsh_env;
 		if (!cmd)
 			cmd = RSYNC_RSH;
 		cmd = strdup(cmd);
@@ -218,7 +219,7 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 		}
 
 		/* check to see if we've already been given '-l user' in
-		   the remote-shell command */
+		 * the remote-shell command */
 		for (i = 0; i < argc-1; i++) {
 			if (!strcmp(args[i], "-l") && args[i+1][0] != '-')
 				dash_l_set = 1;
@@ -241,18 +242,21 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 
 		args[argc++] = rsync_path;
 
-		if (blocking_io == -1) {
-			char *cp = strrchr(cmd, '/');
-			if (cp)
-				cp++;
-			else
-				cp = cmd;
-			if (strcmp(cp, "rsh") == 0 || strcmp(cp, "remsh") == 0)
-				blocking_io = 1;
+		if (blocking_io < 0) {
+			char *cp = getenv(RSYNC_RSH_IO_ENV);
+			if (rsh_env && cp && strcmp(cmd, rsh_env) == 0)
+				blocking_io = *cp == 'b' || *cp == 'B';
+			else {
+				if ((cp = strrchr(cmd, '/')) != NULL)
+					cp++;
+				else
+					cp = cmd;
+				if (strcmp(cp, "rsh") == 0 || strcmp(cp, "remsh") == 0)
+					blocking_io = 1;
+			}
 		}
 
 		server_options(args,&argc);
-
 	}
 
 	args[argc++] = ".";
@@ -444,8 +448,8 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		close(recv_pipe[1]);
 		io_flush();
 		/* finally we go to sleep until our parent kills us
-		   with a USR2 signal. We sleep for a short time as on
-		   some OSes a signal won't interrupt a sleep! */
+		 * with a USR2 signal. We sleep for a short time as on
+		 * some OSes a signal won't interrupt a sleep! */
 		while (msleep(20))
 			;
 	}
@@ -863,7 +867,7 @@ static int start_client(int argc, char *argv[])
 		     &f_in,&f_out);
 
 	/* if we're running an rsync server on the remote host over a
-	   remote shell command, we need to do the RSYNCD protocol first */
+	 * remote shell command, we need to do the RSYNCD protocol first */
 	if (daemon_over_rsh) {
 		int tmpret;
 		tmpret = start_inband_exchange(shell_user, shell_path,
@@ -905,14 +909,14 @@ static RETSIGTYPE sigchld_handler(UNUSED(int val))
 	 * zombie children, maybe that's why he did it.
 	 */
 	while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-		 /* save the child's exit status */
-		 for (cnt = 0; cnt < MAXCHILDPROCS; cnt++) {
-			  if (pid_stat_table[cnt].pid == 0) {
-				   pid_stat_table[cnt].pid = pid;
-				   pid_stat_table[cnt].status = status;
-				   break;
-			  }
-		 }
+		/* save the child's exit status */
+		for (cnt = 0; cnt < MAXCHILDPROCS; cnt++) {
+			if (pid_stat_table[cnt].pid == 0) {
+				pid_stat_table[cnt].pid = pid;
+				pid_stat_table[cnt].status = status;
+				break;
+			}
+		}
 	}
 #endif
 }
@@ -1003,7 +1007,7 @@ int main(int argc,char *argv[])
 	}
 
 	/* we set a 0 umask so that correct file permissions can be
-	   carried across */
+	 * carried across */
 	orig_umask = (int)umask(0);
 
 	if (!parse_arguments(&argc, (const char ***) &argv, 1)) {
@@ -1022,9 +1026,9 @@ int main(int argc,char *argv[])
 	signal(SIGPIPE, SIG_IGN);
 
 	/* Initialize push_dir here because on some old systems getcwd
-	   (implemented by forking "pwd" and reading its output) doesn't
-	   work when there are other child processes.  Also, on all systems
-	   that implement getcwd that way "pwd" can't be found after chroot. */
+	 * (implemented by forking "pwd" and reading its output) doesn't
+	 * work when there are other child processes.  Also, on all systems
+	 * that implement getcwd that way "pwd" can't be found after chroot. */
 	push_dir(NULL,0);
 
 	if (write_batch && !am_server) {
