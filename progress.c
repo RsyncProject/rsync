@@ -21,6 +21,8 @@
 
 #include "rsync.h"
 
+extern int am_server;
+
 static OFF_T  last_ofs;
 static struct timeval print_time;
 static struct timeval start_time;
@@ -78,8 +80,6 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 
 void end_progress(OFF_T size)
 {
-	extern int am_server;
-
 	if (!am_server) {
 		struct timeval now;
 		gettimeofday(&now, NULL);
@@ -93,7 +93,6 @@ void end_progress(OFF_T size)
 
 void show_progress(OFF_T ofs, OFF_T size)
 {
-	extern int am_server;
 	struct timeval now;
 
 	if (!start_time.tv_sec) {
