@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.anu.edu.au)
-manpage(rsync)(1)(13 May 1998)()()
+manpage(rsync)(1)(11 Nov 1998)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
@@ -559,10 +559,10 @@ specified.
 dit(bf(--port PORT)) This specifies an alternate TCP port number to use
 rather than the default port 873. 
 
-dit(bf(--log-format=FORMAT)) Normally rsync just logs filenames as
-they are transferred. This allows you to specify exactly what gets
-logged on a per file basis. The log format is specified using the same
-format conventions as the log format option in rsyncd.conf.
+dit(bf(--log-format=FORMAT)) This allows you to specify exactly what the
+rsync client logs to stdout on a per file basis. The log format is
+specified using the same format conventions as the log format option in
+rsyncd.conf.
 
 dit(bf(--stats)) This tells rsync to print a verbose set of statistics
 on the file transfer, allowing you to tell how effective the rsync
