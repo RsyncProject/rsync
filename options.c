@@ -152,7 +152,7 @@ char *batch_name = NULL;
 static int daemon_opt;   /* sets am_daemon after option error-reporting */
 static int F_option_cnt = 0;
 static int modify_window_set;
-static int refused_verbose, refused_delete, refused_archive_part;
+static int refused_delete, refused_archive_part;
 static int refused_partial, refused_progress, refused_delete_before;
 static char *dest_option = NULL;
 static char *max_size_arg;
@@ -548,9 +548,6 @@ static void set_refuse_options(char *bp)
 				/* These flags are set to let us easily check
 				 * an implied option later in the code. */
 				switch (*shortname) {
-				case 'v':
-					refused_verbose = op->val;
-					break;
 				case 'r': case 'd': case 'l': case 'p':
 				case 't': case 'g': case 'o': case 'D':
 					refused_archive_part = op->val;
@@ -1070,7 +1067,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 
 	if ((do_progress || dry_run) && !verbose && !log_before_transfer
-	    && !refused_verbose)
+	    && !am_server)
 		verbose = 1;
 
 	if (verbose && !log_format) {
