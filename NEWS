@@ -108,12 +108,9 @@ Changes since 2.6.3:
       on the receiving side for the entire destination hierarchy.  The new
       algorithm only creates one directory of objects at a time.
 
-    - Added the --copy-dest option, which works like --link-dest except
-      that it includes copies of identical files.
-
-    - Added support for specifying multiple --compare-dest, --copy-dest, or
-      --link-dest options, but only of a single type. (Promoted from the
-      patches dir and enhanced.)
+    - Added support for specifying multiple --compare-dest or --link-dest
+      options, but only of a single type. (Promoted from the patches dir
+      and enhanced.)
 
     - Added the --max-size option. (Promoted from the patches dir.)
 
@@ -134,9 +131,8 @@ Changes since 2.6.3:
       file, we now flush any data in the write-cache before closing the
       partial file.
 
-    - The --inplace support was enhanced to work with --compare-dest,
-      --link-dest, and (the new) --copy-dest options. (Requires protocol
-      29.)
+    - The --inplace support was enhanced to work with --compare-dest and
+      --link-dest. (Requires protocol 29.)
 
     - Added the --dirs (-d) option for an easier way to copy directories
       without recursion.
