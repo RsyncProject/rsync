@@ -53,6 +53,7 @@ struct {
 	{ RERR_WAITCHILD  , "some error returned by waitpid()" },
 	{ RERR_MALLOC     , "error allocating core memory buffers" },
 	{ RERR_PARTIAL    , "some files could not be transferred" },
+	{ RERR_VANISHED   , "some files vanished before they could be transfered" },
 	{ RERR_TIMEOUT    , "timeout in data send/receive" },
 	{ RERR_CMD_FAILED , "remote shell failed" },
 	{ RERR_CMD_KILLED , "remote shell killed" },
@@ -567,7 +568,13 @@ void log_exit(int code, const char *file, int line)
 		if (!name)
 			name = "unexplained error";
 
-		rprintf(FERROR,"rsync error: %s (code %d) at %s(%d)\n",
-			name, code, file, line);
+		/* VANISHED is not an error, only a warning */
+		if (code == RERR_VANISHED) {
+			rprintf(FINFO, "rsync warning: %s (code %d) at %s(%d)\n", 
+				name, code, file, line);
+		} else {
+			rprintf(FERROR, "rsync error: %s (code %d) at %s(%d)\n",
+				name, code, file, line);
+		}
 	}
 }
