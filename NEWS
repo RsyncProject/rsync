@@ -65,6 +65,13 @@ Changes since 2.6.0:
 
     * Less memory used per-file in the file list.
 
+    * The 2 pipes used between the receiver and generator processes
+      (which are forked on the same machine) were reduced to 1 pipe and
+      the protocol improved so that (1) it is now impossible to have the
+      "redo" pipe fill up and hang rsync, and (2) trailing messages from
+      the receiver don't get lost on their way to through generator over
+      to the sender.  (Wayne Davison)
+
 
 NEWS for rsync 2.6.0 (1 Jan 2004)
 Protocol: 27 (changed)
