@@ -61,7 +61,7 @@ int io_error = 0;
 extern int csum_length;
 
 int am_server = 0;
-static int sender;
+int am_sender;
 int recurse = 0;
 
 static void usage(FILE *f);
@@ -73,7 +73,7 @@ static void report(int f)
   
   if (!verbose) return;
 
-  if (am_server && sender) {
+  if (am_server && am_sender) {
     write_longint(f,read_total());
     write_longint(f,write_total());
     write_longint(f,total_size);
@@ -81,7 +81,7 @@ static void report(int f)
     return;
   }
     
-  if (sender) {
+  if (am_sender) {
     in = read_total();
     out = write_total();
     tsize = total_size;
@@ -115,7 +115,7 @@ static void server_options(char **args,int *argc)
 
   args[ac++] = "--server";
 
-  if (!sender)
+  if (!am_sender)
     args[ac++] = "--sender";
 
   x = 1;
@@ -202,65 +202,70 @@ static void server_options(char **args,int *argc)
 
 static int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f_out)
 {
-  char *args[100];
-  int i,argc=0, ret;
-  char *tok,*dir=NULL;
+	char *args[100];
+	int i,argc=0, ret;
+	char *tok,*dir=NULL;
 
-  if (!local_server) {
-    if (!cmd)
-      cmd = getenv(RSYNC_RSH_ENV);
-    if (!cmd)
-      cmd = RSYNC_RSH;
-    cmd = strdup(cmd);
-    if (!cmd) 
-      goto oom;
+	if (!local_server) {
+		if (!cmd)
+			cmd = getenv(RSYNC_RSH_ENV);
+		if (!cmd)
+			cmd = RSYNC_RSH;
+		cmd = strdup(cmd);
+		if (!cmd) 
+			goto oom;
 
-    for (tok=strtok(cmd," ");tok;tok=strtok(NULL," ")) {
-      args[argc++] = tok;
-    }
+		for (tok=strtok(cmd," ");tok;tok=strtok(NULL," ")) {
+			args[argc++] = tok;
+		}
 
 #if HAVE_REMSH
-    /* remsh (on HPUX) takes the arguments the other way around */
-    args[argc++] = machine;
-    if (user) {
-      args[argc++] = "-l";
-      args[argc++] = user;
-    }
+		/* remsh (on HPUX) takes the arguments the other way around */
+		args[argc++] = machine;
+		if (user) {
+			args[argc++] = "-l";
+			args[argc++] = user;
+		}
 #else
-    if (user) {
-      args[argc++] = "-l";
-      args[argc++] = user;
-    }
-    args[argc++] = machine;
+		if (user) {
+			args[argc++] = "-l";
+			args[argc++] = user;
+		}
+		args[argc++] = machine;
 #endif
-  }
 
-  args[argc++] = rsync_path;
+		args[argc++] = rsync_path;
 
-  server_options(args,&argc);
+		server_options(args,&argc);
+	}
 
-  args[argc++] = ".";
+	args[argc++] = ".";
 
-  if (path && *path) 
-	  args[argc++] = path;
+	if (path && *path) 
+		args[argc++] = path;
 
-  args[argc] = NULL;
+	args[argc] = NULL;
 
-  if (verbose > 3) {
-    fprintf(FINFO,"cmd=");
-    for (i=0;i<argc;i++)
-      fprintf(FINFO,"%s ",args[i]);
-    fprintf(FINFO,"\n");
-  }
+	if (verbose > 3) {
+		fprintf(FINFO,"cmd=");
+		for (i=0;i<argc;i++)
+			fprintf(FINFO,"%s ",args[i]);
+		fprintf(FINFO,"\n");
+	}
 
-  ret = piped_child(args,f_in,f_out);
-  if (dir) free(dir);
+	if (local_server) {
+		ret = local_child(argc, args, f_in, f_out);
+	} else {
+		ret = piped_child(args,f_in,f_out);
+	}
 
-  return ret;
+	if (dir) free(dir);
+
+	return ret;
 
 oom:
-  out_of_memory("do_cmd");
-  return 0; /* not reached */
+	out_of_memory("do_cmd");
+	return 0; /* not reached */
 }
 
 
@@ -417,6 +422,22 @@ void do_server_recv(int argc,char *argv[])
 
   status = do_recv(STDIN_FILENO,STDOUT_FILENO,flist,local_name);
   exit_cleanup(status);
+}
+
+
+void start_server(int argc, char *argv[])
+{
+      setup_protocol(STDOUT_FILENO,STDIN_FILENO);
+	
+      if (am_sender) {
+	      recv_exclude_list(STDIN_FILENO);
+	      if (cvs_exclude)
+		      add_cvs_excludes();
+	      do_server_sender(argc,argv);
+      } else {
+	      do_server_recv(argc,argv);
+      }
+      exit_cleanup(0);
 }
 
 
@@ -682,7 +703,7 @@ int main(int argc,char *argv[])
 	    usage(FERROR);
 	    exit_cleanup(1);
 	  }
-	  sender = 1;
+	  am_sender = 1;
 	  break;
 
 	case 'r':
@@ -740,17 +761,7 @@ int main(int argc,char *argv[])
 #endif
 
     if (am_server) {
-      setup_protocol(STDOUT_FILENO,STDIN_FILENO);
-	
-      if (sender) {
-	recv_exclude_list(STDIN_FILENO);
-	if (cvs_exclude)
-	  add_cvs_excludes();
-	do_server_sender(argc,argv);
-      } else {
-	do_server_recv(argc,argv);
-      }
-      exit_cleanup(0);
+	    start_server(argc, argv);
     }
 
     if (argc < 2) {
@@ -761,14 +772,14 @@ int main(int argc,char *argv[])
     p = strchr(argv[0],':');
 
     if (p) {
-      sender = 0;
+      am_sender = 0;
       *p = 0;
       shell_machine = argv[0];
       shell_path = p+1;
       argc--;
       argv++;
     } else {
-      sender = 1;
+      am_sender = 1;
 
       p = strchr(argv[argc-1],':');
       if (!p) {
@@ -803,7 +814,7 @@ int main(int argc,char *argv[])
 	      shell_path?shell_path:"");
     }
     
-    if (!sender && argc != 1) {
+    if (!am_sender && argc != 1) {
       usage(FERROR);
       exit_cleanup(1);
     }
@@ -819,9 +830,9 @@ int main(int argc,char *argv[])
 
     if (verbose > 3) 
       fprintf(FINFO,"parent=%d child=%d sender=%d recurse=%d\n",
-	      (int)getpid(),pid,sender,recurse);
+	      (int)getpid(),pid,am_sender,recurse);
 
-    if (sender) {
+    if (am_sender) {
       if (cvs_exclude)
 	add_cvs_excludes();
       if (delete_mode) 
