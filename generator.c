@@ -43,6 +43,7 @@ extern int protocol_version;
 extern int always_checksum;
 extern char *compare_dest;
 extern int link_dest;
+extern struct file_struct **hlink_list;
 
 
 /* choose whether to skip a particular file */
@@ -397,13 +398,8 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 	}
 #endif
 
-	if (preserve_hard_links && file->link_u.links && file->F_HEAD != file) {
-		if (verbose > 1) {
-			rprintf(FINFO, "recv_generator: \"%s\" is a hard link\n",
-				f_name(file));
-		}
+	if (preserve_hard_links && hard_link_check(file, HL_CHECK_MASTER))
 		return;
-	}
 
 	if (!S_ISREG(file->mode)) {
 		rprintf(FINFO, "skipping non-regular file \"%s\"\n",fname);
@@ -438,6 +434,8 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 	}
 
 	if (statret == -1) {
+		if (preserve_hard_links && hard_link_check(file, HL_SKIP))
+			return;
 		if (errno == ENOENT) {
 			write_int(f_out,i);
 			if (!dry_run) write_sum_head(f_out, NULL);
@@ -455,6 +453,8 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 		}
 
 		/* now pretend the file didn't exist */
+		if (preserve_hard_links && hard_link_check(file, HL_SKIP))
+			return;
 		write_int(f_out,i);
 		if (!dry_run) write_sum_head(f_out, NULL);
 		return;
@@ -496,6 +496,8 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 		rprintf(FERROR, "failed to open %s, continuing: %s\n",
 			full_fname(fnamecmp), strerror(errno));
 		/* pretend the file didn't exist */
+		if (preserve_hard_links && hard_link_check(file, HL_SKIP))
+			return;
 		write_int(f_out,i);
 		write_sum_head(f_out, NULL);
 		return;
@@ -587,4 +589,19 @@ void generate_files(int f, struct file_list *flist, char *local_name)
 		rprintf(FINFO,"generate_files phase=%d\n",phase);
 
 	write_int(f,-1);
+
+	if (preserve_hard_links)
+		do_hard_links();
+
+	/* now we need to fix any directory permissions that were
+	 * modified during the transfer */
+	for (i = 0; i < flist->count; i++) {
+		struct file_struct *file = flist->files[i];
+		if (!file->basename || !S_ISDIR(file->mode)) continue;
+		recv_generator(local_name ? local_name : f_name(file),
+			       file, i, -1);
+	}
+
+	if (verbose > 2)
+		rprintf(FINFO,"generate_files finished\n");
 }
