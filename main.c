@@ -392,7 +392,7 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 			(long)getpid());
 	}
 
-	if (am_daemon && lp_write_only(module_id) && am_sender) {
+	if (am_daemon && lp_write_only(module_id)) {
 		rprintf(FERROR, "ERROR: module is write only\n");
 		exit_cleanup(RERR_SYNTAX);
 		return;
@@ -529,7 +529,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 			argc, (long)getpid());
 	}
 
-	if (am_daemon && lp_read_only(module_id) && !am_sender) {
+	if (am_daemon && lp_read_only(module_id)) {
 		rprintf(FERROR,"ERROR: module is read only\n");
 		exit_cleanup(RERR_SYNTAX);
 		return;
