@@ -20,7 +20,6 @@
 #include "rsync.h"
 
 extern int verbose;
-extern int itemize_changes;
 extern int log_before_transfer;
 extern int csum_length;
 extern struct stats stats;
@@ -144,12 +143,14 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		file = flist->files[i];
 
-		if (itemize_changes) {
+		if (protocol_version >= 29) {
 			iflags = read_byte(f_in);
+			iflags |= read_byte(f_in) << 8;
 			if (!(iflags & ITEM_UPDATING) || !S_ISREG(file->mode)) {
 				if (am_server) {
 					write_int(f_out, i);
 					write_byte(f_out, iflags);
+					write_byte(f_out, iflags >> 8);
 				} else
 					log_send(file, &stats, iflags);
 				continue;
@@ -186,13 +187,13 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			rprintf(FINFO, "send_files(%d, %s)\n", i, fname);
 
 		if (dry_run) { /* log the transfer */
-			if (!am_server && verbose && !log_format)
-				rprintf(FINFO, "%s\n", safe_fname(fname2));
-			else if (!am_server)
+			if (!am_server && log_format)
 				log_send(file, &stats, iflags);
 			write_int(f_out, i);
-			if (itemize_changes)
+			if (protocol_version >= 29) {
 				write_byte(f_out, iflags);
+				write_byte(f_out, iflags >> 8);
+			}
 			continue;
 		}
 
@@ -244,8 +245,10 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		}
 
 		write_int(f_out, i);
-		if (itemize_changes)
+		if (protocol_version >= 29) {
 			write_byte(f_out, iflags);
+			write_byte(f_out, iflags >> 8);
+		}
 		write_sum_head(f_out, s);
 
 		if (verbose > 2) {
@@ -255,7 +258,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		if (log_before_transfer)
 			log_send(file, &initial_stats, iflags);
-		else if (!am_server && verbose && (!log_format || do_progress))
+		else if (!am_server && verbose && do_progress)
 			rprintf(FINFO, "%s\n", safe_fname(fname2));
 
 		set_compression(fname);
