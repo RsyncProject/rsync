@@ -46,6 +46,7 @@ extern int sanitize_paths;
  * get a listing of remote modules and exit.
  *
  * @return -1 for error in startup, or the result of client_run().
+ * Either way, it eventually gets passed to exit_cleanup().
  **/
 int start_socket_client(char *host, char *path, int argc, char *argv[])
 {
