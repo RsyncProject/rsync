@@ -474,8 +474,8 @@ static void see_deflate_token(char *buf, int len)
 	} while (len || rx_strm.avail_out == 0);
 }
 
-/*
- * transmit a verbatim buffer of length n followed by a token 
+/**
+ * Transmit a verbatim buffer of length @p n followed by a token.
  * If token == -1 then we have reached EOF 
  * If n == 0 then don't send a buffer
  */
