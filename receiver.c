@@ -305,8 +305,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 		rprintf(FINFO,"recv_files(%d) starting\n",flist->count);
 	}
 
-	if (flist->hlink_pool)
-	{
+	if (flist->hlink_pool) {
 		pool_destroy(flist->hlink_pool);
 		flist->hlink_pool = NULL;
 	}
