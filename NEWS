@@ -39,8 +39,9 @@ Changes since 2.5.7:
 
       - A pattern with a "**" no longer causes a "*" to match slashes.
         For example, with "/*/foo/**", "foo" must be 2 levels deep.
-	[Upgrade any "*" wildcards to "**" to get the old behavior in
-	all versions.]
+	[If your string has BOTH "*" and "**" wildcards, changing the
+	"*" wildcards to "**" will provide the old behavior in all
+	versions.]
 
       - "**/foo" now matches at the base of the transfer (like /foo
         does).  [Use "/**/foo" to get the old behavior in all versions.]
