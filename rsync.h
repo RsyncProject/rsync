@@ -493,11 +493,17 @@ struct map_struct {
 #define MATCHFLG_WILD2_PREFIX	(1<<2) /* pattern starts with '**' */
 #define MATCHFLG_ABS_PATH	(1<<3) /* path-match on absolute path */
 struct exclude_struct {
+	struct exclude_struct *next;
 	char *pattern;
 	int match_flags;
 	int include;
 	int directory;
 	int slash_cnt;
+};
+
+struct exclude_list_struct {
+	struct exclude_struct *head;
+	struct exclude_struct *tail;
 };
 
 struct stats {
