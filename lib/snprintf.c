@@ -45,7 +45,7 @@
  *    missing.  Some systems only have snprintf() but not vsnprintf(), so
  *    the code is now broken down under HAVE_SNPRINTF and HAVE_VSNPRINTF.
  *
- *  Andrew Tridgell (tridge@samba.anu.edu.au) Oct 1998
+ *  Andrew Tridgell (tridge@samba.org) Oct 1998
  *    fixed handling of %.0f
  *    added test for HAVE_LONG_DOUBLE
  *

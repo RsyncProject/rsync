@@ -100,25 +100,25 @@ There is a mailing list for the discussion of rsync and its
 applications. It is open to anyone to join. I will announce new
 versions on this list. 
 
-To join the mailing list send mail to listproc@samba.anu.edu.au with
+To join the mailing list send mail to listproc@samba.org with
 no subject and a body of "subscribe rsync Your Name".
 
-To send mail to everyone on the list send it to rsync@samba.anu.edu.au
+To send mail to everyone on the list send it to rsync@samba.org
 
 
 BUG REPORTS
 -----------
 
 If you have web access then please look at
-http://samba.anu.edu.au/rsync/ 
+http://rsync.samba.org/rsync/ 
 
 This will give you access to the bug tracking system used by the
 developers of rsync and will allow you to look at other bug reports or
 submit a new bug report.
 
 If you don't have web access then mail bug reports to
-rsync-bugs@samba.anu.edu.au or (if you think it will be of interest to
-lots of people) send it to rsync@samba.anu.edu.au
+rsync-bugs@samba.org or (if you think it will be of interest to lots
+of people) send it to rsync@samba.org
 
 
 CVS TREE
@@ -128,10 +128,10 @@ If you want to get the very latest version of rsync direct from the
 source code repository then you can use anonymous cvs. You will need a
 recent version of cvs then use the following commands:
 
-	cvs -d :pserver:cvs@samba.anu.edu.au:/cvsroot login
+	cvs -d :pserver:cvs@cvs.samba.org:/cvsroot login
 	Password: cvs
 
-	cvs -d :pserver:cvs@samba.anu.edu.au:/cvsroot co rsync
+	cvs -d :pserver:cvs@cvs.samba.org:/cvsroot co rsync
 
 Look at the cvs documentation for more details.
 
@@ -142,18 +142,13 @@ COPYRIGHT
 Rsync was written by Andrew Tridgell and Paul Mackerras, and is
 available under the Gnu Public License.
 
-tridge@samba.anu.edu.au
+tridge@samba.org
 paulus@cs.anu.edu.au
 
 
 AVAILABILITY
 ------------
 
-The main ftp site for rsync is ftp://samba.anu.edu.au/pub/rsync 
-This is also available as rsync://samba.anu.edu.au/rsyncftp/
-
-Mirrors are available at:
-
-ftp://sunsite.auc.dk/pub/unix/rsync
-ftp://ftp.sunet.se/pub/unix/admin/rsync
-ftp://ftp.fu-berlin.de/pub/unix/network/rsync/
+The main web site for rsync is http://rsync.samba.org/
+The main ftp site is ftp://rsync.samba.org/pub/rsync/
+This is also available as rsync://rsync.samba.org/rsyncftp/

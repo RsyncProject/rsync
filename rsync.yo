@@ -1,4 +1,4 @@
-mailto(rsync-bugs@samba.anu.edu.au)
+mailto(rsync-bugs@samba.org)
 manpage(rsync)(1)(11 Nov 1998)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
@@ -708,7 +708,7 @@ values
 see also the comments on the --delete option
 
 Please report bugs! The rsync bug tracking system is online at
-url(http://samba.anu.edu.au/rsync/)(http://samba.anu.edu.au/rsync/)
+url(http://rsync.samba.org/rsync/)(http://rsync.samba.org/rsync/)
 
 manpagesection(VERSION)
 This man page is current for version 2.0 of rsync
@@ -718,16 +718,16 @@ manpagesection(CREDITS)
 rsync is distributed under the GNU public license.  See the file
 COPYING for details.
 
-The primary ftp site for rsync is
-url(ftp://samba.anu.edu.au/pub/rsync)(ftp://samba.anu.edu.au/pub/rsync).
-
 A WEB site is available at
-url(http://samba.anu.edu.au/rsync/)(http://samba.anu.edu.au/rsync/)
+url(http://rsync.samba.org/)(http://rsync.samba.org/)
+
+The primary ftp site for rsync is
+url(ftp://rsync.samba.org/pub/rsync)(ftp://rsync.samba.org/pub/rsync).
 
 We would be delighted to hear from you if you like this program.
 
-This program uses the zlib compression library written by Jean-loup
-Gailly and Mark Adler.
+This program uses the excellent zlib compression library written by
+Jean-loup Gailly and Mark Adler.
 
 manpagesection(THANKS)
 
@@ -739,6 +739,6 @@ probably missed some people, my apologies if I have.
 manpageauthor()
 
 rsync was written by Andrew Tridgell and Paul Mackerras.  They may be
-contacted via email at tridge@samba.anu.edu.au and
+contacted via email at tridge@samba.org and
 Paul.Mackerras@cs.anu.edu.au
 

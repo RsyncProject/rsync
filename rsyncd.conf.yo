@@ -1,4 +1,4 @@
-mailto(rsync-bugs@samba.anu.edu.au)
+mailto(rsync-bugs@samba.org)
 manpage(rsyncd.conf)(5)(18 Nov 1998)()()
 manpagename(rsyncd.conf)(configuration file for rsync server)
 manpagesynopsis()
@@ -391,7 +391,7 @@ client. this means a client may be mystified as to why a transfer
 failed. The error will have been logged by syslog on the server.
 
 Please report bugs! The rsync bug tracking system is online at
-url(http://samba.anu.edu.au/rsync/)(http://samba.anu.edu.au/rsync/)
+url(http://rsync.samba.org/)(http://rsync.samba.org/)
 
 manpagesection(VERSION)
 This man page is current for version 2.0 of rsync
@@ -402,10 +402,10 @@ rsync is distributed under the GNU public license.  See the file
 COPYING for details.
 
 The primary ftp site for rsync is
-url(ftp://samba.anu.edu.au/pub/rsync)(ftp://samba.anu.edu.au/pub/rsync).
+url(ftp://rsync.samba.org/pub/rsync)(ftp://rsync.samba.org/pub/rsync).
 
 A WEB site is available at
-url(http://samba.anu.edu.au/rsync/)(http://samba.anu.edu.au/rsync/)
+url(http://rsync.samba.org/)(http://rsync.samba.org/)
 
 We would be delighted to hear from you if you like this program.
 
@@ -421,6 +421,6 @@ documentation!
 manpageauthor()
 
 rsync was written by Andrew Tridgell and Paul Mackerras.  They may be
-contacted via email at tridge@samba.anu.edu.au and
+contacted via email at tridge@samba.org and
 Paul.Mackerras@cs.anu.edu.au
 

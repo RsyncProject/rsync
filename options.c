@@ -142,7 +142,7 @@ void usage(int F)
   rprintf(F,"the block size defaults to %d\n",BLOCK_SIZE);  
 
   rprintf(F,"\nPlease see the rsync(1) and rsyncd.conf(5) man pages for full documentation\n");
-  rprintf(F,"See http://samba.anu.edu.au/rsync/ for updates and bug reports\n");
+  rprintf(F,"See http://rsync.samba.org/ for updates and bug reports\n");
 }
 
 enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
