@@ -570,9 +570,9 @@ dit(bf(-t, --times)) This tells rsync to transfer modification times along
 with the files and update them on the remote system.  Note that if this
 option is not used, the optimization that excludes files that have not been
 modified cannot be effective; in other words, a missing -t or -a will
-cause the next transfer to behave as if it used -I, and all files will have
-their checksums compared and show up in log messages even if they haven't
-changed.
+cause the next transfer to behave as if it used -I, causing all files to be
+updated (though the rsync algorithm will make the update fairly efficient
+if the files haven't actually changed, you're much better off using -t).
 
 dit(bf(-n, --dry-run)) This tells rsync to not do any file transfers,
 instead it will just report the actions it would have taken.
