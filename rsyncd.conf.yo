@@ -459,6 +459,10 @@ quote(tt(    refuse options = c delete))
 
 The reason the above refuses all delete options is that the options imply
 bf(--delete), and implied options are refused just like explicit options.
+As an additional safety feature, the refusal of "delete" also refuses
+bf(remove-sent-files) when the daemon is the sender; if you want the latter
+without the former, instead refuse "delete-*" -- that refuses all the
+delete modes without affecting bf(--remove-sent-files).
 
 When an option is refused, the server prints an error message and exits.
 To prevent all compression, you can use "dont compress = *" (see below)
