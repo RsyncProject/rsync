@@ -119,6 +119,9 @@ Changes since 2.6.2:
       options are specified is now the same both with and without the
       --backup-dir option.
 
+    - Fixed a bug that could cause a slow-to-connect rsync daemon to die
+      with an error instead of waiting for the connection to finish.
+
   ENHANCEMENTS:
 
     - Added the --partial-dir=DIR option that lets you specify where to
