@@ -47,7 +47,7 @@ extern struct stats stats;
 static struct sum_struct *receive_sums(int f)
 {
 	struct sum_struct *s;
-	int i;
+	size_t i;
 	OFF_T offset = 0;
 
 	if (!(s = new(struct sum_struct)))
@@ -68,14 +68,14 @@ static struct sum_struct *receive_sums(int f)
 	if (!(s->sums = new_array(struct sum_buf, s->count)))
 		out_of_memory("receive_sums");
 
-	for (i = 0; i < (int)s->count; i++) {
+	for (i = 0; i < s->count; i++) {
 		s->sums[i].sum1 = read_int(f);
 		read_buf(f, s->sums[i].sum2, s->s2length);
 
 		s->sums[i].offset = offset;
 		s->sums[i].flags = 0;
 
-		if (i == (int)s->count-1 && s->remainder != 0)
+		if (i == s->count-1 && s->remainder != 0)
 			s->sums[i].len = s->remainder;
 		else
 			s->sums[i].len = s->blength;
