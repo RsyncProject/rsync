@@ -349,6 +349,22 @@ extern int errno;
 #define S_ISCHR(mode) (((mode) & (_S_IFMT)) == (_S_IFCHR))
 #endif
 
+#ifndef S_ISSOCK
+#ifdef _S_IFSOCK
+#define S_ISSOCK(mode) (((mode) & (_S_IFMT)) == (_S_IFSOCK))
+#else
+#define S_ISSOCK(mode) (0)
+#endif
+#endif
+
+#ifndef S_ISFIFO
+#ifdef _S_IFIFO
+#define S_ISFIFO(mode) (((mode) & (_S_IFMT)) == (_S_IFIFO))
+#else
+#define S_ISFIFO(mode) (0)
+#endif
+#endif
+
 #ifndef S_ISDIR
 #define S_ISDIR(mode) (((mode) & (_S_IFMT)) == (_S_IFDIR))
 #endif
@@ -357,5 +373,6 @@ extern int errno;
 #define S_ISREG(mode) (((mode) & (_S_IFMT)) == (_S_IFREG))
 #endif
 
-#define IS_DEVICE(mode) (S_ISCHR(mode) || S_ISBLK(mode))
+
+#define IS_DEVICE(mode) (S_ISCHR(mode) || S_ISBLK(mode) || S_ISSOCK(mode) || S_ISFIFO(mode))
 
