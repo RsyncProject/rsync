@@ -176,16 +176,19 @@ static void hash_search(int f,struct sum_struct *s,
 		sum = (s1 & 0xffff) | (s2 << 16);
 		tag_hits++;
 		for (; j<s->count && targets[j].t == t; j++) {
-			int i = targets[j].i;
+			int l, i = targets[j].i;
 			
-			if (sum != s->sums[i].sum1 || s->sums[i].len > (len-offset)) continue;
+			if (sum != s->sums[i].sum1) continue;
 			
+			/* also make sure the two blocks are the same length */
+			l = MIN(s->n,len-offset);
+			if (l != s->sums[i].len) continue;			
+
 			if (verbose > 3)
 				rprintf(FINFO,"potential match at %d target=%d %d sum=%08x\n",
 					(int)offset,j,i,sum);
 			
 			if (!done_csum2) {
-				int l = MIN(s->n,len-offset);
 				map = (schar *)map_ptr(buf,offset,l);
 				get_checksum2((char *)map,l,sum2);
 				done_csum2 = 1;
