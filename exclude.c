@@ -388,6 +388,9 @@ void *push_local_excludes(const char *dir, unsigned int dirlen)
 
 	set_excludes_dir(dir, dirlen);
 
+	if (!mergelist_cnt)
+		return NULL;
+
 	push = new_array(struct exclude_list_struct, mergelist_cnt);
 	if (!push)
 		out_of_memory("push_local_excludes");
@@ -458,6 +461,9 @@ void pop_local_excludes(void *mem)
 
 		clear_exclude_list(lp);
 	}
+
+	if (!pop)
+		return;
 
 	for (i = 0, ap = pop; i < mergelist_cnt; i++) {
 		memcpy(mergelist_parents[i]->u.mergelist, ap++,
