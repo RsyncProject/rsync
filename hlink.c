@@ -157,7 +157,7 @@ static void hard_link_one(char *hlink1, char *hlink2)
 	if (do_link(hlink1, hlink2)) {
 		if (verbose) {
 			rsyserr(FINFO, errno, "link %s => %s failed",
-				full_name(hlink2), safe_fname(hlink1));
+				full_fname(hlink2), safe_fname(hlink1));
 		}
 	}
 	else if (verbose)
