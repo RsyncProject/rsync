@@ -362,6 +362,11 @@ int daemon_main(void)
 {
 	extern char *config_file;
 
+	/* this ensures that we don't call getcwd after the chroot,
+           which doesn't work on platforms that use popen("pwd","r")
+           for getcwd */
+	push_dir("/", 0);
+
 	if (is_a_socket(STDIN_FILENO)) {
 		/* we are running via inetd */
 		return start_daemon(STDIN_FILENO);

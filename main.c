@@ -149,8 +149,8 @@ static char *get_local_name(struct file_list *flist,char *name)
 
 	if (do_stat(name,&st) == 0) {
 		if (S_ISDIR(st.st_mode)) {
-			if (chdir(name) != 0) {
-				rprintf(FERROR,"chdir %s : %s (1)\n",
+			if (!push_dir(name, 0)) {
+				rprintf(FERROR,"push_dir %s : %s (1)\n",
 					name,strerror(errno));
 				exit_cleanup(1);
 			}
@@ -176,8 +176,9 @@ static char *get_local_name(struct file_list *flist,char *name)
 		rprintf(FINFO,"created directory %s\n",name);
 	}
 
-	if (chdir(name) != 0) {
-		rprintf(FERROR,"chdir %s : %s (2)\n",name,strerror(errno));
+	if (!push_dir(name, 0)) {
+		rprintf(FERROR,"push_dir %s : %s (2)\n",
+			name,strerror(errno));
 		exit_cleanup(1);
 	}
 
@@ -198,8 +199,8 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 	if (verbose > 2)
 		rprintf(FINFO,"server_sender starting pid=%d\n",(int)getpid());
   
-	if (!relative_paths && chdir(dir) != 0) {
-		rprintf(FERROR,"chdir %s: %s (3)\n",dir,strerror(errno));
+	if (!relative_paths && !push_dir(dir, 0)) {
+		rprintf(FERROR,"push_dir %s: %s (3)\n",dir,strerror(errno));
 		exit_cleanup(1);
 	}
 	argc--;
@@ -289,8 +290,8 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		dir = argv[0];
 		argc--;
 		argv++;
-		if (!am_daemon && chdir(dir) != 0) {
-			rprintf(FERROR,"chdir %s : %s (4)\n",
+		if (!am_daemon && !push_dir(dir, 0)) {
+			rprintf(FERROR,"push_dir %s : %s (4)\n",
 				dir,strerror(errno));
 			exit_cleanup(1);
 		}    

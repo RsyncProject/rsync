@@ -90,49 +90,6 @@ static void send_directory(int f,struct file_list *flist,char *dir);
 
 static char *flist_dir;
 
-static void clean_fname(char *name)
-{
-  char *p;
-  int l;
-  int modified = 1;
-
-  if (!name) return;
-
-  while (modified) {
-    modified = 0;
-
-    if ((p=strstr(name,"/./"))) {
-      modified = 1;
-      while (*p) {
-	p[0] = p[2];
-	p++;
-      }
-    }
-
-    if ((p=strstr(name,"//"))) {
-      modified = 1;
-      while (*p) {
-	p[0] = p[1];
-	p++;
-      }
-    }
-
-    if (strncmp(p=name,"./",2) == 0) {      
-      modified = 1;
-      do {
-	p[0] = p[2];
-      } while (*p++);
-    }
-
-    l = strlen(p=name);
-    if (l > 1 && p[l-1] == '/') {
-      modified = 1;
-      p[l-1] = 0;
-    }
-  }
-}
-
-
 
 void send_file_entry(struct file_struct *file,int f,unsigned base_flags)
 {
@@ -566,7 +523,6 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 	int i,l;
 	STRUCT_STAT st;
 	char *p,*dir;
-	char dbuf[MAXPATHLEN];
 	char lastpath[MAXPATHLEN]="";
 	struct file_list *flist;
 
@@ -646,24 +602,23 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 			fname = ".";
 		
 		if (dir && *dir) {
-			if (getcwd(dbuf,MAXPATHLEN-1) == NULL) {
-				rprintf(FERROR,"getwd : %s\n",strerror(errno));
-				exit_cleanup(1);
-			}
-			if (chdir(dir) != 0) {
+			char *olddir = push_dir(dir, 1);
+
+			if (!olddir) {
 				io_error=1;
-				rprintf(FERROR,"chdir %s : %s\n",
+				rprintf(FERROR,"push_dir %s : %s\n",
 					dir,strerror(errno));
 				continue;
 			}
+
 			flist_dir = dir;
 			if (one_file_system)
 				set_filesystem(fname);
 			send_file_name(f,flist,fname,recurse,FLAG_DELETE);
 			flist_dir = NULL;
-			if (chdir(dbuf) != 0) {
-				rprintf(FERROR,"chdir %s : %s\n",
-					dbuf,strerror(errno));
+			if (pop_dir(olddir) != 0) {
+				rprintf(FERROR,"pop_dir %s : %s\n",
+					dir,strerror(errno));
 				exit_cleanup(1);
 			}
 			continue;

@@ -559,3 +559,97 @@ void *Realloc(void *p, int size)
 	if (!p) return (void *)malloc(size);
 	return (void *)realloc(p, size);
 }
+
+
+void clean_fname(char *name)
+{
+	char *p;
+	int l;
+	int modified = 1;
+
+	if (!name) return;
+
+	while (modified) {
+		modified = 0;
+
+		if ((p=strstr(name,"/./"))) {
+			modified = 1;
+			while (*p) {
+				p[0] = p[2];
+				p++;
+			}
+		}
+
+		if ((p=strstr(name,"//"))) {
+			modified = 1;
+			while (*p) {
+				p[0] = p[1];
+				p++;
+			}
+		}
+
+		if (strncmp(p=name,"./",2) == 0) {      
+			modified = 1;
+			do {
+				p[0] = p[2];
+			} while (*p++);
+		}
+
+		l = strlen(p=name);
+		if (l > 1 && p[l-1] == '/') {
+			modified = 1;
+			p[l-1] = 0;
+		}
+	}
+}
+
+
+static char curr_dir[MAXPATHLEN];
+
+/* like chdir() but can be reversed with pop_dir() if save is set. It
+   is also much faster as it remembers where we have been */
+char *push_dir(char *dir, int save)
+{
+	char *ret = curr_dir;
+	static int initialised;
+
+	if (!initialised) {
+		initialised = 1;
+		getcwd(curr_dir, sizeof(curr_dir)-1);
+	}
+
+	if (chdir(dir)) return NULL;
+
+	if (save) {
+		ret = strdup(curr_dir);
+	}
+
+	if (*dir == '/') {
+		strlcpy(curr_dir, dir, sizeof(curr_dir)-1);
+	} else {
+		strlcat(curr_dir,"/", sizeof(curr_dir)-1);
+		strlcat(curr_dir,dir, sizeof(curr_dir)-1);
+	}
+
+	clean_fname(curr_dir);
+
+	return ret;
+}
+
+/* reverse a push_dir call */
+int pop_dir(char *dir)
+{
+	int ret;
+
+	ret = chdir(dir);
+	if (ret) {
+		free(dir);
+		return ret;
+	}
+
+	strlcpy(curr_dir, dir, sizeof(curr_dir)-1);
+
+	free(dir);
+
+	return 0;
+}

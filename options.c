@@ -79,7 +79,7 @@ void usage(int F)
   rprintf(F,"Options:\n");
   rprintf(F,"-v, --verbose            increase verbosity\n");
   rprintf(F,"-c, --checksum           always checksum\n");
-  rprintf(F,"-a, --archive            archive mode (same as -rlptDog)\n");
+  rprintf(F,"-a, --archive            archive mode\n");
   rprintf(F,"-r, --recursive          recurse into directories\n");
   rprintf(F,"-R, --relative           use relative path names\n");
   rprintf(F,"-b, --backup             make backups (default ~ extension)\n");
