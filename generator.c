@@ -923,8 +923,25 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					}
 					match_level = 0;
 					statret = -1;
-				} else
-					set_perms(fname, file, NULL, 0);
+				} else {
+					if (itemizing) {
+						itemize(file, ndx, 0, &st,
+							ITEM_LOCAL_CHANGE, 0,
+							NULL);
+					} else if (verbose && code) {
+						rprintf(code, "%s\n",
+							safe_fname(fname));
+					}
+					set_perms(fname, file, NULL,
+						  maybe_PERMS_REPORT);
+					if (preserve_hard_links
+					    && file->link_u.links) {
+						hard_link_cluster(file, ndx,
+								  itemizing,
+								  code);
+					}
+					return;
+				}
 			} else if (compare_dest || match_level == 1) {
 				fnamecmp = fnamecmpbuf;
 				fnamecmp_type = i;
