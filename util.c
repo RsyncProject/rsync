@@ -901,6 +901,27 @@ int pop_dir(char *dir)
 }
 
 /**
+ * Return the filename, turning any newlines into '?'s.  This ensures that
+ * outputting it on a line of its own cannot generate an empty line.
+ **/
+const char *safe_fname(const char *fname)
+{
+	static char fbuf[MAXPATHLEN];
+	char *nl = strchr(fname, '\n');
+
+	if (!nl)
+		return fname;
+
+	strlcpy(fbuf, fname, sizeof fbuf);
+	nl = fbuf + (nl - (char *)fname);
+	do {
+		*nl = '?';
+	} while ((nl = strchr(nl+1, '\n')) != NULL);
+
+	return fbuf;
+}
+
+/**
  * Return a quoted string with the full pathname of the indicated filename.
  * The string " (in MODNAME)" may also be appended.  The returned pointer
  * remains valid until the next time full_fname() is called.
