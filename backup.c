@@ -254,7 +254,7 @@ static int keep_backup(char *fname)
 	free(file);
 
 	if (verbose > 1)
-		rprintf(FINFO, "keep_backup %s -> %s\n", fname, buf);
+		rprintf(FINFO, "backed up %s to %s\n", fname, buf);
 	return 1;
 }
 
