@@ -169,7 +169,10 @@ do
 	*)
 	    echo "----- $testbase failed!"
 	    failed=`expr $failed + 1`
-	    [ "$nopersist" = "yes" ] && exit 1
+	    if [ "x$nopersist" = "xyes" ]
+	    then
+		exit 1
+	    fi
 	esac
     fi
 done
