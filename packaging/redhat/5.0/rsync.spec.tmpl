@@ -21,7 +21,7 @@ A technical report describing the rsync algorithm is included with
 this package. 
 
 %changelog
-* Mon May 18 1998
+* Mon May 18 1998 Andrew Tridgell <tridge@samba.anu.edu.au>
   reworked for auto-building when I release rsync (tridge@samba.anu.edu.au)
 
 * Sat May 16 1998 John H Terpstra <jht@aquasoft.com.au>
