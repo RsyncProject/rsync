@@ -351,7 +351,8 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 				 * right place -- no further action
 				 * required. */
 				if (strcmp(lnk,file->u.link) == 0) {
-					set_perms(fname,file,&st,1);
+					set_perms(fname, file, &st,
+						  PERMS_REPORT);
 					return;
 				}
 			}
@@ -391,7 +392,7 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 					rprintf(FINFO,"%s\n",fname);
 			}
 		} else {
-			set_perms(fname,file,&st,1);
+			set_perms(fname, file, &st, PERMS_REPORT);
 		}
 		return;
 	}
@@ -473,7 +474,7 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 
 	if (skip_file(fname, file, &st)) {
 		if (fnamecmp == fname)
-			set_perms(fname,file,&st,1);
+			set_perms(fname, file, &st, PERMS_REPORT);
 		return;
 	}
 
