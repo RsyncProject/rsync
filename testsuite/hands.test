@@ -94,10 +94,8 @@ Failures have occured.
 
 You can find the output of the tests in these files:
   $@
-
-Please hit <RETURN>
 EOF
-  read input
+    exit 1
   else
 
     rm -rf ${TMP}
