@@ -413,7 +413,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
   char dbuf[MAXPATHLEN];
   struct file_list *flist;
 
-  if (verbose && recurse && !am_server) {
+  if (verbose && recurse && !am_server && f != -1) {
     fprintf(FINFO,"building file list ... ");
     fflush(FINFO);
   }
@@ -497,7 +497,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
     write_flush(f);
   }
 
-  if (verbose && recurse && !am_server)
+  if (verbose && recurse && !am_server && f != -1)
     fprintf(FINFO,"done\n");
 
   clean_flist(flist);
