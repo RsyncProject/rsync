@@ -76,6 +76,10 @@ int do_rmdir(char *pathname)
 int do_open(char *pathname, int flags, mode_t mode)
 {
 	if (dry_run) return -1;
+#ifdef O_BINARY
+	/* for Windows */
+	flags |= O_BINARY;
+#endif
 	CHECK_RO
 	return open(pathname, flags, mode);
 }
