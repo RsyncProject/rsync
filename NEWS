@@ -104,10 +104,11 @@ Changes since 2.6.3:
       output without overlapping it.  (Requires protocol 29.)
 
     - When --timeout is specified, lulls that occur in the transfer while
-      the generator is scanning the file system (either looking for files
-      to generate or files to delete) cause a new keep-alive packet to be
-      sent that should keep the transfer going (as long as the generator
-      continues to make progress).  (Requires protocol 29.)
+      the generator is doing work that does not generate socket traffic
+      (looking for changed files, deleting files, doing directory-time
+      touch-ups, etc.) will cause a new keep-alive packet to be sent that
+      should keep the transfer going as long as the generator continues to
+      make progress.  (Requires protocol 29.)
 
     - The stat size of a device is not added to the total file size of the
       items in the transfer since the size might be undefined on some OSes.
@@ -321,7 +322,7 @@ Changes since 2.6.3:
       --filter option instead of --exclude-from to capture any filter rules.
 
     - An index equal to the file-list count is sent as a keep-alive packet
-      from the generator to the sender, who then forwards it on to the
+      from the generator to the sender, which then forwards it on to the
       receiver.  This normally invalid index is only a valid keep-alive
       packet if the 16-bit flag-word that follows it contains a single bit
       (ITEM_IS_NEW, which is normally an illegal flag to appear alone).
