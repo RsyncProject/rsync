@@ -107,12 +107,13 @@ static int delete_file(char *fname)
 	}
 
 	for (di=readdir(d); di; di=readdir(d)) {
-		if (strcmp(di->d_name,".")==0 ||
-		    strcmp(di->d_name,"..")==0)
+		char *dname = d_name(di);
+		if (strcmp(dname,".")==0 ||
+		    strcmp(dname,"..")==0)
 			continue;
-		strncpy(buf, fname, (MAXPATHLEN-strlen(di->d_name))-2);
+		strncpy(buf, fname, (MAXPATHLEN-strlen(dname))-2);
 		strcat(buf, "/");
-		strcat(buf, di->d_name);
+		strcat(buf, dname);
 		buf[MAXPATHLEN-1] = 0;
 		if (verbose > 0)
 			fprintf(FINFO,"deleting %s\n", buf);

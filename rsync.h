@@ -290,6 +290,20 @@ static inline int flist_up(struct file_list *flist, int i)
 	return i;
 }
 
+#if HAVE_DIRENT_H
+# include <dirent.h>
+#else
+# define dirent direct
+# if HAVE_SYS_NDIR_H
+#  include <sys/ndir.h>
+# endif
+# if HAVE_SYS_DIR_H
+#  include <sys/dir.h>
+# endif
+# if HAVE_NDIR_H
+#  include <ndir.h>
+# endif
+#endif
 
 #include "byteorder.h"
 #include "version.h"
@@ -304,21 +318,6 @@ extern char *sys_errlist[];
 #ifndef HAVE_STRCHR
 # define strchr                 index
 # define strrchr                rindex
-#endif
-
-#if HAVE_DIRENT_H
-# include <dirent.h>
-#else
-# define dirent direct
-# if HAVE_SYS_NDIR_H
-#  include <sys/ndir.h>
-# endif
-# if HAVE_SYS_DIR_H
-#  include <sys/dir.h>
-# endif
-# if HAVE_NDIR_H
-#  include <ndir.h>
-# endif
 #endif
 
 #ifndef HAVE_ERRNO_DECL

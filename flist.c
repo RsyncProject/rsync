@@ -538,10 +538,11 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 	}  
 	
 	for (di=readdir(d); di; di=readdir(d)) {
-		if (strcmp(di->d_name,".")==0 ||
-		    strcmp(di->d_name,"..")==0)
+		char *dname = d_name(di);
+		if (strcmp(dname,".")==0 ||
+		    strcmp(dname,"..")==0)
 			continue;
-		strncpy(p,di->d_name,MAXPATHLEN-(l+1));
+		strncpy(p,dname,MAXPATHLEN-(l+1));
 		send_file_name(f,flist,fname,recurse,FLAG_DELETE);
 	}
 

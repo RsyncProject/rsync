@@ -76,4 +76,11 @@ AC_TRY_COMPILE([#include <sys/types.h>
 echo yes;AC_DEFINE(HAVE_UTIMBUF), 
 echo no)
 
+echo $ac_n "checking for broken readdir ... $ac_c"
+AC_TRY_COMPILE([#include <sys/types.h>
+#include <utime.h>],
+[struct utimbuf tbuf;  tbuf.actime = 0; tbuf.modtime = 1; return utime("foo.c",&tbuf);],
+echo yes;AC_DEFINE(HAVE_UTIMBUF), 
+echo no)
+
 AC_OUTPUT(Makefile lib/dummy)

@@ -133,3 +133,21 @@ OFF_T do_lseek(int fd, OFF_T offset, int whence)
 	return lseek(fd, offset, whence);
 #endif
 }
+
+char *d_name(struct dirent *di)
+{
+#if defined(SunOS) && SunOS >= 50
+	static int first = 1;
+	static int broken;
+	if (first) {
+		first = 0;
+		if (!di->d_name[0] && strcmp(".", di->d_name-2)==0) {
+			fprintf(stderr,"WARNING: broken readdir\n");
+			broken = 1;
+		}
+	}
+	if (broken)
+		return (di->d_name - 2);
+#endif
+	return di->d_name;
+}
