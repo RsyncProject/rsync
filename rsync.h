@@ -762,7 +762,7 @@ int inet_pton(int af, const char *src, void *dst);
 const char *get_panic_action(void);
 #endif
 
-#ifndef _AIX
+#if !(defined(__hpux) || defined(_hpux) || defined (hpux))
 #define UNUSED(x) x __attribute__((__unused__))
 #else
 #define UNUSED(x) x
