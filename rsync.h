@@ -428,7 +428,12 @@ struct file_struct {
 	uchar flags;	/* this item MUST remain last */
 };
 
-#define ARENA_SIZE	(32 * 1024)
+/*
+ * Start the flist array at FLIST_START entries and grow it
+ * by doubling until FLIST_LINEAR then grow by FLIST_LINEAR
+ */
+#define FLIST_START	(32 * 1024)
+#define FLIST_LINEAR	(FLIST_START * 512)
 
 struct string_area {
 	char *base;

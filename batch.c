@@ -144,11 +144,8 @@ struct file_list *create_flist_from_batch(void)
 	save_pv = protocol_version;
 	protocol_version = read_int(f);
 
-	batch_flist->count = batch_flist->malloced = read_int(f);
-	batch_flist->files = new_array(struct file_struct *,
-	    batch_flist->malloced);
-	if (!batch_flist->files)
-		out_of_memory("create_flist_from_batch");
+	batch_flist->count = read_int(f);
+	flist_expand(batch_flist);
 
 	for (i = 0; (flags = read_byte(f)) != 0; i++) {
 		if (protocol_version >= 28 && (flags & XMIT_EXTENDED_FLAGS))
