@@ -119,6 +119,8 @@ int try_bind_local(int s,
 		return -1;
 	}
 
+	/* FIXME: Call freeaddrinfo() on all return paths! */
+
 	for (r = bres_all; r; r = r->ai_next) {
 		if (bind(s, r->ai_addr, r->ai_addrlen) == -1)
 			continue;
@@ -329,7 +331,8 @@ static int open_socket_in(int type, int port, const char *bind_address,
 			close(s);
 			continue;
 		}
-		
+
+		/* FIXME: Call freeaddrinfo? */
 		return s;
 	}
 
