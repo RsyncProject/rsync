@@ -7,7 +7,7 @@
 
 . "$suitedir/rsync.fns"
 
-set -x
+# set -x
 
 hands_setup
 
