@@ -522,7 +522,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 	static gid_t gid;
 	static char lastname[MAXPATHLEN], *lastdir;
 	static int lastdir_depth, lastdir_len = -1;
-	static unsigned int del_heir_name_len = 0;
+	static unsigned int del_hier_name_len = 0;
 	static int in_del_hier = 0;
 	char thisname[MAXPATHLEN];
 	unsigned int l1 = 0, l2 = 0;
@@ -646,11 +646,11 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 	if (S_ISDIR(mode)) {
 		if (flags & XMIT_DEL_START) {
 			in_del_hier = 1;
-			del_heir_name_len = l1 + l2;
+			del_hier_name_len = l1 + l2;
 			file->flags |= FLAG_DEL_START;
 		} else if (delete_during && in_del_hier) {
-			if (!relative_paths || (l1 >= del_heir_name_len
-			    && thisname[del_heir_name_len] == '/'))
+			if (!relative_paths || (l1 >= del_hier_name_len
+			    && thisname[del_hier_name_len] == '/'))
 				file->flags |= FLAG_DEL_START;
 			else
 				in_del_hier = 0;
