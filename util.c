@@ -774,6 +774,52 @@ int pop_dir(char *dir)
 	return 0;
 }
 
+/**
+ * Return a quoted string with the full pathname of the indicated filename.
+ * The string " (in MODNAME)" may also be appended.  The returned pointer
+ * remains valid until the next time full_fname() is called.
+ **/
+char *full_fname(char *fn)
+{
+	extern int module_id;
+	static char *result = NULL;
+	char *m1, *m2, *m3;
+	char *p1, *p2;
+
+	if (result)
+		free(result);
+
+	if (*fn == '/')
+		p1 = p2 = "";
+	else {
+		p1 = curr_dir;
+		p2 = "/";
+	}
+	if (module_id >= 0) {
+		m1 = " (in ";
+		m2 = lp_name(module_id);
+		m3 = ")";
+		if (*p1) {
+			if (!lp_use_chroot(module_id)) {
+				char *p = lp_path(module_id);
+				if (*p != '/' || p[1])
+					p1 += strlen(p);
+			}
+			if (!*p1)
+				p2++;
+			else
+				p1++;
+		}
+		else
+			fn++;
+	} else
+		m1 = m2 = m3 = "";
+
+	asprintf(&result, "\"%s%s%s\"%s%s%s", p1, p2, fn, m1, m2, m3);
+
+	return result;
+}
+
 /** We need to supply our own strcmp function for file list comparisons
    to ensure that signed/unsigned usage is consistent between machines. */
 int u_strcmp(const char *cs1, const char *cs2)
