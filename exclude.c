@@ -605,6 +605,18 @@ int check_filter(struct filter_list_struct *listp, char *name, int name_is_dir)
 	return 0;
 }
 
+#define RULE_MATCH(s,r) rule_match((s), (r), sizeof (r) - 1)
+
+static const char *rule_match(const char *str, const char *rule, int rule_len)
+{
+	if (strncmp(str, rule, rule_len) != 0)
+		return NULL;
+	if (isspace(str[rule_len]) || str[rule_len] == '_' || !str[rule_len])
+		return str + rule_len - 1;
+	if (str[rule_len] == ',')
+		return str + rule_len;
+	return NULL;
+}
 
 /* Get the next include/exclude arg from the string.  The token will not
  * be '\0' terminated, so use the returned length to limit the string.
@@ -639,7 +651,7 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 	 * for old include/exclude patterns where just "+ " and "- " are
 	 * allowed as optional prefixes.  */
 	if (mflags & MATCHFLG_NO_PREFIXES) {
-		if (*s == '!')
+		if (*s == '!' && mflags & MATCHFLG_CVS_IGNORE)
 			new_mflags |= MATCHFLG_CLEAR_LIST; /* Tentative! */
 	} else if (xflags & XFLG_OLD_PREFIXES) {
 		if (*s == '-' && s[1] == ' ') {
@@ -652,8 +664,33 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 		if (*s == '!')
 			new_mflags |= MATCHFLG_CLEAR_LIST; /* Tentative! */
 	} else {
-		char *mods = "";
+		char ch = 0, *mods = "";
 		switch (*s) {
+		case 'c':
+			if ((s = RULE_MATCH(s, "clear")) != NULL)
+				ch = '!';
+			break;
+		case 'd':
+			if ((s = RULE_MATCH(s, "dir-merge")) != NULL)
+				ch = ':';
+			break;
+		case 'e':
+			if ((s = RULE_MATCH(s, "exclude")) != NULL)
+				ch = '-';
+			break;
+		case 'i':
+			if ((s = RULE_MATCH(s, "include")) != NULL)
+				ch = '+';
+			break;
+		case 'm':
+			if ((s = RULE_MATCH(s, "merge")) != NULL)
+				ch = '.';
+			break;
+		default:
+			ch = *s;
+			break;
+		}
+		switch (ch) {
 		case ':':
 			new_mflags |= MATCHFLG_PERDIR_MERGE
 				    | MATCHFLG_FINISH_SETUP;
