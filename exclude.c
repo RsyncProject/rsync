@@ -278,7 +278,7 @@ static char *parse_merge_name(const char *merge_file, unsigned int *len_ptr,
 		}
 		if (!sanitize_path(fn, merge_file, r, dirbuf_depth)) {
 			rprintf(FERROR, "merge-file name overflows: %s\n",
-				merge_file);
+				safe_fname(merge_file));
 			return NULL;
 		}
 	} else {
@@ -291,7 +291,8 @@ static char *parse_merge_name(const char *merge_file, unsigned int *len_ptr,
 		goto done;
 
 	if (dirbuf_len + fn_len >= MAXPATHLEN) {
-		rprintf(FERROR, "merge-file name overflows: %s\n", fn);
+		rprintf(FERROR, "merge-file name overflows: %s\n",
+			safe_fname(fn));
 		return NULL;
 	}
 	memcpy(buf, dirbuf + prefix_skip, dirbuf_len - prefix_skip);
