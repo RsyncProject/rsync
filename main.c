@@ -235,6 +235,8 @@ static char *get_local_name(struct file_list *flist,char *name)
   if (mkdir(name,0777) != 0) {
     fprintf(stderr,"mkdir %s : %s\n",name,strerror(errno));
     exit(1);
+  } else {
+    fprintf(am_server?stderr:stdout,"created directory %s\n",name);
   }
 
   if (chdir(name) != 0) {
