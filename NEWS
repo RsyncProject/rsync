@@ -82,11 +82,11 @@ Changes since 2.6.0:
       that start with a double slash (unless the user supplied them).
 
     * Path-specifying options to a daemon should now work the same with
-      or without chroot turned on.  Previously, such an option (such as
-      --link-dest) would get munged into relative path if chroot was not
-      on, making the option fairly useless.  Rsync now transforms the
-      path into one that is based on the module's root dir, just as if
-      chroot were enabled.
+      or without chroot turned on.  Previously, such a option (such as
+      --link-dest) would get its absolute path munged into a relative
+      one if chroot was not on, making that setting fairly useless.
+      Rsync now transforms the path into one that is based on the
+      module's base dir when chroot is not enabled.
 
     * Fixed compilation problem on Tru64 Unix (having to do with
       sockaddr.sa_len and sockaddr.sin_len).
@@ -99,7 +99,7 @@ Changes since 2.6.0:
       process now has improved support for IPv6 addresses and a fix
       for systems that have a length field in their socket structs.
 
-    * Fixed the ability to request an empty backup suffix when
+    * Fixed the ability to request an empty backup --suffix when
       sending files to an rsync daemon.
 
   INTERNAL:
