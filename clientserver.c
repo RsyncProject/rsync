@@ -141,7 +141,7 @@ static int rsync_module(int fd, int i)
 	char *argv[MAX_ARGS];
 	char **argp;
 	char line[MAXPATHLEN];
-	uid_t uid = (uid_t)-2;
+	uid_t uid = (uid_t)-2;  /* canonically "nobody" */
 	gid_t gid = (gid_t)-2;
 	char *p;
 	char *addr = client_addr(fd);

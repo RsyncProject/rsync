@@ -164,12 +164,13 @@ for modules to be listable.
 dit(bf(uid)) The "uid" option specifies the user name or user id that
 file transfers to and from that module should take place as when the daemon
 was run as root. In combination with the "gid" option this determines what
-file permissions are available. The default is the user "nobody".
+file permissions are available. The default is uid -2, which is normally
+the user "nobody".
 
 dit(bf(gid)) The "gid" option specifies the group name or group id that
 file transfers to and from that module should take place as when the daemon
-was run as root. This complements the "uid" option. The default is the
-group "nobody".
+was run as root. This complements the "uid" option. The default is gid -2,
+which is normally the group "nobody".
 
 dit(bf(exclude)) The "exclude" option allows you to specify a space
 separated list of patterns to add to the exclude list. This is
