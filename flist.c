@@ -508,8 +508,8 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 
 
 
-static void receive_file_entry(struct file_list *flist, int ndx,
-			       unsigned short flags, int f)
+static struct file_struct *receive_file_entry(struct file_list *flist,
+					      unsigned short flags, int f)
 {
 	static time_t modtime;
 	static mode_t mode;
@@ -537,7 +537,7 @@ static void receive_file_entry(struct file_list *flist, int ndx,
 		*lastname = '\0';
 		lastdir_len = -1;
 		in_del_hier = 0;
-		return;
+		return NULL;
 	}
 
 	if (flags & XMIT_SAME_NAME)
@@ -630,7 +630,7 @@ static void receive_file_entry(struct file_list *flist, int ndx,
 		  + linkname_len + sum_len;
 	bp = pool_alloc(flist->file_pool, alloc_len, "receive_file_entry");
 
-	file = flist->files[ndx] = (struct file_struct *)bp;
+	file = (struct file_struct *)bp;
 	memset(bp, 0, file_struct_len);
 	bp += file_struct_len;
 
@@ -732,6 +732,8 @@ static void receive_file_entry(struct file_list *flist, int ndx,
 		 * permissions and umask. This emulates what GNU cp does */
 		file->mode &= ~orig_umask;
 	}
+
+	return file;
 }
 
 
@@ -946,8 +948,9 @@ skip_filters:
 	 * a list of files for a delete pass. */
 	if (keep_dirlinks && linkname_len && flist) {
 		STRUCT_STAT st2;
-		int i = flist_find(received_flist, file);
-		if (i >= 0 && S_ISDIR(received_flist->files[i]->mode)
+		int save_mode = file->mode;
+		file->mode = S_IFDIR; /* find a directory w/our name */
+		if (flist_find(received_flist, file) >= 0
 		    && do_stat(thisname, &st2) == 0 && S_ISDIR(st2.st_mode)) {
 			file->modtime = st2.st_mtime;
 			file->length = st2.st_size;
@@ -955,11 +958,8 @@ skip_filters:
 			file->uid = st2.st_uid;
 			file->gid = st2.st_gid;
 			file->u.link = NULL;
-			if (file->link_u.idev) {
-				pool_free(flist->hlink_pool, 0, file->link_u.idev);
-				file->link_u.idev = NULL;
-			}
-		}
+		} else
+			file->mode = save_mode;
 	}
 
 	if (!S_ISDIR(st.st_mode))
@@ -1236,6 +1236,10 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		flist->hlink_pool = NULL;
 	}
 
+	/* Sort the list without removing any duplicates.  This allows the
+	 * receiving side to ask for any name they like, which gives us the
+	 * flexibility to change the way we unduplicate names in the future
+	 * without causing a compatibility problem with older versions. */
 	clean_flist(flist, 0, 0);
 
 	/* Now send the uid/gid list. This was introduced in
@@ -1281,27 +1285,27 @@ struct file_list *recv_file_list(int f)
 
 
 	while ((flags = read_byte(f)) != 0) {
-		int i = flist->count;
+		struct file_struct *file;
 
 		flist_expand(flist);
 
 		if (protocol_version >= 28 && (flags & XMIT_EXTENDED_FLAGS))
 			flags |= read_byte(f) << 8;
-		receive_file_entry(flist, i, flags, f);
+		file = receive_file_entry(flist, flags, f);
 
-		if (S_ISREG(flist->files[i]->mode))
-			stats.total_size += flist->files[i]->length;
+		if (S_ISREG(file->mode))
+			stats.total_size += file->length;
 
-		flist->count++;
+		flist->files[flist->count++] = file;
 
 		maybe_emit_filelist_progress(flist);
 
 		if (verbose > 2) {
 			rprintf(FINFO, "recv_file_name(%s)\n",
-				safe_fname(f_name(flist->files[i])));
+				safe_fname(f_name(file)));
 		}
 	}
-	receive_file_entry(NULL, 0, 0, 0); /* Signal that we're done. */
+	receive_file_entry(NULL, 0, 0); /* Signal that we're done. */
 
 	if (verbose > 2)
 		rprintf(FINFO, "received %d names\n", flist->count);
@@ -1352,6 +1356,8 @@ static int file_compare(struct file_struct **file1, struct file_struct **file2)
 }
 
 
+/* Search for an identically-named item in the file list.  Note that the
+ * items must agree in their directory-ness, or no match is returned. */
 int flist_find(struct file_list *flist, struct file_struct *f)
 {
 	int low = flist->low, high = flist->high;
@@ -1364,8 +1370,13 @@ int flist_find(struct file_list *flist, struct file_struct *f)
 			ret = f_name_cmp(flist->files[mid_up], f);
 		else
 			ret = 1;
-		if (ret == 0)
+		if (ret == 0) {
+			if (protocol_version < 29
+			    && S_ISDIR(flist->files[mid_up]->mode)
+			    != S_ISDIR(f->mode))
+				return -1;
 			return mid_up;
+		}
 		if (ret > 0)
 			high = mid - 1;
 		else
@@ -1373,6 +1384,7 @@ int flist_find(struct file_list *flist, struct file_struct *f)
 	}
 	return -1;
 }
+
 
 /*
  * Free up any resources a file_struct has allocated
@@ -1448,41 +1460,54 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 	}
 	flist->low = prev_i;
 	while (++i < flist->count) {
-		if (!flist->files[i]->basename)
+		int is_dup;
+		struct file_struct *file = flist->files[i];
+
+		if (!file->basename)
 			continue;
-		if (f_name_cmp(flist->files[i], flist->files[prev_i]) == 0) {
+		is_dup = f_name_cmp(file, flist->files[prev_i]) == 0;
+		if (!is_dup && protocol_version >= 29 && S_ISDIR(file->mode)) {
+			int save_mode = file->mode;
+			/* Make sure that this directory doesn't duplicate a
+			 * non-directory earlier in the list. */
+			file->mode = S_IFREG;
+			flist->high = prev_i;
+			is_dup = flist_find(flist, file) >= 0;
+			file->mode = save_mode;
+		}
+		if (is_dup) {
 			if (verbose > 1 && !am_server) {
 				rprintf(FINFO,
 					"removing duplicate name %s from file list %d\n",
-					safe_fname(f_name(flist->files[i])), i);
+					safe_fname(f_name(file)), i);
 			}
 			/* Make sure that if we unduplicate '.', that we don't
 			 * lose track of a user-specified top directory. */
-			if (flist->files[i]->flags & FLAG_TOP_DIR)
+			if (file->flags & FLAG_TOP_DIR)
 				flist->files[prev_i]->flags |= FLAG_TOP_DIR;
 
 			clear_file(i, flist);
 		} else
 			prev_i = i;
 	}
-	flist->high = prev_i;
+	flist->high = no_dups ? prev_i : flist->count - 1;
 
 	if (strip_root) {
-		/* we need to strip off the root directory in the case
-		   of relative paths, but this must be done _after_
-		   the sorting phase */
-		for (i = 0; i < flist->count; i++) {
-			if (flist->files[i]->dirname &&
-			    flist->files[i]->dirname[0] == '/') {
-				memmove(&flist->files[i]->dirname[0],
-					&flist->files[i]->dirname[1],
-					strlen(flist->files[i]->dirname));
+		/* We need to strip off the leading slashes for relative
+		 * paths, but this must be done _after_ the sorting phase. */
+		for (i = flist->low; i <= flist->high; i++) {
+			struct file_struct *file = flist->files[i];
+
+			if (!file->dirname)
+				continue;
+			if (*file->dirname == '/') {
+				char *s = file->dirname + 1;
+				while (*s == '/') s++;
+				memmove(file->dirname, s, strlen(s) + 1);
 			}
 
-			if (flist->files[i]->dirname &&
-			    !flist->files[i]->dirname[0]) {
-				flist->files[i]->dirname = NULL;
-			}
+			if (!*file->dirname)
+				file->dirname = NULL;
 		}
 	}
 }
@@ -1516,23 +1541,30 @@ static void output_flist(struct file_list *flist, const char *whose_list)
 
 
 enum fnc_state { s_DIR, s_SLASH, s_BASE, s_TRAILING };
+enum fnc_type { t_PATH, t_ITEM };
 
 /* Compare the names of two file_struct entities, similar to how strcmp()
- * would do if it were operating on the joined strings.  The only difference
- * is that, beginning with protocol_version 29, a directory name will always
- * sort immediately prior to its contents (previously "foo." would sort in
- * between directory "foo" and "foo/bar").  We do this by assuming that a dir
- * has a trailing slash for comparison purposes, but only if we aren't about
- * to match a file of the same name (because we need all identically named
- * items to match each other).  The dirname component can be an empty string,
- * but the basename component cannot (and never is in the current codebase).
- * The basename component may be NULL, in which case it is sorted to the end
- * of the list (as a removed item). */
+ * would do if it were operating on the joined strings.
+ *
+ * Some differences beginning with protocol_version 29: (1) directory names
+ * are compared with an assumed trailing slash so that they compare in a
+ * way that would cause them to sort immediately prior to any content they
+ * may have; (2) a directory of any name compares after a non-directory of
+ * any name at the same depth; (3) a directory with name "." compares prior
+ * to anything else.  These changes mean that a directory and a non-dir
+ * with the same name will not compare as equal (protocol_version >= 29).
+ *
+ * The dirname component can be an empty string, but the basename component
+ * cannot (and never is in the current codebase).  The basename component
+ * may be NULL (for a removed item), in which case it is considered to be
+ * after any existing item. */
 int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 {
 	int dif;
 	const uchar *c1, *c2;
 	enum fnc_state state1, state2;
+	enum fnc_type type1, type2;
+	enum fnc_type t_path = protocol_version >= 29 ? t_PATH : t_ITEM;
 
 	if (!f1 || !f1->basename) {
 		if (!f2 || !f2->basename)
@@ -1547,64 +1579,97 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 	if (c1 == c2)
 		c1 = c2 = NULL;
 	if (!c1) {
-		state1 = s_BASE;
+		type1 = S_ISDIR(f1->mode) ? t_path : t_ITEM;
 		c1 = (uchar*)f1->basename;
+		if (type1 == t_PATH && *c1 == '.' && !c1[1]) {
+			type1 = t_ITEM;
+			state1 = s_TRAILING;
+			c1 = (uchar*)"";
+		} else
+			state1 = s_BASE;
 	} else if (!*c1) {
+		type1 = t_path;
 		state1 = s_SLASH;
 		c1 = (uchar*)"/";
-	} else
+	} else {
+		type1 = t_path;
 		state1 = s_DIR;
+	}
 	if (!c2) {
-		state2 = s_BASE;
+		type2 = S_ISDIR(f2->mode) ? t_path : t_ITEM;
 		c2 = (uchar*)f2->basename;
+		if (type2 == t_PATH && *c2 == '.' && !c2[1]) {
+			type2 = t_ITEM;
+			state2 = s_TRAILING;
+			c2 = (uchar*)"";
+		} else
+			state2 = s_BASE;
 	} else if (!*c2) {
+		type2 = t_path;
 		state2 = s_SLASH;
 		c2 = (uchar*)"/";
-	} else
+	} else {
+		type2 = t_path;
 		state2 = s_DIR;
+	}
+
+	if (type1 != type2)
+		return type1 == t_PATH ? 1 : -1;
 
 	while (1) {
-		if ((dif = (int)*c1 - (int)*c2) != 0)
+		if ((dif = (int)*c1++ - (int)*c2++) != 0)
 			break;
-		if (!*++c1) {
+		if (!*c1) {
 			switch (state1) {
 			case s_DIR:
 				state1 = s_SLASH;
 				c1 = (uchar*)"/";
 				break;
 			case s_SLASH:
+				type1 = S_ISDIR(f1->mode) ? t_path : t_ITEM;
 				state1 = s_BASE;
 				c1 = (uchar*)f1->basename;
 				break;
 			case s_BASE:
 				state1 = s_TRAILING;
-				if (protocol_version >= 29 && S_ISDIR(f1->mode))
+				if (type1 == t_PATH) {
 					c1 = (uchar*)"/";
-				break;
+					break;
+				}
+				/* FALL THROUGH */
 			case s_TRAILING:
+				type1 = t_ITEM;
 				break;
 			}
+			if (*c2 && type1 != type2)
+				return type1 == t_PATH ? 1 : -1;
 		}
-		if (!*++c2) {
+		if (!*c2) {
 			switch (state2) {
 			case s_DIR:
 				state2 = s_SLASH;
 				c2 = (uchar*)"/";
 				break;
 			case s_SLASH:
+				type2 = S_ISDIR(f2->mode) ? t_path : t_ITEM;
 				state2 = s_BASE;
 				c2 = (uchar*)f2->basename;
 				break;
 			case s_BASE:
-				if (state1 == s_TRAILING)
-					return 0;
 				state2 = s_TRAILING;
-				if (protocol_version >= 29 && S_ISDIR(f2->mode))
+				if (type2 == t_PATH) {
 					c2 = (uchar*)"/";
-				break;
+					break;
+				}
+				/* FALL THROUGH */
 			case s_TRAILING:
+				if (!*c1)
+					return 0;
+				type2 = t_ITEM;
 				break;
 			}
+			if (type1 != type2)
+				return type1 == t_PATH ? 1 : -1;
 		}
 	}
 
@@ -1720,7 +1785,7 @@ void delete_in_dir(struct file_list *flist, char *fbuf,
 void delete_missing(struct file_list *full_list, struct file_list *dir_list,
 		    const char *dirname)
 {
-	int i, j, mode;
+	int i, mode;
 
 	if (max_delete && deletion_count >= max_delete)
 		return;
@@ -1732,8 +1797,7 @@ void delete_missing(struct file_list *full_list, struct file_list *dir_list,
 		if (!dir_list->files[i]->basename)
 			continue;
 		mode = dir_list->files[i]->mode;
-		if ((j = flist_find(full_list, dir_list->files[i])) < 0
-		    || (S_ISDIR(mode) && !S_ISDIR(full_list->files[j]->mode))) {
+		if (flist_find(full_list, dir_list->files[i]) < 0) {
 			char *f = f_name(dir_list->files[i]);
 			if (make_backups && (backup_dir || !is_backup_file(f))
 			  && !S_ISDIR(mode)) {
