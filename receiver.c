@@ -53,7 +53,7 @@ extern char *log_format;
 extern char *tmpdir;
 extern char *partial_dir;
 extern char *basis_dir[];
-
+extern struct file_list *the_file_list;
 extern struct filter_list_struct server_filter_list;
 
 #define SLOT_SIZE	(16*1024)	/* Desired size in bytes */
@@ -343,6 +343,21 @@ static void handle_delayed_updates(struct file_list *flist, char *local_name)
 	}
 }
 
+static int get_next_gen_i(int batch_gen_fd, int next_gen_i, int desired_i)
+{
+	while (next_gen_i < desired_i) {
+		if (next_gen_i >= 0) {
+			rprintf(FINFO,
+				"(No batched update for \"%s\")\n",
+				safe_fname(f_name(the_file_list->files[next_gen_i])));
+		}
+		next_gen_i = read_int(batch_gen_fd);
+		if (next_gen_i == -1)
+			next_gen_i = the_file_list->count;
+	}
+	return next_gen_i;
+}
+
 
 /**
  * main routine for receiver process.
@@ -385,8 +400,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		i = read_int(f_in);
 		if (i == -1) {
 			if (read_batch) {
-				if (next_gen_i != flist->count)
-					while (read_int(batch_gen_fd) != -1) {}
+				get_next_gen_i(batch_gen_fd, next_gen_i,
+					       flist->count);
 				next_gen_i = -1;
 			}
 			if (++phase > max_phase)
@@ -444,13 +459,9 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		}
 
 		if (read_batch) {
-			while (i > next_gen_i) {
-				next_gen_i = read_int(batch_gen_fd);
-				if (next_gen_i == -1)
-					next_gen_i = flist->count;
-			}
+			next_gen_i = get_next_gen_i(batch_gen_fd, next_gen_i, i);
 			if (i < next_gen_i) {
-				rprintf(FINFO, "skipping update for \"%s\"\n",
+				rprintf(FINFO, "(Skipping batched update for \"%s\")\n",
 					safe_fname(fname));
 				discard_receive_data(f_in, file->length);
 				continue;
