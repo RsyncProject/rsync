@@ -42,8 +42,7 @@ static void report(int f)
 		if (f == -1 || !am_sender) return;
 	}
 
-	send_stats = verbose || 
-			((remote_version >= 20) && (PROTOCOL_VERSION >= 20));
+	send_stats = verbose || (remote_version >= 20);
 	if (am_server) {
 		if (am_sender && send_stats) {
 			int64 w;
@@ -71,7 +70,7 @@ static void report(int f)
 	if (do_stats) {
 		if (!am_sender && !send_stats) {
 		    /* missing the bytes written by the generator */
-		    rprintf(FINFO, "\nCannot show stats as receiver because protocol version is less than 20\n");
+		    rprintf(FINFO, "\nCannot show stats as receiver because remote protocol version is less than 20\n");
 		    rprintf(FINFO, "Use --stats -v to show stats\n");
 		    return;
 		}
