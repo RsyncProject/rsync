@@ -27,10 +27,11 @@ Changes since 2.6.0:
       get overwritten (due to an expanded-name caching bug).
       (Wayne Davison)
       
-    * Keep per-file track of the sending of literal data with
-      --partial so that an interrupted transfer doesn't keep a
-      shorter temp file when no new data has been transfered over
-      the wire.  (Wayne Davison)
+    * We now reset the "new data has been sent" flag at the start
+      of each file we send.  This makes sure that an interrupted
+      transfer with the --partial option set doesn't keep a shorter
+      temp file than the current basis file when no new data has been
+      transfered over the wire for that file.  (Wayne Davison)
 
     * Fixed a byte-order problem in --batch-mode on big-endian
       machines.  (Jay Fenlason)
@@ -99,6 +100,10 @@ Changes since 2.6.0:
     * The reading & writing of the file list in batch-mode is now
       handled by the same code that sends & receives the list over
       the wire.  This makes it much easier to maintain.
+
+    * Optimized the -x (--one-file-system) flag's handling of any
+      mount-point directories we encounter (it no longer scans the
+      contents of the mount-point dirs, just to throw away the data).
 
 
 NEWS for rsync 2.6.0 (1 Jan 2004)
