@@ -203,6 +203,11 @@ static int start_daemon(int fd)
 	char *motd;
 	int version;
 	int i = -1;
+	extern char *config_file;
+
+	if (!lp_load(config_file)) {
+		exit_cleanup(1);
+	}
 
 	set_socket_options(fd,"SO_KEEPALIVE");
 
@@ -261,12 +266,6 @@ static int start_daemon(int fd)
 
 int daemon_main(void)
 {
-	extern char *config_file;
-
-	if (!lp_load(config_file)) {
-		exit_cleanup(1);
-	}
-
 	if (is_a_socket(STDIN_FILENO)) {
 		/* we are running via inetd */
 		return start_daemon(STDIN_FILENO);
