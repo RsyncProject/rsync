@@ -446,8 +446,8 @@ static void read_final_goodbye(int f_in, int f_out)
 	}
 
 	if (i != -1) {
-		rprintf(FERROR, "Invalid packet at end of run [%s]\n",
-			who_am_i());
+		rprintf(FERROR, "Invalid packet at end of run (%d) [%s]\n",
+			i, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
 	}
 }
