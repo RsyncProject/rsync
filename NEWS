@@ -35,6 +35,10 @@ Changes since 2.6.2:
 
   ENHANCEMENTS:
 
+    - The new option --keep-dirlinks (-K) allows you to symlink a directory
+      onto another patition on the receiving side and have rsync treat it
+      as matching a normal directory from the sender.
+
     - Added the "write only" option to the daemon's config file.
 
     - Added long-option names for -4 and -6 (namely --ipv4 and --ipv6)
