@@ -29,6 +29,9 @@ Changes since 2.6.3:
     - The "ignore nonreadable" daemon parameter no longer affects symlinks
       that are being copied, even if they point nowhere.
 
+    - If the OS does not have lchown(), we no longer try to set the user
+      & group of a symlink (which would either fail or set the referent).
+
   ENHANCEMENTS:
 
     - Rsync now supports popt's option aliases, which means that you can
