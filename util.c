@@ -638,6 +638,8 @@ char *push_dir(char *dir, int save)
 		getcwd(curr_dir, sizeof(curr_dir)-1);
 	}
 
+	if (!dir) return NULL; /* this call was probably just to initialize */
+
 	if (chdir(dir)) return NULL;
 
 	if (save) {

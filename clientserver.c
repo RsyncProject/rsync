@@ -212,7 +212,7 @@ static int rsync_module(int fd, int i)
 			return -1;
 		}
 
-		if (chdir("/")) {
+		if (!push_dir("/", 0)) {
 			rprintf(FERROR,"chdir %s failed\n", lp_path(i));
 			io_printf(fd,"@ERROR: chdir failed\n");
 			return -1;
@@ -421,11 +421,6 @@ int daemon_main(void)
 {
 	extern char *config_file;
 	char *pid_file;
-
-	/* this ensures that we don't call getcwd after the chroot,
-           which doesn't work on platforms that use popen("pwd","r")
-           for getcwd */
-	push_dir("/", 0);
 
 	if (is_a_socket(STDIN_FILENO)) {
 		int i;

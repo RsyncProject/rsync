@@ -606,6 +606,12 @@ int main(int argc,char *argv[])
 	signal(SIGHUP,SIGNAL_CAST sig_int);
 	signal(SIGTERM,SIGNAL_CAST sig_int);
 
+	/* Initialize push_dir here because on some old systems getcwd
+	   (implemented by forking "pwd" and reading its output) doesn't
+	   work when there are other child processes.  Also, on all systems
+	   that implement getcwd that way "pwd" can't be found after chroot. */
+	push_dir(NULL,0);
+
 	if (am_daemon) {
 		return daemon_main();
 	}
