@@ -120,9 +120,9 @@ void usage(int F)
   rprintf(F," -T  --temp-dir=DIR          create temporary files in directory DIR\n");
   rprintf(F," -z, --compress              compress file data\n");
   rprintf(F,"     --exclude=PATTERN       exclude file FILE\n");
-  rprintf(F,"     --exclude-from=PATTERN  exclude files listed in FILE\n");
+  rprintf(F,"     --exclude-from=FILE     exclude patterns listed in FILE\n");
   rprintf(F,"     --include=PATTERN       don't exclude file FILE\n");
-  rprintf(F,"     --include-from=PATTERN  don't exclude files listed in FILE\n");
+  rprintf(F,"     --include-from=FILE     don't exclude patterns listed in FILE\n");
   rprintf(F,"     --suffix=SUFFIX         override backup suffix\n");  
   rprintf(F,"     --version               print version number\n");  
   rprintf(F,"     --daemon                run as a rsync daemon\n");  
