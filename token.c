@@ -137,6 +137,7 @@ static z_stream tx_strm;
 
 /* Output buffer */
 static char *obuf;
+static int obuf_size;
 
 /* Send a deflated token */
 static void
@@ -160,7 +161,12 @@ send_deflated_token(int f, int token,
 				rprintf(FERROR, "compression init failed\n");
 				exit_cleanup(RERR_STREAMIO);
 			}
-			if ((obuf = malloc(MAX_DATA_COUNT+2)) == NULL)
+#if MAX_DATA_COUNT+2 > CHUNK_SIZE+128 /* this shouldn't ever happen... */
+			obuf_size = MAX_DATA_COUNT+2;
+#else
+			obuf_size = CHUNK_SIZE+128;
+#endif
+			if ((obuf = malloc(obuf_size)) == NULL)
 				out_of_memory("send_deflated_token");
 			init_done = 1;
 		} else
@@ -280,7 +286,7 @@ send_deflated_token(int f, int token,
 		tx_strm.next_in = (Bytef *) map_ptr(buf, offset, toklen);
 		tx_strm.avail_in = toklen;
 		tx_strm.next_out = (Bytef *) obuf;
-		tx_strm.avail_out = MAX_DATA_COUNT;
+		tx_strm.avail_out = obuf_size;
 		r = deflate(&tx_strm, Z_INSERT_ONLY);
 		if (r != Z_OK || tx_strm.avail_in != 0) {
 			rprintf(FERROR, "deflate on token returned %d (%d bytes left)\n",
