@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Copyright (C) 2001 by Martin Pool <mbp@samba.org>
+# Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version
@@ -160,16 +160,25 @@ missing=0
 passed=0
 failed=0
 
-scratchdir="`pwd`"/testtmp
-echo "    scratchdir=$scratchdir"
+# Prefix for scratch directory.  We create separate directories for
+# each test case, so that they can be left behind in case of failure
+# to aid investigation.
+scratchbase="`pwd`"/testtmp
+echo "    scratchbase=$scratchbase"
 
 suitedir="$srcdir/testsuite"
 
 export scratchdir suitedir
 
-clean_scratch() {
+prep_scratch() {
     [ -d "$scratchdir" ] && rm -rf "$scratchdir"
     mkdir "$scratchdir"
+    return 0
+}
+
+discard_scratch() {
+    [ -d "$scratchdir" ] && rm -rf "$scratchdir"
+    return 0
 }
 
 if [ "x$whichtests" = x ]
@@ -179,32 +188,38 @@ fi
 
 for testscript in $suitedir/$whichtests
 do
-    testbase=`echo $testscript | sed 's!.*/!!'`
+    testbase=`echo $testscript | sed 's!.*/!!' | sed -e 's/.test\$//'`
+    scratchdir="$scratchbase.$testbase"
 
     echo "----- $testbase starting"
-    clean_scratch
+    prep_scratch
 
-    if sh $RUNSHFLAGS "$testscript" >"$scratchdir/test.log"  2>&1
-    then
+    set +e
+    sh $RUNSHFLAGS "$testscript" >"$scratchdir/test.log" 2>&1
+    result=$?
+    set -e
+
+    case $result in
+    0)
 	echo "----- $testbase completed successfully"
 	passed=`expr $passed + 1`
-    else 
-	case $? in
-	77)
-	    echo "----- $testbase skipped"
-	    skipped=`expr $skipped + 1`
-	    ;;
-	*)
-	    echo "----- $testbase failed: log follows"
-	    cat "$scratchdir/test.log"
-	    echo "----- $testbase log ends"
-	    failed=`expr $failed + 1`
-	    if [ "x$nopersist" = "xyes" ]
-	    then
-		exit 1
-	    fi
-	esac
-    fi
+	discard_scratch
+	;;
+    77)
+	echo "----- $testbase skipped"
+	skipped=`expr $skipped + 1`
+	discard_scratch
+	;;
+    *)
+	echo "----- $testbase failed: log follows"
+	cat "$scratchdir/test.log"
+	echo "----- $testbase log ends"
+	failed=`expr $failed + 1`
+	if [ "x$nopersist" = "xyes" ]
+	then
+	    exit 1
+	fi
+    esac
 done
 
 echo '------------------------------------------------------------'
