@@ -493,7 +493,7 @@ contains a directory of the same name.
 Since this option was added, deletions were reordered to be done depth-first
 so it is hardly ever needed anymore except in very obscure cases.
 
-dit(bf(-B , --block_size=BLOCKSIZE)) This controls the block size used in
+dit(bf(-B , --block-size=BLOCKSIZE)) This controls the block size used in
 the rsync algorithm. See the technical report for details.
 
 dit(bf(-e, --rsh=COMMAND)) This option allows you to choose an alternative
