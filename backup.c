@@ -158,7 +158,8 @@ static int keep_backup(char *fname)
 	file = make_file(fname, NULL, NO_EXCLUDES);
 
 	/* the file could have disappeared */
-	if (!file) return 1;
+	if (!file)
+		return 1;
 
 	/* make a complete pathname for backup file */
 	if (stringjoin(backup_dir_buf + backup_dir_len, backup_dir_remainder,
@@ -234,6 +235,10 @@ static int keep_backup(char *fname)
 		if (robust_move(fname, backup_dir_buf) != 0) {
 			rsyserr(FERROR, errno, "keep_backup failed: %s -> \"%s\"",
 				full_fname(fname), backup_dir_buf);
+		} else if (st.st_nlink > 1) {
+			/* If someone has hard-linked the file into the backup
+			 * dir, rename() can return success but do nothing! */
+			robust_unlink(fname); /* Just in case... */
 		}
 	}
 	set_perms(backup_dir_buf, file, NULL, 0);
