@@ -52,12 +52,19 @@ static int skip_file(char *fname,
 		return 0;
 	}
 	if (link_dest) {
-		if((st->st_mode & ~_S_IFMT) !=  (file->mode & ~_S_IFMT)) {
+		extern int preserve_perms;
+		extern int preserve_uid;
+		extern int preserve_gid;
+
+		if((preserve_perms
+		    && st->st_mode & ~_S_IFMT) !=  (file->mode & ~_S_IFMT))
 			return 0;
-		}
-		if (st->st_uid != file->uid || st->st_gid != file->gid) {
+
+		if (preserve_uid && st->st_uid != file->uid)
 			return 0;
-		}
+
+		if (preserve_gid && st->st_gid != file->gid)
+			return 0;
 	}
 
 	/* if always checksum is set then we use the checksum instead
