@@ -1086,6 +1086,8 @@ int main(int argc,char *argv[])
 				batch_name);
 			exit_cleanup(RERR_FILEIO);
 		}
+		if (read_batch)
+			read_stream_flags(batch_fd);
 	}
 
 	if (am_daemon && !am_server)
