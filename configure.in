@@ -5,7 +5,7 @@ AC_CONFIG_SRCDIR([byteorder.h])
 AC_CONFIG_HEADER(config.h)
 AC_PREREQ(2.52)
 
-RSYNC_VERSION=2.5.3pre1
+RSYNC_VERSION=2.5.3pre2
 AC_SUBST(RSYNC_VERSION)
 AC_MSG_NOTICE([Configuring rsync $RSYNC_VERSION])
 
@@ -362,7 +362,7 @@ AC_FUNC_UTIME_NULL
 AC_CHECK_FUNCS(waitpid wait4 getcwd strdup strerror chown chmod mknod)
 AC_CHECK_FUNCS(fchmod fstat strchr readlink link utime utimes strftime)
 AC_CHECK_FUNCS(memmove lchown vsnprintf snprintf asprintf setsid glob strpbrk)
-AC_CHECK_FUNCS(strlcat strlcpy mtrace mallinfo setgroups)
+AC_CHECK_FUNCS(strlcat strlcpy mtrace mallinfo)
 
 AC_CACHE_CHECK([for working socketpair],rsync_cv_HAVE_SOCKETPAIR,[
 AC_TRY_RUN([
