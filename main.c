@@ -304,6 +304,8 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	set_nonblocking(f_out);
 
+	io_start_buffering(f_out);
+
 	generate_files(f_out,flist,local_name,recv_pipe[0]);
 
 	io_flush();
