@@ -28,7 +28,6 @@ extern int do_progress;
 extern int log_before_transfer;
 extern int log_format_has_i;
 extern int daemon_log_format_has_i;
-extern int delete_after;
 extern int csum_length;
 extern int read_batch;
 extern int batch_gen_fd;
@@ -56,28 +55,6 @@ extern char *partial_dir;
 extern char *basis_dir[];
 
 extern struct filter_list_struct server_filter_list;
-
-
-/* This deletes any files on the receiving side that are not present on the
- * sending side.  This is used by --delete-before and --delete-after. */
-void delete_files(struct file_list *flist)
-{
-	char fbuf[MAXPATHLEN];
-	int j;
-
-	for (j = 0; j < flist->count; j++) {
-		struct file_struct *file = flist->files[j];
-
-		if (!(file->flags & FLAG_DEL_HERE))
-			continue;
-
-		f_name_to(file, fbuf);
-		if (verbose > 1 && file->flags & FLAG_TOP_DIR)
-			rprintf(FINFO, "deleting in %s\n", safe_fname(fbuf));
-
-		delete_in_dir(flist, fbuf, file);
-	}
-}
 
 #define SLOT_SIZE	(16*1024)	/* Desired size in bytes */
 #define PER_SLOT_BITS	(SLOT_SIZE * 8) /* Number of bits per slot */
@@ -725,9 +702,6 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 			}
 		}
 	}
-
-	if (delete_after && !local_name && flist->count > 0)
-		delete_files(flist);
 
 	if (verbose > 2)
 		rprintf(FINFO,"recv_files finished\n");
