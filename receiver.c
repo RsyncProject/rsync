@@ -57,9 +57,14 @@ extern struct filter_list_struct server_filter_list;
 void delete_files(struct file_list *flist)
 {
  	struct file_list *dir_list;
-	char fbuf[MAXPATHLEN];
-	char *argv[1];
+	char *argv[1], fbuf[MAXPATHLEN];
 	int j;
+
+	if (io_error && !(lp_ignore_errors(module_id) || ignore_errors)) {
+		rprintf(FINFO,
+			"IO error encountered - skipping file deletion\n");
+		return;
+	}
 
 	for (j = 0; j < flist->count; j++) {
 		if (!(flist->files[j]->flags & FLAG_DEL_START)
@@ -67,7 +72,9 @@ void delete_files(struct file_list *flist)
 			continue;
 
 		argv[0] = f_name_to(flist->files[j], fbuf);
-		dir_list = send_file_list(-1, 1, argv);
+
+		if (!(dir_list = send_file_list(-1, 1, argv)))
+			continue;
 
 		delete_missing(flist, dir_list, fbuf);
 
