@@ -515,15 +515,16 @@ remote shell program to use for communication between the local and
 remote copies of rsync. Typically, rsync is configured to use rsh by
 default, but you may prefer to use ssh because of its high security.
 
-Feel free to include options in the COMMAND.  For instance:
+Command-line arguments are permitted in COMMAND provided that COMMAND is
+presented to rsync as a single argument.  For example:
 
-quote(-e "ssh -1 -l joe")
+quote(-e "ssh -p 2234")
 
 (Note that ssh users can alternately customize site-specific connect
 options in their .ssh/config file.)
 
 You can also choose the remote shell program using the RSYNC_RSH
-environment variable.
+environment variable, which accepts the same range of values as -e.
 
 See also the --blocking-io option which is affected by this option.
 
@@ -989,8 +990,8 @@ ignore patterns in .cvsignore files. See the --cvs-exclude option for
 more details.
 
 dit(bf(RSYNC_RSH)) The RSYNC_RSH environment variable allows you to
-override the default shell used as the transport for rsync. This can
-be used instead of the -e option.
+override the default shell used as the transport for rsync.  Command line
+options are permitted after the command name, just as in the -e option.
 
 dit(bf(RSYNC_PROXY)) The RSYNC_PROXY environment variable allows you to
 redirect your rsync client to use a web proxy when connecting to a
