@@ -417,18 +417,19 @@ static void log_formatted(enum logcode code,
 			break;
 		case 'i':
 			n = buf2;
-			n[0] = !(iflags & ITEM_UPDATING) ? ' ' : dry_run
-			     ? '*' : *op == 's' ? '>' : '<';
+			n[0] = !(iflags & ITEM_UPDATING) ? ' '
+			     : dry_run ? '*'
+			     : *op == 's' ? '>' : '<';
 			n[1] = S_ISDIR(file->mode) ? 'd' : IS_DEVICE(file->mode) ? 'D'
 			     : S_ISLNK(file->mode) ? 'L' : 'f';
-			n[2] = !(iflags & ITEM_REPORT_CHECKSUM) ? '-' : 'c';
-			n[3] = !(iflags & ITEM_REPORT_SIZE) ? '-' : 's';
-			n[4] = !(iflags & ITEM_REPORT_TIME) ? '-'
+			n[2] = !(iflags & ITEM_REPORT_CHECKSUM) ? '.' : 'c';
+			n[3] = !(iflags & ITEM_REPORT_SIZE) ? '.' : 's';
+			n[4] = !(iflags & ITEM_REPORT_TIME) ? '.'
 			     : !preserve_times || IS_DEVICE(file->mode)
 					       || S_ISLNK(file->mode) ? 'T' : 't';
-			n[5] = !(iflags & ITEM_REPORT_PERMS) ? '-' : 'p';
-			n[6] = !(iflags & ITEM_REPORT_OWNER) ? '-' : 'o';
-			n[7] = !(iflags & ITEM_REPORT_GROUP) ? '-' : 'g';
+			n[5] = !(iflags & ITEM_REPORT_PERMS) ? '.' : 'p';
+			n[6] = !(iflags & ITEM_REPORT_OWNER) ? '.' : 'o';
+			n[7] = !(iflags & ITEM_REPORT_GROUP) ? '.' : 'g';
 			n[8] = '\0';
 
 			if (iflags & (ITEM_IS_NEW|ITEM_MISSING_DATA)) {
