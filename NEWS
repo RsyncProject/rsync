@@ -113,6 +113,10 @@ Changes since 2.6.3:
     - The stat size of a device is not added to the total file size of the
       items in the transfer since the size might be undefined on some OSes.
 
+    - Fixed a problem with refused-option messages sometimes not making it
+      back to the client side when a remote --files-from was in effect and
+      the daemon was the receiver.
+
   ENHANCEMENTS:
 
     - Rsync now supports popt's option aliases, which means that you can
@@ -220,6 +224,10 @@ Changes since 2.6.3:
 
     - Added the --remove-sent-files option, which lets you move files
       between systems.
+
+    - The hostname in HOST:PATH or HOST::PATH may now be an IPv6 literal
+      enclosed in '[' and ']' (e.g. "[::1]").  (We already allowed IPv6
+      literals in the rsync://HOST:PORT/PATH format.)
 
     - When building under windows, the default for --daemon is now to
       avoid detaching, requiring the new --detach option to force rsync
