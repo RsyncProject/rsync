@@ -327,7 +327,7 @@ static int check_refuse_options(char *ref, int opt)
 	while ((p = strstr(ref,name))) {
 		if ((p==ref || p[-1]==' ') &&
 		    (p[len] == ' ' || p[len] == 0)) {
-			slprintf(err_buf,sizeof(err_buf),
+			snprintf(err_buf,sizeof(err_buf),
 				 "The '%s' option is not supported by this server\n", name);
 			return 1;
 		}
@@ -418,7 +418,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
                          * rprintf?  Everybody who gets this message
                          * ought to send it to the client and also to
                          * the logs. */
-			slprintf(err_buf,sizeof(err_buf),
+			snprintf(err_buf,sizeof(err_buf),
                                  "hard links are not supported on this %s\n",
 				 am_server ? "server" : "client");
 			rprintf(FERROR,"ERROR: hard links not supported on this platform\n");
@@ -471,7 +471,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		default:
                         /* FIXME: If --daemon is specified, then errors for later
                          * parameters seem to disappear. */
-                        slprintf(err_buf, sizeof(err_buf),
+                        snprintf(err_buf, sizeof(err_buf),
                                  "%s%s: %s\n",
                                  am_server ? "on remote machine: " : "",
                                  poptBadOption(pc, POPT_BADOPTION_NOALIAS),
@@ -568,22 +568,22 @@ void server_options(char **args,int *argc)
 	if (x != 1) args[ac++] = argstr;
 
 	if (block_size != BLOCK_SIZE) {
-		slprintf(bsize,sizeof(bsize),"-B%d",block_size);
+		snprintf(bsize,sizeof(bsize),"-B%d",block_size);
 		args[ac++] = bsize;
 	}    
 
 	if (max_delete && am_sender) {
-		slprintf(mdelete,sizeof(mdelete),"--max-delete=%d",max_delete);
+		snprintf(mdelete,sizeof(mdelete),"--max-delete=%d",max_delete);
 		args[ac++] = mdelete;
 	}    
 
 	if (io_timeout) {
-		slprintf(iotime,sizeof(iotime),"--timeout=%d",io_timeout);
+		snprintf(iotime,sizeof(iotime),"--timeout=%d",io_timeout);
 		args[ac++] = iotime;
 	}    
 
 	if (bwlimit) {
-		slprintf(bw,sizeof(bw),"--bwlimit=%d",bwlimit);
+		snprintf(bw,sizeof(bw),"--bwlimit=%d",bwlimit);
 		args[ac++] = bw;
 	}
 
@@ -602,7 +602,7 @@ void server_options(char **args,int *argc)
 		args[ac++] = "--size-only";
 
 	if (modify_window_set) {
-	        slprintf(mwindow,sizeof(mwindow),"--modify-window=%d",
+	        snprintf(mwindow,sizeof(mwindow),"--modify-window=%d",
 			 modify_window);
 		args[ac++] = mwindow;
 	}

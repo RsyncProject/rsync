@@ -39,7 +39,7 @@ static int make_simple_backup(char *fname)
 		return 0;
 	}
 
-	slprintf(fnamebak,sizeof(fnamebak),"%s%s",fname,backup_suffix);
+	snprintf(fnamebak,sizeof(fnamebak),"%s%s",fname,backup_suffix);
 	if (do_rename(fname,fnamebak) != 0) {
 		/* cygwin (at least version b19) reports EINVAL */
 		if (errno != ENOENT && errno != EINVAL) {
@@ -92,9 +92,9 @@ static int make_bak_dir(char *fname,char *bak_path)
         while(strncmp(bak_path,"./",2)==0) bak_path += 2;
 
         if(bak_path[strlen(bak_path)-1]!='/') {
-                slprintf(fullpath,sizeof(fullpath),"%s/",bak_path);
+                snprintf(fullpath,sizeof(fullpath),"%s/",bak_path);
         } else {
-                slprintf(fullpath,sizeof(fullpath),"%s",bak_path);
+                snprintf(fullpath,sizeof(fullpath),"%s",bak_path);
         }
         p=fullpath;
         q=&fullpath[strlen(fullpath)];  /* End of bak_path string */
@@ -208,7 +208,7 @@ static int keep_backup(char *fname)
                 return 0;
         }
 
-        slprintf(keep_name, sizeof (keep_name), "%s/%s", backup_dir, fname);
+        snprintf(keep_name, sizeof (keep_name), "%s/%s", backup_dir, fname);
 
 
 #ifdef HAVE_MKNOD

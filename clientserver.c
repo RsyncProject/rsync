@@ -499,7 +499,7 @@ int daemon_main(void)
 		    rsyserr(FLOG, errno, "failed to create pid file %s", pid_file);
 		    exit_cleanup(RERR_FILEIO);
 		}
-		slprintf(pidbuf, sizeof(pidbuf), "%d\n", pid);
+		snprintf(pidbuf, sizeof(pidbuf), "%d\n", pid);
 		write(fd, pidbuf, strlen(pidbuf));
 		close(fd);
 	}

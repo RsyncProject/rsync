@@ -286,7 +286,7 @@ void rprintf(enum logcode code, const char *format, ...)
 	int len;
 
 	va_start(ap, format);
-	len = vslprintf(buf, sizeof(buf), format, ap);
+	len = vsnprintf(buf, sizeof(buf), format, ap);
 	va_end(ap);
 
 	if (len > sizeof(buf)-1) exit_cleanup(RERR_MESSAGEIO);
@@ -311,7 +311,7 @@ void rsyserr(enum logcode code, int errcode, const char *format, ...)
         char *sysmsg;
 
 	va_start(ap, format);
-	len = vslprintf(buf, sizeof(buf), format, ap);
+	len = vsnprintf(buf, sizeof(buf), format, ap);
 	va_end(ap);
 
 	if (len > sizeof(buf)-1) exit_cleanup(RERR_MESSAGEIO);
@@ -392,18 +392,18 @@ static void log_formatted(enum logcode code,
 		case 'h': if (am_daemon) n = client_name(0); break;
 		case 'a': if (am_daemon) n = client_addr(0); break;
 		case 'l': 
-			slprintf(buf2,sizeof(buf2),"%.0f", 
+			snprintf(buf2,sizeof(buf2),"%.0f", 
 				 (double)file->length); 
 			n = buf2;
 			break;
 		case 'p': 
-			slprintf(buf2,sizeof(buf2),"%d", 
+			snprintf(buf2,sizeof(buf2),"%d", 
 				 (int)getpid()); 
 			n = buf2;
 			break;
 		case 'o': n = op; break;
 		case 'f': 
-			slprintf(buf2, sizeof(buf2), "%s/%s", 
+			snprintf(buf2, sizeof(buf2), "%s/%s", 
 				 file->basedir?file->basedir:"", 
 				 f_name(file));
 			clean_fname(buf2);
@@ -422,7 +422,7 @@ static void log_formatted(enum logcode code,
 				b = stats.total_read - 
 					initial_stats->total_read;
 			}
-			slprintf(buf2,sizeof(buf2),"%.0f", (double)b); 
+			snprintf(buf2,sizeof(buf2),"%.0f", (double)b); 
 			n = buf2;
 			break;
 		case 'c': 
@@ -433,7 +433,7 @@ static void log_formatted(enum logcode code,
 				b = stats.total_read - 
 					initial_stats->total_read;
 			}
-			slprintf(buf2,sizeof(buf2),"%.0f", (double)b); 
+			snprintf(buf2,sizeof(buf2),"%.0f", (double)b); 
 			n = buf2;
 			break;
 		}

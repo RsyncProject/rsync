@@ -558,10 +558,7 @@ void glob_expand(char *base1, char **argv, int *argc, int maxargs)
 	s = strdup(s);
 	if (!s) out_of_memory("glob_expand");
 
-	base = (char *)malloc(strlen(base1)+3);
-	if (!base) out_of_memory("glob_expand");
-
-	sprintf(base," %s/", base1);
+	if (asprintf(&base," %s/", base1) <= 0) out_of_memory("glob_expand");
 
 	q = s;
 	while ((p = strstr(q,base)) && ((*argc) < maxargs)) {
@@ -587,33 +584,6 @@ void strlower(char *s)
 		s++;
 	}
 }
-
-/* this is like vsnprintf but it always null terminates, so you
-   can fit at most n-1 chars in */
-int vslprintf(char *str, int n, const char *format, va_list ap)
-{
-	int ret = vsnprintf(str, n, format, ap);
-	if (ret >= n || ret < 0) {
-		str[n-1] = 0;
-		return -1;
-	}
-	str[ret] = 0;
-	return ret;
-}
-
-
-/* like snprintf but always null terminates */
-int slprintf(char *str, int n, char *format, ...)
-{
-	va_list ap;  
-	int ret;
-
-	va_start(ap, format);
-	ret = vslprintf(str,n,format,ap);
-	va_end(ap);
-	return ret;
-}
-
 
 void *Realloc(void *p, int size)
 {
@@ -987,9 +957,9 @@ int _Insure_trap_error(int a1, int a2, int a3, int a4, int a5, int a6)
 {
 	static int (*fn)();
 	int ret;
-	char cmd[1024];
+	char *cmd;
 
-	sprintf(cmd, "/usr/X11R6/bin/xterm -display :0 -T Panic -n Panic -e /bin/sh -c 'cat /tmp/ierrs.*.%d ; gdb /proc/%d/exe %d'", 
+	asprintf(&cmd, "/usr/X11R6/bin/xterm -display :0 -T Panic -n Panic -e /bin/sh -c 'cat /tmp/ierrs.*.%d ; gdb /proc/%d/exe %d'", 
 		getpid(), getpid(), getpid());
 
 	if (!fn) {
@@ -1001,6 +971,8 @@ int _Insure_trap_error(int a1, int a2, int a3, int a4, int a5, int a6)
 	ret = fn(a1, a2, a3, a4, a5, a6);
 
 	system(cmd);
+
+	free(cmd);
 
 	return ret;
 }

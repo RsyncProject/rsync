@@ -56,7 +56,7 @@ static int skip_file(char *fname,
 
 		if (compare_dest != NULL) {
 			if (access(fname, 0) != 0) {
-				slprintf(fnamecmpdest,MAXPATHLEN,"%s/%s",
+				snprintf(fnamecmpdest,MAXPATHLEN,"%s/%s",
 						    compare_dest,fname);
 				fname = fnamecmpdest;
 			}
@@ -329,7 +329,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 	if ((statret == -1) && (compare_dest != NULL)) {
 		/* try the file at compare_dest instead */
 		int saveerrno = errno;
-		slprintf(fnamecmpbuf,MAXPATHLEN,"%s/%s",compare_dest,fname);
+		snprintf(fnamecmpbuf,MAXPATHLEN,"%s/%s",compare_dest,fname);
 		statret = link_stat(fnamecmpbuf,&st);
 		if (!S_ISREG(st.st_mode))
 			statret = -1;
