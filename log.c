@@ -364,7 +364,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 	 * rather keep going until we reach the nul of the format. */
 	total = strlcpy(buf, format, sizeof buf);
 	
-	for (p = buf; (p = strchr(p, '%')) != NULL && p[1]; ) {
+	for (p = buf; (p = strchr(p, '%')) != NULL; ) {
 		s = p++;
 		n = fmt + 1;
 		if (*p == '-')
@@ -533,6 +533,26 @@ static void log_formatted(enum logcode code, char *format, char *op,
 	}
 
 	rprintf(code, "%s\n", buf);
+}
+
+int log_format_has(const char *format, char esc)
+{
+	const char *p;
+
+	if (!format)
+		return 0;
+
+	for (p = format; (p = strchr(p, '%')) != NULL; ) {
+		if (*++p == '-')
+			p++;
+		while (isdigit(*(uchar*)p))
+			p++;
+		if (!*p)
+			break;
+		if (*p == esc)
+			return 1;
+	}
+	return 0;
 }
 
 /* log the transfer of a file */
