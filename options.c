@@ -767,7 +767,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		keep_partial = 0;
 #else
 		snprintf(err_buf, sizeof err_buf,
-			 "inplace is not supported on this %s\n",
+			 "--inplace is not supported on this %s\n",
 			 am_server ? "server" : "client");
 		return 0;
 #endif
