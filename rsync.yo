@@ -1249,15 +1249,18 @@ is encountered the update might be discarded with no error (if the file
 appears to be up-to-date already) or the file-update may be attempted
 and then, if the file fails to verify, the update discarded with an
 error.  This means that it should be safe to re-run a read-batch operation
-if the command got updated.  If you wish to force the batched-update to
+if the command got interrupted.  If you wish to force the batched-update to
 always be attempted regardless of the file's size and date, use the -I
-option.  If an error occurs, the destination tree will probably be in a
+option (when reading the batch).
+If an error occurs, the destination tree will probably be in a
 partially updated state. In that case, rsync can
 be used in its regular (non-batch) mode of operation to fix up the
 destination tree.
 
 The rsync version used on all destinations must be at least as new as the
-one used to generate the batch file.
+one used to generate the batch file.  Rsync will die with an error if the
+protocol version in the batch file is too new for the batch-reading rsync
+to handle.
 
 The --dry-run (-n) option does not work in batch mode and yields a runtime
 error.
@@ -1277,8 +1280,8 @@ list if a change in what gets deleted by --delete is desired.  A normal
 user can ignore this detail and just use the shell script as an easy way
 to run the appropriate --read-batch command for the batched data.
 
-See bf(http://www.ils.unc.edu/i2dsi/unc_rsync+.html) for papers and technical
-reports.
+The original batch mode in rsync was based on "rsync+", but the latest
+version uses a new implementation.
 
 manpagesection(SYMBOLIC LINKS)
 
