@@ -47,6 +47,7 @@ extern int size_only;
 extern OFF_T max_size;
 extern int io_timeout;
 extern int protocol_version;
+extern int fuzzy_basis;
 extern int always_checksum;
 extern char *partial_dir;
 extern char *basis_dir[];
@@ -227,6 +228,59 @@ static void generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 		unmap_file(mapbuf);
 }
 
+/* Try to find a filename in the same dir as "fname" with a similar name. */
+static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
+{
+	int fname_len, fname_suf_len;
+	const char *fname_suf, *fname = file->basename;
+	uint32 lowest_dist = 0x7FFFFFFF;
+	int j, lowest_j = -1;
+
+	fname_len = strlen(fname);
+	fname_suf = find_filename_suffix(fname, fname_len, &fname_suf_len);
+
+	for (j = 0; j < dirlist->count; j++) {
+		struct file_struct *fp = dirlist->files[j];
+		const char *suf, *name;
+		int len, suf_len;
+		uint32 dist;
+
+		if (!S_ISREG(fp->mode) || !fp->length
+		    || fp->flags & FLAG_NO_FUZZY)
+			continue;
+
+		name = fp->basename;
+
+		if (fp->length == file->length
+		    && fp->modtime == file->modtime) {
+			if (verbose > 4) {
+				rprintf(FINFO,
+					"fuzzy size/modtime match for %s\n",
+					name);
+			}
+			return j;
+		}
+
+		len = strlen(name);
+		suf = find_filename_suffix(name, len, &suf_len);
+
+		dist = fuzzy_distance(name, len, fname, fname_len);
+		/* Add some extra weight to how well the suffixes match. */
+		dist += fuzzy_distance(suf, suf_len, fname_suf, fname_suf_len)
+		      * 10;
+		if (verbose > 4) {
+			rprintf(FINFO, "fuzzy distance for %s = %d.%05d\n",
+				name, (int)(dist>>16), (int)(dist&0xFFFF));
+		}
+		if (dist <= lowest_dist) {
+			lowest_dist = dist;
+			lowest_j = j;
+		}
+	}
+
+	return lowest_j;
+}
+
 
 /* Acts on flist->file's ndx'th item, whose name is fname.  If a directory,
  * make sure it exists, and has the right permissions/timestamp info.  For
@@ -241,6 +295,9 @@ static void recv_generator(char *fname, struct file_list *flist,
 			   int f_out, int f_out_name)
 {
 	static int missing_below = -1;
+	static char *fuzzy_dirname = NULL;
+	static struct file_list *fuzzy_dirlist = NULL;
+	struct file_struct *fuzzy_file = NULL;
 	int fd = -1, f_copy = -1;
 	STRUCT_STAT st, partial_st;
 	struct file_struct *back_file = NULL;
@@ -251,6 +308,19 @@ static void recv_generator(char *fname, struct file_list *flist,
 
 	if (list_only)
 		return;
+
+	if (!fname) {
+		if (fuzzy_dirlist) {
+			flist_free(fuzzy_dirlist);
+			fuzzy_dirlist = NULL;
+			fuzzy_dirname = NULL;
+		}
+		if (missing_below >= 0) {
+			dry_run--;
+			missing_below = -1;
+		}
+		return;
+	}
 
 	if (verbose > 2) {
 		rprintf(FINFO, "recv_generator(%s,%d)\n",
@@ -267,7 +337,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 		return;
 	}
 
-	if (dry_run && missing_below >= 0 && file->dir.depth <= missing_below) {
+	if (missing_below >= 0 && file->dir.depth <= missing_below) {
 		dry_run--;
 		missing_below = -1;
 	}
@@ -275,6 +345,18 @@ static void recv_generator(char *fname, struct file_list *flist,
 		statret = -1;
 		stat_errno = ENOENT;
 	} else {
+		if (fuzzy_basis && S_ISREG(file->mode)) {
+			char *dn = file->dirname ? file->dirname : ".";
+			/* Yes, identical dirnames are guaranteed to have
+			 * identical pointers at this point. */
+			if (fuzzy_dirname != dn) {
+				if (fuzzy_dirlist)
+					flist_free(fuzzy_dirlist);
+				fuzzy_dirname = dn;
+				fuzzy_dirlist = get_dirlist(fuzzy_dirname, 1);
+			}
+		}
+
 		statret = link_stat(fname, &st,
 				    keep_dirlinks && S_ISDIR(file->mode));
 		stat_errno = errno;
@@ -492,6 +574,24 @@ static void recv_generator(char *fname, struct file_list *flist,
 	} else
 		partialptr = NULL;
 
+	if (statret == -1 && fuzzy_basis && dry_run <= 1) {
+		int j = find_fuzzy(file, fuzzy_dirlist);
+		if (j >= 0) {
+			fuzzy_file = fuzzy_dirlist->files[j];
+			f_name_to(fuzzy_file, fnamecmpbuf);
+			if (verbose > 2) {
+				rprintf(FINFO, "fuzzy basis selected for %s: %s\n",
+					safe_fname(fname), safe_fname(fnamecmpbuf));
+			}
+			st.st_mode = fuzzy_file->mode;
+			st.st_size = fuzzy_file->length;
+			st.st_mtime = fuzzy_file->modtime;
+			statret = 0;
+			fnamecmp = fnamecmpbuf;
+			fnamecmp_type = FNAMECMP_FUZZY;
+		}
+	}
+
 	if (statret == -1) {
 		if (preserve_hard_links && hard_link_check(file, HL_SKIP))
 			return;
@@ -520,6 +620,8 @@ static void recv_generator(char *fname, struct file_list *flist,
 
 	if (!compare_dest && fnamecmp_type <= FNAMECMP_BASIS_DIR_HIGH)
 		;
+	else if (fnamecmp_type == FNAMECMP_FUZZY)
+		;
 	else if (unchanged_file(fnamecmp, file, &st)) {
 		if (fnamecmp_type == FNAMECMP_FNAME)
 			set_perms(fname, file, &st, PERMS_REPORT);
@@ -539,6 +641,12 @@ prepare_to_open:
 	if (whole_file > 0) {
 		statret = -1;
 		goto notify_others;
+	}
+
+	if (fuzzy_basis) {
+		int j = flist_find(fuzzy_dirlist, file);
+		if (j >= 0) /* don't use changing file as future fuzzy basis */
+			fuzzy_dirlist->files[j]->flags |= FLAG_NO_FUZZY;
 	}
 
 	/* open the file */
@@ -594,8 +702,24 @@ notify_others:
 	write_int(f_out, ndx);
 	if (protocol_version >= 29 && inplace && !read_batch)
 		write_byte(f_out, fnamecmp_type);
-	if (f_out_name >= 0)
+	if (f_out_name >= 0) {
 		write_byte(f_out_name, fnamecmp_type);
+		if (fnamecmp_type == FNAMECMP_FUZZY) {
+			uchar lenbuf[3], *lb = lenbuf;
+			int len = strlen(fuzzy_file->basename);
+			if (len > 0x7F) {
+#if MAXPATHLEN > 0x7FFF
+				*lb++ = len / 0x10000 + 0x80;
+				*lb++ = len / 0x100;
+#else
+				*lb++ = len / 0x100 + 0x80;
+#endif
+			}
+			*lb = len;
+			write_buf(f_out_name, lenbuf, lb - lenbuf + 1);
+			write_buf(f_out_name, fuzzy_file->basename, len);
+		}
+	}
 
 	if (dry_run || read_batch)
 		return;
@@ -666,6 +790,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
 			       flist, file, i, f_out, f_out_name);
 	}
+	recv_generator(NULL, NULL, NULL, 0, -1, -1);
 	if (delete_during)
 		delete_in_dir(NULL, NULL, NULL);
 
@@ -718,6 +843,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 				       flist, file, i, -1, -1);
 		}
 	}
+	recv_generator(NULL, NULL, NULL, 0, -1, -1);
 
 	if (verbose > 2)
 		rprintf(FINFO,"generate_files finished\n");
