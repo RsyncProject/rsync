@@ -552,3 +552,7 @@ AC_SUBST(BUILD_POPT)
 
 AC_CONFIG_FILES([Makefile lib/dummy zlib/dummy popt/dummy shconfig])
 AC_OUTPUT
+
+AC_MSG_RESULT()
+AC_MSG_RESULT([    rsync ${RSYNC_VERSION} configuration successful])
+AC_MSG_RESULT()
