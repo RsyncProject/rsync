@@ -100,6 +100,7 @@ hands_setup() {
 # Many machines do not have "mkdir -p", so we have to build up long paths.
 # How boring.  
 makepath () {
+    echo "        makepath $1"
     p="$1"
     (
 	# Absolut Unix.
@@ -111,7 +112,7 @@ makepath () {
 	# This will break if $1 contains a space.
 	for c in `echo $p | tr '/' ' '`
 	do 
-	    [ -d "$c" ] || mkdir "$c" || return $? 
+	    [ -d "$c" ] || mkdir "$c" || { echo "failed to create $c" >&2; return $? }
 	    cd "$c" || return $?
 	done
     )
