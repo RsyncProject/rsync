@@ -43,6 +43,7 @@ extern int ignore_errors;
 extern int cvs_exclude;
 
 extern int recurse;
+extern char curr_dir[MAXPATHLEN];
 extern char *files_from;
 extern int filesfrom_fd;
 
@@ -987,7 +988,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 {
 	int l;
 	STRUCT_STAT st;
-	char *p, *dir, *olddir;
+	char *p, *dir, olddir[sizeof curr_dir];
 	char lastpath[MAXPATHLEN] = "";
 	struct file_list *flist;
 	int64 start_write;
@@ -1003,7 +1004,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	if (f != -1) {
 		io_start_buffering_out(f);
 		if (filesfrom_fd >= 0) {
-			if (argv[0] && !push_dir(argv[0], 0)) {
+			if (argv[0] && !push_dir(argv[0])) {
 				rprintf(FERROR, "push_dir %s failed: %s\n",
 					full_fname(argv[0]), strerror(errno));
 				exit_cleanup(RERR_FILESELECT);
@@ -1054,7 +1055,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		}
 
 		dir = NULL;
-		olddir = NULL;
+		olddir[0] = '\0';
 
 		if (!relative_paths) {
 			p = strrchr(fname, '/');
@@ -1105,9 +1106,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			fname = ".";
 
 		if (dir && *dir) {
-			olddir = push_dir(dir, 1);
+			strcpy(olddir, curr_dir); /* can't overflow */
 
-			if (!olddir) {
+			if (!push_dir(dir)) {
 				io_error |= IOERR_GENERAL;
 				rprintf(FERROR, "push_dir %s failed: %s\n",
 					full_fname(dir), strerror(errno));
@@ -1122,9 +1123,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 		send_file_name(f, flist, fname, recurse, FLAG_DELETE);
 
-		if (olddir != NULL) {
+		if (olddir[0]) {
 			flist_dir = NULL;
-			if (pop_dir(olddir) != 0) {
+			if (!pop_dir(olddir)) {
 				rprintf(FERROR, "pop_dir %s failed: %s\n",
 					full_fname(dir), strerror(errno));
 				exit_cleanup(RERR_FILESELECT);
