@@ -324,7 +324,7 @@ enum {OPT_VERSION = 1000, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
 
 static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
-  {"version",          0,  POPT_ARG_NONE,   0,              OPT_VERSION, 0, 0},
+  {"version",          0,  POPT_ARG_NONE,   0, OPT_VERSION, 0, 0},
   {"suffix",           0,  POPT_ARG_STRING, &backup_suffix, 0, 0, 0 },
   {"rsync-path",       0,  POPT_ARG_STRING, &rsync_path, 0, 0, 0 },
   {"password-file",    0,  POPT_ARG_STRING, &password_file, 0, 0, 0 },
@@ -335,16 +335,16 @@ static struct poptOption long_options[] = {
   {"delete",           0,  POPT_ARG_NONE,   &delete_mode, 0, 0, 0 },
   {"existing",         0,  POPT_ARG_NONE,   &only_existing, 0, 0, 0 },
   {"ignore-existing",  0,  POPT_ARG_NONE,   &opt_ignore_existing, 0, 0, 0 },
-  {"delete-after",     0,  POPT_ARG_NONE,   0,              OPT_DELETE_AFTER, 0, 0 },
-  {"delete-excluded",  0,  POPT_ARG_NONE,   0,              OPT_DELETE_EXCLUDED, 0, 0 },
+  {"delete-after",     0,  POPT_ARG_NONE,   0, OPT_DELETE_AFTER, 0, 0 },
+  {"delete-excluded",  0,  POPT_ARG_NONE,   0, OPT_DELETE_EXCLUDED, 0, 0 },
   {"force",            0,  POPT_ARG_NONE,   &force_delete, 0, 0, 0 },
   {"numeric-ids",      0,  POPT_ARG_NONE,   &numeric_ids, 0, 0, 0 },
-  {"exclude",          0,  POPT_ARG_STRING, 0,              OPT_EXCLUDE, 0, 0 },
-  {"include",          0,  POPT_ARG_STRING, 0,              OPT_INCLUDE, 0, 0 },
-  {"exclude-from",     0,  POPT_ARG_STRING, 0,              OPT_EXCLUDE_FROM, 0, 0 },
-  {"include-from",     0,  POPT_ARG_STRING, 0,              OPT_INCLUDE_FROM, 0, 0 },
+  {"exclude",          0,  POPT_ARG_STRING, 0, OPT_EXCLUDE, 0, 0 },
+  {"include",          0,  POPT_ARG_STRING, 0, OPT_INCLUDE, 0, 0 },
+  {"exclude-from",     0,  POPT_ARG_STRING, 0, OPT_EXCLUDE_FROM, 0, 0 },
+  {"include-from",     0,  POPT_ARG_STRING, 0, OPT_INCLUDE_FROM, 0, 0 },
   {"safe-links",       0,  POPT_ARG_NONE,   &safe_symlinks, 0, 0, 0 },
-  {"help",            'h', POPT_ARG_NONE,   0,              'h', 0, 0 },
+  {"help",            'h', POPT_ARG_NONE,   0, 'h', 0, 0 },
   {"backup",          'b', POPT_ARG_NONE,   &make_backups, 0, 0, 0 },
   {"dry-run",         'n', POPT_ARG_NONE,   &dry_run, 0, 0, 0 },
   {"sparse",          'S', POPT_ARG_NONE,   &sparse_files, 0, 0, 0 },
@@ -363,11 +363,11 @@ static struct poptOption long_options[] = {
   {"devices",         'D', POPT_ARG_NONE,   &preserve_devices, 0, 0, 0 },
   {"times",           't', POPT_ARG_NONE,   &preserve_times, 0, 0, 0 },
   {"checksum",        'c', POPT_ARG_NONE,   &always_checksum, 0, 0, 0 },
-  {"verbose",         'v', POPT_ARG_NONE,   0,               'v', 0, 0 },
-  {"quiet",           'q', POPT_ARG_NONE,   0,               'q', 0, 0 },
+  {"verbose",         'v', POPT_ARG_NONE,   0, 'v', 0, 0 },
+  {"quiet",           'q', POPT_ARG_NONE,   0, 'q', 0, 0 },
   {"archive",         'a', POPT_ARG_NONE,   &archive_mode, 0, 0, 0 },
   {"server",           0,  POPT_ARG_NONE,   &am_server, 0, 0, 0 },
-  {"sender",           0,  POPT_ARG_NONE,   0,              OPT_SENDER, 0, 0 },
+  {"sender",           0,  POPT_ARG_NONE,   0, OPT_SENDER, 0, 0 },
   {"recursive",       'r', POPT_ARG_NONE,   &recurse, 0, 0, 0 },
   {"relative",        'R', POPT_ARG_VAL,    &relative_paths, 1, 0, 0 },
   {"no-relative",      0,  POPT_ARG_VAL,    &relative_paths, 0, 0, 0 },
@@ -377,7 +377,7 @@ static struct poptOption long_options[] = {
   {"timeout",          0,  POPT_ARG_INT,    &io_timeout, OPT_TIMEOUT, 0, 0 },
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir, 0, 0, 0 },
   {"compare-dest",     0,  POPT_ARG_STRING, &compare_dest, 0, 0, 0 },
-  {"link-dest",        0,  POPT_ARG_STRING, &compare_dest,  OPT_LINK_DEST, 0, 0 },
+  {"link-dest",        0,  POPT_ARG_STRING, &compare_dest, OPT_LINK_DEST, 0, 0 },
   /* TODO: Should this take an optional int giving the compression level? */
   {"compress",        'z', POPT_ARG_NONE,   &do_compression, 0, 0, 0 },
   {"daemon",           0,  POPT_ARG_NONE,   &daemon_opt, 0, 0, 0 },
@@ -389,7 +389,7 @@ static struct poptOption long_options[] = {
   {"ignore-errors",    0,  POPT_ARG_NONE,   &ignore_errors, 0, 0, 0 },
   {"blocking-io",      0,  POPT_ARG_VAL,    &blocking_io, 1, 0, 0 },
   {"no-blocking-io",   0,  POPT_ARG_VAL,    &blocking_io, 0, 0, 0 },
-  {0,                 'P', POPT_ARG_NONE,   0,              'P', 0, 0 },
+  {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
   {"config",           0,  POPT_ARG_STRING, &config_file, 0, 0, 0 },
   {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
   {"log-format",       0,  POPT_ARG_STRING, &log_format, 0, 0, 0 },
@@ -397,8 +397,8 @@ static struct poptOption long_options[] = {
   {"address",          0,  POPT_ARG_STRING, &bind_address, 0, 0, 0 },
   {"backup-dir",       0,  POPT_ARG_STRING, &backup_dir, 0, 0, 0 },
   {"hard-links",      'H', POPT_ARG_NONE,   &preserve_hard_links, 0, 0, 0 },
-  {"read-batch",       0,  POPT_ARG_STRING, &batch_name,  OPT_READ_BATCH, 0, 0 },
-  {"write-batch",      0,  POPT_ARG_STRING, &batch_name,  OPT_WRITE_BATCH, 0, 0 },
+  {"read-batch",       0,  POPT_ARG_STRING, &batch_name, OPT_READ_BATCH, 0, 0 },
+  {"write-batch",      0,  POPT_ARG_STRING, &batch_name, OPT_WRITE_BATCH, 0, 0 },
   {"files-from",       0,  POPT_ARG_STRING, &files_from, 0, 0, 0 },
   {"from0",           '0', POPT_ARG_NONE,   &eol_nulls, 0, 0, 0},
   {"no-implied-dirs",  0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
@@ -408,7 +408,7 @@ static struct poptOption long_options[] = {
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
 #endif
-  {0,0,0,0, 0, 0, 0}
+  POPT_TABLEEND
 };
 
 
@@ -478,12 +478,14 @@ static void set_refuse_options(char *bp)
 }
 
 
-static int count_args(char const **argv)
+static int count_args(const char **argv)
 {
 	int i = 0;
 
-	while (argv[i] != NULL)
-		i++;
+	if (argv) {
+		while (argv[i] != NULL)
+			i++;
+	}
 
 	return i;
 }
@@ -630,8 +632,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 					    " (-%c)\n", op->shortName);
 				}
 			} else {
-				snprintf(err_buf, sizeof err_buf,
-				    "%s%s: %s\n",
+				snprintf(err_buf, sizeof err_buf, "%s%s: %s\n",
 				    am_server ? "on remote machine: " : "",
 				    poptBadOption(pc, POPT_BADOPTION_NOALIAS),
 				    poptStrerror(opt));
@@ -716,10 +717,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		relative_paths = files_from? 1 : 0;
 
 	*argv = poptGetArgs(pc);
-	if (*argv)
-		*argc = count_args(*argv);
-	else
-		*argc = 0;
+	*argc = count_args(*argv);
 
 	if (sanitize_paths) {
 		int i;
