@@ -441,19 +441,19 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	if (l2 > 255)
 		flags |= XMIT_LONG_NAME;
 
-	/* We must make sure we don't send a zero flags byte or
+	/* We must make sure we don't send a zero flag-byte or
 	 * the other end will terminate the flist transfer. */
-	if (flags == 0 && !S_ISDIR(mode))
+	if (!(flags & 0xFF) && !S_ISDIR(mode))
 		flags |= XMIT_TOP_DIR; /* NOTE: no meaning for non-dir */
 	if (protocol_version >= 28) {
-		if ((flags & 0xFF00) || flags == 0) {
+		if ((flags & 0xFF00) || !(flags & 0xFF)) {
 			flags |= XMIT_EXTENDED_FLAGS;
 			write_byte(f, flags);
 			write_byte(f, flags >> 8);
 		} else
 			write_byte(f, flags);
 	} else {
-		if (flags == 0)
+		if (!(flags & 0xFF))
 			flags |= XMIT_LONG_NAME;
 		write_byte(f, flags);
 	}
