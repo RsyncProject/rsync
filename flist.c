@@ -218,7 +218,7 @@ void send_file_entry(struct file_struct *file,int f,unsigned base_flags)
   last_gid = file->gid;
   last_time = file->modtime;
 
-  strncpy(lastname,fname,MAXPATHLEN-1);
+  strlcpy(lastname,fname,MAXPATHLEN-1);
   lastname[MAXPATHLEN-1] = 0;
 }
 
@@ -253,11 +253,11 @@ static void receive_file_entry(struct file_struct **fptr,
 
   if (l2 >= MAXPATHLEN-l1) overflow("receive_file_entry");
 
-  strncpy(thisname,lastname,l1);
+  strlcpy(thisname,lastname,l1);
   read_sbuf(f,&thisname[l1],l2);
   thisname[l1+l2] = 0;
 
-  strncpy(lastname,thisname,MAXPATHLEN-1);
+  strlcpy(lastname,thisname,MAXPATHLEN-1);
   lastname[MAXPATHLEN-1] = 0;
 
   clean_fname(thisname);
@@ -351,7 +351,7 @@ static struct file_struct *make_file(char *fname)
 	char *p;
 	char cleaned_name[MAXPATHLEN];
 
-	strncpy(cleaned_name, fname, MAXPATHLEN-1);
+	strlcpy(cleaned_name, fname, MAXPATHLEN-1);
 	cleaned_name[MAXPATHLEN-1] = 0;
 	clean_fname(cleaned_name);
 	fname = cleaned_name;
@@ -512,8 +512,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 		return;
 	}
 
-	strncpy(fname,dir,MAXPATHLEN-1);
-	fname[MAXPATHLEN-1]=0;
+	strlcpy(fname,dir,MAXPATHLEN-1);
 	l = strlen(fname);
 	if (fname[l-1] != '/') {
 		if (l == MAXPATHLEN-1) {
@@ -542,7 +541,7 @@ static void send_directory(int f,struct file_list *flist,char *dir)
 		if (strcmp(dname,".")==0 ||
 		    strcmp(dname,"..")==0)
 			continue;
-		strncpy(p,dname,MAXPATHLEN-(l+1));
+		strlcpy(p,dname,MAXPATHLEN-(l+1));
 		send_file_name(f,flist,fname,recurse,FLAG_DELETE);
 	}
 
@@ -578,8 +577,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 		char fname2[MAXPATHLEN];
 		char *fname = fname2;
 
-		strncpy(fname,argv[i],MAXPATHLEN-1);
-		fname[MAXPATHLEN-1] = 0;
+		strlcpy(fname,argv[i],MAXPATHLEN-1);
 
 		l = strlen(fname);
 		if (l != 1 && fname[l-1] == '/') {

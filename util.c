@@ -446,3 +446,12 @@ void kill_all(int sig)
 	}
 }
 
+/* like strncpy but does not 0 fill the buffer and always null 
+   terminates (thus it can use maxlen+1 space in d) */
+void strlcpy(char *d, char *s, int maxlen)
+{
+	int len = strlen(s);
+	if (len > maxlen) len = maxlen;
+	memcpy(d, s, len);
+	d[len] = 0;
+}

@@ -160,6 +160,8 @@ static int rsync_module(int fd, int i)
 	return 0;
 }
 
+/* send a list of available modules to the client. Don't list those
+   with "list = False". */
 static void send_listing(int fd)
 {
 	int n = lp_numservices();
@@ -175,7 +177,7 @@ static void send_listing(int fd)
    here */
 static int start_daemon(int fd)
 {
-	char line[1024];
+	char line[200];
 	char *motd;
 	int version;
 
@@ -205,7 +207,6 @@ static int start_daemon(int fd)
 		io_printf(fd,"\n");
 	}
 
-	/* read a single line indicating the resource that is wanted */
 	while (1) {
 		int i;
 
@@ -240,7 +241,9 @@ static int start_daemon(int fd)
 
 int daemon_main(void)
 {
-	if (!lp_load(RSYNCD_CONF)) {
+	extern char *config_file;
+
+	if (!lp_load(config_file)) {
 		exit_cleanup(1);
 	}
 

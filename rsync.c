@@ -111,7 +111,7 @@ static int delete_file(char *fname)
 		if (strcmp(dname,".")==0 ||
 		    strcmp(dname,"..")==0)
 			continue;
-		strncpy(buf, fname, (MAXPATHLEN-strlen(dname))-2);
+		strlcpy(buf, fname, (MAXPATHLEN-strlen(dname))-2);
 		strcat(buf, "/");
 		strcat(buf, dname);
 		buf[MAXPATHLEN-1] = 0;
@@ -976,8 +976,7 @@ void send_files(struct file_list *flist,int f_out,int f_in)
 
 	  fname[0] = 0;
 	  if (file->basedir) {
-		  strncpy(fname,file->basedir,MAXPATHLEN-1);
-		  fname[MAXPATHLEN-1] = 0;
+		  strlcpy(fname,file->basedir,MAXPATHLEN-1);
 		  if (strlen(fname) == MAXPATHLEN-1) {
 			  io_error = 1;
 			  rprintf(FERROR, "send_files failed on long-named directory %s\n",
