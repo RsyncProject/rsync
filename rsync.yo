@@ -290,9 +290,9 @@ verb(
      --suffix=SUFFIX         backup suffix (default ~ w/o --backup-dir)
  -u, --update                update only (don't overwrite newer files)
  -l, --links                 copy symlinks as symlinks
- -L, --copy-links            copy the referent of symlinks
-     --copy-unsafe-links     copy links outside the source tree
-     --safe-links            ignore links outside the destination tree
+ -L, --copy-links            copy the referent of all symlinks
+     --copy-unsafe-links     copy the referent of "unsafe" symlinks
+     --safe-links            ignore "unsafe" symlinks
  -H, --hard-links            preserve hard links
  -p, --perms                 preserve permissions
  -o, --owner                 preserve owner (root only)
@@ -471,15 +471,15 @@ dit(bf(-l, --links)) When symlinks are encountered, recreate the
 symlink on the destination.
 
 dit(bf(-L, --copy-links)) When symlinks are encountered, the file that
-they point to is copied, rather than the symlink.
+they point to (the referent) is copied, rather than the symlink.
 
 dit(bf(--copy-unsafe-links)) This tells rsync to copy the referent of
-symbolic links that point outside the source tree.  Absolute symlinks
+symbolic links that point outside the copied tree.  Absolute symlinks
 are also treated like ordinary files, and so are any symlinks in the
 source path itself when --relative is used.
 
 dit(bf(--safe-links)) This tells rsync to ignore any symbolic links
-which point outside the destination tree. All absolute symlinks are
+which point outside the copied tree. All absolute symlinks are
 also ignored. Using this option in conjunction with --relative may
 give unexpected results. 
 
