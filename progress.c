@@ -26,6 +26,12 @@ extern int am_server;
 
 #define PROGRESS_HISTORY_SECS 5
 
+#if GETPGRP_VOID
+#define GETPGRP_ARG
+#else
+#define GETPGRP_ARG 0
+#endif
+
 struct progress_history {
 	struct timeval time;
 	OFF_T ofs;
@@ -124,13 +130,8 @@ void show_progress(OFF_T ofs, OFF_T size)
 		return;
 
 #if HAVE_GETPGRP && HAVE_TCGETPGRP
-	if (pgrp == -1) {
-# if GETPGRP_VOID
-		pgrp = getpgrp();
-# else
-		pgrp = getpgrp(0);
-# endif
-	}
+	if (pgrp == -1)
+		pgrp = getpgrp(GETPGRP_ARG);
 #endif
 
 	gettimeofday(&now, NULL);
