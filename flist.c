@@ -497,7 +497,8 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 	static int lastdir_len = -1;
 	char thisname[MAXPATHLEN];
 	unsigned int l1 = 0, l2 = 0;
-	int alloc_len, basename_len, dirname_len, linkname_len, sum_len, idev_len;
+	int alloc_len, basename_len, dirname_len, linkname_len, sum_len;
+	int idev_len, idev_pad;
 	OFF_T file_length;
 	char *basename, *dirname, *bp;
 	struct file_struct *file;
@@ -603,7 +604,12 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 	sum_len = always_checksum && S_ISREG(mode) ? MD4_SUM_LENGTH : 0;
 
 	alloc_len = sizeof file[0] + dirname_len + basename_len
-		  + linkname_len + sum_len + idev_len;
+		  + linkname_len + sum_len;
+	if (idev_len) {
+		idev_pad = (4 - (alloc_len % 4)) % 4;
+		alloc_len += idev_pad + idev_len;
+	} else
+		idev_pad = 0;
 	if (!(bp = new_array(char, alloc_len)))
 		out_of_memory("receive_file_entry");
 	file = *fptr = (struct file_struct *)bp;
@@ -645,8 +651,8 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 
 #if SUPPORT_HARD_LINKS
 	if (idev_len) {
-		file->link_u.idev = (struct idev *)bp;
-		bp += idev_len;
+		file->link_u.idev = (struct idev *)(bp + idev_pad);
+		bp += idev_pad + idev_len;
 		if (protocol_version < 26) {
 			dev = read_int(f);
 			file->F_INODE = read_int(f);
@@ -708,7 +714,8 @@ struct file_struct *make_file(char *fname, int exclude_level)
 	char sum[SUM_LENGTH];
 	char thisname[MAXPATHLEN];
 	char linkname[MAXPATHLEN];
-	int alloc_len, basename_len, dirname_len, linkname_len, sum_len, idev_len;
+	int alloc_len, basename_len, dirname_len, linkname_len, sum_len;
+	int idev_len, idev_pad;
 	char *basename, *dirname, *bp;
 	unsigned short flags = 0;
 
@@ -803,7 +810,12 @@ struct file_struct *make_file(char *fname, int exclude_level)
 	sum_len = always_checksum && S_ISREG(st.st_mode) ? MD4_SUM_LENGTH : 0;
 
 	alloc_len = sizeof file[0] + dirname_len + basename_len
-		  + linkname_len + sum_len + idev_len;
+		  + linkname_len + sum_len;
+	if (idev_len) {
+		idev_pad = (4 - (alloc_len % 4)) % 4;
+		alloc_len += idev_pad + idev_len;
+	} else
+		idev_pad = 0;
 	if (!(bp = new_array(char, alloc_len)))
 		out_of_memory("receive_file_entry");
 	file = (struct file_struct *)bp;
@@ -845,8 +857,8 @@ struct file_struct *make_file(char *fname, int exclude_level)
 
 #if SUPPORT_HARD_LINKS
 	if (idev_len) {
-		file->link_u.idev = (struct idev *)bp;
-		bp += idev_len;
+		file->link_u.idev = (struct idev *)(bp + idev_pad);
+		bp += idev_pad + idev_len;
 		file->F_DEV = st.st_dev;
 		file->F_INODE = st.st_ino;
 	}
