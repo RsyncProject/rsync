@@ -5,8 +5,9 @@
 #
 # This program is distributable under the terms of the GNU GPL (see COPYING)
 
-
 . "$suitedir/rsync.fns"
+
+set -x
 
 hands_setup
 
