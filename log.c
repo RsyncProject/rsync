@@ -1,6 +1,6 @@
 /* -*- c-file-style: "linux"; -*-
    
-   Copyright (C) 1998-2000 by Andrew Tridgell
+   Copyright (C) 1998-2001 by Andrew Tridgell
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -18,9 +18,10 @@
 */
 
 /*
-  logging and utility functions
+  Logging and utility functions.
 
-  tridge, May 1998
+  Mapping to human-readable messages added by Martin Pool
+  <mbp@samba.org>, Oct 2000.
   */
 #include "rsync.h"
 
@@ -42,7 +43,7 @@ struct {
 	{ RERR_STREAMIO   , "error in rsync protocol data stream" }, 
 	{ RERR_MESSAGEIO  , "errors with program diagnostics" }, 
 	{ RERR_IPC        , "error in IPC code" }, 
-	{ RERR_SIGNAL     , "status returned when sent SIGUSR1, SIGINT" }, 
+	{ RERR_SIGNAL     , "received SIGUSR1 or SIGINT" }, 
 	{ RERR_WAITCHILD  , "some error returned by waitpid()" }, 
 	{ RERR_MALLOC     , "error allocating core memory buffers" }, 
 	{ RERR_TIMEOUT    , "timeout in data send/receive" }, 
