@@ -89,6 +89,7 @@ int copy_unsafe_links = 0;
 int size_only = 0;
 int daemon_bwlimit = 0;
 int bwlimit = 0;
+int fuzzy_basis = 0;
 size_t bwlimit_writemax = 0;
 int only_existing = 0;
 int opt_ignore_existing = 0;
@@ -302,6 +303,7 @@ void usage(enum logcode F)
   rprintf(F,"     --size-only             skip files that match in size\n");
   rprintf(F,"     --modify-window=NUM     compare mod-times with reduced accuracy\n");
   rprintf(F," -T, --temp-dir=DIR          create temporary files in directory DIR\n");
+  rprintf(F," -y, --fuzzy                 find similar file for basis if no dest file\n");
   rprintf(F,"     --compare-dest=DIR      also compare destination files relative to DIR\n");
   rprintf(F,"     --copy-dest=DIR         ... and include copies of unchanged files\n");
   rprintf(F,"     --link-dest=DIR         hardlink to files in DIR when unchanged\n");
@@ -411,6 +413,7 @@ static struct poptOption long_options[] = {
   {"compare-dest",     0,  POPT_ARG_STRING, 0, OPT_COMPARE_DEST, 0, 0 },
   {"copy-dest",        0,  POPT_ARG_STRING, 0, OPT_COPY_DEST, 0, 0 },
   {"link-dest",        0,  POPT_ARG_STRING, 0, OPT_LINK_DEST, 0, 0 },
+  {"fuzzy",           'y', POPT_ARG_NONE,   &fuzzy_basis, 0, 0, 0 },
   /* TODO: Should this take an optional int giving the compression level? */
   {"compress",        'z', POPT_ARG_NONE,   &do_compression, 0, 0, 0 },
   {"stats",            0,  POPT_ARG_NONE,   &do_stats, 0, 0, 0 },
@@ -1381,6 +1384,9 @@ void server_options(char **args,int *argc)
 	}
 	if (!implied_dirs && !am_sender)
 		args[ac++] = "--no-implied-dirs";
+
+	if (fuzzy_basis && am_sender)
+		args[ac++] = "--fuzzy";
 
 	*argc = ac;
 	return;
