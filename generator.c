@@ -254,7 +254,7 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 	int fd;
 	STRUCT_STAT st, partial_st;
 	int statret, stat_errno;
-	char *fnamecmp, *partialptr = NULL;
+	char *fnamecmp, *partialptr;
 	char fnamecmpbuf[MAXPATHLEN];
 
 	if (list_only)
@@ -448,15 +448,13 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		stat_errno = ENOENT;
 	}
 
-	if (partial_dir) {
-		if ((partialptr = partial_dir_fname(fname))
-		    && link_stat(partialptr, &partial_st, 0) == 0
-		    && S_ISREG(partial_st.st_mode)) {
-			if (statret == -1)
-				goto prepare_to_open;
-		} else
-			partialptr = NULL;
-	}
+	if (partial_dir && (partialptr = partial_dir_fname(fname))
+	    && link_stat(partialptr, &partial_st, 0) == 0
+	    && S_ISREG(partial_st.st_mode)) {
+		if (statret == -1)
+			goto prepare_to_open;
+	} else
+		partialptr = NULL;
 
 	if (statret == -1) {
 		if (preserve_hard_links && hard_link_check(file, HL_SKIP))
