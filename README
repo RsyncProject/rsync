@@ -44,10 +44,10 @@ Here is a brief description of available options:
 -C, --cvs-exclude        auto ignore files in the same way CVS does
     --delete             delete files that don't exist on the sending side
 -I, --ignore-times       don't exclude files that match length and time
+-z, --compress           compress file data
     --exclude FILE       exclude file FILE
     --exclude-from FILE  exclude files listed in FILE
     --suffix SUFFIX      override backup suffix
-    --csum-length LENGTH set the checksum length
     --version            print version number
 
 
@@ -57,8 +57,8 @@ SETUP
 Rsync uses rsh or ssh for communication. It does not need to be setuid
 and requires no special privilages for installation. It does not
 require a inetd entry or a daemon. You must, however, have a working
-rsh or ssh system. Using ssh is recommended for its security and
-compression features.
+rsh or ssh system. Using ssh is recommended for its security
+features. 
 
 To install rsync, first run the "configure" script. This will create a
 Makefile and config.h appropriate for your system. Then type

@@ -110,7 +110,7 @@ void send_file_entry_v11(struct file_struct *file,int f)
 
   if (l1 > 0) flags |= SAME_NAME;
   if (l2 > 255) flags |= LONG_NAME;
-    
+
   write_byte(f,flags);  
   if (flags & SAME_NAME)
     write_byte(f,l1);
@@ -165,7 +165,7 @@ void send_file_entry_v11(struct file_struct *file,int f)
 void receive_file_entry_v11(struct file_struct *file,
 			    unsigned char flags,int f)
 {
-  static mode_t last_time=0;
+  static time_t last_time=0;
   static mode_t last_mode=0;
   static dev_t last_rdev=0;
   static uid_t last_uid=0;

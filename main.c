@@ -405,7 +405,6 @@ static void usage(FILE *f)
   fprintf(f,"    --exclude FILE       exclude file FILE\n");
   fprintf(f,"    --exclude-from FILE  exclude files listed in FILE\n");
   fprintf(f,"    --suffix SUFFIX      override backup suffix\n");  
-  fprintf(f,"    --csum-length LENGTH set the checksum length\n");  
   fprintf(f,"    --version            print version number\n");  
 
   fprintf(f,"\n");

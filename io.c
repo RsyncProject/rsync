@@ -151,9 +151,9 @@ void read_buf(int f,char *buf,int len)
 
 unsigned char read_byte(int f)
 {
-  char c;
-  read_buf(f,&c,1);
-  return (unsigned char)c;
+  unsigned char c;
+  read_buf(f,(char *)&c,1);
+  return c;
 }
 
 
