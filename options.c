@@ -78,6 +78,8 @@ int quiet = 0;
 int always_checksum = 0;
 int list_only = 0;
 
+struct in_addr socket_address = {INADDR_ANY};
+
 void usage(int F)
 {
   rprintf(F,"rsync version %s Copyright Andrew Tridgell and Paul Mackerras\n\n",
@@ -140,6 +142,7 @@ void usage(int F)
   rprintf(F,"     --include-from=FILE     don't exclude patterns listed in FILE\n");
   rprintf(F,"     --version               print version number\n");  
   rprintf(F,"     --daemon                run as a rsync daemon\n");  
+  rprintf(F,"     --address               bind to the specified address\n");  
   rprintf(F,"     --config=FILE           specify alternate rsyncd.conf file\n");  
   rprintf(F,"     --port=PORT             specify alternate rsyncd port number\n");
   rprintf(F,"     --stats                 give some file transfer stats\n");  
@@ -159,7 +162,7 @@ enum {OPT_VERSION, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
       OPT_RSYNC_PATH, OPT_FORCE, OPT_TIMEOUT, OPT_DAEMON, OPT_CONFIG, OPT_PORT,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS,
       OPT_COPY_UNSAFE_LINKS, OPT_SAFE_LINKS, OPT_COMPARE_DEST,
-      OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY};
+      OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY, OPT_ADDRESS};
 
 static char *short_options = "oblLWHpguDCtcahvqrRIxnSe:B:T:zP";
 
@@ -217,6 +220,7 @@ static struct option long_options[] = {
   {"config",      1,     0,    OPT_CONFIG},
   {"port",        1,     0,    OPT_PORT},
   {"log-format",  1,     0,    OPT_LOG_FORMAT},
+  {"address",     1,     0,    OPT_ADDRESS},
   {0,0,0,0}};
 
 
@@ -516,6 +520,15 @@ int parse_arguments(int argc, char *argv[], int frommain)
 
 		case OPT_LOG_FORMAT:
 			log_format = optarg;
+			break;
+
+		case OPT_ADDRESS:
+			{
+				struct in_addr *ia;
+				if ((ia = ip_address(optarg))) {
+					socket_address = *ia;
+				}
+			}
 			break;
 
 		default:

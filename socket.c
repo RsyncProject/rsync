@@ -157,7 +157,7 @@ int open_socket_out(char *host, int port)
 /****************************************************************************
 open a socket of the specified type, port and address for incoming data
 ****************************************************************************/
-static int open_socket_in(int type, int port)
+static int open_socket_in(int type, int port, struct in_addr *address)
 {
 	struct hostent *hp;
 	struct sockaddr_in sock;
@@ -181,7 +181,11 @@ static int open_socket_in(int type, int port)
 	memcpy((char *)&sock.sin_addr,(char *)hp->h_addr, hp->h_length);
 	sock.sin_port = htons(port);
 	sock.sin_family = hp->h_addrtype;
-	sock.sin_addr.s_addr = INADDR_ANY;
+	if (address) {
+		sock.sin_addr = *address;
+	} else {
+		sock.sin_addr.s_addr = INADDR_ANY;
+	}
 	res = socket(hp->h_addrtype, type, 0);
 	if (res == -1) { 
 		rprintf(FERROR,"socket failed\n"); 
@@ -215,9 +219,10 @@ int is_a_socket(int fd)
 void start_accept_loop(int port, int (*fn)(int ))
 {
 	int s;
+	extern struct in_addr socket_address;
 
 	/* open an incoming socket */
-	s = open_socket_in(SOCK_STREAM, port);
+	s = open_socket_in(SOCK_STREAM, port, &socket_address);
 	if (s == -1)
 		exit_cleanup(RERR_SOCKETIO);
 
@@ -479,4 +484,40 @@ char *client_name(int fd)
 	}
 
 	return name_buf;
+}
+
+/*******************************************************************
+convert a string to an IP address. The string can be a name or
+dotted decimal number
+  ******************************************************************/
+struct in_addr *ip_address(const char *str)
+{
+	static struct in_addr ret;
+	struct hostent *hp;
+
+	/* try as an IP address */
+	if (inet_aton(str, &ret) != 0) {
+		return &ret;
+	}
+
+	/* otherwise assume it's a network name of some sort and use 
+	   gethostbyname */
+	if ((hp = gethostbyname(str)) == 0) {
+		rprintf(FERROR, "gethostbyname: Unknown host. %s\n",str);
+		return NULL;
+	}
+
+	if (hp->h_addr == NULL) {
+		rprintf(FERROR, "gethostbyname: host address is invalid for host %s\n",str);
+		return NULL;
+	}
+
+	if (hp->h_length > sizeof(ret)) {
+		rprintf(FERROR, "gethostbyname: host address is too large\n");
+		return NULL;
+	}
+
+	memcpy(&ret.s_addr, hp->h_addr, hp->h_length);
+
+	return(&ret);
 }

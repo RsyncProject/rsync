@@ -272,6 +272,7 @@ Options
      --include-from=FILE     don't exclude patterns listed in FILE
      --version               print version number
      --daemon                run as a rsync daemon
+     --address               bind to the specified address
      --config=FILE           specify alternate rsyncd.conf file
      --port=PORT             specify alternate rsyncd port number
      --stats                 give some file transfer stats
@@ -588,6 +589,12 @@ terminal and become a background daemon. The daemon will read the
 config file (/etc/rsyncd.conf) on each connect made by a client and
 respond to requests accordingly. See the rsyncd.conf(5) man page for more
 details. 
+
+dit(bf(--address)) By default rsync will bind to the wildcard address
+when run as a daemon with the --daemon option. The --address option
+allows you to specify a specific IP address (or hostname) to bind
+to. This makes virtual hosting possible in conjunction with the
+--config option.
 
 dit(bf(--config=FILE)) This specifies an alternate config file than
 the default /etc/rsyncd.conf. This is only relevant when --daemon is
