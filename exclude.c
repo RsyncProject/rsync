@@ -683,7 +683,7 @@ static const char *get_filter_tok(const char *p, int xflags,
 			case 'n':
 				mflags |= MATCHFLG_NO_INHERIT;
 				break;
-			case 's':
+			case 'w':
 				mflags |= MATCHFLG_WORD_SPLIT;
 				break;
 			}
