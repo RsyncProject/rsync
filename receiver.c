@@ -289,7 +289,7 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
  * main routine for receiver process.
  *
  * Receiver process runs on the same host as the generator process. */
-int recv_files(int f_in,struct file_list *flist,char *local_name)
+int recv_files(int f_in, struct file_list *flist, char *local_name)
 {
 	int fd1,fd2;
 	STRUCT_STAT st;
