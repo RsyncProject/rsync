@@ -22,6 +22,9 @@ rsync changes since last release
       unchanged files are hard-linked in to the destination directory.
       (J.W. Schultz)
 
+    * Don't report an error if an excluded file disappears during an
+      rsync run. (Eugene Chupriyanov and Bo Kersey)
+
   BUG FIXES:
   
     * Fix "forward name lookup failed" errors on AIX 4.3.3.  (John

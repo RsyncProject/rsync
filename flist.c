@@ -660,8 +660,10 @@ struct file_struct *make_file(int f, char *fname, struct string_area **ap,
 
 	if (readlink_stat(fname, &st, linkbuf) != 0) {
 		int save_errno = errno;
-		if ((errno == ENOENT) && copy_links && !noexcludes) {
-			/* symlink pointing nowhere, see if excluded */
+		if ((errno == ENOENT) && !noexcludes) {
+			/* either symlink pointing nowhere or file that 
+			 * was removed during rsync run; see if excluded
+			 * before reporting an error */
 			memset((char *) &st, 0, sizeof(st));
 			if (check_exclude_file(f, fname, &st)) {
 				/* file is excluded anyway, ignore silently */
