@@ -57,29 +57,6 @@ extern int inplace;
 extern struct exclude_list_struct server_exclude_list;
 
 
-static void delete_one(char *fn, int is_dir)
-{
-	if (!is_dir) {
-		if (robust_unlink(fn) != 0) {
-			rsyserr(FERROR, errno, "delete_one: unlink %s failed",
-				full_fname(fn));
-		} else if (verbose)
-			rprintf(FINFO, "deleting %s\n", safe_fname(fn));
-	} else {
-		if (do_rmdir(fn) != 0) {
-			if (errno != ENOTEMPTY && errno != EEXIST) {
-				rsyserr(FERROR, errno,
-					"delete_one: rmdir %s failed",
-					full_fname(fn));
-			}
-		} else if (verbose) {
-			rprintf(FINFO, "deleting directory %s\n",
-				safe_fname(fn));
-		}
-	}
-}
-
-
 static int is_backup_file(char *fn)
 {
 	int k = strlen(fn) - backup_suffix_len;
@@ -132,8 +109,10 @@ void delete_files(struct file_list *flist)
 						rprintf(FINFO, "deleting %s\n",
 							safe_fname(f));
 					}
-				} else
-					delete_one(f, S_ISDIR(mode) != 0);
+				} else {
+					delete_file(f, S_ISDIR(mode)
+					    ? DEL_DIR | DEL_NO_RECURSE : 0);
+				}
 				deletion_count++;
 			}
 		}
