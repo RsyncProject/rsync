@@ -67,6 +67,7 @@ extern int sanitize_paths;
 extern int max_delete;
 extern int orig_umask;
 extern int list_only;
+extern char *log_format;
 
 extern struct filter_list_struct filter_list;
 extern struct filter_list_struct server_filter_list;
@@ -1862,14 +1863,12 @@ void delete_missing(struct file_list *full_list, struct file_list *dir_list,
 			if (make_backups && (backup_dir || !is_backup_file(f))
 			  && !S_ISDIR(mode)) {
 				make_backup(f);
-				if (verbose) {
-					rprintf(FINFO, "deleting %s\n",
-						safe_fname(f));
-				}
+				if (verbose || log_format)
+					log_delete(f, mode);
 			} else if (S_ISDIR(mode))
-				delete_file(f, DEL_DIR | DEL_FORCE_RECURSE);
+				delete_file(f, mode, DEL_FORCE_RECURSE);
 			else
-				delete_file(f, 0);
+				delete_file(f, mode, 0);
 			deletion_count++;
 			if (max_delete && deletion_count >= max_delete)
 				break;
