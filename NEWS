@@ -11,14 +11,13 @@ Changes since version 2.5.7:
       Note that --from0 affects the line-ending character for all the
       files read by the --*-from options. (Wayne Davison)
 
-    * Length of csum2 is now per-file starting with protocol verison
+    * Length of csum2 is now per-file starting with protocol version
       27. (J.W. Schultz)
 
-    * Per-file dynamic block size is now sqrt(file length).
-      The per-file checksum size is determined according
-      to an algorythm provided by Donovan Baarda which
-      reduces the probability of rsync algorithm
-      corrupting data and falling back using the whole md4
+    * Per-file dynamic block size is now sqrt(file length).  The
+      per-file checksum size is determined according to an algorithm
+      provided by Donovan Baarda which reduces the probability of rsync
+      algorithm corrupting data and falling back using the whole md4
       checksums. (J.W. Schultz, Donovan Baarda)
 
     * The --stats option no longer includes the (debug) malloc summary
@@ -27,6 +26,8 @@ Changes since version 2.5.7:
     * Added a new error/warning code for when files vanish from the
       sending side.  Made vanished source files not interfere with the
       file-deletion pass when --delete-after was specified.
+
+    * Various trailing-info sections are now preceded by a newline.
 
   BUG FIXES:
 
