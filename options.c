@@ -123,8 +123,9 @@ static void print_rsync_version(int f)
                 RSYNC_NAME, VERSION, PROTOCOL_VERSION);
         rprintf(f,
                 "Copyright (C) 1996-2001 by Andrew Tridgell, Paul Mackerras and others\n");
+	rprintf(f, "<http://rsync.samba.org/>\n");
         rprintf(f, "Capabilities: %d-bit files, %ssocketpairs, "
-                "%shard links, %ssymlinks\n\n",
+                "%shard links, %ssymlinks, batchfiles\n\n",
                 sizeof(int64) * 8,
                 got_socketpair,
                 hardlinks, links);
@@ -211,7 +212,7 @@ void usage(enum logcode F)
   rprintf(F,"     --log-format=FORMAT     log file transfers using specified format\n");  
   rprintf(F,"     --password-file=FILE    get password from FILE\n");
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth, KBytes per second\n");
-  rprintf(F," -f  --read-batch=FILE       read batch file\n");
+  rprintf(F," -f  --read-batch=EXT        read batch file\n");
   rprintf(F," -F  --write-batch           write batch file\n");
   rprintf(F," -h, --help                  show this help screen\n");
 
