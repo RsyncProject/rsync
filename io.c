@@ -32,9 +32,10 @@ static int io_multiplexing_in;
 static int multiplex_in_fd;
 static int multiplex_out_fd;
 static time_t last_io;
-
+static int eof_error=1;
 extern int verbose;
 extern int io_timeout;
+
 
 int64 write_total(void)
 {
@@ -119,7 +120,9 @@ static int read_timeout(int fd, char *buf, int len)
 		}
 
 		if (n == 0) {
-			rprintf(FERROR,"EOF in read_timeout\n");
+			if (eof_error) {
+				rprintf(FERROR,"EOF in read_timeout\n");
+			}
 			exit_cleanup(1);
 		}
 
@@ -482,8 +485,12 @@ void write_byte(int f,unsigned char c)
 
 int read_line(int f, char *buf, int maxlen)
 {
+	eof_error = 0;
+
 	while (maxlen) {
+		buf[0] = 0;
 		read_buf(f, buf, 1);
+		if (buf[0] == 0) return 0;
 		if (buf[0] == '\n') {
 			buf[0] = 0;
 			break;
@@ -497,6 +504,9 @@ int read_line(int f, char *buf, int maxlen)
 		*buf = 0;
 		return 0;
 	}
+
+	eof_error = 1;
+
 	return 1;
 }
 
