@@ -21,6 +21,8 @@
 
 #include "rsync.h"
 
+extern int csum_length;
+
 extern int preserve_links;
 extern int preserve_perms;
 extern int preserve_devices;
@@ -93,7 +95,7 @@ void send_file_entry_v10(struct file_struct *file,int f)
 #endif
 
   if (always_checksum) {
-    write_buf(f,file->sum,SUM_LENGTH);
+    write_buf(f,file->sum,csum_length);
   }       
 
   last_mode = file->mode;
@@ -159,7 +161,7 @@ void receive_file_entry_v10(struct file_struct *file,
 #endif
   
   if (always_checksum)
-    read_buf(f,file->sum,SUM_LENGTH);
+    read_buf(f,file->sum,csum_length);
   
   last_mode = file->mode;
   last_dev = file->dev;

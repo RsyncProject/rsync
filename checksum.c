@@ -19,6 +19,7 @@
 
 #include "rsync.h"
 
+extern int csum_length;
 
 /*
   a simple 32 bit checksum that can be upadted from either end
@@ -52,8 +53,11 @@ void get_checksum2(char *buf,int len,char *sum)
   bcopy(buf+i,buf2,len-i);
   MDupdate(&MD, buf2, (len-i)*8);
   SIVAL(sum,0,MD.buffer[0]);
+  if (csum_length <= 4) return;
   SIVAL(sum,4,MD.buffer[1]);
+  if (csum_length <= 8) return;
   SIVAL(sum,8,MD.buffer[2]);
+  if (csum_length <= 12) return;
   SIVAL(sum,12,MD.buffer[3]);
 }
 
@@ -61,7 +65,7 @@ void file_checksum(char *fname,char *sum,off_t size)
 {
   char *buf;
   int fd;
-  bzero(sum,SUM_LENGTH);
+  bzero(sum,csum_length);
 
   fd = open(fname,O_RDONLY);
   if (fd == -1) return;

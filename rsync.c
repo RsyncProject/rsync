@@ -19,6 +19,8 @@
 
 #include "rsync.h"
 
+extern int csum_length;
+
 extern int verbose;
 extern int am_server;
 extern int always_checksum;
@@ -67,7 +69,7 @@ static void send_sums(struct sum_struct *s,int f_out)
   if (s)
     for (i=0;i<s->count;i++) {
       write_int(f_out,s->sums[i].sum1);
-      write_buf(f_out,s->sums[i].sum2,SUM_LENGTH);
+      write_buf(f_out,s->sums[i].sum2,csum_length);
     }
   write_flush(f_out);
 }
@@ -164,7 +166,7 @@ static struct sum_struct *receive_sums(int f)
 
   for (i=0;i<s->count;i++) {
     s->sums[i].sum1 = read_int(f);
-    read_buf(f,s->sums[i].sum2,SUM_LENGTH);
+    read_buf(f,s->sums[i].sum2,csum_length);
 
     s->sums[i].offset = offset;
     s->sums[i].i = i;
@@ -343,7 +345,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
   if (st.st_size == flist->files[i].length &&
       ((!ignore_times && st.st_mtime == flist->files[i].modtime) ||
        (always_checksum && S_ISREG(st.st_mode) && 	  
-	memcmp(sum,flist->files[i].sum,SUM_LENGTH) == 0))) {
+	memcmp(sum,flist->files[i].sum,csum_length) == 0))) {
     set_perms(fname,&flist->files[i],&st,1);
     return;
   }

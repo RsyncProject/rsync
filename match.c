@@ -19,6 +19,8 @@
 
 #include "rsync.h"
 
+extern int csum_length;
+
 extern int verbose;
 extern int am_server;
 
@@ -170,7 +172,7 @@ static void hash_search(int f,struct sum_struct *s,char *buf,off_t len)
 	    get_checksum2(map,l,sum2);
 	    done_csum2 = 1;
 	  }
-	  if (memcmp(sum2,s->sums[i].sum2,SUM_LENGTH) == 0) {
+	  if (memcmp(sum2,s->sums[i].sum2,csum_length) == 0) {
 	    matched(f,s,buf,len,offset,i);
 	    offset += s->sums[i].len - 1;
 	    k = MIN((len-offset), s->n);

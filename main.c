@@ -44,6 +44,7 @@ int ignore_times=0;
 int delete_mode=0;
 int one_file_system=0;
 int remote_version=0;
+int csum_length=SUM_LENGTH;
 
 int am_server = 0;
 static int sender = 0;
@@ -88,6 +89,7 @@ static void server_options(char **args,int *argc)
   int ac = *argc;
   static char argstr[50];
   static char bsize[30];
+  static char slength[30];
   int i, x;
 
   args[ac++] = "--server";
@@ -134,6 +136,11 @@ static void server_options(char **args,int *argc)
   if (block_size != BLOCK_SIZE) {
     sprintf(bsize,"-B%d",block_size);
     args[ac++] = bsize;
+  }    
+
+  if (csum_length != SUM_LENGTH) {
+    sprintf(slength,"--csum-length=%d",csum_length);
+    args[ac++] = slength;
   }    
   
   if (delete_mode)
@@ -369,6 +376,7 @@ static void usage(FILE *f)
   fprintf(f,"    --exclude FILE       exclude file FILE\n");
   fprintf(f,"    --exclude-from FILE  exclude files listed in FILE\n");
   fprintf(f,"    --suffix SUFFIX      override backup suffix\n");  
+  fprintf(f,"    --csum-length LENGTH set the checksum length\n");  
   fprintf(f,"    --version            print version number\n");  
 
   fprintf(f,"\n");
@@ -377,7 +385,7 @@ static void usage(FILE *f)
 }
 
 enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
-      OPT_EXCLUDE_FROM,OPT_DELETE,OPT_RSYNC_PATH};
+      OPT_EXCLUDE_FROM,OPT_DELETE,OPT_RSYNC_PATH,OPT_CSUM_LENGTH};
 
 static char *short_options = "oblpguDCtcahvrIxne:B:";
 
@@ -389,6 +397,7 @@ static struct option long_options[] = {
   {"exclude",     1,     0,    OPT_EXCLUDE},
   {"exclude-from",1,     0,    OPT_EXCLUDE_FROM},
   {"rsync-path",  1,     0,    OPT_RSYNC_PATH},
+  {"csum-length", 1,     0,    OPT_CSUM_LENGTH},
   {"one-file-system",0,  0,    'x'},
   {"ignore-times",0,     0,    'I'},
   {"help",        0,     0,    'h'},
@@ -443,6 +452,11 @@ int main(int argc,char *argv[])
 
 	case OPT_RSYNC_PATH:
 	  rsync_path = optarg;
+	  break;
+
+	case OPT_CSUM_LENGTH:
+	  csum_length = atoi(optarg);
+	  csum_length = MIN(csum_length,SUM_LENGTH);
 	  break;
 
 	case 'I':
