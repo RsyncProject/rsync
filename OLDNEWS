@@ -150,7 +150,7 @@ protocol: 26 (changed)
       Vipul's Razor.  (Debian #124286)
 
 rsync 2.5.1 (2002-01-03)
-protocol: 25 (changed)
+protocol: 25 (unchanged)
 
   BUG FIXES: 
    
@@ -186,6 +186,7 @@ protocol: 25 (changed)
 
 
 rsync 2.5.0 (2001-11-30)
+protocol: 25 (changed)
 
   ANNOUNCEMENTS
 
