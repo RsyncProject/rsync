@@ -94,7 +94,7 @@ void delete_files(struct file_list *flist)
 		if (!S_ISDIR(flist->files[j]->mode) ||
 		    !(flist->files[j]->flags & FLAG_DELETE)) continue;
 
-		name = f_name_to(flist->files[j], fbuf, sizeof fbuf);
+		name = f_name_to(flist->files[j], fbuf);
 
 		if (!(local_file_list = send_file_list(-1,1,&name)))
 			continue;
@@ -335,7 +335,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 		if (local_name)
 			fname = local_name;
 		else
-			fname = f_name_to(file, fbuf, sizeof fbuf);
+			fname = f_name_to(file, fbuf);
 
 		if (dry_run) {
 			if (!am_server && verbose) {	/* log transfer */
@@ -486,8 +486,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 	for (i = 0; i < flist->count; i++) {
 		file = flist->files[i];
 		if (!file->basename || !S_ISDIR(file->mode)) continue;
-		recv_generator(local_name? local_name
-			     : f_name_to(file,fbuf,sizeof fbuf), file, i, -1);
+		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
+			       file, i, -1);
 	}
 
 	if (verbose > 2)

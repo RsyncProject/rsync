@@ -137,8 +137,8 @@ void do_hard_links(void)
 {
 #if SUPPORT_HARD_LINKS
 	struct file_struct *file;
-	char fbuf[MAXPATHLEN];
-	char *hlink1, *hlink2;
+	char hlink1[MAXPATHLEN];
+	char *hlink2;
 	STRUCT_STAT st1, st2;
 	int i;
 
@@ -147,8 +147,7 @@ void do_hard_links(void)
 
 	for (i = 0; i < hlink_count; i++) {
 		file = hlink_list[i];
-		hlink1 = f_name_to(file, fbuf, sizeof fbuf);
-		if (link_stat(hlink1, &st1) != 0)
+		if (link_stat(f_name_to(file, hlink1), &st1) != 0)
 			continue;
 		while ((file = file->F_NEXT) != NULL) {
 			hlink2 = f_name(file);

@@ -561,8 +561,8 @@ void generate_files(int f, struct file_list *flist, char *local_name)
 			file = &copy;
 		}
 
-		recv_generator(local_name? local_name
-			     : f_name_to(file,fbuf,sizeof fbuf), file, i, f);
+		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
+			       file, i, f);
 	}
 
 	phase++;
@@ -578,8 +578,8 @@ void generate_files(int f, struct file_list *flist, char *local_name)
 	 * to catch initial checksum errors */
 	while ((i = get_redo_num()) != -1) {
 		struct file_struct *file = flist->files[i];
-		recv_generator(local_name? local_name
-			     : f_name_to(file,fbuf,sizeof fbuf), file, i, f);
+		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
+			       file, i, f);
 	}
 
 	phase++;

@@ -130,7 +130,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		rprintf(FINFO, "send_files starting\n");
 
 	while (1) {
-		int offset = 0;
+		unsigned int offset;
 
 		i = read_int(f_in);
 		if (i == -1) {
@@ -161,14 +161,9 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		if (file->basedir) {
 			offset = stringjoin(fname, sizeof fname,
 					    file->basedir, "/", NULL);
-			if (offset >= MAXPATHLEN-1) {
-				io_error |= IOERR_GENERAL;
-				rprintf(FERROR, "send_files failed on long-named directory %s\n",
-					full_fname(fname));
-				return;
-			}
-		}
-		f_name_to(file, fname + offset, MAXPATHLEN - offset);
+		} else
+			offset = 0;
+		f_name_to(file, fname + offset);
 
 		if (verbose > 2)
 			rprintf(FINFO, "send_files(%d, %s)\n", i, fname);
