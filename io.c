@@ -53,10 +53,12 @@ extern int io_timeout;
 extern int am_server;
 extern int am_daemon;
 extern int am_sender;
+extern int eol_nulls;
+extern char *remote_filesfrom_file;
 extern struct stats stats;
 
-
 const char phase_unknown[] = "unknown";
+int select_timeout = SELECT_TIMEOUT;
 
 /**
  * The connection might be dropped at some point; perhaps because the
@@ -267,7 +269,7 @@ int msg_list_push(int flush_it_all)
 				return 0;
 			FD_ZERO(&fds);
 			FD_SET(msg_fd_out, &fds);
-			tv.tv_sec = io_timeout ? io_timeout : SELECT_TIMEOUT;
+			tv.tv_sec = select_timeout;
 			tv.tv_usec = 0;
 			if (!select(msg_fd_out+1, NULL, &fds, NULL, &tv))
 				check_timeout();
@@ -404,7 +406,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 				fd_count = new_fd+1;
 		}
 
-		tv.tv_sec = io_timeout?io_timeout:SELECT_TIMEOUT;
+		tv.tv_sec = select_timeout;
 		tv.tv_usec = 0;
 
 		errno = 0;
@@ -455,7 +457,6 @@ static int read_timeout(int fd, char *buf, size_t len)
 						io_filesfrom_buflen = io_filesfrom_lastchar? 2 : 1;
 						io_filesfrom_f_in = -1;
 					} else {
-						extern int eol_nulls;
 						if (!eol_nulls) {
 							char *s = io_filesfrom_buf + l;
 							/* Transform CR and/or LF into '\0' */
@@ -525,9 +526,6 @@ int read_filesfrom_line(int fd, char *fname)
 {
 	char ch, *s, *eob = fname + MAXPATHLEN - 1;
 	int cnt;
-	extern int io_timeout;
-	extern int eol_nulls;
-	extern char *remote_filesfrom_file;
 	int reading_remotely = remote_filesfrom_file != NULL;
 	int nulls = eol_nulls || reading_remotely;
 
@@ -541,7 +539,7 @@ int read_filesfrom_line(int fd, char *fname)
 			fd_set fds;
 			FD_ZERO(&fds);
 			FD_SET(fd, &fds);
-			tv.tv_sec = io_timeout? io_timeout : SELECT_TIMEOUT;
+			tv.tv_sec = select_timeout;
 			tv.tv_usec = 0;
 			if (!select(fd+1, &fds, NULL, NULL, &tv))
 				check_timeout();
@@ -819,7 +817,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 				fd_count = msg_fd_in;
 		}
 
-		tv.tv_sec = io_timeout?io_timeout:SELECT_TIMEOUT;
+		tv.tv_sec = select_timeout;
 		tv.tv_usec = 0;
 
 		errno = 0;
