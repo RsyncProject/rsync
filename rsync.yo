@@ -289,6 +289,7 @@ verb(
      --backup-dir            make backups into this directory
      --suffix=SUFFIX         backup suffix (default ~ w/o --backup-dir)
  -u, --update                update only (don't overwrite newer files)
+     --inplace               update the destination file inplace
  -K, --keep-dirlinks         treat symlinked dir on receiver as dir
  -l, --links                 copy symlinks as symlinks
  -L, --copy-links            copy the referent of all symlinks
@@ -483,6 +484,17 @@ free to comment on this on the mailing list if you have an opinion).
 dit(bf(-K, --keep-dirlinks)) On the receiving side, if a symlink is
 pointing to a directory, it will be treated as matching a directory
 from the sender.
+
+dit(bf(--inplace)) This causes rsync not to create a new copy of the file
+and then move it into place.  Instead rsync will overwrite the existing
+file, meaning that the rsync algorithm can't extract the full ammount of
+network reduction it might otherwise.
+
+This option is useful for transfer of large files with block based changes
+and also on systems that are disk bound not network bound.
+
+WARNING: If the transfer is interrupted, you will have an inconsistent file
+and the transfer should be run again.
 
 dit(bf(-l, --links)) When symlinks are encountered, recreate the
 symlink on the destination.

@@ -94,6 +94,7 @@ int ignore_errors = 0;
 int modify_window = 0;
 int blocking_io = -1;
 int checksum_seed = 0;
+int inplace = 0;
 unsigned int block_size = 0;
 
 
@@ -148,6 +149,7 @@ char *bind_address;
 static void print_rsync_version(enum logcode f)
 {
 	char const *got_socketpair = "no ";
+	char const *have_inplace = "no ";
 	char const *hardlinks = "no ";
 	char const *links = "no ";
 	char const *ipv6 = "no ";
@@ -155,6 +157,10 @@ static void print_rsync_version(enum logcode f)
 
 #ifdef HAVE_SOCKETPAIR
 	got_socketpair = "";
+#endif
+
+#if HAVE_FTRUNCATE
+	have_inplace = "";
 #endif
 
 #if SUPPORT_HARD_LINKS
@@ -182,8 +188,8 @@ static void print_rsync_version(enum logcode f)
 	/* Note that this field may not have type ino_t.  It depends
 	 * on the complicated interaction between largefile feature
 	 * macros. */
-	rprintf(f, "              %sIPv6, %d-bit system inums, %d-bit internal inums\n",
-		ipv6,
+	rprintf(f, "              %sinplace, %sIPv6, %d-bit system inums, %d-bit internal inums\n",
+		have_inplace, ipv6,
 		(int) (sizeof dumstat->st_ino * 8),
 		(int) (sizeof (uint64) * 8));
 #ifdef MAINTAINER_MODE
@@ -233,6 +239,7 @@ void usage(enum logcode F)
   rprintf(F,"     --backup-dir            make backups into this directory\n");
   rprintf(F,"     --suffix=SUFFIX         backup suffix (default %s w/o --backup-dir)\n",BACKUP_SUFFIX);
   rprintf(F," -u, --update                update only (don't overwrite newer files)\n");
+  rprintf(F,"     --inplace               update the destination file inplace (see man page)\n");
   rprintf(F," -K, --keep-dirlinks         treat symlinked dir on receiver as dir\n");
   rprintf(F," -l, --links                 copy symlinks as symlinks\n");
   rprintf(F," -L, --copy-links            copy the referent of all symlinks\n");
@@ -340,6 +347,7 @@ static struct poptOption long_options[] = {
   {"sparse",          'S', POPT_ARG_NONE,   &sparse_files, 0, 0, 0 },
   {"cvs-exclude",     'C', POPT_ARG_NONE,   &cvs_exclude, 0, 0, 0 },
   {"update",          'u', POPT_ARG_NONE,   &update_only, 0, 0, 0 },
+  {"inplace",          0,  POPT_ARG_NONE,   &inplace, 0, 0, 0 },
   {"keep-dirlinks",   'K', POPT_ARG_NONE,   &keep_dirlinks, 0, 0, 0 },
   {"links",           'l', POPT_ARG_NONE,   &preserve_links, 0, 0, 0 },
   {"copy-links",      'L', POPT_ARG_NONE,   &copy_links, 0, 0, 0 },
@@ -754,6 +762,17 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			bwlimit_writemax = 512;
 	}
 
+	if (inplace) {
+#if HAVE_FTRUNCATE
+		keep_partial = 0;
+#else
+		snprintf(err_buf, sizeof err_buf,
+			 "inplace is not supported on this %s\n",
+			 am_server ? "server" : "client");
+		return 0;
+#endif
+	}
+
 	if (files_from) {
 		char *colon;
 		if (*argc != 2 && !(am_server && am_sender && *argc == 1)) {
@@ -970,6 +989,9 @@ void server_options(char **args,int *argc)
 
 	if (opt_ignore_existing && am_sender)
 		args[ac++] = "--ignore-existing";
+
+	if (inplace)
+		args[ac++] = "--inplace";
 
 	if (tmpdir) {
 		args[ac++] = "--temp-dir";

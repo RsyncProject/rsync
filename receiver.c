@@ -48,6 +48,7 @@ extern int ignore_errors;
 extern int orig_umask;
 extern int keep_partial;
 extern int checksum_seed;
+extern int inplace;
 
 static void delete_one(char *fn, int is_dir)
 {
@@ -255,15 +256,29 @@ static int receive_data(int f_in,struct map_struct *mapbuf,int fd,char *fname,
 			sum_update(map,len);
 		}
 
-		if (fd != -1 && write_file(fd, map, len) != (int)len) {
-			rsyserr(FERROR, errno, "write failed on %s",
-				full_fname(fname));
-			exit_cleanup(RERR_FILEIO);
+		if (!inplace || offset != offset2) {
+			if (fd != -1 && write_file(fd, map, len) != (int)len) {
+				rsyserr(FERROR, errno, "write failed on %s",
+					full_fname(fname));
+				exit_cleanup(RERR_FILEIO);
+			}
+		} else {
+			flush_write_file(fd);
+			if (do_lseek(fd,(OFF_T)len,SEEK_CUR) != offset+len) {
+				rprintf(FERROR, "lseek failed on %s: %s, %lli, %lli, %i\n",
+					full_fname(fname), strerror(errno), do_lseek(fd,0,SEEK_CUR), (offset+len), i);
+				exit_cleanup(RERR_FILEIO);
+			}
 		}
 		offset += len;
 	}
 
 	flush_write_file(fd);
+
+#ifdef HAVE_FTRUNCATE
+	if (inplace)
+		ftruncate(fd, offset);
+#endif
 
 	if (do_progress)
 		end_progress(total_size);
@@ -414,44 +429,59 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		} else
 			mapbuf = NULL;
 
-		if (!get_tmpname(fnametmp,fname)) {
-			if (mapbuf)
-				unmap_file(mapbuf);
-			if (fd1 != -1)
-				close(fd1);
-			continue;
-		}
+		/* We now check to see if we are writing file "inplace" */
+		if (inplace)  {
+			fd2 = do_open(fnamecmp, O_WRONLY|O_CREAT, 0);
+			if (fd2 == -1) {
+				rsyserr(FERROR, errno, "open %s failed",
+					full_fname(fnamecmp));
+				receive_data(f_in,mapbuf,-1,NULL,file->length);
+				if (mapbuf)
+					unmap_file(mapbuf);
+				if (fd1 != -1)
+					close(fd1);
+				continue;
+			}
+		} else {
+			if (!get_tmpname(fnametmp,fname)) {
+				if (mapbuf)
+					unmap_file(mapbuf);
+				if (fd1 != -1)
+					close(fd1);
+				continue;
+			}
 
-		strlcpy(template, fnametmp, sizeof template);
+			strlcpy(template, fnametmp, sizeof template);
 
-		/* we initially set the perms without the
-		 * setuid/setgid bits to ensure that there is no race
-		 * condition. They are then correctly updated after
-		 * the lchown. Thanks to snabb@epipe.fi for pointing
-		 * this out.  We also set it initially without group
-		 * access because of a similar race condition. */
-		fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
-
-		/* in most cases parent directories will already exist
-		 * because their information should have been previously
-		 * transferred, but that may not be the case with -R */
-		if (fd2 == -1 && relative_paths && errno == ENOENT &&
-		    create_directory_path(fnametmp, orig_umask) == 0) {
-			strlcpy(fnametmp, template, sizeof fnametmp);
+			/* we initially set the perms without the
+			 * setuid/setgid bits to ensure that there is no race
+			 * condition. They are then correctly updated after
+			 * the lchown. Thanks to snabb@epipe.fi for pointing
+			 * this out.  We also set it initially without group
+			 * access because of a similar race condition. */
 			fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
-		}
-		if (fd2 == -1) {
-			rsyserr(FERROR, errno, "mkstemp %s failed",
-				full_fname(fnametmp));
-			receive_data(f_in,mapbuf,-1,NULL,file->length);
-			if (mapbuf)
-				unmap_file(mapbuf);
-			if (fd1 != -1)
-				close(fd1);
-			continue;
-		}
 
-		cleanup_set(fnametmp, fname, file, mapbuf, fd1, fd2);
+			/* in most cases parent directories will already exist
+			 * because their information should have been previously
+			 * transferred, but that may not be the case with -R */
+			if (fd2 == -1 && relative_paths && errno == ENOENT
+			    && create_directory_path(fnametmp, orig_umask) == 0) {
+				strlcpy(fnametmp, template, sizeof fnametmp);
+				fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
+			}
+			if (fd2 == -1) {
+				rsyserr(FERROR, errno, "mkstemp %s failed",
+					full_fname(fnametmp));
+				receive_data(f_in,mapbuf,-1,NULL,file->length);
+				if (mapbuf)
+					unmap_file(mapbuf);
+				if (fd1 != -1)
+					close(fd1);
+				continue;
+			}
+
+			cleanup_set(fnametmp, fname, file, mapbuf, fd1, fd2);
+		}
 
 		if (!am_server && verbose)
 			rprintf(FINFO, "%s\n", fname);

@@ -458,11 +458,13 @@ struct file_list {
 	struct file_struct **files;
 };
 
+#define SUMFLG_SAME_OFFSET	(1<<0)
+
 struct sum_buf {
 	OFF_T offset;		/**< offset in file of this chunk */
 	unsigned int len;	/**< length of chunk of file */
-	int i;			/**< index of this chunk */
 	uint32 sum1;	        /**< simple checksum */
+	short flags;		/**< flag bits */
 	char sum2[SUM_LENGTH];	/**< checksum  */
 };
 

@@ -34,6 +34,7 @@ extern int force_delete;
 extern int recurse;
 extern int make_backups;
 extern char *backup_dir;
+extern int inplace;
 
 
 /*
@@ -238,6 +239,13 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
 
 	if (make_backups && !make_backup(fname))
 		return;
+
+	if (inplace) {
+		if (verbose > 2)
+			rprintf(FINFO, "finishing %s\n", fname);
+		set_perms(fname, file, NULL, 0);
+		return;
+	}
 
 	/* move tmp file over real file */
 	if (verbose > 2)
