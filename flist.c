@@ -291,7 +291,7 @@ static void flist_expand(struct file_list *flist)
 		
 		new_ptr = realloc(flist->files, new_bytes);
 
-		if (verbose > 2) {
+		if (verbose >= 2) {
 			rprintf(FINFO, RSYNC_NAME ": expand file_list to %.0f bytes, did%s move\n",
 				(double) new_bytes,
 				(new_ptr == flist->files) ? " not" : "");
