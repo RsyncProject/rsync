@@ -30,6 +30,7 @@ extern int am_sender;
 extern int am_generator;
 extern int am_daemon;
 extern int verbose;
+extern int what_has_changed;
 extern int blocking_io;
 extern int delete_before;
 extern int daemon_over_rsh;
@@ -1173,8 +1174,8 @@ int main(int argc,char *argv[])
 		exit_cleanup(RERR_SYNTAX);
 	}
 
-	if (dry_run)
-		verbose = MAX(verbose,1);
+	if (dry_run && !verbose && !what_has_changed)
+		verbose = 1;
 
 	if (am_server) {
 		set_nonblocking(STDIN_FILENO);
