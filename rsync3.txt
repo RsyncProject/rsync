@@ -1,0 +1,324 @@
+-*- indented-text -*-
+
+Notes towards a new version of rsync 
+Martin Pool <mbp@samba.org>
+
+
+Good things about the current implementation:
+
+  - Widely known and adopted.
+
+  - Fast/efficient, especially for moderately small sets of files over
+    slow links (transoceanic or modem.)
+
+  - Fairly reliable.
+
+  - The choice of runnning over a plain TCP socket or tunneling over
+    ssh.
+
+  - rsync operations are idempotent: you can always run the same
+    command twice to make sure it worked properly without any fear.
+    (Are there any exceptions?)
+
+  - Small changes to files cause small deltas.
+
+  - There is a way to evolve the protocol to some extent.
+
+  - rdiff and rsync --write-batch allow generation of standalone patch
+    sets.  rsync+ is pretty cheesy, though.  xdelta seems cleaner.
+
+  - Process triangle is creative, but seems to provoke OS bugs.
+
+  - "Morning-after property": you don't need to know anything on the
+    local machine about the state of the remote machine, or about
+    transfers that have been done in the past.
+
+  - You can easily push or pull simply by switching the order of
+    files.
+
+
+Bad things about the current implementation:
+
+  - Persistent and hard-to-diagnose hang bugs remain
+
+  - Protocol is sketchily documented, tied to this implementation, and
+    hard to modify/extend
+
+  - Both the program and the protocol assume a single non-interactive
+    one-way transfer 
+
+  - A list of all files are held in memory for the entire transfer,
+    which cripples scalability to large file trees
+
+  - Opening a new socket for every operation causes problems,
+    especially when running over SSH with password authentication.
+
+  - Renamed files are not handled: the old file is removed, and the
+    new file created from scratch.
+
+  - The versioning approach assumes that future versions of the
+    program know about all previous versions, and will do the right
+    thing.
+
+  - People always get confused about ':' vs '::'
+
+  - Error messages can be cryptic.
+
+
+Protocol philosophy:
+
+   *The* big difference between protocols like HTTP, FTP, and NFS is
+    that their fundamental operations are "read this file", "delete
+    this file", and "make this directory", whereas rsync is "make this
+    directory like this one".
+
+
+Questionable features:
+
+  These are neat, but not necessarily clean or worth preserving.  
+
+  - The remote rsync can be wrapped by some other program, such as in
+    tridge's rsync-mail scripts.  The general feature of sending and
+    retrieving mail over rsync is good, but this is perhaps not the
+    right way to implement it.
+
+
+Desirable features:
+
+  These don't really require architectural changes; they're just
+  something to keep in mind.
+ 
+  - Synchronize ACLs and extended attributes
+
+  - Anonymous servers should be efficient
+
+  - Code should be portable to non-UNIX systems
+
+  - Should be possible to document the protocol in RFC form
+
+  - --dry-run option
+
+  - IPv6 support.  Pretty straightforward.
+
+  - Allow the basis and destination files to be different.  For
+    example, you could use this when you have a CD-ROM and want to
+    download an updated image onto a hard drive.
+
+  - Efficiently interrupt and restart a transfer.  We can write a
+    checkpoint file that says where we're up to in the filesystem.
+    Alternatively, as long as transfers are idempotent, we can just
+    restart the whole thing.  [NFSv4]
+
+  - Scripting support.  
+
+  - Propagate atimes and do not modify them.  This is very ugly on
+    Unix.  It might be better to try to add O_NOATIME to kernels, and
+    call that.
+
+  - VFS.  Useful?
+
+  - Unicode.  Probably just use UTF-8 for everything.
+
+
+Hard links:
+
+  At the moment, we can recreate hard links, but it's a bit
+  inefficient: it depends on holding a list of all files in the tree.
+  Every time we see a file with a linkcount >1, we need to search for
+  another known name that has the same (fsid,inum) tuple.  We could do
+  that more efficiently by keeping a list of only files with
+  linkcount>1, and removing files from that list as all their names
+  become known.
+
+
+Scripting issues:
+
+  - Perhaps support multiple scripting languages: candidates include
+    Perl, Python, Tcl, Scheme (guile?), sh, ...
+
+  - Simply running a subprocess and looking at its stdout/exit code
+    might be sufficient, though it could also be pretty slow if it's
+    called often.
+
+  - There are security issues about running remote code, at least if
+    it's not running in the users own account.  So we can either
+    disallow it, or use some kind of sandbox system.
+
+
+Scripting hooks:
+
+  - Whether to transfer a file
+
+  - What basis file to use
+
+  - Logging
+  
+  - Whether to allow transfers (for public servers)
+
+  - Authentication
+
+  - Locking
+
+
+Interactive interface:
+
+  - Something like ncFTP, or integration into GNOME-vfs.  Probably
+    hold a single socket connection open.
+
+  - Can either call us as a separate process, or as a library.
+
+  - The standalone process needs to produce output in a form easily
+    digestible by a calling program, like the --emacs feature some
+    have. 
+
+  - Yow!  emacs support.  (You could probably build that already, of
+    course.)
+
+
+Pie-in-the-sky features:
+
+  These might have a severe impact on the protocol, and are not
+  clearly in our core requirements.  It looks like in many of them
+  having scripting hooks will allow us 
+
+  - Transport over UDP multicast.  The hard part is handling multiple
+    destinations which have different basis files.  We can look at
+    multicast-TFTP for inspiration.
+
+  - Conflict resolution.  Possibly general scripting support will be
+    sufficient.
+
+  - Integrate with locking.  It's hard to see a good general solution,
+    because Unix systems have several locking mechanisms, and grabbing
+    the lock from programs that don't expect it could cause deadlocks,
+    timeouts, or other problems.  Scripting support might help.
+
+  - Replicate in place, rather than to a temporary file.  This is
+    dangerous in the case of interruption, and it also means that the
+    delta can't refer to blocks that have already been overwritten.
+    On the other hand we could semi-trivially do this at first by
+    simply generating a delta with no copy instructions.
+
+  - Replicate block devices.  Most of the difficulties here are to do
+    with replication in place, though on some systems we will also
+    have to do I/O on block boundaries.
+
+
+In favour of evolving the protocol:
+
+  - Keeping compatibility with existing rsync servers will help with
+    adoption and testing.
+
+  - We should at the very least be able to fall back to the new
+    protocol.
+
+  - Error handling is not so good.
+
+
+In favour of using a new protocol:
+
+  - Maintaining compatibility might soak up development time that
+    would better go into improving a new protocol.
+
+  - If we start from scratch, it can be documented as we go, and we
+    can avoid design decisions that make the protocol complex or
+    implementation-bound. 
+
+
+Error handling:
+
+  - Errors should come back reliably, and be clearly associated with
+    the particular file that caused the problem.
+
+  - Some errors ought to cause the whole transfer to abort; some are
+    just warnings.  If any errors have occurred, then rsync ought to
+    return an error.
+
+
+Concurrency:
+
+  - We want to keep the CPU, filesystem, and network as full as
+    possible as much of the time as possible.
+
+  - We can do nonblocking network IO, but not so for disk.
+
+  - It makes sense to on the destination be generating signatures and
+    applying patches at the same time. 
+
+  - Can structure this with nonblocking, threads, separate processes,
+    etc.
+
+
+Uses:
+
+  - Mirroring software distributions:
+
+  - Synchronizing laptop and desktop
+
+  - NFS filesystem migration/replication.  See
+    http://www.ietf.org/proceedings/00jul/00july-133.htm#P24510_1276764
+
+  - Sync with PDA
+ 
+  - Network backup systems
+
+  - CVS filemover
+
+
+Conflict resolution:
+
+  - Requires application-specific knowledge.  We want to provide
+    policy, rather than mechanism.
+
+  - Possibly allowing two-way migration across a single connection
+    would be useful.
+
+
+Moved files:
+
+  - There's no trivial way to detect renamed files, especially if they
+    move between directories.
+
+  - If we had a picture of the remote directory from last time on
+    either machine, then the inode numbers might give us a hint about
+    files which may have been renamed.
+
+  - Files that are renamed and not modified can be detected by
+    examining the directory listing, looking for files with the same
+    size/date as the origin.
+
+
+Filesystem migration:
+
+  The NFSv4 working group wants atomic migration.  Most of the
+  responsibility for this lies on the NFS server or OS.  
+
+  If migrating a whole tree, then we could do a nearly-atomic rename
+  at the end.  This ties in to having separate basis and destination
+  files.
+
+  NFSv4 probably wants to migrate file locks, but that's not really
+  our problem.
+
+
+Scalability:
+ 
+  We should aim to work well on machines in use in a year or two.
+  That probably means transfers of many millions of files in one
+  batch, and gigabytes or terabytes of data.
+
+  For argument's sake: at the low end, we want to sync ten files for a
+  total of 10kb across a 1kB/s link.  At the high end, we want to sync
+  1e9 files for 1TB of data across a 1GB/s link.
+
+  On the whole CPU usage is not normally a limiting factor, if only
+  because running over SSH burns a lot of cycles on encryption.
+
+
+Streaming:
+
+  A big attraction of rsync is that there are few round-trip delays:
+  basically only one to get started, and then everything is
+  pipelined.  This is a problem with FTP, and NFS (at least up to
+  v3).  NFSv4 can pipeline operations, but building on that is
+  probably a bit complicated.
