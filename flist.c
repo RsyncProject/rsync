@@ -649,14 +649,14 @@ static void receive_file_entry(struct file_struct **fptr,
 #endif
 
 	if (always_checksum) {
-		char tmpsum[MD4_SUM_LENGTH], *sum;
+		char *sum;
 		if (S_ISREG(mode)) {
 			sum = file->sum = new_array(char, MD4_SUM_LENGTH);
 			if (!sum)
 				out_of_memory("md4 sum");
 		} else if (protocol_version < 28) {
 			/* Prior to 28, we get a useless set of nulls. */
-			sum = tmpsum;
+			sum = empty_sum;
 		} else
 			sum = NULL;
 		if (sum) {
