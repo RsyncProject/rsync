@@ -40,7 +40,7 @@ OBJS=$(OBJS1) $(OBJS2) $(DAEMON_OBJ) $(LIBOBJ) $(ZLIBOBJ) @BUILD_POPT@
 TLS_OBJ = tls.o syscall.o lib/permstring.o 
 
 # Programs we must have to run the test cases
-CHECK_PROGS = rsync tls getgroups
+CHECK_PROGS = rsync tls getgroups trimslash
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
@@ -75,6 +75,10 @@ tls: $(TLS_OBJ)
 getgroups: getgroups.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
 
+TRIMSLASH_OBJ = trimslash.o syscall.o
+trimslash: $(TRIMSLASH_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TRIMSLASH_OBJ) $(LIBS)
+
 Makefile: Makefile.in configure config.status
 	echo "WARNING: You need to run ./config.status --recheck"
 
@@ -92,7 +96,7 @@ proto:
 	cat $(srcdir)/*.c $(srcdir)/lib/compat.c | awk -f $(srcdir)/mkproto.awk > $(srcdir)/proto.h
 
 clean: cleantests
-	rm -f *~ $(OBJS) rsync $(TLS_OBJ) tls getgroups
+	rm -f *~ $(OBJS) rsync $(TLS_OBJ) $(CHECK_PROGS)
 
 cleantests:
 	rm -rf ./testtmp*
