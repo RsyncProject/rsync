@@ -90,28 +90,6 @@ static char const *rerr_name(int code)
 	return NULL;
 }
 
-void log_open(void)
-{
-	if (logfname && !logfile) {
-		extern int orig_umask;
-		int old_umask = umask(022 | orig_umask);
-		logfile = fopen(logfname, "a");
-		umask(old_umask);
-		if (!logfile) {
-			am_daemon = 0; /* avoid trying to log again */
-			rsyserr(FERROR, errno, "fopen() of log-file failed");
-			exit_cleanup(RERR_FILESELECT);
-		}
-	}
-}
-
-void log_close(void)
-{
-	if (logfile) {
-		fclose(logfile);
-		logfile = NULL;
-	}
-}
 
 static void logit(int priority, char *buf)
 {
@@ -164,6 +142,29 @@ void log_init(void)
 #ifndef LOG_NDELAY
 	logit(LOG_INFO,"rsyncd started\n");
 #endif
+}
+
+void log_open(void)
+{
+	if (logfname && !logfile) {
+		extern int orig_umask;
+		int old_umask = umask(022 | orig_umask);
+		logfile = fopen(logfname, "a");
+		umask(old_umask);
+		if (!logfile) {
+			am_daemon = 0; /* avoid trying to log again */
+			rsyserr(FERROR, errno, "fopen() of log-file failed");
+			exit_cleanup(RERR_FILESELECT);
+		}
+	}
+}
+
+void log_close(void)
+{
+	if (logfile) {
+		fclose(logfile);
+		logfile = NULL;
+	}
 }
 
 /* this is the underlying (unformatted) rsync debugging function. Call
