@@ -1228,12 +1228,12 @@ Rsync builds an ordered list of filter rules as specified on the
 command-line.  Filter rules have the following syntax:
 
 quote(
-tt(x [RULE])nl()
-tt(xMODIFIERS [RULE])nl()
+tt(x [PATTERN_OR_FILE])nl()
+tt(xMODIFIERS [PATTERN_OR_FILE])nl()
 )
 
 The 'x' is a single-letter that specifies the kind of rule to create.  It
-can have trailing modifiers, and is separated from the RULE by either a
+can have trailing modifiers, and is separated from its arg by either a
 single space or an underscore (_).  Here are the available rule prefixes:
 
 quote(
@@ -1241,7 +1241,7 @@ bf(-) specifies an exclude pattern. nl()
 bf(+) specifies an include pattern. nl()
 bf(.) specifies a merge-file to read for more rules. nl()
 bf(:) specifies a per-directory merge-file. nl()
-bf(!) clears the current include/exclude list (takes no RULE) nl()
+bf(!) clears the current include/exclude list (takes no arg) nl()
 )
 
 Note that the bf(--include)/bf(--exclude) command-line options do not allow the
@@ -1410,6 +1410,9 @@ itemize(
   it() A "!" specifies that the include/exclude should take effect if
   the pattern fails to match.  For instance, "-! */" would exclude all
   non-directories.
+  it() A bf(C) is used to indicate that all the global CVS-exclude rules
+  should be inserted as excludes in place of the "-C".  No arg should
+  follow.
 )
 
 Per-directory rules are inherited in all subdirectories of the directory
