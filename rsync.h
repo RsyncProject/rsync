@@ -567,6 +567,8 @@ struct map_struct {
 #define MATCHFLG_PERDIR_MERGE	(1<<11)/* merge-file is searched per-dir */
 #define MATCHFLG_EXCLUDE_SELF	(1<<12)/* merge-file name should be excluded */
 #define MATCHFLG_FINISH_SETUP	(1<<13)/* per-dir merge file needs setup */
+#define MATCHFLG_NEGATE		(1<<14)/* rule matches when pattern does not */
+
 struct filter_struct {
 	struct filter_struct *next;
 	char *pattern;
