@@ -95,21 +95,6 @@
 }
 #endif
 
-#ifdef REPLACE_INET_NTOA
- char *rep_inet_ntoa(struct in_addr ip)
-{
-	unsigned char *p = (unsigned char *)&ip.s_addr;
-	static char buf[18];
-#if WORDS_BIGENDIAN
-	slprintf(buf, 18, "%d.%d.%d.%d", 
-		 (int)p[0], (int)p[1], (int)p[2], (int)p[3]);
-#else
-	slprintf(buf, 18, "%d.%d.%d.%d", 
-		 (int)p[3], (int)p[2], (int)p[1], (int)p[0]);
-#endif
-	return buf;
-}
-#endif
 
 #ifndef HAVE_STRLCPY
 /* like strncpy but does not 0 fill the buffer and always null 
@@ -146,7 +131,23 @@
 }
 #endif
 
-#ifndef HAVE_INET_ATON
+#ifdef REPLACE_INET_NTOA
+ char *rep_inet_ntoa(struct in_addr ip)
+{
+	unsigned char *p = (unsigned char *)&ip.s_addr;
+	static char buf[18];
+#if WORDS_BIGENDIAN
+	slprintf(buf, 18, "%d.%d.%d.%d", 
+		 (int)p[0], (int)p[1], (int)p[2], (int)p[3]);
+#else
+	slprintf(buf, 18, "%d.%d.%d.%d", 
+		 (int)p[3], (int)p[2], (int)p[1], (int)p[0]);
+#endif
+	return buf;
+}
+#endif
+
+#ifndef REPLACE_INET_ATON
  int inet_aton(const char *cp, struct in_addr *inp)
 {
 	unsigned int a1, a2, a3, a4;
