@@ -566,8 +566,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 	}
 	make_backups = save_make_backups;
 
-	if (delete_after && recurse && delete_mode && !local_name
-	    && flist->count > 0)
+	if (delete_after && recurse && !local_name && flist->count > 0)
 		delete_files(flist);
 
 	if (verbose > 2)
