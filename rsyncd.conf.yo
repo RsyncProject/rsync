@@ -227,6 +227,23 @@ The default is no "hosts deny" option, which means all hosts can connect.
 
 enddit()
 
+manpagesection(AUTHENTICATION STRENGTH)
+
+The authentication protocol used in rsync is a 128 bit MD4 based
+challenge response system. Although I believe that no one has ever
+demonstrated a brute-force break of this sort of system you should
+realise that this is not a "military strength" authentication system.
+It should be good enough for most purposes but if you want really top
+quality security then I recommend that you run rsync over ssh.
+
+Also note that the rsync server protocol does not currently provide any
+encryption of the data that is transferred over the link. Only
+authentication is provided. Use ssh as the transport if you want
+encryption.
+
+Future versions of rsync may support SSL for better authentication and
+encryption, but that is still being investigated.
+
 manpagesection(EXAMPLES)
 
 A simple rsyncd.conf file that allow anonymous rsync to a ftp area at

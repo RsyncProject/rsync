@@ -139,6 +139,11 @@ itemize(
 	list of accessible paths on the server will be shown.
 )
 
+Some paths on the remote server may require authentication. If so then
+you will receive a password prompt when you connect. You can avoid the
+password prompt by setting the environment variable RSYNC_PASSWORD to
+the password you want to use. This may be useful when scripting rsync.
+
 manpagesection(RUNNING AN RSYNC SERVER)
 
 An rsync server is configured using a config file which by default is
