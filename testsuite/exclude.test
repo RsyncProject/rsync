@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Copyright (C) 2003 by Wayne Davison <wayned@samba.org>
+# Copyright (C) 2003, 2004, 2005 by Wayne Davison <wayned@samba.org>
 
 # This program is distributable under the terms of the GNU GPL see
 # COPYING).
@@ -11,8 +11,6 @@
 # processing.
 
 . "$suitedir/rsync.fns"
-
-set -x
 
 HOME="$scratchdir"
 CVSIGNORE='*.junk'
