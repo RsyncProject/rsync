@@ -104,7 +104,8 @@ void log_init(void)
 	int options = LOG_PID;
 	time_t t;
 
-	if (log_initialised) return;
+	if (log_initialised)
+		return;
 	log_initialised = 1;
 
 	/* this looks pointless, but it is needed in order for the
@@ -171,45 +172,39 @@ void rwrite(enum logcode code, char *buf, int len)
 
 	buf[len] = 0;
 
-	if (code == FLOG) {
-		if (am_daemon) logit(LOG_INFO, buf);
+	if (am_server && msg_fd_out >= 0) {
+		/* Pass the message to our sibling. */
+		send_msg((enum msgcode)code, buf, len);
 		return;
 	}
+
+	if (am_daemon) {
+		static int in_block;
+		char msg[2048];
+		int priority = code == FERROR ? LOG_WARNING : LOG_INFO;
+
+		if (in_block)
+			return;
+		in_block = 1;
+		if (!log_initialised)
+			log_init();
+		strlcpy(msg, buf, MIN((int)sizeof msg, len + 1));
+		logit(priority, msg);
+		in_block = 0;
+
+		if (code == FLOG || !am_server)
+			return;
+	} else if (code == FLOG)
+		return;
 
 	if (am_server) {
-		/* Pass it to non-server side, perhaps through our sibling. */
-		if (msg_fd_out >= 0) {
-			send_msg((enum msgcode)code, buf, len);
+		/* Pass the message to the non-server side. */
+		if (io_multiplex_write((enum msgcode)code, buf, len))
+			return;
+		if (am_daemon) {
+			/* TODO: can we send the error to the user somehow? */
 			return;
 		}
-		if (!am_daemon
-		    && io_multiplex_write((enum msgcode)code, buf, len))
-			return;
-	}
-
-	/* otherwise, if in daemon mode and either we are not a server
-	 *  (that is, we are not running --daemon over a remote shell) or
-	 *  the log has already been initialised, log the message on this
-	 *  side because we don't want the client to see most errors for
-	 *  security reasons.  We do want early messages when running daemon
-	 *  mode over a remote shell to go to the remote side; those will
-	 *  fall through to the next case.
-	 * Note that this is only for the time before multiplexing is enabled.
-	 */
-	if (am_daemon && (!am_server || log_initialised)) {
-		static int depth;
-		int priority = LOG_INFO;
-		if (code == FERROR) priority = LOG_WARNING;
-
-		if (depth) return;
-
-		depth++;
-
-		log_init();
-		logit(priority, buf);
-
-		depth--;
-		return;
 	}
 
 	if (code == FERROR) {
@@ -217,18 +212,17 @@ void rwrite(enum logcode code, char *buf, int len)
 		f = stderr;
 	}
 
-	if (code == FINFO) {
-		if (am_server)
-			f = stderr;
-		else
-			f = stdout;
-	}
+	if (code == FINFO)
+		f = am_server ? stderr : stdout;
 
-	if (!f) exit_cleanup(RERR_MESSAGEIO);
+	if (!f)
+		exit_cleanup(RERR_MESSAGEIO);
 
-	if (fwrite(buf, len, 1, f) != 1) exit_cleanup(RERR_MESSAGEIO);
+	if (fwrite(buf, len, 1, f) != 1)
+		exit_cleanup(RERR_MESSAGEIO);
 
-	if (buf[len-1] == '\r' || buf[len-1] == '\n') fflush(f);
+	if (buf[len-1] == '\r' || buf[len-1] == '\n')
+		fflush(f);
 }
 		
 
