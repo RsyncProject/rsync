@@ -469,7 +469,7 @@ static void delete_files(struct file_list *flist)
 
 static char *cleanup_fname = NULL;
 
-int sig_int(void)
+void sig_int(void)
 {
   if (cleanup_fname)
     unlink(cleanup_fname);
@@ -513,25 +513,21 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 	fprintf(stderr,"recv_files(%s)\n",fname);
 
       /* open the file */  
-      if ((fd1 = open(fname,O_RDONLY)) == -1 &&
-	  (fd1 = open(fname,O_RDONLY|O_CREAT,flist->files[i].mode)) == -1) {
-	fprintf(stderr,"recv_files failed to open %s\n",fname);
-	return -1;
-      }
+      fd1 = open(fname,O_RDONLY);
 
-      if (fstat(fd1,&st) != 0) {
+      if (fd1 != -1 && fstat(fd1,&st) != 0) {
 	fprintf(stderr,"fstat %s : %s\n",fname,strerror(errno));
 	close(fd1);
 	return -1;
       }
 
-      if (!S_ISREG(st.st_mode)) {
+      if (fd1 != -1 && !S_ISREG(st.st_mode)) {
 	fprintf(stderr,"%s : not a regular file\n",fname);
 	close(fd1);
 	return -1;
       }
 
-      if (st.st_size > 0) {
+      if (fd1 != -1 && st.st_size > 0) {
 	buf = map_file(fd1,st.st_size);
 	if (!buf) {
 	  fprintf(stderr,"map_file failed\n");
@@ -564,7 +560,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
       /* recv file data */
       receive_data(f_in,buf,fd2,fname);
 
-      close(fd1);
+      if (fd1 != -1) close(fd1);
       close(fd2);
 
       if (verbose > 2)
@@ -573,7 +569,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
       if (make_backups) {
 	char fnamebak[MAXPATHLEN];
 	sprintf(fnamebak,"%s%s",fname,backup_suffix);
-	if (rename(fname,fnamebak) != 0) {
+	if (rename(fname,fnamebak) != 0 && errno != ENOENT) {
 	  fprintf(stderr,"rename %s %s : %s\n",fname,fnamebak,strerror(errno));
 	  exit(1);
 	}

@@ -650,7 +650,7 @@ int main(int argc,char *argv[])
     }
     
     signal(SIGCHLD,SIG_IGN);
-    signal(SIGINT,sig_int);
+    signal(SIGINT,SIGNAL_CAST sig_int);
 
     if (!sender && argc != 1) {
       usage(stderr);

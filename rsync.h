@@ -226,3 +226,5 @@ extern int errno;
 #if !SUPPORT_LINKS
 #define lstat stat
 #endif
+
+#define SIGNAL_CAST (RETSIGTYPE (*)())
