@@ -1,0 +1,5 @@
+Unlike zlib, this is a perfectly ordinary copy of libpopt.  It's only
+used on platforms that don't have a sufficiently up-to-date copy of
+their own.  If you build rsync on a platform which has popt, this
+directory should not be used.  (You can control that using
+--with-included-popt.)

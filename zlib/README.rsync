@@ -1,3 +1,5 @@
+READ THIS BEFORE TRYING TO DYNAMICALLY LINK RSYNC AND ZLIB!
+
 zlib has been adapted slightly for use in rsync. Please don't bother
 the zlib authors with problems related to the use of zlib in rsync as
 any bugs are likely to be our fault and not theirs.
@@ -15,5 +17,15 @@ Specific changes that have been made to zlib for rsync include:
 - include rsync.h to ensure that we get a consistent set of includes
   for all C code in rsync and to take advantage of autoconf
 
---
-Paul Mackerras and Andrew Tridgell
+As a result of the first item, the streams from rsync's version of
+zlib are *not compatible* with those produced by the upstream version
+of rsync.  In other words, if you link rsync against your system's
+copy, it will not be able to interoperate with any other version if
+the -z option is used.  (Sorry.  Sometimes standard is better than
+better.)
+
+The rsync maintainers hope to fix this problem in the future by either
+merging our changes into the upstream version, or backing them out of
+rsync in a way that preserves wire compatibility.  But in the meantime
+this version must be maintained in parallel.
+
