@@ -1009,6 +1009,8 @@ struct file_list *recv_file_list(int f)
 
 
 	for (flags = read_byte(f); flags; flags = read_byte(f)) {
+		int i = flist->count;
+		
 		flist_expand(flist);
 
 		receive_file_entry(&flist->files[i], flags, f);
