@@ -573,6 +573,10 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 						     flist->malloced);
 	if (!flist->files) out_of_memory("send_file_list");
 
+	if (f != -1) {
+		io_start_buffering(f);
+	}
+
 	for (i=0;i<argc;i++) {
 		char fname2[MAXPATHLEN];
 		char *fname = fname2;
@@ -658,7 +662,6 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 
 	if (f != -1) {
 		send_file_entry(NULL,f,0);
-		write_flush(f);
 	}
 
 	if (verbose && recurse && !am_server && f != -1)
@@ -675,6 +678,11 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 	/* if protocol version is >= 17 then send the io_error flag */
 	if (f != -1 && remote_version >= 17) {
 		write_int(f, io_error);
+	}
+
+	if (f != -1) {
+		io_end_buffering(f);
+		write_flush(f);
 	}
 
 	if (verbose > 2)
