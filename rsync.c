@@ -886,10 +886,18 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			continue;
 		}
 
-		fd2 = do_open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,file->mode);
+		/* we initially set the perms without the
+		   setuid/setgid bits to ensure that there is no race
+		   condition. They are then correctly updated after
+		   the lchown. Thanks to snabb@epipe.fi for pointing
+		   this out */
+		fd2 = do_open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,
+			      file->mode & ACCESSPERMS);
+
 		if (fd2 == -1 && relative_paths && errno == ENOENT && 
 		    create_directory_path(fnametmp) == 0) {
-			fd2 = do_open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,file->mode);
+			fd2 = do_open(fnametmp,O_WRONLY|O_CREAT|O_EXCL,
+				      file->mode & ACCESSPERMS);
 		}
 		if (fd2 == -1) {
 			rprintf(FERROR,"open %s : %s\n",fnametmp,strerror(errno));

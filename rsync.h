@@ -437,3 +437,6 @@ extern int errno;
 
 #define IS_DEVICE(mode) (S_ISCHR(mode) || S_ISBLK(mode) || S_ISSOCK(mode) || S_ISFIFO(mode))
 
+#ifndef ACCESSPERMS
+#define ACCESSPERMS 0777
+#endif
