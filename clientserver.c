@@ -122,6 +122,7 @@ static int rsync_module(int fd, int i)
 	char *host = client_name(fd);
 	char *name = lp_name(i);
 	char *user;
+	int use_chroot = lp_use_chroot(i);
 	int start_glob=0;
 	int ret;
 	char *request=NULL;
@@ -194,28 +195,37 @@ static int rsync_module(int fd, int i)
 
 	log_open();
 
-	if (chroot(lp_path(i))) {
-		rprintf(FERROR,"chroot %s failed\n", lp_path(i));
-		io_printf(fd,"@ERROR: chroot failed\n");
-		return -1;
-	}
+	if (use_chroot) {
+		if (chroot(lp_path(i))) {
+			rprintf(FERROR,"chroot %s failed\n", lp_path(i));
+			io_printf(fd,"@ERROR: chroot failed\n");
+			return -1;
+		}
 
-	if (chdir("/")) {
-		rprintf(FERROR,"chdir %s failed\n", lp_path(i));
-		io_printf(fd,"@ERROR: chdir failed\n");
-		return -1;
-	}
+		if (chdir("/")) {
+			rprintf(FERROR,"chdir %s failed\n", lp_path(i));
+			io_printf(fd,"@ERROR: chdir failed\n");
+			return -1;
+		}
 
-	if (setgid(gid) || getgid() != gid) {
-		rprintf(FERROR,"setgid %d failed\n", gid);
-		io_printf(fd,"@ERROR: setgid failed\n");
-		return -1;
-	}
+		if (setgid(gid) || getgid() != gid) {
+			rprintf(FERROR,"setgid %d failed\n", gid);
+			io_printf(fd,"@ERROR: setgid failed\n");
+			return -1;
+		}
 
-	if (setuid(uid) || getuid() != uid) {
-		rprintf(FERROR,"setuid %d failed\n", uid);
-		io_printf(fd,"@ERROR: setuid failed\n");
-		return -1;
+		if (setuid(uid) || getuid() != uid) {
+			rprintf(FERROR,"setuid %d failed\n", uid);
+			io_printf(fd,"@ERROR: setuid failed\n");
+			return -1;
+		}
+
+	} else {
+		if (!push_dir(lp_path(i), 0)) {
+			rprintf(FERROR,"chdir %s failed\n", lp_path(i));
+			io_printf(fd,"@ERROR: chdir failed\n");
+			return -1;
+		}
 	}
 
 	am_root = (getuid() == 0);
@@ -254,6 +264,21 @@ static int rsync_module(int fd, int i)
 
 		if (argc == MAX_ARGS) {
 			return -1;
+		}
+	}
+
+	if (!use_chroot) {
+		/*
+		 * Note that this is applied to all parameters, whether or not
+		 *    they are filenames, but no other legal parameters contain
+		 *    the forms that need to be sanitized so it doesn't hurt;
+		 *    it is not known at this point which parameters are files
+		 *    and which aren't.
+		 */
+		for (i = 1; i < argc; i++) {
+			char *copy = sanitize_path(argv[i]);
+			free((void *)argv[i]);
+			argv[i] = copy;
 		}
 	}
 
@@ -381,6 +406,7 @@ static int start_daemon(int fd)
 int daemon_main(void)
 {
 	extern char *config_file;
+	char *pid_file;
 
 	/* this ensures that we don't call getcwd after the chroot,
            which doesn't work on platforms that use popen("pwd","r")
@@ -413,6 +439,19 @@ int daemon_main(void)
 	log_open();
 
 	rprintf(FINFO,"rsyncd version %s starting\n",VERSION);
+
+	if (((pid_file = lp_pid_file()) != NULL) && (*pid_file != '\0')) {
+		FILE *f;
+		int pid = (int) getpid();
+		cleanup_set_pid(pid);
+		if ((f = fopen(lp_pid_file(), "w")) == NULL) {
+		    cleanup_set_pid(0);
+		    fprintf(stderr,"failed to create pid file %s\n", pid_file);
+		    exit_cleanup(1);
+		}
+		fprintf(f, "%d\n", pid);
+		fclose(f);
+	}
 
 	start_accept_loop(rsync_port, start_daemon);
 	return -1;

@@ -99,6 +99,7 @@ typedef struct
 	char *motd_file;
 	char *lock_file;
 	char *log_file;
+	char *pid_file;
 	int syslog_facility;
 	int max_connections;
 	char *socket_options;
@@ -118,6 +119,7 @@ typedef struct
 	char *comment;
 	BOOL read_only;
 	BOOL list;
+	BOOL use_chroot;
 	char *uid;
 	char *gid;
 	char *hosts_allow;
@@ -137,6 +139,7 @@ static service sDefault =
 	NULL,    /* comment */
 	True,    /* read only */
 	True,    /* list */
+	True,    /* use chroot */
 	"nobody",/* uid */
 	"nobody",/* gid */
 	NULL,    /* hosts allow */
@@ -233,12 +236,14 @@ static struct parm_struct parm_table[] =
   {"syslog facility",  P_ENUM,    P_GLOBAL, &Globals.syslog_facility, enum_facilities,0},
   {"socket options",   P_STRING,  P_GLOBAL, &Globals.socket_options,NULL,  0},
   {"log file",         P_STRING,  P_GLOBAL, &Globals.log_file,      NULL,  0},
+  {"pid file",         P_STRING,  P_GLOBAL, &Globals.pid_file,      NULL,  0},
 
   {"name",             P_STRING,  P_LOCAL,  &sDefault.name,        NULL,   0},
   {"comment",          P_STRING,  P_LOCAL,  &sDefault.comment,     NULL,   0},
   {"path",             P_STRING,  P_LOCAL,  &sDefault.path,        NULL,   0},
   {"read only",        P_BOOL,    P_LOCAL,  &sDefault.read_only,   NULL,   0},
   {"list",             P_BOOL,    P_LOCAL,  &sDefault.list,        NULL,   0},
+  {"use chroot",       P_BOOL,    P_LOCAL,  &sDefault.use_chroot,  NULL,   0},
   {"uid",              P_STRING,  P_LOCAL,  &sDefault.uid,         NULL,   0},
   {"gid",              P_STRING,  P_LOCAL,  &sDefault.gid,         NULL,   0},
   {"hosts allow",      P_STRING,  P_LOCAL,  &sDefault.hosts_allow, NULL,   0},
@@ -298,6 +303,7 @@ static void init_locals(void)
 FN_GLOBAL_STRING(lp_motd_file, &Globals.motd_file)
 FN_GLOBAL_STRING(lp_lock_file, &Globals.lock_file)
 FN_GLOBAL_STRING(lp_log_file, &Globals.log_file)
+FN_GLOBAL_STRING(lp_pid_file, &Globals.pid_file)
 FN_GLOBAL_STRING(lp_socket_options, &Globals.socket_options)
 FN_GLOBAL_INTEGER(lp_max_connections, &Globals.max_connections)
 FN_GLOBAL_INTEGER(lp_syslog_facility, &Globals.syslog_facility)
@@ -307,6 +313,7 @@ FN_LOCAL_STRING(lp_comment, comment)
 FN_LOCAL_STRING(lp_path, path)
 FN_LOCAL_BOOL(lp_read_only, read_only)
 FN_LOCAL_BOOL(lp_list, list)
+FN_LOCAL_BOOL(lp_use_chroot, use_chroot)
 FN_LOCAL_STRING(lp_uid, uid)
 FN_LOCAL_STRING(lp_gid, gid)
 FN_LOCAL_STRING(lp_hosts_allow, hosts_allow)

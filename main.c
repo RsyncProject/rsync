@@ -584,6 +584,7 @@ int main(int argc,char *argv[])
 	signal(SIGINT,SIGNAL_CAST sig_int);
 	signal(SIGPIPE,SIGNAL_CAST sig_int);
 	signal(SIGHUP,SIGNAL_CAST sig_int);
+	signal(SIGTERM,SIGNAL_CAST sig_int);
 
 	if (am_daemon) {
 		return daemon_main();

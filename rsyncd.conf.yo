@@ -94,7 +94,10 @@ exceeded. The default is tt(/var/run/rsyncd.lock).
 dit(bf(log file)) The "log file" option tells the rsync daemon to log
 messages to that file rather than using syslog. This is particularly
 useful on systems (such as AIX) where syslog() doesn't work for
-chrooted programs like rsync.
+chrooted programs.
+
+dit(bf(pid file)) The "pid file" option tells the rsync daemon to write
+its process id to that file.
 
 dit(bf(syslog facility)) The "syslog facility" option allows you to
 specify the syslog facility name to use when logging messages from the
@@ -128,9 +131,15 @@ that is displayed next to the module name when clients obtain a list
 of available modules. The default is no comment.
 
 dit(bf(path)) The "path" option specifies the directory in the servers
-filesystem to make available in this module. The rsync server will
-chroot to this path before starting the file transfer with the
-client. You must specify this option for each module in tt(/etc/rsyncd.conf).
+filesystem to make available in this module.  You must specify this option
+for each module in tt(/etc/rsyncd.conf).
+
+dit(bf(use chroot)) If "use chroot" is true, the rsync server will chroot
+to the "path" before starting the file transfer with the client.  This has
+the advantage of extra protection against possible implementation security
+holes, but it has the disadvantages of requiring super-user privileges and
+of not being able to follow symbolic links outside of the new root path.
+The default is to use chroot.
 
 dit(bf(read only)) The "read only" option determines whether clients
 will be able to upload files or not. If "read only" is true then any
@@ -272,8 +281,10 @@ A more sophisticated example would be:
 
 uid = nobody nl()
 gid = nobody nl()
+use chroot = no nl()
 max connections = 4 nl()
 syslog facility = local5 nl()
+pid file = /etc/rsyncd.pid
 
 verb([ftp]
         path = /var/ftp/pub
