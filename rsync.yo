@@ -489,13 +489,11 @@ then use the --delete-after switch.
 dit(bf(--ignore-errors)) Tells --delete to go ahead and delete files
 even when there are IO errors.
 
-dit(bf(--force)) This options tells rsync to delete directories even if
-they are not empty.  This applies to both the --delete option and to
-cases where rsync tries to copy a normal file but the destination
-contains a directory of the same name. 
-
-Since this option was added, deletions were reordered to be done depth-first
-so it is hardly ever needed anymore except in very obscure cases.
+dit(bf(--force)) This option tells rsync to delete directories
+when non-directories (for example symlinks or plain files) take their
+place even if the deleted directories are not empty.  This applies to both
+the --delete option and to cases where rsync tries to copy a normal file
+but the destination contains a directory of the same name.
 
 dit(bf(-B , --block-size=BLOCKSIZE)) This controls the block size used in
 the rsync algorithm. See the technical report for details.
