@@ -218,9 +218,9 @@ void usage(enum logcode F)
   rprintf(F," -R, --relative              use relative path names\n");
   rprintf(F,"     --no-relative           turn off --relative\n");
   rprintf(F,"     --no-implied-dirs       don't send implied dirs with -R\n");
-  rprintf(F," -b, --backup                make backups (default %s suffix)\n",BACKUP_SUFFIX);
+  rprintf(F," -b, --backup                make backups (see --suffix & --backup-dir)\n");
   rprintf(F,"     --backup-dir            make backups into this directory\n");
-  rprintf(F,"     --suffix=SUFFIX         override backup suffix\n");
+  rprintf(F,"     --suffix=SUFFIX         backup suffix (default %s w/o --backup-dir)\n",BACKUP_SUFFIX);
   rprintf(F," -u, --update                update only (don't overwrite newer files)\n");
   rprintf(F," -l, --links                 copy symlinks as symlinks\n");
   rprintf(F," -L, --copy-links            copy the referent of symlinks\n");
@@ -241,7 +241,7 @@ void usage(enum logcode F)
   rprintf(F," -e, --rsh=COMMAND           specify the remote shell\n");
   rprintf(F,"     --rsync-path=PATH       specify path to rsync on the remote machine\n");
   rprintf(F,"     --existing              only update files that already exist\n");
-  rprintf(F,"     --ignore-existing       ignore files that already exist on the receiving side\n");
+  rprintf(F,"     --ignore-existing       ignore files that already exist on receiving side\n");
   rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
   rprintf(F,"     --delete-excluded       also delete excluded files on the receiving side\n");
   rprintf(F,"     --delete-after          delete after transferring, not before\n");
@@ -251,9 +251,9 @@ void usage(enum logcode F)
   rprintf(F,"     --force                 force deletion of directories even if not empty\n");
   rprintf(F,"     --numeric-ids           don't map uid/gid values by user/group name\n");
   rprintf(F,"     --timeout=TIME          set IO timeout in seconds\n");
-  rprintf(F," -I, --ignore-times          don't exclude files that match length and time\n");
-  rprintf(F,"     --size-only             only use file size when determining if a file should be transferred\n");
-  rprintf(F,"     --modify-window=NUM     Timestamp window (seconds) for file match (default=%d)\n",modify_window);
+  rprintf(F," -I, --ignore-times          turn off mod time & file size quick check\n");
+  rprintf(F,"     --size-only             ignore mod time for quick check (use size)\n");
+  rprintf(F,"     --modify-window=NUM     compare mod times with reduced accuracy\n");
   rprintf(F," -T  --temp-dir=DIR          create temporary files in directory DIR\n");
   rprintf(F,"     --compare-dest=DIR      also compare destination files relative to DIR\n");
   rprintf(F,"     --link-dest=DIR         create hardlinks to DIR for unchanged files\n");
@@ -265,7 +265,7 @@ void usage(enum logcode F)
   rprintf(F,"     --include=PATTERN       don't exclude files matching PATTERN\n");
   rprintf(F,"     --include-from=FILE     don't exclude patterns listed in FILE\n");
   rprintf(F,"     --files-from=FILE       read FILE for list of source-file names\n");
-  rprintf(F," -0  --from0                 file names we read are separated by nulls, not newlines\n");
+  rprintf(F," -0  --from0                 all *-from file lists are delimited by nulls\n");
   rprintf(F,"     --version               print version number\n");
   rprintf(F,"     --daemon                run as a rsync daemon\n");
   rprintf(F,"     --no-detach             do not detach from the parent\n");
