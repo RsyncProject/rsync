@@ -227,7 +227,7 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 	for (prev = NULL, cur = pool->free; cur; prev = cur, cur = cur->next)
 	{
 		if (addr >= cur->start
-		    && addr < cur->start + pool->size)
+		    && addr < PTR_ADD(cur->start, pool->size))
 			break;
 	}
 	if (!cur)
