@@ -4,9 +4,8 @@ rsync changes since last release
 
     * "make install-strip" works.  (Greg Louis)
 
-    * With --progress, if we've finished transferring a file, show the
-      time taken; otherwise show expected time to complete. (Cameron
-      Simpson)
+    * With --progress, when a transfer is complete show the time taken;
+      otherwise show expected time to complete. (Cameron Simpson)
 
     * Make "make install-strip" works properly, and "make install"
       accepts a DESTDIR variable for help in building binary packages.
