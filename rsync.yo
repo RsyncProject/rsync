@@ -578,7 +578,7 @@ temporary destination until they have a chance to be completed.  If DIR is
 a relative path, it is relative to the destination directory.
 
 dit(bf(-z, --compress)) With this option, rsync compresses any data from
-the source file(s) which it sends to the destination machine.  This
+the files that it sends to the destination machine.  This
 option is useful on slow links.  The compression method used is the
 same method that gzip uses.
 
