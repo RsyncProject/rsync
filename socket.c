@@ -496,7 +496,7 @@ char *client_name(int fd)
 	hp = gethostbyname(name_buf);
 	if (!hp) {
 		strcpy (name_buf,def);
-		rprint (FERROR, "reverse name lookup for \"%s\" failed\n",
+		rprintf (FERROR, "reverse name lookup for \"%s\" failed\n",
 			name_buf);
 	} else {
 		for (p=hp->h_addr_list;*p;p++) {
@@ -525,7 +525,10 @@ struct in_addr *ip_address(const char *str)
 	static struct in_addr ret;
 	struct hostent *hp;
 
-	assert (str);
+	if (!str) {
+		rprintf (FERROR, "ip_address received NULL name\n");
+		return NULL;
+	}
 
 	/* try as an IP address */
 	if (inet_aton(str, &ret) != 0) {
