@@ -65,6 +65,9 @@ proto:
 clean:
 	rm -f *~ $(OBJS) rsync 
 
+distclean: clean
+	rm -f config.h config.cache config.status Makefile
+
 
 # this target is really just for my use. It only works on a limited
 # range of machines and is used to produce a list of potentially
