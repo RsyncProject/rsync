@@ -18,7 +18,7 @@ Changes since 2.6.0:
   BUG FIXES:
 
     * The --link-dest code now works properly for a non-root user
-      when the UIDs of the source and destination differ and -u was
+      when the UIDs of the source and destination differ and -o was
       specified, and when the group of the source can't be used on
       the destination and -g was specified.  (Wayne Davison)
 
