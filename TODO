@@ -2,6 +2,21 @@
 
 URGENT ---------------------------------------------------------------
 
+
+IMPORTANT ------------------------------------------------------------
+
+Cross-test versions
+
+  Part of the regression suite should be making sure that we don't
+  break backwards compatibility: old clients vs new servers and so
+  on.  Ideally we would test the cross product of versions.  
+
+  It might be sufficient to test downloads from well-known public
+  rsync servers running different versions of rsync.  This will give
+  some testing and also be the most common case for having different
+  versions and not being able to upgrade.
+
+
 NICE -----------------------------------------------------------------
 
 Merge IPv6 support ***
