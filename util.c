@@ -730,8 +730,8 @@ unsigned int clean_fname(char *name, BOOL collapse_dot_dot)
  * The rootdir string contains a value to use in place of a leading slash.
  * Specify NULL to get the default of lp_path(module_id).
  *
- * If depth is > 0, it is a count of how many '..'s to allow at the start
- * of the path.
+ * If depth is >= 0, it is a count of how many '..'s to allow at the start
+ * of the path.  Use -1 to allow unlimited depth.
  *
  * We also clean the path in a manner similar to clean_fname() but with a
  * few differences: 
