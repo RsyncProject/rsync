@@ -69,6 +69,13 @@
 #endif
 
 #include <sys/types.h>
+
+#ifdef HAVE_GETOPT_LONG
+#include <getopt.h>
+#else
+#include "lib/getopt.h"
+#endif
+
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -160,12 +167,6 @@
 #include <fnmatch.h>
 #else
 #include "lib/fnmatch.h"
-#endif
-
-#ifdef HAVE_GETOPT_LONG
-#include <getopt.h>
-#else
-#include "lib/getopt.h"
 #endif
 
 #ifdef HAVE_GLOB
