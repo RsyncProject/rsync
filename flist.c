@@ -387,46 +387,47 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	flags = base_flags;
 
 	if (file->mode == mode)
-		flags |= SAME_MODE;
+		flags |= XMIT_SAME_MODE;
 	else
 		mode = file->mode;
 	if (preserve_devices) {
 		if (protocol_version < 28) {
 			if (IS_DEVICE(mode)) {
 				if (file->u.rdev == rdev) {
-					/* Set both flags so that the test when
-					 * writing the data is simpler. */
-					flags |= SAME_RDEV_pre28|SAME_HIGH_RDEV;
+					/* Set both flags to simplify the test
+					 * when writing the data. */
+					flags |= XMIT_SAME_RDEV_pre28
+					       | XMIT_SAME_HIGH_RDEV;
 				} else
 					rdev = file->u.rdev;
 			} else
 				rdev = 0;
 		} else if (IS_DEVICE(mode)) {
 			if ((file->u.rdev & ~0xFF) == rdev)
-				flags |= SAME_HIGH_RDEV;
+				flags |= XMIT_SAME_HIGH_RDEV;
 			else
 				rdev = file->u.rdev & ~0xFF;
 		}
 	}
 	if (file->uid == uid)
-		flags |= SAME_UID;
+		flags |= XMIT_SAME_UID;
 	else
 		uid = file->uid;
 	if (file->gid == gid)
-		flags |= SAME_GID;
+		flags |= XMIT_SAME_GID;
 	else
 		gid = file->gid;
 	if (file->modtime == modtime)
-		flags |= SAME_TIME;
+		flags |= XMIT_SAME_TIME;
 	else
 		modtime = file->modtime;
 	if (file->link_u.idev) {
 		if (file->F_DEV == dev) {
 			if (protocol_version >= 28)
-				flags |= SAME_DEV;
+				flags |= XMIT_SAME_DEV;
 		} else
 			dev = file->F_DEV;
-		flags |= HAS_INODE_DATA;
+		flags |= XMIT_HAS_IDEV_DATA;
 	}
 
 	for (l1 = 0;
@@ -435,51 +436,52 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	l2 = strlen(fname+l1);
 
 	if (l1 > 0)
-		flags |= SAME_NAME;
+		flags |= XMIT_SAME_NAME;
 	if (l2 > 255)
-		flags |= LONG_NAME;
+		flags |= XMIT_LONG_NAME;
 
 	/* We must make sure we don't send a zero flags byte or
 	 * the other end will terminate the flist transfer. */
 	if (flags == 0 && !S_ISDIR(mode))
-		flags |= FLAG_DELETE; /* NOTE: no meaning for non-dir */
+		flags |= XMIT_TOP_DIR; /* Will be stripped off by receiver. */
 	if (protocol_version >= 28) {
 		if ((flags & 0xFF00) || flags == 0) {
-			flags |= EXTENDED_FLAGS;
+			flags |= XMIT_EXTENDED_FLAGS;
 			write_byte(f, flags);
 			write_byte(f, flags >> 8);
 		} else
 			write_byte(f, flags);
 	} else {
 		if (flags == 0)
-			flags |= LONG_NAME;
+			flags |= XMIT_LONG_NAME;
 		write_byte(f, flags);
 	}
-	if (flags & SAME_NAME)
+	if (flags & XMIT_SAME_NAME)
 		write_byte(f, l1);
-	if (flags & LONG_NAME)
+	if (flags & XMIT_LONG_NAME)
 		write_int(f, l2);
 	else
 		write_byte(f, l2);
 	write_buf(f, fname + l1, l2);
 
 	write_longint(f, file->length);
-	if (!(flags & SAME_TIME))
+	if (!(flags & XMIT_SAME_TIME))
 		write_int(f, modtime);
-	if (!(flags & SAME_MODE))
+	if (!(flags & XMIT_SAME_MODE))
 		write_int(f, to_wire_mode(mode));
-	if (preserve_uid && !(flags & SAME_UID)) {
+	if (preserve_uid && !(flags & XMIT_SAME_UID)) {
 		add_uid(uid);
 		write_int(f, uid);
 	}
-	if (preserve_gid && !(flags & SAME_GID)) {
+	if (preserve_gid && !(flags & XMIT_SAME_GID)) {
 		add_gid(gid);
 		write_int(f, gid);
 	}
 	if (preserve_devices && IS_DEVICE(mode)) {
-		/* If SAME_HIGH_RDEV is off, SAME_RDEV_pre28 is also off.
-		 * Also, avoid using "rdev" because it may be incomplete. */
-		if (!(flags & SAME_HIGH_RDEV))
+		/* If XMIT_SAME_HIGH_RDEV is off, XMIT_SAME_RDEV_pre28 is
+		 * also off.  Also, avoid using "rdev" because it may be
+		 * incomplete. */
+		if (!(flags & XMIT_SAME_HIGH_RDEV))
 			write_int(f, file->u.rdev);
 		else if (protocol_version >= 28)
 			write_byte(f, file->u.rdev);
@@ -493,14 +495,14 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 #endif
 
 #if SUPPORT_HARD_LINKS
-	if (flags & HAS_INODE_DATA) {
+	if (flags & XMIT_HAS_IDEV_DATA) {
 		if (protocol_version < 26) {
 			/* 32-bit dev_t and ino_t */
 			write_int(f, dev);
 			write_int(f, file->F_INODE);
 		} else {
 			/* 64-bit dev_t and ino_t */
-			if (!(flags & SAME_DEV))
+			if (!(flags & XMIT_SAME_DEV))
 				write_longint(f, dev);
 			write_longint(f, file->F_INODE);
 		}
@@ -551,10 +553,10 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 		return;
 	}
 
-	if (flags & SAME_NAME)
+	if (flags & XMIT_SAME_NAME)
 		l1 = read_byte(f);
 
-	if (flags & LONG_NAME)
+	if (flags & XMIT_LONG_NAME)
 		l2 = read_int(f);
 	else
 		l2 = read_byte(f);
@@ -603,35 +605,35 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 	if (!file->basename)
 		out_of_memory("receive_file_entry 1");
 
-	file->flags = flags & LIVE_FLAGS;
+	file->flags = flags & XMIT_TOP_DIR ? FLAG_TOP_DIR : 0;
 	file->length = read_longint(f);
-	if (!(flags & SAME_TIME))
+	if (!(flags & XMIT_SAME_TIME))
 		modtime = (time_t)read_int(f);
 	file->modtime = modtime;
-	if (!(flags & SAME_MODE))
+	if (!(flags & XMIT_SAME_MODE))
 		mode = from_wire_mode(read_int(f));
 	file->mode = mode;
 
 	if (preserve_uid) {
-		if (!(flags & SAME_UID))
+		if (!(flags & XMIT_SAME_UID))
 			uid = (uid_t)read_int(f);
 		file->uid = uid;
 	}
 	if (preserve_gid) {
-		if (!(flags & SAME_GID))
+		if (!(flags & XMIT_SAME_GID))
 			gid = (gid_t)read_int(f);
 		file->gid = gid;
 	}
 	if (preserve_devices) {
 		if (protocol_version < 28) {
 			if (IS_DEVICE(mode)) {
-				if (!(flags & SAME_RDEV_pre28))
+				if (!(flags & XMIT_SAME_RDEV_pre28))
 					rdev = (DEV64_T)read_int(f);
 				file->u.rdev = rdev;
 			} else
 				rdev = 0;
 		} else if (IS_DEVICE(mode)) {
-			if (!(flags & SAME_HIGH_RDEV)) {
+			if (!(flags & XMIT_SAME_HIGH_RDEV)) {
 				file->u.rdev = (DEV64_T)read_int(f);
 				rdev = file->u.rdev & ~0xFF;
 			} else
@@ -653,15 +655,15 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 	}
 #if SUPPORT_HARD_LINKS
 	if (preserve_hard_links && protocol_version < 28 && S_ISREG(mode))
-		flags |= HAS_INODE_DATA;
-	if (flags & HAS_INODE_DATA) {
+		flags |= XMIT_HAS_IDEV_DATA;
+	if (flags & XMIT_HAS_IDEV_DATA) {
 		if (!(file->link_u.idev = new(struct idev)))
 			out_of_memory("file inode data");
 		if (protocol_version < 26) {
 			dev = read_int(f);
 			file->F_INODE = read_int(f);
 		} else {
-			if (!(flags & SAME_DEV))
+			if (!(flags & XMIT_SAME_DEV))
 				dev = read_longint(f);
 			file->F_INODE = read_longint(f);
 		}
@@ -884,7 +886,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 	flist_expand(flist);
 
 	if (write_batch)
-		file->flags |= FLAG_DELETE;
+		file->flags |= FLAG_TOP_DIR;
 
 	if (file->basename[0]) {
 		flist->files[flist->count++] = file;
@@ -892,8 +894,7 @@ void send_file_name(int f, struct file_list *flist, char *fname,
 	}
 
 	if (S_ISDIR(file->mode) && recursive) {
-		struct exclude_struct **last_exclude_list =
-		    local_exclude_list;
+		struct exclude_struct **last_exclude_list = local_exclude_list;
 		send_directory(f, flist, f_name_to(file, fbuf));
 		local_exclude_list = last_exclude_list;
 		return;
@@ -1126,7 +1127,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (one_file_system)
 			set_filesystem(fname);
 
-		send_file_name(f, flist, fname, recurse, FLAG_DELETE);
+		send_file_name(f, flist, fname, recurse, XMIT_TOP_DIR);
 
 		if (olddir[0]) {
 			flist_dir = NULL;
@@ -1198,7 +1199,7 @@ struct file_list *recv_file_list(int f)
 
 		flist_expand(flist);
 
-		if (protocol_version >= 28 && (flags & EXTENDED_FLAGS))
+		if (protocol_version >= 28 && (flags & XMIT_EXTENDED_FLAGS))
 			flags |= read_byte(f) << 8;
 		receive_file_entry(&flist->files[i], flags, f);
 
@@ -1398,8 +1399,8 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			/* Make sure that if we unduplicate '.', that we don't
 			 * lose track of a user-specified starting point (or
 			 * else deletions will mysteriously fail with -R). */
-			if (flist->files[i]->flags & FLAG_DELETE)
-				flist->files[prev_i]->flags |= FLAG_DELETE;
+			if (flist->files[i]->flags & FLAG_TOP_DIR)
+				flist->files[prev_i]->flags |= FLAG_TOP_DIR;
 			/* it's not great that the flist knows the semantics of
 			 * the file memory usage, but i'd rather not add a flag
 			 * byte to that struct.
