@@ -105,8 +105,8 @@ static int get_secret(int module, char *user, char *secret, int len)
 
 	while (!found) {
 		int i = 0;
-		memset(line, 0, sizeof(line));
-		while (i<(sizeof(line)-1)) {
+		memset(line, 0, sizeof line);
+		while ((size_t) i < (sizeof(line)-1)) {
 			if (read(fd, &line[i], 1) != 1) {
 				memset(line, 0, sizeof(line));
 				close(fd);
