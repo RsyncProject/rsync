@@ -197,12 +197,10 @@ static int full_write(int desc, char *ptr, size_t len)
 	
 	total_written = 0;
 	while (len > 0) {
-		int written = write (desc, ptr, len);
+		int written = write(desc, ptr, len);
 		if (written < 0)  {
-#ifdef EINTR
 			if (errno == EINTR)
 				continue;
-#endif
 			return written;
 		}
 		total_written += written;
@@ -231,13 +229,9 @@ static int safe_read(int desc, char *ptr, size_t len)
 	if (len == 0)
 		return len;
  
-#ifdef EINTR
 	do {
 		n_chars = read(desc, ptr, len);
 	} while (n_chars < 0 && errno == EINTR);
-#else
-	n_chars = read(desc, ptr, len);
-#endif
  
 	return n_chars;
 }
