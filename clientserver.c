@@ -514,7 +514,7 @@ int start_daemon(int f_in, int f_out)
 
 	motd = lp_motd_file();
 	if (motd && *motd) {
-		FILE *f = fopen(motd,"r" O_TEXT_STR);
+		FILE *f = fopen(motd,"r");
 		while (f && !feof(f)) {
 			int len = fread(line, 1, sizeof(line)-1, f);
 			if (len > 0) {
