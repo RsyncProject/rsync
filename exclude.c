@@ -328,32 +328,34 @@ void send_exclude_list(int f)
 		add_exclude(&exclude_list, "/*/*", ADD_EXCLUDE);
 
 	if (!exclude_list) {
-		write_int(f,0);
+		write_int(f, 0);
 		return;
 	}
 
 	for (i = 0; exclude_list[i]; i++) {
 		unsigned int l;
-		char pattern[MAXPATHLEN+1];
+		char p[MAXPATHLEN+1];
 
-		l = strlcpy(pattern, exclude_list[i]->pattern, sizeof pattern);
+		l = strlcpy(p, exclude_list[i]->pattern, sizeof p);
 		if (l == 0 || l >= MAXPATHLEN)
 			continue;
 		if (exclude_list[i]->directory) {
-			pattern[l++] = '/';
-			pattern[l] = '\0';
+			p[l++] = '/';
+			p[l] = '\0';
 		}
 
 		if (exclude_list[i]->include) {
-			write_int(f,l+2);
-			write_buf(f,"+ ",2);
-		} else {
-			write_int(f,l);
-		}
-		write_buf(f,pattern,l);
+			write_int(f, l + 2);
+			write_buf(f, "+ ", 2);
+		} else if ((*p == '-' || *p == '+') && p[1] == ' ') {
+			write_int(f, l + 2);
+			write_buf(f, "- ", 2);
+		} else
+			write_int(f, l);
+		write_buf(f, p, l);
 	}
 
-	write_int(f,0);
+	write_int(f, 0);
 }
 
 
@@ -446,7 +448,7 @@ void add_cvs_excludes(void)
 	char *p;
 	int i;
 
-	for (i=0; cvs_ignore_list[i]; i++)
+	for (i = 0; cvs_ignore_list[i]; i++)
 		add_exclude(&exclude_list, cvs_ignore_list[i], ADD_EXCLUDE);
 
 	if ((p = getenv("HOME"))
