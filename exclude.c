@@ -224,9 +224,9 @@ struct exclude_struct **make_exclude_list(const char *fname,
 	char line[MAXPATHLEN];
 
 	if (strcmp(fname, "-")) {
-		f = fopen(fname,"r" O_TEXT_STR);
+		f = fopen(fname,"r");
 	} else {
-		f = fdopen(0, "r" O_TEXT_STR);
+		f = fdopen(0, "r");
 	}
 	if (!f) {
 		if (fatal) {
@@ -241,7 +241,7 @@ struct exclude_struct **make_exclude_list(const char *fname,
 
 	while (fgets(line,MAXPATHLEN,f)) {
 		int l = strlen(line);
-		if (l && line[l-1] == '\n') l--;
+		while (l && (line[l-1] == '\n' || line[l-1] == '\r')) l--;
 		line[l] = 0;
 		if (line[0] && (line[0] != ';') && (line[0] != '#')) {
 			/* Skip lines starting with semicolon or pound.
