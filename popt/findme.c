@@ -9,7 +9,7 @@ const char * findProgramPath(const char * argv0) {
     char * path = getenv("PATH");
     char * pathbuf;
     char * start, * chptr;
-    char * buf;
+    char * buf, *local = NULL;
 
     /* If there is a / in the argv[0], it has to be an absolute
        path */
@@ -18,7 +18,7 @@ const char * findProgramPath(const char * argv0) {
 
     if (!path) return NULL;
 
-    start = pathbuf = alloca(strlen(path) + 1);
+    local = start = pathbuf = malloc(strlen(path) + 1);
     buf = malloc(strlen(path) + strlen(argv0) + 2);
     strcpy(pathbuf, path);
 
@@ -28,8 +28,10 @@ const char * findProgramPath(const char * argv0) {
 	    *chptr = '\0';
 	sprintf(buf, "%s/%s", start, argv0);
 
-	if (!access(buf, X_OK))
-	    return buf;
+	if (!access(buf, X_OK)) {
+		if (local) free(local);
+		return buf;
+	}
 
 	if (chptr) 
 	    start = chptr + 1;
@@ -38,6 +40,7 @@ const char * findProgramPath(const char * argv0) {
     } while (start && *start);
 
     free(buf);
+    if (local) free(local);
 
     return NULL;
 }

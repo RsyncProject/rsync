@@ -43,7 +43,8 @@ int poptParseArgvString(const char * s, int * argcPtr, const char *** argvPtr)
     const char ** argv = malloc(sizeof(*argv) * argvAlloced);
     int argc = 0;
     int buflen = strlen(s) + 1;
-    char * buf = memset(alloca(buflen), 0, buflen);
+    char *buf0 = calloc(buflen, 1);
+    char *buf = buf0;
 
     argv[argc] = buf;
 
@@ -55,6 +56,7 @@ int poptParseArgvString(const char * s, int * argcPtr, const char *** argvPtr)
 		src++;
 		if (!*src) {
 		    free(argv);
+		    free(buf0);
 		    return POPT_ERROR_BADQUOTE;
 		}
 		if (*src != quote) *buf++ = '\\';
@@ -78,6 +80,7 @@ int poptParseArgvString(const char * s, int * argcPtr, const char *** argvPtr)
 	    src++;
 	    if (!*src) {
 		free(argv);
+		free(buf0);
 		return POPT_ERROR_BADQUOTE;
 	    }
 	    /*@fallthrough@*/
@@ -94,6 +97,6 @@ int poptParseArgvString(const char * s, int * argcPtr, const char *** argvPtr)
     (void) poptDupArgv(argc, argv, argcPtr, argvPtr);
 
     free(argv);
-
+    free(buf0);
     return 0;
 }

@@ -227,7 +227,7 @@ static void execCommand(poptContext con) {
     if (!con->execAbsolute && strchr(script, '/')) return;
 
     if (!strchr(script, '/') && con->execPath) {
-	char *s = alloca(strlen(con->execPath) + strlen(script) + 2);
+	char *s = malloc(strlen(con->execPath) + strlen(script) + 2);
 	sprintf(s, "%s/%s", con->execPath, script);
 	argv[pos] = s;
     } else {
@@ -398,6 +398,14 @@ int poptGetNextOpt(poptContext con)
     const struct poptOption * opt = NULL;
     int done = 0;
 
+    /* looks a bit tricky to get rid of alloca properly in this fn */
+#if HAVE_ALLOCA_H
+#define ALLOCA(x) alloca(x)
+#else
+#define ALLOCA(x) malloc(x)
+#endif
+
+
     while (!done) {
 	const char * origOptString = NULL;
 	poptCallbackType cb = NULL;
@@ -436,7 +444,7 @@ int poptGetNextOpt(poptContext con)
 
 	    /* Make a copy we can hack at */
 	    localOptString = optString =
-			strcpy(alloca(strlen(origOptString) + 1),
+			strcpy(ALLOCA(strlen(origOptString) + 1),
 			origOptString);
 
 	    if (!optString[0])

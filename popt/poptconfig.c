@@ -55,8 +55,8 @@ static void configLine(poptContext con, char * line) {
 }
 
 int poptReadConfigFile(poptContext con, const char * fn) {
-    char * file, * chptr, * end;
-    char * buf, * dst;
+    char * file=NULL, * chptr, * end;
+    char * buf=NULL, * dst;
     int fd, rc;
     int fileLength;
 
@@ -71,16 +71,17 @@ int poptReadConfigFile(poptContext con, const char * fn) {
     fileLength = lseek(fd, 0, SEEK_END);
     (void) lseek(fd, 0, 0);
 
-    file = alloca(fileLength + 1);
+    file = malloc(fileLength + 1);
     if (read(fd, file, fileLength) != fileLength) {
 	rc = errno;
 	close(fd);
 	errno = rc;
+	if (file) free(file);
 	return POPT_ERROR_ERRNO;
     }
     close(fd);
 
-    dst = buf = alloca(fileLength + 1);
+    dst = buf = malloc(fileLength + 1);
 
     chptr = file;
     end = (file + fileLength);
@@ -111,6 +112,9 @@ int poptReadConfigFile(poptContext con, const char * fn) {
 	}
     }
 
+    free(file);
+    free(buf);
+
     return 0;
 }
 
@@ -125,10 +129,11 @@ int poptReadDefaultConfig(poptContext con, /*@unused@*/ int useEnv) {
     if (getuid() != geteuid()) return 0;
 
     if ((home = getenv("HOME"))) {
-	fn = alloca(strlen(home) + 20);
+	fn = malloc(strlen(home) + 20);
 	strcpy(fn, home);
 	strcat(fn, "/.popt");
 	rc = poptReadConfigFile(con, fn);
+	free(fn);
 	if (rc) return rc;
     }
 
