@@ -27,6 +27,7 @@
  **/
 
 int modify_window = 0;
+int module_id = -1;
 struct exclude_struct **server_exclude_list;
 
  void rprintf(UNUSED(enum logcode code), const char *format, ...)
@@ -51,3 +52,19 @@ struct exclude_struct **server_exclude_list;
 	 * just return 0. */
 	return 0;
 }
+
+ char *lp_name(UNUSED(int mod))
+{
+    return NULL;
+}
+
+ BOOL lp_use_chroot(UNUSED(int mod))
+{
+    return 0;
+}
+
+ char *lp_path(UNUSED(int mod))
+{
+    return NULL;
+}
+
