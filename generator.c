@@ -52,7 +52,6 @@ extern int only_existing;
 extern int orig_umask;
 extern int safe_symlinks;
 extern unsigned int block_size;
-extern unsigned int max_map_size;
 
 extern struct exclude_list_struct server_exclude_list;
 
@@ -165,7 +164,6 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 		blength = MAX(blength, BLOCK_SIZE);
 		blength = MIN(blength, MAX_MAP_SIZE);
 	}
-	max_map_size = MAX(MAX_MAP_SIZE, blength * 32);
 
 	if (protocol_version < 27) {
 		s2length = csum_length;
@@ -209,19 +207,25 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
  *
  * Generate approximately one checksum every block_len bytes.
  */
-static void generate_and_send_sums(struct map_struct *buf, OFF_T len, int f_out)
+static void generate_and_send_sums(int fd, OFF_T len, int f_out)
 {
 	size_t i;
+	struct map_struct *mapbuf;
 	struct sum_struct sum;
 	OFF_T offset = 0;
 
 	sum_sizes_sqroot(&sum, len);
 
+	if (len > 0)
+		mapbuf = map_file(fd, len, sum.blength);
+	else
+		mapbuf = NULL;
+
 	write_sum_head(f_out, &sum);
 
 	for (i = 0; i < sum.count; i++) {
 		unsigned int n1 = MIN(len, sum.blength);
-		char *map = map_ptr(buf, offset, n1);
+		char *map = map_ptr(mapbuf, offset, n1);
 		uint32 sum1 = get_checksum1(map, n1);
 		char sum2[SUM_LENGTH];
 
@@ -238,6 +242,9 @@ static void generate_and_send_sums(struct map_struct *buf, OFF_T len, int f_out)
 		len -= n1;
 		offset += n1;
 	}
+
+	if (mapbuf)
+		unmap_file(mapbuf);
 }
 
 
@@ -255,7 +262,6 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 {
 	int fd;
 	STRUCT_STAT st;
-	struct map_struct *mapbuf;
 	int statret;
 	char *fnamecmp;
 	char fnamecmpbuf[MAXPATHLEN];
@@ -508,11 +514,6 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		return;
 	}
 
-	if (st.st_size > 0)
-		mapbuf = map_file(fd,st.st_size);
-	else
-		mapbuf = NULL;
-
 	if (verbose > 3) {
 		rprintf(FINFO,"gen mapped %s of size %.0f\n", fnamecmp,
 			(double)st.st_size);
@@ -522,11 +523,9 @@ static void recv_generator(char *fname, struct file_struct *file, int i,
 		rprintf(FINFO, "generating and sending sums for %d\n", i);
 
 	write_int(f_out,i);
-	generate_and_send_sums(mapbuf, st.st_size, f_out);
+	generate_and_send_sums(fd, st.st_size, f_out);
 
 	close(fd);
-	if (mapbuf)
-		unmap_file(mapbuf);
 }
 
 
