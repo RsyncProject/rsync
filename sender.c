@@ -125,8 +125,8 @@ void successful_send(int ndx)
 	}
 }
 
-static void write_item_attrs(int f_out, int ndx, int iflags, char *buf,
-			     uchar fnamecmp_type, int len)
+static void write_item_attrs(int f_out, int ndx, int iflags,
+			     uchar fnamecmp_type, char *buf, int len)
 {
 	write_int(f_out, ndx);
 	if (protocol_version < 29)
@@ -142,7 +142,8 @@ static void write_item_attrs(int f_out, int ndx, int iflags, char *buf,
 }
 
 /* This is also used by receive.c with f_out = -1. */
-int read_item_attrs(int f_in, int f_out, int ndx, char *buf, uchar *type_ptr)
+int read_item_attrs(int f_in, int f_out, int ndx, uchar *type_ptr,
+		    char *buf, int *len_ptr)
 {
 	int len;
 	uchar fnamecmp_type = FNAMECMP_FNAME;
@@ -174,6 +175,7 @@ int read_item_attrs(int f_in, int f_out, int ndx, char *buf, uchar *type_ptr)
 		*buf = '\0';
 		len = -1;
 	}
+	*len_ptr = len;
 
 	/* XXX Temporary backward compatibility when talking to 2.6.4pre[12] */
 	if (protocol_version >= 29 && iflags & ITEM_TRANSFER
@@ -191,7 +193,7 @@ int read_item_attrs(int f_in, int f_out, int ndx, char *buf, uchar *type_ptr)
 		}
 	} else if (f_out >= 0) {
 		write_item_attrs(f_out, ndx, isave /*XXX iflags */,
-				 buf, fnamecmp_type, len);
+				 fnamecmp_type, buf, len);
 	}
 
 	return iflags;
@@ -204,9 +206,9 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 	struct map_struct *mbuf = NULL;
 	STRUCT_STAT st;
 	char *fname2, fname[MAXPATHLEN];
-	char fnametmp[MAXPATHLEN];
+	char xname[MAXPATHLEN];
 	uchar fnamecmp_type;
-	int iflags;
+	int iflags, xlen;
 	struct file_struct *file;
 	int phase = 0;
 	struct stats initial_stats;
@@ -237,8 +239,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			break;
 		}
 
-		iflags = read_item_attrs(f_in, f_out, i, fnametmp,
-					 &fnamecmp_type);
+		iflags = read_item_attrs(f_in, f_out, i, &fnamecmp_type,
+					 xname, &xlen);
 		if (iflags == ITEM_IS_NEW) /* no-op packet */
 			continue;
 
@@ -256,15 +258,12 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			rprintf(FINFO, "send_files(%d, %s)\n", i, fname);
 
 		if (!(iflags & ITEM_TRANSFER)) {
-			maybe_log_item(file, iflags, itemizing, fnametmp);
+			maybe_log_item(file, iflags, itemizing, xname);
 			continue;
 		}
 
-		if (protocol_version >= 29) {
-			updating_basis_file = inplace
-					   && fnamecmp_type == FNAMECMP_FNAME;
-		} else
-			updating_basis_file = inplace && !make_backups;
+		updating_basis_file = inplace && (protocol_version >= 29
+			? fnamecmp_type == FNAMECMP_FNAME : !make_backups);
 
 		stats.current_file_index = i;
 		stats.num_transferred_files++;
@@ -273,8 +272,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		if (dry_run) { /* log the transfer */
 			if (!am_server && log_format)
 				log_item(file, &stats, iflags, NULL);
-			write_item_attrs(f_out, i, iflags, fnametmp,
-					 fnamecmp_type, -1);
+			write_item_attrs(f_out, i, iflags, fnamecmp_type,
+					 xname, xlen);
 			continue;
 		}
 
@@ -325,7 +324,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				safe_fname(fname), (double)st.st_size);
 		}
 
-		write_item_attrs(f_out, i, iflags, fnametmp, fnamecmp_type, -1);
+		write_item_attrs(f_out, i, iflags, fnamecmp_type, xname, xlen);
 		write_sum_head(f_out, s);
 
 		if (verbose > 2) {
