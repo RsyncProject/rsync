@@ -306,17 +306,6 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 static void read_gen_name(int fd, char *dirname, char *buf)
 {
 	int dlen;
-	int len = read_byte(fd);
-
-	if (len & 0x80) {
-#if MAXPATHLEN > 32767
-		uchar lenbuf[2];
-		read_buf(fd, (char *)lenbuf, 2);
-		len = (len & ~0x80) * 0x10000 + lenbuf[0] * 0x100 + lenbuf[1];
-#else
-		len = (len & ~0x80) * 0x100 + read_byte(fd);
-#endif
-	}
 
 	if (dirname) {
 		dlen = strlcpy(buf, dirname, MAXPATHLEN);
@@ -324,12 +313,7 @@ static void read_gen_name(int fd, char *dirname, char *buf)
 	} else
 		dlen = 0;
 
-	if (dlen + len >= MAXPATHLEN) {
-		rprintf(FERROR, "bogus data on generator name pipe\n");
-		exit_cleanup(RERR_PROTOCOL);
-	}
-
-	read_sbuf(fd, buf + dlen, len);
+	read_vstring(fd, buf + dlen, MAXPATHLEN - dlen);
 }
 
 

@@ -1021,19 +1021,8 @@ notify_others:
 	if (f_out_name >= 0) {
 		write_byte(f_out_name, fnamecmp_type);
 		if (fnamecmp_type == FNAMECMP_FUZZY) {
-			uchar lenbuf[3], *lb = lenbuf;
-			int len = strlen(fuzzy_file->basename);
-			if (len > 0x7F) {
-#if MAXPATHLEN > 0x7FFF
-				*lb++ = len / 0x10000 + 0x80;
-				*lb++ = len / 0x100;
-#else
-				*lb++ = len / 0x100 + 0x80;
-#endif
-			}
-			*lb = len;
-			write_buf(f_out_name, (char*)lenbuf, lb - lenbuf + 1);
-			write_buf(f_out_name, fuzzy_file->basename, len);
+			write_vstring(f_out_name, fuzzy_file->basename,
+				      strlen(fuzzy_file->basename));
 		}
 	}
 

@@ -850,6 +850,25 @@ uchar read_byte(int f)
 	return c;
 }
 
+int read_vstring(int f, char *buf, int bufsize)
+{
+	int len = read_byte(f);
+
+	if (len & 0x80)
+		len = (len & ~0x80) * 0x100 + read_byte(f);
+
+	if (len >= bufsize) {
+		rprintf(FERROR, "over-long vstring received (%d > %d)\n",
+			len, bufsize - 1);
+		exit_cleanup(RERR_PROTOCOL);
+	}
+
+	if (len)
+		readfd(f, buf, len);
+	buf[len] = '\0';
+	return len;
+}
+
 /* Populate a sum_struct with values from the socket.  This is
  * called by both the sender and the receiver. */
 void read_sum_head(int f, struct sum_struct *sum)
@@ -1201,6 +1220,26 @@ void write_sbuf(int f, char *buf)
 void write_byte(int f, uchar c)
 {
 	writefd(f, (char *)&c, 1);
+}
+
+void write_vstring(int f, char *str, int len)
+{
+	uchar lenbuf[3], *lb = lenbuf;
+
+	if (len > 0x7F) {
+		if (len > 0x7FFF) {
+			rprintf(FERROR,
+				"attempting to send over-long vstring (%d > %d)\n",
+				len, 0x7FFF);
+			exit_cleanup(RERR_PROTOCOL);
+		}
+		*lb++ = len / 0x100 + 0x80;
+	}
+	*lb = len;
+
+	writefd(f, (char*)lenbuf, lb - lenbuf + 1);
+	if (len)
+		writefd(f, str, len);
 }
 
 
