@@ -1249,6 +1249,7 @@ void flist_free(struct file_list *flist)
 static void clean_flist(struct file_list *flist, int strip_root)
 {
 	int i;
+	char *name, *prev_name = NULL;
 
 	if (!flist || flist->count == 0)
 		return;
@@ -1256,29 +1257,33 @@ static void clean_flist(struct file_list *flist, int strip_root)
 	qsort(flist->files, flist->count,
 	      sizeof(flist->files[0]), (int (*)()) file_compare);
 
-	for (i = 1; i < flist->count; i++) {
-		if (flist->files[i]->basename &&
-		    flist->files[i - 1]->basename &&
-		    strcmp(f_name(flist->files[i]),
-			   f_name(flist->files[i - 1])) == 0) {
-			if (verbose > 1 && !am_server)
+	for (i = 0; i < flist->count; i++) {
+		if (flist->files[i]->basename) {
+			prev_name = f_name(flist->files[i]);
+			break;
+		}
+	}
+	while (++i < flist->count) {
+		if (!flist->files[i]->basename)
+			continue;
+		name = f_name(flist->files[i]);
+		if (strcmp(name, prev_name) == 0) {
+			if (verbose > 1 && !am_server) {
 				rprintf(FINFO,
 					"removing duplicate name %s from file list %d\n",
-					f_name(flist->files[i - 1]),
-					i - 1);
-			/* it's not great that the flist knows the semantics of the
-			 * file memory usage, but i'd rather not add a flag byte
-			 * to that struct. XXX can i use a bit in the flags field? */
+					name, i);
+			}
+			/* it's not great that the flist knows the semantics of
+			 * the file memory usage, but i'd rather not add a flag
+			 * byte to that struct.
+			 * XXX can i use a bit in the flags field? */
 			if (flist->string_area)
 				flist->files[i][0] = null_file;
 			else
 				free_file(flist->files[i]);
 		}
+		prev_name = name;
 	}
-
-	/* FIXME: There is a bug here when filenames are repeated more
-	 * than once, because we don't handle freed files when doing
-	 * the comparison. */
 
 	if (strip_root) {
 		/* we need to strip off the root directory in the case
@@ -1298,7 +1303,6 @@ static void clean_flist(struct file_list *flist, int strip_root)
 			}
 		}
 	}
-
 
 	if (verbose <= 3)
 		return;
