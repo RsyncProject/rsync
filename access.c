@@ -88,8 +88,7 @@ static int match_address(char *addr, char *tok)
 	/* Fail quietly if tok is a hostname (not an address) */
 	if (strspn(tok, "./0123456789") != len
 #ifdef INET6
-	 && strspn(tok, "/0123456789:ABCDEFabcdef") != len
-	 && !strchr(tok, '%')
+	 && !strchr(tok, ':')
 #endif
 		) return 0;
 
