@@ -41,10 +41,10 @@ The values following the equals sign in parameters are all either a string
 true/false. Case is not significant in boolean values, but is preserved
 in string values. 
 
-manpagesection(LAUNCHING THE RSYNC DAMEON)
+manpagesection(LAUNCHING THE RSYNC DAEMON)
 
 The rsync daemon is launched by specifying the --daemon option to
-rsync. The dameon must run with root privileges.
+rsync. The daemon must run with root privileges.
 
 You can launch it either via inetd or as a standalone daemon. If run
 as a daemon then just run the command "rsync -daemon" from a suitable
@@ -76,7 +76,7 @@ default for that parameter.
 
 startdit()
 dit(bf(motd file)) The "motd file" option allows you to specify a
-"mesage of the day" to display to clients on each connect. This
+"message of the day" to display to clients on each connect. This
 usually contains site information and any legal notices. The default
 is no motd file.
 
@@ -181,21 +181,21 @@ itemize(
   IP address will be allowed in.
 
   it() a address/mask in the form a.b.c.d/e.f.g.h where e.f.g.h is a
-  netmask in dotted decimal motation. All IP addresses which match the masked
+  netmask in dotted decimal notation. All IP addresses which match the masked
   IP address will be allowed in.
 
   it() a hostname. The hostname as determined by a reverse lookup will
-  be matched (case insenstive) against the pattern. Only an exact
+  be matched (case insensitive) against the pattern. Only an exact
   match is allowed in.
 
   it() a hostname pattern using wildcards. These are matched using the
   same rules as normal unix filename matching. If the pattern matches
-  then the client is alowed in.
+  then the client is allowed in.
 )
 
 You can also combine "hosts allow" with a separate "hosts deny"
 option. If both options are specified then the "hosts allow" option s
-checked first and a match results in the client beng able to
+checked first and a match results in the client being able to
 connect. The "hosts deny" option is then checked and a match means
 that the host is rejected. If the host does not match either the 
 "hosts allow" or the "hosts deny" patterns then it is allowed to

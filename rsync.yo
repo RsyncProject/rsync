@@ -414,13 +414,13 @@ will exit. The default is 0, which means no timeout.
 dit(bf(--daemon)) This tells rsync that it is to run as a rsync
 daemon. If standard input is a socket then rsync will assume that it
 is being run via inetd, otherwise it will detach from the current
-terminal and become a background daemon. The dameon will read the
+terminal and become a background daemon. The daemon will read the
 config file (/etc/rsyncd.conf) on each connect made by a client and
 respond to requests accordingly. See the rsyncd.conf(5) man page for more
 details. 
 
 dit(bf(--config FILE)) This specifies an alternate config file than
-the default /etc/rsyncd.conf. This is only relevent when --daemon is
+the default /etc/rsyncd.conf. This is only relevant when --daemon is
 specified. 
 
 dit(bf(--port PORT)) This specifies an alternate TCP port number to use
