@@ -1,0 +1,30 @@
+#! /bin/sh
+
+# Copyright (C) 2004 by Wayne Davison <wayned@samba.org>
+
+# This program is distributable under the terms of the GNU GPL see
+# COPYING).
+
+# Test that various read-only and set[ug]id permissions work properly,
+# even when using a --temp-dir option (which we try to point at a
+# different filesystem than the destination dir).
+
+. "$suitedir/rsync.fns"
+
+set -x
+
+hands_setup
+
+chmod 440 "$fromdir/text"
+chmod 500 "$fromdir/dir/text"
+chmod 6450 "$fromdir/dir/subdir/foobar.baz"
+chmod 2670 "$fromdir/dir/subdir/subsubdir/etc-ltr-list"
+
+# First a normal copy.
+runtest "normal copy" 'checkit "$RSYNC -avv \"$fromdir/\" \"$todir\"" "$fromdir" "$todir"'
+
+# Then we update all the files.
+runtest "update copy" 'checkit "$RSYNC -avvI --no-whole-file \"$fromdir/\" \"$todir\"" "$fromdir" "$todir"'
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0
