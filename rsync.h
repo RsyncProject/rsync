@@ -27,7 +27,7 @@
 #define RSYNC_RSH_IO_ENV "RSYNC_RSH_IO"
 
 #define RSYNC_NAME "rsync"
-#define RSYNCD_SYSCONF "/etc/rsyncd.conf"
+/* RSYNCD_SYSCONF is now set in config.h */
 #define RSYNCD_USERCONF "rsyncd.conf"
 
 #define DEFAULT_LOCK_FILE "/var/run/rsyncd.lock"

@@ -97,6 +97,27 @@ AC_ARG_WITH(rsync-path,
 
 AC_DEFINE_UNQUOTED(RSYNC_PATH, "$RSYNC_PATH", [location of rsync on remote machine])
 
+AC_ARG_WITH(rsyncd-conf,
+	AC_HELP_STRING([--with-rsyncd-conf=PATH], [set configuration file for rsync server to PATH (default: /etc/rsyncd.conf)]),
+	[ if test ! -z "$with_rsyncd_conf" ; then
+		case $with_rsyncd_conf in
+			yes|no)
+				RSYNCD_SYSCONF="/etc/rsyncd.conf"
+				;;
+			/*)
+				RSYNCD_SYSCONF="$with_rsyncd_conf"
+				;;
+			*)
+                                AC_MSG_ERROR(You must specify an absolute path to --with-rsyncd-conf=PATH)
+				;;
+		esac
+	else
+		RSYNCD_SYSCONF="/etc/rsyncd.conf"
+	fi ],
+	[ RSYNCD_SYSCONF="/etc/rsyncd.conf" ])
+
+AC_DEFINE_UNQUOTED(RSYNCD_SYSCONF, "$RSYNCD_SYSCONF", [location of configuration file for rsync server])
+
 AC_ARG_WITH(rsh,
 	AC_HELP_STRING([--with-rsh=CMD], [set remote shell command to CMD (default: ssh)]))
 
