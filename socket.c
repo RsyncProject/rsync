@@ -48,8 +48,8 @@ static int establish_proxy_connection(int fd, char *host, int port,
 	int len;
 
 	if (proxy_user && proxy_pass) {
-		snprintf(buffer, sizeof buffer, "%s:%s",
-			 proxy_user, proxy_pass);
+		stringjoin(buffer, sizeof buffer,
+			 proxy_user, ":", proxy_pass, NULL);
 		len = strlen(buffer);
 
 		if ((len*8 + 5) / 6 >= (int)sizeof authbuf) {
