@@ -28,8 +28,9 @@ do
     chgrp "$g" "$name" || fail "Can't chgrp"
 done
 sleep 2
+ls -lRa "$scratchdir"
+id || true
 
 checkit "$RSYNC -rtgvvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
 exit 0
-# last [] may have failed but if we get here then we've won
