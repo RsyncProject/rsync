@@ -150,7 +150,6 @@ char *dest_option = NULL;
 
 int verbose = 0;
 int quiet = 0;
-int itemize_changes = 0;
 int log_before_transfer = 0;
 int log_format_has_i = 0;
 int log_format_has_o_or_i = 0;
@@ -163,6 +162,7 @@ char *batch_name = NULL;
 static int daemon_opt;   /* sets am_daemon after option error-reporting */
 static int F_option_cnt = 0;
 static int modify_window_set;
+static int itemize_changes = 0;
 static int refused_delete, refused_archive_part;
 static int refused_partial, refused_progress, refused_delete_before;
 static char *max_size_arg;
@@ -1078,10 +1078,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		omit_dir_times = 1;
 
 	if (log_format) {
-		if (strstr(log_format, "%i") != NULL)
+		if (log_format_has(log_format, 'i'))
 			log_format_has_i = 1;
-		if (strstr(log_format, "%b") == NULL
-		 && strstr(log_format, "%c") == NULL)
+		if (!log_format_has(log_format, 'b')
+		 && !log_format_has(log_format, 'c'))
 			log_before_transfer = !am_server;
 	} else if (itemize_changes) {
 		log_format = "%i %n%L";
@@ -1097,8 +1097,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		log_format = "%n%L";
 		log_before_transfer = !am_server;
 	}
-	if (log_format_has_i
-	    || (log_format && strstr(log_format, "%o") != NULL))
+	if (log_format_has_i || log_format_has(log_format, 'o'))
 		log_format_has_o_or_i = 1;
 
 	if (daemon_bwlimit && (!bwlimit || bwlimit > daemon_bwlimit))

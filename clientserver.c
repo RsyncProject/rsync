@@ -283,10 +283,10 @@ static int rsync_module(int f_in, int f_out, int i)
 		read_only = 1;
 
 	if (lp_transfer_logging(i)) {
-		if (strstr(lp_log_format(i), "%i") != NULL)
+		if (log_format_has(lp_log_format(i), 'i'))
 			daemon_log_format_has_i = 1;
 		if (daemon_log_format_has_i
-		    || strstr(lp_log_format(i), "%o") != NULL)
+		    || log_format_has(lp_log_format(i), 'o'))
 			daemon_log_format_has_o_or_i = 1;
 	}
 
