@@ -59,61 +59,44 @@ void write_batch_flist_info(int flist_count, struct file_struct **files)
 
 void write_batch_argvs_file(int argc, char *argv[])
 {
-	int f;
-	int i;
-	char buff[256]; /* XXX */
-	char buff2[MAXPATHLEN + 6];
+	int fd, i;
 	char filename[MAXPATHLEN];
 
 	stringjoin(filename, sizeof filename,
-	    batch_prefix, rsync_argvs_file, NULL);
-
-	f = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
-	    S_IRUSR | S_IWUSR | S_IEXEC);
-	if (f < 0) {
+		   batch_prefix, rsync_argvs_file, NULL);
+	fd = do_open(filename, O_WRONLY | O_CREAT | O_TRUNC,
+		     S_IRUSR | S_IWUSR | S_IEXEC);
+	if (fd < 0) {
 		rsyserr(FERROR, errno, "Batch file %s open error", filename);
 		exit_cleanup(1);
 	}
-	buff[0] = '\0';
 
-	/* Write argvs info to batch file */
-
-	for (i = 0; i < argc; ++i) {
+	/* Write argvs info to BATCH.rsync_argvs file */
+	for (i = 0; i < argc; i++) {
 		if (i == argc - 2) /* Skip source directory on cmdline */
 			continue;
-		/*
-		 * FIXME:
-		 * I think directly manipulating argv[] is probably bogus
-		 */
-		if (!strncmp(argv[i], "--write-batch",
-		    strlen("--write-batch"))) {
-			/* Safer to change it here than script */
-			/*
-			 * Change to --read-batch=prefix
-			 * to get ready for remote
-			 */
-			strlcat(buff, "--read-batch=", sizeof buff);
-			strlcat(buff, batch_prefix, sizeof buff);
+		if (i != 0)
+			write(fd, " ", 1);
+		if (!strncmp(argv[i], "--write-batch=", 14)) {
+			write(fd, "--read-batch=", 13);
+			write(fd, batch_prefix, strlen(batch_prefix));
+		} else if (i == argc - 1) {
+			char *p = find_colon(argv[i]);
+			if (p) {
+				if (*++p == ':')
+					p++;
+			} else
+				p = argv[i];
+			write(fd, "${1:-", 5);
+			write(fd, p, strlen(p));
+			write(fd, "}", 1);
 		} else
-		if (i == argc - 1) {
-			snprintf(buff2, sizeof buff2, "${1:-%s}", argv[i]);
-			strlcat(buff, buff2, sizeof buff);
-		}
-		else {
-			strlcat(buff, argv[i], sizeof buff);
-		}
-
-		if (i < (argc - 1)) {
-			strlcat(buff, " ", sizeof buff);
-		}
+			write(fd, argv[i], strlen(argv[i]));
 	}
-	strlcat(buff, "\n", sizeof buff);
-	if (!write(f, buff, strlen(buff))) {
+	if (write(fd, "\n", 1) != 1 || close(fd) < 0) {
 		rsyserr(FERROR, errno, "Batch file %s write error", filename);
-		close(f);
 		exit_cleanup(1);
 	}
-	close(f);
 }
 
 struct file_list *create_flist_from_batch(void)
