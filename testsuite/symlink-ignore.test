@@ -10,8 +10,6 @@
 
 . "$suitedir/rsync.fns"
 
-set -x
-
 build_symlinks || test_fail "failed to build symlinks"
 
 # Copy recursively, but without -l or -L or -a, and all the symlinks

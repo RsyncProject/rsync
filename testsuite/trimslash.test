@@ -9,8 +9,6 @@
 
 . "$suitedir/rsync.fns"
 
-set -x
-
 "$TOOLDIR/trimslash" "/usr/local/bin" "/usr/local/bin/" "/usr/local/bin///" \
 	"//a//" "////" \
         "/Users/Wierd Macintosh Name/// Ooh, translucent plastic/" \

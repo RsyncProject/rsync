@@ -9,8 +9,6 @@
 
 . "$suitedir/rsync.fns"
 
-set -x
-
 "$TOOLDIR/wildtest" "$srcdir/wildtest.txt" >"$scratchdir/wild.out"
 diff $diffopt "$scratchdir/wild.out" - <<EOF
 No wildmatch errors found.

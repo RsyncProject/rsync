@@ -32,8 +32,6 @@ ln -s ../files/file1 "from/safe/links/"
 ln -s ../files/file2 "from/safe/links/"
 ln -s ../../unsafe/unsafefile "from/safe/links/"
 
-set -x
-
 echo "rsync with relative path and just -a";
 $RSYNC -avv from/safe/ to
 test_symlink to/links/file1

@@ -9,8 +9,6 @@
 
 . "$suitedir/rsync.fns"
 
-set -x
-
 alt1dir="$tmpdir/alt1"
 alt2dir="$tmpdir/alt2"
 
