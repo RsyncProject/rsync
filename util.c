@@ -888,7 +888,7 @@ int pop_dir(char *dir)
  * The string " (in MODNAME)" may also be appended.  The returned pointer
  * remains valid until the next time full_fname() is called.
  **/
-char *full_fname(char *fn)
+char *full_fname(const char *fn)
 {
 	static char *result = NULL;
 	char *m1, *m2, *m3;
