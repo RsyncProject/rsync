@@ -47,10 +47,10 @@ Changes since 2.6.3:
     - Fixed a potential hang when verbosity is high, the client side is
       the sender, and the file-list is large.
 
-    - Fixed a potential protocol-corrupting bug where the generator
-      might accidentally merge a message from the receiver into the
-      middle of a multiplexed packet of data that is waiting for the
-      socket to allow it to flush.
+    - Fixed a potential protocol-corrupting bug where the generator could
+      merge a message from the receiver into the middle of a multiplexed
+      packet of data if only part of that data was written out to the
+      socket when we got the message from the generator.
 
     - We now check if the OS doesn't support using mknod() for creating
       FIFOs and sockets, and compile-in using mkfifo() and socket() when
@@ -126,7 +126,7 @@ Changes since 2.6.3:
       (the preserved) attributes from the version in the compare-dest DIR.
 
     - When rsync is copying files into a write-protected directory, fixed
-      the changed-report output for the directory so that we don't report
+      the change-report output for the directory so that we don't report
       an identical directory as changed.
 
   ENHANCEMENTS:
