@@ -583,6 +583,22 @@ static char *find_colon(char *s)
 }
 
 
+static int copy_argv (char *argv[])
+{
+	int i;
+
+	for (i = 0; argv[i]; i++) {
+		if (!(argv[i] = strdup(argv[i]))) {
+			rprintf (FERROR, "out of memory at %s(%d)\n",
+				 __FILE__, __LINE__);
+			return RERR_MALLOC;
+		}
+	}
+
+	return 0;
+}
+
+
 /*
  * Start a client for either type of remote connection.  Work out
  * whether the arguments request a remote shell or rsyncd connection,
@@ -602,13 +618,18 @@ static int start_client(int argc, char *argv[])
 	extern char *shell_cmd;
 	extern int rsync_port;
 	extern int whole_file;
-	char *argv0 = strdup(argv[0]);
 	extern int read_batch;
+	int rc;
 
-	if (strncasecmp(URL_PREFIX, argv0, strlen(URL_PREFIX)) == 0) {
+	/* Don't clobber argv[] so that ps(1) can still show the right
+           command line. */
+	if ((rc = copy_argv (argv)))
+		return rc;
+
+	if (strncasecmp(URL_PREFIX, argv[0], strlen(URL_PREFIX)) == 0) {
 		char *host, *path;
 
-		host = argv0 + strlen(URL_PREFIX);
+		host = argv[0] + strlen(URL_PREFIX);
 		p = strchr(host,'/');
 		if (p) {
 			*p = 0;
@@ -630,7 +651,7 @@ static int start_client(int argc, char *argv[])
 	if (p) {
 		if (p[1] == ':') {
 			*p = 0;
-			return start_socket_client(argv0, p+2, argc-1, argv+1);
+			return start_socket_client(argv[0], p+2, argc-1, argv+1);
 		}
 
 		if (argc < 1) {
@@ -640,7 +661,7 @@ static int start_client(int argc, char *argv[])
 
 		am_sender = 0;
 		*p = 0;
-		shell_machine = argv0;
+		shell_machine = argv[0];
 		shell_path = p+1;
 		argc--;
 		argv++;
