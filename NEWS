@@ -1,6 +1,14 @@
 rsync 2.5.2 (???)
 
+  SECURITY FIXES:
+
+    * Signedness security patch from Sebastian Krahmer
+      <krahmer@suse.de> -- in some cases we were not sufficiently
+      careful about reading integers from the network.
+
   BUG FIXES:
+
+    * Fix possible string mangling in log files.
 
     * Fix for setting local address of outgoing sockets.
 

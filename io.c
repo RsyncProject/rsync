@@ -49,7 +49,7 @@ int kludge_around_eof = False;
 
 static int io_error_fd = -1;
 
-static void read_loop(int fd, char *buf, int len);
+static void read_loop(int fd, char *buf, size_t len);
 
 static void check_timeout(void)
 {
@@ -163,7 +163,7 @@ static void die_from_readerr (int err)
  * give a better explanation.  We can tell whether the connection has
  * started by looking e.g. at whether the remote version is known yet.
  */
-static int read_timeout (int fd, char *buf, int len)
+static int read_timeout (int fd, char *buf, size_t len)
 {
 	int n, ret=0;
 
@@ -236,7 +236,7 @@ static int read_timeout (int fd, char *buf, int len)
 
 /*! Continue trying to read len bytes - don't return until len has
   been read.   */
-static void read_loop (int fd, char *buf, int len)
+static void read_loop (int fd, char *buf, size_t len)
 {
 	while (len) {
 		int n = read_timeout(fd, buf, len);
@@ -253,7 +253,7 @@ static void read_loop (int fd, char *buf, int len)
  * 
  * Never returns <= 0. 
  */
-static int read_unbuffered(int fd, char *buf, int len)
+static int read_unbuffered(int fd, char *buf, size_t len)
 {
 	static int remaining;
 	int tag, ret=0;
@@ -305,7 +305,7 @@ static int read_unbuffered(int fd, char *buf, int len)
 
 /* do a buffered read from fd. don't return until all N bytes
    have been read. If all N can't be read then exit with an error */
-static void readfd (int fd, char *buffer, int N)
+static void readfd (int fd, char *buffer, size_t N)
 {
 	int  ret;
 	int total=0;  
@@ -356,12 +356,12 @@ int64 read_longint(int f)
 	return ret;
 }
 
-void read_buf(int f,char *buf,int len)
+void read_buf(int f,char *buf,size_t len)
 {
 	readfd(f,buf,len);
 }
 
-void read_sbuf(int f,char *buf,int len)
+void read_sbuf(int f,char *buf,size_t len)
 {
 	read_buf (f,buf,len);
 	buf[len] = 0;
@@ -375,7 +375,7 @@ unsigned char read_byte(int f)
 }
 
 /* write len bytes to fd */
-static void writefd_unbuffered(int fd,char *buf,int len)
+static void writefd_unbuffered(int fd,char *buf,size_t len)
 {
 	int total = 0;
 	fd_set w_fds, r_fds;
@@ -483,7 +483,7 @@ void io_start_buffering(int fd)
 
 /* write an message to a multiplexed stream. If this fails then rsync
    exits */
-static void mplex_write(int fd, enum logcode code, char *buf, int len)
+static void mplex_write(int fd, enum logcode code, char *buf, size_t len)
 {
 	char buffer[4096];
 	int n = len;
@@ -533,7 +533,7 @@ void io_end_buffering(int fd)
 	}
 }
 
-static void writefd(int fd,char *buf,int len)
+static void writefd(int fd,char *buf,size_t len)
 {
 	stats.total_written += len;
 
@@ -587,7 +587,7 @@ void write_longint(int f, int64 x)
 	writefd(f,b,8);
 }
 
-void write_buf(int f,char *buf,int len)
+void write_buf(int f,char *buf,size_t len)
 {
 	writefd(f,buf,len);
 }
@@ -606,7 +606,7 @@ void write_byte(int f,unsigned char c)
 
 
 
-int read_line(int f, char *buf, int maxlen)
+int read_line(int f, char *buf, size_t maxlen)
 {
 	while (maxlen) {
 		buf[0] = 0;
@@ -664,7 +664,7 @@ void io_start_multiplex_in(int fd)
 }
 
 /* write an message to the multiplexed error stream */
-int io_multiplex_write(enum logcode code, char *buf, int len)
+int io_multiplex_write(enum logcode code, char *buf, size_t len)
 {
 	if (!io_multiplexing_out) return 0;
 

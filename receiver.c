@@ -206,7 +206,8 @@ static int get_tmpname(char *fnametmp, char *fname)
 static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 			OFF_T total_size)
 {
-	int i,n,remainder,len,count;
+	int i;
+	unsigned int n,remainder,len,count;
 	OFF_T offset = 0;
 	OFF_T offset2;
 	char *data;

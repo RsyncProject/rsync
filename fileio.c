@@ -36,7 +36,7 @@ int sparse_end(int f)
 }
 
 
-static int write_sparse(int f,char *buf,int len)
+static int write_sparse(int f,char *buf,size_t len)
 {
 	int l1=0,l2=0;
 	int ret;
@@ -69,7 +69,7 @@ static int write_sparse(int f,char *buf,int len)
 
 
 
-int write_file(int f,char *buf,int len)
+int write_file(int f,char *buf,size_t len)
 {
 	int ret = 0;
 

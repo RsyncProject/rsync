@@ -375,7 +375,7 @@ static void receive_file_entry(struct file_struct **fptr,
 	static gid_t last_gid;
 	static char lastname[MAXPATHLEN];
 	char thisname[MAXPATHLEN];
-	int l1=0,l2=0;
+	unsigned int l1=0,l2=0;
 	char *p;
 	struct file_struct *file;
 
@@ -442,6 +442,10 @@ static void receive_file_entry(struct file_struct **fptr,
 
 	if (preserve_links && S_ISLNK(file->mode)) {
 		int l = read_int(f);
+		if (l < 0) {
+			rprintf(FERROR,"overflow: l=%d\n", l);
+			overflow("receive_file_entry");
+		}
 		file->link = (char *)malloc(l+1);
 		if (!file->link) out_of_memory("receive_file_entry 2");
 		read_sbuf(f,file->link,l);

@@ -466,7 +466,7 @@ static void log_formatted(enum logcode code,
 
 		l = strlen(n);
 
-		if ((l-1) + ((int)(s - &buf[0])) > sizeof(buf)) {
+		if (l + ((int)(s - &buf[0])) >= sizeof(buf)) {
 			rprintf(FERROR,"buffer overflow expanding %%%c - exiting\n",
 				p[0]);
 			exit_cleanup(RERR_MESSAGEIO);

@@ -275,7 +275,7 @@ int create_directory_path(char *fname)
 
    derived from GNU C's cccp.c.
 */
-static int full_write(int desc, char *ptr, int len)
+static int full_write(int desc, char *ptr, size_t len)
 {
 	int total_written;
 	
@@ -301,11 +301,11 @@ static int full_write(int desc, char *ptr, int len)
    for an error.  
 
    derived from GNU C's cccp.c. */
-static int safe_read(int desc, char *ptr, int len)
+static int safe_read(int desc, char *ptr, size_t len)
 {
 	int n_chars;
  
-	if (len <= 0)
+	if (len == 0)
 		return len;
  
 #ifdef EINTR
