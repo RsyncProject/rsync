@@ -35,6 +35,7 @@ extern int blocking_io;
 extern int remove_sent_files;
 extern int daemon_over_rsh;
 extern int need_messages_from_generator;
+extern int kludge_around_eof;
 extern int do_stats;
 extern int log_got_error;
 extern int module_id;
@@ -563,6 +564,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		 * USR2 signal.  If --delete-after was specified, we might get
 		 * a keep-alive message over the socket, so handle that too. */
 		if (protocol_version >= 29) {
+			kludge_around_eof = 1;
 			while (read_int(f_in) == flist->count) {
 				if (read_shortint(f_in) != ITEM_IS_NEW)
 					break; /* Complain? */
