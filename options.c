@@ -121,7 +121,7 @@ unsigned int backup_dir_remainder;
 char *backup_suffix = NULL;
 char *tmpdir = NULL;
 char *partial_dir = NULL;
-char *compare_dest = NULL;
+char *basis_dir[MAX_BASIS_DIRS+1];
 char *config_file = NULL;
 char *shell_cmd = NULL;
 char *log_format = NULL;
@@ -130,6 +130,7 @@ char *rsync_path = RSYNC_PATH;
 char *backup_dir = NULL;
 char backup_dir_buf[MAXPATHLEN];
 int rsync_port = RSYNC_PORT;
+int copy_dest = 0;
 int link_dest = 0;
 
 int verbose = 0;
@@ -142,6 +143,9 @@ char *batch_name = NULL;
 
 static int daemon_opt;   /* sets am_daemon after option error-reporting */
 static int modify_window_set;
+static int compare_dest = 0;
+static int basis_dir_cnt = 0;
+static char *dest_option;
 static char *max_size_arg;
 
 /** Local address to bind.  As a character string because it's
@@ -282,7 +286,8 @@ void usage(enum logcode F)
   rprintf(F,"     --modify-window=NUM     compare mod times with reduced accuracy\n");
   rprintf(F," -T, --temp-dir=DIR          create temporary files in directory DIR\n");
   rprintf(F,"     --compare-dest=DIR      also compare destination files relative to DIR\n");
-  rprintf(F,"     --link-dest=DIR         create hardlinks to DIR for unchanged files\n");
+  rprintf(F,"     --copy-dest=DIR         ... and include copies of unchanged files\n");
+  rprintf(F,"     --link-dest=DIR         hardlink to files in DIR when unchanged\n");
   rprintf(F," -P                          equivalent to --partial --progress\n");
   rprintf(F," -z, --compress              compress file data\n");
   rprintf(F," -C, --cvs-exclude           auto ignore files in the same way CVS does\n");
@@ -314,7 +319,8 @@ void usage(enum logcode F)
 }
 
 enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
-      OPT_DELETE_AFTER, OPT_DELETE_EXCLUDED, OPT_LINK_DEST,
+      OPT_DELETE_AFTER, OPT_DELETE_EXCLUDED,
+      OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_TIMEOUT, OPT_MAX_SIZE,
       OPT_REFUSED_BASE = 9000};
@@ -374,8 +380,9 @@ static struct poptOption long_options[] = {
   {"max-size",         0,  POPT_ARG_STRING, &max_size_arg,  OPT_MAX_SIZE, 0, 0 },
   {"timeout",          0,  POPT_ARG_INT,    &io_timeout, OPT_TIMEOUT, 0, 0 },
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir, 0, 0, 0 },
-  {"compare-dest",     0,  POPT_ARG_STRING, &compare_dest, 0, 0, 0 },
-  {"link-dest",        0,  POPT_ARG_STRING, &compare_dest, OPT_LINK_DEST, 0, 0 },
+  {"compare-dest",     0,  POPT_ARG_STRING, 0, OPT_COMPARE_DEST, 0, 0 },
+  {"copy-dest",        0,  POPT_ARG_STRING, 0, OPT_COPY_DEST, 0, 0 },
+  {"link-dest",        0,  POPT_ARG_STRING, 0, OPT_LINK_DEST, 0, 0 },
   /* TODO: Should this take an optional int giving the compression level? */
   {"compress",        'z', POPT_ARG_NONE,   &do_compression, 0, 0, 0 },
   {"stats",            0,  POPT_ARG_NONE,   &do_stats, 0, 0, 0 },
@@ -697,10 +704,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				break;
 			}
 			if (max_size <= 0) {
-				rprintf(FERROR,
+				snprintf(err_buf, sizeof err_buf,
 					"--max-size value is invalid: %s\n",
 					max_size_arg);
-				exit_cleanup(RERR_SYNTAX);
+				return 0;
 			}
 			break;
 
@@ -712,13 +719,35 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		case OPT_LINK_DEST:
 #if HAVE_LINK
 			link_dest = 1;
-			break;
+			dest_option = "--link-dest";
+			goto set_dest_dir;
 #else
 			snprintf(err_buf, sizeof err_buf,
 				 "hard links are not supported on this %s\n",
 				 am_server ? "server" : "client");
 			return 0;
 #endif
+
+		case OPT_COPY_DEST:
+			copy_dest = 1;
+			dest_option = "--copy-dest";
+			goto set_dest_dir;
+
+		case OPT_COMPARE_DEST:
+			compare_dest = 1;
+			dest_option = "--compare-dest";
+		set_dest_dir:
+			if (basis_dir_cnt >= MAX_BASIS_DIRS-1) {
+				snprintf(err_buf, sizeof err_buf,
+					"ERROR: at most %d %s args may be specified\n",
+					MAX_BASIS_DIRS, dest_option);
+				return 0;
+			}
+			arg = poptGetOptArg(pc);
+			if (sanitize_paths)
+				arg = sanitize_path(NULL, arg, NULL, 0);
+			basis_dir[basis_dir_cnt++] = (char *)arg;
+			break;
 
 		default:
 			/* A large opt value means that set_refuse_options()
@@ -802,6 +831,12 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		return 0;
 	}
 
+	if (compare_dest + copy_dest + link_dest > 1) {
+		snprintf(err_buf, sizeof err_buf,
+			"You may not mix --compare-dest, --copy-dest, and --link-dest.\n");
+		return 0;
+	}
+
 	if (archive_mode) {
 		if (!files_from)
 			recurse = 1;
@@ -829,8 +864,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			tmpdir = sanitize_path(NULL, tmpdir, NULL, 0);
 		if (partial_dir)
 			partial_dir = sanitize_path(NULL, partial_dir, NULL, 0);
-		if (compare_dest)
-			compare_dest = sanitize_path(NULL, compare_dest, NULL, 0);
 		if (backup_dir)
 			backup_dir = sanitize_path(NULL, backup_dir, NULL, 0);
 		if (files_from)
@@ -838,6 +871,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 	if (server_exclude_list.head && !am_sender) {
 		struct exclude_list_struct *elp = &server_exclude_list;
+		int i;
 		if (tmpdir) {
 			clean_fname(tmpdir, 1);
 			if (check_exclude(elp, tmpdir, 1) < 0)
@@ -848,9 +882,9 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			if (check_exclude(elp, partial_dir, 1) < 0)
 				goto options_rejected;
 		}
-		if (compare_dest) {
-			clean_fname(compare_dest, 1);
-			if (check_exclude(elp, compare_dest, 1) < 0)
+		for (i = 0; i < basis_dir_cnt; i++) {
+			clean_fname(basis_dir[i], 1);
+			if (check_exclude(elp, basis_dir[i], 1) < 0)
 				goto options_rejected;
 		}
 		if (backup_dir) {
@@ -923,10 +957,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			 am_server ? "server" : "client");
 		return 0;
 #endif
-		if (compare_dest) {
+		if (compare_dest || copy_dest || link_dest) {
 			snprintf(err_buf, sizeof err_buf,
 				 "--inplace does not yet work with %s\n",
-				 link_dest ? "--link-dest" : "--compare-dest");
+				 dest_option);
 			return 0;
 		}
 	} else {
@@ -990,8 +1024,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
  **/
 void server_options(char **args,int *argc)
 {
+	static char argstr[50+MAX_BASIS_DIRS*2];
 	int ac = *argc;
-	static char argstr[50];
 	char *arg;
 
 	int i, x;
@@ -1179,13 +1213,16 @@ void server_options(char **args,int *argc)
 		args[ac++] = tmpdir;
 	}
 
-	if (compare_dest && am_sender) {
+	if (basis_dir[0] && am_sender) {
 		/* the server only needs this option if it is not the sender,
 		 *   and it may be an older version that doesn't know this
 		 *   option, so don't send it if client is the sender.
 		 */
-		args[ac++] = link_dest ? "--link-dest" : "--compare-dest";
-		args[ac++] = compare_dest;
+		int i;
+		for (i = 0; i < basis_dir_cnt; i++) {
+			args[ac++] = dest_option;
+			args[ac++] = basis_dir[i];
+		}
 	}
 
 	if (files_from && (!am_sender || remote_filesfrom_file)) {
