@@ -477,7 +477,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	}
 
 	if (fd_pair(error_pipe) < 0) {
-		rprintf(FERROR,"error pipe failed in do_recv\n");
+		rsyserr(FERROR, errno, "pipe failed in do_recv");
 		exit_cleanup(RERR_SOCKETIO);
 	}
 
