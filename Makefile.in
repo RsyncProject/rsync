@@ -130,3 +130,5 @@ check: all $(CHECK_PROGS)
 installcheck: $(CHECK_PROGS)
 	POSIXLY_CORRECT=1 rsync_bin="$(bindir)/rsync" srcdir="$(srcdir)" $(srcdir)/runtests.sh
 
+$(OBJS): config.h *.h */*.h
+
