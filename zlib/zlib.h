@@ -127,6 +127,7 @@ typedef z_stream FAR *z_streamp;
 #define Z_SYNC_FLUSH    2
 #define Z_FULL_FLUSH    3
 #define Z_FINISH        4
+#define Z_INSERT_ONLY	5
 /* Allowed flush values; see deflate() below for details */
 
 #define Z_OK            0

@@ -80,7 +80,7 @@ local block_state deflate_slow   OF((deflate_state *s, int flush));
 local void lm_init        OF((deflate_state *s));
 local void putShortMSB    OF((deflate_state *s, uInt b));
 local void flush_pending  OF((z_streamp strm));
-local int read_buf        OF((z_streamp strm, Bytef *buf, unsigned size));
+local int dread_buf        OF((z_streamp strm, Bytef *buf, unsigned size));
 #ifdef ASMV
       void match_init OF((void)); /* asm code initialization */
       uInt longest_match  OF((deflate_state *s, IPos cur_match));
@@ -411,7 +411,7 @@ local void putShortMSB (s, b)
  * Flush as much pending output as possible. All deflate() output goes
  * through this function so some applications may wish to modify it
  * to avoid allocating a large strm->next_out buffer and copying into it.
- * (See also read_buf()).
+ * (See also dread_buf()).
  */
 local void flush_pending(strm)
     z_streamp strm;
@@ -441,7 +441,7 @@ int ZEXPORT deflate (strm, flush)
     deflate_state *s;
 
     if (strm == Z_NULL || strm->state == Z_NULL ||
-	flush > Z_FINISH || flush < 0) {
+	flush > Z_INSERT_ONLY || flush < 0) {
         return Z_STREAM_ERROR;
     }
     s = strm->state;
@@ -657,7 +657,7 @@ int ZEXPORT deflateCopy (dest, source)
  * allocating a large strm->next_in buffer and copying from it.
  * (See also flush_pending()).
  */
-local int read_buf(strm, buf, size)
+local int dread_buf(strm, buf, size)
     z_streamp strm;
     Bytef *buf;
     unsigned size;
@@ -1028,7 +1028,7 @@ local void fill_window(s)
          */
         Assert(more >= 2, "more < 2");
 
-        n = read_buf(s->strm, s->window + s->strstart + s->lookahead, more);
+        n = dread_buf(s->strm, s->window + s->strstart + s->lookahead, more);
         s->lookahead += n;
 
         /* Initialize the hash value now that we have some input: */
@@ -1162,6 +1162,12 @@ local block_state deflate_fast(s, flush)
             INSERT_STRING(s, s->strstart, hash_head);
         }
 
+	if (flush == Z_INSERT_ONLY) {
+	    s->strstart++;
+	    s->lookahead--;
+	    continue;
+	}
+
         /* Find the longest match, discarding those <= prev_length.
          * At this point we have always match_length < MIN_MATCH
          */
@@ -1221,6 +1227,10 @@ local block_state deflate_fast(s, flush)
         }
         if (bflush) FLUSH_BLOCK(s, 0);
     }
+    if (flush == Z_INSERT_ONLY) {
+	s->block_start = s->strstart;
+	return need_more;
+    }
     FLUSH_BLOCK(s, flush == Z_FINISH);
     return flush == Z_FINISH ? finish_done : block_done;
 }
@@ -1258,6 +1268,12 @@ local block_state deflate_slow(s, flush)
         if (s->lookahead >= MIN_MATCH) {
             INSERT_STRING(s, s->strstart, hash_head);
         }
+
+	if (flush == Z_INSERT_ONLY) {
+	    s->strstart++;
+	    s->lookahead--;
+	    continue;
+	}
 
         /* Find the longest match, discarding those <= prev_length.
          */
@@ -1336,6 +1352,10 @@ local block_state deflate_slow(s, flush)
             s->strstart++;
             s->lookahead--;
         }
+    }
+    if (flush == Z_INSERT_ONLY) {
+	s->block_start = s->strstart;
+	return need_more;
     }
     Assert (flush != Z_NO_FLUSH, "no flush?");
     if (s->match_available) {

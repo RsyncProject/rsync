@@ -214,21 +214,15 @@ static void hash_search(int f,struct sum_struct *s,
 			--k;
 		}
 
-		if (!do_compression) {
-			/* By matching early we avoid re-reading the
-			   data 3 times in the case where a token
-			   match comes a long way after last
-			   match. The 3 reads are caused by the
-			   running match, the checksum update and the
-			   literal send.
-
-			   we don't enable this for the compressed
-			   case yet as the deflated token code can't
-			   handle it. Paul is working on it */
-			if (offset-last_match >= CHUNK_SIZE+s->n && 
-			    (end-offset > CHUNK_SIZE)) {
-				matched(f,s,buf,offset - s->n, -2);
-			}
+		/* By matching early we avoid re-reading the
+		   data 3 times in the case where a token
+		   match comes a long way after last
+		   match. The 3 reads are caused by the
+		   running match, the checksum update and the
+		   literal send. */
+		if (offset-last_match >= CHUNK_SIZE+s->n && 
+		    (end-offset > CHUNK_SIZE)) {
+			matched(f,s,buf,offset - s->n, -2);
 		}
 	} while (++offset < end);
 	

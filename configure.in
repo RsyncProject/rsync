@@ -118,3 +118,4 @@ fi])
 
 
 AC_OUTPUT(Makefile lib/dummy)
+AC_OUTPUT(Makefile zlib/dummy)

@@ -20,11 +20,14 @@ SHELL=/bin/sh
 .SUFFIXES:
 .SUFFIXES: .c .o
 
-LIBOBJ=lib/getopt.o lib/fnmatch.o lib/zlib.o lib/compat.o
+LIBOBJ=lib/getopt.o lib/fnmatch.o lib/compat.o
+ZLIBOBJ=zlib/deflate.o zlib/infblock.o zlib/infcodes.o zlib/inffast.o \
+	zlib/inflate.o zlib/inftrees.o zlib/infutil.o zlib/trees.o \
+	zlib/zutil.o zlib/adler32.o
 OBJS1=rsync.o exclude.o util.o md4.o main.o checksum.o match.o syscall.o log.o
 OBJS2=options.o flist.o io.o compat.o hlink.o token.o uidlist.o socket.o 
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
-OBJS=$(OBJS1) $(OBJS2) $(DAEMON_OBJ) $(LIBOBJ)
+OBJS=$(OBJS1) $(OBJS2) $(DAEMON_OBJ) $(LIBOBJ) $(ZLIBOBJ)
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
