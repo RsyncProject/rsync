@@ -392,20 +392,27 @@ void close_batch_csums_file(void)
 	close(fdb);
 }
 
+
+/**
+ * Write csum info to batch file 
+ *
+ * @todo This will break if s->count is ever larger than maxint.  The
+ * batch code should probably be changed to consistently use the
+ * variable-length integer routines, which is probably a compatible
+ * change.
+ **/
 void write_batch_csum_info(int *flist_entry, int flist_count,
 			   struct sum_struct *s)
 {
 	size_t i;
-	size_t int_zero = 0;
+	size_t int_count;
 	extern int csum_length;
 
 	fdb_open = 1;
 
-	/* Write csum info to batch file */
-
-	/* FIXME: This will break if s->count is ever not exactly an int. */
 	write_batch_csums_file(flist_entry, sizeof(int));
-	write_batch_csums_file(s ? &s->count : &int_zero, sizeof(int));
+	int_count = s->count;
+	write_batch_csums_file(&int_count, int_count);
 	
 	if (s) {
 		for (i = 0; i < s->count; i++) {
