@@ -602,7 +602,7 @@ char *client_name(int fd)
 	}
 
 #ifdef INET6
-        if (ss.ss_family == AF_INET6 && 
+        if (ss.sa_family == AF_INET6 && 
 	    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)&ss)->sin6_addr)) {
 		struct sockaddr_in6 sin6;
 		struct sockaddr_in *sin;
