@@ -52,6 +52,7 @@ extern int ignore_times;
 extern int size_only;
 extern OFF_T max_size;
 extern int io_timeout;
+extern int ignore_timeout;
 extern int protocol_version;
 extern int fuzzy_basis;
 extern int always_checksum;
@@ -881,6 +882,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	int need_retouch_dir_perms = 0;
 	int save_only_existing = only_existing;
 	int save_opt_ignore_existing = opt_ignore_existing;
+	int allowed_lull = protocol_version >= 29 ? io_timeout / 2 : 0;
 
 	if (verbose > 2) {
 		rprintf(FINFO, "generator starting pid=%ld count=%d\n",
@@ -894,9 +896,8 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 			: "enabled");
 	}
 
-	/* We expect to just sit around now, so don't exit on a timeout.
-	 * If we really get a timeout then the other process should exit. */
-	io_timeout = 0;
+	if (protocol_version < 29)
+		io_timeout = 0; /* kluge for older protocol versions */
 
 	for (i = 0; i < flist->count; i++) {
 		struct file_struct *file = flist->files[i];
@@ -917,6 +918,9 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 
 		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
 			       flist, file, i, f_out, f_out_name);
+
+		if (allowed_lull && !(i % 100))
+			maybe_send_keepalive(allowed_lull, flist->count);
 	}
 	recv_generator(NULL, NULL, NULL, 0, -1, -1);
 	if (delete_during)
@@ -927,6 +931,10 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	only_existing = max_size = opt_ignore_existing = 0;
 	update_only = always_checksum = size_only = 0;
 	ignore_times = 1;
+
+	/* We expect to just sit around now, so don't exit on a timeout.
+	 * If we really get a timeout then the other process should exit. */
+	ignore_timeout = 1;
 
 	if (verbose > 2)
 		rprintf(FINFO,"generate_files phase=%d\n",phase);
@@ -939,6 +947,8 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 		struct file_struct *file = flist->files[i];
 		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
 			       flist, file, i, f_out, f_out_name);
+		if (allowed_lull)
+			maybe_send_keepalive(allowed_lull, flist->count);
 	}
 
 	phase++;
