@@ -303,8 +303,8 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
  * cope with platforms on which this is an unsigned int or even a
  * struct.  Later.
  */ 
-#define INO64_T int64
-#define DEV64_T int64
+#define INO64_T unsigned int64
+#define DEV64_T unsigned int64
 
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
