@@ -60,10 +60,3 @@ proto:
 clean:
 	rm -f *~ $(OBJS) rsync config.cache config.log config.status
 
-dist:
-	tar --exclude-from .ignore -czf dist.tar.gz .
-	-mkdir rsync-$(VERSION)
-	(cd rsync-$(VERSION) ; tar xzf ../dist.tar.gz)
-	tar -czf rsync-$(VERSION).tar.gz rsync-$(VERSION)
-	rm -f dist.tar.gz
-	echo rsync-$(VERSION) >> .cvsignore
