@@ -81,7 +81,7 @@ static char *gid_to_name(gid_t gid)
 static int map_uid(int id, char *name)
 {
 	uid_t uid;
-	if (uid != 0 && name_to_uid(name, &uid))
+	if (id != 0 && name_to_uid(name, &uid))
 		return uid;
 	return id;
 }
@@ -89,7 +89,7 @@ static int map_uid(int id, char *name)
 static int map_gid(int id, char *name)
 {
 	gid_t gid;
-	if (gid != 0 && name_to_gid(name, &gid))
+	if (id != 0 && name_to_gid(name, &gid))
 		return gid;
 	return id;
 }
@@ -161,7 +161,7 @@ static struct idlist *recv_add_uid(int id, char *name)
 	int id2 = name ? map_uid(id, name) : id;
 	struct idlist *node;
 
-	node = add_to_list(&uidlist, id, name, map_uid(id, name));
+	node = add_to_list(&uidlist, id, name, id2);
 
 	if (verbose > 3) {
 		rprintf(FINFO, "uid %d(%s) maps to %d\n",
