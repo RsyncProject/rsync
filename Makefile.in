@@ -20,7 +20,7 @@ SHELL=/bin/sh
 .SUFFIXES:
 .SUFFIXES: .c .o
 
-LIBOBJ=lib/getopt.o lib/fnmatch.o lib/compat.o
+LIBOBJ=lib/getopt.o lib/fnmatch.o lib/compat.o lib/snprintf.o
 ZLIBOBJ=zlib/deflate.o zlib/infblock.o zlib/infcodes.o zlib/inffast.o \
 	zlib/inflate.o zlib/inftrees.o zlib/infutil.o zlib/trees.o \
 	zlib/zutil.o zlib/adler32.o
