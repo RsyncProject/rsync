@@ -16,6 +16,13 @@
 #
 # NOTE:  This script expects /proc/mounts to exist, but could be
 # easily adapted to read /etc/mtab or similar.
+#
+# ADDENDUM:  The addition of the --filter option (which has support for
+# absolute-anchored excludes) has made this script less useful than it
+# was.  Beginning with 2.6.4, you can achieve the effect of this script
+# though this command:
+#
+# awk '{print $2}' /proc/mounts | rsync -f 'merge,/- -' host:/dir /dest/
 
 use strict;
 use Cwd 'abs_path';
