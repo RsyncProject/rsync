@@ -1,0 +1,29 @@
+#! /bin/sh
+
+# Copyright (C) 2002 by Martin Pool <mbp@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test rsync handling of devices.  This can only run if you're root.
+
+. $srcdir/testsuite/rsync.fns
+
+set -x
+
+# Build some hardlinks
+
+fromdir="$scratchdir/from"
+todir="$scratchdir/to"
+
+# TODO: Need to test whether hardlinks are possible on this OS/filesystem
+
+mkdir "$fromdir"
+mknod "$fromdir/char" c 42 69  || test_skipped "Can't create char device node?"
+mknod "$fromdir/block" b 42 69 || test_skipped "Can't create block device node?"
+
+checkit "rsync -aHvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+
+exit 0
+# last [] may have failed but if we get here then we've won
+
