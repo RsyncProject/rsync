@@ -380,7 +380,6 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 
 			if (io_timeout)
 				last_io = time(NULL);
-			continue;
 		}
 	}
 
