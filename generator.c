@@ -52,6 +52,8 @@ extern int only_existing;
 extern int orig_umask;
 extern int safe_symlinks;
 
+extern struct exclude_list_struct server_exclude_list;
+
 
 /* choose whether to skip a particular file */
 static int skip_file(char *fname, struct file_struct *file, STRUCT_STAT *st)
@@ -280,6 +282,11 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 
 	if (verbose > 2)
 		rprintf(FINFO,"recv_generator(%s,%d)\n",fname,i);
+
+	if (server_exclude_list.head
+	    && check_exclude(&server_exclude_list, fname,
+			     S_ISDIR(file->mode)) < 0)
+		return;
 
 	statret = link_stat(fname,&st);
 
