@@ -652,8 +652,7 @@ useful in combination with a recursive transfer.
 You may use as many --exclude options on the command line as you like
 to build up the list of files to exclude.
 
-See the EXCLUDE PATTERNS section for information on the syntax of 
-this option.
+See the EXCLUDE PATTERNS section for detailed information on this option.
 
 dit(bf(--exclude-from=FILE)) This option is similar to the --exclude
 option, but instead it adds all exclude patterns listed in the file
@@ -665,8 +664,7 @@ dit(bf(--include=PATTERN)) This option tells rsync to not exclude the
 specified pattern of filenames. This is useful as it allows you to
 build up quite complex exclude/include rules.
 
-See the EXCLUDE PATTERNS section for information on the syntax of 
-this option.
+See the EXCLUDE PATTERNS section for detailed information on this option.
 
 dit(bf(--include-from=FILE)) This specifies a list of include patterns
 from a file.
