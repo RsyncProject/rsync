@@ -91,7 +91,6 @@ static off_t last_match;
 
 
 static void matched(int f,struct sum_struct *s,struct map_struct *buf,
-		    off_t len,
 		    int offset,int i)
 {
   int n = offset - last_match;
@@ -180,7 +179,7 @@ static void hash_search(int f,struct sum_struct *s,
 	    done_csum2 = 1;
 	  }
 	  if (memcmp(sum2,s->sums[i].sum2,csum_length) == 0) {
-	    matched(f,s,buf,len,offset,i);
+	    matched(f,s,buf,offset,i);
 	    offset += s->sums[i].len - 1;
 	    k = MIN((len-offset), s->n);
 	    map = (signed char *)map_ptr(buf,offset,k);
@@ -212,7 +211,7 @@ static void hash_search(int f,struct sum_struct *s,
 
   } while (++offset < end);
 
-  matched(f,s,buf,len,len,-1);
+  matched(f,s,buf,len,-1);
   map_ptr(buf,len-1,1);
 }
 
@@ -240,7 +239,7 @@ void match_sums(int f,struct sum_struct *s,struct map_struct *buf,off_t len)
     if (verbose > 2) 
       fprintf(FERROR,"done hash search\n");
   } else {
-    matched(f,s,buf,len,len,-1);
+    matched(f,s,buf,len,-1);
   }
 
   sum_end(file_sum);

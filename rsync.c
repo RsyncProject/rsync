@@ -147,7 +147,6 @@ static struct sum_struct *receive_sums(int f)
   struct sum_struct *s;
   int i;
   off_t offset = 0;
-  int block_len;
 
   s = (struct sum_struct *)malloc(sizeof(*s));
   if (!s) out_of_memory("receive_sums");
@@ -160,8 +159,6 @@ static struct sum_struct *receive_sums(int f)
   if (verbose > 3)
     fprintf(FERROR,"count=%d n=%d rem=%d\n",
 	    s->count,s->n,s->remainder);
-
-  block_len = s->n;
 
   if (s->count == 0) 
     return(s);
