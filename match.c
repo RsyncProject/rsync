@@ -24,6 +24,7 @@ extern int am_server;
 extern int do_progress;
 extern int checksum_seed;
 extern int inplace;
+extern int make_backups;
 
 typedef unsigned short tag;
 
@@ -204,7 +205,7 @@ static void hash_search(int f,struct sum_struct *s,
 
 			/* inplace: ensure chunk's offset is either >= our
 			 * offset or that the data didn't move. */
-			if (inplace && s->sums[i].offset < offset
+			if (inplace && !make_backups && s->sums[i].offset < offset
 			    && !(s->sums[i].flags & SUMFLG_SAME_OFFSET))
 				continue;
 
@@ -226,7 +227,7 @@ static void hash_search(int f,struct sum_struct *s,
 			/* If inplace is enabled, the best possible match is
 			 * one with an identical offset, so we prefer that over
 			 * the following want_i optimization. */
-			if (inplace) {
+			if (inplace && !make_backups) {
 				do {
 					size_t i2 = targets[j].i;
 					if (s->sums[i2].offset != offset)
@@ -249,7 +250,7 @@ static void hash_search(int f,struct sum_struct *s,
 			/* we've found a match, but now check to see
 			 * if want_i can hint at a better match. */
 			if (i != want_i && want_i < s->count
-			    && (!inplace || s->sums[want_i].offset >= offset
+			    && (!inplace || make_backups || s->sums[want_i].offset >= offset
 			     || s->sums[want_i].flags & SUMFLG_SAME_OFFSET)
 			    && sum == s->sums[want_i].sum1
 			    && memcmp(sum2, s->sums[want_i].sum2, s->s2length) == 0) {
