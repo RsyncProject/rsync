@@ -1,9 +1,27 @@
--*- outline -*-
+-*- indented-text -*-
 
-* Merge IPv6 support
+URGENT ---------------------------------------------------------------
+
+NICE -----------------------------------------------------------------
+
+Merge IPv6 support ***
 
 A patch is available at
 
         ftp://ftp.kame.net/pub/kame/misc/rsync-244-v6-20000802.diff.gz
 
-but tridge reckons it needs to be cleaned up before it can be accepted.
+but tridge reckons it needs to be cleaned up before it can be
+accepted.
+
+This is now on the track-kameipv6 branch and can be moved across any
+time.  The KAME people say that it should work on machines without
+IPv6 stacks.
+
+rsyncsh 
+
+   Write a small emulation of interactive ftp as a Pythonn program
+   that calls rsync.  Commands such as "cd", "ls", "ls *.c" etc map
+   fairly directly into rsync commands: it just needs to remember the
+   current host, directory and so on.  We can probably even do
+   completion of remote filenames.
+
