@@ -214,7 +214,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	struct sum_struct sum;
 	unsigned int len;
 	OFF_T offset = 0;
-	OFF_T offset2, seekto = 0;
+	OFF_T offset2;
 	char *data;
 	int i;
 	char *map = NULL;
@@ -276,19 +276,16 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		}
 
 		if (inplace) {
-			if (offset == offset2) {
-				seekto = offset += len;
-				continue;
-			}
-			if (seekto && fd != -1) {
+			if (offset == offset2 && fd != -1) {
 				flush_write_file(fd);
-				if (do_lseek(fd, seekto, SEEK_SET) != seekto) {
+				offset += len;
+				if (do_lseek(fd, len, SEEK_CUR) != offset) {
 					rsyserr(FERROR, errno,
 						"lseek failed on %s",
 						full_fname(fname));
 					exit_cleanup(RERR_FILEIO);
 				}
-				seekto = 0;
+				continue;
 			}
 		}
 		if (fd != -1 && write_file(fd, map, len) != (int)len) {
