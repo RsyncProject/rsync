@@ -656,7 +656,7 @@ char *client_name(int fd)
 			break;
 	}
 
-	/* TODO: Do a forward lookup as well to prevent spoofing */
+	/* TODO: Do a  forward lookup as well to prevent spoofing */
 
 	if (res == NULL) {
 		strcpy(name_buf, def);
@@ -668,69 +668,6 @@ char *client_name(int fd)
 	freeaddrinfo(res0);
 	return name_buf;
 }
-
-/**
- * Convert a string to an IP address. The string can be a name or
- * dotted decimal number.
- *
- * Returns a pointer to a static in_addr struct -- if you call this
- * more than once then you should copy it.
- *
- * TODO: Use getaddrinfo() instead, or make this function call getnameinfo
- **/
-struct in_addr *ip_address(const char *str)
-{
-	static struct in_addr ret;
-	struct hostent *hp;
-
-	if (!str) {
-		rprintf (FERROR, "ip_address received NULL name\n");
-		return NULL;
-	}
-
-	/* try as an IP address */
-	if (inet_aton(str, &ret) != 0) {
-		return &ret;
-	}
-
-	/* otherwise assume it's a network name of some sort and use 
-	   gethostbyname */
-	if ((hp = gethostbyname (str)) == 0) {
-		rprintf(FERROR, "gethostbyname failed for \"%s\": unknown host?\n",str);
-		return NULL;
-	}
-
-	if (hp->h_addr == NULL) {
-		rprintf(FERROR, "gethostbyname: host address is invalid for host \"%s\"\n",str);
-		return NULL;
-	}
-
-	if (hp->h_length > sizeof ret) {
-		rprintf(FERROR, "gethostbyname: host address for \"%s\" is too large\n",
-			str);
-		return NULL;
-	}
-
-	if (hp->h_addrtype != AF_INET) {
-		rprintf (FERROR, "gethostname: host address for \"%s\" is not IPv4\n",
-			 str);
-		return NULL;
-	}
-
-	/* This is kind of difficult.  The only field in ret is
-	   s_addr, which is the IP address as a 32-bit int.  On
-	   UNICOS, s_addr is in fact a *bitfield* for reasons best
-	   know to Cray.  This means we can't memcpy in to it.  On the
-	   other hand, h_addr is a char*, so we can't just assign.
-
-	   Since there's meant to be only one field inside the in_addr
-	   structure we will try just copying over the top and see how
-	   that goes. */
-	memcpy (&ret, hp->h_addr, hp->h_length);
-
-	return &ret;
-}
-
 
 
 /*******************************************************************
