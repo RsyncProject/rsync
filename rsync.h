@@ -91,10 +91,6 @@
 #include <string.h>
 #endif
 
-#ifdef HAVE_COMPAT_H
-#include <compat.h>
-#endif
-
 #ifdef HAVE_MALLOC_H
 #include <malloc.h>
 #endif
@@ -186,6 +182,26 @@
 #include <netdb.h>
 #include <syslog.h>
 #include <sys/file.h>
+
+#if HAVE_DIRENT_H
+# include <dirent.h>
+#else
+# define dirent direct
+# if HAVE_SYS_NDIR_H
+#  include <sys/ndir.h>
+# endif
+# if HAVE_SYS_DIR_H
+#  include <sys/dir.h>
+# endif
+# if HAVE_NDIR_H
+#  include <ndir.h>
+# endif
+#endif
+
+#ifdef HAVE_COMPAT_H
+#include <compat.h>
+#endif
+
 
 #ifndef S_IFLNK
 #define S_IFLNK  0120000
@@ -337,21 +353,6 @@ static inline int flist_up(struct file_list *flist, int i)
 	while (!flist->files[i]->basename) i++;
 	return i;
 }
-
-#if HAVE_DIRENT_H
-# include <dirent.h>
-#else
-# define dirent direct
-# if HAVE_SYS_NDIR_H
-#  include <sys/ndir.h>
-# endif
-# if HAVE_SYS_DIR_H
-#  include <sys/dir.h>
-# endif
-# if HAVE_NDIR_H
-#  include <ndir.h>
-# endif
-#endif
 
 #include "byteorder.h"
 #include "version.h"
