@@ -97,15 +97,15 @@ AC_DEFINE(ss_len, __ss_len, [KAME hack])
 
 CFLAGS="$CFLAGS"
 AC_ARG_ENABLE(ipv6,
-	AC_HELP_STRING([--disable-ipv6], [do not try to support IPv6]))
-AC_MSG_CHECKING([whether IPv6 is explicitly disabled])
+	AC_HELP_STRING([--enable-ipv6], [try to support IPv6]))
+AC_MSG_CHECKING([whether IPv6 is requested])
 if test "$xenable_ipv6" = xyes
 then
 	AC_MSG_RESULT(yes)
-	ipv6=no
+	ipv6=yes
 else
 	AC_MSG_RESULT(no)
-	ipv6=yes
+	ipv6=no
 fi
 
 ipv6type=unknown
