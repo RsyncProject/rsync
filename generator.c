@@ -89,12 +89,14 @@ static int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
 
 #define SID_UPDATING		  ITEM_UPDATING
 #define SID_REPORT_CHECKSUM	  ITEM_REPORT_CHECKSUM
+#define SID_USING_ALT_BASIS	  ITEM_USING_ALT_BASIS
+/* This flag doesn't get sent, so it must be outside 0xffff. */
 #define SID_NO_DEST_AND_NO_UPDATE (1<<16)
 
 static void itemize(struct file_struct *file, int statret, STRUCT_STAT *st,
 		    int32 sflags, int f_out, int ndx)
 {
-	int iflags = sflags & (SID_UPDATING | SID_REPORT_CHECKSUM);
+	int iflags = sflags & 0xffff;
 
 	if (statret >= 0) {
 		if (S_ISREG(file->mode) && file->length != st->st_size)
@@ -821,11 +823,12 @@ prepare_to_open:
 notify_others:
 	write_int(f_out, ndx);
 	if (itemizing) {
-		itemize(file, statret, &st, SID_UPDATING
-			| (always_checksum ? SID_REPORT_CHECKSUM : 0),
-			f_out, -1);
-		if (inplace && !read_batch)
-			write_byte(f_out, fnamecmp_type);
+		int iflags = SID_UPDATING;
+		if (always_checksum)
+			iflags |= SID_REPORT_CHECKSUM;
+		if (inplace && fnamecmp_type != FNAMECMP_FNAME)
+			iflags |= SID_USING_ALT_BASIS;
+		itemize(file, statret, &st, iflags, f_out, -1);
 	}
 	if (f_out_name >= 0) {
 		write_byte(f_out_name, fnamecmp_type);
