@@ -669,6 +669,9 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 		write_int(f, io_error);
 	}
 
+	if (verbose > 2)
+		fprintf(FINFO,"send_file_list done\n");
+
 	return flist;
 }
 
@@ -740,6 +743,9 @@ struct file_list *recv_file_list(int f)
   if (f != -1 && remote_version >= 17) {
 	  io_error |= read_int(f);
   }
+
+  if (verbose > 2)
+    fprintf(FINFO,"recv_file_list done\n");
 
   return flist;
 
