@@ -403,9 +403,11 @@ Still, it is probably easy to get burnt with this option.  The moral
 of the story is to use the -n option until you get used to the
 behavior of --delete.
 
-NOTE: It also may delete files on the destination if the sending side
-can't open them or stat them. This is a bug that hopefully will be
-fixed in a future release.
+If the sending side detects any IO errors then the deletion of any
+files at the destination will be automatically disabled. This is to
+prevent temporary filesystem failures (such as NFS errors) on the
+sending side causing a massive deletion of files on the
+destination. 
 
 dit(bf(--force)) This options tells rsync to delete directories even if
 they are not empty.  This applies to both the --delete option and to
