@@ -197,7 +197,10 @@ static int keep_backup(char *fname)
 	if (do_stat (fname, &st)) return 1;
 #endif
 
-	file = make_file (-1, fname, 0);
+	file = make_file(-1, fname, NULL, 1);
+
+	/* the file could have disappeared */
+	if (!file) return 1;
 
         /* make a complete pathname for backup file */
         if (strlen(backup_dir) + strlen(fname) > (MAXPATHLEN - 1)) {
