@@ -205,7 +205,7 @@ fi
 
 for testscript in $suitedir/$whichtests
 do
-    testbase=`echo $testscript | sed 's!.*/!!' | sed -e 's/.test\$//'`
+    testbase=`echo $testscript | sed -e 's!.*/!!' -e 's/.test\$//'`
     scratchdir="$scratchbase.$testbase"
 
     prep_scratch
