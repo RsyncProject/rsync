@@ -39,7 +39,8 @@ Changes since 2.6.2:
 
     - Error messages from the daemon server's option-parsing (such as
       refused options) now get sent back to the client (the server used
-      to just exit).
+      to just exit because the socket wasn't in the right state to send
+      the message).
 
     - Fixed a bug in the daemon authentication code when using one of the
       batch-processing options.
@@ -85,6 +86,6 @@ Changes since 2.6.2:
 
     - The scripts in the testsuite dir were cleaned up a bit.
 
-    - A few new diffs were added to the patches dir, and some accepted
+    - Some new diffs were added to the patches dir, and some accepted
       ones were removed.
 
