@@ -93,7 +93,7 @@ static int delete_file(char *fname)
 	}
 
 	if (do_rmdir(fname) == 0 || errno == ENOENT) return 0;
-	if (!force_delete || errno != ENOTEMPTY) {
+	if (!force_delete || (errno != ENOTEMPTY && errno != EEXIST)) {
 		fprintf(FERROR,"rmdir(%s) : %s\n", fname, strerror(errno));
 		return -1;
 	}
@@ -618,7 +618,7 @@ static void delete_one(struct file_struct *f)
     }
   } else {    
     if (do_rmdir(f_name(f)) != 0) {
-      if (errno != ENOTEMPTY)
+      if (errno != ENOTEMPTY && errno != EEXIST)
 	fprintf(FERROR,"rmdir %s : %s\n",f_name(f),strerror(errno));
     } else if (verbose) {
       fprintf(FINFO,"deleting directory %s\n",f_name(f));      
