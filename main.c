@@ -20,6 +20,9 @@
 */
 
 #include "rsync.h"
+#if defined CONFIG_LOCALE && defined HAVE_LOCALE_H
+#include <locale.h>
+#endif
 
 extern int verbose;
 extern int dry_run;
@@ -1114,6 +1117,10 @@ int main(int argc,char *argv[])
 	/* Ignore SIGPIPE; we consistently check error codes and will
 	 * see the EPIPE. */
 	signal(SIGPIPE, SIG_IGN);
+
+#if defined CONFIG_LOCALE && defined HAVE_SETLOCALE
+	setlocale(LC_CTYPE, "");
+#endif
 
 	/* Initialize push_dir here because on some old systems getcwd
 	 * (implemented by forking "pwd" and reading its output) doesn't
