@@ -430,7 +430,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	for (l1 = 0;
 	     lastname[l1] && (fname[l1] == lastname[l1]) && (l1 < 255);
 	     l1++) {}
-	l2 = strlen(fname) - l1;
+	l2 = strlen(fname+l1);
 
 	if (l1 > 0)
 		flags |= SAME_NAME;
@@ -911,7 +911,7 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 	DIR *d;
 	struct dirent *di;
 	char fname[MAXPATHLEN];
-	int l;
+	unsigned int offset;
 	char *p;
 
 	d = opendir(dir);
@@ -922,28 +922,27 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 		return;
 	}
 
-	strlcpy(fname, dir, MAXPATHLEN);
-	l = strlen(fname);
-	if (fname[l - 1] != '/') {
-		if (l == MAXPATHLEN - 1) {
+	offset = strlcpy(fname, dir, MAXPATHLEN);
+	p = fname + offset;
+	if (offset >= MAXPATHLEN || p[-1] != '/') {
+		if (offset >= MAXPATHLEN - 1) {
 			io_error |= IOERR_GENERAL;
 			rprintf(FERROR, "skipping long-named directory: %s\n",
 				full_fname(fname));
 			closedir(d);
 			return;
 		}
-		strlcat(fname, "/", MAXPATHLEN);
-		l++;
+		*p++ = '/';
+		offset++;
 	}
-	p = fname + strlen(fname);
 
 	local_exclude_list = NULL;
 
 	if (cvs_exclude) {
-		if (strlen(fname) + strlen(".cvsignore") <= MAXPATHLEN - 1) {
-			strcpy(p, ".cvsignore");
+		if (strlcpy(p, ".cvsignore", MAXPATHLEN - offset)
+		    < MAXPATHLEN - offset)
 			add_exclude_file(&local_exclude_list,fname,MISSING_OK,ADD_EXCLUDE);
-		} else {
+		else {
 			io_error |= IOERR_GENERAL;
 			rprintf(FINFO,
 				"cannot cvs-exclude in long-named directory %s\n",
@@ -956,13 +955,19 @@ static void send_directory(int f, struct file_list *flist, char *dir)
 		if (dname[0] == '.' && (dname[1] == '\0'
 		    || (dname[1] == '.' && dname[2] == '\0')))
 			continue;
-		strlcpy(p, dname, MAXPATHLEN - l);
-		send_file_name(f, flist, fname, recurse, 0);
+		if (strlcpy(p, dname, MAXPATHLEN - offset) < MAXPATHLEN - offset)
+			send_file_name(f, flist, fname, recurse, 0);
+		else {
+			io_error |= IOERR_GENERAL;
+			rprintf(FINFO,
+				"cannot send long-named file %s\n",
+				full_fname(fname));
+		}
 	}
 	if (errno) {
 		io_error |= IOERR_GENERAL;
 		rprintf(FERROR, "readdir(%s): (%d) %s\n",
-		    dir, errno, strerror(errno));
+			dir, errno, strerror(errno));
 	}
 
 	if (local_exclude_list)
@@ -1028,8 +1033,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			if (l == 2 && fname[0] == '.') {
 				/* Turn "./" into just "." rather than "./." */
 				fname[1] = '\0';
-			} else {
-				strlcat(fname, ".", MAXPATHLEN);
+			} else if (l < MAXPATHLEN) {
+				fname[l++] = '.';
+				fname[l] = '\0';
 			}
 		}
 
