@@ -25,7 +25,7 @@ Changes since version 2.5.6:
 
     * The exclude list specified in the daemon's config file is now
       properly applied to the pulled items no matter how deep the
-      user's file args are in the source tree. (Wayne Davison)
+      user's file args are in the source tree.  (Wayne Davison)
 
     * For protocol version >= 27, mdfour_tail() is called when the
       block size (including checksum_seed) is a multiple of 64.
@@ -54,6 +54,10 @@ Changes since version 2.5.6:
       path, not just the trailing name.  (Wayne Davison)
 
     * Fixed file I/O error detection.  (John Van Essen)
+
+    * Fixed a compression (-z) bug when syncing a mostly-matching file
+      that contains already-compressed data.  (Yasuoka Masahiko and
+      Wayne Davison)
 
   INTERNAL:
 
