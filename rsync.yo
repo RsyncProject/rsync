@@ -712,6 +712,8 @@ was located on the remote "src" host.
 dit(bf(-0, --from0)) This tells rsync that the filenames it reads from a
 file are terminated by a null ('\0') character, not a NL, CR, or CR+LF.
 This affects --exclude-from, --include-from, and --files-from.
+It does not affect --cvs-exclude (since all names read from a .cvsignore
+file are split on whitespace).
 
 dit(bf(-T, --temp-dir=DIR)) This option instructs rsync to use DIR as a
 scratch directory when creating temporary copies of the files
