@@ -558,8 +558,8 @@ void strlower(char *s)
 
 /* Join strings p1 & p2 into "dest" with a guaranteed '/' between them.  (If
  * p1 ends with a '/', no extra '/' is inserted.)  Returns the length of both
- * strings + 1 (if '/' was inserted), regardless of whether the whole thing
- * fits into destsize (including the terminating '\0'). */
+ * strings + 1 (if '/' was inserted), regardless of whether the null-terminated
+ * string fits into destsize. */
 size_t pathjoin(char *dest, size_t destsize, const char *p1, const char *p2)
 {
 	size_t len = strlcpy(dest, p1, destsize);
@@ -579,9 +579,9 @@ size_t pathjoin(char *dest, size_t destsize, const char *p1, const char *p2)
 }
 
 /* Join any number of strings together, putting them in "dest".  The return
- * value is the length of all the strings, regardless of whether they fit in
- * destsize (including the terminating '\0').  Your list of string pointers
- * should end with a NULL to indicate the end of the list. */
+ * value is the length of all the strings, regardless of whether the null-
+ * terminated whole fits in destsize.  Your list of string pointers must end
+ * with a NULL to indicate the end of the list. */
 size_t stringjoin(char *dest, size_t destsize, ...)
 {
 	va_list ap;
