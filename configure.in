@@ -25,7 +25,7 @@ AC_SUBST(SHELL)
 AC_DEFINE([_GNU_SOURCE], 1,
           [Define _GNU_SOURCE so that we get all necessary prototypes])
 
-if test "$xac_cv_prog_cc_stdc" = xno
+if test "x$ac_cv_prog_cc_stdc" = xno
 then
 	AC_MSG_WARN([rsync requires an ANSI C compiler and you don't seem to have one])
 fi
@@ -421,11 +421,11 @@ then
     AC_MSG_RESULT($srcdir/popt)
     BUILD_POPT='$(popt_OBJS)'
     CFLAGS="$CFLAGS -I$srcdir/popt"
-    if test -n "$ALLOCA"
+    if test x"$ALLOCA" != x
     then
-	# this can be removed when/if we add an included alloca.c; see
-	#  autoconf documentation on AC_FUNC_ALLOCA
-	AC_MSG_ERROR([included libpopt requires alloca which is not available])
+	# this can be removed when/if we add an included alloca.c;
+	#  see autoconf documentation on AC_FUNC_ALLOCA
+	AC_MSG_WARN([included libpopt requires alloca which is not available])
     fi
 else
     AC_MSG_RESULT(no)
