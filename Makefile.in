@@ -73,7 +73,7 @@ tls: $(TLS_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TLS_OBJ) $(LIBS)
 
 getgroups: getgroups.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ getgroups.o $(LIBS)
 
 TRIMSLASH_OBJ = trimslash.o syscall.o
 trimslash: $(TRIMSLASH_OBJ)
