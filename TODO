@@ -224,6 +224,9 @@ logging
   monitor progress in a log file can do so more easily.  See
   http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=48108
 
+  At the connections that just get a list of modules are not logged,
+  but they should be.
+
 rsyncd over ssh
 
   There are already some patches to do this.
