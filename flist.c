@@ -443,7 +443,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	/* We must make sure we don't send a zero flags byte or
 	 * the other end will terminate the flist transfer. */
 	if (flags == 0 && !S_ISDIR(mode))
-		flags |= XMIT_TOP_DIR; /* Will be stripped off by receiver. */
+		flags |= XMIT_TOP_DIR; /* NOTE: no meaning for non-dir */
 	if (protocol_version >= 28) {
 		if ((flags & 0xFF00) || flags == 0) {
 			flags |= XMIT_EXTENDED_FLAGS;
