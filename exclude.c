@@ -757,7 +757,7 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 			mods = NULL;
 			break;
 		default:
-			rprintf(FERROR, "Unknown filter rule: %s\n", p);
+			rprintf(FERROR, "Unknown filter rule: `%s'\n", p);
 			exit_cleanup(RERR_SYNTAX);
 		}
 		while (mods && *++s && *s != ' ' && *s != '_') {
