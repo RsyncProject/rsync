@@ -231,7 +231,7 @@ static pid_t do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int 
 	if (local_server) {
 		if (read_batch)
 		    create_flist_from_batch(); /* sets batch_flist */
-		ret = local_child(argc, args, f_in, f_out);
+		ret = local_child(argc, args, f_in, f_out, child_main);
 	} else {
 		ret = piped_child(args,f_in,f_out);
 	}
@@ -490,6 +490,12 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 
 	status = do_recv(f_in,f_out,flist,local_name);
 	exit_cleanup(status);
+}
+
+
+void child_main(int argc, char *argv[])
+{
+	start_server(STDIN_FILENO, STDOUT_FILENO, argc, argv);
 }
 
 

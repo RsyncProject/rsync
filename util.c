@@ -179,7 +179,8 @@ pid_t piped_child(char **command, int *f_in, int *f_out)
 	return pid;
 }
 
-pid_t local_child(int argc, char **argv,int *f_in,int *f_out)
+pid_t local_child(int argc, char **argv,int *f_in,int *f_out,
+		  int (*child_main)(int, char **))
 {
 	pid_t pid;
 	int to_child_pipe[2];
@@ -215,7 +216,7 @@ pid_t local_child(int argc, char **argv,int *f_in,int *f_out)
 		}
 		if (to_child_pipe[0] != STDIN_FILENO) close(to_child_pipe[0]);
 		if (from_child_pipe[1] != STDOUT_FILENO) close(from_child_pipe[1]);
-		start_server(STDIN_FILENO, STDOUT_FILENO, argc, argv);
+		child_main(argc, argv);
 	}
 
 	if (close(from_child_pipe[1]) < 0 ||
@@ -991,9 +992,9 @@ void show_progress(OFF_T ofs, OFF_T size)
  *
  * @param dest Target of the symlink in question.
  *
- * @src src Top source directory currently applicable.  Basically this
+ * @param src Top source directory currently applicable.  Basically this
  * is the first parameter to rsync in a simple invocation, but it's
- * modified as topsrcname in slightly complex ways.
+ * modified by flist.c in slightly complex ways.
  *
  * @retval True if unsafe
  * @retval False is unsafe
