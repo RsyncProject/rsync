@@ -2,22 +2,7 @@
    file accompanying popt source distributions, available from 
    ftp://ftp.redhat.com/pub/code/popt */
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
-#include <ctype.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-
-#if HAVE_ALLOCA_H
-# include <alloca.h>
-#endif
-
-#include "popt.h"
+#include "system.h"
 #include "poptint.h"
 
 static void configLine(poptContext con, char * line) {
@@ -55,21 +40,21 @@ static void configLine(poptContext con, char * line) {
 	alias.longName = longName, alias.shortName = shortName;
 	poptAddAlias(con, alias, 0);
     } else if (!strcmp(entryType, "exec")) {
-	con->execs = realloc(con->execs, 
+	con->execs = realloc(con->execs,
 				sizeof(*con->execs) * (con->numExecs + 1));
 	if (longName)
-	    con->execs[con->numExecs].longName = strdup(longName);
+	    con->execs[con->numExecs].longName = xstrdup(longName);
 	else
 	    con->execs[con->numExecs].longName = NULL;
 
 	con->execs[con->numExecs].shortName = shortName;
-	con->execs[con->numExecs].script = strdup(line);
+	con->execs[con->numExecs].script = xstrdup(line);
 	
 	con->numExecs++;
     }
 }
 
-int poptReadConfigFile(poptContext con, char * fn) {
+int poptReadConfigFile(poptContext con, const char * fn) {
     char * file, * chptr, * end;
     char * buf, * dst;
     int fd, rc;
@@ -84,10 +69,10 @@ int poptReadConfigFile(poptContext con, char * fn) {
     }
 
     fileLength = lseek(fd, 0, SEEK_END);
-    lseek(fd, 0, 0);
+    (void) lseek(fd, 0, 0);
 
     file = alloca(fileLength + 1);
-    if ((fd = read(fd, file, fileLength)) != fileLength) {
+    if (read(fd, file, fileLength) != fileLength) {
 	rc = errno;
 	close(fd);
 	errno = rc;
@@ -122,13 +107,14 @@ int poptReadConfigFile(poptContext con, char * fn) {
 	    break;
 	  default:
 	    *dst++ = *chptr++;
+	    break;
 	}
     }
 
     return 0;
 }
 
-int poptReadDefaultConfig(poptContext con, int useEnv) {
+int poptReadDefaultConfig(poptContext con, /*@unused@*/ int useEnv) {
     char * fn, * home;
     int rc;
 
