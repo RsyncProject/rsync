@@ -21,8 +21,7 @@
 
 . $srcdir/testsuite/rsync.fns
 
-echo "SKIP THIS FOR NOW; It's a known bug"
-exit 77
+test_skipped "Known minor bug in this code"
 
 set -x
 

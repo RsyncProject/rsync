@@ -12,18 +12,15 @@
 
 if [ "x$rsync_enable_ssh_tests" != xyes ]
 then
-    echo "Skipping SSH tests because \$rsync_enable_ssh_tests is not set"
-    exit 77
+    test_skipped "Skipping SSH tests because \$rsync_enable_ssh_tests is not set"
 fi
 
 if ! type ssh >/dev/null ; then
-    echo "Skipping SSH tests because ssh is not in the path"
-    exit 77
+    test_skipped "Skipping SSH tests because ssh is not in the path"
 fi
 
 if ! [ "`ssh -o'BatchMode yes' localhost echo yes`" = "yes" ]; then
-    echo "Skipping SSH tests because ssh conection to localhost not authorised"
-    exit 77
+    test_skipped "Skipping SSH tests because ssh conection to localhost not authorised"
 fi
 
 runtest "ssh: basic test" 'checkit "$RSYNC -avH -e ssh --rsync-path=$RSYNC ${FROM}/ localhost:${TO}" ${FROM}/ ${TO}'

@@ -26,10 +26,10 @@ name2="$fromdir/name2"
 echo "This is the file" > "$name1"
 echo "This is the other file" > "$name2"
 
-chown 5000 "$name1" || test_skipped "Can't chown"
-chown 5001 "$name2" || test_skipped "Can't chown"
-chgrp 5002 "$name1" || test_skipped "Can't chgrp"
-chgrp 5003 "$name2" || test_skipped "Can't chgrp"
+chown 5000 "$name1" || test_skipped "Can't chown (probably need root)"
+chown 5001 "$name2" || test_skipped "Can't chown (probably need root)"
+chgrp 5002 "$name1" || test_skipped "Can't chgrp (probably need root)"
+chgrp 5003 "$name2" || test_skipped "Can't chgrp (probably need root)"
 
 checkit "rsync -aHvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
