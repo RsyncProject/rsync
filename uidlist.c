@@ -25,6 +25,13 @@
 
 #include "rsync.h"
 
+#ifdef GETGROUPS_T
+# ifndef NGROUPS_MAX
+/* It ought to be defined, but just in case. */
+#  define NGROUPS_MAX 32
+# endif
+#endif
+
 extern int preserve_uid;
 extern int preserve_gid;
 extern int numeric_ids;
@@ -117,12 +124,21 @@ static int is_in_group(gid_t gid)
 	if (gid == last_in)
 		return last_out;
 	if (ngroups < -1) {
-		/* treat failure (-1) as if not member of any group */
+		gid_t mygid = getgid();
 		ngroups = getgroups(0, 0);
-		if (ngroups > 0) {
-			gidset = new_array(GETGROUPS_T, ngroups);
+		/* If that didn't work, perhaps 0 isn't treated specially? */
+		if (ngroups < 0)
+			ngroups = NGROUPS_MAX;
+		gidset = new_array(GETGROUPS_T, ngroups+1);
+		if (ngroups > 0)
 			ngroups = getgroups(ngroups, gidset);
+		/* The default gid might not be in the list on some systems. */
+		for (n = 0; n < ngroups; n++) {
+			if (gidset[n] == mygid)
+				break;
 		}
+		if (n == ngroups)
+			gidset[ngroups++] = mygid;
 	}
 
 	last_in = gid;
