@@ -228,16 +228,16 @@ static void generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 }
 
 
-/*
- * Acts on file number @p i from @p flist, whose name is @p fname.
+/* Acts on flist->file's ndx'th item, whose name is fname.  If a directory,
+ * make sure it exists, and has the right permissions/timestamp info.  For
+ * all other non-regular files (symlinks, etc.) we create them here.  For
+ * regular files that have changed, we try to find a basis file and then
+ * start sending checksums.
  *
- * First fixes up permissions, then generates checksums for the file.
- *
- * @note This comment was added later by mbp who was trying to work it
- * out.  It might be wrong.
- */
+ * Note that f_out is set to -1 when doing final directory-permission and
+ * modification-time repair. */
 static void recv_generator(char *fname, struct file_list *flist,
-			   struct file_struct *file, int i,
+			   struct file_struct *file, int ndx,
 			   int f_out, int f_out_name)
 {
 	int fd = -1, f_copy = -1;
@@ -252,7 +252,7 @@ static void recv_generator(char *fname, struct file_list *flist,
 		return;
 
 	if (verbose > 2)
-		rprintf(FINFO, "recv_generator(%s,%d)\n", safe_fname(fname), i);
+		rprintf(FINFO, "recv_generator(%s,%d)\n", safe_fname(fname), ndx);
 
 	if (server_filter_list.head
 	    && check_filter(&server_filter_list, fname,
@@ -310,14 +310,14 @@ static void recv_generator(char *fname, struct file_list *flist,
 					full_fname(fname));
 			}
 		}
-		/* f_out is set to -1 when doing final directory-permission
-		 * and modification-time repair. */
 		if (set_perms(fname, file, statret ? NULL : &st, 0)
 		    && verbose && f_out != -1)
 			rprintf(FINFO, "%s/\n", safe_fname(fname));
 		if (delete_during && f_out != -1 && csum_length != SUM_LENGTH
-		    && (file->flags & FLAG_DEL_START))
-			delete_in_dir(flist, fname);
+		    && (file->flags & FLAG_DEL_START)) {
+			delete_in_dir(flist, fname, strlen(fname),
+				      file->dir.depth);
+		}
 		return;
 	} else if (max_size && file->length > max_size) {
 		if (verbose > 1)
@@ -575,10 +575,10 @@ prepare_to_open:
 	}
 
 	if (verbose > 2)
-		rprintf(FINFO, "generating and sending sums for %d\n", i);
+		rprintf(FINFO, "generating and sending sums for %d\n", ndx);
 
 notify_others:
-	write_int(f_out, i);
+	write_int(f_out, ndx);
 	if (protocol_version >= 29 && inplace && !read_batch)
 		write_byte(f_out, fnamecmp_type);
 	if (f_out_name >= 0)
@@ -614,6 +614,8 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	char fbuf[MAXPATHLEN];
 	int need_retouch_dir_times = preserve_times && !omit_dir_times;
 	int need_retouch_dir_perms = 0;
+	int save_only_existing = only_existing;
+	int save_opt_ignore_existing = opt_ignore_existing;
 
 	if (verbose > 2) {
 		rprintf(FINFO, "generator starting pid=%ld count=%d\n",
@@ -627,9 +629,8 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 			: "delta transmission enabled\n");
 	}
 
-	/* we expect to just sit around now, so don't exit on a
-	   timeout. If we really get a timeout then the other process should
-	   exit */
+	/* We expect to just sit around now, so don't exit on a timeout.
+	 * If we really get a timeout then the other process should exit. */
 	io_timeout = 0;
 
 	for (i = 0; i < flist->count; i++) {
@@ -638,9 +639,10 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 
 		if (!file->basename)
 			continue;
-		/* we need to ensure that any directories we create have writeable
-		   permissions initially so that we can create the files within
-		   them. This is then fixed after the files are transferred */
+
+		/* We need to ensure that any dirs we create have writeable
+		 * permissions during the time we are putting files within
+		 * them.  This is then fixed after the transfer is done. */
 		if (!am_root && S_ISDIR(file->mode) && !(file->mode & S_IWUSR)) {
 			copy = *file;
 			copy.mode |= S_IWUSR; /* user write */
@@ -652,10 +654,12 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 			       flist, file, i, f_out, f_out_name);
 	}
 	if (delete_during)
-		delete_in_dir(NULL, NULL);
+		delete_in_dir(NULL, NULL, 0, 0);
 
 	phase++;
 	csum_length = SUM_LENGTH;
+	only_existing = max_size = opt_ignore_existing = 0;
+	update_only = always_checksum = size_only = 0;
 	ignore_times = 1;
 
 	if (verbose > 2)
@@ -672,6 +676,9 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	}
 
 	phase++;
+	only_existing = save_only_existing;
+	opt_ignore_existing = save_opt_ignore_existing;
+
 	if (verbose > 2)
 		rprintf(FINFO,"generate_files phase=%d\n",phase);
 
@@ -683,7 +690,8 @@ void generate_files(int f_out, struct file_list *flist, char *local_name,
 	if (preserve_hard_links)
 		do_hard_links();
 
-	if (need_retouch_dir_perms || need_retouch_dir_times) {
+	if ((need_retouch_dir_perms || need_retouch_dir_times)
+	    && !list_only && !local_name && !dry_run) {
 		/* Now we need to fix any directory permissions that were
 		 * modified during the transfer and/or re-set any tweaked
 		 * modified-time values. */
