@@ -1,0 +1,27 @@
+#! /bin/sh
+
+# Copyright (C) 2005 by Wayne Davison <wayned@samba.org>
+
+# This program is distributable under the terms of the GNU GPL see
+# COPYING).
+
+# Test rsync handling of various delete directives.  
+
+. "$suitedir/rsync.fns"
+
+hands_setup
+
+makepath "$chkdir"
+
+# Create two chk dirs, one with a copy of the source files, and one with
+# what we expect to be left behind by the copy using --remove-sent-files.
+$RSYNC -av "$fromdir/" "$chkdir/copy/"
+$RSYNC -av -f 'exclude,! */' "$fromdir/" "$chkdir/empty/"
+
+checkit "$RSYNC -avv --remove-sent-files \
+    \"$fromdir/\" \"$todir/\"" "$chkdir/copy" "$todir"
+
+diff -r "$chkdir/empty" "$fromdir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0
