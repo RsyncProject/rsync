@@ -1,3 +1,387 @@
+NEWS for rsync 2.6.4 (30 March 2005)
+Protocol: 29 (changed)
+Changes since 2.6.3:
+
+  OUTPUT CHANGES:
+
+    - When rsync deletes a directory and outputs a verbose message about
+      it, it now appends a trailing slash to the name instead of (only
+      sometimes) outputting a preceding "directory " string.
+
+    - The --stats output will contain file-list time-statistics if both
+      sides are 2.6.4, or if the local side is 2.6.4 and the files are
+      being pushed (since the stats come from the sending side).
+      (Requires protocol 29 for a pull.)
+
+    - The "%o" (operation) log-format escape now has a third value (besides
+      "send" and "recv"):  "del." (with trailing dot to make it 4 chars).
+      This changes the way deletions are logged in the daemon's log file.
+
+    - When the --log-format option is combined with --verbose, rsync now
+      avoids outputting the name of the file twice in most circumstances.
+      As long as the --log-format item does not refer to any post-transfer
+      items (such as %b or %c), the --log-format message is output prior to
+      the transfer, so --verbose is now the equivalent of a --log-format of
+      '%n%L' (which outputs the name and any link info).  If the log output
+      must occur after the transfer to be complete, the only time the name
+      is also output prior to the transfer is when --progress was specified
+      (so that the name will precede the progress stats, and the full
+      --log-format output will come after).
+  
+  BUG FIXES:
+
+    - Restore the list-clearing behavior of "!" in a .cvsignore file (2.6.3
+      was only treating it as a special token in an rsync include/exclude
+      file).
+
+    - The combination of --verbose and --dry-run now mentions the full list
+      of changes that would be output without --dry-run.
+
+    - Avoid a mkdir warning when removing a directory in the destination
+      that already exists in the --backup-dir.
+
+    - An OS that has a binary mode for its files (such as cygwin) needed
+      setmode(fd, O_BINARY) called on the temp-file we opened with
+      mkstemp().  (Fix derived from the cygwin's 2.6.3 rsync package.)
+
+    - Fixed a potential hang when verbosity is high, the client side is
+      the sender, and the file-list is large.
+
+    - Fixed a potential protocol-corrupting bug where the generator could
+      merge a message from the receiver into the middle of a multiplexed
+      packet of data if only part of that data had been written out to the
+      socket when the message from the generator arrived.
+
+    - We now check if the OS doesn't support using mknod() for creating
+      FIFOs and sockets, and compile-in some compatibility code using
+      mkfifo() and socket() when necessary.
+
+    - Fixed an off-by-one error in the handling of --max-delete=N.  Also,
+      if the --max-delete limit is exceeded during a run, we now output a
+      warning about this at the end of the run and exit with a new error
+      code (25).
+
+    - One place in the code wasn't checking if fork() failed.
+
+    - The "ignore nonreadable" daemon parameter used to erroneously affect
+      readable symlinks that pointed to a non-existent file.
+
+    - If the OS does not have lchown() and a chown() of a symlink will
+      affect the referent of a symlink (as it should), we no longer try
+      to set the user and group of a symlink.
+
+    - The generator now properly runs the hard-link loop and the dir-time
+      rewriting loop after we're sure that the redo phase is complete.
+
+    - When --backup was specified with --partial-dir=DIR, where DIR is a
+      relative path, the backup code was erroneously trying to backup a
+      file that was put into the partial-dir.
+
+    - If a file gets resent in a single transfer and the --backup option is
+      enabled along with --inplace, rsync no longer performs a duplicate
+      backup (it used to overwrite the first backup with the failed file).
+
+    - One call to flush_write_file() was not being checked for an error.
+
+    - The --no-relative option was not being sent from the client to a
+      server sender.
+
+    - If an rsync daemon specified "dont compress = ..." for a file and the
+      client tried to specify --compress, the libz code was not handling a
+      compression level of 0 properly.  This could cause a transfer failure
+      if the block-size for a file was large enough (e.g. rsync might have
+      exited with an error for large files).
+
+    - Fixed a bug that would sometimes surface when using --compress and
+      sending a file with a block-size larger than 64K (either manually
+      specified, or computed due to the file being really large).  Prior
+      versions of rsync would sometimes fail to decompress the data
+      properly, and thus the transferred file would fail its verification.
+
+    - If a daemon can't open the specified log file (i.e. syslog is not
+      being used), die without crashing.  We also output an error about
+      the failure on stderr (which will only be seen if --no-detach was
+      specified) and exit with a new error code (6).
+
+    - A local transfer no longer duplicates all its include/exclude options
+      (since the forked process already has a copy of the exclude list,
+      there's no need to send them a set of duplicates).
+
+    - When --progress is specified, the output of items that the generator
+      is creating (e.g. dirs, symlinks) is now integrated into the progress
+      output without overlapping it.  (Requires protocol 29.)
+
+    - When --timeout is specified, lulls that occur in the transfer while
+      the generator is doing work that does not generate socket traffic
+      (looking for changed files, deleting files, doing directory-time
+      touch-ups, etc.) will cause a new keep-alive packet to be sent that
+      should keep the transfer going as long as the generator continues to
+      make progress.  (Requires protocol 29.)
+
+    - The stat size of a device is not added to the total file size of the
+      items in the transfer (the size might be undefined on some OSes).
+
+    - Fixed a problem with refused-option messages sometimes not making it
+      back to the client side when a remote --files-from was in effect and
+      the daemon was the receiver.
+
+    - The --compare-dest option was not updating a file that differred in
+      (the preserved) attributes from the version in the compare-dest DIR.
+
+    - When rsync is copying files into a write-protected directory, fixed
+      the change-report output for the directory so that we don't report
+      an identical directory as changed.
+
+  ENHANCEMENTS:
+
+    - Rsync now supports popt's option aliases, which means that you can
+      use /etc/popt and/or ~/.popt to create your own option aliases.
+
+    - Added the --delete-during (--del) option which will delete files
+      from the receiving side incrementally as each directory in the
+      transfer is being processed.  This makes it more efficient than the
+      default, before-the-transfer behavior, which is now also available as
+      --delete-before (and is still the default --delete-WHEN option that
+      will be chosen if --delete or --delete-excluded is specified without
+      a --delete-WHEN choice).  All the --del* options infer --delete, so
+      an rsync daemon that refuses "delete" will still refuse to allow any
+      file-deleting options (including the new --remove-sent-files option).
+
+    - All the --delete-WHEN options are now more memory efficient:
+      Previously an duplicate set of file-list objects was created on the
+      receiving side for the entire destination hierarchy.  The new
+      algorithm only creates one directory of objects at a time (for files
+      inside the transfer).
+
+    - Added the --copy-dest option, which works like --link-dest except
+      that it locally copies identical files instead of hard-linking them.
+
+    - Added support for specifying multiple --compare-dest, --copy-dest, or
+      --link-dest options, but only of a single type. (Promoted from the
+      patches dir and enhanced.) (Requires protocol 29.)
+
+    - Added the --max-size option. (Promoted from the patches dir.)
+
+    - The daemon-mode options are now separated from the normal rsync
+      options so that they can't be mixed together.  This makes it
+      impossible to start a daemon that has improper default option values
+      (which could cause problems when a client connects, such as hanging
+      or crashing).
+
+    - The --bwlimit option may now be used in combination with --daemon
+      to specify both a default value for the daemon side and a value
+      that cannot be exceeded by a user-specified --bwlimit option.
+
+    - Added the "port" parameter to the rsyncd.conf file. (Promoted from
+      the patches dir.)  Also added "address".  The command-line options
+      take precedence over a config-file option, as expected.
+
+    - In _exit_cleanup(): when we are exiting with a partially-received
+      file, we now flush any data in the write-cache before closing the
+      partial file.
+
+    - The --inplace support was enhanced to work with --compare-dest,
+      --link-dest, and (the new) --copy-dest options. (Requires protocol
+      29.)
+
+    - Added the --dirs (-d) option for an easier way to copy directories
+      without recursion.
+
+    - Added the --list-only option, which is mainly a way for the client to
+      put the server into listing mode without needing to resort to any
+      internal option kluges (e.g. the age-old use of "-r --exclude="/*/*"
+      for a non-recursive listing).  This option is used automatically
+      (behind the scenes) when a modern rsync speaks to a modern daemon,
+      but may also be specified manually if you want to force the use of
+      the --list-only option over a remote-shell connection.
+
+    - Added the --omit-dir-times (-O) option, which will avoid updating
+      the modified time for directories when --times was specified.  This
+      option will avoid an extra pass through the file-list at the end of
+      the transfer (to tweak all the directory times), which may provide
+      an appreciable speedup for a really large transfer. (Promoted from
+      the patches dir.)
+
+    - Added the --filter (-f) option and its helper option, -F.  Filter
+      rules are an extension to the existing include/exclude handling
+      that also supports nested filter files as well as per-directory
+      filter files (like .cvsignore, but with full filter-rule parsing).
+      This new option was chosen in order to ensure that all existing
+      include/exclude processing remained 100% compatible with older
+      versions.  Protocol 29 is needed for full filter-rule support, but
+      backward-compatible rules work with earlier protocol versions.
+      (Promoted from the patches dir and enhanced.)
+
+    - Added the --delay-updates option that puts all updated files into
+      a temporary directory (by default ".~tmp~", but settable via the
+      --partial-dir=DIR option) until the end of the transfer.  This
+      makes the updates a little more atomic for a large transfer.
+
+    - If rsync is put into the background, any output from --progress is
+      reduced.
+
+    - Documented the "max verbosity" setting for rsyncd.conf.  (This
+      setting was added a couple releases ago, but left undocumented.)
+
+    - The sender and the generator now double-check the file-list index
+      they are given, and refuse to try to do a file transfer on a
+      non-file index (since that would indicate that something had gone
+      very wrong).
+
+    - Added the --itemize-changes (-i) option, which is a way to output a
+      more detailed list of what files changed and in what way.  The effect
+      is the same as specifying a --log-format of "%i %n%L" (see both the
+      rsync and rsyncd.conf manpages).  Works with --dry-run too.
+
+    - Added the --fuzzy (-y) option, which attempts to find a basis file
+      for a file that is being created from scratch.  The current algorithm
+      only looks in the destination directory for the created file, but it
+      does attempt to find a match based on size/mod-time (in case the file
+      was renamed with no other changes) as well as based on a fuzzy
+      name-matching algorithm.  This option requires protocol 29 because it
+      needs the new file-sorting order.  (Promoted from patches dir and
+      enhanced.) (Requires protocol 29.)
+
+    - Added the --remove-sent-files option, which lets you move files
+      between systems.
+
+    - The hostname in HOST:PATH or HOST::PATH may now be an IPv6 literal
+      enclosed in '[' and ']' (e.g. "[::1]").  (We already allowed IPv6
+      literals in the rsync://HOST:PORT/PATH format.)
+
+    - When rsync recurses to build the file list, it no longer keeps open
+      one or more directory handles from the dir's parent dirs.
+
+    - When building under windows, the default for --daemon is now to
+      avoid detaching, requiring the new --detach option to force rsync
+      to detach.
+
+    - The --dry-run option can now be combined with either --write-batch or
+      --read-batch, allowing you to run a do-nothing test command to see
+      what would happen without --dry-run.
+
+    - The daemon's "read only" config item now sets an internal read_only
+      variable that makes extra sure that no write/delete calls on the
+      read-only side can succeed.
+
+    - The log-format % escapes can now have a numeric field width in
+      between the % and the escape letter (e.g. "%-40n %08p").
+
+    - Improved the option descriptions in the --help text.
+
+  SUPPORT FILES:
+
+    - Added atomic-rsync to the support dir: a perl script that will
+      transfer some files using rsync, and then move the updated files into
+      place all at once at the end of the transfer.  Only works when
+      pulling, and uses --link-dest and a parallel hierarchy of files to
+      effect its update.
+
+    - Added mnt-excl to the support dir: a perl script that takes the
+      /proc/mounts file and translates it into a set of excludes that will
+      exclude all mount points (even mapped mounts to the same disk).  The
+      excludes are made relative to the specified source dir and properly
+      anchored.
+
+    - Added savetransfer.c to the support dir: a C program that can make
+      a copy of all the data that flows over the wire.  This lets you test
+      for data corruption (by saving the data on both the sending side and
+      the receiving side) and provides one way to debug a protocol error.
+
+    - Added rrsync to the support dir: this is an updated version of Joe
+      Smith's restricted rsync perl script.  This helps to ensure that only
+      certain rsync commands can be run by an ssh invocation.
+
+  INTERNAL:
+
+    - Added better checking of the checksum-header values that come over
+      the socket.
+
+    - Merged a variety of file-deleting functions into a single function so
+      that it is easier to maintain.
+
+    - Improved the type of some variables (particularly blocksize vars) for
+      consistency and proper size.
+
+    - Got rid of the uint64 type (which we didn't need).
+
+    - Use a slightly more compatible set of core #include directives.
+
+    - Defined int32 in a way that ensures that the build dies if we can't
+      find a variable with at least 32 bits.
+
+  PROTOCOL DIFFERENCES FOR VERSION 29:
+
+    - A 16-bit flag-word is transmitted after every file-list index.  This
+      indicates what is changing between the sender and the receiver.  The
+      generator now transmits an index and a flag-word to indicate when
+      dirs and symlinks have changed (instead of producing a message),
+      which makes the outputting of the information more consistent and
+      less prone to screen corruption (because the local receiver/sender is
+      now outputting all the file-change info messages).
+
+    - If a file is being hard-linked, the ITEM_XNAME_FOLLOWS bit is enabled
+      in the flag-word and the name of the file that was linked immediately
+      follows in vstring format (see below).
+
+    - If a file is being transferred with an alternate-basis file, the
+      ITEM_BASIS_TYPE_FOLLOWS bit is enabled in the flag-word and a single
+      byte follows, indicating what type of basis file was chosen.  If that
+      indicates that a fuzzy-match was selected, the ITEM_XNAME_FOLLOWS bit
+      is set in the flag-word and the name of the match in vstring format
+      follows the basis byte.  A vstring is a variable length string that
+      has its size written prior to the string, and no terminating null.
+      If the string is from 1-127 bytes, the length is a single byte.  If
+      it is from 128-32767 bytes, the length is written as ((len >> 8) |
+      0x80) followed by (len % 0x100).
+
+    - The sending of exclude names is done using filter-rule syntax.  This
+      means that all names have a prefixed rule indicator, even excludes
+      (which used to be sent as a bare pattern, when possible).  The -C
+      option will include the per-dir .cvsignore merge file in the list of
+      filter rules so it is positioned correctly (unlike in some older
+      transfer scenarios).
+
+    - Rsync sorts the filename list in a different way: it sorts the subdir
+      names after the non-subdir names for each dir's contents, and it
+      always puts a dir's contents immediately after the dir's name in the
+      list.  (Previously an item named "foo.txt" would sort in between
+      directory "foo/" and "foo/bar".)
+
+    - When talking to a protocol 29 rsync daemon, a list-only request
+      is able to note this before the options are sent over the wire and
+      the new --list-only option is included in the options.
+
+    - When the --stats bytes are sent over the wire (or stored in a batch),
+      they now include two elapsed-time values: one for how long it took to
+      build the file-list, and one for how long it took to send it over the
+      wire (each expressed in thousandths of a second).
+
+    - When --delete-excluded is specified with some filter rules (AKA
+      excludes), a client sender will now initiate a send of the rules to
+      the receiver (older protocols used to omit the sending of excludes in
+      this situation since there were no receiver-specific rules that
+      survived --delete-excluded back then).  Note that, as with all the
+      filter-list sending, only items that are significant to the other
+      side will actually be sent over the wire, so the filter-rule list
+      that is sent in this scenario is often empty.
+
+    - An index equal to the file-list count is sent as a keep-alive packet
+      from the generator to the sender, which then forwards it on to the
+      receiver.  This normally invalid index is only a valid keep-alive
+      packet if the 16-bit flag-word that follows it contains a single bit
+      (ITEM_IS_NEW, which is normally an illegal flag to appear alone).
+
+    - A protocol-29 batch file includes a bit for the setting of the --dirs
+      option and for the setting of the --compress option.  Also, the shell
+      script created by --write-batch will use the --filter option instead
+      of --exclude-from to capture any filter rules.
+
+  BUILD CHANGES:
+
+    - Handle an operating system that use mkdev() in place of makedev().
+
+    - Improved configure to better handle cross-compiling.
 NEWS for rsync 2.6.3 (30 Sep 2004)
 Protocol: 28 (unchanged)
 Changes since 2.6.2:
