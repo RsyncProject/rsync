@@ -23,6 +23,10 @@ Changes since version 2.5.6:
 
   BUG FIXES:
 
+    * The exclude list specified in the daemon's config file is now
+      properly applied to the pulled items no matter how deep the
+      user's file args are in the source tree. (Wayne Davison)
+
     * For protocol version >= 27, mdfour_tail() is called when the
       block size (including checksum_seed) is a multiple of 64.
       Previously it was not called, giving the wrong MD4 checksum.
@@ -57,6 +61,9 @@ Changes since version 2.5.6:
       supporting. (J.W. Schultz)
 
     * Simplified some of the option-parsing code. (Wayne Davison)
+
+    * Some cleanup made to the exclude code, as well as some new
+      defines added to enhance readability. (Wayne Davison)
 
 
 NEWS for rsync version 2.5.6, aka the dwd-between-jobs release
