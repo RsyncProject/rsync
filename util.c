@@ -740,7 +740,6 @@ unsigned int clean_fname(char *name)
 char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
 {
 	char *start, *sanp;
-	int allowdotdot = 0;
 	int rlen = 0;
 
 	if (dest != p) {
@@ -765,59 +764,45 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
 	}
 
 	start = sanp = dest + rlen;
-	while (*p == '/') {
-		/* remove leading slashes */
-		p++;
-	}
 	while (*p != '\0') {
+		/* discard leading or extra slashes */
+		if (*p == '/') {
+			p++;
+			continue;
+		}
 		/* this loop iterates once per filename component in p.
 		 * both p (and sanp if the original had a slash) should
 		 * always be left pointing after a slash
 		 */
 		if (*p == '.' && (p[1] == '/' || p[1] == '\0')) {
 			/* skip "." component */
-			while (*++p == '/') {
-				/* skip following slashes */
-				;
-			}
+			p++;
 			continue;
 		}
-		allowdotdot = 0;
 		if (*p == '.' && p[1] == '.' && (p[2] == '/' || p[2] == '\0')) {
 			/* ".." component followed by slash or end */
 			if (depth > 0 && sanp == start) {
 				/* allow depth levels of .. at the beginning */
 				--depth;
-				allowdotdot = 1;
-			} else {
-				p += 2;
-				while (*p == '/') p++;
-				if (sanp != start) {
-					/* back up sanp one level */
-					--sanp; /* now pointing at slash */
-					while (sanp > start && sanp[-1] != '/') {
-						/* skip back up to slash */
-						sanp--;
-					}
-				}
+				*sanp++ = *p++;
+				*sanp++ = *p++;
+				/* move virtual beginning to leave .. alone */
+				start = sanp;
 				continue;
 			}
-		}
-		while (1) {
-			/* copy one component through next slash */
-			*sanp++ = *p++;
-			if (*p == '\0' || p[-1] == '/') {
-				while (*p == '/') {
-					/* skip multiple slashes */
-					p++;
+			p += 2;
+			if (sanp != start) {
+				/* back up sanp one level */
+				--sanp; /* now pointing at slash */
+				while (sanp > start && sanp[-1] != '/') {
+					/* skip back up to slash */
+					sanp--;
 				}
-				break;
 			}
+			continue;
 		}
-		if (allowdotdot) {
-			/* move the virtual beginning to leave the .. alone */
-			start = sanp;
-		}
+		/* copy one component through next slash */
+		while (*p && (*sanp++ = *p++) != '/') {}
 	}
 	if (sanp == dest) {
 		/* ended up with nothing, so put in "." component */
