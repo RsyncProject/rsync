@@ -91,7 +91,7 @@ char *client_name(int fd)
 	client_sockaddr(fd, &ss, &ss_len);
 
 	if (!lookup_name(fd, &ss, ss_len, name_buf, sizeof name_buf, port_buf, sizeof port_buf))
-		check_name(fd, &ss, ss_len, name_buf, port_buf);
+		check_name(fd, &ss, name_buf, port_buf);
 
 	return name_buf;
 }
@@ -229,7 +229,6 @@ int compare_addrinfo_sockaddr(const struct addrinfo *ai,
  **/
 int check_name(int fd,
 	       const struct sockaddr_storage *ss,
-	       socklen_t ss_len,
 	       char *name_buf,
 	       const char *port_buf)
 {
