@@ -468,7 +468,7 @@ static struct option long_options[] = {
 
 int main(int argc,char *argv[])
 {
-    int pid, status, status2;
+    int pid, status = 0, status2 = 0;
     int opt;
     int option_index;
     char *shell_cmd = NULL;
