@@ -28,6 +28,7 @@
 int remote_protocol = 0;
 
 extern int verbose;
+extern int itemize_changes;
 extern int am_server;
 extern int am_sender;
 extern int fuzzy_basis;
@@ -81,6 +82,9 @@ void setup_protocol(int f_out,int f_in)
 			protocol_version);
 		exit_cleanup(RERR_PROTOCOL);
 	}
+
+	if (itemize_changes && protocol_version < 29)
+		itemize_changes = 0;
 
 	if (am_server) {
 		if (!checksum_seed)
