@@ -170,7 +170,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			strlcat(fname, "/", MAXPATHLEN);
 			offset = strlen(file->basedir)+1;
 		}
-		strlcat(fname, f_name(file), MAXPATHLEN);
+		f_name_to(file, fname + offset, MAXPATHLEN - offset);
 
 		if (verbose > 2)
 			rprintf(FINFO, "send_files(%d, %s)\n", i, fname);
@@ -251,7 +251,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			/* read checksums originally computed on sender side */
 			read_batch_csum_info(i, s, &checksums_match);
 			if (checksums_match) {
-				read_batch_delta_file( (char *) &j, sizeof(int) );
+				read_batch_delta_file((char*)&j, sizeof (int));
 				if (j != i) {    /* if flist index entries don't match*/
 					rprintf(FINFO, "index mismatch in send_files\n");
 					rprintf(FINFO, "read index = %d flist ndx = %d\n", j, i);
@@ -263,7 +263,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 					write_sum_head(f_out, s);
 					done = 0;
 					while (!done) {
-						read_batch_delta_file( (char *) &buff_len, sizeof(int) );
+						read_batch_delta_file((char*)&buff_len, sizeof (int));
 						write_int(f_out, buff_len);
 						if (buff_len == 0) {
 							done = 1;
