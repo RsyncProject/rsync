@@ -27,7 +27,7 @@ Changes since 2.6.0:
 
     * When -x (--one-file-system) is combined with -L (--copy-links)
       or --copy-unsafe-links, no symlinked files are skipped, even
-      if the referant file is on a different filesystem.
+      if the referent file is on a different filesystem.
 
     * The --link-dest code now works properly for a non-root user
       when (1) the UIDs of the source and destination differ and -o
@@ -53,7 +53,9 @@ Changes since 2.6.0:
 
     * When using --cvs-exclude, the exclude items we get from a
       directory's .cvsignore file once again only affect that one
-      directory (and not all following directories too).
+      directory (and not all following directories too).  The
+      items are also now properly word-split and parsed without
+      any +/- prefix munging.
 
     * When specifying the USER@HOST: prefix for a file, the USER
       part can now contain an '@', if needed (i.e. the last '@'
@@ -71,9 +73,9 @@ Changes since 2.6.0:
     * Improved the -x (--one-file-system) flag's handling of any
       mount-point directories we encounter.  It is both more optimal
       (in that it no longer does a useless scan of the contents of
-      the mount-point dirs) and also fixes a bug where a remaped
-      mount of the original filesystem could get discovered on a
-      disk we should be ignoring.
+      the mount-point dirs) and also fixes a bug where a remapped
+      mount of the original filesystem could get discovered in a
+      subdir we should be ignoring.
 
     * Rsync no longer discards a double-slash at the start of a filename
       when trying to open the file.  It also no longer constructs names
@@ -140,8 +142,8 @@ Changes since 2.6.0:
       for the entire transfer.
 
     * Changed hardlink info and file_struct + strings to use
-      allocation pools.  This reduces memory use for large
-      filesets and permits freeing memory to the OS.  (J.W. Schultz) 
+      allocation pools.  This reduces memory use for large file-
+      sets and permits freeing memory to the OS.  (J.W. Schultz) 
 
     * The 2 pipes used between the receiver and generator processes
       (which are forked on the same machine) were reduced to 1 pipe
@@ -157,3 +159,12 @@ Changes since 2.6.0:
 
     * Improved the internal uid/gid code to be more portable and
       a little more optimized.
+
+    * Device numbers are now sent as separate major/minor values
+      with 32-bit accuracy for each one (protocol 28).  Previously
+      hard-link device data was sent as a single 64-bit number, and
+      copied devices were sent as a single 32-bit number.  This will
+      make inter-operation of 64-bit binaries more compatible with
+      their 32-bit brethren.  Note that optimizations in the binary
+      protocol often sends the device data using fewer bytes than
+      before, even though more precision is now available.
