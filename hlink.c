@@ -36,7 +36,7 @@ static int hlink_compare(struct file_struct **file1, struct file_struct **file2)
 	if (f1->F_INODE != f2->F_INODE)
 		return (int) (f1->F_INODE > f2->F_INODE ? 1 : -1);
 
-	return file_compare(file1, file2);
+	return f_name_cmp(*file1, *file2);
 }
 
 static struct file_struct **hlink_list;
