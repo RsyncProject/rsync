@@ -570,7 +570,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags,
 
 	strlcpy(lastname, thisname, MAXPATHLEN);
 
-	clean_fname(thisname);
+	clean_fname(thisname, 0);
 
 	if (sanitize_paths)
 		sanitize_path(thisname, thisname, "", 0);
@@ -761,7 +761,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 		rprintf(FINFO, "skipping overly long name: %s\n", fname);
 		return NULL;
 	}
-	clean_fname(thisname);
+	clean_fname(thisname, 0);
 	if (sanitize_paths)
 		sanitize_path(thisname, thisname, "", 0);
 

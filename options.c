@@ -743,28 +743,28 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (server_exclude_list.head && !am_sender) {
 		struct exclude_list_struct *elp = &server_exclude_list;
 		if (tmpdir) {
-			clean_fname(tmpdir);
+			clean_fname(tmpdir, 1);
 			if (check_exclude(elp, tmpdir, 1) < 0)
 				goto options_rejected;
 		}
 		if (partial_dir) {
-			clean_fname(partial_dir);
+			clean_fname(partial_dir, 1);
 			if (check_exclude(elp, partial_dir, 1) < 0)
 				goto options_rejected;
 		}
 		if (compare_dest) {
-			clean_fname(compare_dest);
+			clean_fname(compare_dest, 1);
 			if (check_exclude(elp, compare_dest, 1) < 0)
 				goto options_rejected;
 		}
 		if (backup_dir) {
-			clean_fname(backup_dir);
+			clean_fname(backup_dir, 1);
 			if (check_exclude(elp, backup_dir, 1) < 0)
 				goto options_rejected;
 		}
 	}
 	if (server_exclude_list.head && files_from) {
-		clean_fname(files_from);
+		clean_fname(files_from, 1);
 		if (check_exclude(&server_exclude_list, files_from, 0) < 0) {
 		    options_rejected:
 			snprintf(err_buf, sizeof err_buf,

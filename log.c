@@ -373,7 +373,7 @@ static void log_formatted(enum logcode code,
 			pathjoin(buf2, sizeof buf2,
 				 file->basedir ? file->basedir : "",
 				 f_name(file));
-			clean_fname(buf2);
+			clean_fname(buf2, 0);
 			n = buf2;
 			if (*n == '/') n++;
 			break;
