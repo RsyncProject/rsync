@@ -364,8 +364,6 @@ static void writefd_unbuffered(int fd,char *buf,int len)
 		if (FD_ISSET(fd, &w_fds)) {
 			int ret, n = len-total;
 			
-			if (n > PIPE_BUF) n = PIPE_BUF;
-
 			ret = write(fd,buf+total,n?n:1);
 
 			if (ret == -1 && errno == EINTR) {
