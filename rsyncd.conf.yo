@@ -399,13 +399,14 @@ The %i format is a set of cryptic characters that are output as follows:
 
 quote(tt(  *Xcstpog ITEM_NAME))
 
-The bf(*) is either bf(<) (receive) or bf(>) (send) or bf(*) (--dry-run) if
+The bf(*) is either bf(<) (receive), bf(>) (send), or bf(*) (--dry-run) if
 the item is being updated, otherwise it is a space.  The bf(X) will be
 replaced by one of the following: an "f" for a file, a "d" for a dir, an
 "L" for a symlink, or a "D" for a device.  The rest of the letters in the
 string above are the actual letters that will be output if the associated
 attribute for the item is being updated; otherwise the letter will be
-replaced by either a "-" for no change, or a "+" if this is a new item.
+replaced by either a "-" for no change, a "+" for a new item, or a "?" if
+the attribute is not known (which happens when speaking to an older rsync).
 The meanings of the attribute letters are as follows:
 
 quote(itemize(
@@ -415,8 +416,8 @@ quote(itemize(
   by the file transfer.
   it() A bf(t) means the modified time is being updated to the server's
   value (requires --times).  An alternate value of bf(T) means that the
-  time is being set to the transfer time (which happens when symlinks are
-  updated or when a file or device is updated without --times).
+  time is being set to the transfer time, which happens when symlinks are
+  updated, or when a file or device is updated without --times.
   it() A bf(p) means the permissions are being updated (requires
   bf(--perms)).
   it() An bf(o) means the owner is being updated (requires bf(--owner) and
