@@ -219,7 +219,7 @@ static int keep_backup(char *fname)
 	if (IS_DEVICE(file->mode)) {
 		if (am_root && preserve_devices) {
 			make_bak_dir(fname, backup_dir);
-			if (do_mknod(keep_name, file->mode, file->rdev) != 0) {
+			if (do_mknod(keep_name, file->mode, file->u.rdev) != 0) {
 				rprintf(FERROR, "mknod %s failed: %s\n",
 					full_fname(keep_name), strerror(errno));
 			} else if (verbose > 2) {
@@ -249,17 +249,17 @@ static int keep_backup(char *fname)
 #if SUPPORT_LINKS
 	if (!kept && preserve_links && S_ISLNK(file->mode)) {
 		extern int safe_symlinks;
-		if (safe_symlinks && unsafe_symlink(file->link, keep_name)) {
+		if (safe_symlinks && unsafe_symlink(file->u.link, keep_name)) {
 			if (verbose) {
 				rprintf(FINFO, "ignoring unsafe symlink %s -> %s\n",
-					full_fname(keep_name), file->link);
+					full_fname(keep_name), file->u.link);
 			}
 			kept = 1;
 		}
 		make_bak_dir(fname, backup_dir);
-		if (do_symlink(file->link, keep_name) != 0) {
+		if (do_symlink(file->u.link, keep_name) != 0) {
 			rprintf(FERROR, "link %s -> %s : %s\n",
-				full_fname(keep_name), file->link, strerror(errno));
+				full_fname(keep_name), file->u.link, strerror(errno));
 		}
 		do_unlink(fname);
 		kept = 1;

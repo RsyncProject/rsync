@@ -78,7 +78,7 @@ static int skip_file(char *fname, struct file_struct *file, STRUCT_STAT *st)
 			}
 		}
 		file_checksum(fname,sum,st->st_size);
-		return memcmp(sum, file->sum, protocol_version < 21? 2
+		return memcmp(sum, file->u.sum, protocol_version < 21 ? 2
 							: MD4_SUM_LENGTH) == 0;
 	}
 
@@ -336,10 +336,10 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 		int l;
 		extern int safe_symlinks;
 
-		if (safe_symlinks && unsafe_symlink(file->link, fname)) {
+		if (safe_symlinks && unsafe_symlink(file->u.link, fname)) {
 			if (verbose) {
 				rprintf(FINFO, "ignoring unsafe symlink %s -> \"%s\"\n",
-					full_fname(fname), file->link);
+					full_fname(fname), file->u.link);
 			}
 			return;
 		}
@@ -350,7 +350,7 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 				/* A link already pointing to the
 				 * right place -- no further action
 				 * required. */
-				if (strcmp(lnk,file->link) == 0) {
+				if (strcmp(lnk,file->u.link) == 0) {
 					set_perms(fname,file,&st,1);
 					return;
 				}
@@ -360,13 +360,13 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 			 * in place. */
 			delete_file(fname);
 		}
-		if (do_symlink(file->link,fname) != 0) {
+		if (do_symlink(file->u.link,fname) != 0) {
 			rprintf(FERROR, "symlink %s -> \"%s\" failed: %s\n",
-				full_fname(fname), file->link, strerror(errno));
+				full_fname(fname), file->u.link, strerror(errno));
 		} else {
 			set_perms(fname,file,NULL,0);
 			if (verbose) {
-				rprintf(FINFO,"%s -> %s\n", fname,file->link);
+				rprintf(FINFO,"%s -> %s\n", fname,file->u.link);
 			}
 		}
 #endif
@@ -377,12 +377,12 @@ void recv_generator(char *fname, struct file_struct *file, int i, int f_out)
 	if (am_root && preserve_devices && IS_DEVICE(file->mode)) {
 		if (statret != 0 ||
 		    st.st_mode != file->mode ||
-		    (DEV64_T)st.st_rdev != file->rdev) {
+		    (DEV64_T)st.st_rdev != file->u.rdev) {
 			delete_file(fname);
 			if (verbose > 2)
 				rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",
-					fname,(int)file->mode,(int)file->rdev);
-			if (do_mknod(fname,file->mode,file->rdev) != 0) {
+					fname,(int)file->mode,(int)file->u.rdev);
+			if (do_mknod(fname,file->mode,file->u.rdev) != 0) {
 				rprintf(FERROR, "mknod %s failed: %s\n",
 					full_fname(fname), strerror(errno));
 			} else {

@@ -186,7 +186,7 @@ static void list_file_entry(struct file_struct *f)
 		rprintf(FINFO, "%s %11.0f %s %s -> %s\n",
 			perms,
 			(double) f->length, timestring(f->modtime),
-			f_name(f), f->link);
+			f_name(f), f->u.link);
 	} else {
 		rprintf(FINFO, "%s %11.0f %s %s\n",
 			perms,
@@ -388,19 +388,20 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 		mode = file->mode;
 	if (preserve_devices) {
 		if (protocol_version < 28) {
-			if (IS_DEVICE(mode) && file->rdev == rdev) {
-				/* Set both flags so that the test when
-				 * writing the data is simpler. */
-				flags |= SAME_RDEV_pre28|SAME_HIGH_RDEV;
-			}
-			else
-				rdev = file->rdev;
-		}
-		else if (IS_DEVICE(mode)) {
-			if ((file->rdev & ~0xFF) == rdev)
+			if (IS_DEVICE(mode)) {
+				if (file->u.rdev == rdev) {
+					/* Set both flags so that the test when
+					 * writing the data is simpler. */
+					flags |= SAME_RDEV_pre28|SAME_HIGH_RDEV;
+				} else
+					rdev = file->u.rdev;
+			} else
+				rdev = 0;
+		} else if (IS_DEVICE(mode)) {
+			if ((file->u.rdev & ~0xFF) == rdev)
 				flags |= SAME_HIGH_RDEV;
 			else
-				rdev = file->rdev & ~0xFF;
+				rdev = file->u.rdev & ~0xFF;
 		}
 	}
 	if (file->uid == uid)
@@ -419,8 +420,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 		if (file->dev == dev) {
 			if (protocol_version >= 28)
 				flags |= SAME_DEV;
-		}
-		else
+		} else
 			dev = file->dev;
 		flags |= HAS_INODE_DATA;
 	}
@@ -476,15 +476,15 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 		/* If SAME_HIGH_RDEV is off, SAME_RDEV_pre28 is also off.
 		 * Also, avoid using "rdev" because it may be incomplete. */
 		if (!(flags & SAME_HIGH_RDEV))
-			write_int(f, file->rdev);
+			write_int(f, file->u.rdev);
 		else if (protocol_version >= 28)
-			write_byte(f, file->rdev);
+			write_byte(f, file->u.rdev);
 	}
 
 #if SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(mode)) {
-		write_int(f, strlen(file->link));
-		write_buf(f, file->link, strlen(file->link));
+		write_int(f, strlen(file->u.link));
+		write_buf(f, file->u.link, strlen(file->u.link));
 	}
 #endif
 
@@ -503,10 +503,19 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	}
 #endif
 
-	if (always_checksum && (protocol_version < 28 || S_ISREG(mode))) {
-		char *sum = file->sum? file->sum : empty_sum;
-		write_buf(f, sum, protocol_version < 21? 2
-						: MD4_SUM_LENGTH);
+	if (always_checksum) {
+		char *sum;
+		if (S_ISREG(mode))
+			sum = file->u.sum;
+		else if (protocol_version < 28) {
+			/* Prior to 28, we sent a useless set of nulls. */
+			sum = empty_sum;
+		} else
+			sum = NULL;
+		if (sum) {
+			write_buf(f, sum, protocol_version < 21? 2
+							: MD4_SUM_LENGTH);
+		}
 	}
 
 	strlcpy(lastname, fname, MAXPATHLEN);
@@ -615,15 +624,15 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 			if (IS_DEVICE(mode)) {
 				if (!(flags & SAME_RDEV_pre28))
 					rdev = (DEV64_T)read_int(f);
-				file->rdev = rdev;
+				file->u.rdev = rdev;
 			} else
 				rdev = 0;
 		} else if (IS_DEVICE(mode)) {
 			if (!(flags & SAME_HIGH_RDEV)) {
-				file->rdev = (DEV64_T)read_int(f);
-				rdev = file->rdev & ~0xFF;
+				file->u.rdev = (DEV64_T)read_int(f);
+				rdev = file->u.rdev & ~0xFF;
 			} else
-				file->rdev = rdev | (DEV64_T)read_byte(f);
+				file->u.rdev = rdev | (DEV64_T)read_byte(f);
 		}
 	}
 
@@ -633,12 +642,11 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 			rprintf(FERROR, "overflow: l=%d\n", l);
 			overflow("receive_file_entry");
 		}
-		file->link = new_array(char, l + 1);
-		if (!file->link)
+		if (!(file->u.link = new_array(char, l + 1)))
 			out_of_memory("receive_file_entry 2");
-		read_sbuf(f, file->link, l);
+		read_sbuf(f, file->u.link, l);
 		if (sanitize_paths)
-			sanitize_path(file->link, file->dirname);
+			sanitize_path(file->u.link, file->dirname);
 	}
 #if SUPPORT_HARD_LINKS
 	if (preserve_hard_links && protocol_version < 28
@@ -660,7 +668,7 @@ void receive_file_entry(struct file_struct **fptr, unsigned short flags, int f)
 	if (always_checksum) {
 		char *sum;
 		if (S_ISREG(mode)) {
-			sum = file->sum = new_array(char, MD4_SUM_LENGTH);
+			sum = file->u.sum = new_array(char, MD4_SUM_LENGTH);
 			if (!sum)
 				out_of_memory("md4 sum");
 		} else if (protocol_version < 28) {
@@ -825,19 +833,19 @@ struct file_struct *make_file(char *fname, struct string_area **ap,
 		}
 	}
 #ifdef HAVE_STRUCT_STAT_ST_RDEV
-	file->rdev = st.st_rdev;
+	if (IS_DEVICE(st.st_mode))
+		file->u.rdev = st.st_rdev;
 #endif
 
 #if SUPPORT_LINKS
 	if (S_ISLNK(st.st_mode))
-		file->link = STRDUP(ap, linkbuf);
+		file->u.link = STRDUP(ap, linkbuf);
 #endif
 
 	if (always_checksum && S_ISREG(st.st_mode)) {
-		file->sum = (char*)MALLOC(ap, MD4_SUM_LENGTH);
-		if (!file->sum)
+		if (!(file->u.sum = (char*)MALLOC(ap, MD4_SUM_LENGTH)))
 			out_of_memory("md4 sum");
-		file_checksum(fname, file->sum, st.st_size);
+		file_checksum(fname, file->u.sum, st.st_size);
 	}
 
 	if (flist_dir) {
@@ -1290,10 +1298,8 @@ void free_file(struct file_struct *file)
 		return;
 	if (file->basename)
 		free(file->basename);
-	if (file->link)
-		free(file->link);
-	if (file->sum)
-		free(file->sum);
+	if (!IS_DEVICE(file->mode) && file->u.link)
+		free(file->u.link); /* Handles u.sum too. */
 	*file = null_file;
 }
 
@@ -1388,8 +1394,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 				flist->files[i][0] = null_file;
 			else
 				free_file(flist->files[i]);
-		}
-		else
+		} else
 			prev_i = i;
 	}
 
@@ -1449,14 +1454,12 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 	if (!(c1 = (uchar*)f1->dirname)) {
 		state1 = fnc_BASE;
 		c1 = (uchar*)f1->basename;
-	}
-	else
+	} else
 		state1 = fnc_DIR;
 	if (!(c2 = (uchar*)f2->dirname)) {
 		state2 = fnc_BASE;
 		c2 = (uchar*)f2->basename;
-	}
-	else
+	} else
 		state2 = fnc_DIR;
 
 	while (1) {
