@@ -67,7 +67,7 @@ static int open_socket_in(int type, int port)
 {
 	struct hostent *hp;
 	struct sockaddr_in sock;
-	char host_name[200];
+	char host_name[MAXHOSTNAMELEN];
 	int res;
 	int one=1;
 

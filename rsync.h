@@ -17,6 +17,9 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
+#define False 0
+#define True 1
+
 #define BLOCK_SIZE 700
 #define RSYNC_RSH_ENV "RSYNC_RSH"
 
@@ -268,6 +271,10 @@
 
 #ifndef MAX
 #define MAX(a,b) ((a)>(b)?(a):(b))
+#endif
+
+#ifndef MAXHOSTNAMELEN
+#define MAXHOSTNAMELEN 256
 #endif
 
 /* the length of the md4 checksum */

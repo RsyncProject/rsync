@@ -74,9 +74,6 @@
  */
 
 #include "rsync.h"
-#define BOOL int
-#define False 0
-#define True 1
 
 /* -------------------------------------------------------------------------- **
  * Constants...

@@ -44,9 +44,6 @@
  */
 
 #include "rsync.h"
-#define BOOL int
-#define False 0
-#define True 1
 #define PTR_DIFF(p1,p2) ((ptrdiff_t)(((char *)(p1)) - (char *)(p2)))
 #define strequal(a,b) (strcasecmp(a,b)==0)
 #define BOOLSTR(b) ((b) ? "Yes" : "No")
