@@ -208,6 +208,16 @@ file transfers to and from that module should take place as when the daemon
 was run as root. This complements the "uid" option. The default is gid -2,
 which is normally the group "nobody".
 
+dit(bf(filter)) The "filter" option allows you to specify a space-separated
+list of filter rules that the server will not allow to be read or written.
+This is only superficially equivalent to the client specifying these
+patterns with the --filter option.  Only one "filter" option may be
+specified, but it may contain as many rules as you like, including
+merge-file rules.  Note that per-directory merge-file rules do not provide
+as much protection as global rules, but they can be used to make --delete
+work better when a client downloads the server's files (if the per-dir
+merge files are included in the transfer).
+
 dit(bf(exclude)) The "exclude" option allows you to specify a
 space-separated list of patterns that the server will not allow to be read
 or written.  This is only superficially equivalent to the client
