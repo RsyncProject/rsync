@@ -22,6 +22,7 @@
 
 extern int verbose;
 extern int itemize_changes;
+extern int log_before_transfer;
 extern int delete_after;
 extern int csum_length;
 extern struct stats stats;
@@ -49,6 +50,7 @@ extern int keep_partial;
 extern int checksum_seed;
 extern int inplace;
 extern int delay_updates;
+extern char *log_format;
 
 extern struct filter_list_struct server_filter_list;
 
@@ -304,6 +306,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 	int next_gen_i = -1;
 	int fd1,fd2;
 	STRUCT_STAT st;
+	int iflags;
 	char *fname, fbuf[MAXPATHLEN];
 	char template[MAXPATHLEN];
 	char fnametmp[MAXPATHLEN];
@@ -366,8 +369,19 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		}
 
 		file = flist->files[i];
-		if (S_ISDIR(file->mode)) {
-			rprintf(FERROR, "[%s] got index of directory: %d\n",
+
+		if (itemize_changes) {
+			iflags = read_byte(f_in);
+			if (!(iflags & ITEM_UPDATING) || !S_ISREG(file->mode)) {
+				if (!dry_run || !am_server)
+					log_recv(file, &stats, iflags);
+				continue;
+			}
+		} else
+			iflags = ITEM_UPDATING | ITEM_MISSING_DATA;
+
+		if (!S_ISREG(file->mode)) {
+			rprintf(FERROR, "[%s] got index of non-regular file: %d\n",
 				who_am_i(), i);
 			exit_cleanup(RERR_PROTOCOL);
 		}
@@ -389,12 +403,12 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 			rprintf(FINFO, "recv_files(%s)\n", safe_fname(fname));
 
 		if (dry_run) { /* log the transfer */
-			if (!am_server && verbose && !itemize_changes)
+			if (!am_server && verbose && !log_format)
 				rprintf(FINFO, "%s\n", safe_fname(fname));
+			else if (!am_server)
+				log_recv(file, &stats, iflags);
 			continue;
 		}
-
-		initial_stats = stats;
 
 		if (read_batch) {
 			while (i > next_gen_i) {
@@ -445,6 +459,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 			}
 		} else
 			fnamecmp = fname;
+
+		initial_stats = stats;
 
 		/* open the file */
 		fd1 = do_open(fnamecmp, O_RDONLY, 0);
@@ -533,14 +549,17 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		}
 
 		/* log the transfer */
-		if (!am_server && verbose && !itemize_changes)
+		if (log_before_transfer)
+			log_recv(file, &initial_stats, iflags);
+		else if (!am_server && verbose && (!log_format || do_progress))
 			rprintf(FINFO, "%s\n", safe_fname(fname));
 
 		/* recv file data */
 		recv_ok = receive_data(f_in, fnamecmp, fd1, st.st_size,
 				       fname, fd2, file->length);
 
-		log_recv(file, &initial_stats);
+		if (!log_before_transfer)
+			log_recv(file, &initial_stats, iflags);
 
 		if (fd1 != -1)
 			close(fd1);
