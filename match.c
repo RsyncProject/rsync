@@ -100,7 +100,7 @@ static void matched(int f,struct sum_struct *s,struct map_struct *buf,
 		rprintf(FINFO,"match at %d last_match=%d j=%d len=%d n=%d\n",
 			(int)offset,(int)last_match,i,(int)s->sums[i].len,(int)n);
 
-	send_token(f,i,buf,last_match,n,i==-1?0:s->sums[i].len);
+	send_token(f,i,buf,last_match,n,i<0?0:s->sums[i].len);
 	data_transfer += n;
 
 	if (n > 0)
@@ -131,6 +131,7 @@ static void hash_search(int f,struct sum_struct *s,
 	char sum2[SUM_LENGTH];
 	uint32 s1, s2, sum; 
 	schar *map;
+	extern int do_compression;
 
 	if (verbose > 2)
 		rprintf(FINFO,"hash search b=%d len=%d\n",s->n,(int)len);
@@ -212,7 +213,23 @@ static void hash_search(int f,struct sum_struct *s,
 		} else {
 			--k;
 		}
-		
+
+		if (!do_compression) {
+			/* By matching early we avoid re-reading the
+			   data 3 times in the case where a token
+			   match comes a long way after last
+			   match. The 3 reads are caused by the
+			   running match, the checksum update and the
+			   literal send.
+
+			   we don't enable this for the compressed
+			   case yet as the deflated token code can't
+			   handle it. Paul is working on it */
+			if (offset-last_match >= CHUNK_SIZE+s->n && 
+			    (end-offset > CHUNK_SIZE)) {
+				matched(f,s,buf,offset - s->n, -2);
+			}
+		}
 	} while (++offset < end);
 	
 	matched(f,s,buf,len,-1);

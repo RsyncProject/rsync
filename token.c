@@ -51,7 +51,7 @@ static int simple_recv_token(int f,char **data)
 
 /* non-compressing send token */
 static void simple_send_token(int f,int token,
-			      struct map_struct *buf,int offset,int n)
+			      struct map_struct *buf,OFF_T offset,int n)
 {
 	if (n > 0) {
 		int l = 0;
@@ -62,7 +62,10 @@ static void simple_send_token(int f,int token,
 			l += n1;
 		}
 	}
-	write_int(f,-(token+1));
+	/* a -2 token means to send data only and no token */
+	if (token != -2) {
+		write_int(f,-(token+1));
+	}
 }
 
 
@@ -103,7 +106,7 @@ static char *obuf;
 /* Send a deflated token */
 static void
 send_deflated_token(int f, int token,
-		    struct map_struct *buf, int offset, int nb, int toklen)
+		    struct map_struct *buf, OFF_T offset, int nb, int toklen)
 {
     int n, r;
     static int init_done;
@@ -350,7 +353,7 @@ see_deflate_token(char *buf, int len)
  * If token == -1 then we have reached EOF 
  * If n == 0 then don't send a buffer
  */
-void send_token(int f,int token,struct map_struct *buf,int offset,
+void send_token(int f,int token,struct map_struct *buf,OFF_T offset,
 		int n,int toklen)
 {
   if (!do_compression) {
