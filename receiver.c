@@ -41,6 +41,7 @@ extern int io_error;
 extern int basis_dir_cnt;
 extern int make_backups;
 extern int cleanup_got_literal;
+extern int remove_sent_files;
 extern int module_id;
 extern int ignore_errors;
 extern int orig_umask;
@@ -312,7 +313,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 	char *fname, fbuf[MAXPATHLEN];
 	char template[MAXPATHLEN];
 	char fnametmp[MAXPATHLEN];
-	char *fnamecmp, *partialptr;
+	char *fnamecmp, *partialptr, numbuf[4];
 	char fnamecmpbuf[MAXPATHLEN];
 	uchar *delayed_bits = NULL;
 	struct file_struct *file;
@@ -595,7 +596,12 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 
 		cleanup_disable();
 
-		if (!recv_ok) {
+		if (recv_ok) {
+			if (remove_sent_files) {
+				SIVAL(numbuf, 0, i);
+				send_msg(MSG_SUCCESS, numbuf, 4);
+			}
+		} else {
 			int msgtype = csum_length == SUM_LENGTH || read_batch ?
 				FERROR : FINFO;
 			if (msgtype == FERROR || verbose) {
@@ -619,9 +625,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 					keptstr, redostr);
 			}
 			if (csum_length != SUM_LENGTH) {
-				char buf[4];
-				SIVAL(buf, 0, i);
-				send_msg(MSG_REDO, buf, 4);
+				SIVAL(numbuf, 0, i);
+				send_msg(MSG_REDO, numbuf, 4);
 			}
 		}
 	}
