@@ -294,7 +294,7 @@ enum msgcode {
 #define uchar unsigned char
 #endif
 
-#if HAVE_UNSIGNED_CHAR
+#if SIGNED_CHAR_OK
 #define schar signed char
 #else
 #define schar char
