@@ -855,20 +855,17 @@ static void recv_generator(char *fname, struct file_list *flist,
 				}
 			}
 #ifdef HAVE_LINK
-			if (link_dest && match_level == 3 && !dry_run) {
-				if (do_link(fnamecmpbuf, fname) < 0) {
-					if (verbose) {
-						rsyserr(FINFO, errno,
-							"link %s => %s",
-							full_fname(fnamecmpbuf),
-							safe_fname(fname));
-					}
-					fnamecmp = fnamecmpbuf;
-					fnamecmp_type = i;
+			if (link_dest && match_level == 3
+			    && do_link(fnamecmpbuf, fname) < 0) {
+				if (verbose) {
+					rsyserr(FINFO, errno, "link %s => %s",
+						full_fname(fnamecmpbuf),
+						safe_fname(fname));
 				}
-			} else
+				match_level = 1;
+			}
 #endif
-			if (statret == 0) {
+			if (match_level && match_level < 3) {
 				fnamecmp = fnamecmpbuf;
 				fnamecmp_type = i;
 			}
