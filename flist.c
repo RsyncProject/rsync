@@ -435,11 +435,13 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	if (!(flags & XMIT_SAME_MODE))
 		write_int(f, to_wire_mode(mode));
 	if (preserve_uid && !(flags & XMIT_SAME_UID)) {
-		add_uid(uid);
+		if (!numeric_ids)
+			add_uid(uid);
 		write_int(f, uid);
 	}
 	if (preserve_gid && !(flags & XMIT_SAME_GID)) {
-		add_gid(gid);
+		if (!numeric_ids)
+			add_gid(gid);
 		write_int(f, gid);
 	}
 	if (preserve_devices && IS_DEVICE(mode)) {
