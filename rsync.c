@@ -76,7 +76,8 @@ int delete_file(char *fname, int flags)
 		return -1;
 	}
 
-	zap_dir = flags & DEL_RECURSE || (force_delete && recurse);
+	zap_dir = (flags & DEL_FORCE_RECURSE || (force_delete && recurse))
+		&& !(flags & DEL_NO_RECURSE);
 	if (dry_run && zap_dir)
 		errno = ENOTEMPTY;
 	else if (do_rmdir(fname) == 0) {
