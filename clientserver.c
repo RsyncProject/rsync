@@ -230,7 +230,7 @@ static int rsync_module(int f_in, int f_out, int i)
 	}
 
 	if (am_daemon && am_server) {
-		rprintf(FINFO, "rsync allowed access on module %s from %s (%s)\n",
+		rprintf(FLOG, "rsync allowed access on module %s from %s (%s)\n",
 			name, host, addr);
 	}
 
@@ -423,12 +423,12 @@ static int rsync_module(int f_in, int f_out, int i)
 
 	if (request) {
 		if (*auth_user) {
-			rprintf(FINFO,"rsync %s %s from %s@%s (%s)\n",
-				am_sender?"on":"to",
+			rprintf(FLOG, "rsync %s %s from %s@%s (%s)\n",
+				am_sender ? "on" : "to",
 				request, auth_user, host, addr);
 		} else {
-			rprintf(FINFO,"rsync %s %s from %s (%s)\n",
-				am_sender?"on":"to",
+			rprintf(FLOG, "rsync %s %s from %s (%s)\n",
+				am_sender ? "on" : "to",
 				request, host, addr);
 		}
 		free(request);
@@ -581,7 +581,7 @@ int daemon_main(void)
 
 	log_init();
 
-	rprintf(FINFO, "rsyncd version %s starting, listening on port %d\n",
+	rprintf(FLOG, "rsyncd version %s starting, listening on port %d\n",
 		RSYNC_VERSION, rsync_port);
 	/* TODO: If listening on a particular address, then show that
 	 * address too.  In fact, why not just do inet_ntop on the
