@@ -1110,7 +1110,8 @@ itemize(
 manpagesection(BATCH MODE)
 
 bf(Note:) Batch mode should be considered experimental in this version
-of rsync. The interface or behavior may change before it stabilizes.
+of rsync. The interface and behavior have now stabilized, though, so
+feel free to try this out.
 
 Batch mode can be used to apply the same set of updates to many
 identical systems. Suppose one has a tree which is replicated on a
@@ -1184,8 +1185,14 @@ Caveats:
 The read-batch option expects the destination tree that it is updating
 to be identical to the destination tree that was used to create the
 batch update fileset.  When a difference between the destination trees
-is encountered the update might fail at that point, leaving the
-destination tree in a partially updated state. In that case, rsync can
+is encountered the update might be discarded with no error (if the file
+appears to be up-to-date already) or the file-update may be attempted
+and then, if the file fails to verify, the update discarded with an
+error.  This means that it should be safe to re-run a read-batch operation
+if the command got updated.  If you wish to force the batched-update to
+always be attempted regardless of the file's size and date, use the -I
+option.  If an error occurs, the destination tree will probably be in a
+partially updated state. In that case, rsync can
 be used in its regular (non-batch) mode of operation to fix up the
 destination tree.
 
@@ -1195,16 +1202,13 @@ one used to generate the batch file.
 The --dry-run (-n) option does not work in batch mode and yields a runtime
 error.
 
-You should use an equivalent set of options when reading a batch file that
-you used when generating it with a few exceptions.  For instance
+When reading a batch file, rsync will force the value of certain options
+to match the data in the batch file if you didn't set them to the same
+as the batch-writing command.  Other options can (and should) be changed.
+For instance
 --write-batch changes to --read-batch, --files-from is dropped, and the
 --include/--exclude options are not needed unless --delete is specified
-without --delete-excluded.  Other options that affect how the update
-happens should generally remain the same as it is possible to confuse rsync
-into expecting a different data stream than the one that is contained in
-the batch file.  For example, it would not work to change the setting of
-the -H or -c option, but it would work to add or remove the --delete
-option.
+without --delete-excluded.
 
 The code that creates the BATCH.sh file transforms any include/exclude
 options into a single list that is appended as a "here" document to the
