@@ -1,0 +1,18 @@
+#! /bin/sh
+
+# Copyright (C) 2003 by Wayne Davison <wayned@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test the wildmatch functionality
+
+. $srcdir/testsuite/rsync.fns
+
+set -x
+
+"$TOOLDIR/wildtest" >"$scratchdir/wild.out"
+diff -u "$scratchdir/wild.out" - <<EOF
+EOF
+
+exit 0
