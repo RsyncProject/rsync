@@ -22,6 +22,7 @@
  * string mappings in log.c
  */
 
+#define RERR_OK         0
 #define RERR_SYNTAX     1       /* syntax or usage error */
 #define RERR_PROTOCOL   2       /* protocol incompatibility */
 #define RERR_FILESELECT 3       /* errors selecting input/output files, dirs */
