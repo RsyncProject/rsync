@@ -409,7 +409,8 @@ static int skip_filesystem(char *fname, STRUCT_STAT *st)
 	return (st2.st_dev != filesystem_dev);
 }
 
-static struct file_struct *make_file(int f, char *fname)
+/* create a file_struct for a named file */
+struct file_struct *make_file(int f, char *fname)
 {
 	struct file_struct *file;
 	STRUCT_STAT st;
@@ -921,7 +922,7 @@ int flist_find(struct file_list *flist,struct file_struct *f)
 /*
  * free up one file
  */
-static void free_file(struct file_struct *file)
+void free_file(struct file_struct *file)
 {
 	if (!file) return;
 	if (file->basename) free(file->basename);

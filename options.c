@@ -74,6 +74,7 @@ char *shell_cmd = NULL;
 char *log_format = NULL;
 char *password_file = NULL;
 char *rsync_path = RSYNC_NAME;
+char *backup_dir = NULL;
 int rsync_port = RSYNC_PORT;
 
 int verbose = 0;
@@ -107,6 +108,7 @@ void usage(int F)
   rprintf(F," -r, --recursive             recurse into directories\n");
   rprintf(F," -R, --relative              use relative path names\n");
   rprintf(F," -b, --backup                make backups (default %s suffix)\n",BACKUP_SUFFIX);
+  rprintf(F,"     --backup-dir            make backups into this directory");
   rprintf(F,"     --suffix=SUFFIX         override backup suffix\n");  
   rprintf(F," -u, --update                update only (don't overwrite newer files)\n");
   rprintf(F," -l, --links                 preserve soft links\n");
@@ -169,7 +171,7 @@ enum {OPT_VERSION, OPT_SUFFIX, OPT_SENDER, OPT_SERVER, OPT_EXCLUDE,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS,
       OPT_COPY_UNSAFE_LINKS, OPT_SAFE_LINKS, OPT_COMPARE_DEST,
       OPT_LOG_FORMAT, OPT_PASSWORD_FILE, OPT_SIZE_ONLY, OPT_ADDRESS,
-      OPT_DELETE_AFTER, OPT_EXISTING, OPT_MAX_DELETE};
+      OPT_DELETE_AFTER, OPT_EXISTING, OPT_MAX_DELETE, OPT_BACKUP_DIR};
 
 static char *short_options = "oblLWHpguDCtcahvqrRIxnSe:B:T:zP";
 
@@ -231,6 +233,7 @@ static struct option long_options[] = {
   {"log-format",  1,     0,    OPT_LOG_FORMAT},
   {"address",     1,     0,    OPT_ADDRESS},
   {"max-delete",  1,     0,    OPT_MAX_DELETE},
+  {"backup-dir",  1,     0,    OPT_BACKUP_DIR},
   {0,0,0,0}};
 
 
@@ -553,6 +556,10 @@ int parse_arguments(int argc, char *argv[], int frommain)
 			}
 			break;
 
+		case OPT_BACKUP_DIR:
+			backup_dir = optarg;
+			break;
+
 		default:
 			slprintf(err_buf,sizeof(err_buf),"unrecognised option\n");
 			return 0;
@@ -561,6 +568,8 @@ int parse_arguments(int argc, char *argv[], int frommain)
 	return 1;
 }
 
+
+/* need to pass all the valid options from the client to the server */
 
 void server_options(char **args,int *argc)
 {
@@ -678,6 +687,14 @@ void server_options(char **args,int *argc)
 	if (tmpdir) {
 		args[ac++] = "--temp-dir";
 		args[ac++] = tmpdir;
+	}
+
+	if (backup_dir && am_sender) {
+		/* only the receiver needs this option, if we are the sender
+		 *   then we need to send it to the receiver.
+		 */
+		args[ac++] = "--backup-dir";
+		args[ac++] = backup_dir;
 	}
 
 	if (compare_dest && am_sender) {

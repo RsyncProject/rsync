@@ -36,7 +36,6 @@ extern char *compare_dest;
 extern int make_backups;
 extern char *backup_suffix;
 
-
 static struct delete_list {
 	dev_t dev;
 	INO_T inode;
@@ -146,6 +145,7 @@ static void delete_files(struct file_list *flist)
 			if (-1 == flist_find(flist,local_file_list->files[i])) {
 				char *f = f_name(local_file_list->files[i]);
 				int k = strlen(f) - strlen(backup_suffix);
+/* Hi Andrew, do we really need to play with backup_suffix here? */
 				if (make_backups && ((k <= 0) ||
 					    (strcmp(f+k,backup_suffix) != 0))) {
 					(void) make_backup(f);
@@ -291,6 +291,8 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname,
 }
 
 
+/* main routine for receiver process. Receiver process runs on the
+	same host as the generator process. */
 
 int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 {  

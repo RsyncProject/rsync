@@ -259,6 +259,3 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file)
 		set_perms(fname,file,NULL,0);
 	}
 }
-
-
-

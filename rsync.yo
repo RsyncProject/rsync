@@ -223,6 +223,7 @@ verb(
  -r, --recursive             recurse into directories
  -R, --relative              use relative path names
  -b, --backup                make backups (default ~ suffix)
+     --backup-dir=DIR        put backups in the specified directory
      --suffix=SUFFIX         override backup suffix
  -u, --update                update only (don't overwrite newer files)
  -l, --links                 preserve soft links
@@ -347,6 +348,10 @@ machine. The full path name is preserved.
 dit(bf(-b, --backup)) With this option preexisting destination files are
 renamed with a ~ extension as each file is transferred.  You can
 control the backup suffix using the --suffix option.
+
+dit(bf(--backup-dir=DIR)) In combination with the --backup option, this
+tells rsync to store all backups in the specified directory. This is
+very useful for incremental backups.
 
 dit(bf(--suffix=SUFFIX)) This option allows you to override the default
 backup suffix used with the -b option. The default is a ~.
