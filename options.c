@@ -738,7 +738,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			compare_dest = 1;
 			dest_option = "--compare-dest";
 		set_dest_dir:
-			if (basis_dir_cnt >= MAX_BASIS_DIRS-1) {
+			if (basis_dir_cnt >= MAX_BASIS_DIRS) {
 				snprintf(err_buf, sizeof err_buf,
 					"ERROR: at most %d %s args may be specified\n",
 					MAX_BASIS_DIRS, dest_option);
