@@ -15,6 +15,9 @@ Changes since 2.6.0:
       transfer we are, including both a count of files transferred
       and a percentage of the total file-count that we're processed.
 
+    * The configure script now accepts --with-rsyncd-conf=PATH
+      to override the default value of the /etc/rsyncd.conf file.
+
   BUG FIXES:
 
     * When -x (--one-file-system) is combined with -L (--copy-links)
