@@ -660,12 +660,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 #endif
 
-	if (block_size > MAX_BLOCK_SIZE) {
-		rprintf(FINFO, "limiting block-size to %d bytes\n",
-			MAX_BLOCK_SIZE);
-		block_size = MAX_BLOCK_SIZE;
-	}
-
 	if (write_batch && read_batch) {
 		snprintf(err_buf, sizeof err_buf,
 			"--write-batch and --read-batch can not be used together\n");

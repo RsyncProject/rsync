@@ -154,7 +154,6 @@ static void sum_sizes_sqroot(struct sum_struct *sum, uint64 len)
 			c >>= 1;
 		} while (c >= 8);	/* round to multiple of 8 */
 		blength = MAX(blength, BLOCK_SIZE);
-		blength = MIN(blength, MAX_BLOCK_SIZE);
 	}
 
 	if (protocol_version < 27) {

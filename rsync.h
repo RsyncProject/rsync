@@ -90,8 +90,7 @@
 #define SPARSE_WRITE_SIZE (1024)
 #define WRITE_SIZE (32*1024)
 #define CHUNK_SIZE (32*1024)
-#define MAX_MAP_SIZE (512*1024)
-#define MAX_BLOCK_SIZE (256*1024)
+#define MAX_MAP_SIZE (256*1024)
 #define IO_BUFFER_SIZE (4092)
 
 #define IOERR_GENERAL	(1<<0) /* For backward compatibility, this must == 1 */
