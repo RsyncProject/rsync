@@ -21,7 +21,6 @@
 #include "rsync.h"
 
 extern int verbose;
-extern int itemize_changes;
 extern int log_before_transfer;
 extern int delete_after;
 extern int csum_length;
@@ -370,8 +369,9 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 
 		file = flist->files[i];
 
-		if (itemize_changes) {
+		if (protocol_version >= 29) {
 			iflags = read_byte(f_in);
+			iflags |= read_byte(f_in) << 8;
 			if (!(iflags & ITEM_UPDATING) || !S_ISREG(file->mode)) {
 				if (!dry_run || !am_server)
 					log_recv(file, &stats, iflags);
@@ -403,9 +403,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 			rprintf(FINFO, "recv_files(%s)\n", safe_fname(fname));
 
 		if (dry_run) { /* log the transfer */
-			if (!am_server && verbose && !log_format)
-				rprintf(FINFO, "%s\n", safe_fname(fname));
-			else if (!am_server)
+			if (!am_server && log_format)
 				log_recv(file, &stats, iflags);
 			continue;
 		}
@@ -551,7 +549,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		/* log the transfer */
 		if (log_before_transfer)
 			log_recv(file, &initial_stats, iflags);
-		else if (!am_server && verbose && (!log_format || do_progress))
+		else if (!am_server && verbose && do_progress)
 			rprintf(FINFO, "%s\n", safe_fname(fname));
 
 		/* recv file data */
