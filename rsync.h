@@ -331,6 +331,10 @@ enum logcode {FNONE=0, FERROR=1, FINFO=2, FLOG=3 };
 #define INADDR_NONE 0xffffffff
 #endif
 
+#ifndef IN_LOOPBACKNET
+#define IN_LOOPBACKNET 127
+#endif
+
 struct file_struct {
 	unsigned flags;
 	time_t modtime;
@@ -615,7 +619,7 @@ inet_ntop(int af, const void *src, char *dst, size_t size);
 #endif /* !HAVE_INET_NTOP */
 
 #ifndef HAVE_INET_PTON
-int isc_net_pton(int af, const char *src, void *dst);
+int inet_pton(int af, const char *src, void *dst);
 #endif
 
 #ifdef MAINTAINER_MODE
