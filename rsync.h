@@ -52,7 +52,7 @@
 #define SPARSE_WRITE_SIZE (1024)
 #define WRITE_SIZE (32*1024)
 #define CHUNK_SIZE (32*1024)
-#define MAX_MAP_SIZE (1*1024*1024)
+#define MAX_MAP_SIZE (256*1024)
 #define IO_BUFFER_SIZE (4092)
 #define MAX_READ_BUFFER (1024*1024)
 
@@ -147,11 +147,6 @@
 #include <grp.h>
 #endif
 #include <errno.h>
-
-#if defined(HAVE_MMAP) && defined(HAVE_MUNMAP)
-#include <sys/mman.h>
-#define USE_MMAP 1
-#endif
 
 #ifdef HAVE_UTIME_H
 #include <utime.h>
@@ -303,6 +298,7 @@ struct file_struct {
 	char *sum;
 };
 
+
 struct file_list {
 	int count;
 	int malloced;
@@ -326,9 +322,9 @@ struct sum_struct {
 };
 
 struct map_struct {
-	char *map,*p;
+	char *p;
 	int fd,p_size,p_len;
-	OFF_T size, p_offset;
+	OFF_T file_size, p_offset, p_fd_offset;
 };
 
 struct exclude_struct {
