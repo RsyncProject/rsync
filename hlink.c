@@ -106,7 +106,7 @@ int check_hard_link(struct file_struct *file)
 	    file->inode == hlink_list[low - 1].inode) {
 		if (verbose >= 2) {
 			rprintf(FINFO, "check_hard_link: \"%s\" is a hard link to file %d, \"%s\"\n",
-				f_name(file), low, f_name(&hlink_list[low]));
+				f_name(file), low-1, f_name(&hlink_list[low-1]));
 		}
 		return 1;
 	}
