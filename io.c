@@ -51,7 +51,7 @@ extern int eol_nulls;
 extern int csum_length;
 extern int checksum_seed;
 extern int protocol_version;
-extern char *remote_filesfrom_file;
+extern char *filesfrom_host;
 extern struct stats stats;
 
 const char phase_unknown[] = "unknown";
@@ -566,7 +566,7 @@ int read_filesfrom_line(int fd, char *fname)
 {
 	char ch, *s, *eob = fname + MAXPATHLEN - 1;
 	int cnt;
-	int reading_remotely = remote_filesfrom_file != NULL;
+	int reading_remotely = filesfrom_host != NULL;
 	int nulls = eol_nulls || reading_remotely;
 
   start:
