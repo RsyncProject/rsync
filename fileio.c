@@ -22,9 +22,10 @@
   */
 #include "rsync.h"
 
+extern int sparse_files;
+
 static char last_byte;
 static int last_sparse;
-extern int sparse_files;
 
 int sparse_end(int f)
 {
@@ -91,6 +92,7 @@ int flush_write_file(int f)
 	return ret;
 }
 
+
 /*
  * write_file does not allow incomplete writes.  It loops internally
  * until len bytes are written or errno is set.
@@ -106,9 +108,9 @@ int write_file(int f,char *buf,size_t len)
 			r1 = write_sparse(f, buf, len1);
 		} else {
 			if (!wf_writeBuf) {
-				wf_writeBufSize = MAX_MAP_SIZE;
+				wf_writeBufSize = WRITE_SIZE * 8;
 				wf_writeBufCnt  = 0;
-				wf_writeBuf = new_array(char, MAX_MAP_SIZE);
+				wf_writeBuf = new_array(char, wf_writeBufSize);
 				if (!wf_writeBuf)
 					out_of_memory("write_file");
 			}
@@ -154,6 +156,7 @@ struct map_struct *map_file(int fd,OFF_T len)
 	return map;
 }
 
+
 /* slide the read window in the file */
 char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 {
@@ -175,7 +178,6 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 	    offset+len <= map->p_offset+map->p_len) {
 		return (map->p + (offset - map->p_offset));
 	}
-
 
 	/* nope, we are going to have to do a read. Work out our desired window */
 	if (offset > 2*CHUNK_SIZE) {
@@ -259,4 +261,3 @@ int unmap_file(struct map_struct *map)
 
 	return ret;
 }
-
