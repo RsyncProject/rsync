@@ -22,6 +22,7 @@
 #include "popt.h"
 
 extern int sanitize_paths;
+extern int select_timeout;
 extern char curr_dir[MAXPATHLEN];
 extern struct exclude_list_struct exclude_list;
 
@@ -309,7 +310,7 @@ void usage(enum logcode F)
 enum {OPT_VERSION = 1000, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_DELETE_AFTER, OPT_DELETE_EXCLUDED, OPT_LINK_DEST,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW,
-      OPT_READ_BATCH, OPT_WRITE_BATCH,
+      OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_TIMEOUT,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -363,7 +364,7 @@ static struct poptOption long_options[] = {
   {"rsh",             'e', POPT_ARG_STRING, &shell_cmd, 0, 0, 0 },
   {"block-size",      'B', POPT_ARG_INT,    &block_size, 0, 0, 0 },
   {"max-delete",       0,  POPT_ARG_INT,    &max_delete, 0, 0, 0 },
-  {"timeout",          0,  POPT_ARG_INT,    &io_timeout, 0, 0, 0 },
+  {"timeout",          0,  POPT_ARG_INT,    &io_timeout, OPT_TIMEOUT, 0, 0 },
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir, 0, 0, 0 },
   {"compare-dest",     0,  POPT_ARG_STRING, &compare_dest, 0, 0, 0 },
   {"link-dest",        0,  POPT_ARG_STRING, &compare_dest,  OPT_LINK_DEST, 0, 0 },
@@ -582,6 +583,11 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			/* popt stores the filename in batch_prefix for us */
 			read_batch = 1;
 			checksum_seed = FIXED_CHECKSUM_SEED;
+			break;
+
+		case OPT_TIMEOUT:
+			if (io_timeout && io_timeout < select_timeout)
+				select_timeout = io_timeout;
 			break;
 
 		case OPT_LINK_DEST:
