@@ -208,7 +208,6 @@ echo '------------------------------------------------------------'
 # we want, and if we just call expr then this script will always fail,
 # because -e is set.
 
-set -x
 result=`expr $failed + $missing || true`
 echo "overall result is $result"
 exit $result
