@@ -120,8 +120,6 @@ void start_accept_loop(int port, int (*fn)(int ))
 {
 	int s;
 
-	signal(SIGCHLD, SIG_IGN);
-
 	/* open an incoming socket */
 	s = open_socket_in(SOCK_STREAM, port);
 	if (s == -1)
@@ -154,6 +152,15 @@ void start_accept_loop(int port, int (*fn)(int ))
 		fd = accept(s,&addr,&in_addrlen);
 
 		if (fd == -1) continue;
+
+		signal(SIGCHLD, SIG_IGN);
+
+		/* we shouldn't have any children left hanging around
+		   but I have had reports that on Digital Unix zombies
+		   are produced, so this ensures that they are reaped */
+#ifdef WNOHANG
+		waitpid(-1, NULL, WNOHANG);
+#endif
 
 		if (fork()==0) {
 			close(s);
