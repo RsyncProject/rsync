@@ -932,10 +932,10 @@ char *get_rule_prefix(int match_flags, const char *pat, int sending,
 	if (match_flags & MATCHFLG_CVS_IGNORE)
 		*op++ = 'C';
 	else {
-		if (match_flags & MATCHFLG_WORD_SPLIT)
-			*op++ = 's';
 		if (match_flags & MATCHFLG_NO_INHERIT)
 			*op++ = 'n';
+		if (match_flags & MATCHFLG_WORD_SPLIT)
+			*op++ = 'w';
 		if (match_flags & MATCHFLG_NO_PREFIXES) {
 			if (match_flags & MATCHFLG_INCLUDE)
 				*op++ = '+';
