@@ -1670,6 +1670,7 @@ static int is_backup_file(char *fn)
 void delete_in_dir(struct file_list *flist, char *fname)
 {
 	static void *filt_array[MAXPATHLEN/2];
+	static BOOL need_first_push = True;
 	static int fa_lvl = 0;
 	static char fbuf[MAXPATHLEN];
 	struct file_list *dir_list;
@@ -1679,6 +1680,7 @@ void delete_in_dir(struct file_list *flist, char *fname)
 	if (!flist) {
 		while (fa_lvl)
 			pop_local_filters(filt_array[--fa_lvl]);
+		need_first_push = True;
 		*fbuf = '\0';
 		return;
 	}
@@ -1693,12 +1695,6 @@ void delete_in_dir(struct file_list *flist, char *fname)
 		return;
 	}
 
-	if (link_stat(fname, &st, keep_dirlinks) < 0)
-		return;
-
-	if (one_file_system)
-		filesystem_dev = st.st_dev;
-
 	for (j = 0; fbuf[j]; j++) {
 		if (fbuf[j] != fname[j]) {
 			while (fa_lvl) {
@@ -1712,10 +1708,32 @@ void delete_in_dir(struct file_list *flist, char *fname)
 	}
 
 	dlen = strlcpy(fbuf, fname, MAXPATHLEN);
+	if (need_first_push) {
+		if (dlen != 1 || fbuf[0] != '.') {
+			char *s = strrchr(fbuf, '/');
+			int first_dlen;
+			if (s)
+				first_dlen = s - fbuf;
+			else
+				first_dlen = 0;
+			if (!s || s[1] != '.' || s[2] != '\0') {
+				filt_array[fa_lvl++] = push_local_filters(fbuf,
+									  first_dlen);
+			}
+		}
+		need_first_push = False;
+	}
+
 	if (dlen >= MAXPATHLEN - 1)
 		return;
 	if (fa_lvl >= MAXPATHLEN/2)
 		return; /* impossible... */
+
+	if (link_stat(fname, &st, keep_dirlinks) < 0)
+		return;
+
+	if (one_file_system)
+		filesystem_dev = st.st_dev;
 
 	dir_list = flist_new(WITHOUT_HLINK, "delete_in_dir");
 
