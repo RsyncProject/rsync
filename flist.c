@@ -81,7 +81,7 @@ void init_flist(void)
 	struct file_struct f;
 
 	/* Figure out how big the file_struct is without trailing padding */
-	file_struct_len = ((char*)&f.flags - (char*)&f) + sizeof f.flags;
+	file_struct_len = offsetof(struct file_struct, flags) + sizeof f.flags;
 }
 
 
@@ -1175,8 +1175,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			finish_filelist_progress(flist);
 	}
 
-	if (flist->hlink_pool)
-	{
+	if (flist->hlink_pool) {
 		pool_destroy(flist->hlink_pool);
 		flist->hlink_pool = NULL;
 	}
