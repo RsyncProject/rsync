@@ -49,6 +49,8 @@ extern int io_error;
 
 static struct exclude_struct **local_exclude_list;
 
+static void clean_flist(struct file_list *flist, int strip_root);
+
 int link_stat(const char *Path, STRUCT_STAT *Buffer) 
 {
 #if SUPPORT_LINKS
@@ -224,12 +226,6 @@ static void receive_file_entry(struct file_struct **fptr,
 	lastname[MAXPATHLEN-1] = 0;
 
 	clean_fname(thisname);
-
-	if (relative_paths && thisname[0] == '/') {
-		/* strip / off absolute paths in destination */
-		memmove(thisname, thisname+1, strlen(thisname));
-		if (!thisname[0]) strcpy(thisname,".");
-	}
 
 	if ((p = strrchr(thisname,'/'))) {
 		static char *lastdir;
@@ -647,7 +643,7 @@ struct file_list *send_file_list(int f,int argc,char *argv[])
 	if (verbose && recurse && !am_server && f != -1)
 		rprintf(FINFO,"done\n");
 	
-	clean_flist(flist);
+	clean_flist(flist, 0);
 	
 	/* now send the uid/gid list. This was introduced in protocol
            version 15 */
@@ -728,7 +724,7 @@ struct file_list *recv_file_list(int f)
   if (verbose > 2)
     rprintf(FINFO,"received %d names\n",flist->count);
 
-  clean_flist(flist);
+  clean_flist(flist, relative_paths);
 
   if (verbose && recurse && !am_server) {
     rprintf(FINFO,"done\n");
@@ -826,7 +822,7 @@ void flist_free(struct file_list *flist)
  * This routine ensures we don't have any duplicate names in our file list.
  * duplicate names can cause corruption because of the pipelining 
  */
-void clean_flist(struct file_list *flist)
+static void clean_flist(struct file_list *flist, int strip_root)
 {
 	int i;
 
@@ -847,6 +843,37 @@ void clean_flist(struct file_list *flist)
 					f_name(flist->files[i-1]),i-1);
 			free_file(flist->files[i]);
 		} 
+	}
+
+	if (strip_root) {
+		/* we need to strip off the root directory in the case
+		   of relative paths, but this must be done _after_
+		   the sorting phase */
+		for (i=0;i<flist->count;i++) {
+			if (flist->files[i]->dirname &&
+			    flist->files[i]->dirname[0] == '/') {
+				memmove(&flist->files[i]->dirname[0],
+					&flist->files[i]->dirname[1],
+					strlen(flist->files[i]->dirname));
+			}
+			
+			if (flist->files[i]->dirname && 
+			    !flist->files[i]->dirname[0]) {
+				flist->files[i]->dirname = NULL;
+			}
+		}
+	}
+
+
+	if (verbose <= 3) return;
+
+	for (i=0;i<flist->count;i++) {
+		rprintf(FINFO,"[%d] i=%d %s %s mode=0%o len=%d\n",
+			getpid(), i, 
+			flist->files[i]->dirname,
+			flist->files[i]->basename,
+			flist->files[i]->mode,
+			flist->files[i]->length);
 	}
 }
 

@@ -267,8 +267,10 @@ static int rsync_module(int fd, int i)
 		free(request);
 	}
 
+#if !TRIDGE
 	/* don't allow the logs to be flooded too fast */
 	if (verbose > 1) verbose = 1;
+#endif
 
 	argc -= optind;
 	argp = argv + optind;
