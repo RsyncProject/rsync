@@ -586,7 +586,7 @@ static void read_loop(int fd, char *buf, size_t len)
  *
  * Never returns <= 0.
  */
-static int read_unbuffered(int fd, char *buf, size_t len)
+static int readfd_unbuffered(int fd, char *buf, size_t len)
 {
 	static size_t remaining;
 	int tag, ret = 0;
@@ -603,7 +603,7 @@ static int read_unbuffered(int fd, char *buf, size_t len)
 			bufferSz = 2 * IO_BUFFER_SIZE;
 			buffer   = new_array(char, bufferSz);
 			if (!buffer)
-				out_of_memory("read_unbuffered");
+				out_of_memory("readfd_unbuffered");
 		}
 		remaining = read_timeout(fd, buffer, bufferSz);
 		bufferIdx = 0;
@@ -630,7 +630,7 @@ static int read_unbuffered(int fd, char *buf, size_t len)
 			if (!buffer || remaining > bufferSz) {
 				buffer = realloc_array(buffer, char, remaining);
 				if (!buffer)
-					out_of_memory("read_unbuffered");
+					out_of_memory("readfd_unbuffered");
 				bufferSz = remaining;
 			}
 			read_loop(fd, buffer, remaining);
@@ -672,7 +672,7 @@ static void readfd(int fd, char *buffer, size_t N)
 	size_t total = 0;
 
 	while (total < N) {
-		ret = read_unbuffered(fd, buffer + total, N-total);
+		ret = readfd_unbuffered(fd, buffer + total, N-total);
 		total += ret;
 	}
 
@@ -904,9 +904,8 @@ static void mplex_write(int fd, enum msgcode code, char *buf, size_t len)
 
 	SIVAL(buffer, 0, ((MPLEX_BASE + (int)code)<<24) + len);
 
-	if (n > (sizeof buffer - 4)) {
+	if (n > sizeof buffer - 4)
 		n = sizeof buffer - 4;
-	}
 
 	memcpy(&buffer[4], buf, n);
 	writefd_unbuffered(fd, buffer, n+4);
