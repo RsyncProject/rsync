@@ -413,7 +413,9 @@ static void glob_expand_one(char *s, char **argv, int *argc, int maxargs, int sa
 
 	if (!*s) s = ".";
 
-	argv[*argc] = sanitize_paths ? sanitize_path(s) : strdup(s);
+	s = strdup(s);
+	sanitize_path(s);
+	argv[*argc] = s;
 
 	memset(&globbuf, 0, sizeof(globbuf));
 	glob(argv[*argc], 0, NULL, &globbuf);
@@ -561,23 +563,23 @@ void clean_fname(char *name)
  * While we're at it, remove double slashes and "." components like
  *   clean_fname does(), but DON'T remove a trailing slash because that
  *   is sometimes significant on command line arguments.
- * Return a malloc'ed copy.
+ * Can only shrink paths, so sanitizes in place.
  * Contributed by Dave Dykstra <dwd@bell-labs.com>
  */
 
-char *sanitize_path(char *p)
+void sanitize_path(char *p)
 {
-	char *copy, *copyp;
+	char *start, *sanp;
 
-	copy = (char *) malloc(strlen(p)+1);
-	copyp = copy;
+	start = p;
+	sanp = p;
 	while (*p == '/') {
 		/* remove leading slashes */
 		p++;
 	}
 	while (*p != '\0') {
 		/* this loop iterates once per filename component in p.
-		 * both p (and copyp if the original had a slash) should
+		 * both p (and sanp if the original had a slash) should
 		 * always be left pointing after a slash
 		 */
 		if ((*p == '.') && ((*(p+1) == '/') || (*(p+1) == '\0'))) {
@@ -592,18 +594,18 @@ char *sanitize_path(char *p)
 			p += 2;
 			if (*p == '/')
 				p++;
-			if (copyp != copy) {
-				/* back up the copy one level */
-				--copyp; /* now pointing at slash */
-				while ((copyp > copy) && (*(copyp - 1) != '/')) {
+			if (sanp != start) {
+				/* back up sanp one level */
+				--sanp; /* now pointing at slash */
+				while ((sanp > start) && (*(sanp - 1) != '/')) {
 					/* skip back up to slash */
-					copyp--;
+					sanp--;
 				}
 			}
 		} else {
 			while (1) {
 				/* copy one component through next slash */
-				*copyp++ = *p++;
+				*sanp++ = *p++;
 				if ((*p == '\0') || (*(p-1) == '/')) {
 					while (*p == '/') {
 						/* skip multiple slashes */
@@ -614,12 +616,11 @@ char *sanitize_path(char *p)
 			}
 		}
 	}
-	if (copyp == copy) {
+	if (sanp == start) {
 		/* ended up with nothing, so put in "." component */
-		*copyp++ = '.';
+		*sanp++ = '.';
 	}
-	*copyp = '\0';
-	return(copy);
+	*sanp = '\0';
 }
 
 

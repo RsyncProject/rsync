@@ -282,9 +282,7 @@ static int rsync_module(int fd, int i)
 		 *    and which aren't.
 		 */
 		for (i = 1; i < argc; i++) {
-			char *copy = sanitize_path(argv[i]);
-			free((void *)argv[i]);
-			argv[i] = copy;
+			sanitize_path(argv[i]);
 		}
 	}
 
