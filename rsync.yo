@@ -909,30 +909,39 @@ option affects the path you need to use in your matching (in addition to
 changing how much of the file tree is duplicated on the destination
 system).  The following examples demonstrate this.
 
-Let's say that we want to match a source filename that has an absolute
-path of "/home/me/foo/bar", here is how the various command choices can
-differ:
+Let's say that we want to match two source files, one with an absolute
+path of "/home/me/foo/bar", and one with a path of "/home/you/bar/baz".
+Here is how the various command choices differ for a 2-source transfer:
 
 verb(
-   Example cmd: rsync -a /home/me /dest
-   Source root: /home          ("me" is part of transfer)
+   Example cmd: rsync -a /home/me /home/you /dest
+   Source root: /home       (me & you are part of transfer)
    +/- pattern: /me/foo/bar
+   +/- pattern: /you/bar/baz
    Target file: /dest/me/foo/bar
+   Target file: /dest/you/bar/baz
 
-   Example cmd: rsync -a /home/me/ /dest
-   Source root: /home/me              (due to trailing /)
-   +/- pattern: /foo/bar              (note missing "me")
+   Example cmd: rsync -a /home/me/ /home/you/ /dest
+   Source root: /home/me               (due to trailing /)
+   Source root: /home/you              (ditto)
+   +/- pattern: /foo/bar               (note missing "me")
+   +/- pattern: /bar/baz               (note missing "you")
    Target file: /dest/foo/bar
+   Target file: /dest/bar/baz
 
-   Example cmd: rsync -a --relative /home/me/ /dest
-   Source root: /home/me
-   +/- pattern: /home/me/foo/bar      (note full path)
+   Example cmd: rsync -a --relative /home/me/ /home/you /dest
+   Source root: /
+   +/- pattern: /home/me/foo/bar       (note full path)
+   +/- pattern: /home/you/bar/baz      (ditto)
    Target file: /dest/home/me/foo/bar
+   Target file: /dest/home/you/bar/baz
 
-   Example cmd: cd /home; rsync -a --relative me/foo/ /dest
-   Source root: ./me/foo         (source is not absolute)
-   +/- pattern: /me/foo/bar      (only uses specified path)
+   Example cmd: cd /home; rsync -a --relative me/foo you/ /dest
+   Source root: /home
+   +/- pattern: /me/foo/bar      (starts at specified path)
+   +/- pattern: /you/bar/baz     (ditto)
    Target file: /dest/me/foo/bar
+   Target file: /dest/you/bar/baz
 )
 
 The easiest way to see what name you should include/exclude is to just
@@ -1205,6 +1214,7 @@ password to a shell transport such as ssh.
 
 dit(bf(USER) or bf(LOGNAME)) The USER or LOGNAME environment variables
 are used to determine the default username sent to an rsync server.
+If neither is set, the username defaults to "guest".
 
 dit(bf(HOME)) The HOME environment variable is used to find the user's
 default .cvsignore file.
