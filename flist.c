@@ -92,7 +92,7 @@ static int show_filelist_p(void)
 static void start_filelist_progress(char *kind)
 {
 	rprintf(FINFO, "%s ... ", kind);
-	if ((verbose > 1) || do_progress)
+	if (verbose > 1 || do_progress)
 		rprintf(FINFO, "\n");
 	rflush(FINFO);
 }
@@ -106,7 +106,7 @@ static void emit_filelist_progress(const struct file_list *flist)
 
 static void maybe_emit_filelist_progress(const struct file_list *flist)
 {
-	if (do_progress && show_filelist_p() && ((flist->count % 100) == 0))
+	if (do_progress && show_filelist_p() && (flist->count % 100) == 0)
 		emit_filelist_progress(flist);
 }
 
@@ -131,9 +131,10 @@ static void list_file_entry(struct file_struct *f)
 {
 	char perms[11];
 
-	if (!f->basename)
+	if (!f->basename) {
 		/* this can happen if duplicate names were removed */
 		return;
+	}
 
 	permstring(perms, f->mode);
 
@@ -145,10 +146,12 @@ static void list_file_entry(struct file_struct *f)
 			f_name(f), f->u.link);
 	} else
 #endif
+	{
 		rprintf(FINFO, "%s %11.0f %s %s\n",
 			perms,
 			(double)f->length, timestring(f->modtime),
 			f_name(f));
+	}
 }
 
 
@@ -762,13 +765,16 @@ struct file_struct *make_file(char *fname,
 		    && check_exclude_file(thisname, 0, exclude_level))
 			return NULL;
 		if (save_errno == ENOENT) {
+#if SUPPORT_LINKS
 			/* Avoid "vanished" error if symlink points nowhere. */
 			if (copy_links && do_lstat(thisname, &st) == 0
 			    && S_ISLNK(st.st_mode)) {
 				io_error |= IOERR_GENERAL;
 				rprintf(FERROR, "symlink has no referent: %s\n",
 					full_fname(thisname));
-			} else {
+			} else
+#endif
+			{
 				enum logcode c = am_daemon && protocol_version < 28
 				    ? FERROR : FINFO;
 				io_error |= IOERR_VANISHED;
