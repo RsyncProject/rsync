@@ -1,17 +1,17 @@
-/* 
+/*
    Copyright (C) Andrew Tridgell 1996
    Copyright (C) Paul Mackerras 1996
-   
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -21,23 +21,27 @@
 #include "zlib/zlib.h"
 
 extern int do_compression;
+extern int module_id;
+extern int write_batch;
+
 static int compression_level = Z_DEFAULT_COMPRESSION;
 
 /* determine the compression level based on a wildcard filename list */
 void set_compression(char *fname)
 {
-	extern int module_id;
 	char *dont;
 	char *tok;
 
-	if (!do_compression) return;
+	if (!do_compression)
+		return;
 
 	compression_level = Z_DEFAULT_COMPRESSION;
 	dont = lp_dont_compress(module_id);
 
-	if (!dont || !*dont) return;
+	if (!dont || !*dont)
+		return;
 
-	if ((dont[0] == '*') && (!dont[1])) {
+	if (dont[0] == '*' && !dont[1]) {
 		/* an optimization to skip the rest of this routine */
 		compression_level = 0;
 		return;
@@ -45,12 +49,13 @@ void set_compression(char *fname)
 
 	dont = strdup(dont);
 	fname = strdup(fname);
-	if (!dont || !fname) return;
+	if (!dont || !fname)
+		return;
 
 	strlower(dont);
 	strlower(fname);
 
-	for (tok=strtok(dont," ");tok;tok=strtok(NULL," ")) {
+	for (tok = strtok(dont, " "); tok; tok = strtok(NULL, " ")) {
 		if (wildmatch(tok, fname)) {
 			compression_level = 0;
 			break;
@@ -69,12 +74,14 @@ static int simple_recv_token(int f,char **data)
 
 	if (!buf) {
 		buf = new_array(char, CHUNK_SIZE);
-		if (!buf) out_of_memory("simple_recv_token");
+		if (!buf)
+			out_of_memory("simple_recv_token");
 	}
 
 	if (residue == 0) {
 		int i = read_int(f);
-		if (i <= 0) return i;
+		if (i <= 0)
+			return i;
 		residue = i;
 	}
 
@@ -90,7 +97,6 @@ static int simple_recv_token(int f,char **data)
 static void simple_send_token(int f,int token,
 			      struct map_struct *buf,OFF_T offset,int n)
 {
-	extern int write_batch;
 	int hold_int;
 
 	if (n > 0) {
@@ -159,7 +165,6 @@ send_deflated_token(int f, int token,
 {
 	int n, r;
 	static int init_done, flush_pending;
-	extern int write_batch;
 	char temp_byte;
 
 	if (last_token == -1) {
@@ -491,7 +496,7 @@ static void see_deflate_token(char *buf, int len)
 
 /**
  * Transmit a verbatim buffer of length @p n followed by a token.
- * If token == -1 then we have reached EOF 
+ * If token == -1 then we have reached EOF
  * If n == 0 then don't send a buffer
  */
 void send_token(int f,int token,struct map_struct *buf,OFF_T offset,
