@@ -210,5 +210,20 @@ EOF
 }
 
 
+build_symlinks() {
+    fromdir="$scratchdir/from"
+    todir="$scratchdir/to"
+    mkdir "$fromdir"
+    date >"$fromdir/referent"
+    ln -s referent "$fromdir/relative"
+    ln -s "$fromdir/referent" "$fromdir/absolute"
+    ln -s nonexistent "$fromdir/dangling"
+}
+
+test_fail() {
+    echo "$@" >&2
+    exit 1
+}
+
 # be reproducible
 umask 077
