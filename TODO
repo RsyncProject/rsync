@@ -539,18 +539,49 @@ Memory debugger
 
     http://devel-home.kde.org/~sewardj/
 
+Release script
+  
+  Update spec files
+
+  Build tar file; upload
+
+  Send announcement to mailing list and c.o.l.a.
+  
+  Make freshmeat announcement
+
+  Update web site
+
+
+
 TESTING --------------------------------------------------------------
 
 Cross-test versions
 
   Part of the regression suite should be making sure that we don't
   break backwards compatibility: old clients vs new servers and so
-  on.  Ideally we would test the cross product of versions.  
+  on.  Ideally we would test both up and down from the current release
+  to all old versions.
+
+  We might need to omit broken old versions, or versions in which
+  particular functionality is broken
 
   It might be sufficient to test downloads from well-known public
   rsync servers running different versions of rsync.  This will give
   some testing and also be the most common case for having different
   versions and not being able to upgrade.
+
+
+Test on kernel source
+
+  Download all versions of kernel; unpack, sync between them.  Also
+  sync between uncompressed tarballs.  Compare directories after
+  transfer.
+
+  Use local mode; ssh; daemon; --whole-file and --no-whole-file.
+
+  Use awk to pull out the 'speedup' number for each transfer.  Make
+  sure it is >= x.
+
 
 Test large files
 
@@ -674,3 +705,21 @@ rsyncsh
    fairly directly into rsync commands: it just needs to remember the
    current host, directory and so on.  We can probably even do
    completion of remote filenames.
+
+
+RELATED PROJECTS -----------------------------------------------------
+
+http://rsync.samba.org/rsync-and-debian/
+
+rsyncable gzip patch
+
+  Exhaustive, tortuous testing
+
+  Cleanups?
+
+rsyncsplit as alternative to real integration with gzip?
+
+reverse rsync over HTTP Range
+
+  Goswin Brederlow suggested this on Debian; I think tridge and I
+  talked about it previous in relation to rproxy.
