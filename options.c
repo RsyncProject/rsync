@@ -274,7 +274,7 @@ static struct poptOption long_options[] = {
   {"archive",         'a', POPT_ARG_NONE,   0,               'a'}, 
   {"server",           0,  POPT_ARG_NONE,   &am_server},
   {"sender",           0,  POPT_ARG_NONE,   0,               OPT_SENDER},
-  {"recurse",         'r', POPT_ARG_NONE,   &recurse},
+  {"recursive",       'r', POPT_ARG_NONE,   &recurse},
   {"relative",        'R', POPT_ARG_NONE,   &relative_paths},
   {"rsh",             'e', POPT_ARG_STRING, &shell_cmd},
   {"block-size",      'B', POPT_ARG_INT,    &block_size},
