@@ -1,3 +1,5 @@
 #! /bin/sh
 
-echo Hello there.  I am a test.
+. rsync.fns
+
+"$rsync" --version || exit 1

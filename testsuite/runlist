@@ -1,5 +1,9 @@
 #! /bin/sh
 
-# This file is sourced by the Samba build_farm scripts.  It contains a
-# list of tests to run.
+# Actually, rsync tests do too exist.  They're in this strangely-named
+# directory to support old installations of the build farm client
+# software.
 
+echo "$0 running" 
+
+TEST_ALL="rsync-version"
