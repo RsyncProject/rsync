@@ -325,6 +325,9 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		set_compression(fname);
 
 		match_sums(f_out, s, mbuf, st.st_size);
+		if (do_progress)
+			end_progress(st.st_size);
+
 		if (!log_before_transfer)
 			log_item(file, &initial_stats, iflags, NULL);
 
