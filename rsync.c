@@ -441,6 +441,15 @@ static void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 #if SUPPORT_LINKS
 		char lnk[MAXPATHLEN];
 		int l;
+		extern int safe_symlinks;
+
+		if (safe_symlinks && unsafe_symlink(file->link, fname)) {
+			if (verbose) {
+				rprintf(FINFO,"ignoring unsafe symlink %s -> %s\n",
+					fname,file->link);
+			}
+			return;
+		}
 		if (statret == 0) {
 			l = readlink(fname,lnk,MAXPATHLEN-1);
 			if (l > 0) {
@@ -457,9 +466,10 @@ static void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 				fname,file->link,strerror(errno));
 		} else {
 			set_perms(fname,file,NULL,0);
-			if (verbose) 
+			if (verbose) {
 				rprintf(FINFO,"%s -> %s\n",
 					fname,file->link);
+			}
 		}
 #endif
 		return;

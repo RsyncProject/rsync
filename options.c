@@ -58,6 +58,7 @@ int am_client=0;
 int do_stats=0;
 int do_progress=0;
 int keep_partial=0;
+int safe_symlinks=0;
 
 int block_size=BLOCK_SIZE;
 
@@ -95,6 +96,7 @@ void usage(int F)
   rprintf(F," -u, --update                update only (don't overwrite newer files)\n");
   rprintf(F," -l, --links                 preserve soft links\n");
   rprintf(F," -L, --copy-links            treat soft links like regular files\n");
+  rprintf(F,"     --safe-links            ignore links outside the destination tree\n");
   rprintf(F," -H, --hard-links            preserve hard links\n");
   rprintf(F," -p, --perms                 preserve permissions\n");
   rprintf(F," -o, --owner                 preserve owner (root only)\n");
@@ -141,7 +143,8 @@ void usage(int F)
 enum {OPT_VERSION,OPT_SUFFIX,OPT_SENDER,OPT_SERVER,OPT_EXCLUDE,
       OPT_EXCLUDE_FROM,OPT_DELETE,OPT_NUMERIC_IDS,OPT_RSYNC_PATH,
       OPT_FORCE,OPT_TIMEOUT,OPT_DAEMON,OPT_CONFIG,OPT_PORT,
-      OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS};
+      OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_STATS, OPT_PARTIAL, OPT_PROGRESS,
+      OPT_SAFE_LINKS};
 
 static char *short_options = "oblLWHpguDCtcahvrRIxnSe:B:T:z";
 
@@ -174,6 +177,7 @@ static struct option long_options[] = {
   {"perms",       0,     0,    'p'},
   {"links",       0,     0,    'l'},
   {"copy-links",  0,     0,    'L'},
+  {"safe-links",  0,     0,    OPT_SAFE_LINKS},
   {"whole-file",  0,     0,    'W'},
   {"hard-links",  0,     0,    'H'},
   {"owner",       0,     0,    'o'},
@@ -195,316 +199,322 @@ static struct option long_options[] = {
 
 void parse_arguments(int argc, char *argv[])
 {
-    int opt;
-    int option_index;
+	int opt;
+	int option_index;
 
-    while ((opt = getopt_long(argc, argv, 
-			      short_options, long_options, &option_index)) 
-	   != -1) {
-      switch (opt) 
-	{
-	case OPT_VERSION:
-	  rprintf(FINFO,"rsync version %s  protocol version %d\n\n",
-		 VERSION,PROTOCOL_VERSION);
-	  rprintf(FINFO,"Written by Andrew Tridgell and Paul Mackerras\n");
-	  exit_cleanup(0);
+	while ((opt = getopt_long(argc, argv, 
+				  short_options, long_options, &option_index)) 
+	       != -1) {
+		switch (opt) {
+		case OPT_VERSION:
+			rprintf(FINFO,"rsync version %s  protocol version %d\n\n",
+				VERSION,PROTOCOL_VERSION);
+			rprintf(FINFO,"Written by Andrew Tridgell and Paul Mackerras\n");
+			exit_cleanup(0);
+			
+		case OPT_SUFFIX:
+			backup_suffix = optarg;
+			break;
+			
+		case OPT_RSYNC_PATH:
+			rsync_path = optarg;
+			break;
+			
+		case 'I':
+			ignore_times = 1;
+			break;
 
-	case OPT_SUFFIX:
-	  backup_suffix = optarg;
-	  break;
+		case 'x':
+			one_file_system=1;
+			break;
 
-	case OPT_RSYNC_PATH:
-	  rsync_path = optarg;
-	  break;
+		case OPT_DELETE:
+			delete_mode = 1;
+			break;
 
-	case 'I':
-	  ignore_times = 1;
-	  break;
+		case OPT_FORCE:
+			force_delete = 1;
+			break;
 
-	case 'x':
-	  one_file_system=1;
-	  break;
+		case OPT_NUMERIC_IDS:
+			numeric_ids = 1;
+			break;
 
-	case OPT_DELETE:
-	  delete_mode = 1;
-	  break;
+		case OPT_EXCLUDE:
+			add_exclude(optarg, 0);
+			break;
 
-	case OPT_FORCE:
-	  force_delete = 1;
-	  break;
+		case OPT_INCLUDE:
+			add_exclude(optarg, 1);
+			break;
 
-	case OPT_NUMERIC_IDS:
-	  numeric_ids = 1;
-	  break;
+		case OPT_EXCLUDE_FROM:
+			add_exclude_file(optarg,1, 0);
+			break;
 
-	case OPT_EXCLUDE:
-	  add_exclude(optarg, 0);
-	  break;
+		case OPT_INCLUDE_FROM:
+			add_exclude_file(optarg,1, 1);
+			break;
 
-	case OPT_INCLUDE:
-	  add_exclude(optarg, 1);
-	  break;
+		case OPT_SAFE_LINKS:
+			safe_symlinks=1;
+			break;
 
-	case OPT_EXCLUDE_FROM:
-	  add_exclude_file(optarg,1, 0);
-	  break;
+		case 'h':
+			usage(FINFO);
+			exit_cleanup(0);
 
-	case OPT_INCLUDE_FROM:
-	  add_exclude_file(optarg,1, 1);
-	  break;
+		case 'b':
+			make_backups=1;
+			break;
 
-	case 'h':
-	  usage(FINFO);
-	  exit_cleanup(0);
+		case 'n':
+			dry_run=1;
+			break;
 
-	case 'b':
-	  make_backups=1;
-	  break;
+		case 'S':
+			sparse_files=1;
+			break;
 
-	case 'n':
-	  dry_run=1;
-	  break;
+		case 'C':
+			cvs_exclude=1;
+			break;
 
-	case 'S':
-	  sparse_files=1;
-	  break;
+		case 'u':
+			update_only=1;
+			break;
 
-	case 'C':
-	  cvs_exclude=1;
-	  break;
+		case 'l':
+			preserve_links=1;
+			break;
 
-	case 'u':
-	  update_only=1;
-	  break;
+		case 'L':
+			copy_links=1;
+			break;
 
-	case 'l':
-	  preserve_links=1;
-	  break;
+		case 'W':
+			whole_file=1;
+			break;
 
-	case 'L':
-	  copy_links=1;
-	  break;
-
-	case 'W':
-	  whole_file=1;
-	  break;
-
-	case 'H':
+		case 'H':
 #if SUPPORT_HARD_LINKS
-	  preserve_hard_links=1;
+			preserve_hard_links=1;
 #else 
-	  rprintf(FERROR,"ERROR: hard links not supported on this platform\n");
-	  exit_cleanup(1);
+			rprintf(FERROR,"ERROR: hard links not supported on this platform\n");
+			exit_cleanup(1);
 #endif
-	  break;
+			break;
 
-	case 'p':
-	  preserve_perms=1;
-	  break;
+		case 'p':
+			preserve_perms=1;
+			break;
 
-	case 'o':
-	  preserve_uid=1;
-	  break;
+		case 'o':
+			preserve_uid=1;
+			break;
 
-	case 'g':
-	  preserve_gid=1;
-	  break;
+		case 'g':
+			preserve_gid=1;
+			break;
 
-	case 'D':
-	  preserve_devices=1;
-	  break;
+		case 'D':
+			preserve_devices=1;
+			break;
 
-	case 't':
-	  preserve_times=1;
-	  break;
+		case 't':
+			preserve_times=1;
+			break;
 
-	case 'c':
-	  always_checksum=1;
-	  break;
+		case 'c':
+			always_checksum=1;
+			break;
 
-	case 'v':
-	  verbose++;
-	  break;
+		case 'v':
+			verbose++;
+			break;
 
-	case 'a':
-	  recurse=1;
+		case 'a':
+			recurse=1;
 #if SUPPORT_LINKS
-	  preserve_links=1;
+			preserve_links=1;
 #endif
-	  preserve_perms=1;
-	  preserve_times=1;
-	  preserve_gid=1;
-	  if (am_root) {
-	    preserve_devices=1;
-	    preserve_uid=1;
-	  }
-	  break;
+			preserve_perms=1;
+			preserve_times=1;
+			preserve_gid=1;
+			if (am_root) {
+				preserve_devices=1;
+				preserve_uid=1;
+			}
+			break;
 
-	case OPT_SERVER:
-	  am_server = 1;
-	  break;
+		case OPT_SERVER:
+			am_server = 1;
+			break;
 
-	case OPT_SENDER:
-	  if (!am_server) {
-	    usage(FERROR);
-	    exit_cleanup(1);
-	  }
-	  am_sender = 1;
-	  break;
+		case OPT_SENDER:
+			if (!am_server) {
+				usage(FERROR);
+				exit_cleanup(1);
+			}
+			am_sender = 1;
+			break;
 
-	case 'r':
-	  recurse = 1;
-	  break;
+		case 'r':
+			recurse = 1;
+			break;
 
-	case 'R':
-	  relative_paths = 1;
-	  break;
+		case 'R':
+			relative_paths = 1;
+			break;
 
-	case 'e':
-	  shell_cmd = optarg;
-	  break;
+		case 'e':
+			shell_cmd = optarg;
+			break;
 
-	case 'B':
-	  block_size = atoi(optarg);
-	  break;
+		case 'B':
+			block_size = atoi(optarg);
+			break;
 
-	case OPT_TIMEOUT:
-	  io_timeout = atoi(optarg);
-	  break;
+		case OPT_TIMEOUT:
+			io_timeout = atoi(optarg);
+			break;
 
-	case 'T':
-		tmpdir = optarg;
-		break;
+		case 'T':
+			tmpdir = optarg;
+			break;
 
-        case 'z':
-	  do_compression = 1;
-	  break;
+		case 'z':
+			do_compression = 1;
+			break;
 
-	case OPT_DAEMON:
-		am_daemon = 1;
-		break;
+		case OPT_DAEMON:
+			am_daemon = 1;
+			break;
 
-	case OPT_STATS:
-		do_stats = 1;
-		break;
+		case OPT_STATS:
+			do_stats = 1;
+			break;
 
-	case OPT_PROGRESS:
-		do_progress = 1;
-		break;
+		case OPT_PROGRESS:
+			do_progress = 1;
+			break;
 
-	case OPT_PARTIAL:
-		keep_partial = 1;
-		break;
+		case OPT_PARTIAL:
+			keep_partial = 1;
+			break;
 
-	case OPT_CONFIG:
-		config_file = optarg;
-		break;
+		case OPT_CONFIG:
+			config_file = optarg;
+			break;
 
-	case OPT_PORT:
-		rsync_port = atoi(optarg);
-		break;
+		case OPT_PORT:
+			rsync_port = atoi(optarg);
+			break;
 
-	default:
-	  /* rprintf(FERROR,"bad option -%c\n",opt); */
-	  exit_cleanup(1);
+		default:
+			/* rprintf(FERROR,"bad option -%c\n",opt); */
+			exit_cleanup(1);
+		}
 	}
-    }
 }
 
 
 void server_options(char **args,int *argc)
 {
-  int ac = *argc;
-  static char argstr[50];
-  static char bsize[30];
-  static char iotime[30];
-  int i, x;
+	int ac = *argc;
+	static char argstr[50];
+	static char bsize[30];
+	static char iotime[30];
+	int i, x;
 
-  args[ac++] = "--server";
+	args[ac++] = "--server";
 
-  if (!am_sender)
-    args[ac++] = "--sender";
+	if (!am_sender)
+		args[ac++] = "--sender";
 
-  x = 1;
-  argstr[0] = '-';
-  for (i=0;i<verbose;i++)
-    argstr[x++] = 'v';
-  if (make_backups)
-    argstr[x++] = 'b';
-  if (update_only)
-    argstr[x++] = 'u';
-  if (dry_run)
-    argstr[x++] = 'n';
-  if (preserve_links)
-    argstr[x++] = 'l';
-  if (copy_links)
-    argstr[x++] = 'L';
-  if (whole_file)
-    argstr[x++] = 'W';
-  if (preserve_hard_links)
-    argstr[x++] = 'H';
-  if (preserve_uid)
-    argstr[x++] = 'o';
-  if (preserve_gid)
-    argstr[x++] = 'g';
-  if (preserve_devices)
-    argstr[x++] = 'D';
-  if (preserve_times)
-    argstr[x++] = 't';
-  if (preserve_perms)
-    argstr[x++] = 'p';
-  if (recurse)
-    argstr[x++] = 'r';
-  if (always_checksum)
-    argstr[x++] = 'c';
-  if (cvs_exclude)
-    argstr[x++] = 'C';
-  if (ignore_times)
-    argstr[x++] = 'I';
-  if (relative_paths)
-    argstr[x++] = 'R';
-  if (one_file_system)
-    argstr[x++] = 'x';
-  if (sparse_files)
-    argstr[x++] = 'S';
-  if (do_compression)
-    argstr[x++] = 'z';
-  argstr[x] = 0;
+	x = 1;
+	argstr[0] = '-';
+	for (i=0;i<verbose;i++)
+		argstr[x++] = 'v';
+	if (make_backups)
+		argstr[x++] = 'b';
+	if (update_only)
+		argstr[x++] = 'u';
+	if (dry_run)
+		argstr[x++] = 'n';
+	if (preserve_links)
+		argstr[x++] = 'l';
+	if (copy_links)
+		argstr[x++] = 'L';
+	if (whole_file)
+		argstr[x++] = 'W';
+	if (preserve_hard_links)
+		argstr[x++] = 'H';
+	if (preserve_uid)
+		argstr[x++] = 'o';
+	if (preserve_gid)
+		argstr[x++] = 'g';
+	if (preserve_devices)
+		argstr[x++] = 'D';
+	if (preserve_times)
+		argstr[x++] = 't';
+	if (preserve_perms)
+		argstr[x++] = 'p';
+	if (recurse)
+		argstr[x++] = 'r';
+	if (always_checksum)
+		argstr[x++] = 'c';
+	if (cvs_exclude)
+		argstr[x++] = 'C';
+	if (ignore_times)
+		argstr[x++] = 'I';
+	if (relative_paths)
+		argstr[x++] = 'R';
+	if (one_file_system)
+		argstr[x++] = 'x';
+	if (sparse_files)
+		argstr[x++] = 'S';
+	if (do_compression)
+		argstr[x++] = 'z';
+	argstr[x] = 0;
 
-  if (x != 1) args[ac++] = argstr;
+	if (x != 1) args[ac++] = argstr;
 
-  if (block_size != BLOCK_SIZE) {
-    sprintf(bsize,"-B%d",block_size);
-    args[ac++] = bsize;
-  }    
+	if (block_size != BLOCK_SIZE) {
+		sprintf(bsize,"-B%d",block_size);
+		args[ac++] = bsize;
+	}    
 
-  if (io_timeout) {
-    sprintf(iotime,"--timeout=%d",io_timeout);
-    args[ac++] = iotime;
-  }    
+	if (io_timeout) {
+		sprintf(iotime,"--timeout=%d",io_timeout);
+		args[ac++] = iotime;
+	}    
 
-  if (strcmp(backup_suffix, BACKUP_SUFFIX)) {
-	  args[ac++] = "--suffix";
-	  args[ac++] = backup_suffix;
-  }
+	if (strcmp(backup_suffix, BACKUP_SUFFIX)) {
+		args[ac++] = "--suffix";
+		args[ac++] = backup_suffix;
+	}
 
-  if (delete_mode)
-    args[ac++] = "--delete";
+	if (delete_mode)
+		args[ac++] = "--delete";
 
-  if (keep_partial)
-    args[ac++] = "--partial";
+	if (keep_partial)
+		args[ac++] = "--partial";
 
-  if (force_delete)
-    args[ac++] = "--force";
+	if (force_delete)
+		args[ac++] = "--force";
 
-  if (numeric_ids)
-    args[ac++] = "--numeric-ids";
+	if (safe_symlinks)
+		args[ac++] = "--safe-links";
 
-  if (tmpdir) {
-	  args[ac++] = "--temp-dir";
-	  args[ac++] = tmpdir;
-  }
+	if (numeric_ids)
+		args[ac++] = "--numeric-ids";
 
-  *argc = ac;
+	if (tmpdir) {
+		args[ac++] = "--temp-dir";
+		args[ac++] = tmpdir;
+	}
+
+	*argc = ac;
 }
 
