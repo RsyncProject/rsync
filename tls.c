@@ -1,6 +1,6 @@
 /* -*- c-file-style: "linux" -*-
  *
- * Copyright (C) 2001 by Martin Pool
+ * Copyright (C) 2001 by Martin Pool <mbp@samba.org>
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version
@@ -27,18 +27,16 @@
  * our purposes they're the same -- for example, the BSD braindamage
  * about setting the mode on symlinks based on your current umask.
  *
- * There are some restrictions compared to regular ls: all the names
- * on the command line must be directories rather than files; you
- * can't give wildcards either.
+ * All the filenames must be given on the command line -- tls does not
+ * even read directories, let alone recurse.  The typical usage is
+ * "find|sort|xargs tls".
  *
- * We need to recurse downwards and show all the interesting
- * information and no more.
+ * The format is not exactly the same as any particular Unix ls(1).
  *
- * \todo Use readdir64 if available?
- *
- * \todo Sort directory entries.  Either that, or output file listing
- * in such a format that we can just pipe the whole lot through sort.
- */
+ * A key requirement for this program is that the output be "very
+ * reproducible."  So we mask away information that can accidentally
+ * change.
+ **/
 
 
 
@@ -62,23 +60,40 @@ static void failed (char const *what,
 
 
 
-static void list_dir (char const *dn)
+static void list_file (const char *fname)
 {
-	DIR *d;
-	struct dirent *de;
+	struct stat buf;
+	char permbuf[PERMSTRING_SIZE];
+	struct tm *mt;
 
-	if (!(d = opendir (dn)))
-		failed ("opendir", dn);
+	if (do_lstat(fname, &buf) == -1)
+		failed ("stat", fname);
 
-	while ((de = readdir (d))) {
-		char *dname = d_name (de);
-		if (!strcmp (dname, ".")  ||  !strcmp (dname, ".."))
-			continue;
-		printf ("%s\n", dname);
+	/* On some BSD platforms the mode bits of a symlink are
+	 * undefined.  The size of a link is also somewhat shaky. */
+	if (S_ISLNK(buf.st_mode)) {
+		buf.st_mode &= ~0777;
+		buf.st_size = 0;
 	}
-	
-	if (closedir (d) == -1)
-		failed ("closedir", dn);
+
+	permstring(permbuf, buf.st_mode);
+
+	mt = gmtime(&buf.st_mtime);
+
+	/* TODO: Perhaps escape special characters in fname? */
+
+	/* NB: need to pass size as a double because it might be be
+	 * too large for a long. */
+	printf("%s %12.0f %6d.%-6d %04d-%02d-%02d %02d:%02d:%02d %s\n",
+	       permbuf, (double) buf.st_size,
+	       buf.st_uid, buf.st_gid,
+	       mt->tm_year + 1900,
+	       mt->tm_mon + 1,
+	       mt->tm_mday,
+	       mt->tm_hour,
+	       mt->tm_min,
+	       mt->tm_sec,
+	       fname);
 }
 
 
@@ -91,7 +106,7 @@ int main (int argc, char *argv[])
 	}
 
 	for (argv++; *argv; argv++) {
-		list_dir (*argv);
+		list_file (*argv);
 	}
 
 	return 0;
