@@ -381,7 +381,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 			if (verbose > 2)
 				rprintf(FINFO, "recv_files phase=%d\n", phase);
 			send_msg(MSG_DONE, "", 0);
-			if (keep_partial)
+			if (keep_partial && !partial_dir)
 				make_backups = 0; /* prevents double backup */
 			continue;
 		}
@@ -566,19 +566,19 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 			exit_cleanup(RERR_FILEIO);
 		}
 
-		if (recv_ok || inplace)
-			finish_transfer(fname, fnametmp, file, recv_ok);
-		else if (keep_partial && partialptr
-		    && handle_partial_dir(partialptr, PDIR_CREATE))
-			finish_transfer(partialptr, fnametmp, file, 0);
-		else {
+		if (recv_ok || inplace) {
+			finish_transfer(fname, fnametmp, file, recv_ok, 1);
+			if (partialptr != fname && fnamecmp == partialptr) {
+				do_unlink(partialptr);
+				handle_partial_dir(partialptr, PDIR_DELETE);
+			}
+		} else if (keep_partial && partialptr
+		    && handle_partial_dir(partialptr, PDIR_CREATE)) {
+			finish_transfer(partialptr, fnametmp, file, recv_ok,
+					!partial_dir);
+		} else {
 			partialptr = NULL;
 			do_unlink(fnametmp);
-		}
-
-		if (partialptr != fname && fnamecmp == partialptr && recv_ok) {
-			do_unlink(partialptr);
-			handle_partial_dir(partialptr, PDIR_DELETE);
 		}
 
 		cleanup_disable();
