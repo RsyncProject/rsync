@@ -289,7 +289,8 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		offset += len;
 	}
 
-	flush_write_file(fd);
+	if (flush_write_file(fd) < 0)
+		goto report_write_error;
 
 #ifdef HAVE_FTRUNCATE
 	if (inplace && fd != -1)
