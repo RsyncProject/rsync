@@ -421,7 +421,7 @@ then
     AC_MSG_RESULT($srcdir/popt)
     BUILD_POPT='$(popt_OBJS)'
     CFLAGS="$CFLAGS -I$srcdir/popt"
-    if test -z "$ALLOCA"
+    if test -n "$ALLOCA"
     then
 	# this can be removed when/if we add an included alloca.c; see
 	#  autoconf documentation on AC_FUNC_ALLOCA
