@@ -79,6 +79,69 @@ void delete_files(struct file_list *flist)
 	}
 }
 
+#define SLOT_SIZE	(16*1024)	/* Desired size in bytes */
+#define PER_SLOT_BITS	(SLOT_SIZE * 8) /* Number of bits per slot */
+#define PER_SLOT_INTS	(SLOT_SIZE / 4) /* Number of int32s per slot */
+
+static uint32 **delayed_bits = NULL;
+static int delayed_slot_cnt = 0;
+
+static void init_delayed_bits(int max_ndx)
+{
+	delayed_slot_cnt = (max_ndx + PER_SLOT_BITS - 1) / PER_SLOT_BITS;
+
+	if (!(delayed_bits = (uint32**)calloc(delayed_slot_cnt, sizeof (uint32*))))
+		out_of_memory("set_delayed_bit");
+}
+
+static void set_delayed_bit(int ndx)
+{
+	int slot = ndx / PER_SLOT_BITS;
+	ndx %= PER_SLOT_BITS;
+
+	if (!delayed_bits[slot]) {
+		if (!(delayed_bits[slot] = (uint32*)calloc(PER_SLOT_INTS, 4)))
+			out_of_memory("set_delayed_bit");
+	}
+
+	delayed_bits[slot][ndx/32] |= 1u << (ndx % 32);
+}
+
+/* Call this with -1 to start checking from 0.  Returns -1 at the end. */
+static int next_delayed_bit(int after)
+{
+	uint32 bits, mask;
+	int i, ndx = after + 1;
+	int slot = ndx / PER_SLOT_BITS;
+	ndx %= PER_SLOT_BITS;
+
+	mask = (1u << (ndx % 32)) - 1;
+	for (i = ndx / 32; slot < delayed_slot_cnt; slot++, i = mask = 0) {
+		if (!delayed_bits[slot])
+			continue;
+		for ( ; i < PER_SLOT_INTS; i++, mask = 0) {
+			if (!(bits = delayed_bits[slot][i] & ~mask))
+				continue;
+			/* The xor magic figures out the lowest enabled bit in
+			 * bits, and the switch quickly computes log2(bit). */
+			switch (bits ^ (bits & (bits-1))) {
+#define LOG2(n) case 1u << n: return slot*PER_SLOT_BITS + i*32 + n
+			    LOG2(0);  LOG2(1);  LOG2(2);  LOG2(3);
+			    LOG2(4);  LOG2(5);  LOG2(6);  LOG2(7);
+			    LOG2(8);  LOG2(9);  LOG2(10); LOG2(11);
+			    LOG2(12); LOG2(13); LOG2(14); LOG2(15);
+			    LOG2(16); LOG2(17); LOG2(18); LOG2(19);
+			    LOG2(20); LOG2(21); LOG2(22); LOG2(23);
+			    LOG2(24); LOG2(25); LOG2(26); LOG2(27);
+			    LOG2(28); LOG2(29); LOG2(30); LOG2(31);
+			}
+			return -1; /* impossible... */
+		}
+	}
+
+	return -1;
+}
+
 
 /*
  * get_tmpname() - create a tmp filename for a given filename
@@ -315,7 +378,6 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 	char fnametmp[MAXPATHLEN];
 	char *fnamecmp, *partialptr, numbuf[4];
 	char fnamecmpbuf[MAXPATHLEN];
-	uchar *delayed_bits = NULL;
 	struct file_struct *file;
 	struct stats initial_stats;
 	int save_make_backups = make_backups;
@@ -331,12 +393,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		flist->hlink_pool = NULL;
 	}
 
-	if (delay_updates) {
-		int sz = (flist->count + 7) / 8;
-		if (!(delayed_bits = new_array(uchar, sz)))
-			out_of_memory("recv_files");
-		memset(delayed_bits, 0, sz);
-	}
+	if (delay_updates)
+		init_delayed_bits(flist->count);
 
 	while (1) {
 		cleanup_disable();
@@ -587,8 +645,10 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		    && handle_partial_dir(partialptr, PDIR_CREATE)) {
 			finish_transfer(partialptr, fnametmp, file, recv_ok,
 					!partial_dir);
-			if (delay_updates && recv_ok)
-				delayed_bits[i/8] |= 1 << (i % 8);
+			if (delay_updates && recv_ok) {
+				set_delayed_bit(i);
+				recv_ok = -1;
+			}
 		} else {
 			partialptr = NULL;
 			do_unlink(fnametmp);
@@ -597,9 +657,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		cleanup_disable();
 
 		if (recv_ok) {
-			if (delay_updates && delayed_bits[i/8] & (1 << (i % 8)))
-				;
-			else if (remove_sent_files) {
+			if (remove_sent_files && recv_ok > 0) {
 				SIVAL(numbuf, 0, i);
 				send_msg(MSG_SUCCESS, numbuf, 4);
 			}
@@ -635,11 +693,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 	make_backups = save_make_backups;
 
 	if (delay_updates) {
-		for (i = 0; i < flist->count; i++) {
+		for (i = -1; (i = next_delayed_bit(i)) >= 0; ) {
 			struct file_struct *file = flist->files[i];
-			if (!file->basename
-			 || !(delayed_bits[i/8] & (1 << (i % 8))))
-				continue;
 			fname = local_name ? local_name : f_name(file);
 			partialptr = partial_dir_fname(fname);
 			if (partialptr) {
