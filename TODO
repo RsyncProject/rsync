@@ -73,6 +73,31 @@ There seems to be a bug with hardlinks
   -rw-rw-r--    5 mbp      mbp            29 Mar 25 17:30 b3
 
 
+Progress indicator can produce corrupt output when transferring directories:
+
+  main/binary-arm/
+  main/binary-arm/admin/
+  main/binary-arm/base/
+  main/binary-arm/comm/8.56kB/s    0:00:52
+  main/binary-arm/devel/
+  main/binary-arm/doc/
+  main/binary-arm/editors/
+  main/binary-arm/electronics/s    0:00:53
+  main/binary-arm/games/
+  main/binary-arm/graphics/
+  main/binary-arm/hamradio/
+  main/binary-arm/interpreters/
+  main/binary-arm/libs/6.61kB/s    0:00:54
+  main/binary-arm/mail/
+  main/binary-arm/math/
+  main/binary-arm/misc/
+
+lchmod
+
+  I don't think we handle this properly on systems that don't have the
+  call.
+
+
 DAEMON --------------------------------------------------------------
 
 server-imposed bandwidth limits
