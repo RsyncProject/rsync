@@ -142,6 +142,7 @@ int auth_server(int fd, int module, char *addr, char *leader)
 	char secret[100];
 	char pass[30];
 	char pass2[30];
+	char *tok;
 
 	/* if no auth list then allow anyone in! */
 	if (!users || !*users) return 1;
@@ -163,6 +164,18 @@ int auth_server(int fd, int module, char *addr, char *leader)
 		return 0;
 	}
 
+	users = strdup(users);
+	if (!users) return 0;
+
+	for (tok=strtok(users," ,\t"); tok; tok = strtok(NULL," ,\t")) {
+		if (strcmp(tok, user) == 0) break;
+	}
+	free(users);
+
+	if (!tok) {
+		return 0;
+	}
+	
 	memset(secret, 0, sizeof(secret));
 	if (!get_secret(module, user, secret, sizeof(secret)-1)) {
 		memset(secret, 0, sizeof(secret));

@@ -113,17 +113,22 @@ static int rsync_module(int fd, int i)
 	if (!allow_access(addr, host, lp_hosts_allow(i), lp_hosts_deny(i))) {
 		rprintf(FERROR,"rsync denied on module %s from %s (%s)\n",
 			lp_name(i), client_name(fd), client_addr(fd));
+		io_printf(fd,"@ERROR: access denied to %s from %s (%s)\n",
+			  lp_name(i), client_name(fd), client_addr(fd));
 		return -1;
 	}
 
 	if (!auth_server(fd, i, addr, "@RSYNCD: AUTHREQD ")) {
 		rprintf(FERROR,"auth failed on module %s from %s (%s)\n",
 			lp_name(i), client_name(fd), client_addr(fd));
+		io_printf(fd,"@ERROR: auth failed on module %s\n",lp_name(i));
 		return -1;		
 	}
 
 	if (!claim_connection(lp_lock_file(), lp_max_connections())) {
-		rprintf(FERROR,"ERROR: max connections reached\n");
+		rprintf(FERROR,"max connections (%d) reached\n",
+			lp_max_connections());
+		io_printf(fd,"@ERROR: max connections (%d) reached - try again later\n", lp_max_connections());
 		return -1;
 	}
 
@@ -139,6 +144,7 @@ static int rsync_module(int fd, int i)
 	if (!name_to_uid(p, &uid)) {
 		if (!isdigit(*p)) {
 			rprintf(FERROR,"Invalid uid %s\n", p);
+			io_printf(fd,"@ERROR: invalid uid\n");
 			return -1;
 		} 
 		uid = atoi(p);
@@ -148,6 +154,7 @@ static int rsync_module(int fd, int i)
 	if (!name_to_gid(p, &gid)) {
 		if (!isdigit(*p)) {
 			rprintf(FERROR,"Invalid gid %s\n", p);
+			io_printf(fd,"@ERROR: invalid gid\n");
 			return -1;
 		} 
 		gid = atoi(p);
@@ -259,6 +266,7 @@ static int start_daemon(int fd)
 	}
 
 	if (sscanf(line,"@RSYNCD: %d", &remote_version) != 1) {
+		io_printf(fd,"@ERROR: protocol startup error\n");
 		return -1;
 	}	
 
@@ -275,13 +283,13 @@ static int start_daemon(int fd)
 
 		if (*line == '#') {
 			/* it's some sort of command that I don't understand */
-			io_printf(fd,"ERROR: Unknown command '%s'\n", line);
+			io_printf(fd,"@ERROR: Unknown command '%s'\n", line);
 			return -1;
 		}
 
 		i = lp_number(line);
 		if (i == -1) {
-			io_printf(fd,"ERROR: Unknown module '%s'\n", line);
+			io_printf(fd,"@ERROR: Unknown module '%s'\n", line);
 			return -1;
 		}
 	}
