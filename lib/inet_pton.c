@@ -27,10 +27,12 @@
  */
 
 static int inet_pton4(const char *src, unsigned char *dst);
+#ifdef INET6
 static int inet_pton6(const char *src, unsigned char *dst);
+#endif
 
 /* int
- * isc_net_pton(af, src, dst)
+ * inet_pton(af, src, dst)
  *	convert from presentation format (which usually means ASCII printable)
  *	to network format (which is usually some kind of binary format).
  * return:
