@@ -49,6 +49,7 @@ Changes since version 2.5.6:
       matches beyond the root, and "foo**bar" is matched against the
       path, not just the trailing name.  (Wayne Davison)
 
+    * Fixed file I/O error detection.  (John Van Essen)
 
   INTERNAL:
 
