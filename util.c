@@ -686,7 +686,7 @@ int u_strcmp(const char *cs1, const char *cs2)
 	return (int)*s1 - (int)*s2;
 }
 
-static int last_pct = -1;
+static OFF_T last_ofs;
 
 void end_progress(void)
 {
@@ -695,7 +695,7 @@ void end_progress(void)
 	if (do_progress && !am_server) {
 		rprintf(FINFO,"\n");
 	}
-	last_pct = -1;
+	last_ofs = 0;
 }
 
 void show_progress(OFF_T ofs, OFF_T size)
@@ -703,10 +703,10 @@ void show_progress(OFF_T ofs, OFF_T size)
 	extern int do_progress, am_server;
 
 	if (do_progress && !am_server) {
-		int pct = (int)((100.0*ofs)/size + 0.5);
-		if (pct != last_pct) {
+		if (ofs > last_ofs + 1000) {
+			int pct = (int)((100.0*ofs)/size);
 			rprintf(FINFO,"%.0f (%d%%)\r", (double)ofs, pct);
-			last_pct = pct;
+			last_ofs = ofs;
 		}
 	}
 }
