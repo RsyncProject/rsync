@@ -940,7 +940,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
   /* now we need to fix any directory permissions that were 
      modified during the transfer */
   for (i = 0; i < flist->count; i++) {
-	  struct file_struct *file = flist->files[i];
+	  file = flist->files[i];
 	  if (!file->basename || !S_ISDIR(file->mode)) continue;
 	  recv_generator(f_name(file),flist,i,-1);
   }
