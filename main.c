@@ -657,6 +657,16 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	if (protocol_version >= 23 && !read_batch)
 		io_start_multiplex_in();
 
+	/* We set our stderr file handle to blocking because ssh might have
+	 * set it to non-blocking.  This can be particularly troublesome if
+	 * stderr is a clone of stdout, because ssh would have set our stdout
+	 * to non-blocking at the same time (which can easily cause us to lose
+	 * output from our print statements).  This kluge shouldn't cause ssh
+	 * any problems for how we use it.  Note also that we delayed setting
+	 * this until after the above protocol setup so that we know for sure
+	 * that ssh is done twiddling its file descriptors.  */
+	set_blocking(STDERR_FILENO);
+
 	if (am_sender) {
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
 		io_start_buffering_out();
