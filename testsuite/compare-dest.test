@@ -1,0 +1,30 @@
+#! /bin/sh
+
+# Copyright (C) 2003 by Wayne Davison <wayned@samba.org>
+
+# This program is distributable under the terms of the GNU GPL see
+# COPYING).
+
+# Test rsync handling of exclude/include directives.  
+
+# Test some of the more obscure wildcard handling of exclude/include
+# processing.
+
+. "$suitedir/rsync.fns"
+
+set -x
+
+altdir="$tmpdir/alt"
+
+# Build some files/dirs/links to copy
+
+hands_setup
+
+# Setup the chk and alt dirs
+$RSYNC -av --exclude=text "$fromdir/" "$chkdir/"
+$RSYNC -av --include=text --include='*/' --exclude='*' "$fromdir/" "$altdir/"
+
+checkit "$RSYNC -avv --compare-dest=\"$altdir\" \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0
