@@ -68,6 +68,7 @@ static int match_address(char *addr, char *tok)
 			mask = ntohl(mask);
 		} else {
 			int bits = atoi(p+1);
+			if (bits == 0) return 1;
 			if (bits <= 0 || bits > 32) {
 				rprintf(FERROR,"malformed mask in %s\n", tok);
 				return 0;
