@@ -357,8 +357,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name)
 
 		if ((fd1 == -1) && (compare_dest != NULL)) {
 			/* try the file at compare_dest instead */
-			snprintf(fnamecmpbuf,MAXPATHLEN,"%s/%s",
-						compare_dest,fname);
+			pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
+				 compare_dest, fname);
 			fnamecmp = fnamecmpbuf;
 			fd1 = do_open(fnamecmp, O_RDONLY, 0);
 		}
