@@ -442,7 +442,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			n[0] = iflags & ITEM_LOCAL_CHANGE
 			      ? iflags & ITEM_XNAME_FOLLOWS ? 'h' : 'c'
 			     : !(iflags & ITEM_TRANSFER) ? '.'
-			     : *op == 's' ? '>' : '<';
+			     : *op == 's' ? '<' : '>';
 			n[1] = S_ISDIR(file->mode) ? 'd'
 			     : IS_DEVICE(file->mode) ? 'D'
 			     : S_ISLNK(file->mode) ? 'L' : 'f';

@@ -1059,10 +1059,10 @@ modified.
 The update types that replace the bf(U) are as follows:
 
 quote(itemize(
-  it() A bf(<) means that a file is being transferred to the local host
-  (received).
-  it() A bf(>) means that a file is being transferred to the remote host
+  it() A bf(<) means that a file is being transferred to the remote host
   (sent).
+  it() A bf(>) means that a file is being transferred to the local host
+  (received).
   it() A bf(c) means that a local change/creation is occuring for the item
   (such as the creation of a directory or the changing of a symlink, etc.).
   it() A bf(h) means that the item is a hard-link to another item (requires
