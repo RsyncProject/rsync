@@ -145,6 +145,7 @@ int rsync_port = 0;
 int compare_dest = 0;
 int link_dest = 0;
 int basis_dir_cnt = 0;
+char *dest_option = NULL;
 
 int verbose = 0;
 int quiet = 0;
@@ -163,7 +164,6 @@ static int F_option_cnt = 0;
 static int modify_window_set;
 static int refused_delete, refused_archive_part;
 static int refused_partial, refused_progress, refused_delete_before;
-static char *dest_option = NULL;
 static char *max_size_arg;
 static char partialdir_for_delayupdate[] = ".~tmp~";
 
