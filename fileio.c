@@ -24,8 +24,6 @@
 
 extern int sparse_files;
 
-unsigned int max_map_size = MAX_MAP_SIZE;
-
 static char last_byte;
 static int last_sparse;
 
@@ -129,7 +127,8 @@ int write_file(int f,char *buf,size_t len)
 			}
 		}
 		if (r1 <= 0) {
-			if (ret > 0) return ret;
+			if (ret > 0)
+				return ret;
 			return r1;
 		}
 		len -= r1;
@@ -144,7 +143,7 @@ int write_file(int f,char *buf,size_t len)
    read(). It gives sliding window access to a file. mmap() is not
    used because of the possibility of another program (such as a
    mailer) truncating the file thus giving us a SIGBUS */
-struct map_struct *map_file(int fd,OFF_T len)
+struct map_struct *map_file(int fd, OFF_T len, size_t block_size)
 {
 	struct map_struct *map;
 
@@ -154,6 +153,7 @@ struct map_struct *map_file(int fd,OFF_T len)
 	memset(map, 0, sizeof map[0]);
 	map->fd = fd;
 	map->file_size = len;
+	map->def_window_size = MAX(MAX_MAP_SIZE, block_size * 32);
 
 	return map;
 }
@@ -166,9 +166,8 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 	OFF_T window_start, read_start;
 	int window_size, read_size, read_offset;
 
-	if (len == 0) {
+	if (len == 0)
 		return NULL;
-	}
 
 	/* can't go beyond the end of file */
 	if (len > (map->file_size - offset)) {
@@ -188,7 +187,7 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 	} else {
 		window_start = 0;
 	}
-	window_size = max_map_size;
+	window_size = map->def_window_size;
 	if (window_start + window_size > map->file_size) {
 		window_size = map->file_size - window_start;
 	}
@@ -199,7 +198,8 @@ char *map_ptr(struct map_struct *map,OFF_T offset,int len)
 	/* make sure we have allocated enough memory for the window */
 	if (window_size > map->p_size) {
 		map->p = realloc_array(map->p, char, window_size);
-		if (!map->p) out_of_memory("map_ptr");
+		if (!map->p)
+			out_of_memory("map_ptr");
 		map->p_size = window_size;
 	}
 
