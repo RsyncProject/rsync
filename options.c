@@ -141,7 +141,7 @@ static int daemon_opt;   /* sets am_daemon after option error-reporting */
 static int modify_window_set;
 
 /** Local address to bind.  As a character string because it's
- * interpreted by the IPv6 layer: should be a numeric IP4 or ip6
+ * interpreted by the IPv6 layer: should be a numeric IP4 or IP6
  * address, or a hostname. **/
 char *bind_address;
 
