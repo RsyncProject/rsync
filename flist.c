@@ -382,10 +382,19 @@ static void send_file_entry(struct file_struct *file, int f,
 		flags |= SAME_MODE;
 	else
 		last_mode = file->mode;
-	if (file->rdev == last_rdev)
-		flags |= SAME_RDEV;
-	else
-		last_rdev = file->rdev;
+	if (preserve_devices) {
+		if (protocol_version < 28) {
+			if (IS_DEVICE(last_mode) && file->rdev == last_rdev)
+				flags |= OLD_SAME_RDEV|SAME_HIGH_RDEV;
+			else
+				last_rdev = file->rdev;
+		}
+		else if (IS_DEVICE(last_mode)) {
+			if ((file->rdev & ~0xFF) == (last_rdev & ~0xFF))
+				flags |= SAME_HIGH_RDEV;
+			last_rdev = file->rdev;
+		}
+	}
 	if (file->uid == last_uid)
 		flags |= SAME_UID;
 	else
@@ -409,14 +418,22 @@ static void send_file_entry(struct file_struct *file, int f,
 	if (l2 > 255)
 		flags |= LONG_NAME;
 
-	/* we must make sure we don't send a zero flags byte or the other
-	   end will terminate the flist transfer */
+	/* We must make sure we don't send a zero flags byte or
+	 * the other end will terminate the flist transfer. */
 	if (flags == 0 && !S_ISDIR(last_mode))
-		flags |= FLAG_DELETE;
-	if (flags == 0)
-		flags |= LONG_NAME;
-
-	write_byte(f, flags);
+		flags |= FLAG_DELETE; /* NOTE: no meaning for non-dir */
+	if (protocol_version >= 28) {
+		if ((flags & 0xFF00) || flags == 0) {
+			flags |= EXTENDED_FLAGS;
+			write_byte(f, flags);
+			write_byte(f, flags >> 8);
+		} else
+			write_byte(f, flags);
+	} else {
+		if (flags == 0)
+			flags |= LONG_NAME;
+		write_byte(f, flags);
+	}
 	if (flags & SAME_NAME)
 		write_byte(f, l1);
 	if (flags & LONG_NAME)
@@ -438,9 +455,13 @@ static void send_file_entry(struct file_struct *file, int f,
 		add_gid(last_gid);
 		write_int(f, last_gid);
 	}
-	if (preserve_devices && IS_DEVICE(last_mode)
-	    && !(flags & SAME_RDEV))
-		write_int(f, last_rdev);
+	if (preserve_devices && IS_DEVICE(last_mode)) {
+		/* If SAME_HIGH_RDEV is off, OLD_SAME_RDEV is also off. */
+		if (!(flags & SAME_HIGH_RDEV))
+			write_int(f, last_rdev);
+		else if (protocol_version >= 28)
+			write_byte(f, last_rdev);
+	}
 
 #if SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(last_mode)) {
@@ -564,13 +585,22 @@ static void receive_file_entry(struct file_struct **fptr,
 		file->gid = last_gid;
 	}
 	if (preserve_devices) {
-		if (IS_DEVICE(last_mode)) {
-			if (!(flags & SAME_RDEV))
+		if (protocol_version < 28) {
+			if (IS_DEVICE(last_mode)) {
+				if (!(flags & OLD_SAME_RDEV))
+					last_rdev = (DEV64_T)read_int(f);
+				file->rdev = last_rdev;
+			} else
+				last_rdev = 0;
+		} else if (IS_DEVICE(last_mode)) {
+			if (!(flags & SAME_HIGH_RDEV))
 				last_rdev = (DEV64_T)read_int(f);
+			else {
+				last_rdev = (DEV64_T)((last_rdev & ~0xFF)
+							| read_byte(f));
+			}
 			file->rdev = last_rdev;
 		}
-		else
-			last_rdev = 0;
 	}
 
 	if (preserve_links && S_ISLNK(last_mode)) {
@@ -1112,6 +1142,8 @@ struct file_list *recv_file_list(int f)
 
 		flist_expand(flist);
 
+		if (protocol_version >= 28 && (flags & EXTENDED_FLAGS))
+			flags |= read_byte(f) << 8;
 		receive_file_entry(&flist->files[i], flags, f);
 
 		if (S_ISREG(flist->files[i]->mode))
