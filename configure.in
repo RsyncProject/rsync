@@ -255,10 +255,12 @@ fi
 AC_CHECK_LIB(resolv, inet_ntop)
 
 AC_MSG_NOTICE([Looking in libraries: $LIBS])
-AC_REPLACE_FUNCS(getaddrinfo getnameinfo)
 
 AC_CHECK_FUNC(inet_ntop, , AC_LIBOBJ(lib/inet_ntop)) 
 AC_CHECK_FUNC(inet_pton, , AC_LIBOBJ(lib/inet_pton))
+
+AC_CHECK_FUNC(getaddrinfo, , AC_LIBOBJ(lib/getaddrinfo)) 
+AC_CHECK_FUNC(getnameinfo, , AC_LIBOBJ(lib/getnameinfo))
 
 AC_CHECK_MEMBER([struct sockaddr.sa_len], 
 		[ AC_DEFINE(HAVE_SOCKADDR_LEN) ],
