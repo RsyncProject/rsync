@@ -288,6 +288,8 @@ verb(
  -a, --archive               archive mode, equivalent to -rlptgoD
  -r, --recursive             recurse into directories
  -R, --relative              use relative path names
+     --no-relative           turn off --relative
+     --no-implied-dirs       don't send implied dirs with -R
  -b, --backup                make backups (default ~ suffix)
      --backup-dir            make backups into this directory
      --suffix=SUFFIX         define backup suffix
@@ -310,7 +312,6 @@ verb(
  -B, --block-size=SIZE       checksum blocking size (default 700)
  -e, --rsh=COMMAND           specify the remote shell to use
      --rsync-path=PATH       specify path to rsync on the remote machine
- -C, --cvs-exclude           auto ignore files in the same way CVS does
      --existing              only update files that already exist
      --ignore-existing       ignore files that already exist on the receiving side
      --delete                delete files that don't exist on the sending side
@@ -330,10 +331,13 @@ verb(
      --link-dest=DIR         create hardlinks to DIR for unchanged files
  -P                          equivalent to --partial --progress
  -z, --compress              compress file data
+ -C, --cvs-exclude           auto ignore files in the same way CVS does
      --exclude=PATTERN       exclude files matching PATTERN
      --exclude-from=FILE     exclude patterns listed in FILE
      --include=PATTERN       don't exclude files matching PATTERN
      --include-from=FILE     don't exclude patterns listed in FILE
+     --files-from=FILE       read FILE for list of source-file names
+ -0  --from0                 file names we read are separated by nulls, not newlines
      --version               print version number
      --daemon                run as a rsync daemon
      --no-detach             do not detach from the parent
@@ -431,7 +435,22 @@ machine. If instead you used
 verb(rsync -R foo/bar/foo.c remote:/tmp/)
 
 then a file called /tmp/foo/bar/foo.c would be created on the remote
-machine. The full path name is preserved.
+machine -- the full path name is preserved.
+
+dit(bf(--no-relative)) Turn off the --relative option.  This is only
+needed if you want to use --files-from without its implied --relative
+file processing.
+
+dit(bf(--no-implied-dirs)) When combined with the --relative option, the
+implied directories in each path are not explicitly duplicated as part
+of the transfer.  This makes the transfer more optimal and also allows
+the two sides to have non-matching symlinks in the implied part of the
+path.  For instance, if you transfer the file "/path/foo/file" with -R,
+the default is for rsync to ensure that "/path" and "/path/foo" on the
+destination exactly match the directories/symlinks of the source.  Using
+the --no-implied-dirs option would omit both of these implied dirs,
+which means that if "/path" was a real directory on one machine and a
+symlink of the other machine, rsync would not try to change this.
 
 dit(bf(-b, --backup)) With this option preexisting destination files are
 renamed with a ~ extension as each file is transferred.  You can
@@ -607,35 +626,6 @@ rsync on the remote machine. Useful when it's not in your path. Note
 that this is the full path to the binary, not just the directory that
 the binary is in.
 
-dit(bf(--exclude=PATTERN)) This option allows you to selectively exclude
-certain files from the list of files to be transferred. This is most
-useful in combination with a recursive transfer.
-
-You may use as many --exclude options on the command line as you like
-to build up the list of files to exclude.
-
-See the section on exclude patterns for information on the syntax of 
-this option.
-
-dit(bf(--exclude-from=FILE)) This option is similar to the --exclude
-option, but instead it adds all exclude patterns listed in the file
-FILE to the exclude list.  Blank lines in FILE and lines starting with
-';' or '#' are ignored.
-If em(FILE) is bf(-) the list will be read from standard input.
-
-
-dit(bf(--include=PATTERN)) This option tells rsync to not exclude the
-specified pattern of filenames. This is useful as it allows you to
-build up quite complex exclude/include rules.
-
-See the section of exclude patterns for information on the syntax of 
-this option.
-
-dit(bf(--include-from=FILE)) This specifies a list of include patterns
-from a file.
-If em(FILE) is bf(-) the list will be read from standard input.
-
-
 dit(bf(-C, --cvs-exclude)) This is a useful shorthand for excluding a
 broad range of files that you often don't want to transfer between
 systems. It uses the same algorithm that CVS uses to determine if
@@ -653,6 +643,74 @@ files listed in the CVSIGNORE environment variable (space delimited).
 Finally, any file is ignored if it is in the same directory as a
 .cvsignore file and matches one of the patterns listed therein.  See
 the bf(cvs(1)) manual for more information.
+
+dit(bf(--exclude=PATTERN)) This option allows you to selectively exclude
+certain files from the list of files to be transferred. This is most
+useful in combination with a recursive transfer.
+
+You may use as many --exclude options on the command line as you like
+to build up the list of files to exclude.
+
+See the section on exclude patterns for information on the syntax of 
+this option.
+
+dit(bf(--exclude-from=FILE)) This option is similar to the --exclude
+option, but instead it adds all exclude patterns listed in the file
+FILE to the exclude list.  Blank lines in FILE and lines starting with
+';' or '#' are ignored.
+If em(FILE) is bf(-) the list will be read from standard input.
+
+dit(bf(--include=PATTERN)) This option tells rsync to not exclude the
+specified pattern of filenames. This is useful as it allows you to
+build up quite complex exclude/include rules.
+
+See the section of exclude patterns for information on the syntax of 
+this option.
+
+dit(bf(--include-from=FILE)) This specifies a list of include patterns
+from a file.
+If em(FILE) is bf(-) the list will be read from standard input.
+
+dit(bf(--files-from=FILE)) Using this option allows you to specify the
+exact list of files to transfer (as read from the specified FILE or "-"
+for stdin).  It also tweaks the default behavior of rsync to make
+transferring just the specified files and directories easier.  For
+instance, the --relative option is enabled by default when this option
+is used (use --no-relative if you want to turn that off), all
+directories specified in the list are created on the destination (rather
+than being noisily skipped without -r), and the -a (--archive) option's
+behavior does not imply -r (--recursive) -- specify it explicitly, if
+you want it.
+
+The file names that are read from the FILE are all relative to the
+source dir -- any leading slashes are removed and no ".." references are
+allowed to go higher than the source dir.  For example, take this
+command:
+
+quote(rsync -a --files-from=/tmp/foo /usr remote:/backup)
+
+If /tmp/foo contains the string "bin" (or even "/bin"), the /usr/bin
+directory will be created as /backup/bin on the remote host (but the
+contents of the /usr/bin dir would not be sent unless you specified -r
+or the names were explicitly listed in /tmp/foo).  Also keep in mind
+that the effect of the (enabled by default) --relative option is to
+duplicate only the path info that is read from the file -- it does not
+force the duplication of the source-spec path (/usr in this case).
+
+In addition, the --files-from file can be read from the remote host
+instead of the local host if you specify a "host:" in front of the file
+(the host must match one end of the transfer).  As a short-cut, you can
+specify just a prefix of ":" to mean "use the remote end of the
+transfer".  For example:
+
+quote(rsync -a --files-from=:/path/file-list src:/ /tmp/copy)
+
+This would copy all the files specified in the /path/file-list file that
+was located on the remote "src" host.
+
+dit(bf(-0, --from0)) This tells rsync that the filenames it reads from a
+file are terminated by a null ('\0') character, not a NL, CR, or CR+LF.
+This affects --exclude-from, --include-from, and --files-from.
 
 dit(bf(-T, --temp-dir=DIR)) This option instructs rsync to use DIR as a
 scratch directory when creating temporary copies of the files
