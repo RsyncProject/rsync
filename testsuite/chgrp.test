@@ -26,7 +26,7 @@ do
 done
 sleep 2
 
-checkit "$RSYNC -rtgvvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+checkit "$RSYNC -rtgpvvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
