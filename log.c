@@ -572,17 +572,3 @@ void log_exit(int code, const char *file, int line)
 			name, code, file, line);
 	}
 }
-
-/*
- * Log the incoming transfer of a file for interactive use,
- * this will be called at the end where the client was run.
- * Called when a file starts to be transferred.
- */
-void log_transfer(struct file_struct *file, const char *fname)
-{
-	extern int verbose;
-
-	if (!verbose) return;
-
-	rprintf(FINFO, "%s\n", fname);
-}

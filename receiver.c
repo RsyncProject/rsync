@@ -357,8 +357,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 			fname = local_name;
 
 		if (dry_run) {
-			if (!am_server) {
-				log_transfer(file, fname);
+			if (!am_server && verbose) {	/* log transfer */
+				rprintf(FINFO, "%s\n", fname);
 			}
 			continue;
 		}
@@ -444,8 +444,8 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
       
 		cleanup_set(fnametmp, fname, file, buf, fd1, fd2);
 
-		if (!am_server) {
-			log_transfer(file, fname);
+		if (!am_server && verbose) {	/* log transfer */
+			rprintf(FINFO, "%s\n", fname);
 		}
 
 		/* recv file data */
