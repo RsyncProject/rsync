@@ -80,7 +80,10 @@ int check_hard_link(struct file_struct *file)
   while (low != high) {
     int mid = (low+high)/2;
     ret = hlink_compare(&hlink_list[mid],file);
-    if (ret == 0) break;
+    if (ret == 0) {
+	    low = mid;
+	    break;
+    }
     if (ret > 0) 
       high=mid;
     else
