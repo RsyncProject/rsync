@@ -112,7 +112,7 @@ int try_bind_local(int s,
 	}
 
 	for (r = bres_all; r; r = r->ai_next) {
-		if (bind(s, bres->ai_addr, bres->ai_addrlen) == -1)
+		if (bind(s, r->ai_addr, r->ai_addrlen) == -1)
 			continue;
 		return s;
 	}
