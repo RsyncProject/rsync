@@ -19,7 +19,13 @@
 
 #define BLOCK_SIZE 700
 #define RSYNC_RSH_ENV "RSYNC_RSH"
+
+#if HAVE_REMSH
+#define RSYNC_RSH "remsh"
+#else
 #define RSYNC_RSH "rsh"
+#endif
+
 #define RSYNC_NAME "rsync"
 #define BACKUP_SUFFIX "~"
 
@@ -281,6 +287,22 @@ extern int errno;
 
 #ifndef EWOULDBLOCK
 #define EWOULDBLOCK EAGAIN
+#endif
+
+#ifndef STDIN_FILENO
+#define STDIN_FILENO 0
+#endif
+
+#ifndef STDOUT_FILENO
+#define STDOUT_FILENO 1
+#endif
+
+#ifndef STDERR_FILENO
+#define STDERR_FILENO 2
+#endif
+
+#ifndef S_IWUSR
+#define S_IWUSR 0200
 #endif
 
 #define IS_DEVICE(mode) (S_ISCHR(mode) || S_ISBLK(mode))

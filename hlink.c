@@ -54,7 +54,9 @@ void init_hard_links(struct file_list *flist)
 	(struct file_struct *)malloc(sizeof(hlink_list[0])*flist->count)))
     out_of_memory("init_hard_links");
 
-  bcopy((char *)flist->files,hlink_list,sizeof(hlink_list[0])*flist->count);
+  bcopy((char *)flist->files,
+	(char *)hlink_list,
+	sizeof(hlink_list[0])*flist->count);
 
   qsort(hlink_list,flist->count,
 	sizeof(hlink_list[0]),
@@ -113,8 +115,8 @@ void do_hard_links(struct file_list *flist)
 	hlink_list[i].inode == hlink_list[i-1].inode) {
       struct stat st1,st2;
 
-      if (stat(hlink_list[i-1].name,&st1) != 0) continue;
-      if (stat(hlink_list[i].name,&st2) != 0) {
+      if (lstat(hlink_list[i-1].name,&st1) != 0) continue;
+      if (lstat(hlink_list[i].name,&st2) != 0) {
 	if (!dry_run && link(hlink_list[i-1].name,hlink_list[i].name) != 0) {
 	  fprintf(FINFO,"link %s => %s : %s\n",
 		  hlink_list[i].name,hlink_list[i-1].name,strerror(errno));

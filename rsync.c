@@ -45,6 +45,7 @@ extern int ignore_times;
 extern int recurse;
 extern int delete_mode;
 extern int cvs_exclude;
+extern int am_root;
 
 /*
   free a sums struct
@@ -192,18 +193,18 @@ static struct sum_struct *receive_sums(int f)
 }
 
 
-static void set_perms(char *fname,struct file_struct *file,struct stat *st,
-		      int report)
+static int set_perms(char *fname,struct file_struct *file,struct stat *st,
+		     int report)
 {
   int updated = 0;
   struct stat st2;
 
-  if (dry_run) return;
+  if (dry_run) return 0;
 
   if (!st) {
-    if (stat(fname,&st2) != 0) {
+    if (lstat(fname,&st2) != 0) {
       fprintf(FERROR,"stat %s : %s\n",fname,strerror(errno));
-      return;
+      return 0;
     }
     st = &st2;
   }
@@ -214,7 +215,7 @@ static void set_perms(char *fname,struct file_struct *file,struct stat *st,
     if (set_modtime(fname,file->modtime) != 0) {
       fprintf(FERROR,"failed to set times on %s : %s\n",
 	      fname,strerror(errno));
-      return;
+      return 0;
     }
   }
 
@@ -225,20 +226,20 @@ static void set_perms(char *fname,struct file_struct *file,struct stat *st,
     if (chmod(fname,file->mode) != 0) {
       fprintf(FERROR,"failed to set permissions on %s : %s\n",
 	      fname,strerror(errno));
-      return;
+      return 0;
     }
   }
 #endif
 
-  if ((preserve_uid && st->st_uid != file->uid) || 
+  if ((am_root && preserve_uid && st->st_uid != file->uid) || 
       (preserve_gid && st->st_gid != file->gid)) {
     updated = 1;
     if (chown(fname,
-	      preserve_uid?file->uid:-1,
+	      (am_root&&preserve_uid)?file->uid:-1,
 	      preserve_gid?file->gid:-1) != 0) {
       if (verbose>1 || preserve_uid)
 	fprintf(FERROR,"chown %s : %s\n",fname,strerror(errno));
-      return;
+      return updated;
     }
   }
     
@@ -248,6 +249,7 @@ static void set_perms(char *fname,struct file_struct *file,struct stat *st,
     else
       fprintf(FINFO,"%s is uptodate\n",fname);
   }
+  return updated;
 }
 
 
@@ -265,6 +267,22 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
     fprintf(FERROR,"recv_generator(%s,%d)\n",fname,i);
 
   statret = lstat(fname,&st);
+
+  if (S_ISDIR(file->mode)) {
+    if (dry_run) return;
+    if (statret == 0 && !S_ISDIR(st.st_mode)) {
+      if (unlink(fname) != 0) {
+	fprintf(FERROR,"unlink %s : %s\n",fname,strerror(errno));
+	return;
+      }
+      statret = -1;
+    }
+    if (statret != 0 && mkdir(fname,file->mode) != 0 && errno != EEXIST)
+      fprintf(FERROR,"mkdir %s : %s\n",fname,strerror(errno));
+    if (set_perms(fname,file,NULL,0) && verbose) 
+      fprintf(FINFO,"%s/\n",fname);
+    return;
+  }
 
 #if SUPPORT_LINKS
   if (preserve_links && S_ISLNK(file->mode)) {
@@ -295,7 +313,7 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
 #endif
 
 #ifdef HAVE_MKNOD
-  if (preserve_devices && IS_DEVICE(file->mode)) {
+  if (am_root && preserve_devices && IS_DEVICE(file->mode)) {
     if (statret != 0 || 
 	st.st_mode != file->mode ||
 	st.st_rdev != file->rdev) {	
@@ -341,7 +359,21 @@ void recv_generator(char *fname,struct file_list *flist,int i,int f_out)
   }
 
   if (!S_ISREG(st.st_mode)) {
-    fprintf(FERROR,"%s : not a regular file\n",fname);
+    /* its not a regular file on the receiving end, but it is on the
+       sending end. If its a directory then skip it (too dangerous to
+       do a recursive deletion??) otherwise try to unlink it */
+    if (S_ISDIR(st.st_mode)) {
+      fprintf(FERROR,"ERROR: %s is a directory\n",fname);
+      return;
+    }
+    if (unlink(fname) != 0) {
+      fprintf(FERROR,"%s : not a regular file (generator)\n",fname);
+      return;
+    }
+
+    /* now pretend the file didn't exist */
+    write_int(f_out,i);
+    if (!dry_run) send_sums(NULL,f_out);    
     return;
   }
 
@@ -425,7 +457,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
 
       sum_update(data,i);
 
-      if (write_sparse(fd,data,i) != i) {
+      if (fd != -1 && write_sparse(fd,data,i) != i) {
 	fprintf(FERROR,"write failed on %s : %s\n",fname,strerror(errno));
 	exit_cleanup(1);
       }
@@ -446,7 +478,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
       see_token(map, len);
       sum_update(map,len);
 
-      if (write_sparse(fd,map,len) != len) {
+      if (fd != -1 && write_sparse(fd,map,len) != len) {
 	fprintf(FERROR,"write failed on %s : %s\n",fname,strerror(errno));
 	exit_cleanup(1);
       }
@@ -454,7 +486,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
     }
   }
 
-  if (offset > 0 && sparse_end(fd) != 0) {
+  if (fd != -1 && offset > 0 && sparse_end(fd) != 0) {
     fprintf(FERROR,"write failed on %s : %s\n",fname,strerror(errno));
     exit_cleanup(1);
   }
@@ -465,7 +497,7 @@ static int receive_data(int f_in,struct map_struct *buf,int fd,char *fname)
     read_buf(f_in,file_sum2,MD4_SUM_LENGTH);
     if (verbose > 2)
       fprintf(FERROR,"got file_sum\n");
-    if (memcmp(file_sum1,file_sum2,MD4_SUM_LENGTH) != 0)
+    if (fd != -1 && memcmp(file_sum1,file_sum2,MD4_SUM_LENGTH) != 0)
       return 0;
   }
   return 1;
@@ -582,14 +614,16 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 
       if (fd1 != -1 && fstat(fd1,&st) != 0) {
 	fprintf(FERROR,"fstat %s : %s\n",fname,strerror(errno));
+	receive_data(f_in,NULL,-1,NULL);
 	close(fd1);
-	return -1;
+	continue;
       }
 
       if (fd1 != -1 && !S_ISREG(st.st_mode)) {
-	fprintf(FERROR,"%s : not a regular file\n",fname);
+	fprintf(FERROR,"%s : not a regular file (recv_files)\n",fname);
+	receive_data(f_in,NULL,-1,NULL);
 	close(fd1);
-	return -1;
+	continue;
       }
 
       if (fd1 != -1 && st.st_size > 0) {
@@ -604,12 +638,18 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
       sprintf(fnametmp,"%s.XXXXXX",fname);
       if (NULL == mktemp(fnametmp)) {
 	fprintf(FERROR,"mktemp %s failed\n",fnametmp);
-	return -1;
+	receive_data(f_in,buf,-1,NULL);
+	if (buf) unmap_file(buf);
+	close(fd1);
+	continue;
       }
       fd2 = open(fnametmp,O_WRONLY|O_CREAT,file->mode);
       if (fd2 == -1) {
 	fprintf(FERROR,"open %s : %s\n",fnametmp,strerror(errno));
-	return -1;
+	receive_data(f_in,buf,-1,NULL);
+	if (buf) unmap_file(buf);
+	close(fd1);
+	continue;
       }
       
       cleanup_fname = fnametmp;
@@ -634,7 +674,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	sprintf(fnamebak,"%s%s",fname,backup_suffix);
 	if (rename(fname,fnamebak) != 0 && errno != ENOENT) {
 	  fprintf(FERROR,"rename %s %s : %s\n",fname,fnamebak,strerror(errno));
-	  exit_cleanup(1);
+	  continue;
 	}
       }
 
@@ -642,6 +682,7 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
       if (rename(fnametmp,fname) != 0) {
 	fprintf(FERROR,"rename %s -> %s : %s\n",
 		fnametmp,fname,strerror(errno));
+	unlink(fnametmp);
       }
 
       cleanup_fname = NULL;
@@ -656,6 +697,17 @@ int recv_files(int f_in,struct file_list *flist,char *local_name,int f_gen)
 	write_int(f_gen,i);
       }
     }
+
+  /* now we need to fix any directory permissions that were 
+     modified during the transfer */
+  if (!am_root) {
+    for (i = 0; i < flist->count; i++) {
+      struct file_struct *file = &flist->files[i];
+      if (!file->name || !S_ISDIR(file->mode)) continue;
+      recv_generator(file->name,flist,i,-1);
+    }
+  }
+  
 
   if (verbose > 2)
     fprintf(FERROR,"recv_files finished\n");
@@ -796,18 +848,20 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
 
   for (i = 0; i < flist->count; i++) {
     struct file_struct *file = &flist->files[i];
+    mode_t saved_mode = file->mode;
     if (!file->name) continue;
-    if (S_ISDIR(file->mode)) {
-      if (dry_run) continue;
-      if (mkdir(file->name,file->mode) != 0 &&
-	  errno != EEXIST) {
-	fprintf(FERROR,"mkdir %s : %s\n",
-		file->name,strerror(errno));
-      }
-      continue;
+
+    /* we need to ensure that any directories we create have writeable
+       permissions initially so that we can create the files within
+       them. This is then fixed after the files are transferred */
+    if (!am_root && S_ISDIR(file->mode)) {
+      file->mode |= S_IWUSR; /* user write */
     }
+
     recv_generator(local_name?local_name:file->name,
 		   flist,i,f);
+
+    file->mode = saved_mode;
   }
 
   phase++;
@@ -821,6 +875,8 @@ void generate_files(int f,struct file_list *flist,char *local_name,int f_recv)
   write_flush(f);
 
   if (remote_version >= 13) {
+    /* in newer versions of the protocol the files can cycle through
+       the system more than once to catch initial checksum errors */
     for (i=read_int(f_recv); i != -1; i=read_int(f_recv)) {
       struct file_struct *file = &flist->files[i];
       recv_generator(local_name?local_name:file->name,

@@ -7,10 +7,13 @@ AC_PROG_CC
 AC_PROG_INSTALL
 AC_SUBST(SHELL)
 
+AC_CHECK_PROG(HAVE_REMSH, remsh, 1, 0)
+AC_DEFINE_UNQUOTED(HAVE_REMSH, $HAVE_REMSH)
+
 AC_HEADER_DIRENT
 AC_HEADER_TIME
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS(sys/fcntl.h fcntl.h sys/time.h unistd.h utime.h grp.h)
+AC_CHECK_HEADERS(sys/fcntl.h fcntl.h sys/time.h sys/unistd.h unistd.h utime.h grp.h)
 AC_CHECK_HEADERS(compat.h sys/param.h ctype.h sys/wait.h sys/ioctl.h)
 AC_CHECK_HEADERS(sys/filio.h string.h stdlib.h)
 

@@ -47,6 +47,8 @@ int one_file_system=0;
 int remote_version=0;
 int sparse_files=0;
 int do_compression=0;
+int am_root=0;
+int orig_umask=0;
 
 extern int csum_length;
 
@@ -174,11 +176,20 @@ int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f_out)
       args[argc++] = tok;
     }
 
+#if HAVE_REMSH
+    /* remsh (on HPUX) takes the arguments the other way around */
+    args[argc++] = machine;
+    if (user) {
+      args[argc++] = "-l";
+      args[argc++] = user;
+    }
+#else
     if (user) {
       args[argc++] = "-l";
       args[argc++] = user;
     }
     args[argc++] = machine;
+#endif
   }
 
   args[argc++] = rsync_path;
@@ -190,7 +201,10 @@ int do_cmd(char *cmd,char *machine,char *user,char *path,int *f_in,int *f_out)
     p = strrchr(dir,'/');
     if (p) {
       *p = 0;
-      args[argc++] = dir;
+      if (!dir[0])
+	args[argc++] = "/";
+      else
+	args[argc++] = dir;
       p++;
     } else {
       args[argc++] = ".";
@@ -244,7 +258,7 @@ static char *get_local_name(struct file_list *flist,char *name)
   if (!name) 
     return NULL;
 
-  if (mkdir(name,0777) != 0) {
+  if (mkdir(name,0777 & ~orig_umask) != 0) {
     fprintf(FERROR,"mkdir %s : %s\n",name,strerror(errno));
     exit_cleanup(1);
   } else {
@@ -465,6 +479,11 @@ int main(int argc,char *argv[])
     char *local_name = NULL;
 
     starttime = time(NULL);
+    am_root = (getuid() == 0);
+
+    /* we set a 0 umask so that correct file permissions can be
+       carried across */
+    orig_umask = umask(0);
 
     while ((opt = getopt_long(argc, argv, 
 			      short_options, long_options, &option_index)) 
@@ -545,12 +564,7 @@ int main(int argc,char *argv[])
 	  break;
 
 	case 'o':
-	  if (getuid() == 0) {
-	    preserve_uid=1;
-	  } else {
-	    fprintf(FERROR,"-o only allowed for root\n");
-	    exit_cleanup(1);
-	  }
+	  preserve_uid=1;
 	  break;
 
 	case 'g':
@@ -558,12 +572,7 @@ int main(int argc,char *argv[])
 	  break;
 
 	case 'D':
-	  if (getuid() == 0) {
-	    preserve_devices=1;
-	  } else {
-	    fprintf(FERROR,"-D only allowed for root\n");
-	    exit_cleanup(1);
-	  }
+	  preserve_devices=1;
 	  break;
 
 	case 't':
@@ -586,10 +595,10 @@ int main(int argc,char *argv[])
 	  preserve_perms=1;
 	  preserve_times=1;
 	  preserve_gid=1;
-	  if (getuid() == 0) {
+	  if (am_root) {
 	    preserve_devices=1;
 	    preserve_uid=1;
-	  }	    
+	  }
 	  break;
 
 	case OPT_SERVER:
