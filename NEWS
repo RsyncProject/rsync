@@ -27,8 +27,9 @@ Changes since 2.6.0:
 
   INTERNAL:
 
-    * Most of the I/O is now buffered, which has a particularly
-      large effect under MS Windows.  (Craig Xxx and Wayne Davison)
+    * Most of the I/O is now buffered, which results in a pretty
+      large speedup when running under MS Windows.  (Craig Barratt
+      and Wayne Davison)
 
     * Optimizations to the name-handling/comparing code have made
       some significant reductions in user CPU time for large file
