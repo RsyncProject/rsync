@@ -386,15 +386,9 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 			continue;
 		}
 
-		if (i < 0 || i >= flist->count) {
-			/* Handle the new keep-alive (no-op) packet. */
-			if (i == flist->count && protocol_version >= 29
-	 		    && read_shortint(f_in) == ITEM_IS_NEW)
-				continue;
-			rprintf(FERROR,"Invalid file index %d in recv_files (count=%d)\n",
-				i, flist->count);
-			exit_cleanup(RERR_PROTOCOL);
-		}
+		iflags = read_iflags(f_in, -1, i, fnametmp);
+		if (iflags == ITEM_IS_NEW) /* no-op packet */
+			continue;
 
 		file = flist->files[i];
 		fname = local_name ? local_name : f_name_to(file, fbuf);
@@ -402,21 +396,10 @@ int recv_files(int f_in, struct file_list *flist, char *local_name,
 		if (verbose > 2)
 			rprintf(FINFO, "recv_files(%s)\n", safe_fname(fname));
 
-		if (protocol_version >= 29) {
-			iflags = read_shortint(f_in);
-			if (!(iflags & ITEM_UPDATING) || !S_ISREG(file->mode)) {
-				int see_item = itemizing && (iflags || verbose > 1);
-				if (am_server) {
-					if (am_daemon && !dry_run && see_item)
-						log_item(file, &stats, iflags, NULL);
-				} else if (see_item || iflags & ITEM_UPDATING
-				    || (S_ISDIR(file->mode)
-				     && iflags & ITEM_REPORT_TIME))
-					log_item(file, &stats, iflags, NULL);
-				continue;
-			}
-		} else
-			iflags = ITEM_UPDATING | ITEM_MISSING_DATA;
+		if (!(iflags & ITEM_UPDATING) || !S_ISREG(file->mode)) {
+			maybe_log_item(file, iflags, itemizing, fnametmp);
+			continue;
+		}
 
 		if (!S_ISREG(file->mode)) {
 			rprintf(FERROR, "[%s] got index of non-regular file: %d\n",
