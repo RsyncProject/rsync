@@ -16,5 +16,27 @@ test_unsafe() {
 
 set -x
 
-test_unsafe foo foo safe
-test_unsafe ../foo foo unsafe
+test_unsafe file from safe
+test_unsafe dir/file from safe
+test_unsafe dir/./file from safe
+test_unsafe dir/. from safe
+test_unsafe dir/ from safe
+
+test_unsafe /etc/passwd		from unsafe
+test_unsafe //../etc/passwd	from unsafe
+test_unsafe //./etc/passwd	from unsafe
+
+test_unsafe ./foo		from safe
+test_unsafe ../foo		from unsafe
+test_unsafe ../dest		from/dir safe
+
+# Based on tests from unsafe-links by Vladimír Michl
+test_unsafe ../../unsafe/unsafefile    from/safe	unsafe
+test_unsafe ../files/file1	       from/safe	safe
+
+test_unsafe ../../unsafe/unsafefile    safe	unsafe
+test_unsafe ../files/file1	       safe	unsafe
+
+test_unsafe ../../unsafe/unsafefile    `pwd`/from/safe	safe
+test_unsafe ../files/file1	       `pwd`/from/safe	safe
+
