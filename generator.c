@@ -1132,6 +1132,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	int save_only_existing = only_existing;
 	int save_opt_ignore_existing = opt_ignore_existing;
 	int save_do_progress = do_progress;
+	int save_make_backups = make_backups;
 
 	allowed_lull = read_batch ? 0 : (io_timeout + 1) / 2;
 	lull_mod = allowed_lull * 5;
@@ -1240,6 +1241,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	phase++;
 	only_existing = save_only_existing;
 	opt_ignore_existing = save_opt_ignore_existing;
+	make_backups = save_make_backups;
 
 	if (verbose > 2)
 		rprintf(FINFO,"generate_files phase=%d\n",phase);
