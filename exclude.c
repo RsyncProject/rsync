@@ -674,8 +674,7 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 		} else if (*s == '+' && s[1] == ' ') {
 			new_mflags |= MATCHFLG_INCLUDE;
 			s += 2;
-		}
-		if (*s == '!')
+		} else if (*s == '!')
 			new_mflags |= MATCHFLG_CLEAR_LIST; /* Tentative! */
 	} else {
 		char ch = 0, *mods = "";
