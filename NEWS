@@ -15,6 +15,16 @@ Changes since 2.6.4:
       basis for an updated version, log this better when --verbose or -i
       in in effect.
 
+    - Fixed the accidental disabling of --backup during the --delete-after
+      processing.
+
+    - Restored the ability to use the --address option in client mode (in
+      addition to its use in daemon mode).
+
+    - Make sure that some temporary progress information from the delete
+      processing does not get left on the screen when it is followed by a
+      newline.
+
   ENHANCEMENTS:
 
     - Changed the outputting of "safe" filenames to use backslash-escaped
@@ -28,3 +38,10 @@ Changes since 2.6.4:
   BUILD CHANGES:
 
     - You can use --disable-locale to turn off any use of setlocale().
+
+    - Configure now disables the use of mkstemp() under HP-UX (since they
+      refuse to fix its broken handling of large files).
+
+    - Configure now explicitly checks for the lseek64() function so that
+      the code can use HAVE_LSEEK64 instead of inferring lseek64()'s
+      presence based on the presence of the off64_t type.
