@@ -6,14 +6,14 @@ Changes since 2.6.4:
 
     - A crash bug was fixed when a daemon had its "path" set to "/", did
       not have chroot enabled, and used some anchored excludes in the
-      config file.
+      rsyncd.conf file.
 
     - Fixed a case where the generator might try to tweak the write
       permissions of a read-only directory in list-only mode.
 
     - If --compare-dest or --link-dest uses a locally-copied file as the
       basis for an updated version, log this better when --verbose or -i
-      in in effect.
+      is in effect.
 
     - Fixed the accidental disabling of --backup during the --delete-after
       processing.
