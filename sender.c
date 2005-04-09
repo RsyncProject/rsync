@@ -20,7 +20,7 @@
 #include "rsync.h"
 
 extern int verbose;
-extern int dry_run;
+extern int do_xfers;
 extern int am_server;
 extern int am_daemon;
 extern int log_before_transfer;
@@ -34,6 +34,8 @@ extern int updating_basis_file;
 extern int make_backups;
 extern int do_progress;
 extern int inplace;
+extern int batch_fd;
+extern int write_batch;
 extern struct stats stats;
 extern struct file_list *the_file_list;
 extern char *log_format;
@@ -208,6 +210,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 	int save_make_backups = make_backups;
 	int itemizing = am_daemon ? daemon_log_format_has_i
 		      : !am_server && log_format_has_i;
+	int f_xfer = write_batch < 0 ? batch_fd : f_out;
 	int i, j;
 
 	if (verbose > 2)
@@ -230,7 +233,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			continue;
 		}
 
-		iflags = read_item_attrs(f_in, f_out, i, &fnamecmp_type,
+		iflags = read_item_attrs(f_in, f_xfer, i, &fnamecmp_type,
 					 xname, &xlen);
 		if (iflags == ITEM_IS_NEW) /* no-op packet */
 			continue;
@@ -266,10 +269,10 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		stats.num_transferred_files++;
 		stats.total_transferred_size += file->length;
 
-		if (dry_run) { /* log the transfer */
+		if (!do_xfers) { /* log the transfer */
 			if (!am_server && log_format)
 				log_item(file, &stats, iflags, NULL);
-			write_ndx_and_attrs(f_out, i, iflags, fnamecmp_type,
+			write_ndx_and_attrs(f_xfer, i, iflags, fnamecmp_type,
 					    xname, xlen);
 			continue;
 		}
@@ -321,9 +324,9 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				safe_fname(fname), (double)st.st_size);
 		}
 
-		write_ndx_and_attrs(f_out, i, iflags, fnamecmp_type,
+		write_ndx_and_attrs(f_xfer, i, iflags, fnamecmp_type,
 				    xname, xlen);
-		write_sum_head(f_out, s);
+		write_sum_head(f_xfer, s);
 
 		if (verbose > 2) {
 			rprintf(FINFO, "calling match_sums %s\n",
@@ -337,7 +340,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		set_compression(fname);
 
-		match_sums(f_out, s, mbuf, st.st_size);
+		match_sums(f_xfer, s, mbuf, st.st_size);
 		if (do_progress)
 			end_progress(st.st_size);
 
