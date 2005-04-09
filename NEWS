@@ -27,6 +27,10 @@ Changes since 2.6.4:
 
   ENHANCEMENTS:
 
+    - Added the --only-write-batch=FILE option that may be used (instead
+      of --write-batch=FILE) to create a batch file without doing any
+      actual updating of the destination.
+
     - Changed the outputting of "safe" filenames to use backslash-escaped
       characters rather than '?'s.  Any non-printable character is output
       using octal (e.g. "\n" -> "\012"), and backslash is output as "\\".
