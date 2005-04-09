@@ -139,7 +139,7 @@ static void write_filter_rules(int fd)
  * (hopefully) work. */
 void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 {
-	int fd, i;
+	int fd, i, len;
 	char *p, filename[MAXPATHLEN];
 
 	stringjoin(filename, sizeof filename,
@@ -175,11 +175,12 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 			continue;
 		}
 		write(fd, " ", 1);
-		if (strncmp(p, "--write-batch", 13) == 0) {
+		if (strncmp(p, "--write-batch", len = 13) == 0
+		 || strncmp(p, "--only-write-batch", len = 18) == 0) {
 			write(fd, "--read-batch", 12);
-			if (p[13] == '=') {
+			if (p[len] == '=') {
 				write(fd, "=", 1);
-				write_arg(fd, p + 14);
+				write_arg(fd, p + len + 1);
 			}
 		} else
 			write_arg(fd, p);
