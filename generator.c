@@ -25,6 +25,7 @@
 
 extern int verbose;
 extern int dry_run;
+extern int do_xfers;
 extern int log_format_has_i;
 extern int log_format_has_o_or_i;
 extern int daemon_log_format_has_i;
@@ -1020,7 +1021,7 @@ prepare_to_open:
 		statret = 0;
 	}
 
-	if (dry_run || read_batch || whole_file)
+	if (!do_xfers || read_batch || whole_file)
 		goto notify_others;
 
 	if (fuzzy_basis) {
@@ -1092,7 +1093,7 @@ notify_others:
 			fuzzy_file ? fuzzy_file->basename : NULL);
 	}
 
-	if (dry_run) {
+	if (!do_xfers) {
 		if (preserve_hard_links && file->link_u.links)
 			hard_link_cluster(file, ndx, itemizing, code);
 		return;
@@ -1142,9 +1143,9 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		maybe_PERMS_REPORT = log_format_has_i ? 0 : PERMS_REPORT;
 		code = daemon_log_format_has_i ? 0 : FLOG;
 	} else if (am_daemon) {
-		itemizing = daemon_log_format_has_i && !dry_run;
+		itemizing = daemon_log_format_has_i && do_xfers;
 		maybe_PERMS_REPORT = PERMS_REPORT;
-		code = itemizing || dry_run ? FCLIENT : FINFO;
+		code = itemizing || !do_xfers ? FCLIENT : FINFO;
 	} else if (!am_server) {
 		itemizing = log_format_has_i;
 		maybe_PERMS_REPORT = log_format_has_i ? 0 : PERMS_REPORT;
