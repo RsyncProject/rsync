@@ -53,6 +53,7 @@ int omit_dir_times = 0;
 int update_only = 0;
 int cvs_exclude = 0;
 int dry_run = 0;
+int do_xfers = 1;
 int ignore_times = 0;
 int delete_mode = 0;
 int delete_during = 0;
@@ -345,6 +346,7 @@ void usage(enum logcode F)
   rprintf(F,"     --list-only             list the files instead of copying them\n");
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth; KBytes per second\n");
   rprintf(F,"     --write-batch=FILE      write a batched update to FILE\n");
+  rprintf(F,"     --only-write-batch=FILE like --write-batch but w/o updating destination\n");
   rprintf(F,"     --read-batch=FILE       read a batched update from FILE\n");
   rprintf(F,"     --protocol=NUM          force an older protocol version to be used\n");
 #ifdef INET6
@@ -361,7 +363,8 @@ void usage(enum logcode F)
 enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_FILTER, OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW,
-      OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_TIMEOUT, OPT_MAX_SIZE,
+      OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH,
+      OPT_TIMEOUT, OPT_MAX_SIZE,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -452,6 +455,7 @@ static struct poptOption long_options[] = {
   {"hard-links",      'H', POPT_ARG_NONE,   &preserve_hard_links, 0, 0, 0 },
   {"read-batch",       0,  POPT_ARG_STRING, &batch_name, OPT_READ_BATCH, 0, 0 },
   {"write-batch",      0,  POPT_ARG_STRING, &batch_name, OPT_WRITE_BATCH, 0, 0 },
+  {"only-write-batch", 0,  POPT_ARG_STRING, &batch_name, OPT_ONLY_WRITE_BATCH, 0, 0 },
   {"files-from",       0,  POPT_ARG_STRING, &files_from, 0, 0, 0 },
   {"from0",           '0', POPT_ARG_NONE,   &eol_nulls, 0, 0, 0},
   {"no-implied-dirs",  0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
@@ -792,6 +796,11 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			write_batch = 1;
 			break;
 
+		case OPT_ONLY_WRITE_BATCH:
+			/* batch_name is already set */
+			write_batch = -1;
+			break;
+
 		case OPT_READ_BATCH:
 			/* batch_name is already set */
 			read_batch = 1;
@@ -902,7 +911,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			"--write-batch and --read-batch can not be used together\n");
 		return 0;
 	}
-	if (write_batch || read_batch) {
+	if (write_batch > 0 || read_batch) {
 		if (am_server) {
 			rprintf(FINFO,
 				"ignoring --%s-batch option sent to server\n",
@@ -1094,6 +1103,9 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	    && !am_server)
 		verbose = 1;
 
+	if (dry_run)
+		do_xfers = 0;
+
 	if (verbose && !log_format) {
 		log_format = "%n%L";
 		log_before_transfer = !am_server;
@@ -1246,7 +1258,7 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'b';
 	if (update_only)
 		argstr[x++] = 'u';
-	if (dry_run)
+	if (!do_xfers)
 		argstr[x++] = 'n';
 	if (preserve_links)
 		argstr[x++] = 'l';
@@ -1374,6 +1386,8 @@ void server_options(char **args,int *argc)
 			args[ac++] = "--delete-after";
 		if (force_delete)
 			args[ac++] = "--force";
+		if (write_batch < 0)
+			args[ac++] = "--only-write-batch=X";
 	}
 
 	if (size_only)
