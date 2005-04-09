@@ -31,6 +31,14 @@ Changes since 2.6.4:
       characters rather than '?'s.  Any non-printable character is output
       using octal (e.g. "\n" -> "\012"), and backslash is output as "\\".
 
+    - Improved the auth-errors that are logged for the daemon to include
+      some information on why the authorization failed (wrong user,
+      password mismatch, etc.).
+
+    - Improved the client's handling of an "@ERROR" from a daemon so that
+      it does not complain about an unexpectedly closed socket (since we
+      really did expect the socket to close).
+
   INTERNAL:
 
     - Rsync now calls setlocale(LC_CTYPE, "").
