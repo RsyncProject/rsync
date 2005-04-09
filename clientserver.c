@@ -100,7 +100,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 
 	ret = start_inband_exchange(user, path, fd, fd, argc);
 
-	return ret < 0? ret : client_run(fd, fd, -1, argc, argv);
+	return ret ? ret : client_run(fd, fd, -1, argc, argv);
 }
 
 int start_inband_exchange(char *user, char *path, int f_in, int f_out, 
@@ -196,10 +196,10 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out,
 			rprintf(FERROR, "%s\n", line);
 			/* This is always fatal; the server will now
 			 * close the socket. */
-			return RERR_STARTCLIENT;
-		} else {
-			rprintf(FINFO,"%s\n", line);
+			return -1;
 		}
+
+		rprintf(FINFO, "%s\n", line);
 	}
 	kluge_around_eof = 0;
 
