@@ -173,7 +173,7 @@ static void handle_stats(int f)
 			stats.flist_buildtime = read_longint(f);
 			stats.flist_xfertime = read_longint(f);
 		}
-	} else if (write_batch) {
+	} else if (write_batch && !am_server) {
 		/* The --read-batch process is going to be a client
 		 * receiver, so we need to give it the stats. */
 		write_longint(batch_fd, total_read);
@@ -594,7 +594,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	am_generator = 1;
 	close_multiplexing_in();
-	if (write_batch)
+	if (write_batch && !am_server)
 		stop_write_batch();
 
 	close(error_pipe[1]);
@@ -767,7 +767,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		if (filesfrom_host)
 			filesfrom_fd = f_in;
 
-		if (write_batch)
+		if (write_batch && !am_server)
 			start_write_batch(f_out);
 		flist = send_file_list(f_out, argc, argv);
 		set_msg_fd_in(-1);
@@ -805,7 +805,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		filesfrom_fd = -1;
 	}
 
-	if (write_batch)
+	if (write_batch && !am_server)
 		start_write_batch(f_in);
 	flist = recv_file_list(f_in);
 	if (!flist || flist->count == 0) {
@@ -1130,7 +1130,7 @@ int main(int argc,char *argv[])
 
 	init_flist();
 
-	if (write_batch || read_batch) {
+	if ((write_batch || read_batch) && !am_server) {
 		if (write_batch)
 			write_batch_shell_file(orig_argc, orig_argv, argc);
 
@@ -1149,6 +1149,8 @@ int main(int argc,char *argv[])
 		if (read_batch)
 			read_stream_flags(batch_fd);
 	}
+	if (write_batch < 0)
+		dry_run = 1;
 
 	if (am_daemon && !am_server)
 		return daemon_main();
