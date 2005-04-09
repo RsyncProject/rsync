@@ -25,7 +25,6 @@ extern int am_sender;
 extern int am_server;
 extern int blocking_io;
 extern int orig_umask;
-extern int write_batch;
 extern int filesfrom_fd;
 
 /**
@@ -127,10 +126,6 @@ pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 	if (pid == 0) {
 		am_sender = !am_sender;
 		am_server = 1;
-
-		/* The server side never writes the batch, even if it
-		 * is local (it makes the logic easier elsewhere). */
-		write_batch = 0;
 
 		if (!am_sender)
 			filesfrom_fd = -1;
