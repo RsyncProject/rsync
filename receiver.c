@@ -21,7 +21,7 @@
 #include "rsync.h"
 
 extern int verbose;
-extern int dry_run;
+extern int do_xfers;
 extern int am_daemon;
 extern int am_server;
 extern int do_progress;
@@ -30,6 +30,7 @@ extern int log_format_has_i;
 extern int daemon_log_format_has_i;
 extern int csum_length;
 extern int read_batch;
+extern int write_batch;
 extern int batch_gen_fd;
 extern int protocol_version;
 extern int relative_paths;
@@ -452,11 +453,16 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		if (dry_run) { /* log the transfer */
+		if (!do_xfers) { /* log the transfer */
 			if (!am_server && log_format)
 				log_item(file, &stats, iflags, NULL);
 			if (read_batch)
 				discard_receive_data(f_in, file->length);
+			continue;
+		}
+		if (write_batch < 0) {
+			log_item(file, &stats, iflags, NULL);
+			discard_receive_data(f_in, file->length);
 			continue;
 		}
 
