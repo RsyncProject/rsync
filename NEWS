@@ -35,7 +35,7 @@ Changes since 2.6.4:
       characters rather than '?'s.  Any non-printable character is output
       using octal (e.g. "\n" -> "\012"), and backslash is output as "\\".
 
-    - Improved the auth-errors that are logged for the daemon to include
+    - Improved the auth-errors that are logged by the daemon to include
       some information on why the authorization failed (wrong user,
       password mismatch, etc.).
 
@@ -48,6 +48,9 @@ Changes since 2.6.4:
     - Rsync now calls setlocale(LC_CTYPE, "").
 
   BUILD CHANGES:
+
+    - Fixed a bug in the SUPPORT{,_HARD}_LINKS defines which prevented
+      rsync from being built without symlink or hard-link support.
 
     - You can use --disable-locale to turn off any use of setlocale().
 
