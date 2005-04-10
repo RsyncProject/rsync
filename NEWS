@@ -25,6 +25,9 @@ Changes since 2.6.4:
       processing does not get left on the screen when it is followed by a
       newline.
 
+    - When --existing skips a directory with extra verbosity, don't refer
+      to it as a "file".
+
   ENHANCEMENTS:
 
     - Added the --only-write-batch=FILE option that may be used (instead
@@ -37,7 +40,7 @@ Changes since 2.6.4:
 
     - Improved the auth-errors that are logged by the daemon to include
       some information on why the authorization failed (wrong user,
-      password mismatch, etc.).
+      password mismatch, etc.).  (The client-visible message is unchanged.)
 
     - Improved the client's handling of an "@ERROR" from a daemon so that
       it does not complain about an unexpectedly closed socket (since we
