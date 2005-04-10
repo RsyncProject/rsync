@@ -51,10 +51,11 @@ void base64_encode(char *buf, int len, char *out)
 	}
 }
 
-/* Create a 16-byte challenge buffer. */
+/* Generate a challenge buffer and return it base64-encoded. */
 static void gen_challenge(char *addr, char *challenge)
 {
 	char input[32];
+	char md4_out[MD4_SUM_LENGTH];
 	struct timeval tv;
 
 	memset(input, 0, sizeof input);
@@ -67,7 +68,9 @@ static void gen_challenge(char *addr, char *challenge)
 
 	sum_init(0);
 	sum_update(input, sizeof input);
-	sum_end(challenge);
+	sum_end(md4_out);
+
+	base64_encode(md4_out, MD4_SUM_LENGTH, challenge);
 }
 
 
@@ -195,7 +198,8 @@ static char *getpassf(char *filename)
 	return NULL;
 }
 
-/* Generate a 16-byte hash from a password and challenge. */
+/* Generate an MD4 hash created from the combination of the password
+ * and the challenge string and return it base64-encoded. */
 static void generate_hash(char *in, char *challenge, char *out)
 {
 	char buf[MD4_SUM_LENGTH];
@@ -218,8 +222,7 @@ char *auth_server(int f_in, int f_out, int module, char *host, char *addr,
 		  char *leader)
 {
 	char *users = lp_auth_users(module);
-	char challenge[MD4_SUM_LENGTH];
-	char b64_challenge[MD4_SUM_LENGTH*2];
+	char challenge[MD4_SUM_LENGTH*2];
 	char line[MAXPATHLEN];
 	char secret[512];
 	char pass2[MD4_SUM_LENGTH*2];
@@ -231,9 +234,7 @@ char *auth_server(int f_in, int f_out, int module, char *host, char *addr,
 
 	gen_challenge(addr, challenge);
 
-	base64_encode(challenge, MD4_SUM_LENGTH, b64_challenge);
-
-	io_printf(f_out, "%s%s\n", leader, b64_challenge);
+	io_printf(f_out, "%s%s\n", leader, challenge);
 
 	if (!read_line(f_in, line, sizeof line - 1)
 	 || (pass = strchr(line, ' ')) == NULL) {
@@ -269,7 +270,7 @@ char *auth_server(int f_in, int f_out, int module, char *host, char *addr,
 		return NULL;
 	}
 
-	generate_hash(secret, b64_challenge, pass2);
+	generate_hash(secret, challenge, pass2);
 	memset(secret, 0, sizeof secret);
 
 	if (strcmp(pass, pass2) != 0) {
@@ -311,5 +312,3 @@ void auth_client(int fd, char *user, char *challenge)
 	generate_hash(pass, challenge, pass2);
 	io_printf(fd, "%s %s\n", user, pass2);
 }
-
-
