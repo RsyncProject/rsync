@@ -668,7 +668,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (only_existing && statret == -1 && stat_errno == ENOENT) {
 		/* we only want to update existing files */
 		if (verbose > 1) {
-			rprintf(FINFO, "not creating new file \"%s\"\n",
+			rprintf(FINFO, "not creating new %s \"%s\"\n",
+				S_ISDIR(file->mode) ? "directory" : "file",
 				safe_fname(fname));
 		}
 		return;
