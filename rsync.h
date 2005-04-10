@@ -675,8 +675,12 @@ extern char *sys_errlist[];
 extern int errno;
 #endif
 
-#define SUPPORT_LINKS HAVE_READLINK
-#define SUPPORT_HARD_LINKS HAVE_LINK
+#ifdef HAVE_READLINK
+#define SUPPORT_LINKS 1
+#endif
+#ifdef HAVE_LINK
+#define SUPPORT_HARD_LINKS 1
+#endif
 
 #define SIGNAL_CAST (RETSIGTYPE (*)())
 
