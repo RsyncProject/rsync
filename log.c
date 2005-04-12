@@ -59,7 +59,6 @@ struct {
 	{ RERR_FILESELECT , "errors selecting input/output files, dirs" },
 	{ RERR_UNSUPPORTED, "requested action not supported" },
 	{ RERR_STARTCLIENT, "error starting client-server protocol" },
-	{ RERR_LOG_FAILURE, "daemon unable to append to log-file" },
 	{ RERR_SOCKETIO   , "error in socket IO" },
 	{ RERR_FILEIO     , "error in file IO" },
 	{ RERR_STREAMIO   , "error in rsync protocol data stream" },
@@ -98,8 +97,13 @@ static char const *rerr_name(int code)
 static void logit(int priority, char *buf)
 {
 	if (logfname) {
-		if (!logfile)
+		if (!logfile) {
 			log_open();
+			if (!logfname) {
+				logit(priority, buf);
+				return;
+			}
+		}
 		fprintf(logfile,"%s [%d] %s",
 			timestring(time(NULL)), (int)getpid(), buf);
 		fflush(logfile);
@@ -108,9 +112,32 @@ static void logit(int priority, char *buf)
 	}
 }
 
+static void syslog_init()
+{
+	static int been_here = 0;
+	int options = LOG_PID;
+
+	if (been_here)
+		return;
+	been_here = 1;
+
+#ifdef LOG_NDELAY
+	options |= LOG_NDELAY;
+#endif
+
+#ifdef LOG_DAEMON
+	openlog("rsyncd", options, lp_syslog_facility());
+#else
+	openlog("rsyncd", options);
+#endif
+
+#ifndef LOG_NDELAY
+	logit(LOG_INFO, "rsyncd started\n");
+#endif
+}
+
 void log_init(void)
 {
-	int options = LOG_PID;
 	time_t t;
 
 	if (log_initialised)
@@ -133,19 +160,7 @@ void log_init(void)
 		logfname = NULL;
 	}
 
-#ifdef LOG_NDELAY
-	options |= LOG_NDELAY;
-#endif
-
-#ifdef LOG_DAEMON
-	openlog("rsyncd", options, lp_syslog_facility());
-#else
-	openlog("rsyncd", options);
-#endif
-
-#ifndef LOG_NDELAY
-	logit(LOG_INFO,"rsyncd started\n");
-#endif
+	syslog_init();
 }
 
 void log_open(void)
@@ -156,9 +171,14 @@ void log_open(void)
 		logfile = fopen(logfname, "a");
 		umask(old_umask);
 		if (!logfile) {
-			am_daemon = 0; /* avoid trying to log again */
-			rsyserr(FERROR, errno, "fopen() of log-file failed");
-			exit_cleanup(RERR_LOG_FAILURE);
+			char *had_logfname = logfname;
+			int open_errno = errno;
+			/* Rsync falls back to using syslog on failure. */
+			logfname = NULL;
+			syslog_init();
+			rsyserr(FERROR, open_errno,
+				"failed to open log-file %s", had_logfname);
+			rprintf(FINFO, "Ignoring \"log file\" setting.\n");
 		}
 	}
 }
