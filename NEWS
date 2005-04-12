@@ -46,6 +46,10 @@ Changes since 2.6.4:
       it does not complain about an unexpectedly closed socket (since we
       really did expect the socket to close).
 
+    - If the daemon can't open the log-file specified in rsyncd.conf, fall
+      back to using syslog.  This is better than a (typically) totally
+      silent failure (since a daemon is not usually run with --no-detach).
+
   INTERNAL:
 
     - Rsync now calls setlocale(LC_CTYPE, "").
