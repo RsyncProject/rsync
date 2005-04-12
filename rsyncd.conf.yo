@@ -90,7 +90,10 @@ is no motd file.
 dit(bf(log file)) The "log file" option tells the rsync daemon to log
 messages to that file rather than using syslog. This is particularly
 useful on systems (such as AIX) where syslog() doesn't work for
-chrooted programs.
+chrooted programs.  If the daemon fails to open to specified file, it
+will fall back to using syslog and output an error about the failure.
+(Note that a failure to open the specified log file used to be a fatal
+error.)
 
 dit(bf(pid file)) The "pid file" option tells the rsync daemon to write
 its process ID to that file.
