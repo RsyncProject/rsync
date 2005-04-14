@@ -478,7 +478,7 @@ void start_accept_loop(int port, int (*fn)(int, int))
 		/* close log file before the potentially very long select so
 		 * file can be trimmed by another process instead of growing
 		 * forever */
-		log_close();
+		logfile_close();
 
 #ifdef FD_COPY
 		FD_COPY(&deffds, &fds);
@@ -507,8 +507,8 @@ void start_accept_loop(int port, int (*fn)(int, int))
 			for (i = 0; sp[i] >= 0; i++)
 				close(sp[i]);
 			/* Re-open log file in child before possibly giving
-			 * up privileges (see log_close() above). */
-			log_open();
+			 * up privileges (see logfile_close() above). */
+			logfile_reopen();
 			ret = fn(fd, fd);
 			close_all();
 			_exit(ret);
