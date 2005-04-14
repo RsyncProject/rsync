@@ -44,6 +44,7 @@ extern char *auth_user;
 extern char *log_format;
 
 static int log_initialised;
+static int logfile_was_closed;
 static char *logfname;
 static FILE *logfile;
 struct stats stats;
@@ -96,14 +97,9 @@ static char const *rerr_name(int code)
 
 static void logit(int priority, char *buf)
 {
-	if (logfname) {
-		if (!logfile) {
-			log_open();
-			if (!logfname) {
-				logit(priority, buf);
-				return;
-			}
-		}
+	if (logfile_was_closed)
+		logfile_reopen();
+	if (logfile) {
 		fprintf(logfile,"%s [%d] %s",
 			timestring(time(NULL)), (int)getpid(), buf);
 		fflush(logfile);
@@ -136,6 +132,22 @@ static void syslog_init()
 #endif
 }
 
+static void logfile_open(void)
+{
+	extern int orig_umask;
+	int old_umask = umask(022 | orig_umask);
+	logfile = fopen(logfname, "a");
+	umask(old_umask);
+	if (!logfile) {
+		int fopen_errno = errno;
+		/* Rsync falls back to using syslog on failure. */
+		syslog_init();
+		rsyserr(FERROR, fopen_errno,
+			"failed to open log-file %s", logfname);
+		rprintf(FINFO, "Ignoring \"log file\" setting.\n");
+	}
+}
+
 void log_init(void)
 {
 	time_t t;
@@ -152,42 +164,26 @@ void log_init(void)
 
 	/* optionally use a log file instead of syslog */
 	logfname = lp_log_file();
-	if (logfname) {
-		if (*logfname) {
-			log_open();
-			return;
-		}
-		logfname = NULL;
-	}
-
-	syslog_init();
+	if (logfname && *logfname)
+		logfile_open();
+	else
+		syslog_init();
 }
 
-void log_open(void)
-{
-	if (logfname && !logfile) {
-		extern int orig_umask;
-		int old_umask = umask(022 | orig_umask);
-		logfile = fopen(logfname, "a");
-		umask(old_umask);
-		if (!logfile) {
-			char *had_logfname = logfname;
-			int open_errno = errno;
-			/* Rsync falls back to using syslog on failure. */
-			logfname = NULL;
-			syslog_init();
-			rsyserr(FERROR, open_errno,
-				"failed to open log-file %s", had_logfname);
-			rprintf(FINFO, "Ignoring \"log file\" setting.\n");
-		}
-	}
-}
-
-void log_close(void)
+void logfile_close(void)
 {
 	if (logfile) {
+		logfile_was_closed = 1;
 		fclose(logfile);
 		logfile = NULL;
+	}
+}
+
+void logfile_reopen(void)
+{
+	if (logfile_was_closed) {
+		logfile_was_closed = 0;
+		logfile_open();
 	}
 }
 
