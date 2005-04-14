@@ -32,7 +32,9 @@ Changes since 2.6.4:
 
     - Added the --only-write-batch=FILE option that may be used (instead
       of --write-batch=FILE) to create a batch file without doing any
-      actual updating of the destination.
+      actual updating of the destination.  This allows you to divert all
+      the file-updating data away from a slow data link (as long as you
+      are pushing the data to the remote server when creating the batch).
 
     - Changed the outputting of "safe" filenames to use backslash-escaped
       characters rather than '?'s.  Any non-printable character is output
