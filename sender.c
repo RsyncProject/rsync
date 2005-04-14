@@ -175,10 +175,6 @@ int read_item_attrs(int f_in, int f_out, int ndx, uchar *type_ptr,
 	}
 	*len_ptr = len;
 
-	/* Temporary handling of 2.6.4pre3 */
-	if (iflags & ITEM_DUMMY_BIT && iflags & (ITEM_LOCAL_CHANGE|ITEM_TRANSFER))
-		iflags &= ~ITEM_DUMMY_BIT;
-
 	if (iflags & ITEM_TRANSFER) {
 		if (!S_ISREG(the_file_list->files[ndx]->mode)) {
 			rprintf(FERROR,
@@ -233,7 +229,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			continue;
 		}
 
-		iflags = read_item_attrs(f_in, f_xfer, i, &fnamecmp_type,
+		iflags = read_item_attrs(f_in, f_out, i, &fnamecmp_type,
 					 xname, &xlen);
 		if (iflags == ITEM_IS_NEW) /* no-op packet */
 			continue;
@@ -272,7 +268,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		if (!do_xfers) { /* log the transfer */
 			if (!am_server && log_format)
 				log_item(file, &stats, iflags, NULL);
-			write_ndx_and_attrs(f_xfer, i, iflags, fnamecmp_type,
+			write_ndx_and_attrs(f_out, i, iflags, fnamecmp_type,
 					    xname, xlen);
 			continue;
 		}
@@ -324,7 +320,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				safe_fname(fname), (double)st.st_size);
 		}
 
-		write_ndx_and_attrs(f_xfer, i, iflags, fnamecmp_type,
+		write_ndx_and_attrs(f_out, i, iflags, fnamecmp_type,
 				    xname, xlen);
 		write_sum_head(f_xfer, s);
 
