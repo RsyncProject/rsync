@@ -462,7 +462,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		}
 		if (write_batch < 0) {
 			log_item(file, &stats, iflags, NULL);
-			discard_receive_data(f_in, file->length);
+			if (!am_server)
+				discard_receive_data(f_in, file->length);
 			continue;
 		}
 
