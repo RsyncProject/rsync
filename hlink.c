@@ -52,7 +52,7 @@ static int hlink_count;
  * linked, and replace the dev+inode data with the hlindex+next linked list. */
 static void link_idev_data(void)
 {
-	int head, from, to, start;
+	int cur, from, to, start;
 
 	alloc_pool_t hlink_pool;
 	alloc_pool_t idev_pool = the_file_list->hlink_pool;
@@ -62,31 +62,31 @@ static void link_idev_data(void)
 
 	for (from = to = 0; from < hlink_count; from++) {
 		start = from;
-		head = hlink_list[start];
-		while (from < hlink_count-1
-		    && LINKED(hlink_list[from], hlink_list[from+1])) {
-			pool_free(idev_pool, 0, FPTR(hlink_list[from])->link_u.idev);
-			FPTR(hlink_list[from])->link_u.links = pool_talloc(hlink_pool,
+		while (1) {
+			cur = hlink_list[from];
+			if (from == hlink_count-1
+			    || !LINKED(cur, hlink_list[from+1]))
+				break;
+			pool_free(idev_pool, 0, FPTR(cur)->link_u.idev);
+			FPTR(cur)->link_u.links = pool_talloc(hlink_pool,
 			    struct hlink, 1, "hlink_list");
 
-			FPTR(hlink_list[from])->F_HLINDEX = to;
-			FPTR(hlink_list[from])->F_NEXT = hlink_list[from+1];
-			from++;
+			FPTR(cur)->F_HLINDEX = to;
+			FPTR(cur)->F_NEXT = hlink_list[++from];
 		}
+		pool_free(idev_pool, 0, FPTR(cur)->link_u.idev);
 		if (from > start) {
-			pool_free(idev_pool, 0, FPTR(hlink_list[from])->link_u.idev);
-			FPTR(hlink_list[from])->link_u.links = pool_talloc(hlink_pool,
+			int head = hlink_list[start];
+			FPTR(cur)->link_u.links = pool_talloc(hlink_pool,
 			    struct hlink, 1, "hlink_list");
 
 			FPTR(head)->flags |= FLAG_HLINK_TOL;
-			FPTR(hlink_list[from])->F_HLINDEX = to;
-			FPTR(hlink_list[from])->F_NEXT = head;
-			FPTR(hlink_list[from])->flags |= FLAG_HLINK_EOL;
+			FPTR(cur)->F_HLINDEX = to;
+			FPTR(cur)->F_NEXT = head;
+			FPTR(cur)->flags |= FLAG_HLINK_EOL;
 			hlink_list[to++] = head;
-		} else {
-			pool_free(idev_pool, 0, FPTR(head)->link_u.idev);
-			FPTR(head)->link_u.idev = NULL;
-		}
+		} else
+			FPTR(cur)->link_u.links = NULL;
 	}
 
 	if (!to) {
@@ -109,9 +109,6 @@ void init_hard_links(void)
 {
 #ifdef SUPPORT_HARD_LINKS
 	int i;
-
-	if (the_file_list->count < 2)
-		return;
 
 	if (hlink_list)
 		free(hlink_list);
@@ -139,7 +136,7 @@ void init_hard_links(void)
 int hard_link_check(struct file_struct *file, int ndx, int skip)
 {
 #ifdef SUPPORT_HARD_LINKS
-	if (!hlink_list || !file->link_u.links)
+	if (!file->link_u.links)
 		return 0;
 	if (skip && !(file->flags & FLAG_HLINK_EOL))
 		hlink_list[file->F_HLINDEX] = file->F_NEXT;
