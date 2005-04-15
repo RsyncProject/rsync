@@ -32,6 +32,13 @@ ln "$name2" "$name3" || fail "Can't create hardlink"
 cp "$name2" "$name4" || fail "Can't copy file"
 
 checkit "$RSYNC -aHivv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+rm -rf "$todir"
+
+# Make sure there's nothing wrong with sending a single file with -H
+# enabled (this has had a problem twice now, so we need this).
+mkdir "$chkdir"
+cp -p "$name1" "$chkdir"
+checkit "$RSYNC -aHivv \"$name1\" \"$todir/\"" "$chkdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
