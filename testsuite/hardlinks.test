@@ -38,6 +38,7 @@ rm -rf "$todir"
 # enabled (this has had a problem twice now, so we need this).
 mkdir "$chkdir"
 cp -p "$name1" "$chkdir"
+rsync -avvi -f '-! */' "$fromdir/" "$chkdir/"
 checkit "$RSYNC -aHivv \"$name1\" \"$todir/\"" "$chkdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
