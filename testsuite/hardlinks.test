@@ -35,11 +35,9 @@ checkit "$RSYNC -aHivv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 rm -rf "$todir"
 
 # Make sure there's nothing wrong with sending a single file with -H
-# enabled (this has had a problem twice now, so we need this).
-mkdir "$chkdir"
-cp -p "$name1" "$chkdir"
-$RSYNC -avvi -f '-! */' "$fromdir/" "$chkdir/"
-checkit "$RSYNC -aHivv \"$name1\" \"$todir/\"" "$chkdir" "$todir"
+# enabled (this has broken twice so far, so we need this test).
+$RSYNC -aHivv "$name1" "$todir/"
+diff $diffopt "$name1" "$todir" || test_fail "solo copy of name1 failed"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
