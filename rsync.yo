@@ -139,6 +139,15 @@ tt(rsync -av /src/foo /dest)nl()
 tt(rsync -av /src/foo/ /dest/foo)nl()
 )
 
+Note also that host and module references don't require a trailing slash to
+copy the contents of the default directory.  For example, both of these
+copy the remote directory's contents into "/dest":
+
+quote(
+tt(rsync -av host: /dest)nl()
+tt(rsync -av host::module /dest)nl()
+)
+
 You can also use rsync in local-only mode, where both the source and
 destination don't have a ':' in the name. In this case it behaves like
 an improved copy command.
