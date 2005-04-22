@@ -106,6 +106,14 @@ ftp, kern, lpr, mail, news, security, syslog, user, uucp, local0,
 local1, local2, local3, local4, local5, local6 and local7. The default
 is daemon. 
 
+dit(bf(port)) You can override the default port the daemon will listen on
+by specifying this value (defaults to 873).  This is ignored if the daemon
+is being run by inetd, and is superseded by the bf(--port) command-line option.
+
+dit(bf(address)) You can override the default IP address the daemon
+will listen on by specifying this value.  This is ignored if the daemon is
+being run by inetd, and is superseded by the bf(--address) command-line option.
+
 dit(bf(socket options)) This option can provide endless fun for people
 who like to tune their systems to the utmost degree. You can set all
 sorts of socket options which may make transfers faster (or
@@ -167,14 +175,6 @@ rule "/some/dir/**" just to be sure that rsync will not allow deeper
 access to some of the excluded files inside the directory (rsync tries to
 do this automatically, but you might as well specify both to be extra
 sure).
-
-dit(bf(port)) You can override the default port the daemon will listen on
-by specifying this value (defaults to 873).  This is ignored if the daemon
-is being run by inetd, and is superseded by the bf(--port) command-line option.
-
-dit(bf(address)) You can override the default IP address the daemon
-will listen on by specifying this value.  This is ignored if the daemon is
-being run by inetd, and is superseded by the bf(--address) command-line option.
 
 dit(bf(max connections)) The "max connections" option allows you to
 specify the maximum number of simultaneous connections you will allow.
