@@ -914,8 +914,15 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				if (hard_link_one(file, ndx, fname, -1, &st,
 						  fnamecmpbuf, 1,
 						  itemizing && verbose > 1,
-						  code) == 0)
+						  code) == 0) {
+					if (preserve_hard_links
+					    && file->link_u.links) {
+						hard_link_cluster(file, ndx,
+								  itemizing,
+								  code);
+					}
 					return;
+				}
 				match_level = 2;
 			}
 #endif
