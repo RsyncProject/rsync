@@ -30,12 +30,23 @@ echo "This is the file" > "$name1"
 ln "$name1" "$name2" || fail "Can't create hardlink"
 ln "$name2" "$name3" || fail "Can't create hardlink"
 cp "$name2" "$name4" || fail "Can't copy file"
+cat $srcdir/*.c >"$fromdir/text"
 
 checkit "$RSYNC -aHivv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
-rm -rf "$todir"
+
+echo "extra extra" >>"$todir/name1"
+
+checkit "$RSYNC -aHivv --no-whole-file \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+
+mkdir "$fromdir/subdir"
+ln "$name1" "$fromdir/subdir/new-file"
+rm "$todir/text"
+
+checkit "$RSYNC -aHivv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
 # Make sure there's nothing wrong with sending a single file with -H
 # enabled (this has broken twice so far, so we need this test).
+rm -rf "$todir"
 $RSYNC -aHivv "$name1" "$todir/"
 diff $diffopt "$name1" "$todir" || test_fail "solo copy of name1 failed"
 
