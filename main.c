@@ -163,7 +163,9 @@ static void handle_stats(int f)
 
 	/* this is the client */
 
-	if (!am_sender) {
+	if (f < 0 && !am_sender) /* e.g. when we got an empty file list. */
+		; 
+	else if (!am_sender) {
 		/* Read the first two in opposite order because the meaning of
 		 * read/write swaps when switching from sender to receiver. */
 		total_written = read_longint(f);
@@ -808,17 +810,16 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	if (write_batch && !am_server)
 		start_write_batch(f_in);
 	flist = recv_file_list(f_in);
-	if (!flist || flist->count == 0) {
-		rprintf(FINFO, "client: nothing to do: "
-			"perhaps you need to specify some filenames or "
-			"the --recursive option?\n");
-		exit_cleanup(0);
-	}
 	the_file_list = flist;
 
-	local_name = get_local_name(flist,argv[0]);
+	if (flist && flist->count > 0) {
+		local_name = get_local_name(flist, argv[0]);
 
-	status2 = do_recv(f_in,f_out,flist,local_name);
+		status2 = do_recv(f_in, f_out, flist, local_name);
+	} else {
+		handle_stats(-1);
+		output_summary();
+	}
 
 	if (pid != -1) {
 		if (verbose > 3)
