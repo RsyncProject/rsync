@@ -20,7 +20,7 @@ rm "$todir/text"
 runtest "one file" 'checkit "$RSYNC -avH \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
 
 echo "extra line" >> "$todir/text"
-runtest "extra data" 'checkit "$RSYNC -avH \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
+runtest "extra data" 'checkit "$RSYNC -avH --no-whole-file \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
 
 cp "$fromdir/text" "$todir/ThisShouldGo"
 runtest " --delete" 'checkit "$RSYNC --delete -avH \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
