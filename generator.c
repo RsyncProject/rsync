@@ -829,7 +829,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (preserve_hard_links && hard_link_check(file, ndx, HL_CHECK_MASTER))
+	if (preserve_hard_links
+	    && hard_link_check(file, ndx, fname, statret, &st,
+			       itemizing, code, HL_CHECK_MASTER))
 		return;
 
 	if (!S_ISREG(file->mode)) {
@@ -914,11 +916,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 						  itemizing && verbose > 1,
 						  code) == 0)
 					return;
-				if (verbose) {
-					rsyserr(FINFO, errno, "link %s => %s",
-						full_fname(fnamecmpbuf),
-						safe_fname(fname));
-				}
 				match_level = 2;
 			}
 #endif
@@ -987,7 +984,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (statret != 0) {
-		if (preserve_hard_links && hard_link_check(file, ndx, HL_SKIP))
+		if (preserve_hard_links
+		    && hard_link_check(file, ndx, fname, statret, &st,
+				       itemizing, code, HL_SKIP))
 			return;
 		if (stat_errno == ENOENT)
 			goto notify_others;
@@ -1045,7 +1044,9 @@ prepare_to_open:
 			full_fname(fnamecmp));
 	    pretend_missing:
 		/* pretend the file didn't exist */
-		if (preserve_hard_links && hard_link_check(file, ndx, HL_SKIP))
+		if (preserve_hard_links
+		    && hard_link_check(file, ndx, fname, statret, &st,
+				       itemizing, code, HL_SKIP))
 			return;
 		statret = real_ret = -1;
 		goto notify_others;
