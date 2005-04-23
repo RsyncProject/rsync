@@ -27,6 +27,9 @@ extern struct file_list *the_file_list;
 
 #ifdef SUPPORT_HARD_LINKS
 
+#define SKIPPED_LINK (-1)
+#define FINISHED_LINK (-2)
+
 #define FPTR(i) (the_file_list->files[i])
 #define LINKED(p1,p2) (FPTR(p1)->F_DEV == FPTR(p2)->F_DEV \
 		    && FPTR(p1)->F_INODE == FPTR(p2)->F_INODE)
@@ -133,18 +136,67 @@ void init_hard_links(void)
 #endif
 }
 
-int hard_link_check(struct file_struct *file, int ndx, int skip)
+#ifdef SUPPORT_HARD_LINKS
+static int maybe_hard_link(struct file_struct *file, int ndx,
+			   char *fname, int statret, STRUCT_STAT *st,
+			   char *toname, STRUCT_STAT *to_st,
+			   int itemizing, enum logcode code)
+{
+	if (statret == 0) {
+		if (st->st_dev == to_st->st_dev
+		 && st->st_ino == to_st->st_ino) {
+			if (itemizing) {
+				itemize(file, ndx, statret, st,
+					ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS,
+					0, "");
+			}
+			return 0;
+		}
+		if (make_backups) {
+			if (!make_backup(fname))
+				return -1;
+		} else if (robust_unlink(fname)) {
+			rsyserr(FERROR, errno, "unlink %s failed",
+				full_fname(fname));
+			return -1;
+		}
+	}
+	return hard_link_one(file, ndx, fname, statret, st, toname,
+			     0, itemizing, code);
+}
+#endif
+
+int hard_link_check(struct file_struct *file, int ndx, char *fname,
+		    int statret, STRUCT_STAT *st, int itemizing,
+		    enum logcode code, int skip)
 {
 #ifdef SUPPORT_HARD_LINKS
+	int head;
 	if (!file->link_u.links)
 		return 0;
 	if (skip && !(file->flags & FLAG_HLINK_EOL))
-		hlink_list[file->F_HLINDEX] = file->F_NEXT;
-	if (hlink_list[file->F_HLINDEX] != ndx) {
+		head = hlink_list[file->F_HLINDEX] = file->F_NEXT;
+	else
+		head = hlink_list[file->F_HLINDEX];
+	if (ndx != head) {
+		struct file_struct *head_file = FPTR(head);
 		if (verbose > 2) {
 			rprintf(FINFO, "\"%s\" is a hard link\n",
 				safe_fname(f_name(file)));
 		}
+		if (head_file->F_HLINDEX == FINISHED_LINK) {
+			STRUCT_STAT st2;
+			char *toname = f_name(head_file);
+			if (link_stat(toname, &st2, 0) < 0) {
+				rsyserr(FERROR, errno, "stat %s failed",
+					full_fname(toname));
+				return -1;
+			}
+			maybe_hard_link(file, ndx, fname, statret, st,
+					toname, &st2, itemizing, code);
+			file->F_HLINDEX = FINISHED_LINK;
+		} else
+			file->F_HLINDEX = SKIPPED_LINK;
 		return 1;
 	}
 #endif
@@ -157,10 +209,14 @@ int hard_link_one(struct file_struct *file, int ndx, char *fname,
 		  int itemizing, enum logcode code)
 {
 	if (do_link(toname, fname)) {
-		if (verbose) {
-			rsyserr(FERROR, errno, "link %s => %s failed",
-				full_fname(fname), safe_fname(toname));
-		}
+		if (terse) {
+			if (!verbose)
+				return -1;
+			code = FINFO;
+		} else
+			code = FERROR;
+		rsyserr(code, errno, "link %s => %s failed",
+			full_fname(fname), safe_fname(toname));
 		return -1;
 	}
 
@@ -187,6 +243,7 @@ void hard_link_cluster(struct file_struct *file, int master, int itemizing,
 	STRUCT_STAT st1, st2;
 	int statret, ndx = master;
 
+	file->F_HLINDEX = FINISHED_LINK;
 	if (link_stat(f_name_to(file, hlink1), &st1, 0) < 0)
 		return;
 	if (!(file->flags & FLAG_HLINK_TOL)) {
@@ -198,33 +255,13 @@ void hard_link_cluster(struct file_struct *file, int master, int itemizing,
 	do {
 		ndx = file->F_NEXT;
 		file = FPTR(ndx);
-		if (ndx == master)
+		if (file->F_HLINDEX != SKIPPED_LINK)
 			continue;
 		hlink2 = f_name(file);
-		if ((statret = link_stat(hlink2, &st2, 0)) == 0) {
-			if (st2.st_dev == st1.st_dev
-			    && st2.st_ino == st1.st_ino) {
-				if (itemizing) {
-					itemize(file, ndx, statret, &st2,
-						ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS,
-						0, "");
-				}
-				continue;
-			}
-			if (make_backups) {
-				if (!make_backup(hlink2))
-					continue;
-			} else if (robust_unlink(hlink2)) {
-				if (verbose > 0) {
-					rsyserr(FINFO, errno,
-						"unlink %s failed",
-						full_fname(hlink2));
-				}
-				continue;
-			}
-		}
-		hard_link_one(file, ndx, hlink2, statret,
-			      &st2, hlink1, 0, itemizing, code);
+		statret = link_stat(hlink2, &st2, 0);
+		maybe_hard_link(file, ndx, hlink2, statret, &st2,
+				hlink1, &st1, itemizing, code);
+		file->F_HLINDEX = FINISHED_LINK;
 	} while (!(file->flags & FLAG_HLINK_EOL));
 #endif
 }
