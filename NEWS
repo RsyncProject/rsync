@@ -8,6 +8,9 @@ Changes since 2.6.4:
       not have chroot enabled, and used some anchored excludes in the
       rsyncd.conf file.
 
+    - Fixed a bug in the transfer of a single file when -H is specified
+      that might have caused an infininte loop or perhaps a crash.
+
     - Fixed a case where the generator might try to tweak the write
       permissions of a read-only directory in list-only mode.
 
@@ -27,6 +30,17 @@ Changes since 2.6.4:
 
     - When --existing skips a directory with extra verbosity, don't refer
       to it as a "file".
+
+    - When transferring a single file to a different-named file, any
+      generator messages that are source-file related no longer refer to
+      the file by the destination filename.
+
+    - Fixed a bug where hard-linking a group of files might fail if the
+      generator hasn't created the destination directory yet.
+
+    - Fixed a bug where a hard-linked group of files that is newly-linked
+      to a file in a --link-dest dir doesn't link the files from the rest
+      of the cluster.
 
   ENHANCEMENTS:
 
