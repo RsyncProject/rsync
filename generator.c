@@ -210,7 +210,7 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 	struct file_list *dirlist;
 	char delbuf[MAXPATHLEN];
 	STRUCT_STAT st;
-	int dlen, i, j;
+	int dlen, i;
 
 	if (!flist) {
 		while (cur_depth >= min_depth)
@@ -225,9 +225,6 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 
 	if (allowed_lull)
 		maybe_send_keepalive();
-
-	if (file->flags & FLAG_MOUNT_POINT)
-		return;
 
 	if (file->dir.depth >= MAXPATHLEN/2+1)
 		return; /* Impossible... */
@@ -252,8 +249,12 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 	if (link_stat(fbuf, &st, keep_dirlinks) < 0)
 		return;
 
-	if (one_file_system && file->flags & FLAG_TOP_DIR)
-		filesystem_dev = st.st_dev;
+	if (one_file_system) {
+		if (file->flags & FLAG_TOP_DIR)
+			filesystem_dev = st.st_dev;
+		else if (filesystem_dev != st.st_dev)
+			return;
+	}
 
 	dirlist = get_dirlist(fbuf, dlen, 0);
 
@@ -263,13 +264,12 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 		struct file_struct *fp = dirlist->files[i];
 		if (!fp->basename)
 			continue;
-		if ((j = flist_find(flist, fp)) < 0) {
+		if (flist_find(flist, fp) < 0) {
 			int mode = fp->mode;
 			f_name_to(fp, delbuf);
 			if (delete_item(delbuf, mode, DEL_FORCE_RECURSE) < 0)
 				break;
-		} else if (fp->flags & FLAG_MOUNT_POINT)
-			flist->files[j]->flags |= FLAG_MOUNT_POINT;
+		}
 	}
 
 	flist_free(dirlist);
