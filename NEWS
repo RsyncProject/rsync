@@ -42,6 +42,10 @@ Changes since 2.6.4:
       to a file in a --link-dest dir doesn't link the files from the rest
       of the cluster.
 
+    - When deleting files with the --one-file-system (-x) option set, rsync
+      no longer tries to remove files from inside a mount-point on the
+      receiving side.
+
   ENHANCEMENTS:
 
     - Added the --only-write-batch=FILE option that may be used (instead
