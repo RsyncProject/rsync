@@ -31,8 +31,8 @@ die "Not invoked via sshd\n$Usage"	unless defined $command;
 die "SSH_ORIGINAL_COMMAND='$command' is not rsync\n" unless $command =~ /^rsync\s/;
 die "$0 -ro: sending to read-only server not allowed\n"
 	if $ro and $command !~ /^rsync --server --sender /;
-die "$0 -ro: use of --remove-sent-files with read-only server not allowed\n"
-	if $ro and $command =~ /\s--remove-sent-files/;
+die "$0 -ro: use of $1 with read-only server not allowed\n"
+	if $ro and $command =~ /\s(--remove-\S+)/;
 
 my ($cmd,$dir) = $command =~ /^(rsync\s+(?:-[-a-zA-Z]+\s+)+\.) ?("[^"]*"|[^\s"]*)$/;
 die "$0: invalid rsync-command syntax or options\n" if !defined $cmd;
