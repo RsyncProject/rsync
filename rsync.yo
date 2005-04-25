@@ -1080,7 +1080,7 @@ quote(itemize(
   (sent).
   it() A bf(>) means that a file is being transferred to the local host
   (received).
-  it() A bf(c) means that a local change/creation is occuring for the item
+  it() A bf(c) means that a local change/creation is occurring for the item
   (such as the creation of a directory or the changing of a symlink, etc.).
   it() A bf(h) means that the item is a hard-link to another item (requires
   bf(--hard-links)).
@@ -1102,7 +1102,7 @@ The attribute that is associated with each letter is as follows:
 
 quote(itemize(
   it() A bf(c) means the checksum of the file is different and will be
-  updated by the file transfer (requries bf(--checksum)).
+  updated by the file transfer (requires bf(--checksum)).
   it() A bf(s) means the size of the file is different and will be updated
   by the file transfer.
   it() A bf(t) means the modification time is different and is being updated
