@@ -38,11 +38,20 @@ echo "extra extra" >>"$todir/name1"
 
 checkit "$RSYNC -aHivv --no-whole-file \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
+# Add a new link in a new subdirectory to test that we don't try to link
+# the files before the directory gets created.
 mkdir "$fromdir/subdir"
 ln "$name1" "$fromdir/subdir/new-file"
 rm "$todir/text"
 
 checkit "$RSYNC -aHivv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+
+# Do some duplicate copies using --link-dest and --copy-dest to test that
+# we hard-link all locally-inherited items.
+checkit "$RSYNC -aHivv --link-dest=\"$todir\" \"$fromdir/\" \"$chkdir/\"" "$todir" "$chkdir"
+
+rm -rf "$chkdir"
+checkit "$RSYNC -aHivv --copy-dest=\"$todir\" \"$fromdir/\" \"$chkdir/\"" "$fromdir" "$chkdir"
 
 # Make sure there's nothing wrong with sending a single file with -H
 # enabled (this has broken twice so far, so we need this test).
