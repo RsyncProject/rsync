@@ -46,6 +46,9 @@ Changes since 2.6.4:
       no longer tries to remove files from inside a mount-point on the
       receiving side.
 
+    - Fixed a compatibility problem when usig --cvs-ignore (-C) and sending
+      files to an older rsync without using --delete.
+
   ENHANCEMENTS:
 
     - Added the --only-write-batch=FILE option that may be used (instead
