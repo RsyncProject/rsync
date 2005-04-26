@@ -715,7 +715,6 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 			if ((s = RULE_STRCMP(s, "show")) != NULL)
 				ch = 'S';
 			break;
-
 		default:
 			ch = *s;
 			if (s[1] == ',')
@@ -1108,7 +1107,7 @@ static void send_rules(int f_out, struct filter_list_struct *flp)
 		    && !(ent->match_flags & MATCHFLG_MERGE_FILE)) {
 			int f = am_sender || protocol_version < 29 ? f_out : -1;
 			send_rules(f, &cvs_filter_list);
-			if (f >= 0)
+			if (f >= 0 || f_out < 0)
 				continue;
 		}
 		p = get_rule_prefix(ent->match_flags, ent->pattern, 1, &plen);
