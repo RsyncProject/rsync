@@ -1194,8 +1194,11 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 			: "enabled");
 	}
 
-	if (protocol_version < 29)
-		ignore_timeout = 1;
+	/* Since we often fill up the outgoing socket and then just sit around
+	 * waiting for the other 2 processes to do their thing, we don't want
+	 * to exit on a timeout.  If the data stops flowing, the receiver will
+	 * notice that and let us know via the redo pipe (or its closing). */
+	ignore_timeout = 1;
 
 	for (i = 0; i < flist->count; i++) {
 		struct file_struct *file = flist->files[i];
@@ -1240,10 +1243,6 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	update_only = always_checksum = size_only = 0;
 	ignore_times = 1;
 	make_backups = 0; /* avoid a duplicate backup for inplace processing */
-
-	/* We expect to just sit around now, so don't exit on a timeout.
-	 * If we really get a timeout then the other process should exit. */
-	ignore_timeout = 1;
 
 	if (verbose > 2)
 		rprintf(FINFO,"generate_files phase=%d\n",phase);
