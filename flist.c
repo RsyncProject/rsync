@@ -655,6 +655,9 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 		if (flags & XMIT_TOP_DIR) {
 			in_del_hier = 1;
 			del_hier_name_len = file->dir.depth == 0 ? 0 : l1 + l2;
+			if (relative_paths && del_hier_name_len > 2
+			    && basename_len == 1+1 && *basename == '.')
+				del_hier_name_len -= 2;
 			file->flags |= FLAG_TOP_DIR | FLAG_DEL_HERE;
 		} else if (in_del_hier) {
 			if (!relative_paths || !del_hier_name_len
