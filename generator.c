@@ -726,16 +726,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (max_size && file->length > max_size) {
-		if (verbose > 1) {
-			if (the_file_list->count == 1)
-				fname = f_name(file);
-			rprintf(FINFO, "%s is over max-size\n",
-				safe_fname(fname));
-		}
-		return;
-	}
-
 	if (preserve_links && S_ISLNK(file->mode)) {
 #ifdef SUPPORT_LINKS
 		if (safe_symlinks && unsafe_symlink(file->u.link, fname)) {
@@ -844,6 +834,16 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			fname = f_name(file);
 		rprintf(FINFO, "skipping non-regular file \"%s\"\n",
 			safe_fname(fname));
+		return;
+	}
+
+	if (max_size && file->length > max_size) {
+		if (verbose > 1) {
+			if (the_file_list->count == 1)
+				fname = f_name(file);
+			rprintf(FINFO, "%s is over max-size\n",
+				safe_fname(fname));
+		}
 		return;
 	}
 
