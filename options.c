@@ -622,6 +622,35 @@ static int count_args(const char **argv)
 }
 
 
+static OFF_T parse_size_arg(const char *size_arg)
+{
+	const char *arg;
+	OFF_T size;
+
+	for (arg = size_arg; isdigit(*(uchar*)arg); arg++) {}
+	if (*arg == '.')
+		for (arg++; isdigit(*(uchar*)arg); arg++) {}
+	switch (*arg) {
+	case 'k': case 'K':
+		size = atof(size_arg) * 1024;
+		break;
+	case 'm': case 'M':
+		size = atof(size_arg) * 1024*1024;
+		break;
+	case 'g': case 'G':
+		size = atof(size_arg) * 1024*1024*1024;
+		break;
+	case '\0':
+		size = atof(size_arg);
+		break;
+	default:
+		size = 0;
+		break;
+	}
+	return size;
+}
+
+
 static void create_refuse_error(int which)
 {
 	/* The "which" value is the index + OPT_REFUSED_BASE. */
@@ -807,27 +836,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			break;
 
 		case OPT_MAX_SIZE:
-			for (arg = max_size_arg; isdigit(*(uchar*)arg); arg++) {}
-			if (*arg == '.')
-				for (arg++; isdigit(*(uchar*)arg); arg++) {}
-			switch (*arg) {
-			case 'k': case 'K':
-				max_size = atof(max_size_arg) * 1024;
-				break;
-			case 'm': case 'M':
-				max_size = atof(max_size_arg) * 1024*1024;
-				break;
-			case 'g': case 'G':
-				max_size = atof(max_size_arg) * 1024*1024*1024;
-				break;
-			case '\0':
-				max_size = atof(max_size_arg);
-				break;
-			default:
-				max_size = 0;
-				break;
-			}
-			if (max_size <= 0) {
+			if ((max_size = parse_size_arg(max_size_arg)) <= 0) {
 				snprintf(err_buf, sizeof err_buf,
 					"--max-size value is invalid: %s\n",
 					max_size_arg);
