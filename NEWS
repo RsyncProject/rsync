@@ -9,7 +9,7 @@ Changes since 2.6.4:
       rsyncd.conf file.
 
     - Fixed a bug in the transfer of a single file when -H is specified
-      that might have caused an infininte loop or perhaps a crash.
+      that might have caused an infinite loop or perhaps a crash.
 
     - Fixed a case where the generator might try to tweak the write
       permissions of a read-only directory in list-only mode.
@@ -46,8 +46,8 @@ Changes since 2.6.4:
       no longer tries to remove files from inside a mount-point on the
       receiving side.
 
-    - Fixed a compatibility problem when usig --cvs-ignore (-C) and sending
-      files to an older rsync without using --delete.
+    - Fixed a compatibility problem when using --cvs-ignore (-C) and
+      sending files to an older rsync without using --delete.
 
   ENHANCEMENTS:
 
