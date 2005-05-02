@@ -374,7 +374,7 @@ to the detailed description below for a complete description.  verb(
      --include=PATTERN       don't exclude files matching PATTERN
      --include-from=FILE     read include patterns from FILE
      --files-from=FILE       read list of source-file names from FILE
- -0, --from0                 all *from file lists are delimited by nulls
+ -0, --from0                 all *from/filter files are delimited by 0s
      --version               print version number
      --address=ADDRESS       bind address for outgoing socket to daemon
      --port=PORT             specify double-colon alternate port number
@@ -935,7 +935,7 @@ quote(tt(   rsync -a --files-from=:/path/file-list src:/ /tmp/copy))
 This would copy all the files specified in the /path/file-list file that
 was located on the remote "src" host.
 
-dit(bf(-0, --from0)) This tells rsync that the filenames it reads from a
+dit(bf(-0, --from0)) This tells rsync that the rules/filenames it reads from a
 file are terminated by a null ('\0') character, not a NL, CR, or CR+LF.
 This affects bf(--exclude-from), bf(--include-from), bf(--files-from), and any
 merged files specified in a bf(--filter) rule.
