@@ -27,6 +27,9 @@ Changes since 2.6.3:
       is also output prior to the transfer is when --progress was specified
       (so that the name will precede the progress stats, and the full
       --log-format output will come after).
+
+    - Filenames have non-printable characters replaced with a '?' to avoid
+      corrupting the screen or generating empty lines in the output.
   
   BUG FIXES:
 
@@ -1427,6 +1430,7 @@ Changes since 2.4.6:
 
 Partial Protocol History
 	RELEASE DATE	VER.	DATE OF COMMIT*	PROTOCOL
+	?? May 2005	2.6.5			29
 	30 Mar 2005	2.6.4	17 Jan 2005	29
 	30 Sep 2004	2.6.3			28
 	30 Apr 2004	2.6.2			28
