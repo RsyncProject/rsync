@@ -331,7 +331,7 @@ void usage(enum logcode F)
   rprintf(F,"     --include=PATTERN       don't exclude files matching PATTERN\n");
   rprintf(F,"     --include-from=FILE     read include patterns from FILE\n");
   rprintf(F,"     --files-from=FILE       read list of source-file names from FILE\n");
-  rprintf(F," -0, --from0                 all *-from file lists are delimited by nulls\n");
+  rprintf(F," -0, --from0                 all *-from/filter files are delimited by 0s\n");
   rprintf(F,"     --version               print version number\n");
   rprintf(F,"     --address=ADDRESS       bind address for outgoing socket to daemon\n");
   rprintf(F,"     --port=PORT             specify double-colon alternate port number\n");
