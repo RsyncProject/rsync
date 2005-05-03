@@ -2,6 +2,15 @@ NEWS for rsync 2.6.5 (UNRELEASED)
 Protocol: 29 (unchanged)
 Changes since 2.6.4:
 
+  OUTPUT CHANGES:
+
+    - Non-printable chars in filenames are now output using backslash-
+      escaped characters rather than '?'s.  Any non-printable character is
+      output using 3 digits of octal (e.g. "\n" -> "\012"), and a backslash
+      is now output as "\\".  Rsync also uses your locale setting, which
+      should make it treat fewer high-bit characters as non-printable, as
+      appropriate.
+
   BUG FIXES:
 
     - A crash bug was fixed when a daemon had its "path" set to "/", did
@@ -57,9 +66,10 @@ Changes since 2.6.4:
       the file-updating data away from a slow data link (as long as you
       are pushing the data to the remote server when creating the batch).
 
-    - Changed the outputting of "safe" filenames to use backslash-escaped
-      characters rather than '?'s.  Any non-printable character is output
-      using octal (e.g. "\n" -> "\012"), and backslash is output as "\\".
+    - When the generator is taking a long time to fill up its output buffer
+      (e.g. if the transferred files are few, small, or missing), it now
+      periodically flushes the output buffer so that the sender/receiver
+      can get started on the files sooner rather than later.
 
     - Improved the auth-errors that are logged by the daemon to include
       some information on why the authorization failed (wrong user,
