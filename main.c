@@ -296,7 +296,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 
 		for (tok = strtok(cmd, " "); tok; tok = strtok(NULL, " ")) {
 			/* Comparison leaves rooms for server_options(). */
-			if (argc >= MAX_ARGS - 100) {
+			if (argc >= MAX_ARGS - MAX_SERVER_ARGS) {
 				rprintf(FERROR, "internal: args[] overflowed in do_cmd()\n");
 				exit_cleanup(RERR_SYNTAX);
 			}
