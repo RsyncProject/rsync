@@ -892,7 +892,7 @@ char *safe_fname(const char *fname)
 	char *t;
 
 	ndx = (ndx + 1) % MAX_SAFE_NAMES;
-	for (t = fbuf[ndx]; *fname && limit; fname++) {
+	for (t = fbuf[ndx]; *fname; fname++) {
 		if (*fname == '\\') {
 			if ((limit -= 2) < 0)
 				break;
@@ -904,7 +904,8 @@ char *safe_fname(const char *fname)
 			sprintf(t, "\\%03o", *(uchar*)fname);
 			t += 4;
 		} else {
-			limit--;
+			if (--limit < 0)
+				break;
 			*t++ = *fname;
 		}
 	}
