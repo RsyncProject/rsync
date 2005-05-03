@@ -103,8 +103,8 @@
 #define IOERR_DEL_LIMIT (1<<2)
 
 #define MAX_ARGS 1000
-
 #define MAX_BASIS_DIRS 20
+#define MAX_SERVER_ARGS (MAX_BASIS_DIRS*2 + 100)
 
 #define MPLEX_BASE 7
 
