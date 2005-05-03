@@ -375,7 +375,6 @@ to the detailed description below for a complete description.  verb(
      --include-from=FILE     read include patterns from FILE
      --files-from=FILE       read list of source-file names from FILE
  -0, --from0                 all *from/filter files are delimited by 0s
-     --version               print version number
      --address=ADDRESS       bind address for outgoing socket to daemon
      --port=PORT             specify double-colon alternate port number
      --blocking-io           use blocking I/O for the remote shell
@@ -384,7 +383,7 @@ to the detailed description below for a complete description.  verb(
      --progress              show progress during transfer
  -P                          same as --partial --progress
  -i, --itemize-changes       output a change-summary for all updates
-     --log-format=FORMAT     log file-transfers using specified format
+     --log-format=FORMAT     output filenames using the specified format
      --password-file=FILE    read password from FILE
      --list-only             list the files instead of copying them
      --bwlimit=KBPS          limit I/O bandwidth; KBytes per second
@@ -395,6 +394,7 @@ to the detailed description below for a complete description.  verb(
      --checksum-seed=NUM     set block/file checksum seed (advanced)
  -4, --ipv4                  prefer IPv4
  -6, --ipv6                  prefer IPv6
+     --version               print version number
  -h, --help                  show this help screen)
 
 Rsync can also be run as a daemon, in which case the following options are
@@ -434,7 +434,7 @@ you are debugging rsync.
 
 Note that the names of the transferred files that are output are done using
 a default bf(--log-format) of "%n%L", which tells you just the name of the
-file and, if the item is a symlink, where it points.  At the single bf(-v)
+file and, if the item is a link, where it points.  At the single bf(-v)
 level of verbosity, this does not mention when a file gets its attributes
 changed.  If you ask for an itemized list of changed attributes (either
 bf(--itemize-changes) or adding "%i" to the bf(--log-format) setting), the
@@ -1097,7 +1097,7 @@ will be output if the associated attribute for the item is being updated or
 a "." for no change.  Three exceptions to this are: (1) a newly created
 item replaces each letter with a "+", (2) an identical item replaces the
 dots with spaces, and (3) an unknown attribute replaces each letter with
-a "?" (this happens when talking to an older rsync).
+a "?" (this can happen when talking to an older rsync).
 
 The attribute that is associated with each letter is as follows:
 
@@ -1137,7 +1137,7 @@ Specifying this option will mention each file, dir, etc. that gets updated
 in a significant way (a transferred file, a recreated symlink/device, or a
 touched directory) unless the itemized-changes escape (%i) is included in
 the string, in which case the logging of names increases to mention any
-item that is updated in any way (as long as the receiving side is version
+item that is changed in any way (as long as the receiving side is at least
 2.6.4).  See the bf(--itemized-changes) option for a description of the
 output of "%i".
 
@@ -1314,9 +1314,9 @@ dit(bf(--protocol=NUM)) Force an older protocol version to be used.  This
 is useful for creating a batch file that is compatible with an older
 version of rsync.  For instance, if rsync 2.6.4 is being used with the
 bf(--write-batch) option, but rsync 2.6.3 is what will be used to run the
-bf(--read-batch) option, you should use "--protocol=28" (when creating the
-batch file) to force the older protocol version to be used in the batch
-file (assuming you can't upgrade the rsync on the reading system to 2.6.4).
+bf(--read-batch) option, you should use "--protocol=28" when creating the
+batch file to force the older protocol version to be used in the batch
+file (assuming you can't upgrade the rsync on the reading system).
 
 dit(bf(-4, --ipv4) or bf(-6, --ipv6)) Tells rsync to prefer IPv4/IPv6
 when creating sockets.  This only affects sockets that rsync has direct
