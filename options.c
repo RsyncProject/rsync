@@ -332,7 +332,6 @@ void usage(enum logcode F)
   rprintf(F,"     --include-from=FILE     read include patterns from FILE\n");
   rprintf(F,"     --files-from=FILE       read list of source-file names from FILE\n");
   rprintf(F," -0, --from0                 all *-from/filter files are delimited by 0s\n");
-  rprintf(F,"     --version               print version number\n");
   rprintf(F,"     --address=ADDRESS       bind address for outgoing socket to daemon\n");
   rprintf(F,"     --port=PORT             specify double-colon alternate port number\n");
   rprintf(F,"     --blocking-io           use blocking I/O for the remote shell\n");
@@ -341,7 +340,7 @@ void usage(enum logcode F)
   rprintf(F,"     --progress              show progress during transfer\n");
   rprintf(F," -P                          same as --partial --progress\n");
   rprintf(F," -i, --itemize-changes       output a change-summary for all updates\n");
-  rprintf(F,"     --log-format=FORMAT     log file-transfers using specified format\n");
+  rprintf(F,"     --log-format=FORMAT     output filenames using the specified format\n");
   rprintf(F,"     --password-file=FILE    read password from FILE\n");
   rprintf(F,"     --list-only             list the files instead of copying them\n");
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth; KBytes per second\n");
@@ -353,6 +352,7 @@ void usage(enum logcode F)
   rprintf(F," -4, --ipv4                  prefer IPv4\n");
   rprintf(F," -6, --ipv6                  prefer IPv6\n");
 #endif
+  rprintf(F,"     --version               print version number\n");
   rprintf(F," -h, --help                  show this help screen\n");
 
   rprintf(F,"\nUse \"rsync --daemon --help\" to see the daemon-mode command-line options.\n");
@@ -1267,7 +1267,7 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'b';
 	if (update_only)
 		argstr[x++] = 'u';
-	if (!do_xfers)
+	if (!do_xfers) /* NOT "dry_run"! */
 		argstr[x++] = 'n';
 	if (preserve_links)
 		argstr[x++] = 'l';
