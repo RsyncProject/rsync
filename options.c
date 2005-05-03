@@ -1236,7 +1236,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
  **/
 void server_options(char **args,int *argc)
 {
-	static char argstr[50+MAX_BASIS_DIRS*2];
+	static char argstr[64];
 	int ac = *argc;
 	char *arg;
 
