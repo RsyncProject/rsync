@@ -5,7 +5,7 @@ manpagesynopsis()
 
 rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST
 
-rsync [OPTION]... [USER@]HOST:SRC DEST
+rsync [OPTION]... [USER@]HOST:SRC [DEST]
 
 rsync [OPTION]... SRC [SRC]... DEST
 

@@ -251,7 +251,7 @@ void usage(enum logcode F)
   rprintf(F,"\nrsync is a file transfer program capable of efficient remote update\nvia a fast differencing algorithm.\n\n");
 
   rprintf(F,"Usage: rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST\n");
-  rprintf(F,"  or   rsync [OPTION]... [USER@]HOST:SRC DEST\n");
+  rprintf(F,"  or   rsync [OPTION]... [USER@]HOST:SRC [DEST]\n");
   rprintf(F,"  or   rsync [OPTION]... SRC [SRC]... DEST\n");
   rprintf(F,"  or   rsync [OPTION]... [USER@]HOST::SRC [DEST]\n");
   rprintf(F,"  or   rsync [OPTION]... SRC [SRC]... [USER@]HOST::DEST\n");
