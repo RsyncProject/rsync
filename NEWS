@@ -11,7 +11,7 @@ Changes since 2.6.4:
       can make it treat fewer high-bit characters as non-printable.
 
     - If rsync received an empty file list when pulling files, it would
-      output an "nothing to do" message and exit with a 0 (success) exit
+      output a "nothing to do" message and exit with a 0 (success) exit
       status, even if the remote rsync returned an error (it did not do
       this under the same conditions when pushing files).  This was changed
       to make the pulling behavior the same as the pushing behavior:  we
