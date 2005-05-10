@@ -8,14 +8,13 @@ Changes since 2.6.4:
       escaped characters rather than '?'s.  Any non-printable character is
       output using 3 digits of octal (e.g. "\n" -> "\012"), and a backslash
       is now output as "\\".  Rsync also uses your locale setting, which
-      should make it treat fewer high-bit characters as non-printable (when
-      appropriate).
+      can make it treat fewer high-bit characters as non-printable.
 
     - If rsync received an empty file list when pulling files, it would
       output an "nothing to do" message and exit with a 0 (success) exit
       status, even if the remote rsync returned an error (it did not do
       this under the same conditions when pushing files).  This was changed
-      to make the pulling behavior the same as the pushing behavior -- we
+      to make the pulling behavior the same as the pushing behavior:  we
       now do the normal end-of-run outputting (depending on options) and
       exit with the appropriate exit status.
 
@@ -66,6 +65,10 @@ Changes since 2.6.4:
     - Fixed a compatibility problem when using --cvs-ignore (-C) and
       sending files to an older rsync without using --delete.
 
+    - Fixed the ommission of some directories in the delete processing when
+      --relative (-R) was combined with a source path that had a trailing
+      slash.
+
   ENHANCEMENTS:
 
     - Added the --only-write-batch=FILE option that may be used (instead
@@ -90,6 +93,9 @@ Changes since 2.6.4:
     - If the daemon can't open the log-file specified in rsyncd.conf, fall
       back to using syslog.  This is better than a (typically) totally
       silent failure (since a daemon is not usually run with --no-detach).
+
+    - The man pages now consistently refer to an rsync daemon as a "daemon"
+      to distinguish it from a server in a non-daemon transfer.
 
   INTERNAL:
 
