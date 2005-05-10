@@ -52,7 +52,7 @@ Changes since 2.6.4:
       the file by the destination filename.
 
     - Fixed a bug where hard-linking a group of files might fail if the
-      generator hasn't created the destination directory yet.
+      generator hasn't created a needed destination directory yet.
 
     - Fixed a bug where a hard-linked group of files that is newly-linked
       to a file in a --link-dest dir doesn't link the files from the rest
@@ -65,9 +65,21 @@ Changes since 2.6.4:
     - Fixed a compatibility problem when using --cvs-ignore (-C) and
       sending files to an older rsync without using --delete.
 
+    - Make sure that a "- !" or "+ !" include/exclude pattern does not
+      trigger the list-clearing action that is reserved for "!".
+
+    - Avoid a timeout in the generator when the sender/receiver aren't
+      handling the generator's checksum output quickly enough.
+
     - Fixed the ommission of some directories in the delete processing when
       --relative (-R) was combined with a source path that had a trailing
       slash.
+
+    - Make sure that --max-size doesn't affect a device or a symlink.
+
+    - Make sure that a system with a really small MAXPATHLEN does not cause
+      the buffers in readfd_unbuffered() to be too small to receive normal
+      messages.  (This mainly affected Cygwin.)
 
   ENHANCEMENTS:
 
@@ -97,9 +109,19 @@ Changes since 2.6.4:
     - The man pages now consistently refer to an rsync daemon as a "daemon"
       to distinguish it from a server in a non-daemon transfer.
 
+    - Made a small change to the rrsync script (restricted rsync -- in the
+      support dir) to make a read-only server reject all --remove-* options
+      when sending files (to future-proof it against the possibility of
+      other similar options being added at some point).
+
   INTERNAL:
 
     - Rsync now calls setlocale(LC_CTYPE, "").
+
+    - Improved the naming of the logfile-open/-reopen/-close functions.
+
+    - Removed some protocol compatibility code that was only needed to help
+      someone running a pre-release of 2.6.4.
 
   BUILD CHANGES:
 
@@ -114,3 +136,7 @@ Changes since 2.6.4:
     - Configure now explicitly checks for the lseek64() function so that
       the code can use HAVE_LSEEK64 instead of inferring lseek64()'s
       presence based on the presence of the off64_t type.
+
+    - Some minor enhancements to the test scripts.
+
+    - Added a couple new diffs to the patches dir.
