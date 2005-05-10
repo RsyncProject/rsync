@@ -44,41 +44,33 @@ itemize(
 
 manpagesection(GENERAL)
 
-There are eight different ways of using rsync. They are:
+Rsync copies files either to or from a remote host, or locally on the
+current host (it does not support copying files between two remote hosts).
 
-itemize(
-	it() for copying local files. This is invoked when neither
-	     source nor destination path contains a : separator
-	it() for copying from the local machine to a remote machine using
-	a remote shell program as the transport (such as ssh or
-	rsh). This is invoked when the destination path contains a
-	single : separator.
-	it() for copying from a remote machine to the local machine
-	using a remote shell program. This is invoked when the source
-	contains a : separator.
-	it() for copying from a remote rsync server to the local
-	machine. This is invoked when the source path contains a ::
-	separator or an rsync:// URL.
-	it() for copying from the local machine to a remote rsync
-	server. This is invoked when the destination path contains a ::
-	separator or an rsync:// URL.
-	it() for copying from a remote machine using a remote shell
-	program as the transport, using rsync server on the remote
-	machine.  This is invoked when the source path contains a ::
-	separator and the bf(--rsh=COMMAND) (aka "bf(-e COMMAND)") option is
-	also provided.
-	it() for copying from the local machine to a remote machine
-	using a remote shell program as the transport, using rsync
-	server on the remote machine.  This is invoked when the
-	destination path contains a :: separator and the
-	bf(--rsh=COMMAND) option is also provided.
-	it() for listing files on a remote machine. This is done the
-	same way as rsync transfers except that you leave off the
-	local destination.
-)
+There are two different ways for rsync to contact a remote system: using a
+remote-shell program as the transport (such as ssh or rsh) or contacting an
+rsync daemon directly via TCP.  The remote-shell transport is used whenever
+the source or destination path contains a single colon (:) separator after
+a host specification.  Contacting an rsync daemon directly happens when the
+source or destination path contains a double colon (::) separator after a
+host specification, OR when an rsync:// URL is specified.
 
-Note that in all cases (other than listing) at least one of the source
-and destination paths must be local.
+As a special case, if a remote source is specified without a destination,
+the remote files are listed in an output format similar to "ls -l".
+
+As expected, if neither the source or destination path specify a remote
+host, the copy occurs locally (see also the bf(--list-only) option).
+
+Finally, it is possible to use a remote-shell transport to contact a remote
+host and then to spawn a single-use rsync daemon.  This allows the use of
+some of the daemon features (such as named modules) without having to run a
+daemon as a service.  To achieve this, invoke rsync with an explicit
+bf(--rsh=COMMAND) (aka "bf(-e COMMAND)") option combined with either the
+source or destination path specified as an rsync daemon (i.e. either a ::
+separator or an rsync:// URL).  In this case, rsync contacts the remote
+host specified using the specified remote shell, and then starts a
+single-use rsync daemon to deal with that copy request.  See the section
+"CONNECTING TO AN RSYNC SERVER OVER A REMOTE SHELL PROGRAM" below.
 
 manpagesection(SETUP)
 
@@ -1272,9 +1264,11 @@ single line.
 dit(bf(--list-only)) This option will cause the source files to be listed
 instead of transferred.  This option is inferred if there is no destination
 specified, so you don't usually need to use it explicitly.  However, it can
-come in handy for a power user that wants to avoid the "bf(-r --exclude='/*/*')"
+come in handy for a user that wants to avoid the "bf(-r --exclude='/*/*')"
 options that rsync might use as a compatibility kluge when generating a
-non-recursive listing.
+non-recursive listing, or to list the files that are involved in a local
+copy (since the destination path is not optional for a local copy, you
+must specify this option explicitly and still include a destination).
 
 dit(bf(--bwlimit=KBPS)) This option allows you to specify a maximum
 transfer rate in kilobytes per second. This option is most effective when
@@ -2059,6 +2053,10 @@ see also the comments on the bf(--delete) option
 
 Please report bugs! See the website at
 url(http://rsync.samba.org/)(http://rsync.samba.org/)
+
+manpagesection(VERSION)
+
+This man page is current for version 2.6.4 of rsync.
 
 manpagesection(CREDITS)
 
