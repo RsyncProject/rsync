@@ -38,7 +38,7 @@ itemize(
   it() can use any transparent remote shell, including ssh or rsh
   it() does not require root privileges
   it() pipelining of file transfers to minimize latency costs
-  it() support for anonymous or authenticated rsync servers (ideal for
+  it() support for anonymous or authenticated rsync daemons (ideal for
        mirroring)
 )
 
@@ -70,7 +70,7 @@ source or destination path specified as an rsync daemon (i.e. either a ::
 separator or an rsync:// URL).  In this case, rsync contacts the remote
 host specified using the specified remote shell, and then starts a
 single-use rsync daemon to deal with that copy request.  See the section
-"CONNECTING TO AN RSYNC SERVER OVER A REMOTE SHELL PROGRAM" below.
+"CONNECTING TO AN RSYNC DAEMON OVER A REMOTE SHELL PROGRAM" below.
 
 manpagesection(SETUP)
 
@@ -179,10 +179,10 @@ tt(rsync -av host:file?name?with?spaces /dest)nl()
 This latter example assumes that your shell passes through unmatched
 wildcards.  If it complains about "no match", put the name in quotes.
 
-manpagesection(CONNECTING TO AN RSYNC SERVER)
+manpagesection(CONNECTING TO AN RSYNC DAEMON)
 
 It is also possible to use rsync without a remote shell as the
-transport. In this case you will connect to a remote rsync server
+transport. In this case you will connect to a remote rsync daemon
 running on TCP port 873.
 
 You may establish the connection via a web proxy by setting the
@@ -196,15 +196,15 @@ that:
 itemize(
 	it() you either use a double colon :: instead of a single colon to
 	separate the hostname from the path, or you use an rsync:// URL.
-	it() the remote server may print a message of the day when you
+	it() the remote daemon may print a message of the day when you
 	connect.
-	it() if you specify no path name on the remote server then the
-	list of accessible paths on the server will be shown.
+	it() if you specify no path name on the remote daemon then the
+	list of accessible paths on the daemon will be shown.
 	it() if you specify no local destination then a listing of the
-	specified files on the remote server is provided.
+	specified files on the remote daemon is provided.
 )
 
-Some paths on the remote server may require authentication. If so then
+Some paths on the remote daemon may require authentication. If so then
 you will receive a password prompt when you connect. You can avoid the
 password prompt by setting the environment variable RSYNC_PASSWORD to
 the password you want to use or using the bf(--password-file) option. This
@@ -213,24 +213,24 @@ may be useful when scripting rsync.
 WARNING: On some systems environment variables are visible to all
 users. On those systems using bf(--password-file) is recommended.
 
-manpagesection(CONNECTING TO AN RSYNC SERVER OVER A REMOTE SHELL PROGRAM)
+manpagesection(CONNECTING TO AN RSYNC DAEMON OVER A REMOTE SHELL PROGRAM)
 
 It is sometimes useful to be able to set up file transfers using rsync
-server capabilities on the remote machine, while still using ssh or
+daemon capabilities on the remote machine, while still using ssh or
 rsh for transport.  This is especially useful when you want to connect
 to a remote machine via ssh (for encryption or to get through a
-firewall), but you still want to have access to the rsync server
-features (see RUNNING AN RSYNC SERVER OVER A REMOTE SHELL PROGRAM,
+firewall), but you still want to have access to the rsync daemon
+features (see RUNNING AN RSYNC DAEMON OVER A REMOTE SHELL PROGRAM,
 below).
 
 From the user's perspective, using rsync in this way is the same as
-using it to connect to an rsync server, except that you must
+using it to connect to an rsync daemon, except that you must
 explicitly set the remote shell program on the command line with
 bf(--rsh=COMMAND).  (Setting RSYNC_RSH in the environment will not turn on
 this functionality.)
 
 In order to distinguish between the remote-shell user and the rsync
-server user, you can use '-l user' on your remote-shell command:
+daemon user, you can use '-l user' on your remote-shell command:
 
 verb(    rsync -av --rsh="ssh -l ssh-user" \ 
         rsync-user@host::module[/path] local-path)
@@ -238,26 +238,26 @@ verb(    rsync -av --rsh="ssh -l ssh-user" \
 The "ssh-user" will be used at the ssh level; the "rsync-user" will be
 used to check against the rsyncd.conf on the remote host.
 
-manpagesection(RUNNING AN RSYNC SERVER)
+manpagesection(RUNNING AN RSYNC DAEMON)
 
-An rsync server is configured using a configuration file.  Please see the
+An rsync daemon is configured using a configuration file.  Please see the
 rsyncd.conf(5) man page for more information.  By default the configuration
 file is called /etc/rsyncd.conf, unless rsync is running over a remote
 shell program and is not running as root; in that case, the default name
 is rsyncd.conf in the current directory on the remote computer
 (typically $HOME).
 
-manpagesection(RUNNING AN RSYNC SERVER OVER A REMOTE SHELL PROGRAM)
+manpagesection(RUNNING AN RSYNC DAEMON OVER A REMOTE SHELL PROGRAM)
 
 See the rsyncd.conf(5) man page for full information on the rsync
-server configuration file.
+daemon configuration file.
 
 Several configuration options will not be available unless the remote
 user is root (e.g. chroot, setuid/setgid, etc.).  There is no need to
-configure inetd or the services map to include the rsync server port
-if you run an rsync server only via a remote shell program.
+configure inetd or the services map to include the rsync daemon port
+if you run an rsync daemon only via a remote shell program.
 
-To run an rsync server out of a single-use ssh key, see this section
+To run an rsync daemon out of a single-use ssh key, see this section
 in the rsyncd.conf(5) man page.
 
 manpagesection(EXAMPLES)
@@ -773,11 +773,11 @@ remote copies of rsync. Typically, rsync is configured to use ssh by
 default, but you may prefer to use rsh on a local network.
 
 If this option is used with bf([user@]host::module/path), then the
-remote shell em(COMMAND) will be used to run an rsync server on the
+remote shell em(COMMAND) will be used to run an rsync daemon on the
 remote host, and all data will be transmitted through that remote
 shell connection, rather than through a direct socket connection to a
-running rsync server on the remote host.  See the section "CONNECTING
-TO AN RSYNC SERVER OVER A REMOTE SHELL PROGRAM" above.
+running rsync daemon on the remote host.  See the section "CONNECTING
+TO AN RSYNC DAEMON OVER A REMOTE SHELL PROGRAM" above.
 
 Command-line arguments are permitted in COMMAND provided that COMMAND is
 presented to rsync as a single argument.  For example:
@@ -1099,16 +1099,16 @@ quote(itemize(
   it() A bf(s) means the size of the file is different and will be updated
   by the file transfer.
   it() A bf(t) means the modification time is different and is being updated
-  to the server's value (requires bf(--times)).  An alternate value of bf(T)
+  to the sender's value (requires bf(--times)).  An alternate value of bf(T)
   means that the time will be set to the transfer time, which happens
   anytime a symlink is transferred, or when a file or device is transferred
   without bf(--times).
   it() A bf(p) means the permissions are different and are being updated to
-  the server's value (requires bf(--perms)).
+  the sender's value (requires bf(--perms)).
   it() An bf(o) means the owner is different and is being updated to the
-  server's value (requires bf(--owner) and root privileges).
+  sender's value (requires bf(--owner) and root privileges).
   it() A bf(g) means the group is different and is being updated to the
-  server's value (requires bf(--group) and the authority to set the group).
+  sender's value (requires bf(--group) and the authority to set the group).
   it() The bf(a) is reserved for a future enhanced version that supports
   extended file attributes, such as ACLs.
 ))
@@ -1197,7 +1197,7 @@ option does not look for this environment value is (1) when bf(--inplace) was
 specified (since bf(--inplace) conflicts with bf(--partial-dir)), or (2) when
 bf(--delay-updates) was specified (see below).
 
-For the purposes of the server-config's "refuse options" setting,
+For the purposes of the daemon-config's "refuse options" setting,
 bf(--partial-dir) does em(not) imply bf(--partial).  This is so that a
 refusal of the bf(--partial) option can be used to disallow the overwriting
 of destination files with a partial transfer, while still allowing the
@@ -1211,7 +1211,7 @@ atomic.  By default the files are placed into a directory named ".~tmp~" in
 each file's destination directory, but you can override this by specifying
 the bf(--partial-dir) option.  (Note that RSYNC_PARTIAL_DIR has no effect
 on this value, nor is bf(--partial-dir) considered to be implied for the
-purposes of the server-config's "refuse options" setting.)
+purposes of the daemon-config's "refuse options" setting.)
 Conflicts with bf(--inplace).
 
 This option uses more memory on the receiving side (one bit per file
@@ -1255,8 +1255,8 @@ purpose is to make it much easier to specify these two options for a long
 transfer that may be interrupted.
 
 dit(bf(--password-file)) This option allows you to provide a password
-in a file for accessing a remote rsync server. Note that this option
-is only useful when accessing an rsync server using the built in
+in a file for accessing a remote rsync daemon. Note that this option
+is only useful when accessing an rsync daemon using the built in
 transport, not when using a remote shell as the transport. The file
 must not be world readable. It should contain just the password as a
 single line.
@@ -1594,7 +1594,7 @@ itemize(
   default to having that modifier set.  For instance, "merge,-/ .excl" would
   treat the contents of .excl as absolute-path excludes,
   while "dir-merge,s .filt" and ":sC" would each make all their
-  per-directory rules apply only on the server side.
+  per-directory rules apply only on the sending side.
 )
 
 The following modifiers are accepted after a "+" or "-":
@@ -1615,7 +1615,7 @@ itemize(
   being transferred.  The default is for a rule to affect both sides
   unless bf(--delete-excluded) was specified, in which case default rules
   become sender-side only.  See also the hide (H) and show (S) rules,
-  which are an alternate way to specify server-side includes/excludes.
+  which are an alternate way to specify sending-side includes/excludes.
   it() An bf(r) is used to indicate that the rule applies to the receiving
   side.  When a rule affects the receiving side, it prevents files from
   being deleted.  See the bf(s) modifier for more info.  See also the
@@ -2024,7 +2024,7 @@ password allows you to run authenticated rsync connections to an rsync
 daemon without user intervention. Note that this does not supply a
 password to a shell transport such as ssh.
 dit(bf(USER) or bf(LOGNAME)) The USER or LOGNAME environment variables
-are used to determine the default username sent to an rsync server.
+are used to determine the default username sent to an rsync daemon.
 If neither is set, the username defaults to "nobody".
 dit(bf(HOME)) The HOME environment variable is used to find the user's
 default .cvsignore file.
