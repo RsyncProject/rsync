@@ -175,7 +175,7 @@ static void handle_stats(int f)
 			stats.flist_buildtime = read_longint(f);
 			stats.flist_xfertime = read_longint(f);
 		}
-	} else if (write_batch && !am_server) {
+	} else if (write_batch) {
 		/* The --read-batch process is going to be a client
 		 * receiver, so we need to give it the stats. */
 		write_longint(batch_fd, total_read);
@@ -186,7 +186,10 @@ static void handle_stats(int f)
 			write_longint(batch_fd, stats.flist_xfertime);
 		}
 	}
+}
 
+static void output_summary(void)
+{
 	if (do_stats) {
 		rprintf(FINFO,"\nNumber of files: %d\n", stats.num_files);
 		rprintf(FINFO,"Number of files transferred: %d\n",
@@ -214,12 +217,6 @@ static void handle_stats(int f)
 			(double)total_read);
 	}
 
-	fflush(stdout);
-	fflush(stderr);
-}
-
-static void output_summary(void)
-{
 	if (verbose || do_stats) {
 		rprintf(FINFO,
 			"\nsent %.0f bytes  received %.0f bytes  %.2f bytes/sec\n",
