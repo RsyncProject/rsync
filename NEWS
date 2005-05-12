@@ -44,8 +44,8 @@ Changes since 2.6.4:
       processing does not get left on the screen when it is followed by a
       newline.
 
-    - When --existing skips a directory with extra verbosity, don't refer
-      to it as a "file".
+    - When --existing skips a directory with extra verbosity, refer to it
+      as a "directory", not a "file".
 
     - When transferring a single file to a different-named file, any
       generator messages that are source-file related no longer refer to
@@ -103,8 +103,10 @@ Changes since 2.6.4:
       really did expect the socket to close).
 
     - If the daemon can't open the log-file specified in rsyncd.conf, fall
-      back to using syslog.  This is better than a (typically) totally
-      silent failure (since a daemon is not usually run with --no-detach).
+      back to using syslog (and log an appropriate warning).  This is
+      better than what was typically a totally silent failure (since a
+      daemon is not usually run with the --no-detach option that was
+      necessary to see the error on stderr).
 
     - The man pages now consistently refer to an rsync daemon as a "daemon"
       to distinguish it from a server in a non-daemon transfer.
@@ -116,9 +118,10 @@ Changes since 2.6.4:
 
   INTERNAL:
 
-    - Rsync now calls setlocale(LC_CTYPE, "").
+    - Rsync now calls setlocale(LC_CTYPE, "") to enable isprint() to better
+      discern which filename characters need to be escaped in messages.
 
-    - Improved the naming of the logfile-open/-reopen/-close functions.
+    - Improved the naming of the log-file open/reopen/close functions.
 
     - Removed some protocol compatibility code that was only needed to help
       someone running a pre-release of 2.6.4.
