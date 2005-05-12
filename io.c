@@ -1035,11 +1035,6 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 			using_r_fds = 1;
 		} else
 			using_r_fds = 0;
-		if (fd != sock_f_out && iobuf_out_cnt && no_flush == 1) {
-			FD_SET(sock_f_out, &w_fds);
-			if (sock_f_out > maxfd)
-				maxfd = sock_f_out;
-		}
 
 		tv.tv_sec = select_timeout;
 		tv.tv_usec = 0;
