@@ -1,0 +1,43 @@
+#!/usr/bin/perl
+#
+# This script finds all CVS/Entries files in the current directory and below
+# and creates a local .cvsinclude file with non-inherited rules including each
+# checked-in file.  Then, use this option whenever using --cvs-exclude (-C):
+#
+# 	-f ': .cvsinclude'
+#
+# (You could alternately put ": .cvsinclude" into an .rsync-filter file and
+# use the -F option, which is easier to type.)
+#
+# That ensures that all checked-in files/dirs are included in the transfer.
+#
+# The downside is that you need to remember to re-run cvs2includes whenever
+# You add a new file to the project.
+use strict;
+
+open(FIND, 'find . -name CVS -type d |') or die $!;
+while (<FIND>) {
+    chomp;
+    s#^\./##;
+
+    my $entries = "$_/Entries";
+    s/CVS$/.cvsinclude/;
+    my $filter = $_;
+
+    open(ENTRIES, $entries) or die "Unable to open $entries: $!\n";
+    my @includes;
+    while (<ENTRIES>) {
+	push(@includes, $1) if m#/(.+?)/#;
+    }
+    close ENTRIES;
+    if (@includes) {
+	open(FILTER, ">$filter") or die "Unable to write $filter: $!\n";
+	print FILTER '+ /', join("\n+ /", @includes), "\n";
+	close FILTER;
+	print "Updated $filter\n";
+    } elsif (-f $filter) {
+	unlink($filter);
+	print "Removed $filter\n";
+    }
+}
+close FIND;
