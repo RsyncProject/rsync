@@ -282,7 +282,8 @@ static void do_delete_pass(struct file_list *flist)
 	char fbuf[MAXPATHLEN];
 	int j;
 
-	if (dry_run > 1) /* destination doesn't exist yet */
+	if (dry_run > 1 /* destination doesn't exist yet */
+	 || list_only)
 		return;
 
 	for (j = 0; j < flist->count; j++) {
