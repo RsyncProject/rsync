@@ -1120,7 +1120,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			if (l == 2 && fname[0] == '.') {
 				/* Turn "./" into just "." rather than "./." */
 				fname[1] = '\0';
-			} else if (l < MAXPATHLEN) {
+			} else {
+				if (l + 1 >= MAXPATHLEN)
+					overflow("send_file_list");
 				fname[l++] = '.';
 				fname[l] = '\0';
 			}
