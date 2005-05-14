@@ -1127,6 +1127,14 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				fname[l] = '\0';
 			}
 			is_dot_dir = 1;
+		} else if (l > 1 && fname[l-1] == '.' && fname[l-2] == '.'
+		    && (l == 2 || fname[l-3] == '/')) {
+			if (l + 2 >= MAXPATHLEN)
+				overflow("send_file_list");
+			fname[l++] = '/';
+			fname[l++] = '.';
+			fname[l] = '\0';
+			is_dot_dir = 1;
 		} else {
 			is_dot_dir = fname[l-1] == '.'
 				   && (l == 1 || fname[l-2] == '/');
