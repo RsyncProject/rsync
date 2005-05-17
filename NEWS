@@ -81,9 +81,16 @@ Changes since 2.6.4:
       the buffers in readfd_unbuffered() to be too small to receive normal
       messages.  (This mainly affected Cygwin.)
 
+    - If a source filename ends with "..", treat it as if "../" had been
+      specified (so that we don't copy files to the parent dir of the
+      destination).
+
     - If --delete is combined with a file-listing rsync command (i.e. no
       transfer is happening), avoid outputting a warning that we couldn't
       delete anything.
+
+    - If --stats is specified with --delete-after, ensure that all the
+      "deleting" messages are output before the statistics.
 
   ENHANCEMENTS:
 
