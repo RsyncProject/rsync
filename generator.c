@@ -59,8 +59,8 @@ extern int csum_length;
 extern int ignore_times;
 extern int size_only;
 extern OFF_T max_size;
-extern int io_timeout;
 extern int io_error;
+extern int allowed_lull;
 extern int sock_f_out;
 extern int ignore_timeout;
 extern int protocol_version;
@@ -88,8 +88,6 @@ extern char *backup_suffix;
 extern int backup_suffix_len;
 extern struct file_list *the_file_list;
 extern struct filter_list_struct server_filter_list;
-
-int allowed_lull = 0;
 
 static int deletion_count = 0; /* used to implement --max-delete */
 
@@ -1145,19 +1143,17 @@ notify_others:
 
 void generate_files(int f_out, struct file_list *flist, char *local_name)
 {
-	int i, lull_mod;
+	int i;
 	char fbuf[MAXPATHLEN];
 	int itemizing, maybe_PERMS_REPORT;
 	enum logcode code;
+	int lull_mod = allowed_lull * 5;
 	int need_retouch_dir_times = preserve_times && !omit_dir_times;
 	int need_retouch_dir_perms = 0;
 	int save_only_existing = only_existing;
 	int save_opt_ignore_existing = opt_ignore_existing;
 	int save_do_progress = do_progress;
 	int save_make_backups = make_backups;
-
-	allowed_lull = read_batch ? 0 : (io_timeout + 1) / 2;
-	lull_mod = allowed_lull * 5;
 
 	if (protocol_version >= 29) {
 		itemizing = 1;
