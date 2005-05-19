@@ -49,6 +49,7 @@ extern int am_daemon;
 extern int am_sender;
 extern int am_generator;
 extern int eol_nulls;
+extern int read_batch;
 extern int csum_length;
 extern int checksum_seed;
 extern int protocol_version;
@@ -59,7 +60,6 @@ extern struct stats stats;
 extern struct file_list *the_file_list;
 
 const char phase_unknown[] = "unknown";
-int select_timeout = SELECT_TIMEOUT;
 int ignore_timeout = 0;
 int batch_fd = -1;
 int batch_gen_fd = -1;
@@ -90,7 +90,8 @@ int sock_f_out = -1;
 
 static int io_multiplexing_out;
 static int io_multiplexing_in;
-static time_t last_io;
+static time_t last_io_in;
+static time_t last_io_out;
 static int no_flush;
 
 static int write_batch_monitor_in = -1;
@@ -103,6 +104,7 @@ static char *io_filesfrom_bp;
 static char io_filesfrom_lastchar;
 static int io_filesfrom_buflen;
 static size_t contiguous_write_len = 0;
+static int select_timeout = SELECT_TIMEOUT;
 
 static void read_loop(int fd, char *buf, size_t len);
 
@@ -166,17 +168,17 @@ static void check_timeout(void)
 	if (!io_timeout || ignore_timeout)
 		return;
 
-	if (!last_io) {
-		last_io = time(NULL);
+	if (!last_io_in) {
+		last_io_in = time(NULL);
 		return;
 	}
 
 	t = time(NULL);
 
-	if (t - last_io >= io_timeout) {
+	if (t - last_io_in >= io_timeout) {
 		if (!am_server && !am_daemon) {
 			rprintf(FERROR, "io timeout after %d seconds -- exiting\n",
-				(int)(t-last_io));
+				(int)(t-last_io_in));
 		}
 		exit_cleanup(RERR_TIMEOUT);
 	}
@@ -188,6 +190,18 @@ void io_set_sock_fds(int f_in, int f_out)
 {
 	sock_f_in = f_in;
 	sock_f_out = f_out;
+}
+
+void set_io_timeout(int secs)
+{
+	io_timeout = secs;
+
+	if (!io_timeout || io_timeout > SELECT_TIMEOUT)
+		select_timeout = SELECT_TIMEOUT;
+	else
+		select_timeout = io_timeout;
+
+	allowed_lull = read_batch ? 0 : (io_timeout + 1) / 2;
 }
 
 /* Setup the fd used to receive MSG_* messages.  Only needed during the
@@ -574,8 +588,8 @@ static int read_timeout(int fd, char *buf, size_t len)
 		len -= n;
 		ret += n;
 
-		if (fd == sock_f_in && (io_timeout || am_generator))
-			last_io = time(NULL);
+		if (fd == sock_f_in && io_timeout)
+			last_io_in = time(NULL);
 	}
 
 	return ret;
@@ -667,14 +681,14 @@ void io_end_buffering(void)
 
 void maybe_flush_socket(void)
 {
-	if (iobuf_out && iobuf_out_cnt && time(NULL) - last_io >= 5)
+	if (iobuf_out && iobuf_out_cnt && time(NULL) - last_io_out >= 5)
 		io_flush(NORMAL_FLUSH);
 }
 
 
 void maybe_send_keepalive(void)
 {
-	if (time(NULL) - last_io >= allowed_lull) {
+	if (time(NULL) - last_io_out >= allowed_lull) {
 		if (!iobuf_out || !iobuf_out_cnt) {
 			if (protocol_version < 29)
 				return; /* there's nothing we can do */
@@ -1077,7 +1091,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 			/* If the other side is sending us error messages, try
 			 * to grab any messages they sent before they died. */
 			while (fd == sock_f_out && io_multiplexing_in) {
-				io_timeout = select_timeout = 30;
+				set_io_timeout(30);
 				ignore_timeout = 0;
 				readfd_unbuffered(sock_f_in, io_filesfrom_buf,
 						  sizeof io_filesfrom_buf);
@@ -1089,7 +1103,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 
 		if (fd == sock_f_out) {
 			if (io_timeout || am_generator)
-				last_io = time(NULL);
+				last_io_out = time(NULL);
 			sleep_for_bwlimit(ret);
 		}
 	}
