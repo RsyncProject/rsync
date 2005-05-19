@@ -109,8 +109,8 @@ Changes since 2.6.4:
       can get started on the files sooner rather than later.
 
     - Improved the keep-alive code to handle a long silence between the
-      sender and the receiver that can occur when processing the checksum
-      data for a large file.
+      sender and the receiver that can occur when the sender is receiving
+      the checksum data for a large file.
 
     - Improved the auth-errors that are logged by the daemon to include
       some information on why the authorization failed (wrong user,
