@@ -23,7 +23,6 @@
 
 extern int module_id;
 extern int sanitize_paths;
-extern int select_timeout;
 extern struct filter_list_struct filter_list;
 extern struct filter_list_struct server_filter_list;
 
@@ -76,6 +75,7 @@ int implied_dirs = 1;
 int numeric_ids = 0;
 int force_delete = 0;
 int io_timeout = 0;
+int allowed_lull = 0;
 char *files_from = NULL;
 int filesfrom_fd = -1;
 char *filesfrom_host = NULL;
@@ -363,8 +363,7 @@ void usage(enum logcode F)
 enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_FILTER, OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW,
-      OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH,
-      OPT_TIMEOUT, OPT_MAX_SIZE,
+      OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_MAX_SIZE,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -428,7 +427,7 @@ static struct poptOption long_options[] = {
   {"block-size",      'B', POPT_ARG_LONG,   &block_size, 0, 0, 0 },
   {"max-delete",       0,  POPT_ARG_INT,    &max_delete, 0, 0, 0 },
   {"max-size",         0,  POPT_ARG_STRING, &max_size_arg,  OPT_MAX_SIZE, 0, 0 },
-  {"timeout",          0,  POPT_ARG_INT,    &io_timeout, OPT_TIMEOUT, 0, 0 },
+  {"timeout",          0,  POPT_ARG_INT,    &io_timeout, 0, 0, 0 },
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir, 0, 0, 0 },
   {"compare-dest",     0,  POPT_ARG_STRING, 0, OPT_COMPARE_DEST, 0, 0 },
   {"copy-dest",        0,  POPT_ARG_STRING, 0, OPT_COPY_DEST, 0, 0 },
@@ -844,11 +843,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			}
 			break;
 
-		case OPT_TIMEOUT:
-			if (io_timeout && io_timeout < select_timeout)
-				select_timeout = io_timeout;
-			break;
-
 		case OPT_LINK_DEST:
 #ifdef HAVE_LINK
 			link_dest = 1;
@@ -1114,6 +1108,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 	if (dry_run)
 		do_xfers = 0;
+
+	set_io_timeout(io_timeout);
 
 	if (verbose && !log_format) {
 		log_format = "%n%L";
