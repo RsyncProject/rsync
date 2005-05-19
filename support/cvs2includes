@@ -6,10 +6,9 @@
 #
 # 	-f ': .cvsinclude'
 #
+# That ensures that all checked-in files/dirs are included in the transfer.
 # (You could alternately put ": .cvsinclude" into an .rsync-filter file and
 # use the -F option, which is easier to type.)
-#
-# That ensures that all checked-in files/dirs are included in the transfer.
 #
 # The downside is that you need to remember to re-run cvs2includes whenever
 # You add a new file to the project.
