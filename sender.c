@@ -28,6 +28,7 @@ extern int log_format_has_i;
 extern int daemon_log_format_has_i;
 extern int csum_length;
 extern int io_error;
+extern int allowed_lull;
 extern int protocol_version;
 extern int remove_sent_files;
 extern int updating_basis_file;
@@ -56,6 +57,7 @@ static struct sum_struct *receive_sums(int f)
 {
 	struct sum_struct *s;
 	int32 i;
+	int lull_mod = allowed_lull * 5;
 	OFF_T offset = 0;
 
 	if (!(s = new(struct sum_struct)))
@@ -88,6 +90,9 @@ static struct sum_struct *receive_sums(int f)
 		else
 			s->sums[i].len = s->blength;
 		offset += s->sums[i].len;
+
+		if (allowed_lull && !(i % lull_mod))
+			maybe_send_keepalive();
 
 		if (verbose > 3) {
 			rprintf(FINFO,
