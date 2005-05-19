@@ -188,7 +188,11 @@ Changes since 2.6.3:
       29.)
 
     - Added the --dirs (-d) option for an easier way to copy directories
-      without recursion.
+      without recursion.  Any directories that are encountered are created
+      on the destination.  Specifying a directory with a trailing slash
+      copies its immediate contents to the destination.
+
+    - The --files-from option now implies --dirs (-d).
 
     - Added the --list-only option, which is mainly a way for the client to
       put the server into listing mode without needing to resort to any
