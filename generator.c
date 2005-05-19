@@ -186,7 +186,7 @@ static int delete_item(char *fname, int mode, int flags)
 	if (do_rmdir(fname) == 0) {
 		if (!(flags & DEL_TERSE))
 			log_delete(fname, mode);
-	} else if (errno != ENOTEMPTY && errno != ENOENT) {
+	} else if (errno != ENOTEMPTY && errno != EEXIST && errno != ENOENT) {
 		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
 			full_fname(fname));
 		return -1;
