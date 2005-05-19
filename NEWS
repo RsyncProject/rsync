@@ -92,6 +92,9 @@ Changes since 2.6.4:
     - If --stats is specified with --delete-after, ensure that all the
       "deleting" messages are output before the statistics.
 
+    - Improved one "if" in the deletion code that was only checking errno
+      for ENOTEMPTY when it should have also been checking for EEXIST.
+
   ENHANCEMENTS:
 
     - Added the --only-write-batch=FILE option that may be used (instead
