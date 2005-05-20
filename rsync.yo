@@ -1954,11 +1954,30 @@ ensure the rsync module they copy does not include symbolic links to
 bf(/etc/passwd) in the public section of the site.  Using
 bf(--copy-unsafe-links) will cause any links to be copied as the file
 they point to on the destination.  Using bf(--safe-links) will cause
-unsafe links to be omitted altogether.
+unsafe links to be omitted altogether.  (Note that you must specify
+bf(--links) for bf(--safe-links) to have any effect.)
 
 Symbolic links are considered unsafe if they are absolute symlinks
 (start with bf(/)), empty, or if they contain enough bf("..")
 components to ascend from the directory being copied.
+
+Here's a summary of how the symlink options are interpreted.  The list is
+in order of precedence, so if your combination of options isn't mentioned,
+use the first line that is a complete subset of your options:
+
+dit(bf(--copy-links)) Turn all symlinks into normal files (leaving no
+symlinks for any other options to affect).
+
+dit(bf(--links --copy-unsafe-links)) Turn all unsafe symlinks into files
+and duplicate all safe symlinks.
+
+dit(bf(--copy-unsafe-links)) Turn all unsafe symlinks into files, noisily
+skip all safe symlinks.
+
+dit(bf(--links --safe-links))  Duplicate safe symlinks and skip unsafe
+ones.
+
+dit(bf(--links)) Duplicate all symlinks.
 
 manpagediagnostics()
 
