@@ -909,9 +909,14 @@ command:
 quote(tt(   rsync -a --files-from=/tmp/foo /usr remote:/backup))
 
 If /tmp/foo contains the string "bin" (or even "/bin"), the /usr/bin
-directory will be created as /backup/bin on the remote host (but the
-contents of the /usr/bin dir would not be sent unless you specified bf(-r)
-or the names were explicitly listed in /tmp/foo).  Also keep in mind
+directory will be created as /backup/bin on the remote host.  If it
+contains "bin/" (note the trailing slash), the immediate contents of
+the directory would also be sent (without needing to be explicitly
+mentioned in the file -- this began in version 2.6.4).  In both cases,
+if the bf(-r) option was enabled, that dir's entire hierarchy would
+also be transferred (keep in mind that bf(-r) needs to be specified
+explicitly with bf(--files-from), since it is not implied by bf(-a)).
+Also note
 that the effect of the (enabled by default) bf(--relative) option is to
 duplicate only the path info that is read from the file -- it does not
 force the duplication of the source-spec path (/usr in this case).
