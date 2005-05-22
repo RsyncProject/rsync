@@ -60,7 +60,8 @@ Changes since 2.6.4:
 
     - When deleting files with the --one-file-system (-x) option set, rsync
       no longer tries to remove files from inside a mount-point on the
-      receiving side.
+      receiving side.  Also, we don't complain about being unable to remove
+      the mount-point dir.
 
     - Fixed a compatibility problem when using --cvs-ignore (-C) and
       sending files to an older rsync without using --delete.
