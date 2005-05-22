@@ -150,7 +150,7 @@ static int delete_item(char *fname, int mode, int flags)
 		deletion_count--;
 		return 0;
 	}
-	if (!zap_dir || (errno != ENOTEMPTY && errno != EEXIST)) {
+	if (!zap_dir) {
 		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
 			full_fname(fname));
 		return -1;
@@ -169,10 +169,7 @@ static int delete_item(char *fname, int mode, int flags)
 			continue;
 
 		f_name_to(fp, buf);
-		if (delete_item(buf, fp->mode, flags & ~DEL_TERSE) != 0) {
-			flist_free(dirlist);
-			return -1;
-		}
+		delete_item(buf, fp->mode, flags & ~DEL_TERSE);
 	}
 	flist_free(dirlist);
 
@@ -265,8 +262,7 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 		if (flist_find(flist, fp) < 0) {
 			int mode = fp->mode;
 			f_name_to(fp, delbuf);
-			if (delete_item(delbuf, mode, DEL_FORCE_RECURSE) < 0)
-				break;
+			delete_item(delbuf, mode, DEL_FORCE_RECURSE);
 		}
 	}
 
