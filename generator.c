@@ -260,7 +260,7 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 	 * from the filesystem. */
 	for (i = dirlist->count; i--; ) {
 		struct file_struct *fp = dirlist->files[i];
-		if (!fp->basename)
+		if (!fp->basename || fp->flags & FLAG_MOUNT_POINT)
 			continue;
 		if (flist_find(flist, fp) < 0) {
 			int mode = fp->mode;
