@@ -1680,8 +1680,13 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 				break;
 			case s_SLASH:
 				type1 = S_ISDIR(f1->mode) ? t_path : t_ITEM;
-				state1 = s_BASE;
 				c1 = (uchar*)f1->basename;
+				if (type1 == t_PATH && *c1 == '.' && !c1[1]) {
+					type1 = t_ITEM;
+					state1 = s_TRAILING;
+					c1 = (uchar*)"";
+				} else
+					state1 = s_BASE;
 				break;
 			case s_BASE:
 				state1 = s_TRAILING;
@@ -1705,8 +1710,13 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 				break;
 			case s_SLASH:
 				type2 = S_ISDIR(f2->mode) ? t_path : t_ITEM;
-				state2 = s_BASE;
 				c2 = (uchar*)f2->basename;
+				if (type2 == t_PATH && *c2 == '.' && !c2[1]) {
+					type2 = t_ITEM;
+					state2 = s_TRAILING;
+					c2 = (uchar*)"";
+				} else
+					state2 = s_BASE;
 				break;
 			case s_BASE:
 				state2 = s_TRAILING;
