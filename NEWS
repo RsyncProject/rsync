@@ -76,6 +76,11 @@ Changes since 2.6.4:
       --relative (-R) was combined with a source path that had a trailing
       slash.
 
+    - Fixed a case where rsync would erroneously delete some files and then
+      re-transfer them when the options --relative (-R) and --recursive
+      (-r) were both enabled (along with --delete) and a source path had a
+      trailing slash.
+
     - Make sure that --max-size doesn't affect a device or a symlink.
 
     - Make sure that a system with a really small MAXPATHLEN does not cause
