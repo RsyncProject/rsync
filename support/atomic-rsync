@@ -1,9 +1,9 @@
 #!/usr/bin/perl
 #
 # This script lets you update a hierarchy of files in an atomic way by
-# first creating a new hierarchy using --link-dest to rsync, and then
-# swapping the hierarchy into place.  See the usage message for more
-# details and some important caveats!
+# first creating a new hierarchy using rsync's --link-dest option, and
+# then swapping the hierarchy into place.  **See the usage message for
+# more details and some important caveats!**
 
 use strict;
 use Cwd 'abs_path';
