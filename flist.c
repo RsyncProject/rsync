@@ -1524,8 +1524,9 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			}
 			/* Make sure that if we unduplicate '.', that we don't
 			 * lose track of a user-specified top directory. */
-			if (flist->files[drop]->flags & FLAG_TOP_DIR)
-				flist->files[keep]->flags |= FLAG_TOP_DIR;
+			j = flist->files[drop]->flags & (FLAG_TOP_DIR|FLAG_DEL_HERE);
+			if (j)
+				flist->files[keep]->flags |= j;
 
 			clear_file(drop, flist);
 
