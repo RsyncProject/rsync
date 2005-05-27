@@ -1,0 +1,39 @@
+#!/bin/sh
+
+# Copyright (C) 2005 by Wayne Davison <wayned@samba.org>
+#
+# This program is distributable under the terms of the GNU GPL (see COPYING)
+
+. "$suitedir/rsync.fns"
+
+deepstr='down/3/deep'
+deepdir="$fromdir/$deepstr"
+mkdir -p "$deepdir"
+fromdir="$deepdir"
+hands_setup
+fromdir="$tmpdir/from"
+
+outfile="$scratchdir/rsync.out"
+
+cd "$fromdir"
+
+# Main script starts here
+
+echo "$fromdir"
+runtest "basic relative" 'checkit "$RSYNC -avR ./$deepstr \"$todir\"" "$fromdir/" "$todir"'
+
+ln "$deepdir/filelist" "$deepdir/dir"
+runtest "hard links" 'checkit "$RSYNC -avHR ./$deepstr/ \"$todir\"" "$fromdir/" "$todir"'
+
+cp "$deepdir/text" "$todir/$deepstr/ThisShouldGo"
+cp "$deepdir/text" "$todir/$deepstr/dir/ThisShouldGoToo"
+runtest "deletion" 'checkit "$RSYNC -avHR --delete ./$deepstr/ \"$todir\"" "$fromdir/" "$todir"'
+
+runtest "non-deletion" 'checkit "$RSYNC -aiHR --delete ./$deepstr/ \"$todir\"" "$fromdir/" "$todir"' \
+    | tee "$outfile"
+
+# Make sure no files were deleted
+grep 'deleting ' "$outfile" && test_fail "Erroneous deletions occurred!"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0
