@@ -155,6 +155,8 @@ Changes since 2.6.4:
     - Fixed a bug in the SUPPORT{,_HARD}_LINKS defines which prevented
       rsync from being built without symlink or hard-link support.
 
+    - Only define HAVE_REMSH if it is going to be set to 1.
+
     - You can use --disable-locale to turn off any use of setlocale().
 
     - Configure now disables the use of mkstemp() under HP-UX (since they
