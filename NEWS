@@ -166,6 +166,9 @@ Changes since 2.6.4:
       the code can use HAVE_LSEEK64 instead of inferring lseek64()'s
       presence based on the presence of the off64_t type.
 
+    - Configure no longer mentions the switch from rsh to ssh (for the
+      default remote shell) that occurred in 2.6.0.
+
     - Some minor enhancements to the test scripts.
 
     - Added a few new diffs to the patches dir, including a patch that
