@@ -323,7 +323,8 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 			    : S_ISDIR(file->mode) ? !omit_dir_times
 			    : !S_ISLNK(file->mode);
 
-			if ((iflags & (ITEM_TRANSFER|ITEM_LOCAL_CHANGE) && !keep_time)
+			if ((iflags & (ITEM_TRANSFER|ITEM_LOCAL_CHANGE) && !keep_time
+			     && (!(iflags & ITEM_XNAME_FOLLOWS) || *xname))
 			    || (keep_time && file->modtime != st->st_mtime))
 				iflags |= ITEM_REPORT_TIME;
 			if (preserve_perms && file->mode != st->st_mode)
