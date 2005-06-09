@@ -512,7 +512,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 				int i;
 				for (i = 2; n[i]; i++)
 					n[i] = ch;
-			} else if (!(iflags & (ITEM_TRANSFER|ITEM_LOCAL_CHANGE))) {
+			} else if (n[0] == '.' || n[0] == 'h') {
 				int i;
 				for (i = 2; n[i]; i++) {
 					if (n[i] != '.')
@@ -602,12 +602,15 @@ void log_item(struct file_struct *file, struct stats *initial_stats,
 void maybe_log_item(struct file_struct *file, int iflags, int itemizing,
 		    char *buf)
 {
-	int see_item = itemizing && (iflags || verbose > 1);
+	int significant_flags = iflags & SIGNIFICANT_ITEM_FLAGS;
+	int see_item = itemizing && (significant_flags || *buf || verbose > 1);
+	int local_change = iflags & ITEM_LOCAL_CHANGE
+	    && (!(iflags & ITEM_XNAME_FOLLOWS) || significant_flags);
 	if (am_server) {
 		if (am_daemon && !dry_run && see_item)
 			log_item(file, &stats, iflags, buf);
-	} else if (see_item || iflags & ITEM_LOCAL_CHANGE || *buf
-	    || (S_ISDIR(file->mode) && iflags & SIGNIFICANT_ITEM_FLAGS))
+	} else if (see_item || local_change || *buf
+	    || (S_ISDIR(file->mode) && significant_flags))
 		log_item(file, &stats, iflags, buf);
 }
 
