@@ -1,0 +1,149 @@
+#! /bin/sh
+
+# Copyright (C) 2005 by Wayne Davison <wayned@samba.org>
+
+# This program is distributable under the terms of the GNU GPL see
+# COPYING).
+
+# Test the output of various copy commands to ensure itemized output
+# and double-verbose output is correct.
+
+. "$suitedir/rsync.fns"
+
+set -x
+
+itemregex='^[.<>ch][dfDL][c .+][s .+][tT .+][p .+][o .+][g .+][a .+] '
+
+lddir="$tmpdir/ld"
+
+outfile="$scratchdir/rsync.out"
+
+makepath "$fromdir/foo"
+makepath "$fromdir/bar/baz"
+cp -p "$srcdir/config.h" "$fromdir/foo/config1"
+cp -p "$srcdir/config.h.in" "$fromdir/foo/config2"
+cp -p "$srcdir/rsync.h" "$fromdir/bar/baz/rsync"
+ln -s ../bar/baz/rsync "$fromdir/foo/sym"
+ln "$fromdir/foo/config1" "$fromdir/foo/extra"
+
+$RSYNC -iplr "$fromdir/" "$todir/" \
+    | tee "$outfile"
+cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 1 failed"
+cd+++++++ bar/
+cd+++++++ bar/baz/
+>f+++++++ bar/baz/rsync
+cd+++++++ foo/
+>f+++++++ foo/config1
+>f+++++++ foo/config2
+>f+++++++ foo/extra
+cL+++++++ foo/sym -> ../bar/baz/rsync
+EOT
+
+# Ensure there are no accidental directory-time problems.
+$RSYNC -a -f '-! */' "$fromdir/" "$todir"
+
+cp -p "$srcdir/config.h" "$fromdir/foo/config2"
+$RSYNC -iplrH "$fromdir/" "$todir/" \
+    | tee "$outfile"
+cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 2 failed"
+>f..T.... bar/baz/rsync
+>f..T.... foo/config1
+>f.sT.... foo/config2
+hf..T.... foo/extra => foo/config1
+EOT
+
+$RSYNC -a -f '-! */' "$fromdir/" "$todir"
+sleep 1 # For directory mod below to ensure time difference
+rm "$todir/foo/sym"
+ln -s ../bar/baz "$todir/foo/sym"
+cp -p "$srcdir/config.h.in" "$fromdir/foo/config2"
+chmod 777 "$todir/bar/baz/rsync"
+
+$RSYNC -iplrtc "$fromdir/" "$todir/" \
+    | tee "$outfile"
+cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 3 failed"
+.f..tp... bar/baz/rsync
+.d..t.... foo/
+.f..t.... foo/config1
+>fcst.... foo/config2
+cL..T.... foo/sym -> ../bar/baz/rsync
+EOT
+
+cp -p "$srcdir/config.h" "$fromdir/foo/config2"
+# Lack of -t is for unchanged hard-link stress-test!
+$RSYNC -vvplrH "$fromdir/" "$todir/" \
+    | sed -e '0,/done$/d' -e '/--whole-file/d' -e '/total:/d' -e '/^$/,$d' \
+    | tee "$outfile"
+cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 4 failed"
+bar/baz/rsync is uptodate
+foo/config1 is uptodate
+foo/config2
+"foo/extra" is a hard link
+foo/sym is uptodate
+EOT
+
+chmod 747 "$todir/bar/baz/rsync"
+$RSYNC -a -f '-! */' "$fromdir/" "$todir"
+$RSYNC -ivvplrtH "$fromdir/" "$todir/" \
+    | grep "$itemregex" \
+    | tee "$outfile"
+cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 5 failed"
+.d        ./
+.d        bar/
+.d        bar/baz/
+.f...p... bar/baz/rsync
+.d        foo/
+.f        foo/config1
+>f..t.... foo/config2
+hf        foo/extra
+.L        foo/sym -> ../bar/baz/rsync
+EOT
+
+chmod 757 "$todir/foo/config1"
+touch "$todir/foo/config2"
+$RSYNC -vplrtH "$fromdir/" "$todir/" \
+    | sed -e '0,/done$/d' -e '/^$/,$d' \
+    | tee "$outfile"
+cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 6 failed"
+foo/config2
+EOT
+
+chmod 757 "$todir/foo/config1"
+touch "$todir/foo/config2"
+$RSYNC -iplrtH "$fromdir/" "$todir/" \
+    | tee "$outfile"
+cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 7 failed"
+.f...p... foo/config1
+>f..t.... foo/config2
+EOT
+
+mv "$todir" "$lddir"
+$RSYNC -ivvplrtH --copy-dest="$lddir" "$fromdir/" "$todir/" \
+    | grep "$itemregex" \
+    | tee "$outfile"
+cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 8 failed"
+.d..t.... ./
+cd+++++++ bar/
+cd+++++++ bar/baz/
+cf....... bar/baz/rsync
+cd+++++++ foo/
+cf....... foo/config1
+cf....... foo/config2
+hf+++++++ foo/extra => foo/config1
+cL+++++++ foo/sym -> ../bar/baz/rsync
+EOT
+
+rm -rf "$todir"
+$RSYNC -iplrtH --link-dest="$lddir" "$fromdir/" "$todir/" \
+    | tee "$outfile"
+cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 9 failed"
+.d..t.... ./
+cd+++++++ bar/
+cd+++++++ bar/baz/
+cd+++++++ foo/
+hf+++++++ foo/extra => foo/config1
+cL+++++++ foo/sym -> ../bar/baz/rsync
+EOT
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0
