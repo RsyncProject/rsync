@@ -23,6 +23,7 @@
 extern int dry_run;
 extern int verbose;
 extern int make_backups;
+extern int log_format_has_i;
 extern struct file_list *the_file_list;
 
 #ifdef SUPPORT_HARD_LINKS
@@ -180,7 +181,7 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 		head = hlink_list[file->F_HLINDEX];
 	if (ndx != head) {
 		struct file_struct *head_file = FPTR(head);
-		if (verbose > 2) {
+		if (!log_format_has_i && verbose > 1) {
 			rprintf(FINFO, "\"%s\" is a hard link\n",
 				safe_fname(f_name(file)));
 		}
