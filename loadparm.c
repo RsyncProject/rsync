@@ -160,17 +160,8 @@ static service sDefault =
 	True,    /* use chroot */
 	False,   /* transfer logging */
 	False,   /* ignore errors */
-	"nobody",/* uid */
-
-	/* TODO: This causes problems on Debian, where it is called
-	 * "nogroup".  Debian patch this in their version of the
-	 * package, but it would be nice to be consistent.  Possibly
-	 * other systems are different again.
-	 *
-	 * What is the best behaviour?  Perhaps always using (gid_t)
-	 * -2? */
-	"nobody",/* gid */
-
+	NOBODY_USER,/* uid */
+	NOBODY_GROUP,/* gid */
 	NULL,    /* hosts allow */
 	NULL,    /* hosts deny */
 	NULL,    /* auth users */
