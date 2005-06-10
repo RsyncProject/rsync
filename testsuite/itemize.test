@@ -18,8 +18,11 @@ chkfile="$scratchdir/rsync.chk"
 outfile="$scratchdir/rsync.out"
 
 filter_outfile() {
-    sed -e '/^building file list \|^created directory \|^done$/d' \
-	-e '/ --whole-file\|total: /d' \
+    sed -e '/^building file list /d' \
+	-e '/^created directory /d' \
+	-e '/^done$/d' \
+	-e '/ --whole-file$/d' \
+	-e '/^total: /d' \
 	-e '/^$/,$d' \
 	<"$outfile" >"$outfile.new"
     mv "$outfile.new" "$outfile"
