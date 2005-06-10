@@ -1,181 +1,26 @@
-NEWS for rsync 2.6.5 (1 Jun 2005)
+NEWS for rsync 2.6.6 (UNRELEASED)
 Protocol: 29 (unchanged)
-Changes since 2.6.4:
-
-  OUTPUT CHANGES:
-
-    - Non-printable chars in filenames are now output using backslash-
-      escaped characters rather than '?'s.  Any non-printable character is
-      output using 3 digits of octal (e.g. "\n" -> "\012"), and a backslash
-      is now output as "\\".  Rsync also uses your locale setting, which
-      can make it treat fewer high-bit characters as non-printable.
-
-    - If rsync received an empty file-list when pulling files, it would
-      output a "nothing to do" message and exit with a 0 (success) exit
-      status, even if the remote rsync returned an error (it did not do
-      this under the same conditions when pushing files).  This was changed
-      to make the pulling behavior the same as the pushing behavior:  we
-      now do the normal end-of-run outputting (depending on options) and
-      exit with the appropriate exit status.
+Changes since 2.6.5:
 
   BUG FIXES:
 
-    - A crash bug was fixed when a daemon had its "path" set to "/", did
-      not have chroot enabled, and used some anchored excludes in the
-      rsyncd.conf file.
-
-    - Fixed a bug in the transfer of a single file when -H is specified
-      (rsync would either infinite loop or perhaps crash).
-
-    - Fixed a case where the generator might try (and fail) to tweak the
-      write-permissions of a read-only directory in list-only mode (this
-      only caused an annoying warning message).
-
-    - If --compare-dest or --link-dest uses a locally-copied file as the
-      basis for an updated version, log this better when --verbose or -i
-      is in effect.
-
-    - Fixed the accidental disabling of --backup during the --delete-after
-      processing.
-
-    - Restored the ability to use the --address option in client mode (in
-      addition to its use in daemon mode).
-
-    - Make sure that some temporary progress information from the delete
-      processing does not get left on the screen when it is followed by a
-      newline.
-
-    - When --existing skips a directory with extra verbosity, refer to it
-      as a "directory", not a "file".
-
-    - When transferring a single file to a different-named file, any
-      generator messages that are source-file related no longer refer to
-      the file by the destination filename.
-
-    - Fixed a bug where hard-linking a group of files might fail if the
-      generator hasn't created a needed destination directory yet.
-
-    - Fixed a bug where a hard-linked group of files that is newly-linked
-      to a file in a --link-dest dir doesn't link the files from the rest
-      of the cluster.
-
-    - When deleting files with the --one-file-system (-x) option set, rsync
-      no longer tries to remove files from inside a mount-point on the
-      receiving side.  Also, we don't complain about being unable to remove
-      the mount-point dir.
-
-    - Fixed a compatibility problem when using --cvs-ignore (-C) and
-      sending files to an older rsync without using --delete.
-
-    - Make sure that a "- !" or "+ !" include/exclude pattern does not
-      trigger the list-clearing action that is reserved for "!".
-
-    - Avoid a timeout in the generator when the sender/receiver aren't
-      handling the generator's checksum output quickly enough.
-
-    - Fixed the omission of some directories in the delete processing when
-      --relative (-R) was combined with a source path that had a trailing
-      slash.
-
-    - Fixed a case where rsync would erroneously delete some files and then
-      re-transfer them when the options --relative (-R) and --recursive
-      (-r) were both enabled (along with --delete) and a source path had a
-      trailing slash.
-
-    - Make sure that --max-size doesn't affect a device or a symlink.
-
-    - Make sure that a system with a really small MAXPATHLEN does not cause
-      the buffers in readfd_unbuffered() to be too small to receive normal
-      messages.  (This mainly affected Cygwin.)
-
-    - If a source pathname ends with a filename of "..", treat it as if
-      "../" had been specified (so that we don't copy files to the parent
-      dir of the destination).
-
-    - If --delete is combined with a file-listing rsync command (i.e. no
-      transfer is happening), avoid outputting a warning that we couldn't
-      delete anything.
-
-    - If --stats is specified with --delete-after, ensure that all the
-      "deleting" messages are output before the statistics.
-
-    - Improved one "if" in the deletion code that was only checking errno
-      for ENOTEMPTY when it should have also been checking for EEXIST (for
-      compatibility with OS variations).
+    - The outputting of hard-linked files when verbosity was > 1 was not right:
+      without -i it would output the name of each hard-linked file as thought
+      it had been changed (it now outputs a "is hard linked" message for the
+      file); with -i it would could output all trailing dots for an unchanged
+      hard-link (it now changes those dots to spaces, as is done for other
+      unchanged files).
 
   ENHANCEMENTS:
 
-    - Added the --only-write-batch=FILE option that may be used (instead
-      of --write-batch=FILE) to create a batch file without doing any
-      actual updating of the destination.  This allows you to divert all
-      the file-updating data away from a slow data link (as long as you
-      are pushing the data to the remote server when creating the batch).
-
-    - When the generator is taking a long time to fill up its output buffer
-      (e.g. if the transferred files are few, small, or missing), it now
-      periodically flushes the output buffer so that the sender/receiver
-      can get started on the files sooner rather than later.
-
-    - Improved the keep-alive code to handle a long silence between the
-      sender and the receiver that can occur when the sender is receiving
-      the checksum data for a large file.
-
-    - Improved the auth-errors that are logged by the daemon to include
-      some information on why the authorization failed:  wrong user,
-      password mismatch, etc.  (The client-visible message is unchanged!)
-
-    - Improved the client's handling of an "@ERROR" from a daemon so that
-      it does not complain about an unexpectedly closed socket (since we
-      really did expect the socket to close).
-
-    - If the daemon can't open the log-file specified in rsyncd.conf, fall
-      back to using syslog and log an appropriate warning.  This is better
-      than what was typically a totally silent (and fatal) failure (since a
-      daemon is not usually run with the --no-detach option that was
-      necessary to see the error on stderr).
-
-    - The man pages now consistently refer to an rsync daemon as a "daemon"
-      instead of a "server" (to distinguish it from the server process in a
-      non-daemon transfer).
-
-    - Made a small change to the rrsync script (restricted rsync -- in the
-      support dir) to make a read-only server reject all --remove-* options
-      when sending files (to future-proof it against the possibility of
-      other similar options being added at some point).
-
-  INTERNAL:
-
-    - Rsync now calls setlocale(LC_CTYPE, "").  This enables isprint() to
-      better discern which filename characters need to be escaped in
-      messages (which should result in fewer escaped characters in some
-      locales).
-
-    - Improved the naming of the log-file open/reopen/close functions.
-
-    - Removed some protocol-compatibility code that was only needed to help
-      someone running a pre-release of 2.6.4.
+    - Made the "max verbosity" setting in the rsyncd.conf file settable on a
+      per-module basis (which now matches the documentation).
 
   BUILD CHANGES:
 
-    - Added configure option "--disable-locale" to disable any use of
-      setlocale() in the binary.
+    - Made configure define NOBODY_USER (currently hard-wired to "nobody") and
+      NOBODY_GROUP (set to either "nobody" or "nogroup" depending on what we
+      find in the /etc/group file).
 
-    - Fixed a bug in the SUPPORT{,_HARD}_LINKS #defines which prevented
-      rsync from being built without symlink or hard-link support.
-
-    - Only #define HAVE_REMSH if it is going to be set to 1.
-
-    - Configure now disables the use of mkstemp() under HP-UX (since they
-      refuse to fix its broken handling of large files).
-
-    - Configure now explicitly checks for the lseek64() function so that
-      the code can use HAVE_LSEEK64 instead of inferring lseek64()'s
-      presence based on the presence of the off64_t type.
-
-    - Configure no longer mentions the change in the default remote-shell
-      (from rsh to ssh) that occurred for the 2.6.0 release.
-
-    - Some minor enhancements to the test scripts.
-
-    - Added a few new *.diff files to the patches dir, including a patch
-      that enables the optional copying of extended attributes.
+    - Added a test to the test suite, itemized.test, that tests the output of
+      -i (log-format w/%i) and some double-verbose messages.
