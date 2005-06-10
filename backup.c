@@ -188,18 +188,16 @@ static int keep_backup(char *fname)
 		return 0;
 
 	/* Check to see if this is a device file, or link */
-	if (IS_DEVICE(file->mode)) {
-		if (am_root && preserve_devices) {
-			if (do_mknod(buf, file->mode, file->u.rdev) < 0
-			    && (errno != ENOENT || make_bak_dir(buf) < 0
-			     || do_mknod(buf, file->mode, file->u.rdev) < 0)) {
-				rsyserr(FERROR, errno, "mknod %s failed",
-					full_fname(buf));
-			} else if (verbose > 2) {
-				rprintf(FINFO,
-					"make_backup: DEVICE %s successful.\n",
-					safe_fname(fname));
-			}
+	if (IS_DEVICE(file->mode) && am_root && preserve_devices) {
+		do_unlink(buf);
+		if (do_mknod(buf, file->mode, file->u.rdev) < 0
+		    && (errno != ENOENT || make_bak_dir(buf) < 0
+		     || do_mknod(buf, file->mode, file->u.rdev) < 0)) {
+			rsyserr(FERROR, errno, "mknod %s failed",
+				full_fname(buf));
+		} else if (verbose > 2) {
+			rprintf(FINFO, "make_backup: DEVICE %s successful.\n",
+				safe_fname(fname));
 		}
 		kept = 1;
 		do_unlink(fname);
@@ -230,15 +228,18 @@ static int keep_backup(char *fname)
 					full_fname(buf), file->u.link);
 			}
 			kept = 1;
+		} else {
+			do_unlink(buf);
+			if (do_symlink(file->u.link, buf) < 0
+			    && (errno != ENOENT || make_bak_dir(buf) < 0
+			     || do_symlink(file->u.link, buf) < 0)) {
+				rsyserr(FERROR, errno, "link %s -> \"%s\"",
+					full_fname(buf),
+					safe_fname(file->u.link));
+			}
+			do_unlink(fname);
+			kept = 1;
 		}
-		if (do_symlink(file->u.link, buf) < 0
-		    && (errno != ENOENT || make_bak_dir(buf) < 0
-		     || do_symlink(file->u.link, buf) < 0)) {
-			rsyserr(FERROR, errno, "link %s -> \"%s\"",
-				full_fname(buf), safe_fname(file->u.link));
-		}
-		do_unlink(fname);
-		kept = 1;
 	}
 #endif
 
