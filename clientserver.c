@@ -478,8 +478,8 @@ static int rsync_module(int f_in, int f_out, int i)
 
 #ifndef DEBUG
 	/* don't allow the logs to be flooded too fast */
-	if (verbose > lp_max_verbosity())
-		verbose = lp_max_verbosity();
+	if (verbose > lp_max_verbosity(i))
+		verbose = lp_max_verbosity(i);
 #endif
 
 	if (protocol_version < 23

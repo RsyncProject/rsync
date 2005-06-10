@@ -104,7 +104,6 @@ typedef struct
 	char *socket_options;
 	char *bind_address;
 	int syslog_facility;
-	int max_verbosity;
 	int rsync_port;
 } global;
 
@@ -143,6 +142,7 @@ typedef struct
 	char *dont_compress;
 	int timeout;
 	int max_connections;
+	int max_verbosity;
 	BOOL ignore_nonreadable;
 } service;
 
@@ -177,6 +177,7 @@ static service sDefault =
 	"*.gz *.tgz *.zip *.z *.rpm *.deb *.iso *.bz2 *.tbz",    /* dont compress */
 	0,        /* timeout */
 	0,        /* max connections */
+	1,        /* max verbosity */
 	False     /* ignore nonreadable */
 };
 
@@ -265,12 +266,12 @@ static struct parm_struct parm_table[] =
   {"socket options",   P_STRING,  P_GLOBAL, &Globals.socket_options,NULL,  0},
   {"log file",         P_STRING,  P_GLOBAL, &Globals.log_file,      NULL,  0},
   {"pid file",         P_STRING,  P_GLOBAL, &Globals.pid_file,      NULL,  0},
-  {"max verbosity",    P_INTEGER, P_GLOBAL, &Globals.max_verbosity, NULL,  0},
   {"port",             P_INTEGER, P_GLOBAL, &Globals.rsync_port,    NULL,  0},
   {"address",          P_STRING,  P_GLOBAL, &Globals.bind_address,  NULL,  0},
 
   {"timeout",          P_INTEGER, P_LOCAL,  &sDefault.timeout,     NULL,  0},
   {"max connections",  P_INTEGER, P_LOCAL,  &sDefault.max_connections,NULL, 0},
+  {"max verbosity",    P_INTEGER, P_LOCAL,  &sDefault.max_verbosity,NULL,  0},
   {"name",             P_STRING,  P_LOCAL,  &sDefault.name,        NULL,   0},
   {"comment",          P_STRING,  P_LOCAL,  &sDefault.comment,     NULL,   0},
   {"lock file",        P_STRING,  P_LOCAL,  &sDefault.lock_file,   NULL,   0},
@@ -310,7 +311,6 @@ static void init_globals(void)
 #ifdef LOG_DAEMON
 	Globals.syslog_facility = LOG_DAEMON;
 #endif
-	Globals.max_verbosity = 1;
 }
 
 /***************************************************************************
@@ -350,7 +350,6 @@ FN_GLOBAL_STRING(lp_log_file, &Globals.log_file)
 FN_GLOBAL_STRING(lp_pid_file, &Globals.pid_file)
 FN_GLOBAL_STRING(lp_socket_options, &Globals.socket_options)
 FN_GLOBAL_INTEGER(lp_syslog_facility, &Globals.syslog_facility)
-FN_GLOBAL_INTEGER(lp_max_verbosity, &Globals.max_verbosity)
 FN_GLOBAL_INTEGER(lp_rsync_port, &Globals.rsync_port)
 FN_GLOBAL_STRING(lp_bind_address, &Globals.bind_address)
 
@@ -382,6 +381,7 @@ FN_LOCAL_STRING(lp_refuse_options, refuse_options)
 FN_LOCAL_STRING(lp_dont_compress, dont_compress)
 FN_LOCAL_INTEGER(lp_timeout, timeout)
 FN_LOCAL_INTEGER(lp_max_connections, max_connections)
+FN_LOCAL_INTEGER(lp_max_verbosity, max_verbosity)
 
 /* local prototypes */
 static int    strwicmp(char *psz1, char *psz2);
