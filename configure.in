@@ -54,8 +54,6 @@ else
 fi
 
 
-
-
 AC_ARG_ENABLE(profile,
 	AC_HELP_STRING([--enable-profile],
 		[turn on CPU profiling (default no)],
@@ -132,8 +130,19 @@ then
 else
 	RSYNC_RSH="ssh"
 fi
-
 AC_DEFINE_UNQUOTED(RSYNC_RSH, "$RSYNC_RSH", [default -e command])
+
+AC_MSG_CHECKING([the group for user "nobody"])
+if grep '^nobody:' /etc/group >/dev/null 2>&1; then
+    NOBODY_GROUP=nobody
+elif grep '^nogroup:' /etc/group >/dev/null 2>&1; then
+    NOBODY_GROUP=nogroup
+else
+    NOBODY_GROUP=nobody # test for others?
+fi
+AC_MSG_RESULT($NOBODY_GROUP)
+AC_DEFINE_UNQUOTED(NOBODY_USER, "nobody", [unprivileged user--e.g. nobody])
+AC_DEFINE_UNQUOTED(NOBODY_GROUP, "$NOBODY_GROUP", [unprivileged group for unprivileged user])
 
 # arrgh. libc in the current debian stable screws up the largefile
 # stuff, getting byte range locking wrong
