@@ -76,7 +76,7 @@ cp -p "$srcdir/config.h" "$fromdir/foo/config2"
 chmod 600 "$fromdir/foo/config2"
 # Lack of -t is for unchanged hard-link stress-test!
 $RSYNC -vvplrH "$fromdir/" "$todir/" \
-    | sed -e '0,/done$/d' -e '/--whole-file/d' -e '/total:/d' -e '/^$/,$d' \
+    | sed -e '1,/done$/d' -e '/--whole-file/d' -e '/total:/d' -e '/^$/,$d' \
     | tee "$outfile"
 cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 4 failed"
 bar/baz/rsync is uptodate
@@ -106,7 +106,7 @@ EOT
 chmod 757 "$todir/foo/config1"
 touch "$todir/foo/config2"
 $RSYNC -vplrtH "$fromdir/" "$todir/" \
-    | sed -e '0,/done$/d' -e '/^$/,$d' \
+    | sed -e '/done$/d' -e '/^$/,$d' \
     | tee "$outfile"
 cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 6 failed"
 foo/config2
