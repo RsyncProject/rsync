@@ -17,14 +17,14 @@ name2="$fromdir/name2"
 
 outfile="$scratchdir/rsync.out"
 
-cat $srcdir/[gr]*.[ch] > "$name1"
-cat $srcdir/[et]*.[ch] > "$name2"
+cat "$srcdir"/[gr]*.[ch] > "$name1"
+cat "$srcdir"/[et]*.[ch] > "$name2"
 
 checkit "$RSYNC -avv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
 checkit "$RSYNC -avv \"$fromdir/\" \"$chkdir/\"" "$fromdir" "$chkdir"
-cat $srcdir/[fgpr]*.[ch] > "$name1"
-cat $srcdir/[etw]*.[ch] > "$name2"
+cat "$srcdir"/[fgpr]*.[ch] > "$name1"
+cat "$srcdir"/[etw]*.[ch] > "$name2"
 
 $RSYNC -avv --no-whole-file --backup "$fromdir/" "$todir/" \
     | tee "$outfile"
@@ -49,8 +49,8 @@ diff -r $diffopt "$chkdir" "$bakdir" || test_fail "backup dir contents are bogus
 rm "$bakdir/dname"
 
 checkit "$RSYNC -avv --del \"$fromdir/\" \"$chkdir/\"" "$fromdir" "$chkdir"
-cat $srcdir/[efgr]*.[ch] > "$name1"
-cat $srcdir/[ew]*.[ch] > "$name2"
+cat "$srcdir"/[efgr]*.[ch] > "$name1"
+cat "$srcdir"/[ew]*.[ch] > "$name2"
 
 checkit "$RSYNC -avv --inplace --no-whole-file --backup --backup-dir=\"$bakdir\" \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir" \
     | tee "$outfile"
