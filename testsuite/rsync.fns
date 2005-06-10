@@ -92,7 +92,7 @@ hands_setup() {
     ln -s nolf "$fromdir/nolf-symlink"
     umask 022
 
-    cat $srcdir/*.c > "$fromdir/text"
+    cat "$srcdir"/*.c > "$fromdir/text"
     mkdir "$fromdir/dir"
     cp "$fromdir/text" "$fromdir/dir"
     mkdir "$fromdir/dir/subdir"
