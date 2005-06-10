@@ -11,6 +11,9 @@ Changes since 2.6.5:
       hard-link (it now changes those dots to spaces, as is done for other
       unchanged files).
 
+    - When backing up a changed symlink or device, get rid of any old backup
+      item so that we don't get an already-exists error.
+
   ENHANCEMENTS:
 
     - Made the "max verbosity" setting in the rsyncd.conf file settable on a
@@ -24,3 +27,4 @@ Changes since 2.6.5:
 
     - Added a test to the test suite, itemized.test, that tests the output of
       -i (log-format w/%i) and some double-verbose messages.
+
