@@ -17,6 +17,8 @@ lddir="$tmpdir/ld"
 chkfile="$scratchdir/rsync.chk"
 outfile="$scratchdir/rsync.out"
 
+# This is only called if rsync was run with -v or -vv (not -i alone).
+# Higher levels of -v would require more filtering.
 filter_outfile() {
     sed -e '/^building file list /d' \
 	-e '/^created directory /d' \
@@ -94,6 +96,7 @@ chmod 600 "$fromdir/foo/config2"
 # Lack of -t is for unchanged hard-link stress-test!
 $RSYNC -vvplrH "$fromdir/" "$todir/" \
     | tee "$outfile"
+filter_outfile
 cat <<EOT >"$chkfile"
 bar/baz/rsync is uptodate
 foo/config1 is uptodate
@@ -101,13 +104,13 @@ foo/config2
 "foo/extra" is a hard link
 foo/sym is uptodate
 EOT
-filter_outfile
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 4 failed"
 
 chmod 747 "$todir/bar/baz/rsync"
 $RSYNC -a -f '-! */' "$fromdir/" "$todir"
 $RSYNC -ivvplrtH "$fromdir/" "$todir/" \
     | tee "$outfile"
+filter_outfile
 cat <<EOT >"$chkfile"
 .d        ./
 .d        bar/
@@ -119,17 +122,16 @@ cat <<EOT >"$chkfile"
 hf        foo/extra
 .L        foo/sym -> ../bar/baz/rsync
 EOT
-filter_outfile
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 5 failed"
 
 chmod 757 "$todir/foo/config1"
 touch "$todir/foo/config2"
 $RSYNC -vplrtH "$fromdir/" "$todir/" \
     | tee "$outfile"
+filter_outfile
 cat <<EOT >"$chkfile"
 foo/config2
 EOT
-filter_outfile
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 6 failed"
 
 chmod 757 "$todir/foo/config1"
@@ -145,6 +147,7 @@ diff $diffopt "$chkfile" "$outfile" || test_fail "test 7 failed"
 mv "$todir" "$lddir"
 $RSYNC -ivvplrtH --copy-dest="$lddir" "$fromdir/" "$todir/" \
     | tee "$outfile"
+filter_outfile
 cat <<EOT >"$chkfile"
 .d..t.... ./
 cd+++++++ bar/
@@ -156,7 +159,6 @@ cf....... foo/config2
 hf+++++++ foo/extra => foo/config1
 cL+++++++ foo/sym -> ../bar/baz/rsync
 EOT
-filter_outfile
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 8 failed"
 
 rm -rf "$todir"
