@@ -24,7 +24,9 @@ cp -p "$srcdir/config.h" "$fromdir/foo/config1"
 cp -p "$srcdir/config.h.in" "$fromdir/foo/config2"
 cp -p "$srcdir/rsync.h" "$fromdir/bar/baz/rsync"
 chmod 600 "$fromdir"/foo/config? "$fromdir/bar/baz/rsync"
+umask 0
 ln -s ../bar/baz/rsync "$fromdir/foo/sym"
+umask 022
 ln "$fromdir/foo/config1" "$fromdir/foo/extra"
 
 $RSYNC -iplr "$fromdir/" "$todir/" \
