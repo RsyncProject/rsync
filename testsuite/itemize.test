@@ -12,11 +12,18 @@
 
 set -x
 
-itemregex='^[.<>ch][dfDL][c .+][s .+][tT .+][p .+][o .+][g .+][a .+] '
-
 lddir="$tmpdir/ld"
 
+chkfile="$scratchdir/rsync.chk"
 outfile="$scratchdir/rsync.out"
+
+filter_outfile() {
+    sed -e '/^building file list \|^created directory \|^done$/d' \
+	-e '/ --whole-file\|total: /d' \
+	-e '/^$/,$d' \
+	<"$outfile" >"$outfile.new"
+    mv "$outfile.new" "$outfile"
+}
 
 makepath "$fromdir/foo"
 makepath "$fromdir/bar/baz"
@@ -31,7 +38,7 @@ ln "$fromdir/foo/config1" "$fromdir/foo/extra"
 
 $RSYNC -iplr "$fromdir/" "$todir/" \
     | tee "$outfile"
-cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 1 failed"
+cat <<EOT >"$chkfile"
 cd+++++++ bar/
 cd+++++++ bar/baz/
 >f+++++++ bar/baz/rsync
@@ -41,6 +48,7 @@ cd+++++++ foo/
 >f+++++++ foo/extra
 cL+++++++ foo/sym -> ../bar/baz/rsync
 EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 1 failed"
 
 # Ensure there are no accidental directory-time problems.
 $RSYNC -a -f '-! */' "$fromdir/" "$todir"
@@ -49,12 +57,13 @@ cp -p "$srcdir/config.h" "$fromdir/foo/config2"
 chmod 601 "$fromdir/foo/config2"
 $RSYNC -iplrH "$fromdir/" "$todir/" \
     | tee "$outfile"
-cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 2 failed"
+cat <<EOT >"$chkfile"
 >f..T.... bar/baz/rsync
 >f..T.... foo/config1
 >f.sTp... foo/config2
 hf..T.... foo/extra => foo/config1
 EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 2 failed"
 
 $RSYNC -a -f '-! */' "$fromdir/" "$todir"
 sleep 1 # For directory mod below to ensure time difference
@@ -68,34 +77,35 @@ chmod 777 "$todir/bar/baz/rsync"
 
 $RSYNC -iplrtc "$fromdir/" "$todir/" \
     | tee "$outfile"
-cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 3 failed"
+cat <<EOT >"$chkfile"
 .f..tp... bar/baz/rsync
 .d..t.... foo/
 .f..t.... foo/config1
 >fcstp... foo/config2
 cL..T.... foo/sym -> ../bar/baz/rsync
 EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 3 failed"
 
 cp -p "$srcdir/config.h" "$fromdir/foo/config2"
 chmod 600 "$fromdir/foo/config2"
 # Lack of -t is for unchanged hard-link stress-test!
 $RSYNC -vvplrH "$fromdir/" "$todir/" \
-    | sed -e '1,/done$/d' -e '/--whole-file/d' -e '/total:/d' -e '/^$/,$d' \
     | tee "$outfile"
-cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 4 failed"
+cat <<EOT >"$chkfile"
 bar/baz/rsync is uptodate
 foo/config1 is uptodate
 foo/config2
 "foo/extra" is a hard link
 foo/sym is uptodate
 EOT
+filter_outfile
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 4 failed"
 
 chmod 747 "$todir/bar/baz/rsync"
 $RSYNC -a -f '-! */' "$fromdir/" "$todir"
 $RSYNC -ivvplrtH "$fromdir/" "$todir/" \
-    | grep "$itemregex" \
     | tee "$outfile"
-cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 5 failed"
+cat <<EOT >"$chkfile"
 .d        ./
 .d        bar/
 .d        bar/baz/
@@ -106,30 +116,33 @@ cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 5 failed"
 hf        foo/extra
 .L        foo/sym -> ../bar/baz/rsync
 EOT
+filter_outfile
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 5 failed"
 
 chmod 757 "$todir/foo/config1"
 touch "$todir/foo/config2"
 $RSYNC -vplrtH "$fromdir/" "$todir/" \
-    | sed -e '/done$/d' -e '/^$/,$d' \
     | tee "$outfile"
-cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 6 failed"
+cat <<EOT >"$chkfile"
 foo/config2
 EOT
+filter_outfile
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 6 failed"
 
 chmod 757 "$todir/foo/config1"
 touch "$todir/foo/config2"
 $RSYNC -iplrtH "$fromdir/" "$todir/" \
     | tee "$outfile"
-cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 7 failed"
+cat <<EOT >"$chkfile"
 .f...p... foo/config1
 >f..t.... foo/config2
 EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 7 failed"
 
 mv "$todir" "$lddir"
 $RSYNC -ivvplrtH --copy-dest="$lddir" "$fromdir/" "$todir/" \
-    | grep "$itemregex" \
     | tee "$outfile"
-cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 8 failed"
+cat <<EOT >"$chkfile"
 .d..t.... ./
 cd+++++++ bar/
 cd+++++++ bar/baz/
@@ -140,11 +153,13 @@ cf....... foo/config2
 hf+++++++ foo/extra => foo/config1
 cL+++++++ foo/sym -> ../bar/baz/rsync
 EOT
+filter_outfile
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 8 failed"
 
 rm -rf "$todir"
 $RSYNC -iplrtH --link-dest="$lddir" "$fromdir/" "$todir/" \
     | tee "$outfile"
-cat <<EOT | diff $diffopt - "$outfile" || test_fail "test 9 failed"
+cat <<EOT >"$chkfile"
 .d..t.... ./
 cd+++++++ bar/
 cd+++++++ bar/baz/
@@ -152,6 +167,7 @@ cd+++++++ foo/
 hf+++++++ foo/extra => foo/config1
 cL+++++++ foo/sym -> ../bar/baz/rsync
 EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 9 failed"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
