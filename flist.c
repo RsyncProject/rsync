@@ -1471,8 +1471,12 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 {
 	int i, prev_i = 0;
 
-	if (!flist || flist->count == 0)
+	if (!flist)
 		return;
+	if (flist->count == 0) {
+		flist->high = -1;
+		return;
+	}
 
 	sorting_flist = flist;
 	qsort(flist->files, flist->count,
