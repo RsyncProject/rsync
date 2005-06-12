@@ -4,6 +4,11 @@ Changes since 2.6.5:
 
   BUG FIXES:
 
+    - The setting of flist->high in clean_flist() was wrong for an empty list.
+      This could cause flist_find() to crash in certain rare circumstances
+      (e.g. if just the right directory setup was around when --fuzzy was
+      combined with --list-dest).
+
     - The outputting of hard-linked files when verbosity was > 1 was not right:
       without -i it would output the name of each hard-linked file as thought
       it had been changed (it now outputs a "is hard linked" message for the
