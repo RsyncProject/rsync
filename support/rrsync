@@ -1,19 +1,23 @@
 #!/usr/bin/perl
+use strict;
 # Name: /usr/local/bin/rrsync (should also have a symlink in /usr/bin)
 # Purpose: Restricts rsync to subdirectory declared in .ssh/authorized_keys
 # Author: Joe Smith <js-cgi@inwap.com> 30-Sep-2004
-# Modified by Wayne Davison <wayned@samba.org> 12-Jan-2005
+# Modified by: Wayne Davison <wayned@samba.org>
 
 use Socket;
+use File::Glob ':glob';
+use constant RSYNC => 'rsync'; # Optionally set the path of rsync here.
 use constant LOGFILE => 'rrsync.log';
 my $Usage = <<EOM;
 Use 'command="$0 [-ro] SUBDIR"'
 	in front of lines in $ENV{HOME}/.ssh/authorized_keys
 EOM
 
-my $ro = (@ARGV and $ARGV[0] eq '-ro') ? shift : '';	# -ro = Read-Only
-my $subdir = shift;
-die "No subdirectory specified\n$Usage" unless defined $subdir;
+our $ro = (@ARGV && $ARGV[0] eq '-ro') ? shift : '';	# -ro = Read-Only
+our $subdir = shift;
+die "$0: No subdirectory specified\n$Usage" unless defined $subdir;
+die "$0: Restricted subdirectory does not exist!\n" if $subdir ne '/' && !-d $subdir;
 
 # The client uses "rsync -av -e ssh src/ server:dir/", and sshd on the server
 # executes this program when .ssh/authorized_keys has 'command="..."'.
@@ -22,53 +26,171 @@ die "No subdirectory specified\n$Usage" unless defined $subdir;
 # command="rrsync -ro results" ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAIEAmkHG1WCjC...
 #
 # Format of the envrionment variables set by sshd:
-# SSH_ORIGINAL_COMMAND=rsync --server          -vlogDtpr --partial . dir # push
-# SSH_ORIGINAL_COMMAND=rsync --server --sender -vlogDtpr --partial . dir # pull
+# SSH_ORIGINAL_COMMAND=rsync --server          -vlogDtpr --partial . ARG # push
+# SSH_ORIGINAL_COMMAND=rsync --server --sender -vlogDtpr --partial . ARGS # pull
 # SSH_CONNECTION=client_addr client_port server_port
 
 my $command = $ENV{SSH_ORIGINAL_COMMAND};
-die "Not invoked via sshd\n$Usage"	unless defined $command;
-die "SSH_ORIGINAL_COMMAND='$command' is not rsync\n" unless $command =~ /^rsync\s/;
-die "$0 -ro: sending to read-only server not allowed\n"
-	if $ro and $command !~ /^rsync --server --sender /;
-die "$0 -ro: use of $1 with read-only server not allowed\n"
-	if $ro and $command =~ /\s(--remove-\S+)/;
+die "$0: Not invoked via sshd\n$Usage"	unless defined $command;
+die "$0: SSH_ORIGINAL_COMMAND='$command' is not rsync\n" unless $command =~ s/^rsync\s+//;
+our $am_sender = $command =~ /\s--sender\s/;
+die "$0 -ro: sending to read-only server not allowed\n" if $ro && !$am_sender;
 
-my ($cmd,$dir) = $command =~ /^(rsync\s+(?:-[-a-zA-Z]+\s+)+\.) ?("[^"]*"|[^\s"]*)$/;
-die "$0: invalid rsync-command syntax or options\n" if !defined $cmd;
+# These options are only the options that rsync might send to the
+# server, and only in the arg format that the stock rsync uses.
+### START of options data output by the cull-options script. ###
+our $short_no_arg = 'CDHIKLORSWbcdglnoprtuvxz';
+our $short_with_num = 'B';
+# To disable a short-named option, add its letter to this string:
+our $short_disabled = '';
+# To disable a long-named option, change its value to a 0.  A value of -1
+# means the arg doesn't need checking, a 2 means only check when receiving.
+our %long_no_arg = (
+  'copy-unsafe-links' => -1,
+  'daemon' => -1,
+  'delay-updates' => -1,
+  'delete' => -1,
+  'delete-after' => -1,
+  'delete-before' => -1,
+  'delete-during' => -1,
+  'delete-excluded' => -1,
+  'existing' => -1,
+  'force' => -1,
+  'from0' => -1,
+  'fuzzy' => -1,
+  'ignore-errors' => -1,
+  'ignore-existing' => -1,
+  'inplace' => -1,
+  'list-only' => -1,
+  'no-implied-dirs' => -1,
+  'no-relative' => -1,
+  'numeric-ids' => -1,
+  'partial' => -1,
+  'remove-sent-files' => $ro ? 0 : -1,
+  'safe-links' => -1,
+  'sender' => -1,
+  'server' => -1,
+  'size-only' => -1,
+);
+our %long_with_arg = (
+  'bwlimit' => -1,
+  'checksum-seed' => -1,
+  'files-from' => 1,
+  'log-format' => -1,
+  'max-delete' => -1,
+  'modify-window' => -1,
+  'only-write-batch' => -1,
+  'suffix' => -1,
+  'timeout' => -1,
+);
+our %long_before_arg = (
+  'backup-dir' => 2,
+  'files-from' => 1,
+  'max-size' => -1,
+  'partial-dir' => 2,
+  'temp-dir' => 2,
+);
+### END of options data output by the cull-options script. ###
 
-# Enforce default of $subdir instead of the normal $HOME default.
-my $orig = $dir;
-my @dirs;
-$dir =~ s/^"(.*?)"$/$1/;
-$dir =~ s/^\s+//;
-$dir =~ s/\s+$//;
-foreach (split(/(?<!\\)\s+/, $dir)) {
-  s/\\(\s)/$1/g;			# Unescape any escaped whitespace
-  if ($subdir eq '/') {			# Less checking for '/' access
-    $dir = '/' if $dir eq '';
-  } else {
-    s#^/##;				# Don't allow absolute paths
-    $_ = "$subdir/$_" unless m#^\Q$subdir\E(/|$)#;
-    1 while s#/\.\.(/|$)#/__/#g;	# Don't allow foo/../../etc
-  }
-  tr#-_/a-zA-Z0-9.,+@^%: #_#c;		# Don't allow '"&;|!=()[]{}<>*?#\$
-  s/(\s)/\\$1/g;			# Re-escape whitespace
-  push(@dirs, $_);
+if ($short_disabled ne '') {
+    $short_no_arg =~ s/[$short_disabled]//go;
+    $short_with_num =~ s/[$short_disabled]//go;
 }
-push(@dirs, $subdir) unless @dirs;
-$dir = join(' ', @dirs);
 
-if (-f LOGFILE and open LOG,'>>',LOGFILE) {
+my(@opts, @args);
+my $in_options = 1;
+my $last_opt = '';
+my $check_type;
+foreach (split(/(?<!\\)\s+/, $command)) {
+  if ($check_type) {
+    s/\\(.)/$1/g;
+    push(@opts, check_arg($last_opt, $_, $check_type));
+    $check_type = 0;
+  } elsif ($in_options) {
+    s/\\(.)/$1/g;
+    push(@opts, $_);
+    if ($_ eq '.') {
+      $in_options = 0;
+    } else {
+      next if /^-[$short_no_arg]+$/o || /^-[$short_with_num]\d+$/o;
+
+      my($opt,$arg) = /^--([^=]+)(?:=(.*))?$/;
+      my $disabled;
+      if (defined $arg) {
+	my $ct = $long_with_arg{$opt};
+	if ($ct) {
+	  $arg = check_arg($opt, $arg, $ct);
+	  $opts[-1] =~ s/=.*/=$arg/;
+	  next;
+	}
+	$disabled = defined $long_with_arg{$opt};
+	$opt = "--$opt";
+      } elsif (defined $opt) {
+	if (defined $long_no_arg{$opt}) {
+	  next if $long_no_arg{$opt};
+	  $disabled = 1;
+	} else {
+	  $check_type = $long_before_arg{$opt};
+	  if ($check_type) {
+	    $last_opt = $opt;
+	    next;
+	  }
+	  $disabled = defined $check_type;
+	}
+	$opt = "--$opt";
+      } elsif ($short_disabled ne '') {
+	$disabled = /^-[$short_no_arg]*([$short_disabled])/o;
+	$opt = "-$1" if $disabled;
+      }
+
+      die "$0: option $opt has been disabled on this server.\n" if $disabled;
+      die "$0: invalid rsync-command syntax or options\n";
+    }
+  } else {
+    push(@args, $_);
+  }
+}
+
+my $write_log = -f LOGFILE && open(LOG, '>>', LOGFILE);
+
+chdir($subdir) or die "$0: Unable to chdir to $subdir: $!\n";
+
+# Validate args to ensure they don't try to leave our restricted dir.
+if ($subdir ne '/') {
+  my @new;
+  foreach (@args) {
+    s#//+#/#g;			# Turn multiple slashes into a single slash
+    s#^/##;			# Don't allow absolute paths
+    s#^$#.#;			# Turn empty arg into "."
+    die "Do not use .. in any path!\n" if m#(^|/)\.\.(/|$)#;
+    push(@new, bsd_glob($_, GLOB_LIMIT | GLOB_NOCHECK | GLOB_BRACE | GLOB_QUOTE));
+  }
+  @args = @new;
+}
+
+@args = ( '.' ) if !@args;
+
+if ($write_log) {
   my ($mm,$hh) = (localtime)[1,2];
   my $host = $ENV{SSH_CONNECTION} || 'unknown';
   $host =~ s/ .*//;			# Keep only the client's IP addr
   $host =~ s/^::ffff://;
   $host = gethostbyaddr(inet_aton($host),AF_INET) || $host;
-  my $dir_result = $dir eq $orig ? " OK" : "> \"$dir\"";
-  printf LOG "%02d:%02d %-13s [%s] =%s\n", $hh, $mm, $host, $command, $dir_result;
+  printf LOG "%02d:%02d %-13s [%s]\n", $hh, $mm, $host, "@opts @args";
   close LOG;
 }
 
-exec "$cmd \"$dir\"" or die "exec($cmd \"$dir\") failed: $? $!";
 # Note: This assumes that the rsync protocol will not be maliciously hijacked.
+exec(RSYNC, @opts, @args) or die "exec(rsync @opts @args) failed: $? $!";
+
+sub check_arg
+{
+  my($opt, $arg, $type) = @_;
+  if ($subdir ne '/' && $type > 0 && ($type < 2 || !$am_sender)) {
+    $arg =~ s#//#/#g;
+    die "Do not use .. in --$opt; anchor the path at the root of your restricted dir.\n"
+      if $arg =~ m#(^|/)\.\.(/|$)#;
+    $arg =~ s#^/#$subdir/#;
+  }
+  $arg;
+}
