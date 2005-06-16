@@ -1,0 +1,58 @@
+#!/usr/bin/perl
+# This script outputs some perl code that parses all possible options
+# that the code in options.c might send to the server.  This perl code
+# is included in the rrsync script.
+use strict;
+no strict 'refs';
+
+our(%short_no_arg, %short_with_num);
+our(%long_no_arg, %long_before_arg, %long_with_arg);
+our $last_long_opt;
+
+open(IN, '../options.c') or die "Unable to open ../options.c: $!\n";
+
+while (<IN>) {
+    if (/\Qargstr[x++]\E = '(.)'/) {
+	$short_no_arg{$1} = 1;
+	undef $last_long_opt;
+    } elsif (/\Qasprintf(\E[^,]+, "-([a-zA-Z0-9])\%l?[ud]"/) {
+	$short_with_num{$1} = 1;
+	undef $last_long_opt;
+    } elsif (/\Qargs[ac++]\E = "--([^"=]+)"/) {
+	$last_long_opt = $1;
+	$long_no_arg{$1} = 1;
+    } elsif (defined($last_long_opt)
+	&& /\Qargs[ac++]\E = ([^["\s]+);/ && $1 ne 'dest_option') {
+	delete $long_no_arg{$last_long_opt};
+	$long_before_arg{$last_long_opt} = 1;
+	undef $last_long_opt;
+    } elsif (/dest_option = "--([^"])"/) {
+	$long_before_arg{$1} = 1;
+	undef $last_long_opt;
+    } elsif (/\Qasprintf(\E[^,]+, "--([^"=]+)=/ || /\Qargs[ac++]\E = "--([^"=]+)=/) {
+	$long_with_arg{$1} = 1;
+	undef $last_long_opt;
+    }
+}
+close IN;
+
+print "our \$short_no_arg = '", sort(keys %short_no_arg), "';\n",
+    "our \$short_with_num = '", sort(keys %short_with_num), "';\n",
+    "# To disable a short-named option, add its letter to this string:\n",
+    "our \$short_disabled = '';\n",
+    "# To disable a long-named option, change its value to a 0.  A value of -1\n",
+    "# means the arg doesn't need checking, a 2 means only check when receiving.\n";
+
+foreach my $name (qw( long_no_arg long_with_arg long_before_arg )) {
+    $_ = "our \%$name = (\n  '" . join("' => 1,\n  '", sort keys %$name) . "' => 1,\n);\n";
+    if ($name eq 'long_before_arg') {
+	s/ 1,/ 2,/g;
+	s/('files-from' =>) 2,/$1 1,/;
+	s/('max-.* =>) 2,/$1 -1,/g;
+    } else {
+	s/ 1,/ -1,/g;
+	s/('files-from' =>) -1,/$1 1,/;
+    }
+    s/('remove-.* =>) (-?\d),/$1 \$ro ? 0 : $2,/g;
+    print;
+}
