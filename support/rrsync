@@ -42,7 +42,7 @@ die "$0: SSH_ORIGINAL_COMMAND='$command' is not rsync\n" unless $command =~ s/^r
 our $am_sender = $command =~ /^--server\s+--sender\s/; # Restrictive on purpose!
 die "$0 -ro: sending to read-only server not allowed\n" if $ro && !$am_sender;
 
-### START of options data produced by the cull-options script. ###
+### START of options data produced by the cull_options script. ###
 
 # These options are the only options that rsync might send to the server,
 # and only in the option/arg format that the stock rsync produces.
@@ -53,56 +53,54 @@ our $short_disabled = '';
 our $short_no_arg = 'CDHIKLORSWbcdglnoprtuvxz'; # DO NOT REMOVE ANY
 our $short_with_num = 'B'; # DO NOT REMOVE ANY
 
-# To disable a long-named option, change its value to a 0 (NOTE: at least
-# one option appears in two places!).  A value of -1 means the arg doesn't
-# need checking, a 1 means to check it, a 2 means only check when receiving.
-our %long_no_arg = (
-  'copy-unsafe-links' => -1,
-  'daemon' => -1,
-  'delay-updates' => -1,
-  'delete' => -1,
-  'delete-after' => -1,
-  'delete-before' => -1,
-  'delete-during' => -1,
-  'delete-excluded' => -1,
-  'existing' => -1,
-  'force' => -1,
-  'from0' => -1,
-  'fuzzy' => -1,
-  'ignore-errors' => -1,
-  'ignore-existing' => -1,
-  'inplace' => -1,
-  'list-only' => -1,
-  'no-implied-dirs' => -1,
-  'no-relative' => -1,
-  'numeric-ids' => -1,
-  'partial' => -1,
-  'remove-sent-files' => $ro ? 0 : -1,
-  'safe-links' => -1,
-  'sender' => -1,
-  'server' => -1,
-  'size-only' => -1,
-);
-our %long_with_arg = (
-  'bwlimit' => -1,
-  'checksum-seed' => -1,
-  'files-from' => 1,
-  'log-format' => -1,
-  'max-delete' => -1,
-  'modify-window' => -1,
-  'only-write-batch' => -1,
-  'suffix' => -1,
-  'timeout' => -1,
-);
-our %long_before_arg = (
+# To disable a long-named option, change its value to a -1.  The values mean:
+# 0 = the option has no arg; 1 = the arg doesn't need any checking; 2 = only
+# check the arg when receiving; and 3 = always check the arg.
+our %long_opt = (
   'backup-dir' => 2,
-  'files-from' => 1,
-  'max-size' => -1,
+  'bwlimit' => 1,
+  'checksum-seed' => 1,
+  'compare-dest' => 2,
+  'copy-dest' => 2,
+  'copy-unsafe-links' => 0,
+  'daemon' => 0,
+  'delay-updates' => 0,
+  'delete' => 0,
+  'delete-after' => 0,
+  'delete-before' => 0,
+  'delete-during' => 0,
+  'delete-excluded' => 0,
+  'existing' => 0,
+  'files-from' => 3,
+  'force' => 0,
+  'from0' => 0,
+  'fuzzy' => 0,
+  'ignore-errors' => 0,
+  'ignore-existing' => 0,
+  'inplace' => 0,
+  'link-dest' => 2,
+  'list-only' => 0,
+  'log-format' => 1,
+  'max-delete' => 1,
+  'max-size' => 1,
+  'modify-window' => 1,
+  'no-implied-dirs' => 0,
+  'no-relative' => 0,
+  'numeric-ids' => 0,
+  'only-write-batch' => 1,
+  'partial' => 0,
   'partial-dir' => 2,
+  'remove-sent-files' => $ro ? -1 : 0,
+  'safe-links' => 0,
+  'sender' => 0,
+  'server' => 0,
+  'size-only' => 0,
+  'suffix' => 1,
   'temp-dir' => 2,
+  'timeout' => 1,
 );
 
-### END of options data produced by the cull-options script. ###
+### END of options data produced by the cull_options script. ###
 
 if ($short_disabled ne '') {
     $short_no_arg =~ s/[$short_disabled]//go;
@@ -132,31 +130,25 @@ foreach (split(/(?<!\\)\s+/, $command)) {
 
       my($opt,$arg) = /^--([^=]+)(?:=(.*))?$/;
       my $disabled;
-      if (defined $arg) {
-	my $ct = $long_with_arg{$opt};
-	if ($ct) {
+      if (defined $opt) {
+	my $ct = $long_opt{$opt};
+	last unless defined $ct;
+	next if $ct == 0;
+	if ($ct > 0) {
+	  if (!defined $arg) {
+	    $check_type = $ct;
+	    $last_opt = $opt;
+	    next;
+	  }
 	  $arg = check_arg($opt, $arg, $ct);
 	  $opts[-1] =~ s/=.*/=$arg/;
 	  next;
 	}
-	$disabled = defined $long_with_arg{$opt};
-	$opt = "--$opt";
-      } elsif (defined $opt) {
-	if (defined $long_no_arg{$opt}) {
-	  next if $long_no_arg{$opt};
-	  $disabled = 1;
-	} else {
-	  $check_type = $long_before_arg{$opt};
-	  if ($check_type) {
-	    $last_opt = $opt;
-	    next;
-	  }
-	  $disabled = defined $check_type;
-	}
+	$disabled = 1;
 	$opt = "--$opt";
       } elsif ($short_disabled ne '') {
 	$disabled = /^-$short_no_arg*([$short_disabled])/o;
-	$opt = "-$1" if $disabled;
+	$opt = "-$1";
       }
 
       last unless $disabled; # Generate generic failure
@@ -194,7 +186,7 @@ sub check_arg
 {
   my($opt, $arg, $type) = @_;
   $arg =~ s/\\(.)/$1/g;
-  if ($subdir ne '/' && ($type == 1 || ($type == 2 && !$am_sender))) {
+  if ($subdir ne '/' && ($type == 3 || ($type == 2 && !$am_sender))) {
     $arg =~ s#//#/#g;
     die "Do not use .. in --$opt; anchor the path at the root of your restricted dir.\n"
       if $arg =~ m#(^|/)\.\.(/|$)#;
