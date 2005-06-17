@@ -43,10 +43,13 @@ print <<EOT;
 
 # These options are the only options that rsync might send to the server,
 # and only in the option/arg format that the stock rsync produces.
-our \$short_no_arg = '$short_no_arg';
-our \$short_with_num = '$short_with_num';
+
 # To disable a short-named option, add its letter to this string:
 our \$short_disabled = '';
+
+our \$short_no_arg = '$short_no_arg'; # DO NOT REMOVE ANY
+our \$short_with_num = '$short_with_num'; # DO NOT REMOVE ANY
+
 # To disable a long-named option, change its value to a 0 (NOTE: at least
 # one option appears in two places!).  A value of -1 means the arg doesn't
 # need checking, a 1 means to check it, a 2 means only check when receiving.
