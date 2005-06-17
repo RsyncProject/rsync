@@ -8,8 +8,12 @@ use strict;
 use Socket;
 use Cwd 'abs_path';
 use File::Glob ':glob';
-use constant RSYNC => 'rsync'; # Optionally set the path of rsync here.
+
+# You may configure these values to your liking.  See also the section
+# of options if you want to disable any options that rsync accepts.
+use constant RSYNC => '/usr/bin/rsync';
 use constant LOGFILE => 'rrsync.log';
+
 my $Usage = <<EOM;
 Use 'command="$0 [-ro] SUBDIR"'
 	in front of lines in $ENV{HOME}/.ssh/authorized_keys
@@ -40,14 +44,18 @@ die "$0 -ro: sending to read-only server not allowed\n" if $ro && !$am_sender;
 
 ### START of options data produced by the cull-options script. ###
 
-# These options are the only options that rsync might send to the
-# server, and only in the arg styles that the stock rsync produces.
-our $short_no_arg = 'CDHIKLORSWbcdglnoprtuvxz';
-our $short_with_num = 'B';
+# These options are the only options that rsync might send to the server,
+# and only in the option/arg format that the stock rsync produces.
+
 # To disable a short-named option, add its letter to this string:
 our $short_disabled = '';
-# To disable a long-named option, change its value to a 0.  A value of -1
-# means the arg doesn't need checking, a 2 means only check when receiving.
+
+our $short_no_arg = 'CDHIKLORSWbcdglnoprtuvxz'; # DO NOT REMOVE ANY
+our $short_with_num = 'B'; # DO NOT REMOVE ANY
+
+# To disable a long-named option, change its value to a 0 (NOTE: at least
+# one option appears in two places!).  A value of -1 means the arg doesn't
+# need checking, a 1 means to check it, a 2 means only check when receiving.
 our %long_no_arg = (
   'copy-unsafe-links' => -1,
   'daemon' => -1,
@@ -100,6 +108,8 @@ if ($short_disabled ne '') {
     $short_no_arg =~ s/[$short_disabled]//go;
     $short_with_num =~ s/[$short_disabled]//go;
 }
+$short_no_arg = "[$short_no_arg]" if length($short_no_arg) > 1;
+$short_with_num = "[$short_with_num]" if length($short_with_num) > 1;
 
 my $write_log = -f LOGFILE && open(LOG, '>>', LOGFILE);
 
@@ -111,16 +121,14 @@ my $last_opt = '';
 my $check_type;
 foreach (split(/(?<!\\)\s+/, $command)) {
   if ($check_type) {
-    s/\\(.)/$1/g;
     push(@opts, check_arg($last_opt, $_, $check_type));
     $check_type = 0;
   } elsif ($in_options) {
-    s/\\(.)/$1/g;
     push(@opts, $_);
     if ($_ eq '.') {
       $in_options = 0;
     } else {
-      next if /^-[$short_no_arg]+$/o || /^-[$short_with_num]\d+$/o;
+      next if /^-$short_no_arg+$/o || /^-$short_with_num\d+$/o;
 
       my($opt,$arg) = /^--([^=]+)(?:=(.*))?$/;
       my $disabled;
@@ -147,12 +155,12 @@ foreach (split(/(?<!\\)\s+/, $command)) {
 	}
 	$opt = "--$opt";
       } elsif ($short_disabled ne '') {
-	$disabled = /^-[$short_no_arg]*([$short_disabled])/o;
+	$disabled = /^-$short_no_arg*([$short_disabled])/o;
 	$opt = "-$1" if $disabled;
       }
 
-      die "$0: option $opt has been disabled on this server.\n" if $disabled;
-      last;
+      last unless $disabled; # Generate generic failure
+      die "$0: option $opt has been disabled on this server.\n";
     }
   } else {
     if ($subdir ne '/') {
@@ -185,7 +193,8 @@ exec(RSYNC, @opts, @args) or die "exec(rsync @opts @args) failed: $? $!";
 sub check_arg
 {
   my($opt, $arg, $type) = @_;
-  if ($subdir ne '/' && $type > 0 && ($type < 2 || !$am_sender)) {
+  $arg =~ s/\\(.)/$1/g;
+  if ($subdir ne '/' && ($type == 1 || ($type == 2 && !$am_sender))) {
     $arg =~ s#//#/#g;
     die "Do not use .. in --$opt; anchor the path at the root of your restricted dir.\n"
       if $arg =~ m#(^|/)\.\.(/|$)#;
