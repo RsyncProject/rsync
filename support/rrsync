@@ -35,12 +35,13 @@ die "$0: Restricted subdirectory does not exist!\n" if $subdir ne '/' && !-d $su
 my $command = $ENV{SSH_ORIGINAL_COMMAND};
 die "$0: Not invoked via sshd\n$Usage"	unless defined $command;
 die "$0: SSH_ORIGINAL_COMMAND='$command' is not rsync\n" unless $command =~ s/^rsync\s+//;
-our $am_sender = $command =~ /\s--sender\s/;
+our $am_sender = $command =~ /^--server\s+--sender\s/; # Restrictive on purpose!
 die "$0 -ro: sending to read-only server not allowed\n" if $ro && !$am_sender;
 
-# These options are only the options that rsync might send to the
-# server, and only in the arg format that the stock rsync uses.
-### START of options data output by the cull-options script. ###
+### START of options data produced by the cull-options script. ###
+
+# These options are the only options that rsync might send to the
+# server, and only in the arg styles that the stock rsync produces.
 our $short_no_arg = 'CDHIKLORSWbcdglnoprtuvxz';
 our $short_with_num = 'B';
 # To disable a short-named option, add its letter to this string:
@@ -92,7 +93,8 @@ our %long_before_arg = (
   'partial-dir' => 2,
   'temp-dir' => 2,
 );
-### END of options data output by the cull-options script. ###
+
+### END of options data produced by the cull-options script. ###
 
 if ($short_disabled ne '') {
     $short_no_arg =~ s/[$short_disabled]//go;
@@ -161,11 +163,11 @@ chdir($subdir) or die "$0: Unable to chdir to $subdir: $!\n";
 if ($subdir ne '/') {
   my @new;
   foreach (@args) {
-    s#//+#/#g;			# Turn multiple slashes into a single slash
-    s#^/##;			# Don't allow absolute paths
-    s#^$#.#;			# Turn empty arg into "."
-    die "Do not use .. in any path!\n" if m#(^|/)\.\.(/|$)#;
-    push(@new, bsd_glob($_, GLOB_LIMIT | GLOB_NOCHECK | GLOB_BRACE | GLOB_QUOTE));
+    s#//+#/#g;
+    s#^/##;
+    s#^$#.#;
+    die "Do not use .. in any path!\n" if m#(^|/)\\?\.\\?\.(\\?/|$)#;
+    push(@new, bsd_glob($_, GLOB_LIMIT|GLOB_NOCHECK|GLOB_BRACE|GLOB_QUOTE));
   }
   @args = @new;
 }
