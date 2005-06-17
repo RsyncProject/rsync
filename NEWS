@@ -24,6 +24,11 @@ Changes since 2.6.5:
     - Made the "max verbosity" setting in the rsyncd.conf file settable on a
       per-module basis (which now matches the documentation).
 
+    - The support/rrsync script has been upgraded to verify the args of options
+      that take them (instead of rejecting any such options).  The scrip was
+      also changed to try to be more secure and to fix a problem in the parsing
+      of a copy that has multiple sources.
+
   BUILD CHANGES:
 
     - Made configure define NOBODY_USER (currently hard-wired to "nobody") and
