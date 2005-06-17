@@ -19,7 +19,7 @@ our $ro = (@ARGV && $ARGV[0] eq '-ro') ? shift : '';	# -ro = Read-Only
 our $subdir = shift;
 die "$0: No subdirectory specified\n$Usage" unless defined $subdir;
 $subdir = abs_path($subdir);
-die "$0: Restricted subdirectory does not exist!\n" if $subdir ne '/' && !-d $subdir;
+die "$0: Restricted directory does not exist!\n" if $subdir ne '/' && !-d $subdir;
 
 # The client uses "rsync -av -e ssh src/ server:dir/", and sshd on the server
 # executes this program when .ssh/authorized_keys has 'command="..."'.
@@ -101,6 +101,10 @@ if ($short_disabled ne '') {
     $short_with_num =~ s/[$short_disabled]//go;
 }
 
+my $write_log = -f LOGFILE && open(LOG, '>>', LOGFILE);
+
+chdir($subdir) or die "$0: Unable to chdir to restricted dir: $!\n";
+
 my(@opts, @args);
 my $in_options = 1;
 my $last_opt = '';
@@ -148,36 +152,27 @@ foreach (split(/(?<!\\)\s+/, $command)) {
       }
 
       die "$0: option $opt has been disabled on this server.\n" if $disabled;
-      die "$0: invalid rsync-command syntax or options\n";
+      last;
     }
   } else {
-    push(@args, $_);
+    if ($subdir ne '/') {
+      # Validate args to ensure they don't try to leave our restricted dir.
+      s#//+#/#g;
+      s#^/##;
+      s#^$#.#;
+      die "Do not use .. in any path!\n" if m#(^|/)\\?\.\\?\.(\\?/|$)#;
+    }
+    push(@args, bsd_glob($_, GLOB_LIMIT|GLOB_NOCHECK|GLOB_BRACE|GLOB_QUOTE));
   }
 }
-
-my $write_log = -f LOGFILE && open(LOG, '>>', LOGFILE);
-
-chdir($subdir) or die "$0: Unable to chdir to $subdir: $!\n";
-
-# Validate args to ensure they don't try to leave our restricted dir.
-if ($subdir ne '/') {
-  my @new;
-  foreach (@args) {
-    s#//+#/#g;
-    s#^/##;
-    s#^$#.#;
-    die "Do not use .. in any path!\n" if m#(^|/)\\?\.\\?\.(\\?/|$)#;
-    push(@new, bsd_glob($_, GLOB_LIMIT|GLOB_NOCHECK|GLOB_BRACE|GLOB_QUOTE));
-  }
-  @args = @new;
-}
+die "$0: invalid rsync-command syntax or options\n" if $in_options;
 
 @args = ( '.' ) if !@args;
 
 if ($write_log) {
   my ($mm,$hh) = (localtime)[1,2];
   my $host = $ENV{SSH_CONNECTION} || 'unknown';
-  $host =~ s/ .*//;			# Keep only the client's IP addr
+  $host =~ s/ .*//; # Keep only the client's IP addr
   $host =~ s/^::ffff://;
   $host = gethostbyaddr(inet_aton($host),AF_INET) || $host;
   printf LOG "%02d:%02d %-13s [%s]\n", $hh, $mm, $host, "@opts @args";
