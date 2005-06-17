@@ -1,11 +1,12 @@
 #!/usr/bin/perl
-use strict;
 # Name: /usr/local/bin/rrsync (should also have a symlink in /usr/bin)
 # Purpose: Restricts rsync to subdirectory declared in .ssh/authorized_keys
 # Author: Joe Smith <js-cgi@inwap.com> 30-Sep-2004
 # Modified by: Wayne Davison <wayned@samba.org>
+use strict;
 
 use Socket;
+use Cwd 'abs_path';
 use File::Glob ':glob';
 use constant RSYNC => 'rsync'; # Optionally set the path of rsync here.
 use constant LOGFILE => 'rrsync.log';
@@ -17,6 +18,7 @@ EOM
 our $ro = (@ARGV && $ARGV[0] eq '-ro') ? shift : '';	# -ro = Read-Only
 our $subdir = shift;
 die "$0: No subdirectory specified\n$Usage" unless defined $subdir;
+$subdir = abs_path($subdir);
 die "$0: Restricted subdirectory does not exist!\n" if $subdir ne '/' && !-d $subdir;
 
 # The client uses "rsync -av -e ssh src/ server:dir/", and sshd on the server
