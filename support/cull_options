@@ -36,15 +36,21 @@ while (<IN>) {
 }
 close IN;
 
-print "\n",
-    "# These options are the only options that rsync might send to the\n",
-    "# server, and only in the arg styles that the stock rsync produces.\n",
-    "our \$short_no_arg = '", sort(keys %short_no_arg), "';\n",
-    "our \$short_with_num = '", sort(keys %short_with_num), "';\n",
-    "# To disable a short-named option, add its letter to this string:\n",
-    "our \$short_disabled = '';\n",
-    "# To disable a long-named option, change its value to a 0.  A value of -1\n",
-    "# means the arg doesn't need checking, a 2 means only check when receiving.\n";
+my $short_no_arg = join('', sort keys %short_no_arg);
+my $short_with_num = join('', sort keys %short_with_num);
+
+print <<EOT;
+
+# These options are the only options that rsync might send to the server,
+# and only in the option/arg format that the stock rsync produces.
+our \$short_no_arg = '$short_no_arg';
+our \$short_with_num = '$short_with_num';
+# To disable a short-named option, add its letter to this string:
+our \$short_disabled = '';
+# To disable a long-named option, change its value to a 0 (NOTE: at least
+# one option appears in two places!).  A value of -1 means the arg doesn't
+# need checking, a 1 means to check it, a 2 means only check when receiving.
+EOT
 
 foreach my $name (qw( long_no_arg long_with_arg long_before_arg )) {
     $_ = "our \%$name = (\n  '" . join("' => 1,\n  '", sort keys %$name) . "' => 1,\n);\n";
