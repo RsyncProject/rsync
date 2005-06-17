@@ -3,10 +3,8 @@
 # that the code in options.c might send to the server.  This perl code
 # is included in the rrsync script.
 use strict;
-no strict 'refs';
 
-our(%short_no_arg, %short_with_num);
-our(%long_no_arg, %long_before_arg, %long_with_arg);
+our(%short_no_arg, %short_with_num, %long_opt);
 our $last_long_opt;
 
 open(IN, '../options.c') or die "Unable to open ../options.c: $!\n";
@@ -20,17 +18,16 @@ while (<IN>) {
 	undef $last_long_opt;
     } elsif (/\Qargs[ac++]\E = "--([^"=]+)"/) {
 	$last_long_opt = $1;
-	$long_no_arg{$1} = 1;
+	$long_opt{$1} = 0;
     } elsif (defined($last_long_opt)
 	&& /\Qargs[ac++]\E = ([^["\s]+);/ && $1 ne 'dest_option') {
-	delete $long_no_arg{$last_long_opt};
-	$long_before_arg{$last_long_opt} = 1;
+	$long_opt{$last_long_opt} = 2;
 	undef $last_long_opt;
-    } elsif (/dest_option = "--([^"])"/) {
-	$long_before_arg{$1} = 1;
+    } elsif (/dest_option = "--([^"]+)"/) {
+	$long_opt{$1} = 2;
 	undef $last_long_opt;
     } elsif (/\Qasprintf(\E[^,]+, "--([^"=]+)=/ || /\Qargs[ac++]\E = "--([^"=]+)=/) {
-	$long_with_arg{$1} = 1;
+	$long_opt{$1} = 1;
 	undef $last_long_opt;
     }
 }
@@ -50,23 +47,18 @@ our \$short_disabled = '';
 our \$short_no_arg = '$short_no_arg'; # DO NOT REMOVE ANY
 our \$short_with_num = '$short_with_num'; # DO NOT REMOVE ANY
 
-# To disable a long-named option, change its value to a 0 (NOTE: at least
-# one option appears in two places!).  A value of -1 means the arg doesn't
-# need checking, a 1 means to check it, a 2 means only check when receiving.
+# To disable a long-named option, change its value to a -1.  The values mean:
+# 0 = the option has no arg; 1 = the arg doesn't need any checking; 2 = only
+# check the arg when receiving; and 3 = always check the arg.
+our \%long_opt = (
 EOT
 
-foreach my $name (qw( long_no_arg long_with_arg long_before_arg )) {
-    $_ = "our \%$name = (\n  '" . join("' => 1,\n  '", sort keys %$name) . "' => 1,\n);\n";
-    if ($name eq 'long_before_arg') {
-	s/ 1,/ 2,/g;
-	s/('files-from' =>) 2,/$1 1,/;
-	s/('max-.* =>) 2,/$1 -1,/g;
-    } else {
-	s/ 1,/ -1,/g;
-	s/('files-from' =>) -1,/$1 1,/;
-    }
-    s/('remove-.* =>) (-?\d),/$1 \$ro ? 0 : $2,/g;
-    print;
+foreach my $opt (sort keys %long_opt) {
+    my $val = $long_opt{$opt};
+    $val = 1 if $opt =~ /^max-/;
+    $val = 3 if $opt eq 'files-from';
+    $val = '$ro ? -1 : ' . $val if $opt =~ /^remove-/;
+    print "  '$opt' => $val,\n";
 }
 
-print "\n";
+print ");\n\n";
