@@ -12,9 +12,9 @@ Changes since 2.6.5:
     - The outputting of hard-linked files when verbosity was > 1 was not right:
       without -i it would output the name of each hard-linked file as thought
       it had been changed (it now outputs a "is hard linked" message for the
-      file); with -i it would could output all trailing dots for an unchanged
-      hard-link (it now changes those dots to spaces, as is done for other
-      unchanged files).
+      file); with -i it would output all dots for the unchanged attributes of
+      a hard-link (it now changes those dots to spaces, as is done for other
+      totally unchanged items).
 
     - When backing up a changed symlink or device, get rid of any old backup
       item so that we don't get an already-exists error.
@@ -25,9 +25,9 @@ Changes since 2.6.5:
       per-module basis (which now matches the documentation).
 
     - The support/rrsync script has been upgraded to verify the args of options
-      that take them (instead of rejecting any such options).  The scrip was
+      that take them (instead of rejecting any such options).  The script was
       also changed to try to be more secure and to fix a problem in the parsing
-      of a copy that has multiple sources.
+      of a pull operation that has multiple sources.
 
   BUILD CHANGES:
 
