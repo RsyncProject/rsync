@@ -39,7 +39,7 @@ my $short_with_num = join('', sort keys %short_with_num);
 print <<EOT;
 
 # These options are the only options that rsync might send to the server,
-# and only in the option/arg format that the stock rsync produces.
+# and only in the option format that the stock rsync produces.
 
 # To disable a short-named option, add its letter to this string:
 our \$short_disabled = '';
