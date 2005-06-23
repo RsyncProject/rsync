@@ -45,7 +45,7 @@ die "$0 -ro: sending to read-only server not allowed\n" if $ro && !$am_sender;
 ### START of options data produced by the cull_options script. ###
 
 # These options are the only options that rsync might send to the server,
-# and only in the option/arg format that the stock rsync produces.
+# and only in the option format that the stock rsync produces.
 
 # To disable a short-named option, add its letter to this string:
 our $short_disabled = '';
@@ -117,7 +117,8 @@ my(@opts, @args);
 my $in_options = 1;
 my $last_opt = '';
 my $check_type;
-foreach (split(/(?<!\\)\s+/, $command)) {
+while ($command =~ /((?:[^\s\\]+|\\.[^\s\\]*)+)/g) {
+  $_ = $1;
   if ($check_type) {
     push(@opts, check_arg($last_opt, $_, $check_type));
     $check_type = 0;
