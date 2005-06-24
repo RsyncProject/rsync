@@ -32,7 +32,7 @@ filter_outfile() {
 
 makepath "$fromdir/foo"
 makepath "$fromdir/bar/baz"
-cp -p "$srcdir/config.h" "$fromdir/foo/config1"
+cp -p "$srcdir/configure.in" "$fromdir/foo/config1"
 cp -p "$srcdir/config.h.in" "$fromdir/foo/config2"
 cp -p "$srcdir/rsync.h" "$fromdir/bar/baz/rsync"
 chmod 600 "$fromdir"/foo/config? "$fromdir/bar/baz/rsync"
@@ -58,7 +58,7 @@ diff $diffopt "$chkfile" "$outfile" || test_fail "test 1 failed"
 # Ensure there are no accidental directory-time problems.
 $RSYNC -a -f '-! */' "$fromdir/" "$todir"
 
-cp -p "$srcdir/config.h" "$fromdir/foo/config2"
+cp -p "$srcdir/configure.in" "$fromdir/foo/config2"
 chmod 601 "$fromdir/foo/config2"
 $RSYNC -iplrH "$fromdir/" "$todir/" \
     | tee "$outfile"
@@ -91,7 +91,7 @@ cL..T.... foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 3 failed"
 
-cp -p "$srcdir/config.h" "$fromdir/foo/config2"
+cp -p "$srcdir/configure.in" "$fromdir/foo/config2"
 chmod 600 "$fromdir/foo/config2"
 # Lack of -t is for unchanged hard-link stress-test!
 $RSYNC -vvplrH "$fromdir/" "$todir/" \
