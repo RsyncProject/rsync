@@ -10,7 +10,7 @@ Changes since 2.6.5:
       combined with --list-dest).
 
     - The outputting of hard-linked files when verbosity was > 1 was not right:
-      without -i it would output the name of each hard-linked file as thought
+      without -i it would output the name of each hard-linked file as though
       it had been changed (it now outputs a "is hard linked" message for the
       file); with -i it would output all dots for the unchanged attributes of
       a hard-link (it now changes those dots to spaces, as is done for other
@@ -18,6 +18,9 @@ Changes since 2.6.5:
 
     - When backing up a changed symlink or device, get rid of any old backup
       item so that we don't get an already-exists error.
+
+    - A couple places that were comparing a local and a remote modification-
+      time were not honoring the --modify-window option.
 
   ENHANCEMENTS:
 
