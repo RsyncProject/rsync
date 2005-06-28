@@ -325,7 +325,7 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 
 			if ((iflags & (ITEM_TRANSFER|ITEM_LOCAL_CHANGE) && !keep_time
 			     && (!(iflags & ITEM_XNAME_FOLLOWS) || *xname))
-			    || (keep_time && file->modtime != st->st_mtime))
+			    || (keep_time && cmp_modtime(file->modtime, st->st_mtime) != 0))
 				iflags |= ITEM_REPORT_TIME;
 			if (preserve_perms && file->mode != st->st_mode)
 				iflags |= ITEM_REPORT_PERMS;
@@ -529,7 +529,7 @@ static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
 		name = fp->basename;
 
 		if (fp->length == file->length
-		    && fp->modtime == file->modtime) {
+		    && cmp_modtime(fp->modtime, file->modtime) == 0) {
 			if (verbose > 4) {
 				rprintf(FINFO,
 					"fuzzy size/modtime match for %s\n",
