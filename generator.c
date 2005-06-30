@@ -707,7 +707,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (statret != 0 && do_mkdir(fname,file->mode) != 0 && errno != EEXIST) {
 			if (!relative_paths || errno != ENOENT
 			    || create_directory_path(fname, orig_umask) < 0
-			    || do_mkdir(fname, file->mode) < 0) {
+			    || (do_mkdir(fname, file->mode) < 0 && errno != EEXIST)) {
 				rsyserr(FERROR, errno,
 					"recv_generator: mkdir %s failed",
 					full_fname(fname));
