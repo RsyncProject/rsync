@@ -22,6 +22,12 @@ Changes since 2.6.5:
     - A couple places that were comparing a local and a remote modification-
       time were not honoring the --modify-window option.
 
+    - Fixed a really old, minor bug that could cause rsync to warn about being
+      unable to mkdir() a path that ends in "/." because it just created the
+      directory (required --relative, --no-implied-dirs, a source path that
+      ended in either a trailing slash or a trailing "/.", and a non-existing
+      destination dir to tickle the bug in a recent version).
+
   ENHANCEMENTS:
 
     - Made the "max verbosity" setting in the rsyncd.conf file settable on a
