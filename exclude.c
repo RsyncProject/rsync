@@ -1176,7 +1176,7 @@ void recv_filter_list(int f_in)
 	if (!local_server && (am_sender || receiver_wants_list)) {
 		while ((len = read_int(f_in)) != 0) {
 			if (len >= sizeof line)
-				overflow("recv_rules");
+				overflow_exit("recv_rules");
 			read_sbuf(f_in, line, len);
 			parse_rule(&filter_list, line, 0, xflags);
 		}

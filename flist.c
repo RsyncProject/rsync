@@ -546,7 +546,7 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 		rprintf(FERROR,
 			"overflow: flags=0x%x l1=%d l2=%d lastname=%s\n",
 			flags, l1, l2, safe_fname(lastname));
-		overflow("receive_file_entry");
+		overflow_exit("receive_file_entry");
 	}
 
 	strlcpy(thisname, lastname, l1 + 1);
@@ -611,7 +611,7 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 		if (linkname_len <= 0 || linkname_len > MAXPATHLEN) {
 			rprintf(FERROR, "overflow: linkname_len=%d\n",
 				linkname_len - 1);
-			overflow("receive_file_entry");
+			overflow_exit("receive_file_entry");
 		}
 	}
 	else
@@ -1122,7 +1122,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				fname[1] = '\0';
 			} else {
 				if (l + 1 >= MAXPATHLEN)
-					overflow("send_file_list");
+					overflow_exit("send_file_list");
 				fname[l++] = '.';
 				fname[l] = '\0';
 			}
@@ -1130,7 +1130,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		} else if (l > 1 && fname[l-1] == '.' && fname[l-2] == '.'
 		    && (l == 2 || fname[l-3] == '/')) {
 			if (l + 2 >= MAXPATHLEN)
-				overflow("send_file_list");
+				overflow_exit("send_file_list");
 			fname[l++] = '/';
 			fname[l++] = '.';
 			fname[l] = '\0';
