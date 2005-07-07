@@ -6,6 +6,10 @@
 #include "zutil.h"
 #include "infblock.h"
 
+#ifdef BAD /* For AIX */
+#undef BAD
+#endif
+
 struct inflate_blocks_state {int dummy;}; /* for buggy compilers */
 
 typedef enum {
