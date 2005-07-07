@@ -51,6 +51,8 @@
 
 #include "deflate.h"
 
+#define read_buf dread_buf
+
 const char deflate_copyright[] =
    " deflate 1.1.4 Copyright 1995-2002 Jean-loup Gailly ";
 /*
@@ -80,7 +82,7 @@ local block_state deflate_slow   OF((deflate_state *s, int flush));
 local void lm_init        OF((deflate_state *s));
 local void putShortMSB    OF((deflate_state *s, uInt b));
 local void flush_pending  OF((z_streamp strm));
-local int dread_buf        OF((z_streamp strm, Bytef *buf, unsigned size));
+local int read_buf        OF((z_streamp strm, Bytef *buf, unsigned size));
 #ifdef ASMV
       void match_init OF((void)); /* asm code initialization */
       uInt longest_match  OF((deflate_state *s, IPos cur_match));
@@ -411,7 +413,7 @@ local void putShortMSB (s, b)
  * Flush as much pending output as possible. All deflate() output goes
  * through this function so some applications may wish to modify it
  * to avoid allocating a large strm->next_out buffer and copying into it.
- * (See also dread_buf()).
+ * (See also read_buf()).
  */
 local void flush_pending(strm)
     z_streamp strm;
@@ -659,7 +661,7 @@ int ZEXPORT deflateCopy (dest, source)
  * allocating a large strm->next_in buffer and copying from it.
  * (See also flush_pending()).
  */
-local int dread_buf(strm, buf, size)
+local int read_buf(strm, buf, size)
     z_streamp strm;
     Bytef *buf;
     unsigned size;
@@ -1030,7 +1032,7 @@ local void fill_window(s)
          */
         Assert(more >= 2, "more < 2");
 
-        n = dread_buf(s->strm, s->window + s->strstart + s->lookahead, more);
+        n = read_buf(s->strm, s->window + s->strstart + s->lookahead, more);
         s->lookahead += n;
 
         /* Initialize the hash value now that we have some input: */
