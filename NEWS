@@ -2,6 +2,12 @@ NEWS for rsync 2.6.6 (UNRELEASED)
 Protocol: 29 (unchanged)
 Changes since 2.6.5:
 
+  SECURITY FIXES:
+
+    - Applied a zlib fix to block a buffer overflow in the decompression
+      code.  Only affects a daemon if it allows uploads and does not refuse
+      the --compress option.
+
   BUG FIXES:
 
     - The setting of flist->high in clean_flist() was wrong for an empty list.
@@ -17,7 +23,7 @@ Changes since 2.6.5:
       totally unchanged items).
 
     - When backing up a changed symlink or device, get rid of any old backup
-      item so that we don't get an already-exists error.
+      item so that we don't get an "already exists" error.
 
     - A couple places that were comparing a local and a remote modification-
       time were not honoring the --modify-window option.
@@ -37,6 +43,9 @@ Changes since 2.6.5:
       that take them (instead of rejecting any such options).  The script was
       also changed to try to be more secure and to fix a problem in the parsing
       of a pull operation that has multiple sources.
+
+    - Upgraded the zlib code from 1.1.4 to 1.2.2 (plus the security fix
+      mentioned above).
 
   BUILD CHANGES:
 
