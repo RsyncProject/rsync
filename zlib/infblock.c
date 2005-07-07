@@ -251,10 +251,10 @@ int r;
       {
         r = t;
         if (r == Z_DATA_ERROR)
-	  {
-	    ZFREE(z, s->sub.trees.blens);
-	    s->mode = zBAD;
-	  }
+        {
+          ZFREE(z, s->sub.trees.blens);
+          s->mode = zBAD;
+        }
         LEAVE
       }
       s->sub.trees.index = 0;
@@ -318,14 +318,14 @@ int r;
         if (t != Z_OK)
         {
           if (t == (uInt)Z_DATA_ERROR)
-	    {
-	      ZFREE(z, s->sub.trees.blens);
-	      s->mode = zBAD;
-	    }
+          {
+            ZFREE(z, s->sub.trees.blens);
+            s->mode = zBAD;
+          }
           r = t;
           LEAVE
         }
-	ZFREE(z, s->sub.trees.blens);
+        ZFREE(z, s->sub.trees.blens);
         Tracev((stderr, "inflate:       trees ok\n"));
         if ((c = inflate_codes_new(bl, bd, tl, td, z)) == Z_NULL)
         {
