@@ -53,24 +53,15 @@ rsync daemon directly via TCP.  The remote-shell transport is used whenever
 the source or destination path contains a single colon (:) separator after
 a host specification.  Contacting an rsync daemon directly happens when the
 source or destination path contains a double colon (::) separator after a
-host specification, OR when an rsync:// URL is specified.
+host specification, OR when an rsync:// URL is specified (see also the
+"CONNECTING TO AN RSYNC DAEMON OVER A REMOTE SHELL PROGRAM" section for
+an exception to this latter rule).
 
 As a special case, if a remote source is specified without a destination,
 the remote files are listed in an output format similar to "ls -l".
 
 As expected, if neither the source or destination path specify a remote
 host, the copy occurs locally (see also the bf(--list-only) option).
-
-Finally, it is possible to use a remote-shell transport to contact a remote
-host and then to spawn a single-use rsync daemon.  This allows the use of
-some of the daemon features (such as named modules) without having to run a
-daemon as a service.  To achieve this, invoke rsync with an explicit
-bf(--rsh=COMMAND) (aka "bf(-e COMMAND)") option combined with either the
-source or destination path specified as an rsync daemon (i.e. either a ::
-separator or an rsync:// URL).  In this case, rsync contacts the remote
-host specified using the specified remote shell, and then starts a
-single-use rsync daemon to deal with that copy request.  See the section
-"CONNECTING TO AN RSYNC DAEMON OVER A REMOTE SHELL PROGRAM" below.
 
 manpagesection(SETUP)
 
@@ -242,10 +233,8 @@ manpagesection(RUNNING AN RSYNC DAEMON)
 
 An rsync daemon is configured using a configuration file.  Please see the
 rsyncd.conf(5) man page for more information.  By default the configuration
-file is called /etc/rsyncd.conf, unless rsync is running over a remote
-shell program and is not running as root; in that case, the default name
-is rsyncd.conf in the current directory on the remote computer
-(typically $HOME).
+file is called /etc/rsyncd.conf (unless the daemon is spawned via a remote
+shell--see below).
 
 manpagesection(RUNNING AN RSYNC DAEMON OVER A REMOTE SHELL PROGRAM)
 
@@ -253,7 +242,7 @@ See the rsyncd.conf(5) man page for full information on the rsync
 daemon configuration file.
 
 Several configuration options will not be available unless the remote
-user is root (e.g. chroot, setuid/setgid, etc.).  There is no need to
+user is root (e.g. chroot, uid, gid, etc.).  There is no need to
 configure inetd or the services map to include the rsync daemon port
 if you run an rsync daemon only via a remote shell program.
 
