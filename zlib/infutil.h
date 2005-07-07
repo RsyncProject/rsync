@@ -11,6 +11,10 @@
 #ifndef _INFUTIL_H
 #define _INFUTIL_H
 
+#ifdef BAD /* For AIX */
+#undef BAD
+#endif
+
 typedef enum {
       TYPE,     /* get type bits (3, including end bit) */
       LENS,     /* get lengths for stored */
@@ -21,7 +25,7 @@ typedef enum {
       CODES,    /* processing fixed or dynamic block */
       DRY,      /* output remaining window bytes */
       DONE,     /* finished last block, done */
-      zBAD}      /* got a data error--stuck here */
+      BAD}      /* got a data error--stuck here */
 inflate_block_mode;
 
 /* inflate blocks semi-private state */

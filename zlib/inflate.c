@@ -22,7 +22,7 @@ typedef enum {
       CHECK2,   /* two check bytes to go */
       CHECK1,   /* one check byte to go */
       DONE,     /* finished check, done */
-      zBAD}      /* got an error--stay here */
+      BAD}      /* got an error--stay here */
 inflate_mode;
 
 /* inflate private state */
@@ -38,7 +38,7 @@ struct internal_state {
       uLong was;                /* computed check value */
       uLong need;               /* stream check value */
     } check;            /* if CHECK, check values to compare */
-    uInt marker;        /* if zBAD, inflateSync's marker bytes count */
+    uInt marker;        /* if BAD, inflateSync's marker bytes count */
   } sub;        /* submode */
 
   /* mode independent information */
@@ -164,14 +164,14 @@ int f;
       NEEDBYTE
       if (((z->state->sub.method = NEXTBYTE) & 0xf) != Z_DEFLATED)
       {
-        z->state->mode = zBAD;
+        z->state->mode = BAD;
         z->msg = (char*)"unknown compression method";
         z->state->sub.marker = 5;       /* can't try inflateSync */
         break;
       }
       if ((z->state->sub.method >> 4) + 8 > z->state->wbits)
       {
-        z->state->mode = zBAD;
+        z->state->mode = BAD;
         z->msg = (char*)"invalid window size";
         z->state->sub.marker = 5;       /* can't try inflateSync */
         break;
@@ -182,7 +182,7 @@ int f;
       b = NEXTBYTE;
       if (((z->state->sub.method << 8) + b) % 31)
       {
-        z->state->mode = zBAD;
+        z->state->mode = BAD;
         z->msg = (char*)"incorrect header check";
         z->state->sub.marker = 5;       /* can't try inflateSync */
         break;
@@ -213,7 +213,7 @@ int f;
       z->state->mode = DICT0;
       return Z_NEED_DICT;
     case DICT0:
-      z->state->mode = zBAD;
+      z->state->mode = BAD;
       z->msg = (char*)"need dictionary";
       z->state->sub.marker = 0;       /* can try inflateSync */
       return Z_STREAM_ERROR;
@@ -221,7 +221,7 @@ int f;
       r = inflate_blocks(z->state->blocks, z, r);
       if (r == Z_DATA_ERROR)
       {
-        z->state->mode = zBAD;
+        z->state->mode = BAD;
         z->state->sub.marker = 0;       /* can try inflateSync */
         break;
       }
@@ -255,7 +255,7 @@ int f;
 
       if (z->state->sub.check.was != z->state->sub.check.need)
       {
-        z->state->mode = zBAD;
+        z->state->mode = BAD;
         z->msg = (char*)"incorrect data check";
         z->state->sub.marker = 5;       /* can't try inflateSync */
         break;
@@ -264,7 +264,7 @@ int f;
       z->state->mode = DONE;
     case DONE:
       return Z_STREAM_END;
-    case zBAD:
+    case BAD:
       return Z_DATA_ERROR;
     default:
       return Z_STREAM_ERROR;
@@ -310,9 +310,9 @@ z_streamp z;
   /* set up */
   if (z == Z_NULL || z->state == Z_NULL)
     return Z_STREAM_ERROR;
-  if (z->state->mode != zBAD)
+  if (z->state->mode != BAD)
   {
-    z->state->mode = zBAD;
+    z->state->mode = BAD;
     z->state->sub.marker = 0;
   }
   if ((n = z->avail_in) == 0)
