@@ -872,6 +872,13 @@ static int start_client(int argc, char *argv[])
 		argc--;
 		shell_path = check_for_hostspec(argv[0], &shell_machine, &rsync_port);
 		if (shell_path) { /* source is remote */
+			char *dummy1;
+			int dummy2;
+			if (check_for_hostspec(argv[argc], &dummy1, &dummy2)) {
+				rprintf(FERROR,
+					"The source and destination cannot both be remote.\n");
+				exit_cleanup(RERR_SYNTAX);
+			}
 			argv++;
 			if (filesfrom_host && *filesfrom_host
 			    && strcmp(filesfrom_host, shell_machine) != 0) {

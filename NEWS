@@ -34,6 +34,10 @@ Changes since 2.6.5:
       ended in either a trailing slash or a trailing "/.", and a non-existing
       destination dir to tickle the bug in a recent version).
 
+    - If the user specifies a remote-host for both the source and destination,
+      we now output a syntax error rather than trying to open the destination
+      hostspec as a filename.
+
   ENHANCEMENTS:
 
     - Made the "max verbosity" setting in the rsyncd.conf file settable on a
