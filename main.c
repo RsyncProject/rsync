@@ -874,7 +874,7 @@ static int start_client(int argc, char *argv[])
 		if (shell_path) { /* source is remote */
 			char *dummy1;
 			int dummy2;
-			if (check_for_hostspec(argv[argc], &dummy1, &dummy2)) {
+			if (argc && check_for_hostspec(argv[argc], &dummy1, &dummy2)) {
 				rprintf(FERROR,
 					"The source and destination cannot both be remote.\n");
 				exit_cleanup(RERR_SYNTAX);
