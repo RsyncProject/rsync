@@ -1159,7 +1159,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (!relative_paths) {
 			p = strrchr(fname, '/');
 			if (p) {
-				*p = 0;
+				*p = '\0';
 				if (p == fname)
 					dir = "/";
 				else
@@ -1167,10 +1167,10 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				fname = p + 1;
 			}
 		} else if (implied_dirs && (p=strrchr(fname,'/')) && p != fname) {
-			/* this ensures we send the intermediate directories,
-			   thus getting their permissions right */
+			/* Send the implied directories at the start of the
+			 * source spec, so we get their permissions right. */
 			char *lp = lastpath, *fn = fname, *slash = fname;
-			*p = 0;
+			*p = '\0';
 			/* Skip any initial directories in our path that we
 			 * have in common with lastpath. */
 			while (*fn && *lp == *fn) {
@@ -1185,13 +1185,13 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				copy_links = copy_unsafe_links;
 				xfer_dirs = 1;
 				while ((slash = strchr(slash+1, '/')) != 0) {
-					*slash = 0;
+					*slash = '\0';
 					send_file_name(f, flist, fname, 0);
 					*slash = '/';
 				}
 				copy_links = save_copy_links;
 				xfer_dirs = save_xfer_dirs;
-				*p = 0;
+				*p = '\0';
 				strlcpy(lastpath, fname, sizeof lastpath);
 				*p = '/';
 			}
