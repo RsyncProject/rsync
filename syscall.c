@@ -104,7 +104,11 @@ int do_mknod(char *pathname, mode_t mode, dev_t dev)
 		    || (bind(sock, (struct sockaddr*)&saddr, sizeof saddr)) < 0)
 			return -1;
 		close(sock);
+#ifdef HAVE_CHMOD
 		return do_chmod(pathname, mode);
+#else
+		return 0;
+#endif
 	}
 #endif
 #ifdef HAVE_MKNOD
@@ -137,7 +141,14 @@ int do_chmod(const char *path, mode_t mode)
 	int code;
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-	code = chmod(path, mode);
+	if (S_ISLNK(mode)) {
+#ifdef HAVE_LCHMOD
+		code = lchmod(path, mode & CHMOD_BITS);
+#else
+		code = 1;
+#endif
+	} else
+		code = chmod(path, mode & CHMOD_BITS);
 	if (code != 0 && preserve_perms)
 	    return code;
 	return 0;
