@@ -496,11 +496,12 @@ dnl AC_FUNC_MEMCMP
 
 AC_FUNC_UTIME_NULL
 AC_FUNC_ALLOCA
-AC_CHECK_FUNCS(waitpid wait4 getcwd strdup strerror chown chmod mknod mkfifo \
-    fchmod fstat strchr readlink link utime utimes strftime mtrace ftruncate \
+AC_CHECK_FUNCS(waitpid wait4 getcwd strdup chown chmod lchmod mknod mkfifo \
+    fchmod fstat ftruncate strchr readlink link utime utimes lutimes strftime \
     memmove lchown vsnprintf snprintf vasprintf asprintf setsid glob strpbrk \
     strlcat strlcpy strtol mallinfo getgroups setgroups geteuid getegid \
-    setlocale setmode open64 lseek64 mkstemp64 va_copy __va_copy)
+    setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \
+    strerror)
 
 AC_CHECK_FUNCS(getpgrp tcgetpgrp)
 if test $ac_cv_func_getpgrp = yes; then
