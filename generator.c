@@ -327,7 +327,8 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 			     && (!(iflags & ITEM_XNAME_FOLLOWS) || *xname))
 			    || (keep_time && cmp_modtime(file->modtime, st->st_mtime) != 0))
 				iflags |= ITEM_REPORT_TIME;
-			if (preserve_perms && file->mode != st->st_mode)
+			if (preserve_perms
+			 && (file->mode & CHMOD_BITS) != (st->st_mode & CHMOD_BITS))
 				iflags |= ITEM_REPORT_PERMS;
 			if (preserve_uid && am_root && file->uid != st->st_uid)
 				iflags |= ITEM_REPORT_OWNER;
@@ -704,7 +705,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			itemize(file, ndx, statret, &st,
 				statret ? ITEM_LOCAL_CHANGE : 0, 0, NULL);
 		}
-		if (statret != 0 && do_mkdir(fname,file->mode) != 0 && errno != EEXIST) {
+		if (statret != 0 && do_mkdir(fname,file->mode) < 0 && errno != EEXIST) {
 			if (!relative_paths || errno != ENOENT
 			    || create_directory_path(fname, orig_umask) < 0
 			    || (do_mkdir(fname, file->mode) < 0 && errno != EEXIST)) {
@@ -798,7 +799,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					safe_fname(fname),
 					(int)file->mode, (int)file->u.rdev);
 			}
-			if (do_mknod(fname,file->mode,file->u.rdev) != 0) {
+			if (do_mknod(fname,file->mode,file->u.rdev) < 0) {
 				rsyserr(FERROR, errno, "mknod %s failed",
 					full_fname(fname));
 			} else {
@@ -1207,17 +1208,19 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		/* We need to ensure that any dirs we create have writeable
 		 * permissions during the time we are putting files within
 		 * them.  This is then fixed after the transfer is done. */
+#ifdef HAVE_CHMOD
 		if (!am_root && S_ISDIR(file->mode) && !(file->mode & S_IWUSR)
 		    && !list_only) {
 			int mode = file->mode | S_IWUSR; /* user write */
 			char *fname = local_name ? local_name : fbuf;
-			if (do_chmod(fname, mode & CHMOD_BITS) < 0) {
+			if (do_chmod(fname, mode) < 0) {
 				rsyserr(FERROR, errno,
 					"failed to modify permissions on %s",
 					full_fname(fname));
 			}
 			need_retouch_dir_perms = 1;
 		}
+#endif
 
 		if (preserve_hard_links)
 			check_for_finished_hlinks(itemizing, code);
