@@ -128,8 +128,13 @@ void overflow_exit(char *str)
 
 
 
-int set_modtime(char *fname, time_t modtime)
+int set_modtime(char *fname, time_t modtime, mode_t mode)
 {
+#if !defined HAVE_LUTIMES || !defined HAVE_UTIMES
+	if (S_ISLNK(mode))
+		return 1;
+#endif
+
 	if (verbose > 2) {
 		rprintf(FINFO, "set modtime of %s to (%ld) %s",
 			safe_fname(fname), (long)modtime,
@@ -140,7 +145,18 @@ int set_modtime(char *fname, time_t modtime)
 		return 0;
 
 	{
-#ifdef HAVE_UTIMBUF
+#ifdef HAVE_UTIMES
+		struct timeval t[2];
+		t[0].tv_sec = time(NULL);
+		t[0].tv_usec = 0;
+		t[1].tv_sec = modtime;
+		t[1].tv_usec = 0;
+# ifdef HAVE_LUTIMES
+		if (S_ISLNK(mode))
+			return lutimes(fname, t);
+# endif
+		return utimes(fname, t);
+#elif defined HAVE_UTIMBUF
 		struct utimbuf tbuf;
 		tbuf.actime = time(NULL);
 		tbuf.modtime = modtime;
@@ -151,12 +167,7 @@ int set_modtime(char *fname, time_t modtime)
 		t[1] = modtime;
 		return utime(fname,t);
 #else
-		struct timeval t[2];
-		t[0].tv_sec = time(NULL);
-		t[0].tv_usec = 0;
-		t[1].tv_sec = modtime;
-		t[1].tv_usec = 0;
-		return utimes(fname,t);
+#error No file-time-modification routine found!
 #endif
 	}
 }
