@@ -68,17 +68,18 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 		st = &st2;
 	}
 
-	if (!preserve_times || S_ISLNK(st->st_mode)
-	 || (S_ISDIR(st->st_mode) && omit_dir_times))
+	if (!preserve_times || (S_ISDIR(st->st_mode) && omit_dir_times))
 		flags |= PERMS_SKIP_MTIME;
 	if (!(flags & PERMS_SKIP_MTIME)
 	    && cmp_modtime(st->st_mtime, file->modtime) != 0) {
-		if (set_modtime(fname,file->modtime) != 0) {
+		int ret = set_modtime(fname, file->modtime, st->st_mode);
+		if (ret < 0) {
 			rsyserr(FERROR, errno, "failed to set times on %s",
 				full_fname(fname));
 			return 0;
 		}
-		updated = 1;
+		if (ret == 0) /* ret == 1 if symlink could not be set */
+			updated = 1;
 	}
 
 	change_uid = am_root && preserve_uid && st->st_uid != file->uid;
@@ -125,15 +126,16 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	}
 
 #ifdef HAVE_CHMOD
-	if (!S_ISLNK(st->st_mode)) {
-		if ((st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS)) {
-			updated = 1;
-			if (do_chmod(fname,(file->mode & CHMOD_BITS)) != 0) {
-				rsyserr(FERROR, errno, "failed to set permissions on %s",
-					full_fname(fname));
-				return 0;
-			}
+	if ((st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS)) {
+		int ret = do_chmod(fname, file->mode);
+		if (ret < 0) {
+			rsyserr(FERROR, errno,
+				"failed to set permissions on %s",
+				full_fname(fname));
+			return 0;
 		}
+		if (ret == 0) /* ret == 1 if symlink could not be set */
+			updated = 1;
 	}
 #endif
 
