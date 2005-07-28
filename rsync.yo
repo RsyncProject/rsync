@@ -298,6 +298,7 @@ to the detailed description below for a complete description.  verb(
      --suffix=SUFFIX         backup suffix (default ~ w/o --backup-dir)
  -u, --update                skip files that are newer on the receiver
      --inplace               update destination files in-place
+     --append                append data onto shorter files
  -d, --dirs                  transfer directories without recursing
  -l, --links                 copy symlinks as symlinks
  -L, --copy-links            transform symlink into referent file/dir
@@ -556,6 +557,14 @@ transfer (and possibly afterward if the transfer gets interrupted), so you
 should not use this option to update files that are in use.  Also note that
 rsync will be unable to update a file in-place that is not writable by the
 receiving user.
+
+dit(bf(--append)) This causes rsync to update a file by appending data onto
+the end of the file, which presumes that the data that already exists on
+the receiving side is identical with the start of the file on the sending
+side.  If that is not true, the file will fail the checksum test, and the
+resend will do a normal bf(--inplace) update to correct the mismatch.  Any
+file on the receiving side that is longer than a file on the sending side
+is skipped.  Implies bf(--inplace).
 
 dit(bf(-d, --dirs)) Tell the sending side to include any directories that
 are encountered.  Unlike bf(--recursive), a directory's contents are not copied
