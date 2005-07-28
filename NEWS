@@ -4,9 +4,10 @@ Changes since 2.6.5:
 
   SECURITY FIXES:
 
-    - Applied a zlib fix to block a buffer overflow in the decompression
-      code.  Only affects a daemon if it allows uploads and does not refuse
-      the --compress option.
+    - The zlib code was upgraded to version 1.2.3 in order to make it more
+      secure.  While the widely-publicized security problem in zlib 1.2.2 did
+      not affect rsync, another security problem surfaced that affects rsync's
+      zlib 1.1.4.
 
   BUG FIXES:
 
@@ -38,18 +39,39 @@ Changes since 2.6.5:
       we now output a syntax error rather than trying to open the destination
       hostspec as a filename.
 
+    - Rsync now outputs a targeted error if both the source and destination
+      path appear to be a remote filespecs rather than treating the dest as
+      a very strange local path and (most likely) generating an error about
+      non-existent directories.
+
   ENHANCEMENTS:
+
+    - Added the --append option that makes rsync append data onto files
+      that are longer on the source than the destination (this includes new
+      files).
+
+    - The configure script now checks for lutimes() and lchmod() so that
+      rsync can make use of them to update attributes of symlinks (on
+      systems that support this).
 
     - Made the "max verbosity" setting in the rsyncd.conf file settable on a
       per-module basis (which now matches the documentation).
 
+    - Added two config items to the rsyncd.conf parsing:  "pre-xfer exec"
+      and "post-xfer exec".  These allow a command to be specified on a
+      per-module basis that will be run before and/or after a daemon-mode
+      transfer. 
+
     - The support/rrsync script has been upgraded to verify the args of options
-      that take them (instead of rejecting any such options).  The script was
+      that take args (instead of rejecting any such options).  The script was
       also changed to try to be more secure and to fix a problem in the parsing
       of a pull operation that has multiple sources.
 
-    - Upgraded the zlib code from 1.1.4 to 1.2.2 (plus the security fix
-      mentioned above).
+    - Improved the documentation that explains the difference between a
+      normal daemon transfer and a daemon-over remote-shell transfer.
+
+    - Some of the diffs supplied in the patches dir were fixed and/or
+      improved.
 
   BUILD CHANGES:
 
