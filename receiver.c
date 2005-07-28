@@ -45,6 +45,7 @@ extern int remove_sent_files;
 extern int module_id;
 extern int ignore_errors;
 extern int orig_umask;
+extern int append_mode;
 extern int keep_partial;
 extern int checksum_seed;
 extern int inplace;
@@ -211,6 +212,28 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		mapbuf = NULL;
 
 	sum_init(checksum_seed);
+
+	if (append_mode) {
+		OFF_T j;
+		sum.flength = (OFF_T)sum.count * sum.blength;
+		if (sum.remainder)
+			sum.flength -= sum.blength - sum.remainder;
+		for (j = CHUNK_SIZE; j < sum.flength; j += CHUNK_SIZE) {
+			sum_update(map_ptr(mapbuf, offset, CHUNK_SIZE),
+				   CHUNK_SIZE);
+			offset = j;
+		}
+		if (offset < sum.flength) {
+			int32 len = sum.flength - offset;
+			sum_update(map_ptr(mapbuf, offset, len), len);
+			offset = sum.flength;
+		}
+		if (fd != -1 && do_lseek(fd, offset, SEEK_SET) != offset) {
+			rsyserr(FERROR, errno, "lseek failed on %s",
+				full_fname(fname));
+			exit_cleanup(RERR_FILEIO);
+		}
+	}
 
 	while ((i = recv_token(f_in, &data)) != 0) {
 		if (do_progress)
@@ -417,6 +440,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			send_msg(MSG_DONE, "", 0);
 			if (keep_partial && !partial_dir)
 				make_backups = 0; /* prevents double backup */
+			append_mode = 0;
 			continue;
 		}
 

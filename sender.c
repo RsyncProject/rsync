@@ -27,6 +27,7 @@ extern int log_before_transfer;
 extern int log_format_has_i;
 extern int daemon_log_format_has_i;
 extern int csum_length;
+extern int append_mode;
 extern int io_error;
 extern int allowed_lull;
 extern int protocol_version;
@@ -70,6 +71,13 @@ static struct sum_struct *receive_sums(int f)
 	if (verbose > 3) {
 		rprintf(FINFO, "count=%.0f n=%ld rem=%ld\n",
 			(double)s->count, (long)s->blength, (long)s->remainder);
+	}
+
+	if (append_mode) {
+		s->flength = (OFF_T)s->count * s->blength;
+		if (s->remainder)
+			s->flength -= s->blength - s->remainder;
+		return s;
 	}
 
 	if (s->count == 0)
@@ -231,6 +239,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			/* For inplace: redo phase turns off the backup
 			 * flag so that we do a regular inplace send. */
 			make_backups = 0;
+			append_mode = 0;
 			continue;
 		}
 

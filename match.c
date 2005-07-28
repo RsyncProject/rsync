@@ -23,6 +23,7 @@ extern int verbose;
 extern int am_server;
 extern int do_progress;
 extern int checksum_seed;
+extern int append_mode;
 
 int updating_basis_file;
 
@@ -330,6 +331,21 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 
 	sum_init(checksum_seed);
 
+	if (append_mode) {
+		OFF_T j = 0;
+		for (j = CHUNK_SIZE; j < s->flength; j += CHUNK_SIZE) {
+			sum_update(map_ptr(buf, last_match, CHUNK_SIZE),
+				   CHUNK_SIZE);
+			last_match = j;
+		}
+		if (last_match < s->flength) {
+			int32 len = s->flength - last_match;
+			sum_update(map_ptr(buf, last_match, len), len);
+			last_match = s->flength;
+		}
+		s->count = 0;
+	}
+
 	if (len > 0 && s->count > 0) {
 		build_hash_table(s);
 
@@ -343,7 +359,7 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	} else {
 		OFF_T j;
 		/* by doing this in pieces we avoid too many seeks */
-		for (j = CHUNK_SIZE; j < len; j += CHUNK_SIZE)
+		for (j = last_match + CHUNK_SIZE; j < len; j += CHUNK_SIZE)
 			matched(f, s, buf, j, -2);
 		matched(f, s, buf, len, -1);
 	}

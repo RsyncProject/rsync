@@ -54,6 +54,7 @@ extern int delay_updates;
 extern int update_only;
 extern int opt_ignore_existing;
 extern int inplace;
+extern int append_mode;
 extern int make_backups;
 extern int csum_length;
 extern int ignore_times;
@@ -470,35 +471,42 @@ static void generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 	OFF_T offset = 0;
 
 	sum_sizes_sqroot(&sum, len);
+	write_sum_head(f_out, &sum);
+
+	if (append_mode > 0 && f_copy < 0)
+		return;
 
 	if (len > 0)
 		mapbuf = map_file(fd, len, MAX_MAP_SIZE, sum.blength);
 	else
 		mapbuf = NULL;
 
-	write_sum_head(f_out, &sum);
-
 	for (i = 0; i < sum.count; i++) {
 		int32 n1 = (int32)MIN(len, (OFF_T)sum.blength);
 		char *map = map_ptr(mapbuf, offset, n1);
-		uint32 sum1 = get_checksum1(map, n1);
 		char sum2[SUM_LENGTH];
+		uint32 sum1;
 
-		if (f_copy >= 0)
+		len -= n1;
+		offset += n1;
+
+		if (f_copy >= 0) {
 			full_write(f_copy, map, n1);
+			if (append_mode > 0)
+				continue;
+		}
 
+		sum1 = get_checksum1(map, n1);
 		get_checksum2(map, n1, sum2);
 
 		if (verbose > 3) {
 			rprintf(FINFO,
 				"chunk[%.0f] offset=%.0f len=%ld sum1=%08lx\n",
-				(double)i, (double)offset, (long)n1,
+				(double)i, (double)offset - n1, (long)n1,
 				(unsigned long)sum1);
 		}
 		write_int(f_out, sum1);
 		write_buf(f_out, sum2, sum.s2length);
-		len -= n1;
-		offset += n1;
 	}
 
 	if (mapbuf)
@@ -1007,6 +1015,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
+	if (append_mode && st.st_size > file->length)
+		return;
+
 	if (!compare_dest && fnamecmp_type <= FNAMECMP_BASIS_DIR_HIGH)
 		;
 	else if (fnamecmp_type == FNAMECMP_FUZZY)
@@ -1180,7 +1191,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		do_delete_pass(flist);
 	do_progress = 0;
 
-	if (whole_file < 0)
+	if (append_mode || whole_file < 0)
 		whole_file = 0;
 	if (verbose >= 2) {
 		rprintf(FINFO, "delta-transmission %s\n",
@@ -1239,6 +1250,8 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	only_existing = max_size = opt_ignore_existing = 0;
 	update_only = always_checksum = size_only = 0;
 	ignore_times = 1;
+	if (append_mode)  /* resend w/o append mode */
+		append_mode = -1; /* ... but only longer files */
 	make_backups = 0; /* avoid a duplicate backup for inplace processing */
 
 	if (verbose > 2)
