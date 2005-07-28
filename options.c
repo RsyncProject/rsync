@@ -38,6 +38,7 @@ int make_backups = 0;
  **/
 int whole_file = -1;
 
+int append_mode = 0;
 int archive_mode = 0;
 int keep_dirlinks = 0;
 int copy_links = 0;
@@ -166,6 +167,7 @@ static int modify_window_set;
 static int itemize_changes = 0;
 static int refused_delete, refused_archive_part;
 static int refused_partial, refused_progress, refused_delete_before;
+static int refused_inplace;
 static char *max_size_arg;
 static char partialdir_for_delayupdate[] = ".~tmp~";
 
@@ -274,6 +276,7 @@ void usage(enum logcode F)
   rprintf(F,"     --suffix=SUFFIX         set backup suffix (default %s w/o --backup-dir)\n",BACKUP_SUFFIX);
   rprintf(F," -u, --update                skip files that are newer on the receiver\n");
   rprintf(F,"     --inplace               update destination files in-place (SEE MAN PAGE)\n");
+  rprintf(F,"     --append                append data onto shorter files\n");
   rprintf(F," -d, --dirs                  transfer directories without recursing\n");
   rprintf(F," -l, --links                 copy symlinks as symlinks\n");
   rprintf(F," -L, --copy-links            transform symlink into referent file/dir\n");
@@ -404,6 +407,7 @@ static struct poptOption long_options[] = {
   {"links",           'l', POPT_ARG_NONE,   &preserve_links, 0, 0, 0 },
   {"copy-links",      'L', POPT_ARG_NONE,   &copy_links, 0, 0, 0 },
   {"keep-dirlinks",   'K', POPT_ARG_NONE,   &keep_dirlinks, 0, 0, 0 },
+  {"append",           0,  POPT_ARG_VAL,    &append_mode, 1, 0, 0 },
   {"whole-file",      'W', POPT_ARG_VAL,    &whole_file, 1, 0, 0 },
   {"no-whole-file",    0,  POPT_ARG_VAL,    &whole_file, 0, 0, 0 },
   {"copy-unsafe-links",0,  POPT_ARG_NONE,   &copy_unsafe_links, 0, 0, 0 },
@@ -579,6 +583,8 @@ static void set_refuse_options(char *bp)
 						refused_partial = op->val;
 					else if (wildmatch("progress", op->longName))
 						refused_progress = op->val;
+					else if (wildmatch("inplace", op->longName))
+						refused_inplace = op->val;
 					break;
 				}
 				if (!is_wild)
@@ -1128,6 +1134,19 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			bwlimit_writemax = 512;
 	}
 
+	if (append_mode) {
+		if (whole_file > 0) {
+			snprintf(err_buf, sizeof err_buf,
+				 "--append cannot be used with --whole-file\n");
+			return 0;
+		}
+		if (refused_inplace) {
+			create_refuse_error(refused_inplace);
+			return 0;
+		}
+		inplace = 1;
+	}
+
 	if (delay_updates && !partial_dir)
 		partial_dir = partialdir_for_delayupdate;
 
@@ -1135,7 +1154,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 #ifdef HAVE_FTRUNCATE
 		if (partial_dir) {
 			snprintf(err_buf, sizeof err_buf,
-				 "--inplace cannot be used with --%s\n",
+				 "--%s cannot be used with --%s\n",
+				 append_mode ? "append" : "inplace",
 				 delay_updates ? "delay-updates" : "partial-dir");
 			return 0;
 		}
@@ -1148,7 +1168,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		keep_partial = 0;
 #else
 		snprintf(err_buf, sizeof err_buf,
-			 "--inplace is not supported on this %s\n",
+			 "--%s is not supported on this %s\n",
+			 append_mode ? "append" : "inplace",
 			 am_server ? "server" : "client");
 		return 0;
 #endif
@@ -1440,7 +1461,9 @@ void server_options(char **args,int *argc)
 	if (opt_ignore_existing && am_sender)
 		args[ac++] = "--ignore-existing";
 
-	if (inplace)
+	if (append_mode)
+		args[ac++] = "--append";
+	else if (inplace)
 		args[ac++] = "--inplace";
 
 	if (tmpdir) {
