@@ -454,6 +454,35 @@ of the patterns will not be compressed during transfer.
 
 The default setting is tt(*.gz *.tgz *.zip *.z *.rpm *.deb *.iso *.bz2 *.tbz)
 
+dit(bf(pre-xfer exec), bf(post-xfer exec)) You may specify a command to be run
+before and/or after the transfer.  If the bf(pre-xfer exec) command fails, the
+transfer is aborted before it begins.
+
+The following environment variables are set for both commands:
+
+quote(itemize(
+  it() bf(RSYNC_MODULE_NAME): The name of the module being accessed.
+  it() bf(RSYNC_MODULE_PATH): The path configured for the module.
+  it() bf(RSYNC_HOST_ADDR): The accessing host's IP address.
+  it() bf(RSYNC_HOST_NAME): The accessing host's name.
+  it() bf(RSYNC_USER_NAME): The accessing user's name (empty if no user).
+))
+
+These environment variables will also be set for the bf(post-xfer exec)
+command:
+
+quote(itemize(
+  it() bf(RSYNC_EXIT_STATUS): rsync's exit value.  This will be 0 for a
+  successful run, a positive value for an error that rsync returned
+  (e.g. 23=partial xfer), or a -1 if rsync failed to exit properly.
+  it() bf(RSYNC_RAW_STATUS): the raw exit value from waitpid().
+))
+
+Even though the commands can be associated with a particular module, they
+are run using the permissions of the user that started the daemon (not the
+module's uid/gid setting) without any chroot restrictions (even if the
+module will/has run chroot()ed).
+
 enddit()
 
 manpagesection(AUTHENTICATION STRENGTH)
