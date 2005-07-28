@@ -227,6 +227,9 @@ static int rsync_module(int f_in, int f_out, int i)
 	uid_t uid = (uid_t)-2;  /* canonically "nobody" */
 	gid_t gid = (gid_t)-2;
 	char *p;
+#ifdef HAVE_PUTENV
+	char *s;
+#endif
 	char *addr = client_addr(f_in);
 	char *host = client_name(f_in);
 	char *name = lp_name(i);
@@ -346,6 +349,58 @@ static int rsync_module(int f_in, int f_out, int i)
 		   XFLG_ANCHORED2ABS | XFLG_OLD_PREFIXES);
 
 	log_init();
+
+#ifdef HAVE_PUTENV
+	s = lp_prexfer_exec(i);
+	p = lp_postxfer_exec(i);
+	if ((s && *s) || (p && *p)) {
+		char *modname, *modpath, *hostaddr, *hostname, *username;
+		int status;
+		if (asprintf(&modname, "RSYNC_MODULE_NAME=%s", name) < 0
+		 || asprintf(&modpath, "RSYNC_MODULE_PATH=%s", lp_path(i)) < 0
+		 || asprintf(&hostaddr, "RSYNC_HOST_ADDR=%s", addr) < 0
+		 || asprintf(&hostname, "RSYNC_HOST_NAME=%s", host) < 0
+		 || asprintf(&username, "RSYNC_USER_NAME=%s", auth_user) < 0)
+			out_of_memory("rsync_module");
+		putenv(modname);
+		putenv(modpath);
+		putenv(hostaddr);
+		putenv(hostname);
+		putenv(username);
+		umask(orig_umask);
+		if (s && *s) {
+			status = system(s);
+			if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+				rprintf(FLOG, "prexfer-exec failed\n");
+				io_printf(f_out, "@ERROR: prexfer-exec failed\n");
+				return -1;
+			}
+		}
+		if (p && *p) {
+			pid_t pid = fork();
+			if (pid < 0) {
+				rsyserr(FLOG, errno, "fork failed");
+				io_printf(f_out, "@ERROR: fork failed\n");
+				return -1;
+			}
+			if (pid) {
+				char *ret1, *ret2;
+				waitpid(pid, &status, 0);
+				if (asprintf(&ret1, "RSYNC_RAW_STATUS=%d", status) > 0)
+					putenv(ret1);
+				if (WIFEXITED(status))
+					status = WEXITSTATUS(status);
+				else
+					status = -1;
+				if (asprintf(&ret2, "RSYNC_EXIT_STATUS=%d", status) > 0)
+					putenv(ret2);
+				system(p);
+				_exit(status);
+			}
+		}
+		umask(0);
+	}
+#endif
 
 	if (use_chroot) {
 		/*
