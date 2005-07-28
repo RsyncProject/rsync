@@ -52,9 +52,6 @@ write the appropriate data, log, and lock files.
 You can launch it either via inetd, as a stand-alone daemon, or from
 an rsync client via a remote shell.  If run as a stand-alone daemon then
 just run the command "bf(rsync --daemon)" from a suitable startup script.
-If run from an rsync client via a remote shell (by specifying both the
-bf(--rsh) (bf(-e)) option and daemon mode with "::" or "rsync://"), the bf(--daemon)
-option is automatically passed to the remote side.
 
 When run via inetd you should add a line like this to /etc/services:
 
