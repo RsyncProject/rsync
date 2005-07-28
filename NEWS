@@ -1,39 +1,8 @@
-NEWS for rsync 2.6.6 (UNRELEASED)
+NEWS for rsync 2.6.7 (UNRELEASED)
 Protocol: 29 (unchanged)
-Changes since 2.6.5:
-
-  SECURITY FIXES:
-
-    - The zlib code was upgraded to version 1.2.3 in order to make it more
-      secure.  While the widely-publicized security problem in zlib 1.2.2 did
-      not affect rsync, another security problem surfaced that affects rsync's
-      zlib 1.1.4.
+Changes since 2.6.6:
 
   BUG FIXES:
-
-    - The setting of flist->high in clean_flist() was wrong for an empty list.
-      This could cause flist_find() to crash in certain rare circumstances
-      (e.g. if just the right directory setup was around when --fuzzy was
-      combined with --link-dest).
-
-    - The outputting of hard-linked files when verbosity was > 1 was not right:
-      without -i it would output the name of each hard-linked file as though
-      it had been changed (it now outputs a "is hard linked" message for the
-      file); with -i it would output all dots for the unchanged attributes of
-      a hard-link (it now changes those dots to spaces, as is done for other
-      totally unchanged items).
-
-    - When backing up a changed symlink or device, get rid of any old backup
-      item so that we don't get an "already exists" error.
-
-    - A couple places that were comparing a local and a remote modification-
-      time were not honoring the --modify-window option.
-
-    - Fixed a really old, minor bug that could cause rsync to warn about being
-      unable to mkdir() a path that ends in "/." because it just created the
-      directory (required --relative, --no-implied-dirs, a source path that
-      ended in either a trailing slash or a trailing "/.", and a non-existing
-      destination dir to tickle the bug in a recent version).
 
     - If the user specifies a remote-host for both the source and destination,
       we now output a syntax error rather than trying to open the destination
@@ -45,35 +14,10 @@ Changes since 2.6.5:
       that are longer on the source than the destination (this includes new
       files).
 
-    - The configure script now checks for lutimes() and lchmod() so that
-      rsync can make use of them to update attributes of symlinks (on
-      systems that support this).
-
-    - Made the "max verbosity" setting in the rsyncd.conf file settable on a
-      per-module basis (which now matches the documentation).
+    - If lutimes() and/or lchmod() are around, use them to allow the
+      preservation of attributes on symlinks.
 
     - Added two config items to the rsyncd.conf parsing:  "pre-xfer exec"
       and "post-xfer exec".  These allow a command to be specified on a
       per-module basis that will be run before and/or after a daemon-mode
       transfer. 
-
-    - The support/rrsync script has been upgraded to verify the args of options
-      that take args (instead of rejecting any such options).  The script was
-      also changed to try to be more secure and to fix a problem in the parsing
-      of a pull operation that has multiple sources.
-
-    - Improved the documentation that explains the difference between a
-      normal daemon transfer and a daemon-over remote-shell transfer.
-
-    - Some of the diffs supplied in the patches dir were fixed and/or
-      improved.
-
-  BUILD CHANGES:
-
-    - Made configure define NOBODY_USER (currently hard-wired to "nobody") and
-      NOBODY_GROUP (set to either "nobody" or "nogroup" depending on what we
-      find in the /etc/group file).
-
-    - Added a test to the test suite, itemized.test, that tests the output of
-      -i (log-format w/%i) and some double-verbose messages.
-
