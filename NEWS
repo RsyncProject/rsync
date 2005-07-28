@@ -39,11 +39,6 @@ Changes since 2.6.5:
       we now output a syntax error rather than trying to open the destination
       hostspec as a filename.
 
-    - Rsync now outputs a targeted error if both the source and destination
-      path appear to be a remote filespecs rather than treating the dest as
-      a very strange local path and (most likely) generating an error about
-      non-existent directories.
-
   ENHANCEMENTS:
 
     - Added the --append option that makes rsync append data onto files
