@@ -140,6 +140,8 @@ typedef struct
 	char *log_format;
 	char *refuse_options;
 	char *dont_compress;
+	char *prexfer_exec;
+	char *postxfer_exec;
 	int timeout;
 	int max_connections;
 	int max_verbosity;
@@ -175,6 +177,8 @@ static service sDefault =
 	"%o %h [%a] %m (%u) %f %l",    /* log format */
 	NULL,    /* refuse options */
 	"*.gz *.tgz *.zip *.z *.rpm *.deb *.iso *.bz2 *.tbz",    /* dont compress */
+	NULL,     /* prexfer_exec */
+	NULL,     /* postxfer_exec */
 	0,        /* timeout */
 	0,        /* max connections */
 	1,        /* max verbosity */
@@ -298,6 +302,10 @@ static struct parm_struct parm_table[] =
   {"log format",       P_STRING,  P_LOCAL,  &sDefault.log_format,  NULL,   0},
   {"refuse options",   P_STRING,  P_LOCAL,  &sDefault.refuse_options,NULL, 0},
   {"dont compress",    P_STRING,  P_LOCAL,  &sDefault.dont_compress,NULL,  0},
+#ifdef HAVE_PUTENV
+  {"pre-xfer exec",    P_STRING,  P_LOCAL,  &sDefault.prexfer_exec, NULL,  0},
+  {"post-xfer exec",   P_STRING,  P_LOCAL,  &sDefault.postxfer_exec,NULL,  0},
+#endif
   {NULL,               P_BOOL,    P_NONE,   NULL,                  NULL,   0}
 };
 
@@ -379,6 +387,8 @@ FN_LOCAL_STRING(lp_include_from, include_from)
 FN_LOCAL_STRING(lp_log_format, log_format)
 FN_LOCAL_STRING(lp_refuse_options, refuse_options)
 FN_LOCAL_STRING(lp_dont_compress, dont_compress)
+FN_LOCAL_STRING(lp_prexfer_exec, prexfer_exec)
+FN_LOCAL_STRING(lp_postxfer_exec, postxfer_exec)
 FN_LOCAL_INTEGER(lp_timeout, timeout)
 FN_LOCAL_INTEGER(lp_max_connections, max_connections)
 FN_LOCAL_INTEGER(lp_max_verbosity, max_verbosity)
