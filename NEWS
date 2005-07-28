@@ -29,33 +29,19 @@ Changes since 2.6.5:
     - A couple places that were comparing a local and a remote modification-
       time were not honoring the --modify-window option.
 
+    - Fixed a bug where the 'p' (permissions) itemized-changes flag might get
+      set too often (if some non-significant mode bits differed).
+
     - Fixed a really old, minor bug that could cause rsync to warn about being
       unable to mkdir() a path that ends in "/." because it just created the
       directory (required --relative, --no-implied-dirs, a source path that
       ended in either a trailing slash or a trailing "/.", and a non-existing
       destination dir to tickle the bug in a recent version).
 
-    - If the user specifies a remote-host for both the source and destination,
-      we now output a syntax error rather than trying to open the destination
-      hostspec as a filename.
-
   ENHANCEMENTS:
-
-    - Added the --append option that makes rsync append data onto files
-      that are longer on the source than the destination (this includes new
-      files).
-
-    - The configure script now checks for lutimes() and lchmod() so that
-      rsync can make use of them to update attributes of symlinks (on
-      systems that support this).
 
     - Made the "max verbosity" setting in the rsyncd.conf file settable on a
       per-module basis (which now matches the documentation).
-
-    - Added two config items to the rsyncd.conf parsing:  "pre-xfer exec"
-      and "post-xfer exec".  These allow a command to be specified on a
-      per-module basis that will be run before and/or after a daemon-mode
-      transfer. 
 
     - The support/rrsync script has been upgraded to verify the args of options
       that take args (instead of rejecting any such options).  The script was
