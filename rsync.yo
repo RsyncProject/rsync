@@ -54,7 +54,7 @@ the source or destination path contains a single colon (:) separator after
 a host specification.  Contacting an rsync daemon directly happens when the
 source or destination path contains a double colon (::) separator after a
 host specification, OR when an rsync:// URL is specified (see also the
-"CONNECTING TO AN RSYNC DAEMON OVER A REMOTE SHELL PROGRAM" section for
+"USING RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION" section for
 an exception to this latter rule).
 
 As a special case, if a remote source is specified without a destination,
@@ -172,14 +172,11 @@ wildcards.  If it complains about "no match", put the name in quotes.
 
 manpagesection(CONNECTING TO AN RSYNC DAEMON)
 
-It is also possible to use rsync without a remote shell as the
-transport. In this case you will connect to a remote rsync daemon
-running on TCP port 873.
-
-You may establish the connection via a web proxy by setting the
-environment variable RSYNC_PROXY to a hostname:port pair pointing to
-your web proxy.  Note that your web proxy's configuration must support
-proxy connections to port 873.
+It is also possible to use rsync without a remote shell as the transport.
+In this case you will directly connect to a remote rsync daemon, typically
+using TCP port 873.  (This obviously requires the daemon to be running on
+the remote system, so refer to the STARTING AN RSYNC DAEMON TO ACCEPT
+CONNECTIONS section below for information on that.)
 
 Using rsync in this way is the same as using it with a remote shell except
 that:
@@ -187,6 +184,7 @@ that:
 itemize(
 	it() you either use a double colon :: instead of a single colon to
 	separate the hostname from the path, or you use an rsync:// URL.
+	it() the first word after the :: is a module name.
 	it() the remote daemon may print a message of the day when you
 	connect.
 	it() if you specify no path name on the remote daemon then the
@@ -195,7 +193,11 @@ itemize(
 	specified files on the remote daemon is provided.
 )
 
-Some paths on the remote daemon may require authentication. If so then
+An example that copies all the files in a remote module named "src":
+
+verb(    rsync -av host::src /dest)
+
+Some modules on the remote daemon may require authentication. If so,
 you will receive a password prompt when you connect. You can avoid the
 password prompt by setting the environment variable RSYNC_PASSWORD to
 the password you want to use or using the bf(--password-file) option. This
@@ -204,50 +206,57 @@ may be useful when scripting rsync.
 WARNING: On some systems environment variables are visible to all
 users. On those systems using bf(--password-file) is recommended.
 
-manpagesection(CONNECTING TO AN RSYNC DAEMON OVER A REMOTE SHELL PROGRAM)
+You may establish the connection via a web proxy by setting the
+environment variable RSYNC_PROXY to a hostname:port pair pointing to
+your web proxy.  Note that your web proxy's configuration must support
+proxy connections to port 873.
 
-It is sometimes useful to be able to set up file transfers using rsync
-daemon capabilities on the remote machine, while still using ssh or
-rsh for transport.  This is especially useful when you want to connect
-to a remote machine via ssh (for encryption or to get through a
-firewall), but you still want to have access to the rsync daemon
-features (see RUNNING AN RSYNC DAEMON OVER A REMOTE SHELL PROGRAM,
-below).
+manpagesection(USING RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION)
 
-From the user's perspective, using rsync in this way is the same as
-using it to connect to an rsync daemon, except that you must
-explicitly set the remote shell program on the command line with
-bf(--rsh=COMMAND).  (Setting RSYNC_RSH in the environment will not turn on
-this functionality.)
+It is sometimes useful to use various features of an rsync daemon (such as
+named modules) without actually allowing any new socket connections into a
+system (other than what is already required to allow remote-shell access).
+Rsync supports connecting to a host using a remote shell and then spawning
+a single-use "daemon" server that expects to read its config file in the
+home dir of the remote user.  This can be useful if you want to encrypt a
+daemon-style transfer's data, but since the daemon is started up fresh by
+the remote user, you may not be able to use features such as chroot or
+change the uid used by the daemon.  (For another way to encrypt a daemon
+transfer, consider using ssh to tunnel a local port to a remote machine and
+configure a normal rsync daemon on that remote host to only allow
+connections from "localhost".)
 
-In order to distinguish between the remote-shell user and the rsync
-daemon user, you can use '-l user' on your remote-shell command:
+From the user's perspective, a daemon transfer via a remote-shell
+connection uses nearly the same command-line syntax as a normal
+rsync-daemon transfer, with the only exception being that you must
+explicitly set the remote shell program on the command-line with the
+bf(--rsh=COMMAND) option.  (Setting the RSYNC_RSH in the environment
+will not turn on this functionality.)  For example:
 
-verb(    rsync -av --rsh="ssh -l ssh-user" \ 
-        rsync-user@host::module[/path] local-path)
+verb(    rsync -av --rsh=ssh host::module /dest)
+
+If you need to specify a different remote-shell user, keep in mind that the
+user@ prefix in front of the host is specifying the rsync-user value (for a
+module that requires user-based authentication).  This means that you must
+give the '-l user' option to ssh when specifying the remote-shell:
+
+verb(    rsync -av -e "ssh -l ssh-user" rsync-user@host::module /dest)
 
 The "ssh-user" will be used at the ssh level; the "rsync-user" will be
-used to check against the rsyncd.conf on the remote host.
+used to log-in to the "module".
 
-manpagesection(RUNNING AN RSYNC DAEMON)
+manpagesection(STARTING AN RSYNC DAEMON TO ACCEPT CONNECTIONS)
 
-An rsync daemon is configured using a configuration file.  Please see the
-rsyncd.conf(5) man page for more information.  By default the configuration
-file is called /etc/rsyncd.conf (unless the daemon is spawned via a remote
-shell--see below).
+In order to connect to an rsync daemon, the remote system needs to have a
+daemon already running (or it needs to have configured something like inetd
+to spawn an rsync daemon for incoming connections on a particular port).
+For full information on how to start a daemon that will handling incoming
+socket connections, see the rsyncd.conf(5) man page -- that is the config
+file for the daemon, and it contains the full details for how to run the
+daemon (including stand-alone and inetd configurations).
 
-manpagesection(RUNNING AN RSYNC DAEMON OVER A REMOTE SHELL PROGRAM)
-
-See the rsyncd.conf(5) man page for full information on the rsync
-daemon configuration file.
-
-Several configuration options will not be available unless the remote
-user is root (e.g. chroot, uid, gid, etc.).  There is no need to
-configure inetd or the services map to include the rsync daemon port
-if you run an rsync daemon only via a remote shell program.
-
-To run an rsync daemon out of a single-use ssh key, see this section
-in the rsyncd.conf(5) man page.
+If you're using one of the remote-shell transports for the transfer, there is
+no need to manually start an rsync daemon.
 
 manpagesection(EXAMPLES)
 
@@ -774,8 +783,8 @@ If this option is used with bf([user@]host::module/path), then the
 remote shell em(COMMAND) will be used to run an rsync daemon on the
 remote host, and all data will be transmitted through that remote
 shell connection, rather than through a direct socket connection to a
-running rsync daemon on the remote host.  See the section "CONNECTING
-TO AN RSYNC DAEMON OVER A REMOTE SHELL PROGRAM" above.
+running rsync daemon on the remote host.  See the section "USING
+RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION" above.
 
 Command-line arguments are permitted in COMMAND provided that COMMAND is
 presented to rsync as a single argument.  For example:
