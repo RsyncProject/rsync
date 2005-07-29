@@ -108,7 +108,7 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out,
 	int i;
 	char *sargs[MAX_ARGS];
 	int sargc = 0;
-	char line[MAXPATHLEN];
+	char line[BIGPATHBUFLEN];
 	char *p;
 
 	if (argc == 0 && !am_sender)
@@ -223,7 +223,7 @@ static int rsync_module(int f_in, int f_out, int i)
 	int maxargs;
 	char **argv;
 	char **argp;
-	char line[MAXPATHLEN];
+	char line[BIGPATHBUFLEN];
 	uid_t uid = (uid_t)-2;  /* canonically "nobody" */
 	gid_t gid = (gid_t)-2;
 	char *p;
@@ -498,17 +498,20 @@ static int rsync_module(int f_in, int f_out, int i)
 		if (!(argv[argc] = strdup(p)))
 			out_of_memory("rsync_module");
 
-		if (start_glob) {
-			if (start_glob == 1) {
-				request = strdup(p);
-				start_glob++;
-			}
-			glob_expand(name, &argv, &argc, &maxargs);
-		} else
+		switch (start_glob) {
+		case 0:
 			argc++;
-
-		if (strcmp(line, ".") == 0)
-			start_glob = 1;
+			if (strcmp(line, ".") == 0)
+				start_glob = 1;
+			break;
+		case 1:
+			request = strdup(p);
+			start_glob = 2;
+			/* FALL THROUGH */
+		default:
+			glob_expand(name, &argv, &argc, &maxargs);
+			break;
+		}
 	}
 
 	verbose = 0; /* future verbosity is controlled by client options */
@@ -601,7 +604,7 @@ static void send_listing(int fd)
    here */
 int start_daemon(int f_in, int f_out)
 {
-	char line[200];
+	char line[1024];
 	char *motd;
 	int i;
 
