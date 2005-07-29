@@ -954,7 +954,7 @@ void parse_filter_file(struct filter_list_struct *listp, const char *fname,
 		       uint32 mflags, int xflags)
 {
 	FILE *fp;
-	char line[MAXPATHLEN+MAX_RULE_PREFIX+1]; /* +1 for trailing slash. */
+	char line[BIGPATHBUFLEN];
 	char *eob = line + sizeof line - 1;
 	int word_split = mflags & MATCHFLG_WORD_SPLIT;
 
@@ -1167,7 +1167,7 @@ void send_filter_list(int f_out)
 /* This is only called by the server. */
 void recv_filter_list(int f_in)
 {
-	char line[MAXPATHLEN+MAX_RULE_PREFIX+1]; /* +1 for trailing slash. */
+	char line[BIGPATHBUFLEN];
 	int xflags = protocol_version >= 29 ? 0 : XFLG_OLD_PREFIXES;
 	int receiver_wants_list = delete_mode
 		&& (!delete_excluded || protocol_version >= 29);
