@@ -135,10 +135,12 @@ You can also use rsync in local-only mode, where both the source and
 destination don't have a ':' in the name. In this case it behaves like
 an improved copy command.
 
+Finally, you can list all the (listable) modules available from a
+particular rsync daemon by leaving off the module name:
+
 quote(tt(rsync somehost.mydomain.com::))
 
-This would list all the anonymous rsync modules available on the host
-somehost.mydomain.com.  (See the following section for more details.)
+See the following section for more details.
 
 manpagesection(ADVANCED USAGE)
 
