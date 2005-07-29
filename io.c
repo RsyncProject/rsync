@@ -728,11 +728,7 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 	static size_t iobuf_in_ndx;
 	size_t msg_bytes;
 	int tag, ret = 0;
-#if MAXPATHLEN < 4096
-	char line[4096+1024];
-#else
-	char line[MAXPATHLEN+1024];
-#endif
+	char line[BIGPATHBUFLEN];
 
 	if (!iobuf_in || fd != sock_f_in)
 		return read_timeout(fd, buf, len);
@@ -1118,7 +1114,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
  **/
 static void mplex_write(enum msgcode code, char *buf, size_t len)
 {
-	char buffer[4096];
+	char buffer[BIGPATHBUFLEN];
 	size_t n = len;
 
 	SIVAL(buffer, 0, ((MPLEX_BASE + (int)code)<<24) + len);
@@ -1313,7 +1309,7 @@ int read_line(int f, char *buf, size_t maxlen)
 void io_printf(int fd, const char *format, ...)
 {
 	va_list ap;
-	char buf[1024];
+	char buf[BIGPATHBUFLEN];
 	int len;
 
 	va_start(ap, format);
@@ -1322,6 +1318,11 @@ void io_printf(int fd, const char *format, ...)
 
 	if (len < 0)
 		exit_cleanup(RERR_STREAMIO);
+
+	if (len > (int)sizeof buf) {
+		rprintf(FERROR, "io_printf() was too long for the buffer.\n");
+		exit_cleanup(RERR_STREAMIO);
+	}
 
 	write_sbuf(fd, buf);
 }
