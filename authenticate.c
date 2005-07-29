@@ -223,7 +223,7 @@ char *auth_server(int f_in, int f_out, int module, char *host, char *addr,
 {
 	char *users = lp_auth_users(module);
 	char challenge[MD4_SUM_LENGTH*2];
-	char line[MAXPATHLEN];
+	char line[BIGPATHBUFLEN];
 	char secret[512];
 	char pass2[MD4_SUM_LENGTH*2];
 	char *tok, *pass;
