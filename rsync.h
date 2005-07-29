@@ -463,6 +463,14 @@ struct idev {
 #define MAXPATHLEN 1024
 #endif
 
+/* We want a roomy line buffer that can hold more than MAXPATHLEN,
+ * and significantly more than an overly short MAXPATHLEN. */
+#if MAXPATHLEN < 4096
+#define BIGPATHBUFLEN (4096+1024)
+#else
+#define BIGPATHBUFLEN (MAXPATHLEN+1024)
+#endif
+
 #ifndef NAME_MAX
 #define NAME_MAX 255
 #endif
