@@ -21,3 +21,11 @@ Changes since 2.6.6:
       and "post-xfer exec".  These allow a command to be specified on a
       per-module basis that will be run before and/or after a daemon-mode
       transfer. 
+
+  INTERNAL:
+
+    - Some buffer sizes were expanded a bit, particularly on systems where
+      MAXPATHLEN is overly small (e.g. cygwin).
+
+    - If io_printf() tries to format more data than fits in the buffer, exit
+      with an error instead of transmitting a truncated buffer.
