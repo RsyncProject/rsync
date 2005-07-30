@@ -8,6 +8,10 @@ Changes since 2.6.6:
       we now output a syntax error rather than trying to open the destination
       hostspec as a filename.
 
+    - When --inplace creates a new destination file, rsync now creates it with
+      permissions 0600 instead of 0000 -- this makes restarting possible when
+      the transfer gets interrupted in the middle of sending a new file.
+
   ENHANCEMENTS:
 
     - Added the --append option that makes rsync append data onto files
