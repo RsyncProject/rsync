@@ -334,12 +334,16 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	if (append_mode) {
 		OFF_T j = 0;
 		for (j = CHUNK_SIZE; j < s->flength; j += CHUNK_SIZE) {
+			if (buf && do_progress)
+				show_progress(last_match, buf->file_size);
 			sum_update(map_ptr(buf, last_match, CHUNK_SIZE),
 				   CHUNK_SIZE);
 			last_match = j;
 		}
 		if (last_match < s->flength) {
 			int32 len = s->flength - last_match;
+			if (buf && do_progress)
+				show_progress(last_match, buf->file_size);
 			sum_update(map_ptr(buf, last_match, len), len);
 			last_match = s->flength;
 		}
