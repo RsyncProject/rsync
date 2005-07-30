@@ -219,12 +219,16 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		if (sum.remainder)
 			sum.flength -= sum.blength - sum.remainder;
 		for (j = CHUNK_SIZE; j < sum.flength; j += CHUNK_SIZE) {
+			if (do_progress)
+				show_progress(offset, total_size);
 			sum_update(map_ptr(mapbuf, offset, CHUNK_SIZE),
 				   CHUNK_SIZE);
 			offset = j;
 		}
 		if (offset < sum.flength) {
 			int32 len = sum.flength - offset;
+			if (do_progress)
+				show_progress(offset, total_size);
 			sum_update(map_ptr(mapbuf, offset, len), len);
 			offset = sum.flength;
 		}
@@ -605,7 +609,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 
 		/* We now check to see if we are writing file "inplace" */
 		if (inplace)  {
-			fd2 = do_open(fname, O_WRONLY|O_CREAT, 0);
+			fd2 = do_open(fname, O_WRONLY|O_CREAT, 0600);
 			if (fd2 == -1) {
 				rsyserr(FERROR, errno, "open %s failed",
 					full_fname(fname));
