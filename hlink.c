@@ -173,8 +173,6 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 {
 #ifdef SUPPORT_HARD_LINKS
 	int head;
-	if (!file->link_u.links)
-		return 0;
 	if (skip && !(file->flags & FLAG_HLINK_EOL))
 		head = hlink_list[file->F_HLINDEX] = file->F_NEXT;
 	else
