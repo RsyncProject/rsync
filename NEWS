@@ -4,6 +4,8 @@ Changes since 2.6.6:
 
   BUG FIXES:
 
+    - Made hard-linked symlinks and devices work again.
+
     - If the user specifies a remote-host for both the source and destination,
       we now output a syntax error rather than trying to open the destination
       hostspec as a filename.
