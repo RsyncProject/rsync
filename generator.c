@@ -731,6 +731,11 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
+	if (preserve_hard_links && file->link_u.links
+	    && hard_link_check(file, ndx, fname, statret, &st,
+			       itemizing, code, HL_CHECK_MASTER))
+		return;
+
 	if (preserve_links && S_ISLNK(file->mode)) {
 #ifdef SUPPORT_LINKS
 		if (safe_symlinks && unsafe_symlink(file->u.link, fname)) {
@@ -761,6 +766,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					}
 					set_perms(fname, file, &st,
 						  maybe_PERMS_REPORT);
+					if (preserve_hard_links
+					    && file->link_u.links) {
+						hard_link_cluster(file, ndx,
+								  itemizing,
+								  code);
+					}
 					return;
 				}
 			}
@@ -771,6 +782,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			if (!S_ISLNK(st.st_mode))
 				statret = -1;
 		}
+		if (preserve_hard_links && file->link_u.links
+		    && hard_link_check(file, ndx, fname, -1, &st,
+				       itemizing, code, HL_SKIP))
+			return;
 		if (do_symlink(file->u.link,fname) != 0) {
 			rsyserr(FERROR, errno, "symlink %s -> \"%s\" failed",
 				full_fname(fname), safe_fname(file->u.link));
@@ -789,6 +804,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				SIVAL(numbuf, 0, ndx);
 				send_msg(MSG_SUCCESS, numbuf, 4);
 			}
+			if (preserve_hard_links && file->link_u.links)
+				hard_link_cluster(file, ndx, itemizing, code);
 		}
 #endif
 		return;
@@ -799,6 +816,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		    st.st_mode != file->mode ||
 		    st.st_rdev != file->u.rdev) {
 			if (delete_item(fname, st.st_mode, DEL_TERSE) < 0)
+				return;
+			if (preserve_hard_links && file->link_u.links
+			    && hard_link_check(file, ndx, fname, -1, &st,
+					       itemizing, code, HL_SKIP))
 				return;
 			if (!IS_DEVICE(st.st_mode))
 				statret = -1;
@@ -820,19 +841,20 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					rprintf(code, "%s\n",
 						safe_fname(fname));
 				}
+				if (preserve_hard_links && file->link_u.links) {
+					hard_link_cluster(file, ndx,
+							  itemizing, code);
+				}
 			}
 		} else {
 			if (itemizing)
 				itemize(file, ndx, statret, &st, 0, 0, NULL);
 			set_perms(fname, file, &st, maybe_PERMS_REPORT);
+			if (preserve_hard_links && file->link_u.links)
+				hard_link_cluster(file, ndx, itemizing, code);
 		}
 		return;
 	}
-
-	if (preserve_hard_links
-	    && hard_link_check(file, ndx, fname, statret, &st,
-			       itemizing, code, HL_CHECK_MASTER))
-		return;
 
 	if (!S_ISREG(file->mode)) {
 		if (the_file_list->count == 1)
@@ -1001,7 +1023,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (statret != 0) {
-		if (preserve_hard_links
+		if (preserve_hard_links && file->link_u.links
 		    && hard_link_check(file, ndx, fname, statret, &st,
 				       itemizing, code, HL_SKIP))
 			return;
@@ -1064,7 +1086,7 @@ prepare_to_open:
 			full_fname(fnamecmp));
 	    pretend_missing:
 		/* pretend the file didn't exist */
-		if (preserve_hard_links
+		if (preserve_hard_links && file->link_u.links
 		    && hard_link_check(file, ndx, fname, statret, &st,
 				       itemizing, code, HL_SKIP))
 			return;
