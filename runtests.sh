@@ -124,6 +124,7 @@ set -e
 . "./shconfig"
 
 RUNSHFLAGS='-e'
+export RUNSHFLAGS
 
 # for Solaris
 [ -d /usr/xpg4/bin ] && PATH="/usr/xpg4/bin/:$PATH"
