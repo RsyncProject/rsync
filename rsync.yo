@@ -480,25 +480,36 @@ dit(bf(-R, --relative)) Use relative paths. This means that the full path
 names specified on the command line are sent to the server rather than
 just the last parts of the filenames. This is particularly useful when
 you want to send several different directories at the same time. For
-example, if you used the command
+example, if you used this command:
 
-quote(tt(   rsync /foo/bar/foo.c remote:/tmp/))
+quote(tt(   rsync -av /foo/bar/baz.c remote:/tmp/))
 
-then this would create a file called foo.c in /tmp/ on the remote
+... this would create a file called baz.c in /tmp/ on the remote
 machine. If instead you used
 
-quote(tt(   rsync -R /foo/bar/foo.c remote:/tmp/))
+quote(tt(   rsync -avR /foo/bar/baz.c remote:/tmp/))
 
-then a file called /tmp/foo/bar/foo.c would be created on the remote
+then a file called /tmp/foo/bar/baz.c would be created on the remote
 machine -- the full path name is preserved.  To limit the amount of
-path information that is sent, do something like this:
+path information that is sent, you have a couple options:  (1) With
+a modern rsync on the sending side (beginning with 2.6.7), you can
+insert a dot dir into the source path, like this:
+
+quote(tt(   rsync -avR /foo/./bar/baz.c remote:/tmp/))
+
+That would create /tmp/bar/baz.c on the remote machine.  (Note that the
+dot dir must followed by a slash, so "/foo/." would not be abbreviated.)
+(2) For older rsync versions, you would need to use a chdir to limit the
+source path.  For example, when pushing files:
+
+quote(tt(   cd /foo; rsync -avR bar/baz.c remote:/tmp/))
+
+Or when pulling files (which doesn't work with an rsync daemon):
 
 quote(
-tt(   cd /foo)nl()
-tt(   rsync -R bar/foo.c remote:/tmp/)nl()
+tt(   rsync -avR --rsync-path="cd /foo; rsync" \ )nl()
+tt(       remote:bar/baz.c /tmp/)
 )
-
-That would create /tmp/bar/foo.c on the remote machine.
 
 dit(bf(--no-relative)) Turn off the bf(--relative) option.  This is only
 needed if you want to use bf(--files-from) without its implied bf(--relative)
