@@ -812,9 +812,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (am_root && preserve_devices && IS_DEVICE(file->mode)) {
-		if (statret != 0 ||
-		    st.st_mode != file->mode ||
-		    st.st_rdev != file->u.rdev) {
+		if (statret != 0
+		 || (st.st_mode & ~CHMOD_BITS) != (file->mode & ~CHMOD_BITS)
+		 || st.st_rdev != file->u.rdev) {
 			if (delete_item(fname, st.st_mode, DEL_TERSE) < 0)
 				return;
 			if (preserve_hard_links && file->link_u.links
