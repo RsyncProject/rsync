@@ -1166,7 +1166,41 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 					dir = fname;
 				fname = p + 1;
 			}
-		} else if (implied_dirs && (p=strrchr(fname,'/')) && p != fname) {
+		} else if ((p = strstr(fname, "/./")) != NULL) {
+			*p = '\0';
+			if (p == fname)
+				dir = "/";
+			else
+				dir = fname;
+			fname = p + 3;
+		}
+
+		if (!*fname)
+			fname = ".";
+
+		if (dir && *dir) {
+			static char *lastdir;
+			static int lastdir_len;
+
+			strcpy(olddir, curr_dir); /* can't overflow */
+
+			if (!push_dir(dir)) {
+				io_error |= IOERR_GENERAL;
+				rsyserr(FERROR, errno, "push_dir %s failed",
+					full_fname(dir));
+				continue;
+			}
+
+			if (lastdir && strcmp(lastdir, dir) == 0) {
+				flist_dir = lastdir;
+				flist_dir_len = lastdir_len;
+			} else {
+				flist_dir = lastdir = strdup(dir);
+				flist_dir_len = lastdir_len = strlen(dir);
+			}
+		}
+
+		if (implied_dirs && (p=strrchr(fname,'/')) && p != fname) {
 			/* Send the implied directories at the start of the
 			 * source spec, so we get their permissions right. */
 			char *lp = lastpath, *fn = fname, *slash = fname;
@@ -1194,31 +1228,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				*p = '\0';
 				strlcpy(lastpath, fname, sizeof lastpath);
 				*p = '/';
-			}
-		}
-
-		if (!*fname)
-			fname = ".";
-
-		if (dir && *dir) {
-			static char *lastdir;
-			static int lastdir_len;
-
-			strcpy(olddir, curr_dir); /* can't overflow */
-
-			if (!push_dir(dir)) {
-				io_error |= IOERR_GENERAL;
-				rsyserr(FERROR, errno, "push_dir %s failed",
-					full_fname(dir));
-				continue;
-			}
-
-			if (lastdir && strcmp(lastdir, dir) == 0) {
-				flist_dir = lastdir;
-				flist_dir_len = lastdir_len;
-			} else {
-				flist_dir = lastdir = strdup(dir);
-				flist_dir_len = lastdir_len = strlen(dir);
 			}
 		}
 
