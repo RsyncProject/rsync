@@ -4,7 +4,10 @@ Changes since 2.6.6:
 
   BUG FIXES:
 
-    - Made hard-linked symlinks and devices work again.
+    - Made hard-links work with symlinks and devices again.
+
+    - If a device changed permissions, rsync no longer recreates the device
+      instead of just updating the permissions.
 
     - If the user specifies a remote-host for both the source and destination,
       we now output a syntax error rather than trying to open the destination
@@ -27,6 +30,13 @@ Changes since 2.6.6:
       and "post-xfer exec".  These allow a command to be specified on a
       per-module basis that will be run before and/or after a daemon-mode
       transfer. 
+
+    - When using the --relative option, you can now insert a dot dir in
+      the source path to indicate where the replication of the source dirs
+      should start.  For example, if you specify a source path of
+      rsync://host/module/foo/bar/./baz/dir with -R, rsync would only
+      replicate the "baz/dir" part of the source path (note: a trailing
+      dot dir is unaffected unless it also has a trailing slash).
 
   INTERNAL:
 
