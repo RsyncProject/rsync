@@ -222,7 +222,6 @@ static int rsync_module(int f_in, int f_out, int i)
 	int argc = 0;
 	int maxargs;
 	char **argv;
-	char **argp;
 	char line[BIGPATHBUFLEN];
 	uid_t uid = (uid_t)-2;  /* canonically "nobody" */
 	gid_t gid = (gid_t)-2;
@@ -515,8 +514,7 @@ static int rsync_module(int f_in, int f_out, int i)
 	}
 
 	verbose = 0; /* future verbosity is controlled by client options */
-	argp = argv;
-	ret = parse_arguments(&argc, (const char ***) &argp, 0);
+	ret = parse_arguments(&argc, (const char ***) &argv, 0);
 
 	if (filesfrom_fd == 0)
 		filesfrom_fd = f_in;
@@ -578,7 +576,7 @@ static int rsync_module(int f_in, int f_out, int i)
 	if (lp_timeout(i) && lp_timeout(i) > io_timeout)
 		set_io_timeout(lp_timeout(i));
 
-	start_server(f_in, f_out, argc, argp);
+	start_server(f_in, f_out, argc, argv);
 
 	return 0;
 }
