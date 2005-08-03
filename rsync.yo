@@ -502,9 +502,12 @@ dot dir must followed by a slash, so "/foo/." would not be abbreviated.)
 (2) For older rsync versions, you would need to use a chdir to limit the
 source path.  For example, when pushing files:
 
-quote(tt(   cd /foo; rsync -avR bar/baz.c remote:/tmp/))
+quote(tt(   (cd /foo; rsync -avR bar/baz.c remote:/tmp/) ))
 
-Or when pulling files (which doesn't work with an rsync daemon):
+(Note that the parens put the two commands into a sub-shell, so that the
+"cd" command doesn't remain in effect for future commands.)
+If you're pulling files, use this idiom (which doesn't work with an
+rsync daemon):
 
 quote(
 tt(   rsync -avR --rsync-path="cd /foo; rsync" \ )nl()
