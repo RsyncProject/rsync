@@ -528,7 +528,6 @@ static void glob_expand_one(char *s, char ***argv_ptr, int *argc_ptr,
 	filter_server_path(s);
 #else
 	glob_t globbuf;
-	int i;
 
 	if (maxargs <= argc)
 		return;
@@ -553,9 +552,9 @@ static void glob_expand_one(char *s, char ***argv_ptr, int *argc_ptr,
 	if (globbuf.gl_pathc == 0)
 		argv[argc++] = s;
 	else {
-		int j = globbuf.gl_pathc;
+		int i;
 		free(s);
-		for (i = 0; i < j; i++) {
+		for (i = 0; i < (int)globbuf.gl_pathc; i++) {
 			if (!(argv[argc++] = strdup(globbuf.gl_pathv[i])))
 				out_of_memory("glob_expand_one");
 		}
