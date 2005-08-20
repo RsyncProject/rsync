@@ -587,9 +587,10 @@ dit(bf(--append)) This causes rsync to update a file by appending data onto
 the end of the file, which presumes that the data that already exists on
 the receiving side is identical with the start of the file on the sending
 side.  If that is not true, the file will fail the checksum test, and the
-resend will do a normal bf(--inplace) update to correct the mismatch.  Any
-file on the receiving side that is longer than a file on the sending side
-is skipped.  Implies bf(--inplace).
+resend will do a normal bf(--inplace) update to correct the mismatched data.
+Only files on the receiving side that are shorter than the corresponding
+file on the sending side (as well as new files) are sent.
+Implies bf(--inplace).
 
 dit(bf(-d, --dirs)) Tell the sending side to include any directories that
 are encountered.  Unlike bf(--recursive), a directory's contents are not copied
