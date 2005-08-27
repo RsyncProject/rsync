@@ -270,7 +270,7 @@ void usage(enum logcode F)
   rprintf(F," -r, --recursive             recurse into directories\n");
   rprintf(F," -R, --relative              use relative path names\n");
   rprintf(F,"     --no-relative           turn off --relative\n");
-  rprintf(F,"     --no-implied-dirs       don't send implied dirs with -R\n");
+  rprintf(F,"     --no-implied-dirs       don't send implied dirs with --relative\n");
   rprintf(F," -b, --backup                make backups (see --suffix & --backup-dir)\n");
   rprintf(F,"     --backup-dir=DIR        make backups into hierarchy based in DIR\n");
   rprintf(F,"     --suffix=SUFFIX         set backup suffix (default %s w/o --backup-dir)\n",BACKUP_SUFFIX);
@@ -395,27 +395,24 @@ static struct poptOption long_options[] = {
   {"include",          0,  POPT_ARG_STRING, 0, OPT_INCLUDE, 0, 0 },
   {"exclude-from",     0,  POPT_ARG_STRING, 0, OPT_EXCLUDE_FROM, 0, 0 },
   {"include-from",     0,  POPT_ARG_STRING, 0, OPT_INCLUDE_FROM, 0, 0 },
-  {"safe-links",       0,  POPT_ARG_NONE,   &safe_symlinks, 0, 0, 0 },
-  {"help",            'h', POPT_ARG_NONE,   0, 'h', 0, 0 },
-  {"backup",          'b', POPT_ARG_NONE,   &make_backups, 0, 0, 0 },
-  {"dry-run",         'n', POPT_ARG_NONE,   &dry_run, 0, 0, 0 },
-  {"sparse",          'S', POPT_ARG_NONE,   &sparse_files, 0, 0, 0 },
   {"cvs-exclude",     'C', POPT_ARG_NONE,   &cvs_exclude, 0, 0, 0 },
-  {"update",          'u', POPT_ARG_NONE,   &update_only, 0, 0, 0 },
-  {"inplace",          0,  POPT_ARG_NONE,   &inplace, 0, 0, 0 },
   {"dirs",            'd', POPT_ARG_VAL,    &xfer_dirs, 2, 0, 0 },
-  {"links",           'l', POPT_ARG_NONE,   &preserve_links, 0, 0, 0 },
-  {"copy-links",      'L', POPT_ARG_NONE,   &copy_links, 0, 0, 0 },
-  {"keep-dirlinks",   'K', POPT_ARG_NONE,   &keep_dirlinks, 0, 0, 0 },
-  {"append",           0,  POPT_ARG_VAL,    &append_mode, 1, 0, 0 },
-  {"whole-file",      'W', POPT_ARG_VAL,    &whole_file, 1, 0, 0 },
-  {"no-whole-file",    0,  POPT_ARG_VAL,    &whole_file, 0, 0, 0 },
-  {"copy-unsafe-links",0,  POPT_ARG_NONE,   &copy_unsafe_links, 0, 0, 0 },
   {"perms",           'p', POPT_ARG_NONE,   &preserve_perms, 0, 0, 0 },
+  {"times",           't', POPT_ARG_NONE,   &preserve_times, 0, 0, 0 },
   {"owner",           'o', POPT_ARG_NONE,   &preserve_uid, 0, 0, 0 },
   {"group",           'g', POPT_ARG_NONE,   &preserve_gid, 0, 0, 0 },
   {"devices",         'D', POPT_ARG_NONE,   &preserve_devices, 0, 0, 0 },
-  {"times",           't', POPT_ARG_NONE,   &preserve_times, 0, 0, 0 },
+  {"links",           'l', POPT_ARG_VAL,    &preserve_links, 1, 0, 0 },
+  {"copy-links",      'L', POPT_ARG_NONE,   &copy_links, 0, 0, 0 },
+  {"keep-dirlinks",   'K', POPT_ARG_NONE,   &keep_dirlinks, 0, 0, 0 },
+  {"safe-links",       0,  POPT_ARG_NONE,   &safe_symlinks, 0, 0, 0 },
+  {"sparse",          'S', POPT_ARG_NONE,   &sparse_files, 0, 0, 0 },
+  {"inplace",          0,  POPT_ARG_NONE,   &inplace, 0, 0, 0 },
+  {"append",           0,  POPT_ARG_VAL,    &append_mode, 1, 0, 0 },
+  {"update",          'u', POPT_ARG_NONE,   &update_only, 0, 0, 0 },
+  {"whole-file",      'W', POPT_ARG_VAL,    &whole_file, 1, 0, 0 },
+  {"no-whole-file",    0,  POPT_ARG_VAL,    &whole_file, 0, 0, 0 },
+  {"copy-unsafe-links",0,  POPT_ARG_NONE,   &copy_unsafe_links, 0, 0, 0 },
   {"omit-dir-times",  'O', POPT_ARG_VAL,    &omit_dir_times, 2, 0, 0 },
   {"checksum",        'c', POPT_ARG_NONE,   &always_checksum, 0, 0, 0 },
   {"verbose",         'v', POPT_ARG_NONE,   0, 'v', 0, 0 },
@@ -440,6 +437,7 @@ static struct poptOption long_options[] = {
   /* TODO: Should this take an optional int giving the compression level? */
   {"compress",        'z', POPT_ARG_NONE,   &do_compression, 0, 0, 0 },
   {"stats",            0,  POPT_ARG_NONE,   &do_stats, 0, 0, 0 },
+  {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
   {"progress",         0,  POPT_ARG_NONE,   &do_progress, 0, 0, 0 },
   {"partial",          0,  POPT_ARG_NONE,   &keep_partial, 0, 0, 0 },
   {"partial-dir",      0,  POPT_ARG_STRING, &partial_dir, 0, 0, 0 },
@@ -448,12 +446,12 @@ static struct poptOption long_options[] = {
   {"blocking-io",      0,  POPT_ARG_VAL,    &blocking_io, 1, 0, 0 },
   {"no-blocking-io",   0,  POPT_ARG_VAL,    &blocking_io, 0, 0, 0 },
   {0,                 'F', POPT_ARG_NONE,   0, 'F', 0, 0 },
-  {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
   {"address",          0,  POPT_ARG_STRING, &bind_address, 0, 0, 0 },
   {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
   {"log-format",       0,  POPT_ARG_STRING, &log_format, 0, 0, 0 },
   {"itemize-changes", 'i', POPT_ARG_NONE,   &itemize_changes, 0, 0, 0 },
   {"bwlimit",          0,  POPT_ARG_INT,    &bwlimit, 0, 0, 0 },
+  {"backup",          'b', POPT_ARG_NONE,   &make_backups, 0, 0, 0 },
   {"backup-dir",       0,  POPT_ARG_STRING, &backup_dir, 0, 0, 0 },
   {"hard-links",      'H', POPT_ARG_NONE,   &preserve_hard_links, 0, 0, 0 },
   {"read-batch",       0,  POPT_ARG_STRING, &batch_name, OPT_READ_BATCH, 0, 0 },
@@ -468,6 +466,8 @@ static struct poptOption long_options[] = {
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
 #endif
+  {"dry-run",         'n', POPT_ARG_NONE,   &dry_run, 0, 0, 0 },
+  {"help",            'h', POPT_ARG_NONE,   0, 'h', 0, 0 },
   /* All these options switch us into daemon-mode option-parsing. */
   {"config",           0,  POPT_ARG_STRING, 0, OPT_DAEMON, 0, 0 },
   {"daemon",           0,  POPT_ARG_NONE,   0, OPT_DAEMON, 0, 0 },
