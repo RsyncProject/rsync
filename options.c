@@ -39,7 +39,6 @@ int make_backups = 0;
 int whole_file = -1;
 
 int append_mode = 0;
-int archive_mode = 0;
 int keep_dirlinks = 0;
 int copy_links = 0;
 int preserve_links = 0;
@@ -82,7 +81,7 @@ int filesfrom_fd = -1;
 char *filesfrom_host = NULL;
 int eol_nulls = 0;
 int recurse = 0;
-int xfer_dirs = 0;
+int xfer_dirs = -1;
 int am_daemon = 0;
 int daemon_over_rsh = 0;
 int do_stats = 0;
@@ -267,9 +266,9 @@ void usage(enum logcode F)
   rprintf(F," -q, --quiet                 suppress non-error messages\n");
   rprintf(F," -c, --checksum              skip based on checksum, not mod-time & size\n");
   rprintf(F," -a, --archive               archive mode; same as -rlptgoD (no -H)\n");
+  rprintf(F,"     --no-OPTION             turn of an implied OPTION (e.g. --no-D)\n");
   rprintf(F," -r, --recursive             recurse into directories\n");
   rprintf(F," -R, --relative              use relative path names\n");
-  rprintf(F,"     --no-relative           turn off --relative\n");
   rprintf(F,"     --no-implied-dirs       don't send implied dirs with --relative\n");
   rprintf(F," -b, --backup                make backups (see --suffix & --backup-dir)\n");
   rprintf(F,"     --backup-dir=DIR        make backups into hierarchy based in DIR\n");
@@ -293,7 +292,6 @@ void usage(enum logcode F)
   rprintf(F," -S, --sparse                handle sparse files efficiently\n");
   rprintf(F," -n, --dry-run               show what would have been transferred\n");
   rprintf(F," -W, --whole-file            copy files whole (without rsync algorithm)\n");
-  rprintf(F,"     --no-whole-file         always use incremental rsync algorithm\n");
   rprintf(F," -x, --one-file-system       don't cross filesystem boundaries\n");
   rprintf(F," -B, --block-size=SIZE       force a fixed checksum block-size\n");
   rprintf(F," -e, --rsh=COMMAND           specify the remote shell to use\n");
@@ -338,7 +336,6 @@ void usage(enum logcode F)
   rprintf(F,"     --address=ADDRESS       bind address for outgoing socket to daemon\n");
   rprintf(F,"     --port=PORT             specify double-colon alternate port number\n");
   rprintf(F,"     --blocking-io           use blocking I/O for the remote shell\n");
-  rprintf(F,"     --no-blocking-io        turn off blocking I/O when it is the default\n");
   rprintf(F,"     --stats                 give some file-transfer stats\n");
   rprintf(F,"     --progress              show progress during transfer\n");
   rprintf(F," -P                          same as --partial --progress\n");
@@ -374,20 +371,37 @@ static struct poptOption long_options[] = {
   {"help",            'h', POPT_ARG_NONE,   0, 'h', 0, 0 },
   {"version",          0,  POPT_ARG_NONE,   0, OPT_VERSION, 0, 0},
   {"verbose",         'v', POPT_ARG_NONE,   0, 'v', 0, 0 },
+  {"no-verbose",       0,  POPT_ARG_VAL,    &verbose, 0, 0, 0 },
   {"quiet",           'q', POPT_ARG_NONE,   0, 'q', 0, 0 },
   {"stats",            0,  POPT_ARG_NONE,   &do_stats, 0, 0, 0 },
   {"dry-run",         'n', POPT_ARG_NONE,   &dry_run, 0, 0, 0 },
-  {"archive",         'a', POPT_ARG_NONE,   &archive_mode, 0, 0, 0 },
-  {"recursive",       'r', POPT_ARG_NONE,   &recurse, 0, 0, 0 },
+  {"archive",         'a', POPT_ARG_NONE,   0, 'a', 0, 0 },
+  {"recursive",       'r', POPT_ARG_VAL,    &recurse, 2, 0, 0 },
+  {"no-recursive",     0,  POPT_ARG_VAL,    &recurse, 0, 0, 0 },
+  {"no-r",             0,  POPT_ARG_VAL,    &recurse, 0, 0, 0 },
   {"dirs",            'd', POPT_ARG_VAL,    &xfer_dirs, 2, 0, 0 },
-  {"perms",           'p', POPT_ARG_NONE,   &preserve_perms, 0, 0, 0 },
-  {"times",           't', POPT_ARG_NONE,   &preserve_times, 0, 0, 0 },
+  {"no-dirs",          0,  POPT_ARG_VAL,    &xfer_dirs, 0, 0, 0 },
+  {"no-d",             0,  POPT_ARG_VAL,    &xfer_dirs, 0, 0, 0 },
+  {"perms",           'p', POPT_ARG_VAL,    &preserve_perms, 1, 0, 0 },
+  {"no-perms",         0,  POPT_ARG_VAL,    &preserve_perms, 0, 0, 0 },
+  {"no-p",             0,  POPT_ARG_VAL,    &preserve_perms, 0, 0, 0 },
+  {"times",           't', POPT_ARG_VAL,    &preserve_times, 1, 0, 0 },
   {"omit-dir-times",  'O', POPT_ARG_VAL,    &omit_dir_times, 2, 0, 0 },
   {"modify-window",    0,  POPT_ARG_INT,    &modify_window, OPT_MODIFY_WINDOW, 0, 0 },
-  {"owner",           'o', POPT_ARG_NONE,   &preserve_uid, 0, 0, 0 },
-  {"group",           'g', POPT_ARG_NONE,   &preserve_gid, 0, 0, 0 },
-  {"devices",         'D', POPT_ARG_NONE,   &preserve_devices, 0, 0, 0 },
+  {"no-times",         0,  POPT_ARG_VAL,    &preserve_times, 0, 0, 0 },
+  {"no-t",             0,  POPT_ARG_VAL,    &preserve_times, 0, 0, 0 },
+  {"owner",           'o', POPT_ARG_VAL,    &preserve_uid, 1, 0, 0 },
+  {"no-owner",         0,  POPT_ARG_VAL,    &preserve_uid, 0, 0, 0 },
+  {"no-o",             0,  POPT_ARG_VAL,    &preserve_uid, 0, 0, 0 },
+  {"group",           'g', POPT_ARG_VAL,    &preserve_gid, 1, 0, 0 },
+  {"no-group",         0,  POPT_ARG_VAL,    &preserve_gid, 0, 0, 0 },
+  {"no-g",             0,  POPT_ARG_VAL,    &preserve_gid, 0, 0, 0 },
+  {"devices",         'D', POPT_ARG_VAL,    &preserve_devices, 1, 0, 0 },
+  {"no-devices",       0,  POPT_ARG_VAL,    &preserve_devices, 0, 0, 0 },
+  {"no-D",             0,  POPT_ARG_VAL,    &preserve_devices, 0, 0, 0 },
   {"links",           'l', POPT_ARG_VAL,    &preserve_links, 1, 0, 0 },
+  {"no-links",         0,  POPT_ARG_VAL,    &preserve_links, 0, 0, 0 },
+  {"no-l",             0,  POPT_ARG_VAL,    &preserve_links, 0, 0, 0 },
   {"copy-links",      'L', POPT_ARG_NONE,   &copy_links, 0, 0, 0 },
   {"copy-unsafe-links",0,  POPT_ARG_NONE,   &copy_unsafe_links, 0, 0, 0 },
   {"safe-links",       0,  POPT_ARG_NONE,   &safe_symlinks, 0, 0, 0 },
@@ -395,6 +409,7 @@ static struct poptOption long_options[] = {
   {"hard-links",      'H', POPT_ARG_NONE,   &preserve_hard_links, 0, 0, 0 },
   {"relative",        'R', POPT_ARG_VAL,    &relative_paths, 1, 0, 0 },
   {"no-relative",      0,  POPT_ARG_VAL,    &relative_paths, 0, 0, 0 },
+  {"no-R",             0,  POPT_ARG_VAL,    &relative_paths, 0, 0, 0 },
   {"no-implied-dirs",  0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
   {"ignore-times",    'I', POPT_ARG_NONE,   &ignore_times, 0, 0, 0 },
   {"size-only",        0,  POPT_ARG_NONE,   &size_only, 0, 0, 0 },
@@ -425,6 +440,7 @@ static struct poptOption long_options[] = {
   {"cvs-exclude",     'C', POPT_ARG_NONE,   &cvs_exclude, 0, 0, 0 },
   {"whole-file",      'W', POPT_ARG_VAL,    &whole_file, 1, 0, 0 },
   {"no-whole-file",    0,  POPT_ARG_VAL,    &whole_file, 0, 0, 0 },
+  {"no-W",             0,  POPT_ARG_VAL,    &whole_file, 0, 0, 0 },
   {"checksum",        'c', POPT_ARG_NONE,   &always_checksum, 0, 0, 0 },
   {"block-size",      'B', POPT_ARG_LONG,   &block_size, 0, 0, 0 },
   {"compare-dest",     0,  POPT_ARG_STRING, 0, OPT_COMPARE_DEST, 0, 0 },
@@ -433,8 +449,10 @@ static struct poptOption long_options[] = {
   {"fuzzy",           'y', POPT_ARG_NONE,   &fuzzy_basis, 0, 0, 0 },
   {"compress",        'z', POPT_ARG_NONE,   &do_compression, 0, 0, 0 },
   {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
-  {"progress",         0,  POPT_ARG_NONE,   &do_progress, 0, 0, 0 },
-  {"partial",          0,  POPT_ARG_NONE,   &keep_partial, 0, 0, 0 },
+  {"progress",         0,  POPT_ARG_VAL,    &do_progress, 1, 0, 0 },
+  {"no-progress",      0,  POPT_ARG_VAL,    &do_progress, 0, 0, 0 },
+  {"partial",          0,  POPT_ARG_VAL,    &keep_partial, 1, 0, 0 },
+  {"no-partial",       0,  POPT_ARG_VAL,    &keep_partial, 0, 0, 0 },
   {"partial-dir",      0,  POPT_ARG_STRING, &partial_dir, 0, 0, 0 },
   {"delay-updates",    0,  POPT_ARG_NONE,   &delay_updates, 0, 0, 0 },
   {"log-format",       0,  POPT_ARG_STRING, &log_format, 0, 0, 0 },
@@ -782,6 +800,23 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				XFLG_FATAL_ERRORS | XFLG_OLD_PREFIXES);
 			break;
 
+		case 'a':
+			if (refused_archive_part) {
+				create_refuse_error(refused_archive_part);
+				return 0;
+			}
+			if (!recurse) /* preserve recurse == 2 */
+				recurse = 1;
+#ifdef SUPPORT_LINKS
+			preserve_links = 1;
+#endif
+			preserve_perms = 1;
+			preserve_times = 1;
+			preserve_gid = 1;
+			preserve_uid = 1;
+			preserve_devices = 1;
+			break;
+
 		case 'h':
 			usage(FINFO);
 			exit_cleanup(0);
@@ -956,25 +991,15 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		return 0;
 	}
 
-	if (archive_mode) {
-		if (refused_archive_part) {
-			create_refuse_error(refused_archive_part);
-			return 0;
-		}
-		if (!files_from)
-			recurse = 1;
-#ifdef SUPPORT_LINKS
-		preserve_links = 1;
-#endif
-		preserve_perms = 1;
-		preserve_times = 1;
-		preserve_gid = 1;
-		preserve_uid = 1;
-		preserve_devices = 1;
+	if (files_from) {
+		if (recurse == 1) /* preserve recurse == 2 */
+			recurse = 0;
+		if (xfer_dirs < 0)
+			xfer_dirs = 1;
 	}
 
-	if (recurse || list_only || files_from)
-		xfer_dirs |= 1;
+	if (xfer_dirs < 1)
+		xfer_dirs = recurse || list_only;
 
 	if (relative_paths < 0)
 		relative_paths = files_from? 1 : 0;
