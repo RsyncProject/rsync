@@ -300,10 +300,10 @@ to the detailed description below for a complete description.  verb(
  -q, --quiet                 suppress non-error messages
  -c, --checksum              skip based on checksum, not mod-time & size
  -a, --archive               archive mode; same as -rlptgoD (no -H)
+     --no-OPTION             turn off an implied OPTION (e.g. --no-D)
  -r, --recursive             recurse into directories
  -R, --relative              use relative path names
-     --no-relative           turn off --relative
-     --no-implied-dirs       don't send implied dirs with -R
+     --no-implied-dirs       don't send implied dirs with --relative
  -b, --backup                make backups (see --suffix & --backup-dir)
      --backup-dir=DIR        make backups into hierarchy based in DIR
      --suffix=SUFFIX         backup suffix (default ~ w/o --backup-dir)
@@ -326,7 +326,6 @@ to the detailed description below for a complete description.  verb(
  -S, --sparse                handle sparse files efficiently
  -n, --dry-run               show what would have been transferred
  -W, --whole-file            copy files whole (without rsync algorithm)
-     --no-whole-file         always use incremental rsync algorithm
  -x, --one-file-system       don't cross filesystem boundaries
  -B, --block-size=SIZE       force a fixed checksum block-size
  -e, --rsh=COMMAND           specify the remote shell to use
@@ -371,7 +370,6 @@ to the detailed description below for a complete description.  verb(
      --address=ADDRESS       bind address for outgoing socket to daemon
      --port=PORT             specify double-colon alternate port number
      --blocking-io           use blocking I/O for the remote shell
-     --no-blocking-io        turn off blocking I/O when it is default
      --stats                 give some file-transfer stats
      --progress              show progress during transfer
  -P                          same as --partial --progress
@@ -466,12 +464,32 @@ receiver are not transferred.  This option can be quite slow.
 
 dit(bf(-a, --archive)) This is equivalent to bf(-rlptgoD). It is a quick
 way of saying you want recursion and want to preserve almost
-everything.  The only exception to this is if bf(--files-from) was
+everything (with -H being a notable omission).
+The only exception to the above equivalence is when bf(--files-from) is
 specified, in which case bf(-r) is not implied.
 
 Note that bf(-a) bf(does not preserve hardlinks), because
 finding multiply-linked files is expensive.  You must separately
 specify bf(-H).
+
+dit(--no-OPTION) You may turn off one or more implied options by prefixing
+the option name with "no-".  Not all options may be prefixed with a "no-":
+only options that are implied by other options (e.g. bf(--no-D),
+bf(--no-perms)) or have different defaults in various circumstances
+(e.g. bf(--no-whole-file), bf(--no-blocking-io), bf(--no-dirs)).  You may
+specify either the short or the long option name after the "no-" prefix
+(e.g. bf(--no-R) is the same as bf(--no-relative)).
+
+For example: if you want to use bf(-a) (bf(--archive)) but don't want
+bf(-o) (bf(--owner)), instead of converting bf(-a) into bf(-rlptgD), you
+could specify bf(-a --no-o) (or bf(-a --no-owner)).
+
+The order of the options is important:  if you specify bf(--no-r -a), the
+bf(-r) option would end up being turned on, the opposite of bf(-a --no-r).
+Note also that the side-effects of the bf(--files-from) option are NOT
+positional, as it affects the default state of several options and sligntly
+changes the meaning of bf(-a) (see the bf(--files-from) option for more
+details).
 
 dit(bf(-r, --recursive)) This tells rsync to copy directories
 recursively.  See also bf(--dirs) (bf(-d)).
@@ -513,10 +531,6 @@ quote(
 tt(   rsync -avR --rsync-path="cd /foo; rsync" \ )nl()
 tt(       remote:bar/baz.c /tmp/)
 )
-
-dit(bf(--no-relative)) Turn off the bf(--relative) option.  This is only
-needed if you want to use bf(--files-from) without its implied bf(--relative)
-file processing.
 
 dit(bf(--no-implied-dirs)) When combined with the bf(--relative) option, the
 implied directories in each path are not explicitly duplicated as part
@@ -597,7 +611,8 @@ are encountered.  Unlike bf(--recursive), a directory's contents are not copied
 unless the directory was specified on the command-line as either "." or a
 name with a trailing slash (e.g. "foo/").  Without this option or the
 bf(--recursive) option, rsync will skip all directories it encounters (and
-output a message to that effect for each one).
+output a message to that effect for each one).  If you specify both
+bf(--dirs) and bf(--recursive), the latter takes precedence.
 
 dit(bf(-l, --links)) When symlinks are encountered, recreate the
 symlink on the destination.
@@ -640,9 +655,6 @@ faster if this option is used when the bandwidth between the source and
 destination machines is higher than the bandwidth to disk (especially when the
 "disk" is actually a networked filesystem).  This is the default when both
 the source and destination are specified as local paths.
-
-dit(bf(--no-whole-file)) Turn off bf(--whole-file), for use when it is the
-default.
 
 dit(bf(-p, --perms)) This option causes rsync to set the destination
 permissions to be the same as the source permissions.
@@ -917,12 +929,16 @@ transferring just the specified files and directories easier:
 quote(itemize(
   it() The bf(--relative) (bf(-R)) option is implied, which preserves the path
   information that is specified for each item in the file (use
-  bf(--no-relative) if you want to turn that off).
+  bf(--no-relative) or bf(--no-R) if you want to turn that off).
   it() The bf(--dirs) (bf(-d)) option is implied, which will create directories
   specified in the list on the destination rather than noisily skipping
-  them.
+  them (use bf(--no-dirs) or bf(--no-d) if you want to turn that off).
   it() The bf(--archive) (bf(-a)) option's behavior does not imply bf(--recursive)
   (bf(-r)), so specify it explicitly, if you want it.
+  it() These side-effects change the default state of rsync, so the position
+  of the bf(--files-from) option on the command-line has no bearing on how
+  other options are parsed (e.g. bf(-a) works the same before or after
+  bf(--files-from), as does bf(--no-R) and all other options).
 ))
 
 The file names that are read from the FILE are all relative to the
@@ -1081,9 +1097,6 @@ a remote shell transport.  If the remote shell is either rsh or remsh,
 rsync defaults to using
 blocking I/O, otherwise it defaults to using non-blocking I/O.  (Note that
 ssh prefers non-blocking I/O.)
-
-dit(bf(--no-blocking-io)) Turn off bf(--blocking-io), for use when it is the
-default.
 
 dit(bf(-i, --itemize-changes)) Requests a simple itemized list of the
 changes that are being made to each file, including attribute changes.
