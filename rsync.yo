@@ -186,13 +186,14 @@ that:
 itemize(
 	it() you either use a double colon :: instead of a single colon to
 	separate the hostname from the path, or you use an rsync:// URL.
-	it() the first word after the :: is a module name.
+	it() the first word of the "path" is actually a module name.
 	it() the remote daemon may print a message of the day when you
 	connect.
 	it() if you specify no path name on the remote daemon then the
 	list of accessible paths on the daemon will be shown.
 	it() if you specify no local destination then a listing of the
 	specified files on the remote daemon is provided.
+	it() you must not specify the bf(--rsh) (bf(-e)) option.
 )
 
 An example that copies all the files in a remote module named "src":
