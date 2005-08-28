@@ -38,6 +38,11 @@ Changes since 2.6.6:
       replicate the "baz/dir" part of the source path (note: a trailing
       dot dir is unaffected unless it also has a trailing slash).
 
+    - Added some new --no-FOO options that make it easier to override
+      unwanted implied or default options.  For example, "-a --no-o" (aka
+      "--archive --no-owner") can be used to turn off the preservation of
+      file ownership that is implied by -a.
+
   INTERNAL:
 
     - Some buffer sizes were expanded a bit, particularly on systems where
