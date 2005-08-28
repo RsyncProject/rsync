@@ -372,6 +372,7 @@ static struct poptOption long_options[] = {
   {"version",          0,  POPT_ARG_NONE,   0, OPT_VERSION, 0, 0},
   {"verbose",         'v', POPT_ARG_NONE,   0, 'v', 0, 0 },
   {"no-verbose",       0,  POPT_ARG_VAL,    &verbose, 0, 0, 0 },
+  {"no-v",             0,  POPT_ARG_VAL,    &verbose, 0, 0, 0 },
   {"quiet",           'q', POPT_ARG_NONE,   0, 'q', 0, 0 },
   {"stats",            0,  POPT_ARG_NONE,   &do_stats, 0, 0, 0 },
   {"dry-run",         'n', POPT_ARG_NONE,   &dry_run, 0, 0, 0 },
