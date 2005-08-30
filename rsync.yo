@@ -605,7 +605,9 @@ side.  If that is not true, the file will fail the checksum test, and the
 resend will do a normal bf(--inplace) update to correct the mismatched data.
 Only files on the receiving side that are shorter than the corresponding
 file on the sending side (as well as new files) are sent.
-Implies bf(--inplace).
+Implies bf(--inplace), but does not conflict with bf(--sparse) (though the
+bf(--sparse) option will be auto-disabled if a resend of the already-existing
+data is required).
 
 dit(bf(-d, --dirs)) Tell the sending side to include any directories that
 are encountered.  Unlike bf(--recursive), a directory's contents are not copied
@@ -700,7 +702,8 @@ dit(bf(-n, --dry-run)) This tells rsync to not do any file transfers,
 instead it will just report the actions it would have taken.
 
 dit(bf(-S, --sparse)) Try to handle sparse files efficiently so they take
-up less space on the destination.
+up less space on the destination.  Conflicts with bf(--inplace) because it's
+not possible to overwrite data in a sparse fashion.
 
 NOTE: Don't use this option when the destination is a Solaris "tmpfs"
 filesystem. It doesn't seem to handle seeks over null regions
