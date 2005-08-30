@@ -532,6 +532,8 @@ static struct poptOption long_daemon_options[] = {
   {"server",           0,  POPT_ARG_NONE,   &am_server, 0, 0, 0 },
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir, 0, 0, 0 },
   {"verbose",         'v', POPT_ARG_NONE,   0, 'v', 0, 0 },
+  {"no-verbose",       0,  POPT_ARG_VAL,    &verbose, 0, 0, 0 },
+  {"no-v",             0,  POPT_ARG_VAL,    &verbose, 0, 0, 0 },
   {"help",            'h', POPT_ARG_NONE,   0, 'h', 0, 0 },
   {0,0,0,0, 0, 0, 0}
 };
@@ -749,6 +751,13 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 					goto daemon_error;
 				}
 			}
+
+			if (tmpdir && strlen(tmpdir) >= MAXPATHLEN - 10) {
+				snprintf(err_buf, sizeof err_buf,
+					 "the --temp-dir path is WAY too long.\n");
+				return 0;
+			}
+
 			if (!daemon_opt) {
 				rprintf(FERROR, "Daemon option(s) used without --daemon.\n");
 			    daemon_error:
@@ -756,6 +765,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				    "(Type \"rsync --daemon --help\" for assistance with daemon mode.)\n");
 				exit_cleanup(RERR_SYNTAX);
 			}
+
 			*argv = poptGetArgs(pc);
 			*argc = count_args(*argv);
 			am_starting_up = 0;
