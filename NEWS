@@ -17,6 +17,9 @@ Changes since 2.6.6:
       permissions 0600 instead of 0000 -- this makes restarting possible when
       the transfer gets interrupted in the middle of sending a new file.
 
+    - Reject the combination of --inplace and --sparse since the sparse-output
+      algorithm doesn't work when overwriting existing data.
+
   ENHANCEMENTS:
 
     - Added the --append option that makes rsync append data onto files
@@ -42,6 +45,9 @@ Changes since 2.6.6:
       unwanted implied or default options.  For example, "-a --no-o" (aka
       "--archive --no-owner") can be used to turn off the preservation of
       file ownership that is implied by -a.
+
+    - Allow the --temp-dir option to be specified when starting a daemon,
+      which sets the default temporary directory for incoming files.
 
   INTERNAL:
 
