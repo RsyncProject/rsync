@@ -46,6 +46,7 @@ extern int module_id;
 extern int ignore_errors;
 extern int orig_umask;
 extern int append_mode;
+extern int sparse_files;
 extern int keep_partial;
 extern int checksum_seed;
 extern int inplace;
@@ -444,7 +445,10 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			send_msg(MSG_DONE, "", 0);
 			if (keep_partial && !partial_dir)
 				make_backups = 0; /* prevents double backup */
-			append_mode = 0;
+			if (append_mode) {
+				append_mode = 0;
+				sparse_files = 0;
+			}
 			continue;
 		}
 
