@@ -1159,6 +1159,14 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			bwlimit_writemax = 512;
 	}
 
+	if (sparse_files && inplace) {
+		/* Note: we don't check for this below, because --update is
+		 * OK with --sparse (as long as redos are handled right). */
+		snprintf(err_buf, sizeof err_buf,
+			 "--sparse cannot be used with --inplace\n");
+		return 0;
+	}
+
 	if (append_mode) {
 		if (whole_file > 0) {
 			snprintf(err_buf, sizeof err_buf,
