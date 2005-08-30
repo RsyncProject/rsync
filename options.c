@@ -1160,7 +1160,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 
 	if (sparse_files && inplace) {
-		/* Note: we don't check for this below, because --update is
+		/* Note: we don't check for this below, because --append is
 		 * OK with --sparse (as long as redos are handled right). */
 		snprintf(err_buf, sizeof err_buf,
 			 "--sparse cannot be used with --inplace\n");
