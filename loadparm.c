@@ -137,6 +137,7 @@ typedef struct
 	char *prexfer_exec;
 	char *refuse_options;
 	char *secrets_file;
+	char *temp_dir;
 	char *uid;
 
 	int max_connections;
@@ -176,6 +177,7 @@ static service sDefault =
  /* prexfer_exec */	NULL,
  /* refuse options */	NULL,
  /* secrets file */	NULL,
+ /* temp_dir */ 	NULL,
  /* uid */		NOBODY_USER,
 
  /* max connections */	0,
@@ -308,6 +310,7 @@ static struct parm_struct parm_table[] =
  {"refuse options",    P_STRING, P_LOCAL, &sDefault.refuse_options,    NULL,0},
  {"secrets file",      P_STRING, P_LOCAL, &sDefault.secrets_file,      NULL,0},
  {"strict modes",      P_BOOL,   P_LOCAL, &sDefault.strict_modes,      NULL,0},
+ {"temp dir",          P_PATH,   P_LOCAL, &sDefault.temp_dir,          NULL,0},
  {"timeout",           P_INTEGER,P_LOCAL, &sDefault.timeout,           NULL,0},
  {"transfer logging",  P_BOOL,   P_LOCAL, &sDefault.transfer_logging,  NULL,0},
  {"uid",               P_STRING, P_LOCAL, &sDefault.uid,               NULL,0},
@@ -388,6 +391,7 @@ FN_LOCAL_STRING(lp_postxfer_exec, postxfer_exec)
 FN_LOCAL_STRING(lp_prexfer_exec, prexfer_exec)
 FN_LOCAL_STRING(lp_refuse_options, refuse_options)
 FN_LOCAL_STRING(lp_secrets_file, secrets_file)
+FN_LOCAL_STRING(lp_temp_dir, temp_dir)
 FN_LOCAL_STRING(lp_uid, uid)
 
 FN_LOCAL_INTEGER(lp_max_connections, max_connections)
