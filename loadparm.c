@@ -98,91 +98,98 @@ struct parm_struct
  */
 typedef struct
 {
-	char *motd_file;
+	char *bind_address;
 	char *log_file;
+	char *motd_file;
 	char *pid_file;
 	char *socket_options;
-	char *bind_address;
-	int syslog_facility;
+
 	int rsync_port;
+	int syslog_facility;
 } global;
 
 static global Globals;
 
 
 /*
- * This structure describes a single service.
+ * This structure describes a single service.  Their order must match the
+ * initializers below, which you can accomplish by keeping each sub-section
+ * sorted.  (e.g. in vim, just visually select the subsection and use !sort.)
  */
 typedef struct
 {
-	char *name;
-	char *path;
+	char *auth_users;
 	char *comment;
-	char *lock_file;
-	BOOL read_only;
-	BOOL write_only;
-	BOOL list;
-	BOOL use_chroot;
-	BOOL transfer_logging;
-	BOOL ignore_errors;
-	char *uid;
+	char *dont_compress;
+	char *exclude;
+	char *exclude_from;
+	char *filter;
 	char *gid;
 	char *hosts_allow;
 	char *hosts_deny;
-	char *auth_users;
-	char *secrets_file;
-	BOOL strict_modes;
-	char *filter;
-	char *exclude;
-	char *exclude_from;
 	char *include;
 	char *include_from;
+	char *lock_file;
 	char *log_format;
-	char *refuse_options;
-	char *dont_compress;
-	char *prexfer_exec;
+	char *name;
+	char *path;
 	char *postxfer_exec;
-	int timeout;
+	char *prexfer_exec;
+	char *refuse_options;
+	char *secrets_file;
+	char *uid;
+
 	int max_connections;
 	int max_verbosity;
+	int timeout;
+
+	BOOL ignore_errors;
 	BOOL ignore_nonreadable;
+	BOOL list;
+	BOOL read_only;
+	BOOL strict_modes;
+	BOOL transfer_logging;
+	BOOL use_chroot;
+	BOOL write_only;
 } service;
 
 
 /* This is a default service used to prime a services structure */
 static service sDefault =
 {
-	NULL,    /* name */
-	NULL,    /* path */
-	NULL,    /* comment */
-	DEFAULT_LOCK_FILE,    /* lock file */
-	True,    /* read only */
-	False,   /* write only */
-	True,    /* list */
-	True,    /* use chroot */
-	False,   /* transfer logging */
-	False,   /* ignore errors */
-	NOBODY_USER,/* uid */
-	NOBODY_GROUP,/* gid */
-	NULL,    /* hosts allow */
-	NULL,    /* hosts deny */
-	NULL,    /* auth users */
-	NULL,    /* secrets file */
-	True,   /* strict modes */
-	NULL,    /* filter */
-	NULL,    /* exclude */
-	NULL,    /* exclude from */
-	NULL,    /* include */
-	NULL,    /* include from */
-	"%o %h [%a] %m (%u) %f %l",    /* log format */
-	NULL,    /* refuse options */
-	"*.gz *.tgz *.zip *.z *.rpm *.deb *.iso *.bz2 *.tbz",    /* dont compress */
-	NULL,     /* prexfer_exec */
-	NULL,     /* postxfer_exec */
-	0,        /* timeout */
-	0,        /* max connections */
-	1,        /* max verbosity */
-	False     /* ignore nonreadable */
+ /* auth users */	NULL,
+ /* comment */		NULL,
+ /* dont compress */	"*.gz *.tgz *.zip *.z *.rpm *.deb *.iso *.bz2 *.tbz",
+ /* exclude */		NULL,
+ /* exclude from */	NULL,
+ /* filter */		NULL,
+ /* gid */		NOBODY_GROUP,
+ /* hosts allow */	NULL,
+ /* hosts deny */	NULL,
+ /* include */		NULL,
+ /* include from */	NULL,
+ /* lock file */	DEFAULT_LOCK_FILE,
+ /* log format */	"%o %h [%a] %m (%u) %f %l",
+ /* name */		NULL,
+ /* path */		NULL,
+ /* postxfer_exec */	NULL,
+ /* prexfer_exec */	NULL,
+ /* refuse options */	NULL,
+ /* secrets file */	NULL,
+ /* uid */		NOBODY_USER,
+
+ /* max connections */	0,
+ /* max verbosity */	1,
+ /* timeout */		0,
+
+ /* ignore errors */	  False,
+ /* ignore nonreadable */ False,
+ /* list */		  True,
+ /* read only */	  True,
+ /* strict modes */	  True,
+ /* transfer logging */	  False,
+ /* use chroot */	  True,
+ /* write only */	  False,
 };
 
 
@@ -265,48 +272,48 @@ static struct enum_list enum_facilities[] = {
 /* note that we do not initialise the defaults union - it is not allowed in ANSI C */
 static struct parm_struct parm_table[] =
 {
-  {"motd file",        P_STRING,  P_GLOBAL, &Globals.motd_file,    NULL,   0},
-  {"syslog facility",  P_ENUM,    P_GLOBAL, &Globals.syslog_facility, enum_facilities,0},
-  {"socket options",   P_STRING,  P_GLOBAL, &Globals.socket_options,NULL,  0},
-  {"log file",         P_STRING,  P_GLOBAL, &Globals.log_file,      NULL,  0},
-  {"pid file",         P_STRING,  P_GLOBAL, &Globals.pid_file,      NULL,  0},
-  {"port",             P_INTEGER, P_GLOBAL, &Globals.rsync_port,    NULL,  0},
-  {"address",          P_STRING,  P_GLOBAL, &Globals.bind_address,  NULL,  0},
+ {"address",           P_STRING, P_GLOBAL,&Globals.bind_address,       NULL,0},
+ {"log file",          P_STRING, P_GLOBAL,&Globals.log_file,           NULL,0},
+ {"motd file",         P_STRING, P_GLOBAL,&Globals.motd_file,          NULL,0},
+ {"pid file",          P_STRING, P_GLOBAL,&Globals.pid_file,           NULL,0},
+ {"port",              P_INTEGER,P_GLOBAL,&Globals.rsync_port,         NULL,0},
+ {"socket options",    P_STRING, P_GLOBAL,&Globals.socket_options,     NULL,0},
+ {"syslog facility",   P_ENUM,   P_GLOBAL,&Globals.syslog_facility,enum_facilities,0},
 
-  {"timeout",          P_INTEGER, P_LOCAL,  &sDefault.timeout,     NULL,  0},
-  {"max connections",  P_INTEGER, P_LOCAL,  &sDefault.max_connections,NULL, 0},
-  {"max verbosity",    P_INTEGER, P_LOCAL,  &sDefault.max_verbosity,NULL,  0},
-  {"name",             P_STRING,  P_LOCAL,  &sDefault.name,        NULL,   0},
-  {"comment",          P_STRING,  P_LOCAL,  &sDefault.comment,     NULL,   0},
-  {"lock file",        P_STRING,  P_LOCAL,  &sDefault.lock_file,   NULL,   0},
-  {"path",             P_PATH,    P_LOCAL,  &sDefault.path,        NULL,   0},
-  {"read only",        P_BOOL,    P_LOCAL,  &sDefault.read_only,   NULL,   0},
-  {"write only",       P_BOOL,    P_LOCAL,  &sDefault.write_only,  NULL,   0},
-  {"list",             P_BOOL,    P_LOCAL,  &sDefault.list,        NULL,   0},
-  {"use chroot",       P_BOOL,    P_LOCAL,  &sDefault.use_chroot,  NULL,   0},
-  {"ignore nonreadable",P_BOOL,   P_LOCAL,  &sDefault.ignore_nonreadable,  NULL,   0},
-  {"uid",              P_STRING,  P_LOCAL,  &sDefault.uid,         NULL,   0},
-  {"gid",              P_STRING,  P_LOCAL,  &sDefault.gid,         NULL,   0},
-  {"hosts allow",      P_STRING,  P_LOCAL,  &sDefault.hosts_allow, NULL,   0},
-  {"hosts deny",       P_STRING,  P_LOCAL,  &sDefault.hosts_deny,  NULL,   0},
-  {"auth users",       P_STRING,  P_LOCAL,  &sDefault.auth_users,  NULL,   0},
-  {"secrets file",     P_STRING,  P_LOCAL,  &sDefault.secrets_file,NULL,   0},
-  {"strict modes",     P_BOOL,    P_LOCAL,  &sDefault.strict_modes,NULL,   0},
-  {"filter",           P_STRING,  P_LOCAL,  &sDefault.filter,      NULL,   0},
-  {"exclude",          P_STRING,  P_LOCAL,  &sDefault.exclude,     NULL,   0},
-  {"exclude from",     P_STRING,  P_LOCAL,  &sDefault.exclude_from,NULL,   0},
-  {"include",          P_STRING,  P_LOCAL,  &sDefault.include,     NULL,   0},
-  {"include from",     P_STRING,  P_LOCAL,  &sDefault.include_from,NULL,   0},
-  {"transfer logging", P_BOOL,    P_LOCAL,  &sDefault.transfer_logging,NULL,0},
-  {"ignore errors",    P_BOOL,    P_LOCAL,  &sDefault.ignore_errors,NULL,0},
-  {"log format",       P_STRING,  P_LOCAL,  &sDefault.log_format,  NULL,   0},
-  {"refuse options",   P_STRING,  P_LOCAL,  &sDefault.refuse_options,NULL, 0},
-  {"dont compress",    P_STRING,  P_LOCAL,  &sDefault.dont_compress,NULL,  0},
+ {"auth users",        P_STRING, P_LOCAL, &sDefault.auth_users,        NULL,0},
+ {"comment",           P_STRING, P_LOCAL, &sDefault.comment,           NULL,0},
+ {"dont compress",     P_STRING, P_LOCAL, &sDefault.dont_compress,     NULL,0},
+ {"exclude from",      P_STRING, P_LOCAL, &sDefault.exclude_from,      NULL,0},
+ {"exclude",           P_STRING, P_LOCAL, &sDefault.exclude,           NULL,0},
+ {"filter",            P_STRING, P_LOCAL, &sDefault.filter,            NULL,0},
+ {"gid",               P_STRING, P_LOCAL, &sDefault.gid,               NULL,0},
+ {"hosts allow",       P_STRING, P_LOCAL, &sDefault.hosts_allow,       NULL,0},
+ {"hosts deny",        P_STRING, P_LOCAL, &sDefault.hosts_deny,        NULL,0},
+ {"ignore errors",     P_BOOL,   P_LOCAL, &sDefault.ignore_errors,     NULL,0},
+ {"ignore nonreadable",P_BOOL,   P_LOCAL, &sDefault.ignore_nonreadable,NULL,0},
+ {"include from",      P_STRING, P_LOCAL, &sDefault.include_from,      NULL,0},
+ {"include",           P_STRING, P_LOCAL, &sDefault.include,           NULL,0},
+ {"list",              P_BOOL,   P_LOCAL, &sDefault.list,              NULL,0},
+ {"lock file",         P_STRING, P_LOCAL, &sDefault.lock_file,         NULL,0},
+ {"log format",        P_STRING, P_LOCAL, &sDefault.log_format,        NULL,0},
+ {"max connections",   P_INTEGER,P_LOCAL, &sDefault.max_connections,   NULL,0},
+ {"max verbosity",     P_INTEGER,P_LOCAL, &sDefault.max_verbosity,     NULL,0},
+ {"name",              P_STRING, P_LOCAL, &sDefault.name,              NULL,0},
+ {"path",              P_PATH,   P_LOCAL, &sDefault.path,              NULL,0},
 #ifdef HAVE_PUTENV
-  {"pre-xfer exec",    P_STRING,  P_LOCAL,  &sDefault.prexfer_exec, NULL,  0},
-  {"post-xfer exec",   P_STRING,  P_LOCAL,  &sDefault.postxfer_exec,NULL,  0},
+ {"post-xfer exec",    P_STRING, P_LOCAL, &sDefault.postxfer_exec,     NULL,0},
+ {"pre-xfer exec",     P_STRING, P_LOCAL, &sDefault.prexfer_exec,      NULL,0},
 #endif
-  {NULL,               P_BOOL,    P_NONE,   NULL,                  NULL,   0}
+ {"read only",         P_BOOL,   P_LOCAL, &sDefault.read_only,         NULL,0},
+ {"refuse options",    P_STRING, P_LOCAL, &sDefault.refuse_options,    NULL,0},
+ {"secrets file",      P_STRING, P_LOCAL, &sDefault.secrets_file,      NULL,0},
+ {"strict modes",      P_BOOL,   P_LOCAL, &sDefault.strict_modes,      NULL,0},
+ {"timeout",           P_INTEGER,P_LOCAL, &sDefault.timeout,           NULL,0},
+ {"transfer logging",  P_BOOL,   P_LOCAL, &sDefault.transfer_logging,  NULL,0},
+ {"uid",               P_STRING, P_LOCAL, &sDefault.uid,               NULL,0},
+ {"use chroot",        P_BOOL,   P_LOCAL, &sDefault.use_chroot,        NULL,0},
+ {"write only",        P_BOOL,   P_LOCAL, &sDefault.write_only,        NULL,0},
+ {NULL,                P_BOOL,   P_NONE,  NULL,                        NULL,0}
 };
 
 
@@ -353,45 +360,48 @@ static void init_locals(void)
  int fn_name(int i) {return(LP_SNUM_OK(i)? pSERVICE(i)->val : sDefault.val);}
 
 
-FN_GLOBAL_STRING(lp_motd_file, &Globals.motd_file)
+FN_GLOBAL_STRING(lp_bind_address, &Globals.bind_address)
 FN_GLOBAL_STRING(lp_log_file, &Globals.log_file)
+FN_GLOBAL_STRING(lp_motd_file, &Globals.motd_file)
 FN_GLOBAL_STRING(lp_pid_file, &Globals.pid_file)
 FN_GLOBAL_STRING(lp_socket_options, &Globals.socket_options)
-FN_GLOBAL_INTEGER(lp_syslog_facility, &Globals.syslog_facility)
-FN_GLOBAL_INTEGER(lp_rsync_port, &Globals.rsync_port)
-FN_GLOBAL_STRING(lp_bind_address, &Globals.bind_address)
 
-FN_LOCAL_STRING(lp_name, name)
+FN_GLOBAL_INTEGER(lp_rsync_port, &Globals.rsync_port)
+FN_GLOBAL_INTEGER(lp_syslog_facility, &Globals.syslog_facility)
+
+FN_LOCAL_STRING(lp_auth_users, auth_users)
 FN_LOCAL_STRING(lp_comment, comment)
-FN_LOCAL_STRING(lp_path, path)
-FN_LOCAL_STRING(lp_lock_file, lock_file)
-FN_LOCAL_BOOL(lp_read_only, read_only)
-FN_LOCAL_BOOL(lp_write_only, write_only)
-FN_LOCAL_BOOL(lp_list, list)
-FN_LOCAL_BOOL(lp_use_chroot, use_chroot)
-FN_LOCAL_BOOL(lp_transfer_logging, transfer_logging)
-FN_LOCAL_BOOL(lp_ignore_errors, ignore_errors)
-FN_LOCAL_BOOL(lp_ignore_nonreadable, ignore_nonreadable)
-FN_LOCAL_STRING(lp_uid, uid)
+FN_LOCAL_STRING(lp_dont_compress, dont_compress)
+FN_LOCAL_STRING(lp_exclude, exclude)
+FN_LOCAL_STRING(lp_exclude_from, exclude_from)
+FN_LOCAL_STRING(lp_filter, filter)
 FN_LOCAL_STRING(lp_gid, gid)
 FN_LOCAL_STRING(lp_hosts_allow, hosts_allow)
 FN_LOCAL_STRING(lp_hosts_deny, hosts_deny)
-FN_LOCAL_STRING(lp_auth_users, auth_users)
-FN_LOCAL_STRING(lp_secrets_file, secrets_file)
-FN_LOCAL_BOOL(lp_strict_modes, strict_modes)
-FN_LOCAL_STRING(lp_filter, filter)
-FN_LOCAL_STRING(lp_exclude, exclude)
-FN_LOCAL_STRING(lp_exclude_from, exclude_from)
 FN_LOCAL_STRING(lp_include, include)
 FN_LOCAL_STRING(lp_include_from, include_from)
+FN_LOCAL_STRING(lp_lock_file, lock_file)
 FN_LOCAL_STRING(lp_log_format, log_format)
-FN_LOCAL_STRING(lp_refuse_options, refuse_options)
-FN_LOCAL_STRING(lp_dont_compress, dont_compress)
-FN_LOCAL_STRING(lp_prexfer_exec, prexfer_exec)
+FN_LOCAL_STRING(lp_name, name)
+FN_LOCAL_STRING(lp_path, path)
 FN_LOCAL_STRING(lp_postxfer_exec, postxfer_exec)
-FN_LOCAL_INTEGER(lp_timeout, timeout)
+FN_LOCAL_STRING(lp_prexfer_exec, prexfer_exec)
+FN_LOCAL_STRING(lp_refuse_options, refuse_options)
+FN_LOCAL_STRING(lp_secrets_file, secrets_file)
+FN_LOCAL_STRING(lp_uid, uid)
+
 FN_LOCAL_INTEGER(lp_max_connections, max_connections)
 FN_LOCAL_INTEGER(lp_max_verbosity, max_verbosity)
+FN_LOCAL_INTEGER(lp_timeout, timeout)
+
+FN_LOCAL_BOOL(lp_ignore_errors, ignore_errors)
+FN_LOCAL_BOOL(lp_ignore_nonreadable, ignore_nonreadable)
+FN_LOCAL_BOOL(lp_list, list)
+FN_LOCAL_BOOL(lp_read_only, read_only)
+FN_LOCAL_BOOL(lp_strict_modes, strict_modes)
+FN_LOCAL_BOOL(lp_transfer_logging, transfer_logging)
+FN_LOCAL_BOOL(lp_use_chroot, use_chroot)
+FN_LOCAL_BOOL(lp_write_only, write_only)
 
 /* local prototypes */
 static int    strwicmp(char *psz1, char *psz2);
