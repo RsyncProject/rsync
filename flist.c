@@ -1244,7 +1244,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			flist_dir_len = 0;
 			if (!pop_dir(olddir)) {
 				rsyserr(FERROR, errno, "pop_dir %s failed",
-					full_fname(dir));
+					full_fname(olddir));
 				exit_cleanup(RERR_FILESELECT);
 			}
 		}
