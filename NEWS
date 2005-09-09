@@ -6,8 +6,8 @@ Changes since 2.6.6:
 
     - Made hard-links work with symlinks and devices again.
 
-    - If a device changed permissions, rsync no longer recreates the device
-      instead of just updating the permissions.
+    - If a device-file/special-file changes permissions, rsync now updates the
+      permissions without recreating the file.
 
     - If the user specifies a remote-host for both the source and destination,
       we now output a syntax error rather than trying to open the destination
@@ -19,6 +19,9 @@ Changes since 2.6.6:
 
     - Reject the combination of --inplace and --sparse since the sparse-output
       algorithm doesn't work when overwriting existing data.
+
+    - Fixed the directory name in the error that is output when pop_dir()
+      fails.
 
   ENHANCEMENTS:
 
