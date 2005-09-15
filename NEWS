@@ -52,6 +52,8 @@ Changes since 2.6.6:
     - Allow the --temp-dir option to be specified when starting a daemon,
       which sets the default temporary directory for incoming files.
 
+    - Some minor documentation improvements.
+
   INTERNAL:
 
     - Some buffer sizes were expanded a bit, particularly on systems where
