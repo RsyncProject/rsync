@@ -1260,10 +1260,13 @@ Conflicts with bf(--inplace).
 This option uses more memory on the receiving side (one bit per file
 transferred) and also requires enough free disk space on the receiving
 side to hold an additional copy of all the updated files.  Note also that
-you should not use an absolute path to bf(--partial-dir) unless there is no
+you should not use an absolute path to bf(--partial-dir) unless (1)
+there is no
 chance of any of the files in the transfer having the same name (since all
 the updated files will be put into a single directory if the path is
-absolute).
+absolute)
+and (2) there are no mount points in the hierarchy (since the
+delayed updates will fail if they can't be renamed into place).
 
 See also the "atomic-rsync" perl script in the "support" subdir for an
 update algorithm that is even more atomic (it uses bf(--link-dest) and a
