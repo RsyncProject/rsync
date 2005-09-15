@@ -354,6 +354,8 @@ static void handle_delayed_updates(struct file_list *flist, char *local_name)
 					safe_fname(partialptr),
 					safe_fname(fname));
 			}
+			/* We don't use robust_rename() here because the
+			 * partial-dir must be on the same drive. */
 			if (do_rename(partialptr, fname) < 0) {
 				rsyserr(FERROR, errno,
 					"rename failed for %s (from %s)",
