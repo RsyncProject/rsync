@@ -76,9 +76,6 @@ different remote shell by default, such as rsh or remsh.
 You can also specify any remote shell you like, either by using the bf(-e)
 command line option, or by setting the RSYNC_RSH environment variable.
 
-One common substitute is to use ssh, which offers a high degree of
-security.
-
 Note that rsync must be installed on both the source and destination
 machines.
 
