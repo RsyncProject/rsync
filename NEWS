@@ -23,6 +23,8 @@ Changes since 2.6.6:
     - Fixed the directory name in the error that is output when pop_dir()
       fails.
 
+    - Really fixed the parsing of a "!" entry in .cvsignore files this time.
+
   ENHANCEMENTS:
 
     - Added the --append option that makes rsync append data onto files
