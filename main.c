@@ -460,7 +460,6 @@ static void read_final_goodbye(int f_in, int f_out)
 
 static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 {
-	int i;
 	struct file_list *flist;
 	char *dir = argv[0];
 
@@ -488,14 +487,6 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 	}
 	argc--;
 	argv++;
-
-	if (strcmp(dir,".")) {
-		int l = strlen(dir);
-		if (strcmp(dir,"/") == 0)
-			l = 0;
-		for (i = 0; i < argc; i++)
-			argv[i] += l+1;
-	}
 
 	if (argc == 0 && (recurse || list_only)) {
 		argc = 1;
@@ -674,14 +665,8 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	}
 	the_file_list = flist;
 
-	if (argc > 0) {
-		if (strcmp(dir,".")) {
-			argv[0] += strlen(dir);
-			if (argv[0][0] == '/')
-				argv[0]++;
-		}
+	if (argc > 0)
 		local_name = get_local_name(flist,argv[0]);
-	}
 
 	status = do_recv(f_in,f_out,flist,local_name);
 	exit_cleanup(status);
