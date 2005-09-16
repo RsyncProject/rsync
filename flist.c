@@ -480,19 +480,16 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	}
 #endif
 
-	if (always_checksum) {
+	if (always_checksum && (S_ISREG(mode) || protocol_version < 28)) {
 		char *sum;
+		int slen = protocol_version < 21 ? 2 : MD4_SUM_LENGTH;
 		if (S_ISREG(mode))
 			sum = file->u.sum;
-		else if (protocol_version < 28) {
+		else {
 			/* Prior to 28, we sent a useless set of nulls. */
 			sum = empty_sum;
-		} else
-			sum = NULL;
-		if (sum) {
-			write_buf(f, sum,
-			    protocol_version < 21 ? 2 : MD4_SUM_LENGTH);
 		}
+		write_buf(f, sum, slen);
 	}
 
 	strlcpy(lastname, fname, MAXPATHLEN);
@@ -708,20 +705,17 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 	}
 #endif
 
-	if (always_checksum) {
+	if (always_checksum && (sum_len || protocol_version < 28)) {
 		char *sum;
+		int slen = protocol_version < 21 ? 2 : MD4_SUM_LENGTH;
 		if (sum_len) {
 			file->u.sum = sum = bp;
 			/*bp += sum_len;*/
-		} else if (protocol_version < 28) {
+		} else {
 			/* Prior to 28, we get a useless set of nulls. */
 			sum = empty_sum;
-		} else
-			sum = NULL;
-		if (sum) {
-			read_buf(f, sum,
-			    protocol_version < 21 ? 2 : MD4_SUM_LENGTH);
 		}
+		read_buf(f, sum, slen);
 	}
 
 	if (!preserve_perms) {
