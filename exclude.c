@@ -827,7 +827,8 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 		len = strlen((char*)s);
 
 	if (new_mflags & MATCHFLG_CLEAR_LIST) {
-		if (!(xflags & XFLG_OLD_PREFIXES) && len) {
+		if (!(mflags & MATCHFLG_NO_PREFIXES)
+		 && !(xflags & XFLG_OLD_PREFIXES) && len) {
 			rprintf(FERROR,
 				"'!' rule has trailing characters: %s\n", p);
 			exit_cleanup(RERR_SYNTAX);
