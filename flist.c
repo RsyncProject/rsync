@@ -1176,7 +1176,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			static char *lastdir;
 			static int lastdir_len;
 
-			strcpy(olddir, curr_dir); /* can't overflow */
+			strlcpy(olddir, curr_dir, sizeof olddir);
 
 			if (!push_dir(dir)) {
 				io_error |= IOERR_GENERAL;
