@@ -114,7 +114,7 @@ static global Globals;
 /*
  * This structure describes a single service.  Their order must match the
  * initializers below, which you can accomplish by keeping each sub-section
- * sorted.  (e.g. in vim, just visually select the subsection and use !sort.)
+ * sorted.  (e.g. in vim, just visually select each subsection and use !sort.)
  */
 typedef struct
 {
@@ -155,43 +155,46 @@ typedef struct
 } service;
 
 
-/* This is a default service used to prime a services structure */
+/* This is a default service used to prime a services structure.  In order
+ * to make these easy to keep sorted in the same way as the variables
+ * above, use the variable name in the leading comment, including a
+ * trailing ';' (to avoid a sorting problem with trailing digits). */
 static service sDefault =
 {
- /* auth_users */		NULL,
- /* comment */			NULL,
- /* dont_compress */		"*.gz *.tgz *.zip *.z *.rpm *.deb *.iso *.bz2 *.tbz",
- /* exclude */			NULL,
- /* exclude_from */		NULL,
- /* filter */			NULL,
- /* gid */			NOBODY_GROUP,
- /* hosts_allow */		NULL,
- /* hosts_deny */		NULL,
- /* include */			NULL,
- /* include_from */		NULL,
- /* lock_file */		DEFAULT_LOCK_FILE,
- /* log_format */		"%o %h [%a] %m (%u) %f %l",
- /* name */			NULL,
- /* path */			NULL,
- /* postxfer_exec */		NULL,
- /* prexfer_exec */		NULL,
- /* refuse_options */		NULL,
- /* secrets_file */		NULL,
- /* temp_dir */ 		NULL,
- /* uid */			NOBODY_USER,
+ /* auth_users; */		NULL,
+ /* comment; */			NULL,
+ /* dont_compress; */		"*.gz *.tgz *.zip *.z *.rpm *.deb *.iso *.bz2 *.tbz",
+ /* exclude; */			NULL,
+ /* exclude_from; */		NULL,
+ /* filter; */			NULL,
+ /* gid; */			NOBODY_GROUP,
+ /* hosts_allow; */		NULL,
+ /* hosts_deny; */		NULL,
+ /* include; */			NULL,
+ /* include_from; */		NULL,
+ /* lock_file; */		DEFAULT_LOCK_FILE,
+ /* log_format; */		"%o %h [%a] %m (%u) %f %l",
+ /* name; */			NULL,
+ /* path; */			NULL,
+ /* postxfer_exec; */		NULL,
+ /* prexfer_exec; */		NULL,
+ /* refuse_options; */		NULL,
+ /* secrets_file; */		NULL,
+ /* temp_dir; */ 		NULL,
+ /* uid; */			NOBODY_USER,
 
- /* max_connections */		0,
- /* max_verbosity */		1,
- /* timeout */			0,
+ /* max_connections; */		0,
+ /* max_verbosity; */		1,
+ /* timeout; */			0,
 
- /* ignore_errors */		False,
- /* ignore_nonreadable */	False,
- /* list */			True,
- /* read_only */		True,
- /* strict_modes */		True,
- /* transfer_logging */		False,
- /* use_chroot */		True,
- /* write_only */		False,
+ /* ignore_errors; */		False,
+ /* ignore_nonreadable; */	False,
+ /* list; */			True,
+ /* read_only; */		True,
+ /* strict_modes; */		True,
+ /* transfer_logging; */	False,
+ /* use_chroot; */		True,
+ /* write_only; */		False,
 };
 
 
