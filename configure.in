@@ -310,7 +310,7 @@ AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     unistd.h utime.h grp.h compat.h sys/param.h ctype.h sys/wait.h \
     sys/ioctl.h sys/filio.h string.h stdlib.h sys/socket.h sys/mode.h \
     sys/un.h glob.h mcheck.h arpa/inet.h arpa/nameser.h locale.h \
-    netdb.h malloc.h float.h)
+    netdb.h malloc.h float.h limits.h)
 AC_HEADER_MAJOR
 
 AC_CHECK_SIZEOF(int)
