@@ -100,12 +100,12 @@ static void list_file(const char *fname)
 		mt = gmtime(&buf.st_mtime);
 
 		sprintf(datebuf, "%04d-%02d-%02d %02d:%02d:%02d",
-			mt->tm_year + 1900,
-			mt->tm_mon + 1,
-			mt->tm_mday,
-			mt->tm_hour,
-			mt->tm_min,
-			mt->tm_sec);
+			(int)mt->tm_year + 1900,
+			(int)mt->tm_mon + 1,
+			(int)mt->tm_mday,
+			(int)mt->tm_hour,
+			(int)mt->tm_min,
+			(int)mt->tm_sec);
 	} else {
 		strcpy(datebuf, "                   ");
 	}
