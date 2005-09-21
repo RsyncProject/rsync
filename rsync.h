@@ -319,6 +319,10 @@ enum msgcode {
 #include <compat.h>
 #endif
 
+#ifdef HAVE_LIMITS_H
+# include <limits.h>
+#endif
+
 #include <assert.h>
 
 #include "lib/pool_alloc.h"
