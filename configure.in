@@ -694,7 +694,7 @@ AC_TRY_RUN([
 #include <errno.h>
 main() { int rc, ec; char *fn = "fifo-test";
 unlink(fn); rc = mknod(fn,S_IFIFO,0600); ec = errno; unlink(fn);
-if (rc) {printf("%d %d\n",rc,ec); return ec;}
+if (rc) {printf("(%d %d) ",rc,ec); return ec;}
 return 0;}],
            rsync_cv_MKNOD_CREATES_FIFOS=yes,rsync_cv_MKNOD_CREATES_FIFOS=no,rsync_cv_MKNOD_CREATES_FIFOS=cross)])
 if test x"$rsync_cv_MKNOD_CREATES_FIFOS" = x"yes"; then
@@ -708,7 +708,7 @@ AC_TRY_RUN([
 #include <errno.h>
 main() { int rc, ec; char *fn = "sock-test";
 unlink(fn); rc = mknod(fn,S_IFSOCK,0600); ec = errno; unlink(fn);
-if (rc) {printf("%d %d\n",rc,ec); return ec;}
+if (rc) {printf("(%d %d) ",rc,ec); return ec;}
 return 0;}],
            rsync_cv_MKNOD_CREATES_SOCKETS=yes,rsync_cv_MKNOD_CREATES_SOCKETS=no,rsync_cv_MKNOD_CREATES_SOCKETS=cross)])
 if test x"$rsync_cv_MKNOD_CREATES_SOCKETS" = x"yes"; then
