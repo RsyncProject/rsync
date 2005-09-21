@@ -251,13 +251,13 @@ void usage(enum logcode F)
 
   rprintf(F,"\nrsync is a file transfer program capable of efficient remote update\nvia a fast differencing algorithm.\n\n");
 
-  rprintf(F,"Usage: rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST\n");
-  rprintf(F,"  or   rsync [OPTION]... [USER@]HOST:SRC [DEST]\n");
-  rprintf(F,"  or   rsync [OPTION]... SRC [SRC]... DEST\n");
-  rprintf(F,"  or   rsync [OPTION]... [USER@]HOST::SRC [DEST]\n");
+  rprintf(F,"Usage: rsync [OPTION]... SRC [SRC]... DEST\n");
+  rprintf(F,"  or   rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST\n");
   rprintf(F,"  or   rsync [OPTION]... SRC [SRC]... [USER@]HOST::DEST\n");
-  rprintf(F,"  or   rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC [DEST]\n");
   rprintf(F,"  or   rsync [OPTION]... SRC [SRC]... rsync://[USER@]HOST[:PORT]/DEST\n");
+  rprintf(F,"  or   rsync [OPTION]... [USER@]HOST:SRC [DEST]\n");
+  rprintf(F,"  or   rsync [OPTION]... [USER@]HOST::SRC [DEST]\n");
+  rprintf(F,"  or   rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC [DEST]\n");
   rprintf(F,"The ':' usages connect via remote shell, while '::' & 'rsync://' usages connect\n");
   rprintf(F,"to an rsync daemon, and require SRC or DEST to start with a module name.\n");
   rprintf(F,"\nOptions\n");

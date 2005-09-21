@@ -3,19 +3,19 @@ manpage(rsync)(1)(28 Jul 2005)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
-rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST
-
-rsync [OPTION]... [USER@]HOST:SRC [DEST]
-
 rsync [OPTION]... SRC [SRC]... DEST
 
-rsync [OPTION]... [USER@]HOST::SRC [DEST]
+rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST
 
 rsync [OPTION]... SRC [SRC]... [USER@]HOST::DEST
 
-rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC [DEST]
-
 rsync [OPTION]... SRC [SRC]... rsync://[USER@]HOST[:PORT]/DEST
+
+rsync [OPTION]... [USER@]HOST:SRC [DEST]
+
+rsync [OPTION]... [USER@]HOST::SRC [DEST]
+
+rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC [DEST]
 
 manpagedescription()
 
