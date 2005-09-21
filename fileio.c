@@ -22,6 +22,10 @@
   */
 #include "rsync.h"
 
+#ifndef ENODATA
+#define ENODATA EAGAIN
+#endif
+
 extern int sparse_files;
 
 static char last_byte;
@@ -217,33 +221,34 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 		rprintf(FERROR, "invalid read_size of %ld in map_ptr\n",
 			(long)read_size);
 		exit_cleanup(RERR_FILEIO);
-	} else {
-		if (map->p_fd_offset != read_start) {
-			OFF_T ret = do_lseek(map->fd, read_start, SEEK_SET);
-			if (ret != read_start) {
-				rsyserr(FERROR, errno,
-					"lseek returned %.0f, not %.0f",
-					(double)ret, (double)read_start);
-				exit_cleanup(RERR_FILEIO);
-			}
-			map->p_fd_offset = read_start;
-		}
-
-		if ((nread=read(map->fd,map->p + read_offset,read_size)) != read_size) {
-			if (nread < 0) {
-				nread = 0;
-				if (!map->status)
-					map->status = errno;
-			}
-			/* the best we can do is zero the buffer - the file
-			   has changed mid transfer! */
-			memset(map->p+read_offset+nread, 0, read_size - nread);
-		}
-		map->p_fd_offset += nread;
 	}
 
+	if (map->p_fd_offset != read_start) {
+		OFF_T ret = do_lseek(map->fd, read_start, SEEK_SET);
+		if (ret != read_start) {
+			rsyserr(FERROR, errno, "lseek returned %.0f, not %.0f",
+				(double)ret, (double)read_start);
+			exit_cleanup(RERR_FILEIO);
+		}
+		map->p_fd_offset = read_start;
+	}
+	map->p_fd_offset += read_size;
 	map->p_offset = window_start;
 	map->p_len = window_size;
+
+	while (read_size > 0) {
+		nread = read(map->fd, map->p + read_offset, read_size);
+		if (nread <= 0) {
+			if (!map->status)
+				map->status = nread ? errno : ENODATA;
+			/* The best we can do is zero the buffer -- the file
+			 * has changed mid transfer! */
+			memset(map->p + read_offset, 0, read_size);
+			break;
+		}
+		read_offset += nread;
+		read_size -= nread;
+	}
 
 	return map->p;
 }
