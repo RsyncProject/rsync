@@ -86,10 +86,10 @@ then
 fi
 
 AC_ARG_WITH(included-popt,
-        [  --with-included-popt    use bundled popt library, not from system])
+        AC_HELP_STRING([--with-included-popt], [use bundled popt library, not from system]))
 
 AC_ARG_WITH(rsync-path,
-	[  --with-rsync-path=PATH  set default --rsync-path to PATH (default: rsync)],
+	AC_HELP_STRING([--with-rsync-path=PATH], [set default --rsync-path to PATH (default: rsync)]),
 	[ RSYNC_PATH="$with_rsync_path" ],
 	[ RSYNC_PATH="rsync" ])
 
