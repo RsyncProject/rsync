@@ -34,7 +34,7 @@
 #define RERR_STREAMIO   12      /* error in rsync protocol data stream */
 #define RERR_MESSAGEIO  13      /* errors with program diagnostics */
 #define RERR_IPC        14      /* error in IPC code */
-#define RERR_CRASH      15      /* sibling crashed */
+#define RERR_CRASHED    15      /* sibling crashed */
 #define RERR_TERMINATED 16      /* sibling terminated abnormally */
 
 #define RERR_SIGNAL     20      /* status returned when sent SIGUSR1, SIGINT */

@@ -65,7 +65,7 @@ struct {
 	{ RERR_STREAMIO   , "error in rsync protocol data stream" },
 	{ RERR_MESSAGEIO  , "errors with program diagnostics" },
 	{ RERR_IPC        , "error in IPC code" },
-	{ RERR_CRASH      , "sibling process crashed" },
+	{ RERR_CRASHED    , "sibling process crashed" },
 	{ RERR_TERMINATED , "sibling process terminated abnormally" },
 	{ RERR_SIGNAL     , "received SIGUSR1 or SIGINT" },
 	{ RERR_WAITCHILD  , "some error returned by waitpid()" },
