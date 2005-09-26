@@ -25,6 +25,10 @@ Changes since 2.6.6:
 
     - Really fixed the parsing of a "!" entry in .cvsignore files this time.
 
+    - Several diffs in the patches dir now use the proper --enable-FOO
+      configure option instead of --with-FOO to turn on the inclusion of
+      the newly patched feature.
+
   ENHANCEMENTS:
 
     - Added the --append option that makes rsync append data onto files
@@ -55,6 +59,8 @@ Changes since 2.6.6:
       which sets the default temporary directory for incoming files.
 
     - Some minor documentation improvements.
+
+    - Updated some diffs in the patches dir.
 
   INTERNAL:
 
