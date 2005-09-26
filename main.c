@@ -45,6 +45,7 @@ extern int copy_links;
 extern int keep_dirlinks;
 extern int preserve_hard_links;
 extern int protocol_version;
+extern int always_checksum;
 extern int recurse;
 extern int relative_paths;
 extern int rsync_port;
@@ -60,8 +61,10 @@ extern char *filesfrom_host;
 extern char *rsync_path;
 extern char *shell_cmd;
 extern char *batch_name;
+extern char curr_dir[MAXPATHLEN];
 
 int local_server = 0;
+int pre_checksum = 0;
 struct file_list *the_file_list;
 
 /* There's probably never more than at most 2 outstanding child processes,
@@ -112,9 +115,12 @@ static void wait_process(pid_t pid, int *code_ptr)
 	if (waited_pid < 0)
 		*code_ptr = RERR_WAITCHILD;
 	else if (!WIFEXITED(status)) {
+#ifdef WCOREDUMP
 		if (WCOREDUMP(status))
 			*code_ptr = RERR_CRASHED;
-		else if (WIFSIGNALED(status))
+		else
+#endif
+		if (WIFSIGNALED(status))
 			*code_ptr = RERR_TERMINATED;
 		else
 			*code_ptr = RERR_WAITCHILD;
@@ -623,6 +629,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	struct file_list *flist;
 	char *local_name = NULL;
 	char *dir = NULL;
+	char olddir[sizeof curr_dir];
 	int save_verbose = verbose;
 
 	if (filesfrom_fd >= 0) {
@@ -667,6 +674,10 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		filesfrom_fd = -1;
 	}
 
+	strlcpy(olddir, curr_dir, sizeof olddir);
+	if (always_checksum && argc > 0)
+		pre_checksum = push_dir(argv[0]);
+
 	flist = recv_file_list(f_in);
 	verbose = save_verbose;
 	if (!flist) {
@@ -674,6 +685,9 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		exit_cleanup(RERR_FILESELECT);
 	}
 	the_file_list = flist;
+
+	if (pre_checksum)
+		pop_dir(olddir);
 
 	if (argc > 0)
 		local_name = get_local_name(flist,argv[0]);
@@ -723,6 +737,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 {
 	struct file_list *flist = NULL;
 	int status = 0, status2 = 0;
+	char olddir[sizeof curr_dir];
 	char *local_name = NULL;
 
 	cleanup_child_pid = pid;
@@ -794,10 +809,17 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		filesfrom_fd = -1;
 	}
 
+	strlcpy(olddir, curr_dir, sizeof olddir);
+	if (always_checksum)
+		pre_checksum = push_dir(argv[0]);
+
 	if (write_batch && !am_server)
 		start_write_batch(f_in);
 	flist = recv_file_list(f_in);
 	the_file_list = flist;
+
+	if (pre_checksum)
+		pop_dir(olddir);
 
 	if (flist && flist->count > 0) {
 		local_name = get_local_name(flist, argv[0]);
