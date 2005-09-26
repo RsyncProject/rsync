@@ -81,12 +81,12 @@ static void show_malloc_stats(void);
 /****************************************************************************
 wait for a process to exit, calling io_flush while waiting
 ****************************************************************************/
-void wait_process(pid_t pid, int *status)
+static void wait_process(pid_t pid, int *code_ptr)
 {
 	pid_t waited_pid;
-	int cnt;
+	int cnt, status;
 
-	while ((waited_pid = waitpid(pid, status, WNOHANG)) == 0) {
+	while ((waited_pid = waitpid(pid, &status, WNOHANG)) == 0) {
 		msleep(20);
 		io_flush(FULL_FLUSH);
 	}
@@ -97,7 +97,8 @@ void wait_process(pid_t pid, int *status)
 		 */
 		for (cnt = 0;  cnt < MAXCHILDPROCS; cnt++) {
 			if (pid == pid_stat_table[cnt].pid) {
-				*status = pid_stat_table[cnt].status;
+				waited_pid = pid;
+				status = pid_stat_table[cnt].status;
 				pid_stat_table[cnt].pid = 0;
 				break;
 			}
@@ -107,9 +108,18 @@ void wait_process(pid_t pid, int *status)
 	/* TODO: If the child exited on a signal, then log an
 	 * appropriate error message.  Perhaps we should also accept a
 	 * message describing the purpose of the child.  Also indicate
-	 * this to the caller so that thhey know something went
-	 * wrong.  */
-	*status = WEXITSTATUS(*status);
+	 * this to the caller so that they know something went wrong. */
+	if (waited_pid < 0)
+		*code_ptr = RERR_WAITCHILD;
+	else if (!WIFEXITED(status)) {
+		if (WCOREDUMP(status))
+			*code_ptr = RERR_CRASHED;
+		else if (WIFSIGNALED(status))
+			*code_ptr = RERR_TERMINATED;
+		else
+			*code_ptr = RERR_WAITCHILD;
+	} else
+		*code_ptr = WEXITSTATUS(status);
 }
 
 /* This function gets called from all 3 processes.  We want the client side
