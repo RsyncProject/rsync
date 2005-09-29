@@ -1029,11 +1029,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			return;
 		if (stat_errno == ENOENT)
 			goto notify_others;
-		if (verbose > 1) {
-			rsyserr(FERROR, stat_errno,
-				"recv_generator: failed to stat %s",
-				full_fname(fname));
-		}
+		rsyserr(FERROR, stat_errno, "recv_generator: failed to stat %s",
+			full_fname(fname));
 		return;
 	}
 
