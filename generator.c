@@ -52,7 +52,8 @@ extern int ignore_errors;
 extern int remove_sent_files;
 extern int delay_updates;
 extern int update_only;
-extern int opt_ignore_existing;
+extern int ignore_existing;
+extern int ignore_non_existing;
 extern int inplace;
 extern int append_mode;
 extern int make_backups;
@@ -75,7 +76,6 @@ extern int link_dest;
 extern int whole_file;
 extern int list_only;
 extern int read_batch;
-extern int only_existing;
 extern int orig_umask;
 extern int safe_symlinks;
 extern long block_size; /* "long" because popt can't set an int32. */
@@ -675,8 +675,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		stat_errno = errno;
 	}
 
-	if (only_existing && statret == -1 && stat_errno == ENOENT) {
-		/* we only want to update existing files */
+	if (ignore_non_existing && statret == -1 && stat_errno == ENOENT) {
 		if (verbose > 1) {
 			rprintf(FINFO, "not creating new %s \"%s\"\n",
 				S_ISDIR(file->mode) ? "directory" : "file",
@@ -874,7 +873,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (opt_ignore_existing && statret == 0) {
+	if (ignore_existing && statret == 0) {
 		if (verbose > 1)
 			rprintf(FINFO, "%s exists\n", safe_fname(fname));
 		return;
@@ -1178,8 +1177,8 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	int lull_mod = allowed_lull * 5;
 	int need_retouch_dir_times = preserve_times && !omit_dir_times;
 	int need_retouch_dir_perms = 0;
-	int save_only_existing = only_existing;
-	int save_opt_ignore_existing = opt_ignore_existing;
+	int save_ignore_existing = ignore_existing;
+	int save_ignore_non_existing = ignore_non_existing;
 	int save_do_progress = do_progress;
 	int save_make_backups = make_backups;
 
@@ -1266,7 +1265,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 
 	phase++;
 	csum_length = SUM_LENGTH;
-	only_existing = max_size = opt_ignore_existing = 0;
+	max_size = ignore_existing = ignore_non_existing = 0;
 	update_only = always_checksum = size_only = 0;
 	ignore_times = 1;
 	if (append_mode)  /* resend w/o append mode */
@@ -1288,8 +1287,8 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	}
 
 	phase++;
-	only_existing = save_only_existing;
-	opt_ignore_existing = save_opt_ignore_existing;
+	ignore_non_existing = save_ignore_non_existing;
+	ignore_existing = save_ignore_existing;
 	make_backups = save_make_backups;
 
 	if (verbose > 2)

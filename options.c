@@ -94,8 +94,8 @@ int daemon_bwlimit = 0;
 int bwlimit = 0;
 int fuzzy_basis = 0;
 size_t bwlimit_writemax = 0;
-int only_existing = 0;
-int opt_ignore_existing = 0;
+int ignore_existing = 0;
+int ignore_non_existing = 0;
 int need_messages_from_generator = 0;
 int max_delete = 0;
 OFF_T max_size = 0;
@@ -415,8 +415,9 @@ static struct poptOption long_options[] = {
   {"size-only",        0,  POPT_ARG_NONE,   &size_only, 0, 0, 0 },
   {"one-file-system", 'x', POPT_ARG_NONE,   &one_file_system, 0, 0, 0 },
   {"update",          'u', POPT_ARG_NONE,   &update_only, 0, 0, 0 },
-  {"existing",         0,  POPT_ARG_NONE,   &only_existing, 0, 0, 0 },
-  {"ignore-existing",  0,  POPT_ARG_NONE,   &opt_ignore_existing, 0, 0, 0 },
+  {"existing",         0,  POPT_ARG_NONE,   &ignore_non_existing, 0, 0, 0 },
+  {"ignore-existing",  0,  POPT_ARG_NONE,   &ignore_existing, 0, 0, 0 },
+  {"ignore-non-existing",0,POPT_ARG_NONE,   &ignore_non_existing, 0, 0, 0 },
   {"max-size",         0,  POPT_ARG_STRING, &max_size_arg,  OPT_MAX_SIZE, 0, 0 },
   {"sparse",          'S', POPT_ARG_NONE,   &sparse_files, 0, 0, 0 },
   {"inplace",          0,  POPT_ARG_NONE,   &inplace, 0, 0, 0 },
@@ -1498,11 +1499,12 @@ void server_options(char **args,int *argc)
 	if (numeric_ids)
 		args[ac++] = "--numeric-ids";
 
-	if (only_existing && am_sender)
-		args[ac++] = "--existing";
-
-	if (opt_ignore_existing && am_sender)
+	if (ignore_existing && am_sender)
 		args[ac++] = "--ignore-existing";
+
+	/* Backward compatibility: send --existing, not --ignore-non-existing. */
+	if (ignore_non_existing && am_sender)
+		args[ac++] = "--existing";
 
 	if (append_mode)
 		args[ac++] = "--append";
