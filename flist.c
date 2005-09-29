@@ -414,10 +414,8 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 		} else
 			write_byte(f, flags);
 	} else {
-		if (!(flags & 0xFF) && !S_ISDIR(mode))
-			flags |= XMIT_TOP_DIR;
 		if (!(flags & 0xFF))
-			flags |= XMIT_LONG_NAME;
+			flags |= S_ISDIR(mode) ? XMIT_LONG_NAME : XMIT_TOP_DIR;
 		write_byte(f, flags);
 	}
 	if (flags & XMIT_SAME_NAME)
@@ -650,7 +648,7 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 		if (basename_len == 1+1 && *basename == '.') /* +1 for '\0' */
 			file->dir.depth--;
 		if (flags & XMIT_TOP_DIR) {
-			in_del_hier = 1;
+			in_del_hier = recurse;
 			del_hier_name_len = file->dir.depth == 0 ? 0 : l1 + l2;
 			if (relative_paths && del_hier_name_len > 2
 			    && basename_len == 1+1 && *basename == '.')
@@ -1092,7 +1090,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	}
 
 	while (1) {
-		struct file_struct *file;
 		char fname2[MAXPATHLEN];
 		char *fname = fname2;
 		int is_dot_dir;
@@ -1228,10 +1225,12 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (one_file_system)
 			filesystem_dev = st.st_dev;
 
-		if ((file = send_file_name(f, flist, fname, XMIT_TOP_DIR))) {
-			if (recurse || (xfer_dirs && is_dot_dir))
+		if (recurse || (xfer_dirs && is_dot_dir)) {
+			struct file_struct *file;
+			if ((file = send_file_name(f, flist, fname, XMIT_TOP_DIR)))
 				send_if_directory(f, flist, file);
-		}
+		} else
+			send_file_name(f, flist, fname, 0);
 
 		if (olddir[0]) {
 			flist_dir = NULL;
