@@ -1005,7 +1005,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (files_from) {
 		if (recurse == 1) /* preserve recurse == 2 */
 			recurse = 0;
-		if (xfer_dirs < 1)
+		if (xfer_dirs < 0)
 			xfer_dirs = 1;
 	}
 
