@@ -733,7 +733,9 @@ also excluded from being deleted unless you use the bf(--delete-excluded)
 option or mark the rules as only matching on the sending side (see the
 include/exclude modifiers in the FILTER RULES section).
 
-This option has no effect unless directory recursion is enabled.
+Prior to rsync 2.6.7, this option would have no effect unless bf(--recursive)
+was in effect.  Beginning with 2.6.7, deletions will also occur when bf(--dirs)
+is specified, but only for directories whose contents are being copied.
 
 This option can be dangerous if used incorrectly!  It is a very good idea
 to run first using the bf(--dry-run) option (bf(-n)) to see what files would be
