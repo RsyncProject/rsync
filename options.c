@@ -1005,7 +1005,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (files_from) {
 		if (recurse == 1) /* preserve recurse == 2 */
 			recurse = 0;
-		if (xfer_dirs < 0)
+		if (xfer_dirs < 1)
 			xfer_dirs = 1;
 	}
 
@@ -1022,7 +1022,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			"You may not combine multiple --delete-WHEN options.\n");
 		return 0;
 	}
-	if (!recurse) {
+	if (!xfer_dirs) {
 		delete_before = delete_during = delete_after = 0;
 		delete_mode = delete_excluded = 0;
 	} else if (delete_before || delete_during || delete_after)
