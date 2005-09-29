@@ -294,7 +294,7 @@ Changes since 2.6.3:
 
     - An OS that has a binary mode for its files (such as cygwin) needed
       setmode(fd, O_BINARY) called on the temp-file we opened with
-      mkstemp().  (Fix derived from the cygwin's 2.6.3 rsync package.)
+      mkstemp().  (Fix derived from cygwin's 2.6.3 rsync package.)
 
     - Fixed a potential hang when verbosity is high, the client side is
       the sender, and the file-list is large.
@@ -981,7 +981,7 @@ Changes since 2.6.0:
     - We now reset the "new data has been sent" flag at the start of
       each file we send.  This makes sure that an interrupted transfer
       with the --partial option set doesn't keep a shorter temp file
-      than the current basis file when no new data has been transfered
+      than the current basis file when no new data has been transferred
       over the wire for that file.
 
     - Fixed a byte-order problem in --batch-mode on big-endian machines.
