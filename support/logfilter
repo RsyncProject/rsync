@@ -1,0 +1,28 @@
+#!/usr/bin/perl
+# Output rsyncd log messages for a single module.  The log file can be in
+# either syslog format or rsync's own log-file format.
+
+use strict;
+
+my $match = shift;
+die "Usage: logfilter MODULE_NAME [LOGFILE ...]\n" unless defined $match;
+
+my $syslog_prefix = '\w\w\w +\d+ \d\d:\d\d:\d\d \S+ rsyncd';
+my $rsyncd_prefix = '\d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d ';
+
+my %pids;
+
+while (<>) {
+    my($pid,$msg) = /^(?:$syslog_prefix|$rsyncd_prefix)\[(\d+)\]:? (.*)/o;
+    next unless defined $pid;
+    my($mod_spec) = $msg =~ /^rsync (?:on|to) (\S+) from /;
+    if (defined $mod_spec) {
+	if ($mod_spec =~ /^$match(\/\S*)?$/o) {
+	    $pids{$pid} = 1;
+	} else {
+	    delete $pids{$pid};
+	}
+    }
+    next unless $pids{$pid};
+    print $_;
+}
