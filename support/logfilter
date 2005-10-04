@@ -1,6 +1,12 @@
 #!/usr/bin/perl
-# Output rsyncd log messages for a single module.  The log file can be in
-# either syslog format or rsync's own log-file format.
+# Filter the rsync daemon log messages by module name.  The log file can be
+# in either syslog format or rsync's own log-file format.  Note that the
+# MODULE_NAME parameter is used in a regular-expression match in order to
+# allow regex wildcards to be used.  You can also limit the output by
+# directory hierarchy in a module.  Examples:
+#
+#  logfilter foo /var/log/rsyncd.log   # output lines for module foo
+#  logfilter foo/dir /var/log/syslog   # limit lines to those in dir of foo
 
 use strict;
 
