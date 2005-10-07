@@ -25,9 +25,11 @@ Changes since 2.6.6:
 
     - Really fixed the parsing of a "!" entry in .cvsignore files this time.
 
-    - Several diffs in the patches dir now use the proper --enable-FOO
-      configure option instead of --with-FOO to turn on the inclusion of
-      the newly patched feature.
+    - If the generator gets a stat() error on a file, output it (this used to
+      require at least -vv for the error to be seen).
+
+    - If waitpid() fails or the child rsync didn't exit cleanly, we now handle
+      the exit status properly and generate a better error.
 
   ENHANCEMENTS:
 
@@ -58,6 +60,9 @@ Changes since 2.6.6:
     - Allow the --temp-dir option to be specified when starting a daemon,
       which sets the default temporary directory for incoming files.
 
+    - If --delete is combined with --dirs without --recursive, rsync will
+      now delete in any directory whose content is being synchronized.
+
     - Some minor documentation improvements.
 
     - Updated some diffs in the patches dir.
@@ -69,3 +74,10 @@ Changes since 2.6.6:
 
     - If io_printf() tries to format more data than fits in the buffer, exit
       with an error instead of transmitting a truncated buffer.
+
+  DEVELOPER RELATED:
+
+    - Several diffs in the patches dir now use the proper --enable-FOO
+      configure option instead of --with-FOO to turn on the inclusion of
+      the newly patched feature.
+
