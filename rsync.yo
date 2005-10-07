@@ -1648,10 +1648,12 @@ itemize(
 The following modifiers are accepted after a "+" or "-":
 
 itemize(
-  it() A "/" specifies that the include/exclude should be treated as an
-  absolute path, relative to the root of the filesystem.  For example,
+  it() A "/" specifies that the include/exclude rule should be matched
+  against the absolute pathname of the current item.  For example,
   "-/ /etc/passwd" would exclude the passwd file any time the transfer
-  was sending files from the "/etc" directory.
+  was sending files from the "/etc" directory, and "-/ subdir/foo"
+  would always exclude "foo" when it is in a dir named "subdir", even
+  if "foo" is at the root of the current transfer.
   it() A "!" specifies that the include/exclude should take effect if
   the pattern fails to match.  For instance, "-! */" would exclude all
   non-directories.
