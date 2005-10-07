@@ -115,6 +115,7 @@
 #define XFLG_FATAL_ERRORS	(1<<0)
 #define XFLG_OLD_PREFIXES	(1<<1)
 #define XFLG_ANCHORED2ABS	(1<<2)
+#define XFLG_ABS_IF_SLASH	(1<<3)
 
 #define PERMS_REPORT		(1<<0)
 #define PERMS_SKIP_MTIME	(1<<1)
