@@ -133,9 +133,9 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 			listp->debug_type);
 	}
 
-	/* This flag also indicates that we're reading a list that
+	/* These flags also indicate that we're reading a list that
 	 * needs to be filtered now, not post-filtered later. */
-	if (xflags & XFLG_ANCHORED2ABS) {
+	if (xflags & (XFLG_ANCHORED2ABS|XFLG_ABS_IF_SLASH)) {
 		uint32 mf = mflags & (MATCHFLG_RECEIVER_SIDE|MATCHFLG_SENDER_SIDE);
 		if (am_sender) {
 			if (mf == MATCHFLG_RECEIVER_SIDE)
@@ -150,10 +150,14 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 		out_of_memory("add_rule");
 	memset(ret, 0, sizeof ret[0]);
 
-	if (xflags & XFLG_ANCHORED2ABS && *pat == '/'
-	    && !(mflags & (MATCHFLG_ABS_PATH | MATCHFLG_MERGE_FILE))) {
+	if (!(mflags & (MATCHFLG_ABS_PATH | MATCHFLG_MERGE_FILE))
+	 && ((xflags & (XFLG_ANCHORED2ABS|XFLG_ABS_IF_SLASH) && *pat == '/')
+	  || (xflags & XFLG_ABS_IF_SLASH && strchr(pat, '/') != NULL))) {
 		mflags |= MATCHFLG_ABS_PATH;
-		ex_len = dirbuf_len - module_dirlen - 1;
+		if (*pat == '/')
+			ex_len = dirbuf_len - module_dirlen - 1;
+		else
+			ex_len = 0;
 	} else
 		ex_len = 0;
 	if (!(ret->pattern = new_array(char, ex_len + pat_len + 1)))
