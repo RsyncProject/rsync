@@ -75,6 +75,9 @@ Changes since 2.6.6:
     - If io_printf() tries to format more data than fits in the buffer, exit
       with an error instead of transmitting a truncated buffer.
 
+    - If a va_copy macro is defined, lib/snprintf.c will use it when defining
+      the VA_COPY macro.
+
   DEVELOPER RELATED:
 
     - Several diffs in the patches dir now use the proper --enable-FOO
