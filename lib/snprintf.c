@@ -146,7 +146,7 @@
 #endif
 
 #ifndef VA_COPY
-#ifdef HAVE_VA_COPY
+#if defined HAVE_VA_COPY || defined va_copy
 #define VA_COPY(dest, src) va_copy(dest, src)
 #else
 #ifdef HAVE___VA_COPY
