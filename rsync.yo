@@ -1175,7 +1175,7 @@ in a significant way (a transferred file, a recreated symlink/device, or a
 touched directory) unless the itemized-changes escape (%i) is included in
 the string, in which case the logging of names increases to mention any
 item that is changed in any way (as long as the receiving side is at least
-2.6.4).  See the bf(--itemized-changes) option for a description of the
+2.6.4).  See the bf(--itemize-changes) option for a description of the
 output of "%i".
 
 The bf(--verbose) option implies a format of "%n%L", but you can use
