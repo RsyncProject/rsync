@@ -61,6 +61,7 @@ extern int csum_length;
 extern int ignore_times;
 extern int size_only;
 extern OFF_T max_size;
+extern OFF_T min_size;
 extern int io_error;
 extern int allowed_lull;
 extern int sock_f_out;
@@ -872,6 +873,15 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 		return;
 	}
+	if (min_size && file->length < min_size) {
+		if (verbose > 1) {
+			if (the_file_list->count == 1)
+				fname = f_name(file);
+			rprintf(FINFO, "%s is under min-size\n",
+				safe_fname(fname));
+		}
+		return;
+	}
 
 	if (ignore_existing && statret == 0) {
 		if (verbose > 1)
@@ -1265,7 +1275,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 
 	phase++;
 	csum_length = SUM_LENGTH;
-	max_size = ignore_existing = ignore_non_existing = 0;
+	max_size = min_size = ignore_existing = ignore_non_existing = 0;
 	update_only = always_checksum = size_only = 0;
 	ignore_times = 1;
 	if (append_mode)  /* resend w/o append mode */
