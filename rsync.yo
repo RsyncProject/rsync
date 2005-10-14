@@ -799,8 +799,18 @@ This is useful when mirroring very large trees to prevent disasters.
 
 dit(bf(--max-size=SIZE)) This tells rsync to avoid transferring any
 file that is larger than the specified SIZE. The SIZE value can be
-suffixed with a letter to indicate a size multiplier (K, M, or G) and
+suffixed with a string to indicate a size multiplier, and
 may be a fractional value (e.g. "bf(--max-size=1.5m)").
+
+The suffixes are as follows: "K" (or "k") is a kilobyte (1024),
+"M" (or "m") is a megabyte (1024*1024), and "G" (or "g") is a
+gigabyte (1024*1024*1024).
+If you want the multiplier to be 1000 instead of 1024, suffix the K, G, or
+M with a "T" (or "t") to indicate that a power of 10 is desired.
+Finally, if the suffix ends in either "+1" or "-1", the value will
+be offset by one byte in the indicated direction.
+Examples: --max-size=1.5mt-1 is 1499999 bytes, and --max-size=2g+1 is
+2147483649 bytes.
 
 dit(bf(-B, --block-size=BLOCKSIZE)) This forces the block size used in
 the rsync algorithm to a fixed value.  It is normally selected based on
