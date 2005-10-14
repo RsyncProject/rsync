@@ -341,6 +341,7 @@ to the detailed description below for a complete description.  verb(
      --force                 force deletion of dirs even if not empty
      --max-delete=NUM        don't delete more than NUM files
      --max-size=SIZE         don't transfer any file larger than SIZE
+     --min-size=SIZE         don't transfer any file smaller than SIZE
      --partial               keep partially transferred files
      --partial-dir=DIR       put a partially transferred file into DIR
      --delay-updates         put all updated files into place at end
@@ -811,6 +812,11 @@ Finally, if the suffix ends in either "+1" or "-1", the value will
 be offset by one byte in the indicated direction.
 Examples: --max-size=1.5mt-1 is 1499999 bytes, and --max-size=2g+1 is
 2147483649 bytes.
+
+dit(bf(--min-size=SIZE)) This tells rsync to avoid transferring any
+file that is smaller than the specified SIZE, which can help in not
+transferring small, junk files.
+See the bf(--max-size) option for a description of SIZE.
 
 dit(bf(-B, --block-size=BLOCKSIZE)) This forces the block size used in
 the rsync algorithm to a fixed value.  It is normally selected based on
