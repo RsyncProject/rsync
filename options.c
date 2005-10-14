@@ -99,6 +99,7 @@ int ignore_non_existing = 0;
 int need_messages_from_generator = 0;
 int max_delete = 0;
 OFF_T max_size = 0;
+OFF_T min_size = 0;
 int ignore_errors = 0;
 int modify_window = 0;
 int blocking_io = -1;
@@ -167,7 +168,7 @@ static int itemize_changes = 0;
 static int refused_delete, refused_archive_part;
 static int refused_partial, refused_progress, refused_delete_before;
 static int refused_inplace;
-static char *max_size_arg;
+static char *max_size_arg, *min_size_arg;
 static char partialdir_for_delayupdate[] = ".~tmp~";
 
 /** Local address to bind.  As a character string because it's
@@ -308,6 +309,7 @@ void usage(enum logcode F)
   rprintf(F,"     --force                 force deletion of directories even if not empty\n");
   rprintf(F,"     --max-delete=NUM        don't delete more than NUM files\n");
   rprintf(F,"     --max-size=SIZE         don't transfer any file larger than SIZE\n");
+  rprintf(F,"     --min-size=SIZE         don't transfer any file smaller than SIZE\n");
   rprintf(F,"     --partial               keep partially transferred files\n");
   rprintf(F,"     --partial-dir=DIR       put a partially transferred file into DIR\n");
   rprintf(F,"     --delay-updates         put all updated files into place at transfer's end\n");
@@ -361,7 +363,7 @@ void usage(enum logcode F)
 
 enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_FILTER, OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST,
-      OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW,
+      OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW, OPT_MIN_SIZE,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_MAX_SIZE,
       OPT_REFUSED_BASE = 9000};
 
@@ -419,6 +421,7 @@ static struct poptOption long_options[] = {
   {"ignore-existing",  0,  POPT_ARG_NONE,   &ignore_existing, 0, 0, 0 },
   {"ignore-non-existing",0,POPT_ARG_NONE,   &ignore_non_existing, 0, 0, 0 },
   {"max-size",         0,  POPT_ARG_STRING, &max_size_arg, OPT_MAX_SIZE, 0, 0 },
+  {"min-size",         0,  POPT_ARG_STRING, &min_size_arg, OPT_MIN_SIZE, 0, 0 },
   {"sparse",          'S', POPT_ARG_NONE,   &sparse_files, 0, 0, 0 },
   {"inplace",          0,  POPT_ARG_NONE,   &inplace, 0, 0, 0 },
   {"append",           0,  POPT_ARG_VAL,    &append_mode, 1, 0, 0 },
@@ -687,8 +690,8 @@ static OFF_T parse_size_arg(char **size_arg, char def_suf)
 		break;
 	}
 	if (size > 0 && make_compatible) {
-		/* We convert this manually because we many need %lld
-		 * precision, and that's not portable. */
+		/* We convert this manually because we may need %lld precision,
+		 * and that's not a portable sprintf() escape. */
 		char buf[128], *s = buf + sizeof buf;
 		OFF_T num = size;
 		*--s = '\0';
@@ -919,6 +922,15 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				snprintf(err_buf, sizeof err_buf,
 					"--max-size value is invalid: %s\n",
 					max_size_arg);
+				return 0;
+			}
+			break;
+
+		case OPT_MIN_SIZE:
+			if ((min_size = parse_size_arg(&min_size_arg, 'b')) <= 0) {
+				snprintf(err_buf, sizeof err_buf,
+					"--min-size value is invalid: %s\n",
+					min_size_arg);
 				return 0;
 			}
 			break;
@@ -1441,6 +1453,11 @@ void server_options(char **args,int *argc)
 		if (asprintf(&arg, "--max-delete=%d", max_delete) < 0)
 			goto oom;
 		args[ac++] = arg;
+	}
+
+	if (min_size && am_sender) {
+		args[ac++] = "--min-size";
+		args[ac++] = min_size_arg;
 	}
 
 	if (max_size && am_sender) {
