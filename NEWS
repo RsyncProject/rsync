@@ -37,6 +37,10 @@ Changes since 2.6.6:
       that are longer on the source than the destination (this includes new
       files).
 
+    - Added the --min-size=SIZE option.
+
+    - Enhanced the parsing of the SIZE value for --min-size and --max-size.
+
     - If lutimes() and/or lchmod() are around, use them to allow the
       preservation of attributes on symlinks.
 
