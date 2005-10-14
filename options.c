@@ -418,7 +418,7 @@ static struct poptOption long_options[] = {
   {"existing",         0,  POPT_ARG_NONE,   &ignore_non_existing, 0, 0, 0 },
   {"ignore-existing",  0,  POPT_ARG_NONE,   &ignore_existing, 0, 0, 0 },
   {"ignore-non-existing",0,POPT_ARG_NONE,   &ignore_non_existing, 0, 0, 0 },
-  {"max-size",         0,  POPT_ARG_STRING, &max_size_arg,  OPT_MAX_SIZE, 0, 0 },
+  {"max-size",         0,  POPT_ARG_STRING, &max_size_arg, OPT_MAX_SIZE, 0, 0 },
   {"sparse",          'S', POPT_ARG_NONE,   &sparse_files, 0, 0, 0 },
   {"inplace",          0,  POPT_ARG_NONE,   &inplace, 0, 0, 0 },
   {"append",           0,  POPT_ARG_VAL,    &append_mode, 1, 0, 0 },
@@ -648,30 +648,54 @@ static int count_args(const char **argv)
 }
 
 
-static OFF_T parse_size_arg(const char *size_arg)
+static OFF_T parse_size_arg(char **size_arg)
 {
 	const char *arg;
 	OFF_T size;
+	int mult, make_compatible = 0;
 
-	for (arg = size_arg; isdigit(*(uchar*)arg); arg++) {}
+	for (arg = *size_arg; isdigit(*(uchar*)arg); arg++) {}
 	if (*arg == '.')
 		for (arg++; isdigit(*(uchar*)arg); arg++) {}
+	if (*arg && (arg[1] == 't' || arg[1] == 'T'))
+		mult = 1000, make_compatible = 1;
+	else
+		mult = 1024;
 	switch (*arg) {
 	case 'k': case 'K':
-		size = atof(size_arg) * 1024;
+		size = atof(*size_arg) * mult;
 		break;
 	case 'm': case 'M':
-		size = atof(size_arg) * 1024*1024;
+		size = atof(*size_arg) * mult*mult;
 		break;
 	case 'g': case 'G':
-		size = atof(size_arg) * 1024*1024*1024;
+		size = atof(*size_arg) * mult*mult*mult;
 		break;
-	case '\0':
-		size = atof(size_arg);
+	case '\0': case '+': case '-':
+		size = atof(*size_arg);
 		break;
 	default:
-		size = 0;
+		size = -1;
 		break;
+	}
+	if (strchr(arg, '+'))
+		size++, make_compatible = 1;
+	else if (strchr(arg, '-'))
+		size--, make_compatible = 1;
+	if (size > 0 && make_compatible) {
+		/* We convert this manually because we many need %lld
+		 * precision, and that's not portable. */
+		char buf[128], *s = buf + sizeof buf;
+		OFF_T num = size;
+		*--s = '\0';
+		while (num) {
+			if (s == buf) /* impossible... */
+				out_of_memory("parse_size_arg@buf");
+			*--s = (num % 10) + '0';
+			num /= 10;
+		}
+		if (!(*size_arg = strdup(s)))
+			out_of_memory("parse_size_arg");
 	}
 	return size;
 }
@@ -887,7 +911,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			break;
 
 		case OPT_MAX_SIZE:
-			if ((max_size = parse_size_arg(max_size_arg)) <= 0) {
+			if ((max_size = parse_size_arg(&max_size_arg)) <= 0) {
 				snprintf(err_buf, sizeof err_buf,
 					"--max-size value is invalid: %s\n",
 					max_size_arg);
