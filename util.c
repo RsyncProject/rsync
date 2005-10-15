@@ -31,6 +31,7 @@ extern int verbose;
 extern int dry_run;
 extern int module_id;
 extern int modify_window;
+extern int relative_paths;
 extern char *partial_dir;
 extern struct filter_list_struct server_filter_list;
 
@@ -755,7 +756,7 @@ unsigned int clean_fname(char *name, BOOL collapse_dot_dot)
 char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
 {
 	char *start, *sanp;
-	int rlen = 0;
+	int rlen = 0, leave_one_dotdir = relative_paths;
 
 	if (dest != p) {
 		int plen = strlen(p);
@@ -790,9 +791,13 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
 		 * always be left pointing after a slash
 		 */
 		if (*p == '.' && (p[1] == '/' || p[1] == '\0')) {
-			/* skip "." component */
-			p++;
-			continue;
+			if (leave_one_dotdir && p[1] && sanp != dest)
+				leave_one_dotdir = 0;
+			else {
+				/* skip "." component */
+				p++;
+				continue;
+			}
 		}
 		if (*p == '.' && p[1] == '.' && (p[2] == '/' || p[2] == '\0')) {
 			/* ".." component followed by slash or end */
