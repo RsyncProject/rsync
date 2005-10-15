@@ -328,8 +328,8 @@ to the detailed description below for a complete description.  verb(
  -B, --block-size=SIZE       force a fixed checksum block-size
  -e, --rsh=COMMAND           specify the remote shell to use
      --rsync-path=PROGRAM    specify the rsync to run on remote machine
-     --existing              only update files that already exist
      --ignore-existing       ignore files that already exist on receiver
+     --ignore-non-existing   ignore files that don't exist on receiver
      --remove-sent-files     sent files/symlinks are removed from sender
      --del                   an alias for --delete-during
      --delete                delete files that don't exist on sender
@@ -711,12 +711,15 @@ dit(bf(-x, --one-file-system)) This tells rsync not to cross filesystem
 boundaries  when recursing.  This  is useful for transferring the
 contents of only one filesystem.
 
-dit(bf(--existing)) This tells rsync not to create any new files --
-only update files that already exist on the destination.
+dit(bf(--ignore-existing)) This tells rsync to skip updating files that
+already exist on the destination.  See also bf(--ignore-non-existing).
 
-dit(bf(--ignore-existing))
-This tells rsync not to update files that already exist on
-the destination.
+dit(bf(--ignore-non-existing)) This tells rsync to skip updating files that
+do not exist yet on the destination.  If this option is combined with the
+bf(--ignore-existing) option, no files will be updated (which can be useful
+if all you want to do is to delete missing files).  Note that in older
+versions of rsync, this option was named bf(--existing), so this older
+name is still accepted as an alias.
 
 dit(bf(--remove-sent-files)) This tells rsync to remove from the sending
 side the files and/or symlinks that are newly created or whose content is
