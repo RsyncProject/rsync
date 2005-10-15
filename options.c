@@ -666,11 +666,10 @@ static OFF_T parse_size_arg(char **size_arg, char def_suf)
 		mult = 1024;
 	if ((p = strstr(arg, "+1")) != NULL
 	 || (p = strstr(arg, "-1")) != NULL) {
-		if (p[2] == '\0') {
-			size = atoi(p + (*p == '+'));
-			make_compatible = 1;
-		} else
-			p = NULL;
+		if (p[2] != '\0')
+			return -1;
+		size = atoi(p);
+		make_compatible = 1;
 	}
 	switch (*arg && arg != p ? *arg : def_suf) {
 	case 'b': case 'B':
