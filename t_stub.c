@@ -28,6 +28,7 @@
 
 int modify_window = 0;
 int module_id = -1;
+int relative_paths = 0;
 char *partial_dir;
 struct filter_list_struct server_filter_list;
 
