@@ -791,7 +791,7 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
 		 * always be left pointing after a slash
 		 */
 		if (*p == '.' && (p[1] == '/' || p[1] == '\0')) {
-			if (leave_one_dotdir && p[1] && sanp != dest)
+			if (leave_one_dotdir && p[1])
 				leave_one_dotdir = 0;
 			else {
 				/* skip "." component */
