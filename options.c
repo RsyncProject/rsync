@@ -296,8 +296,8 @@ void usage(enum logcode F)
   rprintf(F," -B, --block-size=SIZE       force a fixed checksum block-size\n");
   rprintf(F," -e, --rsh=COMMAND           specify the remote shell to use\n");
   rprintf(F,"     --rsync-path=PROGRAM    specify the rsync to run on the remote machine\n");
-  rprintf(F,"     --existing              only update files that already exist on receiver\n");
   rprintf(F,"     --ignore-existing       ignore files that already exist on receiving side\n");
+  rprintf(F,"     --ignore-non-existing   ignore files that don't exist on receiving side\n");
   rprintf(F,"     --remove-sent-files     sent files/symlinks are removed from sending side\n");
   rprintf(F,"     --del                   an alias for --delete-during\n");
   rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
