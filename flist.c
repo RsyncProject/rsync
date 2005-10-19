@@ -84,7 +84,6 @@ void init_flist(void)
 	file_struct_len = offsetof(struct file_struct, flags) + sizeof f.flags;
 }
 
-
 static int show_filelist_p(void)
 {
 	return verbose && xfer_dirs && !am_server;
@@ -98,19 +97,16 @@ static void start_filelist_progress(char *kind)
 	rflush(FINFO);
 }
 
-
 static void emit_filelist_progress(int count)
 {
 	rprintf(FINFO, " %d files...\r", count);
 }
-
 
 static void maybe_emit_filelist_progress(int count)
 {
 	if (do_progress && show_filelist_p() && (count % 100) == 0)
 		emit_filelist_progress(count);
 }
-
 
 static void finish_filelist_progress(const struct file_list *flist)
 {
@@ -126,7 +122,6 @@ void show_flist_stats(void)
 {
 	/* Nothing yet */
 }
-
 
 static void list_file_entry(struct file_struct *f)
 {
@@ -154,7 +149,6 @@ static void list_file_entry(struct file_struct *f)
 			safe_fname(f_name(f)));
 	}
 }
-
 
 /**
  * Stat either a symlink or its referent, depending on the settings of
@@ -260,7 +254,6 @@ static mode_t from_wire_mode(int mode)
 		return (mode & ~(_S_IFMT)) | _S_IFLNK;
 	return (mode_t)mode;
 }
-
 
 static void send_directory(int f, struct file_list *flist,
 			   char *fbuf, int len);
@@ -495,8 +488,6 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 	io_write_phase = "unknown";
 }
 
-
-
 static struct file_struct *receive_file_entry(struct file_list *flist,
 					      unsigned short flags, int f)
 {
@@ -724,7 +715,6 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 
 	return file;
 }
-
 
 /**
  * Create a file_struct for a named file by reading its stat()
@@ -957,7 +947,6 @@ skip_filters:
 	return file;
 }
 
-
 static struct file_struct *send_file_name(int f, struct file_list *flist,
 					  char *fname, unsigned short base_flags)
 {
@@ -1000,7 +989,6 @@ static void send_if_directory(int f, struct file_list *flist,
 		pop_local_filters(save_filters);
 	}
 }
-
 
 /* This function is normally called by the sender, but the receiving side also
  * calls it from get_dirlist() with f set to -1 so that we just construct the
@@ -1058,7 +1046,6 @@ static void send_directory(int f, struct file_list *flist,
 			send_if_directory(f, flist, flist->files[i]);
 	}
 }
-
 
 struct file_list *send_file_list(int f, int argc, char *argv[])
 {
@@ -1290,7 +1277,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	return flist;
 }
 
-
 struct file_list *recv_file_list(int f)
 {
 	struct file_list *flist;
@@ -1376,12 +1362,10 @@ oom:
 	return NULL;		/* not reached */
 }
 
-
 static int file_compare(struct file_struct **file1, struct file_struct **file2)
 {
 	return f_name_cmp(*file1, *file2);
 }
-
 
 /* Search for an identically-named item in the file list.  Note that the
  * items must agree in their directory-ness, or no match is returned. */
@@ -1412,7 +1396,6 @@ int flist_find(struct file_list *flist, struct file_struct *f)
 	return -1;
 }
 
-
 /*
  * Free up any resources a file_struct has allocated
  * and clear the file.
@@ -1423,7 +1406,6 @@ void clear_file(int i, struct file_list *flist)
 		pool_free(flist->hlink_pool, 0, flist->files[i]->link_u.idev);
 	memset(flist->files[i], 0, file_struct_len);
 }
-
 
 /*
  * allocate a new file list
@@ -1463,7 +1445,6 @@ void flist_free(struct file_list *flist)
 	free(flist->files);
 	free(flist);
 }
-
 
 /*
  * This routine ensures we don't have any duplicate names in our file list.
@@ -1569,7 +1550,6 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 	}
 }
 
-
 static void output_flist(struct file_list *flist)
 {
 	char uidbuf[16], gidbuf[16], depthbuf[16];
@@ -1597,7 +1577,6 @@ static void output_flist(struct file_list *flist)
 			(double)file->length, uidbuf, gidbuf, file->flags);
 	}
 }
-
 
 enum fnc_state { s_DIR, s_SLASH, s_BASE, s_TRAILING };
 enum fnc_type { t_PATH, t_ITEM };
@@ -1745,7 +1724,6 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 	return dif;
 }
 
-
 /* Return a copy of the full filename of a flist entry, using the indicated
  * buffer.  No size-checking is done because we checked the size when creating
  * the file_struct entry.
@@ -1765,7 +1743,6 @@ char *f_name_to(struct file_struct *f, char *fbuf)
 	return fbuf;
 }
 
-
 /* Like f_name_to(), but we rotate through 5 static buffers of our own. */
 char *f_name(struct file_struct *f)
 {
@@ -1776,7 +1753,6 @@ char *f_name(struct file_struct *f)
 
 	return f_name_to(f, names[n]);
 }
-
 
 /* Do a non-recursive scan of the named directory, possibly ignoring all
  * exclude rules except for the daemon's.  If "dlen" is >=0, it is the length
