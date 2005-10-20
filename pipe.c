@@ -28,7 +28,7 @@ extern int orig_umask;
 extern int filesfrom_fd;
 
 /**
- * Create a child connected to use on stdin/stdout.
+ * Create a child connected to us via its stdin/stdout.
  *
  * This is derived from CVS code
  *
