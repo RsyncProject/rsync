@@ -81,31 +81,37 @@ static int64 total_read, total_written;
 
 static void show_malloc_stats(void);
 
-/****************************************************************************
-wait for a process to exit, calling io_flush while waiting
-****************************************************************************/
-static void wait_process(pid_t pid, int *code_ptr)
+/* Works like waitpid(), but if we already harvested the child pid in our
+ * sigchld_handler(), we succeed instead of returning an error. */
+pid_t wait_process(pid_t pid, int *status_ptr, int flags)
 {
-	pid_t waited_pid;
-	int cnt, status;
-
-	while ((waited_pid = waitpid(pid, &status, WNOHANG)) == 0) {
-		msleep(20);
-		io_flush(FULL_FLUSH);
-	}
+	pid_t waited_pid = waitpid(pid, status_ptr, flags);
 
 	if (waited_pid == -1 && errno == ECHILD) {
-		/* status of requested child no longer available.
-		 * check to see if it was processed by the sigchld_handler.
-		 */
+		/* Status of requested child no longer available:  check to
+		 * see if it was processed by sigchld_handler(). */
+		int cnt;
 		for (cnt = 0;  cnt < MAXCHILDPROCS; cnt++) {
 			if (pid == pid_stat_table[cnt].pid) {
-				waited_pid = pid;
-				status = pid_stat_table[cnt].status;
+				*status_ptr = pid_stat_table[cnt].status;
 				pid_stat_table[cnt].pid = 0;
-				break;
+				return pid;
 			}
 		}
+	}
+
+	return waited_pid;
+}
+
+/* Wait for a process to exit, calling io_flush while waiting. */
+static void wait_process_with_flush(pid_t pid, int *code_ptr)
+{
+	pid_t waited_pid;
+	int status;
+
+	while ((waited_pid = wait_process(pid, &status, WNOHANG)) == 0) {
+		msleep(20);
+		io_flush(FULL_FLUSH);
 	}
 
 	/* TODO: If the child exited on a signal, then log an
@@ -618,7 +624,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	set_msg_fd_in(-1);
 	kill(pid, SIGUSR2);
-	wait_process(pid, &status);
+	wait_process_with_flush(pid, &status);
 	return status;
 }
 
@@ -789,7 +795,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			if (verbose > 3)
 				rprintf(FINFO,"client_run waiting on %d\n", (int) pid);
 			io_flush(FULL_FLUSH);
-			wait_process(pid, &status);
+			wait_process_with_flush(pid, &status);
 		}
 		output_summary();
 		io_flush(FULL_FLUSH);
@@ -834,7 +840,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		if (verbose > 3)
 			rprintf(FINFO,"client_run2 waiting on %d\n", (int) pid);
 		io_flush(FULL_FLUSH);
-		wait_process(pid, &status);
+		wait_process_with_flush(pid, &status);
 	}
 
 	return MAX(status, status2);
@@ -1023,8 +1029,7 @@ static RETSIGTYPE sigchld_handler(UNUSED(int val))
 	 * get him to explain why he put it in, so rather than taking it
 	 * out we're instead saving the child exit statuses for later use.
 	 * The waitpid() loop presumably eliminates all possibility of leaving
-	 * zombie children, maybe that's why he did it.
-	 */
+	 * zombie children, maybe that's why he did it. */
 	while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
 		/* save the child's exit status */
 		for (cnt = 0; cnt < MAXCHILDPROCS; cnt++) {
@@ -1036,6 +1041,7 @@ static RETSIGTYPE sigchld_handler(UNUSED(int val))
 		}
 	}
 #endif
+	signal(SIGCHLD, sigchld_handler);
 }
 
 
