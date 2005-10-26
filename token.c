@@ -22,8 +22,9 @@
 
 extern int do_compression;
 extern int module_id;
+extern int def_compress_level;
 
-static int compression_level = Z_DEFAULT_COMPRESSION;
+static int compression_level;
 
 /* determine the compression level based on a wildcard filename list */
 void set_compression(char *fname)
@@ -34,7 +35,7 @@ void set_compression(char *fname)
 	if (!do_compression)
 		return;
 
-	compression_level = Z_DEFAULT_COMPRESSION;
+	compression_level = def_compress_level;
 	dont = lp_dont_compress(module_id);
 
 	if (!dont || !*dont)
