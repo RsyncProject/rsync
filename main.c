@@ -69,11 +69,11 @@ struct file_list *the_file_list;
 
 /* There's probably never more than at most 2 outstanding child processes,
  * but set it higher, just in case. */
-#define MAXCHILDPROCS 5
+#define MAXCHILDPROCS 7
 
 struct pid_status {
 	pid_t pid;
-	int   status;
+	int status;
 } pid_stat_table[MAXCHILDPROCS];
 
 static time_t starttime, endtime;
@@ -91,7 +91,7 @@ pid_t wait_process(pid_t pid, int *status_ptr, int flags)
 		/* Status of requested child no longer available:  check to
 		 * see if it was processed by sigchld_handler(). */
 		int cnt;
-		for (cnt = 0;  cnt < MAXCHILDPROCS; cnt++) {
+		for (cnt = 0; cnt < MAXCHILDPROCS; cnt++) {
 			if (pid == pid_stat_table[cnt].pid) {
 				*status_ptr = pid_stat_table[cnt].status;
 				pid_stat_table[cnt].pid = 0;
@@ -104,7 +104,7 @@ pid_t wait_process(pid_t pid, int *status_ptr, int flags)
 }
 
 /* Wait for a process to exit, calling io_flush while waiting. */
-static void wait_process_with_flush(pid_t pid, int *code_ptr)
+static void wait_process_with_flush(pid_t pid, int *exit_code_ptr)
 {
 	pid_t waited_pid;
 	int status;
@@ -118,20 +118,21 @@ static void wait_process_with_flush(pid_t pid, int *code_ptr)
 	 * appropriate error message.  Perhaps we should also accept a
 	 * message describing the purpose of the child.  Also indicate
 	 * this to the caller so that they know something went wrong. */
-	if (waited_pid < 0)
-		*code_ptr = RERR_WAITCHILD;
-	else if (!WIFEXITED(status)) {
+	if (waited_pid < 0) {
+		rsyserr(FERROR, errno, "waitpid");
+		*exit_code_ptr = RERR_WAITCHILD;
+	} else if (!WIFEXITED(status)) {
 #ifdef WCOREDUMP
 		if (WCOREDUMP(status))
-			*code_ptr = RERR_CRASHED;
+			*exit_code_ptr = RERR_CRASHED;
 		else
 #endif
 		if (WIFSIGNALED(status))
-			*code_ptr = RERR_TERMINATED;
+			*exit_code_ptr = RERR_TERMINATED;
 		else
-			*code_ptr = RERR_WAITCHILD;
+			*exit_code_ptr = RERR_WAITCHILD;
 	} else
-		*code_ptr = WEXITSTATUS(status);
+		*exit_code_ptr = WEXITSTATUS(status);
 }
 
 /* This function gets called from all 3 processes.  We want the client side
@@ -538,7 +539,7 @@ static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
 static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 {
 	int pid;
-	int status = 0;
+	int exit_code = 0;
 	int error_pipe[2];
 
 	/* The receiving side mustn't obey this, or an existing symlink that
@@ -624,14 +625,14 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 
 	set_msg_fd_in(-1);
 	kill(pid, SIGUSR2);
-	wait_process_with_flush(pid, &status);
-	return status;
+	wait_process_with_flush(pid, &exit_code);
+	return exit_code;
 }
 
 
 static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 {
-	int status;
+	int exit_code;
 	struct file_list *flist;
 	char *local_name = NULL;
 	char *dir = NULL;
@@ -698,8 +699,8 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	if (argc > 0)
 		local_name = get_local_name(flist,argv[0]);
 
-	status = do_recv(f_in,f_out,flist,local_name);
-	exit_cleanup(status);
+	exit_code = do_recv(f_in,f_out,flist,local_name);
+	exit_cleanup(exit_code);
 }
 
 
@@ -742,7 +743,7 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 {
 	struct file_list *flist = NULL;
-	int status = 0, status2 = 0;
+	int exit_code = 0, exit_code2 = 0;
 	char olddir[sizeof curr_dir];
 	char *local_name = NULL;
 
@@ -795,11 +796,11 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			if (verbose > 3)
 				rprintf(FINFO,"client_run waiting on %d\n", (int) pid);
 			io_flush(FULL_FLUSH);
-			wait_process_with_flush(pid, &status);
+			wait_process_with_flush(pid, &exit_code);
 		}
 		output_summary();
 		io_flush(FULL_FLUSH);
-		exit_cleanup(status);
+		exit_cleanup(exit_code);
 	}
 
 	if (need_messages_from_generator && !read_batch)
@@ -830,7 +831,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	if (flist && flist->count > 0) {
 		local_name = get_local_name(flist, argv[0]);
 
-		status2 = do_recv(f_in, f_out, flist, local_name);
+		exit_code2 = do_recv(f_in, f_out, flist, local_name);
 	} else {
 		handle_stats(-1);
 		output_summary();
@@ -840,10 +841,10 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		if (verbose > 3)
 			rprintf(FINFO,"client_run2 waiting on %d\n", (int) pid);
 		io_flush(FULL_FLUSH);
-		wait_process_with_flush(pid, &status);
+		wait_process_with_flush(pid, &exit_code);
 	}
 
-	return MAX(status, status2);
+	return MAX(exit_code, exit_code2);
 }
 
 static int copy_argv (char *argv[])
