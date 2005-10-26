@@ -6,6 +6,7 @@
 */
 
 #include "rsync.h"
+#include "zlib/zlib.h"
 #include <time.h>
 
 extern int am_sender;
@@ -19,10 +20,13 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int always_checksum;
 extern int do_compression;
+extern int def_compress_level;
 extern int protocol_version;
 extern char *batch_name;
 
 extern struct filter_list_struct filter_list;
+
+static int tweaked_compress_level;
 
 static int *flag_ptr[] = {
 	&recurse,		/* 0 */
@@ -33,7 +37,7 @@ static int *flag_ptr[] = {
 	&preserve_hard_links,	/* 5 */
 	&always_checksum,	/* 6 */
 	&xfer_dirs,		/* 7 (protocol 29) */
-	&do_compression,	/* 8 (protocol 29) */
+	&tweaked_compress_level,/* 8 (protocol 29) */
 	NULL
 };
 
@@ -53,6 +57,12 @@ static char *flag_name[] = {
 void write_stream_flags(int fd)
 {
 	int i, flags;
+
+#if Z_DEFAULT_COMPRESSION == -1
+	tweaked_compress_level = do_compression ? def_compress_level + 2 : 0;
+#else
+#error internal logic error!  Fix def_compress_level logic above and below too!
+#endif
 
 	/* Start the batch file with a bitmap of data-stream-affecting
 	 * flags. */
@@ -87,6 +97,13 @@ void read_stream_flags(int fd)
 			xfer_dirs |= 1;
 		else if (xfer_dirs < 2)
 			xfer_dirs = 0;
+	}
+
+	if (tweaked_compress_level == 0 || tweaked_compress_level == 2)
+		do_compression = 0;
+	else {
+		do_compression = 1;
+		def_compress_level = tweaked_compress_level - 2;
 	}
 }
 
