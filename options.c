@@ -20,6 +20,7 @@
 
 #include "rsync.h"
 #include "popt.h"
+#include "zlib/zlib.h"
 
 extern int module_id;
 extern int sanitize_paths;
@@ -64,6 +65,7 @@ int one_file_system = 0;
 int protocol_version = PROTOCOL_VERSION;
 int sparse_files = 0;
 int do_compression = 0;
+int def_compress_level = Z_DEFAULT_COMPRESSION;
 int am_root = 0;
 int am_server = 0;
 int am_sender = 0;
@@ -165,7 +167,7 @@ static int daemon_opt;   /* sets am_daemon after option error-reporting */
 static int F_option_cnt = 0;
 static int modify_window_set;
 static int itemize_changes = 0;
-static int refused_delete, refused_archive_part;
+static int refused_delete, refused_archive_part, refused_compress;
 static int refused_partial, refused_progress, refused_delete_before;
 static int refused_inplace;
 static char *max_size_arg, *min_size_arg;
@@ -324,6 +326,7 @@ void usage(enum logcode F)
   rprintf(F,"     --copy-dest=DIR         ... and include copies of unchanged files\n");
   rprintf(F,"     --link-dest=DIR         hardlink to files in DIR when unchanged\n");
   rprintf(F," -z, --compress              compress file data during the transfer\n");
+  rprintf(F,"     --compress-level=NUM    explicitly set compression level\n");
   rprintf(F," -C, --cvs-exclude           auto-ignore files the same way CVS does\n");
   rprintf(F," -f, --filter=RULE           add a file-filtering RULE\n");
   rprintf(F," -F                          same as --filter='dir-merge /.rsync-filter'\n");
@@ -451,7 +454,8 @@ static struct poptOption long_options[] = {
   {"copy-dest",        0,  POPT_ARG_STRING, 0, OPT_COPY_DEST, 0, 0 },
   {"link-dest",        0,  POPT_ARG_STRING, 0, OPT_LINK_DEST, 0, 0 },
   {"fuzzy",           'y', POPT_ARG_NONE,   &fuzzy_basis, 0, 0, 0 },
-  {"compress",        'z', POPT_ARG_NONE,   &do_compression, 0, 0, 0 },
+  {"compress",        'z', POPT_ARG_NONE,   0, 'z', 0, 0 },
+  {"compress-level",   0,  POPT_ARG_INT,    &def_compress_level, 'z', 0, 0 },
   {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
   {"progress",         0,  POPT_ARG_VAL,    &do_progress, 1, 0, 0 },
   {"no-progress",      0,  POPT_ARG_VAL,    &do_progress, 0, 0, 0 },
@@ -597,6 +601,9 @@ static void set_refuse_options(char *bp)
 				case 'r': case 'd': case 'l': case 'p':
 				case 't': case 'g': case 'o': case 'D':
 					refused_archive_part = op->val;
+					break;
+				case 'z':
+					refused_compress = op->val;
 					break;
 				case '\0':
 					if (wildmatch("delete", op->longName))
@@ -899,6 +906,21 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			}
 			do_progress = 1;
 			keep_partial = 1;
+			break;
+
+		case 'z':
+			if (def_compress_level < Z_DEFAULT_COMPRESSION
+			 || def_compress_level > Z_BEST_COMPRESSION) {
+				snprintf(err_buf, sizeof err_buf,
+					"--compress-level value is invalid: %d\n",
+					def_compress_level);
+				return 0;
+			}
+			do_compression = def_compress_level != Z_NO_COMPRESSION;
+			if (do_compression && refused_compress) {
+				create_refuse_error(refused_compress);
+				return 0;
+			}
 			break;
 
 		case OPT_WRITE_BATCH:
@@ -1430,6 +1452,12 @@ void server_options(char **args,int *argc)
 
 	if (list_only > 1)
 		args[ac++] = "--list-only";
+
+	if (do_compression && def_compress_level != Z_DEFAULT_COMPRESSION) {
+		if (asprintf(&arg, "--compress-level=%d", def_compress_level) < 0)
+			goto oom;
+		args[ac++] = arg;
+	}
 
 	/* The server side doesn't use our log-format, but in certain
 	 * circumstances they need to know a little about the option. */
