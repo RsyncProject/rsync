@@ -68,7 +68,7 @@ struct {
 	{ RERR_CRASHED    , "sibling process crashed" },
 	{ RERR_TERMINATED , "sibling process terminated abnormally" },
 	{ RERR_SIGNAL     , "received SIGUSR1 or SIGINT" },
-	{ RERR_WAITCHILD  , "some error returned by waitpid()" },
+	{ RERR_WAITCHILD  , "waitpid() failed" },
 	{ RERR_MALLOC     , "error allocating core memory buffers" },
 	{ RERR_PARTIAL    , "some files could not be transferred" },
 	{ RERR_VANISHED   , "some files vanished before they could be transferred" },
