@@ -356,6 +356,7 @@ to the detailed description below for a complete description.  verb(
      --copy-dest=DIR         ... and include copies of unchanged files
      --link-dest=DIR         hardlink to files in DIR when unchanged
  -z, --compress              compress file data during the transfer
+     --compress-level=NUM    explicitly set compression level
  -C, --cvs-exclude           auto-ignore files in the same way CVS does
  -f, --filter=RULE           add a file-filtering RULE
  -F                          same as --filter='dir-merge /.rsync-filter'
@@ -1082,6 +1083,10 @@ Note this this option typically achieves better compression ratios that can
 be achieved by using a compressing remote shell or a compressing transport
 because it takes advantage of the implicit information in the matching data
 blocks that are not explicitly sent over the connection.
+
+dit(bf(--compress-level=NUM)) Explicitly set the compression level to use
+(see bf(--compress)) instead of letting it default.  If NUM is non-zero,
+the bf(--compress) option is implied.
 
 dit(bf(--numeric-ids)) With this option rsync will transfer numeric group
 and user IDs rather than using user and group names and mapping them

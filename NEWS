@@ -37,7 +37,11 @@ Changes since 2.6.6:
       that are longer on the source than the destination (this includes new
       files).
 
-    - Added the --min-size=SIZE option.
+    - Added the --min-size=SIZE option to exclude small files from the
+      transfer.
+
+    - Added the --compress-level option to allow you to set how aggressive
+      rsync's compression should be (the option implies --compress).
 
     - Enhanced the parsing of the SIZE value for --min-size and --max-size.
 
