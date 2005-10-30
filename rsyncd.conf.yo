@@ -269,7 +269,7 @@ system. The usernames may also contain shell wildcard characters. If
 "auth users" is set then the client will be challenged to supply a
 username and password to connect to the module. A challenge response
 authentication protocol is used for this exchange. The plain text
-usernames are passwords are stored in the file specified by the
+usernames and passwords are stored in the file specified by the
 "secrets file" option. The default is for all users to be able to
 connect without a password (this is called "anonymous rsync").
 
