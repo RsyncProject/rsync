@@ -968,9 +968,10 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 }
 
 static void send_if_directory(int f, struct file_list *flist,
-			      struct file_struct *file)
+			      struct file_struct *file,
+			      char *fbuf, unsigned int ol)
 {
-	char fbuf[MAXPATHLEN];
+	char is_dot_dir = fbuf[ol-1] == '.' && (ol == 1 || fbuf[ol-2] == '/');
 
 	if (S_ISDIR(file->mode)
 	    && !(file->flags & FLAG_MOUNT_POINT) && f_name_to(file, fbuf)) {
@@ -987,6 +988,9 @@ static void send_if_directory(int f, struct file_list *flist,
 		save_filters = push_local_filters(fbuf, len);
 		send_directory(f, flist, fbuf, len);
 		pop_local_filters(save_filters);
+		fbuf[ol] = '\0';
+		if (is_dot_dir)
+			fbuf[ol-1] = '.';
 	}
 }
 
@@ -1043,13 +1047,13 @@ static void send_directory(int f, struct file_list *flist,
 	if (recurse) {
 		int i, end = flist->count - 1;
 		for (i = start; i <= end; i++)
-			send_if_directory(f, flist, flist->files[i]);
+			send_if_directory(f, flist, flist->files[i], fbuf, len);
 	}
 }
 
 struct file_list *send_file_list(int f, int argc, char *argv[])
 {
-	int l;
+	int len;
 	STRUCT_STAT st;
 	char *p, *dir, olddir[sizeof curr_dir];
 	char lastpath[MAXPATHLEN] = "";
@@ -1077,57 +1081,57 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	}
 
 	while (1) {
-		char fname2[MAXPATHLEN];
-		char *fname = fname2;
+		char fbuf[MAXPATHLEN];
+		char *fn;
 		int is_dot_dir;
 
 		if (use_ff_fd) {
-			if (read_filesfrom_line(filesfrom_fd, fname) == 0)
+			if (read_filesfrom_line(filesfrom_fd, fbuf) == 0)
 				break;
-			sanitize_path(fname, fname, "", 0);
+			sanitize_path(fbuf, fbuf, "", 0);
 		} else {
 			if (argc-- == 0)
 				break;
-			strlcpy(fname, *argv++, MAXPATHLEN);
+			strlcpy(fbuf, *argv++, MAXPATHLEN);
 			if (sanitize_paths)
-				sanitize_path(fname, fname, "", 0);
+				sanitize_path(fbuf, fbuf, "", 0);
 		}
 
-		l = strlen(fname);
-		if (!l || fname[l - 1] == '/') {
-			if (l == 2 && fname[0] == '.') {
+		len = strlen(fbuf);
+		if (!len || fbuf[len - 1] == '/') {
+			if (len == 2 && fbuf[0] == '.') {
 				/* Turn "./" into just "." rather than "./." */
-				fname[1] = '\0';
+				fbuf[1] = '\0';
 			} else {
-				if (l + 1 >= MAXPATHLEN)
+				if (len + 1 >= MAXPATHLEN)
 					overflow_exit("send_file_list");
-				fname[l++] = '.';
-				fname[l] = '\0';
+				fbuf[len++] = '.';
+				fbuf[len] = '\0';
 			}
 			is_dot_dir = 1;
-		} else if (l > 1 && fname[l-1] == '.' && fname[l-2] == '.'
-		    && (l == 2 || fname[l-3] == '/')) {
-			if (l + 2 >= MAXPATHLEN)
+		} else if (len > 1 && fbuf[len-1] == '.' && fbuf[len-2] == '.'
+		    && (len == 2 || fbuf[len-3] == '/')) {
+			if (len + 2 >= MAXPATHLEN)
 				overflow_exit("send_file_list");
-			fname[l++] = '/';
-			fname[l++] = '.';
-			fname[l] = '\0';
+			fbuf[len++] = '/';
+			fbuf[len++] = '.';
+			fbuf[len] = '\0';
 			is_dot_dir = 1;
 		} else {
-			is_dot_dir = fname[l-1] == '.'
-				   && (l == 1 || fname[l-2] == '/');
+			is_dot_dir = fbuf[len-1] == '.'
+				   && (len == 1 || fbuf[len-2] == '/');
 		}
 
-		if (link_stat(fname, &st, keep_dirlinks) != 0) {
+		if (link_stat(fbuf, &st, keep_dirlinks) != 0) {
 			io_error |= IOERR_GENERAL;
 			rsyserr(FERROR, errno, "link_stat %s failed",
-				full_fname(fname));
+				full_fname(fbuf));
 			continue;
 		}
 
 		if (S_ISDIR(st.st_mode) && !xfer_dirs) {
 			rprintf(FINFO, "skipping directory %s\n",
-				safe_fname(fname));
+				safe_fname(fbuf));
 			continue;
 		}
 
@@ -1135,26 +1139,32 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		olddir[0] = '\0';
 
 		if (!relative_paths) {
-			p = strrchr(fname, '/');
+			p = strrchr(fbuf, '/');
 			if (p) {
 				*p = '\0';
-				if (p == fname)
+				if (p == fbuf)
 					dir = "/";
 				else
-					dir = fname;
-				fname = p + 1;
-			}
-		} else if ((p = strstr(fname, "/./")) != NULL) {
+					dir = fbuf;
+				len -= p - fbuf + 1;
+				fn = p + 1;
+			} else
+				fn = fbuf;
+		} else if ((p = strstr(fbuf, "/./")) != NULL) {
 			*p = '\0';
-			if (p == fname)
+			if (p == fbuf)
 				dir = "/";
 			else
-				dir = fname;
-			fname = p + 3;
-		}
+				dir = fbuf;
+			len -= p - fbuf + 3;
+			fn = p + 3;
+		} else
+			fn = fbuf;
 
-		if (!*fname)
-			fname = ".";
+		if (!*fn) {
+			len = 1;
+			fn = ".";
+		}
 
 		if (dir && *dir) {
 			static char *lastdir;
@@ -1178,17 +1188,19 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			}
 		}
 
-		if (implied_dirs && (p=strrchr(fname,'/')) && p != fname) {
+		if (fn != fbuf)
+			memmove(fbuf, fn, len + 1);
+
+		if (implied_dirs && (p=strrchr(fbuf,'/')) && p != fbuf) {
 			/* Send the implied directories at the start of the
 			 * source spec, so we get their permissions right. */
-			char *lp = lastpath, *fn = fname, *slash = fname;
+			char *lp = lastpath, *slash = fbuf;
 			*p = '\0';
 			/* Skip any initial directories in our path that we
 			 * have in common with lastpath. */
-			while (*fn && *lp == *fn) {
+			for (fn = fbuf; *fn && *lp == *fn; lp++, fn++) {
 				if (*fn == '/')
 					slash = fn;
-				lp++, fn++;
 			}
 			*p = '/';
 			if (fn != p || (*lp && *lp != '/')) {
@@ -1198,13 +1210,13 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				xfer_dirs = 1;
 				while ((slash = strchr(slash+1, '/')) != 0) {
 					*slash = '\0';
-					send_file_name(f, flist, fname, 0);
+					send_file_name(f, flist, fbuf, 0);
 					*slash = '/';
 				}
 				copy_links = save_copy_links;
 				xfer_dirs = save_xfer_dirs;
 				*p = '\0';
-				strlcpy(lastpath, fname, sizeof lastpath);
+				strlcpy(lastpath, fbuf, sizeof lastpath);
 				*p = '/';
 			}
 		}
@@ -1214,10 +1226,10 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 		if (recurse || (xfer_dirs && is_dot_dir)) {
 			struct file_struct *file;
-			if ((file = send_file_name(f, flist, fname, XMIT_TOP_DIR)))
-				send_if_directory(f, flist, file);
+			if ((file = send_file_name(f, flist, fbuf, XMIT_TOP_DIR)))
+				send_if_directory(f, flist, file, fbuf, len);
 		} else
-			send_file_name(f, flist, fname, 0);
+			send_file_name(f, flist, fbuf, 0);
 
 		if (olddir[0]) {
 			flist_dir = NULL;
