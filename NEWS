@@ -86,6 +86,9 @@ Changes since 2.6.6:
     - If a va_copy macro is defined, lib/snprintf.c will use it when defining
       the VA_COPY macro.
 
+    - Reduced the amount of stack memory needed for each level of directory
+      recursion by nearly MAXPATHLEN bytes.
+
   DEVELOPER RELATED:
 
     - Several diffs in the patches dir now use the proper --enable-FOO
