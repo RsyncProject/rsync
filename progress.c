@@ -99,7 +99,7 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 	if (is_last) {
 		snprintf(eol, sizeof eol, " (xfer#%d, to-check=%d/%d)\n",
 			stats.num_transferred_files,
-			stats.current_file_index+1 - stats.num_files,
+			stats.num_files - stats.current_file_index - 1,
 			stats.num_files);
 	} else
 		strcpy(eol, "\r");
