@@ -144,6 +144,7 @@ char *log_format = NULL;
 char *password_file = NULL;
 char *rsync_path = RSYNC_PATH;
 char *backup_dir = NULL;
+char *chmod_mode = NULL;
 char backup_dir_buf[MAXPATHLEN];
 int rsync_port = 0;
 int compare_dest = 0;
@@ -162,6 +163,8 @@ int list_only = 0;
 
 #define MAX_BATCH_NAME_LEN 256	/* Must be less than MAXPATHLEN-13 */
 char *batch_name = NULL;
+
+struct chmod_mode_struct *chmod_modes = NULL;
 
 static int daemon_opt;   /* sets am_daemon after option error-reporting */
 static int F_option_cnt = 0;
@@ -291,6 +294,7 @@ void usage(enum logcode F)
   rprintf(F," -D, --devices               preserve devices (root only)\n");
   rprintf(F," -t, --times                 preserve times\n");
   rprintf(F," -O, --omit-dir-times        omit directories when preserving times\n");
+  rprintf(F,"     --chmod=CHMOD           change destination permissions\n");
   rprintf(F," -S, --sparse                handle sparse files efficiently\n");
   rprintf(F," -n, --dry-run               show what would have been transferred\n");
   rprintf(F," -W, --whole-file            copy files whole (without rsync algorithm)\n");
@@ -416,6 +420,7 @@ static struct poptOption long_options[] = {
   {"no-relative",      0,  POPT_ARG_VAL,    &relative_paths, 0, 0, 0 },
   {"no-R",             0,  POPT_ARG_VAL,    &relative_paths, 0, 0, 0 },
   {"no-implied-dirs",  0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
+  {"chmod",            0,  POPT_ARG_STRING, &chmod_mode, 0, 0, 0 },
   {"ignore-times",    'I', POPT_ARG_NONE,   &ignore_times, 0, 0, 0 },
   {"size-only",        0,  POPT_ARG_NONE,   &size_only, 0, 0, 0 },
   {"one-file-system", 'x', POPT_ARG_NONE,   &one_file_system, 0, 0, 0 },
@@ -1195,6 +1200,12 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (make_backups && !backup_dir)
 		omit_dir_times = 1;
 
+	if (chmod_mode && !(chmod_modes = parse_chmod(chmod_mode))) {
+		snprintf(err_buf, sizeof err_buf,
+		    "Invalid argument passed to chmod\n");
+		return 0;
+	}
+
 	if (log_format) {
 		if (log_format_has(log_format, 'i'))
 			log_format_has_i = 1;
@@ -1598,6 +1609,11 @@ void server_options(char **args,int *argc)
 			args[ac++] = dest_option;
 			args[ac++] = basis_dir[i];
 		}
+	}
+
+	if (chmod_mode && !am_sender) {
+		args[ac++] = "--chmod";
+		args[ac++] = chmod_mode;
 	}
 
 	if (files_from && (!am_sender || filesfrom_host)) {
