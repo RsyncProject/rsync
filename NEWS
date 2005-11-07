@@ -65,6 +65,9 @@ Changes since 2.6.6:
       "--archive --no-owner") can be used to turn off the preservation of
       file ownership that is implied by -a.
 
+    - Added the --chmod=MODE option that allows the destination permissions
+      to be changed from the source permissions.  E.g. --chmod=g+w,o-rwx
+
     - Allow the --temp-dir option to be specified when starting a daemon,
       which sets the default temporary directory for incoming files.
 
