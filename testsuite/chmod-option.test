@@ -1,0 +1,44 @@
+#! /bin/sh
+
+# Copyright (C) 2002 by Martin Pool <mbp@samba.org>
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test that the --chmod option functions correctly.
+
+. $srcdir/testsuite/rsync.fns
+
+set -x
+
+# Build some files
+
+fromdir="$scratchdir/from"
+todir="$scratchdir/to"
+checkdir="$scratchdir/check"
+
+mkdir "$fromdir"
+name1="$fromdir/name1"
+name2="$fromdir/name2"
+dir1="$fromdir/dir1"
+dir2="$fromdir/dir2"
+echo "This is the file" > "$name1"
+echo "This is the other file" > "$name2"
+mkdir "$dir1" "$dir2"
+
+chmod 4700 "$name1" || test_skipped "Can't chmod"
+chmod 700 "$dir1"
+chmod 770 "$dir2"
+
+# Copy the files we've created over to another directory
+checkit "$RSYNC -avv \"$fromdir/\" \"$checkdir/\"" "$fromdir" "$checkdir"
+
+# And then manually make the changes which should occur 
+umask 002
+chmod ug-s,a+rX "$checkdir"/*
+chmod +w "$checkdir" "$checkdir"/dir*
+
+checkit "$RSYNC -avv --chmod ug-s,a+rX,D+w \"$fromdir/\" \"$todir/\"" "$checkdir" "$todir"
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0
