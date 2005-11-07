@@ -321,6 +321,7 @@ to the detailed description below for a complete description.  verb(
  -D, --devices               preserve devices (root only)
  -t, --times                 preserve times
  -O, --omit-dir-times        omit directories when preserving times
+     --chmod=CHMOD           change destination permissions
  -S, --sparse                handle sparse files efficiently
  -n, --dry-run               show what would have been transferred
  -W, --whole-file            copy files whole (without rsync algorithm)
@@ -696,6 +697,14 @@ dit(bf(-O, --omit-dir-times)) This tells rsync to omit directories when
 it is preserving modification times (see bf(--times)).  If NFS is sharing
 the directories on the receiving side, it is a good idea to use bf(-O).
 This option is inferred if you use bf(--backup) without bf(--backup-dir).
+
+dit(bf(--chmod)) This options tells rsync to apply the listed "chmod" pattern
+to the permission of the files on the destination.  In addition to the normal
+parsing rules specified in the chmod manpage, you can specify an item that
+should only apply to a directory by prefixing it with a 'D', or specify an
+item that should only apply to a file by prefixing it with a 'F'.  For example:
+
+quote(--chmod=Dg+s,ug+w,Fo-w,+X)
 
 dit(bf(-n, --dry-run)) This tells rsync to not do any file transfers,
 instead it will just report the actions it would have taken.
