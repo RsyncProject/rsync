@@ -62,6 +62,8 @@ extern struct file_list *the_file_list;
 
 extern char curr_dir[MAXPATHLEN];
 
+extern struct chmod_mode_struct *chmod_modes;
+
 extern struct filter_list_struct filter_list;
 extern struct filter_list_struct server_filter_list;
 
@@ -865,7 +867,10 @@ skip_filters:
 	file->flags = flags;
 	file->modtime = st.st_mtime;
 	file->length = st.st_size;
-	file->mode = st.st_mode;
+	if (chmod_modes && am_sender && (S_ISREG(st.st_mode) || S_ISDIR(st.st_mode)))
+		file->mode = tweak_mode(st.st_mode, chmod_modes);
+	else
+		file->mode = st.st_mode;
 	file->uid = st.st_uid;
 	file->gid = st.st_gid;
 
