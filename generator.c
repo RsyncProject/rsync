@@ -307,7 +307,7 @@ static void do_delete_pass(struct file_list *flist)
 
 		delete_in_dir(flist, fbuf, file);
 	}
-	//delete_in_dir(NULL, NULL, NULL);
+	delete_in_dir(NULL, NULL, NULL);
 
 	if (do_progress && !am_server)
 		rprintf(FINFO, "                    \r");
