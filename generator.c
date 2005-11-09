@@ -103,13 +103,18 @@ static int is_backup_file(char *fn)
 
 /* Delete a file or directory.  If DEL_FORCE_RECURSE is set in the flags, or if
  * force_delete is set, this will delete recursively as long as DEL_NO_RECURSE
- * is not set in the flags. */
+ * is not set in the flags.
+ *
+ * Note that fname must point to a MAXPATHLEN buffer if the mode indicates it's
+ * a directory! (The buffer is used for recursion, but returned unchanged.)
+ */
 static int delete_item(char *fname, int mode, int flags)
 {
 	struct file_list *dirlist;
-	char buf[MAXPATHLEN];
 	int j, dlen, zap_dir, ok;
+	unsigned remainder;
 	void *save_filters;
+	char *p;
 
 	if (!S_ISDIR(mode)) {
 		if (max_delete && ++deletion_count > max_delete)
@@ -160,20 +165,28 @@ static int delete_item(char *fname, int mode, int flags)
 	flags |= DEL_FORCE_RECURSE; /* mark subdir dels as not "in the way" */
 	deletion_count--;
 
-	dlen = strlcpy(buf, fname, MAXPATHLEN);
-	save_filters = push_local_filters(buf, dlen);
+	dlen = strlen(fname);
+	save_filters = push_local_filters(fname, dlen);
 
-	dirlist = get_dirlist(buf, dlen, 0);
+	dirlist = get_dirlist(fname, dlen, 0);
+
+	p = fname + dlen;
+	if (dlen != 1 || *fname != '/')
+		*p++ = '/';
+	remainder = MAXPATHLEN - (p - fname);
+
 	for (j = dirlist->count; j--; ) {
 		struct file_struct *fp = dirlist->files[j];
 
 		if (fp->flags & FLAG_MOUNT_POINT)
 			continue;
 
-		f_name_to(fp, buf);
-		delete_item(buf, fp->mode, flags & ~DEL_TERSE);
+		strlcpy(p, fp->basename, remainder);
+		delete_item(fname, fp->mode, flags & ~DEL_TERSE);
 	}
 	flist_free(dirlist);
+
+	fname[dlen] = '\0';
 
 	pop_local_filters(save_filters);
 
@@ -294,6 +307,8 @@ static void do_delete_pass(struct file_list *flist)
 
 		delete_in_dir(flist, fbuf, file);
 	}
+	//delete_in_dir(NULL, NULL, NULL);
+
 	if (do_progress && !am_server)
 		rprintf(FINFO, "                    \r");
 }
@@ -592,6 +607,8 @@ static int phase = 0;
  * all other non-regular files (symlinks, etc.) we create them here.  For
  * regular files that have changed, we try to find a basis file and then
  * start sending checksums.
+ *
+ * When fname is non-null, it must point to a MAXPATHLEN buffer!
  *
  * Note that f_out is set to -1 when doing final directory-permission and
  * modification-time repair. */
@@ -1241,9 +1258,12 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		if (!file->basename)
 			continue;
 
-		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
-			       file, i, itemizing, maybe_PERMS_REPORT, code,
-			       f_out);
+		if (local_name)
+			strlcpy(fbuf, local_name, sizeof fbuf);
+		else
+			f_name_to(file, fbuf);
+		recv_generator(fbuf, file, i, itemizing, maybe_PERMS_REPORT,
+			       code, f_out);
 
 		/* We need to ensure that any dirs we create have writeable
 		 * permissions during the time we are putting files within
@@ -1292,9 +1312,12 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	 * to catch initial checksum errors */
 	while ((i = get_redo_num(itemizing, code)) != -1) {
 		struct file_struct *file = flist->files[i];
-		recv_generator(local_name ? local_name : f_name_to(file, fbuf),
-			       file, i, itemizing, maybe_PERMS_REPORT, code,
-			       f_out);
+		if (local_name)
+			strlcpy(fbuf, local_name, sizeof fbuf);
+		else
+			f_name_to(file, fbuf);
+		recv_generator(fbuf, file, i, itemizing, maybe_PERMS_REPORT,
+			       code, f_out);
 	}
 
 	phase++;
