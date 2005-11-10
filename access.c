@@ -208,7 +208,7 @@ static int match_address(char *addr, char *tok)
 
 	ret = match_binary(a, t, mask, addrlen);
 
-out:
+  out:
 	freeaddrinfo(resa);
 	freeaddrinfo(rest);
 	return ret;
