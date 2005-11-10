@@ -68,6 +68,7 @@ extern struct filter_list_struct filter_list;
 extern struct filter_list_struct server_filter_list;
 
 int io_error;
+int checksum_len;
 dev_t filesystem_dev; /* used to implement -x */
 
 static char empty_sum[MD4_SUM_LENGTH];
@@ -84,6 +85,7 @@ void init_flist(void)
 
 	/* Figure out how big the file_struct is without trailing padding */
 	file_struct_len = offsetof(struct file_struct, flags) + sizeof f.flags;
+	checksum_len = protocol_version < 21 ? 2 : MD4_SUM_LENGTH;
 }
 
 static int show_filelist_p(void)
@@ -475,14 +477,13 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 
 	if (always_checksum && (S_ISREG(mode) || protocol_version < 28)) {
 		char *sum;
-		int slen = protocol_version < 21 ? 2 : MD4_SUM_LENGTH;
 		if (S_ISREG(mode))
 			sum = file->u.sum;
 		else {
 			/* Prior to 28, we sent a useless set of nulls. */
 			sum = empty_sum;
 		}
-		write_buf(f, sum, slen);
+		write_buf(f, sum, checksum_len);
 	}
 
 	strlcpy(lastname, fname, MAXPATHLEN);
@@ -698,7 +699,6 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 
 	if (always_checksum && (sum_len || protocol_version < 28)) {
 		char *sum;
-		int slen = protocol_version < 21 ? 2 : MD4_SUM_LENGTH;
 		if (sum_len) {
 			file->u.sum = sum = bp;
 			/*bp += sum_len;*/
@@ -706,7 +706,7 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 			/* Prior to 28, we get a useless set of nulls. */
 			sum = empty_sum;
 		}
-		read_buf(f, sum, slen);
+		read_buf(f, sum, checksum_len);
 	}
 
 	if (!preserve_perms) {
