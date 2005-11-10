@@ -321,7 +321,6 @@ int check_name(int fd,
 		return error;
 	}
 
-
 	/* Given all these results, we expect that one of them will be
 	 * the same as ss.  The comparison is a bit complicated. */
 	for (res = res0; res; res = res->ai_next) {
