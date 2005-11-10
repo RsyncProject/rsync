@@ -659,7 +659,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				 S_ISDIR(file->mode)) < 0) {
 			if (S_ISDIR(file->mode))
 				excluded_below = file->dir.depth;
-		    skipping:
+		  skipping:
 			if (verbose) {
 				rprintf(FINFO,
 					"skipping server-excluded file \"%s\"\n",
@@ -1089,7 +1089,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-prepare_to_open:
+  prepare_to_open:
 	if (partialptr) {
 		st = partial_st;
 		fnamecmp = partialptr;
@@ -1112,7 +1112,7 @@ prepare_to_open:
 	if (fd == -1) {
 		rsyserr(FERROR, errno, "failed to open %s, continuing",
 			full_fname(fnamecmp));
-	    pretend_missing:
+	  pretend_missing:
 		/* pretend the file didn't exist */
 		if (preserve_hard_links && file->link_u.links
 		    && hard_link_check(file, ndx, fname, statret, &st,
@@ -1157,7 +1157,7 @@ prepare_to_open:
 	if (verbose > 2)
 		rprintf(FINFO, "generating and sending sums for %d\n", ndx);
 
-notify_others:
+  notify_others:
 	write_int(f_out, ndx);
 	if (itemizing) {
 		int iflags = ITEM_TRANSFER;
