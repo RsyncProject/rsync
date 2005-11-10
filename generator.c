@@ -1069,6 +1069,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	else if (fnamecmp_type == FNAMECMP_FUZZY)
 		;
 	else if (unchanged_file(fnamecmp, file, &st)) {
+		if (partialptr) {
+			do_unlink(partialptr);
+			handle_partial_dir(partialptr, PDIR_DELETE);
+		}
 		if (fnamecmp_type == FNAMECMP_FNAME) {
 			if (itemizing) {
 				itemize(file, ndx, real_ret, &real_st,
