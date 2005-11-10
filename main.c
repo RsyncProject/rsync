@@ -395,7 +395,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 
 	return ret;
 
-oom:
+  oom:
 	out_of_memory("do_cmd");
 	return 0; /* not reached */
 }
@@ -651,7 +651,6 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		exit_cleanup(RERR_SYNTAX);
 		return;
 	}
-
 
 	if (argc > 0) {
 		dir = argv[0];
