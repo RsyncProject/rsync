@@ -820,7 +820,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 				return NULL;
 	}
 
-skip_filters:
+    skip_filters:
 
 	if (verbose > 2) {
 		rprintf(FINFO, "[%s] make_file(%s,*,%d)\n",
@@ -848,7 +848,8 @@ skip_filters:
 	linkname_len = 0;
 #endif
 
-	sum_len = always_checksum && S_ISREG(st.st_mode) ? MD4_SUM_LENGTH : 0;
+	sum_len = always_checksum && am_sender && S_ISREG(st.st_mode)
+	        ? MD4_SUM_LENGTH : 0;
 
 	alloc_len = file_struct_len + dirname_len + basename_len
 	    + linkname_len + sum_len;
