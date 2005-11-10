@@ -658,7 +658,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 				continue;
 			}
 
-			if (partialptr)
+			if (keep_partial)
 				cleanup_set(fnametmp, partialptr, file, fd1, fd2);
 		}
 
