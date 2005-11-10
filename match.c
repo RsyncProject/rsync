@@ -128,7 +128,6 @@ static void matched(int f, struct sum_struct *s, struct map_struct *buf,
 		sum_update(map_ptr(buf, last_match + j, n1), n1);
 	}
 
-
 	if (i >= 0)
 		last_match = offset + s->sums[i].len;
 	else

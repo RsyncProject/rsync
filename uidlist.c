@@ -324,7 +324,6 @@ void recv_uid_list(int f, struct file_list *flist)
 		}
 	}
 
-
 	if (preserve_gid && !numeric_ids) {
 		/* read the gid list */
 		while ((id = read_int(f)) != 0) {

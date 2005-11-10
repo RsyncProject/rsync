@@ -465,7 +465,6 @@ void start_accept_loop(int port, int (*fn)(int, int))
 			maxfd = sp[i];
 	}
 
-
 	/* now accept incoming connections - forking a new process
 	 * for each incoming connection */
 	while (1) {
