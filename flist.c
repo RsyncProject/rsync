@@ -820,7 +820,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 				return NULL;
 	}
 
-    skip_filters:
+  skip_filters:
 
 	if (verbose > 2) {
 		rprintf(FINFO, "[%s] make_file(%s,*,%d)\n",
@@ -1314,7 +1314,6 @@ struct file_list *recv_file_list(int f)
 	if (!flist->files)
 		goto oom;
 
-
 	while ((flags = read_byte(f)) != 0) {
 		struct file_struct *file;
 
@@ -1375,7 +1374,7 @@ struct file_list *recv_file_list(int f)
 
 	return flist;
 
-oom:
+  oom:
 	out_of_memory("recv_file_list");
 	return NULL;		/* not reached */
 }
