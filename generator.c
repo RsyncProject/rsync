@@ -69,6 +69,7 @@ extern int ignore_timeout;
 extern int protocol_version;
 extern int fuzzy_basis;
 extern int always_checksum;
+extern int checksum_len;
 extern char *partial_dir;
 extern char *basis_dir[];
 extern int compare_dest;
@@ -384,8 +385,7 @@ static int unchanged_file(char *fn, struct file_struct *file, STRUCT_STAT *st)
 	if (always_checksum && S_ISREG(st->st_mode)) {
 		char sum[MD4_SUM_LENGTH];
 		file_checksum(fn, sum, st->st_size);
-		return memcmp(sum, file->u.sum, protocol_version < 21 ? 2
-							: MD4_SUM_LENGTH) == 0;
+		return memcmp(sum, file->u.sum, checksum_len) == 0;
 	}
 
 	if (size_only)
