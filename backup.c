@@ -149,7 +149,7 @@ static int make_bak_dir(char *fullpath)
 	}
 	return 0;
 
-failure:
+  failure:
 	while (p != end) {
 		*p = '/';
 		p += strlen(p);
