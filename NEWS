@@ -4,6 +4,9 @@ Changes since 2.6.6:
 
   BUG FIXES:
 
+    - Fixed a really old bug that caused --checksum (-c) to checksum all the
+      files during the delete scan!
+
     - Made hard-links work with symlinks and devices again.
 
     - If a device-file/special-file changes permissions, rsync now updates the
