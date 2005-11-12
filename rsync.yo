@@ -372,6 +372,8 @@ to the detailed description below for a complete description.  verb(
      --port=PORT             specify double-colon alternate port number
      --blocking-io           use blocking I/O for the remote shell
      --stats                 give some file-transfer stats
+ -m, --human-readable        output numbers in a human-readable format
+     --si                    like human-readable, but use powers of 1000
      --progress              show progress during transfer
  -P                          same as --partial --progress
  -i, --itemize-changes       output a change-summary for all updates
@@ -1225,6 +1227,13 @@ the name of the file being transferred prior to its progress information
 dit(bf(--stats)) This tells rsync to print a verbose set of statistics
 on the file transfer, allowing you to tell how effective the rsync
 algorithm is for your data.
+
+dit(bf(-m, --human-readable)) Output numbers in a more human-readable format.
+Large numbers may be output in larger units, with a K (1024), M (1024*1024),
+or G (1024*1024*1024) suffix.
+
+dit(bf(--si)) Similar to the bf(--human-readable) option, but using powers
+of 1000 instead of 1024.
 
 dit(bf(--partial)) By default, rsync will delete any partially
 transferred file if the transfer is interrupted. In some circumstances
