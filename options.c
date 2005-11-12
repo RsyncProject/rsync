@@ -82,6 +82,7 @@ char *files_from = NULL;
 int filesfrom_fd = -1;
 char *filesfrom_host = NULL;
 int eol_nulls = 0;
+int human_readable = 0;
 int recurse = 0;
 int xfer_dirs = -1;
 int am_daemon = 0;
@@ -345,6 +346,8 @@ void usage(enum logcode F)
   rprintf(F,"     --port=PORT             specify double-colon alternate port number\n");
   rprintf(F,"     --blocking-io           use blocking I/O for the remote shell\n");
   rprintf(F,"     --stats                 give some file-transfer stats\n");
+  rprintf(F," -m, --human-readable        output numbers in a human-readable format\n");
+  rprintf(F,"     --si                    like human-readable, but use powers of 1000\n");
   rprintf(F,"     --progress              show progress during transfer\n");
   rprintf(F," -P                          same as --partial --progress\n");
   rprintf(F," -i, --itemize-changes       output a change-summary for all updates\n");
@@ -383,6 +386,8 @@ static struct poptOption long_options[] = {
   {"no-v",             0,  POPT_ARG_VAL,    &verbose, 0, 0, 0 },
   {"quiet",           'q', POPT_ARG_NONE,   0, 'q', 0, 0 },
   {"stats",            0,  POPT_ARG_NONE,   &do_stats, 0, 0, 0 },
+  {"human-readable",  'm', POPT_ARG_VAL,    &human_readable, 1, 0, 0},
+  {"si",               0,  POPT_ARG_VAL,    &human_readable, 2, 0, 0},
   {"dry-run",         'n', POPT_ARG_NONE,   &dry_run, 0, 0, 0 },
   {"archive",         'a', POPT_ARG_NONE,   0, 'a', 0, 0 },
   {"recursive",       'r', POPT_ARG_VAL,    &recurse, 2, 0, 0 },
@@ -703,12 +708,10 @@ static OFF_T parse_size_arg(char **size_arg, char def_suf)
 	if (size > 0 && make_compatible) {
 		/* We convert this manually because we may need %lld precision,
 		 * and that's not a portable sprintf() escape. */
-		char buf[128], *s = buf + sizeof buf;
+		char buf[128], *s = buf + sizeof buf - 1;
 		OFF_T num = size;
-		*--s = '\0';
+		*s = '\0';
 		while (num) {
-			if (s == buf) /* impossible... */
-				out_of_memory("parse_size_arg@buf");
 			*--s = (num % 10) + '0';
 			num /= 10;
 		}
