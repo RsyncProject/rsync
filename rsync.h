@@ -134,11 +134,6 @@
 #define FNAMECMP_BACKUP 	0x82
 #define FNAMECMP_FUZZY		0x83
 
-/* For calling delete_file() */
-#define DEL_NO_RECURSE		(1<<1)
-#define DEL_FORCE_RECURSE	(1<<2) /* recurse even w/o --force */
-#define DEL_TERSE		(1<<3)
-
 /* For use by the itemize_changes code */
 #define ITEM_REPORT_CHECKSUM (1<<1)
 #define ITEM_REPORT_SIZE (1<<2)
