@@ -677,7 +677,7 @@ static OFF_T parse_size_arg(char **size_arg, char def_suf)
 	for (arg = *size_arg; isdigit(*(uchar*)arg); arg++) {}
 	if (*arg == '.')
 		for (arg++; isdigit(*(uchar*)arg); arg++) {}
-	if (*arg && (arg[1] == 't' || arg[1] == 'T'))
+	if (*arg && (arg[1] == 'b' || arg[1] == 'B'))
 		mult = 1000, make_compatible = 1;
 	else
 		mult = 1024;
