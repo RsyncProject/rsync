@@ -32,6 +32,7 @@ extern int dry_run;
 extern int module_id;
 extern int modify_window;
 extern int relative_paths;
+extern int human_readable;
 extern char *partial_dir;
 extern struct filter_list_struct server_filter_list;
 
@@ -1118,6 +1119,63 @@ int unsafe_symlink(const char *dest, const char *src)
 	return (depth < 0);
 }
 
+/* Return the int64 number as a string.  If the --human-readable option was
+ * specified, we may output the number in K, M, or G units.  We can return
+ * up to 4 buffers at a time. */
+char *human_num(int64 num)
+{
+	static char bufs[4][128]; /* more than enough room */
+	static unsigned int n;
+	char *s;
+
+	n = (n + 1) % (sizeof bufs / sizeof bufs[0]);
+
+	if (human_readable) {
+		char units = '\0';
+		int mult = human_readable == 1 ? 1024 : 1000;
+		double dnum = 0;
+		if (num > mult*mult*mult) {
+			dnum = (double)num / (mult*mult*mult);
+			units = 'G';
+		} else if (num > mult*mult) {
+			dnum = (double)num / (mult*mult);
+			units = 'M';
+		} else if (num > mult) {
+			dnum = (double)num / mult;
+			units = 'K';
+		}
+		if (units) {
+			sprintf(bufs[n], "%.2f%c", dnum, units);
+			return bufs[n];
+		}
+	}
+
+	s = bufs[n] + sizeof bufs[0] - 1;
+	*s = '\0';
+
+	if (!num)
+		*--s = '0';
+	while (num) {
+		*--s = (num % 10) + '0';
+		num /= 10;
+	}
+	return s;
+}
+
+/* Return the double number as a string.  If the --human-readable option was
+ * specified, we may output the number in K, M, or G units.  We use a buffer
+ * from human_num() to return our result. */
+char *human_dnum(double dnum, int decimal_digits)
+{
+	char *buf = human_num(dnum);
+	int len = strlen(buf);
+	if (isdigit(*(uchar*)(buf+len-1))) {
+		/* There's extra room in buf prior to the start of the num. */
+		buf -= decimal_digits + 1;
+		snprintf(buf, len + decimal_digits + 2, "%.*f", decimal_digits, dnum);
+	}
+	return buf;
+}
 
 /**
  * Return the date and time as a string
