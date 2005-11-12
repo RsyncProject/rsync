@@ -94,6 +94,10 @@ extern struct filter_list_struct server_filter_list;
 
 static int deletion_count = 0; /* used to implement --max-delete */
 
+/* For calling delete_file() */
+#define DEL_FORCE_RECURSE	(1<<1) /* recurse even w/o --force */
+#define DEL_TERSE		(1<<3)
+
 
 static int is_backup_file(char *fn)
 {
@@ -103,8 +107,7 @@ static int is_backup_file(char *fn)
 
 
 /* Delete a file or directory.  If DEL_FORCE_RECURSE is set in the flags, or if
- * force_delete is set, this will delete recursively as long as DEL_NO_RECURSE
- * is not set in the flags.
+ * force_delete is set, this will delete recursively.
  *
  * Note that fname must point to a MAXPATHLEN buffer if the mode indicates it's
  * a directory! (The buffer is used for recursion, but returned unchanged.)
@@ -138,8 +141,7 @@ static int delete_item(char *fname, int mode, int flags)
 		return -1;
 	}
 
-	zap_dir = (flags & DEL_FORCE_RECURSE || (force_delete && recurse))
-		&& !(flags & DEL_NO_RECURSE);
+	zap_dir = flags & DEL_FORCE_RECURSE || (force_delete && recurse);
 	if ((max_delete && ++deletion_count > max_delete)
 	    || (dry_run && zap_dir)) {
 		ok = 0;
