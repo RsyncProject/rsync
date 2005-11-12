@@ -46,7 +46,12 @@ Changes since 2.6.6:
     - Added the --compress-level option to allow you to set how aggressive
       rsync's compression should be (the option implies --compress).
 
-    - Enhanced the parsing of the SIZE value for --min-size and --max-size.
+    - Enhanced the parsing of the SIZE value for --min-size and --max-size
+      to allow easy entry of multiples of 1000 (instead of just multiples
+      of 1024) and off-by-one values too (e.g. --max-size=8mb-1).
+
+    - The options --human-readable (-m) and --si change the output of the
+      --stats and the end-of-run summary to be easier to read.
 
     - If lutimes() and/or lchmod() are around, use them to allow the
       preservation of attributes on symlinks.
