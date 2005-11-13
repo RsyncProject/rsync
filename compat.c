@@ -94,7 +94,8 @@ void setup_protocol(int f_out,int f_in)
 
 	if (basis_dir_cnt > 1 && protocol_version < 29) {
 		rprintf(FERROR,
-			"Multiple %s options requires protocol 29 or higher (negotiated %d).\n",
+			"Using more than one %s option requires protocol 29 or higher\n"
+			"(negotiated %d).\n",
 			dest_option, protocol_version);
 		exit_cleanup(RERR_PROTOCOL);
 	}
