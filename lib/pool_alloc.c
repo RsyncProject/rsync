@@ -56,8 +56,7 @@ pool_create(size_t size, size_t quantum,
 	pool->size = size	/* round extent size to min alignment reqs */
 	    ? (size + MINALIGN - 1) & ~(MINALIGN - 1)
 	    : POOL_DEF_EXTENT;
-	if (pool->flags & POOL_INTERN)
-	{
+	if (pool->flags & POOL_INTERN) {
 		pool->size -= sizeof (struct pool_extent);
 		flags |= POOL_APPEND;
 	}
@@ -77,15 +76,13 @@ pool_destroy(alloc_pool_t p)
 	if (!pool)
 		return;
 
-	if (pool->live)
-	{
+	if (pool->live) {
 		cur = pool->live;
 		free(cur->start);
 		if (!(pool->flags & POOL_APPEND))
 			free(cur);
 	}
-	for (cur = pool->free; cur; cur = next)
-	{
+	for (cur = pool->free; cur; cur = next) {
 		next = cur->next;
 		free(cur->start);
 		if (!(pool->flags & POOL_APPEND))
@@ -109,16 +106,14 @@ pool_alloc(alloc_pool_t p, size_t len, char *bomb)
 	if (len > pool->size)
 		goto bomb;
 
-	if (!pool->live || len > pool->live->free)
-	{
+	if (!pool->live || len > pool->live->free) {
 		void	*start;
 		size_t	free;
 		size_t	bound;
 		size_t	sqew;
 		size_t	asize;
 
-		if (pool->live)
-		{
+		if (pool->live) {
 			pool->live->next = pool->free;
 			pool->free = pool->live;
 		}
@@ -137,16 +132,11 @@ pool_alloc(alloc_pool_t p, size_t len, char *bomb)
 			memset(start, 0, pool->size);
 
 		if (pool->flags & POOL_APPEND)
-		{
 			pool->live = PTR_ADD(start, free);
-		}
 		else if (!(pool->live = (struct pool_extent *) malloc(sizeof (struct pool_extent))))
-		{
 			goto bomb;
-		}
 		if (pool->flags & POOL_QALIGN && pool->quantum > 1
-		    && (sqew = (size_t)PTR_ADD(start, free) % pool->quantum))
-		{
+		    && (sqew = (size_t)PTR_ADD(start, free) % pool->quantum)) {
 			bound  += sqew;
 			free -= sqew;
 		}
@@ -186,8 +176,7 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 	else if (pool->quantum > 1 && len % pool->quantum)
 		len += pool->quantum - len % pool->quantum;
 
-	if (!addr && pool->live)
-	{
+	if (!addr && pool->live) {
 		pool->live->next = pool->free;
 		pool->free = pool->live;
 		pool->live = NULL;
@@ -197,35 +186,28 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 	pool->b_freed += len;
 
 	cur = pool->live;
-	if (cur
-	    && addr >= cur->start
-	    && addr < PTR_ADD(cur->start, pool->size))
-	{
-		if (addr == PTR_ADD(cur->start, cur->free))
-		{
+	if (cur && addr >= cur->start
+	    && addr < PTR_ADD(cur->start, pool->size)) {
+		if (addr == PTR_ADD(cur->start, cur->free)) {
 			if (pool->flags & POOL_CLEAR)
 				memset(addr, 0, len);
 			pool->b_freed += len;
-		} else {
+		} else
 			cur->bound += len;
-		}
-		if (cur->free + cur->bound >= pool->size)
-		{
+		if (cur->free + cur->bound >= pool->size) {
 			size_t sqew;
 
 			cur->free = pool->size;
 			cur->bound = 0;
 			if (pool->flags & POOL_QALIGN && pool->quantum > 1
-			    && (sqew = (size_t)PTR_ADD(cur->start, cur->free) % pool->quantum))
-			{
+			    && (sqew = (size_t)PTR_ADD(cur->start, cur->free) % pool->quantum)) {
 				cur->bound += sqew;
 				cur->free -= sqew;
 			}
 		}
 		return;
 	}
-	for (prev = NULL, cur = pool->free; cur; prev = cur, cur = cur->next)
-	{
+	for (prev = NULL, cur = pool->free; cur; prev = cur, cur = cur->next) {
 		if (addr >= cur->start
 		    && addr < PTR_ADD(cur->start, pool->size))
 			break;
@@ -233,16 +215,14 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 	if (!cur)
 		return;
 
-	if (prev)
-	{
+	if (prev) {
 		prev->next = cur->next;
 		cur->next = pool->free;
 		pool->free = cur;
 	}
 	cur->bound += len;
 
-	if (cur->free + cur->bound >= pool->size)
-	{
+	if (cur->free + cur->bound >= pool->size) {
 		pool->free = cur->next;
 
 		free(cur->start);
@@ -254,11 +234,11 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 }
 
 #define FDPRINT(label, value) \
-	snprintf(buf, BUFSIZ, label, value), \
-	write(fd, buf, strlen(buf));
+	snprintf(buf, sizeof buf, label, value), \
+	write(fd, buf, strlen(buf))
 
 #define FDEXTSTAT(ext) \
-	snprintf(buf, BUFSIZ, "  %12ld  %5ld\n", \
+	snprintf(buf, sizeof buf, "  %12ld  %5ld\n", \
 		(long) ext->free, \
 		(long) ext->bound), \
 	write(fd, buf, strlen(buf))
@@ -291,14 +271,10 @@ pool_stats(alloc_pool_t p, int fd, int summarize)
 	write(fd, "\n", 1);
 
 	if (pool->live)
-	{
 		FDEXTSTAT(pool->live);
-	}
 	strcpy(buf, "   FREE    BOUND\n");
 	write(fd, buf, strlen(buf));
 
 	for (cur = pool->free; cur; cur = cur->next)
-	{
 		FDEXTSTAT(cur);
-	}
 }
