@@ -272,7 +272,7 @@ void usage(enum logcode F)
   rprintf(F," -q, --quiet                 suppress non-error messages\n");
   rprintf(F," -c, --checksum              skip based on checksum, not mod-time & size\n");
   rprintf(F," -a, --archive               archive mode; same as -rlptgoD (no -H)\n");
-  rprintf(F,"     --no-OPTION             turn of an implied OPTION (e.g. --no-D)\n");
+  rprintf(F,"     --no-OPTION             turn off an implied OPTION (e.g. --no-D)\n");
   rprintf(F," -r, --recursive             recurse into directories\n");
   rprintf(F," -R, --relative              use relative path names\n");
   rprintf(F,"     --no-implied-dirs       don't send implied dirs with --relative\n");
