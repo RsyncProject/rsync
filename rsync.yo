@@ -372,7 +372,7 @@ to the detailed description below for a complete description.  verb(
      --port=PORT             specify double-colon alternate port number
      --blocking-io           use blocking I/O for the remote shell
      --stats                 give some file-transfer stats
- -m, --human-readable        output numbers in a human-readable format
+ -h, --human-readable        output numbers in a human-readable format
      --si                    like human-readable, but use powers of 1000
      --progress              show progress during transfer
  -P                          same as --partial --progress
@@ -389,7 +389,7 @@ to the detailed description below for a complete description.  verb(
  -4, --ipv4                  prefer IPv4
  -6, --ipv6                  prefer IPv6
      --version               print version number
- -h, --help                  show this help screen)
+     --help                  show this help screen)
 
 Rsync can also be run as a daemon, in which case the following options are
 accepted: verb(
@@ -402,7 +402,7 @@ accepted: verb(
  -v, --verbose               increase verbosity
  -4, --ipv4                  prefer IPv4
  -6, --ipv6                  prefer IPv6
- -h, --help                  show this help screen)
+     --help                  show this help screen)
 
 manpageoptions()
 
@@ -413,8 +413,10 @@ The '=' for options that take a parameter is optional; whitespace
 can be used instead.
 
 startdit()
-dit(bf(-h, --help)) Print a short help page describing the options
-available in rsync.
+dit(bf(--help)) Print a short help page describing the options
+available in rsync and exit.  For backward-compatibility with older
+versions of rsync, the same help output can also be requested by using
+the bf(-h) option without any other args.
 
 dit(bf(--version)) print the rsync version number and exit.
 
@@ -1229,7 +1231,7 @@ dit(bf(--stats)) This tells rsync to print a verbose set of statistics
 on the file transfer, allowing you to tell how effective the rsync
 algorithm is for your data.
 
-dit(bf(-m, --human-readable)) Output numbers in a more human-readable format.
+dit(bf(-h, --human-readable)) Output numbers in a more human-readable format.
 Large numbers may be output in larger units, with a K (1024), M (1024*1024),
 or G (1024*1024*1024) suffix.
 
