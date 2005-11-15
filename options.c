@@ -670,41 +670,44 @@ static int count_args(const char **argv)
 
 static OFF_T parse_size_arg(char **size_arg, char def_suf)
 {
-	int mult, make_compatible = 0;
-	const char *arg, *p;
-	OFF_T size = 0;
+	int reps, mult, make_compatible = 0;
+	const char *arg;
+	OFF_T size = 1;
 
 	for (arg = *size_arg; isdigit(*(uchar*)arg); arg++) {}
 	if (*arg == '.')
 		for (arg++; isdigit(*(uchar*)arg); arg++) {}
-	if (*arg && (arg[1] == 'b' || arg[1] == 'B'))
-		mult = 1000, make_compatible = 1;
-	else
-		mult = 1024;
-	if ((p = strstr(arg, "+1")) != NULL
-	 || (p = strstr(arg, "-1")) != NULL) {
-		if (p[2] != '\0')
-			return -1;
-		size = atoi(p);
-		make_compatible = 1;
-	}
-	switch (*arg && arg != p ? *arg : def_suf) {
+	switch (*arg && *arg != '+' && *arg != '-' ? *arg++ : def_suf) {
 	case 'b': case 'B':
-		size += atof(*size_arg);
+		reps = 0;
 		break;
 	case 'k': case 'K':
-		size += atof(*size_arg) * mult;
+		reps = 1;
 		break;
 	case 'm': case 'M':
-		size += atof(*size_arg) * mult*mult;
+		reps = 2;
 		break;
 	case 'g': case 'G':
-		size += atof(*size_arg) * mult*mult*mult;
+		reps = 3;
 		break;
 	default:
-		size = -1;
-		break;
+		return -1;
 	}
+	if (*arg == 'b' || *arg == 'B')
+		mult = 1000, make_compatible = 1, arg++;
+	else if (!*arg || *arg == '+' || *arg == '-')
+		mult = 1024;
+	else if (strncasecmp(arg, "ib", 2) == 0)
+		mult = 1024, arg += 2;
+	else
+		return -1;
+	while (reps--)
+		size *= mult;
+	size *= atof(*size_arg);
+	if ((*arg == '+' || *arg == '-') && arg[1] == '1')
+		size += atoi(arg), make_compatible = 1, arg += 2;
+	if (*arg)
+		return -1;
 	if (size > 0 && make_compatible) {
 		/* We convert this manually because we may need %lld precision,
 		 * and that's not a portable sprintf() escape. */
