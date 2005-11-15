@@ -346,7 +346,7 @@ void usage(enum logcode F)
   rprintf(F,"     --port=PORT             specify double-colon alternate port number\n");
   rprintf(F,"     --blocking-io           use blocking I/O for the remote shell\n");
   rprintf(F,"     --stats                 give some file-transfer stats\n");
-  rprintf(F," -m, --human-readable        output numbers in a human-readable format\n");
+  rprintf(F," -h, --human-readable        output numbers in a human-readable format\n");
   rprintf(F,"     --si                    like human-readable, but use powers of 1000\n");
   rprintf(F,"     --progress              show progress during transfer\n");
   rprintf(F," -P                          same as --partial --progress\n");
@@ -364,7 +364,7 @@ void usage(enum logcode F)
   rprintf(F," -6, --ipv6                  prefer IPv6\n");
 #endif
   rprintf(F,"     --version               print version number\n");
-  rprintf(F," -h, --help                  show this help screen\n");
+  rprintf(F,"     --help                  show this help screen\n");
 
   rprintf(F,"\nUse \"rsync --daemon --help\" to see the daemon-mode command-line options.\n");
   rprintf(F,"Please see the rsync(1) and rsyncd.conf(5) man pages for full documentation.\n");
@@ -372,21 +372,21 @@ void usage(enum logcode F)
 }
 
 enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
-      OPT_FILTER, OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST,
+      OPT_FILTER, OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST, OPT_HELP,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW, OPT_MIN_SIZE,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_MAX_SIZE,
       OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
-  {"help",            'h', POPT_ARG_NONE,   0, 'h', 0, 0 },
+  {"help",             0,  POPT_ARG_NONE,   0, OPT_HELP, 0, 0 },
   {"version",          0,  POPT_ARG_NONE,   0, OPT_VERSION, 0, 0},
   {"verbose",         'v', POPT_ARG_NONE,   0, 'v', 0, 0 },
   {"no-verbose",       0,  POPT_ARG_VAL,    &verbose, 0, 0, 0 },
   {"no-v",             0,  POPT_ARG_VAL,    &verbose, 0, 0, 0 },
   {"quiet",           'q', POPT_ARG_NONE,   0, 'q', 0, 0 },
   {"stats",            0,  POPT_ARG_NONE,   &do_stats, 0, 0, 0 },
-  {"human-readable",  'm', POPT_ARG_VAL,    &human_readable, 1, 0, 0},
+  {"human-readable",  'h', POPT_ARG_VAL,    &human_readable, 1, 0, 0},
   {"si",               0,  POPT_ARG_VAL,    &human_readable, 2, 0, 0},
   {"dry-run",         'n', POPT_ARG_NONE,   &dry_run, 0, 0, 0 },
   {"archive",         'a', POPT_ARG_NONE,   0, 'a', 0, 0 },
@@ -526,7 +526,7 @@ static void daemon_usage(enum logcode F)
   rprintf(F," -4, --ipv4                  prefer IPv4\n");
   rprintf(F," -6, --ipv6                  prefer IPv6\n");
 #endif
-  rprintf(F," -h, --help                  show this help screen\n");
+  rprintf(F,"     --help                  show this help screen\n");
 
   rprintf(F,"\nIf you were not trying to invoke rsync as a daemon, avoid using any of the\n");
   rprintf(F,"daemon-specific rsync options.  See also the rsyncd.conf(5) man page.\n");
@@ -874,7 +874,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			preserve_devices = 1;
 			break;
 
-		case 'h':
+		case OPT_HELP:
 			usage(FINFO);
 			exit_cleanup(0);
 
@@ -1010,6 +1010,11 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				 poptStrerror(opt));
 			return 0;
 		}
+	}
+
+	if (human_readable && *argc == 2) {
+		usage(FINFO);
+		exit_cleanup(0);
 	}
 
 #ifndef SUPPORT_LINKS
