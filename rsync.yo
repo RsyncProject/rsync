@@ -1298,11 +1298,9 @@ updated file into a holding directory until the end of the
 transfer, at which time all the files are renamed into place in rapid
 succession.  This attempts to make the updating of the files a little more
 atomic.  By default the files are placed into a directory named ".~tmp~" in
-each file's destination directory, but you can override this by specifying
-the bf(--partial-dir) option.  (Note that RSYNC_PARTIAL_DIR has no effect
-on this value, nor is bf(--partial-dir) considered to be implied for the
-purposes of the daemon-config's "refuse options" setting.)
-Conflicts with bf(--inplace).
+each file's destination directory, but if you've specified the
+bf(--partial-dir) option, that directory will be used instead.
+Conflicts with bf(--inplace) and bf(--append).
 
 This option uses more memory on the receiving side (one bit per file
 transferred) and also requires enough free disk space on the receiving
