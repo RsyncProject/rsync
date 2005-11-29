@@ -5,7 +5,7 @@ Changes since 2.6.6:
   BUG FIXES:
 
     - Fixed a really old bug that caused --checksum (-c) to checksum all the
-      files during the delete scan!
+      files encountered during the delete scan (ouch).
 
     - Made hard-links work with symlinks and devices again.
 
@@ -44,13 +44,13 @@ Changes since 2.6.6:
       transfer.
 
     - Added the --compress-level option to allow you to set how aggressive
-      rsync's compression should be (the option implies --compress).
+      rsync's compression should be (this option implies --compress).
 
     - Enhanced the parsing of the SIZE value for --min-size and --max-size
       to allow easy entry of multiples of 1000 (instead of just multiples
       of 1024) and off-by-one values too (e.g. --max-size=8mb-1).
 
-    - The options --human-readable (-m) and --si change the output of the
+    - The options --human-readable (-h) and --si change the output of the
       --stats and the end-of-run summary to be easier to read.
 
     - If lutimes() and/or lchmod() are around, use them to allow the
@@ -59,12 +59,13 @@ Changes since 2.6.6:
     - Added two config items to the rsyncd.conf parsing:  "pre-xfer exec"
       and "post-xfer exec".  These allow a command to be specified on a
       per-module basis that will be run before and/or after a daemon-mode
-      transfer. 
+      transfer.  (See the manpage for a list of the environment variables
+      that are set with information about the transfer.)
 
     - When using the --relative option, you can now insert a dot dir in
       the source path to indicate where the replication of the source dirs
       should start.  For example, if you specify a source path of
-      rsync://host/module/foo/bar/./baz/dir with -R, rsync would only
+      rsync://host/module/foo/bar/./baz/dir with -R, rsync will now only
       replicate the "baz/dir" part of the source path (note: a trailing
       dot dir is unaffected unless it also has a trailing slash).
 
