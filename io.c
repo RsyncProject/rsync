@@ -244,16 +244,6 @@ static void msg_list_add(int code, char *buf, int len)
 	msg_list.tail = ml;
 }
 
-void send_msg(enum msgcode code, char *buf, int len)
-{
-	if (msg_fd_out < 0) {
-		io_multiplex_write(code, buf, len);
-		return;
-	}
-	msg_list_add(code, buf, len);
-	msg_list_push(NORMAL_FLUSH);
-}
-
 /* Read a message from the MSG_* fd and handle it.  This is called either
  * during the early stages of being a local sender (up through the sending
  * of the file list) or when we're the generator (to fetch the messages
@@ -333,7 +323,7 @@ static void read_msg_fd(void)
 /* Try to push messages off the list onto the wire.  If we leave with more
  * to do, return 0.  On error, return -1.  If everything flushed, return 1.
  * This is only active in the receiver. */
-int msg_list_push(int flush_it_all)
+static int msg_list_flush(int flush_it_all)
 {
 	static int written = 0;
 	struct timeval tv;
@@ -368,6 +358,16 @@ int msg_list_push(int flush_it_all)
 		}
 	}
 	return 1;
+}
+
+void send_msg(enum msgcode code, char *buf, int len)
+{
+	if (msg_fd_out < 0) {
+		io_multiplex_write(code, buf, len);
+		return;
+	}
+	msg_list_add(code, buf, len);
+	msg_list_flush(NORMAL_FLUSH);
 }
 
 int get_redo_num(int itemizing, enum logcode code)
@@ -503,7 +503,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 		}
 
 		if (msg_list.head && FD_ISSET(msg_fd_out, &w_fds))
-			msg_list_push(NORMAL_FLUSH);
+			msg_list_flush(NORMAL_FLUSH);
 
 		if (io_filesfrom_f_out >= 0) {
 			if (io_filesfrom_buflen) {
@@ -1148,7 +1148,7 @@ static void mplex_write(enum msgcode code, char *buf, size_t len)
 
 void io_flush(int flush_it_all)
 {
-	msg_list_push(flush_it_all);
+	msg_list_flush(flush_it_all);
 
 	if (!iobuf_out_cnt || no_flush)
 		return;
