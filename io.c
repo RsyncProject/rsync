@@ -1015,7 +1015,7 @@ static void sleep_for_bwlimit(int bytes_written)
 
 
 /* Write len bytes to the file descriptor fd, looping as necessary to get
- * the job done and also (in certain circumstnces) reading any data on
+ * the job done and also (in certain circumstances) reading any data on
  * msg_fd_in to avoid deadlock.
  *
  * This function underlies the multiplexing system.  The body of the
