@@ -119,14 +119,17 @@ struct flist_ndx_list {
 
 static struct flist_ndx_list redo_list, hlink_list;
 
-struct msg_list {
-	struct msg_list *next;
+struct msg_list_item {
+	struct msg_list_item *next;
 	char *buf;
 	int len;
 };
 
-static struct msg_list *msg_list_head;
-static struct msg_list *msg_list_tail;
+struct msg_list {
+	struct msg_list_item *head, *tail;
+};
+
+static struct msg_list msg_list;
 
 static void flist_ndx_push(struct flist_ndx_list *lp, int ndx)
 {
@@ -224,9 +227,9 @@ void set_msg_fd_out(int fd)
 /* Add a message to the pending MSG_* list. */
 static void msg_list_add(int code, char *buf, int len)
 {
-	struct msg_list *ml;
+	struct msg_list_item *ml;
 
-	if (!(ml = new(struct msg_list)))
+	if (!(ml = new(struct msg_list_item)))
 		out_of_memory("msg_list_add");
 	ml->next = NULL;
 	if (!(ml->buf = new_array(char, len+4)))
@@ -234,11 +237,11 @@ static void msg_list_add(int code, char *buf, int len)
 	SIVAL(ml->buf, 0, ((code+MPLEX_BASE)<<24) | len);
 	memcpy(ml->buf+4, buf, len);
 	ml->len = len+4;
-	if (msg_list_tail)
-		msg_list_tail->next = ml;
+	if (msg_list.tail)
+		msg_list.tail->next = ml;
 	else
-		msg_list_head = ml;
-	msg_list_tail = ml;
+		msg_list.head = ml;
+	msg_list.tail = ml;
 }
 
 void send_msg(enum msgcode code, char *buf, int len)
@@ -339,8 +342,8 @@ int msg_list_push(int flush_it_all)
 	if (msg_fd_out < 0)
 		return -1;
 
-	while (msg_list_head) {
-		struct msg_list *ml = msg_list_head;
+	while (msg_list.head) {
+		struct msg_list_item *ml = msg_list.head;
 		int n = write(msg_fd_out, ml->buf + written, ml->len - written);
 		if (n < 0) {
 			if (errno == EINTR)
@@ -357,9 +360,9 @@ int msg_list_push(int flush_it_all)
 				check_timeout();
 		} else if ((written += n) == ml->len) {
 			free(ml->buf);
-			msg_list_head = ml->next;
-			if (!msg_list_head)
-				msg_list_tail = NULL;
+			msg_list.head = ml->next;
+			if (!msg_list.head)
+				msg_list.tail = NULL;
 			free(ml);
 			written = 0;
 		}
@@ -462,7 +465,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 		FD_ZERO(&r_fds);
 		FD_ZERO(&w_fds);
 		FD_SET(fd, &r_fds);
-		if (msg_list_head) {
+		if (msg_list.head) {
 			FD_SET(msg_fd_out, &w_fds);
 			if (msg_fd_out > maxfd)
 				maxfd = msg_fd_out;
@@ -499,7 +502,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 			continue;
 		}
 
-		if (msg_list_head && FD_ISSET(msg_fd_out, &w_fds))
+		if (msg_list.head && FD_ISSET(msg_fd_out, &w_fds))
 			msg_list_push(NORMAL_FLUSH);
 
 		if (io_filesfrom_f_out >= 0) {
