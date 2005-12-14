@@ -485,11 +485,11 @@ enddit()
 manpagesection(AUTHENTICATION STRENGTH)
 
 The authentication protocol used in rsync is a 128 bit MD4 based
-challenge response system. Although I believe that no one has ever
-demonstrated a brute-force break of this sort of system you should
-realize that this is not a "military strength" authentication system.
-It should be good enough for most purposes but if you want really top
-quality security then I recommend that you run rsync over ssh.
+challenge response system. This is fairly weak protection, though (with
+at least one brute-force hash-finding algorithm publicly available), so
+if you want really top-quality security, then I recommend that you run
+rsync over ssh.  (Yes, a future version of rsync will switch over to a
+stronger hashing method.)
 
 Also note that the rsync daemon protocol does not currently provide any
 encryption of the data that is transferred over the connection. Only
