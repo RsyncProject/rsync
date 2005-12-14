@@ -293,10 +293,11 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 	int i, argc = 0;
 	char *args[MAX_ARGS];
 	pid_t ret;
-	char *tok, *dir = NULL;
+	char *dir = NULL;
 	int dash_l_set = 0;
 
 	if (!read_batch && !local_server) {
+		char *t, *f, in_quote = '\0';
 		char *rsh_env = getenv(RSYNC_RSH_ENV);
 		if (!cmd)
 			cmd = rsh_env;
@@ -306,13 +307,39 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 		if (!cmd)
 			goto oom;
 
-		for (tok = strtok(cmd, " "); tok; tok = strtok(NULL, " ")) {
+		for (t = f = cmd; *f; f++) {
+			if (*f == ' ')
+				continue;
 			/* Comparison leaves rooms for server_options(). */
 			if (argc >= MAX_ARGS - MAX_SERVER_ARGS) {
 				rprintf(FERROR, "internal: args[] overflowed in do_cmd()\n");
 				exit_cleanup(RERR_SYNTAX);
 			}
-			args[argc++] = tok;
+			args[argc++] = t;
+			while (*f != ' ' || in_quote) {
+				if (!*f) {
+					if (in_quote) {
+						rprintf(FERROR,
+						    "Missing trailing-%c in remote-shell command.\n",
+						    in_quote);
+						exit_cleanup(RERR_SYNTAX);
+					}
+					f--;
+					break;
+				}
+				if (*f == '\'' || *f == '"') {
+					if (!in_quote) {
+						in_quote = *f++;
+						continue;
+					}
+					if (*f == in_quote && *++f != in_quote) {
+						in_quote = '\0';
+						continue;
+					}
+				}
+				*t++ = *f++;
+			}
+			*t++ = '\0';
 		}
 
 		/* check to see if we've already been given '-l user' in
@@ -365,10 +392,9 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 	args[argc] = NULL;
 
 	if (verbose > 3) {
-		rprintf(FINFO,"cmd=");
 		for (i = 0; i < argc; i++)
-			rprintf(FINFO, "%s ", safe_fname(args[i]));
-		rprintf(FINFO,"\n");
+			rprintf(FINFO, "cmd[%d]=%s ", i, safe_fname(args[i]));
+		rprintf(FINFO, "\n");
 	}
 
 	if (read_batch) {
