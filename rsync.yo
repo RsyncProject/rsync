@@ -853,9 +853,18 @@ running rsync daemon on the remote host.  See the section "USING
 RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION" above.
 
 Command-line arguments are permitted in COMMAND provided that COMMAND is
-presented to rsync as a single argument.  For example:
+presented to rsync as a single argument.  You must use spaces (not tabs
+or other whitespace) to separate the command and args from each other,
+and you can use single- and/or double-quotes to preserve spaces in an
+argument (but not backslashes).  Note that doubling a single-quote
+inside a single-quoted string gives you a single-quote; likewise for
+double-quotes (though you need to pay attention to which quotes your
+shell is parsing and which quotes rsync is parsing).  Some examples:
 
-quote(tt(   -e "ssh -p 2234"))
+quote(
+tt(    -e 'ssh -p 2234')nl()
+tt(    -e 'ssh -o "ProxyCommand nohup ssh firewall nc -w1 %h %p"')nl()
+)
 
 (Note that ssh users can alternately customize site-specific connect
 options in their .ssh/config file.)
