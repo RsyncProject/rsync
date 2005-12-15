@@ -34,6 +34,9 @@ Changes since 2.6.6:
     - If waitpid() fails or the child rsync didn't exit cleanly, we now handle
       the exit status properly and generate a better error.
 
+    - Fixed some glitches in the double-verbose output when using --copy-dest,
+      --link-dest, or --compare-dest.
+
   ENHANCEMENTS:
 
     - Added the --append option that makes rsync append data onto files
@@ -55,6 +58,12 @@ Changes since 2.6.6:
 
     - If lutimes() and/or lchmod() are around, use them to allow the
       preservation of attributes on symlinks.
+
+    - The --link-dest option now affects symlinks and devices (when
+      possible).
+
+    - Improved the output of hard-linked and copied files when using
+      --link-dest, --copy-dest, or --compare-dest.
 
     - Added two config items to the rsyncd.conf parsing:  "pre-xfer exec"
       and "post-xfer exec".  These allow a command to be specified on a
