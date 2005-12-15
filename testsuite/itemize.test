@@ -152,14 +152,61 @@ cat <<EOT >"$chkfile"
 .d..t.... ./
 cd+++++++ bar/
 cd+++++++ bar/baz/
-cf....... bar/baz/rsync
+cf        bar/baz/rsync
 cd+++++++ foo/
-cf....... foo/config1
-cf....... foo/config2
-hf+++++++ foo/extra => foo/config1
-cL+++++++ foo/sym -> ../bar/baz/rsync
+cf        foo/config1
+cf        foo/config2
+hf        foo/extra => foo/config1
+cL..T.... foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 8 failed"
+
+rm -rf "$todir"
+$RSYNC -iplrtH --copy-dest="$lddir" "$fromdir/" "$todir/" \
+    | tee "$outfile"
+cat <<EOT >"$chkfile"
+.d..t.... ./
+cd+++++++ bar/
+cd+++++++ bar/baz/
+cd+++++++ foo/
+hf        foo/extra => foo/config1
+EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 9 failed"
+
+rm -rf "$todir"
+$RSYNC -vvplrtH --copy-dest="$lddir" "$fromdir/" "$todir/" \
+    | tee "$outfile"
+filter_outfile
+cat <<EOT >"$chkfile"
+./
+bar/
+bar/baz/
+bar/baz/rsync is uptodate
+foo/
+foo/config1 is uptodate
+foo/config2 is uptodate
+"foo/extra" is a hard link
+foo/extra => foo/config1
+foo/sym is uptodate
+EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 10 failed"
+
+rm -rf "$todir"
+$RSYNC -ivvplrtH --link-dest="$lddir" "$fromdir/" "$todir/" \
+    | tee "$outfile"
+filter_outfile
+cat <<EOT >"$chkfile"
+.d..t.... ./
+cd+++++++ bar/
+cd+++++++ bar/baz/
+hf        bar/baz/rsync
+cd+++++++ foo/
+hf        foo/config1
+hf        foo/config2
+hf        foo/extra => foo/config1
+hL        foo/sym -> ../bar/baz/rsync
+EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 11 failed"
 
 rm -rf "$todir"
 $RSYNC -iplrtH --link-dest="$lddir" "$fromdir/" "$todir/" \
@@ -169,10 +216,71 @@ cat <<EOT >"$chkfile"
 cd+++++++ bar/
 cd+++++++ bar/baz/
 cd+++++++ foo/
-hf+++++++ foo/extra => foo/config1
-cL+++++++ foo/sym -> ../bar/baz/rsync
 EOT
-diff $diffopt "$chkfile" "$outfile" || test_fail "test 9 failed"
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 12 failed"
+
+rm -rf "$todir"
+$RSYNC -vvplrtH --link-dest="$lddir" "$fromdir/" "$todir/" \
+    | tee "$outfile"
+filter_outfile
+cat <<EOT >"$chkfile"
+./
+bar/
+bar/baz/
+bar/baz/rsync is uptodate
+foo/
+foo/config1 is uptodate
+foo/config2 is uptodate
+"foo/extra" is a hard link
+foo/sym is uptodate
+EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 13 failed"
+
+rm -rf "$todir"
+$RSYNC -ivvplrtH --compare-dest="$lddir" "$fromdir/" "$todir/" \
+    | tee "$outfile"
+filter_outfile
+# TODO fix really-old problem when combining -H with --compare-dest:
+# missing output for foo/extra hard-link (and it might not be updated)!
+cat <<EOT >"$chkfile"
+.d..t.... ./
+cd+++++++ bar/
+cd+++++++ bar/baz/
+.f        bar/baz/rsync
+cd+++++++ foo/
+.f        foo/config1
+.f        foo/config2
+.L        foo/sym -> ../bar/baz/rsync
+EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 14 failed"
+
+rm -rf "$todir"
+$RSYNC -iplrtH --compare-dest="$lddir" "$fromdir/" "$todir/" \
+    | tee "$outfile"
+cat <<EOT >"$chkfile"
+.d..t.... ./
+cd+++++++ bar/
+cd+++++++ bar/baz/
+cd+++++++ foo/
+EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 15 failed"
+
+rm -rf "$todir"
+$RSYNC -vvplrtH --compare-dest="$lddir" "$fromdir/" "$todir/" \
+    | tee "$outfile"
+filter_outfile
+cat <<EOT >"$chkfile"
+./
+bar/
+bar/baz/
+bar/baz/rsync is uptodate
+foo/
+foo/config1 is uptodate
+foo/config2 is uptodate
+"foo/extra" is a hard link
+foo/sym is uptodate
+EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 16 failed"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
