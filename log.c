@@ -38,6 +38,7 @@ extern int module_id;
 extern int msg_fd_out;
 extern int protocol_version;
 extern int preserve_times;
+extern int log_format_has_i;
 extern int log_format_has_o_or_i;
 extern int daemon_log_format_has_o_or_i;
 extern char *auth_user;
@@ -514,7 +515,8 @@ static void log_formatted(enum logcode code, char *format, char *op,
 				int i;
 				for (i = 2; n[i]; i++)
 					n[i] = ch;
-			} else if (n[0] == '.' || n[0] == 'h') {
+			} else if (n[0] == '.' || n[0] == 'h'
+			        || (n[0] == 'c' && n[1] == 'f')) {
 				int i;
 				for (i = 2; n[i]; i++) {
 					if (n[i] != '.')
@@ -605,9 +607,9 @@ void maybe_log_item(struct file_struct *file, int iflags, int itemizing,
 		    char *buf)
 {
 	int significant_flags = iflags & SIGNIFICANT_ITEM_FLAGS;
-	int see_item = itemizing && (significant_flags || *buf || verbose > 1);
-	int local_change = iflags & ITEM_LOCAL_CHANGE
-	    && (!(iflags & ITEM_XNAME_FOLLOWS) || significant_flags);
+	int see_item = itemizing && (significant_flags || *buf
+				  || (verbose > 1 && log_format_has_i));
+	int local_change = iflags & ITEM_LOCAL_CHANGE && significant_flags;
 	if (am_server) {
 		if (am_daemon && !dry_run && see_item)
 			log_item(file, &stats, iflags, buf);
