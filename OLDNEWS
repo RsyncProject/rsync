@@ -17,11 +17,11 @@ Changes since 2.6.5:
       combined with --link-dest).
 
     - The outputting of hard-linked files when verbosity was > 1 was not right:
-      without -i it would output the name of each hard-linked file as though
-      it had been changed (it now outputs a "is hard linked" message for the
-      file); with -i it would output all dots for the unchanged attributes of
-      a hard-link (it now changes those dots to spaces, as is done for other
-      totally unchanged items).
+      (1) Without -i it would output the name of each hard-linked file as
+      though it had been changed; it now outputs a "is hard linked" message for
+      the file. (2) With -i it would output all dots for the unchanged
+      attributes of a hard-link; it now changes those dots to spaces, as is
+      done for other totally unchanged items.
 
     - When backing up a changed symlink or device, get rid of any old backup
       item so that we don't get an "already exists" error.
