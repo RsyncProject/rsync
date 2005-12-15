@@ -93,6 +93,8 @@ extern struct file_list *the_file_list;
 extern struct filter_list_struct server_filter_list;
 
 static int deletion_count = 0; /* used to implement --max-delete */
+static int can_link_symlinks = 1; /* start out optimistic */
+static int can_link_devices = 1;
 
 /* For calling delete_file() */
 #define DEL_FORCE_RECURSE	(1<<1) /* recurse even w/o --force */
@@ -316,7 +318,7 @@ static void do_delete_pass(struct file_list *flist)
 		rprintf(FINFO, "                    \r");
 }
 
-static int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
+int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
 {
 	if (preserve_perms
 	 && (st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS))
@@ -331,31 +333,28 @@ static int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
 	return 1;
 }
 
-
 void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 	     int32 iflags, uchar fnamecmp_type, char *xname)
 {
-	if (statret == 0) {
+	if (statret >= 0) { /* A from-dest-dir statret can == 1! */
+		int keep_time = !preserve_times ? 0
+		    : S_ISDIR(file->mode) ? !omit_dir_times
+		    : !S_ISLNK(file->mode);
+
 		if (S_ISREG(file->mode) && file->length != st->st_size)
 			iflags |= ITEM_REPORT_SIZE;
-		if (!(iflags & ITEM_NO_DEST_AND_NO_UPDATE)) {
-			int keep_time = !preserve_times ? 0
-			    : S_ISDIR(file->mode) ? !omit_dir_times
-			    : !S_ISLNK(file->mode);
-
-			if ((iflags & (ITEM_TRANSFER|ITEM_LOCAL_CHANGE) && !keep_time
-			     && (!(iflags & ITEM_XNAME_FOLLOWS) || *xname))
-			    || (keep_time && cmp_modtime(file->modtime, st->st_mtime) != 0))
-				iflags |= ITEM_REPORT_TIME;
-			if (preserve_perms
-			 && (file->mode & CHMOD_BITS) != (st->st_mode & CHMOD_BITS))
-				iflags |= ITEM_REPORT_PERMS;
-			if (preserve_uid && am_root && file->uid != st->st_uid)
-				iflags |= ITEM_REPORT_OWNER;
-			if (preserve_gid && file->gid != GID_NONE
-			    && st->st_gid != file->gid)
-				iflags |= ITEM_REPORT_GROUP;
-		}
+		if ((iflags & (ITEM_TRANSFER|ITEM_LOCAL_CHANGE) && !keep_time
+		     && (!(iflags & ITEM_XNAME_FOLLOWS) || *xname))
+		    || (keep_time && cmp_modtime(file->modtime, st->st_mtime) != 0))
+			iflags |= ITEM_REPORT_TIME;
+		if (preserve_perms
+		 && (file->mode & CHMOD_BITS) != (st->st_mode & CHMOD_BITS))
+			iflags |= ITEM_REPORT_PERMS;
+		if (preserve_uid && am_root && file->uid != st->st_uid)
+			iflags |= ITEM_REPORT_OWNER;
+		if (preserve_gid && file->gid != GID_NONE
+		    && st->st_gid != file->gid)
+			iflags |= ITEM_REPORT_GROUP;
 	} else
 		iflags |= ITEM_IS_NEW;
 
@@ -377,7 +376,7 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 
 
 /* Perform our quick-check heuristic for determining if a file is unchanged. */
-static int unchanged_file(char *fn, struct file_struct *file, STRUCT_STAT *st)
+int unchanged_file(char *fn, struct file_struct *file, STRUCT_STAT *st)
 {
 	if (st->st_size != file->length)
 		return 0;
@@ -602,6 +601,165 @@ void check_for_finished_hlinks(int itemizing, enum logcode code)
 	}
 }
 
+/* This is only called for regular files.  We return -2 if we've finished
+ * handling the file, -1 if no dest-linking occurred, or a non-negative
+ * value if we found an alternate basis file. */
+static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
+			 char *cmpbuf, STRUCT_STAT *stp, int itemizing,
+			 int maybe_PERMS_REPORT, enum logcode code)
+{
+	int best_match = -1;
+	int match_level = 0;
+	int j = 0;
+
+	do {
+		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
+		if (link_stat(cmpbuf, stp, 0) < 0 || !S_ISREG(stp->st_mode))
+			continue;
+		switch (match_level) {
+		case 0:
+			best_match = j;
+			match_level = 1;
+			/* FALL THROUGH */
+		case 1:
+			if (!unchanged_file(cmpbuf, file, stp))
+				continue;
+			best_match = j;
+			match_level = 2;
+			/* FALL THROUGH */
+		case 2:
+			if (!unchanged_attrs(file, stp))
+				continue;
+			if ((always_checksum || ignore_times)
+			 && cmp_modtime(stp->st_mtime, file->modtime))
+				continue;
+			best_match = j;
+			match_level = 3;
+			break;
+		}
+		break;
+	} while (basis_dir[++j] != NULL);
+
+	if (!match_level)
+		return -1;
+
+	if (j != best_match) {
+		j = best_match;
+		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
+		if (link_stat(cmpbuf, stp, 0) < 0)
+			match_level = 0;
+	}
+
+#ifdef HAVE_LINK
+	if (match_level == 3 && !copy_dest) {
+		if (link_dest) {
+			if (hard_link_one(file, ndx, fname, 0, stp,
+					  cmpbuf, 1,
+					  itemizing && verbose > 1,
+					  code) < 0)
+				goto try_a_copy;
+			if (preserve_hard_links
+			    && file->link_u.links) {
+				hard_link_cluster(file, ndx,
+						  itemizing,
+						  code);
+			}
+		} else if (itemizing)
+			itemize(file, ndx, 0, stp, 0, 0, NULL);
+		if (verbose > 1 && maybe_PERMS_REPORT) {
+			code = daemon_log_format_has_i || dry_run
+			     ? FCLIENT : FINFO;
+			rprintf(code, "%s is uptodate\n",
+				safe_fname(fname));
+		}
+		return -2;
+	}
+#endif
+
+	if (match_level >= 2) {
+	  try_a_copy: /* Copy the file locally. */
+		if (copy_file(cmpbuf, fname, file->mode) < 0) {
+			if (verbose) {
+				rsyserr(FINFO, errno,
+					"copy_file %s => %s",
+					full_fname(cmpbuf),
+					safe_fname(fname));
+			}
+			return -1;
+		}
+		if (itemizing) {
+			itemize(file, ndx, 0, stp,
+				ITEM_LOCAL_CHANGE, 0, NULL);
+		}
+		set_perms(fname, file, NULL, 0);
+		if (maybe_PERMS_REPORT
+		 && ((!itemizing && verbose && match_level == 2)
+		  || (verbose > 1 && match_level == 3))) {
+			code = daemon_log_format_has_i || dry_run
+			     ? FCLIENT : FINFO;
+			rprintf(code, "%s%s\n", safe_fname(fname),
+				match_level == 3 ? " is uptodate" : "");
+		}
+		if (preserve_hard_links && file->link_u.links) {
+			hard_link_cluster(file, ndx,
+					  itemizing, code);
+		}
+		return -2;
+	}
+
+	return FNAMECMP_BASIS_DIR_LOW + j;
+}
+
+/* This is only called for non-regular files.  We return -2 if we've finished
+ * handling the file, or -1 if no dest-linking occurred. */
+static int try_dests_non(struct file_struct *file, char *fname, int ndx,
+			 int itemizing, int *possible_ptr,
+			 int maybe_PERMS_REPORT)
+{
+	char fnamebuf[MAXPATHLEN], lnk[MAXPATHLEN];
+	STRUCT_STAT st;
+	int len, i = 0;
+
+	do {
+		pathjoin(fnamebuf, MAXPATHLEN, basis_dir[i], fname);
+		if (link_stat(fnamebuf, &st, 0) < 0 || S_ISDIR(st.st_mode)
+		 || !unchanged_attrs(file, &st))
+			continue;
+		if (S_ISLNK(file->mode)) {
+			if ((len = readlink(fnamebuf, lnk, MAXPATHLEN-1)) <= 0)
+				continue;
+			lnk[len] = '\0';
+			if (strcmp(lnk, file->u.link) != 0)
+				continue;
+		} else {
+			if (!IS_DEVICE(st.st_mode) || st.st_rdev != file->u.rdev)
+				continue;
+		}
+		if (link_dest) {
+			if (do_link(fnamebuf, fname) < 0) {
+				/* TODO improve this to be based on errno? */
+				*possible_ptr = 0;
+				break;
+			}
+		}
+		if (itemizing && log_format_has_i && verbose > 1) {
+			int changes = compare_dest ? 0 : ITEM_LOCAL_CHANGE
+				    + (link_dest ? ITEM_XNAME_FOLLOWS : 0);
+			char *lp = link_dest ? "" : NULL;
+			itemize(file, ndx, 0, &st, changes, 0, lp);
+		}
+		if (verbose > 1 && maybe_PERMS_REPORT) {
+			enum logcode code = daemon_log_format_has_i || dry_run
+					  ? FCLIENT : FINFO;
+			rprintf(code, "%s is uptodate\n",
+				safe_fname(fname));
+		}
+		return -2;
+	} while (basis_dir[++i] != NULL);
+
+	return -1;
+}
+
 static int phase = 0;
 
 /* Acts on the_file_list->file's ndx'th item, whose name is fname.  If a dir,
@@ -800,6 +958,14 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				return;
 			if (!S_ISLNK(st.st_mode))
 				statret = -1;
+		} else if (basis_dir[0] != NULL && can_link_symlinks) {
+			if (try_dests_non(file, fname, ndx, itemizing,
+					  &can_link_symlinks,
+					  maybe_PERMS_REPORT) == -2) {
+				if (!copy_dest)
+					return;
+				itemizing = code = 0;
+			}
 		}
 		if (preserve_hard_links && file->link_u.links
 		    && hard_link_check(file, ndx, fname, -1, &st,
@@ -831,6 +997,16 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (am_root && preserve_devices && IS_DEVICE(file->mode)) {
+		if (statret != 0
+		 && (basis_dir[0] != NULL && can_link_devices)) {
+			if (try_dests_non(file, fname, ndx, itemizing,
+					  &can_link_devices,
+					  maybe_PERMS_REPORT) == -2) {
+				if (!copy_dest)
+					return;
+				itemizing = code = 0;
+			}
+		}
 		if (statret != 0
 		 || (st.st_mode & ~CHMOD_BITS) != (file->mode & ~CHMOD_BITS)
 		 || st.st_rdev != file->u.rdev) {
@@ -927,100 +1103,14 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (statret != 0 && basis_dir[0] != NULL) {
-		int best_match = -1;
-		int match_level = 0;
-		int i = 0;
-		do {
-			pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
-				 basis_dir[i], fname);
-			if (link_stat(fnamecmpbuf, &st, 0) < 0
-			    || !S_ISREG(st.st_mode))
-				continue;
-			switch (match_level) {
-			case 0:
-				best_match = i;
-				match_level = 1;
-				/* FALL THROUGH */
-			case 1:
-				if (!unchanged_file(fnamecmpbuf, file, &st))
-					continue;
-				best_match = i;
-				match_level = 2;
-				if (copy_dest)
-					break;
-				/* FALL THROUGH */
-			case 2:
-				if (!unchanged_attrs(file, &st))
-					continue;
-				best_match = i;
-				match_level = 3;
-				break;
-			}
-			break;
-		} while (basis_dir[++i] != NULL);
-		if (match_level) {
+		int j = try_dests_reg(file, fname, ndx, fnamecmpbuf, &st,
+				      itemizing, maybe_PERMS_REPORT, code);
+		if (j == -2)
+			return;
+		if (j != -1) {
+			fnamecmp = fnamecmpbuf;
+			fnamecmp_type = j;
 			statret = 0;
-			if (i != best_match) {
-				i = best_match;
-				pathjoin(fnamecmpbuf, sizeof fnamecmpbuf,
-					 basis_dir[i], fname);
-				if (link_stat(fnamecmpbuf, &st, 0) < 0) {
-					match_level = 0;
-					statret = -1;
-					stat_errno = errno;
-				}
-			}
-#ifdef HAVE_LINK
-			if (link_dest && match_level == 3) {
-				if (hard_link_one(file, ndx, fname, -1, &st,
-						  fnamecmpbuf, 1,
-						  itemizing && verbose > 1,
-						  code) == 0) {
-					if (preserve_hard_links
-					    && file->link_u.links) {
-						hard_link_cluster(file, ndx,
-								  itemizing,
-								  code);
-					}
-					return;
-				}
-				match_level = 2;
-			}
-#endif
-			if (match_level == 2) {
-				/* Copy the file locally. */
-				if (copy_file(fnamecmpbuf, fname, file->mode) < 0) {
-					if (verbose) {
-						rsyserr(FINFO, errno,
-							"copy_file %s => %s",
-							full_fname(fnamecmpbuf),
-							safe_fname(fname));
-					}
-					match_level = 0;
-					statret = -1;
-				} else {
-					if (itemizing) {
-						itemize(file, ndx, 0, &st,
-							ITEM_LOCAL_CHANGE, 0,
-							NULL);
-					} else if (verbose && code) {
-						rprintf(code, "%s\n",
-							safe_fname(fname));
-					}
-					set_perms(fname, file, NULL,
-						  maybe_PERMS_REPORT);
-					if (preserve_hard_links
-					    && file->link_u.links) {
-						hard_link_cluster(file, ndx,
-								  itemizing,
-								  code);
-					}
-					return;
-				}
-			} else if (compare_dest || match_level == 1) {
-				fnamecmp = fnamecmpbuf;
-				fnamecmp_type = i;
-			}
 		}
 	}
 
@@ -1066,7 +1156,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (append_mode && st.st_size > file->length)
 		return;
 
-	if (!compare_dest && fnamecmp_type <= FNAMECMP_BASIS_DIR_HIGH)
+	if (fnamecmp_type <= FNAMECMP_BASIS_DIR_HIGH)
 		;
 	else if (fnamecmp_type == FNAMECMP_FUZZY)
 		;
@@ -1075,19 +1165,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			do_unlink(partialptr);
 			handle_partial_dir(partialptr, PDIR_DELETE);
 		}
-		if (fnamecmp_type == FNAMECMP_FNAME) {
-			if (itemizing) {
-				itemize(file, ndx, real_ret, &real_st,
-					0, 0, NULL);
-			}
-			set_perms(fname, file, &st, maybe_PERMS_REPORT);
-			if (preserve_hard_links && file->link_u.links)
-				hard_link_cluster(file, ndx, itemizing, code);
-			return;
+		if (itemizing) {
+			itemize(file, ndx, real_ret, &real_st,
+				0, 0, NULL);
 		}
-		/* Only --compare-dest gets here. */
-		itemize(file, ndx, real_ret, &real_st,
-			ITEM_NO_DEST_AND_NO_UPDATE, 0, NULL);
+		set_perms(fname, file, &st, maybe_PERMS_REPORT);
+		if (preserve_hard_links && file->link_u.links)
+			hard_link_cluster(file, ndx, itemizing, code);
 		return;
 	}
 
