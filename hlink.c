@@ -22,8 +22,10 @@
 
 extern int dry_run;
 extern int verbose;
+extern int link_dest;
 extern int make_backups;
 extern int log_format_has_i;
+extern char *basis_dir[];
 extern struct file_list *the_file_list;
 
 #ifdef SUPPORT_HARD_LINKS
@@ -184,12 +186,37 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 				safe_fname(f_name(file)));
 		}
 		if (head_file->F_HLINDEX == FINISHED_LINK) {
-			STRUCT_STAT st2;
+			STRUCT_STAT st2, st3;
 			char *toname = f_name(head_file);
 			if (link_stat(toname, &st2, 0) < 0) {
 				rsyserr(FERROR, errno, "stat %s failed",
 					full_fname(toname));
 				return -1;
+			}
+			if (statret < 0 && basis_dir[0] != NULL) {
+				char cmpbuf[MAXPATHLEN];
+				int j = 0;
+				do {
+					pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
+					if (link_stat(cmpbuf, &st3, 0) < 0)
+						continue;
+					if (link_dest) {
+						if (st2.st_dev != st3.st_dev
+						 || st2.st_ino != st3.st_ino)
+							continue;
+						statret = 1;
+						st = &st3;
+						if (verbose < 2 || !log_format_has_i)
+							itemizing = code = 0;
+						break;
+					}
+					if (!unchanged_file(cmpbuf, file, &st3))
+						continue;
+					statret = 1;
+					st = &st3;
+					if (unchanged_attrs(file, &st3))
+						break;
+				} while (basis_dir[++j] != NULL);
 			}
 			maybe_hard_link(file, ndx, fname, statret, st,
 					toname, &st2, itemizing, code);
