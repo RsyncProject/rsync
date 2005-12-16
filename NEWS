@@ -92,6 +92,10 @@ Changes since 2.6.6:
     - If --delete is combined with --dirs without --recursive, rsync will
       now delete in any directory whose content is being synchronized.
 
+    - If --backup is combined with --delete without --backup-dir (and
+      without --delete-excluded), we add a protect filter-rule to ensure
+      that files with the backup suffix are not deleted.
+
     - The file-count stats that are output by --progress were improved to
       better indicate what the numbers mean.  For instance, the output:
       "(xfer#5, to-check=8383/9999)" indicates that this was transferred
