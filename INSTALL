@@ -1,4 +1,4 @@
-To build and install rsync
+To build and install rsync:
 
   $ ./configure
   $ make
@@ -9,15 +9,21 @@ to ./configure.  To see them, use:
 
   $ ./configure --help
 
+Configure tries to figure out if the local system uses group "nobody" or
+"nogroup" by looking in the /etc/group file.  (This is only used for the
+default group of an rsync daemon, which attempts to run with "nobody"
+user and group permissions.)  You can change the default user and group
+for the daemon by editing the NOBODY_USER and NOBODY_GROUP defines in
+config.h, or just override them in your /etc/rsyncd.conf file.
+
 As of 2.4.7, rsync uses Eric Troan's popt option-parsing library.  A
-cut-down copy of release 1.5 is included in the rsync distribution,
+cut-down copy of release 1.6.4 is included in the rsync distribution,
 and will be used if there is no popt library on your build host, or if
 the --with-included-popt option is passed to ./configure.
 
 If you configure using --enable-maintainer-mode, then rsync will try
 to pop up an xterm on DISPLAY=:0 if it crashes.  You might find this
 useful, but it should be turned off for production builds.
-
 
 RPM NOTES
 ---------
@@ -37,16 +43,15 @@ fails:
 
 Install gcc or HP's "ANSI/C Compiler".
 
-
-
 MAC OSX NOTES
 -------------
 
-Mac OS X (Darwin) seems to have an IPv6 stack, but it does not
-completely implement the "New Sockets" API.  
+Some versions of Mac OS X (Darwin) seem to have an IPv6 stack, but do
+not completely implement the "New Sockets" API.  
 
-<http://www.ipv6.org/impl/mac.html> says that Apple do not support
-IPv6 yet.  If your build fails, try again with --disable-ipv6.
+<http://www.ipv6.org/impl/mac.html> says that Apple started to support
+IPv6 in 10.2 (Jaguar).  If your build fails, try again after running
+configure with --disable-ipv6.
 
 IBM AIX NOTES
 -------------
