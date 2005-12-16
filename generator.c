@@ -658,19 +658,14 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 					  itemizing && verbose > 1,
 					  code) < 0)
 				goto try_a_copy;
-			if (preserve_hard_links
-			    && file->link_u.links) {
-				hard_link_cluster(file, ndx,
-						  itemizing,
-						  code);
-			}
+			if (preserve_hard_links && file->link_u.links)
+				hard_link_cluster(file, ndx, itemizing, code);
 		} else if (itemizing)
 			itemize(file, ndx, 0, stp, 0, 0, NULL);
 		if (verbose > 1 && maybe_PERMS_REPORT) {
 			code = daemon_log_format_has_i || dry_run
 			     ? FCLIENT : FINFO;
-			rprintf(code, "%s is uptodate\n",
-				safe_fname(fname));
+			rprintf(code, "%s is uptodate\n", safe_fname(fname));
 		}
 		return -2;
 	}
@@ -680,17 +675,13 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 	  try_a_copy: /* Copy the file locally. */
 		if (copy_file(cmpbuf, fname, file->mode) < 0) {
 			if (verbose) {
-				rsyserr(FINFO, errno,
-					"copy_file %s => %s",
-					full_fname(cmpbuf),
-					safe_fname(fname));
+				rsyserr(FINFO, errno, "copy_file %s => %s",
+					full_fname(cmpbuf), safe_fname(fname));
 			}
 			return -1;
 		}
-		if (itemizing) {
-			itemize(file, ndx, 0, stp,
-				ITEM_LOCAL_CHANGE, 0, NULL);
-		}
+		if (itemizing)
+			itemize(file, ndx, 0, stp, ITEM_LOCAL_CHANGE, 0, NULL);
 		set_perms(fname, file, NULL, 0);
 		if (maybe_PERMS_REPORT
 		 && ((!itemizing && verbose && match_level == 2)
@@ -700,10 +691,8 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			rprintf(code, "%s%s\n", safe_fname(fname),
 				match_level == 3 ? " is uptodate" : "");
 		}
-		if (preserve_hard_links && file->link_u.links) {
-			hard_link_cluster(file, ndx,
-					  itemizing, code);
-		}
+		if (preserve_hard_links && file->link_u.links)
+			hard_link_cluster(file, ndx, itemizing, code);
 		return -2;
 	}
 
@@ -714,7 +703,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
  * handling the file, or -1 if no dest-linking occurred. */
 static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			 int itemizing, int *possible_ptr,
-			 int maybe_PERMS_REPORT)
+			 int maybe_PERMS_REPORT, enum logcode code)
 {
 	char fnamebuf[MAXPATHLEN], lnk[MAXPATHLEN];
 	STRUCT_STAT st;
@@ -741,6 +730,8 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 				*possible_ptr = 0;
 				break;
 			}
+			if (preserve_hard_links && file->link_u.links)
+				hard_link_cluster(file, ndx, itemizing, code);
 		}
 		if (itemizing && log_format_has_i && verbose > 1) {
 			int changes = compare_dest ? 0 : ITEM_LOCAL_CHANGE
@@ -749,10 +740,9 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			itemize(file, ndx, 0, &st, changes, 0, lp);
 		}
 		if (verbose > 1 && maybe_PERMS_REPORT) {
-			enum logcode code = daemon_log_format_has_i || dry_run
-					  ? FCLIENT : FINFO;
-			rprintf(code, "%s is uptodate\n",
-				safe_fname(fname));
+			code = daemon_log_format_has_i || dry_run
+			     ? FCLIENT : FINFO;
+			rprintf(code, "%s is uptodate\n", safe_fname(fname));
 		}
 		return -2;
 	} while (basis_dir[++i] != NULL);
@@ -961,7 +951,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		} else if (basis_dir[0] != NULL && can_link_symlinks) {
 			if (try_dests_non(file, fname, ndx, itemizing,
 					  &can_link_symlinks,
-					  maybe_PERMS_REPORT) == -2) {
+					  maybe_PERMS_REPORT, code) == -2) {
 				if (!copy_dest)
 					return;
 				itemizing = code = 0;
@@ -1001,7 +991,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		 && (basis_dir[0] != NULL && can_link_devices)) {
 			if (try_dests_non(file, fname, ndx, itemizing,
 					  &can_link_devices,
-					  maybe_PERMS_REPORT) == -2) {
+					  maybe_PERMS_REPORT, code) == -2) {
 				if (!copy_dest)
 					return;
 				itemizing = code = 0;
