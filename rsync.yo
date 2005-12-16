@@ -552,8 +552,17 @@ dit(bf(-b, --backup)) With this option, preexisting destination files are
 renamed as each file is transferred or deleted.  You can control where the
 backup file goes and what (if any) suffix gets appended using the
 bf(--backup-dir) and bf(--suffix) options.
-Note that if you don't specify bf(--backup-dir), the bf(--omit-dir-times)
-option will be enabled.
+
+Note that if you don't specify bf(--backup-dir), (1) the
+bf(--omit-dir-times) option will be implied, and (2) if bf(--delete) is
+also in effect (without bf(--delete-excluded)), rsync will add a protect
+filter-rule for the backup suffix to the end of all your existing excludes
+(e.g. -f "P *~").  This will prevent previously backed-up files from being
+deleted.  Note that if you are supplying your own filter rules, you may
+need to manually insert your own exclude/protect rule somewhere higher up
+in the list so that it has a high enough priority to be effective (e.g., if
+your rules specify a trailing inclusion/exclusion of '*', the auto-added
+rule would never be reached).
 
 dit(bf(--backup-dir=DIR)) In combination with the bf(--backup) option, this
 tells rsync to store all backups in the specified directory. This is
@@ -1276,10 +1285,10 @@ will prevent partial-dir files from being transferred and also prevent the
 untimely deletion of partial-dir items on the receiving side.  An example:
 the above bf(--partial-dir) option would add an "bf(--exclude=.rsync-partial/)"
 rule at the end of any other filter rules.  Note that if you are
-supplying your own filter rules, you may need to manually insert a
-rule for this directory exclusion somewhere higher up in the list so that
+supplying your own exclude rules, you may need to manually insert your own
+exclude/protect rule somewhere higher up in the list so that
 it has a high enough priority to be effective (e.g., if your rules specify
-a trailing bf(--exclude='*') rule, the auto-added rule would never be
+a trailing inclusion/exclusion of '*', the auto-added rule would never be
 reached).
 
 IMPORTANT: the bf(--partial-dir) should not be writable by other users or it
