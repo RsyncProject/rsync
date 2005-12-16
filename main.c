@@ -1014,7 +1014,7 @@ static int start_client(int argc, char *argv[])
 
 static RETSIGTYPE sigusr1_handler(UNUSED(int val))
 {
-	exit_cleanup(RERR_SIGNAL);
+	exit_cleanup(RERR_SIGNAL1);
 }
 
 static RETSIGTYPE sigusr2_handler(UNUSED(int val))
