@@ -68,7 +68,7 @@ struct {
 	{ RERR_IPC        , "error in IPC code" },
 	{ RERR_CRASHED    , "sibling process crashed" },
 	{ RERR_TERMINATED , "sibling process terminated abnormally" },
-	{ RERR_SIGNAL     , "received SIGUSR1 or SIGINT" },
+	{ RERR_SIGNAL     , "received SIGINT, SIGTERM, SIGHUP, or SIGUSR1" },
 	{ RERR_WAITCHILD  , "waitpid() failed" },
 	{ RERR_MALLOC     , "error allocating core memory buffers" },
 	{ RERR_PARTIAL    , "some files could not be transferred" },
