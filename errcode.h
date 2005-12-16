@@ -37,7 +37,8 @@
 #define RERR_CRASHED    15      /* sibling crashed */
 #define RERR_TERMINATED 16      /* sibling terminated abnormally */
 
-#define RERR_SIGNAL     20      /* status returned when sent SIGUSR1, SIGINT */
+#define RERR_SIGNAL1    19      /* status returned when sent SIGUSR1 */
+#define RERR_SIGNAL     20      /* status returned when sent SIGINT, SIGTERM, SIGHUP */
 #define RERR_WAITCHILD  21      /* some error returned by waitpid() */
 #define RERR_MALLOC     22      /* error allocating core memory buffers */
 #define RERR_PARTIAL    23      /* partial transfer */
