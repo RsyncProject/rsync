@@ -46,8 +46,8 @@ extern unsigned int curr_dir_len;
 extern unsigned int module_dirlen;
 
 struct filter_list_struct filter_list = { 0, 0, "" };
-struct filter_list_struct cvs_filter_list = { 0, 0, " [cvsignore]" };
-struct filter_list_struct server_filter_list = { 0, 0, " [server]" };
+struct filter_list_struct cvs_filter_list = { 0, 0, " [global CVS]" };
+struct filter_list_struct server_filter_list = { 0, 0, " [daemon]" };
 
 /* Need room enough for ":MODS " prefix plus some room to grow. */
 #define MAX_RULE_PREFIX (16)
