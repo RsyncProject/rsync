@@ -57,7 +57,8 @@
 int wildmatch_iteration_count;
 #endif
 
-static int domatch(const uchar *p, const uchar *text)
+/* Match pattern "p" against string "text". */
+static int dowild(const uchar *p, const uchar *text)
 {
     int matched, special;
     uchar ch, prev;
@@ -88,8 +89,7 @@ static int domatch(const uchar *p, const uchar *text)
 	    if (*++p == '*') {
 		while (*++p == '*') {}
 		special = TRUE;
-	    }
-	    else
+	    } else
 		special = FALSE;
 	    if (*p == '\0') {
 		/* Trailing "**" matches everything.  Trailing "*" matches
@@ -97,11 +97,10 @@ static int domatch(const uchar *p, const uchar *text)
 		return special? TRUE : strchr((char*)text, '/') == NULL;
 	    }
 	    for ( ; *text; text++) {
-		if ((matched = domatch(p, text)) != FALSE) {
+		if ((matched = dowild(p, text)) != FALSE) {
 		    if (!special || matched != ABORT_TO_STARSTAR)
 			return matched;
-		}
-		else if (!special && *text == '/')
+		} else if (!special && *text == '/')
 		    return ABORT_TO_STARSTAR;
 	    }
 	    return ABORT_ALL;
@@ -128,8 +127,7 @@ static int domatch(const uchar *p, const uchar *text)
 			return ABORT_ALL;
 		    if (*text == ch)
 			matched = TRUE;
-		}
-		else if (ch == '-' && prev && p[1] && p[1] != ']') {
+		} else if (ch == '-' && prev && p[1] && p[1] != ']') {
 		    ch = *++p;
 		    if (ch == '\\') {
 			ch = *++p;
@@ -139,8 +137,7 @@ static int domatch(const uchar *p, const uchar *text)
 		    if (*text <= ch && *text >= prev)
 			matched = TRUE;
 		    ch = 0; /* This makes "prev" get set to 0. */
-		}
-		else if (ch == '[' && p[1] == ':') {
+		} else if (ch == '[' && p[1] == ':') {
 		    const uchar *s;
 		    int i;
 		    for (s = p += 2; (ch = *p) && ch != ']'; p++) {}
@@ -158,56 +155,43 @@ static int domatch(const uchar *p, const uchar *text)
 		    if (CC_EQ(s,i, "alnum")) {
 			if (ISALNUM(*text))
 			    matched = TRUE;
-		    }
-		    else if (CC_EQ(s,i, "alpha")) {
+		    } else if (CC_EQ(s,i, "alpha")) {
 			if (ISALPHA(*text))
 			    matched = TRUE;
-		    }
-		    else if (CC_EQ(s,i, "blank")) {
+		    } else if (CC_EQ(s,i, "blank")) {
 			if (ISBLANK(*text))
 			    matched = TRUE;
-		    }
-		    else if (CC_EQ(s,i, "cntrl")) {
+		    } else if (CC_EQ(s,i, "cntrl")) {
 			if (ISCNTRL(*text))
 			    matched = TRUE;
-		    }
-		    else if (CC_EQ(s,i, "digit")) {
+		    } else if (CC_EQ(s,i, "digit")) {
 			if (ISDIGIT(*text))
 			    matched = TRUE;
-		    }
-		    else if (CC_EQ(s,i, "graph")) {
+		    } else if (CC_EQ(s,i, "graph")) {
 			if (ISGRAPH(*text))
 			    matched = TRUE;
-		    }
-		    else if (CC_EQ(s,i, "lower")) {
+		    } else if (CC_EQ(s,i, "lower")) {
 			if (ISLOWER(*text))
 			    matched = TRUE;
-		    }
-		    else if (CC_EQ(s,i, "print")) {
+		    } else if (CC_EQ(s,i, "print")) {
 			if (ISPRINT(*text))
 			    matched = TRUE;
-		    }
-		    else if (CC_EQ(s,i, "punct")) {
+		    } else if (CC_EQ(s,i, "punct")) {
 			if (ISPUNCT(*text))
 			    matched = TRUE;
-		    }
-		    else if (CC_EQ(s,i, "space")) {
+		    } else if (CC_EQ(s,i, "space")) {
 			if (ISSPACE(*text))
 			    matched = TRUE;
-		    }
-		    else if (CC_EQ(s,i, "upper")) {
+		    } else if (CC_EQ(s,i, "upper")) {
 			if (ISUPPER(*text))
 			    matched = TRUE;
-		    }
-		    else if (CC_EQ(s,i, "xdigit")) {
+		    } else if (CC_EQ(s,i, "xdigit")) {
 			if (ISXDIGIT(*text))
 			    matched = TRUE;
-		    }
-		    else /* malformed [:class:] string */
+		    } else /* malformed [:class:] string */
 			return ABORT_ALL;
 		    ch = 0; /* This makes "prev" get set to 0. */
-		}
-		else if (*text == ch)
+		} else if (*text == ch)
 		    matched = TRUE;
 	    } while (prev = ch, (ch = *++p) != ']');
 	    if (matched == special || *text == '/')
@@ -219,11 +203,11 @@ static int domatch(const uchar *p, const uchar *text)
     return *text == '\0';
 }
 
-/* Find the pattern (p) in the text string (t). */
-int wildmatch(const char *p, const char *t)
+/* Match the "pattern" against the "text" string. */
+int wildmatch(const char *pattern, const char *text)
 {
 #ifdef WILD_TEST_ITERATIONS
     wildmatch_iteration_count = 0;
 #endif
-    return domatch((const uchar*)p, (const uchar*)t) == TRUE;
+    return dowild((const uchar*)pattern, (const uchar*)text) == TRUE;
 }
