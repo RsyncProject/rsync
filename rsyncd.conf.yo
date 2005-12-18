@@ -163,7 +163,7 @@ specified.
 Note that you are free to setup user/group information in the chroot area
 differently from your normal system.  For example, you could abbreviate
 the list of users and groups.  Also, you can protect this information from
-being downloaded/uploaded by adding an exclude rule to the rsync.conf file
+being downloaded/uploaded by adding an exclude rule to the rsyncd.conf file
 (e.g. "exclude = /etc/**").  Note that having the exclusion affect uploads
 is a relatively new feature in rsync, so make sure your daemon is
 at least 2.6.3 to effect this.  Also note that it is safest to exclude a
