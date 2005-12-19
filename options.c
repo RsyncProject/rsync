@@ -303,8 +303,8 @@ void usage(enum logcode F)
   rprintf(F," -B, --block-size=SIZE       force a fixed checksum block-size\n");
   rprintf(F," -e, --rsh=COMMAND           specify the remote shell to use\n");
   rprintf(F,"     --rsync-path=PROGRAM    specify the rsync to run on the remote machine\n");
+  rprintf(F,"     --existing              ignore non-existing files on receiving side\n");
   rprintf(F,"     --ignore-existing       ignore files that already exist on receiving side\n");
-  rprintf(F,"     --ignore-non-existing   ignore files that don't exist on receiving side\n");
   rprintf(F,"     --remove-sent-files     sent files/symlinks are removed from sending side\n");
   rprintf(F,"     --del                   an alias for --delete-during\n");
   rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
@@ -431,8 +431,8 @@ static struct poptOption long_options[] = {
   {"one-file-system", 'x', POPT_ARG_NONE,   &one_file_system, 0, 0, 0 },
   {"update",          'u', POPT_ARG_NONE,   &update_only, 0, 0, 0 },
   {"existing",         0,  POPT_ARG_NONE,   &ignore_non_existing, 0, 0, 0 },
-  {"ignore-existing",  0,  POPT_ARG_NONE,   &ignore_existing, 0, 0, 0 },
   {"ignore-non-existing",0,POPT_ARG_NONE,   &ignore_non_existing, 0, 0, 0 },
+  {"ignore-existing",  0,  POPT_ARG_NONE,   &ignore_existing, 0, 0, 0 },
   {"max-size",         0,  POPT_ARG_STRING, &max_size_arg, OPT_MAX_SIZE, 0, 0 },
   {"min-size",         0,  POPT_ARG_STRING, &min_size_arg, OPT_MIN_SIZE, 0, 0 },
   {"sparse",          'S', POPT_ARG_NONE,   &sparse_files, 0, 0, 0 },
