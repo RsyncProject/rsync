@@ -21,6 +21,7 @@ set -x
 # Build some files/dirs/links to copy
 
 makepath "$fromdir/foo/down/to/you"
+makepath "$fromdir/foo/sub"
 makepath "$fromdir/bar/down/to/foo/too"
 makepath "$fromdir/bar/down/to/bar/baz"
 makepath "$fromdir/mid/for/foo/and/that/is/who"
@@ -32,13 +33,14 @@ clear
 - *.bak
 - *.old
 EOF
-echo kept >"$fromdir/foo/file1"
+echo filtered-1 >"$fromdir/foo/file1"
 echo removed >"$fromdir/foo/file2"
 echo cvsout >"$fromdir/foo/file2.old"
 cat >"$fromdir/foo/.filt" <<EOF
 include .filt
-- file1
+- /file1
 EOF
+echo not-filtered-1 >"$fromdir/foo/sub/file1"
 cat >"$fromdir/bar/.filt" <<EOF
 - home-cvs-exclude
 dir-merge .filt2
@@ -87,7 +89,8 @@ cat >"$excl" <<EOF
 - /bar
 # This should match against the whole path, not just the name.
 + foo**too
-# This should float at the end of the path.
+# These should float at the end of the path.
++ foo/s?b/
 - foo/*/
 # Test some normal excludes.  Competing lines are paired.
 + t[o]/
