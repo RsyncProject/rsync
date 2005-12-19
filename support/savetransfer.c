@@ -7,20 +7,13 @@
  * -o  Save the output coming from PROGRAM to the OUTPUT_FILE
  *
  * If you want to capture the flow of data for an rsync command, use one of
- * the following commands (the first two are push commands, the last two are
- * pull commands):
+ * the following commands (the resulting files should be identical):
  *
- * rsync -av --rsh="savetransfer -i /tmp/from.sender ssh"
- *   --rsync-path="savetransfer -i /tmp/to.receiver rsync" FILES HOST:DEST
+ * rsync -av --rsh="savetransfer -i /tmp/to.server ssh"
+ *   --rsync-path="savetransfer -i /tmp/from.client rsync" SOURCE DEST
  *
- * rsync -av --rsh="savetransfer -o /tmp/to.sender ssh"
- *   --rsync-path="savetransfer -o /tmp/from.generator rsync" FILES HOST:DEST
- *
- * rsync -av --rsh="savetransfer -i /tmp/from.generator ssh"
- *   --rsync-path="savetransfer -i /tmp/to.sender rsync" HOST:FILES DEST
- *
- * rsync -av --rsh="savetransfer -o /tmp/to.receiver ssh"
- *   --rsync-path="savetransfer -o /tmp/from.sender rsync" HOST:FILES DEST
+ * rsync -av --rsh="savetransfer -o /tmp/from.server ssh"
+ *   --rsync-path="savetransfer -o /tmp/to.client rsync" SOURCE DEST
  *
  * Note that this program aborts after 30 seconds of inactivity, so you'll need
  * to change it if that is not enough dead time for your transfer.  Also, some
