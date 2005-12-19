@@ -329,8 +329,8 @@ to the detailed description below for a complete description.  verb(
  -B, --block-size=SIZE       force a fixed checksum block-size
  -e, --rsh=COMMAND           specify the remote shell to use
      --rsync-path=PROGRAM    specify the rsync to run on remote machine
+     --existing              ignore non-existing files on receiving side
      --ignore-existing       ignore files that already exist on receiver
-     --ignore-non-existing   ignore files that don't exist on receiver
      --remove-sent-files     sent files/symlinks are removed from sender
      --del                   an alias for --delete-during
      --delete                delete files that don't exist on sender
@@ -734,15 +734,13 @@ dit(bf(-x, --one-file-system)) This tells rsync not to cross filesystem
 boundaries  when recursing.  This  is useful for transferring the
 contents of only one filesystem.
 
+dit(bf(--existing, --ignore-non-existing)) This tells rsync to skip
+updating files that do not exist yet on the destination.  If this option is
+combined with the bf(--ignore-existing) option, no files will be updated
+(which can be useful if all you want to do is to delete missing files).
+
 dit(bf(--ignore-existing)) This tells rsync to skip updating files that
 already exist on the destination.  See also bf(--ignore-non-existing).
-
-dit(bf(--ignore-non-existing)) This tells rsync to skip updating files that
-do not exist yet on the destination.  If this option is combined with the
-bf(--ignore-existing) option, no files will be updated (which can be useful
-if all you want to do is to delete missing files).  Note that in older
-versions of rsync, this option was named bf(--existing), so this older
-name is still accepted as an alias.
 
 dit(bf(--remove-sent-files)) This tells rsync to remove from the sending
 side the files and/or symlinks that are newly created or whose content is
@@ -1586,12 +1584,17 @@ itemize(
   of the transfer.
   it() if the pattern ends with a / then it will only match a
   directory, not a file, link, or device.
-  it() if the pattern contains a wildcard character from the set
-  *?[ then expression matching is applied using the shell filename
-  matching rules. Otherwise a simple string match is used.
-  it() the double asterisk pattern "**" will match slashes while a
-  single asterisk pattern "*" will stop at slashes.
-  it() if the pattern contains a / (not counting a trailing /) or a "**"
+
+  it() rsync chooses between doing a simple string match and wildcard
+  matching by checking if the pattern contains one of these three wildcard
+  characters: '*', '?', and '[' .
+  it() a '*' matches any non-empty path component (it stops at slashes).
+  it() use '**' to match anything, including slashes.
+  it() a '?' matches any character except a slash (/).
+  it() a '[' introduces a character class, such as [a-z] or [[:alpha:]].
+  it() in a wildcard pattern, a backslash can be used to escape a wildcard
+  character, but it is matched literally when no wildcards are present.
+  it() if the pattern contains a / (not counting a trailing /) or a "**",
   then it is matched against the full pathname, including any leading
   directories. If the pattern doesn't contain a / or a "**", then it is
   matched only against the final component of the filename.
