@@ -57,32 +57,37 @@
 int wildmatch_iteration_count;
 #endif
 
+static int force_lower_case = 0;
+
 /* Match pattern "p" against string "text". */
 static int dowild(const uchar *p, const uchar *text)
 {
-    int matched, special;
-    uchar ch, prev;
+    uchar p_ch;
 
 #ifdef WILD_TEST_ITERATIONS
     wildmatch_iteration_count++;
 #endif
 
-    for ( ; (ch = *p) != '\0'; text++, p++) {
-	if (*text == '\0' && ch != '*')
-	    return FALSE;
-	switch (ch) {
+    for ( ; (p_ch = *p) != '\0'; text++, p++) {
+	int matched, special;
+	uchar t_ch, prev_ch;
+	if ((t_ch = *text) == '\0' && p_ch != '*')
+	    return ABORT_ALL;
+	if (force_lower_case && ISUPPER(t_ch))
+	    t_ch = tolower(t_ch);
+	switch (p_ch) {
 	  case '\\':
 	    /* Literal match with following character.  Note that the test
 	     * in "default" handles the p[1] == '\0' failure case. */
-	    ch = *++p;
+	    p_ch = *++p;
 	    /* FALLTHROUGH */
 	  default:
-	    if (*text != ch)
+	    if (t_ch != p_ch)
 		return FALSE;
 	    continue;
 	  case '?':
 	    /* Match anything but '/'. */
-	    if (*text == '/')
+	    if (t_ch == '/')
 		return FALSE;
 	    continue;
 	  case '*':
@@ -96,105 +101,105 @@ static int dowild(const uchar *p, const uchar *text)
 		 * only if there are no more slash characters. */
 		return special? TRUE : strchr((char*)text, '/') == NULL;
 	    }
-	    for ( ; *text; text++) {
+	    for ( ; t_ch; (t_ch = *++text)) {
 		if ((matched = dowild(p, text)) != FALSE) {
 		    if (!special || matched != ABORT_TO_STARSTAR)
 			return matched;
-		} else if (!special && *text == '/')
+		} else if (!special && t_ch == '/')
 		    return ABORT_TO_STARSTAR;
 	    }
 	    return ABORT_ALL;
 	  case '[':
-	    ch = *++p;
+	    p_ch = *++p;
 #ifdef NEGATE_CLASS2
-	    if (ch == NEGATE_CLASS2)
-		ch = NEGATE_CLASS;
+	    if (p_ch == NEGATE_CLASS2)
+		p_ch = NEGATE_CLASS;
 #endif
 	    /* Assign literal TRUE/FALSE because of "matched" comparison. */
-	    special = ch == NEGATE_CLASS? TRUE : FALSE;
+	    special = p_ch == NEGATE_CLASS? TRUE : FALSE;
 	    if (special) {
 		/* Inverted character class. */
-		ch = *++p;
+		p_ch = *++p;
 	    }
-	    prev = 0;
+	    prev_ch = 0;
 	    matched = FALSE;
 	    do {
-		if (!ch)
+		if (!p_ch)
 		    return ABORT_ALL;
-		if (ch == '\\') {
-		    ch = *++p;
-		    if (!ch)
+		if (p_ch == '\\') {
+		    p_ch = *++p;
+		    if (!p_ch)
 			return ABORT_ALL;
-		    if (*text == ch)
+		    if (t_ch == p_ch)
 			matched = TRUE;
-		} else if (ch == '-' && prev && p[1] && p[1] != ']') {
-		    ch = *++p;
-		    if (ch == '\\') {
-			ch = *++p;
-			if (!ch)
+		} else if (p_ch == '-' && prev_ch && p[1] && p[1] != ']') {
+		    p_ch = *++p;
+		    if (p_ch == '\\') {
+			p_ch = *++p;
+			if (!p_ch)
 			    return ABORT_ALL;
 		    }
-		    if (*text <= ch && *text >= prev)
+		    if (t_ch <= p_ch && t_ch >= prev_ch)
 			matched = TRUE;
-		    ch = 0; /* This makes "prev" get set to 0. */
-		} else if (ch == '[' && p[1] == ':') {
+		    p_ch = 0; /* This makes "prev_ch" get set to 0. */
+		} else if (p_ch == '[' && p[1] == ':') {
 		    const uchar *s;
 		    int i;
-		    for (s = p += 2; (ch = *p) && ch != ']'; p++) {}
-		    if (!ch)
+		    for (s = p += 2; (p_ch = *p) && p_ch != ']'; p++) {}
+		    if (!p_ch)
 			return ABORT_ALL;
 		    i = p - s - 1;
 		    if (i < 0 || p[-1] != ':') {
 			/* Didn't find ":]", so treat like a normal set. */
 			p = s - 2;
-			ch = '[';
-			if (*text == ch)
+			p_ch = '[';
+			if (t_ch == p_ch)
 			    matched = TRUE;
 			continue;
 		    }
 		    if (CC_EQ(s,i, "alnum")) {
-			if (ISALNUM(*text))
+			if (ISALNUM(t_ch))
 			    matched = TRUE;
 		    } else if (CC_EQ(s,i, "alpha")) {
-			if (ISALPHA(*text))
+			if (ISALPHA(t_ch))
 			    matched = TRUE;
 		    } else if (CC_EQ(s,i, "blank")) {
-			if (ISBLANK(*text))
+			if (ISBLANK(t_ch))
 			    matched = TRUE;
 		    } else if (CC_EQ(s,i, "cntrl")) {
-			if (ISCNTRL(*text))
+			if (ISCNTRL(t_ch))
 			    matched = TRUE;
 		    } else if (CC_EQ(s,i, "digit")) {
-			if (ISDIGIT(*text))
+			if (ISDIGIT(t_ch))
 			    matched = TRUE;
 		    } else if (CC_EQ(s,i, "graph")) {
-			if (ISGRAPH(*text))
+			if (ISGRAPH(t_ch))
 			    matched = TRUE;
 		    } else if (CC_EQ(s,i, "lower")) {
-			if (ISLOWER(*text))
+			if (ISLOWER(t_ch))
 			    matched = TRUE;
 		    } else if (CC_EQ(s,i, "print")) {
-			if (ISPRINT(*text))
+			if (ISPRINT(t_ch))
 			    matched = TRUE;
 		    } else if (CC_EQ(s,i, "punct")) {
-			if (ISPUNCT(*text))
+			if (ISPUNCT(t_ch))
 			    matched = TRUE;
 		    } else if (CC_EQ(s,i, "space")) {
-			if (ISSPACE(*text))
+			if (ISSPACE(t_ch))
 			    matched = TRUE;
 		    } else if (CC_EQ(s,i, "upper")) {
-			if (ISUPPER(*text))
+			if (ISUPPER(t_ch))
 			    matched = TRUE;
 		    } else if (CC_EQ(s,i, "xdigit")) {
-			if (ISXDIGIT(*text))
+			if (ISXDIGIT(t_ch))
 			    matched = TRUE;
 		    } else /* malformed [:class:] string */
 			return ABORT_ALL;
-		    ch = 0; /* This makes "prev" get set to 0. */
-		} else if (*text == ch)
+		    p_ch = 0; /* This makes "prev_ch" get set to 0. */
+		} else if (t_ch == p_ch)
 		    matched = TRUE;
-	    } while (prev = ch, (ch = *++p) != ']');
-	    if (matched == special || *text == '/')
+	    } while (prev_ch = p_ch, (p_ch = *++p) != ']');
+	    if (matched == special || t_ch == '/')
 		return FALSE;
 	    continue;
 	}
@@ -210,4 +215,17 @@ int wildmatch(const char *pattern, const char *text)
     wildmatch_iteration_count = 0;
 #endif
     return dowild((const uchar*)pattern, (const uchar*)text) == TRUE;
+}
+
+/* Match the "pattern" against the forced-to-lower-case "text" string. */
+int iwildmatch(const char *pattern, const char *text)
+{
+    int ret;
+#ifdef WILD_TEST_ITERATIONS
+    wildmatch_iteration_count = 0;
+#endif
+    force_lower_case = 1;
+    ret = dowild((const uchar*)pattern, (const uchar*)text) == TRUE;
+    force_lower_case = 0;
+    return ret;
 }
