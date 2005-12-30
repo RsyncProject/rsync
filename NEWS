@@ -37,6 +37,9 @@ Changes since 2.6.6:
     - Fixed some glitches in the double-verbose output when using --copy-dest,
       --link-dest, or --compare-dest.
 
+    - Fixed the matching of the dont-compress items (e.g. *.gz) against files
+      that have a path component containing a slash.
+
   ENHANCEMENTS:
 
     - Added the --append option that makes rsync append data onto files
