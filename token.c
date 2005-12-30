@@ -47,6 +47,9 @@ void set_compression(char *fname)
 		return;
 	}
 
+	if ((tok = strrchr(fname, '/')) != NULL)
+		fname = tok + 1;
+
 	dont = strdup(dont);
 	fname = strdup(fname);
 	if (!dont || !fname)
