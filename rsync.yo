@@ -1601,6 +1601,10 @@ itemize(
   (Remember that the algorithm is applied recursively so "full filename"
   can actually be any portion of a path from the starting directory on
   down.)
+  it() a trailing "dir_name/***" will match both the directory (as if
+  "dir_name/" had been specified) and all the files in the directory
+  (as if "dir_name/**" had been specified).  (This behavior is new for
+  version 2.6.7.)
 )
 
 Note that, when using the bf(--recursive) (bf(-r)) option (which is implied by
