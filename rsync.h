@@ -586,11 +586,11 @@ struct map_struct {
 
 #define MATCHFLG_WILD		(1<<0) /* pattern has '*', '[', and/or '?' */
 #define MATCHFLG_WILD2		(1<<1) /* pattern has '**' */
-#define MATCHFLG_WILD2_PREFIX	(1<<2) /* pattern starts with '**' */
-#define MATCHFLG_ABS_PATH	(1<<3) /* path-match on absolute path */
-#define MATCHFLG_INCLUDE	(1<<4) /* this is an include, not an exclude */
-#define MATCHFLG_DIRECTORY	(1<<5) /* this matches only directories */
-#define MATCHFLG_CLEAR_LIST 	(1<<6) /* this item is the "!" token */
+#define MATCHFLG_WILD2_PREFIX	(1<<2) /* pattern starts with "**" */
+#define MATCHFLG_WILD3_SUFFIX	(1<<3) /* pattern ends with "***" */
+#define MATCHFLG_ABS_PATH	(1<<4) /* path-match on absolute path */
+#define MATCHFLG_INCLUDE	(1<<5) /* this is an include, not an exclude */
+#define MATCHFLG_DIRECTORY	(1<<6) /* this matches only directories */
 #define MATCHFLG_WORD_SPLIT	(1<<7) /* split rules on whitespace */
 #define MATCHFLG_NO_INHERIT	(1<<8) /* don't inherit these rules */
 #define MATCHFLG_NO_PREFIXES	(1<<9) /* parse no prefixes from patterns */
@@ -602,6 +602,7 @@ struct map_struct {
 #define MATCHFLG_CVS_IGNORE	(1<<15)/* rule was -C or :C */
 #define MATCHFLG_SENDER_SIDE	(1<<16)/* rule applies to the sending side */
 #define MATCHFLG_RECEIVER_SIDE	(1<<17)/* rule applies to the receiving side */
+#define MATCHFLG_CLEAR_LIST 	(1<<18)/* this item is the "!" token */
 
 #define MATCHFLGS_FROM_CONTAINER (MATCHFLG_ABS_PATH | MATCHFLG_INCLUDE \
 				| MATCHFLG_DIRECTORY | MATCHFLG_SENDER_SIDE \
