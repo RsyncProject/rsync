@@ -174,6 +174,12 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 			/* If the pattern starts with **, note that. */
 			if (cp == ret->pattern)
 				mflags |= MATCHFLG_WILD2_PREFIX;
+			/* If the pattern ends with ***, note that. */
+			if (pat_len >= 3
+			 && ret->pattern[pat_len-3] == '*'
+			 && ret->pattern[pat_len-2] == '*'
+			 && ret->pattern[pat_len-1] == '*')
+				mflags |= MATCHFLG_WILD3_SUFFIX;
 		}
 	}
 
@@ -492,10 +498,10 @@ void pop_local_filters(void *mem)
 
 static int rule_matches(char *name, struct filter_struct *ex, int name_is_dir)
 {
-	char *p, full_name[MAXPATHLEN];
-	int anchored_match = 0;
+	int slash_handling, str_cnt = 0, anchored_match = 0;
 	int ret_match = ex->match_flags & MATCHFLG_NEGATE ? 0 : 1;
-	char *pattern = ex->pattern;
+	char *p, *pattern = ex->pattern;
+	const char *strings[16]; /* more than enough */
 
 	if (!*name)
 		return 0;
@@ -510,51 +516,49 @@ static int rule_matches(char *name, struct filter_struct *ex, int name_is_dir)
 	    && curr_dir_len > module_dirlen + 1) {
 		/* If we're matching against an absolute-path pattern,
 		 * we need to prepend our full path info. */
-		pathjoin(full_name, sizeof full_name,
-			 curr_dir + module_dirlen + 1, name);
-		name = full_name;
+		strings[str_cnt++] = curr_dir + module_dirlen + 1;
+		strings[str_cnt++] = "/";
+	} else if (ex->match_flags & MATCHFLG_WILD2_PREFIX && *name != '/') {
+		/* Allow "**"+"/" to match at the start of the string. */
+		strings[str_cnt++] = "/";
 	}
-
-	if (ex->match_flags & MATCHFLG_DIRECTORY && !name_is_dir)
+	strings[str_cnt++] = name;
+	if (name_is_dir) {
+		/* Allow a trailing "/"+"***" to match the directory. */
+		if (ex->match_flags & MATCHFLG_WILD3_SUFFIX)
+			strings[str_cnt++] = "/";
+	} else if (ex->match_flags & MATCHFLG_DIRECTORY)
 		return !ret_match;
+	strings[str_cnt] = NULL;
 
 	if (*pattern == '/') {
 		anchored_match = 1;
 		pattern++;
-		if (*name == '/')
-			name++;
+		if (strings[0][0] == '/')
+			strings[0]++;
+	}
+
+	if (!anchored_match && ex->u.slash_cnt
+	    && !(ex->match_flags & MATCHFLG_WILD2)) {
+		/* A non-anchored match with an infix slash and no "**"
+		 * needs to match the last slash_cnt+1 name elements. */
+		slash_handling = ex->u.slash_cnt + 1;
+	} else if (!anchored_match && !(ex->match_flags & MATCHFLG_WILD2_PREFIX)
+				   && ex->match_flags & MATCHFLG_WILD2) {
+		/* A non-anchored match with an infix or trailing "**" (but not
+		 * a prefixed "**") needs to try matching after every slash. */
+		slash_handling = -1;
+	} else {
+		/* The pattern matches only at the start of the path or name. */
+		slash_handling = 0;
 	}
 
 	if (ex->match_flags & MATCHFLG_WILD) {
-		/* A non-anchored match with an infix slash and no "**"
-		 * needs to match the last slash_cnt+1 name elements. */
-		if (!anchored_match && ex->u.slash_cnt
-		    && !(ex->match_flags & MATCHFLG_WILD2)) {
-			int cnt = ex->u.slash_cnt + 1;
-			for (p = name + strlen(name) - 1; p >= name; p--) {
-				if (*p == '/' && !--cnt)
-					break;
-			}
-			name = p+1;
-		}
-		if (wildmatch(pattern, name))
+		if (wildmatch_array(pattern, strings, slash_handling))
 			return ret_match;
-		if (ex->match_flags & MATCHFLG_WILD2_PREFIX) {
-			/* If the **-prefixed pattern has a '/' as the next
-			 * character, then try to match the rest of the
-			 * pattern at the root. */
-			if (pattern[2] == '/' && wildmatch(pattern+3, name))
-				return ret_match;
-		} else if (!anchored_match && ex->match_flags & MATCHFLG_WILD2) {
-			/* A non-anchored match with an infix or trailing "**"
-			 * (but not a prefixed "**") needs to try matching
-			 * after every slash. */
-			while ((name = strchr(name, '/')) != NULL) {
-				name++;
-				if (wildmatch(pattern, name))
-					return ret_match;
-			}
-		}
+	} else if (str_cnt > 1) {
+		if (litmatch_array(pattern, strings, slash_handling))
+			return ret_match;
 	} else if (anchored_match) {
 		if (strcmp(name,pattern) == 0)
 			return ret_match;
