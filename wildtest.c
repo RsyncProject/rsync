@@ -20,10 +20,16 @@ int wildmatch_errors = 0;
 typedef char bool;
 
 int output_iterations = 0;
+int explode_mod = 0;
+int empties_mod = 0;
+int empty_at_start = 0;
+int empty_at_end = 0;
 
 static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
   {"iterations",     'i', POPT_ARG_NONE,   &output_iterations, 0, 0, 0},
+  {"empties",        'e', POPT_ARG_STRING, 0, 'e', 0, 0},
+  {"explode",        'x', POPT_ARG_INT,    &explode_mod, 0, 0, 0},
   {0,0,0,0, 0, 0, 0}
 };
 
@@ -40,7 +46,40 @@ run_test(int line, bool matches, bool same_as_fnmatch,
     same_as_fnmatch = 0; /* Get rid of unused-variable compiler warning. */
 #endif
 
-    matched = wildmatch(pattern, text);
+    if (explode_mod) {
+	static char *buf;
+	char *texts[MAXPATHLEN], *hold;
+	int pos = 0, cnt = 0, ndx = 0, len = strlen(text);
+
+	if (!buf) {
+	    int j;
+	    if (!(buf = calloc(MAXPATHLEN * 2, 1)))
+		exit(1);
+	    for (j = (MAXPATHLEN-1) / explode_mod; j >= 0; j--)
+		texts[j] = buf + j * (explode_mod + 1);
+	}
+
+	if (empty_at_start)
+	    texts[ndx++][0] = '\0';
+	/* An empty string must turn into at least one empty array item. */
+	while (1) {
+	    strncpy(texts[ndx++], text + pos, explode_mod);
+	    if (pos + explode_mod >= len) {
+		texts[ndx-1][len - pos] = '\0';
+		break;
+	    }
+	    pos += explode_mod;
+	    if (!(++cnt % empties_mod))
+		texts[ndx++][0] = '\0';
+	}
+	if (empty_at_end)
+	    texts[ndx++][0] = '\0';
+	hold = texts[ndx];
+	texts[ndx] = NULL;
+	matched = wildmatch_array(pattern, (const char**)texts, 0);
+	texts[ndx] = hold;
+    } else
+	matched = wildmatch(pattern, text);
 #ifdef COMPARE_WITH_FNMATCH
     fn_matched = !fnmatch(pattern, text, flags);
 #endif
@@ -66,6 +105,7 @@ int
 main(int argc, char **argv)
 {
     char buf[2048], *s, *string[2], *end[2];
+    const char *arg;
     FILE *fp;
     int opt, line, i, flag[2];
     poptContext pc = poptGetContext("wildtest", argc, (const char**)argv,
@@ -73,6 +113,16 @@ main(int argc, char **argv)
 
     while ((opt = poptGetNextOpt(pc)) != -1) {
 	switch (opt) {
+	  case 'e':
+	    arg = poptGetOptArg(pc);
+	    empties_mod = atoi(arg);
+	    if (strchr(arg, 's'))
+		empty_at_start = 1;
+	    if (strchr(arg, 'e'))
+		empty_at_end = 1;
+	    if (!explode_mod)
+		explode_mod = 1024;
+	    break;
 	  default:
 	    fprintf(stderr, "%s: %s\n",
 		    poptBadOption(pc, POPT_BADOPTION_NOALIAS),
@@ -81,9 +131,12 @@ main(int argc, char **argv)
 	}
     }
 
+    if (explode_mod && !empties_mod)
+	empties_mod = 1024;
+
     argv = (char**)poptGetArgs(pc);
     if (!argv || argv[1]) {
-	fprintf(stderr, "Usage: wildtest TESTFILE\n");
+	fprintf(stderr, "Usage: wildtest [OPTIONS] TESTFILE\n");
 	exit(1);
     }
 
