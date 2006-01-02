@@ -25,6 +25,8 @@ makepath "$fromdir/foo/sub"
 makepath "$fromdir/bar/down/to/foo/too"
 makepath "$fromdir/bar/down/to/bar/baz"
 makepath "$fromdir/mid/for/foo/and/that/is/who"
+makepath "$fromdir/new/keep/this"
+makepath "$fromdir/new/lose/this"
 cat >"$fromdir/.filt" <<EOF
 exclude down
 : .filt-temp
@@ -92,6 +94,9 @@ cat >"$excl" <<EOF
 # These should float at the end of the path.
 + foo/s?b/
 - foo/*/
+# Test how /** differs from /***
+- new/keep/**
+- new/lose/***
 # Test some normal excludes.  Competing lines are paired.
 + t[o]/
 - to
@@ -112,6 +117,8 @@ sleep 1 # Ensures that the rm commands will tweak the directory times.
 
 rm -r "$chkdir"/foo/down
 rm -r "$chkdir"/mid/for/foo/and
+rm -r "$chkdir"/new/keep/this
+rm -r "$chkdir"/new/lose
 rm "$chkdir"/foo/file[235-9]
 rm "$chkdir"/bar/down/to/foo/to "$chkdir"/bar/down/to/foo/file[235-9]
 rm "$chkdir"/mid/for/foo/extra
