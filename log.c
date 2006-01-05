@@ -267,7 +267,7 @@ void rwrite(enum logcode code, char *buf, int len)
 void rprintf(enum logcode code, const char *format, ...)
 {
 	va_list ap;
-	char buf[MAXPATHLEN+512];
+	char buf[BIGPATHBUFLEN];
 	size_t len;
 
 	va_start(ap, format);
@@ -278,7 +278,7 @@ void rprintf(enum logcode code, const char *format, ...)
 	 * truncate the resulting string.  (Note that configure ensures
 	 * that we have a vsnprintf() that doesn't ever return -1.) */
 	if (len > sizeof buf - 1) {
-		const char ellipsis[] = "[...]";
+		static const char ellipsis[] = "[...]";
 
 		/* Reset length, and zero-terminate the end of our buffer */
 		len = sizeof buf - 1;
@@ -294,7 +294,7 @@ void rprintf(enum logcode code, const char *format, ...)
 		 * If the input format string has a trailing newline,
 		 * we copy it into that extra null; if it doesn't, well,
 		 * all we lose is one byte.  */
-		strncpy(buf+len-sizeof ellipsis, ellipsis, sizeof ellipsis);
+		memcpy(buf+len-sizeof ellipsis, ellipsis, sizeof ellipsis);
 		if (format[strlen(format)-1] == '\n') {
 			buf[len-1] = '\n';
 		}
@@ -315,7 +315,7 @@ void rprintf(enum logcode code, const char *format, ...)
 void rsyserr(enum logcode code, int errcode, const char *format, ...)
 {
 	va_list ap;
-	char buf[MAXPATHLEN+512];
+	char buf[BIGPATHBUFLEN];
 	size_t len;
 
 	strcpy(buf, RSYNC_NAME ": ");
@@ -403,8 +403,14 @@ static void log_formatted(enum logcode code, char *format, char *op,
 		n = NULL;
 
 		switch (*p) {
-		case 'h': if (am_daemon) n = client_name(0); break;
-		case 'a': if (am_daemon) n = client_addr(0); break;
+		case 'h':
+			if (am_daemon)
+				n = client_name(0);
+			break;
+		case 'a':
+			if (am_daemon)
+				n = client_addr(0);
+			break;
 		case 'l':
 			strlcat(fmt, ".0f", sizeof fmt);
 			snprintf(buf2, sizeof buf2, fmt,
@@ -417,7 +423,9 @@ static void log_formatted(enum logcode code, char *format, char *op,
 				 (long)getpid());
 			n = buf2;
 			break;
-		case 'o': n = op; break;
+		case 'o':
+			n = op;
+			break;
 		case 'f':
 			n = safe_fname(f_name(file));
 			if (am_sender && file->dir.root) {
@@ -459,10 +467,18 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			snprintf(buf2 + 4, sizeof buf2 - 4, fmt, n);
 			n = buf2;
 			break;
-		case 'm': n = lp_name(module_id); break;
-		case 't': n = timestring(time(NULL)); break;
-		case 'P': n = lp_path(module_id); break;
-		case 'u': n = auth_user; break;
+		case 'm':
+			n = lp_name(module_id);
+			break;
+		case 't':
+			n = timestring(time(NULL));
+			break;
+		case 'P':
+			n = lp_path(module_id);
+			break;
+		case 'u':
+			n = auth_user;
+			break;
 		case 'b':
 			if (am_sender) {
 				b = stats.total_written -
