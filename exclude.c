@@ -1006,8 +1006,10 @@ void parse_filter_file(struct filter_list_struct *listp, const char *fname,
 		int ch, overflow = 0;
 		while (1) {
 			if ((ch = getc(fp)) == EOF) {
-				if (ferror(fp) && errno == EINTR)
+				if (ferror(fp) && errno == EINTR) {
+					clearerr(fp);
 					continue;
+				}
 				break;
 			}
 			if (word_split && isspace(ch))
