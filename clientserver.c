@@ -59,8 +59,6 @@ int module_id = -1;
 /* Length of lp_path() string when in daemon mode & not chrooted, else 0. */
 unsigned int module_dirlen = 0;
 
-#define MAX_REQ_LEN (MAXPATHLEN + 255)
-
 /**
  * Run a client connected to an rsyncd.  The alternative to this
  * function for remote-shell connections is do_cmd().
@@ -218,16 +216,19 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out,
 	return 0;
 }
 
-static char *finish_pre_exec(pid_t pid, int fd, char *request)
+static char *finish_pre_exec(pid_t pid, int fd, char *request,
+			     int argc, char *argv[])
 {
-	int status = -1;
+	int j, status = -1;
 
 	if (request) {
-		int len = strlen(request);
-		if (len > MAX_REQ_LEN)
-			len = MAX_REQ_LEN;
-		write(fd, request, len);
+		write_buf(fd, request, strlen(request)+1);
+		for (j = 0; j < argc; j++)
+			write_buf(fd, argv[j], strlen(argv[j])+1);
 	}
+
+	write_byte(fd, 0);
+
 	close(fd);
 
 	if (wait_process(pid, &status, 0) < 0
@@ -238,6 +239,23 @@ static char *finish_pre_exec(pid_t pid, int fd, char *request)
 		return e;
 	}
 	return NULL;
+}
+
+static int read_arg_from_pipe(int fd, char *buf, int limit)
+{
+	char *bp = buf, *eob = buf + limit - 1;
+
+	while (1) {
+	    if (read(fd, bp, 1) != 1)
+		return -1;
+	    if (*bp == '\0')
+		break;
+	    if (bp < eob)
+		bp++;
+	}
+	*bp = '\0';
+
+	return bp - buf;
 }
 
 static int rsync_module(int f_in, int f_out, int i)
@@ -423,18 +441,29 @@ static int rsync_module(int f_in, int f_out, int i)
 				return -1;
 			}
 			if (pre_exec_pid == 0) {
-				char buf[MAX_REQ_LEN+1];
-				int len;
+				char buf[BIGPATHBUFLEN];
+				int j, len;
 				close(fds[1]);
 				set_blocking(fds[0]);
-				len = read(fds[0], buf, MAX_REQ_LEN);
-				close(fds[0]);
+				len = read_arg_from_pipe(fds[0], buf, BIGPATHBUFLEN);
 				if (len <= 0)
 					_exit(1);
-				buf[len] = '\0';
 				if (asprintf(&p, "RSYNC_REQUEST=%s", buf) < 0)
 					out_of_memory("rsync_module");
 				putenv(p);
+				for (j = 0; ; j++) {
+					len = read_arg_from_pipe(fds[0], buf,
+								 BIGPATHBUFLEN);
+					if (len <= 0) {
+						if (!len)
+							break;
+						_exit(1);
+					}
+					if (asprintf(&p, "RSYNC_ARG%d=%s", j, buf) < 0)
+						out_of_memory("rsync_module");
+					putenv(p);
+				}
+				close(fds[0]);
 				close(STDIN_FILENO);
 				close(STDOUT_FILENO);
 				status = system(lp_prexfer_exec(i));
@@ -565,7 +594,8 @@ static int rsync_module(int f_in, int f_out, int i)
 		case 1:
 			if (pre_exec_pid) {
 				err_msg = finish_pre_exec(pre_exec_pid,
-							  pre_exec_fd, p);
+							  pre_exec_fd, p,
+							  argc, argv);
 				pre_exec_pid = 0;
 			}
 			request = strdup(p);
@@ -578,8 +608,10 @@ static int rsync_module(int f_in, int f_out, int i)
 		}
 	}
 
-	if (pre_exec_pid)
-		err_msg = finish_pre_exec(pre_exec_pid, pre_exec_fd, request);
+	if (pre_exec_pid) {
+		err_msg = finish_pre_exec(pre_exec_pid, pre_exec_fd, request,
+					  argc, argv);
+	}
 
 	verbose = 0; /* future verbosity is controlled by client options */
 	ret = parse_arguments(&argc, (const char ***) &argv, 0);
