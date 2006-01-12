@@ -470,6 +470,9 @@ quote(itemize(
   it() bf(RSYNC_REQUEST): (pre-xfer only) The module/path info specified
   by the user (note that the user can specify multiple source files,
   so the request can be something like "mod/path1 mod/path2", etc.).
+  it() bf(RSYNC_ARGn): (pre-xfer only) The pre-request arguments are set
+  in these numbered values. RSYNC_ARG0 is always "rsyncd", and the last
+  value contains a single period.
   it() bf(RSYNC_EXIT_STATUS): (post-xfer only) rsync's exit value.  This will be 0 for a
   successful run, a positive value for an error that rsync returned
   (e.g. 23=partial xfer), or a -1 if rsync failed to exit properly.
