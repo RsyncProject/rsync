@@ -143,14 +143,14 @@ static void list_file_entry(struct file_struct *f)
 		rprintf(FINFO, "%s %11.0f %s %s -> %s\n",
 			perms,
 			(double)f->length, timestring(f->modtime),
-			safe_fname(f_name(f)), safe_fname(f->u.link));
+			f_name(f), f->u.link);
 	} else
 #endif
 	{
 		rprintf(FINFO, "%s %11.0f %s %s\n",
 			perms,
 			(double)f->length, timestring(f->modtime),
-			safe_fname(f_name(f)));
+			f_name(f));
 	}
 }
 
@@ -183,7 +183,7 @@ static int readlink_stat(const char *path, STRUCT_STAT *buffer, char *linkbuf)
 		if (copy_unsafe_links && unsafe_symlink(linkbuf, path)) {
 			if (verbose > 1) {
 				rprintf(FINFO,"copying unsafe symlink \"%s\" -> \"%s\"\n",
-					safe_fname(path), safe_fname(linkbuf));
+					path, linkbuf);
 			}
 			return do_stat(path, buffer);
 		}
@@ -534,7 +534,7 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 	if (l2 >= MAXPATHLEN - l1) {
 		rprintf(FERROR,
 			"overflow: flags=0x%x l1=%d l2=%d lastname=%s\n",
-			flags, l1, l2, safe_fname(lastname));
+			flags, l1, l2, lastname);
 		overflow_exit("receive_file_entry");
 	}
 
@@ -752,8 +752,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 
 	if (strlcpy(thisname, fname, sizeof thisname)
 	    >= sizeof thisname - flist_dir_len) {
-		rprintf(FINFO, "skipping overly long name: %s\n",
-			safe_fname(fname));
+		rprintf(FINFO, "skipping overly long name: %s\n", fname);
 		return NULL;
 	}
 	clean_fname(thisname, 0);
@@ -798,7 +797,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 		goto skip_filters;
 
 	if (S_ISDIR(st.st_mode) && !xfer_dirs) {
-		rprintf(FINFO, "skipping directory %s\n", safe_fname(thisname));
+		rprintf(FINFO, "skipping directory %s\n", thisname);
 		return NULL;
 	}
 
@@ -824,7 +823,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 
 	if (verbose > 2) {
 		rprintf(FINFO, "[%s] make_file(%s,*,%d)\n",
-			who_am_i(), safe_fname(thisname), filter_level);
+			who_am_i(), thisname, filter_level);
 	}
 
 	if ((basename = strrchr(thisname, '/')) != NULL) {
@@ -1031,14 +1030,14 @@ static void send_directory(int f, struct file_list *flist,
 		if (dname[0] == '.' && (dname[1] == '\0'
 		    || (dname[1] == '.' && dname[2] == '\0')))
 			continue;
-		if (strlcpy(p, dname, remainder) < remainder)
-			send_file_name(f, flist, fbuf, 0);
-		else {
+		if (strlcpy(p, dname, remainder) >= remainder) {
 			io_error |= IOERR_GENERAL;
 			rprintf(FINFO,
 				"cannot send long-named file %s\n",
 				full_fname(fbuf));
 		}
+
+		send_file_name(f, flist, fbuf, 0);
 	}
 
 	fbuf[len] = '\0';
@@ -1136,8 +1135,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		}
 
 		if (S_ISDIR(st.st_mode) && !xfer_dirs) {
-			rprintf(FINFO, "skipping directory %s\n",
-				safe_fname(fbuf));
+			rprintf(FINFO, "skipping directory %s\n", fbuf);
 			continue;
 		}
 
@@ -1330,10 +1328,8 @@ struct file_list *recv_file_list(int f)
 
 		maybe_emit_filelist_progress(flist->count);
 
-		if (verbose > 2) {
-			rprintf(FINFO, "recv_file_name(%s)\n",
-				safe_fname(f_name(file)));
-		}
+		if (verbose > 2)
+			rprintf(FINFO, "recv_file_name(%s)\n", f_name(file));
 	}
 	receive_file_entry(NULL, 0, 0); /* Signal that we're done. */
 
@@ -1524,7 +1520,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			if (verbose > 1 && !am_server) {
 				rprintf(FINFO,
 					"removing duplicate name %s from file list (%d)\n",
-					safe_fname(f_name(file)), drop);
+					f_name(file), drop);
 			}
 			/* Make sure that if we unduplicate '.', that we don't
 			 * lose track of a user-specified top directory. */
@@ -1588,7 +1584,7 @@ static void output_flist(struct file_list *flist)
 			sprintf(depthbuf, "%d", file->dir.depth);
 		rprintf(FINFO, "[%s] i=%d %s %s%s%s%s mode=0%o len=%.0f%s%s flags=%x\n",
 			who, i, am_sender ? NS(file->dir.root) : depthbuf,
-			file->dirname ? safe_fname(file->dirname) : "",
+			file->dirname ? file->dirname : "",
 			file->dirname ? "/" : "", NS(file->basename),
 			S_ISDIR(file->mode) ? "/" : "", (int)file->mode,
 			(double)file->length, uidbuf, gidbuf, file->flags);
@@ -1757,6 +1753,7 @@ char *f_name_to(struct file_struct *f, char *fbuf)
 		strcpy(fbuf + len + 1, f->basename);
 	} else
 		strcpy(fbuf, f->basename);
+
 	return fbuf;
 }
 

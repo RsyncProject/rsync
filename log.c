@@ -427,35 +427,31 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			n = op;
 			break;
 		case 'f':
-			n = safe_fname(f_name(file));
+			n = f_name(file);
 			if (am_sender && file->dir.root) {
 				pathjoin(buf2, sizeof buf2,
 					 file->dir.root, n);
-				/* The buffer from safe_fname() has more
-				 * room than MAXPATHLEN, so this is safe. */
+				clean_fname(buf2, 0);
 				if (fmt[1])
-					strcpy(n, buf2);
+					strlcpy(n, buf2, MAXPATHLEN);
 				else
 					n = buf2;
-			}
-			clean_fname(n, 0);
+			} else
+				clean_fname(n, 0);
 			if (*n == '/')
 				n++;
 			break;
 		case 'n':
-			n = safe_fname(f_name(file));
-			if (S_ISDIR(file->mode)) {
-				/* The buffer from safe_fname() has more
-				 * room than MAXPATHLEN, so this is safe. */
-				strcat(n, "/");
-			}
+			n = f_name(file);
+			if (S_ISDIR(file->mode))
+				strlcat(n, "/", MAXPATHLEN);
 			break;
 		case 'L':
 			if (hlink && *hlink) {
-				n = safe_fname(hlink);
+				n = hlink;
 				strcpy(buf2, " => ");
 			} else if (S_ISLNK(file->mode) && file->u.link) {
-				n = safe_fname(file->u.link);
+				n = file->u.link;
 				strcpy(buf2, " -> ");
 			} else {
 				n = "";
