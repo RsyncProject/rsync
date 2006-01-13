@@ -302,7 +302,7 @@ static char *parse_merge_name(const char *merge_file, unsigned int *len_ptr,
 		}
 		if (!sanitize_path(fn, merge_file, r, dirbuf_depth)) {
 			rprintf(FERROR, "merge-file name overflows: %s\n",
-				safe_fname(merge_file));
+				merge_file);
 			return NULL;
 		}
 	} else {
@@ -315,8 +315,7 @@ static char *parse_merge_name(const char *merge_file, unsigned int *len_ptr,
 		goto done;
 
 	if (dirbuf_len + fn_len >= MAXPATHLEN) {
-		rprintf(FERROR, "merge-file name overflows: %s\n",
-			safe_fname(fn));
+		rprintf(FERROR, "merge-file name overflows: %s\n", fn);
 		return NULL;
 	}
 	memcpy(buf, dirbuf + prefix_skip, dirbuf_len - prefix_skip);
@@ -985,7 +984,7 @@ void parse_filter_file(struct filter_list_struct *listp, const char *fname,
 
 	if (verbose > 2) {
 		rprintf(FINFO, "[%s] parse_filter_file(%s,%x,%x)%s\n",
-			who_am_i(), safe_fname(fname), mflags, xflags,
+			who_am_i(), fname, mflags, xflags,
 			fp ? "" : " [not found]");
 	}
 
@@ -994,7 +993,7 @@ void parse_filter_file(struct filter_list_struct *listp, const char *fname,
 			rsyserr(FERROR, errno,
 				"failed to open %sclude file %s",
 				mflags & MATCHFLG_INCLUDE ? "in" : "ex",
-				safe_fname(fname));
+				fname);
 			exit_cleanup(RERR_FILEIO);
 		}
 		return;

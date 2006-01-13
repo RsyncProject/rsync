@@ -297,7 +297,7 @@ static int rsync_module(int f_in, int f_out, int i)
 	if (!claim_connection(lp_lock_file(i), lp_max_connections(i))) {
 		if (errno) {
 			rsyserr(FLOG, errno, "failed to open lock file %s",
-				safe_fname(lp_lock_file(i)));
+				lp_lock_file(i));
 			io_printf(f_out, "@ERROR: failed to open lock file\n");
 		} else {
 			rprintf(FLOG, "max connections (%d) reached\n",
@@ -494,14 +494,14 @@ static int rsync_module(int f_in, int f_out, int i)
 		 */
 		if (chroot(lp_path(i))) {
 			rsyserr(FLOG, errno, "chroot %s failed",
-				safe_fname(lp_path(i)));
+				lp_path(i));
 			io_printf(f_out, "@ERROR: chroot failed\n");
 			return -1;
 		}
 
 		if (!push_dir("/")) {
 			rsyserr(FLOG, errno, "chdir %s failed\n",
-				safe_fname(lp_path(i)));
+				lp_path(i));
 			io_printf(f_out, "@ERROR: chdir failed\n");
 			return -1;
 		}
@@ -509,7 +509,7 @@ static int rsync_module(int f_in, int f_out, int i)
 	} else {
 		if (!push_dir(lp_path(i))) {
 			rsyserr(FLOG, errno, "chdir %s failed\n",
-				safe_fname(lp_path(i)));
+				lp_path(i));
 			io_printf(f_out, "@ERROR: chdir failed\n");
 			return -1;
 		}
@@ -822,7 +822,7 @@ int daemon_main(void)
 					0666 & ~orig_umask)) == -1) {
 			cleanup_set_pid(0);
 			rsyserr(FLOG, errno, "failed to create pid file %s",
-				safe_fname(pid_file));
+				pid_file);
 			exit_cleanup(RERR_FILEIO);
 		}
 		snprintf(pidbuf, sizeof pidbuf, "%ld\n", (long)pid);

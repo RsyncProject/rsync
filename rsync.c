@@ -95,13 +95,13 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 			if (change_uid) {
 				rprintf(FINFO,
 					"set uid of %s from %ld to %ld\n",
-					safe_fname(fname),
+					fname,
 					(long)st->st_uid, (long)file->uid);
 			}
 			if (change_gid) {
 				rprintf(FINFO,
 					"set gid of %s from %ld to %ld\n",
-					safe_fname(fname),
+					fname,
 					(long)st->st_gid, (long)file->gid);
 			}
 		}
@@ -143,9 +143,9 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 		enum logcode code = daemon_log_format_has_i || dry_run
 				  ? FCLIENT : FINFO;
 		if (updated)
-			rprintf(code, "%s\n", safe_fname(fname));
+			rprintf(code, "%s\n", fname);
 		else
-			rprintf(code, "%s is uptodate\n", safe_fname(fname));
+			rprintf(code, "%s is uptodate\n", fname);
 	}
 	return updated;
 }
@@ -175,7 +175,7 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
 
 	if (inplace) {
 		if (verbose > 2)
-			rprintf(FINFO, "finishing %s\n", safe_fname(fname));
+			rprintf(FINFO, "finishing %s\n", fname);
 		goto do_set_perms;
 	}
 
@@ -186,15 +186,13 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
 	set_perms(fnametmp, file, NULL, ok_to_set_time ? 0 : PERMS_SKIP_MTIME);
 
 	/* move tmp file over real file */
-	if (verbose > 2) {
-		rprintf(FINFO, "renaming %s to %s\n",
-			safe_fname(fnametmp), safe_fname(fname));
-	}
+	if (verbose > 2)
+		rprintf(FINFO, "renaming %s to %s\n", fnametmp, fname);
 	ret = robust_rename(fnametmp, fname, file->mode & INITACCESSPERMS);
 	if (ret < 0) {
 		rsyserr(FERROR, errno, "%s %s -> \"%s\"",
-		    ret == -2 ? "copy" : "rename",
-		    full_fname(fnametmp), safe_fname(fname));
+			ret == -2 ? "copy" : "rename",
+			full_fname(fnametmp), fname);
 		do_unlink(fnametmp);
 		return;
 	}

@@ -236,7 +236,7 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 	}
 
 	if (verbose > 2)
-		rprintf(FINFO, "delete_in_dir(%s)\n", safe_fname(fbuf));
+		rprintf(FINFO, "delete_in_dir(%s)\n", fbuf);
 
 	if (allowed_lull)
 		maybe_send_keepalive();
@@ -308,7 +308,7 @@ static void do_delete_pass(struct file_list *flist)
 
 		f_name_to(file, fbuf);
 		if (verbose > 1 && file->flags & FLAG_TOP_DIR)
-			rprintf(FINFO, "deleting in %s\n", safe_fname(fbuf));
+			rprintf(FINFO, "deleting in %s\n", fbuf);
 
 		delete_in_dir(flist, fbuf, file);
 	}
@@ -665,7 +665,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		if (verbose > 1 && maybe_PERMS_REPORT) {
 			code = daemon_log_format_has_i || dry_run
 			     ? FCLIENT : FINFO;
-			rprintf(code, "%s is uptodate\n", safe_fname(fname));
+			rprintf(code, "%s is uptodate\n", fname);
 		}
 		return -2;
 	}
@@ -676,7 +676,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		if (copy_file(cmpbuf, fname, file->mode) < 0) {
 			if (verbose) {
 				rsyserr(FINFO, errno, "copy_file %s => %s",
-					full_fname(cmpbuf), safe_fname(fname));
+					full_fname(cmpbuf), fname);
 			}
 			return -1;
 		}
@@ -688,7 +688,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		  || (verbose > 1 && match_level == 3))) {
 			code = daemon_log_format_has_i || dry_run
 			     ? FCLIENT : FINFO;
-			rprintf(code, "%s%s\n", safe_fname(fname),
+			rprintf(code, "%s%s\n", fname,
 				match_level == 3 ? " is uptodate" : "");
 		}
 		if (preserve_hard_links && file->link_u.links)
@@ -742,7 +742,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 		if (verbose > 1 && maybe_PERMS_REPORT) {
 			code = daemon_log_format_has_i || dry_run
 			     ? FCLIENT : FINFO;
-			rprintf(code, "%s is uptodate\n", safe_fname(fname));
+			rprintf(code, "%s is uptodate\n", fname);
 		}
 		return -2;
 	} while (basis_dir[++i] != NULL);
@@ -794,10 +794,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (verbose > 2) {
-		rprintf(FINFO, "recv_generator(%s,%d)\n",
-			safe_fname(fname), ndx);
-	}
+	if (verbose > 2)
+		rprintf(FINFO, "recv_generator(%s,%d)\n", fname, ndx);
 
 	if (server_filter_list.head) {
 		if (excluded_below >= 0) {
@@ -813,7 +811,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			if (verbose) {
 				rprintf(FINFO,
 					"skipping server-excluded file \"%s\"\n",
-					safe_fname(fname));
+					fname);
 			}
 			return;
 		}
@@ -847,7 +845,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (verbose > 1) {
 			rprintf(FINFO, "not creating new %s \"%s\"\n",
 				S_ISDIR(file->mode) ? "directory" : "file",
-				safe_fname(fname));
+				fname);
 		}
 		return;
 	}
@@ -891,7 +889,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 		if (set_perms(fname, file, statret ? NULL : &st, 0)
 		    && verbose && code && f_out != -1)
-			rprintf(code, "%s/\n", safe_fname(fname));
+			rprintf(code, "%s/\n", fname);
 		if (delete_during && f_out != -1 && !phase && dry_run < 2
 		    && (file->flags & FLAG_DEL_HERE))
 			delete_in_dir(the_file_list, fname, file);
@@ -911,8 +909,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					fname = f_name(file);
 				rprintf(FINFO,
 					"ignoring unsafe symlink %s -> \"%s\"\n",
-					full_fname(fname),
-					safe_fname(file->u.link));
+					full_fname(fname), file->u.link);
 			}
 			return;
 		}
@@ -963,7 +960,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			return;
 		if (do_symlink(file->u.link,fname) != 0) {
 			rsyserr(FERROR, errno, "symlink %s -> \"%s\" failed",
-				full_fname(fname), safe_fname(file->u.link));
+				full_fname(fname), file->u.link);
 		} else {
 			set_perms(fname,file,NULL,0);
 			if (itemizing) {
@@ -971,8 +968,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					ITEM_LOCAL_CHANGE, 0, NULL);
 			}
 			if (code && verbose) {
-				rprintf(code, "%s -> %s\n", safe_fname(fname),
-					safe_fname(file->u.link));
+				rprintf(code, "%s -> %s\n", fname,
+					file->u.link);
 			}
 			if (remove_sent_files && !dry_run) {
 				char numbuf[4];
@@ -1011,7 +1008,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				statret = -1;
 			if (verbose > 2) {
 				rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",
-					safe_fname(fname),
+					fname,
 					(int)file->mode, (int)file->u.rdev);
 			}
 			if (do_mknod(fname,file->mode,file->u.rdev) < 0) {
@@ -1023,10 +1020,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					itemize(file, ndx, statret, &st,
 						ITEM_LOCAL_CHANGE, 0, NULL);
 				}
-				if (code && verbose) {
-					rprintf(code, "%s\n",
-						safe_fname(fname));
-				}
+				if (code && verbose)
+					rprintf(code, "%s\n", fname);
 				if (preserve_hard_links && file->link_u.links) {
 					hard_link_cluster(file, ndx,
 							  itemizing, code);
@@ -1045,8 +1040,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (!S_ISREG(file->mode)) {
 		if (the_file_list->count == 1)
 			fname = f_name(file);
-		rprintf(FINFO, "skipping non-regular file \"%s\"\n",
-			safe_fname(fname));
+		rprintf(FINFO, "skipping non-regular file \"%s\"\n", fname);
 		return;
 	}
 
@@ -1054,8 +1048,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (verbose > 1) {
 			if (the_file_list->count == 1)
 				fname = f_name(file);
-			rprintf(FINFO, "%s is over max-size\n",
-				safe_fname(fname));
+			rprintf(FINFO, "%s is over max-size\n", fname);
 		}
 		return;
 	}
@@ -1063,22 +1056,21 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (verbose > 1) {
 			if (the_file_list->count == 1)
 				fname = f_name(file);
-			rprintf(FINFO, "%s is under min-size\n",
-				safe_fname(fname));
+			rprintf(FINFO, "%s is under min-size\n", fname);
 		}
 		return;
 	}
 
 	if (ignore_existing && statret == 0) {
 		if (verbose > 1)
-			rprintf(FINFO, "%s exists\n", safe_fname(fname));
+			rprintf(FINFO, "%s exists\n", fname);
 		return;
 	}
 
 	if (update_only && statret == 0
 	    && cmp_modtime(st.st_mtime, file->modtime) > 0) {
 		if (verbose > 1)
-			rprintf(FINFO, "%s is newer\n", safe_fname(fname));
+			rprintf(FINFO, "%s is newer\n", fname);
 		return;
 	}
 
@@ -1122,7 +1114,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			f_name_to(fuzzy_file, fnamecmpbuf);
 			if (verbose > 2) {
 				rprintf(FINFO, "fuzzy basis selected for %s: %s\n",
-					safe_fname(fname), safe_fname(fnamecmpbuf));
+					fname, fnamecmpbuf);
 			}
 			st.st_size = fuzzy_file->length;
 			statret = 0;
@@ -1227,7 +1219,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (verbose > 3) {
 		rprintf(FINFO, "gen mapped %s of size %.0f\n",
-			safe_fname(fnamecmp), (double)st.st_size);
+			fnamecmp, (double)st.st_size);
 	}
 
 	if (verbose > 2)
@@ -1267,7 +1259,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		set_perms(backupptr, back_file, NULL, 0);
 		if (verbose > 1) {
 			rprintf(FINFO, "backed up %s to %s\n",
-				safe_fname(fname), safe_fname(backupptr));
+				fname, backupptr);
 		}
 		free(back_file);
 	}

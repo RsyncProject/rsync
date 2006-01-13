@@ -90,7 +90,7 @@ static int get_secret(int module, char *user, char *secret, int len)
 		return 0;
 
 	if (do_stat(fname, &st) == -1) {
-		rsyserr(FLOG, errno, "stat(%s)", safe_fname(fname));
+		rsyserr(FLOG, errno, "stat(%s)", fname);
 		ok = 0;
 	} else if (lp_strict_modes(module)) {
 		if ((st.st_mode & 06) != 0) {
@@ -160,14 +160,14 @@ static char *getpassf(char *filename)
 
 	if ((fd = open(filename,O_RDONLY)) < 0) {
 		rsyserr(FERROR, errno, "could not open password file \"%s\"",
-			safe_fname(filename));
+			filename);
 		if (envpw)
 			rprintf(FERROR, "falling back to RSYNC_PASSWORD environment variable.\n");
 		return NULL;
 	}
 
 	if (do_stat(filename, &st) == -1) {
-		rsyserr(FERROR, errno, "stat(%s)", safe_fname(filename));
+		rsyserr(FERROR, errno, "stat(%s)", filename);
 		ok = 0;
 	} else if ((st.st_mode & 06) != 0) {
 		rprintf(FERROR,"password file must not be other-accessible\n");

@@ -99,7 +99,7 @@ void _exit_cleanup(int code, const char *file, int line)
 
 	if (verbose > 3) {
 		rprintf(FINFO,"_exit_cleanup(code=%d, file=%s, line=%d): entered\n",
-			code, safe_fname(file), line);
+			code, file, line);
 	}
 
 	if (cleanup_child_pid != -1) {
@@ -149,7 +149,7 @@ void _exit_cleanup(int code, const char *file, int line)
 
 	if (verbose > 2) {
 		rprintf(FINFO,"_exit_cleanup(code=%d, file=%s, line=%d): about to call exit(%d)\n",
-			ocode, safe_fname(file), line, code);
+			ocode, file, line, code);
 	}
 
 	close_all();

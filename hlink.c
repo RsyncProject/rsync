@@ -181,10 +181,8 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 		head = hlink_list[file->F_HLINDEX];
 	if (ndx != head) {
 		struct file_struct *head_file = FPTR(head);
-		if (!log_format_has_i && verbose > 1) {
-			rprintf(FINFO, "\"%s\" is a hard link\n",
-				safe_fname(f_name(file)));
-		}
+		if (!log_format_has_i && verbose > 1)
+			rprintf(FINFO, "\"%s\" is a hard link\n", f_name(file));
 		if (head_file->F_HLINDEX == FINISHED_LINK) {
 			STRUCT_STAT st2, st3;
 			char *toname = f_name(head_file);
@@ -242,7 +240,7 @@ int hard_link_one(struct file_struct *file, int ndx, char *fname,
 		} else
 			code = FERROR;
 		rsyserr(code, errno, "link %s => %s failed",
-			full_fname(fname), safe_fname(toname));
+			full_fname(fname), toname);
 		return -1;
 	}
 
@@ -251,10 +249,8 @@ int hard_link_one(struct file_struct *file, int ndx, char *fname,
 			ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS, 0,
 			terse ? "" : toname);
 	}
-	if (code && verbose && !terse) {
-		rprintf(code, "%s => %s\n",
-			safe_fname(fname), safe_fname(toname));
-	}
+	if (code && verbose && !terse)
+		rprintf(code, "%s => %s\n", fname, toname);
 	return 0;
 }
 #endif

@@ -165,7 +165,7 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 		     S_IRUSR | S_IWUSR | S_IEXEC);
 	if (fd < 0) {
 		rsyserr(FERROR, errno, "Batch file %s open error",
-			safe_fname(filename));
+			filename);
 		exit_cleanup(1);
 	}
 
@@ -211,7 +211,7 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 		write_filter_rules(fd);
 	if (write(fd, "\n", 1) != 1 || close(fd) < 0) {
 		rsyserr(FERROR, errno, "Batch file %s write error",
-			safe_fname(filename));
+			filename);
 		exit_cleanup(1);
 	}
 }
@@ -229,14 +229,14 @@ void show_flist(int index, struct file_struct **fptr)
 			(double) fptr[i]->length);
 		rprintf(FINFO, "flist->mode=%#o\n", (int) fptr[i]->mode);
 		rprintf(FINFO, "flist->basename=%s\n",
-			safe_fname(fptr[i]->basename));
+			fptr[i]->basename);
 		if (fptr[i]->dirname) {
 			rprintf(FINFO, "flist->dirname=%s\n",
-				safe_fname(fptr[i]->dirname));
+				fptr[i]->dirname);
 		}
 		if (am_sender && fptr[i]->dir.root) {
 			rprintf(FINFO, "flist->dir.root=%s\n",
-				safe_fname(fptr[i]->dir.root));
+				fptr[i]->dir.root);
 		}
 	}
 }
@@ -248,5 +248,5 @@ void show_argvs(int argc, char *argv[])
 
 	rprintf(FINFO, "BATCH.C:show_argvs,argc=%d\n", argc);
 	for (i = 0; i < argc; i++)
-		rprintf(FINFO, "i=%d,argv[i]=%s\n", i, safe_fname(argv[i]));
+		rprintf(FINFO, "i=%d,argv[i]=%s\n", i, argv[i]);
 }

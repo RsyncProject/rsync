@@ -134,10 +134,8 @@ void successful_send(int ndx)
 	} else
 		offset = 0;
 	f_name_to(file, fname + offset);
-	if (remove_sent_files && do_unlink(fname) == 0 && verbose > 1) {
-		rprintf(FINFO, "sender removed %s\n",
-			safe_fname(fname + offset));
-	}
+	if (remove_sent_files && do_unlink(fname) == 0 && verbose > 1)
+		rprintf(FINFO, "sender removed %s\n", fname + offset);
 }
 
 static void write_ndx_and_attrs(int f_out, int ndx, int iflags,
@@ -331,22 +329,20 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		if (verbose > 2) {
 			rprintf(FINFO, "send_files mapped %s of size %.0f\n",
-				safe_fname(fname), (double)st.st_size);
+				fname, (double)st.st_size);
 		}
 
 		write_ndx_and_attrs(f_out, i, iflags, fnamecmp_type,
 				    xname, xlen);
 		write_sum_head(f_xfer, s);
 
-		if (verbose > 2) {
-			rprintf(FINFO, "calling match_sums %s\n",
-				safe_fname(fname));
-		}
+		if (verbose > 2)
+			rprintf(FINFO, "calling match_sums %s\n", fname);
 
 		if (log_before_transfer)
 			log_item(file, &initial_stats, iflags, NULL);
 		else if (!am_server && verbose && do_progress)
-			rprintf(FINFO, "%s\n", safe_fname(fname2));
+			rprintf(FINFO, "%s\n", fname2);
 
 		set_compression(fname);
 
@@ -370,10 +366,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		free_sums(s);
 
-		if (verbose > 2) {
-			rprintf(FINFO, "sender finished %s\n",
-				safe_fname(fname));
-		}
+		if (verbose > 2)
+			rprintf(FINFO, "sender finished %s\n", fname);
 
 		/* Flag that we actually sent this entry. */
 		file->flags |= FLAG_SENT;

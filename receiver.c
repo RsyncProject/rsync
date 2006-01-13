@@ -173,8 +173,7 @@ static int get_tmpname(char *fnametmp, char *fname)
 	maxname = MIN(MAXPATHLEN - 7 - length, NAME_MAX - 8);
 
 	if (maxname < 1) {
-		rprintf(FERROR, "temporary filename too long: %s\n",
-			safe_fname(fname));
+		rprintf(FERROR, "temporary filename too long: %s\n", fname);
 		fnametmp[0] = '\0';
 		return 0;
 	}
@@ -207,7 +206,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		mapbuf = map_file(fd_r, size_r, read_size, sum.blength);
 		if (verbose > 2) {
 			rprintf(FINFO, "recv mapped %s of size %.0f\n",
-				safe_fname(fname_r), (double)size_r);
+				fname_r, (double)size_r);
 		}
 	} else
 		mapbuf = NULL;
@@ -351,16 +350,14 @@ static void handle_delayed_updates(struct file_list *flist, char *local_name)
 				continue;
 			if (verbose > 2) {
 				rprintf(FINFO, "renaming %s to %s\n",
-					safe_fname(partialptr),
-					safe_fname(fname));
+					partialptr, fname);
 			}
 			/* We don't use robust_rename() here because the
 			 * partial-dir must be on the same drive. */
 			if (do_rename(partialptr, fname) < 0) {
 				rsyserr(FERROR, errno,
 					"rename failed for %s (from %s)",
-					full_fname(fname),
-					safe_fname(partialptr));
+					full_fname(fname), partialptr);
 			} else {
 				if (remove_sent_files
 				    || (preserve_hard_links
@@ -368,8 +365,7 @@ static void handle_delayed_updates(struct file_list *flist, char *local_name)
 					SIVAL(numbuf, 0, i);
 					send_msg(MSG_SUCCESS,numbuf,4);
 				}
-				handle_partial_dir(partialptr,
-						   PDIR_DELETE);
+				handle_partial_dir(partialptr, PDIR_DELETE);
 			}
 		}
 	}
@@ -382,7 +378,7 @@ static int get_next_gen_i(int batch_gen_fd, int next_gen_i, int desired_i)
 			rprintf(FINFO,
 				"(No batched update for%s \"%s\")\n",
 				phase ? " resend of" : "",
-				safe_fname(f_name(the_file_list->files[next_gen_i])));
+				f_name(the_file_list->files[next_gen_i]));
 		}
 		next_gen_i = read_int(batch_gen_fd);
 		if (next_gen_i == -1)
@@ -463,7 +459,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		fname = local_name ? local_name : f_name_to(file, fbuf);
 
 		if (verbose > 2)
-			rprintf(FINFO, "recv_files(%s)\n", safe_fname(fname));
+			rprintf(FINFO, "recv_files(%s)\n", fname);
 
 		if (!(iflags & ITEM_TRANSFER)) {
 			maybe_log_item(file, iflags, itemizing, xname);
@@ -504,8 +500,9 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		if (read_batch) {
 			next_gen_i = get_next_gen_i(batch_gen_fd, next_gen_i, i);
 			if (i < next_gen_i) {
-				rprintf(FINFO, "(Skipping batched update for \"%s\")\n",
-					safe_fname(fname));
+				rprintf(FINFO,
+					"(Skipping batched update for \"%s\")\n",
+					fname);
 				discard_receive_data(f_in, file->length);
 				continue;
 			}
@@ -666,7 +663,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		if (log_before_transfer)
 			log_item(file, &initial_stats, iflags, NULL);
 		else if (!am_server && verbose && do_progress)
-			rprintf(FINFO, "%s\n", safe_fname(fname));
+			rprintf(FINFO, "%s\n", fname);
 
 		/* recv file data */
 		recv_ok = receive_data(f_in, fnamecmp, fd1, st.st_size,
@@ -729,8 +726,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 				}
 				rprintf(msgtype,
 					"%s: %s failed verification -- update %s%s.\n",
-					errstr, safe_fname(fname),
-					keptstr, redostr);
+					errstr, fname, keptstr, redostr);
 			}
 			if (!phase) {
 				SIVAL(numbuf, 0, i);

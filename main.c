@@ -393,7 +393,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 
 	if (verbose > 3) {
 		for (i = 0; i < argc; i++)
-			rprintf(FINFO, "cmd[%d]=%s ", i, safe_fname(args[i]));
+			rprintf(FINFO, "cmd[%d]=%s ", i, args[i]);
 		rprintf(FINFO, "\n");
 	}
 
@@ -463,7 +463,7 @@ static char *get_local_name(struct file_list *flist,char *name)
 		exit_cleanup(RERR_FILEIO);
 	}
 	if (verbose > 0)
-		rprintf(FINFO, "created directory %s\n", safe_fname(name));
+		rprintf(FINFO, "created directory %s\n", name);
 
 	if (dry_run) {
 		dry_run++;
@@ -974,10 +974,10 @@ static int start_client(int argc, char *argv[])
 
 	if (verbose > 3) {
 		rprintf(FINFO,"cmd=%s machine=%s user=%s path=%s\n",
-			shell_cmd ? safe_fname(shell_cmd) : "",
-			shell_machine ? safe_fname(shell_machine) : "",
-			shell_user ? safe_fname(shell_user) : "",
-			shell_path ? safe_fname(shell_path) : "");
+			shell_cmd ? shell_cmd : "",
+			shell_machine ? shell_machine : "",
+			shell_user ? shell_user : "",
+			shell_path ? shell_path : "");
 	}
 
 	/* for remote source, only single dest arg can remain ... */
