@@ -47,37 +47,25 @@ run_test(int line, bool matches, bool same_as_fnmatch,
 #endif
 
     if (explode_mod) {
-	static char *buf;
-	char *texts[MAXPATHLEN], *hold;
+	char buf[MAXPATHLEN*2], *texts[MAXPATHLEN];
 	int pos = 0, cnt = 0, ndx = 0, len = strlen(text);
 
-	if (!buf) {
-	    int j;
-	    if (!(buf = calloc(MAXPATHLEN * 2, 1)))
-		exit(1);
-	    for (j = (MAXPATHLEN-1) / explode_mod; j >= 0; j--)
-		texts[j] = buf + j * (explode_mod + 1);
-	}
-
 	if (empty_at_start)
-	    texts[ndx++][0] = '\0';
+	    texts[ndx++] = "";
 	/* An empty string must turn into at least one empty array item. */
 	while (1) {
-	    strncpy(texts[ndx++], text + pos, explode_mod);
-	    if (pos + explode_mod >= len) {
-		texts[ndx-1][len - pos] = '\0';
+	    texts[ndx] = buf + ndx * (explode_mod + 1);
+	    strlcpy(texts[ndx++], text + pos, explode_mod + 1);
+	    if (pos + explode_mod >= len)
 		break;
-	    }
 	    pos += explode_mod;
 	    if (!(++cnt % empties_mod))
-		texts[ndx++][0] = '\0';
+		texts[ndx++] = "";
 	}
 	if (empty_at_end)
-	    texts[ndx++][0] = '\0';
-	hold = texts[ndx];
+	    texts[ndx++] = "";
 	texts[ndx] = NULL;
 	matched = wildmatch_array(pattern, (const char**)texts, 0);
-	texts[ndx] = hold;
     } else
 	matched = wildmatch(pattern, text);
 #ifdef COMPARE_WITH_FNMATCH
