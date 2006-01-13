@@ -96,13 +96,14 @@ Changes since 2.6.6:
       now delete in any directory whose content is being synchronized.
 
     - If --backup is combined with --delete without --backup-dir (and
-      without --delete-excluded), we add a protect filter-rule to ensure
+      without --delete-excluded), we add a "protect" filter-rule to ensure
       that files with the backup suffix are not deleted.
 
     - The file-count stats that are output by --progress were improved to
       better indicate what the numbers mean.  For instance, the output:
-      "(xfer#5, to-check=8383/9999)" indicates that this was transferred
-      file #5, and we still need to check 8383 files out of 9999 total.
+      "(xfer#5, to-check=8383/9999)" indicates that this was the fifth file
+      to be transferred, and we still need to check 8383 more files out of
+      a total of 9999.
 
     - Some minor documentation improvements.
 
