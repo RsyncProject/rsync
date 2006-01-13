@@ -26,8 +26,7 @@ AC_SUBST(SHELL)
 AC_DEFINE([_GNU_SOURCE], 1,
           [Define _GNU_SOURCE so that we get all necessary prototypes])
 
-if test "x$ac_cv_prog_cc_stdc" = xno
-then
+if test x"$ac_cv_prog_cc_stdc" = x"no"; then
 	AC_MSG_WARN([rsync requires an ANSI C compiler and you don't seem to have one])
 fi
 
@@ -38,12 +37,10 @@ fi
 
 AC_MSG_CHECKING([whether to include debugging symbols])
 AC_ARG_ENABLE(debug,
-	AC_HELP_STRING([--enable-debug],
-		[including debugging symbols and features (default yes)]),
-		[], [])
+	AC_HELP_STRING([--disable-debug],
+		[turn off debugging symbols and features]))
 
-if test x"$enable_debug" = x"no"
-then
+if test x"$enable_debug" = x"no"; then
     AC_MSG_RESULT(no)
     CFLAGS=${CFLAGS-"-O"}
 else
@@ -56,10 +53,8 @@ fi
 
 AC_ARG_ENABLE(profile,
 	AC_HELP_STRING([--enable-profile],
-		[turn on CPU profiling (default no)],
-		[], []))
-if test x"$enable_profile" = xyes
-then
+		[turn on CPU profiling]))
+if test x"$enable_profile" = x"yes"; then
 	CFLAGS="$CFLAGS -pg"
 fi
 
@@ -67,10 +62,8 @@ fi
 # Specifically, this turns on panic_action handling.
 AC_ARG_ENABLE(maintainer-mode,
 	AC_HELP_STRING([--enable-maintainer-mode],
-		[turn on extra debug features],
-		[], []))
-if test x"$enable_maintainer_mode" = xyes
-then
+		[turn on extra debug features]))
+if test x"$enable_maintainer_mode" = x"yes"; then
 	CFLAGS="$CFLAGS -DMAINTAINER_MODE"
 fi
 
@@ -80,8 +73,7 @@ fi
 CFLAGS="$CFLAGS -DHAVE_CONFIG_H"
 
 # If GCC, turn on warnings.
-if test x"$GCC" = x"yes"
-then
+if test x"$GCC" = x"yes"; then
 	CFLAGS="$CFLAGS -Wall -W"
 fi
 
@@ -124,8 +116,7 @@ if test x$HAVE_REMSH = x1; then
 	AC_DEFINE(HAVE_REMSH, 1, [Define to 1 if remote shell is remsh, not rsh])
 fi
 
-if test x"$with_rsh" != x
-then
+if test x"$with_rsh" != x; then
 	RSYNC_RSH="$with_rsh"
 else
 	RSYNC_RSH="ssh"
@@ -190,21 +181,9 @@ ipv6lib=none
 ipv6trylibc=yes
 
 AC_ARG_ENABLE(ipv6,
-	AC_HELP_STRING([--disable-ipv6], [don't even try to use IPv6]))
-
-dnl Do you want to disable use of locale functions
-AH_TEMPLATE([CONFIG_LOCALE],
-[Undefine if you don't want locale features.  By default this is defined.])
-AC_ARG_ENABLE([locale],
-	AC_HELP_STRING([--disable-locale], [turn off locale features]),
-[if test x$enableval = xyes; then
-  AC_DEFINE(CONFIG_LOCALE)
-fi],
-AC_DEFINE(CONFIG_LOCALE)
-)
-
-if test "x$enable_ipv6" != xno
-then
+	AC_HELP_STRING([--disable-ipv6],
+		[don't even try to use IPv6]))
+if test x"$enable_ipv6" != x"no"; then
 	AC_MSG_CHECKING([ipv6 stack type])
 	for i in inria kame linux-glibc linux-inet6 toshiba v6d zeta; do
 		case $i in
@@ -293,6 +272,16 @@ yes
 	AC_SEARCH_LIBS(getaddrinfo, inet6)
 fi
 
+dnl Do you want to disable use of locale functions
+AC_ARG_ENABLE([locale],
+	AC_HELP_STRING([--disable-locale],
+		[turn off locale features]))
+AH_TEMPLATE([CONFIG_LOCALE],
+[Undefine if you don't want locale features.  By default this is defined.])
+if test x"$enable_locale" != x"no"; then
+	AC_DEFINE(CONFIG_LOCALE)
+fi
+
 AC_MSG_CHECKING([whether to call shutdown on all sockets])
 case $host_os in
 	*cygwin* ) AC_MSG_RESULT(yes)
@@ -310,7 +299,7 @@ AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     unistd.h utime.h grp.h compat.h sys/param.h ctype.h sys/wait.h \
     sys/ioctl.h sys/filio.h string.h stdlib.h sys/socket.h sys/mode.h \
     sys/un.h glob.h mcheck.h arpa/inet.h arpa/nameser.h locale.h \
-    netdb.h malloc.h float.h limits.h)
+    netdb.h malloc.h float.h limits.h iconv.h)
 AC_HEADER_MAJOR
 
 AC_CHECK_SIZEOF(int)
@@ -501,12 +490,23 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd strdup chown chmod lchmod mknod mkfifo \
     memmove lchown vsnprintf snprintf vasprintf asprintf setsid glob strpbrk \
     strlcat strlcpy strtol mallinfo getgroups setgroups geteuid getegid \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \
-    strerror putenv)
+    strerror putenv iconv_open)
 
 AC_CHECK_FUNCS(getpgrp tcgetpgrp)
 if test $ac_cv_func_getpgrp = yes; then
     AC_FUNC_GETPGRP
 fi
+
+AC_ARG_ENABLE(iconv,
+    AC_HELP_STRING([--disable-iconv],
+	    [disable rsync's --iconv option]),
+    [], [enable_iconv=$ac_cv_func_iconv_open])
+AH_TEMPLATE([ICONV_OPTION],
+[Define to 1 if you have iconv() and want rsync's --iconv option.])
+if test x"$enable_iconv" = x"yes"; then
+	AC_DEFINE(ICONV_OPTION)
+fi
+
 
 # Determine whether chown follows symlinks (it should).
 AC_CACHE_CHECK([whether chown() dereferences symlinks],rsync_cv_chown_follows_symlink,[
@@ -542,14 +542,12 @@ if test x"$rsync_cv_HAVE_SOCKETPAIR" = x"yes"; then
     AC_DEFINE(HAVE_SOCKETPAIR, 1, [Define to 1 if you have the "socketpair" function])
 fi
 
-if test x"$with_included_popt" != x"yes"
-then
+if test x"$with_included_popt" != x"yes"; then
     AC_CHECK_LIB(popt, poptGetContext, , [with_included_popt=yes])
 fi
 
 AC_MSG_CHECKING([whether to use included libpopt])
-if test x"$with_included_popt" = x"yes"
-then
+if test x"$with_included_popt" = x"yes"; then
     AC_MSG_RESULT($srcdir/popt)
     BUILD_POPT='$(popt_OBJS)'
     CFLAGS="$CFLAGS -I$srcdir/popt"
