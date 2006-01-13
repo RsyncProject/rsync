@@ -107,9 +107,9 @@ void print_child_argv(char **cmd)
 			   "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 			   "0123456789"
 			   ",.-_=+@/") != strlen(*cmd)) {
-			rprintf(FINFO, "\"%s\" ", safe_fname(*cmd));
+			rprintf(FINFO, "\"%s\" ", *cmd);
 		} else {
-			rprintf(FINFO, "%s ", safe_fname(*cmd));
+			rprintf(FINFO, "%s ", *cmd);
 		}
 	}
 	rprintf(FINFO, "\n");
@@ -139,7 +139,7 @@ int set_modtime(char *fname, time_t modtime, mode_t mode)
 
 	if (verbose > 2) {
 		rprintf(FINFO, "set modtime of %s to (%ld) %s",
-			safe_fname(fname), (long)modtime,
+			fname, (long)modtime,
 			asctime(localtime(&modtime)));
 	}
 
@@ -364,7 +364,7 @@ int robust_unlink(char *fname)
 
 	if (verbose > 0) {
 		rprintf(FINFO,"renaming %s to %s because of text busy\n",
-			safe_fname(fname), safe_fname(path));
+			fname, path);
 	}
 
 	/* maybe we should return rename()'s exit status? Nah. */
@@ -893,43 +893,6 @@ int pop_dir(char *dir)
 	return 1;
 }
 
-/* Return the filename, turning any non-printable characters into escaped
- * characters (e.g. \n -> \012, \ -> \\).  This ensures that outputting it
- * cannot generate an empty line nor corrupt the screen.  This function can
- * return only MAX_SAFE_NAMES values at a time!  The returned value can be
- * longer than MAXPATHLEN (because we may be trying to output an error about
- * a too-long filename)! */
-char *safe_fname(const char *fname)
-{
-#define MAX_SAFE_NAMES 4
-	static char fbuf[MAX_SAFE_NAMES][MAXPATHLEN*2];
-	static int ndx = 0;
-	int limit = sizeof fbuf / MAX_SAFE_NAMES - 1;
-	char *t;
-
-	ndx = (ndx + 1) % MAX_SAFE_NAMES;
-	for (t = fbuf[ndx]; *fname; fname++) {
-		if (*fname == '\\') {
-			if ((limit -= 2) < 0)
-				break;
-			*t++ = '\\';
-			*t++ = '\\';
-		} else if (!isprint(*(uchar*)fname)) {
-			if ((limit -= 4) < 0)
-				break;
-			sprintf(t, "\\%03o", *(uchar*)fname);
-			t += 4;
-		} else {
-			if (--limit < 0)
-				break;
-			*t++ = *fname;
-		}
-	}
-	*t = '\0';
-
-	return fbuf[ndx];
-}
-
 /**
  * Return a quoted string with the full pathname of the indicated filename.
  * The string " (in MODNAME)" may also be appended.  The returned pointer
@@ -944,7 +907,6 @@ char *full_fname(const char *fn)
 	if (result)
 		free(result);
 
-	fn = safe_fname(fn);
 	if (*fn == '/')
 		p1 = p2 = "";
 	else {
