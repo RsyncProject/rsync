@@ -191,20 +191,40 @@ void logfile_reopen(void)
 	}
 }
 
+static void filtered_fwrite(const char *buf, int len, FILE *f)
+{
+	const char *s, *end = buf + len;
+	for (s = buf; s < end; s++) {
+		if ((s < end - 4
+		  && *s == '\\' && s[1] == '0'
+		  && isdigit(*(uchar*)(s+2))
+		  && isdigit(*(uchar*)(s+3))
+		  && isdigit(*(uchar*)(s+4)))
+		 || !isprint(*(uchar*)s)
+		 || *(uchar*)s < ' ') {
+			if (s != buf && fwrite(buf, s - buf, 1, f) != 1)
+				exit_cleanup(RERR_MESSAGEIO);
+			fprintf(f, "\\%04o", *(uchar*)s);
+			buf = s + 1;
+		}
+	}
+	if (buf != end && fwrite(buf, end - buf, 1, f) != 1)
+		exit_cleanup(RERR_MESSAGEIO);
+}
+
 /* this is the underlying (unformatted) rsync debugging function. Call
- * it with FINFO, FERROR or FLOG */
+ * it with FINFO, FERROR or FLOG.  Note: recursion can happen with
+ * certain fatal conditions. */
 void rwrite(enum logcode code, char *buf, int len)
 {
+	int trailing_CR_or_NL;
 	FILE *f = NULL;
-	/* recursion can happen with certain fatal conditions */
 
 	if (quiet && code == FINFO)
 		return;
 
 	if (len < 0)
 		exit_cleanup(RERR_MESSAGEIO);
-
-	buf[len] = 0;
 
 	if (am_server && msg_fd_out >= 0) {
 		/* Pass the message to our sibling. */
@@ -243,22 +263,35 @@ void rwrite(enum logcode code, char *buf, int len)
 		}
 	}
 
-	if (code == FERROR) {
+	switch (code) {
+	case FERROR:
 		log_got_error = 1;
 		f = stderr;
+		break;
+	case FINFO:
+		f = am_server ? stderr : stdout;
+		while (len && (*buf == '\n' || *buf == '\t')) {
+			fputc(*buf, f);
+			buf++;
+			len--;
+		}
+		break;
+	case FNAME:
+		f = am_server ? stderr : stdout;
+		break;
+	default:
+		exit_cleanup(RERR_MESSAGEIO);
 	}
 
-	if (code == FINFO)
-		f = am_server ? stderr : stdout;
+	trailing_CR_or_NL = len && (buf[len-1] == '\n' || buf[len-1] == '\r')
+			  ? buf[--len] : 0;
 
-	if (!f)
-		exit_cleanup(RERR_MESSAGEIO);
+	filtered_fwrite(buf, len, f);
 
-	if (fwrite(buf, len, 1, f) != 1)
-		exit_cleanup(RERR_MESSAGEIO);
-
-	if (buf[len-1] == '\r' || buf[len-1] == '\n')
+	if (trailing_CR_or_NL) {
+		fputc(trailing_CR_or_NL, f);
 		fflush(f);
+	}
 }
 
 
@@ -427,7 +460,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			n = op;
 			break;
 		case 'f':
-			n = f_name(file);
+			n = f_name(file, NULL);
 			if (am_sender && file->dir.root) {
 				pathjoin(buf2, sizeof buf2,
 					 file->dir.root, n);
@@ -442,7 +475,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 				n++;
 			break;
 		case 'n':
-			n = f_name(file);
+			n = f_name(file, NULL);
 			if (S_ISDIR(file->mode))
 				strlcat(n, "/", MAXPATHLEN);
 			break;
@@ -611,7 +644,7 @@ void log_item(struct file_struct *file, struct stats *initial_stats,
 		log_formatted(FLOG, lp_log_format(module_id), s_or_r,
 			      file, initial_stats, iflags, hlink);
 	} else if (log_format && !am_server) {
-		log_formatted(FINFO, log_format, s_or_r,
+		log_formatted(FNAME, log_format, s_or_r,
 			      file, initial_stats, iflags, hlink);
 	}
 }
