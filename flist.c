@@ -1035,6 +1035,7 @@ static void send_directory(int f, struct file_list *flist,
 			rprintf(FINFO,
 				"cannot send long-named file %s\n",
 				full_fname(fbuf));
+			continue;
 		}
 
 		send_file_name(f, flist, fbuf, 0);
