@@ -155,16 +155,17 @@
 	ITEM_BASIS_TYPE_FOLLOWS | ITEM_XNAME_FOLLOWS | ITEM_LOCAL_CHANGE))
 
 
-/* Log-message categories.  FLOG and FCLIENT are only used on the daemon
- * side for custom logging -- they don't get sent over the socket. */
-enum logcode { FERROR=1, FINFO=2, FLOG=3, FCLIENT=4 };
+/* Log-message categories.  Only FERROR and FINFO get sent over the socket.
+ * FLOG and FCLIENT are only used on the daemon side for custom logging,
+ * while FNAME is only used on the client side. */
+enum logcode { FERROR=1, FINFO=2, FLOG=3, FCLIENT=4, FNAME=5 };
 
 /* Messages types that are sent over the message channel.  The logcode
  * values must all be present here with identical numbers. */
 enum msgcode {
 	MSG_DATA=0,	/* raw data on the multiplexed stream */
 	MSG_ERROR=FERROR, MSG_INFO=FINFO, /* remote logging */
-	MSG_LOG=FLOG, MSG_FCLIENT=FCLIENT, /* sibling logging */
+	MSG_LOG=FLOG,	/* sibling logging */
 	MSG_REDO=9,	/* reprocess indicated flist index */
 	MSG_SUCCESS=100,/* successfully updated indicated flist index */
 	MSG_DELETED=101,/* successfully deleted a file on receiving side */
