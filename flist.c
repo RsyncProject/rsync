@@ -852,12 +852,11 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 
 	alloc_len = file_struct_len + dirname_len + basename_len
 	    + linkname_len + sum_len;
-	if (flist) {
-		bp = pool_alloc(flist->file_pool, alloc_len,
-		    "receive_file_entry");
-	} else {
+	if (flist)
+		bp = pool_alloc(flist->file_pool, alloc_len, "make_file");
+	else {
 		if (!(bp = new_array(char, alloc_len)))
-			out_of_memory("receive_file_entry");
+			out_of_memory("make_file");
 	}
 
 	file = (struct file_struct *)bp;
