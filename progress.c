@@ -103,8 +103,8 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 			stats.num_files);
 	} else
 		strcpy(eol, "\r");
-	rprintf(FINFO, "%12.0f %3d%% %7.2f%s %4d:%02d:%02d%s",
-		(double) ofs, pct, rate, units,
+	rprintf(FINFO, "%12s %3d%% %7.2f%s %4d:%02d:%02d%s",
+		human_num(ofs), pct, rate, units,
 		remain_h, remain_m, remain_s, eol);
 }
 
