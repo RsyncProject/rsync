@@ -181,11 +181,13 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 		head = hlink_list[file->F_HLINDEX];
 	if (ndx != head) {
 		struct file_struct *head_file = FPTR(head);
-		if (!log_format_has_i && verbose > 1)
-			rprintf(FINFO, "\"%s\" is a hard link\n", f_name(file));
+		if (!log_format_has_i && verbose > 1) {
+			rprintf(FINFO, "\"%s\" is a hard link\n",
+				f_name(file, NULL));
+		}
 		if (head_file->F_HLINDEX == FINISHED_LINK) {
 			STRUCT_STAT st2, st3;
-			char *toname = f_name(head_file);
+			char *toname = f_name(head_file, NULL);
 			if (link_stat(toname, &st2, 0) < 0) {
 				rsyserr(FERROR, errno, "stat %s failed",
 					full_fname(toname));
@@ -266,7 +268,7 @@ void hard_link_cluster(struct file_struct *file, int master, int itemizing,
 	int statret, ndx = master;
 
 	file->F_HLINDEX = FINISHED_LINK;
-	if (link_stat(f_name_to(file, hlink1), &st1, 0) < 0)
+	if (link_stat(f_name(file, hlink1), &st1, 0) < 0)
 		return;
 	if (!(file->flags & FLAG_HLINK_TOL)) {
 		while (!(file->flags & FLAG_HLINK_EOL)) {
@@ -279,7 +281,7 @@ void hard_link_cluster(struct file_struct *file, int master, int itemizing,
 		file = FPTR(ndx);
 		if (file->F_HLINDEX != SKIPPED_LINK)
 			continue;
-		hlink2 = f_name(file);
+		hlink2 = f_name(file, NULL);
 		statret = link_stat(hlink2, &st2, 0);
 		maybe_hard_link(file, ndx, hlink2, statret, &st2,
 				hlink1, &st1, itemizing, code);

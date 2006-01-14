@@ -133,7 +133,7 @@ void successful_send(int ndx)
 				    file->dir.root, "/", NULL);
 	} else
 		offset = 0;
-	f_name_to(file, fname + offset);
+	f_name(file, fname + offset);
 	if (remove_sent_files && do_unlink(fname) == 0 && verbose > 1)
 		rprintf(FINFO, "sender removed %s\n", fname + offset);
 }
@@ -254,7 +254,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 				fname[offset++] = '/';
 		} else
 			offset = 0;
-		fname2 = f_name_to(file, fname + offset);
+		fname2 = f_name(file, fname + offset);
 
 		if (verbose > 2)
 			rprintf(FINFO, "send_files(%d, %s)\n", i, fname);

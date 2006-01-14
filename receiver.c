@@ -344,7 +344,7 @@ static void handle_delayed_updates(struct file_list *flist, char *local_name)
 
 	for (i = -1; (i = next_delayed_bit(i)) >= 0; ) {
 		struct file_struct *file = flist->files[i];
-		fname = local_name ? local_name : f_name(file);
+		fname = local_name ? local_name : f_name(file, NULL);
 		if ((partialptr = partial_dir_fname(fname)) != NULL) {
 			if (make_backups && !make_backup(fname))
 				continue;
@@ -378,7 +378,7 @@ static int get_next_gen_i(int batch_gen_fd, int next_gen_i, int desired_i)
 			rprintf(FINFO,
 				"(No batched update for%s \"%s\")\n",
 				phase ? " resend of" : "",
-				f_name(the_file_list->files[next_gen_i]));
+				f_name(the_file_list->files[next_gen_i], NULL));
 		}
 		next_gen_i = read_int(batch_gen_fd);
 		if (next_gen_i == -1)
@@ -456,7 +456,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			continue;
 
 		file = flist->files[i];
-		fname = local_name ? local_name : f_name_to(file, fbuf);
+		fname = local_name ? local_name : f_name(file, fbuf);
 
 		if (verbose > 2)
 			rprintf(FINFO, "recv_files(%s)\n", fname);

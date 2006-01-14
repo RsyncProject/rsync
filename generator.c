@@ -281,7 +281,7 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 			continue;
 		if (flist_find(flist, fp) < 0) {
 			int mode = fp->mode;
-			f_name_to(fp, delbuf);
+			f_name(fp, delbuf);
 			delete_item(delbuf, mode, DEL_FORCE_RECURSE);
 		}
 	}
@@ -306,7 +306,7 @@ static void do_delete_pass(struct file_list *flist)
 		if (!(file->flags & FLAG_DEL_HERE))
 			continue;
 
-		f_name_to(file, fbuf);
+		f_name(file, fbuf);
 		if (verbose > 1 && file->flags & FLAG_TOP_DIR)
 			rprintf(FINFO, "deleting in %s\n", fbuf);
 
@@ -906,7 +906,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (safe_symlinks && unsafe_symlink(file->u.link, fname)) {
 			if (verbose) {
 				if (the_file_list->count == 1)
-					fname = f_name(file);
+					fname = f_name(file, NULL);
 				rprintf(FINFO,
 					"ignoring unsafe symlink %s -> \"%s\"\n",
 					full_fname(fname), file->u.link);
@@ -1039,7 +1039,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (!S_ISREG(file->mode)) {
 		if (the_file_list->count == 1)
-			fname = f_name(file);
+			fname = f_name(file, NULL);
 		rprintf(FINFO, "skipping non-regular file \"%s\"\n", fname);
 		return;
 	}
@@ -1047,7 +1047,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (max_size && file->length > max_size) {
 		if (verbose > 1) {
 			if (the_file_list->count == 1)
-				fname = f_name(file);
+				fname = f_name(file, NULL);
 			rprintf(FINFO, "%s is over max-size\n", fname);
 		}
 		return;
@@ -1055,7 +1055,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (min_size && file->length < min_size) {
 		if (verbose > 1) {
 			if (the_file_list->count == 1)
-				fname = f_name(file);
+				fname = f_name(file, NULL);
 			rprintf(FINFO, "%s is under min-size\n", fname);
 		}
 		return;
@@ -1111,7 +1111,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		int j = find_fuzzy(file, fuzzy_dirlist);
 		if (j >= 0) {
 			fuzzy_file = fuzzy_dirlist->files[j];
-			f_name_to(fuzzy_file, fnamecmpbuf);
+			f_name(fuzzy_file, fnamecmpbuf);
 			if (verbose > 2) {
 				rprintf(FINFO, "fuzzy basis selected for %s: %s\n",
 					fname, fnamecmpbuf);
@@ -1333,7 +1333,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		if (local_name)
 			strlcpy(fbuf, local_name, sizeof fbuf);
 		else
-			f_name_to(file, fbuf);
+			f_name(file, fbuf);
 		recv_generator(fbuf, file, i, itemizing, maybe_PERMS_REPORT,
 			       code, f_out);
 
@@ -1387,7 +1387,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		if (local_name)
 			strlcpy(fbuf, local_name, sizeof fbuf);
 		else
-			f_name_to(file, fbuf);
+			f_name(file, fbuf);
 		recv_generator(fbuf, file, i, itemizing, maybe_PERMS_REPORT,
 			       code, f_out);
 	}
@@ -1434,7 +1434,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 				continue;
 			if (!need_retouch_dir_times && file->mode & S_IWUSR)
 				continue;
-			recv_generator(f_name(file), file, i, itemizing,
+			recv_generator(f_name(file, NULL), file, i, itemizing,
 				       maybe_PERMS_REPORT, code, -1);
 			if (allowed_lull && !(++j % lull_mod))
 				maybe_send_keepalive();
