@@ -143,14 +143,14 @@ static void list_file_entry(struct file_struct *f)
 		rprintf(FINFO, "%s %11.0f %s %s -> %s\n",
 			perms,
 			(double)f->length, timestring(f->modtime),
-			f_name(f), f->u.link);
+			f_name(f, NULL), f->u.link);
 	} else
 #endif
 	{
 		rprintf(FINFO, "%s %11.0f %s %s\n",
 			perms,
 			(double)f->length, timestring(f->modtime),
-			f_name(f));
+			f_name(f, NULL));
 	}
 }
 
@@ -336,7 +336,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 
 	io_write_phase = "send_file_entry";
 
-	f_name_to(file, fname);
+	f_name(file, fname);
 
 	flags = base_flags;
 
@@ -978,7 +978,7 @@ static void send_if_directory(int f, struct file_list *flist,
 	char is_dot_dir = fbuf[ol-1] == '.' && (ol == 1 || fbuf[ol-2] == '/');
 
 	if (S_ISDIR(file->mode)
-	    && !(file->flags & FLAG_MOUNT_POINT) && f_name_to(file, fbuf)) {
+	    && !(file->flags & FLAG_MOUNT_POINT) && f_name(file, fbuf)) {
 		void *save_filters;
 		unsigned int len = strlen(fbuf);
 		if (len > 1 && fbuf[len-1] == '/')
@@ -1328,8 +1328,10 @@ struct file_list *recv_file_list(int f)
 
 		maybe_emit_filelist_progress(flist->count);
 
-		if (verbose > 2)
-			rprintf(FINFO, "recv_file_name(%s)\n", f_name(file));
+		if (verbose > 2) {
+			rprintf(FINFO, "recv_file_name(%s)\n",
+				f_name(file, NULL));
+		}
 	}
 	receive_file_entry(NULL, 0, 0); /* Signal that we're done. */
 
@@ -1520,7 +1522,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			if (verbose > 1 && !am_server) {
 				rprintf(FINFO,
 					"removing duplicate name %s from file list (%d)\n",
-					f_name(file), drop);
+					f_name(file, NULL), drop);
 			}
 			/* Make sure that if we unduplicate '.', that we don't
 			 * lose track of a user-specified top directory. */
@@ -1738,13 +1740,22 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 }
 
 /* Return a copy of the full filename of a flist entry, using the indicated
- * buffer.  No size-checking is done because we checked the size when creating
- * the file_struct entry.
+ * buffer or one of 5 static buffers if fbuf is NULL.  No size-checking is
+ * done because we checked the size when creating the file_struct entry.
  */
-char *f_name_to(struct file_struct *f, char *fbuf)
+char *f_name(struct file_struct *f, char *fbuf)
 {
 	if (!f || !f->basename)
 		return NULL;
+
+	if (!fbuf) {
+		static char names[5][MAXPATHLEN];
+		static unsigned int n;
+
+		n = (n + 1) % (sizeof names / sizeof names[0]);
+
+		fbuf = names[n];
+	}
 
 	if (f->dirname) {
 		int len = strlen(f->dirname);
@@ -1755,17 +1766,6 @@ char *f_name_to(struct file_struct *f, char *fbuf)
 		strcpy(fbuf, f->basename);
 
 	return fbuf;
-}
-
-/* Like f_name_to(), but we rotate through 5 static buffers of our own. */
-char *f_name(struct file_struct *f)
-{
-	static char names[5][MAXPATHLEN];
-	static unsigned int n;
-
-	n = (n + 1) % (sizeof names / sizeof names[0]);
-
-	return f_name_to(f, names[n]);
 }
 
 /* Do a non-recursive scan of the named directory, possibly ignoring all
