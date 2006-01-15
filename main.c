@@ -426,57 +426,108 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 	return 0; /* not reached */
 }
 
-
-static char *get_local_name(struct file_list *flist,char *name)
+/* The receiving side operates in one of two modes:
+ *
+ * 1. it enters a directory and receives one or more files, placing them
+ * according to their names in the file-list.
+ *
+ * 2. it receives a single file and saves it using the name in the
+ * destination path instead of its file-list name.  This requires a
+ * "local name" for writing out the destination file.
+ *
+ * So, our task is to figure out what mode/local-name we need and return
+ * either a NULL for mode 1, or the local-name for mode 2.  We also
+ * change directory if there are any path components in dest_path. */
+static char *get_local_name(struct file_list *flist, char *dest_path)
 {
 	STRUCT_STAT st;
-	int e;
+	char *cp;
 
-	if (verbose > 2)
-		rprintf(FINFO,"get_local_name count=%d %s\n",
-			flist->count, NS(name));
+	if (verbose > 2) {
+		rprintf(FINFO, "get_local_name count=%d %s\n",
+			flist->count, NS(dest_path));
+	}
 
-	if (!name)
+	if (!dest_path)
 		return NULL;
 
-	if (do_stat(name,&st) == 0) {
+	/* If the destination path refers to an existing directory, enter
+	 * it and use mode 1.  If there is something other than a directory
+	 * at the destination path, we must be transferring one file
+	 * (anything at the destination will be overwritten). */
+	if (do_stat(dest_path, &st) == 0) {
 		if (S_ISDIR(st.st_mode)) {
-			if (!push_dir(name)) {
+			if (!push_dir(dest_path)) {
 				rsyserr(FERROR, errno, "push_dir#1 %s failed",
-					full_fname(name));
+					full_fname(dest_path));
 				exit_cleanup(RERR_FILESELECT);
 			}
 			return NULL;
 		}
 		if (flist->count > 1) {
-			rprintf(FERROR,"ERROR: destination must be a directory when copying more than 1 file\n");
+			rprintf(FERROR,
+				"ERROR: destination must be a directory when"
+				" copying more than 1 file\n");
 			exit_cleanup(RERR_FILESELECT);
 		}
-		return name;
 	}
 
-	if (flist->count <= 1 && ((e = strlen(name)) <= 1 || name[e-1] != '/'))
-		return name;
+	cp = strrchr(dest_path, '/');
 
-	if (do_mkdir(name,0777 & ~orig_umask) != 0) {
-		rsyserr(FERROR, errno, "mkdir %s failed", full_fname(name));
-		exit_cleanup(RERR_FILEIO);
-	}
-	if (verbose > 0)
-		rprintf(FINFO, "created directory %s\n", name);
+	/* If the destination path ends in a slash or we are transferring
+	 * multiple files, create a directory at the destination path,
+	 * enter the new directory, and use mode 1. */
+	if (flist->count > 1 || (cp && !cp[1])) {
+		/* Lop off the final slash (if any). */
+		if (cp && !cp[1])
+			*cp = '\0';
 
-	if (dry_run) {
-		dry_run++;
+		umask(orig_umask);
+		if (do_mkdir(dest_path, 0777) != 0) {
+			rsyserr(FERROR, errno, "mkdir %s failed",
+				full_fname(dest_path));
+			exit_cleanup(RERR_FILEIO);
+		}
+		umask(0);
+
+		if (verbose)
+			rprintf(FINFO, "created directory %s\n", dest_path);
+
+		if (dry_run) {
+			/* Indicate that the destination directory doesn't
+			 * really exist and return mode 1. */
+			dry_run++;
+			return NULL;
+		}
+
+		if (!push_dir(dest_path)) {
+			rsyserr(FERROR, errno, "push_dir#2 %s failed",
+				full_fname(dest_path));
+			exit_cleanup(RERR_FILESELECT);
+		}
+
 		return NULL;
 	}
 
-	if (!push_dir(name)) {
-		rsyserr(FERROR, errno, "push_dir#2 %s failed",
-			full_fname(name));
+	/* Otherwise, we are writing a single file, possibly on top of an
+	 * existing non-directory.  Change to the item's parent directory
+	 * (if it has a path component), return the basename of the
+	 * destination file as the local name, and use mode 2. */
+	if (!cp)
+		return dest_path;
+
+	if (cp == dest_path)
+		dest_path = "/";
+
+	*cp = '\0';
+	if (!push_dir(dest_path)) {
+		rsyserr(FERROR, errno, "push_dir#3 %s failed",
+			full_fname(dest_path));
 		exit_cleanup(RERR_FILESELECT);
 	}
+	*cp = '/';
 
-	return NULL;
+	return cp + 1;
 }
 
 
@@ -504,7 +555,7 @@ static void read_final_goodbye(int f_in, int f_out)
 }
 
 
-static void do_server_sender(int f_in, int f_out, int argc,char *argv[])
+static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 {
 	struct file_list *flist;
 	char *dir = argv[0];
@@ -1133,6 +1184,10 @@ int main(int argc,char *argv[])
 	 * carried across */
 	orig_umask = (int)umask(0);
 
+#if defined CONFIG_LOCALE && defined HAVE_SETLOCALE
+	setlocale(LC_CTYPE, "");
+#endif
+
 	if (!parse_arguments(&argc, (const char ***) &argv, 1)) {
 		/* FIXME: We ought to call the same error-handling
 		 * code here, rather than relying on getopt. */
@@ -1147,10 +1202,6 @@ int main(int argc,char *argv[])
 	/* Ignore SIGPIPE; we consistently check error codes and will
 	 * see the EPIPE. */
 	signal(SIGPIPE, SIG_IGN);
-
-#if defined CONFIG_LOCALE && defined HAVE_SETLOCALE
-	setlocale(LC_CTYPE, "");
-#endif
 
 	/* Initialize push_dir here because on some old systems getcwd
 	 * (implemented by forking "pwd" and reading its output) doesn't
