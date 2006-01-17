@@ -74,7 +74,6 @@ dev_t filesystem_dev; /* used to implement -x */
 static char empty_sum[MD4_SUM_LENGTH];
 static int flist_count_offset;
 static unsigned int file_struct_len;
-static struct file_list *sorting_flist;
 
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
 static void output_flist(struct file_list *flist);
@@ -1476,10 +1475,8 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 		return;
 	}
 
-	sorting_flist = flist;
 	qsort(flist->files, flist->count,
 	    sizeof flist->files[0], (int (*)())file_compare);
-	sorting_flist = NULL;
 
 	for (i = no_dups? 0 : flist->count; i < flist->count; i++) {
 		if (flist->files[i]->basename) {
