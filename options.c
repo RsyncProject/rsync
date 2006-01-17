@@ -214,8 +214,7 @@ static void print_rsync_version(enum logcode f)
 
 	rprintf(f, "%s  version %s  protocol version %d\n",
 		RSYNC_NAME, RSYNC_VERSION, PROTOCOL_VERSION);
-	rprintf(f,
-		"Copyright (C) 1996-2005 by Andrew Tridgell and others\n");
+	rprintf(f, "Copyright (C) 1996-2006 by Wayne Davison, Andrew Tridgell, and others\n");
 	rprintf(f, "<http://rsync.samba.org/>\n");
 	rprintf(f, "Capabilities: %d-bit files, %ssocketpairs, "
 		"%shard links, %ssymlinks, batchfiles, \n",
@@ -243,12 +242,9 @@ static void print_rsync_version(enum logcode f)
 			(int) SIZEOF_INT64, (int) sizeof (int64));
 	}
 
-	rprintf(f,
-"\n"
-"rsync comes with ABSOLUTELY NO WARRANTY.  This is free software, and you\n"
-"are welcome to redistribute it under certain conditions.  See the GNU\n"
-"General Public Licence for details.\n"
-		);
+	rprintf(f,"\nrsync comes with ABSOLUTELY NO WARRANTY.  This is free software, and you\n");
+	rprintf(f,"are welcome to redistribute it under certain conditions.  See the GNU\n");
+	rprintf(f,"General Public Licence for details.\n");
 }
 
 
@@ -256,9 +252,10 @@ void usage(enum logcode F)
 {
   print_rsync_version(F);
 
-  rprintf(F,"\nrsync is a file transfer program capable of efficient remote update\nvia a fast differencing algorithm.\n\n");
+  rprintf(F,"\nrsync is a file transfer program capable of efficient remote update\n");
+  rprintf(F,"via a fast differencing algorithm.\n");
 
-  rprintf(F,"Usage: rsync [OPTION]... SRC [SRC]... DEST\n");
+  rprintf(F,"\nUsage: rsync [OPTION]... SRC [SRC]... DEST\n");
   rprintf(F,"  or   rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST\n");
   rprintf(F,"  or   rsync [OPTION]... SRC [SRC]... [USER@]HOST::DEST\n");
   rprintf(F,"  or   rsync [OPTION]... SRC [SRC]... rsync://[USER@]HOST[:PORT]/DEST\n");
