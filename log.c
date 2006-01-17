@@ -84,7 +84,6 @@ struct {
 };
 
 
-
 /*
  * Map from rsync error code to name, or return NULL.
  */
@@ -97,7 +96,6 @@ static char const *rerr_name(int code)
 	}
 	return NULL;
 }
-
 
 static void logit(int priority, char *buf)
 {
@@ -294,7 +292,6 @@ void rwrite(enum logcode code, char *buf, int len)
 	}
 }
 
-
 /* This is the rsync debugging function. Call it with FINFO, FERROR or
  * FLOG. */
 void rprintf(enum logcode code, const char *format, ...)
@@ -336,7 +333,6 @@ void rprintf(enum logcode code, const char *format, ...)
 	rwrite(code, buf, len);
 }
 
-
 /* This is like rprintf, but it also tries to print some
  * representation of the error code.  Normally errcode = errno.
  *
@@ -368,8 +364,6 @@ void rsyserr(enum logcode code, int errcode, const char *format, ...)
 	rwrite(code, buf, len);
 }
 
-
-
 void rflush(enum logcode code)
 {
 	FILE *f = NULL;
@@ -396,8 +390,6 @@ void rflush(enum logcode code)
 	if (!f) exit_cleanup(RERR_MESSAGEIO);
 	fflush(f);
 }
-
-
 
 /* a generic logging routine for send/recv, with parameter
  * substitiution */
@@ -691,7 +683,6 @@ void log_delete(char *fname, int mode)
 	fmt = daemon_log_format_has_o_or_i ? lp_log_format(module_id) : "deleting %n";
 	log_formatted(FLOG, fmt, "del.", &file, &stats, ITEM_DELETED, NULL);
 }
-
 
 /*
  * Called when the transfer is interrupted for some reason.
