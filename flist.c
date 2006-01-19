@@ -733,7 +733,7 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
  * important case.  Some systems may not have d_type.
  **/
 struct file_struct *make_file(char *fname, struct file_list *flist,
-			      int filter_level)
+			      STRUCT_STAT *stp, int filter_level)
 {
 	static char *lastdir;
 	static int lastdir_len = -1;
@@ -760,7 +760,9 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 
 	memset(sum, 0, SUM_LENGTH);
 
-	if (readlink_stat(thisname, &st, linkname) != 0) {
+	if (stp && S_ISDIR(stp->st_mode))
+		st = *stp; /* Needed for "symlink/." with --relative. */
+	else if (readlink_stat(thisname, &st, linkname) != 0) {
 		int save_errno = errno;
 		/* See if file is excluded before reporting an error. */
 		if (filter_level != NO_FILTERS
@@ -951,11 +953,13 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 }
 
 static struct file_struct *send_file_name(int f, struct file_list *flist,
-					  char *fname, unsigned short base_flags)
+					  char *fname, STRUCT_STAT *stp,
+					  unsigned short base_flags)
 {
 	struct file_struct *file;
 
-	file = make_file(fname, flist, f == -2 ? SERVER_FILTERS : ALL_FILTERS);
+	file = make_file(fname, flist, stp,
+			 f == -2 ? SERVER_FILTERS : ALL_FILTERS);
 	if (!file)
 		return NULL;
 
@@ -1036,7 +1040,7 @@ static void send_directory(int f, struct file_list *flist,
 			continue;
 		}
 
-		send_file_name(f, flist, fbuf, 0);
+		send_file_name(f, flist, fbuf, NULL, 0);
 	}
 
 	fbuf[len] = '\0';
@@ -1169,10 +1173,16 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				fn = fbuf;
 			/* Get rid of trailing "/" and "/.". */
 			while (len) {
-				if (fn[len - 1] == '/')
-					len--;
+				if (fn[len - 1] == '/') {
+					is_dot_dir = 1;
+					if (!--len && !dir) {
+						len++;
+						break;
+					}
+				}
 				else if (len >= 2 && fn[len - 1] == '.'
 						  && fn[len - 2] == '/') {
+					is_dot_dir = 1;
 					if (!(len -= 2) && !dir) {
 						len++;
 						break;
@@ -1182,13 +1192,14 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			}
 			fn[len] = '\0';
 			/* Reject a ".." dir in the active part of the path. */
-			if ((p = strstr(fbuf, "..")) != NULL
-			 && (p[2] == '/' || p[2] == '\0')
-			 && (p == fbuf || p[-1] == '/')) {
-				rprintf(FERROR,
-				    "using a \"..\" dir is invalid with --relative: %s\n",
-				    fbuf);
-				exit_cleanup(RERR_SYNTAX);
+			for (p = fn; (p = strstr(p, "..")) != NULL; p += 2) {
+				if ((p[2] == '/' || p[2] == '\0')
+				 && (p == fn || p[-1] == '/')) {
+					rprintf(FERROR,
+					    "found \"..\" dir in relative path: %s\n",
+					    fbuf);
+					exit_cleanup(RERR_SYNTAX);
+				}
 			}
 		}
 
@@ -1241,7 +1252,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				xfer_dirs = 1;
 				while ((slash = strchr(slash+1, '/')) != 0) {
 					*slash = '\0';
-					send_file_name(f, flist, fbuf, 0);
+					send_file_name(f, flist, fbuf, NULL, 0);
 					*slash = '/';
 				}
 				copy_links = save_copy_links;
@@ -1257,10 +1268,11 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 		if (recurse || (xfer_dirs && is_dot_dir)) {
 			struct file_struct *file;
-			if ((file = send_file_name(f, flist, fbuf, XMIT_TOP_DIR)))
+			file = send_file_name(f, flist, fbuf, &st, XMIT_TOP_DIR);
+			if (file)
 				send_if_directory(f, flist, file, fbuf, len);
 		} else
-			send_file_name(f, flist, fbuf, 0);
+			send_file_name(f, flist, fbuf, &st, 0);
 
 		if (olddir[0]) {
 			flist_dir = NULL;
