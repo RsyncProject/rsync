@@ -46,6 +46,10 @@ Changes since 2.6.6:
     - If --relative is active, simply trim off trailing slashes and dot
       dirs.  Also, reject a ".." dir if it would be sent as a relative dir.
 
+    - If a non-directory is in the way of a directory and rsync is run with
+      --dry-run and --delete, rsync no longer complains about not being
+      able to opendir() the not-yet present directory.
+
   ENHANCEMENTS:
 
     - Added the --append option that makes rsync append data onto files
