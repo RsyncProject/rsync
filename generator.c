@@ -1195,7 +1195,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			close(fd);
 			return;
 		}
-		if (!(back_file = make_file(fname, NULL, NO_FILTERS))) {
+		if (!(back_file = make_file(fname, NULL, NULL, NO_FILTERS))) {
 			close(fd);
 			goto pretend_missing;
 		}
@@ -1266,7 +1266,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	close(fd);
 }
-
 
 void generate_files(int f_out, struct file_list *flist, char *local_name)
 {
@@ -1430,6 +1429,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		 * modified-time values. */
 		for (i = 0; i < flist->count; i++) {
 			struct file_struct *file = flist->files[i];
+
 			if (!file->basename || !S_ISDIR(file->mode))
 				continue;
 			if (!need_retouch_dir_times && file->mode & S_IWUSR)
