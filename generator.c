@@ -261,7 +261,7 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 	dlen = strlen(fbuf);
 	filt_array[cur_depth] = push_local_filters(fbuf, dlen);
 
-	if (link_stat(fbuf, &st, keep_dirlinks) < 0)
+	if (link_stat(fbuf, &st, keep_dirlinks) < 0 || !S_ISDIR(st.st_mode))
 		return;
 
 	if (one_file_system) {
