@@ -1102,7 +1102,10 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		}
 
 		len = strlen(fbuf);
-		if (!len || fbuf[len - 1] == '/') {
+		if (relative_paths) {
+			/* We clean up fbuf below. */
+			is_dot_dir = 0;
+		} else if (!len || fbuf[len - 1] == '/') {
 			if (len == 2 && fbuf[0] == '.') {
 				/* Turn "./" into just "." rather than "./." */
 				fbuf[1] = '\0';
@@ -1153,16 +1156,41 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				fn = p + 1;
 			} else
 				fn = fbuf;
-		} else if ((p = strstr(fbuf, "/./")) != NULL) {
-			*p = '\0';
-			if (p == fbuf)
-				dir = "/";
-			else
-				dir = fbuf;
-			len -= p - fbuf + 3;
-			fn = p + 3;
-		} else
-			fn = fbuf;
+		} else {
+			if ((p = strstr(fbuf, "/./")) != NULL) {
+				*p = '\0';
+				if (p == fbuf)
+					dir = "/";
+				else
+					dir = fbuf;
+				len -= p - fbuf + 3;
+				fn = p + 3;
+			} else
+				fn = fbuf;
+			/* Get rid of trailing "/" and "/.". */
+			while (len) {
+				if (fn[len - 1] == '/')
+					len--;
+				else if (len >= 2 && fn[len - 1] == '.'
+						  && fn[len - 2] == '/') {
+					if (!(len -= 2) && !dir) {
+						len++;
+						break;
+					}
+				} else
+					break;
+			}
+			fn[len] = '\0';
+			/* Reject a ".." dir in the active part of the path. */
+			if ((p = strstr(fbuf, "..")) != NULL
+			 && (p[2] == '/' || p[2] == '\0')
+			 && (p == fbuf || p[-1] == '/')) {
+				rprintf(FERROR,
+				    "using a \"..\" dir is invalid with --relative: %s\n",
+				    fbuf);
+				exit_cleanup(RERR_SYNTAX);
+			}
+		}
 
 		if (!*fn) {
 			len = 1;
