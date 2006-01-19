@@ -40,6 +40,12 @@ Changes since 2.6.6:
     - Fixed the matching of the dont-compress items (e.g. *.gz) against files
       that have a path component containing a slash.
 
+    - If code reading a filter/exclude file an EINTR error, rsync now clears
+      the error flag on the file handle so it can keep on reading.
+
+    - If --relative is active, simply trim off trailing slashes and dot
+      dirs.  Also, reject a ".." dir if it would be sent as a relative dir.
+
   ENHANCEMENTS:
 
     - Added the --append option that makes rsync append data onto files
@@ -105,6 +111,10 @@ Changes since 2.6.6:
       to be transferred, and we still need to check 8383 more files out of
       a total of 9999.
 
+    - The include/exclude code now allows a dir/*** directive (with 3
+      trailing stars) to match both the dir itself as well as all the
+      content below the dir (dir/** would not match the dir).
+
     - Some minor documentation improvements.
 
     - Updated some diffs in the patches dir.
@@ -122,6 +132,16 @@ Changes since 2.6.6:
 
     - Reduced the amount of stack memory needed for each level of directory
       recursion by nearly MAXPATHLEN bytes.
+
+    - The wildmatch function was extended to allow an array of strings to
+      be supplied as the string to match.  This allows the exclude code to
+      do less string copying.
+
+    - Got rid of the safe_fname() function (and all the myriad calls) and
+      replaced it with a new function in the log.c code that filters all
+      the output going to the terminal.
+
+    - Unified the f_name() and the f_name_to() functions.
 
   DEVELOPER RELATED:
 
