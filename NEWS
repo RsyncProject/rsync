@@ -43,8 +43,9 @@ Changes since 2.6.6:
     - If code reading a filter/exclude file an EINTR error, rsync now clears
       the error flag on the file handle so it can keep on reading.
 
-    - If --relative is active, simply trim off trailing slashes and dot
-      dirs.  Also, reject a ".." dir if it would be sent as a relative dir.
+    - If --relative is active, the sending side cleans up trailing "/" or "/."
+      suffixes to avoid triggering a bug in older rsync versions.  Also, we now
+      reject a ".." dir if it would be sent as a relative dir.
 
     - If a non-directory is in the way of a directory and rsync is run with
       --dry-run and --delete, rsync no longer complains about not being
