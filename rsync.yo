@@ -1158,6 +1158,10 @@ ssh prefers non-blocking I/O.)
 dit(bf(-i, --itemize-changes)) Requests a simple itemized list of the
 changes that are being made to each file, including attribute changes.
 This is exactly the same as specifying bf(--log-format='%i %n%L').
+If you repeat the option, unchanged files will also be output, but only
+if the receiving rsync is at least version 2.6.7 (you can use bf(-vv)
+with older versions of rsync, but that also turns on the output of other
+verbose messages).
 
 The "%i" escape has a cryptic output that is 9 letters long.  The general
 format is like the string bf(UXcstpoga)), where bf(U) is replaced by the
