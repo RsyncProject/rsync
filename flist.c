@@ -306,7 +306,7 @@ void flist_expand(struct file_list *flist)
 		out_of_memory("flist_expand");
 }
 
-void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
+static void send_file_entry(struct file_struct *file, int f)
 {
 	unsigned short flags;
 	static time_t modtime;
@@ -337,7 +337,7 @@ void send_file_entry(struct file_struct *file, int f, unsigned short base_flags)
 
 	f_name(file, fname);
 
-	flags = base_flags;
+	flags = file->flags & XMIT_TOP_DIR;
 
 	if (file->mode == mode)
 		flags |= XMIT_SAME_MODE;
@@ -733,7 +733,8 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
  * important case.  Some systems may not have d_type.
  **/
 struct file_struct *make_file(char *fname, struct file_list *flist,
-			      STRUCT_STAT *stp, int filter_level)
+			      STRUCT_STAT *stp, unsigned short flags,
+			      int filter_level)
 {
 	static char *lastdir;
 	static int lastdir_len = -1;
@@ -744,7 +745,6 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	char linkname[MAXPATHLEN];
 	int alloc_len, basename_len, dirname_len, linkname_len, sum_len;
 	char *basename, *dirname, *bp;
-	unsigned short flags = 0;
 
 	if (!flist || !flist->count)	/* Ignore lastdir when invalid. */
 		lastdir_len = -1;
@@ -954,11 +954,11 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 
 static struct file_struct *send_file_name(int f, struct file_list *flist,
 					  char *fname, STRUCT_STAT *stp,
-					  unsigned short base_flags)
+					  unsigned short flags)
 {
 	struct file_struct *file;
 
-	file = make_file(fname, flist, stp,
+	file = make_file(fname, flist, stp, flags,
 			 f == -2 ? SERVER_FILTERS : ALL_FILTERS);
 	if (!file)
 		return NULL;
@@ -969,7 +969,7 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 
 	if (file->basename[0]) {
 		flist->files[flist->count++] = file;
-		send_file_entry(file, f, base_flags);
+		send_file_entry(file, f);
 	}
 	return file;
 }
@@ -1268,7 +1268,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 		if (recurse || (xfer_dirs && is_dot_dir)) {
 			struct file_struct *file;
-			file = send_file_name(f, flist, fbuf, &st, XMIT_TOP_DIR);
+			file = send_file_name(f, flist, fbuf, &st, FLAG_TOP_DIR);
 			if (file)
 				send_if_directory(f, flist, file, fbuf, len);
 		} else
@@ -1292,7 +1292,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		stats.flist_buildtime = 1;
 	start_tv = end_tv;
 
-	send_file_entry(NULL, f, 0);
+	send_file_entry(NULL, f);
 
 	if (show_filelist_p())
 		finish_filelist_progress(flist);
