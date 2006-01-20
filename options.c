@@ -471,7 +471,7 @@ static struct poptOption long_options[] = {
   {"partial-dir",      0,  POPT_ARG_STRING, &partial_dir, 0, 0, 0 },
   {"delay-updates",    0,  POPT_ARG_NONE,   &delay_updates, 0, 0, 0 },
   {"log-format",       0,  POPT_ARG_STRING, &log_format, 0, 0, 0 },
-  {"itemize-changes", 'i', POPT_ARG_NONE,   &itemize_changes, 0, 0, 0 },
+  {"itemize-changes", 'i', POPT_ARG_NONE,   0, 'i', 0, 0 },
   {"bwlimit",          0,  POPT_ARG_INT,    &bwlimit, 0, 0, 0 },
   {"backup",          'b', POPT_ARG_NONE,   &make_backups, 0, 0, 0 },
   {"backup-dir",       0,  POPT_ARG_STRING, &backup_dir, 0, 0, 0 },
@@ -878,6 +878,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			usage(FINFO);
 			exit_cleanup(0);
 
+		case 'i':
+			itemize_changes++;
+			break;
+
 		case 'v':
 			verbose++;
 			break;
@@ -1217,14 +1221,16 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 
 	if (log_format) {
-		if (log_format_has(log_format, 'i'))
-			log_format_has_i = 1;
+		if (am_server && log_format_has(log_format, 'I'))
+			log_format_has_i = 2;
+		else if (log_format_has(log_format, 'i'))
+			log_format_has_i = itemize_changes | 1;
 		if (!log_format_has(log_format, 'b')
 		 && !log_format_has(log_format, 'c'))
 			log_before_transfer = !am_server;
 	} else if (itemize_changes) {
 		log_format = "%i %n%L";
-		log_format_has_i = 1;
+		log_format_has_i = itemize_changes;
 		log_before_transfer = !am_server;
 	}
 
@@ -1483,7 +1489,9 @@ void server_options(char **args,int *argc)
 	/* The server side doesn't use our log-format, but in certain
 	 * circumstances they need to know a little about the option. */
 	if (log_format && am_sender) {
-		if (log_format_has_i)
+		if (log_format_has_i > 1)
+			args[ac++] = "--log-format=%i%I";
+		else if (log_format_has_i)
 			args[ac++] = "--log-format=%i";
 		else if (log_format_has_o_or_i)
 			args[ac++] = "--log-format=%o";
