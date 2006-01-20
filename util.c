@@ -1001,22 +1001,6 @@ int handle_partial_dir(const char *fname, int create)
 	return 1;
 }
 
-/** We need to supply our own strcmp function for file list comparisons
-   to ensure that signed/unsigned usage is consistent between machines. */
-int u_strcmp(const char *cs1, const char *cs2)
-{
-	const uchar *s1 = (const uchar *)cs1;
-	const uchar *s2 = (const uchar *)cs2;
-
-	while (*s1 && *s2 && (*s1 == *s2)) {
-		s1++; s2++;
-	}
-
-	return (int)*s1 - (int)*s2;
-}
-
-
-
 /**
  * Determine if a symlink points outside the current directory tree.
  * This is considered "unsafe" because e.g. when mirroring somebody
