@@ -1195,7 +1195,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			close(fd);
 			return;
 		}
-		if (!(back_file = make_file(fname, NULL, NULL, NO_FILTERS))) {
+		if (!(back_file = make_file(fname, NULL, NULL, 0, NO_FILTERS))) {
 			close(fd);
 			goto pretend_missing;
 		}
