@@ -806,8 +806,11 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	 * into a mount-point directory, not to avoid copying a symlinked
 	 * file if -L (or similar) was specified. */
 	if (one_file_system && st.st_dev != filesystem_dev
-	    && S_ISDIR(st.st_mode))
+	    && S_ISDIR(st.st_mode)) {
+		if (one_file_system > 1)
+			return NULL;
 		flags |= FLAG_MOUNT_POINT;
+	}
 
 	if (is_excluded(thisname, S_ISDIR(st.st_mode) != 0, filter_level))
 		return NULL;
