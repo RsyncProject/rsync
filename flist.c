@@ -569,6 +569,9 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 	if (!(flags & XMIT_SAME_MODE))
 		mode = from_wire_mode(read_int(f));
 
+	if (chmod_modes && (S_ISREG(mode) || S_ISDIR(mode)))
+		mode = tweak_mode(mode, chmod_modes);
+
 	if (preserve_uid && !(flags & XMIT_SAME_UID))
 		uid = (uid_t)read_int(f);
 	if (preserve_gid && !(flags & XMIT_SAME_GID))
@@ -870,10 +873,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	file->flags = flags;
 	file->modtime = st.st_mtime;
 	file->length = st.st_size;
-	if (chmod_modes && am_sender && (S_ISREG(st.st_mode) || S_ISDIR(st.st_mode)))
-		file->mode = tweak_mode(st.st_mode, chmod_modes);
-	else
-		file->mode = st.st_mode;
+	file->mode = st.st_mode;
 	file->uid = st.st_uid;
 	file->gid = st.st_gid;
 
@@ -936,7 +936,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	if (keep_dirlinks && linkname_len && flist) {
 		STRUCT_STAT st2;
 		int save_mode = file->mode;
-		file->mode = S_IFDIR; /* find a directory w/our name */
+		file->mode = S_IFDIR; /* Find a directory with our name. */
 		if (flist_find(the_file_list, file) >= 0
 		    && do_stat(thisname, &st2) == 0 && S_ISDIR(st2.st_mode)) {
 			file->modtime = st2.st_mtime;
@@ -965,6 +965,9 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 			 f == -2 ? SERVER_FILTERS : ALL_FILTERS);
 	if (!file)
 		return NULL;
+
+	if (chmod_modes && (S_ISREG(file->mode) || S_ISDIR(file->mode)))
+		file->mode = tweak_mode(file->mode, chmod_modes);
 
 	maybe_emit_filelist_progress(flist->count + flist_count_offset);
 
