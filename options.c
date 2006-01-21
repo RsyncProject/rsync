@@ -373,7 +373,7 @@ enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_FILTER, OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST, OPT_HELP,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW, OPT_MIN_SIZE, OPT_CHMOD,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_MAX_SIZE,
-      OPT_REFUSED_BASE = 9000};
+      OPT_SERVER, OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
@@ -499,7 +499,7 @@ static struct poptOption long_options[] = {
   {"no-blocking-io",   0,  POPT_ARG_VAL,    &blocking_io, 0, 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
   {"checksum-seed",    0,  POPT_ARG_INT,    &checksum_seed, 0, 0, 0 },
-  {"server",           0,  POPT_ARG_NONE,   &am_server, 0, 0, 0 },
+  {"server",           0,  POPT_ARG_NONE,   0, OPT_SERVER, 0, 0 },
   {"sender",           0,  POPT_ARG_NONE,   0, OPT_SENDER, 0, 0 },
   /* All the following options switch us into daemon-mode option-parsing. */
   {"config",           0,  POPT_ARG_STRING, 0, OPT_DAEMON, 0, 0 },
@@ -771,6 +771,25 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			print_rsync_version(FINFO);
 			exit_cleanup(0);
 
+		case OPT_SERVER:
+			if (!am_server) {
+				/* Disable popt aliases on the server side and
+				 * then start parsing the options again. */
+				poptFreeContext(pc);
+				pc = poptGetContext(RSYNC_NAME, *argc, *argv,
+						    long_options, 0);
+				am_server = 1;
+			}
+			break;
+
+		case OPT_SENDER:
+			if (!am_server) {
+				usage(FERROR);
+				exit_cleanup(RERR_SYNTAX);
+			}
+			am_sender = 1;
+			break;
+
 		case OPT_DAEMON:
 			if (am_daemon) {
 				strcpy(err_buf, "Attempt to hack rsync thwarted!\n");
@@ -890,14 +909,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 		case 'x':
 			one_file_system++;
-			break;
-
-		case OPT_SENDER:
-			if (!am_server) {
-				usage(FERROR);
-				exit_cleanup(RERR_SYNTAX);
-			}
-			am_sender = 1;
 			break;
 
 		case 'F':
