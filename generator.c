@@ -83,9 +83,7 @@ extern int safe_symlinks;
 extern long block_size; /* "long" because popt can't set an int32. */
 extern int max_delete;
 extern int force_delete;
-extern int one_file_system;
 extern struct stats stats;
-extern dev_t filesystem_dev;
 extern char *backup_dir;
 extern char *backup_suffix;
 extern int backup_suffix_len;
@@ -224,7 +222,6 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 	static int already_warned = 0;
 	struct file_list *dirlist;
 	char delbuf[MAXPATHLEN];
-	STRUCT_STAT st;
 	int dlen, i;
 
 	if (!flist) {
@@ -261,15 +258,8 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 	dlen = strlen(fbuf);
 	filt_array[cur_depth] = push_local_filters(fbuf, dlen);
 
-	if (link_stat(fbuf, &st, keep_dirlinks) < 0 || !S_ISDIR(st.st_mode))
+	if (file->flags & FLAG_MOUNT_POINT)
 		return;
-
-	if (one_file_system) {
-		if (file->flags & FLAG_TOP_DIR)
-			filesystem_dev = st.st_dev;
-		else if (filesystem_dev != st.st_dev)
-			return;
-	}
 
 	dirlist = get_dirlist(fbuf, dlen, 0);
 
@@ -277,8 +267,14 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 	 * from the filesystem. */
 	for (i = dirlist->count; i--; ) {
 		struct file_struct *fp = dirlist->files[i];
-		if (!fp->basename || fp->flags & FLAG_MOUNT_POINT)
+		if (!fp->basename)
 			continue;
+		if (fp->flags & FLAG_MOUNT_POINT) {
+			int j = flist_find(flist, fp);
+			if (j >= 0)
+				flist->files[j]->flags |= FLAG_MOUNT_POINT;
+			continue;
+		}
 		if (flist_find(flist, fp) < 0) {
 			int mode = fp->mode;
 			f_name(fp, delbuf);
@@ -294,6 +290,7 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 static void do_delete_pass(struct file_list *flist)
 {
 	char fbuf[MAXPATHLEN];
+	STRUCT_STAT st;
 	int j;
 
 	if (dry_run > 1 /* destination doesn't exist yet */
@@ -309,6 +306,10 @@ static void do_delete_pass(struct file_list *flist)
 		f_name(file, fbuf);
 		if (verbose > 1 && file->flags & FLAG_TOP_DIR)
 			rprintf(FINFO, "deleting in %s\n", fbuf);
+
+		if (link_stat(fbuf, &st, keep_dirlinks) < 0
+		 || !S_ISDIR(st.st_mode))
+			continue;
 
 		delete_in_dir(flist, fbuf, file);
 	}
@@ -715,10 +716,12 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 		 || !unchanged_attrs(file, &st))
 			continue;
 		if (S_ISLNK(file->mode)) {
+#ifdef SUPPORT_LINKS
 			if ((len = readlink(fnamebuf, lnk, MAXPATHLEN-1)) <= 0)
 				continue;
 			lnk[len] = '\0';
 			if (strcmp(lnk, file->u.link) != 0)
+#endif
 				continue;
 		} else {
 			if (!IS_DEVICE(st.st_mode) || st.st_rdev != file->u.rdev)
