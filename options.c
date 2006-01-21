@@ -55,6 +55,8 @@ int cvs_exclude = 0;
 int dry_run = 0;
 int do_xfers = 1;
 int ignore_times = 0;
+int saw_delete_opt = 0;
+int saw_delete_excluded_opt = 0;
 int delete_mode = 0;
 int delete_during = 0;
 int delete_before = 0;
@@ -873,10 +875,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			preserve_devices = 1;
 			break;
 
-		case OPT_HELP:
-			usage(FINFO);
-			exit_cleanup(0);
-
 		case 'i':
 			itemize_changes++;
 			break;
@@ -1014,6 +1012,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			}
 			break;
 
+		case OPT_HELP:
+			usage(FINFO);
+			exit_cleanup(0);
+
 		default:
 			/* A large opt value means that set_refuse_options()
 			 * turned this option off. */
@@ -1114,10 +1116,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			"You may not combine multiple --delete-WHEN options.\n");
 		return 0;
 	}
-	if (!xfer_dirs) {
-		delete_before = delete_during = delete_after = 0;
-		delete_mode = delete_excluded = 0;
-	} else if (delete_before || delete_during || delete_after)
+	if (delete_before || delete_during || delete_after)
 		delete_mode = 1;
 	else if (delete_mode || delete_excluded) {
 		if (refused_delete_before) {
@@ -1125,6 +1124,12 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			return 0;
 		}
 		delete_mode = delete_before = 1;
+	}
+	saw_delete_opt = delete_mode;
+	saw_delete_excluded_opt = delete_excluded;
+	if (!xfer_dirs) {
+		delete_before = delete_during = delete_after = 0;
+		delete_mode = delete_excluded = 0;
 	}
 
 	if (delete_mode && refused_delete) {
@@ -1431,7 +1436,7 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'l';
 	if (copy_links)
 		argstr[x++] = 'L';
-	if (xfer_dirs > 1)
+	if (xfer_dirs > (recurse || !delete_mode || !am_sender))
 		argstr[x++] = 'd';
 	if (keep_dirlinks && am_sender)
 		argstr[x++] = 'K';
@@ -1482,13 +1487,18 @@ void server_options(char **args,int *argc)
 	if (list_only == 1 && !recurse)
 		argstr[x++] = 'r';
 
-	argstr[x] = 0;
+	argstr[x] = '\0';
 
 	if (x != 1)
 		args[ac++] = argstr;
 
 	if (list_only > 1)
 		args[ac++] = "--list-only";
+
+	/* This makes sure that the remote rsync can handle deleting with -d
+	 * sans -r because the --no-r option was added at the same time. */
+	if (xfer_dirs && !recurse && delete_mode && am_sender)
+		args[ac++] = "--no-r";
 
 	if (do_compression && def_compress_level != Z_DEFAULT_COMPRESSION) {
 		if (asprintf(&arg, "--compress-level=%d", def_compress_level) < 0)
