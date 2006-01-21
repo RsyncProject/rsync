@@ -173,7 +173,6 @@ static int itemize_changes = 0;
 static int refused_delete, refused_archive_part, refused_compress;
 static int refused_partial, refused_progress, refused_delete_before;
 static int refused_inplace;
-static char *chmod_mode = NULL;
 static char *max_size_arg, *min_size_arg;
 static char partialdir_for_delayupdate[] = ".~tmp~";
 
@@ -370,7 +369,7 @@ void usage(enum logcode F)
 
 enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_FILTER, OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST, OPT_HELP,
-      OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW, OPT_MIN_SIZE,
+      OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW, OPT_MIN_SIZE, OPT_CHMOD,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_MAX_SIZE,
       OPT_REFUSED_BASE = 9000};
 
@@ -422,7 +421,7 @@ static struct poptOption long_options[] = {
   {"no-relative",      0,  POPT_ARG_VAL,    &relative_paths, 0, 0, 0 },
   {"no-R",             0,  POPT_ARG_VAL,    &relative_paths, 0, 0, 0 },
   {"no-implied-dirs",  0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
-  {"chmod",            0,  POPT_ARG_STRING, &chmod_mode, 0, 0, 0 },
+  {"chmod",            0,  POPT_ARG_STRING, 0, OPT_CHMOD, 0, 0 },
   {"ignore-times",    'I', POPT_ARG_NONE,   &ignore_times, 0, 0, 0 },
   {"size-only",        0,  POPT_ARG_NONE,   &size_only, 0, 0, 0 },
   {"one-file-system", 'x', POPT_ARG_NONE,   0, 'x', 0, 0 },
@@ -1005,6 +1004,16 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			basis_dir[basis_dir_cnt++] = (char *)arg;
 			break;
 
+		case OPT_CHMOD:
+			arg = poptGetOptArg(pc);
+			if (!(chmod_modes = parse_chmod(arg, chmod_modes))) {
+				snprintf(err_buf, sizeof err_buf,
+				    "Invalid argument passed to --chmod (%s)\n",
+				    arg);
+				return 0;
+			}
+			break;
+
 		default:
 			/* A large opt value means that set_refuse_options()
 			 * turned this option off. */
@@ -1217,12 +1226,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 	if (make_backups && !backup_dir)
 		omit_dir_times = 1;
-
-	if (chmod_mode && !(chmod_modes = parse_chmod(chmod_mode))) {
-		snprintf(err_buf, sizeof err_buf,
-		    "Invalid argument passed to --chmod\n");
-		return 0;
-	}
 
 	if (log_format) {
 		if (am_server && log_format_has(log_format, 'I'))
