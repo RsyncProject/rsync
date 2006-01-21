@@ -145,7 +145,6 @@ char *log_format = NULL;
 char *password_file = NULL;
 char *rsync_path = RSYNC_PATH;
 char *backup_dir = NULL;
-char *chmod_mode = NULL;
 char backup_dir_buf[MAXPATHLEN];
 int rsync_port = 0;
 int compare_dest = 0;
@@ -174,6 +173,7 @@ static int itemize_changes = 0;
 static int refused_delete, refused_archive_part, refused_compress;
 static int refused_partial, refused_progress, refused_delete_before;
 static int refused_inplace;
+static char *chmod_mode = NULL;
 static char *max_size_arg, *min_size_arg;
 static char partialdir_for_delayupdate[] = ".~tmp~";
 
@@ -1634,11 +1634,6 @@ void server_options(char **args,int *argc)
 			args[ac++] = dest_option;
 			args[ac++] = basis_dir[i];
 		}
-	}
-
-	if (chmod_mode && !am_sender) {
-		args[ac++] = "--chmod";
-		args[ac++] = chmod_mode;
 	}
 
 	if (files_from && (!am_sender || filesfrom_host)) {
