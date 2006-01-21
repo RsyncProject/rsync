@@ -26,6 +26,7 @@ extern int am_server;
 extern int blocking_io;
 extern int orig_umask;
 extern int filesfrom_fd;
+extern struct chmod_mode_struct *chmod_modes;
 
 /**
  * Create a child connected to us via its stdin/stdout.
@@ -110,6 +111,9 @@ pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 	int to_child_pipe[2];
 	int from_child_pipe[2];
 
+	/* The parent process is always the sender for a local rsync. */
+	assert(am_sender);
+
 	if (fd_pair(to_child_pipe) < 0 ||
 	    fd_pair(from_child_pipe) < 0) {
 		rsyserr(FERROR, errno, "pipe");
@@ -123,11 +127,10 @@ pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 	}
 
 	if (pid == 0) {
-		am_sender = !am_sender;
+		am_sender = 0;
 		am_server = 1;
-
-		if (!am_sender)
-			filesfrom_fd = -1;
+		filesfrom_fd = -1;
+		chmod_modes = NULL; /* Let the sending side handle this. */
 
 		if (dup2(to_child_pipe[0], STDIN_FILENO) < 0 ||
 		    close(to_child_pipe[1]) < 0 ||
@@ -142,9 +145,6 @@ pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 			close(from_child_pipe[1]);
 		child_main(argc, argv);
 	}
-
-	if (!am_sender)
-		filesfrom_fd = -1;
 
 	if (close(from_child_pipe[1]) < 0 ||
 	    close(to_child_pipe[0]) < 0) {
