@@ -628,7 +628,7 @@ unless the directory name specified is "." or ends with a trailing slash
 (e.g. ".", "dir/.", "dir/", etc.).  Without this option or the
 bf(--recursive) option, rsync will skip all directories it encounters (and
 output a message to that effect for each one).  If you specify both
-bf(--dirs) and bf(--recursive), the latter takes precedence.
+bf(--dirs) and bf(--recursive), bf(--recursive) takes precedence.
 
 dit(bf(-l, --links)) When symlinks are encountered, recreate the
 symlink on the destination.
