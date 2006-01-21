@@ -23,12 +23,13 @@ struct chmod_mode_struct {
 /* Parse a chmod-style argument, and break it down into one or more AND/OR
  * pairs in a linked list.  We use a state machine to walk through the
  * options. */
-struct chmod_mode_struct *parse_chmod(char *modestr)
+struct chmod_mode_struct *parse_chmod(const char *modestr,
+				      struct chmod_mode_struct *append_to)
 {
 	int state = STATE_1ST_HALF;
 	int where = 0, what = 0, op = 0, topbits = 0, topoct = 0, flags = 0;
 	struct chmod_mode_struct *first_mode = NULL, *curr_mode = NULL,
-	    *prev_mode = NULL;
+				 *prev_mode = NULL;
 
 	while (state != STATE_ERROR) {
 		if (!*modestr || *modestr == ',') {
@@ -153,8 +154,16 @@ struct chmod_mode_struct *parse_chmod(char *modestr)
 
 	if (state == STATE_ERROR) {
 		free_chmod_mode(first_mode);
-		first_mode = NULL;
+		return NULL;
 	}
+
+	if (append_to) {
+		for (prev_mode = append_to; prev_mode->next; )
+			prev_mode = prev_mode->next;
+		prev_mode->next = first_mode;
+		return append_to;
+	}
+
 	return first_mode;
 }
 
