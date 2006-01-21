@@ -624,8 +624,8 @@ data is required).
 
 dit(bf(-d, --dirs)) Tell the sending side to include any directories that
 are encountered.  Unlike bf(--recursive), a directory's contents are not copied
-unless the directory was specified on the command-line as either "." or a
-name with a trailing slash (e.g. "foo/").  Without this option or the
+unless the directory name specified is "." or ends with a trailing slash
+(e.g. ".", "dir/.", "dir/", etc.).  Without this option or the
 bf(--recursive) option, rsync will skip all directories it encounters (and
 output a message to that effect for each one).  If you specify both
 bf(--dirs) and bf(--recursive), the latter takes precedence.
@@ -719,6 +719,8 @@ item that should only apply to a file by prefixing it with a 'F'.  For example:
 
 quote(--chmod=Dg+s,ug+w,Fo-w,+X)
 
+It is also legal to specify multiple bf(--chmod) options.
+
 dit(bf(-n, --dry-run)) This tells rsync to not do any file transfers,
 instead it will just report the actions it would have taken.
 
@@ -775,7 +777,7 @@ include/exclude modifiers in the FILTER RULES section).
 
 Prior to rsync 2.6.7, this option would have no effect unless bf(--recursive)
 was in effect.  Beginning with 2.6.7, deletions will also occur when bf(--dirs)
-is specified, but only for directories whose contents are being copied.
+(bf(-d)) is in effect, but only for directories whose contents are being copied.
 
 This option can be dangerous if used incorrectly!  It is a very good idea
 to run first using the bf(--dry-run) option (bf(-n)) to see what files would be
