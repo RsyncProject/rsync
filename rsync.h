@@ -58,12 +58,12 @@
 /* These flags are used in the live flist data. */
 
 #define FLAG_TOP_DIR (1<<0)
+#define FLAG_SENT (1<<1)	/* sender */
 #define FLAG_HLINK_EOL (1<<1)	/* receiver/generator */
-#define FLAG_MOUNT_POINT (1<<2)	/* sender */
-#define FLAG_NO_FUZZY (1<<2)	/* generator */
+#define FLAG_MOUNT_POINT (1<<2)	/* sender/generator */
 #define FLAG_DEL_HERE (1<<3)	/* receiver/generator */
-#define FLAG_SENT (1<<3)	/* sender */
 #define FLAG_HLINK_TOL (1<<4)	/* receiver/generator */
+#define FLAG_NO_FUZZY (1<<5)	/* generator */
 
 /* update this if you make incompatible changes */
 #define PROTOCOL_VERSION 29
