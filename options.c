@@ -425,7 +425,7 @@ static struct poptOption long_options[] = {
   {"chmod",            0,  POPT_ARG_STRING, &chmod_mode, 0, 0, 0 },
   {"ignore-times",    'I', POPT_ARG_NONE,   &ignore_times, 0, 0, 0 },
   {"size-only",        0,  POPT_ARG_NONE,   &size_only, 0, 0, 0 },
-  {"one-file-system", 'x', POPT_ARG_NONE,   &one_file_system, 0, 0, 0 },
+  {"one-file-system", 'x', POPT_ARG_NONE,   0, 'x', 0, 0 },
   {"update",          'u', POPT_ARG_NONE,   &update_only, 0, 0, 0 },
   {"existing",         0,  POPT_ARG_NONE,   &ignore_non_existing, 0, 0, 0 },
   {"ignore-non-existing",0,POPT_ARG_NONE,   &ignore_non_existing, 0, 0, 0 },
@@ -889,6 +889,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		case 'q':
 			if (frommain)
 				quiet++;
+			break;
+
+		case 'x':
+			one_file_system++;
 			break;
 
 		case OPT_SENDER:
@@ -1459,8 +1463,11 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'I';
 	if (relative_paths)
 		argstr[x++] = 'R';
-	if (one_file_system)
+	if (one_file_system) {
 		argstr[x++] = 'x';
+		if (one_file_system > 1)
+			argstr[x++] = 'x';
+	}
 	if (sparse_files)
 		argstr[x++] = 'S';
 	if (do_compression)
