@@ -69,7 +69,6 @@ extern struct filter_list_struct server_filter_list;
 
 int io_error;
 int checksum_len;
-dev_t filesystem_dev; /* used to implement -x */
 
 static char empty_sum[MD4_SUM_LENGTH];
 static int flist_count_offset;
@@ -569,7 +568,7 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 	if (!(flags & XMIT_SAME_MODE))
 		mode = from_wire_mode(read_int(f));
 
-	if (chmod_modes && (S_ISREG(mode) || S_ISDIR(mode)))
+	if (chmod_modes && !S_ISLNK(mode))
 		mode = tweak_mode(mode, chmod_modes);
 
 	if (preserve_uid && !(flags & XMIT_SAME_UID))
@@ -808,11 +807,24 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	/* We only care about directories because we need to avoid recursing
 	 * into a mount-point directory, not to avoid copying a symlinked
 	 * file if -L (or similar) was specified. */
-	if (one_file_system && st.st_dev != filesystem_dev
-	    && S_ISDIR(st.st_mode)) {
-		if (one_file_system > 1)
-			return NULL;
-		flags |= FLAG_MOUNT_POINT;
+	if (one_file_system && S_ISDIR(st.st_mode) && !(flags & FLAG_TOP_DIR)) {
+		STRUCT_STAT st2;
+		unsigned int len = strlcat(thisname, "/..", sizeof thisname);
+		/* If the directory's .. dir is on a different filesystem,
+		 * either mark this dir as a mount-point or skip it. */
+		if (len < sizeof thisname && do_stat(thisname, &st2) == 0
+		 && (st.st_dev != st2.st_dev || st.st_ino != st2.st_ino)) {
+			if (one_file_system > 1) {
+				if (verbose > 2) {
+					rprintf(FINFO,
+					    "skipping mount-point dir %s\n",
+					    thisname);
+				}
+				return NULL;
+			}
+			flags |= FLAG_MOUNT_POINT;
+		}
+		thisname[len-3] = '\0';
 	}
 
 	if (is_excluded(thisname, S_ISDIR(st.st_mode) != 0, filter_level))
@@ -966,7 +978,7 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 	if (!file)
 		return NULL;
 
-	if (chmod_modes && (S_ISREG(file->mode) || S_ISDIR(file->mode)))
+	if (chmod_modes && !S_ISLNK(file->mode))
 		file->mode = tweak_mode(file->mode, chmod_modes);
 
 	maybe_emit_filelist_progress(flist->count + flist_count_offset);
@@ -1268,9 +1280,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				*p = '/';
 			}
 		}
-
-		if (one_file_system)
-			filesystem_dev = st.st_dev;
 
 		if (recurse || (xfer_dirs && is_dot_dir)) {
 			struct file_struct *file;
