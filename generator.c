@@ -83,7 +83,9 @@ extern int safe_symlinks;
 extern long block_size; /* "long" because popt can't set an int32. */
 extern int max_delete;
 extern int force_delete;
+extern int one_file_system;
 extern struct stats stats;
+extern dev_t filesystem_dev;
 extern char *backup_dir;
 extern char *backup_suffix;
 extern int backup_suffix_len;
@@ -215,7 +217,7 @@ static int delete_item(char *fname, int mode, int flags)
  * call will append names onto the end, but the old dir value will be restored
  * on exit). */
 static void delete_in_dir(struct file_list *flist, char *fbuf,
-			  struct file_struct *file)
+			  struct file_struct *file, STRUCT_STAT *stp)
 {
 	static int min_depth = MAXPATHLEN, cur_depth = -1;
 	static void *filt_array[MAXPATHLEN/2+1];
@@ -258,8 +260,12 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 	dlen = strlen(fbuf);
 	filt_array[cur_depth] = push_local_filters(fbuf, dlen);
 
-	if (file->flags & FLAG_MOUNT_POINT)
-		return;
+	if (one_file_system) {
+		if (file->flags & FLAG_TOP_DIR)
+			filesystem_dev = stp->st_dev;
+		else if (filesystem_dev != stp->st_dev)
+			return;
+	}
 
 	dirlist = get_dirlist(fbuf, dlen, 0);
 
@@ -267,14 +273,8 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 	 * from the filesystem. */
 	for (i = dirlist->count; i--; ) {
 		struct file_struct *fp = dirlist->files[i];
-		if (!fp->basename)
+		if (!fp->basename || fp->flags & FLAG_MOUNT_POINT)
 			continue;
-		if (fp->flags & FLAG_MOUNT_POINT) {
-			int j = flist_find(flist, fp);
-			if (j >= 0)
-				flist->files[j]->flags |= FLAG_MOUNT_POINT;
-			continue;
-		}
 		if (flist_find(flist, fp) < 0) {
 			int mode = fp->mode;
 			f_name(fp, delbuf);
@@ -311,9 +311,9 @@ static void do_delete_pass(struct file_list *flist)
 		 || !S_ISDIR(st.st_mode))
 			continue;
 
-		delete_in_dir(flist, fbuf, file);
+		delete_in_dir(flist, fbuf, file, &st);
 	}
-	delete_in_dir(NULL, NULL, NULL);
+	delete_in_dir(NULL, NULL, NULL, NULL);
 
 	if (do_progress && !am_server)
 		rprintf(FINFO, "                    \r");
@@ -895,7 +895,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			rprintf(code, "%s/\n", fname);
 		if (delete_during && f_out != -1 && !phase && dry_run < 2
 		    && (file->flags & FLAG_DEL_HERE))
-			delete_in_dir(the_file_list, fname, file);
+			delete_in_dir(the_file_list, fname, file, &st);
 		return;
 	}
 
@@ -1366,7 +1366,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	}
 	recv_generator(NULL, NULL, 0, 0, 0, code, -1);
 	if (delete_during)
-		delete_in_dir(NULL, NULL, NULL);
+		delete_in_dir(NULL, NULL, NULL, NULL);
 
 	phase++;
 	csum_length = SUM_LENGTH;
