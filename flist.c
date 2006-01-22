@@ -69,6 +69,7 @@ extern struct filter_list_struct server_filter_list;
 
 int io_error;
 int checksum_len;
+dev_t filesystem_dev; /* used to implement -x */
 
 static char empty_sum[MD4_SUM_LENGTH];
 static int flist_count_offset;
@@ -807,24 +808,16 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	/* We only care about directories because we need to avoid recursing
 	 * into a mount-point directory, not to avoid copying a symlinked
 	 * file if -L (or similar) was specified. */
-	if (one_file_system && S_ISDIR(st.st_mode) && !(flags & FLAG_TOP_DIR)) {
-		STRUCT_STAT st2;
-		unsigned int len = strlcat(thisname, "/..", sizeof thisname);
-		/* If the directory's .. dir is on a different filesystem,
-		 * either mark this dir as a mount-point or skip it. */
-		if (len < sizeof thisname && do_stat(thisname, &st2) == 0
-		 && (st.st_dev != st2.st_dev || st.st_ino != st2.st_ino)) {
-			if (one_file_system > 1) {
-				if (verbose > 2) {
-					rprintf(FINFO,
-					    "skipping mount-point dir %s\n",
-					    thisname);
-				}
-				return NULL;
+	if (one_file_system && st.st_dev != filesystem_dev
+	 && S_ISDIR(st.st_mode)) {
+		if (one_file_system > 1) {
+			if (verbose > 2) {
+				rprintf(FINFO, "skipping mount-point dir %s\n",
+					thisname);
 			}
-			flags |= FLAG_MOUNT_POINT;
+			return NULL;
 		}
-		thisname[len-3] = '\0';
+		flags |= FLAG_MOUNT_POINT;
 	}
 
 	if (is_excluded(thisname, S_ISDIR(st.st_mode) != 0, filter_level))
@@ -1280,6 +1273,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				*p = '/';
 			}
 		}
+
+		if (one_file_system)
+			filesystem_dev = st.st_dev;
 
 		if (recurse || (xfer_dirs && is_dot_dir)) {
 			struct file_struct *file;
