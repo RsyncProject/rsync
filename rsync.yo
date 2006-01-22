@@ -732,24 +732,23 @@ NOTE: Don't use this option when the destination is a Solaris "tmpfs"
 filesystem. It doesn't seem to handle seeks over null regions
 correctly and ends up corrupting the files.
 
-dit(bf(-x, --one-file-system)) This tells rsync not to cross filesystem
-boundaries  when recursing.  This  is useful for transferring the
-contents of only one filesystem.
+dit(bf(-x, --one-file-system)) This tells rsync to avoid crossing a
+filesystem boundary when recursing.  This does not limit the user's ability
+to specify items to copy from multiple filesystems, just rsync's recursion
+through the hierarchy of each directory that the user specified, and also
+the analogous recursion on the receiving side during deletion.  Also keep
+in mind that rsync treats a "bind" mount to the same device as being on the
+same filesystem.  
 
-dit(bf(-x, --one-file-system)) This tells rsync to avoid recursing into a
-directory that is the mount-point for another filesystem, including (as of
-2.6.7), "bind" mount-points.  You can still copy the contents of multiple
-file systems if you include a source dir from each file system -- this just
-limits rsync's directory-recursion algorithm.
+If this option is repeated, rsync omits all mount-point directories from
+the copy.  Otherwise, it includes an empty directory at each mount-point it
+encounters (using the attributes of the mounted directory because those of
+the underlying mount-point directory are inaccessible).
 
-Rsync will copy the directory at each encountered mount-point unless this
-option is repeated.  Note, however, that the attributes of this mount-point
-directory are copied from those currently visible in the filesystem, not
-the inaccessible attributes of the underlying directory.
-
-This option does not affect the "collapsing" of symlinks that options such
-as bf(--copy-links) perform, irrespective of what filesystem the symlink's
-referent may be on.
+If rsync has been told to collapse symlinks (via bf(--copy-links) or
+bf(--copy-unsafe-links)), a symlink to a directory on another device is
+treated as a mount point, while other referents are treated as though they
+existed on the device where the symlink is found.
 
 dit(bf(--existing, --ignore-non-existing)) This tells rsync to skip
 updating files that do not exist yet on the destination.  If this option is
