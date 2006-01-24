@@ -747,8 +747,8 @@ the underlying mount-point directory are inaccessible).
 
 If rsync has been told to collapse symlinks (via bf(--copy-links) or
 bf(--copy-unsafe-links)), a symlink to a directory on another device is
-treated as a mount point, while other referents are treated as though they
-existed on the device where the symlink is found.
+treated like a mount-point.  Symlinks to non-directories are unaffected
+by this option.
 
 dit(bf(--existing, --ignore-non-existing)) This tells rsync to skip
 updating files that do not exist yet on the destination.  If this option is
