@@ -541,13 +541,11 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			n[2] = !(iflags & ITEM_REPORT_CHECKSUM) ? '.' : 'c';
 			n[3] = !(iflags & ITEM_REPORT_SIZE) ? '.' : 's';
 			n[4] = !(iflags & ITEM_REPORT_TIME) ? '.'
-			     : !preserve_times || IS_DEVICE(file->mode)
-					       || S_ISLNK(file->mode) ? 'T' : 't';
+			     : !preserve_times || S_ISLNK(file->mode) ? 'T' : 't';
 			n[5] = !(iflags & ITEM_REPORT_PERMS) ? '.' : 'p';
 			n[6] = !(iflags & ITEM_REPORT_OWNER) ? '.' : 'o';
 			n[7] = !(iflags & ITEM_REPORT_GROUP) ? '.' : 'g';
-			n[8] = !(iflags & ITEM_REPORT_XATTRS) ? '.' : 'a';
-			n[9] = '\0';
+			n[8] = '\0';
 
 			if (iflags & (ITEM_IS_NEW|ITEM_MISSING_DATA)) {
 				char ch = iflags & ITEM_IS_NEW ? '+' : '?';
