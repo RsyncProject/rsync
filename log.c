@@ -265,10 +265,11 @@ void rwrite(enum logcode code, char *buf, int len)
 	case FERROR:
 		log_got_error = 1;
 		f = stderr;
-		break;
+		goto pre_scan;
 	case FINFO:
 		f = am_server ? stderr : stdout;
-		while (len && (*buf == '\n' || *buf == '\t')) {
+	pre_scan:
+		while (len > 1 && (*buf == '\n' || *buf == '\t')) {
 			fputc(*buf, f);
 			buf++;
 			len--;
