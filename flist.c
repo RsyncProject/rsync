@@ -70,10 +70,10 @@ extern struct filter_list_struct server_filter_list;
 int io_error;
 int checksum_len;
 dev_t filesystem_dev; /* used to implement -x */
+unsigned int file_struct_len;
 
 static char empty_sum[MD4_SUM_LENGTH];
 static int flist_count_offset;
-static unsigned int file_struct_len;
 
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
 static void output_flist(struct file_list *flist);
@@ -362,14 +362,14 @@ static void send_file_entry(struct file_struct *file, int f)
 				flags |= XMIT_RDEV_MINOR_IS_SMALL;
 		}
 	}
-	if (file->uid == uid)
+	if (file->ids->uid == uid)
 		flags |= XMIT_SAME_UID;
 	else
-		uid = file->uid;
-	if (file->gid == gid)
+		uid = file->ids->uid;
+	if (file->ids->gid == gid)
 		flags |= XMIT_SAME_GID;
 	else
-		gid = file->gid;
+		gid = file->ids->gid;
 	if (file->modtime == modtime)
 		flags |= XMIT_SAME_TIME;
 	else
@@ -619,12 +619,10 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 	memset(bp, 0, file_struct_len);
 	bp += file_struct_len;
 
-	file->flags = 0;
 	file->modtime = modtime;
 	file->length = file_length;
 	file->mode = mode;
-	file->uid = uid;
-	file->gid = gid;
+	file->ids = id_pair(uid, gid);
 
 	if (dirname_len) {
 		file->dirname = lastdir = bp;
@@ -880,8 +878,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	file->modtime = st.st_mtime;
 	file->length = st.st_size;
 	file->mode = st.st_mode;
-	file->uid = st.st_uid;
-	file->gid = st.st_gid;
+	file->ids = id_pair(st.st_uid, st.st_gid);
 
 #ifdef SUPPORT_HARD_LINKS
 	if (flist && flist->hlink_pool) {
@@ -948,8 +945,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 			file->modtime = st2.st_mtime;
 			file->length = st2.st_size;
 			file->mode = st2.st_mode;
-			file->uid = st2.st_uid;
-			file->gid = st2.st_gid;
+			file->ids = id_pair(st2.st_uid, st2.st_gid);
 			file->u.link = NULL;
 		} else
 			file->mode = save_mode;
@@ -1324,8 +1320,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	 * without causing a compatibility problem with older versions. */
 	clean_flist(flist, 0, 0);
 
-	/* Now send the uid/gid list. This was introduced in
-	 * protocol version 15 */
 	send_uid_list(f);
 
 	/* send the io_error flag */
@@ -1395,9 +1389,7 @@ struct file_list *recv_file_list(int f)
 	clean_flist(flist, relative_paths, 1);
 
 	if (f >= 0) {
-		/* Now send the uid/gid list. This was introduced in
-		 * protocol version 15 */
-		recv_uid_list(f, flist);
+		recv_uid_list(f);
 
 		/* Recv the io_error flag */
 		if (lp_ignore_errors(module_id) || ignore_errors)
@@ -1624,11 +1616,11 @@ static void output_flist(struct file_list *flist)
 	for (i = 0; i < flist->count; i++) {
 		file = flist->files[i];
 		if ((am_root || am_sender) && preserve_uid)
-			sprintf(uidbuf, " uid=%ld", (long)file->uid);
+			sprintf(uidbuf, " uid=%ld", (long)file->ids->uid);
 		else
 			*uidbuf = '\0';
-		if (preserve_gid && file->gid != GID_NONE)
-			sprintf(gidbuf, " gid=%ld", (long)file->gid);
+		if (preserve_gid && file->ids->gid != GID_NONE)
+			sprintf(gidbuf, " gid=%ld", (long)file->ids->gid);
 		else
 			*gidbuf = '\0';
 		if (!am_sender)

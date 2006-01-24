@@ -46,6 +46,9 @@ struct idlist {
 static struct idlist *uidlist;
 static struct idlist *gidlist;
 
+static struct id_pair *pair_list;
+static int pair_cnt = 0, pair_alloc = 0;
+
 static struct idlist *add_to_list(struct idlist **root, int id, char *name,
 				  int id2)
 {
@@ -307,7 +310,7 @@ void send_uid_list(int f)
 
 /* recv a complete uid/gid mapping from the peer and map the uid/gid
  * in the file list to local names */
-void recv_uid_list(int f, struct file_list *flist)
+void recv_uid_list(int f)
 {
 	int id, i;
 	char *name;
@@ -336,14 +339,32 @@ void recv_uid_list(int f, struct file_list *flist)
 		}
 	}
 
-	/* now convert the uid/gid of all files in the list to the mapped
-	 * uid/gid */
+	/* Now convert the id_pair array over to mapped uid/gid values. */
 	if (am_root && preserve_uid && !numeric_ids) {
-		for (i = 0; i < flist->count; i++)
-			flist->files[i]->uid = match_uid(flist->files[i]->uid);
+		for (i = 0; i < pair_cnt; i++)
+			pair_list[i].uid = match_uid(pair_list[i].uid);
 	}
 	if (preserve_gid && (!am_root || !numeric_ids)) {
-		for (i = 0; i < flist->count; i++)
-			flist->files[i]->gid = match_gid(flist->files[i]->gid);
+		for (i = 0; i < pair_cnt; i++)
+			pair_list[i].gid = match_gid(pair_list[i].gid);
 	}
+}
+
+struct id_pair *id_pair(uid_t uid, gid_t gid)
+{
+	int i;
+
+	for (i = 0; i < pair_cnt; i++) {
+		if (uid == pair_list[i].uid && gid == pair_list[i].gid)
+			return pair_list + i;
+	}
+
+	if (pair_cnt == pair_alloc) {
+		pair_alloc += 128;
+		pair_list = realloc_array(pair_list, struct id_pair,
+					  pair_alloc);
+	}
+	pair_list[pair_cnt].uid = uid;
+	pair_list[pair_cnt].gid = gid;
+	return pair_list + pair_cnt++;
 }

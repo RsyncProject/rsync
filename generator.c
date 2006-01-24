@@ -325,10 +325,10 @@ int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
 	 && (st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS))
 		return 0;
 
-	if (am_root && preserve_uid && st->st_uid != file->uid)
+	if (am_root && preserve_uid && st->st_uid != file->ids->uid)
 		return 0;
 
-	if (preserve_gid && file->gid != GID_NONE && st->st_gid != file->gid)
+	if (preserve_gid && file->ids->gid != GID_NONE && st->st_gid != file->ids->gid)
 		return 0;
 
 	return 1;
@@ -351,10 +351,10 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 		if (preserve_perms
 		 && (file->mode & CHMOD_BITS) != (st->st_mode & CHMOD_BITS))
 			iflags |= ITEM_REPORT_PERMS;
-		if (preserve_uid && am_root && file->uid != st->st_uid)
+		if (preserve_uid && am_root && file->ids->uid != st->st_uid)
 			iflags |= ITEM_REPORT_OWNER;
-		if (preserve_gid && file->gid != GID_NONE
-		    && st->st_gid != file->gid)
+		if (preserve_gid && file->ids->gid != GID_NONE
+		    && st->st_gid != file->ids->gid)
 			iflags |= ITEM_REPORT_GROUP;
 	} else
 		iflags |= ITEM_IS_NEW;

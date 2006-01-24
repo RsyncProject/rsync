@@ -493,6 +493,11 @@ struct hlink {
 	int hlindex;
 };
 
+struct id_pair {
+	uid_t uid;
+	gid_t gid;
+};
+
 #define F_DEV	link_u.idev->dev
 #define F_INODE	link_u.idev->inode
 
@@ -516,9 +521,8 @@ struct file_struct {
 		struct idev *idev;
 		struct hlink *links;
 	} link_u;
+	struct id_pair *ids;
 	time_t modtime;
-	uid_t uid;
-	gid_t gid;
 	mode_t mode;
 	uchar flags;	/* this item MUST remain last */
 };
