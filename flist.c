@@ -647,13 +647,14 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 			in_del_hier = recurse;
 			del_hier_name_len = file->dir.depth == 0 ? 0 : l1 + l2;
 			if (relative_paths && del_hier_name_len > 2
-			    && basename_len == 1+1 && *basename == '.')
+			    && lastname[del_hier_name_len-1] == '.'
+			    && lastname[del_hier_name_len-2] == '/')
 				del_hier_name_len -= 2;
 			file->flags |= FLAG_TOP_DIR | FLAG_DEL_HERE;
 		} else if (in_del_hier) {
 			if (!relative_paths || !del_hier_name_len
 			 || (l1 >= del_hier_name_len
-			  && thisname[del_hier_name_len] == '/'))
+			  && lastname[del_hier_name_len] == '/'))
 				file->flags |= FLAG_DEL_HERE;
 			else
 				in_del_hier = 0;
