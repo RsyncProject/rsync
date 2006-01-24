@@ -352,11 +352,20 @@ void recv_uid_list(int f)
 
 struct id_pair *id_pair(uid_t uid, gid_t gid)
 {
-	int i;
+	static int j = 0;
 
-	for (i = 0; i < pair_cnt; i++) {
-		if (uid == pair_list[i].uid && gid == pair_list[i].gid)
-			return pair_list + i;
+	if (pair_cnt) {
+		int start = j;
+		fprintf(stderr, "start = %d\n", start);
+		/* We start our search where we left off because
+		 * the IDs usually come in clumps. */
+		do {
+		    fprintf(stderr, "checking %d\n", j);
+			if (uid == pair_list[j].uid && gid == pair_list[j].gid)
+				return pair_list + j;
+			if (++j == pair_cnt)
+				j = 0;
+		} while (j != start);
 	}
 
 	if (pair_cnt == pair_alloc) {
@@ -364,7 +373,10 @@ struct id_pair *id_pair(uid_t uid, gid_t gid)
 		pair_list = realloc_array(pair_list, struct id_pair,
 					  pair_alloc);
 	}
-	pair_list[pair_cnt].uid = uid;
-	pair_list[pair_cnt].gid = gid;
-	return pair_list + pair_cnt++;
+
+	j = pair_cnt++;
+	pair_list[j].uid = uid;
+	pair_list[j].gid = gid;
+
+	return pair_list + j;
 }
