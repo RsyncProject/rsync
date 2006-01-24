@@ -1180,7 +1180,7 @@ with older versions of rsync, but that also turns on the output of other
 verbose messages).
 
 The "%i" escape has a cryptic output that is 9 letters long.  The general
-format is like the string bf(UXcstpoga)), where bf(U) is replaced by the
+format is like the string bf(UXcstpog)), where bf(U) is replaced by the
 kind of update being done, bf(X) is replaced by the file-type, and the
 other letters represent attributes that may be output if they are being
 modified.
@@ -1228,8 +1228,6 @@ quote(itemize(
   sender's value (requires bf(--owner) and root privileges).
   it() A bf(g) means the group is different and is being updated to the
   sender's value (requires bf(--group) and the authority to set the group).
-  it() The bf(a) is reserved for a future enhanced version that supports
-  extended file attributes, such as ACLs.
 ))
 
 One other output is possible:  when deleting files, the "%i" will output
