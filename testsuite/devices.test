@@ -9,6 +9,22 @@
 
 . "$suitedir/rsync.fns"
 
+chkfile="$scratchdir/rsync.chk"
+outfile="$scratchdir/rsync.out"
+
+# This is only called if rsync was run with -v or -vv (not -i alone).
+# Higher levels of -v would require more filtering.
+filter_outfile() {
+    sed -e '/^building file list /d' \
+	-e '/^created directory /d' \
+	-e '/^done$/d' \
+	-e '/ --whole-file$/d' \
+	-e '/^total: /d' \
+	-e '/^$/,$d' \
+	<"$outfile" >"$outfile.new"
+    mv "$outfile.new" "$outfile"
+}
+
 # Build some hardlinks
 
 case `id -u` in
@@ -25,16 +41,66 @@ esac
 # TODO: Need to test whether hardlinks are possible on this OS/filesystem
 
 mkdir "$fromdir"
+mkdir "$todir"
 mknod "$fromdir/char" c 41 67  || test_skipped "Can't create char device node unless root"
 mknod "$fromdir/char2" c 42 68  || test_skipped "Can't create char device node unless root"
 mknod "$fromdir/char3" c 42 69  || test_skipped "Can't create char device node unless root"
 mknod "$fromdir/block" b 42 69 || test_skipped "Can't create block device node unless root"
 mknod "$fromdir/block2" b 42 73 || test_skipped "Can't create block device node unless root"
 mknod "$fromdir/block3" b 105 73 || test_skipped "Can't create block device node unless root"
-ln "$fromdir/block3" "$fromdir/block3dup" || echo "Skipping hard-linked device test..."
+ln "$fromdir/block3" "$fromdir/block2.5" || echo "Skipping hard-linked device test..."
 mkfifo "$fromdir/fifo" || test_skipped "Can't run mkfifo"
+touch -r "$fromdir/block" "$fromdir/block2"
 
-checkit "$RSYNC -aHvv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir" skip_file_diff
+$RSYNC -ai "$fromdir/block" "$todir/block2" \
+    | tee "$outfile"
+cat <<EOT >"$chkfile"
+cD++++++ block
+EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 1 failed"
+
+$RSYNC -ai "$fromdir/block2" "$todir/block" \
+    | tee "$outfile"
+cat <<EOT >"$chkfile"
+cD++++++ block2
+EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 2 failed"
+
+sleep 1
+
+$RSYNC -Di "$fromdir/block3" "$todir/block" \
+    | tee "$outfile"
+cat <<EOT >"$chkfile"
+cD..T... block3
+EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 3 failed"
+
+$RSYNC -aiHvv "$fromdir/" "$todir/" \
+    | tee "$outfile"
+filter_outfile
+cat <<EOT >"$chkfile"
+.d..t... ./
+cD..t... block
+cD...... block2
+cD++++++ block3
+hD++++++ block2.5 => block3
+cD++++++ char
+cD++++++ char2
+cD++++++ char3
+cD++++++ fifo
+EOT
+if test ! -b "$fromdir/block2.5"; then
+    sed -e '/block2\.5/d' \
+	<"$chkfile" >"$chkfile.new"
+    mv "$chkfile.new" "$chkfile"
+fi
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 4 failed"
+
+echo "check how the directory listings compare with diff:"
+echo ""
+( cd "$fromdir" && rsync_ls_lR . ) > "$tmpdir/ls-from"
+( cd "$todir" && rsync_ls_lR . ) > "$tmpdir/ls-to"
+diff $diffopt "$tmpdir/ls-from" "$tmpdir/ls-to"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
