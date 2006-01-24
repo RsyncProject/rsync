@@ -356,11 +356,9 @@ struct id_pair *id_pair(uid_t uid, gid_t gid)
 
 	if (pair_cnt) {
 		int start = j;
-		fprintf(stderr, "start = %d\n", start);
 		/* We start our search where we left off because
 		 * the IDs usually come in clumps. */
 		do {
-		    fprintf(stderr, "checking %d\n", j);
 			if (uid == pair_list[j].uid && gid == pair_list[j].gid)
 				return pair_list + j;
 			if (++j == pair_cnt)
