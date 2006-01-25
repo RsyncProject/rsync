@@ -517,9 +517,9 @@ struct file_struct {
 		struct hlink *links;
 	} link_u;
 	time_t modtime;
-	mode_t mode;
 	uid_t uid;
 	gid_t gid;
+	mode_t mode;
 	uchar flags;	/* this item MUST remain last */
 };
 
