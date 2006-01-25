@@ -362,14 +362,14 @@ static void send_file_entry(struct file_struct *file, int f)
 				flags |= XMIT_RDEV_MINOR_IS_SMALL;
 		}
 	}
-	if (file->ids->uid == uid)
+	if (file->uid == uid)
 		flags |= XMIT_SAME_UID;
 	else
-		uid = file->ids->uid;
-	if (file->ids->gid == gid)
+		uid = file->uid;
+	if (file->gid == gid)
 		flags |= XMIT_SAME_GID;
 	else
-		gid = file->ids->gid;
+		gid = file->gid;
 	if (file->modtime == modtime)
 		flags |= XMIT_SAME_TIME;
 	else
@@ -622,7 +622,8 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 	file->modtime = modtime;
 	file->length = file_length;
 	file->mode = mode;
-	file->ids = id_pair(uid, gid);
+	file->uid = uid;
+	file->gid = gid;
 
 	if (dirname_len) {
 		file->dirname = lastdir = bp;
@@ -878,7 +879,8 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	file->modtime = st.st_mtime;
 	file->length = st.st_size;
 	file->mode = st.st_mode;
-	file->ids = id_pair(st.st_uid, st.st_gid);
+	file->uid = st.st_uid;
+	file->gid = st.st_gid;
 
 #ifdef SUPPORT_HARD_LINKS
 	if (flist && flist->hlink_pool) {
@@ -945,7 +947,8 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 			file->modtime = st2.st_mtime;
 			file->length = st2.st_size;
 			file->mode = st2.st_mode;
-			file->ids = id_pair(st2.st_uid, st2.st_gid);
+			file->uid = st2.st_uid;
+			file->gid = st2.st_gid;
 			file->u.link = NULL;
 		} else
 			file->mode = save_mode;
@@ -1389,7 +1392,7 @@ struct file_list *recv_file_list(int f)
 	clean_flist(flist, relative_paths, 1);
 
 	if (f >= 0) {
-		recv_uid_list(f);
+		recv_uid_list(f, flist);
 
 		/* Recv the io_error flag */
 		if (lp_ignore_errors(module_id) || ignore_errors)
@@ -1616,11 +1619,11 @@ static void output_flist(struct file_list *flist)
 	for (i = 0; i < flist->count; i++) {
 		file = flist->files[i];
 		if ((am_root || am_sender) && preserve_uid)
-			sprintf(uidbuf, " uid=%ld", (long)file->ids->uid);
+			sprintf(uidbuf, " uid=%ld", (long)file->uid);
 		else
 			*uidbuf = '\0';
-		if (preserve_gid && file->ids->gid != GID_NONE)
-			sprintf(gidbuf, " gid=%ld", (long)file->ids->gid);
+		if (preserve_gid && file->gid != GID_NONE)
+			sprintf(gidbuf, " gid=%ld", (long)file->gid);
 		else
 			*gidbuf = '\0';
 		if (!am_sender)
