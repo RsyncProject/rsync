@@ -2,6 +2,12 @@ NEWS for rsync 2.6.7 (UNRELEASED)
 Protocol: 29 (unchanged)
 Changes since 2.6.6:
 
+  OUTPUT CHANGES:
+
+    - The itemized output now uses 'S' for a special file instead of
+      clumping them together with the 'D' for devices.  The number of
+      characters is also different (to remove an unused field).
+
   BUG FIXES:
 
     - Fixed a really old bug that caused --checksum (-c) to checksum all the
