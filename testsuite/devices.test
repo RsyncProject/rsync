@@ -87,7 +87,7 @@ hD++++++ block2.5 => block3
 cD++++++ char
 cD++++++ char2
 cD++++++ char3
-cD++++++ fifo
+cS++++++ fifo
 EOT
 if test ! -b "$fromdir/block2.5"; then
     sed -e '/block2\.5/d' \
