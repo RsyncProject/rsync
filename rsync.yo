@@ -36,7 +36,7 @@ itemize(
   it() exclude and exclude-from options similar to GNU tar
   it() a CVS exclude mode for ignoring the same files that CVS would ignore
   it() can use any transparent remote shell, including ssh or rsh
-  it() does not require root privileges
+  it() does not require super-user privileges
   it() pipelining of file transfers to minimize latency costs
   it() support for anonymous or authenticated rsync daemons (ideal for
        mirroring)
@@ -316,13 +316,14 @@ to the detailed description below for a complete description.  verb(
  -H, --hard-links            preserve hard links
  -K, --keep-dirlinks         treat symlinked dir on receiver as dir
  -p, --perms                 preserve permissions
- -o, --owner                 preserve owner (root only)
+ -o, --owner                 preserve owner (super-user only)
  -g, --group                 preserve group
-     --devices               preserve device files (root only)
+     --devices               preserve device files (super-user only)
      --specials              preserve special files
  -D                          same as --devices --specials
  -t, --times                 preserve times
  -O, --omit-dir-times        omit directories when preserving times
+     --super                 receiver attempts super-user activities
      --chmod=CHMOD           change destination permissions
  -S, --sparse                handle sparse files efficiently
  -n, --dry-run               show what would have been transferred
@@ -684,21 +685,25 @@ umask setting
 (which is the same behavior as other file-copy utilities, such as cp).
 
 dit(bf(-o, --owner)) This option causes rsync to set the owner of the
-destination file to be the same as the source file.  On most systems,
-only the super-user can set file ownership.  By default, the preservation
-is done by name, but may fall back to using the ID number in some
-circumstances.  See the bf(--numeric-ids) option for a full discussion.
+destination file to be the same as the source file.  By default, the
+preservation is done by name, but may fall back to using the ID number
+in some circumstances (see the bf(--numeric-ids) option for a full
+discussion).
+This option has no effect if the receiving rsync is not run as the
+super-user and bf(--super) is not specified.
 
 dit(bf(-g, --group)) This option causes rsync to set the group of the
 destination file to be the same as the source file.  If the receiving
-program is not running as the super-user, only groups that the
+program is not running as the super-user (or with the bf(--no-super)
+option), only groups that the
 receiver is a member of will be preserved.  By default, the preservation
 is done by name, but may fall back to using the ID number in some
 circumstances.  See the bf(--numeric-ids) option for a full discussion.
 
 dit(bf(--devices)) This option causes rsync to transfer character and
-block device information to the remote system to recreate these
-devices. This option is only available to the super-user.
+block device files to the remote system to recreate these devices.
+This option has no effect if the receiving rsync is not run as the
+super-user and bf(--super) is not specified.
 
 dit(bf(--specials)) This option causes rsync to transfer special files
 such as named sockets and fifos.
@@ -717,6 +722,16 @@ dit(bf(-O, --omit-dir-times)) This tells rsync to omit directories when
 it is preserving modification times (see bf(--times)).  If NFS is sharing
 the directories on the receiving side, it is a good idea to use bf(-O).
 This option is inferred if you use bf(--backup) without bf(--backup-dir).
+
+dit(bf(--super)) This tells the receiving side to attempt super-user
+activities even if the receiving rsync wasn't run by the super-user.  These
+activities include: preserving users via the bf(--owner) option, preserving
+all groups (not just the current user's groups) via the bf(--groups)
+option, and copying devices via the bf(--devices) option.  This is useful
+for systems that allow such activities without being the super-user, and
+also for ensuring that you will get errors if the receiving side isn't
+being running as the super-user.  To turn off super-user activities, the
+super-user can use bf(--no-super).
 
 dit(bf(--chmod)) This options tells rsync to apply the listed "chmod" pattern
 to the permission of the files on the destination.  In addition to the normal
@@ -1124,9 +1139,9 @@ If em(DIR) is a relative path, it is relative to the destination directory.
 See also bf(--compare-dest) and bf(--copy-dest).
 
 Note that rsync versions prior to 2.6.1 had a bug that could prevent
-bf(--link-dest) from working properly for a non-root user when bf(-o) was specified
-(or implied by bf(-a)).  You can work-around this bug by avoiding the bf(-o) option
-when sending to an old rsync.
+bf(--link-dest) from working properly for a non-super-user when bf(-o) was
+specified (or implied by bf(-a)).  You can work-around this bug by avoiding
+the bf(-o) option when sending to an old rsync.
 
 dit(bf(-z, --compress)) With this option, rsync compresses the file data
 as it is sent to the destination machine, which reduces the amount of data
@@ -1233,7 +1248,7 @@ quote(itemize(
   it() A bf(p) means the permissions are different and are being updated to
   the sender's value (requires bf(--perms)).
   it() An bf(o) means the owner is different and is being updated to the
-  sender's value (requires bf(--owner) and root privileges).
+  sender's value (requires bf(--owner) and super-user privileges).
   it() A bf(g) means the group is different and is being updated to the
   sender's value (requires bf(--group) and the authority to set the group).
 ))
@@ -1492,7 +1507,7 @@ client version of this option (above) for some extra details.
 dit(bf(--config=FILE)) This specifies an alternate config file than
 the default.  This is only relevant when bf(--daemon) is specified.
 The default is /etc/rsyncd.conf unless the daemon is running over
-a remote shell program and the remote user is not root; in that case
+a remote shell program and the remote user is not the super-user; in that case
 the default is rsyncd.conf in the current directory (typically $HOME).
 
 dit(bf(--no-detach)) When running as a daemon, this option instructs
