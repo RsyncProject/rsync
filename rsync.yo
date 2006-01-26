@@ -318,7 +318,9 @@ to the detailed description below for a complete description.  verb(
  -p, --perms                 preserve permissions
  -o, --owner                 preserve owner (root only)
  -g, --group                 preserve group
- -D, --devices               preserve devices (root only)
+     --devices               preserve device files (root only)
+     --specials              preserve special files
+ -D                          same as --devices --specials
  -t, --times                 preserve times
  -O, --omit-dir-times        omit directories when preserving times
      --chmod=CHMOD           change destination permissions
@@ -694,9 +696,14 @@ receiver is a member of will be preserved.  By default, the preservation
 is done by name, but may fall back to using the ID number in some
 circumstances.  See the bf(--numeric-ids) option for a full discussion.
 
-dit(bf(-D, --devices)) This option causes rsync to transfer character and
+dit(bf(--devices)) This option causes rsync to transfer character and
 block device information to the remote system to recreate these
 devices. This option is only available to the super-user.
+
+dit(bf(--specials)) This option causes rsync to transfer special files
+such as named sockets and fifos.
+
+dit(bf(-D)) The bf(-D) option is equivalent to bf(--devices) bf(--specials).
 
 dit(bf(-t, --times)) This tells rsync to transfer modification times along
 with the files and update them on the remote system.  Note that if this
@@ -1201,7 +1208,8 @@ quote(itemize(
 ))
 
 The file-types that replace the bf(X) are: bf(f) for a file, a bf(d) for a
-directory, an bf(L) for a symlink, and a bf(D) for a device.
+directory, an bf(L) for a symlink, a bf(D) for a device, and a bf(S) for a
+special file (e.g. named sockets and fifos).
 
 The other letters in the string above are the actual letters that
 will be output if the associated attribute for the item is being updated or
