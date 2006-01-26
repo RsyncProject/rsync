@@ -21,7 +21,6 @@
 #include "rsync.h"
 
 extern char *password_file;
-extern int am_root;
 
 /***************************************************************************
 encode a buffer using base64 - simple and slow algorithm. null terminates
@@ -96,7 +95,7 @@ static int get_secret(int module, char *user, char *secret, int len)
 		if ((st.st_mode & 06) != 0) {
 			rprintf(FLOG, "secrets file must not be other-accessible (see strict modes option)\n");
 			ok = 0;
-		} else if (am_root && (st.st_uid != 0)) {
+		} else if (MY_UID() == 0 && st.st_uid != 0) {
 			rprintf(FLOG, "secrets file must be owned by root when running as root (see strict modes)\n");
 			ok = 0;
 		}
@@ -172,7 +171,7 @@ static char *getpassf(char *filename)
 	} else if ((st.st_mode & 06) != 0) {
 		rprintf(FERROR,"password file must not be other-accessible\n");
 		ok = 0;
-	} else if (am_root && st.st_uid != 0) {
+	} else if (MY_UID() == 0 && st.st_uid != 0) {
 		rprintf(FERROR,"password file must be owned by root when running as root\n");
 		ok = 0;
 	}
