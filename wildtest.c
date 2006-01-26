@@ -7,7 +7,7 @@
 #define WILD_TEST_ITERATIONS
 #include "lib/wildmatch.c"
 
-#include "popt.h"
+#include <popt.h>
 
 #ifdef COMPARE_WITH_FNMATCH
 #include <fnmatch.h>
