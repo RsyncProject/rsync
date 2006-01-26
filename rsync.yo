@@ -735,7 +735,7 @@ also for ensuring that you will get errors if the receiving side isn't
 being running as the super-user.  To turn off super-user activities, the
 super-user can use bf(--no-super).
 
-dit(bf(--chmod)) This options tells rsync to apply the listed "chmod" pattern
+dit(bf(--chmod)) This option tells rsync to apply the listed "chmod" pattern
 to the permission of the files on the destination.  In addition to the normal
 parsing rules specified in the chmod manpage, you can specify an item that
 should only apply to a directory by prefixing it with a 'D', or specify an
@@ -853,7 +853,7 @@ See bf(--delete) (which is implied) for more details on file-deletion.
 dit(bf(--ignore-errors)) Tells bf(--delete) to go ahead and delete files
 even when there are I/O errors.
 
-dit(bf(--force)) This options tells rsync to delete directories even if
+dit(bf(--force)) This option tells rsync to delete directories even if
 they are not empty when they are to be replaced by non-directories.  This
 is only relevant without bf(--delete) because deletions are now done depth-first.
 Requires the bf(--recursive) option (which is implied by bf(-a)) to have any effect.
