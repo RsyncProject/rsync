@@ -56,7 +56,7 @@ Changes since 2.6.6:
     - Added the --specials option to tell rsync to copy special files (and does
       not require root).  The --devices option now affects just character and
       block devices (which now matches the documentation).  The -D option still
-      requests both --devices and --specials, and -a still infers -D.
+      requests both --devices and --specials, and -a still implies -D.
 
     - Added the --append option that makes rsync append data onto files
       that are longer on the source than the destination (this includes new
@@ -137,6 +137,9 @@ Changes since 2.6.6:
       and is also useful for someone who wants to ensure that errors will
       be output if the receiving rsync isn't being run as root.
 
+    - Added the --sockopts option for those few who want to customize the
+      TCP options used to contact a daemon rsync.
+
     - Some minor documentation improvements.
 
     - Updated some diffs in the patches dir.
@@ -171,3 +174,5 @@ Changes since 2.6.6:
       configure option instead of --with-FOO to turn on the inclusion of
       the newly patched feature.
 
+    - The testsuite now sets HOME so that it won't be affecting by a file
+      such as ~/.popt.
