@@ -149,6 +149,7 @@ char *password_file = NULL;
 char *rsync_path = RSYNC_PATH;
 char *backup_dir = NULL;
 char backup_dir_buf[MAXPATHLEN];
+char *sockopts = NULL;
 int rsync_port = 0;
 int compare_dest = 0;
 int copy_dest = 0;
@@ -346,6 +347,7 @@ void usage(enum logcode F)
   rprintf(F," -0, --from0                 all *-from/filter files are delimited by 0s\n");
   rprintf(F,"     --address=ADDRESS       bind address for outgoing socket to daemon\n");
   rprintf(F,"     --port=PORT             specify double-colon alternate port number\n");
+  rprintf(F,"     --sockopts=OPTIONS      specify custom TCP options\n");
   rprintf(F,"     --blocking-io           use blocking I/O for the remote shell\n");
   rprintf(F,"     --stats                 give some file-transfer stats\n");
   rprintf(F," -h, --human-readable        output numbers in a human-readable format\n");
@@ -504,6 +506,7 @@ static struct poptOption long_options[] = {
 #endif
   {"address",          0,  POPT_ARG_STRING, &bind_address, 0, 0, 0 },
   {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
+  {"sockopts",         0,  POPT_ARG_STRING, &sockopts, 0, 0, 0 },
   {"password-file",    0,  POPT_ARG_STRING, &password_file, 0, 0, 0 },
   {"blocking-io",      0,  POPT_ARG_VAL,    &blocking_io, 1, 0, 0 },
   {"no-blocking-io",   0,  POPT_ARG_VAL,    &blocking_io, 0, 0, 0 },
@@ -529,6 +532,7 @@ static void daemon_usage(enum logcode F)
   rprintf(F,"     --config=FILE           specify alternate rsyncd.conf file\n");
   rprintf(F,"     --no-detach             do not detach from the parent\n");
   rprintf(F,"     --port=PORT             listen on alternate port number\n");
+  rprintf(F,"     --sockopts=OPTIONS      specify custom TCP options\n");
   rprintf(F," -v, --verbose               increase verbosity\n");
 #ifdef INET6
   rprintf(F," -4, --ipv4                  prefer IPv4\n");
@@ -553,6 +557,7 @@ static struct poptOption long_daemon_options[] = {
   {"detach",           0,  POPT_ARG_VAL,    &no_detach, 0, 0, 0 },
   {"no-detach",        0,  POPT_ARG_VAL,    &no_detach, 1, 0, 0 },
   {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
+  {"sockopts",         0,  POPT_ARG_STRING, &sockopts, 0, 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
   {"server",           0,  POPT_ARG_NONE,   &am_server, 0, 0, 0 },
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir, 0, 0, 0 },
