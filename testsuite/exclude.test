@@ -12,9 +12,8 @@
 
 . "$suitedir/rsync.fns"
 
-HOME="$scratchdir"
 CVSIGNORE='*.junk'
-export HOME CVSIGNORE
+export CVSIGNORE
 
 set -x
 
