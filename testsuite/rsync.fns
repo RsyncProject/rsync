@@ -32,6 +32,9 @@ else
     diffopt="-c"
 fi
 
+HOME="$scratchdir"
+export HOME
+
 runtest() {
     echo $ECHO_N "Test $1: $ECHO_C"
     if eval "$2"
