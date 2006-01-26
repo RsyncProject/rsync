@@ -48,6 +48,7 @@ extern int preserve_links;
 extern int preserve_hard_links;
 extern int preserve_perms;
 extern int preserve_devices;
+extern int preserve_specials;
 extern int preserve_uid;
 extern int preserve_gid;
 extern int relative_paths;
@@ -343,16 +344,14 @@ static void send_file_entry(struct file_struct *file, int f)
 		flags |= XMIT_SAME_MODE;
 	else
 		mode = file->mode;
-	if (preserve_devices) {
+	if ((preserve_devices && IS_DEVICE(mode))
+	 || (preserve_specials && IS_SPECIAL(mode))) {
 		if (protocol_version < 28) {
-			if (IS_DEVICE(mode)) {
-				if (file->u.rdev == rdev)
-					flags |= XMIT_SAME_RDEV_pre28;
-				else
-					rdev = file->u.rdev;
-			} else
-				rdev = makedev(0, 0);
-		} else if (IS_DEVICE(mode)) {
+			if (file->u.rdev == rdev)
+				flags |= XMIT_SAME_RDEV_pre28;
+			else
+				rdev = file->u.rdev;
+		} else {
 			rdev = file->u.rdev;
 			if ((uint32)major(rdev) == rdev_major)
 				flags |= XMIT_SAME_RDEV_MAJOR;
@@ -361,7 +360,8 @@ static void send_file_entry(struct file_struct *file, int f)
 			if ((uint32)minor(rdev) <= 0xFFu)
 				flags |= XMIT_RDEV_MINOR_IS_SMALL;
 		}
-	}
+	} else if (protocol_version < 28)
+		rdev = makedev(0, 0);
 	if (file->uid == uid)
 		flags |= XMIT_SAME_UID;
 	else
@@ -437,7 +437,8 @@ static void send_file_entry(struct file_struct *file, int f)
 			add_gid(gid);
 		write_int(f, gid);
 	}
-	if (preserve_devices && IS_DEVICE(mode)) {
+	if ((preserve_devices && IS_DEVICE(mode))
+	 || (preserve_specials && IS_SPECIAL(mode))) {
 		if (protocol_version < 28) {
 			if (!(flags & XMIT_SAME_RDEV_pre28))
 				write_int(f, (int)rdev);
@@ -577,14 +578,12 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 	if (preserve_gid && !(flags & XMIT_SAME_GID))
 		gid = (gid_t)read_int(f);
 
-	if (preserve_devices) {
+	if ((preserve_devices && IS_DEVICE(mode))
+	 || (preserve_specials && IS_SPECIAL(mode))) {
 		if (protocol_version < 28) {
-			if (IS_DEVICE(mode)) {
-				if (!(flags & XMIT_SAME_RDEV_pre28))
-					rdev = (dev_t)read_int(f);
-			} else
-				rdev = makedev(0, 0);
-		} else if (IS_DEVICE(mode)) {
+			if (!(flags & XMIT_SAME_RDEV_pre28))
+				rdev = (dev_t)read_int(f);
+		} else {
 			uint32 rdev_minor;
 			if (!(flags & XMIT_SAME_RDEV_MAJOR))
 				rdev_major = read_int(f);
@@ -594,7 +593,8 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 				rdev_minor = read_int(f);
 			rdev = makedev(rdev_major, rdev_minor);
 		}
-	}
+	} else if (protocol_version < 28)
+		rdev = makedev(0, 0);
 
 #ifdef SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(mode)) {
@@ -664,7 +664,8 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 	memcpy(bp, basename, basename_len);
 	bp += basename_len;
 
-	if (preserve_devices && IS_DEVICE(mode))
+	if ((preserve_devices && IS_DEVICE(mode))
+	 || (preserve_specials && IS_SPECIAL(mode)))
 		file->u.rdev = rdev;
 
 #ifdef SUPPORT_LINKS
@@ -916,7 +917,8 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	bp += basename_len;
 
 #ifdef HAVE_STRUCT_STAT_ST_RDEV
-	if (preserve_devices && IS_DEVICE(st.st_mode))
+	if ((preserve_devices && IS_DEVICE(st.st_mode))
+	 || (preserve_specials && IS_SPECIAL(st.st_mode)))
 		file->u.rdev = st.st_rdev;
 #endif
 

@@ -46,6 +46,7 @@ int preserve_links = 0;
 int preserve_hard_links = 0;
 int preserve_perms = 0;
 int preserve_devices = 0;
+int preserve_specials = 0;
 int preserve_uid = 0;
 int preserve_gid = 0;
 int preserve_times = 0;
@@ -290,7 +291,9 @@ void usage(enum logcode F)
   rprintf(F," -p, --perms                 preserve permissions\n");
   rprintf(F," -o, --owner                 preserve owner (root only)\n");
   rprintf(F," -g, --group                 preserve group\n");
-  rprintf(F," -D, --devices               preserve devices (root only)\n");
+  rprintf(F,"     --devices               preserve device files (root only)\n");
+  rprintf(F,"     --specials              preserve special files\n");
+  rprintf(F," -D                          same as --devices --specials\n");
   rprintf(F," -t, --times                 preserve times\n");
   rprintf(F," -O, --omit-dir-times        omit directories when preserving times\n");
   rprintf(F,"     --chmod=CHMOD           change destination permissions\n");
@@ -373,6 +376,7 @@ enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_FILTER, OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST, OPT_HELP,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW, OPT_MIN_SIZE, OPT_CHMOD,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_MAX_SIZE,
+      OPT_NO_D,
       OPT_SERVER, OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -408,9 +412,12 @@ static struct poptOption long_options[] = {
   {"group",           'g', POPT_ARG_VAL,    &preserve_gid, 1, 0, 0 },
   {"no-group",         0,  POPT_ARG_VAL,    &preserve_gid, 0, 0, 0 },
   {"no-g",             0,  POPT_ARG_VAL,    &preserve_gid, 0, 0, 0 },
-  {"devices",         'D', POPT_ARG_VAL,    &preserve_devices, 1, 0, 0 },
+  {0,                 'D', POPT_ARG_NONE,   0, 'D', 0, 0 },
+  {"no-D",             0,  POPT_ARG_NONE,   0, OPT_NO_D, 0, 0 },
+  {"devices",          0,  POPT_ARG_VAL,    &preserve_devices, 1, 0, 0 },
   {"no-devices",       0,  POPT_ARG_VAL,    &preserve_devices, 0, 0, 0 },
-  {"no-D",             0,  POPT_ARG_VAL,    &preserve_devices, 0, 0, 0 },
+  {"specials",         0,  POPT_ARG_VAL,    &preserve_specials, 1, 0, 0 },
+  {"no-specials",      0,  POPT_ARG_VAL,    &preserve_specials, 0, 0, 0 },
   {"links",           'l', POPT_ARG_VAL,    &preserve_links, 1, 0, 0 },
   {"no-links",         0,  POPT_ARG_VAL,    &preserve_links, 0, 0, 0 },
   {"no-l",             0,  POPT_ARG_VAL,    &preserve_links, 0, 0, 0 },
@@ -892,6 +899,15 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			preserve_gid = 1;
 			preserve_uid = 1;
 			preserve_devices = 1;
+			preserve_specials = 1;
+			break;
+
+		case 'D':
+			preserve_devices = preserve_specials = 1;
+			break;
+
+		case OPT_NO_D:
+			preserve_devices = preserve_specials = 0;
 			break;
 
 		case 'i':
@@ -1464,7 +1480,7 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'o';
 	if (preserve_gid)
 		argstr[x++] = 'g';
-	if (preserve_devices)
+	if (preserve_devices) /* ignore preserve_specials here */
 		argstr[x++] = 'D';
 	if (preserve_times)
 		argstr[x++] = 't';
@@ -1516,6 +1532,13 @@ void server_options(char **args,int *argc)
 			goto oom;
 		args[ac++] = arg;
 	}
+
+	if (preserve_devices) {
+		/* Note: sending "--devices" would not be backward-compatible. */
+		if (!preserve_specials)
+			args[ac++] = "--no-specials"; /* -D is already set. */
+	} else if (preserve_specials)
+		args[ac++] = "--specials";
 
 	/* The server side doesn't use our log-format, but in certain
 	 * circumstances they need to know a little about the option. */

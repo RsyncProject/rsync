@@ -787,7 +787,8 @@ extern int errno;
 #define INADDR_NONE 0xffffffff
 #endif
 
-#define IS_DEVICE(mode) (S_ISCHR(mode) || S_ISBLK(mode) || S_ISSOCK(mode) || S_ISFIFO(mode))
+#define IS_SPECIAL(mode) (S_ISSOCK(mode) || S_ISFIFO(mode))
+#define IS_DEVICE(mode) (S_ISCHR(mode) || S_ISBLK(mode))
 
 /* Initial mask on permissions given to temporary files.  Mask off setuid
      bits and group access because of potential race-condition security

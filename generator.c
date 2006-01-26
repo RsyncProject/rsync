@@ -38,6 +38,7 @@ extern int relative_paths;
 extern int keep_dirlinks;
 extern int preserve_links;
 extern int preserve_devices;
+extern int preserve_specials;
 extern int preserve_hard_links;
 extern int preserve_perms;
 extern int preserve_uid;
@@ -986,7 +987,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (am_root && preserve_devices && IS_DEVICE(file->mode)) {
+	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
+	 || (preserve_specials && IS_SPECIAL(file->mode))) {
 		if (statret != 0
 		 && (basis_dir[0] != NULL && can_link_devices)) {
 			if (try_dests_non(file, fname, ndx, itemizing,
@@ -1007,7 +1009,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			    && hard_link_check(file, ndx, fname, -1, &st,
 					       itemizing, code, HL_SKIP))
 				return;
-			if (!IS_DEVICE(st.st_mode))
+			if ((IS_DEVICE(file->mode) && !IS_DEVICE(st.st_mode))
+			 || (IS_SPECIAL(file->mode) && !IS_SPECIAL(st.st_mode)))
 				statret = -1;
 			if (verbose > 2) {
 				rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",

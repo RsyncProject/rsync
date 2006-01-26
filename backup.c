@@ -30,6 +30,7 @@ extern char *backup_dir;
 
 extern int am_root;
 extern int preserve_devices;
+extern int preserve_specials;
 extern int preserve_links;
 extern int preserve_hard_links;
 extern int orig_umask;
@@ -187,7 +188,8 @@ static int keep_backup(char *fname)
 		return 0;
 
 	/* Check to see if this is a device file, or link */
-	if (IS_DEVICE(file->mode) && am_root && preserve_devices) {
+	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
+	 || (preserve_specials && IS_SPECIAL(file->mode))) {
 		do_unlink(buf);
 		if (do_mknod(buf, file->mode, file->u.rdev) < 0
 		    && (errno != ENOENT || make_bak_dir(buf) < 0
