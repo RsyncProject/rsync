@@ -53,6 +53,11 @@ Changes since 2.6.6:
 
   ENHANCEMENTS:
 
+    - Added the --specials option to tell rsync to copy special files (and does
+      not require root).  The --devices option now affects just character and
+      block devices (which now matches the documentation).  The -D option still
+      requests both --devices and --specials, and -a still infers -D.
+
     - Added the --append option that makes rsync append data onto files
       that are longer on the source than the destination (this includes new
       files).
