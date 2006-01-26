@@ -536,6 +536,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			     : !(iflags & ITEM_TRANSFER) ? '.'
 			     : !local_server && *op == 's' ? '<' : '>';
 			n[1] = S_ISDIR(file->mode) ? 'd'
+			     : IS_SPECIAL(file->mode) ? 'S'
 			     : IS_DEVICE(file->mode) ? 'D'
 			     : S_ISLNK(file->mode) ? 'L' : 'f';
 			n[2] = !(iflags & ITEM_REPORT_CHECKSUM) ? '.' : 'c';
