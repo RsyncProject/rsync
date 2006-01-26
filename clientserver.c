@@ -45,6 +45,7 @@ extern int orig_umask;
 extern int no_detach;
 extern int default_af_hint;
 extern char *bind_address;
+extern char *sockopts;
 extern struct filter_list_struct server_filter_list;
 extern char *config_file;
 extern char *files_from;
@@ -97,6 +98,8 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 				     default_af_hint);
 	if (fd == -1)
 		exit_cleanup(RERR_SOCKETIO);
+
+	set_socket_options(fd, sockopts);
 
 	ret = start_inband_exchange(user, path, fd, fd, argc);
 
@@ -718,7 +721,10 @@ int start_daemon(int f_in, int f_out)
 
 	if (!am_server) {
 		set_socket_options(f_in, "SO_KEEPALIVE");
-		set_socket_options(f_in, lp_socket_options());
+		if (sockopts)
+			set_socket_options(f_in, sockopts);
+		else
+			set_socket_options(f_in, lp_socket_options());
 		set_nonblocking(f_in);
 	}
 
