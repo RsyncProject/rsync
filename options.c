@@ -19,7 +19,7 @@
  */
 
 #include "rsync.h"
-#include "popt.h"
+#include <popt.h>
 #include "zlib/zlib.h"
 
 extern int module_id;
@@ -1474,8 +1474,12 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'L';
 	if (xfer_dirs > (recurse || !delete_mode || !am_sender))
 		argstr[x++] = 'd';
-	if (keep_dirlinks && am_sender)
-		argstr[x++] = 'K';
+	if (am_sender) {
+		if (keep_dirlinks)
+			argstr[x++] = 'K';
+		if (omit_dir_times == 2)
+			argstr[x++] = 'O';
+	}
 
 	if (whole_file > 0)
 		argstr[x++] = 'W';
@@ -1493,8 +1497,6 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'D';
 	if (preserve_times)
 		argstr[x++] = 't';
-	if (omit_dir_times == 2 && am_sender)
-		argstr[x++] = 'O';
 	if (preserve_perms)
 		argstr[x++] = 'p';
 	if (recurse)
