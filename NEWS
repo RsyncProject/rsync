@@ -131,6 +131,12 @@ Changes since 2.6.6:
       the client must be version 2.6.7 for this to work, but the remote
       rsync only needs to be 2.6.7 if you're pushing files.
 
+    - Added the --super option to make the receiver always attempt super-
+      user activities.  This is useful for systems that allow things such
+      as devices to be created or ownership to be set without being UID 0,
+      and is also useful for someone who wants to ensure that errors will
+      be output if the receiving rsync isn't being run as root.
+
     - Some minor documentation improvements.
 
     - Updated some diffs in the patches dir.
