@@ -116,7 +116,8 @@ who like to tune their systems to the utmost degree. You can set all
 sorts of socket options which may make transfers faster (or
 slower!). Read the man page for the setsockopt() system call for
 details on some of the options you may be able to set. By default no
-special socket options are set.
+special socket options are set.  These settings are superseded by the
+bf(--sockopts) command-line option.
 
 enddit()
 
