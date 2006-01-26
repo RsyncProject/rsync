@@ -289,13 +289,14 @@ void usage(enum logcode F)
   rprintf(F," -H, --hard-links            preserve hard links\n");
   rprintf(F," -K, --keep-dirlinks         treat symlinked dir on receiver as dir\n");
   rprintf(F," -p, --perms                 preserve permissions\n");
-  rprintf(F," -o, --owner                 preserve owner (root only)\n");
+  rprintf(F," -o, --owner                 preserve owner (super-user only)\n");
   rprintf(F," -g, --group                 preserve group\n");
-  rprintf(F,"     --devices               preserve device files (root only)\n");
+  rprintf(F,"     --devices               preserve device files (super-user only)\n");
   rprintf(F,"     --specials              preserve special files\n");
   rprintf(F," -D                          same as --devices --specials\n");
   rprintf(F," -t, --times                 preserve times\n");
   rprintf(F," -O, --omit-dir-times        omit directories when preserving times\n");
+  rprintf(F,"     --super                 receiver attempts super-user activities\n");
   rprintf(F,"     --chmod=CHMOD           change destination permissions\n");
   rprintf(F," -S, --sparse                handle sparse files efficiently\n");
   rprintf(F," -n, --dry-run               show what would have been transferred\n");
@@ -406,6 +407,8 @@ static struct poptOption long_options[] = {
   {"no-t",             0,  POPT_ARG_VAL,    &preserve_times, 0, 0, 0 },
   {"omit-dir-times",  'O', POPT_ARG_VAL,    &omit_dir_times, 2, 0, 0 },
   {"modify-window",    0,  POPT_ARG_INT,    &modify_window, OPT_MODIFY_WINDOW, 0, 0 },
+  {"super",            0,  POPT_ARG_VAL,    &am_root, 2, 0, 0 },
+  {"no-super",         0,  POPT_ARG_VAL,    &am_root, 0, 0, 0 },
   {"owner",           'o', POPT_ARG_VAL,    &preserve_uid, 1, 0, 0 },
   {"no-owner",         0,  POPT_ARG_VAL,    &preserve_uid, 0, 0, 0 },
   {"no-o",             0,  POPT_ARG_VAL,    &preserve_uid, 0, 0, 0 },
@@ -1435,6 +1438,7 @@ void server_options(char **args,int *argc)
 	if (blocking_io == -1)
 		blocking_io = 0;
 
+	/* This should always remain first on the server's command-line. */
 	args[ac++] = "--server";
 
 	if (daemon_over_rsh) {
@@ -1615,6 +1619,8 @@ void server_options(char **args,int *argc)
 			args[ac++] = "--force";
 		if (write_batch < 0)
 			args[ac++] = "--only-write-batch=X";
+		if (am_root > 1)
+			args[ac++] = "--super";
 	}
 
 	if (size_only)
