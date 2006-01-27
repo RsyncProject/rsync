@@ -53,6 +53,7 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int relative_paths;
 extern int implied_dirs;
+extern int skip_empty_dirs;
 extern int copy_links;
 extern int copy_unsafe_links;
 extern int protocol_version;
@@ -75,6 +76,7 @@ unsigned int file_struct_len;
 
 static char empty_sum[MD4_SUM_LENGTH];
 static int flist_count_offset;
+static int max_dir_depth = 0;
 
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
 static void output_flist(struct file_list *flist);
@@ -633,6 +635,8 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 		bp[-1] = '\0';
 		lastdir_depth = count_dir_elements(lastdir);
 		file->dir.depth = lastdir_depth + 1;
+		if (lastdir_depth >= max_dir_depth)
+			max_dir_depth = lastdir_depth + 1;
 	} else if (dirname) {
 		file->dirname = dirname; /* we're reusing lastname */
 		file->dir.depth = lastdir_depth + 1;
@@ -1540,6 +1544,20 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 
 		if (!file->basename)
 			continue;
+
+		if (strip_root && file->dirname) {
+			/* We need to strip off the leading slashes for
+			 * relative paths, but this must be done _after_
+			 * the sorting phase (above). */
+			if (*file->dirname == '/') {
+				char *s = file->dirname + 1;
+				while (*s == '/') s++;
+				memmove(file->dirname, s, strlen(s) + 1);
+			}
+			if (!*file->dirname)
+				file->dirname = NULL;
+		}
+
 		if (f_name_cmp(file, flist->files[prev_i]) == 0)
 			j = prev_i;
 		else if (protocol_version >= 29 && S_ISDIR(file->mode)) {
@@ -1552,6 +1570,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			file->mode = save_mode;
 		} else
 			j = -1;
+
 		if (j >= 0) {
 			struct file_struct *fp = flist->files[j];
 			int keep, drop;
@@ -1570,8 +1589,8 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 					"removing duplicate name %s from file list (%d)\n",
 					f_name(file, NULL), drop);
 			}
-			/* Make sure that if we unduplicate '.', that we don't
-			 * lose track of a user-specified top directory. */
+			/* Make sure we don't lose track of a user-specified
+			 * top directory. */
 			flist->files[keep]->flags |= flist->files[drop]->flags
 						   & (FLAG_TOP_DIR|FLAG_DEL_HERE);
 
@@ -1591,23 +1610,45 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 	}
 	flist->high = no_dups ? prev_i : flist->count - 1;
 
-	if (strip_root) {
-		/* We need to strip off the leading slashes for relative
-		 * paths, but this must be done _after_ the sorting phase. */
+	if (skip_empty_dirs && no_dups && max_dir_depth) {
+		int j, cur_depth = 0;
+		int *maybe_dirs = new_array(int, max_dir_depth);
+
+		maybe_dirs[0] = -1;
+
 		for (i = flist->low; i <= flist->high; i++) {
 			struct file_struct *file = flist->files[i];
 
-			if (!file->dirname)
-				continue;
-			if (*file->dirname == '/') {
-				char *s = file->dirname + 1;
-				while (*s == '/') s++;
-				memmove(file->dirname, s, strlen(s) + 1);
+			if (S_ISDIR(file->mode) && file->dir.depth) {
+				j = cur_depth;
+				cur_depth = file->dir.depth - 1;
+				for ( ; j >= cur_depth; j--) {
+					if (maybe_dirs[j] < 0)
+						continue;
+					clear_file(maybe_dirs[j], flist);
+				}
+				maybe_dirs[cur_depth] = i;
+			} else if (maybe_dirs[cur_depth] >= 0) {
+				for (j = 0; j <= cur_depth; j++)
+					maybe_dirs[j] = -1;
 			}
-
-			if (!*file->dirname)
-				file->dirname = NULL;
 		}
+		for (j = cur_depth; j >= 0; j--) {
+			if (maybe_dirs[j] < 0)
+				continue;
+			clear_file(maybe_dirs[j], flist);
+		}
+
+		for (i = flist->low; i <= flist->high; i++) {
+			if (flist->files[i]->basename)
+				break;
+		}
+		flist->low = i;
+		for (i = flist->high; i >= flist->low; i--) {
+			if (flist->files[i]->basename)
+				break;
+		}
+		flist->high = i;
 	}
 }
 
