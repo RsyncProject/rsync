@@ -81,6 +81,7 @@ int numeric_ids = 0;
 int force_delete = 0;
 int io_timeout = 0;
 int allowed_lull = 0;
+int skip_empty_dirs = 0;
 char *files_from = NULL;
 int filesfrom_fd = -1;
 char *filesfrom_host = NULL;
@@ -323,6 +324,7 @@ void usage(enum logcode F)
   rprintf(F,"     --partial               keep partially transferred files\n");
   rprintf(F,"     --partial-dir=DIR       put a partially transferred file into DIR\n");
   rprintf(F,"     --delay-updates         put all updated files into place at transfer's end\n");
+  rprintf(F," -k, --skip-empty-dirs       skip empty directory chains\n");
   rprintf(F,"     --numeric-ids           don't map uid/gid values by user/group name\n");
   rprintf(F,"     --timeout=TIME          set I/O timeout in seconds\n");
   rprintf(F," -I, --ignore-times          don't skip files that match in size and mod-time\n");
@@ -483,6 +485,7 @@ static struct poptOption long_options[] = {
   {"no-partial",       0,  POPT_ARG_VAL,    &keep_partial, 0, 0, 0 },
   {"partial-dir",      0,  POPT_ARG_STRING, &partial_dir, 0, 0, 0 },
   {"delay-updates",    0,  POPT_ARG_NONE,   &delay_updates, 0, 0, 0 },
+  {"skip-empty-dirs", 'k', POPT_ARG_NONE,   &skip_empty_dirs, 0, 0, 0 },
   {"log-format",       0,  POPT_ARG_STRING, &log_format, 0, 0, 0 },
   {"itemize-changes", 'i', POPT_ARG_NONE,   0, 'i', 0, 0 },
   {"bwlimit",          0,  POPT_ARG_INT,    &bwlimit, 0, 0, 0 },
@@ -1477,6 +1480,8 @@ void server_options(char **args,int *argc)
 	if (am_sender) {
 		if (keep_dirlinks)
 			argstr[x++] = 'K';
+		if (skip_empty_dirs)
+			argstr[x++] = 'k';
 		if (omit_dir_times == 2)
 			argstr[x++] = 'O';
 	}
