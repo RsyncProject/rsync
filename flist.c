@@ -1443,11 +1443,30 @@ int flist_find(struct file_list *flist, struct file_struct *f)
 
 	while (low <= high) {
 		mid = (low + high) / 2;
-		for (mid_up = mid; !flist->files[mid_up]->basename; mid_up++) {}
-		if (mid_up <= high)
-			ret = f_name_cmp(flist->files[mid_up], f);
-		else
-			ret = 1;
+		if (flist->files[mid]->basename)
+			mid_up = mid;
+		else if (flist->files[mid]->dir.depth) {
+			mid_up = mid + flist->files[mid]->dir.depth;
+			if (mid_up < mid) {
+				high = mid_up;
+				continue;
+			}
+		} else {
+			/* Scan for the next non-empty entry and cache
+			 * the distance so we never do this again. */
+			mid_up = mid;
+			while (++mid_up <= high
+			    && !flist->files[mid_up]->basename) {}
+			if (mid_up > high) {
+				high = mid;
+				while (--high >= low
+				    && !flist->files[high]->basename) {}
+				flist->files[mid]->dir.depth = high - mid;
+				continue;
+			}
+			flist->files[mid]->dir.depth = mid_up - mid;
+		}
+		ret = f_name_cmp(flist->files[mid_up], f);
 		if (ret == 0) {
 			if (protocol_version < 29
 			    && S_ISDIR(flist->files[mid_up]->mode)
@@ -1544,20 +1563,6 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 
 		if (!file->basename)
 			continue;
-
-		if (strip_root && file->dirname) {
-			/* We need to strip off the leading slashes for
-			 * relative paths, but this must be done _after_
-			 * the sorting phase (above). */
-			if (*file->dirname == '/') {
-				char *s = file->dirname + 1;
-				while (*s == '/') s++;
-				memmove(file->dirname, s, strlen(s) + 1);
-			}
-			if (!*file->dirname)
-				file->dirname = NULL;
-		}
-
 		if (f_name_cmp(file, flist->files[prev_i]) == 0)
 			j = prev_i;
 		else if (protocol_version >= 29 && S_ISDIR(file->mode)) {
@@ -1570,7 +1575,6 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			file->mode = save_mode;
 		} else
 			j = -1;
-
 		if (j >= 0) {
 			struct file_struct *fp = flist->files[j];
 			int keep, drop;
@@ -1609,6 +1613,21 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			prev_i = i;
 	}
 	flist->high = no_dups ? prev_i : flist->count - 1;
+
+	if (strip_root) {
+		/* We need to strip off the leading slashes for relative
+		 * paths, but this must be done _after_ the sorting phase. */
+		for (i = flist->low; i <= flist->high; i++) {
+			struct file_struct *file = flist->files[i];
+
+			if (!file->dirname)
+				continue;
+			while (*file->dirname == '/')
+				file->dirname++;
+			if (!*file->dirname)
+				file->dirname = NULL;
+		}
+	}
 
 	if (skip_empty_dirs && no_dups && max_dir_depth) {
 		int j, cur_depth = 0;
