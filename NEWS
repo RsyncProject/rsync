@@ -131,6 +131,12 @@ Changes since 2.6.6:
       trailing stars) to match both the dir itself as well as all the
       content below the dir (dir/** would not match the dir).
 
+    - Added the --skip-empty-dirs (-k) option that makes the receiving
+      rsync discard empty chains of directories from the file-list.  This
+      makes it much easier to scan a source hierarchy using include,
+      exclude, filter rules, and only end up with the directories needed
+      to hold the resulting files.
+
     - If the --itemize-changes (-i) option is repeated, rsync now includes
       unchanged files in the itemized output (similar to -vv, but without
       all the other verbose messages that can get in the way).  Of course,
