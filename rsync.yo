@@ -349,6 +349,7 @@ to the detailed description below for a complete description.  verb(
      --partial               keep partially transferred files
      --partial-dir=DIR       put a partially transferred file into DIR
      --delay-updates         put all updated files into place at end
+ -k, --skip-empty-dirs       skip empty directory chains
      --numeric-ids           don't map uid/gid values by user/group name
      --timeout=TIME          set I/O timeout in seconds
  -I, --ignore-times          don't skip files that match size and time
@@ -1384,6 +1385,22 @@ delayed updates will fail if they can't be renamed into place).
 See also the "atomic-rsync" perl script in the "support" subdir for an
 update algorithm that is even more atomic (it uses bf(--link-dest) and a
 parallel hierarchy of files).
+
+dit(bf(-k, --skip-empty-dirs)) This option tells the receiving rsync to get
+rid of empty directories from the file-list, including nested directories
+that have no non-directory children.  This is useful for avoiding the
+creation of a bunch of useless directories when the sending rsync is
+recursively scanning a hierarchy of files using include/exclude/filter
+directives.  This also affects what directories get deleted when a delete
+option was specified (but keep in mind that excluded files are also
+protected from deletion).
+
+Here's an example that copies all .pdf files in a hierarchy, only creating
+the necessary destination directories to hold the .pdf files, and ensures
+that any superfluous files and directories in the destination are removed
+(due to a hide filter on non-directories being used instead of an exclude):
+
+quote(     rsync -avk --del --include='*.pdf' -f 'hide! */' src/ dest)
 
 dit(bf(--progress)) This option tells rsync to print information
 showing the progress of the transfer. This gives a bored user
