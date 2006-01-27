@@ -1445,26 +1445,29 @@ int flist_find(struct file_list *flist, struct file_struct *f)
 		mid = (low + high) / 2;
 		if (flist->files[mid]->basename)
 			mid_up = mid;
-		else if (flist->files[mid]->dir.depth) {
-			mid_up = mid + flist->files[mid]->dir.depth;
-			if (mid_up < mid) {
-				high = mid_up;
-				continue;
+		else {
+			/* Scan for the next non-empty entry using the cached
+			 * distance values.  If the value isn't fully up-to-
+			 * date, update it. */
+			while (1) {
+				mid_up = mid + flist->files[mid]->dir.depth;
+				if (flist->files[mid_up]->basename)
+					break;
+				flist->files[mid]->dir.depth
+					+= flist->files[mid_up]->dir.depth;
 			}
-		} else {
-			/* Scan for the next non-empty entry and cache
-			 * the distance so we never do this again. */
-			mid_up = mid;
-			while (++mid_up <= high
-			    && !flist->files[mid_up]->basename) {}
 			if (mid_up > high) {
-				high = mid;
-				while (--high >= low
-				    && !flist->files[high]->basename) {}
-				flist->files[mid]->dir.depth = high - mid;
+				/* If there's nothing left above us, set high to
+				 * a non-empty entry below us and continue. */
+				while (1) {
+					high = mid - flist->files[mid]->length;
+					if (flist->files[high]->basename)
+						break;
+					flist->files[mid]->length
+						+= flist->files[high]->length;
+				}
 				continue;
 			}
-			flist->files[mid]->dir.depth = mid_up - mid;
 		}
 		ret = f_name_cmp(flist->files[mid_up], f);
 		if (ret == 0) {
@@ -1488,9 +1491,15 @@ int flist_find(struct file_list *flist, struct file_struct *f)
  */
 void clear_file(int i, struct file_list *flist)
 {
-	if (flist->hlink_pool && flist->files[i]->link_u.idev)
-		pool_free(flist->hlink_pool, 0, flist->files[i]->link_u.idev);
-	memset(flist->files[i], 0, file_struct_len);
+	struct file_struct *file = flist->files[i];
+	if (flist->hlink_pool && file->link_u.idev)
+		pool_free(flist->hlink_pool, 0, file->link_u.idev);
+	memset(file, 0, file_struct_len);
+	/* In an empty entry, dir.depth is an offset to the next non-empty
+	 * entry.  Likewise for length in the opposite direction.  We assume
+	 * that we're alone for now since flist_find() will collate adjacent
+	 * items for any entries that are encountered during the find. */
+	file->length = file->dir.depth = 1;
 }
 
 /*
