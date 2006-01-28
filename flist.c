@@ -76,7 +76,6 @@ unsigned int file_struct_len;
 
 static char empty_sum[MD4_SUM_LENGTH];
 static int flist_count_offset;
-static int max_dir_depth = 0;
 
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
 static void output_flist(struct file_list *flist);
@@ -635,8 +634,6 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 		bp[-1] = '\0';
 		lastdir_depth = count_dir_elements(lastdir);
 		file->dir.depth = lastdir_depth + 1;
-		if (lastdir_depth >= max_dir_depth)
-			max_dir_depth = lastdir_depth + 1;
 	} else if (dirname) {
 		file->dirname = dirname; /* we're reusing lastname */
 		file->dir.depth = lastdir_depth + 1;
@@ -1489,9 +1486,8 @@ int flist_find(struct file_list *flist, struct file_struct *f)
  * Free up any resources a file_struct has allocated
  * and clear the file.
  */
-void clear_file(int i, struct file_list *flist)
+void clear_file(struct file_struct *file, struct file_list *flist)
 {
-	struct file_struct *file = flist->files[i];
 	if (flist->hlink_pool && file->link_u.idev)
 		pool_free(flist->hlink_pool, 0, file->link_u.idev);
 	memset(file, 0, file_struct_len);
@@ -1608,7 +1604,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			flist->files[keep]->flags |= flist->files[drop]->flags
 						   & (FLAG_TOP_DIR|FLAG_DEL_HERE);
 
-			clear_file(drop, flist);
+			clear_file(flist->files[drop], flist);
 
 			if (keep == i) {
 				if (flist->low == drop) {
@@ -1639,38 +1635,58 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 		}
 	}
 
-	if (prune_empty_dirs && no_dups && max_dir_depth) {
-		int j, cur_depth = 0;
-		int *maybe_dirs = new_array(int, max_dir_depth);
+	if (prune_empty_dirs && no_dups) {
+		int j, prev_depth = 0;
 
-		maybe_dirs[0] = -1;
+		prev_i = 0; /* It's OK that this isn't really true. */
 
 		for (i = flist->low; i <= flist->high; i++) {
-			struct file_struct *file = flist->files[i];
+			struct file_struct *fp, *file = flist->files[i];
 
+			/* This temporarily abuses the dir.depth value for a
+			 * directory that is in a chain that might get pruned.
+			 * We restore the old value if it gets a reprieve. */
 			if (S_ISDIR(file->mode) && file->dir.depth) {
-				j = cur_depth;
-				cur_depth = file->dir.depth - 1;
-				for ( ; j >= cur_depth; j--) {
-					if (maybe_dirs[j] < 0)
-						continue;
-					clear_file(maybe_dirs[j], flist);
+				/* Dump empty dirs when coming back down. */
+				for (j = prev_depth; j >= file->dir.depth; j--) {
+					fp = flist->files[prev_i];
+					if (fp->dir.depth >= 0)
+						break;
+					prev_i = -fp->dir.depth-1;
+					clear_file(fp, flist);
 				}
+				prev_depth = file->dir.depth;
 				if (is_excluded(f_name(file, fbuf), 1,
 						       ALL_FILTERS)) {
-					for (j = 0; j <= cur_depth; j++)
-						maybe_dirs[j] = -1;
+					/* Keep dirs through this dir. */
+					for (j = prev_depth-1; ; j--) {
+						fp = flist->files[prev_i];
+						if (fp->dir.depth >= 0)
+							break;
+						prev_i = -fp->dir.depth-1;
+						fp->dir.depth = j;
+					}
 				} else
-					maybe_dirs[cur_depth] = i;
-			} else if (maybe_dirs[cur_depth] >= 0) {
-				for (j = 0; j <= cur_depth; j++)
-					maybe_dirs[j] = -1;
+					file->dir.depth = -prev_i-1;
+				prev_i = i;
+			} else {
+				/* Keep dirs through this non-dir. */
+				for (j = prev_depth; ; j--) {
+					fp = flist->files[prev_i];
+					if (fp->dir.depth >= 0)
+						break;
+					prev_i = -fp->dir.depth-1;
+					fp->dir.depth = j;
+				}
 			}
 		}
-		for (j = cur_depth; j >= 0; j--) {
-			if (maybe_dirs[j] < 0)
-				continue;
-			clear_file(maybe_dirs[j], flist);
+		/* Dump empty all remaining empty dirs. */
+		while (1) {
+			struct file_struct *fp = flist->files[prev_i];
+			if (fp->dir.depth >= 0)
+				break;
+			prev_i = -fp->dir.depth-1;
+			clear_file(fp, flist);
 		}
 
 		for (i = flist->low; i <= flist->high; i++) {
