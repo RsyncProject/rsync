@@ -36,6 +36,7 @@ extern int io_error;
 extern int local_server;
 extern int saw_delete_opt;
 extern int saw_delete_excluded_opt;
+extern int prune_empty_dirs;
 extern int delete_mode;
 extern int delete_excluded;
 extern int cvs_exclude;
@@ -586,11 +587,13 @@ static void report_filter_result(char const *name,
 	 * case we add it back in here. */
 
 	if (verbose >= 2) {
-		rprintf(FINFO, "[%s] %scluding %s %s because of pattern %s%s%s\n",
-			who_am_i(),
-			ent->match_flags & MATCHFLG_INCLUDE ? "in" : "ex",
-			name_is_dir ? "directory" : "file", name, ent->pattern,
-			ent->match_flags & MATCHFLG_DIRECTORY ? "/" : "", type);
+		static char *actions[2][2]
+		    = { {"show", "hid"}, {"risk", "protect"} };
+		const char *w = who_am_i();
+		rprintf(FINFO, "[%s] %sing %s %s because of pattern %s%s%s\n",
+		    w, actions[*w!='s'][!(ent->match_flags&MATCHFLG_INCLUDE)],
+		    name_is_dir ? "directory" : "file", name, ent->pattern,
+		    ent->match_flags & MATCHFLG_DIRECTORY ? "/" : "", type);
 	}
 }
 
@@ -1147,8 +1150,8 @@ static void send_rules(int f_out, struct filter_list_struct *flp)
 /* This is only called by the client. */
 void send_filter_list(int f_out)
 {
-	int receiver_wants_list = delete_mode
-		&& (!delete_excluded || protocol_version >= 29);
+	int receiver_wants_list = prune_empty_dirs
+	    || (delete_mode && (!delete_excluded || protocol_version >= 29));
 
 	if (local_server || (am_sender && !receiver_wants_list))
 		f_out = -1;
@@ -1181,8 +1184,9 @@ void recv_filter_list(int f_in)
 {
 	char line[BIGPATHBUFLEN];
 	int xflags = protocol_version >= 29 ? 0 : XFLG_OLD_PREFIXES;
-	int receiver_wants_list = saw_delete_opt
-		&& (!saw_delete_excluded_opt || protocol_version >= 29);
+	int receiver_wants_list = prune_empty_dirs
+	    || (saw_delete_opt
+	     && (!saw_delete_excluded_opt || protocol_version >= 29));
 	unsigned int len;
 
 	if (!local_server && (am_sender || receiver_wants_list)) {
