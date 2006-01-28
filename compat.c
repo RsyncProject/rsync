@@ -35,6 +35,7 @@ extern int fuzzy_basis;
 extern int read_batch;
 extern int checksum_seed;
 extern int basis_dir_cnt;
+extern int prune_empty_dirs;
 extern int protocol_version;
 extern char *dest_option;
 
@@ -78,26 +79,38 @@ void setup_protocol(int f_out,int f_in)
 		exit_cleanup(RERR_PROTOCOL);
 	}
 
-	if (fuzzy_basis && protocol_version < 29) {
-		rprintf(FERROR,
-			"--fuzzy requires protocol 29 or higher (negotiated %d).\n",
-			protocol_version);
-		exit_cleanup(RERR_PROTOCOL);
-	}
+	if (protocol_version < 29) {
+		if (fuzzy_basis) {
+			rprintf(FERROR,
+			    "--fuzzy requires protocol 29 or higher"
+			    " (negotiated %d).\n",
+			    protocol_version);
+			exit_cleanup(RERR_PROTOCOL);
+		}
 
-	if (basis_dir_cnt && inplace && protocol_version < 29) {
-		rprintf(FERROR,
-			"%s with --inplace requires protocol 29 or higher (negotiated %d).\n",
-			dest_option, protocol_version);
-		exit_cleanup(RERR_PROTOCOL);
-	}
+		if (basis_dir_cnt && inplace) {
+			rprintf(FERROR,
+			    "%s with --inplace requires protocol 29 or higher"
+			    " (negotiated %d).\n",
+			    dest_option, protocol_version);
+			exit_cleanup(RERR_PROTOCOL);
+		}
 
-	if (basis_dir_cnt > 1 && protocol_version < 29) {
-		rprintf(FERROR,
-			"Using more than one %s option requires protocol 29 or higher\n"
-			"(negotiated %d).\n",
-			dest_option, protocol_version);
-		exit_cleanup(RERR_PROTOCOL);
+		if (basis_dir_cnt > 1) {
+			rprintf(FERROR,
+			    "Using more than one %s option requires protocol"
+			    " 29 or higher (negotiated %d).\n",
+			    dest_option, protocol_version);
+			exit_cleanup(RERR_PROTOCOL);
+		}
+
+		if (prune_empty_dirs) {
+			rprintf(FERROR,
+			    "--prune-empty-dirs requires protocol 29 or higher"
+			    " (negotiated %d).\n",
+			    protocol_version);
+			exit_cleanup(RERR_PROTOCOL);
+		}
 	}
 
 	if (am_server) {
