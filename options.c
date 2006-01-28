@@ -1262,7 +1262,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		snprintf(err_buf, sizeof err_buf,
 			"--suffix cannot be a null string without --backup-dir\n");
 		return 0;
-	} else if (delete_mode && !delete_excluded) {
+	} else if (make_backups && delete_mode && !delete_excluded) {
 		snprintf(backup_dir_buf, sizeof backup_dir_buf,
 			"P *%s", backup_suffix);
 		parse_rule(&filter_list, backup_dir_buf, 0, 0);
