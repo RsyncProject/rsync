@@ -1439,7 +1439,7 @@ static int file_compare(struct file_struct **file1, struct file_struct **file2)
 int flist_find(struct file_list *flist, struct file_struct *f)
 {
 	int low = flist->low, high = flist->high;
-	int ret, mid, mid_up;
+	int diff, mid, mid_up;
 
 	while (low <= high) {
 		mid = (low + high) / 2;
@@ -1469,18 +1469,18 @@ int flist_find(struct file_list *flist, struct file_struct *f)
 				continue;
 			}
 		}
-		ret = f_name_cmp(flist->files[mid_up], f);
-		if (ret == 0) {
+		diff = f_name_cmp(flist->files[mid_up], f);
+		if (diff == 0) {
 			if (protocol_version < 29
 			    && S_ISDIR(flist->files[mid_up]->mode)
 			    != S_ISDIR(f->mode))
 				return -1;
 			return mid_up;
 		}
-		if (ret > 0)
-			high = mid - 1;
-		else
+		if (diff < 0)
 			low = mid_up + 1;
+		else
+			high = mid - 1;
 	}
 	return -1;
 }
