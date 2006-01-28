@@ -53,7 +53,7 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int relative_paths;
 extern int implied_dirs;
-extern int skip_empty_dirs;
+extern int prune_empty_dirs;
 extern int copy_links;
 extern int copy_unsafe_links;
 extern int protocol_version;
@@ -1449,22 +1449,22 @@ int flist_find(struct file_list *flist, struct file_struct *f)
 			/* Scan for the next non-empty entry using the cached
 			 * distance values.  If the value isn't fully up-to-
 			 * date, update it. */
-			while (1) {
-				mid_up = mid + flist->files[mid]->dir.depth;
-				if (flist->files[mid_up]->basename)
-					break;
-				flist->files[mid]->dir.depth
-					+= flist->files[mid_up]->dir.depth;
+			mid_up = mid + flist->files[mid]->dir.depth;
+			if (!flist->files[mid_up]->basename) {
+				do {
+				    mid_up += flist->files[mid_up]->dir.depth;
+				} while (!flist->files[mid_up]->basename);
+				flist->files[mid]->dir.depth = mid_up - mid;
 			}
 			if (mid_up > high) {
 				/* If there's nothing left above us, set high to
 				 * a non-empty entry below us and continue. */
-				while (1) {
-					high = mid - flist->files[mid]->length;
-					if (flist->files[high]->basename)
-						break;
-					flist->files[mid]->length
-						+= flist->files[high]->length;
+				high = mid - flist->files[mid]->length;
+				if (!flist->files[high]->basename) {
+					do {
+					    high -= flist->files[high]->length;
+					} while (!flist->files[high]->basename);
+					flist->files[mid]->length = mid - high;
 				}
 				continue;
 			}
@@ -1547,6 +1547,7 @@ void flist_free(struct file_list *flist)
  */
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 {
+	char fbuf[MAXPATHLEN];
 	int i, prev_i = 0;
 
 	if (!flist)
@@ -1600,7 +1601,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			if (verbose > 1 && !am_server) {
 				rprintf(FINFO,
 					"removing duplicate name %s from file list (%d)\n",
-					f_name(file, NULL), drop);
+					f_name(file, fbuf), drop);
 			}
 			/* Make sure we don't lose track of a user-specified
 			 * top directory. */
@@ -1638,7 +1639,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 		}
 	}
 
-	if (skip_empty_dirs && no_dups && max_dir_depth) {
+	if (prune_empty_dirs && no_dups && max_dir_depth) {
 		int j, cur_depth = 0;
 		int *maybe_dirs = new_array(int, max_dir_depth);
 
@@ -1655,7 +1656,12 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 						continue;
 					clear_file(maybe_dirs[j], flist);
 				}
-				maybe_dirs[cur_depth] = i;
+				if (is_excluded(f_name(file, fbuf), 1,
+						       ALL_FILTERS)) {
+					for (j = 0; j <= cur_depth; j++)
+						maybe_dirs[j] = -1;
+				} else
+					maybe_dirs[cur_depth] = i;
 			} else if (maybe_dirs[cur_depth] >= 0) {
 				for (j = 0; j <= cur_depth; j++)
 					maybe_dirs[j] = -1;
