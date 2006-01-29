@@ -277,9 +277,8 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 		if (!fp->basename || fp->flags & FLAG_MOUNT_POINT)
 			continue;
 		if (flist_find(flist, fp) < 0) {
-			int mode = fp->mode;
 			f_name(fp, delbuf);
-			delete_item(delbuf, mode, DEL_FORCE_RECURSE);
+			delete_item(delbuf, fp->mode, DEL_FORCE_RECURSE);
 		}
 	}
 
@@ -608,7 +607,7 @@ void check_for_finished_hlinks(int itemizing, enum logcode code)
  * value if we found an alternate basis file. */
 static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			 char *cmpbuf, STRUCT_STAT *stp, int itemizing,
-			 int maybe_PERMS_REPORT, enum logcode code)
+			 int maybe_ATTRS_REPORT, enum logcode code)
 {
 	int best_match = -1;
 	int match_level = 0;
@@ -664,7 +663,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 				hard_link_cluster(file, ndx, itemizing, code);
 		} else if (itemizing)
 			itemize(file, ndx, 0, stp, 0, 0, NULL);
-		if (verbose > 1 && maybe_PERMS_REPORT) {
+		if (verbose > 1 && maybe_ATTRS_REPORT) {
 			code = daemon_log_format_has_i || dry_run
 			     ? FCLIENT : FINFO;
 			rprintf(code, "%s is uptodate\n", fname);
@@ -684,8 +683,8 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		}
 		if (itemizing)
 			itemize(file, ndx, 0, stp, ITEM_LOCAL_CHANGE, 0, NULL);
-		set_perms(fname, file, NULL, 0);
-		if (maybe_PERMS_REPORT
+		set_file_attrs(fname, file, NULL, 0);
+		if (maybe_ATTRS_REPORT
 		 && ((!itemizing && verbose && match_level == 2)
 		  || (verbose > 1 && match_level == 3))) {
 			code = daemon_log_format_has_i || dry_run
@@ -705,7 +704,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
  * handling the file, or -1 if no dest-linking occurred. */
 static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			 int itemizing, int *possible_ptr,
-			 int maybe_PERMS_REPORT, enum logcode code)
+			 int maybe_ATTRS_REPORT, enum logcode code)
 {
 	char fnamebuf[MAXPATHLEN], lnk[MAXPATHLEN];
 	STRUCT_STAT st;
@@ -743,7 +742,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			char *lp = link_dest ? "" : NULL;
 			itemize(file, ndx, 0, &st, changes, 0, lp);
 		}
-		if (verbose > 1 && maybe_PERMS_REPORT) {
+		if (verbose > 1 && maybe_ATTRS_REPORT) {
 			code = daemon_log_format_has_i || dry_run
 			     ? FCLIENT : FINFO;
 			rprintf(code, "%s is uptodate\n", fname);
@@ -767,7 +766,7 @@ static int phase = 0;
  * Note that f_out is set to -1 when doing final directory-permission and
  * modification-time repair. */
 static void recv_generator(char *fname, struct file_struct *file, int ndx,
-			   int itemizing, int maybe_PERMS_REPORT,
+			   int itemizing, int maybe_ATTRS_REPORT,
 			   enum logcode code, int f_out)
 {
 	static int missing_below = -1, excluded_below = -1;
@@ -891,7 +890,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					full_fname(fname));
 			}
 		}
-		if (set_perms(fname, file, statret ? NULL : &st, 0)
+		if (set_file_attrs(fname, file, statret ? NULL : &st, 0)
 		    && verbose && code && f_out != -1)
 			rprintf(code, "%s/\n", fname);
 		if (delete_during && f_out != -1 && !phase && dry_run < 2
@@ -932,8 +931,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 						itemize(file, ndx, 0, &st, 0,
 							0, NULL);
 					}
-					set_perms(fname, file, &st,
-						  maybe_PERMS_REPORT);
+					set_file_attrs(fname, file, &st,
+						       maybe_ATTRS_REPORT);
 					if (preserve_hard_links
 					    && file->link_u.links) {
 						hard_link_cluster(file, ndx,
@@ -952,7 +951,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		} else if (basis_dir[0] != NULL && can_link_symlinks) {
 			if (try_dests_non(file, fname, ndx, itemizing,
 					  &can_link_symlinks,
-					  maybe_PERMS_REPORT, code) == -2) {
+					  maybe_ATTRS_REPORT, code) == -2) {
 				if (!copy_dest)
 					return;
 				itemizing = code = 0;
@@ -966,7 +965,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			rsyserr(FERROR, errno, "symlink %s -> \"%s\" failed",
 				full_fname(fname), file->u.link);
 		} else {
-			set_perms(fname,file,NULL,0);
+			set_file_attrs(fname, file, NULL, 0);
 			if (itemizing) {
 				itemize(file, ndx, statret, &st,
 					ITEM_LOCAL_CHANGE, 0, NULL);
@@ -993,7 +992,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		 && (basis_dir[0] != NULL && can_link_devices)) {
 			if (try_dests_non(file, fname, ndx, itemizing,
 					  &can_link_devices,
-					  maybe_PERMS_REPORT, code) == -2) {
+					  maybe_ATTRS_REPORT, code) == -2) {
 				if (!copy_dest)
 					return;
 				itemizing = code = 0;
@@ -1021,7 +1020,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				rsyserr(FERROR, errno, "mknod %s failed",
 					full_fname(fname));
 			} else {
-				set_perms(fname,file,NULL,0);
+				set_file_attrs(fname, file, NULL, 0);
 				if (itemizing) {
 					itemize(file, ndx, statret, &st,
 						ITEM_LOCAL_CHANGE, 0, NULL);
@@ -1036,7 +1035,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		} else {
 			if (itemizing)
 				itemize(file, ndx, statret, &st, 0, 0, NULL);
-			set_perms(fname, file, &st, maybe_PERMS_REPORT);
+			set_file_attrs(fname, file, &st, maybe_ATTRS_REPORT);
 			if (preserve_hard_links && file->link_u.links)
 				hard_link_cluster(file, ndx, itemizing, code);
 		}
@@ -1092,7 +1091,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (statret != 0 && basis_dir[0] != NULL) {
 		int j = try_dests_reg(file, fname, ndx, fnamecmpbuf, &st,
-				      itemizing, maybe_PERMS_REPORT, code);
+				      itemizing, maybe_ATTRS_REPORT, code);
 		if (j == -2)
 			return;
 		if (j != -1) {
@@ -1157,7 +1156,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			itemize(file, ndx, real_ret, &real_st,
 				0, 0, NULL);
 		}
-		set_perms(fname, file, &st, maybe_PERMS_REPORT);
+		set_file_attrs(fname, file, &st, maybe_ATTRS_REPORT);
 		if (preserve_hard_links && file->link_u.links)
 			hard_link_cluster(file, ndx, itemizing, code);
 		return;
@@ -1262,7 +1261,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (f_copy >= 0) {
 		close(f_copy);
-		set_perms(backupptr, back_file, NULL, 0);
+		set_file_attrs(backupptr, back_file, NULL, 0);
 		if (verbose > 1) {
 			rprintf(FINFO, "backed up %s to %s\n",
 				fname, backupptr);
@@ -1277,7 +1276,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 {
 	int i;
 	char fbuf[MAXPATHLEN];
-	int itemizing, maybe_PERMS_REPORT;
+	int itemizing, maybe_ATTRS_REPORT;
 	enum logcode code;
 	int lull_mod = allowed_lull * 5;
 	int need_retouch_dir_times = preserve_times && !omit_dir_times;
@@ -1289,19 +1288,19 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 
 	if (protocol_version >= 29) {
 		itemizing = 1;
-		maybe_PERMS_REPORT = log_format_has_i ? 0 : PERMS_REPORT;
+		maybe_ATTRS_REPORT = log_format_has_i ? 0 : ATTRS_REPORT;
 		code = daemon_log_format_has_i ? 0 : FLOG;
 	} else if (am_daemon) {
 		itemizing = daemon_log_format_has_i && do_xfers;
-		maybe_PERMS_REPORT = PERMS_REPORT;
+		maybe_ATTRS_REPORT = ATTRS_REPORT;
 		code = itemizing || !do_xfers ? FCLIENT : FINFO;
 	} else if (!am_server) {
 		itemizing = log_format_has_i;
-		maybe_PERMS_REPORT = log_format_has_i ? 0 : PERMS_REPORT;
+		maybe_ATTRS_REPORT = log_format_has_i ? 0 : ATTRS_REPORT;
 		code = itemizing ? 0 : FINFO;
 	} else {
 		itemizing = 0;
-		maybe_PERMS_REPORT = PERMS_REPORT;
+		maybe_ATTRS_REPORT = ATTRS_REPORT;
 		code = FINFO;
 	}
 
@@ -1339,7 +1338,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 			strlcpy(fbuf, local_name, sizeof fbuf);
 		else
 			f_name(file, fbuf);
-		recv_generator(fbuf, file, i, itemizing, maybe_PERMS_REPORT,
+		recv_generator(fbuf, file, i, itemizing, maybe_ATTRS_REPORT,
 			       code, f_out);
 
 		/* We need to ensure that any dirs we create have writeable
@@ -1348,7 +1347,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 #ifdef HAVE_CHMOD
 		if (!am_root && S_ISDIR(file->mode) && !(file->mode & S_IWUSR)
 		    && !list_only) {
-			int mode = file->mode | S_IWUSR; /* user write */
+			mode_t mode = file->mode | S_IWUSR; /* user write */
 			char *fname = local_name ? local_name : fbuf;
 			if (do_chmod(fname, mode) < 0) {
 				rsyserr(FERROR, errno,
@@ -1393,7 +1392,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 			strlcpy(fbuf, local_name, sizeof fbuf);
 		else
 			f_name(file, fbuf);
-		recv_generator(fbuf, file, i, itemizing, maybe_PERMS_REPORT,
+		recv_generator(fbuf, file, i, itemizing, maybe_ATTRS_REPORT,
 			       code, f_out);
 	}
 
@@ -1441,7 +1440,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 			if (!need_retouch_dir_times && file->mode & S_IWUSR)
 				continue;
 			recv_generator(f_name(file, NULL), file, i, itemizing,
-				       maybe_PERMS_REPORT, code, -1);
+				       maybe_ATTRS_REPORT, code, -1);
 			if (allowed_lull && !(++j % lull_mod))
 				maybe_send_keepalive();
 			else if (!(j % 200))
