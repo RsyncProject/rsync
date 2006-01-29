@@ -1078,6 +1078,24 @@ scratch directory when creating temporary copies of the files
 transferred on the receiving side.  The default behavior is to create
 the temporary files in the receiving directory.
 
+This option is most often used when the receiving disk partition does not
+have enough free space to hold a copy of the largest file in the transfer.
+In this case (i.e. when the scratch directory in on a different disk
+partition), rsync will not be able to rename each received temporary file
+over the top of the associated destination file, but instead must copy it
+into place.  Rsync does this by copying the file over the top of the
+destination file, which means that the destination file will contain
+truncated data during this copy.  If this were not done this way -- for
+instance, if the destination file were first removed, a copy made to a
+temp-file in the destination dir, and that file renamed over the top of the
+destination file -- the old file could still be taking up disk space (if
+someone had it open), and thus the copy could fail due to lack of space.  
+
+If you are using this option for reasons other than a shortage of disk
+space, you may wish to combine it with the bf(--delay-updates) option,
+which will ensure that all copied files go into a subdirectory of the
+destination dir, awaiting the end of the transfer.
+
 dit(bf(-y, --fuzzy)) This option tells rsync that it should look for a
 basis file for any destination file that is missing.  The current algorithm
 looks in the same directory as the destination file for either a file that
@@ -1317,8 +1335,9 @@ dit(bf(--partial-dir=DIR)) A better way to keep partial files than the
 bf(--partial) option is to specify a em(DIR) that will be used to hold the
 partial data (instead of writing it out to the destination file).
 On the next transfer, rsync will use a file found in this
-dir as data to speed up the resumption of the transfer and then deletes it
+dir as data to speed up the resumption of the transfer and then delete it
 after it has served its purpose.
+
 Note that if bf(--whole-file) is specified (or implied), any partial-dir
 file that is found for a file that is being updated will simply be removed
 (since
@@ -1351,9 +1370,9 @@ enabled, but rather it effects where partial files go when bf(--partial) is
 specified.  For instance, instead of using bf(--partial-dir=.rsync-tmp)
 along with bf(--progress), you could set RSYNC_PARTIAL_DIR=.rsync-tmp in your
 environment and then just use the bf(-P) option to turn on the use of the
-.rsync-tmp dir for partial transfers.  The only time that the bf(--partial)
-option does not look for this environment value is (1) when bf(--inplace) was
-specified (since bf(--inplace) conflicts with bf(--partial-dir)), or (2) when
+.rsync-tmp dir for partial transfers.  The only times that the bf(--partial)
+option does not look for this environment value are (1) when bf(--inplace) was
+specified (since bf(--inplace) conflicts with bf(--partial-dir)), and (2) when
 bf(--delay-updates) was specified (see below).
 
 For the purposes of the daemon-config's "refuse options" setting,
