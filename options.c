@@ -1684,7 +1684,7 @@ void server_options(char **args,int *argc)
 	else if (inplace)
 		args[ac++] = "--inplace";
 
-	if (tmpdir) {
+	if (tmpdir && am_sender) {
 		args[ac++] = "--temp-dir";
 		args[ac++] = tmpdir;
 	}
