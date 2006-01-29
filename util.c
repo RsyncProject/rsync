@@ -260,7 +260,7 @@ static int safe_read(int desc, char *ptr, size_t len)
  *
  * This is used in conjunction with the --temp-dir, --backup, and
  * --copy-dest options. */
-int copy_file(char *source, char *dest, mode_t mode)
+int copy_file(const char *source, const char *dest, mode_t mode)
 {
 	int ifd;
 	int ofd;
@@ -329,7 +329,7 @@ int copy_file(char *source, char *dest, mode_t mode)
  * --delete trying to remove old .rsyncNNN files, hence it renames it
  * each time.
  **/
-int robust_unlink(char *fname)
+int robust_unlink(const char *fname)
 {
 #ifndef ETXTBSY
 	return do_unlink(fname);
@@ -378,7 +378,7 @@ int robust_unlink(char *fname)
 
 /* Returns 0 on successful rename, 1 if we successfully copied the file
  * across filesystems, -2 if copy_file() failed, and -1 on other errors. */
-int robust_rename(char *from, char *to, int mode)
+int robust_rename(const char *from, const char *to, int mode)
 {
 	int tries = 4;
 

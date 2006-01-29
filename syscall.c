@@ -45,14 +45,14 @@ extern int preserve_perms;
 
 #define RETURN_ERROR_IF_RO_OR_LO RETURN_ERROR_IF(read_only || list_only, EROFS)
 
-int do_unlink(char *fname)
+int do_unlink(const char *fname)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 	return unlink(fname);
 }
 
-int do_symlink(char *fname1, char *fname2)
+int do_symlink(const char *fname1, const char *fname2)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
@@ -60,7 +60,7 @@ int do_symlink(char *fname1, char *fname2)
 }
 
 #ifdef HAVE_LINK
-int do_link(char *fname1, char *fname2)
+int do_link(const char *fname1, const char *fname2)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
@@ -118,14 +118,14 @@ int do_mknod(char *pathname, mode_t mode, dev_t dev)
 #endif
 }
 
-int do_rmdir(char *pathname)
+int do_rmdir(const char *pathname)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 	return rmdir(pathname);
 }
 
-int do_open(char *pathname, int flags, mode_t mode)
+int do_open(const char *pathname, int flags, mode_t mode)
 {
 	if (flags != O_RDONLY) {
 		RETURN_ERROR_IF(dry_run, 0);
@@ -155,13 +155,12 @@ int do_chmod(const char *path, mode_t mode)
 }
 #endif
 
-int do_rename(char *fname1, char *fname2)
+int do_rename(const char *fname1, const char *fname2)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
 	return rename(fname1, fname2);
 }
-
 
 void trim_trailing_slashes(char *name)
 {
@@ -181,7 +180,6 @@ void trim_trailing_slashes(char *name)
 	}
 }
 
-
 int do_mkdir(char *fname, mode_t mode)
 {
 	if (dry_run) return 0;
@@ -189,7 +187,6 @@ int do_mkdir(char *fname, mode_t mode)
 	trim_trailing_slashes(fname);	
 	return mkdir(fname, mode);
 }
-
 
 /* like mkstemp but forces permissions */
 int do_mkstemp(char *template, mode_t perms)
