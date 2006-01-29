@@ -49,9 +49,8 @@ void free_sums(struct sum_struct *s)
 	free(s);
 }
 
-
-int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
-	      int flags)
+int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
+		   int flags)
 {
 	int updated = 0;
 	STRUCT_STAT st2;
@@ -69,8 +68,8 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	}
 
 	if (!preserve_times || (S_ISDIR(st->st_mode) && omit_dir_times))
-		flags |= PERMS_SKIP_MTIME;
-	if (!(flags & PERMS_SKIP_MTIME)
+		flags |= ATTRS_SKIP_MTIME;
+	if (!(flags & ATTRS_SKIP_MTIME)
 	    && cmp_modtime(st->st_mtime, file->modtime) != 0) {
 		int ret = set_modtime(fname, file->modtime, st->st_mode);
 		if (ret < 0) {
@@ -139,7 +138,7 @@ int set_perms(char *fname,struct file_struct *file,STRUCT_STAT *st,
 	}
 #endif
 
-	if (verbose > 1 && flags & PERMS_REPORT) {
+	if (verbose > 1 && flags & ATTRS_REPORT) {
 		enum logcode code = daemon_log_format_has_i || dry_run
 				  ? FCLIENT : FINFO;
 		if (updated)
@@ -176,14 +175,15 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
 	if (inplace) {
 		if (verbose > 2)
 			rprintf(FINFO, "finishing %s\n", fname);
-		goto do_set_perms;
+		goto do_set_file_attrs;
 	}
 
 	if (make_backups && overwriting_basis && !make_backup(fname))
 		return;
 
 	/* Change permissions before putting the file into place. */
-	set_perms(fnametmp, file, NULL, ok_to_set_time ? 0 : PERMS_SKIP_MTIME);
+	set_file_attrs(fnametmp, file, NULL,
+		       ok_to_set_time ? 0 : ATTRS_SKIP_MTIME);
 
 	/* move tmp file over real file */
 	if (verbose > 2)
@@ -200,8 +200,9 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
 		/* The file was moved into place (not copied), so it's done. */
 		return;
 	}
-    do_set_perms:
-	set_perms(fname, file, NULL, ok_to_set_time ? 0 : PERMS_SKIP_MTIME);
+  do_set_file_attrs:
+	set_file_attrs(fname, file, NULL,
+		       ok_to_set_time ? 0 : ATTRS_SKIP_MTIME);
 }
 
 const char *who_am_i(void)
