@@ -179,7 +179,7 @@ static int refused_delete, refused_archive_part, refused_compress;
 static int refused_partial, refused_progress, refused_delete_before;
 static int refused_inplace;
 static char *max_size_arg, *min_size_arg;
-static char partialdir_for_delayupdate[] = ".~tmp~";
+static char tmp_partialdir[] = ".~tmp~";
 
 /** Local address to bind.  As a character string because it's
  * interpreted by the IPv6 layer: should be a numeric IP4 or IP6
@@ -1330,7 +1330,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 
 	if (delay_updates && !partial_dir)
-		partial_dir = partialdir_for_delayupdate;
+		partial_dir = tmp_partialdir;
 
 	if (inplace) {
 #ifdef HAVE_FTRUNCATE
@@ -1651,13 +1651,13 @@ void server_options(char **args,int *argc)
 	}
 
 	if (partial_dir && am_sender) {
-		if (partial_dir != partialdir_for_delayupdate) {
+		if (partial_dir != tmp_partialdir) {
 			args[ac++] = "--partial-dir";
 			args[ac++] = partial_dir;
 		}
 		if (delay_updates)
 			args[ac++] = "--delay-updates";
-	} else if (keep_partial)
+	} else if (keep_partial && am_sender)
 		args[ac++] = "--partial";
 
 	if (ignore_errors)
