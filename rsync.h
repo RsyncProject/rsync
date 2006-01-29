@@ -117,8 +117,8 @@
 #define XFLG_ANCHORED2ABS	(1<<2)
 #define XFLG_ABS_IF_SLASH	(1<<3)
 
-#define PERMS_REPORT		(1<<0)
-#define PERMS_SKIP_MTIME	(1<<1)
+#define ATTRS_REPORT		(1<<0)
+#define ATTRS_SKIP_MTIME	(1<<1)
 
 #define FULL_FLUSH	1
 #define NORMAL_FLUSH	0
