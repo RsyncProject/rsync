@@ -261,7 +261,7 @@ static int keep_backup(char *fname)
 			robust_unlink(fname); /* Just in case... */
 		}
 	}
-	set_perms(buf, file, NULL, 0);
+	set_file_attrs(buf, file, NULL, 0);
 	free(file);
 
 	if (verbose > 1) {
