@@ -640,6 +640,7 @@ struct stats {
 	int current_file_index;
 };
 
+struct chmod_mode_struct;
 
 #include "byteorder.h"
 #include "lib/mdfour.h"
@@ -872,5 +873,3 @@ const char *get_panic_action(void);
 #endif
 
 #define UNUSED(x) x __attribute__((__unused__))
-
-extern const char *io_write_phase, *io_read_phase;
