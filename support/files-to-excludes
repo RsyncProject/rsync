@@ -1,0 +1,27 @@
+#!/usr/bin/perl
+# This script takes an input of filenames and outputs a set of
+# include/exclude directives that can be used by rsync to copy
+# just the indicated files using an --exclude-from=FILE option.
+use strict;
+
+my %hash;
+
+while (<>) {
+    chomp;
+    s#^/+##;
+    my $path = '/';
+    while (m#([^/]+/)/*#g) {
+	$path .= $1;
+	print "+ $path\n" unless $hash{$path}++;
+    }
+    if (m#([^/]+)$#) {
+	print "+ $path$1\n";
+    } else {
+	delete $hash{$path};
+    }
+}
+
+foreach (sort keys %hash) {
+    print "- $_*\n";
+}
+print "- /*\n";
