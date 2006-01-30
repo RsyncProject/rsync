@@ -57,6 +57,9 @@ Changes since 2.6.6:
       --dry-run and --delete, rsync no longer complains about not being
       able to opendir() the not-yet present directory.
 
+    - Got rid of the need for --force to be used in some circumstances with
+      --delete-after (making it consistent with --delete-before/-during).
+
   ENHANCEMENTS:
 
     - Added the --specials option to tell rsync to copy special files (and does
@@ -111,6 +114,10 @@ Changes since 2.6.6:
     - Added the --chmod=MODE option that allows the destination permissions
       to be changed from the source permissions.  E.g. --chmod=g+w,o-rwx
 
+    - Added the "incoming chmod" daemon option to allow a module to specify
+      what permissions changes should be applied to all files copied to the
+      daemon.
+
     - Allow the --temp-dir option to be specified when starting a daemon,
       which sets the default temporary directory for incoming files.
 
@@ -131,11 +138,10 @@ Changes since 2.6.6:
       trailing stars) to match both the dir itself as well as all the
       content below the dir (dir/** would not match the dir).
 
-    - Added the --skip-empty-dirs (-k) option that makes the receiving
+    - Added the --prune-empty-dirs (-m) option that makes the receiving
       rsync discard empty chains of directories from the file-list.  This
-      makes it much easier to scan a source hierarchy using include,
-      exclude, filter rules, and only end up with the directories needed
-      to hold the resulting files.
+      makes it easier to selectively copy files from a source hierarchy and
+      end up with just the directories needed to hold the resulting files.
 
     - If the --itemize-changes (-i) option is repeated, rsync now includes
       unchanged files in the itemized output (similar to -vv, but without
@@ -151,6 +157,10 @@ Changes since 2.6.6:
 
     - Added the --sockopts option for those few who want to customize the
       TCP options used to contact a daemon rsync.
+
+    - Added a way for the --temp-dir option to be combined with a partial-dir
+      setting that lets rsync avoid non-atomic updates (for those times when
+      --temp-dir is not being used because space is tight).
 
     - Some minor documentation improvements.
 
