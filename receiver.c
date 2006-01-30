@@ -681,15 +681,18 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		}
 
 		if ((recv_ok && (!delay_updates || !partialptr)) || inplace) {
-			finish_transfer(fname, fnametmp, file, recv_ok, 1);
-			if (partialptr != fname && fnamecmp == partialptr) {
+			if (partialptr == fname || *partial_dir == '/')
+				partialptr = NULL;
+			finish_transfer(fname, fnametmp, partialptr,
+					file, recv_ok, 1);
+			if (fnamecmp == partialptr) {
 				do_unlink(partialptr);
 				handle_partial_dir(partialptr, PDIR_DELETE);
 			}
 		} else if (keep_partial && partialptr
 		    && handle_partial_dir(partialptr, PDIR_CREATE)) {
-			finish_transfer(partialptr, fnametmp, file, recv_ok,
-					!partial_dir);
+			finish_transfer(partialptr, fnametmp, NULL,
+					file, recv_ok, !partial_dir);
 			if (delay_updates && recv_ok) {
 				set_delayed_bit(i);
 				recv_ok = -1;
