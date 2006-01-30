@@ -45,6 +45,7 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_times;
 extern int omit_dir_times;
+extern int delete_mode;
 extern int delete_before;
 extern int delete_during;
 extern int delete_after;
@@ -780,7 +781,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	char *fnamecmp, *partialptr, *backupptr = NULL;
 	char fnamecmpbuf[MAXPATHLEN];
 	uchar fnamecmp_type;
-	int del_opts = DEL_TERSE | (delete_after ? DEL_FORCE_RECURSE : 0);
+	int del_opts = DEL_TERSE | (delete_mode ? DEL_FORCE_RECURSE : 0);
 
 	if (list_only)
 		return;
