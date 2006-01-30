@@ -854,10 +854,13 @@ See bf(--delete) (which is implied) for more details on file-deletion.
 dit(bf(--ignore-errors)) Tells bf(--delete) to go ahead and delete files
 even when there are I/O errors.
 
-dit(bf(--force)) This option tells rsync to delete directories even if
-they are not empty when they are to be replaced by non-directories.  This
-is only relevant without bf(--delete) because deletions are now done depth-first.
-Requires the bf(--recursive) option (which is implied by bf(-a)) to have any effect.
+dit(bf(--force)) This option tells rsync to delete a non-empty directory
+when it is to be replaced by a non-directory.  This is only relevant if
+deletions are not active (see bf(--delete) for details).
+
+Note for older rsync versions: bf(--force) used to still be required when
+using bf(--delete-after), and it used to be non-functional unless the
+bf(--recursive) option was also enabled.
 
 dit(bf(--max-delete=NUM)) This tells rsync not to delete more than NUM
 files or directories (NUM must be non-zero).
