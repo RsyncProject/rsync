@@ -149,7 +149,6 @@ int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
 	return updated;
 }
 
-
 void sig_int(void)
 {
 	/* KLUGE: if the user hits Ctrl-C while ssh is prompting
@@ -164,17 +163,20 @@ void sig_int(void)
 	exit_cleanup(RERR_SIGNAL);
 }
 
-
-/* finish off a file transfer, renaming the file and setting the permissions
-   and ownership */
-void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
-		     int ok_to_set_time, int overwriting_basis)
+/* Finish off a file transfer: renaming the file and setting the file's
+ * attributes (e.g. permissions, ownership, etc.).  If partialptr is not
+ * NULL and the robust_rename() call is forced to copy the temp file, we
+ * stage the file into the partial-dir and then rename it into place. */
+void finish_transfer(char *fname, char *fnametmp, char *partialptr,
+		     struct file_struct *file, int ok_to_set_time,
+		     int overwriting_basis)
 {
 	int ret;
 
 	if (inplace) {
 		if (verbose > 2)
 			rprintf(FINFO, "finishing %s\n", fname);
+		fnametmp = fname;
 		goto do_set_file_attrs;
 	}
 
@@ -188,7 +190,8 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
 	/* move tmp file over real file */
 	if (verbose > 2)
 		rprintf(FINFO, "renaming %s to %s\n", fnametmp, fname);
-	ret = robust_rename(fnametmp, fname, file->mode & INITACCESSPERMS);
+	ret = robust_rename(fnametmp, fname, partialptr,
+			    file->mode & INITACCESSPERMS);
 	if (ret < 0) {
 		rsyserr(FERROR, errno, "%s %s -> \"%s\"",
 			ret == -2 ? "copy" : "rename",
@@ -200,9 +203,21 @@ void finish_transfer(char *fname, char *fnametmp, struct file_struct *file,
 		/* The file was moved into place (not copied), so it's done. */
 		return;
 	}
+	/* The file was copied, so tweak the perms of the copied file.  If it
+	 * was copied to partialptr, move it into its final destination. */
+	fnametmp = partialptr ? partialptr : fname;
+
   do_set_file_attrs:
-	set_file_attrs(fname, file, NULL,
+	set_file_attrs(fnametmp, file, NULL,
 		       ok_to_set_time ? 0 : ATTRS_SKIP_MTIME);
+
+	if (partialptr) {
+		if (do_rename(fnametmp, fname) < 0) {
+			rsyserr(FERROR, errno, "rename %s -> \"%s\"",
+				full_fname(fnametmp), fname);
+		} else
+			handle_partial_dir(partialptr, PDIR_DELETE);
+	}
 }
 
 const char *who_am_i(void)
