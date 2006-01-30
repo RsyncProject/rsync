@@ -168,6 +168,9 @@ Changes since 2.6.6:
 
     - Updated some diffs in the patches dir.
 
+    - A new support script, files-to-excludes, will transform a list of files
+      into a set of include/exclude directives that will copy those files.
+
   INTERNAL:
 
     - Some buffer sizes were expanded a bit, particularly on systems where
