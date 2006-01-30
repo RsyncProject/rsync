@@ -59,6 +59,7 @@ extern int copy_unsafe_links;
 extern int protocol_version;
 extern int sanitize_paths;
 extern int orig_umask;
+extern const char *io_write_phase;
 extern struct stats stats;
 extern struct file_list *the_file_list;
 
