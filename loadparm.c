@@ -129,6 +129,7 @@ typedef struct
 	char *hosts_deny;
 	char *include;
 	char *include_from;
+	char *incoming_chmod;
 	char *lock_file;
 	char *log_format;
 	char *name;
@@ -172,6 +173,7 @@ static service sDefault =
  /* hosts_deny; */		NULL,
  /* include; */			NULL,
  /* include_from; */		NULL,
+ /* incoming_chmod; */		NULL,
  /* lock_file; */		DEFAULT_LOCK_FILE,
  /* log_format; */		"%o %h [%a] %m (%u) %f %l",
  /* name; */			NULL,
@@ -298,6 +300,7 @@ static struct parm_struct parm_table[] =
  {"ignore nonreadable",P_BOOL,   P_LOCAL, &sDefault.ignore_nonreadable,NULL,0},
  {"include from",      P_STRING, P_LOCAL, &sDefault.include_from,      NULL,0},
  {"include",           P_STRING, P_LOCAL, &sDefault.include,           NULL,0},
+ {"incoming chmod",    P_STRING, P_LOCAL, &sDefault.incoming_chmod,    NULL,0},
  {"list",              P_BOOL,   P_LOCAL, &sDefault.list,              NULL,0},
  {"lock file",         P_STRING, P_LOCAL, &sDefault.lock_file,         NULL,0},
  {"log format",        P_STRING, P_LOCAL, &sDefault.log_format,        NULL,0},
@@ -386,6 +389,7 @@ FN_LOCAL_STRING(lp_hosts_allow, hosts_allow)
 FN_LOCAL_STRING(lp_hosts_deny, hosts_deny)
 FN_LOCAL_STRING(lp_include, include)
 FN_LOCAL_STRING(lp_include_from, include_from)
+FN_LOCAL_STRING(lp_incoming_chmod, incoming_chmod)
 FN_LOCAL_STRING(lp_lock_file, lock_file)
 FN_LOCAL_STRING(lp_log_format, log_format)
 FN_LOCAL_STRING(lp_name, name)
