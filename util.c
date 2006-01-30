@@ -377,8 +377,11 @@ int robust_unlink(const char *fname)
 }
 
 /* Returns 0 on successful rename, 1 if we successfully copied the file
- * across filesystems, -2 if copy_file() failed, and -1 on other errors. */
-int robust_rename(const char *from, const char *to, int mode)
+ * across filesystems, -2 if copy_file() failed, and -1 on other errors.
+ * If partialptr is not NULL and we need to do a copy, copy the file into
+ * the active partial-dir instead of over the destination file. */
+int robust_rename(char *from, char *to, char *partialptr,
+		  int mode)
 {
 	int tries = 4;
 
@@ -394,6 +397,11 @@ int robust_rename(const char *from, const char *to, int mode)
 			break;
 #endif
 		case EXDEV:
+			if (partialptr) {
+				if (!handle_partial_dir(partialptr,PDIR_CREATE))
+					return -1;
+				to = partialptr;
+			}
 			if (copy_file(from, to, mode) != 0)
 				return -2;
 			do_unlink(from);
