@@ -1094,8 +1094,16 @@ new version on the disk at the same time.
 
 If you are using this option for reasons other than a shortage of disk
 space, you may wish to combine it with the bf(--delay-updates) option,
-which will ensure that all copied files go into a subdirectory of the
-destination dir, awaiting the end of the transfer.
+which will ensure that all copied files get put into subdirectories in the
+destination hierarchy, awaiting the end of the transfer.  If you don't
+have enough room to duplicate all the arriving files on the destination
+partition, another way to tell rsync that you aren't overly concerned
+about disk space is to use the bf(--partial-dir) option with a relative
+path; because this tells rsync that it is OK to stash off a copy of a
+single file in a subdir in the destination hierarchy, rsync will use the
+partial-dir as a staging area to bring over the copied file, and then
+rename it into place from there. (Specifying a bf(--partial-dir) with
+an absolute path does not have this side-effect.)
 
 dit(bf(-y, --fuzzy)) This option tells rsync that it should look for a
 basis file for any destination file that is missing.  The current algorithm
