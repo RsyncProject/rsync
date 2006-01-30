@@ -746,6 +746,9 @@ quote(--chmod=Dg+s,ug+w,Fo-w,+X)
 
 It is also legal to specify multiple bf(--chmod) options.
 
+If permissions are not being preserved (via bf(--perms)), the resulting value
+will still be masked by the receiving end's umask setting.
+
 dit(bf(-n, --dry-run)) This tells rsync to not do any file transfers,
 instead it will just report the actions it would have taken.
 
