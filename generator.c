@@ -780,6 +780,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	char *fnamecmp, *partialptr, *backupptr = NULL;
 	char fnamecmpbuf[MAXPATHLEN];
 	uchar fnamecmp_type;
+	int del_opts = DEL_TERSE | (delete_after ? DEL_FORCE_RECURSE : 0);
 
 	if (list_only)
 		return;
@@ -869,7 +870,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		 * we need to delete it.  If it doesn't exist, then
 		 * (perhaps recursively) create it. */
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
-			if (delete_item(fname, st.st_mode, DEL_TERSE) < 0)
+			if (delete_item(fname, st.st_mode, del_opts) < 0)
 				return;
 			statret = -1;
 		}
@@ -944,7 +945,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 			/* Not the right symlink (or not a symlink), so
 			 * delete it. */
-			if (delete_item(fname, st.st_mode, DEL_TERSE) < 0)
+			if (delete_item(fname, st.st_mode, del_opts) < 0)
 				return;
 			if (!S_ISLNK(st.st_mode))
 				statret = -1;
@@ -1002,7 +1003,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		 || (st.st_mode & ~CHMOD_BITS) != (file->mode & ~CHMOD_BITS)
 		 || st.st_rdev != file->u.rdev) {
 			if (statret == 0
-			 && delete_item(fname, st.st_mode, DEL_TERSE) < 0)
+			 && delete_item(fname, st.st_mode, del_opts) < 0)
 				return;
 			if (preserve_hard_links && file->link_u.links
 			    && hard_link_check(file, ndx, fname, -1, &st,
@@ -1083,7 +1084,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	fnamecmp_type = FNAMECMP_FNAME;
 
 	if (statret == 0 && !S_ISREG(st.st_mode)) {
-		if (delete_item(fname, st.st_mode, DEL_TERSE) != 0)
+		if (delete_item(fname, st.st_mode, del_opts) != 0)
 			return;
 		statret = -1;
 		stat_errno = ENOENT;
