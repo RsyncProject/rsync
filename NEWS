@@ -116,9 +116,9 @@ Changes since 2.6.6:
     - Added the --chmod=MODE option that allows the destination permissions to
       be changed from the source permissions.  E.g. --chmod=g+w,o-rwx
 
-    - Added the "incoming chmod" daemon option to allow a module to specify
-      what permissions changes should be applied to all files copied to the
-      daemon.
+    - Added the "incoming chmod" and "outgoing chmod" daemon options that allow
+      a module to specify what permissions changes should be applied to all
+      files copied to and from the daemon.
 
     - Allow the --temp-dir option to be specified when starting a daemon, which
       sets the default temporary directory for incoming files.
