@@ -26,8 +26,7 @@
  *
  * @param buf buffer of at least 11 characters
  **/
-void permstring(char *perms,
-		int mode)
+void permstring(char *perms, mode_t mode)
 {
 	static const char *perm_map = "rwxrwxrwx";
 	int i;
