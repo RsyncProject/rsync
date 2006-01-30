@@ -144,7 +144,7 @@ static int delete_item(char *fname, int mode, int flags)
 		return -1;
 	}
 
-	zap_dir = flags & DEL_FORCE_RECURSE || (force_delete && recurse);
+	zap_dir = flags & DEL_FORCE_RECURSE || force_delete;
 	if ((max_delete && ++deletion_count > max_delete)
 	    || (dry_run && zap_dir)) {
 		ok = 0;
