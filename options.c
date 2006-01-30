@@ -1042,7 +1042,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 		case OPT_CHMOD:
 			arg = poptGetOptArg(pc);
-			if (!(chmod_modes = parse_chmod(arg, chmod_modes))) {
+			if (!parse_chmod(arg, &chmod_modes)) {
 				snprintf(err_buf, sizeof err_buf,
 				    "Invalid argument passed to --chmod (%s)\n",
 				    arg);
