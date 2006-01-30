@@ -15,6 +15,10 @@ Changes since 2.6.6:
 
     - Made hard-links work with symlinks and devices again.
 
+    - If the sender gets an early EOF reading a source file, we propagate this
+      error to the receiver so that it can discard the file and try requesting
+      it again (which is the existing behavior for other kinds of read errors).
+
     - If a device-file/special-file changes permissions, rsync now updates the
       permissions without recreating the file.
 
@@ -54,8 +58,8 @@ Changes since 2.6.6:
       reject a ".." dir if it would be sent as a relative dir.
 
     - If a non-directory is in the way of a directory and rsync is run with
-      --dry-run and --delete, rsync no longer complains about not being
-      able to opendir() the not-yet present directory.
+      --dry-run and --delete, rsync no longer complains about not being able
+      to opendir() the not-yet present directory.
 
     - Got rid of the need for --force to be used in some circumstances with
       --delete-after (making it consistent with --delete-before/-during).
@@ -67,9 +71,8 @@ Changes since 2.6.6:
       block devices (which now matches the documentation).  The -D option still
       requests both --devices and --specials, and -a still implies -D.
 
-    - Added the --append option that makes rsync append data onto files
-      that are longer on the source than the destination (this includes new
-      files).
+    - Added the --append option that makes rsync append data onto files that
+      are longer on the source than the destination (this includes new files).
 
     - Added the --min-size=SIZE option to exclude small files from the
       transfer.
@@ -77,9 +80,9 @@ Changes since 2.6.6:
     - Added the --compress-level option to allow you to set how aggressive
       rsync's compression should be (this option implies --compress).
 
-    - Enhanced the parsing of the SIZE value for --min-size and --max-size
-      to allow easy entry of multiples of 1000 (instead of just multiples
-      of 1024) and off-by-one values too (e.g. --max-size=8mb-1).
+    - Enhanced the parsing of the SIZE value for --min-size and --max-size to
+      allow easy entry of multiples of 1000 (instead of just multiples of 1024)
+      and off-by-one values too (e.g. --max-size=8mb-1).
 
     - The options --human-readable (-h) and --si change the output of the
       --stats and the end-of-run summary to be easier to read.
@@ -87,17 +90,16 @@ Changes since 2.6.6:
     - If lutimes() and/or lchmod() are around, use them to allow the
       preservation of attributes on symlinks.
 
-    - The --link-dest option now affects symlinks and devices (when
-      possible).
+    - The --link-dest option now affects symlinks and devices (when possible).
 
     - Improved the output of hard-linked and copied files when using
       --link-dest, --copy-dest, or --compare-dest.
 
-    - Added two config items to the rsyncd.conf parsing:  "pre-xfer exec"
-      and "post-xfer exec".  These allow a command to be specified on a
-      per-module basis that will be run before and/or after a daemon-mode
-      transfer.  (See the manpage for a list of the environment variables
-      that are set with information about the transfer.)
+    - Added two config items to the rsyncd.conf parsing:  "pre-xfer exec" and
+      "post-xfer exec".  These allow a command to be specified on a per-module
+      basis that will be run before and/or after a daemon-mode transfer.  (See
+      the manpage for a list of the environment variables that are set with
+      information about the transfer.)
 
     - When using the --relative option, you can now insert a dot dir in
       the source path to indicate where the replication of the source dirs
@@ -106,27 +108,27 @@ Changes since 2.6.6:
       replicate the "baz/dir" part of the source path (note: a trailing
       dot dir is unaffected unless it also has a trailing slash).
 
-    - Added some new --no-FOO options that make it easier to override
-      unwanted implied or default options.  For example, "-a --no-o" (aka
-      "--archive --no-owner") can be used to turn off the preservation of
-      file ownership that is implied by -a.
+    - Added some new --no-FOO options that make it easier to override unwanted
+      implied or default options.  For example, "-a --no-o" (aka "--archive
+      --no-owner") can be used to turn off the preservation of file ownership
+      that is implied by -a.
 
-    - Added the --chmod=MODE option that allows the destination permissions
-      to be changed from the source permissions.  E.g. --chmod=g+w,o-rwx
+    - Added the --chmod=MODE option that allows the destination permissions to
+      be changed from the source permissions.  E.g. --chmod=g+w,o-rwx
 
     - Added the "incoming chmod" daemon option to allow a module to specify
       what permissions changes should be applied to all files copied to the
       daemon.
 
-    - Allow the --temp-dir option to be specified when starting a daemon,
-      which sets the default temporary directory for incoming files.
+    - Allow the --temp-dir option to be specified when starting a daemon, which
+      sets the default temporary directory for incoming files.
 
-    - If --delete is combined with --dirs without --recursive, rsync will
-      now delete in any directory whose content is being synchronized.
+    - If --delete is combined with --dirs without --recursive, rsync will now
+      delete in any directory whose content is being synchronized.
 
-    - If --backup is combined with --delete without --backup-dir (and
-      without --delete-excluded), we add a "protect" filter-rule to ensure
-      that files with the backup suffix are not deleted.
+    - If --backup is combined with --delete without --backup-dir (and without
+      --delete-excluded), we add a "protect" filter-rule to ensure that files
+      with the backup suffix are not deleted.
 
     - The file-count stats that are output by --progress were improved to
       better indicate what the numbers mean.  For instance, the output:
@@ -134,29 +136,29 @@ Changes since 2.6.6:
       to be transferred, and we still need to check 8383 more files out of
       a total of 9999.
 
-    - The include/exclude code now allows a dir/*** directive (with 3
-      trailing stars) to match both the dir itself as well as all the
-      content below the dir (dir/** would not match the dir).
+    - The include/exclude code now allows a dir/*** directive (with 3 trailing
+      stars) to match both the dir itself as well as all the content below the
+      dir (dir/** would not match the dir).
 
-    - Added the --prune-empty-dirs (-m) option that makes the receiving
-      rsync discard empty chains of directories from the file-list.  This
-      makes it easier to selectively copy files from a source hierarchy and
-      end up with just the directories needed to hold the resulting files.
+    - Added the --prune-empty-dirs (-m) option that makes the receiving rsync
+      discard empty chains of directories from the file-list.  This makes it
+      easier to selectively copy files from a source hierarchy and end up with
+      just the directories needed to hold the resulting files.
 
     - If the --itemize-changes (-i) option is repeated, rsync now includes
-      unchanged files in the itemized output (similar to -vv, but without
-      all the other verbose messages that can get in the way).  Of course,
-      the client must be version 2.6.7 for this to work, but the remote
-      rsync only needs to be 2.6.7 if you're pushing files.
+      unchanged files in the itemized output (similar to -vv, but without all
+      the other verbose messages that can get in the way).  Of course, the
+      client must be version 2.6.7 for this to work, but the remote rsync only
+      needs to be 2.6.7 if you're pushing files.
 
-    - Added the --super option to make the receiver always attempt super-
-      user activities.  This is useful for systems that allow things such
-      as devices to be created or ownership to be set without being UID 0,
-      and is also useful for someone who wants to ensure that errors will
-      be output if the receiving rsync isn't being run as root.
+    - Added the --super option to make the receiver always attempt super- user
+      activities.  This is useful for systems that allow things such as devices
+      to be created or ownership to be set without being UID 0, and is also
+      useful for someone who wants to ensure that errors will be output if the
+      receiving rsync isn't being run as root.
 
-    - Added the --sockopts option for those few who want to customize the
-      TCP options used to contact a daemon rsync.
+    - Added the --sockopts option for those few who want to customize the TCP
+      options used to contact a daemon rsync.
 
     - Added a way for the --temp-dir option to be combined with a partial-dir
       setting that lets rsync avoid non-atomic updates (for those times when
@@ -180,13 +182,13 @@ Changes since 2.6.6:
     - Reduced the amount of stack memory needed for each level of directory
       recursion by nearly MAXPATHLEN bytes.
 
-    - The wildmatch function was extended to allow an array of strings to
-      be supplied as the string to match.  This allows the exclude code to
-      do less string copying.
+    - The wildmatch function was extended to allow an array of strings to be
+      supplied as the string to match.  This allows the exclude code to do less
+      string copying.
 
     - Got rid of the safe_fname() function (and all the myriad calls) and
-      replaced it with a new function in the log.c code that filters all
-      the output going to the terminal.
+      replaced it with a new function in the log.c code that filters all the
+      output going to the terminal.
 
     - Unified the f_name() and the f_name_to() functions.
 
