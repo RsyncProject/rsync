@@ -121,8 +121,8 @@ void _exit_cleanup(int code, const char *file, int line)
 			flush_write_file(cleanup_fd_w);
 			close(cleanup_fd_w);
 		}
-		finish_transfer(cleanup_new_fname, fname, cleanup_file, 0,
-				!partial_dir);
+		finish_transfer(cleanup_new_fname, fname, NULL,
+				cleanup_file, 0, !partial_dir);
 	}
 	io_flush(FULL_FLUSH);
 	if (cleanup_fname)
