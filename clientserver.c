@@ -684,9 +684,14 @@ static int rsync_module(int f_in, int f_out, int i)
 		set_io_timeout(lp_timeout(i));
 
 
-	p = lp_incoming_chmod(i);
-	if (*p && !parse_chmod(p, &chmod_modes))
-		rprintf(FLOG, "Invalid \"incoming chmod\" directive: %s\n", p);
+	if (am_sender)
+		p = lp_outgoing_chmod(i);
+	else
+		p = lp_incoming_chmod(i);
+	if (*p && !parse_chmod(p, &chmod_modes)) {
+		rprintf(FLOG, "Invalid \"%sing chmod\" directive: %s\n",
+			am_sender ? "outgo" : "incom", p);
+	}
 
 	start_server(f_in, f_out, argc, argv);
 

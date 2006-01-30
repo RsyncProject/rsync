@@ -133,6 +133,7 @@ typedef struct
 	char *lock_file;
 	char *log_format;
 	char *name;
+	char *outgoing_chmod;
 	char *path;
 	char *postxfer_exec;
 	char *prexfer_exec;
@@ -177,6 +178,7 @@ static service sDefault =
  /* lock_file; */		DEFAULT_LOCK_FILE,
  /* log_format; */		"%o %h [%a] %m (%u) %f %l",
  /* name; */			NULL,
+ /* outgoing_chmod; */		NULL,
  /* path; */			NULL,
  /* postxfer_exec; */		NULL,
  /* prexfer_exec; */		NULL,
@@ -307,6 +309,7 @@ static struct parm_struct parm_table[] =
  {"max connections",   P_INTEGER,P_LOCAL, &sDefault.max_connections,   NULL,0},
  {"max verbosity",     P_INTEGER,P_LOCAL, &sDefault.max_verbosity,     NULL,0},
  {"name",              P_STRING, P_LOCAL, &sDefault.name,              NULL,0},
+ {"outgoing chmod",    P_STRING, P_LOCAL, &sDefault.outgoing_chmod,    NULL,0},
  {"path",              P_PATH,   P_LOCAL, &sDefault.path,              NULL,0},
 #ifdef HAVE_PUTENV
  {"post-xfer exec",    P_STRING, P_LOCAL, &sDefault.postxfer_exec,     NULL,0},
@@ -393,6 +396,7 @@ FN_LOCAL_STRING(lp_incoming_chmod, incoming_chmod)
 FN_LOCAL_STRING(lp_lock_file, lock_file)
 FN_LOCAL_STRING(lp_log_format, log_format)
 FN_LOCAL_STRING(lp_name, name)
+FN_LOCAL_STRING(lp_outgoing_chmod, outgoing_chmod)
 FN_LOCAL_STRING(lp_path, path)
 FN_LOCAL_STRING(lp_postxfer_exec, postxfer_exec)
 FN_LOCAL_STRING(lp_prexfer_exec, prexfer_exec)
