@@ -46,10 +46,11 @@ extern int no_detach;
 extern int default_af_hint;
 extern char *bind_address;
 extern char *sockopts;
-extern struct filter_list_struct server_filter_list;
 extern char *config_file;
 extern char *files_from;
 extern char *tmpdir;
+extern struct chmod_mode_struct *chmod_modes;
+extern struct filter_list_struct server_filter_list;
 
 char *auth_user;
 int read_only = 0;
@@ -681,6 +682,11 @@ static int rsync_module(int f_in, int f_out, int i)
 
 	if (lp_timeout(i) && lp_timeout(i) > io_timeout)
 		set_io_timeout(lp_timeout(i));
+
+
+	p = lp_incoming_chmod(i);
+	if (*p && !parse_chmod(p, &chmod_modes))
+		rprintf(FLOG, "Invalid \"incoming chmod\" directive: %s\n", p);
 
 	start_server(f_in, f_out, argc, argv);
 
