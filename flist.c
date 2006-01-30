@@ -1917,6 +1917,7 @@ struct file_list *get_dirlist(char *dirname, int dlen,
 	struct file_list *dirlist;
 	char dirbuf[MAXPATHLEN];
 	int save_recurse = recurse;
+	int save_xfer_dirs = xfer_dirs;
 
 	if (dlen < 0) {
 		dlen = strlcpy(dirbuf, dirname, MAXPATHLEN);
@@ -1928,7 +1929,9 @@ struct file_list *get_dirlist(char *dirname, int dlen,
 	dirlist = flist_new(WITHOUT_HLINK, "get_dirlist");
 
 	recurse = 0;
+	xfer_dirs = 1;
 	send_directory(ignore_filter_rules ? -2 : -1, dirlist, dirname, dlen);
+	xfer_dirs = save_xfer_dirs;
 	recurse = save_recurse;
 	if (do_progress)
 		flist_count_offset += dirlist->count;
