@@ -47,6 +47,20 @@ runtest() {
     fi
 }
 
+# Call this if you want to filter out verbose messages (-v or -vv) from
+# the output of an rsync run (whittling the output down to just the file
+# messages).  This isn't needed if you use -i without -v.
+filter_outfile() {
+    sed -e '/^building file list /d' \
+	-e '/^created directory /d' \
+	-e '/^done$/d' \
+	-e '/ --whole-file$/d' \
+	-e '/^total: /d' \
+	-e '/^$/,$d' \
+	<"$outfile" >"$outfile.new"
+    mv "$outfile.new" "$outfile"
+}
+
 printmsg() {
     echo "$1"
 }
