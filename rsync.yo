@@ -498,7 +498,7 @@ could specify bf(-a --no-o) (or bf(-a --no-owner)).
 The order of the options is important:  if you specify bf(--no-r -a), the
 bf(-r) option would end up being turned on, the opposite of bf(-a --no-r).
 Note also that the side-effects of the bf(--files-from) option are NOT
-positional, as it affects the default state of several options and sligntly
+positional, as it affects the default state of several options and slightly
 changes the meaning of bf(-a) (see the bf(--files-from) option for more
 details).
 
@@ -1074,9 +1074,9 @@ It does not affect bf(--cvs-exclude) (since all names read from a .cvsignore
 file are split on whitespace).
 
 dit(bf(-T, --temp-dir=DIR)) This option instructs rsync to use DIR as a
-scratch directory when creating temporary copies of the files
-transferred on the receiving side.  The default behavior is to create
-the temporary files in the receiving directory.
+scratch directory when creating temporary copies of the files transferred
+on the receiving side.  The default behavior is to create each temporary
+file in the same directory as the associated destination file.
 
 This option is most often used when the receiving disk partition does not
 have enough free space to hold a copy of the largest file in the transfer.
@@ -1085,11 +1085,12 @@ partition), rsync will not be able to rename each received temporary file
 over the top of the associated destination file, but instead must copy it
 into place.  Rsync does this by copying the file over the top of the
 destination file, which means that the destination file will contain
-truncated data during this copy.  If this were not done this way -- for
-instance, if the destination file were first removed, a copy made to a
-temp-file in the destination dir, and that file renamed over the top of the
-destination file -- the old file could still be taking up disk space (if
-someone had it open), and thus the copy could fail due to lack of space.  
+truncated data during this copy.  If this were not done this way (even if
+the destination file were first removed, the data locally copied to a
+temporary file in the destination directory, and then renamed into place)
+it would be possible for the old file to continue taking up disk space (if
+someone had it open), and thus there might not be enough room to fit the
+new version on the disk at the same time.
 
 If you are using this option for reasons other than a shortage of disk
 space, you may wish to combine it with the bf(--delay-updates) option,
@@ -1304,7 +1305,7 @@ item that is changed in any way (as long as the receiving side is at least
 output of "%i".
 
 The bf(--verbose) option implies a format of "%n%L", but you can use
-bf(--log-format) without bv(--verbose) if you like, or you can override
+bf(--log-format) without bf(--verbose) if you like, or you can override
 the format of its per-file output using this option.
 
 Rsync will output the log-format string prior to a file's transfer unless
