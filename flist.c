@@ -58,7 +58,6 @@ extern int copy_links;
 extern int copy_unsafe_links;
 extern int protocol_version;
 extern int sanitize_paths;
-extern int orig_umask;
 extern const char *io_write_phase;
 extern struct stats stats;
 extern struct file_list *the_file_list;
@@ -712,12 +711,6 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 			sum = empty_sum;
 		}
 		read_buf(f, sum, checksum_len);
-	}
-
-	if (!preserve_perms) {
-		/* set an appropriate set of permissions based on original
-		 * permissions and umask. This emulates what GNU cp does */
-		file->mode &= ~orig_umask;
 	}
 
 	return file;
