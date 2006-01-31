@@ -268,8 +268,8 @@ comma-separated chmod strings that will affect the permissions of all
 incoming files (files that are being received by the daemon).  These
 changes happen last, giving this setting the final word on what the
 permissions should look like in the repository.
-See the description of the bf(--chmod) rsync option and the bf(chmod)
-utility's manpage for information on the format of this string.
+See the description of the bf(--chmod) rsync option and the bf(chmod)(1)
+manpage for information on the format of this string.
 
 dit(bf(outgoing chmod)) This option allows you to specify a set of
 comma-separated chmod strings that will affect the permissions of all
@@ -277,8 +277,8 @@ outgoing files (files that are being sent out from the daemon).  These
 changes happen first, making the sent permissions appear to be different
 than those stored in the filesystem itself (which, for instance, you
 could disable group write permissions on the server).
-See the description of the bf(--chmod) rsync option and the bf(chmod)
-utility's manpage for information on the format of this string.
+See the description of the bf(--chmod) rsync option and the bf(chmod)(1)
+manpage for information on the format of this string.
 
 dit(bf(auth users)) The "auth users" option specifies a comma and
 space-separated list of usernames that will be allowed to connect to
