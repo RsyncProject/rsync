@@ -25,8 +25,10 @@
 extern int verbose;
 extern int dry_run;
 extern int daemon_log_format_has_i;
+extern int preserve_executability;
 extern int preserve_times;
 extern int omit_dir_times;
+extern int orig_umask;
 extern int am_root;
 extern int am_server;
 extern int am_sender;
@@ -47,6 +49,27 @@ void free_sums(struct sum_struct *s)
 {
 	if (s->sums) free(s->sums);
 	free(s);
+}
+
+/* This is only called when we aren't preserving permissions.  Figure out what
+ * the permissions should be and return them merged back into the mode. */
+mode_t dest_mode(mode_t flist_mode, mode_t dest_mode, int exists)
+{
+	/* If the file already exists we'll return the local permissions,
+	 * possibly tweaked by the --executability option. */
+	if (exists) {
+		if (preserve_executability && S_ISREG(flist_mode)) {
+			/* If the source file is executable, grant execute
+			 * rights to everyone who can read, but ONLY if the
+			 * file isn't already executable. */
+			if (!(flist_mode & 0111))
+				dest_mode &= ~0111;
+			else if (!(dest_mode & 0111))
+				dest_mode |= (dest_mode & 0444) >> 2;
+		}
+	} else
+		dest_mode = flist_mode & ~orig_umask;
+	return (flist_mode & ~CHMOD_BITS) | (dest_mode & CHMOD_BITS);
 }
 
 int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
