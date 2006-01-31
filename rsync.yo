@@ -316,6 +316,7 @@ to the detailed description below for a complete description.  verb(
  -H, --hard-links            preserve hard links
  -K, --keep-dirlinks         treat symlinked dir on receiver as dir
  -p, --perms                 preserve permissions
+ -E, --executability         preserve executability
  -o, --owner                 preserve owner (super-user only)
  -g, --group                 preserve group
      --devices               preserve device files (super-user only)
@@ -561,7 +562,7 @@ bf(--backup-dir) and bf(--suffix) options.
 
 Note that if you don't specify bf(--backup-dir), (1) the
 bf(--omit-dir-times) option will be implied, and (2) if bf(--delete) is
-also in effect (without bf(--delete-excluded)), rsync will add a protect
+also in effect (without bf(--delete-excluded)), rsync will add a "protect"
 filter-rule for the backup suffix to the end of all your existing excludes
 (e.g. -f "P *~").  This will prevent previously backed-up files from being
 deleted.  Note that if you are supplying your own filter rules, you may
@@ -678,14 +679,39 @@ destination machines is higher than the bandwidth to disk (especially when the
 "disk" is actually a networked filesystem).  This is the default when both
 the source and destination are specified as local paths.
 
-dit(bf(-p, --perms)) This option causes rsync to set the destination
-permissions to be the same as the source permissions.
+dit(bf(-p, --perms)) This option causes the receiving rsync to set the
+destination permissions to be the same as the source permissions.  (See
+also the bf(--chmod) option for a way to modify what rsync considers to
+be the source permissions.)
 
-Without this option, all existing files (including updated files) retain
-their existing permissions, while each new file gets its permissions set
-based on the source file's permissions, but masked by the receiving end's
-umask setting
-(which is the same behavior as other file-copy utilities, such as cp).
+When this option is em(off), permissions are set as follows:
+
+quote(itemize(
+  it() Existing files (including updated files) retain their existing
+  permissions, though the bf(--executability) option might change just
+  the execute permission for the file.
+  it() Each new file gets its permissions set based on the source file's
+  permissions, but masked by the receiving end's umask setting (including
+  the stripping of the three special permission bits).
+))
+  
+Thus, when bf(--perms) and bf(--executability) are both disabled,
+rsync's behavior is the same as that of other file-copy utilities,
+such as bf(cp)(1) and bf(tar)(1).
+
+dit(bf(-E, --executability)) This option causes rsync to preserve the
+executability (or non-executability) of regular files when bf(--perms) is
+not enabled.  A regular file is considered to be executable if at least one
+'x' is turned on in the source permissions.  
+
+quote(itemize(
+  it() To make a file non-executable, rsync turns off all its 'x'
+  permissions.
+  it() To make a file executable, rsync turns on each 'x' permission that
+  has a corresponding 'r' permission enabled.
+))
+
+If bf(--perms) is enabled, this option is ignored.
 
 dit(bf(-o, --owner)) This option causes rsync to set the owner of the
 destination file to be the same as the source file.  By default, the
@@ -736,18 +762,24 @@ also for ensuring that you will get errors if the receiving side isn't
 being running as the super-user.  To turn off super-user activities, the
 super-user can use bf(--no-super).
 
-dit(bf(--chmod)) This option tells rsync to apply the listed "chmod" pattern
-to the permission of the files on the destination.  In addition to the normal
-parsing rules specified in the chmod manpage, you can specify an item that
-should only apply to a directory by prefixing it with a 'D', or specify an
-item that should only apply to a file by prefixing it with a 'F'.  For example:
+dit(bf(--chmod)) This option tells rsync to apply one or more
+comma-separated "chmod" strings to the permission of the files in the
+transfer.  The resulting value is treated as though it was the permissions
+that the sending side supplied for the file, which means that this option
+can seem to have no effect on existing files if bf(--perms) is not enabled.
+
+In addition to the normal parsing rules specified in the bf(chmod)(1)
+manpage, you can specify an item that should only apply to a directory by
+prefixing it with a 'D', or specify an item that should only apply to a
+file by prefixing it with a 'F'.  For example:
 
 quote(--chmod=Dg+s,ug+w,Fo-w,+X)
 
-It is also legal to specify multiple bf(--chmod) options.
+It is also legal to specify multiple bf(--chmod) options, as each
+additional option is just appended to the list of changes to make.
 
-If permissions are not being preserved (via bf(--perms)), the resulting value
-will still be masked by the receiving end's umask setting.
+See the bf(--perms) and bf(--executability) options for how the resulting
+permission value can be applied to the files in the transfer.
 
 dit(bf(-n, --dry-run)) This tells rsync to not do any file transfers,
 instead it will just report the actions it would have taken.
@@ -1246,13 +1278,13 @@ if the receiving rsync is at least version 2.6.7 (you can use bf(-vv)
 with older versions of rsync, but that also turns on the output of other
 verbose messages).
 
-The "%i" escape has a cryptic output that is 9 letters long.  The general
-format is like the string bf(UXcstpog)), where bf(U) is replaced by the
+The "%i" escape has a cryptic output that is 8 letters long.  The general
+format is like the string bf(YXcstpog), where bf(Y) is replaced by the
 kind of update being done, bf(X) is replaced by the file-type, and the
 other letters represent attributes that may be output if they are being
 modified.
 
-The update types that replace the bf(U) are as follows:
+The update types that replace the bf(Y) are as follows:
 
 quote(itemize(
   it() A bf(<) means that a file is being transferred to the remote host
