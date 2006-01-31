@@ -164,12 +164,16 @@ Changes since 2.6.6:
       setting that lets rsync avoid non-atomic updates (for those times when
       --temp-dir is not being used because space is tight).
 
+    - A new support script, files-to-excludes, will transform a list of files
+      into a set of include/exclude directives that will copy those files.
+
+    - A new option, --executability (-E) can be used to preserve just the
+      execute bit on files, for those times when using the --perms option is
+      not desired.
+
     - Some minor documentation improvements.
 
     - Updated some diffs in the patches dir.
-
-    - A new support script, files-to-excludes, will transform a list of files
-      into a set of include/exclude directives that will copy those files.
 
   INTERNAL:
 
