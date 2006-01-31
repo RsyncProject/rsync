@@ -855,13 +855,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (statret == 0 && !preserve_perms
-	    && S_ISDIR(st.st_mode) == S_ISDIR(file->mode)) {
-		/* if the file exists already and we aren't perserving
-		 * permissions then act as though the remote end sent
-		 * us the file permissions we already have */
-		file->mode = (file->mode & ~CHMOD_BITS)
-			   | (st.st_mode & CHMOD_BITS);
+	/* If we're not preserving permissions, change the file-list's
+	 * mode based on the local permissions and some heuristics. */
+	if (!preserve_perms) {
+		int exists = statret == 0
+			  && S_ISDIR(st.st_mode) == S_ISDIR(file->mode);
+		file->mode = dest_mode(file->mode, st.st_mode, exists);
 	}
 
 	if (S_ISDIR(file->mode)) {

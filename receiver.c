@@ -603,11 +603,11 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			fd1 = -1;
 		}
 
-		if (fd1 != -1 && !preserve_perms) {
-			/* if the file exists already and we aren't preserving
-			 * permissions then act as though the remote end sent
-			 * us the file permissions we already have */
-			file->mode = st.st_mode;
+		/* If we're not preserving permissions, change the file-list's
+		 * mode based on the local permissions and some heuristics. */
+		if (!preserve_perms) {
+			int exists = fd1 != -1;
+			file->mode = dest_mode(file->mode, st.st_mode, exists);
 		}
 
 		/* We now check to see if we are writing file "inplace" */
