@@ -45,6 +45,7 @@ int copy_links = 0;
 int preserve_links = 0;
 int preserve_hard_links = 0;
 int preserve_perms = 0;
+int preserve_executability = 0;
 int preserve_devices = 0;
 int preserve_specials = 0;
 int preserve_uid = 0;
@@ -291,6 +292,7 @@ void usage(enum logcode F)
   rprintf(F," -H, --hard-links            preserve hard links\n");
   rprintf(F," -K, --keep-dirlinks         treat symlinked dir on receiver as dir\n");
   rprintf(F," -p, --perms                 preserve permissions\n");
+  rprintf(F," -E, --executability         preserve the file's executability\n");
   rprintf(F," -o, --owner                 preserve owner (super-user only)\n");
   rprintf(F," -g, --group                 preserve group\n");
   rprintf(F,"     --devices               preserve device files (super-user only)\n");
@@ -406,6 +408,7 @@ static struct poptOption long_options[] = {
   {"perms",           'p', POPT_ARG_VAL,    &preserve_perms, 1, 0, 0 },
   {"no-perms",         0,  POPT_ARG_VAL,    &preserve_perms, 0, 0, 0 },
   {"no-p",             0,  POPT_ARG_VAL,    &preserve_perms, 0, 0, 0 },
+  {"executability",   'E', POPT_ARG_NONE,   &preserve_executability, 0, 0, 0 },
   {"times",           't', POPT_ARG_VAL,    &preserve_times, 1, 0, 0 },
   {"no-times",         0,  POPT_ARG_VAL,    &preserve_times, 0, 0, 0 },
   {"no-t",             0,  POPT_ARG_VAL,    &preserve_times, 0, 0, 0 },
@@ -1504,6 +1507,8 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 't';
 	if (preserve_perms)
 		argstr[x++] = 'p';
+	else if (preserve_executability && am_sender)
+		argstr[x++] = 'E';
 	if (recurse)
 		argstr[x++] = 'r';
 	if (always_checksum)
