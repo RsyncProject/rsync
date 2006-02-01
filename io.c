@@ -300,6 +300,13 @@ static void read_msg_fd(void)
 		if (preserve_hard_links)
 			flist_ndx_push(&hlink_list, IVAL(buf,0));
 		break;
+	case MSG_SOCKERR:
+		if (!am_generator) {
+			rprintf(FERROR, "invalid message %d:%d\n", tag, len);
+			exit_cleanup(RERR_STREAMIO);
+		}
+		close_multiplexing_out();
+		/* FALL THROUGH */
 	case MSG_INFO:
 	case MSG_ERROR:
 	case MSG_LOG:
@@ -580,9 +587,11 @@ static int read_timeout(int fd, char *buf, size_t len)
 				continue;
 
 			/* Don't write errors on a dead socket. */
-			if (fd == sock_f_in)
+			if (fd == sock_f_in) {
 				close_multiplexing_out();
-			rsyserr(FERROR, errno, "read error");
+				rsyserr(FSOCKERR, errno, "read error");
+			} else
+				rsyserr(FERROR, errno, "read error");
 			exit_cleanup(RERR_STREAMIO);
 		}
 
