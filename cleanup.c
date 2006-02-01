@@ -104,7 +104,8 @@ void _exit_cleanup(int code, const char *file, int line)
 
 	if (cleanup_child_pid != -1) {
 		int status;
-		if (waitpid(cleanup_child_pid, &status, WNOHANG) == cleanup_child_pid) {
+		if (wait_process(cleanup_child_pid, &status, WNOHANG)
+		 == cleanup_child_pid) {
 			status = WEXITSTATUS(status);
 			if (status > code)
 				code = status;
