@@ -218,17 +218,20 @@ void rwrite(enum logcode code, char *buf, int len)
 	int trailing_CR_or_NL;
 	FILE *f = NULL;
 
-	if (quiet && code == FINFO)
-		return;
-
 	if (len < 0)
 		exit_cleanup(RERR_MESSAGEIO);
+
+	if (quiet && code == FINFO)
+		return;
 
 	if (am_server && msg_fd_out >= 0) {
 		/* Pass the message to our sibling. */
 		send_msg((enum msgcode)code, buf, len);
 		return;
 	}
+
+	if (code == FSOCKERR) /* This gets simplified for a non-sibling. */
+		code = FERROR;
 
 	if (code == FCLIENT)
 		code = FINFO;
