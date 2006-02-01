@@ -28,6 +28,7 @@
 #include "rsync.h"
 
 extern int verbose;
+extern int quiet;
 extern int list_only;
 extern int am_sender;
 extern int am_server;
@@ -619,6 +620,7 @@ static int rsync_module(int f_in, int f_out, int i)
 
 	verbose = 0; /* future verbosity is controlled by client options */
 	ret = parse_arguments(&argc, (const char ***) &argv, 0);
+	quiet = 0; /* Don't let someone try to be tricky. */
 
 	if (filesfrom_fd == 0)
 		filesfrom_fd = f_in;
