@@ -36,6 +36,10 @@
 extern char *bind_address;
 extern int default_af_hint;
 
+#if defined HAVE_SIGACTION && defined HAVE_SIGPROCMASK
+static struct sigaction sigact;
+#endif
+
 /**
  * Establish a proxy connection on an open socket to a web proxy by
  * using the CONNECT method. If proxy_user and proxy_pass are not NULL,
@@ -433,7 +437,9 @@ static RETSIGTYPE sigchld_handler(UNUSED(int val))
 #ifdef WNOHANG
 	while (waitpid(-1, NULL, WNOHANG) > 0) {}
 #endif
+#if !defined HAVE_SIGACTION && !defined HAVE_SIGPROCMASK
 	signal(SIGCHLD, sigchld_handler);
+#endif
 }
 
 
@@ -441,6 +447,10 @@ void start_accept_loop(int port, int (*fn)(int, int))
 {
 	fd_set deffds;
 	int *sp, maxfd, i;
+
+#if defined HAVE_SIGACTION && defined HAVE_SIGPROCMASK
+	sigact.sa_flags = SA_NOCLDSTOP;
+#endif
 
 	/* open an incoming socket */
 	sp = open_socket_in(SOCK_STREAM, port, bind_address, default_af_hint);
@@ -499,7 +509,7 @@ void start_accept_loop(int port, int (*fn)(int, int))
 		if (fd < 0)
 			continue;
 
-		signal(SIGCHLD, sigchld_handler);
+		SIGACTION(SIGCHLD, sigchld_handler);
 
 		if ((pid = fork()) == 0) {
 			int ret;

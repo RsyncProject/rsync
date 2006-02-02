@@ -26,6 +26,10 @@ extern int keep_partial;
 extern int log_got_error;
 extern char *partial_dir;
 
+#if defined HAVE_SIGACTION && defined HAVE_SIGPROCMASK
+static struct sigaction sigact;
+#endif
+
 /**
  * Close all open sockets and files, allowing a (somewhat) graceful
  * shutdown() of socket connections.  This eliminates the abortive
@@ -94,8 +98,8 @@ void _exit_cleanup(int code, const char *file, int line)
 	}
 	inside_cleanup++;
 
-	signal(SIGUSR1, SIG_IGN);
-	signal(SIGUSR2, SIG_IGN);
+	SIGACTION(SIGUSR1, SIG_IGN);
+	SIGACTION(SIGUSR2, SIG_IGN);
 
 	if (verbose > 3) {
 		rprintf(FINFO,"_exit_cleanup(code=%d, file=%s, line=%d): entered\n",
