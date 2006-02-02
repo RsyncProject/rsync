@@ -648,6 +648,8 @@ struct chmod_mode_struct;
 #include "lib/permstring.h"
 #include "lib/addrinfo.h"
 
+#define UNUSED(x) x __attribute__((__unused__))
+
 #include "proto.h"
 
 /* We have replacement versions of these if they're missing. */
@@ -691,7 +693,12 @@ extern int errno;
 #define SUPPORT_HARD_LINKS 1
 #endif
 
-#define SIGNAL_CAST (RETSIGTYPE (*)())
+#if defined HAVE_SIGACTION && defined HAVE_SIGPROCMASK
+#define SIGACTION(n,h) sigact.sa_handler=(h), sigaction((n),&sigact,NULL)
+#define signal(n,h) we_need_to_call_SIGACTION_not_signal(n,h)
+#else
+#define SIGACTION(n,h) signal(n,h)
+#endif
 
 #ifndef EWOULDBLOCK
 #define EWOULDBLOCK EAGAIN
@@ -871,5 +878,3 @@ int inet_pton(int af, const char *src, void *dst);
 #ifdef MAINTAINER_MODE
 const char *get_panic_action(void);
 #endif
-
-#define UNUSED(x) x __attribute__((__unused__))
