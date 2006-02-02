@@ -648,6 +648,13 @@ struct chmod_mode_struct;
 #include "lib/permstring.h"
 #include "lib/addrinfo.h"
 
+#if !defined __GNUC__ || defined __APPLE__
+/* Apparently the OS X port of gcc gags on __attribute__.
+ *
+ * <http://www.opensource.apple.com/bugs/X/gcc/2512150.html> */
+#define __attribute__(x)
+#endif
+
 #define UNUSED(x) x __attribute__((__unused__))
 
 #include "proto.h"
@@ -805,14 +812,6 @@ extern int errno;
 
 /* handler for null strings in printf format */
 #define NS(s) ((s)?(s):"<NULL>")
-
-#if !defined __GNUC__ || defined __APPLE__
-/* Apparently the OS X port of gcc gags on __attribute__.
- *
- * <http://www.opensource.apple.com/bugs/X/gcc/2512150.html> */
-#define __attribute__(x)
-
-#endif
 
 /* Convenient wrappers for malloc and realloc.  Use them. */
 #define new(type) ((type *)malloc(sizeof(type)))
