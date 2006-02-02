@@ -68,6 +68,11 @@ struct file_list *the_file_list;
  * but set it higher, just in case. */
 #define MAXCHILDPROCS 7
 
+#if defined HAVE_SIGACTION && defined HAVE_SIGPROCMASK
+#define SIGACTMASK(n,h) SIGACTION(n,h), sigaddset(&sigmask,(n))
+static struct sigaction sigact;
+#endif
+
 struct pid_status {
 	pid_t pid;
 	int status;
@@ -1099,7 +1104,9 @@ static RETSIGTYPE sigchld_handler(UNUSED(int val))
 		}
 	}
 #endif
+#if !defined HAVE_SIGACTION && !defined HAVE_SIGPROCMASK
 	signal(SIGCHLD, sigchld_handler);
+#endif
 }
 
 
@@ -1159,16 +1166,21 @@ int main(int argc,char *argv[])
 	int ret;
 	int orig_argc = argc;
 	char **orig_argv = argv;
+#if defined HAVE_SIGACTION && defined HAVE_SIGPROCMASK
+	sigset_t sigmask;
 
-	signal(SIGUSR1, sigusr1_handler);
-	signal(SIGUSR2, sigusr2_handler);
-	signal(SIGCHLD, sigchld_handler);
+	sigemptyset(&sigmask);
+	sigact.sa_flags = SA_NOCLDSTOP;
+#endif
+	SIGACTMASK(SIGUSR1, sigusr1_handler);
+	SIGACTMASK(SIGUSR2, sigusr2_handler);
+	SIGACTMASK(SIGCHLD, sigchld_handler);
 #ifdef MAINTAINER_MODE
-	signal(SIGSEGV, rsync_panic_handler);
-	signal(SIGFPE, rsync_panic_handler);
-	signal(SIGABRT, rsync_panic_handler);
-	signal(SIGBUS, rsync_panic_handler);
-#endif /* def MAINTAINER_MODE */
+	SIGACTMASK(SIGSEGV, rsync_panic_handler);
+	SIGACTMASK(SIGFPE, rsync_panic_handler);
+	SIGACTMASK(SIGABRT, rsync_panic_handler);
+	SIGACTMASK(SIGBUS, rsync_panic_handler);
+#endif
 
 	starttime = time(NULL);
 	am_root = (MY_UID() == 0);
@@ -1195,13 +1207,16 @@ int main(int argc,char *argv[])
 		exit_cleanup(RERR_SYNTAX);
 	}
 
-	signal(SIGINT,SIGNAL_CAST sig_int);
-	signal(SIGHUP,SIGNAL_CAST sig_int);
-	signal(SIGTERM,SIGNAL_CAST sig_int);
+	SIGACTMASK(SIGINT, sig_int);
+	SIGACTMASK(SIGHUP, sig_int);
+	SIGACTMASK(SIGTERM, sig_int);
+#if defined HAVE_SIGACTION && HAVE_SIGPROCMASK
+	sigprocmask(SIG_UNBLOCK, &sigmask, NULL);
+#endif
 
 	/* Ignore SIGPIPE; we consistently check error codes and will
 	 * see the EPIPE. */
-	signal(SIGPIPE, SIG_IGN);
+	SIGACTION(SIGPIPE, SIG_IGN);
 
 	/* Initialize push_dir here because on some old systems getcwd
 	 * (implemented by forking "pwd" and reading its output) doesn't
