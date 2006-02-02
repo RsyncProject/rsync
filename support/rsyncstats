@@ -12,7 +12,7 @@
 use Getopt::Long;
 
 # You may wish to edit the next line to customize for your default log file.
-$usage_file = "/var/adm/rsyncd.log";
+$usage_file = "/var/log/rsyncd.log";
 
 # Edit the following lines for default report settings.
 # Entries defined here will be over-ridden by the command line.
