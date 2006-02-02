@@ -13,6 +13,11 @@ Changes since 2.6.6:
     - Fixed a really old bug that caused --checksum (-c) to checksum all the
       files encountered during the delete scan (ouch).
 
+    - Fixed a potential hang in a remote generator:  when the receiver gets a
+      read-error on the socket, it now signals the generator about this so that
+      the generator does not try to send any of the terminating error messages
+      to the client (avoiding a potential hang in some setups).
+
     - Made hard-links work with symlinks and devices again.
 
     - If the sender gets an early EOF reading a source file, we propagate this
