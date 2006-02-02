@@ -490,7 +490,8 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd strdup chown chmod lchmod mknod mkfifo \
     memmove lchown vsnprintf snprintf vasprintf asprintf setsid glob strpbrk \
     strlcat strlcpy strtol mallinfo getgroups setgroups geteuid getegid \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \
-    strerror putenv iconv_open locale_charset nl_langinfo)
+    strerror putenv iconv_open locale_charset nl_langinfo \
+    sigaction sigprocmask)
 
 AC_CHECK_FUNCS(getpgrp tcgetpgrp)
 if test $ac_cv_func_getpgrp = yes; then
