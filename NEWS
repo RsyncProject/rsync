@@ -182,6 +182,10 @@ Changes since 2.6.6:
 
   INTERNAL:
 
+    - We now use sigaction() and sigprocmask() if possible, and fall back on
+      signal() if not.  Using sigprocmask() ensures that rsync enables all the
+      signals that it needs, just in case it was started in a masked state.
+
     - Some buffer sizes were expanded a bit, particularly on systems where
       MAXPATHLEN is overly small (e.g. cygwin).
 
