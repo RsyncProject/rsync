@@ -172,7 +172,7 @@ int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
 	return updated;
 }
 
-void sig_int(void)
+RETSIGTYPE sig_int(UNUSED(int val))
 {
 	/* KLUGE: if the user hits Ctrl-C while ssh is prompting
 	 * for a password, then our cleanup's sending of a SIGUSR1
