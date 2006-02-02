@@ -222,20 +222,20 @@ static void print_rsync_version(enum logcode f)
 	rprintf(f, "Copyright (C) 1996-2006 by Andrew Tridgell, Wayne Davison, and others.\n");
 	rprintf(f, "<http://rsync.samba.org/>\n");
 	rprintf(f, "Capabilities: %d-bit files, %ssocketpairs, "
-		"%shard links, %ssymlinks, batchfiles, \n",
+		"%shard links, %ssymlinks, batchfiles,\n",
 		(int) (sizeof (OFF_T) * 8),
 		got_socketpair, hardlinks, links);
 
 	/* Note that this field may not have type ino_t.  It depends
 	 * on the complicated interaction between largefile feature
 	 * macros. */
-	rprintf(f, "              %sinplace, %sIPv6, %d-bit system inums, %d-bit internal inums\n",
+	rprintf(f, "              %sinplace, %sIPv6, "
+		"%d-bit system inums, %d-bit internal inums\n",
 		have_inplace, ipv6,
 		(int) (sizeof dumstat->st_ino * 8),
 		(int) (sizeof (int64) * 8));
 #ifdef MAINTAINER_MODE
-	rprintf(f, "              panic action: \"%s\"\n",
-		get_panic_action());
+	rprintf(f, "Panic Action: \"%s\"\n", get_panic_action());
 #endif
 
 #if SIZEOF_INT64 < 8
