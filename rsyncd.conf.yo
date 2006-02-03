@@ -404,24 +404,25 @@ rsyncstats.)
 The single-character escapes that are understood are as follows:
 
 quote(itemize(
-  it() %h for the remote host name
-  it() %a for the remote IP address
-  it() %l for the length of the file in bytes
-  it() %p for the process ID of this rsync session
-  it() %o for the operation, which is "send", "recv", or "del."
-  (the latter includes the trailing period)
-  it() %f for the filename (long form on sender; no trailing "/")
-  it() %n for the filename (short form; trailing "/" on dir)
-  it() %L either the string " -> SYMLINK", or " => HARDLINK" or an
-  empty string (where bf(SYMLINK) or bf(HARDLINK) is a filename)
-  it() %P for the module path
-  it() %m for the module name
-  it() %t for the current date time
-  it() %u for the authenticated username (or the null string)
-  it() %b for the number of bytes actually transferred 
-  it() %c when sending files this gives the number of checksum bytes
-    received for this file
+  it() %a the remote IP address
+  it() %b the number of bytes actually transferred 
+  it() %B the permission bits of the file (e.g. rwxrwxrwt)
+  it() %c the checksum bytes received for this file (only when sending)
+  it() %f the filename (long form on sender; no trailing "/")
+  it() %G the gid of the file (decimal) or "DEFAULT"
+  it() %h the remote host name
   it() %i an itemized list of what is being updated
+  it() %l the length of the file in bytes
+  it() %L the string " -> SYMLINK", " => HARDLINK", or "" (where bf(SYMLINK) or bf(HARDLINK) is a filename)
+  it() %m the module name
+  it() %M the last-modified time of the file
+  it() %n the filename (short form; trailing "/" on dir)
+  it() %o the operation, which is "send", "recv", or "del." (the latter includes the trailing period)
+  it() %p the process ID of this rsync session
+  it() %P the module path
+  it() %t the current date time
+  it() %u the authenticated username or an empty string
+  it() %U the uid of the file (decimal)
 ))
 
 For a list of what the characters mean that are output by "%i", see the
