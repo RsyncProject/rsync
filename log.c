@@ -198,8 +198,8 @@ static void filtered_fwrite(const char *buf, int len, FILE *f)
 		  && isdigit(*(uchar*)(s+2))
 		  && isdigit(*(uchar*)(s+3))
 		  && isdigit(*(uchar*)(s+4)))
-		 || !isprint(*(uchar*)s)
-		 || *(uchar*)s < ' ') {
+		 || ((!isprint(*(uchar*)s) || *(uchar*)s < ' ')
+		  && *s != '\t')) {
 			if (s != buf && fwrite(buf, s - buf, 1, f) != 1)
 				exit_cleanup(RERR_MESSAGEIO);
 			fprintf(f, "\\%04o", *(uchar*)s);
@@ -272,7 +272,7 @@ void rwrite(enum logcode code, char *buf, int len)
 	case FINFO:
 		f = am_server ? stderr : stdout;
 	pre_scan:
-		while (len > 1 && (*buf == '\n' || *buf == '\t')) {
+		while (len > 1 && *buf == '\n') {
 			fputc(*buf, f);
 			buf++;
 			len--;
@@ -446,11 +446,35 @@ static void log_formatted(enum logcode code, char *format, char *op,
 				 (double)file->length);
 			n = buf2;
 			break;
+		case 'U':
+			strlcat(fmt, "ld", sizeof fmt);
+			snprintf(buf2, sizeof buf2, fmt,
+				 (long)file->uid);
+			n = buf2;
+			break;
+		case 'G':
+			strlcat(fmt, "d", sizeof fmt);
+			snprintf(buf2, sizeof buf2, fmt,
+				 (long)file->gid);
+			n = buf2;
+			break;
 		case 'p':
 			strlcat(fmt, "ld", sizeof fmt);
 			snprintf(buf2, sizeof buf2, fmt,
 				 (long)getpid());
 			n = buf2;
+			break;
+		case 'M':
+			n = timestring(file->modtime);
+			{
+				char *cp = strchr(n, ' ');
+				if (cp)
+					*cp = '-';
+			}
+			break;
+		case 'B':
+			n = buf2 + MAXPATHLEN - PERMSTRING_SIZE;
+			permstring(n - 1, file->mode); /* skip the type char */
 			break;
 		case 'o':
 			n = op;
