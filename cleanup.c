@@ -26,7 +26,7 @@ extern int keep_partial;
 extern int log_got_error;
 extern char *partial_dir;
 
-#if defined HAVE_SIGACTION && defined HAVE_SIGPROCMASK
+#ifdef HAVE_SIGACTION
 static struct sigaction sigact;
 #endif
 

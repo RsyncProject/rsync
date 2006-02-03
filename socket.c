@@ -36,7 +36,7 @@
 extern char *bind_address;
 extern int default_af_hint;
 
-#if defined HAVE_SIGACTION && defined HAVE_SIGPROCMASK
+#ifdef HAVE_SIGACTION
 static struct sigaction sigact;
 #endif
 
@@ -437,7 +437,7 @@ static RETSIGTYPE sigchld_handler(UNUSED(int val))
 #ifdef WNOHANG
 	while (waitpid(-1, NULL, WNOHANG) > 0) {}
 #endif
-#if !defined HAVE_SIGACTION && !defined HAVE_SIGPROCMASK
+#ifndef HAVE_SIGACTION
 	signal(SIGCHLD, sigchld_handler);
 #endif
 }
@@ -448,7 +448,7 @@ void start_accept_loop(int port, int (*fn)(int, int))
 	fd_set deffds;
 	int *sp, maxfd, i;
 
-#if defined HAVE_SIGACTION && defined HAVE_SIGPROCMASK
+#ifdef HAVE_SIGACTION
 	sigact.sa_flags = SA_NOCLDSTOP;
 #endif
 
