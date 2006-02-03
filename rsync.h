@@ -700,7 +700,7 @@ extern int errno;
 #define SUPPORT_HARD_LINKS 1
 #endif
 
-#if defined HAVE_SIGACTION && defined HAVE_SIGPROCMASK
+#ifdef HAVE_SIGACTION
 #define SIGACTION(n,h) sigact.sa_handler=(h), sigaction((n),&sigact,NULL)
 #define signal(n,h) we_need_to_call_SIGACTION_not_signal(n,h)
 #else
