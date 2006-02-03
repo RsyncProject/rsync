@@ -1396,17 +1396,23 @@ the whole path).  This makes it easy to use a relative path (such as
 partial-directory in the destination file's directory when needed, and then
 remove it again when the partial file is deleted.
 
-If the partial-dir value is not an absolute path, rsync will also add a directory
-bf(--exclude) of this value at the end of all your existing excludes.  This
-will prevent partial-dir files from being transferred and also prevent the
-untimely deletion of partial-dir items on the receiving side.  An example:
-the above bf(--partial-dir) option would add an "bf(--exclude=.rsync-partial/)"
-rule at the end of any other filter rules.  Note that if you are
-supplying your own exclude rules, you may need to manually insert your own
-exclude/protect rule somewhere higher up in the list so that
-it has a high enough priority to be effective (e.g., if your rules specify
-a trailing inclusion/exclusion of '*', the auto-added rule would never be
-reached).
+If the partial-dir value is not an absolute path, rsync will add an exclude
+rule at the end of all your existing excludes.  This will prevent the
+sending of any partial-dir files that may exist on the sending side, and
+will also prevent the untimely deletion of partial-dir items on the
+receiving side.  An example: the above bf(--partial-dir) option would add
+the equivalent of "bf(--exclude=.rsync-partial/)" at the end of any other
+filter rules.
+
+If you are supplying your own exclude rules, you may need to add your own
+exclude/hide/protect rule for the partial-dir because (1) the auto-added
+rule may be ineffective at the end of your other rules, or (2) you may wish
+to override rsync's exclude choice.  For instance, if you want to make
+rsync clean-up any left-over partial-dirs that may be lying around, you
+should specify bf(--delete-after) and add a "risk" filter rule, e.g.
+bf(-f 'R .rsync-partial/').  (Avoid using bf(--delete-before) or
+bf(--delete-during) unless you don't need rsync to use any of the
+left-over partial-dir data during the current run.)
 
 IMPORTANT: the bf(--partial-dir) should not be writable by other users or it
 is a security risk.  E.g. AVOID "/tmp".
@@ -1434,7 +1440,10 @@ transfer, at which time all the files are renamed into place in rapid
 succession.  This attempts to make the updating of the files a little more
 atomic.  By default the files are placed into a directory named ".~tmp~" in
 each file's destination directory, but if you've specified the
-bf(--partial-dir) option, that directory will be used instead.
+bf(--partial-dir) option, that directory will be used instead.  See the
+comments in the bf(--partial-dir) section for a discussion of how this
+".~tmp~" dir will be excluded from the transfer, and what you can do if
+you wnat rsync to cleanup old ".~tmp~" dirs that might be lying around.
 Conflicts with bf(--inplace) and bf(--append).
 
 This option uses more memory on the receiving side (one bit per file
