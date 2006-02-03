@@ -68,8 +68,12 @@ struct file_list *the_file_list;
  * but set it higher, just in case. */
 #define MAXCHILDPROCS 7
 
-#if defined HAVE_SIGACTION && defined HAVE_SIGPROCMASK
-#define SIGACTMASK(n,h) SIGACTION(n,h), sigaddset(&sigmask,(n))
+#ifdef HAVE_SIGACTION
+# ifdef HAVE_SIGPROCMASK
+#  define SIGACTMASK(n,h) SIGACTION(n,h), sigaddset(&sigmask,(n))
+# else
+#  define SIGACTMASK(n,h) SIGACTION(n,h)
+# endif
 static struct sigaction sigact;
 #endif
 
@@ -1104,7 +1108,7 @@ static RETSIGTYPE sigchld_handler(UNUSED(int val))
 		}
 	}
 #endif
-#if !defined HAVE_SIGACTION && !defined HAVE_SIGPROCMASK
+#ifndef HAVE_SIGACTION
 	signal(SIGCHLD, sigchld_handler);
 #endif
 }
@@ -1166,10 +1170,12 @@ int main(int argc,char *argv[])
 	int ret;
 	int orig_argc = argc;
 	char **orig_argv = argv;
-#if defined HAVE_SIGACTION && defined HAVE_SIGPROCMASK
+#ifdef HAVE_SIGACTION
+# ifdef HAVE_SIGPROCMASK
 	sigset_t sigmask;
 
 	sigemptyset(&sigmask);
+# endif
 	sigact.sa_flags = SA_NOCLDSTOP;
 #endif
 	SIGACTMASK(SIGUSR1, sigusr1_handler);
