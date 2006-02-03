@@ -161,6 +161,12 @@ else
     echo "    preserve_scratch=no"
 fi    
 
+# We'll use setfacl if it's around.
+if test -f /usr/bin/setfacl || setfacl --help >/dev/null 2>&1 ; then
+    setfacl=setfacl
+else
+    setfacl=true
+fi
 
 if [ ! -f "$rsync_bin" ]; then
     echo "rsync_bin $rsync_bin is not a file" >&2
@@ -195,6 +201,9 @@ export scratchdir suitedir
 prep_scratch() {
     [ -d "$scratchdir" ] && rm -rf "$scratchdir"
     mkdir "$scratchdir"
+    # Get rid of default ACLs and dir-setgid to avoid confusing some tests.
+    $setfacl -k "$scratchdir"
+    chmod g-s "$scratchdir"
     return 0
 }
 
