@@ -65,9 +65,12 @@ printmsg() {
     echo "$1"
 }
 
-
 rsync_ls_lR() {
     find "$@" -print | sort | sed 's/ /\\ /g' | xargs "$TOOLDIR/tls"
+}
+
+check_perms() {
+    "$TOOLDIR/tls" "$1" | grep "^-$2" >/dev/null
 }
 
 rsync_getgroups() { 
