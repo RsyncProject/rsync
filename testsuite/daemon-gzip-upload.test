@@ -20,8 +20,6 @@ build_rsyncd_conf
 RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon"
 export RSYNC_CONNECT_PROG
 
-set -x
-
 hands_setup
 
 # Build chkdir with a normal rsync and an --exclude.

@@ -11,8 +11,6 @@
 
 . "$suitedir/rsync.fns"
 
-set -x
-
 # Build some hardlinks
 
 mygrps="`rsync_getgroups`" || fail "Can't get groups"

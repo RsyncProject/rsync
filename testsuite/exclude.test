@@ -15,8 +15,6 @@
 CVSIGNORE='*.junk'
 export CVSIGNORE
 
-set -x
-
 # Build some files/dirs/links to copy
 
 makepath "$fromdir/foo/down/to/you"

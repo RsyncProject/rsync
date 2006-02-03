@@ -14,8 +14,6 @@ alt2dir="$tmpdir/alt2"
 
 # Build some files/dirs/links to copy
 
-set -x
-
 hands_setup
 
 # Setup the alt and chk dirs

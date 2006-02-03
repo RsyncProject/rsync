@@ -10,8 +10,6 @@
 
 . "$suitedir/rsync.fns"
 
-set -x
-
 lddir="$tmpdir/ld"
 
 chkfile="$scratchdir/rsync.chk"

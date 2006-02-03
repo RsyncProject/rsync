@@ -13,8 +13,6 @@
 
 . "$suitedir/rsync.fns"
 
-set -x
-
 case `id -u` in
 '') ;; # If "id" failed, try to continue...
 0)  ;;

@@ -9,8 +9,6 @@
 
 . "$suitedir/rsync.fns"
 
-set -x
-
 mkdir "$fromdir"
 mkdir "$todir"
 

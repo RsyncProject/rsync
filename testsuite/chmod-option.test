@@ -9,8 +9,6 @@
 
 . $srcdir/testsuite/rsync.fns
 
-set -x
-
 # Build some files
 
 fromdir="$scratchdir/from"

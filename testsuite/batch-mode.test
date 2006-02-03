@@ -9,8 +9,6 @@
 
 . "$suitedir/rsync.fns"
 
-set -x
-
 hands_setup
 
 cd "$tmpdir"
