@@ -773,6 +773,10 @@ int start_daemon(int f_in, int f_out)
 		return -1;
 
 	if (!*line || strcmp(line, "#list") == 0) {
+		char *addr = client_addr(f_in);
+		char *host = client_name(f_in);
+		rprintf(FLOG, "module-list request from %s (%s)\n",
+			host, addr);
 		send_listing(f_out);
 		return -1;
 	}
