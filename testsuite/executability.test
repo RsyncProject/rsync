@@ -7,8 +7,6 @@
 
 . $srcdir/testsuite/rsync.fns
 
-set -x
-
 # Put some files in the From directory
 mkdir "$fromdir"
 cat <<EOF >"$fromdir/1"
@@ -25,8 +23,8 @@ chmod 600 "$fromdir/2"
 
 $RSYNC -rvv "$fromdir/" "$todir/"
 
-check_perms "$todir/1" rwx------ || test_fail "After initial transfer: to/1 should have 700 permissions"
-check_perms "$todir/2" rw------- || test_fail "After initial transfer: to/2 should have 600 permissions"
+check_perms "$todir/1" rwx------ 1
+check_perms "$todir/2" rw------- 1
 
 # Mix up the permissions a bit
 chmod 600 "$fromdir/1"
@@ -36,14 +34,14 @@ chmod 604 "$todir/2"
 $RSYNC -rvv "$fromdir/" "$todir/"
 
 # No -E, so nothing should have changed
-check_perms "$todir/1" rwx------ || test_fail "After update without -E: to/1 should still have 700 permissions"
-check_perms "$todir/2" rw----r-- || test_fail "After update without -E: to/2 should still have 604 permissions"
+check_perms "$todir/1" rwx------ 2
+check_perms "$todir/2" rw----r-- 2
 
 $RSYNC -rvvE "$fromdir/" "$todir/"
 
 # Now things should have happened!
-check_perms "$todir/1" rw------- || test_fail "After update with -E: to/1 should now have 600 permissions"
-check_perms "$todir/2" rwx---r-x || test_fail "After update with -E: to/2 should now have 705 permissions"
+check_perms "$todir/1" rw------- 3
+check_perms "$todir/2" rwx---r-x 3
 
 # Hooray
 exit 0
