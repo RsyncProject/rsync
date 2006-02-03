@@ -467,8 +467,8 @@ static void log_formatted(enum logcode code, char *format, char *op,
 		case 'M':
 			n = timestring(file->modtime);
 			{
-				char *cp = strchr(n, ' ');
-				if (cp)
+				char *cp;
+				while ((cp = strchr(n, ' ')) != NULL)
 					*cp = '-';
 			}
 			break;
