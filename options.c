@@ -1368,8 +1368,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				clean_fname(partial_dir, 1);
 			if (!*partial_dir || strcmp(partial_dir, ".") == 0)
 				partial_dir = NULL;
-			else if (*partial_dir != '/'
-			 && check_filter(&filter_list, partial_dir, 1) == 0) {
+			else if (*partial_dir != '/') {
 				parse_rule(&filter_list, partial_dir,
 				    MATCHFLG_NO_PREFIXES|MATCHFLG_DIRECTORY, 0);
 			}
