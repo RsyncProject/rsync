@@ -1,22 +1,17 @@
 -*- indented-text -*-
 
-BUGS ---------------------------------------------------------------
-Do not rely on having a group called "nobody"
-
 FEATURES ------------------------------------------------------------
 Use chroot only if supported
 Allow supplementary groups in rsyncd.conf			2002/04/09
 Handling IPv6 on old machines
-Other IPv6 stuff:
+Other IPv6 stuff
 Add ACL support							2001/12/02
-Lazy directory creation
 proxy authentication						2002/01/23
 SOCKS								2002/01/23
 FAT support
-Allow forcing arbitrary permissions				2002/03/12
 --diff						david.e.sewell	2002/03/15
 Add daemon --no-fork option
-Create more granular verbosity				jw	2003/05/15
+Create more granular verbosity					2003/05/15
 
 DOCUMENTATION --------------------------------------------------------
 Keep list of open issues and todos on the web site
@@ -25,22 +20,19 @@ Perhaps redo manual as SGML
 LOGGING --------------------------------------------------------------
 Memory accounting
 Improve error messages
-Better statistics:					Rasmus	2002/03/08
+Better statistics					Rasmus	2002/03/08
 Perhaps flush stdout like syslog
-Log deamon sessions that just list modules
 Log child death on signal
-Log errors with function that reports process of origin
 verbose output					David Stein	2001/12/20
 internationalization
 
 DEVELOPMENT --------------------------------------------------------
 Handling duplicate names
 Use generic zlib						2002/02/25
-TDB:								2002/03/12
+TDB								2002/03/12
 Splint								2002/03/12
 
 PERFORMANCE ----------------------------------------------------------
-File list structure in memory
 Traverse just one directory at a time
 Allow skipping MD4 file_sum					2002/04/08
 Accelerate MD4
@@ -52,8 +44,6 @@ Test on kernel source
 Test large files
 Create mutator program for testing
 Create configure option to enable dangerous tests
-If tests are skipped, say why.
-Test daemon feature to disallow particular options.
 Create pipe program for testing
 Create test makefile target for some tests
 
@@ -65,17 +55,6 @@ rsyncsplit as alternative to real integration with gzip?
 reverse rsync over HTTP Range
 
 
-
-BUGS ---------------------------------------------------------------
-
-
-Do not rely on having a group called "nobody"
-
-  http://www.linuxbase.org/spec/refspecs/LSB_1.1.0/gLSB/usernames.html
-
-  On Debian it's "nogroup"
-
-                      --          --
 
 FEATURES ------------------------------------------------------------
 
@@ -133,7 +112,7 @@ Handling IPv6 on old machines
                       --          --
 
 
-Other IPv6 stuff:
+Other IPv6 stuff
   
   Implement suggestions from http://www.kame.net/newsletter/19980604/
   and ftp://ftp.iij.ad.jp/pub/RFC/rfc2553.txt
@@ -155,15 +134,6 @@ Add ACL support							2001/12/02
   Probably better not to even try to convert between NT and POSIX.
   Possibly can share some code with Samba.
   NOTE: there is a patch that implements this in the "patches" subdir.
-
-                      --          --
-
-
-Lazy directory creation
-
-  With the current common --include '*/' --exclude '*' pattern, people
-  can end up with many empty directories.  We might avoid this by
-  lazily creating such directories.
 
                       --          --
 
@@ -199,35 +169,6 @@ FAT support
                       --          --
 
 
-Allow forcing arbitrary permissions				2002/03/12
-
-  On 12 Mar 2002, Dave Dykstra <dwd@bell-labs.com> wrote:
-  > If we would add an option to do that functionality, I
-  > would vote for one that was more general which could mask
-  > off any set of permission bits and possibly add any set of
-  > bits.  Perhaps a chmod-like syntax if it could be
-  > implemented simply.
-
-  I think that would be good too.  For example, people uploading files
-  to a web server might like to say
-
-  rsync -avzP --chmod a+rX ./ sourcefrog.net:/home/www/sourcefrog/
-
-  Ideally the patch would implement as many of the gnu chmod semantics
-  as possible.  I think the mode parser should be a separate function
-  that passes back something like (mask,set) description to the rest
-  of the program.  For bonus points there would be a test case for the
-  parser.
-
-  Possibly also --chown
-
-  (Debian #23628)
-
-  NOTE: there is a patch that implements this in the "patches" subdir.
-
-                      --          --
-
-
 --diff						david.e.sewell	2002/03/15
 
   Allow people to specify the diff command.  (Might want to use wdiff,
@@ -252,7 +193,7 @@ Add daemon --no-fork option
                       --          --
 
 
-Create more granular verbosity				jw	2003/05/15
+Create more granular verbosity					2003/05/15
 
   Control output with the --report option.
 
@@ -322,14 +263,10 @@ Improve error messages
   our load?  (Debian #28416) Probably fixed now, but a test case would
   be good.
 
-  When running as a daemon, some errors should both be returned to the
-  user and logged.  This will make interacting with a daemon less
-  cryptic.
-
                       --          --
 
 
-Better statistics:					Rasmus	2002/03/08
+Better statistics					Rasmus	2002/03/08
 
   <Rasmus>
       hey, how about an rsync option that just gives you the
@@ -355,27 +292,10 @@ Perhaps flush stdout like syslog
                       --          --
 
 
-Log deamon sessions that just list modules
-
-  At the connections that just get a list of modules are not logged,
-  but they should be.
-
-                      --          --
-
-
 Log child death on signal
 
   If a child of the rsync daemon dies with a signal, we should notice
   that when we reap it and log a message.
-
-                      --          --
-
-
-Log errors with function that reports process of origin
-
-  Use a separate function for reporting errors; prefix it with
-  "rsync:" or "rsync(remote)", or perhaps even "rsync(local
-  generator): ".
 
                       --          --
 
@@ -445,7 +365,7 @@ Use generic zlib						2002/02/25
                       --          --
 
 
-TDB:								2002/03/12
+TDB								2002/03/12
 
   Rather than storing the file list in memory, store it in a TDB.
 
@@ -471,20 +391,6 @@ Splint								2002/03/12
                       --          --
 
 PERFORMANCE ----------------------------------------------------------
-
-File list structure in memory
-
-  Rather than one big array, perhaps have a tree in memory mirroring
-  the directory tree.
-
-  This might make sorting much faster!  (I'm not sure it's a big CPU
-  problem, mind you.)
-
-  It might also reduce memory use in storing repeated directory names
-  -- again I'm not sure this is a problem.
-
-                      --          --
-
 
 Traverse just one directory at a time
 
@@ -582,16 +488,6 @@ Create mutator program for testing
 
 
 Create configure option to enable dangerous tests
-
-                      --          --
-
-
-If tests are skipped, say why.
-
-                      --          --
-
-
-Test daemon feature to disallow particular options.
 
                       --          --
 
