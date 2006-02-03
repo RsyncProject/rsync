@@ -176,6 +176,11 @@ Changes since 2.6.6:
       execute bit on files, for those times when using the --perms option is
       not desired.
 
+    - The daemon now logs each module-list request it receives.
+
+    - New log-format options: %M (modtime), %U (uid), %G (gid), and %B
+      (permission bits, e.g. "rwxr-xrwt").
+
     - Some minor documentation improvements.
 
     - Updated some diffs in the patches dir.
