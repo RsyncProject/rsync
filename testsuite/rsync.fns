@@ -70,7 +70,13 @@ rsync_ls_lR() {
 }
 
 check_perms() {
-    "$TOOLDIR/tls" "$1" | grep "^-$2" >/dev/null
+    perms=`"$TOOLDIR/tls" "$1" | sed 's/^[-d]\(.........\).*/\1/'`
+    if test $perms = $2; then
+	return 0
+    fi
+    echo "permissions: $perms on $1"
+    echo "should be:   $2"
+    test_fail "failed test $3"
 }
 
 rsync_getgroups() { 
