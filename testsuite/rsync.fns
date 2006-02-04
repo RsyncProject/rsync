@@ -144,7 +144,7 @@ hands_setup() {
 ####################
 # Many machines do not have "mkdir -p", so we have to build up long paths.
 # How boring.  
-makepath () {
+makepath() {
     echo "        makepath $1"
     p="$1"
     (
