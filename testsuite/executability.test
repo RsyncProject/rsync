@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# This program is distributable under the terms of the GNU GPL see
+# This program is distributable under the terms of the GNU GPL (see
 # COPYING).
 
 # Test the --executability or -E option. -- Matt McCutchen
@@ -18,7 +18,7 @@ cat <<EOF >"$fromdir/2"
 echo 'Program Two!'
 EOF
 
-chmod 700 "$fromdir/1" || test_skipped "Can't chmod"
+chmod 1700 "$fromdir/1" || test_skipped "Can't chmod"
 chmod 600 "$fromdir/2"
 
 $RSYNC -rvv "$fromdir/" "$todir/"
