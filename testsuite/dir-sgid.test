@@ -1,0 +1,41 @@
+#! /bin/sh
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test that rsync obeys directory setgid. -- Matt McCutchen
+
+. $srcdir/testsuite/rsync.fns
+
+umask 077
+
+# Call as: testit <dirname> <dirperms> <file-expected> <program-expected> <dir-expected>
+testit() {
+    todir="$scratchdir/$1"
+    mkdir "$todir"
+    chmod $2 "$todir"
+    # Make sure we obey directory setgid when creating a directory to hold multiple transferred files,
+    # even though the directory itself is outside the transfer
+    $RSYNC -rvv "$scratchdir/dir" "$scratchdir/file" "$scratchdir/program" "$todir/to/"
+    check_perms "$todir/to" $5 "Target $1"
+    check_perms "$todir/to/dir" $5 "Target $1"
+    check_perms "$todir/to/file" $3 "Target $1"
+    check_perms "$todir/to/program" $4 "Target $1"
+}
+
+echo "File!" >"$scratchdir/file"
+echo "#!/bin/sh" >"$scratchdir/program"
+mkdir "$scratchdir/dir"
+chmod 2764 "$scratchdir/dir" || test_skipped "Can't chmod"
+chmod 664 "$scratchdir/file"
+chmod 775 "$scratchdir/program"
+[ -g "$scratchdir/dir" ] || test_skipped "The directory setgid bit vanished!"
+mkdir "$scratchdir/dir/blah"
+[ -g "$scratchdir/dir/blah" ] || test_skipped "Your filesystem doesn't use directory setgid; maybe it's BSD."
+
+# Test some target directories
+testit setgid-off 700 rw------- rwx------ rwx------
+testit setgid-on 2700 rw------- rwx------ rwx--S---
+
+# Hooray
+exit 0
