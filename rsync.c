@@ -21,6 +21,14 @@
    process */
 
 #include "rsync.h"
+#if defined HAVE_ICONV && defined HAVE_ICONV_H
+#include <iconv.h>
+#endif
+#if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
+#include <libcharset.h>
+#elif defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
+#include <langinfo.h>
+#endif
 
 extern int verbose;
 extern int dry_run;
@@ -42,6 +50,32 @@ extern int keep_dirlinks;
 extern int make_backups;
 extern struct stats stats;
 
+#ifdef HAVE_ICONV
+iconv_t ic_chck = (iconv_t)-1;
+
+static char *default_charset(void)
+{
+#if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
+	return locale_charset();
+#elif defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
+	return nl_langinfo(CODESET);
+#else
+	return ""; /* Works with (at the very least) gnu iconv... */
+#endif
+}
+
+void setup_iconv()
+{
+	char *defset = default_charset();
+
+	if (!am_server
+	 && (ic_chck = iconv_open(defset, defset)) == (iconv_t)-1) {
+		rprintf(FERROR, "iconv_open(\"%s\", \"%s\") failed\n",
+			defset, defset);
+		exit_cleanup(RERR_UNSUPPORTED);
+	}
+}
+#endif
 
 /*
   free a sums struct
