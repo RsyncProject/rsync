@@ -25,6 +25,7 @@
 extern int verbose;
 extern int dry_run;
 extern int daemon_log_format_has_i;
+extern int preserve_perms;
 extern int preserve_executability;
 extern int preserve_times;
 extern int omit_dir_times;
@@ -55,7 +56,7 @@ void free_sums(struct sum_struct *s)
  * the permissions should be and return them merged back into the mode. */
 mode_t dest_mode(mode_t flist_mode, mode_t dest_mode, int exists)
 {
-	/* If the file already exists we'll return the local permissions,
+	/* If the file already exists, we'll return the local permissions,
 	 * possibly tweaked by the --executability option. */
 	if (exists) {
 		if (preserve_executability && S_ISREG(flist_mode)) {
@@ -68,7 +69,7 @@ mode_t dest_mode(mode_t flist_mode, mode_t dest_mode, int exists)
 				dest_mode |= (dest_mode & 0444) >> 2;
 		}
 	} else
-		dest_mode = flist_mode & ~orig_umask;
+		dest_mode = flist_mode & ACCESSPERMS & ~orig_umask;
 	return (flist_mode & ~CHMOD_BITS) | (dest_mode & CHMOD_BITS);
 }
 
@@ -88,6 +89,12 @@ int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
 			return 0;
 		}
 		st = &st2;
+		if (!preserve_perms && S_ISDIR(file->mode)
+		 && st->st_mode & S_ISGID) {
+			/* We just created this directory and its setgid
+			 * bit is on, so make sure it stays on. */
+			file->mode |= S_ISGID;
+		}
 	}
 
 	if (!preserve_times || (S_ISDIR(st->st_mode) && omit_dir_times))
