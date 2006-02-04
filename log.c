@@ -26,6 +26,9 @@
   <mbp@samba.org>, Oct 2000.
   */
 #include "rsync.h"
+#if defined HAVE_ICONV && defined HAVE_ICONV_H
+#include <iconv.h>
+#endif
 
 extern int verbose;
 extern int dry_run;
@@ -43,6 +46,9 @@ extern int log_format_has_o_or_i;
 extern int daemon_log_format_has_o_or_i;
 extern char *auth_user;
 extern char *log_format;
+#ifdef HAVE_ICONV
+extern iconv_t ic_chck;
+#endif
 
 static int log_initialised;
 static int logfile_was_closed;
@@ -198,8 +204,12 @@ static void filtered_fwrite(const char *buf, int len, FILE *f)
 		  && isdigit(*(uchar*)(s+2))
 		  && isdigit(*(uchar*)(s+3))
 		  && isdigit(*(uchar*)(s+4)))
-		 || ((!isprint(*(uchar*)s) || *(uchar*)s < ' ')
-		  && *s != '\t')) {
+#ifdef HAVE_ICONV
+		 || (*(uchar*)s < ' ' && *s != '\t')
+#else
+		 || ((!isprint(*(uchar*)s) || *(uchar*)s < ' ') && *s != '\t')
+#endif
+		) {
 			if (s != buf && fwrite(buf, s - buf, 1, f) != 1)
 				exit_cleanup(RERR_MESSAGEIO);
 			fprintf(f, "\\%04o", *(uchar*)s);
@@ -288,7 +298,30 @@ void rwrite(enum logcode code, char *buf, int len)
 	trailing_CR_or_NL = len && (buf[len-1] == '\n' || buf[len-1] == '\r')
 			  ? buf[--len] : 0;
 
-	filtered_fwrite(buf, len, f);
+#ifdef HAVE_ICONV
+	if (ic_chck != (iconv_t)-1) {
+		char convbuf[1024];
+		char *in_buf = buf, *out_buf = convbuf;
+		size_t in_cnt = len, out_cnt = sizeof convbuf - 1;
+
+		iconv(ic_chck, NULL, 0, NULL, 0);
+		while (iconv(ic_chck, &in_buf,&in_cnt,
+				 &out_buf,&out_cnt) == (size_t)-1) {
+			if (out_buf != convbuf) {
+				filtered_fwrite(convbuf, out_buf - convbuf, f);
+				out_buf = convbuf;
+				out_cnt = sizeof convbuf - 1;
+			}
+			if (errno == E2BIG)
+				continue;
+			fprintf(f, "\\%04o", *(uchar*)in_buf++);
+			in_cnt--;
+		}
+		if (out_buf != convbuf)
+			filtered_fwrite(convbuf, out_buf - convbuf, f);
+	} else
+#endif
+		filtered_fwrite(buf, len, f);
 
 	if (trailing_CR_or_NL) {
 		fputc(trailing_CR_or_NL, f);
