@@ -161,8 +161,8 @@ else
     echo "    preserve_scratch=no"
 fi    
 
-# We'll use setfacl if it's around.
-if test -f /usr/bin/setfacl || setfacl --help >/dev/null 2>&1 ; then
+# We'll use setfacl if it's around and it supports the -k option.
+if setfacl --help 2>/dev/null | grep ' -k,' >/dev/null; then
     setfacl=setfacl
 else
     setfacl=true
