@@ -453,10 +453,14 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			n = buf2;
 			break;
 		case 'G':
-			strlcat(fmt, "d", sizeof fmt);
-			snprintf(buf2, sizeof buf2, fmt,
-				 (long)file->gid);
-			n = buf2;
+			if (file->gid == GID_NONE)
+				n = "DEFAULT";
+			else {
+				strlcat(fmt, "ld", sizeof fmt);
+				snprintf(buf2, sizeof buf2, fmt,
+					 (long)file->gid);
+				n = buf2;
+			}
 			break;
 		case 'p':
 			strlcat(fmt, "ld", sizeof fmt);
@@ -467,8 +471,8 @@ static void log_formatted(enum logcode code, char *format, char *op,
 		case 'M':
 			n = timestring(file->modtime);
 			{
-				char *cp;
-				while ((cp = strchr(n, ' ')) != NULL)
+				char *cp = n;
+				while ((cp = strchr(cp, ' ')) != NULL)
 					*cp = '-';
 			}
 			break;
