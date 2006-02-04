@@ -774,12 +774,13 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 			if (msg_bytes >= sizeof line)
 				goto overflow;
 			read_loop(fd, line, msg_bytes);
-			line[msg_bytes] = '\0';
 			/* A directory name was sent with the trailing null */
 			if (msg_bytes > 0 && !line[msg_bytes-1])
 				log_delete(line, S_IFDIR);
-			else
+			else {
+				line[msg_bytes] = '\0';
 				log_delete(line, S_IFREG);
+			}
 			break;
 		case MSG_SUCCESS:
 			if (msg_bytes != 4) {
@@ -1111,7 +1112,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
  **/
 static void mplex_write(enum msgcode code, char *buf, size_t len)
 {
-	char buffer[BIGPATHBUFLEN];
+	char buffer[1024];
 	size_t n = len;
 
 	SIVAL(buffer, 0, ((MPLEX_BASE + (int)code)<<24) + len);
@@ -1124,9 +1125,10 @@ static void mplex_write(enum msgcode code, char *buf, size_t len)
 		contiguous_write_len = len + 4;
 
 	if (n > sizeof buffer - 4)
-		n = sizeof buffer - 4;
+		n = 0;
+	else
+		memcpy(buffer + 4, buf, n);
 
-	memcpy(&buffer[4], buf, n);
 	writefd_unbuffered(sock_f_out, buffer, n+4);
 
 	len -= n;
