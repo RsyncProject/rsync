@@ -85,7 +85,7 @@
 # they're explicitly given on the command line.
 
 # Also, we can't count on 'cp -a' or 'mkdir -p', although they're
-# pretty handy.
+# pretty handy (see function makepath for the latter).
 
 # I think some of the GNU documentation suggests that we shouldn't
 # rely on shell functions.  However, the Bash manual seems to say that
@@ -100,6 +100,8 @@
 # You cannot do "export VAR=VALUE" all on one line; the export must be
 # separate from the assignment.  (SCO SysV)
 
+# Don't rely on grep -q, as that doesn't work everywhere -- just redirect
+# stdout to /dev/null to keep it quiet.
 
 
 # STILL TO DO:
