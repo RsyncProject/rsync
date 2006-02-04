@@ -792,6 +792,9 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 
 	io_set_sock_fds(f_in, f_out);
 	setup_protocol(f_out, f_in);
+#ifdef HAVE_ICONV
+	setup_iconv();
+#endif
 
 	if (protocol_version >= 23)
 		io_start_multiplex_out();
@@ -828,6 +831,9 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 	io_set_sock_fds(f_in, f_out);
 	setup_protocol(f_out,f_in);
+#ifdef HAVE_ICONV
+	setup_iconv();
+#endif
 
 	if (protocol_version >= 23 && !read_batch)
 		io_start_multiplex_in();
