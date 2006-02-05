@@ -50,7 +50,7 @@ extern int keep_dirlinks;
 extern int make_backups;
 extern struct stats stats;
 
-#ifdef HAVE_ICONV_OPEN
+#if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
 iconv_t ic_chck = (iconv_t)-1;
 
 static char *default_charset(void)

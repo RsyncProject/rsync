@@ -792,7 +792,7 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 
 	io_set_sock_fds(f_in, f_out);
 	setup_protocol(f_out, f_in);
-#ifdef HAVE_ICONV_OPEN
+#if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
 	setup_iconv();
 #endif
 
@@ -831,7 +831,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 	io_set_sock_fds(f_in, f_out);
 	setup_protocol(f_out,f_in);
-#ifdef HAVE_ICONV_OPEN
+#if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
 	setup_iconv();
 #endif
 
