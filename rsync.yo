@@ -702,7 +702,7 @@ such as bf(cp)(1) and bf(tar)(1).
 
 In summary: to give destination files (both old and new) the source
 permissions, use bf(--perms).  To give new files the destination-default
-permissions (while leaving existing files unchanged) make sure that the
+permissions (while leaving existing files unchanged), make sure that the
 bf(--perms) option is off and use bf(--chmod=ugo=rwX) (which ensures that
 all non-masked bits get enabled).  If you'd care to make this latter
 behavior easier to type, you could define a popt alias for it, such as
