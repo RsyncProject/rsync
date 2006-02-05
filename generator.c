@@ -41,7 +41,6 @@ extern int preserve_devices;
 extern int preserve_specials;
 extern int preserve_hard_links;
 extern int preserve_perms;
-extern int preserve_executability;
 extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_times;
@@ -350,8 +349,7 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 		     && (!(iflags & ITEM_XNAME_FOLLOWS) || *xname))
 		    || (keep_time && cmp_modtime(file->modtime, st->st_mtime) != 0))
 			iflags |= ITEM_REPORT_TIME;
-		if ((preserve_perms || preserve_executability)
-		 && (file->mode & CHMOD_BITS) != (st->st_mode & CHMOD_BITS))
+		if ((file->mode & CHMOD_BITS) != (st->st_mode & CHMOD_BITS))
 			iflags |= ITEM_REPORT_PERMS;
 		if (preserve_uid && am_root && file->uid != st->st_uid)
 			iflags |= ITEM_REPORT_OWNER;
