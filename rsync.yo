@@ -706,13 +706,17 @@ permissions (while leaving existing files unchanged), make sure that the
 bf(--perms) option is off and use bf(--chmod=ugo=rwX) (which ensures that
 all non-masked bits get enabled).  If you'd care to make this latter
 behavior easier to type, you could define a popt alias for it, such as
-putting this line in the file ~/.popt (this defines the bf(-s) option):
+putting this line in the file ~/.popt (this defines the bf(-s) option,
+and includes --no-g to use the default group of the destination dir):
 
-quote(tt(   rsync alias -s --no-p --chmod=ugo=rwX))
+quote(tt(   rsync alias -s --no-p --no-g --chmod=ugo=rwX))
 
 You could then use this new option in a command such as this one:
 
 quote(tt(   rsync -asv src/ dest/))
+
+(Caveat: make sure that bf(-a) does not follow bf(-s), or it will re-enable
+the "--no-*" options.)
 
 The preservation of the destination's setgid bit on newly-created
 directories when bf(--perms) is off was added in rsync 2.6.7.  Older rsync
