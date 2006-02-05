@@ -21,7 +21,7 @@
    process */
 
 #include "rsync.h"
-#if defined HAVE_ICONV && defined HAVE_ICONV_H
+#if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
 #include <iconv.h>
 #endif
 #if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
@@ -50,7 +50,7 @@ extern int keep_dirlinks;
 extern int make_backups;
 extern struct stats stats;
 
-#ifdef HAVE_ICONV
+#ifdef HAVE_ICONV_OPEN
 iconv_t ic_chck = (iconv_t)-1;
 
 static char *default_charset(void)

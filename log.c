@@ -26,7 +26,7 @@
   <mbp@samba.org>, Oct 2000.
   */
 #include "rsync.h"
-#if defined HAVE_ICONV && defined HAVE_ICONV_H
+#if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
 #include <iconv.h>
 #endif
 
@@ -46,7 +46,7 @@ extern int log_format_has_o_or_i;
 extern int daemon_log_format_has_o_or_i;
 extern char *auth_user;
 extern char *log_format;
-#ifdef HAVE_ICONV
+#ifdef HAVE_ICONV_OPEN
 extern iconv_t ic_chck;
 #endif
 
@@ -204,7 +204,7 @@ static void filtered_fwrite(const char *buf, int len, FILE *f)
 		  && isdigit(*(uchar*)(s+2))
 		  && isdigit(*(uchar*)(s+3))
 		  && isdigit(*(uchar*)(s+4)))
-#ifdef HAVE_ICONV
+#ifdef HAVE_ICONV_OPEN
 		 || (*(uchar*)s < ' ' && *s != '\t')
 #else
 		 || ((!isprint(*(uchar*)s) || *(uchar*)s < ' ') && *s != '\t')
@@ -298,7 +298,7 @@ void rwrite(enum logcode code, char *buf, int len)
 	trailing_CR_or_NL = len && (buf[len-1] == '\n' || buf[len-1] == '\r')
 			  ? buf[--len] : 0;
 
-#ifdef HAVE_ICONV
+#ifdef HAVE_ICONV_OPEN
 	if (ic_chck != (iconv_t)-1) {
 		char convbuf[1024];
 		char *in_buf = buf, *out_buf = convbuf;
