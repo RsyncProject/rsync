@@ -690,19 +690,44 @@ quote(itemize(
   it() Existing files (including updated files) retain their existing
   permissions, though the bf(--executability) option might change just
   the execute permission for the file.
-  it() Each new file gets its permissions set based on the source file's
-  permissions, but masked by the receiving end's umask setting (including
-  the stripping of the three special permission bits).
+  it() New files get their "normal" permission bits set to the source
+  file's permissions masked with the receiving end's umask setting, and
+  their special permission bits disabled except in the case where a new
+  directory inherits a setgid bit from its parent directory.
 ))
-  
+
 Thus, when bf(--perms) and bf(--executability) are both disabled,
 rsync's behavior is the same as that of other file-copy utilities,
 such as bf(cp)(1) and bf(tar)(1).
 
+In summary: to give destination files (both old and new) the source
+permissions, use bf(--perms).  To give new files the destination-default
+permissions (while leaving existing files unchanged) make sure that the
+bf(--perms) option is off and use bf(--chmod=ugo=rwX) (which ensures that
+all non-masked bits get enabled).  If you'd care to make this latter
+behavior easier to type, you could define a popt alias for it, such as
+putting this line in the file ~/.popt (this defines the bf(-s) option):
+
+quote(tt(   rsync alias -s --no-p --chmod=ugo=rwX))
+
+You could then use this new option in a command such as this one:
+
+quote(tt(   rsync -asv src/ dest/))
+
+The preservation of the destination's setgid bit on newly-created
+directories when bf(--perms) is off was added in rsync 2.6.7.  Older rsync
+versions erroneously preserved the three special permission bits for
+newly-created files when bf(--perms) was off, while overriding the
+destination's setgid bit setting on a newly-created directory.  (Keep in
+mind that it is the version of the receiving rsync that affects this
+behavior.)
+
 dit(bf(-E, --executability)) This option causes rsync to preserve the
 executability (or non-executability) of regular files when bf(--perms) is
 not enabled.  A regular file is considered to be executable if at least one
-'x' is turned on in the source permissions.  
+'x' is turned on in its permissions.  When an existing destination file's
+executability differs from that of the corresponding source file, rsync
+modifies the destination file's permissions as follows:
 
 quote(itemize(
   it() To make a file non-executable, rsync turns off all its 'x'
@@ -798,7 +823,7 @@ to specify items to copy from multiple filesystems, just rsync's recursion
 through the hierarchy of each directory that the user specified, and also
 the analogous recursion on the receiving side during deletion.  Also keep
 in mind that rsync treats a "bind" mount to the same device as being on the
-same filesystem.  
+same filesystem.
 
 If this option is repeated, rsync omits all mount-point directories from
 the copy.  Otherwise, it includes an empty directory at each mount-point it
