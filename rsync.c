@@ -53,12 +53,12 @@ extern struct stats stats;
 #if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
 iconv_t ic_chck = (iconv_t)-1;
 
-static char *default_charset(void)
+static const char *default_charset(void)
 {
 #if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
 	return locale_charset();
 #elif defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
-	char *def = nl_langinfo(CODESET);
+	const char *def = nl_langinfo(CODESET);
 	if (strcmp(def, "646") == 0) /* Solaris brain-damage */
 		return "ascii";
 	return def;
@@ -69,7 +69,7 @@ static char *default_charset(void)
 
 void setup_iconv()
 {
-	char *defset = default_charset();
+	const char *defset = default_charset();
 
 	if (!am_server
 	 && (ic_chck = iconv_open(defset, defset)) == (iconv_t)-1) {
