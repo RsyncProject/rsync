@@ -6,7 +6,7 @@ configure: configure.in aclocal.m4
 config.h.in: configure.in aclocal.m4
 	autoheader
 
-proto.h:
+proto.h: *.c lib/compat.c
 	cat *.c lib/compat.c | awk -f mkproto.awk >proto.h.new
 	if diff proto.h proto.h.new >/dev/null; then \
 	  rm proto.h.new; \
