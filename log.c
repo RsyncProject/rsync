@@ -195,24 +195,21 @@ void logfile_reopen(void)
 	}
 }
 
-static void filtered_fwrite(const char *buf, int len, FILE *f)
+static void filtered_fwrite(FILE *f, const char *buf, int len, int use_isprint)
 {
 	const char *s, *end = buf + len;
 	for (s = buf; s < end; s++) {
 		if ((s < end - 4
-		  && *s == '\\' && s[1] == '0'
+		  && *s == '\\' && s[1] == '#'
 		  && isdigit(*(uchar*)(s+2))
 		  && isdigit(*(uchar*)(s+3))
 		  && isdigit(*(uchar*)(s+4)))
-#if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
-		 || (*(uchar*)s < ' ' && *s != '\t')
-#else
-		 || ((!isprint(*(uchar*)s) || *(uchar*)s < ' ') && *s != '\t')
-#endif
-		) {
+		 || (*s != '\t'
+		  && ((use_isprint && !isprint(*(uchar*)s))
+		   || *(uchar*)s < ' '))) {
 			if (s != buf && fwrite(buf, s - buf, 1, f) != 1)
 				exit_cleanup(RERR_MESSAGEIO);
-			fprintf(f, "\\%04o", *(uchar*)s);
+			fprintf(f, "\\#%03o", *(uchar*)s);
 			buf = s + 1;
 		}
 	}
@@ -308,20 +305,20 @@ void rwrite(enum logcode code, char *buf, int len)
 		while (iconv(ic_chck, &in_buf,&in_cnt,
 				 &out_buf,&out_cnt) == (size_t)-1) {
 			if (out_buf != convbuf) {
-				filtered_fwrite(convbuf, out_buf - convbuf, f);
+				filtered_fwrite(f, convbuf, out_buf - convbuf, 0);
 				out_buf = convbuf;
 				out_cnt = sizeof convbuf - 1;
 			}
 			if (errno == E2BIG)
 				continue;
-			fprintf(f, "\\%04o", *(uchar*)in_buf++);
+			fprintf(f, "\\#%03o", *(uchar*)in_buf++);
 			in_cnt--;
 		}
 		if (out_buf != convbuf)
-			filtered_fwrite(convbuf, out_buf - convbuf, f);
+			filtered_fwrite(f, convbuf, out_buf - convbuf, 0);
 	} else
 #endif
-		filtered_fwrite(buf, len, f);
+		filtered_fwrite(f, buf, len, 1);
 
 	if (trailing_CR_or_NL) {
 		fputc(trailing_CR_or_NL, f);
