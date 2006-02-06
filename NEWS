@@ -8,6 +8,21 @@ Changes since 2.6.6:
       clumping them together with the 'D' for devices.  The number of
       characters is also different (to remove an unused field).
 
+    - The way rsync escapes unreadable characters has changed.  First, rsync
+      now has support for recognizing valid multibyte character sequences in
+      your current locale, allowing it to escape fewer characters than before
+      for a locale such as UTF-8.  Second, it now uses an escape idiom of
+      "\#123", which is the literal string "\#" followed by exactly 3 octal
+      digits.  Rsync no longer doubles a backslash character in a filename
+      (e.g. it used to output "foo\\bar" when copying "foo\bar") -- now it only
+      escapes a backslash that is followed by a hash-sign and 3 digits (0-9)
+      (e.g. it will output "foo\#134#789" when copying "foo\#789").
+
+      Script writers: the local rsync is the one that outputs escaped names,
+      so if you need to support unescaping of filenames for older rsyncs, I'd
+      suggest that you parse the output of "rsync --version" and only use the
+      old unescaping rules for 2.6.5 and 2.6.6.
+
   BUG FIXES:
 
     - Fixed a really old bug that caused --checksum (-c) to checksum all the
