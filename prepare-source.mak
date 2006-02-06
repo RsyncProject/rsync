@@ -5,6 +5,7 @@ configure: configure.in aclocal.m4
 
 config.h.in: configure.in aclocal.m4
 	autoheader
+	touch config.h.in
 
 proto.h: *.c lib/compat.c
 	cat *.c lib/compat.c | awk -f mkproto.awk >proto.h.new
