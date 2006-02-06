@@ -215,9 +215,20 @@ Changes since 2.6.6:
 
   DEVELOPER RELATED:
 
+    - The diffs in the patches dir now require "patch -p1 <DIFF" instead of
+      the previous -p0.  Also, the version included in the release tar now
+      affect generated files (e.g. configure, rsync.1, proto.h, etc.), so
+      it is no longer necessary to run autoconf and/or yodl unless you're
+      applying a patch that was checked out from CVS.
+
     - Several diffs in the patches dir now use the proper --enable-FOO
       configure option instead of --with-FOO to turn on the inclusion of
       the newly patched feature.
 
-    - The testsuite now sets HOME so that it won't be affecting by a file
-      such as ~/.popt.
+    - There is a new script, "prepare-source" than can be used to update the
+      various generated files (proto.h, configure, etc.) even before configure
+      has created the Makefile (this is mainly useful when patching the source
+      with a patch that doesn't affect generated files).
+
+    - The testsuite now sets HOME so that it won't be affected by a file such
+      as ~/.popt.
