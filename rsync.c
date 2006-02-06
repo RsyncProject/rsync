@@ -58,10 +58,7 @@ static const char *default_charset(void)
 #if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
 	return locale_charset();
 #elif defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
-	const char *def = nl_langinfo(CODESET);
-	if (strcmp(def, "646") == 0) /* Solaris brain-damage */
-		return "ASCII";
-	return def;
+	return nl_langinfo(CODESET);
 #else
 	return ""; /* Works with (at the very least) gnu iconv... */
 #endif
@@ -69,13 +66,27 @@ static const char *default_charset(void)
 
 void setup_iconv()
 {
-	const char *defset = default_charset();
+	const char *defset;
+	
+	if (!am_server)
+		return;
 
-	if (!am_server
-	 && (ic_chck = iconv_open(defset, defset)) == (iconv_t)-1) {
-		rprintf(FERROR, "iconv_open(\"%s\", \"%s\") failed\n",
-			defset, defset);
-		exit_cleanup(RERR_UNSUPPORTED);
+	defset = default_charset();
+
+	/* It's OK if this fails... */
+	ic_chck = iconv_open(defset, defset);
+
+	if (verbose > 3) {
+		if (ic_chck == (iconv_t)-1) {
+			rprintf(FINFO,
+				"note: iconv_open(\"%s\", \"%s\") failed (%d)"
+				" -- using isprint() instead of iconv().\n",
+				defset, defset, errno);
+		} else {
+			rprintf(FINFO,
+				"note: iconv_open(\"%s\", \"%s\") succeeded.\n",
+				defset, defset);
+		}
 	}
 }
 #endif
