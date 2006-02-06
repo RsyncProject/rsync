@@ -67,7 +67,7 @@ static const char *default_charset(void)
 void setup_iconv()
 {
 	const char *defset;
-	
+
 	if (!am_server)
 		return;
 
