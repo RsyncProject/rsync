@@ -367,7 +367,10 @@ if test x"$ac_cv_func_connect" = x"no"; then
 fi
 
 AC_SEARCH_LIBS(inet_ntop, resolv)
-AC_SEARCH_LIBS(iconv_open, iconv)
+
+# Solaris and HP-UX weirdness:
+# Search for libiconv_open (not iconv_open) to discover if -liconv is needed!
+AC_SEARCH_LIBS(libiconv_open, iconv)
 
 dnl AC_MSG_NOTICE([Looking in libraries: $LIBS])
 
