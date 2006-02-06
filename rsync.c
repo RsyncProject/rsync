@@ -43,6 +43,7 @@ extern int am_server;
 extern int am_sender;
 extern int am_generator;
 extern int am_starting_up;
+extern int allow_8bit_chars;
 extern int preserve_uid;
 extern int preserve_gid;
 extern int inplace;
@@ -66,26 +67,23 @@ static const char *default_charset(void)
 
 void setup_iconv()
 {
-	const char *defset;
+	if (!am_server && !allow_8bit_chars) {
+		const char *defset = default_charset();
 
-	if (!am_server)
-		return;
+		/* It's OK if this fails... */
+		ic_chck = iconv_open(defset, defset);
 
-	defset = default_charset();
-
-	/* It's OK if this fails... */
-	ic_chck = iconv_open(defset, defset);
-
-	if (verbose > 3) {
-		if (ic_chck == (iconv_t)-1) {
-			rprintf(FINFO,
-				"note: iconv_open(\"%s\", \"%s\") failed (%d)"
-				" -- using isprint() instead of iconv().\n",
-				defset, defset, errno);
-		} else {
-			rprintf(FINFO,
-				"note: iconv_open(\"%s\", \"%s\") succeeded.\n",
-				defset, defset);
+		if (verbose > 3) {
+			if (ic_chck == (iconv_t)-1) {
+				rprintf(FINFO,
+					"note: iconv_open(\"%s\", \"%s\") failed (%d)"
+					" -- using isprint() instead of iconv().\n",
+					defset, defset, errno);
+			} else {
+				rprintf(FINFO,
+					"note: iconv_open(\"%s\", \"%s\") succeeded.\n",
+					defset, defset);
+			}
 		}
 	}
 }
