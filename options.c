@@ -79,6 +79,7 @@ int orig_umask = 0;
 int relative_paths = -1;
 int implied_dirs = 1;
 int numeric_ids = 0;
+int allow_8bit_chars = 0;
 int force_delete = 0;
 int io_timeout = 0;
 int allowed_lull = 0;
@@ -354,6 +355,7 @@ void usage(enum logcode F)
   rprintf(F,"     --sockopts=OPTIONS      specify custom TCP options\n");
   rprintf(F,"     --blocking-io           use blocking I/O for the remote shell\n");
   rprintf(F,"     --stats                 give some file-transfer stats\n");
+  rprintf(F," -8, --8-bit                 leave high-bit chars unescaped in output\n");
   rprintf(F," -h, --human-readable        output numbers in a human-readable format\n");
   rprintf(F,"     --si                    like human-readable, but use powers of 1000\n");
   rprintf(F,"     --progress              show progress during transfer\n");
@@ -510,6 +512,7 @@ static struct poptOption long_options[] = {
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
 #endif
+  {"8-bit",           '8', POPT_ARG_NONE,   &allow_8bit_chars, 0, 0, 0 },
   {"address",          0,  POPT_ARG_STRING, &bind_address, 0, 0, 0 },
   {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
   {"sockopts",         0,  POPT_ARG_STRING, &sockopts, 0, 0, 0 },
