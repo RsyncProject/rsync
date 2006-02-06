@@ -39,6 +39,7 @@ extern int local_server;
 extern int quiet;
 extern int module_id;
 extern int msg_fd_out;
+extern int allow_8bit_chars;
 extern int protocol_version;
 extern int preserve_times;
 extern int log_format_has_i;
@@ -318,7 +319,7 @@ void rwrite(enum logcode code, char *buf, int len)
 			filtered_fwrite(f, convbuf, out_buf - convbuf, 0);
 	} else
 #endif
-		filtered_fwrite(f, buf, len, 1);
+		filtered_fwrite(f, buf, len, !allow_8bit_chars);
 
 	if (trailing_CR_or_NL) {
 		fputc(trailing_CR_or_NL, f);
