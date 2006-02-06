@@ -60,7 +60,7 @@ static const char *default_charset(void)
 #elif defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
 	const char *def = nl_langinfo(CODESET);
 	if (strcmp(def, "646") == 0) /* Solaris brain-damage */
-		return "ascii";
+		return "ASCII";
 	return def;
 #else
 	return ""; /* Works with (at the very least) gnu iconv... */
