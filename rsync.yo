@@ -378,6 +378,7 @@ to the detailed description below for a complete description.  verb(
      --sockopts=OPTIONS      specify custom TCP options
      --blocking-io           use blocking I/O for the remote shell
      --stats                 give some file-transfer stats
+ -8, --8-bit                 leave high-bit chars unescaped in output
  -h, --human-readable        output numbers in a human-readable format
      --si                    like human-readable, but use powers of 1000
      --progress              show progress during transfer
@@ -1393,6 +1394,17 @@ the name of the file being transferred prior to its progress information
 dit(bf(--stats)) This tells rsync to print a verbose set of statistics
 on the file transfer, allowing you to tell how effective the rsync
 algorithm is for your data.
+
+dit(bf(-8, --8-bit)) This tells rsync to leave all high-bit characters
+unescaped in the output instead of trying to test them to see if they're
+valid in the current locale and escaping the invalid ones.  All control
+characters (but never tabs) are always escaped, regardless of this option's
+setting.
+
+The escape idiom that started in 2.6.7 is to output a literal backslash (\)
+and a hash (#), followed by exactly 3 octal digits.  For example, a newline
+would output as "\#012".  A literal backslash that is in a filename is not
+escaped unless it is followed by a hash and 3 digits (0-9).
 
 dit(bf(-h, --human-readable)) Output numbers in a more human-readable format.
 Large numbers may be output in larger units, with a K (1024), M (1024*1024),
