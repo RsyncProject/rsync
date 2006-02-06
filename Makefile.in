@@ -90,29 +90,14 @@ T_UNSAFE_OBJ = t_unsafe.o syscall.o util.o t_stub.o lib/compat.o lib/snprintf.o
 t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
 
-gen: $(srcdir)/configure $(srcdir)/config.h.in proto man
+gen:
+	$(MAKE) -C $(srcdir) -f prepare-source.mak gen
 
-man: $(srcdir)/rsync.1 $(srcdir)/rsyncd.conf.5
-
-$(srcdir)/configure: $(srcdir)/configure.in $(srcdir)/aclocal.m4
-	cd $(srcdir); autoconf
-
-$(srcdir)/config.h.in: $(srcdir)/configure.in $(srcdir)/aclocal.m4
-	cd $(srcdir); autoheader
-
-$(srcdir)/rsync.1: $(srcdir)/rsync.yo
-	yodl2man -o $(srcdir)/rsync.1 $(srcdir)/rsync.yo
-
-$(srcdir)/rsyncd.conf.5: $(srcdir)/rsyncd.conf.yo
-	yodl2man -o $(srcdir)/rsyncd.conf.5 $(srcdir)/rsyncd.conf.yo
+man:
+	$(MAKE) -C $(srcdir) -f prepare-source.mak man
 
 proto:
-	cat $(srcdir)/*.c $(srcdir)/lib/compat.c | awk -f $(srcdir)/mkproto.awk >$(srcdir)/proto.h.new
-	if diff $(srcdir)/proto.h $(srcdir)/proto.h.new >/dev/null; then \
-	  rm $(srcdir)/proto.h.new; \
-	else \
-	  mv $(srcdir)/proto.h.new $(srcdir)/proto.h; \
-	fi
+	$(MAKE) -C $(srcdir) -f prepare-source.mak proto
 
 clean: cleantests
 	rm -f *~ $(OBJS) $(TLS_OBJ) $(CHECK_PROGS) $(CHECK_OBJS)
