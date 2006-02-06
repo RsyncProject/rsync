@@ -17,7 +17,7 @@ Changes since 2.6.6:
       (e.g. it used to output "foo\\bar" when copying "foo\bar") -- now it only
       escapes a backslash that is followed by a hash-sign and 3 digits (0-9)
       (e.g. it will output "foo\#134#789" when copying "foo\#789").  See also
-      the --8-bit (-8) option, mentioned below.
+      the --8-bit-output (-8) option, mentioned below.
 
       Script writers: the local rsync is the one that outputs escaped names,
       so if you need to support unescaping of filenames for older rsyncs, I'd
@@ -105,8 +105,8 @@ Changes since 2.6.6:
       allow easy entry of multiples of 1000 (instead of just multiples of 1024)
       and off-by-one values too (e.g. --max-size=8mb-1).
 
-    - Added the --8-bit (-8) option, which tells rsync to avoid escaping high-
-      bit characters that it thinks are unreadable in the current locale.
+    - Added the --8-bit-output (-8) option, which tells rsync to avoid escaping
+      high-bit characters that it thinks are unreadable in the current locale.
 
     - The new options --human-readable (-h) and --si change the output of the
       --stats and the end-of-run summary to be easier to read.

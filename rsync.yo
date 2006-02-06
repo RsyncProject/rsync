@@ -378,7 +378,7 @@ to the detailed description below for a complete description.  verb(
      --sockopts=OPTIONS      specify custom TCP options
      --blocking-io           use blocking I/O for the remote shell
      --stats                 give some file-transfer stats
- -8, --8-bit                 leave high-bit chars unescaped in output
+ -8, --8-bit-output          leave high-bit chars unescaped in output
  -h, --human-readable        output numbers in a human-readable format
      --si                    like human-readable, but use powers of 1000
      --progress              show progress during transfer
@@ -1395,7 +1395,7 @@ dit(bf(--stats)) This tells rsync to print a verbose set of statistics
 on the file transfer, allowing you to tell how effective the rsync
 algorithm is for your data.
 
-dit(bf(-8, --8-bit)) This tells rsync to leave all high-bit characters
+dit(bf(-8, --8-bit-output)) This tells rsync to leave all high-bit characters
 unescaped in the output instead of trying to test them to see if they're
 valid in the current locale and escaping the invalid ones.  All control
 characters (but never tabs) are always escaped, regardless of this option's
