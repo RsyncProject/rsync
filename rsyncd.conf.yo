@@ -266,8 +266,10 @@ See the "exclude" option above.
 dit(bf(incoming chmod)) This option allows you to specify a set of
 comma-separated chmod strings that will affect the permissions of all
 incoming files (files that are being received by the daemon).  These
-changes happen last, giving this setting the final word on what the
-permissions should look like in the repository.
+changes happen after any user-requested changes the client requested via
+bf(--chmod).  Note, however, the if the client didn't specify bf(--perms),
+the daemon's umask setting will still mask the value before it is used, so
+be sure it is set appropriately if this is a concern.
 See the description of the bf(--chmod) rsync option and the bf(chmod)(1)
 manpage for information on the format of this string.
 
@@ -275,8 +277,9 @@ dit(bf(outgoing chmod)) This option allows you to specify a set of
 comma-separated chmod strings that will affect the permissions of all
 outgoing files (files that are being sent out from the daemon).  These
 changes happen first, making the sent permissions appear to be different
-than those stored in the filesystem itself (which, for instance, you
-could disable group write permissions on the server).
+than those stored in the filesystem itself.  For instance, you could
+disable group write permissions on the server while having it appear to
+be on to the clients.
 See the description of the bf(--chmod) rsync option and the bf(chmod)(1)
 manpage for information on the format of this string.
 
