@@ -146,7 +146,7 @@ int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
 	if (!preserve_times || (S_ISDIR(st->st_mode) && omit_dir_times))
 		flags |= ATTRS_SKIP_MTIME;
 	if (!(flags & ATTRS_SKIP_MTIME)
-	    && cmp_modtime(st->st_mtime, file->modtime) != 0) {
+	    && cmp_time(st->st_mtime, file->modtime) != 0) {
 		int ret = set_modtime(fname, file->modtime, st->st_mode);
 		if (ret < 0) {
 			rsyserr(FERROR, errno, "failed to set times on %s",

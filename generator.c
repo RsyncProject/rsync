@@ -347,7 +347,7 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 			iflags |= ITEM_REPORT_SIZE;
 		if ((iflags & (ITEM_TRANSFER|ITEM_LOCAL_CHANGE) && !keep_time
 		     && (!(iflags & ITEM_XNAME_FOLLOWS) || *xname))
-		    || (keep_time && cmp_modtime(file->modtime, st->st_mtime) != 0))
+		    || (keep_time && cmp_time(file->modtime, st->st_mtime) != 0))
 			iflags |= ITEM_REPORT_TIME;
 		if ((file->mode & CHMOD_BITS) != (st->st_mode & CHMOD_BITS))
 			iflags |= ITEM_REPORT_PERMS;
@@ -396,7 +396,7 @@ int unchanged_file(char *fn, struct file_struct *file, STRUCT_STAT *st)
 	if (ignore_times)
 		return 0;
 
-	return cmp_modtime(st->st_mtime, file->modtime) == 0;
+	return cmp_time(st->st_mtime, file->modtime) == 0;
 }
 
 
@@ -556,7 +556,7 @@ static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
 		name = fp->basename;
 
 		if (fp->length == file->length
-		    && cmp_modtime(fp->modtime, file->modtime) == 0) {
+		    && cmp_time(fp->modtime, file->modtime) == 0) {
 			if (verbose > 4) {
 				rprintf(FINFO,
 					"fuzzy size/modtime match for %s\n",
@@ -632,7 +632,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			if (!unchanged_attrs(file, stp))
 				continue;
 			if ((always_checksum || ignore_times)
-			 && cmp_modtime(stp->st_mtime, file->modtime))
+			 && cmp_time(stp->st_mtime, file->modtime))
 				continue;
 			best_match = j;
 			match_level = 3;
@@ -1073,7 +1073,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (update_only && statret == 0
-	    && cmp_modtime(st.st_mtime, file->modtime) > 0) {
+	    && cmp_time(st.st_mtime, file->modtime) > 0) {
 		if (verbose > 1)
 			rprintf(FINFO, "%s is newer\n", fname);
 		return;
