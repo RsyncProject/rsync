@@ -1290,8 +1290,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		log_before_transfer = !am_server;
 	}
 
-	if ((do_progress || dry_run) && !verbose && !log_before_transfer
-	    && !am_server)
+	if (do_progress && !verbose && !log_before_transfer && !am_server)
 		verbose = 1;
 
 	if (dry_run)
