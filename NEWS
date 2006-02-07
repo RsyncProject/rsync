@@ -200,6 +200,8 @@ Changes since 2.6.6:
     - New log-format options: %M (modtime), %U (uid), %G (gid), and %B
       (permission bits, e.g. "rwxr-xrwt").
 
+    - The --dry-run option no longer forces the enabling of --verbose.
+
     - Some minor documentation improvements.
 
     - Updated some diffs in the patches dir.
