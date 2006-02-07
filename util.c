@@ -70,7 +70,6 @@ void set_blocking(int fd)
 	}
 }
 
-
 /**
  * Create a file descriptor pair - like pipe() but use socketpair if
  * possible (because of blocking issues on pipes).
@@ -95,7 +94,6 @@ int fd_pair(int fd[2])
 	return ret;
 }
 
-
 void print_child_argv(char **cmd)
 {
 	rprintf(FINFO, "opening connection using ");
@@ -115,7 +113,6 @@ void print_child_argv(char **cmd)
 	rprintf(FINFO, "\n");
 }
 
-
 void out_of_memory(char *str)
 {
 	rprintf(FERROR, "ERROR: out of memory in %s\n", str);
@@ -127,8 +124,6 @@ void overflow_exit(char *str)
 	rprintf(FERROR, "ERROR: buffer overflow in %s\n", str);
 	exit_cleanup(RERR_MALLOC);
 }
-
-
 
 int set_modtime(char *fname, time_t modtime, mode_t mode)
 {
@@ -174,7 +169,6 @@ int set_modtime(char *fname, time_t modtime, mode_t mode)
 	}
 }
 
-
 /**
    Create any necessary directories in fname. Unfortunately we don't know
    what perms to give the directory when this is called so we need to rely
@@ -198,7 +192,6 @@ int create_directory_path(char *fname, int base_umask)
 	}
 	return 0;
 }
-
 
 /**
  * Write @p len bytes at @p ptr to descriptor @p desc, retrying if
@@ -229,7 +222,6 @@ int full_write(int desc, char *ptr, size_t len)
 	return total_written;
 }
 
-
 /**
  * Read @p len bytes at @p ptr from descriptor @p desc, retrying if
  * interrupted.
@@ -254,7 +246,6 @@ static int safe_read(int desc, char *ptr, size_t len)
 
 	return n_chars;
 }
-
 
 /** Copy a file.
  *
@@ -413,7 +404,6 @@ int robust_rename(char *from, char *to, char *partialptr,
 	return -1;
 }
 
-
 static pid_t all_pids[10];
 static int num_pids;
 
@@ -457,7 +447,6 @@ void kill_all(int sig)
 	}
 }
 
-
 /** Turn a user name into a uid */
 int name_to_uid(char *name, uid_t *uid)
 {
@@ -485,7 +474,6 @@ int name_to_gid(char *name, gid_t *gid)
 	}
 	return 0;
 }
-
 
 /** Lock a byte range in a open file */
 int lock_range(int fd, int offset, int len)
@@ -1152,7 +1140,6 @@ char *timestring(time_t t)
 	return TimeBuf;
 }
 
-
 /**
  * Sleep for a specified number of milliseconds.
  *
@@ -1181,11 +1168,8 @@ int msleep(int t)
 	return True;
 }
 
-
-/**
- * Determine if two file modification times are equivalent (either
- * exact or in the modification timestamp window established by
- * --modify-window).
+/* Determine if two time_t values are equivalent (either exact, or in
+ * the modification timestamp window established by --modify-window).
  *
  * @retval 0 if the times should be treated as the same
  *
@@ -1193,7 +1177,7 @@ int msleep(int t)
  *
  * @retval -1 if the 2nd is later
  **/
-int cmp_modtime(time_t file1, time_t file2)
+int cmp_time(time_t file1, time_t file2)
 {
 	if (file2 > file1) {
 		if (file2 - file1 <= modify_window)
@@ -1238,7 +1222,6 @@ int _Insure_trap_error(int a1, int a2, int a3, int a4, int a5, int a6)
 	return ret;
 }
 #endif
-
 
 #define MALLOC_MAX 0x40000000
 
@@ -1364,4 +1347,96 @@ uint32 fuzzy_distance(const char *s1, int len1, const char *s2, int len2)
 	}
 
 	return a[len2-1];
+}
+
+#define BB_SLOT_SIZE     (16*1024)          /* Desired size in bytes */
+#define BB_PER_SLOT_BITS (BB_SLOT_SIZE * 8) /* Number of bits per slot */
+#define BB_PER_SLOT_INTS (BB_SLOT_SIZE / 4) /* Number of int32s per slot */
+
+struct bitbag {
+    uint32 **bits;
+    int slot_cnt;
+};
+
+struct bitbag *bitbag_create(int max_ndx)
+{
+	struct bitbag *bb = new(struct bitbag);
+	bb->slot_cnt = (max_ndx + BB_PER_SLOT_BITS - 1) / BB_PER_SLOT_BITS;
+
+	if (!(bb->bits = (uint32**)calloc(bb->slot_cnt, sizeof (uint32*))))
+		out_of_memory("bitbag_create");
+
+	return bb;
+}
+
+void bitbag_set_bit(struct bitbag *bb, int ndx)
+{
+	int slot = ndx / BB_PER_SLOT_BITS;
+	ndx %= BB_PER_SLOT_BITS;
+
+	if (!bb->bits[slot]) {
+		if (!(bb->bits[slot] = (uint32*)calloc(BB_PER_SLOT_INTS, 4)))
+			out_of_memory("bitbag_set_bit");
+	}
+
+	bb->bits[slot][ndx/32] |= 1u << (ndx % 32);
+}
+
+#if 0 /* not needed yet */
+void bitbag_clear_bit(struct bitbag *bb, int ndx)
+{
+	int slot = ndx / BB_PER_SLOT_BITS;
+	ndx %= BB_PER_SLOT_BITS;
+
+	if (!bb->bits[slot])
+		return;
+
+	bb->bits[slot][ndx/32] &= ~(1u << (ndx % 32));
+}
+
+int bitbag_check_bit(struct bitbag *bb, int ndx)
+{
+	int slot = ndx / BB_PER_SLOT_BITS;
+	ndx %= BB_PER_SLOT_BITS;
+
+	if (!bb->bits[slot])
+		return 0;
+
+	return bb->bits[slot][ndx/32] & (1u << (ndx % 32)) ? 1 : 0;
+}
+#endif
+
+/* Call this with -1 to start checking from 0.  Returns -1 at the end. */
+int bitbag_next_bit(struct bitbag *bb, int after)
+{
+	uint32 bits, mask;
+	int i, ndx = after + 1;
+	int slot = ndx / BB_PER_SLOT_BITS;
+	ndx %= BB_PER_SLOT_BITS;
+
+	mask = (1u << (ndx % 32)) - 1;
+	for (i = ndx / 32; slot < bb->slot_cnt; slot++, i = mask = 0) {
+		if (!bb->bits[slot])
+			continue;
+		for ( ; i < BB_PER_SLOT_INTS; i++, mask = 0) {
+			if (!(bits = bb->bits[slot][i] & ~mask))
+				continue;
+			/* The xor magic figures out the lowest enabled bit in
+			 * bits, and the switch quickly computes log2(bit). */
+			switch (bits ^ (bits & (bits-1))) {
+#define LOG2(n) case 1u << n: return slot*BB_PER_SLOT_BITS + i*32 + n
+			    LOG2(0);  LOG2(1);  LOG2(2);  LOG2(3);
+			    LOG2(4);  LOG2(5);  LOG2(6);  LOG2(7);
+			    LOG2(8);  LOG2(9);  LOG2(10); LOG2(11);
+			    LOG2(12); LOG2(13); LOG2(14); LOG2(15);
+			    LOG2(16); LOG2(17); LOG2(18); LOG2(19);
+			    LOG2(20); LOG2(21); LOG2(22); LOG2(23);
+			    LOG2(24); LOG2(25); LOG2(26); LOG2(27);
+			    LOG2(28); LOG2(29); LOG2(30); LOG2(31);
+			}
+			return -1; /* impossible... */
+		}
+	}
+
+	return -1;
 }
