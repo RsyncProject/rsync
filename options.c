@@ -1362,7 +1362,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		return 0;
 #endif
 	} else {
-		if (keep_partial && !partial_dir) {
+		if (keep_partial && !partial_dir && !am_server) {
 			if ((arg = getenv("RSYNC_PARTIAL_DIR")) != NULL && *arg)
 				partial_dir = strdup(arg);
 		}
