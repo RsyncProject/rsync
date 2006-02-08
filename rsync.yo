@@ -380,7 +380,6 @@ to the detailed description below for a complete description.  verb(
      --stats                 give some file-transfer stats
  -8, --8-bit-output          leave high-bit chars unescaped in output
  -h, --human-readable        output numbers in a human-readable format
-     --si                    like human-readable, but use powers of 1000
      --progress              show progress during transfer
  -P                          same as --partial --progress
  -i, --itemize-changes       output a change-summary for all updates
@@ -1407,11 +1406,10 @@ would output as "\#012".  A literal backslash that is in a filename is not
 escaped unless it is followed by a hash and 3 digits (0-9).
 
 dit(bf(-h, --human-readable)) Output numbers in a more human-readable format.
-Large numbers may be output in larger units, with a K (1024), M (1024*1024),
-or G (1024*1024*1024) suffix.
-
-dit(bf(--si)) Similar to the bf(--human-readable) option, but using powers
-of 1000 instead of 1024.
+This makes big numbers output using larger units, with a K, M, or G suffix.  If
+this option was specified once, these units are K (1000), M (1000*1000), and
+G (1000*1000*1000); if the option is repeated, the units are powers of 1024
+instead of 1000.
 
 dit(bf(--partial)) By default, rsync will delete any partially
 transferred file if the transfer is interrupted. In some circumstances
