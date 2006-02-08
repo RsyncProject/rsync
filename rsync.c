@@ -100,7 +100,7 @@ void free_sums(struct sum_struct *s)
 
 /* This is only called when we aren't preserving permissions.  Figure out what
  * the permissions should be and return them merged back into the mode. */
-mode_t dest_mode(mode_t flist_mode, mode_t dest_mode, int exists)
+mode_t dest_mode(mode_t flist_mode, mode_t cur_mode, int exists)
 {
 	/* If the file already exists, we'll return the local permissions,
 	 * possibly tweaked by the --executability option. */
@@ -110,13 +110,13 @@ mode_t dest_mode(mode_t flist_mode, mode_t dest_mode, int exists)
 			 * rights to everyone who can read, but ONLY if the
 			 * file isn't already executable. */
 			if (!(flist_mode & 0111))
-				dest_mode &= ~0111;
-			else if (!(dest_mode & 0111))
-				dest_mode |= (dest_mode & 0444) >> 2;
+				cur_mode &= ~0111;
+			else if (!(cur_mode & 0111))
+				cur_mode |= (cur_mode & 0444) >> 2;
 		}
 	} else
-		dest_mode = flist_mode & ACCESSPERMS & ~orig_umask;
-	return (flist_mode & ~CHMOD_BITS) | (dest_mode & CHMOD_BITS);
+		cur_mode = flist_mode & ACCESSPERMS & ~orig_umask;
+	return (flist_mode & ~CHMOD_BITS) | (cur_mode & CHMOD_BITS);
 }
 
 int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
