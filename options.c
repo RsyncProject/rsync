@@ -357,7 +357,6 @@ void usage(enum logcode F)
   rprintf(F,"     --stats                 give some file-transfer stats\n");
   rprintf(F," -8, --8-bit-output          leave high-bit chars unescaped in output\n");
   rprintf(F," -h, --human-readable        output numbers in a human-readable format\n");
-  rprintf(F,"     --si                    like human-readable, but use powers of 1000\n");
   rprintf(F,"     --progress              show progress during transfer\n");
   rprintf(F," -P                          same as --partial --progress\n");
   rprintf(F," -i, --itemize-changes       output a change-summary for all updates\n");
@@ -397,8 +396,7 @@ static struct poptOption long_options[] = {
   {"no-v",             0,  POPT_ARG_VAL,    &verbose, 0, 0, 0 },
   {"quiet",           'q', POPT_ARG_NONE,   0, 'q', 0, 0 },
   {"stats",            0,  POPT_ARG_NONE,   &do_stats, 0, 0, 0 },
-  {"human-readable",  'h', POPT_ARG_VAL,    &human_readable, 1, 0, 0},
-  {"si",               0,  POPT_ARG_VAL,    &human_readable, 2, 0, 0},
+  {"human-readable",  'h', POPT_ARG_NONE,   0, 'h', 0, 0},
   {"dry-run",         'n', POPT_ARG_NONE,   &dry_run, 0, 0, 0 },
   {"archive",         'a', POPT_ARG_NONE,   0, 'a', 0, 0 },
   {"recursive",       'r', POPT_ARG_VAL,    &recurse, 2, 0, 0 },
@@ -927,6 +925,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			preserve_devices = preserve_specials = 0;
 			break;
 
+		case 'h':
+			human_readable++;
+			break;
+
 		case 'i':
 			itemize_changes++;
 			break;
@@ -1076,6 +1078,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 
 	if (human_readable && *argc == 2) {
+		/* Allow the old meaning of 'h' (--help) on its own. */
 		usage(FINFO);
 		exit_cleanup(0);
 	}
