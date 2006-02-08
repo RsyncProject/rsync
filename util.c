@@ -1074,7 +1074,7 @@ char *human_num(int64 num)
 
 	if (human_readable) {
 		char units = '\0';
-		int mult = human_readable == 1 ? 1024 : 1000;
+		int mult = human_readable == 1 ? 1000 : 1024;
 		double dnum = 0;
 		if (num > mult*mult*mult) {
 			dnum = (double)num / (mult*mult*mult);
