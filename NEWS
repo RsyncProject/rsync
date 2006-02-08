@@ -108,8 +108,9 @@ Changes since 2.6.6:
     - Added the --8-bit-output (-8) option, which tells rsync to avoid escaping
       high-bit characters that it thinks are unreadable in the current locale.
 
-    - The new options --human-readable (-h) and --si change the output of the
-      --stats and the end-of-run summary to be easier to read.
+    - The new option --human-readable (-h) changes the output of --progress,
+      --stats, and the end-of-run summary to be easier to read.  If repeated,
+      the units become powers of 1024 instead of powers of 1000.
 
     - If lutimes() and/or lchmod() are around, use them to allow the
       preservation of attributes on symlinks.
