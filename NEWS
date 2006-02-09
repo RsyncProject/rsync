@@ -4,8 +4,11 @@ Changes since 2.6.6:
 
   OUTPUT CHANGES:
 
-    - The itemized output now uses 'S' for a special file instead of
-      clumping them together with the 'D' for devices.
+    - The letter 'D' in the itemized output was being used for both devices
+      (character or block) as well as other special files (such as fifos and
+      named sockets).  This has changed to separate non-device special files
+      under the 'S' designation (e.g. "cS+++++++ path/fifo").  See also the
+      "--specials" option, below.
 
     - The way rsync escapes unreadable characters has changed.  First, rsync
       now has support for recognizing valid multibyte character sequences in
@@ -86,11 +89,6 @@ Changes since 2.6.6:
 
   ENHANCEMENTS:
 
-    - Added the --specials option to tell rsync to copy special files (and does
-      not require root).  The --devices option now affects just character and
-      block devices (which now matches the documentation).  The -D option still
-      requests both --devices and --specials, and -a still implies -D.
-
     - Added the --append option that makes rsync append data onto files that
       are longer on the source than the destination (this includes new files).
 
@@ -109,7 +107,9 @@ Changes since 2.6.6:
 
     - The new option --human-readable (-h) changes the output of --progress,
       --stats, and the end-of-run summary to be easier to read.  If repeated,
-      the units become powers of 1024 instead of powers of 1000.
+      the units become powers of 1024 instead of powers of 1000.  (The old
+      meaning of -h, as a shorthand for --help, still works as long as you
+      just use it on its own, as in "rsync -h".)
 
     - If lutimes() and/or lchmod() are around, use them to allow the
       preservation of attributes on symlinks.
@@ -175,7 +175,14 @@ Changes since 2.6.6:
       client must be version 2.6.7 for this to work, but the remote rsync only
       needs to be 2.6.7 if you're pushing files.
 
-    - Added the --super option to make the receiver always attempt super- user
+    - Added the --specials option to tell rsync to copy non-device special
+      files (which rsync now attempts even as a normal user).  The --devices
+      option now requests the copying of just devices (character and block).
+      The -D option still requests both (e.g. --devices and --specials), -a
+      still implies -D, and non-root users still get a silent downgrade that
+      omits device copying.
+
+    - Added the --super option to make the receiver always attempt super-user
       activities.  This is useful for systems that allow things such as devices
       to be created or ownership to be set without being UID 0, and is also
       useful for someone who wants to ensure that errors will be output if the
