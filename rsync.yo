@@ -659,8 +659,8 @@ which point outside the copied tree. All absolute symlinks are
 also ignored. Using this option in conjunction with bf(--relative) may
 give unexpected results.
 
-dit(bf(-H, --hard-links)) This tells rsync to recreate hard  links  on
-the  remote system  to  be the same as the local system. Without this
+dit(bf(-H, --hard-links)) This tells rsync to recreate hard links on
+the remote system to be the same as the local system. Without this
 option hard links are treated like regular files.
 
 Note that rsync can only detect hard links if both parts of the link
@@ -1244,7 +1244,7 @@ dit(bf(-z, --compress)) With this option, rsync compresses the file data
 as it is sent to the destination machine, which reduces the amount of data
 being transmitted -- something that is useful over a slow connection.
 
-Note this this option typically achieves better compression ratios that can
+Note that this option typically achieves better compression ratios than can
 be achieved by using a compressing remote shell or a compressing transport
 because it takes advantage of the implicit information in the matching data
 blocks that are not explicitly sent over the connection.
@@ -1322,7 +1322,7 @@ quote(itemize(
   (received).
   it() A bf(c) means that a local change/creation is occurring for the item
   (such as the creation of a directory or the changing of a symlink, etc.).
-  it() A bf(h) means that the item is a hard-link to another item (requires
+  it() A bf(h) means that the item is a hard link to another item (requires
   bf(--hard-links)).
   it() A bf(.) means that the item is not being updated (though it might
   have attributes that are being modified).
@@ -1459,7 +1459,7 @@ is a security risk.  E.g. AVOID "/tmp".
 
 You can also set the partial-dir value the RSYNC_PARTIAL_DIR environment
 variable.  Setting this in the environment does not force bf(--partial) to be
-enabled, but rather it effects where partial files go when bf(--partial) is
+enabled, but rather it affects where partial files go when bf(--partial) is
 specified.  For instance, instead of using bf(--partial-dir=.rsync-tmp)
 along with bf(--progress), you could set RSYNC_PARTIAL_DIR=.rsync-tmp in your
 environment and then just use the bf(-P) option to turn on the use of the
@@ -1907,7 +1907,7 @@ itemize(
   "- foo + bar" is parsed as two rules (assuming that prefix-parsing wasn't
   also disabled).
   it() You may also specify any of the modifiers for the "+" or "-" rules
-  (below) in order  to have the rules that are read-in from the file
+  (below) in order to have the rules that are read-in from the file
   default to having that modifier set.  For instance, "merge,-/ .excl" would
   treat the contents of .excl as absolute-path excludes,
   while "dir-merge,s .filt" and ":sC" would each make all their
@@ -2288,7 +2288,7 @@ and duplicate all safe symlinks.
 dit(bf(--copy-unsafe-links)) Turn all unsafe symlinks into files, noisily
 skip all safe symlinks.
 
-dit(bf(--links --safe-links))  Duplicate safe symlinks and skip unsafe
+dit(bf(--links --safe-links)) Duplicate safe symlinks and skip unsafe
 ones.
 
 dit(bf(--links)) Duplicate all symlinks.
@@ -2378,7 +2378,7 @@ rsyncd.conf(5)
 
 manpagebugs()
 
-times are transferred as unix time_t values
+times are transferred as *nix time_t values
 
 When transferring to FAT filesystems rsync may re-sync
 unmodified files.
