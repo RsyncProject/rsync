@@ -1307,9 +1307,9 @@ if the receiving rsync is at least version 2.6.7 (you can use bf(-vv)
 with older versions of rsync, but that also turns on the output of other
 verbose messages).
 
-The "%i" escape has a cryptic output that is 8 letters long.  The general
-format is like the string bf(YXcstpog), where bf(Y) is replaced by the
-kind of update being done, bf(X) is replaced by the file-type, and the
+The "%i" escape has a cryptic output that is 9 letters long.  The general
+format is like the string bf(YXcstpogz), where bf(Y) is replaced by the
+type of update being done, bf(X) is replaced by the file-type, and the
 other letters represent attributes that may be output if they are being
 modified.
 
@@ -1357,6 +1357,7 @@ quote(itemize(
   sender's value (requires bf(--owner) and super-user privileges).
   it() A bf(g) means the group is different and is being updated to the
   sender's value (requires bf(--group) and the authority to set the group).
+  it() The bf(z) slot is reserved for future use.
 ))
 
 One other output is possible:  when deleting files, the "%i" will output
@@ -1373,7 +1374,7 @@ option does not affect what a daemon logs to its logfile.)
 
 Specifying this option will mention each file, dir, etc. that gets updated
 in a significant way (a transferred file, a recreated symlink/device, or a
-touched directory) unless the itemized-changes escape (%i) is included in
+touched directory) unless the itemize-changes escape (%i) is included in
 the string, in which case the logging of names increases to mention any
 item that is changed in any way (as long as the receiving side is at least
 2.6.4).  See the bf(--itemize-changes) option for a description of the
