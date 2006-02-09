@@ -409,7 +409,7 @@ accepted: verb(
  -v, --verbose               increase verbosity
  -4, --ipv4                  prefer IPv4
  -6, --ipv6                  prefer IPv6
-     --help                  show this help screen)
+ -h, --help                  show this help screen)
 
 manpageoptions()
 
