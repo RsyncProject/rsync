@@ -5,8 +5,7 @@ Changes since 2.6.6:
   OUTPUT CHANGES:
 
     - The itemized output now uses 'S' for a special file instead of
-      clumping them together with the 'D' for devices.  The number of
-      characters is also different (to remove an unused field).
+      clumping them together with the 'D' for devices.
 
     - The way rsync escapes unreadable characters has changed.  First, rsync
       now has support for recognizing valid multibyte character sequences in
