@@ -1643,10 +1643,9 @@ void server_options(char **args,int *argc)
 			args[ac++] = "--only-write-batch=X";
 		if (am_root > 1)
 			args[ac++] = "--super";
+		if (size_only)
+			args[ac++] = "--size-only";
 	}
-
-	if (size_only)
-		args[ac++] = "--size-only";
 
 	if (modify_window_set) {
 		if (asprintf(&arg, "--modify-window=%d", modify_window) < 0)
