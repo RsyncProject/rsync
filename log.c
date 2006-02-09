@@ -608,7 +608,8 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			n[5] = !(iflags & ITEM_REPORT_PERMS) ? '.' : 'p';
 			n[6] = !(iflags & ITEM_REPORT_OWNER) ? '.' : 'o';
 			n[7] = !(iflags & ITEM_REPORT_GROUP) ? '.' : 'g';
-			n[8] = '\0';
+			n[8] = '.';
+			n[9] = '\0';
 
 			if (iflags & (ITEM_IS_NEW|ITEM_MISSING_DATA)) {
 				char ch = iflags & ITEM_IS_NEW ? '+' : '?';

@@ -42,14 +42,14 @@ touch -r "$fromdir/block" "$fromdir/block2"
 $RSYNC -ai "$fromdir/block" "$todir/block2" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
-cD++++++ block
+cD+++++++ block
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 1 failed"
 
 $RSYNC -ai "$fromdir/block2" "$todir/block" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
-cD++++++ block2
+cD+++++++ block2
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 2 failed"
 
@@ -58,7 +58,7 @@ sleep 1
 $RSYNC -Di "$fromdir/block3" "$todir/block" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
-cD..T... block3
+cD..T.... block3
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 3 failed"
 
@@ -66,15 +66,15 @@ $RSYNC -aiHvv "$fromdir/" "$todir/" \
     | tee "$outfile"
 filter_outfile
 cat <<EOT >"$chkfile"
-.d..t... ./
-cD..t... block
-cD...... block2
-cD++++++ block3
-hD++++++ block2.5 => block3
-cD++++++ char
-cD++++++ char2
-cD++++++ char3
-cS++++++ fifo
+.d..t.... ./
+cD..t.... block
+cD....... block2
+cD+++++++ block3
+hD+++++++ block2.5 => block3
+cD+++++++ char
+cD+++++++ char2
+cD+++++++ char3
+cS+++++++ fifo
 EOT
 if test ! -b "$fromdir/block2.5"; then
     sed -e '/block2\.5/d' \
