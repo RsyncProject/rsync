@@ -373,7 +373,7 @@ void usage(enum logcode F)
   rprintf(F," -6, --ipv6                  prefer IPv6\n");
 #endif
   rprintf(F,"     --version               print version number\n");
-  rprintf(F,"     --help                  show this help screen\n");
+  rprintf(F,"(-h) --help                  show this help (-h works with no other options)\n");
 
   rprintf(F,"\nUse \"rsync --daemon --help\" to see the daemon-mode command-line options.\n");
   rprintf(F,"Please see the rsync(1) and rsyncd.conf(5) man pages for full documentation.\n");
