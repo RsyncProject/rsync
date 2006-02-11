@@ -87,6 +87,9 @@ Changes since 2.6.6:
     - Got rid of the need for --force to be used in some circumstances with
       --delete-after (making it consistent with --delete-before/-during).
 
+    - Rsync now ignores the SIGXFSZ signal, just in case your OS sends this
+      when a file is too large (rsync handles the write error).
+
   ENHANCEMENTS:
 
     - Added the --append option that makes rsync append data onto files that
