@@ -1229,6 +1229,9 @@ int main(int argc,char *argv[])
 	/* Ignore SIGPIPE; we consistently check error codes and will
 	 * see the EPIPE. */
 	SIGACTION(SIGPIPE, SIG_IGN);
+#ifdef SIGXFSZ
+	SIGACTION(SIGXFSZ, SIG_IGN);
+#endif
 
 	/* Initialize push_dir here because on some old systems getcwd
 	 * (implemented by forking "pwd" and reading its output) doesn't
