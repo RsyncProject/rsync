@@ -395,7 +395,8 @@ to the detailed description below for a complete description.  verb(
  -4, --ipv4                  prefer IPv4
  -6, --ipv6                  prefer IPv6
      --version               print version number
-     --help                  show this help screen)
+(-h) --help                  show this help (see below for -h comment)
+)
 
 Rsync can also be run as a daemon, in which case the following options are
 accepted: verb(
@@ -409,7 +410,8 @@ accepted: verb(
  -v, --verbose               increase verbosity
  -4, --ipv4                  prefer IPv4
  -6, --ipv6                  prefer IPv6
- -h, --help                  show this help screen)
+ -h, --help                  show this help (if used after --daemon)
+)
 
 manpageoptions()
 
@@ -422,8 +424,8 @@ can be used instead.
 startdit()
 dit(bf(--help)) Print a short help page describing the options
 available in rsync and exit.  For backward-compatibility with older
-versions of rsync, the same help output can also be requested by using
-the bf(-h) option without any other args.
+versions of rsync, the help will also be output if you use the bf(-h)
+option without any other args.
 
 dit(bf(--version)) print the rsync version number and exit.
 
@@ -1907,7 +1909,7 @@ itemize(
   "- foo + bar" is parsed as two rules (assuming that prefix-parsing wasn't
   also disabled).
   it() You may also specify any of the modifiers for the "+" or "-" rules
-  (below) in order to have the rules that are read-in from the file
+  (below) in order to have the rules that are read in from the file
   default to having that modifier set.  For instance, "merge,-/ .excl" would
   treat the contents of .excl as absolute-path excludes,
   while "dir-merge,s .filt" and ":sC" would each make all their
@@ -1970,7 +1972,7 @@ tt(- *.o)nl()
 
 This will merge the contents of the /home/user/.global-filter file at the
 start of the list and also turns the ".rules" filename into a per-directory
-filter file.  All rules read-in prior to the start of the directory scan
+filter file.  All rules read in prior to the start of the directory scan
 follow the global anchoring rules (i.e. a leading slash matches at the root
 of the transfer).
 
