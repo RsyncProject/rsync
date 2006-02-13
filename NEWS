@@ -212,7 +212,8 @@ Changes since 2.6.6:
 
     - The --dry-run option no longer forces the enabling of --verbose.
 
-    - Some minor documentation improvements.
+    - Various documentation improvements, including the documenting of what
+      the various items in the --stats output mean.
 
     - Updated some diffs in the patches dir.
 
