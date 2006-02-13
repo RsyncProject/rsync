@@ -1366,7 +1366,7 @@ struct file_list *recv_file_list(int f)
 			flags |= read_byte(f) << 8;
 		file = receive_file_entry(flist, flags, f);
 
-		if (S_ISREG(file->mode))
+		if (S_ISREG(file->mode) || S_ISLNK(file->mode))
 			stats.total_size += file->length;
 
 		flist->files[flist->count++] = file;
