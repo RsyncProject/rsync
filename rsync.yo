@@ -1397,6 +1397,38 @@ dit(bf(--stats)) This tells rsync to print a verbose set of statistics
 on the file transfer, allowing you to tell how effective the rsync
 algorithm is for your data.
 
+The current statistics are as follows: itemize(
+  it() bf(Number of files) is the count of all "files" (in the generic
+  sense), which includes directories, symlinks, etc.
+  it() bf(Number of files transferred) is the count of normal files that
+  were updated via the rsync algorithm, which does not include created
+  dirs, symlinks, etc.
+  it() bf(Total file size) is the total sum of all file sizes in the transfer.
+  This does not count any size for directories or special files, but does
+  include the size of symlinks.
+  it() bf(Total transferred file size) is the total sum of all files sizes
+  for just the transferred files.
+  it() bf(Literal data) is how much unmatched file-update data we had to
+  send to the receiver for it to recreate the updated files.
+  it() bf(Matched data) is how much data the receiver got locally when
+  recreating the updated files.
+  it() bf(File list size) is how big the file-list data was when the sender
+  sent it to the receiver.  This is smaller than the in-memory size for the
+  file list due to some compressing of duplicated data when rsync sends the
+  list.
+  it() bf(File list generation time) is the number of seconds that the
+  sender spent creating the file list.  This requires a modern rsync on the
+  sending side for this to be present.
+  it() bf(File list transfer time) is the number of seconds that the sender
+  spent sending the file list to the receiver.
+  it() bf(Total bytes sent) is the count of all the bytes that rsync sent
+  from the client side to the server side.
+  it() bf(Total bytes received) is the count of all non-message bytes that
+  rsync received by the client side from the server side.  "Non-message"
+  bytes means that we don't count the bytes for a verbose message that the
+  server sent to us, which makes the stats more consistent.
+)
+
 dit(bf(-8, --8-bit-output)) This tells rsync to leave all high-bit characters
 unescaped in the output instead of trying to test them to see if they're
 valid in the current locale and escaping the invalid ones.  All control
