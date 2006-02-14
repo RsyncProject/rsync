@@ -516,12 +516,12 @@ example, if you used this command:
 
 quote(tt(   rsync -av /foo/bar/baz.c remote:/tmp/))
 
-... this would create a file called baz.c in /tmp/ on the remote
+... this would create a file named baz.c in /tmp/ on the remote
 machine. If instead you used
 
 quote(tt(   rsync -avR /foo/bar/baz.c remote:/tmp/))
 
-then a file called /tmp/foo/bar/baz.c would be created on the remote
+then a file named /tmp/foo/bar/baz.c would be created on the remote
 machine -- the full path name is preserved.  To limit the amount of
 path information that is sent, you have a couple options:  (1) With
 a modern rsync on the sending side (beginning with 2.6.7), you can
@@ -1559,7 +1559,7 @@ the necessary destination directories to hold the .pdf files, and ensures
 that any superfluous files and directories in the destination are removed
 (note the hide filter of non-directories being used instead of an exclude):
 
-quote(     rsync -avm --del --include='*.pdf' -f 'hide! */' src/ dest)
+quote(     rsync -avm --del --include='*.pdf' -f 'hide,! */' src/ dest)
 
 If you didn't want to remove superfluous destination files, the more
 time-honored options of "--include='*/' --exclude='*'" would work fine
@@ -1805,7 +1805,7 @@ itemize(
   particular spot in the hierarchy of files, otherwise it is matched
   against the end of the pathname.  This is similar to a leading ^ in
   regular expressions.
-  Thus "/foo" would match a file called "foo" at either the "root of the
+  Thus "/foo" would match a file named "foo" at either the "root of the
   transfer" (for a global rule) or in the merge-file's directory (for a
   per-directory rule).
   An unqualified "foo" would match any file or directory named "foo"
@@ -1864,7 +1864,8 @@ This fails because the parent directory "some" is excluded by the '*'
 rule, so rsync never visits any of the files in the "some" or "some/path"
 directories.  One solution is to ask for all directories in the hierarchy
 to be included by using a single rule: "+ */" (put it somewhere before the
-"- *" rule).  Another solution is to add specific include rules for all
+"- *" rule), and perhaps use the bf(--prune-empty-dirs) option.  Another
+solution is to add specific include rules for all
 the parent dirs that need to be visited.  For instance, this set of rules
 works fine:
 
@@ -1880,14 +1881,16 @@ Here are some examples of exclude/include matching:
 
 itemize(
   it() "- *.o" would exclude all filenames matching *.o
-  it() "- /foo" would exclude a file called foo in the transfer-root directory
-  it() "- foo/" would exclude any directory called foo
-  it() "- /foo/*/bar" would exclude any file called bar two
-  levels below a directory called foo in the transfer-root directory
-  it() "- /foo/**/bar" would exclude any file called bar two
-  or more levels below a directory called foo in the transfer-root directory
+  it() "- /foo" would exclude a file (or directory) named foo in the
+  transfer-root directory
+  it() "- foo/" would exclude any directory named foo
+  it() "- /foo/*/bar" would exclude any file named bar which is at two
+  levels below a directory named foo in the transfer-root directory
+  it() "- /foo/**/bar" would exclude any file named bar two
+  or more levels below a directory named foo in the transfer-root directory
   it() The combination of "+ */", "+ *.c", and "- *" would include all
-  directories and C source files but nothing else.
+  directories and C source files but nothing else (see also the
+  bf(--prune-empty-dirs) option)
   it() The combination of "+ foo/", "+ foo/bar.c", and "- *" would include
   only the foo directory and foo/bar.c (the foo directory must be
   explicitly included or it would be excluded by the "*")
