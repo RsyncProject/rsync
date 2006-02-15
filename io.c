@@ -105,6 +105,8 @@ static char io_filesfrom_lastchar;
 static int io_filesfrom_buflen;
 static size_t contiguous_write_len = 0;
 static int select_timeout = SELECT_TIMEOUT;
+static int active_filecnt = 0;
+static OFF_T active_bytecnt = 0;
 
 static void read_loop(int fd, char *buf, size_t len);
 
@@ -279,6 +281,8 @@ static void read_msg_fd(void)
 			exit_cleanup(RERR_STREAMIO);
 		}
 		read_loop(fd, buf, 4);
+		if (remove_sent_files)
+			decrement_active_files(IVAL(buf,0));
 		flist_ndx_push(&redo_list, IVAL(buf,0));
 		break;
 	case MSG_DELETED:
@@ -295,8 +299,10 @@ static void read_msg_fd(void)
 			exit_cleanup(RERR_STREAMIO);
 		}
 		read_loop(fd, buf, len);
-		if (remove_sent_files)
+		if (remove_sent_files) {
+			decrement_active_files(IVAL(buf,0));
 			io_multiplex_write(MSG_SUCCESS, buf, len);
+		}
 		if (preserve_hard_links)
 			flist_ndx_push(&hlink_list, IVAL(buf,0));
 		break;
@@ -325,6 +331,29 @@ static void read_msg_fd(void)
 	}
 
 	msg_fd_in = fd;
+}
+
+/* This is used by the generator to limit how many file transfers can
+ * be active at once when --remove-sent-files is specified.  Without
+ * this, sender-side deletions were mostly happening at the end. */
+void increment_active_files(int ndx, int itemizing, enum logcode code)
+{
+	/* TODO: tune these limits? */
+	while (active_filecnt >= 10
+	 && (active_bytecnt >= 128*1024 || active_filecnt >= 50)) {
+		if (hlink_list.head)
+			check_for_finished_hlinks(itemizing, code);
+		read_msg_fd();
+	}
+
+	active_filecnt++;
+	active_bytecnt += the_file_list->files[ndx]->length;
+}
+
+void decrement_active_files(int ndx)
+{
+	active_filecnt--;
+	active_bytecnt -= the_file_list->files[ndx]->length;
 }
 
 /* Try to push messages off the list onto the wire.  If we leave with more
