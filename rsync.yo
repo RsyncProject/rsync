@@ -470,11 +470,19 @@ transferring to or from an MS Windows FAT filesystem (which represents
 times with a 2-second resolution), bf(--modify-window=1) is useful
 (allowing times to differ by up to 1 second).
 
-dit(bf(-c, --checksum)) This forces the sender to checksum all files using
-a 128-bit MD4 checksum before transfer. The checksum is then
-explicitly checked on the receiver and any files of the same name
-which already exist and have the same checksum and size on the
-receiver are not transferred.  This option can be quite slow.
+dit(bf(-c, --checksum)) This forces the sender to checksum every file using
+a 128-bit MD4 checksum before the transfer (during the initial file-system
+scan). The receiver then checksums every existing file that has the same
+size as its sender-side counterpart in order to decide which files need to
+be transferred: files with either a changed size or changed checksum are
+selected for transfer.  Since this whole-file checksumming of all files on
+both sides of the connection occurs in addition to the automatic checksum
+verifications that occur during and after a file's transfer, this option
+can be quite slow.
+
+Note that rsync always uses a whole-file checksum to verify that each
+transferred file was reconstructed correctly, irrespective of this or
+any other option's setting.
 
 dit(bf(-a, --archive)) This is equivalent to bf(-rlptgoD). It is a quick
 way of saying you want recursion and want to preserve almost
