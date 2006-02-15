@@ -211,6 +211,10 @@ Changes since 2.6.6:
 
     - The --dry-run option no longer forces the enabling of --verbose.
 
+    - The --remove-sent-files option now does a better job of incrementally
+      removing the sent files on the sending side (older versions tended to
+      clump up all the removals at the end).
+
     - Various documentation improvements, including: a better synopsis, some
       improved examples, a better discussion of the presence and absence of
       --perms (including how it interacts with the new --executability and
