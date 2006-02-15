@@ -339,8 +339,7 @@ static void read_msg_fd(void)
 void increment_active_files(int ndx, int itemizing, enum logcode code)
 {
 	/* TODO: tune these limits? */
-	while (active_filecnt >= 10
-	 && (active_bytecnt >= 128*1024 || active_filecnt >= 50)) {
+	while (active_filecnt >= (active_bytecnt >= 128*1024 ? 10 : 50)) {
 		if (hlink_list.head)
 			check_for_finished_hlinks(itemizing, code);
 		read_msg_fd();
