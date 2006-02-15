@@ -480,9 +480,9 @@ both sides of the connection occurs in addition to the automatic checksum
 verifications that occur during and after a file's transfer, this option
 can be quite slow.
 
-Note that rsync always uses a whole-file checksum to verify that each
-transferred file was reconstructed correctly, irrespective of this or
-any other option's setting.
+Note that rsync always verifies that each em(transferred) file was
+correctly reconstructed on the receiving side using a whole-file checksum,
+but that checking has nothing to do with this option.
 
 dit(bf(-a, --archive)) This is equivalent to bf(-rlptgoD). It is a quick
 way of saying you want recursion and want to preserve almost
