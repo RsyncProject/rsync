@@ -1231,6 +1231,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		rprintf(FINFO, "generating and sending sums for %d\n", ndx);
 
   notify_others:
+	if (remove_sent_files && !phase)
+	    increment_active_files(ndx, itemizing, code);
 	write_int(f_out, ndx);
 	if (itemizing) {
 		int iflags = ITEM_TRANSFER;
