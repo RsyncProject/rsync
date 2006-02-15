@@ -482,7 +482,8 @@ can be quite slow.
 
 Note that rsync always verifies that each em(transferred) file was
 correctly reconstructed on the receiving side using a whole-file checksum,
-but that checking has nothing to do with this option.
+but that after-transfer check has nothing to do with this option's
+before-transfer "Does the file need to be updated?" check.
 
 dit(bf(-a, --archive)) This is equivalent to bf(-rlptgoD). It is a quick
 way of saying you want recursion and want to preserve almost
