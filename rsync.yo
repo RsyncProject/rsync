@@ -470,20 +470,21 @@ transferring to or from an MS Windows FAT filesystem (which represents
 times with a 2-second resolution), bf(--modify-window=1) is useful
 (allowing times to differ by up to 1 second).
 
-dit(bf(-c, --checksum)) This forces the sender to checksum every file using
-a 128-bit MD4 checksum before the transfer (during the initial file-system
-scan). The receiver then checksums every existing file that has the same
-size as its sender-side counterpart in order to decide which files need to
-be transferred: files with either a changed size or changed checksum are
+dit(bf(-c, --checksum)) This forces the sender to checksum em(every)
+regular file using a 128-bit MD4 checksum.  It does this during the initial
+file-system scan as it builds the list of all available files. The receiver
+then checksums its version of each file (if it exists and it has the same
+size as its sender-side counterpart) in order to decide which files need to
+be updated: files with either a changed size or a changed checksum are
 selected for transfer.  Since this whole-file checksumming of all files on
 both sides of the connection occurs in addition to the automatic checksum
-verifications that occur during and after a file's transfer, this option
-can be quite slow.
+verifications that occur during a file's transfer, this option can be quite
+slow.
 
-Note that rsync always verifies that each em(transferred) file was
-correctly reconstructed on the receiving side using a whole-file checksum,
-but that after-transfer check has nothing to do with this option's
-before-transfer "Does the file need to be updated?" check.
+Note that rsync always verifies that each em(transferred) file was correctly
+reconstructed on the receiving side by checking its whole-file checksum, but
+that automatic after-the-transfer verification has nothing to do with this
+option's before-the-transfer "Does this file need to be updated?" check.
 
 dit(bf(-a, --archive)) This is equivalent to bf(-rlptgoD). It is a quick
 way of saying you want recursion and want to preserve almost
