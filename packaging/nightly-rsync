@@ -1,0 +1,113 @@
+#!/usr/bin/perl
+use strict;
+
+# This script expects the directory ~/samba-rsync-ftp to exist and to be a
+# copy of the /home/ftp/pub/rsync dir on samba.org.  It also requires a
+# pristine CVS checkout of rsync (don't use your normal rsync build dir
+# unless you're 100% sure that there are not unchecked-in changes).
+#
+# If this is run with -ctu, it will make an updated "nightly" tar file in
+# the nightly dir.  It will also remove any old tar files, regenerate the
+# HTML man pages in the nightly dir, and then rsync the changes to the
+# samba.org server.
+
+use Getopt::Long;
+use Date::Format;
+
+# Choose any dir where a pristine rsync has been checked out of CVS.
+our $unpacked = $ENV{HOME} . '/release/nightly';
+# Where the local copy of /home/ftp/pub/rsync/nightly should be updated.
+our $nightly = $ENV{HOME} . '/samba-rsync-ftp/nightly';
+
+our($cvs_update, $make_tar, $upload, $help_opt);
+&Getopt::Long::Configure('bundling');
+&usage if !&GetOptions(
+    'cvs-update|c' => \$cvs_update,
+    'make-tar|t' => \$make_tar,
+    'upload|u' => \$upload,
+    'help|h' => \$help_opt,
+) || $help_opt;
+
+our $name = time2str('rsync-HEAD-%Y%m%d-%H%M%Z', time, 'GMT');
+our $ztoday = time2str('%d %b %Y', time);
+our $today = $ztoday;
+
+chdir($unpacked) or die $!;
+
+if ($cvs_update) {
+    print "Updating from cvs...\n";
+    system 'cvs -q up' and die $!;
+}
+
+if ($make_tar) {
+    print "Generating list of active CVS files...\n";
+    my($dir, @files);
+    open(CVS, '-|', 'cvs status 2>&1') or die $!;
+    while (<CVS>) {
+	if (/^cvs status: Examining (.*)/) {
+	    if ($1 eq '.') {
+		$dir = '';
+	    } else {
+		push(@files, $1);
+		$dir = $1 . '/';
+	    }
+	} elsif (/^File: (.*?)\s+Status: / && $1 ne '.cvsignore') {
+	    push(@files, $dir . $1);
+	}
+    }
+    close CVS;
+
+    print "Creating $unpacked/$name.tar.gz\n";
+    chdir('..') or die $!;
+    rename($unpacked, $name) or die $!;
+    open(TAR, '|-', "fakeroot tar --files-from=- --mode=g-w -czf $nightly/$name.tar.gz $name") or die $!;
+    foreach (@files) {
+	print TAR "$name/$_\n";
+    }
+    close TAR;
+    rename($name, $unpacked) or die $!;
+}
+
+chdir($nightly) or die $!;
+
+foreach my $fn (qw( rsync.yo rsyncd.conf.yo )) {
+    my $html_fn = $fn;
+    $html_fn =~ s/\.yo/.html/;
+
+    open(IN, '<', "$unpacked/$fn") or die $!;
+    undef $/; $_ = <IN>; $/ = "\n";
+    close IN;
+
+    s/^(manpage\([^)]+\)\(\d+\)\()[^)]+(\).*)/$1$today$2/m;
+    #s/^(This man ?page is current for version) \S+ (of rsync)/$1 $version $2/m;
+
+    open(OUT, '>', $fn) or die $!;
+    print OUT $_;
+    close OUT;
+
+    system "yodl2html -o $html_fn $fn";
+
+    unlink($fn);
+}
+
+system "find . -name 'rsync-HEAD-*' -daystart -mtime +14 | xargs rm -f";
+system 'ls -ltr';
+
+if ($upload) {
+    $ENV{RSYNC_PARTIAL_DIR} = ''; # The rsync on samba.org is OLD.
+    system "rsync -aviHP --delete -f 'H rsync/' . samba.org:/home/ftp/pub/rsync/nightly";
+}
+
+exit;
+
+sub usage
+{
+    die <<EOT;
+Usage: nightly-rsync [OPTIONS]
+
+ -c, --cvs-update  update $unpacked via CVS.
+ -t, --make-tar    create a new tar file in $nightly
+ -u, --upload      upload the revised nightly dir to samba.org
+ -h, --help        display this help
+EOT
+}
