@@ -1,0 +1,244 @@
+#!/usr/bin/perl
+use strict;
+
+# This script expects the directory ~/samba-rsync-ftp to exist and to
+# be a copy of the /home/ftp/pub/rsync dir on samba.org.  If it is run
+# in test mode, it instead expects a dir named ~/tmp/samba-rsync-ftp
+# (e.g. copy ~/samba-rsync-ftp into ~/tmp and you can do a trial-run of
+# a release without affecting the files in the ~/samba-rsync-ftp dir).
+#
+# Run this as "release-rsync live" to affect ~/samba-rsync-ftp instead
+# of ~/tmp/samba-rsync-ftp.
+
+use Date::Format;
+
+my $dest = $ENV{HOME} . '/samba-rsync-ftp';
+my $releasedir = $ENV{HOME} . '/release';
+my $cvsroot = $ENV{CVSROOT} = 'samba.org:/data/cvs';
+
+my $ztoday = time2str('%d %b %Y', time);
+my $today = $ztoday;
+$today =~ s/^0//;
+
+my $dots = <<EOT;
+.........................................................................
+EOT
+my $note = <<EOT;
+
+**
+** Note: type "-a u,n" if you want to auto-accept the U,N suggestions. **
+**
+EOT
+
+my $live = shift;
+
+if ($live) {
+    print "This will release a new version of rsync onto an unsuspecting world.\n";
+} else {
+    print "**** TESTMODE **** (add \"live\" arg to avoid this)\n";
+    $dest =~ s#([^/]+$)#tmp/$1#;
+}
+die "$dest does not exist\n" unless -d $dest;
+
+print "\nPlease enter the version number of this release: ";
+my $version = <STDIN>;
+chomp $version;
+$version =~ s/[-.]*pre[-.]*/pre/;
+
+my $cvstag = "release-$version";
+$cvstag =~ s/[.]/-/g;
+$cvstag =~ s/pre/-pre/;
+
+print "Enter the previous version to produce a patch against: ";
+my $lastversion = <STDIN>;
+chomp $lastversion;
+$lastversion =~ s/[-.]*pre[-.]*/pre/;
+
+print "Please enter the RPM release number of this release (default 1): ";
+my $release = <STDIN>;
+chomp $release;
+$release = 1 if $release eq '';
+
+my $diffdir;
+if ($lastversion =~ /pre/) {
+    if ($version !~ /pre/) {
+	die "You should not diff a release version against a pre-release version.\n";
+    }
+    $diffdir = "$dest/old-previews";
+} elsif ($version =~ /pre/) {
+    $diffdir = $dest;
+} else {
+    $diffdir = "$dest/old-versions";
+}
+
+my $tarfile = "$dest/rsync-$version.tar.gz";
+
+print <<EOT;
+
+\$version is "$version"
+\$lastversion is "$lastversion"
+\$cvstag is "$cvstag"
+\$dest is "$dest"
+\$releasedir is "$releasedir"
+\$diffdir is "$diffdir"
+\$release is "$release"
+
+About to:
+    - create and/or clean the \$releasedir
+    - checkout rsync into \$releasedir
+    - tweak NEWS and OLDNEWS to update the release date
+    - tweak the version in configure.in, configure, and the spec files
+    - tweak the date in the *.yo files and re-generate the man pages
+    - make sure that the patches dir has been updated
+    - page through the "cvs diff" output
+
+EOT
+print "<Press Enter to continue> ";
+$_ = <STDIN>;
+
+mkdir($releasedir, 0755) or die $! unless -d $releasedir;
+chdir($releasedir) or die $!;
+
+system "rm -rf rsync rsync-$version rsync-$lastversion";
+
+system "cvs checkout -P rsync";
+
+chdir('rsync') or die $!;
+
+print $dots;
+
+system "./prepare-source && touch proto.h";
+
+my @tweak_files = ( glob('packaging/*.spec'), glob('packaging/*/*.spec'),
+		    glob('*.yo'), qw( configure.in configure ) );
+if ($version !~ /pre/) {
+    push(@tweak_files, qw( NEWS OLDNEWS ));
+}
+foreach my $fn (@tweak_files) {
+    open(IN, '<', $fn) or die $!;
+    undef $/; $_ = <IN>; $/ = "\n";
+    close IN;
+    if ($fn =~ /configure/) {
+	s/^RSYNC_VERSION.*/RSYNC_VERSION=$version/m;
+    } elsif ($fn =~ /\.spec/) {
+	s/^(Version:) .*/$1 $version/m;
+	s/^(Release:) .*/$1 $release/m;
+    } elsif ($fn =~ /\.yo/) {
+	s/^(manpage\([^)]+\)\(\d+\)\()[^)]+(\).*)/$1$today$2/m;
+	s/^(This man ?page is current for version) \S+ (of rsync)/$1 $version $2/m;
+    } else {
+	s/^(NEWS for rsync \Q$version\E) \(UNRELEASED\)\s*$/$1 ($today)\n/m;
+	s/^\t\S\S\s\S\S\S\s\d\d\d\d(\t\Q$version\E)/\t$ztoday$1/m;
+    }
+    open(OUT, '>', $fn) or die $!;
+    print OUT $_;
+    close OUT;
+}
+
+system "yodl2man -o rsync.1 rsync.yo";
+system "yodl2man -o rsyncd.conf.5 rsyncd.conf.yo";
+#system "perl -pi -e \"s/\\\\\\'/\\\\&'/g\" rsync.1 rsyncd.conf.5";
+
+mkdir('patches/tmp') or die $!;
+system "rsync -a --exclude=patches/ --exclude-from=.cvsignore . patches/tmp/cvsdir/";
+
+print $dots, $note;
+
+system "patches/verify-patches -un -an";
+
+system "cvs -q diff | egrep -v '^(===============|RCS file: |retrieving revision |Index: )' | less -p '^diff .*'";
+
+if ($live) {
+    print <<EOT;
+
+About to:
+    - "cvs commit" all changes
+    - "cvs tag" this release as $cvstag
+
+EOT
+    print "<Press Enter to continue> ";
+    $_ = <STDIN>;
+
+    system "cvs commit -m 'Preparing for release of $version'";
+    system "cvs tag -F $cvstag .";
+} else {
+    print "\n**** Skipping cvs commit and tagging in TESTMODE ****\n";
+}
+
+print <<EOT;
+
+About to do the following in the samba-rsync-ftp dir:
+    - change the diffs in the patches dir to include generated files
+    - create release tar "$tarfile"
+    - create release diffs
+    - update README, *NEWS, TODO, and cvs.log
+    - update rsync*.html man pages
+
+EOT
+print "<Press Enter to continue> ";
+$_ = <STDIN>;
+
+print $note;
+
+system "patches/verify-patches -pun -an";
+
+chdir($releasedir) or die $!;
+
+print $dots;
+
+mkdir("rsync-$version", 0755) or die $!;
+system "rsync -aC --exclude=.cvsignore rsync/ rsync-$version";
+
+# When creating a pre-release after a normal release, there's nothing to move.
+if ($diffdir ne $dest) {
+    chdir($dest) or die $!;
+
+    # We need to run this regardless of $lastversion's "pre"ness. */
+    foreach my $fn (glob('rsync*pre*.tar.gz*'), glob('rsync*pre*-NEWS')) {
+	rename($fn, "old-previews/$fn");
+    }
+    system "rm -f rsync*pre*.diffs.gz*";
+
+    if ($version !~ /pre/) {
+	foreach my $fn (glob('rsync*.tar.gz*'), glob('rsync*-NEWS')) {
+	    rename($fn, "old-versions/$fn");
+	}
+
+	foreach my $fn (glob('rsync*.diffs.gz*')) {
+	    rename($fn, "old-patches/$fn");
+	}
+    }
+
+    chdir($releasedir) or die $!;
+}
+system "fakeroot tar czf $tarfile rsync-$version";
+
+system "tar xzf $diffdir/rsync-$lastversion.tar.gz";
+## TWEAK THE VERSIONS AS DESIRED HERE ##
+#mkdir("rsync-$lastversion/support", 0755) or die $!;
+#rename("rsync-$lastversion/rsyncstats", "rsync-$lastversion/support/rsyncstats");
+## END ##
+system "diff -urN --exclude=patches rsync-$lastversion rsync-$version"
+     . "| gzip -9 >$dest/rsync-$lastversion-$version.diffs.gz";
+
+system "rsync -a rsync/{README,NEWS,OLDNEWS,TODO} $dest";
+unlink("$dest/rsync-$version-NEWS");
+link("$dest/NEWS", "$dest/rsync-$version-NEWS");
+system "rsync -a $cvsroot/CVSROOT/rsync.updates $dest/cvs.log";
+
+system "yodl2html -o $dest/rsync.html rsync/rsync.yo";
+system "yodl2html -o $dest/rsyncd.conf.html rsync/rsyncd.conf.yo";
+
+system "rm -rf rsync rsync-$version rsync-$lastversion";
+
+if ($live) {
+    chdir($dest) or die $!;
+    system "gpg -ba rsync-$version.tar.gz";
+    system "gpg -ba rsync-$lastversion-$version.diffs.gz";
+}
+
+print <<EOT;
+
+All done.  Remember to announce the release on *BOTH*
+rsync-announce\@lists.samba.org and rsync\@lists.samba.org!
+EOT
