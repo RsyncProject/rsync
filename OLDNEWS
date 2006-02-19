@@ -359,9 +359,11 @@ Changes since 2.6.3:
       (since the forked process already has a copy of the exclude list,
       there's no need to send them a set of duplicates).
 
-    - When --progress is specified, the output of items that the generator
-      is creating (e.g. dirs, symlinks) is now integrated into the progress
-      output without overlapping it.  (Requires protocol 29.)
+    - The output of the items that are being updated by the generator (dirs,
+      symlinks, devices) is now intermingled in the proper order with the
+      output from the items that the receiver is updating (regular files)
+      when pulling.  This misordering was particularly bad when --progress
+      was specified.  (Requires protocol 29.)
 
     - When --timeout is specified, lulls that occur in the transfer while
       the generator is doing work that does not generate socket traffic
