@@ -60,7 +60,7 @@ if ($make_tar) {
     print "Creating $unpacked/$name.tar.gz\n";
     chdir('..') or die $!;
     rename($unpacked, $name) or die $!;
-    open(TAR, '|-', "fakeroot tar --files-from=- --mode=g-w -czf $nightly/$name.tar.gz $name") or die $!;
+    open(TAR, '|-', "fakeroot tar --files-from=- --no-recursion --mode=g-w -czf $nightly/$name.tar.gz $name") or die $!;
     foreach (@files) {
 	print TAR "$name/$_\n";
     }
