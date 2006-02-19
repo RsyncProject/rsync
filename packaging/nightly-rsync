@@ -95,7 +95,7 @@ system 'ls -ltr';
 
 if ($upload) {
     $ENV{RSYNC_PARTIAL_DIR} = ''; # The rsync on samba.org is OLD.
-    system "rsync -aviHP --delete -f 'H rsync/' . samba.org:/home/ftp/pub/rsync/nightly";
+    system "rsync -aviHP --delete . samba.org:/home/ftp/pub/rsync/nightly";
 }
 
 exit;
