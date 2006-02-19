@@ -266,10 +266,9 @@ See the "exclude" option above.
 dit(bf(incoming chmod)) This option allows you to specify a set of
 comma-separated chmod strings that will affect the permissions of all
 incoming files (files that are being received by the daemon).  These
-changes happen after any user-requested changes the client requested via
-bf(--chmod).  Note, however, the if the client didn't specify bf(--perms),
-the daemon's umask setting will still mask the value before it is used, so
-be sure it is set appropriately if this is a concern.
+changes happen after all other permission calculations, and this will
+even override destination-default and/or existing permissions when the
+client does not specify bf(--perms).
 See the description of the bf(--chmod) rsync option and the bf(chmod)(1)
 manpage for information on the format of this string.
 
