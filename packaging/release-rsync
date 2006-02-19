@@ -148,14 +148,14 @@ system "patches/verify-patches -un -an";
 
 system "cvs -q diff | egrep -v '^(===============|RCS file: |retrieving revision |Index: )' | less -p '^diff .*'";
 
-if ($live) {
-    print <<EOT;
+print <<EOT;
 
 About to:
     - "cvs commit" all changes
     - "cvs tag" this release as $cvstag
 
 EOT
+if ($live) {
     print "<Press Enter to continue> ";
     $_ = <STDIN>;
 
