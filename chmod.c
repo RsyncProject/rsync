@@ -21,9 +21,10 @@ struct chmod_mode_struct {
 #define STATE_2ND_HALF 2
 
 /* Parse a chmod-style argument, and break it down into one or more AND/OR
- * pairs in a linked list.  We use a state machine to walk through the
- * options. */
-int parse_chmod(const char *modestr, struct chmod_mode_struct **root_mode_ptr)
+ * pairs in a linked list.  We return a pointer to new items on succcess
+ * (appending the items to the specified list), or NULL on error. */
+struct chmod_mode_struct *parse_chmod(const char *modestr,
+				      struct chmod_mode_struct **root_mode_ptr)
 {
 	int state = STATE_1ST_HALF;
 	int where = 0, what = 0, op = 0, topbits = 0, topoct = 0, flags = 0;
@@ -153,7 +154,7 @@ int parse_chmod(const char *modestr, struct chmod_mode_struct **root_mode_ptr)
 
 	if (state == STATE_ERROR) {
 		free_chmod_mode(first_mode);
-		return 0;
+		return NULL;
 	}
 
 	if (!(curr_mode = *root_mode_ptr))
@@ -164,7 +165,7 @@ int parse_chmod(const char *modestr, struct chmod_mode_struct **root_mode_ptr)
 		curr_mode->next = first_mode;
 	}
 
-	return 1;
+	return first_mode;
 }
 
 
