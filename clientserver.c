@@ -63,6 +63,10 @@ struct chmod_mode_struct *daemon_chmod_modes;
 /* Length of lp_path() string when in daemon mode & not chrooted, else 0. */
 unsigned int module_dirlen = 0;
 
+#ifdef HAVE_SIGACTION
+static struct sigaction sigact;
+#endif
+
 /**
  * Run a client connected to an rsyncd.  The alternative to this
  * function for remote-shell connections is do_cmd().
@@ -795,6 +799,11 @@ int start_daemon(int f_in, int f_out)
 		io_printf(f_out, "@ERROR: Unknown module '%s'\n", line);
 		return -1;
 	}
+
+#ifdef HAVE_SIGACTION
+	sigact.sa_flags = SA_NOCLDSTOP;
+#endif
+	SIGACTION(SIGCHLD, remember_children);
 
 	return rsync_module(f_in, f_out, i);
 }
