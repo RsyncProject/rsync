@@ -1011,7 +1011,7 @@ static void sleep_for_bwlimit(int bytes_written)
 
 #define ONE_SEC	1000000L /* # of microseconds in a second */
 
-	if (!bwlimit)
+	if (!bwlimit_writemax)
 		return;
 
 	total_written += bytes_written; 
@@ -1091,7 +1091,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 			continue;
 
 		n = len - total;
-		if (bwlimit && n > bwlimit_writemax)
+		if (bwlimit_writemax && n > bwlimit_writemax)
 			n = bwlimit_writemax;
 		cnt = write(fd, buf + total, n);
 
