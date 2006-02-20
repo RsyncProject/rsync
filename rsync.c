@@ -50,6 +50,7 @@ extern int inplace;
 extern int keep_dirlinks;
 extern int make_backups;
 extern struct stats stats;
+extern struct chmod_mode_struct *daemon_chmod_modes;
 
 #if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
 iconv_t ic_chck = (iconv_t)-1;
@@ -116,6 +117,8 @@ mode_t dest_mode(mode_t flist_mode, mode_t cur_mode, int exists)
 		}
 	} else
 		cur_mode = flist_mode & ACCESSPERMS & ~orig_umask;
+	if (daemon_chmod_modes && !S_ISLNK(flist_mode))
+		cur_mode = tweak_mode(cur_mode, daemon_chmod_modes);
 	return (flist_mode & ~CHMOD_BITS) | (cur_mode & CHMOD_BITS);
 }
 
