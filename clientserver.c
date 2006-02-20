@@ -58,6 +58,7 @@ int read_only = 0;
 int daemon_log_format_has_i = 0;
 int daemon_log_format_has_o_or_i = 0;
 int module_id = -1;
+struct chmod_mode_struct *daemon_chmod_modes;
 
 /* Length of lp_path() string when in daemon mode & not chrooted, else 0. */
 unsigned int module_dirlen = 0;
@@ -685,12 +686,11 @@ static int rsync_module(int f_in, int f_out, int i)
 	if (lp_timeout(i) && lp_timeout(i) > io_timeout)
 		set_io_timeout(lp_timeout(i));
 
-
 	if (am_sender)
 		p = lp_outgoing_chmod(i);
 	else
 		p = lp_incoming_chmod(i);
-	if (*p && !parse_chmod(p, &chmod_modes)) {
+	if (*p && !(daemon_chmod_modes = parse_chmod(p, &chmod_modes))) {
 		rprintf(FLOG, "Invalid \"%sing chmod\" directive: %s\n",
 			am_sender ? "outgo" : "incom", p);
 	}
