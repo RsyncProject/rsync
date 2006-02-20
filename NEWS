@@ -215,6 +215,14 @@ Changes since 2.6.6:
       removing the sent files on the sending side (older versions tended to
       clump up all the removals at the end).
 
+    - A daemon now supersedes its minimal SIGCHLD handler with the standard
+      PID-remembering version after forking to handle the request.  This
+      ensures that the generator can get the child-exit status from the
+      receiver.
+
+    - Use of the --bwlimit option no longer interferes with the remote rsync
+      sending error messages about invalid/refused options.
+
     - Various documentation improvements, including: a better synopsis, some
       improved examples, a better discussion of the presence and absence of
       --perms (including how it interacts with the new --executability and
