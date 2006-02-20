@@ -40,24 +40,54 @@ if ($live) {
 }
 die "$dest does not exist\n" unless -d $dest;
 
-print "\nPlease enter the version number of this release: ";
-my $version = <STDIN>;
-chomp $version;
+print "Checking out the latest rsync into $releasedir...\n";
+
+mkdir($releasedir, 0755) or die $! unless -d $releasedir;
+chdir($releasedir) or die $!;
+
+system "rm -rf rsync rsync-*";
+
+system "cvs checkout -P rsync";
+
+chdir('rsync') or die $!;
+
+my($version, $lastversion);
+open(IN, 'configure.in') or die $!;
+while (<IN>) {
+    if (/^RSYNC_VERSION=(.*)/) {
+	$version = $lastversion = $1;
+	last;
+    }
+}
+close IN;
+
+$lastversion =~ s/(\d+)cvs$/ $1 - 1 /e;
+$version =~ s/cvs/pre1/ || $version =~ s/pre(\d+)/ 'pre' . ($1 + 1) /e;
+
+print "\nPlease enter the version number of this release: [$version] ";
+chomp($_ = <STDIN>);
+if ($_ eq '.') {
+    $version =~ s/pre\d+//;
+} elsif ($_ ne '') {
+    $version = $_;
+}
 $version =~ s/[-.]*pre[-.]*/pre/;
+
+$lastversion =~ s/(\d+)pre\d+$/ $1 - 1 /e unless $version =~ /pre/;
 
 my $cvstag = "release-$version";
 $cvstag =~ s/[.]/-/g;
 $cvstag =~ s/pre/-pre/;
 
-print "Enter the previous version to produce a patch against: ";
-my $lastversion = <STDIN>;
-chomp $lastversion;
+print "Enter the previous version to produce a patch against: [$lastversion] ";
+chomp($_ = <STDIN>);
+$lastversion = $_ if $_ ne '';
 $lastversion =~ s/[-.]*pre[-.]*/pre/;
 
-print "Please enter the RPM release number of this release (default 1): ";
-my $release = <STDIN>;
-chomp $release;
-$release = 1 if $release eq '';
+my $release = 1;
+print "Please enter the RPM release number of this release: [$release] ";
+chomp($_ = <STDIN>);
+$release = $_ if $_ ne '';
 
 my $diffdir;
 if ($lastversion =~ /pre/) {
@@ -84,8 +114,6 @@ print <<EOT;
 \$release is "$release"
 
 About to:
-    - create and/or clean the \$releasedir
-    - checkout rsync into \$releasedir
     - tweak NEWS and OLDNEWS to update the release date
     - tweak the version in configure.in, configure, and the spec files
     - tweak the date in the *.yo files and re-generate the man pages
@@ -95,15 +123,6 @@ About to:
 EOT
 print "<Press Enter to continue> ";
 $_ = <STDIN>;
-
-mkdir($releasedir, 0755) or die $! unless -d $releasedir;
-chdir($releasedir) or die $!;
-
-system "rm -rf rsync rsync-$version rsync-$lastversion";
-
-system "cvs checkout -P rsync";
-
-chdir('rsync') or die $!;
 
 print $dots;
 
@@ -162,13 +181,15 @@ if ($live) {
     system "cvs commit -m 'Preparing for release of $version'";
     system "cvs tag -F $cvstag .";
 } else {
-    print "\n**** Skipping cvs commit and tagging in TESTMODE ****\n";
+    print "**** Skipping cvs commit and tagging in TESTMODE ****\n";
 }
 
 print <<EOT;
 
 About to do the following in the samba-rsync-ftp dir:
     - change the diffs in the patches dir to include generated files
+    - move the old tar/diff files into the appropriate old-* dir
+    - hard-link the new tar/diff files to the old on samba.org
     - create release tar "$tarfile"
     - create release diffs
     - update README, *NEWS, TODO, and cvs.log
@@ -193,20 +214,32 @@ system "rsync -aC --exclude=.cvsignore rsync/ rsync-$version";
 if ($diffdir ne $dest) {
     chdir($dest) or die $!;
 
-    # We need to run this regardless of $lastversion's "pre"ness. */
+    # We need to run this regardless of $lastversion's "pre"ness.
+    my @moved_files;
     foreach my $fn (glob('rsync*pre*.tar.gz*'), glob('rsync*pre*-NEWS')) {
-	rename($fn, "old-previews/$fn");
+	link($fn, "old-previews/$fn") or die $!;
+	push(@moved_files, $fn);
     }
-    system "rm -f rsync*pre*.diffs.gz*";
 
     if ($version !~ /pre/) {
 	foreach my $fn (glob('rsync*.tar.gz*'), glob('rsync*-NEWS')) {
-	    rename($fn, "old-versions/$fn");
+	    link($fn, "old-versions/$fn") or die $!;
+	    push(@moved_files, $fn);
 	}
 
 	foreach my $fn (glob('rsync*.diffs.gz*')) {
-	    rename($fn, "old-patches/$fn");
+	    link($fn, "old-patches/$fn") or die $!;
+	    push(@moved_files, $fn);
 	}
+    }
+
+    # Optimize our future upload (in the absence of --detect-renamed) by
+    # uploading the above hard-linked files that we are about to delete.
+    if ($live) {
+	system "rsync -avHC --include='rsync*.gz*' --include='old-*/' --exclude='*' . samba.org:/home/ftp/pub/rsync";
+    }
+    foreach (@moved_files, glob("rsync*pre*.diffs.gz*")) {
+	unlink($_);
     }
 
     chdir($releasedir) or die $!;
