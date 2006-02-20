@@ -88,14 +88,14 @@ static int64 total_read, total_written;
 static void show_malloc_stats(void);
 
 /* Works like waitpid(), but if we already harvested the child pid in our
- * sigchld_handler(), we succeed instead of returning an error. */
+ * remember_children(), we succeed instead of returning an error. */
 pid_t wait_process(pid_t pid, int *status_ptr, int flags)
 {
 	pid_t waited_pid = waitpid(pid, status_ptr, flags);
 
 	if (waited_pid == -1 && errno == ECHILD) {
 		/* Status of requested child no longer available:  check to
-		 * see if it was processed by sigchld_handler(). */
+		 * see if it was processed by remember_children(). */
 		int cnt;
 		for (cnt = 0; cnt < MAXCHILDPROCS; cnt++) {
 			if (pid == pid_stat_table[cnt].pid) {
@@ -1093,7 +1093,7 @@ static RETSIGTYPE sigusr2_handler(UNUSED(int val))
 	_exit(0);
 }
 
-static RETSIGTYPE sigchld_handler(UNUSED(int val))
+RETSIGTYPE remember_children(UNUSED(int val))
 {
 #ifdef WNOHANG
 	int cnt, status;
@@ -1115,7 +1115,7 @@ static RETSIGTYPE sigchld_handler(UNUSED(int val))
 	}
 #endif
 #ifndef HAVE_SIGACTION
-	signal(SIGCHLD, sigchld_handler);
+	signal(SIGCHLD, remember_children);
 #endif
 }
 
@@ -1186,7 +1186,7 @@ int main(int argc,char *argv[])
 #endif
 	SIGACTMASK(SIGUSR1, sigusr1_handler);
 	SIGACTMASK(SIGUSR2, sigusr2_handler);
-	SIGACTMASK(SIGCHLD, sigchld_handler);
+	SIGACTMASK(SIGCHLD, remember_children);
 #ifdef MAINTAINER_MODE
 	SIGACTMASK(SIGSEGV, rsync_panic_handler);
 	SIGACTMASK(SIGFPE, rsync_panic_handler);
