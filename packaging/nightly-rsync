@@ -51,8 +51,11 @@ if ($make_tar) {
 		push(@files, $1);
 		$dir = $1 . '/';
 	    }
-	} elsif (/^File: (.*?)\s+Status: / && $1 ne '.cvsignore') {
+	} elsif (/^File: (.*?)\s+Status: (.*)/ && $1 ne '.cvsignore') {
 	    push(@files, $dir . $1);
+	    if ($2 ne 'Up-to-date') {
+		print "Not up-to-date: $dir$1\n";
+	    }
 	}
     }
     close CVS;
