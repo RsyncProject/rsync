@@ -31,12 +31,14 @@ my $note = <<EOT;
 EOT
 
 my $live = shift;
+my $skipping = '';
 
 if ($live) {
     print "This will release a new version of rsync onto an unsuspecting world.\n";
 } else {
     print "**** TESTMODE **** (add \"live\" arg to avoid this)\n";
     $dest =~ s#([^/]+$)#tmp/$1#;
+    $skipping = ' ** SKIPPING **';
 }
 die "$dest does not exist\n" unless -d $dest;
 
@@ -170,8 +172,8 @@ system "cvs -q diff | egrep -v '^(===============|RCS file: |retrieving revision
 print <<EOT;
 
 About to:
-    - "cvs commit" all changes
-    - "cvs tag" this release as $cvstag
+    - "cvs commit" all changes$skipping
+    - "cvs tag" this release as $cvstag$skipping
 
 EOT
 if ($live) {
@@ -181,15 +183,15 @@ if ($live) {
     system "cvs commit -m 'Preparing for release of $version'";
     system "cvs tag -F $cvstag .";
 } else {
-    print "**** Skipping cvs commit and tagging in TESTMODE ****\n";
+    print "** Skipping prompt in TESTMODE **\n";
 }
 
 print <<EOT;
 
 About to do the following in the samba-rsync-ftp dir:
     - change the diffs in the patches dir to include generated files
-    - move the old tar/diff files into the appropriate old-* dir
-    - hard-link the new tar/diff files to the old on samba.org
+    - move the old tar/diff files into the appropriate old-* dirs
+    - hard-link the new tar/diff files to the old files on samba.org$skipping
     - create release tar "$tarfile"
     - create release diffs
     - update README, *NEWS, TODO, and cvs.log
@@ -223,11 +225,13 @@ if ($diffdir ne $dest) {
 
     if ($version !~ /pre/) {
 	foreach my $fn (glob('rsync*.tar.gz*'), glob('rsync*-NEWS')) {
+	    next if $fn =~ /^rsync.*pre/;
 	    link($fn, "old-versions/$fn") or die $!;
 	    push(@moved_files, $fn);
 	}
 
 	foreach my $fn (glob('rsync*.diffs.gz*')) {
+	    next if $fn =~ /^rsync.*pre/;
 	    link($fn, "old-patches/$fn") or die $!;
 	    push(@moved_files, $fn);
 	}
@@ -262,7 +266,7 @@ system "rsync -a $cvsroot/CVSROOT/rsync.updates $dest/cvs.log";
 system "yodl2html -o $dest/rsync.html rsync/rsync.yo";
 system "yodl2html -o $dest/rsyncd.conf.html rsync/rsyncd.conf.yo";
 
-system "rm -rf rsync rsync-$version rsync-$lastversion";
+system "rm -rf rsync rsync-*";
 
 if ($live) {
     chdir($dest) or die $!;
