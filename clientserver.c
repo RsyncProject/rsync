@@ -690,6 +690,10 @@ static int rsync_module(int f_in, int f_out, int i)
 	if (lp_timeout(i) && lp_timeout(i) > io_timeout)
 		set_io_timeout(lp_timeout(i));
 
+	/* If we have some incoming/outgoing chmod changes, append them to
+	 * any user-specified changes (making our changes have priority).
+	 * We also get a pointer to just our changes so that a receiver
+	 * process can use them separately if --perms wasn't specified. */
 	if (am_sender)
 		p = lp_outgoing_chmod(i);
 	else
