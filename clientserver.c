@@ -268,7 +268,7 @@ static int read_arg_from_pipe(int fd, char *buf, int limit)
 	return bp - buf;
 }
 
-static int rsync_module(int f_in, int f_out, int i)
+static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 {
 	int argc = 0;
 	int maxargs;
@@ -277,8 +277,6 @@ static int rsync_module(int f_in, int f_out, int i)
 	uid_t uid = (uid_t)-2;  /* canonically "nobody" */
 	gid_t gid = (gid_t)-2;
 	char *p, *err_msg = NULL;
-	char *addr = client_addr(f_in);
-	char *host = client_name(f_in);
 	char *name = lp_name(i);
 	int use_chroot = lp_use_chroot(i);
 	int start_glob = 0;
@@ -731,7 +729,11 @@ int start_daemon(int f_in, int f_out)
 {
 	char line[1024];
 	char *motd;
+	char *addr = client_addr(f_in);
+	char *host = client_name(f_in);
 	int i;
+
+	rprintf(FLOG, "connect from %s (%s)\n", host, addr);
 
 	io_set_sock_fds(f_in, f_out);
 
@@ -781,8 +783,6 @@ int start_daemon(int f_in, int f_out)
 		return -1;
 
 	if (!*line || strcmp(line, "#list") == 0) {
-		char *addr = client_addr(f_in);
-		char *host = client_name(f_in);
 		rprintf(FLOG, "module-list request from %s (%s)\n",
 			host, addr);
 		send_listing(f_out);
@@ -796,8 +796,6 @@ int start_daemon(int f_in, int f_out)
 	}
 
 	if ((i = lp_number(line)) < 0) {
-		char *addr = client_addr(f_in);
-		char *host = client_name(f_in);
 		rprintf(FLOG, "unknown module '%s' tried from %s (%s)\n",
 			line, host, addr);
 		io_printf(f_out, "@ERROR: Unknown module '%s'\n", line);
@@ -809,7 +807,7 @@ int start_daemon(int f_in, int f_out)
 #endif
 	SIGACTION(SIGCHLD, remember_children);
 
-	return rsync_module(f_in, f_out, i);
+	return rsync_module(f_in, f_out, i, addr, host);
 }
 
 int daemon_main(void)
