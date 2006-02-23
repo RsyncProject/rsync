@@ -11,6 +11,8 @@ rsync [OPTION]... SRC [SRC]... [USER@]HOST::DEST
 
 rsync [OPTION]... SRC [SRC]... rsync://[USER@]HOST[:PORT]/DEST
 
+rsync [OPTION]... SRC
+
 rsync [OPTION]... [USER@]HOST:SRC [DEST]
 
 rsync [OPTION]... [USER@]HOST::SRC [DEST]
@@ -57,8 +59,8 @@ host specification, OR when an rsync:// URL is specified (see also the
 "USING RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION" section for
 an exception to this latter rule).
 
-As a special case, if a remote source is specified without a destination,
-the remote files are listed in an output format similar to "ls -l".
+As a special case, if a single source arg is specified without a
+destination, the files are listed in an output format similar to "ls -l".
 
 As expected, if neither the source or destination path specify a remote
 host, the copy occurs locally (see also the bf(--list-only) option).
@@ -1612,12 +1614,12 @@ single line.
 
 dit(bf(--list-only)) This option will cause the source files to be listed
 instead of transferred.  This option is inferred if there is no destination
-specified, so you don't usually need to use it explicitly.  However, it can
-come in handy for a user that wants to avoid the "bf(-r --exclude='/*/*')"
-options that rsync might use as a compatibility kluge when generating a
-non-recursive listing, or to list the files that are involved in a local
-copy (since the destination path is not optional for a local copy, you
-must specify this option explicitly and still include a destination).
+specified, so its main uses are: (1) to turn a copy command that includes a
+destination arg into a file-listing command, (2) to be able to specify more
+than one local source arg (note: be sure to include the destination), or
+(3) to avoid the automatically added "bf(-r --exclude='/*/*')" options that
+rsync usually uses as a compatibility kluge when generating a non-recursive
+listing.
 
 dit(bf(--bwlimit=KBPS)) This option allows you to specify a maximum
 transfer rate in kilobytes per second. This option is most effective when
