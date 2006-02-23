@@ -86,6 +86,10 @@ Changes since 2.6.6:
       --dry-run and --delete, rsync no longer complains about not being able
       to opendir() the not-yet present directory.
 
+    - When --list-only is used and a non-existent local destination dir was
+      also specified as a destination, rsync no longer generates a warning
+      about being unable to create the missing directory.
+
     - Got rid of the need for --force to be used in some circumstances with
       --delete-after (making it consistent with --delete-before/-during).
 
@@ -223,6 +227,10 @@ Changes since 2.6.6:
 
     - Use of the --bwlimit option no longer interferes with the remote rsync
       sending error messages about invalid/refused options.
+
+    - Rsync no longer returns a usage error when used with one local source arg
+      and no destination: this now implies the --list-only option, just like
+      the comparable situation with a remote source arg.
 
     - Various documentation improvements, including: a better synopsis, some
       improved examples, a better discussion of the presence and absence of
