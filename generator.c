@@ -848,8 +848,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 		parent_dirname = dn;
 
-		if (need_fuzzy_dirlist && S_ISREG(file->mode))
+		if (need_fuzzy_dirlist && S_ISREG(file->mode)) {
 			fuzzy_dirlist = get_dirlist(dn, -1, 1);
+			need_fuzzy_dirlist = 0;
+		}
 
 		statret = link_stat(fname, &st,
 				    keep_dirlinks && S_ISDIR(file->mode));
