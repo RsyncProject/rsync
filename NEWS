@@ -90,6 +90,11 @@ Changes since 2.6.6:
       also specified as a destination, rsync no longer generates a warning
       about being unable to create the missing directory.
 
+    - Fixed some problems with --relative --no-implied-dirs when the
+      destination directory did not yet exist:  we can now create a symlink or
+      device when it is the first thing in the missing dir, and --fuzzy no
+      longer complains about being unable to open the missing dir.
+
     - Got rid of the need for --force to be used in some circumstances with
       --delete-after (making it consistent with --delete-before/-during).
 
