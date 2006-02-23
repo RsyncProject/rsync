@@ -790,12 +790,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (fuzzy_dirlist) {
 			flist_free(fuzzy_dirlist);
 			fuzzy_dirlist = NULL;
-			parent_dirname = "";
 		}
 		if (missing_below >= 0) {
 			dry_run--;
 			missing_below = -1;
 		}
+		parent_dirname = "";
 		return;
 	}
 
@@ -830,19 +830,22 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		statret = -1;
 		stat_errno = ENOENT;
 	} else {
-		if (fuzzy_basis && S_ISREG(file->mode)) {
-			char *dn = file->dirname ? file->dirname : ".";
-			if (parent_dirname != dn
-			    && strcmp(parent_dirname, dn) != 0) {
-				if (fuzzy_dirlist)
-					flist_free(fuzzy_dirlist);
-				if (implied_dirs || stat(dn, &st) == 0)
-					fuzzy_dirlist = get_dirlist(dn, -1, 1);
-				else
-					fuzzy_dirlist = NULL;
+		char *dn = file->dirname ? file->dirname : ".";
+		if (parent_dirname != dn && strcmp(parent_dirname, dn) != 0) {
+			if (relative_paths && !implied_dirs && stat(dn, &st) < 0
+			 && create_directory_path(fname, orig_umask) < 0) {
+				rsyserr(FERROR, errno,
+					"recv_generator: mkdir %s failed",
+					full_fname(dn));
 			}
-			parent_dirname = dn;
+			if (fuzzy_dirlist) {
+				flist_free(fuzzy_dirlist);
+				fuzzy_dirlist = NULL;
+			}
+			if (fuzzy_basis)
+				fuzzy_dirlist = get_dirlist(dn, -1, 1);
 		}
+		parent_dirname = dn;
 
 		statret = link_stat(fname, &st,
 				    keep_dirlinks && S_ISDIR(file->mode));
