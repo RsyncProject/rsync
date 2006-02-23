@@ -771,7 +771,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			   enum logcode code, int f_out)
 {
 	static int missing_below = -1, excluded_below = -1;
-	static char *fuzzy_dirname = "";
+	static char *parent_dirname = "";
 	static struct file_list *fuzzy_dirlist = NULL;
 	struct file_struct *fuzzy_file = NULL;
 	int fd = -1, f_copy = -1;
@@ -790,7 +790,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (fuzzy_dirlist) {
 			flist_free(fuzzy_dirlist);
 			fuzzy_dirlist = NULL;
-			fuzzy_dirname = "";
+			parent_dirname = "";
 		}
 		if (missing_below >= 0) {
 			dry_run--;
@@ -832,8 +832,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	} else {
 		if (fuzzy_basis && S_ISREG(file->mode)) {
 			char *dn = file->dirname ? file->dirname : ".";
-			if (fuzzy_dirname != dn
-			    && strcmp(fuzzy_dirname, dn) != 0) {
+			if (parent_dirname != dn
+			    && strcmp(parent_dirname, dn) != 0) {
 				if (fuzzy_dirlist)
 					flist_free(fuzzy_dirlist);
 				if (implied_dirs || stat(dn, &st) == 0)
@@ -841,7 +841,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				else
 					fuzzy_dirlist = NULL;
 			}
-			fuzzy_dirname = dn;
+			parent_dirname = dn;
 		}
 
 		statret = link_stat(fname, &st,
