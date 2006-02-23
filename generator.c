@@ -773,6 +773,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	static int missing_below = -1, excluded_below = -1;
 	static char *parent_dirname = "";
 	static struct file_list *fuzzy_dirlist = NULL;
+	static struct file_list *need_dirlist = (struct file_list *)"";
 	struct file_struct *fuzzy_file = NULL;
 	int fd = -1, f_copy = -1;
 	STRUCT_STAT st, real_st, partial_st;
@@ -788,7 +789,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (!fname) {
 		if (fuzzy_dirlist) {
-			flist_free(fuzzy_dirlist);
+			if (fuzzy_dirlist != need_dirlist)
+				flist_free(fuzzy_dirlist);
 			fuzzy_dirlist = NULL;
 		}
 		if (missing_below >= 0) {
@@ -839,13 +841,17 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					full_fname(dn));
 			}
 			if (fuzzy_dirlist) {
-				flist_free(fuzzy_dirlist);
+				if (fuzzy_dirlist != need_dirlist)
+					flist_free(fuzzy_dirlist);
 				fuzzy_dirlist = NULL;
 			}
 			if (fuzzy_basis)
-				fuzzy_dirlist = get_dirlist(dn, -1, 1);
+				fuzzy_dirlist = need_dirlist;
 		}
 		parent_dirname = dn;
+
+		if (fuzzy_dirlist == need_dirlist && S_ISREG(file->mode))
+			fuzzy_dirlist = get_dirlist(dn, -1, 1);
 
 		statret = link_stat(fname, &st,
 				    keep_dirlinks && S_ISDIR(file->mode));
