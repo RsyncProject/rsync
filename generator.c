@@ -35,6 +35,7 @@ extern int am_daemon;
 extern int do_progress;
 extern int recurse;
 extern int relative_paths;
+extern int implied_dirs;
 extern int keep_dirlinks;
 extern int preserve_links;
 extern int preserve_devices;
@@ -835,7 +836,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			    && strcmp(fuzzy_dirname, dn) != 0) {
 				if (fuzzy_dirlist)
 					flist_free(fuzzy_dirlist);
-				fuzzy_dirlist = get_dirlist(dn, -1, 1);
+				if (implied_dirs || stat(dn, &st) == 0)
+					fuzzy_dirlist = get_dirlist(dn, -1, 1);
+				else
+					fuzzy_dirlist = NULL;
 			}
 			fuzzy_dirname = dn;
 		}
@@ -1112,7 +1116,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	} else
 		partialptr = NULL;
 
-	if (statret != 0 && fuzzy_basis && dry_run <= 1) {
+	if (statret != 0 && fuzzy_dirlist && dry_run <= 1) {
 		int j = find_fuzzy(file, fuzzy_dirlist);
 		if (j >= 0) {
 			fuzzy_file = fuzzy_dirlist->files[j];
@@ -1173,7 +1177,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (!do_xfers || read_batch || whole_file)
 		goto notify_others;
 
-	if (fuzzy_basis) {
+	if (fuzzy_dirlist) {
 		int j = flist_find(fuzzy_dirlist, file);
 		if (j >= 0) /* don't use changing file as future fuzzy basis */
 			fuzzy_dirlist->files[j]->flags |= FLAG_NO_FUZZY;
