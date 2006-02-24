@@ -184,28 +184,29 @@ int mkdir_defmode(char *fname)
 	return ret;
 }
 
-/**
-   Create any necessary directories in fname. Unfortunately we don't know
-   what perms to give the directory when this is called so we need to rely
-   on the umask
-**/
+/* Create any necessary directories in fname.  Any missing directories are
+ * created with default permissions. */
 int create_directory_path(char *fname)
 {
 	char *p;
+	int ret = 0;
 
 	while (*fname == '/')
 		fname++;
 	while (strncmp(fname, "./", 2) == 0)
 		fname += 2;
 
+	umask(orig_umask);
 	p = fname;
 	while ((p = strchr(p,'/')) != NULL) {
-		*p = 0;
-		mkdir_defmode(fname);
-		*p = '/';
-		p++;
+		*p = '\0';
+		if (do_mkdir(fname, ACCESSPERMS) < 0 && errno != EEXIST)
+		    ret = -1;
+		*p++ = '/';
 	}
-	return 0;
+	umask(0);
+
+	return ret;
 }
 
 /**
