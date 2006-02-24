@@ -33,7 +33,6 @@ extern int preserve_devices;
 extern int preserve_specials;
 extern int preserve_links;
 extern int preserve_hard_links;
-extern int orig_umask;
 extern int safe_symlinks;
 
 /* make a complete pathname for backup file */
@@ -112,7 +111,7 @@ static int make_bak_dir(char *fullpath)
 		}
 		if (*p == '/') {
 			*p = '\0';
-			if (do_mkdir(fullpath, 0777 & ~orig_umask) == 0)
+			if (mkdir_defmode(fullpath) == 0)
 				break;
 			if (errno != ENOENT) {
 				rsyserr(FERROR, errno,
@@ -141,7 +140,7 @@ static int make_bak_dir(char *fullpath)
 		p += strlen(p);
 		if (p == end)
 			break;
-		if (do_mkdir(fullpath, 0777 & ~orig_umask) < 0) {
+		if (mkdir_defmode(fullpath) < 0) {
 			rsyserr(FERROR, errno, "make_bak_dir mkdir %s failed",
 				full_fname(fullpath));
 			goto failure;
