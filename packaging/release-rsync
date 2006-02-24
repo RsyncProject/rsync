@@ -211,7 +211,7 @@ print $break, <<EOT;
 
 About to do the following in the samba-rsync-ftp dir:
     - move the old tar/diff files into the appropriate old-* dirs
-    - hard-link the new tar/diff files to the old files on samba.org$skipping
+    - hard-link moved tar/diff files to old files on samba.org$skipping
     - create release tar, "$tar_file"
     - create release diffs, "$diff_file"
     - update README, *NEWS, TODO, and cvs.log
