@@ -41,6 +41,7 @@ int whole_file = -1;
 
 int append_mode = 0;
 int keep_dirlinks = 0;
+int copy_dirlinks = 0;
 int copy_links = 0;
 int preserve_links = 0;
 int preserve_hard_links = 0;
@@ -289,8 +290,9 @@ void usage(enum logcode F)
   rprintf(F," -L, --copy-links            transform symlink into referent file/dir\n");
   rprintf(F,"     --copy-unsafe-links     only \"unsafe\" symlinks are transformed\n");
   rprintf(F,"     --safe-links            ignore symlinks that point outside the source tree\n");
-  rprintf(F," -H, --hard-links            preserve hard links\n");
+  rprintf(F," -k, --copy-dirlinks         transform symlink to a dir into referent dir\n");
   rprintf(F," -K, --keep-dirlinks         treat symlinked dir on receiver as dir\n");
+  rprintf(F," -H, --hard-links            preserve hard links\n");
   rprintf(F," -p, --perms                 preserve permissions\n");
   rprintf(F," -E, --executability         preserve the file's executability\n");
   rprintf(F,"     --chmod=CHMOD           change destination permissions\n");
@@ -433,11 +435,13 @@ static struct poptOption long_options[] = {
   {"copy-links",      'L', POPT_ARG_NONE,   &copy_links, 0, 0, 0 },
   {"copy-unsafe-links",0,  POPT_ARG_NONE,   &copy_unsafe_links, 0, 0, 0 },
   {"safe-links",       0,  POPT_ARG_NONE,   &safe_symlinks, 0, 0, 0 },
+  {"copy-dirlinks",   'k', POPT_ARG_NONE,   &copy_dirlinks, 0, 0, 0 },
   {"keep-dirlinks",   'K', POPT_ARG_NONE,   &keep_dirlinks, 0, 0, 0 },
   {"hard-links",      'H', POPT_ARG_NONE,   &preserve_hard_links, 0, 0, 0 },
   {"relative",        'R', POPT_ARG_VAL,    &relative_paths, 1, 0, 0 },
   {"no-relative",      0,  POPT_ARG_VAL,    &relative_paths, 0, 0, 0 },
   {"no-R",             0,  POPT_ARG_VAL,    &relative_paths, 0, 0, 0 },
+  {"implied-dirs",     0,  POPT_ARG_VAL,    &implied_dirs, 1, 0, 0 },
   {"no-implied-dirs",  0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
   {"chmod",            0,  POPT_ARG_STRING, 0, OPT_CHMOD, 0, 0 },
   {"ignore-times",    'I', POPT_ARG_NONE,   &ignore_times, 0, 0, 0 },
@@ -1477,12 +1481,10 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'b';
 	if (update_only)
 		argstr[x++] = 'u';
-	if (!do_xfers) /* NOT "dry_run"! */
+	if (!do_xfers) /* Note: NOT "dry_run"! */
 		argstr[x++] = 'n';
 	if (preserve_links)
 		argstr[x++] = 'l';
-	if (copy_links)
-		argstr[x++] = 'L';
 	if (xfer_dirs > (recurse || !delete_mode || !am_sender))
 		argstr[x++] = 'd';
 	if (am_sender) {
@@ -1492,6 +1494,11 @@ void server_options(char **args,int *argc)
 			argstr[x++] = 'm';
 		if (omit_dir_times == 2)
 			argstr[x++] = 'O';
+	} else {
+		if (copy_links)
+			argstr[x++] = 'L';
+		if (copy_dirlinks)
+			argstr[x++] = 'k';
 	}
 
 	if (whole_file > 0)
