@@ -81,7 +81,6 @@ extern int link_dest;
 extern int whole_file;
 extern int list_only;
 extern int read_batch;
-extern int orig_umask;
 extern int safe_symlinks;
 extern long block_size; /* "long" because popt can't set an int32. */
 extern int max_delete;
@@ -834,7 +833,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		char *dn = file->dirname ? file->dirname : ".";
 		if (parent_dirname != dn && strcmp(parent_dirname, dn) != 0) {
 			if (relative_paths && !implied_dirs && stat(dn, &st) < 0
-			 && create_directory_path(fname, orig_umask) < 0) {
+			 && create_directory_path(fname) < 0) {
 				rsyserr(FERROR, errno,
 					"recv_generator: mkdir %s failed",
 					full_fname(dn));
@@ -896,7 +895,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 		if (statret != 0 && do_mkdir(fname,file->mode) < 0 && errno != EEXIST) {
 			if (!relative_paths || errno != ENOENT
-			    || create_directory_path(fname, orig_umask) < 0
+			    || create_directory_path(fname) < 0
 			    || (do_mkdir(fname, file->mode) < 0 && errno != EEXIST)) {
 				rsyserr(FERROR, errno,
 					"recv_generator: mkdir %s failed",

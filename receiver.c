@@ -44,7 +44,6 @@ extern int cleanup_got_literal;
 extern int remove_sent_files;
 extern int module_id;
 extern int ignore_errors;
-extern int orig_umask;
 extern int append_mode;
 extern int sparse_files;
 extern int keep_partial;
@@ -580,7 +579,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			 * because their information should have been previously
 			 * transferred, but that may not be the case with -R */
 			if (fd2 == -1 && relative_paths && errno == ENOENT
-			    && create_directory_path(fnametmp, orig_umask) == 0) {
+			    && create_directory_path(fnametmp) == 0) {
 				/* Get back to name with XXXXXX in it. */
 				get_tmpname(fnametmp, fname);
 				fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
