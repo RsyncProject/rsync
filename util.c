@@ -33,6 +33,7 @@ extern int module_id;
 extern int modify_window;
 extern int relative_paths;
 extern int human_readable;
+extern mode_t orig_umask;
 extern char *partial_dir;
 extern struct filter_list_struct server_filter_list;
 
@@ -169,12 +170,26 @@ int set_modtime(char *fname, time_t modtime, mode_t mode)
 	}
 }
 
+/* This creates a new directory with default permissions.  Since there
+ * might be some directory-default permissions affecting this, we can't
+ * force the permissions directly using the original umask and mkdir(). */
+int mkdir_defmode(char *fname)
+{
+	int ret;
+
+	umask(orig_umask);
+	ret = do_mkdir(fname, ACCESSPERMS);
+	umask(0);
+
+	return ret;
+}
+
 /**
    Create any necessary directories in fname. Unfortunately we don't know
    what perms to give the directory when this is called so we need to rely
    on the umask
 **/
-int create_directory_path(char *fname, int base_umask)
+int create_directory_path(char *fname)
 {
 	char *p;
 
@@ -186,7 +201,7 @@ int create_directory_path(char *fname, int base_umask)
 	p = fname;
 	while ((p = strchr(p,'/')) != NULL) {
 		*p = 0;
-		do_mkdir(fname, 0777 & ~base_umask);
+		mkdir_defmode(fname);
 		*p = '/';
 		p++;
 	}
