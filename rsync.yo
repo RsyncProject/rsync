@@ -240,7 +240,8 @@ verb(    rsync -av --rsh=ssh host::module /dest)
 If you need to specify a different remote-shell user, keep in mind that the
 user@ prefix in front of the host is specifying the rsync-user value (for a
 module that requires user-based authentication).  This means that you must
-give the '-l user' option to ssh when specifying the remote-shell:
+give the '-l user' option to ssh when specifying the remote-shell, as in
+this example that uses the short version of the bf(--rsh) option:
 
 verb(    rsync -av -e "ssh -l ssh-user" rsync-user@host::module /dest)
 
@@ -315,8 +316,9 @@ to the detailed description below for a complete description.  verb(
  -L, --copy-links            transform symlink into referent file/dir
      --copy-unsafe-links     only "unsafe" symlinks are transformed
      --safe-links            ignore symlinks that point outside the tree
- -H, --hard-links            preserve hard links
+ -k, --copy-dirlinks         transform symlink to dir into referent dir
  -K, --keep-dirlinks         treat symlinked dir on receiver as dir
+ -H, --hard-links            preserve hard links
  -p, --perms                 preserve permissions
  -E, --executability         preserve executability
      --chmod=CHMOD           change destination permissions
@@ -537,12 +539,12 @@ then a file named /tmp/foo/bar/baz.c would be created on the remote
 machine -- the full path name is preserved.  To limit the amount of
 path information that is sent, you have a couple options:  (1) With
 a modern rsync on the sending side (beginning with 2.6.7), you can
-insert a dot dir into the source path, like this:
+insert a dot and a slash into the source path, like this:
 
 quote(tt(   rsync -avR /foo/./bar/baz.c remote:/tmp/))
 
 That would create /tmp/bar/baz.c on the remote machine.  (Note that the
-dot dir must followed by a slash, so "/foo/." would not be abbreviated.)
+dot must be followed by a slash, so "/foo/." would not be abbreviated.)
 (2) For older rsync versions, you would need to use a chdir to limit the
 source path.  For example, when pushing files:
 
@@ -558,16 +560,35 @@ tt(   rsync -avR --rsync-path="cd /foo; rsync" \ )nl()
 tt(       remote:bar/baz.c /tmp/)
 )
 
-dit(bf(--no-implied-dirs)) When combined with the bf(--relative) option, the
-implied directories in each path are not explicitly duplicated as part
-of the transfer.  This makes the transfer more optimal and also allows
-the two sides to have non-matching symlinks in the implied part of the
-path.  For instance, if you transfer the file "/path/foo/file" with bf(-R),
-the default is for rsync to ensure that "/path" and "/path/foo" on the
-destination exactly match the directories/symlinks of the source.  Using
-the bf(--no-implied-dirs) option would omit both of these implied dirs,
-which means that if "/path" was a real directory on one machine and a
-symlink of the other machine, rsync would not try to change this.
+dit(bf(--no-implied-dirs)) This option affects the default behavior of the
+bf(--relative) option.  When it is specified, the attributes of the implied
+directories from the source names are not included in the transfer.  This
+means that the corresponding path elements on the destination system are
+left unchanged if they exist, and any missing implied directories are
+created with default attributes.  This even allows these implied path
+elements to have big differences, such as being a symlink to a directory on
+one side of the transfer, and a real directory on the other side.
+
+For instance, if a command-line arg or a files-from entry told rsync to
+transfer the file "path/foo/file", the directories "path" and "path/foo"
+are implied when bf(--relative) is used.  If "path/foo" is a symlink to
+"bar" on the destination system, the receiving rsync would ordinarily
+delete "path/foo", recreate it as a directory, and receive the file into
+the new directory.  With bf(--no-implied-dirs), the receiving rsync updates
+"path/foo/file" using the existing path elements, which means that the file
+ends up being created in "path/bar".  Another way to accomplish this link
+preservation is to use the bf(--keep-dirlinks) option (which will also
+affect symlinks to directories in the rest of the transfer).
+
+In a similar but opposite scenario, if the transfer of "path/foo/file" is
+requested and "path/foo" is a symlink on the sending side, running without
+bf(--no-implied-dirs) would cause rsync to transform "path/foo" on the
+receiving side into an identical symlink, and then attempt to transfer
+"path/foo/file", which might fail if the duplicated symlink did not point
+to a directory on the receiving side.  Another way to avoid this sending of
+a symlink as an implied directory is to use bf(--copy-unsafe-links), or
+bf(--copy-dirlinks) (which will also affect symlinks to directories in the
+rest of the transfer).
 
 dit(bf(-b, --backup)) With this option, preexisting destination files are
 renamed as each file is transferred or deleted.  You can control where the
@@ -654,7 +675,7 @@ bf(--dirs) and bf(--recursive), bf(--recursive) takes precedence.
 dit(bf(-l, --links)) When symlinks are encountered, recreate the
 symlink on the destination.
 
-dit(bf(-L, --copy-links)) When symlinks are encountered, the file that
+dit(bf(-L, --copy-links)) When symlinks are encountered, the item that
 they point to (the referent) is copied, rather than the symlink.  In older
 versions of rsync, this option also had the side-effect of telling the
 receiving side to follow symlinks, such as symlinks to directories.  In a
@@ -666,32 +687,48 @@ will still have the side-effect of bf(-K) on that older receiving rsync.
 dit(bf(--copy-unsafe-links)) This tells rsync to copy the referent of
 symbolic links that point outside the copied tree.  Absolute symlinks
 are also treated like ordinary files, and so are any symlinks in the
-source path itself when bf(--relative) is used.
+source path itself when bf(--relative) is used.  This option has no
+additional effect if bf(--copy-links) was also specified.
 
 dit(bf(--safe-links)) This tells rsync to ignore any symbolic links
 which point outside the copied tree. All absolute symlinks are
 also ignored. Using this option in conjunction with bf(--relative) may
 give unexpected results.
 
-dit(bf(-H, --hard-links)) This tells rsync to recreate hard links on
-the remote system to be the same as the local system. Without this
-option hard links are treated like regular files.
+dit(bf(-K, --copy-dirlinks)) This option causes the sending side to treat
+a symlink to a directory as though it were a real directory.  This is
+useful if you don't want symlinks to non-directories to be affected, as
+they would be using bf(--copy-links).
+
+Without this option, if the sending side has replaced a directory with a
+symlink to a directory, the receiving side will delete anything that is in
+the way of the new symlink, including a directory hierarchy (as long as
+bf(--force) or bf(--delete) is in effect).
+
+See also bf(--keep-dirlinks) for an analogous option for the receiving
+side.
+
+dit(bf(-K, --keep-dirlinks)) This option causes the receiving side to treat
+a symlink to a directory as though it were a real directory, but only if it
+matches a real directory from the sender.  Without this option, the
+receiver's symlink would be deleted and replaced with a real directory.
+
+For example, suppose you transfer a directory "foo" that contains a file
+"file", but "foo" is a symlink to directory "bar" on the receiver.  Without
+bf(--keep-dirlinks), the receiver deletes symlink "foo", recreates it as a
+directory, and receives the file into the new directory.  With
+bf(--keep-dirlinks), the receiver keeps the symlink and "file" ends up in
+"bar".
+
+See also bf(--copy-dirlinks) for an analogous option for the sending side.
+
+dit(bf(-H, --hard-links)) This tells rsync to look for hard-linked files in
+the transfer and link together the corresponding files on the receiving
+side.  Without this option, hard-linked files in the transfer are treated
+as though they were separate files.
 
 Note that rsync can only detect hard links if both parts of the link
 are in the list of files being sent.
-
-This option can be quite slow, so only use it if you need it.
-
-dit(bf(-K, --keep-dirlinks)) On the receiving side, if a symlink is
-pointing to a directory, it will be treated as matching a directory
-from the sender.
-
-dit(bf(-W, --whole-file)) With this option the incremental rsync algorithm
-is not used and the whole file is sent as-is instead.  The transfer may be
-faster if this option is used when the bandwidth between the source and
-destination machines is higher than the bandwidth to disk (especially when the
-"disk" is actually a networked filesystem).  This is the default when both
-the source and destination are specified as local paths.
 
 dit(bf(-p, --perms)) This option causes the receiving rsync to set the
 destination permissions to be the same as the source permissions.  (See
@@ -824,9 +861,6 @@ also for ensuring that you will get errors if the receiving side isn't
 being running as the super-user.  To turn off super-user activities, the
 super-user can use bf(--no-super).
 
-dit(bf(-n, --dry-run)) This tells rsync to not do any file transfers,
-instead it will just report the actions it would have taken.
-
 dit(bf(-S, --sparse)) Try to handle sparse files efficiently so they take
 up less space on the destination.  Conflicts with bf(--inplace) because it's
 not possible to overwrite data in a sparse fashion.
@@ -834,6 +868,16 @@ not possible to overwrite data in a sparse fashion.
 NOTE: Don't use this option when the destination is a Solaris "tmpfs"
 filesystem. It doesn't seem to handle seeks over null regions
 correctly and ends up corrupting the files.
+
+dit(bf(-n, --dry-run)) This tells rsync to not do any file transfers,
+instead it will just report the actions it would have taken.
+
+dit(bf(-W, --whole-file)) With this option the incremental rsync algorithm
+is not used and the whole file is sent as-is instead.  The transfer may be
+faster if this option is used when the bandwidth between the source and
+destination machines is higher than the bandwidth to disk (especially when the
+"disk" is actually a networked filesystem).  This is the default when both
+the source and destination are specified as local paths.
 
 dit(bf(-x, --one-file-system)) This tells rsync to avoid crossing a
 filesystem boundary when recursing.  This does not limit the user's ability
