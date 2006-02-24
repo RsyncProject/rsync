@@ -28,7 +28,6 @@
 #include "rsync.h"
 
 extern int verbose;
-extern int dry_run;
 extern int list_only;
 extern int am_root;
 extern int am_server;
@@ -43,10 +42,10 @@ extern int recurse;
 extern int xfer_dirs;
 extern int filesfrom_fd;
 extern int one_file_system;
+extern int copy_dirlinks;
 extern int keep_dirlinks;
 extern int preserve_links;
 extern int preserve_hard_links;
-extern int preserve_perms;
 extern int preserve_devices;
 extern int preserve_specials;
 extern int preserve_uid;
@@ -174,7 +173,7 @@ static int readlink_stat(const char *path, STRUCT_STAT *buffer, char *linkbuf)
 #ifdef SUPPORT_LINKS
 	if (copy_links)
 		return do_stat(path, buffer);
-	if (link_stat(path, buffer, 0) < 0)
+	if (link_stat(path, buffer, copy_dirlinks) < 0)
 		return -1;
 	if (S_ISLNK(buffer->st_mode)) {
 		int l = readlink((char *)path, linkbuf, MAXPATHLEN - 1);
@@ -1141,7 +1140,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				   && (len == 1 || fbuf[len-2] == '/');
 		}
 
-		if (link_stat(fbuf, &st, keep_dirlinks) != 0) {
+		if (link_stat(fbuf, &st, copy_dirlinks) != 0) {
 			io_error |= IOERR_GENERAL;
 			rsyserr(FERROR, errno, "link_stat %s failed",
 				full_fname(fbuf));
@@ -1256,7 +1255,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			if (fn != p || (*lp && *lp != '/')) {
 				int save_copy_links = copy_links;
 				int save_xfer_dirs = xfer_dirs;
-				copy_links = copy_unsafe_links;
+				copy_links |= copy_unsafe_links;
 				xfer_dirs = 1;
 				while ((slash = strchr(slash+1, '/')) != 0) {
 					*slash = '\0';
