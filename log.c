@@ -39,13 +39,13 @@ extern int local_server;
 extern int quiet;
 extern int module_id;
 extern int msg_fd_out;
-extern int orig_umask;
 extern int allow_8bit_chars;
 extern int protocol_version;
 extern int preserve_times;
 extern int log_format_has_i;
 extern int log_format_has_o_or_i;
 extern int daemon_log_format_has_o_or_i;
+extern mode_t orig_umask;
 extern char *auth_user;
 extern char *log_format;
 #if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
@@ -144,7 +144,7 @@ static void syslog_init()
 
 static void logfile_open(void)
 {
-	int old_umask = umask(022 | orig_umask);
+	mode_t old_umask = umask(022 | orig_umask);
 	logfile = fopen(logfname, "a");
 	umask(old_umask);
 	if (!logfile) {

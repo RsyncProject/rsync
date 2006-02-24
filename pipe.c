@@ -24,8 +24,8 @@
 extern int am_sender;
 extern int am_server;
 extern int blocking_io;
-extern int orig_umask;
 extern int filesfrom_fd;
+extern mode_t orig_umask;
 extern struct chmod_mode_struct *chmod_modes;
 
 /**

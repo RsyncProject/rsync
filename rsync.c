@@ -37,7 +37,6 @@ extern int preserve_perms;
 extern int preserve_executability;
 extern int preserve_times;
 extern int omit_dir_times;
-extern int orig_umask;
 extern int am_root;
 extern int am_server;
 extern int am_sender;
@@ -49,6 +48,7 @@ extern int preserve_gid;
 extern int inplace;
 extern int keep_dirlinks;
 extern int make_backups;
+extern mode_t orig_umask;
 extern struct stats stats;
 extern struct chmod_mode_struct *daemon_chmod_modes;
 
