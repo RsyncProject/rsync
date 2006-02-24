@@ -832,7 +832,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	} else {
 		char *dn = file->dirname ? file->dirname : ".";
 		if (parent_dirname != dn && strcmp(parent_dirname, dn) != 0) {
-			if (relative_paths && !implied_dirs && stat(dn, &st) < 0
+			if (relative_paths && !implied_dirs
+			 && do_stat(dn, &st) < 0
 			 && create_directory_path(fname) < 0) {
 				rsyserr(FERROR, errno,
 					"recv_generator: mkdir %s failed",
