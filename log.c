@@ -39,6 +39,7 @@ extern int local_server;
 extern int quiet;
 extern int module_id;
 extern int msg_fd_out;
+extern int orig_umask;
 extern int allow_8bit_chars;
 extern int protocol_version;
 extern int preserve_times;
@@ -143,7 +144,6 @@ static void syslog_init()
 
 static void logfile_open(void)
 {
-	extern int orig_umask;
 	int old_umask = umask(022 | orig_umask);
 	logfile = fopen(logfname, "a");
 	umask(old_umask);
