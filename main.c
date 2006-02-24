@@ -40,7 +40,6 @@ extern int kluge_around_eof;
 extern int do_stats;
 extern int log_got_error;
 extern int module_id;
-extern int orig_umask;
 extern int copy_links;
 extern int keep_dirlinks;
 extern int preserve_hard_links;
@@ -62,6 +61,7 @@ extern char *shell_cmd;
 extern char *batch_name;
 
 int local_server = 0;
+mode_t orig_umask = 0;
 struct file_list *the_file_list;
 
 /* There's probably never more than at most 2 outstanding child processes,
@@ -491,13 +491,11 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		if (cp && !cp[1])
 			*cp = '\0';
 
-		umask(orig_umask);
-		if (do_mkdir(dest_path, 0777) != 0) {
+		if (mkdir_defmode(dest_path) != 0) {
 			rsyserr(FERROR, errno, "mkdir %s failed",
 				full_fname(dest_path));
 			exit_cleanup(RERR_FILEIO);
 		}
-		umask(0);
 
 		if (verbose)
 			rprintf(FINFO, "created directory %s\n", dest_path);
@@ -1208,7 +1206,7 @@ int main(int argc,char *argv[])
 
 	/* we set a 0 umask so that correct file permissions can be
 	 * carried across */
-	orig_umask = (int)umask(0);
+	orig_umask = umask(0);
 
 #if defined CONFIG_LOCALE && defined HAVE_SETLOCALE
 	setlocale(LC_CTYPE, "");
