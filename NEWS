@@ -95,6 +95,9 @@ Changes since 2.6.6:
       device when it is the first thing in the missing dir, and --fuzzy no
       longer complains about being unable to open the missing dir.
 
+    - Fixed a bug where the --copy-links option would not affect implied
+      directories (see --relative) without --copy-unsafe-links.
+
     - Got rid of the need for --force to be used in some circumstances with
       --delete-after (making it consistent with --delete-before/-during).
 
@@ -237,13 +240,15 @@ Changes since 2.6.6:
       and no destination: this now implies the --list-only option, just like
       the comparable situation with a remote source arg.
 
+    - Added the --copy-dirlinks option, a more limited version of --copy-links.
+
     - Various documentation improvements, including: a better synopsis, some
       improved examples, a better discussion of the presence and absence of
       --perms (including how it interacts with the new --executability and
       --chmod options), an extended discussion of --temp-dir, an improved
       discussion of --partial-dir, a better description of rsync's pattern
-      matching characters, and the documenting of what the various items in
-      the --stats output mean.
+      matching characters, an improved --no-implied-dirs section, and the
+      documenting of what the --stats option outputs.
 
     - Various new and updated diffs in the patches dir, including: acls.diff,
       xattrs.diff, atimes.diff, detect-renamed.diff, and slp.diff.
