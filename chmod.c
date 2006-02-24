@@ -1,6 +1,6 @@
 #include "rsync.h"
 
-extern int orig_umask;
+extern mode_t orig_umask;
 
 #define FLAG_X_KEEP (1<<0)
 #define FLAG_DIRS_ONLY (1<<1)
@@ -56,15 +56,15 @@ struct chmod_mode_struct *parse_chmod(const char *modestr,
 
 			switch (op) {
 			case CHMOD_ADD:
-				curr_mode->ModeAND = 07777;
+				curr_mode->ModeAND = CHMOD_BITS;
 				curr_mode->ModeOR  = bits + topoct;
 				break;
 			case CHMOD_SUB:
-				curr_mode->ModeAND = 07777 - bits - topoct;
+				curr_mode->ModeAND = CHMOD_BITS - bits - topoct;
 				curr_mode->ModeOR  = 0;
 				break;
 			case CHMOD_EQ:
-				curr_mode->ModeAND = 07777 - (where * 7) - (topoct ? topbits : 0);
+				curr_mode->ModeAND = CHMOD_BITS - (where * 7) - (topoct ? topbits : 0);
 				curr_mode->ModeOR  = bits + topoct;
 				break;
 			}
@@ -174,7 +174,7 @@ struct chmod_mode_struct *parse_chmod(const char *modestr,
 int tweak_mode(int mode, struct chmod_mode_struct *chmod_modes)
 {
 	int IsX = mode & 0111;
-	int NonPerm = mode & ~07777;
+	int NonPerm = mode & ~CHMOD_BITS;
 
 	for ( ; chmod_modes; chmod_modes = chmod_modes->next) {
 		if ((chmod_modes->flags & FLAG_DIRS_ONLY) && !S_ISDIR(NonPerm))
