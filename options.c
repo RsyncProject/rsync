@@ -75,7 +75,6 @@ int am_server = 0;
 int am_sender = 0;
 int am_generator = 0;
 int am_starting_up = 1;
-int orig_umask = 0;
 int relative_paths = -1;
 int implied_dirs = 1;
 int numeric_ids = 0;
