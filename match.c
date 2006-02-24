@@ -20,7 +20,6 @@
 #include "rsync.h"
 
 extern int verbose;
-extern int am_server;
 extern int do_progress;
 extern int checksum_seed;
 extern int append_mode;

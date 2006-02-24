@@ -20,7 +20,6 @@
 
 #include "rsync.h"
 
-extern int dry_run;
 extern int verbose;
 extern int link_dest;
 extern int make_backups;

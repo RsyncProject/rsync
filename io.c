@@ -41,7 +41,6 @@
 
 extern int bwlimit;
 extern size_t bwlimit_writemax;
-extern int verbose;
 extern int io_timeout;
 extern int allowed_lull;
 extern int am_server;

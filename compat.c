@@ -29,7 +29,6 @@ int remote_protocol = 0;
 
 extern int verbose;
 extern int am_server;
-extern int am_sender;
 extern int inplace;
 extern int fuzzy_basis;
 extern int read_batch;

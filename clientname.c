@@ -34,7 +34,6 @@
 #include "rsync.h"
 
 static const char default_name[] = "UNKNOWN";
-extern int am_daemon;
 extern int am_server;
 
 

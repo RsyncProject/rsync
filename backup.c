@@ -21,7 +21,6 @@
 #include "rsync.h"
 
 extern int verbose;
-extern int backup_suffix_len;
 extern int backup_dir_len;
 extern unsigned int backup_dir_remainder;
 extern char backup_dir_buf[MAXPATHLEN];
@@ -32,7 +31,6 @@ extern int am_root;
 extern int preserve_devices;
 extern int preserve_specials;
 extern int preserve_links;
-extern int preserve_hard_links;
 extern int safe_symlinks;
 
 /* make a complete pathname for backup file */

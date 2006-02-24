@@ -27,7 +27,6 @@ extern int verbose;
 extern int dry_run;
 extern int do_xfers;
 extern int log_format_has_i;
-extern int log_format_has_o_or_i;
 extern int daemon_log_format_has_i;
 extern int am_root;
 extern int am_server;
