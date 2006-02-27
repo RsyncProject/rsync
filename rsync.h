@@ -560,6 +560,7 @@ struct sum_buf {
 	OFF_T offset;		/**< offset in file of this chunk */
 	int32 len;		/**< length of chunk of file */
 	uint32 sum1;	        /**< simple checksum */
+	int32 chain;		/**< next hash-table collision */
 	short flags;		/**< flag bits */
 	char sum2[SUM_LENGTH];	/**< checksum  */
 };
