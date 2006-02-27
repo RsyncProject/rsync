@@ -26,11 +26,6 @@ extern int append_mode;
 
 int updating_basis_file;
 
-typedef unsigned short tag;
-
-#define TABLESIZE (1<<16)
-#define NULL_TAG (-1)
-
 static int false_alarms;
 static int tag_hits;
 static int matches;
@@ -42,47 +37,37 @@ static int total_matches;
 
 extern struct stats stats;
 
-struct target {
-	tag t;
-	int32 i;
-};
+static uint32 tablesize;
+static int32 *sum_table;
 
-static struct target *targets;
-
-static int32 *tag_table;
-
-#define gettag2(s1,s2) (((s1) + (s2)) & 0xFFFF)
-#define gettag(sum) gettag2((sum)&0xFFFF,(sum)>>16)
-
-static int compare_targets(struct target *t1,struct target *t2)
-{
-	return (int)t1->t - (int)t2->t;
-}
-
+#define gettag2(s1,s2) gettag((s1) + ((s2)<<16))
+#define gettag(sum) ((sum)%tablesize)
 
 static void build_hash_table(struct sum_struct *s)
 {
 	int32 i;
+	uint32 prior_size = tablesize;
 
-	if (!tag_table)
-		tag_table = new_array(int32, TABLESIZE);
-
-	targets = new_array(struct target, s->count);
-	if (!tag_table || !targets)
-		out_of_memory("build_hash_table");
-
-	for (i = 0; i < s->count; i++) {
-		targets[i].i = i;
-		targets[i].t = gettag(s->sums[i].sum1);
+	/* Dynamically calculate the hash table size so that the hash load
+	 * for big files is about 80%.  This number must be odd or s2 will
+	 * not be able to span the entire set. */
+	tablesize = (uint32)(s->count/8) * 10 + 11;
+	if (tablesize < 65537)
+		tablesize = 65537; /* a prime number */
+	if (tablesize != prior_size) {
+		free(sum_table);
+		sum_table = new_array(int32, tablesize);
+		if (!sum_table)
+			out_of_memory("build_hash_table");
 	}
 
-	qsort(targets,s->count,sizeof(targets[0]),(int (*)())compare_targets);
+	memset(sum_table, 0xFF, tablesize * sizeof sum_table[0]);
 
-	for (i = 0; i < TABLESIZE; i++)
-		tag_table[i] = NULL_TAG;
-
-	for (i = s->count; i-- > 0; )
-		tag_table[targets[i].t] = i;
+	for (i = 0; i < s->count; i++) {
+		uint32 t = gettag(s->sums[i].sum1);
+		s->sums[i].chain = sum_table[t];
+		sum_table[t] = i;
+	}
 }
 
 
@@ -176,20 +161,17 @@ static void hash_search(int f,struct sum_struct *s,
 	}
 
 	do {
-		tag t = gettag2(s1,s2);
+		uint32 t = gettag2(s1,s2);
 		int done_csum2 = 0;
-		int32 j = tag_table[t];
+		int32 i;
 
 		if (verbose > 4)
 			rprintf(FINFO,"offset=%.0f sum=%08x\n",(double)offset,sum);
 
-		if (j == NULL_TAG)
-			goto null_tag;
-
 		sum = (s1 & 0xffff) | (s2 << 16);
 		tag_hits++;
-		do {
-			int32 l, i = targets[j].i;
+		for (i = sum_table[t]; i >= 0; i = s->sums[i].chain) {
+			int32 l;
 
 			if (sum != s->sums[i].sum1)
 				continue;
@@ -205,9 +187,11 @@ static void hash_search(int f,struct sum_struct *s,
 			    && !(s->sums[i].flags & SUMFLG_SAME_OFFSET))
 				continue;
 
-			if (verbose > 3)
-				rprintf(FINFO,"potential match at %.0f target=%.0f %.0f sum=%08x\n",
-					(double)offset,(double)j,(double)i,sum);
+			if (verbose > 3) {
+				rprintf(FINFO,
+					"potential match at %.0f i=%ld sum=%08x\n",
+					(double)offset, (long)i, sum);
+			}
 
 			if (!done_csum2) {
 				map = (schar *)map_ptr(buf,offset,l);
@@ -224,8 +208,8 @@ static void hash_search(int f,struct sum_struct *s,
 			 * one with an identical offset, so we prefer that over
 			 * the following want_i optimization. */
 			if (updating_basis_file) {
-				do {
-					int32 i2 = targets[j].i;
+				int32 i2;
+				for (i2 = i; i2 >= 0; i2 = s->sums[i2].chain) {
 					if (s->sums[i2].offset != offset)
 						continue;
 					if (i2 != i) {
@@ -240,7 +224,7 @@ static void hash_search(int f,struct sum_struct *s,
 					 * both the sender and the receiver. */
 					s->sums[i].flags |= SUMFLG_SAME_OFFSET;
 					goto set_want_i;
-				} while (++j < s->count && targets[j].t == t);
+				}
 			}
 
 			/* we've found a match, but now check to see
@@ -266,9 +250,8 @@ static void hash_search(int f,struct sum_struct *s,
 			s2 = sum >> 16;
 			matches++;
 			break;
-		} while (++j < s->count && targets[j].t == t);
+		}
 
-	null_tag:
 		backup = offset - last_match;
 		/* We sometimes read 1 byte prior to last_match... */
 		if (backup < 0)
@@ -374,11 +357,6 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	if (verbose > 2)
 		rprintf(FINFO,"sending file_sum\n");
 	write_buf(f,file_sum,MD4_SUM_LENGTH);
-
-	if (targets) {
-		free(targets);
-		targets=NULL;
-	}
 
 	if (verbose > 2)
 		rprintf(FINFO, "false_alarms=%d tag_hits=%d matches=%d\n",
