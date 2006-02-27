@@ -948,6 +948,11 @@ int read_vstring(int f, char *buf, int bufsize)
 void read_sum_head(int f, struct sum_struct *sum)
 {
 	sum->count = read_int(f);
+	if (sum->count < 0) {
+		rprintf(FERROR, "Invalid checksum count %ld [%s]\n",
+			(long)sum->count, who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	}
 	sum->blength = read_int(f);
 	if (sum->blength < 0 || sum->blength > MAX_BLOCK_SIZE) {
 		rprintf(FERROR, "Invalid block length %ld [%s]\n",
