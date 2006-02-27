@@ -587,8 +587,8 @@ receiving side into an identical symlink, and then attempt to transfer
 "path/foo/file", which might fail if the duplicated symlink did not point
 to a directory on the receiving side.  Another way to avoid this sending of
 a symlink as an implied directory is to use bf(--copy-unsafe-links), or
-bf(--copy-dirlinks) (which will also affect symlinks to directories in the
-rest of the transfer).
+bf(--copy-dirlinks) (both of which also affect symlinks in the rest of the
+transfer -- see their descriptions for full details).
 
 dit(bf(-b, --backup)) With this option, preexisting destination files are
 renamed as each file is transferred or deleted.  You can control where the
