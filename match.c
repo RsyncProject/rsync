@@ -40,7 +40,7 @@ extern struct stats stats;
 static uint32 tablesize;
 static int32 *sum_table;
 
-#define GETTAG(sum) ((sum)%tablesize)
+#define SUM2HASH(sum) ((sum)%tablesize)
 
 static void build_hash_table(struct sum_struct *s)
 {
@@ -63,7 +63,7 @@ static void build_hash_table(struct sum_struct *s)
 	memset(sum_table, 0xFF, tablesize * sizeof sum_table[0]);
 
 	for (i = 0; i < s->count; i++) {
-		uint32 t = GETTAG(s->sums[i].sum1);
+		uint32 t = SUM2HASH(s->sums[i].sum1);
 		s->sums[i].chain = sum_table[t];
 		sum_table[t] = i;
 	}
@@ -166,7 +166,7 @@ static void hash_search(int f,struct sum_struct *s,
 		if (verbose > 4)
 			rprintf(FINFO,"offset=%.0f sum=%08x\n",(double)offset,sum);
 
-		i = sum_table[GETTAG(sum)];
+		i = sum_table[SUM2HASH(sum)];
 		if (i < 0)
 			goto null_hash;
 
