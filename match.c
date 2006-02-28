@@ -37,30 +37,24 @@ static int total_matches;
 
 extern struct stats stats;
 
-static uint32 tablesize;
+#define TABLESIZE (1<<16)
+
 static int32 *hash_table;
 
-#define SUM2HASH(sum) ((sum)%tablesize)
+#define SUM2HASH2(s1,s2) (((s1) + (s2)) & 0xFFFF)
+#define SUM2HASH(sum) SUM2HASH2((sum)&0xFFFF,(sum)>>16)
 
 static void build_hash_table(struct sum_struct *s)
 {
 	int32 i;
-	uint32 prior_size = tablesize;
 
-	/* Dynamically calculate the hash table size so that the hash load
-	 * for big files is about 80%.  This number must be odd or s2 will
-	 * not be able to span the entire set. */
-	tablesize = (uint32)(s->count/8) * 10 + 11;
-	if (tablesize < 65537)
-		tablesize = 65537; /* a prime number */
-	if (tablesize != prior_size) {
-		free(hash_table);
-		hash_table = new_array(int32, tablesize);
+	if (!hash_table) {
+		hash_table = new_array(int32, TABLESIZE);
 		if (!hash_table)
 			out_of_memory("build_hash_table");
 	}
 
-	memset(hash_table, 0xFF, tablesize * sizeof hash_table[0]);
+	memset(hash_table, 0xFF, TABLESIZE * sizeof hash_table[0]);
 
 	for (i = 0; i < s->count; i++) {
 		uint32 t = SUM2HASH(s->sums[i].sum1);
@@ -163,13 +157,16 @@ static void hash_search(int f,struct sum_struct *s,
 		int done_csum2 = 0;
 		int32 i;
 
-		if (verbose > 4)
-			rprintf(FINFO,"offset=%.0f sum=%08x\n",(double)offset,sum);
+		if (verbose > 4) {
+			rprintf(FINFO, "offset=%.0f sum=%04x%04x\n",
+				(double)offset, s1 & 0xFFFF, s2 & 0xFFFF);
+		}
 
-		i = hash_table[SUM2HASH(sum)];
+		i = hash_table[SUM2HASH2(s1,s2)];
 		if (i < 0)
 			goto null_hash;
 
+		sum = (s1 & 0xffff) | (s2 << 16);
 		hash_hits++;
 		do {
 			int32 l;
@@ -272,7 +269,6 @@ static void hash_search(int f,struct sum_struct *s,
 			s2 += s1;
 		} else
 			--k;
-		sum = (s1 & 0xffff) | (s2 << 16);
 
 		/* By matching early we avoid re-reading the
 		   data 3 times in the case where a token
