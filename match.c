@@ -159,7 +159,7 @@ static void hash_search(int f,struct sum_struct *s,
 
 		if (verbose > 4) {
 			rprintf(FINFO, "offset=%.0f sum=%04x%04x\n",
-				(double)offset, s1 & 0xFFFF, s2 & 0xFFFF);
+				(double)offset, s2 & 0xFFFF, s1 & 0xFFFF);
 		}
 
 		i = hash_table[SUM2HASH2(s1,s2)];
