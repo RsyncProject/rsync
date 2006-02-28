@@ -27,12 +27,12 @@ extern int append_mode;
 int updating_basis_file;
 
 static int false_alarms;
-static int tag_hits;
+static int hash_hits;
 static int matches;
 static int64 data_transfer;
 
 static int total_false_alarms;
-static int total_tag_hits;
+static int total_hash_hits;
 static int total_matches;
 
 extern struct stats stats;
@@ -40,8 +40,7 @@ extern struct stats stats;
 static uint32 tablesize;
 static int32 *sum_table;
 
-#define gettag2(s1,s2) gettag((s1) + ((s2)<<16))
-#define gettag(sum) ((sum)%tablesize)
+#define GETTAG(sum) ((sum)%tablesize)
 
 static void build_hash_table(struct sum_struct *s)
 {
@@ -64,7 +63,7 @@ static void build_hash_table(struct sum_struct *s)
 	memset(sum_table, 0xFF, tablesize * sizeof sum_table[0]);
 
 	for (i = 0; i < s->count; i++) {
-		uint32 t = gettag(s->sums[i].sum1);
+		uint32 t = GETTAG(s->sums[i].sum1);
 		s->sums[i].chain = sum_table[t];
 		sum_table[t] = i;
 	}
@@ -161,16 +160,20 @@ static void hash_search(int f,struct sum_struct *s,
 	}
 
 	do {
-		uint32 t = gettag2(s1,s2);
 		int done_csum2 = 0;
 		int32 i;
+		uint32 t;
 
 		if (verbose > 4)
 			rprintf(FINFO,"offset=%.0f sum=%08x\n",(double)offset,sum);
 
-		sum = (s1 & 0xffff) | (s2 << 16);
-		tag_hits++;
-		for (i = sum_table[t]; i >= 0; i = s->sums[i].chain) {
+		t = GETTAG(sum);
+		i = sum_table[t];
+		if (i < 0)
+			goto null_hash;
+
+		hash_hits++;
+		do {
 			int32 l;
 
 			if (sum != s->sums[i].sum1)
@@ -250,8 +253,9 @@ static void hash_search(int f,struct sum_struct *s,
 			s2 = sum >> 16;
 			matches++;
 			break;
-		}
+		} while ((i = s->sums[i].chain) >= 0);
 
+	  null_hash:
 		backup = offset - last_match;
 		/* We sometimes read 1 byte prior to last_match... */
 		if (backup < 0)
@@ -270,6 +274,7 @@ static void hash_search(int f,struct sum_struct *s,
 			s2 += s1;
 		} else
 			--k;
+		sum = (s1 & 0xffff) | (s2 << 16);
 
 		/* By matching early we avoid re-reading the
 		   data 3 times in the case where a token
@@ -306,7 +311,7 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 
 	last_match = 0;
 	false_alarms = 0;
-	tag_hits = 0;
+	hash_hits = 0;
 	matches = 0;
 	data_transfer = 0;
 
@@ -359,10 +364,10 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	write_buf(f,file_sum,MD4_SUM_LENGTH);
 
 	if (verbose > 2)
-		rprintf(FINFO, "false_alarms=%d tag_hits=%d matches=%d\n",
-			false_alarms, tag_hits, matches);
+		rprintf(FINFO, "false_alarms=%d hash_hits=%d matches=%d\n",
+			false_alarms, hash_hits, matches);
 
-	total_tag_hits += tag_hits;
+	total_hash_hits += hash_hits;
 	total_false_alarms += false_alarms;
 	total_matches += matches;
 	stats.literal_data += data_transfer;
@@ -374,8 +379,7 @@ void match_report(void)
 		return;
 
 	rprintf(FINFO,
-		"total: matches=%d  tag_hits=%d  false_alarms=%d data=%.0f\n",
-		total_matches,total_tag_hits,
-		total_false_alarms,
+		"total: matches=%d  hash_hits=%d  false_alarms=%d data=%.0f\n",
+		total_matches, total_hash_hits, total_false_alarms,
 		(double)stats.literal_data);
 }
