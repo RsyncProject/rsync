@@ -104,6 +104,9 @@ Changes since 2.6.6:
     - Rsync now ignores the SIGXFSZ signal, just in case your OS sends this
       when a file is too large (rsync handles the write error).
 
+    - Fixed a bug in the debug output (-vvvvv) that could mention the wrong
+      checksum for the current file offset.
+
   ENHANCEMENTS:
 
     - Added the --append option that makes rsync append data onto files that
