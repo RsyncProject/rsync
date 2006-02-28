@@ -162,13 +162,11 @@ static void hash_search(int f,struct sum_struct *s,
 	do {
 		int done_csum2 = 0;
 		int32 i;
-		uint32 t;
 
 		if (verbose > 4)
 			rprintf(FINFO,"offset=%.0f sum=%08x\n",(double)offset,sum);
 
-		t = GETTAG(sum);
-		i = sum_table[t];
+		i = sum_table[GETTAG(sum)];
 		if (i < 0)
 			goto null_hash;
 
