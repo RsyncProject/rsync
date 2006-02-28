@@ -38,7 +38,7 @@ static int total_matches;
 extern struct stats stats;
 
 static uint32 tablesize;
-static int32 *sum_table;
+static int32 *hash_table;
 
 #define SUM2HASH(sum) ((sum)%tablesize)
 
@@ -54,18 +54,18 @@ static void build_hash_table(struct sum_struct *s)
 	if (tablesize < 65537)
 		tablesize = 65537; /* a prime number */
 	if (tablesize != prior_size) {
-		free(sum_table);
-		sum_table = new_array(int32, tablesize);
-		if (!sum_table)
+		free(hash_table);
+		hash_table = new_array(int32, tablesize);
+		if (!hash_table)
 			out_of_memory("build_hash_table");
 	}
 
-	memset(sum_table, 0xFF, tablesize * sizeof sum_table[0]);
+	memset(hash_table, 0xFF, tablesize * sizeof hash_table[0]);
 
 	for (i = 0; i < s->count; i++) {
 		uint32 t = SUM2HASH(s->sums[i].sum1);
-		s->sums[i].chain = sum_table[t];
-		sum_table[t] = i;
+		s->sums[i].chain = hash_table[t];
+		hash_table[t] = i;
 	}
 }
 
@@ -166,7 +166,7 @@ static void hash_search(int f,struct sum_struct *s,
 		if (verbose > 4)
 			rprintf(FINFO,"offset=%.0f sum=%08x\n",(double)offset,sum);
 
-		i = sum_table[SUM2HASH(sum)];
+		i = hash_table[SUM2HASH(sum)];
 		if (i < 0)
 			goto null_hash;
 
