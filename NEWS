@@ -242,13 +242,6 @@ Changes since 2.6.6:
 
     - Added the --copy-dirlinks option, a more limited version of --copy-links.
 
-    - The sender's hash table for checksum information was improved to make it
-      more efficient when updating really large files (starting from around
-      2.5GB, but most visibly for much larger files).  This prevents the hash
-      table from getting overloaded, which saves CPU time (and real time) at
-      the expense of a little extra memory (and it actually saves memory for
-      normal sized files).
-
     - Various documentation improvements, including: a better synopsis, some
       improved examples, a better discussion of the presence and absence of
       --perms (including how it interacts with the new --executability and
@@ -287,6 +280,9 @@ Changes since 2.6.6:
       output going to the terminal.
 
     - Unified the f_name() and the f_name_to() functions.
+
+    - Improved the hash-table code the sender uses to handle checksums to make
+      it use slightly less memory and run just a little faster.
 
   DEVELOPER RELATED:
 
