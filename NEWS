@@ -96,7 +96,7 @@ Changes since 2.6.6:
       longer complains about being unable to open the missing dir.
 
     - Fixed a bug where the --copy-links option would not affect implied
-      directories (see --relative) without --copy-unsafe-links.
+      directories without --copy-unsafe-links (see --relative).
 
     - Got rid of the need for --force to be used in some circumstances with
       --delete-after (making it consistent with --delete-before/-during).
@@ -232,9 +232,8 @@ Changes since 2.6.6:
       clump up all the removals at the end).
 
     - A daemon now supersedes its minimal SIGCHLD handler with the standard
-      PID-remembering version after forking to handle the request.  This
-      ensures that the generator can get the child-exit status from the
-      receiver.
+      PID-remembering version after forking.  This ensures that the generator
+      can get the child-exit status from the receiver.
 
     - Use of the --bwlimit option no longer interferes with the remote rsync
       sending error messages about invalid/refused options.
