@@ -1657,13 +1657,18 @@ must not be world readable. It should contain just the password as a
 single line.
 
 dit(bf(--list-only)) This option will cause the source files to be listed
-instead of transferred.  This option is inferred if there is no destination
-specified, so its main uses are: (1) to turn a copy command that includes a
+instead of transferred.  This option is inferred if there is a single source
+arg and no destination specified, so its main uses are: (1) to turn a copy
+command that includes a
 destination arg into a file-listing command, (2) to be able to specify more
 than one local source arg (note: be sure to include the destination), or
 (3) to avoid the automatically added "bf(-r --exclude='/*/*')" options that
 rsync usually uses as a compatibility kluge when generating a non-recursive
-listing.
+listing.  Caution: keep in mind that a source arg with a wild-card is expanded
+by the shell into multiple args, so it is never safe to try to list such an arg
+without using this option.  For example:
+
+verb(    rsync -av --list-only foo* dest/)
 
 dit(bf(--bwlimit=KBPS)) This option allows you to specify a maximum
 transfer rate in kilobytes per second. This option is most effective when
