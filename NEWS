@@ -107,6 +107,9 @@ Changes since 2.6.6:
     - Fixed a bug in the debug output (-vvvvv) that could mention the wrong
       checksum for the current file offset.
 
+    - Rsync no longer allows a single directory to be copied over a non-
+      directory destination arg.
+
   ENHANCEMENTS:
 
     - Added the --append option that makes rsync append data onto files that
