@@ -480,6 +480,13 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 				" copying more than 1 file\n");
 			exit_cleanup(RERR_FILESELECT);
 		}
+		/* Caution: flist->count could be 0! */
+		if (flist->count == 1 && S_ISDIR(flist->files[0]->mode)) {
+			rprintf(FERROR,
+				"ERROR: cannot overwrite non-directory"
+				" with a directory\n");
+			exit_cleanup(RERR_FILESELECT);
+		}
 	} else if (errno != ENOENT) {
 		rsyserr(FERROR, errno, "cannot stat destination %s",
 			full_fname(dest_path));
