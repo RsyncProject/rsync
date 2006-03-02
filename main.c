@@ -438,8 +438,8 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 
 /* The receiving side operates in one of two modes:
  *
- * 1. it enters a directory and receives one or more files, placing them
- * according to their names in the file-list.
+ * 1. it receives any number of files into a destination directory,
+ * placing them according to their names in the file-list.
  *
  * 2. it receives a single file and saves it using the name in the
  * destination path instead of its file-list name.  This requires a
@@ -480,6 +480,10 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 				" copying more than 1 file\n");
 			exit_cleanup(RERR_FILESELECT);
 		}
+	} else if (errno != ENOENT) {
+		rsyserr(FERROR, errno, "cannot stat destination %s",
+			full_fname(dest_path));
+		exit_cleanup(RERR_FILESELECT);
 	}
 
 	cp = strrchr(dest_path, '/');
