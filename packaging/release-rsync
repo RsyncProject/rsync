@@ -140,6 +140,7 @@ About to:
 EOT
 print "<Press Enter to continue> ";
 $_ = <STDIN>;
+my $f_opt = /f/ ? ' -f' : '';
 
 print $break;
 system "./prepare-source && touch proto.h";
@@ -178,7 +179,7 @@ mkdir('patches/tmp') or die $!;
 system "rsync -a --exclude=patches/ --exclude-from=.cvsignore . patches/tmp/cvsdir/";
 
 print "\n", $break, $note, $break;
-system "patches/verify-patches -un -an";
+system "patches/verify-patches -n -an$f_opt";
 
 print $break;
 system "cvs -q diff | egrep -v '^(===============|RCS file: |retrieving revision |Index: )' | less -p '^diff .*'";
@@ -236,30 +237,38 @@ if ($diffdir ne $dest) {
     # We need to run this regardless of $lastversion's "pre"ness.
     my @moved_files;
     foreach my $fn (glob('rsync*pre*.tar.gz*'), glob('rsync*pre*-NEWS')) {
-	link($fn, "old-previews/$fn") or die $!;
-	push(@moved_files, $fn);
+	my $new_fn = "old-previews/$fn";
+	rename($fn, $new_fn) or die $!;
+	push(@moved_files, $new_fn);
     }
 
     if ($version !~ /pre/) {
 	foreach my $fn (glob('rsync*.tar.gz*'), glob('rsync*-NEWS')) {
 	    next if $fn =~ /^rsync.*pre/;
-	    link($fn, "old-versions/$fn") or die $!;
-	    push(@moved_files, $fn);
+	    my $new_fn = "old-versions/$fn";
+	    rename($fn, $new_fn) or die $!;
+	    push(@moved_files, $new_fn);
 	}
 
 	foreach my $fn (glob('rsync*.diffs.gz*')) {
 	    next if $fn =~ /^rsync.*pre/;
-	    link($fn, "old-patches/$fn") or die $!;
-	    push(@moved_files, $fn);
+	    my $new_fn = "old-patches/$fn";
+	    rename($fn, $new_fn) or die $!;
+	    push(@moved_files, $new_fn);
 	}
     }
 
     # Optimize our future upload (in the absence of --detect-renamed) by
-    # uploading the above hard-linked files that we are about to delete.
+    # hard-linking the above moved files on the remote server.
     if ($live) {
-	system "rsync -avHC --include='rsync*.gz*' --include='old-*/' --exclude='*' . samba.org:/home/ftp/pub/rsync";
+	my $remote_cmd = '';
+	foreach (@moved_files) {
+	    my($path, $fn) = m#(.*)/([^/]+)$#;
+	    $remote_cmd .= "ln -f /home/ftp/pub/rsync/{$fn,$path};";
+	}
+	system "ssh samba.org '$remote_cmd'";
     }
-    foreach (@moved_files, glob("rsync*pre*.diffs.gz*")) {
+    foreach (glob("rsync*pre*.diffs.gz*")) {
 	unlink($_);
     }
 
