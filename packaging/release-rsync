@@ -277,7 +277,7 @@ if ($diffdir ne $dest) {
 
 print "Creating $tar_file ...\n";
 system "fakeroot tar czf $tar_file rsync-$version";
-open(TAR, '|-', "fakeroot tar --files-from=- --no-recursion --mode=g-w -czf $tar_file rsync-$version") or die $!;
+open(TAR, '|-', "fakeroot tar --files-from=- --no-recursion --mode=g+w -czf $tar_file rsync-$version") or die $!;
 foreach (@files) {
     print TAR "rsync-$version/$_\n";
 }
