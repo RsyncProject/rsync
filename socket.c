@@ -64,7 +64,7 @@ static int establish_proxy_connection(int fd, char *host, int port,
 			return -1;
 		}
 
-		base64_encode(buffer, len, authbuf);
+		base64_encode(buffer, len, authbuf, 1);
 		authhdr = "\r\nProxy-Authorization: Basic ";
 	} else {
 		*authbuf = '\0';
