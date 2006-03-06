@@ -26,14 +26,12 @@ extern char *password_file;
 encode a buffer using base64 - simple and slow algorithm. null terminates
 the result.
   ***************************************************************************/
-void base64_encode(char *buf, int len, char *out)
+void base64_encode(char *buf, int len, char *out, int pad)
 {
 	char *b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 	int bit_offset, byte_offset, idx, i;
 	unsigned char *d = (unsigned char *)buf;
 	int bytes = (len*8 + 5)/6;
-
-	memset(out, 0, bytes+1);
 
 	for (i = 0; i < bytes; i++) {
 		byte_offset = (i*6)/8;
@@ -48,6 +46,11 @@ void base64_encode(char *buf, int len, char *out)
 		}
 		out[i] = b64[idx];
 	}
+
+	while (pad && (i % 4))
+		out[i++] = '=';
+
+	out[i] = '\0';
 }
 
 /* Generate a challenge buffer and return it base64-encoded. */
@@ -69,7 +72,7 @@ static void gen_challenge(char *addr, char *challenge)
 	sum_update(input, sizeof input);
 	sum_end(md4_out);
 
-	base64_encode(md4_out, MD4_SUM_LENGTH, challenge);
+	base64_encode(md4_out, MD4_SUM_LENGTH, challenge, 0);
 }
 
 
@@ -208,7 +211,7 @@ static void generate_hash(char *in, char *challenge, char *out)
 	sum_update(challenge, strlen(challenge));
 	sum_end(buf);
 
-	base64_encode(buf, MD4_SUM_LENGTH, out);
+	base64_encode(buf, MD4_SUM_LENGTH, out, 0);
 }
 
 /* Possibly negotiate authentication with the client.  Use "leader" to
