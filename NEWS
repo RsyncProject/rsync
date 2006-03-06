@@ -104,6 +104,11 @@ Changes since 2.6.6:
     - Rsync now ignores the SIGXFSZ signal, just in case your OS sends this
       when a file is too large (rsync handles the write error).
 
+    - Fixed a bug in the Proxy-Authorization header's base64-encoded value: it
+      was not properly padded with trailing '=' chars.  This only affects a
+      user that need to use a password-authenticated proxy for an outgoing
+      daemon-rsync connection.
+
     - Fixed a bug in the debug output (-vvvvv) that could mention the wrong
       checksum for the current file offset.
 
