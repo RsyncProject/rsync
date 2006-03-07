@@ -58,7 +58,7 @@ static int establish_proxy_connection(int fd, char *host, int port,
 			 proxy_user, ":", proxy_pass, NULL);
 		len = strlen(buffer);
 
-		if ((len*8 + 5) / 6 >= (int)sizeof authbuf) {
+		if ((len*8 + 5) / 6 >= (int)sizeof authbuf - 3) {
 			rprintf(FERROR,
 				"authentication information is too long\n");
 			return -1;
