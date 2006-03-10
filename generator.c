@@ -1299,6 +1299,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	int save_ignore_non_existing = ignore_non_existing;
 	int save_do_progress = do_progress;
 	int save_make_backups = make_backups;
+	int dir_tweaking = !(list_only || local_name || dry_run);
 
 	if (protocol_version >= 29) {
 		itemizing = 1;
@@ -1360,7 +1361,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		 * them.  This is then fixed after the transfer is done. */
 #ifdef HAVE_CHMOD
 		if (!am_root && S_ISDIR(file->mode) && !(file->mode & S_IWUSR)
-		    && !list_only) {
+		 && dir_tweaking) {
 			mode_t mode = file->mode | S_IWUSR; /* user write */
 			char *fname = local_name ? local_name : fbuf;
 			if (do_chmod(fname, mode) < 0) {
@@ -1440,8 +1441,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	if (delete_after && !local_name && flist->count > 0)
 		do_delete_pass(flist);
 
-	if ((need_retouch_dir_perms || need_retouch_dir_times)
-	    && !list_only && !local_name && !dry_run) {
+	if ((need_retouch_dir_perms || need_retouch_dir_times) && dir_tweaking) {
 		int j = 0;
 		/* Now we need to fix any directory permissions that were
 		 * modified during the transfer and/or re-set any tweaked
