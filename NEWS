@@ -109,6 +109,10 @@ Changes since 2.6.6:
       user that need to use a password-authenticated proxy for an outgoing
       daemon-rsync connection.
 
+    - If we're transferring an empty directory to a new name, rsync no longer
+      forces S_IWUSR if it wasn't already set, nor does it accidentally leave
+      it set.
+
     - Fixed a bug in the debug output (-vvvvv) that could mention the wrong
       checksum for the current file offset.
 
