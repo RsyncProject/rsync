@@ -1,4 +1,5 @@
-NEWS for rsync 2.6.7 (UNRELEASED)
+NEWS for rsync 2.6.7 (11 Mar 2006)
+
 Protocol: 29 (unchanged)
 Changes since 2.6.6:
 
