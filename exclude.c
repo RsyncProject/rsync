@@ -562,7 +562,7 @@ static int rule_matches(char *name, struct filter_struct *ex, int name_is_dir)
 		if (litmatch_array(pattern, strings, slash_handling))
 			return ret_match;
 	} else if (anchored_match) {
-		if (strcmp(name,pattern) == 0)
+		if (strcmp(strings[0], pattern) == 0)
 			return ret_match;
 	} else {
 		int l1 = strlen(name);
