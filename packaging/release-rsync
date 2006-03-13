@@ -163,7 +163,7 @@ foreach my $fn (@tweak_files) {
 	s/^(manpage\([^)]+\)\(\d+\)\()[^)]+(\).*)/$1$today$2/m;
 	s/^(This man ?page is current for version) \S+ (of rsync)/$1 $version $2/m;
     } else {
-	s/^(NEWS for rsync \Q$version\E) \(UNRELEASED\)\s*$/$1 ($today)\n/m;
+	s/^(NEWS for rsync \Q$version\E) \(UNRELEASED\)\s*\n/$1 ($today)\n/m;
 	s/^\t\S\S\s\S\S\S\s\d\d\d\d(\t\Q$version\E)/\t$ztoday$1/m;
     }
     open(OUT, '>', $fn) or die $!;
@@ -259,12 +259,12 @@ if ($diffdir ne $dest) {
     }
 
     # Optimize our future upload (in the absence of --detect-renamed) by
-    # hard-linking the above moved files on the remote server.
+    # copying the above moved files on the remote server.
     if ($live) {
 	my $remote_cmd = '';
 	foreach (@moved_files) {
 	    my($path, $fn) = m#(.*)/([^/]+)$#;
-	    $remote_cmd .= "ln -f /home/ftp/pub/rsync/{$fn,$path};";
+	    $remote_cmd .= "cp -p /home/ftp/pub/rsync/{$fn,$path};";
 	}
 	system "ssh samba.org '$remote_cmd'";
     }
