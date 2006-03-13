@@ -203,5 +203,12 @@ $RSYNC -av --delete-excluded --exclude='*' "$fromdir/" "$todir/"
 checkit "$RSYNC -avv -f dir-merge,-_.excl \
     \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
 
+$RSYNC -avR "$fromdir/foo" "$chkdir/"
+rm -rf "$chkdir$fromdir/foo/down"
+$RSYNC -avR --existing --filter='-! */' "$fromdir/foo" "$chkdir/"
+
+checkit "$RSYNC -avvR --exclude=\"$fromdir/foo/down\" \
+    \"$fromdir/foo\" \"$todir\"" "$chkdir$fromdir/foo" "$todir$fromdir/foo"
+
 # The script would have aborted on error, so getting here means we've won.
 exit 0
