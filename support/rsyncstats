@@ -52,9 +52,22 @@ if ($only_section) {
 
 line: while (<LOG>) {
 
+my $syslog_prefix = '\w\w\w +\d+ \d\d:\d\d:\d\d \S+ rsyncd';
+my $rsyncd_prefix = '\d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d ';
+
    next unless ($day,$time,$op,$host,$module,$file,$bytes)
-      = m#^ (\d+/\d\d/\d\d)\s+(\d\d:\d\d:\d\d)\s+\[\d+\]\s+(send|recv|[<>]f\S+)\s+
-          (\S+)\s+\[\d+\.\d+\.\d+\.\d+\]\s+(\S+)\s+\(\S*\)\s+(.*)\s+(\d+) $ #x;
+      = m{^
+	  ( \w\w\w\s+\d+ | \d+/\d\d/\d\d ) \s+ # day
+	  (\d\d:\d\d:\d\d) \s+                 # time
+	  [^[]* \[\d+\]:? \s+                  # pid (ignored)
+	  (send|recv|[<>]f\S+) \s+             # op (%o or %i)
+	  (\S+) \s+                            # host
+	  \[\d+\.\d+\.\d+\.\d+\] \s+           # IP (ignored)
+	  (\S+) \s+                            # module
+	  \(\S*\) \s+                          # user (ignored)
+	  (.*) \s+                             # file name
+	  (\d+)                                # file length in bytes
+	  $ }x;
 
    # TODO actually divide the data by into send/recv categories
    if ($op =~ /^>/) {
