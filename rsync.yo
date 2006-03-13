@@ -1453,7 +1453,7 @@ dit(bf(--stats)) This tells rsync to print a verbose set of statistics
 on the file transfer, allowing you to tell how effective the rsync
 algorithm is for your data.
 
-The current statistics are as follows: itemize(
+The current statistics are as follows: quote(itemize(
   it() bf(Number of files) is the count of all "files" (in the generic
   sense), which includes directories, symlinks, etc.
   it() bf(Number of files transferred) is the count of normal files that
@@ -1483,7 +1483,7 @@ The current statistics are as follows: itemize(
   rsync received by the client side from the server side.  "Non-message"
   bytes means that we don't count the bytes for a verbose message that the
   server sent to us, which makes the stats more consistent.
-)
+))
 
 dit(bf(-8, --8-bit-output)) This tells rsync to leave all high-bit characters
 unescaped in the output instead of trying to test them to see if they're
