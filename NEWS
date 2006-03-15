@@ -5,10 +5,16 @@ Changes since 2.6.7:
   BUG FIXES:
 
     - Fixed a bug in the exclude code where an anchored exclude without any
-      wildcards failed to match an absolute source arg, but only when
-      --relative is in effect.
+      wildcards fails to match an absolute source arg, but only when --relative
+      is in effect.
 
   ENHANCEMENTS:
 
     - The support/rsyncstats script has an improved line-parsing regex that is
       easier to read and also allows it to parse syslog-generated lines.
+
+  DEVELOPER RELATED:
+
+    - A new patch was added: log-file.diff.  This contains an early version of
+      a future option, --log-file=FILE, that will allow any rsync to log its
+      actions to a file (which is only supported by a daemon at present).
