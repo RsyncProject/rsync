@@ -1880,7 +1880,6 @@ itemize(
   of the transfer.
   it() if the pattern ends with a / then it will only match a
   directory, not a file, link, or device.
-
   it() rsync chooses between doing a simple string match and wildcard
   matching by checking if the pattern contains one of these three wildcard
   characters: '*', '?', and '[' .
