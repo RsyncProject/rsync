@@ -1103,7 +1103,7 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 
 		if (msg2sndr.head && !defer_forwarding_messages) {
 			struct msg_list_item *m = msg2sndr.head;
-			int code = (IVAL(m->buf,0) >> 24) - MPLEX_BASE;
+			int code = *((uchar*)m->buf+3) - MPLEX_BASE;
 			if (!(msg2sndr.head = m->next))
 				msg2sndr.tail = NULL;
 			defer_forwarding_messages = 1;
