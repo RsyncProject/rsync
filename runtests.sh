@@ -163,11 +163,13 @@ else
     echo "    preserve_scratch=no"
 fi    
 
-# We'll use setfacl if it's around and it supports the -k option.
+# Check if setfacl is around and if it supports the -k or -s option.
 if setfacl --help 2>/dev/null | grep ' -k,' >/dev/null; then
-    setfacl=setfacl
+    setfacl_nodef='setfacl -k'
+elif setfacl -s u::7,g::5,o:5 testsuite 2>/dev/null; then
+    setfacl_nodef='setfacl -s u::7,g::5,o:5'
 else
-    setfacl=true
+    setfacl_nodef=true
 fi
 
 if [ ! -f "$rsync_bin" ]; then
@@ -183,7 +185,7 @@ fi
 RSYNC="$rsync_bin"
 #RSYNC="valgrind --tool=addrcheck $rsync_bin"
 
-export rsync_bin RSYNC
+export rsync_bin RSYNC setfacl_nodef
 
 skipped=0
 missing=0
@@ -204,7 +206,7 @@ prep_scratch() {
     [ -d "$scratchdir" ] && rm -rf "$scratchdir"
     mkdir "$scratchdir"
     # Get rid of default ACLs and dir-setgid to avoid confusing some tests.
-    $setfacl -k "$scratchdir"
+    $setfacl_nodef "$scratchdir"
     chmod g-s "$scratchdir"
     return 0
 }
