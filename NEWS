@@ -8,6 +8,11 @@ Changes since 2.6.7:
       wildcards fails to match an absolute source arg, but only when --relative
       is in effect.
 
+    - Improved the I/O code for the generator to fix a potential hang when the
+      receiver gets an EOF on the socket but the generator's select() call
+      never indicates that the socket is writable for it to be notified about
+      the EOF.  (This can happen when using stunnel).
+
   ENHANCEMENTS:
 
     - The support/rsyncstats script has an improved line-parsing regex that is
