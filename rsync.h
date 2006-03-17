@@ -135,15 +135,15 @@
 #define FNAMECMP_FUZZY		0x83
 
 /* For use by the itemize_changes code */
+#define ITEM_REPORT_ATIME (1<<0)
 #define ITEM_REPORT_CHECKSUM (1<<1)
 #define ITEM_REPORT_SIZE (1<<2)
 #define ITEM_REPORT_TIME (1<<3)
 #define ITEM_REPORT_PERMS (1<<4)
 #define ITEM_REPORT_OWNER (1<<5)
 #define ITEM_REPORT_GROUP (1<<6)
-#define ITEM_REPORT_ATIME (1<<7)
-#define ITEM_REPORT_ACL (1<<8)
-#define ITEM_REPORT_XATTR (1<<9)
+#define ITEM_REPORT_ACL (1<<7)
+#define ITEM_REPORT_XATTR (1<<8)
 #define ITEM_BASIS_TYPE_FOLLOWS (1<<11)
 #define ITEM_XNAME_FOLLOWS (1<<12)
 #define ITEM_IS_NEW (1<<13)
