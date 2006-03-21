@@ -254,7 +254,7 @@ In order to connect to an rsync daemon, the remote system needs to have a
 daemon already running (or it needs to have configured something like inetd
 to spawn an rsync daemon for incoming connections on a particular port).
 For full information on how to start a daemon that will handling incoming
-socket connections, see the rsyncd.conf(5) man page -- that is the config
+socket connections, see the bf(rsyncd.conf)(5) man page -- that is the config
 file for the daemon, and it contains the full details for how to run the
 daemon (including stand-alone and inetd configurations).
 
@@ -1078,7 +1078,7 @@ are delimited by whitespace).
 Finally, any file is ignored if it is in the same directory as a
 .cvsignore file and matches one of the patterns listed therein.  Unlike
 rsync's filter/exclude files, these patterns are split on whitespace.
-See the bf(cvs(1)) manual for more information.
+See the bf(cvs)(1) manual for more information.
 
 If you're combining bf(-C) with your own bf(--filter) rules, you should
 note that these CVS excludes are appended at the end of your own rules,
@@ -1345,7 +1345,7 @@ option in the bf(--daemon) mode section.
 dit(bf(--sockopts)) This option can provide endless fun for people
 who like to tune their systems to the utmost degree. You can set all
 sorts of socket options which may make transfers faster (or
-slower!). Read the man page for the setsockopt() system call for
+slower!). Read the man page for the code(setsockopt()) system call for
 details on some of the options you may be able to set. By default no
 special socket options are set. This only affects direct socket
 connections to a remote rsync daemon.  This option also exists in the
@@ -1720,11 +1720,11 @@ rsync daemon.  See also these options in the bf(--daemon) mode section.
 dit(bf(--checksum-seed=NUM)) Set the MD4 checksum seed to the integer
 NUM.  This 4 byte checksum seed is included in each block and file
 MD4 checksum calculation.  By default the checksum seed is generated
-by the server and defaults to the current time().  This option
+by the server and defaults to the current code(time()).  This option
 is used to set a specific checksum seed, which is useful for
 applications that want repeatable block and file checksums, or
 in the case where the user wants a more random checksum seed.
-Note that setting NUM to 0 causes rsync to use the default of time()
+Note that setting NUM to 0 causes rsync to use the default of code(time())
 for checksum seed.
 enddit()
 
@@ -1741,7 +1741,7 @@ If standard input is a socket then rsync will assume that it is being
 run via inetd, otherwise it will detach from the current terminal and
 become a background daemon.  The daemon will read the config file
 (rsyncd.conf) on each connect made by a client and respond to
-requests accordingly.  See the rsyncd.conf(5) man page for more
+requests accordingly.  See the bf(rsyncd.conf)(5) man page for more
 details.
 
 dit(bf(--address)) By default rsync will bind to the wildcard address when
@@ -2257,7 +2257,8 @@ For convenience, one additional file is creating when the write-batch
 option is used.  This file's name is created by appending
 ".sh" to the batch filename.  The .sh file contains
 a command-line suitable for updating a destination tree using that
-batch file. It can be executed using a Bourne(-like) shell, optionally
+batch file. It can be executed using a Bourne (or Bourne-like) shell,
+optionally
 passing in an alternate destination tree pathname which is then used
 instead of the original path. This is useful when the destination tree
 path differs from the original destination tree path.
@@ -2434,7 +2435,7 @@ dit(bf(12)) Error in rsync protocol data stream
 dit(bf(13)) Errors with program diagnostics
 dit(bf(14)) Error in IPC code
 dit(bf(20)) Received SIGUSR1 or SIGINT
-dit(bf(21)) Some error returned by waitpid()
+dit(bf(21)) Some error returned by code(waitpid())
 dit(bf(22)) Error allocating core memory buffers
 dit(bf(23)) Partial transfer due to error
 dit(bf(24)) Partial transfer due to vanished source files
@@ -2471,7 +2472,7 @@ manpagefiles()
 
 manpageseealso()
 
-rsyncd.conf(5)
+bf(rsyncd.conf)(5)
 
 manpagebugs()
 
