@@ -86,7 +86,7 @@ is no motd file.
 
 dit(bf(log file)) The "log file" option tells the rsync daemon to log
 messages to that file rather than using syslog. This is particularly
-useful on systems (such as AIX) where syslog() doesn't work for
+useful on systems (such as AIX) where code(syslog()) doesn't work for
 chrooted programs.  If the daemon fails to open to specified file, it
 will fall back to using syslog and output an error about the failure.
 (Note that a failure to open the specified log file used to be a fatal
@@ -114,7 +114,7 @@ being run by inetd, and is superseded by the bf(--address) command-line option.
 dit(bf(socket options)) This option can provide endless fun for people
 who like to tune their systems to the utmost degree. You can set all
 sorts of socket options which may make transfers faster (or
-slower!). Read the man page for the setsockopt() system call for
+slower!). Read the man page for the code(setsockopt()) system call for
 details on some of the options you may be able to set. By default no
 special socket options are set.  These settings are superseded by the
 bf(--sockopts) command-line option.
@@ -154,7 +154,7 @@ The default for "use chroot" is true.
 
 In order to preserve usernames and groupnames, rsync needs to be able to
 use the standard library functions for looking up names and IDs (i.e.
-getpwuid(), getgrgid(), getpwname(), and getgrnam()).  This means a
+code(getpwuid()), code(getgrgid()), code(getpwname()), and code(getgrnam())).  This means a
 process in the chroot namespace will need to have access to the resources
 used by these library functions (traditionally /etc/passwd and
 /etc/group).  If these resources are not available, rsync will only be
@@ -294,7 +294,7 @@ usernames and passwords are stored in the file specified by the
 connect without a password (this is called "anonymous rsync").
 
 See also the "CONNECTING TO AN RSYNC DAEMON OVER A REMOTE SHELL
-PROGRAM" section in rsync(1) for information on how handle an
+PROGRAM" section in bf(rsync)(1) for information on how handle an
 rsyncd.conf-level username that differs from the remote-shell-level
 username when using a remote shell to connect to an rsync daemon.
 
@@ -497,7 +497,7 @@ quote(itemize(
   it() bf(RSYNC_EXIT_STATUS): (post-xfer only) rsync's exit value.  This will be 0 for a
   successful run, a positive value for an error that rsync returned
   (e.g. 23=partial xfer), or a -1 if rsync failed to exit properly.
-  it() bf(RSYNC_RAW_STATUS): (post-xfer only) the raw exit value from waitpid().
+  it() bf(RSYNC_RAW_STATUS): (post-xfer only) the raw exit value from code(waitpid()).
 ))
 
 Even though the commands can be associated with a particular module, they
