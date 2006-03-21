@@ -1,0 +1,172 @@
+#!/usr/bin/perl
+# This script will parse the output of "find ARG [ARG...] -ls" and
+# apply (at your discretion) the permissions, owner, and group info
+# it reads onto any existing files and dirs (it doesn't try to affect
+# symlinks).  Run this with --help (-h) for a usage summary.
+
+use strict;
+use Getopt::Long;
+
+our($p_opt, $o_opt, $g_opt, $map_file, $dry_run, $verbosity, $help_opt);
+
+&Getopt::Long::Configure('bundling');
+&usage if !&GetOptions(
+    'all|a' => sub { $p_opt = $o_opt = $g_opt = 1 },
+    'perms|p' => \$p_opt,
+    'owner|o' => \$o_opt,
+    'groups|g' => \$g_opt,
+    'map|m=s' => \$map_file,
+    'dry-run|n' => \$dry_run,
+    'help|h' => \$help_opt,
+    'verbose|v+' => \$verbosity,
+) || $help_opt;
+
+our(%uid_hash, %gid_hash);
+
+$" = ', '; # How to join arrays referenced in double-quotes.
+
+&parse_map_file($map_file) if defined $map_file;
+
+my $detail_line = qr{
+    ^ \s* \d+ \s+             # ignore inode
+    \d+ \s+                   # ignore size
+    ([-bcdlps])               # 1. File type
+    ( [-r][-w][-xsS]          # 2. user-permissions
+      [-r][-w][-xsS]          # 3. group-permissions
+      [-r][-w][-xtT] ) \s+    # 4. other-permissions
+    \d+ \s+                   # ignore number of links
+    (\S+) \s+                 # 5. owner
+    (\S+) \s+                 # 6. group
+    (?: \d+ \s+ )?            # ignore size (when present)
+    \w+ \s+ \d+ \s+           # ignore month and date
+    \d+ (?: : \d+ )? \s+      # ignore time or year
+    ([^\r\n]+) $              # 7. name
+}x;
+
+while (<>) {
+    my($type, $perms, $owner, $group, $name) = /$detail_line/;
+    die "Invalid input line $.:\n$_" unless defined $name;
+    die "A filename is not properly escaped:\n$_" unless $name =~ /^[^"\\]*(\\(\d\d\d|\D)[^"\\]*)*$/;
+    my $fn = eval "\"$name\"";
+    if ($type eq '-') {
+	undef $type unless -f $fn;
+    } elsif ($type eq 'd') {
+	undef $type unless -d $fn;
+    } elsif ($type eq 'b') {
+	undef $type unless -b $fn;
+    } elsif ($type eq 'c') {
+	undef $type unless -c $fn;
+    } elsif ($type eq 'p') {
+	undef $type unless -p $fn;
+    } elsif ($type eq 's') {
+	undef $type unless -S $fn;
+    } else {
+	if ($verbosity) {
+	    if ($type eq 'l') {
+		$name =~ s/ -> .*//;
+		$type = 'symlink';
+	    } else {
+		$type = "type '$type'";
+	    }
+	    print "Skipping $name ($type ignored)\n";
+	}
+	next;
+    }
+    if (!defined $type) {
+	my $reason = -e _ ? "types don't match" : 'missing';
+	print "Skipping $name ($reason)\n";
+	next;
+    }
+    my($cur_mode, $cur_uid, $cur_gid) = (stat(_))[2,4,5];
+    $cur_mode &= 07777;
+    my $highs = join('', $perms =~ /..(.)..(.)..(.)/);
+    $highs =~ tr/-rwxSTst/00001111/;
+    $perms =~ tr/-STrwxst/00011111/;
+    my $mode = $p_opt ? oct('0b' . $highs . $perms) : $cur_mode;
+    my $uid = $o_opt ? $uid_hash{$owner} : $cur_uid;
+    if (!defined $uid) {
+	if ($owner =~ /^\d+$/) {
+	    $uid = $owner;
+	} else {
+	    $uid = getpwnam($owner);
+	}
+	$uid_hash{$owner} = $uid;
+    }
+    my $gid = $g_opt ? $gid_hash{$group} : $cur_gid;
+    if (!defined $gid) {
+	if ($group =~ /^\d+$/) {
+	    $gid = $group;
+	} else {
+	    $gid = getgrnam($group);
+	}
+	$gid_hash{$group} = $gid;
+    }
+
+    my @changes;
+    if ($mode != $cur_mode) {
+	push(@changes, 'permissions');
+	if (!$dry_run && !chmod($mode, $fn)) {
+	    warn "chmod($mode, \"$name\") failed: $!\n";
+	}
+    }
+    if ($uid != $cur_uid || $gid != $cur_gid) {
+	push(@changes, 'owner') if $uid != $cur_uid;
+	push(@changes, 'group') if $gid != $cur_gid;
+	if (!$dry_run) {
+	    if (!chown($uid, $gid, $fn)) {
+		warn "chown($uid, $gid, \"$name\") failed: $!\n";
+	    }
+	    if (($mode & 06000) && !chmod($mode, $fn)) {
+		warn "post-chown chmod($mode, \"$name\") failed: $!\n";
+	    }
+	}
+    }
+    if (@changes) {
+	print "$name: changed @changes\n";
+    } elsif ($verbosity) {
+	print "$name: OK\n";
+    }
+}
+exit;
+
+sub parse_map_file
+{
+    my($fn) = @_;
+    open(IN, $fn) or die "Unable to open $fn: $!\n";
+    while (<IN>) {
+	if (/^user\s+(\S+)\s+(\S+)/) {
+	    $uid_hash{$1} = $2;
+	} elsif (/^group\s+(\S+)\s+(\S+)/) {
+	    $gid_hash{$1} = $2;
+	} else {
+	    die "Invalid line #$. in mapfile `$fn':\n$_";
+	}
+    }
+    close IN;
+}
+
+sub usage
+{
+    die <<EOT;
+Usage: file-attr-restore [OPTIONS] FILE [FILE...]
+ -a, --all       Restore all the attributes (-pog)
+ -p, --perms     Restore the permissions
+ -o, --owner     Restore the ownership
+ -g, --groups    Restore the group
+ -m, --map=FILE  Read user/group mappings from FILE
+ -n, --dry-run   Don't actually make the changes
+ -v, --verbose   Increase verbosity
+ -h, --help      Show this help text
+
+The FILE arg(s) should have been created by running the "find"
+program with "-ls" as the output specifier.
+
+The input file for the --map option must be in this format:
+
+    user FROM TO
+    group FROM TO
+
+The "FROM" should be an user/group mentioned in the input, and the TO
+should be either a uid/gid number, or a local user/group name.
+EOT
+}
