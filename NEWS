@@ -18,8 +18,12 @@ Changes since 2.6.7:
     - The support/rsyncstats script has an improved line-parsing regex that is
       easier to read and also allows it to parse syslog-generated lines.
 
+    - A new script, support/file-attr-restore, can be used to restore the
+      attributes of a fileset (the permissions, ownership, and group info)
+      taken from the cached output of a "find ARG... -ls" command.
+
   DEVELOPER RELATED:
 
     - A new patch was added: log-file.diff.  This contains an early version of
       a future option, --log-file=FILE, that will allow any rsync to log its
-      actions to a file (which is only supported by a daemon at present).
+      actions to a file (something that only a daemon supports at present).
