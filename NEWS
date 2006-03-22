@@ -15,6 +15,9 @@ Changes since 2.6.7:
 
   ENHANCEMENTS:
 
+    - In daemon mode, if rsync fails to bind to the requested port, the
+      error(s) returned by socket() and/or bind() are now logged.
+
     - The support/rsyncstats script has an improved line-parsing regex that is
       easier to read and also allows it to parse syslog-generated lines.
 
@@ -23,6 +26,8 @@ Changes since 2.6.7:
       taken from the cached output of a "find ARG... -ls" command.
 
   DEVELOPER RELATED:
+
+    - The acls.diff patch has been improved quite a bit, with more to come.
 
     - A new patch was added: log-file.diff.  This contains an early version of
       a future option, --log-file=FILE, that will allow any rsync to log its
