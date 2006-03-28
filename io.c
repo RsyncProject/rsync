@@ -333,7 +333,8 @@ static void read_msg_fd(void)
 		}
 		break;
 	default:
-		rprintf(FERROR, "unknown message %d:%d\n", tag, len);
+		rprintf(FERROR, "unknown message %d:%d [%s]\n",
+			tag, len, who_am_i());
 		exit_cleanup(RERR_STREAMIO);
 	}
 
