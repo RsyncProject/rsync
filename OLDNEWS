@@ -1091,6 +1091,8 @@ Changes since 2.6.2:
       user chose to combine the output of rsync's stdout and stderr (e.g.
       using the "2>&1").
 
+    - Fixed an option-parsing bug when --files-from got passed to a daemon.
+
   ENHANCEMENTS:
 
     - Added the --partial-dir=DIR option that lets you specify where to
@@ -1356,6 +1358,9 @@ Changes since 2.6.0:
 
     - Fixed the ability to request an empty backup --suffix when sending
       files to an rsync daemon.
+
+    - Fixed an option-parsing bug when --files-from was sent to a server
+      sender.
 
   INTERNAL:
 
@@ -2008,6 +2013,7 @@ Changes since 2.4.6:
 
 Partial Protocol History
 	RELEASE DATE	VER.	DATE OF COMMIT*	PROTOCOL
+	?? Apr 2006	2.6.8			29
 	11 Mar 2006	2.6.7			29
 	28 Jul 2005	2.6.6			29
 	01 Jun 2005	2.6.5			29
