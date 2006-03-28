@@ -34,8 +34,6 @@ extern int list_only;
 extern int recurse;
 extern int io_error;
 extern int local_server;
-extern int saw_delete_opt;
-extern int saw_delete_excluded_opt;
 extern int prune_empty_dirs;
 extern int delete_mode;
 extern int delete_excluded;
@@ -1185,8 +1183,8 @@ void recv_filter_list(int f_in)
 	char line[BIGPATHBUFLEN];
 	int xflags = protocol_version >= 29 ? 0 : XFLG_OLD_PREFIXES;
 	int receiver_wants_list = prune_empty_dirs
-	    || (saw_delete_opt
-	     && (!saw_delete_excluded_opt || protocol_version >= 29));
+	    || (delete_mode
+	     && (!delete_excluded || protocol_version >= 29));
 	unsigned int len;
 
 	if (!local_server && (am_sender || receiver_wants_list)) {
