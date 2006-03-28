@@ -58,8 +58,6 @@ int cvs_exclude = 0;
 int dry_run = 0;
 int do_xfers = 1;
 int ignore_times = 0;
-int saw_delete_opt = 0;
-int saw_delete_excluded_opt = 0;
 int delete_mode = 0;
 int delete_during = 0;
 int delete_before = 0;
@@ -1178,11 +1176,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		}
 		delete_mode = delete_before = 1;
 	}
-	saw_delete_opt = delete_mode;
-	saw_delete_excluded_opt = delete_excluded;
-	if (!xfer_dirs) {
-		delete_before = delete_during = delete_after = 0;
-		delete_mode = delete_excluded = 0;
+	if (!xfer_dirs && delete_mode) {
+		snprintf(err_buf, sizeof err_buf,
+			"--delete does not work without -r or -d.\n");
+		return 0;
 	}
 
 	if (delete_mode && refused_delete) {
