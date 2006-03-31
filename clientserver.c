@@ -733,14 +733,14 @@ int start_daemon(int f_in, int f_out)
 	char *host = client_name(f_in);
 	int i;
 
-	rprintf(FLOG, "connect from %s (%s)\n", host, addr);
-
 	io_set_sock_fds(f_in, f_out);
 
 	if (!lp_load(config_file, 0))
 		exit_cleanup(RERR_SYNTAX);
 
 	log_init();
+
+	rprintf(FLOG, "connect from %s (%s)\n", host, addr);
 
 	if (!am_server) {
 		set_socket_options(f_in, "SO_KEEPALIVE");
