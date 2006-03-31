@@ -13,10 +13,19 @@ Changes since 2.6.7:
       never indicates that the socket is writable for it to be notified about
       the EOF.  (This can happen when using stunnel).
 
+    - Fixed a logging bug where the "log file" directive was not being honored
+      in a single-use daemon (one spawned by a remote-shell connection).
+
+    - If rsync cannot honor the --delete option, we output an error and exit
+      instead of silently ignoring the option.
+
   ENHANCEMENTS:
 
     - In daemon mode, if rsync fails to bind to the requested port, the
       error(s) returned by socket() and/or bind() are now logged.
+
+    - When we output a fatal error, we now output the version of rsync in the
+      message.
 
     - The support/rsyncstats script has an improved line-parsing regex that is
       easier to read and also allows it to parse syslog-generated lines.
