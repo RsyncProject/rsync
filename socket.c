@@ -394,7 +394,8 @@ static int *open_socket_in(int type, int port, const char *bind_addr,
 		if (bind(s, resp->ai_addr, resp->ai_addrlen) < 0) {
 			/* Nope, try another */
 			int r = asprintf(&errmsgs[ecnt++],
-				"bind() failed: %s\n", strerror(errno));
+				"bind() failed: %s (address-family %d)\n",
+				strerror(errno), (int)resp->ai_family);
 			if (r < 0)
 				out_of_memory("open_socket_in");
 			close(s);
