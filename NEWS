@@ -27,11 +27,11 @@ Changes since 2.6.7:
     - When we output a fatal error, we now output the version of rsync in the
       message.
 
-    - The support/rsyncstats script has an improved line-parsing regex that is
-      easier to read and also allows it to parse syslog-generated lines.
+    - The rsyncstats script in support has an improved line-parsing regex that
+      is easier to read and also allows it to parse syslog-generated lines.
 
-    - A new script, support/file-attr-restore, can be used to restore the
-      attributes of a fileset (the permissions, ownership, and group info)
+    - A new script, in support: file-attr-restore, can be used to restore the
+      attributes of a file-set (the permissions, ownership, and group info)
       taken from the cached output of a "find ARG... -ls" command.
 
   DEVELOPER RELATED:
