@@ -52,13 +52,13 @@ extern char *log_format;
 extern iconv_t ic_chck;
 #endif
 
-static int log_initialised;
 static int logfile_was_closed;
 static char *logfname;
 static FILE *logfile;
 struct stats stats;
 
 int log_got_error = 0;
+int log_initialised;
 
 struct {
         int code;
