@@ -802,7 +802,6 @@ False on failure.
 BOOL lp_load(char *pszFname, int globals_only)
 {
 	extern int am_server;
-	extern int am_daemon;
 	extern int am_root;
 	pstring n2;
 	BOOL bRetval;
@@ -815,7 +814,7 @@ BOOL lp_load(char *pszFname, int globals_only)
 
 	if (pszFname)
 	    pstrcpy(n2,pszFname);
-	else if (am_server && am_daemon && !am_root)
+	else if (am_server && !am_root)
 	    pstrcpy(n2,RSYNCD_USERCONF);
 	else
 	    pstrcpy(n2,RSYNCD_SYSCONF);
