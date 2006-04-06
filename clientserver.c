@@ -44,6 +44,7 @@ extern int protocol_version;
 extern int io_timeout;
 extern int no_detach;
 extern int default_af_hint;
+extern int log_initialised;
 extern mode_t orig_umask;
 extern char *bind_address;
 extern char *sockopts;
@@ -735,12 +736,14 @@ int start_daemon(int f_in, int f_out)
 
 	io_set_sock_fds(f_in, f_out);
 
+	if (log_initialised)
+		rprintf(FLOG, "connect from %s (%s)\n", host, addr);
+
 	if (!lp_load(config_file, 0))
 		exit_cleanup(RERR_SYNTAX);
 
-	log_init();
-
-	rprintf(FLOG, "connect from %s (%s)\n", host, addr);
+	if (!log_initialised)
+		log_init();
 
 	if (!am_server) {
 		set_socket_options(f_in, "SO_KEEPALIVE");
