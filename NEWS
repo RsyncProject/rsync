@@ -14,7 +14,8 @@ Changes since 2.6.7:
       the EOF.  (This can happen when using stunnel).
 
     - Fixed a logging bug where the "log file" directive was not being honored
-      in a single-use daemon (one spawned by a remote-shell connection).
+      in a single-use daemon (one spawned by a remote-shell connection or by
+      init).
 
     - If rsync cannot honor the --delete option, we output an error and exit
       instead of silently ignoring the option.
@@ -27,10 +28,10 @@ Changes since 2.6.7:
     - When we output a fatal error, we now output the version of rsync in the
       message.
 
-    - The rsyncstats script in support has an improved line-parsing regex that
-      is easier to read and also allows it to parse syslog-generated lines.
+    - The rsyncstats script in "support" has an improved line-parsing regex
+      that is easier to read and also makes it to parse syslog-generated lines.
 
-    - A new script, in support: file-attr-restore, can be used to restore the
+    - A new script in "support": file-attr-restore, can be used to restore the
       attributes of a file-set (the permissions, ownership, and group info)
       taken from the cached output of a "find ARG... -ls" command.
 
