@@ -44,7 +44,6 @@ extern int protocol_version;
 extern int io_timeout;
 extern int no_detach;
 extern int default_af_hint;
-extern int log_initialised;
 extern mode_t orig_umask;
 extern char *bind_address;
 extern char *sockopts;
@@ -729,21 +728,21 @@ static void send_listing(int fd)
 int start_daemon(int f_in, int f_out)
 {
 	char line[1024];
-	char *motd;
-	char *addr = client_addr(f_in);
-	char *host = client_name(f_in);
+	char *motd, *addr, *host;
 	int i;
 
 	io_set_sock_fds(f_in, f_out);
 
-	if (log_initialised)
-		rprintf(FLOG, "connect from %s (%s)\n", host, addr);
-
+	/* We must load the config file before calling any function that
+	 * might cause log-file output to occur.  This ensures that the
+	 * "log file" param gets honored for the 2 non-forked use-cases
+	 * (called by init and called by remote shell). */
 	if (!lp_load(config_file, 0))
 		exit_cleanup(RERR_SYNTAX);
 
-	if (!log_initialised)
-		log_init();
+	addr = client_addr(f_in);
+	host = client_name(f_in);
+	rprintf(FLOG, "connect from %s (%s)\n", host, addr);
 
 	if (!am_server) {
 		set_socket_options(f_in, "SO_KEEPALIVE");
