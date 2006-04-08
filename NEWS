@@ -13,6 +13,10 @@ Changes since 2.6.7:
       never indicates that the socket is writable for it to be notified about
       the EOF.  (This can happen when using stunnel).
 
+    - Fixed a problem with the file-reading code where a failed read (such as
+      that caused by a bad sector) would make rsync think that the file's
+      read-position was left after the failed read's data.
+
     - Fixed a logging bug where the "log file" directive was not being honored
       in a single-use daemon (one spawned by a remote-shell connection or by
       init).
