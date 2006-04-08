@@ -232,7 +232,6 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 		}
 		map->p_fd_offset = read_start;
 	}
-	map->p_fd_offset += read_size;
 	map->p_offset = window_start;
 	map->p_len = window_size;
 
@@ -246,6 +245,7 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 			memset(map->p + read_offset, 0, read_size);
 			break;
 		}
+		map->p_fd_offset += nread;
 		read_offset += nread;
 		read_size -= nread;
 	}
