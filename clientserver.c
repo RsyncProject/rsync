@@ -736,7 +736,7 @@ int start_daemon(int f_in, int f_out)
 	/* We must load the config file before calling any function that
 	 * might cause log-file output to occur.  This ensures that the
 	 * "log file" param gets honored for the 2 non-forked use-cases
-	 * (called by init and called by remote shell). */
+	 * (when rsync is run by init and run by a remote shell). */
 	if (!lp_load(config_file, 0))
 		exit_cleanup(RERR_SYNTAX);
 
