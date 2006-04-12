@@ -205,18 +205,21 @@ if (!/skip/i) {
     system "patches/verify-patches -pun -an";
 }
 
-my $tar_file = "$dest/rsync-$version.tar.gz";
-my $diff_file = "$dest/rsync-$lastversion-$version.diffs.gz";
+my $tar_name = "rsync-$version.tar.gz";
+my $diff_name = "rsync-$lastversion-$version.diffs.gz";
+my $tar_file = "$dest/$tar_name";
+my $diff_file = "$dest/$diff_name";
 
 print $break, <<EOT;
 
 About to do the following in the samba-rsync-ftp dir:
     - move the old tar/diff files into the appropriate old-* dirs
-    - hard-link moved tar/diff files to old files on samba.org$skipping
-    - create release tar, "$tar_file"
-    - create release diffs, "$diff_file"
+    - copy the moved tar/diff files on samba.org$skipping
+    - create release tar, "$tar_name"
+    - create release diffs, "$diff_name"
     - update README, *NEWS, TODO, and cvs.log
     - update rsync*.html man pages
+    - gpg-sign the release files$skipping
 
 EOT
 print "<Press Enter to continue> ";
@@ -306,8 +309,7 @@ system "rm -rf rsync-*";
 
 if ($live) {
     chdir($dest) or die $!;
-    system "gpg -ba rsync-$version.tar.gz";
-    system "gpg -ba rsync-$lastversion-$version.diffs.gz";
+    system "gpg -ba $tar_name; gpg -ba $diff_name";
 }
 
 print $break, <<EOT;
