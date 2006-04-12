@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsync)(1)(11 Mar 2006)()()
+manpage(rsync)(1)(12 Apr 2006)()()
 manpagename(rsync)(faster, flexible replacement for rcp)
 manpagesynopsis()
 
@@ -2492,7 +2492,7 @@ url(http://rsync.samba.org/)(http://rsync.samba.org/)
 
 manpagesection(VERSION)
 
-This man page is current for version 2.6.7 of rsync.
+This man page is current for version 2.6.8pre1 of rsync.
 
 manpagesection(CREDITS)
 
