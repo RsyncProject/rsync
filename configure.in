@@ -650,35 +650,6 @@ if test x"$rsync_cv_HAVE_SECURE_MKSTEMP" = x"yes"; then
 fi
 
 
-AC_CACHE_CHECK([for broken inet_ntoa],rsync_cv_REPLACE_INET_NTOA,[
-AC_TRY_RUN([
-#include <stdio.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-main() { struct in_addr ip; ip.s_addr = 0x12345678;
-if (strcmp(inet_ntoa(ip),"18.52.86.120") &&
-    strcmp(inet_ntoa(ip),"120.86.52.18")) { exit(1); }
-exit(0);}],
-           rsync_cv_REPLACE_INET_NTOA=no,rsync_cv_REPLACE_INET_NTOA=yes,rsync_cv_REPLACE_INET_NTOA=cross)])
-if test x"$rsync_cv_REPLACE_INET_NTOA" = x"yes"; then
-    AC_DEFINE(REPLACE_INET_NTOA, 1, [Define to 1 if inet_ntoa() needs to be replaced])
-fi
-
-
-AC_CACHE_CHECK([for broken inet_aton],rsync_cv_REPLACE_INET_ATON,[
-AC_TRY_RUN([
-#include <stdio.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-main() { struct in_addr ip;
-if (inet_aton("example", &ip) == 0) exit(0); exit(1);}],
-           rsync_cv_REPLACE_INET_ATON=no,rsync_cv_REPLACE_INET_ATON=yes,rsync_cv_REPLACE_INET_ATON=cross)])
-if test x"$rsync_cv_REPLACE_INET_ATON" = x"yes"; then
-    AC_DEFINE(REPLACE_INET_ATON, 1, [Define to 1 if inet_aton() needs to be replaced])
-fi
-
 AC_CACHE_CHECK([if mknod creates FIFOs],rsync_cv_MKNOD_CREATES_FIFOS,[
 AC_TRY_RUN([
 #include <stdio.h>
