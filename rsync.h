@@ -832,10 +832,6 @@ void rsyserr(enum logcode, int, const char *, ...)
      __attribute__((format (printf, 3, 4)))
      ;
 
-#ifdef REPLACE_INET_NTOA
-#define inet_ntoa rep_inet_ntoa
-#endif
-
 /* Make sure that the O_BINARY flag is defined. */
 #ifndef O_BINARY
 #define O_BINARY 0
