@@ -6,8 +6,7 @@
 # NOTE:  if you use a diff from the "patches" directory in a release
 # tar, this is not needed (but doesn't hurt anything).
 dir=`dirname $0`
-if test x"$dir" = x -o x"$dir" = x.; then
-    make -f prepare-source.mak
-else
-    make -C "$dir" -f prepare-source.mak
+if test x"$dir" != x -o x"$dir" != x.; then
+    cd "$dir"
 fi
+make -f prepare-source.mak
