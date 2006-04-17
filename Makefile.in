@@ -91,13 +91,13 @@ t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
 
 gen:
-	$(MAKE) -C $(srcdir) -f prepare-source.mak gen
+	cd $(srcdir) && $(MAKE) -f prepare-source.mak gen
 
 man:
-	$(MAKE) -C $(srcdir) -f prepare-source.mak man
+	cd $(srcdir) && $(MAKE) -f prepare-source.mak man
 
 proto:
-	$(MAKE) -C $(srcdir) -f prepare-source.mak proto.h
+	cd $(srcdir) && $(MAKE) -f prepare-source.mak proto.h
 
 clean: cleantests
 	rm -f *~ $(OBJS) $(TLS_OBJ) $(CHECK_PROGS) $(CHECK_OBJS)
