@@ -703,27 +703,32 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			 int itemizing, int maybe_ATTRS_REPORT,
 			 enum logcode code)
 {
-	char fnamebuf[MAXPATHLEN], lnk[MAXPATHLEN];
+	char fnamebuf[MAXPATHLEN];
 	STRUCT_STAT st;
-	int len, i = 0;
+	int i = 0;
 
 	do {
 		pathjoin(fnamebuf, MAXPATHLEN, basis_dir[i], fname);
 		if (link_stat(fnamebuf, &st, 0) < 0 || S_ISDIR(st.st_mode)
 		 || !unchanged_attrs(file, &st))
 			continue;
+#ifdef CAN_HARDLINK_SYMLINK
 		if (S_ISLNK(file->mode)) {
 #ifdef SUPPORT_LINKS
+			char lnk[MAXPATHLEN];
+			int len;
 			if ((len = readlink(fnamebuf, lnk, MAXPATHLEN-1)) <= 0)
 				continue;
 			lnk[len] = '\0';
 			if (strcmp(lnk, file->u.link) != 0)
 #endif
 				continue;
-		} else {
-			if (!IS_DEVICE(st.st_mode) || st.st_rdev != file->u.rdev)
-				continue;
-		}
+		} else
+#endif
+		if (IS_DEVICE(st.st_mode) != IS_DEVICE(file->mode)
+		 || IS_SPECIAL(st.st_mode) != IS_SPECIAL(file->mode)
+		 || st.st_rdev != file->u.rdev)
+			continue;
 		if (link_dest) {
 			if (do_link(fnamebuf, fname) < 0) {
 				rsyserr(FERROR, errno,
