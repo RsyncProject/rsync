@@ -94,8 +94,6 @@ extern struct file_list *the_file_list;
 extern struct filter_list_struct server_filter_list;
 
 static int deletion_count = 0; /* used to implement --max-delete */
-static int can_link_symlinks = 1; /* start out optimistic */
-static int can_link_devices = 1;
 
 /* For calling delete_file() */
 #define DEL_FORCE_RECURSE	(1<<1) /* recurse even w/o --force */
@@ -702,8 +700,8 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 /* This is only called for non-regular files.  We return -2 if we've finished
  * handling the file, or -1 if no dest-linking occurred. */
 static int try_dests_non(struct file_struct *file, char *fname, int ndx,
-			 int itemizing, int *possible_ptr,
-			 int maybe_ATTRS_REPORT, enum logcode code)
+			 int itemizing, int maybe_ATTRS_REPORT,
+			 enum logcode code)
 {
 	char fnamebuf[MAXPATHLEN], lnk[MAXPATHLEN];
 	STRUCT_STAT st;
@@ -728,8 +726,9 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 		}
 		if (link_dest) {
 			if (do_link(fnamebuf, fname) < 0) {
-				/* TODO improve this to be based on errno? */
-				*possible_ptr = 0;
+				rsyserr(FERROR, errno,
+					"failed to hard-link %s with %s",
+					fnamebuf, fname);
 				break;
 			}
 			if (preserve_hard_links && file->link_u.links)
@@ -960,14 +959,15 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				return;
 			if (!S_ISLNK(st.st_mode))
 				statret = -1;
-		} else if (basis_dir[0] != NULL && can_link_symlinks) {
+#ifdef CAN_HARDLINK_SYMLINK
+		} else if (basis_dir[0] != NULL) {
 			if (try_dests_non(file, fname, ndx, itemizing,
-					  &can_link_symlinks,
 					  maybe_ATTRS_REPORT, code) == -2) {
 				if (!copy_dest)
 					return;
 				itemizing = code = 0;
 			}
+#endif
 		}
 		if (preserve_hard_links && file->link_u.links
 		    && hard_link_check(file, ndx, fname, -1, &st,
@@ -1000,16 +1000,16 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
 	 || (preserve_specials && IS_SPECIAL(file->mode))) {
-		if (statret != 0
-		 && (basis_dir[0] != NULL && can_link_devices)) {
+#ifdef CAN_HARDLINK_SPECIAL
+		if (statret != 0 && basis_dir[0] != NULL) {
 			if (try_dests_non(file, fname, ndx, itemizing,
-					  &can_link_devices,
 					  maybe_ATTRS_REPORT, code) == -2) {
 				if (!copy_dest)
 					return;
 				itemizing = code = 0;
 			}
 		}
+#endif
 		if (statret != 0
 		 || (st.st_mode & ~CHMOD_BITS) != (file->mode & ~CHMOD_BITS)
 		 || st.st_rdev != file->u.rdev) {
