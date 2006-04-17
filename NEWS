@@ -24,6 +24,10 @@ Changes since 2.6.7:
     - If rsync cannot honor the --delete option, we output an error and exit
       instead of silently ignoring the option.
 
+    - The ability to hard-link symlinks and special files is now determined at
+      configure time instead of at runtime.  This fixes a bug with --link-dest
+      creating a hard-link to a symlink's referent on a BSD system.
+
   ENHANCEMENTS:
 
     - In daemon mode, if rsync fails to bind to the requested port, the
@@ -40,6 +44,9 @@ Changes since 2.6.7:
       taken from the cached output of a "find ARG... -ls" command.
 
   DEVELOPER RELATED:
+
+    - Removd two unused configure checks and two related (also unused)
+      compatibility functions.
 
     - The acls.diff patch has been improved quite a bit, with more to come.
 
