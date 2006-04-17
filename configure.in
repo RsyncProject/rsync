@@ -502,8 +502,7 @@ if test $ac_cv_func_getpgrp = yes; then
     AC_FUNC_GETPGRP
 fi
 
-# Determine whether chown follows symlinks (it should).
-AC_CACHE_CHECK([whether chown() dereferences symlinks],rsync_cv_chown_follows_symlink,[
+AC_CACHE_CHECK([whether chown() modifies symlinks],rsync_cv_chown_modifies_symlink,[
   AC_TRY_RUN([
 #if HAVE_UNISTD_H
 # include <unistd.h>
@@ -514,12 +513,50 @@ AC_CACHE_CHECK([whether chown() dereferences symlinks],rsync_cv_chown_follows_sy
 	char const *dangling_symlink = "conftest.dangle";
 	unlink(dangling_symlink);
 	if (symlink("conftest.no-such", dangling_symlink) < 0) abort();
-	if (chown(dangling_symlink, getuid(), getgid()) < 0 && errno == ENOENT) exit(0);
-	exit(1);
+	if (chown(dangling_symlink, getuid(), getgid()) < 0 && errno == ENOENT) exit(1);
+	exit(0);
     }],
-  rsync_cv_chown_follows_symlink=yes,rsync_cv_chown_follows_symlink=no,rsync_cv_chown_follows_symlink=yes)])
-if test $rsync_cv_chown_follows_symlink = no; then
+  rsync_cv_chown_modifies_symlink=yes,rsync_cv_chown_modifies_symlink=no,rsync_cv_chown_modifies_symlink=no)])
+if test $rsync_cv_chown_modifies_symlink = yes; then
   AC_DEFINE(CHOWN_MODIFIES_SYMLINK, 1, [Define to 1 if chown modifies symlinks.])
+fi
+
+AC_CACHE_CHECK([whether link() can hard-link symlinks],rsync_cv_can_hardlink_symlink,[
+  AC_TRY_RUN([
+#if HAVE_UNISTD_H
+# include <unistd.h>
+#endif
+#include <stdlib.h>
+#include <errno.h>
+#define FILENAME "conftest.dangle"
+    main() {
+	unlink(FILENAME);
+	if (symlink("conftest.no-such", FILENAME) < 0) abort();
+	if (link(FILENAME, FILENAME "2") < 0) exit(1);
+	exit(0);
+    }],
+  rsync_cv_can_hardlink_symlink=yes,rsync_cv_can_hardlink_symlink=no,rsync_cv_can_hardlink_symlink=no)])
+if test $rsync_cv_can_hardlink_symlink = yes; then
+  AC_DEFINE(CAN_HARDLINK_SYMLINK, 1, [Define to 1 if link() can hard-link symlinks.])
+fi
+
+AC_CACHE_CHECK([whether link() can hard-link special files],rsync_cv_can_hardlink_special,[
+  AC_TRY_RUN([
+#if HAVE_UNISTD_H
+# include <unistd.h>
+#endif
+#include <stdlib.h>
+#include <errno.h>
+#define FILENAME "conftest.fifi"
+    main() {
+	unlink(FILENAME);
+	if (mkfifo(FILENAME, 0777) < 0) abort();
+	if (link(FILENAME, FILENAME "2") < 0) exit(1);
+	exit(0);
+    }],
+  rsync_cv_can_hardlink_special=yes,rsync_cv_can_hardlink_special=no,rsync_cv_can_hardlink_special=no)])
+if test $rsync_cv_can_hardlink_special = yes; then
+    AC_DEFINE(CAN_HARDLINK_SPECIAL, 1, [Define to 1 if link() can hard-link special files.])
 fi
 
 AC_CACHE_CHECK([for working socketpair],rsync_cv_HAVE_SOCKETPAIR,[
