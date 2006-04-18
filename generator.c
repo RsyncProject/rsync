@@ -712,14 +712,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 		if (link_stat(fnamebuf, &st, 0) < 0 || S_ISDIR(st.st_mode)
 		 || !unchanged_attrs(file, &st))
 			continue;
-		if (IS_DEVICE(file->mode)) {
-			if (!IS_DEVICE(st.st_mode) || st.st_rdev != file->u.rdev)
-				continue;
-		} else if (IS_SPECIAL(file->mode)) {
-			if (!IS_SPECIAL(st.st_mode) || st.st_rdev != file->u.rdev)
-				continue;
-#ifdef CAN_HARDLINK_SYMLINK
-		} else if (S_ISLNK(file->mode)) {
+		if (S_ISLNK(file->mode)) {
 #ifdef SUPPORT_LINKS
 			char lnk[MAXPATHLEN];
 			int len;
@@ -729,14 +722,26 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			if (strcmp(lnk, file->u.link) != 0)
 #endif
 				continue;
-#endif
+		} else if (IS_SPECIAL(file->mode)) {
+			if (!IS_SPECIAL(st.st_mode) || st.st_rdev != file->u.rdev)
+				continue;
+		} else if (IS_DEVICE(file->mode)) {
+			if (!IS_DEVICE(st.st_mode) || st.st_rdev != file->u.rdev)
+				continue;
 		} else {
 			rprintf(FERROR,
 				"internal: try_dests_non() called with invalid mode (%o)\n",
 				file->mode);
 			exit_cleanup(RERR_UNSUPPORTED);
 		}
-		if (link_dest) {
+		if (link_dest
+#ifndef CAN_HARDLINK_SYMLINK
+		 && !S_ISLNK(file->mode)
+#endif
+#ifndef CAN_HARDLINK_SPECIAL
+		 && !IS_SPECIAL(st.st_mode) && !IS_DEVICE(file->mode)
+#endif
+		) {
 			if (do_link(fnamebuf, fname) < 0) {
 				rsyserr(FERROR, errno,
 					"failed to hard-link %s with %s",
@@ -971,15 +976,18 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				return;
 			if (!S_ISLNK(st.st_mode))
 				statret = -1;
-#ifdef CAN_HARDLINK_SYMLINK
 		} else if (basis_dir[0] != NULL) {
 			if (try_dests_non(file, fname, ndx, itemizing,
 					  maybe_ATTRS_REPORT, code) == -2) {
+#ifndef CAN_HARDLINK_SYMLINK
+				if (link_dest) {
+					/* Resort to --copy-dest behavior. */
+				} else
+#endif
 				if (!copy_dest)
 					return;
 				itemizing = code = 0;
 			}
-#endif
 		}
 		if (preserve_hard_links && file->link_u.links
 		    && hard_link_check(file, ndx, fname, -1, &st,
@@ -1012,16 +1020,19 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
 	 || (preserve_specials && IS_SPECIAL(file->mode))) {
-#ifdef CAN_HARDLINK_SPECIAL
 		if (statret != 0 && basis_dir[0] != NULL) {
 			if (try_dests_non(file, fname, ndx, itemizing,
 					  maybe_ATTRS_REPORT, code) == -2) {
+#ifndef CAN_HARDLINK_SPECIAL
+				if (link_dest) {
+					/* Resort to --copy-dest behavior. */
+				} else
+#endif
 				if (!copy_dest)
 					return;
 				itemizing = code = 0;
 			}
 		}
-#endif
 		if (statret != 0
 		 || (st.st_mode & ~CHMOD_BITS) != (file->mode & ~CHMOD_BITS)
 		 || st.st_rdev != file->u.rdev) {
