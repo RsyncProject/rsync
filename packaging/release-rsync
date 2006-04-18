@@ -310,10 +310,11 @@ system "rm -rf rsync-*";
 if ($live) {
     chdir($dest) or die $!;
     system "gpg -ba $tar_name; gpg -ba $diff_name";
-}
-
-print $break, <<EOT;
+    print $break, <<EOT;
 
 All done.  Remember to announce the release on *BOTH*
 rsync-announce\@lists.samba.org and rsync\@lists.samba.org!
 EOT
+} else {
+    print $break, "All done.\n";
+}
