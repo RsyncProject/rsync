@@ -813,20 +813,27 @@ See the bf(--perms) and bf(--executability) options for how the resulting
 permission value can be applied to the files in the transfer.
 
 dit(bf(-o, --owner)) This option causes rsync to set the owner of the
-destination file to be the same as the source file.  By default, the
-preservation is done by name, but may fall back to using the ID number
-in some circumstances (see the bf(--numeric-ids) option for a full
-discussion).
-This option has no effect if the receiving rsync is not run as the
-super-user and bf(--super) is not specified.
+destination file to be the same as the source file, but only if the
+receiving rsync is being run as the super-user (see also the bf(--super)
+option to force rsync to attempt super-user activities).
+Without this option, the owner is set to the invoking user on the
+receiving side.
+
+The preservation of ownership will associate matching names by default, but
+may fall back to using the ID number in some circumstances (see also the
+bf(--numeric-ids) option for a full discussion).
 
 dit(bf(-g, --group)) This option causes rsync to set the group of the
 destination file to be the same as the source file.  If the receiving
-program is not running as the super-user (or with the bf(--no-super)
-option), only groups that the
-receiver is a member of will be preserved.  By default, the preservation
-is done by name, but may fall back to using the ID number in some
-circumstances.  See the bf(--numeric-ids) option for a full discussion.
+program is not running as the super-user (or if bf(--no-super) was
+specified), only groups that the invoking user on the receiving side
+is a member of will be preserved.
+Without this option, the group is set to the default group of the invoking
+user on the receiving side.
+
+The preservation of group information will associate matching names by
+default, but may fall back to using the ID number in some circumstances
+(see also the bf(--numeric-ids) option for a full discussion).
 
 dit(bf(--devices)) This option causes rsync to transfer character and
 block device files to the remote system to recreate these devices.
