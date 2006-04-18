@@ -739,7 +739,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 		 && !S_ISLNK(file->mode)
 #endif
 #ifndef CAN_HARDLINK_SPECIAL
-		 && !IS_SPECIAL(st.st_mode) && !IS_DEVICE(file->mode)
+		 && !IS_SPECIAL(file->mode) && !IS_DEVICE(file->mode)
 #endif
 		) {
 			if (do_link(fnamebuf, fname) < 0) {
