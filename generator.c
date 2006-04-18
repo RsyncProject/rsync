@@ -712,8 +712,14 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 		if (link_stat(fnamebuf, &st, 0) < 0 || S_ISDIR(st.st_mode)
 		 || !unchanged_attrs(file, &st))
 			continue;
+		if (IS_DEVICE(file->mode)) {
+			if (!IS_DEVICE(st.st_mode) || st.st_rdev != file->u.rdev)
+				continue;
+		} else if (IS_SPECIAL(file->mode)) {
+			if (!IS_SPECIAL(st.st_mode) || st.st_rdev != file->u.rdev)
+				continue;
 #ifdef CAN_HARDLINK_SYMLINK
-		if (S_ISLNK(file->mode)) {
+		} else if (S_ISLNK(file->mode)) {
 #ifdef SUPPORT_LINKS
 			char lnk[MAXPATHLEN];
 			int len;
@@ -723,12 +729,13 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			if (strcmp(lnk, file->u.link) != 0)
 #endif
 				continue;
-		} else
 #endif
-		if (IS_DEVICE(st.st_mode) != IS_DEVICE(file->mode)
-		 || IS_SPECIAL(st.st_mode) != IS_SPECIAL(file->mode)
-		 || st.st_rdev != file->u.rdev)
-			continue;
+		} else {
+			rprintf(FERROR,
+				"internal: try_dests_non() called with invalid mode (%o)\n",
+				file->mode);
+			exit_cleanup(RERR_UNSUPPORTED);
+		}
 		if (link_dest) {
 			if (do_link(fnamebuf, fname) < 0) {
 				rsyserr(FERROR, errno,
