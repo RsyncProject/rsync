@@ -50,7 +50,11 @@ Changes since 2.6.7:
 
   DEVELOPER RELATED:
 
-    - Removd two unused configure checks and two related (also unused)
+    - Removed the unused function write_int_named(), the unused variable
+      io_read_phase, and the rarely used variable io_write_phase.  This also
+      elides the confusing 'phase "unknown"' part of one error message.
+
+    - Removed two unused configure checks and two related (also unused)
       compatibility functions.
 
     - The xattrs.diff patch received a security fix that prevents a potential
