@@ -57,7 +57,6 @@ extern int copy_links;
 extern int copy_unsafe_links;
 extern int protocol_version;
 extern int sanitize_paths;
-extern const char *io_write_phase;
 extern struct stats stats;
 extern struct file_list *the_file_list;
 
@@ -334,8 +333,6 @@ static void send_file_entry(struct file_struct *file, int f)
 		return;
 	}
 
-	io_write_phase = "send_file_entry";
-
 	f_name(file, fname);
 
 	flags = file->flags & XMIT_TOP_DIR;
@@ -487,8 +484,6 @@ static void send_file_entry(struct file_struct *file, int f)
 	}
 
 	strlcpy(lastname, fname, MAXPATHLEN);
-
-	io_write_phase = "unknown";
 }
 
 static struct file_struct *receive_file_entry(struct file_list *flist,
