@@ -63,22 +63,6 @@ int ignore_timeout = 0;
 int batch_fd = -1;
 int batch_gen_fd = -1;
 
-/**
- * The connection might be dropped at some point; perhaps because the
- * remote instance crashed.  Just giving the offset on the stream is
- * not very helpful.  So instead we try to make io_phase_name point to
- * something useful.
- *
- * For buffered/multiplexed I/O these names will be somewhat
- * approximate; perhaps for ease of support we would rather make the
- * buffer always flush when a single application-level I/O finishes.
- *
- * @todo Perhaps we want some simple stack functionality, but there's
- * no need to overdo it.
- **/
-const char *io_write_phase = phase_unknown;
-const char *io_read_phase = phase_unknown;
-
 /* Ignore an EOF error if non-zero. See whine_about_eof(). */
 int kluge_around_eof = 0;
 
@@ -1122,8 +1106,8 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 			if (fd == sock_f_out)
 				close_multiplexing_out();
 			rsyserr(FERROR, errno,
-				"writefd_unbuffered failed to write %ld bytes: phase \"%s\" [%s]",
-				(long)len, io_write_phase, who_am_i());
+				"writefd_unbuffered failed to write %ld bytes [%s]",
+				(long)len, who_am_i());
 			/* If the other side is sending us error messages, try
 			 * to grab any messages they sent before they died. */
 			while (fd == sock_f_out && io_multiplexing_in) {
@@ -1257,13 +1241,6 @@ void write_int(int f,int32 x)
 	char b[4];
 	SIVAL(b,0,x);
 	writefd(f,b,4);
-}
-
-void write_int_named(int f, int32 x, const char *phase)
-{
-	io_write_phase = phase;
-	write_int(f, x);
-	io_write_phase = phase_unknown;
 }
 
 /*
