@@ -39,6 +39,8 @@ Changes since 2.6.7:
     - When we output a fatal error, we now output the version of rsync in the
       message.
 
+    - Improved the documentation for the --owner and --group options.
+
     - The rsyncstats script in "support" has an improved line-parsing regex
       that is easier to read and also makes it to parse syslog-generated lines.
 
@@ -50,6 +52,9 @@ Changes since 2.6.7:
 
     - Removd two unused configure checks and two related (also unused)
       compatibility functions.
+
+    - The xattrs.diff patch received a security fix that prevents a potential
+      buffer overflow in the receive_xattr() code.
 
     - The acls.diff patch has been improved quite a bit, with more to come.
 
