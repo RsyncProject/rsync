@@ -1,67 +1,15 @@
-NEWS for rsync 2.6.8 (22 Apr 2006)
+NEWS for rsync 2.6.9 (unreleased)
 Protocol: 29 (unchanged)
-Changes since 2.6.7:
+Changes since 2.6.8:
 
   BUG FIXES:
 
-    - Fixed a bug in the exclude code where an anchored exclude without any
-      wildcards fails to match an absolute source arg, but only when --relative
-      is in effect.
-
-    - Improved the I/O code for the generator to fix a potential hang when the
-      receiver gets an EOF on the socket but the generator's select() call
-      never indicates that the socket is writable for it to be notified about
-      the EOF.  (This can happen when using stunnel).
-
-    - Fixed a problem with the file-reading code where a failed read (such as
-      that caused by a bad sector) would not advance the file's read-position
-      beyond the failed read's data.
-
-    - Fixed a logging bug where the "log file" directive was not being honored
-      in a single-use daemon (one spawned by a remote-shell connection or by
-      init).
-
-    - If rsync cannot honor the --delete option, we output an error and exit
-      instead of silently ignoring the option.
-
-    - Fixed a bug in the --link-dest code that prevented special files (such as
-      fifos) from being linked.
-
-    - The ability to hard-link symlinks and special files is now determined at
-      configure time instead of at runtime.  This fixes a bug with --link-dest
-      creating a hard-link to a symlink's referent on a BSD system.
+    - ...
 
   ENHANCEMENTS:
 
-    - In daemon mode, if rsync fails to bind to the requested port, the
-      error(s) returned by socket() and/or bind() are now logged.
-
-    - When we output a fatal error, we now output the version of rsync in the
-      message.
-
-    - Improved the documentation for the --owner and --group options.
-
-    - The rsyncstats script in "support" has an improved line-parsing regex
-      that is easier to read and also makes it to parse syslog-generated lines.
-
-    - A new script in "support": file-attr-restore, can be used to restore the
-      attributes of a file-set (the permissions, ownership, and group info)
-      taken from the cached output of a "find ARG... -ls" command.
+    - ...
 
   DEVELOPER RELATED:
 
-    - Removed the unused function write_int_named(), the unused variable
-      io_read_phase, and the rarely used variable io_write_phase.  This also
-      elides the confusing 'phase "unknown"' part of one error message.
-
-    - Removed two unused configure checks and two related (also unused)
-      compatibility functions.
-
-    - The xattrs.diff patch received a security fix that prevents a potential
-      buffer overflow in the receive_xattr() code.
-
-    - The acls.diff patch has been improved quite a bit, with more to come.
-
-    - A new patch was added: log-file.diff.  This contains an early version of
-      a future option, --log-file=FILE, that will allow any rsync to log its
-      actions to a file (something that only a daemon supports at present).
+    - Updated config.guess and config.sub to their 2006-02-23 version.
