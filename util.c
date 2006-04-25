@@ -1,8 +1,10 @@
-/*  -*- c-file-style: "linux" -*-
+/*
+ * Utility routines used in rsync.
  *
- * Copyright (C) 1996-2000 by Andrew Tridgell
- * Copyright (C) Paul Mackerras 1996
- * Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
+ * Copyright (C) 1996-2000 Andrew Tridgell
+ * Copyright (C) 1996 Paul Mackerras
+ * Copyright (C) 2001, 2002 Martin Pool <mbp@samba.org>
+ * Copyright (C) 2003, 2004, 2005, 2006 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,14 +18,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-
-/**
- * @file
- *
- * Utilities used in rsync
- **/
 
 #include "rsync.h"
 
@@ -39,11 +35,7 @@ extern struct filter_list_struct server_filter_list;
 
 int sanitize_paths = 0;
 
-
-
-/**
- * Set a fd into nonblocking mode
- **/
+/* Set a fd into nonblocking mode. */
 void set_nonblocking(int fd)
 {
 	int val;
@@ -56,9 +48,7 @@ void set_nonblocking(int fd)
 	}
 }
 
-/**
- * Set a fd into blocking mode
- **/
+/* Set a fd into blocking mode. */
 void set_blocking(int fd)
 {
 	int val;
@@ -759,7 +749,7 @@ unsigned int clean_fname(char *name, BOOL collapse_dot_dot)
  * of the path.  Use -1 to allow unlimited depth.
  *
  * We also clean the path in a manner similar to clean_fname() but with a
- * few differences: 
+ * few differences:
  *
  * Turns multiple adjacent slashes into a single slash, gets rid of "." dir
  * elements (INCLUDING a trailing dot dir), PRESERVES a trailing slash, and

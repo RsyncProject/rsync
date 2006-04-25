@@ -1,8 +1,10 @@
-/* -*- c-file-style: "linux" -*-
+/*
+ * The filter include/exclude routines.
  *
- * Copyright (C) 1996-2001 by Andrew Tridgell <tridge@samba.org>
- * Copyright (C) 1996 by Paul Mackerras
- * Copyright (C) 2002 by Martin Pool
+ * Copyright (C) 1996-2001 Andrew Tridgell <tridge@samba.org>
+ * Copyright (C) 1996 Paul Mackerras
+ * Copyright (C) 2002 Martin Pool
+ * Copyright (C) 2003, 2004, 2005, 2006 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,13 +18,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-
-/* a lot of this stuff was originally derived from GNU tar, although
-   it has now changed so much that it is hard to tell :) */
-
-/* include/exclude cluestick added by Martin Pool <mbp@samba.org> */
 
 #include "rsync.h"
 
@@ -310,7 +307,7 @@ static char *parse_merge_name(const char *merge_file, unsigned int *len_ptr,
 		strlcpy(fn, merge_file, len_ptr ? *len_ptr + 1 : MAXPATHLEN);
 		clean_fname(fn, 1);
 	}
-	
+
 	fn_len = strlen(fn);
 	if (fn == buf)
 		goto done;
@@ -856,7 +853,7 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 }
 
 
-static char default_cvsignore[] = 
+static char default_cvsignore[] =
 	/* These default ignored items come from the CVS manual. */
 	"RCS SCCS CVS CVS.adm RCSLOG cvslog.* tags TAGS"
 	" .make.state .nse_depinfo *~ #* .#* ,* _$* *$"

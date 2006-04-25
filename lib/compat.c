@@ -1,33 +1,26 @@
-/* 
-   Copyright (C) Andrew Tridgell 1998
-   Copyright (C) 2002 by Martin Pool
-   
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-   
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-   
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-*/
-
-/**
- * @file compat.c
+/*
+ * Reimplementations of standard functions for platforms that don't have them.
  *
- * Reimplementations of standard functions for platforms that don't
- * have them.
- **/
-
-
+ * Copyright (C) 1998 Andrew Tridgell
+ * Copyright (C) 2002 Martin Pool
+ * Copyright (C) 2004, 2005, 2006 Wayne Davison
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 
 #include "rsync.h"
-
 
 #ifndef HAVE_STRDUP
  char *strdup(char *s)
@@ -86,7 +79,7 @@
 /**
  * Find the first ocurrence in @p s of any character in @p accept.
  *
- * Derived from glibc 
+ * Derived from glibc
  **/
  char *strpbrk(const char *s, const char *accept)
 {
@@ -105,7 +98,7 @@
 
 #ifndef HAVE_STRLCPY
 /**
- * Like strncpy but does not 0 fill the buffer and always null 
+ * Like strncpy but does not 0 fill the buffer and always null
  * terminates.
  *
  * @param bufsize is the size of the destination buffer.
@@ -128,7 +121,7 @@
 
 #ifndef HAVE_STRLCAT
 /**
- * Like strncat() but does not 0 fill the buffer and always null 
+ * Like strncat() but does not 0 fill the buffer and always null
  * terminates.
  *
  * @param bufsize length of the buffer, which should be one more than

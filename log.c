@@ -1,30 +1,25 @@
-/* -*- c-file-style: "linux"; -*-
-
-   Copyright (C) 1998-2001 by Andrew Tridgell <tridge@samba.org>
-   Copyright (C) 2000-2001 by Martin Pool <mbp@samba.org>
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-*/
-
 /*
-  Logging and utility functions.
-  tridge, May 1998
+ * Logging and utility functions.
+ *
+ * Copyright (C) 1998-2001 Andrew Tridgell <tridge@samba.org>
+ * Copyright (C) 2000-2001 Martin Pool <mbp@samba.org>
+ * Copyright (C) 2003, 2004, 2005, 2006 Wayne Davison
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 
-  Mapping to human-readable messages added by Martin Pool
-  <mbp@samba.org>, Oct 2000.
-  */
 #include "rsync.h"
 #if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
 #include <iconv.h>
@@ -769,7 +764,7 @@ void log_exit(int code, const char *file, int line)
 
 		/* VANISHED is not an error, only a warning */
 		if (code == RERR_VANISHED) {
-			rprintf(FINFO, "rsync warning: %s (code %d) at %s(%d) [%s=%s]\n", 
+			rprintf(FINFO, "rsync warning: %s (code %d) at %s(%d) [%s=%s]\n",
 				name, code, file, line, who_am_i(), RSYNC_VERSION);
 		} else {
 			rprintf(FERROR, "rsync error: %s (code %d) at %s(%d) [%s=%s]\n",

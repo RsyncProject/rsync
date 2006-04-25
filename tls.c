@@ -1,6 +1,8 @@
-/* -*- c-file-style: "linux" -*-
+/*
+ * Trivial ls for comparing two directories after running an rsync.
  *
- * Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
+ * Copyright (C) 2001, 2002 Martin Pool <mbp@samba.org>
+ * Copyright (C) 2003, 2004, 2005 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version
@@ -13,15 +15,10 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/**
- * @file tls.c
- *
- * Trivial @c ls for comparing two directories after running an rsync.
- *
- * The problem with using the system's own ls is that some features
+/* The problem with using the system's own ls is that some features
  * have little quirks that make directories look different when for
  * our purposes they're the same -- for example, the BSD braindamage
  * about setting the mode on symlinks based on your current umask.
@@ -34,9 +31,7 @@
  *
  * A key requirement for this program is that the output be "very
  * reproducible."  So we mask away information that can accidentally
- * change.
- **/
-
+ * change. */
 
 #include "rsync.h"
 
@@ -48,15 +43,12 @@ int read_only = 1;
 int list_only = 0;
 int preserve_perms = 0;
 
-
 static void failed(char const *what, char const *where)
 {
 	fprintf(stderr, PROGRAM ": %s %s: %s\n",
 		what, where, strerror(errno));
 	exit(1);
 }
-
-
 
 static void list_file(const char *fname)
 {
@@ -123,7 +115,6 @@ static void list_file(const char *fname)
 	       (long)buf.st_uid, (long)buf.st_gid, (long)buf.st_nlink,
 	       datebuf, fname, linkbuf);
 }
-
 
 int
 main(int argc, char *argv[])

@@ -1,8 +1,10 @@
-/*  -*- c-file-style: "linux" -*-
+/*
+ * Routines used to setup various kinds of inter-process pipes.
  *
- * Copyright (C) 1996-2000 by Andrew Tridgell
- * Copyright (C) Paul Mackerras 1996
- * Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
+ * Copyright (C) 1996-2000 Andrew Tridgell
+ * Copyright (C) 1996 Paul Mackerras
+ * Copyright (C) 2001, 2002 Martin Pool <mbp@samba.org>
+ * Copyright (C) 2004, 2005, 2006 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include "rsync.h"

@@ -1,7 +1,9 @@
-/* -*- c-file-style: "linux"; -*-
+/*
+ * The socket based protocol for setting up a connection with rsyncd.
  *
- * Copyright (C) 1998-2001 by Andrew Tridgell <tridge@samba.org>
- * Copyright (C) 2001-2002 by Martin Pool <mbp@samba.org>
+ * Copyright (C) 1998-2001 Andrew Tridgell <tridge@samba.org>
+ * Copyright (C) 2001-2002 Martin Pool <mbp@samba.org>
+ * Copyright (C) 2002, 2003, 2004, 2005, 2006 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,15 +17,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-
-/**
- * @file
- *
- * The socket based protocol for setting up a connection with
- * rsyncd.
- **/
 
 #include "rsync.h"
 
@@ -113,7 +108,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	return ret ? ret : client_run(fd, fd, -1, argc, argv);
 }
 
-int start_inband_exchange(char *user, char *path, int f_in, int f_out, 
+int start_inband_exchange(char *user, char *path, int f_in, int f_out,
 			  int argc)
 {
 	int i;

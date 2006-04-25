@@ -1,21 +1,24 @@
 /*
-   Copyright (C) Andrew Tridgell 1996
-   Copyright (C) Paul Mackerras 1996
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-*/
+ * Routines used by the file-transfer code.
+ *
+ * Copyright (C) 1996 Andrew Tridgell
+ * Copyright (C) 1996 Paul Mackerras
+ * Copyright (C) 2003, 2004, 2005 Wayne Davison
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 
 #include "rsync.h"
 #include "zlib/zlib.h"
@@ -105,7 +108,6 @@ static int32 simple_recv_token(int f, char **data)
 	return n;
 }
 
-
 /* non-compressing send token */
 static void simple_send_token(int f, int32 token, struct map_struct *buf,
 			      OFF_T offset, int32 n)
@@ -123,7 +125,6 @@ static void simple_send_token(int f, int32 token, struct map_struct *buf,
 	if (token != -2)
 		write_int(f, -(token+1));
 }
-
 
 /* Flag bytes in compressed stream are encoded as follows: */
 #define END_FLAG	0	/* that's all folks */
@@ -188,10 +189,8 @@ send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 		last_run_end = 0;
 		run_start = token;
 		flush_pending = 0;
-
 	} else if (last_token == -2) {
 		run_start = token;
-
 	} else if (nb != 0 || token != last_token + 1
 		   || token >= run_start + 65536) {
 		/* output previous run */
@@ -294,7 +293,6 @@ send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 		} while (toklen > 0);
 	}
 }
-
 
 /* tells us what the receiver is in the middle of doing */
 static enum { r_init, r_idle, r_running, r_inflating, r_inflated } recv_state;
@@ -493,7 +491,6 @@ void send_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 	else
 		send_deflated_token(f, token, buf, offset, n, toklen);
 }
-
 
 /*
  * receive a token or buffer from the other end. If the reurn value is >0 then

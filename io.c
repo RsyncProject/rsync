@@ -1,8 +1,10 @@
-/* -*- c-file-style: "linux" -*-
+/*
+ * Socket and pipe I/O utilities used in rsync.
  *
- * Copyright (C) 1996-2001 by Andrew Tridgell
- * Copyright (C) Paul Mackerras 1996
- * Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
+ * Copyright (C) 1996-2001 Andrew Tridgell
+ * Copyright (C) 1996 Paul Mackerras
+ * Copyright (C) 2001, 2002 Martin Pool <mbp@samba.org>
+ * Copyright (C) 2003, 2004, 2005, 2006 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,23 +18,15 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/**
- * @file io.c
- *
- * Socket and pipe I/O utilities used in rsync.
- *
- * rsync provides its own multiplexing system, which is used to send
- * stderr and stdout over a single socket.  We need this because
- * stdout normally carries the binary data stream, and stderr all our
- * error messages.
+/* Rsync provides its own multiplexing system, which is used to send
+ * stderr and stdout over a single socket.
  *
  * For historical reasons this is off during the start of the
  * connection, but it's switched on quite early using
- * io_start_multiplex_out() and io_start_multiplex_in().
- **/
+ * io_start_multiplex_out() and io_start_multiplex_in(). */
 
 #include "rsync.h"
 
@@ -1001,7 +995,7 @@ void write_sum_head(int f, struct sum_struct *sum)
 static void sleep_for_bwlimit(int bytes_written)
 {
 	static struct timeval prior_tv;
-	static long total_written = 0; 
+	static long total_written = 0;
 	struct timeval tv, start_tv;
 	long elapsed_usec, sleep_usec;
 
@@ -1010,7 +1004,7 @@ static void sleep_for_bwlimit(int bytes_written)
 	if (!bwlimit_writemax)
 		return;
 
-	total_written += bytes_written; 
+	total_written += bytes_written;
 
 	gettimeofday(&start_tv, NULL);
 	if (prior_tv.tv_sec) {

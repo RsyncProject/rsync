@@ -1,7 +1,9 @@
-/*  -*- c-file-style: "linux" -*-
+/*
+ * Command-line (and received via daemon-socket) option parsing.
  *
- * Copyright (C) 1998-2001 by Andrew Tridgell <tridge@samba.org>
- * Copyright (C) 2000, 2001, 2002 by Martin Pool <mbp@samba.org>
+ * Copyright (C) 1998-2001 Andrew Tridgell <tridge@samba.org>
+ * Copyright (C) 2000, 2001, 2002 Martin Pool <mbp@samba.org>
+ * Copyright (C) 2002, 2003, 2004, 2005, 2006 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include "rsync.h"

@@ -1,6 +1,7 @@
 #! /bin/sh
 
 # Copyright (C) 2001, 2002 by Martin Pool <mbp@samba.org>
+# Copyright (C) 2003, 2004, 2005, 2006 Wayne Davison
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version
@@ -13,8 +14,7 @@
 # 
 # You should have received a copy of the GNU Lesser General Public
 # License along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 # rsync top-level test script -- this invokes all the other more
 # detailed tests in order.  This script can either be called by `make

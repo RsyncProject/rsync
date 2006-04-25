@@ -1,28 +1,25 @@
-/* 
-   Copyright (C) Andrew Tridgell 1998
-   Copyright (C) 2002 by Martin Pool
-   
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-   
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-   
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-*/
-
-/**
- * @file syscall.c
- *
+/*
  * Syscall wrappers to ensure that nothing gets done in dry_run mode
  * and to handle system peculiarities.
- **/
+ *
+ * Copyright (C) 1998 Andrew Tridgell
+ * Copyright (C) 2002 Martin Pool
+ * Copyright (C) 2003, 2004, 2005, 2006 Wayne Davison
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 
 #include "rsync.h"
 
@@ -168,10 +165,10 @@ void trim_trailing_slashes(char *name)
 	/* Some BSD systems cannot make a directory if the name
 	 * contains a trailing slash.
 	 * <http://www.opensource.apple.com/bugs/X/BSD%20Kernel/2734739.html> */
-	
+
 	/* Don't change empty string; and also we can't improve on
 	 * "/" */
-	
+
 	l = strlen(name);
 	while (l > 1) {
 		if (name[--l] != '/')
@@ -184,7 +181,7 @@ int do_mkdir(char *fname, mode_t mode)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-	trim_trailing_slashes(fname);	
+	trim_trailing_slashes(fname);
 	return mkdir(fname, mode);
 }
 
