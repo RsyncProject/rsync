@@ -893,12 +893,15 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			if (sanitize_paths)
 				arg = sanitize_path(NULL, arg, NULL, 0);
 			if (server_filter_list.head) {
-				char *cp = (char *)arg;
+				char *cp = strdup(arg);
+				if (!cp)
+					out_of_memory("parse_arguments");
 				if (!*cp)
 					goto options_rejected;
 				clean_fname(cp, 1);
 				if (check_filter(&server_filter_list, cp, 0) < 0)
 					goto options_rejected;
+				free(cp);
 			}
 			parse_filter_file(&filter_list, arg,
 				opt == OPT_INCLUDE_FROM ? MATCHFLG_INCLUDE : 0,
@@ -1215,7 +1218,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 	if (server_filter_list.head && !am_sender) {
 		struct filter_list_struct *elp = &server_filter_list;
-		int i;
 		if (tmpdir) {
 			if (!*tmpdir)
 				goto options_rejected;
@@ -1226,13 +1228,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		if (partial_dir && *partial_dir) {
 			clean_fname(partial_dir, 1);
 			if (check_filter(elp, partial_dir, 1) < 0)
-				goto options_rejected;
-		}
-		for (i = 0; i < basis_dir_cnt; i++) {
-			if (!*basis_dir[i])
-				goto options_rejected;
-			clean_fname(basis_dir[i], 1);
-			if (check_filter(elp, basis_dir[i], 1) < 0)
 				goto options_rejected;
 		}
 		if (backup_dir) {
