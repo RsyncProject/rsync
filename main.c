@@ -49,6 +49,8 @@ extern int preserve_hard_links;
 extern int protocol_version;
 extern int recurse;
 extern int relative_paths;
+extern int sanitize_paths;
+extern int module_id;
 extern int rsync_port;
 extern int whole_file;
 extern int read_batch;
@@ -59,9 +61,12 @@ extern int filesfrom_fd;
 extern pid_t cleanup_child_pid;
 extern struct stats stats;
 extern char *filesfrom_host;
+extern char *basis_dir[];
 extern char *rsync_path;
 extern char *shell_cmd;
 extern char *batch_name;
+
+extern char curr_dir[MAXPATHLEN];
 
 int local_server = 0;
 mode_t orig_umask = 0;
@@ -784,6 +789,16 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 
 	if (argc > 0)
 		local_name = get_local_name(flist,argv[0]);
+
+	/* Now that we know what our destination directory turned out to be,
+	 * we can sanitize the --link-/copy-/compare-dest args correctly. */
+	if (sanitize_paths) {
+		char *dest_path = curr_dir + strlen(lp_path(module_id));
+		int dest_depth = count_dir_elements(dest_path);
+		char **dir;
+		for (dir = basis_dir; *dir; dir++)
+			*dir = sanitize_path(NULL, *dir, NULL, dest_depth);
+	}
 
 	exit_code = do_recv(f_in,f_out,flist,local_name);
 	exit_cleanup(exit_code);
