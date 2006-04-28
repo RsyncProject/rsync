@@ -1048,10 +1048,9 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 					MAX_BASIS_DIRS, dest_option);
 				return 0;
 			}
-			arg = poptGetOptArg(pc);
-			if (sanitize_paths)
-				arg = sanitize_path(NULL, arg, NULL, 0);
-			basis_dir[basis_dir_cnt++] = (char *)arg;
+			/* We defer sanitizing this arg until we know what
+			 * our destination directory is going to be. */
+			basis_dir[basis_dir_cnt++] = (char *)poptGetOptArg(pc);
 			break;
 
 		case OPT_CHMOD:
