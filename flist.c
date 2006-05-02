@@ -149,61 +149,55 @@ static void list_file_entry(struct file_struct *f)
 	}
 }
 
-/**
- * Stat either a symlink or its referent, depending on the settings of
- * copy_links, copy_unsafe_links, etc.
+/* Stat either a symlink or its referent, depending on the settings of
+ * copy_links, copy_unsafe_links, etc.  Returns -1 on error, 0 on success.
  *
- * @retval -1 on error
+ * If path is the name of a symlink, then the linkbuf buffer (which must hold
+ * MAXPATHLEN chars) will be set to the symlink's target string.
  *
- * @retval 0 for success
- *
- * @post If @p path is a symlink, then @p linkbuf (of size @c
- * MAXPATHLEN) contains the symlink target.
- *
- * @post @p buffer contains information about the link or the
- * referrent as appropriate, if they exist.
- **/
-static int readlink_stat(const char *path, STRUCT_STAT *buffer, char *linkbuf)
+ * The stat structure pointed to by stp will contain information about the
+ * link or the referent as appropriate, if they exist. */
+static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
 {
 #ifdef SUPPORT_LINKS
 	if (copy_links)
-		return do_stat(path, buffer);
-	if (link_stat(path, buffer, copy_dirlinks) < 0)
+		return do_stat(path, stp);
+	if (link_stat(path, stp, copy_dirlinks) < 0)
 		return -1;
-	if (S_ISLNK(buffer->st_mode)) {
-		int l = readlink((char *)path, linkbuf, MAXPATHLEN - 1);
-		if (l == -1)
+	if (S_ISLNK(stp->st_mode)) {
+		int llen = readlink(path, linkbuf, MAXPATHLEN - 1);
+		if (llen < 0)
 			return -1;
-		linkbuf[l] = 0;
+		linkbuf[llen] = '\0';
 		if (copy_unsafe_links && unsafe_symlink(linkbuf, path)) {
 			if (verbose > 1) {
 				rprintf(FINFO,"copying unsafe symlink \"%s\" -> \"%s\"\n",
 					path, linkbuf);
 			}
-			return do_stat(path, buffer);
+			return do_stat(path, stp);
 		}
 	}
 	return 0;
 #else
-	return do_stat(path, buffer);
+	return do_stat(path, stp);
 #endif
 }
 
-int link_stat(const char *path, STRUCT_STAT *buffer, int follow_dirlinks)
+int link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
 {
 #ifdef SUPPORT_LINKS
 	if (copy_links)
-		return do_stat(path, buffer);
-	if (do_lstat(path, buffer) < 0)
+		return do_stat(path, stp);
+	if (do_lstat(path, stp) < 0)
 		return -1;
-	if (follow_dirlinks && S_ISLNK(buffer->st_mode)) {
+	if (follow_dirlinks && S_ISLNK(stp->st_mode)) {
 		STRUCT_STAT st;
 		if (do_stat(path, &st) == 0 && S_ISDIR(st.st_mode))
-			*buffer = st;
+			*stp = st;
 	}
 	return 0;
 #else
-	return do_stat(path, buffer);
+	return do_stat(path, stp);
 #endif
 }
 
@@ -847,7 +841,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	        ? MD4_SUM_LENGTH : 0;
 
 	alloc_len = file_struct_len + dirname_len + basename_len
-	    + linkname_len + sum_len;
+		  + linkname_len + sum_len;
 	if (flist)
 		bp = pool_alloc(flist->file_pool, alloc_len, "make_file");
 	else {
