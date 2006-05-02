@@ -66,9 +66,8 @@ extern char *rsync_path;
 extern char *shell_cmd;
 extern char *batch_name;
 
-extern char curr_dir[MAXPATHLEN];
-
 int local_server = 0;
+int startdir_depth = 0;
 mode_t orig_umask = 0;
 struct file_list *the_file_list;
 
@@ -479,6 +478,8 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 					full_fname(dest_path));
 				exit_cleanup(RERR_FILESELECT);
 			}
+			if (sanitize_paths)
+				startdir_depth = count_dir_elements(dest_path);
 			return NULL;
 		}
 		if (flist->count > 1) {
@@ -531,6 +532,8 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 				full_fname(dest_path));
 			exit_cleanup(RERR_FILESELECT);
 		}
+		if (sanitize_paths)
+			startdir_depth = count_dir_elements(dest_path);
 
 		return NULL;
 	}
@@ -551,6 +554,8 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 			full_fname(dest_path));
 		exit_cleanup(RERR_FILESELECT);
 	}
+	if (sanitize_paths)
+		startdir_depth = count_dir_elements(dest_path);
 	*cp = '/';
 
 	return cp + 1;
@@ -793,11 +798,9 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	/* Now that we know what our destination directory turned out to be,
 	 * we can sanitize the --link-/copy-/compare-dest args correctly. */
 	if (sanitize_paths) {
-		char *dest_path = curr_dir + strlen(lp_path(module_id));
-		int dest_depth = count_dir_elements(dest_path);
 		char **dir;
 		for (dir = basis_dir; *dir; dir++)
-			*dir = sanitize_path(NULL, *dir, NULL, dest_depth);
+			*dir = sanitize_path(NULL, *dir, NULL, startdir_depth);
 	}
 
 	exit_code = do_recv(f_in,f_out,flist,local_name);
