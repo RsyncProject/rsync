@@ -50,6 +50,8 @@ extern int delete_before;
 extern int delete_during;
 extern int delete_after;
 extern int module_id;
+extern int sanitize_paths;
+extern int startdir_depth;
 extern int ignore_errors;
 extern int remove_sent_files;
 extern int delay_updates;
@@ -952,6 +954,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					full_fname(fname), file->u.link);
 			}
 			return;
+		}
+		if (sanitize_paths) {
+			sanitize_path(file->u.link, file->u.link, "",
+				      startdir_depth + file->dir.depth - 1);
 		}
 		if (statret == 0) {
 			char lnk[MAXPATHLEN];
