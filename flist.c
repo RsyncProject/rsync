@@ -663,8 +663,6 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 	if (linkname_len) {
 		file->u.link = bp;
 		read_sbuf(f, bp, linkname_len - 1);
-		if (sanitize_paths)
-			sanitize_path(bp, bp, "", lastdir_depth);
 		bp += linkname_len;
 	}
 #endif
