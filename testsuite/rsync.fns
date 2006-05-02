@@ -232,9 +232,10 @@ pid file = $pidfile
 use chroot = no
 hosts allow = localhost, 127.0.0.1
 log file = $logfile
+log format = %i %h [%a] %m (%u) %l %f%L
+transfer logging = yes
 exclude = foobar.baz
 max verbosity = 9
-
 uid = 0
 gid = 0
 
@@ -244,6 +245,10 @@ gid = 0
 
 [test-to]
 	path = $todir
+	read only = no
+
+[test-scratch]
+	path = $scratchdir
 	read only = no
 EOF
 }
