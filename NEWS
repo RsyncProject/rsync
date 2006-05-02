@@ -4,7 +4,17 @@ Changes since 2.6.8:
 
   BUG FIXES:
 
-    - ...
+    - Fixed the sanitizing of acceptable ../ dirs in 2 cases where an rsync
+      daemon is receiving files when "use chroot" is not enabled and the
+      destination dir is not at the top of the module's path:  both the value
+      of a symlink and the arg of the --FOO-dest options (i.e.  --link-dest,
+      --copy-dest, and --compare-dest) now know how deep the destination dir
+      is in the module, and allow a safe number of ../ references instead of
+      preventing the references from leaving the destination hierarchy (use
+      the age-old --safe-links for that behavior).
+
+    - Make sure that the --link-dest option can still do its job even when -I
+      or --size-only is specified.
 
   ENHANCEMENTS:
 
@@ -12,4 +22,10 @@ Changes since 2.6.8:
 
   DEVELOPER RELATED:
 
+    - The acls.diff and xattrs.diff patches have received a bunch of work to
+      make them much closer to being acceptable in the main distribution.
+
     - Updated config.guess and config.sub to their 2006-02-23 version.
+
+    - Updated various files to include the latest FSF address and to have
+      consistent opening comments.
