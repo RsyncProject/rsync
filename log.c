@@ -256,7 +256,7 @@ void rwrite(enum logcode code, char *buf, int len)
 
 	if (am_server) {
 		/* Pass the message to the non-server side. */
-		if (send_msg(code, buf, len))
+		if (send_msg((enum msgcode)code, buf, len))
 			return;
 		if (am_daemon) {
 			/* TODO: can we send the error to the user somehow? */
