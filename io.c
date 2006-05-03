@@ -267,10 +267,7 @@ static void read_msg_fd(void)
 			exit_cleanup(RERR_STREAMIO);
 		}
 		read_loop(fd, buf, len);
-		if (defer_forwarding_messages)
-			msg_list_add(&msg2sndr, MSG_DELETED, buf, len);
-		else
-			io_multiplex_write(MSG_DELETED, buf, len);
+		send_msg(MSG_DELETED, buf, len);
 		break;
 	case MSG_SUCCESS:
 		if (len != 4 || !am_generator) {
@@ -280,10 +277,7 @@ static void read_msg_fd(void)
 		read_loop(fd, buf, len);
 		if (remove_sent_files) {
 			decrement_active_files(IVAL(buf,0));
-			if (defer_forwarding_messages)
-				msg_list_add(&msg2sndr, MSG_SUCCESS, buf, len);
-			else
-				io_multiplex_write(MSG_SUCCESS, buf, len);
+			send_msg(MSG_SUCCESS, buf, len);
 		}
 		if (preserve_hard_links)
 			flist_ndx_push(&hlink_list, IVAL(buf,0));
@@ -294,7 +288,6 @@ static void read_msg_fd(void)
 			exit_cleanup(RERR_STREAMIO);
 		}
 		close_multiplexing_out();
-		defer_forwarding_messages = 0;
 		/* FALL THROUGH */
 	case MSG_INFO:
 	case MSG_ERROR:
@@ -304,11 +297,7 @@ static void read_msg_fd(void)
 			if (n >= sizeof buf)
 				n = sizeof buf - 1;
 			read_loop(fd, buf, n);
-			if (am_generator && am_server
-			 && defer_forwarding_messages && tag != MSG_LOG)
-				msg_list_add(&msg2sndr, tag, buf, n);
-			else
-				rwrite((enum logcode)tag, buf, n);
+			rwrite(tag, buf, n);
 			len -= n;
 		}
 		break;
@@ -382,14 +371,19 @@ static int msg2genr_flush(int flush_it_all)
 	return 1;
 }
 
-void send_msg(enum msgcode code, char *buf, int len)
+int send_msg(enum msgcode code, char *buf, int len)
 {
 	if (msg_fd_out < 0) {
-		io_multiplex_write(code, buf, len);
-		return;
+		if (!defer_forwarding_messages)
+			return io_multiplex_write(code, buf, len);
+		if (!io_multiplexing_out)
+			return 0;
+		msg_list_add(&msg2sndr, code, buf, len);
+		return 1;
 	}
 	msg_list_add(&msg2genr, code, buf, len);
 	msg2genr_flush(NORMAL_FLUSH);
+	return 1;
 }
 
 int get_redo_num(int itemizing, enum logcode code)
@@ -1136,20 +1130,11 @@ static void msg2sndr_flush(void)
 
 	while (msg2sndr.head && io_multiplexing_out) {
 		struct msg_list_item *m = msg2sndr.head;
-		int tag = *((uchar*)m->buf+3) - MPLEX_BASE;
 		if (!(msg2sndr.head = m->next))
 			msg2sndr.tail = NULL;
+		stats.total_written += m->len;
 		defer_forwarding_messages = 1;
-		switch (tag) {
-		case MSG_INFO:
-		case MSG_ERROR:
-			rwrite((enum logcode)tag, m->buf + 4, m->len - 4);
-			break;
-		default:
-			stats.total_written += m->len;
-			writefd_unbuffered(sock_f_out, m->buf, m->len);
-			break;
-		}
+		writefd_unbuffered(sock_f_out, m->buf, m->len);
 		defer_forwarding_messages = 0;
 		free(m);
 	}
