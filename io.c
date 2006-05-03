@@ -294,6 +294,7 @@ static void read_msg_fd(void)
 			exit_cleanup(RERR_STREAMIO);
 		}
 		close_multiplexing_out();
+		defer_forwarding_messages = 0;
 		/* FALL THROUGH */
 	case MSG_INFO:
 	case MSG_ERROR:
@@ -303,7 +304,8 @@ static void read_msg_fd(void)
 			if (n >= sizeof buf)
 				n = sizeof buf - 1;
 			read_loop(fd, buf, n);
-			if (am_generator && am_server && defer_forwarding_messages)
+			if (am_generator && am_server
+			 && defer_forwarding_messages && tag != MSG_LOG)
 				msg_list_add(&msg2sndr, tag, buf, n);
 			else
 				rwrite((enum logcode)tag, buf, n);
@@ -1134,11 +1136,20 @@ static void msg2sndr_flush(void)
 
 	while (msg2sndr.head && io_multiplexing_out) {
 		struct msg_list_item *m = msg2sndr.head;
+		int tag = (IVAL(m->buf, 0) >> 24) - MPLEX_BASE;
 		if (!(msg2sndr.head = m->next))
 			msg2sndr.tail = NULL;
-		stats.total_written += m->len;
 		defer_forwarding_messages = 1;
-		writefd_unbuffered(sock_f_out, m->buf, m->len);
+		switch (tag) {
+		case MSG_INFO:
+		case MSG_ERROR:
+			rwrite((enum logcode)tag, m->buf + 4, m->len - 4);
+			break;
+		default:
+			stats.total_written += m->len;
+			writefd_unbuffered(sock_f_out, m->buf, m->len);
+			break;
+		}
 		defer_forwarding_messages = 0;
 		free(m);
 	}
