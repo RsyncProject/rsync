@@ -13,6 +13,10 @@ Changes since 2.6.8:
       preventing the references from leaving the destination hierarchy (use
       the age-old --safe-links for that behavior).
 
+    - Fixed a bug where a deferred FLOG message would get sent from the
+      generator to the sender instead of being handled by rwrite().  This
+      fixes the "unexpected tag 3" fatal error.
+
     - Make sure that the --link-dest option can still do its job even when -I
       or --size-only is specified.
 
