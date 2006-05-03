@@ -298,7 +298,7 @@ static char *parse_merge_name(const char *merge_file, unsigned int *len_ptr,
 			strlcpy(to, merge_file, *len_ptr + 1);
 			merge_file = to;
 		}
-		if (!sanitize_path(fn, merge_file, r, dirbuf_depth)) {
+		if (!sanitize_path(fn, merge_file, r, dirbuf_depth, NULL)) {
 			rprintf(FERROR, "merge-file name overflows: %s\n",
 				merge_file);
 			return NULL;
