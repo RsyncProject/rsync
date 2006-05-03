@@ -1136,7 +1136,7 @@ static void msg2sndr_flush(void)
 
 	while (msg2sndr.head && io_multiplexing_out) {
 		struct msg_list_item *m = msg2sndr.head;
-		int tag = (IVAL(m->buf, 0) >> 24) - MPLEX_BASE;
+		int tag = *((uchar*)m->buf+3) - MPLEX_BASE;
 		if (!(msg2sndr.head = m->next))
 			msg2sndr.tail = NULL;
 		defer_forwarding_messages = 1;
