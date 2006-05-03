@@ -29,11 +29,16 @@ extern int module_id;
 extern int modify_window;
 extern int relative_paths;
 extern int human_readable;
+extern unsigned int module_dirlen;
 extern mode_t orig_umask;
 extern char *partial_dir;
 extern struct filter_list_struct server_filter_list;
 
 int sanitize_paths = 0;
+
+char curr_dir[MAXPATHLEN];
+unsigned int curr_dir_len;
+int curr_dir_depth; /* This is only set for a sanitizing daemon. */
 
 /* Set a fd into nonblocking mode. */
 void set_nonblocking(int fd)
@@ -539,7 +544,7 @@ static void glob_expand_one(char *s, char ***argv_ptr, int *argc_ptr,
 		s = ".";
 
 	if (sanitize_paths)
-		s = sanitize_path(NULL, s, "", 0);
+		s = sanitize_path(NULL, s, "", 0, NULL);
 	else
 		s = strdup(s);
 
@@ -670,7 +675,7 @@ int count_dir_elements(const char *p)
 	int cnt = 0, new_component = 1;
 	while (*p) {
 		if (*p++ == '/')
-			new_component = 1;
+			new_component = (*p != '.' || (p[1] != '/' && p[1] != '\0'));
 		else if (new_component) {
 			new_component = 0;
 			cnt++;
@@ -745,8 +750,9 @@ unsigned int clean_fname(char *name, BOOL collapse_dot_dot)
  * The rootdir string contains a value to use in place of a leading slash.
  * Specify NULL to get the default of lp_path(module_id).
  *
- * If depth is >= 0, it is a count of how many '..'s to allow at the start
- * of the path.  Use -1 to allow unlimited depth.
+ * The depth var is a count of how many '..'s to allow at the start of the
+ * path.  If symlink is set, combine its value with the "p" value to get
+ * the target path, and **return NULL if any '..'s try to escape**.
  *
  * We also clean the path in a manner similar to clean_fname() but with a
  * few differences:
@@ -756,10 +762,16 @@ unsigned int clean_fname(char *name, BOOL collapse_dot_dot)
  * ALWAYS collapses ".." elements (except for those at the start of the
  * string up to "depth" deep).  If the resulting name would be empty,
  * change it into a ".". */
-char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
+char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth,
+		    const char *symlink)
 {
-	char *start, *sanp;
+	char *start, *sanp, *save_dest = dest;
 	int rlen = 0, leave_one_dotdir = relative_paths;
+
+	if (symlink && *symlink == '/') {
+		p = symlink;
+		symlink = "";
+	}
 
 	if (dest != p) {
 		int plen = strlen(p);
@@ -783,7 +795,18 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
 	}
 
 	start = sanp = dest + rlen;
-	while (*p != '\0') {
+	while (1) {
+		if (*p == '\0') {
+			if (!symlink || !*symlink)
+				break;
+			while (sanp != start && sanp[-1] != '/') {
+				/* strip last element */
+				sanp--;
+			}
+			/* Append a relative symlink */
+			p = symlink;
+			symlink = "";
+		}
 		/* discard leading or extra slashes */
 		if (*p == '/') {
 			p++;
@@ -805,6 +828,11 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
 		if (*p == '.' && p[1] == '.' && (p[2] == '/' || p[2] == '\0')) {
 			/* ".." component followed by slash or end */
 			if (depth <= 0 || sanp != start) {
+				if (symlink && sanp == start) {
+					if (!save_dest)
+						free(dest);
+					return NULL;
+				}
 				p += 2;
 				if (sanp != start) {
 					/* back up sanp one level */
@@ -833,14 +861,48 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
 	return dest;
 }
 
-char curr_dir[MAXPATHLEN];
-unsigned int curr_dir_len;
+/* If sanitize_paths is not set, this works exactly the same as do_stat().
+ * Otherwise, we verify that no symlink takes us outside the module path.
+ * If we encounter an escape attempt, we return a symlink's stat info! */
+int safe_stat(const char *fname, STRUCT_STAT *stp)
+{
+#ifdef SUPPORT_LINKS
+	char tmpbuf[MAXPATHLEN], linkbuf[MAXPATHLEN], *mod_path;
+	int i, llen, mod_path_len;
 
-/**
- * Like chdir(), but it keeps track of the current directory (in the
+	if (!sanitize_paths)
+		return do_stat(fname, stp);
+
+	mod_path = lp_path(module_id);
+	mod_path_len = strlen(mod_path);
+
+	for (i = 0; i < 16; i++) {
+#ifdef DEBUG
+		if (*fname == '/')
+			assert(strncmp(fname, mod_path, mod_path_len) == 0 && fname[mod_path_len] == '/');
+#endif
+		if (do_lstat(fname, stp) < 0)
+			return -1;
+		if (!S_ISLNK(stp->st_mode))
+			return 0;
+		if ((llen = readlink(fname, linkbuf, sizeof linkbuf - 1)) < 0)
+			return -1;
+		linkbuf[llen] = '\0';
+		if (*fname == '/')
+			fname += mod_path_len;
+		if (!(fname = sanitize_path(tmpbuf, fname, mod_path, curr_dir_depth, linkbuf)))
+			break;
+	}
+
+	return 0; /* Leave *stp set to the last symlink. */
+#else
+	return do_stat(fname, stp);
+#endif
+}
+
+/* Like chdir(), but it keeps track of the current directory (in the
  * global "curr_dir"), and ensures that the path size doesn't overflow.
- * Also cleans the path using the clean_fname() function.
- **/
+ * Also cleans the path using the clean_fname() function. */
 int push_dir(char *dir)
 {
 	static int initialised;
@@ -875,6 +937,11 @@ int push_dir(char *dir)
 	}
 
 	curr_dir_len = clean_fname(curr_dir, 1);
+	if (sanitize_paths) {
+		if (module_dirlen > curr_dir_len)
+			module_dirlen = curr_dir_len;
+		curr_dir_depth = count_dir_elements(curr_dir + module_dirlen);
+	}
 
 	return 1;
 }
@@ -891,6 +958,8 @@ int pop_dir(char *dir)
 	curr_dir_len = strlcpy(curr_dir, dir, sizeof curr_dir);
 	if (curr_dir_len >= sizeof curr_dir)
 		curr_dir_len = sizeof curr_dir - 1;
+	if (sanitize_paths)
+		curr_dir_depth = count_dir_elements(curr_dir + module_dirlen);
 
 	return 1;
 }
