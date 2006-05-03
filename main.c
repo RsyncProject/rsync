@@ -50,6 +50,7 @@ extern int protocol_version;
 extern int recurse;
 extern int relative_paths;
 extern int sanitize_paths;
+extern int curr_dir_depth;
 extern int module_id;
 extern int rsync_port;
 extern int whole_file;
@@ -67,7 +68,6 @@ extern char *shell_cmd;
 extern char *batch_name;
 
 int local_server = 0;
-int startdir_depth = 0;
 mode_t orig_umask = 0;
 struct file_list *the_file_list;
 
@@ -471,15 +471,13 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	 * it and use mode 1.  If there is something other than a directory
 	 * at the destination path, we must be transferring one file
 	 * (anything at the destination will be overwritten). */
-	if (do_stat(dest_path, &st) == 0) {
+	if (safe_stat(dest_path, &st) == 0) {
 		if (S_ISDIR(st.st_mode)) {
 			if (!push_dir(dest_path)) {
 				rsyserr(FERROR, errno, "push_dir#1 %s failed",
 					full_fname(dest_path));
 				exit_cleanup(RERR_FILESELECT);
 			}
-			if (sanitize_paths)
-				startdir_depth = count_dir_elements(dest_path);
 			return NULL;
 		}
 		if (flist->count > 1) {
@@ -532,8 +530,6 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 				full_fname(dest_path));
 			exit_cleanup(RERR_FILESELECT);
 		}
-		if (sanitize_paths)
-			startdir_depth = count_dir_elements(dest_path);
 
 		return NULL;
 	}
@@ -554,8 +550,6 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 			full_fname(dest_path));
 		exit_cleanup(RERR_FILESELECT);
 	}
-	if (sanitize_paths)
-		startdir_depth = count_dir_elements(dest_path);
 	*cp = '/';
 
 	return cp + 1;
@@ -800,7 +794,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	if (sanitize_paths) {
 		char **dir;
 		for (dir = basis_dir; *dir; dir++)
-			*dir = sanitize_path(NULL, *dir, NULL, startdir_depth);
+			*dir = sanitize_path(NULL, *dir, NULL, curr_dir_depth, NULL);
 	}
 
 	exit_code = do_recv(f_in,f_out,flist,local_name);
