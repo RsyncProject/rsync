@@ -37,6 +37,7 @@ extern int numeric_ids;
 extern int recurse;
 extern int xfer_dirs;
 extern int filesfrom_fd;
+extern int curr_dir_depth;
 extern int one_file_system;
 extern int copy_dirlinks;
 extern int keep_dirlinks;
@@ -160,8 +161,6 @@ static void list_file_entry(struct file_struct *f)
 static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
 {
 #ifdef SUPPORT_LINKS
-	if (copy_links)
-		return do_stat(path, stp);
 	if (link_stat(path, stp, copy_dirlinks) < 0)
 		return -1;
 	if (S_ISLNK(stp->st_mode)) {
@@ -174,7 +173,7 @@ static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
 				rprintf(FINFO,"copying unsafe symlink \"%s\" -> \"%s\"\n",
 					path, linkbuf);
 			}
-			return do_stat(path, stp);
+			return safe_stat(path, stp);
 		}
 	}
 	return 0;
@@ -187,12 +186,12 @@ int link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
 {
 #ifdef SUPPORT_LINKS
 	if (copy_links)
-		return do_stat(path, stp);
+		return safe_stat(path, stp);
 	if (do_lstat(path, stp) < 0)
 		return -1;
 	if (follow_dirlinks && S_ISLNK(stp->st_mode)) {
 		STRUCT_STAT st;
-		if (do_stat(path, &st) == 0 && S_ISDIR(st.st_mode))
+		if (safe_stat(path, &st) == 0 && S_ISDIR(st.st_mode))
 			*stp = st;
 	}
 	return 0;
@@ -532,7 +531,7 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 	clean_fname(thisname, 0);
 
 	if (sanitize_paths)
-		sanitize_path(thisname, thisname, "", 0);
+		sanitize_path(thisname, thisname, "", 0, NULL);
 
 	if ((basename = strrchr(thisname, '/')) != NULL) {
 		dirname_len = ++basename - thisname; /* counts future '\0' */
@@ -737,7 +736,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 	}
 	clean_fname(thisname, 0);
 	if (sanitize_paths)
-		sanitize_path(thisname, thisname, "", 0);
+		sanitize_path(thisname, thisname, "", 0, NULL);
 
 	memset(sum, 0, SUM_LENGTH);
 
@@ -922,7 +921,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 		int save_mode = file->mode;
 		file->mode = S_IFDIR; /* Find a directory with our name. */
 		if (flist_find(the_file_list, file) >= 0
-		    && do_stat(thisname, &st2) == 0 && S_ISDIR(st2.st_mode)) {
+		    && safe_stat(thisname, &st2) == 0 && S_ISDIR(st2.st_mode)) {
 			file->modtime = st2.st_mtime;
 			file->length = st2.st_size;
 			file->mode = st2.st_mode;
@@ -1086,13 +1085,13 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (use_ff_fd) {
 			if (read_filesfrom_line(filesfrom_fd, fbuf) == 0)
 				break;
-			sanitize_path(fbuf, fbuf, "", 0);
+			sanitize_path(fbuf, fbuf, "", 0, NULL);
 		} else {
 			if (argc-- == 0)
 				break;
 			strlcpy(fbuf, *argv++, MAXPATHLEN);
 			if (sanitize_paths)
-				sanitize_path(fbuf, fbuf, "", 0);
+				sanitize_path(fbuf, fbuf, "", 0, NULL);
 		}
 
 		len = strlen(fbuf);
