@@ -751,7 +751,10 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 		 && !IS_SPECIAL(file->mode) && !IS_DEVICE(file->mode)
 #endif
 		) {
-			if (do_link(fnamebuf, fname) < 0) {
+#ifdef SUPPORT_HARD_LINKS
+			if (do_link(fnamebuf, fname) < 0) 
+#endif
+			{
 				rsyserr(FERROR, errno,
 					"failed to hard-link %s with %s",
 					fnamebuf, fname);
