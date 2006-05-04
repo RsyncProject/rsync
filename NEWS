@@ -5,16 +5,16 @@ Changes since 2.6.8:
   BUG FIXES:
 
     - An rsync daemon that is receiving files with "use chroot = no" no longer
-      sanitizes the symlink target strings.  This means that the symlinks
-      values will now be accepted (and returned) with all their symlink info
+      sanitizes the symlink target strings.  This means that each symlink's
+      value will now be accepted (and thus returned) with its symlink info
       intact.  Also, in order to keep things safe, any option that tells a
       non-chroot daemon to treat some symlinks as their referent (such as
       --copy-links or --keep-dirlinks) now manually checks the symlink chain
       to ensure that the symlinks do not try to escape past the top of the
-      module's path.  This makes a non-chroot daemon behave the same as a
-      chroot daemon with regard to symlinks, and also avoids a potential
-      problem where pre-existing symlinks could have escaped the module's
-      hierarchy.
+      module's path.  Both these changes make a non-chroot daemon behave the
+      same as a chroot daemon with regard to symlinks, and also avoids a
+      potential problem where a pre-existing symlink could have escaped the
+      module's hierarchy.
 
     - Fixed a overzealous sanitizing bug in the handling of the --*-dest
       options (--link-dest, --copy-dest, and --compare-dest):  if the copy's
