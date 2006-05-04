@@ -4,14 +4,25 @@ Changes since 2.6.8:
 
   BUG FIXES:
 
-    - Fixed the sanitizing of acceptable ../ dirs in 2 cases where an rsync
-      daemon is receiving files when "use chroot" is not enabled and the
-      destination dir is not at the top of the module's path:  both the value
-      of a symlink and the arg of the --FOO-dest options (i.e.  --link-dest,
-      --copy-dest, and --compare-dest) now know how deep the destination dir
-      is in the module, and allow a safe number of ../ references instead of
-      preventing the references from leaving the destination hierarchy (use
-      the age-old --safe-links for that behavior).
+    - An rsync daemon that is receiving files with "use chroot = no" no longer
+      sanitizes the symlink target strings.  This means that the symlinks
+      values will now be accepted (and returned) with all their symlink info
+      intact.  Also, in order to keep things safe, any option that tells a
+      non-chroot daemon to treat some symlinks as their referent (such as
+      --copy-links or --keep-dirlinks) now manually checks the symlink chain
+      to ensure that the symlinks do not try to escape past the top of the
+      module's path.  This makes a non-chroot daemon behave the same as a
+      chroot daemon with regard to symlinks, and also avoids a potential
+      problem where pre-existing symlinks could have escaped the module's
+      hierarchy.
+
+    - Fixed a overzealous sanitizing bug in the handling of the --*-dest
+      options (--link-dest, --copy-dest, and --compare-dest):  if the copy's
+      destination dir is deeper than the top of the module's path, these
+      options now accept a safe number of ../ (parent-dir) references (since
+      these options are relative to the destination dir).  The old code
+      incorrectly chopped off all "../" prefixes for these options, no matter
+      how deep the destination directory was in the hierarchy.
 
     - Fixed a bug where a deferred info/error/log message could get sent
       directly to the sender instead of being handled by rwrite() in the
@@ -23,6 +34,9 @@ Changes since 2.6.8:
 
     - Make sure that the --link-dest option can still do its job even when -I
       or --size-only is specified.
+
+    - The daemon now calls more timezone-using functions prior to doing a
+      chroot.
 
   ENHANCEMENTS:
 
