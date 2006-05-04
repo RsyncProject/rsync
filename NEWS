@@ -17,12 +17,12 @@ Changes since 2.6.8:
       module's hierarchy.
 
     - Fixed a overzealous sanitizing bug in the handling of the --*-dest
-      options (--link-dest, --copy-dest, and --compare-dest):  if the copy's
+      options (--link-dest, --copy-dest, and --compare-dest): if the copy's
       destination dir is deeper than the top of the module's path, these
       options now accept a safe number of ../ (parent-dir) references (since
       these options are relative to the destination dir).  The old code
       incorrectly chopped off all "../" prefixes for these options, no matter
-      how deep the destination directory was in the hierarchy.
+      how deep the destination directory was in the module's hierarchy.
 
     - Fixed a bug where a deferred info/error/log message could get sent
       directly to the sender instead of being handled by rwrite() in the
@@ -36,7 +36,9 @@ Changes since 2.6.8:
       or --size-only is specified.
 
     - The daemon now calls more timezone-using functions prior to doing a
-      chroot.
+      chroot.  This should help some C libraries to generate proper timestamps
+      from inside a chrooted daemon (and to not try to access /etc/timezone
+      over and over again).
 
   ENHANCEMENTS:
 
