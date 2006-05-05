@@ -337,15 +337,15 @@ to the detailed description below for a complete description.  verb(
  -B, --block-size=SIZE       force a fixed checksum block-size
  -e, --rsh=COMMAND           specify the remote shell to use
      --rsync-path=PROGRAM    specify the rsync to run on remote machine
-     --existing              ignore non-existing files on receiving side
-     --ignore-existing       ignore files that already exist on receiver
-     --remove-sent-files     sent files/symlinks are removed from sender
+     --existing              skip creating new files on receiver
+     --ignore-existing       skip updating files that exist on receiver
+     --remove-sent-files     sender removes successfully sent files
      --del                   an alias for --delete-during
-     --delete                delete files that don't exist on sender
+     --delete                delete extraneous files from dest dirs
      --delete-before         receiver deletes before transfer (default)
      --delete-during         receiver deletes during xfer, not before
      --delete-after          receiver deletes after transfer, not before
-     --delete-excluded       also delete excluded files on receiver
+     --delete-excluded       also delete excluded files from dest dirs
      --ignore-errors         delete even if there are I/O errors
      --force                 force deletion of dirs even if not empty
      --max-delete=NUM        don't delete more than NUM files
@@ -905,12 +905,14 @@ treated like a mount-point.  Symlinks to non-directories are unaffected
 by this option.
 
 dit(bf(--existing, --ignore-non-existing)) This tells rsync to skip
-updating files that do not exist yet on the destination.  If this option is
+creating files (i.e. non-directory items) that do not exist yet on the
+destination.  If this option is
 combined with the bf(--ignore-existing) option, no files will be updated
 (which can be useful if all you want to do is to delete missing files).
 
-dit(bf(--ignore-existing)) This tells rsync to skip updating files that
-already exist on the destination.  See also bf(--ignore-non-existing).
+dit(bf(--ignore-existing)) This tells rsync to skip updating files (i.e.
+non-directory items) that
+already exist on the destination.  See also bf(--existing).
 
 dit(bf(--remove-sent-files)) This tells rsync to remove from the sending
 side the files and/or symlinks that are newly created or whose content is
