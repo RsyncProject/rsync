@@ -657,8 +657,8 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			match_level = 0;
 	}
 
-#ifdef HAVE_LINK
 	if (match_level == 3 && !copy_dest) {
+#ifdef SUPPORT_HARD_LINKS
 		if (link_dest) {
 			if (hard_link_one(file, ndx, fname, 0, stp,
 					  cmpbuf, 1,
@@ -667,7 +667,9 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 				goto try_a_copy;
 			if (preserve_hard_links && file->link_u.links)
 				hard_link_cluster(file, ndx, itemizing, code);
-		} else if (itemizing)
+		} else
+#endif
+		if (itemizing)
 			itemize(file, ndx, 0, stp, 0, 0, NULL);
 		if (verbose > 1 && maybe_ATTRS_REPORT) {
 			code = daemon_log_format_has_i || dry_run
@@ -676,7 +678,6 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		}
 		return -2;
 	}
-#endif
 
 	if (match_level >= 2) {
 	  try_a_copy: /* Copy the file locally. */
@@ -743,6 +744,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 				(int)file->mode);
 			exit_cleanup(RERR_UNSUPPORTED);
 		}
+#ifdef SUPPORT_HARD_LINKS
 		if (link_dest
 #ifndef CAN_HARDLINK_SYMLINK
 		 && !S_ISLNK(file->mode)
@@ -751,10 +753,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 		 && !IS_SPECIAL(file->mode) && !IS_DEVICE(file->mode)
 #endif
 		) {
-#ifdef SUPPORT_HARD_LINKS
-			if (do_link(fnamebuf, fname) < 0) 
-#endif
-			{
+			if (do_link(fnamebuf, fname) < 0) {
 				rsyserr(FERROR, errno,
 					"failed to hard-link %s with %s",
 					fnamebuf, fname);
@@ -763,6 +762,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			if (preserve_hard_links && file->link_u.links)
 				hard_link_cluster(file, ndx, itemizing, code);
 		}
+#endif
 		if (itemizing && log_format_has_i && verbose > 1) {
 			int changes = compare_dest ? 0 : ITEM_LOCAL_CHANGE
 				    + (link_dest ? ITEM_XNAME_FOLLOWS : 0);
