@@ -900,6 +900,46 @@ int safe_stat(const char *fname, STRUCT_STAT *stp)
 #endif
 }
 
+void die_on_unsafe_path(char *path, int strip_filename)
+{
+#ifdef SUPPORT_LINKS
+	char *final_slash, *p;
+	STRUCT_STAT st;
+
+	if (!path)
+		return;
+	if (strip_filename) {
+		if (!(final_slash = strrchr(path, '/')))
+			return;
+		*final_slash = '\0';
+	} else
+		final_slash = NULL;
+
+	p = path;
+	if (*p == '/')
+		p += module_dirlen + 1;
+	while (*p) {
+		if ((p = strchr(p, '/')) != NULL)
+			*p = '\0';
+		if (safe_stat(path, &st) < 0) {
+			*p++ = '/';
+			goto done;
+		}
+		if (S_ISLNK(st.st_mode)) {
+			rprintf(FERROR, "Unsafe path: %s\n", path);
+			exit_cleanup(RERR_SYNTAX);
+		}
+		if (!p)
+			break;
+		*p++ = '/';
+	}
+
+  done:
+	if (final_slash)
+		*final_slash = '/';
+#endif
+}
+
 /* Like chdir(), but it keeps track of the current directory (in the
  * global "curr_dir"), and ensures that the path size doesn't overflow.
  * Also cleans the path using the clean_fname() function. */
