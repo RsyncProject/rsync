@@ -311,15 +311,15 @@ void usage(enum logcode F)
   rprintf(F," -B, --block-size=SIZE       force a fixed checksum block-size\n");
   rprintf(F," -e, --rsh=COMMAND           specify the remote shell to use\n");
   rprintf(F,"     --rsync-path=PROGRAM    specify the rsync to run on the remote machine\n");
-  rprintf(F,"     --existing              ignore non-existing files on receiving side\n");
-  rprintf(F,"     --ignore-existing       ignore files that already exist on receiving side\n");
-  rprintf(F,"     --remove-sent-files     sent files/symlinks are removed from sending side\n");
+  rprintf(F,"     --existing              skip creating new files on receiver\n");
+  rprintf(F,"     --ignore-existing       skip updating files that already exist on receiver\n");
+  rprintf(F,"     --remove-sent-files     sender removes successfully sent files (non-dirs)\n");
   rprintf(F,"     --del                   an alias for --delete-during\n");
-  rprintf(F,"     --delete                delete files that don't exist on the sending side\n");
+  rprintf(F,"     --delete                delete extraneous files from destination dirs\n");
   rprintf(F,"     --delete-before         receiver deletes before transfer (default)\n");
   rprintf(F,"     --delete-during         receiver deletes during transfer, not before\n");
   rprintf(F,"     --delete-after          receiver deletes after transfer, not before\n");
-  rprintf(F,"     --delete-excluded       also delete excluded files on the receiving side\n");
+  rprintf(F,"     --delete-excluded       also delete excluded files from destination dirs\n");
   rprintf(F,"     --ignore-errors         delete even if there are I/O errors\n");
   rprintf(F,"     --force                 force deletion of directories even if not empty\n");
   rprintf(F,"     --max-delete=NUM        don't delete more than NUM files\n");
@@ -1025,7 +1025,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			break;
 
 		case OPT_LINK_DEST:
-#ifdef HAVE_LINK
+#ifdef SUPPORT_HARD_LINKS
 			link_dest = 1;
 			dest_option = "--link-dest";
 			goto set_dest_dir;
