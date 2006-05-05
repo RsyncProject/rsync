@@ -740,7 +740,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 		} else {
 			rprintf(FERROR,
 				"internal: try_dests_non() called with invalid mode (%o)\n",
-				file->mode);
+				(int)file->mode);
 			exit_cleanup(RERR_UNSUPPORTED);
 		}
 		if (link_dest
