@@ -1069,6 +1069,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 	io_start_buffering_out();
 	if (filesfrom_fd >= 0) {
+		if (sanitize_paths)
+			die_on_unsafe_path(argv[0], 0);
 		if (argv[0] && !push_dir(argv[0])) {
 			rsyserr(FERROR, errno, "push_dir %s failed",
 				full_fname(argv[0]));
@@ -1122,6 +1124,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				   && (len == 1 || fbuf[len-2] == '/');
 		}
 
+		if (sanitize_paths)
+			die_on_unsafe_path(fbuf, 1);
 		if (link_stat(fbuf, &st, copy_dirlinks) != 0) {
 			io_error |= IOERR_GENERAL;
 			rsyserr(FERROR, errno, "link_stat %s failed",
