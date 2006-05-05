@@ -62,10 +62,12 @@ extern int filesfrom_fd;
 extern pid_t cleanup_child_pid;
 extern struct stats stats;
 extern char *filesfrom_host;
+extern char *partial_dir;
 extern char *basis_dir[];
 extern char *rsync_path;
 extern char *shell_cmd;
 extern char *batch_name;
+extern struct filter_list_struct server_filter_list;
 
 int local_server = 0;
 mode_t orig_umask = 0;
@@ -805,8 +807,32 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	 * we can sanitize the --link-/copy-/compare-dest args correctly. */
 	if (sanitize_paths) {
 		char **dir;
-		for (dir = basis_dir; *dir; dir++)
+		for (dir = basis_dir; *dir; dir++) {
 			*dir = sanitize_path(NULL, *dir, NULL, curr_dir_depth, NULL);
+			die_on_unsafe_path(*dir, 0);
+		}
+		if (partial_dir) {
+			partial_dir = sanitize_path(NULL, partial_dir, NULL, curr_dir_depth, NULL);
+			/* A relative path gets this checked at every dir change. */
+			if (*partial_dir == '/')
+				die_on_unsafe_path(partial_dir, 0);
+		}
+	}
+	if (server_filter_list.head) {
+		char **dir;
+		struct filter_list_struct *elp = &server_filter_list;
+
+		for (dir = basis_dir; *dir; dir++) {
+			if (check_filter(elp, *dir, 1) < 0)
+				goto options_rejected;
+		}
+		if (partial_dir && *partial_dir == '/'
+		 && check_filter(elp, partial_dir, 1) < 0) {
+		    options_rejected:
+			rprintf(FERROR,
+				"Your options have been rejected by the server.\n");
+			exit_cleanup(RERR_SYNTAX);
+		}
 	}
 
 	exit_code = do_recv(f_in,f_out,flist,local_name);
