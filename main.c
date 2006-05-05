@@ -473,6 +473,8 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	 * (anything at the destination will be overwritten). */
 	if (safe_stat(dest_path, &st) == 0) {
 		if (S_ISDIR(st.st_mode)) {
+			if (sanitize_paths)
+				die_on_unsafe_path(dest_path, 0);
 			if (!push_dir(dest_path)) {
 				rsyserr(FERROR, errno, "push_dir#1 %s failed",
 					full_fname(dest_path));
@@ -480,6 +482,8 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 			}
 			return NULL;
 		}
+		if (sanitize_paths && S_ISLNK(st.st_mode))
+			die_on_unsafe_path(dest_path, 0);
 		if (flist->count > 1) {
 			rprintf(FERROR,
 				"ERROR: destination must be a directory when"
@@ -525,6 +529,8 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 			return NULL;
 		}
 
+		if (sanitize_paths)
+			die_on_unsafe_path(dest_path, 0);
 		if (!push_dir(dest_path)) {
 			rsyserr(FERROR, errno, "push_dir#2 %s failed",
 				full_fname(dest_path));
@@ -545,6 +551,8 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		dest_path = "/";
 
 	*cp = '\0';
+	if (sanitize_paths)
+		die_on_unsafe_path(dest_path, 0);
 	if (!push_dir(dest_path)) {
 		rsyserr(FERROR, errno, "push_dir#3 %s failed",
 			full_fname(dest_path));
@@ -602,10 +610,14 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 		return;
 	}
 
-	if (!relative_paths && !push_dir(dir)) {
-		rsyserr(FERROR, errno, "push_dir#3 %s failed",
-			full_fname(dir));
-		exit_cleanup(RERR_FILESELECT);
+	if (!relative_paths) {
+		if (sanitize_paths)
+			die_on_unsafe_path(dir, 0);
+		if (!push_dir(dir)) {
+			rsyserr(FERROR, errno, "push_dir#3 %s failed",
+				full_fname(dir));
+			exit_cleanup(RERR_FILESELECT);
+		}
 	}
 	argc--;
 	argv++;
