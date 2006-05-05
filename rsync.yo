@@ -905,14 +905,14 @@ treated like a mount-point.  Symlinks to non-directories are unaffected
 by this option.
 
 dit(bf(--existing, --ignore-non-existing)) This tells rsync to skip
-creating files (i.e. non-directory items) that do not exist yet on the
-destination.  If this option is
+creating files (including directories) that do not exist
+yet on the destination.  If this option is
 combined with the bf(--ignore-existing) option, no files will be updated
-(which can be useful if all you want to do is to delete missing files).
+(which can be useful if all you want to do is to delete extraneous files).
 
-dit(bf(--ignore-existing)) This tells rsync to skip updating files (i.e.
-non-directory items) that
-already exist on the destination.  See also bf(--existing).
+dit(bf(--ignore-existing)) This tells rsync to skip updating files that
+already exist on the destination (this does em(not) ignore existing
+directores, or nothing would get done).  See also bf(--existing).
 
 dit(bf(--remove-sent-files)) This tells rsync to remove from the sending
 side the files and/or symlinks that are newly created or whose content is
