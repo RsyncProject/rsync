@@ -1066,13 +1066,11 @@ char *partial_dir_fname(const char *fname)
 	if ((int)pathjoin(t, sz, partial_dir, fn) >= sz)
 		return NULL;
 	if (server_filter_list.head) {
-		static int len;
-		if (!len)
-			len = strlen(partial_dir);
-		t[len] = '\0';
+		t = strrchr(partial_fname, '/');
+		*t = '\0';
 		if (check_filter(&server_filter_list, partial_fname, 1) < 0)
 			return NULL;
-		t[len] = '/';
+		*t = '/';
 		if (check_filter(&server_filter_list, partial_fname, 0) < 0)
 			return NULL;
 	}
@@ -1098,6 +1096,8 @@ int handle_partial_dir(const char *fname, int create)
 	if (create) {
 		STRUCT_STAT st;
 		int statret = do_lstat(dir, &st);
+		if (sanitize_paths && *partial_dir != '/')
+			die_on_unsafe_path(dir, 1); /* lstat handles last element */
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			if (do_unlink(dir) < 0)
 				return 0;
