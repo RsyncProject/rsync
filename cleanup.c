@@ -23,10 +23,13 @@
 
 #include "rsync.h"
 
+extern int am_server;
+extern int am_daemon;
 extern int io_error;
 extern int keep_partial;
 extern int log_got_error;
 extern char *partial_dir;
+extern char *logfile_name;
 
 #ifdef HAVE_SIGACTION
 static struct sigaction sigact;
@@ -151,7 +154,7 @@ void _exit_cleanup(int code, const char *file, int line)
 			code = RERR_PARTIAL;
 	}
 
-	if (code)
+	if (code || am_daemon || (logfile_name && (am_server || !verbose)))
 		log_exit(code, file, line);
 
 	if (verbose > 2) {
