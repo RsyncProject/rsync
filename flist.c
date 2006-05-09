@@ -90,15 +90,15 @@ static int show_filelist_p(void)
 
 static void start_filelist_progress(char *kind)
 {
-	rprintf(FINFO, "%s ... ", kind);
+	rprintf(FCLIENT, "%s ... ", kind);
 	if (verbose > 1 || do_progress)
-		rprintf(FINFO, "\n");
+		rprintf(FCLIENT, "\n");
 	rflush(FINFO);
 }
 
 static void emit_filelist_progress(int count)
 {
-	rprintf(FINFO, " %d files...\r", count);
+	rprintf(FCLIENT, " %d files...\r", count);
 }
 
 static void maybe_emit_filelist_progress(int count)
@@ -282,7 +282,7 @@ void flist_expand(struct file_list *flist)
 				flist->malloced);
 
 	if (verbose >= 2 && flist->malloced != FLIST_START) {
-		rprintf(FINFO, "[%s] expand file_list to %.0f bytes, did%s move\n",
+		rprintf(FCLIENT, "[%s] expand file_list to %.0f bytes, did%s move\n",
 		    who_am_i(),
 		    (double)sizeof flist->files[0] * flist->malloced,
 		    (new_ptr == flist->files) ? " not" : "");
@@ -1058,6 +1058,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	int64 start_write;
 	int use_ff_fd = 0;
 
+	rprintf(FLOG, "building file list\n");
 	if (show_filelist_p())
 		start_filelist_progress("building file list");
 
@@ -1328,6 +1329,7 @@ struct file_list *recv_file_list(int f)
 	unsigned short flags;
 	int64 start_read;
 
+	rprintf(FLOG, "receiving file list\n");
 	if (show_filelist_p())
 		start_filelist_progress("receiving file list");
 
