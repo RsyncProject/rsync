@@ -617,9 +617,14 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		}
 
 		if ((recv_ok && (!delay_updates || !partialptr)) || inplace) {
-			if (partialptr == fname || *partial_dir == '/')
-				partialptr = NULL;
-			finish_transfer(fname, fnametmp, partialptr,
+			char *temp_copy_name;
+			if (partialptr == fname)
+				partialptr = temp_copy_name = NULL;
+			else if (*partial_dir == '/')
+				temp_copy_name = NULL;
+			else
+				temp_copy_name = partialptr;
+			finish_transfer(fname, fnametmp, temp_copy_name,
 					file, recv_ok, 1);
 			if (fnamecmp == partialptr) {
 				do_unlink(partialptr);
