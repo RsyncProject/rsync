@@ -176,7 +176,6 @@ static void handle_stats(int f)
 		return;
 
 	if (am_daemon) {
-		log_exit(0, __FILE__, __LINE__);
 		if (f == -1 || !am_sender)
 			return;
 	}
