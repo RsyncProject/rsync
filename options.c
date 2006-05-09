@@ -148,6 +148,8 @@ char *basis_dir[MAX_BASIS_DIRS+1];
 char *config_file = NULL;
 char *shell_cmd = NULL;
 char *log_format = NULL;
+char *logfile_name = NULL;
+char *logfile_format = NULL;
 char *password_file = NULL;
 char *rsync_path = RSYNC_PATH;
 char *backup_dir = NULL;
@@ -164,7 +166,9 @@ int verbose = 0;
 int quiet = 0;
 int log_before_transfer = 0;
 int log_format_has_i = 0;
+int logfile_format_has_i = 0;
 int log_format_has_o_or_i = 0;
+int logfile_format_has_o_or_i = 0;
 int always_checksum = 0;
 int list_only = 0;
 
@@ -361,6 +365,7 @@ void usage(enum logcode F)
   rprintf(F,"     --progress              show progress during transfer\n");
   rprintf(F," -P                          same as --partial --progress\n");
   rprintf(F," -i, --itemize-changes       output a change-summary for all updates\n");
+  rprintf(F,"     --log-file=FILE         output what we're doing to a log file\n");
   rprintf(F,"     --log-format=FORMAT     output filenames using the specified format\n");
   rprintf(F,"     --password-file=FILE    read password from FILE\n");
   rprintf(F,"     --list-only             list the files instead of copying them\n");
@@ -494,6 +499,7 @@ static struct poptOption long_options[] = {
   {"partial-dir",      0,  POPT_ARG_STRING, &partial_dir, 0, 0, 0 },
   {"delay-updates",    0,  POPT_ARG_NONE,   &delay_updates, 0, 0, 0 },
   {"prune-empty-dirs",'m', POPT_ARG_NONE,   &prune_empty_dirs, 0, 0, 0 },
+  {"log-file",         0,  POPT_ARG_STRING, &logfile_name, 0, 0, 0 },
   {"log-format",       0,  POPT_ARG_STRING, &log_format, 0, 0, 0 },
   {"itemize-changes", 'i', POPT_ARG_NONE,   0, 'i', 0, 0 },
   {"bwlimit",          0,  POPT_ARG_INT,    &bwlimit, 0, 0, 0 },
@@ -544,6 +550,7 @@ static void daemon_usage(enum logcode F)
   rprintf(F,"     --config=FILE           specify alternate rsyncd.conf file\n");
   rprintf(F,"     --no-detach             do not detach from the parent\n");
   rprintf(F,"     --port=PORT             listen on alternate port number\n");
+  rprintf(F,"     --log-file=FILE         override the \"log file\" setting\n");
   rprintf(F,"     --sockopts=OPTIONS      specify custom TCP options\n");
   rprintf(F," -v, --verbose               increase verbosity\n");
 #ifdef INET6
@@ -567,6 +574,7 @@ static struct poptOption long_daemon_options[] = {
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
 #endif
   {"detach",           0,  POPT_ARG_VAL,    &no_detach, 0, 0, 0 },
+  {"log-file",         0,  POPT_ARG_STRING, &logfile_name, 0, 0, 0 },
   {"no-detach",        0,  POPT_ARG_VAL,    &no_detach, 1, 0, 0 },
   {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
   {"sockopts",         0,  POPT_ARG_STRING, &sockopts, 0, 0, 0 },
@@ -1305,6 +1313,21 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	}
 	if (log_format_has_i || log_format_has(log_format, 'o'))
 		log_format_has_o_or_i = 1;
+
+	if (am_daemon)
+		logfile_name = NULL;
+	else if (logfile_name) {
+		if (am_server) {
+			logfile_format = "%i %n%L";
+			logfile_format_has_i = logfile_format_has_o_or_i = 1;
+		} else if (log_format) {
+			logfile_format = log_format;
+			logfile_format_has_i = log_format_has_i;
+			logfile_format_has_o_or_i = log_format_has_o_or_i;
+		}
+		log_before_transfer = !am_server;
+		log_init();
+	}
 
 	if (daemon_bwlimit && (!bwlimit || bwlimit > daemon_bwlimit))
 		bwlimit = daemon_bwlimit;
