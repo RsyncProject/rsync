@@ -37,7 +37,6 @@ extern int numeric_ids;
 extern int recurse;
 extern int xfer_dirs;
 extern int filesfrom_fd;
-extern int curr_dir_depth;
 extern int one_file_system;
 extern int copy_dirlinks;
 extern int keep_dirlinks;
