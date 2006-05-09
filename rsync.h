@@ -157,9 +157,10 @@
 	ITEM_BASIS_TYPE_FOLLOWS | ITEM_XNAME_FOLLOWS | ITEM_LOCAL_CHANGE))
 
 
-/* Log-message categories.  Only FERROR and FINFO get sent over the socket.
- * FLOG and FCLIENT are only used on the daemon side for custom logging,
- * while FNAME is only used on the client side. */
+/* Log-message categories.  Only FERROR and FINFO get sent over the socket,
+ * but FLOG and FSOCKERR can be sent over the receiver -> generator pipe.
+ * FLOG only goes to the log file, not to the client; FCLIENT is the opposite.
+ * FNAME is a client-side message when outputting a filename on its own. */
 enum logcode { FERROR=1, FINFO=2, FLOG=3, FCLIENT=4, FNAME=5, FSOCKERR=6 };
 
 /* Messages types that are sent over the message channel.  The logcode
