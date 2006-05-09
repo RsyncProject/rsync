@@ -39,18 +39,19 @@ extern int protocol_version;
 extern int preserve_times;
 extern int log_format_has_i;
 extern int log_format_has_o_or_i;
-extern int daemon_log_format_has_o_or_i;
+extern int logfile_format_has_o_or_i;
 extern mode_t orig_umask;
 extern char *auth_user;
 extern char *log_format;
+extern char *logfile_format;
+extern char *logfile_name;
 #if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
 extern iconv_t ic_chck;
 #endif
 
 static int log_initialised;
 static int logfile_was_closed;
-static char *logfname;
-static FILE *logfile;
+static FILE *logfile_fp;
 struct stats stats;
 
 int log_got_error = 0;
@@ -104,10 +105,10 @@ static void logit(int priority, char *buf)
 {
 	if (logfile_was_closed)
 		logfile_reopen();
-	if (logfile) {
-		fprintf(logfile,"%s [%d] %s",
+	if (logfile_fp) {
+		fprintf(logfile_fp, "%s [%d] %s",
 			timestring(time(NULL)), (int)getpid(), buf);
-		fflush(logfile);
+		fflush(logfile_fp);
 	} else {
 		syslog(priority, "%s", buf);
 	}
@@ -140,14 +141,14 @@ static void syslog_init()
 static void logfile_open(void)
 {
 	mode_t old_umask = umask(022 | orig_umask);
-	logfile = fopen(logfname, "a");
+	logfile_fp = fopen(logfile_name, "a");
 	umask(old_umask);
-	if (!logfile) {
+	if (!logfile_fp) {
 		int fopen_errno = errno;
 		/* Rsync falls back to using syslog on failure. */
 		syslog_init();
 		rsyserr(FERROR, fopen_errno,
-			"failed to open log-file %s", logfname);
+			"failed to open log-file %s", logfile_name);
 		rprintf(FINFO, "Ignoring \"log file\" setting.\n");
 	}
 }
@@ -163,9 +164,11 @@ void log_init(void)
 	 * before the chroot. */
 	timestring(time(NULL));
 
-	/* optionally use a log file instead of syslog */
-	logfname = lp_log_file();
-	if (logfname && *logfname)
+	/* Optionally use a log file instead of syslog.  (Non-daemon
+	 * rsyncs will have already set logfile_name, as needed.) */
+	if (am_daemon && !logfile_name)
+		logfile_name = lp_log_file();
+	if (logfile_name && *logfile_name)
 		logfile_open();
 	else
 		syslog_init();
@@ -173,10 +176,10 @@ void log_init(void)
 
 void logfile_close(void)
 {
-	if (logfile) {
+	if (logfile_fp) {
 		logfile_was_closed = 1;
-		fclose(logfile);
-		logfile = NULL;
+		fclose(logfile_fp);
+		logfile_fp = NULL;
 	}
 }
 
@@ -235,9 +238,9 @@ void rwrite(enum logcode code, char *buf, int len)
 
 	if (code == FCLIENT)
 		code = FINFO;
-	else if (am_daemon) {
+	else if (am_daemon || logfile_name) {
 		static int in_block;
-		char msg[2048];
+		char msg[2048], *s;
 		int priority = code == FERROR ? LOG_WARNING : LOG_INFO;
 
 		if (in_block)
@@ -246,10 +249,11 @@ void rwrite(enum logcode code, char *buf, int len)
 		if (!log_initialised)
 			log_init();
 		strlcpy(msg, buf, MIN((int)sizeof msg, len + 1));
-		logit(priority, msg);
+		for (s = msg; *s == '\n' && s[1]; s++) {}
+		logit(priority, s);
 		in_block = 0;
 
-		if (code == FLOG || !am_server)
+		if (code == FLOG || (am_daemon && !am_server))
 			return;
 	} else if (code == FLOG)
 		return;
@@ -395,26 +399,14 @@ void rflush(enum logcode code)
 {
 	FILE *f = NULL;
 
-	if (am_daemon) {
+	if (am_daemon || code == FLOG)
 		return;
-	}
 
-	if (code == FLOG) {
-		return;
-	}
-
-	if (code == FERROR) {
+	if (code == FERROR || am_server)
 		f = stderr;
-	}
+	else
+		f = stdout;
 
-	if (code == FINFO) {
-		if (am_server)
-			f = stderr;
-		else
-			f = stdout;
-	}
-
-	if (!f) exit_cleanup(RERR_MESSAGEIO);
 	fflush(f);
 }
 
@@ -687,11 +679,11 @@ void log_item(struct file_struct *file, struct stats *initial_stats,
 {
 	char *s_or_r = am_sender ? "send" : "recv";
 
-	if (lp_transfer_logging(module_id)) {
-		log_formatted(FLOG, lp_log_format(module_id), s_or_r,
-			      file, initial_stats, iflags, hlink);
-	} else if (log_format && !am_server) {
+	if (log_format && !am_server) {
 		log_formatted(FNAME, log_format, s_or_r,
+			      file, initial_stats, iflags, hlink);
+	} else if (logfile_format) {
+		log_formatted(FLOG, logfile_format, s_or_r,
 			      file, initial_stats, iflags, hlink);
 	}
 }
@@ -704,7 +696,7 @@ void maybe_log_item(struct file_struct *file, int iflags, int itemizing,
 		|| log_format_has_i > 1 || (verbose > 1 && log_format_has_i));
 	int local_change = iflags & ITEM_LOCAL_CHANGE && significant_flags;
 	if (am_server) {
-		if (am_daemon && !dry_run && see_item)
+		if (logfile_name && !dry_run && see_item)
 			log_item(file, &stats, iflags, buf);
 	} else if (see_item || local_change || *buf
 	    || (S_ISDIR(file->mode) && significant_flags))
@@ -732,10 +724,10 @@ void log_delete(char *fname, int mode)
 			      ITEM_DELETED, NULL);
 	}
 
-	if (!am_daemon || dry_run || !lp_transfer_logging(module_id))
+	if (!logfile_name || dry_run || !logfile_format)
 		return;
 
-	fmt = daemon_log_format_has_o_or_i ? lp_log_format(module_id) : "deleting %n";
+	fmt = logfile_format_has_o_or_i ? logfile_format : "deleting %n";
 	log_formatted(FLOG, fmt, "del.", &file, &stats, ITEM_DELETED, NULL);
 }
 
