@@ -387,6 +387,7 @@ to the detailed description below for a complete description.  verb(
      --progress              show progress during transfer
  -P                          same as --partial --progress
  -i, --itemize-changes       output a change-summary for all updates
+     --log-file=FILE         output what we're doing to a log file
      --log-format=FORMAT     output filenames using the specified format
      --password-file=FILE    read password from FILE
      --list-only             list the files instead of copying them
@@ -410,6 +411,7 @@ accepted: verb(
      --config=FILE           specify alternate rsyncd.conf file
      --no-detach             do not detach from the parent
      --port=PORT             listen on alternate port number
+     --log-file=FILE         override the "log file" setting
      --sockopts=OPTIONS      specify custom TCP options
  -v, --verbose               increase verbosity
  -4, --ipv4                  prefer IPv4
@@ -1432,6 +1434,23 @@ the string "*deleting" for each item that is being removed (assuming that
 you are talking to a recent enough rsync that it logs deletions instead of
 outputting them as a verbose message).
 
+dit(bf(--log-file=FILE)) This option causes rsync to log what it is doing
+to a file.  This is similar to the logging that a daemon does, but can be
+requested for the client side and/or the server side of a non-daemon
+transfer.  If specified as a client option, transfer logging will in effect
+if the bf(--log-format) option was either specified or implied (e.g.
+bf(--verbose) implies a basic log format).  If explicitly sent to a server
+via the bf(--rsync-path) option, transfer logging will always occur using
+the default bf(--itemize-changes) format.
+
+Here's a example command that requests the remote side to log what is
+happening:
+
+verb(  rsync -av --rsync-path="path --log-file=/tmp/rlog" src/ dest/)
+
+This is very useful if you need to debug why a connection is closing
+unexpectedly.
+
 dit(bf(--log-format=FORMAT)) This allows you to specify exactly what the
 rsync client outputs to the user on a per-file basis.  The format is a text
 string containing embedded single-character escape sequences prefixed with
@@ -1783,6 +1802,10 @@ sshd.
 dit(bf(--port=PORT)) This specifies an alternate TCP port number for the
 daemon to listen on rather than the default of 873.  See also the "port"
 global option in the rsyncd.conf manpage.
+
+dit(bf(--log-file=FILE)) This option tells the rsync daemon to use the
+given log-file name instead of using the "log file" setting in the config
+file.
 
 dit(bf(--sockopts)) This overrides the bf(socket options) setting in the
 rsyncd.conf file and has the same syntax.
