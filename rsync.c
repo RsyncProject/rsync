@@ -32,7 +32,7 @@
 
 extern int verbose;
 extern int dry_run;
-extern int daemon_log_format_has_i;
+extern int logfile_format_has_i;
 extern int preserve_perms;
 extern int preserve_executability;
 extern int preserve_times;
@@ -218,7 +218,7 @@ int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
 #endif
 
 	if (verbose > 1 && flags & ATTRS_REPORT) {
-		enum logcode code = daemon_log_format_has_i || dry_run
+		enum logcode code = logfile_format_has_i || dry_run
 				  ? FCLIENT : FINFO;
 		if (updated)
 			rprintf(code, "%s\n", fname);

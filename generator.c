@@ -27,7 +27,7 @@ extern int verbose;
 extern int dry_run;
 extern int do_xfers;
 extern int log_format_has_i;
-extern int daemon_log_format_has_i;
+extern int logfile_format_has_i;
 extern int am_root;
 extern int am_server;
 extern int am_daemon;
@@ -672,7 +672,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		if (itemizing)
 			itemize(file, ndx, 0, stp, 0, 0, NULL);
 		if (verbose > 1 && maybe_ATTRS_REPORT) {
-			code = daemon_log_format_has_i || dry_run
+			code = logfile_format_has_i || dry_run
 			     ? FCLIENT : FINFO;
 			rprintf(code, "%s is uptodate\n", fname);
 		}
@@ -694,7 +694,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		if (maybe_ATTRS_REPORT
 		 && ((!itemizing && verbose && match_level == 2)
 		  || (verbose > 1 && match_level == 3))) {
-			code = daemon_log_format_has_i || dry_run
+			code = logfile_format_has_i || dry_run
 			     ? FCLIENT : FINFO;
 			rprintf(code, "%s%s\n", fname,
 				match_level == 3 ? " is uptodate" : "");
@@ -770,7 +770,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			itemize(file, ndx, 0, &st, changes, 0, lp);
 		}
 		if (verbose > 1 && maybe_ATTRS_REPORT) {
-			code = daemon_log_format_has_i || dry_run
+			code = logfile_format_has_i || dry_run
 			     ? FCLIENT : FINFO;
 			rprintf(code, "%s is uptodate\n", fname);
 		}
@@ -1339,9 +1339,9 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	if (protocol_version >= 29) {
 		itemizing = 1;
 		maybe_ATTRS_REPORT = log_format_has_i ? 0 : ATTRS_REPORT;
-		code = daemon_log_format_has_i ? 0 : FLOG;
+		code = logfile_format_has_i ? 0 : FLOG;
 	} else if (am_daemon) {
-		itemizing = daemon_log_format_has_i && do_xfers;
+		itemizing = logfile_format_has_i && do_xfers;
 		maybe_ATTRS_REPORT = ATTRS_REPORT;
 		code = itemizing || !do_xfers ? FCLIENT : FINFO;
 	} else if (!am_server) {

@@ -28,7 +28,7 @@ extern int am_server;
 extern int am_daemon;
 extern int log_before_transfer;
 extern int log_format_has_i;
-extern int daemon_log_format_has_i;
+extern int logfile_format_has_i;
 extern int csum_length;
 extern int append_mode;
 extern int io_error;
@@ -218,8 +218,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 	int phase = 0, max_phase = protocol_version >= 29 ? 2 : 1;
 	struct stats initial_stats;
 	int save_make_backups = make_backups;
-	int itemizing = am_daemon ? daemon_log_format_has_i
-		      : !am_server && log_format_has_i;
+	int itemizing = am_server ? logfile_format_has_i : log_format_has_i;
 	int f_xfer = write_batch < 0 ? batch_fd : f_out;
 	int i, j;
 

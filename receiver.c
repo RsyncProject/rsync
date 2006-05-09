@@ -24,12 +24,11 @@
 
 extern int verbose;
 extern int do_xfers;
-extern int am_daemon;
 extern int am_server;
 extern int do_progress;
 extern int log_before_transfer;
 extern int log_format_has_i;
-extern int daemon_log_format_has_i;
+extern int logfile_format_has_i;
 extern int csum_length;
 extern int read_batch;
 extern int write_batch;
@@ -343,8 +342,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 	struct file_struct *file;
 	struct stats initial_stats;
 	int save_make_backups = make_backups;
-	int itemizing = am_daemon ? daemon_log_format_has_i
-		      : !am_server && log_format_has_i;
+	int itemizing = am_server ? logfile_format_has_i : log_format_has_i;
 	int max_phase = protocol_version >= 29 ? 2 : 1;
 	int i, recv_ok;
 

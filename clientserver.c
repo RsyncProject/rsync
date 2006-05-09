@@ -39,10 +39,13 @@ extern int protocol_version;
 extern int io_timeout;
 extern int no_detach;
 extern int default_af_hint;
+extern int logfile_format_has_i;
+extern int logfile_format_has_o_or_i;
 extern mode_t orig_umask;
 extern char *bind_address;
 extern char *sockopts;
 extern char *config_file;
+extern char *logfile_format;
 extern char *files_from;
 extern char *tmpdir;
 extern struct chmod_mode_struct *chmod_modes;
@@ -50,8 +53,6 @@ extern struct filter_list_struct server_filter_list;
 
 char *auth_user;
 int read_only = 0;
-int daemon_log_format_has_i = 0;
-int daemon_log_format_has_o_or_i = 0;
 int module_id = -1;
 struct chmod_mode_struct *daemon_chmod_modes;
 
@@ -324,11 +325,12 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 		read_only = 1;
 
 	if (lp_transfer_logging(i)) {
-		if (log_format_has(lp_log_format(i), 'i'))
-			daemon_log_format_has_i = 1;
-		if (daemon_log_format_has_i
-		    || log_format_has(lp_log_format(i), 'o'))
-			daemon_log_format_has_o_or_i = 1;
+		logfile_format = lp_log_format(i);
+		if (log_format_has(logfile_format, 'i'))
+			logfile_format_has_i = 1;
+		if (logfile_format_has_i
+		    || log_format_has(logfile_format, 'o'))
+			logfile_format_has_o_or_i = 1;
 	}
 
 	am_root = (MY_UID() == 0);
