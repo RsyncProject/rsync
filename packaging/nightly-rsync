@@ -18,6 +18,7 @@ use Date::Format;
 our $unpacked = $ENV{HOME} . '/release/nightly';
 # Where the local copy of /home/ftp/pub/rsync/nightly should be updated.
 our $nightly = $ENV{HOME} . '/samba-rsync-ftp/nightly';
+our $nightly_symlink = "$nightly/rsync-nightly.tar.gz";
 
 our($cvs_update, $make_tar, $upload, $help_opt);
 &Getopt::Long::Configure('bundling');
@@ -69,6 +70,8 @@ if ($make_tar) {
     }
     close TAR;
     rename($name, $unpacked) or die $!;
+    unlink($nightly_symlink);
+    symlink("$name.tar.gz", $nightly_symlink);
 }
 
 chdir($nightly) or die $!;
