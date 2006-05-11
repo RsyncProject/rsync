@@ -183,7 +183,7 @@ if [ ! -d "$srcdir" ]; then
 fi
 
 RSYNC="$rsync_bin"
-#RSYNC="valgrind --tool=addrcheck $rsync_bin"
+#RSYNC="valgrind $rsync_bin"
 
 export rsync_bin RSYNC setfacl_nodef
 
