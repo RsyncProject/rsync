@@ -292,7 +292,7 @@ system "tar xzf $tar_file; tar xzf $diffdir/rsync-$lastversion.tar.gz";
 ## TWEAK THE VERSIONS AS DESIRED HERE ##
 #mkdir("rsync-$lastversion/support", 0755) or die $!;
 #rename("rsync-$lastversion/rsyncstats", "rsync-$lastversion/support/rsyncstats");
-unlink("rsync-$lastversion/.ignore");
+#unlink("rsync-$lastversion/.ignore");
 ## END ##
 system "diff -urN --exclude=patches rsync-$lastversion rsync-$version| gzip -9 >$diff_file";
 
