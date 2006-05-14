@@ -224,9 +224,6 @@ void rwrite(enum logcode code, char *buf, int len)
 	if (len < 0)
 		exit_cleanup(RERR_MESSAGEIO);
 
-	if (quiet && code == FINFO)
-		return;
-
 	if (am_server && msg_fd_out >= 0) {
 		/* Pass the message to our sibling. */
 		send_msg((enum msgcode)code, buf, len);
@@ -256,6 +253,9 @@ void rwrite(enum logcode code, char *buf, int len)
 		if (code == FLOG || (am_daemon && !am_server))
 			return;
 	} else if (code == FLOG)
+		return;
+
+	if (quiet && code != FERROR)
 		return;
 
 	if (am_server) {
