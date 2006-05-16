@@ -607,14 +607,13 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			 int maybe_ATTRS_REPORT, enum logcode code)
 {
 	int save_ignore_times = ignore_times;
-	int save_size_only = size_only;
 	int best_match = -1;
 	int match_level = 0;
 	int j = 0;
 
-	/* We can't let these send-affecting options affect our checking
-	 * for identical files in the alternate basis dirs. */
-	ignore_times = size_only = 0;
+	/* We can't let ignore_times affect the unchanged_file() test in
+	 * an alternate-dest dir or we will never find any matches. */
+	ignore_times = 0;
 
 	do {
 		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
@@ -634,7 +633,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		case 2:
 			if (!unchanged_attrs(file, stp))
 				continue;
-			if (always_checksum
+			if (always_checksum && preserve_times
 			 && cmp_time(stp->st_mtime, file->modtime))
 				continue;
 			best_match = j;
@@ -645,7 +644,6 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 	} while (basis_dir[++j] != NULL);
 
 	ignore_times = save_ignore_times;
-	size_only = save_size_only;
 
 	if (!match_level)
 		return -1;
