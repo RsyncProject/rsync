@@ -15,11 +15,11 @@ Changes since 2.6.8:
       potential problem where a pre-existing symlink could have escaped the
       module's hierarchy.
 
-    - Fixed a overzealous sanitizing bug in the handling of the --*-dest
-      options (--link-dest, --copy-dest, and --compare-dest): if the copy's
-      destination dir is deeper than the top of the module's path, these
-      options now accept a safe number of ../ (parent-dir) references (since
-      these options are relative to the destination dir).  The old code
+    - Fixed an overzealous sanitizing bug in the handling of the --link-dest,
+      --copy-dest, and --compare-dest options to a daemon without chroot: if
+      the copy's destination dir is deeper than the top of the module's path,
+      these options now accept a safe number of ../ (parent-dir) references
+      (since these options are relative to the destination dir).  The old code
       incorrectly chopped off all "../" prefixes for these options, no matter
       how deep the destination directory was in the module's hierarchy.
 
@@ -32,7 +32,11 @@ Changes since 2.6.8:
       receiving files.)
 
     - Make sure that the --link-dest option can still do its job even when -I
-      or --size-only is specified.
+      is specified.
+
+    - If --link-dest is specified with --checksum but without --times, rsync
+      will now allow a hard-link to be created to a matching link-dest file
+      regardless of the file's modify-time.
 
     - The daemon now calls more timezone-using functions prior to doing a
       chroot.  This should help some C libraries to generate proper timestamps
