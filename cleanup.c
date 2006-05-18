@@ -121,7 +121,7 @@ void _exit_cleanup(int code, const char *file, int line)
 		}
 	}
 
-	if (cleanup_got_literal && cleanup_fname && keep_partial
+	if (cleanup_got_literal && cleanup_new_fname && keep_partial
 	    && handle_partial_dir(cleanup_new_fname, PDIR_CREATE)) {
 		char *fname = cleanup_fname;
 		cleanup_fname = NULL;
@@ -168,7 +168,7 @@ void _exit_cleanup(int code, const char *file, int line)
 
 void cleanup_disable(void)
 {
-	cleanup_fname = NULL;
+	cleanup_fname = cleanup_new_fname = NULL;
 	cleanup_got_literal = 0;
 }
 
@@ -176,8 +176,8 @@ void cleanup_disable(void)
 void cleanup_set(char *fnametmp, char *fname, struct file_struct *file,
 		 int fd_r, int fd_w)
 {
-	cleanup_fname = fname ? fnametmp : NULL;
-	cleanup_new_fname = fname;
+	cleanup_fname = fnametmp;
+	cleanup_new_fname = fname; /* can be NULL on a partial-dir failure */
 	cleanup_file = file;
 	cleanup_fd_r = fd_r;
 	cleanup_fd_w = fd_w;
