@@ -167,9 +167,9 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 			sum_update(map_ptr(mapbuf, offset, len), len);
 			offset = sum.flength;
 		}
-		if (fd != -1 && do_lseek(fd, offset, SEEK_SET) != offset) {
-			rsyserr(FERROR, errno, "lseek failed on %s",
-				full_fname(fname));
+		if (fd != -1 && (j = do_lseek(fd, offset, SEEK_SET)) != offset) {
+			rsyserr(FERROR, errno, "lseek of %s returned %.0f, not %.0f",
+				full_fname(fname), (double)j, (double)offset);
 			exit_cleanup(RERR_FILEIO);
 		}
 	}
@@ -218,13 +218,15 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 		if (inplace) {
 			if (offset == offset2 && fd != -1) {
+				OFF_T pos;
 				if (flush_write_file(fd) < 0)
 					goto report_write_error;
 				offset += len;
-				if (do_lseek(fd, len, SEEK_CUR) != offset) {
+				if ((pos = do_lseek(fd, len, SEEK_CUR)) != offset) {
 					rsyserr(FERROR, errno,
-						"lseek failed on %s",
-						full_fname(fname));
+						"lseek of %s returned %.0f, not %.0f",
+						full_fname(fname),
+						(double)pos, (double)offset);
 					exit_cleanup(RERR_FILEIO);
 				}
 				continue;
