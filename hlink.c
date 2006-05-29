@@ -26,7 +26,7 @@
 extern int verbose;
 extern int link_dest;
 extern int make_backups;
-extern int log_format_has_i;
+extern int stdout_format_has_i;
 extern char *basis_dir[];
 extern struct file_list *the_file_list;
 
@@ -183,7 +183,7 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 		head = hlink_list[file->F_HLINDEX];
 	if (ndx != head) {
 		struct file_struct *head_file = FPTR(head);
-		if (!log_format_has_i && verbose > 1) {
+		if (!stdout_format_has_i && verbose > 1) {
 			rprintf(FINFO, "\"%s\" is a hard link\n",
 				f_name(file, NULL));
 		}
@@ -208,7 +208,7 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 							continue;
 						statret = 1;
 						st = &st3;
-						if (verbose < 2 || !log_format_has_i)
+						if (verbose < 2 || !stdout_format_has_i)
 							itemizing = code = 0;
 						break;
 					}

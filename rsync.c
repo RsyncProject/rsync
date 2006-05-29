@@ -218,8 +218,7 @@ int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
 #endif
 
 	if (verbose > 1 && flags & ATTRS_REPORT) {
-		enum logcode code = logfile_format_has_i || dry_run
-				  ? FCLIENT : FINFO;
+		enum logcode code = logfile_format_has_i || dry_run ? FCLIENT : FINFO;
 		if (updated)
 			rprintf(code, "%s\n", fname);
 		else
