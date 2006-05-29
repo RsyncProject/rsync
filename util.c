@@ -92,7 +92,7 @@ int fd_pair(int fd[2])
 
 void print_child_argv(char **cmd)
 {
-	rprintf(FINFO, "opening connection using ");
+	rprintf(FCLIENT, "opening connection using ");
 	for (; *cmd; cmd++) {
 		/* Look for characters that ought to be quoted.  This
 		* is not a great quoting algorithm, but it's
@@ -101,12 +101,12 @@ void print_child_argv(char **cmd)
 			   "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 			   "0123456789"
 			   ",.-_=+@/") != strlen(*cmd)) {
-			rprintf(FINFO, "\"%s\" ", *cmd);
+			rprintf(FCLIENT, "\"%s\" ", *cmd);
 		} else {
-			rprintf(FINFO, "%s ", *cmd);
+			rprintf(FCLIENT, "%s ", *cmd);
 		}
 	}
-	rprintf(FINFO, "\n");
+	rprintf(FCLIENT, "\n");
 }
 
 void out_of_memory(char *str)
