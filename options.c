@@ -147,9 +147,9 @@ char *partial_dir = NULL;
 char *basis_dir[MAX_BASIS_DIRS+1];
 char *config_file = NULL;
 char *shell_cmd = NULL;
-char *log_format = NULL;
 char *logfile_name = NULL;
 char *logfile_format = NULL;
+char *stdout_format = NULL;
 char *password_file = NULL;
 char *rsync_path = RSYNC_PATH;
 char *backup_dir = NULL;
@@ -165,9 +165,9 @@ char *dest_option = NULL;
 int verbose = 0;
 int quiet = 0;
 int log_before_transfer = 0;
-int log_format_has_i = 0;
+int stdout_format_has_i = 0;
+int stdout_format_has_o_or_i = 0;
 int logfile_format_has_i = 0;
-int log_format_has_o_or_i = 0;
 int logfile_format_has_o_or_i = 0;
 int always_checksum = 0;
 int list_only = 0;
@@ -365,8 +365,9 @@ void usage(enum logcode F)
   rprintf(F,"     --progress              show progress during transfer\n");
   rprintf(F," -P                          same as --partial --progress\n");
   rprintf(F," -i, --itemize-changes       output a change-summary for all updates\n");
-  rprintf(F,"     --log-file=FILE         output what we're doing to a log file\n");
-  rprintf(F,"     --log-format=FORMAT     output filenames using the specified format\n");
+  rprintf(F,"     --out-format=FORMAT     output updates using the specified FORMAT\n");
+  rprintf(F,"     --log-file=FILE         log what we're doing to the specified FILE\n");
+  rprintf(F,"     --log-file-format=FMT   log updates using the specified FMT\n");
   rprintf(F,"     --password-file=FILE    read password from FILE\n");
   rprintf(F,"     --list-only             list the files instead of copying them\n");
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth; KBytes per second\n");
@@ -500,7 +501,9 @@ static struct poptOption long_options[] = {
   {"delay-updates",    0,  POPT_ARG_NONE,   &delay_updates, 0, 0, 0 },
   {"prune-empty-dirs",'m', POPT_ARG_NONE,   &prune_empty_dirs, 0, 0, 0 },
   {"log-file",         0,  POPT_ARG_STRING, &logfile_name, 0, 0, 0 },
-  {"log-format",       0,  POPT_ARG_STRING, &log_format, 0, 0, 0 },
+  {"log-file-format",  0,  POPT_ARG_STRING, &logfile_format, 0, 0, 0 },
+  {"out-format",       0,  POPT_ARG_STRING, &stdout_format, 0, 0, 0 },
+  {"log-format",       0,  POPT_ARG_STRING, &stdout_format, 0, 0, 0 }, /* DEPRECATED */
   {"itemize-changes", 'i', POPT_ARG_NONE,   0, 'i', 0, 0 },
   {"bwlimit",          0,  POPT_ARG_INT,    &bwlimit, 0, 0, 0 },
   {"backup",          'b', POPT_ARG_NONE,   &make_backups, 0, 0, 0 },
@@ -1285,17 +1288,17 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (make_backups && !backup_dir)
 		omit_dir_times = 1;
 
-	if (log_format) {
-		if (am_server && log_format_has(log_format, 'I'))
-			log_format_has_i = 2;
-		else if (log_format_has(log_format, 'i'))
-			log_format_has_i = itemize_changes | 1;
-		if (!log_format_has(log_format, 'b')
-		 && !log_format_has(log_format, 'c'))
+	if (stdout_format) {
+		if (am_server && log_format_has(stdout_format, 'I'))
+			stdout_format_has_i = 2;
+		else if (log_format_has(stdout_format, 'i'))
+			stdout_format_has_i = itemize_changes | 1;
+		if (!log_format_has(stdout_format, 'b')
+		 && !log_format_has(stdout_format, 'c'))
 			log_before_transfer = !am_server;
 	} else if (itemize_changes) {
-		log_format = "%i %n%L";
-		log_format_has_i = itemize_changes;
+		stdout_format = "%i %n%L";
+		stdout_format_has_i = itemize_changes;
 		log_before_transfer = !am_server;
 	}
 
@@ -1307,25 +1310,25 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 	set_io_timeout(io_timeout);
 
-	if (verbose && !log_format) {
-		log_format = "%n%L";
+	if (verbose && !stdout_format) {
+		stdout_format = "%n%L";
 		log_before_transfer = !am_server;
 	}
-	if (log_format_has_i || log_format_has(log_format, 'o'))
-		log_format_has_o_or_i = 1;
+	if (stdout_format_has_i || log_format_has(stdout_format, 'o'))
+		stdout_format_has_o_or_i = 1;
 
 	if (am_daemon)
 		logfile_name = NULL;
 	else if (logfile_name) {
-		if (am_server) {
-			logfile_format = "%i %n%L";
+		if (!logfile_format) {
+			logfile_format = "%i %n%L (!)";
 			logfile_format_has_i = logfile_format_has_o_or_i = 1;
-		} else if (log_format) {
-			logfile_format = log_format;
-			logfile_format_has_i = log_format_has_i;
-			logfile_format_has_o_or_i = log_format_has_o_or_i;
+		} else {
+			if (log_format_has(logfile_format, 'i'))
+				stdout_format_has_i = 2;
+			if (logfile_format_has_i || log_format_has(logfile_format, 'o'))
+				logfile_format_has_o_or_i = 1;
 		}
-		log_before_transfer = !am_server;
 		log_init();
 	}
 
@@ -1592,12 +1595,13 @@ void server_options(char **args,int *argc)
 
 	/* The server side doesn't use our log-format, but in certain
 	 * circumstances they need to know a little about the option. */
-	if (log_format && am_sender) {
-		if (log_format_has_i > 1)
+	if (stdout_format && am_sender) {
+		/* Use --log-format, not --out-format, for compatibility. */
+		if (stdout_format_has_i > 1)
 			args[ac++] = "--log-format=%i%I";
-		else if (log_format_has_i)
+		else if (stdout_format_has_i)
 			args[ac++] = "--log-format=%i";
-		else if (log_format_has_o_or_i)
+		else if (stdout_format_has_o_or_i)
 			args[ac++] = "--log-format=%o";
 		else if (!verbose)
 			args[ac++] = "--log-format=X";
