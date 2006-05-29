@@ -27,7 +27,7 @@ extern int do_xfers;
 extern int am_server;
 extern int do_progress;
 extern int log_before_transfer;
-extern int log_format_has_i;
+extern int stdout_format_has_i;
 extern int logfile_format_has_i;
 extern int csum_length;
 extern int read_batch;
@@ -48,7 +48,7 @@ extern int checksum_seed;
 extern int inplace;
 extern int delay_updates;
 extern struct stats stats;
-extern char *log_format;
+extern char *stdout_format;
 extern char *tmpdir;
 extern char *partial_dir;
 extern char *basis_dir[];
@@ -344,7 +344,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 	struct file_struct *file;
 	struct stats initial_stats;
 	int save_make_backups = make_backups;
-	int itemizing = am_server ? logfile_format_has_i : log_format_has_i;
+	int itemizing = am_server ? logfile_format_has_i : stdout_format_has_i;
+	enum logcode log_code = log_before_transfer ? FLOG : FINFO;
 	int max_phase = protocol_version >= 29 ? 2 : 1;
 	int i, recv_ok;
 
@@ -420,14 +421,13 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		}
 
 		if (!do_xfers) { /* log the transfer */
-			if (!am_server && log_format)
-				log_item(file, &stats, iflags, NULL);
+			log_item(FNAME, file, &stats, iflags, NULL);
 			if (read_batch)
 				discard_receive_data(f_in, file->length);
 			continue;
 		}
 		if (write_batch < 0) {
-			log_item(file, &stats, iflags, NULL);
+			log_item(FINFO, file, &stats, iflags, NULL);
 			if (!am_server)
 				discard_receive_data(f_in, file->length);
 			continue;
@@ -596,7 +596,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 
 		/* log the transfer */
 		if (log_before_transfer)
-			log_item(file, &initial_stats, iflags, NULL);
+			log_item(FNAME, file, &initial_stats, iflags, NULL);
 		else if (!am_server && verbose && do_progress)
 			rprintf(FINFO, "%s\n", fname);
 
@@ -604,8 +604,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		recv_ok = receive_data(f_in, fnamecmp, fd1, st.st_size,
 				       fname, fd2, file->length);
 
-		if (!log_before_transfer)
-			log_item(file, &initial_stats, iflags, NULL);
+		log_item(log_code, file, &initial_stats, iflags, NULL);
 
 		if (fd1 != -1)
 			close(fd1);

@@ -27,7 +27,7 @@ extern int do_xfers;
 extern int am_server;
 extern int am_daemon;
 extern int log_before_transfer;
-extern int log_format_has_i;
+extern int stdout_format_has_i;
 extern int logfile_format_has_i;
 extern int csum_length;
 extern int append_mode;
@@ -43,7 +43,7 @@ extern int batch_fd;
 extern int write_batch;
 extern struct stats stats;
 extern struct file_list *the_file_list;
-extern char *log_format;
+extern char *stdout_format;
 
 
 /**
@@ -218,7 +218,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 	int phase = 0, max_phase = protocol_version >= 29 ? 2 : 1;
 	struct stats initial_stats;
 	int save_make_backups = make_backups;
-	int itemizing = am_server ? logfile_format_has_i : log_format_has_i;
+	int itemizing = am_server ? logfile_format_has_i : stdout_format_has_i;
+	enum logcode log_code = log_before_transfer ? FLOG : FINFO;
 	int f_xfer = write_batch < 0 ? batch_fd : f_out;
 	int i, j;
 
@@ -280,8 +281,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		stats.total_transferred_size += file->length;
 
 		if (!do_xfers) { /* log the transfer */
-			if (!am_server && log_format)
-				log_item(file, &stats, iflags, NULL);
+			log_item(FNAME, file, &stats, iflags, NULL);
 			write_ndx_and_attrs(f_out, i, iflags, fnamecmp_type,
 					    xname, xlen);
 			continue;
@@ -342,9 +342,9 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			rprintf(FINFO, "calling match_sums %s\n", fname);
 
 		if (log_before_transfer)
-			log_item(file, &initial_stats, iflags, NULL);
+			log_item(FNAME, file, &initial_stats, iflags, NULL);
 		else if (!am_server && verbose && do_progress)
-			rprintf(FINFO, "%s\n", fname2);
+			rprintf(FNAME, "%s\n", fname2);
 
 		set_compression(fname);
 
@@ -352,8 +352,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		if (do_progress)
 			end_progress(st.st_size);
 
-		if (!log_before_transfer)
-			log_item(file, &initial_stats, iflags, NULL);
+		log_item(log_code, file, &initial_stats, iflags, NULL);
 
 		if (mbuf) {
 			j = unmap_file(mbuf);
