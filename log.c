@@ -37,12 +37,12 @@ extern int msg_fd_out;
 extern int allow_8bit_chars;
 extern int protocol_version;
 extern int preserve_times;
-extern int log_format_has_i;
-extern int log_format_has_o_or_i;
+extern int stdout_format_has_i;
+extern int stdout_format_has_o_or_i;
 extern int logfile_format_has_o_or_i;
 extern mode_t orig_umask;
 extern char *auth_user;
-extern char *log_format;
+extern char *stdout_format;
 extern char *logfile_format;
 extern char *logfile_name;
 #if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
@@ -235,7 +235,10 @@ void rwrite(enum logcode code, char *buf, int len)
 
 	if (code == FCLIENT)
 		code = FINFO;
-	else if (am_daemon || logfile_name) {
+	else if (code == FNAME) {
+		if (am_server)
+			code = FINFO;
+	} else if (am_daemon || logfile_name) {
 		static int in_block;
 		char msg[2048], *s;
 		int priority = code == FERROR ? LOG_WARNING : LOG_INFO;
@@ -410,8 +413,7 @@ void rflush(enum logcode code)
 	fflush(f);
 }
 
-/* a generic logging routine for send/recv, with parameter
- * substitiution */
+/* A generic logging routine for send/recv, with parameter substitiution. */
 static void log_formatted(enum logcode code, char *format, char *op,
 			  struct file_struct *file, struct stats *initial_stats,
 			  int iflags, char *hlink)
@@ -673,16 +675,19 @@ int log_format_has(const char *format, char esc)
 	return 0;
 }
 
-/* log the transfer of a file */
-void log_item(struct file_struct *file, struct stats *initial_stats,
-	      int iflags, char *hlink)
+/* Log the transfer of a file.  If the code is FNAME, the output just goes
+ * to stdout.  If it is FLOG, it just goes to the log file.  Otherwise we
+ * output to both. */
+void log_item(enum logcode code, struct file_struct *file,
+	      struct stats *initial_stats, int iflags, char *hlink)
 {
 	char *s_or_r = am_sender ? "send" : "recv";
 
-	if (log_format && !am_server) {
-		log_formatted(FNAME, log_format, s_or_r,
+	if (code != FLOG && stdout_format && !am_server) {
+		log_formatted(FNAME, stdout_format, s_or_r,
 			      file, initial_stats, iflags, hlink);
-	} else if (logfile_format) {
+	}
+	if (code != FNAME && logfile_format) {
 		log_formatted(FLOG, logfile_format, s_or_r,
 			      file, initial_stats, iflags, hlink);
 	}
@@ -693,14 +698,14 @@ void maybe_log_item(struct file_struct *file, int iflags, int itemizing,
 {
 	int significant_flags = iflags & SIGNIFICANT_ITEM_FLAGS;
 	int see_item = itemizing && (significant_flags || *buf
-		|| log_format_has_i > 1 || (verbose > 1 && log_format_has_i));
+		|| stdout_format_has_i > 1 || (verbose > 1 && stdout_format_has_i));
 	int local_change = iflags & ITEM_LOCAL_CHANGE && significant_flags;
 	if (am_server) {
 		if (logfile_name && !dry_run && see_item)
-			log_item(file, &stats, iflags, buf);
+			log_item(FLOG, file, &stats, iflags, buf);
 	} else if (see_item || local_change || *buf
 	    || (S_ISDIR(file->mode) && significant_flags))
-		log_item(file, &stats, iflags, buf);
+		log_item(FINFO, file, &stats, iflags, buf);
 }
 
 void log_delete(char *fname, int mode)
@@ -712,14 +717,14 @@ void log_delete(char *fname, int mode)
 	file.mode = mode;
 	file.basename = fname;
 
-	if (!verbose && !log_format)
+	if (!verbose && !stdout_format)
 		;
 	else if (am_server && protocol_version >= 29 && len < MAXPATHLEN) {
 		if (S_ISDIR(mode))
 			len++; /* directories include trailing null */
 		send_msg(MSG_DELETED, fname, len);
 	} else {
-		fmt = log_format_has_o_or_i ? log_format : "deleting %n";
+		fmt = stdout_format_has_o_or_i ? stdout_format : "deleting %n";
 		log_formatted(FCLIENT, fmt, "del.", &file, &stats,
 			      ITEM_DELETED, NULL);
 	}
