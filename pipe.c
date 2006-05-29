@@ -28,6 +28,7 @@ extern int am_server;
 extern int blocking_io;
 extern int filesfrom_fd;
 extern mode_t orig_umask;
+extern char *logfile_name;
 extern struct chmod_mode_struct *chmod_modes;
 
 /**
@@ -146,6 +147,12 @@ pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 		if (from_child_pipe[1] != STDOUT_FILENO)
 			close(from_child_pipe[1]);
 		child_main(argc, argv);
+	}
+
+	/* Let the client side handle this. */
+	if (logfile_name) {
+		logfile_name = NULL;
+		logfile_close();
 	}
 
 	if (close(from_child_pipe[1]) < 0 ||
