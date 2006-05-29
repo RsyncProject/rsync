@@ -387,8 +387,9 @@ to the detailed description below for a complete description.  verb(
      --progress              show progress during transfer
  -P                          same as --partial --progress
  -i, --itemize-changes       output a change-summary for all updates
-     --log-file=FILE         output what we're doing to a log file
-     --log-format=FORMAT     output filenames using the specified format
+     --out-format=FORMAT     output updates using the specified FORMAT
+     --log-file=FILE         log what we're doing to the specified FILE
+     --log-file-format=FMT   log updates using the specified FMT
      --password-file=FILE    read password from FILE
      --list-only             list the files instead of copying them
      --bwlimit=KBPS          limit I/O bandwidth; KBytes per second
@@ -1456,7 +1457,7 @@ rsync client outputs to the user on a per-file basis.  The format is a text
 string containing embedded single-character escape sequences prefixed with
 a percent (%) character.  For a list of the possible escape characters, see
 the "log format" setting in the rsyncd.conf manpage.  (Note that this
-option does not affect what a daemon logs to its logfile.)
+option does not affect what a daemon logs to its log file.)
 
 Specifying this option will mention each file, dir, etc. that gets updated
 in a significant way (a transferred file, a recreated symlink/device, or a
