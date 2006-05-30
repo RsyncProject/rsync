@@ -687,7 +687,7 @@ void log_item(enum logcode code, struct file_struct *file,
 		log_formatted(FNAME, stdout_format, s_or_r,
 			      file, initial_stats, iflags, hlink);
 	}
-	if (code != FNAME && logfile_format) {
+	if (code != FNAME && logfile_format && *logfile_format) {
 		log_formatted(FLOG, logfile_format, s_or_r,
 			      file, initial_stats, iflags, hlink);
 	}
