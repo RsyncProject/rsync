@@ -413,6 +413,7 @@ accepted: verb(
      --no-detach             do not detach from the parent
      --port=PORT             listen on alternate port number
      --log-file=FILE         override the "log file" setting
+     --log-file-format=FMT   override the "log format" setting
      --sockopts=OPTIONS      specify custom TCP options
  -v, --verbose               increase verbosity
  -4, --ipv4                  prefer IPv4
@@ -445,13 +446,13 @@ information at the end. More than two bf(-v) flags should only be used if
 you are debugging rsync.
 
 Note that the names of the transferred files that are output are done using
-a default bf(--log-format) of "%n%L", which tells you just the name of the
+a default bf(--out-format) of "%n%L", which tells you just the name of the
 file and, if the item is a link, where it points.  At the single bf(-v)
 level of verbosity, this does not mention when a file gets its attributes
 changed.  If you ask for an itemized list of changed attributes (either
-bf(--itemize-changes) or adding "%i" to the bf(--log-format) setting), the
+bf(--itemize-changes) or adding "%i" to the bf(--out-format) setting), the
 output (on the client) increases to mention all items that are changed in
-any way.  See the bf(--log-format) option for more details.
+any way.  See the bf(--out-format) option for more details.
 
 dit(bf(-q, --quiet)) This option decreases the amount of information you
 are given during the transfer, notably suppressing information messages
@@ -1371,7 +1372,7 @@ ssh prefers non-blocking I/O.)
 
 dit(bf(-i, --itemize-changes)) Requests a simple itemized list of the
 changes that are being made to each file, including attribute changes.
-This is exactly the same as specifying bf(--log-format='%i %n%L').
+This is exactly the same as specifying bf(--out-format='%i %n%L').
 If you repeat the option, unchanged files will also be output, but only
 if the receiving rsync is at least version 2.6.7 (you can use bf(-vv)
 with older versions of rsync, but that also turns on the output of other
@@ -1435,48 +1436,52 @@ the string "*deleting" for each item that is being removed (assuming that
 you are talking to a recent enough rsync that it logs deletions instead of
 outputting them as a verbose message).
 
-dit(bf(--log-file=FILE)) This option causes rsync to log what it is doing
-to a file.  This is similar to the logging that a daemon does, but can be
-requested for the client side and/or the server side of a non-daemon
-transfer.  If specified as a client option, transfer logging will in effect
-if the bf(--log-format) option was either specified or implied (e.g.
-bf(--verbose) implies a basic log format).  If explicitly sent to a server
-via the bf(--rsync-path) option, transfer logging will always occur using
-the default bf(--itemize-changes) format.
-
-Here's a example command that requests the remote side to log what is
-happening:
-
-verb(  rsync -av --rsync-path="path --log-file=/tmp/rlog" src/ dest/)
-
-This is very useful if you need to debug why a connection is closing
-unexpectedly.
-
-dit(bf(--log-format=FORMAT)) This allows you to specify exactly what the
-rsync client outputs to the user on a per-file basis.  The format is a text
+dit(bf(--out-format=FORMAT)) This allows you to specify exactly what the
+rsync client outputs to the user on a per-update basis.  The format is a text
 string containing embedded single-character escape sequences prefixed with
 a percent (%) character.  For a list of the possible escape characters, see
-the "log format" setting in the rsyncd.conf manpage.  (Note that this
-option does not affect what a daemon logs to its log file.)
+the "log format" setting in the rsyncd.conf manpage.
 
 Specifying this option will mention each file, dir, etc. that gets updated
 in a significant way (a transferred file, a recreated symlink/device, or a
-touched directory) unless the itemize-changes escape (%i) is included in
-the string, in which case the logging of names increases to mention any
+touched directory).  In addition, if the itemize-changes escape (%i) is
+included in the string, the logging of names increases to mention any
 item that is changed in any way (as long as the receiving side is at least
 2.6.4).  See the bf(--itemize-changes) option for a description of the
 output of "%i".
 
 The bf(--verbose) option implies a format of "%n%L", but you can use
-bf(--log-format) without bf(--verbose) if you like, or you can override
+bf(--out-format) without bf(--verbose) if you like, or you can override
 the format of its per-file output using this option.
 
-Rsync will output the log-format string prior to a file's transfer unless
+Rsync will output the out-format string prior to a file's transfer unless
 one of the transfer-statistic escapes is requested, in which case the
 logging is done at the end of the file's transfer.  When this late logging
 is in effect and bf(--progress) is also specified, rsync will also output
 the name of the file being transferred prior to its progress information
-(followed, of course, by the log-format output).
+(followed, of course, by the out-format output).
+
+dit(bf(--log-file=FILE)) This option causes rsync to log what it is doing
+to a file.  This is similar to the logging that a daemon does, but can be
+requested for the client side and/or the server side of a non-daemon
+transfer.  If specified as a client option, transfer logging will be
+enabled with a default format of "%i %n%L".  See the bf(--log-file-format)
+option if you wish to override this.
+
+Here's a example command that requests the remote side to log what is
+happening:
+
+verb(  rsync -av --rsync-path="rsync --log-file=/tmp/rlog" src/ dest/)
+
+This is very useful if you need to debug why a connection is closing
+unexpectedly.
+
+dit(bf(--log-file-format=FORMAT)) This allows you to specify exactly what
+per-update logging is put into the file specified by the bf(--log-file) option
+(which must also be specified for this option to have any effect).  If you
+specify an empty string, updated files will not be mentioned in the log file.
+For a list of the possible escape characters, see the "log format" setting
+in the rsyncd.conf manpage.
 
 dit(bf(--stats)) This tells rsync to print a verbose set of statistics
 on the file transfer, allowing you to tell how effective the rsync
@@ -1807,6 +1812,11 @@ global option in the rsyncd.conf manpage.
 dit(bf(--log-file=FILE)) This option tells the rsync daemon to use the
 given log-file name instead of using the "log file" setting in the config
 file.
+
+dit(bf(--log-file-format=FORMAT)) This option tells the rsync daemon to use the
+given FORMAT string instead of using the "log format" setting in the config
+file.  It also enables "transfer logging" unless the string is empty, in which
+case transfer logging is turned off.
 
 dit(bf(--sockopts)) This overrides the bf(socket options) setting in the
 rsyncd.conf file and has the same syntax.
