@@ -1321,7 +1321,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				logfile_format_has_o_or_i = 1;
 		}
 		log_init();
-	}
+	} else if (!am_daemon)
+		logfile_format = NULL;
 
 	if (daemon_bwlimit && (!bwlimit || bwlimit > daemon_bwlimit))
 		bwlimit = daemon_bwlimit;
