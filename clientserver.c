@@ -324,14 +324,12 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	if (lp_read_only(i))
 		read_only = 1;
 
-	if (lp_transfer_logging(i)) {
+	if (lp_transfer_logging(i) && !logfile_format)
 		logfile_format = lp_log_format(i);
-		if (log_format_has(logfile_format, 'i'))
-			logfile_format_has_i = 1;
-		if (logfile_format_has_i
-		    || log_format_has(logfile_format, 'o'))
-			logfile_format_has_o_or_i = 1;
-	}
+	if (log_format_has(logfile_format, 'i'))
+		logfile_format_has_i = 1;
+	if (logfile_format_has_i || log_format_has(logfile_format, 'o'))
+		logfile_format_has_o_or_i = 1;
 
 	am_root = (MY_UID() == 0);
 
