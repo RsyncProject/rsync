@@ -554,6 +554,7 @@ static void daemon_usage(enum logcode F)
   rprintf(F,"     --no-detach             do not detach from the parent\n");
   rprintf(F,"     --port=PORT             listen on alternate port number\n");
   rprintf(F,"     --log-file=FILE         override the \"log file\" setting\n");
+  rprintf(F,"     --log-file-format=FMT   override the \"log format\" setting\n");
   rprintf(F,"     --sockopts=OPTIONS      specify custom TCP options\n");
   rprintf(F," -v, --verbose               increase verbosity\n");
 #ifdef INET6
@@ -578,6 +579,7 @@ static struct poptOption long_daemon_options[] = {
 #endif
   {"detach",           0,  POPT_ARG_VAL,    &no_detach, 0, 0, 0 },
   {"log-file",         0,  POPT_ARG_STRING, &logfile_name, 0, 0, 0 },
+  {"log-file-format",  0,  POPT_ARG_STRING, &logfile_format, 0, 0, 0 },
   {"no-detach",        0,  POPT_ARG_VAL,    &no_detach, 1, 0, 0 },
   {"port",             0,  POPT_ARG_INT,    &rsync_port, 0, 0, 0 },
   {"sockopts",         0,  POPT_ARG_STRING, &sockopts, 0, 0, 0 },
@@ -677,17 +679,6 @@ static void set_refuse_options(char *bp)
 			break;
 		*cp = ' ';
 		bp = cp + 1;
-	}
-
-	for (op = long_options; ; op++) {
-		*shortname = op->shortName;
-		if (!op->longName && !*shortname)
-			break;
-		if (op->val == OPT_DAEMON) {
-			if (op->argInfo == POPT_ARG_VAL)
-				op->argInfo = POPT_ARG_NONE;
-			op->val = (op - long_options) + OPT_REFUSED_BASE;
-		}
 	}
 }
 
@@ -793,6 +784,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 	if (ref && *ref)
 		set_refuse_options(ref);
+	if (am_daemon)
+		set_refuse_options("log-file*");
 
 	/* TODO: Call poptReadDefaultConfig; handle errors. */
 
@@ -1317,11 +1310,9 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (stdout_format_has_i || log_format_has(stdout_format, 'o'))
 		stdout_format_has_o_or_i = 1;
 
-	if (am_daemon)
-		logfile_name = NULL;
-	else if (logfile_name) {
+	if (logfile_name && !am_daemon) {
 		if (!logfile_format) {
-			logfile_format = "%i %n%L (!)";
+			logfile_format = "%i %n%L";
 			logfile_format_has_i = logfile_format_has_o_or_i = 1;
 		} else {
 			if (log_format_has(logfile_format, 'i'))
