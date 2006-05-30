@@ -49,10 +49,15 @@ Changes since 2.6.8:
 
   ENHANCEMENTS:
 
-    - Added the --log-file=FILE option that can be used to tell any rsync to
-      output what it is doing to a log file.  This works with a client rsync, a
-      non-daemon server rsync (see the man page for instructions), and also
-      allows the overriding of the rsyncd.conf setting when starting a daemon.
+    - Added the --log-file=FILE and --log-file-format=FORMAT options.  These
+      can be used to tell any rsync to output what it is doing to a log file.
+      They work with a client rsync, a non-daemon server rsync (see the man
+      page for instructions), and also allows the overriding of rsyncd.conf
+      settings when starting a daemon.
+
+    - The --log-format option was renamed to be --out-format to avoid confusing
+      it with affecting the log-file output.  (The old option remains as an
+      alias for the new to preserve backward compatibility.)
 
   DEVELOPER RELATED:
 
