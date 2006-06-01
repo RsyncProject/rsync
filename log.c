@@ -39,6 +39,7 @@ extern int protocol_version;
 extern int preserve_times;
 extern int stdout_format_has_i;
 extern int stdout_format_has_o_or_i;
+extern int logfile_format_has_i;
 extern int logfile_format_has_o_or_i;
 extern mode_t orig_umask;
 extern char *auth_user;
@@ -235,12 +236,9 @@ void rwrite(enum logcode code, char *buf, int len)
 
 	if (code == FCLIENT)
 		code = FINFO;
-	else if (code == FNAME) {
-		if (am_server)
-			code = FINFO;
-	} else if (am_daemon || logfile_name) {
+	else if (am_daemon || logfile_name) {
 		static int in_block;
-		char msg[2048], *s;
+		char msg[2048];
 		int priority = code == FERROR ? LOG_WARNING : LOG_INFO;
 
 		if (in_block)
@@ -249,8 +247,7 @@ void rwrite(enum logcode code, char *buf, int len)
 		if (!log_initialised)
 			log_init();
 		strlcpy(msg, buf, MIN((int)sizeof msg, len + 1));
-		for (s = msg; *s == '\n' && s[1]; s++) {}
-		logit(priority, s);
+		logit(priority, msg);
 		in_block = 0;
 
 		if (code == FLOG || (am_daemon && !am_server))
@@ -275,17 +272,8 @@ void rwrite(enum logcode code, char *buf, int len)
 	case FERROR:
 		log_got_error = 1;
 		f = stderr;
-		goto pre_scan;
-	case FINFO:
-		f = am_server ? stderr : stdout;
-	pre_scan:
-		while (len > 1 && *buf == '\n') {
-			fputc(*buf, f);
-			buf++;
-			len--;
-		}
 		break;
-	case FNAME:
+	case FINFO:
 		f = am_server ? stderr : stdout;
 		break;
 	default:
@@ -675,7 +663,7 @@ int log_format_has(const char *format, char esc)
 	return 0;
 }
 
-/* Log the transfer of a file.  If the code is FNAME, the output just goes
+/* Log the transfer of a file.  If the code is FCLIENT, the output just goes
  * to stdout.  If it is FLOG, it just goes to the log file.  Otherwise we
  * output to both. */
 void log_item(enum logcode code, struct file_struct *file,
@@ -684,10 +672,10 @@ void log_item(enum logcode code, struct file_struct *file,
 	char *s_or_r = am_sender ? "send" : "recv";
 
 	if (code != FLOG && stdout_format && !am_server) {
-		log_formatted(FNAME, stdout_format, s_or_r,
+		log_formatted(FCLIENT, stdout_format, s_or_r,
 			      file, initial_stats, iflags, hlink);
 	}
-	if (code != FNAME && logfile_format && *logfile_format) {
+	if (code != FCLIENT && logfile_format && *logfile_format) {
 		log_formatted(FLOG, logfile_format, s_or_r,
 			      file, initial_stats, iflags, hlink);
 	}
@@ -701,11 +689,14 @@ void maybe_log_item(struct file_struct *file, int iflags, int itemizing,
 		|| stdout_format_has_i > 1 || (verbose > 1 && stdout_format_has_i));
 	int local_change = iflags & ITEM_LOCAL_CHANGE && significant_flags;
 	if (am_server) {
-		if (logfile_name && !dry_run && see_item)
+		if (logfile_name && !dry_run && see_item
+		 && (significant_flags || logfile_format_has_i))
 			log_item(FLOG, file, &stats, iflags, buf);
 	} else if (see_item || local_change || *buf
-	    || (S_ISDIR(file->mode) && significant_flags))
-		log_item(FINFO, file, &stats, iflags, buf);
+	    || (S_ISDIR(file->mode) && significant_flags)) {
+		enum logcode code = significant_flags || logfile_format_has_i ? FINFO : FCLIENT;
+		log_item(code, file, &stats, iflags, buf);
+	}
 }
 
 void log_delete(char *fname, int mode)
