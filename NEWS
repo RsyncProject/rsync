@@ -4,6 +4,9 @@ Changes since 2.6.8:
 
   BUG FIXES:
 
+    - If rsync is interrupted via a handled signal (such as SIGINT), it will
+      once again clean-up its temp file from the destination dir.
+
     - An rsync daemon that is receiving files with "use chroot = no" no longer
       sanitizes the symlink target strings.  This means that each symlink's
       value will now be accepted (and thus returned) with its symlink info
@@ -36,7 +39,7 @@ Changes since 2.6.8:
 
     - If --link-dest is specified with --checksum but without --times, rsync
       will now allow a hard-link to be created to a matching link-dest file
-      regardless of the file's modify-time.
+      even when the file's modify-time doesn't match the server's file.
 
     - The daemon now calls more timezone-using functions prior to doing a
       chroot.  This should help some C libraries to generate proper timestamps
