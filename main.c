@@ -223,7 +223,8 @@ static void handle_stats(int f)
 static void output_summary(void)
 {
 	if (do_stats) {
-		rprintf(FINFO,"\nNumber of files: %d\n", stats.num_files);
+		rprintf(FCLIENT, "\n");
+		rprintf(FINFO,"Number of files: %d\n", stats.num_files);
 		rprintf(FINFO,"Number of files transferred: %d\n",
 			stats.num_transferred_files);
 		rprintf(FINFO,"Total file size: %s bytes\n",
@@ -250,8 +251,9 @@ static void output_summary(void)
 	}
 
 	if (verbose || do_stats) {
+		rprintf(FCLIENT, "\n");
 		rprintf(FINFO,
-			"\nsent %s bytes  received %s bytes  %s bytes/sec\n",
+			"sent %s bytes  received %s bytes  %s bytes/sec\n",
 			human_num(total_written), human_num(total_read),
 			human_dnum((total_written + total_read)/(0.5 + (endtime - starttime)), 2));
 		rprintf(FINFO, "total size is %s  speedup is %.2f\n",
@@ -274,7 +276,8 @@ static void show_malloc_stats(void)
 
 	mi = mallinfo();
 
-	rprintf(FINFO, "\n" RSYNC_NAME "[%d] (%s%s%s) heap statistics:\n",
+	rprintf(FCLIENT, "\n");
+	rprintf(FINFO, RSYNC_NAME "[%d] (%s%s%s) heap statistics:\n",
 		getpid(), am_server ? "server " : "",
 		am_daemon ? "daemon " : "", who_am_i());
 	rprintf(FINFO, "  arena:     %10ld   (bytes from sbrk)\n",
@@ -410,8 +413,8 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 
 	if (verbose > 3) {
 		for (i = 0; i < argc; i++)
-			rprintf(FINFO, "cmd[%d]=%s ", i, args[i]);
-		rprintf(FINFO, "\n");
+			rprintf(FCLIENT, "cmd[%d]=%s ", i, args[i]);
+		rprintf(FCLIENT, "\n");
 	}
 
 	if (read_batch) {

@@ -252,7 +252,8 @@ static void print_rsync_version(enum logcode f)
 			(int) SIZEOF_INT64, (int) sizeof (int64));
 	}
 
-	rprintf(f,"\nrsync comes with ABSOLUTELY NO WARRANTY.  This is free software, and you\n");
+	rprintf(f,"\n");
+	rprintf(f,"rsync comes with ABSOLUTELY NO WARRANTY.  This is free software, and you\n");
 	rprintf(f,"are welcome to redistribute it under certain conditions.  See the GNU\n");
 	rprintf(f,"General Public Licence for details.\n");
 }
@@ -262,10 +263,12 @@ void usage(enum logcode F)
 {
   print_rsync_version(F);
 
-  rprintf(F,"\nrsync is a file transfer program capable of efficient remote update\n");
+  rprintf(F,"\n");
+  rprintf(F,"rsync is a file transfer program capable of efficient remote update\n");
   rprintf(F,"via a fast differencing algorithm.\n");
 
-  rprintf(F,"\nUsage: rsync [OPTION]... SRC [SRC]... DEST\n");
+  rprintf(F,"\n");
+  rprintf(F,"Usage: rsync [OPTION]... SRC [SRC]... DEST\n");
   rprintf(F,"  or   rsync [OPTION]... SRC [SRC]... [USER@]HOST:DEST\n");
   rprintf(F,"  or   rsync [OPTION]... SRC [SRC]... [USER@]HOST::DEST\n");
   rprintf(F,"  or   rsync [OPTION]... SRC [SRC]... rsync://[USER@]HOST[:PORT]/DEST\n");
@@ -274,7 +277,8 @@ void usage(enum logcode F)
   rprintf(F,"  or   rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC [DEST]\n");
   rprintf(F,"The ':' usages connect via remote shell, while '::' & 'rsync://' usages connect\n");
   rprintf(F,"to an rsync daemon, and require SRC or DEST to start with a module name.\n");
-  rprintf(F,"\nOptions\n");
+  rprintf(F,"\n");
+  rprintf(F,"Options\n");
   rprintf(F," -v, --verbose               increase verbosity\n");
   rprintf(F," -q, --quiet                 suppress non-error messages\n");
   rprintf(F," -c, --checksum              skip based on checksum, not mod-time & size\n");
@@ -382,7 +386,8 @@ void usage(enum logcode F)
   rprintf(F,"     --version               print version number\n");
   rprintf(F,"(-h) --help                  show this help (-h works with no other options)\n");
 
-  rprintf(F,"\nUse \"rsync --daemon --help\" to see the daemon-mode command-line options.\n");
+  rprintf(F,"\n");
+  rprintf(F,"Use \"rsync --daemon --help\" to see the daemon-mode command-line options.\n");
   rprintf(F,"Please see the rsync(1) and rsyncd.conf(5) man pages for full documentation.\n");
   rprintf(F,"See http://rsync.samba.org/ for updates, bug reports, and answers\n");
 }
@@ -547,7 +552,8 @@ static void daemon_usage(enum logcode F)
 {
   print_rsync_version(F);
 
-  rprintf(F,"\nUsage: rsync --daemon [OPTION]...\n");
+  rprintf(F,"\n");
+  rprintf(F,"Usage: rsync --daemon [OPTION]...\n");
   rprintf(F,"     --address=ADDRESS       bind to the specified address\n");
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth; KBytes per second\n");
   rprintf(F,"     --config=FILE           specify alternate rsyncd.conf file\n");
@@ -563,7 +569,8 @@ static void daemon_usage(enum logcode F)
 #endif
   rprintf(F,"     --help                  show this help screen\n");
 
-  rprintf(F,"\nIf you were not trying to invoke rsync as a daemon, avoid using any of the\n");
+  rprintf(F,"\n");
+  rprintf(F,"If you were not trying to invoke rsync as a daemon, avoid using any of the\n");
   rprintf(F,"daemon-specific rsync options.  See also the rsyncd.conf(5) man page.\n");
 }
 
