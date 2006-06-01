@@ -1316,7 +1316,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			logfile_format_has_i = logfile_format_has_o_or_i = 1;
 		} else {
 			if (log_format_has(logfile_format, 'i'))
-				stdout_format_has_i = 2;
+				logfile_format_has_i = 1;
 			if (logfile_format_has_i || log_format_has(logfile_format, 'o'))
 				logfile_format_has_o_or_i = 1;
 		}
