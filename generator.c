@@ -367,8 +367,10 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 				write_byte(sock_f_out, fnamecmp_type);
 			if (iflags & ITEM_XNAME_FOLLOWS)
 				write_vstring(sock_f_out, xname, strlen(xname));
-		} else if (ndx >= 0)
-			log_item(FINFO, file, &stats, iflags, xname);
+		} else if (ndx >= 0) {
+			enum logcode code = logfile_format_has_i ? FINFO : FCLIENT;
+			log_item(code, file, &stats, iflags, xname);
+		}
 	}
 }
 
@@ -670,8 +672,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		if (itemizing)
 			itemize(file, ndx, 0, stp, 0, 0, NULL);
 		if (verbose > 1 && maybe_ATTRS_REPORT) {
-			code = logfile_format_has_i || dry_run ? FNAME : FINFO;
-			rprintf(code, "%s is uptodate\n", fname);
+			rprintf(FCLIENT, "%s is uptodate\n", fname);
 		}
 		return -2;
 	}
@@ -691,7 +692,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		if (maybe_ATTRS_REPORT
 		 && ((!itemizing && verbose && match_level == 2)
 		  || (verbose > 1 && match_level == 3))) {
-			code = logfile_format_has_i || dry_run ? FNAME : FINFO;
+			code = match_level == 3 ? FCLIENT : FINFO;
 			rprintf(code, "%s%s\n", fname,
 				match_level == 3 ? " is uptodate" : "");
 		}
@@ -766,8 +767,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			itemize(file, ndx, 0, &st, changes, 0, lp);
 		}
 		if (verbose > 1 && maybe_ATTRS_REPORT) {
-			code = logfile_format_has_i || dry_run ? FNAME : FINFO;
-			rprintf(code, "%s is uptodate\n", fname);
+			rprintf(FCLIENT, "%s is uptodate\n", fname);
 		}
 		return -2;
 	} while (basis_dir[++i] != NULL);
