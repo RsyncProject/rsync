@@ -281,7 +281,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		stats.total_transferred_size += file->length;
 
 		if (!do_xfers) { /* log the transfer */
-			log_item(FNAME, file, &stats, iflags, NULL);
+			log_item(FCLIENT, file, &stats, iflags, NULL);
 			write_ndx_and_attrs(f_out, i, iflags, fnamecmp_type,
 					    xname, xlen);
 			continue;
@@ -342,9 +342,9 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			rprintf(FINFO, "calling match_sums %s\n", fname);
 
 		if (log_before_transfer)
-			log_item(FNAME, file, &initial_stats, iflags, NULL);
+			log_item(FCLIENT, file, &initial_stats, iflags, NULL);
 		else if (!am_server && verbose && do_progress)
-			rprintf(FNAME, "%s\n", fname2);
+			rprintf(FCLIENT, "%s\n", fname2);
 
 		set_compression(fname);
 

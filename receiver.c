@@ -421,7 +421,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		}
 
 		if (!do_xfers) { /* log the transfer */
-			log_item(FNAME, file, &stats, iflags, NULL);
+			log_item(FCLIENT, file, &stats, iflags, NULL);
 			if (read_batch)
 				discard_receive_data(f_in, file->length);
 			continue;
@@ -596,7 +596,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 
 		/* log the transfer */
 		if (log_before_transfer)
-			log_item(FNAME, file, &initial_stats, iflags, NULL);
+			log_item(FCLIENT, file, &initial_stats, iflags, NULL);
 		else if (!am_server && verbose && do_progress)
 			rprintf(FINFO, "%s\n", fname);
 

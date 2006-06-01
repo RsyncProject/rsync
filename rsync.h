@@ -159,9 +159,8 @@
 
 /* Log-message categories.  Only FERROR and FINFO get sent over the socket,
  * but FLOG and FSOCKERR can be sent over the receiver -> generator pipe.
- * FLOG only goes to the log file, not to the client; FCLIENT is the opposite.
- * FNAME is a client-side message when outputting a filename on its own. */
-enum logcode { FERROR=1, FINFO=2, FLOG=3, FCLIENT=4, FNAME=5, FSOCKERR=6 };
+ * FLOG only goes to the log file, not the client; FCLIENT is the opposite. */
+enum logcode { FERROR=1, FINFO=2, FLOG=3, FCLIENT=4, FSOCKERR=5 };
 
 /* Messages types that are sent over the message channel.  The logcode
  * values must all be present here with identical numbers. */
