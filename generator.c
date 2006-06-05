@@ -32,7 +32,6 @@ extern int am_root;
 extern int am_server;
 extern int am_daemon;
 extern int do_progress;
-extern int recurse;
 extern int relative_paths;
 extern int implied_dirs;
 extern int keep_dirlinks;
@@ -291,8 +290,8 @@ static void do_delete_pass(struct file_list *flist)
 	STRUCT_STAT st;
 	int j;
 
-	if (dry_run > 1 /* destination doesn't exist yet */
-	 || list_only)
+	/* dry_run is incremented when the destination doesn't exist yet. */
+	if (dry_run > 1 || list_only)
 		return;
 
 	for (j = 0; j < flist->count; j++) {
@@ -814,7 +813,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			fuzzy_dirlist = NULL;
 		}
 		if (missing_below >= 0) {
-			dry_run--;
+			if (dry_run)
+				dry_run--;
 			missing_below = -1;
 		}
 		parent_dirname = "";
@@ -844,9 +844,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 	}
 
-	if (missing_below >= 0 && file->dir.depth <= missing_below) {
-		dry_run--;
-		missing_below = -1;
+	if (missing_below >= 0) {
+		if (file->dir.depth <= missing_below) {
+			if (dry_run)
+				dry_run--;
+			missing_below = -1;
+		} else if (!dry_run)
+			return;
 	}
 	if (dry_run > 1) {
 		statret = -1;
@@ -923,6 +927,14 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				rsyserr(FERROR, errno,
 					"recv_generator: mkdir %s failed",
 					full_fname(fname));
+				file->flags |= FLAG_MISSING;
+				if (ndx+1 < the_file_list->count
+				 && the_file_list->files[ndx+1]->dir.depth > file->dir.depth) {
+					rprintf(FERROR,
+					    "*** Skipping everything below this failed directory ***\n");
+					missing_below = file->dir.depth;
+				}
+				return;
 			}
 		}
 		if (set_file_attrs(fname, file, statret ? NULL : &st, 0)
@@ -1483,6 +1495,16 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 				continue;
 			if (!need_retouch_dir_times && file->mode & S_IWUSR)
 				continue;
+			if (file->flags & FLAG_MISSING) {
+				int missing = file->dir.depth;
+				while (++i < flist->count) {
+					file = flist->files[i];
+					if (file->dir.depth <= missing)
+						break;
+				}
+				i--;
+				continue;
+			}
 			recv_generator(f_name(file, NULL), file, i, itemizing,
 				       maybe_ATTRS_REPORT, code, -1);
 			if (allowed_lull && !(++j % lull_mod))
