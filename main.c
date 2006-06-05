@@ -455,12 +455,14 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
  * destination path instead of its file-list name.  This requires a
  * "local name" for writing out the destination file.
  *
- * So, our task is to figure out what mode/local-name we need and return
- * either a NULL for mode 1, or the local-name for mode 2.  We also
- * change directory if there are any path components in dest_path. */
+ * So, our task is to figure out what mode/local-name we need.
+ * For mode 1, we change into the destination directory and return NULL.
+ * For mode 2, we change into the directory containing the destination
+ * file (if we aren't already there) and return the local-name. */
 static char *get_local_name(struct file_list *flist, char *dest_path)
 {
 	STRUCT_STAT st;
+	int statret;
 	char *cp;
 
 	if (verbose > 2) {
@@ -471,11 +473,9 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	if (!dest_path || list_only)
 		return NULL;
 
-	/* If the destination path refers to an existing directory, enter
-	 * it and use mode 1.  If there is something other than a directory
-	 * at the destination path, we must be transferring one file
-	 * (anything at the destination will be overwritten). */
-	if (safe_stat(dest_path, &st) == 0) {
+	/* See what currently exists at the destination. */
+	if ((statret = safe_stat(dest_path, &st)) == 0) {
+		/* If the destination is a dir, enter it and use mode 1. */
 		if (S_ISDIR(st.st_mode)) {
 			if (sanitize_paths)
 				die_on_unsafe_path(dest_path, 0);
@@ -502,20 +502,27 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 			exit_cleanup(RERR_FILESELECT);
 		}
 	} else if (errno != ENOENT) {
-		rsyserr(FERROR, errno, "cannot stat destination %s",
+		/* If we don't know what's at the destination, fail. */
+		rsyserr(FERROR, errno, "ERROR: cannot stat destination %s",
 			full_fname(dest_path));
 		exit_cleanup(RERR_FILESELECT);
 	}
 
 	cp = strrchr(dest_path, '/');
 
-	/* If the destination path ends in a slash or we are transferring
-	 * multiple files, create a directory at the destination path,
-	 * enter the new directory, and use mode 1. */
+	/* If we need a destination directory because the transfer is not
+	 * of a single non-directory or the user has requested one via a
+	 * destination path ending in a slash, create one and use mode 1. */
 	if (flist->count > 1 || (cp && !cp[1])) {
 		/* Lop off the final slash (if any). */
 		if (cp && !cp[1])
 			*cp = '\0';
+
+		if (statret == 0) {
+			rprintf(FERROR,
+			    "ERROR: destination path is not a directory\n");
+			exit_cleanup(RERR_SYNTAX);
+		}
 
 		if (mkdir_defmode(dest_path) != 0) {
 			rsyserr(FERROR, errno, "mkdir %s failed",
