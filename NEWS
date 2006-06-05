@@ -34,6 +34,9 @@ Changes since 2.6.8:
       process.  (These problems could only affect an rsync daemon that was
       receiving files.)
 
+    - If the receiving side fails to create a directory, it will now skip
+      trying to update everything that is inside that directory.
+
     - Make sure that the --link-dest option can still do its job even when -I
       is specified.
 
