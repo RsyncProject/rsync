@@ -64,6 +64,7 @@
 #define FLAG_DEL_HERE (1<<3)	/* receiver/generator */
 #define FLAG_HLINK_TOL (1<<4)	/* receiver/generator */
 #define FLAG_NO_FUZZY (1<<5)	/* generator */
+#define FLAG_MISSING (1<<6)	/* generator */
 
 /* update this if you make incompatible changes */
 #define PROTOCOL_VERSION 29
