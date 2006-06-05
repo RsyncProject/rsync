@@ -32,7 +32,6 @@
 
 extern int verbose;
 extern int dry_run;
-extern int logfile_format_has_i;
 extern int preserve_perms;
 extern int preserve_executability;
 extern int preserve_times;
