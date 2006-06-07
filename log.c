@@ -129,7 +129,7 @@ static void syslog_init()
 #endif
 
 #ifdef LOG_DAEMON
-	openlog("rsyncd", options, lp_syslog_facility());
+	openlog("rsyncd", options, lp_syslog_facility(module_id));
 #else
 	openlog("rsyncd", options);
 #endif
@@ -154,11 +154,26 @@ static void logfile_open(void)
 	}
 }
 
-void log_init(void)
+void log_init(int restart)
 {
-	if (log_initialised)
-		return;
-	log_initialised = 1;
+	if (log_initialised) {
+		if (!restart)
+			return;
+		if (strcmp(logfile_name, lp_log_file(module_id)) != 0) {
+			if (logfile_fp) {
+				fclose(logfile_fp);
+				logfile_fp = NULL;
+			} else
+				closelog();
+			logfile_name = NULL;
+		} else if (*logfile_name)
+			return; /* unchanged, non-empty "log file" names */
+		else if (lp_syslog_facility(-1) != lp_syslog_facility(module_id))
+			closelog();
+		else
+			return; /* unchanged syslog settings */
+	} else
+		log_initialised = 1;
 
 	/* This looks pointless, but it is needed in order for the
 	 * C library on some systems to fetch the timezone info
@@ -168,7 +183,7 @@ void log_init(void)
 	/* Optionally use a log file instead of syslog.  (Non-daemon
 	 * rsyncs will have already set logfile_name, as needed.) */
 	if (am_daemon && !logfile_name)
-		logfile_name = lp_log_file();
+		logfile_name = lp_log_file(module_id);
 	if (logfile_name && *logfile_name)
 		logfile_open();
 	else
@@ -245,7 +260,7 @@ void rwrite(enum logcode code, char *buf, int len)
 			return;
 		in_block = 1;
 		if (!log_initialised)
-			log_init();
+			log_init(0);
 		strlcpy(msg, buf, MIN((int)sizeof msg, len + 1));
 		logit(priority, msg);
 		in_block = 0;
