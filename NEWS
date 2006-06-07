@@ -65,6 +65,9 @@ Changes since 2.6.8:
       it with affecting the log-file output.  (The old option remains as an
       alias for the new to preserve backward compatibility.)
 
+    - Made "log file" and "syslog facility" settable on a per-module basis in
+      the daemon's config file.
+
   DEVELOPER RELATED:
 
     - The acls.diff and xattrs.diff patches have received a bunch of work to
