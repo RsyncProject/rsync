@@ -57,6 +57,10 @@
 typedef char pstring[1024];
 #define pstrcpy(a,b) strlcpy(a,b,sizeof(pstring))
 
+#ifndef LOG_DAEMON
+#define LOG_DAEMON 0
+#endif
+
 /* the following are used by loadparm for option lists */
 typedef enum
 {
@@ -99,13 +103,11 @@ struct parm_struct
 typedef struct
 {
 	char *bind_address;
-	char *log_file;
 	char *motd_file;
 	char *pid_file;
 	char *socket_options;
 
 	int rsync_port;
-	int syslog_facility;
 } global;
 
 static global Globals;
@@ -131,6 +133,7 @@ typedef struct
 	char *include_from;
 	char *incoming_chmod;
 	char *lock_file;
+	char *log_file;
 	char *log_format;
 	char *name;
 	char *outgoing_chmod;
@@ -144,6 +147,7 @@ typedef struct
 
 	int max_connections;
 	int max_verbosity;
+	int syslog_facility;
 	int timeout;
 
 	BOOL ignore_errors;
@@ -176,6 +180,7 @@ static service sDefault =
  /* include_from; */		NULL,
  /* incoming_chmod; */		NULL,
  /* lock_file; */		DEFAULT_LOCK_FILE,
+ /* log_file; */		NULL,
  /* log_format; */		"%o %h [%a] %m (%u) %f %l",
  /* name; */			NULL,
  /* outgoing_chmod; */		NULL,
@@ -189,6 +194,7 @@ static service sDefault =
 
  /* max_connections; */		0,
  /* max_verbosity; */		1,
+ /* syslog_facility; */		LOG_DAEMON,
  /* timeout; */			0,
 
  /* ignore_errors; */		False,
@@ -282,12 +288,10 @@ static struct enum_list enum_facilities[] = {
 static struct parm_struct parm_table[] =
 {
  {"address",           P_STRING, P_GLOBAL,&Globals.bind_address,       NULL,0},
- {"log file",          P_STRING, P_GLOBAL,&Globals.log_file,           NULL,0},
  {"motd file",         P_STRING, P_GLOBAL,&Globals.motd_file,          NULL,0},
  {"pid file",          P_STRING, P_GLOBAL,&Globals.pid_file,           NULL,0},
  {"port",              P_INTEGER,P_GLOBAL,&Globals.rsync_port,         NULL,0},
  {"socket options",    P_STRING, P_GLOBAL,&Globals.socket_options,     NULL,0},
- {"syslog facility",   P_ENUM,   P_GLOBAL,&Globals.syslog_facility,enum_facilities,0},
 
  {"auth users",        P_STRING, P_LOCAL, &sDefault.auth_users,        NULL,0},
  {"comment",           P_STRING, P_LOCAL, &sDefault.comment,           NULL,0},
@@ -305,6 +309,7 @@ static struct parm_struct parm_table[] =
  {"incoming chmod",    P_STRING, P_LOCAL, &sDefault.incoming_chmod,    NULL,0},
  {"list",              P_BOOL,   P_LOCAL, &sDefault.list,              NULL,0},
  {"lock file",         P_STRING, P_LOCAL, &sDefault.lock_file,         NULL,0},
+ {"log file",          P_STRING, P_LOCAL, &sDefault.log_file,          NULL,0},
  {"log format",        P_STRING, P_LOCAL, &sDefault.log_format,        NULL,0},
  {"max connections",   P_INTEGER,P_LOCAL, &sDefault.max_connections,   NULL,0},
  {"max verbosity",     P_INTEGER,P_LOCAL, &sDefault.max_verbosity,     NULL,0},
@@ -319,6 +324,7 @@ static struct parm_struct parm_table[] =
  {"refuse options",    P_STRING, P_LOCAL, &sDefault.refuse_options,    NULL,0},
  {"secrets file",      P_STRING, P_LOCAL, &sDefault.secrets_file,      NULL,0},
  {"strict modes",      P_BOOL,   P_LOCAL, &sDefault.strict_modes,      NULL,0},
+ {"syslog facility",   P_ENUM,   P_LOCAL, &sDefault.syslog_facility,enum_facilities,0},
  {"temp dir",          P_PATH,   P_LOCAL, &sDefault.temp_dir,          NULL,0},
  {"timeout",           P_INTEGER,P_LOCAL, &sDefault.timeout,           NULL,0},
  {"transfer logging",  P_BOOL,   P_LOCAL, &sDefault.transfer_logging,  NULL,0},
@@ -335,9 +341,6 @@ Initialise the global parameter structure.
 static void init_globals(void)
 {
 	memset(&Globals, 0, sizeof Globals);
-#ifdef LOG_DAEMON
-	Globals.syslog_facility = LOG_DAEMON;
-#endif
 }
 
 /***************************************************************************
@@ -373,13 +376,11 @@ static void init_locals(void)
 
 
 FN_GLOBAL_STRING(lp_bind_address, &Globals.bind_address)
-FN_GLOBAL_STRING(lp_log_file, &Globals.log_file)
 FN_GLOBAL_STRING(lp_motd_file, &Globals.motd_file)
 FN_GLOBAL_STRING(lp_pid_file, &Globals.pid_file)
 FN_GLOBAL_STRING(lp_socket_options, &Globals.socket_options)
 
 FN_GLOBAL_INTEGER(lp_rsync_port, &Globals.rsync_port)
-FN_GLOBAL_INTEGER(lp_syslog_facility, &Globals.syslog_facility)
 
 FN_LOCAL_STRING(lp_auth_users, auth_users)
 FN_LOCAL_STRING(lp_comment, comment)
@@ -394,6 +395,7 @@ FN_LOCAL_STRING(lp_include, include)
 FN_LOCAL_STRING(lp_include_from, include_from)
 FN_LOCAL_STRING(lp_incoming_chmod, incoming_chmod)
 FN_LOCAL_STRING(lp_lock_file, lock_file)
+FN_LOCAL_STRING(lp_log_file, log_file)
 FN_LOCAL_STRING(lp_log_format, log_format)
 FN_LOCAL_STRING(lp_name, name)
 FN_LOCAL_STRING(lp_outgoing_chmod, outgoing_chmod)
@@ -402,6 +404,7 @@ FN_LOCAL_STRING(lp_postxfer_exec, postxfer_exec)
 FN_LOCAL_STRING(lp_prexfer_exec, prexfer_exec)
 FN_LOCAL_STRING(lp_refuse_options, refuse_options)
 FN_LOCAL_STRING(lp_secrets_file, secrets_file)
+FN_LOCAL_INTEGER(lp_syslog_facility, syslog_facility)
 FN_LOCAL_STRING(lp_temp_dir, temp_dir)
 FN_LOCAL_STRING(lp_uid, uid)
 
