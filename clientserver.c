@@ -389,7 +389,7 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	parse_rule(&server_filter_list, p, MATCHFLG_WORD_SPLIT,
 		   XFLG_ABS_IF_SLASH | XFLG_OLD_PREFIXES);
 
-	log_init();
+	log_init(1);
 
 #ifdef HAVE_PUTENV
 	if (*lp_prexfer_exec(i) || *lp_postxfer_exec(i)) {
@@ -836,7 +836,7 @@ int daemon_main(void)
 	if (bind_address == NULL && *lp_bind_address())
 		bind_address = lp_bind_address();
 
-	log_init();
+	log_init(0);
 
 	rprintf(FLOG, "rsyncd version %s starting, listening on port %d\n",
 		RSYNC_VERSION, rsync_port);

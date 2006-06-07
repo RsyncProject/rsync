@@ -1327,7 +1327,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			if (logfile_format_has_i || log_format_has(logfile_format, 'o'))
 				logfile_format_has_o_or_i = 1;
 		}
-		log_init();
+		log_init(0);
 	} else if (!am_daemon)
 		logfile_format = NULL;
 
