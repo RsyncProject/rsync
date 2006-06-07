@@ -84,24 +84,8 @@ dit(bf(motd file)) The "motd file" option allows you to specify a
 usually contains site information and any legal notices. The default
 is no motd file.
 
-dit(bf(log file)) The "log file" option tells the rsync daemon to log
-messages to that file rather than using syslog. This is particularly
-useful on systems (such as AIX) where code(syslog()) doesn't work for
-chrooted programs.  If the daemon fails to open to specified file, it
-will fall back to using syslog and output an error about the failure.
-(Note that a failure to open the specified log file used to be a fatal
-error.)
-
 dit(bf(pid file)) The "pid file" option tells the rsync daemon to write
 its process ID to that file.
-
-dit(bf(syslog facility)) The "syslog facility" option allows you to
-specify the syslog facility name to use when logging messages from the
-rsync daemon. You may use any standard syslog facility name which is
-defined on your system. Common names are auth, authpriv, cron, daemon,
-ftp, kern, lpr, mail, news, security, syslog, user, uucp, local0,
-local1, local2, local3, local4, local5, local6 and local7. The default
-is daemon. 
 
 dit(bf(port)) You can override the default port the daemon will listen on
 by specifying this value (defaults to 873).  This is ignored if the daemon
@@ -179,6 +163,29 @@ specify the maximum number of simultaneous connections you will allow.
 Any clients connecting when the maximum has been reached will receive a
 message telling them to try later.  The default is 0 which means no limit.
 See also the "lock file" option.
+
+dit(bf(log file)) When the "log file" option is set to a non-empty
+string, the rsync daemon will log messages to the indicated file rather
+than using syslog. This is particularly useful on systems (such as AIX)
+where code(syslog()) doesn't work for chrooted programs.  The file is
+opened before code(chroot()) is called, allowing it to be placed outside
+the transfer.  If this value is set on a per-module basis instead of
+globally, the global log will still contain any authorization failures
+or config-file error messages.
+
+If the daemon fails to open to specified file, it will fall back to
+using syslog and output an error about the failure.  (Note that the
+failure to open the specified log file used to be a fatal error.)
+
+dit(bf(syslog facility)) The "syslog facility" option allows you to
+specify the syslog facility name to use when logging messages from the
+rsync daemon. You may use any standard syslog facility name which is
+defined on your system. Common names are auth, authpriv, cron, daemon,
+ftp, kern, lpr, mail, news, security, syslog, user, uucp, local0,
+local1, local2, local3, local4, local5, local6 and local7. The default
+is daemon.  This setting has no effect if the "log file" setting is a
+non-empty string (either set in the per-modules settings, or inherited
+from the global settings).
 
 dit(bf(max verbosity)) The "max verbosity" option allows you to control
 the maximum amount of verbose information that you'll allow the daemon to
