@@ -34,6 +34,10 @@ Changes since 2.6.8:
       process.  (These problems could only affect an rsync daemon that was
       receiving files.)
 
+    - Fixed a bug in the %f logfile escape when receiving files: the
+      destination path is now included in the output (e.g. you can now tell
+      when a user specifies a subdir inside a module).
+
     - If the receiving side fails to create a directory, it will now skip
       trying to update everything that is inside that directory.
 
