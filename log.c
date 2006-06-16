@@ -49,6 +49,8 @@ extern char *logfile_name;
 #if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
 extern iconv_t ic_chck;
 #endif
+extern char curr_dir[];
+extern unsigned int module_dirlen;
 
 static int log_initialised;
 static int logfile_was_closed;
@@ -513,8 +515,18 @@ static void log_formatted(enum logcode code, char *format, char *op,
 					strlcpy(n, buf2, MAXPATHLEN);
 				else
 					n = buf2;
-			} else
-				clean_fname(n, 0);
+			} else {
+				if (*n != '/') {
+					pathjoin(buf2, sizeof buf2,
+						 curr_dir + module_dirlen, n);
+					clean_fname(buf2, 0);
+					if (fmt[1])
+						strlcpy(n, buf2, MAXPATHLEN);
+					else
+						n = buf2;
+				} else
+					clean_fname(n, 0);
+			}
 			if (*n == '/')
 				n++;
 			break;
