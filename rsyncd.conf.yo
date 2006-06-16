@@ -126,14 +126,12 @@ for each module in tt(rsyncd.conf).
 dit(bf(use chroot)) If "use chroot" is true, the rsync daemon will chroot
 to the "path" before starting the file transfer with the client.  This has
 the advantage of extra protection against possible implementation security
-holes, but it has the disadvantages of requiring super-user privileges, 
-of not being able to follow symbolic links that are either absolute or outside
-of the new root path, and of complicating the preservation of usernames and groups
-(see below).  When "use chroot" is false, for security reasons,
-symlinks may only be relative paths pointing to other files within the root
-path, and leading slashes are removed from most absolute paths (options
-such as bf(--backup-dir), bf(--compare-dest), etc. interpret an absolute path as
-rooted in the module's "path" dir, just as if chroot was specified).
+holes, but it has the disadvantages of requiring super-user privileges 
+and of complicating the preservation of usernames and groups
+(see below).  When "use chroot" is false, rsync takes extra steps to
+manually process symlinks in an attempt to make them behave the same
+way as when "use chroot" is true (this behavior is new for version
+2.6.9).
 The default for "use chroot" is true.
 
 In order to preserve usernames and groupnames, rsync needs to be able to
