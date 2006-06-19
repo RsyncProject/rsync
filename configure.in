@@ -123,15 +123,23 @@ else
 fi
 AC_DEFINE_UNQUOTED(RSYNC_RSH, "$RSYNC_RSH", [default -e command])
 
-AC_MSG_CHECKING([the group for user "nobody"])
-if grep '^nobody:' /etc/group >/dev/null 2>&1; then
-    NOBODY_GROUP=nobody
-elif grep '^nogroup:' /etc/group >/dev/null 2>&1; then
-    NOBODY_GROUP=nogroup
-else
-    NOBODY_GROUP=nobody # test for others?
+AC_ARG_WITH(nobody-group,
+    AC_HELP_STRING([--with-nobody-group=GROUP],
+		   [set the default unprivileged group (default nobody or nogroup)]),
+    [ NOBODY_GROUP="$with_nobody_group" ])
+
+if test x"$with_nobody_group" = x; then
+    AC_MSG_CHECKING([the group for user "nobody"])
+    if grep '^nobody:' /etc/group >/dev/null 2>&1; then
+	NOBODY_GROUP=nobody
+    elif grep '^nogroup:' /etc/group >/dev/null 2>&1; then
+	NOBODY_GROUP=nogroup
+    else
+	NOBODY_GROUP=nobody # test for others?
+    fi
+    AC_MSG_RESULT($NOBODY_GROUP)
 fi
-AC_MSG_RESULT($NOBODY_GROUP)
+
 AC_DEFINE_UNQUOTED(NOBODY_USER, "nobody", [unprivileged user--e.g. nobody])
 AC_DEFINE_UNQUOTED(NOBODY_GROUP, "$NOBODY_GROUP", [unprivileged group for unprivileged user])
 
