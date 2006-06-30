@@ -50,7 +50,7 @@ extern int delete_during;
 extern int delete_after;
 extern int module_id;
 extern int ignore_errors;
-extern int remove_sent_files;
+extern int remove_sender_files;
 extern int delay_updates;
 extern int update_only;
 extern int ignore_existing;
@@ -986,6 +986,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 								  itemizing,
 								  code);
 					}
+					if (remove_sender_files == 1)
+						goto return_with_success;
 					return;
 				}
 			}
@@ -1025,13 +1027,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				rprintf(code, "%s -> %s\n", fname,
 					file->u.link);
 			}
-			if (remove_sent_files && !dry_run) {
-				char numbuf[4];
-				SIVAL(numbuf, 0, ndx);
-				send_msg(MSG_SUCCESS, numbuf, 4);
-			}
 			if (preserve_hard_links && file->link_u.links)
 				hard_link_cluster(file, ndx, itemizing, code);
+			if (remove_sender_files)
+				goto return_with_success;
 		}
 #endif
 		return;
@@ -1085,6 +1084,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					hard_link_cluster(file, ndx,
 							  itemizing, code);
 				}
+				if (remove_sender_files == 1)
+					goto return_with_success;
 			}
 		} else {
 			if (itemizing)
@@ -1092,6 +1093,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			set_file_attrs(fname, file, &st, maybe_ATTRS_REPORT);
 			if (preserve_hard_links && file->link_u.links)
 				hard_link_cluster(file, ndx, itemizing, code);
+			if (remove_sender_files == 1)
+				goto return_with_success;
 		}
 		return;
 	}
@@ -1146,8 +1149,11 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (statret != 0 && basis_dir[0] != NULL) {
 		int j = try_dests_reg(file, fname, ndx, fnamecmpbuf, &st,
 				      itemizing, maybe_ATTRS_REPORT, code);
-		if (j == -2)
+		if (j == -2) {
+			if (remove_sender_files == 1)
+				goto return_with_success;
 			return;
+		}
 		if (j != -1) {
 			fnamecmp = fnamecmpbuf;
 			fnamecmp_type = j;
@@ -1213,6 +1219,14 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		set_file_attrs(fname, file, &st, maybe_ATTRS_REPORT);
 		if (preserve_hard_links && file->link_u.links)
 			hard_link_cluster(file, ndx, itemizing, code);
+		if (remove_sender_files != 1)
+			return;
+	  return_with_success:
+		if (!dry_run) {
+			char numbuf[4];
+			SIVAL(numbuf, 0, ndx);
+			send_msg(MSG_SUCCESS, numbuf, 4);
+		}
 		return;
 	}
 
@@ -1285,8 +1299,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		rprintf(FINFO, "generating and sending sums for %d\n", ndx);
 
   notify_others:
-	if (remove_sent_files && !delay_updates && !phase)
-	    increment_active_files(ndx, itemizing, code);
+	if (remove_sender_files && !delay_updates && !phase)
+		increment_active_files(ndx, itemizing, code);
 	write_int(f_out, ndx);
 	if (itemizing) {
 		int iflags = ITEM_TRANSFER;
