@@ -35,7 +35,7 @@ extern int am_sender;
 extern int am_generator;
 extern int am_daemon;
 extern int blocking_io;
-extern int remove_sender_files;
+extern int remove_source_files;
 extern int daemon_over_rsh;
 extern int need_messages_from_generator;
 extern int kluge_around_eof;
@@ -614,10 +614,10 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 		exit_cleanup(RERR_SYNTAX);
 		return;
 	}
-	if (am_daemon && lp_read_only(module_id) && remove_sender_files) {
+	if (am_daemon && lp_read_only(module_id) && remove_source_files) {
 		rprintf(FERROR,
 		    "ERROR: --remove-%s-files cannot be used with a read-only module\n",
-		    remove_sender_files == 1 ? "sender" : "sent");
+		    remove_source_files == 1 ? "source" : "sent");
 		exit_cleanup(RERR_SYNTAX);
 		return;
 	}

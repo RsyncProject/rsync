@@ -40,7 +40,7 @@ extern int preserve_perms;
 extern int basis_dir_cnt;
 extern int make_backups;
 extern int cleanup_got_literal;
-extern int remove_sender_files;
+extern int remove_source_files;
 extern int append_mode;
 extern int sparse_files;
 extern int keep_partial;
@@ -296,7 +296,7 @@ static void handle_delayed_updates(struct file_list *flist, char *local_name)
 					"rename failed for %s (from %s)",
 					full_fname(fname), partialptr);
 			} else {
-				if (remove_sender_files
+				if (remove_source_files
 				    || (preserve_hard_links
 				     && file->link_u.links)) {
 					SIVAL(numbuf, 0, i);
@@ -644,7 +644,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		cleanup_disable();
 
 		if (recv_ok > 0) {
-			if (remove_sender_files
+			if (remove_source_files
 			    || (preserve_hard_links && file->link_u.links)) {
 				SIVAL(numbuf, 0, i);
 				send_msg(MSG_SUCCESS, numbuf, 4);

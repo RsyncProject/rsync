@@ -46,7 +46,7 @@ extern int read_batch;
 extern int csum_length;
 extern int checksum_seed;
 extern int protocol_version;
-extern int remove_sender_files;
+extern int remove_source_files;
 extern int preserve_hard_links;
 extern char *filesfrom_host;
 extern struct stats stats;
@@ -257,7 +257,7 @@ static void read_msg_fd(void)
 			exit_cleanup(RERR_STREAMIO);
 		}
 		read_loop(fd, buf, 4);
-		if (remove_sender_files)
+		if (remove_source_files)
 			decrement_active_files(IVAL(buf,0));
 		flist_ndx_push(&redo_list, IVAL(buf,0));
 		break;
@@ -275,7 +275,7 @@ static void read_msg_fd(void)
 			exit_cleanup(RERR_STREAMIO);
 		}
 		read_loop(fd, buf, len);
-		if (remove_sender_files) {
+		if (remove_source_files) {
 			decrement_active_files(IVAL(buf,0));
 			send_msg(MSG_SUCCESS, buf, len);
 		}
@@ -311,7 +311,7 @@ static void read_msg_fd(void)
 }
 
 /* This is used by the generator to limit how many file transfers can
- * be active at once when --remove-sender-files is specified.  Without
+ * be active at once when --remove-source-files is specified.  Without
  * this, sender-side deletions were mostly happening at the end. */
 void increment_active_files(int ndx, int itemizing, enum logcode code)
 {

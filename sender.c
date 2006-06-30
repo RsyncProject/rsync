@@ -34,7 +34,7 @@ extern int append_mode;
 extern int io_error;
 extern int allowed_lull;
 extern int protocol_version;
-extern int remove_sender_files;
+extern int remove_source_files;
 extern int updating_basis_file;
 extern int make_backups;
 extern int do_progress;
@@ -134,7 +134,7 @@ void successful_send(int ndx)
 	} else
 		offset = 0;
 	f_name(file, fname + offset);
-	if (remove_sender_files && do_unlink(fname) == 0 && verbose > 1)
+	if (remove_source_files && do_unlink(fname) == 0 && verbose > 1)
 		rprintf(FINFO, "sender removed %s\n", fname + offset);
 }
 

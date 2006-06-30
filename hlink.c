@@ -27,7 +27,7 @@ extern int verbose;
 extern int do_xfers;
 extern int link_dest;
 extern int make_backups;
-extern int remove_sender_files;
+extern int remove_source_files;
 extern int stdout_format_has_i;
 extern char *basis_dir[];
 extern struct file_list *the_file_list;
@@ -224,7 +224,7 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 			}
 			maybe_hard_link(file, ndx, fname, statret, st,
 					toname, &st2, itemizing, code);
-			if (remove_sender_files == 1 && do_xfers) {
+			if (remove_source_files == 1 && do_xfers) {
 				char numbuf[4];
 				SIVAL(numbuf, 0, ndx);
 				send_msg(MSG_SUCCESS, numbuf, 4);
@@ -294,7 +294,7 @@ void hard_link_cluster(struct file_struct *file, int master, int itemizing,
 		statret = link_stat(hlink2, &st2, 0);
 		maybe_hard_link(file, ndx, hlink2, statret, &st2,
 				hlink1, &st1, itemizing, code);
-		if (remove_sender_files == 1 && do_xfers) {
+		if (remove_source_files == 1 && do_xfers) {
 			char numbuf[4];
 			SIVAL(numbuf, 0, ndx);
 			send_msg(MSG_SUCCESS, numbuf, 4);

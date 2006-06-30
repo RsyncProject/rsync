@@ -65,7 +65,7 @@ int delete_during = 0;
 int delete_before = 0;
 int delete_after = 0;
 int delete_excluded = 0;
-int remove_sender_files = 0;
+int remove_source_files = 0;
 int one_file_system = 0;
 int protocol_version = PROTOCOL_VERSION;
 int sparse_files = 0;
@@ -321,7 +321,7 @@ void usage(enum logcode F)
   rprintf(F,"     --rsync-path=PROGRAM    specify the rsync to run on the remote machine\n");
   rprintf(F,"     --existing              skip creating new files on receiver\n");
   rprintf(F,"     --ignore-existing       skip updating files that already exist on receiver\n");
-  rprintf(F,"     --remove-sender-files   sender removes synchronized files (non-dirs)\n");
+  rprintf(F,"     --remove-source-files   sender removes synchronized files (non-dirs)\n");
   rprintf(F,"     --del                   an alias for --delete-during\n");
   rprintf(F,"     --delete                delete extraneous files from destination dirs\n");
   rprintf(F,"     --delete-before         receiver deletes before transfer (default)\n");
@@ -475,8 +475,8 @@ static struct poptOption long_options[] = {
   {"delete-during",    0,  POPT_ARG_NONE,   &delete_during, 0, 0, 0 },
   {"delete-after",     0,  POPT_ARG_NONE,   &delete_after, 0, 0, 0 },
   {"delete-excluded",  0,  POPT_ARG_NONE,   &delete_excluded, 0, 0, 0 },
-  {"remove-sent-files",0,  POPT_ARG_VAL,    &remove_sender_files, 2, 0, 0 }, /* deprecated */
-  {"remove-sender-files",0,POPT_ARG_VAL,    &remove_sender_files, 1, 0, 0 },
+  {"remove-sent-files",0,  POPT_ARG_VAL,    &remove_source_files, 2, 0, 0 }, /* deprecated */
+  {"remove-source-files",0,POPT_ARG_VAL,    &remove_source_files, 1, 0, 0 },
   {"force",            0,  POPT_ARG_NONE,   &force_delete, 0, 0, 0 },
   {"ignore-errors",    0,  POPT_ARG_NONE,   &ignore_errors, 0, 0, 0 },
   {"max-delete",       0,  POPT_ARG_INT,    &max_delete, 0, 0, 0 },
@@ -1205,8 +1205,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		return 0;
 	}
 
-	if (remove_sender_files) {
-		/* We only want to infer this refusal of --remove-sender-files
+	if (remove_source_files) {
+		/* We only want to infer this refusal of --remove-source-files
 		 * via the refusal of "delete", not any of the "delete-FOO"
 		 * options. */
 		if (refused_delete && am_sender) {
@@ -1757,9 +1757,9 @@ void server_options(char **args,int *argc)
 	if (fuzzy_basis && am_sender)
 		args[ac++] = "--fuzzy";
 
-	if (remove_sender_files == 1)
-		args[ac++] = "--remove-sender-files";
-	else if (remove_sender_files)
+	if (remove_source_files == 1)
+		args[ac++] = "--remove-source-files";
+	else if (remove_source_files)
 		args[ac++] = "--remove-sent-files";
 
 	*argc = ac;
