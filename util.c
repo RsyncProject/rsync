@@ -1021,7 +1021,7 @@ char *full_fname(const char *fn)
 	if (*fn == '/')
 		p1 = p2 = "";
 	else {
-		p1 = curr_dir;
+		p1 = curr_dir + module_dirlen;
 		for (p2 = p1; *p2 == '/'; p2++) {}
 		if (*p2)
 			p2 = "/";
@@ -1030,13 +1030,6 @@ char *full_fname(const char *fn)
 		m1 = " (in ";
 		m2 = lp_name(module_id);
 		m3 = ")";
-		if (p1 == curr_dir) {
-			if (!lp_use_chroot(module_id)) {
-				char *p = lp_path(module_id);
-				if (*p != '/' || p[1])
-					p1 += strlen(p);
-			}
-		}
 	} else
 		m1 = m2 = m3 = "";
 
