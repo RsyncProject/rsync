@@ -339,7 +339,7 @@ to the detailed description below for a complete description.  verb(
      --rsync-path=PROGRAM    specify the rsync to run on remote machine
      --existing              skip creating new files on receiver
      --ignore-existing       skip updating files that exist on receiver
-     --remove-sent-files     sender removes successfully sent files
+     --remove-sender-files   sender removes synchronized files (non-dir)
      --del                   an alias for --delete-during
      --delete                delete extraneous files from dest dirs
      --delete-before         receiver deletes before transfer (default)
@@ -918,10 +918,9 @@ dit(bf(--ignore-existing)) This tells rsync to skip updating files that
 already exist on the destination (this does em(not) ignore existing
 directores, or nothing would get done).  See also bf(--existing).
 
-dit(bf(--remove-sent-files)) This tells rsync to remove from the sending
-side the files and/or symlinks that are newly created or whose content is
-updated on the receiving side.  Directories and devices are not removed,
-nor are files/symlinks whose attributes are merely changed.
+dit(bf(--remove-sender-files)) This tells rsync to remove from the sending
+side the files (meaning non-directories) that are a part of the transfer
+and have been successfully duplicated on the receiving side.
 
 dit(bf(--delete)) This tells rsync to delete extraneous files from the
 receiving side (ones that aren't on the sending side), but only for the
