@@ -34,7 +34,7 @@ extern int append_mode;
 extern int io_error;
 extern int allowed_lull;
 extern int protocol_version;
-extern int remove_sent_files;
+extern int remove_sender_files;
 extern int updating_basis_file;
 extern int make_backups;
 extern int do_progress;
@@ -128,16 +128,13 @@ void successful_send(int ndx)
 		return;
 
 	file = the_file_list->files[ndx];
-	/* The generator might tell us about symlinks we didn't send. */
-	if (!(file->flags & FLAG_SENT) && !S_ISLNK(file->mode))
-		return;
 	if (file->dir.root) {
 		offset = stringjoin(fname, sizeof fname,
 				    file->dir.root, "/", NULL);
 	} else
 		offset = 0;
 	f_name(file, fname + offset);
-	if (remove_sent_files && do_unlink(fname) == 0 && verbose > 1)
+	if (remove_sender_files && do_unlink(fname) == 0 && verbose > 1)
 		rprintf(FINFO, "sender removed %s\n", fname + offset);
 }
 
