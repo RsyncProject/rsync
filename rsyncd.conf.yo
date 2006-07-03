@@ -162,6 +162,18 @@ Any clients connecting when the maximum has been reached will receive a
 message telling them to try later.  The default is 0 which means no limit.
 See also the "lock file" option.
 
+dit(bf(munge symlinks)) The "munge symlinks" option tells rsync to not
+allow absolute symlinks (any leading slashes are stripped) and to trim
+parent-dir references ("../") if they attempt to move beyond the root of
+the transfer.  Use this option if you need to ensure that other processes
+(besides a daemon rsync) don't ever see a module-created symlink that can
+point outside the module, or perhaps if you value safety over preserving
+symlink data.
+
+Prior to rsync 2.6.9, symlink munging was always enabled when "use chroot"
+was off, and always disabled when it was on.  Starting with 2.6.9, this
+symlink-munging is totally controlled by the setting of this option.
+
 dit(bf(log file)) When the "log file" option is set to a non-empty
 string, the rsync daemon will log messages to the indicated file rather
 than using syslog. This is particularly useful on systems (such as AIX)
