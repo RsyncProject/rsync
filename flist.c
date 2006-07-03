@@ -655,6 +655,8 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 	if (linkname_len) {
 		file->u.link = bp;
 		read_sbuf(f, bp, linkname_len - 1);
+		if (lp_munge_symlinks(module_id))
+			sanitize_path(bp, bp, "", lastdir_depth, NULL);
 		bp += linkname_len;
 	}
 #endif
