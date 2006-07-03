@@ -16,7 +16,7 @@ Changes since 2.6.8:
       of the module's path.  These changes make a non-chroot daemon behave the
       same way as a chroot daemon with regard to symlinks, and also avoids a
       potential problem where a pre-existing symlink could have escaped the
-      module's hierarchy.
+      module's hierarchy.  See also the new "munge symlinks" daemon setting.
 
     - Fixed an overzealous sanitizing bug in the handling of the --link-dest,
       --copy-dest, and --compare-dest options to a daemon without chroot: if
@@ -71,6 +71,9 @@ Changes since 2.6.8:
 
     - Made "log file" and "syslog facility" settable on a per-module basis in
       the daemon's config file.
+
+    - Added the "munge symlinks" daemon setting to enable the old-style
+      tweaking of "unsafe" symlinks, regardless of how "use chroot" is set.
 
   DEVELOPER RELATED:
 
