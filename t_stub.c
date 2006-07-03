@@ -66,16 +66,15 @@ struct filter_list_struct server_filter_list;
 
  char *lp_name(UNUSED(int mod))
 {
-    return NULL;
+	return NULL;
 }
 
  BOOL lp_use_chroot(UNUSED(int mod))
 {
-    return 0;
+	return 0;
 }
 
  char *lp_path(UNUSED(int mod))
 {
-    return NULL;
+	return NULL;
 }
-
