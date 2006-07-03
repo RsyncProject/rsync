@@ -153,6 +153,7 @@ typedef struct
 	BOOL ignore_errors;
 	BOOL ignore_nonreadable;
 	BOOL list;
+	BOOL munge_symlinks;
 	BOOL read_only;
 	BOOL strict_modes;
 	BOOL transfer_logging;
@@ -200,6 +201,7 @@ static service sDefault =
  /* ignore_errors; */		False,
  /* ignore_nonreadable; */	False,
  /* list; */			True,
+ /* munge_symlinks; */		False,
  /* read_only; */		True,
  /* strict_modes; */		True,
  /* transfer_logging; */	False,
@@ -313,6 +315,7 @@ static struct parm_struct parm_table[] =
  {"log format",        P_STRING, P_LOCAL, &sDefault.log_format,        NULL,0},
  {"max connections",   P_INTEGER,P_LOCAL, &sDefault.max_connections,   NULL,0},
  {"max verbosity",     P_INTEGER,P_LOCAL, &sDefault.max_verbosity,     NULL,0},
+ {"munge symlinks",    P_BOOL,   P_LOCAL, &sDefault.munge_symlinks,    NULL,0},
  {"name",              P_STRING, P_LOCAL, &sDefault.name,              NULL,0},
  {"outgoing chmod",    P_STRING, P_LOCAL, &sDefault.outgoing_chmod,    NULL,0},
  {"path",              P_PATH,   P_LOCAL, &sDefault.path,              NULL,0},
@@ -415,6 +418,7 @@ FN_LOCAL_INTEGER(lp_timeout, timeout)
 FN_LOCAL_BOOL(lp_ignore_errors, ignore_errors)
 FN_LOCAL_BOOL(lp_ignore_nonreadable, ignore_nonreadable)
 FN_LOCAL_BOOL(lp_list, list)
+FN_LOCAL_BOOL(lp_munge_symlinks, munge_symlinks)
 FN_LOCAL_BOOL(lp_read_only, read_only)
 FN_LOCAL_BOOL(lp_strict_modes, strict_modes)
 FN_LOCAL_BOOL(lp_transfer_logging, transfer_logging)
