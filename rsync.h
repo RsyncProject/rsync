@@ -314,6 +314,12 @@ enum msgcode {
 #include <sys/sysmacros.h>
 #endif
 
+#ifdef MAKEDEV_TAKES_3_ARGS
+#define MAKEDEV(devmajor,devminor) makedev(0,devmajor,devminor)
+#else
+#define MAKEDEV(devmajor,devminor) makedev(devmajor,devminor)
+#endif
+
 #ifdef HAVE_COMPAT_H
 #include <compat.h>
 #endif
