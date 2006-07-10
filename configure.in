@@ -310,6 +310,31 @@ AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     netdb.h malloc.h float.h limits.h iconv.h libcharset.h langinfo.h)
 AC_HEADER_MAJOR
 
+AC_CACHE_CHECK([if makedev takes 3 args],rsync_cv_MAKEDEV_TAKES_3_ARGS,[
+AC_TRY_RUN([
+#include <sys/types.h>
+#ifdef MAJOR_IN_MKDEV
+#include <sys/mkdev.h>
+# if !defined makedev && (defined mkdev || defined _WIN32 || defined __WIN32__)
+#  define makedev mkdev
+# endif
+#elif defined MAJOR_IN_SYSMACROS
+#include <sys/sysmacros.h>
+#endif
+
+int main(void)
+{
+	dev_t dev = makedev(0, 5, 7);
+	if (major(dev) != 5 || minor(dev) != 7)
+		exit(1);
+	return 0;
+}
+],
+rsync_cv_MAKEDEV_TAKES_3_ARGS=yes,rsync_cv_MAKEDEV_TAKES_3_ARGS=no,rsync_cv_MAKEDEV_TAKES_3_ARGS=no)])
+if test x"$rsync_cv_MAKEDEV_TAKES_3_ARGS" = x"yes"; then
+   AC_DEFINE(MAKEDEV_TAKES_3_ARGS, 1, [Define to 1 if makedev() takes 3 args])
+fi
+
 AC_CHECK_SIZEOF(int)
 AC_CHECK_SIZEOF(long)
 AC_CHECK_SIZEOF(long long)
