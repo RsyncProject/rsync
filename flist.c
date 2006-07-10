@@ -314,7 +314,7 @@ static void send_file_entry(struct file_struct *file, int f)
 	if (!file) {
 		write_byte(f, 0);
 		modtime = 0, mode = 0;
-		dev = 0, rdev = makedev(0, 0);
+		dev = 0, rdev = MAKEDEV(0, 0);
 		rdev_major = 0;
 		uid = 0, gid = 0;
 		*lastname = '\0';
@@ -346,7 +346,7 @@ static void send_file_entry(struct file_struct *file, int f)
 				flags |= XMIT_RDEV_MINOR_IS_SMALL;
 		}
 	} else if (protocol_version < 28)
-		rdev = makedev(0, 0);
+		rdev = MAKEDEV(0, 0);
 	if (file->uid == uid)
 		flags |= XMIT_SAME_UID;
 	else
@@ -497,7 +497,7 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 
 	if (!flist) {
 		modtime = 0, mode = 0;
-		dev = 0, rdev = makedev(0, 0);
+		dev = 0, rdev = MAKEDEV(0, 0);
 		rdev_major = 0;
 		uid = 0, gid = 0;
 		*lastname = '\0';
@@ -574,10 +574,10 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 				rdev_minor = read_byte(f);
 			else
 				rdev_minor = read_int(f);
-			rdev = makedev(rdev_major, rdev_minor);
+			rdev = MAKEDEV(rdev_major, rdev_minor);
 		}
 	} else if (protocol_version < 28)
-		rdev = makedev(0, 0);
+		rdev = MAKEDEV(0, 0);
 
 #ifdef SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(mode)) {
