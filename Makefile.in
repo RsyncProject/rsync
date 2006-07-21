@@ -2,6 +2,7 @@
 # Makefile
 
 prefix=@prefix@
+datarootdir=@datarootdir@
 exec_prefix=@exec_prefix@
 bindir=@bindir@
 mandir=@mandir@
