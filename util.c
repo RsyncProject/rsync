@@ -1033,7 +1033,8 @@ char *full_fname(const char *fn)
 	} else
 		m1 = m2 = m3 = "";
 
-	asprintf(&result, "\"%s%s%s\"%s%s%s", p1, p2, fn, m1, m2, m3);
+	if (asprintf(&result, "\"%s%s%s\"%s%s%s", p1, p2, fn, m1, m2, m3) <= 0)
+		out_of_memory("full_fname");
 
 	return result;
 }
