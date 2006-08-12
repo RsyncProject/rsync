@@ -500,6 +500,8 @@ static int rule_matches(char *name, struct filter_struct *ex, int name_is_dir)
 	char *p, *pattern = ex->pattern;
 	const char *strings[16]; /* more than enough */
 
+	if (*name == '/')
+		name++;
 	if (!*name)
 		return 0;
 
@@ -531,8 +533,6 @@ static int rule_matches(char *name, struct filter_struct *ex, int name_is_dir)
 	if (*pattern == '/') {
 		anchored_match = 1;
 		pattern++;
-		if (strings[0][0] == '/')
-			strings[0]++;
 	}
 
 	if (!anchored_match && ex->u.slash_cnt
