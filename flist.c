@@ -1185,6 +1185,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				} else
 					break;
 			}
+			if (len == 1 && fn[0] == '/')
+				fn[len++] = '.';
 			fn[len] = '\0';
 			/* Reject a ".." dir in the active part of the path. */
 			for (p = fn; (p = strstr(p, "..")) != NULL; p += 2) {
