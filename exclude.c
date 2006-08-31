@@ -1102,7 +1102,8 @@ static void send_rules(int f_out, struct filter_list_struct *flp)
 			elide = am_sender ? 1 : -1;
 		if (ent->match_flags & MATCHFLG_RECEIVER_SIDE)
 			elide = elide ? 0 : am_sender ? -1 : 1;
-		else if (delete_excluded && !elide)
+		else if (delete_excluded && !elide
+		 && (!(ent->match_flags & MATCHFLG_PERDIR_MERGE) || ent->match_flags & MATCHFLG_CVS_IGNORE))
 			elide = am_sender ? 1 : -1;
 		if (elide < 0) {
 			if (prev)
