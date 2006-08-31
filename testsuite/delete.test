@@ -23,5 +23,15 @@ checkit "$RSYNC -avv --remove-sent-files \
 
 diff -r "$chkdir/empty" "$fromdir"
 
+# Make sure that --delete-excluded does not dump a per-dir merge-file filter.
+cat >"$todir/filters" <<EOF
+P foo
+EOF
+touch "$todir/foo"
+
+$RSYNC -r --filter=': filters' --delete-excluded "$fromdir/" "$todir/"
+
+test -f "$todir/foo" || test_fail "rsync incorrectly elided the merge file"
+
 # The script would have aborted on error, so getting here means we've won.
 exit 0
