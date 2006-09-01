@@ -847,6 +847,14 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 		exit_cleanup(RERR_SYNTAX);
 	}
 
+	/* --delete-excluded turns an un-modified include/exclude into a
+	 * sender-side rule.  We also affect a per-dir .cvsignore file so
+	 * that we are compatible with older protocol versions. */
+	if (delete_excluded
+	 && !(new_mflags & (MATCHFLG_RECEIVER_SIDE|MATCHFLG_SENDER_SIDE))
+	 && (!(new_mflags & MATCHFLG_PERDIR_MERGE) || new_mflags & MATCHFLG_CVS_IGNORE))
+		new_mflags |= MATCHFLG_SENDER_SIDE;
+
 	*len_ptr = len;
 	*mflags_ptr = new_mflags;
 	return (const char *)s;
@@ -1098,6 +1106,9 @@ static void send_rules(int f_out, struct filter_list_struct *flp)
 		int elide = 0;
 		char *p;
 
+		/* Note we need to check delete_excluded here in addition to
+		 * the code in parse_rule_tok() because some rules may have
+		 * been added before we found the --delete-excluded option. */
 		if (ent->match_flags & MATCHFLG_SENDER_SIDE)
 			elide = am_sender ? 1 : -1;
 		if (ent->match_flags & MATCHFLG_RECEIVER_SIDE)
