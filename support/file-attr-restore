@@ -48,8 +48,7 @@ while (<>) {
     die "Invalid input line $.:\n$_" unless defined $name;
     die "A filename is not properly escaped:\n$_" unless $name =~ /^[^"\\]*(\\(\d\d\d|\D)[^"\\]*)*$/;
     my $fn = $name;
-    $fn =~ s/([\$\@\%])/\\$1/g;
-    $fn = eval "\"$fn\"";
+    $fn =~ s/\\(\d+|[A-Za-z]|.)/ eval "\"\\$1\"" /eg;
     if ($type eq '-') {
 	undef $type unless -f $fn;
     } elsif ($type eq 'd') {
