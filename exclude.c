@@ -557,7 +557,7 @@ static int rule_matches(char *name, struct filter_struct *ex, int name_is_dir)
 		if (litmatch_array(pattern, strings, slash_handling))
 			return ret_match;
 	} else if (anchored_match) {
-		if (strcmp(strings[0], pattern) == 0)
+		if (strcmp(name, pattern) == 0)
 			return ret_match;
 	} else {
 		int l1 = strlen(name);
@@ -848,11 +848,12 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 	}
 
 	/* --delete-excluded turns an un-modified include/exclude into a
-	 * sender-side rule.  We also affect a per-dir .cvsignore file so
-	 * that we are compatible with older protocol versions. */
+	 * sender-side rule.  We also affect per-dir merge files that take
+	 * no prefixes as a simple optimization. */
 	if (delete_excluded
 	 && !(new_mflags & (MATCHFLG_RECEIVER_SIDE|MATCHFLG_SENDER_SIDE))
-	 && (!(new_mflags & MATCHFLG_PERDIR_MERGE) || new_mflags & MATCHFLG_CVS_IGNORE))
+	 && (!(new_mflags & MATCHFLG_PERDIR_MERGE)
+	  || new_mflags & MATCHFLG_NO_PREFIXES))
 		new_mflags |= MATCHFLG_SENDER_SIDE;
 
 	*len_ptr = len;
@@ -1108,13 +1109,18 @@ static void send_rules(int f_out, struct filter_list_struct *flp)
 
 		/* Note we need to check delete_excluded here in addition to
 		 * the code in parse_rule_tok() because some rules may have
-		 * been added before we found the --delete-excluded option. */
+		 * been added before we found the --delete-excluded option.
+		 * We must also elide any CVS merge-file rules to avoid a
+		 * backward compatibility problem, and we elide any no-prefix
+		 * merge files as an optimization (since they can only have
+		 * include/exclude rules). */
 		if (ent->match_flags & MATCHFLG_SENDER_SIDE)
 			elide = am_sender ? 1 : -1;
 		if (ent->match_flags & MATCHFLG_RECEIVER_SIDE)
 			elide = elide ? 0 : am_sender ? -1 : 1;
 		else if (delete_excluded && !elide
-		 && (!(ent->match_flags & MATCHFLG_PERDIR_MERGE) || ent->match_flags & MATCHFLG_CVS_IGNORE))
+		 && (!(ent->match_flags & MATCHFLG_PERDIR_MERGE)
+		  || ent->match_flags & MATCHFLG_NO_PREFIXES))
 			elide = am_sender ? 1 : -1;
 		if (elide < 0) {
 			if (prev)
