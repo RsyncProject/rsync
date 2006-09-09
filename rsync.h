@@ -389,10 +389,7 @@ enum msgcode {
  * to ensure that any code that really requires a 64-bit integer has
  * it (e.g. the checksum code uses two 32-bit integers for its 64-bit
  * counter). */
-#if SIZEOF_OFF64_T == 8
-# define int64 off64_t
-# define SIZEOF_INT64 8
-#elif SIZEOF_LONG == 8
+#if SIZEOF_LONG == 8
 # define int64 long
 # define SIZEOF_INT64 8
 #elif SIZEOF_INT == 8
@@ -400,6 +397,9 @@ enum msgcode {
 # define SIZEOF_INT64 8
 #elif SIZEOF_LONG_LONG == 8
 # define int64 long long
+# define SIZEOF_INT64 8
+#elif SIZEOF_OFF64_T == 8
+# define int64 off64_t
 # define SIZEOF_INT64 8
 #elif SIZEOF_OFF_T == 8
 # define int64 off_t
