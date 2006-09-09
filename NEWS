@@ -8,9 +8,9 @@ Changes since 2.6.8:
       once again clean-up its temp file from the destination dir.
 
     - An rsync daemon that is receiving files with "use chroot = no" no longer
-      sanitizes the symlink target strings.  This means that each symlink's
-      value will now be accepted (and thus returned) with its symlink info
-      intact.  Also, in order to keep things safe, all arg paths and any
+      sanitizes the symlink target strings (by default).  This means that each
+      symlink's value will now be accepted (and thus returned) with its symlink
+      info intact.  Also, in order to keep things safe, all arg paths and any
       dereferenced symlinks (e.g. via --copy-links or --keep-dirlinks) are
       manually verified to ensure that no symlinks try to escape past the top
       of the module's path.  These changes make a non-chroot daemon behave the
@@ -57,6 +57,17 @@ Changes since 2.6.8:
       it now deletes an alternate basis file from the partial-dir that was used
       to successfully update a destination file.
 
+    - Fixed a bug in the handling of --delete-excluded when using a per-dir
+      merge file:  the merge file is now honored on the receiving side, and
+      only its unqualified include/exclude commands are ignored (just as is
+      done for global include/excludes).
+
+    - Fixed a recent bug where --delete was not working when transferring from
+      the root (/) of the filesystem with --relative enabled.
+
+    - Fixed a recent bug where an --exclude='*' could affect the root (/) of
+      the filesystem with --relative enabled.
+
   ENHANCEMENTS:
 
     - Added the --log-file=FILE and --log-file-format=FORMAT options.  These
@@ -73,7 +84,13 @@ Changes since 2.6.8:
       the daemon's config file.
 
     - Added the "munge symlinks" daemon setting to enable the old-style
-      tweaking of "unsafe" symlinks, regardless of how "use chroot" is set.
+      tweaking of "unsafe" symlinks, but it can now be consistently applied
+      regardless of how "use chroot" is set.
+
+    - Added a new environment variable to the pre-/post-xfer exec commands (in
+      the daemon's config file):  RSYNC_PID.  This value will be the same in
+      both the pre- and post-xfer commands, so it can be used if the pre-xfer
+      command wants to cache some arg/request info for the post-xfer command.
 
   DEVELOPER RELATED:
 
