@@ -418,17 +418,18 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 				return -1;
 			}
 			if (pid) {
-				char *ret1, *ret2;
+				if (asprintf(&p, "RSYNC_PID=%ld", (long)pid) > 0)
+					putenv(p);
 				if (wait_process(pid, &status, 0) < 0)
 					status = -1;
-				if (asprintf(&ret1, "RSYNC_RAW_STATUS=%d", status) > 0)
-					putenv(ret1);
+				if (asprintf(&p, "RSYNC_RAW_STATUS=%d", status) > 0)
+					putenv(p);
 				if (WIFEXITED(status))
 					status = WEXITSTATUS(status);
 				else
 					status = -1;
-				if (asprintf(&ret2, "RSYNC_EXIT_STATUS=%d", status) > 0)
-					putenv(ret2);
+				if (asprintf(&p, "RSYNC_EXIT_STATUS=%d", status) > 0)
+					putenv(p);
 				system(lp_postxfer_exec(i));
 				_exit(status);
 			}
@@ -438,6 +439,8 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 		 * send us the user's request via a pipe. */
 		if (*lp_prexfer_exec(i)) {
 			int fds[2];
+			if (asprintf(&p, "RSYNC_PID=%ld", (long)getpid()) > 0)
+				putenv(p);
 			if (pipe(fds) < 0 || (pre_exec_pid = fork()) < 0) {
 				rsyserr(FLOG, errno, "pre-xfer exec preparation failed");
 				io_printf(f_out, "@ERROR: pre-xfer exec preparation failed\n");
@@ -451,9 +454,8 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 				len = read_arg_from_pipe(fds[0], buf, BIGPATHBUFLEN);
 				if (len <= 0)
 					_exit(1);
-				if (asprintf(&p, "RSYNC_REQUEST=%s", buf) < 0)
-					out_of_memory("rsync_module");
-				putenv(p);
+				if (asprintf(&p, "RSYNC_REQUEST=%s", buf) > 0)
+					putenv(p);
 				for (j = 0; ; j++) {
 					len = read_arg_from_pipe(fds[0], buf,
 								 BIGPATHBUFLEN);
@@ -462,9 +464,8 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 							break;
 						_exit(1);
 					}
-					if (asprintf(&p, "RSYNC_ARG%d=%s", j, buf) < 0)
-						out_of_memory("rsync_module");
-					putenv(p);
+					if (asprintf(&p, "RSYNC_ARG%d=%s", j, buf) > 0)
+						putenv(p);
 				}
 				close(fds[0]);
 				close(STDIN_FILENO);
