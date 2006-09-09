@@ -505,6 +505,7 @@ quote(itemize(
   it() bf(RSYNC_HOST_ADDR): The accessing host's IP address.
   it() bf(RSYNC_HOST_NAME): The accessing host's name.
   it() bf(RSYNC_USER_NAME): The accessing user's name (empty if no user).
+  it() bf(RSYNC_PID): A unique number for this transfer.
   it() bf(RSYNC_REQUEST): (pre-xfer only) The module/path info specified
   by the user (note that the user can specify multiple source files,
   so the request can be something like "mod/path1 mod/path2", etc.).
