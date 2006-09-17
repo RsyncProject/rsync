@@ -57,6 +57,8 @@ extern struct filter_list_struct server_filter_list;
 
 static struct bitbag *delayed_bits = NULL;
 static int phase = 0;
+/* We're either updating the basis file or an identical copy: */
+static int updating_basis;
 
 
 /*
@@ -216,7 +218,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 			sum_update(map, len);
 		}
 
-		if (inplace) {
+		if (updating_basis) {
 			if (offset == offset2 && fd != -1) {
 				OFF_T pos;
 				if (flush_write_file(fd) < 0)
@@ -360,6 +362,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 	if (delay_updates)
 		delayed_bits = bitbag_create(flist->count);
 
+	updating_basis = inplace;
+
 	while (1) {
 		cleanup_disable();
 
@@ -459,6 +463,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 				fnamecmp = get_backup_name(fname);
 				break;
 			case FNAMECMP_FUZZY:
+				updating_basis = 0;
 				if (file->dirname) {
 					pathjoin(fnamecmpbuf, MAXPATHLEN,
 						 file->dirname, xname);
@@ -467,6 +472,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 					fnamecmp = xname;
 				break;
 			default:
+				updating_basis = 0;
 				if (fnamecmp_type >= basis_dir_cnt) {
 					rprintf(FERROR,
 						"invalid basis_dir index: %d.\n",
@@ -546,7 +552,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			file->mode = dest_mode(file->mode, st.st_mode, exists);
 		}
 
-		/* We now check to see if we are writing file "inplace" */
+		/* We now check to see if we are writing the file "inplace" */
 		if (inplace)  {
 			fd2 = do_open(fname, O_WRONLY|O_CREAT, 0600);
 			if (fd2 == -1) {
