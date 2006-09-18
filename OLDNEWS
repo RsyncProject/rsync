@@ -1690,7 +1690,7 @@ Changes since 2.5.5:
     * The --suffix option can now be used with --backup-dir.  (Michael
       Zimmerman)
 
-    * Combining "::" syntax with the -rsh/-e option now uses the
+    * Combining "::" syntax with the --rsh/-e option now uses the
       specified remote-shell as a transport to talk to a (newly-spawned)
       server-daemon.  This allows someone to use daemon features, such
       as modules, over a secure protocol, such as ssh.  (JD Paul)
