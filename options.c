@@ -1780,10 +1780,10 @@ char *check_for_hostspec(char *s, char **host_ptr, int *port_ptr)
 {
 	char *p;
 	int not_host;
+	int hostlen;
 
 	if (port_ptr && strncasecmp(URL_PREFIX, s, strlen(URL_PREFIX)) == 0) {
 		char *path;
-		int hostlen;
 		s += strlen(URL_PREFIX);
 		if ((p = strchr(s, '/')) != NULL) {
 			hostlen = p - s;
@@ -1811,6 +1811,8 @@ char *check_for_hostspec(char *s, char **host_ptr, int *port_ptr)
 	}
 
 	if (*s == '[' && (p = strchr(s, ']')) != NULL && p[1] == ':') {
+		s++;
+		hostlen = p - s;
 		*p = '\0';
 		not_host = strchr(s, '/') || !strchr(s, ':');
 		*p = ']';
@@ -1820,6 +1822,7 @@ char *check_for_hostspec(char *s, char **host_ptr, int *port_ptr)
 	} else {
 		if (!(p = strchr(s, ':')))
 			return NULL;
+		hostlen = p - s;
 		*p = '\0';
 		not_host = strchr(s, '/') != NULL;
 		*p = ':';
@@ -1827,8 +1830,8 @@ char *check_for_hostspec(char *s, char **host_ptr, int *port_ptr)
 			return NULL;
 	}
 
-	*host_ptr = new_array(char, p - s + 1);
-	strlcpy(*host_ptr, s, p - s + 1);
+	*host_ptr = new_array(char, hostlen + 1);
+	strlcpy(*host_ptr, s, hostlen + 1);
 
 	if (p[1] == ':') {
 		if (port_ptr && !*port_ptr)
