@@ -50,17 +50,19 @@ die "$0 -ro: sending to read-only server not allowed\n" if $ro && !$am_sender;
 # To disable a short-named option, add its letter to this string:
 our $short_disabled = '';
 
-our $short_no_arg = 'CDHIKLORSWbcdglnoprtuvxz'; # DO NOT REMOVE ANY
+our $short_no_arg = 'CDEHIKLORSWbcdgklmnoprtuvxz'; # DO NOT REMOVE ANY
 our $short_with_num = 'B'; # DO NOT REMOVE ANY
 
 # To disable a long-named option, change its value to a -1.  The values mean:
 # 0 = the option has no arg; 1 = the arg doesn't need any checking; 2 = only
 # check the arg when receiving; and 3 = always check the arg.
 our %long_opt = (
+  'append' => 0,
   'backup-dir' => 2,
   'bwlimit' => 1,
   'checksum-seed' => 1,
   'compare-dest' => 2,
+  'compress-level' => 1,
   'copy-dest' => 2,
   'copy-unsafe-links' => 0,
   'daemon' => 0,
@@ -83,19 +85,25 @@ our %long_opt = (
   'log-format' => 1,
   'max-delete' => 1,
   'max-size' => 1,
+  'min-size' => 1,
   'modify-window' => 1,
   'no-implied-dirs' => 0,
+  'no-r' => 0,
   'no-relative' => 0,
+  'no-specials' => 0,
   'numeric-ids' => 0,
   'only-write-batch' => 1,
   'partial' => 0,
   'partial-dir' => 2,
   'remove-sent-files' => $ro ? -1 : 0,
+  'remove-source-files' => $ro ? -1 : 0,
   'safe-links' => 0,
   'sender' => 0,
   'server' => 0,
   'size-only' => 0,
+  'specials' => 0,
   'suffix' => 1,
+  'super' => 0,
   'temp-dir' => 2,
   'timeout' => 1,
 );
