@@ -2536,6 +2536,16 @@ manpagesection(VERSION)
 
 This man page is current for version 2.6.8 of rsync.
 
+manpagesection(INTERNAL OPTIONS)
+
+The options bf(--server) and bf(--sender) are used internally by rsync,
+and should never be typed by a user under normal circumstances.  Some
+awareness of these options may be needed in certain scenarios, such as
+when setting up a login that can only run an rsync command.  For instance,
+the support directory of the rsync distribution has an example script
+named rrsync (for restricted rsync) that can be used with a restricted
+ssh login.
+
 manpagesection(CREDITS)
 
 rsync is distributed under the GNU public license.  See the file
