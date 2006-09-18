@@ -55,7 +55,7 @@ EOT
 
 foreach my $opt (sort keys %long_opt) {
     my $val = $long_opt{$opt};
-    $val = 1 if $opt =~ /^max-/;
+    $val = 1 if $opt =~ /^(max-|min-)/;
     $val = 3 if $opt eq 'files-from';
     $val = '$ro ? -1 : ' . $val if $opt =~ /^remove-/;
     print "  '$opt' => $val,\n";
