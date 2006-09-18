@@ -87,6 +87,15 @@ Changes since 2.6.8:
       tweaking of "unsafe" symlinks, but it can now be consistently applied
       regardless of how "use chroot" is set.
 
+    - Added the --remove-source-files option as a replacement for the (now
+      deprecated) --remove-sent-files option.  This new option removes all
+      non-dirs from the source directories, even if the file was already
+      up-to-date.  This fixes a problem where interrupting an rsync that
+      was using --remove-sent-files and restarting it could leave behind
+      a file that the earlier rsync synchronized, but didn't get to remove.
+      (The deprecated --remove-sent-files is still understood for now, and
+      still behaves in the same way as before.)
+
     - Added a new environment variable to the pre-/post-xfer exec commands (in
       the daemon's config file):  RSYNC_PID.  This value will be the same in
       both the pre- and post-xfer commands, so it can be used if the pre-xfer
