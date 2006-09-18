@@ -1811,7 +1811,6 @@ char *check_for_hostspec(char *s, char **host_ptr, int *port_ptr)
 	}
 
 	if (*s == '[' && (p = strchr(s, ']')) != NULL && p[1] == ':') {
-		s++;
 		*p = '\0';
 		not_host = strchr(s, '/') || !strchr(s, ':');
 		*p = ']';
