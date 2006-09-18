@@ -68,6 +68,11 @@ Changes since 2.6.8:
     - Fixed a recent bug where an --exclude='*' could affect the root (/) of
       the filesystem with --relative enabled.
 
+    - When --inplace creates a file, it is now created with owner read/write
+      permissions (0600) instead of no permissions at all.  This avoids a
+      problem continuing a transfer that was interrupted (since --inplace
+      will not update a file that has no write permissions).
+
   ENHANCEMENTS:
 
     - Added the --log-file=FILE and --log-file-format=FORMAT options.  These
