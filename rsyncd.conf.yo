@@ -512,9 +512,11 @@ quote(itemize(
   it() bf(RSYNC_ARG#): (pre-xfer only) The pre-request arguments are set
   in these numbered values. RSYNC_ARG0 is always "rsyncd", and the last
   value contains a single period.
-  it() bf(RSYNC_EXIT_STATUS): (post-xfer only) rsync's exit value.  This will be 0 for a
-  successful run, a positive value for an error that rsync returned
-  (e.g. 23=partial xfer), or a -1 if rsync failed to exit properly.
+  it() bf(RSYNC_EXIT_STATUS): (post-xfer only) the server side's exit value.
+  This will be 0 for a successful run, a positive value for an error that the
+  server generated, or a -1 if rsync failed to exit properly.  Note that an
+  error that occurs on the client side does not currently get sent to the
+  server side, so this is not the final exit status for the whole transfer.
   it() bf(RSYNC_RAW_STATUS): (post-xfer only) the raw exit value from code(waitpid()).
 ))
 
