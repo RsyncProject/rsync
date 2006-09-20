@@ -134,8 +134,13 @@ void successful_send(int ndx)
 	} else
 		offset = 0;
 	f_name(file, fname + offset);
-	if (remove_source_files && do_unlink(fname) == 0 && verbose > 1)
-		rprintf(FINFO, "sender removed %s\n", fname + offset);
+	if (remove_source_files) {
+		if (do_unlink(fname) == 0) {
+			if (verbose > 1)
+				rprintf(FINFO, "sender removed %s\n", fname + offset);
+		} else
+			rsyserr(FERROR, errno, "sender failed to remove %s", fname + offset);
+	}
 }
 
 static void write_ndx_and_attrs(int f_out, int ndx, int iflags,
