@@ -100,25 +100,29 @@ void free_sums(struct sum_struct *s)
 
 /* This is only called when we aren't preserving permissions.  Figure out what
  * the permissions should be and return them merged back into the mode. */
-mode_t dest_mode(mode_t flist_mode, mode_t cur_mode, int exists)
+mode_t dest_mode(mode_t flist_mode, mode_t stat_mode, int exists)
 {
+	int new_mode;
 	/* If the file already exists, we'll return the local permissions,
 	 * possibly tweaked by the --executability option. */
 	if (exists) {
+		new_mode = (flist_mode & ~CHMOD_BITS) | (stat_mode & CHMOD_BITS);
 		if (preserve_executability && S_ISREG(flist_mode)) {
 			/* If the source file is executable, grant execute
 			 * rights to everyone who can read, but ONLY if the
 			 * file isn't already executable. */
 			if (!(flist_mode & 0111))
-				cur_mode &= ~0111;
-			else if (!(cur_mode & 0111))
-				cur_mode |= (cur_mode & 0444) >> 2;
+				new_mode &= ~0111;
+			else if (!(stat_mode & 0111))
+				new_mode |= (new_mode & 0444) >> 2;
 		}
-	} else
-		cur_mode = flist_mode & ACCESSPERMS & ~orig_umask;
+	} else {
+		/* Apply the umask and turn off special permissions. */
+		new_mode = flist_mode & (~CHMOD_BITS | (ACCESSPERMS & ~orig_umask));
+	}
 	if (daemon_chmod_modes && !S_ISLNK(flist_mode))
-		cur_mode = tweak_mode(cur_mode, daemon_chmod_modes);
-	return (flist_mode & ~CHMOD_BITS) | (cur_mode & CHMOD_BITS);
+		new_mode = tweak_mode(new_mode, daemon_chmod_modes);
+	return new_mode;
 }
 
 int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
