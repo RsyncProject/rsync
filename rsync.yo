@@ -1659,24 +1659,34 @@ showing the progress of the transfer. This gives a bored user
 something to watch.
 Implies bf(--verbose) if it wasn't already specified.
 
-When the file is transferring, the data looks like this:
+While rsync is transferring a regular file, it updates a progress line that
+looks like this:
 
 verb(      782448  63%  110.64kB/s    0:00:04)
 
-This tells you the current file size, the percentage of the transfer that
-is complete, the current calculated file-completion rate (including both
-data over the wire and data being matched locally), and the estimated time
-remaining in this transfer.
+In this example, the receiver has reconstructed 782448 bytes or 63% of the
+sender's file, which is being reconstructed at a rate of 110.64 kilobytes
+per second, and the transfer will finish in 4 seconds if the current rate
+is maintained until the end.
 
-After a file is complete, the data looks like this:
+These statistics can be misleading if the incremental transfer algorithm is
+in use.  For example, if the sender's file consists of the basis file
+followed by additional data, the reported rate will probably drop
+dramatically when the receiver gets to the literal data, and the transfer
+will probably take much longer to finish than the receiver estimated as it
+was finishing the matched part of the file.
 
-verb(     1238099 100%  146.38kB/s    0:00:08  (5, 57.1% of 396))
+When the file transfer finishes, rsync replaces the progress line with a
+summary line that looks like this:
 
-This tells you the final file size, that it's 100% complete, the final
-transfer rate for the file, the amount of elapsed time it took to transfer
-the file, and the addition of a total-transfer summary in parentheses.
-These additional numbers tell you how many files have been updated, and
-what percent of the total number of files has been scanned.
+verb(     1238099 100%  146.38kB/s    0:00:08  (xfer#5, to-check=169/396))
+
+In this example, the file was 1238099 bytes long in total, the average rate
+of transfer for the whole file was 146.38 kilobytes per second over the 8
+seconds that it took to complete, it was the 5th transfer of a regular file
+during the current rsync session, and there are 169 more files for the
+receiver to check (to see if they are up-to-date or not) remaining out of
+the 396 total files in the file-list.
 
 dit(bf(-P)) The bf(-P) option is equivalent to bf(--partial) bf(--progress).  Its
 purpose is to make it much easier to specify these two options for a long
