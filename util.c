@@ -111,13 +111,13 @@ void print_child_argv(char **cmd)
 
 void out_of_memory(char *str)
 {
-	rprintf(FERROR, "ERROR: out of memory in %s\n", str);
+	rprintf(FERROR, "ERROR: out of memory in %s [%s]\n", str, who_am_i());
 	exit_cleanup(RERR_MALLOC);
 }
 
 void overflow_exit(char *str)
 {
-	rprintf(FERROR, "ERROR: buffer overflow in %s\n", str);
+	rprintf(FERROR, "ERROR: buffer overflow in %s [%s]\n", str, who_am_i());
 	exit_cleanup(RERR_MALLOC);
 }
 
