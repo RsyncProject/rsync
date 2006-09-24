@@ -76,6 +76,9 @@ Changes since 2.6.8:
     - If either --remove-source-files or --remove-sent-files is enabled and we
       are unable to remove the source file, rsync now outputs an error.
 
+    - Fixed a bug in the daemon's "incoming chmod" rule: newly-created
+      directories no longer get the 'F' (file) rules applied to them.
+
   ENHANCEMENTS:
 
     - Added the --log-file=FILE and --log-file-format=FORMAT options.  These
