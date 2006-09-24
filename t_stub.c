@@ -78,3 +78,8 @@ struct filter_list_struct server_filter_list;
 {
 	return NULL;
 }
+
+ const char *who_am_i(void)
+{
+	return "tester";
+}
