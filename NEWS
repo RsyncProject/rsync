@@ -41,9 +41,6 @@ Changes since 2.6.8:
     - If the receiving side fails to create a directory, it will now skip
       trying to update everything that is inside that directory.
 
-    - Make sure that the --link-dest option can still do its job even when -I
-      is specified.
-
     - If --link-dest is specified with --checksum but without --times, rsync
       will now allow a hard-link to be created to a matching link-dest file
       even when the file's modify-time doesn't match the server's file.
