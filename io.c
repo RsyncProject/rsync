@@ -633,13 +633,19 @@ int read_filesfrom_line(int fd, char *fname)
 		if (cnt < 0 && (errno == EWOULDBLOCK
 		  || errno == EINTR || errno == EAGAIN)) {
 			struct timeval tv;
-			fd_set fds;
-			FD_ZERO(&fds);
-			FD_SET(fd, &fds);
+			fd_set r_fds, e_fds;
+			FD_ZERO(&r_fds);
+			FD_SET(fd, &r_fds);
+			FD_ZERO(&e_fds);
+			FD_SET(fd, &e_fds);
 			tv.tv_sec = select_timeout;
 			tv.tv_usec = 0;
-			if (!select(fd+1, &fds, NULL, NULL, &tv))
+			if (!select(fd+1, &r_fds, NULL, &e_fds, &tv))
 				check_timeout();
+			if (FD_ISSET(fd, &e_fds)) {
+				rsyserr(FINFO, errno,
+					"select exception on fd %d", fd);
+			}
 			continue;
 		}
 		if (cnt != 1)
@@ -1036,7 +1042,7 @@ static void sleep_for_bwlimit(int bytes_written)
 static void writefd_unbuffered(int fd,char *buf,size_t len)
 {
 	size_t n, total = 0;
-	fd_set w_fds, r_fds;
+	fd_set w_fds, r_fds, e_fds;
 	int maxfd, count, cnt, using_r_fds;
 	int defer_save = defer_forwarding_messages;
 	struct timeval tv;
@@ -1045,12 +1051,14 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 
 	while (total < len) {
 		FD_ZERO(&w_fds);
-		FD_SET(fd,&w_fds);
+		FD_SET(fd, &w_fds);
+		FD_ZERO(&e_fds);
+		FD_SET(fd, &e_fds);
 		maxfd = fd;
 
 		if (msg_fd_in >= 0) {
 			FD_ZERO(&r_fds);
-			FD_SET(msg_fd_in,&r_fds);
+			FD_SET(msg_fd_in, &r_fds);
 			if (msg_fd_in > maxfd)
 				maxfd = msg_fd_in;
 			using_r_fds = 1;
@@ -1062,13 +1070,18 @@ static void writefd_unbuffered(int fd,char *buf,size_t len)
 
 		errno = 0;
 		count = select(maxfd + 1, using_r_fds ? &r_fds : NULL,
-			       &w_fds, NULL, &tv);
+			       &w_fds, &e_fds, &tv);
 
 		if (count <= 0) {
 			if (count < 0 && errno == EBADF)
 				exit_cleanup(RERR_SOCKETIO);
 			check_timeout();
 			continue;
+		}
+
+		if (FD_ISSET(fd, &e_fds)) {
+			rsyserr(FINFO, errno,
+				"select exception on fd %d", fd);
 		}
 
 		if (using_r_fds && FD_ISSET(msg_fd_in, &r_fds))
