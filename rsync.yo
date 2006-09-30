@@ -461,7 +461,8 @@ cron.
 
 dit(bf(-I, --ignore-times)) Normally rsync will skip any files that are
 already the same size and have the same modification time-stamp.
-This option turns off this "quick check" behavior.
+This option turns off this "quick check" behavior, causing all files to
+be updated.
 
 dit(bf(--size-only)) Normally rsync will not transfer any files that are
 already the same size and have the same modification time-stamp. With the
@@ -1301,6 +1302,11 @@ If a match is found that differs only in attributes, a local copy is made
 and the attributes updated.
 If a match is not found, a basis file from one of the em(DIR)s will be
 selected to try to speed up the transfer.
+
+Note that if you combine this option with bf(--ignore-times), rsync will not
+link any files together because it only links identical files together as a
+substitute for transferring the file, never as an additional check after the
+file is updated.
 
 If em(DIR) is a relative path, it is relative to the destination directory.
 See also bf(--compare-dest) and bf(--copy-dest).
