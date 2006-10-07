@@ -138,9 +138,27 @@ if [ "x$loglevel" != x ] && [ "$loglevel" -gt 8 ]; then
     fi
 fi
 
+POSIXLY_CORRECT=1 
+if test x"$TOOLDIR" = x; then
+    TOOLDIR=`pwd`
+fi
+srcdir=`dirname $0`
+if test x"$srcdir" = x -o x"$srcdir" = x.; then
+    srcdir="$TOOLDIR"
+fi
+if test x"$rsync_bin" = x; then
+    rsync_bin="$TOOLDIR/rsync"
+fi
+
+# This allows the user to specify extra rsync options -- use carefully!
+RSYNC="$rsync_bin $*"
+#RSYNC="valgrind $rsync_bin $*"
+
+export POSIXLY_CORRECT TOOLDIR srcdir RSYNC
+
 echo "============================================================"
-echo "$0 running in `pwd`"
-echo "    rsync_bin=$rsync_bin"
+echo "$0 running in $TOOLDIR"
+echo "    rsync_bin=$RSYNC"
 echo "    srcdir=$srcdir"
 
 if [ -f /usr/bin/whoami ]; then
@@ -172,6 +190,8 @@ else
     setfacl_nodef=true
 fi
 
+export setfacl_nodef
+
 if [ ! -f "$rsync_bin" ]; then
     echo "rsync_bin $rsync_bin is not a file" >&2
     exit 2
@@ -182,11 +202,6 @@ if [ ! -d "$srcdir" ]; then
     exit 2
 fi
 
-RSYNC="$rsync_bin"
-#RSYNC="valgrind $rsync_bin"
-
-export rsync_bin RSYNC setfacl_nodef
-
 skipped=0
 missing=0
 passed=0
@@ -195,7 +210,7 @@ failed=0
 # Prefix for scratch directory.  We create separate directories for
 # each test case, so that they can be left behind in case of failure
 # to aid investigation.
-scratchbase="`pwd`"/testtmp
+scratchbase="$TOOLDIR"/testtmp
 echo "    scratchbase=$scratchbase"
 
 suitedir="$srcdir/testsuite"
