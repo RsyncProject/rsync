@@ -1,12 +1,12 @@
 #!/bin/sh
-# Use autoconf, autoheader, yodl, etc. to ready the generated files
-# in the release.  This is typically used after applying a diff from
-# "patches" directory in CVS.
+# Use autoconf, autoheader, yodl, etc. to ready the generated files in the
+# release.  This is typically used after applying a diff from the "patches"
+# directory in a CVS-checked-out version.
 #
-# NOTE:  if you use a diff from the "patches" directory in a release
-# tar, this is not needed (but doesn't hurt anything).
+# NOTE:  if you use a diff from the "patches" directory of a *release tar*
+# (as opposed to from CVS), this is not needed (but doesn't hurt anything).
 dir=`dirname $0`
-if test x"$dir" != x -o x"$dir" != x.; then
+if test x"$dir" != x -a x"$dir" != x.; then
     cd "$dir"
 fi
 make -f prepare-source.mak
