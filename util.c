@@ -922,7 +922,8 @@ void die_on_unsafe_path(char *path, int strip_filename)
 		if ((p = strchr(p, '/')) != NULL)
 			*p = '\0';
 		if (safe_stat(path, &st) < 0) {
-			*p++ = '/';
+			if (p)
+				*p = '/';
 			goto done;
 		}
 		if (S_ISLNK(st.st_mode)) {
