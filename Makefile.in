@@ -143,7 +143,7 @@ test: check
 # might lose in the future where POSIX diverges from old sh.
 
 check: all $(CHECK_PROGS)
-	POSIXLY_CORRECT=1 TOOLDIR=`pwd` rsync_bin=`pwd`/rsync$(EXEEXT) srcdir="$(srcdir)" $(srcdir)/runtests.sh
+	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh
 
 wildtest.o: wildtest.c lib/wildmatch.c rsync.h
 wildtest$(EXEEXT): wildtest.o lib/compat.o
