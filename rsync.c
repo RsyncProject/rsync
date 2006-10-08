@@ -120,8 +120,6 @@ mode_t dest_mode(mode_t flist_mode, mode_t stat_mode, int exists)
 		/* Apply the umask and turn off special permissions. */
 		new_mode = flist_mode & (~CHMOD_BITS | (ACCESSPERMS & ~orig_umask));
 	}
-	if (daemon_chmod_modes && !S_ISLNK(flist_mode))
-		new_mode = tweak_mode(new_mode, daemon_chmod_modes);
 	return new_mode;
 }
 
@@ -131,6 +129,7 @@ int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
 	int updated = 0;
 	STRUCT_STAT st2;
 	int change_uid, change_gid;
+	mode_t new_mode = file->mode;
 
 	if (!st) {
 		if (dry_run)
@@ -141,11 +140,11 @@ int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
 			return 0;
 		}
 		st = &st2;
-		if (!preserve_perms && S_ISDIR(file->mode)
+		if (!preserve_perms && S_ISDIR(new_mode)
 		 && st->st_mode & S_ISGID) {
 			/* We just created this directory and its setgid
 			 * bit is on, so make sure it stays on. */
-			file->mode |= S_ISGID;
+			new_mode |= S_ISGID;
 		}
 	}
 
@@ -206,9 +205,11 @@ int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
 		updated = 1;
 	}
 
+	if (daemon_chmod_modes && !S_ISLNK(new_mode))
+		new_mode = tweak_mode(new_mode, daemon_chmod_modes);
 #ifdef HAVE_CHMOD
-	if ((st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS)) {
-		int ret = do_chmod(fname, file->mode);
+	if ((st->st_mode & CHMOD_BITS) != (new_mode & CHMOD_BITS)) {
+		int ret = do_chmod(fname, new_mode);
 		if (ret < 0) {
 			rsyserr(FERROR, errno,
 				"failed to set permissions on %s",
