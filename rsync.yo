@@ -321,7 +321,7 @@ to the detailed description below for a complete description.  verb(
  -H, --hard-links            preserve hard links
  -p, --perms                 preserve permissions
  -E, --executability         preserve executability
-     --chmod=CHMOD           change destination permissions
+     --chmod=CHMOD           change the permissions of transferred files
  -o, --owner                 preserve owner (super-user only)
  -g, --group                 preserve group
      --devices               preserve device files (super-user only)

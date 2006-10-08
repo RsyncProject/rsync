@@ -303,7 +303,7 @@ void usage(enum logcode F)
   rprintf(F," -H, --hard-links            preserve hard links\n");
   rprintf(F," -p, --perms                 preserve permissions\n");
   rprintf(F," -E, --executability         preserve the file's executability\n");
-  rprintf(F,"     --chmod=CHMOD           change destination permissions\n");
+  rprintf(F,"     --chmod=CHMOD           change the permissions of transferred files\n");
   rprintf(F," -o, --owner                 preserve owner (super-user only)\n");
   rprintf(F," -g, --group                 preserve group\n");
   rprintf(F,"     --devices               preserve device files (super-user only)\n");
