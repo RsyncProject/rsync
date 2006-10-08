@@ -51,6 +51,7 @@ extern int recurse;
 extern int relative_paths;
 extern int sanitize_paths;
 extern int curr_dir_depth;
+extern int curr_dir_len;
 extern int module_id;
 extern int rsync_port;
 extern int whole_file;
@@ -67,6 +68,7 @@ extern char *basis_dir[];
 extern char *rsync_path;
 extern char *shell_cmd;
 extern char *batch_name;
+extern char curr_dir[MAXPATHLEN];
 extern struct filter_list_struct server_filter_list;
 
 int local_server = 0;
@@ -479,7 +481,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		if (S_ISDIR(st.st_mode)) {
 			if (sanitize_paths)
 				die_on_unsafe_path(dest_path, 0);
-			if (!push_dir(dest_path)) {
+			if (!push_dir(dest_path, 0)) {
 				rsyserr(FERROR, errno, "push_dir#1 %s failed",
 					full_fname(dest_path));
 				exit_cleanup(RERR_FILESELECT);
@@ -534,15 +536,13 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 			rprintf(FINFO, "created directory %s\n", dest_path);
 
 		if (dry_run) {
-			/* Indicate that the destination directory doesn't
-			 * really exist and return mode 1. */
+			/* Indicate that dest dir doesn't really exist. */
 			dry_run++;
-			return NULL;
 		}
 
 		if (sanitize_paths)
 			die_on_unsafe_path(dest_path, 0);
-		if (!push_dir(dest_path)) {
+		if (!push_dir(dest_path, dry_run > 1)) {
 			rsyserr(FERROR, errno, "push_dir#2 %s failed",
 				full_fname(dest_path));
 			exit_cleanup(RERR_FILESELECT);
@@ -564,7 +564,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	*cp = '\0';
 	if (sanitize_paths)
 		die_on_unsafe_path(dest_path, 0);
-	if (!push_dir(dest_path)) {
+	if (!push_dir(dest_path, 0)) {
 		rsyserr(FERROR, errno, "push_dir#3 %s failed",
 			full_fname(dest_path));
 		exit_cleanup(RERR_FILESELECT);
@@ -574,6 +574,25 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	return cp + 1;
 }
 
+/* Call this if the destination dir (which is assumed to be in curr_dir)
+ * does not yet exist and we can't create it due to being in dry-run
+ * mode.  We'll fix dirs that can be relative to the non-existent dir. */
+static void fix_basis_dirs(void)
+{
+	char **dir, *new;
+	int len;
+
+	for (dir = basis_dir; *dir; dir++) {
+		if (**dir == '/')
+			continue;
+		len = curr_dir_len + 1 + strlen(*dir) + 1;
+		if (!(new = new_array(char, len)))
+			out_of_memory("fix_basis_dirs");
+		pathjoin(new, len, curr_dir, *dir);
+		clean_fname(new, 1);
+		*dir = new;
+	}
+}
 
 /* This is only called by the sender. */
 static void read_final_goodbye(int f_in, int f_out)
@@ -625,7 +644,7 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 	if (!relative_paths) {
 		if (sanitize_paths)
 			die_on_unsafe_path(dir, 0);
-		if (!push_dir(dir)) {
+		if (!push_dir(dir, 0)) {
 			rsyserr(FERROR, errno, "push_dir#3 %s failed",
 				full_fname(dir));
 			exit_cleanup(RERR_FILESELECT);
@@ -782,7 +801,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		dir = argv[0];
 		argc--;
 		argv++;
-		if (!am_daemon && !push_dir(dir)) {
+		if (!am_daemon && !push_dir(dir, 0)) {
 			rsyserr(FERROR, errno, "push_dir#4 %s failed",
 				full_fname(dir));
 			exit_cleanup(RERR_FILESELECT);
@@ -828,6 +847,9 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 				die_on_unsafe_path(partial_dir, 0);
 		}
 	}
+	if (dry_run > 1)
+		fix_basis_dirs();
+
 	if (server_filter_list.head) {
 		char **dir;
 		struct filter_list_struct *elp = &server_filter_list;
@@ -974,6 +996,9 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 	if (flist && flist->count > 0) {
 		local_name = get_local_name(flist, argv[0]);
+
+		if (dry_run > 1)
+			fix_basis_dirs();
 
 		exit_code2 = do_recv(f_in, f_out, flist, local_name);
 	} else {
@@ -1311,7 +1336,7 @@ int main(int argc,char *argv[])
 	 * (implemented by forking "pwd" and reading its output) doesn't
 	 * work when there are other child processes.  Also, on all systems
 	 * that implement getcwd that way "pwd" can't be found after chroot. */
-	push_dir(NULL);
+	push_dir(NULL, 0);
 
 	init_flist();
 
