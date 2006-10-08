@@ -21,7 +21,7 @@ Changes since 2.6.8:
     - Fixed an overzealous sanitizing bug in the handling of the --link-dest,
       --copy-dest, and --compare-dest options to a daemon without chroot: if
       the copy's destination dir is deeper than the top of the module's path,
-      these options now accept a safe number of ../ (parent-dir) references
+      these options now accept a safe number of parent-dir (../) references
       (since these options are relative to the destination dir).  The old code
       incorrectly chopped off all "../" prefixes for these options, no matter
       how deep the destination directory was in the module's hierarchy.
@@ -33,6 +33,10 @@ Changes since 2.6.8:
       the receiver might bypass the log file and get sent only to the client
       process.  (These problems could only affect an rsync daemon that was
       receiving files.)
+
+    - Fixed a bug where using --dry-run with a --*-dest option with a path
+      relative to a directory that does not yet exist:  the affected option
+      gets its proper path value so that the output of the dry-run is right.
 
     - Fixed a bug in the %f logfile escape when receiving files: the
       destination path is now included in the output (e.g. you can now tell
@@ -73,7 +77,7 @@ Changes since 2.6.8:
     - If either --remove-source-files or --remove-sent-files is enabled and we
       are unable to remove the source file, rsync now outputs an error.
 
-    - Fixed a bug in the daemon's "incoming chmod" rule: newly-created
+    - Fixed a bug in the daemon's "incoming chmod" rule:  newly-created
       directories no longer get the 'F' (file) rules applied to them.
 
   ENHANCEMENTS:
