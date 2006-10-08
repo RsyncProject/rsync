@@ -1073,7 +1073,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	if (filesfrom_fd >= 0) {
 		if (sanitize_paths)
 			die_on_unsafe_path(argv[0], 0);
-		if (argv[0] && !push_dir(argv[0])) {
+		if (argv[0] && !push_dir(argv[0], 0)) {
 			rsyserr(FERROR, errno, "push_dir %s failed",
 				full_fname(argv[0]));
 			exit_cleanup(RERR_FILESELECT);
@@ -1211,7 +1211,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 			strlcpy(olddir, curr_dir, sizeof olddir);
 
-			if (!push_dir(dir)) {
+			if (!push_dir(dir, 0)) {
 				io_error |= IOERR_GENERAL;
 				rsyserr(FERROR, errno, "push_dir %s failed",
 					full_fname(dir));
