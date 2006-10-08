@@ -944,7 +944,7 @@ void die_on_unsafe_path(char *path, int strip_filename)
 /* Like chdir(), but it keeps track of the current directory (in the
  * global "curr_dir"), and ensures that the path size doesn't overflow.
  * Also cleans the path using the clean_fname() function. */
-int push_dir(char *dir)
+int push_dir(char *dir, int set_path_only)
 {
 	static int initialised;
 	unsigned int len;
@@ -965,7 +965,7 @@ int push_dir(char *dir)
 	if ((*dir == '/' ? len : curr_dir_len + 1 + len) >= sizeof curr_dir)
 		return 0;
 
-	if (chdir(dir))
+	if (!set_path_only && chdir(dir))
 		return 0;
 
 	if (*dir == '/') {
