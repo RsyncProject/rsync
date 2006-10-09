@@ -130,7 +130,7 @@ EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 7 failed"
 
 mv "$todir" "$lddir"
-$RSYNC -ivvplrtH --copy-dest="$lddir" "$fromdir/" "$todir/" \
+$RSYNC -ivvplrtH --copy-dest=../ld "$fromdir/" "$todir/" \
     | tee "$outfile"
 filter_outfile
 cat <<EOT >"$chkfile"
@@ -147,7 +147,7 @@ EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 8 failed"
 
 rm -rf "$todir"
-$RSYNC -iplrtH --copy-dest="$lddir" "$fromdir/" "$todir/" \
+$RSYNC -iplrtH --copy-dest=../ld "$fromdir/" "$todir/" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
 .d..t.... ./
@@ -194,7 +194,18 @@ EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 11 failed"
 
 rm -rf "$todir"
-$RSYNC -iplrtH --link-dest="$lddir" "$fromdir/" "$todir/" \
+$RSYNC -iplrtH --dry-run --link-dest=../ld "$fromdir/" "$todir/" \
+    | tee "$outfile"
+cat <<EOT >"$chkfile"
+cd+++++++ ./
+cd+++++++ bar/
+cd+++++++ bar/baz/
+cd+++++++ foo/
+EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 12 failed"
+
+rm -rf "$todir"
+$RSYNC -iplrtH --link-dest=../ld "$fromdir/" "$todir/" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
 .d..t.... ./
