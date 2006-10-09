@@ -498,8 +498,9 @@ struct idev {
 #define HL_SKIP		1
 
 struct hlink {
-	int next;
-	int hlindex;
+	int32 next;
+	int32 hlindex;
+	unsigned short link_dest_used;
 };
 
 #define F_DEV	link_u.idev->dev
