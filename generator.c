@@ -657,8 +657,11 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 					  itemizing && verbose > 1,
 					  code) < 0)
 				goto try_a_copy;
-			if (preserve_hard_links && file->link_u.links)
+			if (preserve_hard_links && file->link_u.links) {
+				if (dry_run)
+					file->link_u.links->link_dest_used = j + 1;
 				hard_link_cluster(file, ndx, itemizing, code);
+			}
 		} else
 #endif
 		if (itemizing)
