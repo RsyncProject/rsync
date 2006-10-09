@@ -55,14 +55,14 @@ static int hlink_compare(int *int1, int *int2)
 	return f_name_cmp(f1, f2);
 }
 
-static int *hlink_list;
-static int hlink_count;
+static int32 *hlink_list;
+static int32 hlink_count;
 
 /* Analyze the data in the hlink_list[], remove items that aren't multiply
  * linked, and replace the dev+inode data with the hlindex+next linked list. */
 static void link_idev_data(void)
 {
-	int cur, from, to, start;
+	int32 cur, from, to, start;
 
 	alloc_pool_t hlink_pool;
 	alloc_pool_t idev_pool = the_file_list->hlink_pool;
@@ -106,7 +106,7 @@ static void link_idev_data(void)
 		hlink_pool = NULL;
 	} else {
 		hlink_count = to;
-		hlink_list = realloc_array(hlink_list, int, hlink_count);
+		hlink_list = realloc_array(hlink_list, int32, hlink_count);
 		if (!hlink_list)
 			out_of_memory("init_hard_links");
 	}
@@ -123,7 +123,7 @@ void init_hard_links(void)
 	if (hlink_list)
 		free(hlink_list);
 
-	if (!(hlink_list = new_array(int, the_file_list->count)))
+	if (!(hlink_list = new_array(int32, the_file_list->count)))
 		out_of_memory("init_hard_links");
 
 	hlink_count = 0;
@@ -191,7 +191,13 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 		}
 		if (head_file->F_HLINDEX == FINISHED_LINK) {
 			STRUCT_STAT st2, st3;
-			char *toname = f_name(head_file, NULL);
+			char toname[MAXPATHLEN];
+			int ldu = head_file->link_u.links->link_dest_used;
+			if (ldu) {
+				pathjoin(toname, MAXPATHLEN, basis_dir[ldu-1],
+					 f_name(head_file, NULL));
+			} else
+				f_name(head_file, toname);
 			if (link_stat(toname, &st2, 0) < 0) {
 				rsyserr(FERROR, errno, "stat %s failed",
 					full_fname(toname));
