@@ -579,8 +579,13 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
  * mode.  We'll fix dirs that can be relative to the non-existent dir. */
 static void fix_basis_dirs(void)
 {
-	char **dir, *new;
+	char **dir, *new, *slash;
 	int len;
+
+	if (dry_run <= 1)
+		return;
+
+	slash = strrchr(curr_dir, '/');
 
 	for (dir = basis_dir; *dir; dir++) {
 		if (**dir == '/')
@@ -588,8 +593,16 @@ static void fix_basis_dirs(void)
 		len = curr_dir_len + 1 + strlen(*dir) + 1;
 		if (!(new = new_array(char, len)))
 			out_of_memory("fix_basis_dirs");
-		pathjoin(new, len, curr_dir, *dir);
-		clean_fname(new, 1);
+		if (slash && strncmp(*dir, "../", 3) == 0) {
+		    /* We want to remove only one leading "../" prefix for
+		     * the directory we couldn't create in dry-run mode:
+		     * this ensures that any other ".." references get
+		     * evaluated the same as they would for a live copy. */
+		    *slash = '\0';
+		    pathjoin(new, len, curr_dir, *dir + 3);
+		    *slash = '/';
+		} else
+		    pathjoin(new, len, curr_dir, *dir);
 		*dir = new;
 	}
 }
@@ -847,8 +860,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 				die_on_unsafe_path(partial_dir, 0);
 		}
 	}
-	if (dry_run > 1)
-		fix_basis_dirs();
+	fix_basis_dirs();
 
 	if (server_filter_list.head) {
 		char **dir;
@@ -997,8 +1009,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	if (flist && flist->count > 0) {
 		local_name = get_local_name(flist, argv[0]);
 
-		if (dry_run > 1)
-			fix_basis_dirs();
+		fix_basis_dirs();
 
 		exit_code2 = do_recv(f_in, f_out, flist, local_name);
 	} else {
