@@ -72,6 +72,7 @@ extern char curr_dir[MAXPATHLEN];
 extern struct filter_list_struct server_filter_list;
 
 int local_server = 0;
+int new_root_dir = 0;
 mode_t orig_umask = 0;
 struct file_list *the_file_list;
 
@@ -531,6 +532,8 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 				full_fname(dest_path));
 			exit_cleanup(RERR_FILEIO);
 		}
+
+		new_root_dir = 1;
 
 		if (verbose)
 			rprintf(FINFO, "created directory %s\n", dest_path);
