@@ -78,6 +78,7 @@ extern int copy_dest;
 extern int link_dest;
 extern int whole_file;
 extern int list_only;
+extern int new_root_dir;
 extern int read_batch;
 extern int safe_symlinks;
 extern long block_size; /* "long" because popt can't set an int32. */
@@ -913,8 +914,14 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			dry_run++;
 		}
 		if (itemizing && f_out != -1) {
-			itemize(file, ndx, statret, &st,
-				statret ? ITEM_LOCAL_CHANGE : 0, 0, NULL);
+			int sr = statret;
+			if (new_root_dir) {
+				if (*fname == '.' && fname[1] == '\0')
+					sr = -1;
+				new_root_dir = 0;
+			}
+			itemize(file, ndx, sr, &st,
+				sr ? ITEM_LOCAL_CHANGE : 0, 0, NULL);
 		}
 		if (statret != 0 && do_mkdir(fname,file->mode) < 0 && errno != EEXIST) {
 			if (!relative_paths || errno != ENOENT
