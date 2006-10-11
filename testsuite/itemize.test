@@ -214,7 +214,7 @@ cd+++++++ bar/
 cd+++++++ bar/baz/
 cd+++++++ foo/
 EOT
-diff $diffopt "$chkfile" "$outfile" || test_fail "test 12 failed"
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 13 failed"
 
 rm -rf "$todir"
 $RSYNC -vvplrtH --link-dest="$lddir" "$fromdir/" "$todir/" \
@@ -231,7 +231,7 @@ foo/config2 is uptodate
 "foo/extra" is a hard link
 foo/sym is uptodate
 EOT
-diff $diffopt "$chkfile" "$outfile" || test_fail "test 13 failed"
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 14 failed"
 
 rm -rf "$todir"
 $RSYNC -ivvplrtH --compare-dest="$lddir" "$fromdir/" "$todir/" \
@@ -249,7 +249,7 @@ cd+++++++ foo/
 .f        foo/config2
 .L        foo/sym -> ../bar/baz/rsync
 EOT
-diff $diffopt "$chkfile" "$outfile" || test_fail "test 14 failed"
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 15 failed"
 
 rm -rf "$todir"
 $RSYNC -iplrtH --compare-dest="$lddir" "$fromdir/" "$todir/" \
@@ -260,7 +260,7 @@ cd+++++++ bar/
 cd+++++++ bar/baz/
 cd+++++++ foo/
 EOT
-diff $diffopt "$chkfile" "$outfile" || test_fail "test 15 failed"
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 16 failed"
 
 rm -rf "$todir"
 $RSYNC -vvplrtH --compare-dest="$lddir" "$fromdir/" "$todir/" \
@@ -277,7 +277,7 @@ foo/config2 is uptodate
 "foo/extra" is a hard link
 foo/sym is uptodate
 EOT
-diff $diffopt "$chkfile" "$outfile" || test_fail "test 16 failed"
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 17 failed"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
