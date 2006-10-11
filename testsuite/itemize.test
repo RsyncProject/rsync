@@ -29,6 +29,7 @@ ln "$fromdir/foo/config1" "$fromdir/foo/extra"
 $RSYNC -iplr "$fromdir/" "$todir/" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
+cd+++++++ ./
 cd+++++++ bar/
 cd+++++++ bar/baz/
 >f+++++++ bar/baz/rsync
@@ -134,7 +135,7 @@ $RSYNC -ivvplrtH --copy-dest=../ld "$fromdir/" "$todir/" \
     | tee "$outfile"
 filter_outfile
 cat <<EOT >"$chkfile"
-.d..t.... ./
+cd+++++++ ./
 cd+++++++ bar/
 cd+++++++ bar/baz/
 cf        bar/baz/rsync
@@ -150,7 +151,7 @@ rm -rf "$todir"
 $RSYNC -iplrtH --copy-dest=../ld "$fromdir/" "$todir/" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
-.d..t.... ./
+cd+++++++ ./
 cd+++++++ bar/
 cd+++++++ bar/baz/
 cd+++++++ foo/
@@ -181,7 +182,7 @@ $RSYNC -ivvplrtH --link-dest="$lddir" "$fromdir/" "$todir/" \
     | tee "$outfile"
 filter_outfile
 cat <<EOT >"$chkfile"
-.d..t.... ./
+cd+++++++ ./
 cd+++++++ bar/
 cd+++++++ bar/baz/
 hf        bar/baz/rsync
@@ -208,7 +209,7 @@ rm -rf "$todir"
 $RSYNC -iplrtH --link-dest=../ld "$fromdir/" "$todir/" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
-.d..t.... ./
+cd+++++++ ./
 cd+++++++ bar/
 cd+++++++ bar/baz/
 cd+++++++ foo/
@@ -239,7 +240,7 @@ filter_outfile
 # TODO fix really-old problem when combining -H with --compare-dest:
 # missing output for foo/extra hard-link (and it might not be updated)!
 cat <<EOT >"$chkfile"
-.d..t.... ./
+cd+++++++ ./
 cd+++++++ bar/
 cd+++++++ bar/baz/
 .f        bar/baz/rsync
@@ -254,7 +255,7 @@ rm -rf "$todir"
 $RSYNC -iplrtH --compare-dest="$lddir" "$fromdir/" "$todir/" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
-.d..t.... ./
+cd+++++++ ./
 cd+++++++ bar/
 cd+++++++ bar/baz/
 cd+++++++ foo/
