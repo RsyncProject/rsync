@@ -477,11 +477,9 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		return NULL;
 
 	/* See what currently exists at the destination. */
-	if ((statret = safe_stat(dest_path, &st)) == 0) {
+	if ((statret = do_stat(dest_path, &st)) == 0) {
 		/* If the destination is a dir, enter it and use mode 1. */
 		if (S_ISDIR(st.st_mode)) {
-			if (sanitize_paths)
-				die_on_unsafe_path(dest_path, 0);
 			if (!push_dir(dest_path, 0)) {
 				rsyserr(FERROR, errno, "push_dir#1 %s failed",
 					full_fname(dest_path));
@@ -489,8 +487,6 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 			}
 			return NULL;
 		}
-		if (sanitize_paths && S_ISLNK(st.st_mode))
-			die_on_unsafe_path(dest_path, 0);
 		if (flist->count > 1) {
 			rprintf(FERROR,
 				"ERROR: destination must be a directory when"
@@ -543,8 +539,6 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 			dry_run++;
 		}
 
-		if (sanitize_paths)
-			die_on_unsafe_path(dest_path, 0);
 		if (!push_dir(dest_path, dry_run > 1)) {
 			rsyserr(FERROR, errno, "push_dir#2 %s failed",
 				full_fname(dest_path));
@@ -565,8 +559,6 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		dest_path = "/";
 
 	*cp = '\0';
-	if (sanitize_paths)
-		die_on_unsafe_path(dest_path, 0);
 	if (!push_dir(dest_path, 0)) {
 		rsyserr(FERROR, errno, "push_dir#3 %s failed",
 			full_fname(dest_path));
@@ -658,8 +650,6 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 	}
 
 	if (!relative_paths) {
-		if (sanitize_paths)
-			die_on_unsafe_path(dir, 0);
 		if (!push_dir(dir, 0)) {
 			rsyserr(FERROR, errno, "push_dir#3 %s failed",
 				full_fname(dir));
@@ -854,13 +844,9 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		char **dir;
 		for (dir = basis_dir; *dir; dir++) {
 			*dir = sanitize_path(NULL, *dir, NULL, curr_dir_depth, NULL);
-			die_on_unsafe_path(*dir, 0);
 		}
 		if (partial_dir) {
 			partial_dir = sanitize_path(NULL, partial_dir, NULL, curr_dir_depth, NULL);
-			/* A relative path gets this checked at every dir change. */
-			if (*partial_dir == '/')
-				die_on_unsafe_path(partial_dir, 0);
 		}
 	}
 	fix_basis_dirs();

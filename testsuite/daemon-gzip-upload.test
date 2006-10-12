@@ -22,14 +22,10 @@ export RSYNC_CONNECT_PROG
 
 hands_setup
 
-umask 0
-ln -s ../to/nolf "$fromdir/to-nolf-symlink"
-umask 022
-
 # Build chkdir with a normal rsync and an --exclude.
 $RSYNC -av --exclude=foobar.baz "$fromdir/" "$chkdir/"
 
-checkit "$RSYNC -avvvvz \"$fromdir/\" localhost::test-scratch/to/" "$chkdir" "$todir"
+checkit "$RSYNC -avvvvz \"$fromdir/\" localhost::test-to/" "$chkdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0

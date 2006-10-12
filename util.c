@@ -861,86 +861,6 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth,
 	return dest;
 }
 
-/* If sanitize_paths is not set, this works exactly the same as do_stat().
- * Otherwise, we verify that no symlink takes us outside the module path.
- * If we encounter an escape attempt, we return a symlink's stat info! */
-int safe_stat(const char *fname, STRUCT_STAT *stp)
-{
-#ifdef SUPPORT_LINKS
-	char tmpbuf[MAXPATHLEN], linkbuf[MAXPATHLEN], *mod_path;
-	int i, llen, mod_path_len;
-
-	if (!sanitize_paths)
-		return do_stat(fname, stp);
-
-	mod_path = lp_path(module_id);
-	mod_path_len = strlen(mod_path);
-
-	for (i = 0; i < 16; i++) {
-#ifdef DEBUG
-		if (*fname == '/')
-			assert(strncmp(fname, mod_path, mod_path_len) == 0 && fname[mod_path_len] == '/');
-#endif
-		if (do_lstat(fname, stp) < 0)
-			return -1;
-		if (!S_ISLNK(stp->st_mode))
-			return 0;
-		if ((llen = readlink(fname, linkbuf, sizeof linkbuf - 1)) < 0)
-			return -1;
-		linkbuf[llen] = '\0';
-		if (*fname == '/')
-			fname += mod_path_len;
-		if (!(fname = sanitize_path(tmpbuf, fname, mod_path, curr_dir_depth, linkbuf)))
-			break;
-	}
-
-	return 0; /* Leave *stp set to the last symlink. */
-#else
-	return do_stat(fname, stp);
-#endif
-}
-
-void die_on_unsafe_path(char *path, int strip_filename)
-{
-#ifdef SUPPORT_LINKS
-	char *final_slash, *p;
-	STRUCT_STAT st;
-
-	if (!path)
-		return;
-	if (strip_filename) {
-		if (!(final_slash = strrchr(path, '/')))
-			return;
-		*final_slash = '\0';
-	} else
-		final_slash = NULL;
-
-	p = path;
-	if (*p == '/')
-		p += module_dirlen + 1;
-	while (*p) {
-		if ((p = strchr(p, '/')) != NULL)
-			*p = '\0';
-		if (safe_stat(path, &st) < 0) {
-			if (p)
-				*p = '/';
-			goto done;
-		}
-		if (S_ISLNK(st.st_mode)) {
-			rprintf(FERROR, "Unsafe path: %s\n", path);
-			exit_cleanup(RERR_SYNTAX);
-		}
-		if (!p)
-			break;
-		*p++ = '/';
-	}
-
-  done:
-	if (final_slash)
-		*final_slash = '/';
-#endif
-}
-
 /* Like chdir(), but it keeps track of the current directory (in the
  * global "curr_dir"), and ensures that the path size doesn't overflow.
  * Also cleans the path using the clean_fname() function. */
@@ -1091,8 +1011,6 @@ int handle_partial_dir(const char *fname, int create)
 	if (create) {
 		STRUCT_STAT st;
 		int statret = do_lstat(dir, &st);
-		if (sanitize_paths && *partial_dir != '/')
-			die_on_unsafe_path(dir, 1); /* lstat handles last element */
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			if (do_unlink(dir) < 0)
 				return 0;

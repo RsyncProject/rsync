@@ -172,7 +172,7 @@ static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
 				rprintf(FINFO,"copying unsafe symlink \"%s\" -> \"%s\"\n",
 					path, linkbuf);
 			}
-			return safe_stat(path, stp);
+			return do_stat(path, stp);
 		}
 	}
 	return 0;
@@ -185,12 +185,12 @@ int link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
 {
 #ifdef SUPPORT_LINKS
 	if (copy_links)
-		return safe_stat(path, stp);
+		return do_stat(path, stp);
 	if (do_lstat(path, stp) < 0)
 		return -1;
 	if (follow_dirlinks && S_ISLNK(stp->st_mode)) {
 		STRUCT_STAT st;
-		if (safe_stat(path, &st) == 0 && S_ISDIR(st.st_mode))
+		if (do_stat(path, &st) == 0 && S_ISDIR(st.st_mode))
 			*stp = st;
 	}
 	return 0;
@@ -655,7 +655,7 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 	if (linkname_len) {
 		file->u.link = bp;
 		read_sbuf(f, bp, linkname_len - 1);
-		if (lp_munge_symlinks(module_id))
+		if (sanitize_paths)
 			sanitize_path(bp, bp, "", lastdir_depth, NULL);
 		bp += linkname_len;
 	}
@@ -922,7 +922,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 		int save_mode = file->mode;
 		file->mode = S_IFDIR; /* Find a directory with our name. */
 		if (flist_find(the_file_list, file) >= 0
-		    && safe_stat(thisname, &st2) == 0 && S_ISDIR(st2.st_mode)) {
+		    && do_stat(thisname, &st2) == 0 && S_ISDIR(st2.st_mode)) {
 			file->modtime = st2.st_mtime;
 			file->length = st2.st_size;
 			file->mode = st2.st_mode;
@@ -1071,8 +1071,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 	io_start_buffering_out();
 	if (filesfrom_fd >= 0) {
-		if (sanitize_paths)
-			die_on_unsafe_path(argv[0], 0);
 		if (argv[0] && !push_dir(argv[0], 0)) {
 			rsyserr(FERROR, errno, "push_dir %s failed",
 				full_fname(argv[0]));
@@ -1126,8 +1124,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				   && (len == 1 || fbuf[len-2] == '/');
 		}
 
-		if (sanitize_paths)
-			die_on_unsafe_path(fbuf, 1);
 		if (link_stat(fbuf, &st, copy_dirlinks) != 0) {
 			io_error |= IOERR_GENERAL;
 			rsyserr(FERROR, errno, "link_stat %s failed",

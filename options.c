@@ -902,10 +902,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		case OPT_EXCLUDE_FROM:
 		case OPT_INCLUDE_FROM:
 			arg = poptGetOptArg(pc);
-			if (sanitize_paths) {
+			if (sanitize_paths)
 				arg = sanitize_path(NULL, arg, NULL, 0, NULL);
-				die_on_unsafe_path((char*)arg, 0);
-			}
 			if (server_filter_list.head) {
 				char *cp = strdup(arg);
 				if (!cp)
@@ -1223,14 +1221,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		int i;
 		for (i = *argc; i-- > 0; )
 			(*argv)[i] = sanitize_path(NULL, (*argv)[i], "", 0, NULL);
-		if (tmpdir) {
+		if (tmpdir)
 			tmpdir = sanitize_path(NULL, tmpdir, NULL, 0, NULL);
-			die_on_unsafe_path(tmpdir, 0);
-		}
-		if (backup_dir) {
+		if (backup_dir)
 			backup_dir = sanitize_path(NULL, backup_dir, NULL, 0, NULL);
-			die_on_unsafe_path(backup_dir, 0);
-		}
 	}
 	if (server_filter_list.head && !am_sender) {
 		struct filter_list_struct *elp = &server_filter_list;
