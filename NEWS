@@ -7,17 +7,6 @@ Changes since 2.6.8:
     - If rsync is interrupted via a handled signal (such as SIGINT), it will
       once again clean-up its temp file from the destination dir.
 
-    - An rsync daemon that is receiving files with "use chroot = no" no longer
-      sanitizes the symlink target strings (by default).  This means that each
-      symlink's value will now be accepted (and thus returned) with its symlink
-      info intact.  Also, in order to keep things safe, all arg paths and any
-      dereferenced symlinks (e.g. via --copy-links or --keep-dirlinks) are
-      manually verified to ensure that no symlinks try to escape past the top
-      of the module's path.  These changes make a non-chroot daemon behave the
-      same way as a chroot daemon with regard to symlinks, and also avoids a
-      potential problem where a pre-existing symlink could have escaped the
-      module's hierarchy.  See also the new "munge symlinks" daemon setting.
-
     - Fixed an overzealous sanitizing bug in the handling of the --link-dest,
       --copy-dest, and --compare-dest options to a daemon without chroot: if
       the copy's destination dir is deeper than the top of the module's path,
@@ -94,10 +83,6 @@ Changes since 2.6.8:
 
     - Made "log file" and "syslog facility" settable on a per-module basis in
       the daemon's config file.
-
-    - Added the "munge symlinks" daemon setting to enable the old-style
-      tweaking of "unsafe" symlinks, but it can now be consistently applied
-      regardless of how "use chroot" is set.
 
     - Added the --remove-source-files option as a replacement for the (now
       deprecated) --remove-sent-files option.  This new option removes all
