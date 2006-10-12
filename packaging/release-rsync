@@ -155,7 +155,7 @@ foreach my $fn (@tweak_files) {
     undef $/; $_ = <IN>; $/ = "\n";
     close IN;
     if ($fn =~ /configure/) {
-	s/^RSYNC_VERSION.*/RSYNC_VERSION=$version/m;
+	s/^RSYNC_VERSION=.*/RSYNC_VERSION=$version/m;
     } elsif ($fn =~ /\.spec/) {
 	s/^(Version:) .*/$1 $version/m;
 	s/^(Release:) .*/$1 $release/m;
