@@ -303,24 +303,23 @@ static char *parse_merge_name(const char *merge_file, unsigned int *len_ptr,
 				merge_file);
 			return NULL;
 		}
+		fn_len = strlen(fn);
 	} else {
 		strlcpy(fn, merge_file, len_ptr ? *len_ptr + 1 : MAXPATHLEN);
-		clean_fname(fn, 1);
+		fn_len = clean_fname(fn, 1);
 	}
 
-	fn_len = strlen(fn);
-	if (fn == buf)
-		goto done;
-
-	if (dirbuf_len + fn_len >= MAXPATHLEN) {
-		rprintf(FERROR, "merge-file name overflows: %s\n", fn);
-		return NULL;
+	/* If the name isn't in buf yet, it's wasn't absolute. */
+	if (fn != buf) {
+		if (dirbuf_len + fn_len >= MAXPATHLEN) {
+			rprintf(FERROR, "merge-file name overflows: %s\n", fn);
+			return NULL;
+		}
+		memcpy(buf, dirbuf + prefix_skip, dirbuf_len - prefix_skip);
+		memcpy(buf + dirbuf_len - prefix_skip, fn, fn_len + 1);
+		fn_len = clean_fname(buf, 1);
 	}
-	memcpy(buf, dirbuf + prefix_skip, dirbuf_len - prefix_skip);
-	memcpy(buf + dirbuf_len - prefix_skip, fn, fn_len + 1);
-	fn_len = clean_fname(buf, 1);
 
-    done:
 	if (len_ptr)
 		*len_ptr = fn_len;
 	return buf;
