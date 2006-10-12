@@ -515,18 +515,16 @@ static void log_formatted(enum logcode code, char *format, char *op,
 					strlcpy(n, buf2, MAXPATHLEN);
 				else
 					n = buf2;
-			} else {
-				if (*n != '/') {
-					pathjoin(buf2, sizeof buf2,
-						 curr_dir + module_dirlen, n);
-					clean_fname(buf2, 0);
-					if (fmt[1])
-						strlcpy(n, buf2, MAXPATHLEN);
-					else
-						n = buf2;
-				} else
-					clean_fname(n, 0);
-			}
+			} else if (*n != '/') {
+				pathjoin(buf2, sizeof buf2,
+					 curr_dir + module_dirlen, n);
+				clean_fname(buf2, 0);
+				if (fmt[1])
+					strlcpy(n, buf2, MAXPATHLEN);
+				else
+					n = buf2;
+			} else
+				clean_fname(n, 0);
 			if (*n == '/')
 				n++;
 			break;
