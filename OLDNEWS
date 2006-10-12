@@ -2082,6 +2082,7 @@ Changes since 2.4.6:
 
 Partial Protocol History
 	RELEASE DATE	VER.	DATE OF COMMIT*	PROTOCOL
+	?? Oct 2006	2.6.9			29
 	22 Apr 2006	2.6.8			29
 	11 Mar 2006	2.6.7			29
 	28 Jul 2005	2.6.6			29
