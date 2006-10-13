@@ -81,7 +81,7 @@ inet_ntop4(const unsigned char *src, char *dst, size_t size)
 		errno = ENOSPC;
 		return (NULL);
 	}
-	strcpy(dst, tmp);
+	memcpy(dst, tmp, len + 1);
 
 	return (dst);
 }
@@ -178,7 +178,7 @@ inet_ntop6(const unsigned char *src, char *dst, size_t size)
 		errno = ENOSPC;
 		return (NULL);
 	}
-	strcpy(dst, tmp);
+	memcpy(dst, tmp, tp - tmp);
 	return (dst);
 }
 #endif /* AF_INET6 */

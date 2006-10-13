@@ -25,11 +25,11 @@
 #ifndef HAVE_STRDUP
  char *strdup(char *s)
 {
-  int l = strlen(s) + 1;
-  char *ret = (char *)malloc(l);
-  if (ret)
-    strcpy(ret,s);
-  return ret;
+	int len = strlen(s) + 1;
+	char *ret = (char *)malloc(len);
+	if (ret)
+		memcpy(ret, s, len);
+	return ret;
 }
 #endif
 
