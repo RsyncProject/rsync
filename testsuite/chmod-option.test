@@ -44,9 +44,9 @@ makepath "$fromdir/foo"
 touch "$fromdir/bar"
 
 checkit "$RSYNC -avv \"$fromdir/\" \"$checkdir/\"" "$fromdir" "$checkdir"
-chmod +t "$checkdir"/bar
+chmod o+x "$fromdir"/bar
 
-checkit "$RSYNC -avv --chmod=F+t \"$fromdir/\" \"$todir/\"" "$checkdir" "$todir"
+checkit "$RSYNC -avv --chmod=Fo-x \"$fromdir/\" \"$todir/\"" "$checkdir" "$todir"
 
 # Tickle a bug in rsync 2.6.8: if you push a new directory with --perms off to
 # a daemon with an incoming chmod, the daemon pretends the directory is a file
@@ -57,7 +57,7 @@ cat >>"$scratchdir/test-rsyncd.conf" <<EOF
 [test-incoming-chmod]
 	path = $todir
 	read only = no
-	incoming chmod = F+t
+	incoming chmod = Fo-x
 EOF
 
 RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon"
