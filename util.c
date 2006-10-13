@@ -359,7 +359,7 @@ int robust_unlink(const char *fname)
 	/* start where the last one left off to reduce chance of clashes */
 	start = counter;
 	do {
-		sprintf(&path[pos], "%03d", counter);
+		snprintf(&path[pos], 4, "%03d", counter);
 		if (++counter >= MAX_RENAMES)
 			counter = 1;
 	} while ((rc = access(path, 0)) == 0 && counter != start);
@@ -1115,7 +1115,7 @@ char *human_num(int64 num)
 			units = 'K';
 		}
 		if (units) {
-			sprintf(bufs[n], "%.2f%c", dnum, units);
+			snprintf(bufs[n], sizeof bufs[0], "%.2f%c", dnum, units);
 			return bufs[n];
 		}
 	}

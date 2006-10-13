@@ -1258,8 +1258,8 @@ static RETSIGTYPE rsync_panic_handler(UNUSED(int whatsig))
 	char cmd_buf[300];
 	int ret;
 
-	sprintf(cmd_buf, get_panic_action(),
-		getpid(), getpid());
+	snprintf(cmd_buf, sizeof cmd_buf, get_panic_action(),
+		 getpid(), getpid());
 
 	/* Unless we failed to execute gdb, we allow the process to
 	 * continue.  I'm not sure if that's right. */
