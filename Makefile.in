@@ -39,7 +39,7 @@ OBJS3=progress.o pipe.o
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS=popt/findme.o  popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o
-OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) $(ZLIBOBJ) @BUILD_POPT@
+OBJS=$(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) $(OBJS1) $(ZLIBOBJ) @BUILD_POPT@
 
 TLS_OBJ = tls.o syscall.o lib/compat.o lib/snprintf.o lib/permstring.o
 
