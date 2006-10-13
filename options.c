@@ -1499,7 +1499,7 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'n';
 	if (preserve_links)
 		argstr[x++] = 'l';
-	if (xfer_dirs > (recurse || !delete_mode || !am_sender))
+	if (xfer_dirs > (recurse || !delete_mode || !am_sender ? 1 : 0))
 		argstr[x++] = 'd';
 	if (am_sender) {
 		if (keep_dirlinks)
