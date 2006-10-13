@@ -336,7 +336,7 @@ static struct parm_struct parm_table[] =
 
 
 /***************************************************************************
-Initialise the global parameter structure.
+* Initialise the global parameter structure.
 ***************************************************************************/
 static void init_globals(void)
 {
@@ -344,7 +344,7 @@ static void init_globals(void)
 }
 
 /***************************************************************************
-Initialise the sDefault parameter structure.
+* Initialise the sDefault parameter structure.
 ***************************************************************************/
 static void init_locals(void)
 {
@@ -432,7 +432,7 @@ static BOOL   do_section(char *sectionname);
 
 
 /***************************************************************************
-initialise a service to the defaults
+* initialise a service to the defaults
 ***************************************************************************/
 static void init_service(service *pservice)
 {
@@ -466,8 +466,8 @@ static void string_set(char **s, const char *v)
 
 
 /***************************************************************************
-add a new service to the services array initialising it with the given
-service
+* add a new service to the services array initialising it with the given
+* service
 ***************************************************************************/
 static int add_a_service(service *pservice, char *name)
 {
@@ -506,7 +506,7 @@ static int add_a_service(service *pservice, char *name)
 }
 
 /***************************************************************************
-Do a case-insensitive, whitespace-ignoring string compare.
+* Do a case-insensitive, whitespace-ignoring string compare.
 ***************************************************************************/
 static int strwicmp(char *psz1, char *psz2)
 {
@@ -538,8 +538,8 @@ static int strwicmp(char *psz1, char *psz2)
 }
 
 /***************************************************************************
-Map a parameter's string representation to something we can use.
-Returns False if the parameter string is not recognised, else TRUE.
+* Map a parameter's string representation to something we can use.
+* Returns False if the parameter string is not recognised, else TRUE.
 ***************************************************************************/
 static int map_parameter(char *parmname)
 {
@@ -558,9 +558,9 @@ static int map_parameter(char *parmname)
 
 
 /***************************************************************************
-Set a boolean variable from the text value stored in the passed string.
-Returns True in success, False if the passed string does not correctly
-represent a boolean.
+* Set a boolean variable from the text value stored in the passed string.
+* Returns True in success, False if the passed string does not correctly
+* represent a boolean.
 ***************************************************************************/
 static BOOL set_boolean(BOOL *pb, char *parmvalue)
 {
@@ -586,7 +586,7 @@ static BOOL set_boolean(BOOL *pb, char *parmvalue)
 }
 
 /***************************************************************************
-Find a service by name. Otherwise works like get_service.
+* Find a service by name. Otherwise works like get_service.
 ***************************************************************************/
 static int getservicebyname(char *name, service *pserviceDest)
 {
@@ -606,8 +606,7 @@ static int getservicebyname(char *name, service *pserviceDest)
 
 
 /***************************************************************************
-Copy a service structure to another
-
+* Copy a service structure to another
 ***************************************************************************/
 static void copy_service(service *pserviceDest,
                          service *pserviceSource)
@@ -652,8 +651,8 @@ static void copy_service(service *pserviceDest,
 
 
 /***************************************************************************
-Process a parameter for a particular service number. If snum < 0
-then assume we are in the globals
+* Process a parameter for a particular service number. If snum < 0
+* then assume we are in the globals
 ***************************************************************************/
 static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
 {
@@ -744,7 +743,7 @@ static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
 }
 
 /***************************************************************************
-Process a parameter.
+* Process a parameter.
 ***************************************************************************/
 static BOOL do_parameter(char *parmname, char *parmvalue)
 {
@@ -752,9 +751,9 @@ static BOOL do_parameter(char *parmname, char *parmvalue)
 }
 
 /***************************************************************************
-Process a new section (service). At this stage all sections are services.
-Later we'll have special sections that permit server parameters to be set.
-Returns True on success, False on failure.
+* Process a new section (service). At this stage all sections are services.
+* Later we'll have special sections that permit server parameters to be set.
+* Returns True on success, False on failure.
 ***************************************************************************/
 static BOOL do_section(char *sectionname)
 {
@@ -799,8 +798,8 @@ static BOOL do_section(char *sectionname)
 
 
 /***************************************************************************
-Load the services array from the services file. Return True on success,
-False on failure.
+* Load the services array from the services file. Return True on success,
+* False on failure.
 ***************************************************************************/
 BOOL lp_load(char *pszFname, int globals_only)
 {
@@ -831,7 +830,7 @@ BOOL lp_load(char *pszFname, int globals_only)
 
 
 /***************************************************************************
-return the max number of services
+* return the max number of services
 ***************************************************************************/
 int lp_numservices(void)
 {
@@ -839,10 +838,10 @@ int lp_numservices(void)
 }
 
 /***************************************************************************
-Return the number of the service with the given name, or -1 if it doesn't
-exist. Note that this is a DIFFERENT ANIMAL from the internal function
-getservicebyname()! This works ONLY if all services have been loaded, and
-does not copy the found service.
+* Return the number of the service with the given name, or -1 if it doesn't
+* exist. Note that this is a DIFFERENT ANIMAL from the internal function
+* getservicebyname()! This works ONLY if all services have been loaded, and
+* does not copy the found service.
 ***************************************************************************/
 int lp_number(char *name)
 {
