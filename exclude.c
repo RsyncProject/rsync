@@ -911,7 +911,7 @@ void parse_rule(struct filter_list_struct *listp, const char *pattern,
 
 		if (pat_len >= MAXPATHLEN) {
 			rprintf(FERROR, "discarding over-long filter: %.*s\n",
-				pat_len, cp);
+				(int)pat_len, cp);
 			continue;
 		}
 
