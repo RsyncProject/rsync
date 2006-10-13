@@ -906,12 +906,14 @@ void parse_rule(struct filter_list_struct *listp, const char *pattern,
 				    &pat_len, &new_mflags);
 		if (!cp)
 			break;
+
+		pattern = cp + pat_len;
+
 		if (pat_len >= MAXPATHLEN) {
-			rprintf(FERROR, "discarding over-long filter: %s\n",
-				cp);
+			rprintf(FERROR, "discarding over-long filter: %.*s\n",
+				pat_len, cp);
 			continue;
 		}
-		pattern = cp + pat_len;
 
 		if (new_mflags & MATCHFLG_CLEAR_LIST) {
 			if (verbose > 2) {
@@ -931,11 +933,9 @@ void parse_rule(struct filter_list_struct *listp, const char *pattern,
 			}
 			len = pat_len;
 			if (new_mflags & MATCHFLG_EXCLUDE_SELF) {
-				const char *name = strrchr(cp, '/');
-				if (name)
-					len -= ++name - cp;
-				else
-					name = cp;
+				const char *name = cp + len;
+				while (name > cp && name[-1] != '/') name--;
+				len -= name - cp;
 				add_rule(listp, name, len, 0, 0);
 				new_mflags &= ~MATCHFLG_EXCLUDE_SELF;
 				len = pat_len;
