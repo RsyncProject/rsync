@@ -333,7 +333,7 @@ connection is rejected.
 
 Each pattern can be in one of five forms:
 
-quote(itemize(
+quote(itemization(
   it() a dotted decimal IPv4 address of the form a.b.c.d, or an IPv6 address
   of the form a:b:c::d:e:f. In this case the incoming machine's IP address
   must match exactly.
@@ -412,7 +412,7 @@ rsyncstats.)
 
 The single-character escapes that are understood are as follows:
 
-quote(itemize(
+quote(itemization(
   it() %a the remote IP address
   it() %b the number of bytes actually transferred 
   it() %B the permission bits of the file (e.g. rwxrwxrwt)
@@ -489,7 +489,7 @@ transfer is aborted before it begins.
 The following environment variables will be set, though some are
 specific to the pre-xfer or the post-xfer environment:
 
-quote(itemize(
+quote(itemization(
   it() bf(RSYNC_MODULE_NAME): The name of the module being accessed.
   it() bf(RSYNC_MODULE_PATH): The path configured for the module.
   it() bf(RSYNC_HOST_ADDR): The accessing host's IP address.
@@ -590,7 +590,7 @@ manpagefiles()
 
 manpageseealso()
 
-rsync(1)
+bf(rsync)(1)
 
 manpagediagnostics()
 

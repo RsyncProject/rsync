@@ -33,7 +33,7 @@ report that accompanies this package.
 
 Some of the additional features of rsync are:
 
-itemize(
+itemization(
   it() support for copying links, devices, owners, groups, and permissions
   it() exclude and exclude-from options similar to GNU tar
   it() a CVS exclude mode for ignoring the same files that CVS would ignore
@@ -182,7 +182,7 @@ CONNECTIONS section below for information on that.)
 Using rsync in this way is the same as using it with a remote shell except
 that:
 
-itemize(
+itemization(
 	it() you either use a double colon :: instead of a single colon to
 	separate the hostname from the path, or you use an rsync:// URL.
 	it() the first word of the "path" is actually a module name.
@@ -401,8 +401,7 @@ to the detailed description below for a complete description.  verb(
  -4, --ipv4                  prefer IPv4
  -6, --ipv6                  prefer IPv6
      --version               print version number
-(-h) --help                  show this help (see below for -h comment)
-)
+(-h) --help                  show this help (see below for -h comment))
 
 Rsync can also be run as a daemon, in which case the following options are
 accepted: verb(
@@ -418,8 +417,7 @@ accepted: verb(
  -v, --verbose               increase verbosity
  -4, --ipv4                  prefer IPv4
  -6, --ipv6                  prefer IPv6
- -h, --help                  show this help (if used after --daemon)
-)
+ -h, --help                  show this help (if used after --daemon))
 
 manpageoptions()
 
@@ -742,7 +740,7 @@ be the source permissions.)
 
 When this option is em(off), permissions are set as follows:
 
-quote(itemize(
+quote(itemization(
   it() Existing files (including updated files) retain their existing
   permissions, though the bf(--executability) option might change just
   the execute permission for the file.
@@ -789,7 +787,7 @@ not enabled.  A regular file is considered to be executable if at least one
 executability differs from that of the corresponding source file, rsync
 modifies the destination file's permissions as follows:
 
-quote(itemize(
+quote(itemization(
   it() To make a file non-executable, rsync turns off all its 'x'
   permissions.
   it() To make a file executable, rsync turns on each 'x' permission that
@@ -1158,7 +1156,7 @@ exact list of files to transfer (as read from the specified FILE or bf(-)
 for standard input).  It also tweaks the default behavior of rsync to make
 transferring just the specified files and directories easier:
 
-quote(itemize(
+quote(itemization(
   it() The bf(--relative) (bf(-R)) option is implied, which preserves the path
   information that is specified for each item in the file (use
   bf(--no-relative) or bf(--no-R) if you want to turn that off).
@@ -1391,7 +1389,7 @@ modified.
 
 The update types that replace the bf(Y) are as follows:
 
-quote(itemize(
+quote(itemization(
   it() A bf(<) means that a file is being transferred to the remote host
   (sent).
   it() A bf(>) means that a file is being transferred to the local host
@@ -1417,7 +1415,7 @@ a "?" (this can happen when talking to an older rsync).
 
 The attribute that is associated with each letter is as follows:
 
-quote(itemize(
+quote(itemization(
   it() A bf(c) means the checksum of the file is different and will be
   updated by the file transfer (requires bf(--checksum)).
   it() A bf(s) means the size of the file is different and will be updated
@@ -1492,7 +1490,7 @@ dit(bf(--stats)) This tells rsync to print a verbose set of statistics
 on the file transfer, allowing you to tell how effective the rsync
 algorithm is for your data.
 
-The current statistics are as follows: quote(itemize(
+The current statistics are as follows: quote(itemization(
   it() bf(Number of files) is the count of all "files" (in the generic
   sense), which includes directories, symlinks, etc.
   it() bf(Number of files transferred) is the count of normal files that
@@ -1919,7 +1917,7 @@ The include/exclude rules each specify a pattern that is matched against
 the names of the files that are going to be transferred.  These patterns
 can take several forms:
 
-itemize(
+itemization(
   it() if the pattern starts with a / then it is anchored to a
   particular spot in the hierarchy of files, otherwise it is matched
   against the end of the pathname.  This is similar to a leading ^ in
@@ -1997,7 +1995,7 @@ tt(- *)nl()
 
 Here are some examples of exclude/include matching:
 
-itemize(
+itemization(
   it() "- *.o" would exclude all filenames matching *.o
   it() "- /foo" would exclude a file (or directory) named foo in the
   transfer-root directory
@@ -2044,7 +2042,7 @@ tt(:n- .non-inherited-per-dir-excludes)nl()
 
 The following modifiers are accepted after a merge or dir-merge rule:
 
-itemize(
+itemization(
   it() A bf(-) specifies that the file should consist of only exclude
   patterns, with no other rule-parsing except for in-file comments.
   it() A bf(+) specifies that the file should consist of only include
@@ -2071,7 +2069,7 @@ itemize(
 
 The following modifiers are accepted after a "+" or "-":
 
-itemize(
+itemization(
   it() A "/" specifies that the include/exclude rule should be matched
   against the absolute pathname of the current item.  For example,
   "-/ /etc/passwd" would exclude the passwd file any time the transfer
@@ -2346,7 +2344,7 @@ and the information to repeat this operation is stored in "foo" and
 into the directory /bdest/dir.  The differences between the two examples
 reveals some of the flexibility you have in how you deal with batches:
 
-itemize(
+itemization(
   it() The first example shows that the initial copy doesn't have to be
   local -- you can push or pull data to/from a remote host using either the
   remote-shell syntax or rsync daemon syntax, as desired.
