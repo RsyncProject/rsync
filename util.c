@@ -109,13 +109,13 @@ void print_child_argv(char **cmd)
 	rprintf(FCLIENT, "\n");
 }
 
-void out_of_memory(char *str)
+NORETURN void out_of_memory(char *str)
 {
 	rprintf(FERROR, "ERROR: out of memory in %s [%s]\n", str, who_am_i());
 	exit_cleanup(RERR_MALLOC);
 }
 
-void overflow_exit(char *str)
+NORETURN void overflow_exit(char *str)
 {
 	rprintf(FERROR, "ERROR: buffer overflow in %s [%s]\n", str, who_am_i());
 	exit_cleanup(RERR_MALLOC);
