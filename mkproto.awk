@@ -54,14 +54,13 @@ BEGIN {
   printf "int %s(void);\n", a[2]
 }
 
-/^static|^extern/ || !/^[a-zA-Z]/ || /[;]/ {
+/^static|^extern/ || /[;]/ {
   next;
 }
 
-!/^OFF_T|^size_t|^off_t|^pid_t|^unsigned|^mode_t|^DIR|^user|^int|^char|^uint|^uchar|^short|^struct|^BOOL|^void|^time|^const|^RETSIGTYPE/ {
+!/^[A-Za-z][A-Za-z0-9_]* / {
   next;
 }
-
 
 /[(].*[)][ \t]*$/ {
     printf "%s;\n",$0;
@@ -73,4 +72,3 @@ BEGIN {
   printf "%s\n",$0;
   next;
 }
-
