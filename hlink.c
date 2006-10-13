@@ -216,8 +216,10 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 							continue;
 						statret = 1;
 						st = &st3;
-						if (verbose < 2 || !stdout_format_has_i)
-							itemizing = code = 0;
+						if (verbose < 2 || !stdout_format_has_i) {
+							itemizing = 0;
+							code = FNONE;
+						}
 						break;
 					}
 					if (!unchanged_file(cmpbuf, file, &st3))
@@ -266,7 +268,7 @@ int hard_link_one(struct file_struct *file, int ndx, char *fname,
 			ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS, 0,
 			terse ? "" : toname);
 	}
-	if (code && verbose && !terse)
+	if (code != FNONE && verbose && !terse)
 		rprintf(code, "%s => %s\n", fname, toname);
 	return 0;
 }
