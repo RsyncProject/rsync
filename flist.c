@@ -233,17 +233,21 @@ static int is_excluded(char *fname, int is_dir, int filter_level)
 static int to_wire_mode(mode_t mode)
 {
 #ifdef SUPPORT_LINKS
-	if (S_ISLNK(mode) && (_S_IFLNK != 0120000))
+#if _S_IFLNK != 0120000
+	if (S_ISLNK(mode))
 		return (mode & ~(_S_IFMT)) | 0120000;
 #endif
-	return (int)mode;
+#endif
+	return mode;
 }
 
 static mode_t from_wire_mode(int mode)
 {
-	if ((mode & (_S_IFMT)) == 0120000 && (_S_IFLNK != 0120000))
+#if _S_IFLNK != 0120000
+	if ((mode & (_S_IFMT)) == 0120000)
 		return (mode & ~(_S_IFMT)) | _S_IFLNK;
-	return (mode_t)mode;
+#endif
+	return mode;
 }
 
 static void send_directory(int f, struct file_list *flist,
@@ -446,7 +450,7 @@ static void send_file_entry(struct file_struct *file, int f)
 #endif
 
 #ifdef SUPPORT_HARD_LINKS
-	if (flags & XMIT_HAS_IDEV_DATA) {
+	if (file->link_u.idev) {
 		if (protocol_version < 26) {
 			/* 32-bit dev_t and ino_t */
 			write_int(f, dev);
@@ -741,9 +745,10 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 
 	memset(sum, 0, SUM_LENGTH);
 
-	if (stp && S_ISDIR(stp->st_mode))
+	if (stp && S_ISDIR(stp->st_mode)) {
 		st = *stp; /* Needed for "symlink/." with --relative. */
-	else if (readlink_stat(thisname, &st, linkname) != 0) {
+		*linkname = '\0'; /* make IBM code checker happy */
+	} else if (readlink_stat(thisname, &st, linkname) != 0) {
 		int save_errno = errno;
 		/* See if file is excluded before reporting an error. */
 		if (filter_level != NO_FILTERS
@@ -1757,10 +1762,6 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 			c1 = (uchar*)"";
 		} else
 			state1 = s_BASE;
-	} else if (!*c1) {
-		type1 = t_path;
-		state1 = s_SLASH;
-		c1 = (uchar*)"/";
 	} else {
 		type1 = t_path;
 		state1 = s_DIR;
@@ -1774,10 +1775,6 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 			c2 = (uchar*)"";
 		} else
 			state2 = s_BASE;
-	} else if (!*c2) {
-		type2 = t_path;
-		state2 = s_SLASH;
-		c2 = (uchar*)"/";
 	} else {
 		type2 = t_path;
 		state2 = s_DIR;
@@ -1786,9 +1783,7 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 	if (type1 != type2)
 		return type1 == t_PATH ? 1 : -1;
 
-	while (1) {
-		if ((dif = (int)*c1++ - (int)*c2++) != 0)
-			break;
+	do {
 		if (!*c1) {
 			switch (state1) {
 			case s_DIR:
@@ -1851,7 +1846,7 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 			if (type1 != type2)
 				return type1 == t_PATH ? 1 : -1;
 		}
-	}
+	} while ((dif = (int)*c1++ - (int)*c2++) == 0);
 
 	return dif;
 }
