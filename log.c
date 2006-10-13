@@ -655,7 +655,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			rprintf(FERROR,
 				"buffer overflow expanding %%%c -- exiting\n",
 				p[0]);
-			exit_cleanup(RERR_MESSAGEIO);
+			EXIT_OR_RETURN(RERR_MESSAGEIO);
 		}
 
 		/* Shuffle the rest of the string along to make space for n */
