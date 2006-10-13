@@ -453,7 +453,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 		int64 l;
 		int b = BLOCKSUM_BIAS;
 		for (l = len; l >>= 1; b += 2) {}
-		for (c = blength; c >>= 1 && b; b--) {}
+		for (c = blength; (c >>= 1) && b; b--) {}
 		/* add a bit, subtract rollsum, round up. */
 		s2length = (b + 1 - 32 + 7) / 8; /* --optimize in compiler-- */
 		s2length = MAX(s2length, csum_length);
@@ -941,7 +941,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 		}
 		if (set_file_attrs(fname, file, statret ? NULL : &st, 0)
-		    && verbose && code && f_out != -1)
+		    && verbose && code != FNONE && f_out != -1)
 			rprintf(code, "%s/\n", fname);
 		if (delete_during && f_out != -1 && !phase && dry_run < 2
 		    && (file->flags & FLAG_DEL_HERE))
@@ -1010,7 +1010,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 #endif
 				if (!copy_dest)
 					return;
-				itemizing = code = 0;
+				itemizing = 0;
+				code = FNONE;
 			}
 		}
 		if (preserve_hard_links && file->link_u.links
@@ -1026,7 +1027,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				itemize(file, ndx, statret, &st,
 					ITEM_LOCAL_CHANGE, 0, NULL);
 			}
-			if (code && verbose) {
+			if (code != FNONE && verbose) {
 				rprintf(code, "%s -> %s\n", fname,
 					file->u.link);
 			}
@@ -1051,7 +1052,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 #endif
 				if (!copy_dest)
 					return;
-				itemizing = code = 0;
+				itemizing = 0;
+				code = FNONE;
 			}
 		}
 		if (statret != 0
@@ -1081,7 +1083,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					itemize(file, ndx, statret, &st,
 						ITEM_LOCAL_CHANGE, 0, NULL);
 				}
-				if (code && verbose)
+				if (code != FNONE && verbose)
 					rprintf(code, "%s\n", fname);
 				if (preserve_hard_links && file->link_u.links) {
 					hard_link_cluster(file, ndx,
@@ -1363,7 +1365,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	if (protocol_version >= 29) {
 		itemizing = 1;
 		maybe_ATTRS_REPORT = stdout_format_has_i ? 0 : ATTRS_REPORT;
-		code = logfile_format_has_i ? 0 : FLOG;
+		code = logfile_format_has_i ? FNONE : FLOG;
 	} else if (am_daemon) {
 		itemizing = logfile_format_has_i && do_xfers;
 		maybe_ATTRS_REPORT = ATTRS_REPORT;
@@ -1371,7 +1373,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	} else if (!am_server) {
 		itemizing = stdout_format_has_i;
 		maybe_ATTRS_REPORT = stdout_format_has_i ? 0 : ATTRS_REPORT;
-		code = itemizing ? 0 : FINFO;
+		code = itemizing ? FNONE : FINFO;
 	} else {
 		itemizing = 0;
 		maybe_ATTRS_REPORT = ATTRS_REPORT;
