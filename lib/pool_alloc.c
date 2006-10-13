@@ -272,7 +272,7 @@ pool_stats(alloc_pool_t p, int fd, int summarize)
 
 	if (pool->live)
 		FDEXTSTAT(pool->live);
-	strcpy(buf, "   FREE    BOUND\n");
+	strlcpy(buf, "   FREE    BOUND\n", sizeof buf);
 	write(fd, buf, strlen(buf));
 
 	for (cur = pool->free; cur; cur = cur->next)

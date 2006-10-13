@@ -394,7 +394,7 @@ void rsyserr(enum logcode code, int errcode, const char *format, ...)
 	char buf[BIGPATHBUFLEN];
 	size_t len;
 
-	strcpy(buf, RSYNC_NAME ": ");
+	strlcpy(buf, RSYNC_NAME ": ", sizeof buf);
 	len = (sizeof RSYNC_NAME ": ") - 1;
 
 	va_start(ap, format);
@@ -544,15 +544,15 @@ static void log_formatted(enum logcode code, char *format, char *op,
 		case 'L':
 			if (hlink && *hlink) {
 				n = hlink;
-				strcpy(buf2, " => ");
+				strlcpy(buf2, " => ", sizeof buf2);
 			} else if (S_ISLNK(file->mode) && file->u.link) {
 				n = file->u.link;
-				strcpy(buf2, " -> ");
+				strlcpy(buf2, " -> ", sizeof buf2);
 			} else {
 				n = "";
 				if (!fmt[1])
 					break;
-				strcpy(buf2, "    ");
+				strlcpy(buf2, "    ", sizeof buf2);
 			}
 			strlcat(fmt, "s", sizeof fmt);
 			snprintf(buf2 + 4, sizeof buf2 - 4, fmt, n);

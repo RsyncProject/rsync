@@ -30,7 +30,7 @@ void permstring(char *perms, mode_t mode)
 	static const char *perm_map = "rwxrwxrwx";
 	int i;
 
-	strcpy(perms, "----------");
+	strlcpy(perms, "----------", 11);
 
 	for (i = 0; i < 9; i++) {
 		if (mode & (1 << i))

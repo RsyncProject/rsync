@@ -74,7 +74,7 @@ static void list_file(const char *fname)
 		buf.st_mode &= ~0777;
 		buf.st_mtime = (time_t)0;
 		buf.st_uid = buf.st_gid = 0;
-		strcpy(linkbuf, " -> ");
+		strlcpy(linkbuf, " -> ", sizeof linkbuf);
 		/* const-cast required for silly UNICOS headers */
 		len = readlink((char *) fname, linkbuf+4, sizeof(linkbuf) - 4);
 		if (len == -1)
@@ -99,7 +99,7 @@ static void list_file(const char *fname)
 			(int)mt->tm_min,
 			(int)mt->tm_sec);
 	} else {
-		strcpy(datebuf, "                   ");
+		strlcpy(datebuf, "                   ", sizeof datebuf);
 	}
 
 	/* TODO: Perhaps escape special characters in fname? */
