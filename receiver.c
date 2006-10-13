@@ -84,15 +84,13 @@ static int updating_basis;
 
 static int get_tmpname(char *fnametmp, char *fname)
 {
+	int maxname, added, length = 0;
 	char *f;
-	int     length = 0;
-	int	maxname;
 
 	if (tmpdir) {
 		/* Note: this can't overflow, so the return value is safe */
 		length = strlcpy(fnametmp, tmpdir, MAXPATHLEN - 2);
 		fnametmp[length++] = '/';
-		fnametmp[length] = '\0';	/* always NULL terminated */
 	}
 
 	if ((f = strrchr(fname, '/')) != NULL) {
@@ -105,8 +103,9 @@ static int get_tmpname(char *fnametmp, char *fname)
 	} else
 		f = fname;
 	fnametmp[length++] = '.';
-	fnametmp[length] = '\0';		/* always NULL terminated */
 
+	/* The maxname value is bufsize, and includes space for the '\0'.
+	 * (Note that NAME_MAX get -8 for the leading '.' above.) */
 	maxname = MIN(MAXPATHLEN - 7 - length, NAME_MAX - 8);
 
 	if (maxname < 1) {
@@ -115,8 +114,10 @@ static int get_tmpname(char *fnametmp, char *fname)
 		return 0;
 	}
 
-	strlcpy(fnametmp + length, f, maxname);
-	strcat(fnametmp + length, ".XXXXXX");
+	added = strlcpy(fnametmp + length, f, maxname);
+	if (added >= maxname)
+		added = maxname - 1;
+	memcpy(fnametmp + length + added, ".XXXXXX", 8);
 
 	return 1;
 }
@@ -519,7 +520,10 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			}
 		}
 
-		if (fd1 != -1 && do_fstat(fd1,&st) != 0) {
+		if (fd1 == -1) {
+			st.st_mode = 0;
+			st.st_size = 0;
+		} else if (do_fstat(fd1,&st) != 0) {
 			rsyserr(FERROR, errno, "fstat %s failed",
 				full_fname(fnamecmp));
 			discard_receive_data(f_in, file->length);
