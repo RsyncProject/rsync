@@ -161,7 +161,7 @@
 /* Log-message categories.  Only FERROR and FINFO get sent over the socket,
  * but FLOG and FSOCKERR can be sent over the receiver -> generator pipe.
  * FLOG only goes to the log file, not the client; FCLIENT is the opposite. */
-enum logcode { FERROR=1, FINFO=2, FLOG=3, FCLIENT=4, FSOCKERR=5 };
+enum logcode { FNONE=0, FERROR=1, FINFO=2, FLOG=3, FCLIENT=4, FSOCKERR=5 };
 
 /* Messages types that are sent over the message channel.  The logcode
  * values must all be present here with identical numbers. */
@@ -667,6 +667,7 @@ struct chmod_mode_struct;
 #endif
 
 #define UNUSED(x) x __attribute__((__unused__))
+#define NORETURN __attribute__((__noreturn__))
 
 #include "proto.h"
 
