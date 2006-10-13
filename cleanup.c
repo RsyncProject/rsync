@@ -87,24 +87,21 @@ static pid_t cleanup_pid = 0;
 
 pid_t cleanup_child_pid = -1;
 
+int in_exit_cleanup = 0;
+
 /**
  * Eventually calls exit(), passing @p code, therefore does not return.
  *
  * @param code one of the RERR_* codes from errcode.h.
  **/
-void _exit_cleanup(int code, const char *file, int line)
+NORETURN void _exit_cleanup(int code, const char *file, int line)
 {
 	int ocode = code;
-	static int inside_cleanup = 0;
-
-	if (inside_cleanup > 10) {
-		/* prevent the occasional infinite recursion */
-		return;
-	}
-	inside_cleanup++;
 
 	SIGACTION(SIGUSR1, SIG_IGN);
 	SIGACTION(SIGUSR2, SIG_IGN);
+
+	in_exit_cleanup = 1;
 
 	if (verbose > 3) {
 		rprintf(FINFO,"_exit_cleanup(code=%d, file=%s, line=%d): entered\n",
@@ -113,8 +110,7 @@ void _exit_cleanup(int code, const char *file, int line)
 
 	if (cleanup_child_pid != -1) {
 		int status;
-		if (wait_process(cleanup_child_pid, &status, WNOHANG)
-		 == cleanup_child_pid) {
+		if (wait_process(cleanup_child_pid, &status, WNOHANG) == cleanup_child_pid) {
 			status = WEXITSTATUS(status);
 			if (status > code)
 				code = status;
