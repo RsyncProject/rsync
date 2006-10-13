@@ -50,7 +50,7 @@ char *client_addr(int fd)
 	initialised = 1;
 
 	if (am_server) {	/* daemon over --rsh mode */
-		strcpy(addr_buf, "0.0.0.0");
+		strlcpy(addr_buf, "0.0.0.0", sizeof addr_buf);
 		if ((ssh_info = getenv("SSH_CONNECTION")) != NULL
 		    || (ssh_info = getenv("SSH_CLIENT")) != NULL
 		    || (ssh_info = getenv("SSH2_CLIENT")) != NULL) {
@@ -99,7 +99,7 @@ char *client_name(int fd)
 	if (initialised)
 		return name_buf;
 
-	strcpy(name_buf, default_name);
+	strlcpy(name_buf, default_name, sizeof name_buf);
 	initialised = 1;
 
 	memset(&ss, 0, sizeof ss);
@@ -133,6 +133,8 @@ char *client_name(int fd)
 			memcpy(&ss, answer->ai_addr, ss_len);
 			break;
 #endif
+		default:
+			exit_cleanup(RERR_SOCKETIO);
 		}
 		freeaddrinfo(answer);
 	} else {
@@ -142,7 +144,7 @@ char *client_name(int fd)
 
 	if (lookup_name(fd, &ss, ss_len, name_buf, sizeof name_buf,
 			port_buf, sizeof port_buf) == 0)
-		check_name(fd, &ss, name_buf);
+		check_name(fd, &ss, name_buf, sizeof name_buf);
 
 	return name_buf;
 }
@@ -206,18 +208,18 @@ void client_sockaddr(int fd,
  **/
 int lookup_name(int fd, const struct sockaddr_storage *ss,
 		socklen_t ss_len,
-		char *name_buf, size_t name_buf_len,
-		char *port_buf, size_t port_buf_len)
+		char *name_buf, size_t name_buf_size,
+		char *port_buf, size_t port_buf_size)
 {
 	int name_err;
 
 	/* reverse lookup */
 	name_err = getnameinfo((struct sockaddr *) ss, ss_len,
-			       name_buf, name_buf_len,
-			       port_buf, port_buf_len,
+			       name_buf, name_buf_size,
+			       port_buf, port_buf_size,
 			       NI_NAMEREQD | NI_NUMERICSERV);
 	if (name_err != 0) {
-		strcpy(name_buf, default_name);
+		strlcpy(name_buf, default_name, name_buf_size);
 		rprintf(FLOG, "name lookup failed for %s: %s\n",
 			client_addr(fd), gai_strerror(name_err));
 		return name_err;
@@ -298,7 +300,7 @@ int compare_addrinfo_sockaddr(const struct addrinfo *ai,
  **/
 int check_name(int fd,
 	       const struct sockaddr_storage *ss,
-	       char *name_buf)
+	       char *name_buf, size_t name_buf_size)
 {
 	struct addrinfo hints, *res, *res0;
 	int error;
@@ -312,7 +314,7 @@ int check_name(int fd,
 	if (error) {
 		rprintf(FLOG, "forward name lookup for %s failed: %s\n",
 			name_buf, gai_strerror(error));
-		strcpy(name_buf, default_name);
+		strlcpy(name_buf, default_name, name_buf_size);
 		return error;
 	}
 
@@ -328,13 +330,13 @@ int check_name(int fd,
 		 * address that was the same as ss. */
 		rprintf(FLOG, "no known address for \"%s\": "
 			"spoofed address?\n", name_buf);
-		strcpy(name_buf, default_name);
+		strlcpy(name_buf, default_name, name_buf_size);
 	} else if (res == NULL) {
 		/* We hit the end of the list without finding an
 		 * address that was the same as ss. */
 		rprintf(FLOG, "%s is not a known address for \"%s\": "
 			"spoofed address?\n", client_addr(fd), name_buf);
-		strcpy(name_buf, default_name);
+		strlcpy(name_buf, default_name, name_buf_size);
 	}
 
 	freeaddrinfo(res0);
