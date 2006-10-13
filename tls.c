@@ -91,16 +91,16 @@ static void list_file(const char *fname)
 	if (buf.st_mtime) {
 		mt = gmtime(&buf.st_mtime);
 
-		sprintf(datebuf, "%04d-%02d-%02d %02d:%02d:%02d",
+		snprintf(datebuf, sizeof datebuf,
+			"%04d-%02d-%02d %02d:%02d:%02d",
 			(int)mt->tm_year + 1900,
 			(int)mt->tm_mon + 1,
 			(int)mt->tm_mday,
 			(int)mt->tm_hour,
 			(int)mt->tm_min,
 			(int)mt->tm_sec);
-	} else {
+	} else
 		strlcpy(datebuf, "                   ", sizeof datebuf);
-	}
 
 	/* TODO: Perhaps escape special characters in fname? */
 
