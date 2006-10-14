@@ -104,9 +104,10 @@ Changes since 2.6.8:
   INTERNAL:
 
     - Did a code audit using IBM's code checker program and made several
-      changes, including: replacing most of the strcpy() and sprintf() calls
-      with strlcpy(), snprintf(), and memcpy(); adding a 0-value to an enum
-      that had been intermingling a literal 0 with the defined enum values.
+      changes, including: replacing most of the strcpy() and sprintf()
+      calls with strlcpy(), snprintf(), and memcpy(), and adding a 0-value
+      to an enum that had been intermingling a literal 0 with the defined
+      enum values.
 
     - Fixed a potential bug in f_name_cmp() when both the args are a
       top-level "." dir (which doesn't happen in normal operations).
