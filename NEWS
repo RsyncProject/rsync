@@ -69,6 +69,9 @@ Changes since 2.6.8:
     - Fixed a bug in the daemon's "incoming chmod" rule:  newly-created
       directories no longer get the 'F' (file) rules applied to them.
 
+    - Fixed an infinite loop bug when a filter rule was rejected due to being
+      overly long.
+
   ENHANCEMENTS:
 
     - Added the --log-file=FILE and --log-file-format=FORMAT options.  These
@@ -98,10 +101,29 @@ Changes since 2.6.8:
       both the pre- and post-xfer commands, so it can be used if the pre-xfer
       command wants to cache some arg/request info for the post-xfer command.
 
+  INTERNAL:
+
+    - Did a code audit using IBM's code checker program and made several
+      changes, including: replacing most of the strcpy() and sprintf() calls
+      with strlcpy(), snprintf(), and memcpy(); adding a 0-value to an enum
+      that had been intermingling a literal 0 with the defined enum values.
+
+    - Fixed a potential bug in f_name_cmp() when both the args are a
+      top-level "." dir (which doesn't happen in normal operations).
+
+    - Changed exit_cleanup() so that it can never return instead of exit.
+      The old code might return if it found the exit_cleanup() function
+      was being called recursively.  The new code adds a check into the
+      logging functions so that they return back to the exit function
+      instead of recursing.
+
   DEVELOPER RELATED:
 
     - The acls.diff and xattrs.diff patches have received a bunch of work to
       make them much closer to being acceptable in the main distribution.
+
+    - The rsync.yo and rsyncd.conf.yo files have been updated to work
+      better with the latest yodl 2.x releases.
 
     - Updated config.guess and config.sub to their 2006-02-23 version.
 
