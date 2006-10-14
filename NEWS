@@ -113,9 +113,9 @@ Changes since 2.6.8:
 
     - Changed exit_cleanup() so that it can never return instead of exit.
       The old code might return if it found the exit_cleanup() function
-      was being called recursively.  The new code adds a check into the
-      logging functions so that they return back to the exit function
-      instead of recursing.
+      was being called recursively.  The new code segments the exit code
+      so that any recursive calls move on to the next step of the exit
+      processing.
 
   DEVELOPER RELATED:
 
