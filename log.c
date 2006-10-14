@@ -37,7 +37,6 @@ extern int msg_fd_out;
 extern int allow_8bit_chars;
 extern int protocol_version;
 extern int preserve_times;
-extern int in_exit_cleanup;
 extern int stdout_format_has_i;
 extern int stdout_format_has_o_or_i;
 extern int logfile_format_has_i;
@@ -90,14 +89,6 @@ struct {
 	{ RERR_DEL_LIMIT  , "the --max-delete limit stopped deletions" },
 	{ 0, NULL }
 };
-
-#define EXIT_OR_RETURN(err) \
-	do { \
-		if (in_exit_cleanup) \
-			return; \
-		exit_cleanup(err); \
-	} while (0)
-
 
 /*
  * Map from rsync error code to name, or return NULL.
@@ -230,13 +221,13 @@ static void filtered_fwrite(FILE *f, const char *buf, int len, int use_isprint)
 		  && ((use_isprint && !isprint(*(uchar*)s))
 		   || *(uchar*)s < ' '))) {
 			if (s != buf && fwrite(buf, s - buf, 1, f) != 1)
-				EXIT_OR_RETURN(RERR_MESSAGEIO);
+				exit_cleanup(RERR_MESSAGEIO);
 			fprintf(f, "\\#%03o", *(uchar*)s);
 			buf = s + 1;
 		}
 	}
 	if (buf != end && fwrite(buf, end - buf, 1, f) != 1)
-		EXIT_OR_RETURN(RERR_MESSAGEIO);
+		exit_cleanup(RERR_MESSAGEIO);
 }
 
 /* this is the underlying (unformatted) rsync debugging function. Call
@@ -248,7 +239,7 @@ void rwrite(enum logcode code, char *buf, int len)
 	FILE *f = NULL;
 
 	if (len < 0)
-		EXIT_OR_RETURN(RERR_MESSAGEIO);
+		exit_cleanup(RERR_MESSAGEIO);
 
 	if (am_server && msg_fd_out >= 0) {
 		/* Pass the message to our sibling. */
@@ -302,7 +293,7 @@ void rwrite(enum logcode code, char *buf, int len)
 		f = am_server ? stderr : stdout;
 		break;
 	default:
-		EXIT_OR_RETURN(RERR_MESSAGEIO);
+		exit_cleanup(RERR_MESSAGEIO);
 	}
 
 	trailing_CR_or_NL = len && (buf[len-1] == '\n' || buf[len-1] == '\r')
@@ -406,7 +397,7 @@ void rsyserr(enum logcode code, int errcode, const char *format, ...)
 				": %s (%d)\n", strerror(errcode), errcode);
 	}
 	if (len >= sizeof buf)
-		EXIT_OR_RETURN(RERR_MESSAGEIO);
+		exit_cleanup(RERR_MESSAGEIO);
 
 	rwrite(code, buf, len);
 }
@@ -444,7 +435,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 	total = strlcpy(buf, format, sizeof buf);
 	if (total > MAXPATHLEN) {
 		rprintf(FERROR, "log-format string is WAY too long!\n");
-		EXIT_OR_RETURN(RERR_MESSAGEIO);
+		exit_cleanup(RERR_MESSAGEIO);
 	}
 	buf[total++] = '\n';
 	buf[total] = '\0';
@@ -655,7 +646,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			rprintf(FERROR,
 				"buffer overflow expanding %%%c -- exiting\n",
 				p[0]);
-			EXIT_OR_RETURN(RERR_MESSAGEIO);
+			exit_cleanup(RERR_MESSAGEIO);
 		}
 
 		/* Shuffle the rest of the string along to make space for n */
