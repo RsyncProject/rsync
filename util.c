@@ -359,7 +359,7 @@ int robust_unlink(const char *fname)
 	/* start where the last one left off to reduce chance of clashes */
 	start = counter;
 	do {
-		snprintf(&path[pos], 4, "%03d", counter);
+		snprintf(&path[pos], MAX_RENAMES_DIGITS+1, "%03d", counter);
 		if (++counter >= MAX_RENAMES)
 			counter = 1;
 	} while ((rc = access(path, 0)) == 0 && counter != start);
