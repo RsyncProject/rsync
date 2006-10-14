@@ -1228,11 +1228,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			}
 		}
 
-		if (fn != fbuf) {
-			if (len >= MAXPATHLEN)
-				overflow_exit("send_file_list");
+		if (fn != fbuf)
 			memmove(fbuf, fn, len + 1);
-		}
 
 		if (implied_dirs && (p=strrchr(fbuf,'/')) && p != fbuf) {
 			/* Send the implied directories at the start of the
