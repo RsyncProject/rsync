@@ -214,7 +214,7 @@ print $break, <<EOT;
 
 About to do the following in the samba-rsync-ftp dir:
     - move the old tar/diff files into the appropriate old-* dirs
-    - copy the moved tar/diff files on samba.org$skipping
+    - hard-link the moved tar/diff files on samba.org$skipping
     - create release tar, "$tar_name"
     - create release diffs, "$diff_name"
     - update README, *NEWS, TODO, and cvs.log
@@ -240,38 +240,30 @@ if ($diffdir ne $dest) {
     # We need to run this regardless of $lastversion's "pre"ness.
     my @moved_files;
     foreach my $fn (glob('rsync*pre*.tar.gz*'), glob('rsync*pre*-NEWS')) {
-	my $new_fn = "old-previews/$fn";
-	rename($fn, $new_fn) or die $!;
-	push(@moved_files, $new_fn);
+	link($fn, "old-previews/$fn") or die $!;
+	push(@moved_files, $fn);
     }
 
     if ($version !~ /pre/) {
 	foreach my $fn (glob('rsync*.tar.gz*'), glob('rsync*-NEWS')) {
 	    next if $fn =~ /^rsync.*pre/;
-	    my $new_fn = "old-versions/$fn";
-	    rename($fn, $new_fn) or die $!;
-	    push(@moved_files, $new_fn);
+	    link($fn, "old-versions/$fn") or die $!;
+	    push(@moved_files, $fn);
 	}
 
 	foreach my $fn (glob('rsync*.diffs.gz*')) {
 	    next if $fn =~ /^rsync.*pre/;
-	    my $new_fn = "old-patches/$fn";
-	    rename($fn, $new_fn) or die $!;
-	    push(@moved_files, $new_fn);
+	    link($fn, "old-patches/$fn") or die $!;
+	    push(@moved_files, $fn);
 	}
     }
 
     # Optimize our future upload (in the absence of --detect-renamed) by
-    # copying the above moved files on the remote server.
+    # using rsync to hard-link the above files on samba.org.
     if ($live) {
-	my $remote_cmd = '';
-	foreach (@moved_files) {
-	    my($path, $fn) = m#(.*)/([^/]+)$#;
-	    $remote_cmd .= "cp -p /home/ftp/pub/rsync/{$fn,$path};";
-	}
-	system "ssh samba.org '$remote_cmd'";
+	system "rsync -avHOC --include='rsync*.gz*' --include='old-*/' --exclude='*' . samba.org:/home/ftp/pub/rsync";
     }
-    foreach (glob("rsync*pre*.diffs.gz*")) {
+    foreach (@moved_files, glob("rsync*pre*.diffs.gz*")) {
 	unlink($_);
     }
 
