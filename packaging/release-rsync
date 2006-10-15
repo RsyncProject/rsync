@@ -162,9 +162,14 @@ foreach my $fn (@tweak_files) {
     } elsif ($fn =~ /\.yo/) {
 	s/^(manpage\([^)]+\)\(\d+\)\()[^)]+(\).*)/$1$today$2/m;
 	s/^(This man ?page is current for version) \S+ (of rsync)/$1 $version $2/m;
+    } elsif ($fn eq 'NEWS') {
+	s/^(NEWS for rsync \Q$version\E) \(UNRELEASED\)\s*\n/$1 ($today)\n/mi
+	    or die "Couldn't update NEWS file with release date!\n";
+    } elsif ($fn eq 'OLDNEWS') {
+	s/^\t\S\S\s\S\S\S\s\d\d\d\d(\t\Q$version\E)/\t$ztoday$1/m
+	    or die "Couldn't update OLDNEWS file with release date!\n";
     } else {
-	s/^(NEWS for rsync \Q$version\E) \(UNRELEASED\)\s*\n/$1 ($today)\n/m;
-	s/^\t\S\S\s\S\S\S\s\d\d\d\d(\t\Q$version\E)/\t$ztoday$1/m;
+	die "Unrecognized file in \@tweak_files: $fn\n";
     }
     open(OUT, '>', $fn) or die $!;
     print OUT $_;
@@ -251,8 +256,11 @@ if ($diffdir ne $dest) {
 	    push(@moved_files, $fn);
 	}
 
+	foreach my $fn (glob('rsync*pre*.diffs.gz*')) {
+	    unlink($fn);
+	}
+
 	foreach my $fn (glob('rsync*.diffs.gz*')) {
-	    next if $fn =~ /^rsync.*pre/;
 	    link($fn, "old-patches/$fn") or die $!;
 	    push(@moved_files, $fn);
 	}
@@ -263,7 +271,7 @@ if ($diffdir ne $dest) {
     if ($live) {
 	system "rsync -avHOC --include='rsync*.gz*' --include='old-*/' --exclude='*' . samba.org:/home/ftp/pub/rsync";
     }
-    foreach (@moved_files, glob("rsync*pre*.diffs.gz*")) {
+    foreach (@moved_files) {
 	unlink($_);
     }
 
