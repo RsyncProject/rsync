@@ -103,20 +103,22 @@ Changes since 2.6.8:
 
   INTERNAL:
 
-    - Did a code audit using IBM's code checker program and made several
+    - Did a code audit using IBM's code-checker program and made several
       changes, including: replacing most of the strcpy() and sprintf()
-      calls with strlcpy(), snprintf(), and memcpy(), and adding a 0-value
-      to an enum that had been intermingling a literal 0 with the defined
-      enum values.
+      calls with strlcpy(), snprintf(), and memcpy(), adding a 0-value to
+      an enum that had been intermingling a literal 0 with the defined enum
+      values, silencing some uninitialized memory checks, marking some
+      functions with a "noreturn" attribute, and changing an "if" that
+      could never succeed on some platforms into a pre-processor directive
+      that conditionally compiles the code.
 
     - Fixed a potential bug in f_name_cmp() when both the args are a
       top-level "." dir (which doesn't happen in normal operations).
 
     - Changed exit_cleanup() so that it can never return instead of exit.
       The old code might return if it found the exit_cleanup() function
-      was being called recursively.  The new code segments the exit code
-      so that any recursive calls move on to the next step of the exit
-      processing.
+      was being called recursively.  The new code is segmented so that
+      any recursive calls move on to the next step of the exit-processing.
 
   DEVELOPER RELATED:
 
