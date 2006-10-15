@@ -107,8 +107,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 	/* Some of our actions might cause a recursive call back here, so we
 	 * keep track of where we are in the cleanup and never repeat a step. */
 	switch (cleanup_step) {
-	case 0:
-		cleanup_step++;
+#include "case_N.h" /* case 0: cleanup_step++; */
 
 		exit_code = unmodified_code = code;
 
@@ -119,8 +118,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		}
 
 		/* FALLTHROUGH */
-	case 1:
-		cleanup_step++;
+#include "case_N.h"
 
 		if (cleanup_child_pid != -1) {
 			int status;
@@ -133,8 +131,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		}
 
 		/* FALLTHROUGH */
-	case 2:
-		cleanup_step++;
+#include "case_N.h"
 
 		if (cleanup_got_literal && cleanup_fname && cleanup_new_fname
 		 && keep_partial && handle_partial_dir(cleanup_new_fname, PDIR_CREATE)) {
@@ -151,14 +148,12 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		}
 
 		/* FALLTHROUGH */
-	case 3:
-		cleanup_step++;
+#include "case_N.h"
 
 		io_flush(FULL_FLUSH);
 
 		/* FALLTHROUGH */
-	case 4:
-		cleanup_step++;
+#include "case_N.h"
 
 		if (cleanup_fname)
 			do_unlink(cleanup_fname);
@@ -183,8 +178,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 			log_exit(code, file, line);
 
 		/* FALLTHROUGH */
-	case 5:
-		cleanup_step++;
+#include "case_N.h"
 
 		if (verbose > 2) {
 			rprintf(FINFO,
@@ -194,8 +188,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		}
 
 		/* FALLTHROUGH */
-	case 6:
-		cleanup_step++;
+#include "case_N.h"
 
 		close_all();
 
