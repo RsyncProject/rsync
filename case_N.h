@@ -18,11 +18,10 @@
  * 51 Franklin Street - Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-/* The file cleanup.c includes this file multiple times, once for every
- * time it wants to start a new segment its _exit_cleanup() code.  This
- * produces the next "case N:" statement in sequence and increments the
- * cleanup_step variable.  This ensures that our case statements never
- * get out of whack due to added/removed steps. */
+/* This is included by cleanup.c multiple times, once for every segement in
+ * the _exit_cleanup() code.  This produces the next "case N:" statement in
+ * sequence and increments the cleanup_step variable by 1.  This ensures that
+ * our case statements never get out of whack due to added/removed steps. */
 
 #if !defined EXIT_CLEANUP_CASE_0
 #define EXIT_CLEANUP_CASE_0
