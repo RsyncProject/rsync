@@ -83,6 +83,7 @@ static void link_idev_data(void)
 
 			FPTR(cur)->F_HLINDEX = to;
 			FPTR(cur)->F_NEXT = hlink_list[++from];
+			FPTR(cur)->link_u.links->link_dest_used = 0;
 		}
 		pool_free(idev_pool, 0, FPTR(cur)->link_u.idev);
 		if (from > start) {
@@ -94,6 +95,7 @@ static void link_idev_data(void)
 			FPTR(cur)->F_HLINDEX = to;
 			FPTR(cur)->F_NEXT = head;
 			FPTR(cur)->flags |= FLAG_HLINK_EOL;
+			FPTR(cur)->link_u.links->link_dest_used = 0;
 			hlink_list[to++] = head;
 		} else
 			FPTR(cur)->link_u.links = NULL;
