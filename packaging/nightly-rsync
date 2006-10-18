@@ -100,7 +100,6 @@ system "find . -name 'rsync-HEAD-*' -daystart -mtime +14 | xargs rm -f";
 system 'ls -ltr';
 
 if ($upload) {
-    $ENV{RSYNC_PARTIAL_DIR} = ''; # The rsync on samba.org is OLD.
     system "rsync -aviHP --delete-after . samba.org:/home/ftp/pub/rsync/nightly";
 }
 
