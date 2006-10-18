@@ -72,6 +72,11 @@ Changes since 2.6.8:
     - Fixed an infinite loop bug when a filter rule was rejected due to being
       overly long.
 
+    - When the server receives a --partial-dir option from the client, it no
+      longer runs the client-side code that adds an assumed filter rule (since
+      the client will be sending us the rules in the usual manner, and they
+      may have chosen to override the auto-added rule).
+
   ENHANCEMENTS:
 
     - Added the --log-file=FILE and --log-file-format=FORMAT options.  These
