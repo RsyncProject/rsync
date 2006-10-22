@@ -101,7 +101,7 @@ proto:
 	cd $(srcdir) && $(MAKE) -f prepare-source.mak proto.h
 
 unpatch:
-	[ -f $(srcdir)/acls.c ] && patch -d $(srcdir) -p1 -R <$(srcdir)/patches/acls.diff || true
+	test -f $(srcdir)/acls.c && patch -d $(srcdir) -p1 -R <$(srcdir)/patches/acls.diff || true
 	rm -f $(srcdir)/lib/sysacls.? $(srcdir)/smb_acls.h $(srcdir)/acls.c
 	rm -f $(srcdir)/*.orig $(srcdir)/*.rej $(srcdir)/*/*.orig $(srcdir)/*/*.rej
 	rm -f $(srcdir)/testsuite/default-acls.test $(srcdir)/testsuite/acls.test
