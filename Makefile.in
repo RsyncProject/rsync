@@ -100,13 +100,13 @@ man:
 proto:
 	cd $(srcdir) && $(MAKE) -f prepare-source.mak proto.h
 
-clean: cleantests
+unpatch:
+	[ -f $(srcdir)/acls.c ] && patch -d $(srcdir) -p1 -R <$(srcdir)/patches/acls.diff || true
+	rm -f $(srcdir)/lib/sysacls.? $(srcdir)/smb_acls.h $(srcdir)/acls.c
+	rm -f $(srcdir)/*.orig $(srcdir)/*.rej $(srcdir)/*/*.orig $(srcdir)/*/*.rej
+
+clean: unpatch proto cleantests
 	rm -f *~ $(OBJS) $(TLS_OBJ) $(CHECK_PROGS) $(CHECK_OBJS)
-	cd $(srcdir)
-	[ -f acls.c ] && patch -p1 -R <patches/acls.diff || true
-	rm -f *.orig *.rej */*.orig */*.rej
-	$(MAKE) -f prepare-source.mak proto.h
-	rm -f lib/sysacls.c lib/sysacls.h smb_acls.h acls.c
 
 cleantests:
 	rm -rf ./testtmp*
