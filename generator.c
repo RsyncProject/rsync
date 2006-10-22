@@ -647,7 +647,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		j = best_match;
 		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
 		if (link_stat(cmpbuf, stp, 0) < 0)
-			match_level = 0;
+			return -1;
 	}
 
 	if (match_level == 3 && !copy_dest) {
@@ -1033,6 +1033,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 			if (preserve_hard_links && file->link_u.links)
 				hard_link_cluster(file, ndx, itemizing, code);
+			/* This does not check remove_source_files == 1
+			 * because this is one of the items that the old
+			 * --remove-sent-files option would remove. */
 			if (remove_source_files)
 				goto return_with_success;
 		}
