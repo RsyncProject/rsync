@@ -104,6 +104,7 @@ unpatch:
 	[ -f $(srcdir)/acls.c ] && patch -d $(srcdir) -p1 -R <$(srcdir)/patches/acls.diff || true
 	rm -f $(srcdir)/lib/sysacls.? $(srcdir)/smb_acls.h $(srcdir)/acls.c
 	rm -f $(srcdir)/*.orig $(srcdir)/*.rej $(srcdir)/*/*.orig $(srcdir)/*/*.rej
+	rm -f $(srcdir)/testsuite/default-acls.test $(srcdir)/testsuite/acls.test
 
 clean: unpatch proto cleantests
 	rm -f *~ $(OBJS) $(TLS_OBJ) $(CHECK_PROGS) $(CHECK_OBJS)
