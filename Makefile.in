@@ -56,7 +56,7 @@ CHECK_OBJS=getgroups.o getfsdev.o t_stub.o t_unsafe.o trimslash.o wildtest.o
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -c $< @CC_SHOBJ_FLAG@
 @OBJ_RESTORE@
 
-all: proto rsync$(EXEEXT)
+all: rsync$(EXEEXT)
 
 install: all
 	-mkdir -p ${DESTDIR}${bindir}
@@ -100,13 +100,7 @@ man:
 proto:
 	cd $(srcdir) && $(MAKE) -f prepare-source.mak proto.h
 
-unpatch:
-	test -f $(srcdir)/acls.c && patch -td $(srcdir) -p1 -R <$(srcdir)/patches/acls.diff || true
-	rm -f $(srcdir)/lib/sysacls.? $(srcdir)/smb_acls.h $(srcdir)/acls.c
-	rm -f $(srcdir)/*.orig $(srcdir)/*.rej $(srcdir)/*/*.orig $(srcdir)/*/*.rej
-	rm -f $(srcdir)/testsuite/default-acls.test $(srcdir)/testsuite/acls.test
-
-clean: unpatch proto cleantests
+clean: cleantests
 	rm -f *~ $(OBJS) $(TLS_OBJ) $(CHECK_PROGS) $(CHECK_OBJS)
 
 cleantests:
