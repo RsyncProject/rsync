@@ -24,6 +24,7 @@
 
 extern int verbose;
 extern int quiet;
+extern int output_motd;
 extern int list_only;
 extern int am_sender;
 extern int am_server;
@@ -205,7 +206,10 @@ int start_inband_exchange(char *user, char *path, int f_in, int f_out,
 			return -1;
 		}
 
-		rprintf(FINFO, "%s\n", line);
+		/* This might be a MOTD line or a module listing, but there is
+		 * no way to differentiate it.  The manpage mentions this. */
+		if (output_motd)
+			rprintf(FINFO, "%s\n", line);
 	}
 	kluge_around_eof = 0;
 
