@@ -101,6 +101,9 @@ Changes since 2.6.8:
       (The deprecated --remove-sent-files is still understood for now, and
       still behaves in the same way as before.)
 
+    - Added the option --no-motd to suppress the message-of-the-day output
+      from a daemon when doing a copy.  (See the manpage for a caveat.)
+
     - Added a new environment variable to the pre-/post-xfer exec commands (in
       the daemon's config file):  RSYNC_PID.  This value will be the same in
       both the pre- and post-xfer commands, so it can be used if the pre-xfer
