@@ -857,6 +857,9 @@ size_t strlcat(char *d, const char *s, size_t bufsize);
 #ifndef WEXITSTATUS
 #define	WEXITSTATUS(stat)	((int)(((stat)>>8)&0xFF))
 #endif
+#ifndef WIFEXITED
+#define	WIFEXITED(stat)		((int)((stat)&0xFF) == 0)
+#endif
 
 #define exit_cleanup(code) _exit_cleanup(code, __FILE__, __LINE__)
 
