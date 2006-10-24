@@ -299,6 +299,7 @@ Here is a short summary of the options available in rsync. Please refer
 to the detailed description below for a complete description.  verb(
  -v, --verbose               increase verbosity
  -q, --quiet                 suppress non-error messages
+     --no-motd               suppress daemon-mode MOTD (see caveat)
  -c, --checksum              skip based on checksum, not mod-time & size
  -a, --archive               archive mode; same as -rlptgoD (no -H)
      --no-OPTION             turn off an implied OPTION (e.g. --no-D)
@@ -456,6 +457,13 @@ dit(bf(-q, --quiet)) This option decreases the amount of information you
 are given during the transfer, notably suppressing information messages
 from the remote server. This flag is useful when invoking rsync from
 cron.
+
+dit(bf(--no-motd)) This option affects the information that is output
+by the client at the start of a daemon transfer.  This suppresses the
+message-of-the-day (MOTD) text, but it also affects the list of modules
+that the daemon sends in response to the "rsync host::" request (due to
+a limitation in the rsync protocol), so omit this option if you want to
+request the list of modules from the deamon.
 
 dit(bf(-I, --ignore-times)) Normally rsync will skip any files that are
 already the same size and have the same modification time-stamp.
