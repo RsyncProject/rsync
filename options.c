@@ -164,6 +164,7 @@ char *dest_option = NULL;
 
 int verbose = 0;
 int quiet = 0;
+int output_motd = 1;
 int log_before_transfer = 0;
 int stdout_format_has_i = 0;
 int stdout_format_has_o_or_i = 0;
@@ -281,6 +282,7 @@ void usage(enum logcode F)
   rprintf(F,"Options\n");
   rprintf(F," -v, --verbose               increase verbosity\n");
   rprintf(F," -q, --quiet                 suppress non-error messages\n");
+  rprintf(F,"     --no-motd               suppress daemon-mode MOTD (see manpage caveat)\n");
   rprintf(F," -c, --checksum              skip based on checksum, not mod-time & size\n");
   rprintf(F," -a, --archive               archive mode; same as -rlptgoD (no -H)\n");
   rprintf(F,"     --no-OPTION             turn off an implied OPTION (e.g. --no-D)\n");
@@ -407,6 +409,8 @@ static struct poptOption long_options[] = {
   {"no-verbose",       0,  POPT_ARG_VAL,    &verbose, 0, 0, 0 },
   {"no-v",             0,  POPT_ARG_VAL,    &verbose, 0, 0, 0 },
   {"quiet",           'q', POPT_ARG_NONE,   0, 'q', 0, 0 },
+  {"motd",             0,  POPT_ARG_VAL,    &output_motd, 1, 0, 0 },
+  {"no-motd",          0,  POPT_ARG_VAL,    &output_motd, 0, 0, 0 },
   {"stats",            0,  POPT_ARG_NONE,   &do_stats, 0, 0, 0 },
   {"human-readable",  'h', POPT_ARG_NONE,   0, 'h', 0, 0},
   {"dry-run",         'n', POPT_ARG_NONE,   &dry_run, 0, 0, 0 },
