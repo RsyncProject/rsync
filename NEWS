@@ -128,6 +128,9 @@ Changes since 2.6.8:
       was being called recursively.  The new code is segmented so that
       any recursive calls move on to the next step of the exit-processing.
 
+    - The macro WIFEXITED(stat) will now be defined if the OS didn't already
+      define it.
+
   DEVELOPER RELATED:
 
     - The acls.diff and xattrs.diff patches have received a bunch of work to
