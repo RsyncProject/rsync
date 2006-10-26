@@ -132,6 +132,8 @@ Changes since 2.6.8:
 
     - The acls.diff and xattrs.diff patches have received a bunch of work to
       make them much closer to being acceptable in the main distribution.
+      The xattrs patch also has some preliminary Mac OS X compatibility code
+      that allows Macs and non-macs to exchange extended attributes.
 
     - The rsync.yo and rsyncd.conf.yo files have been updated to work
       better with the latest yodl 2.x releases.
