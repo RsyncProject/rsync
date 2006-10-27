@@ -23,6 +23,11 @@ Changes since 2.6.8:
       process.  (These problems could only affect an rsync daemon that was
       receiving files.)
 
+    - Fixed a bug when --inplace was combined with a --*-dest option and we
+      update a file's data using an alternate basis file.  The code now
+      notices that it needs to copy the matching data from the basis file
+      instead of (wrongly) assuming that it was already present in the file.
+
     - Fixed a bug where using --dry-run with a --*-dest option with a path
       relative to a directory that does not yet exist:  the affected option
       gets its proper path value so that the output of the dry-run is right.
