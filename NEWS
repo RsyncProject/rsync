@@ -143,6 +143,12 @@ Changes since 2.6.8:
       The xattrs patch also has some preliminary Mac OS X compatibility code
       that allows Macs and non-macs to exchange extended attributes.
 
+    - A new diff in the patches dir, fake-root.diff, allows rsync to
+      maintain a backup hierarchy with full owner, group, and device info
+      without actually running as root.  It does this using a special
+      extended attribute, so it depends on xattrs.diff (which depends on
+      acls.diff).
+
     - The rsync.yo and rsyncd.conf.yo files have been updated to work
       better with the latest yodl 2.x releases.
 
