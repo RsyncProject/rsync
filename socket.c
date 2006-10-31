@@ -28,6 +28,7 @@
 #include "rsync.h"
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
+#include <netinet/tcp.h>
 
 extern char *bind_address;
 extern int default_af_hint;
