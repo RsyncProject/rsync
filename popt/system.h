@@ -123,8 +123,4 @@ int snprintf(char *str,size_t count,const char *fmt,...);
 
 #define PACKAGE "rsync"
 
-#ifdef _ABS
-#undef _ABS
-#endif
-
 #include "popt.h"
