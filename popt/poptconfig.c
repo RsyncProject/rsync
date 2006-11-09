@@ -30,20 +30,20 @@ static void configLine(poptContext con, char * line)
     if (strncmp(line, con->appName, nameLength)) return;
 
     line += nameLength;
-    if (*line == '\0' || !isspace(*line)) return;
+    if (*line == '\0' || !isSpace(line)) return;
 
-    while (*line != '\0' && isspace(*line)) line++;
+    while (*line != '\0' && isSpace(line)) line++;
     entryType = line;
-    while (*line == '\0' || !isspace(*line)) line++;
+    while (*line == '\0' || !isSpace(line)) line++;
     *line++ = '\0';
 
-    while (*line != '\0' && isspace(*line)) line++;
+    while (*line != '\0' && isSpace(line)) line++;
     if (*line == '\0') return;
     opt = line;
-    while (*line == '\0' || !isspace(*line)) line++;
+    while (*line == '\0' || !isSpace(line)) line++;
     *line++ = '\0';
 
-    while (*line != '\0' && isspace(*line)) line++;
+    while (*line != '\0' && isSpace(line)) line++;
     if (*line == '\0') return;
 
     /*@-temptrans@*/ /* FIX: line alias is saved */
@@ -134,7 +134,7 @@ int poptReadConfigFile(poptContext con, const char * fn)
 	  case '\n':
 	    *dst = '\0';
 	    dst = buf;
-	    while (*dst && isspace(*dst)) dst++;
+	    while (*dst && isSpace(dst)) dst++;
 	    if (*dst && *dst != '#')
 		configLine(con, dst);
 	    chptr++;

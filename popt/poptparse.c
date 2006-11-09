@@ -8,6 +8,8 @@
 
 #include "system.h"
 
+#include "poptint.h"
+
 #define POPT_ARGV_ARRAY_GROW_DELTA 5
 
 /*@-boundswrite@*/
@@ -81,7 +83,7 @@ int poptParseArgvString(const char * s, int * argcPtr, const char *** argvPtr)
 		if (*src != quote) *buf++ = '\\';
 	    }
 	    *buf++ = *src;
-	} else if (isspace(*src)) {
+	} else if (isSpace(src)) {
 	    if (*argv[argc] != '\0') {
 		buf++, argc++;
 		if (argc == argvAlloced) {
@@ -157,7 +159,7 @@ int poptConfigFileToString(FILE *fp, char ** argstrp, /*@unused@*/ UNUSED(int fl
 	p = line;
 
 	/* loop until first non-space char or EOL */
-	while( *p != '\0' && isspace(*p) )
+	while( *p != '\0' && isSpace(p) )
 	    p++;
 
 	linelen = strlen(p);
@@ -169,13 +171,13 @@ int poptConfigFileToString(FILE *fp, char ** argstrp, /*@unused@*/ UNUSED(int fl
 
 	q = p;
 
-	while (*q != '\0' && (!isspace(*q)) && *q != '=')
+	while (*q != '\0' && (!isSpace(q)) && *q != '=')
 	    q++;
 
-	if (isspace(*q)) {
+	if (isSpace(q)) {
 	    /* a space after the name, find next non space */
 	    *q++='\0';
-	    while( *q != '\0' && isspace((int)*q) ) q++;
+	    while( *q != '\0' && isSpace(q) ) q++;
 	}
 	if (*q == '\0') {
 	    /* single command line option (ie, no name=val, just name) */
@@ -197,14 +199,14 @@ int poptConfigFileToString(FILE *fp, char ** argstrp, /*@unused@*/ UNUSED(int fl
 	*q++ = '\0';
 
 	/* find next non-space letter of value */
-	while (*q != '\0' && isspace(*q))
+	while (*q != '\0' && isSpace(q))
 	    q++;
 	if (*q == '\0')
 	    continue;	/* XXX silently ignore missing value */
 
 	/* now, loop and strip all ending whitespace */
 	x = p + linelen;
-	while (isspace(*--x))
+	while (isSpace(--x))
 	    *x = 0;	/* null out last char if space (including fgets() NL) */
 
 	/* rest of line accept */

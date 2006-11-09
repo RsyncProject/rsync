@@ -22,6 +22,12 @@ _free(/*@only@*/ /*@null@*/ const void * p)
     return NULL;
 }
 
+static inline int
+isSpace(const char *ptr)
+{
+    return isspace(*(unsigned char *)ptr);
+}
+
 /* Bit mask macros. */
 /*@-exporttype -redef @*/
 typedef	unsigned int __pbm_bits;
