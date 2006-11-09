@@ -95,23 +95,31 @@ char * xstrdup (const char *str)
 	/*@*/;
 /*@=redecl =redef@*/
 
-#if HAVE_MCHECK_H && defined(__GNUC__)
-#define	vmefail()	(fprintf(stderr, "virtual memory exhausted.\n"), exit(EXIT_FAILURE), NULL)
-#define xstrdup(_str)   (strcpy((malloc(strlen(_str)+1) ? : vmefail()), (_str)))
-#else
-#define	xstrdup(_str)	strdup(_str)
-#endif  /* HAVE_MCHECK_H && defined(__GNUC__) */
-
-#if HAVE___SECURE_GETENV && !defined(__LCLINT__)
-#define	getenv(_s)	__secure_getenv(_s)
-#endif
-
 #ifndef HAVE_STRLCPY
 size_t strlcpy(char *d, const char *s, size_t bufsize);
 #endif
 
 #ifndef HAVE_STRLCAT
 size_t strlcat(char *d, const char *s, size_t bufsize);
+#endif
+
+#if HAVE_MCHECK_H && defined(__GNUC__)
+#define	vmefail()	(fprintf(stderr, "virtual memory exhausted.\n"), exit(EXIT_FAILURE), NULL)
+static inline char *
+xstrdup(const char *s)
+{
+    size_t memsize = strlen(s) + 1;
+    char *ptr = malloc(memsize);
+    if (!ptr) vmefail();
+    strlcpy(ptr, s, memsize);
+    return ptr;
+}
+#else
+#define	xstrdup(_str)	strdup(_str)
+#endif  /* HAVE_MCHECK_H && defined(__GNUC__) */
+
+#if HAVE___SECURE_GETENV && !defined(__LCLINT__)
+#define	getenv(_s)	__secure_getenv(_s)
 #endif
 
 #if !defined HAVE_SNPRINTF || !defined HAVE_C99_VSNPRINTF
