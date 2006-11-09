@@ -10,7 +10,7 @@
 
 #include "system.h"
 
-#define	POPT_WCHAR_HACK
+/*#define POPT_WCHAR_HACK*/
 #ifdef 	POPT_WCHAR_HACK
 #include <wchar.h>			/* for mbsrtowcs */
 /*@access mbstate_t @*/
@@ -360,7 +360,7 @@ static void singleOptionHelp(FILE * fp, size_t maxLeftCol,
 /*@=boundswrite@*/
 
     if (help)
-	fprintf(fp,"  %-*s   ", maxLeftCol+displaypad, left);
+	fprintf(fp,"  %-*s   ", (int)maxLeftCol+displaypad, left);
     else {
 	fprintf(fp,"  %s\n", left); 
 	goto out;
