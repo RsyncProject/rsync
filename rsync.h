@@ -659,10 +659,7 @@ struct chmod_mode_struct;
 #include "lib/permstring.h"
 #include "lib/addrinfo.h"
 
-#if !defined __GNUC__ || defined __APPLE__
-/* Apparently the OS X port of gcc gags on __attribute__.
- *
- * <http://www.opensource.apple.com/bugs/X/gcc/2512150.html> */
+#ifndef __GNUC__
 #define __attribute__(x)
 #endif
 
