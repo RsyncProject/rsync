@@ -2,18 +2,20 @@
  * \file popt/findme.c
  */
 
-/* (C) 1998-2000 Red Hat, Inc. -- Licensing details are in the COPYING
+/* (C) 1998-2002 Red Hat, Inc. -- Licensing details are in the COPYING
    file accompanying popt source distributions, available from 
    ftp://ftp.rpm.org/pub/rpm/dist. */
 
 #include "system.h"
 #include "findme.h"
 
-const char * findProgramPath(const char * argv0) {
+const char * findProgramPath(const char * argv0)
+{
     char * path = getenv("PATH");
     char * pathbuf;
     char * start, * chptr;
     char * buf;
+    size_t bufsize;
 
     if (argv0 == NULL) return NULL;	/* XXX can't happen */
     /* If there is a / in the argv[0], it has to be an absolute path */
@@ -22,17 +24,20 @@ const char * findProgramPath(const char * argv0) {
 
     if (path == NULL) return NULL;
 
-    start = pathbuf = alloca(strlen(path) + 1);
-    buf = malloc(strlen(path) + strlen(argv0) + sizeof("/"));
+    bufsize = strlen(path) + 1;
+    start = pathbuf = alloca(bufsize);
+    if (pathbuf == NULL) return NULL;	/* XXX can't happen */
+    strlcpy(pathbuf, path, bufsize);
+    bufsize += sizeof "/" - 1 + strlen(argv0);
+    buf = malloc(bufsize);
     if (buf == NULL) return NULL;	/* XXX can't happen */
-    strcpy(pathbuf, path);
 
     chptr = NULL;
     /*@-branchstate@*/
     do {
 	if ((chptr = strchr(start, ':')))
 	    *chptr = '\0';
-	sprintf(buf, "%s/%s", start, argv0);
+	snprintf(buf, bufsize, "%s/%s", start, argv0);
 
 	if (!access(buf, X_OK))
 	    return buf;

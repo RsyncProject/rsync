@@ -2,30 +2,32 @@
  * \file popt/poptconfig.c
  */
 
-/* (C) 1998-2000 Red Hat, Inc. -- Licensing details are in the COPYING
+/* (C) 1998-2002 Red Hat, Inc. -- Licensing details are in the COPYING
    file accompanying popt source distributions, available from 
    ftp://ftp.rpm.org/pub/rpm/dist. */
 
 #include "system.h"
 #include "poptint.h"
+/*@access poptContext @*/
 
 /*@-compmempass@*/	/* FIX: item->option.longName kept, not dependent. */
-static void configLine(poptContext con, unsigned char * line)
+static void configLine(poptContext con, char * line)
 	/*@modifies con @*/
 {
-    /*@-type@*/
-    int nameLength = strlen(con->appName);
-    /*@=type@*/
+    size_t nameLength;
     const char * entryType;
     const char * opt;
     poptItem item = (poptItem) alloca(sizeof(*item));
     int i, j;
+
+    if (con->appName == NULL)
+	return;
+    nameLength = strlen(con->appName);
     
+/*@-boundswrite@*/
     memset(item, 0, sizeof(*item));
 
-    /*@-type@*/
     if (strncmp(line, con->appName, nameLength)) return;
-    /*@=type@*/
 
     line += nameLength;
     if (*line == '\0' || !isspace(*line)) return;
@@ -80,6 +82,7 @@ static void configLine(poptContext con, unsigned char * line)
 	item->argc = j;
     }
     /*@=modobserver@*/
+/*@=boundswrite@*/
 	
     /*@-nullstate@*/ /* FIX: item->argv[] may be NULL */
     if (!strcmp(entryType, "alias"))
@@ -92,9 +95,9 @@ static void configLine(poptContext con, unsigned char * line)
 
 int poptReadConfigFile(poptContext con, const char * fn)
 {
-    const unsigned char * file, * chptr, * end;
-    unsigned char * buf;
-/*@dependent@*/ unsigned char * dst;
+    const char * file, * chptr, * end;
+    char * buf;
+/*@dependent@*/ char * dst;
     int fd, rc;
     off_t fileLength;
 
@@ -106,9 +109,7 @@ int poptReadConfigFile(poptContext con, const char * fn)
     if (fileLength == -1 || lseek(fd, 0, 0) == -1) {
 	rc = errno;
 	(void) close(fd);
-	/*@-mods@*/
 	errno = rc;
-	/*@=mods@*/
 	return POPT_ERROR_ERRNO;
     }
 
@@ -116,14 +117,13 @@ int poptReadConfigFile(poptContext con, const char * fn)
     if (read(fd, (char *)file, fileLength) != fileLength) {
 	rc = errno;
 	(void) close(fd);
-	/*@-mods@*/
 	errno = rc;
-	/*@=mods@*/
 	return POPT_ERROR_ERRNO;
     }
     if (close(fd) == -1)
 	return POPT_ERROR_ERRNO;
 
+/*@-boundswrite@*/
     dst = buf = alloca(fileLength + 1);
 
     chptr = file;
@@ -155,6 +155,7 @@ int poptReadConfigFile(poptContext con, const char * fn)
 	}
     }
     /*@=infloops@*/
+/*@=boundswrite@*/
 
     return 0;
 }
@@ -164,18 +165,16 @@ int poptReadDefaultConfig(poptContext con, /*@unused@*/ UNUSED(int useEnv))
     char * fn, * home;
     int rc;
 
-    /*@-type@*/
-    if (!con->appName) return 0;
-    /*@=type@*/
+    if (con->appName == NULL) return 0;
 
     rc = poptReadConfigFile(con, "/etc/popt");
     if (rc) return rc;
-    if (getuid() != geteuid()) return 0;
 
     if ((home = getenv("HOME"))) {
-	fn = alloca(strlen(home) + 20);
-	strcpy(fn, home);
-	strcat(fn, "/.popt");
+	size_t bufsize = strlen(home) + 20;
+	fn = alloca(bufsize);
+	if (fn == NULL) return 0;
+	snprintf(fn, bufsize, "%s/.popt", home);
 	rc = poptReadConfigFile(con, fn);
 	if (rc) return rc;
     }

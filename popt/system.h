@@ -2,7 +2,17 @@
 #include "config.h"
 #endif
 
+#if defined (__GLIBC__) && defined(__LCLINT__)
+/*@-declundef@*/
+/*@unchecked@*/
+extern __const __int32_t *__ctype_tolower;
+/*@unchecked@*/
+extern __const __int32_t *__ctype_toupper;
+/*@=declundef@*/
+#endif
+
 #include <ctype.h>
+
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -19,12 +29,8 @@
 #include <unistd.h>
 #endif
 
-#if !defined(__GNUC__) || defined(APPLE)
-/* Apparently the OS X port of gcc gags on __attribute__.
- *
- * <http://www.opensource.apple.com/bugs/X/gcc/2512150.html> */
+#ifndef __GNUC__
 #define __attribute__(x) 
-
 #endif
 
 #ifdef __NeXT
@@ -34,11 +40,12 @@
 #endif
 
 #if defined(__LCLINT__)
-/*@-declundef -incondefs -redecl@*/ /* LCL: missing annotation */
-/*@only@*/ void * alloca (size_t __size)
+/*@-declundef -incondefs @*/ /* LCL: missing annotation */
+/*@only@*/ /*@out@*/
+void * alloca (size_t __size)
 	/*@ensures MaxSet(result) == (__size - 1) @*/
 	/*@*/;
-/*@=declundef =incondefs =redecl@*/
+/*@=declundef =incondefs @*/
 #endif
 
 /* AIX requires this to be the first thing in the file.  */ 
@@ -49,7 +56,7 @@
 #  ifdef _AIX
 #pragma alloca
 #  else
-#   if HAVE_ALLOCA
+#   ifdef HAVE_ALLOCA
 #    ifndef alloca /* predefined by HP cc +Olibcalls */
 char *alloca ();
 #    endif
@@ -66,7 +73,8 @@ char *alloca ();
 #endif
 
 /*@-redecl -redef@*/
-/*@mayexit@*/ /*@only@*/ char * xstrdup (const char *str)
+/*@mayexit@*/ /*@only@*/ /*@unused@*/
+char * xstrdup (const char *str)
 	/*@*/;
 /*@=redecl =redef@*/
 
@@ -77,6 +85,28 @@ char *alloca ();
 #define	xstrdup(_str)	strdup(_str)
 #endif  /* HAVE_MCHECK_H && defined(__GNUC__) */
 
+#if HAVE___SECURE_GETENV && !defined(__LCLINT__)
+#define	getenv(_s)	__secure_getenv(_s)
+#endif
+
+#ifndef HAVE_STRLCPY
+size_t strlcpy(char *d, const char *s, size_t bufsize);
+#endif
+
+#ifndef HAVE_STRLCAT
+size_t strlcat(char *d, const char *s, size_t bufsize);
+#endif
+
 #define UNUSED(x) x __attribute__((__unused__))
+
+#define PACKAGE "rsync"
+
+#ifndef DBL_EPSILON
+#define DBL_EPSILON 2.2204460492503131e-16
+#endif
+
+#ifdef _ABS
+#undef _ABS
+#endif
 
 #include "popt.h"
