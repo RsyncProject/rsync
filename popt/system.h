@@ -22,11 +22,28 @@ extern __const __int32_t *__ctype_toupper;
 #endif
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#if HAVE_UNISTD_H
-#include <unistd.h>
+#ifdef HAVE_SYS_TYPES_H
+# include <sys/types.h>
+#endif
+#ifdef STDC_HEADERS
+# include <stdlib.h>
+# include <stddef.h>
+#else
+# ifdef HAVE_STDLIB_H
+#  include <stdlib.h>
+# endif
+#endif
+#ifdef HAVE_STRING_H
+# if !defined STDC_HEADERS && defined HAVE_MEMORY_H
+#  include <memory.h>
+# endif
+# include <string.h>
+#endif
+#ifdef HAVE_STRINGS_H
+# include <strings.h>
+#endif
+#ifdef HAVE_UNISTD_H
+# include <unistd.h>
 #endif
 
 #ifndef __GNUC__
@@ -95,6 +112,11 @@ size_t strlcpy(char *d, const char *s, size_t bufsize);
 
 #ifndef HAVE_STRLCAT
 size_t strlcat(char *d, const char *s, size_t bufsize);
+#endif
+
+#if !defined HAVE_SNPRINTF || !defined HAVE_C99_VSNPRINTF
+#define snprintf rsync_snprintf
+int snprintf(char *str,size_t count,const char *fmt,...);
 #endif
 
 #define UNUSED(x) x __attribute__((__unused__))
