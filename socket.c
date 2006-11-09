@@ -95,7 +95,7 @@ static int establish_proxy_connection(int fd, char *host, int port,
 			buffer);
 		return -1;
 	}
-	for (cp = &buffer[5]; isdigit(*(uchar*)cp) || *cp == '.'; cp++) {}
+	for (cp = &buffer[5]; isDigit(cp) || *cp == '.'; cp++) {}
 	while (*cp == ' ')
 		cp++;
 	if (*cp != '2') {

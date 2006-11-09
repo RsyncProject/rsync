@@ -715,9 +715,9 @@ static OFF_T parse_size_arg(char **size_arg, char def_suf)
 	const char *arg;
 	OFF_T size = 1;
 
-	for (arg = *size_arg; isdigit(*(uchar*)arg); arg++) {}
+	for (arg = *size_arg; isDigit(arg); arg++) {}
 	if (*arg == '.')
-		for (arg++; isdigit(*(uchar*)arg); arg++) {}
+		for (arg++; isDigit(arg); arg++) {}
 	switch (*arg && *arg != '+' && *arg != '-' ? *arg++ : def_suf) {
 	case 'b': case 'B':
 		reps = 0;

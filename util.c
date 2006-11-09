@@ -612,8 +612,8 @@ void glob_expand(char *base1, char ***argv_ptr, int *argc_ptr, int *maxargs_ptr)
 void strlower(char *s)
 {
 	while (*s) {
-		if (isupper(*(unsigned char *)s))
-			*s = tolower(*(unsigned char *)s);
+		if (isUpper(s))
+			*s = toLower(s);
 		s++;
 	}
 }
@@ -1139,7 +1139,7 @@ char *human_dnum(double dnum, int decimal_digits)
 {
 	char *buf = human_num(dnum);
 	int len = strlen(buf);
-	if (isdigit(*(uchar*)(buf+len-1))) {
+	if (isDigit(buf + len - 1)) {
 		/* There's extra room in buf prior to the start of the num. */
 		buf -= decimal_digits + 1;
 		snprintf(buf, len + decimal_digits + 2, "%.*f", decimal_digits, dnum);
@@ -1307,7 +1307,7 @@ const char *find_filename_suffix(const char *fn, int fn_len, int *len_ptr)
 			if (strcmp(s+1, "orig") == 0)
 				continue;
 		} else if (s_len > 2 && had_tilde
-		    && s[1] == '~' && isdigit(*(uchar*)(s+2)))
+		    && s[1] == '~' && isDigit(s + 2))
 			continue;
 		*len_ptr = s_len;
 		suf = s;
@@ -1315,7 +1315,7 @@ const char *find_filename_suffix(const char *fn, int fn_len, int *len_ptr)
 			break;
 		/* Determine if the suffix is all digits. */
 		for (s++, s_len--; s_len > 0; s++, s_len--) {
-			if (!isdigit(*(uchar*)s))
+			if (!isDigit(s))
 				return suf;
 		}
 		/* An all-digit suffix may not be that signficant. */

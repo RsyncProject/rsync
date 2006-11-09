@@ -49,8 +49,8 @@ void set_compression(char *fname)
 				continue;
 			}
 			do {
-				if (isupper(*(unsigned char *)f))
-					*t++ = tolower(*(unsigned char *)f);
+				if (isUpper(f))
+					*t++ = toLower(f);
 				else
 					*t++ = *f;
 			} while (*++f != ' ' && *f);

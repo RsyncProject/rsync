@@ -214,11 +214,11 @@ static void filtered_fwrite(FILE *f, const char *buf, int len, int use_isprint)
 	for (s = buf; s < end; s++) {
 		if ((s < end - 4
 		  && *s == '\\' && s[1] == '#'
-		  && isdigit(*(uchar*)(s+2))
-		  && isdigit(*(uchar*)(s+3))
-		  && isdigit(*(uchar*)(s+4)))
+		  && isDigit(s + 2)
+		  && isDigit(s + 3)
+		  && isDigit(s + 4))
 		 || (*s != '\t'
-		  && ((use_isprint && !isprint(*(uchar*)s))
+		  && ((use_isprint && !isPrint(s))
 		   || *(uchar*)s < ' '))) {
 			if (s != buf && fwrite(buf, s - buf, 1, f) != 1)
 				exit_cleanup(RERR_MESSAGEIO);
@@ -445,7 +445,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 		n = fmt + 1;
 		if (*p == '-')
 			*n++ = *p++;
-		while (isdigit(*(uchar*)p) && n - fmt < (int)(sizeof fmt) - 8)
+		while (isDigit(p) && n - fmt < (int)(sizeof fmt) - 8)
 			*n++ = *p++;
 		if (!*p)
 			break;
@@ -677,7 +677,7 @@ int log_format_has(const char *format, char esc)
 	for (p = format; (p = strchr(p, '%')) != NULL; ) {
 		if (*++p == '-')
 			p++;
-		while (isdigit(*(uchar*)p))
+		while (isDigit(p))
 			p++;
 		if (!*p)
 			break;

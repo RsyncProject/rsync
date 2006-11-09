@@ -165,7 +165,7 @@ static int Continuation( char *line, int pos )
    */
   {
   pos--;
-  while( (pos >= 0) && isspace(((unsigned char *)line)[pos]) )
+  while( pos >= 0 && isSpace(line + pos) )
      pos--;
 
   return( ((pos >= 0) && ('\\' == line[pos])) ? pos : -1 );
@@ -387,7 +387,7 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
           c = 0;
         else
           {
-          for( end = i; (end >= 0) && isspace(((unsigned char *) bufr)[end]); end-- )
+          for( end = i; end >= 0 && isSpace(bufr + end); end-- )
             ;
           c = getc( InFile );
           }

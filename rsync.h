@@ -885,3 +885,45 @@ int inet_pton(int af, const char *src, void *dst);
 #ifdef MAINTAINER_MODE
 const char *get_panic_action(void);
 #endif
+
+static inline int
+isDigit(const char *ptr)
+{
+	return isdigit(*(unsigned char *)ptr);
+}
+
+static inline int
+isPrint(const char *ptr)
+{
+	return isprint(*(unsigned char *)ptr);
+}
+
+static inline int
+isSpace(const char *ptr)
+{
+	return isspace(*(unsigned char *)ptr);
+}
+
+static inline int
+isLower(const char *ptr)
+{
+	return islower(*(unsigned char *)ptr);
+}
+
+static inline int
+isUpper(const char *ptr)
+{
+	return isupper(*(unsigned char *)ptr);
+}
+
+static inline int
+toLower(const char *ptr)
+{
+	return tolower(*(unsigned char *)ptr);
+}
+
+static inline int
+toUpper(const char *ptr)
+{
+	return toupper(*(unsigned char *)ptr);
+}
