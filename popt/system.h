@@ -123,10 +123,6 @@ int snprintf(char *str,size_t count,const char *fmt,...);
 
 #define PACKAGE "rsync"
 
-#ifndef DBL_EPSILON
-#define DBL_EPSILON 2.2204460492503131e-16
-#endif
-
 #ifdef _ABS
 #undef _ABS
 #endif

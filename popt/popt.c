@@ -18,6 +18,10 @@
 #include "findme.h"
 #include "poptint.h"
 
+#ifndef DBL_EPSILON
+#define DBL_EPSILON 2.2204460492503131e-16
+#endif
+
 #ifdef	MYDEBUG
 /*@unchecked@*/
 int _popt_debug = 0;
