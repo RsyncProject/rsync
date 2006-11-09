@@ -98,13 +98,15 @@ size_t strlcat(char *d, const char *s, size_t bufsize);
 #endif
 
 #if HAVE_MCHECK_H && defined(__GNUC__)
-#define	vmefail()	(fprintf(stderr, "virtual memory exhausted.\n"), exit(EXIT_FAILURE), NULL)
 static inline char *
 xstrdup(const char *s)
 {
     size_t memsize = strlen(s) + 1;
     char *ptr = malloc(memsize);
-    if (!ptr) vmefail();
+    if (!ptr) {
+	fprintf(stderr, "virtual memory exhausted.\n");
+	exit(EXIT_FAILURE);
+    }
     strlcpy(ptr, s, memsize);
     return ptr;
 }
