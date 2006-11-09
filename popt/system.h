@@ -89,12 +89,6 @@ char *alloca(size_t size);
 #define alloca __builtin_alloca
 #endif
 
-/*@-redecl -redef@*/
-/*@mayexit@*/ /*@only@*/ /*@unused@*/
-char * xstrdup (const char *str)
-	/*@*/;
-/*@=redecl =redef@*/
-
 #ifndef HAVE_STRLCPY
 size_t strlcpy(char *d, const char *s, size_t bufsize);
 #endif
