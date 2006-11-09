@@ -1,158 +1,20 @@
-NEWS for rsync 2.6.9 (6 Nov 2006)
+NEWS for rsync 3.0.0 (UNRELEASED)
 Protocol: 29 (unchanged)
-Changes since 2.6.8:
+Changes since 2.6.9:
 
   BUG FIXES:
 
-    - If rsync is interrupted via a handled signal (such as SIGINT), it will
-      once again clean-up its temp file from the destination dir.
-
-    - Fixed an overzealous sanitizing bug in the handling of the --link-dest,
-      --copy-dest, and --compare-dest options to a daemon without chroot: if
-      the copy's destination dir is deeper than the top of the module's path,
-      these options now accept a safe number of parent-dir (../) references
-      (since these options are relative to the destination dir).  The old code
-      incorrectly chopped off all "../" prefixes for these options, no matter
-      how deep the destination directory was in the module's hierarchy.
-
-    - Fixed a bug where a deferred info/error/log message could get sent
-      directly to the sender instead of being handled by rwrite() in the
-      generator.  This fixes an "unexpected tag 3" fatal error, and should
-      also fix a potential problem where a deferred info/error message from
-      the receiver might bypass the log file and get sent only to the client
-      process.  (These problems could only affect an rsync daemon that was
-      receiving files.)
-
-    - Fixed a bug when --inplace was combined with a --*-dest option and we
-      update a file's data using an alternate basis file.  The code now
-      notices that it needs to copy the matching data from the basis file
-      instead of (wrongly) assuming that it was already present in the file.
-
-    - Fixed a bug where using --dry-run with a --*-dest option with a path
-      relative to a directory that does not yet exist:  the affected option
-      gets its proper path value so that the output of the dry-run is right.
-
-    - Fixed a bug in the %f logfile escape when receiving files: the
-      destination path is now included in the output (e.g. you can now tell
-      when a user specifies a subdir inside a module).
-
-    - If the receiving side fails to create a directory, it will now skip
-      trying to update everything that is inside that directory.
-
-    - If --link-dest is specified with --checksum but without --times, rsync
-      will now allow a hard-link to be created to a matching link-dest file
-      even when the file's modify-time doesn't match the server's file.
-
-    - The daemon now calls more timezone-using functions prior to doing a
-      chroot.  This should help some C libraries to generate proper timestamps
-      from inside a chrooted daemon (and to not try to access /etc/timezone
-      over and over again).
-
-    - Fixed a bug in the handling of an absolute --partial-dir=ABS_PATH option:
-      it now deletes an alternate basis file from the partial-dir that was used
-      to successfully update a destination file.
-
-    - Fixed a bug in the handling of --delete-excluded when using a per-dir
-      merge file:  the merge file is now honored on the receiving side, and
-      only its unqualified include/exclude commands are ignored (just as is
-      done for global include/excludes).
-
-    - Fixed a recent bug where --delete was not working when transferring from
-      the root (/) of the filesystem with --relative enabled.
-
-    - Fixed a recent bug where an --exclude='*' could affect the root (/) of
-      the filesystem with --relative enabled.
-
-    - When --inplace creates a file, it is now created with owner read/write
-      permissions (0600) instead of no permissions at all.  This avoids a
-      problem continuing a transfer that was interrupted (since --inplace
-      will not update a file that has no write permissions).
-
-    - If either --remove-source-files or --remove-sent-files is enabled and we
-      are unable to remove the source file, rsync now outputs an error.
-
-    - Fixed a bug in the daemon's "incoming chmod" rule:  newly-created
-      directories no longer get the 'F' (file) rules applied to them.
-
-    - Fixed an infinite loop bug when a filter rule was rejected due to being
-      overly long.
-
-    - When the server receives a --partial-dir option from the client, it no
-      longer runs the client-side code that adds an assumed filter rule (since
-      the client will be sending us the rules in the usual manner, and they
-      may have chosen to override the auto-added rule).
+    - ...
 
   ENHANCEMENTS:
 
-    - Added the --log-file=FILE and --log-file-format=FORMAT options.  These
-      can be used to tell any rsync to output what it is doing to a log file.
-      They work with a client rsync, a non-daemon server rsync (see the man
-      page for instructions), and also allows the overriding of rsyncd.conf
-      settings when starting a daemon.
-
-    - The --log-format option was renamed to be --out-format to avoid confusing
-      it with affecting the log-file output.  (The old option remains as an
-      alias for the new to preserve backward compatibility.)
-
-    - Made "log file" and "syslog facility" settable on a per-module basis in
-      the daemon's config file.
-
-    - Added the --remove-source-files option as a replacement for the (now
-      deprecated) --remove-sent-files option.  This new option removes all
-      non-dirs from the source directories, even if the file was already
-      up-to-date.  This fixes a problem where interrupting an rsync that
-      was using --remove-sent-files and restarting it could leave behind
-      a file that the earlier rsync synchronized, but didn't get to remove.
-      (The deprecated --remove-sent-files is still understood for now, and
-      still behaves in the same way as before.)
-
-    - Added the option --no-motd to suppress the message-of-the-day output
-      from a daemon when doing a copy.  (See the manpage for a caveat.)
-
-    - Added a new environment variable to the pre-/post-xfer exec commands (in
-      the daemon's config file):  RSYNC_PID.  This value will be the same in
-      both the pre- and post-xfer commands, so it can be used if the pre-xfer
-      command wants to cache some arg/request info for the post-xfer command.
+    - ...
 
   INTERNAL:
 
-    - Did a code audit using IBM's code-checker program and made several
-      changes, including: replacing most of the strcpy() and sprintf()
-      calls with strlcpy(), snprintf(), and memcpy(), adding a 0-value to
-      an enum that had been intermingling a literal 0 with the defined enum
-      values, silencing some uninitialized memory checks, marking some
-      functions with a "noreturn" attribute, and changing an "if" that
-      could never succeed on some platforms into a pre-processor directive
-      that conditionally compiles the code.
-
-    - Fixed a potential bug in f_name_cmp() when both the args are a
-      top-level "." dir (which doesn't happen in normal operations).
-
-    - Changed exit_cleanup() so that it can never return instead of exit.
-      The old code might return if it found the exit_cleanup() function
-      was being called recursively.  The new code is segmented so that
-      any recursive calls move on to the next step of the exit-processing.
-
-    - The macro WIFEXITED(stat) will now be defined if the OS didn't already
-      define it.
+    - Upgraded the popt version to 1.10.2 and improved its use of string-
+      handling functions.
 
   DEVELOPER RELATED:
 
-    - The acls.diff and xattrs.diff patches have received a bunch of work to
-      make them much closer to being acceptable in the main distribution.
-      The xattrs patch also has some preliminary Mac OS X compatibility code
-      that allows Macs and non-macs to exchange extended attributes.
-
-    - A new diff in the patches dir, fake-root.diff, allows rsync to
-      maintain a backup hierarchy with full owner, group, and device info
-      without actually running as root.  It does this using a special
-      extended attribute, so it depends on xattrs.diff (which depends on
-      acls.diff).
-
-    - The rsync.yo and rsyncd.conf.yo files have been updated to work
-      better with the latest yodl 2.x releases.
-
-    - Updated config.guess and config.sub to their 2006-02-23 version.
-
-    - Updated various files to include the latest FSF address and to have
-      consistent opening comments.
+    - ...
