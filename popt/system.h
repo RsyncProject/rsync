@@ -75,7 +75,7 @@ void * alloca (size_t __size)
 #  else
 #   ifdef HAVE_ALLOCA
 #    ifndef alloca /* predefined by HP cc +Olibcalls */
-char *alloca ();
+char *alloca(size_t size);
 #    endif
 #   else
 #    ifdef alloca
