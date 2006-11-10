@@ -17,6 +17,9 @@ Changes since 2.6.9:
 
   INTERNAL:
 
+    - Added some isType() functions that make dealing with signed characters
+      easier without forcing variables via casts.
+
     - Upgraded the included popt version to 1.10.2 and improved its use of
       string-handling functions.
 
