@@ -976,7 +976,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		 * file of that name and it is *not* a directory, then
 		 * we need to delete it.  If it doesn't exist, then
 		 * (perhaps recursively) create it. */
-		int sr;
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			if (delete_item(fname, st.st_mode, del_opts) < 0)
 				return;
@@ -986,26 +985,27 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			missing_below = file->dir.depth;
 			dry_run++;
 		}
-		sr = statret;
+		real_ret = statret;
+		real_st = st;
 		if (new_root_dir) {
 			if (*fname == '.' && fname[1] == '\0')
-				sr = -1;
+				statret = -1;
 			new_root_dir = 0;
 		}
-		if (sr != 0 && basis_dir[0] != NULL) {
+		if (statret != 0 && basis_dir[0] != NULL) {
 			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &st,
 					      itemizing, maybe_ATTRS_REPORT, code);
 			if (j == -2) {
 				itemizing = 0;
 				code = FNONE;
 			} else if (j >= 0)
-				sr = 1;
+				statret = 1;
 		}
 		if (itemizing && f_out != -1) {
-			itemize(file, ndx, sr, &st,
-				sr ? ITEM_LOCAL_CHANGE : 0, 0, NULL);
+			itemize(file, ndx, statret, &st,
+				statret ? ITEM_LOCAL_CHANGE : 0, 0, NULL);
 		}
-		if (statret != 0 && do_mkdir(fname,file->mode) < 0 && errno != EEXIST) {
+		if (real_ret != 0 && do_mkdir(fname,file->mode) < 0 && errno != EEXIST) {
 			if (!relative_paths || errno != ENOENT
 			    || create_directory_path(fname) < 0
 			    || (do_mkdir(fname, file->mode) < 0 && errno != EEXIST)) {
@@ -1022,9 +1022,11 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				return;
 			}
 		}
-		if (set_file_attrs(fname, file, statret ? NULL : &st, 0)
+		if (set_file_attrs(fname, file, real_ret ? NULL : &real_st, 0)
 		    && verbose && code != FNONE && f_out != -1)
 			rprintf(code, "%s/\n", fname);
+		if (real_ret != 0 && one_file_system)
+			st.st_dev = filesystem_dev;
 		if (delete_during && f_out != -1 && !phase && dry_run < 2
 		    && (file->flags & FLAG_DEL_HERE))
 			delete_in_dir(the_file_list, fname, file, &st);
