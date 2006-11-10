@@ -1026,10 +1026,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		    && verbose && code != FNONE && f_out != -1)
 			rprintf(code, "%s/\n", fname);
 		if (real_ret != 0 && one_file_system)
-			st.st_dev = filesystem_dev;
+			real_st.st_dev = filesystem_dev;
 		if (delete_during && f_out != -1 && !phase && dry_run < 2
 		    && (file->flags & FLAG_DEL_HERE))
-			delete_in_dir(the_file_list, fname, file, &st);
+			delete_in_dir(the_file_list, fname, file, &real_st);
 		return;
 	}
 
