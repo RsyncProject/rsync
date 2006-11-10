@@ -10,7 +10,7 @@
 
 . "$suitedir/rsync.fns"
 
-lddir="$tmpdir/ld"
+to2dir="$tmpdir/to2"
 
 chkfile="$scratchdir/rsync.chk"
 outfile="$scratchdir/rsync.out"
@@ -134,8 +134,7 @@ cat <<EOT >"$chkfile"
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 7 failed"
 
-mv "$todir" "$lddir"
-$RSYNC -ivvplrtH --copy-dest=../ld "$fromdir/" "$todir/" \
+$RSYNC -ivvplrtH --copy-dest=../to "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 filter_outfile
 cat <<EOT >"$chkfile"
@@ -151,16 +150,16 @@ cL        foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 8 failed"
 
-rm -rf "$todir"
-$RSYNC -iplrtH --copy-dest=../ld "$fromdir/" "$todir/" \
+rm -rf "$to2dir"
+$RSYNC -iplrtH --copy-dest=../to "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
 hf        foo/extra => foo/config1
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 9 failed"
 
-rm -rf "$todir"
-$RSYNC -vvplrtH --copy-dest="$lddir" "$fromdir/" "$todir/" \
+rm -rf "$to2dir"
+$RSYNC -vvplrtH --copy-dest="$todir" "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 filter_outfile
 cat <<EOT >"$chkfile"
@@ -177,8 +176,8 @@ foo/sym is uptodate
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 10 failed"
 
-rm -rf "$todir"
-$RSYNC -ivvplrtH --link-dest="$lddir" "$fromdir/" "$todir/" \
+rm -rf "$to2dir"
+$RSYNC -ivvplrtH --link-dest="$todir" "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 filter_outfile
 cat <<EOT >"$chkfile"
@@ -194,22 +193,22 @@ $L        foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 11 failed"
 
-rm -rf "$todir"
-$RSYNC -iplrtH --dry-run --link-dest=../ld "$fromdir/" "$todir/" \
+rm -rf "$to2dir"
+$RSYNC -iplrtH --dry-run --link-dest=../to "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 12 failed"
 
-rm -rf "$todir"
-$RSYNC -iplrtH --link-dest=../ld "$fromdir/" "$todir/" \
+rm -rf "$to2dir"
+$RSYNC -iplrtH --link-dest=../to "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 13 failed"
 
-rm -rf "$todir"
-$RSYNC -vvplrtH --link-dest="$lddir" "$fromdir/" "$todir/" \
+rm -rf "$to2dir"
+$RSYNC -vvplrtH --link-dest="$todir" "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 filter_outfile
 cat <<EOT >"$chkfile"
@@ -225,8 +224,8 @@ foo/sym is uptodate
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 14 failed"
 
-rm -rf "$todir"
-$RSYNC -ivvplrtH --compare-dest="$lddir" "$fromdir/" "$todir/" \
+rm -rf "$to2dir"
+$RSYNC -ivvplrtH --compare-dest="$todir" "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 filter_outfile
 # TODO fix really-old problem when combining -H with --compare-dest:
@@ -243,15 +242,15 @@ cd        foo/
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 15 failed"
 
-rm -rf "$todir"
-$RSYNC -iplrtH --compare-dest="$lddir" "$fromdir/" "$todir/" \
+rm -rf "$to2dir"
+$RSYNC -iplrtH --compare-dest="$todir" "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 16 failed"
 
-rm -rf "$todir"
-$RSYNC -vvplrtH --compare-dest="$lddir" "$fromdir/" "$todir/" \
+rm -rf "$to2dir"
+$RSYNC -vvplrtH --compare-dest="$todir" "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 filter_outfile
 cat <<EOT >"$chkfile"
