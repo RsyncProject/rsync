@@ -614,8 +614,7 @@ static void log_formatted(enum logcode code, char *format, char *op,
 				int i;
 				for (i = 2; n[i]; i++)
 					n[i] = ch;
-			} else if (n[0] == '.' || n[0] == 'h'
-			        || (n[0] == 'c' && n[1] == 'f')) {
+			} else if (n[0] == '.' || n[0] == 'h' || n[0] == 'c') {
 				int i;
 				for (i = 2; n[i]; i++) {
 					if (n[i] != '.')
