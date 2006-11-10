@@ -26,6 +26,10 @@ ln -s ../bar/baz/rsync "$fromdir/foo/sym"
 umask 022
 ln "$fromdir/foo/config1" "$fromdir/foo/extra"
 
+# Check if the OS can hard-link symlinks or not
+ln "$fromdir/foo/sym" "$fromdir/foo/sym.test" && L=hL || L=cL
+rm -f "$fromdir/foo/sym.test"
+
 $RSYNC -iplr "$fromdir/" "$todir/" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
@@ -186,7 +190,7 @@ cd        foo/
 hf        foo/config1
 hf        foo/config2
 hf        foo/extra => foo/config1
-hL        foo/sym -> ../bar/baz/rsync
+$L        foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 11 failed"
 
