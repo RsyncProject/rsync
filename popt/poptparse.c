@@ -188,8 +188,8 @@ int poptConfigFileToString(FILE *fp, char ** argstrp, /*@unused@*/ UNUSED(int fl
 		argstr = realloc(argstr, maxargvlen);
 		if (argstr == NULL) return POPT_ERROR_MALLOC;
 	    }
-	    strcat(argstr, " --");
-	    strcat(argstr, p);
+	    strlcat(argstr, " --", maxargvlen);
+	    strlcat(argstr, p, maxargvlen);
 	    continue;
 	}
 	if (*q != '=')
@@ -217,11 +217,11 @@ int poptConfigFileToString(FILE *fp, char ** argstrp, /*@unused@*/ UNUSED(int fl
 	    argstr = realloc(argstr, maxargvlen);
 	    if (argstr == NULL) return POPT_ERROR_MALLOC;
 	}
-	strcat(argstr, " --");
-	strcat(argstr, p);
-	strcat(argstr, "=\"");
-	strcat(argstr, q);
-	strcat(argstr, "\"");
+	strlcat(argstr, " --", maxargvlen);
+	strlcat(argstr, p, maxargvlen);
+	strlcat(argstr, "=\"", maxargvlen);
+	strlcat(argstr, q, maxargvlen);
+	strlcat(argstr, "\"", maxargvlen);
     }
 
     *argstrp = argstr;
