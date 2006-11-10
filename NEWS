@@ -4,7 +4,12 @@ Changes since 2.6.9:
 
   BUG FIXES:
 
-    - ...
+    - Fixed the output of -ii when combined with one of the --*-dest options:
+      it now itemizes all the items, not just the changed ones.
+
+    - Made the output of all file types consistent when using a --*-dest
+      option.  Prior versions used to output too many creation events for
+      matching items.
 
   ENHANCEMENTS:
 
@@ -12,8 +17,8 @@ Changes since 2.6.9:
 
   INTERNAL:
 
-    - Upgraded the popt version to 1.10.2 and improved its use of string-
-      handling functions.
+    - Upgraded the included popt version to 1.10.2 and improved its use of
+      string-handling functions.
 
   DEVELOPER RELATED:
 
