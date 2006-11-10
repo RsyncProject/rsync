@@ -153,6 +153,7 @@
 /* These are outside the range of the transmitted flags. */
 #define ITEM_MISSING_DATA (1<<16)	   /* used by log_formatted() */
 #define ITEM_DELETED (1<<17)		   /* used by log_formatted() */
+#define ITEM_MATCHED (1<<18)		   /* used by itemize() */
 
 #define SIGNIFICANT_ITEM_FLAGS (~(\
 	ITEM_BASIS_TYPE_FOLLOWS | ITEM_XNAME_FOLLOWS | ITEM_LOCAL_CHANGE))
