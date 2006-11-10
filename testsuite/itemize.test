@@ -27,8 +27,13 @@ umask 022
 ln "$fromdir/foo/config1" "$fromdir/foo/extra"
 
 # Check if the OS can hard-link symlinks or not
-ln "$fromdir/foo/sym" "$fromdir/foo/sym.test" && L=hL || L=cL
-rm -f "$fromdir/foo/sym.test"
+ln -s no-such-dir "$to2dir"
+if ln "$to2dir" "$to2dir.test" 2>/dev/null; then
+    L=hL
+else
+    L=cL
+fi
+rm -f "$to2dir" "$to2dir.test"
 
 $RSYNC -iplr "$fromdir/" "$todir/" \
     | tee "$outfile"
