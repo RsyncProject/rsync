@@ -68,7 +68,7 @@ filter_outfile
 cat <<EOT >"$chkfile"
 .d..t.... ./
 cD..t.... block
-cD....... block2
+cD        block2
 cD+++++++ block3
 hD+++++++ block2.5 => block3
 cD+++++++ char
@@ -88,6 +88,24 @@ echo ""
 ( cd "$fromdir" && rsync_ls_lR . ) > "$tmpdir/ls-from"
 ( cd "$todir" && rsync_ls_lR . ) > "$tmpdir/ls-to"
 diff $diffopt "$tmpdir/ls-from" "$tmpdir/ls-to"
+
+if test -b "$fromdir/block2.5"; then
+    set -x
+    $RSYNC -aii --link-dest="$todir" "$fromdir/" "$chkdir/" \
+	| tee "$outfile"
+    cat <<EOT >"$chkfile"
+cd        ./
+hD        block
+hD        block2
+hD        block2.5
+hD        block3
+hD        char
+hD        char2
+hD        char3
+hS        fifo
+EOT
+    diff $diffopt "$chkfile" "$outfile" || test_fail "test 4 failed"
+fi
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
