@@ -99,6 +99,9 @@ static int deletion_count = 0; /* used to implement --max-delete */
 #define DEL_FORCE_RECURSE	(1<<1) /* recurse even w/o --force */
 #define DEL_TERSE		(1<<3)
 
+enum nonregtype {
+    TYPE_DIR, TYPE_SPECIAL, TYPE_DEVICE, TYPE_SYMLINK
+};
 
 static int is_backup_file(char *fn)
 {
@@ -343,8 +346,9 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 		if (S_ISREG(file->mode) && file->length != st->st_size)
 			iflags |= ITEM_REPORT_SIZE;
 		if ((iflags & (ITEM_TRANSFER|ITEM_LOCAL_CHANGE) && !keep_time
-		     && (!(iflags & ITEM_XNAME_FOLLOWS) || *xname))
-		    || (keep_time && cmp_time(file->modtime, st->st_mtime) != 0))
+		  && !(iflags & ITEM_MATCHED)
+		  && (!(iflags & ITEM_XNAME_FOLLOWS) || *xname))
+		 || (keep_time && cmp_time(file->modtime, st->st_mtime) != 0))
 			iflags |= ITEM_REPORT_TIME;
 		if ((file->mode & CHMOD_BITS) != (st->st_mode & CHMOD_BITS))
 			iflags |= ITEM_REPORT_PERMS;
@@ -653,10 +657,9 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 	if (match_level == 3 && !copy_dest) {
 #ifdef SUPPORT_HARD_LINKS
 		if (link_dest) {
+			int i = itemizing && (verbose > 1 || stdout_format_has_i > 1);
 			if (hard_link_one(file, ndx, fname, 0, stp,
-					  cmpbuf, 1,
-					  itemizing && verbose > 1,
-					  code) < 0)
+					  cmpbuf, 1, i, code) < 0)
 				goto try_a_copy;
 			if (preserve_hard_links && file->link_u.links) {
 				if (dry_run)
@@ -701,42 +704,107 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 }
 
 /* This is only called for non-regular files.  We return -2 if we've finished
- * handling the file, or -1 if no dest-linking occurred. */
+ * handling the file, or -1 if no dest-linking occurred, or a non-negative
+ * value if we found an alternate basis file. */
 static int try_dests_non(struct file_struct *file, char *fname, int ndx,
-			 int itemizing, int maybe_ATTRS_REPORT,
-			 enum logcode code)
+			 char *cmpbuf, STRUCT_STAT *stp, int itemizing,
+			 int maybe_ATTRS_REPORT, enum logcode code)
 {
-	char fnamebuf[MAXPATHLEN];
-	STRUCT_STAT st;
-	int i = 0;
+	char lnk[MAXPATHLEN];
+	int best_match = -1;
+	int match_level = 0;
+	enum nonregtype type;
+	int len, j = 0;
+
+#ifndef SUPPORT_LINKS
+	if (S_ISLNK(file->mode))
+		return -1;
+#endif
+	if (S_ISDIR(file->mode)) {
+		type = TYPE_DIR;
+	} else if (IS_SPECIAL(file->mode))
+		type = TYPE_SPECIAL;
+	else if (IS_DEVICE(file->mode))
+		type = TYPE_DEVICE;
+#ifdef SUPPORT_LINKS
+	else if (S_ISLNK(file->mode))
+		type = TYPE_SYMLINK;
+#endif
+	else {
+		rprintf(FERROR,
+			"internal: try_dests_non() called with invalid mode (%o)\n",
+			(int)file->mode);
+		exit_cleanup(RERR_UNSUPPORTED);
+	}
 
 	do {
-		pathjoin(fnamebuf, MAXPATHLEN, basis_dir[i], fname);
-		if (link_stat(fnamebuf, &st, 0) < 0 || S_ISDIR(st.st_mode)
-		 || !unchanged_attrs(file, &st))
+		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
+		if (link_stat(cmpbuf, stp, 0) < 0)
 			continue;
-		if (S_ISLNK(file->mode)) {
+		switch (type) {
+		case TYPE_DIR:
+			if (!S_ISDIR(stp->st_mode))
+				continue;
+			break;
+		case TYPE_SPECIAL:
+			if (!IS_SPECIAL(stp->st_mode))
+				continue;
+			break;
+		case TYPE_DEVICE:
+			if (!IS_DEVICE(stp->st_mode))
+				continue;
+			break;
 #ifdef SUPPORT_LINKS
-			char lnk[MAXPATHLEN];
-			int len;
-			if ((len = readlink(fnamebuf, lnk, MAXPATHLEN-1)) <= 0)
+		case TYPE_SYMLINK:
+			if (!S_ISLNK(stp->st_mode))
+				continue;
+			break;
+#endif
+		}
+		if (match_level < 1) {
+			match_level = 1;
+			best_match = j;
+		}
+		switch (type) {
+		case TYPE_DIR:
+			break;
+		case TYPE_SPECIAL:
+		case TYPE_DEVICE:
+			if (stp->st_rdev != file->u.rdev)
+				continue;
+			break;
+#ifdef SUPPORT_LINKS
+		case TYPE_SYMLINK:
+			if ((len = readlink(cmpbuf, lnk, MAXPATHLEN-1)) <= 0)
 				continue;
 			lnk[len] = '\0';
 			if (strcmp(lnk, file->u.link) != 0)
+				continue;
+			break;
 #endif
-				continue;
-		} else if (IS_SPECIAL(file->mode)) {
-			if (!IS_SPECIAL(st.st_mode) || st.st_rdev != file->u.rdev)
-				continue;
-		} else if (IS_DEVICE(file->mode)) {
-			if (!IS_DEVICE(st.st_mode) || st.st_rdev != file->u.rdev)
-				continue;
-		} else {
-			rprintf(FERROR,
-				"internal: try_dests_non() called with invalid mode (%o)\n",
-				(int)file->mode);
-			exit_cleanup(RERR_UNSUPPORTED);
 		}
+		if (match_level < 2) {
+			match_level = 2;
+			best_match = j;
+		}
+		if (unchanged_attrs(file, stp)) {
+			match_level = 3;
+			best_match = j;
+			break;
+		}
+	} while (basis_dir[++j] != NULL);
+
+	if (!match_level)
+		return -1;
+
+	if (j != best_match) {
+		j = best_match;
+		pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
+		if (link_stat(cmpbuf, stp, 0) < 0)
+			return -1;
+	}
+
+	if (match_level == 3) {
 #ifdef SUPPORT_HARD_LINKS
 		if (link_dest
 #ifndef CAN_HARDLINK_SYMLINK
@@ -745,30 +813,34 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 #ifndef CAN_HARDLINK_SPECIAL
 		 && !IS_SPECIAL(file->mode) && !IS_DEVICE(file->mode)
 #endif
-		) {
-			if (do_link(fnamebuf, fname) < 0) {
+		 && !S_ISDIR(file->mode)) {
+			if (do_link(cmpbuf, fname) < 0) {
 				rsyserr(FERROR, errno,
 					"failed to hard-link %s with %s",
-					fnamebuf, fname);
-				break;
+					cmpbuf, fname);
+				return j;
 			}
 			if (preserve_hard_links && file->link_u.links)
 				hard_link_cluster(file, ndx, itemizing, code);
-		}
+		} else
 #endif
-		if (itemizing && stdout_format_has_i && verbose > 1) {
-			int changes = compare_dest ? 0 : ITEM_LOCAL_CHANGE
-				    + (link_dest ? ITEM_XNAME_FOLLOWS : 0);
-			char *lp = link_dest ? "" : NULL;
-			itemize(file, ndx, 0, &st, changes, 0, lp);
+			match_level = 2;
+		if (itemizing && stdout_format_has_i
+		 && (verbose > 1 || stdout_format_has_i > 1)) {
+			int chg = compare_dest && type != TYPE_DIR ? 0
+			    : ITEM_LOCAL_CHANGE
+			     + (match_level == 3 ? ITEM_XNAME_FOLLOWS : 0);
+			char *lp = match_level == 3 ? "" : NULL;
+			itemize(file, ndx, 0, stp, chg + ITEM_MATCHED, 0, lp);
 		}
 		if (verbose > 1 && maybe_ATTRS_REPORT) {
-			rprintf(FCLIENT, "%s is uptodate\n", fname);
+			rprintf(FCLIENT, "%s%s is uptodate\n",
+				fname, type == TYPE_DIR ? "/" : "");
 		}
 		return -2;
-	} while (basis_dir[++i] != NULL);
+	}
 
-	return -1;
+	return j;
 }
 
 static int phase = 0;
@@ -904,6 +976,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		 * file of that name and it is *not* a directory, then
 		 * we need to delete it.  If it doesn't exist, then
 		 * (perhaps recursively) create it. */
+		int sr;
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
 			if (delete_item(fname, st.st_mode, del_opts) < 0)
 				return;
@@ -913,13 +986,22 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			missing_below = file->dir.depth;
 			dry_run++;
 		}
+		sr = statret;
+		if (new_root_dir) {
+			if (*fname == '.' && fname[1] == '\0')
+				sr = -1;
+			new_root_dir = 0;
+		}
+		if (sr != 0 && basis_dir[0] != NULL) {
+			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &st,
+					      itemizing, maybe_ATTRS_REPORT, code);
+			if (j == -2) {
+				itemizing = 0;
+				code = FNONE;
+			} else if (j >= 0)
+				sr = 1;
+		}
 		if (itemizing && f_out != -1) {
-			int sr = statret;
-			if (new_root_dir) {
-				if (*fname == '.' && fname[1] == '\0')
-					sr = -1;
-				new_root_dir = 0;
-			}
 			itemize(file, ndx, sr, &st,
 				sr ? ITEM_LOCAL_CHANGE : 0, 0, NULL);
 		}
@@ -970,39 +1052,29 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			char lnk[MAXPATHLEN];
 			int len;
 
-			if (!S_ISDIR(st.st_mode)
-			    && (len = readlink(fname, lnk, MAXPATHLEN-1)) > 0) {
-				lnk[len] = 0;
-				/* A link already pointing to the
-				 * right place -- no further action
-				 * required. */
-				if (strcmp(lnk, file->u.link) == 0) {
-					if (itemizing) {
-						itemize(file, ndx, 0, &st, 0,
-							0, NULL);
-					}
-					set_file_attrs(fname, file, &st,
-						       maybe_ATTRS_REPORT);
-					if (preserve_hard_links
-					    && file->link_u.links) {
-						hard_link_cluster(file, ndx,
-								  itemizing,
-								  code);
-					}
-					if (remove_source_files == 1)
-						goto return_with_success;
-					return;
-				}
+			if (!S_ISLNK(st.st_mode))
+				statret = -1;
+			else if ((len = readlink(fname, lnk, MAXPATHLEN-1)) > 0
+			      && strncmp(lnk, file->u.link, len) == 0
+			      && file->u.link[len] == '\0') {
+				/* The link is pointing to the right place. */
+				if (itemizing)
+					itemize(file, ndx, 0, &st, 0, 0, NULL);
+				set_file_attrs(fname, file, &st, maybe_ATTRS_REPORT);
+				if (preserve_hard_links && file->link_u.links)
+					hard_link_cluster(file, ndx, itemizing, code);
+				if (remove_source_files == 1)
+					goto return_with_success;
+				return;
 			}
 			/* Not the right symlink (or not a symlink), so
 			 * delete it. */
 			if (delete_item(fname, st.st_mode, del_opts) < 0)
 				return;
-			if (!S_ISLNK(st.st_mode))
-				statret = -1;
 		} else if (basis_dir[0] != NULL) {
-			if (try_dests_non(file, fname, ndx, itemizing,
-					  maybe_ATTRS_REPORT, code) == -2) {
+			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &st,
+					      itemizing, maybe_ATTRS_REPORT, code);
+			if (j == -2) {
 #ifndef CAN_HARDLINK_SYMLINK
 				if (link_dest) {
 					/* Resort to --copy-dest behavior. */
@@ -1012,13 +1084,14 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					return;
 				itemizing = 0;
 				code = FNONE;
-			}
+			} else if (j >= 0)
+				statret = 1;
 		}
 		if (preserve_hard_links && file->link_u.links
 		    && hard_link_check(file, ndx, fname, -1, &st,
 				       itemizing, code, HL_SKIP))
 			return;
-		if (do_symlink(file->u.link,fname) != 0) {
+		if (do_symlink(file->u.link, fname) != 0) {
 			rsyserr(FERROR, errno, "symlink %s -> \"%s\" failed",
 				full_fname(fname), file->u.link);
 		} else {
@@ -1027,10 +1100,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				itemize(file, ndx, statret, &st,
 					ITEM_LOCAL_CHANGE, 0, NULL);
 			}
-			if (code != FNONE && verbose) {
-				rprintf(code, "%s -> %s\n", fname,
-					file->u.link);
-			}
+			if (code != FNONE && verbose)
+				rprintf(code, "%s -> %s\n", fname, file->u.link);
 			if (preserve_hard_links && file->link_u.links)
 				hard_link_cluster(file, ndx, itemizing, code);
 			/* This does not check remove_source_files == 1
@@ -1045,9 +1116,28 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
 	 || (preserve_specials && IS_SPECIAL(file->mode))) {
-		if (statret != 0 && basis_dir[0] != NULL) {
-			if (try_dests_non(file, fname, ndx, itemizing,
-					  maybe_ATTRS_REPORT, code) == -2) {
+		if (statret == 0) {
+			if ((IS_DEVICE(file->mode) && !IS_DEVICE(st.st_mode))
+			 || (IS_SPECIAL(file->mode) && !IS_SPECIAL(st.st_mode)))
+				statret = -1;
+			else if ((st.st_mode & ~CHMOD_BITS) == (file->mode & ~CHMOD_BITS)
+			      && st.st_rdev == file->u.rdev) {
+				/* The device or special file is identical. */
+				if (itemizing)
+					itemize(file, ndx, 0, &st, 0, 0, NULL);
+				set_file_attrs(fname, file, &st, maybe_ATTRS_REPORT);
+				if (preserve_hard_links && file->link_u.links)
+					hard_link_cluster(file, ndx, itemizing, code);
+				if (remove_source_files == 1)
+					goto return_with_success;
+				return;
+			}
+			if (delete_item(fname, st.st_mode, del_opts) < 0)
+				return;
+		} else if (basis_dir[0] != NULL) {
+			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &st,
+					      itemizing, maybe_ATTRS_REPORT, code);
+			if (j == -2) {
 #ifndef CAN_HARDLINK_SPECIAL
 				if (link_dest) {
 					/* Resort to --copy-dest behavior. */
@@ -1057,48 +1147,28 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					return;
 				itemizing = 0;
 				code = FNONE;
-			}
+			} else if (j >= 0)
+				statret = 1;
 		}
-		if (statret != 0
-		 || (st.st_mode & ~CHMOD_BITS) != (file->mode & ~CHMOD_BITS)
-		 || st.st_rdev != file->u.rdev) {
-			if (statret == 0
-			 && delete_item(fname, st.st_mode, del_opts) < 0)
-				return;
-			if (preserve_hard_links && file->link_u.links
-			    && hard_link_check(file, ndx, fname, -1, &st,
-					       itemizing, code, HL_SKIP))
-				return;
-			if ((IS_DEVICE(file->mode) && !IS_DEVICE(st.st_mode))
-			 || (IS_SPECIAL(file->mode) && !IS_SPECIAL(st.st_mode)))
-				statret = -1;
-			if (verbose > 2) {
-				rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",
-					fname,
-					(int)file->mode, (int)file->u.rdev);
-			}
-			if (do_mknod(fname,file->mode,file->u.rdev) < 0) {
-				rsyserr(FERROR, errno, "mknod %s failed",
-					full_fname(fname));
-			} else {
-				set_file_attrs(fname, file, NULL, 0);
-				if (itemizing) {
-					itemize(file, ndx, statret, &st,
-						ITEM_LOCAL_CHANGE, 0, NULL);
-				}
-				if (code != FNONE && verbose)
-					rprintf(code, "%s\n", fname);
-				if (preserve_hard_links && file->link_u.links) {
-					hard_link_cluster(file, ndx,
-							  itemizing, code);
-				}
-				if (remove_source_files == 1)
-					goto return_with_success;
-			}
+		if (preserve_hard_links && file->link_u.links
+		    && hard_link_check(file, ndx, fname, -1, &st,
+				       itemizing, code, HL_SKIP))
+			return;
+		if (verbose > 2) {
+			rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",
+				fname, (int)file->mode, (int)file->u.rdev);
+		}
+		if (do_mknod(fname, file->mode, file->u.rdev) < 0) {
+			rsyserr(FERROR, errno, "mknod %s failed",
+				full_fname(fname));
 		} else {
-			if (itemizing)
-				itemize(file, ndx, statret, &st, 0, 0, NULL);
-			set_file_attrs(fname, file, &st, maybe_ATTRS_REPORT);
+			set_file_attrs(fname, file, NULL, 0);
+			if (itemizing) {
+				itemize(file, ndx, statret, &st,
+					ITEM_LOCAL_CHANGE, 0, NULL);
+			}
+			if (code != FNONE && verbose)
+				rprintf(code, "%s\n", fname);
 			if (preserve_hard_links && file->link_u.links)
 				hard_link_cluster(file, ndx, itemizing, code);
 			if (remove_source_files == 1)
