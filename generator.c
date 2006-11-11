@@ -182,7 +182,7 @@ static enum delret delete_item(char *fname, int mode, char *replace, int flags)
 	return ret;
 }
 
-/* Prep directory is to be deleted, so delete all its contents.  Note
+/* The directory is to be deleted, so delete all its contents.  Note
  * that fname must point to a MAXPATHLEN buffer!  (The buffer is used
  * for recursion, but returned unchanged.)
  */
@@ -195,6 +195,11 @@ static enum delret delete_dir_contents(char *fname, int flags)
 	int j, dlen;
 	char *p;
 
+	if (verbose > 3) {
+		rprintf(FINFO, "delete_dir_contents(%s) flags=%d\n",
+			fname, flags);
+	}
+
 	dlen = strlen(fname);
 	save_filters = push_local_filters(fname, dlen);
 
@@ -205,6 +210,8 @@ static enum delret delete_dir_contents(char *fname, int flags)
 		*p++ = '/';
 	remainder = MAXPATHLEN - (p - fname);
 
+	/* We do our own recursion, so make delete_item() non-recursive. */
+	flags &= ~DEL_RECURSE;
 	ret = DR_SUCCESS;
 
 	for (j = dirlist->count; j--; ) {
@@ -221,9 +228,19 @@ static enum delret delete_dir_contents(char *fname, int flags)
 		}
 
 		strlcpy(p, fp->basename, remainder);
+		if (S_ISDIR(fp->mode)) {
+			/* Save stack by recursing to ourself directly. */
+			result = delete_dir_contents(fname, flags);
+			if (result == DR_PINNED)
+				ret = result;
+			else if (result != DR_SUCCESS && ret == DR_SUCCESS)
+				ret = DR_NOT_EMPTY;
+		}
 		result = delete_item(fname, fp->mode, NULL, flags);
-		if (result != DR_SUCCESS && ret == DR_SUCCESS)
-			ret = result == DR_PINNED ? result : DR_NOT_EMPTY;
+		if (result == DR_PINNED)
+			ret = result;
+		else if (result != DR_SUCCESS && ret == DR_SUCCESS)
+			ret = DR_NOT_EMPTY;
 	}
 
 	fname[dlen] = '\0';
