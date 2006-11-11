@@ -1141,7 +1141,7 @@ static void send_rules(int f_out, struct filter_list_struct *flp)
 		if (!p) {
 			rprintf(FERROR,
 				"filter rules are too modern for remote rsync.\n");
-			exit_cleanup(RERR_SYNTAX);
+			exit_cleanup(RERR_PROTOCOL);
 		}
 		if (f_out < 0)
 			continue;
