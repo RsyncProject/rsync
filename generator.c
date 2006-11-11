@@ -93,17 +93,21 @@ extern int backup_suffix_len;
 extern struct file_list *the_file_list;
 extern struct filter_list_struct server_filter_list;
 
+int ignore_perishable = 0;
+int non_perishable_cnt = 0;
+
 static int deletion_count = 0; /* used to implement --max-delete */
 
 /* For calling delete_item() */
 #define DEL_RECURSE		(1<<1) /* recurse */
+#define DEL_DIR_IS_EMPTY	(1<<2) /* used by delete_dir_contents() */
 
 enum nonregtype {
     TYPE_DIR, TYPE_SPECIAL, TYPE_DEVICE, TYPE_SYMLINK
 };
 
 enum delret {
-    DR_SUCCESS = 0, DR_FAILURE, DR_AT_LIMIT, DR_PINNED, DR_NOT_EMPTY
+    DR_SUCCESS = 0, DR_FAILURE, DR_AT_LIMIT, DR_NOT_EMPTY
 };
 
 /* Forward declaration for delete_item(). */
@@ -133,10 +137,12 @@ static enum delret delete_item(char *fname, int mode, char *replace, int flags)
 			fname, mode, flags);
 	}
 
-	if (S_ISDIR(mode) && flags & DEL_RECURSE) {
+	if (S_ISDIR(mode) && !(flags & DEL_DIR_IS_EMPTY)) {
+		ignore_perishable = 1;
+		/* If DEL_RECURSE is not set, this just reports emptiness. */
 		ret = delete_dir_contents(fname, flags);
-		if (ret == DR_PINNED || ret == DR_NOT_EMPTY
-		 || ret == DR_AT_LIMIT)
+		ignore_perishable = 0;
+		if (ret == DR_NOT_EMPTY || ret == DR_AT_LIMIT)
 			goto check_ret;
 		/* OK: try to delete the directory. */
 	}
@@ -161,7 +167,7 @@ static enum delret delete_item(char *fname, int mode, char *replace, int flags)
 		ret = DR_SUCCESS;
 	} else {
 		if (S_ISDIR(mode) && errno == ENOTEMPTY) {
-			rprintf(FINFO, "non-empty directory, %s, not deleted\n",
+			rprintf(FINFO, "cannot delete non-empty directory: %s\n",
 				fname);
 			ret = DR_NOT_EMPTY;
 		} else if (errno != ENOENT) {
@@ -182,14 +188,15 @@ static enum delret delete_item(char *fname, int mode, char *replace, int flags)
 	return ret;
 }
 
-/* The directory is to be deleted, so delete all its contents.  Note
- * that fname must point to a MAXPATHLEN buffer!  (The buffer is used
- * for recursion, but returned unchanged.)
+/* The directory is about to be deleted: if DEL_RECURSE is given, delete all
+ * its contents, otherwise just checks for content.  Returns DR_SUCCESS or
+ * DR_NOT_EMPTY.  Note that fname must point to a MAXPATHLEN buffer!  (The
+ * buffer is used for recursion, but returned unchanged.)
  */
 static enum delret delete_dir_contents(char *fname, int flags)
 {
 	struct file_list *dirlist;
-	enum delret ret, result;
+	enum delret ret;
 	unsigned remainder;
 	void *save_filters;
 	int j, dlen;
@@ -203,7 +210,17 @@ static enum delret delete_dir_contents(char *fname, int flags)
 	dlen = strlen(fname);
 	save_filters = push_local_filters(fname, dlen);
 
+	non_perishable_cnt = 0;
 	dirlist = get_dirlist(fname, dlen, 0);
+	ret = non_perishable_cnt ? DR_NOT_EMPTY : DR_SUCCESS;
+
+	if (!dirlist->count)
+		goto done;
+
+	if (!(flags & DEL_RECURSE)) {
+		ret = DR_NOT_EMPTY;
+		goto done;
+	}
 
 	p = fname + dlen;
 	if (dlen != 1 || *fname != '/')
@@ -211,8 +228,7 @@ static enum delret delete_dir_contents(char *fname, int flags)
 	remainder = MAXPATHLEN - (p - fname);
 
 	/* We do our own recursion, so make delete_item() non-recursive. */
-	flags &= ~DEL_RECURSE;
-	ret = DR_SUCCESS;
+	flags = (flags & ~DEL_RECURSE) | DEL_DIR_IS_EMPTY;
 
 	for (j = dirlist->count; j--; ) {
 		struct file_struct *fp = dirlist->files[j];
@@ -223,31 +239,29 @@ static enum delret delete_dir_contents(char *fname, int flags)
 				    "mount point, %s, pins parent directory\n",
 				    f_name(fp, NULL));
 			}
-			ret = DR_PINNED;
+			ret = DR_NOT_EMPTY;
 			continue;
 		}
 
 		strlcpy(p, fp->basename, remainder);
-		if (S_ISDIR(fp->mode)) {
-			/* Save stack by recursing to ourself directly. */
-			result = delete_dir_contents(fname, flags);
-			if (result == DR_PINNED)
-				ret = result;
-			else if (result != DR_SUCCESS && ret == DR_SUCCESS)
-				ret = DR_NOT_EMPTY;
-		}
-		result = delete_item(fname, fp->mode, NULL, flags);
-		if (result == DR_PINNED)
-			ret = result;
-		else if (result != DR_SUCCESS && ret == DR_SUCCESS)
+		/* Save stack by recursing to ourself directly. */
+		if (S_ISDIR(fp->mode)
+		 && delete_dir_contents(fname, flags | DEL_RECURSE) != DR_SUCCESS)
+			ret = DR_NOT_EMPTY;
+		if (delete_item(fname, fp->mode, NULL, flags) != DR_SUCCESS)
 			ret = DR_NOT_EMPTY;
 	}
 
 	fname[dlen] = '\0';
 
-	pop_local_filters(save_filters);
+  done:
 	flist_free(dirlist);
+	pop_local_filters(save_filters);
 
+	if (ret == DR_NOT_EMPTY) {
+		rprintf(FINFO, "cannot delete non-empty directory: %s\n",
+			fname);
+	}
 	return ret;
 }
 
@@ -318,7 +332,7 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 			continue;
 		if (fp->flags & FLAG_MOUNT_POINT) {
 			if (verbose > 1)
-				rprintf(FINFO, "mount point %s not deleted\n",
+				rprintf(FINFO, "cannot delete mount point: %s\n",
 					f_name(fp, NULL));
 			continue;
 		}
