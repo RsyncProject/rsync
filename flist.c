@@ -48,6 +48,8 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int relative_paths;
 extern int implied_dirs;
+extern int ignore_perishable;
+extern int non_perishable_cnt;
 extern int prune_empty_dirs;
 extern int copy_links;
 extern int copy_unsafe_links;
@@ -753,8 +755,11 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 		/* See if file is excluded before reporting an error. */
 		if (filter_level != NO_FILTERS
 		 && (is_excluded(thisname, 0, filter_level)
-		  || is_excluded(thisname, 1, filter_level)))
+		  || is_excluded(thisname, 1, filter_level))) {
+			if (ignore_perishable && save_errno != ENOENT)
+				non_perishable_cnt++;
 			return NULL;
+		}
 		if (save_errno == ENOENT) {
 #ifdef SUPPORT_LINKS
 			/* Avoid "vanished" error if symlink points nowhere. */
@@ -804,8 +809,11 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 		flags |= FLAG_MOUNT_POINT;
 	}
 
-	if (is_excluded(thisname, S_ISDIR(st.st_mode) != 0, filter_level))
+	if (is_excluded(thisname, S_ISDIR(st.st_mode) != 0, filter_level)) {
+		if (ignore_perishable)
+			non_perishable_cnt++;
 		return NULL;
+	}
 
 	if (lp_ignore_nonreadable(module_id)) {
 #ifdef SUPPORT_LINKS
