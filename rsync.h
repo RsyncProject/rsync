@@ -616,10 +616,12 @@ struct map_struct {
 #define MATCHFLG_SENDER_SIDE	(1<<16)/* rule applies to the sending side */
 #define MATCHFLG_RECEIVER_SIDE	(1<<17)/* rule applies to the receiving side */
 #define MATCHFLG_CLEAR_LIST 	(1<<18)/* this item is the "!" token */
+#define MATCHFLG_PERISHABLE	(1<<19)/* perishable if parent dir goes away */
 
 #define MATCHFLGS_FROM_CONTAINER (MATCHFLG_ABS_PATH | MATCHFLG_INCLUDE \
 				| MATCHFLG_DIRECTORY | MATCHFLG_SENDER_SIDE \
-				| MATCHFLG_NEGATE | MATCHFLG_RECEIVER_SIDE)
+				| MATCHFLG_NEGATE | MATCHFLG_RECEIVER_SIDE \
+				| MATCHFLG_PERISHABLE)
 
 struct filter_struct {
 	struct filter_struct *next;
