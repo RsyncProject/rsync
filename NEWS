@@ -1,5 +1,5 @@
 NEWS for rsync 3.0.0 (UNRELEASED)
-Protocol: 29 (unchanged)
+Protocol: 30 (changed)
 Changes since 2.6.9:
 
   BUG FIXES:
@@ -13,7 +13,11 @@ Changes since 2.6.9:
 
   ENHANCEMENTS:
 
-    - ...
+    - You may specify --max-delete=0 to a 3.0.0 client as long as the
+      receiving side is at least version 3.0.0.  This means that you
+      can pull from an older rsync with this option, but pushing to an
+      older rsync will generate an error.  *Be careful to never specify
+      a 0 value to older rsync client, or it will be silently ignored.*
 
   INTERNAL:
 
