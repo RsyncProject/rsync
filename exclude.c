@@ -32,6 +32,7 @@ extern int recurse;
 extern int io_error;
 extern int local_server;
 extern int prune_empty_dirs;
+extern int ignore_perishable;
 extern int delete_mode;
 extern int delete_excluded;
 extern int cvs_exclude;
@@ -51,8 +52,8 @@ struct filter_list_struct server_filter_list = { 0, 0, " [daemon]" };
 #define MAX_RULE_PREFIX (16)
 
 #define MODIFIERS_MERGE_FILE "-+Cenw"
-#define MODIFIERS_INCL_EXCL "/!Crs"
-#define MODIFIERS_HIDE_PROTECT "/!"
+#define MODIFIERS_INCL_EXCL "/!Crsp"
+#define MODIFIERS_HIDE_PROTECT "/!p"
 
 /* The dirbuf is set by push_local_filters() to the current subdirectory
  * relative to curr_dir that is being processed.  The path always has a
@@ -601,6 +602,8 @@ int check_filter(struct filter_list_struct *listp, char *name, int name_is_dir)
 	struct filter_struct *ent;
 
 	for (ent = listp->head; ent; ent = ent->next) {
+		if (ignore_perishable && ent->match_flags & MATCHFLG_PERISHABLE)
+			continue;
 		if (ent->match_flags & MATCHFLG_PERDIR_MERGE) {
 			int rc = check_filter(ent->u.mergelist, name,
 					      name_is_dir);
@@ -808,6 +811,9 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 			case 'n':
 				new_mflags |= MATCHFLG_NO_INHERIT;
 				break;
+			case 'p':
+				new_mflags |= MATCHFLG_PERISHABLE;
+				break;
 			case 'r':
 				new_mflags |= MATCHFLG_RECEIVER_SIDE;
 				break;
@@ -880,7 +886,7 @@ static void get_cvs_excludes(uint32 mflags)
 		return;
 	initialized = 1;
 
-	parse_rule(&cvs_filter_list, default_cvsignore, mflags, 0);
+	parse_rule(&cvs_filter_list, default_cvsignore, mflags | MATCHFLG_PERISHABLE, 0);
 
 	p = module_id >= 0 && lp_use_chroot(module_id) ? "/" : getenv("HOME");
 	if (p && pathjoin(fname, MAXPATHLEN, p, ".cvsignore") < MAXPATHLEN)
@@ -1087,6 +1093,12 @@ char *get_rule_prefix(int match_flags, const char *pat, int for_xfer,
 	    && (!for_xfer || protocol_version >= 29
 	     || (delete_excluded && am_sender)))
 		*op++ = 'r';
+	if (match_flags & MATCHFLG_PERISHABLE) {
+		if (!for_xfer || protocol_version >= 30)
+			*op++ = 'p';
+		else if (am_sender)
+			return NULL;
+	}
 	if (op - buf > legal_len)
 		return NULL;
 	if (legal_len)
