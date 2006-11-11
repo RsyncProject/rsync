@@ -98,9 +98,9 @@ int non_perishable_cnt = 0;
 
 static int deletion_count = 0; /* used to implement --max-delete */
 
-/* For calling delete_item() */
+/* For calling delete_item() and delete_dir_contents(). */
 #define DEL_RECURSE		(1<<1) /* recurse */
-#define DEL_DIR_IS_EMPTY	(1<<2) /* used by delete_dir_contents() */
+#define DEL_DIR_IS_EMPTY	(1<<2) /* internal delete_FUNCTIONS use only */
 
 enum nonregtype {
     TYPE_DIR, TYPE_SPECIAL, TYPE_DEVICE, TYPE_SYMLINK
