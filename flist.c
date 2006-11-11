@@ -752,7 +752,8 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 		int save_errno = errno;
 		/* See if file is excluded before reporting an error. */
 		if (filter_level != NO_FILTERS
-		    && is_excluded(thisname, 0, filter_level))
+		 && (is_excluded(thisname, 0, filter_level)
+		  || is_excluded(thisname, 1, filter_level)))
 			return NULL;
 		if (save_errno == ENOENT) {
 #ifdef SUPPORT_LINKS
