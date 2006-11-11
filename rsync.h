@@ -67,7 +67,7 @@
 #define FLAG_MISSING (1<<6)	/* generator */
 
 /* update this if you make incompatible changes */
-#define PROTOCOL_VERSION 29
+#define PROTOCOL_VERSION 30
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
