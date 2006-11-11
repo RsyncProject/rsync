@@ -95,13 +95,20 @@ extern struct filter_list_struct server_filter_list;
 
 static int deletion_count = 0; /* used to implement --max-delete */
 
-/* For calling delete_file() */
-#define DEL_FORCE_RECURSE	(1<<1) /* recurse even w/o --force */
-#define DEL_TERSE		(1<<3)
+/* For calling delete_item() */
+#define DEL_RECURSE		(1<<1) /* recurse */
 
 enum nonregtype {
     TYPE_DIR, TYPE_SPECIAL, TYPE_DEVICE, TYPE_SYMLINK
 };
+
+enum delret {
+    DR_SUCCESS = 0, DR_FAILURE, DR_AT_LIMIT, DR_PINNED, DR_NOT_EMPTY
+};
+
+/* Forward declaration for delete_item(). */
+static enum delret delete_dir_contents(char *fname, int flags);
+
 
 static int is_backup_file(char *fn)
 {
@@ -109,68 +116,84 @@ static int is_backup_file(char *fn)
 	return k > 0 && strcmp(fn+k, backup_suffix) == 0;
 }
 
-
-/* Delete a file or directory.  If DEL_FORCE_RECURSE is set in the flags, or if
- * force_delete is set, this will delete recursively.
+/* Delete a file or directory.  If DEL_RECURSE is set in the flags, this will
+ * delete recursively.
  *
  * Note that fname must point to a MAXPATHLEN buffer if the mode indicates it's
  * a directory! (The buffer is used for recursion, but returned unchanged.)
  */
-static int delete_item(char *fname, int mode, int flags)
+static enum delret delete_item(char *fname, int mode, char *replace, int flags)
+{
+	enum delret ret;
+	char *what;
+	int ok;
+
+	if (verbose > 2) {
+		rprintf(FINFO, "delete_item(%s) mode=%o flags=%d\n",
+			fname, mode, flags);
+	}
+
+	if (S_ISDIR(mode) && flags & DEL_RECURSE) {
+		ret = delete_dir_contents(fname, flags);
+		if (ret == DR_PINNED || ret == DR_NOT_EMPTY
+		 || ret == DR_AT_LIMIT)
+			goto check_ret;
+		/* OK: try to delete the directory. */
+	}
+
+	if (!replace && max_delete >= 0 && ++deletion_count > max_delete)
+		return DR_AT_LIMIT;
+
+	if (S_ISDIR(mode)) {
+		what = "rmdir";
+		ok = do_rmdir(fname) == 0;
+	} else if (make_backups && (backup_dir || !is_backup_file(fname))) {
+		what = "make_backup";
+		ok = make_backup(fname);
+	} else {
+		what = "unlink";
+		ok = robust_unlink(fname) == 0;
+	}
+
+	if (ok) {
+		if (!replace)
+			log_delete(fname, mode);
+		ret = DR_SUCCESS;
+	} else {
+		if (S_ISDIR(mode) && errno == ENOTEMPTY) {
+			rprintf(FINFO, "non-empty directory, %s, not deleted\n",
+				fname);
+			ret = DR_NOT_EMPTY;
+		} else if (errno != ENOENT) {
+			rsyserr(FERROR, errno, "delete_file: %s(%s) failed",
+				what, full_fname(fname));
+			ret = DR_FAILURE;
+		} else {
+			deletion_count--;
+			ret = DR_SUCCESS;
+		}
+	}
+
+  check_ret:
+	if (replace && ret != DR_SUCCESS) {
+		rprintf(FERROR, "could not make way for new %s: %s\n",
+			replace, fname);
+	}
+	return ret;
+}
+
+/* Prep directory is to be deleted, so delete all its contents.  Note
+ * that fname must point to a MAXPATHLEN buffer!  (The buffer is used
+ * for recursion, but returned unchanged.)
+ */
+static enum delret delete_dir_contents(char *fname, int flags)
 {
 	struct file_list *dirlist;
-	int j, dlen, zap_dir, ok;
+	enum delret ret, result;
 	unsigned remainder;
 	void *save_filters;
+	int j, dlen;
 	char *p;
-
-	if (!S_ISDIR(mode)) {
-		if (max_delete >= 0 && ++deletion_count > max_delete)
-			return 0;
-		if (make_backups && (backup_dir || !is_backup_file(fname)))
-			ok = make_backup(fname);
-		else
-			ok = robust_unlink(fname) == 0;
-		if (ok) {
-			if (!(flags & DEL_TERSE))
-				log_delete(fname, mode);
-			return 0;
-		}
-		if (errno == ENOENT) {
-			deletion_count--;
-			return 0;
-		}
-		rsyserr(FERROR, errno, "delete_file: unlink %s failed",
-			full_fname(fname));
-		return -1;
-	}
-
-	zap_dir = flags & DEL_FORCE_RECURSE || force_delete;
-	if ((max_delete >= 0 && ++deletion_count > max_delete)
-	    || (dry_run && zap_dir)) {
-		ok = 0;
-		errno = ENOTEMPTY;
-	} else if (make_backups && !backup_dir && !is_backup_file(fname)
-	    && !(flags & DEL_FORCE_RECURSE))
-		ok = make_backup(fname);
-	else
-		ok = do_rmdir(fname) == 0;
-	if (ok) {
-		if (!(flags & DEL_TERSE))
-			log_delete(fname, mode);
-		return 0;
-	}
-	if (errno == ENOENT) {
-		deletion_count--;
-		return 0;
-	}
-	if (!zap_dir) {
-		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
-			full_fname(fname));
-		return -1;
-	}
-	flags |= DEL_FORCE_RECURSE; /* mark subdir dels as not "in the way" */
-	deletion_count--;
 
 	dlen = strlen(fname);
 	save_filters = push_local_filters(fname, dlen);
@@ -182,34 +205,33 @@ static int delete_item(char *fname, int mode, int flags)
 		*p++ = '/';
 	remainder = MAXPATHLEN - (p - fname);
 
+	ret = DR_SUCCESS;
+
 	for (j = dirlist->count; j--; ) {
 		struct file_struct *fp = dirlist->files[j];
 
-		if (fp->flags & FLAG_MOUNT_POINT)
+		if (fp->flags & FLAG_MOUNT_POINT) {
+			if (verbose > 1) {
+				rprintf(FINFO,
+				    "mount point, %s, pins parent directory\n",
+				    f_name(fp, NULL));
+			}
+			ret = DR_PINNED;
 			continue;
+		}
 
 		strlcpy(p, fp->basename, remainder);
-		delete_item(fname, fp->mode, flags & ~DEL_TERSE);
+		result = delete_item(fname, fp->mode, NULL, flags);
+		if (result != DR_SUCCESS && ret == DR_SUCCESS)
+			ret = result == DR_PINNED ? result : DR_NOT_EMPTY;
 	}
-	flist_free(dirlist);
 
 	fname[dlen] = '\0';
 
 	pop_local_filters(save_filters);
+	flist_free(dirlist);
 
-	if (max_delete >= 0 && ++deletion_count > max_delete)
-		return 0;
-
-	if (do_rmdir(fname) == 0) {
-		if (!(flags & DEL_TERSE))
-			log_delete(fname, mode);
-	} else if (errno != ENOTEMPTY && errno != EEXIST && errno != ENOENT) {
-		rsyserr(FERROR, errno, "delete_file: rmdir %s failed",
-			full_fname(fname));
-		return -1;
-	}
-
-	return 0;
+	return ret;
 }
 
 
@@ -275,11 +297,17 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 	 * from the filesystem. */
 	for (i = dirlist->count; i--; ) {
 		struct file_struct *fp = dirlist->files[i];
-		if (!fp->basename || fp->flags & FLAG_MOUNT_POINT)
+		if (!fp->basename)
 			continue;
+		if (fp->flags & FLAG_MOUNT_POINT) {
+			if (verbose > 1)
+				rprintf(FINFO, "mount point %s not deleted\n",
+					f_name(fp, NULL));
+			continue;
+		}
 		if (flist_find(flist, fp) < 0) {
 			f_name(fp, delbuf);
-			delete_item(delbuf, fp->mode, DEL_FORCE_RECURSE);
+			delete_item(delbuf, fp->mode, NULL, DEL_RECURSE);
 		}
 	}
 
@@ -871,7 +899,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	char *fnamecmp, *partialptr, *backupptr = NULL;
 	char fnamecmpbuf[MAXPATHLEN];
 	uchar fnamecmp_type;
-	int del_opts = DEL_TERSE | (delete_mode ? DEL_FORCE_RECURSE : 0);
+	int del_opts = delete_mode || force_delete ? DEL_RECURSE : 0;
 
 	if (list_only)
 		return;
@@ -977,7 +1005,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		 * we need to delete it.  If it doesn't exist, then
 		 * (perhaps recursively) create it. */
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
-			if (delete_item(fname, st.st_mode, del_opts) < 0)
+			if (delete_item(fname, st.st_mode, "directory", del_opts) != 0)
 				return;
 			statret = -1;
 		}
@@ -1071,7 +1099,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 			/* Not the right symlink (or not a symlink), so
 			 * delete it. */
-			if (delete_item(fname, st.st_mode, del_opts) < 0)
+			if (delete_item(fname, st.st_mode, "symlink", del_opts) != 0)
 				return;
 		} else if (basis_dir[0] != NULL) {
 			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &st,
@@ -1119,11 +1147,19 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
 	 || (preserve_specials && IS_SPECIAL(file->mode))) {
 		if (statret == 0) {
-			if ((IS_DEVICE(file->mode) && !IS_DEVICE(st.st_mode))
-			 || (IS_SPECIAL(file->mode) && !IS_SPECIAL(st.st_mode)))
-				statret = -1;
-			else if ((st.st_mode & ~CHMOD_BITS) == (file->mode & ~CHMOD_BITS)
-			      && st.st_rdev == file->u.rdev) {
+			char *t;
+			if (IS_DEVICE(file->mode)) {
+				if (!IS_DEVICE(st.st_mode))
+					statret = -1;
+				t = "device file";
+			} else {
+				if (!IS_SPECIAL(st.st_mode))
+					statret = -1;
+				t = "special file";
+			}
+			if (statret == 0
+			 && (st.st_mode & ~CHMOD_BITS) == (file->mode & ~CHMOD_BITS)
+			 && st.st_rdev == file->u.rdev) {
 				/* The device or special file is identical. */
 				if (itemizing)
 					itemize(file, ndx, 0, &st, 0, 0, NULL);
@@ -1134,7 +1170,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					goto return_with_success;
 				return;
 			}
-			if (delete_item(fname, st.st_mode, del_opts) < 0)
+			if (delete_item(fname, st.st_mode, t, del_opts) != 0)
 				return;
 		} else if (basis_dir[0] != NULL) {
 			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &st,
@@ -1220,7 +1256,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	fnamecmp_type = FNAMECMP_FNAME;
 
 	if (statret == 0 && !S_ISREG(st.st_mode)) {
-		if (delete_item(fname, st.st_mode, del_opts) != 0)
+		if (delete_item(fname, st.st_mode, "regular file", del_opts) != 0)
 			return;
 		statret = -1;
 		stat_errno = ENOENT;
