@@ -1086,16 +1086,17 @@ quote(tt(    rsync -avR --rsync-path="cd /a/b && rsync" hst:c/d /e/))
 
 dit(bf(-C, --cvs-exclude)) This is a useful shorthand for excluding a
 broad range of files that you often don't want to transfer between
-systems. It uses the same algorithm that CVS uses to determine if
+systems. It uses a similar algorithm to CVS to determine if
 a file should be ignored.
 
-The exclude list is initialized to:
+The exclude list is initialized to exclude the following items (these
+initial items are marked as perishable -- see the FILTER RULES section):
 
 quote(quote(tt(RCS SCCS CVS CVS.adm RCSLOG cvslog.* tags TAGS .make.state
 .nse_depinfo *~ #* .#* ,* _$* *$ *.old *.bak *.BAK *.orig *.rej
-.del-* *.a *.olb *.o *.obj *.so *.exe *.Z *.elc *.ln core .svn/)))
+.del-* *.a *.olb *.o *.obj *.so *.exe *.Z *.elc *.ln core .svn/ .bzr/)))
 
-then files listed in a $HOME/.cvsignore are added to the list and any
+then, files listed in a $HOME/.cvsignore are added to the list and any
 files listed in the CVSIGNORE environment variable (all cvsignore names
 are delimited by whitespace).
 
@@ -1967,8 +1968,8 @@ itemization(
   down.)
   it() a trailing "dir_name/***" will match both the directory (as if
   "dir_name/" had been specified) and all the files in the directory
-  (as if "dir_name/**" had been specified).  (This behavior is new for
-  version 2.6.7.)
+  (as if "dir_name/**" had been specified).  This behavior was added in
+  version 2.6.7.
 )
 
 Note that, when using the bf(--recursive) (bf(-r)) option (which is implied by
@@ -2083,13 +2084,13 @@ itemization(
 The following modifiers are accepted after a "+" or "-":
 
 itemization(
-  it() A "/" specifies that the include/exclude rule should be matched
+  it() A bf(/) specifies that the include/exclude rule should be matched
   against the absolute pathname of the current item.  For example,
   "-/ /etc/passwd" would exclude the passwd file any time the transfer
   was sending files from the "/etc" directory, and "-/ subdir/foo"
   would always exclude "foo" when it is in a dir named "subdir", even
   if "foo" is at the root of the current transfer.
-  it() A "!" specifies that the include/exclude should take effect if
+  it() A bf(!) specifies that the include/exclude should take effect if
   the pattern fails to match.  For instance, "-! */" would exclude all
   non-directories.
   it() A bf(C) is used to indicate that all the global CVS-exclude rules
@@ -2106,6 +2107,11 @@ itemization(
   being deleted.  See the bf(s) modifier for more info.  See also the
   protect (P) and risk (R) rules, which are an alternate way to
   specify receiver-side includes/excludes.
+  it() A bf(p) indicates that a rule is perishable, meaning that it is
+  ignored in directories that are being deleted.  For instance, the bf(-C)
+  option's default rules that exclude things like "CVS" and "*.o" are
+  marked as perishable, and will not prevent a directory that was removed
+  on the source from being deleted on the destination.
 )
 
 Per-directory rules are inherited in all subdirectories of the directory
