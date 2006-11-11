@@ -125,7 +125,7 @@ static int delete_item(char *fname, int mode, int flags)
 	char *p;
 
 	if (!S_ISDIR(mode)) {
-		if (max_delete && ++deletion_count > max_delete)
+		if (max_delete >= 0 && ++deletion_count > max_delete)
 			return 0;
 		if (make_backups && (backup_dir || !is_backup_file(fname)))
 			ok = make_backup(fname);
@@ -146,7 +146,7 @@ static int delete_item(char *fname, int mode, int flags)
 	}
 
 	zap_dir = flags & DEL_FORCE_RECURSE || force_delete;
-	if ((max_delete && ++deletion_count > max_delete)
+	if ((max_delete >= 0 && ++deletion_count > max_delete)
 	    || (dry_run && zap_dir)) {
 		ok = 0;
 		errno = ENOTEMPTY;
@@ -197,7 +197,7 @@ static int delete_item(char *fname, int mode, int flags)
 
 	pop_local_filters(save_filters);
 
-	if (max_delete && ++deletion_count > max_delete)
+	if (max_delete >= 0 && ++deletion_count > max_delete)
 		return 0;
 
 	if (do_rmdir(fname) == 0) {
@@ -1609,7 +1609,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	}
 	recv_generator(NULL, NULL, 0, 0, 0, code, -1);
 
-	if (max_delete > 0 && deletion_count > max_delete) {
+	if (max_delete >= 0 && deletion_count > max_delete) {
 		rprintf(FINFO,
 			"Deletions stopped due to --max-delete limit (%d skipped)\n",
 			deletion_count - max_delete);

@@ -106,7 +106,7 @@ size_t bwlimit_writemax = 0;
 int ignore_existing = 0;
 int ignore_non_existing = 0;
 int need_messages_from_generator = 0;
-int max_delete = 0;
+int max_delete = -1;
 OFF_T max_size = 0;
 OFF_T min_size = 0;
 int ignore_errors = 0;
@@ -1614,7 +1614,7 @@ void server_options(char **args,int *argc)
 		args[ac++] = arg;
 	}
 
-	if (max_delete && am_sender) {
+	if (max_delete >= 0 && am_sender) {
 		if (asprintf(&arg, "--max-delete=%d", max_delete) < 0)
 			goto oom;
 		args[ac++] = arg;
