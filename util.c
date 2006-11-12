@@ -145,8 +145,10 @@ int set_modtime(char *fname, time_t modtime, mode_t mode)
 		t[1].tv_sec = modtime;
 		t[1].tv_usec = 0;
 # ifdef HAVE_LUTIMES
-		if (S_ISLNK(mode))
-			return lutimes(fname, t);
+		if (S_ISLNK(mode)) {
+			lutimes(fname, t);
+			return 0; /* ignore errors */
+		}
 # endif
 		return utimes(fname, t);
 #elif defined HAVE_UTIMBUF
