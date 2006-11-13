@@ -255,7 +255,7 @@ static mode_t from_wire_mode(int mode)
 static void send_directory(int f, struct file_list *flist,
 			   char *fbuf, int len);
 
-static char *flist_dir;
+static const char *flist_dir;
 static int flist_dir_len;
 
 
@@ -1216,7 +1216,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		}
 
 		if (dir && *dir) {
-			static char *lastdir;
+			static const char *lastdir;
 			static int lastdir_len;
 
 			strlcpy(olddir, curr_dir, sizeof olddir);
