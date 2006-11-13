@@ -866,7 +866,7 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth,
 /* Like chdir(), but it keeps track of the current directory (in the
  * global "curr_dir"), and ensures that the path size doesn't overflow.
  * Also cleans the path using the clean_fname() function. */
-int push_dir(char *dir, int set_path_only)
+int push_dir(const char *dir, int set_path_only)
 {
 	static int initialised;
 	unsigned int len;
@@ -913,7 +913,7 @@ int push_dir(char *dir, int set_path_only)
  * Reverse a push_dir() call.  You must pass in an absolute path
  * that was copied from a prior value of "curr_dir".
  **/
-int pop_dir(char *dir)
+int pop_dir(const char *dir)
 {
 	if (chdir(dir))
 		return 0;
