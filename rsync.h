@@ -520,7 +520,7 @@ struct file_struct {
 	char *basename;		/* The current item's name (AKA filename) */
 	char *dirname;		/* The directory info inside the transfer */
 	union {
-		char *root;	/* Sender-side dir info outside transfer */
+		const char *root;/* Sender-side dir info outside transfer */
 		int depth;	/* Receiver-side directory depth info */
 	} dir;
 	union {
