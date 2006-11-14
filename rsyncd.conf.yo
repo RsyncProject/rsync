@@ -17,7 +17,7 @@ manpagesection(FILE FORMAT)
 
 The file consists of modules and parameters. A module begins with the
 name of the module in square brackets and continues until the next
-module begins. Modules contain parameters of the form 'name = value'.
+module begins. Modules contain parameters of the form "name = value".
 
 The file is line-based -- that is, each newline-terminated line represents
 either a comment, a module name or a parameter.
@@ -149,7 +149,7 @@ Note that you are free to setup user/group information in the chroot area
 differently from your normal system.  For example, you could abbreviate
 the list of users and groups.  Also, you can protect this information from
 being downloaded/uploaded by adding an exclude rule to the rsyncd.conf file
-(e.g. "exclude = /etc/**").  Note that having the exclusion affect uploads
+(e.g. "bf(exclude = /etc/**)").  Note that having the exclusion affect uploads
 is a relatively new feature in rsync, so make sure your daemon is
 at least 2.6.3 to effect this.  Also note that it is safest to exclude a
 directory and all its contents combining the rule "/some/dir/" with the
@@ -402,7 +402,7 @@ format used for logging file transfers when transfer logging is enabled.
 The format is a text string containing embedded single-character escape
 sequences prefixed with a percent (%) character.  An optional numeric
 field width may also be specified between the percent and the escape
-letter (e.g. "%-50n %8l %07p").
+letter (e.g. "bf(%-50n %8l %07p)").
 
 The default log format is "%o %h [%a] %m (%u) %f %l", and a "%t [%p] "
 is always prefixed when using the "log file" option.
