@@ -18,8 +18,8 @@ man: rsync.1 rsyncd.conf.5
 
 rsync.1: rsync.yo
 	yodl2man -o rsync.1 rsync.yo
-	-./tweak_manpage_dashes rsync.1
+	-./tweak_manpage rsync.1
 
 rsyncd.conf.5: rsyncd.conf.yo
 	yodl2man -o rsyncd.conf.5 rsyncd.conf.yo
-	-./tweak_manpage_dashes rsyncd.conf.5
+	-./tweak_manpage rsyncd.conf.5
