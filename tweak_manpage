@@ -1,4 +1,6 @@
 #!/usr/bin/perl -i -p
+
+# Make some hyphens unbreakable.
 s{(--\w[-\w]+)}{ $x = $1; $x =~ s/-/\\-/g; $x }eg;
 s/(?<!\\)-(['"\d*])/\\-$1/g;
 s#(['"(= /,])-(?!-)#$1\\-#g;
@@ -6,3 +8,30 @@ s/(\\fB)-/$1\\-/g;
 s/(\[\w)-(\w\])/$1\\-$2/g;
 s{(\\f\(CW.*?\\fP)}{ $x = $1; $x =~ s/(?<!\\)-/\\-/g; $x }eg;
 s/(\.\w+)-/$1\\-/g;
+
+# We only need to use "\&'" or "\&." at the start of a line.
+s/(?<=.)\\\&(['.])/$1$2/g;
+
+# Use an em-dash where appropriate.
+s/ \\?-{1,2} / \\(em /g;
+
+# Some quotes turn into open/close quotes.
+s/'(.)'/\\(oq$1\\(cq/g;
+s/(^|[ (])"(?!( |$))/$1\\(lq/gm;
+s/(?<! )"([.,:;! )]|$)/\\(rq$1/gm;
+s/(\\\(lq[^(]*) "( |$)/$1 \\(rq$2/gm;
+s/(^| )" ([^(]*\\\(rq)/$1\\(lq $2/gm;
+
+# And some don't.
+s/^([. ])(.*)/ $1 . realquotes($2) /egm;
+s/(\\f(B|\(CW).*?\\fP)/ realquotes($1) /egs;
+
+s/^\\\&(\\\(oq)/$1/gm;
+
+sub realquotes
+{
+    my($txt) = @_;
+    $txt =~ s/\\\([lr]q/"/g;
+    $txt =~ s/\\\([oc]q/'/g;
+    $txt;
+}
