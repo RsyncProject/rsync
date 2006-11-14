@@ -610,7 +610,7 @@ Note that if you don't specify bf(--backup-dir), (1) the
 bf(--omit-dir-times) option will be implied, and (2) if bf(--delete) is
 also in effect (without bf(--delete-excluded)), rsync will add a "protect"
 filter-rule for the backup suffix to the end of all your existing excludes
-(e.g. -f "P *~").  This will prevent previously backed-up files from being
+(e.g. bf(-f "P *~")).  This will prevent previously backed-up files from being
 deleted.  Note that if you are supplying your own filter rules, you may
 need to manually insert your own exclude/protect rule somewhere higher up
 in the list so that it has a high enough priority to be effective (e.g., if
@@ -1669,7 +1669,7 @@ that any superfluous files and directories in the destination are removed
 quote(     rsync -avm --del --include='*.pdf' -f 'hide,! */' src/ dest)
 
 If you didn't want to remove superfluous destination files, the more
-time-honored options of "--include='*/' --exclude='*'" would work fine
+time-honored options of "bf(--include='*/' --exclude='*')" would work fine
 in place of the hide-filter (if that is more natural to you).
 
 dit(bf(--progress)) This option tells rsync to print information
@@ -2199,7 +2199,7 @@ that follow the :C instead of being subservient to all your rules.  To
 affect the other CVS exclude rules (i.e. the default list of exclusions,
 the contents of $HOME/.cvsignore, and the value of $CVSIGNORE) you should
 omit the bf(-C) command-line option and instead insert a "-C" rule into
-your filter rules; e.g. "--filter=-C".
+your filter rules; e.g. "bf(--filter=-C)".
 
 manpagesection(LIST-CLEARING FILTER RULE)
 
@@ -2445,7 +2445,7 @@ unsafe links to be omitted altogether.  (Note that you must specify
 bf(--links) for bf(--safe-links) to have any effect.)
 
 Symbolic links are considered unsafe if they are absolute symlinks
-(start with bf(/)), empty, or if they contain enough bf("..")
+(start with bf(/)), empty, or if they contain enough ".."
 components to ascend from the directory being copied.
 
 Here's a summary of how the symlink options are interpreted.  The list is
