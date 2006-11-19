@@ -1246,12 +1246,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			if (!*backup_dir)
 				goto options_rejected;
 			clean_fname(backup_dir, 1);
-			if (check_filter(elp, backup_dir, 1) < 0) {
-			    options_rejected:
-				snprintf(err_buf, sizeof err_buf,
-				    "Your options have been rejected by the server.\n");
-				return 0;
-			}
+			if (check_filter(elp, backup_dir, 1) < 0)
+				goto options_rejected;
 		}
 	}
 
@@ -1457,6 +1453,11 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	am_starting_up = 0;
 
 	return 1;
+
+  options_rejected:
+	snprintf(err_buf, sizeof err_buf,
+		"Your options have been rejected by the server.\n");
+	return 0;
 }
 
 
