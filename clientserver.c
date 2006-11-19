@@ -678,7 +678,7 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 
 	if (!ret || err_msg) {
 		if (err_msg)
-			rprintf(FERROR, err_msg);
+			rwrite(FERROR, err_msg, strlen(err_msg));
 		else
 			option_error();
 		msleep(400);
