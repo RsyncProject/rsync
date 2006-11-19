@@ -395,7 +395,7 @@ int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
 }
 
 void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
-	     int32 iflags, uchar fnamecmp_type, char *xname)
+	     int32 iflags, uchar fnamecmp_type, const char *xname)
 {
 	if (statret >= 0) { /* A from-dest-dir statret can == 1! */
 		int keep_time = !preserve_times ? 0
@@ -919,7 +919,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			   enum logcode code, int f_out)
 {
 	static int missing_below = -1, excluded_below = -1;
-	static char *parent_dirname = "";
+	static const char *parent_dirname = "";
 	static struct file_list *fuzzy_dirlist = NULL;
 	static int need_fuzzy_dirlist = 0;
 	struct file_struct *fuzzy_file = NULL;
@@ -984,7 +984,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		statret = -1;
 		stat_errno = ENOENT;
 	} else {
-		char *dn = file->dirname ? file->dirname : ".";
+		const char *dn = file->dirname ? file->dirname : ".";
 		if (parent_dirname != dn && strcmp(parent_dirname, dn) != 0) {
 			if (relative_paths && !implied_dirs
 			 && do_stat(dn, &st) < 0
@@ -1003,7 +1003,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		parent_dirname = dn;
 
 		if (need_fuzzy_dirlist && S_ISREG(file->mode)) {
-			fuzzy_dirlist = get_dirlist(dn, -1, 1);
+			strlcpy(fnamecmpbuf, dn, sizeof fnamecmpbuf);
+			fuzzy_dirlist = get_dirlist(fnamecmpbuf, -1, 1);
 			need_fuzzy_dirlist = 0;
 		}
 

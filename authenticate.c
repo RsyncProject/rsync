@@ -27,11 +27,11 @@ extern char *password_file;
 encode a buffer using base64 - simple and slow algorithm. null terminates
 the result.
   ***************************************************************************/
-void base64_encode(char *buf, int len, char *out, int pad)
+void base64_encode(const char *buf, int len, char *out, int pad)
 {
 	char *b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 	int bit_offset, byte_offset, idx, i;
-	unsigned char *d = (unsigned char *)buf;
+	const uchar *d = (const uchar *)buf;
 	int bytes = (len*8 + 5)/6;
 
 	for (i = 0; i < bytes; i++) {
@@ -55,7 +55,7 @@ void base64_encode(char *buf, int len, char *out, int pad)
 }
 
 /* Generate a challenge buffer and return it base64-encoded. */
-static void gen_challenge(char *addr, char *challenge)
+static void gen_challenge(const char *addr, char *challenge)
 {
 	char input[32];
 	char md4_out[MD4_SUM_LENGTH];
@@ -63,7 +63,7 @@ static void gen_challenge(char *addr, char *challenge)
 
 	memset(input, 0, sizeof input);
 
-	strlcpy((char *)input, addr, 17);
+	strlcpy(input, addr, 17);
 	sys_gettimeofday(&tv);
 	SIVAL(input, 16, tv.tv_sec);
 	SIVAL(input, 20, tv.tv_usec);
@@ -79,12 +79,13 @@ static void gen_challenge(char *addr, char *challenge)
 
 /* Return the secret for a user from the secret file, null terminated.
  * Maximum length is len (not counting the null). */
-static int get_secret(int module, char *user, char *secret, int len)
+static int get_secret(int module, const char *user, char *secret, int len)
 {
-	char *fname = lp_secrets_file(module);
+	const char *fname = lp_secrets_file(module);
 	STRUCT_STAT st;
 	int fd, ok = 1;
-	char ch, *p;
+	const char *p;
+	char ch, *s;
 
 	if (!fname || !*fname)
 		return 0;
@@ -136,27 +137,27 @@ static int get_secret(int module, char *user, char *secret, int len)
 	}
 
 	/* Slurp the secret into the "secret" buffer. */
-	p = secret;
+	s = secret;
 	while (len > 0) {
-		if (read(fd, p, 1) != 1 || *p == '\n')
+		if (read(fd, s, 1) != 1 || *s == '\n')
 			break;
-		if (*p == '\r')
+		if (*s == '\r')
 			continue;
-		p++;
+		s++;
 		len--;
 	}
-	*p = '\0';
+	*s = '\0';
 	close(fd);
 
 	return 1;
 }
 
-static char *getpassf(char *filename)
+static const char *getpassf(const char *filename)
 {
 	STRUCT_STAT st;
 	char buffer[512], *p;
 	int fd, n, ok = 1;
-	char *envpw = getenv("RSYNC_PASSWORD");
+	const char *envpw = getenv("RSYNC_PASSWORD");
 
 	if (!filename)
 		return NULL;
@@ -203,7 +204,7 @@ static char *getpassf(char *filename)
 
 /* Generate an MD4 hash created from the combination of the password
  * and the challenge string and return it base64-encoded. */
-static void generate_hash(char *in, char *challenge, char *out)
+static void generate_hash(const char *in, const char *challenge, char *out)
 {
 	char buf[MD4_SUM_LENGTH];
 
@@ -221,8 +222,8 @@ static void generate_hash(char *in, char *challenge, char *out)
  * Return NULL if authentication failed.  Return "" if anonymous access.
  * Otherwise return username.
  */
-char *auth_server(int f_in, int f_out, int module, char *host, char *addr,
-		  char *leader)
+char *auth_server(int f_in, int f_out, int module, const char *host,
+		  const char *addr, const char *leader)
 {
 	char *users = lp_auth_users(module);
 	char challenge[MD4_SUM_LENGTH*2];
@@ -286,10 +287,9 @@ char *auth_server(int f_in, int f_out, int module, char *host, char *addr,
 	return strdup(line);
 }
 
-
-void auth_client(int fd, char *user, char *challenge)
+void auth_client(int fd, const char *user, const char *challenge)
 {
-	char *pass;
+	const char *pass;
 	char pass2[MD4_SUM_LENGTH*2];
 
 	if (!user || !*user)

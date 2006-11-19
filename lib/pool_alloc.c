@@ -44,8 +44,7 @@ struct align_test {
 #define PTR_ADD(b,o)	( (void*) ((char*)(b) + (o)) )
 
 alloc_pool_t
-pool_create(size_t size, size_t quantum,
-    void (*bomb)(char *), int flags)
+pool_create(size_t size, size_t quantum, void (*bomb)(const char *), int flags)
 {
 	struct alloc_pool	*pool;
 
@@ -92,7 +91,7 @@ pool_destroy(alloc_pool_t p)
 }
 
 void *
-pool_alloc(alloc_pool_t p, size_t len, char *bomb)
+pool_alloc(alloc_pool_t p, size_t len, const char *bomb)
 {
 	struct alloc_pool *pool = (struct alloc_pool *) p;
 	if (!pool)

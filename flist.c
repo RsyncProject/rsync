@@ -467,7 +467,7 @@ static void send_file_entry(struct file_struct *file, int f)
 #endif
 
 	if (always_checksum && (S_ISREG(mode) || protocol_version < 28)) {
-		char *sum;
+		const char *sum;
 		if (S_ISREG(mode))
 			sum = file->u.sum;
 		else {
@@ -1505,8 +1505,7 @@ struct file_list *flist_new(int with_hlink, char *msg)
 
 	memset(flist, 0, sizeof (struct file_list));
 
-	if (!(flist->file_pool = pool_create(FILE_EXTENT, 0,
-	    out_of_memory, POOL_INTERN)))
+	if (!(flist->file_pool = pool_create(FILE_EXTENT, 0, out_of_memory, POOL_INTERN)))
 		out_of_memory(msg);
 
 #ifdef SUPPORT_HARD_LINKS

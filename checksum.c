@@ -151,7 +151,7 @@ void sum_init(int seed)
  * @todo Perhaps get rid of md and just pass in the address each time.
  * Very slightly clearer and slower.
  **/
-void sum_update(char *p, int32 len)
+void sum_update(const char *p, int32 len)
 {
 	if (len + sumresidue < CSUM_CHUNK) {
 		memcpy(sumrbuf + sumresidue, p, len);

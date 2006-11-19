@@ -109,19 +109,19 @@ void print_child_argv(char **cmd)
 	rprintf(FCLIENT, "\n");
 }
 
-NORETURN void out_of_memory(char *str)
+NORETURN void out_of_memory(const char *str)
 {
 	rprintf(FERROR, "ERROR: out of memory in %s [%s]\n", str, who_am_i());
 	exit_cleanup(RERR_MALLOC);
 }
 
-NORETURN void overflow_exit(char *str)
+NORETURN void overflow_exit(const char *str)
 {
 	rprintf(FERROR, "ERROR: buffer overflow in %s [%s]\n", str, who_am_i());
 	exit_cleanup(RERR_MALLOC);
 }
 
-int set_modtime(char *fname, time_t modtime, mode_t mode)
+int set_modtime(const char *fname, time_t modtime, mode_t mode)
 {
 #if !defined HAVE_LUTIMES || !defined HAVE_UTIMES
 	if (S_ISLNK(mode))
@@ -216,7 +216,7 @@ int create_directory_path(char *fname)
  *
  * Derived from GNU C's cccp.c.
  */
-int full_write(int desc, char *ptr, size_t len)
+int full_write(int desc, const char *ptr, size_t len)
 {
 	int total_written;
 
@@ -384,7 +384,7 @@ int robust_unlink(const char *fname)
  * across filesystems, -2 if copy_file() failed, and -1 on other errors.
  * If partialptr is not NULL and we need to do a copy, copy the file into
  * the active partial-dir instead of over the destination file. */
-int robust_rename(char *from, char *to, char *partialptr,
+int robust_rename(const char *from, const char *to, const char *partialptr,
 		  int mode)
 {
 	int tries = 4;
@@ -461,7 +461,7 @@ void kill_all(int sig)
 }
 
 /** Turn a user name into a uid */
-int name_to_uid(char *name, uid_t *uid)
+int name_to_uid(const char *name, uid_t *uid)
 {
 	struct passwd *pass;
 	if (!name || !*name)
@@ -475,7 +475,7 @@ int name_to_uid(char *name, uid_t *uid)
 }
 
 /** Turn a group name into a gid */
-int name_to_gid(char *name, gid_t *gid)
+int name_to_gid(const char *name, gid_t *gid)
 {
 	struct group *grp;
 	if (!name || !*name)
@@ -1149,9 +1149,7 @@ char *human_dnum(double dnum, int decimal_digits)
 	return buf;
 }
 
-/**
- * Return the date and time as a string
- **/
+/* Return the date and time as a string.  Some callers tweak returned buf. */
 char *timestring(time_t t)
 {
 	static char TimeBuf[200];

@@ -513,12 +513,12 @@ struct hlink {
 struct file_struct {
 	union {
 		dev_t rdev;	/* The device number, if this is a device */
-		char *sum;	/* Only a normal file can have a checksum */
-		char *link;	/* Points to symlink string, if a symlink */
+		const char *sum;/* Only a normal file can have a checksum */
+		const char *link;/* Points to symlink string, if a symlink */
 	} u;
 	OFF_T length;
-	char *basename;		/* The current item's name (AKA filename) */
-	char *dirname;		/* The directory info inside the transfer */
+	const char *basename;	/* The current item's name (AKA filename) */
+	const char *dirname;	/* The directory info inside the transfer */
 	union {
 		const char *root;/* Sender-side dir info outside transfer */
 		int depth;	/* Receiver-side directory depth info */

@@ -204,7 +204,7 @@ void set_msg_fd_out(int fd)
 }
 
 /* Add a message to the pending MSG_* list. */
-static void msg_list_add(struct msg_list *lst, int code, char *buf, int len)
+static void msg_list_add(struct msg_list *lst, int code, const char *buf, int len)
 {
 	struct msg_list_item *m;
 	int sz = len + 4 + sizeof m[0] - 1;
@@ -371,7 +371,7 @@ static int msg2genr_flush(int flush_it_all)
 	return 1;
 }
 
-int send_msg(enum msgcode code, char *buf, int len)
+int send_msg(enum msgcode code, const char *buf, int len)
 {
 	if (msg_fd_out < 0) {
 		if (!defer_forwarding_messages)
@@ -894,12 +894,12 @@ int64 read_longint(int f)
 	return num;
 }
 
-void read_buf(int f,char *buf,size_t len)
+void read_buf(int f, char *buf, size_t len)
 {
 	readfd(f,buf,len);
 }
 
-void read_sbuf(int f,char *buf,size_t len)
+void read_sbuf(int f, char *buf, size_t len)
 {
 	readfd(f, buf, len);
 	buf[len] = '\0';
@@ -1039,7 +1039,7 @@ static void sleep_for_bwlimit(int bytes_written)
  *
  * This function underlies the multiplexing system.  The body of the
  * application never calls this function directly. */
-static void writefd_unbuffered(int fd,char *buf,size_t len)
+static void writefd_unbuffered(int fd, const char *buf, size_t len)
 {
 	size_t n, total = 0;
 	fd_set w_fds, r_fds, e_fds;
@@ -1157,7 +1157,7 @@ static void msg2sndr_flush(void)
  * Write an message to a multiplexed stream. If this fails then rsync
  * exits.
  **/
-static void mplex_write(enum msgcode code, char *buf, size_t len)
+static void mplex_write(enum msgcode code, const char *buf, size_t len)
 {
 	char buffer[1024];
 	size_t n = len;
@@ -1197,7 +1197,7 @@ void io_flush(int flush_it_all)
 	iobuf_out_cnt = 0;
 }
 
-static void writefd(int fd,char *buf,size_t len)
+static void writefd(int fd, const char *buf, size_t len)
 {
 	if (fd == msg_fd_out) {
 		rprintf(FERROR, "Internal error: wrong write used in receiver.\n");
@@ -1271,13 +1271,13 @@ void write_longint(int f, int64 x)
 #endif
 }
 
-void write_buf(int f,char *buf,size_t len)
+void write_buf(int f, const char *buf, size_t len)
 {
 	writefd(f,buf,len);
 }
 
 /** Write a string to the connection */
-void write_sbuf(int f, char *buf)
+void write_sbuf(int f, const char *buf)
 {
 	writefd(f, buf, strlen(buf));
 }
@@ -1287,7 +1287,7 @@ void write_byte(int f, uchar c)
 	writefd(f, (char *)&c, 1);
 }
 
-void write_vstring(int f, char *str, int len)
+void write_vstring(int f, const char *str, int len)
 {
 	uchar lenbuf[3], *lb = lenbuf;
 
@@ -1370,7 +1370,7 @@ void io_start_multiplex_in(void)
 }
 
 /** Write an message to the multiplexed data stream. */
-int io_multiplex_write(enum msgcode code, char *buf, size_t len)
+int io_multiplex_write(enum msgcode code, const char *buf, size_t len)
 {
 	if (!io_multiplexing_out)
 		return 0;

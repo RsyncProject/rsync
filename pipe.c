@@ -50,9 +50,8 @@ pid_t piped_child(char **command, int *f_in, int *f_out)
 	int to_child_pipe[2];
 	int from_child_pipe[2];
 
-	if (verbose >= 2) {
+	if (verbose >= 2)
 		print_child_argv(command);
-	}
 
 	if (fd_pair(to_child_pipe) < 0 || fd_pair(from_child_pipe) < 0) {
 		rsyserr(FERROR, errno, "pipe");

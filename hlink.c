@@ -67,8 +67,7 @@ static void link_idev_data(void)
 	alloc_pool_t hlink_pool;
 	alloc_pool_t idev_pool = the_file_list->hlink_pool;
 
-	hlink_pool = pool_create(128 * 1024, sizeof (struct hlink),
-	    out_of_memory, POOL_INTERN);
+	hlink_pool = pool_create(128 * 1024, sizeof (struct hlink), out_of_memory, POOL_INTERN);
 
 	for (from = to = 0; from < hlink_count; from++) {
 		start = from;

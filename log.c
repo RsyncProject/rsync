@@ -103,7 +103,7 @@ static char const *rerr_name(int code)
 	return NULL;
 }
 
-static void logit(int priority, char *buf)
+static void logit(int priority, const char *buf)
 {
 	if (logfile_was_closed)
 		logfile_reopen();
@@ -233,7 +233,7 @@ static void filtered_fwrite(FILE *f, const char *buf, int len, int use_isprint)
 /* this is the underlying (unformatted) rsync debugging function. Call
  * it with FINFO, FERROR or FLOG.  Note: recursion can happen with
  * certain fatal conditions. */
-void rwrite(enum logcode code, char *buf, int len)
+void rwrite(enum logcode code, const char *buf, int len)
 {
 	int trailing_CR_or_NL;
 	FILE *f = NULL;
@@ -302,7 +302,8 @@ void rwrite(enum logcode code, char *buf, int len)
 #if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
 	if (ic_chck != (iconv_t)-1) {
 		char convbuf[1024];
-		char *in_buf = buf, *out_buf = convbuf;
+		const char *in_buf = buf;
+		char *out_buf = convbuf;
 		size_t in_cnt = len, out_cnt = sizeof convbuf - 1;
 
 		iconv(ic_chck, NULL, 0, NULL, 0);
@@ -418,12 +419,13 @@ void rflush(enum logcode code)
 }
 
 /* A generic logging routine for send/recv, with parameter substitiution. */
-static void log_formatted(enum logcode code, char *format, char *op,
+static void log_formatted(enum logcode code, const char *format, const char *op,
 			  struct file_struct *file, struct stats *initial_stats,
-			  int iflags, char *hlink)
+			  int iflags, const char *hlink)
 {
 	char buf[MAXPATHLEN+1024], buf2[MAXPATHLEN], fmt[32];
-	char *p, *s, *n;
+	char *p, *s, *c;
+	const char *n;
 	size_t len, total;
 	int64 b;
 
@@ -442,14 +444,14 @@ static void log_formatted(enum logcode code, char *format, char *op,
 
 	for (p = buf; (p = strchr(p, '%')) != NULL; ) {
 		s = p++;
-		n = fmt + 1;
+		c = fmt + 1;
 		if (*p == '-')
-			*n++ = *p++;
-		while (isDigit(p) && n - fmt < (int)(sizeof fmt) - 8)
-			*n++ = *p++;
+			*c++ = *p++;
+		while (isDigit(p) && c - fmt < (int)(sizeof fmt) - 8)
+			*c++ = *p++;
 		if (!*p)
 			break;
-		*n = '\0';
+		*c = '\0';
 		n = NULL;
 
 		switch (*p) {
@@ -490,47 +492,50 @@ static void log_formatted(enum logcode code, char *format, char *op,
 			n = buf2;
 			break;
 		case 'M':
-			n = timestring(file->modtime);
-			{
-				char *cp = n;
-				while ((cp = strchr(cp, ' ')) != NULL)
-					*cp = '-';
-			}
+			n = c = timestring(file->modtime);
+			while ((c = strchr(p, ' ')) != NULL)
+				*c = '-';
 			break;
 		case 'B':
-			n = buf2 + MAXPATHLEN - PERMSTRING_SIZE;
-			permstring(n - 1, file->mode); /* skip the type char */
+			c = buf2 + MAXPATHLEN - PERMSTRING_SIZE - 1;
+			permstring(c, file->mode);
+			n = c + 1; /* skip the type char */
 			break;
 		case 'o':
 			n = op;
 			break;
 		case 'f':
-			n = f_name(file, NULL);
+			c = f_name(file, NULL);
 			if (am_sender && file->dir.root) {
 				pathjoin(buf2, sizeof buf2,
-					 file->dir.root, n);
+					 file->dir.root, c);
 				clean_fname(buf2, 0);
-				if (fmt[1])
-					strlcpy(n, buf2, MAXPATHLEN);
-				else
+				if (fmt[1]) {
+					strlcpy(c, buf2, MAXPATHLEN);
+					n = c;
+				} else
 					n = buf2;
-			} else if (*n != '/') {
+			} else if (*c != '/') {
 				pathjoin(buf2, sizeof buf2,
-					 curr_dir + module_dirlen, n);
+					 curr_dir + module_dirlen, c);
 				clean_fname(buf2, 0);
-				if (fmt[1])
-					strlcpy(n, buf2, MAXPATHLEN);
-				else
+				if (fmt[1]) {
+					strlcpy(c, buf2, MAXPATHLEN);
+					n = c;
+				} else
 					n = buf2;
-			} else
-				clean_fname(n, 0);
+			} else {
+				clean_fname(c, 0);
+				n = c;
+			}
 			if (*n == '/')
 				n++;
 			break;
 		case 'n':
-			n = f_name(file, NULL);
+			c = f_name(file, NULL);
 			if (S_ISDIR(file->mode))
-				strlcat(n, "/", MAXPATHLEN);
+				strlcat(c, "/", MAXPATHLEN);
+			n = c;
 			break;
 		case 'L':
 			if (hlink && *hlink) {
@@ -590,39 +595,39 @@ static void log_formatted(enum logcode code, char *format, char *op,
 				n = "*deleting";
 				break;
 			}
-			n = buf2 + MAXPATHLEN - 32;
-			n[0] = iflags & ITEM_LOCAL_CHANGE
+			n  = c = buf2 + MAXPATHLEN - 32;
+			c[0] = iflags & ITEM_LOCAL_CHANGE
 			      ? iflags & ITEM_XNAME_FOLLOWS ? 'h' : 'c'
 			     : !(iflags & ITEM_TRANSFER) ? '.'
 			     : !local_server && *op == 's' ? '<' : '>';
-			n[1] = S_ISDIR(file->mode) ? 'd'
+			c[1] = S_ISDIR(file->mode) ? 'd'
 			     : IS_SPECIAL(file->mode) ? 'S'
 			     : IS_DEVICE(file->mode) ? 'D'
 			     : S_ISLNK(file->mode) ? 'L' : 'f';
-			n[2] = !(iflags & ITEM_REPORT_CHECKSUM) ? '.' : 'c';
-			n[3] = !(iflags & ITEM_REPORT_SIZE) ? '.' : 's';
-			n[4] = !(iflags & ITEM_REPORT_TIME) ? '.'
+			c[2] = !(iflags & ITEM_REPORT_CHECKSUM) ? '.' : 'c';
+			c[3] = !(iflags & ITEM_REPORT_SIZE) ? '.' : 's';
+			c[4] = !(iflags & ITEM_REPORT_TIME) ? '.'
 			     : !preserve_times || S_ISLNK(file->mode) ? 'T' : 't';
-			n[5] = !(iflags & ITEM_REPORT_PERMS) ? '.' : 'p';
-			n[6] = !(iflags & ITEM_REPORT_OWNER) ? '.' : 'o';
-			n[7] = !(iflags & ITEM_REPORT_GROUP) ? '.' : 'g';
-			n[8] = '.';
-			n[9] = '\0';
+			c[5] = !(iflags & ITEM_REPORT_PERMS) ? '.' : 'p';
+			c[6] = !(iflags & ITEM_REPORT_OWNER) ? '.' : 'o';
+			c[7] = !(iflags & ITEM_REPORT_GROUP) ? '.' : 'g';
+			c[8] = '.';
+			c[9] = '\0';
 
 			if (iflags & (ITEM_IS_NEW|ITEM_MISSING_DATA)) {
 				char ch = iflags & ITEM_IS_NEW ? '+' : '?';
 				int i;
-				for (i = 2; n[i]; i++)
-					n[i] = ch;
-			} else if (n[0] == '.' || n[0] == 'h' || n[0] == 'c') {
+				for (i = 2; c[i]; i++)
+					c[i] = ch;
+			} else if (c[0] == '.' || c[0] == 'h' || c[0] == 'c') {
 				int i;
-				for (i = 2; n[i]; i++) {
-					if (n[i] != '.')
+				for (i = 2; c[i]; i++) {
+					if (c[i] != '.')
 						break;
 				}
-				if (!n[i]) {
-					for (i = 2; n[i]; i++)
-						n[i] = ' ';
+				if (!c[i]) {
+					for (i = 2; c[i]; i++)
+						c[i] = ' ';
 				}
 			}
 			break;
@@ -690,9 +695,9 @@ int log_format_has(const char *format, char esc)
  * to stdout.  If it is FLOG, it just goes to the log file.  Otherwise we
  * output to both. */
 void log_item(enum logcode code, struct file_struct *file,
-	      struct stats *initial_stats, int iflags, char *hlink)
+	      struct stats *initial_stats, int iflags, const char *hlink)
 {
-	char *s_or_r = am_sender ? "send" : "recv";
+	const char *s_or_r = am_sender ? "send" : "recv";
 
 	if (code != FLOG && stdout_format && !am_server) {
 		log_formatted(FCLIENT, stdout_format, s_or_r,
@@ -705,7 +710,7 @@ void log_item(enum logcode code, struct file_struct *file,
 }
 
 void maybe_log_item(struct file_struct *file, int iflags, int itemizing,
-		    char *buf)
+		    const char *buf)
 {
 	int significant_flags = iflags & SIGNIFICANT_ITEM_FLAGS;
 	int see_item = itemizing && (significant_flags || *buf
@@ -722,11 +727,11 @@ void maybe_log_item(struct file_struct *file, int iflags, int itemizing,
 	}
 }
 
-void log_delete(char *fname, int mode)
+void log_delete(const char *fname, int mode)
 {
 	static struct file_struct file;
 	int len = strlen(fname);
-	char *fmt;
+	const char *fmt;
 
 	file.mode = mode;
 	file.basename = fname;

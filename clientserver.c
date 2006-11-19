@@ -110,7 +110,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	return ret ? ret : client_run(fd, fd, -1, argc, argv);
 }
 
-int start_inband_exchange(char *user, char *path, int f_in, int f_out,
+int start_inband_exchange(const char *user, char *path, int f_in, int f_out,
 			  int argc)
 {
 	int i;
