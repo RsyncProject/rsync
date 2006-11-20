@@ -300,15 +300,18 @@ void rwrite(enum logcode code, const char *buf, int len)
 			  ? buf[--len] : 0;
 
 #if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
+#ifndef ICONV_CONST
+#define ICONV_CONST
+#endif
 	if (ic_chck != (iconv_t)-1) {
 		char convbuf[1024];
-		const char *in_buf = buf;
+		ICONV_CONST char *in_buf = (ICONV_CONST char *)buf;
 		char *out_buf = convbuf;
 		size_t in_cnt = len, out_cnt = sizeof convbuf - 1;
 
 		iconv(ic_chck, NULL, 0, NULL, 0);
 		while (iconv(ic_chck, &in_buf,&in_cnt,
-				 &out_buf,&out_cnt) == (size_t)-1) {
+			     &out_buf,&out_cnt) == (size_t)-1) {
 			if (out_buf != convbuf) {
 				filtered_fwrite(f, convbuf, out_buf - convbuf, 0);
 				out_buf = convbuf;
