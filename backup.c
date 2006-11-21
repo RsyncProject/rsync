@@ -132,7 +132,9 @@ static int make_bak_dir(char *fullpath)
 					full_fname(rel));
 			} else {
 				do_lchown(fullpath, st.st_uid, st.st_gid);
+#ifdef HAVE_CHMOD
 				do_chmod(fullpath, st.st_mode);
+#endif
 			}
 		}
 		*p = '/';
