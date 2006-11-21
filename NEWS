@@ -11,6 +11,9 @@ Changes since 2.6.9:
       option.  Prior versions used to output too many creation events for
       matching items.
 
+    - A negated filter rule now sends the negation option when sending the
+      filter rules.
+
   ENHANCEMENTS:
 
     - You may specify --max-delete=0 to a 3.0.0 client as long as the
@@ -26,6 +29,13 @@ Changes since 2.6.9:
 
     - Upgraded the included popt version to 1.10.2 and improved its use of
       string-handling functions.
+
+    - Added missing prototypes for compatibility functions from the lib dir.
+
+    - Figure out if the iconv() function has a const arg to avoid a compiler
+      warning.
+
+    - Improved the use of "const" on pointers.
 
   DEVELOPER RELATED:
 
