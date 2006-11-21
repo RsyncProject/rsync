@@ -455,8 +455,8 @@ static void send_file_entry(struct file_struct *file, int f)
 	if (file->link_u.idev) {
 		if (protocol_version < 26) {
 			/* 32-bit dev_t and ino_t */
-			write_int(f, dev);
-			write_int(f, file->F_INODE);
+			write_int(f, (int32)dev);
+			write_int(f, (int32)file->F_INODE);
 		} else {
 			/* 64-bit dev_t and ino_t */
 			if (!(flags & XMIT_SAME_DEV))
@@ -1450,10 +1450,10 @@ int flist_find(struct file_list *flist, struct file_struct *f)
 			if (mid_up > high) {
 				/* If there's nothing left above us, set high to
 				 * a non-empty entry below us and continue. */
-				high = mid - flist->files[mid]->length;
+				high = mid - (int)flist->files[mid]->length;
 				if (!flist->files[high]->basename) {
 					do {
-					    high -= flist->files[high]->length;
+					    high -= (int)flist->files[high]->length;
 					} while (!flist->files[high]->basename);
 					flist->files[mid]->length = mid - high;
 				}

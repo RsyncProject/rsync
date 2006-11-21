@@ -190,7 +190,7 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 	window_start = offset;
 	window_size = map->def_window_size;
 	if (window_start + window_size > map->file_size)
-		window_size = map->file_size - window_start;
+		window_size = (int32)(map->file_size - window_start);
 	if (len > window_size)
 		window_size = len;
 
@@ -208,7 +208,7 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 	    window_start < map->p_offset + map->p_len &&
 	    window_start + window_size >= map->p_offset + map->p_len) {
 		read_start = map->p_offset + map->p_len;
-		read_offset = read_start - window_start;
+		read_offset = (int32)(read_start - window_start);
 		read_size = window_size - read_offset;
 		memmove(map->p, map->p + (map->p_len - read_offset), read_offset);
 	} else {

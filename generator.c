@@ -526,8 +526,8 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 	sum->flength	= len;
 	sum->blength	= blength;
 	sum->s2length	= s2length;
-	sum->remainder	= len % blength;
-	sum->count	= len / blength + (sum->remainder != 0);
+	sum->remainder	= (int32)(len % blength);
+	sum->count	= (int32)(len / blength) + (sum->remainder != 0);
 
 	if (sum->count && verbose > 2) {
 		rprintf(FINFO,

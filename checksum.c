@@ -95,11 +95,11 @@ void get_checksum2(char *buf, int32 len, char *sum)
 
 void file_checksum(char *fname,char *sum,OFF_T size)
 {
-	OFF_T i;
 	struct map_struct *buf;
-	int fd;
-	OFF_T len = size;
+	OFF_T i, len = size;
 	struct mdfour m;
+	int32 remainder;
+	int fd;
 
 	memset(sum,0,MD4_SUM_LENGTH);
 
@@ -120,8 +120,9 @@ void file_checksum(char *fname,char *sum,OFF_T size)
 	 * by failing to call mdfour_tail() for block sizes that
 	 * are multiples of 64.  This is fixed by calling mdfour_update()
 	 * even when there are no more bytes. */
-	if (len - i > 0 || protocol_version >= 27)
-		mdfour_update(&m, (uchar *)map_ptr(buf, i, len-i), len-i);
+	remainder = (int32)(len - i);
+	if (remainder > 0 || protocol_version >= 27)
+		mdfour_update(&m, (uchar *)map_ptr(buf, i, remainder), remainder);
 
 	mdfour_result(&m, (uchar *)sum);
 

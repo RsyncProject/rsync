@@ -85,7 +85,7 @@ static OFF_T last_match;
 static void matched(int f, struct sum_struct *s, struct map_struct *buf,
 		    OFF_T offset, int32 i)
 {
-	int32 n = offset - last_match; /* max value: block_size (int32) */
+	int32 n = (int32)(offset - last_match); /* max value: block_size (int32) */
 	int32 j;
 
 	if (verbose > 2 && i >= 0) {
@@ -121,8 +121,8 @@ static void matched(int f, struct sum_struct *s, struct map_struct *buf,
 static void hash_search(int f,struct sum_struct *s,
 			struct map_struct *buf, OFF_T len)
 {
-	OFF_T offset, end, backup;
-	int32 k, want_i;
+	OFF_T offset, end;
+	int32 k, want_i, backup;
 	char sum2[SUM_LENGTH];
 	uint32 s1, s2, sum;
 	int more;
@@ -254,7 +254,7 @@ static void hash_search(int f,struct sum_struct *s,
 		} while ((i = s->sums[i].chain) >= 0);
 
 	  null_hash:
-		backup = offset - last_match;
+		backup = (int32)(offset - last_match);
 		/* We sometimes read 1 byte prior to last_match... */
 		if (backup < 0)
 			backup = 0;
@@ -324,7 +324,7 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 			last_match = j;
 		}
 		if (last_match < s->flength) {
-			int32 len = s->flength - last_match;
+			int32 len = (int32)(s->flength - last_match);
 			if (buf && do_progress)
 				show_progress(last_match, buf->file_size);
 			sum_update(map_ptr(buf, last_match, len), len);

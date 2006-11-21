@@ -756,7 +756,7 @@ static OFF_T parse_size_arg(char **size_arg, char def_suf)
 		OFF_T num = size;
 		*s = '\0';
 		while (num) {
-			*--s = (num % 10) + '0';
+			*--s = (char)(num % 10) + '0';
 			num /= 10;
 		}
 		if (!(*size_arg = strdup(s)))

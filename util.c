@@ -1128,7 +1128,7 @@ char *human_num(int64 num)
 	if (!num)
 		*--s = '0';
 	while (num) {
-		*--s = (num % 10) + '0';
+		*--s = (char)(num % 10) + '0';
 		num /= 10;
 	}
 	return s;
