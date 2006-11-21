@@ -648,7 +648,7 @@ struct stats {
 	int64 matched_data;
 	int64 flist_buildtime;
 	int64 flist_xfertime;
-	int flist_size;
+	int64 flist_size;
 	int num_files;
 	int num_transferred_files;
 	int current_file_index;
