@@ -297,7 +297,7 @@ static void read_msg_fd(void)
 			if (n >= sizeof buf)
 				n = sizeof buf - 1;
 			read_loop(fd, buf, n);
-			rwrite(tag, buf, n);
+			rwrite((enum logcode)tag, buf, n);
 			len -= n;
 		}
 		break;
