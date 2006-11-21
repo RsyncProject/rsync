@@ -1070,6 +1070,8 @@ char *get_rule_prefix(int match_flags, const char *pat, int for_xfer,
 	else
 		legal_len = 0;
 
+	if (match_flags & MATCHFLG_NEGATE)
+		*op++ = '!';
 	if (match_flags & MATCHFLG_CVS_IGNORE)
 		*op++ = 'C';
 	else {
