@@ -87,14 +87,15 @@ int do_mknod(const char *pathname, mode_t mode, dev_t dev)
 	if (S_ISSOCK(mode)) {
 		int sock;
 		struct sockaddr_un saddr;
-		unsigned int len;
-
-		saddr.sun_family = AF_UNIX;
-		len = strlcpy(saddr.sun_path, pathname, sizeof saddr.sun_path);
+#ifdef HAVE_SOCKADDR_UN_LEN
+		unsigned int len =
+#endif
+		    strlcpy(saddr.sun_path, pathname, sizeof saddr.sun_path);
 #ifdef HAVE_SOCKADDR_UN_LEN
 		saddr.sun_len = len >= sizeof saddr.sun_path
 			      ? sizeof saddr.sun_path : len + 1;
 #endif
+		saddr.sun_family = AF_UNIX;
 
 		if ((sock = socket(PF_UNIX, SOCK_STREAM, 0)) < 0
 		    || (unlink(pathname) < 0 && errno != ENOENT)
