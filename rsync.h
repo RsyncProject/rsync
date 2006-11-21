@@ -664,10 +664,15 @@ struct chmod_mode_struct;
 
 #ifndef __GNUC__
 #define __attribute__(x)
+# if __GNUC__ <= 2
+# define NORETURN
+# endif
 #endif
 
 #define UNUSED(x) x __attribute__((__unused__))
+#ifndef NORETURN
 #define NORETURN __attribute__((__noreturn__))
+#endif
 
 #include "proto.h"
 
