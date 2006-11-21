@@ -471,7 +471,7 @@ if (_popt_debug)
     }
 #endif
 
-    rc = execvp(argv[0], (char *const *)argv);
+    execvp(argv[0], (char *const *)argv);
 
     return POPT_ERROR_ERRNO;
 }
