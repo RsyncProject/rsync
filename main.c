@@ -238,7 +238,8 @@ static void output_summary(void)
 			human_num(stats.literal_data));
 		rprintf(FINFO,"Matched data: %s bytes\n",
 			human_num(stats.matched_data));
-		rprintf(FINFO,"File list size: %d\n", stats.flist_size);
+		rprintf(FINFO,"File list size: %s\n",
+			human_num(stats.flist_size));
 		if (stats.flist_buildtime) {
 			rprintf(FINFO,
 				"File list generation time: %.3f seconds\n",
