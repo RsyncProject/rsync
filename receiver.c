@@ -164,7 +164,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 			offset = j;
 		}
 		if (offset < sum.flength) {
-			int32 len = sum.flength - offset;
+			int32 len = (int32)(sum.flength - offset);
 			if (do_progress)
 				show_progress(offset, total_size);
 			sum_update(map_ptr(mapbuf, offset, len), len);
@@ -660,7 +660,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 				send_msg(MSG_SUCCESS, numbuf, 4);
 			}
 		} else if (!recv_ok) {
-			int msgtype = phase || read_batch ? FERROR : FINFO;
+			enum logcode msgtype = phase || read_batch ? FERROR : FINFO;
 			if (msgtype == FERROR || verbose) {
 				char *errstr, *redostr, *keptstr;
 				if (!(keep_partial && partialptr) && !inplace)
