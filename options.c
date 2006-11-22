@@ -328,6 +328,7 @@ void usage(enum logcode F)
   rprintf(F,"     --delete                delete extraneous files from destination dirs\n");
   rprintf(F,"     --delete-before         receiver deletes before transfer (default)\n");
   rprintf(F,"     --delete-during         receiver deletes during transfer, not before\n");
+  rprintf(F,"     --delete-delay          find deletions during, delete after\n");
   rprintf(F,"     --delete-after          receiver deletes after transfer, not before\n");
   rprintf(F,"     --delete-excluded       also delete excluded files from destination dirs\n");
   rprintf(F,"     --ignore-errors         delete even if there are I/O errors\n");
@@ -476,7 +477,8 @@ static struct poptOption long_options[] = {
   {"del",              0,  POPT_ARG_NONE,   &delete_during, 0, 0, 0 },
   {"delete",           0,  POPT_ARG_NONE,   &delete_mode, 0, 0, 0 },
   {"delete-before",    0,  POPT_ARG_VAL,    &delete_before, 2, 0, 0 },
-  {"delete-during",    0,  POPT_ARG_NONE,   &delete_during, 0, 0, 0 },
+  {"delete-during",    0,  POPT_ARG_VAL,    &delete_during, 1, 0, 0 },
+  {"delete-delay",     0,  POPT_ARG_VAL,    &delete_during, 2, 0, 0 },
   {"delete-after",     0,  POPT_ARG_NONE,   &delete_after, 0, 0, 0 },
   {"delete-excluded",  0,  POPT_ARG_NONE,   &delete_excluded, 0, 0, 0 },
   {"remove-sent-files",0,  POPT_ARG_VAL,    &remove_source_files, 2, 0, 0 }, /* deprecated */
@@ -1185,7 +1187,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (!relative_paths)
 		implied_dirs = 0;
 
-	if (!!delete_before + delete_during + delete_after > 1) {
+	if (!!delete_before + !!delete_during + delete_after > 1) {
 		snprintf(err_buf, sizeof err_buf,
 			"You may not combine multiple --delete-WHEN options.\n");
 		return 0;
@@ -1663,8 +1665,10 @@ void server_options(char **args,int *argc)
 			args[ac++] = "--delete";
 		if (delete_before > 1)
 			args[ac++] = "--delete-before";
-		if (delete_during)
-			args[ac++] = "--delete-during";
+		if (delete_during) {
+			args[ac++] = delete_during == 2 ? "--delete-delay"
+							: "--delete-during";
+		}
 		if (delete_after)
 			args[ac++] = "--delete-after";
 		if (force_delete)
