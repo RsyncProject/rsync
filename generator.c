@@ -97,6 +97,7 @@ int ignore_perishable = 0;
 int non_perishable_cnt = 0;
 
 static int deletion_count = 0; /* used to implement --max-delete */
+static FILE *delete_delay_fp = NULL;
 
 /* For calling delete_item() and delete_dir_contents(). */
 #define DEL_RECURSE		(1<<1) /* recurse */
@@ -123,10 +124,10 @@ static int is_backup_file(char *fn)
 /* Delete a file or directory.  If DEL_RECURSE is set in the flags, this will
  * delete recursively.
  *
- * Note that fname must point to a MAXPATHLEN buffer if the mode indicates it's
+ * Note that fbuf must point to a MAXPATHLEN buffer if the mode indicates it's
  * a directory! (The buffer is used for recursion, but returned unchanged.)
  */
-static enum delret delete_item(char *fname, int mode, char *replace, int flags)
+static enum delret delete_item(char *fbuf, int mode, char *replace, int flags)
 {
 	enum delret ret;
 	char *what;
@@ -134,13 +135,13 @@ static enum delret delete_item(char *fname, int mode, char *replace, int flags)
 
 	if (verbose > 2) {
 		rprintf(FINFO, "delete_item(%s) mode=%o flags=%d\n",
-			fname, mode, flags);
+			fbuf, mode, flags);
 	}
 
 	if (S_ISDIR(mode) && !(flags & DEL_DIR_IS_EMPTY)) {
 		ignore_perishable = 1;
 		/* If DEL_RECURSE is not set, this just reports emptiness. */
-		ret = delete_dir_contents(fname, flags);
+		ret = delete_dir_contents(fbuf, flags);
 		ignore_perishable = 0;
 		if (ret == DR_NOT_EMPTY || ret == DR_AT_LIMIT)
 			goto check_ret;
@@ -152,27 +153,27 @@ static enum delret delete_item(char *fname, int mode, char *replace, int flags)
 
 	if (S_ISDIR(mode)) {
 		what = "rmdir";
-		ok = do_rmdir(fname) == 0;
-	} else if (make_backups && (backup_dir || !is_backup_file(fname))) {
+		ok = do_rmdir(fbuf) == 0;
+	} else if (make_backups && (backup_dir || !is_backup_file(fbuf))) {
 		what = "make_backup";
-		ok = make_backup(fname);
+		ok = make_backup(fbuf);
 	} else {
 		what = "unlink";
-		ok = robust_unlink(fname) == 0;
+		ok = robust_unlink(fbuf) == 0;
 	}
 
 	if (ok) {
 		if (!replace)
-			log_delete(fname, mode);
+			log_delete(fbuf, mode);
 		ret = DR_SUCCESS;
 	} else {
 		if (S_ISDIR(mode) && errno == ENOTEMPTY) {
 			rprintf(FINFO, "cannot delete non-empty directory: %s\n",
-				fname);
+				fbuf);
 			ret = DR_NOT_EMPTY;
 		} else if (errno != ENOENT) {
 			rsyserr(FERROR, errno, "delete_file: %s(%s) failed",
-				what, full_fname(fname));
+				what, fbuf);
 			ret = DR_FAILURE;
 		} else {
 			deletion_count--;
@@ -183,7 +184,7 @@ static enum delret delete_item(char *fname, int mode, char *replace, int flags)
   check_ret:
 	if (replace && ret != DR_SUCCESS) {
 		rprintf(FERROR, "could not make way for new %s: %s\n",
-			replace, fname);
+			replace, fbuf);
 	}
 	return ret;
 }
@@ -265,6 +266,68 @@ static enum delret delete_dir_contents(char *fname, int flags)
 	return ret;
 }
 
+static void start_delete_temp(void)
+{
+	char fnametmp[MAXPATHLEN];
+	int fd, save_dry_run = dry_run;
+
+	dry_run = 0;
+	if (!get_tmpname(fnametmp, "deldelay")
+	 || (fd = do_mkstemp(fnametmp, 0600)) < 0
+	 || !(delete_delay_fp = fdopen(fd, "w+"))) {
+		rprintf(FERROR, "Unable to create delete-delay temp file.\n");
+		exit_cleanup(RERR_FILEIO);
+	}
+	dry_run = save_dry_run;
+	unlink(fnametmp);
+}
+
+static int read_delay_line(FILE *fp, char *buf, int bsize)
+{
+	int ch, mode = 0;
+
+	if ((ch = fgetc(fp)) == EOF)
+		return -1;
+
+	while (1) {
+		if (ch == ' ')
+			break;
+		if (ch > '7' || ch < '0') {
+			rprintf(FERROR, "invalid data in delete-delay file.\n");
+			exit_cleanup(RERR_FILEIO);
+		}
+		mode = mode*8 + ch - '0';
+		if ((ch = fgetc(fp)) == EOF) {
+		  unexpected_eof:
+			rprintf(FERROR, "unexpected EOF in delete-delay file.\n");
+			exit_cleanup(RERR_FILEIO);
+		}
+	}
+
+	while (1) {
+		if ((ch = fgetc(fp)) == EOF)
+			goto unexpected_eof;
+		if (bsize-- <= 0) {
+			rprintf(FERROR, "filename too long in delete-delay file.\n");
+			exit_cleanup(RERR_FILEIO);
+		}
+		*buf++ = (char)ch;
+		if (ch == '\0')
+			break;
+	}
+
+	return mode;
+}
+
+static void delayed_deletions(char *delbuf)
+{
+	int mode;
+
+	fseek(delete_delay_fp, 0, 0);
+	while ((mode = read_delay_line(delete_delay_fp, delbuf, MAXPATHLEN)) >= 0)
+		delete_item(delbuf, mode, NULL, DEL_RECURSE);
+	fclose(delete_delay_fp);
+}
 
 /* This function is used to implement per-directory deletion, and is used by
  * all the --delete-WHEN options.  Note that the fbuf pointer must point to a
@@ -338,7 +401,10 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 		}
 		if (flist_find(flist, fp) < 0) {
 			f_name(fp, delbuf);
-			delete_item(delbuf, fp->mode, NULL, DEL_RECURSE);
+			if (delete_delay_fp)
+				fprintf(delete_delay_fp, "%o %s%c", fp->mode, delbuf, '\0');
+			else
+				delete_item(delbuf, fp->mode, NULL, DEL_RECURSE);
 		}
 	}
 
@@ -1530,6 +1596,8 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 
 	if (delete_before && !local_name && flist->count > 0)
 		do_delete_pass(flist);
+	if (delete_during == 2)
+		start_delete_temp();
 	do_progress = 0;
 
 	if (append_mode || whole_file < 0)
@@ -1642,6 +1710,8 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	}
 
 	do_progress = save_do_progress;
+	if (delete_delay_fp)
+		delayed_deletions(fbuf);
 	if (delete_after && !local_name && flist->count > 0)
 		do_delete_pass(flist);
 
