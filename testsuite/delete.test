@@ -21,11 +21,11 @@ echo extra >"$todir"/extradir/remove3
 echo extra >"$todir"/emptydir/subdir/remove4
 
 # Create two chk dirs, one with a copy of the source files, and one with
-# what we expect to be left behind by the copy using --remove-sent-files.
+# what we expect to be left behind by the copy using --remove-source-files.
 $RSYNC -av "$fromdir/" "$chkdir/copy/"
 $RSYNC -av -f 'exclude,! */' "$fromdir/" "$chkdir/empty/"
 
-checkit "$RSYNC -avv --del --remove-sent-files \
+checkit "$RSYNC -avv --del --remove-source-files \
     \"$fromdir/\" \"$todir/\"" "$chkdir/copy" "$todir"
 
 diff -r "$chkdir/empty" "$fromdir"
