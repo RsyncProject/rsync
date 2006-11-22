@@ -345,6 +345,7 @@ to the detailed description below for a complete description.  verb(
      --delete                delete extraneous files from dest dirs
      --delete-before         receiver deletes before transfer (default)
      --delete-during         receiver deletes during xfer, not before
+     --delete-delay          find deletions during, delete after
      --delete-after          receiver deletes after transfer, not before
      --delete-excluded       also delete excluded files from dest dirs
      --ignore-errors         delete even if there are I/O errors
@@ -976,6 +977,12 @@ receiving side be done incrementally as the transfer happens.  This is
 a faster method than choosing the before- or after-transfer algorithm,
 but it is only supported beginning with rsync version 2.6.4.
 See bf(--delete) (which is implied) for more details on file-deletion.
+
+dit(bf(--delete-delay)) Request that the file-deletions on the receiving
+side be computed incrementally as the transfer happens, and then removed
+after the transfer completes.  A temporary file will be created on the
+receiving side to hold the names, but it is removed while open, so you
+won't see it during the transfer.
 
 dit(bf(--delete-after)) Request that the file-deletions on the receiving
 side be done after the transfer has completed.  This is useful if you
