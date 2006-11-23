@@ -392,7 +392,6 @@ static int execCommand(poptContext con)
     poptItem item = con->doExec;
     const char ** argv;
     int argc = 0;
-    int rc;
 
     if (item == NULL) /*XXX can't happen*/
 	return POPT_ERROR_NOARG;
@@ -432,8 +431,9 @@ static int execCommand(poptContext con)
 
     argv[argc] = NULL;
 
+  {
 #ifdef __hpux
-    rc = setresgid(getgid(), getgid(),-1);
+    int rc = setresgid(getgid(), getgid(),-1);
     if (rc) return POPT_ERROR_ERRNO;
     rc = setresuid(getuid(), getuid(),-1);
     if (rc) return POPT_ERROR_ERRNO;
@@ -444,12 +444,12 @@ static int execCommand(poptContext con)
  * XXX	from Norbert Warmuth <nwarmuth@privat.circular.de>
  */
 #if defined(HAVE_SETUID)
-    rc = setgid(getgid());
+    int rc = setgid(getgid());
     if (rc) return POPT_ERROR_ERRNO;
     rc = setuid(getuid());
     if (rc) return POPT_ERROR_ERRNO;
 #elif defined (HAVE_SETREUID)
-    rc = setregid(getgid(), getgid());
+    int rc = setregid(getgid(), getgid());
     if (rc) return POPT_ERROR_ERRNO;
     rc = setreuid(getuid(), getuid());
     if (rc) return POPT_ERROR_ERRNO;
@@ -457,6 +457,7 @@ static int execCommand(poptContext con)
     ; /* Can't drop privileges */
 #endif
 #endif
+  }
 
     if (argv[0] == NULL)
 	return POPT_ERROR_NOARG;
