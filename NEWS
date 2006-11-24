@@ -16,11 +16,15 @@ Changes since 2.6.9:
 
   ENHANCEMENTS:
 
+    - Added the --delete-delay option, which is a more efficient way to
+      delete files at the end of the transfer without needing a separate
+      delete pass.
+
     - You may specify --max-delete=0 to a 3.0.0 client as long as the
       receiving side is at least version 3.0.0.  This means that you
       can pull from an older rsync with this option, but pushing to an
-      older rsync will generate an error.  *Be careful to never specify
-      a 0 value to older rsync client, or it will be silently ignored.*
+      older rsync will generate an error.  *Be sure to never specify a 0
+      value to an older rsync client, or it will be silently ignored.*
 
   INTERNAL:
 
@@ -32,8 +36,10 @@ Changes since 2.6.9:
 
     - Added missing prototypes for compatibility functions from the lib dir.
 
-    - Figure out if the iconv() function has a const arg to avoid a compiler
-      warning.
+    - Configure determines if iconv() has a const arg, allowing us to avoid a
+      compiler warning.
+
+    - Made the sending of some numbers more efficient for protocol 30.
 
     - Improved the use of "const" on pointers.
 
