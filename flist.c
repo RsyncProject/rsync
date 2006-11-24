@@ -396,8 +396,7 @@ static void send_file_entry(struct file_struct *file, int f)
 			flags |= XMIT_TOP_DIR;
 		if ((flags & 0xFF00) || !flags) {
 			flags |= XMIT_EXTENDED_FLAGS;
-			write_byte(f, flags);
-			write_byte(f, flags >> 8);
+			write_shortint(f, flags);
 		} else
 			write_byte(f, flags);
 	} else {
@@ -794,7 +793,7 @@ struct file_struct *make_file(char *fname, struct file_list *flist,
 		return NULL;
 	}
 
-	/* We only care about directories because we need to avoid recursing
+	/* -x only affects directories because we need to avoid recursing
 	 * into a mount-point directory, not to avoid copying a symlinked
 	 * file if -L (or similar) was specified. */
 	if (one_file_system && st.st_dev != filesystem_dev
