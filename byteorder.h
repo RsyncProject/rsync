@@ -20,8 +20,8 @@
 
 #undef CAREFUL_ALIGNMENT
 
-/* we know that the x86 can handle misalignment and has the "right"
-   byteorder */
+/* We know that the x86 can handle misalignment and has the same
+ * byte order (LSB-first) as the 32-bit numbers we transmit. */
 #ifdef __i386__
 #define CAREFUL_ALIGNMENT 0
 #endif
@@ -31,13 +31,22 @@
 #endif
 
 #define CVAL(buf,pos) (((unsigned char *)(buf))[pos])
-#define PVAL(buf,pos) ((unsigned)CVAL(buf,pos))
+#define UVAL(buf,pos) ((uint32)CVAL(buf,pos))
 #define SCVAL(buf,pos,val) (CVAL(buf,pos) = (val))
 
+/* Our 64-bit numbers are sent in MSB-first order so that we can use
+ * the highest bits to indicate the number of bytes sent. */
+#define NVAL2(b,m) ((UVAL(b,0)&~(m))<<8|UVAL(b,1))
+#define NVAL3(b,m) (NVAL2(b,m)<<8|UVAL(b,2))
+#define NVAL4(b,m) (NVAL3(b,m)<<8|UVAL(b,3))
+#define NVAL5(b,m) ((int64)NVAL4(b,m)<<8|UVAL(b,4))
+#define NVAL6(b,m) (NVAL5(b,m)<<8|UVAL(b,5))
+#define NVAL7(b,m) (NVAL6(b,m)<<8|UVAL(b,6))
+#define NVAL8(b,m) (NVAL7(b,m)<<8|UVAL(b,7))
 
 #if CAREFUL_ALIGNMENT
-#define SVAL(buf,pos) (PVAL(buf,pos)|PVAL(buf,(pos)+1)<<8)
-#define IVAL(buf,pos) (SVAL(buf,pos)|SVAL(buf,(pos)+2)<<16)
+#define PVAL(buf,pos) (UVAL(buf,pos)|UVAL(buf,(pos)+1)<<8)
+#define IVAL(buf,pos) (PVAL(buf,pos)|PVAL(buf,(pos)+2)<<16)
 #define SSVALX(buf,pos,val) (CVAL(buf,pos)=(val)&0xFF,CVAL(buf,pos+1)=(val)>>8)
 #define SIVALX(buf,pos,val) (SSVALX(buf,pos,val&0xFFFF),SSVALX(buf,pos+2,val>>16))
 #define SIVAL(buf,pos,val) SIVALX((buf),(pos),((uint32)(val)))
@@ -51,5 +60,3 @@
 #define IVAL(buf,pos) (*(uint32 *)((char *)(buf) + (pos)))
 #define SIVAL(buf,pos,val) IVAL(buf,pos)=((uint32)(val))
 #endif
-
-
