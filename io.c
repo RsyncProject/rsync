@@ -917,6 +917,12 @@ int64 read_longint(int f)
 		int cnt;
 		readfd(f, b, 3);
 		cnt = int_byte_cnt[CVAL(b, 0)];
+#if SIZEOF_INT64 < 8
+		if (cnt > 5 || (cnt == 5 && (CVAL(b,0)&0x3F || CVAL(b,1)&0x80))) {
+			rprintf(FERROR, "Integer overflow: attempted 64-bit offset\n");
+			exit_cleanup(RERR_UNSUPPORTED);
+		}
+#endif
 		if (cnt > 3)
 			readfd(f, b + 3, cnt - 3);
 		switch (cnt) {
@@ -929,6 +935,7 @@ int64 read_longint(int f)
 		case 5:
 			num = NVAL5(b, 0xC0);
 			break;
+#if SIZEOF_INT64 >= 8
 		case 6:
 			num = NVAL6(b, 0xE0);
 			break;
@@ -941,8 +948,9 @@ int64 read_longint(int f)
 		case 9:
 			num = NVAL8(b+1, 0);
 			break;
+#endif
 		default:
-			exit_cleanup(RERR_PROTOCOL); // XXX impossible
+			exit_cleanup(RERR_PROTOCOL); /* impossible... */
 		}
 	}
 
@@ -1344,6 +1352,16 @@ void write_longint(int f, int64 x)
 		b[2] = (char)(x >> 8);
 		b[3] = (char)x;
 		writefd(f, b, 4);
+#if SIZEOF_INT64 < 8
+	} else {
+		b[0] = 0xC0;
+		b[1] = (char)(x >> 24);
+		b[2] = (char)(x >> 16);
+		b[3] = (char)(x >> 8);
+		b[4] = (char)x;
+		writefd(f, b, 5);
+	}
+#else
 	} else if (x < ((int64)1<<(5*8-3))) {
 		b[0] = (char)((x >> 32) | 0xC0);
 		b[1] = (char)(x >> 24);
@@ -1351,7 +1369,6 @@ void write_longint(int f, int64 x)
 		b[3] = (char)(x >> 8);
 		b[4] = (char)x;
 		writefd(f, b, 5);
-#if SIZEOF_INT64 >= 8
 	} else if (x < ((int64)1<<(6*8-4))) {
 		b[0] = (char)((x >> 40) | 0xE0);
 		b[1] = (char)(x >> 32);
@@ -1391,8 +1408,8 @@ void write_longint(int f, int64 x)
 		b[7] = (char)(x >> 8);
 		b[8] = (char)x;
 		writefd(f, b, 9);
-#endif
 	}
+#endif
 }
 
 void write_buf(int f, const char *buf, size_t len)
