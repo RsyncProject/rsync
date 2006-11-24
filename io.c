@@ -874,7 +874,7 @@ static void readfd(int fd, char *buffer, size_t N)
 		stats.total_read += total;
 }
 
-int read_shortint(int f)
+unsigned short read_shortint(int f)
 {
 	char b[2];
 	readfd(f, b, 2);
@@ -1286,12 +1286,12 @@ static void writefd(int fd, const char *buf, size_t len)
 	}
 }
 
-void write_shortint(int f, int x)
+void write_shortint(int f, unsigned short x)
 {
-	uchar b[2];
-	b[0] = x;
-	b[1] = x >> 8;
-	writefd(f, (char *)b, 2);
+	char b[2];
+	b[0] = (char)x;
+	b[1] = (char)(x >> 8);
+	writefd(f, b, 2);
 }
 
 void write_int(int f, int32 x)
@@ -1334,62 +1334,62 @@ void write_longint(int f, int64 x)
 		goto all_bits;
 #endif
 	} else if (x < ((int32)1<<(3*8-1))) {
-		b[0] = (x >> 16);
-		b[1] = x >> 8;
-		b[2] = x;
+		b[0] = (char)(x >> 16);
+		b[1] = (char)(x >> 8);
+		b[2] = (char)x;
 		writefd(f, b, 3);
 	} else if (x < ((int64)1<<(4*8-2))) {
-		b[0] = (x >> 24) | 0x80;
-		b[1] = x >> 16;
-		b[2] = x >> 8;
-		b[3] = x;
+		b[0] = (char)((x >> 24) | 0x80);
+		b[1] = (char)(x >> 16);
+		b[2] = (char)(x >> 8);
+		b[3] = (char)x;
 		writefd(f, b, 4);
 	} else if (x < ((int64)1<<(5*8-3))) {
-		b[0] = (x >> 32) | 0xC0;
-		b[1] = x >> 24;
-		b[2] = x >> 16;
-		b[3] = x >> 8;
-		b[4] = x;
+		b[0] = (char)((x >> 32) | 0xC0);
+		b[1] = (char)(x >> 24);
+		b[2] = (char)(x >> 16);
+		b[3] = (char)(x >> 8);
+		b[4] = (char)x;
 		writefd(f, b, 5);
 #if SIZEOF_INT64 >= 8
 	} else if (x < ((int64)1<<(6*8-4))) {
-		b[0] = (x >> 40) | 0xE0;
-		b[1] = x >> 32;
-		b[2] = x >> 24;
-		b[3] = x >> 16;
-		b[4] = x >> 8;
-		b[5] = x;
+		b[0] = (char)((x >> 40) | 0xE0);
+		b[1] = (char)(x >> 32);
+		b[2] = (char)(x >> 24);
+		b[3] = (char)(x >> 16);
+		b[4] = (char)(x >> 8);
+		b[5] = (char)x;
 		writefd(f, b, 6);
 	} else if (x < ((int64)1<<(7*8-5))) {
-		b[0] = (x >> 48) | 0xF0;
-		b[1] = x >> 40;
-		b[2] = x >> 32;
-		b[3] = x >> 24;
-		b[4] = x >> 16;
-		b[5] = x >> 8;
-		b[6] = x;
+		b[0] = (char)((x >> 48) | 0xF0);
+		b[1] = (char)(x >> 40);
+		b[2] = (char)(x >> 32);
+		b[3] = (char)(x >> 24);
+		b[4] = (char)(x >> 16);
+		b[5] = (char)(x >> 8);
+		b[6] = (char)x;
 		writefd(f, b, 7);
 	} else if (x < ((int64)1<<(8*8-6))) {
-		b[0] = (x >> 56) | 0xF8;
-		b[1] = x >> 48;
-		b[2] = x >> 40;
-		b[3] = x >> 32;
-		b[4] = x >> 24;
-		b[5] = x >> 16;
-		b[6] = x >> 8;
-		b[7] = x;
+		b[0] = (char)((x >> 56) | 0xF8);
+		b[1] = (char)(x >> 48);
+		b[2] = (char)(x >> 40);
+		b[3] = (char)(x >> 32);
+		b[4] = (char)(x >> 24);
+		b[5] = (char)(x >> 16);
+		b[6] = (char)(x >> 8);
+		b[7] = (char)x;
 		writefd(f, b, 8);
 	} else {
 	  all_bits:
-		b[0] = 0xFC;
-		b[1] = x >> 56;
-		b[2] = x >> 48;
-		b[3] = x >> 40;
-		b[4] = x >> 32;
-		b[5] = x >> 24;
-		b[6] = x >> 16;
-		b[7] = x >> 8;
-		b[8] = x;
+		b[0] = (char)0xFC;
+		b[1] = (char)(x >> 56);
+		b[2] = (char)(x >> 48);
+		b[3] = (char)(x >> 40);
+		b[4] = (char)(x >> 32);
+		b[5] = (char)(x >> 24);
+		b[6] = (char)(x >> 16);
+		b[7] = (char)(x >> 8);
+		b[8] = (char)x;
 		writefd(f, b, 9);
 #endif
 	}
