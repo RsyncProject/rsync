@@ -35,7 +35,7 @@ extern int preserve_links;
 extern int safe_symlinks;
 
 /* make a complete pathname for backup file */
-char *get_backup_name(char *fname)
+char *get_backup_name(const char *fname)
 {
 	if (backup_dir) {
 		if (stringjoin(backup_dir_buf + backup_dir_len, backup_dir_remainder,
@@ -52,10 +52,10 @@ char *get_backup_name(char *fname)
 }
 
 /* simple backup creates a backup with a suffix in the same directory */
-static int make_simple_backup(char *fname)
+static int make_simple_backup(const char *fname)
 {
 	int rename_errno;
-	char *fnamebak = get_backup_name(fname);
+	const char *fnamebak = get_backup_name(fname);
 
 	if (!fnamebak)
 		return 0;
@@ -158,7 +158,7 @@ static int make_bak_dir(char *fullpath)
 }
 
 /* robustly move a file, creating new directory structures if necessary */
-static int robust_move(char *src, char *dst)
+static int robust_move(const char *src, char *dst)
 {
 	if (robust_rename(src, dst, NULL, 0755) < 0
 	 && (errno != ENOENT || make_bak_dir(dst) < 0
@@ -170,7 +170,7 @@ static int robust_move(char *src, char *dst)
 
 /* If we have a --backup-dir, then we get here from make_backup().
  * We will move the file to be deleted into a parallel directory tree. */
-static int keep_backup(char *fname)
+static int keep_backup(const char *fname)
 {
 	STRUCT_STAT st;
 	struct file_struct *file;
@@ -274,7 +274,7 @@ static int keep_backup(char *fname)
 
 
 /* main backup switch routine */
-int make_backup(char *fname)
+int make_backup(const char *fname)
 {
 	if (backup_dir)
 		return keep_backup(fname);

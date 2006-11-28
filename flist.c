@@ -718,7 +718,7 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
  * statting directories if we're not recursing, but this is not a very
  * important case.  Some systems may not have d_type.
  **/
-struct file_struct *make_file(char *fname, struct file_list *flist,
+struct file_struct *make_file(const char *fname, struct file_list *flist,
 			      STRUCT_STAT *stp, unsigned short flags,
 			      int filter_level)
 {
