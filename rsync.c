@@ -42,6 +42,7 @@ extern int am_sender;
 extern int am_generator;
 extern int am_starting_up;
 extern int allow_8bit_chars;
+extern int protocol_version;
 extern int preserve_uid;
 extern int preserve_gid;
 extern int inplace;
@@ -49,6 +50,7 @@ extern int keep_dirlinks;
 extern int make_backups;
 extern mode_t orig_umask;
 extern struct stats stats;
+extern struct file_list *the_file_list;
 extern struct chmod_mode_struct *daemon_chmod_modes;
 
 #if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
