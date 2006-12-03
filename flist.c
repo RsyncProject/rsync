@@ -48,6 +48,7 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int relative_paths;
 extern int implied_dirs;
+extern int flist_extra_ndx;
 extern int ignore_perishable;
 extern int non_perishable_cnt;
 extern int prune_empty_dirs;
@@ -68,7 +69,14 @@ extern struct filter_list_struct server_filter_list;
 int io_error;
 int checksum_len;
 dev_t filesystem_dev; /* used to implement -x */
-unsigned int file_struct_len;
+int file_struct_len;
+
+/* The tmp_* vars are used as a cache area by make_file() to store data
+ * that the sender doesn't need to remember in its file list.  The data
+ * will survive just long enough to be used by send_file_entry(). */
+static dev_t tmp_rdev;
+static struct idev tmp_idev;
+static char tmp_sum[MD4_SUM_LENGTH];
 
 static char empty_sum[MD4_SUM_LENGTH];
 static int flist_count_offset;
@@ -140,7 +148,7 @@ static void list_file_entry(struct file_struct *f)
 		rprintf(FINFO, "%s %11.0f %s %s -> %s\n",
 			permbuf,
 			(double)f->length, timestring(f->modtime),
-			f_name(f, NULL), f->u.link);
+			f_name(f, NULL), F_SYMLINK(f));
 	} else
 #endif
 	{
@@ -329,7 +337,7 @@ static void send_file_entry(struct file_struct *file, int f)
 
 	f_name(file, fname);
 
-	flags = file->flags & XMIT_TOP_DIR;
+	flags = file->flags & FLAG_TOP_DIR; /* FLAG_TOP_DIR == XMIT_TOP_DIR */
 
 	if (file->mode == mode)
 		flags |= XMIT_SAME_MODE;
@@ -338,12 +346,12 @@ static void send_file_entry(struct file_struct *file, int f)
 	if ((preserve_devices && IS_DEVICE(mode))
 	 || (preserve_specials && IS_SPECIAL(mode))) {
 		if (protocol_version < 28) {
-			if (file->u.rdev == rdev)
+			if (tmp_rdev == rdev)
 				flags |= XMIT_SAME_RDEV_pre28;
 			else
-				rdev = file->u.rdev;
+				rdev = tmp_rdev;
 		} else {
-			rdev = file->u.rdev;
+			rdev = tmp_rdev;
 			if ((uint32)major(rdev) == rdev_major)
 				flags |= XMIT_SAME_RDEV_MAJOR;
 			else
@@ -353,26 +361,30 @@ static void send_file_entry(struct file_struct *file, int f)
 		}
 	} else if (protocol_version < 28)
 		rdev = MAKEDEV(0, 0);
-	if (file->uid == uid)
-		flags |= XMIT_SAME_UID;
-	else
-		uid = file->uid;
-	if (file->gid == gid)
-		flags |= XMIT_SAME_GID;
-	else
-		gid = file->gid;
+	if (preserve_uid) {
+		if (F_UID(file) == uid)
+			flags |= XMIT_SAME_UID;
+		else
+			uid = F_UID(file);
+	}
+	if (preserve_gid) {
+		if (F_GID(file) == gid)
+			flags |= XMIT_SAME_GID;
+		else
+			gid = F_GID(file);
+	}
 	if (file->modtime == modtime)
 		flags |= XMIT_SAME_TIME;
 	else
 		modtime = file->modtime;
 
 #ifdef SUPPORT_HARD_LINKS
-	if (file->link_u.idev) {
-		if (file->F_DEV == dev) {
+	if (tmp_idev.dev != 0) {
+		if (tmp_idev.dev == dev) {
 			if (protocol_version >= 28)
 				flags |= XMIT_SAME_DEV;
 		} else
-			dev = file->F_DEV;
+			dev = tmp_idev.dev;
 		flags |= XMIT_HAS_IDEV_DATA;
 	}
 #endif
@@ -444,23 +456,24 @@ static void send_file_entry(struct file_struct *file, int f)
 
 #ifdef SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(mode)) {
-		int len = strlen(file->u.link);
+		const char *sl = F_SYMLINK(file);
+		int len = strlen(sl);
 		write_int(f, len);
-		write_buf(f, file->u.link, len);
+		write_buf(f, sl, len);
 	}
 #endif
 
 #ifdef SUPPORT_HARD_LINKS
-	if (file->link_u.idev) {
+	if (tmp_idev.dev != 0) {
 		if (protocol_version < 26) {
 			/* 32-bit dev_t and ino_t */
 			write_int(f, (int32)dev);
-			write_int(f, (int32)file->F_INODE);
+			write_int(f, (int32)tmp_idev.ino);
 		} else {
 			/* 64-bit dev_t and ino_t */
 			if (!(flags & XMIT_SAME_DEV))
 				write_longint(f, dev);
-			write_longint(f, file->F_INODE);
+			write_longint(f, tmp_idev.ino);
 		}
 	}
 #endif
@@ -468,7 +481,7 @@ static void send_file_entry(struct file_struct *file, int f)
 	if (always_checksum && (S_ISREG(mode) || protocol_version < 28)) {
 		const char *sum;
 		if (S_ISREG(mode))
-			sum = file->u.sum;
+			sum = tmp_sum;
 		else {
 			/* Prior to 28, we sent a useless set of nulls. */
 			sum = empty_sum;
@@ -479,8 +492,8 @@ static void send_file_entry(struct file_struct *file, int f)
 	strlcpy(lastname, fname, MAXPATHLEN);
 }
 
-static struct file_struct *receive_file_entry(struct file_list *flist,
-					      unsigned short flags, int f)
+static struct file_struct *recv_file_entry(struct file_list *flist,
+					   unsigned short flags, int f)
 {
 	static time_t modtime;
 	static mode_t mode;
@@ -496,6 +509,7 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 	char thisname[MAXPATHLEN];
 	unsigned int l1 = 0, l2 = 0;
 	int alloc_len, basename_len, dirname_len, linkname_len, sum_len;
+	int extra_len = (flist_extra_ndx-1) * sizeof (union flist_extras);
 	OFF_T file_length;
 	char *basename, *dirname, *bp;
 	struct file_struct *file;
@@ -521,9 +535,9 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 
 	if (l2 >= MAXPATHLEN - l1) {
 		rprintf(FERROR,
-			"overflow: flags=0x%x l1=%d l2=%d lastname=%s\n",
-			flags, l1, l2, lastname);
-		overflow_exit("receive_file_entry");
+			"overflow: flags=0x%x l1=%d l2=%d lastname=%s [%s]\n",
+			flags, l1, l2, lastname, who_am_i());
+		overflow_exit("recv_file_entry");
 	}
 
 	strlcpy(thisname, lastname, l1 + 1);
@@ -581,6 +595,7 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 				rdev_minor = read_int(f);
 			rdev = MAKEDEV(rdev_major, rdev_minor);
 		}
+		extra_len += 2 * sizeof (union flist_extras);
 	} else if (protocol_version < 28)
 		rdev = MAKEDEV(0, 0);
 
@@ -590,28 +605,44 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 		if (linkname_len <= 0 || linkname_len > MAXPATHLEN) {
 			rprintf(FERROR, "overflow: linkname_len=%d\n",
 				linkname_len - 1);
-			overflow_exit("receive_file_entry");
+			overflow_exit("recv_file_entry");
 		}
 	}
 	else
 #endif
 		linkname_len = 0;
 
+#ifdef SUPPORT_HARD_LINKS
+	if (preserve_hard_links && protocol_version < 28 && S_ISREG(mode))
+		flags |= XMIT_HAS_IDEV_DATA;
+	if (flags & XMIT_HAS_IDEV_DATA) {
+		extra_len += sizeof (union flist_extras);
+		assert(flist->hlink_pool != NULL);
+	}
+#endif
+
 	sum_len = always_checksum && S_ISREG(mode) ? MD4_SUM_LENGTH : 0;
 
 	alloc_len = file_struct_len + dirname_len + basename_len
-		  + linkname_len + sum_len;
-	bp = pool_alloc(flist->file_pool, alloc_len, "receive_file_entry");
+		  + linkname_len + sum_len + extra_len;
+	bp = pool_alloc(flist->file_pool, alloc_len, "recv_file_entry");
 
+	memset(bp, 0, file_struct_len + extra_len);
+	bp += extra_len;
 	file = (struct file_struct *)bp;
-	memset(bp, 0, file_struct_len);
-	bp += file_struct_len;
+	bp += file_struct_len + linkname_len + sum_len;
 
+#ifdef SUPPORT_HARD_LINKS
+	if (flags & XMIT_HAS_IDEV_DATA)
+		file->flags |= FLAG_HLINK_INFO;
+#endif
 	file->modtime = modtime;
 	file->length = file_length;
 	file->mode = mode;
-	file->uid = uid;
-	file->gid = gid;
+	if (preserve_uid)
+		F_UID(file) = uid;
+	if (preserve_gid)
+		F_GID(file) = gid;
 
 	if (dirname_len) {
 		file->dirname = lastdir = bp;
@@ -637,12 +668,12 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 			    && lastname[del_hier_name_len-1] == '.'
 			    && lastname[del_hier_name_len-2] == '/')
 				del_hier_name_len -= 2;
-			file->flags |= FLAG_TOP_DIR | FLAG_DEL_HERE;
+			file->flags |= FLAG_TOP_DIR | FLAG_XFER_DIR;
 		} else if (in_del_hier) {
 			if (!relative_paths || !del_hier_name_len
 			 || (l1 >= del_hier_name_len
 			  && lastname[del_hier_name_len] == '/'))
-				file->flags |= FLAG_DEL_HERE;
+				file->flags |= FLAG_XFER_DIR;
 			else
 				in_del_hier = 0;
 		}
@@ -653,51 +684,45 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
 	bp += basename_len;
 
 	if ((preserve_devices && IS_DEVICE(mode))
-	 || (preserve_specials && IS_SPECIAL(mode)))
-		file->u.rdev = rdev;
+	 || (preserve_specials && IS_SPECIAL(mode))) {
+		F_DMAJOR(file) = major(rdev);
+		F_DMINOR(file) = minor(rdev);
+	}
 
 #ifdef SUPPORT_LINKS
 	if (linkname_len) {
-		file->u.link = bp;
+		bp = F_SYMLINK(file);
 		read_sbuf(f, bp, linkname_len - 1);
 		if (sanitize_paths)
 			sanitize_path(bp, bp, "", lastdir_depth, NULL);
-		bp += linkname_len;
 	}
 #endif
 
 #ifdef SUPPORT_HARD_LINKS
-	if (preserve_hard_links && protocol_version < 28 && S_ISREG(mode))
-		flags |= XMIT_HAS_IDEV_DATA;
 	if (flags & XMIT_HAS_IDEV_DATA) {
-		int64 inode;
+		struct idev *idevp = pool_talloc(flist->hlink_pool, struct idev,
+						 1, "inode_table");
+		F_IDEV(file) = idevp;
 		if (protocol_version < 26) {
-			dev = read_int(f);
-			inode = read_int(f);
+			idevp->dev = read_int(f);
+			idevp->ino = read_int(f);
 		} else {
 			if (!(flags & XMIT_SAME_DEV))
 				dev = read_longint(f);
-			inode = read_longint(f);
-		}
-		if (flist->hlink_pool) {
-			file->link_u.idev = pool_talloc(flist->hlink_pool,
-			    struct idev, 1, "inode_table");
-			file->F_INODE = inode;
-			file->F_DEV = dev;
+			idevp->dev = dev;
+			idevp->ino = read_longint(f);
 		}
 	}
 #endif
 
 	if (always_checksum && (sum_len || protocol_version < 28)) {
-		char *sum;
-		if (sum_len) {
-			file->u.sum = sum = bp;
-			/*bp += sum_len;*/
-		} else {
+		if (sum_len)
+			bp = F_SUM(file);
+		else {
 			/* Prior to 28, we get a useless set of nulls. */
-			sum = empty_sum;
+			bp = tmp_sum;
 		}
-		read_buf(f, sum, checksum_len);
+		read_buf(f, bp, checksum_len);
 	}
 
 	return file;
@@ -719,17 +744,16 @@ static struct file_struct *receive_file_entry(struct file_list *flist,
  * important case.  Some systems may not have d_type.
  **/
 struct file_struct *make_file(const char *fname, struct file_list *flist,
-			      STRUCT_STAT *stp, unsigned short flags,
-			      int filter_level)
+			      STRUCT_STAT *stp, int flags, int filter_level)
 {
 	static char *lastdir;
 	static int lastdir_len = -1;
 	struct file_struct *file;
 	STRUCT_STAT st;
-	char sum[SUM_LENGTH];
 	char thisname[MAXPATHLEN];
 	char linkname[MAXPATHLEN];
-	int alloc_len, basename_len, dirname_len, linkname_len, sum_len;
+	int alloc_len, basename_len, dirname_len, linkname_len;
+	int extra_len = (flist_extra_ndx-1) * sizeof (union flist_extras);
 	char *basename, *dirname, *bp;
 
 	if (!flist || !flist->count)	/* Ignore lastdir when invalid. */
@@ -743,8 +767,6 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	clean_fname(thisname, 0);
 	if (sanitize_paths)
 		sanitize_path(thisname, thisname, "", 0, NULL);
-
-	memset(sum, 0, SUM_LENGTH);
 
 	if (stp && S_ISDIR(stp->st_mode)) {
 		st = *stp; /* Needed for "symlink/." with --relative. */
@@ -805,7 +827,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			}
 			return NULL;
 		}
-		flags |= FLAG_MOUNT_POINT;
+		flags |= FLAG_MOUNT_DIR;
 	}
 
 	if (is_excluded(thisname, S_ISDIR(st.st_mode) != 0, filter_level)) {
@@ -850,11 +872,8 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	linkname_len = 0;
 #endif
 
-	sum_len = always_checksum && am_sender && S_ISREG(st.st_mode)
-	        ? MD4_SUM_LENGTH : 0;
-
 	alloc_len = file_struct_len + dirname_len + basename_len
-		  + linkname_len + sum_len;
+		  + linkname_len + extra_len;
 	if (flist)
 		bp = pool_alloc(flist->file_pool, alloc_len, "make_file");
 	else {
@@ -862,36 +881,31 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			out_of_memory("make_file");
 	}
 
+	memset(bp, 0, file_struct_len + extra_len);
+	bp += extra_len;
 	file = (struct file_struct *)bp;
-	memset(bp, 0, file_struct_len);
-	bp += file_struct_len;
+	bp += file_struct_len + linkname_len;
+
+#ifdef SUPPORT_HARD_LINKS
+	if (preserve_hard_links && flist) {
+		if (protocol_version >= 28
+		 ? (!S_ISDIR(st.st_mode) && st.st_nlink > 1)
+		 : S_ISREG(st.st_mode)) {
+			tmp_idev.dev = st.st_dev;
+			tmp_idev.ino = st.st_ino;
+		} else
+			tmp_idev.dev = tmp_idev.ino = 0;
+	}
+#endif
 
 	file->flags = flags;
 	file->modtime = st.st_mtime;
 	file->length = st.st_size;
 	file->mode = st.st_mode;
-	file->uid = st.st_uid;
-	file->gid = st.st_gid;
-
-#ifdef SUPPORT_HARD_LINKS
-	if (flist && flist->hlink_pool) {
-		if (protocol_version < 28) {
-			if (S_ISREG(st.st_mode))
-				file->link_u.idev = pool_talloc(
-				    flist->hlink_pool, struct idev, 1,
-				    "inode_table");
-		} else {
-			if (!S_ISDIR(st.st_mode) && st.st_nlink > 1)
-				file->link_u.idev = pool_talloc(
-				    flist->hlink_pool, struct idev, 1,
-				    "inode_table");
-		}
-	}
-	if (file->link_u.idev) {
-		file->F_DEV = st.st_dev;
-		file->F_INODE = st.st_ino;
-	}
-#endif
+	if (preserve_uid)
+		F_UID(file) = st.st_uid;
+	if (preserve_gid)
+		F_GID(file) = st.st_gid;
 
 	if (dirname_len) {
 		file->dirname = lastdir = bp;
@@ -909,22 +923,16 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 #ifdef HAVE_STRUCT_STAT_ST_RDEV
 	if ((preserve_devices && IS_DEVICE(st.st_mode))
 	 || (preserve_specials && IS_SPECIAL(st.st_mode)))
-		file->u.rdev = st.st_rdev;
+		tmp_rdev = st.st_rdev;
 #endif
 
 #ifdef SUPPORT_LINKS
-	if (linkname_len) {
-		file->u.link = bp;
-		memcpy(bp, linkname, linkname_len);
-		bp += linkname_len;
-	}
+	if (linkname_len)
+		memcpy(F_SYMLINK(file), linkname, linkname_len);
 #endif
 
-	if (sum_len) {
-		file->u.sum = bp;
-		file_checksum(thisname, bp, st.st_size);
-		/*bp += sum_len;*/
-	}
+	if (always_checksum && am_sender && S_ISREG(st.st_mode))
+		file_checksum(thisname, tmp_sum, st.st_size);
 
 	file->dir.root = flist_dir;
 
@@ -939,9 +947,10 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			file->modtime = st2.st_mtime;
 			file->length = st2.st_size;
 			file->mode = st2.st_mode;
-			file->uid = st2.st_uid;
-			file->gid = st2.st_gid;
-			file->u.link = NULL;
+			if (preserve_uid)
+				F_UID(file) = st2.st_uid;
+			if (preserve_gid)
+				F_GID(file) = st2.st_gid;
 		} else
 			file->mode = save_mode;
 	}
@@ -949,7 +958,18 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	if (S_ISREG(st.st_mode) || S_ISLNK(st.st_mode))
 		stats.total_size += st.st_size;
 
+	if (basename_len == 0+1)
+		return NULL;
+
 	return file;
+}
+
+/* Only called for temporary file_struct entries. */
+void unmake_file(struct file_struct *file)
+{
+	union flist_extras *start = (union flist_extras *)file
+				  - (flist_extra_ndx - 1);
+	free(start);
 }
 
 static struct file_struct *send_file_name(int f, struct file_list *flist,
@@ -969,11 +989,8 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 	maybe_emit_filelist_progress(flist->count + flist_count_offset);
 
 	flist_expand(flist);
-
-	if (file->basename[0]) {
-		flist->files[flist->count++] = file;
-		send_file_entry(file, f);
-	}
+	flist->files[flist->count++] = file;
+	send_file_entry(file, f);
 	return file;
 }
 
@@ -984,7 +1001,7 @@ static void send_if_directory(int f, struct file_list *flist,
 	char is_dot_dir = fbuf[ol-1] == '.' && (ol == 1 || fbuf[ol-2] == '/');
 
 	if (S_ISDIR(file->mode)
-	    && !(file->flags & FLAG_MOUNT_POINT) && f_name(file, fbuf)) {
+	    && !(file->flags & FLAG_MOUNT_DIR) && f_name(file, fbuf)) {
 		void *save_filters;
 		unsigned int len = strlen(fbuf);
 		if (len > 1 && fbuf[len-1] == '/')
@@ -1080,7 +1097,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	start_write = stats.total_written;
 	gettimeofday(&start_tv, NULL);
 
-	flist = flist_new(WITH_HLINK, "send_file_list");
+	flist = flist_new(0, "send_file_list");
 
 	io_start_buffering_out();
 	if (filesfrom_fd >= 0) {
@@ -1307,18 +1324,14 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	stats.flist_xfertime = (int64)(end_tv.tv_sec - start_tv.tv_sec) * 1000
 			     + (end_tv.tv_usec - start_tv.tv_usec) / 1000;
 
-	if (flist->hlink_pool) {
-		pool_destroy(flist->hlink_pool);
-		flist->hlink_pool = NULL;
-	}
-
 	/* Sort the list without removing any duplicates.  This allows the
 	 * receiving side to ask for any name they like, which gives us the
 	 * flexibility to change the way we unduplicate names in the future
 	 * without causing a compatibility problem with older versions. */
 	clean_flist(flist, 0, 0);
 
-	send_uid_list(f);
+	if (!numeric_ids)
+		send_uid_list(f);
 
 	/* send the io_error flag */
 	write_int(f, lp_ignore_errors(module_id) ? 0 : io_error);
@@ -1350,11 +1363,6 @@ struct file_list *recv_file_list(int f)
 
 	flist = flist_new(WITH_HLINK, "recv_file_list");
 
-	flist->count = 0;
-	flist->malloced = 1000;
-	flist->files = new_array(struct file_struct *, flist->malloced);
-	if (!flist->files)
-		goto oom;
 
 	while ((flags = read_byte(f)) != 0) {
 		struct file_struct *file;
@@ -1363,7 +1371,7 @@ struct file_list *recv_file_list(int f)
 
 		if (protocol_version >= 28 && (flags & XMIT_EXTENDED_FLAGS))
 			flags |= read_byte(f) << 8;
-		file = receive_file_entry(flist, flags, f);
+		file = recv_file_entry(flist, flags, f);
 
 		if (S_ISREG(file->mode) || S_ISLNK(file->mode))
 			stats.total_size += file->length;
@@ -1377,7 +1385,7 @@ struct file_list *recv_file_list(int f)
 				f_name(file, NULL));
 		}
 	}
-	receive_file_entry(NULL, 0, 0); /* Signal that we're done. */
+	recv_file_entry(NULL, 0, 0); /* Signal that we're done. */
 
 	if (verbose > 2)
 		rprintf(FINFO, "received %d names\n", flist->count);
@@ -1413,10 +1421,6 @@ struct file_list *recv_file_list(int f)
 	stats.num_files = flist->count;
 
 	return flist;
-
-  oom:
-	out_of_memory("recv_file_list");
-	return NULL;		/* not reached */
 }
 
 static int file_compare(struct file_struct **file1, struct file_struct **file2)
@@ -1479,10 +1483,8 @@ int flist_find(struct file_list *flist, struct file_struct *f)
  * Free up any resources a file_struct has allocated
  * and clear the file.
  */
-void clear_file(struct file_struct *file, struct file_list *flist)
+void clear_file(struct file_struct *file)
 {
-	if (flist->hlink_pool && file->link_u.idev)
-		pool_free(flist->hlink_pool, 0, file->link_u.idev);
 	memset(file, 0, file_struct_len);
 	/* In an empty entry, dir.depth is an offset to the next non-empty
 	 * entry.  Likewise for length in the opposite direction.  We assume
@@ -1502,7 +1504,7 @@ struct file_list *flist_new(int with_hlink, char *msg)
 	if (!flist)
 		out_of_memory(msg);
 
-	memset(flist, 0, sizeof (struct file_list));
+	memset(flist, 0, sizeof flist[0]);
 
 	if (!(flist->file_pool = pool_create(FILE_EXTENT, 0, out_of_memory, POOL_INTERN)))
 		out_of_memory(msg);
@@ -1594,9 +1596,9 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			/* Make sure we don't lose track of a user-specified
 			 * top directory. */
 			flist->files[keep]->flags |= flist->files[drop]->flags
-						   & (FLAG_TOP_DIR|FLAG_DEL_HERE);
+						   & (FLAG_TOP_DIR|FLAG_XFER_DIR);
 
-			clear_file(flist->files[drop], flist);
+			clear_file(flist->files[drop]);
 
 			if (keep == i) {
 				if (flist->low == drop) {
@@ -1645,7 +1647,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 					if (fp->dir.depth >= 0)
 						break;
 					prev_i = -fp->dir.depth-1;
-					clear_file(fp, flist);
+					clear_file(fp);
 				}
 				prev_depth = file->dir.depth;
 				if (is_excluded(f_name(file, fbuf), 1,
@@ -1678,7 +1680,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			if (fp->dir.depth >= 0)
 				break;
 			prev_i = -fp->dir.depth-1;
-			clear_file(fp, flist);
+			clear_file(fp);
 		}
 
 		for (i = flist->low; i <= flist->high; i++) {
@@ -1703,13 +1705,15 @@ static void output_flist(struct file_list *flist)
 
 	for (i = 0; i < flist->count; i++) {
 		file = flist->files[i];
-		if ((am_root || am_sender) && preserve_uid)
-			snprintf(uidbuf, sizeof uidbuf, " uid=%ld", (long)file->uid);
-		else
+		if ((am_root || am_sender) && preserve_uid) {
+			snprintf(uidbuf, sizeof uidbuf, " uid=%ld",
+				 (long)F_UID(file));
+		} else
 			*uidbuf = '\0';
-		if (preserve_gid && file->gid != GID_NONE)
-			snprintf(gidbuf, sizeof gidbuf, " gid=%ld", (long)file->gid);
-		else
+		if (preserve_gid && F_GID(file) != GID_NONE) {
+			snprintf(gidbuf, sizeof gidbuf, " gid=%ld",
+				 (long)F_GID(file));
+		} else
 			*gidbuf = '\0';
 		if (!am_sender)
 			snprintf(depthbuf, sizeof depthbuf, "%d", file->dir.depth);

@@ -37,6 +37,10 @@ extern int msg_fd_out;
 extern int allow_8bit_chars;
 extern int protocol_version;
 extern int preserve_times;
+extern int preserve_uid;
+extern int preserve_gid;
+extern int flist_extra_ndx;
+extern int file_struct_len;
 extern int stdout_format_has_i;
 extern int stdout_format_has_o_or_i;
 extern int logfile_format_has_i;
@@ -475,16 +479,16 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 		case 'U':
 			strlcat(fmt, "ld", sizeof fmt);
 			snprintf(buf2, sizeof buf2, fmt,
-				 (long)file->uid);
+				 preserve_uid ? (long)F_UID(file) : 0);
 			n = buf2;
 			break;
 		case 'G':
-			if (file->gid == GID_NONE)
+			if (!preserve_gid || F_GID(file) == GID_NONE)
 				n = "DEFAULT";
 			else {
 				strlcat(fmt, "ld", sizeof fmt);
 				snprintf(buf2, sizeof buf2, fmt,
-					 (long)file->gid);
+					 (long)F_GID(file));
 				n = buf2;
 			}
 			break;
@@ -544,8 +548,8 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			if (hlink && *hlink) {
 				n = hlink;
 				strlcpy(buf2, " => ", sizeof buf2);
-			} else if (S_ISLNK(file->mode) && file->u.link) {
-				n = file->u.link;
+			} else if (S_ISLNK(file->mode)) {
+				n = F_SYMLINK(file);
 				strlcpy(buf2, " -> ", sizeof buf2);
 			} else {
 				n = "";

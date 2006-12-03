@@ -215,9 +215,9 @@ int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
 			updated = 1;
 	}
 
-	change_uid = am_root && preserve_uid && st->st_uid != file->uid;
-	change_gid = preserve_gid && file->gid != GID_NONE
-		&& st->st_gid != file->gid;
+	change_uid = am_root && preserve_uid && st->st_uid != F_UID(file);
+	change_gid = preserve_gid && F_GID(file) != GID_NONE
+		&& st->st_gid != F_GID(file);
 #if !defined HAVE_LCHOWN && !defined CHOWN_MODIFIES_SYMLINK
 	if (S_ISLNK(st->st_mode))
 		;
@@ -229,18 +229,18 @@ int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
 				rprintf(FINFO,
 					"set uid of %s from %ld to %ld\n",
 					fname,
-					(long)st->st_uid, (long)file->uid);
+					(long)st->st_uid, (long)F_UID(file));
 			}
 			if (change_gid) {
 				rprintf(FINFO,
 					"set gid of %s from %ld to %ld\n",
 					fname,
-					(long)st->st_gid, (long)file->gid);
+					(long)st->st_gid, (long)F_GID(file));
 			}
 		}
 		if (do_lchown(fname,
-		    change_uid ? file->uid : st->st_uid,
-		    change_gid ? file->gid : st->st_gid) != 0) {
+		    change_uid ? F_UID(file) : st->st_uid,
+		    change_gid ? F_GID(file) : st->st_gid) != 0) {
 			/* shouldn't have attempted to change uid or gid
 			 * unless have the privilege */
 			rsyserr(FERROR, errno, "%s %s failed",

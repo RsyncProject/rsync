@@ -22,17 +22,18 @@
 #include "rsync.h"
 
 extern int verbose;
-extern int backup_dir_len;
-extern unsigned int backup_dir_remainder;
-extern char backup_dir_buf[MAXPATHLEN];
-extern char *backup_suffix;
-extern char *backup_dir;
-
 extern int am_root;
 extern int preserve_devices;
 extern int preserve_specials;
 extern int preserve_links;
 extern int safe_symlinks;
+extern int backup_dir_len;
+extern int flist_extra_ndx;
+extern int file_struct_len;
+extern unsigned int backup_dir_remainder;
+extern char backup_dir_buf[MAXPATHLEN];
+extern char *backup_suffix;
+extern char *backup_dir;
 
 /* make a complete pathname for backup file */
 char *get_backup_name(const char *fname)
@@ -185,16 +186,19 @@ static int keep_backup(const char *fname)
 	if (!(file = make_file(fname, NULL, NULL, 0, NO_FILTERS)))
 		return 1; /* the file could have disappeared */
 
-	if (!(buf = get_backup_name(fname)))
+	if (!(buf = get_backup_name(fname))) {
+		unmake_file(file);
 		return 0;
+	}
 
 	/* Check to see if this is a device file, or link */
 	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
 	 || (preserve_specials && IS_SPECIAL(file->mode))) {
+		dev_t rdev = MAKEDEV(F_DMAJOR(file), F_DMINOR(file));
 		do_unlink(buf);
-		if (do_mknod(buf, file->mode, file->u.rdev) < 0
+		if (do_mknod(buf, file->mode, rdev) < 0
 		    && (errno != ENOENT || make_bak_dir(buf) < 0
-		     || do_mknod(buf, file->mode, file->u.rdev) < 0)) {
+		     || do_mknod(buf, file->mode, rdev) < 0)) {
 			rsyserr(FERROR, errno, "mknod %s failed",
 				full_fname(buf));
 		} else if (verbose > 2) {
@@ -224,20 +228,20 @@ static int keep_backup(const char *fname)
 
 #ifdef SUPPORT_LINKS
 	if (!kept && preserve_links && S_ISLNK(file->mode)) {
-		if (safe_symlinks && unsafe_symlink(file->u.link, buf)) {
+		const char *sl = F_SYMLINK(file);
+		if (safe_symlinks && unsafe_symlink(sl, buf)) {
 			if (verbose) {
 				rprintf(FINFO, "ignoring unsafe symlink %s -> %s\n",
-					full_fname(buf), file->u.link);
+					full_fname(buf), sl);
 			}
 			kept = 1;
 		} else {
 			do_unlink(buf);
-			if (do_symlink(file->u.link, buf) < 0
+			if (do_symlink(sl, buf) < 0
 			    && (errno != ENOENT || make_bak_dir(buf) < 0
-			     || do_symlink(file->u.link, buf) < 0)) {
+			     || do_symlink(sl, buf) < 0)) {
 				rsyserr(FERROR, errno, "link %s -> \"%s\"",
-					full_fname(buf),
-					file->u.link);
+					full_fname(buf), sl);
 			}
 			do_unlink(fname);
 			kept = 1;
@@ -248,6 +252,7 @@ static int keep_backup(const char *fname)
 	if (!kept && !S_ISREG(file->mode)) {
 		rprintf(FINFO, "make_bak: skipping non-regular file %s\n",
 			fname);
+		unmake_file(file);
 		return 1;
 	}
 
@@ -263,7 +268,7 @@ static int keep_backup(const char *fname)
 		}
 	}
 	set_file_attrs(buf, file, NULL, 0);
-	free(file);
+	unmake_file(file);
 
 	if (verbose > 1) {
 		rprintf(FINFO, "backed up %s to %s\n",

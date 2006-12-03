@@ -270,9 +270,6 @@ void send_uid_list(int f)
 {
 	struct idlist *list;
 
-	if (numeric_ids)
-		return;
-
 	if (preserve_uid) {
 		int len;
 		/* we send sequences of uid/byte-length/name */
@@ -338,10 +335,10 @@ void recv_uid_list(int f, struct file_list *flist)
 	/* Now convert all the uids/gids from sender values to our values. */
 	if (am_root && preserve_uid && !numeric_ids) {
 		for (i = 0; i < flist->count; i++)
-			flist->files[i]->uid = match_uid(flist->files[i]->uid);
+			F_UID(flist->files[i]) = match_uid(F_UID(flist->files[i]));
 	}
 	if (preserve_gid && (!am_root || !numeric_ids)) {
 		for (i = 0; i < flist->count; i++)
-			flist->files[i]->gid = match_gid(flist->files[i]->gid);
+			F_GID(flist->files[i]) = match_gid(F_GID(flist->files[i]));
 	}
 }

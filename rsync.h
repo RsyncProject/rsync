@@ -57,14 +57,14 @@
 
 /* These flags are used in the live flist data. */
 
-#define FLAG_TOP_DIR (1<<0)
-#define FLAG_SENT (1<<1)	/* sender */
-#define FLAG_HLINK_EOL (1<<1)	/* receiver/generator */
-#define FLAG_MOUNT_POINT (1<<2)	/* sender/generator */
-#define FLAG_DEL_HERE (1<<3)	/* receiver/generator */
-#define FLAG_HLINK_TOL (1<<4)	/* receiver/generator */
-#define FLAG_NO_FUZZY (1<<5)	/* generator */
-#define FLAG_MISSING (1<<6)	/* generator */
+#define FLAG_TOP_DIR (1<<0)	/* sender/receiver/generator */
+#define FLAG_SENT (1<<1)	/* sender/generator */
+#define FLAG_XFER_DIR (1<<2)	/* sender/receiver/generator */
+#define FLAG_MOUNT_DIR (1<<3)	/* sender/generator */
+#define FLAG_MISSING_DIR (1<<4)	/* generator (dirs only) */
+#define FLAG_HLINK_INFO (1<<5)	/* receiver/generator */
+#define FLAG_HLINK_FIRST (1<<6)	/* receiver/generator */
+#define FLAG_HLINK_LAST (1<<7)	/* receiver/generator */
 
 /* update this if you make incompatible changes */
 #define PROTOCOL_VERSION 30
@@ -175,6 +175,8 @@ enum msgcode {
 	MSG_DELETED=101,/* successfully deleted a file on receiving side */
 	MSG_DONE=86	/* current phase is done */
 };
+
+#define NDX_DONE -1
 
 #include "errcode.h"
 
@@ -447,7 +449,7 @@ enum msgcode {
  */
 
 struct idev {
-	int64 inode;
+	int64 ino;
 	int64 dev;
 };
 
@@ -498,24 +500,13 @@ struct idev {
 #define HL_CHECK_MASTER	0
 #define HL_SKIP		1
 
-struct hlink {
+struct hlist {
 	int32 next;
 	int32 hlindex;
-	unsigned short link_dest_used;
+	unsigned short dest_used;
 };
 
-#define F_DEV	link_u.idev->dev
-#define F_INODE	link_u.idev->inode
-
-#define F_HLINDEX link_u.links->hlindex
-#define F_NEXT	link_u.links->next
-
 struct file_struct {
-	union {
-		dev_t rdev;	/* The device number, if this is a device */
-		const char *sum;/* Only a normal file can have a checksum */
-		const char *link;/* Points to symlink string, if a symlink */
-	} u;
 	OFF_T length;
 	const char *basename;	/* The current item's name (AKA filename) */
 	const char *dirname;	/* The directory info inside the transfer */
@@ -523,13 +514,7 @@ struct file_struct {
 		const char *root;/* Sender-side dir info outside transfer */
 		int depth;	/* Receiver-side directory depth info */
 	} dir;
-	union {
-		struct idev *idev;
-		struct hlink *links;
-	} link_u;
 	time_t modtime;
-	uid_t uid;
-	gid_t gid;
 	mode_t mode;
 	uchar flags;	/* this item MUST remain last */
 };
@@ -541,13 +526,40 @@ struct file_struct {
 #define FLIST_START	(32 * 1024)
 #define FLIST_LINEAR	(FLIST_START * 512)
 
+union flist_extras {
+	uid_t uid;		/* the user ID number */
+	uid_t gid;		/* the group ID number or GID_NONE */
+	struct idev *idev;	/* The hard-link info during matching */
+	struct hlist *hlist;	/* The hard-link info after matching */
+	int32 num;		/* A general-purpose number */
+};
+
+#define FLIST_EXTRA(f,j) ((union flist_extras *)(f))[-(j)]
+#define IS_HLINKED(f) ((f)->flags & FLAG_HLINK_INFO)
+
+/* When enabled, all entries have these: */
+#define F_UID(f) FLIST_EXTRA(f, preserve_uid).uid
+#define F_GID(f) FLIST_EXTRA(f, preserve_gid).gid
+
+/* These are per-entry optional and mutally exclusive: */
+#define F_IDEV(f) FLIST_EXTRA(f, flist_extra_ndx).idev
+#define F_HLIST(f) FLIST_EXTRA(f, flist_extra_ndx).hlist
+
+/* These are per-entry optional, but always both or neither: */
+#define F_DMAJOR(f) FLIST_EXTRA(f, flist_extra_ndx + (IS_HLINKED(f)? 1 : 0)).num
+#define F_DMINOR(f) FLIST_EXTRA(f, flist_extra_ndx + (IS_HLINKED(f)? 2 : 1)).num
+
+/* This is the first string past the struct (mutually exclusive). */
+#define F_SYMLINK(f) ((char*)(f) + file_struct_len)
+#define F_SUM(f) F_SYMLINK(f)
+
 /*
- * Extent size for allocation pools A minimum size of 128KB
+ * Extent size for allocation pools: A minimum size of 128KB
  * is needed to mmap them so that freeing will release the
  * space to the OS.
  *
  * Larger sizes reduce leftover fragments and speed free calls
- * (when they happen) Smaller sizes increase the chance of
+ * (when they happen). Smaller sizes increase the chance of
  * freed allocations freeing whole extents.
  */
 #define FILE_EXTENT	(256 * 1024)
@@ -560,9 +572,8 @@ struct file_list {
 	struct file_struct **files;
 	alloc_pool_t file_pool;
 	alloc_pool_t hlink_pool;
-	int count;
-	int malloced;
-	int low, high;
+	int count, malloced;
+	int low, high; /* 0-relative index values excluding empties */
 };
 
 #define SUMFLG_SAME_OFFSET	(1<<0)
@@ -692,7 +703,7 @@ int vsnprintf(char *str, size_t count, const char *fmt, va_list args);
 
 #if !defined HAVE_SNPRINTF || !defined HAVE_C99_VSNPRINTF
 #define snprintf rsync_snprintf
-int snprintf(char *str,size_t count,const char *fmt,...);
+int snprintf(char *str, size_t count, const char *fmt,...);
 #endif
 
 

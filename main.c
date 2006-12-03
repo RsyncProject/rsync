@@ -619,7 +619,7 @@ static void read_final_goodbye(int f_in, int f_out)
 		}
 	}
 
-	if (i != -1) {
+	if (i != NDX_DONE) {
 		rprintf(FERROR, "Invalid packet at end of run (%d) [%s]\n",
 			i, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
@@ -768,7 +768,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	io_flush(FULL_FLUSH);
 	if (protocol_version >= 24) {
 		/* send a final goodbye message */
-		write_int(f_out, -1);
+		write_int(f_out, NDX_DONE);
 	}
 	io_flush(FULL_FLUSH);
 

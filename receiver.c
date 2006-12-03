@@ -39,6 +39,7 @@ extern int preserve_hard_links;
 extern int preserve_perms;
 extern int basis_dir_cnt;
 extern int make_backups;
+extern int flist_extra_ndx;
 extern int cleanup_got_literal;
 extern int remove_source_files;
 extern int append_mode;
@@ -300,8 +301,7 @@ static void handle_delayed_updates(struct file_list *flist, char *local_name)
 					full_fname(fname), partialptr);
 			} else {
 				if (remove_source_files
-				    || (preserve_hard_links
-				     && file->link_u.links)) {
+				 || (preserve_hard_links && IS_HLINKED(file))) {
 					SIVAL(numbuf, 0, i);
 					send_msg(MSG_SUCCESS,numbuf,4);
 				}
@@ -369,7 +369,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		cleanup_disable();
 
 		i = read_int(f_in);
-		if (i == -1) {
+		if (i == NDX_DONE) {
 			if (read_batch) {
 				get_next_gen_i(batch_gen_fd, next_gen_i,
 					       flist->count);
@@ -655,7 +655,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 
 		if (recv_ok > 0) {
 			if (remove_source_files
-			    || (preserve_hard_links && file->link_u.links)) {
+			    || (preserve_hard_links && IS_HLINKED(file))) {
 				SIVAL(numbuf, 0, i);
 				send_msg(MSG_SUCCESS, numbuf, 4);
 			}
