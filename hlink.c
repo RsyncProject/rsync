@@ -50,10 +50,10 @@ static int hlink_compare(int *int1, int *int2)
 	struct idev *i2 = F_IDEV(f2);
 
 	if (i1->dev != i2->dev)
-		return (int)(i1->dev > i2->dev ? 1 : -1);
+		return i1->dev > i2->dev ? 1 : -1;
 
 	if (i1->ino != i2->ino)
-		return (int)(i1->ino > i2->ino ? 1 : -1);
+		return i1->ino > i2->ino ? 1 : -1;
 
 	return f_name_cmp(f1, f2);
 }
@@ -245,11 +245,8 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 			}
 			maybe_hard_link(file, ndx, fname, statret, st,
 					toname, &st2, itemizing, code);
-			if (remove_source_files == 1 && do_xfers) {
-				char numbuf[4];
-				SIVAL(numbuf, 0, ndx);
-				send_msg(MSG_SUCCESS, numbuf, 4);
-			}
+			if (remove_source_files == 1 && do_xfers)
+				send_msg_int(MSG_SUCCESS, ndx);
 			hl->hlindex = FINISHED_LINK;
 		} else
 			hl->hlindex = SKIPPED_LINK;
@@ -320,11 +317,8 @@ void hard_link_cluster(struct file_struct *file, int master, int itemizing,
 		statret = link_stat(hlink2, &st2, 0);
 		maybe_hard_link(file, ndx, hlink2, statret, &st2,
 				hlink1, &st1, itemizing, code);
-		if (remove_source_files == 1 && do_xfers) {
-			char numbuf[4];
-			SIVAL(numbuf, 0, ndx);
-			send_msg(MSG_SUCCESS, numbuf, 4);
-		}
+		if (remove_source_files == 1 && do_xfers)
+			send_msg_int(MSG_SUCCESS, ndx);
 		hl->hlindex = FINISHED_LINK;
 	} while (!(file->flags & FLAG_HLINK_LAST));
 #endif

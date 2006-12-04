@@ -1435,11 +1435,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (remove_source_files != 1)
 			return;
 	  return_with_success:
-		if (!dry_run) {
-			char numbuf[4];
-			SIVAL(numbuf, 0, ndx);
-			send_msg(MSG_SUCCESS, numbuf, 4);
-		}
+		if (!dry_run)
+			send_msg_int(MSG_SUCCESS, ndx);
 		return;
 	}
 

@@ -280,7 +280,7 @@ static void discard_receive_data(int f_in, OFF_T length)
 
 static void handle_delayed_updates(struct file_list *flist, char *local_name)
 {
-	char *fname, *partialptr, numbuf[4];
+	char *fname, *partialptr;
 	int i;
 
 	for (i = -1; (i = bitbag_next_bit(delayed_bits, i)) >= 0; ) {
@@ -301,10 +301,8 @@ static void handle_delayed_updates(struct file_list *flist, char *local_name)
 					full_fname(fname), partialptr);
 			} else {
 				if (remove_source_files
-				 || (preserve_hard_links && IS_HLINKED(file))) {
-					SIVAL(numbuf, 0, i);
-					send_msg(MSG_SUCCESS,numbuf,4);
-				}
+				 || (preserve_hard_links && IS_HLINKED(file)))
+					send_msg_int(MSG_SUCCESS, i);
 				handle_partial_dir(partialptr, PDIR_DELETE);
 			}
 		}
@@ -341,7 +339,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 	char *fname, fbuf[MAXPATHLEN];
 	char xname[MAXPATHLEN];
 	char fnametmp[MAXPATHLEN];
-	char *fnamecmp, *partialptr, numbuf[4];
+	char *fnamecmp, *partialptr;
 	char fnamecmpbuf[MAXPATHLEN];
 	uchar fnamecmp_type;
 	struct file_struct *file;
@@ -655,10 +653,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 
 		if (recv_ok > 0) {
 			if (remove_source_files
-			    || (preserve_hard_links && IS_HLINKED(file))) {
-				SIVAL(numbuf, 0, i);
-				send_msg(MSG_SUCCESS, numbuf, 4);
-			}
+			 || (preserve_hard_links && IS_HLINKED(file)))
+				send_msg_int(MSG_SUCCESS, i);
 		} else if (!recv_ok) {
 			enum logcode msgtype = phase || read_batch ? FERROR : FINFO;
 			if (msgtype == FERROR || verbose) {
@@ -680,10 +676,8 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 					"%s: %s failed verification -- update %s%s.\n",
 					errstr, fname, keptstr, redostr);
 			}
-			if (!phase) {
-				SIVAL(numbuf, 0, i);
-				send_msg(MSG_REDO, numbuf, 4);
-			}
+			if (!phase)
+				send_msg_int(MSG_REDO, i);
 		}
 	}
 	make_backups = save_make_backups;
