@@ -405,6 +405,13 @@ int send_msg(enum msgcode code, const char *buf, int len)
 	return 1;
 }
 
+void send_msg_int(enum msgcode code, int num)
+{
+	char numbuf[4];
+	SIVAL(numbuf, 0, num);
+	send_msg(code, numbuf, 4);
+}
+
 int get_redo_num(int itemizing, enum logcode code)
 {
 	while (1) {
