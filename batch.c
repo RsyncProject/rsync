@@ -36,7 +36,7 @@ extern int always_checksum;
 extern int do_compression;
 extern int def_compress_level;
 extern int protocol_version;
-extern int flist_extra_ndx;
+extern int flist_extra_cnt;
 extern char *batch_name;
 
 extern struct filter_list_struct filter_list;
@@ -120,12 +120,12 @@ void read_stream_flags(int fd)
 
 	if (tweaked_preserve_uid) {
 		if (!preserve_uid)
-			preserve_uid = flist_extra_ndx++;
+			preserve_uid = ++flist_extra_cnt;
 	} else
 		preserve_uid = 0;
 	if (tweaked_preserve_gid) {
 		if (!preserve_gid)
-			preserve_gid = flist_extra_ndx++;
+			preserve_gid = ++flist_extra_cnt;
 	} else
 		preserve_gid = 0;
 	if (tweaked_compress_level == 0 || tweaked_compress_level == 2)
