@@ -27,8 +27,6 @@ extern int preserve_devices;
 extern int preserve_specials;
 extern int preserve_links;
 extern int safe_symlinks;
-extern int flist_extra_ndx;
-extern int file_struct_len;
 extern int backup_dir_len;
 extern unsigned int backup_dir_remainder;
 extern char backup_dir_buf[MAXPATHLEN];
