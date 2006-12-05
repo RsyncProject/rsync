@@ -980,10 +980,11 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	return file;
 }
 
-/* Only called for temporary file_struct entries. */
+/* Only called for temporary file_struct entries created by make_file(). */
 void unmake_file(struct file_struct *file)
 {
-	free(file->extras - (flist_extra_cnt - 1));
+	int extra_cnt = flist_extra_cnt - 1 + LEN64_BUMP(file);
+	free(file->extras - extra_cnt);
 }
 
 static struct file_struct *send_file_name(int f, struct file_list *flist,
