@@ -39,7 +39,6 @@ extern int preserve_hard_links;
 extern int preserve_perms;
 extern int basis_dir_cnt;
 extern int make_backups;
-extern int flist_extra_ndx;
 extern int cleanup_got_literal;
 extern int remove_source_files;
 extern int append_mode;
@@ -301,7 +300,7 @@ static void handle_delayed_updates(struct file_list *flist, char *local_name)
 					full_fname(fname), partialptr);
 			} else {
 				if (remove_source_files
-				 || (preserve_hard_links && IS_HLINKED(file)))
+				 || (preserve_hard_links && F_IS_HLINKED(file)))
 					send_msg_int(MSG_SUCCESS, i);
 				handle_partial_dir(partialptr, PDIR_DELETE);
 			}
@@ -414,7 +413,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 
 		stats.current_file_index = i;
 		stats.num_transferred_files++;
-		stats.total_transferred_size += file->length;
+		stats.total_transferred_size += F_LENGTH(file);
 		cleanup_got_literal = 0;
 
 		if (server_filter_list.head
@@ -426,13 +425,13 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		if (!do_xfers) { /* log the transfer */
 			log_item(FCLIENT, file, &stats, iflags, NULL);
 			if (read_batch)
-				discard_receive_data(f_in, file->length);
+				discard_receive_data(f_in, F_LENGTH(file));
 			continue;
 		}
 		if (write_batch < 0) {
 			log_item(FINFO, file, &stats, iflags, NULL);
 			if (!am_server)
-				discard_receive_data(f_in, file->length);
+				discard_receive_data(f_in, F_LENGTH(file));
 			continue;
 		}
 
@@ -442,7 +441,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 				rprintf(FINFO,
 					"(Skipping batched update for \"%s\")\n",
 					fname);
-				discard_receive_data(f_in, file->length);
+				discard_receive_data(f_in, F_LENGTH(file));
 				continue;
 			}
 			next_gen_i = -1;
@@ -524,7 +523,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		} else if (do_fstat(fd1,&st) != 0) {
 			rsyserr(FERROR, errno, "fstat %s failed",
 				full_fname(fnamecmp));
-			discard_receive_data(f_in, file->length);
+			discard_receive_data(f_in, F_LENGTH(file));
 			close(fd1);
 			continue;
 		}
@@ -537,7 +536,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			 */
 			rprintf(FERROR,"recv_files: %s is a directory\n",
 				full_fname(fnamecmp));
-			discard_receive_data(f_in, file->length);
+			discard_receive_data(f_in, F_LENGTH(file));
 			close(fd1);
 			continue;
 		}
@@ -560,14 +559,14 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			if (fd2 == -1) {
 				rsyserr(FERROR, errno, "open %s failed",
 					full_fname(fname));
-				discard_receive_data(f_in, file->length);
+				discard_receive_data(f_in, F_LENGTH(file));
 				if (fd1 != -1)
 					close(fd1);
 				continue;
 			}
 		} else {
 			if (!get_tmpname(fnametmp,fname)) {
-				discard_receive_data(f_in, file->length);
+				discard_receive_data(f_in, F_LENGTH(file));
 				if (fd1 != -1)
 					close(fd1);
 				continue;
@@ -593,7 +592,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			if (fd2 == -1) {
 				rsyserr(FERROR, errno, "mkstemp %s failed",
 					full_fname(fnametmp));
-				discard_receive_data(f_in, file->length);
+				discard_receive_data(f_in, F_LENGTH(file));
 				if (fd1 != -1)
 					close(fd1);
 				continue;
@@ -610,7 +609,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 
 		/* recv file data */
 		recv_ok = receive_data(f_in, fnamecmp, fd1, st.st_size,
-				       fname, fd2, file->length);
+				       fname, fd2, F_LENGTH(file));
 
 		log_item(log_code, file, &initial_stats, iflags, NULL);
 
@@ -653,7 +652,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 
 		if (recv_ok > 0) {
 			if (remove_source_files
-			 || (preserve_hard_links && IS_HLINKED(file)))
+			 || (preserve_hard_links && F_IS_HLINKED(file)))
 				send_msg_int(MSG_SUCCESS, i);
 		} else if (!recv_ok) {
 			enum logcode msgtype = phase || read_batch ? FERROR : FINFO;

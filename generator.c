@@ -50,7 +50,6 @@ extern int delete_during;
 extern int delete_after;
 extern int module_id;
 extern int ignore_errors;
-extern int flist_extra_ndx;
 extern int remove_source_files;
 extern int delay_updates;
 extern int update_only;
@@ -86,7 +85,6 @@ extern long block_size; /* "long" because popt can't set an int32. */
 extern int max_delete;
 extern int force_delete;
 extern int one_file_system;
-extern int file_struct_len;
 extern struct stats stats;
 extern dev_t filesystem_dev;
 extern char *backup_dir;
@@ -246,7 +244,7 @@ static enum delret delete_dir_contents(char *fname, int flags)
 			continue;
 		}
 
-		strlcpy(p, fp->basename, remainder);
+		strlcpy(p, F_BASENAME(fp), remainder);
 		/* Save stack by recursing to ourself directly. */
 		if (S_ISDIR(fp->mode)
 		 && delete_dir_contents(fname, flags | DEL_RECURSE) != DR_SUCCESS)
@@ -393,7 +391,7 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 	 * from the filesystem. */
 	for (i = dirlist->count; i--; ) {
 		struct file_struct *fp = dirlist->files[i];
-		if (!fp->basename)
+		if (!F_IS_ACTIVE(fp))
 			continue;
 		if (fp->flags & FLAG_MOUNT_DIR) {
 			if (verbose > 1)
@@ -470,7 +468,7 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 		    : S_ISDIR(file->mode) ? !omit_dir_times
 		    : !S_ISLNK(file->mode);
 
-		if (S_ISREG(file->mode) && file->length != st->st_size)
+		if (S_ISREG(file->mode) && F_LENGTH(file) != st->st_size)
 			iflags |= ITEM_REPORT_SIZE;
 		if ((iflags & (ITEM_TRANSFER|ITEM_LOCAL_CHANGE) && !keep_time
 		  && !(iflags & ITEM_MATCHED)
@@ -509,7 +507,7 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 /* Perform our quick-check heuristic for determining if a file is unchanged. */
 int unchanged_file(char *fn, struct file_struct *file, STRUCT_STAT *st)
 {
-	if (st->st_size != file->length)
+	if (st->st_size != F_LENGTH(file))
 		return 0;
 
 	/* if always checksum is set then we use the checksum instead
@@ -666,7 +664,7 @@ static void generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
 {
 	int fname_len, fname_suf_len;
-	const char *fname_suf, *fname = file->basename;
+	const char *fname_suf, *fname = F_BASENAME(file);
 	uint32 lowest_dist = 25 << 16; /* ignore a distance greater than 25 */
 	int j, lowest_j = -1;
 
@@ -679,12 +677,12 @@ static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
 		int len, suf_len;
 		uint32 dist;
 
-		if (!S_ISREG(fp->mode) || !fp->length || fp->flags & FLAG_SENT)
+		if (!S_ISREG(fp->mode) || !F_LENGTH(fp) || fp->flags & FLAG_SENT)
 			continue;
 
-		name = fp->basename;
+		name = F_BASENAME(fp);
 
-		if (fp->length == file->length
+		if (F_LENGTH(fp) == F_LENGTH(file)
 		    && cmp_time(fp->modtime, file->modtime) == 0) {
 			if (verbose > 4) {
 				rprintf(FINFO,
@@ -724,7 +722,7 @@ void check_for_finished_hlinks(int itemizing, enum logcode code)
 			continue;
 
 		file = the_file_list->files[ndx];
-		if (!IS_HLINKED(file))
+		if (!F_IS_HLINKED(file))
 			continue;
 
 		hard_link_cluster(file, ndx, itemizing, code, -1);
@@ -787,7 +785,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			if (hard_link_one(file, ndx, fname, 0, stp,
 					  cmpbuf, 1, i, code) < 0)
 				goto try_a_copy;
-			if (preserve_hard_links && IS_HLINKED(file))
+			if (preserve_hard_links && F_IS_HLINKED(file))
 				hard_link_cluster(file, ndx, itemizing, code, j);
 		} else
 #endif
@@ -818,7 +816,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			rprintf(code, "%s%s\n", fname,
 				match_level == 3 ? " is uptodate" : "");
 		}
-		if (preserve_hard_links && IS_HLINKED(file))
+		if (preserve_hard_links && F_IS_HLINKED(file))
 			hard_link_cluster(file, ndx, itemizing, code, j);
 		return -2;
 	}
@@ -943,7 +941,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 					cmpbuf, fname);
 				return j;
 			}
-			if (preserve_hard_links && IS_HLINKED(file))
+			if (preserve_hard_links && F_IS_HLINKED(file))
 				hard_link_cluster(file, ndx, itemizing, code, -1);
 		} else
 #endif
@@ -1157,7 +1155,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (preserve_hard_links && IS_HLINKED(file)
+	if (preserve_hard_links && F_IS_HLINKED(file)
 	    && hard_link_check(file, ndx, fname, statret, &st,
 			       itemizing, code, HL_CHECK_MASTER))
 		return;
@@ -1187,7 +1185,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				if (itemizing)
 					itemize(file, ndx, 0, &st, 0, 0, NULL);
 				set_file_attrs(fname, file, &st, maybe_ATTRS_REPORT);
-				if (preserve_hard_links && IS_HLINKED(file))
+				if (preserve_hard_links && F_IS_HLINKED(file))
 					hard_link_cluster(file, ndx, itemizing, code, -1);
 				if (remove_source_files == 1)
 					goto return_with_success;
@@ -1213,7 +1211,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			} else if (j >= 0)
 				statret = 1;
 		}
-		if (preserve_hard_links && IS_HLINKED(file)
+		if (preserve_hard_links && F_IS_HLINKED(file)
 		    && hard_link_check(file, ndx, fname, -1, &st,
 				       itemizing, code, HL_SKIP))
 			return;
@@ -1228,7 +1226,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 			if (code != FNONE && verbose)
 				rprintf(code, "%s -> %s\n", fname, sl);
-			if (preserve_hard_links && IS_HLINKED(file))
+			if (preserve_hard_links && F_IS_HLINKED(file))
 				hard_link_cluster(file, ndx, itemizing, code, -1);
 			/* This does not check remove_source_files == 1
 			 * because this is one of the items that the old
@@ -1261,7 +1259,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				if (itemizing)
 					itemize(file, ndx, 0, &st, 0, 0, NULL);
 				set_file_attrs(fname, file, &st, maybe_ATTRS_REPORT);
-				if (preserve_hard_links && IS_HLINKED(file))
+				if (preserve_hard_links && F_IS_HLINKED(file))
 					hard_link_cluster(file, ndx, itemizing, code, -1);
 				if (remove_source_files == 1)
 					goto return_with_success;
@@ -1285,7 +1283,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			} else if (j >= 0)
 				statret = 1;
 		}
-		if (preserve_hard_links && IS_HLINKED(file)
+		if (preserve_hard_links && F_IS_HLINKED(file)
 		    && hard_link_check(file, ndx, fname, -1, &st,
 				       itemizing, code, HL_SKIP))
 			return;
@@ -1304,7 +1302,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 			if (code != FNONE && verbose)
 				rprintf(code, "%s\n", fname);
-			if (preserve_hard_links && IS_HLINKED(file))
+			if (preserve_hard_links && F_IS_HLINKED(file))
 				hard_link_cluster(file, ndx, itemizing, code, -1);
 			if (remove_source_files == 1)
 				goto return_with_success;
@@ -1319,7 +1317,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (max_size && file->length > max_size) {
+	if (max_size && F_LENGTH(file) > max_size) {
 		if (verbose > 1) {
 			if (the_file_list->count == 1)
 				fname = f_name(file, NULL);
@@ -1327,7 +1325,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 		return;
 	}
-	if (min_size && file->length < min_size) {
+	if (min_size && F_LENGTH(file) < min_size) {
 		if (verbose > 1) {
 			if (the_file_list->count == 1)
 				fname = f_name(file, NULL);
@@ -1394,7 +1392,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				rprintf(FINFO, "fuzzy basis selected for %s: %s\n",
 					fname, fnamecmpbuf);
 			}
-			st.st_size = fuzzy_file->length;
+			st.st_size = F_LENGTH(fuzzy_file);
 			statret = 0;
 			fnamecmp = fnamecmpbuf;
 			fnamecmp_type = FNAMECMP_FUZZY;
@@ -1402,7 +1400,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (statret != 0) {
-		if (preserve_hard_links && IS_HLINKED(file)
+		if (preserve_hard_links && F_IS_HLINKED(file)
 		    && hard_link_check(file, ndx, fname, statret, &st,
 				       itemizing, code, HL_SKIP))
 			return;
@@ -1413,7 +1411,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (append_mode && st.st_size > file->length)
+	if (append_mode && st.st_size > F_LENGTH(file))
 		return;
 
 	if (fnamecmp_type <= FNAMECMP_BASIS_DIR_HIGH)
@@ -1430,7 +1428,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				0, 0, NULL);
 		}
 		set_file_attrs(fname, file, &st, maybe_ATTRS_REPORT);
-		if (preserve_hard_links && IS_HLINKED(file))
+		if (preserve_hard_links && F_IS_HLINKED(file))
 			hard_link_cluster(file, ndx, itemizing, code, -1);
 		if (remove_source_files != 1)
 			return;
@@ -1465,7 +1463,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			full_fname(fnamecmp));
 	  pretend_missing:
 		/* pretend the file didn't exist */
-		if (preserve_hard_links && IS_HLINKED(file)
+		if (preserve_hard_links && F_IS_HLINKED(file)
 		    && hard_link_check(file, ndx, fname, statret, &st,
 				       itemizing, code, HL_SKIP))
 			return;
@@ -1521,11 +1519,11 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (fnamecmp_type == FNAMECMP_FUZZY)
 			iflags |= ITEM_XNAME_FOLLOWS;
 		itemize(file, -1, real_ret, &real_st, iflags, fnamecmp_type,
-			fuzzy_file ? fuzzy_file->basename : NULL);
+			fuzzy_file ? F_BASENAME(fuzzy_file) : NULL);
 	}
 
 	if (!do_xfers) {
-		if (preserve_hard_links && IS_HLINKED(file))
+		if (preserve_hard_links && F_IS_HLINKED(file))
 			hard_link_cluster(file, ndx, itemizing, code, -1);
 		return;
 	}
@@ -1614,7 +1612,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	for (i = 0; i < flist->count; i++) {
 		struct file_struct *file = flist->files[i];
 
-		if (!file->basename)
+		if (!F_IS_ACTIVE(file))
 			continue;
 
 		if (local_name)
@@ -1718,8 +1716,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		 * modified-time values. */
 		for (i = 0; i < flist->count; i++) {
 			struct file_struct *file = flist->files[i];
-
-			if (!file->basename || !S_ISDIR(file->mode))
+			if (!F_IS_ACTIVE(file) || !S_ISDIR(file->mode))
 				continue;
 			if (!need_retouch_dir_times && file->mode & S_IWUSR)
 				continue;

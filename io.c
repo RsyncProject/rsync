@@ -342,13 +342,13 @@ void increment_active_files(int ndx, int itemizing, enum logcode code)
 	}
 
 	active_filecnt++;
-	active_bytecnt += the_file_list->files[ndx]->length;
+	active_bytecnt += F_LENGTH(the_file_list->files[ndx]);
 }
 
 void decrement_active_files(int ndx)
 {
 	active_filecnt--;
-	active_bytecnt -= the_file_list->files[ndx]->length;
+	active_bytecnt -= F_LENGTH(the_file_list->files[ndx]);
 }
 
 /* Try to push messages off the list onto the wire.  If we leave with more

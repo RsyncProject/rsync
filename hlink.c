@@ -28,7 +28,6 @@ extern int dry_run;
 extern int do_xfers;
 extern int link_dest;
 extern int make_backups;
-extern int flist_extra_ndx;
 extern int remove_source_files;
 extern int stdout_format_has_i;
 extern char *basis_dir[];
@@ -106,7 +105,7 @@ static void link_idev_data(void)
 			file->flags |= FLAG_HLINK_LAST;
 			F_HLIST(file) = hl;
 		} else
-			file->flags &= ~FLAG_HLINK_INFO;
+			file->flags &= ~FLAG_HLINKED;
 	}
 
 	if (!to) {
@@ -138,7 +137,7 @@ void init_hard_links(void)
 
 	hlink_count = 0;
 	for (i = 0; i < the_file_list->count; i++) {
-		if (IS_HLINKED(FPTR(i)))
+		if (F_IS_HLINKED(FPTR(i)))
 			hlink_list[hlink_count++] = i;
 	}
 

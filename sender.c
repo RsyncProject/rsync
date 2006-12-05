@@ -230,7 +230,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 
 		stats.current_file_index = i;
 		stats.num_transferred_files++;
-		stats.total_transferred_size += file->length;
+		stats.total_transferred_size += F_LENGTH(file);
 
 		if (!do_xfers) { /* log the transfer */
 			log_item(FCLIENT, file, &stats, iflags, NULL);

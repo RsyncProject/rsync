@@ -39,8 +39,6 @@ extern int protocol_version;
 extern int preserve_times;
 extern int preserve_uid;
 extern int preserve_gid;
-extern int flist_extra_ndx;
-extern int file_struct_len;
 extern int stdout_format_has_i;
 extern int stdout_format_has_o_or_i;
 extern int logfile_format_has_i;
@@ -427,8 +425,9 @@ void rflush(enum logcode code)
 
 /* A generic logging routine for send/recv, with parameter substitiution. */
 static void log_formatted(enum logcode code, const char *format, const char *op,
-			  struct file_struct *file, struct stats *initial_stats,
-			  int iflags, const char *hlink)
+			  struct file_struct *file, const char *fname,
+			  struct stats *initial_stats, int iflags,
+			  const char *hlink)
 {
 	char buf[MAXPATHLEN+1024], buf2[MAXPATHLEN], fmt[32];
 	char *p, *s, *c;
@@ -473,7 +472,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 		case 'l':
 			strlcat(fmt, ".0f", sizeof fmt);
 			snprintf(buf2, sizeof buf2, fmt,
-				 (double)file->length);
+				 (double)F_LENGTH(file));
 			n = buf2;
 			break;
 		case 'U':
@@ -512,7 +511,11 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			n = op;
 			break;
 		case 'f':
-			c = f_name(file, NULL);
+			if (fname) {
+				c = f_name_buf();
+				strlcpy(c, fname, MAXPATHLEN);
+			} else
+				c = f_name(file, NULL);
 			if (am_sender && file->dir.root) {
 				pathjoin(buf2, sizeof buf2,
 					 file->dir.root, c);
@@ -539,7 +542,11 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 				n++;
 			break;
 		case 'n':
-			c = f_name(file, NULL);
+			if (fname) {
+				c = f_name_buf();
+				strlcpy(c, fname, MAXPATHLEN);
+			} else
+				c = f_name(file, NULL);
 			if (S_ISDIR(file->mode))
 				strlcat(c, "/", MAXPATHLEN);
 			n = c;
@@ -548,7 +555,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			if (hlink && *hlink) {
 				n = hlink;
 				strlcpy(buf2, " => ", sizeof buf2);
-			} else if (S_ISLNK(file->mode)) {
+			} else if (S_ISLNK(file->mode) && !fname) {
 				n = F_SYMLINK(file);
 				strlcpy(buf2, " -> ", sizeof buf2);
 			} else {
@@ -708,11 +715,11 @@ void log_item(enum logcode code, struct file_struct *file,
 
 	if (code != FLOG && stdout_format && !am_server) {
 		log_formatted(FCLIENT, stdout_format, s_or_r,
-			      file, initial_stats, iflags, hlink);
+			      file, NULL, initial_stats, iflags, hlink);
 	}
 	if (code != FCLIENT && logfile_format && *logfile_format) {
 		log_formatted(FLOG, logfile_format, s_or_r,
-			      file, initial_stats, iflags, hlink);
+			      file, NULL, initial_stats, iflags, hlink);
 	}
 }
 
@@ -736,12 +743,15 @@ void maybe_log_item(struct file_struct *file, int iflags, int itemizing,
 
 void log_delete(const char *fname, int mode)
 {
-	static struct file_struct file;
+	static struct {
+		union flist_extras ex[4]; /* just in case... */
+		struct file_struct file;
+		char basename[1];
+	} x;
 	int len = strlen(fname);
 	const char *fmt;
 
-	file.mode = mode;
-	file.basename = fname;
+	x.file.mode = mode;
 
 	if (!verbose && !stdout_format)
 		;
@@ -751,7 +761,7 @@ void log_delete(const char *fname, int mode)
 		send_msg(MSG_DELETED, fname, len);
 	} else {
 		fmt = stdout_format_has_o_or_i ? stdout_format : "deleting %n";
-		log_formatted(FCLIENT, fmt, "del.", &file, &stats,
+		log_formatted(FCLIENT, fmt, "del.", &x.file, fname, &stats,
 			      ITEM_DELETED, NULL);
 	}
 
@@ -759,7 +769,7 @@ void log_delete(const char *fname, int mode)
 		return;
 
 	fmt = logfile_format_has_o_or_i ? logfile_format : "deleting %n";
-	log_formatted(FLOG, fmt, "del.", &file, &stats, ITEM_DELETED, NULL);
+	log_formatted(FLOG, fmt, "del.", &x.file, fname, &stats, ITEM_DELETED, NULL);
 }
 
 /*
