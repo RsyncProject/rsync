@@ -61,10 +61,11 @@
 #define FLAG_SENT (1<<1)	/* sender/generator */
 #define FLAG_XFER_DIR (1<<2)	/* sender/receiver/generator */
 #define FLAG_MOUNT_DIR (1<<3)	/* sender/generator */
-#define FLAG_MISSING_DIR (1<<4)	/* generator (dirs only) */
-#define FLAG_HLINK_INFO (1<<5)	/* receiver/generator */
+#define FLAG_MISSING_DIR (1<<4)	/* generator */
+#define FLAG_HLINKED (1<<5)	/* receiver/generator */
 #define FLAG_HLINK_FIRST (1<<6)	/* receiver/generator */
 #define FLAG_HLINK_LAST (1<<7)	/* receiver/generator */
+#define FLAG_LENGTH64 (1<<8)	/* sender/receiver/generator */
 
 /* update this if you make incompatible changes */
 #define PROTOCOL_VERSION 30
@@ -507,17 +508,65 @@ struct hlist {
 };
 
 struct file_struct {
-	OFF_T length;
-	const char *basename;	/* The current item's name (AKA filename) */
-	const char *dirname;	/* The directory info inside the transfer */
+	union flist_extras {
+		uid_t uid;           /* The user ID number */
+		uid_t gid;           /* The group ID number or GID_NONE */
+		struct idev *idev;   /* The hard-link info during matching */
+		struct hlist *hlist; /* The hard-link info after matching */
+		uint32 unum;         /* An unsigned number */
+	} extras[1];
+	time_t modtime;              /* When the item was last modified */
+	const char *dirname;         /* The dir info inside the transfer */
 	union {
-		const char *root;/* Sender-side dir info outside transfer */
-		int depth;	/* Receiver-side directory depth info */
+		const char *root;    /* Sender-side dir info outside transfer */
+		int32 depth;         /* Receiver-side directory depth info */
 	} dir;
-	time_t modtime;
-	mode_t mode;
-	uchar flags;	/* this item MUST remain last */
+	uint32 len32;                /* Lowest 32 bits of the file's length */
+	unsigned short mode;         /* The item's type and permissions */
+	unsigned short flags;        /* This item MUST remain last! */
 };
+
+extern int flist_extra_cnt;
+extern int preserve_uid;
+extern int preserve_gid;
+
+#define FILE_STRUCT_LEN (offsetof(struct file_struct, flags) \
+			+ sizeof (unsigned short))
+#define EXTRA_LEN (sizeof (union flist_extras))
+#define SUM_EXTRA_CNT ((MD4_SUM_LENGTH + EXTRA_LEN - 1) / EXTRA_LEN)
+
+#define REQ_EXTRA(f,ndx) ((f)->extras - (ndx - 1))
+#define OPT_EXTRA(f,bump) ((f)->extras - flist_extra_cnt - (bump))
+#define LEN64_BUMP(f) ((f)->flags & FLAG_LENGTH64 ? 1 : 0)
+#define HLINK_BUMP(f) (F_IS_HLINKED(f) ? 1 : 0)
+
+/* Basename (AKA filename) and length applies to all items */
+#define F_BASENAME(f) ((const char*)(f) + FILE_STRUCT_LEN)
+#define F_LENGTH(f) ((OFF_T)(f)->len32 + ((f)->flags & FLAG_LENGTH64 \
+		   ? (OFF_T)OPT_EXTRA(f, 0)->unum << 32 : 0u))
+
+/* If there is a symlink string, it is always right after the basename */
+#define F_SYMLINK(f) (F_BASENAME(f) + strlen(F_BASENAME(f)) + 1)
+
+/* When the associated option is on, all entries will have these present: */
+#define F_UID(f) REQ_EXTRA(f, preserve_uid)->uid
+#define F_GID(f) REQ_EXTRA(f, preserve_gid)->gid
+
+/* These are per-entry optional and mutally exclusive: */
+#define F_IDEV(f)  OPT_EXTRA(f, LEN64_BUMP(f))->idev
+#define F_HLIST(f) OPT_EXTRA(f, LEN64_BUMP(f))->hlist
+
+/* These are per-entry optional, but always both or neither:
+ * (Note: a device doesn't need to use LEN64_BUMP(f).) */
+#define F_DMAJOR(f) OPT_EXTRA(f, HLINK_BUMP(f))->unum
+#define F_DMINOR(f) OPT_EXTRA(f, HLINK_BUMP(f) + 1)->unum
+
+/* The sum is only present on regular files. */
+#define F_SUM(f) ((const char*)OPT_EXTRA(f, LEN64_BUMP(f) + SUM_EXTRA_CNT - 1))
+
+/* A couple bool-type utility functions: */
+#define F_IS_HLINKED(f) ((f)->flags & FLAG_HLINKED)
+#define F_IS_ACTIVE(f) F_BASENAME(f)[0]
 
 /*
  * Start the flist array at FLIST_START entries and grow it
@@ -525,33 +574,6 @@ struct file_struct {
  */
 #define FLIST_START	(32 * 1024)
 #define FLIST_LINEAR	(FLIST_START * 512)
-
-union flist_extras {
-	uid_t uid;		/* the user ID number */
-	uid_t gid;		/* the group ID number or GID_NONE */
-	struct idev *idev;	/* The hard-link info during matching */
-	struct hlist *hlist;	/* The hard-link info after matching */
-	int32 num;		/* A general-purpose number */
-};
-
-#define FLIST_EXTRA(f,j) ((union flist_extras *)(f))[-(j)]
-#define IS_HLINKED(f) ((f)->flags & FLAG_HLINK_INFO)
-
-/* When enabled, all entries have these: */
-#define F_UID(f) FLIST_EXTRA(f, preserve_uid).uid
-#define F_GID(f) FLIST_EXTRA(f, preserve_gid).gid
-
-/* These are per-entry optional and mutally exclusive: */
-#define F_IDEV(f) FLIST_EXTRA(f, flist_extra_ndx).idev
-#define F_HLIST(f) FLIST_EXTRA(f, flist_extra_ndx).hlist
-
-/* These are per-entry optional, but always both or neither: */
-#define F_DMAJOR(f) FLIST_EXTRA(f, flist_extra_ndx + (IS_HLINKED(f)? 1 : 0)).num
-#define F_DMINOR(f) FLIST_EXTRA(f, flist_extra_ndx + (IS_HLINKED(f)? 2 : 1)).num
-
-/* This is the first string past the struct (mutually exclusive). */
-#define F_SYMLINK(f) ((char*)(f) + file_struct_len)
-#define F_SUM(f) F_SYMLINK(f)
 
 /*
  * Extent size for allocation pools: A minimum size of 128KB

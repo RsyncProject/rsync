@@ -48,7 +48,7 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int relative_paths;
 extern int implied_dirs;
-extern int flist_extra_ndx;
+extern int flist_extra_cnt;
 extern int ignore_perishable;
 extern int non_perishable_cnt;
 extern int prune_empty_dirs;
@@ -69,7 +69,6 @@ extern struct filter_list_struct server_filter_list;
 int io_error;
 int checksum_len;
 dev_t filesystem_dev; /* used to implement -x */
-int file_struct_len;
 
 /* The tmp_* vars are used as a cache area by make_file() to store data
  * that the sender doesn't need to remember in its file list.  The data
@@ -86,10 +85,10 @@ static void output_flist(struct file_list *flist);
 
 void init_flist(void)
 {
-	struct file_struct f;
-
-	/* Figure out how big the file_struct is without trailing padding */
-	file_struct_len = offsetof(struct file_struct, flags) + sizeof f.flags;
+	if (verbose > 4) {
+		rprintf(FINFO, "FILE_STRUCT_LEN=%d, EXTRA_LEN=%d\n",
+			FILE_STRUCT_LEN, EXTRA_LEN);
+	}
 	checksum_len = protocol_version < 21 ? 2 : MD4_SUM_LENGTH;
 }
 
@@ -135,26 +134,26 @@ void show_flist_stats(void)
 static void list_file_entry(struct file_struct *f)
 {
 	char permbuf[PERMSTRING_SIZE];
+	double len;
 
-	if (!f->basename) {
+	if (!F_IS_ACTIVE(f)) {
 		/* this can happen if duplicate names were removed */
 		return;
 	}
 
 	permstring(permbuf, f->mode);
+	len = F_LENGTH(f);
 
 #ifdef SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(f->mode)) {
 		rprintf(FINFO, "%s %11.0f %s %s -> %s\n",
-			permbuf,
-			(double)f->length, timestring(f->modtime),
+			permbuf, len, timestring(f->modtime),
 			f_name(f, NULL), F_SYMLINK(f));
 	} else
 #endif
 	{
 		rprintf(FINFO, "%s %11.0f %s %s\n",
-			permbuf,
-			(double)f->length, timestring(f->modtime),
+			permbuf, len, timestring(f->modtime),
 			f_name(f, NULL));
 	}
 }
@@ -424,7 +423,7 @@ static void send_file_entry(struct file_struct *file, int f)
 		write_byte(f, l2);
 	write_buf(f, fname + l1, l2);
 
-	write_longint(f, file->length);
+	write_longint(f, F_LENGTH(file));
 	if (!(flags & XMIT_SAME_TIME))
 		write_int(f, modtime);
 	if (!(flags & XMIT_SAME_MODE))
@@ -508,8 +507,8 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	static int in_del_hier = 0;
 	char thisname[MAXPATHLEN];
 	unsigned int l1 = 0, l2 = 0;
-	int alloc_len, basename_len, dirname_len, linkname_len, sum_len;
-	int extra_len = (flist_extra_ndx-1) * sizeof (union flist_extras);
+	int alloc_len, basename_len, dirname_len, linkname_len;
+	int extra_len = (flist_extra_cnt - 1) * EXTRA_LEN;
 	OFF_T file_length;
 	char *basename, *dirname, *bp;
 	struct file_struct *file;
@@ -595,7 +594,8 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 				rdev_minor = read_int(f);
 			rdev = MAKEDEV(rdev_major, rdev_minor);
 		}
-		extra_len += 2 * sizeof (union flist_extras);
+		extra_len += 2 * EXTRA_LEN;
+		file_length = 0;
 	} else if (protocol_version < 28)
 		rdev = MAKEDEV(0, 0);
 
@@ -616,28 +616,39 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (preserve_hard_links && protocol_version < 28 && S_ISREG(mode))
 		flags |= XMIT_HAS_IDEV_DATA;
 	if (flags & XMIT_HAS_IDEV_DATA) {
-		extra_len += sizeof (union flist_extras);
+		extra_len += EXTRA_LEN;
 		assert(flist->hlink_pool != NULL);
 	}
 #endif
 
-	sum_len = always_checksum && S_ISREG(mode) ? MD4_SUM_LENGTH : 0;
+	if (always_checksum && S_ISREG(mode))
+		extra_len += SUM_EXTRA_CNT * EXTRA_LEN;
 
-	alloc_len = file_struct_len + dirname_len + basename_len
-		  + linkname_len + sum_len + extra_len;
+	if (file_length > 0xFFFFFFFFu && S_ISREG(mode))
+		extra_len += EXTRA_LEN;
+
+	alloc_len = FILE_STRUCT_LEN + extra_len + basename_len + dirname_len
+		  + linkname_len;
 	bp = pool_alloc(flist->file_pool, alloc_len, "recv_file_entry");
 
-	memset(bp, 0, file_struct_len + extra_len);
+	memset(bp, 0, FILE_STRUCT_LEN + extra_len);
 	bp += extra_len;
 	file = (struct file_struct *)bp;
-	bp += file_struct_len + linkname_len + sum_len;
+	bp += FILE_STRUCT_LEN;
+
+	memcpy(bp, basename, basename_len);
+	bp += basename_len + linkname_len; /* skip space for symlink too */
 
 #ifdef SUPPORT_HARD_LINKS
 	if (flags & XMIT_HAS_IDEV_DATA)
-		file->flags |= FLAG_HLINK_INFO;
+		file->flags |= FLAG_HLINKED;
 #endif
 	file->modtime = modtime;
-	file->length = file_length;
+	file->len32 = file_length;
+	if (file_length > 0xFFFFFFFFu && S_ISREG(mode)) {
+		file->flags |= FLAG_LENGTH64;
+		OPT_EXTRA(file, 0)->unum = (uint32)(file_length >> 32);
+	}
 	file->mode = mode;
 	if (preserve_uid)
 		F_UID(file) = uid;
@@ -679,10 +690,6 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		}
 	}
 
-	file->basename = bp;
-	memcpy(bp, basename, basename_len);
-	bp += basename_len;
-
 	if ((preserve_devices && IS_DEVICE(mode))
 	 || (preserve_specials && IS_SPECIAL(mode))) {
 		F_DMAJOR(file) = major(rdev);
@@ -691,7 +698,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 
 #ifdef SUPPORT_LINKS
 	if (linkname_len) {
-		bp = F_SYMLINK(file);
+		bp = (char*)F_BASENAME(file) + basename_len;
 		read_sbuf(f, bp, linkname_len - 1);
 		if (sanitize_paths)
 			sanitize_path(bp, bp, "", lastdir_depth, NULL);
@@ -715,9 +722,9 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	}
 #endif
 
-	if (always_checksum && (sum_len || protocol_version < 28)) {
-		if (sum_len)
-			bp = F_SUM(file);
+	if (always_checksum && (S_ISREG(mode) || protocol_version < 28)) {
+		if (S_ISREG(mode))
+			bp = (char*)F_SUM(file);
 		else {
 			/* Prior to 28, we get a useless set of nulls. */
 			bp = tmp_sum;
@@ -753,7 +760,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	char thisname[MAXPATHLEN];
 	char linkname[MAXPATHLEN];
 	int alloc_len, basename_len, dirname_len, linkname_len;
-	int extra_len = (flist_extra_ndx-1) * sizeof (union flist_extras);
+	int extra_len = (flist_extra_cnt - 1) * EXTRA_LEN;
 	char *basename, *dirname, *bp;
 
 	if (!flist || !flist->count)	/* Ignore lastdir when invalid. */
@@ -872,8 +879,11 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	linkname_len = 0;
 #endif
 
-	alloc_len = file_struct_len + dirname_len + basename_len
-		  + linkname_len + extra_len;
+	if (st.st_size > 0xFFFFFFFFu && S_ISREG(st.st_mode))
+		extra_len += EXTRA_LEN;
+
+	alloc_len = FILE_STRUCT_LEN + extra_len + basename_len + dirname_len
+		  + linkname_len;
 	if (flist)
 		bp = pool_alloc(flist->file_pool, alloc_len, "make_file");
 	else {
@@ -881,10 +891,13 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			out_of_memory("make_file");
 	}
 
-	memset(bp, 0, file_struct_len + extra_len);
+	memset(bp, 0, FILE_STRUCT_LEN + extra_len);
 	bp += extra_len;
 	file = (struct file_struct *)bp;
-	bp += file_struct_len + linkname_len;
+	bp += FILE_STRUCT_LEN;
+
+	memcpy(bp, basename, basename_len);
+	bp += basename_len + linkname_len; /* skip space for symlink too */
 
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && flist) {
@@ -898,9 +911,20 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	}
 #endif
 
+#ifdef HAVE_STRUCT_STAT_ST_RDEV
+	if (IS_DEVICE(st.st_mode) || IS_SPECIAL(st.st_mode)) {
+		tmp_rdev = st.st_rdev;
+		st.st_size = 0;
+	}
+#endif
+
 	file->flags = flags;
 	file->modtime = st.st_mtime;
-	file->length = st.st_size;
+	file->len32 = st.st_size;
+	if (st.st_size > 0xFFFFFFFFu && S_ISREG(st.st_mode)) {
+		file->flags |= FLAG_LENGTH64;
+		OPT_EXTRA(file, 0)->unum = (uint32)(st.st_size >> 32);
+	}
 	file->mode = st.st_mode;
 	if (preserve_uid)
 		F_UID(file) = st.st_uid;
@@ -916,19 +940,11 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	} else if (dirname)
 		file->dirname = dirname;
 
-	file->basename = bp;
-	memcpy(bp, basename, basename_len);
-	bp += basename_len;
-
-#ifdef HAVE_STRUCT_STAT_ST_RDEV
-	if ((preserve_devices && IS_DEVICE(st.st_mode))
-	 || (preserve_specials && IS_SPECIAL(st.st_mode)))
-		tmp_rdev = st.st_rdev;
-#endif
-
 #ifdef SUPPORT_LINKS
-	if (linkname_len)
-		memcpy(F_SYMLINK(file), linkname, linkname_len);
+	if (linkname_len) {
+		bp = (char*)F_BASENAME(file) + basename_len;
+		memcpy(bp, linkname, linkname_len);
+	}
 #endif
 
 	if (always_checksum && am_sender && S_ISREG(st.st_mode))
@@ -945,7 +961,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		if (flist_find(the_file_list, file) >= 0
 		    && do_stat(thisname, &st2) == 0 && S_ISDIR(st2.st_mode)) {
 			file->modtime = st2.st_mtime;
-			file->length = st2.st_size;
+			file->len32 = 0;
 			file->mode = st2.st_mode;
 			if (preserve_uid)
 				F_UID(file) = st2.st_uid;
@@ -967,9 +983,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 /* Only called for temporary file_struct entries. */
 void unmake_file(struct file_struct *file)
 {
-	union flist_extras *start = (union flist_extras *)file
-				  - (flist_extra_ndx - 1);
-	free(start);
+	free(file->extras - (flist_extra_cnt - 1));
 }
 
 static struct file_struct *send_file_name(int f, struct file_list *flist,
@@ -1374,7 +1388,7 @@ struct file_list *recv_file_list(int f)
 		file = recv_file_entry(flist, flags, f);
 
 		if (S_ISREG(file->mode) || S_ISLNK(file->mode))
-			stats.total_size += file->length;
+			stats.total_size += F_LENGTH(file);
 
 		flist->files[flist->count++] = file;
 
@@ -1437,28 +1451,28 @@ int flist_find(struct file_list *flist, struct file_struct *f)
 
 	while (low <= high) {
 		mid = (low + high) / 2;
-		if (flist->files[mid]->basename)
+		if (F_IS_ACTIVE(flist->files[mid]))
 			mid_up = mid;
 		else {
 			/* Scan for the next non-empty entry using the cached
 			 * distance values.  If the value isn't fully up-to-
 			 * date, update it. */
 			mid_up = mid + flist->files[mid]->dir.depth;
-			if (!flist->files[mid_up]->basename) {
+			if (!F_IS_ACTIVE(flist->files[mid_up])) {
 				do {
 				    mid_up += flist->files[mid_up]->dir.depth;
-				} while (!flist->files[mid_up]->basename);
+				} while (!F_IS_ACTIVE(flist->files[mid_up]));
 				flist->files[mid]->dir.depth = mid_up - mid;
 			}
 			if (mid_up > high) {
 				/* If there's nothing left above us, set high to
 				 * a non-empty entry below us and continue. */
-				high = mid - (int)flist->files[mid]->length;
-				if (!flist->files[high]->basename) {
+				high = mid - (int)flist->files[mid]->len32;
+				if (!F_IS_ACTIVE(flist->files[high])) {
 					do {
-					    high -= (int)flist->files[high]->length;
-					} while (!flist->files[high]->basename);
-					flist->files[mid]->length = mid - high;
+					    high -= (int)flist->files[high]->len32;
+					} while (!F_IS_ACTIVE(flist->files[high]));
+					flist->files[mid]->len32 = mid - high;
 				}
 				continue;
 			}
@@ -1485,12 +1499,12 @@ int flist_find(struct file_list *flist, struct file_struct *f)
  */
 void clear_file(struct file_struct *file)
 {
-	memset(file, 0, file_struct_len);
+	memset((char*)file + EXTRA_LEN, 0, FILE_STRUCT_LEN - EXTRA_LEN + 1);
 	/* In an empty entry, dir.depth is an offset to the next non-empty
-	 * entry.  Likewise for length in the opposite direction.  We assume
+	 * entry.  Likewise for len32 in the opposite direction.  We assume
 	 * that we're alone for now since flist_find() will adjust the counts
 	 * it runs into that aren't up-to-date. */
-	file->length = file->dir.depth = 1;
+	file->len32 = file->dir.depth = 1;
 }
 
 /*
@@ -1551,7 +1565,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 	    sizeof flist->files[0], (int (*)())file_compare);
 
 	for (i = no_dups? 0 : flist->count; i < flist->count; i++) {
-		if (flist->files[i]->basename) {
+		if (F_IS_ACTIVE(flist->files[i])) {
 			prev_i = i;
 			break;
 		}
@@ -1561,7 +1575,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 		int j;
 		struct file_struct *file = flist->files[i];
 
-		if (!file->basename)
+		if (!F_IS_ACTIVE(file))
 			continue;
 		if (f_name_cmp(file, flist->files[prev_i]) == 0)
 			j = prev_i;
@@ -1603,7 +1617,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 			if (keep == i) {
 				if (flist->low == drop) {
 					for (j = drop + 1;
-					     j < i && !flist->files[j]->basename;
+					     j < i && !F_IS_ACTIVE(flist->files[j]);
 					     j++) {}
 					flist->low = j;
 				}
@@ -1684,12 +1698,12 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 		}
 
 		for (i = flist->low; i <= flist->high; i++) {
-			if (flist->files[i]->basename)
+			if (F_IS_ACTIVE(flist->files[i]))
 				break;
 		}
 		flist->low = i;
 		for (i = flist->high; i >= flist->low; i--) {
-			if (flist->files[i]->basename)
+			if (F_IS_ACTIVE(flist->files[i]))
 				break;
 		}
 		flist->high = i;
@@ -1700,6 +1714,7 @@ static void output_flist(struct file_list *flist)
 {
 	char uidbuf[16], gidbuf[16], depthbuf[16];
 	struct file_struct *file;
+	const char *dir, *slash, *name, *trail;
 	const char *who = who_am_i();
 	int i;
 
@@ -1717,12 +1732,19 @@ static void output_flist(struct file_list *flist)
 			*gidbuf = '\0';
 		if (!am_sender)
 			snprintf(depthbuf, sizeof depthbuf, "%d", file->dir.depth);
+		if (F_IS_ACTIVE(file)) {
+			if ((dir = file->dirname) == NULL)
+				dir = slash = "";
+			else
+				slash = "/";
+			name = F_BASENAME(file);
+			trail = S_ISDIR(file->mode) ? "/" : "";
+		} else
+			dir = slash = name = trail = "";
 		rprintf(FINFO, "[%s] i=%d %s %s%s%s%s mode=0%o len=%.0f%s%s flags=%x\n",
 			who, i, am_sender ? NS(file->dir.root) : depthbuf,
-			file->dirname ? file->dirname : "",
-			file->dirname ? "/" : "", NS(file->basename),
-			S_ISDIR(file->mode) ? "/" : "", (int)file->mode,
-			(double)file->length, uidbuf, gidbuf, file->flags);
+			dir, slash, name, trail, (int)file->mode,
+			(double)F_LENGTH(file), uidbuf, gidbuf, file->flags);
 	}
 }
 
@@ -1752,12 +1774,12 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 	enum fnc_type type1, type2;
 	enum fnc_type t_path = protocol_version >= 29 ? t_PATH : t_ITEM;
 
-	if (!f1 || !f1->basename) {
-		if (!f2 || !f2->basename)
+	if (!f1 || !F_IS_ACTIVE(f1)) {
+		if (!f2 || !F_IS_ACTIVE(f2))
 			return 0;
 		return -1;
 	}
-	if (!f2 || !f2->basename)
+	if (!f2 || !F_IS_ACTIVE(f2))
 		return 1;
 
 	c1 = (uchar*)f1->dirname;
@@ -1766,7 +1788,7 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 		c1 = c2 = NULL;
 	if (!c1) {
 		type1 = S_ISDIR(f1->mode) ? t_path : t_ITEM;
-		c1 = (uchar*)f1->basename;
+		c1 = (uchar*)F_BASENAME(f1);
 		if (type1 == t_PATH && *c1 == '.' && !c1[1]) {
 			type1 = t_ITEM;
 			state1 = s_TRAILING;
@@ -1779,7 +1801,7 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 	}
 	if (!c2) {
 		type2 = S_ISDIR(f2->mode) ? t_path : t_ITEM;
-		c2 = (uchar*)f2->basename;
+		c2 = (uchar*)F_BASENAME(f2);
 		if (type2 == t_PATH && *c2 == '.' && !c2[1]) {
 			type2 = t_ITEM;
 			state2 = s_TRAILING;
@@ -1803,7 +1825,7 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 				break;
 			case s_SLASH:
 				type1 = S_ISDIR(f1->mode) ? t_path : t_ITEM;
-				c1 = (uchar*)f1->basename;
+				c1 = (uchar*)F_BASENAME(f1);
 				if (type1 == t_PATH && *c1 == '.' && !c1[1]) {
 					type1 = t_ITEM;
 					state1 = s_TRAILING;
@@ -1833,7 +1855,7 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 				break;
 			case s_SLASH:
 				type2 = S_ISDIR(f2->mode) ? t_path : t_ITEM;
-				c2 = (uchar*)f2->basename;
+				c2 = (uchar*)F_BASENAME(f2);
 				if (type2 == t_PATH && *c2 == '.' && !c2[1]) {
 					type2 = t_ITEM;
 					state2 = s_TRAILING;
@@ -1862,31 +1884,35 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 	return dif;
 }
 
+char *f_name_buf(void)
+{
+	static char names[5][MAXPATHLEN];
+	static unsigned int n;
+
+	n = (n + 1) % (sizeof names / sizeof names[0]);
+
+	return names[n];
+}
+
 /* Return a copy of the full filename of a flist entry, using the indicated
  * buffer or one of 5 static buffers if fbuf is NULL.  No size-checking is
  * done because we checked the size when creating the file_struct entry.
  */
 char *f_name(struct file_struct *f, char *fbuf)
 {
-	if (!f || !f->basename)
+	if (!f || !F_IS_ACTIVE(f))
 		return NULL;
 
-	if (!fbuf) {
-		static char names[5][MAXPATHLEN];
-		static unsigned int n;
-
-		n = (n + 1) % (sizeof names / sizeof names[0]);
-
-		fbuf = names[n];
-	}
+	if (!fbuf)
+		fbuf = f_name_buf();
 
 	if (f->dirname) {
 		int len = strlen(f->dirname);
 		memcpy(fbuf, f->dirname, len);
 		fbuf[len] = '/';
-		strlcpy(fbuf + len + 1, f->basename, MAXPATHLEN - (len + 1));
+		strlcpy(fbuf + len + 1, F_BASENAME(f), MAXPATHLEN - (len + 1));
 	} else
-		strlcpy(fbuf, f->basename, MAXPATHLEN);
+		strlcpy(fbuf, F_BASENAME(f), MAXPATHLEN);
 
 	return fbuf;
 }
