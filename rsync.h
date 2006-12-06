@@ -562,7 +562,8 @@ extern int preserve_gid;
 #define F_DMINOR(f) OPT_EXTRA(f, HLINK_BUMP(f) + 1)->unum
 
 /* The sum is only present on regular files. */
-#define F_SUM(f) ((const char*)OPT_EXTRA(f, LEN64_BUMP(f) + SUM_EXTRA_CNT - 1))
+#define F_SUM(f) ((const char*)OPT_EXTRA(f, LEN64_BUMP(f) + HLINK_BUMP(f) \
+					  + SUM_EXTRA_CNT - 1))
 
 /* A couple bool-type utility functions: */
 #define F_IS_HLINKED(f) ((f)->flags & FLAG_HLINKED)
