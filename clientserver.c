@@ -244,7 +244,9 @@ static char *finish_pre_exec(pid_t pid, int fd, char *request,
 	if (wait_process(pid, &status, 0) < 0
 	 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
 		char *e;
-		if (asprintf(&e, "pre-xfer exec returned failure (%d)\n", status) < 0)
+		if (asprintf(&e, "pre-xfer exec returned failure (%d)%s%s\n",
+			     status, status < 0 ? ": " : "",
+			     status < 0 ? strerror(errno) : "") < 0)
 			out_of_memory("finish_pre_exec");
 		return e;
 	}
