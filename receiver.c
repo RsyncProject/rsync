@@ -280,10 +280,10 @@ static void discard_receive_data(int f_in, OFF_T length)
 static void handle_delayed_updates(struct file_list *flist, char *local_name)
 {
 	char *fname, *partialptr;
-	int i;
+	int ndx;
 
-	for (i = -1; (i = bitbag_next_bit(delayed_bits, i)) >= 0; ) {
-		struct file_struct *file = flist->files[i];
+	for (ndx = -1; (ndx = bitbag_next_bit(delayed_bits, ndx)) >= 0; ) {
+		struct file_struct *file = flist->files[ndx];
 		fname = local_name ? local_name : f_name(file, NULL);
 		if ((partialptr = partial_dir_fname(fname)) != NULL) {
 			if (make_backups && !make_backup(fname))
@@ -301,27 +301,27 @@ static void handle_delayed_updates(struct file_list *flist, char *local_name)
 			} else {
 				if (remove_source_files
 				 || (preserve_hard_links && F_IS_HLINKED(file)))
-					send_msg_int(MSG_SUCCESS, i);
+					send_msg_int(MSG_SUCCESS, ndx);
 				handle_partial_dir(partialptr, PDIR_DELETE);
 			}
 		}
 	}
 }
 
-static int get_next_gen_i(int batch_gen_fd, int next_gen_i, int desired_i)
+static int get_next_gen_ndx(int batch_gen_fd, int next_gen_ndx, int desired_ndx)
 {
-	while (next_gen_i < desired_i) {
-		if (next_gen_i >= 0) {
+	while (next_gen_ndx < desired_ndx) {
+		if (next_gen_ndx >= 0) {
 			rprintf(FINFO,
 				"(No batched update for%s \"%s\")\n",
 				phase ? " resend of" : "",
-				f_name(the_file_list->files[next_gen_i], NULL));
+				f_name(the_file_list->files[next_gen_ndx], NULL));
 		}
-		next_gen_i = read_int(batch_gen_fd);
-		if (next_gen_i == -1)
-			next_gen_i = the_file_list->count;
+		next_gen_ndx = read_int(batch_gen_fd);
+		if (next_gen_ndx == -1)
+			next_gen_ndx = the_file_list->count;
 	}
-	return next_gen_i;
+	return next_gen_ndx;
 }
 
 
@@ -331,7 +331,7 @@ static int get_next_gen_i(int batch_gen_fd, int next_gen_i, int desired_i)
  * Receiver process runs on the same host as the generator process. */
 int recv_files(int f_in, struct file_list *flist, char *local_name)
 {
-	int next_gen_i = -1;
+	int next_gen_ndx = -1;
 	int fd1,fd2;
 	STRUCT_STAT st;
 	int iflags, xlen;
@@ -347,10 +347,10 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 	int itemizing = am_server ? logfile_format_has_i : stdout_format_has_i;
 	enum logcode log_code = log_before_transfer ? FLOG : FINFO;
 	int max_phase = protocol_version >= 29 ? 2 : 1;
-	int i, recv_ok;
+	int ndx, recv_ok;
 
 	if (verbose > 2)
-		rprintf(FINFO,"recv_files(%d) starting\n",flist->count);
+		rprintf(FINFO, "recv_files(%d) starting\n", flist->count);
 
 	if (flist->hlink_pool) {
 		pool_destroy(flist->hlink_pool);
@@ -365,12 +365,12 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 	while (1) {
 		cleanup_disable();
 
-		i = read_int(f_in);
-		if (i == NDX_DONE) {
+		ndx = read_int(f_in);
+		if (ndx == NDX_DONE) {
 			if (read_batch) {
-				get_next_gen_i(batch_gen_fd, next_gen_i,
-					       flist->count);
-				next_gen_i = -1;
+				get_next_gen_ndx(batch_gen_fd, next_gen_ndx,
+						 flist->count);
+				next_gen_ndx = -1;
 			}
 			if (++phase > max_phase)
 				break;
@@ -389,12 +389,12 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			continue;
 		}
 
-		iflags = read_item_attrs(f_in, -1, i, &fnamecmp_type,
+		iflags = read_item_attrs(f_in, -1, ndx, &fnamecmp_type,
 					 xname, &xlen);
 		if (iflags == ITEM_IS_NEW) /* no-op packet */
 			continue;
 
-		file = flist->files[i];
+		file = flist->files[ndx];
 		fname = local_name ? local_name : f_name(file, fbuf);
 
 		if (verbose > 2)
@@ -411,7 +411,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		stats.current_file_index = i;
+		stats.current_file_index = ndx;
 		stats.num_transferred_files++;
 		stats.total_transferred_size += F_LENGTH(file);
 		cleanup_got_literal = 0;
@@ -436,15 +436,15 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		}
 
 		if (read_batch) {
-			next_gen_i = get_next_gen_i(batch_gen_fd, next_gen_i, i);
-			if (i < next_gen_i) {
+			next_gen_ndx = get_next_gen_ndx(batch_gen_fd, next_gen_ndx, ndx);
+			if (ndx < next_gen_ndx) {
 				rprintf(FINFO,
 					"(Skipping batched update for \"%s\")\n",
 					fname);
 				discard_receive_data(f_in, F_LENGTH(file));
 				continue;
 			}
-			next_gen_i = -1;
+			next_gen_ndx = -1;
 		}
 
 		partialptr = partial_dir ? partial_dir_fname(fname) : fname;
@@ -640,7 +640,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 			finish_transfer(partialptr, fnametmp, NULL,
 					file, recv_ok, !partial_dir);
 			if (delay_updates && recv_ok) {
-				bitbag_set_bit(delayed_bits, i);
+				bitbag_set_bit(delayed_bits, ndx);
 				recv_ok = -1;
 			}
 		} else {
@@ -653,7 +653,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		if (recv_ok > 0) {
 			if (remove_source_files
 			 || (preserve_hard_links && F_IS_HLINKED(file)))
-				send_msg_int(MSG_SUCCESS, i);
+				send_msg_int(MSG_SUCCESS, ndx);
 		} else if (!recv_ok) {
 			enum logcode msgtype = phase || read_batch ? FERROR : FINFO;
 			if (msgtype == FERROR || verbose) {
@@ -676,7 +676,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 					errstr, fname, keptstr, redostr);
 			}
 			if (!phase)
-				send_msg_int(MSG_REDO, i);
+				send_msg_int(MSG_REDO, ndx);
 		}
 	}
 	make_backups = save_make_backups;
