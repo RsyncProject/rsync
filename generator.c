@@ -712,6 +712,7 @@ static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
 	return lowest_j;
 }
 
+#ifdef SUPPORT_HARD_LINKS
 void check_for_finished_hlinks(int itemizing, enum logcode code)
 {
 	struct file_struct *file;
@@ -728,6 +729,7 @@ void check_for_finished_hlinks(int itemizing, enum logcode code)
 		hard_link_cluster(file, ndx, itemizing, code, -1);
 	}
 }
+#endif
 
 /* This is only called for regular files.  We return -2 if we've finished
  * handling the file, -1 if no dest-linking occurred, or a non-negative
@@ -816,8 +818,10 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			rprintf(code, "%s%s\n", fname,
 				match_level == 3 ? " is uptodate" : "");
 		}
+#ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_IS_HLINKED(file))
 			hard_link_cluster(file, ndx, itemizing, code, j);
+#endif
 		return -2;
 	}
 
@@ -1155,10 +1159,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
+#ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && F_IS_HLINKED(file)
 	    && hard_link_check(file, ndx, fname, statret, &st,
 			       itemizing, code, HL_CHECK_MASTER))
 		return;
+#endif
 
 	if (preserve_links && S_ISLNK(file->mode)) {
 #ifdef SUPPORT_LINKS
@@ -1185,8 +1191,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				if (itemizing)
 					itemize(file, ndx, 0, &st, 0, 0, NULL);
 				set_file_attrs(fname, file, &st, maybe_ATTRS_REPORT);
+#ifdef SUPPORT_HARD_LINKS
 				if (preserve_hard_links && F_IS_HLINKED(file))
 					hard_link_cluster(file, ndx, itemizing, code, -1);
+#endif
 				if (remove_source_files == 1)
 					goto return_with_success;
 				return;
@@ -1211,10 +1219,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			} else if (j >= 0)
 				statret = 1;
 		}
+#ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_IS_HLINKED(file)
 		    && hard_link_check(file, ndx, fname, -1, &st,
 				       itemizing, code, HL_SKIP))
 			return;
+#endif
 		if (do_symlink(sl, fname) != 0) {
 			rsyserr(FERROR, errno, "symlink %s -> \"%s\" failed",
 				full_fname(fname), sl);
@@ -1226,8 +1236,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 			if (code != FNONE && verbose)
 				rprintf(code, "%s -> %s\n", fname, sl);
+#ifdef SUPPORT_HARD_LINKS
 			if (preserve_hard_links && F_IS_HLINKED(file))
 				hard_link_cluster(file, ndx, itemizing, code, -1);
+#endif
 			/* This does not check remove_source_files == 1
 			 * because this is one of the items that the old
 			 * --remove-sent-files option would remove. */
@@ -1259,8 +1271,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				if (itemizing)
 					itemize(file, ndx, 0, &st, 0, 0, NULL);
 				set_file_attrs(fname, file, &st, maybe_ATTRS_REPORT);
+#ifdef SUPPORT_HARD_LINKS
 				if (preserve_hard_links && F_IS_HLINKED(file))
 					hard_link_cluster(file, ndx, itemizing, code, -1);
+#endif
 				if (remove_source_files == 1)
 					goto return_with_success;
 				return;
@@ -1283,10 +1297,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			} else if (j >= 0)
 				statret = 1;
 		}
+#ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_IS_HLINKED(file)
 		    && hard_link_check(file, ndx, fname, -1, &st,
 				       itemizing, code, HL_SKIP))
 			return;
+#endif
 		if (verbose > 2) {
 			rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",
 				fname, (int)file->mode, (int)rdev);
@@ -1302,8 +1318,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 			if (code != FNONE && verbose)
 				rprintf(code, "%s\n", fname);
+#ifdef SUPPORT_HARD_LINKS
 			if (preserve_hard_links && F_IS_HLINKED(file))
 				hard_link_cluster(file, ndx, itemizing, code, -1);
+#endif
 			if (remove_source_files == 1)
 				goto return_with_success;
 		}
@@ -1400,10 +1418,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (statret != 0) {
+#ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_IS_HLINKED(file)
 		    && hard_link_check(file, ndx, fname, statret, &st,
 				       itemizing, code, HL_SKIP))
 			return;
+#endif
 		if (stat_errno == ENOENT)
 			goto notify_others;
 		rsyserr(FERROR, stat_errno, "recv_generator: failed to stat %s",
@@ -1428,8 +1448,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				0, 0, NULL);
 		}
 		set_file_attrs(fname, file, &st, maybe_ATTRS_REPORT);
+#ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_IS_HLINKED(file))
 			hard_link_cluster(file, ndx, itemizing, code, -1);
+#endif
 		if (remove_source_files != 1)
 			return;
 	  return_with_success:
@@ -1463,10 +1485,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			full_fname(fnamecmp));
 	  pretend_missing:
 		/* pretend the file didn't exist */
+#ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_IS_HLINKED(file)
 		    && hard_link_check(file, ndx, fname, statret, &st,
 				       itemizing, code, HL_SKIP))
 			return;
+#endif
 		statret = real_ret = -1;
 		goto notify_others;
 	}
@@ -1523,8 +1547,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (!do_xfers) {
+#ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_IS_HLINKED(file))
 			hard_link_cluster(file, ndx, itemizing, code, -1);
+#endif
 		return;
 	}
 	if (read_batch)
@@ -1639,8 +1665,10 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		}
 #endif
 
+#ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links)
 			check_for_finished_hlinks(itemizing, code);
+#endif
 
 		if (allowed_lull && !(i % lull_mod))
 			maybe_send_keepalive();

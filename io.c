@@ -336,8 +336,10 @@ void increment_active_files(int ndx, int itemizing, enum logcode code)
 {
 	/* TODO: tune these limits? */
 	while (active_filecnt >= (active_bytecnt >= 128*1024 ? 10 : 50)) {
+#ifdef SUPPORT_HARD_LINKS
 		if (hlink_list.head)
 			check_for_finished_hlinks(itemizing, code);
+#endif
 		read_msg_fd();
 	}
 
@@ -415,8 +417,10 @@ void send_msg_int(enum msgcode code, int num)
 int get_redo_num(int itemizing, enum logcode code)
 {
 	while (1) {
+#ifdef SUPPORT_HARD_LINKS
 		if (hlink_list.head)
 			check_for_finished_hlinks(itemizing, code);
+#endif
 		if (redo_list.head)
 			break;
 		read_msg_fd();

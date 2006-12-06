@@ -695,8 +695,10 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	 * points to an identical file won't be replaced by the referent. */
 	copy_links = copy_dirlinks = 0;
 
+#ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links)
 		init_hard_links();
+#endif
 
 	if (fd_pair(error_pipe) < 0) {
 		rsyserr(FERROR, errno, "pipe failed in do_recv");
