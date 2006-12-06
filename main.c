@@ -103,7 +103,11 @@ static void show_malloc_stats(void);
  * remember_children(), we succeed instead of returning an error. */
 pid_t wait_process(pid_t pid, int *status_ptr, int flags)
 {
-	pid_t waited_pid = waitpid(pid, status_ptr, flags);
+	pid_t waited_pid;
+	
+	do {
+		waited_pid = waitpid(pid, status_ptr, flags);
+	} while (waited_pid == -1 && errno == EINTR);
 
 	if (waited_pid == -1 && errno == ECHILD) {
 		/* Status of requested child no longer available:  check to
