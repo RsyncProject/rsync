@@ -11,6 +11,10 @@ Changes since 2.6.9:
       option.  Prior versions used to output too many creation events for
       matching items.
 
+    - The code that waits for a child pid now handles being interrupted by
+      a signal.  This fixes a problem with the pre-xfer exec function not
+      being able to get the exit status from the script.
+
     - A negated filter rule now sends the negation option when sending the
       filter rules.
 
