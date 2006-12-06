@@ -122,11 +122,9 @@ static void link_idev_data(void)
 	the_file_list->hlink_pool = hlink_pool;
 	pool_destroy(idev_pool);
 }
-#endif
 
 void init_hard_links(void)
 {
-#ifdef SUPPORT_HARD_LINKS
 	int i;
 
 	if (hlink_list)
@@ -149,20 +147,18 @@ void init_hard_links(void)
 		hlink_list = NULL;
 	} else
 		link_idev_data();
-#endif
 }
 
-#ifdef SUPPORT_HARD_LINKS
 static int maybe_hard_link(struct file_struct *file, int ndx,
-			   char *fname, int statret, STRUCT_STAT *st,
-			   char *toname, STRUCT_STAT *to_st,
+			   const char *fname, int statret, STRUCT_STAT *stp,
+			   const char *toname, STRUCT_STAT *to_stp,
 			   int itemizing, enum logcode code)
 {
 	if (statret == 0) {
-		if (st->st_dev == to_st->st_dev
-		 && st->st_ino == to_st->st_ino) {
+		if (stp->st_dev == to_stp->st_dev
+		 && stp->st_ino == to_stp->st_ino) {
 			if (itemizing) {
-				itemize(file, ndx, statret, st,
+				itemize(file, ndx, statret, stp,
 					ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS,
 					0, "");
 			}
@@ -177,16 +173,14 @@ static int maybe_hard_link(struct file_struct *file, int ndx,
 			return -1;
 		}
 	}
-	return hard_link_one(file, ndx, fname, statret, st, toname,
+	return hard_link_one(file, ndx, fname, statret, stp, toname,
 			     0, itemizing, code);
 }
-#endif
 
-int hard_link_check(struct file_struct *file, int ndx, char *fname,
-		    int statret, STRUCT_STAT *st, int itemizing,
+int hard_link_check(struct file_struct *file, int ndx, const char *fname,
+		    int statret, STRUCT_STAT *stp, int itemizing,
 		    enum logcode code, int skip)
 {
-#ifdef SUPPORT_HARD_LINKS
 	int head;
 	struct hlist *hl = F_HLIST(file);
 
@@ -227,7 +221,7 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 						 || st2.st_ino != st3.st_ino)
 							continue;
 						statret = 1;
-						st = &st3;
+						stp = &st3;
 						if (verbose < 2 || !stdout_format_has_i) {
 							itemizing = 0;
 							code = FNONE;
@@ -237,12 +231,12 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 					if (!unchanged_file(cmpbuf, file, &st3))
 						continue;
 					statret = 1;
-					st = &st3;
+					stp = &st3;
 					if (unchanged_attrs(file, &st3))
 						break;
 				} while (basis_dir[++j] != NULL);
 			}
-			maybe_hard_link(file, ndx, fname, statret, st,
+			maybe_hard_link(file, ndx, fname, statret, stp,
 					toname, &st2, itemizing, code);
 			if (remove_source_files == 1 && do_xfers)
 				send_msg_int(MSG_SUCCESS, ndx);
@@ -251,13 +245,11 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 			hl->hlindex = SKIPPED_LINK;
 		return 1;
 	}
-#endif
 	return 0;
 }
 
-#ifdef SUPPORT_HARD_LINKS
-int hard_link_one(struct file_struct *file, int ndx, char *fname,
-		  int statret, STRUCT_STAT *st, char *toname, int terse,
+int hard_link_one(struct file_struct *file, int ndx, const char *fname,
+		  int statret, STRUCT_STAT *stp, const char *toname, int terse,
 		  int itemizing, enum logcode code)
 {
 	if (do_link(toname, fname)) {
@@ -273,7 +265,7 @@ int hard_link_one(struct file_struct *file, int ndx, char *fname,
 	}
 
 	if (itemizing) {
-		itemize(file, ndx, statret, st,
+		itemize(file, ndx, statret, stp,
 			ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS, 0,
 			terse ? "" : toname);
 	}
@@ -281,13 +273,10 @@ int hard_link_one(struct file_struct *file, int ndx, char *fname,
 		rprintf(code, "%s => %s\n", fname, toname);
 	return 0;
 }
-#endif
-
 
 void hard_link_cluster(struct file_struct *file, int master, int itemizing,
 		       enum logcode code, int dest_used)
 {
-#ifdef SUPPORT_HARD_LINKS
 	char hlink1[MAXPATHLEN];
 	char *hlink2;
 	STRUCT_STAT st1, st2;
@@ -320,5 +309,5 @@ void hard_link_cluster(struct file_struct *file, int master, int itemizing,
 			send_msg_int(MSG_SUCCESS, ndx);
 		hl->hlindex = FINISHED_LINK;
 	} while (!(file->flags & FLAG_HLINK_LAST));
-#endif
 }
+#endif
