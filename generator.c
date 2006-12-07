@@ -1304,8 +1304,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			return;
 #endif
 		if (verbose > 2) {
-			rprintf(FINFO,"mknod(%s,0%o,0x%x)\n",
-				fname, (int)file->mode, (int)rdev);
+			rprintf(FINFO, "mknod(%s, 0%o, [%ld,%ld])\n",
+				fname, (int)file->mode,
+				(long)major(rdev), (long)minor(rdev));
 		}
 		if (do_mknod(fname, file->mode, rdev) < 0) {
 			rsyserr(FERROR, errno, "mknod %s failed",
@@ -1689,7 +1690,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	make_backups = 0; /* avoid a duplicate backup for inplace processing */
 
 	if (verbose > 2)
-		rprintf(FINFO,"generate_files phase=%d\n",phase);
+		rprintf(FINFO, "generate_files phase=%d\n", phase);
 
 	write_int(f_out, NDX_DONE);
 
@@ -1711,7 +1712,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	make_backups = save_make_backups;
 
 	if (verbose > 2)
-		rprintf(FINFO,"generate_files phase=%d\n",phase);
+		rprintf(FINFO, "generate_files phase=%d\n", phase);
 
 	write_int(f_out, NDX_DONE);
 	/* Reduce round-trip lag-time for a useless delay-updates phase. */
@@ -1776,5 +1777,5 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	}
 
 	if (verbose > 2)
-		rprintf(FINFO,"generate_files finished\n");
+		rprintf(FINFO, "generate_files finished\n");
 }
