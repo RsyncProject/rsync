@@ -1613,6 +1613,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		maybe_ATTRS_REPORT = ATTRS_REPORT;
 		code = FINFO;
 	}
+	solo_file = local_name != NULL;
 
 	if (verbose > 2) {
 		rprintf(FINFO, "generator starting pid=%ld count=%d\n",
