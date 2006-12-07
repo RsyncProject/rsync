@@ -513,6 +513,7 @@ struct file_struct {
 		uid_t gid;           /* The group ID number or GID_NONE */
 		struct idev *idev;   /* The hard-link info during matching */
 		struct hlist *hlist; /* The hard-link info after matching */
+		int32 num;           /* A signed number */
 		uint32 unum;         /* An unsigned number */
 	} extras[1];
 	time_t modtime;              /* When the item was last modified */
@@ -537,6 +538,7 @@ extern int preserve_gid;
 
 #define REQ_EXTRA(f,ndx) ((f)->extras - (ndx - 1))
 #define OPT_EXTRA(f,bump) ((f)->extras - flist_extra_cnt - (bump))
+
 #define LEN64_BUMP(f) ((f)->flags & FLAG_LENGTH64 ? 1 : 0)
 #define HLINK_BUMP(f) (F_IS_HLINKED(f) ? 1 : 0)
 
@@ -552,22 +554,24 @@ extern int preserve_gid;
 #define F_UID(f) REQ_EXTRA(f, preserve_uid)->uid
 #define F_GID(f) REQ_EXTRA(f, preserve_gid)->gid
 
-/* These are per-entry optional and mutally exclusive: */
-#define F_IDEV(f)  OPT_EXTRA(f, LEN64_BUMP(f))->idev
-#define F_HLIST(f) OPT_EXTRA(f, LEN64_BUMP(f))->hlist
+/* These items are per-entry optional and mutally exclusive: */
+#define F_HL_IDEV(f) OPT_EXTRA(f, LEN64_BUMP(f))->idev
+#define F_HL_LIST(f) OPT_EXTRA(f, LEN64_BUMP(f))->hlist
 
-/* These are per-entry optional, but always both or neither:
- * (Note: a device doesn't need to use LEN64_BUMP(f).) */
-#define F_DMAJOR(f) OPT_EXTRA(f, HLINK_BUMP(f))->unum
-#define F_DMINOR(f) OPT_EXTRA(f, HLINK_BUMP(f) + 1)->unum
+/* This optional item might follow an F_HL_*() item.
+ * (Note: a device doesn't need to check LEN64_BUMP(f).) */
+#define F_RDEV_P(f) (&OPT_EXTRA(f, HLINK_BUMP(f) + 2 - 1)->unum)
 
 /* The sum is only present on regular files. */
 #define F_SUM(f) ((const char*)OPT_EXTRA(f, LEN64_BUMP(f) + HLINK_BUMP(f) \
 					  + SUM_EXTRA_CNT - 1))
 
-/* A couple bool-type utility functions: */
+/* Some utility defines: */
 #define F_IS_HLINKED(f) ((f)->flags & FLAG_HLINKED)
 #define F_IS_ACTIVE(f) F_BASENAME(f)[0]
+
+#define DEV_MAJOR(a) (a)[0]
+#define DEV_MINOR(a) (a)[1]
 
 /*
  * Start the flist array at FLIST_START entries and grow it
