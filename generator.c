@@ -98,6 +98,7 @@ int non_perishable_cnt = 0;
 
 static int deletion_count = 0; /* used to implement --max-delete */
 static FILE *delete_delay_fp = NULL;
+static BOOL solo_file = 0;
 
 /* For calling delete_item() and delete_dir_contents(). */
 #define DEL_RECURSE		(1<<1) /* recurse */
@@ -838,6 +839,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 	char lnk[MAXPATHLEN];
 	int best_match = -1;
 	int match_level = 0;
+	uint32 *devp;
 	enum nonregtype type;
 	int len, j = 0;
 
@@ -895,7 +897,8 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			break;
 		case TYPE_SPECIAL:
 		case TYPE_DEVICE:
-			if (stp->st_rdev != MAKEDEV(F_DMAJOR(file), F_DMINOR(file)))
+			devp = F_RDEV_P(file);
+			if (stp->st_rdev != MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp)))
 				continue;
 			break;
 #ifdef SUPPORT_LINKS
@@ -1171,7 +1174,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		const char *sl = F_SYMLINK(file);
 		if (safe_symlinks && unsafe_symlink(sl, fname)) {
 			if (verbose) {
-				if (the_file_list->count == 1)
+				if (solo_file)
 					fname = f_name(file, NULL);
 				rprintf(FINFO,
 					"ignoring unsafe symlink %s -> \"%s\"\n",
@@ -1252,7 +1255,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
 	 || (preserve_specials && IS_SPECIAL(file->mode))) {
-		dev_t rdev = MAKEDEV(F_DMAJOR(file), F_DMINOR(file));
+		uint32 *devp = F_RDEV_P(file);
+		dev_t rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
 		if (statret == 0) {
 			char *t;
 			if (IS_DEVICE(file->mode)) {
@@ -1330,7 +1334,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (!S_ISREG(file->mode)) {
-		if (the_file_list->count == 1)
+		if (solo_file)
 			fname = f_name(file, NULL);
 		rprintf(FINFO, "skipping non-regular file \"%s\"\n", fname);
 		return;
@@ -1338,7 +1342,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (max_size && F_LENGTH(file) > max_size) {
 		if (verbose > 1) {
-			if (the_file_list->count == 1)
+			if (solo_file)
 				fname = f_name(file, NULL);
 			rprintf(FINFO, "%s is over max-size\n", fname);
 		}
@@ -1346,7 +1350,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 	if (min_size && F_LENGTH(file) < min_size) {
 		if (verbose > 1) {
-			if (the_file_list->count == 1)
+			if (solo_file)
 				fname = f_name(file, NULL);
 			rprintf(FINFO, "%s is under min-size\n", fname);
 		}
