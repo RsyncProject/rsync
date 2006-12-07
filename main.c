@@ -630,7 +630,6 @@ static void read_final_goodbye(int f_in, int f_out)
 	}
 }
 
-
 static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 {
 	struct file_list *flist;
@@ -671,9 +670,8 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 	}
 
 	flist = send_file_list(f_out,argc,argv);
-	if (!flist || flist->count == 0) {
+	if (!flist || flist->count == 0)
 		exit_cleanup(0);
-	}
 	the_file_list = flist;
 
 	io_start_buffering_in();
@@ -783,7 +781,6 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	wait_process_with_flush(pid, &exit_code);
 	return exit_code;
 }
-
 
 static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 {
@@ -905,12 +902,10 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
 		if (need_messages_from_generator)
 			io_start_multiplex_in();
-
 		recv_filter_list(f_in);
 		do_server_sender(f_in, f_out, argc, argv);
-	} else {
+	} else
 		do_server_recv(f_in, f_out, argc, argv);
-	}
 	exit_cleanup(0);
 }
 
@@ -1023,7 +1018,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	return MAX(exit_code, exit_code2);
 }
 
-static int copy_argv (char *argv[])
+static int copy_argv(char *argv[])
 {
 	int i;
 
