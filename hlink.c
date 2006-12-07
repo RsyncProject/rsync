@@ -45,8 +45,8 @@ static int hlink_compare(int *int1, int *int2)
 {
 	struct file_struct *f1 = FPTR(*int1);
 	struct file_struct *f2 = FPTR(*int2);
-	struct idev *i1 = F_IDEV(f1);
-	struct idev *i2 = F_IDEV(f2);
+	struct idev *i1 = F_HL_IDEV(f1);
+	struct idev *i2 = F_HL_IDEV(f2);
 
 	if (i1->dev != i2->dev)
 		return i1->dev > i2->dev ? 1 : -1;
@@ -76,12 +76,12 @@ static void link_idev_data(void)
 
 	for (from = to = 0; from < hlink_count; from++) {
 		start = from;
-		for (file = FPTR(hlink_list[from]), idev = F_IDEV(file);
+		for (file = FPTR(hlink_list[from]), idev = F_HL_IDEV(file);
 		     from < hlink_count-1;
 		     file = file_next, idev = idev_next)
 		{
 			file_next = FPTR(hlink_list[from+1]);
-			idev_next = F_IDEV(file_next);
+			idev_next = F_HL_IDEV(file_next);
 			if (!LINKED(idev, idev_next))
 				break;
 			pool_free(idev_pool, 0, idev);
@@ -90,7 +90,7 @@ static void link_idev_data(void)
 			hl->hlindex = to;
 			hl->next = hlink_list[++from];
 			hl->dest_used = 0;
-			F_HLIST(file) = hl;
+			F_HL_LIST(file) = hl;
 		}
 		pool_free(idev_pool, 0, idev);
 		if (from > start) {
@@ -103,7 +103,7 @@ static void link_idev_data(void)
 			hl->dest_used = 0;
 			hlink_list[to++] = head;
 			file->flags |= FLAG_HLINK_LAST;
-			F_HLIST(file) = hl;
+			F_HL_LIST(file) = hl;
 		} else
 			file->flags &= ~FLAG_HLINKED;
 	}
@@ -182,7 +182,7 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 		    enum logcode code, int skip)
 {
 	int head;
-	struct hlist *hl = F_HLIST(file);
+	struct hlist *hl = F_HL_LIST(file);
 
 	if (skip && !(file->flags & FLAG_HLINK_LAST))
 		head = hlink_list[hl->hlindex] = hl->next;
@@ -190,7 +190,7 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 		head = hlink_list[hl->hlindex];
 	if (ndx != head) {
 		struct file_struct *head_file = FPTR(head);
-		struct hlist *hf_hl = F_HLIST(head_file);
+		struct hlist *hf_hl = F_HL_LIST(head_file);
 		if (!stdout_format_has_i && verbose > 1) {
 			rprintf(FINFO, "\"%s\" is a hard link\n",
 				f_name(file, NULL));
@@ -281,7 +281,7 @@ void hard_link_cluster(struct file_struct *file, int master, int itemizing,
 	char *hlink2;
 	STRUCT_STAT st1, st2;
 	int statret, ndx = master;
-	struct hlist *hl = F_HLIST(file);
+	struct hlist *hl = F_HL_LIST(file);
 
 	hl->hlindex = FINISHED_LINK;
 	if (dry_run)
@@ -292,13 +292,13 @@ void hard_link_cluster(struct file_struct *file, int master, int itemizing,
 		while (!(file->flags & FLAG_HLINK_LAST)) {
 			ndx = hl->next;
 			file = FPTR(ndx);
-			hl = F_HLIST(file);
+			hl = F_HL_LIST(file);
 		}
 	}
 	do {
 		ndx = hl->next;
 		file = FPTR(ndx);
-		hl = F_HLIST(file);
+		hl = F_HL_LIST(file);
 		if (hl->hlindex != SKIPPED_LINK)
 			continue;
 		hlink2 = f_name(file, NULL);
