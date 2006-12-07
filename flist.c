@@ -613,11 +613,11 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		linkname_len = 0;
 
 #ifdef SUPPORT_HARD_LINKS
-	if (preserve_hard_links && protocol_version < 28 && S_ISREG(mode))
-		flags |= XMIT_HAS_IDEV_DATA;
-	if (flags & XMIT_HAS_IDEV_DATA) {
-		extra_len += EXTRA_LEN;
-		assert(flist->hlink_pool != NULL);
+	if (preserve_hard_links) {
+		if (protocol_version < 28 && S_ISREG(mode))
+			flags |= XMIT_HAS_IDEV_DATA;
+		if (flags & XMIT_HAS_IDEV_DATA)
+			extra_len += EXTRA_LEN;
 	}
 #endif
 
@@ -692,8 +692,9 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 
 	if ((preserve_devices && IS_DEVICE(mode))
 	 || (preserve_specials && IS_SPECIAL(mode))) {
-		F_DMAJOR(file) = major(rdev);
-		F_DMINOR(file) = minor(rdev);
+		uint32 *devp = F_RDEV_P(file);
+		DEV_MAJOR(devp) = major(rdev);
+		DEV_MINOR(devp) = minor(rdev);
 	}
 
 #ifdef SUPPORT_LINKS
@@ -706,10 +707,10 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 #endif
 
 #ifdef SUPPORT_HARD_LINKS
-	if (flags & XMIT_HAS_IDEV_DATA) {
+	if (preserve_hard_links && flags & XMIT_HAS_IDEV_DATA) {
 		struct idev *idevp = pool_talloc(flist->hlink_pool, struct idev,
 						 1, "inode_table");
-		F_IDEV(file) = idevp;
+		F_HL_IDEV(file) = idevp;
 		if (protocol_version < 26) {
 			idevp->dev = read_int(f);
 			idevp->ino = read_int(f);
@@ -1508,9 +1509,7 @@ void clear_file(struct file_struct *file)
 	file->len32 = file->dir.depth = 1;
 }
 
-/*
- * allocate a new file list
- */
+/* Allocate a new file list. */
 struct file_list *flist_new(int with_hlink, char *msg)
 {
 	struct file_list *flist;
@@ -1535,9 +1534,7 @@ struct file_list *flist_new(int with_hlink, char *msg)
 	return flist;
 }
 
-/*
- * free up all elements in a flist
- */
+/* Free up all elements in a flist. */
 void flist_free(struct file_list *flist)
 {
 	pool_destroy(flist->file_pool);
