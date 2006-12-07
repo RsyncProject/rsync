@@ -192,7 +192,8 @@ static int keep_backup(const char *fname)
 	/* Check to see if this is a device file, or link */
 	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
 	 || (preserve_specials && IS_SPECIAL(file->mode))) {
-		dev_t rdev = MAKEDEV(F_DMAJOR(file), F_DMINOR(file));
+		uint32 *devp = F_RDEV_P(file);
+		dev_t rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
 		do_unlink(buf);
 		if (do_mknod(buf, file->mode, rdev) < 0
 		    && (errno != ENOENT || make_bak_dir(buf) < 0
