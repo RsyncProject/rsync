@@ -97,7 +97,9 @@ int ignore_perishable = 0;
 int non_perishable_cnt = 0;
 
 static int deletion_count = 0; /* used to implement --max-delete */
-static FILE *delete_delay_fp = NULL;
+static int deldelay_size = 0, deldelay_cnt = 0;
+static char *deldelay_buf = NULL;
+static int deldelay_fd = -1;
 static BOOL solo_file = 0;
 
 /* For calling delete_item() and delete_dir_contents(). */
@@ -267,67 +269,135 @@ static enum delret delete_dir_contents(char *fname, int flags)
 	return ret;
 }
 
-static void start_delete_temp(void)
+static int start_delete_delay_temp(void)
 {
 	char fnametmp[MAXPATHLEN];
-	int fd, save_dry_run = dry_run;
+	int save_dry_run = dry_run;
 
 	dry_run = 0;
 	if (!get_tmpname(fnametmp, "deldelay")
-	 || (fd = do_mkstemp(fnametmp, 0600)) < 0
-	 || !(delete_delay_fp = fdopen(fd, "w+"))) {
-		rprintf(FERROR, "Unable to create delete-delay temp file.\n");
-		exit_cleanup(RERR_FILEIO);
+	 || (deldelay_fd = do_mkstemp(fnametmp, 0600)) < 0) {
+		rprintf(FINFO, "NOTE: Unable to create delete-delay temp file--"
+			"switching to --delete-after.\n");
+		delete_during = 0;
+		delete_after = 1;
+		dry_run = save_dry_run;
+		return 0;
 	}
 	dry_run = save_dry_run;
 	unlink(fnametmp);
+	return 1;
 }
 
-static int read_delay_line(FILE *fp, char *buf, int bsize)
+static int flush_delete_delay(void)
 {
-	int ch, mode = 0;
+	if (write(deldelay_fd, deldelay_buf, deldelay_cnt) != deldelay_cnt) {
+		rsyserr(FERROR, errno, "flush of delete-delay buffer");
+		delete_during = 0;
+		delete_after = 1;
+		close(deldelay_fd);
+		return 0;
+	}
+	deldelay_cnt = 0;
+	return 1;
+}
 
-	if ((ch = fgetc(fp)) == EOF)
+static int remember_delete(struct file_struct *file, const char *fname)
+{
+	int len;
+	
+	while (1) {
+		len = snprintf(deldelay_buf + deldelay_cnt,
+			       deldelay_size - deldelay_cnt,
+			       "%x %s%c", (int)file->mode, fname, '\0');
+		if ((deldelay_cnt += len) <= deldelay_size)
+			break;
+		if (deldelay_fd < 0 && !start_delete_delay_temp())
+			return 0;
+		deldelay_cnt -= len;
+		if (!flush_delete_delay())
+			return 0;
+	}
+
+	return 1;
+}
+
+static int read_delay_line(char *buf)
+{
+	static int read_pos = 0;
+	int j, len, mode;
+	char *bp, *past_space;
+
+	while (1) {
+		for (j = read_pos; j < deldelay_cnt && deldelay_buf[j]; j++) {}
+		if (j < deldelay_cnt)
+			break;
+		if (deldelay_fd < 0) {
+			if (j > read_pos)
+				goto invalid_data;
+			return -1;
+		}
+		deldelay_cnt -= read_pos;
+		if (deldelay_cnt == deldelay_size)
+			goto invalid_data;
+		if (deldelay_cnt && read_pos) {
+			memmove(deldelay_buf, deldelay_buf + read_pos,
+				deldelay_cnt);
+		}
+		len = read(deldelay_fd, deldelay_buf + deldelay_cnt,
+			   deldelay_size - deldelay_cnt);
+		if (len == 0) {
+			if (deldelay_cnt) {
+				rprintf(FERROR,
+				    "ERROR: unexpected EOF in delete-delay file.\n");
+			}
+			return -1;
+		}
+		if (len < 0) {
+			rsyserr(FERROR, errno,
+				"reading delete-delay file");
+			return -1;
+		}
+		deldelay_cnt += len;
+		read_pos = 0;
+	}
+
+	bp = deldelay_buf + read_pos;
+
+	if (sscanf(bp, "%x ", &mode) != 1) {
+	  invalid_data:
+		rprintf(FERROR, "ERROR: invalid data in delete-delay file.\n");
 		return -1;
+	}
+	past_space = strchr(bp, ' ') + 1;
+	len = j - read_pos - (past_space - bp) + 1; /* count the '\0' */
+	read_pos = j + 1;
 
-	while (1) {
-		if (ch == ' ')
-			break;
-		if (ch > '7' || ch < '0') {
-			rprintf(FERROR, "invalid data in delete-delay file.\n");
-			exit_cleanup(RERR_FILEIO);
-		}
-		mode = mode*8 + ch - '0';
-		if ((ch = fgetc(fp)) == EOF) {
-		  unexpected_eof:
-			rprintf(FERROR, "unexpected EOF in delete-delay file.\n");
-			exit_cleanup(RERR_FILEIO);
-		}
+	if (len > MAXPATHLEN) {
+		rprintf(FERROR, "ERROR: filename too long in delete-delay file.\n");
+		return -1;
 	}
 
-	while (1) {
-		if ((ch = fgetc(fp)) == EOF)
-			goto unexpected_eof;
-		if (bsize-- <= 0) {
-			rprintf(FERROR, "filename too long in delete-delay file.\n");
-			exit_cleanup(RERR_FILEIO);
-		}
-		*buf++ = (char)ch;
-		if (ch == '\0')
-			break;
-	}
+	/* The caller needs the name in a MAXPATHLEN buffer, so we copy it
+	 * instead of returning a pointer to our buffer. */
+	memcpy(buf, past_space, len);
 
 	return mode;
 }
 
-static void delayed_deletions(char *delbuf)
+static void do_delayed_deletions(char *delbuf)
 {
 	int mode;
 
-	fseek(delete_delay_fp, 0, 0);
-	while ((mode = read_delay_line(delete_delay_fp, delbuf, MAXPATHLEN)) >= 0)
+	if (deldelay_fd >= 0) {
+		if (deldelay_cnt && !flush_delete_delay())
+			return;
+		lseek(deldelay_fd, 0, 0);
+	}
+	while ((mode = read_delay_line(delbuf)) >= 0)
 		delete_item(delbuf, mode, NULL, DEL_RECURSE);
-	fclose(delete_delay_fp);
+	if (deldelay_fd >= 0)
+		close(deldelay_fd);
 }
 
 /* This function is used to implement per-directory deletion, and is used by
@@ -402,9 +472,10 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 		}
 		if (flist_find(flist, fp) < 0) {
 			f_name(fp, delbuf);
-			if (delete_delay_fp)
-				fprintf(delete_delay_fp, "%o %s%c", fp->mode, delbuf, '\0');
-			else
+			if (delete_during == 2) {
+				if (!remember_delete(fp, delbuf))
+					break;
+			} else
 				delete_item(delbuf, fp->mode, NULL, DEL_RECURSE);
 		}
 	}
@@ -1622,8 +1693,12 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 
 	if (delete_before && !local_name && flist->count > 0)
 		do_delete_pass(flist);
-	if (delete_during == 2)
-		start_delete_temp();
+	if (delete_during == 2) {
+		deldelay_size = BIGPATHBUFLEN * 4;
+		deldelay_buf = new_array(char, deldelay_size);
+		if (!deldelay_buf)
+			out_of_memory("delete-delay");
+	}
 	do_progress = 0;
 
 	if (append_mode || whole_file < 0)
@@ -1738,8 +1813,8 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	}
 
 	do_progress = save_do_progress;
-	if (delete_delay_fp)
-		delayed_deletions(fbuf);
+	if (delete_during == 2)
+		do_delayed_deletions(fbuf);
 	if (delete_after && !local_name && flist->count > 0)
 		do_delete_pass(flist);
 
