@@ -644,7 +644,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		file->flags |= FLAG_HLINKED;
 #endif
 	file->modtime = modtime;
-	file->len32 = file_length;
+	file->len32 = (uint32)file_length;
 	if (file_length > 0xFFFFFFFFu && S_ISREG(mode)) {
 		file->flags |= FLAG_LENGTH64;
 		OPT_EXTRA(file, 0)->unum = (uint32)(file_length >> 32);
@@ -921,7 +921,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 
 	file->flags = flags;
 	file->modtime = st.st_mtime;
-	file->len32 = st.st_size;
+	file->len32 = (uint32)st.st_size;
 	if (st.st_size > 0xFFFFFFFFu && S_ISREG(st.st_mode)) {
 		file->flags |= FLAG_LENGTH64;
 		OPT_EXTRA(file, 0)->unum = (uint32)(st.st_size >> 32);
