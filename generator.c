@@ -284,8 +284,8 @@ static int start_delete_delay_temp(void)
 		dry_run = save_dry_run;
 		return 0;
 	}
-	dry_run = save_dry_run;
 	unlink(fnametmp);
+	dry_run = save_dry_run;
 	return 1;
 }
 
@@ -520,7 +520,7 @@ static void do_delete_pass(struct file_list *flist)
 int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
 {
 	if (preserve_perms
-	 && (st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS))
+	 && (unsigned)(st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS))
 		return 0;
 
 	if (am_root && preserve_uid && st->st_uid != F_UID(file))
@@ -547,7 +547,7 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 		  && (!(iflags & ITEM_XNAME_FOLLOWS) || *xname))
 		 || (keep_time && cmp_time(file->modtime, st->st_mtime) != 0))
 			iflags |= ITEM_REPORT_TIME;
-		if ((file->mode & CHMOD_BITS) != (st->st_mode & CHMOD_BITS))
+		if ((unsigned)(st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS))
 			iflags |= ITEM_REPORT_PERMS;
 		if (preserve_uid && am_root && F_UID(file) != st->st_uid)
 			iflags |= ITEM_REPORT_OWNER;
@@ -910,8 +910,8 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 	char lnk[MAXPATHLEN];
 	int best_match = -1;
 	int match_level = 0;
-	uint32 *devp;
 	enum nonregtype type;
+	uint32 *devp;
 	int len, j = 0;
 
 #ifndef SUPPORT_LINKS
@@ -1340,7 +1340,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				t = "special file";
 			}
 			if (statret == 0
-			 && (st.st_mode & ~CHMOD_BITS) == (file->mode & ~CHMOD_BITS)
+			 && (unsigned)(st.st_mode & ~CHMOD_BITS) == (file->mode & ~CHMOD_BITS)
 			 && st.st_rdev == rdev) {
 				/* The device or special file is identical. */
 				if (itemizing)
