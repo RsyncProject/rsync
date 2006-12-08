@@ -403,7 +403,7 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 		if (flist_find(flist, fp) < 0) {
 			f_name(fp, delbuf);
 			if (delete_delay_fp)
-				fprintf(delete_delay_fp, "%o %s%c", (short)fp->mode, delbuf, '\0');
+				fprintf(delete_delay_fp, "%o %s%c", fp->mode, delbuf, '\0');
 			else
 				delete_item(delbuf, fp->mode, NULL, DEL_RECURSE);
 		}
