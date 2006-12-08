@@ -38,7 +38,7 @@ done
 echo deleted-file >"$todir/dname"
 cp -p "$todir/dname" "$chkdir"
 
-checkit "$RSYNC -avv --no-whole-file --delete-after \
+checkit "$RSYNC -avv --no-whole-file --delete-delay \
     --backup --backup-dir=\"$bakdir\" \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir" \
     | tee "$outfile"
 
