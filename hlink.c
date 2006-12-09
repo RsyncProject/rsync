@@ -30,16 +30,23 @@ extern int link_dest;
 extern int make_backups;
 extern int remove_source_files;
 extern int stdout_format_has_i;
+extern int maybe_ATTRS_REPORT;
 extern char *basis_dir[];
 extern struct file_list *the_file_list;
 
 #ifdef SUPPORT_HARD_LINKS
 
-#define SKIPPED_LINK (-1)
-#define FINISHED_LINK (-2)
+alloc_pool_t hlink_pool;
 
 #define FPTR(i) (the_file_list->files[i])
 #define LINKED(i1,i2) ((i1)->dev == (i2)->dev && (i1)->ino == (i2)->ino)
+
+void init_hard_links(void)
+{
+	if (!(hlink_pool = pool_create(HLINK_EXTENT, sizeof (struct idev),
+				       out_of_memory, POOL_INTERN)))
+		out_of_memory("init_hard_links");
+}
 
 static int hlink_compare(int *int1, int *int2)
 {
@@ -57,111 +64,76 @@ static int hlink_compare(int *int1, int *int2)
 	return f_name_cmp(f1, f2);
 }
 
-static int32 *hlink_list;
-static int32 hlink_count;
-
-/* Analyze the data in the hlink_list[], remove items that aren't multiply
- * linked, and replace the dev+inode data with the hlindex+next linked list. */
-static void link_idev_data(void)
+/* Analyze the dev+inode data in the file-list by creating a list of all
+ * the items that have hlink data, sorting them, and matching up identical
+ * values into clusters.  These will be a single linked list from last to
+ * first when we're done. */
+void match_hard_links(void)
 {
-	int32 from, to, start;
+	int32 from, prev, *ndx_list;
 	struct file_struct *file, *file_next;
 	struct idev *idev, *idev_next;
-	struct hlist *hl;
+	int i, ndx_count = 0;
 
-	alloc_pool_t hlink_pool;
-	alloc_pool_t idev_pool = the_file_list->hlink_pool;
+	if (!(ndx_list = new_array(int32, the_file_list->count)))
+		out_of_memory("match_hard_links");
 
-	hlink_pool = pool_create(128 * 1024, sizeof (struct hlist), out_of_memory, POOL_INTERN);
+	for (i = 0; i < the_file_list->count; i++) {
+		if (F_IS_HLINKED(FPTR(i)))
+			ndx_list[ndx_count++] = i;
+	}
 
-	for (from = to = 0; from < hlink_count; from++) {
-		start = from;
-		for (file = FPTR(hlink_list[from]), idev = F_HL_IDEV(file);
-		     from < hlink_count-1;
-		     file = file_next, idev = idev_next)
+	if (!ndx_count) {
+		free(ndx_list);
+		return;
+	}
+
+	qsort(ndx_list, ndx_count, sizeof ndx_list[0],
+	     (int (*)()) hlink_compare);
+
+	for (from = 0; from < ndx_count; from++) {
+		for (file = FPTR(ndx_list[from]), idev = F_HL_IDEV(file), prev = -1;
+		     from < ndx_count-1;
+		     file = file_next, idev = idev_next, prev = ndx_list[from++])
 		{
-			file_next = FPTR(hlink_list[from+1]);
+			file_next = FPTR(ndx_list[from+1]);
 			idev_next = F_HL_IDEV(file_next);
 			if (!LINKED(idev, idev_next))
 				break;
-			pool_free(idev_pool, 0, idev);
-			hl = pool_talloc(hlink_pool, struct hlist, 1,
-					 "hlink_list");
-			hl->hlindex = to;
-			hl->next = hlink_list[++from];
-			hl->dest_used = 0;
-			F_HL_LIST(file) = hl;
+			pool_free(hlink_pool, 0, idev);
+			if (prev < 0)
+				file->flags |= FLAG_HLINK_FIRST;
+			F_HL_PREV(file) = prev;
 		}
-		pool_free(idev_pool, 0, idev);
-		if (from > start) {
-			int head = hlink_list[start];
-			hl = pool_talloc(hlink_pool, struct hlist, 1,
-					 "hlink_list");
-			FPTR(head)->flags |= FLAG_HLINK_FIRST;
-			hl->hlindex = to;
-			hl->next = head;
-			hl->dest_used = 0;
-			hlink_list[to++] = head;
-			file->flags |= FLAG_HLINK_LAST;
-			F_HL_LIST(file) = hl;
-		} else
+		pool_free(hlink_pool, 0, idev);
+		if (prev < 0)
 			file->flags &= ~FLAG_HLINKED;
+		else {
+			file->flags |= FLAG_HLINK_LAST;
+			F_HL_PREV(file) = prev;
+		}
 	}
 
-	if (!to) {
-		free(hlink_list);
-		hlink_list = NULL;
-		pool_destroy(hlink_pool);
-		hlink_pool = NULL;
-	} else {
-		hlink_count = to;
-		hlink_list = realloc_array(hlink_list, int32, hlink_count);
-		if (!hlink_list)
-			out_of_memory("init_hard_links");
-	}
-	the_file_list->hlink_pool = hlink_pool;
-	pool_destroy(idev_pool);
-}
-
-void init_hard_links(void)
-{
-	int i;
-
-	if (hlink_list)
-		free(hlink_list);
-
-	if (!(hlink_list = new_array(int32, the_file_list->count)))
-		out_of_memory("init_hard_links");
-
-	hlink_count = 0;
-	for (i = 0; i < the_file_list->count; i++) {
-		if (F_IS_HLINKED(FPTR(i)))
-			hlink_list[hlink_count++] = i;
-	}
-
-	qsort(hlink_list, hlink_count,
-	    sizeof hlink_list[0], (int (*)()) hlink_compare);
-
-	if (!hlink_count) {
-		free(hlink_list);
-		hlink_list = NULL;
-	} else
-		link_idev_data();
+	pool_destroy(hlink_pool);
+	free(ndx_list);
 }
 
 static int maybe_hard_link(struct file_struct *file, int ndx,
 			   const char *fname, int statret, STRUCT_STAT *stp,
-			   const char *toname, STRUCT_STAT *to_stp,
-			   int itemizing, enum logcode code)
+			   const char *oldname, STRUCT_STAT *old_stp,
+			   const char *realname, int itemizing, enum logcode code)
 {
 	if (statret == 0) {
-		if (stp->st_dev == to_stp->st_dev
-		 && stp->st_ino == to_stp->st_ino) {
+		if (stp->st_dev == old_stp->st_dev
+		 && stp->st_ino == old_stp->st_ino) {
 			if (itemizing) {
 				itemize(file, ndx, statret, stp,
 					ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS,
 					0, "");
 			}
+			if (verbose > 1 && maybe_ATTRS_REPORT)
+				rprintf(FCLIENT, "%s is uptodate\n", fname);
+			file->flags |= FLAG_HLINK_DONE;
 			return 0;
 		}
 		if (make_backups) {
@@ -173,86 +145,118 @@ static int maybe_hard_link(struct file_struct *file, int ndx,
 			return -1;
 		}
 	}
-	return hard_link_one(file, ndx, fname, statret, stp, toname,
-			     0, itemizing, code);
+
+	if (hard_link_one(file, fname, oldname, 0)) {
+		if (itemizing) {
+			itemize(file, ndx, statret, stp,
+				ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS, 0,
+				realname);
+		}
+		if (code != FNONE && verbose)
+			rprintf(code, "%s => %s\n", fname, realname);
+		return 0;
+	}
+	return -1;
 }
 
+/* Only called if FLAG_HLINKED is set and FLAG_HLINK_FIRST is not.  Returns:
+ * 0 = process the file, 1 = skip the file, -1 = error occurred. */
 int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 		    int statret, STRUCT_STAT *stp, int itemizing,
-		    enum logcode code, int skip)
+		    enum logcode code)
 {
-	int head;
-	struct hlist *hl = F_HL_LIST(file);
+	STRUCT_STAT prev_st;
+	char prev_name[MAXPATHLEN], altbuf[MAXPATHLEN], *realname;
+	int alt_dest, prev_ndx = F_HL_PREV(file);
+	struct file_struct *prev_file = FPTR(prev_ndx);
 
-	if (skip && !(file->flags & FLAG_HLINK_LAST))
-		head = hlink_list[hl->hlindex] = hl->next;
-	else
-		head = hlink_list[hl->hlindex];
-	if (ndx != head) {
-		struct file_struct *head_file = FPTR(head);
-		struct hlist *hf_hl = F_HL_LIST(head_file);
-		if (!stdout_format_has_i && verbose > 1) {
-			rprintf(FINFO, "\"%s\" is a hard link\n",
-				f_name(file, NULL));
+	/* Is the previous link is not complete yet? */
+	if (!(prev_file->flags & FLAG_HLINK_DONE)) {
+		/* Is the previous link being transferred? */
+		if (prev_file->flags & FLAG_SENT) {
+			/* Add ourselves to the list of files that will be
+			 * updated when the transfer completes, and mark
+			 * ourself as waiting for the transfer. */
+			F_HL_PREV(file) = F_HL_PREV(prev_file);
+			F_HL_PREV(prev_file) = ndx;
+			file->flags |= FLAG_SENT;
+			return 1;
 		}
-		if (hf_hl->hlindex == FINISHED_LINK) {
-			STRUCT_STAT st2, st3;
-			char toname[MAXPATHLEN];
-			int ldu = hf_hl->dest_used;
-			if (ldu) {
-				pathjoin(toname, MAXPATHLEN, basis_dir[ldu-1],
-					 f_name(head_file, NULL));
-			} else
-				f_name(head_file, toname);
-			if (link_stat(toname, &st2, 0) < 0) {
-				rsyserr(FERROR, errno, "stat %s failed",
-					full_fname(toname));
-				return -1;
-			}
-			if (statret < 0 && basis_dir[0] != NULL) {
-				char cmpbuf[MAXPATHLEN];
-				int j = 0;
-				do {
-					pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
-					if (link_stat(cmpbuf, &st3, 0) < 0)
-						continue;
-					if (link_dest) {
-						if (st2.st_dev != st3.st_dev
-						 || st2.st_ino != st3.st_ino)
-							continue;
-						statret = 1;
-						stp = &st3;
-						if (verbose < 2 || !stdout_format_has_i) {
-							itemizing = 0;
-							code = FNONE;
-						}
-						break;
-					}
-					if (!unchanged_file(cmpbuf, file, &st3))
-						continue;
-					statret = 1;
-					stp = &st3;
-					if (unchanged_attrs(file, &st3))
-						break;
-				} while (basis_dir[++j] != NULL);
-			}
-			maybe_hard_link(file, ndx, fname, statret, stp,
-					toname, &st2, itemizing, code);
-			if (remove_source_files == 1 && do_xfers)
-				send_msg_int(MSG_SUCCESS, ndx);
-			hl->hlindex = FINISHED_LINK;
-		} else
-			hl->hlindex = SKIPPED_LINK;
-		return 1;
+		return 0;
 	}
-	return 0;
+
+	/* There is a finished file to link with! */
+	if (!(prev_file->flags & FLAG_HLINK_FIRST)) {
+		/* The previous previous will be marked with FIRST. */
+		prev_ndx = F_HL_PREV(prev_file);
+		prev_file = FPTR(prev_ndx);
+		/* Update our previous pointer to point to the first. */
+		F_HL_PREV(file) = prev_ndx;
+	}
+	alt_dest = F_HL_PREV(prev_file); /* alternate value when DONE && FIRST */
+	if (alt_dest >= 0 && dry_run) {
+		pathjoin(prev_name, MAXPATHLEN, basis_dir[alt_dest],
+			 f_name(prev_file, NULL));
+		f_name(prev_file, altbuf);
+		realname = altbuf;
+	} else {
+		f_name(prev_file, prev_name);
+		realname = prev_name;
+	}
+
+	if (link_stat(prev_name, &prev_st, 0) < 0) {
+		rsyserr(FERROR, errno, "stat %s failed",
+			full_fname(prev_name));
+		return -1;
+	}
+
+	if (statret < 0 && basis_dir[0] != NULL) {
+		/* If we match an alt-dest item, we don't output this as a change. */
+		char cmpbuf[MAXPATHLEN];
+		STRUCT_STAT alt_st;
+		int j = 0;
+		do {
+			pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
+			if (link_stat(cmpbuf, &alt_st, 0) < 0)
+				continue;
+			if (link_dest) {
+				if (prev_st.st_dev != alt_st.st_dev
+				 || prev_st.st_ino != alt_st.st_ino)
+					continue;
+				statret = 1;
+				*stp = alt_st;
+				if (verbose < 2 || !stdout_format_has_i) {
+					itemizing = 0;
+					code = FNONE;
+					if (verbose > 1 && maybe_ATTRS_REPORT)
+						rprintf(FCLIENT, "%s is uptodate\n", fname);
+				}
+				break;
+			}
+			if (!unchanged_file(cmpbuf, file, &alt_st))
+				continue;
+			statret = 1;
+			*stp = alt_st;
+			if (unchanged_attrs(file, &alt_st))
+				break;
+		} while (basis_dir[++j] != NULL);
+	}
+
+	if (maybe_hard_link(file, ndx, fname, statret, stp, prev_name, &prev_st,
+			    realname, itemizing, code) < 0)
+		return -1;
+
+	if (remove_source_files == 1 && do_xfers)
+		send_msg_int(MSG_SUCCESS, ndx);
+
+	return 1;
 }
 
-int hard_link_one(struct file_struct *file, int ndx, const char *fname,
-		  int statret, STRUCT_STAT *stp, const char *toname, int terse,
-		  int itemizing, enum logcode code)
+int hard_link_one(struct file_struct *file, const char *fname,
+		  const char *oldname, int terse)
 {
-	if (do_link(toname, fname)) {
+	if (do_link(oldname, fname) < 0) {
+		enum logcode code;
 		if (terse) {
 			if (!verbose)
 				return -1;
@@ -260,54 +264,54 @@ int hard_link_one(struct file_struct *file, int ndx, const char *fname,
 		} else
 			code = FERROR;
 		rsyserr(code, errno, "link %s => %s failed",
-			full_fname(fname), toname);
-		return -1;
+			full_fname(fname), oldname);
+		return 0;
 	}
 
-	if (itemizing) {
-		itemize(file, ndx, statret, stp,
-			ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS, 0,
-			terse ? "" : toname);
-	}
-	if (code != FNONE && verbose && !terse)
-		rprintf(code, "%s => %s\n", fname, toname);
-	return 0;
+	file->flags |= FLAG_HLINK_DONE;
+
+	return 1;
 }
 
-void hard_link_cluster(struct file_struct *file, int master, int itemizing,
-		       enum logcode code, int dest_used)
+void finish_hard_link(struct file_struct *file, const char *fname,
+		      STRUCT_STAT *stp, int itemizing, enum logcode code,
+		      int alt_dest)
 {
-	char hlink1[MAXPATHLEN];
-	char *hlink2;
-	STRUCT_STAT st1, st2;
-	int statret, ndx = master;
-	struct hlist *hl = F_HL_LIST(file);
+	STRUCT_STAT st, prev_st;
+	char alt_name[MAXPATHLEN], *prev_name;
+	const char *our_name;
+	int prev_statret, ndx, prev_ndx = F_HL_PREV(file);
 
-	hl->hlindex = FINISHED_LINK;
-	if (dry_run)
-		hl->dest_used = dest_used + 1;
-	if (link_stat(f_name(file, hlink1), &st1, 0) < 0)
-		return;
-	if (!(file->flags & FLAG_HLINK_FIRST)) {
-		while (!(file->flags & FLAG_HLINK_LAST)) {
-			ndx = hl->next;
-			file = FPTR(ndx);
-			hl = F_HL_LIST(file);
+	if (stp == NULL && prev_ndx >= 0) {
+		if (link_stat(fname, &st, 0) < 0) {
+			rsyserr(FERROR, errno, "stat %s failed",
+				full_fname(fname));
+			return;
 		}
+		stp = &st;
 	}
-	do {
-		ndx = hl->next;
+
+	/* FIRST combined with DONE means we were the first to get done. */
+	file->flags |= FLAG_HLINK_FIRST | FLAG_HLINK_DONE;
+	F_HL_PREV(file) = alt_dest;
+	if (alt_dest >= 0 && dry_run) {
+		pathjoin(alt_name, MAXPATHLEN, basis_dir[alt_dest],
+			 f_name(file, NULL));
+		our_name = alt_name;
+	} else
+		our_name = fname;
+
+	while ((ndx = prev_ndx) >= 0) {
 		file = FPTR(ndx);
-		hl = F_HL_LIST(file);
-		if (hl->hlindex != SKIPPED_LINK)
+		file->flags = (file->flags & ~FLAG_HLINK_FIRST) | FLAG_HLINK_DONE;
+		prev_ndx = F_HL_PREV(file);
+		prev_name = f_name(file, NULL);
+		prev_statret = link_stat(prev_name, &prev_st, 0);
+		if (maybe_hard_link(file, ndx, prev_name, prev_statret, &prev_st,
+				    our_name, stp, fname, itemizing, code) < 0)
 			continue;
-		hlink2 = f_name(file, NULL);
-		statret = link_stat(hlink2, &st2, 0);
-		maybe_hard_link(file, ndx, hlink2, statret, &st2,
-				hlink1, &st1, itemizing, code);
 		if (remove_source_files == 1 && do_xfers)
 			send_msg_int(MSG_SUCCESS, ndx);
-		hl->hlindex = FINISHED_LINK;
-	} while (!(file->flags & FLAG_HLINK_LAST));
+	}
 }
 #endif
