@@ -95,6 +95,7 @@ extern struct filter_list_struct server_filter_list;
 
 int ignore_perishable = 0;
 int non_perishable_cnt = 0;
+int maybe_ATTRS_REPORT = 0;
 
 static int deletion_count = 0; /* used to implement --max-delete */
 static int deldelay_size = 0, deldelay_cnt = 0;
@@ -788,6 +789,7 @@ static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
 void check_for_finished_hlinks(int itemizing, enum logcode code)
 {
 	struct file_struct *file;
+	char fbuf[MAXPATHLEN];
 	int ndx;
 
 	while ((ndx = get_hlink_num()) != -1) {
@@ -798,7 +800,7 @@ void check_for_finished_hlinks(int itemizing, enum logcode code)
 		if (!F_IS_HLINKED(file))
 			continue;
 
-		hard_link_cluster(file, ndx, itemizing, code, -1);
+		finish_hard_link(file, f_name(file, fbuf), NULL, itemizing, code, -1);
 	}
 }
 #endif
@@ -808,7 +810,7 @@ void check_for_finished_hlinks(int itemizing, enum logcode code)
  * value if we found an alternate basis file. */
 static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			 char *cmpbuf, STRUCT_STAT *stp, int itemizing,
-			 int maybe_ATTRS_REPORT, enum logcode code)
+			 enum logcode code)
 {
 	int best_match = -1;
 	int match_level = 0;
@@ -855,24 +857,28 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 	if (match_level == 3 && !copy_dest) {
 #ifdef SUPPORT_HARD_LINKS
 		if (link_dest) {
-			int i = itemizing && (verbose > 1 || stdout_format_has_i > 1);
-			if (hard_link_one(file, ndx, fname, 0, stp,
-					  cmpbuf, 1, i, code) < 0)
+			if (!hard_link_one(file, fname, cmpbuf, 1))
 				goto try_a_copy;
 			if (preserve_hard_links && F_IS_HLINKED(file))
-				hard_link_cluster(file, ndx, itemizing, code, j);
+				finish_hard_link(file, fname, stp, itemizing, code, j);
+			if (itemizing && (verbose > 1 || stdout_format_has_i > 1)) {
+				itemize(file, ndx, 1, stp,
+					ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS,
+					0, "");
+			}
 		} else
 #endif
 		if (itemizing)
 			itemize(file, ndx, 0, stp, 0, 0, NULL);
-		if (verbose > 1 && maybe_ATTRS_REPORT) {
+		if (verbose > 1 && maybe_ATTRS_REPORT)
 			rprintf(FCLIENT, "%s is uptodate\n", fname);
-		}
 		return -2;
 	}
 
 	if (match_level >= 2) {
+#ifdef SUPPORT_HARD_LINKS
 	  try_a_copy: /* Copy the file locally. */
+#endif
 		if (copy_file(cmpbuf, fname, file->mode) < 0) {
 			if (verbose) {
 				rsyserr(FINFO, errno, "copy_file %s => %s",
@@ -892,7 +898,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		}
 #ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_IS_HLINKED(file))
-			hard_link_cluster(file, ndx, itemizing, code, j);
+			finish_hard_link(file, fname, stp, itemizing, code, -1);
 #endif
 		return -2;
 	}
@@ -905,7 +911,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
  * value if we found an alternate basis file. */
 static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			 char *cmpbuf, STRUCT_STAT *stp, int itemizing,
-			 int maybe_ATTRS_REPORT, enum logcode code)
+			 enum logcode code)
 {
 	char lnk[MAXPATHLEN];
 	int best_match = -1;
@@ -1020,7 +1026,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 				return j;
 			}
 			if (preserve_hard_links && F_IS_HLINKED(file))
-				hard_link_cluster(file, ndx, itemizing, code, -1);
+				finish_hard_link(file, fname, NULL, itemizing, code, -1);
 		} else
 #endif
 			match_level = 2;
@@ -1055,8 +1061,7 @@ static int phase = 0;
  * Note that f_out is set to -1 when doing final directory-permission and
  * modification-time repair. */
 static void recv_generator(char *fname, struct file_struct *file, int ndx,
-			   int itemizing, int maybe_ATTRS_REPORT,
-			   enum logcode code, int f_out)
+			   int itemizing, enum logcode code, int f_out)
 {
 	static int missing_below = -1, excluded_below = -1;
 	static const char *parent_dirname = "";
@@ -1194,7 +1199,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 		if (statret != 0 && basis_dir[0] != NULL) {
 			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &st,
-					      itemizing, maybe_ATTRS_REPORT, code);
+					      itemizing, code);
 			if (j == -2) {
 				itemizing = 0;
 				code = FNONE;
@@ -1234,9 +1239,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 #ifdef SUPPORT_HARD_LINKS
-	if (preserve_hard_links && F_IS_HLINKED(file)
-	    && hard_link_check(file, ndx, fname, statret, &st,
-			       itemizing, code, HL_CHECK_MASTER))
+	if (preserve_hard_links && F_NOT_HLINK_FIRST(file)
+	 && hard_link_check(file, ndx, fname, statret, &st, itemizing, code))
 		return;
 #endif
 
@@ -1267,7 +1271,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				set_file_attrs(fname, file, &st, maybe_ATTRS_REPORT);
 #ifdef SUPPORT_HARD_LINKS
 				if (preserve_hard_links && F_IS_HLINKED(file))
-					hard_link_cluster(file, ndx, itemizing, code, -1);
+					finish_hard_link(file, fname, &st, itemizing, code, -1);
 #endif
 				if (remove_source_files == 1)
 					goto return_with_success;
@@ -1279,7 +1283,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				return;
 		} else if (basis_dir[0] != NULL) {
 			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &st,
-					      itemizing, maybe_ATTRS_REPORT, code);
+					      itemizing, code);
 			if (j == -2) {
 #ifndef CAN_HARDLINK_SYMLINK
 				if (link_dest) {
@@ -1294,9 +1298,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				statret = 1;
 		}
 #ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_IS_HLINKED(file)
-		    && hard_link_check(file, ndx, fname, -1, &st,
-				       itemizing, code, HL_SKIP))
+		if (preserve_hard_links && F_NOT_HLINK_LAST(file))
 			return;
 #endif
 		if (do_symlink(sl, fname) != 0) {
@@ -1312,7 +1314,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				rprintf(code, "%s -> %s\n", fname, sl);
 #ifdef SUPPORT_HARD_LINKS
 			if (preserve_hard_links && F_IS_HLINKED(file))
-				hard_link_cluster(file, ndx, itemizing, code, -1);
+				finish_hard_link(file, fname, NULL, itemizing, code, -1);
 #endif
 			/* This does not check remove_source_files == 1
 			 * because this is one of the items that the old
@@ -1348,7 +1350,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				set_file_attrs(fname, file, &st, maybe_ATTRS_REPORT);
 #ifdef SUPPORT_HARD_LINKS
 				if (preserve_hard_links && F_IS_HLINKED(file))
-					hard_link_cluster(file, ndx, itemizing, code, -1);
+					finish_hard_link(file, fname, &st, itemizing, code, -1);
 #endif
 				if (remove_source_files == 1)
 					goto return_with_success;
@@ -1358,7 +1360,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				return;
 		} else if (basis_dir[0] != NULL) {
 			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &st,
-					      itemizing, maybe_ATTRS_REPORT, code);
+					      itemizing, code);
 			if (j == -2) {
 #ifndef CAN_HARDLINK_SPECIAL
 				if (link_dest) {
@@ -1373,9 +1375,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				statret = 1;
 		}
 #ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_IS_HLINKED(file)
-		    && hard_link_check(file, ndx, fname, -1, &st,
-				       itemizing, code, HL_SKIP))
+		if (preserve_hard_links && F_NOT_HLINK_LAST(file))
 			return;
 #endif
 		if (verbose > 2) {
@@ -1396,7 +1396,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				rprintf(code, "%s\n", fname);
 #ifdef SUPPORT_HARD_LINKS
 			if (preserve_hard_links && F_IS_HLINKED(file))
-				hard_link_cluster(file, ndx, itemizing, code, -1);
+				finish_hard_link(file, fname, NULL, itemizing, code, -1);
 #endif
 			if (remove_source_files == 1)
 				goto return_with_success;
@@ -1453,7 +1453,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (statret != 0 && basis_dir[0] != NULL) {
 		int j = try_dests_reg(file, fname, ndx, fnamecmpbuf, &st,
-				      itemizing, maybe_ATTRS_REPORT, code);
+				      itemizing, code);
 		if (j == -2) {
 			if (remove_source_files == 1)
 				goto return_with_success;
@@ -1495,9 +1495,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (statret != 0) {
 #ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_IS_HLINKED(file)
-		    && hard_link_check(file, ndx, fname, statret, &st,
-				       itemizing, code, HL_SKIP))
+		if (preserve_hard_links && F_NOT_HLINK_LAST(file))
 			return;
 #endif
 		if (stat_errno == ENOENT)
@@ -1520,13 +1518,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			handle_partial_dir(partialptr, PDIR_DELETE);
 		}
 		if (itemizing) {
-			itemize(file, ndx, real_ret, &real_st,
+			itemize(file, ndx, statret, &st,
 				0, 0, NULL);
 		}
 		set_file_attrs(fname, file, &st, maybe_ATTRS_REPORT);
 #ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_IS_HLINKED(file))
-			hard_link_cluster(file, ndx, itemizing, code, -1);
+			finish_hard_link(file, fname, &st, itemizing, code, -1);
 #endif
 		if (remove_source_files != 1)
 			return;
@@ -1562,9 +1560,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	  pretend_missing:
 		/* pretend the file didn't exist */
 #ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_IS_HLINKED(file)
-		    && hard_link_check(file, ndx, fname, statret, &st,
-				       itemizing, code, HL_SKIP))
+		if (preserve_hard_links && F_NOT_HLINK_LAST(file))
 			return;
 #endif
 		statret = real_ret = -1;
@@ -1609,6 +1605,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
   notify_others:
 	if (remove_source_files && !delay_updates && !phase)
 		increment_active_files(ndx, itemizing, code);
+#ifdef SUPPORT_HARD_LINKS
+	if (preserve_hard_links && F_IS_HLINKED(file))
+		file->flags |= FLAG_SENT;
+#endif
 	write_int(f_out, ndx);
 	if (itemizing) {
 		int iflags = ITEM_TRANSFER;
@@ -1625,7 +1625,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (!do_xfers) {
 #ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_IS_HLINKED(file))
-			hard_link_cluster(file, ndx, itemizing, code, -1);
+			finish_hard_link(file, fname, &st, itemizing, code, -1);
 #endif
 		return;
 	}
@@ -1656,7 +1656,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 {
 	int i;
 	char fbuf[MAXPATHLEN];
-	int itemizing, maybe_ATTRS_REPORT;
+	int itemizing;
 	enum logcode code;
 	int lull_mod = allowed_lull * 5;
 	int need_retouch_dir_times = preserve_times && !omit_dir_times;
@@ -1726,8 +1726,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 			strlcpy(fbuf, local_name, sizeof fbuf);
 		else
 			f_name(file, fbuf);
-		recv_generator(fbuf, file, i, itemizing, maybe_ATTRS_REPORT,
-			       code, f_out);
+		recv_generator(fbuf, file, i, itemizing, code, f_out);
 
 		/* We need to ensure that any dirs we create have writeable
 		 * permissions during the time we are putting files within
@@ -1756,7 +1755,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		else if (!(i % 200))
 			maybe_flush_socket();
 	}
-	recv_generator(NULL, NULL, 0, 0, 0, code, -1);
+	recv_generator(NULL, NULL, 0, 0, code, -1);
 	if (delete_during)
 		delete_in_dir(NULL, NULL, NULL, NULL);
 
@@ -1782,8 +1781,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 			strlcpy(fbuf, local_name, sizeof fbuf);
 		else
 			f_name(file, fbuf);
-		recv_generator(fbuf, file, i, itemizing, maybe_ATTRS_REPORT,
-			       code, f_out);
+		recv_generator(fbuf, file, i, itemizing, code, f_out);
 	}
 
 	phase++;
@@ -1840,14 +1838,14 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 				continue;
 			}
 			recv_generator(f_name(file, NULL), file, i, itemizing,
-				       maybe_ATTRS_REPORT, code, -1);
+				       code, -1);
 			if (allowed_lull && !(++j % lull_mod))
 				maybe_send_keepalive();
 			else if (!(j % 200))
 				maybe_flush_socket();
 		}
 	}
-	recv_generator(NULL, NULL, 0, 0, 0, code, -1);
+	recv_generator(NULL, NULL, 0, 0, code, -1);
 
 	if (max_delete >= 0 && deletion_count > max_delete) {
 		rprintf(FINFO,
