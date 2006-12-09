@@ -58,6 +58,7 @@ extern int protocol_version;
 extern int sanitize_paths;
 extern struct stats stats;
 extern struct file_list *the_file_list;
+extern alloc_pool_t hlink_pool;
 
 extern char curr_dir[MAXPATHLEN];
 
@@ -74,7 +75,9 @@ dev_t filesystem_dev; /* used to implement -x */
  * that the sender doesn't need to remember in its file list.  The data
  * will survive just long enough to be used by send_file_entry(). */
 static dev_t tmp_rdev;
+#ifdef SUPPORT_HARD_LINKS
 static struct idev tmp_idev;
+#endif
 static char tmp_sum[MD4_SUM_LENGTH];
 
 static char empty_sum[MD4_SUM_LENGTH];
@@ -708,7 +711,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && flags & XMIT_HAS_IDEV_DATA) {
-		struct idev *idevp = pool_talloc(flist->hlink_pool, struct idev,
+		struct idev *idevp = pool_talloc(hlink_pool, struct idev,
 						 1, "inode_table");
 		F_HL_IDEV(file) = idevp;
 		if (protocol_version < 26) {
@@ -1113,7 +1116,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	start_write = stats.total_written;
 	gettimeofday(&start_tv, NULL);
 
-	flist = flist_new(0, "send_file_list");
+	flist = flist_new("send_file_list");
 
 	io_start_buffering_out();
 	if (filesfrom_fd >= 0) {
@@ -1377,7 +1380,7 @@ struct file_list *recv_file_list(int f)
 
 	start_read = stats.total_read;
 
-	flist = flist_new(WITH_HLINK, "recv_file_list");
+	flist = flist_new("recv_file_list");
 
 
 	while ((flags = read_byte(f)) != 0) {
@@ -1510,7 +1513,7 @@ void clear_file(struct file_struct *file)
 }
 
 /* Allocate a new file list. */
-struct file_list *flist_new(int with_hlink, char *msg)
+struct file_list *flist_new(char *msg)
 {
 	struct file_list *flist;
 
@@ -1523,14 +1526,6 @@ struct file_list *flist_new(int with_hlink, char *msg)
 	if (!(flist->file_pool = pool_create(FILE_EXTENT, 0, out_of_memory, POOL_INTERN)))
 		out_of_memory(msg);
 
-#ifdef SUPPORT_HARD_LINKS
-	if (with_hlink && preserve_hard_links) {
-		if (!(flist->hlink_pool = pool_create(HLINK_EXTENT,
-		    sizeof (struct idev), out_of_memory, POOL_INTERN)))
-			out_of_memory(msg);
-	}
-#endif
-
 	return flist;
 }
 
@@ -1538,7 +1533,6 @@ struct file_list *flist_new(int with_hlink, char *msg)
 void flist_free(struct file_list *flist)
 {
 	pool_destroy(flist->file_pool);
-	pool_destroy(flist->hlink_pool);
 	free(flist->files);
 	free(flist);
 }
@@ -1935,7 +1929,7 @@ struct file_list *get_dirlist(char *dirname, int dlen,
 		dirname = dirbuf;
 	}
 
-	dirlist = flist_new(WITHOUT_HLINK, "get_dirlist");
+	dirlist = flist_new("get_dirlist");
 
 	recurse = 0;
 	xfer_dirs = 1;
