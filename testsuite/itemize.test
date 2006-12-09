@@ -96,7 +96,7 @@ cat <<EOT >"$chkfile"
 bar/baz/rsync is uptodate
 foo/config1 is uptodate
 foo/config2
-"foo/extra" is a hard link
+foo/extra is uptodate
 foo/sym is uptodate
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 4 failed"
@@ -175,7 +175,6 @@ bar/baz/rsync is uptodate
 foo/ is uptodate
 foo/config1 is uptodate
 foo/config2 is uptodate
-"foo/extra" is a hard link
 foo/extra => foo/config1
 foo/sym is uptodate
 EOT
@@ -224,7 +223,7 @@ bar/baz/rsync is uptodate
 foo/ is uptodate
 foo/config1 is uptodate
 foo/config2 is uptodate
-"foo/extra" is a hard link
+foo/extra is uptodate
 foo/sym is uptodate
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 14 failed"
@@ -233,8 +232,6 @@ rm -rf "$to2dir"
 $RSYNC -ivvplrtH --compare-dest="$todir" "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 filter_outfile
-# TODO fix really-old problem when combining -H with --compare-dest:
-# missing output for foo/extra hard-link (and it might not be updated)!
 cat <<EOT >"$chkfile"
 cd        ./
 cd        bar/
@@ -243,6 +240,7 @@ cd        bar/baz/
 cd        foo/
 .f        foo/config1
 .f        foo/config2
+.f        foo/extra
 .L        foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 15 failed"
@@ -266,7 +264,7 @@ bar/baz/rsync is uptodate
 foo/ is uptodate
 foo/config1 is uptodate
 foo/config2 is uptodate
-"foo/extra" is a hard link
+foo/extra is uptodate
 foo/sym is uptodate
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 17 failed"
