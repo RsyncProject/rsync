@@ -352,11 +352,6 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 	if (verbose > 2)
 		rprintf(FINFO, "recv_files(%d) starting\n", flist->count);
 
-	if (flist->hlink_pool) {
-		pool_destroy(flist->hlink_pool);
-		flist->hlink_pool = NULL;
-	}
-
 	if (delay_updates)
 		delayed_bits = bitbag_create(flist->count);
 
