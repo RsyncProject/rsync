@@ -65,7 +65,11 @@
 #define FLAG_HLINKED (1<<5)	/* receiver/generator */
 #define FLAG_HLINK_FIRST (1<<6)	/* receiver/generator */
 #define FLAG_HLINK_LAST (1<<7)	/* receiver/generator */
-#define FLAG_LENGTH64 (1<<8)	/* sender/receiver/generator */
+#define FLAG_HLINK_DONE (1<<8)	/* receiver/generator */
+#define FLAG_LENGTH64 (1<<9)	/* sender/receiver/generator */
+
+#define BITS_SET(val,bits) (((val) & (bits)) == (bits))
+#define BITS_SETnUNSET(val,onbits,offbits) (((val) & ((onbits)|(offbits))) == (onbits))
 
 /* update this if you make incompatible changes */
 #define PROTOCOL_VERSION 30
@@ -498,15 +502,6 @@ struct idev {
 
 #define GID_NONE ((gid_t)-1)
 
-#define HL_CHECK_MASTER	0
-#define HL_SKIP		1
-
-struct hlist {
-	int32 next;
-	int32 hlindex;
-	unsigned short dest_used;
-};
-
 struct file_struct {
 	union flist_extras {
 		uid_t uid;           /* The user ID number */
@@ -556,7 +551,7 @@ extern int preserve_gid;
 
 /* These items are per-entry optional and mutally exclusive: */
 #define F_HL_IDEV(f) OPT_EXTRA(f, LEN64_BUMP(f))->idev
-#define F_HL_LIST(f) OPT_EXTRA(f, LEN64_BUMP(f))->hlist
+#define F_HL_PREV(f) OPT_EXTRA(f, LEN64_BUMP(f))->num
 
 /* This optional item might follow an F_HL_*() item.
  * (Note: a device doesn't need to check LEN64_BUMP(f).) */
@@ -567,8 +562,10 @@ extern int preserve_gid;
 					  + SUM_EXTRA_CNT - 1))
 
 /* Some utility defines: */
-#define F_IS_HLINKED(f) ((f)->flags & FLAG_HLINKED)
 #define F_IS_ACTIVE(f) F_BASENAME(f)[0]
+#define F_IS_HLINKED(f) ((f)->flags & FLAG_HLINKED)
+#define F_NOT_HLINK_FIRST(f) BITS_SETnUNSET((f)->flags, FLAG_HLINKED, FLAG_HLINK_FIRST)
+#define F_NOT_HLINK_LAST(f) BITS_SETnUNSET((f)->flags, FLAG_HLINKED, FLAG_HLINK_LAST)
 
 #define DEV_MAJOR(a) (a)[0]
 #define DEV_MINOR(a) (a)[1]
@@ -592,13 +589,9 @@ extern int preserve_gid;
 #define FILE_EXTENT	(256 * 1024)
 #define HLINK_EXTENT	(128 * 1024)
 
-#define WITH_HLINK	1
-#define WITHOUT_HLINK	0
-
 struct file_list {
 	struct file_struct **files;
 	alloc_pool_t file_pool;
-	alloc_pool_t hlink_pool;
 	int count, malloced;
 	int low, high; /* 0-relative index values excluding empties */
 };
