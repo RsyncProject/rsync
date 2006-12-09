@@ -1517,10 +1517,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			do_unlink(partialptr);
 			handle_partial_dir(partialptr, PDIR_DELETE);
 		}
-		if (itemizing) {
-			itemize(file, ndx, statret, &st,
-				0, 0, NULL);
-		}
+		if (itemizing)
+			itemize(file, ndx, statret, &st, 0, 0, NULL);
 		set_file_attrs(fname, file, &st, maybe_ATTRS_REPORT);
 #ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_IS_HLINKED(file))
