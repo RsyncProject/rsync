@@ -174,7 +174,7 @@ enum logcode { FNONE=0, FERROR=1, FINFO=2, FLOG=3, FCLIENT=4, FSOCKERR=5 };
 enum msgcode {
 	MSG_DATA=0,	/* raw data on the multiplexed stream */
 	MSG_ERROR=FERROR, MSG_INFO=FINFO, /* remote logging */
-	MSG_LOG=FLOG, MSG_SOCKERR=FSOCKERR, /* sibling logging */
+	MSG_LOG=FLOG, MSG_CLIENT=FCLIENT, MSG_SOCKERR=FSOCKERR, /* sibling logging */
 	MSG_REDO=9,	/* reprocess indicated flist index */
 	MSG_SUCCESS=100,/* successfully updated indicated flist index */
 	MSG_DELETED=101,/* successfully deleted a file on receiving side */
