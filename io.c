@@ -302,11 +302,13 @@ static void read_msg_fd(void)
 			flist_ndx_push(&hlink_list, IVAL(buf,0));
 		break;
 	case MSG_SOCKERR:
+	case MSG_CLIENT:
 		if (!am_generator) {
 			rprintf(FERROR, "invalid message %d:%d\n", tag, len);
 			exit_cleanup(RERR_STREAMIO);
 		}
-		close_multiplexing_out();
+		if (tag == MSG_SOCKERR)
+			close_multiplexing_out();
 		/* FALL THROUGH */
 	case MSG_INFO:
 	case MSG_ERROR:
