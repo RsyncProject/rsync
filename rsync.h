@@ -507,7 +507,6 @@ struct file_struct {
 		uid_t uid;           /* The user ID number */
 		uid_t gid;           /* The group ID number or GID_NONE */
 		struct idev *idev;   /* The hard-link info during matching */
-		struct hlist *hlist; /* The hard-link info after matching */
 		int32 num;           /* A signed number */
 		uint32 unum;         /* An unsigned number */
 	} extras[1];
