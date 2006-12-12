@@ -520,8 +520,7 @@ static void do_delete_pass(struct file_list *flist)
 
 int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
 {
-	if (preserve_perms
-	 && (unsigned)(st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS))
+	if (preserve_perms && !BITS_EQUAL(st->st_mode, file->mode, CHMOD_BITS))
 		return 0;
 
 	if (am_root && preserve_uid && st->st_uid != F_UID(file))
@@ -548,7 +547,7 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 		  && (!(iflags & ITEM_XNAME_FOLLOWS) || *xname))
 		 || (keep_time && cmp_time(file->modtime, st->st_mtime) != 0))
 			iflags |= ITEM_REPORT_TIME;
-		if ((unsigned)(st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS))
+		if (!BITS_EQUAL(st->st_mode, file->mode, CHMOD_BITS))
 			iflags |= ITEM_REPORT_PERMS;
 		if (preserve_uid && am_root && F_UID(file) != st->st_uid)
 			iflags |= ITEM_REPORT_OWNER;
@@ -1342,7 +1341,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				t = "special file";
 			}
 			if (statret == 0
-			 && (unsigned)(st.st_mode & ~CHMOD_BITS) == (file->mode & ~CHMOD_BITS)
+			 && BITS_EQUAL(st.st_mode, file->mode, _S_IFMT)
 			 && st.st_rdev == rdev) {
 				/* The device or special file is identical. */
 				if (itemizing)

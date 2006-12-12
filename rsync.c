@@ -261,7 +261,7 @@ int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
 	if (daemon_chmod_modes && !S_ISLNK(new_mode))
 		new_mode = tweak_mode(new_mode, daemon_chmod_modes);
 #ifdef HAVE_CHMOD
-	if ((st->st_mode & CHMOD_BITS) != (new_mode & CHMOD_BITS)) {
+	if (!BITS_EQUAL(st->st_mode, new_mode, CHMOD_BITS)) {
 		int ret = do_chmod(fname, new_mode);
 		if (ret < 0) {
 			rsyserr(FERROR, errno,
