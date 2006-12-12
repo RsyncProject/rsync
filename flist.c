@@ -1045,8 +1045,7 @@ static void send_if_directory(int f, struct file_list *flist,
  * file list in memory without sending it over the wire.  Also, get_dirlist()
  * might call this with f set to -2, which also indicates that local filter
  * rules should be ignored. */
-static void send_directory(int f, struct file_list *flist,
-			   char *fbuf, int len)
+static void send_directory(int f, struct file_list *flist, char *fbuf, int len)
 {
 	struct dirent *di;
 	unsigned remainder;
@@ -1914,8 +1913,7 @@ char *f_name(struct file_struct *f, char *fbuf)
  * of the dirname string, and also indicates that "dirname" is a MAXPATHLEN
  * buffer (the functions we call will append names onto the end, but the old
  * dir value will be restored on exit). */
-struct file_list *get_dirlist(char *dirname, int dlen,
-			      int ignore_filter_rules)
+struct file_list *get_dirlist(char *dirname, int dlen, int ignore_filter_rules)
 {
 	struct file_list *dirlist;
 	char dirbuf[MAXPATHLEN];
