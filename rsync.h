@@ -539,8 +539,12 @@ extern int preserve_gid;
 
 /* Basename (AKA filename) and length applies to all items */
 #define F_BASENAME(f) ((const char*)(f) + FILE_STRUCT_LEN)
-#define F_LENGTH(f) ((OFF_T)(f)->len32 + ((f)->flags & FLAG_LENGTH64 \
-		   ? (OFF_T)OPT_EXTRA(f, 0)->unum << 32 : 0u))
+#if SIZEOF_INT64 < 8
+#define F_LENGTH(f) ((int64)(f)->len32)
+#else
+#define F_LENGTH(f) ((int64)(f)->len32 + ((f)->flags & FLAG_LENGTH64 \
+		   ? (int64)OPT_EXTRA(f, 0)->unum << 32 : 0))
+#endif
 
 /* If there is a symlink string, it is always right after the basename */
 #define F_SYMLINK(f) (F_BASENAME(f) + strlen(F_BASENAME(f)) + 1)
