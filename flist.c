@@ -90,7 +90,7 @@ void init_flist(void)
 {
 	if (verbose > 4) {
 		rprintf(FINFO, "FILE_STRUCT_LEN=%d, EXTRA_LEN=%d\n",
-			FILE_STRUCT_LEN, EXTRA_LEN);
+			(int)FILE_STRUCT_LEN, (int)EXTRA_LEN);
 	}
 	checksum_len = protocol_version < 21 ? 2 : MD4_SUM_LENGTH;
 }
