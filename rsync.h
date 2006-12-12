@@ -70,6 +70,8 @@
 
 #define BITS_SET(val,bits) (((val) & (bits)) == (bits))
 #define BITS_SETnUNSET(val,onbits,offbits) (((val) & ((onbits)|(offbits))) == (onbits))
+#define BITS_EQUAL(b1,b2,mask) (((unsigned)(b1) & (unsigned)(mask)) \
+			     == ((unsigned)(b2) & (unsigned)(mask)))
 
 /* update this if you make incompatible changes */
 #define PROTOCOL_VERSION 30
