@@ -1666,11 +1666,11 @@ void server_options(char **args,int *argc)
 			args[ac++] = "--delete";
 		if (delete_before > 1)
 			args[ac++] = "--delete-before";
-		if (delete_during) {
-			args[ac++] = delete_during == 2 ? "--delete-delay"
-							: "--delete-during";
-		}
-		if (delete_after)
+		else if (delete_during == 2)
+			args[ac++] = "--delete-delay";
+		else if (delete_during)
+			args[ac++] = "--delete-during";
+		else if (delete_after)
 			args[ac++] = "--delete-after";
 		if (force_delete)
 			args[ac++] = "--force";
