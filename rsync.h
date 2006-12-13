@@ -569,8 +569,8 @@ extern int preserve_gid;
 /* Some utility defines: */
 #define F_IS_ACTIVE(f) F_BASENAME(f)[0]
 #define F_IS_HLINKED(f) ((f)->flags & FLAG_HLINKED)
-#define F_NOT_HLINK_FIRST(f) BITS_SETnUNSET((f)->flags, FLAG_HLINKED, FLAG_HLINK_FIRST)
-#define F_NOT_HLINK_LAST(f) BITS_SETnUNSET((f)->flags, FLAG_HLINKED, FLAG_HLINK_LAST)
+#define F_HLINK_NOT_FIRST(f) BITS_SETnUNSET((f)->flags, FLAG_HLINKED, FLAG_HLINK_FIRST)
+#define F_HLINK_NOT_LAST(f) BITS_SETnUNSET((f)->flags, FLAG_HLINKED, FLAG_HLINK_LAST)
 
 #define DEV_MAJOR(a) (a)[0]
 #define DEV_MINOR(a) (a)[1]

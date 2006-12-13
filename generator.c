@@ -1238,7 +1238,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 #ifdef SUPPORT_HARD_LINKS
-	if (preserve_hard_links && F_NOT_HLINK_FIRST(file)
+	if (preserve_hard_links && F_HLINK_NOT_FIRST(file)
 	 && hard_link_check(file, ndx, fname, statret, &st, itemizing, code))
 		return;
 #endif
@@ -1297,7 +1297,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				statret = 1;
 		}
 #ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_NOT_HLINK_LAST(file))
+		if (preserve_hard_links && F_HLINK_NOT_LAST(file))
 			return;
 #endif
 		if (do_symlink(sl, fname) != 0) {
@@ -1374,7 +1374,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				statret = 1;
 		}
 #ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_NOT_HLINK_LAST(file))
+		if (preserve_hard_links && F_HLINK_NOT_LAST(file))
 			return;
 #endif
 		if (verbose > 2) {
@@ -1494,7 +1494,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (statret != 0) {
 #ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_NOT_HLINK_LAST(file))
+		if (preserve_hard_links && F_HLINK_NOT_LAST(file))
 			return;
 #endif
 		if (stat_errno == ENOENT)
@@ -1557,7 +1557,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	  pretend_missing:
 		/* pretend the file didn't exist */
 #ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_NOT_HLINK_LAST(file))
+		if (preserve_hard_links && F_HLINK_NOT_LAST(file))
 			return;
 #endif
 		statret = real_ret = -1;
