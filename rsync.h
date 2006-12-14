@@ -51,7 +51,7 @@
 #define XMIT_LONG_NAME (1<<6)
 #define XMIT_SAME_TIME (1<<7)
 #define XMIT_SAME_RDEV_MAJOR (1<<8)
-#define XMIT_HAS_IDEV_DATA (1<<9)
+#define XMIT_HLINKED (1<<9)
 #define XMIT_SAME_DEV (1<<10)
 #define XMIT_RDEV_MINOR_IS_SMALL (1<<11)
 

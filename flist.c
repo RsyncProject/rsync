@@ -81,7 +81,7 @@ static struct idev tmp_idev;
 static char tmp_sum[MD4_SUM_LENGTH];
 
 static char empty_sum[MD4_SUM_LENGTH];
-static int flist_count_offset;
+static int flist_count_offset; /* for --delete --progress */
 
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
 static void output_flist(struct file_list *flist);
@@ -387,7 +387,7 @@ static void send_file_entry(struct file_struct *file, int f)
 				flags |= XMIT_SAME_DEV;
 		} else
 			dev = tmp_idev.dev;
-		flags |= XMIT_HAS_IDEV_DATA;
+		flags |= XMIT_HLINKED;
 	}
 #endif
 
@@ -618,8 +618,8 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links) {
 		if (protocol_version < 28 && S_ISREG(mode))
-			flags |= XMIT_HAS_IDEV_DATA;
-		if (flags & XMIT_HAS_IDEV_DATA)
+			flags |= XMIT_HLINKED;
+		if (flags & XMIT_HLINKED)
 			extra_len += EXTRA_LEN;
 	}
 #endif
@@ -643,7 +643,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	bp += basename_len + linkname_len; /* skip space for symlink too */
 
 #ifdef SUPPORT_HARD_LINKS
-	if (flags & XMIT_HAS_IDEV_DATA)
+	if (flags & XMIT_HLINKED)
 		file->flags |= FLAG_HLINKED;
 #endif
 	file->modtime = modtime;
@@ -710,7 +710,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 #endif
 
 #ifdef SUPPORT_HARD_LINKS
-	if (preserve_hard_links && flags & XMIT_HAS_IDEV_DATA) {
+	if (preserve_hard_links && flags & XMIT_HLINKED) {
 		struct idev *idevp = pool_talloc(hlink_pool, struct idev,
 						 1, "inode_table");
 		F_HL_IDEV(file) = idevp;
