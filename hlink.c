@@ -28,6 +28,7 @@ extern int dry_run;
 extern int do_xfers;
 extern int link_dest;
 extern int make_backups;
+extern int protocol_version;
 extern int remove_source_files;
 extern int stdout_format_has_i;
 extern int maybe_ATTRS_REPORT;
@@ -38,17 +39,177 @@ extern struct file_list *the_file_list;
 
 alloc_pool_t hlink_pool;
 
+#define HASH_LOAD_LIMIT(size) ((size)*3/4)
 #define FPTR(i) (the_file_list->files[i])
-#define LINKED(i1,i2) ((i1)->dev == (i2)->dev && (i1)->ino == (i2)->ino)
+
+struct ihash_table {
+	int32 size;
+	int32 entries;
+	struct idev_node *buckets;
+} *dev_tbl;
+
+static struct idev_node *ihash_node(struct ihash_table *tbl, int64 key);
+
+/* Starting with protocol 30, we use a simple hashtable on the sending side
+ * for hashing the st_dev and st_ino info.  The receiving side gets told
+ * (via flags and a "group index") which items are hard-linked together, so
+ * we can avoid the pool of dev+inode data. */
+
+static struct ihash_table *ihash_create(int size)
+{
+	struct ihash_table *tbl;
+
+	/* Pick a power of 2 that can hold the requested size. */
+	if (size & (size-1)) {
+		int req = size;
+		size = 32;
+		while (size < req)
+			size *= 2;
+	}
+
+	if (!(tbl = new(struct ihash_table))
+	 || !(tbl->buckets = new_array(struct idev_node, size)))
+		out_of_memory("ihash_create");
+	memset(tbl->buckets, 0, size * sizeof tbl->buckets[0]);
+	tbl->size = size;
+	tbl->entries = 0;
+
+	return tbl;
+}
+
+static void ihash_destroy(struct ihash_table *tbl)
+{
+	free(tbl->buckets);
+	free(tbl);
+}
 
 void init_hard_links(void)
 {
+	if (protocol_version >= 30) {
+		dev_tbl = ihash_create(16);
+		return;
+	}
+
 	if (!(hlink_pool = pool_create(HLINK_EXTENT, sizeof (struct idev),
 				       out_of_memory, POOL_INTERN)))
 		out_of_memory("init_hard_links");
 }
 
-static int hlink_compare(int *int1, int *int2)
+static void expand_ihash(struct ihash_table *tbl)
+{
+	struct idev_node *old_buckets;
+	int size = tbl->size * 2;
+	int i;
+
+	old_buckets = tbl->buckets;
+	if (!(tbl->buckets = new_array(struct idev_node, size)))
+		out_of_memory("ihash_create");
+	memset(tbl->buckets, 0, size * sizeof tbl->buckets[0]);
+	tbl->size = size;
+	tbl->entries = 0;
+
+	for (i = size / 2; i-- > 0; ) {
+		int64 key = old_buckets[i].key;
+		if (key == 0)
+			continue;
+		ihash_node(tbl, key)->data = old_buckets[i].data;
+	}
+
+	free(old_buckets);
+}
+
+/* This returns the node for the indicated key, either newly created,
+ * or already existing. */
+static struct idev_node *ihash_node(struct ihash_table *tbl, int64 key)
+{
+	uint32 bkt;
+
+	if (tbl->entries > HASH_LOAD_LIMIT(tbl->size))
+		expand_ihash(tbl);
+
+#if SIZEOF_INT64 < 8
+	/* Based on Jenkins One-at-a-time hash. */
+	{
+		uchar *keyp = (uchar*)&key;
+		int i;
+
+		for (bkt = 0, i = 0; i < SIZEOF_INT64; i++) {
+			bkt += keyp[i];
+			bkt += (bkt << 10);
+			bkt ^= (bkt >> 6);
+		}
+		bkt += (bkt << 3);
+		bkt ^= (bkt >> 11);
+		bkt += (bkt << 15);
+	}
+#else
+#define rot(x,k) (((x)<<(k)) ^ ((x)>>(32-(k))))
+	/* Based on Jenkins hashword() from lookup3.c. */
+	{
+		uint32 a, b, c;
+
+		/* Set up the internal state */
+		a = b = c = 0xdeadbeef + (8 << 2);
+
+		b += (uint32)(key >> 32);
+		a += (uint32)key;
+		c ^= b; c -= rot(b, 14);
+		a ^= c; a -= rot(c, 11);
+		b ^= a; b -= rot(a, 25);
+		c ^= b; c -= rot(b, 16);
+		a ^= c; a -= rot(c, 4);
+		b ^= a; b -= rot(a, 14);
+		c ^= b; c -= rot(b, 24);
+		bkt = c;
+	}
+#endif
+
+	/* If it already exists, return it. */
+	while (1) {
+		bkt &= tbl->size - 1;
+		if (tbl->buckets[bkt].key == key)
+			return &tbl->buckets[bkt];
+		if (tbl->buckets[bkt].key == 0)
+			break;
+		bkt++;
+	}
+
+	/* Otherwise, take over this empty spot and then return it. */
+	tbl->buckets[bkt].key = key;
+	tbl->entries++;
+	return &tbl->buckets[bkt];
+}
+
+struct idev_node *idev_node(int64 dev, int64 ino)
+{
+	static struct idev_node *dev_node = NULL;
+	struct ihash_table *tbl;
+
+	if (!dev_node || dev_node->key != dev) {
+		/* We keep a separate hash table of inodes for every device. */
+		dev_node = ihash_node(dev_tbl, dev);
+		if (!(tbl = dev_node->data))
+			tbl = dev_node->data = ihash_create(512);
+	} else
+		tbl = dev_node->data;
+
+	return ihash_node(tbl, ino);
+}
+
+void idev_destroy(void)
+{
+	int i;
+
+	for (i = 0; i < dev_tbl->size; i++) {
+		if (dev_tbl->buckets[i].data)
+			ihash_destroy(dev_tbl->buckets[i].data);
+	}
+
+	ihash_destroy(dev_tbl);
+}
+
+/* This routine compares dev+inode info for protocols < 30. */
+static int hlink_compare_idev(int *int1, int *int2)
 {
 	struct file_struct *f1 = FPTR(*int1);
 	struct file_struct *f2 = FPTR(*int2);
@@ -61,35 +222,32 @@ static int hlink_compare(int *int1, int *int2)
 	if (i1->ino != i2->ino)
 		return i1->ino > i2->ino ? 1 : -1;
 
-	return f_name_cmp(f1, f2);
+	return *int1 > *int2 ? 1 : -1;
 }
 
-/* Analyze the dev+inode data in the file-list by creating a list of all
- * the items that have hlink data, sorting them, and matching up identical
- * values into clusters.  These will be a single linked list from last to
- * first when we're done. */
-void match_hard_links(void)
+/* This routine compares group numbers for protocols >= 30. */
+static int hlink_compare_gnum(int *int1, int *int2)
 {
-	int32 from, prev, *ndx_list;
+	struct file_struct *f1 = FPTR(*int1);
+	struct file_struct *f2 = FPTR(*int2);
+	int gnum1 = F_HL_GNUM(f1);
+	int gnum2 = F_HL_GNUM(f2);
+
+	if (gnum1 != gnum2)
+		return gnum1 > gnum2 ? 1 : -1;
+
+	return *int1 > *int2 ? 1 : -1;
+}
+
+/* The match routine for protocols < 30. */
+static void match_idevs(int32 *ndx_list, int ndx_count)
+{
+	int32 from, prev;
 	struct file_struct *file, *file_next;
 	struct idev *idev, *idev_next;
-	int i, ndx_count = 0;
-
-	if (!(ndx_list = new_array(int32, the_file_list->count)))
-		out_of_memory("match_hard_links");
-
-	for (i = 0; i < the_file_list->count; i++) {
-		if (F_IS_HLINKED(FPTR(i)))
-			ndx_list[ndx_count++] = i;
-	}
-
-	if (!ndx_count) {
-		free(ndx_list);
-		return;
-	}
 
 	qsort(ndx_list, ndx_count, sizeof ndx_list[0],
-	     (int (*)()) hlink_compare);
+	     (int (*)()) hlink_compare_idev);
 
 	for (from = 0; from < ndx_count; from++) {
 		for (file = FPTR(ndx_list[from]), idev = F_HL_IDEV(file), prev = -1;
@@ -98,7 +256,7 @@ void match_hard_links(void)
 		{
 			file_next = FPTR(ndx_list[from+1]);
 			idev_next = F_HL_IDEV(file_next);
-			if (!LINKED(idev, idev_next))
+			if (idev->dev != idev_next->dev || idev->ino != idev_next->ino)
 				break;
 			pool_free(hlink_pool, 0, idev);
 			if (prev < 0)
@@ -113,8 +271,65 @@ void match_hard_links(void)
 			F_HL_PREV(file) = prev;
 		}
 	}
+}
 
-	pool_destroy(hlink_pool);
+/* The match routine for protocols >= 30. */
+static void match_gnums(int32 *ndx_list, int ndx_count)
+{
+	int32 from, prev;
+	struct file_struct *file, *file_next;
+	int gnum, gnum_next;
+
+	qsort(ndx_list, ndx_count, sizeof ndx_list[0],
+	     (int (*)()) hlink_compare_gnum);
+
+	for (from = 0; from < ndx_count; from++) {
+		for (file = FPTR(ndx_list[from]), gnum = F_HL_GNUM(file), prev = -1;
+		     from < ndx_count-1;
+		     file = file_next, gnum = gnum_next, prev = ndx_list[from++])
+		{
+			file_next = FPTR(ndx_list[from+1]);
+			gnum_next = F_HL_GNUM(file_next);
+			if (gnum != gnum_next)
+				break;
+			if (prev < 0)
+				file->flags |= FLAG_HLINK_FIRST;
+			F_HL_PREV(file) = prev;
+		}
+		if (prev < 0)
+			file->flags &= ~FLAG_HLINKED;
+		else {
+			file->flags |= FLAG_HLINK_LAST;
+			F_HL_PREV(file) = prev;
+		}
+	}
+}
+
+/* Analyze the hard-links in the file-list by creating a list of all the
+ * items that have hlink data, sorting them, and matching up identical
+ * values into clusters.  These will be a single linked list from last
+ * to first when we're done. */
+void match_hard_links(void)
+{
+	int i, ndx_count = 0;
+	int32 *ndx_list;
+
+	if (!(ndx_list = new_array(int32, the_file_list->count)))
+		out_of_memory("match_hard_links");
+
+	for (i = 0; i < the_file_list->count; i++) {
+		if (F_IS_HLINKED(FPTR(i)))
+			ndx_list[ndx_count++] = i;
+	}
+
+	if (ndx_count) {
+		if (protocol_version >= 30)
+			match_gnums(ndx_list, ndx_count);
+		else {
+			match_idevs(ndx_list, ndx_count);
+			pool_destroy(hlink_pool);
+		}
+	}
 	free(ndx_list);
 }
 
