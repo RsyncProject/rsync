@@ -831,11 +831,6 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		filesfrom_fd = -1;
 	}
 
-#ifdef SUPPORT_HARD_LINKS
-	if (preserve_hard_links)
-		init_hard_links();
-#endif
-
 	flist = recv_file_list(f_in);
 	verbose = save_verbose;
 	if (!flist) {
@@ -996,11 +991,6 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		io_set_filesfrom_fds(filesfrom_fd, f_out);
 		filesfrom_fd = -1;
 	}
-
-#ifdef SUPPORT_HARD_LINKS
-	if (preserve_hard_links)
-		init_hard_links();
-#endif
 
 	if (write_batch && !am_server)
 		start_write_batch(f_in);
