@@ -310,7 +310,7 @@ void flist_expand(struct file_list *flist)
 		out_of_memory("flist_expand");
 }
 
-static void send_file_entry(struct file_struct *file, int f)
+static void send_file_entry(struct file_struct *file, int f, int ndx)
 {
 	unsigned short flags;
 	static time_t modtime;
@@ -322,20 +322,8 @@ static void send_file_entry(struct file_struct *file, int f)
 	static gid_t gid;
 	static char lastname[MAXPATHLEN];
 	char fname[MAXPATHLEN];
+	int first_hlink_ndx = -1;
 	int l1, l2;
-
-	if (f < 0)
-		return;
-
-	if (!file) {
-		write_byte(f, 0);
-		modtime = 0, mode = 0;
-		dev = 0, rdev = MAKEDEV(0, 0);
-		rdev_major = 0;
-		uid = 0, gid = 0;
-		*lastname = '\0';
-		return;
-	}
 
 	f_name(file, fname);
 
@@ -382,12 +370,22 @@ static void send_file_entry(struct file_struct *file, int f)
 
 #ifdef SUPPORT_HARD_LINKS
 	if (tmp_idev.dev != 0) {
-		if (tmp_idev.dev == dev) {
-			if (protocol_version >= 28)
-				flags |= XMIT_SAME_DEV;
-		} else
-			dev = tmp_idev.dev;
-		flags |= XMIT_HLINKED;
+		if (protocol_version >= 30) {
+			struct idev_node *np = idev_node(tmp_idev.dev, tmp_idev.ino);
+			first_hlink_ndx = (int32)np->data - 1;
+			if (first_hlink_ndx < 0) {
+				np->data = (void*)(ndx + 1);
+				flags |= XMIT_HLINK_FIRST;
+			}
+			flags |= XMIT_HLINKED;
+		} else {
+			if (tmp_idev.dev == dev) {
+				if (protocol_version >= 28)
+					flags |= XMIT_SAME_DEV_pre30;
+			} else
+				dev = tmp_idev.dev;
+			flags |= XMIT_HLINKED;
+		}
 	}
 #endif
 
@@ -425,6 +423,11 @@ static void send_file_entry(struct file_struct *file, int f)
 	else
 		write_byte(f, l2);
 	write_buf(f, fname + l1, l2);
+
+	if (first_hlink_ndx >= 0) {
+		write_int(f, first_hlink_ndx);
+		goto the_end;
+	}
 
 	write_longint(f, F_LENGTH(file));
 	if (!(flags & XMIT_SAME_TIME))
@@ -466,14 +469,14 @@ static void send_file_entry(struct file_struct *file, int f)
 #endif
 
 #ifdef SUPPORT_HARD_LINKS
-	if (tmp_idev.dev != 0) {
+	if (tmp_idev.dev != 0 && protocol_version < 30) {
 		if (protocol_version < 26) {
 			/* 32-bit dev_t and ino_t */
 			write_int(f, (int32)dev);
 			write_int(f, (int32)tmp_idev.ino);
 		} else {
 			/* 64-bit dev_t and ino_t */
-			if (!(flags & XMIT_SAME_DEV))
+			if (!(flags & XMIT_SAME_DEV_pre30))
 				write_longint(f, dev);
 			write_longint(f, tmp_idev.ino);
 		}
@@ -491,6 +494,7 @@ static void send_file_entry(struct file_struct *file, int f)
 		write_buf(f, sum, checksum_len);
 	}
 
+  the_end:
 	strlcpy(lastname, fname, MAXPATHLEN);
 }
 
@@ -512,6 +516,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	unsigned int l1 = 0, l2 = 0;
 	int alloc_len, basename_len, dirname_len, linkname_len;
 	int extra_len = (flist_extra_cnt - 1) * EXTRA_LEN;
+	int first_hlink_ndx = -1;
 	OFF_T file_length;
 	char *basename, *dirname, *bp;
 	struct file_struct *file;
@@ -568,6 +573,38 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	}
 	basename_len = strlen(basename) + 1; /* count the '\0' */
 
+#ifdef SUPPORT_HARD_LINKS
+	if (protocol_version >= 30
+	 && BITS_SETnUNSET(flags, XMIT_HLINKED, XMIT_HLINK_FIRST)) {
+		struct file_struct *first;
+		first_hlink_ndx = read_int(f);
+		if (first_hlink_ndx < 0 || first_hlink_ndx >= flist->count) {
+			rprintf(FERROR,
+				"hard-link reference out of range: %d (%d)\n",
+				first_hlink_ndx, flist->count);
+			exit_cleanup(RERR_PROTOCOL);
+		}
+		first = flist->files[first_hlink_ndx];
+		file_length = F_LENGTH(first);
+		modtime = first->modtime;
+		mode = first->mode;
+		if (preserve_uid)
+			uid = F_UID(first);
+		if (preserve_gid)
+			gid = F_GID(first);
+		if ((preserve_devices && IS_DEVICE(mode))
+		 || (preserve_specials && IS_SPECIAL(mode))) {
+			uint32 *devp = F_RDEV_P(first);
+			rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
+		}
+		if (preserve_links && S_ISLNK(mode))
+			linkname_len = strlen(F_SYMLINK(first)) + 1;
+		else
+			linkname_len = 0;
+		goto create_object;
+	}
+#endif
+
 	file_length = read_longint(f);
 	if (!(flags & XMIT_SAME_TIME))
 		modtime = (time_t)read_int(f);
@@ -616,6 +653,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		linkname_len = 0;
 
 #ifdef SUPPORT_HARD_LINKS
+  create_object:
 	if (preserve_hard_links) {
 		if (protocol_version < 28 && S_ISREG(mode))
 			flags |= XMIT_HLINKED;
@@ -703,7 +741,11 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 #ifdef SUPPORT_LINKS
 	if (linkname_len) {
 		bp = (char*)F_BASENAME(file) + basename_len;
-		read_sbuf(f, bp, linkname_len - 1);
+		if (first_hlink_ndx >= 0) {
+			struct file_struct *first = flist->files[first_hlink_ndx];
+			memcpy(bp, F_SYMLINK(first), linkname_len);
+		} else
+			read_sbuf(f, bp, linkname_len - 1);
 		if (sanitize_paths)
 			sanitize_path(bp, bp, "", lastdir_depth, NULL);
 	}
@@ -711,17 +753,22 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && flags & XMIT_HLINKED) {
-		struct idev *idevp = pool_talloc(hlink_pool, struct idev,
-						 1, "inode_table");
-		F_HL_IDEV(file) = idevp;
-		if (protocol_version < 26) {
-			idevp->dev = read_int(f);
-			idevp->ino = read_int(f);
+		if (protocol_version >= 30) {
+			F_HL_GNUM(file) = flags & XMIT_HLINK_FIRST
+					? flist->count : first_hlink_ndx;
 		} else {
-			if (!(flags & XMIT_SAME_DEV))
-				dev = read_longint(f);
-			idevp->dev = dev;
-			idevp->ino = read_longint(f);
+			struct idev *idevp = pool_talloc(hlink_pool, struct idev,
+							 1, "inode_table");
+			F_HL_IDEV(file) = idevp;
+			if (protocol_version < 26) {
+				idevp->dev = read_int(f);
+				idevp->ino = read_int(f);
+			} else {
+				if (!(flags & XMIT_SAME_DEV_pre30))
+					dev = read_longint(f);
+				idevp->dev = dev;
+				idevp->ino = read_longint(f);
+			}
 		}
 	}
 #endif
@@ -733,7 +780,11 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 			/* Prior to 28, we get a useless set of nulls. */
 			bp = tmp_sum;
 		}
-		read_buf(f, bp, checksum_len);
+		if (first_hlink_ndx >= 0) {
+			struct file_struct *first = flist->files[first_hlink_ndx];
+			memcpy(bp, F_SUM(first), checksum_len);
+		} else
+			read_buf(f, bp, checksum_len);
 	}
 
 	return file;
@@ -1009,7 +1060,8 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 
 	flist_expand(flist);
 	flist->files[flist->count++] = file;
-	send_file_entry(file, f);
+	if (f >= 0)
+		send_file_entry(file, f, flist->count - 1);
 	return file;
 }
 
@@ -1092,6 +1144,7 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len)
 
 	if (recurse) {
 		int i, end = flist->count - 1;
+		/* send_if_directory() bumps flist->count, so use "end". */
 		for (i = start; i <= end; i++)
 			send_if_directory(f, flist, flist->files[i], fbuf, len);
 	}
@@ -1114,6 +1167,11 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 	start_write = stats.total_written;
 	gettimeofday(&start_tv, NULL);
+
+#ifdef SUPPORT_HARD_LINKS
+	if (preserve_hard_links && protocol_version >= 30)
+		init_hard_links();
+#endif
 
 	flist = flist_new("send_file_list");
 
@@ -1333,7 +1391,12 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		stats.flist_buildtime = 1;
 	start_tv = end_tv;
 
-	send_file_entry(NULL, f);
+	write_byte(f, 0); /* Indicate end of file list */
+
+#ifdef SUPPORT_HARD_LINKS
+	if (preserve_hard_links && protocol_version >= 30)
+		idev_destroy();
+#endif
 
 	if (show_filelist_p())
 		finish_filelist_progress(flist);
@@ -1381,6 +1444,10 @@ struct file_list *recv_file_list(int f)
 
 	flist = flist_new("recv_file_list");
 
+#ifdef SUPPORT_HARD_LINKS
+	if (preserve_hard_links && protocol_version < 30)
+		init_hard_links();
+#endif
 
 	while ((flags = read_byte(f)) != 0) {
 		struct file_struct *file;
