@@ -744,9 +744,8 @@ void maybe_log_item(struct file_struct *file, int iflags, int itemizing,
 void log_delete(const char *fname, int mode)
 {
 	static struct {
-		union flist_extras ex[4]; /* just in case... */
+		union file_extras ex[4]; /* just in case... */
 		struct file_struct file;
-		char basename[1];
 	} x;
 	int len = strlen(fname);
 	const char *fmt;
