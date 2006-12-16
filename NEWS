@@ -34,6 +34,16 @@ Changes since 2.6.9:
       older rsync will generate an error.  *Be sure to never specify a 0
       value to an older rsync client, or it will be silently ignored.*
 
+    - The --hard-link option now uses less memory on both the sending and
+      receiving side for all protocol versions.  For protocol 30, the use
+      of a hashtable on the sending side allows us to more efficiently
+      convey to the receiver what files are linked together.  This reduces
+      the amount of data sent over the socket by a considerable margin, and
+      moves the in-memory storage of the device+inode information from the
+      receiving side (for protocols < 30) to the sending side (note that
+      older rsync versions kept the device+inode information on both
+      sides).
+
   INTERNAL:
 
     - Added some isType() functions that make dealing with signed characters
