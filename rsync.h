@@ -510,14 +510,15 @@ struct idev_node {
 
 #define GID_NONE ((gid_t)-1)
 
+union file_extras {
+	uid_t uid;		/* The user ID number */
+	uid_t gid;		/* The group ID number or GID_NONE */
+	struct idev *idev;	/* The hard-link info during matching */
+	int32 num;		/* A signed number */
+	uint32 unum;		/* An unsigned number */
+};
+
 struct file_struct {
-	union flist_extras {
-		uid_t uid;           /* The user ID number */
-		uid_t gid;           /* The group ID number or GID_NONE */
-		struct idev *idev;   /* The hard-link info during matching */
-		int32 num;           /* A signed number */
-		uint32 unum;         /* An unsigned number */
-	} extras[1];
 	time_t modtime;              /* When the item was last modified */
 	const char *dirname;         /* The dir info inside the transfer */
 	union {
@@ -535,11 +536,11 @@ extern int preserve_uid;
 extern int preserve_gid;
 
 #define FILE_STRUCT_LEN (offsetof(struct file_struct, basename))
-#define EXTRA_LEN (sizeof (union flist_extras))
+#define EXTRA_LEN (sizeof (union file_extras))
 #define SUM_EXTRA_CNT ((MD4_SUM_LENGTH + EXTRA_LEN - 1) / EXTRA_LEN)
 
-#define REQ_EXTRA(f,ndx) ((f)->extras - (ndx - 1))
-#define OPT_EXTRA(f,bump) ((f)->extras - flist_extra_cnt - (bump))
+#define REQ_EXTRA(f,ndx) ((union file_extras*)(f) - (ndx))
+#define OPT_EXTRA(f,bump) ((union file_extras*)(f) - flist_extra_cnt - 1 - (bump))
 
 #define LEN64_BUMP(f) ((f)->flags & FLAG_LENGTH64 ? 1 : 0)
 #define HLINK_BUMP(f) (F_IS_HLINKED(f) ? 1 : 0)
