@@ -66,7 +66,7 @@ export RSYNC_CONNECT_PROG
 rm -r "$todir"
 makepath "$todir"
 
-checkit "$RSYNC -rtvv \"$fromdir/\" localhost::test-incoming-chmod/" "$checkdir" "$todir"
+checkit "$RSYNC -avv --no-perms \"$fromdir/\" localhost::test-incoming-chmod/" "$checkdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
