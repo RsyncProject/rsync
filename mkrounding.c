@@ -37,9 +37,11 @@ struct test4 {
 	cnt = 3;
     }
     if (cnt)
-	fprintf(stderr, "Rounding file_extras values in multiples of %d.\n", cnt + 1);
+	fprintf(stderr, "Rounding file_extras values in multiples of %d", cnt + 1);
     else
-	fprintf(stderr, "No rounding needed for file_extras values.\n");
+	fprintf(stderr, "No rounding needed for file_extras values");
+    fprintf(stderr, " (EXTRA_LEN=%d, FILE_STRUCT_LEN=%d)\n",
+	    (int)EXTRA_LEN, (int)FILE_STRUCT_LEN);
     printf("#define EXTRA_ROUNDING %d\n", cnt);
     return 0;
 }
