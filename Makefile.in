@@ -31,9 +31,9 @@ LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o \
 	lib/permstring.o lib/pool_alloc.o @LIBOBJS@
 ZLIBOBJ=zlib/deflate.o zlib/inffast.o zlib/inflate.o zlib/inftrees.o \
 	zlib/trees.o zlib/zutil.o zlib/adler32.o zlib/compress.o zlib/crc32.o
-OBJS1=rsync.o generator.o receiver.o cleanup.o sender.o exclude.o util.o \
-	main.o checksum.o match.o syscall.o log.o backup.o
-OBJS2=options.o flist.o io.o compat.o hlink.o token.o uidlist.o socket.o \
+OBJS1=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
+	util.o main.o checksum.o match.o syscall.o log.o backup.o
+OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o \
 	fileio.o batch.o clientname.o chmod.o
 OBJS3=progress.o pipe.o
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
@@ -74,6 +74,16 @@ rsync$(EXEEXT): $(OBJS)
 
 $(OBJS): $(HEADERS)
 
+flist.o: rounding.h
+
+rounding.h: mkrounding$(EXEEXT)
+	./mkrounding$(EXEEXT) >rounding.h
+
+mkrounding$(EXEEXT): mkrounding.c
+	@sed '1,/^struct file_struct/d; /^}/,$$d' <rsync.h >mkrounding.h
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mkrounding.c
+	@rm mkrounding.h
+
 tls$(EXEEXT): $(TLS_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TLS_OBJ) $(LIBS)
 
@@ -101,7 +111,8 @@ proto:
 	cd $(srcdir) && $(MAKE) -f prepare-source.mak proto.h
 
 clean: cleantests
-	rm -f *~ $(OBJS) $(TLS_OBJ) $(CHECK_PROGS) $(CHECK_OBJS)
+	rm -f *~ $(OBJS) $(TLS_OBJ) $(CHECK_PROGS) $(CHECK_OBJS) \
+		mkrounding mkrounding.h rounding.h
 
 cleantests:
 	rm -rf ./testtmp*
