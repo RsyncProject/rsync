@@ -40,9 +40,9 @@ touch "$todir/foo" "$todir/bar" "$todir/baz"
 
 $RSYNC -r --exclude=baz --filter=': filters' --delete-excluded "$fromdir/" "$todir/"
 
-test -f "$todir/foo" || test_fail "rsync deleted $todir/foo"
-test -f "$todir/bar" && test_fail "rsync did not delete $todir/bar"
-test -f "$todir/baz" && test_fail "rsync did not delete $todir/baz"
+test -f "$todir/foo" || test_fail "rsync should NOT have deleted $todir/foo"
+test -f "$todir/bar" && test_fail "rsync SHOULD have deleted $todir/bar"
+test -f "$todir/baz" && test_fail "rsync SHOULD have deleted $todir/baz"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
