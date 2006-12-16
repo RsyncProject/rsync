@@ -248,7 +248,7 @@ static enum delret delete_dir_contents(char *fname, int flags)
 			continue;
 		}
 
-		strlcpy(p, F_BASENAME(fp), remainder);
+		strlcpy(p, fp->basename, remainder);
 		/* Save stack by recursing to ourself directly. */
 		if (S_ISDIR(fp->mode)
 		 && delete_dir_contents(fname, flags | DEL_RECURSE) != DR_SUCCESS)
@@ -736,7 +736,7 @@ static void generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
 {
 	int fname_len, fname_suf_len;
-	const char *fname_suf, *fname = F_BASENAME(file);
+	const char *fname_suf, *fname = file->basename;
 	uint32 lowest_dist = 25 << 16; /* ignore a distance greater than 25 */
 	int j, lowest_j = -1;
 
@@ -752,7 +752,7 @@ static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
 		if (!S_ISREG(fp->mode) || !F_LENGTH(fp) || fp->flags & FLAG_SENT)
 			continue;
 
-		name = F_BASENAME(fp);
+		name = fp->basename;
 
 		if (F_LENGTH(fp) == F_LENGTH(file)
 		    && cmp_time(fp->modtime, file->modtime) == 0) {
@@ -1616,7 +1616,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (fnamecmp_type == FNAMECMP_FUZZY)
 			iflags |= ITEM_XNAME_FOLLOWS;
 		itemize(file, -1, real_ret, &real_st, iflags, fnamecmp_type,
-			fuzzy_file ? F_BASENAME(fuzzy_file) : NULL);
+			fuzzy_file ? fuzzy_file->basename : NULL);
 	}
 
 	if (!do_xfers) {

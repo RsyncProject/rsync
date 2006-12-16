@@ -740,7 +740,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 
 #ifdef SUPPORT_LINKS
 	if (linkname_len) {
-		bp = (char*)F_BASENAME(file) + basename_len;
+		bp = (char*)file->basename + basename_len;
 		if (first_hlink_ndx >= 0) {
 			struct file_struct *first = flist->files[first_hlink_ndx];
 			memcpy(bp, F_SYMLINK(first), linkname_len);
@@ -997,7 +997,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 
 #ifdef SUPPORT_LINKS
 	if (linkname_len) {
-		bp = (char*)F_BASENAME(file) + basename_len;
+		bp = (char*)file->basename + basename_len;
 		memcpy(bp, linkname, linkname_len);
 	}
 #endif
@@ -1795,7 +1795,7 @@ static void output_flist(struct file_list *flist)
 				dir = slash = "";
 			else
 				slash = "/";
-			name = F_BASENAME(file);
+			name = file->basename;
 			trail = S_ISDIR(file->mode) ? "/" : "";
 		} else
 			dir = slash = name = trail = "";
@@ -1846,7 +1846,7 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 		c1 = c2 = NULL;
 	if (!c1) {
 		type1 = S_ISDIR(f1->mode) ? t_path : t_ITEM;
-		c1 = (uchar*)F_BASENAME(f1);
+		c1 = (const uchar*)f1->basename;
 		if (type1 == t_PATH && *c1 == '.' && !c1[1]) {
 			type1 = t_ITEM;
 			state1 = s_TRAILING;
@@ -1859,7 +1859,7 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 	}
 	if (!c2) {
 		type2 = S_ISDIR(f2->mode) ? t_path : t_ITEM;
-		c2 = (uchar*)F_BASENAME(f2);
+		c2 = (const uchar*)f2->basename;
 		if (type2 == t_PATH && *c2 == '.' && !c2[1]) {
 			type2 = t_ITEM;
 			state2 = s_TRAILING;
@@ -1883,7 +1883,7 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 				break;
 			case s_SLASH:
 				type1 = S_ISDIR(f1->mode) ? t_path : t_ITEM;
-				c1 = (uchar*)F_BASENAME(f1);
+				c1 = (const uchar*)f1->basename;
 				if (type1 == t_PATH && *c1 == '.' && !c1[1]) {
 					type1 = t_ITEM;
 					state1 = s_TRAILING;
@@ -1913,7 +1913,7 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 				break;
 			case s_SLASH:
 				type2 = S_ISDIR(f2->mode) ? t_path : t_ITEM;
-				c2 = (uchar*)F_BASENAME(f2);
+				c2 = (const uchar*)f2->basename;
 				if (type2 == t_PATH && *c2 == '.' && !c2[1]) {
 					type2 = t_ITEM;
 					state2 = s_TRAILING;
@@ -1968,9 +1968,9 @@ char *f_name(struct file_struct *f, char *fbuf)
 		int len = strlen(f->dirname);
 		memcpy(fbuf, f->dirname, len);
 		fbuf[len] = '/';
-		strlcpy(fbuf + len + 1, F_BASENAME(f), MAXPATHLEN - (len + 1));
+		strlcpy(fbuf + len + 1, f->basename, MAXPATHLEN - (len + 1));
 	} else
-		strlcpy(fbuf, F_BASENAME(f), MAXPATHLEN);
+		strlcpy(fbuf, f->basename, MAXPATHLEN);
 
 	return fbuf;
 }

@@ -526,15 +526,15 @@ struct file_struct {
 	} dir;
 	uint32 len32;                /* Lowest 32 bits of the file's length */
 	unsigned short mode;         /* The item's type and permissions */
-	unsigned short flags;        /* This item MUST remain last! */
+	unsigned short flags;        /* The FLAG_* bits for this item */
+	const char basename[1];      /* The basename (AKA filename) follows */
 };
 
 extern int flist_extra_cnt;
 extern int preserve_uid;
 extern int preserve_gid;
 
-#define FILE_STRUCT_LEN (offsetof(struct file_struct, flags) \
-			+ sizeof (unsigned short))
+#define FILE_STRUCT_LEN (offsetof(struct file_struct, basename))
 #define EXTRA_LEN (sizeof (union flist_extras))
 #define SUM_EXTRA_CNT ((MD4_SUM_LENGTH + EXTRA_LEN - 1) / EXTRA_LEN)
 
@@ -544,8 +544,7 @@ extern int preserve_gid;
 #define LEN64_BUMP(f) ((f)->flags & FLAG_LENGTH64 ? 1 : 0)
 #define HLINK_BUMP(f) (F_IS_HLINKED(f) ? 1 : 0)
 
-/* Basename (AKA filename) and length applies to all items */
-#define F_BASENAME(f) ((const char*)(f) + FILE_STRUCT_LEN)
+/* The length applies to all items. */
 #if SIZEOF_INT64 < 8
 #define F_LENGTH(f) ((int64)(f)->len32)
 #else
@@ -554,7 +553,7 @@ extern int preserve_gid;
 #endif
 
 /* If there is a symlink string, it is always right after the basename */
-#define F_SYMLINK(f) (F_BASENAME(f) + strlen(F_BASENAME(f)) + 1)
+#define F_SYMLINK(f) ((f)->basename + strlen((f)->basename) + 1)
 
 /* When the associated option is on, all entries will have these present: */
 #define F_UID(f) REQ_EXTRA(f, preserve_uid)->uid
@@ -574,7 +573,7 @@ extern int preserve_gid;
 					  + SUM_EXTRA_CNT - 1))
 
 /* Some utility defines: */
-#define F_IS_ACTIVE(f) F_BASENAME(f)[0]
+#define F_IS_ACTIVE(f) (f)->basename[0]
 #define F_IS_HLINKED(f) ((f)->flags & FLAG_HLINKED)
 #define F_HLINK_NOT_FIRST(f) BITS_SETnUNSET((f)->flags, FLAG_HLINKED, FLAG_HLINK_FIRST)
 #define F_HLINK_NOT_LAST(f) BITS_SETnUNSET((f)->flags, FLAG_HLINKED, FLAG_HLINK_LAST)
