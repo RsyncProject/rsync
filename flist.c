@@ -22,6 +22,7 @@
  */
 
 #include "rsync.h"
+#include "rounding.h"
 
 extern int verbose;
 extern int list_only;
@@ -515,7 +516,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	char thisname[MAXPATHLEN];
 	unsigned int l1 = 0, l2 = 0;
 	int alloc_len, basename_len, dirname_len, linkname_len;
-	int extra_len = (flist_extra_cnt - 1) * EXTRA_LEN;
+	int extra_len = flist_extra_cnt * EXTRA_LEN;
 	int first_hlink_ndx = -1;
 	OFF_T file_length;
 	char *basename, *dirname, *bp;
@@ -668,11 +669,16 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (file_length > 0xFFFFFFFFu && S_ISREG(mode))
 		extra_len += EXTRA_LEN;
 
+#if EXTRA_ROUNDING > 0
+	if (extra_len & (EXTRA_ROUNDING * EXTRA_LEN))
+		extra_len = (extra_len | (EXTRA_ROUNDING * EXTRA_LEN)) + EXTRA_LEN;
+#endif
+
 	alloc_len = FILE_STRUCT_LEN + extra_len + basename_len + dirname_len
 		  + linkname_len;
 	bp = pool_alloc(flist->file_pool, alloc_len, "recv_file_entry");
 
-	memset(bp, 0, FILE_STRUCT_LEN + extra_len);
+	memset(bp, 0, extra_len + FILE_STRUCT_LEN);
 	bp += extra_len;
 	file = (struct file_struct *)bp;
 	bp += FILE_STRUCT_LEN;
@@ -815,7 +821,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	char thisname[MAXPATHLEN];
 	char linkname[MAXPATHLEN];
 	int alloc_len, basename_len, dirname_len, linkname_len;
-	int extra_len = (flist_extra_cnt - 1) * EXTRA_LEN;
+	int extra_len = flist_extra_cnt * EXTRA_LEN;
 	char *basename, *dirname, *bp;
 
 	if (!flist || !flist->count)	/* Ignore lastdir when invalid. */
@@ -937,6 +943,11 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	if (st.st_size > 0xFFFFFFFFu && S_ISREG(st.st_mode))
 		extra_len += EXTRA_LEN;
 
+#if EXTRA_ROUNDING > 0
+	if (extra_len & (EXTRA_ROUNDING * EXTRA_LEN))
+		extra_len = (extra_len | (EXTRA_ROUNDING * EXTRA_LEN)) + EXTRA_LEN;
+#endif
+
 	alloc_len = FILE_STRUCT_LEN + extra_len + basename_len + dirname_len
 		  + linkname_len;
 	if (flist)
@@ -946,7 +957,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			out_of_memory("make_file");
 	}
 
-	memset(bp, 0, FILE_STRUCT_LEN + extra_len);
+	memset(bp, 0, extra_len + FILE_STRUCT_LEN);
 	bp += extra_len;
 	file = (struct file_struct *)bp;
 	bp += FILE_STRUCT_LEN;
@@ -1038,8 +1049,12 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 /* Only called for temporary file_struct entries created by make_file(). */
 void unmake_file(struct file_struct *file)
 {
-	int extra_cnt = flist_extra_cnt - 1 + LEN64_BUMP(file);
-	free(file->extras - extra_cnt);
+	int extra_cnt = flist_extra_cnt + LEN64_BUMP(file);
+#if EXTRA_ROUNDING > 0
+	if (extra_cnt & EXTRA_ROUNDING)
+		extra_cnt = (extra_cnt | EXTRA_ROUNDING) + 1;
+#endif
+	free(REQ_EXTRA(file, extra_cnt));
 }
 
 static struct file_struct *send_file_name(int f, struct file_list *flist,
@@ -1570,7 +1585,8 @@ int flist_find(struct file_list *flist, struct file_struct *f)
  */
 void clear_file(struct file_struct *file)
 {
-	memset((char*)file + EXTRA_LEN, 0, FILE_STRUCT_LEN - EXTRA_LEN + 1);
+	/* The +1 zeros out the first char of the basename. */
+	memset(file, 0, FILE_STRUCT_LEN + 1);
 	/* In an empty entry, dir.depth is an offset to the next non-empty
 	 * entry.  Likewise for len32 in the opposite direction.  We assume
 	 * that we're alone for now since flist_find() will adjust the counts
