@@ -116,7 +116,6 @@ int checksum_seed = 0;
 int inplace = 0;
 int delay_updates = 0;
 long block_size = 0; /* "long" because popt can't set an int32. */
-int flist_extra_cnt = 0; /* count of file-list extras that everyone gets */
 
 /** Network address family. **/
 #ifdef INET6
@@ -1218,11 +1217,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		}
 		need_messages_from_generator = 1;
 	}
-
-	if (preserve_uid)
-		preserve_uid = ++flist_extra_cnt;
-	if (preserve_gid)
-		preserve_gid = ++flist_extra_cnt;
 
 	*argv = poptGetArgs(pc);
 	*argc = count_args(*argv);
