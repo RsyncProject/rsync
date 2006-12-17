@@ -37,8 +37,6 @@ extern struct file_list *the_file_list;
 
 #ifdef SUPPORT_HARD_LINKS
 
-alloc_pool_t hlink_pool;
-
 #define HASH_LOAD_LIMIT(size) ((size)*3/4)
 #define FPTR(i) (the_file_list->files[i])
 
@@ -85,14 +83,7 @@ static void ihash_destroy(struct ihash_table *tbl)
 
 void init_hard_links(void)
 {
-	if (protocol_version >= 30) {
-		dev_tbl = ihash_create(16);
-		return;
-	}
-
-	if (!(hlink_pool = pool_create(HLINK_EXTENT, sizeof (struct idev),
-				       out_of_memory, POOL_INTERN)))
-		out_of_memory("init_hard_links");
+	dev_tbl = ihash_create(16);
 }
 
 static void expand_ihash(struct ihash_table *tbl)
@@ -208,24 +199,6 @@ void idev_destroy(void)
 	ihash_destroy(dev_tbl);
 }
 
-/* This routine compares dev+inode info for protocols < 30. */
-static int hlink_compare_idev(int *int1, int *int2)
-{
-	struct file_struct *f1 = FPTR(*int1);
-	struct file_struct *f2 = FPTR(*int2);
-	struct idev *i1 = F_HL_IDEV(f1);
-	struct idev *i2 = F_HL_IDEV(f2);
-
-	if (i1->dev != i2->dev)
-		return i1->dev > i2->dev ? 1 : -1;
-
-	if (i1->ino != i2->ino)
-		return i1->ino > i2->ino ? 1 : -1;
-
-	return *int1 > *int2 ? 1 : -1;
-}
-
-/* This routine compares group numbers for protocols >= 30. */
 static int hlink_compare_gnum(int *int1, int *int2)
 {
 	struct file_struct *f1 = FPTR(*int1);
@@ -239,41 +212,6 @@ static int hlink_compare_gnum(int *int1, int *int2)
 	return *int1 > *int2 ? 1 : -1;
 }
 
-/* The match routine for protocols < 30. */
-static void match_idevs(int32 *ndx_list, int ndx_count)
-{
-	int32 from, prev;
-	struct file_struct *file, *file_next;
-	struct idev *idev, *idev_next;
-
-	qsort(ndx_list, ndx_count, sizeof ndx_list[0],
-	     (int (*)()) hlink_compare_idev);
-
-	for (from = 0; from < ndx_count; from++) {
-		for (file = FPTR(ndx_list[from]), idev = F_HL_IDEV(file), prev = -1;
-		     from < ndx_count-1;
-		     file = file_next, idev = idev_next, prev = ndx_list[from++])
-		{
-			file_next = FPTR(ndx_list[from+1]);
-			idev_next = F_HL_IDEV(file_next);
-			if (idev->dev != idev_next->dev || idev->ino != idev_next->ino)
-				break;
-			pool_free(hlink_pool, 0, idev);
-			if (prev < 0)
-				file->flags |= FLAG_HLINK_FIRST;
-			F_HL_PREV(file) = prev;
-		}
-		pool_free(hlink_pool, 0, idev);
-		if (prev < 0)
-			file->flags &= ~FLAG_HLINKED;
-		else {
-			file->flags |= FLAG_HLINK_LAST;
-			F_HL_PREV(file) = prev;
-		}
-	}
-}
-
-/* The match routine for protocols >= 30. */
 static void match_gnums(int32 *ndx_list, int ndx_count)
 {
 	int32 from, prev;
@@ -322,15 +260,12 @@ void match_hard_links(void)
 			ndx_list[ndx_count++] = i;
 	}
 
-	if (ndx_count) {
-		if (protocol_version >= 30)
-			match_gnums(ndx_list, ndx_count);
-		else {
-			match_idevs(ndx_list, ndx_count);
-			pool_destroy(hlink_pool);
-		}
-	}
+	if (ndx_count)
+		match_gnums(ndx_list, ndx_count);
+
 	free(ndx_list);
+	if (protocol_version < 30)
+		idev_destroy();
 }
 
 static int maybe_hard_link(struct file_struct *file, int ndx,
