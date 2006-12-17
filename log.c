@@ -516,9 +516,9 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 				strlcpy(c, fname, MAXPATHLEN);
 			} else
 				c = f_name(file, NULL);
-			if (am_sender && file->dir.root) {
+			if (am_sender && F_ROOTDIR(file)) {
 				pathjoin(buf2, sizeof buf2,
-					 file->dir.root, c);
+					 F_ROOTDIR(file), c);
 				clean_fname(buf2, 0);
 				if (fmt[1]) {
 					strlcpy(c, buf2, MAXPATHLEN);

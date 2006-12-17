@@ -128,9 +128,9 @@ void successful_send(int ndx)
 		return;
 
 	file = the_file_list->files[ndx];
-	if (file->dir.root) {
+	if (F_ROOTDIR(file)) {
 		offset = stringjoin(fname, sizeof fname,
-				    file->dir.root, "/", NULL);
+				    F_ROOTDIR(file), "/", NULL);
 	} else
 		offset = 0;
 	f_name(file, fname + offset);
@@ -202,9 +202,9 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			continue;
 
 		file = flist->files[i];
-		if (file->dir.root) {
+		if (F_ROOTDIR(file)) {
 			/* N.B. We're sure that this fits, so offset is OK. */
-			offset = strlcpy(fname, file->dir.root, sizeof fname);
+			offset = strlcpy(fname, F_ROOTDIR(file), sizeof fname);
 			if (!offset || fname[offset-1] != '/')
 				fname[offset++] = '/';
 		} else
