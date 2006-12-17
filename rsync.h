@@ -216,6 +216,9 @@ enum msgcode {
 #ifdef HAVE_STRINGS_H
 # include <strings.h>
 #endif
+#ifdef HAVE_INTTYPES_H
+# include <inttypes.h>
+#endif
 #ifdef HAVE_UNISTD_H
 # include <unistd.h>
 #endif
@@ -355,11 +358,30 @@ enum msgcode {
 #define schar char
 #endif
 
+#ifndef int16
+#if SIZEOF_INT16_T == 2
+# define int16 int16_t
+#else
+# define int16 short
+#endif
+#endif
+
+#ifndef uint16
+#if SIZEOF_UINT16_T == 2
+# define uint16 uint16_t
+#else
+# define uint16 unsigned int16
+#endif
+#endif
+
 /* Find a variable that is either exactly 32-bits or longer.
  * If some code depends on 32-bit truncation, it will need to
  * take special action in a "#if SIZEOF_INT32 > 4" section. */
 #ifndef int32
-#if SIZEOF_INT == 4
+#if SIZEOF_INT32_T == 4
+# define int32 int32_t
+# define SIZEOF_INT32 4
+#elif SIZEOF_INT == 4
 # define int32 int
 # define SIZEOF_INT32 4
 #elif SIZEOF_LONG == 4
@@ -382,7 +404,11 @@ enum msgcode {
 #endif
 
 #ifndef uint32
-#define uint32 unsigned int32
+#if SIZEOF_UINT32_T == 4
+# define uint32 uint32_t
+#else
+# define uint32 unsigned int32
+#endif
 #endif
 
 #if SIZEOF_OFF_T == 8 || !SIZEOF_OFF64_T || !defined HAVE_STRUCT_STAT64
@@ -400,7 +426,10 @@ enum msgcode {
  * to ensure that any code that really requires a 64-bit integer has
  * it (e.g. the checksum code uses two 32-bit integers for its 64-bit
  * counter). */
-#if SIZEOF_LONG == 8
+#if SIZEOF_INT64_T == 8
+# define int64 int64_t
+# define SIZEOF_INT64 8
+#elif SIZEOF_LONG == 8
 # define int64 long
 # define SIZEOF_INT64 8
 #elif SIZEOF_INT == 8
@@ -511,12 +540,12 @@ union file_extras {
 };
 
 struct file_struct {
-	const char *dirname;         /* The dir info inside the transfer */
-	time_t modtime;              /* When the item was last modified */
-	uint32 len32;                /* Lowest 32 bits of the file's length */
-	unsigned short mode;         /* The item's type and permissions */
-	unsigned short flags;        /* The FLAG_* bits for this item */
-	const char basename[1];      /* The basename (AKA filename) follows */
+	const char *dirname;	/* The dir info inside the transfer */
+	time_t modtime;		/* When the item was last modified */
+	uint32 len32;		/* Lowest 32 bits of the file's length */
+	uint16 mode;		/* The item's type and permissions */
+	uint16 flags;		/* The FLAG_* bits for this item */
+	const char basename[1];	/* The basename (AKA filename) follows */
 };
 
 extern int flist_extra_cnt;
