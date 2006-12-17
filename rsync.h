@@ -456,11 +456,6 @@ enum msgcode {
  * where dev_t is a struct.
  */
 
-struct idev {
-	int64 ino;
-	int64 dev;
-};
-
 struct idev_node {
 	int64 key;
 	void *data;
@@ -511,20 +506,13 @@ struct idev_node {
 #define GID_NONE ((gid_t)-1)
 
 union file_extras {
-	uid_t uid;		/* The user ID number */
-	uid_t gid;		/* The group ID number or GID_NONE */
-	struct idev *idev;	/* The hard-link info during matching */
-	int32 num;		/* A signed number */
-	uint32 unum;		/* An unsigned number */
+	int32 num;
+	uint32 unum;
 };
 
 struct file_struct {
-	time_t modtime;              /* When the item was last modified */
 	const char *dirname;         /* The dir info inside the transfer */
-	union {
-		const char *root;    /* Sender-side dir info outside transfer */
-		int32 depth;         /* Receiver-side directory depth info */
-	} dir;
+	time_t modtime;              /* When the item was last modified */
 	uint32 len32;                /* Lowest 32 bits of the file's length */
 	unsigned short mode;         /* The item's type and permissions */
 	unsigned short flags;        /* The FLAG_* bits for this item */
@@ -537,6 +525,7 @@ extern int preserve_gid;
 
 #define FILE_STRUCT_LEN (offsetof(struct file_struct, basename))
 #define EXTRA_LEN (sizeof (union file_extras))
+#define PTR_EXTRA_LEN ((sizeof (char *) + EXTRA_LEN - 1) / EXTRA_LEN)
 #define SUM_EXTRA_CNT ((MD4_SUM_LENGTH + EXTRA_LEN - 1) / EXTRA_LEN)
 
 #define REQ_EXTRA(f,ndx) ((union file_extras*)(f) - (ndx))
@@ -556,12 +545,17 @@ extern int preserve_gid;
 /* If there is a symlink string, it is always right after the basename */
 #define F_SYMLINK(f) ((f)->basename + strlen((f)->basename) + 1)
 
+/* The sending side always has this available: */
+#define F_ROOTDIR(f) (*(const char**)REQ_EXTRA(f, PTR_EXTRA_LEN))
+
+/* The receiving side always has this available: */
+#define F_DEPTH(f) REQ_EXTRA(f, 1)->num
+
 /* When the associated option is on, all entries will have these present: */
-#define F_UID(f) REQ_EXTRA(f, preserve_uid)->uid
-#define F_GID(f) REQ_EXTRA(f, preserve_gid)->gid
+#define F_UID(f) REQ_EXTRA(f, preserve_uid)->unum
+#define F_GID(f) REQ_EXTRA(f, preserve_gid)->unum
 
 /* These items are per-entry optional and mutally exclusive: */
-#define F_HL_IDEV(f) OPT_EXTRA(f, LEN64_BUMP(f))->idev
 #define F_HL_GNUM(f) OPT_EXTRA(f, LEN64_BUMP(f))->num
 #define F_HL_PREV(f) OPT_EXTRA(f, LEN64_BUMP(f))->num
 
