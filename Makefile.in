@@ -79,7 +79,7 @@ flist.o: rounding.h
 rounding.h: mkrounding$(EXEEXT)
 	./mkrounding$(EXEEXT) >rounding.h
 
-mkrounding$(EXEEXT): mkrounding.c
+mkrounding$(EXEEXT): mkrounding.c rsync.h
 	@sed '1,/^struct file_struct/d; /^}/,$$d' <rsync.h >mkrounding.h
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mkrounding.c
 	@rm mkrounding.h
@@ -155,6 +155,9 @@ test: check
 
 check: all $(CHECK_PROGS)
 	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh
+
+check29: all $(CHECK_PROGS)
+	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh --protocol=29
 
 wildtest.o: wildtest.c lib/wildmatch.c rsync.h
 wildtest$(EXEEXT): wildtest.o lib/compat.o lib/snprintf.o
