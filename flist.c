@@ -59,7 +59,6 @@ extern int protocol_version;
 extern int sanitize_paths;
 extern struct stats stats;
 extern struct file_list *the_file_list;
-extern alloc_pool_t hlink_pool;
 
 extern char curr_dir[MAXPATHLEN];
 
@@ -77,7 +76,7 @@ dev_t filesystem_dev; /* used to implement -x */
  * will survive just long enough to be used by send_file_entry(). */
 static dev_t tmp_rdev;
 #ifdef SUPPORT_HARD_LINKS
-static struct idev tmp_idev;
+static int64 tmp_dev, tmp_ino;
 #endif
 static char tmp_sum[MD4_SUM_LENGTH];
 
@@ -370,9 +369,9 @@ static void send_file_entry(struct file_struct *file, int f, int ndx)
 		modtime = file->modtime;
 
 #ifdef SUPPORT_HARD_LINKS
-	if (tmp_idev.dev != 0) {
+	if (tmp_dev != 0) {
 		if (protocol_version >= 30) {
-			struct idev_node *np = idev_node(tmp_idev.dev, tmp_idev.ino);
+			struct idev_node *np = idev_node(tmp_dev, tmp_ino);
 			first_hlink_ndx = (int32)np->data - 1;
 			if (first_hlink_ndx < 0) {
 				np->data = (void*)(ndx + 1);
@@ -380,11 +379,11 @@ static void send_file_entry(struct file_struct *file, int f, int ndx)
 			}
 			flags |= XMIT_HLINKED;
 		} else {
-			if (tmp_idev.dev == dev) {
+			if (tmp_dev == dev) {
 				if (protocol_version >= 28)
 					flags |= XMIT_SAME_DEV_pre30;
 			} else
-				dev = tmp_idev.dev;
+				dev = tmp_dev;
 			flags |= XMIT_HLINKED;
 		}
 	}
@@ -470,16 +469,16 @@ static void send_file_entry(struct file_struct *file, int f, int ndx)
 #endif
 
 #ifdef SUPPORT_HARD_LINKS
-	if (tmp_idev.dev != 0 && protocol_version < 30) {
+	if (tmp_dev != 0 && protocol_version < 30) {
 		if (protocol_version < 26) {
 			/* 32-bit dev_t and ino_t */
 			write_int(f, (int32)dev);
-			write_int(f, (int32)tmp_idev.ino);
+			write_int(f, (int32)tmp_ino);
 		} else {
 			/* 64-bit dev_t and ino_t */
 			if (!(flags & XMIT_SAME_DEV_pre30))
 				write_longint(f, dev);
-			write_longint(f, tmp_idev.ino);
+			write_longint(f, tmp_ino);
 		}
 	}
 #endif
@@ -709,19 +708,19 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		bp += dirname_len;
 		bp[-1] = '\0';
 		lastdir_depth = count_dir_elements(lastdir);
-		file->dir.depth = lastdir_depth + 1;
+		F_DEPTH(file) = lastdir_depth + 1;
 	} else if (dirname) {
 		file->dirname = dirname; /* we're reusing lastname */
-		file->dir.depth = lastdir_depth + 1;
+		F_DEPTH(file) = lastdir_depth + 1;
 	} else
-		file->dir.depth = 1;
+		F_DEPTH(file) = 1;
 
 	if (S_ISDIR(mode)) {
 		if (basename_len == 1+1 && *basename == '.') /* +1 for '\0' */
-			file->dir.depth--;
+			F_DEPTH(file)--;
 		if (flags & XMIT_TOP_DIR) {
 			in_del_hier = recurse;
-			del_hier_name_len = file->dir.depth == 0 ? 0 : l1 + l2;
+			del_hier_name_len = F_DEPTH(file) == 0 ? 0 : l1 + l2;
 			if (relative_paths && del_hier_name_len > 2
 			    && lastname[del_hier_name_len-1] == '.'
 			    && lastname[del_hier_name_len-2] == '/')
@@ -763,18 +762,25 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 			F_HL_GNUM(file) = flags & XMIT_HLINK_FIRST
 					? flist->count : first_hlink_ndx;
 		} else {
-			struct idev *idevp = pool_talloc(hlink_pool, struct idev,
-							 1, "inode_table");
-			F_HL_IDEV(file) = idevp;
+			static int32 cnt = 0;
+			struct idev_node *np;
+			int64 ino;
+			int32 ndx;
 			if (protocol_version < 26) {
-				idevp->dev = read_int(f);
-				idevp->ino = read_int(f);
+				dev = read_int(f);
+				ino = read_int(f);
 			} else {
 				if (!(flags & XMIT_SAME_DEV_pre30))
 					dev = read_longint(f);
-				idevp->dev = dev;
-				idevp->ino = read_longint(f);
+				ino = read_longint(f);
 			}
+			np = idev_node(dev, ino);
+			ndx = (int32)np->data - 1;
+			if (ndx < 0) {
+				ndx = cnt++;
+				np->data = (void*)cnt;
+			}
+			F_HL_GNUM(file) = ndx;
 		}
 	}
 #endif
@@ -970,10 +976,10 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		if (protocol_version >= 28
 		 ? (!S_ISDIR(st.st_mode) && st.st_nlink > 1)
 		 : S_ISREG(st.st_mode)) {
-			tmp_idev.dev = st.st_dev;
-			tmp_idev.ino = st.st_ino;
+			tmp_dev = st.st_dev;
+			tmp_ino = st.st_ino;
 		} else
-			tmp_idev.dev = tmp_idev.ino = 0;
+			tmp_dev = 0;
 	}
 #endif
 
@@ -1016,7 +1022,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	if (always_checksum && am_sender && S_ISREG(st.st_mode))
 		file_checksum(thisname, tmp_sum, st.st_size);
 
-	file->dir.root = flist_dir;
+	F_ROOTDIR(file) = flist_dir;
 
 	/* This code is only used by the receiver when it is building
 	 * a list of files for a delete pass. */
@@ -1543,12 +1549,12 @@ int flist_find(struct file_list *flist, struct file_struct *f)
 			/* Scan for the next non-empty entry using the cached
 			 * distance values.  If the value isn't fully up-to-
 			 * date, update it. */
-			mid_up = mid + flist->files[mid]->dir.depth;
+			mid_up = mid + F_DEPTH(flist->files[mid]);
 			if (!F_IS_ACTIVE(flist->files[mid_up])) {
 				do {
-				    mid_up += flist->files[mid_up]->dir.depth;
+				    mid_up += F_DEPTH(flist->files[mid_up]);
 				} while (!F_IS_ACTIVE(flist->files[mid_up]));
-				flist->files[mid]->dir.depth = mid_up - mid;
+				F_DEPTH(flist->files[mid]) = mid_up - mid;
 			}
 			if (mid_up > high) {
 				/* If there's nothing left above us, set high to
@@ -1587,11 +1593,11 @@ void clear_file(struct file_struct *file)
 {
 	/* The +1 zeros out the first char of the basename. */
 	memset(file, 0, FILE_STRUCT_LEN + 1);
-	/* In an empty entry, dir.depth is an offset to the next non-empty
+	/* In an empty entry, F_DEPTH() is an offset to the next non-empty
 	 * entry.  Likewise for len32 in the opposite direction.  We assume
 	 * that we're alone for now since flist_find() will adjust the counts
 	 * it runs into that aren't up-to-date. */
-	file->len32 = file->dir.depth = 1;
+	file->len32 = F_DEPTH(file) = 1;
 }
 
 /* Allocate a new file list. */
@@ -1725,49 +1731,49 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 		for (i = flist->low; i <= flist->high; i++) {
 			struct file_struct *fp, *file = flist->files[i];
 
-			/* This temporarily abuses the dir.depth value for a
+			/* This temporarily abuses the F_DEPTH() value for a
 			 * directory that is in a chain that might get pruned.
 			 * We restore the old value if it gets a reprieve. */
-			if (S_ISDIR(file->mode) && file->dir.depth) {
+			if (S_ISDIR(file->mode) && F_DEPTH(file)) {
 				/* Dump empty dirs when coming back down. */
-				for (j = prev_depth; j >= file->dir.depth; j--) {
+				for (j = prev_depth; j >= F_DEPTH(file); j--) {
 					fp = flist->files[prev_i];
-					if (fp->dir.depth >= 0)
+					if (F_DEPTH(fp) >= 0)
 						break;
-					prev_i = -fp->dir.depth-1;
+					prev_i = -F_DEPTH(fp)-1;
 					clear_file(fp);
 				}
-				prev_depth = file->dir.depth;
+				prev_depth = F_DEPTH(file);
 				if (is_excluded(f_name(file, fbuf), 1,
 						       ALL_FILTERS)) {
 					/* Keep dirs through this dir. */
 					for (j = prev_depth-1; ; j--) {
 						fp = flist->files[prev_i];
-						if (fp->dir.depth >= 0)
+						if (F_DEPTH(fp) >= 0)
 							break;
-						prev_i = -fp->dir.depth-1;
-						fp->dir.depth = j;
+						prev_i = -F_DEPTH(fp)-1;
+						F_DEPTH(fp) = j;
 					}
 				} else
-					file->dir.depth = -prev_i-1;
+					F_DEPTH(file) = -prev_i-1;
 				prev_i = i;
 			} else {
 				/* Keep dirs through this non-dir. */
 				for (j = prev_depth; ; j--) {
 					fp = flist->files[prev_i];
-					if (fp->dir.depth >= 0)
+					if (F_DEPTH(fp) >= 0)
 						break;
-					prev_i = -fp->dir.depth-1;
-					fp->dir.depth = j;
+					prev_i = -F_DEPTH(fp)-1;
+					F_DEPTH(fp) = j;
 				}
 			}
 		}
 		/* Dump empty all remaining empty dirs. */
 		while (1) {
 			struct file_struct *fp = flist->files[prev_i];
-			if (fp->dir.depth >= 0)
+			if (F_DEPTH(fp) >= 0)
 				break;
-			prev_i = -fp->dir.depth-1;
+			prev_i = -F_DEPTH(fp)-1;
 			clear_file(fp);
 		}
 
@@ -1788,7 +1794,7 @@ static void output_flist(struct file_list *flist)
 {
 	char uidbuf[16], gidbuf[16], depthbuf[16];
 	struct file_struct *file;
-	const char *dir, *slash, *name, *trail;
+	const char *root, *dir, *slash, *name, *trail;
 	const char *who = who_am_i();
 	int i;
 
@@ -1805,8 +1811,9 @@ static void output_flist(struct file_list *flist)
 		} else
 			*gidbuf = '\0';
 		if (!am_sender)
-			snprintf(depthbuf, sizeof depthbuf, "%d", file->dir.depth);
+			snprintf(depthbuf, sizeof depthbuf, "%d", F_DEPTH(file));
 		if (F_IS_ACTIVE(file)) {
+			root = am_sender ? NS(F_ROOTDIR(file)) : depthbuf;
 			if ((dir = file->dirname) == NULL)
 				dir = slash = "";
 			else
@@ -1814,10 +1821,9 @@ static void output_flist(struct file_list *flist)
 			name = file->basename;
 			trail = S_ISDIR(file->mode) ? "/" : "";
 		} else
-			dir = slash = name = trail = "";
+			root = dir = slash = name = trail = "";
 		rprintf(FINFO, "[%s] i=%d %s %s%s%s%s mode=0%o len=%.0f%s%s flags=%x\n",
-			who, i, am_sender ? NS(file->dir.root) : depthbuf,
-			dir, slash, name, trail, (int)file->mode,
+			who, i, root, dir, slash, name, trail, (int)file->mode,
 			(double)F_LENGTH(file), uidbuf, gidbuf, file->flags);
 	}
 }
