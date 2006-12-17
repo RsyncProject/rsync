@@ -430,7 +430,7 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 	if (allowed_lull)
 		maybe_send_keepalive();
 
-	if (file->dir.depth >= MAXPATHLEN/2+1)
+	if (F_DEPTH(file) >= MAXPATHLEN/2+1)
 		return; /* Impossible... */
 
 	if (io_error && !(lp_ignore_errors(module_id) || ignore_errors)) {
@@ -442,9 +442,9 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 		return;
 	}
 
-	while (cur_depth >= file->dir.depth && cur_depth >= min_depth)
+	while (cur_depth >= F_DEPTH(file) && cur_depth >= min_depth)
 		pop_local_filters(filt_array[cur_depth--]);
-	cur_depth = file->dir.depth;
+	cur_depth = F_DEPTH(file);
 	if (min_depth > cur_depth)
 		min_depth = cur_depth;
 	dlen = strlen(fbuf);
@@ -1098,14 +1098,14 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (server_filter_list.head) {
 		if (excluded_below >= 0) {
-			if (file->dir.depth > excluded_below)
+			if (F_DEPTH(file) > excluded_below)
 				goto skipping;
 			excluded_below = -1;
 		}
 		if (check_filter(&server_filter_list, fname,
 				 S_ISDIR(file->mode)) < 0) {
 			if (S_ISDIR(file->mode))
-				excluded_below = file->dir.depth;
+				excluded_below = F_DEPTH(file);
 		  skipping:
 			if (verbose) {
 				rprintf(FINFO,
@@ -1117,7 +1117,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (missing_below >= 0) {
-		if (file->dir.depth <= missing_below) {
+		if (F_DEPTH(file) <= missing_below) {
 			if (dry_run)
 				dry_run--;
 			missing_below = -1;
@@ -1186,7 +1186,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			statret = -1;
 		}
 		if (dry_run && statret != 0 && missing_below < 0) {
-			missing_below = file->dir.depth;
+			missing_below = F_DEPTH(file);
 			dry_run++;
 		}
 		real_ret = statret;
@@ -1218,10 +1218,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					full_fname(fname));
 				file->flags |= FLAG_MISSING_DIR;
 				if (ndx+1 < the_file_list->count
-				 && the_file_list->files[ndx+1]->dir.depth > file->dir.depth) {
+				 && F_DEPTH(the_file_list->files[ndx+1]) > F_DEPTH(file)) {
 					rprintf(FERROR,
 					    "*** Skipping everything below this failed directory ***\n");
-					missing_below = file->dir.depth;
+					missing_below = F_DEPTH(file);
 				}
 				return;
 			}
@@ -1825,10 +1825,10 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 			if (!need_retouch_dir_times && file->mode & S_IWUSR)
 				continue;
 			if (file->flags & FLAG_MISSING_DIR) {
-				int missing = file->dir.depth;
+				int missing = F_DEPTH(file);
 				while (++i < flist->count) {
 					file = flist->files[i];
-					if (file->dir.depth <= missing)
+					if (F_DEPTH(file) <= missing)
 						break;
 				}
 				i--;
