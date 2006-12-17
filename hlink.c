@@ -58,9 +58,9 @@ static struct ihash_table *ihash_create(int size)
 	struct ihash_table *tbl;
 
 	/* Pick a power of 2 that can hold the requested size. */
-	if (size & (size-1)) {
+	if (size & (size-1) || size < 16) {
 		int req = size;
-		size = 32;
+		size = 16;
 		while (size < req)
 			size *= 2;
 	}
@@ -88,14 +88,13 @@ void init_hard_links(void)
 
 static void expand_ihash(struct ihash_table *tbl)
 {
-	struct idev_node *old_buckets;
+	struct idev_node *old_buckets = tbl->buckets;
 	int size = tbl->size * 2;
 	int i;
 
-	old_buckets = tbl->buckets;
 	if (!(tbl->buckets = new_array(struct idev_node, size)))
 		out_of_memory("ihash_create");
-	memset(tbl->buckets, 0, size * sizeof tbl->buckets[0]);
+	memset(tbl->buckets, 0, size * sizeof (struct idev_node));
 	tbl->size = size;
 	tbl->entries = 0;
 
@@ -203,8 +202,8 @@ static int hlink_compare_gnum(int *int1, int *int2)
 {
 	struct file_struct *f1 = FPTR(*int1);
 	struct file_struct *f2 = FPTR(*int2);
-	int gnum1 = F_HL_GNUM(f1);
-	int gnum2 = F_HL_GNUM(f2);
+	int32 gnum1 = F_HL_GNUM(f1);
+	int32 gnum2 = F_HL_GNUM(f2);
 
 	if (gnum1 != gnum2)
 		return gnum1 > gnum2 ? 1 : -1;
@@ -216,7 +215,7 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 {
 	int32 from, prev;
 	struct file_struct *file, *file_next;
-	int gnum, gnum_next;
+	int32 gnum, gnum_next;
 
 	qsort(ndx_list, ndx_count, sizeof ndx_list[0],
 	     (int (*)()) hlink_compare_gnum);
