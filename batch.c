@@ -36,19 +36,16 @@ extern int always_checksum;
 extern int do_compression;
 extern int def_compress_level;
 extern int protocol_version;
-extern int flist_extra_cnt;
 extern char *batch_name;
 
 extern struct filter_list_struct filter_list;
 
-static int tweaked_preserve_uid;
-static int tweaked_preserve_gid;
 static int tweaked_compress_level;
 
 static int *flag_ptr[] = {
 	&recurse,		/* 0 */
-	&tweaked_preserve_uid,	/* 1 */
-	&tweaked_preserve_gid,	/* 2 */
+	&preserve_uid,		/* 1 */
+	&preserve_gid,		/* 2 */
 	&preserve_links,	/* 3 */
 	&preserve_devices,	/* 4 */
 	&preserve_hard_links,	/* 5 */
@@ -75,8 +72,6 @@ void write_stream_flags(int fd)
 {
 	int i, flags;
 
-	tweaked_preserve_uid = preserve_uid != 0;
-	tweaked_preserve_gid = preserve_gid != 0;
 #if Z_DEFAULT_COMPRESSION == -1
 	tweaked_compress_level = do_compression ? def_compress_level + 2 : 0;
 #else
@@ -118,16 +113,6 @@ void read_stream_flags(int fd)
 			xfer_dirs = 0;
 	}
 
-	if (tweaked_preserve_uid) {
-		if (!preserve_uid)
-			preserve_uid = ++flist_extra_cnt;
-	} else
-		preserve_uid = 0;
-	if (tweaked_preserve_gid) {
-		if (!preserve_gid)
-			preserve_gid = ++flist_extra_cnt;
-	} else
-		preserve_gid = 0;
 	if (tweaked_compress_level == 0 || tweaked_compress_level == 2)
 		do_compression = 0;
 	else {
