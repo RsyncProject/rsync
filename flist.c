@@ -49,7 +49,7 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int relative_paths;
 extern int implied_dirs;
-extern int flist_extra_cnt;
+extern int file_extra_cnt;
 extern int ignore_perishable;
 extern int non_perishable_cnt;
 extern int prune_empty_dirs;
@@ -312,7 +312,6 @@ void flist_expand(struct file_list *flist)
 
 static void send_file_entry(struct file_struct *file, int f, int ndx)
 {
-	unsigned short flags;
 	static time_t modtime;
 	static mode_t mode;
 	static int64 dev;
@@ -324,6 +323,7 @@ static void send_file_entry(struct file_struct *file, int f, int ndx)
 	char fname[MAXPATHLEN];
 	int first_hlink_ndx = -1;
 	int l1, l2;
+	int flags;
 
 	f_name(file, fname);
 
@@ -499,7 +499,7 @@ static void send_file_entry(struct file_struct *file, int f, int ndx)
 }
 
 static struct file_struct *recv_file_entry(struct file_list *flist,
-					   unsigned short flags, int f)
+					   int flags, int f)
 {
 	static time_t modtime;
 	static mode_t mode;
@@ -515,7 +515,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	char thisname[MAXPATHLEN];
 	unsigned int l1 = 0, l2 = 0;
 	int alloc_len, basename_len, dirname_len, linkname_len;
-	int extra_len = flist_extra_cnt * EXTRA_LEN;
+	int extra_len = file_extra_cnt * EXTRA_LEN;
 	int first_hlink_ndx = -1;
 	OFF_T file_length;
 	char *basename, *dirname, *bp;
@@ -827,7 +827,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	char thisname[MAXPATHLEN];
 	char linkname[MAXPATHLEN];
 	int alloc_len, basename_len, dirname_len, linkname_len;
-	int extra_len = flist_extra_cnt * EXTRA_LEN;
+	int extra_len = file_extra_cnt * EXTRA_LEN;
 	char *basename, *dirname, *bp;
 
 	if (!flist || !flist->count)	/* Ignore lastdir when invalid. */
@@ -1055,7 +1055,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 /* Only called for temporary file_struct entries created by make_file(). */
 void unmake_file(struct file_struct *file)
 {
-	int extra_cnt = flist_extra_cnt + LEN64_BUMP(file);
+	int extra_cnt = file_extra_cnt + LEN64_BUMP(file);
 #if EXTRA_ROUNDING > 0
 	if (extra_cnt & EXTRA_ROUNDING)
 		extra_cnt = (extra_cnt | EXTRA_ROUNDING) + 1;
@@ -1065,7 +1065,7 @@ void unmake_file(struct file_struct *file)
 
 static struct file_struct *send_file_name(int f, struct file_list *flist,
 					  char *fname, STRUCT_STAT *stp,
-					  unsigned short flags)
+					  int flags)
 {
 	struct file_struct *file;
 
@@ -1454,7 +1454,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 struct file_list *recv_file_list(int f)
 {
 	struct file_list *flist;
-	unsigned short flags;
+	int flags;
 	int64 start_read;
 
 	rprintf(FLOG, "receiving file list\n");

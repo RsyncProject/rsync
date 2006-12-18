@@ -548,7 +548,7 @@ struct file_struct {
 	const char basename[1];	/* The basename (AKA filename) follows */
 };
 
-extern int flist_extra_cnt;
+extern int file_extra_cnt;
 extern int preserve_uid;
 extern int preserve_gid;
 
@@ -558,7 +558,7 @@ extern int preserve_gid;
 #define SUM_EXTRA_CNT ((MD4_SUM_LENGTH + EXTRA_LEN - 1) / EXTRA_LEN)
 
 #define REQ_EXTRA(f,ndx) ((union file_extras*)(f) - (ndx))
-#define OPT_EXTRA(f,bump) ((union file_extras*)(f) - flist_extra_cnt - 1 - (bump))
+#define OPT_EXTRA(f,bump) ((union file_extras*)(f) - file_extra_cnt - 1 - (bump))
 
 #define LEN64_BUMP(f) ((f)->flags & FLAG_LENGTH64 ? 1 : 0)
 #define HLINK_BUMP(f) (F_IS_HLINKED(f) ? 1 : 0)

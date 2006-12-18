@@ -23,7 +23,7 @@
 #include "rsync.h"
 
 int remote_protocol = 0;
-int flist_extra_cnt = 0; /* count of file-list extras that everyone gets */
+int file_extra_cnt = 0; /* count of file-list extras that everyone gets */
 
 extern int verbose;
 extern int am_server;
@@ -36,18 +36,20 @@ extern int checksum_seed;
 extern int basis_dir_cnt;
 extern int prune_empty_dirs;
 extern int protocol_version;
+extern int preserve_uid;
+extern int preserve_gid;
 extern char *dest_option;
 
 void setup_protocol(int f_out,int f_in)
 {
 	if (am_sender)
-		flist_extra_cnt += PTR_EXTRA_LEN;
+		file_extra_cnt += PTR_EXTRA_LEN;
 	else
-		flist_extra_cnt++;
+		file_extra_cnt++;
 	if (preserve_uid)
-		preserve_uid = ++flist_extra_cnt;
+		preserve_uid = ++file_extra_cnt;
 	if (preserve_gid)
-		preserve_gid = ++flist_extra_cnt;
+		preserve_gid = ++file_extra_cnt;
 
 	if (remote_protocol == 0) {
 		if (!read_batch)
