@@ -1360,6 +1360,9 @@ int main(int argc,char *argv[])
 		}
 		if (read_batch)
 			read_stream_flags(batch_fd);
+		else
+			write_stream_flags(batch_fd);
+
 	}
 	if (write_batch < 0)
 		dry_run = 1;
