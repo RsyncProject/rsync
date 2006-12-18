@@ -27,6 +27,10 @@
 
 #define TIMEOUT_SECONDS 30
 
+#ifdef HAVE_SIGACTION
+static struct sigaction sigact;
+#endif
+
 void run_program(char **command);
 
 char buf[4096];
@@ -64,7 +68,7 @@ main(int argc, char *argv[])
     }
     set_blocking(fd_file);
 
-    signal(SIGPIPE, SIG_IGN);
+    SIGACTION(SIGPIPE, SIG_IGN);
 
     run_program(argv + 1);
 
