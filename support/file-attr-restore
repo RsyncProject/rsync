@@ -32,15 +32,15 @@ my $detail_line = qr{
     \d+ \s+                   # ignore size
     ([-bcdlps])               # 1. File type
     ( [-r][-w][-xsS]          # 2. user-permissions
-      [-r][-w][-xsS]          # 3. group-permissions
-      [-r][-w][-xtT] ) \s+    # 4. other-permissions
+      [-r][-w][-xsS]          #    group-permissions
+      [-r][-w][-xtT] ) \s+    #    other-permissions
     \d+ \s+                   # ignore number of links
-    (\S+) \s+                 # 5. owner
-    (\S+) \s+                 # 6. group
+    (\S+) \s+                 # 3. owner
+    (\S+) \s+                 # 4. group
     (?: \d+ \s+ )?            # ignore size (when present)
     \w+ \s+ \d+ \s+           # ignore month and date
     \d+ (?: : \d+ )? \s+      # ignore time or year
-    ([^\r\n]+) $              # 7. name
+    ([^\r\n]+) $              # 5. name
 }x;
 
 while (<>) {
