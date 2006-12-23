@@ -525,7 +525,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 					n = c;
 				} else
 					n = buf2;
-			} else if (*c != '/') {
+			} else if (am_daemon && *c != '/') {
 				pathjoin(buf2, sizeof buf2,
 					 curr_dir + module_dirlen, c);
 				clean_fname(buf2, 0);
