@@ -22,7 +22,7 @@
 
 #include "rsync.h"
 
-int csum_length=2; /* initial value */
+int csum_length = SHORT_SUM_LENGTH; /* initial value */
 
 #define CSUM_CHUNK 64
 
