@@ -18,6 +18,9 @@ Changes since 2.6.9:
     - A negated filter rule now sends the negation option when sending the
       filter rules.
 
+    - Fixed a problem with the --out-format (aka --log-format) option:  it
+      would output superfluous directory information for a non-daemon rsync.
+
     - Fixed a problem with -vv (double --verbose) and --stats when "pushing"
       files (which includes local copies).  Version 2.6.9 would complete the
       copy, but exit with an error when the receiver output its memory stats.
