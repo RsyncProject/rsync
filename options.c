@@ -370,7 +370,7 @@ void usage(enum logcode F)
   rprintf(F,"     --out-format=FORMAT     output updates using the specified FORMAT\n");
   rprintf(F,"     --log-file=FILE         log what we're doing to the specified FILE\n");
   rprintf(F,"     --log-file-format=FMT   log updates using the specified FMT\n");
-  rprintf(F,"     --password-file=FILE    read daemon password from FILE\n");
+  rprintf(F,"     --password-file=FILE    read daemon-access password from FILE\n");
   rprintf(F,"     --list-only             list the files instead of copying them\n");
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth; KBytes per second\n");
   rprintf(F,"     --write-batch=FILE      write a batched update to FILE\n");

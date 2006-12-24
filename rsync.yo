@@ -392,7 +392,7 @@ to the detailed description below for a complete description.  verb(
      --out-format=FORMAT     output updates using the specified FORMAT
      --log-file=FILE         log what we're doing to the specified FILE
      --log-file-format=FMT   log updates using the specified FMT
-     --password-file=FILE    read daemon password from FILE
+     --password-file=FILE    read daemon-access password from FILE
      --list-only             list the files instead of copying them
      --bwlimit=KBPS          limit I/O bandwidth; KBytes per second
      --write-batch=FILE      write a batched update to FILE
