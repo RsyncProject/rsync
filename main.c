@@ -68,6 +68,7 @@ extern char *basis_dir[];
 extern char *rsync_path;
 extern char *shell_cmd;
 extern char *batch_name;
+extern char *password_file;
 extern char curr_dir[MAXPATHLEN];
 extern struct filter_list_struct server_filter_list;
 
@@ -1128,6 +1129,12 @@ static int start_client(int argc, char *argv[])
 			rprintf(FERROR, "remote destination is not allowed with --read-batch\n");
 			exit_cleanup(RERR_SYNTAX);
 		}
+	}
+
+	if (password_file && !daemon_over_rsh) {
+		rprintf(FERROR, "The --password-file option is used for "
+				"talking to an rsync daemon.\n");
+		exit_cleanup(RERR_SYNTAX);
 	}
 
 	if (shell_machine) {
