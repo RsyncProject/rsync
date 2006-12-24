@@ -1132,8 +1132,8 @@ static int start_client(int argc, char *argv[])
 	}
 
 	if (password_file && !daemon_over_rsh) {
-		rprintf(FERROR, "The --password-file option is used for "
-				"talking to an rsync daemon.\n");
+		rprintf(FERROR, "The --password-file option may only be "
+				"used when accessing an rsync daemon.\n");
 		exit_cleanup(RERR_SYNTAX);
 	}
 
