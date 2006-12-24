@@ -25,6 +25,10 @@ Changes since 2.6.9:
       files (which includes local copies).  Version 2.6.9 would complete the
       copy, but exit with an error when the receiver output its memory stats.
 
+    - If the user tries to use --password-file with using daemon mode, we now
+      complain and exit.  This should help users figure out that they can't
+      use this option to control a remote shell's password prompt.
+
   ENHANCEMENTS:
 
     - Added the --delete-delay option, which is a more efficient way to
