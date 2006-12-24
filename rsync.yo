@@ -392,7 +392,7 @@ to the detailed description below for a complete description.  verb(
      --out-format=FORMAT     output updates using the specified FORMAT
      --log-file=FILE         log what we're doing to the specified FILE
      --log-file-format=FMT   log updates using the specified FMT
-     --password-file=FILE    read password from FILE
+     --password-file=FILE    read daemon password from FILE
      --list-only             list the files instead of copying them
      --bwlimit=KBPS          limit I/O bandwidth; KBytes per second
      --write-batch=FILE      write a batched update to FILE
@@ -1717,12 +1717,14 @@ dit(bf(-P)) The bf(-P) option is equivalent to bf(--partial) bf(--progress).  It
 purpose is to make it much easier to specify these two options for a long
 transfer that may be interrupted.
 
-dit(bf(--password-file)) This option allows you to provide a password
-in a file for accessing a remote rsync daemon. Note that this option
-is only useful when accessing an rsync daemon using the built in
-transport, not when using a remote shell as the transport. The file
-must not be world readable. It should contain just the password as a
-single line.
+dit(bf(--password-file)) This option allows you to provide a password in a
+file for accessing an rsync daemon.  The file must not be world readable.
+It should contain just the password as a single line.
+
+When accessing an rsync daemon using a remote shell as the transport, this
+option only comes into effect after the remote shell finishes its
+authentication (i.e. if you have also specified a password in the daemon's
+config file).
 
 dit(bf(--list-only)) This option will cause the source files to be listed
 instead of transferred.  This option is inferred if there is a single source
