@@ -31,6 +31,7 @@ extern int am_server;
 extern int am_daemon;
 extern int am_root;
 extern int rsync_port;
+extern int ignore_errors;
 extern int kluge_around_eof;
 extern int daemon_over_rsh;
 extern int sanitize_paths;
@@ -626,6 +627,8 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	verbose = 0; /* future verbosity is controlled by client options */
 	ret = parse_arguments(&argc, (const char ***) &argv, 0);
 	quiet = 0; /* Don't let someone try to be tricky. */
+	if (lp_ignore_errors(module_id))
+		ignore_errors = 1;
 
 	if (filesfrom_fd == 0)
 		filesfrom_fd = f_in;
