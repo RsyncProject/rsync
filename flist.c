@@ -1436,7 +1436,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		send_uid_list(f);
 
 	/* send the io_error flag */
-	write_int(f, lp_ignore_errors(module_id) ? 0 : io_error);
+	write_int(f, ignore_errors ? 0 : io_error);
 
 	io_end_buffering();
 	stats.flist_size = stats.total_written - start_write;
@@ -1505,7 +1505,7 @@ struct file_list *recv_file_list(int f)
 		recv_uid_list(f, flist);
 
 		/* Recv the io_error flag */
-		if (lp_ignore_errors(module_id) || ignore_errors)
+		if (ignore_errors)
 			read_int(f);
 		else
 			io_error |= read_int(f);

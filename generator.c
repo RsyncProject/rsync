@@ -433,7 +433,7 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 	if (F_DEPTH(file) >= MAXPATHLEN/2+1)
 		return; /* Impossible... */
 
-	if (io_error && !(lp_ignore_errors(module_id) || ignore_errors)) {
+	if (io_error && !ignore_errors) {
 		if (already_warned)
 			return;
 		rprintf(FINFO,
