@@ -16,6 +16,12 @@ cd "$tmpdir"
 # Build chkdir for the daemon tests using a normal rsync and an --exclude.
 $RSYNC -av --exclude=foobar.baz "$fromdir/" "$chkdir/"
 
+$RSYNC -av --only-write-batch=BATCH --exclude=foobar.baz "$fromdir/" "$todir/missing/"
+test -d "$todir/missing" && test_fail "--only-write-batch should not have created destination dir"
+
+runtest "--read-batch (only)" 'checkit "$RSYNC -av --read-batch=BATCH \"$todir\"" "$chkdir" "$todir"'
+
+rm -rf "$todir" BATCH*
 runtest "local --write-batch" 'checkit "$RSYNC -av --write-batch=BATCH \"$fromdir/\" \"$todir\"" "$fromdir" "$todir"'
 
 rm -rf "$todir"
