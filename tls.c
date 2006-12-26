@@ -120,7 +120,7 @@ int
 main(int argc, char *argv[])
 {
 	if (argc < 2) {
-		fprintf(stderr, "usage: " PROGRAM " DIR ...\n"
+		fprintf(stderr, "usage: " PROGRAM " FILE ...\n"
 			"Trivial file listing program for portably checking rsync\n");
 		return 1;
 	}
