@@ -80,8 +80,8 @@ rounding.h: mkrounding$(EXEEXT)
 	./mkrounding$(EXEEXT) >rounding.h
 
 mkrounding$(EXEEXT): mkrounding.c rsync.h
-	@sed '1,/^struct file_struct/d; /^}/,$$d' <rsync.h >mkrounding.h
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mkrounding.c
+	@sed '1,/^struct file_struct/d; /^}/,$$d' <$(srcdir)/rsync.h >mkrounding.h
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ -I. $(srcdir)/mkrounding.c
 	@rm mkrounding.h
 
 tls$(EXEEXT): $(TLS_OBJ)
