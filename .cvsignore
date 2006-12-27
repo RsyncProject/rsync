@@ -6,8 +6,7 @@ config.cache
 config.h
 config.log
 config.status
-conftest.c
-conftest.log
+conftest*
 dox
 getgroups
 gmon.out
