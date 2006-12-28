@@ -343,7 +343,7 @@ int push_flist_dir(const char *dir, int len)
 	return 1;
 }
 
-static void send_file_entry(struct file_struct *file, int f, int ndx)
+static void send_file_entry(int f, struct file_struct *file, int ndx)
 {
 	static time_t modtime;
 	static mode_t mode;
@@ -1115,7 +1115,7 @@ void unmake_file(struct file_struct *file)
 	free(REQ_EXTRA(file, extra_cnt));
 }
 
-static struct file_struct *send_file_name(struct file_list *flist,
+static struct file_struct *send_file_name(int f, struct file_list *flist,
 					  char *fname, STRUCT_STAT *stp,
 					  int flags, int filter_flags)
 {
@@ -1132,6 +1132,8 @@ static struct file_struct *send_file_name(struct file_list *flist,
 
 	flist_expand(flist);
 	flist->files[flist->count++] = file;
+	if (f >= 0)
+		send_file_entry(f, file, flist->count - 1);
 	return file;
 }
 
@@ -1215,7 +1217,6 @@ static void send_directory(int f, struct file_list *flist, int parent_ndx,
 	int divert_dirs = (flags & FLAG_DIVERT_DIRS) != 0;
 	int start = divert_dirs ? dir_flist->count : flist->count;
 	int filter_flags = f == -2 ? SERVER_FILTERS : ALL_FILTERS;
-	struct file_struct *file;
 
 	assert(flist != NULL);
 
@@ -1244,9 +1245,7 @@ static void send_directory(int f, struct file_list *flist, int parent_ndx,
 			continue;
 		}
 
-		file = send_file_name(flist, fbuf, NULL, flags, filter_flags);
-		if (file && f >= 0)
-			send_file_entry(file, f, flist->count - 1);
+		send_file_name(f, flist, fbuf, NULL, flags, filter_flags);
 	}
 
 	fbuf[len] = '\0';
@@ -1346,7 +1345,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	char lastpath[MAXPATHLEN] = "";
 	struct file_list *flist;
 	struct timeval start_tv, end_tv;
-	struct file_struct *file;
 	int64 start_write;
 	int use_ff_fd = 0;
 	int flags, disable_buffering;
@@ -1545,9 +1543,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				xfer_dirs = 1;
 				while ((slash = strchr(slash+1, '/')) != 0) {
 					*slash = '\0';
-					file = send_file_name(flist, fbuf, NULL, dir_flags, ALL_FILTERS);
-					if (file)
-						send_file_entry(file, f, flist->count - 1);
+					send_file_name(f, flist, fbuf, NULL,
+						       dir_flags, ALL_FILTERS);
 					*slash = '/';
 				}
 				copy_links = save_copy_links;
@@ -1562,20 +1559,16 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			filesystem_dev = st.st_dev;
 
 		if (recurse || (xfer_dirs && is_dot_dir)) {
+			struct file_struct *file;
 			int top_flags = FLAG_TOP_DIR | FLAG_XFER_DIR
 				      | (is_dot_dir ? 0 : flags)
 				      | (incremental ? FLAG_DIVERT_DIRS : 0);
-			file = send_file_name(flist, fbuf, &st, top_flags, ALL_FILTERS);
-			if (file) {
-				send_file_entry(file, f, flist->count - 1);
-				if (!incremental)
-					send_if_directory(f, flist, file, fbuf, len, flags);
-			}
-		} else {
-			file = send_file_name(flist, fbuf, &st, flags, ALL_FILTERS);
-			if (file)
-				send_file_entry(file, f, flist->count - 1);
-		}
+			file = send_file_name(f, flist, fbuf, &st,
+					      top_flags, ALL_FILTERS);
+			if (file && !incremental)
+				send_if_directory(f, flist, file, fbuf, len, flags);
+		} else
+			send_file_name(f, flist, fbuf, &st, flags, ALL_FILTERS);
 	}
 
 	gettimeofday(&end_tv, NULL);
