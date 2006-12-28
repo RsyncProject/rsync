@@ -31,6 +31,7 @@ extern int logfile_format_has_i;
 extern int am_root;
 extern int am_server;
 extern int am_daemon;
+extern int incremental;
 extern int do_progress;
 extern int relative_paths;
 extern int implied_dirs;
@@ -48,7 +49,7 @@ extern int delete_mode;
 extern int delete_before;
 extern int delete_during;
 extern int delete_after;
-extern int module_id;
+extern int done_cnt;
 extern int ignore_errors;
 extern int remove_source_files;
 extern int delay_updates;
@@ -64,10 +65,12 @@ extern int size_only;
 extern OFF_T max_size;
 extern OFF_T min_size;
 extern int io_error;
+extern int flist_eof;
 extern int allowed_lull;
 extern int sock_f_out;
 extern int ignore_timeout;
 extern int protocol_version;
+extern int file_total;
 extern int fuzzy_basis;
 extern int always_checksum;
 extern int checksum_len;
@@ -90,13 +93,14 @@ extern dev_t filesystem_dev;
 extern char *backup_dir;
 extern char *backup_suffix;
 extern int backup_suffix_len;
-extern struct file_list *the_file_list;
+extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct filter_list_struct server_filter_list;
 
 int ignore_perishable = 0;
 int non_perishable_cnt = 0;
 int maybe_ATTRS_REPORT = 0;
 
+static dev_t dev_zero;
 static int deletion_count = 0; /* used to implement --max-delete */
 static int deldelay_size = 0, deldelay_cnt = 0;
 static char *deldelay_buf = NULL;
@@ -158,7 +162,7 @@ static enum delret delete_item(char *fbuf, int mode, char *replace, int flags)
 	if (S_ISDIR(mode)) {
 		what = "rmdir";
 		ok = do_rmdir(fbuf) == 0;
-	} else if (make_backups && (backup_dir || !is_backup_file(fbuf))) {
+	} else if (make_backups > 0 && (backup_dir || !is_backup_file(fbuf))) {
 		what = "make_backup";
 		ok = make_backup(fbuf);
 	} else {
@@ -407,20 +411,15 @@ static void do_delayed_deletions(char *delbuf)
  * call will append names onto the end, but the old dir value will be restored
  * on exit). */
 static void delete_in_dir(struct file_list *flist, char *fbuf,
-			  struct file_struct *file, STRUCT_STAT *stp)
+			  struct file_struct *file, dev_t *fs_dev)
 {
-	static int min_depth = MAXPATHLEN, cur_depth = -1;
-	static void *filt_array[MAXPATHLEN/2+1];
 	static int already_warned = 0;
 	struct file_list *dirlist;
 	char delbuf[MAXPATHLEN];
 	int dlen, i;
 
 	if (!flist) {
-		while (cur_depth >= min_depth)
-			pop_local_filters(filt_array[cur_depth--]);
-		min_depth = MAXPATHLEN;
-		cur_depth = -1;
+		change_local_filter_dir(NULL, 0, 0);
 		return;
 	}
 
@@ -429,9 +428,6 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 
 	if (allowed_lull)
 		maybe_send_keepalive();
-
-	if (F_DEPTH(file) >= MAXPATHLEN/2+1)
-		return; /* Impossible... */
 
 	if (io_error && !ignore_errors) {
 		if (already_warned)
@@ -442,18 +438,13 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 		return;
 	}
 
-	while (cur_depth >= F_DEPTH(file) && cur_depth >= min_depth)
-		pop_local_filters(filt_array[cur_depth--]);
-	cur_depth = F_DEPTH(file);
-	if (min_depth > cur_depth)
-		min_depth = cur_depth;
 	dlen = strlen(fbuf);
-	filt_array[cur_depth] = push_local_filters(fbuf, dlen);
+	change_local_filter_dir(fbuf, dlen, F_DEPTH(file));
 
 	if (one_file_system) {
 		if (file->flags & FLAG_TOP_DIR)
-			filesystem_dev = stp->st_dev;
-		else if (filesystem_dev != stp->st_dev)
+			filesystem_dev = *fs_dev;
+		else if (filesystem_dev != *fs_dev)
 			return;
 	}
 
@@ -510,9 +501,9 @@ static void do_delete_pass(struct file_list *flist)
 		 || !S_ISDIR(st.st_mode))
 			continue;
 
-		delete_in_dir(flist, fbuf, file, &st);
+		delete_in_dir(flist, fbuf, file, &st.st_dev);
 	}
-	delete_in_dir(NULL, NULL, NULL, NULL);
+	delete_in_dir(NULL, NULL, NULL, &dev_zero);
 
 	if (do_progress && !am_server)
 		rprintf(FINFO, "                    \r");
@@ -532,8 +523,9 @@ int unchanged_attrs(struct file_struct *file, STRUCT_STAT *st)
 	return 1;
 }
 
-void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
-	     int32 iflags, uchar fnamecmp_type, const char *xname)
+void itemize(struct file_struct *file, int ndx, int statret,
+	     STRUCT_STAT *st, int32 iflags, uchar fnamecmp_type,
+	     const char *xname)
 {
 	if (statret >= 0) { /* A from-dest-dir statret can == 1! */
 		int keep_time = !preserve_times ? 0
@@ -562,7 +554,7 @@ void itemize(struct file_struct *file, int ndx, int statret, STRUCT_STAT *st,
 	  || stdout_format_has_i > 1 || (xname && *xname)) && !read_batch) {
 		if (protocol_version >= 29) {
 			if (ndx >= 0)
-				write_int(sock_f_out, ndx);
+				write_int(sock_f_out, ndx + cur_flist->ndx_start);
 			write_shortint(sock_f_out, iflags);
 			if (iflags & ITEM_BASIS_TYPE_FOLLOWS)
 				write_byte(sock_f_out, fnamecmp_type);
@@ -584,13 +576,13 @@ int unchanged_file(char *fn, struct file_struct *file, STRUCT_STAT *st)
 
 	/* if always checksum is set then we use the checksum instead
 	   of the file time to determine whether to sync */
-	if (always_checksum && S_ISREG(st->st_mode)) {
+	if (always_checksum > 0 && S_ISREG(st->st_mode)) {
 		char sum[MD4_SUM_LENGTH];
 		file_checksum(fn, sum, st->st_size);
 		return memcmp(sum, F_SUM(file), checksum_len) == 0;
 	}
 
-	if (size_only)
+	if (size_only > 0)
 		return 1;
 
 	if (ignore_times)
@@ -749,7 +741,8 @@ static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
 		int len, suf_len;
 		uint32 dist;
 
-		if (!S_ISREG(fp->mode) || !F_LENGTH(fp) || fp->flags & FLAG_SENT)
+		if (!S_ISREG(fp->mode) || !F_LENGTH(fp)
+		 || fp->flags & FLAG_FILE_SENT)
 			continue;
 
 		name = fp->basename;
@@ -788,17 +781,15 @@ static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
 void check_for_finished_hlinks(int itemizing, enum logcode code)
 {
 	struct file_struct *file;
+	struct file_list *flist;
 	char fbuf[MAXPATHLEN];
 	int ndx;
 
 	while ((ndx = get_hlink_num()) != -1) {
-		if (ndx < 0 || ndx >= the_file_list->count)
-			continue;
-
-		file = the_file_list->files[ndx];
-		if (!F_IS_HLINKED(file))
-			continue;
-
+		flist = flist_for_ndx(ndx);
+		assert(flist != NULL);
+		file = flist->files[ndx];
+		assert(file->flags & FLAG_HLINKED);
 		finish_hard_link(file, f_name(file, fbuf), NULL, itemizing, code, -1);
 	}
 }
@@ -833,7 +824,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		case 2:
 			if (!unchanged_attrs(file, stp))
 				continue;
-			if (always_checksum && preserve_times
+			if (always_checksum > 0 && preserve_times
 			 && cmp_time(stp->st_mtime, file->modtime))
 				continue;
 			best_match = j;
@@ -1049,7 +1040,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 
 static int phase = 0;
 
-/* Acts on the_file_list->file's ndx'th item, whose name is fname.  If a dir,
+/* Acts on cur_flist->file's ndx'th item, whose name is fname.  If a dir,
  * make sure it exists, and has the right permissions/timestamp info.  For
  * all other non-regular files (symlinks, etc.) we create them here.  For
  * regular files that have changed, we try to find a basis file and then
@@ -1079,20 +1070,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (list_only)
 		return;
 
-	if (!fname) {
-		if (fuzzy_dirlist) {
-			flist_free(fuzzy_dirlist);
-			fuzzy_dirlist = NULL;
-		}
-		if (missing_below >= 0) {
-			if (dry_run)
-				dry_run--;
-			missing_below = -1;
-		}
-		parent_dirname = "";
-		return;
-	}
-
 	if (verbose > 2)
 		rprintf(FINFO, "recv_generator(%s,%d)\n", fname, ndx);
 
@@ -1121,10 +1098,18 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			if (dry_run)
 				dry_run--;
 			missing_below = -1;
-		} else if (!dry_run)
+		} else if (!dry_run) {
+			if (S_ISDIR(file->mode))
+				file->flags |= FLAG_MISSING_DIR;
 			return;
+		}
 	}
 	if (dry_run > 1) {
+		if (fuzzy_dirlist) {
+			flist_free(fuzzy_dirlist);
+			fuzzy_dirlist = NULL;
+		}
+		parent_dirname = "";
 		statret = -1;
 		stat_errno = ENOENT;
 	} else {
@@ -1157,11 +1142,19 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		stat_errno = errno;
 	}
 
-	if (ignore_non_existing && statret == -1 && stat_errno == ENOENT) {
+	if (ignore_non_existing > 0 && statret == -1 && stat_errno == ENOENT) {
 		if (verbose > 1) {
 			rprintf(FINFO, "not creating new %s \"%s\"\n",
 				S_ISDIR(file->mode) ? "directory" : "file",
 				fname);
+		}
+		if (S_ISDIR(file->mode)) {
+			if (missing_below < 0) {
+				if (dry_run)
+					dry_run++;
+				missing_below = F_DEPTH(file);
+			}
+			file->flags |= FLAG_MISSING_DIR;
 		}
 		return;
 	}
@@ -1216,13 +1209,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				rsyserr(FERROR, errno,
 					"recv_generator: mkdir %s failed",
 					full_fname(fname));
+				rprintf(FERROR,
+				    "*** Skipping any contents from this failed directory ***\n");
+				missing_below = F_DEPTH(file);
 				file->flags |= FLAG_MISSING_DIR;
-				if (ndx+1 < the_file_list->count
-				 && F_DEPTH(the_file_list->files[ndx+1]) > F_DEPTH(file)) {
-					rprintf(FERROR,
-					    "*** Skipping everything below this failed directory ***\n");
-					missing_below = F_DEPTH(file);
-				}
 				return;
 			}
 		}
@@ -1231,9 +1221,16 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			rprintf(code, "%s/\n", fname);
 		if (real_ret != 0 && one_file_system)
 			real_st.st_dev = filesystem_dev;
-		if (delete_during && f_out != -1 && !phase && dry_run < 2
+		if (incremental) {
+			if (one_file_system) {
+				uint32 *devp = F_DIRDEV_P(file);
+				DEV_MAJOR(devp) = major(real_st.st_dev);
+				DEV_MINOR(devp) = minor(real_st.st_dev);
+			}
+		}
+		else if (delete_during && f_out != -1 && !phase && dry_run < 2
 		    && (file->flags & FLAG_XFER_DIR))
-			delete_in_dir(the_file_list, fname, file, &real_st);
+			delete_in_dir(cur_flist, fname, file, &real_st.st_dev);
 		return;
 	}
 
@@ -1410,7 +1407,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (max_size && F_LENGTH(file) > max_size) {
+	if (max_size > 0 && F_LENGTH(file) > max_size) {
 		if (verbose > 1) {
 			if (solo_file)
 				fname = f_name(file, NULL);
@@ -1418,7 +1415,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 		return;
 	}
-	if (min_size && F_LENGTH(file) < min_size) {
+	if (min_size > 0 && F_LENGTH(file) < min_size) {
 		if (verbose > 1) {
 			if (solo_file)
 				fname = f_name(file, NULL);
@@ -1427,13 +1424,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (ignore_existing && statret == 0) {
+	if (ignore_existing > 0 && statret == 0) {
 		if (verbose > 1)
 			rprintf(FINFO, "%s exists\n", fname);
 		return;
 	}
 
-	if (update_only && statret == 0
+	if (update_only > 0 && statret == 0
 	    && cmp_time(st.st_mtime, file->modtime) > 0) {
 		if (verbose > 1)
 			rprintf(FINFO, "%s is newer\n", fname);
@@ -1504,7 +1501,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (append_mode && st.st_size > F_LENGTH(file))
+	if (append_mode > 0 && st.st_size > F_LENGTH(file))
 		return;
 
 	if (fnamecmp_type <= FNAMECMP_BASIS_DIR_HIGH)
@@ -1527,7 +1524,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			return;
 	  return_with_success:
 		if (!dry_run)
-			send_msg_int(MSG_SUCCESS, ndx);
+			send_msg_int(MSG_SUCCESS, ndx + cur_flist->ndx_start);
 		return;
 	}
 
@@ -1545,7 +1542,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (fuzzy_dirlist) {
 		int j = flist_find(fuzzy_dirlist, file);
 		if (j >= 0) /* don't use changing file as future fuzzy basis */
-			fuzzy_dirlist->files[j]->flags |= FLAG_SENT;
+			fuzzy_dirlist->files[j]->flags |= FLAG_FILE_SENT;
 	}
 
 	/* open the file */
@@ -1564,7 +1561,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		goto notify_others;
 	}
 
-	if (inplace && make_backups && fnamecmp_type == FNAMECMP_FNAME) {
+	if (inplace && make_backups > 0 && fnamecmp_type == FNAMECMP_FNAME) {
 		if (!(backupptr = get_backup_name(fname))) {
 			close(fd);
 			return;
@@ -1602,14 +1599,16 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
   notify_others:
 	if (remove_source_files && !delay_updates && !phase)
 		increment_active_files(ndx, itemizing, code);
+	if (incremental && !dry_run)
+		cur_flist->in_progress++;
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && F_IS_HLINKED(file))
-		file->flags |= FLAG_SENT;
+		file->flags |= FLAG_FILE_SENT;
 #endif
-	write_int(f_out, ndx);
+	write_int(f_out, ndx + cur_flist->ndx_start);
 	if (itemizing) {
 		int iflags = ITEM_TRANSFER;
-		if (always_checksum)
+		if (always_checksum > 0)
 			iflags |= ITEM_REPORT_CHECKSUM;
 		if (fnamecmp_type != FNAMECMP_FNAME)
 			iflags |= ITEM_BASIS_TYPE_FOLLOWS;
@@ -1649,19 +1648,17 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	close(fd);
 }
 
-void generate_files(int f_out, struct file_list *flist, char *local_name)
+void generate_files(int f_out, char *local_name)
 {
 	int i;
 	char fbuf[MAXPATHLEN];
 	int itemizing;
 	enum logcode code;
+	struct file_list *next_flist;
 	int lull_mod = allowed_lull * 5;
 	int need_retouch_dir_times = preserve_times && !omit_dir_times;
 	int need_retouch_dir_perms = 0;
-	int save_ignore_existing = ignore_existing;
-	int save_ignore_non_existing = ignore_non_existing;
 	int save_do_progress = do_progress;
-	int save_make_backups = make_backups;
 	int dir_tweaking = !(list_only || local_name || dry_run);
 
 	if (protocol_version >= 29) {
@@ -1683,13 +1680,11 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	}
 	solo_file = local_name != NULL;
 
-	if (verbose > 2) {
-		rprintf(FINFO, "generator starting pid=%ld count=%d\n",
-			(long)getpid(), flist->count);
-	}
+	if (verbose > 2)
+		rprintf(FINFO, "generator starting pid=%ld\n", (long)getpid());
 
-	if (delete_before && !local_name && flist->count > 0)
-		do_delete_pass(flist);
+	if (delete_before && !local_name && cur_flist->count > 0)
+		do_delete_pass(cur_flist);
 	if (delete_during == 2) {
 		deldelay_size = BIGPATHBUFLEN * 4;
 		deldelay_buf = new_array(char, deldelay_size);
@@ -1698,7 +1693,7 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	}
 	do_progress = 0;
 
-	if (append_mode || whole_file < 0)
+	if (append_mode > 0 || whole_file < 0)
 		whole_file = 0;
 	if (verbose >= 2) {
 		rprintf(FINFO, "delta-transmission %s\n",
@@ -1713,79 +1708,171 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 	 * notice that and let us know via the redo pipe (or its closing). */
 	ignore_timeout = 1;
 
-	for (i = 0; i < flist->count; i++) {
-		struct file_struct *file = flist->files[i];
-
-		if (!F_IS_ACTIVE(file))
-			continue;
-
-		if (local_name)
-			strlcpy(fbuf, local_name, sizeof fbuf);
-		else
-			f_name(file, fbuf);
-		recv_generator(fbuf, file, i, itemizing, code, f_out);
-
-		/* We need to ensure that any dirs we create have writeable
-		 * permissions during the time we are putting files within
-		 * them.  This is then fixed after the transfer is done. */
-#ifdef HAVE_CHMOD
-		if (!am_root && S_ISDIR(file->mode) && !(file->mode & S_IWUSR)
-		 && dir_tweaking) {
-			mode_t mode = file->mode | S_IWUSR; /* user write */
-			char *fname = local_name ? local_name : fbuf;
-			if (do_chmod(fname, mode) < 0) {
-				rsyserr(FERROR, errno,
-					"failed to modify permissions on %s",
-					full_fname(fname));
+	do {
+		if (incremental && delete_during && cur_flist->ndx_start) {
+			struct file_struct *fp = dir_flist->files[cur_flist->parent_ndx];
+			if (BITS_SETnUNSET(fp->flags, FLAG_XFER_DIR, FLAG_MISSING_DIR)) {
+				dev_t dirdev;
+				if (one_file_system) {
+					uint32 *devp = F_DIRDEV_P(fp);
+					dirdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
+				} else
+					dirdev = MAKEDEV(0, 0);
+				delete_in_dir(cur_flist, f_name(fp, fbuf), fp, &dirdev);
 			}
-			need_retouch_dir_perms = 1;
 		}
+		for (i = cur_flist->low; i <= cur_flist->high; i++) {
+			struct file_struct *file = cur_flist->files[i];
+
+			if (!F_IS_ACTIVE(file))
+				continue;
+
+			if (local_name)
+				strlcpy(fbuf, local_name, sizeof fbuf);
+			else
+				f_name(file, fbuf);
+			recv_generator(fbuf, file, i, itemizing, code, f_out);
+
+			/* We need to ensure that any dirs we create have
+			 * writeable permissions during the time we are putting
+			 * files within them.  This is then fixed after the
+			 * transfer is done. */
+#ifdef HAVE_CHMOD
+			if (!am_root && S_ISDIR(file->mode)
+			 && !(file->mode & S_IWUSR) && dir_tweaking) {
+				mode_t mode = file->mode | S_IWUSR;
+				char *fname = local_name ? local_name : fbuf;
+				if (do_chmod(fname, mode) < 0) {
+					rsyserr(FERROR, errno,
+					    "failed to modify permissions on %s",
+					    full_fname(fname));
+				}
+				need_retouch_dir_perms = 1;
+			}
 #endif
 
 #ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links)
-			check_for_finished_hlinks(itemizing, code);
+			if (preserve_hard_links)
+				check_for_finished_hlinks(itemizing, code);
 #endif
 
-		if (allowed_lull && !(i % lull_mod))
-			maybe_send_keepalive();
-		else if (!(i % 200))
-			maybe_flush_socket();
-	}
-	recv_generator(NULL, NULL, 0, 0, code, -1);
-	if (delete_during)
-		delete_in_dir(NULL, NULL, NULL, NULL);
+			if (allowed_lull && !(i % lull_mod))
+				maybe_send_keepalive();
+			else if (!(i % 200))
+				maybe_flush_socket();
+		}
+
+		if (!incremental) {
+			if (delete_during)
+				delete_in_dir(NULL, NULL, NULL, &dev_zero);
+			phase++;
+			if (verbose > 2) {
+				rprintf(FINFO, "generate_files phase=%d\n",
+					phase);
+			}
+
+			write_int(f_out, NDX_DONE);
+		}
+
+		csum_length = SUM_LENGTH;
+		max_size = -max_size;
+		min_size = -min_size;
+		ignore_existing = -ignore_existing;
+		ignore_non_existing = -ignore_non_existing;
+		update_only = -update_only;
+		always_checksum = -always_checksum;
+		size_only = -size_only;
+		append_mode = -append_mode;
+		make_backups = -make_backups; /* avoid dup backup w/inplace */
+		ignore_times++;
+
+		/* Files can cycle through the system more than once
+		 * to catch initial checksum errors. */
+		while (!done_cnt) {
+			struct file_struct *file;
+			struct file_list *save_flist;
+
+			check_for_finished_hlinks(itemizing, code);
+
+			if ((i = get_redo_num()) == -1) {
+				if (incremental)
+					break;
+				wait_for_receiver();
+				continue;
+			}
+
+			save_flist = cur_flist;
+			cur_flist = flist_for_ndx(i);
+			file = cur_flist->files[i];
+			if (local_name)
+				strlcpy(fbuf, local_name, sizeof fbuf);
+			else
+				f_name(file, fbuf);
+			recv_generator(fbuf, file, i, itemizing, code, f_out);
+			cur_flist->to_redo--;
+			cur_flist = save_flist;
+		}
+
+		csum_length = SHORT_SUM_LENGTH;
+		max_size = -max_size;
+		min_size = -min_size;
+		ignore_existing = -ignore_existing;
+		ignore_non_existing = -ignore_non_existing;
+		update_only = -update_only;
+		always_checksum = -always_checksum;
+		size_only = -size_only;
+		append_mode = -append_mode;
+		make_backups = -make_backups;
+		ignore_times--;
+
+		if (!incremental)
+			break;
+
+		while (!cur_flist->next && !flist_eof)
+			wait_for_receiver();
+		next_flist = cur_flist->next;
+		while (first_flist != next_flist) {
+			struct file_struct *fp;
+			if (first_flist->in_progress || first_flist->to_redo) {
+				if (next_flist)
+					break;
+				wait_for_receiver();
+				continue;
+			}
+
+			cur_flist = first_flist;
+			if (cur_flist->ndx_start != 0) {
+				fp = dir_flist->files[cur_flist->parent_ndx];
+				if (!(fp->flags & FLAG_MISSING_DIR)) {
+					f_name(fp, fbuf);
+					if (!(fp->mode & S_IWUSR))
+						do_chmod(fbuf, fp->mode);
+					if (preserve_times && !omit_dir_times) {
+						set_modtime(fbuf, fp->modtime,
+							    fp->mode);
+					}
+				}
+			} else if (relative_paths && implied_dirs
+			    && preserve_times && !omit_dir_times) {
+				/* Set mtime on implied dirs */
+				for (i = 0; i < cur_flist->count; i++) {
+					fp = cur_flist->files[i];
+					if (!S_ISDIR(fp->mode)
+					 || fp->flags & (FLAG_XFER_DIR|FLAG_MISSING_DIR))
+						continue;
+					f_name(fp, fbuf);
+					set_modtime(fbuf, fp->modtime, fp->mode);
+				}
+			}
+
+			flist_free(cur_flist);
+
+			if (!read_batch)
+				write_int(f_out, NDX_DONE);
+		}
+	} while ((cur_flist = next_flist) != NULL);
 
 	phase++;
-	csum_length = SUM_LENGTH;
-	max_size = min_size = ignore_existing = ignore_non_existing = 0;
-	update_only = always_checksum = size_only = 0;
-	ignore_times = 1;
-	if (append_mode)  /* resend w/o append mode */
-		append_mode = -1; /* ... but only longer files */
-	make_backups = 0; /* avoid a duplicate backup for inplace processing */
-
-	if (verbose > 2)
-		rprintf(FINFO, "generate_files phase=%d\n", phase);
-
-	write_int(f_out, NDX_DONE);
-
-	/* files can cycle through the system more than once
-	 * to catch initial checksum errors */
-	while ((i = get_redo_num(itemizing, code)) != -1) {
-		struct file_struct *file = flist->files[i];
-		if (local_name)
-			strlcpy(fbuf, local_name, sizeof fbuf);
-		else
-			f_name(file, fbuf);
-		recv_generator(fbuf, file, i, itemizing, code, f_out);
-	}
-
-	phase++;
-	ignore_non_existing = save_ignore_non_existing;
-	ignore_existing = save_ignore_existing;
-	make_backups = save_make_backups;
-
 	if (verbose > 2)
 		rprintf(FINFO, "generate_files phase=%d\n", phase);
 
@@ -1795,7 +1882,10 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		write_int(f_out, NDX_DONE);
 
 	/* Read MSG_DONE for the redo phase (and any prior messages). */
-	get_redo_num(itemizing, code);
+	while (done_cnt <= 1) {
+		check_for_finished_hlinks(itemizing, code);
+		wait_for_receiver();
+	}
 
 	if (protocol_version >= 29) {
 		phase++;
@@ -1804,30 +1894,32 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 		if (delay_updates)
 			write_int(f_out, NDX_DONE);
 		/* Read MSG_DONE for delay-updates phase & prior messages. */
-		get_redo_num(itemizing, code);
+		while (done_cnt == 2)
+			wait_for_receiver();
 	}
 
 	do_progress = save_do_progress;
 	if (delete_during == 2)
 		do_delayed_deletions(fbuf);
-	if (delete_after && !local_name && flist->count > 0)
-		do_delete_pass(flist);
+	if (delete_after && !local_name && file_total > 0)
+		do_delete_pass(cur_flist);
 
-	if ((need_retouch_dir_perms || need_retouch_dir_times) && dir_tweaking) {
+	if ((need_retouch_dir_perms || need_retouch_dir_times)
+	 && dir_tweaking && !incremental) {
 		int j = 0;
 		/* Now we need to fix any directory permissions that were
 		 * modified during the transfer and/or re-set any tweaked
 		 * modified-time values. */
-		for (i = 0; i < flist->count; i++) {
-			struct file_struct *file = flist->files[i];
+		for (i = 0; i < cur_flist->count; i++) {
+			struct file_struct *file = cur_flist->files[i];
 			if (!F_IS_ACTIVE(file) || !S_ISDIR(file->mode))
 				continue;
 			if (!need_retouch_dir_times && file->mode & S_IWUSR)
 				continue;
 			if (file->flags & FLAG_MISSING_DIR) {
 				int missing = F_DEPTH(file);
-				while (++i < flist->count) {
-					file = flist->files[i];
+				while (++i < cur_flist->count) {
+					file = cur_flist->files[i];
 					if (F_DEPTH(file) <= missing)
 						break;
 				}
@@ -1842,7 +1934,6 @@ void generate_files(int f_out, struct file_list *flist, char *local_name)
 				maybe_flush_socket();
 		}
 	}
-	recv_generator(NULL, NULL, 0, 0, code, -1);
 
 	if (max_delete >= 0 && deletion_count > max_delete) {
 		rprintf(FINFO,

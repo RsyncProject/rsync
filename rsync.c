@@ -45,12 +45,14 @@ extern int allow_8bit_chars;
 extern int protocol_version;
 extern int preserve_uid;
 extern int preserve_gid;
+extern int incremental;
 extern int inplace;
+extern int flist_eof;
 extern int keep_dirlinks;
 extern int make_backups;
 extern mode_t orig_umask;
 extern struct stats stats;
-extern struct file_list *the_file_list;
+extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct chmod_mode_struct *daemon_chmod_modes;
 
 #if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
@@ -93,26 +95,72 @@ void setup_iconv()
 
 /* This is used by sender.c with a valid f_out, and by receive.c with
  * f_out = -1. */
-int read_item_attrs(int f_in, int f_out, int ndx, uchar *type_ptr,
-		    char *buf, int *len_ptr)
+int read_ndx_and_attrs(int f_in, int f_out, int *iflag_ptr,
+		       uchar *type_ptr, char *buf, int *len_ptr)
 {
-	int len;
+	int len, iflags = 0;
+	struct file_list *flist;
 	uchar fnamecmp_type = FNAMECMP_FNAME;
-	int iflags = protocol_version >= 29 ? read_shortint(f_in)
+	int verbose_save, ndx;
+
+  read_loop:
+	while (1) {
+		ndx = read_int(f_in);
+
+		if (ndx >= 0)
+			break;
+		if (ndx == NDX_DONE)
+			return ndx;
+		if (!incremental || am_sender)
+			goto invalid_ndx;
+		if (ndx == NDX_FLIST_EOF) {
+			flist_eof = 1;
+			send_msg(MSG_FLIST_EOF, "", 0);
+			continue;
+		}
+		ndx = NDX_FLIST_OFFSET - ndx;
+		if (ndx < 0 || ndx >= dir_flist->count) {
+			ndx = NDX_FLIST_OFFSET - ndx;
+			rprintf(FERROR,
+				"Invalid dir index: %d (%d - %d)\n",
+				ndx, NDX_FLIST_OFFSET,
+				NDX_FLIST_OFFSET - dir_flist->count);
+			exit_cleanup(RERR_PROTOCOL);
+		}
+		verbose_save = verbose;
+		verbose = 0; /* TODO allow verbose messages? */
+
+		/* Send everything read from f_in to msg_fd_out. */
+		send_msg_int(MSG_FLIST, ndx);
+		start_flist_forward(f_in);
+		flist = recv_file_list(f_in);
+		flist->parent_ndx = ndx;
+		stop_flist_forward();
+
+		verbose = verbose_save;
+	}
+
+	iflags = protocol_version >= 29 ? read_shortint(f_in)
 		   : ITEM_TRANSFER | ITEM_MISSING_DATA;
 
-	/* Handle the new keep-alive (no-op) packet. */
-	if (ndx == the_file_list->count && iflags == ITEM_IS_NEW)
-		;
-	else if (ndx < 0 || ndx >= the_file_list->count) {
-		rprintf(FERROR, "Invalid file index: %d (count=%d) [%s]\n",
-			ndx, the_file_list->count, who_am_i());
-		exit_cleanup(RERR_PROTOCOL);
-	} else if (iflags == ITEM_IS_NEW) {
-		rprintf(FERROR, "Invalid itemized flag word: %x [%s]\n",
-			iflags, who_am_i());
+	/* Honor the old-style keep-alive indicator. */
+	if (protocol_version < 30
+	 && ndx == cur_flist->count && iflags == ITEM_IS_NEW) {
+		if (am_sender)
+			maybe_send_keepalive();
+		goto read_loop;
+	}
+
+	if (!(flist = flist_for_ndx(ndx))) {
+	  invalid_ndx:
+		rprintf(FERROR,
+			"Invalid file index: %d (%d - %d) with iflags %x [%s]\n",
+			ndx, first_flist->ndx_start + first_flist->ndx_start,
+			first_flist->prev->ndx_start + first_flist->ndx_start
+			+ first_flist->prev->count - 1, iflags, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
 	}
+	cur_flist = flist;
 
 	if (iflags & ITEM_BASIS_TYPE_FOLLOWS)
 		fnamecmp_type = read_byte(f_in);
@@ -128,7 +176,8 @@ int read_item_attrs(int f_in, int f_out, int ndx, uchar *type_ptr,
 	*len_ptr = len;
 
 	if (iflags & ITEM_TRANSFER) {
-		if (!S_ISREG(the_file_list->files[ndx]->mode)) {
+		int i = ndx - cur_flist->ndx_start;
+		if (!S_ISREG(cur_flist->files[i]->mode)) {
 			rprintf(FERROR,
 				"received request to transfer non-regular file: %d [%s]\n",
 				ndx, who_am_i());
@@ -139,7 +188,8 @@ int read_item_attrs(int f_in, int f_out, int ndx, uchar *type_ptr,
 				    fnamecmp_type, buf, len);
 	}
 
-	return iflags;
+	*iflag_ptr = iflags;
+	return ndx;
 }
 
 /*
@@ -314,7 +364,7 @@ void finish_transfer(char *fname, char *fnametmp, char *partialptr,
 		goto do_set_file_attrs;
 	}
 
-	if (make_backups && overwriting_basis && !make_backup(fname))
+	if (make_backups > 0 && overwriting_basis && !make_backup(fname))
 		return;
 
 	/* Change permissions before putting the file into place. */
@@ -352,6 +402,25 @@ void finish_transfer(char *fname, char *fnametmp, char *partialptr,
 		} else
 			handle_partial_dir(partialptr, PDIR_DELETE);
 	}
+}
+
+struct file_list *flist_for_ndx(int ndx)
+{
+	struct file_list *flist = cur_flist;
+
+	if (!flist)
+		return NULL;
+
+	while (ndx < flist->ndx_start) {
+		if (flist == first_flist)
+			return NULL;
+		flist = flist->prev;
+	}
+	while (ndx >= flist->ndx_start + flist->count) {
+		if (!(flist = flist->next))
+			return NULL;
+	}
+	return flist;
 }
 
 const char *who_am_i(void)

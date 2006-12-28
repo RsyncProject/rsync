@@ -26,6 +26,7 @@ extern int verbose;
 extern int do_xfers;
 extern int am_server;
 extern int am_daemon;
+extern int incremental;
 extern int log_before_transfer;
 extern int stdout_format_has_i;
 extern int logfile_format_has_i;
@@ -42,9 +43,8 @@ extern int inplace;
 extern int batch_fd;
 extern int write_batch;
 extern struct stats stats;
-extern struct file_list *the_file_list;
+extern struct file_list *cur_flist, *first_flist;
 extern char *stdout_format;
-
 
 /**
  * @file
@@ -76,7 +76,7 @@ static struct sum_struct *receive_sums(int f)
 			(double)s->count, (long)s->blength, (long)s->remainder);
 	}
 
-	if (append_mode) {
+	if (append_mode > 0) {
 		s->flength = (OFF_T)s->count * s->blength;
 		if (s->remainder)
 			s->flength -= s->blength - s->remainder;
@@ -122,25 +122,28 @@ void successful_send(int ndx)
 {
 	char fname[MAXPATHLEN];
 	struct file_struct *file;
-	unsigned int offset;
+	struct file_list *flist;
 
-	if (ndx < 0 || ndx >= the_file_list->count)
+	if (!remove_source_files)
 		return;
 
-	file = the_file_list->files[ndx];
-	if (F_ROOTDIR(file)) {
-		offset = stringjoin(fname, sizeof fname,
-				    F_ROOTDIR(file), "/", NULL);
-	} else
-		offset = 0;
-	f_name(file, fname + offset);
-	if (remove_source_files) {
-		if (do_unlink(fname) == 0) {
-			if (verbose > 1)
-				rprintf(FINFO, "sender removed %s\n", fname + offset);
-		} else
-			rsyserr(FERROR, errno, "sender failed to remove %s", fname + offset);
+	if (!(flist = flist_for_ndx(ndx))) {
+		rprintf(FERROR,
+			"INTERNAL ERROR: unable to find flist for item %d\n",
+			ndx);
+		return;
 	}
+
+	file = flist->files[ndx - flist->ndx_start];
+	if (!push_flist_dir(F_ROOTDIR(file), -1))
+		return;
+	f_name(file, fname);
+
+	if (do_unlink(fname) == 0) {
+		if (verbose > 1)
+			rprintf(FINFO, "sender removed %s\n", fname);
+	} else
+		rsyserr(FERROR, errno, "sender failed to remove %s", fname);
 }
 
 void write_ndx_and_attrs(int f_out, int ndx, int iflags,
@@ -156,63 +159,63 @@ void write_ndx_and_attrs(int f_out, int ndx, int iflags,
 		write_vstring(f_out, buf, len);
 }
 
-void send_files(struct file_list *flist, int f_out, int f_in)
+void send_files(int f_in, int f_out)
 {
 	int fd = -1;
 	struct sum_struct *s;
 	struct map_struct *mbuf = NULL;
 	STRUCT_STAT st;
-	char *fname2, fname[MAXPATHLEN];
-	char xname[MAXPATHLEN];
+	char fname[MAXPATHLEN], xname[MAXPATHLEN];
+	const char *path, *slash;
 	uchar fnamecmp_type;
 	int iflags, xlen;
 	struct file_struct *file;
 	int phase = 0, max_phase = protocol_version >= 29 ? 2 : 1;
 	struct stats initial_stats;
-	int save_make_backups = make_backups;
 	int itemizing = am_server ? logfile_format_has_i : stdout_format_has_i;
 	enum logcode log_code = log_before_transfer ? FLOG : FINFO;
 	int f_xfer = write_batch < 0 ? batch_fd : f_out;
-	int i, j;
+	int ndx, j;
 
 	if (verbose > 2)
 		rprintf(FINFO, "send_files starting\n");
 
 	while (1) {
-		unsigned int offset;
+		if (incremental)
+			send_extra_file_list(f_out, 1000);
 
-		i = read_int(f_in);
-		if (i == NDX_DONE) {
+		/* This call also sets cur_flist. */
+		ndx = read_ndx_and_attrs(f_in, f_out, &iflags,
+					 &fnamecmp_type, xname, &xlen);
+		if (ndx == NDX_DONE) {
+			if (incremental && first_flist) {
+				flist_free(first_flist);
+				if (first_flist) {
+					write_int(f_out, NDX_DONE);
+					continue;
+				}
+			}
 			if (++phase > max_phase)
 				break;
-			csum_length = SUM_LENGTH;
 			if (verbose > 2)
 				rprintf(FINFO, "send_files phase=%d\n", phase);
 			write_int(f_out, NDX_DONE);
-			/* For inplace: redo phase turns off the backup
-			 * flag so that we do a regular inplace send. */
-			make_backups = 0;
-			append_mode = 0;
 			continue;
 		}
 
-		iflags = read_item_attrs(f_in, f_out, i, &fnamecmp_type,
-					 xname, &xlen);
-		if (iflags == ITEM_IS_NEW) /* no-op packet */
-			continue;
-
-		file = flist->files[i];
+		file = cur_flist->files[ndx - cur_flist->ndx_start];
 		if (F_ROOTDIR(file)) {
-			/* N.B. We're sure that this fits, so offset is OK. */
-			offset = strlcpy(fname, F_ROOTDIR(file), sizeof fname);
-			if (!offset || fname[offset-1] != '/')
-				fname[offset++] = '/';
-		} else
-			offset = 0;
-		fname2 = f_name(file, fname + offset);
+			path = F_ROOTDIR(file);
+			slash = "/";
+		} else {
+			path = slash = "";
+		}
+		if (!push_flist_dir(F_ROOTDIR(file), -1))
+			continue;
+		f_name(file, fname);
 
 		if (verbose > 2)
-			rprintf(FINFO, "send_files(%d, %s)\n", i, fname);
+			rprintf(FINFO, "send_files(%d, %s%s%s)\n", ndx, path,slash,fname);
 
 		if (!(iflags & ITEM_TRANSFER)) {
 			maybe_log_item(file, iflags, itemizing, xname);
@@ -225,16 +228,32 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		updating_basis_file = inplace && (protocol_version >= 29
-			? fnamecmp_type == FNAMECMP_FNAME : !make_backups);
+		if (file->flags & FLAG_FILE_SENT) {
+			if (csum_length == SHORT_SUM_LENGTH) {
+				/* For inplace: redo phase turns off the backup
+				 * flag so that we do a regular inplace send. */
+				make_backups = -make_backups;
+				append_mode = -append_mode;
+				csum_length = SUM_LENGTH;
+			}
+		} else {
+			if (csum_length != SHORT_SUM_LENGTH) {
+				make_backups = -make_backups;
+				append_mode = -append_mode;
+				csum_length = SHORT_SUM_LENGTH;
+			}
+		}
 
-		stats.current_file_index = i;
+		updating_basis_file = inplace && (protocol_version >= 29
+			? fnamecmp_type == FNAMECMP_FNAME : make_backups <= 0);
+
+		stats.current_file_index = ndx;
 		stats.num_transferred_files++;
 		stats.total_transferred_size += F_LENGTH(file);
 
 		if (!do_xfers) { /* log the transfer */
 			log_item(FCLIENT, file, &stats, iflags, NULL);
-			write_ndx_and_attrs(f_out, i, iflags, fnamecmp_type,
+			write_ndx_and_attrs(f_out, ndx, iflags, fnamecmp_type,
 					    xname, xlen);
 			continue;
 		}
@@ -244,7 +263,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		if (!(s = receive_sums(f_in))) {
 			io_error |= IOERR_GENERAL;
 			rprintf(FERROR, "receive_sums failed\n");
-			return;
+			exit_cleanup(RERR_PROTOCOL);
 		}
 
 		fd = do_open(fname, O_RDONLY, 0);
@@ -263,6 +282,8 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 					full_fname(fname));
 			}
 			free_sums(s);
+			if (protocol_version >= 30)
+				send_msg_int(MSG_NO_SEND, ndx);
 			continue;
 		}
 
@@ -272,7 +293,7 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			rsyserr(FERROR, errno, "fstat failed");
 			free_sums(s);
 			close(fd);
-			return;
+			exit_cleanup(RERR_PROTOCOL);
 		}
 
 		if (st.st_size) {
@@ -282,21 +303,21 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 			mbuf = NULL;
 
 		if (verbose > 2) {
-			rprintf(FINFO, "send_files mapped %s of size %.0f\n",
-				fname, (double)st.st_size);
+			rprintf(FINFO, "send_files mapped %s%s%s of size %.0f\n",
+				path,slash,fname, (double)st.st_size);
 		}
 
-		write_ndx_and_attrs(f_out, i, iflags, fnamecmp_type,
+		write_ndx_and_attrs(f_out, ndx, iflags, fnamecmp_type,
 				    xname, xlen);
 		write_sum_head(f_xfer, s);
 
 		if (verbose > 2)
-			rprintf(FINFO, "calling match_sums %s\n", fname);
+			rprintf(FINFO, "calling match_sums %s%s%s\n", path,slash,fname);
 
 		if (log_before_transfer)
 			log_item(FCLIENT, file, &initial_stats, iflags, NULL);
 		else if (!am_server && verbose && do_progress)
-			rprintf(FCLIENT, "%s\n", fname2);
+			rprintf(FCLIENT, "%s\n", fname);
 
 		set_compression(fname);
 
@@ -320,12 +341,13 @@ void send_files(struct file_list *flist, int f_out, int f_in)
 		free_sums(s);
 
 		if (verbose > 2)
-			rprintf(FINFO, "sender finished %s\n", fname);
+			rprintf(FINFO, "sender finished %s%s%s\n", path,slash,fname);
 
 		/* Flag that we actually sent this entry. */
-		file->flags |= FLAG_SENT;
+		file->flags |= FLAG_FILE_SENT;
 	}
-	make_backups = save_make_backups;
+	if (make_backups < 0)
+		make_backups = -make_backups;
 
 	if (verbose > 2)
 		rprintf(FINFO, "send files finished\n");

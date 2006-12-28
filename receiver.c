@@ -26,6 +26,7 @@ extern int verbose;
 extern int do_xfers;
 extern int am_server;
 extern int do_progress;
+extern int incremental;
 extern int log_before_transfer;
 extern int stdout_format_has_i;
 extern int logfile_format_has_i;
@@ -52,14 +53,13 @@ extern char *stdout_format;
 extern char *tmpdir;
 extern char *partial_dir;
 extern char *basis_dir[];
-extern struct file_list *the_file_list;
+extern struct file_list *cur_flist, *first_flist;
 extern struct filter_list_struct server_filter_list;
 
 static struct bitbag *delayed_bits = NULL;
 static int phase = 0;
 /* We're either updating the basis file or an identical copy: */
 static int updating_basis;
-
 
 /*
  * get_tmpname() - create a tmp filename for a given filename
@@ -151,7 +151,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 	sum_init(checksum_seed);
 
-	if (append_mode) {
+	if (append_mode > 0) {
 		OFF_T j;
 		sum.flength = (OFF_T)sum.count * sum.blength;
 		if (sum.remainder)
@@ -277,16 +277,16 @@ static void discard_receive_data(int f_in, OFF_T length)
 	receive_data(f_in, NULL, -1, 0, NULL, -1, length);
 }
 
-static void handle_delayed_updates(struct file_list *flist, char *local_name)
+static void handle_delayed_updates(char *local_name)
 {
 	char *fname, *partialptr;
 	int ndx;
 
 	for (ndx = -1; (ndx = bitbag_next_bit(delayed_bits, ndx)) >= 0; ) {
-		struct file_struct *file = flist->files[ndx];
+		struct file_struct *file = cur_flist->files[ndx];
 		fname = local_name ? local_name : f_name(file, NULL);
 		if ((partialptr = partial_dir_fname(fname)) != NULL) {
-			if (make_backups && !make_backup(fname))
+			if (make_backups > 0 && !make_backup(fname))
 				continue;
 			if (verbose > 2) {
 				rprintf(FINFO, "renaming %s to %s\n",
@@ -308,28 +308,31 @@ static void handle_delayed_updates(struct file_list *flist, char *local_name)
 	}
 }
 
-static int get_next_gen_ndx(int batch_gen_fd, int next_gen_ndx, int desired_ndx)
+static int get_next_gen_ndx(int fd, int next_gen_ndx, int desired_ndx)
 {
 	while (next_gen_ndx < desired_ndx) {
 		if (next_gen_ndx >= 0) {
 			rprintf(FINFO,
 				"(No batched update for%s \"%s\")\n",
 				phase ? " resend of" : "",
-				f_name(the_file_list->files[next_gen_ndx], NULL));
+				f_name(cur_flist->files[next_gen_ndx], NULL));
 		}
-		next_gen_ndx = read_int(batch_gen_fd);
-		if (next_gen_ndx == -1)
-			next_gen_ndx = the_file_list->count;
+		next_gen_ndx = read_int(fd);
+		if (next_gen_ndx == -1) {
+			if (incremental)
+				next_gen_ndx = first_flist->prev->count + first_flist->prev->ndx_start;
+			else
+				next_gen_ndx = cur_flist->count;
+		}
 	}
 	return next_gen_ndx;
 }
-
 
 /**
  * main routine for receiver process.
  *
  * Receiver process runs on the same host as the generator process. */
-int recv_files(int f_in, struct file_list *flist, char *local_name)
+int recv_files(int f_in, char *local_name)
 {
 	int next_gen_ndx = -1;
 	int fd1,fd2;
@@ -343,53 +346,49 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 	uchar fnamecmp_type;
 	struct file_struct *file;
 	struct stats initial_stats;
-	int save_make_backups = make_backups;
 	int itemizing = am_server ? logfile_format_has_i : stdout_format_has_i;
 	enum logcode log_code = log_before_transfer ? FLOG : FINFO;
 	int max_phase = protocol_version >= 29 ? 2 : 1;
 	int ndx, recv_ok;
 
 	if (verbose > 2)
-		rprintf(FINFO, "recv_files(%d) starting\n", flist->count);
+		rprintf(FINFO, "recv_files(%d) starting\n", cur_flist->count);
 
 	if (delay_updates)
-		delayed_bits = bitbag_create(flist->count);
+		delayed_bits = bitbag_create(cur_flist->count + 1);
 
 	updating_basis = inplace;
 
 	while (1) {
 		cleanup_disable();
 
-		ndx = read_int(f_in);
+		/* This call also sets cur_flist. */
+		ndx = read_ndx_and_attrs(f_in, -1, &iflags,
+					 &fnamecmp_type, xname, &xlen);
 		if (ndx == NDX_DONE) {
-			if (read_batch) {
-				get_next_gen_ndx(batch_gen_fd, next_gen_ndx,
-						 flist->count);
+			if (incremental && first_flist) {
+				flist_free(first_flist);
+				if (first_flist)
+					continue;
+			}
+			if (read_batch && cur_flist) {
+				int high = incremental
+				    ? first_flist->prev->count + first_flist->prev->ndx_start
+				    : cur_flist->count;
+				get_next_gen_ndx(batch_gen_fd, next_gen_ndx, high);
 				next_gen_ndx = -1;
 			}
 			if (++phase > max_phase)
 				break;
-			csum_length = SUM_LENGTH;
 			if (verbose > 2)
 				rprintf(FINFO, "recv_files phase=%d\n", phase);
 			if (phase == 2 && delay_updates)
-				handle_delayed_updates(flist, local_name);
+				handle_delayed_updates(local_name);
 			send_msg(MSG_DONE, "", 0);
-			if (keep_partial && !partial_dir)
-				make_backups = 0; /* prevents double backup */
-			if (append_mode) {
-				append_mode = 0;
-				sparse_files = 0;
-			}
 			continue;
 		}
 
-		iflags = read_item_attrs(f_in, -1, ndx, &fnamecmp_type,
-					 xname, &xlen);
-		if (iflags == ITEM_IS_NEW) /* no-op packet */
-			continue;
-
-		file = flist->files[ndx];
+		file = cur_flist->files[ndx - cur_flist->ndx_start];
 		fname = local_name ? local_name : f_name(file, fbuf);
 
 		if (verbose > 2)
@@ -404,6 +403,24 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 				"got transfer request in phase 2 [%s]\n",
 				who_am_i());
 			exit_cleanup(RERR_PROTOCOL);
+		}
+
+		if (file->flags & FLAG_FILE_SENT) {
+			if (csum_length == SHORT_SUM_LENGTH) {
+				if (keep_partial && !partial_dir)
+					make_backups = -make_backups; /* prevents double backup */
+				append_mode = -append_mode;
+				sparse_files = -sparse_files;
+				csum_length = SUM_LENGTH;
+			}
+		} else {
+			if (csum_length != SHORT_SUM_LENGTH) {
+				if (keep_partial && !partial_dir)
+					make_backups = -make_backups;
+				append_mode = -append_mode;
+				sparse_files = -sparse_files;
+				csum_length = SHORT_SUM_LENGTH;
+			}
 		}
 
 		stats.current_file_index = ndx;
@@ -483,7 +500,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		} else {
 			/* Reminder: --inplace && --partial-dir are never
 			 * enabled at the same time. */
-			if (inplace && make_backups) {
+			if (inplace && make_backups > 0) {
 				if (!(fnamecmp = get_backup_name(fname)))
 					fnamecmp = fname;
 			} else if (partial_dir && partialptr)
@@ -646,7 +663,7 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 		cleanup_disable();
 
 		if (recv_ok > 0) {
-			if (remove_source_files
+			if (remove_source_files || incremental
 			 || (preserve_hard_links && F_IS_HLINKED(file)))
 				send_msg_int(MSG_SUCCESS, ndx);
 		} else if (!recv_ok) {
@@ -670,14 +687,17 @@ int recv_files(int f_in, struct file_list *flist, char *local_name)
 					"%s: %s failed verification -- update %s%s.\n",
 					errstr, fname, keptstr, redostr);
 			}
-			if (!phase)
+			if (!phase || incremental) {
 				send_msg_int(MSG_REDO, ndx);
+				file->flags |= FLAG_FILE_SENT;
+			}
 		}
 	}
-	make_backups = save_make_backups;
+	if (make_backups < 0)
+		make_backups = -make_backups;
 
 	if (phase == 2 && delay_updates) /* for protocol_version < 29 */
-		handle_delayed_updates(flist, local_name);
+		handle_delayed_updates(local_name);
 
 	if (verbose > 2)
 		rprintf(FINFO,"recv_files finished\n");

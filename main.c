@@ -34,6 +34,7 @@ extern int am_server;
 extern int am_sender;
 extern int am_generator;
 extern int am_daemon;
+extern int incremental;
 extern int blocking_io;
 extern int remove_source_files;
 extern int daemon_over_rsh;
@@ -47,6 +48,7 @@ extern int copy_dirlinks;
 extern int keep_dirlinks;
 extern int preserve_hard_links;
 extern int protocol_version;
+extern int file_total;
 extern int recurse;
 extern int relative_paths;
 extern int sanitize_paths;
@@ -58,7 +60,6 @@ extern int whole_file;
 extern int read_batch;
 extern int write_batch;
 extern int batch_fd;
-extern int batch_gen_fd;
 extern int filesfrom_fd;
 extern pid_t cleanup_child_pid;
 extern struct stats stats;
@@ -75,7 +76,7 @@ extern struct filter_list_struct server_filter_list;
 int local_server = 0;
 int new_root_dir = 0;
 mode_t orig_umask = 0;
-struct file_list *the_file_list;
+int batch_gen_fd = -1;
 
 /* There's probably never more than at most 2 outstanding child processes,
  * but set it higher, just in case. */
@@ -476,7 +477,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 
 	if (verbose > 2) {
 		rprintf(FINFO, "get_local_name count=%d %s\n",
-			flist->count, NS(dest_path));
+			file_total, NS(dest_path));
 	}
 
 	if (!dest_path || list_only)
@@ -493,14 +494,13 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 			}
 			return NULL;
 		}
-		if (flist->count > 1) {
+		if (file_total > 1) {
 			rprintf(FERROR,
 				"ERROR: destination must be a directory when"
 				" copying more than 1 file\n");
 			exit_cleanup(RERR_FILESELECT);
 		}
-		/* Caution: flist->count could be 0! */
-		if (flist->count == 1 && S_ISDIR(flist->files[0]->mode)) {
+		if (file_total == 1 && S_ISDIR(flist->files[0]->mode)) {
 			rprintf(FERROR,
 				"ERROR: cannot overwrite non-directory"
 				" with a directory\n");
@@ -518,7 +518,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	/* If we need a destination directory because the transfer is not
 	 * of a single non-directory or the user has requested one via a
 	 * destination path ending in a slash, create one and use mode 1. */
-	if (flist->count > 1 || (cp && !cp[1])) {
+	if (file_total > 1 || (cp && !cp[1])) {
 		/* Lop off the final slash (if any). */
 		if (cp && !cp[1])
 			*cp = '\0';
@@ -611,17 +611,15 @@ static void fix_basis_dirs(void)
 /* This is only called by the sender. */
 static void read_final_goodbye(int f_in, int f_out)
 {
-	int i;
+	int i, iflags, xlen;
+	uchar fnamecmp_type;
+	char xname[MAXPATHLEN];
 
 	if (protocol_version < 29)
 		i = read_int(f_in);
 	else {
-		while ((i = read_int(f_in)) == the_file_list->count
-		    && read_shortint(f_in) == ITEM_IS_NEW) {
-			/* Forward the keep-alive (no-op) to the receiver. */
-			write_int(f_out, the_file_list->count);
-			write_shortint(f_out, ITEM_IS_NEW);
-		}
+		i = read_ndx_and_attrs(f_in, f_out, &iflags,
+				       &fnamecmp_type, xname, &xlen);
 	}
 
 	if (i != NDX_DONE) {
@@ -673,12 +671,10 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 	flist = send_file_list(f_out,argc,argv);
 	if (!flist || flist->count == 0)
 		exit_cleanup(0);
-	the_file_list = flist;
 
-	io_start_buffering_in();
-	io_start_buffering_out();
+	io_start_buffering_in(f_in);
 
-	send_files(flist,f_out,f_in);
+	send_files(f_in, f_out);
 	io_flush(FULL_FLUSH);
 	handle_stats(f_out);
 	if (protocol_version >= 24)
@@ -688,7 +684,7 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 }
 
 
-static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
+static int do_recv(int f_in, int f_out, char *local_name)
 {
 	int pid;
 	int exit_code = 0;
@@ -721,12 +717,13 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 			close(f_out);
 
 		/* we can't let two processes write to the socket at one time */
-		close_multiplexing_out();
+		io_end_multiplex_out();
 
 		/* set place to send errors */
 		set_msg_fd_out(error_pipe[1]);
+		io_start_buffering_out(error_pipe[1]);
 
-		recv_files(f_in, flist, local_name);
+		recv_files(f_in, local_name);
 		io_flush(FULL_FLUSH);
 		handle_stats(f_in);
 
@@ -736,11 +733,15 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 		/* Handle any keep-alive packets from the post-processing work
 		 * that the generator does. */
 		if (protocol_version >= 29) {
+			int iflags, xlen;
+			uchar fnamecmp_type;
+			char xname[MAXPATHLEN];
+
 			kluge_around_eof = -1;
 
 			/* This should only get stopped via a USR2 signal. */
-			while (read_int(f_in) == flist->count
-			    && read_shortint(f_in) == ITEM_IS_NEW) {}
+			read_ndx_and_attrs(f_in, -1, &iflags, &fnamecmp_type,
+					   xname, &xlen);
 
 			rprintf(FERROR, "Invalid packet at end of run [%s]\n",
 				who_am_i());
@@ -755,7 +756,8 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	}
 
 	am_generator = 1;
-	close_multiplexing_in();
+
+	io_end_multiplex_in();
 	if (write_batch && !am_server)
 		stop_write_batch();
 
@@ -763,11 +765,12 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	if (f_in != f_out)
 		close(f_in);
 
-	io_start_buffering_out();
+	io_start_buffering_out(f_out);
 
 	set_msg_fd_in(error_pipe[0]);
+	io_start_buffering_in(error_pipe[0]);
 
-	generate_files(f_out, flist, local_name);
+	generate_files(f_out, local_name);
 
 	handle_stats(-1);
 	io_flush(FULL_FLUSH);
@@ -783,7 +786,7 @@ static int do_recv(int f_in,int f_out,struct file_list *flist,char *local_name)
 	return exit_code;
 }
 
-static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
+static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 {
 	int exit_code;
 	struct file_list *flist;
@@ -819,7 +822,10 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		}
 	}
 
-	io_start_buffering_in();
+	if (protocol_version >= 30)
+		io_start_multiplex_in();
+	else
+		io_start_buffering_in(f_in);
 	recv_filter_list(f_in);
 
 	if (filesfrom_fd >= 0) {
@@ -833,12 +839,13 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 	}
 
 	flist = recv_file_list(f_in);
-	verbose = save_verbose;
 	if (!flist) {
 		rprintf(FERROR,"server_recv: recv_file_list error\n");
 		exit_cleanup(RERR_FILESELECT);
 	}
-	the_file_list = flist;
+	if (incremental && file_total == 1)
+		recv_additional_file_list(f_in);
+	verbose = save_verbose;
 
 	if (argc > 0)
 		local_name = get_local_name(flist,argv[0]);
@@ -873,7 +880,7 @@ static void do_server_recv(int f_in, int f_out, int argc,char *argv[])
 		}
 	}
 
-	exit_code = do_recv(f_in,f_out,flist,local_name);
+	exit_code = do_recv(f_in, f_out, local_name);
 	exit_cleanup(exit_code);
 }
 
@@ -933,9 +940,6 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	setup_iconv();
 #endif
 
-	if (protocol_version >= 23 && !read_batch)
-		io_start_multiplex_in();
-
 	/* We set our stderr file handle to blocking because ssh might have
 	 * set it to non-blocking.  This can be particularly troublesome if
 	 * stderr is a clone of stdout, because ssh would have set our stdout
@@ -948,7 +952,10 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 	if (am_sender) {
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
-		io_start_buffering_out();
+		if (protocol_version >= 30)
+			io_start_multiplex_out();
+		else
+			io_start_buffering_out(f_out);
 		if (!filesfrom_host)
 			set_msg_fd_in(f_in);
 		send_filter_list(f_out);
@@ -961,10 +968,12 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		set_msg_fd_in(-1);
 		if (verbose > 3)
 			rprintf(FINFO,"file list sent\n");
-		the_file_list = flist;
+
+		if (protocol_version >= 23)
+			io_start_multiplex_in();
 
 		io_flush(NORMAL_FLUSH);
-		send_files(flist,f_out,f_in);
+		send_files(f_in, f_out);
 		io_flush(FULL_FLUSH);
 		handle_stats(-1);
 		if (protocol_version >= 24)
@@ -980,8 +989,12 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		exit_cleanup(exit_code);
 	}
 
-	if (need_messages_from_generator && !read_batch)
-		io_start_multiplex_out();
+	if (!read_batch) {
+		if (protocol_version >= 23)
+			io_start_multiplex_in();
+		if (need_messages_from_generator)
+			io_start_multiplex_out();
+	}
 
 	if (argc == 0)
 		list_only |= 1;
@@ -996,14 +1009,15 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	if (write_batch && !am_server)
 		start_write_batch(f_in);
 	flist = recv_file_list(f_in);
-	the_file_list = flist;
+	if (incremental && file_total == 1)
+		recv_additional_file_list(f_in);
 
 	if (flist && flist->count > 0) {
 		local_name = get_local_name(flist, argv[0]);
 
 		fix_basis_dirs();
 
-		exit_code2 = do_recv(f_in, f_out, flist, local_name);
+		exit_code2 = do_recv(f_in, f_out, local_name);
 	} else {
 		handle_stats(-1);
 		output_summary();
