@@ -19,7 +19,7 @@ cd "$fromdir"
 
 # Main script starts here
 
-echo "$fromdir"
+sleep 1
 runtest "basic relative" 'checkit "$RSYNC -avR ./$deepstr \"$todir\"" "$fromdir/" "$todir"'
 
 ln "$deepdir/filelist" "$deepdir/dir"
