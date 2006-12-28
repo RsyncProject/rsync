@@ -282,10 +282,10 @@ static int start_delete_delay_temp(void)
 	dry_run = 0;
 	if (!get_tmpname(fnametmp, "deldelay")
 	 || (deldelay_fd = do_mkstemp(fnametmp, 0600)) < 0) {
-		rprintf(FINFO, "NOTE: Unable to create delete-delay temp file--"
-			"switching to --delete-after.\n");
+		rprintf(FINFO, "NOTE: Unable to create delete-delay temp file%s.\n",
+			incremental ? "" : " -- switching to --delete-after");
 		delete_during = 0;
-		delete_after = 1;
+		delete_after = !incremental;
 		dry_run = save_dry_run;
 		return 0;
 	}
