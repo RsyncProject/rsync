@@ -1286,7 +1286,6 @@ void send_extra_file_list(int f, int at_least)
 	past_and_present = cur_flist->ndx_start - first_flist->ndx_start
 			 + cur_flist->count;
 	while (file_total - past_and_present < at_least) {
-		start_write = stats.total_written;
 		struct file_struct *file = dir_flist->files[send_dir_ndx];
 		int32 *dp;
 		int dlen;
@@ -1300,6 +1299,7 @@ void send_extra_file_list(int f, int at_least)
 		}
 
 		flist = flist_new(0, "send_extra_file_list");
+		start_write = stats.total_written;
 
 		write_int(f, NDX_FLIST_OFFSET - send_dir_ndx);
 		change_local_filter_dir(fbuf, dlen, send_dir_depth);
