@@ -1352,6 +1352,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	rprintf(FLOG, "building file list\n");
 	if (show_filelist_p())
 		start_filelist_progress("building file list");
+	else if (incremental && verbose && !am_server)
+		rprintf(FCLIENT, "sending incremental file list\n");
 
 	start_write = stats.total_written;
 	gettimeofday(&start_tv, NULL);
@@ -1643,10 +1645,12 @@ struct file_list *recv_file_list(int f)
 	int dstart, flags;
 	int64 start_read;
 
-	if (f >= 0 && !incremental)
+	if (!first_flist)
 		rprintf(FLOG, "receiving file list\n");
 	if (show_filelist_p())
 		start_filelist_progress("receiving file list");
+	else if (incremental && verbose && !am_server && !first_flist)
+		rprintf(FCLIENT, "receiving incremental file list\n");
 
 	start_read = stats.total_read;
 
