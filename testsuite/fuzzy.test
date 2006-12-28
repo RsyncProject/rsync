@@ -16,7 +16,7 @@ cp -p "$srcdir"/rsync.c "$fromdir"/rsync.c
 cp -p "$fromdir"/rsync.c "$todir"/rsync2.c
 
 # Let's do it!
-checkit "$RSYNC -avvi --no-whole-file --fuzzy --delete-after \
+checkit "$RSYNC -avvi --no-whole-file --fuzzy --delete-delay \
     \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
