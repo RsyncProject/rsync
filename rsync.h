@@ -595,8 +595,8 @@ extern int preserve_gid;
 #define F_DEPTH(f) REQ_EXTRA(f, 1)->num
 
 /* When the associated option is on, all entries will have these present: */
-#define F_UID(f) REQ_EXTRA(f, preserve_uid)->unum
-#define F_GID(f) REQ_EXTRA(f, preserve_gid)->unum
+#define F_OWNER(f) REQ_EXTRA(f, preserve_uid)->unum
+#define F_GROUP(f) REQ_EXTRA(f, preserve_gid)->unum
 
 /* These items are per-entry optional and mutally exclusive: */
 #define F_HL_GNUM(f) OPT_EXTRA(f, LEN64_BUMP(f))->num
@@ -615,8 +615,12 @@ extern int preserve_gid;
 /* Some utility defines: */
 #define F_IS_ACTIVE(f) (f)->basename[0]
 #define F_IS_HLINKED(f) ((f)->flags & FLAG_HLINKED)
+
 #define F_HLINK_NOT_FIRST(f) BITS_SETnUNSET((f)->flags, FLAG_HLINKED, FLAG_HLINK_FIRST)
 #define F_HLINK_NOT_LAST(f) BITS_SETnUNSET((f)->flags, FLAG_HLINKED, FLAG_HLINK_LAST)
+
+#define F_UID(f) ((uid_t)F_OWNER(f))
+#define F_GID(f) ((gid_t)F_GROUP(f))
 
 #define DEV_MAJOR(a) (a)[0]
 #define DEV_MINOR(a) (a)[1]
