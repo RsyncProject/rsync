@@ -534,6 +534,23 @@ details).
 dit(bf(-r, --recursive)) This tells rsync to copy directories
 recursively.  See also bf(--dirs) (bf(-d)).
 
+Beginning with rsync 3.0.0, the recursive algorithm used is now an
+incremental scan that uses much less memory than before and begins the
+transfer after the scanning of the first few directories have been
+completed.  This incremental scan only affects our recursion algorithm, and
+does not change a non-recursive transfer (e.g. when using a fully-specified
+bf(--files-from) list).  It is also only possible when both ends of the
+transfer are at least version 3.0.0.
+
+Some options require rsync to know the full file list, so these options
+disable the incremental recusion mode.  These include: bf(--delete-before),
+bf(--delete-after), bf(--delay-updates), and (currently) bf(--hard-links).
+Because of this, the default delete mode when you specify bf(--delete) is now
+bf(--delete-during) (when both ends of the connection are at least 3.0.0;
+use bf(--del) or bf(--delete-during) to request this improved deletion mode
+explicitly).  See also the bf(--delete-delay) option that is a better choice
+than using bf(--delete-after).
+
 dit(bf(-R, --relative)) Use relative paths. This means that the full path
 names specified on the command line are sent to the server rather than
 just the last parts of the filenames. This is particularly useful when
@@ -942,8 +959,8 @@ option or mark the rules as only matching on the sending side (see the
 include/exclude modifiers in the FILTER RULES section).
 
 Prior to rsync 2.6.7, this option would have no effect unless bf(--recursive)
-was in effect.  Beginning with 2.6.7, deletions will also occur when bf(--dirs)
-(bf(-d)) is in effect, but only for directories whose contents are being copied.
+was enabled.  Beginning with 2.6.7, deletions will also occur when bf(--dirs)
+(bf(-d)) is enabled, but only for directories whose contents are being copied.
 
 This option can be dangerous if used incorrectly!  It is a very good idea
 to run first using the bf(--dry-run) option (bf(-n)) to see what files would be
@@ -957,20 +974,22 @@ destination.  You can override this with the bf(--ignore-errors) option.
 
 The bf(--delete) option may be combined with one of the --delete-WHEN options
 without conflict, as well as bf(--delete-excluded).  However, if none of the
---delete-WHEN options are specified, rsync will currently choose the
-bf(--delete-before) algorithm.  A future version may change this to choose the
-bf(--delete-during) algorithm.  See also bf(--delete-after).
+--delete-WHEN options are specified, rsync will choose the
+bf(--delete-during) algorithm when talking to an rsync 3.0.0 or newer, and
+the bf(--delete-before) algorithm when talking to an older rsync.  See also
+bf(--delete-delay) and bf(--delete-after).
 
 dit(bf(--delete-before)) Request that the file-deletions on the receiving
-side be done before the transfer starts.  This is the default if bf(--delete)
-or bf(--delete-excluded) is specified without one of the --delete-WHEN options.
+side be done before the transfer starts.
 See bf(--delete) (which is implied) for more details on file-deletion.
 
 Deleting before the transfer is helpful if the filesystem is tight for space
 and removing extraneous files would help to make the transfer possible.
 However, it does introduce a delay before the start of the transfer,
 and this delay might cause the transfer to timeout (if bf(--timeout) was
-specified).
+specified).  It also forces rsync to use the old, non-incremental recursion
+algorithm that requires rsync to scan all the files in the transfer into
+memory at once (see bf(--recursive)).
 
 dit(bf(--delete-during, --del)) Request that the file-deletions on the
 receiving side be done incrementally as the transfer happens.  This is
@@ -979,16 +998,21 @@ but it is only supported beginning with rsync version 2.6.4.
 See bf(--delete) (which is implied) for more details on file-deletion.
 
 dit(bf(--delete-delay)) Request that the file-deletions on the receiving
-side be computed incrementally as the transfer happens, and then removed
-after the transfer completes.  A temporary file will be created on the
-receiving side to hold the names, but it is removed while open, so you
-won't see it during the transfer.
+side be computed during the transfer, and then removed after the transfer
+completes.  If the number of removed files overflows an internal buffer, a
+temporary file will be created on the receiving side to hold the names (it
+is removed while open, so you shouldn't see it during the transfer).  If
+the creation of the temporary file fails, rsync will try to fall back to
+using bf(--delete-after) (which it cannot do if bf(--recursive) is doing an
+incremental scan).
 
 dit(bf(--delete-after)) Request that the file-deletions on the receiving
 side be done after the transfer has completed.  This is useful if you
 are sending new per-directory merge files as a part of the transfer and
 you want their exclusions to take effect for the delete phase of the
-current transfer.
+current transfer.  It also forces rsync to use the old, non-incremental
+recursion algorithm that requires rsync to scan all the files in the
+transfer into memory at once (see bf(--recursive)).
 See bf(--delete) (which is implied) for more details on file-deletion.
 
 dit(bf(--delete-excluded)) In addition to deleting the files on the
