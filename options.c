@@ -183,6 +183,7 @@ static int modify_window_set;
 static int itemize_changes = 0;
 static int refused_delete, refused_archive_part, refused_compress;
 static int refused_partial, refused_progress, refused_delete_before;
+static int refused_delete_during;
 static int refused_inplace;
 static char *max_size_arg, *min_size_arg;
 static char tmp_partialdir[] = ".~tmp~";
@@ -321,10 +322,10 @@ void usage(enum logcode F)
   rprintf(F,"     --remove-source-files   sender removes synchronized files (non-dirs)\n");
   rprintf(F,"     --del                   an alias for --delete-during\n");
   rprintf(F,"     --delete                delete extraneous files from destination dirs\n");
-  rprintf(F,"     --delete-before         receiver deletes before transfer (default)\n");
-  rprintf(F,"     --delete-during         receiver deletes during transfer, not before\n");
+  rprintf(F,"     --delete-before         receiver deletes before transfer, not during\n");
+  rprintf(F,"     --delete-during         receiver deletes during transfer (default)\n");
   rprintf(F,"     --delete-delay          find deletions during, delete after\n");
-  rprintf(F,"     --delete-after          receiver deletes after transfer, not before\n");
+  rprintf(F,"     --delete-after          receiver deletes after transfer, not during\n");
   rprintf(F,"     --delete-excluded       also delete excluded files from destination dirs\n");
   rprintf(F,"     --ignore-errors         delete even if there are I/O errors\n");
   rprintf(F,"     --force                 force deletion of directories even if not empty\n");
@@ -448,7 +449,7 @@ static struct poptOption long_options[] = {
   {"safe-links",       0,  POPT_ARG_NONE,   &safe_symlinks, 0, 0, 0 },
   {"copy-dirlinks",   'k', POPT_ARG_NONE,   &copy_dirlinks, 0, 0, 0 },
   {"keep-dirlinks",   'K', POPT_ARG_NONE,   &keep_dirlinks, 0, 0, 0 },
-  {"hard-links",      'H', POPT_ARG_VAL,    &preserve_hard_links, 1, 0, 0 },
+  {"hard-links",      'H', POPT_ARG_NONE,   0, 'H', 0, 0 },
   {"no-hard-links",    0,  POPT_ARG_VAL,    &preserve_hard_links, 0, 0, 0 },
   {"no-H",             0,  POPT_ARG_VAL,    &preserve_hard_links, 0, 0, 0 },
   {"relative",        'R', POPT_ARG_VAL,    &relative_paths, 1, 0, 0 },
@@ -471,7 +472,7 @@ static struct poptOption long_options[] = {
   {"append",           0,  POPT_ARG_VAL,    &append_mode, 1, 0, 0 },
   {"del",              0,  POPT_ARG_NONE,   &delete_during, 0, 0, 0 },
   {"delete",           0,  POPT_ARG_NONE,   &delete_mode, 0, 0, 0 },
-  {"delete-before",    0,  POPT_ARG_VAL,    &delete_before, 2, 0, 0 },
+  {"delete-before",    0,  POPT_ARG_NONE,   &delete_before, 0, 0, 0 },
   {"delete-during",    0,  POPT_ARG_VAL,    &delete_during, 1, 0, 0 },
   {"delete-delay",     0,  POPT_ARG_VAL,    &delete_during, 2, 0, 0 },
   {"delete-after",     0,  POPT_ARG_NONE,   &delete_after, 0, 0, 0 },
@@ -669,6 +670,8 @@ static void set_refuse_options(char *bp)
 						refused_delete = op->val;
 					else if (wildmatch("delete-before", op->longName))
 						refused_delete_before = op->val;
+					else if (wildmatch("delete-during", op->longName))
+						refused_delete_during = op->val;
 					else if (wildmatch("partial", op->longName))
 						refused_partial = op->val;
 					else if (wildmatch("progress", op->longName))
@@ -954,6 +957,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			human_readable++;
 			break;
 
+		case 'H':
+			preserve_hard_links++;
+			break;
+
 		case 'i':
 			itemize_changes++;
 			break;
@@ -1182,7 +1189,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (!relative_paths)
 		implied_dirs = 0;
 
-	if (!!delete_before + !!delete_during + delete_after > 1) {
+	if (delete_before + !!delete_during + delete_after > 1) {
 		snprintf(err_buf, sizeof err_buf,
 			"You may not combine multiple --delete-WHEN options.\n");
 		return 0;
@@ -1190,11 +1197,17 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (delete_before || delete_during || delete_after)
 		delete_mode = 1;
 	else if (delete_mode || delete_excluded) {
+		/* Only choose now between before & during if one is refused. */
 		if (refused_delete_before) {
-			create_refuse_error(refused_delete_before);
-			return 0;
-		}
-		delete_mode = delete_before = 1;
+			if (!refused_delete_during)
+				delete_during = 1;
+			else {
+				create_refuse_error(refused_delete_before);
+				return 0;
+			}
+		} else if (refused_delete_during)
+			delete_before = 1;
+		delete_mode = 1;
 	}
 	if (!xfer_dirs && delete_mode) {
 		snprintf(err_buf, sizeof err_buf,
@@ -1526,8 +1539,11 @@ void server_options(char **args,int *argc)
 	 * default for remote transfers, and in any case old versions
 	 * of rsync will not understand it. */
 
-	if (preserve_hard_links)
+	if (preserve_hard_links) {
 		argstr[x++] = 'H';
+		if (preserve_hard_links > 1)
+			argstr[x++] = 'H';
+	}
 	if (preserve_uid)
 		argstr[x++] = 'o';
 	if (preserve_gid)
@@ -1654,11 +1670,7 @@ void server_options(char **args,int *argc)
 	}
 
 	if (am_sender) {
-		if (delete_excluded)
-			args[ac++] = "--delete-excluded";
-		else if (delete_before == 1 || delete_after)
-			args[ac++] = "--delete";
-		if (delete_before > 1)
+		if (delete_before)
 			args[ac++] = "--delete-before";
 		else if (delete_during == 2)
 			args[ac++] = "--delete-delay";
@@ -1666,6 +1678,10 @@ void server_options(char **args,int *argc)
 			args[ac++] = "--delete-during";
 		else if (delete_after)
 			args[ac++] = "--delete-after";
+		else if (delete_mode && !delete_excluded)
+			args[ac++] = "--delete";
+		if (delete_excluded)
+			args[ac++] = "--delete-excluded";
 		if (force_delete)
 			args[ac++] = "--force";
 		if (write_batch < 0)
