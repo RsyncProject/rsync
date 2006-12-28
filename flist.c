@@ -755,9 +755,9 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	}
 	file->mode = mode;
 	if (preserve_uid)
-		F_UID(file) = uid;
+		F_OWNER(file) = uid;
 	if (preserve_gid)
-		F_GID(file) = gid;
+		F_GROUP(file) = gid;
 
 	if (basename != thisname) {
 		file->dirname = lastdir;
@@ -1052,9 +1052,9 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	}
 	file->mode = st.st_mode;
 	if (preserve_uid)
-		F_UID(file) = st.st_uid;
+		F_OWNER(file) = st.st_uid;
 	if (preserve_gid)
-		F_GID(file) = st.st_gid;
+		F_GROUP(file) = st.st_gid;
 
 	if (basename != thisname)
 		file->dirname = lastdir;
@@ -1083,9 +1083,9 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			file->len32 = 0;
 			file->mode = st2.st_mode;
 			if (preserve_uid)
-				F_UID(file) = st2.st_uid;
+				F_OWNER(file) = st2.st_uid;
 			if (preserve_gid)
-				F_GID(file) = st2.st_gid;
+				F_GROUP(file) = st2.st_gid;
 		} else
 			file->mode = save_mode;
 	}
