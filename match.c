@@ -314,7 +314,7 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 
 	sum_init(checksum_seed);
 
-	if (append_mode) {
+	if (append_mode > 0) {
 		OFF_T j = 0;
 		for (j = CHUNK_SIZE; j < s->flength; j += CHUNK_SIZE) {
 			if (buf && do_progress)
