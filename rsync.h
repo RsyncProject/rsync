@@ -55,11 +55,14 @@
 #define XMIT_SAME_DEV_pre30 (1<<10)	/* protocols < 30 */
 #define XMIT_HLINK_FIRST (1<<10)	/* protocols >= 30 */
 #define XMIT_RDEV_MINOR_IS_SMALL (1<<11)
+#define XMIT_USER_NAME_FOLLOWS (1<<12)	/* protocols >= 30 */
+#define XMIT_GROUP_NAME_FOLLOWS (1<<13) /* protocols >= 30 */
 
 /* These flags are used in the live flist data. */
 
 #define FLAG_TOP_DIR (1<<0)	/* sender/receiver/generator */
-#define FLAG_SENT (1<<1)	/* sender/generator */
+#define FLAG_FILE_SENT (1<<1)	/* sender/receiver/generator */
+#define FLAG_DIR_CHANGED (1<<1)	/* generator */
 #define FLAG_XFER_DIR (1<<2)	/* sender/receiver/generator */
 #define FLAG_MOUNT_DIR (1<<3)	/* sender/generator */
 #define FLAG_MISSING_DIR (1<<4)	/* generator */
@@ -68,6 +71,10 @@
 #define FLAG_HLINK_LAST (1<<7)	/* receiver/generator */
 #define FLAG_HLINK_DONE (1<<8)	/* receiver/generator */
 #define FLAG_LENGTH64 (1<<9)	/* sender/receiver/generator */
+
+/* These flags are passed to functions but not stored. */
+
+#define FLAG_DIVERT_DIRS (1<<16)/* sender */
 
 #define BITS_SET(val,bits) (((val) & (bits)) == (bits))
 #define BITS_SETnUNSET(val,onbits,offbits) (((val) & ((onbits)|(offbits))) == (onbits))
@@ -179,12 +186,19 @@ enum msgcode {
 	MSG_ERROR=FERROR, MSG_INFO=FINFO, /* remote logging */
 	MSG_LOG=FLOG, MSG_CLIENT=FCLIENT, MSG_SOCKERR=FSOCKERR, /* sibling logging */
 	MSG_REDO=9,	/* reprocess indicated flist index */
+	MSG_FLIST=20,	/* extra file list over sibling socket */
+	MSG_FLIST_EOF=21,/* we've transmitted all the file lists */
+	MSG_IO_ERROR=22,/* the sending side had an I/O error */
+	MSG_NOOP=42,	/* a do-nothing message */
 	MSG_SUCCESS=100,/* successfully updated indicated flist index */
 	MSG_DELETED=101,/* successfully deleted a file on receiving side */
+	MSG_NO_SEND=102,/* sender failed to open a file we wanted */
 	MSG_DONE=86	/* current phase is done */
 };
 
 #define NDX_DONE -1
+#define NDX_FLIST_EOF -2
+#define NDX_FLIST_OFFSET -101
 
 #include "errcode.h"
 
@@ -587,6 +601,8 @@ extern int preserve_gid;
 /* These items are per-entry optional and mutally exclusive: */
 #define F_HL_GNUM(f) OPT_EXTRA(f, LEN64_BUMP(f))->num
 #define F_HL_PREV(f) OPT_EXTRA(f, LEN64_BUMP(f))->num
+#define F_DIRDEV_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) + 2 - 1)->unum)
+#define F_DIRNODE_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) + 3 - 1)->num)
 
 /* This optional item might follow an F_HL_*() item.
  * (Note: a device doesn't need to check LEN64_BUMP(f).) */
@@ -604,6 +620,10 @@ extern int preserve_gid;
 
 #define DEV_MAJOR(a) (a)[0]
 #define DEV_MINOR(a) (a)[1]
+
+#define DIR_PARENT(a) (a)[0]
+#define DIR_FIRST_CHILD(a) (a)[1]
+#define DIR_NEXT_SIBLING(a) (a)[2]
 
 /*
  * Start the flist array at FLIST_START entries and grow it
@@ -624,11 +644,17 @@ extern int preserve_gid;
 #define FILE_EXTENT	(256 * 1024)
 #define HLINK_EXTENT	(128 * 1024)
 
+#define FLIST_TEMP	(1<<1)
+
 struct file_list {
+	struct file_list *next, *prev;
 	struct file_struct **files;
 	alloc_pool_t file_pool;
 	int count, malloced;
 	int low, high; /* 0-relative index values excluding empties */
+	int ndx_start; /* the start offset when incremental */
+	int parent_ndx; /* dir_flist index of parent directory */
+	int in_progress, to_redo;
 };
 
 #define SUMFLG_SAME_OFFSET	(1<<0)
