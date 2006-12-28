@@ -24,20 +24,26 @@
 
 int remote_protocol = 0;
 int file_extra_cnt = 0; /* count of file-list extras that everyone gets */
+int incremental = 0;
 
 extern int verbose;
 extern int am_server;
 extern int am_sender;
 extern int inplace;
+extern int recurse;
 extern int fuzzy_basis;
 extern int read_batch;
 extern int max_delete;
+extern int delay_updates;
 extern int checksum_seed;
 extern int basis_dir_cnt;
 extern int prune_empty_dirs;
 extern int protocol_version;
 extern int preserve_uid;
 extern int preserve_gid;
+extern int preserve_hard_links;
+extern int need_messages_from_generator;
+extern int delete_mode, delete_before, delete_during, delete_after;
 extern char *dest_option;
 
 void setup_protocol(int f_out,int f_in)
@@ -99,6 +105,13 @@ void setup_protocol(int f_out,int f_in)
 		}
 	}
 
+	if (delete_mode && !(delete_before+delete_during+delete_after)) {
+		if (protocol_version < 30)
+			delete_before = 1;
+		else
+			delete_during = 1;
+	}
+
 	if (protocol_version < 29) {
 		if (fuzzy_basis) {
 			rprintf(FERROR,
@@ -131,6 +144,11 @@ void setup_protocol(int f_out,int f_in)
 			    protocol_version);
 			exit_cleanup(RERR_PROTOCOL);
 		}
+	} else if (protocol_version >= 30) {
+		if (recurse && !preserve_hard_links && !delete_before
+		 && !delete_after && !delay_updates)
+			incremental = 1;
+		need_messages_from_generator = 1;
 	}
 
 	if (am_server) {
