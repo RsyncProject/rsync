@@ -107,7 +107,7 @@ int write_file(int f,char *buf,size_t len)
 
 	while (len > 0) {
 		int r1;
-		if (sparse_files) {
+		if (sparse_files > 0) {
 			int len1 = MIN(len, SPARSE_WRITE_SIZE);
 			r1 = write_sparse(f, buf, len1);
 		} else {
