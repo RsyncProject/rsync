@@ -189,7 +189,7 @@ static gid_t recv_add_gid(gid_t id, char *name)
 }
 
 /* this function is a definate candidate for a faster algorithm */
-static uid_t match_uid(uid_t uid)
+uid_t match_uid(uid_t uid)
 {
 	static uid_t last_in, last_out;
 	struct idlist *list;
@@ -210,7 +210,7 @@ static uid_t match_uid(uid_t uid)
 	return last_out = uid;
 }
 
-static gid_t match_gid(gid_t gid)
+gid_t match_gid(gid_t gid)
 {
 	static gid_t last_in = GID_NONE, last_out = GID_NONE;
 	struct idlist *list;
@@ -232,35 +232,39 @@ static gid_t match_gid(gid_t gid)
 }
 
 /* Add a uid to the list of uids.  Only called on sending side. */
-void add_uid(uid_t uid)
+char *add_uid(uid_t uid)
 {
 	struct idlist *list;
+	struct idlist *node;
 
 	if (uid == 0)	/* don't map root */
-		return;
+		return NULL;
 
 	for (list = uidlist; list; list = list->next) {
 		if (list->id == (int)uid)
-			return;
+			return NULL;
 	}
 
-	add_to_list(&uidlist, (int)uid, uid_to_name(uid), 0);
+	node = add_to_list(&uidlist, (int)uid, uid_to_name(uid), 0);
+	return node->name;
 }
 
 /* Add a gid to the list of gids.  Only called on sending side. */
-void add_gid(gid_t gid)
+char *add_gid(gid_t gid)
 {
 	struct idlist *list;
+	struct idlist *node;
 
 	if (gid == 0)	/* don't map root */
-		return;
+		return NULL;
 
 	for (list = gidlist; list; list = list->next) {
 		if (list->id == (int)gid)
-			return;
+			return NULL;
 	}
 
-	add_to_list(&gidlist, (int)gid, gid_to_name(gid), 0);
+	node = add_to_list(&gidlist, (int)gid, gid_to_name(gid), 0);
+	return node->name;
 }
 
 /* send a complete uid/gid mapping to the peer */
@@ -299,7 +303,7 @@ void send_uid_list(int f)
 	}
 }
 
-static uid_t recv_user_name(int f, uid_t uid)
+uid_t recv_user_name(int f, uid_t uid)
 {
 	int len = read_byte(f);
 	char *name = new_array(char, len+1);
@@ -309,7 +313,7 @@ static uid_t recv_user_name(int f, uid_t uid)
 	return recv_add_uid(uid, name); /* node keeps name's memory */
 }
 
-static gid_t recv_group_name(int f, gid_t gid)
+gid_t recv_group_name(int f, gid_t gid)
 {
 	int len = read_byte(f);
 	char *name = new_array(char, len+1);
