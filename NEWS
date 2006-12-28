@@ -31,6 +31,16 @@ Changes since 2.6.9:
 
   ENHANCEMENTS:
 
+    - A new incremental-recursion algorithm is now used when rsync is talking
+      to another 3.0.0 version.  This starts the transfer going more quickly
+      (before all the files have been found), and requires much less memory.
+      See the --recursive option in the manpage for some restrictions.
+
+    - The default --delete algorithm is now --delete-during when talking to a
+      3.x rsync.  This is a faster scan than using --delete-before (which is
+      the default when talking to older rsync versions), and is compatible
+      with the new incremental recursion mode.
+
     - Added the --delete-delay option, which is a more efficient way to
       delete files at the end of the transfer without needing a separate
       delete pass.
