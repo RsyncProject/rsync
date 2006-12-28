@@ -149,7 +149,7 @@ void successful_send(int ndx)
 void write_ndx_and_attrs(int f_out, int ndx, int iflags,
 			 uchar fnamecmp_type, char *buf, int len)
 {
-	write_int(f_out, ndx);
+	write_ndx(f_out, ndx);
 	if (protocol_version < 29)
 		return;
 	write_shortint(f_out, iflags);
@@ -191,7 +191,7 @@ void send_files(int f_in, int f_out)
 			if (incremental && first_flist) {
 				flist_free(first_flist);
 				if (first_flist) {
-					write_int(f_out, NDX_DONE);
+					write_ndx(f_out, NDX_DONE);
 					continue;
 				}
 			}
@@ -199,7 +199,7 @@ void send_files(int f_in, int f_out)
 				break;
 			if (verbose > 2)
 				rprintf(FINFO, "send_files phase=%d\n", phase);
-			write_int(f_out, NDX_DONE);
+			write_ndx(f_out, NDX_DONE);
 			continue;
 		}
 
@@ -354,5 +354,5 @@ void send_files(int f_in, int f_out)
 
 	match_report();
 
-	write_int(f_out, NDX_DONE);
+	write_ndx(f_out, NDX_DONE);
 }

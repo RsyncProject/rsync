@@ -776,7 +776,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	io_flush(FULL_FLUSH);
 	if (protocol_version >= 24) {
 		/* send a final goodbye message */
-		write_int(f_out, NDX_DONE);
+		write_ndx(f_out, NDX_DONE);
 	}
 	io_flush(FULL_FLUSH);
 

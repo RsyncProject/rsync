@@ -1300,7 +1300,7 @@ void send_extra_file_list(int f, int at_least)
 		flist = flist_new(0, "send_extra_file_list");
 		start_write = stats.total_written;
 
-		write_int(f, NDX_FLIST_OFFSET - send_dir_ndx);
+		write_ndx(f, NDX_FLIST_OFFSET - send_dir_ndx);
 		change_local_filter_dir(fbuf, dlen, send_dir_depth);
 		send_directory(f, flist, send_dir_ndx, fbuf, dlen, FLAG_DIVERT_DIRS | FLAG_XFER_DIR);
 		write_byte(f, 0);
@@ -1319,7 +1319,7 @@ void send_extra_file_list(int f, int at_least)
 		} else {
 			while (DIR_NEXT_SIBLING(dp) < 0) {
 				if ((send_dir_ndx = DIR_PARENT(dp)) < 0) {
-					write_int(f, NDX_FLIST_EOF);
+					write_ndx(f, NDX_FLIST_EOF);
 					flist_eof = 1;
 					change_local_filter_dir(NULL, 0, 0);
 					goto finish;
@@ -1630,7 +1630,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			 * was just 1 item in the first file-list, send 1 more
 			 * file-list to check if this is a 1-file xfer. */
 			if (send_dir_ndx < 0)
-				write_int(f, NDX_DONE);
+				write_ndx(f, NDX_DONE);
 			else
 				send_extra_file_list(f, 1);
 		}
@@ -1743,7 +1743,7 @@ struct file_list *recv_file_list(int f)
 void recv_additional_file_list(int f)
 {
 	struct file_list *flist;
-	int ndx = read_int(f);
+	int ndx = read_ndx(f);
 	if (ndx == NDX_DONE) {
 		flist_eof = 1;
 		change_local_filter_dir(NULL, 0, 0);

@@ -554,7 +554,7 @@ void itemize(struct file_struct *file, int ndx, int statret,
 	  || stdout_format_has_i > 1 || (xname && *xname)) && !read_batch) {
 		if (protocol_version >= 29) {
 			if (ndx >= 0)
-				write_int(sock_f_out, ndx + cur_flist->ndx_start);
+				write_ndx(sock_f_out, ndx + cur_flist->ndx_start);
 			write_shortint(sock_f_out, iflags);
 			if (iflags & ITEM_BASIS_TYPE_FOLLOWS)
 				write_byte(sock_f_out, fnamecmp_type);
@@ -1605,7 +1605,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (preserve_hard_links && F_IS_HLINKED(file))
 		file->flags |= FLAG_FILE_SENT;
 #endif
-	write_int(f_out, ndx + cur_flist->ndx_start);
+	write_ndx(f_out, ndx + cur_flist->ndx_start);
 	if (itemizing) {
 		int iflags = ITEM_TRANSFER;
 		if (always_checksum > 0)
@@ -1771,7 +1771,7 @@ void generate_files(int f_out, char *local_name)
 					phase);
 			}
 
-			write_int(f_out, NDX_DONE);
+			write_ndx(f_out, NDX_DONE);
 		}
 
 		csum_length = SUM_LENGTH;
@@ -1865,10 +1865,10 @@ void generate_files(int f_out, char *local_name)
 				}
 			}
 
-			flist_free(cur_flist);
+			flist_free(first_flist); /* updates cur_flist & first_flist */
 
 			if (!read_batch)
-				write_int(f_out, NDX_DONE);
+				write_ndx(f_out, NDX_DONE);
 		}
 	} while ((cur_flist = next_flist) != NULL);
 
@@ -1876,10 +1876,10 @@ void generate_files(int f_out, char *local_name)
 	if (verbose > 2)
 		rprintf(FINFO, "generate_files phase=%d\n", phase);
 
-	write_int(f_out, NDX_DONE);
+	write_ndx(f_out, NDX_DONE);
 	/* Reduce round-trip lag-time for a useless delay-updates phase. */
 	if (protocol_version >= 29 && !delay_updates)
-		write_int(f_out, NDX_DONE);
+		write_ndx(f_out, NDX_DONE);
 
 	/* Read MSG_DONE for the redo phase (and any prior messages). */
 	while (done_cnt <= 1) {
@@ -1892,7 +1892,7 @@ void generate_files(int f_out, char *local_name)
 		if (verbose > 2)
 			rprintf(FINFO, "generate_files phase=%d\n", phase);
 		if (delay_updates)
-			write_int(f_out, NDX_DONE);
+			write_ndx(f_out, NDX_DONE);
 		/* Read MSG_DONE for delay-updates phase & prior messages. */
 		while (done_cnt == 2)
 			wait_for_receiver();
