@@ -33,12 +33,12 @@ extern int remove_source_files;
 extern int stdout_format_has_i;
 extern int maybe_ATTRS_REPORT;
 extern char *basis_dir[];
-extern struct file_list *the_file_list;
+extern struct file_list *cur_flist;
 
 #ifdef SUPPORT_HARD_LINKS
 
 #define HASH_LOAD_LIMIT(size) ((size)*3/4)
-#define FPTR(i) (the_file_list->files[i])
+#define FPTR(i) (cur_flist->files[i])
 
 struct ihash_table {
 	int32 size;
@@ -251,10 +251,10 @@ void match_hard_links(void)
 	int i, ndx_count = 0;
 	int32 *ndx_list;
 
-	if (!(ndx_list = new_array(int32, the_file_list->count)))
+	if (!(ndx_list = new_array(int32, cur_flist->count)))
 		out_of_memory("match_hard_links");
 
-	for (i = 0; i < the_file_list->count; i++) {
+	for (i = 0; i < cur_flist->count; i++) {
 		if (F_IS_HLINKED(FPTR(i)))
 			ndx_list[ndx_count++] = i;
 	}
@@ -285,7 +285,7 @@ static int maybe_hard_link(struct file_struct *file, int ndx,
 			file->flags |= FLAG_HLINK_DONE;
 			return 0;
 		}
-		if (make_backups) {
+		if (make_backups > 0) {
 			if (!make_backup(fname))
 				return -1;
 		} else if (robust_unlink(fname)) {
@@ -322,13 +322,13 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 	/* Is the previous link is not complete yet? */
 	if (!(prev_file->flags & FLAG_HLINK_DONE)) {
 		/* Is the previous link being transferred? */
-		if (prev_file->flags & FLAG_SENT) {
+		if (prev_file->flags & FLAG_FILE_SENT) {
 			/* Add ourselves to the list of files that will be
 			 * updated when the transfer completes, and mark
 			 * ourself as waiting for the transfer. */
 			F_HL_PREV(file) = F_HL_PREV(prev_file);
 			F_HL_PREV(prev_file) = ndx;
-			file->flags |= FLAG_SENT;
+			file->flags |= FLAG_FILE_SENT;
 			return 1;
 		}
 		return 0;
