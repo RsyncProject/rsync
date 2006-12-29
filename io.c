@@ -107,7 +107,7 @@ static char int_byte_cnt[64] = {
 	5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 8, 9, /* (C0 - FF)/4 */
 };
 
-static int readfd_unbuffered(int fd, char *buf, size_t len);
+static void readfd(int fd, char *buffer, size_t N);
 static void writefd(int fd, const char *buf, size_t len);
 static void writefd_unbuffered(int fd, const char *buf, size_t len);
 static void decrement_active_files(int ndx);
@@ -264,7 +264,7 @@ static void read_msg_fd(void)
 	 * to this routine from writefd_unbuffered(). */
 	msg_fd_in = -1;
 
-	readfd_unbuffered(fd, buf, 4);
+	readfd(fd, buf, 4);
 	tag = IVAL(buf, 0);
 
 	len = tag & 0xFFFFFF;
@@ -284,7 +284,7 @@ static void read_msg_fd(void)
 	case MSG_REDO:
 		if (len != 4 || !am_generator)
 			goto invalid_msg;
-		readfd_unbuffered(fd, buf, 4);
+		readfd(fd, buf, 4);
 		if (remove_source_files)
 			decrement_active_files(IVAL(buf,0));
 		flist_ndx_push(&redo_list, IVAL(buf,0));
@@ -294,7 +294,7 @@ static void read_msg_fd(void)
 	case MSG_FLIST:
 		if (len != 4 || !am_generator || !incremental)
 			goto invalid_msg;
-		readfd_unbuffered(fd, buf, 4);
+		readfd(fd, buf, 4);
 		/* Read extra file list from receiver. */
 		assert(iobuf_in != NULL);
 		assert(iobuf_f_in == fd);
@@ -309,13 +309,13 @@ static void read_msg_fd(void)
 	case MSG_DELETED:
 		if (len >= (int)sizeof buf || !am_generator)
 			goto invalid_msg;
-		readfd_unbuffered(fd, buf, len);
+		readfd(fd, buf, len);
 		send_msg(MSG_DELETED, buf, len);
 		break;
 	case MSG_SUCCESS:
 		if (len != 4 || !am_generator)
 			goto invalid_msg;
-		readfd_unbuffered(fd, buf, len);
+		readfd(fd, buf, len);
 		if (remove_source_files) {
 			decrement_active_files(IVAL(buf,0));
 			send_msg(MSG_SUCCESS, buf, len);
@@ -328,7 +328,7 @@ static void read_msg_fd(void)
 	case MSG_NO_SEND:
 		if (len != 4 || !am_generator)
 			goto invalid_msg;
-		readfd_unbuffered(fd, buf, len);
+		readfd(fd, buf, len);
 		if (incremental)
 			decrement_flist_in_progress(IVAL(buf,0), 0);
 		break;
@@ -346,7 +346,7 @@ static void read_msg_fd(void)
 			n = len;
 			if (n >= sizeof buf)
 				n = sizeof buf - 1;
-			readfd_unbuffered(fd, buf, n);
+			readfd(fd, buf, n);
 			rwrite((enum logcode)tag, buf, n);
 			len -= n;
 		}
@@ -417,7 +417,7 @@ static void decrement_flist_in_progress(int ndx, int redo)
  * This is only active in the receiver. */
 static int msg2genr_flush(void)
 {
-	if (msg_fd_out < 0 || no_flush)
+	if (msg_fd_out < 0 || no_flush || flist_forward_from >= 0)
 		return -1;
 
 	no_flush++;
@@ -538,7 +538,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 {
 	int n, cnt = 0;
 
-	io_flush(NORMAL_FLUSH);
+	io_flush(FULL_FLUSH);
 
 	while (cnt == 0) {
 		/* until we manage to read *something* */
@@ -818,8 +818,8 @@ void start_flist_forward(int f_in)
 
 void stop_flist_forward()
 {
-	io_flush(NORMAL_FLUSH);
 	flist_forward_from = -1;
+	io_flush(FULL_FLUSH);
 }
 
 /**
@@ -947,11 +947,8 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 	return cnt;
 }
 
-/**
- * Do a buffered read from @p fd.  Don't return until all @p n bytes
- * have been read.  If all @p n can't be read then exit with an
- * error.
- **/
+/* Do a buffered read from fd.  Don't return until all N bytes have
+ * been read.  If all N can't be read then exit with an error. */
 static void readfd(int fd, char *buffer, size_t N)
 {
 	int  cnt;
@@ -1345,10 +1342,12 @@ static void mplex_write(enum msgcode code, const char *buf, size_t len)
 	}
 }
 
-void io_flush(UNUSED(int flush_it_all))
+void io_flush(int flush_it_all)
 {
-	msg2genr_flush();
-	msg2sndr_flush();
+	if (flush_it_all) {
+		msg2genr_flush();
+		msg2sndr_flush();
+	}
 
 	if (!iobuf_out_cnt || no_flush)
 		return;
