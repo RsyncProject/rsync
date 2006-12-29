@@ -544,7 +544,7 @@ transfer are at least version 3.0.0.
 
 Some options require rsync to know the full file list, so these options
 disable the incremental recursion mode.  These include: bf(--delete-before),
-bf(--delete-after), bf(--delay-updates), and (currently) bf(--hard-links).
+bf(--delete-after), bf(--prune-empty-dirs), bf(--delay-updates), and bf(--hard-links).
 Because of this, the default delete mode when you specify bf(--delete) is now
 bf(--delete-during) when both ends of the connection are at least 3.0.0
 (use bf(--del) or bf(--delete-during) to request this improved deletion mode
