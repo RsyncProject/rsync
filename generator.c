@@ -1648,6 +1648,40 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	close(fd);
 }
 
+static void touch_up_dirs(struct file_list *flist, int ndx,
+			  int need_retouch_dir_times, int lull_mod)
+{
+	struct file_struct *file;
+	char *fname;
+	int i, j, start, end;
+
+	if (ndx < 0) {
+		start = 0;
+		end = flist->count - 1;
+	} else
+		start = end = ndx;
+
+	/* Fix any directory permissions that were modified during the
+	 * transfer and/or re-set any tweaked modified-time values. */
+	for (i = start, j = 0; i <= end; i++) {
+		file = flist->files[i];
+		if (!F_IS_ACTIVE(file) || !S_ISDIR(file->mode)
+		 || file->flags & FLAG_MISSING_DIR)
+			continue;
+		if (!need_retouch_dir_times && file->mode & S_IWUSR)
+			continue;
+		fname = f_name(file, NULL);
+		if (!(file->mode & S_IWUSR))
+			do_chmod(fname, file->mode);
+		if (need_retouch_dir_times)
+			set_modtime(fname, file->modtime, file->mode);
+		if (allowed_lull && !(++j % lull_mod))
+			maybe_send_keepalive();
+		else if (!(j % 200))
+			maybe_flush_socket();
+	}
+}
+
 void generate_files(int f_out, char *local_name)
 {
 	int i;
@@ -1832,7 +1866,6 @@ void generate_files(int f_out, char *local_name)
 			wait_for_receiver();
 		next_flist = cur_flist->next;
 		while (first_flist != next_flist) {
-			struct file_struct *fp;
 			if (first_flist->in_progress || first_flist->to_redo) {
 				if (next_flist)
 					break;
@@ -1841,28 +1874,14 @@ void generate_files(int f_out, char *local_name)
 			}
 
 			cur_flist = first_flist;
-			if (cur_flist->ndx_start != 0) {
-				fp = dir_flist->files[cur_flist->parent_ndx];
-				if (!(fp->flags & FLAG_MISSING_DIR)) {
-					f_name(fp, fbuf);
-					if (!(fp->mode & S_IWUSR))
-						do_chmod(fbuf, fp->mode);
-					if (preserve_times && !omit_dir_times) {
-						set_modtime(fbuf, fp->modtime,
-							    fp->mode);
-					}
-				}
-			} else if (relative_paths && implied_dirs
-			    && preserve_times && !omit_dir_times) {
-				/* Set mtime on implied dirs */
-				for (i = 0; i < cur_flist->count; i++) {
-					fp = cur_flist->files[i];
-					if (!S_ISDIR(fp->mode)
-					 || fp->flags & (FLAG_XFER_DIR|FLAG_MISSING_DIR))
-						continue;
-					f_name(fp, fbuf);
-					set_modtime(fbuf, fp->modtime, fp->mode);
-				}
+			if (delete_during == 2 || !dir_tweaking) {
+				/* Skip directory touch-up. */
+			} else if (cur_flist->ndx_start != 0) {
+				touch_up_dirs(dir_flist, cur_flist->parent_ndx,
+					      need_retouch_dir_times, lull_mod);
+			} else if (relative_paths && implied_dirs) {
+				touch_up_dirs(cur_flist, -1,
+					      need_retouch_dir_times, lull_mod);
 			}
 
 			flist_free(first_flist); /* updates cur_flist & first_flist */
@@ -1905,34 +1924,9 @@ void generate_files(int f_out, char *local_name)
 		do_delete_pass(cur_flist);
 
 	if ((need_retouch_dir_perms || need_retouch_dir_times)
-	 && dir_tweaking && !incremental) {
-		int j = 0;
-		/* Now we need to fix any directory permissions that were
-		 * modified during the transfer and/or re-set any tweaked
-		 * modified-time values. */
-		for (i = 0; i < cur_flist->count; i++) {
-			struct file_struct *file = cur_flist->files[i];
-			if (!F_IS_ACTIVE(file) || !S_ISDIR(file->mode))
-				continue;
-			if (!need_retouch_dir_times && file->mode & S_IWUSR)
-				continue;
-			if (file->flags & FLAG_MISSING_DIR) {
-				int missing = F_DEPTH(file);
-				while (++i < cur_flist->count) {
-					file = cur_flist->files[i];
-					if (F_DEPTH(file) <= missing)
-						break;
-				}
-				i--;
-				continue;
-			}
-			recv_generator(f_name(file, NULL), file, i, itemizing,
-				       code, -1);
-			if (allowed_lull && !(++j % lull_mod))
-				maybe_send_keepalive();
-			else if (!(j % 200))
-				maybe_flush_socket();
-		}
+	 && dir_tweaking && (!incremental || delete_during == 2)) {
+		touch_up_dirs(incremental ? dir_flist : cur_flist, -1,
+			      need_retouch_dir_times, lull_mod);
 	}
 
 	if (max_delete >= 0 && deletion_count > max_delete) {
