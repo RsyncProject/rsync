@@ -14,6 +14,7 @@ mkdir "$todir"
 
 cp -p "$srcdir"/rsync.c "$fromdir"/rsync.c
 cp -p "$fromdir"/rsync.c "$todir"/rsync2.c
+sleep 1
 
 # Let's do it!
 checkit "$RSYNC -avvi --no-whole-file --fuzzy --delete-delay \
