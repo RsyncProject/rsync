@@ -146,7 +146,7 @@ void setup_protocol(int f_out,int f_in)
 		}
 	} else if (protocol_version >= 30) {
 		if (recurse && !preserve_hard_links && !delete_before
-		 && !delete_after && !delay_updates)
+		 && !delete_after && !delay_updates && !prune_empty_dirs)
 			incremental = 1;
 		need_messages_from_generator = 1;
 	}
