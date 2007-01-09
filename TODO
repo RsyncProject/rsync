@@ -365,21 +365,6 @@ Use generic zlib						2002/02/25
                       --          --
 
 
-TDB								2002/03/12
-
-  Rather than storing the file list in memory, store it in a TDB.
-
-  This *might* make memory usage lower while building the file list.
-
-  Hashtable lookup will mean files are not transmitted in order,
-  though... hm.
-
-  This would neatly eliminate one of the major post-fork shared data
-  structures.
-
-                      --          --
-
-
 Splint								2002/03/12
 
   Build rsync with SPLINT to try to find security holes.  Add
@@ -391,17 +376,6 @@ Splint								2002/03/12
                       --          --
 
 PERFORMANCE ----------------------------------------------------------
-
-Traverse just one directory at a time
-
-  Traverse just one directory at a time.  Tridge says it's possible.
-
-  At the moment rsync reads the whole file list into memory at the
-  start, which makes us use a lot of memory and also not pipeline
-  network access as much as we could.
-
-                      --          --
-
 
 Allow skipping MD4 file_sum					2002/04/08
 
