@@ -548,6 +548,9 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 
   the_end:
 	strlcpy(lastname, fname, MAXPATHLEN);
+
+	if (S_ISREG(mode) || S_ISLNK(mode))
+		stats.total_size += F_LENGTH(file);
 }
 
 static struct file_struct *recv_file_entry(struct file_list *flist,
@@ -849,6 +852,9 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 			read_buf(f, bp, checksum_len);
 	}
 
+	if (S_ISREG(mode) || S_ISLNK(mode))
+		stats.total_size += file_length;
+
 	return file;
 }
 
@@ -1089,9 +1095,6 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		} else
 			file->mode = save_mode;
 	}
-
-	if (S_ISREG(st.st_mode) || S_ISLNK(st.st_mode))
-		stats.total_size += st.st_size;
 
 	if (basename_len == 0+1)
 		return NULL;
@@ -1679,9 +1682,6 @@ struct file_list *recv_file_list(int f)
 			flags |= read_byte(f) << 8;
 		file = recv_file_entry(flist, flags, f);
 
-		if (S_ISREG(file->mode) || S_ISLNK(file->mode))
-			stats.total_size += F_LENGTH(file);
-
 		if (incremental && S_ISDIR(file->mode)) {
 			flist_expand(dir_flist);
 			dir_flist->files[dir_flist->count++] = file;
@@ -2035,7 +2035,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 				}
 			}
 		}
-		/* Dump empty all remaining empty dirs. */
+		/* Dump all remaining empty dirs. */
 		while (1) {
 			struct file_struct *fp = flist->files[prev_i];
 			if (F_DEPTH(fp) >= 0)
