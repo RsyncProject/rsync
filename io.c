@@ -107,6 +107,7 @@ static char int_byte_cnt[64] = {
 	5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 8, 9, /* (C0 - FF)/4 */
 };
 
+static void msg2sndr_flush(void);
 static void readfd(int fd, char *buffer, size_t N);
 static void writefd(int fd, const char *buf, size_t len);
 static void writefd_unbuffered(int fd, const char *buf, size_t len);
@@ -360,6 +361,7 @@ static void read_msg_fd(void)
 
 	defer_forwarding_messages--;
 	msg_fd_in = fd;
+	msg2sndr_flush();
 }
 
 /* This is used by the generator to limit how many file transfers can
