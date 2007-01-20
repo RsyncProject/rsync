@@ -263,6 +263,7 @@ static void read_msg_fd(void)
 	/* Temporarily disable msg_fd_in.  This is needed to avoid looping back
 	 * to this routine from writefd_unbuffered(). */
 	msg_fd_in = -1;
+	defer_forwarding_messages++;
 
 	readfd(fd, buf, 4);
 	tag = IVAL(buf, 0);
@@ -357,6 +358,7 @@ static void read_msg_fd(void)
 		exit_cleanup(RERR_STREAMIO);
 	}
 
+	defer_forwarding_messages--;
 	msg_fd_in = fd;
 }
 
