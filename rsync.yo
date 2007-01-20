@@ -464,7 +464,7 @@ by the client at the start of a daemon transfer.  This suppresses the
 message-of-the-day (MOTD) text, but it also affects the list of modules
 that the daemon sends in response to the "rsync host::" request (due to
 a limitation in the rsync protocol), so omit this option if you want to
-request the list of modules from the deamon.
+request the list of modules from the daemon.
 
 dit(bf(-I, --ignore-times)) Normally rsync will skip any files that are
 already the same size and have the same modification time-stamp.
@@ -941,7 +941,7 @@ combined with the bf(--ignore-existing) option, no files will be updated
 
 dit(bf(--ignore-existing)) This tells rsync to skip updating files that
 already exist on the destination (this does em(not) ignore existing
-directores, or nothing would get done).  See also bf(--existing).
+directories, or nothing would get done).  See also bf(--existing).
 
 dit(bf(--remove-source-files)) This tells rsync to remove from the sending
 side the files (meaning non-directories) that are a part of the transfer
@@ -1113,7 +1113,7 @@ communicate.
 One tricky example is to set a different default directory on the remote
 machine for use with the bf(--relative) option.  For instance:
 
-quote(tt(    rsync -avR --rsync-path="cd /a/b && rsync" hst:c/d /e/))
+quote(tt(    rsync -avR --rsync-path="cd /a/b && rsync" host:c/d /e/))
 
 dit(bf(-C, --cvs-exclude)) This is a useful shorthand for excluding a
 broad range of files that you often don't want to transfer between
@@ -1655,7 +1655,7 @@ each file's destination directory, but if you've specified the
 bf(--partial-dir) option, that directory will be used instead.  See the
 comments in the bf(--partial-dir) section for a discussion of how this
 ".~tmp~" dir will be excluded from the transfer, and what you can do if
-you wnat rsync to cleanup old ".~tmp~" dirs that might be lying around.
+you want rsync to cleanup old ".~tmp~" dirs that might be lying around.
 Conflicts with bf(--inplace) and bf(--append).
 
 This option uses more memory on the receiving side (one bit per file
