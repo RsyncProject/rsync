@@ -57,7 +57,7 @@ extern struct file_list *cur_flist, *first_flist;
 extern struct filter_list_struct server_filter_list;
 
 static struct bitbag *delayed_bits = NULL;
-static int phase = 0;
+static int phase = 0, redoing = 0;
 /* We're either updating the basis file or an identical copy: */
 static int updating_basis;
 
@@ -314,7 +314,7 @@ static int get_next_gen_ndx(int fd, int next_gen_ndx, int desired_ndx)
 		if (next_gen_ndx >= 0) {
 			rprintf(FINFO,
 				"(No batched update for%s \"%s\")\n",
-				phase ? " resend of" : "",
+				redoing ? " resend of" : "",
 				f_name(cur_flist->files[next_gen_ndx], NULL));
 		}
 		next_gen_ndx = read_int(fd);
@@ -412,6 +412,7 @@ int recv_files(int f_in, char *local_name)
 				append_mode = -append_mode;
 				sparse_files = -sparse_files;
 				csum_length = SUM_LENGTH;
+				redoing = 1;
 			}
 		} else {
 			if (csum_length != SHORT_SUM_LENGTH) {
@@ -420,6 +421,7 @@ int recv_files(int f_in, char *local_name)
 				append_mode = -append_mode;
 				sparse_files = -sparse_files;
 				csum_length = SHORT_SUM_LENGTH;
+				redoing = 0;
 			}
 		}
 
@@ -667,7 +669,7 @@ int recv_files(int f_in, char *local_name)
 			 || (preserve_hard_links && F_IS_HLINKED(file)))
 				send_msg_int(MSG_SUCCESS, ndx);
 		} else if (!recv_ok) {
-			enum logcode msgtype = phase || read_batch ? FERROR : FINFO;
+			enum logcode msgtype = redoing || read_batch ? FERROR : FINFO;
 			if (msgtype == FERROR || verbose) {
 				char *errstr, *redostr, *keptstr;
 				if (!(keep_partial && partialptr) && !inplace)
@@ -687,10 +689,11 @@ int recv_files(int f_in, char *local_name)
 					"%s: %s failed verification -- update %s%s.\n",
 					errstr, fname, keptstr, redostr);
 			}
-			if (!phase || incremental) {
+			if (!redoing) {
 				send_msg_int(MSG_REDO, ndx);
 				file->flags |= FLAG_FILE_SENT;
-			}
+			} else if (incremental)
+				send_msg_int(MSG_NO_SEND, ndx);
 		}
 	}
 	if (make_backups < 0)
