@@ -1346,6 +1346,12 @@ and the attributes updated.
 If a match is not found, a basis file from one of the em(DIR)s will be
 selected to try to speed up the transfer.
 
+This option works best when copying into an empty destination hierarchy, as
+rsync treats existing files as definitive (so it never looks in the link-dest
+dirs when a destination file already exists), and as malleable (so it might
+change the attributes of a destination file, which affects all the hard-linked
+versions).
+
 Note that if you combine this option with bf(--ignore-times), rsync will not
 link any files together because it only links identical files together as a
 substitute for transferring the file, never as an additional check after the
