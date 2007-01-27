@@ -656,7 +656,7 @@ struct file_list {
 	alloc_pool_t file_pool;
 	int count, malloced;
 	int low, high; /* 0-relative index values excluding empties */
-	int ndx_start; /* the start offset when incremental */
+	int ndx_start; /* the start offset for inc_recurse mode */
 	int parent_ndx; /* dir_flist index of parent directory */
 	int in_progress, to_redo;
 };

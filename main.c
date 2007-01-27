@@ -34,7 +34,7 @@ extern int am_server;
 extern int am_sender;
 extern int am_generator;
 extern int am_daemon;
-extern int incremental;
+extern int inc_recurse;
 extern int blocking_io;
 extern int remove_source_files;
 extern int daemon_over_rsh;
@@ -844,7 +844,7 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 		rprintf(FERROR,"server_recv: recv_file_list error\n");
 		exit_cleanup(RERR_FILESELECT);
 	}
-	if (incremental && file_total == 1)
+	if (inc_recurse && file_total == 1)
 		recv_additional_file_list(f_in);
 	verbose = save_verbose;
 
@@ -1010,7 +1010,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	if (write_batch && !am_server)
 		start_write_batch(f_in);
 	flist = recv_file_list(f_in);
-	if (incremental && file_total == 1)
+	if (inc_recurse && file_total == 1)
 		recv_additional_file_list(f_in);
 
 	if (flist && flist->count > 0) {

@@ -30,7 +30,7 @@ extern int am_root;
 extern int am_server;
 extern int am_daemon;
 extern int am_sender;
-extern int incremental;
+extern int inc_recurse;
 extern int do_progress;
 extern int always_checksum;
 extern int module_id;
@@ -103,7 +103,7 @@ void init_flist(void)
 
 static int show_filelist_p(void)
 {
-	return verbose && xfer_dirs && !am_server && !incremental;
+	return verbose && xfer_dirs && !am_server && !inc_recurse;
 }
 
 static void start_filelist_progress(char *kind)
@@ -392,7 +392,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 			uid = F_UID(file);
 			if (preserve_uid && !numeric_ids) {
 				user_name = add_uid(uid);
-				if (incremental && user_name)
+				if (inc_recurse && user_name)
 					flags |= XMIT_USER_NAME_FOLLOWS;
 			}
 		}
@@ -404,7 +404,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 			gid = F_GID(file);
 			if (preserve_gid && !numeric_ids) {
 				group_name = add_gid(gid);
-				if (incremental && group_name)
+				if (inc_recurse && group_name)
 					flags |= XMIT_GROUP_NAME_FOLLOWS;
 			}
 		}
@@ -661,14 +661,14 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		uid = (uid_t)read_int(f);
 		if (flags & XMIT_USER_NAME_FOLLOWS)
 			uid = recv_user_name(f, uid);
-		else if (incremental && am_root && !numeric_ids)
+		else if (inc_recurse && am_root && !numeric_ids)
 			uid = match_uid(uid);
 	}
 	if (preserve_gid && !(flags & XMIT_SAME_GID)) {
 		gid = (gid_t)read_int(f);
 		if (flags & XMIT_GROUP_NAME_FOLLOWS)
 			gid = recv_group_name(f, gid);
-		else if (incremental && (!am_root || !numeric_ids))
+		else if (inc_recurse && (!am_root || !numeric_ids))
 			gid = match_gid(gid);
 	}
 
@@ -726,7 +726,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		extra_len = (extra_len | (EXTRA_ROUNDING * EXTRA_LEN)) + EXTRA_LEN;
 #endif
 
-	if (incremental && S_ISDIR(mode)) {
+	if (inc_recurse && S_ISDIR(mode)) {
 		if (one_file_system) {
 			/* Room to save the dir's device for -x */
 			extra_len += 2 * EXTRA_LEN;
@@ -1099,7 +1099,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	if (basename_len == 0+1)
 		return NULL;
 
-	if (incremental && flist == dir_flist) {
+	if (inc_recurse && flist == dir_flist) {
 		flist_expand(flist);
 		flist->files[flist->count++] = file;
 	}
@@ -1355,7 +1355,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	rprintf(FLOG, "building file list\n");
 	if (show_filelist_p())
 		start_filelist_progress("building file list");
-	else if (incremental && verbose && !am_server)
+	else if (inc_recurse && verbose && !am_server)
 		rprintf(FCLIENT, "sending incremental file list\n");
 
 	start_write = stats.total_written;
@@ -1367,7 +1367,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 #endif
 
 	flist = cur_flist = flist_new(0, "send_file_list");
-	if (incremental) {
+	if (inc_recurse) {
 		dir_flist = flist_new(FLIST_TEMP, "send_file_list");
 		flags = FLAG_DIVERT_DIRS;
 	} else {
@@ -1543,7 +1543,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			if (fn != p || (*lp && *lp != '/')) {
 				int save_copy_links = copy_links;
 				int save_xfer_dirs = xfer_dirs;
-				int dir_flags = incremental ? FLAG_DIVERT_DIRS : 0;
+				int dir_flags = inc_recurse ? FLAG_DIVERT_DIRS : 0;
 				copy_links |= copy_unsafe_links;
 				xfer_dirs = 1;
 				while ((slash = strchr(slash+1, '/')) != 0) {
@@ -1567,10 +1567,10 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			struct file_struct *file;
 			int top_flags = FLAG_TOP_DIR | FLAG_XFER_DIR
 				      | (is_dot_dir ? 0 : flags)
-				      | (incremental ? FLAG_DIVERT_DIRS : 0);
+				      | (inc_recurse ? FLAG_DIVERT_DIRS : 0);
 			file = send_file_name(f, flist, fbuf, &st,
 					      top_flags, ALL_FILTERS);
-			if (file && !incremental)
+			if (file && !inc_recurse)
 				send_if_directory(f, flist, file, fbuf, len, flags);
 		} else
 			send_file_name(f, flist, fbuf, &st, flags, ALL_FILTERS);
@@ -1586,7 +1586,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	write_byte(f, 0); /* Indicate end of file list */
 
 #ifdef SUPPORT_HARD_LINKS
-	if (preserve_hard_links && protocol_version >= 30 && !incremental)
+	if (preserve_hard_links && protocol_version >= 30 && !inc_recurse)
 		idev_destroy();
 #endif
 
@@ -1602,10 +1602,10 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	 * kept.  For incremental mode, the sender also removes duplicates
 	 * in this initial file-list so that it avoids re-sending duplicated
 	 * directories. */
-	clean_flist(flist, 0, incremental);
+	clean_flist(flist, 0, inc_recurse);
 	file_total += flist->count;
 
-	if (!numeric_ids && !incremental)
+	if (!numeric_ids && !inc_recurse)
 		send_uid_list(f);
 
 	/* send the io_error flag */
@@ -1626,7 +1626,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	if (verbose > 2)
 		rprintf(FINFO, "send_file_list done\n");
 
-	if (incremental) {
+	if (inc_recurse) {
 		add_dirs_to_tree(-1, 0, dir_flist->count - 1);
 		if (file_total == 1) {
 			/* If we're creating incremental file-lists and there
@@ -1652,7 +1652,7 @@ struct file_list *recv_file_list(int f)
 		rprintf(FLOG, "receiving file list\n");
 	if (show_filelist_p())
 		start_filelist_progress("receiving file list");
-	else if (incremental && verbose && !am_server && !first_flist)
+	else if (inc_recurse && verbose && !am_server && !first_flist)
 		rprintf(FCLIENT, "receiving incremental file list\n");
 
 	start_read = stats.total_read;
@@ -1664,7 +1664,7 @@ struct file_list *recv_file_list(int f)
 		init_hard_links();
 #endif
 
-	if (incremental) {
+	if (inc_recurse) {
 		if (flist->ndx_start == 0)
 			dir_flist = flist_new(FLIST_TEMP, "recv_file_list");
 		dstart = dir_flist->count;
@@ -1682,7 +1682,7 @@ struct file_list *recv_file_list(int f)
 			flags |= read_byte(f) << 8;
 		file = recv_file_entry(flist, flags, f);
 
-		if (incremental && S_ISDIR(file->mode)) {
+		if (inc_recurse && S_ISDIR(file->mode)) {
 			flist_expand(dir_flist);
 			dir_flist->files[dir_flist->count++] = file;
 		}
@@ -1706,7 +1706,7 @@ struct file_list *recv_file_list(int f)
 
 	clean_flist(flist, relative_paths, 1);
 
-	if (incremental) {
+	if (inc_recurse) {
 		qsort(dir_flist->files + dstart, dir_flist->count - dstart,
 		      sizeof dir_flist->files[0], (int (*)())file_compare);
 	} else if (f >= 0)

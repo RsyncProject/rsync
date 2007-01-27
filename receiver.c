@@ -26,7 +26,7 @@ extern int verbose;
 extern int do_xfers;
 extern int am_server;
 extern int do_progress;
-extern int incremental;
+extern int inc_recurse;
 extern int log_before_transfer;
 extern int stdout_format_has_i;
 extern int logfile_format_has_i;
@@ -318,7 +318,7 @@ static int get_next_gen_ndx(int fd, int next_gen_ndx, int desired_ndx)
 		}
 		next_gen_ndx = read_int(fd);
 		if (next_gen_ndx == -1) {
-			if (incremental)
+			if (inc_recurse)
 				next_gen_ndx = first_flist->prev->count + first_flist->prev->ndx_start;
 			else
 				next_gen_ndx = cur_flist->count;
@@ -365,13 +365,13 @@ int recv_files(int f_in, char *local_name)
 		ndx = read_ndx_and_attrs(f_in, -1, &iflags,
 					 &fnamecmp_type, xname, &xlen);
 		if (ndx == NDX_DONE) {
-			if (incremental && first_flist) {
+			if (inc_recurse && first_flist) {
 				flist_free(first_flist);
 				if (first_flist)
 					continue;
 			}
 			if (read_batch && cur_flist) {
-				int high = incremental
+				int high = inc_recurse
 				    ? first_flist->prev->count + first_flist->prev->ndx_start
 				    : cur_flist->count;
 				get_next_gen_ndx(batch_gen_fd, next_gen_ndx, high);
@@ -664,7 +664,7 @@ int recv_files(int f_in, char *local_name)
 		cleanup_disable();
 
 		if (recv_ok > 0) {
-			if (remove_source_files || incremental
+			if (remove_source_files || inc_recurse
 			 || (preserve_hard_links && F_IS_HLINKED(file)))
 				send_msg_int(MSG_SUCCESS, ndx);
 		} else if (!recv_ok) {
@@ -691,7 +691,7 @@ int recv_files(int f_in, char *local_name)
 			if (!redoing) {
 				send_msg_int(MSG_REDO, ndx);
 				file->flags |= FLAG_FILE_SENT;
-			} else if (incremental)
+			} else if (inc_recurse)
 				send_msg_int(MSG_NO_SEND, ndx);
 		}
 	}

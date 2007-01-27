@@ -41,7 +41,7 @@ extern int am_server;
 extern int am_daemon;
 extern int am_sender;
 extern int am_generator;
-extern int incremental;
+extern int inc_recurse;
 extern int io_error;
 extern int eol_nulls;
 extern int flist_eof;
@@ -292,7 +292,7 @@ static void read_msg_fd(void)
 		  invalid_msg:
 			rprintf(FERROR, "invalid message %d:%d [%s%s]\n",
 				tag, len, who_am_i(),
-				incremental ? "/incremental" : "");
+				inc_recurse ? "/inc" : "");
 			exit_cleanup(RERR_STREAMIO);
 		}
 		if (len) {
@@ -308,11 +308,11 @@ static void read_msg_fd(void)
 		if (remove_source_files)
 			decrement_active_files(IVAL(buf,0));
 		flist_ndx_push(&redo_list, IVAL(buf,0));
-		if (incremental)
+		if (inc_recurse)
 			decrement_flist_in_progress(IVAL(buf,0), 1);
 		break;
 	case MSG_FLIST:
-		if (len != 4 || !am_generator || !incremental)
+		if (len != 4 || !am_generator || !inc_recurse)
 			goto invalid_msg;
 		readfd(fd, buf, 4);
 		/* Read extra file list from receiver. */
@@ -322,7 +322,7 @@ static void read_msg_fd(void)
 		flist->parent_ndx = IVAL(buf,0);
 		break;
 	case MSG_FLIST_EOF:
-		if (len != 0 || !am_generator || !incremental)
+		if (len != 0 || !am_generator || !inc_recurse)
 			goto invalid_msg;
 		flist_eof = 1;
 		break;
@@ -342,14 +342,14 @@ static void read_msg_fd(void)
 		}
 		if (preserve_hard_links)
 			flist_ndx_push(&hlink_list, IVAL(buf,0));
-		if (incremental)
+		if (inc_recurse)
 			decrement_flist_in_progress(IVAL(buf,0), 0);
 		break;
 	case MSG_NO_SEND:
 		if (len != 4 || !am_generator)
 			goto invalid_msg;
 		readfd(fd, buf, len);
-		if (incremental)
+		if (inc_recurse)
 			decrement_flist_in_progress(IVAL(buf,0), 0);
 		break;
 	case MSG_SOCKERR:

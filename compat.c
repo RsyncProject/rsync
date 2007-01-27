@@ -24,7 +24,7 @@
 
 int remote_protocol = 0;
 int file_extra_cnt = 0; /* count of file-list extras that everyone gets */
-int incremental = 0;
+int inc_recurse = 0;
 
 extern int verbose;
 extern int am_server;
@@ -147,7 +147,7 @@ void setup_protocol(int f_out,int f_in)
 	} else if (protocol_version >= 30) {
 		if (recurse && !preserve_hard_links && !delete_before
 		 && !delete_after && !delay_updates && !prune_empty_dirs)
-			incremental = 1;
+			inc_recurse = 1;
 		need_messages_from_generator = 1;
 	}
 

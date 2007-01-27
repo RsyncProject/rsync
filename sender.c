@@ -26,7 +26,7 @@ extern int verbose;
 extern int do_xfers;
 extern int am_server;
 extern int am_daemon;
-extern int incremental;
+extern int inc_recurse;
 extern int log_before_transfer;
 extern int stdout_format_has_i;
 extern int logfile_format_has_i;
@@ -180,14 +180,14 @@ void send_files(int f_in, int f_out)
 		rprintf(FINFO, "send_files starting\n");
 
 	while (1) {
-		if (incremental)
+		if (inc_recurse)
 			send_extra_file_list(f_out, 1000);
 
 		/* This call also sets cur_flist. */
 		ndx = read_ndx_and_attrs(f_in, f_out, &iflags,
 					 &fnamecmp_type, xname, &xlen);
 		if (ndx == NDX_DONE) {
-			if (incremental && first_flist) {
+			if (inc_recurse && first_flist) {
 				flist_free(first_flist);
 				if (first_flist) {
 					write_ndx(f_out, NDX_DONE);

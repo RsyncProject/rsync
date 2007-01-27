@@ -45,7 +45,7 @@ extern int allow_8bit_chars;
 extern int protocol_version;
 extern int preserve_uid;
 extern int preserve_gid;
-extern int incremental;
+extern int inc_recurse;
 extern int inplace;
 extern int flist_eof;
 extern int keep_dirlinks;
@@ -110,7 +110,7 @@ int read_ndx_and_attrs(int f_in, int f_out, int *iflag_ptr,
 			break;
 		if (ndx == NDX_DONE)
 			return ndx;
-		if (!incremental || am_sender)
+		if (!inc_recurse || am_sender)
 			goto invalid_ndx;
 		if (ndx == NDX_FLIST_EOF) {
 			flist_eof = 1;

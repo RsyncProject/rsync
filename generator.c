@@ -31,7 +31,7 @@ extern int logfile_format_has_i;
 extern int am_root;
 extern int am_server;
 extern int am_daemon;
-extern int incremental;
+extern int inc_recurse;
 extern int do_progress;
 extern int relative_paths;
 extern int implied_dirs;
@@ -283,9 +283,9 @@ static int start_delete_delay_temp(void)
 	if (!get_tmpname(fnametmp, "deldelay")
 	 || (deldelay_fd = do_mkstemp(fnametmp, 0600)) < 0) {
 		rprintf(FINFO, "NOTE: Unable to create delete-delay temp file%s.\n",
-			incremental ? "" : " -- switching to --delete-after");
+			inc_recurse ? "" : " -- switching to --delete-after");
 		delete_during = 0;
-		delete_after = !incremental;
+		delete_after = !inc_recurse;
 		dry_run = save_dry_run;
 		return 0;
 	}
@@ -1221,7 +1221,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			rprintf(code, "%s/\n", fname);
 		if (real_ret != 0 && one_file_system)
 			real_st.st_dev = filesystem_dev;
-		if (incremental) {
+		if (inc_recurse) {
 			if (one_file_system) {
 				uint32 *devp = F_DIRDEV_P(file);
 				DEV_MAJOR(devp) = major(real_st.st_dev);
@@ -1599,7 +1599,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
   notify_others:
 	if (remove_source_files && !delay_updates && !phase)
 		increment_active_files(ndx, itemizing, code);
-	if (incremental && !dry_run)
+	if (inc_recurse && !dry_run)
 		cur_flist->in_progress++;
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && F_IS_HLINKED(file))
@@ -1743,7 +1743,7 @@ void generate_files(int f_out, char *local_name)
 	ignore_timeout = 1;
 
 	do {
-		if (incremental && delete_during && cur_flist->ndx_start) {
+		if (inc_recurse && delete_during && cur_flist->ndx_start) {
 			struct file_struct *fp = dir_flist->files[cur_flist->parent_ndx];
 			if (BITS_SETnUNSET(fp->flags, FLAG_XFER_DIR, FLAG_MISSING_DIR)) {
 				dev_t dirdev;
@@ -1796,7 +1796,7 @@ void generate_files(int f_out, char *local_name)
 				maybe_flush_socket();
 		}
 
-		if (!incremental) {
+		if (!inc_recurse) {
 			if (delete_during)
 				delete_in_dir(NULL, NULL, NULL, &dev_zero);
 			phase++;
@@ -1829,7 +1829,7 @@ void generate_files(int f_out, char *local_name)
 			check_for_finished_hlinks(itemizing, code);
 
 			if ((i = get_redo_num()) == -1) {
-				if (incremental)
+				if (inc_recurse)
 					break;
 				wait_for_receiver();
 				continue;
@@ -1859,7 +1859,7 @@ void generate_files(int f_out, char *local_name)
 		make_backups = -make_backups;
 		ignore_times--;
 
-		if (!incremental)
+		if (!inc_recurse)
 			break;
 
 		while (!cur_flist->next && !flist_eof)
@@ -1924,8 +1924,8 @@ void generate_files(int f_out, char *local_name)
 		do_delete_pass(cur_flist);
 
 	if ((need_retouch_dir_perms || need_retouch_dir_times)
-	 && dir_tweaking && (!incremental || delete_during == 2)) {
-		touch_up_dirs(incremental ? dir_flist : cur_flist, -1,
+	 && dir_tweaking && (!inc_recurse || delete_during == 2)) {
+		touch_up_dirs(inc_recurse ? dir_flist : cur_flist, -1,
 			      need_retouch_dir_times, lull_mod);
 	}
 
