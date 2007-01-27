@@ -44,7 +44,6 @@ extern int batch_fd;
 extern int write_batch;
 extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist;
-extern char *stdout_format;
 
 /**
  * @file

@@ -51,7 +51,6 @@ extern int flist_eof;
 extern int keep_dirlinks;
 extern int make_backups;
 extern mode_t orig_umask;
-extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct chmod_mode_struct *daemon_chmod_modes;
 
