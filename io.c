@@ -288,12 +288,16 @@ static void read_msg_fd(void)
 
 	switch (tag) {
 	case MSG_DONE:
-		if (len != 0 || !am_generator) {
+		if (len < 0 || len > 1 || !am_generator) {
 		  invalid_msg:
 			rprintf(FERROR, "invalid message %d:%d [%s%s]\n",
 				tag, len, who_am_i(),
 				incremental ? "/incremental" : "");
 			exit_cleanup(RERR_STREAMIO);
+		}
+		if (len) {
+			readfd(fd, buf, len);
+			stats.total_read = read_longint(fd);
 		}
 		done_cnt++;
 		break;

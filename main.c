@@ -727,7 +727,8 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		io_flush(FULL_FLUSH);
 		handle_stats(f_in);
 
-		send_msg(MSG_DONE, "", 0);
+		send_msg(MSG_DONE, "", 1);
+		write_longint(error_pipe[1], stats.total_read);
 		io_flush(FULL_FLUSH);
 
 		/* Handle any keep-alive packets from the post-processing work
