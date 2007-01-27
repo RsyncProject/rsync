@@ -485,8 +485,10 @@ void send_msg_int(enum msgcode code, int num)
 
 void wait_for_receiver(void)
 {
-	io_flush(NORMAL_FLUSH);
-	read_msg_fd();
+	if (iobuf_out_cnt)
+		io_flush(NORMAL_FLUSH);
+	else
+		read_msg_fd();
 }
 
 int get_redo_num(void)
@@ -601,8 +603,10 @@ static int read_timeout(int fd, char *buf, size_t len)
 		count = select(maxfd + 1, &r_fds, &w_fds, NULL, &tv);
 
 		if (count <= 0) {
-			if (errno == EBADF)
+			if (errno == EBADF) {
+				defer_forwarding_messages = 0;
 				exit_cleanup(RERR_SOCKETIO);
+			}
 			check_timeout();
 			continue;
 		}
@@ -1286,6 +1290,9 @@ static void writefd_unbuffered(int fd, const char *buf, size_t len)
 			/* Don't try to write errors back across the stream. */
 			if (fd == sock_f_out)
 				io_end_multiplex_out();
+			/* Don't try to write errors down a failing msg pipe. */
+			if (am_server && fd == msg_fd_out)
+				exit_cleanup(RERR_STREAMIO);
 			rsyserr(FERROR, errno,
 				"writefd_unbuffered failed to write %ld bytes [%s]",
 				(long)len, who_am_i());
