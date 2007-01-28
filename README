@@ -51,13 +51,13 @@ case.
 Once built put a copy of rsync in your search path on the local and
 remote systems (or use "make install"). That's it!
 
-RSYNC SERVERS
+RSYNC DAEMONS
 -------------
 
-rsync can also talk to "rsync servers" which can provide anonymous or
+rsync can also talk to "rsync daemons" which can provide anonymous or
 authenticated rsync. See the rsyncd.conf(5) man page for details on how
-to setup a rsync server. See the rsync(1) man page for info on how to
-connect to a rsync server.
+to setup an rsync daemon. See the rsync(1) man page for info on how to
+connect to an rsync daemon.
 
 
 MAILING LIST
@@ -69,7 +69,7 @@ versions on this list.
 
 To join the mailing list see the web page at http://lists.samba.org/
 
-To send mail to everyone on the list send it to rsync@samba.org
+To send mail to everyone on the list send it to rsync@lists.samba.org
 
 
 BUG REPORTS
