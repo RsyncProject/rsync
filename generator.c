@@ -49,7 +49,7 @@ extern int delete_mode;
 extern int delete_before;
 extern int delete_during;
 extern int delete_after;
-extern int done_cnt;
+extern int msgdone_cnt;
 extern int ignore_errors;
 extern int remove_source_files;
 extern int delay_updates;
@@ -105,7 +105,10 @@ static int deletion_count = 0; /* used to implement --max-delete */
 static int deldelay_size = 0, deldelay_cnt = 0;
 static char *deldelay_buf = NULL;
 static int deldelay_fd = -1;
-static BOOL solo_file = 0;
+static int lull_mod;
+static int dir_tweaking;
+static int need_retouch_dir_times;
+static const char *solo_file = NULL;
 
 /* For calling delete_item() and delete_dir_contents(). */
 #define DEL_RECURSE		(1<<1) /* recurse */
@@ -776,24 +779,6 @@ static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
 
 	return lowest_j;
 }
-
-#ifdef SUPPORT_HARD_LINKS
-void check_for_finished_hlinks(int itemizing, enum logcode code)
-{
-	struct file_struct *file;
-	struct file_list *flist;
-	char fbuf[MAXPATHLEN];
-	int ndx;
-
-	while ((ndx = get_hlink_num()) != -1) {
-		flist = flist_for_ndx(ndx);
-		assert(flist != NULL);
-		file = flist->files[ndx];
-		assert(file->flags & FLAG_HLINKED);
-		finish_hard_link(file, f_name(file, fbuf), NULL, itemizing, code, -1);
-	}
-}
-#endif
 
 /* This is only called for regular files.  We return -2 if we've finished
  * handling the file, -1 if no dest-linking occurred, or a non-negative
@@ -1648,8 +1633,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	close(fd);
 }
 
-static void touch_up_dirs(struct file_list *flist, int ndx,
-			  int need_retouch_dir_times, int lull_mod)
+static void touch_up_dirs(struct file_list *flist, int ndx)
 {
 	struct file_struct *file;
 	char *fname;
@@ -1682,18 +1666,89 @@ static void touch_up_dirs(struct file_list *flist, int ndx,
 	}
 }
 
-void generate_files(int f_out, char *local_name)
+void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
+{
+	struct file_struct *file;
+	struct file_list *flist;
+	char fbuf[MAXPATHLEN];
+	int ndx;
+
+#ifdef SUPPORT_HARD_LINKS
+	while (preserve_hard_links && (ndx = get_hlink_num()) != -1) {
+		flist = flist_for_ndx(ndx);
+		assert(flist != NULL);
+		file = flist->files[ndx];
+		assert(file->flags & FLAG_HLINKED);
+		finish_hard_link(file, f_name(file, fbuf), NULL, itemizing, code, -1);
+	}
+#endif
+
+	while (check_redo && (ndx = get_redo_num()) != -1) {
+		csum_length = SUM_LENGTH;
+		max_size = -max_size;
+		min_size = -min_size;
+		ignore_existing = -ignore_existing;
+		ignore_non_existing = -ignore_non_existing;
+		update_only = -update_only;
+		always_checksum = -always_checksum;
+		size_only = -size_only;
+		append_mode = -append_mode;
+		make_backups = -make_backups; /* avoid dup backup w/inplace */
+		ignore_times++;
+
+		flist = cur_flist;
+		cur_flist = flist_for_ndx(ndx);
+		ndx -= cur_flist->ndx_start;
+
+		file = cur_flist->files[ndx];
+		if (solo_file)
+			strlcpy(fbuf, solo_file, sizeof fbuf);
+		else
+			f_name(file, fbuf);
+		recv_generator(fbuf, file, ndx, itemizing, code, sock_f_out);
+		cur_flist->to_redo--;
+
+		cur_flist = flist;
+
+		csum_length = SHORT_SUM_LENGTH;
+		max_size = -max_size;
+		min_size = -min_size;
+		ignore_existing = -ignore_existing;
+		ignore_non_existing = -ignore_non_existing;
+		update_only = -update_only;
+		always_checksum = -always_checksum;
+		size_only = -size_only;
+		append_mode = -append_mode;
+		make_backups = -make_backups;
+		ignore_times--;
+	}
+
+	while (cur_flist != first_flist) { /* only possible with inc_recurse */
+		if (first_flist->in_progress || first_flist->to_redo)
+			break;
+
+		if (!read_batch)
+			write_ndx(sock_f_out, NDX_DONE);
+
+		if (delete_during == 2 || !dir_tweaking) {
+			/* Skip directory touch-up. */
+		} else if (first_flist->ndx_start != 0)
+			touch_up_dirs(dir_flist, first_flist->parent_ndx);
+		else if (relative_paths && implied_dirs)
+			touch_up_dirs(first_flist, -1);
+
+		flist_free(first_flist); /* updates first_flist */
+	}
+}
+
+void generate_files(int f_out, const char *local_name)
 {
 	int i;
 	char fbuf[MAXPATHLEN];
 	int itemizing;
 	enum logcode code;
-	struct file_list *next_flist;
-	int lull_mod = allowed_lull * 5;
-	int need_retouch_dir_times = preserve_times && !omit_dir_times;
 	int need_retouch_dir_perms = 0;
 	int save_do_progress = do_progress;
-	int dir_tweaking = !(list_only || local_name || dry_run);
 
 	if (protocol_version >= 29) {
 		itemizing = 1;
@@ -1712,12 +1767,15 @@ void generate_files(int f_out, char *local_name)
 		maybe_ATTRS_REPORT = ATTRS_REPORT;
 		code = FINFO;
 	}
-	solo_file = local_name != NULL;
+	solo_file = local_name;
+	dir_tweaking = !(list_only || solo_file || dry_run);
+	need_retouch_dir_times = preserve_times && !omit_dir_times;
+	lull_mod = allowed_lull * 5;
 
 	if (verbose > 2)
 		rprintf(FINFO, "generator starting pid=%ld\n", (long)getpid());
 
-	if (delete_before && !local_name && cur_flist->count > 0)
+	if (delete_before && !solo_file && cur_flist->count > 0)
 		do_delete_pass(cur_flist);
 	if (delete_during == 2) {
 		deldelay_size = BIGPATHBUFLEN * 4;
@@ -1761,8 +1819,8 @@ void generate_files(int f_out, char *local_name)
 			if (!F_IS_ACTIVE(file))
 				continue;
 
-			if (local_name)
-				strlcpy(fbuf, local_name, sizeof fbuf);
+			if (solo_file)
+				strlcpy(fbuf, solo_file, sizeof fbuf);
 			else
 				f_name(file, fbuf);
 			recv_generator(fbuf, file, i, itemizing, code, f_out);
@@ -1775,7 +1833,7 @@ void generate_files(int f_out, char *local_name)
 			if (!am_root && S_ISDIR(file->mode)
 			 && !(file->mode & S_IWUSR) && dir_tweaking) {
 				mode_t mode = file->mode | S_IWUSR;
-				char *fname = local_name ? local_name : fbuf;
+				const char *fname = solo_file ? solo_file : fbuf;
 				if (do_chmod(fname, mode) < 0) {
 					rsyserr(FERROR, errno,
 					    "failed to modify permissions on %s",
@@ -1785,10 +1843,7 @@ void generate_files(int f_out, char *local_name)
 			}
 #endif
 
-#ifdef SUPPORT_HARD_LINKS
-			if (preserve_hard_links)
-				check_for_finished_hlinks(itemizing, code);
-#endif
+			check_for_finished_files(itemizing, code, inc_recurse);
 
 			if (allowed_lull && !(i % lull_mod))
 				maybe_send_keepalive();
@@ -1797,99 +1852,26 @@ void generate_files(int f_out, char *local_name)
 		}
 
 		if (!inc_recurse) {
-			if (delete_during)
-				delete_in_dir(NULL, NULL, NULL, &dev_zero);
-			phase++;
-			if (verbose > 2) {
-				rprintf(FINFO, "generate_files phase=%d\n",
-					phase);
-			}
-
 			write_ndx(f_out, NDX_DONE);
-		}
-
-		csum_length = SUM_LENGTH;
-		max_size = -max_size;
-		min_size = -min_size;
-		ignore_existing = -ignore_existing;
-		ignore_non_existing = -ignore_non_existing;
-		update_only = -update_only;
-		always_checksum = -always_checksum;
-		size_only = -size_only;
-		append_mode = -append_mode;
-		make_backups = -make_backups; /* avoid dup backup w/inplace */
-		ignore_times++;
-
-		/* Files can cycle through the system more than once
-		 * to catch initial checksum errors. */
-		while (!done_cnt) {
-			struct file_struct *file;
-			struct file_list *save_flist;
-
-			check_for_finished_hlinks(itemizing, code);
-
-			if ((i = get_redo_num()) == -1) {
-				if (inc_recurse)
-					break;
-				wait_for_receiver();
-				continue;
-			}
-
-			save_flist = cur_flist;
-			cur_flist = flist_for_ndx(i);
-			file = cur_flist->files[i];
-			if (local_name)
-				strlcpy(fbuf, local_name, sizeof fbuf);
-			else
-				f_name(file, fbuf);
-			recv_generator(fbuf, file, i, itemizing, code, f_out);
-			cur_flist->to_redo--;
-			cur_flist = save_flist;
-		}
-
-		csum_length = SHORT_SUM_LENGTH;
-		max_size = -max_size;
-		min_size = -min_size;
-		ignore_existing = -ignore_existing;
-		ignore_non_existing = -ignore_non_existing;
-		update_only = -update_only;
-		always_checksum = -always_checksum;
-		size_only = -size_only;
-		append_mode = -append_mode;
-		make_backups = -make_backups;
-		ignore_times--;
-
-		if (!inc_recurse)
 			break;
-
-		while (!cur_flist->next && !flist_eof)
-			wait_for_receiver();
-		next_flist = cur_flist->next;
-		while (first_flist != next_flist) {
-			if (first_flist->in_progress || first_flist->to_redo) {
-				if (next_flist)
-					break;
-				wait_for_receiver();
-				continue;
-			}
-
-			cur_flist = first_flist;
-			if (delete_during == 2 || !dir_tweaking) {
-				/* Skip directory touch-up. */
-			} else if (cur_flist->ndx_start != 0) {
-				touch_up_dirs(dir_flist, cur_flist->parent_ndx,
-					      need_retouch_dir_times, lull_mod);
-			} else if (relative_paths && implied_dirs) {
-				touch_up_dirs(cur_flist, -1,
-					      need_retouch_dir_times, lull_mod);
-			}
-
-			flist_free(first_flist); /* updates cur_flist & first_flist */
-
-			if (!read_batch)
-				write_ndx(f_out, NDX_DONE);
 		}
-	} while ((cur_flist = next_flist) != NULL);
+
+		while (!cur_flist->next && !flist_eof) {
+			check_for_finished_files(itemizing, code, 1);
+			wait_for_receiver();
+		}
+	} while ((cur_flist = cur_flist->next) != NULL);
+
+	if (delete_during)
+		delete_in_dir(NULL, NULL, NULL, &dev_zero);
+	phase++;
+	if (verbose > 2)
+		rprintf(FINFO, "generate_files phase=%d\n", phase);
+
+	while (!msgdone_cnt) {
+		check_for_finished_files(itemizing, code, 1);
+		wait_for_receiver();
+	}
 
 	phase++;
 	if (verbose > 2)
@@ -1901,8 +1883,8 @@ void generate_files(int f_out, char *local_name)
 		write_ndx(f_out, NDX_DONE);
 
 	/* Read MSG_DONE for the redo phase (and any prior messages). */
-	while (done_cnt <= 1) {
-		check_for_finished_hlinks(itemizing, code);
+	while (msgdone_cnt <= 1) {
+		check_for_finished_files(itemizing, code, 0);
 		wait_for_receiver();
 	}
 
@@ -1913,21 +1895,19 @@ void generate_files(int f_out, char *local_name)
 		if (delay_updates)
 			write_ndx(f_out, NDX_DONE);
 		/* Read MSG_DONE for delay-updates phase & prior messages. */
-		while (done_cnt == 2)
+		while (msgdone_cnt == 2)
 			wait_for_receiver();
 	}
 
 	do_progress = save_do_progress;
 	if (delete_during == 2)
 		do_delayed_deletions(fbuf);
-	if (delete_after && !local_name && file_total > 0)
+	if (delete_after && !solo_file && file_total > 0)
 		do_delete_pass(cur_flist);
 
 	if ((need_retouch_dir_perms || need_retouch_dir_times)
-	 && dir_tweaking && (!inc_recurse || delete_during == 2)) {
-		touch_up_dirs(inc_recurse ? dir_flist : cur_flist, -1,
-			      need_retouch_dir_times, lull_mod);
-	}
+	 && dir_tweaking && (!inc_recurse || delete_during == 2))
+		touch_up_dirs(inc_recurse ? dir_flist : cur_flist, -1);
 
 	if (max_delete >= 0 && deletion_count > max_delete) {
 		rprintf(FINFO,
