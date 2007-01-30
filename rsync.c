@@ -407,7 +407,7 @@ struct file_list *flist_for_ndx(int ndx)
 {
 	struct file_list *flist = cur_flist;
 
-	if (!flist)
+	if (!flist && !(flist = first_flist))
 		return NULL;
 
 	while (ndx < flist->ndx_start) {
