@@ -111,8 +111,9 @@ Changes since 2.6.8:
 
     - Added a new environment variable to the pre-/post-xfer exec commands (in
       the daemon's config file):  RSYNC_PID.  This value will be the same in
-      both the pre- and post-xfer commands, so it can be used if the pre-xfer
-      command wants to cache some arg/request info for the post-xfer command.
+      both the pre- and post-xfer commands, so it can be used as a unique ID
+      if the pre-xfer command wants to cache some arg/request info for the
+      post-xfer command.
 
   INTERNAL:
 
