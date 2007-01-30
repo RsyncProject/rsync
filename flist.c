@@ -1278,16 +1278,20 @@ void send_extra_file_list(int f, int at_least)
 	char fbuf[MAXPATHLEN];
 	struct file_list *flist;
 	int64 start_write;
-	int past_and_present, save_io_error = io_error;
+	int future_cnt, save_io_error = io_error;
 
 	if (send_dir_ndx < 0)
 		return;
 
 	/* Keep sending data until we have the requested number of
 	 * files in the upcoming file-lists. */
-	past_and_present = cur_flist->ndx_start - first_flist->ndx_start
-			 + cur_flist->count;
-	while (file_total - past_and_present < at_least) {
+	if (cur_flist->next) {
+		flist = first_flist->prev; /* the newest flist */
+		future_cnt = flist->count
+			   + flist->ndx_start - cur_flist->next->ndx_start;
+	} else
+		future_cnt = 0;
+	while (future_cnt < at_least) {
 		struct file_struct *file = dir_flist->files[send_dir_ndx];
 		int32 *dp;
 		int dlen;
@@ -1310,6 +1314,7 @@ void send_extra_file_list(int f, int at_least)
 
 		clean_flist(flist, 0, 0);
 		file_total += flist->count;
+		future_cnt += flist->count;
 		stats.flist_size += stats.total_written - start_write;
 		stats.num_files += flist->count;
 		if (verbose > 3)
