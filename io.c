@@ -58,7 +58,7 @@ extern struct file_list *cur_flist, *first_flist;
 const char phase_unknown[] = "unknown";
 int ignore_timeout = 0;
 int batch_fd = -1;
-int done_cnt = 0;
+int msgdone_cnt = 0;
 
 /* Ignore an EOF error if non-zero. See whine_about_eof(). */
 int kluge_around_eof = 0;
@@ -299,7 +299,7 @@ static void read_msg_fd(void)
 			readfd(fd, buf, len);
 			stats.total_read = read_longint(fd);
 		}
-		done_cnt++;
+		msgdone_cnt++;
 		break;
 	case MSG_REDO:
 		if (len != 4 || !am_generator)
@@ -390,12 +390,11 @@ void increment_active_files(int ndx, int itemizing, enum logcode code)
 {
 	/* TODO: tune these limits? */
 	while (active_filecnt >= (active_bytecnt >= 128*1024 ? 10 : 50)) {
-#ifdef SUPPORT_HARD_LINKS
-		if (hlink_list.head)
-			check_for_finished_hlinks(itemizing, code);
-#endif
-		io_flush(NORMAL_FLUSH);
-		read_msg_fd();
+		check_for_finished_files(itemizing, code, 0);
+		if (iobuf_out_cnt)
+			io_flush(NORMAL_FLUSH);
+		else
+			read_msg_fd();
 	}
 
 	active_filecnt++;
