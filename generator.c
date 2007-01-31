@@ -4,7 +4,7 @@
  * Copyright (C) 1996-2000 Andrew Tridgell
  * Copyright (C) 1996 Paul Mackerras
  * Copyright (C) 2002 Martin Pool <mbp@samba.org>
- * Copyright (C) 2003, 2004, 2005, 2006 Wayne Davison
+ * Copyright (C) 2003, 2004, 2005, 2006, 2007 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1843,7 +1843,7 @@ void generate_files(int f_out, const char *local_name)
 			}
 #endif
 
-			check_for_finished_files(itemizing, code, inc_recurse);
+			check_for_finished_files(itemizing, code, 0);
 
 			if (allowed_lull && !(i % lull_mod))
 				maybe_send_keepalive();
