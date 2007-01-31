@@ -3,7 +3,7 @@
  *
  * Copyright (C) 1998-2001 Andrew Tridgell <tridge@samba.org>
  * Copyright (C) 2000, 2001, 2002 Martin Pool <mbp@samba.org>
- * Copyright (C) 2002, 2003, 2004, 2005, 2006 Wayne Davison
+ * Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -225,7 +225,7 @@ static void print_rsync_version(enum logcode f)
 
 	rprintf(f, "%s  version %s  protocol version %d\n",
 		RSYNC_NAME, RSYNC_VERSION, PROTOCOL_VERSION);
-	rprintf(f, "Copyright (C) 1996-2006 by Andrew Tridgell, Wayne Davison, and others.\n");
+	rprintf(f, "Copyright (C) 1996-2007 by Andrew Tridgell, Wayne Davison, and others.\n");
 	rprintf(f, "<http://rsync.samba.org/>\n");
 	rprintf(f, "Capabilities: %d-bit files, %d-bit system inums, %d-bit internal inums,\n",
 		(int)(sizeof (OFF_T) * 8),

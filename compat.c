@@ -3,7 +3,7 @@
  *
  * Copyright (C) Andrew Tridgell 1996
  * Copyright (C) Paul Mackerras 1996
- * Copyright (C) 2004, 2005, 2006 Wayne Davison
+ * Copyright (C) 2004, 2005, 2006, 2007 Wayne Davison
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
