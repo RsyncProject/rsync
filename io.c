@@ -398,7 +398,7 @@ void increment_active_files(int ndx, int itemizing, enum logcode code)
 	}
 
 	active_filecnt++;
-	active_bytecnt += F_LENGTH(cur_flist->files[ndx]);
+	active_bytecnt += F_LENGTH(cur_flist->files[ndx - cur_flist->ndx_start]);
 }
 
 static void decrement_active_files(int ndx)
