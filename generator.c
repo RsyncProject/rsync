@@ -557,7 +557,7 @@ void itemize(struct file_struct *file, int ndx, int statret,
 	  || stdout_format_has_i > 1 || (xname && *xname)) && !read_batch) {
 		if (protocol_version >= 29) {
 			if (ndx >= 0)
-				write_ndx(sock_f_out, ndx + cur_flist->ndx_start);
+				write_ndx(sock_f_out, ndx);
 			write_shortint(sock_f_out, iflags);
 			if (iflags & ITEM_BASIS_TYPE_FOLLOWS)
 				write_byte(sock_f_out, fnamecmp_type);
@@ -1025,11 +1025,11 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 
 static int phase = 0;
 
-/* Acts on cur_flist->file's ndx'th item, whose name is fname.  If a dir,
+/* Acts on the indicated item in cur_flist whose name is fname.  If a dir,
  * make sure it exists, and has the right permissions/timestamp info.  For
  * all other non-regular files (symlinks, etc.) we create them here.  For
  * regular files that have changed, we try to find a basis file and then
- * start sending checksums.
+ * start sending checksums.  The ndx is the file's unique index value.
  *
  * When fname is non-null, it must point to a MAXPATHLEN buffer!
  *
@@ -1509,7 +1509,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			return;
 	  return_with_success:
 		if (!dry_run)
-			send_msg_int(MSG_SUCCESS, ndx + cur_flist->ndx_start);
+			send_msg_int(MSG_SUCCESS, ndx);
 		return;
 	}
 
@@ -1590,7 +1590,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (preserve_hard_links && F_IS_HLINKED(file))
 		file->flags |= FLAG_FILE_SENT;
 #endif
-	write_ndx(f_out, ndx + cur_flist->ndx_start);
+	write_ndx(f_out, ndx);
 	if (itemizing) {
 		int iflags = ITEM_TRANSFER;
 		if (always_checksum > 0)
@@ -1698,9 +1698,8 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 
 		flist = cur_flist;
 		cur_flist = flist_for_ndx(ndx);
-		ndx -= cur_flist->ndx_start;
 
-		file = cur_flist->files[ndx];
+		file = cur_flist->files[ndx - cur_flist->ndx_start];
 		if (solo_file)
 			strlcpy(fbuf, solo_file, sizeof fbuf);
 		else
@@ -1823,7 +1822,8 @@ void generate_files(int f_out, const char *local_name)
 				strlcpy(fbuf, solo_file, sizeof fbuf);
 			else
 				f_name(file, fbuf);
-			recv_generator(fbuf, file, i, itemizing, code, f_out);
+			recv_generator(fbuf, file, i + cur_flist->ndx_start,
+				       itemizing, code, f_out);
 
 			/* We need to ensure that any dirs we create have
 			 * writeable permissions during the time we are putting
