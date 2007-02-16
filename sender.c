@@ -44,8 +44,6 @@ extern int write_batch;
 extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist;
 
-#define FILECNT_LOOKAHEAD 1000
-
 /**
  * @file
  *
@@ -202,9 +200,6 @@ void send_files(int f_in, int f_out)
 			write_ndx(f_out, NDX_DONE);
 			continue;
 		}
-
-		if (inc_recurse)
-			send_extra_file_list(f_out, FILECNT_LOOKAHEAD);
 
 		file = cur_flist->files[ndx - cur_flist->ndx_start];
 		if (F_ROOTDIR(file)) {

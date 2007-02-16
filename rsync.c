@@ -182,6 +182,8 @@ int read_ndx_and_attrs(int f_in, int f_out, int *iflag_ptr,
 			exit_cleanup(RERR_PROTOCOL);
 		}
 	} else if (f_out >= 0) {
+		if (inc_recurse)
+			send_extra_file_list(f_out, FILECNT_LOOKAHEAD);
 		write_ndx_and_attrs(f_out, ndx, iflags,
 				    fnamecmp_type, buf, len);
 	}
