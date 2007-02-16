@@ -626,6 +626,7 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	verbose = 0; /* future verbosity is controlled by client options */
 	ret = parse_arguments(&argc, (const char ***) &argv, 0);
 	quiet = 0; /* Don't let someone try to be tricky. */
+	am_server = 1; /* ditto */
 	if (lp_ignore_errors(module_id))
 		ignore_errors = 1;
 
