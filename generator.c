@@ -1661,7 +1661,7 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 		if (allowed_lull && !(++j % lull_mod))
 			maybe_send_keepalive();
 		else if (!(j % 200))
-			maybe_flush_socket();
+			maybe_flush_socket(0);
 	}
 }
 
@@ -1725,8 +1725,10 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 		if (first_flist->in_progress || first_flist->to_redo)
 			break;
 
-		if (!read_batch)
+		if (!read_batch) {
 			write_ndx(sock_f_out, NDX_DONE);
+			maybe_flush_socket(1);
+		}
 
 		if (delete_during == 2 || !dir_tweaking) {
 			/* Skip directory touch-up. */
@@ -1847,7 +1849,7 @@ void generate_files(int f_out, const char *local_name)
 			if (allowed_lull && !(i % lull_mod))
 				maybe_send_keepalive();
 			else if (!(i % 200))
-				maybe_flush_socket();
+				maybe_flush_socket(0);
 		}
 
 		if (!inc_recurse) {

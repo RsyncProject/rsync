@@ -804,9 +804,10 @@ void io_end_buffering_out(void)
 	iobuf_f_out = -1;
 }
 
-void maybe_flush_socket(void)
+void maybe_flush_socket(int important)
 {
-	if (iobuf_out && iobuf_out_cnt && time(NULL) - last_io_out >= 5)
+	if (iobuf_out && iobuf_out_cnt
+	 && (important || time(NULL) - last_io_out >= 5))
 		io_flush(NORMAL_FLUSH);
 }
 
