@@ -1143,14 +1143,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	/* If we're not preserving permissions, change the file-list's
-	 * mode based on the local permissions and some heuristics. */
-	if (!preserve_perms) {
-		int exists = statret == 0
-			  && S_ISDIR(st.st_mode) == S_ISDIR(file->mode);
-		file->mode = dest_mode(file->mode, st.st_mode, exists);
-	}
-
 	if (S_ISDIR(file->mode)) {
 		/* The file to be received is a directory, so we need
 		 * to prepare appropriately.  If there is already a
@@ -1172,6 +1164,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			if (*fname == '.' && fname[1] == '\0')
 				statret = -1;
 			new_root_dir = 0;
+		}
+		if (!preserve_perms) { /* See comment in non-dir code below. */
+			file->mode = dest_mode(file->mode, st.st_mode,
+					       statret == 0);
 		}
 		if (statret != 0 && basis_dir[0] != NULL) {
 			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &st,
@@ -1216,6 +1212,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		    && (file->flags & FLAG_XFER_DIR))
 			delete_in_dir(cur_flist, fname, file, &real_st.st_dev);
 		return;
+	}
+
+	/* If we're not preserving permissions, change the file-list's
+	 * mode based on the local permissions and some heuristics. */
+	if (!preserve_perms) {
+		int exists = statret == 0 && !S_ISDIR(st.st_mode);
+		file->mode = dest_mode(file->mode, st.st_mode, exists);
 	}
 
 #ifdef SUPPORT_HARD_LINKS
