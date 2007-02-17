@@ -29,6 +29,9 @@ Changes since 2.6.9:
       and exits.  This should help users figure out that they can't use this
       option to control a remote shell's password prompt.
 
+    - Make sure that directory permissions of a newly-created destination
+      directory are handled right when --perms is left off.
+
   ENHANCEMENTS:
 
     - A new incremental-recursion algorithm is now used when rsync is talking
@@ -76,6 +79,9 @@ Changes since 2.6.9:
       compiler warning.
 
     - Made the sending of some numbers more efficient for protocol 30.
+
+    - Make sure that a daemon process doesn't mind if the client was weird and
+      omitted the --server option.
 
     - Improved the use of "const" on pointers.
 
