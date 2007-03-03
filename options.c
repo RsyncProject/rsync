@@ -1287,10 +1287,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		snprintf(err_buf, sizeof err_buf,
 			"--suffix cannot be a null string without --backup-dir\n");
 		return 0;
-	} else if (make_backups && delete_mode && !delete_excluded) {
-		snprintf(backup_dir_buf, sizeof backup_dir_buf,
-			"Pp *%s", backup_suffix);
-		parse_rule(&filter_list, backup_dir_buf, 0, 0);
 	}
 	if (make_backups && !backup_dir)
 		omit_dir_times = 1;
@@ -1403,11 +1399,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				clean_fname(partial_dir, 1);
 			if (!*partial_dir || strcmp(partial_dir, ".") == 0)
 				partial_dir = NULL;
-			else if (*partial_dir != '/' && !am_server) {
-				parse_rule(&filter_list, partial_dir,
-				    MATCHFLG_NO_PREFIXES | MATCHFLG_DIRECTORY
-				    | MATCHFLG_PERISHABLE, 0);
-			}
 			if (!partial_dir && refused_partial) {
 				create_refuse_error(refused_partial);
 				return 0;

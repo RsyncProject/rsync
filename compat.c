@@ -43,7 +43,12 @@ extern int preserve_gid;
 extern int preserve_hard_links;
 extern int need_messages_from_generator;
 extern int delete_mode, delete_before, delete_during, delete_after;
+extern int delete_excluded;
+extern int make_backups;
+extern char *backup_dir, *backup_suffix;
+extern char *partial_dir;
 extern char *dest_option;
+extern struct filter_list_struct filter_list;
 
 void setup_protocol(int f_out,int f_in)
 {
@@ -148,6 +153,23 @@ void setup_protocol(int f_out,int f_in)
 		 && !delete_after && !delay_updates && !prune_empty_dirs)
 			inc_recurse = 1;
 		need_messages_from_generator = 1;
+	}
+
+	if (make_backups && !backup_dir && delete_mode && !delete_excluded
+	 && !am_server) {
+		char *rule;
+		if (asprintf(&rule, "P%s *%s",
+			    !am_sender || protocol_version >= 30 ? "p" : "",
+			    backup_suffix) < 0)
+			out_of_memory("setup_protocol");
+		parse_rule(&filter_list, rule, 0, 0);
+		free(rule);
+	}
+	if (partial_dir && *partial_dir != '/' && !am_server) {
+		int flags = MATCHFLG_NO_PREFIXES | MATCHFLG_DIRECTORY;
+		if (!am_sender || protocol_version >= 30)
+			flags |= MATCHFLG_PERISHABLE;
+		parse_rule(&filter_list, partial_dir, flags, 0);
 	}
 
 	if (am_server) {
