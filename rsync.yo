@@ -628,7 +628,7 @@ Note that if you don't specify bf(--backup-dir), (1) the
 bf(--omit-dir-times) option will be implied, and (2) if bf(--delete) is
 also in effect (without bf(--delete-excluded)), rsync will add a "protect"
 filter-rule for the backup suffix to the end of all your existing excludes
-(e.g. bf(-f "P *~")).  This will prevent previously backed-up files from being
+(e.g. bf(-f "Pp *~")).  This will prevent previously backed-up files from being
 deleted.  Note that if you are supplying your own filter rules, you may
 need to manually insert your own exclude/protect rule somewhere higher up
 in the list so that it has a high enough priority to be effective (e.g., if
@@ -1619,7 +1619,7 @@ rule at the end of all your existing excludes.  This will prevent the
 sending of any partial-dir files that may exist on the sending side, and
 will also prevent the untimely deletion of partial-dir items on the
 receiving side.  An example: the above bf(--partial-dir) option would add
-the equivalent of "bf(--exclude=.rsync-partial/)" at the end of any other
+the equivalent of "bf(-f '-p .rsync-partial/')" at the end of any other
 filter rules.
 
 If you are supplying your own exclude rules, you may need to add your own
