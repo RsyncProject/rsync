@@ -28,6 +28,7 @@ int inc_recurse = 0;
 extern int verbose;
 extern int am_server;
 extern int am_sender;
+extern int local_server;
 extern int inplace;
 extern int recurse;
 extern int fuzzy_basis;
@@ -156,7 +157,7 @@ void setup_protocol(int f_out,int f_in)
 	}
 
 	if (make_backups && !backup_dir && delete_mode && !delete_excluded
-	 && !am_server) {
+	 && (!am_server || local_server)) {
 		char *rule;
 		if (asprintf(&rule, "P%s *%s",
 			    !am_sender || protocol_version >= 30 ? "p" : "",
@@ -165,7 +166,7 @@ void setup_protocol(int f_out,int f_in)
 		parse_rule(&filter_list, rule, 0, 0);
 		free(rule);
 	}
-	if (partial_dir && *partial_dir != '/' && !am_server) {
+	if (partial_dir && *partial_dir != '/' && (!am_server || local_server)) {
 		int flags = MATCHFLG_NO_PREFIXES | MATCHFLG_DIRECTORY;
 		if (!am_sender || protocol_version >= 30)
 			flags |= MATCHFLG_PERISHABLE;
