@@ -156,16 +156,6 @@ void setup_protocol(int f_out,int f_in)
 		need_messages_from_generator = 1;
 	}
 
-	if (make_backups && !backup_dir && delete_mode && !delete_excluded
-	 && (!am_server || local_server)) {
-		char *rule;
-		if (asprintf(&rule, "P%s *%s",
-			    !am_sender || protocol_version >= 30 ? "p" : "",
-			    backup_suffix) < 0)
-			out_of_memory("setup_protocol");
-		parse_rule(&filter_list, rule, 0, 0);
-		free(rule);
-	}
 	if (partial_dir && *partial_dir != '/' && (!am_server || local_server)) {
 		int flags = MATCHFLG_NO_PREFIXES | MATCHFLG_DIRECTORY;
 		if (!am_sender || protocol_version >= 30)
