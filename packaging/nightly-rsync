@@ -96,7 +96,15 @@ foreach my $fn (qw( rsync.yo rsyncd.conf.yo )) {
     unlink($fn);
 }
 
-system "find . -name 'rsync-HEAD-*' -daystart -mtime +14 | xargs rm -f";
+my $cnt = 0;
+open(PIPE, '-|', 'ls -1t rsync-HEAD-*') or die $!;
+while (<PIPE>) {
+    chomp;
+    next if $cnt++ < 10;
+    unlink($_);
+}
+close PIPE;
+
 system 'ls -ltr';
 
 if ($upload) {
