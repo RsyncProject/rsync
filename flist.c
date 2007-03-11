@@ -41,6 +41,7 @@ extern int filesfrom_fd;
 extern int one_file_system;
 extern int copy_dirlinks;
 extern int keep_dirlinks;
+extern int preserve_acls;
 extern int preserve_links;
 extern int preserve_hard_links;
 extern int preserve_devices;
@@ -151,6 +152,8 @@ static void list_file_entry(struct file_struct *f)
 
 	permstring(permbuf, f->mode);
 	len = F_LENGTH(f);
+
+	/* TODO: indicate '+' if the entry has an ACL. */
 
 #ifdef SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(f->mode)) {
@@ -464,13 +467,13 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 	if (flags & XMIT_SAME_NAME)
 		write_byte(f, l1);
 	if (flags & XMIT_LONG_NAME)
-		write_int(f, l2);
+		write_abbrevint30(f, l2);
 	else
 		write_byte(f, l2);
 	write_buf(f, fname + l1, l2);
 
 	if (first_hlink_ndx >= 0) {
-		write_int(f, first_hlink_ndx);
+		write_abbrevint30(f, first_hlink_ndx);
 		goto the_end;
 	}
 
@@ -480,7 +483,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 	if (!(flags & XMIT_SAME_MODE))
 		write_int(f, to_wire_mode(mode));
 	if (preserve_uid && !(flags & XMIT_SAME_UID)) {
-		write_int(f, uid);
+		write_abbrevint30(f, uid);
 		if (flags & XMIT_USER_NAME_FOLLOWS) {
 			int len = strlen(user_name);
 			write_byte(f, len);
@@ -488,7 +491,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 		}
 	}
 	if (preserve_gid && !(flags & XMIT_SAME_GID)) {
-		write_int(f, gid);
+		write_abbrevint30(f, gid);
 		if (flags & XMIT_GROUP_NAME_FOLLOWS) {
 			int len = strlen(group_name);
 			write_byte(f, len);
@@ -514,7 +517,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 	if (preserve_links && S_ISLNK(mode)) {
 		const char *sl = F_SYMLINK(file);
 		int len = strlen(sl);
-		write_int(f, len);
+		write_abbrevint30(f, len);
 		write_buf(f, sl, len);
 	}
 #endif
@@ -580,7 +583,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		l1 = read_byte(f);
 
 	if (flags & XMIT_LONG_NAME)
-		l2 = read_int(f);
+		l2 = read_abbrevint30(f);
 	else
 		l2 = read_byte(f);
 
@@ -619,7 +622,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (protocol_version >= 30
 	 && BITS_SETnUNSET(flags, XMIT_HLINKED, XMIT_HLINK_FIRST)) {
 		struct file_struct *first;
-		first_hlink_ndx = read_int(f);
+		first_hlink_ndx = read_abbrevint30(f);
 		if (first_hlink_ndx < 0 || first_hlink_ndx >= flist->count) {
 			rprintf(FERROR,
 				"hard-link reference out of range: %d (%d)\n",
@@ -657,14 +660,14 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		mode = tweak_mode(mode, chmod_modes);
 
 	if (preserve_uid && !(flags & XMIT_SAME_UID)) {
-		uid = (uid_t)read_int(f);
+		uid = (uid_t)read_abbrevint30(f);
 		if (flags & XMIT_USER_NAME_FOLLOWS)
 			uid = recv_user_name(f, uid);
 		else if (inc_recurse && am_root && !numeric_ids)
 			uid = match_uid(uid);
 	}
 	if (preserve_gid && !(flags & XMIT_SAME_GID)) {
-		gid = (gid_t)read_int(f);
+		gid = (gid_t)read_abbrevint30(f);
 		if (flags & XMIT_GROUP_NAME_FOLLOWS)
 			gid = recv_group_name(f, gid);
 		else if (inc_recurse && (!am_root || !numeric_ids))
@@ -693,7 +696,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 
 #ifdef SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(mode)) {
-		linkname_len = read_int(f) + 1; /* count the '\0' */
+		linkname_len = read_abbrevint30(f) + 1; /* count the '\0' */
 		if (linkname_len <= 0 || linkname_len > MAXPATHLEN) {
 			rprintf(FERROR, "overflow: linkname_len=%d\n",
 				linkname_len - 1);
@@ -712,6 +715,12 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		if (flags & XMIT_HLINKED)
 			extra_len += EXTRA_LEN;
 	}
+#endif
+
+#ifdef SUPPORT_ACLS
+	/* We need one or two index int32s when we're preserving ACLs. */
+	if (preserve_acls)
+		extra_len += (S_ISDIR(mode) ? 2 : 1) * EXTRA_LEN;
 #endif
 
 	if (always_checksum && S_ISREG(mode))
@@ -850,6 +859,11 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		} else
 			read_buf(f, bp, checksum_len);
 	}
+
+#ifdef SUPPORT_ACLS
+	if (preserve_acls && !S_ISLNK(mode))
+		receive_acl(file, f);
+#endif
 
 	if (S_ISREG(mode) || S_ISLNK(mode))
 		stats.total_size += file_length;
@@ -1122,6 +1136,9 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 					  int flags, int filter_flags)
 {
 	struct file_struct *file;
+#ifdef SUPPORT_ACLS
+	statx sx;
+#endif
 
 	file = make_file(fname, flist, stp, flags, filter_flags);
 	if (!file)
@@ -1130,12 +1147,28 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 	if (chmod_modes && !S_ISLNK(file->mode))
 		file->mode = tweak_mode(file->mode, chmod_modes);
 
+#ifdef SUPPORT_ACLS
+	if (preserve_acls && !S_ISLNK(file->mode) && f >= 0) {
+		sx.st.st_mode = file->mode;
+		sx.acc_acl = sx.def_acl = NULL;
+		if (get_acl(fname, &sx) < 0)
+			return NULL;
+	}
+#endif
+
 	maybe_emit_filelist_progress(flist->count + flist_count_offset);
 
 	flist_expand(flist);
 	flist->files[flist->count++] = file;
-	if (f >= 0)
+	if (f >= 0) {
 		send_file_entry(f, file, flist->count - 1);
+#ifdef SUPPORT_ACLS
+		if (preserve_acls && !S_ISLNK(file->mode)) {
+			send_acl(&sx, f);
+			free_acl(&sx);
+		}
+#endif
+	}
 	return file;
 }
 

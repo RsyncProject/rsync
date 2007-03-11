@@ -35,6 +35,7 @@ extern int verbose;
 extern int am_root;
 extern int preserve_uid;
 extern int preserve_gid;
+extern int preserve_acls;
 extern int numeric_ids;
 
 struct idlist {
@@ -271,7 +272,7 @@ void send_uid_list(int f)
 {
 	struct idlist *list;
 
-	if (preserve_uid) {
+	if (preserve_uid || preserve_acls) {
 		int len;
 		/* we send sequences of uid/byte-length/name */
 		for (list = uidlist; list; list = list->next) {
@@ -288,7 +289,7 @@ void send_uid_list(int f)
 		write_int(f, 0);
 	}
 
-	if (preserve_gid) {
+	if (preserve_gid || preserve_acls) {
 		int len;
 		for (list = gidlist; list; list = list->next) {
 			if (!list->name)
@@ -328,17 +329,27 @@ void recv_uid_list(int f, struct file_list *flist)
 {
 	int id, i;
 
-	if (preserve_uid && !numeric_ids) {
+	if ((preserve_uid || preserve_acls) && !numeric_ids) {
 		/* read the uid list */
 		while ((id = read_int(f)) != 0)
 			recv_user_name(f, (uid_t)id);
 	}
 
-	if (preserve_gid && !numeric_ids) {
+	if ((preserve_gid || preserve_acls) && !numeric_ids) {
 		/* read the gid list */
 		while ((id = read_int(f)) != 0)
 			recv_group_name(f, (gid_t)id);
 	}
+
+#ifdef SUPPORT_ACLS
+	if (preserve_acls && !numeric_ids) {
+		id_t *id;
+		while ((id = next_acl_uid(flist)) != NULL)
+			*id = match_uid(*id);
+		while ((id = next_acl_gid(flist)) != NULL)
+			*id = match_gid(*id);
+	}
+#endif
 
 	/* Now convert all the uids/gids from sender values to our values. */
 	if (am_root && preserve_uid && !numeric_ids) {

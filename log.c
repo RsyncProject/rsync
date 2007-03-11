@@ -624,8 +624,10 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			c[5] = !(iflags & ITEM_REPORT_PERMS) ? '.' : 'p';
 			c[6] = !(iflags & ITEM_REPORT_OWNER) ? '.' : 'o';
 			c[7] = !(iflags & ITEM_REPORT_GROUP) ? '.' : 'g';
-			c[8] = '.';
-			c[9] = '\0';
+			c[8] = !(iflags & ITEM_REPORT_ATIME) ? '.' : 'u';
+			c[9] = !(iflags & ITEM_REPORT_ACL) ? '.' : 'a';
+			c[10] = !(iflags & ITEM_REPORT_XATTR) ? '.' : 'x';
+			c[11] = '\0';
 
 			if (iflags & (ITEM_IS_NEW|ITEM_MISSING_DATA)) {
 				char ch = iflags & ITEM_IS_NEW ? '+' : '?';

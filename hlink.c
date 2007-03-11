@@ -26,6 +26,7 @@ extern int verbose;
 extern int dry_run;
 extern int do_xfers;
 extern int link_dest;
+extern int preserve_acls;
 extern int make_backups;
 extern int protocol_version;
 extern int remove_source_files;
@@ -267,15 +268,15 @@ void match_hard_links(void)
 }
 
 static int maybe_hard_link(struct file_struct *file, int ndx,
-			   const char *fname, int statret, STRUCT_STAT *stp,
+			   const char *fname, int statret, statx *sxp,
 			   const char *oldname, STRUCT_STAT *old_stp,
 			   const char *realname, int itemizing, enum logcode code)
 {
 	if (statret == 0) {
-		if (stp->st_dev == old_stp->st_dev
-		 && stp->st_ino == old_stp->st_ino) {
+		if (sxp->st.st_dev == old_stp->st_dev
+		 && sxp->st.st_ino == old_stp->st_ino) {
 			if (itemizing) {
-				itemize(file, ndx, statret, stp,
+				itemize(fname, file, ndx, statret, sxp,
 					ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS,
 					0, "");
 			}
@@ -296,7 +297,7 @@ static int maybe_hard_link(struct file_struct *file, int ndx,
 
 	if (hard_link_one(file, fname, oldname, 0)) {
 		if (itemizing) {
-			itemize(file, ndx, statret, stp,
+			itemize(fname, file, ndx, statret, sxp,
 				ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS, 0,
 				realname);
 		}
@@ -310,7 +311,7 @@ static int maybe_hard_link(struct file_struct *file, int ndx,
 /* Only called if FLAG_HLINKED is set and FLAG_HLINK_FIRST is not.  Returns:
  * 0 = process the file, 1 = skip the file, -1 = error occurred. */
 int hard_link_check(struct file_struct *file, int ndx, const char *fname,
-		    int statret, STRUCT_STAT *stp, int itemizing,
+		    int statret, statx *sxp, int itemizing,
 		    enum logcode code)
 {
 	STRUCT_STAT prev_st;
@@ -361,18 +362,20 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 	if (statret < 0 && basis_dir[0] != NULL) {
 		/* If we match an alt-dest item, we don't output this as a change. */
 		char cmpbuf[MAXPATHLEN];
-		STRUCT_STAT alt_st;
+		statx alt_sx;
 		int j = 0;
+#ifdef SUPPORT_ACLS
+		alt_sx.acc_acl = alt_sx.def_acl = NULL;
+#endif
 		do {
 			pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
-			if (link_stat(cmpbuf, &alt_st, 0) < 0)
+			if (link_stat(cmpbuf, &alt_sx.st, 0) < 0)
 				continue;
 			if (link_dest) {
-				if (prev_st.st_dev != alt_st.st_dev
-				 || prev_st.st_ino != alt_st.st_ino)
+				if (prev_st.st_dev != alt_sx.st.st_dev
+				 || prev_st.st_ino != alt_sx.st.st_ino)
 					continue;
 				statret = 1;
-				*stp = alt_st;
 				if (verbose < 2 || !stdout_format_has_i) {
 					itemizing = 0;
 					code = FNONE;
@@ -381,16 +384,32 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 				}
 				break;
 			}
-			if (!unchanged_file(cmpbuf, file, &alt_st))
+			if (!unchanged_file(cmpbuf, file, &alt_sx.st))
 				continue;
 			statret = 1;
-			*stp = alt_st;
-			if (unchanged_attrs(file, &alt_st))
+			if (unchanged_attrs(cmpbuf, file, &alt_sx))
 				break;
 		} while (basis_dir[++j] != NULL);
+		if (statret == 1) {
+			sxp->st = alt_sx.st;
+#ifdef SUPPORT_ACLS
+			if (preserve_acls && !S_ISLNK(file->mode)) {
+				if (!ACL_READY(*sxp))
+					get_acl(cmpbuf, sxp);
+				else {
+					sxp->acc_acl = alt_sx.acc_acl;
+					sxp->def_acl = alt_sx.def_acl;
+				}
+			}
+#endif
+		}
+#ifdef SUPPORT_ACLS
+		else if (preserve_acls)
+			free_acl(&alt_sx);
+#endif
 	}
 
-	if (maybe_hard_link(file, ndx, fname, statret, stp, prev_name, &prev_st,
+	if (maybe_hard_link(file, ndx, fname, statret, sxp, prev_name, &prev_st,
 			    realname, itemizing, code) < 0)
 		return -1;
 
@@ -425,7 +444,8 @@ void finish_hard_link(struct file_struct *file, const char *fname,
 		      STRUCT_STAT *stp, int itemizing, enum logcode code,
 		      int alt_dest)
 {
-	STRUCT_STAT st, prev_st;
+	statx prev_sx;
+	STRUCT_STAT st;
 	char alt_name[MAXPATHLEN], *prev_name;
 	const char *our_name;
 	int prev_statret, ndx, prev_ndx = F_HL_PREV(file);
@@ -449,14 +469,24 @@ void finish_hard_link(struct file_struct *file, const char *fname,
 	} else
 		our_name = fname;
 
+#ifdef SUPPORT_ACLS
+	prev_sx.acc_acl = prev_sx.def_acl = NULL;
+#endif
+
 	while ((ndx = prev_ndx) >= 0) {
+		int val;
 		file = FPTR(ndx);
 		file->flags = (file->flags & ~FLAG_HLINK_FIRST) | FLAG_HLINK_DONE;
 		prev_ndx = F_HL_PREV(file);
 		prev_name = f_name(file, NULL);
-		prev_statret = link_stat(prev_name, &prev_st, 0);
-		if (maybe_hard_link(file, ndx, prev_name, prev_statret, &prev_st,
-				    our_name, stp, fname, itemizing, code) < 0)
+		prev_statret = link_stat(prev_name, &prev_sx.st, 0);
+		val = maybe_hard_link(file, ndx, prev_name, prev_statret, &prev_sx,
+				      our_name, stp, fname, itemizing, code);
+#ifdef SUPPORT_ACLS
+		if (preserve_acls)
+			free_acl(&prev_sx);
+#endif
+		if (val < 0)
 			continue;
 		if (remove_source_files == 1 && do_xfers)
 			send_msg_int(MSG_SUCCESS, ndx);

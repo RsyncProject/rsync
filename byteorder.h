@@ -36,7 +36,8 @@
 
 /* Our 64-bit numbers are sent in MSB-first order so that we can use
  * the highest bits to indicate the number of bytes sent. */
-#define NVAL2(b,m) ((UVAL(b,0)&~(m))<<8|UVAL(b,1))
+#define NVAL1(b,m) (UVAL(b,0)&~(uint32)(m))
+#define NVAL2(b,m) (NVAL1(b,m)<<8|UVAL(b,1))
 #define NVAL3(b,m) (NVAL2(b,m)<<8|UVAL(b,2))
 #define NVAL4(b,m) (NVAL3(b,m)<<8|UVAL(b,3))
 #define NVAL5(b,m) ((int64)NVAL4(b,m)<<8|UVAL(b,4))

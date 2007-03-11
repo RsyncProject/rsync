@@ -41,6 +41,7 @@ extern int prune_empty_dirs;
 extern int protocol_version;
 extern int preserve_uid;
 extern int preserve_gid;
+extern int preserve_acls;
 extern int preserve_hard_links;
 extern int need_messages_from_generator;
 extern int delete_mode, delete_before, delete_during, delete_after;
@@ -61,6 +62,8 @@ void setup_protocol(int f_out,int f_in)
 		preserve_uid = ++file_extra_cnt;
 	if (preserve_gid)
 		preserve_gid = ++file_extra_cnt;
+	if (preserve_acls && !am_sender)
+		preserve_acls = ++file_extra_cnt;
 
 	if (remote_protocol == 0) {
 		if (!read_batch)
@@ -104,6 +107,13 @@ void setup_protocol(int f_out,int f_in)
 		if (max_delete == 0 && am_sender) {
 			rprintf(FERROR,
 			    "--max-delete=0 requires protocol 30 or higher"
+			    " (negotiated %d).\n",
+			    protocol_version);
+			exit_cleanup(RERR_PROTOCOL);
+		}
+		if (preserve_acls) {
+			rprintf(FERROR,
+			    "--acls requires protocol 30 or higher"
 			    " (negotiated %d).\n",
 			    protocol_version);
 			exit_cleanup(RERR_PROTOCOL);

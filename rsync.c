@@ -31,6 +31,7 @@
 
 extern int verbose;
 extern int dry_run;
+extern int preserve_acls;
 extern int preserve_perms;
 extern int preserve_executability;
 extern int preserve_times;
@@ -49,7 +50,6 @@ extern int inplace;
 extern int flist_eof;
 extern int keep_dirlinks;
 extern int make_backups;
-extern mode_t orig_umask;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct chmod_mode_struct *daemon_chmod_modes;
 
@@ -203,7 +203,8 @@ void free_sums(struct sum_struct *s)
 
 /* This is only called when we aren't preserving permissions.  Figure out what
  * the permissions should be and return them merged back into the mode. */
-mode_t dest_mode(mode_t flist_mode, mode_t stat_mode, int exists)
+mode_t dest_mode(mode_t flist_mode, mode_t stat_mode, int dflt_perms,
+		 int exists)
 {
 	int new_mode;
 	/* If the file already exists, we'll return the local permissions,
@@ -220,56 +221,65 @@ mode_t dest_mode(mode_t flist_mode, mode_t stat_mode, int exists)
 				new_mode |= (new_mode & 0444) >> 2;
 		}
 	} else {
-		/* Apply the umask and turn off special permissions. */
-		new_mode = flist_mode & (~CHMOD_BITS | (ACCESSPERMS & ~orig_umask));
+		/* Apply destination default permissions and turn
+		 * off special permissions. */
+		new_mode = flist_mode & (~CHMOD_BITS | dflt_perms);
 	}
 	return new_mode;
 }
 
-int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
+int set_file_attrs(char *fname, struct file_struct *file, statx *sxp,
 		   int flags)
 {
 	int updated = 0;
-	STRUCT_STAT st2;
+	statx sx2;
 	int change_uid, change_gid;
 	mode_t new_mode = file->mode;
 
-	if (!st) {
+	if (!sxp) {
 		if (dry_run)
 			return 1;
-		if (link_stat(fname, &st2, 0) < 0) {
+		if (link_stat(fname, &sx2.st, 0) < 0) {
 			rsyserr(FERROR, errno, "stat %s failed",
 				full_fname(fname));
 			return 0;
 		}
-		st = &st2;
+#ifdef SUPPORT_ACLS
+		sx2.acc_acl = sx2.def_acl = NULL;
+#endif
 		if (!preserve_perms && S_ISDIR(new_mode)
-		 && st->st_mode & S_ISGID) {
+		 && sx2.st.st_mode & S_ISGID) {
 			/* We just created this directory and its setgid
 			 * bit is on, so make sure it stays on. */
 			new_mode |= S_ISGID;
 		}
+		sxp = &sx2;
 	}
 
-	if (!preserve_times || (S_ISDIR(st->st_mode) && omit_dir_times))
+#ifdef SUPPORT_ACLS
+	if (preserve_acls && !S_ISLNK(file->mode) && !ACL_READY(*sxp))
+		get_acl(fname, sxp);
+#endif
+
+	if (!preserve_times || (S_ISDIR(sxp->st.st_mode) && omit_dir_times))
 		flags |= ATTRS_SKIP_MTIME;
 	if (!(flags & ATTRS_SKIP_MTIME)
-	    && cmp_time(st->st_mtime, file->modtime) != 0) {
-		int ret = set_modtime(fname, file->modtime, st->st_mode);
+	    && cmp_time(sxp->st.st_mtime, file->modtime) != 0) {
+		int ret = set_modtime(fname, file->modtime, sxp->st.st_mode);
 		if (ret < 0) {
 			rsyserr(FERROR, errno, "failed to set times on %s",
 				full_fname(fname));
-			return 0;
+			goto cleanup;
 		}
 		if (ret == 0) /* ret == 1 if symlink could not be set */
 			updated = 1;
 	}
 
-	change_uid = am_root && preserve_uid && st->st_uid != F_UID(file);
+	change_uid = am_root && preserve_uid && sxp->st.st_uid != F_UID(file);
 	change_gid = preserve_gid && F_GID(file) != GID_NONE
-		&& st->st_gid != F_GID(file);
+		&& sxp->st.st_gid != F_GID(file);
 #if !defined HAVE_LCHOWN && !defined CHOWN_MODIFIES_SYMLINK
-	if (S_ISLNK(st->st_mode))
+	if (S_ISLNK(sxp->st.st_mode))
 		;
 	else
 #endif
@@ -279,45 +289,57 @@ int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
 				rprintf(FINFO,
 					"set uid of %s from %ld to %ld\n",
 					fname,
-					(long)st->st_uid, (long)F_UID(file));
+					(long)sxp->st.st_uid, (long)F_UID(file));
 			}
 			if (change_gid) {
 				rprintf(FINFO,
 					"set gid of %s from %ld to %ld\n",
 					fname,
-					(long)st->st_gid, (long)F_GID(file));
+					(long)sxp->st.st_gid, (long)F_GID(file));
 			}
 		}
 		if (do_lchown(fname,
-		    change_uid ? F_UID(file) : st->st_uid,
-		    change_gid ? F_GID(file) : st->st_gid) != 0) {
+		    change_uid ? F_UID(file) : sxp->st.st_uid,
+		    change_gid ? F_GID(file) : sxp->st.st_gid) != 0) {
 			/* shouldn't have attempted to change uid or gid
 			 * unless have the privilege */
 			rsyserr(FERROR, errno, "%s %s failed",
 			    change_uid ? "chown" : "chgrp",
 			    full_fname(fname));
-			return 0;
+			goto cleanup;
 		}
 		/* a lchown had been done - we have to re-stat if the
 		 * destination had the setuid or setgid bits set due
 		 * to the side effect of the chown call */
-		if (st->st_mode & (S_ISUID | S_ISGID)) {
-			link_stat(fname, st,
-				  keep_dirlinks && S_ISDIR(st->st_mode));
+		if (sxp->st.st_mode & (S_ISUID | S_ISGID)) {
+			link_stat(fname, &sxp->st,
+				  keep_dirlinks && S_ISDIR(sxp->st.st_mode));
 		}
 		updated = 1;
 	}
 
 	if (daemon_chmod_modes && !S_ISLNK(new_mode))
 		new_mode = tweak_mode(new_mode, daemon_chmod_modes);
+
+#ifdef SUPPORT_ACLS
+	/* It's OK to call set_acl() now, even for a dir, as the generator
+	 * will enable owner-writability using chmod, if necessary.
+	 * 
+	 * If set_acl() changes permission bits in the process of setting
+	 * an access ACL, it changes sxp->st.st_mode so we know whether we
+	 * need to chmod(). */
+	if (preserve_acls && !S_ISLNK(new_mode) && set_acl(fname, file, sxp) == 0)
+		updated = 1;
+#endif
+
 #ifdef HAVE_CHMOD
-	if (!BITS_EQUAL(st->st_mode, new_mode, CHMOD_BITS)) {
+	if (!BITS_EQUAL(sxp->st.st_mode, new_mode, CHMOD_BITS)) {
 		int ret = do_chmod(fname, new_mode);
 		if (ret < 0) {
 			rsyserr(FERROR, errno,
 				"failed to set permissions on %s",
 				full_fname(fname));
-			return 0;
+			goto cleanup;
 		}
 		if (ret == 0) /* ret == 1 if symlink could not be set */
 			updated = 1;
@@ -330,6 +352,11 @@ int set_file_attrs(char *fname, struct file_struct *file, STRUCT_STAT *st,
 		else
 			rprintf(FCLIENT, "%s is uptodate\n", fname);
 	}
+  cleanup:
+#ifdef SUPPORT_ACLS
+	if (preserve_acls && sxp == &sx2)
+		free_acl(&sx2);
+#endif
 	return updated;
 }
 

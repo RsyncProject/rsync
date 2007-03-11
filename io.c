@@ -100,10 +100,10 @@ static int active_filecnt = 0;
 static OFF_T active_bytecnt = 0;
 
 static char int_byte_cnt[64] = {
-	3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, /* (00 - 3F)/4 */
-	3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, /* (40 - 7F)/4 */
-	4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, /* (80 - BF)/4 */
-	5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 8, 9, /* (C0 - FF)/4 */
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* (00 - 3F)/4 */
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* (40 - 7F)/4 */
+	2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, /* (80 - BF)/4 */
+	3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 6, 7, /* (C0 - FF)/4 */
 };
 
 static void readfd(int fd, char *buffer, size_t N);
@@ -998,6 +998,37 @@ unsigned short read_shortint(int f)
 	return (UVAL(b, 1) << 8) + UVAL(b, 0);
 }
 
+int32 read_abbrevint(int f)
+{
+	int32 num;
+	char b[5];
+	int cnt;
+	readfd(f, b, 1);
+	cnt = int_byte_cnt[CVAL(b, 0) / 4];
+	if (cnt > 1)
+		readfd(f, b + 1, cnt - 1);
+	switch (cnt) {
+	case 1:
+		num = NVAL1(b, 0);
+		break;
+	case 2:
+		num = NVAL2(b, 0x80);
+		break;
+	case 3:
+		num = NVAL3(b, 0xC0);
+		break;
+	case 4:
+		num = NVAL4(b, 0xE0);
+		break;
+	case 5:
+		num = NVAL4(b+1, 0);
+		break;
+	default:
+		exit_cleanup(RERR_PROTOCOL); /* impossible... */
+	}
+	return num;
+}
+
 int32 read_int(int f)
 {
 	char b[4];
@@ -1033,7 +1064,7 @@ int64 read_longint(int f)
 	} else {
 		int cnt;
 		readfd(f, b, 3);
-		cnt = int_byte_cnt[CVAL(b, 0) / 4];
+		cnt = int_byte_cnt[CVAL(b, 0) / 4] + 2;
 #if SIZEOF_INT64 < 8
 		if (cnt > 5 || (cnt == 5 && (CVAL(b,0)&0x3F || CVAL(b,1)&0x80))) {
 			rprintf(FERROR, "Integer overflow: attempted 64-bit offset\n");
@@ -1371,6 +1402,37 @@ void write_shortint(int f, unsigned short x)
 	b[0] = (char)x;
 	b[1] = (char)(x >> 8);
 	writefd(f, b, 2);
+}
+
+void write_abbrevint(int f, int32 x)
+{
+	char b[5];
+	if ((uint32)x < ((uint32)1<<(1*8-1))) {
+		b[0] = (char)x;
+		writefd(f, b, 1);
+	} else if ((uint32)x < ((uint32)1<<(2*8-2))) {
+		b[0] = (char)(x >> 8) | 0x80;
+		b[1] = (char)x;
+		writefd(f, b, 2);
+	} else if ((uint32)x < ((uint32)1<<(3*8-3))) {
+		b[0] = (char)(x >> 16) | 0xC0;
+		b[1] = (char)(x >> 8);
+		b[2] = (char)x;
+		writefd(f, b, 3);
+	} else if ((uint32)x < ((uint32)1<<(4*8-4))) {
+		b[0] = (char)(x >> 24) | 0xE0;
+		b[1] = (char)(x >> 16);
+		b[2] = (char)(x >> 8);
+		b[3] = (char)x;
+		writefd(f, b, 4);
+	} else {
+		b[0] = 0xF0;
+		b[1] = (char)(x >> 24);
+		b[2] = (char)(x >> 16);
+		b[3] = (char)(x >> 8);
+		b[4] = (char)x;
+		writefd(f, b, 5);
+	}
 }
 
 void write_int(int f, int32 x)

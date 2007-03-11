@@ -47,6 +47,7 @@ extern int keep_partial;
 extern int checksum_seed;
 extern int inplace;
 extern int delay_updates;
+extern mode_t orig_umask;
 extern struct stats stats;
 extern char *tmpdir;
 extern char *partial_dir;
@@ -347,6 +348,10 @@ int recv_files(int f_in, char *local_name)
 	int itemizing = am_server ? logfile_format_has_i : stdout_format_has_i;
 	enum logcode log_code = log_before_transfer ? FLOG : FINFO;
 	int max_phase = protocol_version >= 29 ? 2 : 1;
+	int dflt_perms = (ACCESSPERMS & ~orig_umask);
+#ifdef SUPPORT_ACLS
+	const char *parent_dirname = "";
+#endif
 	int ndx, recv_ok;
 
 	if (verbose > 2)
@@ -562,7 +567,16 @@ int recv_files(int f_in, char *local_name)
 		 * mode based on the local permissions and some heuristics. */
 		if (!preserve_perms) {
 			int exists = fd1 != -1;
-			file->mode = dest_mode(file->mode, st.st_mode, exists);
+#ifdef SUPPORT_ACLS
+			const char *dn = file->dirname ? file->dirname : ".";
+			if (parent_dirname != dn
+			 && strcmp(parent_dirname, dn) != 0) {
+				dflt_perms = default_perms_for_dir(dn);
+				parent_dirname = dn;
+			}
+#endif
+			file->mode = dest_mode(file->mode, st.st_mode,
+					       dflt_perms, exists);
 		}
 
 		/* We now check to see if we are writing the file "inplace" */

@@ -547,6 +547,10 @@ struct idev_node {
 #define IN_LOOPBACKNET 127
 #endif
 
+#if HAVE_UNIXWARE_ACLS|HAVE_SOLARIS_ACLS|HAVE_HPUX_ACLS
+#define ACLS_NEED_MASK 1
+#endif
+
 #define GID_NONE ((gid_t)-1)
 
 union file_extras {
@@ -566,6 +570,7 @@ struct file_struct {
 extern int file_extra_cnt;
 extern int preserve_uid;
 extern int preserve_gid;
+extern int preserve_acls;
 
 #define FILE_STRUCT_LEN (offsetof(struct file_struct, basename))
 #define EXTRA_LEN (sizeof (union file_extras))
@@ -598,10 +603,12 @@ extern int preserve_gid;
 /* When the associated option is on, all entries will have these present: */
 #define F_OWNER(f) REQ_EXTRA(f, preserve_uid)->unum
 #define F_GROUP(f) REQ_EXTRA(f, preserve_gid)->unum
+#define F_ACL(f) REQ_EXTRA(f, preserve_acls)->unum
 
 /* These items are per-entry optional and mutally exclusive: */
 #define F_HL_GNUM(f) OPT_EXTRA(f, LEN64_BUMP(f))->num
 #define F_HL_PREV(f) OPT_EXTRA(f, LEN64_BUMP(f))->num
+#define F_DEF_ACL(f) OPT_EXTRA(f, LEN64_BUMP(f))->unum
 #define F_DIRDEV_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) + 2 - 1)->unum)
 #define F_DIRNODE_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) + 3 - 1)->num)
 
@@ -753,6 +760,17 @@ struct stats {
 
 struct chmod_mode_struct;
 
+#define EMPTY_ITEM_LIST {NULL, 0, 0}
+
+typedef struct {
+	void *items;
+	size_t count;
+	size_t malloced;
+} item_list;
+
+#define EXPAND_ITEM_LIST(lp, type, incr) \
+	(type*)expand_item_list(lp, sizeof (type), #type, incr)
+
 #include "byteorder.h"
 #include "lib/mdfour.h"
 #include "lib/wildmatch.h"
@@ -770,6 +788,16 @@ struct chmod_mode_struct;
 #ifndef NORETURN
 #define NORETURN __attribute__((__noreturn__))
 #endif
+
+typedef struct {
+    STRUCT_STAT st;
+#ifdef SUPPORT_ACLS
+    struct rsync_acl *acc_acl; /* access ACL */
+    struct rsync_acl *def_acl; /* default ACL */
+#endif
+} statx;
+
+#define ACL_READY(sx) ((sx).acc_acl != NULL)
 
 #include "proto.h"
 
@@ -977,7 +1005,7 @@ size_t strlcat(char *d, const char *s, size_t bufsize);
 #define MY_GID() getgid()
 #endif
 
-extern int verbose;
+extern int verbose, protocol_version;
 
 #ifndef HAVE_INET_NTOP
 const char *inet_ntop(int af, const void *src, char *dst, size_t size);
@@ -990,6 +1018,23 @@ int inet_pton(int af, const char *src, void *dst);
 #ifdef MAINTAINER_MODE
 const char *get_panic_action(void);
 #endif
+
+static inline int32
+read_abbrevint30(int f)
+{
+	if (protocol_version < 30)
+		return read_int(f);
+	return read_abbrevint(f);
+}
+
+static inline void
+write_abbrevint30(int f, int32 x)
+{
+	if (protocol_version < 30)
+		write_int(f, x);
+	else
+		write_abbrevint(f, x);
+}
 
 static inline int
 isDigit(const char *ptr)

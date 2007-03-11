@@ -22,6 +22,7 @@
 
 extern int verbose;
 extern int am_root;
+extern int preserve_acls;
 extern int preserve_devices;
 extern int preserve_specials;
 extern int preserve_links;
@@ -92,7 +93,8 @@ path
 ****************************************************************************/
 static int make_bak_dir(char *fullpath)
 {
-	STRUCT_STAT st;
+	statx sx;
+	struct file_struct *file;
 	char *rel = fullpath + backup_dir_len;
 	char *end = rel + strlen(rel);
 	char *p = end;
@@ -124,15 +126,25 @@ static int make_bak_dir(char *fullpath)
 		if (p >= rel) {
 			/* Try to transfer the directory settings of the
 			 * actual dir that the files are coming from. */
-			if (do_stat(rel, &st) < 0) {
+			if (do_stat(rel, &sx.st) < 0) {
 				rsyserr(FERROR, errno,
 					"make_bak_dir stat %s failed",
 					full_fname(rel));
 			} else {
-				do_lchown(fullpath, st.st_uid, st.st_gid);
-#ifdef HAVE_CHMOD
-				do_chmod(fullpath, st.st_mode);
+#ifdef SUPPORT_ACLS
+				sx.acc_acl = sx.def_acl = NULL;
 #endif
+				if (!(file = make_file(rel, NULL, NULL, 0, NO_FILTERS)))
+					continue;
+#ifdef SUPPORT_ACLS
+				if (preserve_acls && !S_ISLNK(file->mode)) {
+					get_acl(rel, &sx);
+					cache_acl(file, &sx);
+					free_acl(&sx);
+				}
+#endif
+				set_file_attrs(fullpath, file, NULL, 0);
+				free(file);
 			}
 		}
 		*p = '/';
@@ -170,15 +182,18 @@ static int robust_move(const char *src, char *dst)
  * We will move the file to be deleted into a parallel directory tree. */
 static int keep_backup(const char *fname)
 {
-	STRUCT_STAT st;
+	statx sx;
 	struct file_struct *file;
 	char *buf;
 	int kept = 0;
 	int ret_code;
 
 	/* return if no file to keep */
-	if (do_lstat(fname, &st) < 0)
+	if (do_lstat(fname, &sx.st) < 0)
 		return 1;
+#ifdef SUPPORT_ACLS
+	sx.acc_acl = sx.def_acl = NULL;
+#endif
 
 	if (!(file = make_file(fname, NULL, NULL, 0, NO_FILTERS)))
 		return 1; /* the file could have disappeared */
@@ -187,6 +202,14 @@ static int keep_backup(const char *fname)
 		unmake_file(file);
 		return 0;
 	}
+
+#ifdef SUPPORT_ACLS
+	if (preserve_acls && !S_ISLNK(file->mode)) {
+		get_acl(fname, &sx);
+		cache_acl(file, &sx);
+		free_acl(&sx);
+	}
+#endif
 
 	/* Check to see if this is a device file, or link */
 	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
@@ -259,7 +282,7 @@ static int keep_backup(const char *fname)
 		if (robust_move(fname, buf) != 0) {
 			rsyserr(FERROR, errno, "keep_backup failed: %s -> \"%s\"",
 				full_fname(fname), buf);
-		} else if (st.st_nlink > 1) {
+		} else if (sx.st.st_nlink > 1) {
 			/* If someone has hard-linked the file into the backup
 			 * dir, rename() might return success but do nothing! */
 			robust_unlink(fname); /* Just in case... */

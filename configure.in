@@ -542,6 +542,11 @@ if test x"$ac_cv_func_strcasecmp" = x"no"; then
     AC_CHECK_LIB(resolv, strcasecmp)
 fi
 
+AC_CHECK_FUNCS(aclsort)
+if test x"$ac_cv_func_aclsort" = x"no"; then
+    AC_CHECK_LIB(sec, aclsort)
+fi
+
 dnl At the moment we don't test for a broken memcmp(), because all we
 dnl need to do is test for equality, not comparison, and it seems that
 dnl every platform has a memcmp that can do at least that.
@@ -805,6 +810,76 @@ AC_SUBST(OBJ_SAVE)
 AC_SUBST(OBJ_RESTORE)
 AC_SUBST(CC_SHOBJ_FLAG)
 AC_SUBST(BUILD_POPT)
+
+AC_CHECK_HEADERS(sys/acl.h acl/libacl.h)
+AC_CHECK_FUNCS(_acl __acl _facl __facl)
+#################################################
+# check for ACL support
+
+AC_MSG_CHECKING([whether to support ACLs])
+AC_ARG_ENABLE(acl-support,
+	AC_HELP_STRING([--disable-acl-support],
+		       [Turn off ACL support]))
+
+if test x"$enable_acl_support" = x"no"; then
+    AC_MSG_RESULT(no)
+else
+    AC_DEFINE(SUPPORT_ACLS, 1, [Define to 1 to add support for ACLs])
+    case "$host_os" in
+    *sysv5*)
+	AC_MSG_RESULT(Using UnixWare ACLs)
+	AC_DEFINE(HAVE_UNIXWARE_ACLS, 1, [true if you have UnixWare ACLs])
+	;;
+    *solaris*|*cygwin*)
+	AC_MSG_RESULT(Using solaris ACLs)
+	AC_DEFINE(HAVE_SOLARIS_ACLS, 1, [true if you have solaris ACLs])
+	;;
+    *hpux*)
+	AC_MSG_RESULT(Using HPUX ACLs)
+	AC_DEFINE(HAVE_HPUX_ACLS, 1, [true if you have HPUX ACLs])
+	;;
+    *irix*)
+	AC_MSG_RESULT(Using IRIX ACLs)
+	AC_DEFINE(HAVE_IRIX_ACLS, 1, [true if you have IRIX ACLs])
+	;;
+    *aix*)
+	AC_MSG_RESULT(Using AIX ACLs)
+	AC_DEFINE(HAVE_AIX_ACLS, 1, [true if you have AIX ACLs])
+	;;
+    *osf*)
+	AC_MSG_RESULT(Using Tru64 ACLs)
+	AC_DEFINE(HAVE_TRU64_ACLS, 1, [true if you have Tru64 ACLs])
+	LIBS="$LIBS -lpacl"
+	;;
+    *)
+	AC_MSG_RESULT(running tests:)
+	AC_CHECK_LIB(acl,acl_get_file)
+	    AC_CACHE_CHECK([for ACL support],samba_cv_HAVE_POSIX_ACLS,[
+	    AC_TRY_LINK([#include <sys/types.h>
+#include <sys/acl.h>],
+[ acl_t acl; int entry_id; acl_entry_t *entry_p; return acl_get_entry( acl, entry_id, entry_p);],
+samba_cv_HAVE_POSIX_ACLS=yes,samba_cv_HAVE_POSIX_ACLS=no)])
+	AC_MSG_CHECKING(ACL test results)
+	if test x"$samba_cv_HAVE_POSIX_ACLS" = x"yes"; then
+	    AC_MSG_RESULT(Using posix ACLs)
+	    AC_DEFINE(HAVE_POSIX_ACLS, 1, [true if you have posix ACLs])
+	    AC_CACHE_CHECK([for acl_get_perm_np],samba_cv_HAVE_ACL_GET_PERM_NP,[
+		AC_TRY_LINK([#include <sys/types.h>
+#include <sys/acl.h>],
+[ acl_permset_t permset_d; acl_perm_t perm; return acl_get_perm_np( permset_d, perm);],
+samba_cv_HAVE_ACL_GET_PERM_NP=yes,samba_cv_HAVE_ACL_GET_PERM_NP=no)])
+	    if test x"$samba_cv_HAVE_ACL_GET_PERM_NP" = x"yes"; then
+		AC_DEFINE(HAVE_ACL_GET_PERM_NP, 1, [true if you have acl_get_perm_np])
+	    fi
+	else
+	    AC_MSG_ERROR(Failed to find ACL support)
+	    if test x"$enable_acl_support" != x"yes"; then
+		AC_DEFINE(SUPPORT_ACLS, 0)
+	    fi
+	fi
+	;;
+    esac
+fi
 
 AC_CONFIG_FILES([Makefile lib/dummy zlib/dummy popt/dummy shconfig])
 AC_OUTPUT

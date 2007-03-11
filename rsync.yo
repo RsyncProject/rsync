@@ -301,7 +301,7 @@ to the detailed description below for a complete description.  verb(
  -q, --quiet                 suppress non-error messages
      --no-motd               suppress daemon-mode MOTD (see caveat)
  -c, --checksum              skip based on checksum, not mod-time & size
- -a, --archive               archive mode; same as -rlptgoD (no -H)
+ -a, --archive               archive mode; same as -rlptgoD (no -H, -A)
      --no-OPTION             turn off an implied OPTION (e.g. --no-D)
  -r, --recursive             recurse into directories
  -R, --relative              use relative path names
@@ -323,6 +323,7 @@ to the detailed description below for a complete description.  verb(
  -p, --perms                 preserve permissions
  -E, --executability         preserve executability
      --chmod=CHMOD           affect file and/or directory permissions
+ -A, --acls                  preserve ACLs (implies -p)
  -o, --owner                 preserve owner (super-user only)
  -g, --group                 preserve group
      --devices               preserve device files (super-user only)
@@ -771,7 +772,9 @@ quote(itemization(
   permissions, though the bf(--executability) option might change just
   the execute permission for the file.
   it() New files get their "normal" permission bits set to the source
-  file's permissions masked with the receiving end's umask setting, and
+  file's permissions masked with the receiving directory's default
+  permissions (either the receiving process's umask, or the permissions
+  specified via the destination directory's default ACL), and
   their special permission bits disabled except in the case where a new
   directory inherits a setgid bit from its parent directory.
 ))
@@ -802,9 +805,11 @@ The preservation of the destination's setgid bit on newly-created
 directories when bf(--perms) is off was added in rsync 2.6.7.  Older rsync
 versions erroneously preserved the three special permission bits for
 newly-created files when bf(--perms) was off, while overriding the
-destination's setgid bit setting on a newly-created directory.  (Keep in
-mind that it is the version of the receiving rsync that affects this
-behavior.)
+destination's setgid bit setting on a newly-created directory.  Default ACL
+observance was added to the ACL patch for rsync 2.6.7, so older (or
+non-ACL-enabled) rsyncs use the umask even if default ACLs are present.
+(Keep in mind that it is the version of the receiving rsync that affects
+these behaviors.)
 
 dit(bf(-E, --executability)) This option causes rsync to preserve the
 executability (or non-executability) of regular files when bf(--perms) is
@@ -821,6 +826,10 @@ quote(itemization(
 ))
 
 If bf(--perms) is enabled, this option is ignored.
+
+dit(bf(-A, --acls)) This option causes rsync to update the destination
+ACLs to be the same as the source ACLs.  This nonstandard option only
+works if the remote rsync also supports it.  bf(--acls) implies bf(--perms).
 
 dit(bf(--chmod)) This option tells rsync to apply one or more
 comma-separated "chmod" strings to the permission of the files in the
@@ -1432,8 +1441,8 @@ if the receiving rsync is at least version 2.6.7 (you can use bf(-vv)
 with older versions of rsync, but that also turns on the output of other
 verbose messages).
 
-The "%i" escape has a cryptic output that is 9 letters long.  The general
-format is like the string bf(YXcstpogz), where bf(Y) is replaced by the
+The "%i" escape has a cryptic output that is 11 letters long.  The general
+format is like the string bf(YXcstpoguax), where bf(Y) is replaced by the
 type of update being done, bf(X) is replaced by the file-type, and the
 other letters represent attributes that may be output if they are being
 modified.
@@ -1482,7 +1491,11 @@ quote(itemization(
   sender's value (requires bf(--owner) and super-user privileges).
   it() A bf(g) means the group is different and is being updated to the
   sender's value (requires bf(--group) and the authority to set the group).
-  it() The bf(z) slot is reserved for future use.
+  it() The bf(u) slot is reserved for reporting update (access) time changes
+  (a feature that is not yet released).
+  it() The bf(a) means that the ACL information changed.
+  it() The bf(x) slot is reserved for reporting extended attribute changes
+  (a feature that is not yet released).
 ))
 
 One other output is possible:  when deleting files, the "%i" will output
