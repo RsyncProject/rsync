@@ -510,7 +510,7 @@ static int get_rsync_acl(const char *fname, rsync_acl *racl,
 		if (!ok) {
 			return -1;
 		}
-	} else if (errno == ENOTSUP || errno == ENOSYS) {
+	} else if (no_acl_syscall_error(errno)) {
 		/* ACLs are not supported, so pretend we have a basic ACL. */
 		if (type == SMB_ACL_TYPE_ACCESS)
 			rsync_acl_fake_perms(racl, mode);
@@ -1043,7 +1043,9 @@ int default_perms_for_dir(const char *dir)
 	if (sacl == NULL) {
 		/* Couldn't get an ACL.  Darn. */
 		switch (errno) {
+#ifdef ENOTSUP
 		case ENOTSUP:
+#endif
 		case ENOSYS:
 			/* No ACLs are available. */
 			break;

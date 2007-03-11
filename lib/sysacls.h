@@ -36,5 +36,6 @@ int sys_acl_delete_def_file(const char *name);
 int sys_acl_free_text(char *text);
 int sys_acl_free_acl(SMB_ACL_T the_acl);
 int sys_acl_free_qualifier(void *qual, SMB_ACL_TAG_T tagtype);
+int no_acl_syscall_error(int err);
 
 #endif /* SUPPORT_ACLS */
