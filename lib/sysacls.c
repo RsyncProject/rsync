@@ -1206,6 +1206,7 @@ SMB_ACL_T sys_acl_get_file(const char *path_p, SMB_ACL_TYPE_T type)
 	return acl_d;
 }
 
+#if 0
 SMB_ACL_T sys_acl_get_fd(int fd)
 {
 	/*
@@ -1226,6 +1227,7 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 
 	return sys_acl_get_file(fsp->fsp_name, SMB_ACL_TYPE_ACCESS);
 }
+#endif
 
 int sys_acl_clear_perms(SMB_ACL_PERMSET_T permset_d)
 {
@@ -1885,6 +1887,7 @@ int sys_acl_set_file(const char *name, SMB_ACL_TYPE_T type, SMB_ACL_T acl_d)
 	return ret;
 }
 
+#if 0
 int sys_acl_set_fd(int fd, SMB_ACL_T acl_d)
 {
 	/*
@@ -1909,6 +1912,7 @@ int sys_acl_set_fd(int fd, SMB_ACL_T acl_d)
 
 	return sys_acl_set_file(fsp->fsp_name, SMB_ACL_TYPE_ACCESS, acl_d);
 }
+#endif
 
 int sys_acl_delete_def_file(const char *path)
 {
