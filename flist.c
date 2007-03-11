@@ -22,6 +22,7 @@
 
 #include "rsync.h"
 #include "rounding.h"
+#include "io.h"
 
 extern int verbose;
 extern int list_only;

@@ -1005,7 +1005,7 @@ size_t strlcat(char *d, const char *s, size_t bufsize);
 #define MY_GID() getgid()
 #endif
 
-extern int verbose, protocol_version;
+extern int verbose;
 
 #ifndef HAVE_INET_NTOP
 const char *inet_ntop(int af, const void *src, char *dst, size_t size);
@@ -1018,23 +1018,6 @@ int inet_pton(int af, const char *src, void *dst);
 #ifdef MAINTAINER_MODE
 const char *get_panic_action(void);
 #endif
-
-static inline int32
-read_abbrevint30(int f)
-{
-	if (protocol_version < 30)
-		return read_int(f);
-	return read_abbrevint(f);
-}
-
-static inline void
-write_abbrevint30(int f, int32 x)
-{
-	if (protocol_version < 30)
-		write_int(f, x);
-	else
-		write_abbrevint(f, x);
-}
 
 static inline int
 isDigit(const char *ptr)
