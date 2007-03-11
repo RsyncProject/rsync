@@ -642,6 +642,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		 || (preserve_specials && IS_SPECIAL(mode))) {
 			uint32 *devp = F_RDEV_P(first);
 			rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
+			extra_len += 2 * EXTRA_LEN;
 		}
 		if (preserve_links && S_ISLNK(mode))
 			linkname_len = strlen(F_SYMLINK(first)) + 1;
