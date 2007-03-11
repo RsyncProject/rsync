@@ -631,7 +631,6 @@ static void send_rsync_acl(rsync_acl *racl, SMB_ACL_TYPE_T type,
  * This also frees the ACL data. */
 void send_acl(statx *sxp, int f)
 {
-
 	if (!sxp->acc_acl) {
 		sxp->acc_acl = create_racl();
 		rsync_acl_fake_perms(sxp->acc_acl, sxp->st.st_mode);
@@ -719,7 +718,7 @@ static int recv_rsync_acl(item_list *racl_list, SMB_ACL_TYPE_T type, int f)
 
 	if (ndx < 0 || (size_t)ndx > racl_list->count) {
 		rprintf(FERROR, "recv_acl_index: %s ACL index %d > %d\n",
-			str_acl_type(type), ndx, racl_list->count);
+			str_acl_type(type), ndx, (int)racl_list->count);
 		exit_cleanup(RERR_STREAMIO);
 	}
 
