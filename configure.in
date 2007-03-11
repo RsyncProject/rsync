@@ -856,6 +856,9 @@ else
 	AC_DEFINE(SUPPORT_ACLS, 1)
 	LIBS="$LIBS -lpacl"
 	;;
+    *darwin*)
+	AC_MSG_RESULT(MacOS ACLs not yet supported)
+	;;
     *)
 	AC_MSG_RESULT(running tests:)
 	AC_CHECK_LIB(acl,acl_get_file)
