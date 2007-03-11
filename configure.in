@@ -828,7 +828,7 @@ else
     *sysv5*)
 	AC_MSG_RESULT(Using UnixWare ACLs)
 	AC_DEFINE(HAVE_UNIXWARE_ACLS, 1, [true if you have UnixWare ACLs])
-	AC_DEFINE(SUPPORT_ACLS, 1)
+	AC_DEFINE(SUPPORT_ACLS, 1, [Define to 1 to add support for ACLs])
 	;;
     *solaris*|*cygwin*)
 	AC_MSG_RESULT(Using solaris ACLs)
@@ -882,7 +882,6 @@ samba_cv_HAVE_ACL_GET_PERM_NP=yes,samba_cv_HAVE_ACL_GET_PERM_NP=no)])
 		AC_MSG_ERROR(Failed to find ACL support)
 	    else
 		AC_MSG_RESULT(No ACL support found)
-		AC_DEFINE(SUPPORT_ACLS, 0, [Define to 1 to add support for ACLs])
 	    fi
 	fi
 	;;
