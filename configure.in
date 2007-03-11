@@ -824,31 +824,36 @@ AC_ARG_ENABLE(acl-support,
 if test x"$enable_acl_support" = x"no"; then
     AC_MSG_RESULT(no)
 else
-    AC_DEFINE(SUPPORT_ACLS, 1, [Define to 1 to add support for ACLs])
     case "$host_os" in
     *sysv5*)
 	AC_MSG_RESULT(Using UnixWare ACLs)
 	AC_DEFINE(HAVE_UNIXWARE_ACLS, 1, [true if you have UnixWare ACLs])
+	AC_DEFINE(SUPPORT_ACLS, 1)
 	;;
     *solaris*|*cygwin*)
 	AC_MSG_RESULT(Using solaris ACLs)
 	AC_DEFINE(HAVE_SOLARIS_ACLS, 1, [true if you have solaris ACLs])
+	AC_DEFINE(SUPPORT_ACLS, 1)
 	;;
     *hpux*)
 	AC_MSG_RESULT(Using HPUX ACLs)
 	AC_DEFINE(HAVE_HPUX_ACLS, 1, [true if you have HPUX ACLs])
+	AC_DEFINE(SUPPORT_ACLS, 1)
 	;;
     *irix*)
 	AC_MSG_RESULT(Using IRIX ACLs)
 	AC_DEFINE(HAVE_IRIX_ACLS, 1, [true if you have IRIX ACLs])
+	AC_DEFINE(SUPPORT_ACLS, 1)
 	;;
     *aix*)
 	AC_MSG_RESULT(Using AIX ACLs)
 	AC_DEFINE(HAVE_AIX_ACLS, 1, [true if you have AIX ACLs])
+	AC_DEFINE(SUPPORT_ACLS, 1)
 	;;
     *osf*)
 	AC_MSG_RESULT(Using Tru64 ACLs)
 	AC_DEFINE(HAVE_TRU64_ACLS, 1, [true if you have Tru64 ACLs])
+	AC_DEFINE(SUPPORT_ACLS, 1)
 	LIBS="$LIBS -lpacl"
 	;;
     *)
@@ -863,6 +868,7 @@ samba_cv_HAVE_POSIX_ACLS=yes,samba_cv_HAVE_POSIX_ACLS=no)])
 	if test x"$samba_cv_HAVE_POSIX_ACLS" = x"yes"; then
 	    AC_MSG_RESULT(Using posix ACLs)
 	    AC_DEFINE(HAVE_POSIX_ACLS, 1, [true if you have posix ACLs])
+	    AC_DEFINE(SUPPORT_ACLS, 1)
 	    AC_CACHE_CHECK([for acl_get_perm_np],samba_cv_HAVE_ACL_GET_PERM_NP,[
 		AC_TRY_LINK([#include <sys/types.h>
 #include <sys/acl.h>],
@@ -872,9 +878,11 @@ samba_cv_HAVE_ACL_GET_PERM_NP=yes,samba_cv_HAVE_ACL_GET_PERM_NP=no)])
 		AC_DEFINE(HAVE_ACL_GET_PERM_NP, 1, [true if you have acl_get_perm_np])
 	    fi
 	else
-	    AC_MSG_ERROR(Failed to find ACL support)
-	    if test x"$enable_acl_support" != x"yes"; then
-		AC_DEFINE(SUPPORT_ACLS, 0)
+	    if test x"$enable_acl_support" = x"yes"; then
+		AC_MSG_ERROR(Failed to find ACL support)
+	    else
+		AC_MSG_RESULT(No ACL support found)
+		AC_DEFINE(SUPPORT_ACLS, 0, [Define to 1 to add support for ACLs])
 	    fi
 	fi
 	;;
