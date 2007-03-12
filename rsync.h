@@ -42,20 +42,20 @@
 
 #define XMIT_TOP_DIR (1<<0)
 #define XMIT_SAME_MODE (1<<1)
-#define XMIT_EXTENDED_FLAGS (1<<2)
-#define XMIT_SAME_RDEV_pre28 XMIT_EXTENDED_FLAGS /* protocols < 28 */
+#define XMIT_SAME_RDEV_pre28 (1<<2)	/* protocols 20 - 27  */
+#define XMIT_EXTENDED_FLAGS (1<<2)	/* protocols 28 - NOW */
 #define XMIT_SAME_UID (1<<3)
 #define XMIT_SAME_GID (1<<4)
 #define XMIT_SAME_NAME (1<<5)
 #define XMIT_LONG_NAME (1<<6)
 #define XMIT_SAME_TIME (1<<7)
-#define XMIT_SAME_RDEV_MAJOR (1<<8)
-#define XMIT_HLINKED (1<<9)
-#define XMIT_SAME_DEV_pre30 (1<<10)	/* protocols < 30 */
-#define XMIT_HLINK_FIRST (1<<10)	/* protocols >= 30 */
-#define XMIT_RDEV_MINOR_IS_SMALL (1<<11)
-#define XMIT_USER_NAME_FOLLOWS (1<<12)	/* protocols >= 30 */
-#define XMIT_GROUP_NAME_FOLLOWS (1<<13) /* protocols >= 30 */
+#define XMIT_SAME_RDEV_MAJOR (1<<8)	/* protocols 28 - NOW */
+#define XMIT_HLINKED (1<<9)		/* protocols 28 - NOW */
+#define XMIT_SAME_DEV_pre30 (1<<10)	/* protocols 28 - 29  */
+#define XMIT_USER_NAME_FOLLOWS (1<<10)	/* protocols 30 - NOW */
+#define XMIT_RDEV_MINOR_8_pre30 (1<<11)	/* protocols 28 - 29  */
+#define XMIT_GROUP_NAME_FOLLOWS (1<<11) /* protocols 30 - NOW */
+#define XMIT_HLINK_FIRST (1<<12)	/* protocols 30 - NOW */
 
 /* These flags are used in the live flist data. */
 

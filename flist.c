@@ -383,8 +383,8 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 				flags |= XMIT_SAME_RDEV_MAJOR;
 			else
 				rdev_major = major(rdev);
-			if ((uint32)minor(rdev) <= 0xFFu)
-				flags |= XMIT_RDEV_MINOR_IS_SMALL;
+			if (protocol_version < 30 && (uint32)minor(rdev) <= 0xFFu)
+				flags |= XMIT_RDEV_MINOR_8_pre30;
 		}
 	} else if (protocol_version < 28)
 		rdev = MAKEDEV(0, 0);
@@ -484,19 +484,27 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 	if (!(flags & XMIT_SAME_MODE))
 		write_int(f, to_wire_mode(mode));
 	if (preserve_uid && !(flags & XMIT_SAME_UID)) {
-		write_abbrevint30(f, uid);
-		if (flags & XMIT_USER_NAME_FOLLOWS) {
-			int len = strlen(user_name);
-			write_byte(f, len);
-			write_buf(f, user_name, len);
+		if (protocol_version < 30)
+			write_int(f, uid);
+		else {
+			write_abbrevint(f, uid);
+			if (flags & XMIT_USER_NAME_FOLLOWS) {
+				int len = strlen(user_name);
+				write_byte(f, len);
+				write_buf(f, user_name, len);
+			}
 		}
 	}
 	if (preserve_gid && !(flags & XMIT_SAME_GID)) {
-		write_abbrevint30(f, gid);
-		if (flags & XMIT_GROUP_NAME_FOLLOWS) {
-			int len = strlen(group_name);
-			write_byte(f, len);
-			write_buf(f, group_name, len);
+		if (protocol_version < 30)
+			write_int(f, gid);
+		else {
+			write_abbrevint(f, gid);
+			if (flags & XMIT_GROUP_NAME_FOLLOWS) {
+				int len = strlen(group_name);
+				write_byte(f, len);
+				write_buf(f, group_name, len);
+			}
 		}
 	}
 	if ((preserve_devices && IS_DEVICE(mode))
@@ -506,8 +514,10 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 				write_int(f, (int)rdev);
 		} else {
 			if (!(flags & XMIT_SAME_RDEV_MAJOR))
-				write_int(f, major(rdev));
-			if (flags & XMIT_RDEV_MINOR_IS_SMALL)
+				write_abbrevint30(f, major(rdev));
+			if (protocol_version >= 30)
+				write_abbrevint(f, minor(rdev));
+			else if (flags & XMIT_RDEV_MINOR_8_pre30)
 				write_byte(f, minor(rdev));
 			else
 				write_int(f, minor(rdev));
@@ -662,18 +672,26 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		mode = tweak_mode(mode, chmod_modes);
 
 	if (preserve_uid && !(flags & XMIT_SAME_UID)) {
-		uid = (uid_t)read_abbrevint30(f);
-		if (flags & XMIT_USER_NAME_FOLLOWS)
-			uid = recv_user_name(f, uid);
-		else if (inc_recurse && am_root && !numeric_ids)
-			uid = match_uid(uid);
+		if (protocol_version < 30)
+			uid = (uid_t)read_int(f);
+		else {
+			uid = (uid_t)read_abbrevint(f);
+			if (flags & XMIT_USER_NAME_FOLLOWS)
+				uid = recv_user_name(f, uid);
+			else if (inc_recurse && am_root && !numeric_ids)
+				uid = match_uid(uid);
+		}
 	}
 	if (preserve_gid && !(flags & XMIT_SAME_GID)) {
-		gid = (gid_t)read_abbrevint30(f);
-		if (flags & XMIT_GROUP_NAME_FOLLOWS)
-			gid = recv_group_name(f, gid);
-		else if (inc_recurse && (!am_root || !numeric_ids))
-			gid = match_gid(gid);
+		if (protocol_version < 30)
+			gid = (gid_t)read_int(f);
+		else {
+			gid = (gid_t)read_abbrevint(f);
+			if (flags & XMIT_GROUP_NAME_FOLLOWS)
+				gid = recv_group_name(f, gid);
+			else if (inc_recurse && (!am_root || !numeric_ids))
+				gid = match_gid(gid);
+		}
 	}
 
 	if ((preserve_devices && IS_DEVICE(mode))
@@ -684,8 +702,10 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		} else {
 			uint32 rdev_minor;
 			if (!(flags & XMIT_SAME_RDEV_MAJOR))
-				rdev_major = read_int(f);
-			if (flags & XMIT_RDEV_MINOR_IS_SMALL)
+				rdev_major = read_abbrevint30(f);
+			if (protocol_version >= 30)
+				rdev_minor = read_abbrevint(f);
+			else if (flags & XMIT_RDEV_MINOR_8_pre30)
 				rdev_minor = read_byte(f);
 			else
 				rdev_minor = read_int(f);
