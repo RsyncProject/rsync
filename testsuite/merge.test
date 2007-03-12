@@ -46,7 +46,7 @@ $RSYNC -av --protocol=29 --existing -f 'exclude,! */' "$from2dir/" "$from3dir/"
 $RSYNC -av --protocol=29 --existing -f 'exclude,! */' "$from1dir/" "$chkdir/"
 $RSYNC -av --protocol=29 --existing -f 'exclude,! */' "$from3dir/" "$chkdir/"
 
-checkit "$RSYNC -aHvv --protocol=29 \"$from1dir/\" \"$from2dir/\" \"$from3dir/\" \"$todir/\"" "$chkdir" "$todir"
+checkit "$RSYNC -aHvv \"$from1dir/\" \"$from2dir/\" \"$from3dir/\" \"$todir/\"" "$chkdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
