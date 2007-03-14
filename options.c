@@ -90,6 +90,7 @@ char *filesfrom_host = NULL;
 int eol_nulls = 0;
 int human_readable = 0;
 int recurse = 0;
+int allow_inc_recurse = 1;
 int xfer_dirs = -1;
 int am_daemon = 0;
 int daemon_over_rsh = 0;
@@ -422,6 +423,10 @@ static struct poptOption long_options[] = {
   {"archive",         'a', POPT_ARG_NONE,   0, 'a', 0, 0 },
   {"recursive",       'r', POPT_ARG_VAL,    &recurse, 2, 0, 0 },
   {"no-recursive",     0,  POPT_ARG_VAL,    &recurse, 0, 0, 0 },
+  {"ir",               0,  POPT_ARG_VAL,    &allow_inc_recurse, 1, 0, 0 },
+  {"inc-recursive",    0,  POPT_ARG_VAL,    &allow_inc_recurse, 1, 0, 0 },
+  {"no-ir",            0,  POPT_ARG_VAL,    &allow_inc_recurse, 0, 0, 0 },
+  {"no-inc-recursive", 0,  POPT_ARG_VAL,    &allow_inc_recurse, 0, 0, 0 },
   {"no-r",             0,  POPT_ARG_VAL,    &recurse, 0, 0, 0 },
   {"dirs",            'd', POPT_ARG_VAL,    &xfer_dirs, 2, 0, 0 },
   {"no-dirs",          0,  POPT_ARG_VAL,    &xfer_dirs, 0, 0, 0 },

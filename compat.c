@@ -31,6 +31,7 @@ extern int am_sender;
 extern int local_server;
 extern int inplace;
 extern int recurse;
+extern int allow_inc_recurse;
 extern int fuzzy_basis;
 extern int read_batch;
 extern int max_delete;
@@ -160,8 +161,9 @@ void setup_protocol(int f_out,int f_in)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 	} else if (protocol_version >= 30) {
-		if (recurse && !preserve_hard_links && !delete_before
-		 && !delete_after && !delay_updates && !prune_empty_dirs)
+		if (recurse && allow_inc_recurse && !preserve_hard_links
+		 && !delete_before && !delete_after && !delay_updates
+		 && !prune_empty_dirs)
 			inc_recurse = 1;
 		need_messages_from_generator = 1;
 	}
