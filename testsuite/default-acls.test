@@ -20,8 +20,6 @@ true) test_skipped "I don't know how to use your setfacl command" ;;
 esac
 setfacl $opts "$scratchdir" || test_skipped "Your filesystem has ACLs disabled"
 
-test_skipped "Skipping temporarily due to compile-farm timeouts"
-
 # Call as: testit <dirname> <default-acl> <file-expected> <program-expected>
 testit() {
     todir="$scratchdir/$1"
