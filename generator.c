@@ -1902,8 +1902,10 @@ void generate_files(int f_out, const char *local_name)
 			break;
 		}
 
-		while (!cur_flist->next && !flist_eof) {
+		while (1) {
 			check_for_finished_files(itemizing, code, 1);
+			if (cur_flist->next || flist_eof)
+				break;
 			wait_for_receiver();
 		}
 	} while ((cur_flist = cur_flist->next) != NULL);
@@ -1914,8 +1916,10 @@ void generate_files(int f_out, const char *local_name)
 	if (verbose > 2)
 		rprintf(FINFO, "generate_files phase=%d\n", phase);
 
-	while (!msgdone_cnt) {
+	while (1) {
 		check_for_finished_files(itemizing, code, 1);
+		if (msgdone_cnt)
+			break;
 		wait_for_receiver();
 	}
 
@@ -1929,8 +1933,10 @@ void generate_files(int f_out, const char *local_name)
 		write_ndx(f_out, NDX_DONE);
 
 	/* Read MSG_DONE for the redo phase (and any prior messages). */
-	while (msgdone_cnt <= 1) {
+	while (1) {
 		check_for_finished_files(itemizing, code, 0);
+		if (msgdone_cnt > 1)
+			break;
 		wait_for_receiver();
 	}
 
