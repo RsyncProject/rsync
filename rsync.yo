@@ -725,7 +725,7 @@ which point outside the copied tree. All absolute symlinks are
 also ignored. Using this option in conjunction with bf(--relative) may
 give unexpected results.
 
-dit(bf(-K, --copy-dirlinks)) This option causes the sending side to treat
+dit(bf(-k, --copy-dirlinks)) This option causes the sending side to treat
 a symlink to a directory as though it were a real directory.  This is
 useful if you don't want symlinks to non-directories to be affected, as
 they would be using bf(--copy-links).
