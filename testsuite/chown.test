@@ -36,9 +36,8 @@ chown 5001 "$name2" || test_skipped "Can't chown (probably need root)"
 chgrp 5002 "$name1" || test_skipped "Can't chgrp (probably need root)"
 chgrp 5003 "$name2" || test_skipped "Can't chgrp (probably need root)"
 
-# This makes sure that multi-file, non-dir, relative transfers work.
 cd "$fromdir/.."
-checkit "$RSYNC -aHvv from/* to/" "$fromdir" "$todir"
+checkit "$RSYNC -aHvv from/ to/" "$fromdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
