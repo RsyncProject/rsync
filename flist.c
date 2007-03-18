@@ -1336,7 +1336,7 @@ void send_extra_file_list(int f, int at_least)
 	int64 start_write;
 	int future_cnt, save_io_error = io_error;
 
-	if (send_dir_ndx < 0)
+	if (flist_eof)
 		return;
 
 	/* Keep sending data until we have the requested number of
@@ -1491,18 +1491,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				   && (len == 1 || fbuf[len-2] == '/');
 		}
 
-		if (link_stat(fbuf, &st, copy_dirlinks) != 0) {
-			io_error |= IOERR_GENERAL;
-			rsyserr(FERROR, errno, "link_stat %s failed",
-				full_fname(fbuf));
-			continue;
-		}
-
-		if (S_ISDIR(st.st_mode) && !xfer_dirs) {
-			rprintf(FINFO, "skipping directory %s\n", fbuf);
-			continue;
-		}
-
 		dir = NULL;
 
 		if (!relative_paths) {
@@ -1588,6 +1576,18 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 		if (fn != fbuf)
 			memmove(fbuf, fn, len + 1);
+
+		if (link_stat(fbuf, &st, copy_dirlinks) != 0) {
+			io_error |= IOERR_GENERAL;
+			rsyserr(FERROR, errno, "link_stat %s failed",
+				full_fname(fbuf));
+			continue;
+		}
+
+		if (S_ISDIR(st.st_mode) && !xfer_dirs) {
+			rprintf(FINFO, "skipping directory %s\n", fbuf);
+			continue;
+		}
 
 		if (implied_dirs && (p=strrchr(fbuf,'/')) && p != fbuf) {
 			/* Send the implied directories at the start of the
@@ -1689,14 +1689,15 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 	if (inc_recurse) {
 		add_dirs_to_tree(-1, 0, dir_flist->count - 1);
-		if (file_total == 1) {
+		if (send_dir_ndx < 0) {
+			write_ndx(f, NDX_FLIST_EOF);
+			flist_eof = 1;
+		}
+		else if (file_total == 1) {
 			/* If we're creating incremental file-lists and there
 			 * was just 1 item in the first file-list, send 1 more
 			 * file-list to check if this is a 1-file xfer. */
-			if (send_dir_ndx < 0)
-				write_ndx(f, NDX_DONE);
-			else
-				send_extra_file_list(f, 1);
+			send_extra_file_list(f, 1);
 		}
 	}
 
@@ -1805,7 +1806,7 @@ void recv_additional_file_list(int f)
 {
 	struct file_list *flist;
 	int ndx = read_ndx(f);
-	if (ndx == NDX_DONE) {
+	if (ndx == NDX_FLIST_EOF) {
 		flist_eof = 1;
 		change_local_filter_dir(NULL, 0, 0);
 	} else {
