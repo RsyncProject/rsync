@@ -56,11 +56,11 @@ void get_checksum2(char *buf, int32 len, char *sum)
 	if (protocol_version >= 30) {
 		uchar seedbuf[4];
 		md5_begin(&m);
+		md5_update(&m, (uchar *)buf, len);
 		if (checksum_seed) {
 			SIVAL(seedbuf, 0, checksum_seed);
 			md5_update(&m, seedbuf, 4);
 		}
-		md5_update(&m, (uchar *)buf, len);
 		md5_result(&m, (uchar *)sum);
 	} else {
 		int32 i;
