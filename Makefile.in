@@ -27,7 +27,7 @@ VERSION=@VERSION@
 .SUFFIXES: .c .o
 
 HEADERS=byteorder.h config.h errcode.h proto.h rsync.h smb_acls.h lib/pool_alloc.h
-LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o \
+LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o lib/md5.o \
 	lib/permstring.o lib/pool_alloc.o lib/sysacls.o @LIBOBJS@
 ZLIBOBJ=zlib/deflate.o zlib/inffast.o zlib/inflate.o zlib/inftrees.o \
 	zlib/trees.o zlib/zutil.o zlib/adler32.o zlib/compress.o zlib/crc32.o

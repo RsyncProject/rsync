@@ -1159,7 +1159,7 @@ void read_sum_head(int f, struct sum_struct *sum)
 		exit_cleanup(RERR_PROTOCOL);
 	}
 	sum->s2length = protocol_version < 27 ? csum_length : (int)read_int(f);
-	if (sum->s2length < 0 || sum->s2length > MD4_SUM_LENGTH) {
+	if (sum->s2length < 0 || sum->s2length > MAX_DIGEST_LEN) {
 		rprintf(FERROR, "Invalid checksum length %d [%s]\n",
 			sum->s2length, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);

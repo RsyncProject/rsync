@@ -57,8 +57,9 @@ void base64_encode(const char *buf, int len, char *out, int pad)
 static void gen_challenge(const char *addr, char *challenge)
 {
 	char input[32];
-	char md4_out[MD4_SUM_LENGTH];
+	char digest[MAX_DIGEST_LEN];
 	struct timeval tv;
+	int len;
 
 	memset(input, 0, sizeof input);
 
@@ -70,9 +71,9 @@ static void gen_challenge(const char *addr, char *challenge)
 
 	sum_init(0);
 	sum_update(input, sizeof input);
-	sum_end(md4_out);
+	len = sum_end(digest);
 
-	base64_encode(md4_out, MD4_SUM_LENGTH, challenge, 0);
+	base64_encode(digest, len, challenge, 0);
 }
 
 
@@ -205,14 +206,15 @@ static const char *getpassf(const char *filename)
  * and the challenge string and return it base64-encoded. */
 static void generate_hash(const char *in, const char *challenge, char *out)
 {
-	char buf[MD4_SUM_LENGTH];
+	char buf[MAX_DIGEST_LEN];
+	int len;
 
 	sum_init(0);
 	sum_update(in, strlen(in));
 	sum_update(challenge, strlen(challenge));
-	sum_end(buf);
+	len = sum_end(buf);
 
-	base64_encode(buf, MD4_SUM_LENGTH, out, 0);
+	base64_encode(buf, len, out, 0);
 }
 
 /* Possibly negotiate authentication with the client.  Use "leader" to
@@ -225,10 +227,10 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 		  const char *addr, const char *leader)
 {
 	char *users = lp_auth_users(module);
-	char challenge[MD4_SUM_LENGTH*2];
+	char challenge[MAX_DIGEST_LEN*2];
 	char line[BIGPATHBUFLEN];
 	char secret[512];
-	char pass2[MD4_SUM_LENGTH*2];
+	char pass2[MAX_DIGEST_LEN*2];
 	char *tok, *pass;
 
 	/* if no auth list then allow anyone in! */
@@ -289,7 +291,7 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 void auth_client(int fd, const char *user, const char *challenge)
 {
 	const char *pass;
-	char pass2[MD4_SUM_LENGTH*2];
+	char pass2[MAX_DIGEST_LEN*2];
 
 	if (!user || !*user)
 		user = "nobody";

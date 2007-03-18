@@ -303,7 +303,8 @@ static void hash_search(int f,struct sum_struct *s,
  **/
 void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 {
-	char file_sum[MD4_SUM_LENGTH];
+	char file_sum[MAX_DIGEST_LEN];
+	int sum_len;
 
 	last_match = 0;
 	false_alarms = 0;
@@ -323,10 +324,10 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 			last_match = j;
 		}
 		if (last_match < s->flength) {
-			int32 len = (int32)(s->flength - last_match);
+			int32 n = (int32)(s->flength - last_match);
 			if (buf && do_progress)
 				show_progress(last_match, buf->file_size);
-			sum_update(map_ptr(buf, last_match, len), len);
+			sum_update(map_ptr(buf, last_match, n), n);
 			last_match = s->flength;
 		}
 		s->count = 0;
@@ -338,7 +339,7 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 		if (verbose > 2)
 			rprintf(FINFO,"built hash table\n");
 
-		hash_search(f,s,buf,len);
+		hash_search(f, s, buf, len);
 
 		if (verbose > 2)
 			rprintf(FINFO,"done hash search\n");
@@ -350,14 +351,14 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 		matched(f, s, buf, len, -1);
 	}
 
-	sum_end(file_sum);
+	sum_len = sum_end(file_sum);
 	/* If we had a read error, send a bad checksum. */
 	if (buf && buf->status != 0)
 		file_sum[0]++;
 
 	if (verbose > 2)
 		rprintf(FINFO,"sending file_sum\n");
-	write_buf(f,file_sum,MD4_SUM_LENGTH);
+	write_buf(f, file_sum, sum_len);
 
 	if (verbose > 2)
 		rprintf(FINFO, "false_alarms=%d hash_hits=%d matches=%d\n",

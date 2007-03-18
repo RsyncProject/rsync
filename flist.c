@@ -85,9 +85,9 @@ static dev_t tmp_rdev;
 #ifdef SUPPORT_HARD_LINKS
 static int64 tmp_dev, tmp_ino;
 #endif
-static char tmp_sum[MD4_SUM_LENGTH];
+static char tmp_sum[MAX_DIGEST_LEN];
 
-static char empty_sum[MD4_SUM_LENGTH];
+static char empty_sum[MAX_DIGEST_LEN];
 static int flist_count_offset; /* for --delete --progress */
 
 static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
@@ -99,7 +99,9 @@ void init_flist(void)
 		rprintf(FINFO, "FILE_STRUCT_LEN=%d, EXTRA_LEN=%d\n",
 			(int)FILE_STRUCT_LEN, (int)EXTRA_LEN);
 	}
-	checksum_len = protocol_version < 21 ? 2 : MD4_SUM_LENGTH;
+	checksum_len = protocol_version < 21 ? 2
+		     : protocol_version < 30 ? MD4_DIGEST_LEN
+		     : MD5_DIGEST_LEN;
 }
 
 static int show_filelist_p(void)

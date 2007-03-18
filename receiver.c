@@ -125,11 +125,11 @@ int get_tmpname(char *fnametmp, char *fname)
 static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 			char *fname, int fd, OFF_T total_size)
 {
-	static char file_sum1[MD4_SUM_LENGTH];
-	static char file_sum2[MD4_SUM_LENGTH];
+	static char file_sum1[MAX_DIGEST_LEN];
+	static char file_sum2[MAX_DIGEST_LEN];
 	struct map_struct *mapbuf;
 	struct sum_struct sum;
-	int32 len;
+	int32 len, sum_len;
 	OFF_T offset = 0;
 	OFF_T offset2;
 	char *data;
@@ -257,15 +257,15 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		exit_cleanup(RERR_FILEIO);
 	}
 
-	sum_end(file_sum1);
+	sum_len = sum_end(file_sum1);
 
 	if (mapbuf)
 		unmap_file(mapbuf);
 
-	read_buf(f_in,file_sum2,MD4_SUM_LENGTH);
+	read_buf(f_in, file_sum2, sum_len);
 	if (verbose > 2)
 		rprintf(FINFO,"got file_sum\n");
-	if (fd != -1 && memcmp(file_sum1, file_sum2, MD4_SUM_LENGTH) != 0)
+	if (fd != -1 && memcmp(file_sum1, file_sum2, sum_len) != 0)
 		return 0;
 	return 1;
 }

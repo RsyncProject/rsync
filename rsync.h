@@ -517,8 +517,6 @@ struct idev_node {
 #define MAXHOSTNAMELEN 256
 #endif
 
-/* the length of the md4 checksum */
-#define MD4_SUM_LENGTH 16
 #define SUM_LENGTH 16
 #define SHORT_SUM_LENGTH 2
 #define BLOCKSUM_BIAS 10
@@ -575,7 +573,7 @@ extern int preserve_acls;
 #define FILE_STRUCT_LEN (offsetof(struct file_struct, basename))
 #define EXTRA_LEN (sizeof (union file_extras))
 #define PTR_EXTRA_LEN ((sizeof (char *) + EXTRA_LEN - 1) / EXTRA_LEN)
-#define SUM_EXTRA_CNT ((MD4_SUM_LENGTH + EXTRA_LEN - 1) / EXTRA_LEN)
+#define SUM_EXTRA_CNT ((MAX_DIGEST_LEN + EXTRA_LEN - 1) / EXTRA_LEN)
 
 #define REQ_EXTRA(f,ndx) ((union file_extras*)(f) - (ndx))
 #define OPT_EXTRA(f,bump) ((union file_extras*)(f) - file_extra_cnt - 1 - (bump))
@@ -772,7 +770,7 @@ typedef struct {
 	(type*)expand_item_list(lp, sizeof (type), #type, incr)
 
 #include "byteorder.h"
-#include "lib/mdfour.h"
+#include "lib/mdigest.h"
 #include "lib/wildmatch.h"
 #include "lib/permstring.h"
 #include "lib/addrinfo.h"

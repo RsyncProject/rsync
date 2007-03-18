@@ -4,7 +4,7 @@
  * An implementation of MD4 designed for use in the SMB authentication protocol.
  *
  * Copyright (C) 1997-1998 Andrew Tridgell
- * Copyright (C) 2005 Wayne Davison
+ * Copyright (C) 2005-2007 Wayne Davison
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@
  *
  * It assumes that a int is at least 32 bits long. */
 
-static struct mdfour *m;
+static md_context *m;
 
 #define MASK32 (0xffffffff)
 
@@ -49,32 +49,31 @@ static void mdfour64(uint32 *M)
 	A = m->A; B = m->B; C = m->C; D = m->D; 
 	AA = A; BB = B; CC = C; DD = D;
 
-        ROUND1(A,B,C,D,  0,  3);  ROUND1(D,A,B,C,  1,  7);  
+	ROUND1(A,B,C,D,  0,  3);  ROUND1(D,A,B,C,  1,  7);  
 	ROUND1(C,D,A,B,  2, 11);  ROUND1(B,C,D,A,  3, 19);
-        ROUND1(A,B,C,D,  4,  3);  ROUND1(D,A,B,C,  5,  7);  
+	ROUND1(A,B,C,D,  4,  3);  ROUND1(D,A,B,C,  5,  7);  
 	ROUND1(C,D,A,B,  6, 11);  ROUND1(B,C,D,A,  7, 19);
-        ROUND1(A,B,C,D,  8,  3);  ROUND1(D,A,B,C,  9,  7);  
+	ROUND1(A,B,C,D,  8,  3);  ROUND1(D,A,B,C,  9,  7);  
 	ROUND1(C,D,A,B, 10, 11);  ROUND1(B,C,D,A, 11, 19);
-        ROUND1(A,B,C,D, 12,  3);  ROUND1(D,A,B,C, 13,  7);  
+	ROUND1(A,B,C,D, 12,  3);  ROUND1(D,A,B,C, 13,  7);  
 	ROUND1(C,D,A,B, 14, 11);  ROUND1(B,C,D,A, 15, 19);	
 
-
-        ROUND2(A,B,C,D,  0,  3);  ROUND2(D,A,B,C,  4,  5);  
+	ROUND2(A,B,C,D,  0,  3);  ROUND2(D,A,B,C,  4,  5);  
 	ROUND2(C,D,A,B,  8,  9);  ROUND2(B,C,D,A, 12, 13);
-        ROUND2(A,B,C,D,  1,  3);  ROUND2(D,A,B,C,  5,  5);  
+	ROUND2(A,B,C,D,  1,  3);  ROUND2(D,A,B,C,  5,  5);  
 	ROUND2(C,D,A,B,  9,  9);  ROUND2(B,C,D,A, 13, 13);
-        ROUND2(A,B,C,D,  2,  3);  ROUND2(D,A,B,C,  6,  5);  
+	ROUND2(A,B,C,D,  2,  3);  ROUND2(D,A,B,C,  6,  5);  
 	ROUND2(C,D,A,B, 10,  9);  ROUND2(B,C,D,A, 14, 13);
-        ROUND2(A,B,C,D,  3,  3);  ROUND2(D,A,B,C,  7,  5);  
+	ROUND2(A,B,C,D,  3,  3);  ROUND2(D,A,B,C,  7,  5);  
 	ROUND2(C,D,A,B, 11,  9);  ROUND2(B,C,D,A, 15, 13);
 
 	ROUND3(A,B,C,D,  0,  3);  ROUND3(D,A,B,C,  8,  9);  
 	ROUND3(C,D,A,B,  4, 11);  ROUND3(B,C,D,A, 12, 15);
-        ROUND3(A,B,C,D,  2,  3);  ROUND3(D,A,B,C, 10,  9);  
+	ROUND3(A,B,C,D,  2,  3);  ROUND3(D,A,B,C, 10,  9);  
 	ROUND3(C,D,A,B,  6, 11);  ROUND3(B,C,D,A, 14, 15);
-        ROUND3(A,B,C,D,  1,  3);  ROUND3(D,A,B,C,  9,  9);  
+	ROUND3(A,B,C,D,  1,  3);  ROUND3(D,A,B,C,  9,  9);  
 	ROUND3(C,D,A,B,  5, 11);  ROUND3(B,C,D,A, 13, 15);
-        ROUND3(A,B,C,D,  3,  3);  ROUND3(D,A,B,C, 11,  9);  
+	ROUND3(A,B,C,D,  3,  3);  ROUND3(D,A,B,C, 11,  9);  
 	ROUND3(C,D,A,B,  7, 11);  ROUND3(B,C,D,A, 15, 15);
 
 	A += AA; B += BB; 
@@ -86,16 +85,17 @@ static void mdfour64(uint32 *M)
 	m->A = A; m->B = B; m->C = C; m->D = D;
 }
 
-static void copy64(uint32 *M, unsigned char *in)
+static void copy64(uint32 *M, const uchar *in)
 {
 	int i;
 
-	for (i=0;i<16;i++)
-		M[i] = (in[i*4+3]<<24) | (in[i*4+2]<<16) |
-			(in[i*4+1]<<8) | (in[i*4+0]<<0);
+	for (i = 0; i < MD4_DIGEST_LEN; i++) {
+		M[i] = (in[i*4+3] << 24) | (in[i*4+2] << 16)
+		     | (in[i*4+1] << 8)  | (in[i*4+0] << 0);
+	}
 }
 
-static void copy4(unsigned char *out,uint32 x)
+static void copy4(uchar *out,uint32 x)
 {
 	out[0] = x&0xFF;
 	out[1] = (x>>8)&0xFF;
@@ -103,7 +103,7 @@ static void copy4(unsigned char *out,uint32 x)
 	out[3] = (x>>24)&0xFF;
 }
 
-void mdfour_begin(struct mdfour *md)
+void mdfour_begin(md_context *md)
 {
 	md->A = 0x67452301;
 	md->B = 0xefcdab89;
@@ -113,27 +113,26 @@ void mdfour_begin(struct mdfour *md)
 	md->totalN2 = 0;
 }
 
-
-static void mdfour_tail(unsigned char *in, uint32 n)
+static void mdfour_tail(const uchar *in, uint32 length)
 {
-	unsigned char buf[128];
+	uchar buf[128];
 	uint32 M[16];
 	extern int protocol_version;
 
 	/*
 	 * Count total number of bits, modulo 2^64
 	 */
-	m->totalN += n << 3;
-	if (m->totalN < (n << 3)) {
+	m->totalN += length << 3;
+	if (m->totalN < (length << 3))
 		m->totalN2++;
-	}
-	m->totalN2 += n >> 29;
+	m->totalN2 += length >> 29;
 
 	memset(buf, 0, 128);
-	if (n) memcpy(buf, in, n);
-	buf[n] = 0x80;
+	if (length)
+		memcpy(buf, in, length);
+	buf[length] = 0x80;
 
-	if (n <= 55) {
+	if (length <= 55) {
 		copy4(buf+56, m->totalN);
 		/*
 		 * Prior to protocol version 27 only the number of bits
@@ -141,9 +140,8 @@ static void mdfour_tail(unsigned char *in, uint32 n)
 		 * of bits modulo 2^64, which was fixed starting with
 		 * protocol version 27.
 		 */
-		if (protocol_version >= 27) {
+		if (protocol_version >= 27)
 			copy4(buf+60, m->totalN2);
-		}
 		copy64(M, buf);
 		mdfour64(M);
 	} else {
@@ -154,9 +152,8 @@ static void mdfour_tail(unsigned char *in, uint32 n)
 		 * of bits modulo 2^64, which was fixed starting with
 		 * protocol version 27.
 		 */
-		if (protocol_version >= 27) {
+		if (protocol_version >= 27)
 			copy4(buf+124, m->totalN2); 
-		}
 		copy64(M, buf);
 		mdfour64(M);
 		copy64(M, buf+64);
@@ -164,46 +161,45 @@ static void mdfour_tail(unsigned char *in, uint32 n)
 	}
 }
 
-void mdfour_update(struct mdfour *md, unsigned char *in, uint32 n)
+void mdfour_update(md_context *md, const uchar *in, uint32 length)
 {
 	uint32 M[16];
 
 	m = md;
 
-	if (n == 0) mdfour_tail(in, n);
+	if (length == 0)
+		mdfour_tail(in, length);
 
-	while (n >= 64) {
+	while (length >= 64) {
 		copy64(M, in);
 		mdfour64(M);
 		in += 64;
-		n -= 64;
+		length -= 64;
 		m->totalN += 64 << 3;
-		if (m->totalN < 64 << 3) {
+		if (m->totalN < 64 << 3)
 			m->totalN2++;
-		}
 	}
 
-	if (n) mdfour_tail(in, n);
+	if (length)
+		mdfour_tail(in, length);
 }
 
-
-void mdfour_result(struct mdfour *md, unsigned char *out)
+void mdfour_result(md_context *md, uchar digest[MD4_DIGEST_LEN])
 {
 	m = md;
 
-	copy4(out, m->A);
-	copy4(out+4, m->B);
-	copy4(out+8, m->C);
-	copy4(out+12, m->D);
+	copy4(digest, m->A);
+	copy4(digest+4, m->B);
+	copy4(digest+8, m->C);
+	copy4(digest+12, m->D);
 }
 
-
-void mdfour(unsigned char *out, unsigned char *in, int n)
+void mdfour(uchar digest[MD4_DIGEST_LEN], uchar *in, int length)
 {
-	struct mdfour md;
+	md_context md;
 	mdfour_begin(&md);
-	mdfour_update(&md, in, n);
-	mdfour_result(&md, out);
+	mdfour_update(&md, in, length);
+	mdfour_result(&md, digest);
 }
 
 #ifdef TEST_MDFOUR
@@ -212,8 +208,8 @@ int protocol_version = 28;
 static void file_checksum1(char *fname)
 {
 	int fd, i, was_multiple_of_64 = 1;
-	struct mdfour md;
-	unsigned char buf[64*1024], sum[16];
+	md_context md;
+	uchar buf[64*1024], sum[MD4_DIGEST_LEN];
 	
 	fd = open(fname,O_RDONLY);
 	if (fd == -1) {
@@ -224,7 +220,7 @@ static void file_checksum1(char *fname)
 	mdfour_begin(&md);
 
 	while (1) {
-		int n = read(fd, buf, sizeof(buf));
+		int n = read(fd, buf, sizeof buf);
 		if (n <= 0)
 			break;
 		was_multiple_of_64 = !(n % 64);
@@ -237,54 +233,15 @@ static void file_checksum1(char *fname)
 
 	mdfour_result(&md, sum);
 
-	for (i=0;i<16;i++)
+	for (i = 0; i < MD4_DIGEST_LEN; i++)
 		printf("%02X", sum[i]);
 	printf("\n");
 }
-
-#if 0
-#include "../md4.h"
-
-static void file_checksum2(char *fname)
-{
-	int fd, i;
-	MDstruct md;
-	unsigned char buf[64], sum[16];
-
-	fd = open(fname,O_RDONLY);
-	if (fd == -1) {
-		perror("fname");
-		exit(1);
-	}
-	
-	MDbegin(&md);
-
-	while (1) {
-		int n = read(fd, buf, sizeof(buf));
-		if (n <= 0) break;
-		MDupdate(&md, buf, n*8);
-	}
-
-	if (!md.done) {
-		MDupdate(&md, buf, 0);
-	}
-
-	close(fd);
-
-	memcpy(sum, md.buffer, 16);
-
-	for (i=0;i<16;i++)
-		printf("%02X", sum[i]);
-	printf("\n");
-}
-#endif
 
  int main(int argc, char *argv[])
 {
-	file_checksum1(argv[1]);
-#if 0
-	file_checksum2(argv[1]);
-#endif
+	while (--argc)
+		file_checksum1(*++argv);
 	return 0;
 }
 #endif
