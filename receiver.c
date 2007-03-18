@@ -123,7 +123,7 @@ int get_tmpname(char *fnametmp, char *fname)
 
 
 static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
-			char *fname, int fd, OFF_T total_size)
+			const char *fname, int fd, OFF_T total_size)
 {
 	static char file_sum1[MAX_DIGEST_LEN];
 	static char file_sum2[MAX_DIGEST_LEN];
