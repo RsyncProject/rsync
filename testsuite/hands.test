@@ -25,5 +25,12 @@ runtest "extra data" 'checkit "$RSYNC -avH --no-whole-file \"$fromdir/\" \"$todi
 cp "$fromdir/text" "$todir/ThisShouldGo"
 runtest " --delete" 'checkit "$RSYNC --delete -avH \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
 
+cd "$tmpdir"
+rm -rf to from/*dir
+
+# Do the real copy, touch up the parent-dir's time, and then check the copy.
+$RSYNC -av from/* to/
+checkit "$RSYNC -av --exclude='*' from/ to/" "$fromdir" "$todir"
+
 # The script would have aborted on error, so getting here means we've won.
 exit 0
