@@ -11,7 +11,7 @@
 # use the -F option, which is easier to type.)
 #
 # The downside is that you need to remember to re-run cvs2includes whenever
-# You add a new file to the project.
+# you add a new file to the project.
 use strict;
 
 open(FIND, 'find . -name CVS -type d |') or die $!;
@@ -31,7 +31,7 @@ while (<FIND>) {
     close ENTRIES;
     if (@includes) {
 	open(FILTER, ">$filter") or die "Unable to write $filter: $!\n";
-	print FILTER '+ /', join("\n+ /", @includes), "\n";
+	print FILTER map "+ /$_\n", @includes;
 	close FILTER;
 	print "Updated $filter\n";
     } elsif (-f $filter) {
