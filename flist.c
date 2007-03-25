@@ -337,8 +337,8 @@ int push_flist_dir(const char *dir, int len)
 
 	if (dir && !push_dir(dir, 0)) {
 		io_error |= IOERR_GENERAL;
-		rsyserr(FERROR, errno, "push_dir %s failed",
-			full_fname(dir));
+		rsyserr(FERROR, errno, "push_dir %s failed in %s",
+			full_fname(dir), curr_dir);
 		return 0;
 	}
 
@@ -1439,8 +1439,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	disable_buffering = io_start_buffering_out(f);
 	if (filesfrom_fd >= 0) {
 		if (argv[0] && !push_dir(argv[0], 0)) {
-			rsyserr(FERROR, errno, "push_dir %s failed",
-				full_fname(argv[0]));
+			rsyserr(FERROR, errno, "push_dir %s failed in %s",
+				full_fname(argv[0]), curr_dir);
 			exit_cleanup(RERR_FILESELECT);
 		}
 		use_ff_fd = 1;
@@ -1568,8 +1568,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			} else if (!push_flist_dir(lastdir, lastdir_len)) {
 			  push_error:
 				io_error |= IOERR_GENERAL;
-				rsyserr(FERROR, errno, "push_dir %s failed",
-					full_fname(dir));
+				rsyserr(FERROR, errno, "push_dir %s failed in %s",
+					full_fname(dir), curr_dir);
 				continue;
 			}
 		}
