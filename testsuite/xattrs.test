@@ -9,10 +9,6 @@
 
 $RSYNC --version | grep ", xattrs" >/dev/null || test_skipped "Rsync is configured without xattr support"
 
-case "$RSYNC" in
-*protocol=29*) test_skipped "xattr support requires protocol 30" ;;
-esac
-
 case "`xattr 2>&1`" in
 *--list:*)
     xset() {

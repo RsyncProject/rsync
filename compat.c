@@ -115,14 +115,14 @@ void setup_protocol(int f_out,int f_in)
 			    protocol_version);
 			exit_cleanup(RERR_PROTOCOL);
 		}
-		if (preserve_acls) {
+		if (preserve_acls && !local_server) {
 			rprintf(FERROR,
 			    "--acls requires protocol 30 or higher"
 			    " (negotiated %d).\n",
 			    protocol_version);
 			exit_cleanup(RERR_PROTOCOL);
 		}
-		if (preserve_xattrs) {
+		if (preserve_xattrs && !local_server) {
 			rprintf(FERROR,
 			    "--xattrs requires protocol 30 or higher"
 			    " (negotiated %d).\n",
