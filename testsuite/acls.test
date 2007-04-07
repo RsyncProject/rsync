@@ -10,7 +10,7 @@
 $RSYNC --version | grep ", ACLs" >/dev/null || test_skipped "Rsync is configured without ACL support"
 
 case "$RSYNC" in
-*protocol=29*) test_skipped "ACLs require protocol 30" ;;
+*protocol=29*) test_skipped "ACL support requires protocol 30" ;;
 esac
 
 case "$setfacl_nodef" in
