@@ -36,6 +36,7 @@ extern int relative_paths;
 extern int implied_dirs;
 extern int keep_dirlinks;
 extern int preserve_acls;
+extern int preserve_xattrs;
 extern int preserve_links;
 extern int preserve_devices;
 extern int preserve_specials;
@@ -532,11 +533,19 @@ int unchanged_attrs(const char *fname, struct file_struct *file, statx *sxp)
 			return 0;
 	}
 #endif
+#ifdef SUPPORT_XATTRS
+	if (preserve_xattrs) {
+		if (!XATTR_READY(*sxp))
+			get_xattr(fname, sxp);
+		if (xattr_diff(file, sxp, 0))
+			return 0;
+	}
+#endif
 
 	return 1;
 }
 
-void itemize(const char *fname, struct file_struct *file, int ndx, int statret,
+void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statret,
 	     statx *sxp, int32 iflags, uchar fnamecmp_type,
 	     const char *xname)
 {
@@ -562,16 +571,29 @@ void itemize(const char *fname, struct file_struct *file, int ndx, int statret,
 #ifdef SUPPORT_ACLS
 		if (preserve_acls && !S_ISLNK(file->mode)) {
 			if (!ACL_READY(*sxp))
-				get_acl(fname, sxp);
+				get_acl(fnamecmp, sxp);
 			if (set_acl(NULL, file, sxp) == 0)
 				iflags |= ITEM_REPORT_ACL;
 		}
 #endif
-	} else
+#ifdef SUPPORT_XATTRS
+		if (preserve_xattrs) {
+			if (!XATTR_READY(*sxp))
+				get_xattr(fnamecmp, sxp);
+			if (xattr_diff(file, sxp, 1))
+				iflags |= ITEM_REPORT_XATTR;
+		}
+#endif
+	} else {
+#ifdef SUPPORT_XATTRS
+		if (preserve_xattrs && xattr_diff(file, NULL, 1))
+			iflags |= ITEM_REPORT_XATTR;
+#endif
 		iflags |= ITEM_IS_NEW;
+	}
 
 	iflags &= 0xffff;
-	if ((iflags & SIGNIFICANT_ITEM_FLAGS || verbose > 1
+	if ((iflags & (SIGNIFICANT_ITEM_FLAGS|ITEM_REPORT_XATTR) || verbose > 1
 	  || stdout_format_has_i > 1 || (xname && *xname)) && !read_batch) {
 		if (protocol_version >= 29) {
 			if (ndx >= 0)
@@ -581,6 +603,10 @@ void itemize(const char *fname, struct file_struct *file, int ndx, int statret,
 				write_byte(sock_f_out, fnamecmp_type);
 			if (iflags & ITEM_XNAME_FOLLOWS)
 				write_vstring(sock_f_out, xname, strlen(xname));
+#ifdef SUPPORT_XATTRS
+			if (iflags & ITEM_REPORT_XATTR && !dry_run)
+				send_xattr_request(NULL, file, sock_f_out);
+#endif
 		} else if (ndx >= 0) {
 			enum logcode code = logfile_format_has_i ? FINFO : FCLIENT;
 			log_item(code, file, &stats, iflags, xname);
@@ -855,14 +881,14 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			if (preserve_hard_links && F_IS_HLINKED(file))
 				finish_hard_link(file, fname, &sxp->st, itemizing, code, j);
 			if (itemizing && (verbose > 1 || stdout_format_has_i > 1)) {
-				itemize(fname, file, ndx, 1, sxp,
+				itemize(cmpbuf, file, ndx, 1, sxp,
 					ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS,
 					0, "");
 			}
 		} else
 #endif
 		if (itemizing)
-			itemize(fname, file, ndx, 0, sxp, 0, 0, NULL);
+			itemize(cmpbuf, file, ndx, 0, sxp, 0, 0, NULL);
 		if (verbose > 1 && maybe_ATTRS_REPORT)
 			rprintf(FCLIENT, "%s is uptodate\n", fname);
 		return -2;
@@ -879,9 +905,13 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			}
 			return -1;
 		}
+		set_file_attrs(fname, file, NULL, cmpbuf, 0);
 		if (itemizing)
-			itemize(fname, file, ndx, 0, sxp, ITEM_LOCAL_CHANGE, 0, NULL);
-		set_file_attrs(fname, file, NULL, 0);
+			itemize(cmpbuf, file, ndx, 0, sxp, ITEM_LOCAL_CHANGE, 0, NULL);
+#ifdef SUPPORT_XATTRS
+		if (preserve_xattrs)
+			xattr_clear_locals(file);
+#endif
 		if (maybe_ATTRS_REPORT
 		 && ((!itemizing && verbose && match_level == 2)
 		  || (verbose > 1 && match_level == 3))) {
@@ -1029,7 +1059,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			    : ITEM_LOCAL_CHANGE
 			     + (match_level == 3 ? ITEM_XNAME_FOLLOWS : 0);
 			char *lp = match_level == 3 ? "" : NULL;
-			itemize(fname, file, ndx, 0, sxp, chg + ITEM_MATCHED, 0, lp);
+			itemize(cmpbuf, file, ndx, 0, sxp, chg + ITEM_MATCHED, 0, lp);
 		}
 		if (verbose > 1 && maybe_ATTRS_REPORT) {
 			rprintf(FCLIENT, "%s%s is uptodate\n",
@@ -1111,6 +1141,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 #ifdef SUPPORT_ACLS
 	sx.acc_acl = sx.def_acl = NULL;
+#endif
+#ifdef SUPPORT_XATTRS
+	sx.xattr = NULL;
 #endif
 	if (dry_run > 1) {
 		if (fuzzy_dirlist) {
@@ -1224,7 +1257,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				goto cleanup;
 			}
 		}
-		if (set_file_attrs(fname, file, real_ret ? NULL : &real_sx, 0)
+		if (set_file_attrs(fname, file, real_ret ? NULL : &real_sx, NULL, 0)
 		    && verbose && code != FNONE && f_out != -1)
 			rprintf(code, "%s/\n", fname);
 		if (real_ret != 0 && one_file_system)
@@ -1278,9 +1311,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			else if ((len = readlink(fname, lnk, MAXPATHLEN-1)) > 0
 			      && strncmp(lnk, sl, len) == 0 && sl[len] == '\0') {
 				/* The link is pointing to the right place. */
+				set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT);
 				if (itemizing)
 					itemize(fname, file, ndx, 0, &sx, 0, 0, NULL);
-				set_file_attrs(fname, file, &sx, maybe_ATTRS_REPORT);
 #ifdef SUPPORT_HARD_LINKS
 				if (preserve_hard_links && F_IS_HLINKED(file))
 					finish_hard_link(file, fname, &sx.st, itemizing, code, -1);
@@ -1317,7 +1350,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			rsyserr(FERROR, errno, "symlink %s -> \"%s\" failed",
 				full_fname(fname), sl);
 		} else {
-			set_file_attrs(fname, file, NULL, 0);
+			set_file_attrs(fname, file, NULL, NULL, 0);
 			if (itemizing) {
 				itemize(fname, file, ndx, statret, &sx,
 					ITEM_LOCAL_CHANGE, 0, NULL);
@@ -1357,9 +1390,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			 && BITS_EQUAL(sx.st.st_mode, file->mode, _S_IFMT)
 			 && sx.st.st_rdev == rdev) {
 				/* The device or special file is identical. */
+				set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT);
 				if (itemizing)
 					itemize(fname, file, ndx, 0, &sx, 0, 0, NULL);
-				set_file_attrs(fname, file, &sx, maybe_ATTRS_REPORT);
 #ifdef SUPPORT_HARD_LINKS
 				if (preserve_hard_links && F_IS_HLINKED(file))
 					finish_hard_link(file, fname, &sx.st, itemizing, code, -1);
@@ -1399,7 +1432,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			rsyserr(FERROR, errno, "mknod %s failed",
 				full_fname(fname));
 		} else {
-			set_file_attrs(fname, file, NULL, 0);
+			set_file_attrs(fname, file, NULL, NULL, 0);
 			if (itemizing) {
 				itemize(fname, file, ndx, statret, &sx,
 					ITEM_LOCAL_CHANGE, 0, NULL);
@@ -1529,9 +1562,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			do_unlink(partialptr);
 			handle_partial_dir(partialptr, PDIR_DELETE);
 		}
+		set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT);
 		if (itemizing)
 			itemize(fnamecmp, file, ndx, statret, &sx, 0, 0, NULL);
-		set_file_attrs(fname, file, &sx, maybe_ATTRS_REPORT);
 #ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_IS_HLINKED(file))
 			finish_hard_link(file, fname, &sx.st, itemizing, code, -1);
@@ -1636,6 +1669,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (preserve_acls)
 			free_acl(&real_sx);
 #endif
+#ifdef SUPPORT_XATTRS
+		if (preserve_xattrs)
+			free_xattr(&real_sx);
+#endif
 	}
 
 	if (!do_xfers) {
@@ -1657,7 +1694,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (f_copy >= 0) {
 		close(f_copy);
-		set_file_attrs(backupptr, back_file, NULL, 0);
+		set_file_attrs(backupptr, back_file, NULL, NULL, 0);
 		if (verbose > 1) {
 			rprintf(FINFO, "backed up %s to %s\n",
 				fname, backupptr);
@@ -1671,6 +1708,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 #ifdef SUPPORT_ACLS
 	if (preserve_acls)
 		free_acl(&sx);
+#endif
+#ifdef SUPPORT_XATTRS
+	if (preserve_xattrs)
+		free_xattr(&sx);
 #endif
 	return;
 }

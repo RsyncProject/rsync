@@ -22,6 +22,7 @@
 #include "rsync.h"
 
 extern int verbose;
+extern int dry_run;
 extern int do_xfers;
 extern int am_server;
 extern int am_daemon;
@@ -33,6 +34,7 @@ extern int csum_length;
 extern int append_mode;
 extern int io_error;
 extern int allowed_lull;
+extern int preserve_xattrs;
 extern int protocol_version;
 extern int remove_source_files;
 extern int updating_basis_file;
@@ -144,8 +146,9 @@ void successful_send(int ndx)
 		rsyserr(FERROR, errno, "sender failed to remove %s", fname);
 }
 
-void write_ndx_and_attrs(int f_out, int ndx, int iflags,
-			 uchar fnamecmp_type, char *buf, int len)
+static void write_ndx_and_attrs(int f_out, int ndx, int iflags,
+				const char *fname, struct file_struct *file,
+				uchar fnamecmp_type, char *buf, int len)
 {
 	write_ndx(f_out, ndx);
 	if (protocol_version < 29)
@@ -155,6 +158,10 @@ void write_ndx_and_attrs(int f_out, int ndx, int iflags,
 		write_byte(f_out, fnamecmp_type);
 	if (iflags & ITEM_XNAME_FOLLOWS)
 		write_vstring(f_out, buf, len);
+#ifdef SUPPORT_XATTRS
+	if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && !dry_run)
+		send_xattr_request(fname, file, f_out);
+#endif
 }
 
 void send_files(int f_in, int f_out)
@@ -183,8 +190,8 @@ void send_files(int f_in, int f_out)
 			send_extra_file_list(f_out, FILECNT_LOOKAHEAD);
 
 		/* This call also sets cur_flist. */
-		ndx = read_ndx_and_attrs(f_in, f_out, &iflags,
-					 &fnamecmp_type, xname, &xlen);
+		ndx = read_ndx_and_attrs(f_in, &iflags, &fnamecmp_type,
+					 xname, &xlen);
 		if (ndx == NDX_DONE) {
 			if (inc_recurse && first_flist) {
 				flist_free(first_flist);
@@ -201,6 +208,9 @@ void send_files(int f_in, int f_out)
 			continue;
 		}
 
+		if (inc_recurse)
+			send_extra_file_list(f_out, FILECNT_LOOKAHEAD);
+
 		file = cur_flist->files[ndx - cur_flist->ndx_start];
 		if (F_ROOTDIR(file)) {
 			path = F_ROOTDIR(file);
@@ -215,8 +225,15 @@ void send_files(int f_in, int f_out)
 		if (verbose > 2)
 			rprintf(FINFO, "send_files(%d, %s%s%s)\n", ndx, path,slash,fname);
 
+#ifdef SUPPORT_XATTRS
+		if (preserve_xattrs && iflags & ITEM_REPORT_XATTR)
+			recv_xattr_request(file, f_in);
+#endif
+
 		if (!(iflags & ITEM_TRANSFER)) {
 			maybe_log_item(file, iflags, itemizing, xname);
+			write_ndx_and_attrs(f_out, ndx, iflags, fname, file,
+					    fnamecmp_type, xname, xlen);
 			continue;
 		}
 		if (phase == 2) {
@@ -251,8 +268,8 @@ void send_files(int f_in, int f_out)
 
 		if (!do_xfers) { /* log the transfer */
 			log_item(FCLIENT, file, &stats, iflags, NULL);
-			write_ndx_and_attrs(f_out, ndx, iflags, fnamecmp_type,
-					    xname, xlen);
+			write_ndx_and_attrs(f_out, ndx, iflags, fname, file,
+					    fnamecmp_type, xname, xlen);
 			continue;
 		}
 
@@ -305,8 +322,8 @@ void send_files(int f_in, int f_out)
 				path,slash,fname, (double)st.st_size);
 		}
 
-		write_ndx_and_attrs(f_out, ndx, iflags, fnamecmp_type,
-				    xname, xlen);
+		write_ndx_and_attrs(f_out, ndx, iflags, fname, file,
+				    fnamecmp_type, xname, xlen);
 		write_sum_head(f_xfer, s);
 
 		if (verbose > 2)

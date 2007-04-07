@@ -32,6 +32,7 @@
 extern int verbose;
 extern int dry_run;
 extern int preserve_acls;
+extern int preserve_xattrs;
 extern int preserve_perms;
 extern int preserve_executability;
 extern int preserve_times;
@@ -91,10 +92,8 @@ void setup_iconv()
 }
 #endif
 
-/* This is used by sender.c with a valid f_out, and by receive.c with
- * f_out = -1. */
-int read_ndx_and_attrs(int f_in, int f_out, int *iflag_ptr,
-		       uchar *type_ptr, char *buf, int *len_ptr)
+int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
+		       char *buf, int *len_ptr)
 {
 	int len, iflags = 0;
 	struct file_list *flist;
@@ -181,11 +180,6 @@ int read_ndx_and_attrs(int f_in, int f_out, int *iflag_ptr,
 				ndx, who_am_i());
 			exit_cleanup(RERR_PROTOCOL);
 		}
-	} else if (f_out >= 0) {
-		if (inc_recurse)
-			send_extra_file_list(f_out, FILECNT_LOOKAHEAD);
-		write_ndx_and_attrs(f_out, ndx, iflags,
-				    fnamecmp_type, buf, len);
 	}
 
 	*iflag_ptr = iflags;
@@ -228,8 +222,8 @@ mode_t dest_mode(mode_t flist_mode, mode_t stat_mode, int dflt_perms,
 	return new_mode;
 }
 
-int set_file_attrs(char *fname, struct file_struct *file, statx *sxp,
-		   int flags)
+int set_file_attrs(const char *fname, struct file_struct *file, statx *sxp,
+		   const char *fnamecmp, int flags)
 {
 	int updated = 0;
 	statx sx2;
@@ -247,6 +241,9 @@ int set_file_attrs(char *fname, struct file_struct *file, statx *sxp,
 #ifdef SUPPORT_ACLS
 		sx2.acc_acl = sx2.def_acl = NULL;
 #endif
+#ifdef SUPPORT_XATTRS
+		sx2.xattr = NULL;
+#endif
 		if (!preserve_perms && S_ISDIR(new_mode)
 		 && sx2.st.st_mode & S_ISGID) {
 			/* We just created this directory and its setgid
@@ -259,6 +256,11 @@ int set_file_attrs(char *fname, struct file_struct *file, statx *sxp,
 #ifdef SUPPORT_ACLS
 	if (preserve_acls && !S_ISLNK(file->mode) && !ACL_READY(*sxp))
 		get_acl(fname, sxp);
+#endif
+
+#ifdef SUPPORT_XATTRS
+	if (preserve_xattrs && fnamecmp)
+		set_xattr(fname, file, fnamecmp, sxp);
 #endif
 
 	if (!preserve_times || (S_ISDIR(sxp->st.st_mode) && omit_dir_times))
@@ -353,10 +355,16 @@ int set_file_attrs(char *fname, struct file_struct *file, statx *sxp,
 			rprintf(FCLIENT, "%s is uptodate\n", fname);
 	}
   cleanup:
+	if (sxp == &sx2) {
 #ifdef SUPPORT_ACLS
-	if (preserve_acls && sxp == &sx2)
-		free_acl(&sx2);
+		if (preserve_acls)
+			free_acl(&sx2);
 #endif
+#ifdef SUPPORT_XATTRS
+		if (preserve_xattrs)
+			free_xattr(&sx2);
+#endif
+	}
 	return updated;
 }
 
@@ -378,7 +386,8 @@ RETSIGTYPE sig_int(UNUSED(int val))
  * attributes (e.g. permissions, ownership, etc.).  If partialptr is not
  * NULL and the robust_rename() call is forced to copy the temp file, we
  * stage the file into the partial-dir and then rename it into place. */
-void finish_transfer(char *fname, char *fnametmp, char *partialptr,
+void finish_transfer(const char *fname, const char *fnametmp,
+		     const char *fnamecmp, const char *partialptr,
 		     struct file_struct *file, int ok_to_set_time,
 		     int overwriting_basis)
 {
@@ -395,7 +404,7 @@ void finish_transfer(char *fname, char *fnametmp, char *partialptr,
 		return;
 
 	/* Change permissions before putting the file into place. */
-	set_file_attrs(fnametmp, file, NULL,
+	set_file_attrs(fnametmp, file, NULL, fnamecmp,
 		       ok_to_set_time ? 0 : ATTRS_SKIP_MTIME);
 
 	/* move tmp file over real file */
@@ -419,7 +428,7 @@ void finish_transfer(char *fname, char *fnametmp, char *partialptr,
 	fnametmp = partialptr ? partialptr : fname;
 
   do_set_file_attrs:
-	set_file_attrs(fnametmp, file, NULL,
+	set_file_attrs(fnametmp, file, NULL, fnamecmp,
 		       ok_to_set_time ? 0 : ATTRS_SKIP_MTIME);
 
 	if (partialptr) {

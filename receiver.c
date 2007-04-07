@@ -22,6 +22,7 @@
 #include "rsync.h"
 
 extern int verbose;
+extern int dry_run;
 extern int do_xfers;
 extern int am_server;
 extern int do_progress;
@@ -37,6 +38,7 @@ extern int protocol_version;
 extern int relative_paths;
 extern int preserve_hard_links;
 extern int preserve_perms;
+extern int preserve_xattrs;
 extern int basis_dir_cnt;
 extern int make_backups;
 extern int cleanup_got_literal;
@@ -366,8 +368,8 @@ int recv_files(int f_in, char *local_name)
 		cleanup_disable();
 
 		/* This call also sets cur_flist. */
-		ndx = read_ndx_and_attrs(f_in, -1, &iflags,
-					 &fnamecmp_type, xname, &xlen);
+		ndx = read_ndx_and_attrs(f_in, &iflags, &fnamecmp_type,
+					 xname, &xlen);
 		if (ndx == NDX_DONE) {
 			if (inc_recurse && first_flist) {
 				flist_free(first_flist);
@@ -397,8 +399,17 @@ int recv_files(int f_in, char *local_name)
 		if (verbose > 2)
 			rprintf(FINFO, "recv_files(%s)\n", fname);
 
+#ifdef SUPPORT_XATTRS
+		if (iflags & ITEM_REPORT_XATTR && !dry_run)
+			recv_xattr_request(file, f_in);
+#endif
+
 		if (!(iflags & ITEM_TRANSFER)) {
 			maybe_log_item(file, iflags, itemizing, xname);
+#ifdef SUPPORT_XATTRS
+			if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && !dry_run)
+				set_file_attrs(fname, file, NULL, fname, 0);
+#endif
 			continue;
 		}
 		if (phase == 2) {
@@ -655,15 +666,15 @@ int recv_files(int f_in, char *local_name)
 				temp_copy_name = NULL;
 			else
 				temp_copy_name = partialptr;
-			finish_transfer(fname, fnametmp, temp_copy_name,
-					file, recv_ok, 1);
+			finish_transfer(fname, fnametmp, fnamecmp,
+					temp_copy_name, file, recv_ok, 1);
 			if (fnamecmp == partialptr) {
 				do_unlink(partialptr);
 				handle_partial_dir(partialptr, PDIR_DELETE);
 			}
 		} else if (keep_partial && partialptr
 		    && handle_partial_dir(partialptr, PDIR_CREATE)) {
-			finish_transfer(partialptr, fnametmp, NULL,
+			finish_transfer(partialptr, fnametmp, fnamecmp, NULL,
 					file, recv_ok, !partial_dir);
 			if (delay_updates && recv_ok) {
 				bitbag_set_bit(delayed_bits, ndx);

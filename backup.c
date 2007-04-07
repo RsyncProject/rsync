@@ -23,6 +23,7 @@
 extern int verbose;
 extern int am_root;
 extern int preserve_acls;
+extern int preserve_xattrs;
 extern int preserve_devices;
 extern int preserve_specials;
 extern int preserve_links;
@@ -134,6 +135,9 @@ static int make_bak_dir(char *fullpath)
 #ifdef SUPPORT_ACLS
 				sx.acc_acl = sx.def_acl = NULL;
 #endif
+#ifdef SUPPORT_XATTRS
+				sx.xattr = NULL;
+#endif
 				if (!(file = make_file(rel, NULL, NULL, 0, NO_FILTERS)))
 					continue;
 #ifdef SUPPORT_ACLS
@@ -143,7 +147,14 @@ static int make_bak_dir(char *fullpath)
 					free_acl(&sx);
 				}
 #endif
-				set_file_attrs(fullpath, file, NULL, 0);
+#ifdef SUPPORT_XATTRS
+				if (preserve_xattrs) {
+					get_xattr(rel, &sx);
+					cache_xattr(file, &sx);
+					free_xattr(&sx);
+				}
+#endif
+				set_file_attrs(fullpath, file, NULL, NULL, 0);
 				free(file);
 			}
 		}
@@ -194,6 +205,9 @@ static int keep_backup(const char *fname)
 #ifdef SUPPORT_ACLS
 	sx.acc_acl = sx.def_acl = NULL;
 #endif
+#ifdef SUPPORT_XATTRS
+	sx.xattr = NULL;
+#endif
 
 	if (!(file = make_file(fname, NULL, NULL, 0, NO_FILTERS)))
 		return 1; /* the file could have disappeared */
@@ -208,6 +222,13 @@ static int keep_backup(const char *fname)
 		get_acl(fname, &sx);
 		cache_acl(file, &sx);
 		free_acl(&sx);
+	}
+#endif
+#ifdef SUPPORT_XATTRS
+	if (preserve_xattrs) {
+		get_xattr(fname, &sx);
+		cache_xattr(file, &sx);
+		free_xattr(&sx);
 	}
 #endif
 
@@ -288,7 +309,7 @@ static int keep_backup(const char *fname)
 			robust_unlink(fname); /* Just in case... */
 		}
 	}
-	set_file_attrs(buf, file, NULL, 0);
+	set_file_attrs(buf, file, NULL, fname, 0);
 	unmake_file(file);
 
 	if (verbose > 1) {

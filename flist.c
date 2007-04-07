@@ -43,6 +43,7 @@ extern int one_file_system;
 extern int copy_dirlinks;
 extern int keep_dirlinks;
 extern int preserve_acls;
+extern int preserve_xattrs;
 extern int preserve_links;
 extern int preserve_hard_links;
 extern int preserve_devices;
@@ -888,6 +889,10 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (preserve_acls && !S_ISLNK(mode))
 		receive_acl(file, f);
 #endif
+#ifdef SUPPORT_XATTRS
+	if (preserve_xattrs)
+		receive_xattr(file, f );
+#endif
 
 	if (S_ISREG(mode) || S_ISLNK(mode))
 		stats.total_size += file_length;
@@ -1160,7 +1165,7 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 					  int flags, int filter_flags)
 {
 	struct file_struct *file;
-#ifdef SUPPORT_ACLS
+#if defined SUPPORT_ACLS || defined SUPPORT_XATTRS
 	statx sx;
 #endif
 
@@ -1179,6 +1184,13 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 			return NULL;
 	}
 #endif
+#ifdef SUPPORT_XATTRS
+	if (preserve_xattrs && f >= 0) {
+		sx.xattr = NULL;
+		if (get_xattr(fname, &sx) < 0)
+			return NULL;
+	}
+#endif
 
 	maybe_emit_filelist_progress(flist->count + flist_count_offset);
 
@@ -1190,6 +1202,12 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 		if (preserve_acls && !S_ISLNK(file->mode)) {
 			send_acl(&sx, f);
 			free_acl(&sx);
+		}
+#endif
+#ifdef SUPPORT_XATTRS
+		if (preserve_xattrs) {
+			F_XATTR(file) = send_xattr(&sx, f);
+			free_xattr(&sx);
 		}
 #endif
 	}

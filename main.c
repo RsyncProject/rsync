@@ -608,7 +608,7 @@ static void fix_basis_dirs(void)
 }
 
 /* This is only called by the sender. */
-static void read_final_goodbye(int f_in, int f_out)
+static void read_final_goodbye(int f_in)
 {
 	int i, iflags, xlen;
 	uchar fnamecmp_type;
@@ -617,8 +617,8 @@ static void read_final_goodbye(int f_in, int f_out)
 	if (protocol_version < 29)
 		i = read_int(f_in);
 	else {
-		i = read_ndx_and_attrs(f_in, f_out, &iflags,
-				       &fnamecmp_type, xname, &xlen);
+		i = read_ndx_and_attrs(f_in, &iflags, &fnamecmp_type,
+				       xname, &xlen);
 	}
 
 	if (i != NDX_DONE) {
@@ -677,7 +677,7 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 	io_flush(FULL_FLUSH);
 	handle_stats(f_out);
 	if (protocol_version >= 24)
-		read_final_goodbye(f_in, f_out);
+		read_final_goodbye(f_in);
 	io_flush(FULL_FLUSH);
 	exit_cleanup(0);
 }
@@ -740,7 +740,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 			kluge_around_eof = -1;
 
 			/* This should only get stopped via a USR2 signal. */
-			read_ndx_and_attrs(f_in, -1, &iflags, &fnamecmp_type,
+			read_ndx_and_attrs(f_in, &iflags, &fnamecmp_type,
 					   xname, &xlen);
 
 			rprintf(FERROR, "Invalid packet at end of run [%s]\n",
@@ -977,7 +977,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		io_flush(FULL_FLUSH);
 		handle_stats(-1);
 		if (protocol_version >= 24)
-			read_final_goodbye(f_in, f_out);
+			read_final_goodbye(f_in);
 		if (pid != -1) {
 			if (verbose > 3)
 				rprintf(FINFO,"client_run waiting on %d\n", (int) pid);

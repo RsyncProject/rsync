@@ -1,0 +1,107 @@
+#! /bin/sh
+
+# This program is distributable under the terms of the GNU GPL (see
+# COPYING).
+
+# Test that rsync handles basic xattr preservation.
+
+. $srcdir/testsuite/rsync.fns
+
+$RSYNC --version | grep ", xattrs" >/dev/null || test_skipped "Rsync is configured without xattr support"
+
+case "$RSYNC" in
+*protocol=29*) test_skipped "xattr support requires protocol 30" ;;
+esac
+
+case "`xattr 2>&1`" in
+*--list:*)
+    xset() {
+	xnam="$1"
+	xval="$2"
+	shift 2
+	xattr -s "$xnam" "$xval" "${@}"
+    }
+    xls() {
+	xattr -l "${@}"
+    }
+    ;;
+*)
+    xset() {
+	xnam="$1"
+	xval="$2"
+	shift 2
+	setfattr -n "$xnam" -v "$xval" "${@}"
+    }
+    xls() {
+	getfattr -d "${@}"
+    }
+    ;;
+esac
+
+makepath "$fromdir/foo"
+echo now >"$fromdir/file0"
+echo something >"$fromdir/file1"
+echo else >"$fromdir/file2"
+echo deep >"$fromdir/foo/file3"
+echo normal >"$fromdir/file4"
+
+makepath "$chkdir/foo"
+echo wow >"$chkdir/file1"
+cp -p "$fromdir/foo/file3" "$chkdir/foo"
+
+files='foo file0 file1 file2 foo/file3 file4'
+
+cd "$fromdir"
+
+xset user.foo foo file0 2>/dev/null || test_skipped "Unable to set an xattr"
+xset user.bar bar file0
+
+xset user.short 'this is short' file1
+xset user.long 'this is a long attribute that will be truncated in the initial data send' file1
+xset user.good 'this is good' file1
+xset user.nice 'this is nice' file1
+
+xset user.foo foo file2
+xset user.bar bar file2
+xset user.long 'a long attribute for our new file that tests to ensure that this works' file2
+
+xset user.foo 'new foo' foo/file3
+xset user.bar 'new bar' foo/file3
+xset user.long 'this is also a long attribute that will be truncated in the initial data send' foo/file3
+xset user.equal 'this long attribute should remain the same and not need to be transferred' foo/file3
+
+xset user.short 'old short' "$chkdir/file1"
+xset user.extra 'remove me' "$chkdir/file1"
+
+xset user.foo 'old foo' "$chkdir/foo/file3"
+xset user.equal 'this long attribute should remain the same and not need to be transferred' "$chkdir/foo/file3"
+
+xls $files >"$scratchdir/xattrs.txt"
+
+# OK, let's try a simple xattr copy.
+checkit "$RSYNC -avX . \"$chkdir/\"" "$fromdir" "$chkdir"
+
+cd "$chkdir"
+xls $files | diff $diffopt "$scratchdir/xattrs.txt" -
+
+cd "$fromdir"
+
+checkit "$RSYNC -aiX --copy-dest=../chk . ../to" "$fromdir" "$todir"
+
+cd "$todir"
+xls $files | diff $diffopt "$scratchdir/xattrs.txt" -
+
+cd "$fromdir"
+xset user.nice 'this is nice, but different' file1
+
+xls $files >"$scratchdir/xattrs.txt"
+
+rm -rf "$todir"
+
+checkit "$RSYNC -aiX --link-dest=../chk . ../to" "$chkdir" "$todir"
+
+cd "$todir"
+xls $files | diff $diffopt "$scratchdir/xattrs.txt" -
+
+# The script would have aborted on error, so getting here means we've won.
+exit 0

@@ -47,6 +47,7 @@ int copy_links = 0;
 int preserve_links = 0;
 int preserve_hard_links = 0;
 int preserve_acls = 0;
+int preserve_xattrs = 0;
 int preserve_perms = 0;
 int preserve_executability = 0;
 int preserve_devices = 0;
@@ -201,6 +202,7 @@ static void print_rsync_version(enum logcode f)
 	char const *have_inplace = "no ";
 	char const *hardlinks = "no ";
 	char const *acls = "no ";
+	char const *xattrs = "no ";
 	char const *links = "no ";
 	char const *ipv6 = "no ";
 	STRUCT_STAT *dumstat;
@@ -220,7 +222,9 @@ static void print_rsync_version(enum logcode f)
 #ifdef SUPPORT_ACLS
 	acls = "";
 #endif
-
+#ifdef SUPPORT_XATTRS
+	xattrs = "";
+#endif
 #ifdef SUPPORT_LINKS
 	links = "";
 #endif
@@ -239,8 +243,8 @@ static void print_rsync_version(enum logcode f)
 		(int)(sizeof (int64) * 8));
 	rprintf(f, "    %ssocketpairs, %shardlinks, %ssymlinks, %sIPv6, batchfiles, %sinplace,\n",
 		got_socketpair, hardlinks, links, ipv6, have_inplace);
-	rprintf(f, "    %sappend, %sACLs\n",
-		have_inplace, acls);
+	rprintf(f, "    %sappend, %sACLs, %sxattrs\n",
+		have_inplace, acls, xattrs);
 
 #ifdef MAINTAINER_MODE
 	rprintf(f, "Panic Action: \"%s\"\n", get_panic_action());
@@ -286,7 +290,7 @@ void usage(enum logcode F)
   rprintf(F," -q, --quiet                 suppress non-error messages\n");
   rprintf(F,"     --no-motd               suppress daemon-mode MOTD (see manpage caveat)\n");
   rprintf(F," -c, --checksum              skip based on checksum, not mod-time & size\n");
-  rprintf(F," -a, --archive               archive mode; same as -rlptgoD (no -H, -A)\n");
+  rprintf(F," -a, --archive               archive mode; equals -rlptgoD (no -H,-A,-X)\n");
   rprintf(F,"     --no-OPTION             turn off an implied OPTION (e.g. --no-D)\n");
   rprintf(F," -r, --recursive             recurse into directories\n");
   rprintf(F," -R, --relative              use relative path names\n");
@@ -310,6 +314,9 @@ void usage(enum logcode F)
   rprintf(F,"     --chmod=CHMOD           affect file and/or directory permissions\n");
 #ifdef SUPPORT_ACLS
   rprintf(F," -A, --acls                  preserve ACLs (implies --perms)\n");
+#endif
+#ifdef SUPPORT_XATTRS
+  rprintf(F," -X, --xattrs                preserve extended attributes (implies --perms)\n");
 #endif
   rprintf(F," -o, --owner                 preserve owner (super-user only)\n");
   rprintf(F," -g, --group                 preserve group\n");
@@ -438,6 +445,9 @@ static struct poptOption long_options[] = {
   {"acls",            'A', POPT_ARG_NONE,   0, 'A', 0, 0 },
   {"no-acls",          0,  POPT_ARG_VAL,    &preserve_acls, 0, 0, 0 },
   {"no-A",             0,  POPT_ARG_VAL,    &preserve_acls, 0, 0, 0 },
+  {"xattrs",          'X', POPT_ARG_NONE,   0, 'X', 0, 0 },
+  {"no-xattrs",        0,  POPT_ARG_VAL,    &preserve_xattrs, 0, 0, 0 },
+  {"no-X",             0,  POPT_ARG_VAL,    &preserve_xattrs, 0, 0, 0 },
   {"times",           't', POPT_ARG_VAL,    &preserve_times, 1, 0, 0 },
   {"no-times",         0,  POPT_ARG_VAL,    &preserve_times, 0, 0, 0 },
   {"no-t",             0,  POPT_ARG_VAL,    &preserve_times, 0, 0, 0 },
@@ -1126,6 +1136,17 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			return 0;
 #endif
 
+		case 'X':
+#ifdef SUPPORT_XATTRS
+			preserve_xattrs = 1;
+			preserve_perms = 1;
+			break;
+#else
+			snprintf(err_buf,sizeof(err_buf),
+				 "extended attributes are not supported on this %s\n",
+				 am_server ? "server" : "client");
+			return 0;
+#endif
 
 		default:
 			/* A large opt value means that set_refuse_options()
@@ -1589,6 +1610,10 @@ void server_options(char **args,int *argc)
 #ifdef SUPPORT_ACLS
 	if (preserve_acls)
 		argstr[x++] = 'A';
+#endif
+#ifdef SUPPORT_XATTRS
+	if (preserve_xattrs)
+		argstr[x++] = 'X';
 #endif
 	if (recurse)
 		argstr[x++] = 'r';

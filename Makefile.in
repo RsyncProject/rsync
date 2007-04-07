@@ -28,13 +28,13 @@ VERSION=@VERSION@
 
 HEADERS=byteorder.h config.h errcode.h proto.h rsync.h smb_acls.h lib/pool_alloc.h
 LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o lib/md5.o \
-	lib/permstring.o lib/pool_alloc.o lib/sysacls.o @LIBOBJS@
+	lib/permstring.o lib/pool_alloc.o lib/sysacls.o lib/sysxattrs.o @LIBOBJS@
 ZLIBOBJ=zlib/deflate.o zlib/inffast.o zlib/inflate.o zlib/inftrees.o \
 	zlib/trees.o zlib/zutil.o zlib/adler32.o zlib/compress.o zlib/crc32.o
 OBJS1=flist.o rsync.o generator.o receiver.o cleanup.o sender.o exclude.o \
 	util.o main.o checksum.o match.o syscall.o log.o backup.o
 OBJS2=options.o io.o compat.o hlink.o token.o uidlist.o socket.o \
-	fileio.o batch.o clientname.o chmod.o acls.o
+	fileio.o batch.o clientname.o chmod.o acls.o xattrs.o
 OBJS3=progress.o pipe.o
 DAEMON_OBJ = params.o loadparm.o clientserver.o access.o connection.o authenticate.o
 popt_OBJS=popt/findme.o  popt/popt.o  popt/poptconfig.o \

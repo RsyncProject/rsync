@@ -142,7 +142,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 				flush_write_file(cleanup_fd_w);
 				close(cleanup_fd_w);
 			}
-			finish_transfer(cleanup_new_fname, fname, NULL,
+			finish_transfer(cleanup_new_fname, fname, NULL, NULL,
 					cleanup_file, 0, !partial_dir);
 		}
 

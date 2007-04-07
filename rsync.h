@@ -569,6 +569,7 @@ extern int file_extra_cnt;
 extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_acls;
+extern int preserve_xattrs;
 
 #define FILE_STRUCT_LEN (offsetof(struct file_struct, basename))
 #define EXTRA_LEN (sizeof (union file_extras))
@@ -601,7 +602,8 @@ extern int preserve_acls;
 /* When the associated option is on, all entries will have these present: */
 #define F_OWNER(f) REQ_EXTRA(f, preserve_uid)->unum
 #define F_GROUP(f) REQ_EXTRA(f, preserve_gid)->unum
-#define F_ACL(f) REQ_EXTRA(f, preserve_acls)->unum
+#define F_ACL(f) REQ_EXTRA(f, preserve_acls)->num
+#define F_XATTR(f) REQ_EXTRA(f, preserve_xattrs)->num
 
 /* These items are per-entry optional and mutally exclusive: */
 #define F_HL_GNUM(f) OPT_EXTRA(f, LEN64_BUMP(f))->num
@@ -793,9 +795,13 @@ typedef struct {
     struct rsync_acl *acc_acl; /* access ACL */
     struct rsync_acl *def_acl; /* default ACL */
 #endif
+#ifdef SUPPORT_XATTRS
+    item_list *xattr;
+#endif
 } statx;
 
 #define ACL_READY(sx) ((sx).acc_acl != NULL)
+#define XATTR_READY(sx) ((sx).xattr != NULL)
 
 #include "proto.h"
 
