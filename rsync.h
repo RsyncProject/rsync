@@ -779,6 +779,7 @@ typedef struct {
 
 #ifndef __GNUC__
 #define __attribute__(x)
+#else
 # if __GNUC__ <= 2
 # define NORETURN
 # endif
