@@ -488,20 +488,26 @@ transferring to or from an MS Windows FAT filesystem (which represents
 times with a 2-second resolution), bf(--modify-window=1) is useful
 (allowing times to differ by up to 1 second).
 
-dit(bf(-c, --checksum)) This forces the sender to checksum em(every)
-regular file using a 128-bit MD4 checksum.  It does this during the initial
-file-system scan as it builds the list of all available files. The receiver
-then checksums its version of each file (if it exists and it has the same
-size as its sender-side counterpart) in order to decide which files need to
-be updated: files with either a changed size or a changed checksum are
-selected for transfer.  Since this whole-file checksumming of all files on
-both sides of the connection occurs in addition to the automatic checksum
-verifications that occur during a file's transfer, this option can be quite
-slow.
+dit(bf(-c, --checksum)) This changes the way rsync checks if the files have
+been changed and are in need of a transfer.  Without this option, rsync
+uses a "quick check" that (by default) checks if each file's size and time
+of last modification match between the sender and receiver.  This option
+changes this to compare a 128-bit MD4 checksum for each file that has a
+matching size.  Generating the checksums means that both sides will expend
+a lot of disk I/O reading all the data in the files in the transfer (and
+this is prior to any reading that will be done to transfer changed files),
+so this can slow things down significantly.
 
-Note that rsync always verifies that each em(transferred) file was correctly
-reconstructed on the receiving side by checking its whole-file checksum, but
-that automatic after-the-transfer verification has nothing to do with this
+The sending side generates its checksums while it is doing the file-system
+scan that builds the list of the available files.  The receiver generates
+its checksums when it is scanning for changed files, and will checksum any
+file that has the same size as the corresponding sender's file:  files with
+either a changed size or a changed checksum are selected for transfer.
+
+Note that rsync always verifies that each em(transferred) file was
+correctly reconstructed on the receiving side by checking a whole-file
+checksum that is generated when as the file is transferred, but that
+automatic after-the-transfer verification has nothing to do with this
 option's before-the-transfer "Does this file need to be updated?" check.
 
 dit(bf(-a, --archive)) This is equivalent to bf(-rlptgoD). It is a quick
