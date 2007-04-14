@@ -49,8 +49,8 @@
 
 # This script must be invoked from the build directory.  
 
-# A scratch directory, 'testtmp', is created in the build directory to
-# hold working files.
+# A scratch directory, 'testtmp', is used in the build directory to
+# hold per-test subdirectories.
 
 # This script also uses the $loglevel environment variable.  1 is the
 # default value, and 10 the most verbose.  You can set this from the
@@ -207,11 +207,14 @@ missing=0
 passed=0
 failed=0
 
-# Prefix for scratch directory.  We create separate directories for
-# each test case, so that they can be left behind in case of failure
-# to aid investigation.
+# Directory that holds the other test subdirs.  We create separate dirs
+# inside for each test case, so that they can be left behind in case of
+# failure to aid investigation.  We don't remove the testtmp subdir at
+# the end so that it can be configured as a symlink to a filesystem that
+# has ACLs and xattr support enabled (if desired).
 scratchbase="$TOOLDIR"/testtmp
 echo "    scratchbase=$scratchbase"
+[ -d "$scratchbase" ] || mkdir "$scratchbase"
 
 suitedir="$srcdir/testsuite"
 
@@ -238,7 +241,7 @@ fi
 for testscript in $suitedir/$whichtests
 do
     testbase=`echo $testscript | sed -e 's!.*/!!' -e 's/.test\$//'`
-    scratchdir="$scratchbase.$testbase"
+    scratchdir="$scratchbase/$testbase"
 
     prep_scratch
 
