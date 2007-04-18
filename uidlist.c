@@ -342,17 +342,11 @@ void recv_uid_list(int f, struct file_list *flist)
 			recv_group_name(f, (gid_t)id);
 	}
 
-#ifdef SUPPORT_ACLS
-	if (preserve_acls && !numeric_ids) {
-		id_t *id;
-		while ((id = next_acl_uid(flist)) != NULL)
-			*id = match_uid(*id);
-		while ((id = next_acl_gid(flist)) != NULL)
-			*id = match_gid(*id);
-	}
-#endif
-
 	/* Now convert all the uids/gids from sender values to our values. */
+#ifdef SUPPORT_ACLS
+	if (preserve_acls && !numeric_ids)
+		match_acl_ids();
+#endif
 	if (am_root && preserve_uid && !numeric_ids) {
 		for (i = 0; i < flist->count; i++)
 			F_OWNER(flist->files[i]) = match_uid(F_UID(flist->files[i]));

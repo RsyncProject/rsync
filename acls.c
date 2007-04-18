@@ -672,7 +672,6 @@ static uchar recv_acl_access(uchar *name_follows_val, int f)
 static uchar recv_ida_entries(ida_entries *ent, int user_names, int f)
 {
 	uchar computed_mask_bits = 0;
-	uchar has_name;
 	int i, count = read_abbrevint(f);
 
 	if (count) {
@@ -684,6 +683,7 @@ static uchar recv_ida_entries(ida_entries *ent, int user_names, int f)
 	ent->count = count;
 
 	for (i = 0; i < count; i++) {
+		uchar has_name;
 		id_t id = read_abbrevint(f);
 		int access = recv_acl_access(&has_name, f);
 
@@ -967,63 +967,30 @@ int set_acl(const char *fname, const struct file_struct *file, statx *sxp)
 	return unchanged;
 }
 
-/* === Enumeration functions for uid mapping === */
-
-/* Context -- one and only one.  Should be cycled through once on uid
- * mapping and once on gid mapping. */
-static item_list *_enum_racl_lists[] = {
-	&access_acl_list, &default_acl_list, NULL
-};
-
-static item_list **enum_racl_list = &_enum_racl_lists[0];
-static int enum_ida_index = 0;
-static size_t enum_racl_index = 0;
-
-/* This returns the next tag_type id from the given ACL for the next entry,
- * or it returns 0 if there are no more tag_type ids in the acl. */
-static id_t *next_ace_id(SMB_ACL_TAG_T tag_type, const rsync_acl *racl)
+/* Non-incremental recursion needs to convert all the received IDs
+ * in a single pass after the file-list is complete. */
+static void match_racl_ids(const item_list *racl_list)
 {
-	const ida_entries *idal = tag_type == SMB_ACL_USER ? &racl->users : &racl->groups;
-	if (enum_ida_index < idal->count) {
-		id_access *ida = &idal->idas[enum_ida_index++];
-		return &ida->id;
+	int list_cnt, name_cnt;
+	acl_duo *duo_item = racl_list->items;
+	for (list_cnt = racl_list->count; list_cnt--; duo_item++) {
+		ida_entries *idal = &duo_item->racl.users;
+		for (name_cnt = idal->count; name_cnt--; idal++) {
+			id_access *ida = idal->idas;
+			ida->id = match_uid(ida->id);
+		}
+		idal = &duo_item->racl.groups;
+		for (name_cnt = idal->count; name_cnt--; idal++) {
+			id_access *ida = idal->idas;
+			ida->id = match_gid(ida->id);
+		}
 	}
-	enum_ida_index = 0;
-	return NULL;
 }
 
-static id_t *next_acl_id(SMB_ACL_TAG_T tag_type, const item_list *racl_list)
+void match_acl_ids(void)
 {
-	for (; enum_racl_index < racl_list->count; enum_racl_index++) {
-		id_t *id;
-		acl_duo *duo_item = racl_list->items;
-		duo_item += enum_racl_index;
-		if ((id = next_ace_id(tag_type, &duo_item->racl)) != NULL)
-			return id;
-	}
-	enum_racl_index = 0;
-	return NULL;
-}
-
-static id_t *next_acl_list_id(SMB_ACL_TAG_T tag_type)
-{
-	for (; *enum_racl_list; enum_racl_list++) {
-		id_t *id = next_acl_id(tag_type, *enum_racl_list);
-		if (id)
-			return id;
-	}
-	enum_racl_list = &_enum_racl_lists[0];
-	return NULL;
-}
-
-id_t *next_acl_uid()
-{
-	return next_acl_list_id(SMB_ACL_USER);
-}
-
-id_t *next_acl_gid()
-{
-	return next_acl_list_id(SMB_ACL_GROUP);
+	match_racl_ids(&access_acl_list);
+	match_racl_ids(&default_acl_list);
 }
 
 /* This is used by dest_mode(). */
