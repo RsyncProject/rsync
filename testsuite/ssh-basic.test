@@ -10,34 +10,38 @@
 
 . "$suitedir/rsync.fns"
 
-if [ "x$rsync_enable_ssh_tests" != xyes ]
-then
-    test_skipped "Skipping SSH tests because \$rsync_enable_ssh_tests is not set"
+SSH="$scratchdir/pretend-ssh"
+
+cat >"$SSH" <<'EOT'
+while : ; do
+    case "$1" in
+    -*) shift ;;
+    localhost) shift; break ;;
+    *) exit 1 ;;
+    esac
+done
+
+$*
+EOT
+chmod +x "$SSH"
+
+if test x"$rsync_enable_ssh_tests" = xyes; then
+    if type ssh >/dev/null ; then
+	SSH=ssh
+    fi
 fi
 
-if ! type ssh >/dev/null ; then
-    test_skipped "Skipping SSH tests because ssh is not in the path"
-fi
-
-if ! [ "`ssh -o'BatchMode yes' localhost echo yes`" = "yes" ]; then
+if ! [ "`"$SSH" -o'BatchMode yes' localhost echo yes`" = "yes" ]; then
     test_skipped "Skipping SSH tests because ssh conection to localhost not authorised"
 fi
 
-# Added by Steve Bonds Feb 2 2003
-# Without this, there are no files in the $fromdir directory, so rsync has
-# nothing to do.
+echo "Using remote shell: $SSH"
+
+# Create some files for rsync to copy
 hands_setup
 
-runtest "ssh: basic test" 'checkit "$RSYNC -avH -e ssh --rsync-path=\"$RSYNC\" \"$fromdir/\" \"localhost:$todir\"" "$fromdir/" "$todir"'
+runtest "ssh: basic test" 'checkit "$RSYNC -avH -e \"$SSH\" --rsync-path=\"$RSYNC\" \"$fromdir/\" \"localhost:$todir\"" "$fromdir/" "$todir"'
 
-# Added by Steve Bonds Feb 2 2003
-# I assumed that "F1" was intended to hold a single file for testing if
-# rsync could detect a renamed file over ssh.  Without this line below
-# it was unset so the "mv" tried to move a parent directory into a
-# subdirectory of itself.  There is probably a better way of pulling out
-# a sample file to rename.
-F1=`ls "$todir" | head -5 | tail -1`
+mv "$todir/text" "$todir/ThisShouldGo"
 
-mv "$todir/$F1" "$todir/ThisShouldGo"
-
-runtest "ssh: renamed file" 'checkit "$RSYNC --delete -avH -e ssh --rsync-path=\"$RSYNC\" \"$fromdir/\" \"localhost:$todir\"" "$fromdir/" "$todir"'
+runtest "ssh: renamed file" 'checkit "$RSYNC --delete -avH -e \"$SSH\" --rsync-path=\"$RSYNC\" \"$fromdir/\" \"localhost:$todir\"" "$fromdir/" "$todir"'
