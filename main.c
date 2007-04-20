@@ -21,6 +21,7 @@
  */
 
 #include "rsync.h"
+#include "io.h"
 #if defined CONFIG_LOCALE && defined HAVE_LOCALE_H
 #include <locale.h>
 #endif
@@ -190,12 +191,12 @@ static void handle_stats(int f)
 
 	if (am_server) {
 		if (am_sender) {
-			write_longint(f, total_read);
-			write_longint(f, total_written);
-			write_longint(f, stats.total_size);
+			write_varlong30(f, total_read, 3);
+			write_varlong30(f, total_written, 3);
+			write_varlong30(f, stats.total_size, 3);
 			if (protocol_version >= 29) {
-				write_longint(f, stats.flist_buildtime);
-				write_longint(f, stats.flist_xfertime);
+				write_varlong30(f, stats.flist_buildtime, 3);
+				write_varlong30(f, stats.flist_xfertime, 3);
 			}
 		}
 		return;
@@ -208,22 +209,22 @@ static void handle_stats(int f)
 	else if (!am_sender) {
 		/* Read the first two in opposite order because the meaning of
 		 * read/write swaps when switching from sender to receiver. */
-		total_written = read_longint(f);
-		total_read = read_longint(f);
-		stats.total_size = read_longint(f);
+		total_written = read_varlong30(f, 3);
+		total_read = read_varlong30(f, 3);
+		stats.total_size = read_varlong30(f, 3);
 		if (protocol_version >= 29) {
-			stats.flist_buildtime = read_longint(f);
-			stats.flist_xfertime = read_longint(f);
+			stats.flist_buildtime = read_varlong30(f, 3);
+			stats.flist_xfertime = read_varlong30(f, 3);
 		}
 	} else if (write_batch) {
 		/* The --read-batch process is going to be a client
 		 * receiver, so we need to give it the stats. */
-		write_longint(batch_fd, total_read);
-		write_longint(batch_fd, total_written);
-		write_longint(batch_fd, stats.total_size);
+		write_varlong30(batch_fd, total_read, 3);
+		write_varlong30(batch_fd, total_written, 3);
+		write_varlong30(batch_fd, stats.total_size, 3);
 		if (protocol_version >= 29) {
-			write_longint(batch_fd, stats.flist_buildtime);
-			write_longint(batch_fd, stats.flist_xfertime);
+			write_varlong30(batch_fd, stats.flist_buildtime, 3);
+			write_varlong30(batch_fd, stats.flist_xfertime, 3);
 		}
 	}
 }
@@ -727,7 +728,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		handle_stats(f_in);
 
 		send_msg(MSG_DONE, "", 1);
-		write_longint(error_pipe[1], stats.total_read);
+		write_varlong(error_pipe[1], stats.total_read, 3);
 		io_flush(FULL_FLUSH);
 
 		/* Handle any keep-alive packets from the post-processing work
