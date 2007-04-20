@@ -481,9 +481,13 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 		goto the_end;
 	}
 
-	write_longint(f, F_LENGTH(file));
-	if (!(flags & XMIT_SAME_TIME))
-		write_int(f, modtime);
+	write_varlong30(f, F_LENGTH(file), 3);
+	if (!(flags & XMIT_SAME_TIME)) {
+		if (protocol_version >= 30)
+			write_varlong(f, modtime, 4);
+		else
+			write_int(f, modtime);
+	}
 	if (!(flags & XMIT_SAME_MODE))
 		write_int(f, to_wire_mode(mode));
 	if (preserve_uid && !(flags & XMIT_SAME_UID)) {
@@ -665,9 +669,13 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	}
 #endif
 
-	file_length = read_longint(f);
-	if (!(flags & XMIT_SAME_TIME))
-		modtime = (time_t)read_int(f);
+	file_length = read_varlong30(f, 3);
+	if (!(flags & XMIT_SAME_TIME)) {
+		if (protocol_version >= 30)
+			modtime = (time_t)read_varlong(f, 4);
+		else
+			modtime = (time_t)read_int(f);
+	}
 	if (!(flags & XMIT_SAME_MODE))
 		mode = from_wire_mode(read_int(f));
 
