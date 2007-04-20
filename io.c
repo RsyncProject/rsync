@@ -99,11 +99,11 @@ static int select_timeout = SELECT_TIMEOUT;
 static int active_filecnt = 0;
 static OFF_T active_bytecnt = 0;
 
-static char int_byte_cnt[64] = {
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* (00 - 3F)/4 */
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* (40 - 7F)/4 */
-	2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, /* (80 - BF)/4 */
-	3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 6, 7, /* (C0 - FF)/4 */
+static char int_byte_extra[64] = {
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* (00 - 3F)/4 */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* (40 - 7F)/4 */
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* (80 - BF)/4 */
+	2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5, 6, /* (C0 - FF)/4 */
 };
 
 static void readfd(int fd, char *buffer, size_t N);
@@ -296,7 +296,7 @@ static void read_msg_fd(void)
 		}
 		if (len) {
 			readfd(fd, buf, len);
-			stats.total_read = read_longint(fd);
+			stats.total_read = read_varlong(fd, 3);
 		}
 		msgdone_cnt++;
 		break;
@@ -998,37 +998,6 @@ unsigned short read_shortint(int f)
 	return (UVAL(b, 1) << 8) + UVAL(b, 0);
 }
 
-int32 read_varint(int f)
-{
-	int32 num;
-	char b[5];
-	int cnt;
-	readfd(f, b, 1);
-	cnt = int_byte_cnt[CVAL(b, 0) / 4];
-	if (cnt > 1)
-		readfd(f, b + 1, cnt - 1);
-	switch (cnt) {
-	case 1:
-		num = NVAL1(b, 0);
-		break;
-	case 2:
-		num = NVAL2(b, 0x80);
-		break;
-	case 3:
-		num = NVAL3(b, 0xC0);
-		break;
-	case 4:
-		num = NVAL4(b, 0xE0);
-		break;
-	case 5:
-		num = NVAL4(b+1, 0);
-		break;
-	default:
-		exit_cleanup(RERR_PROTOCOL); /* impossible... */
-	}
-	return num;
-}
-
 int32 read_int(int f)
 {
 	char b[4];
@@ -1043,66 +1012,96 @@ int32 read_int(int f)
 	return num;
 }
 
-int64 read_longint(int f)
+int32 read_varint(int f)
 {
-	int64 num;
-	char b[9];
+	union {
+	    char b[5];
+	    int32 x;
+	} u;
+	uchar ch;
+	int extra;
 
-	if (protocol_version < 30) {
-		num = read_int(f);
-
-		if ((int32)num != (int32)0xffffffff)
-			return num;
-
-#if SIZEOF_INT64 < 8
-		rprintf(FERROR, "Integer overflow: attempted 64-bit offset\n");
-		exit_cleanup(RERR_UNSUPPORTED);
-#else
-		readfd(f, b, 8);
-		num = IVAL(b,0) | (((int64)IVAL(b,4))<<32);
+	u.x = 0;
+	readfd(f, (char*)&ch, 1);
+	extra = int_byte_extra[ch / 4];
+	if (extra) {
+		uchar bit = ((uchar)1<<(8-extra));
+		if (extra >= (int)sizeof u.b) {
+			rprintf(FERROR, "Overflow in read_varint()\n");
+			exit_cleanup(RERR_STREAMIO);
+		}
+		readfd(f, u.b, extra);
+		u.b[extra] = ch & (bit-1);
+	} else
+		u.b[0] = ch;
+#if CAREFUL_ALIGNMENT
+	u.x = IVAL(u.b,0);
 #endif
-	} else {
-		int cnt;
-		readfd(f, b, 3);
-		cnt = int_byte_cnt[CVAL(b, 0) / 4] + 2;
+#if SIZEOF_INT32 > 4
+	if (u.x & (int32)0x80000000)
+		u.x |= ~(int32)0xffffffff;
+#endif
+	return u.x;
+}
+
+int64 read_varlong(int f, uchar min_bytes)
+{
+	union {
+	    char b[9];
+	    int64 x;
+	} u;
+	char b2[8];
+	int extra;
+
 #if SIZEOF_INT64 < 8
-		if (cnt > 5 || (cnt == 5 && (CVAL(b,0)&0x3F || CVAL(b,1)&0x80))) {
+	memset(u.b, 0, 8);
+#else
+	u.x = 0;
+#endif
+	readfd(f, b2, min_bytes);
+	memcpy(u.b, b2+1, min_bytes-1);
+	extra = int_byte_extra[CVAL(b2, 0) / 4];
+	if (extra) {
+		uchar bit = ((uchar)1<<(8-extra));
+		if (min_bytes + extra > (int)sizeof u.b) {
+			rprintf(FERROR, "Overflow in read_varlong()\n");
+			exit_cleanup(RERR_STREAMIO);
+		}
+		readfd(f, u.b + min_bytes - 1, extra);
+		u.b[min_bytes + extra - 1] = CVAL(b2, 0) & (bit-1);
+#if SIZEOF_INT64 < 8
+		if (min_bytes + extra > 5 || u.b[4] || CVAL(u.b,3) & 0x80) {
 			rprintf(FERROR, "Integer overflow: attempted 64-bit offset\n");
 			exit_cleanup(RERR_UNSUPPORTED);
 		}
 #endif
-		if (cnt > 3)
-			readfd(f, b + 3, cnt - 3);
-		switch (cnt) {
-		case 3:
-			num = NVAL3(b, 0);
-			break;
-		case 4:
-			num = NVAL4(b, 0x80);
-			break;
-		case 5:
-			num = NVAL5(b, 0xC0);
-			break;
-#if SIZEOF_INT64 >= 8
-		case 6:
-			num = NVAL6(b, 0xE0);
-			break;
-		case 7:
-			num = NVAL7(b, 0xF0);
-			break;
-		case 8:
-			num = NVAL8(b, 0xF8);
-			break;
-		case 9:
-			num = NVAL8(b+1, 0);
-			break;
+	} else
+		u.b[min_bytes + extra - 1] = CVAL(b2, 0);
+#if SIZEOF_INT64 < 8
+	u.x = IVAL(u.b,0);
+#elif CAREFUL_ALIGNMENT
+	u.x = IVAL(u.b,0) | (((int64)IVAL(u.b,4))<<32);
 #endif
-		default:
-			exit_cleanup(RERR_PROTOCOL); /* impossible... */
-		}
-	}
+	return u.x;
+}
 
-	return num;
+int64 read_longint(int f)
+{
+#if SIZEOF_INT64 >= 8
+	char b[9];
+#endif
+	int32 num = read_int(f);
+
+	if (num != (int32)0xffffffff)
+		return num;
+
+#if SIZEOF_INT64 < 8
+	rprintf(FERROR, "Integer overflow: attempted 64-bit offset\n");
+	exit_cleanup(RERR_UNSUPPORTED);
+#else
+	readfd(f, b, 8);
+	return IVAL(b,0) | (((int64)IVAL(b,4))<<32);
+#endif
 }
 
 void read_buf(int f, char *buf, size_t len)
@@ -1404,42 +1403,65 @@ void write_shortint(int f, unsigned short x)
 	writefd(f, b, 2);
 }
 
-void write_varint(int f, int32 x)
-{
-	char b[5];
-	if ((uint32)x < ((uint32)1<<(1*8-1))) {
-		b[0] = (char)x;
-		writefd(f, b, 1);
-	} else if ((uint32)x < ((uint32)1<<(2*8-2))) {
-		b[0] = (char)(x >> 8) | 0x80;
-		b[1] = (char)x;
-		writefd(f, b, 2);
-	} else if ((uint32)x < ((uint32)1<<(3*8-3))) {
-		b[0] = (char)(x >> 16) | 0xC0;
-		b[1] = (char)(x >> 8);
-		b[2] = (char)x;
-		writefd(f, b, 3);
-	} else if ((uint32)x < ((uint32)1<<(4*8-4))) {
-		b[0] = (char)(x >> 24) | 0xE0;
-		b[1] = (char)(x >> 16);
-		b[2] = (char)(x >> 8);
-		b[3] = (char)x;
-		writefd(f, b, 4);
-	} else {
-		b[0] = 0xF0;
-		b[1] = (char)(x >> 24);
-		b[2] = (char)(x >> 16);
-		b[3] = (char)(x >> 8);
-		b[4] = (char)x;
-		writefd(f, b, 5);
-	}
-}
-
 void write_int(int f, int32 x)
 {
 	char b[4];
 	SIVAL(b, 0, x);
 	writefd(f, b, 4);
+}
+
+void write_varint(int f, int32 x)
+{
+	char b[5];
+	uchar bit;
+	int cnt = 4;
+
+	SIVAL(b, 1, x);
+
+	while (cnt > 1 && b[cnt] == 0)
+		cnt--;
+	bit = ((uchar)1<<(7-cnt+1));
+	if (CVAL(b, cnt) >= bit) {
+		cnt++;
+		*b = ~(bit-1);
+	} else if (cnt > 1)
+		*b = b[cnt] | ~(bit*2-1);
+	else
+		*b = b[cnt];
+
+	writefd(f, b, cnt);
+}
+
+void write_varlong(int f, int64 x, uchar min_bytes)
+{
+	char b[9];
+	uchar bit;
+	int cnt = 8;
+
+	SIVAL(b, 1, x);
+#if SIZEOF_INT64 >= 8
+	SIVAL(b, 5, x >> 32);
+#else
+	if (x <= 0x7FFFFFFF && x >= 0)
+		memset(b + 5, 0, 4);
+	else {
+		rprintf(FERROR, "Integer overflow: attempted 64-bit offset\n");
+		exit_cleanup(RERR_UNSUPPORTED);
+	}
+#endif
+
+	while (cnt > min_bytes && b[cnt] == 0)
+		cnt--;
+	bit = ((uchar)1<<(7-cnt+min_bytes));
+	if (CVAL(b, cnt) >= bit) {
+		cnt++;
+		*b = ~(bit-1);
+	} else if (cnt > min_bytes)
+		*b = b[cnt] | ~(bit*2-1);
+	else
+		*b = b[cnt];
+
+	writefd(f, b, cnt);
 }
 
 /*
@@ -1448,100 +1470,21 @@ void write_int(int f, int32 x)
  */
 void write_longint(int f, int64 x)
 {
-	char b[12];
+	char b[12], * const s = b+4;
 
-#if SIZEOF_INT64 < 8
-	if (x < 0 || x > 0x7FFFFFFF) {
-		rprintf(FERROR, "Integer overflow: attempted 64-bit offset\n");
-		exit_cleanup(RERR_UNSUPPORTED);
-	}
-#endif
-
-	if (protocol_version < 30) {
-		char * const s = b+4;
-		SIVAL(s, 0, x);
-#if SIZEOF_INT64 < 8
+	SIVAL(s, 0, x);
+	if (x <= 0x7FFFFFFF && x >= 0) {
 		writefd(f, s, 4);
-#else
-		if (x <= 0x7FFFFFFF && x >= 0) {
-			writefd(f, s, 4);
-			return;
-		}
+		return;
+	}
 
-		memset(b, 0xFF, 4);
-		SIVAL(s, 4, x >> 32);
-		writefd(f, b, 12);
-	} else if (x < 0) {
-		goto all_bits;
-#endif
-	} else if (x < ((int32)1<<(3*8-1))) {
-		b[0] = (char)(x >> 16);
-		b[1] = (char)(x >> 8);
-		b[2] = (char)x;
-		writefd(f, b, 3);
-	} else if (x < ((int64)1<<(4*8-2))) {
-		b[0] = (char)((x >> 24) | 0x80);
-		b[1] = (char)(x >> 16);
-		b[2] = (char)(x >> 8);
-		b[3] = (char)x;
-		writefd(f, b, 4);
 #if SIZEOF_INT64 < 8
-	} else {
-		b[0] = 0xC0;
-		b[1] = (char)(x >> 24);
-		b[2] = (char)(x >> 16);
-		b[3] = (char)(x >> 8);
-		b[4] = (char)x;
-		writefd(f, b, 5);
-	}
+	rprintf(FERROR, "Integer overflow: attempted 64-bit offset\n");
+	exit_cleanup(RERR_UNSUPPORTED);
 #else
-	} else if (x < ((int64)1<<(5*8-3))) {
-		b[0] = (char)((x >> 32) | 0xC0);
-		b[1] = (char)(x >> 24);
-		b[2] = (char)(x >> 16);
-		b[3] = (char)(x >> 8);
-		b[4] = (char)x;
-		writefd(f, b, 5);
-	} else if (x < ((int64)1<<(6*8-4))) {
-		b[0] = (char)((x >> 40) | 0xE0);
-		b[1] = (char)(x >> 32);
-		b[2] = (char)(x >> 24);
-		b[3] = (char)(x >> 16);
-		b[4] = (char)(x >> 8);
-		b[5] = (char)x;
-		writefd(f, b, 6);
-	} else if (x < ((int64)1<<(7*8-5))) {
-		b[0] = (char)((x >> 48) | 0xF0);
-		b[1] = (char)(x >> 40);
-		b[2] = (char)(x >> 32);
-		b[3] = (char)(x >> 24);
-		b[4] = (char)(x >> 16);
-		b[5] = (char)(x >> 8);
-		b[6] = (char)x;
-		writefd(f, b, 7);
-	} else if (x < ((int64)1<<(8*8-6))) {
-		b[0] = (char)((x >> 56) | 0xF8);
-		b[1] = (char)(x >> 48);
-		b[2] = (char)(x >> 40);
-		b[3] = (char)(x >> 32);
-		b[4] = (char)(x >> 24);
-		b[5] = (char)(x >> 16);
-		b[6] = (char)(x >> 8);
-		b[7] = (char)x;
-		writefd(f, b, 8);
-	} else {
-	  all_bits:
-		b[0] = (char)0xFC;
-		b[1] = (char)(x >> 56);
-		b[2] = (char)(x >> 48);
-		b[3] = (char)(x >> 40);
-		b[4] = (char)(x >> 32);
-		b[5] = (char)(x >> 24);
-		b[6] = (char)(x >> 16);
-		b[7] = (char)(x >> 8);
-		b[8] = (char)x;
-		writefd(f, b, 9);
-	}
+	memset(b, 0xFF, 4);
+	SIVAL(s, 4, x >> 32);
+	writefd(f, b, 12);
 #endif
 }
 
@@ -1617,9 +1560,9 @@ void write_ndx(int f, int32 ndx)
 	else if (diff < 0 || diff > 0x7FFF) {
 		b[cnt++] = (char)0xFE;
 		b[cnt++] = (char)((ndx >> 24) | 0x80);
-		b[cnt++] = (char)(ndx >> 16);
-		b[cnt++] = (char)(ndx >> 8);
 		b[cnt++] = (char)ndx;
+		b[cnt++] = (char)(ndx >> 8);
+		b[cnt++] = (char)(ndx >> 16);
 	} else {
 		b[cnt++] = (char)0xFE;
 		b[cnt++] = (char)(diff >> 8);
@@ -1649,12 +1592,14 @@ int32 read_ndx(int f)
 	if (CVAL(b, 0) == 0xFE) {
 		readfd(f, b, 2);
 		if (CVAL(b, 0) & 0x80) {
-			readfd(f, b+2, 2);
-			num = NVAL4(b, 0x80);
+			b[3] = CVAL(b, 0) & ~0x80;
+			b[0] = b[1];
+			readfd(f, b+1, 2);
+			num = IVAL(b, 0);
 		} else
-			num = NVAL2(b, 0) + *prev_ptr;
+			num = (UVAL(b,0)<<8) + UVAL(b,1) + *prev_ptr;
 	} else
-		num = CVAL(b, 0) + *prev_ptr;
+		num = UVAL(b, 0) + *prev_ptr;
 	*prev_ptr = num;
 	if (prev_ptr == &prev_negative)
 		num = -num;
