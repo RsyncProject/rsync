@@ -30,6 +30,7 @@ extern int am_root;
 extern int am_server;
 extern int am_daemon;
 extern int am_sender;
+extern int am_generator;
 extern int inc_recurse;
 extern int do_progress;
 extern int always_checksum;
@@ -576,7 +577,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 static struct file_struct *recv_file_entry(struct file_list *flist,
 					   int flags, int f)
 {
-	static time_t modtime;
+	static int64 modtime;
 	static mode_t mode;
 	static int64 dev;
 	static dev_t rdev;
@@ -671,10 +672,17 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 
 	file_length = read_varlong30(f, 3);
 	if (!(flags & XMIT_SAME_TIME)) {
-		if (protocol_version >= 30)
-			modtime = (time_t)read_varlong(f, 4);
-		else
-			modtime = (time_t)read_int(f);
+		if (protocol_version >= 30) {
+			modtime = read_varlong(f, 4);
+#if SIZEOF_TIME_T < SIZEOF_INT64
+			if ((modtime > INT_MAX || modtime < INT_MIN) && !am_generator) {
+				rprintf(FERROR,
+				    "Time value of %s truncated on receiver.\n",
+				    lastname);
+			}
+#endif
+		} else
+			modtime = read_int(f);
 	}
 	if (!(flags & XMIT_SAME_MODE))
 		mode = from_wire_mode(read_int(f));
@@ -791,7 +799,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (flags & XMIT_HLINKED)
 		file->flags |= FLAG_HLINKED;
 #endif
-	file->modtime = modtime;
+	file->modtime = (time_t)modtime;
 	file->len32 = (uint32)file_length;
 	if (file_length > 0xFFFFFFFFu && S_ISREG(mode)) {
 		file->flags |= FLAG_LENGTH64;
