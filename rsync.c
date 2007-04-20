@@ -98,7 +98,7 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 	int len, iflags = 0;
 	struct file_list *flist;
 	uchar fnamecmp_type = FNAMECMP_FNAME;
-	int verbose_save, ndx;
+	int ndx;
 
   read_loop:
 	while (1) {
@@ -124,8 +124,6 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 				NDX_FLIST_OFFSET - dir_flist->count);
 			exit_cleanup(RERR_PROTOCOL);
 		}
-		verbose_save = verbose;
-		verbose = 0; /* TODO allow verbose messages? */
 
 		/* Send everything read from f_in to msg_fd_out. */
 		send_msg_int(MSG_FLIST, ndx);
@@ -133,8 +131,6 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 		flist = recv_file_list(f_in);
 		flist->parent_ndx = ndx;
 		stop_flist_forward();
-
-		verbose = verbose_save;
 	}
 
 	iflags = protocol_version >= 29 ? read_shortint(f_in)
