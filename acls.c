@@ -559,11 +559,11 @@ static void send_ida_entries(const ida_entries *idal, int user_names, int f)
 	id_access *ida;
 	size_t count = idal->count;
 
-	write_abbrevint(f, idal->count);
+	write_varint(f, idal->count);
 
 	for (ida = idal->idas; count--; ida++) {
 		char *name = user_names ? add_uid(ida->id) : add_gid(ida->id);
-		write_abbrevint(f, ida->id);
+		write_varint(f, ida->id);
 		if (inc_recurse && name) {
 			int len = strlen(name);
 			write_byte(f, ida->access | (uchar)0x80);
@@ -580,7 +580,7 @@ static void send_rsync_acl(rsync_acl *racl, SMB_ACL_TYPE_T type,
 	int ndx = find_matching_rsync_acl(racl, type, racl_list);
 
 	/* Send 0 (-1 + 1) to indicate that literal ACL data follows. */
-	write_abbrevint(f, ndx + 1);
+	write_varint(f, ndx + 1);
 
 	if (ndx < 0) {
 		rsync_acl *new_racl = EXPAND_ITEM_LIST(racl_list, rsync_acl, 1000);
@@ -672,7 +672,7 @@ static uchar recv_acl_access(uchar *name_follows_val, int f)
 static uchar recv_ida_entries(ida_entries *ent, int user_names, int f)
 {
 	uchar computed_mask_bits = 0;
-	int i, count = read_abbrevint(f);
+	int i, count = read_varint(f);
 
 	if (count) {
 		if (!(ent->idas = new_array(id_access, ent->count)))
@@ -684,7 +684,7 @@ static uchar recv_ida_entries(ida_entries *ent, int user_names, int f)
 
 	for (i = 0; i < count; i++) {
 		uchar has_name;
-		id_t id = read_abbrevint(f);
+		id_t id = read_varint(f);
 		int access = recv_acl_access(&has_name, f);
 
 		if (has_name) {
@@ -713,7 +713,7 @@ static int recv_rsync_acl(item_list *racl_list, SMB_ACL_TYPE_T type, int f)
 	uchar computed_mask_bits = 0;
 	acl_duo *duo_item;
 	uchar flags;
-	int ndx = read_abbrevint(f);
+	int ndx = read_varint(f);
 
 	if (ndx < 0 || (size_t)ndx > racl_list->count) {
 		rprintf(FERROR, "recv_acl_index: %s ACL index %d > %d\n",

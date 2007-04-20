@@ -280,14 +280,14 @@ void send_uid_list(int f)
 			if (!list->name)
 				continue;
 			len = strlen(list->name);
-			write_abbrevint30(f, list->id);
+			write_varint30(f, list->id);
 			write_byte(f, len);
 			write_buf(f, list->name, len);
 		}
 
 		/* terminate the uid list with a 0 uid. We explicitly exclude
 		 * 0 from the list */
-		write_abbrevint30(f, 0);
+		write_varint30(f, 0);
 	}
 
 	if (preserve_gid || preserve_acls) {
@@ -296,11 +296,11 @@ void send_uid_list(int f)
 			if (!list->name)
 				continue;
 			len = strlen(list->name);
-			write_abbrevint30(f, list->id);
+			write_varint30(f, list->id);
 			write_byte(f, len);
 			write_buf(f, list->name, len);
 		}
-		write_abbrevint30(f, 0);
+		write_varint30(f, 0);
 	}
 }
 
@@ -332,13 +332,13 @@ void recv_uid_list(int f, struct file_list *flist)
 
 	if ((preserve_uid || preserve_acls) && !numeric_ids) {
 		/* read the uid list */
-		while ((id = read_abbrevint30(f)) != 0)
+		while ((id = read_varint30(f)) != 0)
 			recv_user_name(f, (uid_t)id);
 	}
 
 	if ((preserve_gid || preserve_acls) && !numeric_ids) {
 		/* read the gid list */
-		while ((id = read_abbrevint30(f)) != 0)
+		while ((id = read_varint30(f)) != 0)
 			recv_group_name(f, (gid_t)id);
 	}
 

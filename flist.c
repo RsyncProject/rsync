@@ -471,13 +471,13 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 	if (flags & XMIT_SAME_NAME)
 		write_byte(f, l1);
 	if (flags & XMIT_LONG_NAME)
-		write_abbrevint30(f, l2);
+		write_varint30(f, l2);
 	else
 		write_byte(f, l2);
 	write_buf(f, fname + l1, l2);
 
 	if (first_hlink_ndx >= 0) {
-		write_abbrevint30(f, first_hlink_ndx);
+		write_varint30(f, first_hlink_ndx);
 		goto the_end;
 	}
 
@@ -490,7 +490,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 		if (protocol_version < 30)
 			write_int(f, uid);
 		else {
-			write_abbrevint(f, uid);
+			write_varint(f, uid);
 			if (flags & XMIT_USER_NAME_FOLLOWS) {
 				int len = strlen(user_name);
 				write_byte(f, len);
@@ -502,7 +502,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 		if (protocol_version < 30)
 			write_int(f, gid);
 		else {
-			write_abbrevint(f, gid);
+			write_varint(f, gid);
 			if (flags & XMIT_GROUP_NAME_FOLLOWS) {
 				int len = strlen(group_name);
 				write_byte(f, len);
@@ -517,9 +517,9 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 				write_int(f, (int)rdev);
 		} else {
 			if (!(flags & XMIT_SAME_RDEV_MAJOR))
-				write_abbrevint30(f, major(rdev));
+				write_varint30(f, major(rdev));
 			if (protocol_version >= 30)
-				write_abbrevint(f, minor(rdev));
+				write_varint(f, minor(rdev));
 			else if (flags & XMIT_RDEV_MINOR_8_pre30)
 				write_byte(f, minor(rdev));
 			else
@@ -531,7 +531,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 	if (preserve_links && S_ISLNK(mode)) {
 		const char *sl = F_SYMLINK(file);
 		int len = strlen(sl);
-		write_abbrevint30(f, len);
+		write_varint30(f, len);
 		write_buf(f, sl, len);
 	}
 #endif
@@ -597,7 +597,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		l1 = read_byte(f);
 
 	if (flags & XMIT_LONG_NAME)
-		l2 = read_abbrevint30(f);
+		l2 = read_varint30(f);
 	else
 		l2 = read_byte(f);
 
@@ -636,7 +636,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (protocol_version >= 30
 	 && BITS_SETnUNSET(flags, XMIT_HLINKED, XMIT_HLINK_FIRST)) {
 		struct file_struct *first;
-		first_hlink_ndx = read_abbrevint30(f);
+		first_hlink_ndx = read_varint30(f);
 		if (first_hlink_ndx < 0 || first_hlink_ndx >= flist->count) {
 			rprintf(FERROR,
 				"hard-link reference out of range: %d (%d)\n",
@@ -678,7 +678,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		if (protocol_version < 30)
 			uid = (uid_t)read_int(f);
 		else {
-			uid = (uid_t)read_abbrevint(f);
+			uid = (uid_t)read_varint(f);
 			if (flags & XMIT_USER_NAME_FOLLOWS)
 				uid = recv_user_name(f, uid);
 			else if (inc_recurse && am_root && !numeric_ids)
@@ -689,7 +689,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		if (protocol_version < 30)
 			gid = (gid_t)read_int(f);
 		else {
-			gid = (gid_t)read_abbrevint(f);
+			gid = (gid_t)read_varint(f);
 			if (flags & XMIT_GROUP_NAME_FOLLOWS)
 				gid = recv_group_name(f, gid);
 			else if (inc_recurse && (!am_root || !numeric_ids))
@@ -705,9 +705,9 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		} else {
 			uint32 rdev_minor;
 			if (!(flags & XMIT_SAME_RDEV_MAJOR))
-				rdev_major = read_abbrevint30(f);
+				rdev_major = read_varint30(f);
 			if (protocol_version >= 30)
-				rdev_minor = read_abbrevint(f);
+				rdev_minor = read_varint(f);
 			else if (flags & XMIT_RDEV_MINOR_8_pre30)
 				rdev_minor = read_byte(f);
 			else
@@ -721,7 +721,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 
 #ifdef SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(mode)) {
-		linkname_len = read_abbrevint30(f) + 1; /* count the '\0' */
+		linkname_len = read_varint30(f) + 1; /* count the '\0' */
 		if (linkname_len <= 0 || linkname_len > MAXPATHLEN) {
 			rprintf(FERROR, "overflow: linkname_len=%d\n",
 				linkname_len - 1);

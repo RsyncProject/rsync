@@ -316,28 +316,28 @@ int send_xattr(statx *sxp, int f)
 	int ndx = find_matching_xattr(sxp->xattr);
 
 	/* Send 0 (-1 + 1) to indicate that literal xattr data follows. */
-	write_abbrevint(f, ndx + 1);
+	write_varint(f, ndx + 1);
 
 	if (ndx < 0) {
 		rsync_xa *rxa;
 		int count = sxp->xattr->count;
-		write_abbrevint(f, count);
+		write_varint(f, count);
 		for (rxa = sxp->xattr->items; count--; rxa++) {
 #ifdef HAVE_LINUX_XATTRS
-			write_abbrevint(f, rxa->name_len);
-			write_abbrevint(f, rxa->datum_len);
+			write_varint(f, rxa->name_len);
+			write_varint(f, rxa->datum_len);
 			write_buf(f, rxa->name, rxa->name_len);
 #else
 			/* We strip the rsync prefix from disguised namespaces
 			 * and put everything else in the user namespace. */
 			if (HAS_PREFIX(rxa->name, RSYNC_PREFIX)
 			 && rxa->name[RPRE_LEN] != '%') {
-				write_abbrevint(f, rxa->name_len - RPRE_LEN);
-				write_abbrevint(f, rxa->datum_len);
+				write_varint(f, rxa->name_len - RPRE_LEN);
+				write_varint(f, rxa->datum_len);
 				write_buf(f, rxa->name + RPRE_LEN, rxa->name_len - RPRE_LEN);
 			} else {
-				write_abbrevint(f, rxa->name_len + UPRE_LEN);
-				write_abbrevint(f, rxa->datum_len);
+				write_varint(f, rxa->name_len + UPRE_LEN);
+				write_varint(f, rxa->datum_len);
 				write_buf(f, USER_PREFIX, UPRE_LEN);
 				write_buf(f, rxa->name, rxa->name_len);
 			}
@@ -454,7 +454,7 @@ void send_xattr_request(const char *fname, struct file_struct *file, int f_out)
 		/* Flag that we handled this abbreviated item. */
 		rxa->datum[0] = XSTATE_DONE;
 
-		write_abbrevint(f_out, j - prior_req);
+		write_varint(f_out, j - prior_req);
 		prior_req = j;
 
 		if (fname) {
@@ -465,7 +465,7 @@ void send_xattr_request(const char *fname, struct file_struct *file, int f_out)
 			if (!(ptr = get_xattr_data(fname, rxa->name, &len, 0)))
 				continue;
 
-			write_abbrevint(f_out, len); /* length might have changed! */
+			write_varint(f_out, len); /* length might have changed! */
 			write_buf(f_out, ptr, len);
 			free(ptr);
 		}
@@ -515,7 +515,7 @@ void recv_xattr_request(struct file_struct *file, int f_in)
 	cnt = lst->count;
 	rxa = lst->items;
 	rxa -= 1;
-	while ((rel_pos = read_abbrevint(f_in)) != 0) {
+	while ((rel_pos = read_varint(f_in)) != 0) {
 		rxa += rel_pos;
 		cnt -= rel_pos;
 		if (cnt < 0 || rxa->datum_len <= MAX_FULL_DATUM
@@ -530,7 +530,7 @@ void recv_xattr_request(struct file_struct *file, int f_in)
 		}
 
 		old_datum = rxa->datum;
-		rxa->datum_len = read_abbrevint(f_in);
+		rxa->datum_len = read_varint(f_in);
 
 		if (rxa->name_len + rxa->datum_len < rxa->name_len)
 			out_of_memory("recv_xattr_request"); /* overflow */
@@ -552,7 +552,7 @@ void receive_xattr(struct file_struct *file, int f)
 {
 	static item_list temp_xattr = EMPTY_ITEM_LIST;
 	int count;
-	int ndx = read_abbrevint(f);
+	int ndx = read_varint(f);
 
 	if (ndx < 0 || (size_t)ndx > rsync_xal_l.count) {
 		rprintf(FERROR, "receive_xattr: xa index %d out of"
@@ -565,7 +565,7 @@ void receive_xattr(struct file_struct *file, int f)
 		return;
 	}
 	
-	if ((count = read_abbrevint(f)) != 0) {
+	if ((count = read_varint(f)) != 0) {
 		(void)EXPAND_ITEM_LIST(&temp_xattr, rsync_xa, count);
 		temp_xattr.count = 0;
 	}
@@ -573,8 +573,8 @@ void receive_xattr(struct file_struct *file, int f)
 	while (count--) {
 		char *ptr, *name;
 		rsync_xa *rxa;
-		size_t name_len = read_abbrevint(f);
-		size_t datum_len = read_abbrevint(f);
+		size_t name_len = read_varint(f);
+		size_t datum_len = read_varint(f);
 		size_t dget_len = datum_len > MAX_FULL_DATUM ? 1 + MAX_DIGEST_LEN : datum_len;
 #ifdef HAVE_LINUX_XATTRS
 		size_t extra_len = 0;

@@ -18,18 +18,18 @@
 extern int protocol_version;
 
 static inline int32
-read_abbrevint30(int f)
+read_varint30(int f)
 {
 	if (protocol_version < 30)
 		return read_int(f);
-	return read_abbrevint(f);
+	return read_varint(f);
 }
 
 static inline void
-write_abbrevint30(int f, int32 x)
+write_varint30(int f, int32 x)
 {
 	if (protocol_version < 30)
 		write_int(f, x);
 	else
-		write_abbrevint(f, x);
+		write_varint(f, x);
 }

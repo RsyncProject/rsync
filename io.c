@@ -998,7 +998,7 @@ unsigned short read_shortint(int f)
 	return (UVAL(b, 1) << 8) + UVAL(b, 0);
 }
 
-int32 read_abbrevint(int f)
+int32 read_varint(int f)
 {
 	int32 num;
 	char b[5];
@@ -1404,7 +1404,7 @@ void write_shortint(int f, unsigned short x)
 	writefd(f, b, 2);
 }
 
-void write_abbrevint(int f, int32 x)
+void write_varint(int f, int32 x)
 {
 	char b[5];
 	if ((uint32)x < ((uint32)1<<(1*8-1))) {
