@@ -48,6 +48,16 @@ Changes since 2.6.9:
       delete files at the end of the transfer without needing a separate
       delete pass.
 
+    - Added the --acls (-A) option to preserve Access Control Lists.  This is
+      an improved version of the prior patch that was available.  (If you need
+      to have backward compatibility with old, patched versions, the new
+      acls.diff patch that will add that.)
+
+    - Added the --xattrs (-X) option to preserver extended attributes.  This is
+      an improved version of the prior patch that was available.  (If you need
+      to have backward compatibility with old, patched versions, the new
+      xattrs.diff patch that will add that.)
+
     - You may specify --max-delete=0 to a 3.0.0 client as long as the
       receiving side is at least version 3.0.0.  This means that you
       can pull from an older rsync with this option, but pushing to an
@@ -66,6 +76,10 @@ Changes since 2.6.9:
       both sides).
 
   INTERNAL:
+
+    - Rsync now supports the transfer of 64-bit timestamps (time_t values).
+
+    - Fixed a build problem with older (2.x) versions of gcc.
 
     - Added some isType() functions that make dealing with signed characters
       easier without forcing variables via casts.
@@ -87,4 +101,8 @@ Changes since 2.6.9:
 
   DEVELOPER RELATED:
 
-    - ...
+    - Rsync now has a way of handling protocol-version changes during the
+      development of a new protocol version.  This exchange of sub-version
+      info does not interfere with the {MIN,MAX}_PROTOCOL_VERSION checking
+      in older versions (which would be the case if every minor change made
+      to the protocol in CVS incremented the main PROTOCOL_VERSION value).
