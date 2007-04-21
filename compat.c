@@ -75,6 +75,19 @@ void setup_protocol(int f_out,int f_in)
 		remote_protocol = read_int(f_in);
 		if (protocol_version > remote_protocol)
 			protocol_version = remote_protocol;
+		/* CVS support: fallback to finalized protocol if incompatible */
+		if (protocol_version >= 30) {
+			int theirsub, oursub = PROTOCOL_SUBVERSION;
+			if (!read_batch)
+				write_varint(f_out, oursub);
+			theirsub = read_varint(f_in);
+			if (remote_protocol > PROTOCOL_VERSION)
+				theirsub = 0; /* 0 == final version */
+			if (protocol_version < PROTOCOL_VERSION)
+				oursub = 0;
+			if (theirsub != oursub)
+				protocol_version--;
+		}
 	}
 	if (read_batch && remote_protocol > protocol_version) {
 	        rprintf(FERROR, "The protocol version in the batch file is too new (%d > %d).\n",
