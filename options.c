@@ -237,9 +237,10 @@ static void print_rsync_version(enum logcode f)
 		RSYNC_NAME, RSYNC_VERSION, PROTOCOL_VERSION);
 	rprintf(f, "Copyright (C) 1996-2007 by Andrew Tridgell, Wayne Davison, and others.\n");
 	rprintf(f, "<http://rsync.samba.org/>\n");
-	rprintf(f, "Capabilities: %d-bit files, %d-bit system inums, %d-bit internal inums,\n",
+	rprintf(f, "Capabilities: %d-bit files, %d-bit inums, %d-bit timestamps, %d-bit long ints,\n",
 		(int)(sizeof (OFF_T) * 8),
 		(int)(sizeof dumstat->st_ino * 8), /* Don't check ino_t! */
+		(int)(sizeof (time_t) * 8),
 		(int)(sizeof (int64) * 8));
 	rprintf(f, "    %ssocketpairs, %shardlinks, %ssymlinks, %sIPv6, batchfiles, %sinplace,\n",
 		got_socketpair, hardlinks, links, ipv6, have_inplace);
