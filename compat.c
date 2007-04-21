@@ -77,7 +77,7 @@ void setup_protocol(int f_out,int f_in)
 			protocol_version = remote_protocol;
 		/* CVS support: fallback to finalized protocol if incompatible */
 		if (protocol_version >= 30) {
-			int theirsub, oursub = PROTOCOL_SUBVERSION;
+			int theirsub, oursub = SUBPROTOCOL_VERSION;
 			if (!read_batch)
 				write_varint(f_out, oursub);
 			theirsub = read_varint(f_in);
