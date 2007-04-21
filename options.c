@@ -198,6 +198,7 @@ char *bind_address;
 
 static void print_rsync_version(enum logcode f)
 {
+	char buf[32];
 	char const *got_socketpair = "no ";
 	char const *have_inplace = "no ";
 	char const *hardlinks = "no ";
@@ -233,11 +234,16 @@ static void print_rsync_version(enum logcode f)
 	ipv6 = "";
 #endif
 
-	rprintf(f, "%s  version %s  protocol version %d\n",
-		RSYNC_NAME, RSYNC_VERSION, PROTOCOL_VERSION);
+	if (SUBPROTOCOL_VERSION)
+		snprintf(buf, sizeof buf, ".PR%d", SUBPROTOCOL_VERSION);
+	else
+		*buf = '\0';
+	rprintf(f, "%s  version %s  protocol version %d%s\n",
+		RSYNC_NAME, RSYNC_VERSION, PROTOCOL_VERSION, buf);
 	rprintf(f, "Copyright (C) 1996-2007 by Andrew Tridgell, Wayne Davison, and others.\n");
-	rprintf(f, "<http://rsync.samba.org/>\n");
-	rprintf(f, "Capabilities: %d-bit files, %d-bit inums, %d-bit timestamps, %d-bit long ints,\n",
+	rprintf(f, "Web site: http://rsync.samba.org/\n");
+	rprintf(f, "Capabilities:\n");
+	rprintf(f, "    %d-bit files, %d-bit inums, %d-bit timestamps, %d-bit long ints,\n",
 		(int)(sizeof (OFF_T) * 8),
 		(int)(sizeof dumstat->st_ino * 8), /* Don't check ino_t! */
 		(int)(sizeof (time_t) * 8),
