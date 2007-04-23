@@ -49,10 +49,40 @@ extern int need_messages_from_generator;
 extern int delete_mode, delete_before, delete_during, delete_after;
 extern int delete_excluded;
 extern int make_backups;
+extern char *shell_cmd; /* contains VER.SUB string if client is a pre-release */
 extern char *backup_dir, *backup_suffix;
 extern char *partial_dir;
 extern char *dest_option;
 extern struct filter_list_struct filter_list;
+
+/* The server makes sure that if either side only supports a pre-release
+ * version of a protocol, that both sides must speak a compatible version
+ * of that protocol for it to be advertised as available. */
+static void check_sub_protocol(void)
+{
+	char *dot;
+	int their_protocol, their_sub;
+	int our_sub = protocol_version < PROTOCOL_VERSION ? 0 : SUBPROTOCOL_VERSION;
+
+	if (!shell_cmd || !(dot = strchr(shell_cmd, '.'))
+	 || !(their_protocol = atoi(shell_cmd))
+	 || !(their_sub = atoi(dot+1))) {
+		if (our_sub)
+			protocol_version--;
+		return;
+	}
+
+	if (their_protocol < protocol_version) {
+		if (their_sub)
+			protocol_version = their_protocol - 1;
+		return;
+	}
+
+	if (their_protocol > protocol_version)
+		their_sub = 0; /* 0 == final version */
+	if (their_sub != our_sub)
+		protocol_version--;
+}
 
 void setup_protocol(int f_out,int f_in)
 {
@@ -70,27 +100,16 @@ void setup_protocol(int f_out,int f_in)
 		preserve_xattrs = ++file_extra_cnt;
 
 	if (remote_protocol == 0) {
+		if (am_server && !local_server)
+			check_sub_protocol();
 		if (!read_batch)
 			write_int(f_out, protocol_version);
 		remote_protocol = read_int(f_in);
 		if (protocol_version > remote_protocol)
 			protocol_version = remote_protocol;
-		/* CVS support: fallback to finalized protocol if incompatible */
-		if (protocol_version >= 30) {
-			int theirsub, oursub = SUBPROTOCOL_VERSION;
-			if (!read_batch)
-				write_varint(f_out, oursub);
-			theirsub = read_varint(f_in);
-			if (remote_protocol > PROTOCOL_VERSION)
-				theirsub = 0; /* 0 == final version */
-			if (protocol_version < PROTOCOL_VERSION)
-				oursub = 0;
-			if (theirsub != oursub)
-				protocol_version--;
-		}
 	}
 	if (read_batch && remote_protocol > protocol_version) {
-	        rprintf(FERROR, "The protocol version in the batch file is too new (%d > %d).\n",
+		rprintf(FERROR, "The protocol version in the batch file is too new (%d > %d).\n",
 			remote_protocol, protocol_version);
 		exit_cleanup(RERR_PROTOCOL);
 	}

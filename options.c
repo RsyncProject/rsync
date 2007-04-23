@@ -1650,6 +1650,13 @@ void server_options(char **args,int *argc)
 
 	argstr[x] = '\0';
 
+	/* If we're speaking a pre-release version of a protocol, we tell
+	 * the server about this by (ab)using the -e option. */
+	if (SUBPROTOCOL_VERSION && protocol_version == PROTOCOL_VERSION) {
+		x += snprintf(argstr+x, sizeof argstr - x,
+			      "e%d.%d", PROTOCOL_VERSION, SUBPROTOCOL_VERSION);
+	}
+
 	if (x != 1)
 		args[ac++] = argstr;
 

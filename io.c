@@ -1715,11 +1715,6 @@ void start_write_batch(int fd)
 	 * actual communication so far depends on whether a daemon
 	 * is involved. */
 	write_int(batch_fd, protocol_version);
-	if (protocol_version >= 30) {
-		int sub = protocol_version == PROTOCOL_VERSION
-		        ? SUBPROTOCOL_VERSION : 0;
-		write_varint(batch_fd, sub);
-	}
 	write_int(batch_fd, checksum_seed);
 
 	if (am_sender)
