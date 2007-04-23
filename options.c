@@ -198,7 +198,7 @@ char *bind_address;
 
 static void print_rsync_version(enum logcode f)
 {
-	char buf[32];
+	char *subprotocol = "";
 	char const *got_socketpair = "no ";
 	char const *have_inplace = "no ";
 	char const *hardlinks = "no ";
@@ -208,18 +208,18 @@ static void print_rsync_version(enum logcode f)
 	char const *ipv6 = "no ";
 	STRUCT_STAT *dumstat;
 
+#if SUBPROTOCOL_VERSION != 0
+	asprintf(&subprotocol, ".PR%d", SUBPROTOCOL_VERSION);
+#endif
 #ifdef HAVE_SOCKETPAIR
 	got_socketpair = "";
 #endif
-
 #ifdef HAVE_FTRUNCATE
 	have_inplace = "";
 #endif
-
 #ifdef SUPPORT_HARD_LINKS
 	hardlinks = "";
 #endif
-
 #ifdef SUPPORT_ACLS
 	acls = "";
 #endif
@@ -229,17 +229,12 @@ static void print_rsync_version(enum logcode f)
 #ifdef SUPPORT_LINKS
 	links = "";
 #endif
-
 #ifdef INET6
 	ipv6 = "";
 #endif
 
-	if (SUBPROTOCOL_VERSION)
-		snprintf(buf, sizeof buf, ".PR%d", SUBPROTOCOL_VERSION);
-	else
-		*buf = '\0';
 	rprintf(f, "%s  version %s  protocol version %d%s\n",
-		RSYNC_NAME, RSYNC_VERSION, PROTOCOL_VERSION, buf);
+		RSYNC_NAME, RSYNC_VERSION, PROTOCOL_VERSION, subprotocol);
 	rprintf(f, "Copyright (C) 1996-2007 by Andrew Tridgell, Wayne Davison, and others.\n");
 	rprintf(f, "Web site: http://rsync.samba.org/\n");
 	rprintf(f, "Capabilities:\n");
@@ -1650,12 +1645,14 @@ void server_options(char **args,int *argc)
 
 	argstr[x] = '\0';
 
+#if SUBPROTOCOL_VERSION != 0
 	/* If we're speaking a pre-release version of a protocol, we tell
 	 * the server about this by (ab)using the -e option. */
-	if (SUBPROTOCOL_VERSION && protocol_version == PROTOCOL_VERSION) {
+	if (protocol_version == PROTOCOL_VERSION) {
 		x += snprintf(argstr+x, sizeof argstr - x,
 			      "e%d.%d", PROTOCOL_VERSION, SUBPROTOCOL_VERSION);
 	}
+#endif
 
 	if (x != 1)
 		args[ac++] = argstr;
