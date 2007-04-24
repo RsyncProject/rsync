@@ -13,13 +13,38 @@
 
 . "$suitedir/rsync.fns"
 
-case `id -u` in
-'') ;; # If "id" failed, try to continue...
-0)  ;;
-*)  if [ -f /usr/bin/fakeroot ]; then
-	echo "Let's try re-running the script under fakeroot..."
-	exec /usr/bin/fakeroot /bin/sh "$0"
-    fi
+case $0 in
+*fake*)
+    $RSYNC --version | grep ", xattrs" >/dev/null || test_skipped "Rsync needs xattrs for fake device tests"
+    RSYNC="$RSYNC --fake-super"
+    TLS_ARGS=--fake-super
+    case "`xattr 2>&1`" in
+    *--list:*)
+	chown() {
+	    own=$1
+	    shift
+	    xattr -s 'rsync.%stat' "100644 0,0 $own" "${@}"
+	}
+	;;
+    *)
+	chown() {
+	    own=$1
+	    shift
+	    setfattr -n 'user.rsync.%stat' -v "100644 0,0 $own" "${@}"
+	}
+	;;
+    esac
+    ;;
+*)
+    case `id -u` in
+    '') ;; # If "id" failed, try to continue...
+    0)  ;;
+    *)  if [ -f /usr/bin/fakeroot ]; then
+	    echo "Let's try re-running the script under fakeroot..."
+	    exec /usr/bin/fakeroot /bin/sh "$0"
+	fi
+	;;
+    esac
     ;;
 esac
 
@@ -31,10 +56,8 @@ name2="$fromdir/name2"
 echo "This is the file" > "$name1"
 echo "This is the other file" > "$name2"
 
-chown 5000 "$name1" || test_skipped "Can't chown (probably need root)"
-chown 5001 "$name2" || test_skipped "Can't chown (probably need root)"
-chgrp 5002 "$name1" || test_skipped "Can't chgrp (probably need root)"
-chgrp 5003 "$name2" || test_skipped "Can't chgrp (probably need root)"
+chown 5000:5002 "$name1" || test_skipped "Can't chown (probably need root)"
+chown 5001:5003 "$name2" || test_skipped "Can't chown (probably need root)"
 
 cd "$fromdir/.."
 checkit "$RSYNC -aHvv from/ to/" "$fromdir" "$todir"
