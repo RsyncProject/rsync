@@ -85,7 +85,7 @@ mkrounding$(EXEEXT): mkrounding.c rsync.h
 	@rm mkrounding.h
 
 tls$(EXEEXT): $(TLS_OBJ)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TLS_OBJ) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TLS_OBJ) @BUILD_POPT@ $(LIBS)
 
 getgroups$(EXEEXT): getgroups.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ getgroups.o $(LIBS)
