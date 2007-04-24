@@ -127,7 +127,7 @@ static int make_bak_dir(char *fullpath)
 		if (p >= rel) {
 			/* Try to transfer the directory settings of the
 			 * actual dir that the files are coming from. */
-			if (do_stat(rel, &sx.st) < 0) {
+			if (x_stat(rel, &sx.st, NULL) < 0) {
 				rsyserr(FERROR, errno,
 					"make_bak_dir stat %s failed",
 					full_fname(rel));
@@ -200,7 +200,7 @@ static int keep_backup(const char *fname)
 	int ret_code;
 
 	/* return if no file to keep */
-	if (do_lstat(fname, &sx.st) < 0)
+	if (x_lstat(fname, &sx.st, NULL) < 0)
 		return 1;
 #ifdef SUPPORT_ACLS
 	sx.acc_acl = sx.def_acl = NULL;

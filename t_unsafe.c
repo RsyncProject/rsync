@@ -23,7 +23,11 @@
 
 #include "rsync.h"
 
-int dry_run, read_only, list_only, verbose;
+int dry_run = 0;
+int am_root = 0;
+int read_only = 0;
+int list_only = 0;
+int verbose = 0;
 int preserve_perms = 0;
 
 int

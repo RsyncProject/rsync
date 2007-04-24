@@ -197,12 +197,12 @@ static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
 				rprintf(FINFO,"copying unsafe symlink \"%s\" -> \"%s\"\n",
 					path, linkbuf);
 			}
-			return do_stat(path, stp);
+			return x_stat(path, stp, NULL);
 		}
 	}
 	return 0;
 #else
-	return do_stat(path, stp);
+	return x_stat(path, stp, NULL);
 #endif
 }
 
@@ -210,17 +210,17 @@ int link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
 {
 #ifdef SUPPORT_LINKS
 	if (copy_links)
-		return do_stat(path, stp);
-	if (do_lstat(path, stp) < 0)
+		return x_stat(path, stp, NULL);
+	if (x_lstat(path, stp, NULL) < 0)
 		return -1;
 	if (follow_dirlinks && S_ISLNK(stp->st_mode)) {
 		STRUCT_STAT st;
-		if (do_stat(path, &st) == 0 && S_ISDIR(st.st_mode))
+		if (x_stat(path, &st, NULL) == 0 && S_ISDIR(st.st_mode))
 			*stp = st;
 	}
 	return 0;
 #else
-	return do_stat(path, stp);
+	return x_stat(path, stp, NULL);
 #endif
 }
 
@@ -253,26 +253,6 @@ static int is_excluded(char *fname, int is_dir, int filter_level)
 	    && check_filter(&filter_list, fname, is_dir) < 0)
 		return 1;
 	return 0;
-}
-
-static int to_wire_mode(mode_t mode)
-{
-#ifdef SUPPORT_LINKS
-#if _S_IFLNK != 0120000
-	if (S_ISLNK(mode))
-		return (mode & ~(_S_IFMT)) | 0120000;
-#endif
-#endif
-	return mode;
-}
-
-static mode_t from_wire_mode(int mode)
-{
-#if _S_IFLNK != 0120000
-	if ((mode & (_S_IFMT)) == 0120000)
-		return (mode & ~(_S_IFMT)) | _S_IFLNK;
-#endif
-	return mode;
 }
 
 static void send_directory(int f, struct file_list *flist, int ndx,
@@ -970,7 +950,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		if (save_errno == ENOENT) {
 #ifdef SUPPORT_LINKS
 			/* Avoid "vanished" error if symlink points nowhere. */
-			if (copy_links && do_lstat(thisname, &st) == 0
+			if (copy_links && x_lstat(thisname, &st, NULL) == 0
 			    && S_ISLNK(st.st_mode)) {
 				io_error |= IOERR_GENERAL;
 				rprintf(FERROR, "symlink has no referent: %s\n",
@@ -1142,7 +1122,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		int save_mode = file->mode;
 		file->mode = S_IFDIR; /* Find a directory with our name. */
 		if (flist_find(dir_flist, file) >= 0
-		    && do_stat(thisname, &st2) == 0 && S_ISDIR(st2.st_mode)) {
+		    && x_stat(thisname, &st2, NULL) == 0 && S_ISDIR(st2.st_mode)) {
 			file->modtime = st2.st_mtime;
 			file->len32 = 0;
 			file->mode = st2.st_mode;

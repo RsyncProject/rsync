@@ -811,6 +811,12 @@ typedef struct {
 
 #include "proto.h"
 
+#ifndef SUPPORT_XATTRS
+#define x_stat(fn,fst,xst) do_stat(fn,fst)
+#define x_lstat(fn,fst,xst) do_lstat(fn,fst)
+#define x_fstat(fd,fst,xst) do_fstat(fd,fst)
+#endif
+
 /* We have replacement versions of these if they're missing. */
 #ifndef HAVE_ASPRINTF
 int asprintf(char **ptr, const char *format, ...);
@@ -1028,6 +1034,26 @@ int inet_pton(int af, const char *src, void *dst);
 #ifdef MAINTAINER_MODE
 const char *get_panic_action(void);
 #endif
+
+static inline int to_wire_mode(mode_t mode)
+{
+#ifdef SUPPORT_LINKS
+#if _S_IFLNK != 0120000
+	if (S_ISLNK(mode))
+		return (mode & ~(_S_IFMT)) | 0120000;
+#endif
+#endif
+	return mode;
+}
+
+static inline mode_t from_wire_mode(int mode)
+{
+#if _S_IFLNK != 0120000
+	if ((mode & (_S_IFMT)) == 0120000)
+		return (mode & ~(_S_IFMT)) | _S_IFLNK;
+#endif
+	return mode;
+}
 
 static inline int
 isDigit(const char *ptr)

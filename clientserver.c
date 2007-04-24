@@ -629,6 +629,11 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	if (lp_ignore_errors(module_id))
 		ignore_errors = 1;
 
+	if (lp_fake_super(i))
+		am_root = -1;
+	else if (am_root < 0) /* Treat --fake-super from client as --super. */
+		am_root = 2;
+
 	if (filesfrom_fd == 0)
 		filesfrom_fd = f_in;
 

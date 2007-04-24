@@ -149,6 +149,7 @@ typedef struct
 	int syslog_facility;
 	int timeout;
 
+	BOOL fake_super;
 	BOOL ignore_errors;
 	BOOL ignore_nonreadable;
 	BOOL list;
@@ -196,6 +197,7 @@ static service sDefault =
  /* syslog_facility; */		LOG_DAEMON,
  /* timeout; */			0,
 
+ /* fake_super; */		False,
  /* ignore_errors; */		False,
  /* ignore_nonreadable; */	False,
  /* list; */			True,
@@ -297,6 +299,7 @@ static struct parm_struct parm_table[] =
  {"dont compress",     P_STRING, P_LOCAL, &sDefault.dont_compress,     NULL,0},
  {"exclude from",      P_STRING, P_LOCAL, &sDefault.exclude_from,      NULL,0},
  {"exclude",           P_STRING, P_LOCAL, &sDefault.exclude,           NULL,0},
+ {"fake super",        P_BOOL,   P_LOCAL, &sDefault.fake_super,        NULL,0},
  {"filter",            P_STRING, P_LOCAL, &sDefault.filter,            NULL,0},
  {"gid",               P_STRING, P_LOCAL, &sDefault.gid,               NULL,0},
  {"hosts allow",       P_STRING, P_LOCAL, &sDefault.hosts_allow,       NULL,0},
@@ -411,6 +414,7 @@ FN_LOCAL_INTEGER(lp_max_connections, max_connections)
 FN_LOCAL_INTEGER(lp_max_verbosity, max_verbosity)
 FN_LOCAL_INTEGER(lp_timeout, timeout)
 
+FN_LOCAL_BOOL(lp_fake_super, fake_super)
 FN_LOCAL_BOOL(lp_ignore_errors, ignore_errors)
 FN_LOCAL_BOOL(lp_ignore_nonreadable, ignore_nonreadable)
 FN_LOCAL_BOOL(lp_list, list)
@@ -814,7 +818,7 @@ BOOL lp_load(char *pszFname, int globals_only)
 
 	if (pszFname)
 	    pstrcpy(n2,pszFname);
-	else if (am_server && !am_root)
+	else if (am_server && am_root <= 0)
 	    pstrcpy(n2,RSYNCD_USERCONF);
 	else
 	    pstrcpy(n2,RSYNCD_SYSCONF);

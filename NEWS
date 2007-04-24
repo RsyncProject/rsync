@@ -11,9 +11,9 @@ Changes since 2.6.9:
       option.  Prior versions used to output too many creation events for
       matching items.
 
-    - The code that waits for a child pid now handles being interrupted by
-      a signal.  This fixes a problem with the pre-xfer exec function not
-      being able to get the exit status from the script.
+    - The code that waits for a child pid now handles being interrupted by a
+      signal.  This fixes a problem with the pre-xfer exec function not being
+      able to get the exit status from the script.
 
     - A negated filter rule now sends the negation option when sending the
       filter rules.
@@ -41,12 +41,11 @@ Changes since 2.6.9:
 
     - The default --delete algorithm is now --delete-during when talking to a
       3.x rsync.  This is a faster scan than using --delete-before (which is
-      the default when talking to older rsync versions), and is compatible
-      with the new incremental recursion mode.
+      the default when talking to older rsync versions), and is compatible with
+      the new incremental recursion mode.
 
-    - Added the --delete-delay option, which is a more efficient way to
-      delete files at the end of the transfer without needing a separate
-      delete pass.
+    - Added the --delete-delay option, which is a more efficient way to delete
+      files at the end of the transfer without needing a separate delete pass.
 
     - Added the --acls (-A) option to preserve Access Control Lists.  This is
       an improved version of the prior patch that was available.  (If you need
@@ -58,22 +57,25 @@ Changes since 2.6.9:
       to have backward compatibility with old, patched versions, the new
       xattrs.diff patch that will add that.)
 
-    - You may specify --max-delete=0 to a 3.0.0 client as long as the
-      receiving side is at least version 3.0.0.  This means that you
-      can pull from an older rsync with this option, but pushing to an
-      older rsync will generate an error.  *Be sure to never specify a 0
-      value to an older rsync client, or it will be silently ignored.*
+    - Added the --fake-super option that allows a non-super user to preserve
+      all attributes of a file by using a special extended-attribute idiom.
+      There is also an analogous "fake super" option for an rsync daemon.
+
+    - You may specify --max-delete=0 to a 3.0.0 client as long as the receiving
+      side is at least version 3.0.0.  This means that you can pull from an
+      older rsync with this option, but pushing to an older rsync will generate
+      an error.  *Be sure to never specify a 0 value to an older rsync client,
+      or it will be silently ignored.*
 
     - The --hard-link option now uses less memory on both the sending and
-      receiving side for all protocol versions.  For protocol 30, the use
-      of a hashtable on the sending side allows us to more efficiently
-      convey to the receiver what files are linked together.  This reduces
-      the amount of data sent over the socket by a considerable margin
-      (rather than adding more data), and limits the in-memory storage of
-      the device+inode information to just the sending side for the new
-      protocol 30, or to the receiving side when speaking an older protocol
-      (note that older rsync versions kept the device+inode information on
-      both sides).
+      receiving side for all protocol versions.  For protocol 30, the use of a
+      hashtable on the sending side allows us to more efficiently convey to the
+      receiver what files are linked together.  This reduces the amount of data
+      sent over the socket by a considerable margin (rather than adding more
+      data), and limits the in-memory storage of the device+inode information
+      to just the sending side for the new protocol 30, or to the receiving
+      side when speaking an older protocol (note that older rsync versions kept
+      the device+inode information on both sides).
 
   INTERNAL:
 

@@ -333,6 +333,7 @@ to the detailed description below for a complete description.  verb(
  -t, --times                 preserve times
  -O, --omit-dir-times        omit directories when preserving times
      --super                 receiver attempts super-user activities
+     --fake-super            store/recover privileged attrs using xattrs
  -S, --sparse                handle sparse files efficiently
  -n, --dry-run               show what would have been transferred
  -W, --whole-file            copy files whole (without rsync algorithm)
@@ -865,7 +866,7 @@ permission value can be applied to the files in the transfer.
 dit(bf(-o, --owner)) This option causes rsync to set the owner of the
 destination file to be the same as the source file, but only if the
 receiving rsync is being run as the super-user (see also the bf(--super)
-option to force rsync to attempt super-user activities).
+and bf(--fake-super) options).
 Without this option, the owner is set to the invoking user on the
 receiving side.
 
@@ -888,7 +889,7 @@ default, but may fall back to using the ID number in some circumstances
 dit(bf(--devices)) This option causes rsync to transfer character and
 block device files to the remote system to recreate these devices.
 This option has no effect if the receiving rsync is not run as the
-super-user and bf(--super) is not specified.
+super-user (see also the bf(--super) and bf(--fake-super) options).
 
 dit(bf(--specials)) This option causes rsync to transfer special files
 such as named sockets and fifos.
@@ -917,6 +918,34 @@ for systems that allow such activities without being the super-user, and
 also for ensuring that you will get errors if the receiving side isn't
 being running as the super-user.  To turn off super-user activities, the
 super-user can use bf(--no-super).
+
+dit(bf(--fake-super)) When this option is enabled, rsync simulates
+super-user activities by saving/restoring the privileged attributes via a
+special extended attribute that is attached to each file (as needed).  This
+includes the file's owner and group (if it is not the default), the file's
+device info (device & special files are created as empty text files), and
+any permission bits that we won't allow to be set on the real file (e.g.
+the real file gets u-s,g-s,o-t for safety) or that would limit the owner's
+access (since the real super-user can always access/change a file or
+directory, the files we create can always be accessed/changed by the
+creating user).
+
+The bf(--fake-super) option only affects the side where the option is used.
+To affect the remote side of a remote-shell connection, specify an rsync
+path:
+
+quote(tt(  rsync -av --rsync-path="rsync --fake-super" /src/ host:/dest/))
+
+Since there is only one "side" in a local copy, this option affects both
+the sending and recieving of files.  You'll need to specify a copy using
+"localhost" if you need to avoid this.  Note, however, that it is always
+safe to copy from some non-fake-super files into some fake-super files
+using a local bf(--fake-super) command because the non-fake source files
+will just have their normal attributes.
+
+This option is overridden by both bf(--super) and bf(--no-super).
+
+See also the "fake super" setting in the daemon's rsyncd.conf file.
 
 dit(bf(-S, --sparse)) Try to handle sparse files efficiently so they take
 up less space on the destination.  Conflicts with bf(--inplace) because it's

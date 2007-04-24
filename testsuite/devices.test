@@ -21,7 +21,41 @@ case `id -u` in
 	echo "Let's try re-running the script under fakeroot..."
 	exec /usr/bin/fakeroot /bin/sh $RUNSHFLAGS "$0"
     fi
-    test_skipped "Rsync won't copy devices unless we're root"
+
+    # If we can't test the real device code, try to test --fake-super instead
+    $RSYNC --version | grep ", xattrs" >/dev/null || test_skipped "Rsync needs root/fakeroot/--fake-super for device tests"
+    RSYNC="$RSYNC --fake-super"
+    export RSYNC_FAKE_SUPER=1
+    case "`xattr 2>&1`" in
+    *--list:*)
+	mknod() {
+	    fn="$1"
+	    case "$2" in
+	    p) mode=10644 ;;
+	    c) mode=20644 ;;
+	    b) mode=60644 ;;
+	    esac
+	    maj="${3:-0}"
+	    min="${4:-0}"
+	    touch "$fn"
+	    xattr -s 'rsync.%stat' "$mode $maj,$min 0:0" "$fn"
+	}
+	;;
+    *)
+	mknod() {
+	    fn="$1"
+	    case "$2" in
+	    p) mode=10644 ;;
+	    c) mode=20644 ;;
+	    b) mode=60644 ;;
+	    esac
+	    maj="${3:-0}"
+	    min="${4:-0}"
+	    touch "$fn"
+	    setfattr -n 'user.rsync.%stat' -v "$mode $maj,$min 0:0" "$fn"
+	}
+	;;
+    esac
     ;;
 esac
 
@@ -29,14 +63,14 @@ esac
 
 mkdir "$fromdir"
 mkdir "$todir"
-mknod "$fromdir/char" c 41 67  || test_skipped "Can't create char device node unless root"
-mknod "$fromdir/char2" c 42 68  || test_skipped "Can't create char device node unless root"
-mknod "$fromdir/char3" c 42 69  || test_skipped "Can't create char device node unless root"
-mknod "$fromdir/block" b 42 69 || test_skipped "Can't create block device node unless root"
-mknod "$fromdir/block2" b 42 73 || test_skipped "Can't create block device node unless root"
-mknod "$fromdir/block3" b 105 73 || test_skipped "Can't create block device node unless root"
+mknod "$fromdir/char" c 41 67  || test_skipped "Can't create char device node"
+mknod "$fromdir/char2" c 42 68  || test_skipped "Can't create char device node"
+mknod "$fromdir/char3" c 42 69  || test_skipped "Can't create char device node"
+mknod "$fromdir/block" b 42 69 || test_skipped "Can't create block device node"
+mknod "$fromdir/block2" b 42 73 || test_skipped "Can't create block device node"
+mknod "$fromdir/block3" b 105 73 || test_skipped "Can't create block device node"
 ln "$fromdir/block3" "$fromdir/block2.5" || echo "Skipping hard-linked device test..."
-mkfifo "$fromdir/fifo" || test_skipped "Can't run mkfifo"
+mkfifo "$fromdir/fifo" || mknod "$fromdir/fifo" p || test_skipped "Can't run mkfifo"
 touch -r "$fromdir/block" "$fromdir/block2"
 
 $RSYNC -ai "$fromdir/block" "$todir/block2" \
@@ -76,9 +110,8 @@ cD+++++++++ char2
 cD+++++++++ char3
 cS+++++++++ fifo
 EOT
-if test ! -b "$fromdir/block2.5"; then
-    sed -e '/block2\.5/d' \
-	<"$chkfile" >"$chkfile.new"
+if test ! -r "$fromdir/block2.5"; then
+    sed -e '/block2\.5/d' <"$chkfile" >"$chkfile.new"
     mv "$chkfile.new" "$chkfile"
 fi
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 4 failed"

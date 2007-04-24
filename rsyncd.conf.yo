@@ -226,6 +226,11 @@ file transfers to and from that module should take place as when the daemon
 was run as root. This complements the "uid" option. The default is gid -2,
 which is normally the group "nobody".
 
+dit(bf(fake super)) Setting "fake super = yes" for a module causes the
+daemon side to behave as if the bf(--fake-user) command-line option had
+been specified.  This allows the full attributes of a file to be stored
+without having to have the daemon actually running as root.
+
 dit(bf(filter)) The "filter" option allows you to specify a space-separated
 list of filter rules that the daemon will not allow to be read or written.
 This is only superficially equivalent to the client specifying these

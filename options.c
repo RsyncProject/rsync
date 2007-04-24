@@ -72,7 +72,7 @@ int protocol_version = PROTOCOL_VERSION;
 int sparse_files = 0;
 int do_compression = 0;
 int def_compress_level = Z_DEFAULT_COMPRESSION;
-int am_root = 0;
+int am_root = 0; /* 0 = normal, 1 = root, 2 = --super, -1 = --fake-super */
 int am_server = 0;
 int am_sender = 0;
 int am_generator = 0;
@@ -328,6 +328,9 @@ void usage(enum logcode F)
   rprintf(F," -t, --times                 preserve times\n");
   rprintf(F," -O, --omit-dir-times        omit directories when preserving times\n");
   rprintf(F,"     --super                 receiver attempts super-user activities\n");
+#ifdef SUPPORT_XATTRS
+  rprintf(F,"     --fake-super            store/recover privileged attrs using xattrs\n");
+#endif
   rprintf(F," -S, --sparse                handle sparse files efficiently\n");
   rprintf(F," -n, --dry-run               show what would have been transferred\n");
   rprintf(F," -W, --whole-file            copy files whole (without rsync algorithm)\n");
@@ -457,6 +460,7 @@ static struct poptOption long_options[] = {
   {"modify-window",    0,  POPT_ARG_INT,    &modify_window, OPT_MODIFY_WINDOW, 0, 0 },
   {"super",            0,  POPT_ARG_VAL,    &am_root, 2, 0, 0 },
   {"no-super",         0,  POPT_ARG_VAL,    &am_root, 0, 0, 0 },
+  {"fake-super",       0,  POPT_ARG_VAL,    &am_root, -1, 0, 0 },
   {"owner",           'o', POPT_ARG_VAL,    &preserve_uid, 1, 0, 0 },
   {"no-owner",         0,  POPT_ARG_VAL,    &preserve_uid, 0, 0, 0 },
   {"no-o",             0,  POPT_ARG_VAL,    &preserve_uid, 0, 0, 0 },
@@ -1185,6 +1189,14 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		snprintf(err_buf, sizeof err_buf,
 			 "hard links are not supported on this %s\n",
 			 am_server ? "server" : "client");
+		return 0;
+	}
+#endif
+
+#ifndef SUPPORT_XATTRS
+	if (am_root < 0) {
+		snprintf(err_buf, sizeof err_buf,
+			 "--fake-super requires an rsync with extended attributes enabled\n");
 		return 0;
 	}
 #endif

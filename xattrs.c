@@ -53,11 +53,16 @@ extern int checksum_seed;
 #define SPRE_LEN ((int)sizeof SYSTEM_PREFIX - 1)
 
 #ifdef HAVE_LINUX_XATTRS
-#define RPRE_LEN 0
+#define MIGHT_NEED_RPRE (am_root < 0)
+#define RSYNC_PREFIX USER_PREFIX "rsync."
 #else
+#define MIGHT_NEED_RPRE am_root
 #define RSYNC_PREFIX "rsync."
-#define RPRE_LEN ((int)sizeof RSYNC_PREFIX - 1)
 #endif
+#define RPRE_LEN ((int)sizeof RSYNC_PREFIX - 1)
+
+#define XSTAT_ATTR RSYNC_PREFIX "%stat"
+#define XSTAT_LEN ((int)sizeof XSTAT_ATTR - 1)
 
 typedef struct {
 	char *datum, *name;
@@ -218,6 +223,10 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 			continue;
 #endif
 
+		if (am_root < 0 && name_len == XSTAT_LEN + 1
+		 && name[RPRE_LEN] == '%' && strcmp(name, XSTAT_ATTR) == 0)
+			continue;
+
 		datum_len = name_len; /* Pass extra size to get_xattr_data() */
 		if (!(ptr = get_xattr_data(fname, name, &datum_len, 0)))
 			return -1;
@@ -235,6 +244,14 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 			sum_end(ptr + 1);
 		} else
 			name_offset = datum_len;
+
+#ifdef HAVE_LINUX_XATTRS
+		if (am_root < 0 && name_len > RPRE_LEN
+		 && HAS_PREFIX(name, RSYNC_PREFIX)) {
+			name += RPRE_LEN;
+			name_len -= RPRE_LEN;
+		}
+#endif
 
 		rxas = EXPAND_ITEM_LIST(xalp, rsync_xa, RSYNC_XAL_INITIAL);
 		rxas->name = ptr + name_offset;
@@ -576,13 +593,9 @@ void receive_xattr(struct file_struct *file, int f)
 		size_t name_len = read_varint(f);
 		size_t datum_len = read_varint(f);
 		size_t dget_len = datum_len > MAX_FULL_DATUM ? 1 + MAX_DIGEST_LEN : datum_len;
-#ifdef HAVE_LINUX_XATTRS
-		size_t extra_len = 0;
-#else
-		size_t extra_len = am_root ? RPRE_LEN : 0;
+		size_t extra_len = MIGHT_NEED_RPRE ? RPRE_LEN : 0;
 		if (dget_len + extra_len < dget_len)
 			out_of_memory("receive_xattr"); /* overflow */
-#endif
 		if (dget_len + extra_len + name_len < dget_len)
 			out_of_memory("receive_xattr"); /* overflow */
 		ptr = new_array(char, dget_len + extra_len + name_len);
@@ -598,9 +611,14 @@ void receive_xattr(struct file_struct *file, int f)
 		}
 #ifdef HAVE_LINUX_XATTRS
 		/* Non-root can only save the user namespace. */
-		if (!am_root && !HAS_PREFIX(name, USER_PREFIX)) {
-			free(ptr);
-			continue;
+			if (am_root <= 0 && !HAS_PREFIX(name, USER_PREFIX)) {
+				if (!am_root) {
+					free(ptr);
+					continue;
+				}
+				name -= RPRE_LEN;
+				name_len += RPRE_LEN;
+				memcpy(name, RSYNC_PREFIX, RPRE_LEN);
 		}
 #else
 		/* This OS only has a user namespace, so we either
@@ -618,6 +636,11 @@ void receive_xattr(struct file_struct *file, int f)
 			continue;
 		}
 #endif
+		if (am_root < 0 && name_len == XSTAT_LEN + 1
+		 && name[RPRE_LEN] == '%' && strcmp(name, XSTAT_ATTR) == 0) {
+			free(ptr);
+			continue;
+		}
 		rxa = EXPAND_ITEM_LIST(&temp_xattr, rsync_xa, 1);
 		rxa->name = name;
 		rxa->datum = ptr;
@@ -770,6 +793,152 @@ int set_xattr(const char *fname, const struct file_struct *file,
 
 	ndx = F_XATTR(file);
 	return rsync_xal_set(fname, lst + ndx, fnamecmp, sxp);
+}
+
+int get_stat_xattr(const char *fname, int fd, STRUCT_STAT *fst, STRUCT_STAT *xst)
+{
+	int mode, rdev_major, rdev_minor, uid, gid, len;
+	char buf[256];
+
+	if (am_root >= 0 || IS_DEVICE(fst->st_mode) || IS_SPECIAL(fst->st_mode))
+		return -1;
+
+	if (xst)
+		*xst = *fst;
+	else
+		xst = fst;
+	if (fname) {
+		fd = -1;
+		len = sys_lgetxattr(fname, XSTAT_ATTR, buf, sizeof buf - 1);
+	} else {
+		fname = "fd";
+		len = sys_fgetxattr(fd, XSTAT_ATTR, buf, sizeof buf - 1);
+	}
+	if (len >= (int)sizeof buf) {
+		len = -1;
+		errno = ERANGE;
+	}
+	if (len < 0) {
+		if (errno == ENOTSUP || errno == ENOATTR)
+			return -1;
+		if (errno == EPERM && S_ISLNK(fst->st_mode)) {
+			xst->st_uid = 0;
+			xst->st_gid = 0;
+			return 0;
+		}
+		rsyserr(FERROR, errno, "failed to read xattr %s for %s",
+			XSTAT_ATTR, full_fname(fname));
+		return -1;
+	}
+	buf[len] = '\0';
+
+	if (sscanf(buf, "%o %d,%d %d:%d",
+		   &mode, &rdev_major, &rdev_minor, &uid, &gid) != 5) {
+		rprintf(FERROR, "Corrupt %s xattr attached to %s: \"%s\"\n",
+			XSTAT_ATTR, full_fname(fname), buf);
+		exit_cleanup(RERR_FILEIO);
+	}
+
+	xst->st_mode = from_wire_mode(mode);
+	xst->st_rdev = MAKEDEV(rdev_major, rdev_minor);
+	xst->st_uid = uid;
+	xst->st_gid = gid;
+
+	return 0;
+}
+
+int set_stat_xattr(const char *fname, struct file_struct *file)
+{
+	STRUCT_STAT fst, xst;
+	dev_t rdev;
+	mode_t mode, fmode;
+
+	if (dry_run)
+		return 0;
+
+	if (read_only || list_only) {
+		rsyserr(FERROR, EROFS, "failed to write xattr %s for %s",
+			XSTAT_ATTR, full_fname(fname));
+		return -1;
+	}
+
+	if (x_lstat(fname, &fst, &xst) < 0) {
+		rsyserr(FERROR, errno, "failed to re-stat %s",
+			full_fname(fname));
+		return -1;
+	}
+
+	fst.st_mode &= (_S_IFMT | CHMOD_BITS);
+	fmode = file->mode & (_S_IFMT | CHMOD_BITS);
+
+	if (IS_DEVICE(fmode) || IS_SPECIAL(fmode)) {
+		uint32 *devp = F_RDEV_P(file);
+		rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
+	} else
+		rdev = 0;
+
+	/* Dump the special permissions and enable full owner access. */
+	mode = (fst.st_mode & _S_IFMT) | (fmode & ACCESSPERMS)
+	     | (S_ISDIR(fst.st_mode) ? 0700 : 0600);
+	if (fst.st_mode != mode)
+		do_chmod(fname, mode);
+	if (!IS_DEVICE(fst.st_mode) && !IS_SPECIAL(fst.st_mode))
+		fst.st_rdev = 0; /* just in case */
+
+	if (mode == fmode && fst.st_rdev == rdev
+	 && fst.st_uid == F_UID(file) && fst.st_gid == F_GID(file)) {
+		/* xst.st_mode will be 0 if there's no current stat xattr */
+		if (xst.st_mode && sys_lremovexattr(fname, XSTAT_ATTR) < 0) {
+			rsyserr(FERROR, errno,
+				"delete of stat xattr failed for %s",
+				full_fname(fname));
+			return -1;
+		}
+		return 0;
+	}
+
+	if (xst.st_mode != fmode || xst.st_rdev != rdev
+	 || xst.st_uid != F_UID(file) || xst.st_gid != F_GID(file)) {
+		char buf[256];
+		int len = snprintf(buf, sizeof buf, "%o %u,%u %u:%u",
+			to_wire_mode(fmode),
+			(int)major(rdev), (int)minor(rdev),
+			(int)F_UID(file), (int)F_GID(file));
+		if (sys_lsetxattr(fname, XSTAT_ATTR, buf, len) < 0) {
+			if (errno == EPERM && S_ISLNK(fst.st_mode))
+				return 0;
+			rsyserr(FERROR, errno,
+				"failed to write xattr %s for %s",
+				XSTAT_ATTR, full_fname(fname));
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+int x_stat(const char *fname, STRUCT_STAT *fst, STRUCT_STAT *xst)
+{
+	int ret = do_stat(fname, fst);
+	if ((ret < 0 || get_stat_xattr(fname, -1, fst, xst) < 0) && xst)
+		xst->st_mode = 0;
+	return ret;
+}
+
+int x_lstat(const char *fname, STRUCT_STAT *fst, STRUCT_STAT *xst)
+{
+	int ret = do_lstat(fname, fst);
+	if ((ret < 0 || get_stat_xattr(fname, -1, fst, xst) < 0) && xst)
+		xst->st_mode = 0;
+	return ret;
+}
+
+int x_fstat(int fd, STRUCT_STAT *fst, STRUCT_STAT *xst)
+{
+	int ret = do_fstat(fd, fst);
+	if ((ret < 0 || get_stat_xattr(NULL, fd, fst, xst) < 0) && xst)
+		xst->st_mode = 0;
+	return ret;
 }
 
 #endif /* SUPPORT_XATTRS */

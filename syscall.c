@@ -27,6 +27,7 @@
 #endif
 
 extern int dry_run;
+extern int am_root;
 extern int read_only;
 extern int list_only;
 extern int preserve_perms;
@@ -78,6 +79,15 @@ int do_mknod(const char *pathname, mode_t mode, dev_t dev)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+
+	/* For --fake-super, we create a normal file with mode 0600. */
+	if (am_root < 0) {
+		int fd = open(pathname, O_WRONLY|O_CREAT|O_TRUNC, S_IWUSR|S_IRUSR);
+		if (fd < 0 || close(fd) < 0)
+			return -1;
+		return 0;
+	}
+
 #if !defined MKNOD_CREATES_FIFOS && defined HAVE_MKFIFO
 	if (S_ISFIFO(mode))
 		return mkfifo(pathname, mode);
