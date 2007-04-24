@@ -155,7 +155,7 @@ static int make_bak_dir(char *fullpath)
 				}
 #endif
 				set_file_attrs(fullpath, file, NULL, NULL, 0);
-				free(file);
+				unmake_file(file);
 			}
 		}
 		*p = '/';
