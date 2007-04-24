@@ -46,6 +46,8 @@ int read_only = 1;
 int list_only = 0;
 int preserve_perms = 0;
 
+#ifdef SUPPORT_XATTRS
+
 #ifdef HAVE_LINUX_XATTRS
 #define XSTAT_ATTR "user.rsync.%stat"
 #else
@@ -94,6 +96,8 @@ static int stat_xattr(const char *fname, STRUCT_STAT *fst)
 	return 0;
 }
 
+#endif
+
 static void failed(char const *what, char const *where)
 {
 	fprintf(stderr, PROGRAM ": %s %s: %s\n",
@@ -111,8 +115,10 @@ static void list_file(const char *fname)
 
 	if (do_lstat(fname, &buf) < 0)
 		failed("stat", fname);
+#ifdef SUPPORT_XATTRS
 	if (am_root < 0)
 		stat_xattr(fname, &buf);
+#endif
 
 	/* The size of anything but a regular file is probably not
 	 * worth thinking about. */
@@ -171,7 +177,9 @@ static void list_file(const char *fname)
 
 static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
+#ifdef SUPPORT_XATTRS
   {"fake-super",      'f', POPT_ARG_VAL,    &am_root, -1, 0, 0 },
+#endif
   {"help",            'h', POPT_ARG_NONE,   0, 'h', 0, 0 },
   {0,0,0,0,0,0,0}
 };
@@ -182,7 +190,9 @@ static void tls_usage(int ret)
   fprintf(F,"usage: " PROGRAM " [OPTIONS] FILE ...\n");
   fprintf(F,"Trivial file listing program for portably checking rsync\n");
   fprintf(F,"\nOptions:\n");
+#ifdef SUPPORT_XATTRS
   fprintf(F," -f, --fake-super            display attributes including fake-super xattrs\n");
+#endif
   fprintf(F," -h, --help                  show this help\n");
   exit(ret);
 }
