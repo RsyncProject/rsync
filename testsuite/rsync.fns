@@ -66,7 +66,7 @@ printmsg() {
 }
 
 rsync_ls_lR() {
-    find "$@" -print | sort | sed 's/ /\\ /g' | xargs "$TOOLDIR/tls"
+    find "$@" -print | sort | sed 's/ /\\ /g' | xargs "$TOOLDIR/tls" $TLS_ARGS
 }
 
 check_perms() {

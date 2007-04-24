@@ -25,7 +25,7 @@ case `id -u` in
     # If we can't test the real device code, try to test --fake-super instead
     $RSYNC --version | grep ", xattrs" >/dev/null || test_skipped "Rsync needs root/fakeroot/--fake-super for device tests"
     RSYNC="$RSYNC --fake-super"
-    export RSYNC_FAKE_SUPER=1
+    TLS_ARGS=--fake-super
     case "`xattr 2>&1`" in
     *--list:*)
 	mknod() {

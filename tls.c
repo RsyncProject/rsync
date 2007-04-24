@@ -34,6 +34,7 @@
  * change. */
 
 #include "rsync.h"
+#include "popt.h"
 #include "lib/sysxattrs.h"
 
 #define PROGRAM "tls"
@@ -168,20 +169,53 @@ static void list_file(const char *fname)
 	       datebuf, fname, linkbuf);
 }
 
+static struct poptOption long_options[] = {
+  /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
+  {"fake-super",      'f', POPT_ARG_VAL,    &am_root, -1, 0, 0 },
+  {"help",            'h', POPT_ARG_NONE,   0, 'h', 0, 0 },
+  {0,0,0,0,0,0,0}
+};
+
+static void tls_usage(int ret)
+{
+  FILE *F = ret ? stderr : stdout;
+  fprintf(F,"usage: " PROGRAM " [OPTIONS] FILE ...\n");
+  fprintf(F,"Trivial file listing program for portably checking rsync\n");
+  fprintf(F,"\nOptions:\n");
+  fprintf(F," -f, --fake-super            store/recover privileged attrs using xattrs\n");
+  fprintf(F," -h, --help                  show this help (-h works with no other options)\n");
+  exit(ret);
+}
+
 int
 main(int argc, char *argv[])
 {
-	if (argc < 2) {
-		fprintf(stderr, "usage: " PROGRAM " FILE ...\n"
-			"Trivial file listing program for portably checking rsync\n");
-		return 1;
+	poptContext pc;
+	const char **extra_args;
+	int opt;
+
+	pc = poptGetContext(PROGRAM, argc, (const char **)argv,
+			    long_options, 0);
+	while ((opt = poptGetNextOpt(pc)) != -1) {
+		switch (opt) {
+		case 'h':
+			tls_usage(0);
+		default:
+			fprintf(stderr,
+			        "%s: %s\n",
+				poptBadOption(pc, POPT_BADOPTION_NOALIAS),
+				poptStrerror(opt));
+			tls_usage(1);
+		}
 	}
 
-	if (getenv("RSYNC_FAKE_SUPER"))
-		am_root = -1;
+	extra_args = poptGetArgs(pc);
+	if (!extra_args || *extra_args == NULL)
+		tls_usage(1);
 
-	for (argv++; *argv; argv++)
-		list_file(*argv);
+	for (; *extra_args; extra_args++)
+		list_file(*extra_args);
+	poptFreeContext(pc);
 
 	return 0;
 }
