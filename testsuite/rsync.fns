@@ -145,16 +145,16 @@ hands_setup() {
 # Many machines do not have "mkdir -p", so we have to build up long paths.
 # How boring.  
 makepath() {
-    echo "        makepath $1"
-    p="$1"
-    (
+    for p in "${@}"; do
+	(echo "        makepath $p"
+
 	# Absolut Unix.
 	if echo $p | grep '^/' >/dev/null
 	then
 	    cd /
 	fi
     
-	# This will break if $1 contains a space.
+	# This will break if $p contains a space.
 	for c in `echo $p | tr '/' ' '`
 	do 
 	    if [ -d "$c" ] || mkdir "$c" 
@@ -163,8 +163,8 @@ makepath() {
 	    else
 		echo "failed to create $c" >&2; return $?
 	    fi
-	done
-    )
+	done)
+    done
 }
 
 
