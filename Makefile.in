@@ -41,7 +41,7 @@ popt_OBJS=popt/findme.o  popt/popt.o  popt/poptconfig.o \
 	popt/popthelp.o popt/poptparse.o
 OBJS=$(OBJS1) $(OBJS2) $(OBJS3) $(DAEMON_OBJ) $(LIBOBJ) $(ZLIBOBJ) @BUILD_POPT@
 
-TLS_OBJ = tls.o syscall.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o
+TLS_OBJ = tls.o syscall.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxattrs.o @BUILD_POPT@
 
 # Programs we must have to run the test cases
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
@@ -85,7 +85,7 @@ mkrounding$(EXEEXT): mkrounding.c rsync.h
 	@rm mkrounding.h
 
 tls$(EXEEXT): $(TLS_OBJ)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TLS_OBJ) @BUILD_POPT@ $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(TLS_OBJ) $(LIBS)
 
 getgroups$(EXEEXT): getgroups.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ getgroups.o $(LIBS)
@@ -160,7 +160,7 @@ check29: all $(CHECK_PROGS)
 	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh --protocol=29
 
 wildtest.o: wildtest.c lib/wildmatch.c rsync.h
-wildtest$(EXEEXT): wildtest.o lib/compat.o lib/snprintf.o
+wildtest$(EXEEXT): wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@ $(LIBS)
 
 # This does *not* depend on building or installing: you can use it to
