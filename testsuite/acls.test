@@ -23,9 +23,9 @@ setfacl -m u:0:7 "$fromdir/foo" || test_skipped "Your filesystem has ACLs disabl
 setfacl -m u:0:5 "$fromdir/file1"
 setfacl -m u:0:5 "$fromdir/file2"
 
-$RSYNC -avvA "$fromdir/" "$todir/"
-
 cd "$fromdir"
+$RSYNC -avvA $files "$todir/"
+
 getfacl $files >"$scratchdir/acls.txt"
 
 cd "$todir"
