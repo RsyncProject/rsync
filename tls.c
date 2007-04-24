@@ -182,8 +182,8 @@ static void tls_usage(int ret)
   fprintf(F,"usage: " PROGRAM " [OPTIONS] FILE ...\n");
   fprintf(F,"Trivial file listing program for portably checking rsync\n");
   fprintf(F,"\nOptions:\n");
-  fprintf(F," -f, --fake-super            store/recover privileged attrs using xattrs\n");
-  fprintf(F," -h, --help                  show this help (-h works with no other options)\n");
+  fprintf(F," -f, --fake-super            display attributes including fake-super xattrs\n");
+  fprintf(F," -h, --help                  show this help\n");
   exit(ret);
 }
 
