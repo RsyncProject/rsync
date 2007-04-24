@@ -14,10 +14,10 @@
 # Use local dirnames to better exercise the arg-parsing code.
 cd "$tmpdir"
 
-mkdir from1 from2 from3
+mkdir from1 from2 from3 deep
 mkdir from2/sub1 from3/sub1
 mkdir from3/sub2 from1/dir-and-not-dir
-mkdir -p chk/sub1 chk/sub2 chk/dir-and-not-dir
+mkdir chk chk/sub1 chk/sub2 chk/dir-and-not-dir
 echo "one" >from1/one
 cp -p from1/one from2/one
 cp -p from1/one from3/one
@@ -33,8 +33,11 @@ echo "sub3" >from2/sub1/tres
 echo "subby" >from3/sub2/subby
 echo "extra" >from1/dir-and-not-dir/inside
 echo "not-dir" >from3/dir-and-not-dir
+echo "arg-test" >deep/arg-test
+echo "shallow" >shallow
 
 cp -p from1/one from1/two from2/three from3/four from1/five from3/six chk
+cp -p deep/arg-test shallow chk
 cp -p from1/dir-and-not-dir/inside chk/dir-and-not-dir
 cp -p from2/sub1/uno from3/sub1/dos from2/sub1/tres chk/sub1
 cp -p from3/sub2/subby chk/sub2
@@ -46,7 +49,7 @@ $RSYNC -av --existing -f 'exclude,! */' from1/ chk/
 $RSYNC -av --existing -f 'exclude,! */' from3/ chk/
 
 # TODO: fix inc-recurse unduplications of directory contents!
-checkit "$RSYNC -avv --no-ir from1/ from2/ from3/ to/" chk to
+checkit "$RSYNC -avv --no-ir deep/arg-test shallow from1/ from2/ from3/ to/" chk to
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
