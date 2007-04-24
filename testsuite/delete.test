@@ -11,9 +11,7 @@
 
 hands_setup
 
-makepath "$chkdir"
-makepath "$todir/extradir"
-makepath "$todir/emptydir/subdir"
+makepath "$chkdir" "$todir/extradir" "$todir/emptydir/subdir"
 
 echo extra >"$todir"/remove1
 echo extra >"$todir"/remove2

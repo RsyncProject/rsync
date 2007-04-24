@@ -39,8 +39,7 @@ chmod +w "$checkdir" "$checkdir"/dir*
 checkit "$RSYNC -avv --chmod ug-s,a+rX,D+w \"$fromdir/\" \"$todir/\"" "$checkdir" "$todir"
 
 rm -r "$fromdir" "$checkdir" "$todir"
-makepath "$todir"
-makepath "$fromdir/foo"
+makepath "$todir" "$fromdir/foo"
 touch "$fromdir/bar"
 
 checkit "$RSYNC -avv \"$fromdir/\" \"$checkdir/\"" "$fromdir" "$checkdir"
