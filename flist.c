@@ -1417,7 +1417,9 @@ void send_extra_file_list(int f, int at_least)
 
 struct file_list *send_file_list(int f, int argc, char *argv[])
 {
-	int len;
+	static const char *lastdir;
+	static int lastdir_len = -1;
+	int len, dirlen;
 	STRUCT_STAT st;
 	char *p, *dir;
 	char lastpath[MAXPATHLEN] = "";
@@ -1569,23 +1571,18 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			fn = ".";
 		}
 
-		if (dir && *dir) {
-			static const char *lastdir;
-			static int lastdir_len = -1;
-			int len = strlen(dir);
-
-			if (len != lastdir_len || memcmp(lastdir, dir, len) != 0) {
-				if (!push_flist_dir(strdup(dir), len))
-					goto push_error;
-				lastdir = flist_dir;
-				lastdir_len = flist_dir_len;
-			} else if (!push_flist_dir(lastdir, lastdir_len)) {
-			  push_error:
-				io_error |= IOERR_GENERAL;
-				rsyserr(FERROR, errno, "push_dir %s failed in %s",
-					full_fname(dir), curr_dir);
-				continue;
-			}
+		dirlen = dir ? strlen(dir) : 0;
+		if (dirlen != lastdir_len || memcmp(lastdir, dir, dirlen) != 0) {
+			if (!push_flist_dir(dir ? strdup(dir) : NULL, dirlen))
+				goto push_error;
+			lastdir = flist_dir;
+			lastdir_len = flist_dir_len;
+		} else if (!push_flist_dir(lastdir, lastdir_len)) {
+		  push_error:
+			io_error |= IOERR_GENERAL;
+			rsyserr(FERROR, errno, "push_dir %s failed in %s",
+				full_fname(dir), curr_dir);
+			continue;
 		}
 
 		if (fn != fbuf)
