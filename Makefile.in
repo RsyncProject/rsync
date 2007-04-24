@@ -47,6 +47,8 @@ TLS_OBJ = tls.o syscall.o lib/compat.o lib/snprintf.o lib/permstring.o lib/sysxa
 CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
 	trimslash$(EXEEXT) t_unsafe$(EXEEXT) wildtest$(EXEEXT)
 
+CHECK_SYMLINKS = testsuite/chown-fake.test testsuite/devices-fake.test
+
 # Objects for CHECK_PROGS to clean
 CHECK_OBJS=getgroups.o getfsdev.o t_stub.o t_unsafe.o trimslash.o wildtest.o
 
@@ -111,7 +113,7 @@ proto:
 	cd $(srcdir) && $(MAKE) -f prepare-source.mak proto.h
 
 clean: cleantests
-	rm -f *~ $(OBJS) $(TLS_OBJ) $(CHECK_PROGS) $(CHECK_OBJS) \
+	rm -f *~ $(OBJS) $(TLS_OBJ) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_SYMLINKS) \
 		mkrounding mkrounding.h rounding.h
 
 cleantests:
@@ -142,7 +144,6 @@ finddead:
 
 test: check
 
-
 # There seems to be no standard way to specify some variables as
 # exported from a Makefile apart from listing them like this.
 
@@ -153,15 +154,21 @@ test: check
 # catch Bash-isms earlier even if we're running on GNU.  Of course, we
 # might lose in the future where POSIX diverges from old sh.
 
-check: all $(CHECK_PROGS)
+check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh
 
-check29: all $(CHECK_PROGS)
+check29: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh --protocol=29
 
 wildtest.o: wildtest.c lib/wildmatch.c rsync.h
 wildtest$(EXEEXT): wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@ $(LIBS)
+
+testsuite/chown-fake.test:
+	ln -s chown.test $(srcdir)/testsuite/chown-fake.test
+
+testsuite/devices-fake.test:
+	ln -s devices.test $(srcdir)/testsuite/devices-fake.test
 
 # This does *not* depend on building or installing: you can use it to
 # check a version installed from a binary or some other source tree,
