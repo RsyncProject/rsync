@@ -48,8 +48,7 @@ $RSYNC -av --existing -f 'exclude,! */' from2/ from3/
 $RSYNC -av --existing -f 'exclude,! */' from1/ chk/
 $RSYNC -av --existing -f 'exclude,! */' from3/ chk/
 
-# TODO: fix inc-recurse unduplications of directory contents!
-checkit "$RSYNC -avv --no-ir deep/arg-test shallow from1/ from2/ from3/ to/" chk to
+checkit "$RSYNC -avv deep/arg-test shallow from1/ from2/ from3/ to/" chk to
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
