@@ -8,7 +8,7 @@
 
 deepstr='down/3/deep'
 deepdir="$fromdir/$deepstr"
-mkdir -p "$deepdir"
+makepath "$deepdir"
 fromdir="$deepdir"
 hands_setup
 fromdir="$tmpdir/from"
