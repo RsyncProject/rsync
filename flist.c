@@ -98,7 +98,7 @@ static char tmp_sum[MAX_DIGEST_LEN];
 static char empty_sum[MAX_DIGEST_LEN];
 static int flist_count_offset; /* for --delete --progress */
 
-static void clean_flist(struct file_list *flist, int strip_root, int no_dups);
+static void clean_flist(struct file_list *flist, int strip_root);
 static void output_flist(struct file_list *flist);
 
 void init_flist(void)
@@ -261,7 +261,7 @@ static int is_excluded(char *fname, int is_dir, int filter_level)
 	return 0;
 }
 
-static void send_directory(int f, struct file_list *flist, int ndx,
+static void send_directory(int f, struct file_list *flist,
 			   char *fbuf, int len, int flags);
 
 static const char *pathname, *orig_dir;
@@ -286,12 +286,17 @@ void flist_expand(struct file_list *flist)
 	else
 		flist->malloced *= 2;
 
-	/*
-	 * In case count jumped or we are starting the list
-	 * with a known size just set it.
-	 */
+	/* In case count jumped or we are starting the list
+	 * with a known size just set it. */
 	if (flist->malloced < flist->count)
 		flist->malloced = flist->count;
+
+#ifdef ICONV_OPTION
+	if (inc_recurse && flist == dir_flist && need_unsorted_flist) {
+		flist->sorted = realloc_array(flist->sorted, struct file_struct *,
+					      flist->malloced);
+	}
+#endif
 
 	new_ptr = realloc_array(flist->files, struct file_struct *,
 				flist->malloced);
@@ -1202,8 +1207,14 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		return NULL;
 
 	if (inc_recurse && flist == dir_flist) {
-		flist_expand(flist);
-		flist->files[flist->count++] = file;
+#ifdef ICONV_OPTION
+		if (ic_ndx)
+			F_NDX(file) = dir_flist->count;
+#endif
+		flist_expand(dir_flist);
+		if (need_unsorted_flist)
+			dir_flist->sorted[dir_flist->count] = file;
+		dir_flist->files[dir_flist->count++] = file;
 	}
 
 	return file;
@@ -1294,7 +1305,7 @@ static void send_if_directory(int f, struct file_list *flist,
 			return;
 		}
 		save_filters = push_local_filters(fbuf, len);
-		send_directory(f, flist, -1, fbuf, len, flags);
+		send_directory(f, flist, fbuf, len, flags);
 		pop_local_filters(save_filters);
 		fbuf[ol] = '\0';
 		if (is_dot_dir)
@@ -1315,13 +1326,13 @@ static void add_dirs_to_tree(int parent_ndx, int start, int end)
 	int i;
 	int32 *dp = NULL;
 	int32 *parent_dp = parent_ndx < 0 ? NULL
-			 : F_DIRNODE_P(dir_flist->files[parent_ndx]);
+			 : F_DIRNODE_P(dir_flist->sorted[parent_ndx]);
 
-	qsort(dir_flist->files + start, end - start + 1,
-	      sizeof dir_flist->files[0], (int (*)())file_compare);
+	qsort(dir_flist->sorted + start, end - start + 1,
+	      sizeof dir_flist->sorted[0], (int (*)())file_compare);
 
 	for (i = start; i <= end; i++) {
-		struct file_struct *file = dir_flist->files[i];
+		struct file_struct *file = dir_flist->sorted[i];
 		if (!(file->flags & FLAG_XFER_DIR)
 		 || file->flags & FLAG_MOUNT_DIR)
 			continue;
@@ -1344,15 +1355,15 @@ static void add_dirs_to_tree(int parent_ndx, int start, int end)
  * file list in memory without sending it over the wire.  Also, get_dirlist()
  * might call this with f set to -2, which also indicates that local filter
  * rules should be ignored. */
-static void send_directory(int f, struct file_list *flist, int parent_ndx,
-			   char *fbuf, int len, int flags)
+static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
+			   int flags)
 {
 	struct dirent *di;
 	unsigned remainder;
 	char *p;
 	DIR *d;
 	int divert_dirs = (flags & FLAG_DIVERT_DIRS) != 0;
-	int start = divert_dirs ? dir_flist->count : flist->count;
+	int start = flist->count;
 	int filter_flags = f == -2 ? SERVER_FILTERS : ALL_FILTERS;
 
 	assert(flist != NULL);
@@ -1394,12 +1405,7 @@ static void send_directory(int f, struct file_list *flist, int parent_ndx,
 
 	closedir(d);
 
-	if (f < 0)
-		return;
-
-	if (divert_dirs)
-		add_dirs_to_tree(parent_ndx, start, dir_flist->count - 1);
-	else if (recurse) {
+	if (f >= 0 && recurse && !divert_dirs) {
 		int i, end = flist->count - 1;
 		/* send_if_directory() bumps flist->count, so use "end". */
 		for (i = start; i <= end; i++)
@@ -1407,9 +1413,26 @@ static void send_directory(int f, struct file_list *flist, int parent_ndx,
 	}
 }
 
-void send_extra_file_list(int f, int at_least)
+static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 {
 	char fbuf[MAXPATHLEN];
+	int dlen;
+
+	f_name(file, fbuf);
+	dlen = strlen(fbuf);
+
+	if (F_PATHNAME(file) != pathname) {
+		if (!push_pathname(F_PATHNAME(file), -1))
+			exit_cleanup(RERR_FILESELECT);
+	}
+
+	change_local_filter_dir(fbuf, dlen, send_dir_depth);
+
+	send_directory(f, flist, fbuf, dlen, FLAG_DIVERT_DIRS | FLAG_XFER_DIR);
+}
+
+void send_extra_file_list(int f, int at_least)
+{
 	struct file_list *flist;
 	int64 start_write;
 	int future_cnt, save_io_error = io_error;
@@ -1426,34 +1449,79 @@ void send_extra_file_list(int f, int at_least)
 	} else
 		future_cnt = 0;
 	while (future_cnt < at_least) {
-		struct file_struct *file = dir_flist->files[send_dir_ndx];
+		struct file_struct *file = dir_flist->sorted[send_dir_ndx];
+		int start = dir_flist->count;
 		int32 *dp;
-		int dlen;
-
-		f_name(file, fbuf);
-		dlen = strlen(fbuf);
-
-		if (F_PATHNAME(file) != pathname) {
-			if (!push_pathname(F_PATHNAME(file), -1))
-				exit_cleanup(RERR_FILESELECT);
-		}
 
 		flist = flist_new(0, "send_extra_file_list");
 		start_write = stats.total_written;
 
-		write_ndx(f, NDX_FLIST_OFFSET - send_dir_ndx);
-		change_local_filter_dir(fbuf, dlen, send_dir_depth);
-		send_directory(f, flist, send_dir_ndx, fbuf, dlen,
-			       FLAG_DIVERT_DIRS | FLAG_XFER_DIR);
-		write_byte(f, 0);
+		/* If this is the first of a set of duplicate dirs, we must
+		 * send all the dirs together in a single file-list.  We must
+		 * also send the index of the last dir in the header. */
+		if (file->flags & FLAG_DUPLICATE) {
+			int dir_ndx, end_ndx = send_dir_ndx;
+			struct file_struct *fp = file;
+
+			while (1) {
+				dp = F_DIRNODE_P(fp);
+				end_ndx = DIR_NEXT_SIBLING(dp);
+				fp = dir_flist->sorted[end_ndx];
+				if (!(fp->flags & FLAG_DUPLICATE))
+					break;
+			}
 
 #ifdef ICONV_OPTION
+			if (ic_ndx)
+				dir_ndx = F_NDX(fp);
+			else
+#endif
+				dir_ndx = end_ndx;
+			write_ndx(f, NDX_FLIST_OFFSET - dir_ndx);
+
+			while (1) {
+				send1extra(f, file, flist);
+				if (send_dir_ndx == end_ndx)
+					break;
+				dp = F_DIRNODE_P(file);
+				send_dir_ndx = DIR_NEXT_SIBLING(dp);
+				file = dir_flist->sorted[send_dir_ndx];
+			}
+		} else {
+			int dir_ndx;
+#ifdef ICONV_OPTION
+			if (ic_ndx)
+				dir_ndx = F_NDX(file);
+			else
+#endif
+				dir_ndx = send_dir_ndx;
+			write_ndx(f, NDX_FLIST_OFFSET - dir_ndx);
+
+			send1extra(f, file, flist);
+		}
+		write_byte(f, 0);
+
 		if (!need_unsorted_flist)
+			dir_flist->sorted = dir_flist->files;
+		add_dirs_to_tree(send_dir_ndx, start, dir_flist->count - 1);
+
+#ifdef ICONV_OPTION
+		if (need_unsorted_flist) {
+			if (inc_recurse) {
+				if (!(flist->sorted = new_array(struct file_struct *, flist->count)))
+					out_of_memory("send_extra_file_list");
+				memcpy(flist->sorted, flist->files,
+				       flist->count * sizeof (struct file_struct*));
+				clean_flist(flist, 0);
+			} else
+				flist->sorted = flist->files;
+		} else
 #endif
 		{
 			flist->sorted = flist->files;
-			clean_flist(flist, 0, 0);
+			clean_flist(flist, 0);
 		}
+
 		file_total += flist->count;
 		future_cnt += flist->count;
 		stats.flist_size += stats.total_written - start_write;
@@ -1474,7 +1542,7 @@ void send_extra_file_list(int f, int at_least)
 					goto finish;
 				}
 				send_dir_depth--;
-				file = dir_flist->files[send_dir_ndx];
+				file = dir_flist->sorted[send_dir_ndx];
 				dp = F_DIRNODE_P(file);
 			}
 			send_dir_ndx = DIR_NEXT_SIBLING(dp);
@@ -1742,25 +1810,25 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	 * because the names will differ on the sending and receiving sides
 	 * (both sides will use the unsorted index number for each item). */
 
-	/* Sort the list without removing any duplicates in non-incremental
-	 * mode.  This allows the receiving side to ask for whatever name it
-	 * kept.  For incremental mode, the sender also removes duplicates
-	 * in this initial file-list so that it avoids re-sending duplicated
-	 * directories. */
+	/* Sort the list without removing any duplicates.  This allows the
+	 * receiving side to ask for whatever name it kept.  For incremental
+	 * recursion mode, the sender marks duplicate dirs so that it can
+	 * send them together in a single file-list. */
 #ifdef ICONV_OPTION
 	if (need_unsorted_flist) {
 		if (inc_recurse) {
 			if (!(flist->sorted = new_array(struct file_struct *, flist->count)))
-				out_of_memory("recv_file_list");
+				out_of_memory("send_file_list");
 			memcpy(flist->sorted, flist->files,
 			       flist->count * sizeof (struct file_struct*));
-			clean_flist(flist, 0, 1);
-		}
+			clean_flist(flist, 0);
+		} else
+			flist->sorted = flist->files;
 	} else
 #endif
 	{
 		flist->sorted = flist->files;
-		clean_flist(flist, 0, inc_recurse);
+		clean_flist(flist, 0);
 	}
 	file_total += flist->count;
 
@@ -1786,6 +1854,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		rprintf(FINFO, "send_file_list done\n");
 
 	if (inc_recurse) {
+		if (!need_unsorted_flist)
+			dir_flist->sorted = dir_flist->files;
 		add_dirs_to_tree(-1, 0, dir_flist->count - 1);
 		if (send_dir_ndx < 0) {
 			write_ndx(f, NDX_FLIST_EOF);
@@ -1844,6 +1914,8 @@ struct file_list *recv_file_list(int f)
 
 		if (inc_recurse && S_ISDIR(file->mode)) {
 			flist_expand(dir_flist);
+			if (need_unsorted_flist)
+				dir_flist->sorted[dir_flist->count] = file;
 			dir_flist->files[dir_flist->count++] = file;
 		}
 
@@ -1875,18 +1947,25 @@ struct file_list *recv_file_list(int f)
 			out_of_memory("recv_file_list");
 		memcpy(flist->sorted, flist->files,
 		       flist->count * sizeof (struct file_struct*));
+		if (inc_recurse) {
+			qsort(dir_flist->sorted + dstart, dir_flist->count - dstart,
+			      sizeof (struct file_struct*), (int (*)())file_compare);
+		}
 	} else
 #endif
+	{
 		flist->sorted = flist->files;
+		if (inc_recurse) {
+			dir_flist->sorted = dir_flist->files;
+			qsort(dir_flist->sorted + dstart, dir_flist->count - dstart,
+			      sizeof (struct file_struct*), (int (*)())file_compare);
+		}
+	}
 
-	clean_flist(flist, relative_paths, 1);
-
-	if (inc_recurse) {
-		dir_flist->sorted = dir_flist->files;
-		qsort(dir_flist->sorted + dstart, dir_flist->count - dstart,
-		      sizeof dir_flist->sorted[0], (int (*)())file_compare);
-	} else if (f >= 0)
+	if (!inc_recurse && f >= 0)
 		recv_uid_list(f, flist);
+
+	clean_flist(flist, relative_paths);
 
 	if (protocol_version < 30) {
 		/* Recv the io_error flag */
@@ -2068,14 +2147,12 @@ void flist_free(struct file_list *flist)
 	free(flist);
 }
 
-/*
- * This routine ensures we don't have any duplicate names in our file list.
- * duplicate names can cause corruption because of the pipelining
- */
-static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
+/* This routine ensures we don't have any duplicate names in our file list.
+ * duplicate names can cause corruption because of the pipelining. */
+static void clean_flist(struct file_list *flist, int strip_root)
 {
 	char fbuf[MAXPATHLEN];
-	int i, prev_i = 0;
+	int i, prev_i;
 
 	if (!flist)
 		return;
@@ -2087,13 +2164,19 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 	qsort(flist->sorted, flist->count,
 	    sizeof flist->sorted[0], (int (*)())file_compare);
 
-	for (i = no_dups? 0 : flist->count; i < flist->count; i++) {
-		if (F_IS_ACTIVE(flist->sorted[i])) {
-			prev_i = i;
-			break;
+	if (!am_sender || inc_recurse) {
+		for (i = prev_i = 0; i < flist->count; i++) {
+			if (F_IS_ACTIVE(flist->sorted[i])) {
+				prev_i = i;
+				break;
+			}
 		}
+		flist->low = prev_i;
+	} else {
+		i = prev_i = flist->count - 1;
+		flist->low = 0;
 	}
-	flist->low = prev_i;
+
 	while (++i < flist->count) {
 		int j;
 		struct file_struct *file = flist->sorted[i];
@@ -2127,17 +2210,22 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 				keep = j, drop = i;
 			else
 				keep = i, drop = j;
-			if (verbose > 1 && !am_server) {
-				rprintf(FINFO,
-					"removing duplicate name %s from file list (%d)\n",
-					f_name(file, fbuf), drop);
-			}
-			/* Make sure we don't lose track of a user-specified
-			 * top directory. */
-			flist->sorted[keep]->flags |= flist->sorted[drop]->flags
-						   & (FLAG_TOP_DIR|FLAG_XFER_DIR);
 
-			clear_file(flist->sorted[drop]);
+			if (am_sender)
+				flist->sorted[drop]->flags |= FLAG_DUPLICATE;
+			else {
+				if (verbose > 1) {
+					rprintf(FINFO,
+					    "removing duplicate name %s from file list (%d)\n",
+					    f_name(file, fbuf), drop);
+				}
+				/* Make sure we don't lose track of a user-specified
+				 * top directory. */
+				flist->sorted[keep]->flags |= flist->sorted[drop]->flags
+							   & (FLAG_TOP_DIR|FLAG_XFER_DIR);
+
+				clear_file(flist->sorted[drop]);
+			}
 
 			if (keep == i) {
 				if (flist->low == drop) {
@@ -2151,7 +2239,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 		} else
 			prev_i = i;
 	}
-	flist->high = no_dups ? prev_i : flist->count - 1;
+	flist->high = prev_i;
 
 	if (strip_root) {
 		/* We need to strip off the leading slashes for relative
@@ -2168,7 +2256,7 @@ static void clean_flist(struct file_list *flist, int strip_root, int no_dups)
 		}
 	}
 
-	if (prune_empty_dirs && no_dups) {
+	if (prune_empty_dirs && !am_sender) {
 		int j, prev_depth = 0;
 
 		prev_i = 0; /* It's OK that this isn't really true. */
@@ -2246,7 +2334,7 @@ static void output_flist(struct file_list *flist)
 	rprintf(FINFO, "[%s] flist start=%d, count=%d, low=%d, high=%d\n",
 		who, flist->ndx_start, flist->count, flist->low, flist->high);
 	for (i = 0; i < flist->count; i++) {
-		file = flist->files[i];
+		file = flist->sorted[i];
 		if ((am_root || am_sender) && preserve_uid) {
 			snprintf(uidbuf, sizeof uidbuf, " uid=%ld",
 				 (long)F_UID(file));
@@ -2467,14 +2555,14 @@ struct file_list *get_dirlist(char *dirname, int dlen, int ignore_filter_rules)
 
 	recurse = 0;
 	xfer_dirs = 1;
-	send_directory(ignore_filter_rules ? -2 : -1, dirlist, -1, dirname, dlen, 0);
+	send_directory(ignore_filter_rules ? -2 : -1, dirlist, dirname, dlen, 0);
 	xfer_dirs = save_xfer_dirs;
 	recurse = save_recurse;
 	if (do_progress)
 		flist_count_offset += dirlist->count;
 
 	dirlist->sorted = dirlist->files;
-	clean_flist(dirlist, 0, 0);
+	clean_flist(dirlist, 0);
 
 	if (verbose > 3)
 		output_flist(dirlist);
