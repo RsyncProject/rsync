@@ -127,7 +127,7 @@ void setup_iconv()
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
 
-	if (!am_sender)
+	if (!am_sender || inc_recurse)
 		ic_ndx = ++file_extra_cnt;
 
 	if (verbose > 1) {
