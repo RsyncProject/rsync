@@ -1733,7 +1733,7 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 	/* Fix any directory permissions that were modified during the
 	 * transfer and/or re-set any tweaked modified-time values. */
 	for (i = start, j = 0; i <= end; i++) {
-		file = flist->sorted[i];
+		file = flist->files[i];
 		if (!F_IS_ACTIVE(file) || !S_ISDIR(file->mode)
 		 || file->flags & FLAG_MISSING_DIR)
 			continue;
@@ -2008,7 +2008,7 @@ void generate_files(int f_out, const char *local_name)
 
 	if ((need_retouch_dir_perms || need_retouch_dir_times)
 	 && dir_tweaking && (!inc_recurse || delete_during == 2))
-		touch_up_dirs(inc_recurse ? dir_flist : cur_flist, -1);
+		touch_up_dirs(dir_flist, -1);
 
 	if (max_delete >= 0 && deletion_count > max_delete) {
 		rprintf(FINFO,
