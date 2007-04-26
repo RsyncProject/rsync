@@ -599,7 +599,7 @@ extern int preserve_xattrs;
 #define F_SYMLINK(f) ((f)->basename + strlen((f)->basename) + 1)
 
 /* The sending side always has this available: */
-#define F_ROOTDIR(f) (*(const char**)REQ_EXTRA(f, PTR_EXTRA_LEN))
+#define F_PATHNAME(f) (*(const char**)REQ_EXTRA(f, PTR_EXTRA_LEN))
 
 /* The receiving side always has this available: */
 #define F_DEPTH(f) REQ_EXTRA(f, 1)->num

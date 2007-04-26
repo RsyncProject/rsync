@@ -135,7 +135,7 @@ void successful_send(int ndx)
 	}
 
 	file = flist->files[ndx - flist->ndx_start];
-	if (!push_flist_dir(F_ROOTDIR(file), -1))
+	if (!push_pathname(F_PATHNAME(file), -1))
 		return;
 	f_name(file, fname);
 
@@ -212,13 +212,13 @@ void send_files(int f_in, int f_out)
 			send_extra_file_list(f_out, FILECNT_LOOKAHEAD);
 
 		file = cur_flist->files[ndx - cur_flist->ndx_start];
-		if (F_ROOTDIR(file)) {
-			path = F_ROOTDIR(file);
+		if (F_PATHNAME(file)) {
+			path = F_PATHNAME(file);
 			slash = "/";
 		} else {
 			path = slash = "";
 		}
-		if (!push_flist_dir(F_ROOTDIR(file), -1))
+		if (!push_pathname(F_PATHNAME(file), -1))
 			continue;
 		f_name(file, fname);
 
