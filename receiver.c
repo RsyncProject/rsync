@@ -470,6 +470,8 @@ int recv_files(int f_in, char *local_name)
 					"(Skipping batched update for \"%s\")\n",
 					fname);
 				discard_receive_data(f_in, F_LENGTH(file));
+				if (inc_recurse)
+					send_msg_int(MSG_NO_SEND, ndx);
 				continue;
 			}
 			next_gen_ndx = -1;
@@ -553,6 +555,8 @@ int recv_files(int f_in, char *local_name)
 				full_fname(fnamecmp));
 			discard_receive_data(f_in, F_LENGTH(file));
 			close(fd1);
+			if (inc_recurse)
+				send_msg_int(MSG_NO_SEND, ndx);
 			continue;
 		}
 
@@ -566,6 +570,8 @@ int recv_files(int f_in, char *local_name)
 				full_fname(fnamecmp));
 			discard_receive_data(f_in, F_LENGTH(file));
 			close(fd1);
+			if (inc_recurse)
+				send_msg_int(MSG_NO_SEND, ndx);
 			continue;
 		}
 
@@ -599,6 +605,8 @@ int recv_files(int f_in, char *local_name)
 				discard_receive_data(f_in, F_LENGTH(file));
 				if (fd1 != -1)
 					close(fd1);
+				if (inc_recurse)
+					send_msg_int(MSG_NO_SEND, ndx);
 				continue;
 			}
 		} else {
@@ -606,6 +614,8 @@ int recv_files(int f_in, char *local_name)
 				discard_receive_data(f_in, F_LENGTH(file));
 				if (fd1 != -1)
 					close(fd1);
+				if (inc_recurse)
+					send_msg_int(MSG_NO_SEND, ndx);
 				continue;
 			}
 
@@ -632,6 +642,8 @@ int recv_files(int f_in, char *local_name)
 				discard_receive_data(f_in, F_LENGTH(file));
 				if (fd1 != -1)
 					close(fd1);
+				if (inc_recurse)
+					send_msg_int(MSG_NO_SEND, ndx);
 				continue;
 			}
 
