@@ -64,6 +64,7 @@
 #define FLAG_DIR_CHANGED (1<<1)	/* generator */
 #define FLAG_XFER_DIR (1<<2)	/* sender/receiver/generator */
 #define FLAG_MOUNT_DIR (1<<3)	/* sender/generator */
+#define FLAG_DUPLICATE (1<<4)	/* sender */
 #define FLAG_MISSING_DIR (1<<4)	/* generator */
 #define FLAG_HLINKED (1<<5)	/* receiver/generator */
 #define FLAG_HLINK_FIRST (1<<6)	/* receiver/generator */
