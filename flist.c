@@ -258,8 +258,8 @@ static int is_excluded(char *fname, int is_dir, int filter_level)
 static void send_directory(int f, struct file_list *flist, int ndx,
 			   char *fbuf, int len, int flags);
 
-static const char *flist_dir, *orig_dir;
-static int flist_dir_len;
+static const char *pathname, *orig_dir;
+static int pathname_len;
 
 
 /**
@@ -303,15 +303,15 @@ void flist_expand(struct file_list *flist)
 		out_of_memory("flist_expand");
 }
 
-int push_flist_dir(const char *dir, int len)
+int push_pathname(const char *dir, int len)
 {
-	if (dir == flist_dir)
+	if (dir == pathname)
 		return 1;
 
 	if (!orig_dir)
 		orig_dir = strdup(curr_dir);
 
-	if (flist_dir && !pop_dir(orig_dir)) {
+	if (pathname && !pop_dir(orig_dir)) {
 		rsyserr(FERROR, errno, "pop_dir %s failed",
 			full_fname(orig_dir));
 		exit_cleanup(RERR_FILESELECT);
@@ -324,8 +324,8 @@ int push_flist_dir(const char *dir, int len)
 		return 0;
 	}
 
-	flist_dir = dir;
-	flist_dir_len = len >= 0 ? len : dir ? (int)strlen(dir) : 0;
+	pathname = dir;
+	pathname_len = len >= 0 ? len : dir ? (int)strlen(dir) : 0;
 
 	return 1;
 }
@@ -575,8 +575,9 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	int first_hlink_ndx = -1;
 	OFF_T file_length;
 	const char *basename;
-	char *bp;
 	struct file_struct *file;
+	alloc_pool_t *pool;
+	char *bp;
 
 	if (flags & XMIT_SAME_NAME)
 		l1 = read_byte(f);
@@ -760,12 +761,13 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 			/* Room to save the dir's device for -x */
 			extra_len += 2 * EXTRA_LEN;
 		}
-		flist = dir_flist;
-	}
+		pool = dir_flist->file_pool;
+	} else
+		pool = flist->file_pool;
 
 	alloc_len = FILE_STRUCT_LEN + extra_len + basename_len
 		  + linkname_len;
-	bp = pool_alloc(flist->file_pool, alloc_len, "recv_file_entry");
+	bp = pool_alloc(pool, alloc_len, "recv_file_entry");
 
 	memset(bp, 0, extra_len + FILE_STRUCT_LEN);
 	bp += extra_len;
@@ -926,7 +928,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	char *bp;
 
 	if (strlcpy(thisname, fname, sizeof thisname)
-	    >= sizeof thisname - flist_dir_len) {
+	    >= sizeof thisname - pathname_len) {
 		rprintf(FINFO, "skipping overly long name: %s\n", fname);
 		return NULL;
 	}
@@ -1113,7 +1115,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	if (always_checksum && am_sender && S_ISREG(st.st_mode))
 		file_checksum(thisname, tmp_sum, st.st_size);
 
-	F_ROOTDIR(file) = flist_dir;
+	F_PATHNAME(file) = pathname;
 
 	/* This code is only used by the receiver when it is building
 	 * a list of files for a delete pass. */
@@ -1357,8 +1359,8 @@ void send_extra_file_list(int f, int at_least)
 	 * files in the upcoming file-lists. */
 	if (cur_flist->next) {
 		flist = first_flist->prev; /* the newest flist */
-		future_cnt = flist->count
-			   + flist->ndx_start - cur_flist->next->ndx_start;
+		future_cnt = flist->count + flist->ndx_start
+			   - cur_flist->next->ndx_start;
 	} else
 		future_cnt = 0;
 	while (future_cnt < at_least) {
@@ -1369,8 +1371,8 @@ void send_extra_file_list(int f, int at_least)
 		f_name(file, fbuf);
 		dlen = strlen(fbuf);
 
-		if (F_ROOTDIR(file) != flist_dir) {
-			if (!push_flist_dir(F_ROOTDIR(file), -1))
+		if (F_PATHNAME(file) != pathname) {
+			if (!push_pathname(F_PATHNAME(file), -1))
 				exit_cleanup(RERR_FILESELECT);
 		}
 
@@ -1379,7 +1381,8 @@ void send_extra_file_list(int f, int at_least)
 
 		write_ndx(f, NDX_FLIST_OFFSET - send_dir_ndx);
 		change_local_filter_dir(fbuf, dlen, send_dir_depth);
-		send_directory(f, flist, send_dir_ndx, fbuf, dlen, FLAG_DIVERT_DIRS | FLAG_XFER_DIR);
+		send_directory(f, flist, send_dir_ndx, fbuf, dlen,
+			       FLAG_DIVERT_DIRS | FLAG_XFER_DIR);
 		write_byte(f, 0);
 
 		clean_flist(flist, 0, 0);
@@ -1573,11 +1576,11 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 		dirlen = dir ? strlen(dir) : 0;
 		if (dirlen != lastdir_len || memcmp(lastdir, dir, dirlen) != 0) {
-			if (!push_flist_dir(dir ? strdup(dir) : NULL, dirlen))
+			if (!push_pathname(dir ? strdup(dir) : NULL, dirlen))
 				goto push_error;
-			lastdir = flist_dir;
-			lastdir_len = flist_dir_len;
-		} else if (!push_flist_dir(lastdir, lastdir_len)) {
+			lastdir = pathname;
+			lastdir_len = pathname_len;
+		} else if (!push_pathname(lastdir, lastdir_len)) {
 		  push_error:
 			io_error |= IOERR_GENERAL;
 			rsyserr(FERROR, errno, "push_dir %s failed in %s",
@@ -1637,9 +1640,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 		if (recurse || (xfer_dirs && is_dot_dir)) {
 			struct file_struct *file;
-			int top_flags = FLAG_TOP_DIR | FLAG_XFER_DIR
-				      | (is_dot_dir ? 0 : flags)
-				      | (inc_recurse ? FLAG_DIVERT_DIRS : 0);
+			int top_flags = FLAG_TOP_DIR | FLAG_XFER_DIR | flags;
 			file = send_file_name(f, flist, fbuf, &st,
 					      top_flags, ALL_FILTERS);
 			if (file && !inc_recurse)
@@ -2155,7 +2156,7 @@ static void output_flist(struct file_list *flist)
 		if (!am_sender)
 			snprintf(depthbuf, sizeof depthbuf, "%d", F_DEPTH(file));
 		if (F_IS_ACTIVE(file)) {
-			root = am_sender ? NS(F_ROOTDIR(file)) : depthbuf;
+			root = am_sender ? NS(F_PATHNAME(file)) : depthbuf;
 			if ((dir = file->dirname) == NULL)
 				dir = slash = "";
 			else
