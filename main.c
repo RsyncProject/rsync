@@ -727,7 +727,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		io_flush(FULL_FLUSH);
 		handle_stats(f_in);
 
-		send_msg(MSG_DONE, "", 1);
+		send_msg(MSG_DONE, "", 1, 0);
 		write_varlong(error_pipe[1], stats.total_read, 3);
 		io_flush(FULL_FLUSH);
 
@@ -900,7 +900,7 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 
 	io_set_sock_fds(f_in, f_out);
 	setup_protocol(f_out, f_in);
-#if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
+#ifdef ICONV_CONST
 	setup_iconv();
 #endif
 
@@ -937,7 +937,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 	io_set_sock_fds(f_in, f_out);
 	setup_protocol(f_out,f_in);
-#if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
+#ifdef ICONV_CONST
 	setup_iconv();
 #endif
 

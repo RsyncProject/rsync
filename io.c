@@ -53,6 +53,9 @@ extern int preserve_hard_links;
 extern char *filesfrom_host;
 extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist;
+#ifdef ICONV_OPTION
+extern iconv_t ic_send, ic_recv;
+#endif
 
 const char phase_unknown[] = "unknown";
 int ignore_timeout = 0;
@@ -91,6 +94,9 @@ static int write_batch_monitor_out = -1;
 static int io_filesfrom_f_in = -1;
 static int io_filesfrom_f_out = -1;
 static char io_filesfrom_buf[2048];
+#ifdef ICONV_OPTION
+static char iconv_buf[sizeof io_filesfrom_buf / 2];
+#endif
 static char *io_filesfrom_bp;
 static char io_filesfrom_lastchar;
 static int io_filesfrom_buflen;
@@ -111,6 +117,7 @@ static void writefd(int fd, const char *buf, size_t len);
 static void writefd_unbuffered(int fd, const char *buf, size_t len);
 static void decrement_active_files(int ndx);
 static void decrement_flist_in_progress(int ndx, int redo);
+static void mplex_write(int fd, enum msgcode code, const char *buf, size_t len, int convert);
 
 struct flist_ndx_item {
 	struct flist_ndx_item *next;
@@ -125,7 +132,7 @@ static struct flist_ndx_list redo_list, hlink_list;
 
 struct msg_list_item {
 	struct msg_list_item *next;
-	int len;
+	char convert;
 	char buf[1];
 };
 
@@ -229,7 +236,7 @@ void set_msg_fd_out(int fd)
 }
 
 /* Add a message to the pending MSG_* list. */
-static void msg_list_add(struct msg_list *lst, int code, const char *buf, int len)
+static void msg_list_add(struct msg_list *lst, int code, const char *buf, int len, int convert)
 {
 	struct msg_list_item *m;
 	int sz = len + 4 + sizeof m[0] - 1;
@@ -237,7 +244,7 @@ static void msg_list_add(struct msg_list *lst, int code, const char *buf, int le
 	if (!(m = (struct msg_list_item *)new_array(char, sz)))
 		out_of_memory("msg_list_add");
 	m->next = NULL;
-	m->len = len + 4;
+	m->convert = convert;
 	SIVAL(m->buf, 0, ((code+MPLEX_BASE)<<24) | len);
 	memcpy(m->buf + 4, buf, len);
 	if (lst->tail)
@@ -252,21 +259,25 @@ static void msg_flush(void)
 	if (am_generator) {
 		while (msg_queue.head && io_multiplexing_out) {
 			struct msg_list_item *m = msg_queue.head;
+			int len = IVAL(m->buf, 0) & 0xFFFFFF;
+			int tag = *((uchar*)m->buf+3) - MPLEX_BASE;
 			if (!(msg_queue.head = m->next))
 				msg_queue.tail = NULL;
-			stats.total_written += m->len;
+			stats.total_written += len + 4;
 			defer_forwarding_messages++;
-			writefd_unbuffered(sock_f_out, m->buf, m->len);
+			mplex_write(sock_f_out, tag, m->buf + 4, len, m->convert);
 			defer_forwarding_messages--;
 			free(m);
 		}
 	} else {
 		while (msg_queue.head) {
 			struct msg_list_item *m = msg_queue.head;
+			int len = IVAL(m->buf, 0) & 0xFFFFFF;
+			int tag = *((uchar*)m->buf+3) - MPLEX_BASE;
 			if (!(msg_queue.head = m->next))
 				msg_queue.tail = NULL;
 			defer_forwarding_messages++;
-			writefd_unbuffered(msg_fd_out, m->buf, m->len);
+			mplex_write(msg_fd_out, tag, m->buf + 4, len, m->convert);
 			defer_forwarding_messages--;
 			free(m);
 		}
@@ -341,7 +352,7 @@ static void read_msg_fd(void)
 		if (len >= (int)sizeof buf || !am_generator)
 			goto invalid_msg;
 		readfd(fd, buf, len);
-		send_msg(MSG_DELETED, buf, len);
+		send_msg(MSG_DELETED, buf, len, 1);
 		break;
 	case MSG_SUCCESS:
 		if (len != 4 || !am_generator)
@@ -349,7 +360,7 @@ static void read_msg_fd(void)
 		readfd(fd, buf, len);
 		if (remove_source_files) {
 			decrement_active_files(IVAL(buf,0));
-			send_msg(MSG_SUCCESS, buf, len);
+			send_msg(MSG_SUCCESS, buf, len, 0);
 		}
 		if (preserve_hard_links)
 			flist_ndx_push(&hlink_list, IVAL(buf,0));
@@ -378,7 +389,7 @@ static void read_msg_fd(void)
 			if (n >= sizeof buf)
 				n = sizeof buf - 1;
 			readfd(fd, buf, n);
-			rwrite((enum logcode)tag, buf, n);
+			rwrite((enum logcode)tag, buf, n, !am_generator);
 			len -= n;
 		}
 		break;
@@ -447,14 +458,19 @@ static void decrement_flist_in_progress(int ndx, int redo)
 }
 
 /* Write an message to a multiplexed stream. If this fails, rsync exits. */
-static void mplex_write(int fd, enum msgcode code, const char *buf, size_t len)
+static void mplex_write(int fd, enum msgcode code, const char *buf, size_t len, int convert)
 {
-	char buffer[1024];
+	char buffer[BIGPATHBUFLEN]; /* Oversized for use by iconv code. */
 	size_t n = len;
 
 	SIVAL(buffer, 0, ((MPLEX_BASE + (int)code)<<24) + len);
 
-	if (n > sizeof buffer - 4)
+#ifdef ICONV_OPTION
+	if (convert && ic_send == (iconv_t)-1)
+#endif
+		convert = 0;
+
+	if (convert || n > 1024 - 4) /* BIGPATHBUFLEN can handle 1024 bytes */
 		n = 0;
 	else
 		memcpy(buffer + 4, buf, n);
@@ -464,6 +480,28 @@ static void mplex_write(int fd, enum msgcode code, const char *buf, size_t len)
 	len -= n;
 	buf += n;
 
+#ifdef ICONV_OPTION
+	if (convert) {
+		iconv(ic_send, NULL, 0, NULL, 0);
+		defer_forwarding_messages++;
+		while (len) {
+			ICONV_CONST char *ibuf = (ICONV_CONST char *)buf;
+			char *obuf = buffer;
+			size_t ocnt = sizeof buffer;
+			while (len && iconv(ic_send, &ibuf,&len,
+					    &obuf,&ocnt) == (size_t)-1) {
+				if (errno == E2BIG || !ocnt)
+					break;
+				*obuf++ = *ibuf++;
+				ocnt--, len--;
+			}
+			n = obuf - buffer;
+			writefd_unbuffered(fd, buffer, n);
+		}
+		if (!--defer_forwarding_messages)
+			msg_flush();
+	} else
+#endif
 	if (len) {
 		defer_forwarding_messages++;
 		writefd_unbuffered(fd, buf, len);
@@ -472,20 +510,20 @@ static void mplex_write(int fd, enum msgcode code, const char *buf, size_t len)
 	}
 }
 
-int send_msg(enum msgcode code, const char *buf, int len)
+int send_msg(enum msgcode code, const char *buf, int len, int convert)
 {
 	if (msg_fd_out < 0) {
 		if (!defer_forwarding_messages)
-			return io_multiplex_write(code, buf, len);
+			return io_multiplex_write(code, buf, len, convert);
 		if (!io_multiplexing_out)
 			return 0;
-		msg_list_add(&msg_queue, code, buf, len);
+		msg_list_add(&msg_queue, code, buf, len, convert);
 		return 1;
 	}
 	if (flist_forward_from >= 0)
-		msg_list_add(&msg_queue, code, buf, len);
+		msg_list_add(&msg_queue, code, buf, len, convert);
 	else
-		mplex_write(msg_fd_out, code, buf, len);
+		mplex_write(msg_fd_out, code, buf, len, convert);
 	return 1;
 }
 
@@ -493,7 +531,7 @@ void send_msg_int(enum msgcode code, int num)
 {
 	char numbuf[4];
 	SIVAL(numbuf, 0, num);
-	send_msg(code, numbuf, 4);
+	send_msg(code, numbuf, 4, 0);
 }
 
 void wait_for_receiver(void)
@@ -719,10 +757,8 @@ static int read_timeout(int fd, char *buf, size_t len)
 	return cnt;
 }
 
-/**
- * Read a line into the "fname" buffer (which must be at least MAXPATHLEN
- * characters long).
- */
+/* Read a line into the "fname" buffer (which must be at least MAXPATHLEN
+ * characters long). */
 int read_filesfrom_line(int fd, char *fname)
 {
 	char ch, *s, *eob = fname + MAXPATHLEN - 1;
@@ -833,7 +869,7 @@ void maybe_send_keepalive(void)
 			if (protocol_version < 29)
 				return; /* there's nothing we can do */
 			if (protocol_version >= 30)
-				send_msg(MSG_NOOP, "", 0);
+				send_msg(MSG_NOOP, "", 0, 0);
 			else {
 				write_int(sock_f_out, cur_flist->count);
 				write_shortint(sock_f_out, ITEM_IS_NEW);
@@ -932,7 +968,30 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 		case MSG_DELETED:
 			if (msg_bytes >= sizeof line)
 				goto overflow;
-			read_loop(fd, line, msg_bytes);
+#ifdef ICONV_OPTION
+			if (ic_recv != (iconv_t)-1) {
+				ICONV_CONST char *ibuf;
+				char *obuf = line;
+				size_t icnt, ocnt = sizeof line - 1;
+				int add_null = 0;
+				iconv(ic_send, NULL, 0, NULL, 0);
+				while (msg_bytes) {
+					icnt = msg_bytes > sizeof iconv_buf
+					     ? sizeof iconv_buf : msg_bytes;
+					read_loop(fd, iconv_buf, icnt);
+					if (!(msg_bytes -= icnt) && !iconv_buf[icnt-1])
+						icnt--, add_null = 1;
+					ibuf = (ICONV_CONST char *)iconv_buf;
+					if (iconv(ic_send, &ibuf,&icnt,
+						  &obuf,&ocnt) == (size_t)-1)
+						goto overflow; // XXX
+				}
+				if (add_null)
+					*obuf++ = '\0';
+				msg_bytes = obuf - line;
+			} else
+#endif
+				read_loop(fd, line, msg_bytes);
 			/* A directory name was sent with the trailing null */
 			if (msg_bytes > 0 && !line[msg_bytes-1])
 				log_delete(line, S_IFDIR);
@@ -967,7 +1026,7 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 				exit_cleanup(RERR_STREAMIO);
 			}
 			read_loop(fd, line, msg_bytes);
-			rwrite((enum logcode)tag, line, msg_bytes);
+			rwrite((enum logcode)tag, line, msg_bytes, 1);
 			break;
 		default:
 			rprintf(FERROR, "unexpected tag %d [%s]\n",
@@ -1372,7 +1431,7 @@ void io_flush(int flush_it_all)
 		return;
 
 	if (io_multiplexing_out)
-		mplex_write(sock_f_out, MSG_DATA, iobuf_out, iobuf_out_cnt);
+		mplex_write(sock_f_out, MSG_DATA, iobuf_out, iobuf_out_cnt, 0);
 	else
 		writefd_unbuffered(iobuf_f_out, iobuf_out, iobuf_out_cnt);
 	iobuf_out_cnt = 0;
@@ -1684,13 +1743,13 @@ void io_start_multiplex_in(void)
 }
 
 /** Write an message to the multiplexed data stream. */
-int io_multiplex_write(enum msgcode code, const char *buf, size_t len)
+int io_multiplex_write(enum msgcode code, const char *buf, size_t len, int convert)
 {
 	if (!io_multiplexing_out)
 		return 0;
 	io_flush(NORMAL_FLUSH);
 	stats.total_written += (len+4);
-	mplex_write(sock_f_out, code, buf, len);
+	mplex_write(sock_f_out, code, buf, len, convert);
 	return 1;
 }
 

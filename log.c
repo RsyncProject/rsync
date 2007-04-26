@@ -20,15 +20,13 @@
  */
 
 #include "rsync.h"
-#if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
-#include <iconv.h>
-#endif
 
 extern int verbose;
 extern int dry_run;
 extern int am_daemon;
 extern int am_server;
 extern int am_sender;
+extern int am_generator;
 extern int local_server;
 extern int quiet;
 extern int module_id;
@@ -47,8 +45,11 @@ extern char *auth_user;
 extern char *stdout_format;
 extern char *logfile_format;
 extern char *logfile_name;
-#if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
+#ifdef ICONV_CONST
 extern iconv_t ic_chck;
+#endif
+#ifdef ICONV_OPTION
+extern iconv_t ic_send, ic_recv;
 #endif
 extern char curr_dir[];
 extern unsigned int module_dirlen;
@@ -234,17 +235,25 @@ static void filtered_fwrite(FILE *f, const char *buf, int len, int use_isprint)
 /* this is the underlying (unformatted) rsync debugging function. Call
  * it with FINFO, FERROR or FLOG.  Note: recursion can happen with
  * certain fatal conditions. */
-void rwrite(enum logcode code, const char *buf, int len)
+void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 {
 	int trailing_CR_or_NL;
 	FILE *f = NULL;
+#ifdef ICONV_OPTION
+	iconv_t ic = is_utf8 && ic_recv != (iconv_t)-1 ? ic_recv : ic_chck;
+#else
+#ifdef ICONV_CONST
+	iconv_t ic = ic_chck;
+#endif
+#endif
 
 	if (len < 0)
 		exit_cleanup(RERR_MESSAGEIO);
 
 	if (am_server && msg_fd_out >= 0) {
+		assert(!is_utf8);
 		/* Pass the message to our sibling. */
-		send_msg((enum msgcode)code, buf, len);
+		send_msg((enum msgcode)code, buf, len, 0);
 		return;
 	}
 
@@ -277,7 +286,7 @@ void rwrite(enum logcode code, const char *buf, int len)
 
 	if (am_server) {
 		/* Pass the message to the non-server side. */
-		if (send_msg((enum msgcode)code, buf, len))
+		if (send_msg((enum msgcode)code, buf, len, !is_utf8))
 			return;
 		if (am_daemon) {
 			/* TODO: can we send the error to the user somehow? */
@@ -300,18 +309,15 @@ void rwrite(enum logcode code, const char *buf, int len)
 	trailing_CR_or_NL = len && (buf[len-1] == '\n' || buf[len-1] == '\r')
 			  ? buf[--len] : 0;
 
-#if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
-#ifndef ICONV_CONST
-#define ICONV_CONST
-#endif
-	if (ic_chck != (iconv_t)-1) {
+#ifdef ICONV_CONST
+	if (ic != (iconv_t)-1) {
 		char convbuf[1024];
 		ICONV_CONST char *in_buf = (ICONV_CONST char *)buf;
 		char *out_buf = convbuf;
 		size_t in_cnt = len, out_cnt = sizeof convbuf - 1;
 
-		iconv(ic_chck, NULL, 0, NULL, 0);
-		while (iconv(ic_chck, &in_buf,&in_cnt,
+		iconv(ic, NULL, 0, NULL, 0);
+		while (iconv(ic, &in_buf,&in_cnt,
 			     &out_buf,&out_cnt) == (size_t)-1) {
 			if (out_buf != convbuf) {
 				filtered_fwrite(f, convbuf, out_buf - convbuf, 0);
@@ -373,7 +379,7 @@ void rprintf(enum logcode code, const char *format, ...)
 		}
 	}
 
-	rwrite(code, buf, len);
+	rwrite(code, buf, len, 0);
 }
 
 /* This is like rprintf, but it also tries to print some
@@ -404,7 +410,7 @@ void rsyserr(enum logcode code, int errcode, const char *format, ...)
 	if (len >= sizeof buf)
 		exit_cleanup(RERR_MESSAGEIO);
 
-	rwrite(code, buf, len);
+	rwrite(code, buf, len, 0);
 }
 
 void rflush(enum logcode code)
@@ -681,7 +687,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 		p = s + len;
 	}
 
-	rwrite(code, buf, total);
+	rwrite(code, buf, total, 0);
 }
 
 /* Return 1 if the format escape is in the log-format string (e.g. look for
@@ -758,7 +764,7 @@ void log_delete(const char *fname, int mode)
 	else if (am_server && protocol_version >= 29 && len < MAXPATHLEN) {
 		if (S_ISDIR(mode))
 			len++; /* directories include trailing null */
-		send_msg(MSG_DELETED, fname, len);
+		send_msg(MSG_DELETED, fname, len, am_generator);
 	} else {
 		fmt = stdout_format_has_o_or_i ? stdout_format : "deleting %n";
 		log_formatted(FCLIENT, fmt, "del.", &x.file, fname, &stats,

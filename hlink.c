@@ -34,11 +34,13 @@ extern int stdout_format_has_i;
 extern int maybe_ATTRS_REPORT;
 extern char *basis_dir[];
 extern struct file_list *cur_flist;
+#ifdef ICONV_OPTION
+extern int ic_ndx;
+#endif
 
 #ifdef SUPPORT_HARD_LINKS
 
 #define HASH_LOAD_LIMIT(size) ((size)*3/4)
-#define FPTR(i) (cur_flist->files[i])
 
 struct ihash_table {
 	int32 size;
@@ -200,8 +202,8 @@ void idev_destroy(void)
 
 static int hlink_compare_gnum(int *int1, int *int2)
 {
-	struct file_struct *f1 = FPTR(*int1);
-	struct file_struct *f2 = FPTR(*int2);
+	struct file_struct *f1 = cur_flist->sorted[*int1];
+	struct file_struct *f2 = cur_flist->sorted[*int2];
 	int32 gnum1 = F_HL_GNUM(f1);
 	int32 gnum2 = F_HL_GNUM(f2);
 
@@ -221,17 +223,24 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 	     (int (*)()) hlink_compare_gnum);
 
 	for (from = 0; from < ndx_count; from++) {
-		for (file = FPTR(ndx_list[from]), gnum = F_HL_GNUM(file), prev = -1;
+		for (file = cur_flist->sorted[ndx_list[from]], gnum = F_HL_GNUM(file), prev = -1;
 		     from < ndx_count-1;
-		     file = file_next, gnum = gnum_next, prev = ndx_list[from++])
+		     file = file_next, gnum = gnum_next, from++)
 		{
-			file_next = FPTR(ndx_list[from+1]);
+			file_next = cur_flist->sorted[ndx_list[from+1]];
 			gnum_next = F_HL_GNUM(file_next);
 			if (gnum != gnum_next)
 				break;
 			if (prev < 0)
 				file->flags |= FLAG_HLINK_FIRST;
 			F_HL_PREV(file) = prev;
+			/* The linked list must use raw ndx values. */
+#ifdef ICONV_OPTION
+			if (ic_ndx)
+				prev = F_NDX(file);
+			else
+#endif
+				prev = ndx_list[from];
 		}
 		if (prev < 0)
 			file->flags &= ~FLAG_HLINKED;
@@ -255,7 +264,7 @@ void match_hard_links(void)
 		out_of_memory("match_hard_links");
 
 	for (i = 0; i < cur_flist->count; i++) {
-		if (F_IS_HLINKED(FPTR(i)))
+		if (F_IS_HLINKED(cur_flist->sorted[i]))
 			ndx_list[ndx_count++] = i;
 	}
 
@@ -317,7 +326,7 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 	STRUCT_STAT prev_st;
 	char prev_name[MAXPATHLEN], altbuf[MAXPATHLEN], *realname;
 	int alt_dest, prev_ndx = F_HL_PREV(file);
-	struct file_struct *prev_file = FPTR(prev_ndx);
+	struct file_struct *prev_file = cur_flist->files[prev_ndx];
 
 	/* Is the previous link is not complete yet? */
 	if (!(prev_file->flags & FLAG_HLINK_DONE)) {
@@ -338,7 +347,7 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 	if (!(prev_file->flags & FLAG_HLINK_FIRST)) {
 		/* The previous previous will be marked with FIRST. */
 		prev_ndx = F_HL_PREV(prev_file);
-		prev_file = FPTR(prev_ndx);
+		prev_file = cur_flist->files[prev_ndx];
 		/* Update our previous pointer to point to the first. */
 		F_HL_PREV(file) = prev_ndx;
 	}
@@ -475,7 +484,7 @@ void finish_hard_link(struct file_struct *file, const char *fname,
 
 	while ((ndx = prev_ndx) >= 0) {
 		int val;
-		file = FPTR(ndx);
+		file = cur_flist->files[ndx];
 		file->flags = (file->flags & ~FLAG_HLINK_FIRST) | FLAG_HLINK_DONE;
 		prev_ndx = F_HL_PREV(file);
 		prev_name = f_name(file, NULL);

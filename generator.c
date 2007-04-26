@@ -97,6 +97,9 @@ extern char *backup_suffix;
 extern int backup_suffix_len;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct filter_list_struct server_filter_list;
+#ifdef ICONV_OPTION
+extern int ic_ndx;
+#endif
 
 int ignore_perishable = 0;
 int non_perishable_cnt = 0;
@@ -415,15 +418,14 @@ static void do_delayed_deletions(char *delbuf)
  * MAXPATHLEN buffer with the name of the directory in it (the functions we
  * call will append names onto the end, but the old dir value will be restored
  * on exit). */
-static void delete_in_dir(struct file_list *flist, char *fbuf,
-			  struct file_struct *file, dev_t *fs_dev)
+static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 {
 	static int already_warned = 0;
 	struct file_list *dirlist;
 	char delbuf[MAXPATHLEN];
 	int dlen, i;
 
-	if (!flist) {
+	if (!fbuf) {
 		change_local_filter_dir(NULL, 0, 0);
 		return;
 	}
@@ -467,7 +469,7 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 					f_name(fp, NULL));
 			continue;
 		}
-		if (flist_find(flist, fp) < 0) {
+		if (flist_find(cur_flist, fp) < 0) {
 			f_name(fp, delbuf);
 			if (delete_during == 2) {
 				if (!remember_delete(fp, delbuf))
@@ -482,7 +484,7 @@ static void delete_in_dir(struct file_list *flist, char *fbuf,
 
 /* This deletes any files on the receiving side that are not present on the
  * sending side.  This is used by --delete-before and --delete-after. */
-static void do_delete_pass(struct file_list *flist)
+static void do_delete_pass(void)
 {
 	char fbuf[MAXPATHLEN];
 	STRUCT_STAT st;
@@ -492,8 +494,8 @@ static void do_delete_pass(struct file_list *flist)
 	if (dry_run > 1 || list_only)
 		return;
 
-	for (j = 0; j < flist->count; j++) {
-		struct file_struct *file = flist->files[j];
+	for (j = 0; j < cur_flist->count; j++) {
+		struct file_struct *file = cur_flist->sorted[j];
 
 		if (!(file->flags & FLAG_XFER_DIR))
 			continue;
@@ -506,9 +508,9 @@ static void do_delete_pass(struct file_list *flist)
 		 || !S_ISDIR(st.st_mode))
 			continue;
 
-		delete_in_dir(flist, fbuf, file, &st.st_dev);
+		delete_in_dir(fbuf, file, &st.st_dev);
 	}
-	delete_in_dir(NULL, NULL, NULL, &dev_zero);
+	delete_in_dir(NULL, NULL, &dev_zero);
 
 	if (do_progress && !am_server)
 		rprintf(FINFO, "                    \r");
@@ -1271,7 +1273,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 		else if (delete_during && f_out != -1 && !phase && dry_run < 2
 		    && (file->flags & FLAG_XFER_DIR))
-			delete_in_dir(cur_flist, fname, file, &real_sx.st.st_dev);
+			delete_in_dir(fname, file, &real_sx.st.st_dev);
 		goto cleanup;
 	}
 
@@ -1731,7 +1733,7 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 	/* Fix any directory permissions that were modified during the
 	 * transfer and/or re-set any tweaked modified-time values. */
 	for (i = start, j = 0; i <= end; i++) {
-		file = flist->files[i];
+		file = flist->sorted[i];
 		if (!F_IS_ACTIVE(file) || !S_ISDIR(file->mode)
 		 || file->flags & FLAG_MISSING_DIR)
 			continue;
@@ -1827,7 +1829,7 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 
 void generate_files(int f_out, const char *local_name)
 {
-	int i;
+	int i, ndx;
 	char fbuf[MAXPATHLEN];
 	int itemizing;
 	enum logcode code;
@@ -1860,7 +1862,7 @@ void generate_files(int f_out, const char *local_name)
 		rprintf(FINFO, "generator starting pid=%ld\n", (long)getpid());
 
 	if (delete_before && !solo_file && cur_flist->count > 0)
-		do_delete_pass(cur_flist);
+		do_delete_pass();
 	if (delete_during == 2) {
 		deldelay_size = BIGPATHBUFLEN * 4;
 		deldelay_buf = new_array(char, deldelay_size);
@@ -1896,21 +1898,27 @@ void generate_files(int f_out, const char *local_name)
 					dirdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
 				} else
 					dirdev = MAKEDEV(0, 0);
-				delete_in_dir(cur_flist, f_name(fp, fbuf), fp, &dirdev);
+				delete_in_dir(f_name(fp, fbuf), fp, &dirdev);
 			}
 		}
 		for (i = cur_flist->low; i <= cur_flist->high; i++) {
-			struct file_struct *file = cur_flist->files[i];
+			struct file_struct *file = cur_flist->sorted[i];
 
 			if (!F_IS_ACTIVE(file))
 				continue;
+
+#ifdef ICONV_OPTION
+			if (ic_ndx)
+				ndx = F_NDX(file);
+			else
+#endif
+				ndx = i + cur_flist->ndx_start;
 
 			if (solo_file)
 				strlcpy(fbuf, solo_file, sizeof fbuf);
 			else
 				f_name(file, fbuf);
-			recv_generator(fbuf, file, i + cur_flist->ndx_start,
-				       itemizing, code, f_out);
+			recv_generator(fbuf, file, ndx, itemizing, code, f_out);
 
 			/* We need to ensure that any dirs we create have
 			 * writeable permissions during the time we are putting
@@ -1952,7 +1960,7 @@ void generate_files(int f_out, const char *local_name)
 	} while ((cur_flist = cur_flist->next) != NULL);
 
 	if (delete_during)
-		delete_in_dir(NULL, NULL, NULL, &dev_zero);
+		delete_in_dir(NULL, NULL, &dev_zero);
 	phase++;
 	if (verbose > 2)
 		rprintf(FINFO, "generate_files phase=%d\n", phase);
@@ -1996,7 +2004,7 @@ void generate_files(int f_out, const char *local_name)
 	if (delete_during == 2)
 		do_delayed_deletions(fbuf);
 	if (delete_after && !solo_file && file_total > 0)
-		do_delete_pass(cur_flist);
+		do_delete_pass();
 
 	if ((need_retouch_dir_perms || need_retouch_dir_times)
 	 && dir_tweaking && (!inc_recurse || delete_during == 2))

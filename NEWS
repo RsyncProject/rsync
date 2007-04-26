@@ -61,6 +61,10 @@ Changes since 2.6.9:
       all attributes of a file by using a special extended-attribute idiom.
       There is also an analogous "fake super" option for an rsync daemon.
 
+    - Added the --iconv option, which allows rsync to convert filenames from
+      one character set to another during the transfer.  (Currently must be
+      manually enabled via configure's --enable-iconv option.)
+
     - You may specify --max-delete=0 to a 3.0.0 client as long as the receiving
       side is at least version 3.0.0.  This means that you can pull from an
       older rsync with this option, but pushing to an older rsync will generate

@@ -389,7 +389,7 @@ int recv_files(int f_in, char *local_name)
 				rprintf(FINFO, "recv_files phase=%d\n", phase);
 			if (phase == 2 && delay_updates)
 				handle_delayed_updates(local_name);
-			send_msg(MSG_DONE, "", 0);
+			send_msg(MSG_DONE, "", 0, 0);
 			continue;
 		}
 

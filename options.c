@@ -177,6 +177,11 @@ int list_only = 0;
 #define MAX_BATCH_NAME_LEN 256	/* Must be less than MAXPATHLEN-13 */
 char *batch_name = NULL;
 
+#ifdef ICONV_OPTION
+int need_unsorted_flist = 0;
+char *iconv_opt = ICONV_OPTION;
+#endif
+
 struct chmod_mode_struct *chmod_modes = NULL;
 
 static int daemon_opt;   /* sets am_daemon after option error-reporting */
@@ -205,6 +210,7 @@ static void print_rsync_version(enum logcode f)
 	char const *acls = "no ";
 	char const *xattrs = "no ";
 	char const *links = "no ";
+	char const *iconv = "no ";
 	char const *ipv6 = "no ";
 	STRUCT_STAT *dumstat;
 
@@ -232,6 +238,9 @@ static void print_rsync_version(enum logcode f)
 #ifdef INET6
 	ipv6 = "";
 #endif
+#ifdef ICONV_OPTION
+	iconv = "";
+#endif
 
 	rprintf(f, "%s  version %s  protocol version %d%s\n",
 		RSYNC_NAME, RSYNC_VERSION, PROTOCOL_VERSION, subprotocol);
@@ -245,8 +254,8 @@ static void print_rsync_version(enum logcode f)
 		(int)(sizeof (int64) * 8));
 	rprintf(f, "    %ssocketpairs, %shardlinks, %ssymlinks, %sIPv6, batchfiles, %sinplace,\n",
 		got_socketpair, hardlinks, links, ipv6, have_inplace);
-	rprintf(f, "    %sappend, %sACLs, %sxattrs\n",
-		have_inplace, acls, xattrs);
+	rprintf(f, "    %sappend, %sACLs, %sxattrs, %siconv\n",
+		have_inplace, acls, xattrs, iconv);
 
 #ifdef MAINTAINER_MODE
 	rprintf(f, "Panic Action: \"%s\"\n", get_panic_action());
@@ -399,6 +408,9 @@ void usage(enum logcode F)
   rprintf(F,"     --only-write-batch=FILE like --write-batch but w/o updating destination\n");
   rprintf(F,"     --read-batch=FILE       read a batched update from FILE\n");
   rprintf(F,"     --protocol=NUM          force an older protocol version to be used\n");
+#ifdef ICONV_OPTION
+  rprintf(F,"     --iconv=CONVERT_SPEC    request charset conversion of filesnames\n");
+#endif
 #ifdef INET6
   rprintf(F," -4, --ipv4                  prefer IPv4\n");
   rprintf(F," -6, --ipv6                  prefer IPv6\n");
@@ -560,6 +572,9 @@ static struct poptOption long_options[] = {
   {"rsh",             'e', POPT_ARG_STRING, &shell_cmd, 0, 0, 0 },
   {"rsync-path",       0,  POPT_ARG_STRING, &rsync_path, 0, 0, 0 },
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir, 0, 0, 0 },
+#ifdef ICONV_OPTION
+  {"iconv",            0,  POPT_ARG_STRING, &iconv_opt, 0, 0, 0 },
+#endif
 #ifdef INET6
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
@@ -832,6 +847,11 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (am_daemon)
 		set_refuse_options("log-file*");
 
+#ifdef ICONV_OPTION
+	if (!am_daemon && (arg = getenv("RSYNC_ICONV")) != NULL && *arg)
+		iconv_opt = strdup(arg);
+#endif
+
 	/* TODO: Call poptReadDefaultConfig; handle errors. */
 
 	/* The context leaks in case of an error, but if there's a
@@ -857,6 +877,9 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 						    long_options, 0);
 				am_server = 1;
 			}
+#ifdef ICONV_OPTION
+			iconv_opt = NULL;
+#endif
 			break;
 
 		case OPT_SENDER:
@@ -874,6 +897,9 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 					sizeof err_buf);
 				return 0;
 			}
+#ifdef ICONV_OPTION
+			iconv_opt = NULL;
+#endif
 			poptFreeContext(pc);
 			pc = poptGetContext(RSYNC_NAME, *argc, *argv,
 					    long_daemon_options, 0);
@@ -1174,6 +1200,15 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		usage(FINFO);
 		exit_cleanup(0);
 	}
+
+#ifdef ICONV_OPTION
+	if (iconv_opt) {
+		if (!am_server && strcmp(iconv_opt, "-") == 0)
+			iconv_opt = NULL;
+		else
+			need_unsorted_flist = 1;
+	}
+#endif
 
 #ifndef SUPPORT_LINKS
 	if (preserve_links && !am_sender) {
@@ -1655,8 +1690,6 @@ void server_options(char **args,int *argc)
 	if (list_only == 1 && !recurse)
 		argstr[x++] = 'r';
 
-	argstr[x] = '\0';
-
 #if SUBPROTOCOL_VERSION != 0
 	/* If we're speaking a pre-release version of a protocol, we tell
 	 * the server about this by (ab)using the -e option. */
@@ -1665,6 +1698,8 @@ void server_options(char **args,int *argc)
 			      "e%d.%d", PROTOCOL_VERSION, SUBPROTOCOL_VERSION);
 	}
 #endif
+
+	argstr[x] = '\0';
 
 	if (x != 1)
 		args[ac++] = argstr;
@@ -1703,6 +1738,19 @@ void server_options(char **args,int *argc)
 		else if (!verbose)
 			args[ac++] = "--log-format=X";
 	}
+
+#ifdef ICONV_OPTION
+	if (iconv_opt) {
+		char *set = strchr(iconv_opt, ',');
+		if (set)
+			set++;
+		else
+			set = iconv_opt;
+		if (asprintf(&arg, "--iconv=%s", set) < 0)
+			goto oom;
+		args[ac++] = arg;
+	}
+#endif
 
 	if (block_size) {
 		if (asprintf(&arg, "-B%lu", block_size) < 0)

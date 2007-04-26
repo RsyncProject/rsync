@@ -568,6 +568,22 @@ if test $ac_cv_func_getpgrp = yes; then
     AC_FUNC_GETPGRP
 fi
 
+AC_ARG_ENABLE(iconv,
+    AC_HELP_STRING([--disable-iconv],
+	    [disable rsync's --iconv option]),
+    [], [enable_iconv=$ac_cv_func_iconv_open])
+AH_TEMPLATE([ICONV_OPTION],
+[Define if you want the --iconv option.  Specifing a value will set the
+default iconv setting (a NULL means no --iconv processing by default).])
+if test x"$enable_iconv" != x"no"; then
+	if test x"$enable_iconv" = x"yes"; then
+		AC_DEFINE(ICONV_OPTION, NULL)
+	else
+		AC_DEFINE_UNQUOTED(ICONV_OPTION, "$enable_iconv")
+	fi
+	AC_DEFINE(UTF8_CHARSET, "UTF-8", [String to pass to iconv() for the UTF-8 charset.])
+fi
+
 AC_CACHE_CHECK([whether chown() modifies symlinks],rsync_cv_chown_modifies_symlink,[
   AC_TRY_RUN([
 #if HAVE_UNISTD_H

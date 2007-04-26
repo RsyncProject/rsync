@@ -409,7 +409,7 @@ static int *open_socket_in(int type, int port, const char *bind_addr,
 	 * unsuccessful, or if the daemon is being run with -vv. */
 	for (s = 0; s < ecnt; s++) {
 		if (!i || verbose > 1)
-			rwrite(FLOG, errmsgs[s], strlen(errmsgs[s]));
+			rwrite(FLOG, errmsgs[s], strlen(errmsgs[s]), 0);
 		free(errmsgs[s]);
 	}
 	free(errmsgs);

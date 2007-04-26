@@ -362,6 +362,15 @@ enum msgcode {
 # include <limits.h>
 #endif
 
+#if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
+#include <iconv.h>
+#ifndef ICONV_CONST
+#define ICONV_CONST
+#endif
+#elif defined ICONV_CONST
+#undef ICONV_CONST
+#endif
+
 #include <assert.h>
 
 #include "lib/pool_alloc.h"
@@ -609,6 +618,7 @@ extern int preserve_xattrs;
 #define F_GROUP(f) REQ_EXTRA(f, preserve_gid)->unum
 #define F_ACL(f) REQ_EXTRA(f, preserve_acls)->num
 #define F_XATTR(f) REQ_EXTRA(f, preserve_xattrs)->num
+#define F_NDX(f) REQ_EXTRA(f, ic_ndx)->num
 
 /* These items are per-entry optional and mutally exclusive: */
 #define F_HL_GNUM(f) OPT_EXTRA(f, LEN64_BUMP(f))->num
@@ -665,7 +675,7 @@ extern int preserve_xattrs;
 
 struct file_list {
 	struct file_list *next, *prev;
-	struct file_struct **files;
+	struct file_struct **files, **sorted;
 	alloc_pool_t file_pool;
 	int count, malloced;
 	int low, high; /* 0-relative index values excluding empties */

@@ -402,6 +402,7 @@ to the detailed description below for a complete description.  verb(
      --only-write-batch=FILE like --write-batch but w/o updating dest
      --read-batch=FILE       read a batched update from FILE
      --protocol=NUM          force an older protocol version to be used
+     --iconv=CONVERT_SPEC    request charset conversion of filesnames
      --checksum-seed=NUM     set block/file checksum seed (advanced)
  -4, --ipv4                  prefer IPv4
  -6, --ipv6                  prefer IPv6
@@ -1866,6 +1867,24 @@ bf(--read-batch) option, you should use "--protocol=28" when creating the
 batch file to force the older protocol version to be used in the batch
 file (assuming you can't upgrade the rsync on the reading system).
 
+dit(bf(--iconv=CONVERT_SPEC)) Rsync can convert filenames between character
+sets using this option.  Using a CONVERT_SPEC of "." tells rsync to look up
+the default character-set via the locale setting.  Alternately, you can
+fully specify what conversion to do by giving a local and a remote charset
+separated by a comma (local first), e.g. bf(--iconv=utf8,iso88591).
+Finally, you can specify a CONVERT_SPEC of "-" to turn off any conversion.
+The default setting of this option is site-specific, and can also be
+affected via the RSYNC_ICONV environment variable.
+
+Note that rsync does not do any conversion of names in filter files
+(including include/exclude files), in a files-from file, nor those
+specified on the command line.  It is up to you to ensure that you're
+requesting the right names from a remote server, and you can specify
+extra include/exclude rules if there are filename differences on the
+two sides that need to be accounted for.  (In the future there may be
+a way to specify a UTF-8 filter rule that gets auto-converted to the
+local side's character set.)
+
 dit(bf(-4, --ipv4) or bf(-6, --ipv6)) Tells rsync to prefer IPv4/IPv6
 when creating sockets.  This only affects sockets that rsync has direct
 control over, such as the outgoing socket when directly contacting an
@@ -2617,6 +2636,8 @@ startdit()
 dit(bf(CVSIGNORE)) The CVSIGNORE environment variable supplements any
 ignore patterns in .cvsignore files. See the bf(--cvs-exclude) option for
 more details.
+dit(bf(RSYNC_ICONV)) Specify a default bf(--iconv) setting using this
+environment variable.
 dit(bf(RSYNC_RSH)) The RSYNC_RSH environment variable allows you to
 override the default shell used as the transport for rsync.  Command line
 options are permitted after the command name, just as in the bf(-e) option.

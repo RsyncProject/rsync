@@ -20,9 +20,6 @@
  */
 
 #include "rsync.h"
-#if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
-#include <iconv.h>
-#endif
 #if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
 #include <libcharset.h>
 #elif defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
@@ -53,9 +50,16 @@ extern int keep_dirlinks;
 extern int make_backups;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct chmod_mode_struct *daemon_chmod_modes;
+#ifdef ICONV_OPTION
+extern char *iconv_opt;
+#endif
 
-#if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
+#ifdef ICONV_CONST
 iconv_t ic_chck = (iconv_t)-1;
+#ifdef ICONV_OPTION
+iconv_t ic_send = (iconv_t)-1, ic_recv = (iconv_t)-1;
+int ic_ndx;
+#endif
 
 static const char *default_charset(void)
 {
@@ -70,8 +74,13 @@ static const char *default_charset(void)
 
 void setup_iconv()
 {
+	const char *defset = default_charset();
+# ifdef ICONV_OPTION
+	const char *charset;
+	char *cp;
+#endif
+
 	if (!am_server && !allow_8bit_chars) {
-		const char *defset = default_charset();
 
 		/* It's OK if this fails... */
 		ic_chck = iconv_open(defset, defset);
@@ -89,6 +98,44 @@ void setup_iconv()
 			}
 		}
 	}
+
+# ifdef ICONV_OPTION
+	if (!iconv_opt)
+		return;
+
+	if ((cp = strchr(iconv_opt, ',')) != NULL) {
+		if (am_server) /* A local transfer needs this. */
+			iconv_opt = cp + 1;
+		else
+			*cp = '\0';
+	}
+
+	if (!*iconv_opt || (*iconv_opt == '.' && iconv_opt[1] == '\0'))
+		charset = defset;
+	else
+		charset = iconv_opt;
+
+	if ((ic_send = iconv_open(UTF8_CHARSET, charset)) == (iconv_t)-1) {
+		rprintf(FERROR, "iconv_open(\"%s\", \"%s\") failed\n",
+			UTF8_CHARSET, charset);
+		exit_cleanup(RERR_UNSUPPORTED);
+	}
+
+	if ((ic_recv = iconv_open(charset, UTF8_CHARSET)) == (iconv_t)-1) {
+		rprintf(FERROR, "iconv_open(\"%s\", \"%s\") failed\n",
+			charset, UTF8_CHARSET);
+		exit_cleanup(RERR_UNSUPPORTED);
+	}
+
+	if (!am_sender)
+		ic_ndx = ++file_extra_cnt;
+
+	if (verbose > 1) {
+		rprintf(FINFO, "%s charset: %s\n",
+			am_server ? "server" : "client",
+			*charset ? charset : "[LOCALE]");
+	}
+# endif
 }
 #endif
 
@@ -112,7 +159,7 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 			goto invalid_ndx;
 		if (ndx == NDX_FLIST_EOF) {
 			flist_eof = 1;
-			send_msg(MSG_FLIST_EOF, "", 0);
+			send_msg(MSG_FLIST_EOF, "", 0, 0);
 			continue;
 		}
 		ndx = NDX_FLIST_OFFSET - ndx;
