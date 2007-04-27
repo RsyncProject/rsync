@@ -174,7 +174,7 @@ testsuite/devices-fake.test:
 # check a version installed from a binary or some other source tree,
 # if you want.
 
-installcheck: $(CHECK_PROGS)
+installcheck: $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	POSIXLY_CORRECT=1 TOOLDIR=`pwd` rsync_bin="$(bindir)/rsync$(EXEEXT)" srcdir="$(srcdir)" $(srcdir)/runtests.sh
 
 # TODO: Add 'dist' target; need to know which files will be included
