@@ -62,8 +62,9 @@ Changes since 2.6.9:
       There is also an analogous "fake super" option for an rsync daemon.
 
     - Added the --iconv option, which allows rsync to convert filenames from
-      one character set to another during the transfer.  (Currently must be
-      manually enabled via configure's --enable-iconv option.)
+      one character-set to another during the transfer.  (If your system does
+      not support iconv, you must currently manually disable this by using
+      the --enable-iconv configure option.)
 
     - You may specify --max-delete=0 to a 3.0.0 client as long as the receiving
       side is at least version 3.0.0.  This means that you can pull from an
