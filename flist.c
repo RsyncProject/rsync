@@ -1207,13 +1207,13 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		return NULL;
 
 	if (inc_recurse && flist == dir_flist) {
+		flist_expand(dir_flist);
 #ifdef ICONV_OPTION
 		if (ic_ndx)
 			F_NDX(file) = dir_flist->count;
-#endif
-		flist_expand(dir_flist);
 		if (need_unsorted_flist)
 			dir_flist->sorted[dir_flist->count] = file;
+#endif
 		dir_flist->files[dir_flist->count++] = file;
 	}
 
@@ -1501,7 +1501,9 @@ void send_extra_file_list(int f, int at_least)
 		}
 		write_byte(f, 0);
 
+#ifdef ICONV_OPTION
 		if (!need_unsorted_flist)
+#endif
 			dir_flist->sorted = dir_flist->files;
 		add_dirs_to_tree(send_dir_ndx, start, dir_flist->count - 1);
 
@@ -1854,7 +1856,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		rprintf(FINFO, "send_file_list done\n");
 
 	if (inc_recurse) {
+#ifdef ICONV_OPTION
 		if (!need_unsorted_flist)
+#endif
 			dir_flist->sorted = dir_flist->files;
 		add_dirs_to_tree(-1, 0, dir_flist->count - 1);
 		if (send_dir_ndx < 0) {
@@ -1914,8 +1918,10 @@ struct file_list *recv_file_list(int f)
 
 		if (inc_recurse && S_ISDIR(file->mode)) {
 			flist_expand(dir_flist);
+#ifdef ICONV_OPTION
 			if (need_unsorted_flist)
 				dir_flist->sorted[dir_flist->count] = file;
+#endif
 			dir_flist->files[dir_flist->count++] = file;
 		}
 
