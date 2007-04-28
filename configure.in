@@ -38,7 +38,7 @@ fi
 AC_MSG_CHECKING([whether to include debugging symbols])
 AC_ARG_ENABLE(debug,
 	AC_HELP_STRING([--disable-debug],
-		[turn off debugging symbols and features]))
+		[disable debugging symbols and features]))
 
 if test x"$enable_debug" = x"no"; then
     AC_MSG_RESULT(no)
@@ -283,7 +283,7 @@ fi
 dnl Do you want to disable use of locale functions
 AC_ARG_ENABLE([locale],
 	AC_HELP_STRING([--disable-locale],
-		[turn off locale features]))
+		[disable locale features]))
 AH_TEMPLATE([CONFIG_LOCALE],
 [Undefine if you don't want locale features.  By default this is defined.])
 if test x"$enable_locale" != x"no"; then
@@ -560,7 +560,7 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd strdup chown chmod lchmod mknod mkfifo \
     memmove lchown vsnprintf snprintf vasprintf asprintf setsid glob strpbrk \
     strlcat strlcpy strtol mallinfo getgroups setgroups geteuid getegid \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \
-    strerror putenv iconv_open locale_charset nl_langinfo \
+    strerror putenv iconv_open locale_charset nl_langinfo lgetxattr \
     sigaction sigprocmask)
 
 AC_CHECK_FUNCS(getpgrp tcgetpgrp)
@@ -836,7 +836,7 @@ AC_CHECK_FUNCS(_acl __acl _facl __facl)
 AC_MSG_CHECKING([whether to support ACLs])
 AC_ARG_ENABLE(acl-support,
 	AC_HELP_STRING([--disable-acl-support],
-		       [Turn off ACL support]))
+		       [disable ACL support]))
 
 if test x"$enable_acl_support" = x"no"; then
     AC_MSG_RESULT(no)
@@ -916,9 +916,11 @@ AC_CHECK_HEADERS(sys/extattr.h)
 # check for extended attribute support
 AC_MSG_CHECKING(whether to support extended attributes)
 AC_ARG_ENABLE(xattr-support,
-	AC_HELP_STRING([--disable-xattr-support],
-		       [Turn off extended attribute support]))
-
+    AC_HELP_STRING([--disable-xattr-support],
+	    [disable extended attributes]),
+    [], [enable_xattr_support=$ac_cv_func_lgetxattr])
+AH_TEMPLATE([SUPPORT_XATTRS],
+[Define to 1 to add support for extended attributes])
 if test x"$enable_xattr_support" = x"no"; then
     AC_MSG_RESULT(no)
 else
@@ -926,7 +928,7 @@ else
     *linux*)
 	AC_MSG_RESULT(Using Linux xattrs)
 	AC_DEFINE(HAVE_LINUX_XATTRS, 1, [True if you have Linux xattrs])
-	AC_DEFINE(SUPPORT_XATTRS, 1, [Define to 1 to add support for extended attributes])
+	AC_DEFINE(SUPPORT_XATTRS, 1)
 	;;
     darwin*)
 	AC_MSG_RESULT(Using OS X xattrs)
