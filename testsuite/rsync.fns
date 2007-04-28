@@ -233,7 +233,7 @@ build_rsyncd_conf() {
 
 pid file = $pidfile
 use chroot = no
-hosts allow = localhost 127.0.0.1 $hostname
+hosts allow = localhost 127.0.0.1 10.0.1.2 $hostname
 log file = $logfile
 log format = %i %h [%a] %m (%u) %l %f%L
 transfer logging = yes
