@@ -42,6 +42,9 @@ cp -p from1/dir-and-not-dir/inside chk/dir-and-not-dir
 cp -p from2/sub1/uno from3/sub1/dos from2/sub1/tres chk/sub1
 cp -p from3/sub2/subby chk/sub2
 
+# Make sure that time has moved on.
+sleep 1
+
 # Get rid of any directory-time differences
 $RSYNC -av --existing -f 'exclude,! */' from1/ from2/
 $RSYNC -av --existing -f 'exclude,! */' from2/ from3/
