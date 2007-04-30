@@ -560,8 +560,8 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd strdup chown chmod lchmod mknod mkfifo \
     memmove lchown vsnprintf snprintf vasprintf asprintf setsid glob strpbrk \
     strlcat strlcpy strtol mallinfo getgroups setgroups geteuid getegid \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \
-    strerror putenv iconv_open locale_charset nl_langinfo lgetxattr \
-    sigaction sigprocmask)
+    strerror putenv iconv_open locale_charset nl_langinfo getxattr \
+    extattr_get_link sigaction sigprocmask)
 
 AC_CHECK_FUNCS(getpgrp tcgetpgrp)
 if test $ac_cv_func_getpgrp = yes; then
@@ -918,7 +918,10 @@ AC_MSG_CHECKING(whether to support extended attributes)
 AC_ARG_ENABLE(xattr-support,
     AC_HELP_STRING([--disable-xattr-support],
 	    [disable extended attributes]),
-    [], [enable_xattr_support=$ac_cv_func_lgetxattr])
+    [], [case "$ac_cv_func_getxattr$ac_cv_func_extattr_get_link" in
+	*yes*) enable_xattr_support=maybe ;;
+	*) enable_xattr_support=no ;;
+	esac])
 AH_TEMPLATE([SUPPORT_XATTRS],
 [Define to 1 to add support for extended attributes])
 if test x"$enable_xattr_support" = x"no"; then
