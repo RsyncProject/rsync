@@ -1856,34 +1856,36 @@ void server_options(char **args,int *argc)
 	if (numeric_ids)
 		args[ac++] = "--numeric-ids";
 
-	if (ignore_existing && am_sender)
-		args[ac++] = "--ignore-existing";
+	if (am_sender) {
+		if (ignore_existing)
+			args[ac++] = "--ignore-existing";
 
-	/* Backward compatibility: send --existing, not --ignore-non-existing. */
-	if (ignore_non_existing && am_sender)
-		args[ac++] = "--existing";
+		/* Backward compatibility: send --existing, not --ignore-non-existing. */
+		if (ignore_non_existing)
+			args[ac++] = "--existing";
+
+		if (tmpdir) {
+			args[ac++] = "--temp-dir";
+			args[ac++] = tmpdir;
+		}
+
+		if (basis_dir[0]) {
+			/* the server only needs this option if it is not the sender,
+			 *   and it may be an older version that doesn't know this
+			 *   option, so don't send it if client is the sender.
+			 */
+			int i;
+			for (i = 0; i < basis_dir_cnt; i++) {
+				args[ac++] = dest_option;
+				args[ac++] = basis_dir[i];
+			}
+		}
+	}
 
 	if (append_mode)
 		args[ac++] = "--append";
 	else if (inplace)
 		args[ac++] = "--inplace";
-
-	if (tmpdir && am_sender) {
-		args[ac++] = "--temp-dir";
-		args[ac++] = tmpdir;
-	}
-
-	if (basis_dir[0] && am_sender) {
-		/* the server only needs this option if it is not the sender,
-		 *   and it may be an older version that doesn't know this
-		 *   option, so don't send it if client is the sender.
-		 */
-		int i;
-		for (i = 0; i < basis_dir_cnt; i++) {
-			args[ac++] = dest_option;
-			args[ac++] = basis_dir[i];
-		}
-	}
 
 	if (files_from && (!am_sender || filesfrom_host)) {
 		if (filesfrom_host) {
