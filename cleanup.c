@@ -189,6 +189,8 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		/* FALLTHROUGH */
 #include "case_N.h"
 
+		if (am_server && code)
+			msleep(100);
 		close_all();
 
 		/* FALLTHROUGH */
