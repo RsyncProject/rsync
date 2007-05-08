@@ -21,7 +21,7 @@ rsync [OPTION]... rsync://[USER@]HOST[:PORT]/SRC [DEST]
 
 manpagedescription()
 
-rsync is a program that behaves in much the same way that rcp does,
+Rsync is a program that behaves in much the same way that rcp does,
 but has many more options and uses the rsync remote-update protocol to
 greatly speed up file transfers when the destination file is being
 updated.
@@ -31,7 +31,7 @@ differences between two sets of files across the network connection, using
 an efficient checksum-search algorithm described in the technical
 report that accompanies this package.
 
-It finds files that need to be transferred using a "quick check" algorithm
+Rsync finds files that need to be transferred using a "quick check" algorithm
 that looks for files that have changed in size or in last-modified time (by
 default).  Any changes in the other preserved attributes (as requested by
 options) are made on the destination file directly when the quick check
