@@ -31,6 +31,12 @@ differences between two sets of files across the network connection, using
 an efficient checksum-search algorithm described in the technical
 report that accompanies this package.
 
+It finds files that need to be transferred using a "quick check" algorithm
+that looks for files that have changed in size or in last-modified time (by
+default).  Any changes in the other preserved attributes (as requested by
+options) are made on the destination file directly when the quick check
+indicates that the file's data does not need to be updated.
+
 Some of the additional features of rsync are:
 
 itemization(
@@ -471,16 +477,16 @@ a limitation in the rsync protocol), so omit this option if you want to
 request the list of modules from the daemon.
 
 dit(bf(-I, --ignore-times)) Normally rsync will skip any files that are
-already the same size and have the same modification time-stamp.
+already the same size and have the same modification timestamp.
 This option turns off this "quick check" behavior, causing all files to
 be updated.
 
-dit(bf(--size-only)) Normally rsync will not transfer any files that are
-already the same size and have the same modification time-stamp. With the
-bf(--size-only) option, files will not be transferred if they have the same size,
-regardless of timestamp. This is useful when starting to use rsync
-after using another mirroring system which may not preserve timestamps
-exactly.
+dit(bf(--size-only)) This modifies rsync's "quick check" algorithm for
+finding files that need to be transferred, changing it from the default of
+transferring files with either a changed size or a changed last-modified
+time to just transferring files that have a changed size.  This is useful
+when starting to use rsync after using another mirroring system which may
+not preserve timestamps exactly.
 
 dit(bf(--modify-window)) When comparing two timestamps, rsync treats the
 timestamps as being equal if they differ by no more than the modify-window
