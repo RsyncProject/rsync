@@ -20,7 +20,14 @@ echo else >"$fromdir/file2"
 files='foo file1 file2'
 
 setfacl -m u:0:7 "$fromdir/foo" || test_skipped "Your filesystem has ACLs disabled"
+setfacl -m g:1:5 "$fromdir/foo"
+setfacl -m g:2:1 "$fromdir/foo"
+setfacl -m g:0:7 "$fromdir/foo"
+setfacl -m u:2:1 "$fromdir/foo"
+setfacl -m u:1:5 "$fromdir/foo"
+
 setfacl -m u:0:5 "$fromdir/file1"
+
 setfacl -m u:0:5 "$fromdir/file2"
 
 cd "$fromdir"
