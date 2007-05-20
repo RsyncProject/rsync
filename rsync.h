@@ -71,6 +71,7 @@
 #define FLAG_HLINK_LAST (1<<7)	/* receiver/generator */
 #define FLAG_HLINK_DONE (1<<8)	/* receiver/generator */
 #define FLAG_LENGTH64 (1<<9)	/* sender/receiver/generator */
+#define FLAG_SKIP_GROUP (1<<10)	/* receiver/generator */
 
 /* These flags are passed to functions but not stored. */
 
@@ -642,9 +643,6 @@ extern int preserve_xattrs;
 
 #define F_HLINK_NOT_FIRST(f) BITS_SETnUNSET((f)->flags, FLAG_HLINKED, FLAG_HLINK_FIRST)
 #define F_HLINK_NOT_LAST(f) BITS_SETnUNSET((f)->flags, FLAG_HLINKED, FLAG_HLINK_LAST)
-
-#define F_UID(f) ((uid_t)F_OWNER(f))
-#define F_GID(f) ((gid_t)F_GROUP(f))
 
 #define DEV_MAJOR(a) (a)[0]
 #define DEV_MINOR(a) (a)[1]
