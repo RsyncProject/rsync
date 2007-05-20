@@ -322,9 +322,9 @@ int set_file_attrs(const char *fname, struct file_struct *file, statx *sxp,
 			updated = 1;
 	}
 
-	change_uid = am_root && preserve_uid && sxp->st.st_uid != F_UID(file);
-	change_gid = preserve_gid && F_GID(file) != GID_NONE
-		&& sxp->st.st_gid != F_GID(file);
+	change_uid = am_root && preserve_uid && sxp->st.st_uid != F_OWNER(file);
+	change_gid = preserve_gid && !(file->flags & FLAG_SKIP_GROUP)
+		  && sxp->st.st_gid != F_GROUP(file);
 #if !defined HAVE_LCHOWN && !defined CHOWN_MODIFIES_SYMLINK
 	if (S_ISLNK(sxp->st.st_mode))
 		;
@@ -334,22 +334,20 @@ int set_file_attrs(const char *fname, struct file_struct *file, statx *sxp,
 		if (verbose > 2) {
 			if (change_uid) {
 				rprintf(FINFO,
-					"set uid of %s from %ld to %ld\n",
-					fname,
-					(long)sxp->st.st_uid, (long)F_UID(file));
+					"set uid of %s from %u to %u\n",
+					fname, (unsigned)sxp->st.st_uid, F_OWNER(file));
 			}
 			if (change_gid) {
 				rprintf(FINFO,
-					"set gid of %s from %ld to %ld\n",
-					fname,
-					(long)sxp->st.st_gid, (long)F_GID(file));
+					"set gid of %s from %u to %u\n",
+					fname, (unsigned)sxp->st.st_gid, F_GROUP(file));
 			}
 		}
 		if (am_root < 0) {
 			;
 		} else if (do_lchown(fname,
-		    change_uid ? F_UID(file) : sxp->st.st_uid,
-		    change_gid ? F_GID(file) : sxp->st.st_gid) != 0) {
+		    change_uid ? F_OWNER(file) : sxp->st.st_uid,
+		    change_gid ? F_GROUP(file) : sxp->st.st_gid) != 0) {
 			/* shouldn't have attempted to change uid or gid
 			 * unless have the privilege */
 			rsyserr(FERROR, errno, "%s %s failed",

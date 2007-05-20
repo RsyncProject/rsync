@@ -481,18 +481,18 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			n = buf2;
 			break;
 		case 'U':
-			strlcat(fmt, "ld", sizeof fmt);
+			strlcat(fmt, "u", sizeof fmt);
 			snprintf(buf2, sizeof buf2, fmt,
-				 preserve_uid ? (long)F_UID(file) : 0);
+				 preserve_uid ? F_OWNER(file) : 0);
 			n = buf2;
 			break;
 		case 'G':
-			if (!preserve_gid || F_GID(file) == GID_NONE)
+			if (!preserve_gid || file->flags & FLAG_SKIP_GROUP)
 				n = "DEFAULT";
 			else {
-				strlcat(fmt, "ld", sizeof fmt);
+				strlcat(fmt, "u", sizeof fmt);
 				snprintf(buf2, sizeof buf2, fmt,
-					 (long)F_GID(file));
+					 F_GROUP(file));
 				n = buf2;
 			}
 			break;
