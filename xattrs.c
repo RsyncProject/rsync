@@ -886,7 +886,7 @@ int set_stat_xattr(const char *fname, struct file_struct *file)
 		fst.st_rdev = 0; /* just in case */
 
 	if (mode == fmode && fst.st_rdev == rdev
-	 && fst.st_uid == F_UID(file) && fst.st_gid == F_GID(file)) {
+	 && fst.st_uid == F_OWNER(file) && fst.st_gid == F_GROUP(file)) {
 		/* xst.st_mode will be 0 if there's no current stat xattr */
 		if (xst.st_mode && sys_lremovexattr(fname, XSTAT_ATTR) < 0) {
 			rsyserr(FERROR, errno,
@@ -898,12 +898,12 @@ int set_stat_xattr(const char *fname, struct file_struct *file)
 	}
 
 	if (xst.st_mode != fmode || xst.st_rdev != rdev
-	 || xst.st_uid != F_UID(file) || xst.st_gid != F_GID(file)) {
+	 || xst.st_uid != F_OWNER(file) || xst.st_gid != F_GROUP(file)) {
 		char buf[256];
 		int len = snprintf(buf, sizeof buf, "%o %u,%u %u:%u",
 			to_wire_mode(fmode),
 			(int)major(rdev), (int)minor(rdev),
-			(int)F_UID(file), (int)F_GID(file));
+			F_OWNER(file), F_GROUP(file));
 		if (sys_lsetxattr(fname, XSTAT_ATTR, buf, len) < 0) {
 			if (errno == EPERM && S_ISLNK(fst.st_mode))
 				return 0;
