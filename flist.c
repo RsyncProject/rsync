@@ -412,10 +412,10 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 	} else if (protocol_version < 28)
 		rdev = MAKEDEV(0, 0);
 	if (preserve_uid) {
-		if (F_UID(file) == uid && *lastname)
+		if (F_OWNER(file) == uid && *lastname)
 			flags |= XMIT_SAME_UID;
 		else {
-			uid = F_UID(file);
+			uid = F_OWNER(file);
 			if (preserve_uid && !numeric_ids) {
 				user_name = add_uid(uid);
 				if (inc_recurse && user_name)
@@ -424,10 +424,10 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 		}
 	}
 	if (preserve_gid) {
-		if (F_GID(file) == gid && *lastname)
+		if (F_GROUP(file) == gid && *lastname)
 			flags |= XMIT_SAME_GID;
 		else {
-			gid = F_GID(file);
+			gid = F_GROUP(file);
 			if (preserve_gid && !numeric_ids) {
 				group_name = add_gid(gid);
 				if (inc_recurse && group_name)
@@ -594,7 +594,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 }
 
 static struct file_struct *recv_file_entry(struct file_list *flist,
-					   int flags, int f)
+					   int xflags, int f)
 {
 	static int64 modtime;
 	static mode_t mode;
@@ -617,19 +617,20 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	struct file_struct *file;
 	alloc_pool_t *pool;
 	char *bp;
+	uint16 new_flags = 0;
 
-	if (flags & XMIT_SAME_NAME)
+	if (xflags & XMIT_SAME_NAME)
 		l1 = read_byte(f);
 
-	if (flags & XMIT_LONG_NAME)
+	if (xflags & XMIT_LONG_NAME)
 		l2 = read_varint30(f);
 	else
 		l2 = read_byte(f);
 
 	if (l2 >= MAXPATHLEN - l1) {
 		rprintf(FERROR,
-			"overflow: flags=0x%x l1=%d l2=%d lastname=%s [%s]\n",
-			flags, l1, l2, lastname, who_am_i());
+			"overflow: xflags=0x%x l1=%d l2=%d lastname=%s [%s]\n",
+			xflags, l1, l2, lastname, who_am_i());
 		overflow_exit("recv_file_entry");
 	}
 
@@ -683,7 +684,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 
 #ifdef SUPPORT_HARD_LINKS
 	if (protocol_version >= 30
-	 && BITS_SETnUNSET(flags, XMIT_HLINKED, XMIT_HLINK_FIRST)) {
+	 && BITS_SETnUNSET(xflags, XMIT_HLINKED, XMIT_HLINK_FIRST)) {
 		struct file_struct *first;
 		first_hlink_ndx = read_varint30(f);
 		if (first_hlink_ndx < 0 || first_hlink_ndx >= flist->count) {
@@ -697,9 +698,9 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		modtime = first->modtime;
 		mode = first->mode;
 		if (preserve_uid)
-			uid = F_UID(first);
+			uid = F_OWNER(first);
 		if (preserve_gid)
-			gid = F_GID(first);
+			gid = F_GROUP(first);
 		if ((preserve_devices && IS_DEVICE(mode))
 		 || (preserve_specials && IS_SPECIAL(mode))) {
 			uint32 *devp = F_RDEV_P(first);
@@ -715,7 +716,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 #endif
 
 	file_length = read_varlong30(f, 3);
-	if (!(flags & XMIT_SAME_TIME)) {
+	if (!(xflags & XMIT_SAME_TIME)) {
 		if (protocol_version >= 30) {
 			modtime = read_varlong(f, 4);
 #if SIZEOF_TIME_T < SIZEOF_INT64
@@ -728,47 +729,47 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		} else
 			modtime = read_int(f);
 	}
-	if (!(flags & XMIT_SAME_MODE))
+	if (!(xflags & XMIT_SAME_MODE))
 		mode = from_wire_mode(read_int(f));
 
 	if (chmod_modes && !S_ISLNK(mode))
 		mode = tweak_mode(mode, chmod_modes);
 
-	if (preserve_uid && !(flags & XMIT_SAME_UID)) {
+	if (preserve_uid && !(xflags & XMIT_SAME_UID)) {
 		if (protocol_version < 30)
 			uid = (uid_t)read_int(f);
 		else {
 			uid = (uid_t)read_varint(f);
-			if (flags & XMIT_USER_NAME_FOLLOWS)
+			if (xflags & XMIT_USER_NAME_FOLLOWS)
 				uid = recv_user_name(f, uid);
 			else if (inc_recurse && am_root && !numeric_ids)
 				uid = match_uid(uid);
 		}
 	}
-	if (preserve_gid && !(flags & XMIT_SAME_GID)) {
+	if (preserve_gid && !(xflags & XMIT_SAME_GID)) {
 		if (protocol_version < 30)
 			gid = (gid_t)read_int(f);
 		else {
 			gid = (gid_t)read_varint(f);
-			if (flags & XMIT_GROUP_NAME_FOLLOWS)
-				gid = recv_group_name(f, gid);
+			if (xflags & XMIT_GROUP_NAME_FOLLOWS)
+				gid = recv_group_name(f, gid, &new_flags);
 			else if (inc_recurse && (!am_root || !numeric_ids))
-				gid = match_gid(gid);
+				gid = match_gid(gid, &new_flags);
 		}
 	}
 
 	if ((preserve_devices && IS_DEVICE(mode))
 	 || (preserve_specials && IS_SPECIAL(mode))) {
 		if (protocol_version < 28) {
-			if (!(flags & XMIT_SAME_RDEV_pre28))
+			if (!(xflags & XMIT_SAME_RDEV_pre28))
 				rdev = (dev_t)read_int(f);
 		} else {
 			uint32 rdev_minor;
-			if (!(flags & XMIT_SAME_RDEV_MAJOR))
+			if (!(xflags & XMIT_SAME_RDEV_MAJOR))
 				rdev_major = read_varint30(f);
 			if (protocol_version >= 30)
 				rdev_minor = read_varint(f);
-			else if (flags & XMIT_RDEV_MINOR_8_pre30)
+			else if (xflags & XMIT_RDEV_MINOR_8_pre30)
 				rdev_minor = read_byte(f);
 			else
 				rdev_minor = read_int(f);
@@ -796,9 +797,11 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
   create_object:
 	if (preserve_hard_links) {
 		if (protocol_version < 28 && S_ISREG(mode))
-			flags |= XMIT_HLINKED;
-		if (flags & XMIT_HLINKED)
+			xflags |= XMIT_HLINKED;
+		if (xflags & XMIT_HLINKED) {
 			extra_len += EXTRA_LEN;
+			new_flags |= FLAG_HLINKED;
+		}
 	}
 #endif
 
@@ -840,10 +843,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	memcpy(bp, basename, basename_len);
 	bp += basename_len + linkname_len; /* skip space for symlink too */
 
-#ifdef SUPPORT_HARD_LINKS
-	if (flags & XMIT_HLINKED)
-		file->flags |= FLAG_HLINKED;
-#endif
+	file->flags = new_flags;
 	file->modtime = (time_t)modtime;
 	file->len32 = (uint32)file_length;
 	if (file_length > 0xFFFFFFFFu && S_ISREG(mode)) {
@@ -869,7 +869,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (S_ISDIR(mode)) {
 		if (basename_len == 1+1 && *basename == '.') /* +1 for '\0' */
 			F_DEPTH(file)--;
-		if (flags & XMIT_TOP_DIR) {
+		if (xflags & XMIT_TOP_DIR) {
 			in_del_hier = recurse;
 			del_hier_name_len = F_DEPTH(file) == 0 ? 0 : l1 + l2;
 			if (relative_paths && del_hier_name_len > 2
@@ -908,9 +908,9 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 #endif
 
 #ifdef SUPPORT_HARD_LINKS
-	if (preserve_hard_links && flags & XMIT_HLINKED) {
+	if (preserve_hard_links && xflags & XMIT_HLINKED) {
 		if (protocol_version >= 30) {
-			F_HL_GNUM(file) = flags & XMIT_HLINK_FIRST
+			F_HL_GNUM(file) = xflags & XMIT_HLINK_FIRST
 					? flist->count : first_hlink_ndx;
 		} else {
 			static int32 cnt = 0;
@@ -921,7 +921,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 				dev = read_int(f);
 				ino = read_int(f);
 			} else {
-				if (!(flags & XMIT_SAME_DEV_pre30))
+				if (!(xflags & XMIT_SAME_DEV_pre30))
 					dev = read_longint(f);
 				ino = read_longint(f);
 			}
@@ -1835,7 +1835,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	file_total += flist->count;
 
 	if (!numeric_ids && !inc_recurse)
-		send_uid_list(f);
+		send_id_list(f);
 
 	/* send the io_error flag */
 	if (protocol_version < 30)
@@ -1969,7 +1969,7 @@ struct file_list *recv_file_list(int f)
 	}
 
 	if (!inc_recurse && f >= 0)
-		recv_uid_list(f, flist);
+		recv_id_list(f, flist);
 
 	clean_flist(flist, relative_paths);
 
@@ -2342,13 +2342,15 @@ static void output_flist(struct file_list *flist)
 	for (i = 0; i < flist->count; i++) {
 		file = flist->sorted[i];
 		if ((am_root || am_sender) && preserve_uid) {
-			snprintf(uidbuf, sizeof uidbuf, " uid=%ld",
-				 (long)F_UID(file));
+			snprintf(uidbuf, sizeof uidbuf, " uid=%u",
+				 F_OWNER(file));
 		} else
 			*uidbuf = '\0';
-		if (preserve_gid && F_GID(file) != GID_NONE) {
-			snprintf(gidbuf, sizeof gidbuf, " gid=%ld",
-				 (long)F_GID(file));
+		if (preserve_gid) {
+			static char parens[] = "(\0)\0\0\0";
+			char *pp = parens + (file->flags & FLAG_SKIP_GROUP ? 0 : 3);
+			snprintf(gidbuf, sizeof gidbuf, " gid=%s%u%s",
+				 pp, F_GROUP(file), pp + 2);
 		} else
 			*gidbuf = '\0';
 		if (!am_sender)
