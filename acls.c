@@ -33,12 +33,15 @@ extern int protocol_version;
 extern int numeric_ids;
 extern int inc_recurse;
 
+/* Flags used to indicate what items are being transmitted for an entry. */
 #define XMIT_USER_OBJ (1<<0)
 #define XMIT_USER_LIST (1<<1)
 #define XMIT_GROUP_OBJ (1<<2)
 #define XMIT_GROUP_LIST (1<<3)
 #define XMIT_MASK_OBJ (1<<4)
 #define XMIT_OTHER_OBJ (1<<5)
+
+#define NO_ENTRY ((uchar)0x80)
 
 /* === ACL structures === */
 
@@ -57,7 +60,6 @@ typedef struct {
 	uchar len;
 } idname;
 
-#define NO_ENTRY ((uchar)0x80)
 typedef struct rsync_acl {
 	ida_entries users;
 	ida_entries groups;
@@ -675,7 +677,7 @@ static uchar recv_ida_entries(ida_entries *ent, int user_names, int f)
 	int i, count = read_varint(f);
 
 	if (count) {
-		if (!(ent->idas = new_array(id_access, ent->count)))
+		if (!(ent->idas = new_array(id_access, count)))
 			out_of_memory("recv_ida_entries");
 	} else
 		ent->idas = NULL;
@@ -691,13 +693,13 @@ static uchar recv_ida_entries(ida_entries *ent, int user_names, int f)
 			if (user_names)
 				id = recv_user_name(f, id);
 			else
-				id = recv_group_name(f, id);
+				id = recv_group_name(f, id, NULL);
 		} else if (user_names) {
 			if (inc_recurse && am_root && !numeric_ids)
 				id = match_uid(id);
 		} else {
 			if (inc_recurse && (!am_root || !numeric_ids))
-				id = match_gid(id);
+				id = match_gid(id, NULL);
 		}
 
 		ent->idas[i].id = id;
@@ -967,23 +969,22 @@ int set_acl(const char *fname, const struct file_struct *file, statx *sxp)
 	return unchanged;
 }
 
-/* Non-incremental recursion needs to convert all the received IDs
- * in a single pass after the file-list is complete. */
+/* Non-incremental recursion needs to convert all the received IDs.
+ * This is done in a single pass after receiving the whole file-list. */
 static void match_racl_ids(const item_list *racl_list)
 {
 	int list_cnt, name_cnt;
 	acl_duo *duo_item = racl_list->items;
 	for (list_cnt = racl_list->count; list_cnt--; duo_item++) {
 		ida_entries *idal = &duo_item->racl.users;
-		for (name_cnt = idal->count; name_cnt--; idal++) {
-			id_access *ida = idal->idas;
+		id_access *ida = idal->idas;
+		for (name_cnt = idal->count; name_cnt--; ida++)
 			ida->id = match_uid(ida->id);
-		}
+
 		idal = &duo_item->racl.groups;
-		for (name_cnt = idal->count; name_cnt--; idal++) {
-			id_access *ida = idal->idas;
-			ida->id = match_gid(ida->id);
-		}
+		ida = idal->idas;
+		for (name_cnt = idal->count; name_cnt--; ida++)
+			ida->id = match_gid(ida->id, NULL);
 	}
 }
 
