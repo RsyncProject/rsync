@@ -41,15 +41,16 @@ extern int numeric_ids;
 
 struct idlist {
 	struct idlist *next;
-	int id, id2;
 	char *name;
+	id_t id, id2;
+	uint16 flags;
 };
 
 static struct idlist *uidlist;
 static struct idlist *gidlist;
 
-static struct idlist *add_to_list(struct idlist **root, int id, char *name,
-				  int id2)
+static struct idlist *add_to_list(struct idlist **root, id_t id, char *name,
+				  id_t id2, uint16 flags)
 {
 	struct idlist *node = new(struct idlist);
 	if (!node)
@@ -58,6 +59,7 @@ static struct idlist *add_to_list(struct idlist **root, int id, char *name,
 	node->name = name;
 	node->id = id;
 	node->id2 = id2;
+	node->flags = flags;
 	*root = node;
 	return node;
 }
@@ -149,44 +151,43 @@ static int is_in_group(gid_t gid)
 	if (mygid == GID_NONE) {
 		mygid = MY_GID();
 		if (verbose > 3)
-			rprintf(FINFO, "process has gid %d\n", (int)mygid);
+			rprintf(FINFO, "process has gid %u\n", (unsigned)mygid);
 	}
 	return gid == mygid;
 #endif
 }
 
 /* Add a uid to the list of uids.  Only called on receiving side. */
-static uid_t recv_add_uid(uid_t id, char *name)
+static struct idlist *recv_add_uid(uid_t id, char *name)
 {
 	uid_t id2 = name ? map_uid(id, name) : id;
 	struct idlist *node;
 
-	node = add_to_list(&uidlist, (int)id, name, (int)id2);
+	node = add_to_list(&uidlist, id, name, id2, 0);
 
 	if (verbose > 3) {
-		rprintf(FINFO, "uid %d(%s) maps to %d\n",
-			(int)id, name ? name : "", (int)id2);
+		rprintf(FINFO, "uid %u(%s) maps to %u\n",
+			(unsigned)id, name ? name : "", (unsigned)id2);
 	}
 
-	return id2;
+	return node;
 }
 
 /* Add a gid to the list of gids.  Only called on receiving side. */
-static gid_t recv_add_gid(gid_t id, char *name)
+static struct idlist *recv_add_gid(gid_t id, char *name)
 {
 	gid_t id2 = name ? map_gid(id, name) : id;
 	struct idlist *node;
 
-	if (!am_root && !is_in_group(id2))
-		id2 = GID_NONE;
-	node = add_to_list(&gidlist, (int)id, name, (int)id2);
+	node = add_to_list(&gidlist, id, name, id2,
+		!am_root && !is_in_group(id2) ? FLAG_SKIP_GROUP : 0);
 
 	if (verbose > 3) {
-		rprintf(FINFO, "gid %d(%s) maps to %d\n",
-			(int)id, name ? name : "", (int)id2);
+		rprintf(FINFO, "gid %u(%s) maps to %u\n",
+			(unsigned)id, name ? name : "", (unsigned)id2);
 	}
 
-	return id2;
+	return node;
 }
 
 /* this function is a definate candidate for a faster algorithm */
@@ -204,14 +205,14 @@ uid_t match_uid(uid_t uid)
 	last_in = uid;
 
 	for (list = uidlist; list; list = list->next) {
-		if (list->id == (int)uid)
-			return last_out = (uid_t)list->id2;
+		if (list->id == uid)
+			return last_out = list->id2;
 	}
 
 	return last_out = uid;
 }
 
-gid_t match_gid(gid_t gid)
+gid_t match_gid(gid_t gid, uint16 *flags_ptr)
 {
 	static gid_t last_in = GID_NONE, last_out = GID_NONE;
 	struct idlist *list;
@@ -225,11 +226,16 @@ gid_t match_gid(gid_t gid)
 	last_in = gid;
 
 	for (list = gidlist; list; list = list->next) {
-		if (list->id == (int)gid)
-			return last_out = (gid_t)list->id2;
+		if (list->id == gid)
+			break;
 	}
 
-	return last_out = recv_add_gid(gid, NULL);
+	if (!list)
+		list = recv_add_gid(gid, NULL);
+
+	if (flags_ptr && list->flags & FLAG_SKIP_GROUP)
+		*flags_ptr |= FLAG_SKIP_GROUP;
+	return last_out = list->id2;
 }
 
 /* Add a uid to the list of uids.  Only called on sending side. */
@@ -242,11 +248,11 @@ char *add_uid(uid_t uid)
 		return NULL;
 
 	for (list = uidlist; list; list = list->next) {
-		if (list->id == (int)uid)
+		if (list->id == uid)
 			return NULL;
 	}
 
-	node = add_to_list(&uidlist, (int)uid, uid_to_name(uid), 0);
+	node = add_to_list(&uidlist, uid, uid_to_name(uid), 0, 0);
 	return node->name;
 }
 
@@ -260,16 +266,16 @@ char *add_gid(gid_t gid)
 		return NULL;
 
 	for (list = gidlist; list; list = list->next) {
-		if (list->id == (int)gid)
+		if (list->id == gid)
 			return NULL;
 	}
 
-	node = add_to_list(&gidlist, (int)gid, gid_to_name(gid), 0);
+	node = add_to_list(&gidlist, gid, gid_to_name(gid), 0, 0);
 	return node->name;
 }
 
 /* send a complete uid/gid mapping to the peer */
-void send_uid_list(int f)
+void send_id_list(int f)
 {
 	struct idlist *list;
 
@@ -306,40 +312,47 @@ void send_uid_list(int f)
 
 uid_t recv_user_name(int f, uid_t uid)
 {
+	struct idlist *node;
 	int len = read_byte(f);
 	char *name = new_array(char, len+1);
 	if (!name)
 		out_of_memory("recv_user_name");
 	read_sbuf(f, name, len);
-	return recv_add_uid(uid, name); /* node keeps name's memory */
+	node = recv_add_uid(uid, name); /* node keeps name's memory */
+	return node->id2;
 }
 
-gid_t recv_group_name(int f, gid_t gid)
+gid_t recv_group_name(int f, gid_t gid, uint16 *flags_ptr)
 {
+	struct idlist *node;
 	int len = read_byte(f);
 	char *name = new_array(char, len+1);
 	if (!name)
 		out_of_memory("recv_group_name");
 	read_sbuf(f, name, len);
-	return recv_add_gid(gid, name); /* node keeps name's memory */
+	node = recv_add_gid(gid, name); /* node keeps name's memory */
+	if (flags_ptr && node->flags & FLAG_SKIP_GROUP)
+		*flags_ptr |= FLAG_SKIP_GROUP;
+	return node->id2;
 }
 
 /* recv a complete uid/gid mapping from the peer and map the uid/gid
  * in the file list to local names */
-void recv_uid_list(int f, struct file_list *flist)
+void recv_id_list(int f, struct file_list *flist)
 {
-	int id, i;
+	id_t id;
+	int i;
 
 	if ((preserve_uid || preserve_acls) && !numeric_ids) {
 		/* read the uid list */
 		while ((id = read_varint30(f)) != 0)
-			recv_user_name(f, (uid_t)id);
+			recv_user_name(f, id);
 	}
 
 	if ((preserve_gid || preserve_acls) && !numeric_ids) {
 		/* read the gid list */
 		while ((id = read_varint30(f)) != 0)
-			recv_group_name(f, (gid_t)id);
+			recv_group_name(f, id, NULL);
 	}
 
 	/* Now convert all the uids/gids from sender values to our values. */
@@ -349,10 +362,12 @@ void recv_uid_list(int f, struct file_list *flist)
 #endif
 	if (am_root && preserve_uid && !numeric_ids) {
 		for (i = 0; i < flist->count; i++)
-			F_OWNER(flist->files[i]) = match_uid(F_UID(flist->files[i]));
+			F_OWNER(flist->files[i]) = match_uid(F_OWNER(flist->files[i]));
 	}
 	if (preserve_gid && (!am_root || !numeric_ids)) {
-		for (i = 0; i < flist->count; i++)
-			F_GROUP(flist->files[i]) = match_gid(F_GID(flist->files[i]));
+		for (i = 0; i < flist->count; i++) {
+			F_GROUP(flist->files[i]) = match_gid(F_GROUP(flist->files[i]),
+							     &flist->files[i]->flags);
+		}
 	}
 }
