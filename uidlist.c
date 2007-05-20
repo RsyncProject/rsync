@@ -26,18 +26,20 @@
 #include "rsync.h"
 #include "io.h"
 
-#ifdef HAVE_GETGROUPS
-# ifndef GETGROUPS_T
-#  define GETGROUPS_T gid_t
-# endif
-#endif
-
 extern int verbose;
 extern int am_root;
 extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_acls;
 extern int numeric_ids;
+
+#ifdef HAVE_GETGROUPS
+# ifndef GETGROUPS_T
+#  define GETGROUPS_T gid_t
+# endif
+#endif
+
+#define GID_NONE ((gid_t)-1)
 
 struct idlist {
 	struct idlist *next;
@@ -216,9 +218,6 @@ gid_t match_gid(gid_t gid, uint16 *flags_ptr)
 {
 	static gid_t last_in = GID_NONE, last_out = GID_NONE;
 	struct idlist *list;
-
-	if (gid == GID_NONE)
-		return GID_NONE;
 
 	if (gid == last_in)
 		return last_out;

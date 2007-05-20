@@ -565,8 +565,6 @@ struct idev_node {
 #define ACLS_NEED_MASK 1
 #endif
 
-#define GID_NONE ((gid_t)-1)
-
 union file_extras {
 	int32 num;
 	uint32 unum;
