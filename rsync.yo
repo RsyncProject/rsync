@@ -484,7 +484,7 @@ be updated.
 dit(bf(--size-only)) This modifies rsync's "quick check" algorithm for
 finding files that need to be transferred, changing it from the default of
 transferring files with either a changed size or a changed last-modified
-time to just transferring files that have a changed size.  This is useful
+time to just looking for files that have changed in size.  This is useful
 when starting to use rsync after using another mirroring system which may
 not preserve timestamps exactly.
 
