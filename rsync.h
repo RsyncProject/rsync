@@ -88,7 +88,7 @@
 /* This is used when working on a new protocol version in CVS, and should
  * be a new non-zero value for each CVS change that affects the protocol.
  * It must ALWAYS be 0 when the protocol goes final! */
-#define SUBPROTOCOL_VERSION 2
+#define SUBPROTOCOL_VERSION 3
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
