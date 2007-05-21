@@ -216,25 +216,24 @@ uid_t match_uid(uid_t uid)
 
 gid_t match_gid(gid_t gid, uint16 *flags_ptr)
 {
-	static gid_t last_in = GID_NONE, last_out = GID_NONE;
+	static struct idlist *last = NULL;
 	struct idlist *list;
 
-	if (gid == last_in)
-		return last_out;
-
-	last_in = gid;
-
-	for (list = gidlist; list; list = list->next) {
-		if (list->id == gid)
-			break;
+	if (last && gid == last->id)
+		list = last;
+	else {
+		for (list = gidlist; list; list = list->next) {
+			if (list->id == gid)
+				break;
+		}
+		if (!list)
+			list = recv_add_gid(gid, flags_ptr);
+		last = list;
 	}
-
-	if (!list)
-		list = recv_add_gid(gid, NULL);
 
 	if (flags_ptr && list->flags & FLAG_SKIP_GROUP)
 		*flags_ptr |= FLAG_SKIP_GROUP;
-	return last_out = list->id2;
+	return list->id2;
 }
 
 /* Add a uid to the list of uids.  Only called on sending side. */
