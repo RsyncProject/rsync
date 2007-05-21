@@ -603,6 +603,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	static uint32 rdev_major;
 	static uid_t uid;
 	static gid_t gid;
+	static uint16 gid_flags;
 	static char lastname[MAXPATHLEN], *lastdir;
 	static int lastdir_depth, lastdir_len = -1;
 	static unsigned int del_hier_name_len = 0;
@@ -617,7 +618,6 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	struct file_struct *file;
 	alloc_pool_t *pool;
 	char *bp;
-	uint16 new_flags = 0;
 
 	if (xflags & XMIT_SAME_NAME)
 		l1 = read_byte(f);
@@ -751,10 +751,11 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 			gid = (gid_t)read_int(f);
 		else {
 			gid = (gid_t)read_varint(f);
+			gid_flags = 0;
 			if (xflags & XMIT_GROUP_NAME_FOLLOWS)
-				gid = recv_group_name(f, gid, &new_flags);
+				gid = recv_group_name(f, gid, &gid_flags);
 			else if (inc_recurse && (!am_root || !numeric_ids))
-				gid = match_gid(gid, &new_flags);
+				gid = match_gid(gid, &gid_flags);
 		}
 	}
 
@@ -798,10 +799,8 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (preserve_hard_links) {
 		if (protocol_version < 28 && S_ISREG(mode))
 			xflags |= XMIT_HLINKED;
-		if (xflags & XMIT_HLINKED) {
+		if (xflags & XMIT_HLINKED)
 			extra_len += EXTRA_LEN;
-			new_flags |= FLAG_HLINKED;
-		}
 	}
 #endif
 
@@ -843,7 +842,10 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	memcpy(bp, basename, basename_len);
 	bp += basename_len + linkname_len; /* skip space for symlink too */
 
-	file->flags = new_flags;
+#ifdef SUPPORT_HARD_LINKS
+	if (xflags & XMIT_HLINKED)
+		file->flags |= FLAG_HLINKED;
+#endif
 	file->modtime = (time_t)modtime;
 	file->len32 = (uint32)file_length;
 	if (file_length > 0xFFFFFFFFu && S_ISREG(mode)) {
@@ -853,8 +855,10 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	file->mode = mode;
 	if (preserve_uid)
 		F_OWNER(file) = uid;
-	if (preserve_gid)
+	if (preserve_gid) {
 		F_GROUP(file) = gid;
+		file->flags |= gid_flags;
+	}
 #ifdef ICONV_OPTION
 	if (ic_ndx)
 		F_NDX(file) = flist->count + flist->ndx_start;
