@@ -35,19 +35,27 @@ extern int inc_recurse;
 
 /* Flags used to indicate what items are being transmitted for an entry. */
 #define XMIT_USER_OBJ (1<<0)
-#define XMIT_USER_LIST (1<<1)
-#define XMIT_GROUP_OBJ (1<<2)
-#define XMIT_GROUP_LIST (1<<3)
-#define XMIT_MASK_OBJ (1<<4)
-#define XMIT_OTHER_OBJ (1<<5)
+#define XMIT_GROUP_OBJ (1<<1)
+#define XMIT_MASK_OBJ (1<<2)
+#define XMIT_OTHER_OBJ (1<<3)
+#define XMIT_NAME_LIST (1<<4)
 
-#define NO_ENTRY ((uchar)0x80)
+#define NO_ENTRY ((uchar)0x80) /* Default value of a NON-name-list entry. */
+
+#define NAME_IS_USER (1u<<31) /* Bit used only on a name-list entry. */
+
+/* When we send the access bits over the wire, we shift them 2 bits to the
+ * left and use the lower 2 bits as flags (relevant only to a name entry).
+ * This makes the protocol more efficient than sending a value that would
+ * be likely to have its hightest bits set. */
+#define XFLAG_NAME_FOLLOWS 0x0001u
+#define XFLAG_NAME_IS_USER 0x0002u
 
 /* === ACL structures === */
 
 typedef struct {
 	id_t id;
-	uchar access;
+	uint32 access;
 } id_access;
 
 typedef struct {
@@ -61,8 +69,7 @@ typedef struct {
 } idname;
 
 typedef struct rsync_acl {
-	ida_entries users;
-	ida_entries groups;
+	ida_entries names;
 	/* These will be NO_ENTRY if there's no such entry. */
 	uchar user_obj;
 	uchar group_obj;
@@ -76,7 +83,7 @@ typedef struct {
 } acl_duo;
 
 static const rsync_acl empty_rsync_acl = {
-	{NULL, 0}, {NULL, 0}, NO_ENTRY, NO_ENTRY, NO_ENTRY, NO_ENTRY
+	{NULL, 0}, NO_ENTRY, NO_ENTRY, NO_ENTRY, NO_ENTRY
 };
 
 static item_list access_acl_list = EMPTY_ITEM_LIST;
@@ -94,7 +101,7 @@ static const char *str_acl_type(SMB_ACL_TYPE_T type)
 static int calc_sacl_entries(const rsync_acl *racl)
 {
 	/* A System ACL always gets user/group/other permission entries. */
-	return racl->users.count + racl->groups.count
+	return racl->names.count
 #ifdef ACLS_NEED_MASK
 	     + 4;
 #else
@@ -168,8 +175,7 @@ static BOOL rsync_acl_equal(const rsync_acl *racl1, const rsync_acl *racl2)
 	    && racl1->group_obj == racl2->group_obj
 	    && racl1->mask_obj == racl2->mask_obj
 	    && racl1->other_obj == racl2->other_obj
-	    && ida_entries_equal(&racl1->users, &racl2->users)
-	    && ida_entries_equal(&racl1->groups, &racl2->groups);
+	    && ida_entries_equal(&racl1->names, &racl2->names);
 }
 
 /* Are the extended (non-permission-bit) entries equal?  If so, the rest of
@@ -195,16 +201,13 @@ static BOOL rsync_acl_equal_enough(const rsync_acl *racl1,
 		} else if (racl1->group_obj != racl2->group_obj)
 			return False;
 	}
-	return ida_entries_equal(&racl1->users, &racl2->users)
-	    && ida_entries_equal(&racl1->groups, &racl2->groups);
+	return ida_entries_equal(&racl1->names, &racl2->names);
 }
 
 static void rsync_acl_free(rsync_acl *racl)
 {
-	if (racl->users.idas)
-		free(racl->users.idas);
-	if (racl->groups.idas)
-		free(racl->groups.idas);
+	if (racl->names.idas)
+		free(racl->names.idas);
 	*racl = empty_rsync_acl;
 }
 
@@ -222,57 +225,24 @@ void free_acl(statx *sxp)
 	}
 }
 
+#ifdef SMB_ACL_NEED_SORT
 static int id_access_sorter(const void *r1, const void *r2)
 {
 	id_access *ida1 = (id_access *)r1;
 	id_access *ida2 = (id_access *)r2;
 	id_t rid1 = ida1->id, rid2 = ida2->id;
+	if ((ida1->access ^ ida2->access) & NAME_IS_USER)
+		return ida1->access & NAME_IS_USER ? -1 : 1;
 	return rid1 == rid2 ? 0 : rid1 < rid2 ? -1 : 1;
 }
-
-static void sort_ida_entries(ida_entries *idal)
-{
-	if (!idal->count)
-		return;
-	qsort(idal->idas, idal->count, sizeof idal->idas[0], id_access_sorter);
-}
+#endif
 
 /* === System ACLs === */
-
-/* Transfer the count id_access items out of the temp_ida_list into either
- * the users or groups ida_entries list in racl. */
-static void save_idas(rsync_acl *racl, SMB_ACL_TAG_T type, item_list *temp_ida_list)
-{
-	id_access *idas;
-	ida_entries *ent;
-
-	if (temp_ida_list->count) {
-		int cnt = temp_ida_list->count;
-		id_access *temp_idas = temp_ida_list->items;
-		if (!(idas = new_array(id_access, cnt)))
-			out_of_memory("save_idas");
-		memcpy(idas, temp_idas, cnt * sizeof *temp_idas);
-	} else
-		idas = NULL;
-
-	ent = type == SMB_ACL_USER ? &racl->users : &racl->groups;
-
-	if (ent->count) {
-		rprintf(FERROR, "save_idas: disjoint list found for type %d\n", type);
-		exit_cleanup(RERR_UNSUPPORTED);
-	}
-	ent->count = temp_ida_list->count;
-	ent->idas = idas;
-
-	/* Truncate the temporary list now that its idas have been saved. */
-	temp_ida_list->count = 0;
-}
 
 /* Unpack system ACL -> rsync ACL verbatim.  Return whether we succeeded. */
 static BOOL unpack_smb_acl(SMB_ACL_T sacl, rsync_acl *racl)
 {
 	static item_list temp_ida_list = EMPTY_ITEM_LIST;
-	SMB_ACL_TAG_T prior_list_type = 0;
 	SMB_ACL_ENTRY_T entry;
 	const char *errfun;
 	int rc;
@@ -282,21 +252,17 @@ static BOOL unpack_smb_acl(SMB_ACL_T sacl, rsync_acl *racl)
 	     rc == 1;
 	     rc = sys_acl_get_entry(sacl, SMB_ACL_NEXT_ENTRY, &entry)) {
 		SMB_ACL_TAG_T tag_type;
-		SMB_ACL_PERMSET_T permset;
-		uchar access;
+		uint32 access;
 		void *qualifier;
 		id_access *ida;
-		if ((rc = sys_acl_get_tag_type(entry, &tag_type))) {
+		if ((rc = sys_acl_get_tag_type(entry, &tag_type)) != 0) {
 			errfun = "sys_acl_get_tag_type";
 			break;
 		}
-		if ((rc = sys_acl_get_permset(entry, &permset))) {
-			errfun = "sys_acl_get_tag_type";
+		if ((rc = sys_acl_get_access_bits(entry, &access)) != 0) {
+			errfun = "sys_acl_get_access_bits";
 			break;
 		}
-		access = (sys_acl_get_perm(permset, SMB_ACL_READ) ? 4 : 0)
-		       | (sys_acl_get_perm(permset, SMB_ACL_WRITE) ? 2 : 0)
-		       | (sys_acl_get_perm(permset, SMB_ACL_EXECUTE) ? 1 : 0);
 		/* continue == done with entry; break == store in temporary ida list */
 		switch (tag_type) {
 		case SMB_ACL_USER_OBJ:
@@ -306,6 +272,7 @@ static BOOL unpack_smb_acl(SMB_ACL_T sacl, rsync_acl *racl)
 				rprintf(FINFO, "unpack_smb_acl: warning: duplicate USER_OBJ entry ignored\n");
 			continue;
 		case SMB_ACL_USER:
+			access |= NAME_IS_USER;
 			break;
 		case SMB_ACL_GROUP_OBJ:
 			if (racl->group_obj == NO_ENTRY)
@@ -336,11 +303,6 @@ static BOOL unpack_smb_acl(SMB_ACL_T sacl, rsync_acl *racl)
 			rc = EINVAL;
 			break;
 		}
-		if (tag_type != prior_list_type) {
-			if (prior_list_type)
-				save_idas(racl, prior_list_type, &temp_ida_list);
-			prior_list_type = tag_type;
-		}
 		ida = EXPAND_ITEM_LIST(&temp_ida_list, id_access, -10);
 		ida->id = *((id_t *)qualifier);
 		ida->access = access;
@@ -351,14 +313,30 @@ static BOOL unpack_smb_acl(SMB_ACL_T sacl, rsync_acl *racl)
 		rsync_acl_free(racl);
 		return False;
 	}
-	if (prior_list_type)
-		save_idas(racl, prior_list_type, &temp_ida_list);
 
-	sort_ida_entries(&racl->users);
-	sort_ida_entries(&racl->groups);
+	/* Transfer the count id_access items out of the temp_ida_list
+	 * into the names ida_entries list in racl. */
+	if (temp_ida_list.count) {
+#ifdef SMB_ACL_NEED_SORT
+		if (temp_ida_list.count > 1) {
+			qsort(temp_ida_list.items, temp_ida_list.count,
+			      sizeof (id_access), id_access_sorter);
+		}
+#endif
+		if (!(racl->names.idas = new_array(id_access, temp_ida_list.count)))
+			out_of_memory("unpack_smb_acl");
+		memcpy(racl->names.idas, temp_ida_list.items,
+		       temp_ida_list.count * sizeof (id_access));
+	} else
+		racl->names.idas = NULL;
+
+	racl->names.count = temp_ida_list.count;
+
+	/* Truncate the temporary list now that its idas have been saved. */
+	temp_ida_list.count = 0;
 
 #ifdef ACLS_NEED_MASK
-	if (!racl->users.count && !racl->groups.count && racl->mask_obj != NO_ENTRY) {
+	if (!racl->names.count && racl->mask_obj != NO_ENTRY) {
 		/* Throw away a superfluous mask, but mask off the
 		 * group perms with it first. */
 		racl->group_obj &= racl->mask_obj;
@@ -383,26 +361,13 @@ static BOOL unpack_smb_acl(SMB_ACL_T sacl, rsync_acl *racl)
 #define COE2(func,args) CALL_OR_ERROR(func,args,NULL)
 
 /* Store the permissions in the system ACL entry. */
-static int store_access_in_entry(uchar access, SMB_ACL_ENTRY_T entry)
+static int store_access_in_entry(uint32 access, SMB_ACL_ENTRY_T entry)
 {
-	const char *errfun = NULL;
-	SMB_ACL_PERMSET_T permset;
-
-	COE( sys_acl_get_permset,(entry, &permset) );
-	COE( sys_acl_clear_perms,(permset) );
-	if (access & 4)
-		COE( sys_acl_add_perm,(permset, SMB_ACL_READ) );
-	if (access & 2)
-		COE( sys_acl_add_perm,(permset, SMB_ACL_WRITE) );
-	if (access & 1)
-		COE( sys_acl_add_perm,(permset, SMB_ACL_EXECUTE) );
-	COE( sys_acl_set_permset,(entry, permset) );
-
+	if (sys_acl_set_access_bits(entry, access)) {
+		rsyserr(FERROR, errno, "store_access_in_entry sys_acl_set_access_bits()");
+		return -1;
+	}
 	return 0;
-
-  error_exit:
-	rsyserr(FERROR, errno, "store_access_in_entry %s()", errfun);
-	return -1;
 }
 
 /* Pack rsync ACL -> system ACL verbatim.  Return whether we succeeded. */
@@ -423,28 +388,39 @@ static BOOL pack_smb_acl(SMB_ACL_T *smb_acl, const rsync_acl *racl)
 
 	COE( sys_acl_create_entry,(smb_acl, &entry) );
 	COE( sys_acl_set_tag_type,(entry, SMB_ACL_USER_OBJ) );
-	COE2( store_access_in_entry,(racl->user_obj & 7, entry) );
+	COE2( store_access_in_entry,(racl->user_obj & ~NO_ENTRY, entry) );
 
-	for (ida = racl->users.idas, count = racl->users.count; count--; ida++) {
+	for (ida = racl->names.idas, count = racl->names.count; count; ida++, count--) {
+#ifdef SMB_ACL_NEED_SORT
+		if (!(ida->access & NAME_IS_USER))
+			break;
+#endif
 		COE( sys_acl_create_entry,(smb_acl, &entry) );
+#ifdef SMB_ACL_NEED_SORT
 		COE( sys_acl_set_tag_type,(entry, SMB_ACL_USER) );
+#else
+		COE( sys_acl_set_tag_type,(entry, ida->access & NAME_IS_USER
+						? SMB_ACL_USER : SMB_ACL_GROUP) );
+#endif
 		COE( sys_acl_set_qualifier,(entry, (void*)&ida->id) );
-		COE2( store_access_in_entry,(ida->access, entry) );
+		COE2( store_access_in_entry,(ida->access & ~NAME_IS_USER, entry) );
 	}
 
 	COE( sys_acl_create_entry,(smb_acl, &entry) );
 	COE( sys_acl_set_tag_type,(entry, SMB_ACL_GROUP_OBJ) );
-	COE2( store_access_in_entry,(racl->group_obj & 7, entry) );
+	COE2( store_access_in_entry,(racl->group_obj & ~NO_ENTRY, entry) );
 
-	for (ida = racl->groups.idas, count = racl->groups.count; count--; ida++) {
+#ifdef SMB_ACL_NEED_SORT
+	for ( ; count; ida++, count--) {
 		COE( sys_acl_create_entry,(smb_acl, &entry) );
 		COE( sys_acl_set_tag_type,(entry, SMB_ACL_GROUP) );
 		COE( sys_acl_set_qualifier,(entry, (void*)&ida->id) );
 		COE2( store_access_in_entry,(ida->access, entry) );
 	}
+#endif
 
 #ifdef ACLS_NEED_MASK
-	mask_bits = racl->mask_obj == NO_ENTRY ? racl->group_obj & 7 : racl->mask_obj;
+	mask_bits = racl->mask_obj == NO_ENTRY ? racl->group_obj & ~NO_ENTRY : racl->mask_obj;
 	COE( sys_acl_create_entry,(smb_acl, &entry) );
 	COE( sys_acl_set_tag_type,(entry, SMB_ACL_MASK) );
 	COE2( store_access_in_entry,(mask_bits, entry) );
@@ -458,7 +434,7 @@ static BOOL pack_smb_acl(SMB_ACL_T *smb_acl, const rsync_acl *racl)
 
 	COE( sys_acl_create_entry,(smb_acl, &entry) );
 	COE( sys_acl_set_tag_type,(entry, SMB_ACL_OTHER) );
-	COE2( store_access_in_entry,(racl->other_obj & 7, entry) );
+	COE2( store_access_in_entry,(racl->other_obj & ~NO_ENTRY, entry) );
 
 #ifdef DEBUG
 	if (sys_acl_valid(*smb_acl) < 0)
@@ -556,7 +532,7 @@ int get_acl(const char *fname, statx *sxp)
  * type ACL. */
 
 /* Send the ida list over the file descriptor. */
-static void send_ida_entries(const ida_entries *idal, int user_names, int f)
+static void send_ida_entries(const ida_entries *idal, int f)
 {
 	id_access *ida;
 	size_t count = idal->count;
@@ -564,15 +540,21 @@ static void send_ida_entries(const ida_entries *idal, int user_names, int f)
 	write_varint(f, idal->count);
 
 	for (ida = idal->idas; count--; ida++) {
-		char *name = user_names ? add_uid(ida->id) : add_gid(ida->id);
+		uint32 xbits = ida->access << 2;
+		char *name;
+		if (ida->access & NAME_IS_USER) {
+			xbits |= XFLAG_NAME_IS_USER;
+			name = add_uid(ida->id);
+		} else
+			name = add_gid(ida->id);
 		write_varint(f, ida->id);
 		if (inc_recurse && name) {
 			int len = strlen(name);
-			write_byte(f, ida->access | (uchar)0x80);
+			write_varint(f, xbits | XFLAG_NAME_FOLLOWS);
 			write_byte(f, len);
 			write_buf(f, name, len);
 		} else
-			write_byte(f, ida->access);
+			write_varint(f, xbits);
 	}
 }
 
@@ -590,37 +572,27 @@ static void send_rsync_acl(rsync_acl *racl, SMB_ACL_TYPE_T type,
 
 		if (racl->user_obj != NO_ENTRY)
 			flags |= XMIT_USER_OBJ;
-		if (racl->users.count)
-			flags |= XMIT_USER_LIST;
-
 		if (racl->group_obj != NO_ENTRY)
 			flags |= XMIT_GROUP_OBJ;
-		if (racl->groups.count)
-			flags |= XMIT_GROUP_LIST;
-
 		if (racl->mask_obj != NO_ENTRY)
 			flags |= XMIT_MASK_OBJ;
-
 		if (racl->other_obj != NO_ENTRY)
 			flags |= XMIT_OTHER_OBJ;
+		if (racl->names.count)
+			flags |= XMIT_NAME_LIST;
 
 		write_byte(f, flags);
 
 		if (flags & XMIT_USER_OBJ)
-			write_byte(f, racl->user_obj);
-		if (flags & XMIT_USER_LIST)
-			send_ida_entries(&racl->users, 1, f);
-
+			write_varint(f, racl->user_obj);
 		if (flags & XMIT_GROUP_OBJ)
-			write_byte(f, racl->group_obj);
-		if (flags & XMIT_GROUP_LIST)
-			send_ida_entries(&racl->groups, 0, f);
-
+			write_varint(f, racl->group_obj);
 		if (flags & XMIT_MASK_OBJ)
-			write_byte(f, racl->mask_obj);
-
+			write_varint(f, racl->mask_obj);
 		if (flags & XMIT_OTHER_OBJ)
-			write_byte(f, racl->other_obj);
+			write_varint(f, racl->other_obj);
+		if (flags & XMIT_NAME_LIST)
+			send_ida_entries(&racl->names, f);
 
 		/* Give the allocated data to the new list object. */
 		*new_racl = *racl;
@@ -651,27 +623,32 @@ void send_acl(statx *sxp, int f)
 
 /* === Receive functions === */
 
-static uchar recv_acl_access(uchar *name_follows_val, int f)
+static uint32 recv_acl_access(uchar *name_follows_ptr, int f)
 {
-	uchar access = read_byte(f);
+	uint32 access = read_varint(f);
 
-	if (name_follows_val) {
-		if (access & (uchar)0x80) {
-			access &= ~(uchar)0x80;
-			*name_follows_val = 1;
-		} else
-			*name_follows_val = 0;
-	}
-
-	if (access & ~(4 | 2 | 1)) {
-		rprintf(FERROR, "recv_acl_access: bogus permset %o\n", access);
+	if (name_follows_ptr) {
+		int flags = access & 3;
+		access >>= 2;
+		if (access & ~SMB_ACL_VALID_NAME_BITS)
+			goto value_error;
+		if (flags & XFLAG_NAME_FOLLOWS)
+			*name_follows_ptr = 1;
+		else
+			*name_follows_ptr = 0;
+		if (flags & XFLAG_NAME_IS_USER)
+			access |= NAME_IS_USER;
+	} else if (access & ~SMB_ACL_VALID_OBJ_BITS) {
+	  value_error:
+		rprintf(FERROR, "recv_acl_access: value out of range: %x\n",
+			access);
 		exit_cleanup(RERR_STREAMIO);
 	}
 
 	return access;
 }
 
-static uchar recv_ida_entries(ida_entries *ent, int user_names, int f)
+static uchar recv_ida_entries(ida_entries *ent, int f)
 {
 	uchar computed_mask_bits = 0;
 	int i, count = read_varint(f);
@@ -687,14 +664,14 @@ static uchar recv_ida_entries(ida_entries *ent, int user_names, int f)
 	for (i = 0; i < count; i++) {
 		uchar has_name;
 		id_t id = read_varint(f);
-		int access = recv_acl_access(&has_name, f);
+		uint32 access = recv_acl_access(&has_name, f);
 
 		if (has_name) {
-			if (user_names)
+			if (access & NAME_IS_USER)
 				id = recv_user_name(f, id);
 			else
 				id = recv_group_name(f, id, NULL);
-		} else if (user_names) {
+		} else if (access & NAME_IS_USER) {
 			if (inc_recurse && am_root && !numeric_ids)
 				id = match_uid(id);
 		} else {
@@ -707,7 +684,7 @@ static uchar recv_ida_entries(ida_entries *ent, int user_names, int f)
 		computed_mask_bits |= access;
 	}
 
-	return computed_mask_bits;
+	return computed_mask_bits & ~NO_ENTRY;
 }
 
 static int recv_rsync_acl(item_list *racl_list, SMB_ACL_TYPE_T type, int f)
@@ -734,23 +711,16 @@ static int recv_rsync_acl(item_list *racl_list, SMB_ACL_TYPE_T type, int f)
 
 	if (flags & XMIT_USER_OBJ)
 		duo_item->racl.user_obj = recv_acl_access(NULL, f);
-
-	if (flags & XMIT_USER_LIST)
-		computed_mask_bits |= recv_ida_entries(&duo_item->racl.users, 1, f);
-
 	if (flags & XMIT_GROUP_OBJ)
 		duo_item->racl.group_obj = recv_acl_access(NULL, f);
-
-	if (flags & XMIT_GROUP_LIST)
-		computed_mask_bits |= recv_ida_entries(&duo_item->racl.groups, 0, f);
-
 	if (flags & XMIT_MASK_OBJ)
 		duo_item->racl.mask_obj = recv_acl_access(NULL, f);
-
 	if (flags & XMIT_OTHER_OBJ)
 		duo_item->racl.other_obj = recv_acl_access(NULL, f);
+	if (flags & XMIT_NAME_LIST)
+		computed_mask_bits |= recv_ida_entries(&duo_item->racl.names, f);
 
-	if (!duo_item->racl.users.count && !duo_item->racl.groups.count) {
+	if (!duo_item->racl.names.count) {
 		/* If we received a superfluous mask, throw it away. */
 		if (duo_item->racl.mask_obj != NO_ENTRY) {
 			/* Mask off the group perms with it first. */
@@ -758,7 +728,7 @@ static int recv_rsync_acl(item_list *racl_list, SMB_ACL_TYPE_T type, int f)
 			duo_item->racl.mask_obj = NO_ENTRY;
 		}
 	} else if (duo_item->racl.mask_obj == NO_ENTRY) /* Must be non-empty with lists. */
-		duo_item->racl.mask_obj = computed_mask_bits | (duo_item->racl.group_obj & 7);
+		duo_item->racl.mask_obj = (computed_mask_bits | duo_item->racl.group_obj) & ~NO_ENTRY;
 
 	duo_item->sacl = NULL;
 
@@ -834,7 +804,7 @@ static mode_t change_sacl_perms(SMB_ACL_T sacl, rsync_acl *racl, mode_t old_mode
 	     rc == 1;
 	     rc = sys_acl_get_entry(sacl, SMB_ACL_NEXT_ENTRY, &entry)) {
 		SMB_ACL_TAG_T tag_type;
-		if ((rc = sys_acl_get_tag_type(entry, &tag_type))) {
+		if ((rc = sys_acl_get_tag_type(entry, &tag_type)) != 0) {
 			errfun = "sys_acl_get_tag_type";
 			break;
 		}
@@ -976,15 +946,14 @@ static void match_racl_ids(const item_list *racl_list)
 	int list_cnt, name_cnt;
 	acl_duo *duo_item = racl_list->items;
 	for (list_cnt = racl_list->count; list_cnt--; duo_item++) {
-		ida_entries *idal = &duo_item->racl.users;
+		ida_entries *idal = &duo_item->racl.names;
 		id_access *ida = idal->idas;
-		for (name_cnt = idal->count; name_cnt--; ida++)
-			ida->id = match_uid(ida->id);
-
-		idal = &duo_item->racl.groups;
-		ida = idal->idas;
-		for (name_cnt = idal->count; name_cnt--; ida++)
-			ida->id = match_gid(ida->id, NULL);
+		for (name_cnt = idal->count; name_cnt--; ida++) {
+			if (ida->access & NAME_IS_USER)
+				ida->id = match_uid(ida->id);
+			else
+				ida->id = match_gid(ida->id, NULL);
+		}
 	}
 }
 
