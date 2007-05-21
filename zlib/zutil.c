@@ -34,28 +34,28 @@ uLong ZEXPORT zlibCompileFlags()
     uLong flags;
 
     flags = 0;
-    switch (sizeof(uInt)) { /* CONSTANT CONDITION */
-    case 2:     break;
-    case 4:     flags += 1;     break;
-    case 8:     flags += 2;     break;
+    switch (sizeof(uInt)) {
+    case 2:     break;				/* CONSTANT CONDITION */
+    case 4:     flags += 1;     break;		/* CONSTANT CONDITION */
+    case 8:     flags += 2;     break;		/* CONSTANT CONDITION */
     default:    flags += 3;
     }
-    switch (sizeof(uLong)) { /* CONSTANT CONDITION */
-    case 2:     break;
-    case 4:     flags += 1 << 2;        break;
-    case 8:     flags += 2 << 2;        break;
+    switch (sizeof(uLong)) {
+    case 2:     break;				/* CONSTANT CONDITION */
+    case 4:     flags += 1 << 2;        break;	/* CONSTANT CONDITION */
+    case 8:     flags += 2 << 2;        break;	/* CONSTANT CONDITION */
     default:    flags += 3 << 2;
     }
-    switch (sizeof(voidpf)) { /* CONSTANT CONDITION */
-    case 2:     break;
-    case 4:     flags += 1 << 4;        break;
-    case 8:     flags += 2 << 4;        break;
+    switch (sizeof(voidpf)) {
+    case 2:     break;				/* CONSTANT CONDITION */
+    case 4:     flags += 1 << 4;        break;	/* CONSTANT CONDITION */
+    case 8:     flags += 2 << 4;        break;	/* CONSTANT CONDITION */
     default:    flags += 3 << 4;
     }
-    switch (sizeof(z_off_t)) { /* CONSTANT CONDITION */
-    case 2:     break;
-    case 4:     flags += 1 << 6;        break;
-    case 8:     flags += 2 << 6;        break;
+    switch (sizeof(z_off_t)) {
+    case 2:     break;				/* CONSTANT CONDITION */
+    case 4:     flags += 1 << 6;        break;	/* CONSTANT CONDITION */
+    case 8:     flags += 2 << 6;        break;	/* CONSTANT CONDITION */
     default:    flags += 3 << 6;
     }
 #ifdef DEBUG
