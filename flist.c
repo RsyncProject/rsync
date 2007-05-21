@@ -643,7 +643,8 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 
 #ifdef ICONV_OPTION
 	if (ic_recv != (iconv_t)-1) {
-		char *obuf = thisname, *ibuf = lastname;
+		char *obuf = thisname;
+		ICONV_CONST char *ibuf = (ICONV_CONST char *)lastname;
 		size_t ocnt = MAXPATHLEN, icnt = basename_len;
 
 		if (icnt >= MAXPATHLEN) {
