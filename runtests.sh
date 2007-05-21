@@ -221,7 +221,7 @@ suitedir="$srcdir/testsuite"
 export scratchdir suitedir
 
 prep_scratch() {
-    [ -d "$scratchdir" ] && rm -rf "$scratchdir"
+    [ -d "$scratchdir" ] && chmod -R u+rwX "$scratchdir" && rm -rf "$scratchdir"
     mkdir "$scratchdir"
     # Get rid of default ACLs and dir-setgid to avoid confusing some tests.
     $setfacl_nodef "$scratchdir" || true
