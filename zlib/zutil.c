@@ -34,25 +34,25 @@ uLong ZEXPORT zlibCompileFlags()
     uLong flags;
 
     flags = 0;
-    switch (sizeof(uInt)) {
+    switch (sizeof(uInt)) { /* CONSTANT CONDITION */
     case 2:     break;
     case 4:     flags += 1;     break;
     case 8:     flags += 2;     break;
     default:    flags += 3;
     }
-    switch (sizeof(uLong)) {
+    switch (sizeof(uLong)) { /* CONSTANT CONDITION */
     case 2:     break;
     case 4:     flags += 1 << 2;        break;
     case 8:     flags += 2 << 2;        break;
     default:    flags += 3 << 2;
     }
-    switch (sizeof(voidpf)) {
+    switch (sizeof(voidpf)) { /* CONSTANT CONDITION */
     case 2:     break;
     case 4:     flags += 1 << 4;        break;
     case 8:     flags += 2 << 4;        break;
     default:    flags += 3 << 4;
     }
-    switch (sizeof(z_off_t)) {
+    switch (sizeof(z_off_t)) { /* CONSTANT CONDITION */
     case 2:     break;
     case 4:     flags += 1 << 6;        break;
     case 8:     flags += 2 << 6;        break;
