@@ -538,7 +538,7 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 
 int sys_acl_get_access_bits(SMB_ACL_ENTRY_T entry_d, uint32 *bits)
 {
-	*bits = &entry_d->a_perm;
+	*bits = entry_d->a_perm;
 	return 0;
 }
 
@@ -1021,7 +1021,7 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 
 int sys_acl_get_access_bits(SMB_ACL_ENTRY_T entry_d, uint32 *bits)
 {
-	*bits = &entry_d->a_perm;
+	*bits = entry_d->a_perm;
 
 	return 0;
 }
