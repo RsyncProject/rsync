@@ -227,7 +227,7 @@ gid_t match_gid(gid_t gid, uint16 *flags_ptr)
 				break;
 		}
 		if (!list)
-			list = recv_add_gid(gid, flags_ptr);
+			list = recv_add_gid(gid, NULL);
 		last = list;
 	}
 
