@@ -203,6 +203,8 @@ $RSYNC -av --delete-excluded --exclude='*' "$fromdir/" "$todir/"
 checkit "$RSYNC -avv -f dir-merge,-_.excl \
     \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
 
+set -x
+
 relative_opts='--relative --chmod=Du+w --copy-unsafe-links'
 $RSYNC -av $relative_opts "$fromdir/foo" "$chkdir/"
 rm -rf "$chkdir$fromdir/foo/down"
