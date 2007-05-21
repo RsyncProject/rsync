@@ -322,9 +322,9 @@ int set_file_attrs(const char *fname, struct file_struct *file, statx *sxp,
 			updated = 1;
 	}
 
-	change_uid = am_root && preserve_uid && sxp->st.st_uid != F_OWNER(file);
+	change_uid = am_root && preserve_uid && sxp->st.st_uid != (uid_t)F_OWNER(file);
 	change_gid = preserve_gid && !(file->flags & FLAG_SKIP_GROUP)
-		  && sxp->st.st_gid != F_GROUP(file);
+		  && sxp->st.st_gid != (gid_t)F_GROUP(file);
 #if !defined HAVE_LCHOWN && !defined CHOWN_MODIFIES_SYMLINK
 	if (S_ISLNK(sxp->st.st_mode))
 		;
@@ -346,8 +346,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, statx *sxp,
 		if (am_root < 0) {
 			;
 		} else if (do_lchown(fname,
-		    change_uid ? F_OWNER(file) : sxp->st.st_uid,
-		    change_gid ? F_GROUP(file) : sxp->st.st_gid) != 0) {
+		    change_uid ? (uid_t)F_OWNER(file) : sxp->st.st_uid,
+		    change_gid ? (gid_t)F_GROUP(file) : sxp->st.st_gid) != 0) {
 			/* shouldn't have attempted to change uid or gid
 			 * unless have the privilege */
 			rsyserr(FERROR, errno, "%s %s failed",

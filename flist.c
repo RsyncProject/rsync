@@ -412,7 +412,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 	} else if (protocol_version < 28)
 		rdev = MAKEDEV(0, 0);
 	if (preserve_uid) {
-		if (F_OWNER(file) == uid && *lastname)
+		if ((uid_t)F_OWNER(file) == uid && *lastname)
 			flags |= XMIT_SAME_UID;
 		else {
 			uid = F_OWNER(file);
@@ -424,7 +424,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 		}
 	}
 	if (preserve_gid) {
-		if (F_GROUP(file) == gid && *lastname)
+		if ((gid_t)F_GROUP(file) == gid && *lastname)
 			flags |= XMIT_SAME_GID;
 		else {
 			gid = F_GROUP(file);

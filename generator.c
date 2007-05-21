@@ -521,10 +521,10 @@ int unchanged_attrs(const char *fname, struct file_struct *file, statx *sxp)
 	if (preserve_perms && !BITS_EQUAL(sxp->st.st_mode, file->mode, CHMOD_BITS))
 		return 0;
 
-	if (am_root && preserve_uid && sxp->st.st_uid != F_OWNER(file))
+	if (am_root && preserve_uid && sxp->st.st_uid != (uid_t)F_OWNER(file))
 		return 0;
 
-	if (preserve_gid && !(file->flags & FLAG_SKIP_GROUP) && sxp->st.st_gid != F_GROUP(file))
+	if (preserve_gid && !(file->flags & FLAG_SKIP_GROUP) && sxp->st.st_gid != (gid_t)F_GROUP(file))
 		return 0;
 
 #ifdef SUPPORT_ACLS
@@ -565,10 +565,10 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 			iflags |= ITEM_REPORT_TIME;
 		if (!BITS_EQUAL(sxp->st.st_mode, file->mode, CHMOD_BITS))
 			iflags |= ITEM_REPORT_PERMS;
-		if (preserve_uid && am_root && F_OWNER(file) != sxp->st.st_uid)
+		if (preserve_uid && am_root && (uid_t)F_OWNER(file) != sxp->st.st_uid)
 			iflags |= ITEM_REPORT_OWNER;
 		if (preserve_gid && !(file->flags & FLAG_SKIP_GROUP)
-		    && sxp->st.st_gid != F_GROUP(file))
+		    && sxp->st.st_gid != (gid_t)F_GROUP(file))
 			iflags |= ITEM_REPORT_GROUP;
 #ifdef SUPPORT_ACLS
 		if (preserve_acls && !S_ISLNK(file->mode)) {
