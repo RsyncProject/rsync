@@ -2228,7 +2228,7 @@ static void clean_flist(struct file_list *flist, int strip_root)
 				if (verbose > 1) {
 					rprintf(FINFO,
 					    "removing duplicate name %s from file list (%d)\n",
-					    f_name(file, fbuf), drop);
+					    f_name(file, fbuf), drop + flist->ndx_start);
 				}
 				/* Make sure we don't lose track of a user-specified
 				 * top directory. */
@@ -2370,9 +2370,12 @@ static void output_flist(struct file_list *flist)
 			trail = S_ISDIR(file->mode) ? "/" : "";
 		} else
 			root = dir = slash = name = trail = "";
-		rprintf(FINFO, "[%s] i=%d %s %s%s%s%s mode=0%o len=%.0f%s%s flags=%x\n",
-			who, i, root, dir, slash, name, trail, (int)file->mode,
-			(double)F_LENGTH(file), uidbuf, gidbuf, file->flags);
+		rprintf(FINFO,
+			"[%s] i=%d %s %s%s%s%s mode=0%o len=%.0f%s%s flags=%x\n",
+			who, i + flist->ndx_start,
+			root, dir, slash, name, trail,
+			(int)file->mode, (double)F_LENGTH(file),
+			uidbuf, gidbuf, file->flags);
 	}
 }
 
