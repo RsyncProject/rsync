@@ -1336,6 +1336,9 @@ static void add_dirs_to_tree(int parent_ndx, int start, int end)
 	qsort(dir_flist->sorted + start, end - start + 1,
 	      sizeof dir_flist->sorted[0], (int (*)())file_compare);
 
+	if (verbose > 3)
+		output_flist(dir_flist);
+
 	for (i = start; i <= end; i++) {
 		struct file_struct *file = dir_flist->sorted[i];
 		if (!(file->flags & FLAG_XFER_DIR)
