@@ -166,9 +166,9 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 		if (ndx < 0 || ndx >= dir_flist->count) {
 			ndx = NDX_FLIST_OFFSET - ndx;
 			rprintf(FERROR,
-				"Invalid dir index: %d (%d - %d)\n",
-				ndx, NDX_FLIST_OFFSET,
-				NDX_FLIST_OFFSET - dir_flist->count);
+				"[%s] Invalid dir index: %d (%d - %d)\n",
+				who_am_i(), ndx, NDX_FLIST_OFFSET,
+				NDX_FLIST_OFFSET - dir_flist->count + 1);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
