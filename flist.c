@@ -97,6 +97,7 @@ static char tmp_sum[MAX_DIGEST_LEN];
 
 static char empty_sum[MAX_DIGEST_LEN];
 static int flist_count_offset; /* for --delete --progress */
+static int dir_count = 0;
 
 static void clean_flist(struct file_list *flist, int strip_root);
 static void output_flist(struct file_list *flist);
@@ -268,15 +269,12 @@ static const char *pathname, *orig_dir;
 static int pathname_len;
 
 
-/**
- * Make sure @p flist is big enough to hold at least @p flist->count
- * entries.
- **/
-void flist_expand(struct file_list *flist)
+/* Make sure flist can hold at least flist->count + extra entries. */
+static void flist_expand(struct file_list *flist, int extra)
 {
 	struct file_struct **new_ptr;
 
-	if (flist->count < flist->malloced)
+	if (flist->count + extra <= flist->malloced)
 		return;
 
 	if (flist->malloced < FLIST_START)
@@ -288,15 +286,8 @@ void flist_expand(struct file_list *flist)
 
 	/* In case count jumped or we are starting the list
 	 * with a known size just set it. */
-	if (flist->malloced < flist->count)
-		flist->malloced = flist->count;
-
-#ifdef ICONV_OPTION
-	if (inc_recurse && flist == dir_flist && need_unsorted_flist) {
-		flist->sorted = realloc_array(flist->sorted, struct file_struct *,
-					      flist->malloced);
-	}
-#endif
+	if (flist->malloced < flist->count + extra)
+		flist->malloced = flist->count + extra;
 
 	new_ptr = realloc_array(flist->files, struct file_struct *,
 				flist->malloced);
@@ -997,6 +988,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	int alloc_len, basename_len, linkname_len;
 	int extra_len = file_extra_cnt * EXTRA_LEN;
 	const char *basename;
+	alloc_pool_t *pool;
 	char *bp;
 
 	if (strlcpy(thisname, fname, sizeof thisname)
@@ -1087,12 +1079,17 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
   skip_filters:
 
 	/* Only divert a directory in the main transfer. */
-	if (flist && flist->prev && S_ISDIR(st.st_mode)
-	 && flags & FLAG_DIVERT_DIRS) {
-		flist = dir_flist;
-		/* Room for parent/sibling/next-child info. */
-		extra_len += 3 * EXTRA_LEN;
-	}
+	if (flist) {
+		if (flist->prev && S_ISDIR(st.st_mode)
+		 && flags & FLAG_DIVERT_DIRS) {
+			/* Room for parent/sibling/next-child info. */
+			extra_len += 3 * EXTRA_LEN;
+			dir_count++;
+			pool = dir_flist->file_pool;
+		} else
+			pool = flist->file_pool;
+	} else
+		pool = NULL;
 
 	if (verbose > 2) {
 		rprintf(FINFO, "[%s] make_file(%s,*,%d)\n",
@@ -1127,8 +1124,8 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 
 	alloc_len = FILE_STRUCT_LEN + extra_len + basename_len
 		  + linkname_len;
-	if (flist)
-		bp = pool_alloc(flist->file_pool, alloc_len, "make_file");
+	if (pool)
+		bp = pool_alloc(pool, alloc_len, "make_file");
 	else {
 		if (!(bp = new_array(char, alloc_len)))
 			out_of_memory("make_file");
@@ -1196,7 +1193,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		int save_mode = file->mode;
 		file->mode = S_IFDIR; /* Find a directory with our name. */
 		if (flist_find(dir_flist, file) >= 0
-		    && x_stat(thisname, &st2, NULL) == 0 && S_ISDIR(st2.st_mode)) {
+		 && x_stat(thisname, &st2, NULL) == 0 && S_ISDIR(st2.st_mode)) {
 			file->modtime = st2.st_mtime;
 			file->len32 = 0;
 			file->mode = st2.st_mode;
@@ -1211,16 +1208,10 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	if (basename_len == 0+1)
 		return NULL;
 
-	if (inc_recurse && flist == dir_flist) {
-		flist_expand(dir_flist);
 #ifdef ICONV_OPTION
-		if (ic_ndx)
-			F_NDX(file) = dir_flist->count;
-		if (need_unsorted_flist)
-			dir_flist->sorted[dir_flist->count] = file;
+	if (ic_ndx)
+		F_NDX(file) = dir_count - 1;
 #endif
-		dir_flist->files[dir_flist->count++] = file;
-	}
 
 	return file;
 }
@@ -1270,7 +1261,7 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 
 	maybe_emit_filelist_progress(flist->count + flist_count_offset);
 
-	flist_expand(flist);
+	flist_expand(flist, 1);
 	flist->files[flist->count++] = file;
 	if (f >= 0) {
 		send_file_entry(f, file, flist->count - 1);
@@ -1323,33 +1314,39 @@ static int file_compare(struct file_struct **file1, struct file_struct **file2)
 	return f_name_cmp(*file1, *file2);
 }
 
-/* We take an entire set of sibling dirs from dir_flist (start <= ndx <= end),
- * sort them by name, and link them into the tree, setting the appropriate
- * parent/child/sibling pointers. */
-static void add_dirs_to_tree(int parent_ndx, int start, int end)
+/* We take an entire set of sibling dirs from the sorted flist and link them
+ * into the tree, setting the appropriate parent/child/sibling pointers. */
+static void add_dirs_to_tree(int parent_ndx, struct file_list *from_flist,
+			     int dir_cnt)
 {
 	int i;
 	int32 *dp = NULL;
 	int32 *parent_dp = parent_ndx < 0 ? NULL
 			 : F_DIRNODE_P(dir_flist->sorted[parent_ndx]);
 
-	qsort(dir_flist->sorted + start, end - start + 1,
-	      sizeof dir_flist->sorted[0], (int (*)())file_compare);
+	flist_expand(dir_flist, dir_cnt);
+	dir_flist->sorted = dir_flist->files;
 
-	if (verbose > 3)
-		output_flist(dir_flist);
+	for (i = 0; dir_cnt; i++) {
+		struct file_struct *file = from_flist->sorted[i];
 
-	for (i = start; i <= end; i++) {
-		struct file_struct *file = dir_flist->sorted[i];
+		if (!S_ISDIR(file->mode))
+			continue;
+
+		dir_flist->files[dir_flist->count++] = file;
+		dir_cnt--;
+
 		if (!(file->flags & FLAG_XFER_DIR)
 		 || file->flags & FLAG_MOUNT_DIR)
 			continue;
+
 		if (dp)
-			DIR_NEXT_SIBLING(dp) = i;
+			DIR_NEXT_SIBLING(dp) = dir_flist->count - 1;
 		else if (parent_dp)
-			DIR_FIRST_CHILD(parent_dp) = i;
+			DIR_FIRST_CHILD(parent_dp) = dir_flist->count - 1;
 		else
-			send_dir_ndx = i;
+			send_dir_ndx = dir_flist->count - 1;
+
 		dp = F_DIRNODE_P(file);
 		DIR_PARENT(dp) = parent_ndx;
 		DIR_FIRST_CHILD(dp) = -1;
@@ -1458,7 +1455,7 @@ void send_extra_file_list(int f, int at_least)
 		future_cnt = 0;
 	while (future_cnt < at_least) {
 		struct file_struct *file = dir_flist->sorted[send_dir_ndx];
-		int start = dir_flist->count;
+		int dstart = dir_count;
 		int32 *dp;
 
 		flist = flist_new(0, "send_extra_file_list");
@@ -1510,27 +1507,18 @@ void send_extra_file_list(int f, int at_least)
 		write_byte(f, 0);
 
 #ifdef ICONV_OPTION
-		if (!need_unsorted_flist)
-#endif
-			dir_flist->sorted = dir_flist->files;
-		add_dirs_to_tree(send_dir_ndx, start, dir_flist->count - 1);
-
-#ifdef ICONV_OPTION
 		if (need_unsorted_flist) {
-			if (inc_recurse) {
-				if (!(flist->sorted = new_array(struct file_struct *, flist->count)))
-					out_of_memory("send_extra_file_list");
-				memcpy(flist->sorted, flist->files,
-				       flist->count * sizeof (struct file_struct*));
-				clean_flist(flist, 0);
-			} else
-				flist->sorted = flist->files;
+			if (!(flist->sorted = new_array(struct file_struct *, flist->count)))
+				out_of_memory("send_extra_file_list");
+			memcpy(flist->sorted, flist->files,
+			       flist->count * sizeof (struct file_struct*));
 		} else
 #endif
-		{
 			flist->sorted = flist->files;
-			clean_flist(flist, 0);
-		}
+
+		clean_flist(flist, 0);
+
+		add_dirs_to_tree(send_dir_ndx, flist, dir_count - dstart);
 
 		file_total += flist->count;
 		future_cnt += flist->count;
@@ -1864,11 +1852,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		rprintf(FINFO, "send_file_list done\n");
 
 	if (inc_recurse) {
-#ifdef ICONV_OPTION
-		if (!need_unsorted_flist)
-#endif
-			dir_flist->sorted = dir_flist->files;
-		add_dirs_to_tree(-1, 0, dir_flist->count - 1);
+		add_dirs_to_tree(-1, flist, dir_count);
 		if (send_dir_ndx < 0) {
 			write_ndx(f, NDX_FLIST_EOF);
 			flist_eof = 1;
@@ -1918,18 +1902,14 @@ struct file_list *recv_file_list(int f)
 	while ((flags = read_byte(f)) != 0) {
 		struct file_struct *file;
 
-		flist_expand(flist);
+		flist_expand(flist, 1);
 
 		if (protocol_version >= 28 && (flags & XMIT_EXTENDED_FLAGS))
 			flags |= read_byte(f) << 8;
 		file = recv_file_entry(flist, flags, f);
 
 		if (inc_recurse && S_ISDIR(file->mode)) {
-			flist_expand(dir_flist);
-#ifdef ICONV_OPTION
-			if (need_unsorted_flist)
-				dir_flist->sorted[dir_flist->count] = file;
-#endif
+			flist_expand(dir_flist, 1);
 			dir_flist->files[dir_flist->count++] = file;
 		}
 
@@ -1961,7 +1941,12 @@ struct file_list *recv_file_list(int f)
 			out_of_memory("recv_file_list");
 		memcpy(flist->sorted, flist->files,
 		       flist->count * sizeof (struct file_struct*));
-		if (inc_recurse) {
+		if (inc_recurse && dir_flist->count > dstart) {
+			dir_flist->sorted = realloc_array(dir_flist->sorted,
+						struct file_struct *,
+						dir_flist->count);
+			memcpy(dir_flist->sorted + dstart, dir_flist->files + dstart,
+			       (dir_flist->count - dstart) * sizeof (struct file_struct*));
 			qsort(dir_flist->sorted + dstart, dir_flist->count - dstart,
 			      sizeof (struct file_struct*), (int (*)())file_compare);
 		}
@@ -2021,9 +2006,9 @@ void recv_additional_file_list(int f)
 		if (ndx < 0 || ndx >= dir_flist->count) {
 			ndx = NDX_FLIST_OFFSET - ndx;
 			rprintf(FERROR,
-				"Invalid dir index: %d (%d - %d)\n",
-				ndx, NDX_FLIST_OFFSET,
-				NDX_FLIST_OFFSET - dir_flist->count);
+				"[%s] Invalid dir index: %d (%d - %d)\n",
+				who_am_i(), ndx, NDX_FLIST_OFFSET,
+				NDX_FLIST_OFFSET - dir_flist->count + 1);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 		flist = recv_file_list(f);
