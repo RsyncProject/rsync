@@ -225,7 +225,7 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 	for (from = 0; from < ndx_count; from++) {
 		for (file = cur_flist->sorted[ndx_list[from]], gnum = F_HL_GNUM(file), prev = -1;
 		     from < ndx_count-1;
-		     file = file_next, gnum = gnum_next, from++)
+		     file = file_next, gnum = gnum_next, from++) /*SHARED ITERATOR*/
 		{
 			file_next = cur_flist->sorted[ndx_list[from+1]];
 			gnum_next = F_HL_GNUM(file_next);

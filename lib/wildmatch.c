@@ -165,7 +165,7 @@ static int dowild(const uchar *p, const uchar *text, const uchar*const *a)
 		} else if (p_ch == '[' && p[1] == ':') {
 		    const uchar *s;
 		    int i;
-		    for (s = p += 2; (p_ch = *p) && p_ch != ']'; p++) {}
+		    for (s = p += 2; (p_ch = *p) && p_ch != ']'; p++) {} /*SHARED ITERATOR*/
 		    if (!p_ch)
 			return ABORT_ALL;
 		    i = p - s - 1;
