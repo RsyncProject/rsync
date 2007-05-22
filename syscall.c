@@ -112,7 +112,7 @@ int do_mknod(const char *pathname, mode_t mode, dev_t dev)
 			return -1;
 		close(sock);
 #ifdef HAVE_CHMOD
-		return do_chmod(pathname, mode);
+		return do_chmod(pathname, mode); /*DISCOURAGED FUNCTION*/
 #else
 		return 0;
 #endif
