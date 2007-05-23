@@ -1720,9 +1720,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 static void touch_up_dirs(struct file_list *flist, int ndx)
 {
+	static int counter = 0;
 	struct file_struct *file;
 	char *fname;
-	int i, j, start, end;
+	int i, start, end;
 
 	if (ndx < 0) {
 		start = 0;
@@ -1732,8 +1733,12 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 
 	/* Fix any directory permissions that were modified during the
 	 * transfer and/or re-set any tweaked modified-time values. */
-	for (i = start, j = 0; i <= end; i++) {
+	for (i = start; i <= end; i++, counter++) {
 		file = flist->files[i];
+		if (verbose > 3) {
+			rprintf(FINFO, "touch_up_dirs: %s (%d)\n",
+				f_name(file, NULL), i);
+		}
 		if (!F_IS_ACTIVE(file) || !S_ISDIR(file->mode)
 		 || file->flags & FLAG_MISSING_DIR)
 			continue;
@@ -1744,9 +1749,9 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 			do_chmod(fname, file->mode);
 		if (need_retouch_dir_times)
 			set_modtime(fname, file->modtime, file->mode);
-		if (allowed_lull && !(++j % lull_mod))
+		if (allowed_lull && !(counter % lull_mod))
 			maybe_send_keepalive();
-		else if (!(j % 200))
+		else if (!(counter & 0xFF))
 			maybe_flush_socket(0);
 	}
 }
@@ -1942,7 +1947,7 @@ void generate_files(int f_out, const char *local_name)
 
 			if (allowed_lull && !(i % lull_mod))
 				maybe_send_keepalive();
-			else if (!(i % 200))
+			else if (!(i & 0xFF))
 				maybe_flush_socket(0);
 		}
 
