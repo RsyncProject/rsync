@@ -1736,8 +1736,9 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 	for (i = start; i <= end; i++, counter++) {
 		file = flist->files[i];
 		if (verbose > 3) {
+			fname = f_name(file, NULL);
 			rprintf(FINFO, "touch_up_dirs: %s (%d)\n",
-				f_name(file, NULL), i);
+				NS(fname), i);
 		}
 		if (!F_IS_ACTIVE(file) || !S_ISDIR(file->mode)
 		 || file->flags & FLAG_MISSING_DIR)
