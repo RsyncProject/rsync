@@ -340,6 +340,10 @@ static void read_msg_fd(void)
 		/* Read extra file list from receiver. */
 		assert(iobuf_in != NULL);
 		assert(iobuf_f_in == fd);
+		if (verbose > 3) {
+			rprintf(FINFO, "[%s] receiving flist for dir %d\n",
+				who_am_i(), IVAL(buf,0));
+		}
 		flist = recv_file_list(fd);
 		flist->parent_ndx = IVAL(buf,0);
 		break;

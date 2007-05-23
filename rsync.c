@@ -175,6 +175,10 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 		/* Send everything read from f_in to msg_fd_out. */
 		send_msg_int(MSG_FLIST, ndx);
 		start_flist_forward(f_in);
+		if (verbose > 3) {
+			rprintf(FINFO, "[%s] receiving flist for dir %d\n",
+				who_am_i(), ndx);
+		}
 		flist = recv_file_list(f_in);
 		flist->parent_ndx = ndx;
 		stop_flist_forward();

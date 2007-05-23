@@ -1954,7 +1954,7 @@ struct file_list *recv_file_list(int f)
 #endif
 	{
 		flist->sorted = flist->files;
-		if (inc_recurse) {
+		if (inc_recurse && dir_flist->count > dstart) {
 			dir_flist->sorted = dir_flist->files;
 			qsort(dir_flist->sorted + dstart, dir_flist->count - dstart,
 			      sizeof (struct file_struct*), (int (*)())file_compare);
@@ -2010,6 +2010,10 @@ void recv_additional_file_list(int f)
 				who_am_i(), ndx, NDX_FLIST_OFFSET,
 				NDX_FLIST_OFFSET - dir_flist->count + 1);
 			exit_cleanup(RERR_PROTOCOL);
+		}
+		if (verbose > 3) {
+			rprintf(FINFO, "[%s] receiving flist for dir %d\n",
+				who_am_i(), ndx);
 		}
 		flist = recv_file_list(f);
 		flist->parent_ndx = ndx;
