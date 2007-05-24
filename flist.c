@@ -38,6 +38,7 @@ extern int module_id;
 extern int ignore_errors;
 extern int numeric_ids;
 extern int recurse;
+extern int use_qsort;
 extern int xfer_dirs;
 extern int filesfrom_fd;
 extern int one_file_system;
@@ -75,6 +76,8 @@ extern int ic_ndx;
 extern int need_unsorted_flist;
 extern iconv_t ic_send, ic_recv;
 #endif
+
+#define PTR_SIZE (sizeof (struct file_struct *))
 
 int io_error;
 int checksum_len;
@@ -1309,9 +1312,70 @@ static void send_if_directory(int f, struct file_list *flist,
 	}
 }
 
-static int file_compare(struct file_struct **file1, struct file_struct **file2)
+static int file_compare(const void *file1, const void *file2)
 {
-	return f_name_cmp(*file1, *file2);
+	return f_name_cmp(*(struct file_struct **)file1,
+			  *(struct file_struct **)file2);
+}
+
+/* The guts of a merge sort algorithm.  This was derived from the GNU C
+ * version, but I (Wayne) changed the merge code to do less copying and
+ * to require only half the amount of temporary memory. */
+static void fsort_tmp(struct file_struct **fp, size_t num,
+		      struct file_struct **tmp)
+{
+	struct file_struct **f1, **f2, **t;
+	size_t n1, n2;
+
+	n1 = num / 2;
+	n2 = num - n1;
+	f1 = fp;
+	f2 = fp + n1;
+
+	if (n1 > 1)
+		fsort_tmp(f1, n1, tmp);
+	if (n2 > 1)
+		fsort_tmp(f2, n2, tmp);
+
+	while (f_name_cmp(*f1, *f2) <= 0) {
+		if (!--n1)
+			return;
+		f1++;
+	}
+
+	t = tmp;
+	memcpy(t, f1, n1 * PTR_SIZE);
+
+	*f1++ = *f2++, n2--;
+
+	while (n1 > 0 && n2 > 0) {
+		if (f_name_cmp(*t, *f2) <= 0)
+			*f1++ = *t++, n1--;
+		else
+			*f1++ = *f2++, n2--;
+	}
+
+	if (n1 > 0)
+		memcpy(f1, t, n1 * PTR_SIZE);
+}
+
+/* This file-struct sorting routine makes sure that any identical names in
+ * the file list stay in the same order as they were in the original list.
+ * This is particularly vital in inc_recurse mode where we expect a sort
+ * on the flist to match the exact order of a sort on the dir_flist. */
+static void fsort(struct file_struct **fp, size_t num)
+{
+	if (num <= 1)
+		return;
+
+	if (use_qsort)
+		qsort(fp, num, PTR_SIZE, file_compare);
+	else {
+		struct file_struct **tmp = new_array(struct file_struct *,
+						     (num+1) / 2);
+		fsort_tmp(fp, num, tmp);
+		free(tmp);
+	}
 }
 
 /* We take an entire set of sibling dirs from the sorted flist and link them
@@ -1947,8 +2011,7 @@ struct file_list *recv_file_list(int f)
 						dir_flist->count);
 			memcpy(dir_flist->sorted + dstart, dir_flist->files + dstart,
 			       (dir_flist->count - dstart) * sizeof (struct file_struct*));
-			qsort(dir_flist->sorted + dstart, dir_flist->count - dstart,
-			      sizeof (struct file_struct*), (int (*)())file_compare);
+			fsort(dir_flist->sorted + dstart, dir_flist->count - dstart);
 		}
 	} else
 #endif
@@ -1956,8 +2019,7 @@ struct file_list *recv_file_list(int f)
 		flist->sorted = flist->files;
 		if (inc_recurse && dir_flist->count > dstart) {
 			dir_flist->sorted = dir_flist->files;
-			qsort(dir_flist->sorted + dstart, dir_flist->count - dstart,
-			      sizeof (struct file_struct*), (int (*)())file_compare);
+			fsort(dir_flist->sorted + dstart, dir_flist->count - dstart);
 		}
 	}
 
@@ -2164,8 +2226,7 @@ static void clean_flist(struct file_list *flist, int strip_root)
 		return;
 	}
 
-	qsort(flist->sorted, flist->count,
-	    sizeof flist->sorted[0], (int (*)())file_compare);
+	fsort(flist->sorted, flist->count);
 
 	if (!am_sender || inc_recurse) {
 		for (i = prev_i = 0; i < flist->count; i++) {
