@@ -1519,55 +1519,34 @@ void send_extra_file_list(int f, int at_least)
 		future_cnt = 0;
 	while (future_cnt < at_least) {
 		struct file_struct *file = dir_flist->sorted[send_dir_ndx];
-		int dstart = dir_count;
+		int dir_ndx, dstart = dir_count;
 		int32 *dp;
 
 		flist = flist_new(0, "send_extra_file_list");
 		start_write = stats.total_written;
 
-		/* If this is the first of a set of duplicate dirs, we must
-		 * send all the dirs together in a single file-list.  We must
-		 * also send the index of the last dir in the header. */
-		if (file->flags & FLAG_DUPLICATE) {
-			int dir_ndx, end_ndx = send_dir_ndx;
-			struct file_struct *fp = file;
-
-			while (1) {
-				dp = F_DIRNODE_P(fp);
-				end_ndx = DIR_NEXT_SIBLING(dp);
-				fp = dir_flist->sorted[end_ndx];
-				if (!(fp->flags & FLAG_DUPLICATE))
-					break;
-			}
-
 #ifdef ICONV_OPTION
-			if (ic_ndx)
-				dir_ndx = F_NDX(fp);
-			else
+		if (ic_ndx)
+			dir_ndx = F_NDX(file);
+		else
 #endif
-				dir_ndx = end_ndx;
-			write_ndx(f, NDX_FLIST_OFFSET - dir_ndx);
+			dir_ndx = send_dir_ndx;
+		write_ndx(f, NDX_FLIST_OFFSET - dir_ndx);
 
-			while (1) {
-				send1extra(f, file, flist);
-				if (send_dir_ndx == end_ndx)
-					break;
-				dp = F_DIRNODE_P(file);
-				send_dir_ndx = DIR_NEXT_SIBLING(dp);
-				file = dir_flist->sorted[send_dir_ndx];
-			}
-		} else {
-			int dir_ndx;
-#ifdef ICONV_OPTION
-			if (ic_ndx)
-				dir_ndx = F_NDX(file);
-			else
-#endif
-				dir_ndx = send_dir_ndx;
-			write_ndx(f, NDX_FLIST_OFFSET - dir_ndx);
+		send1extra(f, file, flist);
+		dp = F_DIRNODE_P(file);
 
+		/* If there are any duplicate directory names that follow, we
+		 * send all the dirs together in one file-list.  The dir_flist
+		 * tree links all the child subdirs onto the last dup dir. */
+		while ((dir_ndx = DIR_NEXT_SIBLING(dp)) >= 0
+		    && dir_flist->sorted[dir_ndx]->flags & FLAG_DUPLICATE) {
+			send_dir_ndx = dir_ndx;
+			file = dir_flist->sorted[dir_ndx];
 			send1extra(f, file, flist);
+			dp = F_DIRNODE_P(file);
 		}
+
 		write_byte(f, 0);
 
 #ifdef ICONV_OPTION
@@ -1591,7 +1570,6 @@ void send_extra_file_list(int f, int at_least)
 		if (verbose > 3)
 			output_flist(flist);
 
-		dp = F_DIRNODE_P(file);
 		if (DIR_FIRST_CHILD(dp) >= 0) {
 			send_dir_ndx = DIR_FIRST_CHILD(dp);
 			send_dir_depth++;
@@ -2260,20 +2238,18 @@ static void clean_flist(struct file_list *flist, int strip_root)
 		} else
 			j = -1;
 		if (j >= 0) {
-			struct file_struct *fp = flist->sorted[j];
 			int keep, drop;
 			/* If one is a dir and the other is not, we want to
 			 * keep the dir because it might have contents in the
 			 * list. */
-			if (S_ISDIR(file->mode) != S_ISDIR(fp->mode)) {
-				if (S_ISDIR(file->mode))
+			if (S_ISDIR(file->mode)) {
+				struct file_struct *fp = flist->sorted[j];
+				if (!S_ISDIR(fp->mode))
 					keep = i, drop = j;
 				else
 					keep = j, drop = i;
-			} else if (protocol_version < 27)
+			} else
 				keep = j, drop = i;
-			else
-				keep = i, drop = j;
 
 			if (am_sender)
 				flist->sorted[drop]->flags |= FLAG_DUPLICATE;
