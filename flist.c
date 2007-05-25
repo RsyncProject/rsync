@@ -1318,7 +1318,7 @@ static int file_compare(const void *file1, const void *file2)
 			  *(struct file_struct **)file2);
 }
 
-/* The guts of a merge sort algorithm.  This was derived from the GNU C
+/* The guts of a merge-sort algorithm.  This was derived from the glibc
  * version, but I (Wayne) changed the merge code to do less copying and
  * to require only half the amount of temporary memory. */
 static void fsort_tmp(struct file_struct **fp, size_t num,
