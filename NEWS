@@ -94,8 +94,8 @@ Changes since 2.6.9:
     - The file-list sorting algorithm now uses a sort that keeps any same-
       named items in the same order as they were specified.  This allows
       rsync to always ensure that the first of the duplicates is the one
-      that will be included in the copy.  The new sort was also faster than
-      the GNU C version of qsort() (and mergesort() too) in my testing.
+      that will be included in the copy.  The new sort was also faster
+      than the glibc version of qsort() and mergesort() in my testing.
 
     - Rsync now supports the transfer of 64-bit timestamps (time_t values).
 
