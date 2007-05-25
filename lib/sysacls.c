@@ -279,7 +279,6 @@ int sys_acl_set_access_bits(SMB_ACL_ENTRY_T entry, uint32 bits)
 	int rc;
 	if ((rc = acl_get_permset(entry, &permset)) != 0)
 		return rc;
-	acl_clear_perms(permset);
 	*permset = bits & 7;
 	return acl_set_permset(entry, permset);
 }
