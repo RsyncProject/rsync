@@ -28,47 +28,55 @@
 extern int sparse_files;
 
 static char last_byte;
-static int last_sparse;
+static size_t sparse_seek = 0;
 
 int sparse_end(int f)
 {
-	if (last_sparse) {
-		do_lseek(f,-1,SEEK_CUR);
-		return (write(f,&last_byte,1) == 1 ? 0 : -1);
-	}
-	last_sparse = 0;
-	return 0;
+	int ret;
+
+	if (!sparse_seek)
+		return 0;
+
+	do_lseek(f, sparse_seek-1, SEEK_CUR);
+	sparse_seek = 0;
+
+	do {
+		ret = write(f, "", 1);
+	} while (ret < 0 && errno == EINTR);
+
+	return ret <= 0 ? -1 : 0;
 }
 
 
-static int write_sparse(int f,char *buf,size_t len)
+static int write_sparse(int f, char *buf, size_t len)
 {
-	size_t l1=0, l2=0;
+	size_t l1 = 0, l2 = 0;
 	int ret;
 
 	for (l1 = 0; l1 < len && buf[l1] == 0; l1++) {}
 	for (l2 = 0; l2 < len-l1 && buf[len-(l2+1)] == 0; l2++) {}
 
+	/* XXX Riddle me this: why does this function SLOW DOWN when I
+	 * remove the following (unneeded) line?? Core Duo weirdness? */
 	last_byte = buf[len-1];
 
-	if (l1 == len || l2 > 0)
-		last_sparse=1;
-
-	if (l1 > 0) {
-		do_lseek(f,l1,SEEK_CUR);
-	}
+	sparse_seek += l1;
 
 	if (l1 == len)
 		return len;
 
-	ret = write(f, buf + l1, len - (l1+l2));
-	if (ret == -1 || ret == 0)
-		return ret;
-	else if (ret != (int) (len - (l1+l2)))
-		return (l1+ret);
+	if (sparse_seek)
+		do_lseek(f, sparse_seek, SEEK_CUR);
+	sparse_seek = l2;
 
-	if (l2 > 0)
-		do_lseek(f,l2,SEEK_CUR);
+	while ((ret = write(f, buf + l1, len - (l1+l2))) <= 0) {
+		if (ret < 0 && errno == EINTR)
+			continue;
+		return ret;
+	}
+
+	if (ret != (int)(len - (l1+l2)))
+		return l1+ret;
 
 	return len;
 }
