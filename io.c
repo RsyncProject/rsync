@@ -677,7 +677,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 							io_filesfrom_bp = io_filesfrom_buf;
 						else
 							io_filesfrom_bp += l;
-					} else {
+					} else if (errno != EINTR) {
 						/* XXX should we complain? */
 						io_filesfrom_f_out = -1;
 					}
@@ -688,11 +688,13 @@ static int read_timeout(int fd, char *buf, size_t len)
 						     io_filesfrom_buf,
 						     sizeof io_filesfrom_buf);
 					if (l <= 0) {
-						/* Send end-of-file marker */
-						io_filesfrom_buf[0] = '\0';
-						io_filesfrom_buf[1] = '\0';
-						io_filesfrom_buflen = io_filesfrom_lastchar? 2 : 1;
-						io_filesfrom_f_in = -1;
+						if (l == 0 || errno != EINTR) {
+							/* Send end-of-file marker */
+							io_filesfrom_buf[0] = '\0';
+							io_filesfrom_buf[1] = '\0';
+							io_filesfrom_buflen = io_filesfrom_lastchar? 2 : 1;
+							io_filesfrom_f_in = -1;
+						}
 					} else {
 						if (!eol_nulls) {
 							char *s = io_filesfrom_buf + l;
