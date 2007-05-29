@@ -119,6 +119,9 @@ Changes since 2.6.9:
 
     - Improved the use of "const" on pointers.
 
+    - Improved J.W.'s pool_alloc routines to add a way of freeing older
+      sections of a pool's memory.
+
   DEVELOPER RELATED:
 
     - Rsync now has a way of handling protocol-version changes during the
