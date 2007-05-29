@@ -308,6 +308,15 @@ static void flist_expand(struct file_list *flist, int extra)
 		out_of_memory("flist_expand");
 }
 
+static void flist_done_allocating(struct file_list *flist)
+{
+	void *ptr = pool_boundary(flist->file_pool, 8*1024);
+	if (flist->pool_boundary == ptr)
+		flist->pool_boundary = NULL; /* list didn't use any pool memory */
+	else
+		flist->pool_boundary = ptr;
+}
+
 int push_pathname(const char *dir, int len)
 {
 	if (dir == pathname)
@@ -1562,6 +1571,7 @@ void send_extra_file_list(int f, int at_least)
 		clean_flist(flist, 0);
 
 		add_dirs_to_tree(send_dir_ndx, flist, dir_count - dstart);
+		flist_done_allocating(flist);
 
 		file_total += flist->count;
 		future_cnt += flist->count;
@@ -1895,6 +1905,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 	if (inc_recurse) {
 		add_dirs_to_tree(-1, flist, dir_count);
+		flist_done_allocating(flist);
 		if (send_dir_ndx < 0) {
 			write_ndx(f, NDX_FLIST_EOF);
 			flist_eof = 1;
@@ -2001,7 +2012,9 @@ struct file_list *recv_file_list(int f)
 		}
 	}
 
-	if (!inc_recurse && f >= 0)
+	if (inc_recurse)
+		flist_done_allocating(flist);
+	else if (f >= 0)
 		recv_id_list(f, flist);
 
 	clean_flist(flist, relative_paths);
@@ -2137,24 +2150,32 @@ struct file_list *flist_new(int flags, char *msg)
 
 	memset(flist, 0, sizeof flist[0]);
 
-	if (!(flags & FLIST_TEMP)) {
-		if (first_flist) {
-			flist->ndx_start = first_flist->prev->ndx_start
-					 + first_flist->prev->count;
-		}
+	if (flags & FLIST_TEMP) {
+		if (!(flist->file_pool = pool_create(SMALL_EXTENT, 0,
+						out_of_memory, POOL_INTERN)))
+			out_of_memory(msg);
+	} else {
 		/* This is a doubly linked list with prev looping back to
 		 * the end of the list, but the last next pointer is NULL. */
-		if (!first_flist)
+		if (!first_flist) {
+			flist->file_pool = pool_create(NORMAL_EXTENT, 0,
+						out_of_memory, POOL_INTERN);
+			if (!flist->file_pool)
+				out_of_memory(msg);
+
 			first_flist = cur_flist = flist->prev = flist;
-		else {
+		} else {
+			flist->file_pool = first_flist->file_pool;
+
+			flist->ndx_start = first_flist->prev->ndx_start
+					 + first_flist->prev->count;
+
 			flist->prev = first_flist->prev;
 			flist->prev->next = first_flist->prev = flist;
 		}
+		flist->pool_boundary = pool_boundary(flist->file_pool, 0);
 		flist_cnt++;
 	}
-
-	if (!(flist->file_pool = pool_create(FILE_EXTENT, 0, out_of_memory, POOL_INTERN)))
-		out_of_memory(msg);
 
 	return flist;
 }
@@ -2162,9 +2183,9 @@ struct file_list *flist_new(int flags, char *msg)
 /* Free up all elements in a flist. */
 void flist_free(struct file_list *flist)
 {
-	if (!flist->prev)
-		; /* Was FLIST_TEMP dir-list. */
-	else if (flist == flist->prev) {
+	if (!flist->prev) {
+		/* Was FLIST_TEMP dir-list. */
+	} else if (flist == flist->prev) {
 		first_flist = cur_flist = NULL;
 		file_total = 0;
 		flist_cnt = 0;
@@ -2183,7 +2204,11 @@ void flist_free(struct file_list *flist)
 		flist_cnt--;
 	}
 
-	pool_destroy(flist->file_pool);
+	if (!flist->prev || !flist_cnt)
+		pool_destroy(flist->file_pool);
+	else
+		pool_free_old(flist->file_pool, flist->pool_boundary);
+
 	if (flist->sorted && flist->sorted != flist->files)
 		free(flist->sorted);
 	free(flist->files);
