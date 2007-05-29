@@ -9,8 +9,7 @@ struct alloc_pool
 	struct pool_extent	*live;		/* current extent for
 						 * allocations		*/
 	struct pool_extent	*free;		/* unfreed extent list	*/
-	void			(*bomb)();
-						/* function to call if
+	void			(*bomb)();	/* function to call if
 						 * malloc fails		*/
 	int			flags;
 
@@ -33,8 +32,8 @@ struct pool_extent
 };
 
 struct align_test {
-    void *foo;
-    int64 bar;
+	void *foo;
+	int64 bar;
 };
 
 #define MINALIGN	offsetof(struct align_test, bar)
@@ -48,7 +47,7 @@ pool_create(size_t size, size_t quantum, void (*bomb)(const char *), int flags)
 {
 	struct alloc_pool	*pool;
 
-	if (!(pool = (struct alloc_pool*) malloc(sizeof (struct alloc_pool))))
+	if (!(pool = new(struct alloc_pool)))
 		return pool;
 	memset(pool, 0, sizeof (struct alloc_pool));
 
@@ -109,8 +108,9 @@ pool_alloc(alloc_pool_t p, size_t len, const char *bomb)
 		void	*start;
 		size_t	free;
 		size_t	bound;
-		size_t	sqew;
+		size_t	skew;
 		size_t	asize;
+		struct pool_extent *ext;
 
 		if (pool->live) {
 			pool->live->next = pool->free;
@@ -124,25 +124,26 @@ pool_alloc(alloc_pool_t p, size_t len, const char *bomb)
 		if (pool->flags & POOL_APPEND)
 			asize += sizeof (struct pool_extent);
 
-		if (!(start = (void *) malloc(asize)))
+		if (!(start = new_array(char, asize)))
 			goto bomb;
 
 		if (pool->flags & POOL_CLEAR)
-			memset(start, 0, pool->size);
+			memset(start, 0, free);
 
 		if (pool->flags & POOL_APPEND)
-			pool->live = PTR_ADD(start, free);
-		else if (!(pool->live = (struct pool_extent *) malloc(sizeof (struct pool_extent))))
+			ext = PTR_ADD(start, free);
+		else if (!(ext = new(struct pool_extent)))
 			goto bomb;
 		if (pool->flags & POOL_QALIGN && pool->quantum > 1
-		    && (sqew = (size_t)PTR_ADD(start, free) % pool->quantum)) {
-			bound  += sqew;
-			free -= sqew;
+		    && (skew = (size_t)PTR_ADD(start, free) % pool->quantum)) {
+			bound  += skew;
+			free -= skew;
 		}
-		pool->live->start = start;
-		pool->live->free = free;
-		pool->live->bound = bound;
-		pool->live->next = NULL;
+		ext->start = start;
+		ext->free = free;
+		ext->bound = bound;
+		ext->next = NULL;
+		pool->live = ext;
 
 		pool->e_created++;
 	}
@@ -160,12 +161,14 @@ bomb:
 	return NULL;
 }
 
+/* This function allows you to declare memory in the pool that you are done
+ * using.  If you free all the memory in a pool's extent, that extent will
+ * be freed. */
 void
 pool_free(alloc_pool_t p, size_t len, void *addr)
 {
-	struct alloc_pool *pool = (struct alloc_pool *) p;
-	struct pool_extent	*cur;
-	struct pool_extent	*prev;
+	struct alloc_pool *pool = (struct alloc_pool *)p;
+	struct pool_extent *cur, *prev;
 
 	if (!pool)
 		return;
@@ -190,18 +193,22 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 		if (addr == PTR_ADD(cur->start, cur->free)) {
 			if (pool->flags & POOL_CLEAR)
 				memset(addr, 0, len);
-			pool->b_freed += len;
+			cur->free += len;
 		} else
 			cur->bound += len;
 		if (cur->free + cur->bound >= pool->size) {
-			size_t sqew;
+			size_t skew;
 
+			if (pool->flags & POOL_CLEAR) {
+				memset(PTR_ADD(cur->start, cur->free), 0,
+				       pool->size - cur->free);
+			}
 			cur->free = pool->size;
 			cur->bound = 0;
 			if (pool->flags & POOL_QALIGN && pool->quantum > 1
-			    && (sqew = (size_t)PTR_ADD(cur->start, cur->free) % pool->quantum)) {
-				cur->bound += sqew;
-				cur->free -= sqew;
+			    && (skew = (size_t)PTR_ADD(cur->start, cur->free) % pool->quantum)) {
+				cur->bound += skew;
+				cur->free -= skew;
 			}
 		}
 		return;
@@ -229,7 +236,6 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 			free(cur);
 		pool->e_freed++;
 	}
-	return;
 }
 
 #define FDPRINT(label, value) \
@@ -258,8 +264,8 @@ pool_stats(alloc_pool_t p, int fd, int summarize)
 	FDPRINT("  Extents freed:     %12ld\n",		pool->e_freed);
 	FDPRINT("  Alloc count:       %12.0f\n", (double) pool->n_allocated);
 	FDPRINT("  Free Count:        %12.0f\n", (double) pool->n_freed);
-	FDPRINT("  Alloc bytes:       %12.0f\n", (double) pool->b_allocated);
-	FDPRINT("  Free bytes:        %12.0f\n", (double) pool->b_freed);
+	FDPRINT("  Bytes allocated:   %12.0f\n", (double) pool->b_allocated);
+	FDPRINT("  Bytes freed:       %12.0f\n", (double) pool->b_freed);
 
 	if (summarize)
 		return;
