@@ -6,9 +6,7 @@ struct alloc_pool
 {
 	size_t			size;		/* extent size		*/
 	size_t			quantum;	/* allocation quantum	*/
-	struct pool_extent	*live;		/* current extent for
-						 * allocations		*/
-	struct pool_extent	*free;		/* unfreed extent list	*/
+	struct pool_extent	*extents;	/* top extent is "live" */
 	void			(*bomb)();	/* function to call if
 						 * malloc fails		*/
 	int			flags;
@@ -74,13 +72,7 @@ pool_destroy(alloc_pool_t p)
 	if (!pool)
 		return;
 
-	if (pool->live) {
-		cur = pool->live;
-		free(cur->start);
-		if (!(pool->flags & POOL_APPEND))
-			free(cur);
-	}
-	for (cur = pool->free; cur; cur = next) {
+	for (cur = pool->extents; cur; cur = next) {
 		next = cur->next;
 		free(cur->start);
 		if (!(pool->flags & POOL_APPEND))
@@ -104,18 +96,13 @@ pool_alloc(alloc_pool_t p, size_t len, const char *bomb_msg)
 	if (len > pool->size)
 		goto bomb_out;
 
-	if (!pool->live || len > pool->live->free) {
+	if (!pool->extents || len > pool->extents->free) {
 		void	*start;
 		size_t	free;
 		size_t	bound;
 		size_t	skew;
 		size_t	asize;
 		struct pool_extent *ext;
-
-		if (pool->live) {
-			pool->live->next = pool->free;
-			pool->free = pool->live;
-		}
 
 		free = pool->size;
 		bound = 0;
@@ -142,8 +129,8 @@ pool_alloc(alloc_pool_t p, size_t len, const char *bomb_msg)
 		ext->start = start;
 		ext->free = free;
 		ext->bound = bound;
-		ext->next = NULL;
-		pool->live = ext;
+		ext->next = pool->extents;
+		pool->extents = ext;
 
 		pool->e_created++;
 	}
@@ -151,9 +138,9 @@ pool_alloc(alloc_pool_t p, size_t len, const char *bomb_msg)
 	pool->n_allocated++;
 	pool->b_allocated += len;
 
-	pool->live->free -= len;
+	pool->extents->free -= len;
 
-	return PTR_ADD(pool->live->start, pool->live->free);
+	return PTR_ADD(pool->extents->start, pool->extents->free);
 
   bomb_out:
 	if (pool->bomb)
@@ -178,25 +165,20 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 	else if (pool->quantum > 1 && len % pool->quantum)
 		len += pool->quantum - len % pool->quantum;
 
-	if (!addr && pool->live) {
-		pool->live->next = pool->free;
-		pool->free = pool->live;
-		pool->live = NULL;
-		return;
-	}
 	pool->n_freed++;
 	pool->b_freed += len;
 
-	cur = pool->live;
-	if (cur && addr >= cur->start
-	    && addr < PTR_ADD(cur->start, pool->size)) {
-		if (addr == PTR_ADD(cur->start, cur->free)) {
-			if (pool->flags & POOL_CLEAR)
-				memset(addr, 0, len);
-			cur->free += len;
-		} else
-			cur->bound += len;
-		if (cur->free + cur->bound >= pool->size) {
+	for (prev = NULL, cur = pool->extents; cur; prev = cur, cur = cur->next) {
+		if (addr >= cur->start
+		    && addr < PTR_ADD(cur->start, pool->size))
+			break;
+	}
+	if (!cur)
+		return;
+
+	if (!prev) {
+		/* The "live" extent is kept ready for more allocations. */
+		if (cur->free + cur->bound + len >= pool->size) {
 			size_t skew;
 
 			if (pool->flags & POOL_CLEAR) {
@@ -210,10 +192,44 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 				cur->bound += skew;
 				cur->free -= skew;
 			}
+		} else if (addr == PTR_ADD(cur->start, cur->free)) {
+			if (pool->flags & POOL_CLEAR)
+				memset(addr, 0, len);
+			cur->free += len;
+		} else
+			cur->bound += len;
+	} else {
+		cur->bound += len;
+
+		if (cur->free + cur->bound >= pool->size) {
+			prev->next = cur->next;
+			free(cur->start);
+			if (!(pool->flags & POOL_APPEND))
+				free(cur);
+			pool->e_freed++;
+		} else if (prev != pool->extents) {
+			/* Move the extent to be the first non-live extent. */
+			prev->next = cur->next;
+			cur->next = pool->extents->next;
+			pool->extents->next = cur;
 		}
-		return;
 	}
-	for (prev = NULL, cur = pool->free; cur; prev = cur, cur = cur->next) {
+}
+
+/* This allows you to declare that the given address marks the edge of some
+ * pool memory that is no longer needed.  Any extents that hold only data
+ * older than the boundary address are freed.  NOTE: You MUST NOT USE BOTH
+ * pool_free() and pool_free_old() on the same pool!! */
+void
+pool_free_old(alloc_pool_t p, void *addr)
+{
+	struct alloc_pool *pool = (struct alloc_pool *)p;
+	struct pool_extent *cur, *prev, *next;
+
+	if (!pool || !addr)
+		return;
+
+	for (prev = NULL, cur = pool->extents; cur; prev = cur, cur = cur->next) {
 		if (addr >= cur->start
 		    && addr < PTR_ADD(cur->start, pool->size))
 			break;
@@ -221,21 +237,60 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 	if (!cur)
 		return;
 
-	if (prev) {
-		prev->next = cur->next;
-		cur->next = pool->free;
-		pool->free = cur;
+	if (addr == PTR_ADD(cur->start, cur->free)) {
+		if (prev) {
+			prev->next = NULL;
+			next = cur;
+		} else {
+			size_t skew;
+
+			/* The most recent live extent can just be reset. */
+			if (pool->flags & POOL_CLEAR)
+				memset(addr, 0, pool->size - cur->free);
+			cur->free = pool->size;
+			cur->bound = 0;
+			if (pool->flags & POOL_QALIGN && pool->quantum > 1
+			    && (skew = (size_t)PTR_ADD(cur->start, cur->free) % pool->quantum)) {
+				cur->bound += skew;
+				cur->free -= skew;
+			}
+			next = cur->next;
+		}
+	} else {
+		next = cur->next;
+		cur->next = NULL;
 	}
-	cur->bound += len;
 
-	if (cur->free + cur->bound >= pool->size) {
-		pool->free = cur->next;
-
+	while ((cur = next) != NULL) {
+		next = cur->next;
 		free(cur->start);
 		if (!(pool->flags & POOL_APPEND))
 			free(cur);
 		pool->e_freed++;
 	}
+}
+
+/* If the current extent doesn't have "len" free space in it, mark it as full
+ * so that the next alloc will start a new extent.  If len is (size_t)-1, this
+ * bump will always occur.  The function returns a boundary address that can
+ * be used with pool_free_old(), or a NULL if no memory is allocated. */
+void *
+pool_boundary(alloc_pool_t p, size_t len)
+{
+	struct alloc_pool *pool = (struct alloc_pool *)p;
+	struct pool_extent *cur;
+
+	if (!pool || !pool->extents)
+		return NULL;
+
+	cur = pool->extents;
+
+	if (cur->free < len) {
+		cur->bound += cur->free;
+		cur->free = 0;
+	}
+
+	return PTR_ADD(cur->start, cur->free);
 }
 
 #define FDPRINT(label, value) \
@@ -270,16 +325,11 @@ pool_stats(alloc_pool_t p, int fd, int summarize)
 	if (summarize)
 		return;
 
-	if (!pool->live && !pool->free)
+	if (!pool->extents)
 		return;
 
 	write(fd, "\n", 1);
 
-	if (pool->live)
-		FDEXTSTAT(pool->live);
-	strlcpy(buf, "   FREE    BOUND\n", sizeof buf);
-	write(fd, buf, strlen(buf));
-
-	for (cur = pool->free; cur; cur = cur->next)
+	for (cur = pool->extents; cur; cur = cur->next)
 		FDEXTSTAT(cur);
 }

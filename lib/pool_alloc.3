@@ -28,7 +28,7 @@ See \fB\\$1\fP in \fB\\$2\fP for details.
 ..
 .TH POOL_ALLOC 3
 .SH NAME
-pool_alloc, pool_free, pool_talloc, pool_tfree, pool_create, pool_destroy
+pool_alloc, pool_free, pool_free_old, pool_talloc, pool_tfree, pool_create, pool_destroy, pool_boundary
 \- Allocate and free memory in managed allocation pools.
 .SH SYNOPSIS
 .B #include "pool_alloc.h"
@@ -41,9 +41,13 @@ pool_alloc, pool_free, pool_talloc, pool_tfree, pool_create, pool_destroy
 
 \fBvoid pool_free(struct alloc_pool *\fIpool\fB, size_t \fIsize\fB, void *\fIaddr\fB);
 
+\fBvoid pool_free_old(struct alloc_pool *\fIpool\fB, void *\fIaddr\fB);
+
 \fBvoid *pool_talloc(struct alloc_pool *\fIpool\fB, \fItype\fB), int \fIcount\fB, char *\fImsg\fB);
 
 \fBvoid pool_tfree(struct alloc_pool *\fIpool\fB, \fItype\fB, int \fIcount\fB, void *\fIaddr\fB);
+
+\fBvoid pool_boundary(struct alloc_pool *\fIpool\fB, sise_t \fIsize\fB);
 .SH DESCRIPTION
 .P
 The pool allocation routines use
@@ -58,16 +62,17 @@ Instead, each extent tracks the total free memory within the
 extent.  Each extent can either be used to allocate memory
 or to manage the freeing of memory within that extent.
 When an extent has less free memory than a given
-allocation request (or at the request of the user),
-memory within that extent ceases to be used for allocation,
-and a new extent is added to the pool.
+allocation request, the current extent ceases to be used
+for allocation.  See also the
+.B pool_boundary()
+function.
 .P
 This form of memory management is suited to large numbers of small
 related allocations that are held for a while
 and then freed as a group.
 Because the
 underlying allocations are done in large contiguous extents,
-when an extent is freed, it releases a large enough
+when an extent is freed, it can release a large enough
 contiguous block of memory to allow the memory to be returned
 to the OS for use by whatever program needs it.
 You can allocate from one or more memory pools and/or
@@ -168,6 +173,38 @@ is
 no memory will be freed, but subsequent allocations will come
 from a new extent.
 .P
+.B pool_free_old()
+takes a boundary
+.I addr
+value that was returned by
+.B pool_boundary()
+and frees up any extents in the
+.I pool
+that have data allocated from that point backward in time.
+NOTE: you must NOT mix calls to both
+.B pool_free
+and
+.B pool_free_old
+on the same pool!
+.P
+.B pool_boundary()
+asks for a boundary value that can be sent to 
+.B pool_free_old()
+at a later time to free up all memory allocated prior to a particular
+moment in time.
+If the extent that holds the boundary point has allocations from after the
+boundary point, it will not be freed until a future
+.B pool_free_old()
+call encompasses the entirety of the extent's data.
+If
+.I len
+is non-zero, the call will also check if the active extent has at least
+that much free memory available in it, and if not, it will mark the
+extent as inactive, forcing a new extent to be used for future allocations.
+(You can specify -1 for
+.I len
+if you want to force a new extent to start.)
+.P
 .B pool_talloc()
 is a macro that takes a
 .I type
@@ -199,7 +236,12 @@ will normally require casting to the desired type but
 will returns a pointer of the requested
 .IR type .
 .P
+.B pool_boundary()
+returns a pointer that should only be used in a call to
+.BR pool_free_old() .
+.P
 .BR pool_free() ,
+.BR pool_free_old() ,
 .B pool_tfree()
 and
 .B pool_destroy()
