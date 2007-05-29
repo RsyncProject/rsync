@@ -39,7 +39,7 @@ pool_alloc, pool_free, pool_talloc, pool_tfree, pool_create, pool_destroy
 
 \fBvoid *pool_alloc(struct alloc_pool *\fIpool\fB, size_t \fIsize\fB, char *\fImsg\fB);
 
-\fBvoid pool_free(struct alloc_pool *\fIpool\fB, sise_t \fIsize\fB, void *\fIaddr\fB);
+\fBvoid pool_free(struct alloc_pool *\fIpool\fB, size_t \fIsize\fB, void *\fIaddr\fB);
 
 \fBvoid *pool_talloc(struct alloc_pool *\fIpool\fB, \fItype\fB), int \fIcount\fB, char *\fImsg\fB);
 
@@ -49,32 +49,30 @@ pool_alloc, pool_free, pool_talloc, pool_tfree, pool_create, pool_destroy
 The pool allocation routines use
 .B malloc()
 for underlying memory management.
-What allocation pools do is cause
-memory within a given pool to be in large contigious blocks
-(called extents) that when freed will be reusable.  Unlike
-.B malloc()
+What allocation pools do is cause memory within a given pool
+to be allocated in large contiguous blocks
+(called extents) that will be reusable when freed.  Unlike
+.BR malloc() ,
 the allocations are not managed individually.
-Instead each extent tracks the total free memory within the
+Instead, each extent tracks the total free memory within the
 extent.  Each extent can either be used to allocate memory
 or to manage the freeing of memory within that extent.
 When an extent has less free memory than a given
-allocation request or when the first request to free
-memory within that extent is received the extent ceases to
-be used for allocation.
+allocation request (or at the request of the user),
+memory within that extent ceases to be used for allocation,
+and a new extent is added to the pool.
 .P
 This form of memory management is suited to large numbers of small
 related allocations that are held for a while
 and then freed as a group.
 Because the
-underlying allocations are done in large contigious extents
-when an extent is freed it releases a large enough
-contigious block of memory to be useful to subsequent
+underlying allocations are done in large contiguous extents,
+when an extent is freed, it releases a large enough
+contiguous block of memory to allow the memory to be returned
+to the OS for use by whatever program needs it.
+You can allocate from one or more memory pools and/or
 .B malloc()
-and
-.B pool_alloc()
-calls even if allocations from other pools or from
-.B malloc()
-are made between allocations from a given pool.
+all at the same time without interfering with how pools work.
 .P
 .B pool_create()
 Creates an allocation pool for subsequent calls to the pool
@@ -90,22 +88,32 @@ Specifying
 .B 0
 for
 .I quantum
-Will produce a quantum that should meet maximal allignment
+will produce a quantum that should meet maximal alignment
 on most platforms.
-If the
+If
 .B POOL_QALIGN
-.I flag
-is set allocations will be aligned to addresses that are a
+is set in the
+.IR flags ,
+allocations will be aligned to addresses that are a
 multiple of
 .IR quantum .
-If the
+If
 .B POOL_CLEAR
-.I flag
-is set all allocations from the pool will be zero filled.
+is set in the
+.IR flags ,
+all allocations from the pool will be initialized to zeros.
+You may specify a
+.B NULL
+for the
+.I bomb
+function pointer if you don't wish to use it.  (See the
+.B pool_alloc()
+function for how it is used.)
 .P
 .B pool_destroy()
-destroys an allocation pool and frees all memory allocated
-in that pool.
+destroys an allocation
+.I pool
+and frees all its associated memory.
 .P
 .B pool_alloc()
 allocates
@@ -115,57 +123,65 @@ bytes from the specified
 If
 .I size
 is
-.B 0
+.BR 0 ,
 .I quantum
-bytes will be freed.
-If the requested memory cannot be allocated
-.B pool_alloc()
-will call
+bytes will be allocated.
+If the pool has been created with
+.BR POOL_QALIGN ,
+every chunk of memory that is returned will be suitably aligned.
+You can use this with the default
+.I quantum
+size to ensure that all memory can store a variable of any type.
+If the requested memory cannot be allocated, the
 .I bomb()
-function, if defined, with
+function will be called with
 .I msg
-as it's sole argument and
+as its sole argument (if the function was defined at the time
+the pool was created), and then a
 .B NULL
-will be returned.
+address is returned (assuming that the bomb function didn't exit).
 .P
 .B pool_free()
 frees
 .I size
-bytes pointed to by
+bytes pointed to by an
 .I addr
-previously allocated in the specified
+that was previously allocated in the specified
 .IR pool .
-The memory freed within an extent will not be reusable until
-all of the memory in that extent has been freed but 
-depending on the order in which the
-allocations are freed some extents may be released for reuse
-while others are still in use.
 If
 .I size
 is
-.B 0
+.BR 0 ,
 .I quantum
 bytes will be freed.
+The memory freed within an extent will not be reusable until
+all of the memory in that extent has been freed with one
+exception: the most recent pool allocation may be freed back
+into the pool prior to making any further allocations.
+If enough free calls are made to indicate that an extent has no
+remaining allocated objects (as computed by the total freed size for
+an extent), its memory will be completely freed back to the system.
 If
 .I addr
 is
-.B 0
-no memory will be freed but subsequent allocations will come
+.BR 0 ,
+no memory will be freed, but subsequent allocations will come
 from a new extent.
 .P
 .B pool_talloc()
-is a macro that take a
+is a macro that takes a
 .I type
-and
+and a
 .I count
-instead of
-.I size
-and will cast the return value to the correct type.
+instead of a
+.IR size .
+It casts the return value to the correct pointer type.
 .P
 .B pool_tfree
-is a macro to free memory previously allocated in the
-specified
-.IR pool .
+is a macro that calls
+.B pool_free
+on memory that was allocated by
+.BR pool_talloc() .
 .SH RETURN VALUE
 .B pool_create()
 returns a pointer to
@@ -176,9 +192,6 @@ and
 .B pool_talloc()
 return pointers to the allocated memory,
 or NULL if the request fails.
-For each extent so long as no allocations are smaller than varaible
-allignment requirements this pointer will be suitably
-alligned for any kind of variable.
 The return type of
 .B pool_alloc()
 will normally require casting to the desired type but
