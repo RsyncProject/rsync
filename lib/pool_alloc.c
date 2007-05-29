@@ -90,7 +90,7 @@ pool_destroy(alloc_pool_t p)
 }
 
 void *
-pool_alloc(alloc_pool_t p, size_t len, const char *bomb)
+pool_alloc(alloc_pool_t p, size_t len, const char *bomb_msg)
 {
 	struct alloc_pool *pool = (struct alloc_pool *) p;
 	if (!pool)
@@ -102,7 +102,7 @@ pool_alloc(alloc_pool_t p, size_t len, const char *bomb)
 		len += pool->quantum - len % pool->quantum;
 
 	if (len > pool->size)
-		goto bomb;
+		goto bomb_out;
 
 	if (!pool->live || len > pool->live->free) {
 		void	*start;
@@ -125,7 +125,7 @@ pool_alloc(alloc_pool_t p, size_t len, const char *bomb)
 			asize += sizeof (struct pool_extent);
 
 		if (!(start = new_array(char, asize)))
-			goto bomb;
+			goto bomb_out;
 
 		if (pool->flags & POOL_CLEAR)
 			memset(start, 0, free);
@@ -133,7 +133,7 @@ pool_alloc(alloc_pool_t p, size_t len, const char *bomb)
 		if (pool->flags & POOL_APPEND)
 			ext = PTR_ADD(start, free);
 		else if (!(ext = new(struct pool_extent)))
-			goto bomb;
+			goto bomb_out;
 		if (pool->flags & POOL_QALIGN && pool->quantum > 1
 		    && (skew = (size_t)PTR_ADD(start, free) % pool->quantum)) {
 			bound  += skew;
@@ -155,9 +155,9 @@ pool_alloc(alloc_pool_t p, size_t len, const char *bomb)
 
 	return PTR_ADD(pool->live->start, pool->live->free);
 
-bomb:
+  bomb_out:
 	if (pool->bomb)
-		(*pool->bomb)(bomb);
+		(*pool->bomb)(bomb_msg);
 	return NULL;
 }
 
