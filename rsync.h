@@ -665,8 +665,8 @@ extern int preserve_xattrs;
  * (when they happen). Smaller sizes increase the chance of
  * freed allocations freeing whole extents.
  */
-#define FILE_EXTENT	(256 * 1024)
-#define HLINK_EXTENT	(128 * 1024)
+#define NORMAL_EXTENT	(256 * 1024)
+#define SMALL_EXTENT	(128 * 1024)
 
 #define FLIST_TEMP	(1<<1)
 
@@ -674,6 +674,7 @@ struct file_list {
 	struct file_list *next, *prev;
 	struct file_struct **files, **sorted;
 	alloc_pool_t file_pool;
+	void *pool_boundary;
 	int count, malloced;
 	int low, high; /* 0-relative index values excluding empties */
 	int ndx_start; /* the start offset for inc_recurse mode */
