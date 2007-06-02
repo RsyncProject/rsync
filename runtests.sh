@@ -181,12 +181,15 @@ else
     echo "    preserve_scratch=no"
 fi    
 
-# Check if setfacl is around and if it supports the -k or -s option.
-if setfacl --help 2>&1 | grep ' -k,\|\[-[a-z]*k' >/dev/null; then
+# Check if setacl/setfacl is around and if it supports the -k or -s option.
+if setacl -k u::7,g::5,o:5 testsuite 2>/dev/null; then
+    setfacl_nodef='setacl -k'
+elif setfacl --help 2>&1 | grep ' -k,\|\[-[a-z]*k' >/dev/null; then
     setfacl_nodef='setfacl -k'
 elif setfacl -s u::7,g::5,o:5 testsuite 2>/dev/null; then
     setfacl_nodef='setfacl -s u::7,g::5,o:5'
 else
+    # The "true" command runs successfully, but does nothing.
     setfacl_nodef=true
 fi
 
