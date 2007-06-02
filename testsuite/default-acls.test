@@ -55,7 +55,7 @@ umask 0077
 testit da777 u::7,g::7,o:7 rw-rw-rw- rwxrwxrwx
 testit da775 u::7,g::7,o:5 rw-rw-r-- rwxrwxr-x
 testit da750 u::7,g::5,o:0 rw-r----- rwxr-x---
-testit da770mask u::7,u:0:7,g::0,m:7,o:0 rw-rw---- rwxrwx---
+testit da750mask u::7,u:0:7,g::7,m:5,o:0 rw-r----- rwxr-x---
 testit noda1 '' rw------- rwx------
 umask 0000
 testit noda2 '' rw-rw-rw- rwxrwxrwx
