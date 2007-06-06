@@ -226,14 +226,8 @@ pool_free_old(alloc_pool_t p, void *addr)
 	struct alloc_pool *pool = (struct alloc_pool *)p;
 	struct pool_extent *cur, *prev, *next;
 
-	if (!pool)
+	if (!pool || !addr)
 		return;
-
-	if (!addr) {
-		if (!pool->extents)
-			return;
-		addr = PTR_ADD(pool->extents->start, pool->extents->free);
-	}
 
 	for (prev = NULL, cur = pool->extents; cur; prev = cur, cur = cur->next) {
 		if (addr >= cur->start
