@@ -30,6 +30,7 @@ extern int am_sender;
 extern int am_generator;
 extern int read_only;
 extern int list_only;
+extern int preserve_xattrs;
 extern int checksum_seed;
 
 #define RSYNC_XAL_INITIAL 5
@@ -62,7 +63,6 @@ extern int checksum_seed;
 #define RPRE_LEN ((int)sizeof RSYNC_PREFIX - 1)
 
 #define XSTAT_ATTR RSYNC_PREFIX "%stat"
-#define XSTAT_LEN ((int)sizeof XSTAT_ATTR - 1)
 
 typedef struct {
 	char *datum, *name;
@@ -223,8 +223,9 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 			continue;
 #endif
 
-		if (am_root < 0 && name_len == XSTAT_LEN + 1
-		 && name[RPRE_LEN] == '%' && strcmp(name, XSTAT_ATTR) == 0)
+		/* No rsync.%FOO attributes are copied w/o 2 -X options. */
+		if (preserve_xattrs < 2 && name_len > RPRE_LEN
+		 && name[RPRE_LEN] == '%' && HAS_PREFIX(name, RSYNC_PREFIX))
 			continue;
 
 		datum_len = name_len; /* Pass extra size to get_xattr_data() */
@@ -636,8 +637,9 @@ void receive_xattr(struct file_struct *file, int f)
 			continue;
 		}
 #endif
-		if (am_root < 0 && name_len == XSTAT_LEN + 1
-		 && name[RPRE_LEN] == '%' && strcmp(name, XSTAT_ATTR) == 0) {
+		/* No rsync.%FOO attributes are copied w/o 2 -X options. */
+		if (preserve_xattrs < 2 && name_len > RPRE_LEN
+		 && name[RPRE_LEN] == '%' && HAS_PREFIX(name, RSYNC_PREFIX)) {
 			free(ptr);
 			continue;
 		}

@@ -1186,7 +1186,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 
 		case 'X':
 #ifdef SUPPORT_XATTRS
-			preserve_xattrs = 1;
+			preserve_xattrs++;
 			preserve_perms = 1;
 			break;
 #else
@@ -1677,8 +1677,11 @@ void server_options(char **args,int *argc)
 		argstr[x++] = 'A';
 #endif
 #ifdef SUPPORT_XATTRS
-	if (preserve_xattrs)
+	if (preserve_xattrs) {
 		argstr[x++] = 'X';
+		if (preserve_xattrs > 1)
+			argstr[x++] = 'X';
+	}
 #endif
 	if (recurse)
 		argstr[x++] = 'r';
