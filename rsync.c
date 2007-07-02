@@ -41,8 +41,8 @@ extern int am_generator;
 extern int am_starting_up;
 extern int allow_8bit_chars;
 extern int protocol_version;
-extern int preserve_uid;
-extern int preserve_gid;
+extern int uid_ndx;
+extern int gid_ndx;
 extern int inc_recurse;
 extern int inplace;
 extern int flist_eof;
@@ -326,8 +326,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, statx *sxp,
 			updated = 1;
 	}
 
-	change_uid = am_root && preserve_uid && sxp->st.st_uid != (uid_t)F_OWNER(file);
-	change_gid = preserve_gid && !(file->flags & FLAG_SKIP_GROUP)
+	change_uid = am_root && uid_ndx && sxp->st.st_uid != (uid_t)F_OWNER(file);
+	change_gid = gid_ndx && !(file->flags & FLAG_SKIP_GROUP)
 		  && sxp->st.st_gid != (gid_t)F_GROUP(file);
 #if !defined HAVE_LCHOWN && !defined CHOWN_MODIFIES_SYMLINK
 	if (S_ISLNK(sxp->st.st_mode))

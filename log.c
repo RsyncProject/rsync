@@ -34,8 +34,8 @@ extern int msg_fd_out;
 extern int allow_8bit_chars;
 extern int protocol_version;
 extern int preserve_times;
-extern int preserve_uid;
-extern int preserve_gid;
+extern int uid_ndx;
+extern int gid_ndx;
 extern int stdout_format_has_i;
 extern int stdout_format_has_o_or_i;
 extern int logfile_format_has_i;
@@ -484,11 +484,11 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 		case 'U':
 			strlcat(fmt, "u", sizeof fmt);
 			snprintf(buf2, sizeof buf2, fmt,
-				 preserve_uid ? F_OWNER(file) : 0);
+				 uid_ndx ? F_OWNER(file) : 0);
 			n = buf2;
 			break;
 		case 'G':
-			if (!preserve_gid || file->flags & FLAG_SKIP_GROUP)
+			if (!gid_ndx || file->flags & FLAG_SKIP_GROUP)
 				n = "DEFAULT";
 			else {
 				strlcat(fmt, "u", sizeof fmt);

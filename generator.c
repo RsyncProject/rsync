@@ -42,10 +42,10 @@ extern int preserve_devices;
 extern int preserve_specials;
 extern int preserve_hard_links;
 extern int preserve_perms;
-extern int preserve_uid;
-extern int preserve_gid;
 extern int preserve_times;
 extern int omit_dir_times;
+extern int uid_ndx;
+extern int gid_ndx;
 extern int delete_mode;
 extern int delete_before;
 extern int delete_during;
@@ -521,10 +521,10 @@ int unchanged_attrs(const char *fname, struct file_struct *file, statx *sxp)
 	if (preserve_perms && !BITS_EQUAL(sxp->st.st_mode, file->mode, CHMOD_BITS))
 		return 0;
 
-	if (am_root && preserve_uid && sxp->st.st_uid != (uid_t)F_OWNER(file))
+	if (am_root && uid_ndx && sxp->st.st_uid != (uid_t)F_OWNER(file))
 		return 0;
 
-	if (preserve_gid && !(file->flags & FLAG_SKIP_GROUP) && sxp->st.st_gid != (gid_t)F_GROUP(file))
+	if (gid_ndx && !(file->flags & FLAG_SKIP_GROUP) && sxp->st.st_gid != (gid_t)F_GROUP(file))
 		return 0;
 
 #ifdef SUPPORT_ACLS
@@ -565,9 +565,9 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 			iflags |= ITEM_REPORT_TIME;
 		if (!BITS_EQUAL(sxp->st.st_mode, file->mode, CHMOD_BITS))
 			iflags |= ITEM_REPORT_PERMS;
-		if (preserve_uid && am_root && (uid_t)F_OWNER(file) != sxp->st.st_uid)
+		if (uid_ndx && am_root && (uid_t)F_OWNER(file) != sxp->st.st_uid)
 			iflags |= ITEM_REPORT_OWNER;
-		if (preserve_gid && !(file->flags & FLAG_SKIP_GROUP)
+		if (gid_ndx && !(file->flags & FLAG_SKIP_GROUP)
 		    && sxp->st.st_gid != (gid_t)F_GROUP(file))
 			iflags |= ITEM_REPORT_GROUP;
 #ifdef SUPPORT_ACLS

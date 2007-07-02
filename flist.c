@@ -50,8 +50,8 @@ extern int preserve_links;
 extern int preserve_hard_links;
 extern int preserve_devices;
 extern int preserve_specials;
-extern int preserve_uid;
-extern int preserve_gid;
+extern int uid_ndx;
+extern int gid_ndx;
 extern int relative_paths;
 extern int implied_dirs;
 extern int file_extra_cnt;
@@ -414,24 +414,24 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 		}
 	} else if (protocol_version < 28)
 		rdev = MAKEDEV(0, 0);
-	if (preserve_uid) {
+	if (uid_ndx) {
 		if ((uid_t)F_OWNER(file) == uid && *lastname)
 			flags |= XMIT_SAME_UID;
 		else {
 			uid = F_OWNER(file);
-			if (preserve_uid && !numeric_ids) {
+			if (uid_ndx && !numeric_ids) {
 				user_name = add_uid(uid);
 				if (inc_recurse && user_name)
 					flags |= XMIT_USER_NAME_FOLLOWS;
 			}
 		}
 	}
-	if (preserve_gid) {
+	if (gid_ndx) {
 		if ((gid_t)F_GROUP(file) == gid && *lastname)
 			flags |= XMIT_SAME_GID;
 		else {
 			gid = F_GROUP(file);
-			if (preserve_gid && !numeric_ids) {
+			if (gid_ndx && !numeric_ids) {
 				group_name = add_gid(gid);
 				if (inc_recurse && group_name)
 					flags |= XMIT_GROUP_NAME_FOLLOWS;
@@ -513,7 +513,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 	}
 	if (!(flags & XMIT_SAME_MODE))
 		write_int(f, to_wire_mode(mode));
-	if (preserve_uid && !(flags & XMIT_SAME_UID)) {
+	if (uid_ndx && !(flags & XMIT_SAME_UID)) {
 		if (protocol_version < 30)
 			write_int(f, uid);
 		else {
@@ -525,7 +525,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 			}
 		}
 	}
-	if (preserve_gid && !(flags & XMIT_SAME_GID)) {
+	if (gid_ndx && !(flags & XMIT_SAME_GID)) {
 		if (protocol_version < 30)
 			write_int(f, gid);
 		else {
@@ -701,9 +701,9 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		file_length = F_LENGTH(first);
 		modtime = first->modtime;
 		mode = first->mode;
-		if (preserve_uid)
+		if (uid_ndx)
 			uid = F_OWNER(first);
-		if (preserve_gid)
+		if (gid_ndx)
 			gid = F_GROUP(first);
 		if ((preserve_devices && IS_DEVICE(mode))
 		 || (preserve_specials && IS_SPECIAL(mode))) {
@@ -739,7 +739,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (chmod_modes && !S_ISLNK(mode))
 		mode = tweak_mode(mode, chmod_modes);
 
-	if (preserve_uid && !(xflags & XMIT_SAME_UID)) {
+	if (uid_ndx && !(xflags & XMIT_SAME_UID)) {
 		if (protocol_version < 30)
 			uid = (uid_t)read_int(f);
 		else {
@@ -750,7 +750,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 				uid = match_uid(uid);
 		}
 	}
-	if (preserve_gid && !(xflags & XMIT_SAME_GID)) {
+	if (gid_ndx && !(xflags & XMIT_SAME_GID)) {
 		if (protocol_version < 30)
 			gid = (gid_t)read_int(f);
 		else {
@@ -857,9 +857,9 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		OPT_EXTRA(file, 0)->unum = (uint32)(file_length >> 32);
 	}
 	file->mode = mode;
-	if (preserve_uid)
+	if (uid_ndx)
 		F_OWNER(file) = uid;
-	if (preserve_gid) {
+	if (gid_ndx) {
 		F_GROUP(file) = gid;
 		file->flags |= gid_flags;
 	}
@@ -1178,9 +1178,9 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		OPT_EXTRA(file, 0)->unum = (uint32)(st.st_size >> 32);
 	}
 	file->mode = st.st_mode;
-	if (preserve_uid)
+	if (uid_ndx)
 		F_OWNER(file) = st.st_uid;
-	if (preserve_gid)
+	if (gid_ndx)
 		F_GROUP(file) = st.st_gid;
 
 	if (basename != thisname)
@@ -1209,9 +1209,9 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			file->modtime = st2.st_mtime;
 			file->len32 = 0;
 			file->mode = st2.st_mode;
-			if (preserve_uid)
+			if (uid_ndx)
 				F_OWNER(file) = st2.st_uid;
-			if (preserve_gid)
+			if (gid_ndx)
 				F_GROUP(file) = st2.st_gid;
 		} else
 			file->mode = save_mode;
@@ -2400,12 +2400,12 @@ static void output_flist(struct file_list *flist)
 		who, flist->ndx_start, flist->count, flist->low, flist->high);
 	for (i = 0; i < flist->count; i++) {
 		file = flist->sorted[i];
-		if ((am_root || am_sender) && preserve_uid) {
+		if ((am_root || am_sender) && uid_ndx) {
 			snprintf(uidbuf, sizeof uidbuf, " uid=%u",
 				 F_OWNER(file));
 		} else
 			*uidbuf = '\0';
-		if (preserve_gid) {
+		if (gid_ndx) {
 			static char parens[] = "(\0)\0\0\0";
 			char *pp = parens + (file->flags & FLAG_SKIP_GROUP ? 0 : 3);
 			snprintf(gidbuf, sizeof gidbuf, " gid=%s%u%s",
