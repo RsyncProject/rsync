@@ -28,6 +28,7 @@ int human_readable = 0;
 int module_dirlen = 0;
 mode_t orig_umask = 002;
 char *partial_dir;
+char *module_dir;
 struct filter_list_struct server_filter_list;
 
  void rprintf(UNUSED(enum logcode code), const char *format, ...)
@@ -71,11 +72,6 @@ struct filter_list_struct server_filter_list;
  BOOL lp_use_chroot(UNUSED(int mod))
 {
 	return 0;
-}
-
- char *lp_path(UNUSED(int mod))
-{
-	return NULL;
 }
 
  const char *who_am_i(void)

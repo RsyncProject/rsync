@@ -28,6 +28,7 @@ extern int module_id;
 extern int modify_window;
 extern int relative_paths;
 extern int human_readable;
+extern char *module_dir;
 extern unsigned int module_dirlen;
 extern mode_t orig_umask;
 extern char *partial_dir;
@@ -749,7 +750,7 @@ unsigned int clean_fname(char *name, BOOL collapse_dot_dot)
  * rootdir will be ignored to avoid expansion of the string.
  *
  * The rootdir string contains a value to use in place of a leading slash.
- * Specify NULL to get the default of lp_path(module_id).
+ * Specify NULL to get the default of "module_dir".
  *
  * The depth var is a count of how many '..'s to allow at the start of the
  * path.  If symlink is set, combine its value with the "p" value to get
@@ -778,7 +779,7 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth,
 		int plen = strlen(p);
 		if (*p == '/') {
 			if (!rootdir)
-				rootdir = lp_path(module_id);
+				rootdir = module_dir;
 			rlen = strlen(rootdir);
 			depth = 0;
 			p++;
@@ -883,8 +884,10 @@ int push_dir(const char *dir, int set_path_only)
 	if (len == 1 && *dir == '.')
 		return 1;
 
-	if ((*dir == '/' ? len : curr_dir_len + 1 + len) >= sizeof curr_dir)
+	if ((*dir == '/' ? len : curr_dir_len + 1 + len) >= sizeof curr_dir) {
+		errno = ENAMETOOLONG;
 		return 0;
+	}
 
 	if (!set_path_only && chdir(dir))
 		return 0;
