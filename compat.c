@@ -56,6 +56,9 @@ extern char *partial_dir;
 extern char *dest_option;
 extern struct filter_list_struct filter_list;
 
+/* These index values are for the file-list's extra-attribute array. */
+int uid_ndx, gid_ndx, acls_ndx, xattrs_ndx;
+
 /* The server makes sure that if either side only supports a pre-release
  * version of a protocol, that both sides must speak a compatible version
  * of that protocol for it to be advertised as available. */
@@ -92,13 +95,13 @@ void setup_protocol(int f_out,int f_in)
 	else
 		file_extra_cnt++;
 	if (preserve_uid)
-		preserve_uid = ++file_extra_cnt;
+		uid_ndx = ++file_extra_cnt;
 	if (preserve_gid)
-		preserve_gid = ++file_extra_cnt;
+		gid_ndx = ++file_extra_cnt;
 	if (preserve_acls && !am_sender)
-		preserve_acls = ++file_extra_cnt;
+		acls_ndx = ++file_extra_cnt;
 	if (preserve_xattrs)
-		preserve_xattrs = ++file_extra_cnt;
+		xattrs_ndx = ++file_extra_cnt;
 
 	if (remote_protocol == 0) {
 		if (am_server && !local_server)

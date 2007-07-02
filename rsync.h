@@ -580,10 +580,10 @@ struct file_struct {
 };
 
 extern int file_extra_cnt;
-extern int preserve_uid;
-extern int preserve_gid;
-extern int preserve_acls;
-extern int preserve_xattrs;
+extern int uid_ndx;
+extern int gid_ndx;
+extern int acls_ndx;
+extern int xattrs_ndx;
 
 #define FILE_STRUCT_LEN (offsetof(struct file_struct, basename))
 #define EXTRA_LEN (sizeof (union file_extras))
@@ -614,10 +614,10 @@ extern int preserve_xattrs;
 #define F_DEPTH(f) REQ_EXTRA(f, 1)->num
 
 /* When the associated option is on, all entries will have these present: */
-#define F_OWNER(f) REQ_EXTRA(f, preserve_uid)->unum
-#define F_GROUP(f) REQ_EXTRA(f, preserve_gid)->unum
-#define F_ACL(f) REQ_EXTRA(f, preserve_acls)->num
-#define F_XATTR(f) REQ_EXTRA(f, preserve_xattrs)->num
+#define F_OWNER(f) REQ_EXTRA(f, uid_ndx)->unum
+#define F_GROUP(f) REQ_EXTRA(f, gid_ndx)->unum
+#define F_ACL(f) REQ_EXTRA(f, acls_ndx)->num
+#define F_XATTR(f) REQ_EXTRA(f, xattrs_ndx)->num
 #define F_NDX(f) REQ_EXTRA(f, ic_ndx)->num
 
 /* These items are per-entry optional and mutally exclusive: */
