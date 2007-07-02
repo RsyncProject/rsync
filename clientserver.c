@@ -51,13 +51,16 @@ extern char *files_from;
 extern char *tmpdir;
 extern struct chmod_mode_struct *chmod_modes;
 extern struct filter_list_struct server_filter_list;
+extern char curr_dir[];
 
 char *auth_user;
 int read_only = 0;
 int module_id = -1;
 struct chmod_mode_struct *daemon_chmod_modes;
 
-/* Length of lp_path() string when in daemon mode & not chrooted, else 0. */
+/* module_dirlen is the length of the module_dir string when in daemon
+ * mode, not chrooted, and the path is not "/"; otherwise 0. */
+char *module_dir = NULL;
 unsigned int module_dirlen = 0;
 
 #ifdef HAVE_SIGACTION
@@ -368,11 +371,22 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	/* TODO: Perhaps take a list of gids, and make them into the
 	 * supplementary groups. */
 
-	if (use_chroot || (module_dirlen = strlen(lp_path(i))) == 1) {
+	/* We do a push_dir() without actually calling chdir() in order
+	 * to make sure that the module's path is absolute.  After this
+	 * check, module_dir will be set to an absolute path. */
+	module_dir = lp_path(i);
+	strlcpy(line, curr_dir, sizeof line);
+	if (!push_dir(module_dir, 1))
+		goto chdir_failed;
+	if (strcmp(curr_dir, module_dir) != 0)
+		module_dir = strdup(curr_dir);
+	push_dir(line, 1); /* Restore curr_dir. */
+
+	if (use_chroot || (module_dirlen = strlen(module_dir)) == 1) {
 		module_dirlen = 0;
 		set_filter_dir("/", 1);
 	} else
-		set_filter_dir(lp_path(i), module_dirlen);
+		set_filter_dir(module_dir, module_dirlen);
 
 	p = lp_filter(i);
 	parse_rule(&server_filter_list, p, MATCHFLG_WORD_SPLIT,
@@ -402,7 +416,7 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 		char *modname, *modpath, *hostaddr, *hostname, *username;
 		int status;
 		if (asprintf(&modname, "RSYNC_MODULE_NAME=%s", name) < 0
-		 || asprintf(&modpath, "RSYNC_MODULE_PATH=%s", lp_path(i)) < 0
+		 || asprintf(&modpath, "RSYNC_MODULE_PATH=%s", module_dir) < 0
 		 || asprintf(&hostaddr, "RSYNC_HOST_ADDR=%s", addr) < 0
 		 || asprintf(&hostname, "RSYNC_HOST_NAME=%s", host) < 0
 		 || asprintf(&username, "RSYNC_USER_NAME=%s", auth_user) < 0)
@@ -502,24 +516,17 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 		 * a warning, unless a "require chroot" flag is set,
 		 * in which case we fail.
 		 */
-		if (chroot(lp_path(i))) {
-			rsyserr(FLOG, errno, "chroot %s failed",
-				lp_path(i));
+		if (chroot(module_dir)) {
+			rsyserr(FLOG, errno, "chroot %s failed", module_dir);
 			io_printf(f_out, "@ERROR: chroot failed\n");
 			return -1;
 		}
-
-		if (!push_dir("/", 0)) {
-			rsyserr(FLOG, errno, "chdir %s failed\n",
-				lp_path(i));
-			io_printf(f_out, "@ERROR: chdir failed\n");
-			return -1;
-		}
-
+		if (!push_dir("/", 0))
+			goto chdir_failed;
 	} else {
-		if (!push_dir(lp_path(i), 0)) {
-			rsyserr(FLOG, errno, "chdir %s failed\n",
-				lp_path(i));
+		if (!push_dir(module_dir, 0)) {
+		  chdir_failed:
+			rsyserr(FLOG, errno, "chdir %s failed\n", module_dir);
 			io_printf(f_out, "@ERROR: chdir failed\n");
 			return -1;
 		}
