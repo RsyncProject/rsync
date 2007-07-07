@@ -162,12 +162,12 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 			continue;
 		}
 		ndx = NDX_FLIST_OFFSET - ndx;
-		if (ndx < 0 || ndx >= dir_flist->count) {
+		if (ndx < 0 || ndx >= dir_flist->used) {
 			ndx = NDX_FLIST_OFFSET - ndx;
 			rprintf(FERROR,
 				"[%s] Invalid dir index: %d (%d - %d)\n",
 				who_am_i(), ndx, NDX_FLIST_OFFSET,
-				NDX_FLIST_OFFSET - dir_flist->count + 1);
+				NDX_FLIST_OFFSET - dir_flist->used + 1);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
@@ -188,7 +188,7 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 
 	/* Honor the old-style keep-alive indicator. */
 	if (protocol_version < 30
-	 && ndx == cur_flist->count && iflags == ITEM_IS_NEW) {
+	 && ndx == cur_flist->used && iflags == ITEM_IS_NEW) {
 		if (am_sender)
 			maybe_send_keepalive();
 		goto read_loop;
@@ -200,7 +200,7 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 			"Invalid file index: %d (%d - %d) with iflags %x [%s]\n",
 			ndx, first_flist->ndx_start + first_flist->ndx_start,
 			first_flist->prev->ndx_start + first_flist->ndx_start
-			+ first_flist->prev->count - 1, iflags, who_am_i());
+			+ first_flist->prev->used - 1, iflags, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
 	}
 	cur_flist = flist;
@@ -500,7 +500,7 @@ struct file_list *flist_for_ndx(int ndx)
 			return NULL;
 		flist = flist->prev;
 	}
-	while (ndx >= flist->ndx_start + flist->count) {
+	while (ndx >= flist->ndx_start + flist->used) {
 		if (!(flist = flist->next))
 			return NULL;
 	}

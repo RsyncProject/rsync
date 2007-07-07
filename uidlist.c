@@ -358,11 +358,11 @@ void recv_id_list(int f, struct file_list *flist)
 		match_acl_ids();
 #endif
 	if (am_root && preserve_uid && !numeric_ids) {
-		for (i = 0; i < flist->count; i++)
+		for (i = 0; i < flist->used; i++)
 			F_OWNER(flist->files[i]) = match_uid(F_OWNER(flist->files[i]));
 	}
 	if (preserve_gid && (!am_root || !numeric_ids)) {
-		for (i = 0; i < flist->count; i++) {
+		for (i = 0; i < flist->used; i++) {
 			F_GROUP(flist->files[i]) = match_gid(F_GROUP(flist->files[i]),
 							     &flist->files[i]->flags);
 		}

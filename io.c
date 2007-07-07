@@ -444,13 +444,13 @@ static void decrement_flist_in_progress(int ndx, int redo)
 			rprintf(FERROR,
 				"Invalid file index: %d (%d - %d) [%s]\n",
 				ndx, first_flist->ndx_start,
-				first_flist->prev->ndx_start + first_flist->prev->count - 1,
+				first_flist->prev->ndx_start + first_flist->prev->used - 1,
 				who_am_i());
 			exit_cleanup(RERR_PROTOCOL);
 		}
 		flist = flist->prev;
 	}
-	while (ndx >= flist->ndx_start + flist->count) {
+	while (ndx >= flist->ndx_start + flist->used) {
 		if (!(flist = flist->next))
 			goto invalid_ndx;
 	}
@@ -876,7 +876,7 @@ void maybe_send_keepalive(void)
 			if (protocol_version >= 30)
 				send_msg(MSG_NOOP, "", 0, 0);
 			else {
-				write_int(sock_f_out, cur_flist->count);
+				write_int(sock_f_out, cur_flist->used);
 				write_shortint(sock_f_out, ITEM_IS_NEW);
 			}
 		}

@@ -668,7 +668,7 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 	}
 
 	flist = send_file_list(f_out,argc,argv);
-	if (!flist || flist->count == 0)
+	if (!flist || flist->used == 0)
 		exit_cleanup(0);
 
 	io_start_buffering_in(f_in);
@@ -1012,7 +1012,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	if (inc_recurse && file_total == 1)
 		recv_additional_file_list(f_in);
 
-	if (flist && flist->count > 0) {
+	if (flist && flist->used > 0) {
 		local_name = get_local_name(flist, argv[0]);
 
 		fix_basis_dirs();

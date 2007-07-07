@@ -144,7 +144,7 @@ static void finish_filelist_progress(const struct file_list *flist)
 	if (do_progress) {
 		/* This overwrites the progress line */
 		rprintf(FINFO, "%d file%sto consider\n",
-			flist->count, flist->count == 1 ? " " : "s ");
+			flist->used, flist->used == 1 ? " " : "s ");
 	} else
 		rprintf(FINFO, "done\n");
 }
@@ -271,12 +271,12 @@ static const char *pathname, *orig_dir;
 static int pathname_len;
 
 
-/* Make sure flist can hold at least flist->count + extra entries. */
+/* Make sure flist can hold at least flist->used + extra entries. */
 static void flist_expand(struct file_list *flist, int extra)
 {
 	struct file_struct **new_ptr;
 
-	if (flist->count + extra <= flist->malloced)
+	if (flist->used + extra <= flist->malloced)
 		return;
 
 	if (flist->malloced < FLIST_START)
@@ -288,8 +288,8 @@ static void flist_expand(struct file_list *flist, int extra)
 
 	/* In case count jumped or we are starting the list
 	 * with a known size just set it. */
-	if (flist->malloced < flist->count + extra)
-		flist->malloced = flist->count + extra;
+	if (flist->malloced < flist->used + extra)
+		flist->malloced = flist->used + extra;
 
 	new_ptr = realloc_array(flist->files, struct file_struct *,
 				flist->malloced);
@@ -690,10 +690,10 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	 && BITS_SETnUNSET(xflags, XMIT_HLINKED, XMIT_HLINK_FIRST)) {
 		struct file_struct *first;
 		first_hlink_ndx = read_varint30(f);
-		if (first_hlink_ndx < 0 || first_hlink_ndx >= flist->count) {
+		if (first_hlink_ndx < 0 || first_hlink_ndx >= flist->used) {
 			rprintf(FERROR,
 				"hard-link reference out of range: %d (%d)\n",
-				first_hlink_ndx, flist->count);
+				first_hlink_ndx, flist->used);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 		first = flist->files[first_hlink_ndx];
@@ -864,7 +864,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	}
 #ifdef ICONV_OPTION
 	if (ic_ndx)
-		F_NDX(file) = flist->count + flist->ndx_start;
+		F_NDX(file) = flist->used + flist->ndx_start;
 #endif
 
 	if (basename != thisname) {
@@ -918,7 +918,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (preserve_hard_links && xflags & XMIT_HLINKED) {
 		if (protocol_version >= 30) {
 			F_HL_GNUM(file) = xflags & XMIT_HLINK_FIRST
-					? flist->count : first_hlink_ndx;
+					? flist->used : first_hlink_ndx;
 		} else {
 			static int32 cnt = 0;
 			struct idev_node *np;
@@ -1269,12 +1269,12 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 	}
 #endif
 
-	maybe_emit_filelist_progress(flist->count + flist_count_offset);
+	maybe_emit_filelist_progress(flist->used + flist_count_offset);
 
 	flist_expand(flist, 1);
-	flist->files[flist->count++] = file;
+	flist->files[flist->used++] = file;
 	if (f >= 0) {
-		send_file_entry(f, file, flist->count - 1);
+		send_file_entry(f, file, flist->used - 1);
 #ifdef SUPPORT_ACLS
 		if (preserve_acls && !S_ISLNK(file->mode)) {
 			send_acl(&sx, f);
@@ -1404,7 +1404,7 @@ static void add_dirs_to_tree(int parent_ndx, struct file_list *from_flist,
 		if (!S_ISDIR(file->mode))
 			continue;
 
-		dir_flist->files[dir_flist->count++] = file;
+		dir_flist->files[dir_flist->used++] = file;
 		dir_cnt--;
 
 		if (!(file->flags & FLAG_XFER_DIR)
@@ -1412,11 +1412,11 @@ static void add_dirs_to_tree(int parent_ndx, struct file_list *from_flist,
 			continue;
 
 		if (dp)
-			DIR_NEXT_SIBLING(dp) = dir_flist->count - 1;
+			DIR_NEXT_SIBLING(dp) = dir_flist->used - 1;
 		else if (parent_dp)
-			DIR_FIRST_CHILD(parent_dp) = dir_flist->count - 1;
+			DIR_FIRST_CHILD(parent_dp) = dir_flist->used - 1;
 		else
-			send_dir_ndx = dir_flist->count - 1;
+			send_dir_ndx = dir_flist->used - 1;
 
 		dp = F_DIRNODE_P(file);
 		DIR_PARENT(dp) = parent_ndx;
@@ -1439,7 +1439,7 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 	char *p;
 	DIR *d;
 	int divert_dirs = (flags & FLAG_DIVERT_DIRS) != 0;
-	int start = flist->count;
+	int start = flist->used;
 	int filter_flags = f == -2 ? SERVER_FILTERS : ALL_FILTERS;
 
 	assert(flist != NULL);
@@ -1482,8 +1482,8 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 	closedir(d);
 
 	if (f >= 0 && recurse && !divert_dirs) {
-		int i, end = flist->count - 1;
-		/* send_if_directory() bumps flist->count, so use "end". */
+		int i, end = flist->used - 1;
+		/* send_if_directory() bumps flist->used, so use "end". */
 		for (i = start; i <= end; i++)
 			send_if_directory(f, flist, flist->files[i], fbuf, len, flags);
 	}
@@ -1520,7 +1520,7 @@ void send_extra_file_list(int f, int at_least)
 	 * files in the upcoming file-lists. */
 	if (cur_flist->next) {
 		flist = first_flist->prev; /* the newest flist */
-		future_cnt = flist->count + flist->ndx_start
+		future_cnt = flist->used + flist->ndx_start
 			   - cur_flist->next->ndx_start;
 	} else
 		future_cnt = 0;
@@ -1558,10 +1558,10 @@ void send_extra_file_list(int f, int at_least)
 
 #ifdef ICONV_OPTION
 		if (need_unsorted_flist) {
-			if (!(flist->sorted = new_array(struct file_struct *, flist->count)))
+			if (!(flist->sorted = new_array(struct file_struct *, flist->used)))
 				out_of_memory("send_extra_file_list");
 			memcpy(flist->sorted, flist->files,
-			       flist->count * sizeof (struct file_struct*));
+			       flist->used * sizeof (struct file_struct*));
 		} else
 #endif
 			flist->sorted = flist->files;
@@ -1571,10 +1571,10 @@ void send_extra_file_list(int f, int at_least)
 		add_dirs_to_tree(send_dir_ndx, flist, dir_count - dstart);
 		flist_done_allocating(flist);
 
-		file_total += flist->count;
-		future_cnt += flist->count;
+		file_total += flist->used;
+		future_cnt += flist->used;
 		stats.flist_size += stats.total_written - start_write;
-		stats.num_files += flist->count;
+		stats.num_files += flist->used;
 		if (verbose > 3)
 			output_flist(flist);
 
@@ -1865,20 +1865,23 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 #ifdef ICONV_OPTION
 	if (need_unsorted_flist) {
 		if (inc_recurse) {
-			if (!(flist->sorted = new_array(struct file_struct *, flist->count)))
+			if (!(flist->sorted = new_array(struct file_struct *, flist->used)))
 				out_of_memory("send_file_list");
 			memcpy(flist->sorted, flist->files,
-			       flist->count * sizeof (struct file_struct*));
+			       flist->used * sizeof (struct file_struct*));
 			clean_flist(flist, 0);
-		} else
+		} else {
 			flist->sorted = flist->files;
+			flist->low = 0;
+			flist->high = flist->used - 1;
+		}
 	} else
 #endif
 	{
 		flist->sorted = flist->files;
 		clean_flist(flist, 0);
 	}
-	file_total += flist->count;
+	file_total += flist->used;
 
 	if (!numeric_ids && !inc_recurse)
 		send_id_list(f);
@@ -1893,7 +1896,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		io_end_buffering_out();
 
 	stats.flist_size = stats.total_written - start_write;
-	stats.num_files = flist->count;
+	stats.num_files = flist->used;
 
 	if (verbose > 3)
 		output_flist(flist);
@@ -1944,7 +1947,7 @@ struct file_list *recv_file_list(int f)
 	if (inc_recurse) {
 		if (flist->ndx_start == 0)
 			dir_flist = flist_new(FLIST_TEMP, "recv_file_list");
-		dstart = dir_flist->count;
+		dstart = dir_flist->used;
 	} else {
 		dir_flist = flist;
 		dstart = 0;
@@ -1961,22 +1964,22 @@ struct file_list *recv_file_list(int f)
 
 		if (inc_recurse && S_ISDIR(file->mode)) {
 			flist_expand(dir_flist, 1);
-			dir_flist->files[dir_flist->count++] = file;
+			dir_flist->files[dir_flist->used++] = file;
 		}
 
-		flist->files[flist->count++] = file;
+		flist->files[flist->used++] = file;
 
-		maybe_emit_filelist_progress(flist->count);
+		maybe_emit_filelist_progress(flist->used);
 
 		if (verbose > 2) {
 			rprintf(FINFO, "recv_file_name(%s)\n",
 				f_name(file, NULL));
 		}
 	}
-	file_total += flist->count;
+	file_total += flist->used;
 
 	if (verbose > 2)
-		rprintf(FINFO, "received %d names\n", flist->count);
+		rprintf(FINFO, "received %d names\n", flist->used);
 
 	if (show_filelist_p())
 		finish_filelist_progress(flist);
@@ -1988,25 +1991,25 @@ struct file_list *recv_file_list(int f)
 		 * order and for calling flist_find()).  We keep the "files"
 		 * list unsorted for our exchange of index numbers with the
 		 * other side (since their names may not sort the same). */
-		if (!(flist->sorted = new_array(struct file_struct *, flist->count)))
+		if (!(flist->sorted = new_array(struct file_struct *, flist->used)))
 			out_of_memory("recv_file_list");
 		memcpy(flist->sorted, flist->files,
-		       flist->count * sizeof (struct file_struct*));
-		if (inc_recurse && dir_flist->count > dstart) {
+		       flist->used * sizeof (struct file_struct*));
+		if (inc_recurse && dir_flist->used > dstart) {
 			dir_flist->sorted = realloc_array(dir_flist->sorted,
 						struct file_struct *,
-						dir_flist->count);
+						dir_flist->used);
 			memcpy(dir_flist->sorted + dstart, dir_flist->files + dstart,
-			       (dir_flist->count - dstart) * sizeof (struct file_struct*));
-			fsort(dir_flist->sorted + dstart, dir_flist->count - dstart);
+			       (dir_flist->used - dstart) * sizeof (struct file_struct*));
+			fsort(dir_flist->sorted + dstart, dir_flist->used - dstart);
 		}
 	} else
 #endif
 	{
 		flist->sorted = flist->files;
-		if (inc_recurse && dir_flist->count > dstart) {
+		if (inc_recurse && dir_flist->used > dstart) {
 			dir_flist->sorted = dir_flist->files;
-			fsort(dir_flist->sorted + dstart, dir_flist->count - dstart);
+			fsort(dir_flist->sorted + dstart, dir_flist->used - dstart);
 		}
 	}
 
@@ -2030,7 +2033,7 @@ struct file_list *recv_file_list(int f)
 
 	if (list_only) {
 		int i;
-		for (i = 0; i < flist->count; i++)
+		for (i = flist->low; i <= flist->high; i++)
 			list_file_entry(flist->files[i]);
 	}
 
@@ -2038,7 +2041,7 @@ struct file_list *recv_file_list(int f)
 		rprintf(FINFO, "recv_file_list done\n");
 
 	stats.flist_size += stats.total_read - start_read;
-	stats.num_files += flist->count;
+	stats.num_files += flist->used;
 
 	return flist;
 }
@@ -2054,12 +2057,12 @@ void recv_additional_file_list(int f)
 		change_local_filter_dir(NULL, 0, 0);
 	} else {
 		ndx = NDX_FLIST_OFFSET - ndx;
-		if (ndx < 0 || ndx >= dir_flist->count) {
+		if (ndx < 0 || ndx >= dir_flist->used) {
 			ndx = NDX_FLIST_OFFSET - ndx;
 			rprintf(FERROR,
 				"[%s] Invalid dir index: %d (%d - %d)\n",
 				who_am_i(), ndx, NDX_FLIST_OFFSET,
-				NDX_FLIST_OFFSET - dir_flist->count + 1);
+				NDX_FLIST_OFFSET - dir_flist->used + 1);
 			exit_cleanup(RERR_PROTOCOL);
 		}
 		if (verbose > 3) {
@@ -2166,7 +2169,7 @@ struct file_list *flist_new(int flags, char *msg)
 			flist->file_pool = first_flist->file_pool;
 
 			flist->ndx_start = first_flist->prev->ndx_start
-					 + first_flist->prev->count;
+					 + first_flist->prev->used;
 
 			flist->prev = first_flist->prev;
 			flist->prev->next = first_flist->prev = flist;
@@ -2198,7 +2201,7 @@ void flist_free(struct file_list *flist)
 				flist->next = first_flist;
 		}
 		flist->next->prev = flist->prev;
-		file_total -= flist->count;
+		file_total -= flist->used;
 		flist_cnt--;
 	}
 
@@ -2222,15 +2225,16 @@ static void clean_flist(struct file_list *flist, int strip_root)
 
 	if (!flist)
 		return;
-	if (flist->count == 0) {
+	if (flist->used == 0) {
 		flist->high = -1;
+		flist->low = 0;
 		return;
 	}
 
-	fsort(flist->sorted, flist->count);
+	fsort(flist->sorted, flist->used);
 
 	if (!am_sender || inc_recurse) {
-		for (i = prev_i = 0; i < flist->count; i++) {
+		for (i = prev_i = 0; i < flist->used; i++) {
 			if (F_IS_ACTIVE(flist->sorted[i])) {
 				prev_i = i;
 				break;
@@ -2238,11 +2242,11 @@ static void clean_flist(struct file_list *flist, int strip_root)
 		}
 		flist->low = prev_i;
 	} else {
-		i = prev_i = flist->count - 1;
+		i = prev_i = flist->used - 1;
 		flist->low = 0;
 	}
 
-	while (++i < flist->count) {
+	while (++i < flist->used) {
 		int j;
 		struct file_struct *file = flist->sorted[i];
 
@@ -2395,8 +2399,8 @@ static void output_flist(struct file_list *flist)
 	int i;
 
 	rprintf(FINFO, "[%s] flist start=%d, count=%d, low=%d, high=%d\n",
-		who, flist->ndx_start, flist->count, flist->low, flist->high);
-	for (i = 0; i < flist->count; i++) {
+		who, flist->ndx_start, flist->used, flist->low, flist->high);
+	for (i = 0; i < flist->used; i++) {
 		file = flist->sorted[i];
 		if ((am_root || am_sender) && uid_ndx) {
 			snprintf(uidbuf, sizeof uidbuf, " uid=%u",
@@ -2627,7 +2631,7 @@ struct file_list *get_dirlist(char *dirname, int dlen, int ignore_filter_rules)
 	xfer_dirs = save_xfer_dirs;
 	recurse = save_recurse;
 	if (do_progress)
-		flist_count_offset += dirlist->count;
+		flist_count_offset += dirlist->used;
 
 	dirlist->sorted = dirlist->files;
 	clean_flist(dirlist, 0);

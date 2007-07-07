@@ -320,9 +320,9 @@ static int get_next_gen_ndx(int fd, int next_gen_ndx, int desired_ndx)
 		next_gen_ndx = read_int(fd);
 		if (next_gen_ndx == -1) {
 			if (inc_recurse)
-				next_gen_ndx = first_flist->prev->count + first_flist->prev->ndx_start;
+				next_gen_ndx = first_flist->prev->used + first_flist->prev->ndx_start;
 			else
-				next_gen_ndx = cur_flist->count;
+				next_gen_ndx = cur_flist->used;
 		}
 	}
 	return next_gen_ndx;
@@ -356,10 +356,10 @@ int recv_files(int f_in, char *local_name)
 	int ndx, recv_ok;
 
 	if (verbose > 2)
-		rprintf(FINFO, "recv_files(%d) starting\n", cur_flist->count);
+		rprintf(FINFO, "recv_files(%d) starting\n", cur_flist->used);
 
 	if (delay_updates)
-		delayed_bits = bitbag_create(cur_flist->count + 1);
+		delayed_bits = bitbag_create(cur_flist->used + 1);
 
 	updating_basis = inplace;
 
@@ -377,8 +377,8 @@ int recv_files(int f_in, char *local_name)
 			}
 			if (read_batch && cur_flist) {
 				int high = inc_recurse
-				    ? first_flist->prev->count + first_flist->prev->ndx_start
-				    : cur_flist->count;
+				    ? first_flist->prev->used + first_flist->prev->ndx_start
+				    : cur_flist->used;
 				get_next_gen_ndx(batch_gen_fd, next_gen_ndx, high);
 				next_gen_ndx = -1;
 			}

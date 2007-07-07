@@ -230,7 +230,7 @@ static enum delret delete_dir_contents(char *fname, int flags)
 	dirlist = get_dirlist(fname, dlen, 0);
 	ret = non_perishable_cnt ? DR_NOT_EMPTY : DR_SUCCESS;
 
-	if (!dirlist->count)
+	if (!dirlist->used)
 		goto done;
 
 	if (!(flags & DEL_RECURSE)) {
@@ -246,7 +246,7 @@ static enum delret delete_dir_contents(char *fname, int flags)
 	/* We do our own recursion, so make delete_item() non-recursive. */
 	flags = (flags & ~DEL_RECURSE) | DEL_DIR_IS_EMPTY;
 
-	for (j = dirlist->count; j--; ) {
+	for (j = dirlist->used; j--; ) {
 		struct file_struct *fp = dirlist->files[j];
 
 		if (fp->flags & FLAG_MOUNT_DIR) {
@@ -458,7 +458,7 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 
 	/* If an item in dirlist is not found in flist, delete it
 	 * from the filesystem. */
-	for (i = dirlist->count; i--; ) {
+	for (i = dirlist->used; i--; ) {
 		struct file_struct *fp = dirlist->files[i];
 		if (!F_IS_ACTIVE(fp))
 			continue;
@@ -493,7 +493,7 @@ static void do_delete_pass(void)
 	if (dry_run > 1 || list_only)
 		return;
 
-	for (j = 0; j < cur_flist->count; j++) {
+	for (j = 0; j < cur_flist->used; j++) {
 		struct file_struct *file = cur_flist->sorted[j];
 
 		if (!(file->flags & FLAG_XFER_DIR))
@@ -783,7 +783,7 @@ static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
 	fname_len = strlen(fname);
 	fname_suf = find_filename_suffix(fname, fname_len, &fname_suf_len);
 
-	for (j = 0; j < dirlist->count; j++) {
+	for (j = 0; j < dirlist->used; j++) {
 		struct file_struct *fp = dirlist->files[j];
 		const char *suf, *name;
 		int len, suf_len;
@@ -1726,7 +1726,7 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 
 	if (ndx < 0) {
 		start = 0;
-		end = flist->count - 1;
+		end = flist->used - 1;
 	} else
 		start = end = ndx;
 
@@ -1866,7 +1866,7 @@ void generate_files(int f_out, const char *local_name)
 	if (verbose > 2)
 		rprintf(FINFO, "generator starting pid=%ld\n", (long)getpid());
 
-	if (delete_before && !solo_file && cur_flist->count > 0)
+	if (delete_before && !solo_file && cur_flist->used > 0)
 		do_delete_pass();
 	if (delete_during == 2) {
 		deldelay_size = BIGPATHBUFLEN * 4;

@@ -259,10 +259,10 @@ void match_hard_links(void)
 	int i, ndx_count = 0;
 	int32 *ndx_list;
 
-	if (!(ndx_list = new_array(int32, cur_flist->count)))
+	if (!(ndx_list = new_array(int32, cur_flist->used)))
 		out_of_memory("match_hard_links");
 
-	for (i = 0; i < cur_flist->count; i++) {
+	for (i = 0; i < cur_flist->used; i++) {
 		if (F_IS_HLINKED(cur_flist->sorted[i]))
 			ndx_list[ndx_count++] = i;
 	}
