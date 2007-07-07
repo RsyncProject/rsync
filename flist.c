@@ -2615,6 +2615,7 @@ struct file_list *get_dirlist(char *dirname, int dlen, int ignore_filter_rules)
 	char dirbuf[MAXPATHLEN];
 	int save_recurse = recurse;
 	int save_xfer_dirs = xfer_dirs;
+	int save_prune_empty_dirs = prune_empty_dirs;
 
 	if (dlen < 0) {
 		dlen = strlcpy(dirbuf, dirname, MAXPATHLEN);
@@ -2633,8 +2634,10 @@ struct file_list *get_dirlist(char *dirname, int dlen, int ignore_filter_rules)
 	if (do_progress)
 		flist_count_offset += dirlist->used;
 
+	prune_empty_dirs = 0;
 	dirlist->sorted = dirlist->files;
 	clean_flist(dirlist, 0);
+	prune_empty_dirs = save_prune_empty_dirs;
 
 	if (verbose > 3)
 		output_flist(dirlist);
