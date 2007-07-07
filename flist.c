@@ -1002,8 +1002,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	alloc_pool_t *pool;
 	char *bp;
 
-	if (strlcpy(thisname, fname, sizeof thisname)
-	    >= sizeof thisname - pathname_len) {
+	if (strlcpy(thisname, fname, sizeof thisname) >= sizeof thisname) {
 		rprintf(FINFO, "skipping overly long name: %s\n", fname);
 		return NULL;
 	}
