@@ -5,8 +5,8 @@
 # This program is distributable under the terms of the GNU GPL (see
 # COPYING).
 
-# Test rsync handling of hardlinks.  By default (in 2.5.1) rsync does
-# not detect symlinks and they get split into different files.  If you
+# Test rsync handling of hardlinks.  By default, rsync does not
+# detect symlinks and they get split into different files.  If you
 # specify -H, then hard links are detected and recreated as hardlinks
 # on the other end.
 
