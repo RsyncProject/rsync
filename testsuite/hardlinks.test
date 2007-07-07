@@ -5,10 +5,9 @@
 # This program is distributable under the terms of the GNU GPL (see
 # COPYING).
 
-# Test rsync handling of hardlinks.  By default, rsync does not
-# detect symlinks and they get split into different files.  If you
-# specify -H, then hard links are detected and recreated as hardlinks
-# on the other end.
+# Test rsync handling of hardlinks.  By default, rsync does not detect
+# hard links and they get sent as separate files.  If you specify -H,
+# then hard links are detected and linked together on the receiver.
 
 . "$suitedir/rsync.fns"
 
