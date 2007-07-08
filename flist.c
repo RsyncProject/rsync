@@ -708,7 +708,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		 || (preserve_specials && IS_SPECIAL(mode))) {
 			uint32 *devp = F_RDEV_P(first);
 			rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
-			extra_len += 2 * EXTRA_LEN;
+			extra_len += DEV_EXTRA_CNT * EXTRA_LEN;
 		}
 		if (preserve_links && S_ISLNK(mode))
 			linkname_len = strlen(F_SYMLINK(first)) + 1;
@@ -779,7 +779,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 				rdev_minor = read_int(f);
 			rdev = MAKEDEV(rdev_major, rdev_minor);
 		}
-		extra_len += 2 * EXTRA_LEN;
+		extra_len += DEV_EXTRA_CNT * EXTRA_LEN;
 		file_length = 0;
 	} else if (protocol_version < 28)
 		rdev = MAKEDEV(0, 0);
@@ -827,7 +827,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (inc_recurse && S_ISDIR(mode)) {
 		if (one_file_system) {
 			/* Room to save the dir's device for -x */
-			extra_len += 2 * EXTRA_LEN;
+			extra_len += DEV_EXTRA_CNT * EXTRA_LEN;
 		}
 		pool = dir_flist->file_pool;
 	} else
@@ -945,7 +945,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 
 	if (always_checksum && (S_ISREG(mode) || protocol_version < 28)) {
 		if (S_ISREG(mode))
-			bp = (char*)F_SUM(file);
+			bp = F_SUM(file);
 		else {
 			/* Prior to 28, we get a useless set of nulls. */
 			bp = tmp_sum;
@@ -1093,7 +1093,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		if (flist->prev && S_ISDIR(st.st_mode)
 		 && flags & FLAG_DIVERT_DIRS) {
 			/* Room for parent/sibling/next-child info. */
-			extra_len += 3 * EXTRA_LEN;
+			extra_len += DIRNODE_EXTRA_CNT * EXTRA_LEN;
 			dir_count++;
 			pool = dir_flist->file_pool;
 		} else
@@ -1393,7 +1393,7 @@ static void add_dirs_to_tree(int parent_ndx, struct file_list *from_flist,
 	int i;
 	int32 *dp = NULL;
 	int32 *parent_dp = parent_ndx < 0 ? NULL
-			 : F_DIRNODE_P(dir_flist->sorted[parent_ndx]);
+			 : F_DIR_NODE_P(dir_flist->sorted[parent_ndx]);
 
 	flist_expand(dir_flist, dir_cnt);
 	dir_flist->sorted = dir_flist->files;
@@ -1418,7 +1418,7 @@ static void add_dirs_to_tree(int parent_ndx, struct file_list *from_flist,
 		else
 			send_dir_ndx = dir_flist->used - 1;
 
-		dp = F_DIRNODE_P(file);
+		dp = F_DIR_NODE_P(file);
 		DIR_PARENT(dp) = parent_ndx;
 		DIR_FIRST_CHILD(dp) = -1;
 	}
@@ -1541,7 +1541,7 @@ void send_extra_file_list(int f, int at_least)
 		flist->parent_ndx = dir_ndx;
 
 		send1extra(f, file, flist);
-		dp = F_DIRNODE_P(file);
+		dp = F_DIR_NODE_P(file);
 
 		/* If there are any duplicate directory names that follow, we
 		 * send all the dirs together in one file-list.  The dir_flist
@@ -1551,7 +1551,7 @@ void send_extra_file_list(int f, int at_least)
 			send_dir_ndx = dir_ndx;
 			file = dir_flist->sorted[dir_ndx];
 			send1extra(f, file, flist);
-			dp = F_DIRNODE_P(file);
+			dp = F_DIR_NODE_P(file);
 		}
 
 		write_byte(f, 0);
@@ -1594,7 +1594,7 @@ void send_extra_file_list(int f, int at_least)
 				}
 				send_dir_depth--;
 				file = dir_flist->sorted[send_dir_ndx];
-				dp = F_DIRNODE_P(file);
+				dp = F_DIR_NODE_P(file);
 			}
 			send_dir_ndx = DIR_NEXT_SIBLING(dp);
 		}
