@@ -112,6 +112,7 @@ static int deldelay_fd = -1;
 static int lull_mod;
 static int dir_tweaking;
 static int need_retouch_dir_times;
+static int need_retouch_dir_perms;
 static const char *solo_file = NULL;
 
 /* For calling delete_item() and delete_dir_contents(). */
@@ -1261,6 +1262,22 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (set_file_attrs(fname, file, real_ret ? NULL : &real_sx, NULL, 0)
 		    && verbose && code != FNONE && f_out != -1)
 			rprintf(code, "%s/\n", fname);
+
+		/* We need to ensure that the dirs in the transfer have writable
+		 * permissions during the time we are putting files within them.
+		 * This is then fixed after the transfer is done. */
+#ifdef HAVE_CHMOD
+		if (!am_root && !(file->mode & S_IWUSR) && dir_tweaking) {
+			mode_t mode = file->mode | S_IWUSR;
+			if (do_chmod(fname, mode) < 0) {
+				rsyserr(FERROR, errno,
+					"failed to modify permissions on %s",
+					full_fname(fname));
+			}
+			need_retouch_dir_perms = 1;
+		}
+#endif
+
 		if (real_ret != 0 && one_file_system)
 			real_sx.st.st_dev = filesystem_dev;
 		if (inc_recurse) {
@@ -1838,7 +1855,6 @@ void generate_files(int f_out, const char *local_name)
 	char fbuf[MAXPATHLEN];
 	int itemizing;
 	enum logcode code;
-	int need_retouch_dir_perms = 0;
 	int save_do_progress = do_progress;
 
 	if (protocol_version >= 29) {
@@ -1894,16 +1910,21 @@ void generate_files(int f_out, const char *local_name)
 	dflt_perms = (ACCESSPERMS & ~orig_umask);
 
 	do {
-		if (inc_recurse && delete_during && cur_flist->ndx_start) {
+		if (inc_recurse && cur_flist->ndx_start) {
 			struct file_struct *fp = dir_flist->files[cur_flist->parent_ndx];
-			if (BITS_SETnUNSET(fp->flags, FLAG_XFER_DIR, FLAG_MISSING_DIR)) {
-				dev_t dirdev;
-				if (one_file_system) {
-					uint32 *devp = F_DIRDEV_P(fp);
-					dirdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
-				} else
-					dirdev = MAKEDEV(0, 0);
-				delete_in_dir(f_name(fp, fbuf), fp, &dirdev);
+			f_name(fp, fbuf);
+			ndx = cur_flist->ndx_start - 1;
+			recv_generator(fbuf, fp, ndx, itemizing, code, f_out);
+			if (delete_during) {
+				if (BITS_SETnUNSET(fp->flags, FLAG_XFER_DIR, FLAG_MISSING_DIR)) {
+					dev_t dirdev;
+					if (one_file_system) {
+						uint32 *devp = F_DIRDEV_P(fp);
+						dirdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
+					} else
+						dirdev = MAKEDEV(0, 0);
+					delete_in_dir(f_name(fp, fbuf), fp, &dirdev);
+				}
 			}
 		}
 		for (i = cur_flist->low; i <= cur_flist->high; i++) {
@@ -1911,6 +1932,14 @@ void generate_files(int f_out, const char *local_name)
 
 			if (!F_IS_ACTIVE(file))
 				continue;
+
+			if (inc_recurse && S_ISDIR(file->mode)) {
+				/* Regular dirs are at the end, so we can stop. */
+				if (F_DEPTH(file))
+					break;
+				/* A dot-dir is at the start, so just skip it. */
+				continue;
+			}
 
 #ifdef ICONV_OPTION
 			if (ic_ndx)
@@ -1924,24 +1953,6 @@ void generate_files(int f_out, const char *local_name)
 			else
 				f_name(file, fbuf);
 			recv_generator(fbuf, file, ndx, itemizing, code, f_out);
-
-			/* We need to ensure that any dirs we create have
-			 * writeable permissions during the time we are putting
-			 * files within them.  This is then fixed after the
-			 * transfer is done. */
-#ifdef HAVE_CHMOD
-			if (!am_root && S_ISDIR(file->mode)
-			 && !(file->mode & S_IWUSR) && dir_tweaking) {
-				mode_t mode = file->mode | S_IWUSR;
-				const char *fname = solo_file ? solo_file : fbuf;
-				if (do_chmod(fname, mode) < 0) {
-					rsyserr(FERROR, errno,
-					    "failed to modify permissions on %s",
-					    full_fname(fname));
-				}
-				need_retouch_dir_perms = 1;
-			}
-#endif
 
 			check_for_finished_files(itemizing, code, 0);
 
