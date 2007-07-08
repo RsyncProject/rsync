@@ -1520,8 +1520,7 @@ void send_extra_file_list(int f, int at_least)
 	 * files in the upcoming file-lists. */
 	if (cur_flist->next) {
 		flist = first_flist->prev; /* the newest flist */
-		future_cnt = flist->used + flist->ndx_start
-			   - cur_flist->next->ndx_start;
+		future_cnt = flist->ndx_end - cur_flist->next->ndx_start + 1;
 	} else
 		future_cnt = 0;
 	while (future_cnt < at_least) {
@@ -1539,6 +1538,7 @@ void send_extra_file_list(int f, int at_least)
 #endif
 			dir_ndx = send_dir_ndx;
 		write_ndx(f, NDX_FLIST_OFFSET - dir_ndx);
+		flist->parent_ndx = dir_ndx;
 
 		send1extra(f, file, flist);
 		dp = F_DIRNODE_P(file);
@@ -1567,6 +1567,9 @@ void send_extra_file_list(int f, int at_least)
 			flist->sorted = flist->files;
 
 		clean_flist(flist, 0);
+
+		flist->ndx_end = flist->ndx_start + flist->used - 1
+			       - (dir_count - dstart);
 
 		add_dirs_to_tree(send_dir_ndx, flist, dir_count - dstart);
 		flist_done_allocating(flist);
@@ -1883,6 +1886,10 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	}
 	file_total += flist->used;
 
+	/* We don't subtract dir_count for the first send since we
+	 * might have one or more dot dirs which need to get sent. */
+	flist->ndx_end = flist->ndx_start + flist->used - 1;
+
 	if (!numeric_ids && !inc_recurse)
 		send_id_list(f);
 
@@ -1977,6 +1984,10 @@ struct file_list *recv_file_list(int f)
 		}
 	}
 	file_total += flist->used;
+
+	flist->ndx_end = flist->ndx_start + flist->used - 1;
+	if (inc_recurse && flist->ndx_start)
+		flist->ndx_end -= dir_flist->used - dstart;
 
 	if (verbose > 2)
 		rprintf(FINFO, "received %d names\n", flist->used);
@@ -2168,8 +2179,7 @@ struct file_list *flist_new(int flags, char *msg)
 		} else {
 			flist->file_pool = first_flist->file_pool;
 
-			flist->ndx_start = first_flist->prev->ndx_start
-					 + first_flist->prev->used;
+			flist->ndx_start = first_flist->prev->ndx_end + 2;
 
 			flist->prev = first_flist->prev;
 			flist->prev->next = first_flist->prev = flist;
@@ -2398,8 +2408,8 @@ static void output_flist(struct file_list *flist)
 	const char *who = who_am_i();
 	int i;
 
-	rprintf(FINFO, "[%s] flist start=%d, count=%d, low=%d, high=%d\n",
-		who, flist->ndx_start, flist->used, flist->low, flist->high);
+	rprintf(FINFO, "[%s] flist start=%d, end=%d, used=%d, low=%d, high=%d\n",
+		who, flist->ndx_start, flist->ndx_end, flist->used, flist->low, flist->high);
 	for (i = 0; i < flist->used; i++) {
 		file = flist->sorted[i];
 		if ((am_root || am_sender) && uid_ndx) {
