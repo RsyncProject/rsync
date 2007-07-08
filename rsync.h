@@ -587,6 +587,8 @@ extern int xattrs_ndx;
 #define FILE_STRUCT_LEN (offsetof(struct file_struct, basename))
 #define EXTRA_LEN (sizeof (union file_extras))
 #define PTR_EXTRA_LEN ((sizeof (char *) + EXTRA_LEN - 1) / EXTRA_LEN)
+#define DEV_EXTRA_CNT 2
+#define DIRNODE_EXTRA_CNT 3
 #define SUM_EXTRA_CNT ((MAX_DIGEST_LEN + EXTRA_LEN - 1) / EXTRA_LEN)
 
 #define REQ_EXTRA(f,ndx) ((union file_extras*)(f) - (ndx))
@@ -594,6 +596,7 @@ extern int xattrs_ndx;
 
 #define LEN64_BUMP(f) ((f)->flags & FLAG_LENGTH64 ? 1 : 0)
 #define HLINK_BUMP(f) (F_IS_HLINKED(f) ? 1 : 0)
+#define ACL_BUMP(f) (acls_ndx ? 1 : 0)
 
 /* The length applies to all items. */
 #if SIZEOF_INT64 < 8
@@ -619,20 +622,22 @@ extern int xattrs_ndx;
 #define F_XATTR(f) REQ_EXTRA(f, xattrs_ndx)->num
 #define F_NDX(f) REQ_EXTRA(f, ic_ndx)->num
 
-/* These items are per-entry optional and mutally exclusive: */
-#define F_HL_GNUM(f) OPT_EXTRA(f, LEN64_BUMP(f))->num
-#define F_HL_PREV(f) OPT_EXTRA(f, LEN64_BUMP(f))->num
-#define F_DEF_ACL(f) OPT_EXTRA(f, LEN64_BUMP(f))->unum
-#define F_DIRDEV_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) + 2 - 1)->unum)
-#define F_DIRNODE_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) + 3 - 1)->num)
+/* These items are per-entry optional: */
+#define F_HL_GNUM(f) OPT_EXTRA(f, LEN64_BUMP(f))->num /* non-dirs */
+#define F_HL_PREV(f) OPT_EXTRA(f, LEN64_BUMP(f))->num /* non-dirs */
+#define F_DIR_NODE_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) \
+				+ DIRNODE_EXTRA_CNT - 1)->num) /* sender dirs */
+#define F_DIR_DEFACL(f) OPT_EXTRA(f, LEN64_BUMP(f))->unum /* receiver dirs */
+#define F_DIR_DEV_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) + ACL_BUMP(f) \
+				+ DEV_EXTRA_CNT - 1)->unum) /* receiver dirs */
 
 /* This optional item might follow an F_HL_*() item.
  * (Note: a device doesn't need to check LEN64_BUMP(f).) */
 #define F_RDEV_P(f) (&OPT_EXTRA(f, HLINK_BUMP(f) + 2 - 1)->unum)
 
 /* The sum is only present on regular files. */
-#define F_SUM(f) ((const char*)OPT_EXTRA(f, LEN64_BUMP(f) + HLINK_BUMP(f) \
-					  + SUM_EXTRA_CNT - 1))
+#define F_SUM(f) ((char*)OPT_EXTRA(f, LEN64_BUMP(f) + HLINK_BUMP(f) \
+				    + SUM_EXTRA_CNT - 1))
 
 /* Some utility defines: */
 #define F_IS_ACTIVE(f) (f)->basename[0]
