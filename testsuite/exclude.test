@@ -5,7 +5,7 @@
 # This program is distributable under the terms of the GNU GPL (see
 # COPYING).
 
-# Test rsync handling of exclude/include directives.  
+# Test rsync handling of exclude/include directives.
 
 # Test some of the more obscure wildcard handling of exclude/include
 # processing.
@@ -76,7 +76,6 @@ EOF
 echo cvsin >"$fromdir/mid/for/one-in-one-out"
 echo expunged >"$fromdir/mid/for/foo/extra"
 echo retained >"$fromdir/mid/for/foo/keep"
-ln -s too "$fromdir/bar/down/to/foo/sym"
 
 # Setup our test exclude/include files.
 
@@ -106,12 +105,17 @@ cat >"$scratchdir/.cvsignore" <<EOF
 home-cvs-exclude
 EOF
 
-# Create the chk dir with what we expect to be excluded
+# Start with a check of --prune-empty-dirs:
+$RSYNC -av -f -_foo/too/ -f -_foo/down/ -f -_foo/and/ -f -_new/ "$fromdir/" "$chkdir/"
+checkit "$RSYNC -av --prune-empty-dirs \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+rm -rf "$todir"
 
+# Add a directory symlink.
+ln -s too "$fromdir/bar/down/to/foo/sym"
+
+# Create chkdir with what we expect to be excluded.
 checkit "$RSYNC -avv \"$fromdir/\" \"$chkdir/\"" "$fromdir" "$chkdir"
-
 sleep 1 # Ensures that the rm commands will tweak the directory times.
-
 rm -r "$chkdir"/foo/down
 rm -r "$chkdir"/mid/for/foo/and
 rm -r "$chkdir"/new/keep/this
