@@ -1282,7 +1282,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			real_sx.st.st_dev = filesystem_dev;
 		if (inc_recurse) {
 			if (one_file_system) {
-				uint32 *devp = F_DIRDEV_P(file);
+				uint32 *devp = F_DIR_DEV_P(file);
 				DEV_MAJOR(devp) = major(real_sx.st.st_dev);
 				DEV_MINOR(devp) = minor(real_sx.st.st_dev);
 			}
@@ -1838,13 +1838,6 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 			maybe_flush_socket(1);
 		}
 
-		if (delete_during == 2 || !dir_tweaking) {
-			/* Skip directory touch-up. */
-		} else if (first_flist->ndx_start != 0)
-			touch_up_dirs(dir_flist, first_flist->parent_ndx);
-		else if (relative_paths && implied_dirs)
-			touch_up_dirs(first_flist, -1);
-
 		flist_free(first_flist); /* updates first_flist */
 	}
 }
@@ -1919,7 +1912,7 @@ void generate_files(int f_out, const char *local_name)
 				if (BITS_SETnUNSET(fp->flags, FLAG_XFER_DIR, FLAG_MISSING_DIR)) {
 					dev_t dirdev;
 					if (one_file_system) {
-						uint32 *devp = F_DIRDEV_P(fp);
+						uint32 *devp = F_DIR_DEV_P(fp);
 						dirdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
 					} else
 						dirdev = MAKEDEV(0, 0);
@@ -2022,8 +2015,7 @@ void generate_files(int f_out, const char *local_name)
 	if (delete_after && !solo_file && file_total > 0)
 		do_delete_pass();
 
-	if ((need_retouch_dir_perms || need_retouch_dir_times)
-	 && dir_tweaking && (!inc_recurse || delete_during == 2))
+	if ((need_retouch_dir_perms || need_retouch_dir_times) && dir_tweaking)
 		touch_up_dirs(dir_flist, -1);
 
 	if (max_delete >= 0 && deletion_count > max_delete) {
