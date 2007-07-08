@@ -53,7 +53,7 @@ extern struct stats stats;
 extern char *tmpdir;
 extern char *partial_dir;
 extern char *basis_dir[];
-extern struct file_list *cur_flist, *first_flist;
+extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct filter_list_struct server_filter_list;
 
 static struct bitbag *delayed_bits = NULL;
@@ -392,7 +392,10 @@ int recv_files(int f_in, char *local_name)
 			continue;
 		}
 
-		file = cur_flist->files[ndx - cur_flist->ndx_start];
+		if (ndx - cur_flist->ndx_start >= 0)
+			file = cur_flist->files[ndx - cur_flist->ndx_start];
+		else
+			file = dir_flist->files[cur_flist->parent_ndx];
 		fname = local_name ? local_name : f_name(file, fbuf);
 
 		if (verbose > 2)

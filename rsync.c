@@ -198,9 +198,8 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 	  invalid_ndx:
 		rprintf(FERROR,
 			"Invalid file index: %d (%d - %d) with iflags %x [%s]\n",
-			ndx, first_flist->ndx_start + first_flist->ndx_start,
-			first_flist->prev->ndx_start + first_flist->ndx_start
-			+ first_flist->prev->used - 1, iflags, who_am_i());
+			ndx, first_flist->ndx_start - 1, first_flist->prev->ndx_end,
+			iflags, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
 	}
 	cur_flist = flist;
@@ -220,7 +219,7 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 
 	if (iflags & ITEM_TRANSFER) {
 		int i = ndx - cur_flist->ndx_start;
-		if (!S_ISREG(cur_flist->files[i]->mode)) {
+		if (i < 0 || !S_ISREG(cur_flist->files[i]->mode)) {
 			rprintf(FERROR,
 				"received request to transfer non-regular file: %d [%s]\n",
 				ndx, who_am_i());
@@ -495,12 +494,12 @@ struct file_list *flist_for_ndx(int ndx)
 	if (!flist && !(flist = first_flist))
 		return NULL;
 
-	while (ndx < flist->ndx_start) {
+	while (ndx < flist->ndx_start-1) {
 		if (flist == first_flist)
 			return NULL;
 		flist = flist->prev;
 	}
-	while (ndx >= flist->ndx_start + flist->used) {
+	while (ndx > flist->ndx_end) {
 		if (!(flist = flist->next))
 			return NULL;
 	}

@@ -43,7 +43,7 @@ extern int inplace;
 extern int batch_fd;
 extern int write_batch;
 extern struct stats stats;
-extern struct file_list *cur_flist, *first_flist;
+extern struct file_list *cur_flist, *first_flist, *dir_flist;
 
 /**
  * @file
@@ -210,7 +210,10 @@ void send_files(int f_in, int f_out)
 		if (inc_recurse)
 			send_extra_file_list(f_out, FILECNT_LOOKAHEAD);
 
-		file = cur_flist->files[ndx - cur_flist->ndx_start];
+		if (ndx - cur_flist->ndx_start >= 0)
+			file = cur_flist->files[ndx - cur_flist->ndx_start];
+		else
+			file = dir_flist->files[cur_flist->parent_ndx];
 		if (F_PATHNAME(file)) {
 			path = F_PATHNAME(file);
 			slash = "/";
