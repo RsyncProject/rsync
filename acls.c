@@ -740,7 +740,7 @@ void receive_acl(struct file_struct *file, int f)
 	F_ACL(file) = recv_rsync_acl(&access_acl_list, SMB_ACL_TYPE_ACCESS, f);
 
 	if (S_ISDIR(file->mode))
-		F_DEF_ACL(file) = recv_rsync_acl(&default_acl_list, SMB_ACL_TYPE_DEFAULT, f);
+		F_DIR_DEFACL(file) = recv_rsync_acl(&default_acl_list, SMB_ACL_TYPE_DEFAULT, f);
 }
 
 static int cache_rsync_acl(rsync_acl *racl, SMB_ACL_TYPE_T type, item_list *racl_list)
@@ -769,7 +769,7 @@ void cache_acl(struct file_struct *file, statx *sxp)
 				      SMB_ACL_TYPE_ACCESS, &access_acl_list);
 
 	if (S_ISDIR(sxp->st.st_mode)) {
-		F_DEF_ACL(file) = cache_rsync_acl(sxp->def_acl,
+		F_DIR_DEFACL(file) = cache_rsync_acl(sxp->def_acl,
 				      SMB_ACL_TYPE_DEFAULT, &default_acl_list);
 	}
 }
@@ -920,7 +920,7 @@ int set_acl(const char *fname, const struct file_struct *file, statx *sxp)
 	if (!S_ISDIR(sxp->st.st_mode))
 		return unchanged;
 
-	ndx = F_DEF_ACL(file);
+	ndx = F_DIR_DEFACL(file);
 	if (ndx >= 0 && (size_t)ndx < default_acl_list.count) {
 		acl_duo *duo_item = default_acl_list.items;
 		duo_item += ndx;
