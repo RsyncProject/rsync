@@ -10,15 +10,6 @@
 
 . "$suitedir/rsync.fns"
 
-case "$RSYNC" in
-*protocol=29*)
-    sed_cmd='/_P30_/d; s/_P29_//'
-    ;;
-*)
-    sed_cmd='/_P29_/d; s/_P30_//'
-    ;;
-esac
-
 to2dir="$tmpdir/to2"
 
 chkfile="$scratchdir/rsync.chk"
@@ -46,13 +37,12 @@ rm -f "$to2dir" "$to2dir.test"
 
 $RSYNC -iplr "$fromdir/" "$todir/" \
     | tee "$outfile"
-sed -e "$sed_cmd" <<EOT >"$chkfile"
+cat <<EOT >"$chkfile"
 cd+++++++++ ./
 cd+++++++++ bar/
-cd+++++++++ foo/_P30_
 cd+++++++++ bar/baz/
 >f+++++++++ bar/baz/rsync
-cd+++++++++ foo/_P29_
+cd+++++++++ foo/
 >f+++++++++ foo/config1
 >f+++++++++ foo/config2
 >f+++++++++ foo/extra
@@ -67,7 +57,7 @@ cp -p "$srcdir/configure.in" "$fromdir/foo/config2"
 chmod 601 "$fromdir/foo/config2"
 $RSYNC -iplrH "$fromdir/" "$todir/" \
     | tee "$outfile"
-sed -e "$sed_cmd" <<EOT >"$chkfile"
+cat <<EOT >"$chkfile"
 >f..T...... bar/baz/rsync
 >f..T...... foo/config1
 >f.sTp..... foo/config2
@@ -87,10 +77,9 @@ chmod 777 "$todir/bar/baz/rsync"
 
 $RSYNC -iplrtc "$fromdir/" "$todir/" \
     | tee "$outfile"
-sed -e "$sed_cmd" <<EOT >"$chkfile"
-.d..t...... foo/_P30_
+cat <<EOT >"$chkfile"
 .f..tp..... bar/baz/rsync
-.d..t...... foo/_P29_
+.d..t...... foo/
 .f..t...... foo/config1
 >fcstp..... foo/config2
 cL..T...... foo/sym -> ../bar/baz/rsync
@@ -103,7 +92,7 @@ chmod 600 "$fromdir/foo/config2"
 $RSYNC -vvplrH "$fromdir/" "$todir/" \
     | tee "$outfile"
 filter_outfile
-sed -e "$sed_cmd" <<EOT >"$chkfile"
+cat <<EOT >"$chkfile"
 bar/baz/rsync is uptodate
 foo/config1 is uptodate
 foo/config2
@@ -117,7 +106,7 @@ $RSYNC -a -f '-! */' "$fromdir/" "$todir"
 $RSYNC -ivvplrtH "$fromdir/" "$todir/" \
     | tee "$outfile"
 filter_outfile
-sed -e "$sed_cmd" <<EOT >"$chkfile"
+cat <<EOT >"$chkfile"
 .d          ./
 .d          bar/
 .d          bar/baz/
@@ -135,7 +124,7 @@ touch "$todir/foo/config2"
 $RSYNC -vplrtH "$fromdir/" "$todir/" \
     | tee "$outfile"
 filter_outfile
-sed -e "$sed_cmd" <<EOT >"$chkfile"
+cat <<EOT >"$chkfile"
 foo/config2
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 6 failed"
@@ -144,7 +133,7 @@ chmod 757 "$todir/foo/config1"
 touch "$todir/foo/config2"
 $RSYNC -iplrtH "$fromdir/" "$todir/" \
     | tee "$outfile"
-sed -e "$sed_cmd" <<EOT >"$chkfile"
+cat <<EOT >"$chkfile"
 .f...p..... foo/config1
 >f..t...... foo/config2
 EOT
@@ -153,7 +142,7 @@ diff $diffopt "$chkfile" "$outfile" || test_fail "test 7 failed"
 $RSYNC -ivvplrtH --copy-dest=../to "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 filter_outfile
-sed -e "$sed_cmd" <<EOT >"$chkfile"
+cat <<EOT >"$chkfile"
 cd          ./
 cd          bar/
 cd          bar/baz/
@@ -169,7 +158,7 @@ diff $diffopt "$chkfile" "$outfile" || test_fail "test 8 failed"
 rm -rf "$to2dir"
 $RSYNC -iplrtH --copy-dest=../to "$fromdir/" "$to2dir/" \
     | tee "$outfile"
-sed -e "$sed_cmd" <<EOT >"$chkfile"
+cat <<EOT >"$chkfile"
 hf          foo/extra => foo/config1
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 9 failed"
@@ -178,7 +167,7 @@ rm -rf "$to2dir"
 $RSYNC -vvplrtH --copy-dest="$todir" "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 filter_outfile
-sed -e "$sed_cmd" <<EOT >"$chkfile"
+cat <<EOT >"$chkfile"
 ./ is uptodate
 bar/ is uptodate
 bar/baz/ is uptodate
@@ -195,7 +184,7 @@ rm -rf "$to2dir"
 $RSYNC -ivvplrtH --link-dest="$todir" "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 filter_outfile
-sed -e "$sed_cmd" <<EOT >"$chkfile"
+cat <<EOT >"$chkfile"
 cd          ./
 cd          bar/
 cd          bar/baz/
@@ -211,14 +200,14 @@ diff $diffopt "$chkfile" "$outfile" || test_fail "test 11 failed"
 rm -rf "$to2dir"
 $RSYNC -iplrtH --dry-run --link-dest=../to "$fromdir/" "$to2dir/" \
     | tee "$outfile"
-sed -e "$sed_cmd" <<EOT >"$chkfile"
+cat <<EOT >"$chkfile"
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 12 failed"
 
 rm -rf "$to2dir"
 $RSYNC -iplrtH --link-dest=../to "$fromdir/" "$to2dir/" \
     | tee "$outfile"
-sed -e "$sed_cmd" <<EOT >"$chkfile"
+cat <<EOT >"$chkfile"
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 13 failed"
 
@@ -226,7 +215,7 @@ rm -rf "$to2dir"
 $RSYNC -vvplrtH --link-dest="$todir" "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 filter_outfile
-sed -e "$sed_cmd" <<EOT >"$chkfile"
+cat <<EOT >"$chkfile"
 ./ is uptodate
 bar/ is uptodate
 bar/baz/ is uptodate
@@ -243,7 +232,7 @@ rm -rf "$to2dir"
 $RSYNC -ivvplrtH --compare-dest="$todir" "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 filter_outfile
-sed -e "$sed_cmd" <<EOT >"$chkfile"
+cat <<EOT >"$chkfile"
 cd          ./
 cd          bar/
 cd          bar/baz/
@@ -259,7 +248,7 @@ diff $diffopt "$chkfile" "$outfile" || test_fail "test 15 failed"
 rm -rf "$to2dir"
 $RSYNC -iplrtH --compare-dest="$todir" "$fromdir/" "$to2dir/" \
     | tee "$outfile"
-sed -e "$sed_cmd" <<EOT >"$chkfile"
+cat <<EOT >"$chkfile"
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 16 failed"
 
@@ -267,7 +256,7 @@ rm -rf "$to2dir"
 $RSYNC -vvplrtH --compare-dest="$todir" "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 filter_outfile
-sed -e "$sed_cmd" <<EOT >"$chkfile"
+cat <<EOT >"$chkfile"
 ./ is uptodate
 bar/ is uptodate
 bar/baz/ is uptodate
