@@ -1239,14 +1239,14 @@ void unmake_file(struct file_struct *file)
 
 static struct file_struct *send_file_name(int f, struct file_list *flist,
 					  char *fname, STRUCT_STAT *stp,
-					  int flags, int filter_flags)
+					  int flags, int filter_level)
 {
 	struct file_struct *file;
 #if defined SUPPORT_ACLS || defined SUPPORT_XATTRS
 	statx sx;
 #endif
 
-	file = make_file(fname, flist, stp, flags, filter_flags);
+	file = make_file(fname, flist, stp, flags, filter_level);
 	if (!file)
 		return NULL;
 
@@ -1440,7 +1440,7 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 	DIR *d;
 	int divert_dirs = (flags & FLAG_DIVERT_DIRS) != 0;
 	int start = flist->used;
-	int filter_flags = f == -2 ? SERVER_FILTERS : ALL_FILTERS;
+	int filter_level = f == -2 ? SERVER_FILTERS : ALL_FILTERS;
 
 	assert(flist != NULL);
 
@@ -1469,7 +1469,7 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 			continue;
 		}
 
-		send_file_name(f, flist, fbuf, NULL, flags, filter_flags);
+		send_file_name(f, flist, fbuf, NULL, flags, filter_level);
 	}
 
 	fbuf[len] = '\0';
