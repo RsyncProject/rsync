@@ -993,11 +993,19 @@ dit(bf(--existing, --ignore-non-existing)) This tells rsync to skip
 creating files (including directories) that do not exist
 yet on the destination.  If this option is
 combined with the bf(--ignore-existing) option, no files will be updated
-(which can be useful if all you want to do is to delete extraneous files).
+(which can be useful if all you want to do is delete extraneous files).
 
 dit(bf(--ignore-existing)) This tells rsync to skip updating files that
 already exist on the destination (this does em(not) ignore existing
 directories, or nothing would get done).  See also bf(--existing).
+
+This option can be useful for those doing backups using the bf(--link-dest)
+option when they need to continue a backup run that got interrupted.  Since
+a bf(--link-dest) run is copied into a new directory hierarchy (when it is
+used properly), using bf(--ignore existing) will ensure that the
+already-handled files don't get tweaked (which avoids a change in
+permissions on the hard-linked files).  This does mean that this option
+is only looking at the existing files in the destination hierarchy itself.
 
 dit(bf(--remove-source-files)) This tells rsync to remove from the sending
 side the files (meaning non-directories) that are a part of the transfer
