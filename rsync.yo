@@ -933,9 +933,8 @@ includes the file's owner and group (if it is not the default), the file's
 device info (device & special files are created as empty text files), and
 any permission bits that we won't allow to be set on the real file (e.g.
 the real file gets u-s,g-s,o-t for safety) or that would limit the owner's
-access (since the real super-user can always access/change a file or
-directory, the files we create can always be accessed/changed by the
-creating user).
+access (since the real super-user can always access/change a file, the
+files we create can always be accessed/changed by the creating user).
 
 The bf(--fake-super) option only affects the side where the option is used.
 To affect the remote side of a remote-shell connection, specify an rsync
@@ -1273,7 +1272,7 @@ quote(itemization(
   bf(--files-from), as does bf(--no-R) and all other options).
 ))
 
-The file names that are read from the FILE are all relative to the
+The filenames that are read from the FILE are all relative to the
 source dir -- any leading slashes are removed and no ".." references are
 allowed to go higher than the source dir.  For example, take this
 command:
@@ -1531,8 +1530,8 @@ quote(itemization(
   it() A bf(t) means the modification time is different and is being updated
   to the sender's value (requires bf(--times)).  An alternate value of bf(T)
   means that the time will be set to the transfer time, which happens
-  anytime a symlink is transferred, or when a file or device is transferred
-  without bf(--times).
+  anytime a symlink is transferred, or when a regular file or device is
+  transferred without bf(--times).
   it() A bf(p) means the permissions are different and are being updated to
   the sender's value (requires bf(--perms)).
   it() An bf(o) means the owner is different and is being updated to the
@@ -2054,20 +2053,19 @@ itemization(
   particular spot in the hierarchy of files, otherwise it is matched
   against the end of the pathname.  This is similar to a leading ^ in
   regular expressions.
-  Thus "/foo" would match a file named "foo" at either the "root of the
+  Thus "/foo" would match a name of "foo" at either the "root of the
   transfer" (for a global rule) or in the merge-file's directory (for a
   per-directory rule).
-  An unqualified "foo" would match any file or directory named "foo"
-  anywhere in the tree because the algorithm is applied recursively from
-  the
+  An unqualified "foo" would match a name of "foo" anywhere in the
+  tree because the algorithm is applied recursively from the
   top down; it behaves as if each path component gets a turn at being the
-  end of the file name.  Even the unanchored "sub/foo" would match at
+  end of the filename.  Even the unanchored "sub/foo" would match at
   any point in the hierarchy where a "foo" was found within a directory
   named "sub".  See the section on ANCHORING INCLUDE/EXCLUDE PATTERNS for
   a full discussion of how to specify a pattern that matches at the root
   of the transfer.
   it() if the pattern ends with a / then it will only match a
-  directory, not a file, link, or device.
+  directory, not a regular file, symlink, or device.
   it() rsync chooses between doing a simple string match and wildcard
   matching by checking if the pattern contains one of these three wildcard
   characters: '*', '?', and '[' .
@@ -2085,7 +2083,7 @@ itemization(
   can actually be any portion of a path from the starting directory on
   down.)
   it() a trailing "dir_name/***" will match both the directory (as if
-  "dir_name/" had been specified) and all the files in the directory
+  "dir_name/" had been specified) and everything in the directory
   (as if "dir_name/**" had been specified).  This behavior was added in
   version 2.6.7.
 )
@@ -2128,7 +2126,7 @@ tt(- *)nl()
 Here are some examples of exclude/include matching:
 
 itemization(
-  it() "- *.o" would exclude all filenames matching *.o
+  it() "- *.o" would exclude all names matching *.o
   it() "- /foo" would exclude a file (or directory) named foo in the
   transfer-root directory
   it() "- foo/" would exclude any directory named foo
