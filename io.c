@@ -445,13 +445,13 @@ static void decrement_flist_in_progress(int ndx, int redo)
 			rprintf(FERROR,
 				"Invalid file index: %d (%d - %d) [%s]\n",
 				ndx, first_flist->ndx_start,
-				first_flist->prev->ndx_start + first_flist->prev->used - 1,
+				first_flist->prev->ndx_end,
 				who_am_i());
 			exit_cleanup(RERR_PROTOCOL);
 		}
 		flist = flist->prev;
 	}
-	while (ndx >= flist->ndx_start + flist->used) {
+	while (ndx > flist->ndx_end) {
 		if (!(flist = flist->next))
 			goto invalid_ndx;
 	}
