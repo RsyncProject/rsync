@@ -336,8 +336,8 @@ to the detailed description below for a complete description.  verb(
      --devices               preserve device files (super-user only)
      --specials              preserve special files
  -D                          same as --devices --specials
- -t, --times                 preserve times
- -O, --omit-dir-times        omit directories when preserving times
+ -t, --times                 preserve modification times
+ -O, --omit-dir-times        omit directories from --times
      --super                 receiver attempts super-user activities
      --fake-super            store/recover privileged attrs using xattrs
  -S, --sparse                handle sparse files efficiently
@@ -664,7 +664,7 @@ if no -bf(-backup-dir) was specified, otherwise it is an empty string.
 
 dit(bf(-u, --update)) This forces rsync to skip any files which exist on
 the destination and have a modified time that is newer than the source
-file.  (If an existing destination file has a modify time equal to the
+file.  (If an existing destination file has a modification time equal to the
 source file's, it will be updated if the sizes are different.)
 
 In the current implementation of bf(--update), a difference of file format
@@ -1537,7 +1537,7 @@ quote(itemization(
   by the file transfer.
   it() A bf(t) means the modification time is different and is being updated
   to the sender's value (requires bf(--times)).  An alternate value of bf(T)
-  means that the time will be set to the transfer time, which happens
+  means that the modification time will be set to the transfer time, which happens
   anytime a symlink is transferred, or when a regular file or device is
   transferred without bf(--times).
   it() A bf(p) means the permissions are different and are being updated to

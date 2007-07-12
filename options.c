@@ -335,8 +335,8 @@ void usage(enum logcode F)
   rprintf(F,"     --devices               preserve device files (super-user only)\n");
   rprintf(F,"     --specials              preserve special files\n");
   rprintf(F," -D                          same as --devices --specials\n");
-  rprintf(F," -t, --times                 preserve times\n");
-  rprintf(F," -O, --omit-dir-times        omit directories when preserving times\n");
+  rprintf(F," -t, --times                 preserve modification times\n");
+  rprintf(F," -O, --omit-dir-times        omit directories from --times\n");
   rprintf(F,"     --super                 receiver attempts super-user activities\n");
 #ifdef SUPPORT_XATTRS
   rprintf(F,"     --fake-super            store/recover privileged attrs using xattrs\n");
