@@ -668,13 +668,12 @@ the destination and have a modified time that is newer than the source
 file.  (If an existing destination file has a modification time equal to the
 source file's, it will be updated if the sizes are different.)
 
-In the current implementation of bf(--update), a difference of file format
-between the sender and receiver is always
-considered to be important enough for an update, no matter what date
-is on the objects.  In other words, if the source has a directory or a
-symlink where the destination has a file, the transfer would occur
-regardless of the timestamps.  This might change in the future (feel
-free to comment on this on the mailing list if you have an opinion).
+Note that this does not affect the copying of symlinks or other special
+files.  Also, a difference of file format between the sender and receiver
+is always considered to be important enough for an update, no matter what
+date is on the objects.  In other words, if the source has a directory
+where the destination has a file, the transfer would occur regardless of
+the timestamps.
 
 dit(bf(--inplace)) This causes rsync not to create a new copy of the file
 and then move it into place.  Instead rsync will overwrite the existing
