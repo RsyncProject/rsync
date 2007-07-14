@@ -151,7 +151,7 @@ static void init_set_compression(void)
 
 		/* Move *.foo items into the stuffix tree. */
 		if (*start == '*' && start[1] == '.' && start[2]
-		 && !strchr(start+2, '.')) {
+		 && !strpbrk(start+2, ".?*")) {
 			add_suffix(&suftree, start[2], start+3);
 			t = start;
 		}
