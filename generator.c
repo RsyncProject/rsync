@@ -1092,6 +1092,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 {
 	static int missing_below = -1, excluded_below = -1;
 	static const char *parent_dirname = "";
+	static struct file_struct *missing_dir = NULL, *excluded_dir = NULL;
 	static struct file_list *fuzzy_dirlist = NULL;
 	static int need_fuzzy_dirlist = 0;
 	struct file_struct *fuzzy_file = NULL;
@@ -1113,14 +1114,17 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (server_filter_list.head) {
 		if (excluded_below >= 0) {
-			if (F_DEPTH(file) > excluded_below)
+			if (F_DEPTH(file) > excluded_below
+			 && (implied_dirs || f_name_has_prefix(file, excluded_dir)))
 				goto skipping;
 			excluded_below = -1;
 		}
 		if (check_filter(&server_filter_list, fname,
 				 S_ISDIR(file->mode)) < 0) {
-			if (S_ISDIR(file->mode))
+			if (S_ISDIR(file->mode)) {
 				excluded_below = F_DEPTH(file);
+				excluded_dir = file;
+			}
 		  skipping:
 			if (verbose) {
 				rprintf(FINFO,
@@ -1132,7 +1136,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (missing_below >= 0) {
-		if (F_DEPTH(file) <= missing_below) {
+		if (F_DEPTH(file) <= missing_below
+		 || (!implied_dirs && !f_name_has_prefix(file, missing_dir))) {
 			if (dry_run)
 				dry_run--;
 			missing_below = -1;
@@ -1201,6 +1206,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				if (dry_run)
 					dry_run++;
 				missing_below = F_DEPTH(file);
+				missing_dir = file;
 			}
 			file->flags |= FLAG_MISSING_DIR;
 		}
@@ -1215,11 +1221,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		 * (perhaps recursively) create it. */
 		if (statret == 0 && !S_ISDIR(sx.st.st_mode)) {
 			if (delete_item(fname, sx.st.st_mode, "directory", del_opts) != 0)
-				return;
+				goto skipping_dir_contents;
 			statret = -1;
 		}
 		if (dry_run && statret != 0 && missing_below < 0) {
 			missing_below = F_DEPTH(file);
+			missing_dir = file;
 			dry_run++;
 		}
 		real_ret = statret;
@@ -1253,9 +1260,11 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				rsyserr(FERROR, errno,
 					"recv_generator: mkdir %s failed",
 					full_fname(fname));
+			  skipping_dir_contents:
 				rprintf(FERROR,
 				    "*** Skipping any contents from this failed directory ***\n");
 				missing_below = F_DEPTH(file);
+				missing_dir = file;
 				file->flags |= FLAG_MISSING_DIR;
 				goto cleanup;
 			}
