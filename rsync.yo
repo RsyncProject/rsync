@@ -378,6 +378,7 @@ to the detailed description below for a complete description.  verb(
      --link-dest=DIR         hardlink to files in DIR when unchanged
  -z, --compress              compress file data during the transfer
      --compress-level=NUM    explicitly set compression level
+     --skip-compress=LIST    skip compressing files with suffix in LIST
  -C, --cvs-exclude           auto-ignore files in the same way CVS does
  -f, --filter=RULE           add a file-filtering RULE
  -F                          same as --filter='dir-merge /.rsync-filter'
@@ -1438,9 +1439,39 @@ be achieved by using a compressing remote shell or a compressing transport
 because it takes advantage of the implicit information in the matching data
 blocks that are not explicitly sent over the connection.
 
+See the bf(--skip-compress) option for the default list of file suffixes
+that will not be compressed.
+
 dit(bf(--compress-level=NUM)) Explicitly set the compression level to use
 (see bf(--compress)) instead of letting it default.  If NUM is non-zero,
 the bf(--compress) option is implied.
+
+dit(bf(--skip-compress=LIST)) Override the list of file suffixes that will
+not be compressed.  The bf(LIST) should be one or more file suffixes
+(without the dot) separated by slashes (/).
+
+You may specify an empty string to indicate that no file should be skipped.
+
+Simple character-class matching is supported: each must consist of a list
+of letters inside the square brackets (e.g. no special classes, such as
+"[:alpha:]", are supported).
+
+The characters asterisk (*) and question-mark (?) have no special meaning.
+
+Here's an example that specifies 6 suffixes to skip (since 1 of the 5 rules
+matches 2 suffixes):
+
+verb(    --skip-compress=gz/jpg/mp[34]/7z/bz2)
+
+The default list of suffixes that will not be compressed is this (several
+of these are newly added for 3.0.0):
+
+verb(    gz/zip/z/rpm/deb/iso/bz2/t[gb]z/7z/mp[34]/mov/avi/ogg/jpg/jpeg)
+
+This list will be replaced by your bf(--skip-compress) list in all but one
+situation: a copy from a daemon rsync will add your skipped suffixes to
+its list of non-compressing files (and its list may be configured to a
+different default).
 
 dit(bf(--numeric-ids)) With this option rsync will transfer numeric group
 and user IDs rather than using user and group names and mapping them
