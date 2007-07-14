@@ -33,9 +33,11 @@ extern int inplace;
 extern int recurse;
 extern int use_qsort;
 extern int allow_inc_recurse;
+extern int relative_paths;
 extern int fuzzy_basis;
 extern int read_batch;
 extern int max_delete;
+extern int implied_dirs;
 extern int delay_updates;
 extern int checksum_seed;
 extern int basis_dir_cnt;
@@ -209,7 +211,8 @@ void setup_protocol(int f_out,int f_in)
 	} else if (protocol_version >= 30) {
 		if (recurse && allow_inc_recurse && !preserve_hard_links
 		 && !delete_before && !delete_after && !delay_updates
-		 && !prune_empty_dirs && !use_qsort)
+		 && (!relative_paths || implied_dirs) && !use_qsort
+		 && !prune_empty_dirs)
 			inc_recurse = 1;
 		need_messages_from_generator = 1;
 	}
