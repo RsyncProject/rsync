@@ -32,6 +32,9 @@ Changes since 2.6.9:
     - Make sure that directory permissions of a newly-created destination
       directory are handled right when --perms is left off.
 
+    - Improved --hard-link so that more corner cases are handled correctly
+      when combined with options such as --link-dest and/or --ignore-existing.
+
   ENHANCEMENTS:
 
     - A new incremental-recursion algorithm is now used when rsync is talking
@@ -70,6 +73,9 @@ Changes since 2.6.9:
       --iconv option that you wish to use.  For example, --enable-iconv=. is a
       good choice.  See the rsync man page for an explanation of the --iconv
       option's settings.
+
+    - Added the --skip-compress=LIST option to override of the default list of
+      file suffixes that will not be compressed when using --compress.
 
     - You may specify --max-delete=0 to a 3.0.0 client as long as the receiving
       side is at least version 3.0.0.  This means that you can pull from an
