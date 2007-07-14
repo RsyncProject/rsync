@@ -124,6 +124,8 @@ Changes since 2.6.9:
 
   DEVELOPER RELATED:
 
+    - Rsync is now licensed under the GPLv3 or later.
+
     - Rsync now has a way of handling protocol-version changes during the
       development of a new protocol version.  This exchange of sub-version
       info does not interfere with the {MIN,MAX}_PROTOCOL_VERSION checking
