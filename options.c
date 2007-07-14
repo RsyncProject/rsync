@@ -119,6 +119,7 @@ int checksum_seed = 0;
 int inplace = 0;
 int delay_updates = 0;
 long block_size = 0; /* "long" because popt can't set an int32. */
+char *skip_compress = NULL;
 
 /** Network address family. **/
 #ifdef INET6
@@ -379,6 +380,7 @@ void usage(enum logcode F)
   rprintf(F,"     --link-dest=DIR         hardlink to files in DIR when unchanged\n");
   rprintf(F," -z, --compress              compress file data during the transfer\n");
   rprintf(F,"     --compress-level=NUM    explicitly set compression level\n");
+  rprintf(F,"     --skip-compress=LIST    skip compressing files with a suffix in LIST\n");
   rprintf(F," -C, --cvs-exclude           auto-ignore files the same way CVS does\n");
   rprintf(F," -f, --filter=RULE           add a file-filtering RULE\n");
   rprintf(F," -F                          same as --filter='dir-merge /.rsync-filter'\n");
@@ -549,6 +551,7 @@ static struct poptOption long_options[] = {
   {"fuzzy",           'y', POPT_ARG_NONE,   &fuzzy_basis, 0, 0, 0 },
   {"compress",        'z', POPT_ARG_NONE,   0, 'z', 0, 0 },
   {"no-compress",      0,  POPT_ARG_VAL,    &do_compression, 0, 0, 0 },
+  {"skip-compress",    0,  POPT_ARG_STRING, &skip_compress, 0, 0, 0 },
   {"no-z",             0,  POPT_ARG_VAL,    &do_compression, 0, 0, 0 },
   {"compress-level",   0,  POPT_ARG_INT,    &def_compress_level, 'z', 0, 0 },
   {0,                 'P', POPT_ARG_NONE,   0, 'P', 0, 0 },
@@ -1839,6 +1842,12 @@ void server_options(char **args,int *argc)
 			args[ac++] = "--super";
 		if (size_only)
 			args[ac++] = "--size-only";
+	} else {
+		if (skip_compress) {
+			if (asprintf(&arg, "--skip-compress=%s", skip_compress) < 0)
+				goto oom;
+			args[ac++] = arg;
+		}
 	}
 
 	if (modify_window_set) {
