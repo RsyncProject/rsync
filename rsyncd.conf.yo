@@ -488,7 +488,10 @@ The "dont compress" option takes a space-separated list of
 case-insensitive wildcard patterns. Any source filename matching one
 of the patterns will not be compressed during transfer.
 
-The default setting is tt(*.gz *.tgz *.zip *.z *.rpm *.deb *.iso *.bz2 *.tbz)
+See the bf(--skip-compress) option in the bf(rsync)(1) manpage for the list
+of file suffixes that are not compressed by default.  Specifying a value
+for the bf(dont compress) option changes the default when the daemon is
+the sender.
 
 dit(bf(pre-xfer exec), bf(post-xfer exec)) You may specify a command to be run
 before and/or after the transfer.  If the bf(pre-xfer exec) command fails, the
