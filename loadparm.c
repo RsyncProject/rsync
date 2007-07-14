@@ -60,6 +60,9 @@ typedef char pstring[1024];
 #define LOG_DAEMON 0
 #endif
 
+#define DEFAULT_DONT_COMPRESS "*.gz *.zip *.z *.rpm *.deb *.iso *.bz2" \
+	" *.t[gb]z *.7z *.mp[34] *.mov *.avi *.ogg *.jpg *.jpeg"
+
 /* the following are used by loadparm for option lists */
 typedef enum
 {
@@ -169,7 +172,7 @@ static service sDefault =
 {
  /* auth_users; */		NULL,
  /* comment; */			NULL,
- /* dont_compress; */		"*.gz *.tgz *.zip *.z *.rpm *.deb *.iso *.bz2 *.tbz",
+ /* dont_compress; */		DEFAULT_DONT_COMPRESS,
  /* exclude; */			NULL,
  /* exclude_from; */		NULL,
  /* filter; */			NULL,
