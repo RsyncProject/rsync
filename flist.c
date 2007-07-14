@@ -2449,6 +2449,8 @@ static void output_flist(struct file_list *flist)
 enum fnc_state { s_DIR, s_SLASH, s_BASE, s_TRAILING };
 enum fnc_type { t_PATH, t_ITEM };
 
+static int found_prefix;
+
 /* Compare the names of two file_struct entities, similar to how strcmp()
  * would do if it were operating on the joined strings.
  *
@@ -2464,7 +2466,7 @@ enum fnc_type { t_PATH, t_ITEM };
  * cannot (and never is in the current codebase).  The basename component
  * may be NULL (for a removed item), in which case it is considered to be
  * after any existing item. */
-int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
+int f_name_cmp(const struct file_struct *f1, const struct file_struct *f2)
 {
 	int dif;
 	const uchar *c1, *c2;
@@ -2569,6 +2571,7 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 				}
 				/* FALL THROUGH */
 			case s_TRAILING:
+				found_prefix = 1;
 				if (!*c1)
 					return 0;
 				type2 = t_ITEM;
@@ -2580,6 +2583,16 @@ int f_name_cmp(struct file_struct *f1, struct file_struct *f2)
 	} while ((dif = (int)*c1++ - (int)*c2++) == 0);
 
 	return dif;
+}
+
+/* Returns 1 if f1's filename has all of f2's filename as a prefix.  This does
+ * not match if f2's basename is not an exact match of a path element in f1.
+ * E.g. /path/foo is not a prefix of /path/foobar/baz, but /path/foobar is. */
+int f_name_has_prefix(const struct file_struct *f1, const struct file_struct *f2)
+{
+	found_prefix = 0;
+	f_name_cmp(f1, f2);
+	return found_prefix;
 }
 
 char *f_name_buf(void)
@@ -2596,7 +2609,7 @@ char *f_name_buf(void)
  * buffer or one of 5 static buffers if fbuf is NULL.  No size-checking is
  * done because we checked the size when creating the file_struct entry.
  */
-char *f_name(struct file_struct *f, char *fbuf)
+char *f_name(const struct file_struct *f, char *fbuf)
 {
 	if (!f || !F_IS_ACTIVE(f))
 		return NULL;
