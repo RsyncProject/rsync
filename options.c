@@ -109,7 +109,7 @@ size_t bwlimit_writemax = 0;
 int ignore_existing = 0;
 int ignore_non_existing = 0;
 int need_messages_from_generator = 0;
-int max_delete = -1;
+int max_delete = INT_MIN;
 OFF_T max_size = 0;
 OFF_T min_size = 0;
 int ignore_errors = 0;
@@ -1291,6 +1291,11 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		return 0;
 	}
 
+	if (max_delete < 0 && max_delete != INT_MIN) {
+		/* Negative numbers are treated as "no deletions". */
+		max_delete = 0;
+	}
+
 	if (compare_dest + copy_dest + link_dest > 1) {
 		snprintf(err_buf, sizeof err_buf,
 			"You may not mix --compare-dest, --copy-dest, and --link-dest.\n");
@@ -1780,22 +1785,6 @@ void server_options(char **args,int *argc)
 		args[ac++] = arg;
 	}
 
-	if (max_delete >= 0 && am_sender) {
-		if (asprintf(&arg, "--max-delete=%d", max_delete) < 0)
-			goto oom;
-		args[ac++] = arg;
-	}
-
-	if (min_size && am_sender) {
-		args[ac++] = "--min-size";
-		args[ac++] = min_size_arg;
-	}
-
-	if (max_size && am_sender) {
-		args[ac++] = "--max-size";
-		args[ac++] = max_size_arg;
-	}
-
 	if (io_timeout) {
 		if (asprintf(&arg, "--timeout=%d", io_timeout) < 0)
 			goto oom;
@@ -1822,6 +1811,20 @@ void server_options(char **args,int *argc)
 	}
 
 	if (am_sender) {
+		if (max_delete > 0) {
+			if (asprintf(&arg, "--max-delete=%d", max_delete) < 0)
+				goto oom;
+			args[ac++] = arg;
+		} else if (max_delete == 0)
+			args[ac++] = "--max_delete=-1";
+		if (min_size) {
+			args[ac++] = "--min-size";
+			args[ac++] = min_size_arg;
+		}
+		if (max_size) {
+			args[ac++] = "--max-size";
+			args[ac++] = max_size_arg;
+		}
 		if (delete_before)
 			args[ac++] = "--delete-before";
 		else if (delete_during == 2)
