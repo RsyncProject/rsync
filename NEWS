@@ -77,11 +77,15 @@ Changes since 2.6.9:
     - Added the --skip-compress=LIST option to override of the default list of
       file suffixes that will not be compressed when using --compress.
 
-    - You may specify --max-delete=0 to a 3.0.0 client as long as the receiving
-      side is at least version 3.0.0.  This means that you can pull from an
-      older rsync with this option, but pushing to an older rsync will generate
-      an error.  *Be sure to never specify a 0 value to an older rsync client,
-      or it will be silently ignored.*
+    - The --max-delete option now outputs a warning if it skipped any file
+      deletions, including a count of how many deletions were skipped.  (Older
+      versions just silently stopped deleting things.)
+
+    - You may specify --max-delete=0 to a 3.0.0 client to request that it warn
+      about any files that it wants to delete without deleting anything.  If
+      you're not sure what version the client is, you can use the less-obvious
+      --max-delete=-1, as old and new versions will both treat that as the
+      same request (though older versions don't warn).
 
     - The --hard-link option now uses less memory on both the sending and
       receiving side for all protocol versions.  For protocol 30, the use of a
