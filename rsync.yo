@@ -1099,13 +1099,15 @@ using bf(--delete-after), and it used to be non-functional unless the
 bf(--recursive) option was also enabled.
 
 dit(bf(--max-delete=NUM)) This tells rsync not to delete more than NUM
-files or directories.
-Beginning with version 3.0.0, you may specify bf(--max-delete=0) to
-be warned about any extraneous files in the destination, but be very
-careful to never specify a 0 value to an older rsync client, or the
-option will be silently ignored.  (A 3.0.0 client will die with an
-error if the remote rsync is not new enough to handle the situation.)
-This is useful when mirroring very large trees to prevent disasters.
+files or directories.  If that limit is exceeded, a warning is output
+and rsync exits with an error code of 25 (new for 3.0.0).
+
+Also new for version 3.0.0, you may specify bf(--max-delete=0) to be warned
+about any extraneous files in the destination without removing any of them.
+Older clients interpreted this as "unlimited", so if you don't know what
+version the client is, you can use the less obvious bf(--max-delete=-1) as
+a backward-compatible way to specify that no deletions be allowed (though
+older versions didn't warn when the limit was exceeded).
 
 dit(bf(--max-size=SIZE)) This tells rsync to avoid transferring any
 file that is larger than the specified SIZE. The SIZE value can be
