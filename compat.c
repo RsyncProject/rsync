@@ -36,7 +36,6 @@ extern int allow_inc_recurse;
 extern int relative_paths;
 extern int fuzzy_basis;
 extern int read_batch;
-extern int max_delete;
 extern int implied_dirs;
 extern int delay_updates;
 extern int checksum_seed;
@@ -146,13 +145,6 @@ void setup_protocol(int f_out,int f_in)
 	}
 
 	if (protocol_version < 30) {
-		if (max_delete == 0 && am_sender) {
-			rprintf(FERROR,
-			    "--max-delete=0 requires protocol 30 or higher"
-			    " (negotiated %d).\n",
-			    protocol_version);
-			exit_cleanup(RERR_PROTOCOL);
-		}
 		if (preserve_acls && !local_server) {
 			rprintf(FERROR,
 			    "--acls requires protocol 30 or higher"
