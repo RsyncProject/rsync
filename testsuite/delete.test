@@ -23,12 +23,12 @@ echo extra >"$todir"/emptydir/subdir/remove4
 # Also, make sure that --dry-run --del doesn't output anything extraneous.
 $RSYNC -av "$fromdir/" "$chkdir/copy/" >"$tmpdir/copy.out" 2>&1
 cat "$tmpdir/copy.out"
-grep -v '^\(created directory\|sent\|total size\) ' "$tmpdir/copy.out" >"$tmpdir/copy.new"
+egrep -v '^(created directory|sent|total size) ' "$tmpdir/copy.out" >"$tmpdir/copy.new"
 mv "$tmpdir/copy.new" "$tmpdir/copy.out"
 
 $RSYNC -avn --del "$fromdir/" "$chkdir/copy2/" >"$tmpdir/copy2.out" 2>&1 || true
 cat "$tmpdir/copy2.out"
-grep -v '^\(created directory\|sent\|total size\) ' "$tmpdir/copy2.out" >"$tmpdir/copy2.new"
+egrep -v '^(created directory|sent|total size) ' "$tmpdir/copy2.out" >"$tmpdir/copy2.new"
 mv "$tmpdir/copy2.new" "$tmpdir/copy2.out"
 
 diff $diffopt "$tmpdir/copy.out" "$tmpdir/copy2.out"
