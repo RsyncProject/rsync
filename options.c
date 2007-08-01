@@ -1981,7 +1981,7 @@ char *check_for_hostspec(char *s, char **host_ptr, int *port_ptr)
 			if (p[1] == ':')
 				*port_ptr = atoi(p+2);
 		} else {
-			if ((p = strchr(s, ':')) != NULL) {
+			if ((p = strchr(s, ':')) != NULL && p < s + hostlen) {
 				hostlen = p - s;
 				*port_ptr = atoi(p+1);
 			}
