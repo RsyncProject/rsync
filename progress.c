@@ -59,12 +59,11 @@ static unsigned long msdiff(struct timeval *t1, struct timeval *t2)
 static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 			    int is_last)
 {
-	char eol[256];
+	char rembuf[64], eol[128];
 	const char *units;
 	int pct = ofs == size ? 100 : (int) (100.0 * ofs / size);
 	unsigned long diff;
 	double rate, remain;
-	int remain_h, remain_m, remain_s;
 
 	if (is_last) {
 		/* Compute stats based on the starting info. */
@@ -93,9 +92,14 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 		units = "kB/s";
 	}
 
-	remain_s = (int) remain % 60;
-	remain_m = (int) (remain / 60.0) % 60;
-	remain_h = (int) (remain / 3600.0);
+	if (remain < 0)
+		strlcpy(rembuf, "  ??:??:??", sizeof rembuf);
+	else {
+		snprintf(rembuf, sizeof rembuf, "%4d:%02d:%02d",
+			 (int) (remain / 3600.0),
+			 (int) (remain / 60.0) % 60,
+			 (int) remain % 60);
+	}
 
 	if (is_last) {
 		snprintf(eol, sizeof eol, " (xfer#%d, to-check=%d/%d)\n",
@@ -104,9 +108,8 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 			stats.num_files);
 	} else
 		strlcpy(eol, "\r", sizeof eol);
-	rprintf(FCLIENT, "%12s %3d%% %7.2f%s %4d:%02d:%02d%s",
-		human_num(ofs), pct, rate, units,
-		remain_h, remain_m, remain_s, eol);
+	rprintf(FCLIENT, "%12s %3d%% %7.2f%s %s%s",
+		human_num(ofs), pct, rate, units, rembuf, eol);
 }
 
 void end_progress(OFF_T size)
