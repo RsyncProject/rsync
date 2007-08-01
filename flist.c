@@ -1469,6 +1469,13 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 				full_fname(fbuf));
 			continue;
 		}
+		if (dname[0] == '\0') {
+			io_error |= IOERR_GENERAL;
+			rprintf(FINFO,
+				"cannot send file with empty name in %s\n",
+				full_fname(fbuf));
+			continue;
+		}
 
 		send_file_name(f, flist, fbuf, NULL, flags, filter_level);
 	}
