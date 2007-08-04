@@ -555,8 +555,8 @@ Beginning with rsync 3.0.0, the recursive algorithm used is now an
 incremental scan that uses much less memory than before and begins the
 transfer after the scanning of the first few directories have been
 completed.  This incremental scan only affects our recursion algorithm, and
-does not change a non-recursive transfer (e.g. when using a fully-specified
-bf(--files-from) list).  It is also only possible when both ends of the
+does not change a non-recursive transfer.
+It is also only possible when both ends of the
 transfer are at least version 3.0.0.
 
 Some options require rsync to know the full file list, so these options
@@ -704,7 +704,7 @@ the receiving side is identical with the start of the file on the sending
 side.  If that is not true, the file will fail the checksum test, and the
 resend will do a normal bf(--inplace) update to correct the mismatched data.
 Only files on the receiving side that are shorter than the corresponding
-file on the sending side (as well as new files) are sent.
+file on the sending side (as well as new files) are transferred.
 Implies bf(--inplace), but does not conflict with bf(--sparse) (though the
 bf(--sparse) option will be auto-disabled if a resend of the already-existing
 data is required).
@@ -964,7 +964,7 @@ correctly and ends up corrupting the files.
 dit(bf(-n, --dry-run)) This tells rsync to not do any file transfers,
 instead it will just report the actions it would have taken.
 
-dit(bf(-W, --whole-file)) With this option the incremental rsync algorithm
+dit(bf(-W, --whole-file)) With this option the differential rsync algorithm
 is not used and the whole file is sent as-is instead.  The transfer may be
 faster if this option is used when the bandwidth between the source and
 destination machines is higher than the bandwidth to disk (especially when the
@@ -1706,7 +1706,7 @@ after it has served its purpose.
 Note that if bf(--whole-file) is specified (or implied), any partial-dir
 file that is found for a file that is being updated will simply be removed
 (since
-rsync is sending files without using the incremental rsync algorithm).
+rsync is sending files without using the differential rsync algorithm).
 
 Rsync will create the em(DIR) if it is missing (just the last dir -- not
 the whole path).  This makes it easy to use a relative path (such as
@@ -1824,7 +1824,7 @@ sender's file, which is being reconstructed at a rate of 110.64 kilobytes
 per second, and the transfer will finish in 4 seconds if the current rate
 is maintained until the end.
 
-These statistics can be misleading if the incremental transfer algorithm is
+These statistics can be misleading if the differential transfer algorithm is
 in use.  For example, if the sender's file consists of the basis file
 followed by additional data, the reported rate will probably drop
 dramatically when the receiver gets to the literal data, and the transfer
