@@ -358,7 +358,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 	char fname[MAXPATHLEN];
 	int first_hlink_ndx = -1;
 	int l1, l2;
-	int flags;
+	int xflags;
 
 #ifdef ICONV_OPTION
 	if (ic_send != (iconv_t)-1) {
@@ -390,56 +390,56 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 #endif
 		f_name(file, fname);
 
-	flags = file->flags & FLAG_TOP_DIR; /* FLAG_TOP_DIR == XMIT_TOP_DIR */
+	xflags = file->flags & FLAG_TOP_DIR; /* FLAG_TOP_DIR == XMIT_TOP_DIR */
 
 	if (file->mode == mode)
-		flags |= XMIT_SAME_MODE;
+		xflags |= XMIT_SAME_MODE;
 	else
 		mode = file->mode;
 	if ((preserve_devices && IS_DEVICE(mode))
 	 || (preserve_specials && IS_SPECIAL(mode))) {
 		if (protocol_version < 28) {
 			if (tmp_rdev == rdev)
-				flags |= XMIT_SAME_RDEV_pre28;
+				xflags |= XMIT_SAME_RDEV_pre28;
 			else
 				rdev = tmp_rdev;
 		} else {
 			rdev = tmp_rdev;
 			if ((uint32)major(rdev) == rdev_major)
-				flags |= XMIT_SAME_RDEV_MAJOR;
+				xflags |= XMIT_SAME_RDEV_MAJOR;
 			else
 				rdev_major = major(rdev);
 			if (protocol_version < 30 && (uint32)minor(rdev) <= 0xFFu)
-				flags |= XMIT_RDEV_MINOR_8_pre30;
+				xflags |= XMIT_RDEV_MINOR_8_pre30;
 		}
 	} else if (protocol_version < 28)
 		rdev = MAKEDEV(0, 0);
 	if (uid_ndx) {
 		if ((uid_t)F_OWNER(file) == uid && *lastname)
-			flags |= XMIT_SAME_UID;
+			xflags |= XMIT_SAME_UID;
 		else {
 			uid = F_OWNER(file);
 			if (uid_ndx && !numeric_ids) {
 				user_name = add_uid(uid);
 				if (inc_recurse && user_name)
-					flags |= XMIT_USER_NAME_FOLLOWS;
+					xflags |= XMIT_USER_NAME_FOLLOWS;
 			}
 		}
 	}
 	if (gid_ndx) {
 		if ((gid_t)F_GROUP(file) == gid && *lastname)
-			flags |= XMIT_SAME_GID;
+			xflags |= XMIT_SAME_GID;
 		else {
 			gid = F_GROUP(file);
 			if (gid_ndx && !numeric_ids) {
 				group_name = add_gid(gid);
 				if (inc_recurse && group_name)
-					flags |= XMIT_GROUP_NAME_FOLLOWS;
+					xflags |= XMIT_GROUP_NAME_FOLLOWS;
 			}
 		}
 	}
 	if (file->modtime == modtime)
-		flags |= XMIT_SAME_TIME;
+		xflags |= XMIT_SAME_TIME;
 	else
 		modtime = file->modtime;
 
@@ -450,16 +450,16 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 			first_hlink_ndx = (int32)(long)np->data - 1;
 			if (first_hlink_ndx < 0) {
 				np->data = (void*)(long)(ndx + 1);
-				flags |= XMIT_HLINK_FIRST;
+				xflags |= XMIT_HLINK_FIRST;
 			}
-			flags |= XMIT_HLINKED;
+			xflags |= XMIT_HLINKED;
 		} else {
 			if (tmp_dev == dev) {
 				if (protocol_version >= 28)
-					flags |= XMIT_SAME_DEV_pre30;
+					xflags |= XMIT_SAME_DEV_pre30;
 			} else
 				dev = tmp_dev;
-			flags |= XMIT_HLINKED;
+			xflags |= XMIT_HLINKED;
 		}
 	}
 #endif
@@ -470,30 +470,30 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 	l2 = strlen(fname+l1);
 
 	if (l1 > 0)
-		flags |= XMIT_SAME_NAME;
+		xflags |= XMIT_SAME_NAME;
 	if (l2 > 255)
-		flags |= XMIT_LONG_NAME;
+		xflags |= XMIT_LONG_NAME;
 
 	/* We must make sure we don't send a zero flag byte or the
 	 * other end will terminate the flist transfer.  Note that
 	 * the use of XMIT_TOP_DIR on a non-dir has no meaning, so
 	 * it's harmless way to add a bit to the first flag byte. */
 	if (protocol_version >= 28) {
-		if (!flags && !S_ISDIR(mode))
-			flags |= XMIT_TOP_DIR;
-		if ((flags & 0xFF00) || !flags) {
-			flags |= XMIT_EXTENDED_FLAGS;
-			write_shortint(f, flags);
+		if (!xflags && !S_ISDIR(mode))
+			xflags |= XMIT_TOP_DIR;
+		if ((xflags & 0xFF00) || !xflags) {
+			xflags |= XMIT_EXTENDED_FLAGS;
+			write_shortint(f, xflags);
 		} else
-			write_byte(f, flags);
+			write_byte(f, xflags);
 	} else {
-		if (!(flags & 0xFF))
-			flags |= S_ISDIR(mode) ? XMIT_LONG_NAME : XMIT_TOP_DIR;
-		write_byte(f, flags);
+		if (!(xflags & 0xFF))
+			xflags |= S_ISDIR(mode) ? XMIT_LONG_NAME : XMIT_TOP_DIR;
+		write_byte(f, xflags);
 	}
-	if (flags & XMIT_SAME_NAME)
+	if (xflags & XMIT_SAME_NAME)
 		write_byte(f, l1);
-	if (flags & XMIT_LONG_NAME)
+	if (xflags & XMIT_LONG_NAME)
 		write_varint30(f, l2);
 	else
 		write_byte(f, l2);
@@ -505,32 +505,32 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 	}
 
 	write_varlong30(f, F_LENGTH(file), 3);
-	if (!(flags & XMIT_SAME_TIME)) {
+	if (!(xflags & XMIT_SAME_TIME)) {
 		if (protocol_version >= 30)
 			write_varlong(f, modtime, 4);
 		else
 			write_int(f, modtime);
 	}
-	if (!(flags & XMIT_SAME_MODE))
+	if (!(xflags & XMIT_SAME_MODE))
 		write_int(f, to_wire_mode(mode));
-	if (uid_ndx && !(flags & XMIT_SAME_UID)) {
+	if (uid_ndx && !(xflags & XMIT_SAME_UID)) {
 		if (protocol_version < 30)
 			write_int(f, uid);
 		else {
 			write_varint(f, uid);
-			if (flags & XMIT_USER_NAME_FOLLOWS) {
+			if (xflags & XMIT_USER_NAME_FOLLOWS) {
 				int len = strlen(user_name);
 				write_byte(f, len);
 				write_buf(f, user_name, len);
 			}
 		}
 	}
-	if (gid_ndx && !(flags & XMIT_SAME_GID)) {
+	if (gid_ndx && !(xflags & XMIT_SAME_GID)) {
 		if (protocol_version < 30)
 			write_int(f, gid);
 		else {
 			write_varint(f, gid);
-			if (flags & XMIT_GROUP_NAME_FOLLOWS) {
+			if (xflags & XMIT_GROUP_NAME_FOLLOWS) {
 				int len = strlen(group_name);
 				write_byte(f, len);
 				write_buf(f, group_name, len);
@@ -540,14 +540,14 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 	if ((preserve_devices && IS_DEVICE(mode))
 	 || (preserve_specials && IS_SPECIAL(mode))) {
 		if (protocol_version < 28) {
-			if (!(flags & XMIT_SAME_RDEV_pre28))
+			if (!(xflags & XMIT_SAME_RDEV_pre28))
 				write_int(f, (int)rdev);
 		} else {
-			if (!(flags & XMIT_SAME_RDEV_MAJOR))
+			if (!(xflags & XMIT_SAME_RDEV_MAJOR))
 				write_varint30(f, major(rdev));
 			if (protocol_version >= 30)
 				write_varint(f, minor(rdev));
-			else if (flags & XMIT_RDEV_MINOR_8_pre30)
+			else if (xflags & XMIT_RDEV_MINOR_8_pre30)
 				write_byte(f, minor(rdev));
 			else
 				write_int(f, minor(rdev));
@@ -571,7 +571,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 			write_int(f, (int32)tmp_ino);
 		} else {
 			/* 64-bit dev_t and ino_t */
-			if (!(flags & XMIT_SAME_DEV_pre30))
+			if (!(xflags & XMIT_SAME_DEV_pre30))
 				write_longint(f, dev);
 			write_longint(f, tmp_ino);
 		}
@@ -847,7 +847,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	bp += basename_len + linkname_len; /* skip space for symlink too */
 
 #ifdef SUPPORT_HARD_LINKS
-	if (xflags & XMIT_HLINKED)
+	if (xflags & XMIT_HLINKED && S_ISDIR(mode))
 		file->flags |= FLAG_HLINKED;
 #endif
 	file->modtime = (time_t)modtime;
@@ -916,7 +916,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 #endif
 
 #ifdef SUPPORT_HARD_LINKS
-	if (preserve_hard_links && xflags & XMIT_HLINKED) {
+	if (preserve_hard_links && xflags & XMIT_HLINKED && S_ISDIR(mode)) {
 		if (protocol_version >= 30) {
 			F_HL_GNUM(file) = xflags & XMIT_HLINK_FIRST
 					? flist->used : first_hlink_ndx;
