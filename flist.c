@@ -847,7 +847,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	bp += basename_len + linkname_len; /* skip space for symlink too */
 
 #ifdef SUPPORT_HARD_LINKS
-	if (xflags & XMIT_HLINKED && S_ISDIR(mode))
+	if (xflags & XMIT_HLINKED && !S_ISDIR(mode))
 		file->flags |= FLAG_HLINKED;
 #endif
 	file->modtime = (time_t)modtime;
@@ -916,7 +916,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 #endif
 
 #ifdef SUPPORT_HARD_LINKS
-	if (preserve_hard_links && xflags & XMIT_HLINKED && S_ISDIR(mode)) {
+	if (preserve_hard_links && xflags & XMIT_HLINKED && !S_ISDIR(mode)) {
 		if (protocol_version >= 30) {
 			F_HL_GNUM(file) = xflags & XMIT_HLINK_FIRST
 					? flist->used : first_hlink_ndx;
