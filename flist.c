@@ -396,6 +396,10 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 		xflags |= XMIT_SAME_MODE;
 	else
 		mode = file->mode;
+
+	if (protocol_version >= 30 && S_ISDIR(mode) && !(file->flags & FLAG_XFER_DIR))
+		xflags |= XMIT_NON_XFER_DIR;
+
 	if ((preserve_devices && IS_DEVICE(mode))
 	 || (preserve_specials && IS_SPECIAL(mode))) {
 		if (protocol_version < 28) {
@@ -847,7 +851,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	bp += basename_len + linkname_len; /* skip space for symlink too */
 
 #ifdef SUPPORT_HARD_LINKS
-	if (xflags & XMIT_HLINKED && !S_ISDIR(mode))
+	if (xflags & XMIT_HLINKED)
 		file->flags |= FLAG_HLINKED;
 #endif
 	file->modtime = (time_t)modtime;
@@ -885,6 +889,9 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 			    && lastname[del_hier_name_len-2] == '/')
 				del_hier_name_len -= 2;
 			file->flags |= FLAG_TOP_DIR | FLAG_XFER_DIR;
+		} else if (protocol_version >= 30) {
+			if (!(xflags & XMIT_NON_XFER_DIR))
+				file->flags |= FLAG_XFER_DIR;
 		} else if (in_del_hier) {
 			if (!relative_paths || !del_hier_name_len
 			 || (l1 >= del_hier_name_len
@@ -916,7 +923,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 #endif
 
 #ifdef SUPPORT_HARD_LINKS
-	if (preserve_hard_links && xflags & XMIT_HLINKED && !S_ISDIR(mode)) {
+	if (preserve_hard_links && xflags & XMIT_HLINKED) {
 		if (protocol_version >= 30) {
 			F_HL_GNUM(file) = xflags & XMIT_HLINK_FIRST
 					? flist->used : first_hlink_ndx;
@@ -1053,10 +1060,13 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	if (filter_level == NO_FILTERS)
 		goto skip_filters;
 
-	if (S_ISDIR(st.st_mode) && !xfer_dirs) {
-		rprintf(FINFO, "skipping directory %s\n", thisname);
-		return NULL;
-	}
+	if (S_ISDIR(st.st_mode)) {
+		if (!xfer_dirs) {
+			rprintf(FINFO, "skipping directory %s\n", thisname);
+			return NULL;
+		}
+	} else
+		flags &= ~FLAG_XFER_DIR;
 
 	/* -x only affects directories because we need to avoid recursing
 	 * into a mount-point directory, not to avoid copying a symlinked
@@ -1644,10 +1654,10 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	flist = cur_flist = flist_new(0, "send_file_list");
 	if (inc_recurse) {
 		dir_flist = flist_new(FLIST_TEMP, "send_file_list");
-		flags = FLAG_DIVERT_DIRS;
+		flags = FLAG_DIVERT_DIRS | FLAG_XFER_DIR;
 	} else {
 		dir_flist = cur_flist;
-		flags = 0;
+		flags = FLAG_XFER_DIR;
 	}
 
 	disable_buffering = io_start_buffering_out(f);
@@ -1813,7 +1823,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			if (fn != p || (*lp && *lp != '/')) {
 				int save_copy_links = copy_links;
 				int save_xfer_dirs = xfer_dirs;
-				int dir_flags = inc_recurse ? FLAG_DIVERT_DIRS : 0;
+				int dir_flags = flags & ~FLAG_XFER_DIR;
 				copy_links |= copy_unsafe_links;
 				xfer_dirs = 1;
 				while ((slash = strchr(slash+1, '/')) != 0) {
@@ -1835,7 +1845,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 		if (recurse || (xfer_dirs && is_dot_dir)) {
 			struct file_struct *file;
-			int top_flags = FLAG_TOP_DIR | FLAG_XFER_DIR | flags;
+			int top_flags = FLAG_TOP_DIR | flags;
 			file = send_file_name(f, flist, fbuf, &st,
 					      top_flags, ALL_FILTERS);
 			if (file && !inc_recurse)
