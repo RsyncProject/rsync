@@ -494,25 +494,29 @@ void pop_local_filters(void *mem)
 
 void change_local_filter_dir(const char *dname, int dlen, int dir_depth)
 {
-	static int min_depth = MAXPATHLEN, cur_depth = -1;
+	static int cur_depth = -1;
 	static void *filt_array[MAXPATHLEN/2+1];
 
 	if (!dname) {
-		while (cur_depth >= min_depth)
-			pop_local_filters(filt_array[cur_depth--]);
-		min_depth = MAXPATHLEN;
-		cur_depth = -1;
+		for ( ; cur_depth >= 0; cur_depth--) {
+			if (filt_array[cur_depth]) {
+				pop_local_filters(filt_array[cur_depth]);
+				filt_array[cur_depth] = NULL;
+			}
+		}
 		return;
 	}
 
 	assert(dir_depth < MAXPATHLEN/2+1);
 
-	while (cur_depth >= dir_depth && cur_depth >= min_depth)
-		pop_local_filters(filt_array[cur_depth--]);
-	cur_depth = dir_depth;
-	if (cur_depth < min_depth)
-		min_depth = cur_depth;
+	for ( ; cur_depth >= dir_depth; cur_depth--) {
+		if (filt_array[cur_depth]) {
+			pop_local_filters(filt_array[cur_depth]);
+			filt_array[cur_depth] = NULL;
+		}
+	}
 
+	cur_depth = dir_depth;
 	filt_array[cur_depth] = push_local_filters(dname, dlen);
 }
 
