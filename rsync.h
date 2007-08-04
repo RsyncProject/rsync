@@ -49,13 +49,14 @@
 #define XMIT_SAME_NAME (1<<5)
 #define XMIT_LONG_NAME (1<<6)
 #define XMIT_SAME_TIME (1<<7)
-#define XMIT_SAME_RDEV_MAJOR (1<<8)	/* protocols 28 - NOW */
+#define XMIT_SAME_RDEV_MAJOR (1<<8)	/* protocols 28 - NOW (devices only) */
+#define XMIT_NON_XFER_DIR (1<<8)	/* protocols 30 - NOW (dirs only) */
 #define XMIT_HLINKED (1<<9)		/* protocols 28 - NOW */
 #define XMIT_SAME_DEV_pre30 (1<<10)	/* protocols 28 - 29  */
 #define XMIT_USER_NAME_FOLLOWS (1<<10)	/* protocols 30 - NOW */
 #define XMIT_RDEV_MINOR_8_pre30 (1<<11)	/* protocols 28 - 29  */
 #define XMIT_GROUP_NAME_FOLLOWS (1<<11) /* protocols 30 - NOW */
-#define XMIT_HLINK_FIRST (1<<12)	/* protocols 30 - NOW */
+#define XMIT_HLINK_FIRST (1<<12)	/* protocols 30 - NOW (HLINKED files only) */
 
 /* These flags are used in the live flist data. */
 
@@ -88,7 +89,7 @@
 /* This is used when working on a new protocol version in CVS, and should
  * be a new non-zero value for each CVS change that affects the protocol.
  * It must ALWAYS be 0 when the protocol goes final! */
-#define SUBPROTOCOL_VERSION 4
+#define SUBPROTOCOL_VERSION 5
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
