@@ -329,7 +329,7 @@ void usage(enum logcode F)
   rprintf(F," -A, --acls                  preserve ACLs (implies --perms)\n");
 #endif
 #ifdef SUPPORT_XATTRS
-  rprintf(F," -X, --xattrs                preserve extended attributes (implies --perms)\n");
+  rprintf(F," -X, --xattrs                preserve extended attributes\n");
 #endif
   rprintf(F," -o, --owner                 preserve owner (super-user only)\n");
   rprintf(F," -g, --group                 preserve group\n");
@@ -1190,7 +1190,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		case 'X':
 #ifdef SUPPORT_XATTRS
 			preserve_xattrs++;
-			preserve_perms = 1;
 			break;
 #else
 			snprintf(err_buf,sizeof(err_buf),
