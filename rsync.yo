@@ -330,7 +330,7 @@ to the detailed description below for a complete description.  verb(
  -E, --executability         preserve executability
      --chmod=CHMOD           affect file and/or directory permissions
  -A, --acls                  preserve ACLs (implies -p)
- -X, --xattrs                preserve extended attrs (implies -p)
+ -X, --xattrs                preserve extended attributes
  -o, --owner                 preserve owner (super-user only)
  -g, --group                 preserve group
      --devices               preserve device files (super-user only)
@@ -848,8 +848,7 @@ works if the remote rsync also supports it.  bf(--acls) implies bf(--perms).
 
 dit(bf(-X, --xattrs)) This option causes rsync to update the remote
 extended attributes to be the same as the local ones.  This will work
-only if the remote machine's rsync supports this option also. This is
-a non-standard option.
+only if the remote machine's rsync also supports this option.
 
 dit(bf(--chmod)) This option tells rsync to apply one or more
 comma-separated "chmod" strings to the permission of the files in the
