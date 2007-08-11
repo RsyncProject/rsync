@@ -219,6 +219,21 @@ environment variable RSYNC_PROXY to a hostname:port pair pointing to
 your web proxy.  Note that your web proxy's configuration must support
 proxy connections to port 873.
 
+You may also establish a daemon connection using a program as a proxy by
+setting the environment variable RSYNC_CONNECT_PROG to the commands you
+wish to run in place of making a direct socket connection.  The string may
+contain the escape "%H" to represent the hostname specified in the rsync
+command (so use "%%" if you need a single "%" in your string).  For
+example:
+
+verb(  export RSYNC_CONNECT_PROG='ssh proxyhost nc %H 873'
+  rsync -av targethost1::module/src/ /dest/
+  rsync -av rsync:://targethost2/module/src/ /dest/ )
+
+The command specifed above uses ssh to run nc (netcat) on a proxyhost,
+which forwards all data to port 873 (the rsync daemon) on the targethost
+(%H).
+
 manpagesection(USING RSYNC-DAEMON FEATURES VIA A REMOTE-SHELL CONNECTION)
 
 It is sometimes useful to use various features of an rsync daemon (such as
@@ -2719,7 +2734,7 @@ values
 
 see also the comments on the bf(--delete) option
 
-Please report bugs! See the website at
+Please report bugs! See the web site at
 url(http://rsync.samba.org/)(http://rsync.samba.org/)
 
 manpagesection(VERSION)
