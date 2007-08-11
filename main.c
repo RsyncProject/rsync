@@ -37,7 +37,6 @@ extern int am_daemon;
 extern int inc_recurse;
 extern int blocking_io;
 extern int remove_source_files;
-extern int daemon_over_rsh;
 extern int need_messages_from_generator;
 extern int kluge_around_eof;
 extern int do_stats;
@@ -75,6 +74,7 @@ extern struct filter_list_struct server_filter_list;
 
 int local_server = 0;
 int new_root_dir = 0;
+int daemon_over_rsh = 0;
 mode_t orig_umask = 0;
 int batch_gen_fd = -1;
 
@@ -1092,16 +1092,9 @@ static int start_client(int argc, char *argv[])
 					"--files-from hostname is not the same as the transfer hostname\n");
 				exit_cleanup(RERR_SYNTAX);
 			}
-			if (rsync_port) {
-				if (!shell_cmd) {
-					return start_socket_client(shell_machine,
-								   shell_path,
-								   argc, argv);
-				}
-				daemon_over_rsh = 1;
-			}
-
 			am_sender = 0;
+			if (rsync_port)
+				daemon_over_rsh = shell_cmd ? 1 : -1;
 		} else { /* source is local, check dest arg */
 			am_sender = 1;
 
@@ -1128,14 +1121,8 @@ static int start_client(int argc, char *argv[])
 				}
 				shell_machine = NULL;
 				shell_path = p;
-			} else if (rsync_port) {
-				if (!shell_cmd) {
-					return start_socket_client(shell_machine,
-								   shell_path,
-								   argc, argv);
-				}
-				daemon_over_rsh = 1;
-			}
+			} else if (rsync_port)
+				daemon_over_rsh = shell_cmd ? 1 : -1;
 		}
 	} else {  /* read_batch */
 		local_server = 1;
@@ -1145,6 +1132,15 @@ static int start_client(int argc, char *argv[])
 			exit_cleanup(RERR_SYNTAX);
 		}
 	}
+
+	/* for remote source, only single dest arg can remain ... */
+	if (!am_sender && argc > 1) {
+		usage(FERROR);
+		exit_cleanup(RERR_SYNTAX);
+	}
+
+	if (daemon_over_rsh < 0)
+		return start_socket_client(shell_machine, shell_path, argc, argv);
 
 	if (password_file && !daemon_over_rsh) {
 		rprintf(FERROR, "The --password-file option may only be "
@@ -1167,12 +1163,6 @@ static int start_client(int argc, char *argv[])
 			shell_machine ? shell_machine : "",
 			shell_user ? shell_user : "",
 			shell_path ? shell_path : "");
-	}
-
-	/* for remote source, only single dest arg can remain ... */
-	if (!am_sender && argc > 1) {
-		usage(FERROR);
-		exit_cleanup(RERR_SYNTAX);
 	}
 
 	/* ... or no dest at all */

@@ -25,6 +25,7 @@
 
 extern int module_id;
 extern int sanitize_paths;
+extern int daemon_over_rsh;
 extern struct filter_list_struct filter_list;
 extern struct filter_list_struct server_filter_list;
 
@@ -95,7 +96,6 @@ int recurse = 0;
 int allow_inc_recurse = 1;
 int xfer_dirs = -1;
 int am_daemon = 0;
-int daemon_over_rsh = 0;
 int do_stats = 0;
 int do_progress = 0;
 int keep_partial = 0;
@@ -1616,7 +1616,7 @@ void server_options(char **args,int *argc)
 	/* This should always remain first on the server's command-line. */
 	args[ac++] = "--server";
 
-	if (daemon_over_rsh) {
+	if (daemon_over_rsh > 0) {
 		args[ac++] = "--daemon";
 		*argc = ac;
 		/* if we're passing --daemon, we're done */
