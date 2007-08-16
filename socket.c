@@ -300,7 +300,7 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_addr,
 {
 	char *prog = getenv("RSYNC_CONNECT_PROG");
 
-	if (strchr(prog, '%')) {
+	if (prog && strchr(prog, '%')) {
 		int hlen = strlen(host);
 		int len = strlen(prog) + 1;
 		char *f, *t;
