@@ -255,6 +255,7 @@ pool_free_old(alloc_pool_t p, void *addr)
 				cur->free -= skew;
 			}
 			next = cur->next;
+			cur->next = NULL;
 		}
 	} else {
 		next = cur->next;
