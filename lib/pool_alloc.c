@@ -52,7 +52,7 @@ pool_create(size_t size, size_t quantum, void (*bomb)(const char *), int flags)
 	pool->size = size	/* round extent size to min alignment reqs */
 	    ? (size + MINALIGN - 1) & ~(MINALIGN - 1)
 	    : POOL_DEF_EXTENT;
-	if (pool->flags & POOL_INTERN) {
+	if (flags & POOL_INTERN) {
 		pool->size -= sizeof (struct pool_extent);
 		flags |= POOL_APPEND;
 	}
