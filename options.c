@@ -122,10 +122,15 @@ long block_size = 0; /* "long" because popt can't set an int32. */
 char *skip_compress = NULL;
 
 /** Network address family. **/
+int default_af_hint
 #ifdef INET6
-int default_af_hint = 0;	/* Any protocol */
+	= 0;		/* Any protocol */
 #else
-int default_af_hint = AF_INET;	/* Must use IPv4 */
+	= AF_INET;	/* Must use IPv4 */
+# ifdef AF_INET6
+#  undef AF_INET6
+# endif
+# define AF_INET6 AF_INET /* make -6 option a no-op */
 #endif
 
 /** Do not go into the background when run as --daemon.  Good
@@ -414,10 +419,8 @@ void usage(enum logcode F)
 #ifdef ICONV_OPTION
   rprintf(F,"     --iconv=CONVERT_SPEC    request charset conversion of filesnames\n");
 #endif
-#ifdef INET6
   rprintf(F," -4, --ipv4                  prefer IPv4\n");
   rprintf(F," -6, --ipv6                  prefer IPv6\n");
-#endif
   rprintf(F,"     --version               print version number\n");
   rprintf(F,"(-h) --help                  show this help (-h works with no other options)\n");
 
@@ -593,10 +596,8 @@ static struct poptOption long_options[] = {
 #ifdef ICONV_OPTION
   {"iconv",            0,  POPT_ARG_STRING, &iconv_opt, 0, 0, 0 },
 #endif
-#ifdef INET6
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
-#endif
   {"8-bit-output",    '8', POPT_ARG_NONE,   &allow_8bit_chars, 0, 0, 0 },
   {"qsort",            0,  POPT_ARG_NONE,   &use_qsort, 0, 0, 0 },
   {"address",          0,  POPT_ARG_STRING, &bind_address, 0, 0, 0 },
@@ -632,10 +633,8 @@ static void daemon_usage(enum logcode F)
   rprintf(F,"     --log-file-format=FMT   override the \"log format\" setting\n");
   rprintf(F,"     --sockopts=OPTIONS      specify custom TCP options\n");
   rprintf(F," -v, --verbose               increase verbosity\n");
-#ifdef INET6
   rprintf(F," -4, --ipv4                  prefer IPv4\n");
   rprintf(F," -6, --ipv6                  prefer IPv6\n");
-#endif
   rprintf(F,"     --help                  show this help screen\n");
 
   rprintf(F,"\n");
@@ -649,10 +648,8 @@ static struct poptOption long_daemon_options[] = {
   {"bwlimit",          0,  POPT_ARG_INT,    &daemon_bwlimit, 0, 0, 0 },
   {"config",           0,  POPT_ARG_STRING, &config_file, 0, 0, 0 },
   {"daemon",           0,  POPT_ARG_NONE,   &daemon_opt, 0, 0, 0 },
-#ifdef INET6
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
-#endif
   {"detach",           0,  POPT_ARG_VAL,    &no_detach, 0, 0, 0 },
   {"no-detach",        0,  POPT_ARG_VAL,    &no_detach, 1, 0, 0 },
   {"log-file",         0,  POPT_ARG_STRING, &logfile_name, 0, 0, 0 },

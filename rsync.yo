@@ -1949,6 +1949,10 @@ when creating sockets.  This only affects sockets that rsync has direct
 control over, such as the outgoing socket when directly contacting an
 rsync daemon.  See also these options in the bf(--daemon) mode section.
 
+If rsync was complied without support for IPv6, the bf(--ipv6) option
+will have no effect.  The bf(--version) output will tell you if this
+is the case.
+
 dit(bf(--checksum-seed=NUM)) Set the MD4 checksum seed to the integer
 NUM.  This 4 byte checksum seed is included in each block and file
 MD4 checksum calculation.  By default the checksum seed is generated
@@ -2030,6 +2034,10 @@ listen for connections.  One of these options may be required in older
 versions of Linux to work around an IPv6 bug in the kernel (if you see
 an "address already in use" error when nothing else is using the port,
 try specifying bf(--ipv6) or bf(--ipv4) when starting the daemon).
+
+If rsync was complied without support for IPv6, the bf(--ipv6) option
+will have no effect.  The bf(--version) output will tell you if this
+is the case.
 
 dit(bf(-h, --help)) When specified after bf(--daemon), print a short help
 page describing the options available for starting an rsync daemon.
