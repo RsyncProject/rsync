@@ -296,7 +296,7 @@ static void flist_expand(struct file_list *flist, int extra)
 				flist->malloced);
 
 	if (verbose >= 2 && flist->malloced != FLIST_START) {
-		rprintf(FCLIENT, "[%s] expand file_list to %.0f bytes, did%s move\n",
+		rprintf(FCLIENT, "[%s] expand file_list pointer array to %.0f bytes, did%s move\n",
 		    who_am_i(),
 		    (double)sizeof flist->files[0] * flist->malloced,
 		    (new_ptr == flist->files) ? " not" : "");
