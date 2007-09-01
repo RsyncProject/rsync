@@ -319,6 +319,7 @@ void usage(enum logcode F)
   rprintf(F," -u, --update                skip files that are newer on the receiver\n");
   rprintf(F,"     --inplace               update destination files in-place (SEE MAN PAGE)\n");
   rprintf(F,"     --append                append data onto shorter files\n");
+  rprintf(F,"     --append-verify         like --append, but with old data in file checksum\n");
   rprintf(F," -d, --dirs                  transfer directories without recursing\n");
   rprintf(F," -l, --links                 copy symlinks as symlinks\n");
   rprintf(F," -L, --copy-links            transform symlink into referent file/dir\n");
@@ -434,7 +435,7 @@ enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_FILTER, OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST, OPT_HELP,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW, OPT_MIN_SIZE, OPT_CHMOD,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_MAX_SIZE,
-      OPT_NO_D,
+      OPT_NO_D, OPT_APPEND,
       OPT_SERVER, OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -521,7 +522,9 @@ static struct poptOption long_options[] = {
   {"min-size",         0,  POPT_ARG_STRING, &min_size_arg, OPT_MIN_SIZE, 0, 0 },
   {"sparse",          'S', POPT_ARG_NONE,   &sparse_files, 0, 0, 0 },
   {"inplace",          0,  POPT_ARG_NONE,   &inplace, 0, 0, 0 },
-  {"append",           0,  POPT_ARG_VAL,    &append_mode, 1, 0, 0 },
+  {"append",           0,  POPT_ARG_NONE,   0, OPT_APPEND, 0, 0 },
+  {"append-verify",    0,  POPT_ARG_VAL,    &append_mode, 2, 0, 0 },
+  {"no-append",        0,  POPT_ARG_VAL,    &append_mode, 0, 0, 0 },
   {"del",              0,  POPT_ARG_NONE,   &delete_during, 0, 0, 0 },
   {"delete",           0,  POPT_ARG_NONE,   &delete_mode, 0, 0, 0 },
   {"delete-before",    0,  POPT_ARG_NONE,   &delete_before, 0, 0, 0 },
@@ -1119,6 +1122,13 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 					min_size_arg);
 				return 0;
 			}
+			break;
+
+		case OPT_APPEND:
+			if (am_server)
+				append_mode++;
+			else
+				append_mode = 1;
 			break;
 
 		case OPT_LINK_DEST:
@@ -1912,9 +1922,11 @@ void server_options(char **args,int *argc)
 		}
 	}
 
-	if (append_mode)
+	if (append_mode) {
+		if (append_mode > 1)
+			args[ac++] = "--append";
 		args[ac++] = "--append";
-	else if (inplace)
+	} else if (inplace)
 		args[ac++] = "--inplace";
 
 	if (files_from && (!am_sender || filesfrom_host)) {

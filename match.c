@@ -315,21 +315,23 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	sum_init(checksum_seed);
 
 	if (append_mode > 0) {
-		OFF_T j = 0;
-		for (j = CHUNK_SIZE; j < s->flength; j += CHUNK_SIZE) {
-			if (buf && do_progress)
-				show_progress(last_match, buf->file_size);
-			sum_update(map_ptr(buf, last_match, CHUNK_SIZE),
-				   CHUNK_SIZE);
-			last_match = j;
+		if (append_mode == 2) {
+			OFF_T j = 0;
+			for (j = CHUNK_SIZE; j < s->flength; j += CHUNK_SIZE) {
+				if (buf && do_progress)
+					show_progress(last_match, buf->file_size);
+				sum_update(map_ptr(buf, last_match, CHUNK_SIZE),
+					   CHUNK_SIZE);
+				last_match = j;
+			}
+			if (last_match < s->flength) {
+				int32 n = (int32)(s->flength - last_match);
+				if (buf && do_progress)
+					show_progress(last_match, buf->file_size);
+				sum_update(map_ptr(buf, last_match, n), n);
+			}
 		}
-		if (last_match < s->flength) {
-			int32 n = (int32)(s->flength - last_match);
-			if (buf && do_progress)
-				show_progress(last_match, buf->file_size);
-			sum_update(map_ptr(buf, last_match, n), n);
-			last_match = s->flength;
-		}
+		last_match = s->flength;
 		s->count = 0;
 	}
 

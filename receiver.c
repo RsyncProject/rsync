@@ -157,20 +157,22 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		sum.flength = (OFF_T)sum.count * sum.blength;
 		if (sum.remainder)
 			sum.flength -= sum.blength - sum.remainder;
-		for (j = CHUNK_SIZE; j < sum.flength; j += CHUNK_SIZE) {
-			if (do_progress)
-				show_progress(offset, total_size);
-			sum_update(map_ptr(mapbuf, offset, CHUNK_SIZE),
-				   CHUNK_SIZE);
-			offset = j;
+		if (append_mode == 2) {
+			for (j = CHUNK_SIZE; j < sum.flength; j += CHUNK_SIZE) {
+				if (do_progress)
+					show_progress(offset, total_size);
+				sum_update(map_ptr(mapbuf, offset, CHUNK_SIZE),
+					   CHUNK_SIZE);
+				offset = j;
+			}
+			if (offset < sum.flength) {
+				int32 len = (int32)(sum.flength - offset);
+				if (do_progress)
+					show_progress(offset, total_size);
+				sum_update(map_ptr(mapbuf, offset, len), len);
+			}
 		}
-		if (offset < sum.flength) {
-			int32 len = (int32)(sum.flength - offset);
-			if (do_progress)
-				show_progress(offset, total_size);
-			sum_update(map_ptr(mapbuf, offset, len), len);
-			offset = sum.flength;
-		}
+		offset = sum.flength;
 		if (fd != -1 && (j = do_lseek(fd, offset, SEEK_SET)) != offset) {
 			rsyserr(FERROR, errno, "lseek of %s returned %.0f, not %.0f",
 				full_fname(fname), (double)j, (double)offset);
@@ -426,8 +428,9 @@ int recv_files(int f_in, char *local_name)
 			if (csum_length == SHORT_SUM_LENGTH) {
 				if (keep_partial && !partial_dir)
 					make_backups = -make_backups; /* prevents double backup */
+				if (append_mode)
+					sparse_files = -sparse_files;
 				append_mode = -append_mode;
-				sparse_files = -sparse_files;
 				csum_length = SUM_LENGTH;
 				redoing = 1;
 			}
@@ -435,8 +438,9 @@ int recv_files(int f_in, char *local_name)
 			if (csum_length != SHORT_SUM_LENGTH) {
 				if (keep_partial && !partial_dir)
 					make_backups = -make_backups;
+				if (append_mode)
+					sparse_files = -sparse_files;
 				append_mode = -append_mode;
-				sparse_files = -sparse_files;
 				csum_length = SHORT_SUM_LENGTH;
 				redoing = 0;
 			}
