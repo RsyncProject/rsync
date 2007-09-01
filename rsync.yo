@@ -333,6 +333,7 @@ to the detailed description below for a complete description.  verb(
  -u, --update                skip files that are newer on the receiver
      --inplace               update destination files in-place
      --append                append data onto shorter files
+     --append-verify         --append w/old data in file cheksum
  -d, --dirs                  transfer directories without recursing
  -l, --links                 copy symlinks as symlinks
  -L, --copy-links            transform symlink into referent file/dir
@@ -716,13 +717,22 @@ receiving user.
 dit(bf(--append)) This causes rsync to update a file by appending data onto
 the end of the file, which presumes that the data that already exists on
 the receiving side is identical with the start of the file on the sending
-side.  If that is not true, the file will fail the checksum test, and the
-resend will do a normal bf(--inplace) update to correct the mismatched data.
-Only files on the receiving side that are shorter than the corresponding
-file on the sending side (as well as new files) are transferred.
-Implies bf(--inplace), but does not conflict with bf(--sparse) (though the
-bf(--sparse) option will be auto-disabled if a resend of the already-existing
-data is required).
+side.  Any files that are the same size or shorter on the receiving size
+are skipped.  Files that do not yet exist on the receiving side are also
+sent, since they are considered to have 0 length.  Implies bf(--inplace),
+but does not conflict with bf(--sparse) (since it is always extending a
+file's length).
+
+dit(bf(--append-verify)) This works just like the bf(--append) option, but
+the existing data on the receiving side is included in the full-file
+checksum verification step, which will cause a file to be resent if the
+final verification step fails (rsync uses a normal, non-appending
+bf(--inplace) transfer for the resend).
+
+Note: prior to rsync 3.0.0, the bf(--append) option worked like
+bf(--append-verify), so if you are interacting with an older rsync (or the
+transfer is using a protocol prior to 30), specifying either append option
+will initiate an bf(--append-verify) transfer.
 
 dit(bf(-d, --dirs)) Tell the sending side to include any directories that
 are encountered.  Unlike bf(--recursive), a directory's contents are not copied
