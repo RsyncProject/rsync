@@ -980,34 +980,24 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	return file;
 }
 
-/**
- * Create a file_struct for a named file by reading its stat()
- * information and performing extensive checks against global
- * options.
+/* Create a file_struct for a named file by reading its stat() information
+ * and performing extensive checks against global options.
  *
- * @return the new file, or NULL if there was an error or this file
- * should be excluded.
- *
- * @todo There is a small optimization opportunity here to avoid
- * stat()ing the file in some circumstances, which has a certain cost.
- * We are called immediately after doing readdir(), and so we may
- * already know the d_type of the file.  We could for example avoid
- * statting directories if we're not recursing, but this is not a very
- * important case.  Some systems may not have d_type.
- **/
+ * Returns a pointer to the new file struct, or NULL if there was an error
+ * or this file should be excluded. */
 struct file_struct *make_file(const char *fname, struct file_list *flist,
 			      STRUCT_STAT *stp, int flags, int filter_level)
 {
 	static char *lastdir;
 	static int lastdir_len = -1;
 	struct file_struct *file;
-	STRUCT_STAT st;
 	char thisname[MAXPATHLEN];
 	char linkname[MAXPATHLEN];
 	int alloc_len, basename_len, linkname_len;
 	int extra_len = file_extra_cnt * EXTRA_LEN;
 	const char *basename;
 	alloc_pool_t *pool;
+	STRUCT_STAT st;
 	char *bp;
 
 	if (strlcpy(thisname, fname, sizeof thisname) >= sizeof thisname) {
