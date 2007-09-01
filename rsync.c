@@ -33,7 +33,6 @@ extern int preserve_xattrs;
 extern int preserve_perms;
 extern int preserve_executability;
 extern int preserve_times;
-extern int omit_dir_times;
 extern int am_root;
 extern int am_server;
 extern int am_sender;
@@ -311,7 +310,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, statx *sxp,
 		set_stat_xattr(fname, file);
 #endif
 
-	if (!preserve_times || (S_ISDIR(sxp->st.st_mode) && omit_dir_times))
+	if (!preserve_times || (S_ISDIR(sxp->st.st_mode) && preserve_times == 1))
 		flags |= ATTRS_SKIP_MTIME;
 	if (!(flags & ATTRS_SKIP_MTIME)
 	    && cmp_time(sxp->st.st_mtime, file->modtime) != 0) {

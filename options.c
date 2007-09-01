@@ -56,7 +56,6 @@ int preserve_specials = 0;
 int preserve_uid = 0;
 int preserve_gid = 0;
 int preserve_times = 0;
-int omit_dir_times = 0;
 int update_only = 0;
 int cvs_exclude = 0;
 int dry_run = 0;
@@ -192,6 +191,7 @@ char *iconv_opt = ICONV_OPTION;
 struct chmod_mode_struct *chmod_modes = NULL;
 
 static int daemon_opt;   /* sets am_daemon after option error-reporting */
+static int omit_dir_times = 0;
 static int F_option_cnt = 0;
 static int modify_window_set;
 static int itemize_changes = 0;
@@ -474,10 +474,10 @@ static struct poptOption long_options[] = {
   {"xattrs",          'X', POPT_ARG_NONE,   0, 'X', 0, 0 },
   {"no-xattrs",        0,  POPT_ARG_VAL,    &preserve_xattrs, 0, 0, 0 },
   {"no-X",             0,  POPT_ARG_VAL,    &preserve_xattrs, 0, 0, 0 },
-  {"times",           't', POPT_ARG_VAL,    &preserve_times, 1, 0, 0 },
+  {"times",           't', POPT_ARG_VAL,    &preserve_times, 2, 0, 0 },
   {"no-times",         0,  POPT_ARG_VAL,    &preserve_times, 0, 0, 0 },
   {"no-t",             0,  POPT_ARG_VAL,    &preserve_times, 0, 0, 0 },
-  {"omit-dir-times",  'O', POPT_ARG_VAL,    &omit_dir_times, 2, 0, 0 },
+  {"omit-dir-times",  'O', POPT_ARG_VAL,    &omit_dir_times, 1, 0, 0 },
   {"modify-window",    0,  POPT_ARG_INT,    &modify_window, OPT_MODIFY_WINDOW, 0, 0 },
   {"super",            0,  POPT_ARG_VAL,    &am_root, 2, 0, 0 },
   {"no-super",         0,  POPT_ARG_VAL,    &am_root, 0, 0, 0 },
@@ -1015,7 +1015,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			preserve_links = 1;
 #endif
 			preserve_perms = 1;
-			preserve_times = 1;
+			preserve_times = 2;
 			preserve_gid = 1;
 			preserve_uid = 1;
 			preserve_devices = 1;
@@ -1395,6 +1395,9 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		}
 	}
 
+	if (omit_dir_times && preserve_times > 1)
+		preserve_times = 1;
+
 	if (!backup_suffix)
 		backup_suffix = backup_dir ? "" : BACKUP_SUFFIX;
 	backup_suffix_len = strlen(backup_suffix);
@@ -1427,8 +1430,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			"P *%s", backup_suffix);
  		parse_rule(&filter_list, backup_dir_buf, 0, 0);
 	}
-	if (make_backups && !backup_dir)
-		omit_dir_times = 1;
+	if (make_backups && !backup_dir && preserve_times > 1)
+		preserve_times = 1;
 
 	if (stdout_format) {
 		if (am_server && log_format_has(stdout_format, 'I'))
@@ -1654,7 +1657,7 @@ void server_options(char **args,int *argc)
 			argstr[x++] = 'K';
 		if (prune_empty_dirs)
 			argstr[x++] = 'm';
-		if (omit_dir_times == 2)
+		if (omit_dir_times)
 			argstr[x++] = 'O';
 	} else {
 		if (copy_links)

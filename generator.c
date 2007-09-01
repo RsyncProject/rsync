@@ -43,7 +43,6 @@ extern int preserve_specials;
 extern int preserve_hard_links;
 extern int preserve_perms;
 extern int preserve_times;
-extern int omit_dir_times;
 extern int uid_ndx;
 extern int gid_ndx;
 extern int delete_mode;
@@ -554,7 +553,7 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 {
 	if (statret >= 0) { /* A from-dest-dir statret can == 1! */
 		int keep_time = !preserve_times ? 0
-		    : S_ISDIR(file->mode) ? !omit_dir_times
+		    : S_ISDIR(file->mode) ? preserve_times > 1
 		    : !S_ISLNK(file->mode);
 
 		if (S_ISREG(file->mode) && F_LENGTH(file) != sxp->st.st_size)
@@ -1879,7 +1878,7 @@ void generate_files(int f_out, const char *local_name)
 	}
 	solo_file = local_name;
 	dir_tweaking = !(list_only || solo_file || dry_run);
-	need_retouch_dir_times = preserve_times && !omit_dir_times;
+	need_retouch_dir_times = preserve_times > 1;
 	lull_mod = allowed_lull * 5;
 
 	if (verbose > 2)
