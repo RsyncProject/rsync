@@ -34,6 +34,7 @@ extern int recurse;
 extern int use_qsort;
 extern int allow_inc_recurse;
 extern int relative_paths;
+extern int append_mode;
 extern int fuzzy_basis;
 extern int read_batch;
 extern int implied_dirs;
@@ -145,6 +146,8 @@ void setup_protocol(int f_out,int f_in)
 	}
 
 	if (protocol_version < 30) {
+		if (append_mode == 1)
+			append_mode = 2;
 		if (preserve_acls && !local_server) {
 			rprintf(FERROR,
 			    "--acls requires protocol 30 or higher"
