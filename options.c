@@ -1397,9 +1397,6 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		}
 	}
 
-	if (omit_dir_times && preserve_times > 1)
-		preserve_times = 1;
-
 	if (!backup_suffix)
 		backup_suffix = backup_dir ? "" : BACKUP_SUFFIX;
 	backup_suffix_len = strlen(backup_suffix);
@@ -1432,8 +1429,15 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			"P *%s", backup_suffix);
  		parse_rule(&filter_list, backup_dir_buf, 0, 0);
 	}
-	if (make_backups && !backup_dir && preserve_times > 1)
-		preserve_times = 1;
+
+	if (make_backups && !backup_dir) {
+		omit_dir_times = 0; /* Implied, so avoid -O to sender. */
+		if (preserve_times > 1)
+			preserve_times = 1;
+	} else if (omit_dir_times) {
+		if (preserve_times > 1)
+			preserve_times = 1;
+	}
 
 	if (stdout_format) {
 		if (am_server && log_format_has(stdout_format, 'I'))
