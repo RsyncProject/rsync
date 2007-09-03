@@ -491,10 +491,25 @@ enum msgcode {
 # define SIZEOF_INT64 SIZEOF_OFF_T
 #endif
 
-struct idev_node {
-	int64 key;
-	void *data;
+struct hashtable {
+	void *nodes;
+	int32 size, entries;
+	uint32 node_size;
 };
+
+struct ht_int32_node {
+	void *data;
+	int32 key;
+};
+
+struct ht_int64_node {
+	void *data;
+	int64 key;
+};
+
+#define HT_NODE(tbl, bkts, i) ((void*)((char*)(bkts) + (i)*(tbl)->node_size))
+#define HT_KEY(node, k64) ((k64)? ((struct ht_int64_node*)(node))->key \
+			 : (int64)((struct ht_int32_node*)(node))->key)
 
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
