@@ -40,152 +40,32 @@ extern int ic_ndx;
 
 #ifdef SUPPORT_HARD_LINKS
 
-#define HASH_LOAD_LIMIT(size) ((size)*3/4)
-
-struct ihash_table {
-	int32 size;
-	int32 entries;
-	struct idev_node *buckets;
-} *dev_tbl;
-
-static struct idev_node *ihash_node(struct ihash_table *tbl, int64 key);
-
 /* Starting with protocol 30, we use a simple hashtable on the sending side
  * for hashing the st_dev and st_ino info.  The receiving side gets told
  * (via flags and a "group index") which items are hard-linked together, so
  * we can avoid the pool of dev+inode data. */
 
-static struct ihash_table *ihash_create(int size)
-{
-	struct ihash_table *tbl;
-
-	/* Pick a power of 2 that can hold the requested size. */
-	if (size & (size-1) || size < 16) {
-		int req = size;
-		size = 16;
-		while (size < req)
-			size *= 2;
-	}
-
-	if (!(tbl = new(struct ihash_table))
-	 || !(tbl->buckets = new_array(struct idev_node, size)))
-		out_of_memory("ihash_create");
-	memset(tbl->buckets, 0, size * sizeof tbl->buckets[0]);
-	tbl->size = size;
-	tbl->entries = 0;
-
-	return tbl;
-}
-
-static void ihash_destroy(struct ihash_table *tbl)
-{
-	free(tbl->buckets);
-	free(tbl);
-}
+struct hashtable *dev_tbl;
 
 void init_hard_links(void)
 {
-	dev_tbl = ihash_create(16);
+	dev_tbl = hashtable_create(16, SIZEOF_INT64 == 8);
 }
 
-static void expand_ihash(struct ihash_table *tbl)
+struct ht_int64_node *idev_find(int64 dev, int64 ino)
 {
-	struct idev_node *old_buckets = tbl->buckets;
-	int size = tbl->size * 2;
-	int i;
-
-	if (!(tbl->buckets = new_array(struct idev_node, size)))
-		out_of_memory("ihash_create");
-	memset(tbl->buckets, 0, size * sizeof (struct idev_node));
-	tbl->size = size;
-	tbl->entries = 0;
-
-	for (i = size / 2; i-- > 0; ) {
-		int64 key = old_buckets[i].key;
-		if (key == 0)
-			continue;
-		ihash_node(tbl, key)->data = old_buckets[i].data;
-	}
-
-	free(old_buckets);
-}
-
-/* This returns the node for the indicated key, either newly created,
- * or already existing. */
-static struct idev_node *ihash_node(struct ihash_table *tbl, int64 key)
-{
-	uint32 bkt;
-
-	if (tbl->entries > HASH_LOAD_LIMIT(tbl->size))
-		expand_ihash(tbl);
-
-#if SIZEOF_INT64 < 8
-	/* Based on Jenkins One-at-a-time hash. */
-	{
-		uchar *keyp = (uchar*)&key;
-		int i;
-
-		for (bkt = 0, i = 0; i < SIZEOF_INT64; i++) {
-			bkt += keyp[i];
-			bkt += (bkt << 10);
-			bkt ^= (bkt >> 6);
-		}
-		bkt += (bkt << 3);
-		bkt ^= (bkt >> 11);
-		bkt += (bkt << 15);
-	}
-#else
-#define rot(x,k) (((x)<<(k)) ^ ((x)>>(32-(k))))
-	/* Based on Jenkins hashword() from lookup3.c. */
-	{
-		uint32 a, b, c;
-
-		/* Set up the internal state */
-		a = b = c = 0xdeadbeef + (8 << 2);
-
-		b += (uint32)(key >> 32);
-		a += (uint32)key;
-		c ^= b; c -= rot(b, 14);
-		a ^= c; a -= rot(c, 11);
-		b ^= a; b -= rot(a, 25);
-		c ^= b; c -= rot(b, 16);
-		a ^= c; a -= rot(c, 4);
-		b ^= a; b -= rot(a, 14);
-		c ^= b; c -= rot(b, 24);
-		bkt = c;
-	}
-#endif
-
-	/* If it already exists, return it. */
-	while (1) {
-		bkt &= tbl->size - 1;
-		if (tbl->buckets[bkt].key == key)
-			return &tbl->buckets[bkt];
-		if (tbl->buckets[bkt].key == 0)
-			break;
-		bkt++;
-	}
-
-	/* Otherwise, take over this empty spot and then return it. */
-	tbl->buckets[bkt].key = key;
-	tbl->entries++;
-	return &tbl->buckets[bkt];
-}
-
-struct idev_node *idev_node(int64 dev, int64 ino)
-{
-	static struct idev_node *dev_node = NULL;
-	struct ihash_table *tbl;
+	static struct ht_int64_node *dev_node = NULL;
+	struct hashtable *tbl;
 
 	if (!dev_node || dev_node->key != dev) {
 		/* We keep a separate hash table of inodes for every device. */
-		dev_node = ihash_node(dev_tbl, dev);
+		dev_node = hashtable_find(dev_tbl, dev, 1);
 		if (!(tbl = dev_node->data))
-			tbl = dev_node->data = ihash_create(512);
+			tbl = dev_node->data = hashtable_create(512, SIZEOF_INT64 == 8);
 	} else
 		tbl = dev_node->data;
 
-	return ihash_node(tbl, ino);
+	return hashtable_find(tbl, ino, 1);
 }
 
 void idev_destroy(void)
@@ -193,11 +73,12 @@ void idev_destroy(void)
 	int i;
 
 	for (i = 0; i < dev_tbl->size; i++) {
-		if (dev_tbl->buckets[i].data)
-			ihash_destroy(dev_tbl->buckets[i].data);
+		struct ht_int32_node *node = HT_NODE(dev_tbl, dev_tbl->nodes, i);
+		if (node->data)
+			hashtable_destroy(node->data);
 	}
 
-	ihash_destroy(dev_tbl);
+	hashtable_destroy(dev_tbl);
 }
 
 static int hlink_compare_gnum(int *int1, int *int2)
