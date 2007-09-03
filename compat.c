@@ -47,7 +47,6 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_acls;
 extern int preserve_xattrs;
-extern int preserve_hard_links;
 extern int need_messages_from_generator;
 extern int delete_mode, delete_before, delete_during, delete_after;
 extern int delete_excluded;
@@ -204,7 +203,7 @@ void setup_protocol(int f_out,int f_in)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 	} else if (protocol_version >= 30) {
-		if (recurse && allow_inc_recurse && !preserve_hard_links
+		if (recurse && allow_inc_recurse
 		 && !delete_before && !delete_after && !delay_updates
 		 && (!relative_paths || implied_dirs) && !use_qsort
 		 && !prune_empty_dirs)
