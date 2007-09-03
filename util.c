@@ -1255,11 +1255,11 @@ int _Insure_trap_error(int a1, int a2, int a3, int a4, int a5, int a6)
 
 #define MALLOC_MAX 0x40000000
 
-void *_new_array(unsigned int size, unsigned long num)
+void *_new_array(unsigned long num, unsigned int size, int use_calloc)
 {
 	if (num >= MALLOC_MAX/size)
 		return NULL;
-	return malloc(size * num);
+	return use_calloc ? calloc(num, size) : malloc(num * size);
 }
 
 void *_realloc_array(void *ptr, unsigned int size, unsigned long num)
