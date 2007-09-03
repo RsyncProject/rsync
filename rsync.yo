@@ -571,18 +571,20 @@ Beginning with rsync 3.0.0, the recursive algorithm used is now an
 incremental scan that uses much less memory than before and begins the
 transfer after the scanning of the first few directories have been
 completed.  This incremental scan only affects our recursion algorithm, and
-does not change a non-recursive transfer.
-It is also only possible when both ends of the
-transfer are at least version 3.0.0.
+does not change a non-recursive transfer.  It is also only possible when
+both ends of the transfer are at least version 3.0.0.
 
 Some options require rsync to know the full file list, so these options
 disable the incremental recursion mode.  These include: bf(--delete-before),
-bf(--delete-after), bf(--prune-empty-dirs), bf(--delay-updates), and bf(--hard-links).
+bf(--delete-after), bf(--prune-empty-dirs), and bf(--delay-updates).
 Because of this, the default delete mode when you specify bf(--delete) is now
 bf(--delete-during) when both ends of the connection are at least 3.0.0
 (use bf(--del) or bf(--delete-during) to request this improved deletion mode
 explicitly).  See also the bf(--delete-delay) option that is a better choice
 than using bf(--delete-after).
+
+Incremental recursion can be disabled using the bf(--no-inc-recursive)
+option or its shorter bf(--no-ir) alias.
 
 dit(bf(-R, --relative)) Use relative paths. This means that the full path
 names specified on the command line are sent to the server rather than
@@ -799,6 +801,11 @@ as though they were separate files.
 
 Note that rsync can only detect hard links if both parts of the link
 are in the list of files being sent.
+
+If incremental recursion is active (see bf(--recursive)), rsync may transfer
+a missing hard-linked file before it finds that another link for the file
+exists elsewhere in the hierarchy.  One way to avoid this is to disable
+incremental recursion using the bf(--no-ir) option.
 
 dit(bf(-p, --perms)) This option causes the receiving rsync to set the
 destination permissions to be the same as the source permissions.  (See
