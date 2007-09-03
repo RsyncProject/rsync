@@ -778,10 +778,8 @@ int read_filesfrom_line(int fd, char *fname)
 			tv.tv_usec = 0;
 			if (!select(fd+1, &r_fds, NULL, &e_fds, &tv))
 				check_timeout();
-			if (FD_ISSET(fd, &e_fds)) {
-				rsyserr(FINFO, errno,
-					"select exception on fd %d", fd);
-			}
+			/*if (FD_ISSET(fd, &e_fds))
+				rprintf(FINFO, "select exception on fd %d\n", fd); */
 			continue;
 		}
 		if (cnt != 1)
@@ -1360,10 +1358,8 @@ static void writefd_unbuffered(int fd, const char *buf, size_t len)
 			continue;
 		}
 
-		if (FD_ISSET(fd, &e_fds)) {
-			rsyserr(FINFO, errno,
-				"select exception on fd %d", fd);
-		}
+		/*if (FD_ISSET(fd, &e_fds))
+			rprintf(FINFO, "select exception on fd %d\n", fd); */
 
 		if (using_r_fds && FD_ISSET(msg_fd_in, &r_fds))
 			read_msg_fd();
