@@ -43,20 +43,20 @@
 #define XMIT_TOP_DIR (1<<0)
 #define XMIT_SAME_MODE (1<<1)
 #define XMIT_SAME_RDEV_pre28 (1<<2)	/* protocols 20 - 27  */
-#define XMIT_EXTENDED_FLAGS (1<<2)	/* protocols 28 - NOW */
+#define XMIT_EXTENDED_FLAGS (1<<2)	/* protocols 28 - now */
 #define XMIT_SAME_UID (1<<3)
 #define XMIT_SAME_GID (1<<4)
 #define XMIT_SAME_NAME (1<<5)
 #define XMIT_LONG_NAME (1<<6)
 #define XMIT_SAME_TIME (1<<7)
-#define XMIT_SAME_RDEV_MAJOR (1<<8)	/* protocols 28 - NOW (devices only) */
-#define XMIT_NON_XFER_DIR (1<<8)	/* protocols 30 - NOW (dirs only) */
-#define XMIT_HLINKED (1<<9)		/* protocols 28 - NOW */
+#define XMIT_SAME_RDEV_MAJOR (1<<8)	/* protocols 28 - now (devices only) */
+#define XMIT_NON_XFER_DIR (1<<8)	/* protocols 30 - now (dirs only) */
+#define XMIT_HLINKED (1<<9)		/* protocols 28 - now */
 #define XMIT_SAME_DEV_pre30 (1<<10)	/* protocols 28 - 29  */
-#define XMIT_USER_NAME_FOLLOWS (1<<10)	/* protocols 30 - NOW */
+#define XMIT_USER_NAME_FOLLOWS (1<<10)	/* protocols 30 - now */
 #define XMIT_RDEV_MINOR_8_pre30 (1<<11)	/* protocols 28 - 29  */
-#define XMIT_GROUP_NAME_FOLLOWS (1<<11) /* protocols 30 - NOW */
-#define XMIT_HLINK_FIRST (1<<12)	/* protocols 30 - NOW (HLINKED files only) */
+#define XMIT_GROUP_NAME_FOLLOWS (1<<11) /* protocols 30 - now */
+#define XMIT_HLINK_FIRST (1<<12)	/* protocols 30 - now (HLINKED files only) */
 
 /* These flags are used in the live flist data. */
 
@@ -89,7 +89,7 @@
 /* This is used when working on a new protocol version in CVS, and should
  * be a new non-zero value for each CVS change that affects the protocol.
  * It must ALWAYS be 0 when the protocol goes final! */
-#define SUBPROTOCOL_VERSION 6
+#define SUBPROTOCOL_VERSION 7
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
@@ -570,6 +570,7 @@ struct file_struct {
 };
 
 extern int file_extra_cnt;
+extern int inc_recurse;
 extern int uid_ndx;
 extern int gid_ndx;
 extern int acls_ndx;
@@ -586,7 +587,7 @@ extern int xattrs_ndx;
 #define OPT_EXTRA(f,bump) ((union file_extras*)(f) - file_extra_cnt - 1 - (bump))
 
 #define LEN64_BUMP(f) ((f)->flags & FLAG_LENGTH64 ? 1 : 0)
-#define HLINK_BUMP(f) (F_IS_HLINKED(f) ? 1 : 0)
+#define HLINK_BUMP(f) (F_IS_HLINKED(f) ? inc_recurse+1 : 0)
 #define ACL_BUMP(f) (acls_ndx ? 1 : 0)
 
 /* The length applies to all items. */
@@ -615,7 +616,7 @@ extern int xattrs_ndx;
 
 /* These items are per-entry optional: */
 #define F_HL_GNUM(f) OPT_EXTRA(f, LEN64_BUMP(f))->num /* non-dirs */
-#define F_HL_PREV(f) OPT_EXTRA(f, LEN64_BUMP(f))->num /* non-dirs */
+#define F_HL_PREV(f) OPT_EXTRA(f, LEN64_BUMP(f)+inc_recurse)->num /* non-dirs */
 #define F_DIR_NODE_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) \
 				+ DIRNODE_EXTRA_CNT - 1)->num) /* sender dirs */
 #define F_DIR_DEFACL(f) OPT_EXTRA(f, LEN64_BUMP(f))->unum /* receiver dirs */
