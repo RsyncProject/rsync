@@ -491,32 +491,6 @@ enum msgcode {
 # define SIZEOF_INT64 SIZEOF_OFF_T
 #endif
 
-/* Starting from protocol version 26, we always use 64-bit
- * ino_t and dev_t internally, even if this platform does not
- * allow files to have 64-bit inums.  That's because the
- * receiver needs to find duplicate (dev,ino) tuples to detect
- * hardlinks, and it might have files coming from a platform
- * that has 64-bit inums.
- *
- * The only exception is if we're on a platform with no 64-bit type at
- * all.
- *
- * Because we use read_longint() to get these off the wire, if you
- * transfer devices or hardlinks with dev or inum > 2**32 to a machine
- * with no 64-bit types then you will get an overflow error.  Probably
- * not many people have that combination of machines, and you can
- * avoid it by not preserving hardlinks or not transferring device
- * nodes.  It's not clear that any other behaviour is better.
- *
- * Note that if you transfer devices from a 64-bit-devt machine (say,
- * Solaris) to a 32-bit-devt machine (say, Linux-2.2/x86) then the
- * device numbers will be truncated.  But it's a kind of silly thing
- * to do anyhow.
- *
- * FIXME: I don't think the code in flist.c has ever worked on a system
- * where dev_t is a struct.
- */
-
 struct idev_node {
 	int64 key;
 	void *data;
@@ -987,9 +961,11 @@ extern int errno;
 #define NS(s) ((s)?(s):"<NULL>")
 
 /* Convenient wrappers for malloc and realloc.  Use them. */
-#define new(type) ((type *)malloc(sizeof(type)))
-#define new_array(type, num) ((type *)_new_array(sizeof(type), (num)))
-#define realloc_array(ptr, type, num) ((type *)_realloc_array((ptr), sizeof(type), (num)))
+#define new(type) ((type*)malloc(sizeof (type)))
+#define new0(type) ((type*)calloc(1, sizeof (type)))
+#define new_array(type, num) ((type*)_new_array((num), sizeof (type), 0))
+#define new_array0(type, num) ((type*)_new_array((num), sizeof (type), 1))
+#define realloc_array(ptr, type, num) ((type*)_realloc_array((ptr), sizeof(type), (num)))
 
 /* use magic gcc attributes to catch format errors */
  void rprintf(enum logcode , const char *, ...)
