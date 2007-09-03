@@ -112,11 +112,11 @@ static char int_byte_extra[64] = {
 	2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5, 6, /* (C0 - FF)/4 */
 };
 
+enum festatus { FES_SUCCESS, FES_REDO, FES_NO_SEND };
+
 static void readfd(int fd, char *buffer, size_t N);
 static void writefd(int fd, const char *buf, size_t len);
 static void writefd_unbuffered(int fd, const char *buf, size_t len);
-static void decrement_active_files(int ndx);
-static void decrement_flist_in_progress(int ndx, int redo);
 static void mplex_write(int fd, enum msgcode code, const char *buf, size_t len, int convert);
 
 struct flist_ndx_item {
@@ -173,6 +173,42 @@ static int flist_ndx_pop(struct flist_ndx_list *lp)
 		lp->tail = NULL;
 
 	return ndx;
+}
+
+static void got_flist_entry_status(enum festatus status, const char *buf)
+{
+	int ndx = IVAL(buf, 0);
+	struct file_list *flist = flist_for_ndx(ndx);
+
+	assert(flist != NULL);
+	assert(ndx >= flist->ndx_start);
+
+	if (remove_source_files) {
+		active_filecnt--;
+		active_bytecnt -= F_LENGTH(flist->files[ndx - flist->ndx_start]);
+	}
+
+	if (inc_recurse)
+		flist->in_progress--;
+
+	switch (status) {
+	case FES_SUCCESS:
+		if (remove_source_files)
+			send_msg(MSG_SUCCESS, buf, 4, 0);
+		if (preserve_hard_links) {
+			struct file_struct *file = flist->files[ndx - flist->ndx_start];
+			if (F_IS_HLINKED(file))
+				flist_ndx_push(&hlink_list, ndx);
+		}
+		break;
+	case FES_REDO:
+		if (inc_recurse)
+			flist->to_redo++;
+		flist_ndx_push(&redo_list, ndx);
+		break;
+	case FES_NO_SEND:
+		break;
+	}
 }
 
 static void check_timeout(void)
@@ -327,11 +363,7 @@ static void read_msg_fd(void)
 		if (len != 4 || !am_generator)
 			goto invalid_msg;
 		readfd(fd, buf, 4);
-		if (remove_source_files)
-			decrement_active_files(IVAL(buf,0));
-		flist_ndx_push(&redo_list, IVAL(buf,0));
-		if (inc_recurse)
-			decrement_flist_in_progress(IVAL(buf,0), 1);
+		got_flist_entry_status(FES_REDO, buf);
 		break;
 	case MSG_FLIST:
 		if (len != 4 || !am_generator || !inc_recurse)
@@ -361,22 +393,14 @@ static void read_msg_fd(void)
 	case MSG_SUCCESS:
 		if (len != 4 || !am_generator)
 			goto invalid_msg;
-		readfd(fd, buf, len);
-		if (remove_source_files) {
-			decrement_active_files(IVAL(buf,0));
-			send_msg(MSG_SUCCESS, buf, len, 0);
-		}
-		if (preserve_hard_links)
-			flist_ndx_push(&hlink_list, IVAL(buf,0));
-		if (inc_recurse)
-			decrement_flist_in_progress(IVAL(buf,0), 0);
+		readfd(fd, buf, 4);
+		got_flist_entry_status(FES_SUCCESS, buf);
 		break;
 	case MSG_NO_SEND:
 		if (len != 4 || !am_generator)
 			goto invalid_msg;
-		readfd(fd, buf, len);
-		if (inc_recurse)
-			decrement_flist_in_progress(IVAL(buf,0), 0);
+		readfd(fd, buf, 4);
+		got_flist_entry_status(FES_NO_SEND, buf);
 		break;
 	case MSG_SOCKERR:
 	case MSG_CLIENT:
@@ -425,40 +449,6 @@ void increment_active_files(int ndx, int itemizing, enum logcode code)
 
 	active_filecnt++;
 	active_bytecnt += F_LENGTH(cur_flist->files[ndx - cur_flist->ndx_start]);
-}
-
-static void decrement_active_files(int ndx)
-{
-	struct file_list *flist = flist_for_ndx(ndx);
-	assert(flist != NULL);
-	active_filecnt--;
-	active_bytecnt -= F_LENGTH(flist->files[ndx - flist->ndx_start]);
-}
-
-static void decrement_flist_in_progress(int ndx, int redo)
-{
-	struct file_list *flist = cur_flist ? cur_flist : first_flist;
-
-	while (ndx < flist->ndx_start) {
-		if (flist == first_flist) {
-		  invalid_ndx:
-			rprintf(FERROR,
-				"Invalid file index: %d (%d - %d) [%s]\n",
-				ndx, first_flist->ndx_start,
-				first_flist->prev->ndx_end,
-				who_am_i());
-			exit_cleanup(RERR_PROTOCOL);
-		}
-		flist = flist->prev;
-	}
-	while (ndx > flist->ndx_end) {
-		if (!(flist = flist->next))
-			goto invalid_ndx;
-	}
-
-	flist->in_progress--;
-	if (redo)
-		flist->to_redo++;
 }
 
 /* Write an message to a multiplexed stream. If this fails, rsync exits. */
