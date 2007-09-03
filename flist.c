@@ -89,6 +89,18 @@ int flist_cnt = 0; /* how many (non-tmp) file list objects exist */
 int file_total = 0; /* total of all active items over all file-lists */
 int flist_eof = 0; /* all the file-lists are now known */
 
+/* Starting from protocol version 26, we always use 64-bit ino_t and dev_t
+ * internally, even if this platform does not allow files to have 64-bit inums.
+ * The only exception is if we're on a platform with no 64-bit type at all.
+ *
+ * Because we use read_longint() to get these off the wire, if you transfer
+ * devices or (for protocols < 30) hardlinks with dev or inum > 2**32 to a
+ * machine with no 64-bit types then you will get an overflow error.
+ *
+ * Note that if you transfer devices from a 64-bit-devt machine (say, Solaris)
+ * to a 32-bit-devt machine (say, Linux-2.2/x86) then the device numbers will
+ * be truncated.  But it's a kind of silly thing to do anyhow. */
+
 /* The tmp_* vars are used as a cache area by make_file() to store data
  * that the sender doesn't need to remember in its file list.  The data
  * will survive just long enough to be used by send_file_entry(). */
@@ -2164,11 +2176,9 @@ struct file_list *flist_new(int flags, char *msg)
 {
 	struct file_list *flist;
 
-	flist = new(struct file_list);
+	flist = new0(struct file_list);
 	if (!flist)
 		out_of_memory(msg);
-
-	memset(flist, 0, sizeof flist[0]);
 
 	if (flags & FLIST_TEMP) {
 		if (!(flist->file_pool = pool_create(SMALL_EXTENT, 0,
