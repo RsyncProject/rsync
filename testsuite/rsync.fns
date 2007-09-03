@@ -52,6 +52,7 @@ runtest() {
 # messages).  This isn't needed if you use -i without -v.
 filter_outfile() {
     sed -e '/^building file list /d' \
+	-e '/^sending incremental file list/d' \
 	-e '/^created directory /d' \
 	-e '/^done$/d' \
 	-e '/ --whole-file$/d' \
