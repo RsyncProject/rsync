@@ -356,7 +356,7 @@ int push_pathname(const char *dir, int len)
 	return 1;
 }
 
-static void send_file_entry(int f, struct file_struct *file, int ndx)
+static void send_file_entry(int f, struct file_struct *file, int ndx, int first_ndx)
 {
 	static time_t modtime;
 	static mode_t mode;
@@ -465,7 +465,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 			struct ht_int64_node *np = idev_find(tmp_dev, tmp_ino);
 			first_hlink_ndx = (int32)(long)np->data - 1;
 			if (first_hlink_ndx < 0) {
-				np->data = (void*)(long)(ndx + 1);
+				np->data = (void*)(long)(ndx + first_ndx + 1);
 				xflags |= XMIT_HLINK_FIRST;
 			}
 			xflags |= XMIT_HLINKED;
@@ -517,7 +517,8 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 
 	if (first_hlink_ndx >= 0) {
 		write_varint(f, first_hlink_ndx);
-		goto the_end;
+		if (first_hlink_ndx >= first_ndx)
+			goto the_end;
 	}
 
 	write_varlong30(f, F_LENGTH(file), 3);
@@ -705,33 +706,34 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 #ifdef SUPPORT_HARD_LINKS
 	if (protocol_version >= 30
 	 && BITS_SETnUNSET(xflags, XMIT_HLINKED, XMIT_HLINK_FIRST)) {
-		struct file_struct *first;
 		first_hlink_ndx = read_varint(f);
-		if (first_hlink_ndx < 0 || first_hlink_ndx >= flist->used) {
+		if (first_hlink_ndx < 0 || first_hlink_ndx >= flist->ndx_start + flist->used) {
 			rprintf(FERROR,
 				"hard-link reference out of range: %d (%d)\n",
-				first_hlink_ndx, flist->used);
+				first_hlink_ndx, flist->ndx_start + flist->used);
 			exit_cleanup(RERR_PROTOCOL);
 		}
-		first = flist->files[first_hlink_ndx];
-		file_length = F_LENGTH(first);
-		modtime = first->modtime;
-		mode = first->mode;
-		if (uid_ndx)
-			uid = F_OWNER(first);
-		if (gid_ndx)
-			gid = F_GROUP(first);
-		if ((preserve_devices && IS_DEVICE(mode))
-		 || (preserve_specials && IS_SPECIAL(mode))) {
-			uint32 *devp = F_RDEV_P(first);
-			rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
-			extra_len += DEV_EXTRA_CNT * EXTRA_LEN;
+		if (first_hlink_ndx >= flist->ndx_start) {
+			struct file_struct *first = flist->files[first_hlink_ndx - flist->ndx_start];
+			file_length = F_LENGTH(first);
+			modtime = first->modtime;
+			mode = first->mode;
+			if (uid_ndx)
+				uid = F_OWNER(first);
+			if (gid_ndx)
+				gid = F_GROUP(first);
+			if ((preserve_devices && IS_DEVICE(mode))
+			 || (preserve_specials && IS_SPECIAL(mode))) {
+				uint32 *devp = F_RDEV_P(first);
+				rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
+				extra_len += DEV_EXTRA_CNT * EXTRA_LEN;
+			}
+			if (preserve_links && S_ISLNK(mode))
+				linkname_len = strlen(F_SYMLINK(first)) + 1;
+			else
+				linkname_len = 0;
+			goto create_object;
 		}
-		if (preserve_links && S_ISLNK(mode))
-			linkname_len = strlen(F_SYMLINK(first)) + 1;
-		else
-			linkname_len = 0;
-		goto create_object;
 	}
 #endif
 
@@ -820,7 +822,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		if (protocol_version < 28 && S_ISREG(mode))
 			xflags |= XMIT_HLINKED;
 		if (xflags & XMIT_HLINKED)
-			extra_len += EXTRA_LEN;
+			extra_len += (inc_recurse+1) * EXTRA_LEN;
 	}
 #endif
 
@@ -924,7 +926,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 #ifdef SUPPORT_LINKS
 	if (linkname_len) {
 		bp = (char*)file->basename + basename_len;
-		if (first_hlink_ndx >= 0) {
+		if (first_hlink_ndx >= flist->ndx_start) {
 			struct file_struct *first = flist->files[first_hlink_ndx];
 			memcpy(bp, F_SYMLINK(first), linkname_len);
 		} else
@@ -938,7 +940,8 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (preserve_hard_links && xflags & XMIT_HLINKED) {
 		if (protocol_version >= 30) {
 			F_HL_GNUM(file) = xflags & XMIT_HLINK_FIRST
-					? flist->used : first_hlink_ndx;
+					? flist->ndx_start + flist->used
+					: first_hlink_ndx;
 		} else {
 			static int32 cnt = 0;
 			struct ht_int64_node *np;
@@ -970,7 +973,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 			/* Prior to 28, we get a useless set of nulls. */
 			bp = tmp_sum;
 		}
-		if (first_hlink_ndx >= 0) {
+		if (first_hlink_ndx >= flist->ndx_start) {
 			struct file_struct *first = flist->files[first_hlink_ndx];
 			memcpy(bp, F_SUM(first), checksum_len);
 		} else
@@ -1287,7 +1290,7 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 	flist_expand(flist, 1);
 	flist->files[flist->used++] = file;
 	if (f >= 0) {
-		send_file_entry(f, file, flist->used - 1);
+		send_file_entry(f, file, flist->used - 1, flist->ndx_start);
 #ifdef SUPPORT_ACLS
 		if (preserve_acls && !S_ISLNK(file->mode)) {
 			send_acl(&sx, f);
@@ -1965,7 +1968,7 @@ struct file_list *recv_file_list(int f)
 	start_read = stats.total_read;
 
 #ifdef SUPPORT_HARD_LINKS
-	if (preserve_hard_links && protocol_version < 30)
+	if (preserve_hard_links && !first_flist)
 		init_hard_links();
 #endif
 

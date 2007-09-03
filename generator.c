@@ -1370,8 +1370,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				statret = 1;
 		}
 #ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_HLINK_NOT_LAST(file))
+		if (preserve_hard_links && F_HLINK_NOT_LAST(file)) {
+			cur_flist->in_progress++;
 			goto cleanup;
+		}
 #endif
 		if (do_symlink(sl, fname) != 0) {
 			rsyserr(FERROR, errno, "symlink %s -> \"%s\" failed",
@@ -1447,8 +1449,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				statret = 1;
 		}
 #ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_HLINK_NOT_LAST(file))
+		if (preserve_hard_links && F_HLINK_NOT_LAST(file)) {
+			cur_flist->in_progress++;
 			goto cleanup;
+		}
 #endif
 		if (verbose > 2) {
 			rprintf(FINFO, "mknod(%s, 0%o, [%ld,%ld])\n",
@@ -1567,8 +1571,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (statret != 0) {
 #ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_HLINK_NOT_LAST(file))
+		if (preserve_hard_links && F_HLINK_NOT_LAST(file)) {
+			cur_flist->in_progress++;
 			goto cleanup;
+		}
 #endif
 		if (stat_errno == ENOENT)
 			goto notify_others;
@@ -1630,8 +1636,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	  pretend_missing:
 		/* pretend the file didn't exist */
 #ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_HLINK_NOT_LAST(file))
+		if (preserve_hard_links && F_HLINK_NOT_LAST(file)) {
+			cur_flist->in_progress++;
 			goto cleanup;
+		}
 #endif
 		statret = real_ret = -1;
 		goto notify_others;
@@ -1793,7 +1801,7 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 	while (preserve_hard_links && (ndx = get_hlink_num()) != -1) {
 		flist = flist_for_ndx(ndx);
 		assert(flist != NULL);
-		file = flist->files[ndx];
+		file = flist->files[ndx - flist->ndx_start];
 		assert(file->flags & FLAG_HLINKED);
 		finish_hard_link(file, f_name(file, fbuf), NULL, itemizing, code, -1);
 	}
@@ -1912,6 +1920,10 @@ void generate_files(int f_out, const char *local_name)
 	dflt_perms = (ACCESSPERMS & ~orig_umask);
 
 	do {
+#ifdef SUPPORT_HARD_LINKS
+		if (inc_recurse && preserve_hard_links)
+			match_hard_links(cur_flist);
+#endif
 		if (inc_recurse && cur_flist->ndx_start) {
 			struct file_struct *fp = dir_flist->files[cur_flist->parent_ndx];
 			f_name(fp, fbuf);

@@ -70,6 +70,7 @@ extern char *shell_cmd;
 extern char *batch_name;
 extern char *password_file;
 extern char curr_dir[MAXPATHLEN];
+extern struct file_list *cur_flist;
 extern struct filter_list_struct server_filter_list;
 
 int local_server = 0;
@@ -695,8 +696,8 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	copy_links = copy_dirlinks = 0;
 
 #ifdef SUPPORT_HARD_LINKS
-	if (preserve_hard_links)
-		match_hard_links();
+	if (preserve_hard_links && !inc_recurse)
+		match_hard_links(cur_flist);
 #endif
 
 	if (fd_pair(error_pipe) < 0) {

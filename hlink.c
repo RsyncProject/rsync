@@ -24,6 +24,8 @@
 
 extern int verbose;
 extern int dry_run;
+extern int am_sender;
+extern int inc_recurse;
 extern int do_xfers;
 extern int link_dest;
 extern int preserve_acls;
@@ -43,13 +45,21 @@ extern int ic_ndx;
 /* Starting with protocol 30, we use a simple hashtable on the sending side
  * for hashing the st_dev and st_ino info.  The receiving side gets told
  * (via flags and a "group index") which items are hard-linked together, so
- * we can avoid the pool of dev+inode data. */
+ * we can avoid the pool of dev+inode data.  For incremental recursion mode,
+ * the receiver will use a ndx hash to remember old pathnames. */
 
-struct hashtable *dev_tbl;
+static struct hashtable *dev_tbl;
+
+static struct hashtable *prior_hlinks;
+
+static struct file_list *hlink_flist;
 
 void init_hard_links(void)
 {
-	dev_tbl = hashtable_create(16, SIZEOF_INT64 == 8);
+	if (am_sender || protocol_version < 30)
+		dev_tbl = hashtable_create(16, SIZEOF_INT64 == 8);
+	else if (inc_recurse)
+		prior_hlinks = hashtable_create(1024, 0);
 }
 
 struct ht_int64_node *idev_find(int64 dev, int64 ino)
@@ -83,8 +93,8 @@ void idev_destroy(void)
 
 static int hlink_compare_gnum(int *int1, int *int2)
 {
-	struct file_struct *f1 = cur_flist->sorted[*int1];
-	struct file_struct *f2 = cur_flist->sorted[*int2];
+	struct file_struct *f1 = hlink_flist->sorted[*int1];
+	struct file_struct *f2 = hlink_flist->sorted[*int2];
 	int32 gnum1 = F_HL_GNUM(f1);
 	int32 gnum2 = F_HL_GNUM(f2);
 
@@ -98,22 +108,39 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 {
 	int32 from, prev;
 	struct file_struct *file, *file_next;
+	struct ht_int32_node *node = NULL;
 	int32 gnum, gnum_next;
 
 	qsort(ndx_list, ndx_count, sizeof ndx_list[0],
 	     (int (*)()) hlink_compare_gnum);
 
 	for (from = 0; from < ndx_count; from++) {
-		for (file = cur_flist->sorted[ndx_list[from]], gnum = F_HL_GNUM(file), prev = -1;
-		     from < ndx_count-1;
-		     file = file_next, gnum = gnum_next, from++) /*SHARED ITERATOR*/
-		{
-			file_next = cur_flist->sorted[ndx_list[from+1]];
+		file = hlink_flist->sorted[ndx_list[from]];
+		gnum = F_HL_GNUM(file);
+		if (inc_recurse) {
+			node = hashtable_find(prior_hlinks, gnum, 1);
+			if (!node->data) {
+				node->data = new_array0(char, 5);
+				assert(gnum >= hlink_flist->ndx_start);
+			}
+		}
+		if (gnum >= hlink_flist->ndx_start) {
+			file->flags |= FLAG_HLINK_FIRST;
+			prev = -1;
+		} else if (CVAL(node->data, 0) == 0) {
+			struct file_list *flist;
+			prev = IVAL(node->data, 1);
+			flist = flist_for_ndx(prev);
+			assert(flist != NULL);
+			file_next = flist->files[prev - flist->ndx_start];
+			file_next->flags &= ~FLAG_HLINK_LAST;
+		} else
+			prev = -1;
+		for ( ; from < ndx_count-1; file = file_next, gnum = gnum_next, from++) { /*SHARED ITERATOR*/
+			file_next = hlink_flist->sorted[ndx_list[from+1]];
 			gnum_next = F_HL_GNUM(file_next);
 			if (gnum != gnum_next)
 				break;
-			if (prev < 0)
-				file->flags |= FLAG_HLINK_FIRST;
 			F_HL_PREV(file) = prev;
 			/* The linked list must use raw ndx values. */
 #ifdef ICONV_OPTION
@@ -121,13 +148,23 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 				prev = F_NDX(file);
 			else
 #endif
-				prev = ndx_list[from];
+				prev = ndx_list[from] + hlink_flist->ndx_start;
 		}
-		if (prev < 0)
-			file->flags &= ~FLAG_HLINKED;
-		else {
-			file->flags |= FLAG_HLINK_LAST;
-			F_HL_PREV(file) = prev;
+		if (prev < 0 && !inc_recurse) {
+			file->flags &= ~(FLAG_HLINKED | FLAG_HLINK_FIRST);
+			continue;
+		}
+
+		file->flags |= FLAG_HLINK_LAST;
+		F_HL_PREV(file) = prev;
+		if (inc_recurse && CVAL(node->data, 0) == 0) {
+#ifdef ICONV_OPTION
+			if (ic_ndx)
+				prev = F_NDX(file);
+			else
+#endif
+				prev = ndx_list[from] + hlink_flist->ndx_start;
+			SIVAL(node->data, 1, prev);
 		}
 	}
 }
@@ -136,18 +173,20 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
  * items that have hlink data, sorting them, and matching up identical
  * values into clusters.  These will be a single linked list from last
  * to first when we're done. */
-void match_hard_links(void)
+void match_hard_links(struct file_list *flist)
 {
 	int i, ndx_count = 0;
 	int32 *ndx_list;
 
-	if (!(ndx_list = new_array(int32, cur_flist->used)))
+	if (!(ndx_list = new_array(int32, flist->used)))
 		out_of_memory("match_hard_links");
 
-	for (i = 0; i < cur_flist->used; i++) {
-		if (F_IS_HLINKED(cur_flist->sorted[i]))
+	for (i = 0; i < flist->used; i++) {
+		if (F_IS_HLINKED(flist->sorted[i]))
 			ndx_list[ndx_count++] = i;
 	}
+
+	hlink_flist = flist;
 
 	if (ndx_count)
 		match_gnums(ndx_list, ndx_count);
@@ -198,6 +237,24 @@ static int maybe_hard_link(struct file_struct *file, int ndx,
 	return -1;
 }
 
+/* Figure out if a prior entry is still there or if we just have a
+ * cached name for it.  Never called with a FLAG_HLINK_FIRST entry. */
+static char *check_prior(int prev_ndx, int gnum)
+{
+	struct file_list *flist = flist_for_ndx(prev_ndx);
+	struct ht_int32_node *node;
+
+	if (flist) {
+		hlink_flist = flist;
+		return NULL;
+	}
+
+	node = hashtable_find(prior_hlinks, gnum, 0);
+	assert(node != NULL && node->data);
+	assert(CVAL(node->data, 0) != 0);
+	return node->data;
+}
+
 /* Only called if FLAG_HLINKED is set and FLAG_HLINK_FIRST is not.  Returns:
  * 0 = process the file, 1 = skip the file, -1 = error occurred. */
 int hard_link_check(struct file_struct *file, int ndx, const char *fname,
@@ -205,42 +262,54 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 		    enum logcode code)
 {
 	STRUCT_STAT prev_st;
-	char prev_name[MAXPATHLEN], altbuf[MAXPATHLEN], *realname;
-	int alt_dest, prev_ndx = F_HL_PREV(file);
-	struct file_struct *prev_file = cur_flist->files[prev_ndx];
+	char namebuf[MAXPATHLEN], altbuf[MAXPATHLEN];
+	char *realname, *prev_name;
+	int gnum = F_HL_GNUM(file);
+	int prev_ndx = F_HL_PREV(file);
 
-	/* Is the previous link is not complete yet? */
-	if (!(prev_file->flags & FLAG_HLINK_DONE)) {
-		/* Is the previous link being transferred? */
-		if (prev_file->flags & FLAG_FILE_SENT) {
-			/* Add ourselves to the list of files that will be
-			 * updated when the transfer completes, and mark
-			 * ourself as waiting for the transfer. */
-			F_HL_PREV(file) = F_HL_PREV(prev_file);
-			F_HL_PREV(prev_file) = ndx;
-			file->flags |= FLAG_FILE_SENT;
-			return 1;
+	prev_name = realname = check_prior(prev_ndx, gnum);
+
+	if (!prev_name) {
+		struct file_struct *prev_file = hlink_flist->files[prev_ndx - hlink_flist->ndx_start];
+
+		/* Is the previous link is not complete yet? */
+		if (!(prev_file->flags & FLAG_HLINK_DONE)) {
+			/* Is the previous link being transferred? */
+			if (prev_file->flags & FLAG_FILE_SENT) {
+				/* Add ourselves to the list of files that will be
+				 * updated when the transfer completes, and mark
+				 * ourself as waiting for the transfer. */
+				F_HL_PREV(file) = F_HL_PREV(prev_file);
+				F_HL_PREV(prev_file) = ndx;
+				file->flags |= FLAG_FILE_SENT;
+				cur_flist->in_progress++;
+				return 1;
+			}
+			return 0;
 		}
-		return 0;
-	}
 
-	/* There is a finished file to link with! */
-	if (!(prev_file->flags & FLAG_HLINK_FIRST)) {
-		/* The previous previous will be marked with FIRST. */
-		prev_ndx = F_HL_PREV(prev_file);
-		prev_file = cur_flist->files[prev_ndx];
-		/* Update our previous pointer to point to the first. */
-		F_HL_PREV(file) = prev_ndx;
+		/* There is a finished file to link with! */
+		if (!(prev_file->flags & FLAG_HLINK_FIRST)) {
+			/* The previous previous will be marked with FIRST. */
+			prev_ndx = F_HL_PREV(prev_file);
+			prev_name = realname = check_prior(prev_ndx, gnum);
+			/* Update our previous pointer to point to the first. */
+			F_HL_PREV(file) = prev_ndx;
+		}
 	}
-	alt_dest = F_HL_PREV(prev_file); /* alternate value when DONE && FIRST */
-	if (alt_dest >= 0 && dry_run) {
-		pathjoin(prev_name, MAXPATHLEN, basis_dir[alt_dest],
-			 f_name(prev_file, NULL));
-		f_name(prev_file, altbuf);
-		realname = altbuf;
-	} else {
-		f_name(prev_file, prev_name);
-		realname = prev_name;
+	if (!prev_name) {
+		struct file_struct *prev_file = hlink_flist->files[prev_ndx - hlink_flist->ndx_start];
+		int alt_dest = F_HL_PREV(prev_file); /* alternate value when DONE && FIRST */
+
+		if (alt_dest >= 0 && dry_run) {
+			pathjoin(namebuf, MAXPATHLEN, basis_dir[alt_dest],
+				 f_name(prev_file, NULL));
+			prev_name = namebuf;
+			realname = f_name(prev_file, altbuf);
+		} else {
+			prev_name = f_name(prev_file, namebuf);
+			realname = prev_name;
+		}
 	}
 
 	if (link_stat(prev_name, &prev_st, 0) < 0) {
@@ -338,6 +407,7 @@ void finish_hard_link(struct file_struct *file, const char *fname,
 	STRUCT_STAT st;
 	char alt_name[MAXPATHLEN], *prev_name;
 	const char *our_name;
+	struct file_list *flist;
 	int prev_statret, ndx, prev_ndx = F_HL_PREV(file);
 
 	if (stp == NULL && prev_ndx >= 0) {
@@ -365,13 +435,16 @@ void finish_hard_link(struct file_struct *file, const char *fname,
 
 	while ((ndx = prev_ndx) >= 0) {
 		int val;
-		file = cur_flist->files[ndx];
+		flist = flist_for_ndx(ndx);
+		assert(flist != NULL);
+		file = flist->files[ndx - flist->ndx_start];
 		file->flags = (file->flags & ~FLAG_HLINK_FIRST) | FLAG_HLINK_DONE;
 		prev_ndx = F_HL_PREV(file);
 		prev_name = f_name(file, NULL);
 		prev_statret = link_stat(prev_name, &prev_sx.st, 0);
 		val = maybe_hard_link(file, ndx, prev_name, prev_statret, &prev_sx,
 				      our_name, stp, fname, itemizing, code);
+		flist->in_progress--;
 #ifdef SUPPORT_ACLS
 		if (preserve_acls)
 			free_acl(&prev_sx);
@@ -380,6 +453,16 @@ void finish_hard_link(struct file_struct *file, const char *fname,
 			continue;
 		if (remove_source_files == 1 && do_xfers)
 			send_msg_int(MSG_SUCCESS, ndx);
+	}
+
+	if (inc_recurse) {
+		int gnum = F_HL_GNUM(file);
+		struct ht_int32_node *node = hashtable_find(prior_hlinks, gnum, 0);
+		assert(node != NULL && node->data != NULL);
+		assert(CVAL(node->data, 0) == 0);
+		free(node->data);
+		if (!(node->data = strdup(our_name)))
+			out_of_memory("finish_hard_link");
 	}
 }
 #endif
