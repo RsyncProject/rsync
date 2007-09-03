@@ -462,7 +462,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 #ifdef SUPPORT_HARD_LINKS
 	if (tmp_dev != 0) {
 		if (protocol_version >= 30) {
-			struct idev_node *np = idev_node(tmp_dev, tmp_ino);
+			struct ht_int64_node *np = idev_find(tmp_dev, tmp_ino);
 			first_hlink_ndx = (int32)(long)np->data - 1;
 			if (first_hlink_ndx < 0) {
 				np->data = (void*)(long)(ndx + 1);
@@ -516,7 +516,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx)
 	write_buf(f, fname + l1, l2);
 
 	if (first_hlink_ndx >= 0) {
-		write_varint30(f, first_hlink_ndx);
+		write_varint(f, first_hlink_ndx);
 		goto the_end;
 	}
 
@@ -706,7 +706,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (protocol_version >= 30
 	 && BITS_SETnUNSET(xflags, XMIT_HLINKED, XMIT_HLINK_FIRST)) {
 		struct file_struct *first;
-		first_hlink_ndx = read_varint30(f);
+		first_hlink_ndx = read_varint(f);
 		if (first_hlink_ndx < 0 || first_hlink_ndx >= flist->used) {
 			rprintf(FERROR,
 				"hard-link reference out of range: %d (%d)\n",
@@ -941,7 +941,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 					? flist->used : first_hlink_ndx;
 		} else {
 			static int32 cnt = 0;
-			struct idev_node *np;
+			struct ht_int64_node *np;
 			int64 ino;
 			int32 ndx;
 			if (protocol_version < 26) {
@@ -952,7 +952,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 					dev = read_longint(f);
 				ino = read_longint(f);
 			}
-			np = idev_node(dev, ino);
+			np = idev_find(dev, ino);
 			ndx = (int32)(long)np->data - 1;
 			if (ndx < 0) {
 				ndx = cnt++;
@@ -1964,12 +1964,12 @@ struct file_list *recv_file_list(int f)
 
 	start_read = stats.total_read;
 
-	flist = flist_new(0, "recv_file_list");
-
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && protocol_version < 30)
 		init_hard_links();
 #endif
+
+	flist = flist_new(0, "recv_file_list");
 
 	if (inc_recurse) {
 		if (flist->ndx_start == 0)
