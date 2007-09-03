@@ -20,9 +20,9 @@ outfile="$scratchdir/rsync.out"
 cat "$srcdir"/[gr]*.[ch] > "$name1"
 cat "$srcdir"/[et]*.[ch] > "$name2"
 
-checkit "$RSYNC -avv \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir"
+checkit "$RSYNC -avv '$fromdir/' '$todir/'" "$fromdir" "$todir"
 
-checkit "$RSYNC -avv \"$fromdir/\" \"$chkdir/\"" "$fromdir" "$chkdir"
+checkit "$RSYNC -avv '$fromdir/' '$chkdir/'" "$fromdir" "$chkdir"
 cat "$srcdir"/[fgpr]*.[ch] > "$name1"
 cat "$srcdir"/[etw]*.[ch] > "$name2"
 
@@ -39,7 +39,7 @@ echo deleted-file >"$todir/dname"
 cp -p "$todir/dname" "$chkdir"
 
 checkit "$RSYNC -avv --no-whole-file --delete-delay \
-    --backup --backup-dir=\"$bakdir\" \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir" \
+    --backup --backup-dir='$bakdir' '$fromdir/' '$todir/'" "$fromdir" "$todir" \
     | tee "$outfile"
 
 for fn in deep/name1 deep/name2; do
@@ -48,11 +48,11 @@ done
 diff -r $diffopt "$chkdir" "$bakdir" || test_fail "backup dir contents are bogus"
 rm "$bakdir/dname"
 
-checkit "$RSYNC -avv --del \"$fromdir/\" \"$chkdir/\"" "$fromdir" "$chkdir"
+checkit "$RSYNC -avv --del '$fromdir/' '$chkdir/'" "$fromdir" "$chkdir"
 cat "$srcdir"/[efgr]*.[ch] > "$name1"
 cat "$srcdir"/[ew]*.[ch] > "$name2"
 
-checkit "$RSYNC -avv --inplace --no-whole-file --backup --backup-dir=\"$bakdir\" \"$fromdir/\" \"$todir/\"" "$fromdir" "$todir" \
+checkit "$RSYNC -avv --inplace --no-whole-file --backup --backup-dir='$bakdir' '$fromdir/' '$todir/'" "$fromdir" "$todir" \
     | tee "$outfile"
 
 for fn in deep/name1 deep/name2; do
@@ -60,7 +60,7 @@ for fn in deep/name1 deep/name2; do
 done
 diff -r $diffopt "$chkdir" "$bakdir" || test_fail "backup dir contents are bogus"
 
-checkit "$RSYNC -avv --inplace --no-whole-file \"$fromdir/\" \"$bakdir/\"" "$fromdir" "$bakdir"
+checkit "$RSYNC -avv --inplace --no-whole-file '$fromdir/' '$bakdir/'" "$fromdir" "$bakdir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0

@@ -29,23 +29,23 @@ chmod 700 "$dir1"
 chmod 770 "$dir2"
 
 # Copy the files we've created over to another directory
-checkit "$RSYNC -avv \"$fromdir/\" \"$checkdir/\"" "$fromdir" "$checkdir"
+checkit "$RSYNC -avv '$fromdir/' '$checkdir/'" "$fromdir" "$checkdir"
 
 # And then manually make the changes which should occur 
 umask 002
 chmod ug-s,a+rX "$checkdir"/*
 chmod +w "$checkdir" "$checkdir"/dir*
 
-checkit "$RSYNC -avv --chmod ug-s,a+rX,D+w \"$fromdir/\" \"$todir/\"" "$checkdir" "$todir"
+checkit "$RSYNC -avv --chmod ug-s,a+rX,D+w '$fromdir/' '$todir/'" "$checkdir" "$todir"
 
 rm -r "$fromdir" "$checkdir" "$todir"
 makepath "$todir" "$fromdir/foo"
 touch "$fromdir/bar"
 
-checkit "$RSYNC -avv \"$fromdir/\" \"$checkdir/\"" "$fromdir" "$checkdir"
+checkit "$RSYNC -avv '$fromdir/' '$checkdir/'" "$fromdir" "$checkdir"
 chmod o+x "$fromdir"/bar
 
-checkit "$RSYNC -avv --chmod=Fo-x \"$fromdir/\" \"$todir/\"" "$checkdir" "$todir"
+checkit "$RSYNC -avv --chmod=Fo-x '$fromdir/' '$todir/'" "$checkdir" "$todir"
 
 # Tickle a bug in rsync 2.6.8: if you push a new directory with --perms off to
 # a daemon with an incoming chmod, the daemon pretends the directory is a file
@@ -65,7 +65,7 @@ export RSYNC_CONNECT_PROG
 rm -r "$todir"
 makepath "$todir"
 
-checkit "$RSYNC -avv --no-perms \"$fromdir/\" localhost::test-incoming-chmod/" "$checkdir" "$todir"
+checkit "$RSYNC -avv --no-perms '$fromdir/' localhost::test-incoming-chmod/" "$checkdir" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0

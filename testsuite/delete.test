@@ -35,8 +35,7 @@ diff $diffopt "$tmpdir/copy.out" "$tmpdir/copy2.out"
 
 $RSYNC -av -f 'exclude,! */' "$fromdir/" "$chkdir/empty/"
 
-checkit "$RSYNC -avv --del --remove-source-files \
-    \"$fromdir/\" \"$todir/\"" "$chkdir/copy" "$todir"
+checkit "$RSYNC -avv --del --remove-source-files '$fromdir/' '$todir/'" "$chkdir/copy" "$todir"
 
 diff -r "$chkdir/empty" "$fromdir"
 

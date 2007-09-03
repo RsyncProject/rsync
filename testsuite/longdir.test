@@ -20,7 +20,7 @@ if [ -r /etc ]; then
 else
     ls -la / >"$longdir/2"
 fi
-checkit "$RSYNC --delete -avH \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"
+checkit "$RSYNC --delete -avH '$fromdir/' '$todir'" "$fromdir/" "$todir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0

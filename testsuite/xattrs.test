@@ -75,7 +75,7 @@ xset user.equal 'this long attribute should remain the same and not need to be t
 xls $files >"$scratchdir/xattrs.txt"
 
 # OK, let's try a simple xattr copy.
-checkit "$RSYNC -avX . \"$chkdir/\"" "$fromdir" "$chkdir"
+checkit "$RSYNC -avX . '$chkdir/'" "$fromdir" "$chkdir"
 
 cd "$chkdir"
 xls $files | diff $diffopt "$scratchdir/xattrs.txt" -

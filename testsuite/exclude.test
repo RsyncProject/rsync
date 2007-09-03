@@ -107,14 +107,14 @@ EOF
 
 # Start with a check of --prune-empty-dirs:
 $RSYNC -av -f -_foo/too/ -f -_foo/down/ -f -_foo/and/ -f -_new/ "$fromdir/" "$chkdir/"
-checkit "$RSYNC -av --prune-empty-dirs \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+checkit "$RSYNC -av --prune-empty-dirs '$fromdir/' '$todir/'" "$chkdir" "$todir"
 rm -rf "$todir"
 
 # Add a directory symlink.
 ln -s too "$fromdir/bar/down/to/foo/sym"
 
 # Create chkdir with what we expect to be excluded.
-checkit "$RSYNC -avv \"$fromdir/\" \"$chkdir/\"" "$fromdir" "$chkdir"
+checkit "$RSYNC -avv '$fromdir/' '$chkdir/'" "$fromdir" "$chkdir"
 sleep 1 # Ensures that the rm commands will tweak the directory times.
 rm -r "$chkdir"/foo/down
 rm -r "$chkdir"/mid/for/foo/and
@@ -130,8 +130,8 @@ $RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$chkdir/"
 
 # Now, test if rsync excludes the same files.
 
-checkit "$RSYNC -avv --exclude-from=\"$excl\" \
-    --delete-during \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+checkit "$RSYNC -avv --exclude-from='$excl' \
+    --delete-during '$fromdir/' '$todir/'" "$chkdir" "$todir"
 
 # Modify the chk dir by removing cvs-ignored files and then tweaking the dir times.
 
@@ -146,8 +146,8 @@ $RSYNC -av --existing --filter='exclude,! */' "$fromdir/" "$chkdir/"
 # Now, test if rsync excludes the same files, this time with --cvs-exclude
 # and --delete-excluded.
 
-checkit "$RSYNC -avvC --filter=\"merge $excl\" --delete-excluded \
-    --delete-during \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+checkit "$RSYNC -avvC --filter='merge $excl' --delete-excluded \
+    --delete-during '$fromdir/' '$todir/'" "$chkdir" "$todir"
 
 # Modify the chk dir for our merge-exclude test and then tweak the dir times.
 
@@ -166,9 +166,9 @@ $RSYNC -av --existing --filter='-! */' "$fromdir/" "$chkdir/"
 # Now, test if rsync excludes the same files, this time with a merge-exclude
 # file.
 
-checkit "sed '/!/d' \"$excl\" |
+checkit "sed '/!/d' '$excl' |
     $RSYNC -avv -f dir-merge_.filt -f merge_- \
-    --delete-during \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+    --delete-during '$fromdir/' '$todir/'" "$chkdir" "$todir"
 
 # Remove the files that will be deleted.
 
@@ -184,9 +184,9 @@ $RSYNC -av --protocol=28 --existing --include='*/' --exclude='*' "$fromdir/" "$c
 # Now, try the prior command with --delete-before and some side-specific
 # rules.
 
-checkit "sed '/!/d' \"$excl\" |
+checkit "sed '/!/d' '$excl' |
     $RSYNC -avv -f :s_.filt -f .s_- -f P_nodel.deep \
-    --delete-before \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+    --delete-before '$fromdir/' '$todir/'" "$chkdir" "$todir"
 
 # Next, we'll test some rule-restricted filter files.
 
@@ -205,15 +205,15 @@ $RSYNC -av --existing --filter='-! */' "$fromdir/" "$chkdir/"
 $RSYNC -av --delete-excluded --exclude='*' "$fromdir/" "$todir/"
 
 checkit "$RSYNC -avv -f dir-merge,-_.excl \
-    \"$fromdir/\" \"$todir/\"" "$chkdir" "$todir"
+    '$fromdir/' '$todir/'" "$chkdir" "$todir"
 
 relative_opts='--relative --chmod=Du+w --copy-unsafe-links'
 $RSYNC -av $relative_opts "$fromdir/foo" "$chkdir/"
 rm -rf "$chkdir$fromdir/foo/down"
 $RSYNC -av $relative_opts --existing --filter='-! */' "$fromdir/foo" "$chkdir/"
 
-checkit "$RSYNC -avv $relative_opts --exclude=\"$fromdir/foo/down\" \
-    \"$fromdir/foo\" \"$todir\"" "$chkdir$fromdir/foo" "$todir$fromdir/foo"
+checkit "$RSYNC -avv $relative_opts --exclude='$fromdir/foo/down' \
+    '$fromdir/foo' '$todir'" "$chkdir$fromdir/foo" "$todir$fromdir/foo"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
