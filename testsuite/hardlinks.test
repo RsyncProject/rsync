@@ -11,6 +11,8 @@
 
 . "$suitedir/rsync.fns"
 
+outfile="$scratchdir/rsync.out"
+
 # Build some hardlinks
 
 fromdir="$scratchdir/from"
@@ -49,6 +51,14 @@ checkit "$RSYNC -aHivv --link-dest='$todir' '$fromdir/' '$chkdir/'" "$todir" "$c
 
 rm -rf "$chkdir"
 checkit "$RSYNC -aHivv --copy-dest='$todir' '$fromdir/' '$chkdir/'" "$fromdir" "$chkdir"
+
+# Create a hard link that has only one part in the hierarchy.
+echo "This is another file" >"$fromdir/solo"
+ln "$fromdir/solo" "$chkdir/solo" || fail "Can't create hardlink"
+
+# Make sure that the checksum data doesn't slide due to an HLINK_BUMP() change.
+$RSYNC -aHivc "$fromdir/" "$chkdir/" | tee "$outfile"
+grep solo "$outfile" && test_fail "Erroneous copy of solo file occurred!"
 
 # Make sure there's nothing wrong with sending a single file with -H
 # enabled (this has broken twice so far, so we need this test).
