@@ -587,7 +587,7 @@ extern int xattrs_ndx;
 #define OPT_EXTRA(f,bump) ((union file_extras*)(f) - file_extra_cnt - 1 - (bump))
 
 #define LEN64_BUMP(f) ((f)->flags & FLAG_LENGTH64 ? 1 : 0)
-#define HLINK_BUMP(f) (F_IS_HLINKED(f) ? inc_recurse+1 : 0)
+#define HLINK_BUMP(f) ((f)->flags & (FLAG_HLINKED|FLAG_HLINK_DONE) ? inc_recurse+1 : 0)
 #define ACL_BUMP(f) (acls_ndx ? 1 : 0)
 
 /* The length applies to all items. */
