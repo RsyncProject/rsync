@@ -804,7 +804,8 @@ are in the list of files being sent.
 
 If incremental recursion is active (see bf(--recursive)), rsync may transfer
 a missing hard-linked file before it finds that another link for the file
-exists elsewhere in the hierarchy.  One way to avoid this is to disable
+exists elsewhere in the hierarchy.  This does not affect the accuracy of
+the transfer, just its efficiency.  One way to avoid this is to disable
 incremental recursion using the bf(--no-ir) option.
 
 dit(bf(-p, --perms)) This option causes the receiving rsync to set the
