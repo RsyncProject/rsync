@@ -151,7 +151,10 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 				prev = ndx_list[from] + hlink_flist->ndx_start;
 		}
 		if (prev < 0 && !inc_recurse) {
+			/* Indicate that this item isn't hard-linked without
+			 * affecting any HLINK_BUMP()-dependent values. */
 			file->flags &= ~(FLAG_HLINKED | FLAG_HLINK_FIRST);
+			file->flags |= FLAG_HLINK_DONE;
 			continue;
 		}
 
