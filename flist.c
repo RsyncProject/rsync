@@ -927,7 +927,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (linkname_len) {
 		bp = (char*)file->basename + basename_len;
 		if (first_hlink_ndx >= flist->ndx_start) {
-			struct file_struct *first = flist->files[first_hlink_ndx];
+			struct file_struct *first = flist->files[first_hlink_ndx - flist->ndx_start];
 			memcpy(bp, F_SYMLINK(first), linkname_len);
 		} else
 			read_sbuf(f, bp, linkname_len - 1);
@@ -974,7 +974,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 			bp = tmp_sum;
 		}
 		if (first_hlink_ndx >= flist->ndx_start) {
-			struct file_struct *first = flist->files[first_hlink_ndx];
+			struct file_struct *first = flist->files[first_hlink_ndx - flist->ndx_start];
 			memcpy(bp, F_SUM(first), checksum_len);
 		} else
 			read_buf(f, bp, checksum_len);
