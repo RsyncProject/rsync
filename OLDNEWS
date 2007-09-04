@@ -306,8 +306,8 @@ Changes since 2.6.6:
     - Fixed the matching of the dont-compress items (e.g. *.gz) against files
       that have a path component containing a slash.
 
-    - If code reading a filter/exclude file an EINTR error, rsync now clears
-      the error flag on the file handle so it can keep on reading.
+    - If the code reading a filter/exclude file gets an EINTR error, rsync now
+      clears the error flag on the file handle so it can keep on reading.
 
     - If --relative is active, the sending side cleans up trailing "/" or "/."
       suffixes to avoid triggering a bug in older rsync versions.  Also, we now
