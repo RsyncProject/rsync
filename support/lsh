@@ -1,0 +1,23 @@
+#!/bin/sh
+# This script can be used as a "remote shell" command that is only
+# capable of pretending to connect to "localhost".  This is useful
+# for testing or for running a local copy where the sender and the
+# receiver needs to use different options (e.g. --fake-super).  If
+# we get a -l USER option, we try to use "sudo -u USER" to run the
+# command.
+
+prefix=''
+
+cd # Default path is home dir, just like ssh.
+
+while : ; do
+    case "$1" in
+    -l) shift ; prefix="sudo -u $1"; shift ;;
+    -l*) prefix=`echo $1 | sed 's/-l/sudo -u /'`; shift ;;
+    -*) shift ;;
+    localhost) shift; break ;;
+    *) exit 1 ;;
+    esac
+done
+
+eval $prefix "${@}"
