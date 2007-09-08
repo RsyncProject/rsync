@@ -21,7 +21,7 @@ while : ; do
     esac
 done
 
-$*
+eval "${@}"
 EOT
 chmod +x "$SSH"
 
