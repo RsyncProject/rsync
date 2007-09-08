@@ -856,12 +856,13 @@ static void create_refuse_error(int which)
  *
  * @retval 0 on error, with err_buf containing an explanation
  **/
-int parse_arguments(int *argc, const char ***argv, int frommain)
+int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 {
-	int opt;
-	char *ref = lp_refuse_options(module_id);
-	const char *arg;
 	poptContext pc;
+	char *ref = lp_refuse_options(module_id);
+	const char *arg, **argv = *argv_p;
+	int argc = *argc_p;
+	int opt;
 
 	if (ref && *ref)
 		set_refuse_options(ref);
@@ -894,7 +895,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				/* Disable popt aliases on the server side and
 				 * then start parsing the options again. */
 				poptFreeContext(pc);
-				pc = poptGetContext(RSYNC_NAME, *argc, *argv,
+				pc = poptGetContext(RSYNC_NAME, argc, argv,
 						    long_options, 0);
 				am_server = 1;
 			}
@@ -922,7 +923,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 			iconv_opt = NULL;
 #endif
 			poptFreeContext(pc);
-			pc = poptGetContext(RSYNC_NAME, *argc, *argv,
+			pc = poptGetContext(RSYNC_NAME, argc, argv,
 					    long_daemon_options, 0);
 			while ((opt = poptGetNextOpt(pc)) != -1) {
 				switch (opt) {
@@ -957,8 +958,8 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 				exit_cleanup(RERR_SYNTAX);
 			}
 
-			*argv = poptGetArgs(pc);
-			*argc = count_args(*argv);
+			*argv_p = argv = poptGetArgs(pc);
+			*argc_p = argc = count_args(argv);
 			am_starting_up = 0;
 			daemon_opt = 0;
 			am_daemon = 1;
@@ -1222,7 +1223,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		}
 	}
 
-	if (human_readable && *argc == 2) {
+	if (human_readable && argc == 2) {
 		/* Allow the old meaning of 'h' (--help) on its own. */
 		usage(FINFO);
 		exit_cleanup(0);
@@ -1367,13 +1368,13 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 		need_messages_from_generator = 1;
 	}
 
-	*argv = poptGetArgs(pc);
-	*argc = count_args(*argv);
+	*argv_p = argv = poptGetArgs(pc);
+	*argc_p = argc = count_args(argv);
 
 	if (sanitize_paths) {
 		int i;
-		for (i = *argc; i-- > 0; )
-			(*argv)[i] = sanitize_path(NULL, (*argv)[i], "", 0, NULL);
+		for (i = argc; i-- > 0; )
+			argv[i] = sanitize_path(NULL, argv[i], "", 0, NULL);
 		if (tmpdir)
 			tmpdir = sanitize_path(NULL, tmpdir, NULL, 0, NULL);
 		if (backup_dir)
@@ -1558,7 +1559,7 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
 	if (files_from) {
 		char *h, *p;
 		int q;
-		if (*argc > 2 || (!am_daemon && *argc == 1)) {
+		if (argc > 2 || (!am_daemon && argc == 1)) {
 			usage(FERROR);
 			exit_cleanup(RERR_SYNTAX);
 		}
@@ -1618,10 +1619,10 @@ int parse_arguments(int *argc, const char ***argv, int frommain)
  * behave, and also filtering out options that are processed only
  * locally.
  **/
-void server_options(char **args,int *argc)
+void server_options(char **args, int *argc_p)
 {
 	static char argstr[64];
-	int ac = *argc;
+	int ac = *argc_p;
 	char *arg;
 
 	int i, x;
@@ -1634,7 +1635,7 @@ void server_options(char **args,int *argc)
 
 	if (daemon_over_rsh > 0) {
 		args[ac++] = "--daemon";
-		*argc = ac;
+		*argc_p = ac;
 		/* if we're passing --daemon, we're done */
 		return;
 	}
@@ -1962,7 +1963,7 @@ void server_options(char **args,int *argc)
 	else if (remove_source_files)
 		args[ac++] = "--remove-sent-files";
 
-	*argc = ac;
+	*argc_p = ac;
 	return;
 
     oom:
