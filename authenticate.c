@@ -241,7 +241,7 @@ char *auth_server(int f_in, int f_out, int module, const char *host,
 
 	io_printf(f_out, "%s%s\n", leader, challenge);
 
-	if (!read_line(f_in, line, sizeof line - 1)
+	if (!read_line_old(f_in, line, sizeof line)
 	 || (pass = strchr(line, ' ')) == NULL) {
 		rprintf(FLOG, "auth failed on module %s from %s (%s): "
 			"invalid challenge response\n",
