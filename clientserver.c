@@ -63,6 +63,8 @@ struct chmod_mode_struct *daemon_chmod_modes;
 char *module_dir = NULL;
 unsigned int module_dirlen = 0;
 
+static int rl_nulls = 0;
+
 #ifdef HAVE_SIGACTION
 static struct sigaction sigact;
 #endif
@@ -81,7 +83,8 @@ static struct sigaction sigact;
  * @return -1 for error in startup, or the result of client_run().
  * Either way, it eventually gets passed to exit_cleanup().
  **/
-int start_socket_client(char *host, char *path, int argc, char *argv[])
+int start_socket_client(char *host, int remote_argc, char *remote_argv[],
+			int argc, char *argv[])
 {
 	int fd, ret;
 	char *p, *user = NULL;
@@ -89,7 +92,7 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 	/* This is redundant with code in start_inband_exchange(), but this
 	 * short-circuits a problem in the client before we open a socket,
 	 * and the extra check won't hurt. */
-	if (*path == '/') {
+	if (**remote_argv == '/') {
 		rprintf(FERROR,
 			"ERROR: The remote path must start with a module name not a /\n");
 		return -1;
@@ -108,19 +111,92 @@ int start_socket_client(char *host, char *path, int argc, char *argv[])
 
 	set_socket_options(fd, sockopts);
 
-	ret = start_inband_exchange(user, path, fd, fd, argc);
+	ret = start_inband_exchange(fd, fd, user, remote_argc, remote_argv);
 
 	return ret ? ret : client_run(fd, fd, -1, argc, argv);
 }
 
-int start_inband_exchange(const char *user, char *path, int f_in, int f_out,
-			  int argc)
+static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int am_client)
+{
+	int remote_sub = -1;
+#if SUBPROTOCOL_VERSION != 0
+	int our_sub = protocol_version < PROTOCOL_VERSION ? 0 : SUBPROTOCOL_VERSION;
+#else
+	int our_sub = 0;
+#endif
+	char *motd;
+
+	io_printf(f_out, "@RSYNCD: %d.%d\n", protocol_version, our_sub);
+
+	if (!am_client) {
+		motd = lp_motd_file();
+		if (motd && *motd) {
+			FILE *f = fopen(motd,"r");
+			while (f && !feof(f)) {
+				int len = fread(buf, 1, bufsiz - 1, f);
+				if (len > 0)
+					write_buf(f_out, buf, len);
+			}
+			if (f)
+				fclose(f);
+			write_sbuf(f_out, "\n");
+		}
+	}
+
+	/* This strips the \n. */
+	if (!read_line_old(f_in, buf, bufsiz)) {
+		if (am_client)
+			rprintf(FERROR, "rsync: did not see server greeting\n");
+		return -1;
+	}
+
+	if (sscanf(buf, "@RSYNCD: %d.%d", &remote_protocol, &remote_sub) < 1) {
+		if (am_client)
+			rprintf(FERROR, "rsync: server sent \"%s\" rather than greeting\n", buf);
+		else
+			io_printf(f_out, "@ERROR: protocol startup error\n");
+		return -1;
+	}
+
+	if (remote_sub < 0) {
+		if (remote_protocol == 30) {
+			if (am_client)
+				rprintf(FERROR, "rsync: server is speaking an incompatible beta of protocol 30\n");
+			else
+				io_printf(f_out, "@ERROR: your client is speaking an incompatible beta of protocol 30\n");
+			return -1;
+		}
+		remote_sub = 0;
+	}
+
+	if (protocol_version > remote_protocol) {
+		protocol_version = remote_protocol;
+		if (remote_sub)
+			protocol_version--;
+	} else if (protocol_version == remote_protocol) {
+		if (remote_sub != our_sub)
+			protocol_version--;
+	}
+#if SUBPROTOCOL_VERSION != 0
+	else if (protocol_version < remote_protocol) {
+		if (our_sub)
+			protocol_version--;
+	}
+#endif
+
+	if (protocol_version >= 30)
+		rl_nulls = 1;
+
+	return 0;
+}
+
+int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char *argv[])
 {
 	int i;
+	char line[BIGPATHBUFLEN];
 	char *sargs[MAX_ARGS];
 	int sargc = 0;
-	char line[BIGPATHBUFLEN];
-	char *p;
+	char *p, *path = *argv;
 
 	if (argc == 0 && !am_sender)
 		list_only |= 1;
@@ -136,21 +212,8 @@ int start_inband_exchange(const char *user, char *path, int f_in, int f_out,
 	if (!user)
 		user = getenv("LOGNAME");
 
-	io_printf(f_out, "@RSYNCD: %d\n", protocol_version);
-
-	if (!read_line(f_in, line, sizeof line - 1)) {
-		rprintf(FERROR, "rsync: did not see server greeting\n");
+	if (exchange_protocols(f_in, f_out, line, sizeof line, 1) < 0)
 		return -1;
-	}
-
-	if (sscanf(line,"@RSYNCD: %d", &remote_protocol) != 1) {
-		/* note that read_line strips of \n or \r */
-		rprintf(FERROR, "rsync: server sent \"%s\" rather than greeting\n",
-			line);
-		return -1;
-	}
-	if (protocol_version > remote_protocol)
-		protocol_version = remote_protocol;
 
 	if (list_only && protocol_version >= 29)
 		list_only |= 2;
@@ -161,18 +224,28 @@ int start_inband_exchange(const char *user, char *path, int f_in, int f_out,
 	daemon_over_rsh = 0;
 	server_options(sargs, &sargc);
 
+	if (sargc >= MAX_ARGS - 2)
+		goto arg_overflow;
+
 	sargs[sargc++] = ".";
 
-	if (path && *path)
-		sargs[sargc++] = path;
+	while (argc > 0) {
+		if (sargc >= MAX_ARGS - 1) {
+		  arg_overflow:
+			rprintf(FERROR, "internal: args[] overflowed in do_cmd()\n");
+			exit_cleanup(RERR_SYNTAX);
+		}
+		sargs[sargc++] = *argv++;
+		argc--;
+	}
 
 	sargs[sargc] = NULL;
 
 	if (verbose > 1)
 		print_child_argv(sargs);
 
-	p = strchr(path,'/');
-	if (p) *p = 0;
+	p = strchr(path, '/');
+	if (p) *p = '\0';
 	io_printf(f_out, "%s\n", path);
 	if (p) *p = '/';
 
@@ -181,7 +254,7 @@ int start_inband_exchange(const char *user, char *path, int f_in, int f_out,
 	kluge_around_eof = list_only && protocol_version < 25 ? 1 : 0;
 
 	while (1) {
-		if (!read_line(f_in, line, sizeof line - 1)) {
+		if (!read_line_old(f_in, line, sizeof line)) {
 			rprintf(FERROR, "rsync: didn't get server startup line\n");
 			return -1;
 		}
@@ -216,10 +289,17 @@ int start_inband_exchange(const char *user, char *path, int f_in, int f_out,
 	}
 	kluge_around_eof = 0;
 
-	for (i = 0; i < sargc; i++) {
-		io_printf(f_out, "%s\n", sargs[i]);
+	if (rl_nulls) {
+		for (i = 0; i < sargc; i++) {
+			write_sbuf(f_out, sargs[i]);
+			write_byte(f_out, 0);
+		}
+		write_byte(f_out, 0);
+	} else {
+		for (i = 0; i < sargc; i++)
+			io_printf(f_out, "%s\n", sargs[i]);
+		write_sbuf(f_out, "\n");
 	}
-	io_printf(f_out, "\n");
 
 	if (protocol_version < 23) {
 		if (protocol_version == 22 || !am_sender)
@@ -234,12 +314,12 @@ static char *finish_pre_exec(pid_t pid, int fd, char *request,
 {
 	int j, status = -1;
 
-	if (request) {
-		write_buf(fd, request, strlen(request)+1);
-		for (j = 0; j < argc; j++)
-			write_buf(fd, argv[j], strlen(argv[j])+1);
-	}
+	if (!request)
+		request = "(NONE)";
 
+	write_buf(fd, request, strlen(request)+1);
+	for (j = 0; j < argc; j++)
+		write_buf(fd, argv[j], strlen(argv[j])+1);
 	write_byte(fd, 0);
 
 	close(fd);
@@ -275,8 +355,7 @@ static int read_arg_from_pipe(int fd, char *buf, int limit)
 
 static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 {
-	int argc = 0;
-	int maxargs;
+	int argc, opt_cnt;
 	char **argv;
 	char line[BIGPATHBUFLEN];
 	uid_t uid = (uid_t)-2;  /* canonically "nobody" */
@@ -284,7 +363,6 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	char *p, *err_msg = NULL;
 	char *name = lp_name(i);
 	int use_chroot = lp_use_chroot(i);
-	int start_glob = 0;
 	int ret, pre_exec_fd = -1;
 	pid_t pre_exec_pid = 0;
 	char *request = NULL;
@@ -580,54 +658,11 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 
 	io_printf(f_out, "@RSYNCD: OK\n");
 
-	maxargs = MAX_ARGS;
-	if (!(argv = new_array(char *, maxargs)))
-		out_of_memory("rsync_module");
-	argv[argc++] = "rsyncd";
-
-	while (1) {
-		if (!read_line(f_in, line, sizeof line - 1))
-			return -1;
-
-		if (!*line)
-			break;
-
-		p = line;
-
-		if (argc == maxargs) {
-			maxargs += MAX_ARGS;
-			if (!(argv = realloc_array(argv, char *, maxargs)))
-				out_of_memory("rsync_module");
-		}
-		if (!(argv[argc] = strdup(p)))
-			out_of_memory("rsync_module");
-
-		switch (start_glob) {
-		case 0:
-			argc++;
-			if (strcmp(line, ".") == 0)
-				start_glob = 1;
-			break;
-		case 1:
-			if (pre_exec_pid) {
-				err_msg = finish_pre_exec(pre_exec_pid,
-							  pre_exec_fd, p,
-							  argc, argv);
-				pre_exec_pid = 0;
-			}
-			request = strdup(p);
-			start_glob = 2;
-			/* FALL THROUGH */
-		default:
-			if (!err_msg)
-				glob_expand(name, &argv, &argc, &maxargs);
-			break;
-		}
-	}
+	opt_cnt = read_args(f_in, name, line, sizeof line, rl_nulls, &argv, &argc, &request);
 
 	if (pre_exec_pid) {
 		err_msg = finish_pre_exec(pre_exec_pid, pre_exec_fd, request,
-					  argc, argv);
+					  opt_cnt, argv);
 	}
 
 	verbose = 0; /* future verbosity is controlled by client options */
@@ -744,7 +779,7 @@ static void send_listing(int fd)
 int start_daemon(int f_in, int f_out)
 {
 	char line[1024];
-	char *motd, *addr, *host;
+	char *addr, *host;
 	int i;
 
 	io_set_sock_fds(f_in, f_out);
@@ -769,35 +804,11 @@ int start_daemon(int f_in, int f_out)
 		set_nonblocking(f_in);
 	}
 
-	io_printf(f_out, "@RSYNCD: %d\n", protocol_version);
-
-	motd = lp_motd_file();
-	if (motd && *motd) {
-		FILE *f = fopen(motd,"r");
-		while (f && !feof(f)) {
-			int len = fread(line, 1, sizeof line - 1, f);
-			if (len > 0) {
-				line[len] = 0;
-				io_printf(f_out, "%s", line);
-			}
-		}
-		if (f)
-			fclose(f);
-		io_printf(f_out, "\n");
-	}
-
-	if (!read_line(f_in, line, sizeof line - 1))
+	if (exchange_protocols(f_in, f_out, line, sizeof line, 0) < 0)
 		return -1;
-
-	if (sscanf(line,"@RSYNCD: %d", &remote_protocol) != 1) {
-		io_printf(f_out, "@ERROR: protocol startup error\n");
-		return -1;
-	}
-	if (protocol_version > remote_protocol)
-		protocol_version = remote_protocol;
 
 	line[0] = 0;
-	if (!read_line(f_in, line, sizeof line - 1))
+	if (!read_line_old(f_in, line, sizeof line))
 		return -1;
 
 	if (!*line || strcmp(line, "#list") == 0) {
