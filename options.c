@@ -90,6 +90,7 @@ char *files_from = NULL;
 int filesfrom_fd = -1;
 char *filesfrom_host = NULL;
 int eol_nulls = 0;
+int protect_args = 0;
 int human_readable = 0;
 int recurse = 0;
 int allow_inc_recurse = 1;
@@ -397,6 +398,7 @@ void usage(enum logcode F)
   rprintf(F,"     --include-from=FILE     read include patterns from FILE\n");
   rprintf(F,"     --files-from=FILE       read list of source-file names from FILE\n");
   rprintf(F," -0, --from0                 all *-from/filter files are delimited by 0s\n");
+  rprintf(F," -s, --protect-args          no space-splitting; only wildcard special-chars\n");
   rprintf(F,"     --address=ADDRESS       bind address for outgoing socket to daemon\n");
   rprintf(F,"     --port=PORT             specify double-colon alternate port number\n");
   rprintf(F,"     --sockopts=OPTIONS      specify custom TCP options\n");
@@ -591,6 +593,7 @@ static struct poptOption long_options[] = {
   {"files-from",       0,  POPT_ARG_STRING, &files_from, 0, 0, 0 },
   {"from0",           '0', POPT_ARG_VAL,    &eol_nulls, 1, 0, 0},
   {"no-from0",         0,  POPT_ARG_VAL,    &eol_nulls, 0, 0, 0},
+  {"protect-args",    's', POPT_ARG_NONE,   &protect_args, 0, 0, 0},
   {"numeric-ids",      0,  POPT_ARG_VAL,    &numeric_ids, 1, 0, 0 },
   {"no-numeric-ids",   0,  POPT_ARG_VAL,    &numeric_ids, 0, 0, 0 },
   {"timeout",          0,  POPT_ARG_INT,    &io_timeout, 0, 0, 0 },
@@ -858,7 +861,7 @@ static void create_refuse_error(int which)
  **/
 int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 {
-	poptContext pc;
+	static poptContext pc;
 	char *ref = lp_refuse_options(module_id);
 	const char *arg, **argv = *argv_p;
 	int argc = *argc_p;
@@ -878,8 +881,11 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 
 	/* The context leaks in case of an error, but if there's a
 	 * problem we always exit anyhow. */
-	pc = poptGetContext(RSYNC_NAME, *argc, *argv, long_options, 0);
-	poptReadDefaultConfig(pc, 0);
+	if (pc)
+		poptFreeContext(pc);
+	pc = poptGetContext(RSYNC_NAME, argc, argv, long_options, 0);
+	if (!am_server)
+		poptReadDefaultConfig(pc, 0);
 
 	while ((opt = poptGetNextOpt(pc)) != -1) {
 		/* most options are handled automatically by popt;
@@ -1227,6 +1233,13 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 		/* Allow the old meaning of 'h' (--help) on its own. */
 		usage(FINFO);
 		exit_cleanup(0);
+	}
+
+	if (protect_args) {
+		if (!frommain)
+			protect_args = 0;
+		else if (am_server)
+			return 1;
 	}
 
 #ifdef ICONV_OPTION
