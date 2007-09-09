@@ -519,8 +519,7 @@ static int filter_server_path(char *arg)
 	return 0;
 }
 
-static void glob_expand_one(char *s, char ***argv_ptr, int *argc_ptr,
-			    int *maxargs_ptr)
+void glob_expand(char *s, char ***argv_ptr, int *argc_ptr, int *maxargs_ptr)
 {
 	char **argv = *argv_ptr;
 	int argc = *argc_ptr;
@@ -529,7 +528,7 @@ static void glob_expand_one(char *s, char ***argv_ptr, int *argc_ptr,
 	if (argc == maxargs) {
 		maxargs += MAX_ARGS;
 		if (!(argv = realloc_array(argv, char *, maxargs)))
-			out_of_memory("glob_expand_one");
+			out_of_memory("glob_expand");
 		*argv_ptr = argv;
 		*maxargs_ptr = maxargs;
 	}
@@ -549,6 +548,8 @@ static void glob_expand_one(char *s, char ***argv_ptr, int *argc_ptr,
 		s = sanitize_path(NULL, s, "", 0, NULL);
 	else
 		s = strdup(s);
+	if (!s)
+		out_of_memory("glob_expand");
 
 	memset(&globbuf, 0, sizeof globbuf);
 	if (!filter_server_path(s))
@@ -556,7 +557,7 @@ static void glob_expand_one(char *s, char ***argv_ptr, int *argc_ptr,
 	if (MAX((int)globbuf.gl_pathc, 1) > maxargs - argc) {
 		maxargs += globbuf.gl_pathc + MAX_ARGS;
 		if (!(argv = realloc_array(argv, char *, maxargs)))
-			out_of_memory("glob_expand_one");
+			out_of_memory("glob_expand");
 		*argv_ptr = argv;
 		*maxargs_ptr = maxargs;
 	}
@@ -567,7 +568,7 @@ static void glob_expand_one(char *s, char ***argv_ptr, int *argc_ptr,
 		free(s);
 		for (i = 0; i < (int)globbuf.gl_pathc; i++) {
 			if (!(argv[argc++] = strdup(globbuf.gl_pathv[i])))
-				out_of_memory("glob_expand_one");
+				out_of_memory("glob_expand");
 		}
 	}
 	globfree(&globbuf);
@@ -576,35 +577,34 @@ static void glob_expand_one(char *s, char ***argv_ptr, int *argc_ptr,
 }
 
 /* This routine is only used in daemon mode. */
-void glob_expand(char *base1, char ***argv_ptr, int *argc_ptr, int *maxargs_ptr)
+void glob_expand_module(char *base1, char *arg, char ***argv_ptr, int *argc_ptr, int *maxargs_ptr)
 {
-	char *s = (*argv_ptr)[*argc_ptr];
-	char *p, *q;
+	char *p, *s;
 	char *base = base1;
 	int base_len = strlen(base);
 
-	if (!s || !*s)
+	if (!arg || !*arg)
 		return;
 
-	if (strncmp(s, base, base_len) == 0)
-		s += base_len;
+	if (strncmp(arg, base, base_len) == 0)
+		arg += base_len;
 
-	if (!(s = strdup(s)))
-		out_of_memory("glob_expand");
+	if (!(arg = strdup(arg)))
+		out_of_memory("glob_expand_module");
 
 	if (asprintf(&base," %s/", base1) <= 0)
-		out_of_memory("glob_expand");
+		out_of_memory("glob_expand_module");
 	base_len++;
 
-	for (q = s; *q; q = p + base_len) {
-		if ((p = strstr(q, base)) != NULL)
+	for (s = arg; *s; s = p + base_len) {
+		if ((p = strstr(s, base)) != NULL)
 			*p = '\0'; /* split it at this point */
-		glob_expand_one(q, argv_ptr, argc_ptr, maxargs_ptr);
+		glob_expand(s, argv_ptr, argc_ptr, maxargs_ptr);
 		if (!p)
 			break;
 	}
 
-	free(s);
+	free(arg);
 	free(base);
 }
 
