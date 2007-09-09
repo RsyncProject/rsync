@@ -52,6 +52,7 @@ extern int preserve_devices;
 extern int preserve_specials;
 extern int uid_ndx;
 extern int gid_ndx;
+extern int eol_nulls;
 extern int relative_paths;
 extern int implied_dirs;
 extern int file_extra_cnt;
@@ -63,6 +64,7 @@ extern int copy_unsafe_links;
 extern int protocol_version;
 extern int sanitize_paths;
 extern struct stats stats;
+extern char *filesfrom_host;
 
 extern char curr_dir[MAXPATHLEN];
 
@@ -1641,6 +1643,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	int64 start_write;
 	int use_ff_fd = 0;
 	int flags, disable_buffering;
+	int reading_remotely = filesfrom_host != NULL;
+	int rl_nulls = eol_nulls || reading_remotely;
 
 	rprintf(FLOG, "building file list\n");
 	if (show_filelist_p())
@@ -1681,7 +1685,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		int is_dot_dir;
 
 		if (use_ff_fd) {
-			if (read_filesfrom_line(filesfrom_fd, fbuf) == 0)
+			if (read_line(filesfrom_fd, fbuf, sizeof fbuf, !reading_remotely, rl_nulls) == 0)
 				break;
 			sanitize_path(fbuf, fbuf, "", 0, NULL);
 		} else {
