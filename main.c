@@ -49,6 +49,7 @@ extern int preserve_hard_links;
 extern int protocol_version;
 extern int file_total;
 extern int recurse;
+extern int protect_args;
 extern int relative_paths;
 extern int sanitize_paths;
 extern int curr_dir_depth;
@@ -318,8 +319,8 @@ static void show_malloc_stats(void)
 
 
 /* Start the remote shell.   cmd may be NULL to use the default. */
-static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
-		    int *f_in, int *f_out)
+static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, int remote_argc,
+		    int *f_in_p, int *f_out_p)
 {
 	int i, argc = 0;
 	char *args[MAX_ARGS];
@@ -342,10 +343,8 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 			if (*f == ' ')
 				continue;
 			/* Comparison leaves rooms for server_options(). */
-			if (argc >= MAX_ARGS - MAX_SERVER_ARGS) {
-				rprintf(FERROR, "internal: args[] overflowed in do_cmd()\n");
-				exit_cleanup(RERR_SYNTAX);
-			}
+			if (argc >= MAX_ARGS - MAX_SERVER_ARGS)
+				goto arg_overflow;
 			args[argc++] = t;
 			while (*f != ' ' || in_quote) {
 				if (!*f) {
@@ -409,16 +408,23 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 
 		server_options(args,&argc);
 
-		if (argc >= MAX_ARGS - 2) {
-			rprintf(FERROR, "internal: args[] overflowed in do_cmd()\n");
-			exit_cleanup(RERR_SYNTAX);
-		}
+		if (argc >= MAX_ARGS - 2)
+			goto arg_overflow;
 	}
 
 	args[argc++] = ".";
 
-	if (!daemon_over_rsh && path && *path)
-		args[argc++] = path;
+	if (!daemon_over_rsh) {
+		while (remote_argc > 0) {
+			if (argc >= MAX_ARGS - 1) {
+			  arg_overflow:
+				rprintf(FERROR, "internal: args[] overflowed in do_cmd()\n");
+				exit_cleanup(RERR_SYNTAX);
+			}
+			args[argc++] = *remote_argv++;
+			remote_argc--;
+		}
+	}
 
 	args[argc] = NULL;
 
@@ -435,17 +441,35 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char *path,
 			exit_cleanup(RERR_IPC);
 		}
 		batch_gen_fd = from_gen_pipe[0];
-		*f_out = from_gen_pipe[1];
-		*f_in = batch_fd;
+		*f_out_p = from_gen_pipe[1];
+		*f_in_p = batch_fd;
 		ret = -1; /* no child pid */
 	} else if (local_server) {
 		/* If the user didn't request --[no-]whole-file, force
 		 * it on, but only if we're not batch processing. */
 		if (whole_file < 0 && !write_batch)
 			whole_file = 1;
-		ret = local_child(argc, args, f_in, f_out, child_main);
-	} else
-		ret = piped_child(args,f_in,f_out);
+		ret = local_child(argc, args, f_in_p, f_out_p, child_main);
+	} else {
+		if (protect_args) {
+			char *save_opts1, *save_opts2;
+			for (i = 0; strcmp(args[i], "--server") != 0; i++) {}
+			save_opts1 = args[i+1];
+			save_opts2 = args[i+2];
+			args[i+1] = "-s";
+			args[i+2] = NULL;
+			ret = piped_child(args, f_in_p, f_out_p);
+			args[i] = args[i-1]; /* move command name over --server */
+			args[i+1] = save_opts1;
+			args[i+2] = save_opts2;
+			while (args[i]) {
+				write_sbuf(*f_out_p, args[i++]);
+				write_byte(*f_out_p, 0);
+			}
+			write_byte(*f_out_p, 0);
+		} else
+			ret = piped_child(args, f_in_p, f_out_p);
+	}
 
 	if (dir)
 		free(dir);
@@ -1061,32 +1085,37 @@ static int copy_argv(char *argv[])
  **/
 static int start_client(int argc, char *argv[])
 {
-	char *p;
-	char *shell_machine = NULL;
-	char *shell_path = NULL;
-	char *shell_user = NULL;
+	char *p, *shell_machine = NULL, *shell_user = NULL;
+	char **remote_argv;
+	int remote_argc;
+	int f_in, f_out;
 	int ret;
 	pid_t pid;
-	int f_in,f_out;
-	int rc;
 
 	/* Don't clobber argv[] so that ps(1) can still show the right
 	 * command line. */
-	if ((rc = copy_argv(argv)))
-		return rc;
+	if ((ret = copy_argv(argv)) != 0)
+		return ret;
 
 	if (!read_batch) { /* for read_batch, NO source is specified */
-		shell_path = check_for_hostspec(argv[0], &shell_machine, &rsync_port);
-		if (shell_path) { /* source is remote */
+		char *path = check_for_hostspec(argv[0], &shell_machine, &rsync_port);
+		if (path) { /* source is remote */
 			char *dummy1;
 			int dummy2;
-			if (--argc
-			 && check_for_hostspec(argv[argc], &dummy1, &dummy2)) {
+			*argv = path;
+			remote_argv = argv;
+			remote_argc = argc;
+			argv += argc - 1;
+			if (argc == 1 || **argv == ':')
+				argc = 0; /* no dest arg */
+			else if (check_for_hostspec(*argv, &dummy1, &dummy2)) {
 				rprintf(FERROR,
 					"The source and destination cannot both be remote.\n");
 				exit_cleanup(RERR_SYNTAX);
+			} else {
+				remote_argc--; /* don't count dest */
+				argc = 1;
 			}
-			argv++;
 			if (filesfrom_host && *filesfrom_host
 			    && strcmp(filesfrom_host, shell_machine) != 0) {
 				rprintf(FERROR,
@@ -1099,21 +1128,25 @@ static int start_client(int argc, char *argv[])
 		} else { /* source is local, check dest arg */
 			am_sender = 1;
 
-			if (argc > 1)
+			if (argc > 1) {
 				p = argv[--argc];
-			else {
-				p = ".";
+				remote_argv = argv + argc;
+			} else {
+				static char *dotarg[1] = { "." };
+				p = dotarg[0];
+				remote_argv = dotarg;
 				list_only = 1;
 			}
+			remote_argc = 1;
 
-			shell_path = check_for_hostspec(p, &shell_machine, &rsync_port);
-			if (shell_path && filesfrom_host && *filesfrom_host
+			path = check_for_hostspec(p, &shell_machine, &rsync_port);
+			if (path && filesfrom_host && *filesfrom_host
 			    && strcmp(filesfrom_host, shell_machine) != 0) {
 				rprintf(FERROR,
 					"--files-from hostname is not the same as the transfer hostname\n");
 				exit_cleanup(RERR_SYNTAX);
 			}
-			if (!shell_path) { /* no hostspec found, so src & dest are local */
+			if (!path) { /* no hostspec found, so src & dest are local */
 				local_server = 1;
 				if (filesfrom_host) {
 					rprintf(FERROR,
@@ -1121,27 +1154,50 @@ static int start_client(int argc, char *argv[])
 					exit_cleanup(RERR_SYNTAX);
 				}
 				shell_machine = NULL;
-				shell_path = p;
-			} else if (rsync_port)
-				daemon_over_rsh = shell_cmd ? 1 : -1;
+			} else { /* hostspec was found, so dest is remote */
+				argv[argc] = path;
+				if (rsync_port)
+					daemon_over_rsh = shell_cmd ? 1 : -1;
+			}
 		}
 	} else {  /* read_batch */
 		local_server = 1;
-		shell_path = argv[argc-1];
-		if (check_for_hostspec(shell_path, &shell_machine, &rsync_port)) {
+		if (check_for_hostspec(argv[argc-1], &shell_machine, &rsync_port)) {
 			rprintf(FERROR, "remote destination is not allowed with --read-batch\n");
 			exit_cleanup(RERR_SYNTAX);
 		}
+		remote_argv = argv + argc - 1;
+		remote_argc = 1;
 	}
 
-	/* for remote source, only single dest arg can remain ... */
-	if (!am_sender && argc > 1) {
-		usage(FERROR);
-		exit_cleanup(RERR_SYNTAX);
+	if (am_sender) {
+		char *dummy1;
+		int dummy2;
+		int i;
+		/* For local source, extra source args must not have hostspec. */
+		for (i = 1; i < argc; i++) {
+			if (check_for_hostspec(argv[i], &dummy1, &dummy2)) {
+				rprintf(FERROR, "Unexpected remote arg: %s\n", argv[i]);
+				exit_cleanup(RERR_SYNTAX);
+			}
+		}
+	} else {
+		int i;
+		/* For remote source, any extra source args must be ":SOURCE" args. */
+		for (i = 1; i < remote_argc; i++) {
+			if (*remote_argv[i] != ':') {
+				rprintf(FERROR, "Unexpected local arg: %s\n", remote_argv[i]);
+				rprintf(FERROR, "If arg is a remote file/dir, prefix it with a colon (:).\n");
+				exit_cleanup(RERR_SYNTAX);
+			}
+			remote_argv[i]++;
+		}
+		if (argc == 0)
+			list_only |= 1;
 	}
 
 	if (daemon_over_rsh < 0)
-		return start_socket_client(shell_machine, shell_path, argc, argv);
+		return start_socket_client(shell_machine, remote_argc, remote_argv, argc, argv);
 
 	if (password_file && !daemon_over_rsh) {
 		rprintf(FERROR, "The --password-file option may only be "
@@ -1160,25 +1216,18 @@ static int start_client(int argc, char *argv[])
 
 	if (verbose > 3) {
 		rprintf(FINFO,"cmd=%s machine=%s user=%s path=%s\n",
-			shell_cmd ? shell_cmd : "",
-			shell_machine ? shell_machine : "",
-			shell_user ? shell_user : "",
-			shell_path ? shell_path : "");
+			NS(shell_cmd), NS(shell_machine), NS(shell_user),
+			remote_argv ? NS(remote_argv[0]) : "");
 	}
 
-	/* ... or no dest at all */
-	if (!am_sender && argc == 0)
-		list_only |= 1;
-
-	pid = do_cmd(shell_cmd,shell_machine,shell_user,shell_path,
-		     &f_in,&f_out);
+	pid = do_cmd(shell_cmd, shell_machine, shell_user, remote_argv, remote_argc,
+		     &f_in, &f_out);
 
 	/* if we're running an rsync server on the remote host over a
 	 * remote shell command, we need to do the RSYNCD protocol first */
 	if (daemon_over_rsh) {
 		int tmpret;
-		tmpret = start_inband_exchange(shell_user, shell_path,
-					       f_in, f_out, argc);
+		tmpret = start_inband_exchange(f_in, f_out, shell_user, remote_argc, remote_argv);
 		if (tmpret < 0)
 			return tmpret;
 	}
@@ -1382,6 +1431,16 @@ int main(int argc,char *argv[])
 
 	if (am_daemon && !am_server)
 		return daemon_main();
+
+	if (am_server && protect_args) {
+		char buf[MAXPATHLEN];
+		protect_args = 0;
+		read_args(STDIN_FILENO, NULL, buf, sizeof buf, 1, &argv, &argc, NULL);
+		if (!parse_arguments(&argc, (const char ***) &argv, 1)) {
+			option_error();
+			exit_cleanup(RERR_SYNTAX);
+		}
+	}
 
 	if (argc < 1) {
 		usage(FERROR);
