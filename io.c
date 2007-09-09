@@ -50,7 +50,6 @@ extern int checksum_seed;
 extern int protocol_version;
 extern int remove_source_files;
 extern int preserve_hard_links;
-extern char *filesfrom_host;
 extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist;
 #ifdef ICONV_OPTION
@@ -753,17 +752,14 @@ static int read_timeout(int fd, char *buf, size_t len)
 	return cnt;
 }
 
-/* Read a line into the "fname" buffer (which must be at least MAXPATHLEN
- * characters long). */
-int read_filesfrom_line(int fd, char *fname)
+/* Read a line into the "buf" buffer. */
+int read_line(int fd, char *buf, size_t bufsiz, int dump_comments, int rl_nulls)
 {
-	char ch, *s, *eob = fname + MAXPATHLEN - 1;
+	char ch, *s, *eob = buf + bufsiz - 1;
 	int cnt;
-	int reading_remotely = filesfrom_host != NULL;
-	int nulls = eol_nulls || reading_remotely;
 
   start:
-	s = fname;
+	s = buf;
 	while (1) {
 		cnt = read(fd, &ch, 1);
 		if (cnt < 0 && (errno == EWOULDBLOCK
@@ -784,9 +780,9 @@ int read_filesfrom_line(int fd, char *fname)
 		}
 		if (cnt != 1)
 			break;
-		if (nulls? !ch : (ch == '\r' || ch == '\n')) {
-			/* Skip empty lines if reading locally. */
-			if (!reading_remotely && s == fname)
+		if (rl_nulls ? ch == '\0' : (ch == '\r' || ch == '\n')) {
+			/* Skip empty lines if dumping comments. */
+			if (dump_comments && s == buf)
 				continue;
 			break;
 		}
@@ -795,11 +791,57 @@ int read_filesfrom_line(int fd, char *fname)
 	}
 	*s = '\0';
 
-	/* Dump comments. */
-	if (*fname == '#' || *fname == ';')
+	if (dump_comments && (*buf == '#' || *buf == ';'))
 		goto start;
 
-	return s - fname;
+	return s - buf;
+}
+
+int read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
+	      char ***argv_p, int *argc_p, char **request_p)
+{
+	int maxargs = MAX_ARGS;
+	int dot_pos = 0;
+	int argc = 0;
+	char **argv, *p;
+
+	if (!(argv = new_array(char *, maxargs)))
+		out_of_memory("read_args");
+	if (mod_name)
+		argv[argc++] = "rsyncd";
+
+	while (1) {
+		if (read_line(f_in, buf, bufsiz, 0, rl_nulls) == 0)
+			break;
+
+		if (argc == maxargs) {
+			maxargs += MAX_ARGS;
+			if (!(argv = realloc_array(argv, char *, maxargs)))
+				out_of_memory("read_args");
+		}
+
+		if (dot_pos) {
+			if (request_p) {
+				*request_p = strdup(buf);
+				request_p = NULL;
+			}
+			if (mod_name)
+				glob_expand_module(mod_name, buf, &argv, &argc, &maxargs);
+			else
+				glob_expand(buf, &argv, &argc, &maxargs);
+		} else {
+			if (!(p = strdup(buf)))
+				out_of_memory("read_args");
+			argv[argc++] = p;
+			if (*p == '.' && p[1] == '\0')
+				dot_pos = argc;
+		}
+	}
+
+	*argc_p = argc;
+	*argv_p = argv;
+
+	return dot_pos ? dot_pos : argc;
 }
 
 int io_start_buffering_out(int f_out)
@@ -1672,16 +1714,13 @@ int32 read_ndx(int f)
 	return num;
 }
 
-/**
- * Read a line of up to @p maxlen characters into @p buf (not counting
- * the trailing null).  Strips the (required) trailing newline and all
- * carriage returns.
- *
- * @return 1 for success; 0 for I/O error or truncation.
- **/
-int read_line(int f, char *buf, size_t maxlen)
+/* Read a line of up to bufsiz-1 characters into buf.  Strips
+ * the (required) trailing newline and all carriage returns.
+ * Returns 1 for success; 0 for I/O error or truncation. */
+int read_line_old(int f, char *buf, size_t bufsiz)
 {
-	while (maxlen) {
+	bufsiz--; /* leave room for the null */
+	while (bufsiz > 0) {
 		buf[0] = 0;
 		read_buf(f, buf, 1);
 		if (buf[0] == 0)
@@ -1690,11 +1729,11 @@ int read_line(int f, char *buf, size_t maxlen)
 			break;
 		if (buf[0] != '\r') {
 			buf++;
-			maxlen--;
+			bufsiz--;
 		}
 	}
 	*buf = '\0';
-	return maxlen > 0;
+	return bufsiz > 0;
 }
 
 void io_printf(int fd, const char *format, ...)
