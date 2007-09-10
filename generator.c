@@ -881,7 +881,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			if (!hard_link_one(file, fname, cmpbuf, 1))
 				goto try_a_copy;
 			if (preserve_hard_links && F_IS_HLINKED(file))
-				finish_hard_link(file, fname, &sxp->st, itemizing, code, j);
+				finish_hard_link(file, fname, ndx, &sxp->st, itemizing, code, j);
 			if (itemizing && (verbose > 1 || stdout_format_has_i > 1)) {
 				itemize(cmpbuf, file, ndx, 1, sxp,
 					ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS,
@@ -923,7 +923,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		}
 #ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_IS_HLINKED(file))
-			finish_hard_link(file, fname, &sxp->st, itemizing, code, -1);
+			finish_hard_link(file, fname, ndx, &sxp->st, itemizing, code, -1);
 #endif
 		return -2;
 	}
@@ -1051,7 +1051,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 				return j;
 			}
 			if (preserve_hard_links && F_IS_HLINKED(file))
-				finish_hard_link(file, fname, NULL, itemizing, code, -1);
+				finish_hard_link(file, fname, ndx, NULL, itemizing, code, -1);
 		} else
 #endif
 			match_level = 2;
@@ -1343,7 +1343,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					itemize(fname, file, ndx, 0, &sx, 0, 0, NULL);
 #ifdef SUPPORT_HARD_LINKS
 				if (preserve_hard_links && F_IS_HLINKED(file))
-					finish_hard_link(file, fname, &sx.st, itemizing, code, -1);
+					finish_hard_link(file, fname, ndx, &sx.st, itemizing, code, -1);
 #endif
 				if (remove_source_files == 1)
 					goto return_with_success;
@@ -1388,7 +1388,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				rprintf(code, "%s -> %s\n", fname, sl);
 #ifdef SUPPORT_HARD_LINKS
 			if (preserve_hard_links && F_IS_HLINKED(file))
-				finish_hard_link(file, fname, NULL, itemizing, code, -1);
+				finish_hard_link(file, fname, ndx, NULL, itemizing, code, -1);
 #endif
 			/* This does not check remove_source_files == 1
 			 * because this is one of the items that the old
@@ -1424,7 +1424,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					itemize(fname, file, ndx, 0, &sx, 0, 0, NULL);
 #ifdef SUPPORT_HARD_LINKS
 				if (preserve_hard_links && F_IS_HLINKED(file))
-					finish_hard_link(file, fname, &sx.st, itemizing, code, -1);
+					finish_hard_link(file, fname, ndx, &sx.st, itemizing, code, -1);
 #endif
 				if (remove_source_files == 1)
 					goto return_with_success;
@@ -1472,7 +1472,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				rprintf(code, "%s\n", fname);
 #ifdef SUPPORT_HARD_LINKS
 			if (preserve_hard_links && F_IS_HLINKED(file))
-				finish_hard_link(file, fname, NULL, itemizing, code, -1);
+				finish_hard_link(file, fname, ndx, NULL, itemizing, code, -1);
 #endif
 			if (remove_source_files == 1)
 				goto return_with_success;
@@ -1600,7 +1600,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			itemize(fnamecmp, file, ndx, statret, &sx, 0, 0, NULL);
 #ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_IS_HLINKED(file))
-			finish_hard_link(file, fname, &sx.st, itemizing, code, -1);
+			finish_hard_link(file, fname, ndx, &sx.st, itemizing, code, -1);
 #endif
 		if (remove_source_files != 1)
 			goto cleanup;
@@ -1713,7 +1713,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (!do_xfers) {
 #ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && F_IS_HLINKED(file))
-			finish_hard_link(file, fname, &sx.st, itemizing, code, -1);
+			finish_hard_link(file, fname, ndx, &sx.st, itemizing, code, -1);
 #endif
 		goto cleanup;
 	}
@@ -1803,7 +1803,7 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 		assert(flist != NULL);
 		file = flist->files[ndx - flist->ndx_start];
 		assert(file->flags & FLAG_HLINKED);
-		finish_hard_link(file, f_name(file, fbuf), NULL, itemizing, code, -1);
+		finish_hard_link(file, f_name(file, fbuf), ndx, NULL, itemizing, code, -1);
 	}
 #endif
 
