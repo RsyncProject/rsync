@@ -122,20 +122,22 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 			if (!node->data) {
 				node->data = new_array0(char, 5);
 				assert(gnum >= hlink_flist->ndx_start);
-			}
-		}
-		if (gnum >= hlink_flist->ndx_start) {
+				file->flags |= FLAG_HLINK_FIRST;
+				prev = -1;
+			} else if (CVAL(node->data, 0) == 0) {
+				struct file_list *flist;
+				struct file_struct *fp;
+				prev = IVAL(node->data, 1);
+				flist = flist_for_ndx(prev);
+				assert(flist != NULL);
+				fp = flist->files[prev - flist->ndx_start];
+				fp->flags &= ~FLAG_HLINK_LAST;
+			} else
+				prev = -1;
+		} else {
 			file->flags |= FLAG_HLINK_FIRST;
 			prev = -1;
-		} else if (CVAL(node->data, 0) == 0) {
-			struct file_list *flist;
-			prev = IVAL(node->data, 1);
-			flist = flist_for_ndx(prev);
-			assert(flist != NULL);
-			file_next = flist->files[prev - flist->ndx_start];
-			file_next->flags &= ~FLAG_HLINK_LAST;
-		} else
-			prev = -1;
+		}
 		for ( ; from < ndx_count-1; file = file_next, gnum = gnum_next, from++) { /*SHARED ITERATOR*/
 			file_next = hlink_flist->sorted[ndx_list[from+1]];
 			gnum_next = F_HL_GNUM(file_next);
@@ -151,8 +153,8 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 				prev = ndx_list[from] + hlink_flist->ndx_start;
 		}
 		if (prev < 0 && !inc_recurse) {
-			/* Indicate that this item isn't hard-linked without
-			 * affecting any HLINK_BUMP()-dependent values. */
+			/* Disable hard-link bit and set DONE so that
+			 * HLINK_BUMP()-dependent values are unaffected. */
 			file->flags &= ~(FLAG_HLINKED | FLAG_HLINK_FIRST);
 			file->flags |= FLAG_HLINK_DONE;
 			continue;
@@ -242,13 +244,13 @@ static int maybe_hard_link(struct file_struct *file, int ndx,
 
 /* Figure out if a prior entry is still there or if we just have a
  * cached name for it.  Never called with a FLAG_HLINK_FIRST entry. */
-static char *check_prior(int prev_ndx, int gnum)
+static char *check_prior(int prev_ndx, int gnum, struct file_list **flist_p)
 {
 	struct file_list *flist = flist_for_ndx(prev_ndx);
 	struct ht_int32_node *node;
 
 	if (flist) {
-		hlink_flist = flist;
+		*flist_p = flist;
 		return NULL;
 	}
 
@@ -267,13 +269,14 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 	STRUCT_STAT prev_st;
 	char namebuf[MAXPATHLEN], altbuf[MAXPATHLEN];
 	char *realname, *prev_name;
-	int gnum = F_HL_GNUM(file);
+	struct file_list *flist;
+	int gnum = inc_recurse ? F_HL_GNUM(file) : -1;
 	int prev_ndx = F_HL_PREV(file);
 
-	prev_name = realname = check_prior(prev_ndx, gnum);
+	prev_name = realname = check_prior(prev_ndx, gnum, &flist);
 
 	if (!prev_name) {
-		struct file_struct *prev_file = hlink_flist->files[prev_ndx - hlink_flist->ndx_start];
+		struct file_struct *prev_file = flist->files[prev_ndx - flist->ndx_start];
 
 		/* Is the previous link is not complete yet? */
 		if (!(prev_file->flags & FLAG_HLINK_DONE)) {
@@ -293,25 +296,29 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 
 		/* There is a finished file to link with! */
 		if (!(prev_file->flags & FLAG_HLINK_FIRST)) {
-			/* The previous previous will be marked with FIRST. */
+			/* The previous previous is FIRST when prev is not. */
 			prev_ndx = F_HL_PREV(prev_file);
-			prev_name = realname = check_prior(prev_ndx, gnum);
-			/* Update our previous pointer to point to the first. */
+			prev_name = realname = check_prior(prev_ndx, gnum, &flist);
+			/* Update our previous pointer to point to the FIRST. */
 			F_HL_PREV(file) = prev_ndx;
 		}
-	}
-	if (!prev_name) {
-		struct file_struct *prev_file = hlink_flist->files[prev_ndx - hlink_flist->ndx_start];
-		int alt_dest = F_HL_PREV(prev_file); /* alternate value when DONE && FIRST */
 
-		if (alt_dest >= 0 && dry_run) {
-			pathjoin(namebuf, MAXPATHLEN, basis_dir[alt_dest],
-				 f_name(prev_file, NULL));
-			prev_name = namebuf;
-			realname = f_name(prev_file, altbuf);
-		} else {
-			prev_name = f_name(prev_file, namebuf);
-			realname = prev_name;
+		if (!prev_name) {
+			int alt_dest;
+
+			prev_file = flist->files[prev_ndx - flist->ndx_start];
+			/* F_HL_PREV() is alt_dest value when DONE && FIRST. */
+			alt_dest = F_HL_PREV(prev_file);
+
+			if (alt_dest >= 0 && dry_run) {
+				pathjoin(namebuf, MAXPATHLEN, basis_dir[alt_dest],
+					 f_name(prev_file, NULL));
+				prev_name = namebuf;
+				realname = f_name(prev_file, altbuf);
+			} else {
+				prev_name = f_name(prev_file, namebuf);
+				realname = prev_name;
+			}
 		}
 	}
 
@@ -402,7 +409,7 @@ int hard_link_one(struct file_struct *file, const char *fname,
 	return 1;
 }
 
-void finish_hard_link(struct file_struct *file, const char *fname,
+void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 		      STRUCT_STAT *stp, int itemizing, enum logcode code,
 		      int alt_dest)
 {
@@ -443,6 +450,7 @@ void finish_hard_link(struct file_struct *file, const char *fname,
 		file = flist->files[ndx - flist->ndx_start];
 		file->flags = (file->flags & ~FLAG_HLINK_FIRST) | FLAG_HLINK_DONE;
 		prev_ndx = F_HL_PREV(file);
+		F_HL_PREV(file) = fin_ndx;
 		prev_name = f_name(file, NULL);
 		prev_statret = link_stat(prev_name, &prev_sx.st, 0);
 		val = maybe_hard_link(file, ndx, prev_name, prev_statret, &prev_sx,
