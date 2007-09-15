@@ -1551,6 +1551,7 @@ void send_extra_file_list(int f, int at_least)
 	while (future_cnt < at_least) {
 		struct file_struct *file = dir_flist->sorted[send_dir_ndx];
 		int dir_ndx, dstart = dir_count;
+		const char *pathname = F_PATHNAME(file);
 		int32 *dp;
 
 		flist = flist_new(0, "send_extra_file_list");
@@ -1575,7 +1576,8 @@ void send_extra_file_list(int f, int at_least)
 		    && dir_flist->sorted[dir_ndx]->flags & FLAG_DUPLICATE) {
 			send_dir_ndx = dir_ndx;
 			file = dir_flist->sorted[dir_ndx];
-			send1extra(f, file, flist);
+			if (F_PATHNAME(file) != pathname)
+				send1extra(f, file, flist);
 			dp = F_DIR_NODE_P(file);
 		}
 
@@ -2301,7 +2303,7 @@ static void clean_flist(struct file_list *flist, int strip_root)
 			 * list.  Otherwise keep the first one. */
 			if (S_ISDIR(file->mode)) {
 				struct file_struct *fp = flist->sorted[j];
-				if (!S_ISDIR(fp->mode))
+				if (!S_ISDIR(fp->mode) || !(fp->flags & FLAG_XFER_DIR))
 					keep = i, drop = j;
 				else {
 					if (am_sender)
