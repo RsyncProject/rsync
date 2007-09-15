@@ -377,6 +377,10 @@ static void read_msg_fd(void)
 		}
 		flist = recv_file_list(fd);
 		flist->parent_ndx = IVAL(buf,0);
+#ifdef SUPPORT_HARD_LINKS
+		if (preserve_hard_links)
+			match_hard_links(flist);
+#endif
 		break;
 	case MSG_FLIST_EOF:
 		if (len != 0 || !am_generator || !inc_recurse)

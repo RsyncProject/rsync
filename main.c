@@ -71,7 +71,7 @@ extern char *shell_cmd;
 extern char *batch_name;
 extern char *password_file;
 extern char curr_dir[MAXPATHLEN];
-extern struct file_list *cur_flist;
+extern struct file_list *first_flist;
 extern struct filter_list_struct server_filter_list;
 
 int local_server = 0;
@@ -721,7 +721,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && !inc_recurse)
-		match_hard_links(cur_flist);
+		match_hard_links(first_flist);
 #endif
 
 	if (fd_pair(error_pipe) < 0) {
@@ -795,6 +795,14 @@ static int do_recv(int f_in, int f_out, char *local_name)
 
 	set_msg_fd_in(error_pipe[0]);
 	io_start_buffering_in(error_pipe[0]);
+
+#ifdef SUPPORT_HARD_LINKS
+	if (preserve_hard_links && inc_recurse) {
+		struct file_list *flist;
+		for (flist = first_flist; flist; flist = flist->next)
+			match_hard_links(flist);
+	}
+#endif
 
 	generate_files(f_out, local_name);
 

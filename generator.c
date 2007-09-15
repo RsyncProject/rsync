@@ -1921,9 +1921,12 @@ void generate_files(int f_out, const char *local_name)
 
 	do {
 #ifdef SUPPORT_HARD_LINKS
-		if (inc_recurse && preserve_hard_links)
-			match_hard_links(cur_flist);
+		if (preserve_hard_links && inc_recurse) {
+			while (!flist_eof && file_total < FILECNT_LOOKAHEAD/2)
+				wait_for_receiver();
+		}
 #endif
+
 		if (inc_recurse && cur_flist->ndx_start) {
 			struct file_struct *fp = dir_flist->files[cur_flist->parent_ndx];
 			f_name(fp, fbuf);
