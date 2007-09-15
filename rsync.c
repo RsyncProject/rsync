@@ -274,6 +274,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, statx *sxp,
 	statx sx2;
 	int change_uid, change_gid;
 	mode_t new_mode = file->mode;
+	int inherit;
 
 	if (!sxp) {
 		if (dry_run)
@@ -289,13 +290,15 @@ int set_file_attrs(const char *fname, struct file_struct *file, statx *sxp,
 #ifdef SUPPORT_XATTRS
 		sx2.xattr = NULL;
 #endif
-		if (!preserve_perms && S_ISDIR(new_mode)
-		 && sx2.st.st_mode & S_ISGID) {
-			/* We just created this directory and its setgid
-			 * bit is on, so make sure it stays on. */
-			new_mode |= S_ISGID;
-		}
 		sxp = &sx2;
+		inherit = !preserve_perms;
+	} else
+		inherit = !preserve_perms && file->flags & FLAG_DIR_CREATED;
+
+	if (inherit && S_ISDIR(new_mode) && sxp->st.st_mode & S_ISGID) {
+		/* We just created this directory and its setgid
+		 * bit is on, so make sure it stays on. */
+		new_mode |= S_ISGID;
 	}
 
 #ifdef SUPPORT_ACLS
