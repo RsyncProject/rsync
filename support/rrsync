@@ -50,7 +50,7 @@ die "$0 -ro: sending to read-only server not allowed\n" if $ro && !$am_sender;
 # To disable a short-named option, add its letter to this string:
 our $short_disabled = '';
 
-our $short_no_arg = 'CDEHIKLORSWbcdgklmnoprtuvxz'; # DO NOT REMOVE ANY
+our $short_no_arg = 'ACDEHIKLORSWXbcdgklmnoprtuvxz'; # DO NOT REMOVE ANY
 our $short_with_num = 'B'; # DO NOT REMOVE ANY
 
 # To disable a long-named option, change its value to a -1.  The values mean:
@@ -70,6 +70,7 @@ our %long_opt = (
   'delete' => 0,
   'delete-after' => 0,
   'delete-before' => 0,
+  'delete-delay' => 0,
   'delete-during' => 0,
   'delete-excluded' => 0,
   'existing' => 0,
@@ -77,6 +78,7 @@ our %long_opt = (
   'force' => 0,
   'from0' => 0,
   'fuzzy' => 0,
+  'iconv' => 1,
   'ignore-errors' => 0,
   'ignore-existing' => 0,
   'inplace' => 0,
@@ -87,6 +89,7 @@ our %long_opt = (
   'max-size' => 1,
   'min-size' => 1,
   'modify-window' => 1,
+  'no-i-r' => 0,
   'no-implied-dirs' => 0,
   'no-r' => 0,
   'no-relative' => 0,
@@ -101,6 +104,7 @@ our %long_opt = (
   'sender' => 0,
   'server' => 0,
   'size-only' => 0,
+  'skip-compress' => 1,
   'specials' => 0,
   'suffix' => 1,
   'super' => 0,
