@@ -33,7 +33,7 @@ while (<IN>) {
 }
 close IN;
 
-$short_no_arg{'p'} = 1;
+$short_no_arg{'s'} = 1;
 
 my $short_no_arg = join('', sort keys %short_no_arg);
 my $short_with_num = join('', sort keys %short_with_num);
