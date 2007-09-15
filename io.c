@@ -1435,7 +1435,7 @@ static void writefd_unbuffered(int fd, const char *buf, size_t len)
 				(long)len, who_am_i());
 			/* If the other side is sending us error messages, try
 			 * to grab any messages they sent before they died. */
-			while (fd == sock_f_out && io_multiplexing_in) {
+			while (!am_server && fd == sock_f_out && io_multiplexing_in) {
 				set_io_timeout(30);
 				ignore_timeout = 0;
 				readfd_unbuffered(sock_f_in, io_filesfrom_buf,
