@@ -75,7 +75,6 @@ extern struct file_list *first_flist;
 extern struct filter_list_struct server_filter_list;
 
 int local_server = 0;
-int new_root_dir = 0;
 int daemon_over_rsh = 0;
 mode_t orig_umask = 0;
 int batch_gen_fd = -1;
@@ -560,7 +559,8 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 			exit_cleanup(RERR_FILEIO);
 		}
 
-		new_root_dir = 1;
+		if (strcmp(flist->files[0]->basename, ".") == 0)
+			flist->files[0]->flags |= FLAG_DIR_CREATED;
 
 		if (verbose)
 			rprintf(FINFO, "created directory %s\n", dest_path);
