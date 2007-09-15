@@ -1791,16 +1791,11 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		dirlen = dir ? strlen(dir) : 0;
 		if (dirlen != lastdir_len || memcmp(lastdir, dir, dirlen) != 0) {
 			if (!push_pathname(dir ? strdup(dir) : NULL, dirlen))
-				goto push_error;
+				continue;
 			lastdir = pathname;
 			lastdir_len = pathname_len;
-		} else if (!push_pathname(lastdir, lastdir_len)) {
-		  push_error:
-			io_error |= IOERR_GENERAL;
-			rsyserr(FERROR, errno, "push_dir %s failed in %s",
-				full_fname(dir), curr_dir);
+		} else if (!push_pathname(lastdir, lastdir_len))
 			continue;
-		}
 
 		if (fn != fbuf)
 			memmove(fbuf, fn, len + 1);
