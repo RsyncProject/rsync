@@ -62,7 +62,7 @@
 
 #define FLAG_TOP_DIR (1<<0)	/* sender/receiver/generator */
 #define FLAG_FILE_SENT (1<<1)	/* sender/receiver/generator */
-#define FLAG_DIR_CHANGED (1<<1)	/* generator */
+#define FLAG_DIR_CREATED (1<<1)	/* generator */
 #define FLAG_XFER_DIR (1<<2)	/* sender/receiver/generator */
 #define FLAG_MOUNT_DIR (1<<3)	/* sender/generator */
 #define FLAG_DUPLICATE (1<<4)	/* sender */
