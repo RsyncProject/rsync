@@ -461,8 +461,9 @@ static struct poptOption long_options[] = {
   {"no-r",             0,  POPT_ARG_VAL,    &recurse, 0, 0, 0 },
   {"inc-recursive",    0,  POPT_ARG_VAL,    &allow_inc_recurse, 1, 0, 0 },
   {"no-inc-recursive", 0,  POPT_ARG_VAL,    &allow_inc_recurse, 0, 0, 0 },
-  {"ir",               0,  POPT_ARG_VAL,    &allow_inc_recurse, 1, 0, 0 },
-  {"no-ir",            0,  POPT_ARG_VAL,    &allow_inc_recurse, 0, 0, 0 },
+  {"i-r",              0,  POPT_ARG_VAL,    &allow_inc_recurse, 1, 0, 0 },
+  {"no-i-r",           0,  POPT_ARG_VAL,    &allow_inc_recurse, 0, 0, 0 },
+  {"no-ir",            0,  POPT_ARG_VAL,    &allow_inc_recurse, 0, 0, 0 }, /* XXX remove soon */
   {"dirs",            'd', POPT_ARG_VAL,    &xfer_dirs, 2, 0, 0 },
   {"no-dirs",          0,  POPT_ARG_VAL,    &xfer_dirs, 0, 0, 0 },
   {"no-d",             0,  POPT_ARG_VAL,    &xfer_dirs, 0, 0, 0 },
@@ -514,6 +515,8 @@ static struct poptOption long_options[] = {
   {"no-R",             0,  POPT_ARG_VAL,    &relative_paths, 0, 0, 0 },
   {"implied-dirs",     0,  POPT_ARG_VAL,    &implied_dirs, 1, 0, 0 },
   {"no-implied-dirs",  0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
+  {"i-d",              0,  POPT_ARG_VAL,    &implied_dirs, 1, 0, 0 },
+  {"no-i-d",           0,  POPT_ARG_VAL,    &implied_dirs, 0, 0, 0 },
   {"chmod",            0,  POPT_ARG_STRING, 0, OPT_CHMOD, 0, 0 },
   {"ignore-times",    'I', POPT_ARG_NONE,   &ignore_times, 0, 0, 0 },
   {"size-only",        0,  POPT_ARG_NONE,   &size_only, 0, 0, 0 },
@@ -1847,7 +1850,7 @@ void server_options(char **args, int *argc_p)
 				goto oom;
 			args[ac++] = arg;
 		} else if (max_delete == 0)
-			args[ac++] = "--max_delete=-1";
+			args[ac++] = "--max-delete=-1";
 		if (min_size) {
 			args[ac++] = "--min-size";
 			args[ac++] = min_size_arg;
@@ -1919,7 +1922,7 @@ void server_options(char **args, int *argc_p)
 		args[ac++] = "--numeric-ids";
 
 	if (!allow_inc_recurse)
-		args[ac++] = "--no-ir";
+		args[ac++] = "--no-ir"; /* XXX change to --no-i-r soon */
 
 	if (am_sender) {
 		if (ignore_existing)
