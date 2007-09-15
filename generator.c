@@ -81,7 +81,6 @@ extern int copy_dest;
 extern int link_dest;
 extern int whole_file;
 extern int list_only;
-extern int new_root_dir;
 extern int read_batch;
 extern int safe_symlinks;
 extern long block_size; /* "long" because popt can't set an int32. */
@@ -1213,6 +1212,21 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (S_ISDIR(file->mode)) {
+		if (inc_recurse && ndx != cur_flist->ndx_start - 1
+		 && file->flags & FLAG_XFER_DIR) {
+			/* In inc_recurse mode we want ot make sure any missing
+			 * directories get created while we're still processing
+			 * the parent dir (which allows us to touch the parent
+			 * dir's mtime right away).  We will handle the dir in
+			 * full later (right before we handle its contents). */
+			if (statret == 0
+			 && (S_ISDIR(sx.st.st_mode)
+			  || delete_item(fname, sx.st.st_mode, "directory", del_opts) != 0))
+				goto cleanup; /* Any errors get reported later. */
+			if (do_mkdir(fname, file->mode & 0700) == 0)
+				file->flags |= FLAG_DIR_CREATED;
+			goto cleanup;
+		}
 		/* The file to be received is a directory, so we need
 		 * to prepare appropriately.  If there is already a
 		 * file of that name and it is *not* a directory, then
@@ -1230,11 +1244,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 		real_ret = statret;
 		real_sx = sx;
-		if (new_root_dir) {
-			if (*fname == '.' && fname[1] == '\0')
-				statret = -1;
-			new_root_dir = 0;
-		}
+		if (file->flags & FLAG_DIR_CREATED)
+			statret = -1;
 		if (!preserve_perms) { /* See comment in non-dir code below. */
 			file->mode = dest_mode(file->mode, sx.st.st_mode,
 					       dflt_perms, statret == 0);
@@ -1855,6 +1866,13 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 			maybe_flush_socket(1);
 		}
 
+		if (delete_during == 2 || !dir_tweaking) {
+			/* Skip directory touch-up. */
+		} else if (first_flist->ndx_start != 0)
+			touch_up_dirs(dir_flist, first_flist->parent_ndx);
+		else if (relative_paths && implied_dirs)
+			touch_up_dirs(first_flist, -1);
+
 		flist_free(first_flist); /* updates first_flist */
 	}
 }
@@ -1950,14 +1968,6 @@ void generate_files(int f_out, const char *local_name)
 			if (!F_IS_ACTIVE(file))
 				continue;
 
-			if (inc_recurse && S_ISDIR(file->mode)) {
-				/* Regular dirs are at the end, so we can stop. */
-				if (F_DEPTH(file))
-					break;
-				/* A dot-dir is at the start, so just skip it. */
-				continue;
-			}
-
 #ifdef ICONV_OPTION
 			if (ic_ndx)
 				ndx = F_NDX(file);
@@ -2039,7 +2049,8 @@ void generate_files(int f_out, const char *local_name)
 	if (delete_after && !solo_file && file_total > 0)
 		do_delete_pass();
 
-	if ((need_retouch_dir_perms || need_retouch_dir_times) && dir_tweaking)
+	if ((need_retouch_dir_perms || need_retouch_dir_times)
+	 && dir_tweaking && (!inc_recurse || delete_during == 2))
 		touch_up_dirs(dir_flist, -1);
 
 	if (max_delete >= 0 && deletion_count > max_delete) {
