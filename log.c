@@ -792,7 +792,7 @@ void log_exit(int code, const char *file, int line)
 			(double)stats.total_written,
 			(double)stats.total_read,
 			(double)stats.total_size);
-	} else {
+	} else if (am_server != 2) {
 		const char *name;
 
 		name = rerr_name(code);
