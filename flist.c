@@ -2298,14 +2298,11 @@ static void clean_flist(struct file_list *flist, int strip_root)
 			int keep, drop;
 			/* If one is a dir and the other is not, we want to
 			 * keep the dir because it might have contents in the
-			 * list. */
-			if (S_ISDIR(file->mode)) {
-				struct file_struct *fp = flist->sorted[j];
-				if (!S_ISDIR(fp->mode))
-					keep = i, drop = j;
-				else
-					keep = j, drop = i;
-			} else
+			 * list.  If both are dirs, keep the last one.
+			 * Otherwise keep the first one. */
+			if (S_ISDIR(file->mode))
+				keep = i, drop = j;
+			else
 				keep = j, drop = i;
 
 			if (am_sender)
