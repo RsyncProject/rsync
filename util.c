@@ -90,9 +90,9 @@ int fd_pair(int fd[2])
 	return ret;
 }
 
-void print_child_argv(char **cmd)
+void print_child_argv(const char *prefix, char **cmd)
 {
-	rprintf(FCLIENT, "opening connection using ");
+	rprintf(FCLIENT, "%s ", prefix);
 	for (; *cmd; cmd++) {
 		/* Look for characters that ought to be quoted.  This
 		* is not a great quoting algorithm, but it's
@@ -1478,7 +1478,7 @@ void *expand_item_list(item_list *lp, size_t item_size,
 		void *new_ptr;
 		size_t new_size = lp->malloced;
 		if (incr < 0)
-			new_size -= incr; /* increase slowly */
+			new_size += -incr; /* increase slowly */
 		else if (new_size < (size_t)incr)
 			new_size += incr;
 		else

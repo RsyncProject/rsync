@@ -242,7 +242,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 	sargs[sargc] = NULL;
 
 	if (verbose > 1)
-		print_child_argv(sargs);
+		print_child_argv("sending daemon args:", sargs);
 
 	p = strchr(path, '/');
 	if (p) *p = '\0';
