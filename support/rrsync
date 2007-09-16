@@ -48,7 +48,7 @@ die "$0 -ro: sending to read-only server not allowed\n" if $ro && !$am_sender;
 # and only in the option format that the stock rsync produces.
 
 # To disable a short-named option, add its letter to this string:
-our $short_disabled = '';
+our $short_disabled = 's';
 
 our $short_no_arg = 'ACDEHIKLORSWXbcdgklmnoprtuvxz'; # DO NOT REMOVE ANY
 our $short_with_num = 'B'; # DO NOT REMOVE ANY

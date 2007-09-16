@@ -44,7 +44,7 @@ print <<EOT;
 # and only in the option format that the stock rsync produces.
 
 # To disable a short-named option, add its letter to this string:
-our \$short_disabled = '';
+our \$short_disabled = 's';
 
 our \$short_no_arg = '$short_no_arg'; # DO NOT REMOVE ANY
 our \$short_with_num = '$short_with_num'; # DO NOT REMOVE ANY
