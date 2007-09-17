@@ -50,7 +50,7 @@ die "$0 -ro: sending to read-only server not allowed\n" if $ro && !$am_sender;
 # To disable a short-named option, add its letter to this string:
 our $short_disabled = 's';
 
-our $short_no_arg = 'ACDEHIKLORSWXbcdgklmnoprtuvxz'; # DO NOT REMOVE ANY
+our $short_no_arg = 'ACDEHIKLORSWXbcdgklmnoprstuvxz'; # DO NOT REMOVE ANY
 our $short_with_num = 'B'; # DO NOT REMOVE ANY
 
 # To disable a long-named option, change its value to a -1.  The values mean:
@@ -139,7 +139,7 @@ while ($command =~ /((?:[^\s\\]+|\\.[^\s\\]*)+)/g) {
     if ($_ eq '.') {
       $in_options = 0;
     } else {
-      next if /^-$short_no_arg+$/o || /^-$short_with_num\d+$/o;
+      next if /^-$short_no_arg+(e\d+\.\d+)?$/o || /^-$short_with_num\d+$/o;
 
       my($opt,$arg) = /^--([^=]+)(?:=(.*))?$/;
       my $disabled;
