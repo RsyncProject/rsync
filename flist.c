@@ -115,6 +115,7 @@ static char tmp_sum[MAX_DIGEST_LEN];
 static char empty_sum[MAX_DIGEST_LEN];
 static int flist_count_offset; /* for --delete --progress */
 static int dir_count = 0;
+static int high_hlink_ndx;
 
 static void clean_flist(struct file_list *flist, int strip_root);
 static void output_flist(struct file_list *flist);
@@ -467,7 +468,8 @@ static void send_file_entry(int f, struct file_struct *file, int ndx, int first_
 			struct ht_int64_node *np = idev_find(tmp_dev, tmp_ino);
 			first_hlink_ndx = (int32)(long)np->data - 1;
 			if (first_hlink_ndx < 0) {
-				np->data = (void*)(long)(ndx + first_ndx + 1);
+				high_hlink_ndx = ndx + first_ndx;
+				np->data = (void*)(long)(high_hlink_ndx + 1);
 				xflags |= XMIT_HLINK_FIRST;
 			}
 			xflags |= XMIT_HLINKED;
@@ -941,9 +943,11 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && xflags & XMIT_HLINKED) {
 		if (protocol_version >= 30) {
-			F_HL_GNUM(file) = xflags & XMIT_HLINK_FIRST
-					? flist->ndx_start + flist->used
-					: first_hlink_ndx;
+			if (xflags & XMIT_HLINK_FIRST) {
+				high_hlink_ndx = flist->ndx_start + flist->used;
+				F_HL_GNUM(file) = high_hlink_ndx;
+			} else
+				F_HL_GNUM(file) = first_hlink_ndx;
 		} else {
 			static int32 cnt = 0;
 			struct ht_int64_node *np;
@@ -2202,6 +2206,8 @@ struct file_list *flist_new(int flags, char *msg)
 			flist->file_pool = first_flist->file_pool;
 
 			flist->ndx_start = first_flist->prev->ndx_end + 2;
+			if (flist->ndx_start <= high_hlink_ndx)
+				flist->ndx_start = high_hlink_ndx + 1;
 
 			flist->prev = first_flist->prev;
 			flist->prev->next = first_flist->prev = flist;
