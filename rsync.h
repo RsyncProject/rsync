@@ -370,8 +370,14 @@ enum msgcode {
 #ifndef ICONV_CONST
 #define ICONV_CONST
 #endif
-#elif defined ICONV_CONST
+#else
+#ifdef ICONV_CONST
 #undef ICONV_CONST
+#endif
+#ifdef iconv_t
+#undef iconv_t
+#endif
+#define iconv_t int
 #endif
 
 #include <assert.h>
