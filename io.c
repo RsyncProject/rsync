@@ -674,7 +674,11 @@ static int read_timeout(int fd, char *buf, size_t len)
 				}
 			} else if (io_filesfrom_f_in >= 0) {
 				if (FD_ISSET(io_filesfrom_f_in, &r_fds)) {
+#ifdef ICONV_OPTION
 					xbuf *ibuf = filesfrom_convert ? &iconv_buf : &ff_buf;
+#else
+					xbuf *ibuf = &ff_buf;
+#endif
 					int l = read(io_filesfrom_f_in, ibuf->buf, ibuf->size);
 					if (l <= 0) {
 						if (l == 0 || errno != EINTR) {
@@ -685,6 +689,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 							io_filesfrom_f_in = -1;
 						}
 					} else {
+#ifdef ICONV_OPTION
 						if (filesfrom_convert) {
 							iconv_buf.pos = 0;
 							iconv_buf.len = l;
@@ -692,6 +697,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 							    ICB_EXPAND_OUT|ICB_INCLUDE_BAD|ICB_INCLUDE_INCOMPLETE);
 							l = ff_buf.len;
 						}
+#endif
 						if (!eol_nulls) {
 							char *s = ff_buf.buf + l;
 							/* Transform CR and/or LF into '\0' */
@@ -771,7 +777,11 @@ int read_line(int fd, char *buf, size_t bufsiz, int flags)
 #endif
 
   start:
+#ifdef ICONV_OPTION
 	s = flags & RL_CONVERT ? iconv_buf.buf : buf;
+#else
+	s = buf;
+#endif
 	eob = s + bufsiz - 1;
 	while (1) {
 		cnt = read(fd, &ch, 1);
@@ -830,8 +840,11 @@ int read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 	int dot_pos = 0;
 	int argc = 0;
 	char **argv, *p;
-	int rl_flags = (rl_nulls ? RL_EOL_NULLS : 0)
-		     | (protect_args && ic_recv != (iconv_t)-1 ? RL_CONVERT : 0);
+	int rl_flags = (rl_nulls ? RL_EOL_NULLS : 0);
+
+#ifdef ICONV_OPTION
+	rl_flags |= (protect_args && ic_recv != (iconv_t)-1 ? RL_CONVERT : 0);
+#endif
 
 	if (!(argv = new_array(char *, maxargs)))
 		out_of_memory("read_args");

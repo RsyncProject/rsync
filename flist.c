@@ -1645,8 +1645,10 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	int flags, disable_buffering;
 	int reading_remotely = filesfrom_host != NULL;
 	int rl_flags = (reading_remotely ? 0 : RL_DUMP_COMMENTS)
-		     | (eol_nulls || reading_remotely ? RL_EOL_NULLS : 0)
-		     | (filesfrom_convert ? RL_CONVERT : 0);
+#ifdef ICONV_OPTION
+		     | (filesfrom_convert ? RL_CONVERT : 0)
+#endif
+		     | (eol_nulls || reading_remotely ? RL_EOL_NULLS : 0);
 
 	rprintf(FLOG, "building file list\n");
 	if (show_filelist_p())
