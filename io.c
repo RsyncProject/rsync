@@ -46,6 +46,7 @@ extern int eol_nulls;
 extern int flist_eof;
 extern int read_batch;
 extern int csum_length;
+extern int protect_args;
 extern int checksum_seed;
 extern int protocol_version;
 extern int remove_source_files;
@@ -53,6 +54,7 @@ extern int preserve_hard_links;
 extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist;
 #ifdef ICONV_OPTION
+extern int filesfrom_convert;
 extern iconv_t ic_send, ic_recv;
 #endif
 
@@ -92,13 +94,11 @@ static int write_batch_monitor_out = -1;
 
 static int io_filesfrom_f_in = -1;
 static int io_filesfrom_f_out = -1;
-static char io_filesfrom_buf[2048];
+static xbuf ff_buf = EMPTY_XBUF;
+static char ff_lastchar;
 #ifdef ICONV_OPTION
-static char iconv_buf[sizeof io_filesfrom_buf / 2];
+static xbuf iconv_buf = EMPTY_XBUF;
 #endif
-static char *io_filesfrom_bp;
-static char io_filesfrom_lastchar;
-static int io_filesfrom_buflen;
 static int defer_forwarding_messages = 0;
 static int select_timeout = SELECT_TIMEOUT;
 static int active_filecnt = 0;
@@ -479,22 +479,17 @@ static void mplex_write(int fd, enum msgcode code, const char *buf, size_t len, 
 
 #ifdef ICONV_OPTION
 	if (convert) {
-		iconv(ic_send, NULL, 0, NULL, 0);
+		xbuf outbuf, inbuf;
+
+		INIT_CONST_XBUF(outbuf, buffer);
+		INIT_XBUF(inbuf, (char*)buf, len, -1);
+
 		defer_forwarding_messages++;
-		while (len) {
-			ICONV_CONST char *ibuf = (ICONV_CONST char *)buf;
-			char *obuf = buffer;
-			size_t ocnt = sizeof buffer;
-			while (len && iconv(ic_send, &ibuf,&len,
-					    &obuf,&ocnt) == (size_t)-1) {
-				if (errno == E2BIG || !ocnt)
-					break;
-				*obuf++ = *ibuf++;
-				ocnt--, len--;
-			}
-			n = obuf - buffer;
-			writefd_unbuffered(fd, buffer, n);
-		}
+		do {
+			iconvbufs(ic_send, &inbuf, &outbuf,
+				  ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE);
+			writefd_unbuffered(fd, outbuf.buf, outbuf.len);
+		} while (inbuf.len);
 		if (!--defer_forwarding_messages)
 			msg_flush();
 	} else
@@ -555,17 +550,19 @@ int get_hlink_num(void)
  * things at the same time: send the sender a list of what files we're
  * processing and read the incoming file+info list from the sender.  We do
  * this by augmenting the read_timeout() function to copy this data.  It
- * uses the io_filesfrom_buf to read a block of data from f_in (when it is
- * ready, since it might be a pipe) and then blast it out f_out (when it
- * is ready to receive more data).
+ * uses ff_buf to read a block of data from f_in (when it is ready, since
+ * it might be a pipe) and then blast it out f_out (when it is ready to
+ * receive more data).
  */
 void io_set_filesfrom_fds(int f_in, int f_out)
 {
 	io_filesfrom_f_in = f_in;
 	io_filesfrom_f_out = f_out;
-	io_filesfrom_bp = io_filesfrom_buf;
-	io_filesfrom_lastchar = '\0';
-	io_filesfrom_buflen = 0;
+	alloc_xbuf(&ff_buf, 2048);
+#ifdef ICONV_OPTION
+	if (protect_args)
+		alloc_xbuf(&iconv_buf, 1024);
+#endif
 }
 
 /* It's almost always an error to get an EOF when we're trying to read from the
@@ -627,7 +624,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 		FD_SET(fd, &r_fds);
 		if (io_filesfrom_f_out >= 0) {
 			int new_fd;
-			if (io_filesfrom_buflen == 0) {
+			if (ff_buf.len == 0) {
 				if (io_filesfrom_f_in >= 0) {
 					FD_SET(io_filesfrom_f_in, &r_fds);
 					new_fd = io_filesfrom_f_in;
@@ -660,16 +657,16 @@ static int read_timeout(int fd, char *buf, size_t len)
 		}
 
 		if (io_filesfrom_f_out >= 0) {
-			if (io_filesfrom_buflen) {
+			if (ff_buf.len) {
 				if (FD_ISSET(io_filesfrom_f_out, &w_fds)) {
 					int l = write(io_filesfrom_f_out,
-						      io_filesfrom_bp,
-						      io_filesfrom_buflen);
+						      ff_buf.buf + ff_buf.pos,
+						      ff_buf.len);
 					if (l > 0) {
-						if (!(io_filesfrom_buflen -= l))
-							io_filesfrom_bp = io_filesfrom_buf;
+						if (!(ff_buf.len -= l))
+							ff_buf.pos = 0;
 						else
-							io_filesfrom_bp += l;
+							ff_buf.pos += l;
 					} else if (errno != EINTR) {
 						/* XXX should we complain? */
 						io_filesfrom_f_out = -1;
@@ -677,36 +674,42 @@ static int read_timeout(int fd, char *buf, size_t len)
 				}
 			} else if (io_filesfrom_f_in >= 0) {
 				if (FD_ISSET(io_filesfrom_f_in, &r_fds)) {
-					int l = read(io_filesfrom_f_in,
-						     io_filesfrom_buf,
-						     sizeof io_filesfrom_buf);
+					xbuf *ibuf = filesfrom_convert ? &iconv_buf : &ff_buf;
+					int l = read(io_filesfrom_f_in, ibuf->buf, ibuf->size);
 					if (l <= 0) {
 						if (l == 0 || errno != EINTR) {
 							/* Send end-of-file marker */
-							io_filesfrom_buf[0] = '\0';
-							io_filesfrom_buf[1] = '\0';
-							io_filesfrom_buflen = io_filesfrom_lastchar? 2 : 1;
+							memcpy(ff_buf.buf, "\0\0", 2);
+							ff_buf.len = ff_lastchar? 2 : 1;
+							ff_buf.pos = 0;
 							io_filesfrom_f_in = -1;
 						}
 					} else {
+						if (filesfrom_convert) {
+							iconv_buf.pos = 0;
+							iconv_buf.len = l;
+							iconvbufs(ic_send, &iconv_buf, &ff_buf,
+							    ICB_EXPAND_OUT|ICB_INCLUDE_BAD|ICB_INCLUDE_INCOMPLETE);
+							l = ff_buf.len;
+						}
 						if (!eol_nulls) {
-							char *s = io_filesfrom_buf + l;
+							char *s = ff_buf.buf + l;
 							/* Transform CR and/or LF into '\0' */
-							while (s-- > io_filesfrom_buf) {
+							while (s-- > ff_buf.buf) {
 								if (*s == '\n' || *s == '\r')
 									*s = '\0';
 							}
 						}
-						if (!io_filesfrom_lastchar) {
+						if (!ff_lastchar) {
 							/* Last buf ended with a '\0', so don't
 							 * let this buf start with one. */
-							while (l && !*io_filesfrom_bp)
-								io_filesfrom_bp++, l--;
+							while (l && ff_buf.buf[ff_buf.pos] == '\0')
+								ff_buf.pos++, l--;
 						}
 						if (!l)
-							io_filesfrom_bp = io_filesfrom_buf;
+							ff_buf.pos = 0;
 						else {
-							char *f = io_filesfrom_bp;
+							char *f = ff_buf.buf + ff_buf.pos;
 							char *t = f;
 							char *eob = f + l;
 							/* Eliminate any multi-'\0' runs. */
@@ -716,9 +719,9 @@ static int read_timeout(int fd, char *buf, size_t len)
 										f++, l--;
 								}
 							}
-							io_filesfrom_lastchar = f[-1];
+							ff_lastchar = f[-1];
 						}
-						io_filesfrom_buflen = l;
+						ff_buf.len = l;
 					}
 				}
 			}
@@ -757,13 +760,19 @@ static int read_timeout(int fd, char *buf, size_t len)
 }
 
 /* Read a line into the "buf" buffer. */
-int read_line(int fd, char *buf, size_t bufsiz, int dump_comments, int rl_nulls)
+int read_line(int fd, char *buf, size_t bufsiz, int flags)
 {
-	char ch, *s, *eob = buf + bufsiz - 1;
+	char ch, *s, *eob;
 	int cnt;
 
+#ifdef ICONV_OPTION
+	if (flags & RL_CONVERT && iconv_buf.size < bufsiz)
+		realloc_xbuf(&iconv_buf, bufsiz + 1024);
+#endif
+
   start:
-	s = buf;
+	s = flags & RL_CONVERT ? iconv_buf.buf : buf;
+	eob = s + bufsiz - 1;
 	while (1) {
 		cnt = read(fd, &ch, 1);
 		if (cnt < 0 && (errno == EWOULDBLOCK
@@ -784,9 +793,9 @@ int read_line(int fd, char *buf, size_t bufsiz, int dump_comments, int rl_nulls)
 		}
 		if (cnt != 1)
 			break;
-		if (rl_nulls ? ch == '\0' : (ch == '\r' || ch == '\n')) {
+		if (flags & RL_EOL_NULLS ? ch == '\0' : (ch == '\r' || ch == '\n')) {
 			/* Skip empty lines if dumping comments. */
-			if (dump_comments && s == buf)
+			if (flags & RL_DUMP_COMMENTS && s == buf)
 				continue;
 			break;
 		}
@@ -795,8 +804,21 @@ int read_line(int fd, char *buf, size_t bufsiz, int dump_comments, int rl_nulls)
 	}
 	*s = '\0';
 
-	if (dump_comments && (*buf == '#' || *buf == ';'))
+	if (flags & RL_DUMP_COMMENTS && (*buf == '#' || *buf == ';'))
 		goto start;
+
+#ifdef ICONV_OPTION
+	if (flags & RL_CONVERT) {
+		xbuf outbuf;
+		INIT_XBUF(outbuf, buf, 0, bufsiz);
+		iconv_buf.pos = 0;
+		iconv_buf.len = s - iconv_buf.buf;
+		iconvbufs(ic_recv, &iconv_buf, &outbuf,
+			  ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE);
+		outbuf.buf[outbuf.len] = '\0';
+		return outbuf.len;
+	}
+#endif
 
 	return s - buf;
 }
@@ -808,6 +830,8 @@ int read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 	int dot_pos = 0;
 	int argc = 0;
 	char **argv, *p;
+	int rl_flags = (rl_nulls ? RL_EOL_NULLS : 0)
+		     | (protect_args && ic_recv != (iconv_t)-1 ? RL_CONVERT : 0);
 
 	if (!(argv = new_array(char *, maxargs)))
 		out_of_memory("read_args");
@@ -815,7 +839,7 @@ int read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 		argv[argc++] = "rsyncd";
 
 	while (1) {
-		if (read_line(f_in, buf, bufsiz, 0, rl_nulls) == 0)
+		if (read_line(f_in, buf, bufsiz, rl_flags) == 0)
 			break;
 
 		if (argc == maxargs) {
@@ -1010,25 +1034,32 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 				goto overflow;
 #ifdef ICONV_OPTION
 			if (ic_recv != (iconv_t)-1) {
-				ICONV_CONST char *ibuf;
-				char *obuf = line;
-				size_t icnt, ocnt = sizeof line - 1;
+				xbuf outbuf, inbuf;
+				char ibuf[512];
 				int add_null = 0;
-				iconv(ic_send, NULL, 0, NULL, 0);
+				int pos = 0;
+
+				INIT_CONST_XBUF(outbuf, line);
+				inbuf.buf = ibuf;
+
 				while (msg_bytes) {
-					icnt = msg_bytes > sizeof iconv_buf
-					     ? sizeof iconv_buf : msg_bytes;
-					read_loop(fd, iconv_buf, icnt);
-					if (!(msg_bytes -= icnt) && !iconv_buf[icnt-1])
-						icnt--, add_null = 1;
-					ibuf = (ICONV_CONST char *)iconv_buf;
-					if (iconv(ic_send, &ibuf,&icnt,
-						  &obuf,&ocnt) == (size_t)-1)
-						goto overflow; // XXX
+					inbuf.len = msg_bytes > sizeof ibuf
+						  ? sizeof ibuf : msg_bytes;
+					read_loop(fd, inbuf.buf, inbuf.len);
+					if (!(msg_bytes -= inbuf.len)
+					 && !ibuf[inbuf.len-1])
+						inbuf.len--, add_null = 1;
+					if (iconvbufs(ic_send, &inbuf, &outbuf,
+					    ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE) < 0)
+						goto overflow;
+					pos = -1;
 				}
-				if (add_null)
-					*obuf++ = '\0';
-				msg_bytes = obuf - line;
+				if (add_null) {
+					if (outbuf.len == outbuf.size)
+						goto overflow;
+					outbuf.buf[outbuf.len++] = '\0';
+				}
+				msg_bytes = outbuf.len;
 			} else
 #endif
 				read_loop(fd, line, msg_bytes);
@@ -1440,10 +1471,10 @@ static void writefd_unbuffered(int fd, const char *buf, size_t len)
 			/* If the other side is sending us error messages, try
 			 * to grab any messages they sent before they died. */
 			while (!am_server && fd == sock_f_out && io_multiplexing_in) {
+				char buf[1024];
 				set_io_timeout(30);
 				ignore_timeout = 0;
-				readfd_unbuffered(sock_f_in, io_filesfrom_buf,
-						  sizeof io_filesfrom_buf);
+				readfd_unbuffered(sock_f_in, buf, sizeof buf);
 			}
 			exit_cleanup(RERR_STREAMIO);
 		}
