@@ -463,7 +463,6 @@ static struct poptOption long_options[] = {
   {"no-inc-recursive", 0,  POPT_ARG_VAL,    &allow_inc_recurse, 0, 0, 0 },
   {"i-r",              0,  POPT_ARG_VAL,    &allow_inc_recurse, 1, 0, 0 },
   {"no-i-r",           0,  POPT_ARG_VAL,    &allow_inc_recurse, 0, 0, 0 },
-  {"no-ir",            0,  POPT_ARG_VAL,    &allow_inc_recurse, 0, 0, 0 }, /* XXX remove soon */
   {"dirs",            'd', POPT_ARG_VAL,    &xfer_dirs, 2, 0, 0 },
   {"no-dirs",          0,  POPT_ARG_VAL,    &xfer_dirs, 0, 0, 0 },
   {"no-d",             0,  POPT_ARG_VAL,    &xfer_dirs, 0, 0, 0 },
@@ -1930,7 +1929,7 @@ void server_options(char **args, int *argc_p)
 		args[ac++] = "--numeric-ids";
 
 	if (!allow_inc_recurse)
-		args[ac++] = "--no-ir"; /* XXX change to --no-i-r soon */
+		args[ac++] = "--no-i-r";
 
 	if (am_sender) {
 		if (ignore_existing)
