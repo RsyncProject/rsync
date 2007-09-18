@@ -26,7 +26,7 @@ int claim_connection(char *fname, int max_connections)
 {
 	int fd, i;
 
-	if (max_connections <= 0)
+	if (max_connections == 0)
 		return 1;
 
 	if ((fd = open(fname, O_RDWR|O_CREAT, 0600)) < 0)
