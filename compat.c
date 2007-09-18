@@ -33,16 +33,15 @@ extern int inplace;
 extern int recurse;
 extern int use_qsort;
 extern int allow_inc_recurse;
-extern int relative_paths;
 extern int append_mode;
 extern int fuzzy_basis;
 extern int read_batch;
-extern int implied_dirs;
 extern int delay_updates;
 extern int checksum_seed;
 extern int basis_dir_cnt;
 extern int prune_empty_dirs;
 extern int protocol_version;
+extern int protect_args;
 extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_acls;
@@ -55,10 +54,21 @@ extern char *shell_cmd; /* contains VER.SUB string if client is a pre-release */
 extern char *backup_dir, *backup_suffix;
 extern char *partial_dir;
 extern char *dest_option;
+extern char *files_from;
+extern char *filesfrom_host;
 extern struct filter_list_struct filter_list;
+#ifdef ICONV_OPTION
+extern char *iconv_opt;
+extern iconv_t ic_send, ic_recv;
+#endif
 
 /* These index values are for the file-list's extra-attribute array. */
 int uid_ndx, gid_ndx, acls_ndx, xattrs_ndx;
+#ifdef ICONV_OPTION
+int ic_ndx;
+
+int filesfrom_convert = 0;
+#endif
 
 /* The server makes sure that if either side only supports a pre-release
  * version of a protocol, that both sides must speak a compatible version
@@ -109,6 +119,10 @@ void setup_protocol(int f_out,int f_in)
 		acls_ndx = ++file_extra_cnt;
 	if (preserve_xattrs)
 		xattrs_ndx = ++file_extra_cnt;
+#ifdef ICONV_OPTION
+	if (iconv_opt && (!am_sender || inc_recurse))
+		ic_ndx = ++file_extra_cnt;
+#endif
 
 	if (remote_protocol == 0) {
 		if (am_server && !local_server)
@@ -211,8 +225,7 @@ void setup_protocol(int f_out,int f_in)
 	} else if (protocol_version >= 30) {
 		if (recurse && allow_inc_recurse
 		 && !delete_before && !delete_after && !delay_updates
-		 && (!relative_paths || implied_dirs) && !use_qsort
-		 && !prune_empty_dirs)
+		 && !use_qsort && !prune_empty_dirs)
 			inc_recurse = 1;
 		need_messages_from_generator = 1;
 	}
@@ -223,6 +236,16 @@ void setup_protocol(int f_out,int f_in)
 			flags |= MATCHFLG_PERISHABLE;
 		parse_rule(&filter_list, partial_dir, flags, 0);
 	}
+
+
+#ifdef ICONV_OPTION
+	if (protect_args && files_from) {
+		if (am_sender)
+			filesfrom_convert = filesfrom_host && ic_send != (iconv_t)-1;
+		else
+			filesfrom_convert = !filesfrom_host && ic_recv != (iconv_t)-1;
+	}
+#endif
 
 	if (am_server) {
 		if (!checksum_seed)
