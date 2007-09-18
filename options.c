@@ -878,7 +878,7 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 		set_refuse_options("log-file*");
 
 #ifdef ICONV_OPTION
-	if (!am_daemon && (arg = getenv("RSYNC_ICONV")) != NULL && *arg)
+	if (!am_daemon && !protect_args && (arg = getenv("RSYNC_ICONV")) != NULL && *arg)
 		iconv_opt = strdup(arg);
 #endif
 
@@ -1240,21 +1240,22 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 		exit_cleanup(0);
 	}
 
-	if (protect_args) {
-		if (!frommain)
-			protect_args = 0;
-		else if (am_server)
-			return 1;
-	}
-
 #ifdef ICONV_OPTION
-	if (iconv_opt) {
+	if (iconv_opt && protect_args != 2) {
 		if (!am_server && strcmp(iconv_opt, "-") == 0)
 			iconv_opt = NULL;
 		else
 			need_unsorted_flist = 1;
 	}
+	setup_iconv();
 #endif
+
+	if (protect_args == 1) {
+		if (!frommain)
+			protect_args = 0;
+		else if (am_server)
+			return 1;
+	}
 
 #ifndef SUPPORT_LINKS
 	if (preserve_links && !am_sender) {
@@ -1663,6 +1664,10 @@ void server_options(char **args, int *argc_p)
 
 	x = 1;
 	argstr[0] = '-';
+
+	if (protect_args)
+		argstr[x++] = 's';
+
 	for (i = 0; i < verbose; i++)
 		argstr[x++] = 'v';
 
@@ -1765,6 +1770,22 @@ void server_options(char **args, int *argc_p)
 	if (x != 1)
 		args[ac++] = argstr;
 
+#ifdef ICONV_OPTION
+	if (iconv_opt) {
+		char *set = strchr(iconv_opt, ',');
+		if (set)
+			set++;
+		else
+			set = iconv_opt;
+		if (asprintf(&arg, "--iconv=%s", set) < 0)
+			goto oom;
+		args[ac++] = arg;
+	}
+#endif
+
+	if (protect_args) /* initial args break here */
+		args[ac++] = NULL;
+
 	if (list_only > 1)
 		args[ac++] = "--list-only";
 
@@ -1799,19 +1820,6 @@ void server_options(char **args, int *argc_p)
 		else if (!verbose)
 			args[ac++] = "--log-format=X";
 	}
-
-#ifdef ICONV_OPTION
-	if (iconv_opt) {
-		char *set = strchr(iconv_opt, ',');
-		if (set)
-			set++;
-		else
-			set = iconv_opt;
-		if (asprintf(&arg, "--iconv=%s", set) < 0)
-			goto oom;
-		args[ac++] = arg;
-	}
-#endif
 
 	if (block_size) {
 		if (asprintf(&arg, "-B%lu", block_size) < 0)
