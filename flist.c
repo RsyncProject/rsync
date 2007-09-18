@@ -75,6 +75,7 @@ extern struct filter_list_struct server_filter_list;
 
 #ifdef ICONV_OPTION
 extern int ic_ndx;
+extern int filesfrom_convert;
 extern int need_unsorted_flist;
 extern iconv_t ic_send, ic_recv;
 #endif
@@ -377,22 +378,21 @@ static void send_file_entry(int f, struct file_struct *file, int ndx, int first_
 
 #ifdef ICONV_OPTION
 	if (ic_send != (iconv_t)-1) {
-		ICONV_CONST char *ibuf;
-		char *obuf = fname;
-		size_t ocnt = MAXPATHLEN, icnt;
+		xbuf outbuf, inbuf;
 
-		iconv(ic_send, NULL,0, NULL,0);
-		if ((ibuf = (ICONV_CONST char *)file->dirname) != NULL) {
-		    icnt = strlen(ibuf);
-		    ocnt--; /* pre-subtract the space for the '/' */
-		    if (iconv(ic_send, &ibuf,&icnt, &obuf,&ocnt) == (size_t)-1)
-			goto convert_error;
-		    *obuf++ = '/';
+		INIT_CONST_XBUF(outbuf, fname);
+
+		if (file->dirname) {
+			INIT_XBUF_STRLEN(inbuf, (char*)file->dirname);
+			outbuf.size -= 2; /* Reserve room for '/' & 1 more char. */
+			if (iconvbufs(ic_send, &inbuf, &outbuf, 0) < 0)
+				goto convert_error;
+			outbuf.size += 2;
+			outbuf.buf[outbuf.len++] = '/';
 		}
 
-		ibuf = (ICONV_CONST char *)file->basename;
-		icnt = strlen(ibuf);
-		if (iconv(ic_send, &ibuf,&icnt, &obuf,&ocnt) == (size_t)-1) {
+		INIT_XBUF_STRLEN(inbuf, (char*)file->basename);
+		if (iconvbufs(ic_send, &inbuf, &outbuf, 0) < 0) {
 		  convert_error:
 			io_error |= IOERR_GENERAL;
 			rprintf(FINFO,
@@ -400,7 +400,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx, int first_
 			    who_am_i(), f_name(file, fname), strerror(errno));
 			return;
 		}
-		*obuf = '\0';
+		outbuf.buf[outbuf.len] = '\0';
 	} else
 #endif
 		f_name(file, fname);
@@ -667,25 +667,19 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 
 #ifdef ICONV_OPTION
 	if (ic_recv != (iconv_t)-1) {
-		char *obuf = thisname;
-		ICONV_CONST char *ibuf = (ICONV_CONST char *)lastname;
-		size_t ocnt = MAXPATHLEN, icnt = basename_len;
+		xbuf outbuf, inbuf;
 
-		if (icnt >= MAXPATHLEN) {
-			errno = E2BIG;
-			goto convert_error;
-		}
+		INIT_CONST_XBUF(outbuf, thisname);
+		INIT_XBUF(inbuf, lastname, basename_len, -1);
 
-		iconv(ic_recv, NULL,0, NULL,0);
-		if (iconv(ic_recv, &ibuf,&icnt, &obuf,&ocnt) == (size_t)-1) {
-		  convert_error:
+		if (iconvbufs(ic_recv, &inbuf, &outbuf, 0) < 0) {
 			io_error |= IOERR_GENERAL;
 			rprintf(FINFO,
 			    "[%s] cannot convert filename: %s (%s)\n",
 			    who_am_i(), lastname, strerror(errno));
-			obuf = thisname;
+			outbuf.len = 0;
 		}
-		*obuf = '\0';
+		outbuf.buf[outbuf.len] = '\0';
 	}
 #endif
 
@@ -1650,7 +1644,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	int use_ff_fd = 0;
 	int flags, disable_buffering;
 	int reading_remotely = filesfrom_host != NULL;
-	int rl_nulls = eol_nulls || reading_remotely;
+	int rl_flags = (reading_remotely ? 0 : RL_DUMP_COMMENTS)
+		     | (eol_nulls || reading_remotely ? RL_EOL_NULLS : 0)
+		     | (filesfrom_convert ? RL_CONVERT : 0);
 
 	rprintf(FLOG, "building file list\n");
 	if (show_filelist_p())
@@ -1691,7 +1687,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		int is_dot_dir;
 
 		if (use_ff_fd) {
-			if (read_line(filesfrom_fd, fbuf, sizeof fbuf, !reading_remotely, rl_nulls) == 0)
+			if (read_line(filesfrom_fd, fbuf, sizeof fbuf, rl_flags) == 0)
 				break;
 			sanitize_path(fbuf, fbuf, "", 0, NULL);
 		} else {

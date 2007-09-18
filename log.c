@@ -312,26 +312,25 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 
 #ifdef ICONV_CONST
 	if (ic != (iconv_t)-1) {
+		xbuf outbuf, inbuf;
 		char convbuf[1024];
-		ICONV_CONST char *in_buf = (ICONV_CONST char *)buf;
-		char *out_buf = convbuf;
-		size_t in_cnt = len, out_cnt = sizeof convbuf - 1;
+		int ierrno;
 
-		iconv(ic, NULL, 0, NULL, 0);
-		while (iconv(ic, &in_buf,&in_cnt,
-			     &out_buf,&out_cnt) == (size_t)-1) {
-			if (out_buf != convbuf) {
-				filtered_fwrite(f, convbuf, out_buf - convbuf, 0);
-				out_buf = convbuf;
-				out_cnt = sizeof convbuf - 1;
+		INIT_CONST_XBUF(outbuf, convbuf);
+		INIT_XBUF(inbuf, (char*)buf, len, -1);
+
+		while (inbuf.len) {
+			iconvbufs(ic, &inbuf, &outbuf, 0);
+			ierrno = errno;
+			if (outbuf.len) {
+				filtered_fwrite(f, convbuf, outbuf.len, 0);
+				outbuf.len = 0;
 			}
-			if (errno == E2BIG)
+			if (!ierrno || ierrno == E2BIG)
 				continue;
-			fprintf(f, "\\#%03o", *(uchar*)in_buf++);
-			in_cnt--;
+			fprintf(f, "\\#%03o", CVAL(inbuf.buf, inbuf.pos++));
+			inbuf.len--;
 		}
-		if (out_buf != convbuf)
-			filtered_fwrite(f, convbuf, out_buf - convbuf, 0);
 	} else
 #endif
 		filtered_fwrite(f, buf, len, !allow_8bit_chars);
