@@ -585,7 +585,7 @@ explicitly).  See also the bf(--delete-delay) option that is a better choice
 than using bf(--delete-after).
 
 Incremental recursion can be disabled using the bf(--no-inc-recursive)
-option or its shorter bf(--no-ir) alias.
+option or its shorter bf(--no-i-r) alias.
 
 dit(bf(-R, --relative)) Use relative paths. This means that the full path
 names specified on the command line are sent to the server rather than
@@ -807,7 +807,7 @@ If incremental recursion is active (see bf(--recursive)), rsync may transfer
 a missing hard-linked file before it finds that another link for the file
 exists elsewhere in the hierarchy.  This does not affect the accuracy of
 the transfer, just its efficiency.  One way to avoid this is to disable
-incremental recursion using the bf(--no-ir) option.
+incremental recursion using the bf(--no-inc-recursive) option.
 
 dit(bf(-p, --perms)) This option causes the receiving rsync to set the
 destination permissions to be the same as the source permissions.  (See
