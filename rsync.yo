@@ -405,6 +405,7 @@ to the detailed description below for a complete description.  verb(
      --include-from=FILE     read include patterns from FILE
      --files-from=FILE       read list of source-file names from FILE
  -0, --from0                 all *from/filter files are delimited by 0s
+ -s, --protect-args          no space-splitting; wildcard chars only
      --address=ADDRESS       bind address for outgoing socket to daemon
      --port=PORT             specify double-colon alternate port number
      --sockopts=OPTIONS      specify custom TCP options
@@ -1352,6 +1353,21 @@ merged files specified in a bf(--filter) rule.
 It does not affect bf(--cvs-exclude) (since all names read from a .cvsignore
 file are split on whitespace).
 
+If the bf(--iconv) and bf(--protect-args) options are specified and the
+bf(--files-from) filenames are being sent from one host to another, the
+filenames will be translated from the sending host's charset to the
+receiving host's charset.
+
+dit(bf(-s, --protect-args)) This option sends all filenames and some options to
+the remote rsync without allowing the remote shell to interpret them.  This
+means that spaces are not split in names, and any non-wildcard special
+characters are not translated (such as ~, $, ;, &, etc.).  Wildcards are
+expanded on the remote host by rsync (instead of the shell doing it).
+
+If you use this option with bf(--iconv), the args will also be translated
+from the local to the remote character set.  The translation happens before
+wild-cards are expanded.  See also the bf(--files-from) option.
+
 dit(bf(-T, --temp-dir=DIR)) This option instructs rsync to use DIR as a
 scratch directory when creating temporary copies of the files transferred
 on the receiving side.  The default behavior is to create each temporary
@@ -1953,14 +1969,15 @@ Finally, you can specify a CONVERT_SPEC of "-" to turn off any conversion.
 The default setting of this option is site-specific, and can also be
 affected via the RSYNC_ICONV environment variable.
 
+If you specify the bf(--protect-args) option (bf(-s)), rsync will translate
+the filenames you specify on the command-line that are being sent to the
+remote host.  See also the bf(--files-from) option.
+
 Note that rsync does not do any conversion of names in filter files
-(including include/exclude files), in a files-from file, nor those
-specified on the command line.  It is up to you to ensure that you're
-requesting the right names from a remote server, and you can specify
-extra include/exclude rules if there are filename differences on the
-two sides that need to be accounted for.  (In the future there may be
-a way to specify a UTF-8 filter rule that gets auto-converted to the
-local side's character set.)
+(including include/exclude files).  It is up to you to ensure that you're
+specifying matching rules that can match on both sides of the transfer.
+For instance, you can specify extra include/exclude rules if there are
+filename differences on the two sides that need to be accounted for.
 
 dit(bf(-4, --ipv4) or bf(-6, --ipv6)) Tells rsync to prefer IPv4/IPv6
 when creating sockets.  This only affects sockets that rsync has direct
