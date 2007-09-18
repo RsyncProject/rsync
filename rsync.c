@@ -55,20 +55,19 @@ extern char *iconv_opt;
 
 #ifdef ICONV_CONST
 iconv_t ic_chck = (iconv_t)-1;
-#ifdef ICONV_OPTION
+# ifdef ICONV_OPTION
 iconv_t ic_send = (iconv_t)-1, ic_recv = (iconv_t)-1;
-int ic_ndx;
-#endif
+# endif
 
 static const char *default_charset(void)
 {
-#if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
+# if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
 	return locale_charset();
-#elif defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
+# elif defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO
 	return nl_langinfo(CODESET);
-#else
+# else
 	return ""; /* Works with (at the very least) gnu iconv... */
-#endif
+# endif
 }
 
 void setup_iconv()
@@ -77,7 +76,7 @@ void setup_iconv()
 # ifdef ICONV_OPTION
 	const char *charset;
 	char *cp;
-#endif
+# endif
 
 	if (!am_server && !allow_8bit_chars) {
 
@@ -126,9 +125,6 @@ void setup_iconv()
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
 
-	if (!am_sender || inc_recurse)
-		ic_ndx = ++file_extra_cnt;
-
 	if (verbose > 1) {
 		rprintf(FINFO, "%s charset: %s\n",
 			am_server ? "server" : "client",
@@ -136,6 +132,79 @@ void setup_iconv()
 	}
 # endif
 }
+
+# ifdef ICONV_OPTION
+
+/* This function converts the characters in the "in" xbuf into characters
+ * in the "out" xbuf.  The "len" of the "in" xbuf is used starting from its
+ * "pos".  The "size" of the "out" xbuf restricts how many characters can be
+ * stored, starting at its "pos+len" position.  Note that the last byte of
+ * the buffer is never used, which reserves space for a terminating '\0'.
+ * We return a 0 on success or a -1 on error.  An error also sets errno to
+ * E2BIG, EILSEQ, or EINVAL (see below); otherwise errno will be set to 0.
+ * The "in" xbuf is altered to update "pos" and "len".  The "out" xbuf has
+ * data appended, and its "len" incremented.   If ICB_EXPAND_OUT is set in
+ * "flags", the "out" xbuf will also be allocated if empty, and expanded if
+ * too small (so E2BIG will not be returned).  If ICB_INCLUDE_BAD is set in
+ * "flags", any badly-encoded chars are included verbatim in the "out" xbuf,
+ * so EILSEQ will not be returned.  Likewise for ICB_INCLUDE_INCOMPLETE with
+ * respect to an incomplete multi-byte char at the end, which ensures that
+ * EINVAL is not returned.  Anytime "in.pos" is 0 we will reset the iconv()
+ * state prior to processing the characters. */
+int iconvbufs(iconv_t ic, xbuf *in, xbuf *out, int flags)
+{
+	ICONV_CONST char *ibuf;
+	size_t icnt, ocnt;
+	char *obuf;
+
+	if (!out->size && flags & ICB_EXPAND_OUT)
+		alloc_xbuf(out, 1024);
+
+	if (!in->pos)
+		iconv(ic, NULL, 0, NULL, 0);
+
+	ibuf = in->buf + in->pos;
+	icnt = in->len;
+
+	obuf = out->buf + (out->pos + out->len);
+	ocnt = out->size - (out->pos + out->len) - 1;
+
+	while (icnt) {
+		while (iconv(ic, &ibuf, &icnt, &obuf, &ocnt) == (size_t)-1) {
+			if (errno == EINTR)
+				continue;
+			if (errno == EINVAL) {
+				if (!(flags & ICB_INCLUDE_INCOMPLETE))
+					goto finish;
+			} else if (errno == EILSEQ) {
+				if (!(flags & ICB_INCLUDE_BAD))
+					goto finish;
+			} else {
+				size_t opos = obuf - out->buf;
+				if (!(flags & ICB_EXPAND_OUT)) {
+					errno = E2BIG;
+					goto finish;
+				}
+				realloc_xbuf(out, out->size + 1024);
+				obuf = out->buf + opos;
+				ocnt += 1024;
+				continue;
+			}
+			*obuf++ = *ibuf++;
+			ocnt--, icnt--;
+		}
+	}
+
+	errno = 0;
+
+  finish:
+	in->len = icnt;
+	in->pos = ibuf - in->buf;
+	out->len = obuf - out->buf - out->pos;
+
+	return errno ? -1 : 0;
+}
+# endif
 #endif
 
 int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
