@@ -161,7 +161,8 @@ sure).
 dit(bf(max connections)) The "max connections" option allows you to
 specify the maximum number of simultaneous connections you will allow.
 Any clients connecting when the maximum has been reached will receive a
-message telling them to try later.  The default is 0 which means no limit.
+message telling them to try later.  The default is 0, which means no limit.
+A negative value disables the module.
 See also the "lock file" option.
 
 dit(bf(log file)) When the "log file" option is set to a non-empty
