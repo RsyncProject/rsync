@@ -119,10 +119,6 @@ void setup_protocol(int f_out,int f_in)
 		acls_ndx = ++file_extra_cnt;
 	if (preserve_xattrs)
 		xattrs_ndx = ++file_extra_cnt;
-#ifdef ICONV_OPTION
-	if (iconv_opt && (!am_sender || inc_recurse))
-		ic_ndx = ++file_extra_cnt;
-#endif
 
 	if (remote_protocol == 0) {
 		if (am_server && !local_server)
@@ -229,6 +225,11 @@ void setup_protocol(int f_out,int f_in)
 			inc_recurse = 1;
 		need_messages_from_generator = 1;
 	}
+
+#ifdef ICONV_OPTION
+	if (iconv_opt && (!am_sender || inc_recurse))
+		ic_ndx = ++file_extra_cnt;
+#endif
 
 	if (partial_dir && *partial_dir != '/' && (!am_server || local_server)) {
 		int flags = MATCHFLG_NO_PREFIXES | MATCHFLG_DIRECTORY;
