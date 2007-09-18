@@ -89,7 +89,7 @@
 /* This is used when working on a new protocol version in CVS, and should
  * be a new non-zero value for each CVS change that affects the protocol.
  * It must ALWAYS be 0 when the protocol goes final! */
-#define SUBPROTOCOL_VERSION 7
+#define SUBPROTOCOL_VERSION 8
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
@@ -781,6 +781,28 @@ typedef struct {
 #define EXPAND_ITEM_LIST(lp, type, incr) \
 	(type*)expand_item_list(lp, sizeof (type), #type, incr)
 
+#define EMPTY_XBUF {NULL, 0, 0, 0}
+
+typedef struct {
+	char *buf;
+	size_t pos;  /* pos = read pos in the buf */
+	size_t len;  /* len = chars following pos */
+	size_t size; /* size = total space in buf */
+} xbuf;
+
+#define INIT_XBUF(xb, str, ln, sz) (xb).buf = (str), (xb).len = (ln), (xb).size = (sz), (xb).pos = 0
+#define INIT_XBUF_STRLEN(xb, str) (xb).buf = (str), (xb).len = strlen((xb).buf), (xb).size = (-1), (xb).pos = 0
+/* This one is used to make an output xbuf based on a char[] buffer: */
+#define INIT_CONST_XBUF(xb, bf) (xb).buf = (bf), (xb).size = sizeof (bf), (xb).len = (xb).pos = 0
+
+#define ICB_EXPAND_OUT (1<<0)
+#define ICB_INCLUDE_BAD (1<<1)
+#define ICB_INCLUDE_INCOMPLETE (1<<2)
+
+#define RL_EOL_NULLS (1<<0)
+#define RL_DUMP_COMMENTS (1<<1)
+#define RL_CONVERT (1<<2)
+
 #include "byteorder.h"
 #include "lib/mdigest.h"
 #include "lib/wildmatch.h"
@@ -1042,7 +1064,27 @@ int inet_pton(int af, const char *src, void *dst);
 const char *get_panic_action(void);
 #endif
 
-static inline int to_wire_mode(mode_t mode)
+static inline void
+alloc_xbuf(xbuf *xb, size_t sz)
+{
+	if (!(xb->buf = new_array(char, sz)))
+		out_of_memory("alloc_xbuf");
+	xb->size = sz;
+	xb->len = xb->pos = 0;
+}
+
+static inline void
+realloc_xbuf(xbuf *xb, size_t sz)
+{
+	char *bf = realloc_array(xb->buf, char, sz);
+	if (!bf)
+		out_of_memory("realloc_xbuf");
+	xb->buf = bf;
+	xb->size = sz;
+}
+
+static inline int
+to_wire_mode(mode_t mode)
 {
 #ifdef SUPPORT_LINKS
 #if _S_IFLNK != 0120000
@@ -1053,7 +1095,8 @@ static inline int to_wire_mode(mode_t mode)
 	return mode;
 }
 
-static inline mode_t from_wire_mode(int mode)
+static inline mode_t
+from_wire_mode(int mode)
 {
 #if _S_IFLNK != 0120000
 	if ((mode & (_S_IFMT)) == 0120000)
