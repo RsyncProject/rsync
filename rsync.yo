@@ -601,10 +601,23 @@ machine. If instead you used
 quote(tt(   rsync -avR /foo/bar/baz.c remote:/tmp/))
 
 then a file named /tmp/foo/bar/baz.c would be created on the remote
-machine -- the full path name is preserved.  To limit the amount of
-path information that is sent, you have a couple options:  (1) With
-a modern rsync on the sending side (beginning with 2.6.7), you can
-insert a dot and a slash into the source path, like this:
+machine, preserving its full path.  These extra path elements are called
+"implied directories" (i.e. the "foo" and the "foo/bar" directories in the
+above example).
+
+Beginning with rsync 3.0.0, rsync always sends these implied directories as
+real directories in the file list, even if a path element is really a
+symlink on the sending side.  This prevents some really unexpected
+behaviors when copying the full path of a file that you didn't realize had
+a symlink in its path.  If you want to duplicate a server-side symlink,
+include both the symlink via its path, and referent directory via its real
+path.  If you're dealing with an older rsync on the sending side, you may
+need to use the bf(--no-implied-dirs) option.
+
+It is also possible to limit the amount of path information that is sent as
+implied directories for each path you specify.  With a modern rsync on the
+sending side (beginning with 2.6.7), you can insert a dot and a slash into
+the source path, like this:
 
 quote(tt(   rsync -avR /foo/./bar/baz.c remote:/tmp/))
 
@@ -617,8 +630,8 @@ quote(tt(   (cd /foo; rsync -avR bar/baz.c remote:/tmp/) ))
 
 (Note that the parens put the two commands into a sub-shell, so that the
 "cd" command doesn't remain in effect for future commands.)
-If you're pulling files, use this idiom (which doesn't work with an
-rsync daemon):
+If you're pulling files from an older rsync, use this idiom (but only
+for a non-daemon transfer):
 
 quote(
 tt(   rsync -avR --rsync-path="cd /foo; rsync" \ )nl()
@@ -632,7 +645,7 @@ means that the corresponding path elements on the destination system are
 left unchanged if they exist, and any missing implied directories are
 created with default attributes.  This even allows these implied path
 elements to have big differences, such as being a symlink to a directory on
-one side of the transfer, and a real directory on the other side.
+the receiving side.
 
 For instance, if a command-line arg or a files-from entry told rsync to
 transfer the file "path/foo/file", the directories "path" and "path/foo"
@@ -645,15 +658,9 @@ ends up being created in "path/bar".  Another way to accomplish this link
 preservation is to use the bf(--keep-dirlinks) option (which will also
 affect symlinks to directories in the rest of the transfer).
 
-In a similar but opposite scenario, if the transfer of "path/foo/file" is
-requested and "path/foo" is a symlink on the sending side, running without
-bf(--no-implied-dirs) would cause rsync to transform "path/foo" on the
-receiving side into an identical symlink, and then attempt to transfer
-"path/foo/file", which might fail if the duplicated symlink did not point
-to a directory on the receiving side.  Another way to avoid this sending of
-a symlink as an implied directory is to use bf(--copy-unsafe-links), or
-bf(--copy-dirlinks) (both of which also affect symlinks in the rest of the
-transfer -- see their descriptions for full details).
+When pulling files from an rsync older than 3.0.0, you may need to use this
+option if the sending side has a symlink in the path you request and you
+wish the implied directories to be transferred as normal directories.
 
 dit(bf(-b, --backup)) With this option, preexisting destination files are
 renamed as each file is transferred or deleted.  You can control where the
