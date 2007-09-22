@@ -89,7 +89,7 @@
 /* This is used when working on a new protocol version in CVS, and should
  * be a new non-zero value for each CVS change that affects the protocol.
  * It must ALWAYS be 0 when the protocol goes final! */
-#define SUBPROTOCOL_VERSION 8
+#define SUBPROTOCOL_VERSION 9
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
@@ -584,7 +584,7 @@ extern int xattrs_ndx;
 
 #define FILE_STRUCT_LEN (offsetof(struct file_struct, basename))
 #define EXTRA_LEN (sizeof (union file_extras))
-#define PTR_EXTRA_LEN ((sizeof (char *) + EXTRA_LEN - 1) / EXTRA_LEN)
+#define PTR_EXTRA_CNT ((sizeof (char *) + EXTRA_LEN - 1) / EXTRA_LEN)
 #define DEV_EXTRA_CNT 2
 #define DIRNODE_EXTRA_CNT 3
 #define SUM_EXTRA_CNT ((MAX_DIGEST_LEN + EXTRA_LEN - 1) / EXTRA_LEN)
@@ -608,7 +608,7 @@ extern int xattrs_ndx;
 #define F_SYMLINK(f) ((f)->basename + strlen((f)->basename) + 1)
 
 /* The sending side always has this available: */
-#define F_PATHNAME(f) (*(const char**)REQ_EXTRA(f, PTR_EXTRA_LEN))
+#define F_PATHNAME(f) (*(const char**)REQ_EXTRA(f, PTR_EXTRA_CNT))
 
 /* The receiving side always has this available: */
 #define F_DEPTH(f) REQ_EXTRA(f, 1)->num
@@ -625,6 +625,8 @@ extern int xattrs_ndx;
 #define F_HL_PREV(f) OPT_EXTRA(f, LEN64_BUMP(f)+inc_recurse)->num /* non-dirs */
 #define F_DIR_NODE_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) \
 				+ DIRNODE_EXTRA_CNT - 1)->num) /* sender dirs */
+#define F_DIR_RELS_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) + DIRNODE_EXTRA_CNT \
+				+ PTR_EXTRA_CNT - 1)->num) /* sender dirs */
 #define F_DIR_DEFACL(f) OPT_EXTRA(f, LEN64_BUMP(f))->unum /* receiver dirs */
 #define F_DIR_DEV_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) + ACL_BUMP(f) \
 				+ DEV_EXTRA_CNT - 1)->unum) /* receiver dirs */
@@ -644,9 +646,11 @@ extern int xattrs_ndx;
 #define F_HLINK_NOT_FIRST(f) BITS_SETnUNSET((f)->flags, FLAG_HLINKED, FLAG_HLINK_FIRST)
 #define F_HLINK_NOT_LAST(f) BITS_SETnUNSET((f)->flags, FLAG_HLINKED, FLAG_HLINK_LAST)
 
+/* These access the F_DIR_DEV_P() and F_RDEV_P() values: */
 #define DEV_MAJOR(a) (a)[0]
 #define DEV_MINOR(a) (a)[1]
 
+/* These access the F_DIRS_NODE_P() values: */
 #define DIR_PARENT(a) (a)[0]
 #define DIR_FIRST_CHILD(a) (a)[1]
 #define DIR_NEXT_SIBLING(a) (a)[2]
