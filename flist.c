@@ -1077,16 +1077,19 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	/* -x only affects directories because we need to avoid recursing
 	 * into a mount-point directory, not to avoid copying a symlinked
 	 * file if -L (or similar) was specified. */
-	if (one_file_system && st.st_dev != filesystem_dev
-	 && S_ISDIR(st.st_mode)) {
-		if (one_file_system > 1) {
-			if (verbose > 2) {
-				rprintf(FINFO, "skipping mount-point dir %s\n",
-					thisname);
+	if (one_file_system && S_ISDIR(st.st_mode)) {
+		if (flags & FLAG_TOP_DIR)
+			filesystem_dev = st.st_dev;
+		else if (st.st_dev != filesystem_dev) {
+			if (one_file_system > 1) {
+				if (verbose > 2) {
+					rprintf(FINFO, "skipping mount-point dir %s\n",
+						thisname);
+				}
+				return NULL;
 			}
-			return NULL;
+			flags |= FLAG_MOUNT_DIR;
 		}
-		flags |= FLAG_MOUNT_DIR;
 	}
 
 	if (is_excluded(thisname, S_ISDIR(st.st_mode) != 0, filter_level)) {
@@ -1111,6 +1114,8 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		 && flags & FLAG_DIVERT_DIRS) {
 			/* Room for parent/sibling/next-child info. */
 			extra_len += DIRNODE_EXTRA_CNT * EXTRA_LEN;
+			if (relative_paths)
+				extra_len += PTR_EXTRA_CNT * EXTRA_LEN;
 			dir_count++;
 			pool = dir_flist->file_pool;
 		} else
@@ -1424,8 +1429,7 @@ static void add_dirs_to_tree(int parent_ndx, struct file_list *from_flist,
 		dir_flist->files[dir_flist->used++] = file;
 		dir_cnt--;
 
-		if (!(file->flags & FLAG_XFER_DIR)
-		 || file->flags & FLAG_MOUNT_DIR)
+		if (file->flags & FLAG_MOUNT_DIR)
 			continue;
 
 		if (dp)
@@ -1513,10 +1517,89 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 	}
 }
 
+static char lastpath[MAXPATHLEN] = "";
+static int lastpath_len = 0;
+static struct file_struct *lastpath_struct;
+
+static void send_implied_dirs(int f, struct file_list *flist, char *fname,
+			      char *start, char *limit, int flags, int is_dot_dir)
+{
+	struct file_struct *file;
+	item_list *rel_list;
+	char **ep, *slash;
+	int len, need_new_dir;
+
+	flags &= ~FLAG_XFER_DIR;
+
+	if (inc_recurse) {
+		if (lastpath_struct && F_PATHNAME(lastpath_struct) == pathname
+		 && lastpath_len == limit - fname
+		 && strncmp(lastpath, fname, lastpath_len) == 0)
+			need_new_dir = 0;
+		else
+			need_new_dir = 1;
+	} else
+		need_new_dir = 1;
+
+	if (need_new_dir) {
+		int save_copy_links = copy_links;
+		int save_xfer_dirs = xfer_dirs;
+
+		copy_links |= copy_unsafe_links;
+		xfer_dirs = 1;
+
+		*limit = '\0';
+
+		for (slash = start; (slash = strchr(slash+1, '/')) != NULL; ) {
+			*slash = '\0';
+			send_file_name(f, flist, fname, NULL, flags, ALL_FILTERS);
+			*slash = '/';
+		}
+
+		file = send_file_name(f, flist, fname, NULL, flags, ALL_FILTERS);
+		if (inc_recurse) {
+			if (file && !S_ISDIR(file->mode))
+				file = NULL;
+			else if (file)
+				memset(F_DIR_RELS_P(file), 0, sizeof (item_list*));
+			lastpath_struct = file;
+		}
+
+		strlcpy(lastpath, fname, sizeof lastpath);
+		lastpath_len = limit - fname;
+
+		*limit = '/';
+
+		copy_links = save_copy_links;
+		xfer_dirs = save_xfer_dirs;
+
+		if (!inc_recurse)
+			return;
+	}
+
+	if (!lastpath_struct)
+		return; /* dir must have vanished */
+
+	len = strlen(limit+1);
+	memcpy(&rel_list, F_DIR_RELS_P(lastpath_struct), sizeof rel_list);
+	if (!rel_list) {
+		if (!(rel_list = new0(item_list)))
+			out_of_memory("send_implied_dirs");
+		memcpy(F_DIR_RELS_P(lastpath_struct), &rel_list, sizeof rel_list);
+	}
+	ep = EXPAND_ITEM_LIST(rel_list, char *, 32);
+	if (!(*ep = new_array(char, 1 + len + 1)))
+		out_of_memory("send_implied_dirs");
+	**ep = is_dot_dir;
+	strlcpy(*ep + 1, limit+1, len + 1);
+}
+
 static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 {
 	char fbuf[MAXPATHLEN];
-	int dlen;
+	item_list *rel_list;
+	int len, dlen, flags = FLAG_DIVERT_DIRS | FLAG_XFER_DIR;
+	size_t j;
 
 	f_name(file, fbuf);
 	dlen = strlen(fbuf);
@@ -1528,7 +1611,51 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 
 	change_local_filter_dir(fbuf, dlen, send_dir_depth);
 
-	send_directory(f, flist, fbuf, dlen, FLAG_DIVERT_DIRS | FLAG_XFER_DIR);
+	if (file->flags & FLAG_XFER_DIR)
+		send_directory(f, flist, fbuf, dlen, flags);
+
+	if (!relative_paths)
+		return;
+
+	memcpy(&rel_list, F_DIR_RELS_P(file), sizeof rel_list);
+	if (!rel_list)
+		return;
+
+	for (j = 0; j < rel_list->count; j++) {
+		char *slash, *ep = ((char**)rel_list->items)[j];
+		int is_dot_dir = *ep;
+
+		fbuf[dlen] = '/';
+		len = strlcpy(fbuf + dlen + 1, ep+1, sizeof fbuf - dlen - 1);
+		free(ep);
+		if (len >= (int)sizeof fbuf)
+			continue; /* Impossible... */
+
+		slash = strchr(fbuf+dlen+1, '/');
+		if (slash) {
+			send_implied_dirs(f, flist, fbuf, fbuf+dlen+1, slash, flags, is_dot_dir);
+			continue;
+		}
+
+		if (is_dot_dir) {
+			STRUCT_STAT st;
+			if (link_stat(fbuf, &st, copy_dirlinks) != 0) {
+				io_error |= IOERR_GENERAL;
+				rsyserr(FERROR, errno, "link_stat %s failed",
+					full_fname(fbuf));
+				continue;
+			}
+			send_file_name(f, flist, fbuf, &st,
+			    recurse || xfer_dirs ? FLAG_TOP_DIR | flags : flags,
+			    ALL_FILTERS);
+		} else {
+			send_file_name(f, flist, fbuf, NULL,
+			    recurse ? FLAG_TOP_DIR | flags : flags,
+			    ALL_FILTERS);
+		}
+	}
+
+	free(rel_list);
 }
 
 void send_extra_file_list(int f, int at_least)
@@ -1638,7 +1765,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	int len, dirlen;
 	STRUCT_STAT st;
 	char *p, *dir;
-	char lastpath[MAXPATHLEN] = "";
 	struct file_list *flist;
 	struct timeval start_tv, end_tv;
 	int64 start_write;
@@ -1817,7 +1943,12 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			continue;
 		}
 
-		if (implied_dirs && (p=strrchr(fbuf,'/')) && p != fbuf) {
+		if (inc_recurse && relative_paths && *fbuf) {
+			if ((p = strchr(fbuf+1, '/')) != NULL) {
+				send_implied_dirs(f, flist, fbuf, fbuf, p, flags, is_dot_dir);
+				continue;
+			}
+		} else if (implied_dirs && (p=strrchr(fbuf,'/')) && p != fbuf) {
 			/* Send the implied directories at the start of the
 			 * source spec, so we get their permissions right. */
 			char *lp = lastpath, *slash = fbuf;
@@ -1829,28 +1960,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 					slash = fn;
 			}
 			*p = '/';
-			if (fn != p || (*lp && *lp != '/')) {
-				int save_copy_links = copy_links;
-				int save_xfer_dirs = xfer_dirs;
-				int dir_flags = flags & ~FLAG_XFER_DIR;
-				copy_links |= copy_unsafe_links;
-				xfer_dirs = 1;
-				while ((slash = strchr(slash+1, '/')) != 0) {
-					*slash = '\0';
-					send_file_name(f, flist, fbuf, NULL,
-						       dir_flags, ALL_FILTERS);
-					*slash = '/';
-				}
-				copy_links = save_copy_links;
-				xfer_dirs = save_xfer_dirs;
-				*p = '\0';
-				strlcpy(lastpath, fbuf, sizeof lastpath);
-				*p = '/';
-			}
+			if (fn != p || (*lp && *lp != '/'))
+				send_implied_dirs(f, flist, fbuf, slash, p, flags, 0);
 		}
-
-		if (one_file_system)
-			filesystem_dev = st.st_dev;
 
 		if (recurse || (xfer_dirs && is_dot_dir)) {
 			struct file_struct *file;
@@ -2183,8 +2295,7 @@ struct file_list *flist_new(int flags, char *msg)
 {
 	struct file_list *flist;
 
-	flist = new0(struct file_list);
-	if (!flist)
+	if (!(flist = new0(struct file_list)))
 		out_of_memory(msg);
 
 	if (flags & FLIST_TEMP) {
@@ -2308,7 +2419,7 @@ static void clean_flist(struct file_list *flist, int strip_root)
 			 * list.  Otherwise keep the first one. */
 			if (S_ISDIR(file->mode)) {
 				struct file_struct *fp = flist->sorted[j];
-				if (!S_ISDIR(fp->mode) || !(fp->flags & FLAG_XFER_DIR))
+				if (!S_ISDIR(fp->mode))
 					keep = i, drop = j;
 				else {
 					if (am_sender)
