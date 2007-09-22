@@ -1545,8 +1545,7 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 		int save_copy_links = copy_links;
 		int save_xfer_dirs = xfer_dirs;
 
-		copy_links |= copy_unsafe_links;
-		xfer_dirs = 1;
+		copy_links = xfer_dirs = 1;
 
 		*limit = '\0';
 
@@ -1560,8 +1559,6 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 		if (inc_recurse) {
 			if (file && !S_ISDIR(file->mode))
 				file = NULL;
-			else if (file)
-				memset(F_DIR_RELS_P(file), 0, sizeof (item_list*));
 			lastpath_struct = file;
 		}
 
