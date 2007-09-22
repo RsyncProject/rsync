@@ -1978,7 +1978,8 @@ void server_options(char **args, int *argc_p)
 		if (!relative_paths)
 			args[ac++] = "--no-relative";
 	}
-	if (relative_paths && !implied_dirs && !am_sender)
+	/* It's OK that this checks the upper-bound of the protocol_version. */
+	if (relative_paths && !implied_dirs && (!am_sender || protocol_version >= 30))
 		args[ac++] = "--no-implied-dirs";
 
 	if (fuzzy_basis && am_sender)
