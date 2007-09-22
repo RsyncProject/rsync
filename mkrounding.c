@@ -65,17 +65,17 @@ struct test4 {
     return 0;
 }
 
-void *_new_array(UNUSED(unsigned long num), UNUSED(unsigned int size), UNUSED(int use_calloc))
+ void *_new_array(UNUSED(unsigned long num), UNUSED(unsigned int size), UNUSED(int use_calloc))
 {
 	out_of_memory("");
 }
 
-void *_realloc_array(UNUSED(void *ptr), UNUSED(unsigned int size), UNUSED(unsigned long num))
+ void *_realloc_array(UNUSED(void *ptr), UNUSED(unsigned int size), UNUSED(unsigned long num))
 {
 	out_of_memory("");
 }
 
-NORETURN void out_of_memory(UNUSED(const char *str))
+ NORETURN void out_of_memory(UNUSED(const char *str))
 {
 	fprintf(stderr, "ERROR: this function should not be called!\n");
 	exit(1);
