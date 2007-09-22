@@ -108,7 +108,7 @@ static void check_sub_protocol(void)
 void setup_protocol(int f_out,int f_in)
 {
 	if (am_sender)
-		file_extra_cnt += PTR_EXTRA_LEN;
+		file_extra_cnt += PTR_EXTRA_CNT;
 	else
 		file_extra_cnt++;
 	if (preserve_uid)
