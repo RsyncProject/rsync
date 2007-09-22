@@ -1102,6 +1102,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	char *fnamecmp, *partialptr, *backupptr = NULL;
 	char fnamecmpbuf[MAXPATHLEN];
 	uchar fnamecmp_type;
+	int implied_dirs_are_missing = relative_paths && !implied_dirs && !inc_recurse;
 	int del_opts = delete_mode || force_delete ? DEL_RECURSE : 0;
 
 	if (list_only)
@@ -1113,7 +1114,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (server_filter_list.head) {
 		if (excluded_below >= 0) {
 			if (F_DEPTH(file) > excluded_below
-			 && (implied_dirs || f_name_has_prefix(file, excluded_dir)))
+			 && (!implied_dirs_are_missing || f_name_has_prefix(file, excluded_dir)))
 				goto skipping;
 			excluded_below = -1;
 		}
@@ -1135,7 +1136,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (missing_below >= 0) {
 		if (F_DEPTH(file) <= missing_below
-		 || (!implied_dirs && !f_name_has_prefix(file, missing_dir))) {
+		 || (implied_dirs_are_missing && !f_name_has_prefix(file, missing_dir))) {
 			if (dry_run)
 				dry_run--;
 			missing_below = -1;
@@ -1162,8 +1163,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	} else {
 		const char *dn = file->dirname ? file->dirname : ".";
 		if (parent_dirname != dn && strcmp(parent_dirname, dn) != 0) {
-			if (relative_paths && !implied_dirs
-			 && do_stat(dn, &sx.st) < 0
+			if (implied_dirs_are_missing && do_stat(dn, &sx.st) < 0
 			 && create_directory_path(fname) < 0) {
 				rsyserr(FERROR, errno,
 					"recv_generator: mkdir %s failed",
@@ -1212,8 +1212,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (S_ISDIR(file->mode)) {
-		if (inc_recurse && ndx != cur_flist->ndx_start - 1
-		 && file->flags & FLAG_XFER_DIR) {
+		if (!implied_dirs && !(file->flags & FLAG_XFER_DIR))
+			goto cleanup;
+		if (inc_recurse && ndx != cur_flist->ndx_start - 1) {
 			/* In inc_recurse mode we want ot make sure any missing
 			 * directories get created while we're still processing
 			 * the parent dir (which allows us to touch the parent
@@ -1779,7 +1780,8 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 	 * transfer and/or re-set any tweaked modified-time values. */
 	for (i = start; i <= end; i++, counter++) {
 		file = flist->files[i];
-		if (!S_ISDIR(file->mode))
+		if (!S_ISDIR(file->mode)
+		 || (relative_paths && !implied_dirs && !(file->flags & FLAG_XFER_DIR)))
 			continue;
 		if (verbose > 3) {
 			fname = f_name(file, NULL);
@@ -1870,8 +1872,6 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 			/* Skip directory touch-up. */
 		} else if (first_flist->ndx_start != 0)
 			touch_up_dirs(dir_flist, first_flist->parent_ndx);
-		else if (relative_paths && implied_dirs)
-			touch_up_dirs(first_flist, -1);
 
 		flist_free(first_flist); /* updates first_flist */
 	}
