@@ -21,6 +21,7 @@
  */
 
 #include "rsync.h"
+#include "ifuncs.h"
 #include "rounding.h"
 #include "io.h"
 

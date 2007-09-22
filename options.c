@@ -20,6 +20,7 @@
  */
 
 #include "rsync.h"
+#include "ifuncs.h"
 #include <popt.h>
 #include "zlib/zlib.h"
 

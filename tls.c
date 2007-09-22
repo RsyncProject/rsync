@@ -89,7 +89,12 @@ static int stat_xattr(const char *fname, STRUCT_STAT *fst)
 		exit(1);
 	}
 
-	fst->st_mode = from_wire_mode(mode);
+#if _S_IFLNK != 0120000
+	if ((mode & (_S_IFMT)) == 0120000)
+		mode = (mode & ~(_S_IFMT)) | _S_IFLNK;
+#endif
+	fst->st_mode = mode;
+
 	fst->st_rdev = MAKEDEV(rdev_major, rdev_minor);
 	fst->st_uid = uid;
 	fst->st_gid = gid;
@@ -229,20 +234,4 @@ main(int argc, char *argv[])
 	poptFreeContext(pc);
 
 	return 0;
-}
-
- void *_new_array(UNUSED(unsigned long num), UNUSED(unsigned int size), UNUSED(int use_calloc))
-{
-	out_of_memory("");
-}
-
- void *_realloc_array(UNUSED(void *ptr), UNUSED(unsigned int size), UNUSED(unsigned long num))
-{
-	out_of_memory("");
-}
-
- NORETURN void out_of_memory(UNUSED(const char *str))
-{
-	fprintf(stderr, "ERROR: this function should not be called!\n");
-	exit(1);
 }

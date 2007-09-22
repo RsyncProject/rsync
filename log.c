@@ -20,6 +20,7 @@
  */
 
 #include "rsync.h"
+#include "ifuncs.h"
 
 extern int verbose;
 extern int dry_run;

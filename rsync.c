@@ -20,6 +20,7 @@
  */
 
 #include "rsync.h"
+#include "ifuncs.h"
 #if defined HAVE_LIBCHARSET_H && defined HAVE_LOCALE_CHARSET
 #include <libcharset.h>
 #elif defined HAVE_LANGINFO_H && defined HAVE_NL_LANGINFO

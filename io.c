@@ -28,6 +28,7 @@
  * io_start_multiplex_out() and io_start_multiplex_in(). */
 
 #include "rsync.h"
+#include "ifuncs.h"
 
 /** If no timeout is specified then use a 60 second select timeout */
 #define SELECT_TIMEOUT 60

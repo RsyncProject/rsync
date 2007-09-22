@@ -20,6 +20,7 @@
  */
 
 #include "rsync.h"
+#include "ifuncs.h"
 #include "zlib/zlib.h"
 
 extern int do_compression;
