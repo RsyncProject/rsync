@@ -899,7 +899,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 #ifdef SUPPORT_HARD_LINKS
 	  try_a_copy: /* Copy the file locally. */
 #endif
-		if (copy_file(cmpbuf, fname, file->mode) < 0) {
+		if (copy_file(cmpbuf, fname, file->mode, 0) < 0) {
 			if (verbose) {
 				rsyserr(FINFO, errno, "copy_file %s => %s",
 					full_fname(cmpbuf), fname);
@@ -1666,8 +1666,23 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		statret = 0;
 	}
 
-	if (!do_xfers || read_batch || whole_file)
+	if (!do_xfers)
 		goto notify_others;
+
+	if (read_batch || whole_file) {
+		if (inplace && make_backups > 0 && fnamecmp_type == FNAMECMP_FNAME) {
+			if (!(backupptr = get_backup_name(fname)))
+				goto cleanup;
+			if (!(back_file = make_file(fname, NULL, NULL, 0, NO_FILTERS)))
+				goto pretend_missing;
+			if (copy_file(fname, backupptr, back_file->mode, 1) < 0) {
+				unmake_file(back_file);
+				back_file = NULL;
+				goto cleanup;
+			}
+		}
+		goto notify_others;
+	}
 
 	if (fuzzy_dirlist) {
 		int j = flist_find(fuzzy_dirlist, file);
@@ -1676,9 +1691,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	/* open the file */
-	fd = do_open(fnamecmp, O_RDONLY, 0);
-
-	if (fd == -1) {
+	if ((fd = do_open(fnamecmp, O_RDONLY, 0)) < 0) {
 		rsyserr(FERROR, errno, "failed to open %s, continuing",
 			full_fname(fnamecmp));
 	  pretend_missing:
@@ -1706,6 +1719,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			rsyserr(FERROR, errno, "unlink %s",
 				full_fname(backupptr));
 			unmake_file(back_file);
+			back_file = NULL;
 			close(fd);
 			goto cleanup;
 		}
@@ -1715,6 +1729,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			rsyserr(FERROR, errno, "open %s",
 				full_fname(backupptr));
 			unmake_file(back_file);
+			back_file = NULL;
 			close(fd);
 			goto cleanup;
 		}
@@ -1769,15 +1784,17 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (read_batch)
 		goto cleanup;
 
-	if (statret != 0 || whole_file) {
+	if (statret != 0 || whole_file)
 		write_sum_head(f_out, NULL);
-		goto cleanup;
+	else {
+		generate_and_send_sums(fd, sx.st.st_size, f_out, f_copy);
+		close(fd);
 	}
 
-	generate_and_send_sums(fd, sx.st.st_size, f_out, f_copy);
-
-	if (f_copy >= 0) {
-		close(f_copy);
+  cleanup:
+	if (back_file) {
+		if (f_copy >= 0)
+			close(f_copy);
 		set_file_attrs(backupptr, back_file, NULL, NULL, 0);
 		if (verbose > 1) {
 			rprintf(FINFO, "backed up %s to %s\n",
@@ -1786,9 +1803,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		unmake_file(back_file);
 	}
 
-	close(fd);
-
-  cleanup:
 #ifdef SUPPORT_ACLS
 	if (preserve_acls)
 		free_acl(&sx);
