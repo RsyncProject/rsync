@@ -92,7 +92,7 @@ static int make_simple_backup(const char *fname)
 Create a directory given an absolute path, perms based upon another directory
 path
 ****************************************************************************/
-static int make_bak_dir(char *fullpath)
+int make_bak_dir(char *fullpath)
 {
 	statx sx;
 	struct file_struct *file;
