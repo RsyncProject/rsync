@@ -71,7 +71,7 @@ static const char *default_charset(void)
 # endif
 }
 
-void setup_iconv()
+void setup_iconv(void)
 {
 	const char *defset = default_charset();
 # ifdef ICONV_OPTION
