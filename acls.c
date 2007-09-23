@@ -210,7 +210,7 @@ static void rsync_acl_free(rsync_acl *racl)
 	*racl = empty_rsync_acl;
 }
 
-void free_acl(statx *sxp)
+void free_acl(stat_x *sxp)
 {
 	if (sxp->acc_acl) {
 		rsync_acl_free(sxp->acc_acl);
@@ -500,7 +500,7 @@ static int get_rsync_acl(const char *fname, rsync_acl *racl,
 }
 
 /* Return the Access Control List for the given filename. */
-int get_acl(const char *fname, statx *sxp)
+int get_acl(const char *fname, stat_x *sxp)
 {
 	sxp->acc_acl = create_racl();
 	if (get_rsync_acl(fname, sxp->acc_acl, SMB_ACL_TYPE_ACCESS,
@@ -599,9 +599,9 @@ static void send_rsync_acl(rsync_acl *racl, SMB_ACL_TYPE_T type,
 	}
 }
 
-/* Send the ACL from the statx structure down the indicated file descriptor.
+/* Send the ACL from the stat_x structure down the indicated file descriptor.
  * This also frees the ACL data. */
-void send_acl(statx *sxp, int f)
+void send_acl(stat_x *sxp, int f)
 {
 	if (!sxp->acc_acl) {
 		sxp->acc_acl = create_racl();
@@ -761,9 +761,9 @@ static int cache_rsync_acl(rsync_acl *racl, SMB_ACL_TYPE_T type, item_list *racl
 	return ndx;
 }
 
-/* Turn the ACL data in statx into cached ACL data, setting the index
+/* Turn the ACL data in stat_x into cached ACL data, setting the index
  * values in the file struct. */
-void cache_acl(struct file_struct *file, statx *sxp)
+void cache_acl(struct file_struct *file, stat_x *sxp)
 {
 	F_ACL(file) = cache_rsync_acl(sxp->acc_acl,
 				      SMB_ACL_TYPE_ACCESS, &access_acl_list);
@@ -851,7 +851,7 @@ static mode_t change_sacl_perms(SMB_ACL_T sacl, rsync_acl *racl, mode_t old_mode
 }
 
 static int set_rsync_acl(const char *fname, acl_duo *duo_item,
-			 SMB_ACL_TYPE_T type, statx *sxp, mode_t mode)
+			 SMB_ACL_TYPE_T type, stat_x *sxp, mode_t mode)
 {
 	if (type == SMB_ACL_TYPE_DEFAULT
 	 && duo_item->racl.user_obj == NO_ENTRY) {
@@ -891,7 +891,7 @@ static int set_rsync_acl(const char *fname, acl_duo *duo_item,
  *
  * Returns 1 for unchanged, 0 for changed, -1 for failed.  Call this
  * with fname set to NULL to just check if the ACL is unchanged. */
-int set_acl(const char *fname, const struct file_struct *file, statx *sxp)
+int set_acl(const char *fname, const struct file_struct *file, stat_x *sxp)
 {
 	int unchanged = 1;
 	int32 ndx;

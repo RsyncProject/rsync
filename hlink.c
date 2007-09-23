@@ -202,7 +202,7 @@ void match_hard_links(struct file_list *flist)
 }
 
 static int maybe_hard_link(struct file_struct *file, int ndx,
-			   const char *fname, int statret, statx *sxp,
+			   const char *fname, int statret, stat_x *sxp,
 			   const char *oldname, STRUCT_STAT *old_stp,
 			   const char *realname, int itemizing, enum logcode code)
 {
@@ -263,7 +263,7 @@ static char *check_prior(int prev_ndx, int gnum, struct file_list **flist_p)
 /* Only called if FLAG_HLINKED is set and FLAG_HLINK_FIRST is not.  Returns:
  * 0 = process the file, 1 = skip the file, -1 = error occurred. */
 int hard_link_check(struct file_struct *file, int ndx, const char *fname,
-		    int statret, statx *sxp, int itemizing,
+		    int statret, stat_x *sxp, int itemizing,
 		    enum logcode code)
 {
 	STRUCT_STAT prev_st;
@@ -331,7 +331,7 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 	if (statret < 0 && basis_dir[0] != NULL) {
 		/* If we match an alt-dest item, we don't output this as a change. */
 		char cmpbuf[MAXPATHLEN];
-		statx alt_sx;
+		stat_x alt_sx;
 		int j = 0;
 #ifdef SUPPORT_ACLS
 		alt_sx.acc_acl = alt_sx.def_acl = NULL;
@@ -413,7 +413,7 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 		      STRUCT_STAT *stp, int itemizing, enum logcode code,
 		      int alt_dest)
 {
-	statx prev_sx;
+	stat_x prev_sx;
 	STRUCT_STAT st;
 	char alt_name[MAXPATHLEN], *prev_name;
 	const char *our_name;

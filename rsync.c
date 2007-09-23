@@ -337,11 +337,11 @@ mode_t dest_mode(mode_t flist_mode, mode_t stat_mode, int dflt_perms,
 	return new_mode;
 }
 
-int set_file_attrs(const char *fname, struct file_struct *file, statx *sxp,
+int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		   const char *fnamecmp, int flags)
 {
 	int updated = 0;
-	statx sx2;
+	stat_x sx2;
 	int change_uid, change_gid;
 	mode_t new_mode = file->mode;
 	int inherit;

@@ -90,7 +90,7 @@ static void rsync_xal_free(item_list *xalp)
 	xalp->count = 0;
 }
 
-void free_xattr(statx *sxp)
+void free_xattr(stat_x *sxp)
 {
 	if (!sxp->xattr)
 		return;
@@ -268,7 +268,7 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 }
 
 /* Read the xattr(s) for this filename. */
-int get_xattr(const char *fname, statx *sxp)
+int get_xattr(const char *fname, stat_x *sxp)
 {
 	sxp->xattr = new(item_list);
 	*sxp->xattr = empty_xattr;
@@ -330,7 +330,7 @@ static void rsync_xal_store(item_list *xalp)
 }
 
 /* Send the make_xattr()-generated xattr list for this flist entry. */
-int send_xattr(statx *sxp, int f)
+int send_xattr(stat_x *sxp, int f)
 {
 	int ndx = find_matching_xattr(sxp->xattr);
 
@@ -376,7 +376,7 @@ int send_xattr(statx *sxp, int f)
 /* Return a flag indicating if we need to change a file's xattrs.  If
  * "find_all" is specified, also mark any abbreviated xattrs that we
  * need so that send_xattr_request() can tell the sender about them. */
-int xattr_diff(struct file_struct *file, statx *sxp, int find_all)
+int xattr_diff(struct file_struct *file, stat_x *sxp, int find_all)
 {
 	item_list *lst = rsync_xal_l.items;
 	rsync_xa *snd_rxa, *rec_rxa;
@@ -657,9 +657,9 @@ void receive_xattr(struct file_struct *file, int f)
 	F_XATTR(file) = ndx;
 }
 
-/* Turn the xattr data in statx into cached xattr data, setting the index
+/* Turn the xattr data in stat_x into cached xattr data, setting the index
  * values in the file struct. */
-void cache_xattr(struct file_struct *file, statx *sxp)
+void cache_xattr(struct file_struct *file, stat_x *sxp)
 {
 	int ndx;
 
@@ -674,7 +674,7 @@ void cache_xattr(struct file_struct *file, statx *sxp)
 }
 
 static int rsync_xal_set(const char *fname, item_list *xalp,
-			 const char *fnamecmp, statx *sxp)
+			 const char *fnamecmp, stat_x *sxp)
 {
 	rsync_xa *rxas = xalp->items;
 	ssize_t list_len;
@@ -781,7 +781,7 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 
 /* Set extended attributes on indicated filename. */
 int set_xattr(const char *fname, const struct file_struct *file,
-	      const char *fnamecmp, statx *sxp)
+	      const char *fnamecmp, stat_x *sxp)
 {
 	int ndx;
 	item_list *lst = rsync_xal_l.items;

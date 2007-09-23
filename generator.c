@@ -515,7 +515,7 @@ static void do_delete_pass(void)
 		rprintf(FINFO, "                    \r");
 }
 
-int unchanged_attrs(const char *fname, struct file_struct *file, statx *sxp)
+int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 {
 	if (preserve_perms && !BITS_EQUAL(sxp->st.st_mode, file->mode, CHMOD_BITS))
 		return 0;
@@ -547,7 +547,7 @@ int unchanged_attrs(const char *fname, struct file_struct *file, statx *sxp)
 }
 
 void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statret,
-	     statx *sxp, int32 iflags, uchar fnamecmp_type,
+	     stat_x *sxp, int32 iflags, uchar fnamecmp_type,
 	     const char *xname)
 {
 	if (statret >= 0) { /* A from-dest-dir statret can == 1! */
@@ -829,7 +829,7 @@ static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
  * handling the file, -1 if no dest-linking occurred, or a non-negative
  * value if we found an alternate basis file. */
 static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
-			 char *cmpbuf, statx *sxp, int itemizing,
+			 char *cmpbuf, stat_x *sxp, int itemizing,
 			 enum logcode code)
 {
 	int best_match = -1;
@@ -934,7 +934,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
  * handling the file, or -1 if no dest-linking occurred, or a non-negative
  * value if we found an alternate basis file. */
 static int try_dests_non(struct file_struct *file, char *fname, int ndx,
-			 char *cmpbuf, statx *sxp, int itemizing,
+			 char *cmpbuf, stat_x *sxp, int itemizing,
 			 enum logcode code)
 {
 	char lnk[MAXPATHLEN];
@@ -1124,7 +1124,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	static int need_fuzzy_dirlist = 0;
 	struct file_struct *fuzzy_file = NULL;
 	int fd = -1, f_copy = -1;
-	statx sx, real_sx;
+	stat_x sx, real_sx;
 	STRUCT_STAT partial_st;
 	struct file_struct *back_file = NULL;
 	int statret, real_ret, stat_errno;

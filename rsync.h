@@ -846,7 +846,7 @@ typedef struct {
 #ifdef SUPPORT_XATTRS
     item_list *xattr;
 #endif
-} statx;
+} stat_x;
 
 #define ACL_READY(sx) ((sx).acc_acl != NULL)
 #define XATTR_READY(sx) ((sx).xattr != NULL)

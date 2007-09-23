@@ -97,7 +97,7 @@ int make_bak_dir(const char *fullpath)
 	char fbuf[MAXPATHLEN], *rel, *end, *p;
 	struct file_struct *file;
 	int len = backup_dir_len;
-	statx sx;
+	stat_x sx;
 
 	while (*fullpath == '.' && fullpath[1] == '/') {
 		fullpath += 2;
@@ -192,7 +192,7 @@ static int robust_move(const char *src, char *dst)
  * We will move the file to be deleted into a parallel directory tree. */
 static int keep_backup(const char *fname)
 {
-	statx sx;
+	stat_x sx;
 	struct file_struct *file;
 	char *buf;
 	int kept = 0;

@@ -1235,7 +1235,7 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 {
 	struct file_struct *file;
 #if defined SUPPORT_ACLS || defined SUPPORT_XATTRS
-	statx sx;
+	stat_x sx;
 #endif
 
 	file = make_file(fname, flist, stp, flags, filter_level);
