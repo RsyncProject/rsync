@@ -265,15 +265,14 @@ static int safe_read(int desc, char *ptr, size_t len)
  *
  * This is used in conjunction with the --temp-dir, --backup, and
  * --copy-dest options. */
-int copy_file(const char *source, const char *dest, mode_t mode)
+int copy_file(const char *source, const char *dest, mode_t mode, int create_bak_dir)
 {
 	int ifd;
 	int ofd;
 	char buf[1024 * 8];
 	int len;   /* Number of bytes read into `buf'. */
 
-	ifd = do_open(source, O_RDONLY, 0);
-	if (ifd == -1) {
+	if ((ifd = do_open(source, O_RDONLY, 0)) < 0) {
 		rsyserr(FERROR, errno, "open %s", full_fname(source));
 		return -1;
 	}
@@ -283,8 +282,9 @@ int copy_file(const char *source, const char *dest, mode_t mode)
 		return -1;
 	}
 
-	ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode);
-	if (ofd == -1) {
+	if ((ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0
+	 && (!create_bak_dir || errno != ENOENT || make_bak_dir(dest) < 0
+	  || (ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0)) {
 		rsyserr(FERROR, errno, "open %s", full_fname(dest));
 		close(ifd);
 		return -1;
@@ -407,7 +407,7 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 					return -1;
 				to = partialptr;
 			}
-			if (copy_file(from, to, mode) != 0)
+			if (copy_file(from, to, mode, 0) != 0)
 				return -2;
 			do_unlink(from);
 			return 1;
