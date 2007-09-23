@@ -1709,8 +1709,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			close(fd);
 			goto cleanup;
 		}
-		if ((f_copy = do_open(backupptr,
-		    O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0) {
+		if ((f_copy = do_open(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0
+		 && (errno != ENOENT || make_bak_dir(backupptr) < 0
+		  || (f_copy = do_open(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0)) {
 			rsyserr(FERROR, errno, "open %s",
 				full_fname(backupptr));
 			unmake_file(back_file);
