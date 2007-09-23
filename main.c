@@ -582,7 +582,8 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 			exit_cleanup(RERR_FILEIO);
 		}
 
-		if (strcmp(flist->files[0]->basename, ".") == 0)
+		if (flist->high >= flist->low
+		 && strcmp(flist->files[flist->low]->basename, ".") == 0)
 			flist->files[0]->flags |= FLAG_DIR_CREATED;
 
 		if (verbose)
