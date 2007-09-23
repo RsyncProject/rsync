@@ -26,7 +26,6 @@
 #include "io.h"
 
 extern int verbose;
-extern int list_only;
 extern int am_root;
 extern int am_server;
 extern int am_daemon;
@@ -170,35 +169,6 @@ static void finish_filelist_progress(const struct file_list *flist)
 void show_flist_stats(void)
 {
 	/* Nothing yet */
-}
-
-static void list_file_entry(struct file_struct *f)
-{
-	char permbuf[PERMSTRING_SIZE];
-	double len;
-
-	if (!F_IS_ACTIVE(f)) {
-		/* this can happen if duplicate names were removed */
-		return;
-	}
-
-	permstring(permbuf, f->mode);
-	len = F_LENGTH(f);
-
-	/* TODO: indicate '+' if the entry has an ACL. */
-
-#ifdef SUPPORT_LINKS
-	if (preserve_links && S_ISLNK(f->mode)) {
-		rprintf(FINFO, "%s %11.0f %s %s -> %s\n",
-			permbuf, len, timestring(f->modtime),
-			f_name(f, NULL), F_SYMLINK(f));
-	} else
-#endif
-	{
-		rprintf(FINFO, "%s %11.0f %s %s\n",
-			permbuf, len, timestring(f->modtime),
-			f_name(f, NULL));
-	}
 }
 
 /* Stat either a symlink or its referent, depending on the settings of
@@ -2177,12 +2147,6 @@ struct file_list *recv_file_list(int f)
 
 	if (verbose > 3)
 		output_flist(flist);
-
-	if (list_only) {
-		int i;
-		for (i = flist->low; i <= flist->high; i++)
-			list_file_entry(flist->files[i]);
-	}
 
 	if (verbose > 2)
 		rprintf(FINFO, "recv_file_list done\n");

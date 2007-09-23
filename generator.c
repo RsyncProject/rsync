@@ -1072,6 +1072,35 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 	return j;
 }
 
+static void list_file_entry(struct file_struct *f)
+{
+	char permbuf[PERMSTRING_SIZE];
+	double len;
+
+	if (!F_IS_ACTIVE(f)) {
+		/* this can happen if duplicate names were removed */
+		return;
+	}
+
+	permstring(permbuf, f->mode);
+	len = F_LENGTH(f);
+
+	/* TODO: indicate '+' if the entry has an ACL. */
+
+#ifdef SUPPORT_LINKS
+	if (preserve_links && S_ISLNK(f->mode)) {
+		rprintf(FINFO, "%s %11.0f %s %s -> %s\n",
+			permbuf, len, timestring(f->modtime),
+			f_name(f, NULL), F_SYMLINK(f));
+	} else
+#endif
+	{
+		rprintf(FINFO, "%s %11.0f %s %s\n",
+			permbuf, len, timestring(f->modtime),
+			f_name(f, NULL));
+	}
+}
+
 static int phase = 0;
 static int dflt_perms;
 
@@ -1105,11 +1134,17 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	int implied_dirs_are_missing = relative_paths && !implied_dirs && !inc_recurse;
 	int del_opts = delete_mode || force_delete ? DEL_RECURSE : 0;
 
-	if (list_only)
-		return;
-
 	if (verbose > 2)
 		rprintf(FINFO, "recv_generator(%s,%d)\n", fname, ndx);
+
+	if (list_only) {
+		if (S_ISDIR(file->mode)
+		 && ((!implied_dirs && !(file->flags & FLAG_XFER_DIR))
+		  || (inc_recurse && ndx != cur_flist->ndx_start - 1)))
+			return;
+		list_file_entry(file);
+		return;
+	}
 
 	if (server_filter_list.head) {
 		if (excluded_below >= 0) {
