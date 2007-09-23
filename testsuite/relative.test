@@ -18,6 +18,8 @@ fromdir="$tmpdir/from"
 extrafile="$extradir/./$deepstr/extra.added.value"
 echo wowza >"$extrafile"
 
+$RSYNC -av --existing --include='*/' --exclude='*' "$fromdir/" "$extradir/"
+
 outfile="$scratchdir/rsync.out"
 
 cd "$fromdir"
