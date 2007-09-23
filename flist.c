@@ -1049,10 +1049,10 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 				filesystem_dev = st.st_dev;
 			else if (st.st_dev != filesystem_dev) {
 				if (one_file_system > 1) {
-					if (verbose > 2) {
+					if (verbose > 1) {
 						rprintf(FINFO,
-						    "skipping mount-point dir %s\n",
-						    thisname);
+						    "[%s] skipping mount-point dir %s\n",
+						    who_am_i(), thisname);
 					}
 					return NULL;
 				}
@@ -1399,9 +1399,6 @@ static void add_dirs_to_tree(int parent_ndx, struct file_list *from_flist,
 		dir_flist->files[dir_flist->used++] = file;
 		dir_cnt--;
 
-		if (file->flags & FLAG_MOUNT_DIR)
-			continue;
-
 		if (dp)
 			DIR_NEXT_SIBLING(dp) = dir_flist->used - 1;
 		else if (parent_dp)
@@ -1579,7 +1576,7 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 
 	change_local_filter_dir(fbuf, dlen, send_dir_depth);
 
-	if (file->flags & FLAG_XFER_DIR)
+	if (BITS_SETnUNSET(file->flags, FLAG_XFER_DIR, FLAG_MOUNT_DIR))
 		send_directory(f, flist, fbuf, dlen, flags);
 
 	if (!relative_paths)
