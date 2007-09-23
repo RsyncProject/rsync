@@ -625,7 +625,7 @@ extern int xattrs_ndx;
 #define F_HL_PREV(f) OPT_EXTRA(f, LEN64_BUMP(f)+inc_recurse)->num /* non-dirs */
 #define F_DIR_NODE_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) \
 				+ DIRNODE_EXTRA_CNT - 1)->num) /* sender dirs */
-#define F_DIR_RELS_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) + DIRNODE_EXTRA_CNT \
+#define F_DIR_RELNAMES_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) + DIRNODE_EXTRA_CNT \
 				+ PTR_EXTRA_CNT - 1)->num) /* sender dirs */
 #define F_DIR_DEFACL(f) OPT_EXTRA(f, LEN64_BUMP(f))->unum /* receiver dirs */
 #define F_DIR_DEV_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) + ACL_BUMP(f) \
@@ -812,6 +812,11 @@ typedef struct {
 #define RL_EOL_NULLS (1<<0)
 #define RL_DUMP_COMMENTS (1<<1)
 #define RL_CONVERT (1<<2)
+
+typedef struct {
+	char is_dot_dir;
+	char fname[1]; /* has variable size */
+} relnamecache;
 
 #include "byteorder.h"
 #include "lib/mdigest.h"

@@ -1495,8 +1495,9 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 			      char *start, char *limit, int flags, int is_dot_dir)
 {
 	struct file_struct *file;
-	item_list *rel_list;
-	char **ep, *slash;
+	item_list *relname_list;
+	relnamecache **rnpp;
+	char *slash;
 	int len, need_new_dir;
 
 	flags &= ~FLAG_XFER_DIR;
@@ -1548,23 +1549,23 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 		return; /* dir must have vanished */
 
 	len = strlen(limit+1);
-	memcpy(&rel_list, F_DIR_RELS_P(lastpath_struct), sizeof rel_list);
-	if (!rel_list) {
-		if (!(rel_list = new0(item_list)))
+	memcpy(&relname_list, F_DIR_RELNAMES_P(lastpath_struct), sizeof relname_list);
+	if (!relname_list) {
+		if (!(relname_list = new0(item_list)))
 			out_of_memory("send_implied_dirs");
-		memcpy(F_DIR_RELS_P(lastpath_struct), &rel_list, sizeof rel_list);
+		memcpy(F_DIR_RELNAMES_P(lastpath_struct), &relname_list, sizeof relname_list);
 	}
-	ep = EXPAND_ITEM_LIST(rel_list, char *, 32);
-	if (!(*ep = new_array(char, 1 + len + 1)))
+	rnpp = EXPAND_ITEM_LIST(relname_list, relnamecache *, 32);
+	if (!(*rnpp = (relnamecache*)new_array(char, sizeof (relnamecache) + len)))
 		out_of_memory("send_implied_dirs");
-	**ep = is_dot_dir;
-	strlcpy(*ep + 1, limit+1, len + 1);
+	(*rnpp)->is_dot_dir = is_dot_dir;
+	strlcpy((*rnpp)->fname, limit+1, len + 1);
 }
 
 static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 {
 	char fbuf[MAXPATHLEN];
-	item_list *rel_list;
+	item_list *relname_list;
 	int len, dlen, flags = FLAG_DIVERT_DIRS | FLAG_XFER_DIR;
 	size_t j;
 
@@ -1584,17 +1585,18 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 	if (!relative_paths)
 		return;
 
-	memcpy(&rel_list, F_DIR_RELS_P(file), sizeof rel_list);
-	if (!rel_list)
+	memcpy(&relname_list, F_DIR_RELNAMES_P(file), sizeof relname_list);
+	if (!relname_list)
 		return;
 
-	for (j = 0; j < rel_list->count; j++) {
-		char *slash, *ep = ((char**)rel_list->items)[j];
-		int is_dot_dir = *ep;
+	for (j = 0; j < relname_list->count; j++) {
+		char *slash;
+		relnamecache *rnp = ((relnamecache**)relname_list->items)[j];
+		int is_dot_dir = rnp->is_dot_dir;
 
 		fbuf[dlen] = '/';
-		len = strlcpy(fbuf + dlen + 1, ep+1, sizeof fbuf - dlen - 1);
-		free(ep);
+		len = strlcpy(fbuf + dlen + 1, rnp->fname, sizeof fbuf - dlen - 1);
+		free(rnp);
 		if (len >= (int)sizeof fbuf)
 			continue; /* Impossible... */
 
@@ -1622,7 +1624,7 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 		}
 	}
 
-	free(rel_list);
+	free(relname_list);
 }
 
 void send_extra_file_list(int f, int at_least)
