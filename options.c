@@ -1003,15 +1003,17 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 			if (sanitize_paths)
 				arg = sanitize_path(NULL, arg, NULL, 0, NULL);
 			if (server_filter_list.head) {
+				int rej;
 				char *cp = strdup(arg);
 				if (!cp)
 					out_of_memory("parse_arguments");
 				if (!*cp)
 					goto options_rejected;
 				clean_fname(cp, 1);
-				if (check_filter(&server_filter_list, cp, 0) < 0)
-					goto options_rejected;
+				rej = check_filter(&server_filter_list, cp, 0) < 0;
 				free(cp);
+				if (rej)
+					goto options_rejected;
 			}
 			parse_filter_file(&filter_list, arg,
 				opt == OPT_INCLUDE_FROM ? MATCHFLG_INCLUDE : 0,
