@@ -29,7 +29,6 @@ extern int am_root;
 extern int read_only;
 extern int list_only;
 extern int orig_umask;
-extern int protocol_version;
 extern int numeric_ids;
 extern int inc_recurse;
 

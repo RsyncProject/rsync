@@ -48,10 +48,7 @@ extern int preserve_acls;
 extern int preserve_xattrs;
 extern int need_messages_from_generator;
 extern int delete_mode, delete_before, delete_during, delete_after;
-extern int delete_excluded;
-extern int make_backups;
 extern char *shell_cmd; /* contains VER.SUB string if client is a pre-release */
-extern char *backup_dir, *backup_suffix;
 extern char *partial_dir;
 extern char *dest_option;
 extern char *files_from;

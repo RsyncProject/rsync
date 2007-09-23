@@ -53,7 +53,7 @@ extern int protocol_version;
 extern int remove_source_files;
 extern int preserve_hard_links;
 extern struct stats stats;
-extern struct file_list *cur_flist, *first_flist;
+extern struct file_list *cur_flist;
 #ifdef ICONV_OPTION
 extern int filesfrom_convert;
 extern iconv_t ic_send, ic_recv;

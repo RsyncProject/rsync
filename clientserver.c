@@ -23,7 +23,6 @@
 #include "ifuncs.h"
 
 extern int verbose;
-extern int quiet;
 extern int output_motd;
 extern int list_only;
 extern int am_sender;
