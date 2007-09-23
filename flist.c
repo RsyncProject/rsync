@@ -1041,26 +1041,26 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			rprintf(FINFO, "skipping directory %s\n", thisname);
 			return NULL;
 		}
+		/* -x only affects dirs because we need to avoid recursing
+		 * into a mount-point directory, not to avoid copying a
+		 * symlinked file if -L (or similar) was specified. */
+		if (one_file_system && flags & FLAG_XFER_DIR) {
+			if (flags & FLAG_TOP_DIR)
+				filesystem_dev = st.st_dev;
+			else if (st.st_dev != filesystem_dev) {
+				if (one_file_system > 1) {
+					if (verbose > 2) {
+						rprintf(FINFO,
+						    "skipping mount-point dir %s\n",
+						    thisname);
+					}
+					return NULL;
+				}
+				flags |= FLAG_MOUNT_DIR;
+			}
+		}
 	} else
 		flags &= ~FLAG_XFER_DIR;
-
-	/* -x only affects directories because we need to avoid recursing
-	 * into a mount-point directory, not to avoid copying a symlinked
-	 * file if -L (or similar) was specified. */
-	if (one_file_system && S_ISDIR(st.st_mode)) {
-		if (flags & FLAG_TOP_DIR)
-			filesystem_dev = st.st_dev;
-		else if (st.st_dev != filesystem_dev) {
-			if (one_file_system > 1) {
-				if (verbose > 2) {
-					rprintf(FINFO, "skipping mount-point dir %s\n",
-						thisname);
-				}
-				return NULL;
-			}
-			flags |= FLAG_MOUNT_DIR;
-		}
-	}
 
 	if (is_excluded(thisname, S_ISDIR(st.st_mode) != 0, filter_level)) {
 		if (ignore_perishable)
@@ -1631,6 +1631,7 @@ void send_extra_file_list(int f, int at_least)
 {
 	struct file_list *flist;
 	int64 start_write;
+	uint16 prev_flags;
 	int future_cnt, save_io_error = io_error;
 
 	if (flist_eof)
@@ -1662,6 +1663,7 @@ void send_extra_file_list(int f, int at_least)
 		flist->parent_ndx = dir_ndx;
 
 		send1extra(f, file, flist);
+		prev_flags = file->flags;
 		dp = F_DIR_NODE_P(file);
 
 		/* If there are any duplicate directory names that follow, we
@@ -1671,8 +1673,11 @@ void send_extra_file_list(int f, int at_least)
 		    && dir_flist->sorted[dir_ndx]->flags & FLAG_DUPLICATE) {
 			send_dir_ndx = dir_ndx;
 			file = dir_flist->sorted[dir_ndx];
-			if (F_PATHNAME(file) != pathname)
-				send1extra(f, file, flist);
+			/* Try to avoid some duplicate scanning of identical dirs. */
+			if (F_PATHNAME(file) == pathname && prev_flags & FLAG_XFER_DIR)
+				file->flags &= ~FLAG_XFER_DIR;
+			send1extra(f, file, flist);
+			prev_flags = file->flags;
 			dp = F_DIR_NODE_P(file);
 		}
 
