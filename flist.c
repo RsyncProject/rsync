@@ -2392,6 +2392,8 @@ static void clean_flist(struct file_list *flist, int strip_root)
 				else {
 					if (am_sender)
 						file->flags |= FLAG_DUPLICATE;
+					else    /* Make sure we don't lose vital flags. */
+						fp->flags |= file->flags & (FLAG_TOP_DIR|FLAG_XFER_DIR);
 					keep = j, drop = i;
 				}
 			} else
@@ -2403,11 +2405,6 @@ static void clean_flist(struct file_list *flist, int strip_root)
 					    "removing duplicate name %s from file list (%d)\n",
 					    f_name(file, fbuf), drop + flist->ndx_start);
 				}
-				/* Make sure we don't lose track of a user-specified
-				 * top directory. */
-				flist->sorted[keep]->flags |= flist->sorted[drop]->flags
-							   & (FLAG_TOP_DIR|FLAG_XFER_DIR);
-
 				clear_file(flist->sorted[drop]);
 			}
 
