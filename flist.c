@@ -1608,7 +1608,7 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 
 		if (is_dot_dir) {
 			STRUCT_STAT st;
-			if (link_stat(fbuf, &st, copy_dirlinks) != 0) {
+			if (link_stat(fbuf, &st, 1) != 0) {
 				io_error |= IOERR_GENERAL;
 				rsyserr(FERROR, errno, "link_stat %s failed",
 					full_fname(fbuf));
@@ -1905,7 +1905,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (fn != fbuf)
 			memmove(fbuf, fn, len + 1);
 
-		if (link_stat(fbuf, &st, copy_dirlinks) != 0) {
+		if (link_stat(fbuf, &st, copy_dirlinks || is_dot_dir) != 0) {
 			io_error |= IOERR_GENERAL;
 			rsyserr(FERROR, errno, "link_stat %s failed",
 				full_fname(fbuf));
