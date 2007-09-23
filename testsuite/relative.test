@@ -8,10 +8,15 @@
 
 deepstr='down/3/deep'
 deepdir="$fromdir/$deepstr"
-makepath "$deepdir"
+extradir="$fromdir/extra"
+makepath "$deepdir" "$extradir/$deepstr" "$chkdir"
+
 fromdir="$deepdir"
 hands_setup
 fromdir="$tmpdir/from"
+
+extrafile="$extradir/./$deepstr/extra.added.value"
+echo wowza >"$extrafile"
 
 outfile="$scratchdir/rsync.out"
 
@@ -19,21 +24,35 @@ cd "$fromdir"
 
 # Main script starts here
 
-sleep 1
-runtest "basic relative" 'checkit "$RSYNC -avR ./$deepstr \"$todir\"" "$fromdir/" "$todir"'
+$RSYNC -ai --include=/down/ --exclude='/*' "$fromdir/" "$chkdir/"
 
-ln "$deepdir/filelist" "$deepdir/dir"
-runtest "hard links" 'checkit "$RSYNC -avHR ./$deepstr/ \"$todir\"" "$fromdir/" "$todir"'
+sleep 1
+runtest "basic relative" 'checkit "$RSYNC -avR ./$deepstr \"$todir\"" "$chkdir" "$todir"'
+
+ln $deepstr/filelist $deepstr/dir
+ln ../chk/$deepstr/filelist ../chk/$deepstr/dir
+runtest "hard links" 'checkit "$RSYNC -avHR ./$deepstr/ \"$todir\"" "$chkdir" "$todir"'
 
 cp "$deepdir/text" "$todir/$deepstr/ThisShouldGo"
 cp "$deepdir/text" "$todir/$deepstr/dir/ThisShouldGoToo"
-runtest "deletion" 'checkit "$RSYNC -avHR --delete ./$deepstr/ \"$todir\"" "$fromdir/" "$todir"'
+runtest "deletion" 'checkit "$RSYNC -avHR --del ./$deepstr/ \"$todir\"" "$chkdir" "$todir"'
 
-runtest "non-deletion" 'checkit "$RSYNC -aiHR --delete ./$deepstr/ \"$todir\"" "$fromdir/" "$todir"' \
+runtest "non-deletion" 'checkit "$RSYNC -aiHR --del ./$deepstr/ \"$todir\"" "$chkdir" "$todir"' \
     | tee "$outfile"
 
 # Make sure no files were deleted
 grep 'deleting ' "$outfile" && test_fail "Erroneous deletions occurred!"
+
+# Relative with merging.
+$RSYNC -ai "$extradir/down" "$chkdir/"
+
+checkit "$RSYNC -aiR $deepstr '$extrafile' '$todir'" "$chkdir" "$todir"
+
+checkit "$RSYNC -aiR --del $deepstr '$extrafile' '$todir'" "$chkdir" "$todir" \
+    | tee "$outfile"
+
+# Make sure no files were deleted
+grep 'deleting ' "$outfile" && test_fail "Erroneous deletions occurred! (2)"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
