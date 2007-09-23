@@ -64,6 +64,11 @@ struct filter_list_struct server_filter_list;
 	return 0;
 }
 
+ int make_bak_dir(UNUSED(const char *fullpath))
+{
+	return -1;
+}
+
  char *lp_name(UNUSED(int mod))
 {
 	return NULL;
