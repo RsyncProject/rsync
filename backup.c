@@ -92,32 +92,37 @@ static int make_simple_backup(const char *fname)
 Create a directory given an absolute path, perms based upon another directory
 path
 ****************************************************************************/
-int make_bak_dir(char *fullpath)
+int make_bak_dir(const char *fullpath)
 {
-	statx sx;
+	char fbuf[MAXPATHLEN], *rel, *end, *p;
 	struct file_struct *file;
-	char *rel = fullpath + backup_dir_len;
-	char *end = rel + strlen(rel);
-	char *p = end;
+	int len = backup_dir_len;
+	statx sx;
 
-	while (strncmp(fullpath, "./", 2) == 0)
+	while (*fullpath == '.' && fullpath[1] == '/') {
 		fullpath += 2;
+		len -= 2;
+	}
+
+	if (strlcpy(fbuf, fullpath, sizeof fbuf) >= sizeof fbuf)
+		return -1;
+
+	rel = fbuf + len;
+	end = p = rel + strlen(rel);
 
 	/* Try to find an existing dir, starting from the deepest dir. */
 	while (1) {
-		if (--p == fullpath) {
-			p += strlen(p);
-			goto failure;
-		}
+		if (--p == fbuf)
+			return -1;
 		if (*p == '/') {
 			*p = '\0';
-			if (mkdir_defmode(fullpath) == 0)
+			if (mkdir_defmode(fbuf) == 0)
 				break;
 			if (errno != ENOENT) {
 				rsyserr(FERROR, errno,
 					"make_bak_dir mkdir %s failed",
-					full_fname(fullpath));
-				goto failure;
+					full_fname(fbuf));
+				return -1;
 			}
 		}
 	}
@@ -154,7 +159,7 @@ int make_bak_dir(char *fullpath)
 					free_xattr(&sx);
 				}
 #endif
-				set_file_attrs(fullpath, file, NULL, NULL, 0);
+				set_file_attrs(fbuf, file, NULL, NULL, 0);
 				unmake_file(file);
 			}
 		}
@@ -162,20 +167,14 @@ int make_bak_dir(char *fullpath)
 		p += strlen(p);
 		if (p == end)
 			break;
-		if (mkdir_defmode(fullpath) < 0) {
+		if (mkdir_defmode(fbuf) < 0) {
 			rsyserr(FERROR, errno, "make_bak_dir mkdir %s failed",
-				full_fname(fullpath));
-			goto failure;
+				full_fname(fbuf));
+			return -1;
 		}
 	}
-	return 0;
 
-  failure:
-	while (p != end) {
-		*p = '/';
-		p += strlen(p);
-	}
-	return -1;
+	return 0;
 }
 
 /* robustly move a file, creating new directory structures if necessary */
