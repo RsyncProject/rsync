@@ -67,7 +67,7 @@ while (<CVS>) {
 chdir('rsync') or die $!;
 
 my($version, $lastversion);
-open(IN, 'configure.in') or die $!;
+open(IN, '<', 'configure.in') or die $!;
 while (<IN>) {
     if (/^RSYNC_VERSION=(.*)/) {
 	$version = $lastversion = $1;
@@ -76,15 +76,11 @@ while (<IN>) {
 }
 close IN;
 
-if (my($major, $minor, $rel) = $lastversion =~ /(\d+)\.(\d+)\.(\d+)cvs$/) {
-    if (--$rel < 0) {
-	$rel = 9;
-	if (--$minor < 0) {
-	    $minor = 6;
-	    $major--;
-	}
-    }
-    $lastversion = "$major.$minor.$rel";
+if ($lastversion =~ /cvs$/) {
+    open(IN, '<', 'OLDNEWS') or die $!;
+    $_ = <IN>;
+    close IN;
+    ($lastversion) = /(\d+\.\d+\.\d+)/;
 }
 
 $version =~ s/cvs/pre1/ || $version =~ s/pre(\d+)/ 'pre' . ($1 + 1) /e;
