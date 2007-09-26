@@ -76,7 +76,17 @@ while (<IN>) {
 }
 close IN;
 
-$lastversion =~ s/(\d+)cvs$/ $1 - 1 /e;
+if (my($major, $minor, $rel) = $lastversion =~ /(\d+)\.(\d+)\.(\d+)cvs$/) {
+    if (--$rel < 0) {
+	$rel = 9;
+	if (--$minor < 0) {
+	    $minor = 6;
+	    $major--;
+	}
+    }
+    $lastversion = "$major.$minor.$rel";
+}
+
 $version =~ s/cvs/pre1/ || $version =~ s/pre(\d+)/ 'pre' . ($1 + 1) /e;
 
 print $break, "\nPlease enter the version number of this release: [$version] ";
@@ -130,8 +140,9 @@ print "\n", $break, <<EOT;
 \$release is "$release"
 
 About to:
-    - make sure that configure, config.h.in, and proto.h are updated
+    - make sure that SUBPROTOCOL_VERSION is 0$skipping2
     - tweak the version in configure.in, configure, and the spec files
+    - make sure that configure, config.h.in, and proto.h are updated
     - tweak NEWS and OLDNEWS to update the release date$skipping2
     - tweak the date in the *.yo files and re-generate the man pages
     - make sure that the patches dir has been updated
@@ -148,7 +159,7 @@ system "./prepare-source && touch proto.h";
 my @tweak_files = ( glob('packaging/*.spec'), glob('packaging/*/*.spec'),
 		    glob('*.yo'), qw( configure.in configure ) );
 if ($version !~ /pre/) {
-    push(@tweak_files, qw( NEWS OLDNEWS ));
+    push(@tweak_files, qw( rsync.h NEWS OLDNEWS ));
 }
 foreach my $fn (@tweak_files) {
     open(IN, '<', $fn) or die $!;
@@ -165,6 +176,8 @@ foreach my $fn (@tweak_files) {
     } elsif ($fn eq 'NEWS') {
 	s/^(NEWS for rsync \Q$version\E) \(UNRELEASED\)\s*\n/$1 ($today)\n/mi
 	    or die "Couldn't update NEWS file with release date!\n";
+    } elsif ($fn eq 'rsync.h') {
+	s/(#define\s+SUBPROTOCOL_VERSION)\s+\d+/$1 0/;
     } elsif ($fn eq 'OLDNEWS') {
 	s/^\t\S\S\s\S\S\S\s\d\d\d\d(\t\Q$version\E)/\t$ztoday$1/m
 	    or die "Couldn't update OLDNEWS file with release date!\n";
@@ -176,8 +189,8 @@ foreach my $fn (@tweak_files) {
     close OUT;
 }
 
-system "yodl2man -o rsync.1 rsync.yo; ./tweak_manpage_dashes rsync.1";
-system "yodl2man -o rsyncd.conf.5 rsyncd.conf.yo; ./tweak_manpage_dashes rsyncd.conf.5";
+system "yodl2man -o rsync.1 rsync.yo; ./tweak_manpage rsync.1";
+system "yodl2man -o rsyncd.conf.5 rsyncd.conf.yo; ./tweak_manpage rsyncd.conf.5";
 
 mkdir('patches/tmp') or die $!;
 system "rsync -a --exclude=patches/ --exclude-from=.cvsignore . patches/tmp/cvsdir/";
