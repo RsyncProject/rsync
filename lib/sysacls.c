@@ -45,34 +45,22 @@ void SAFE_FREE(void *mem)
 
  int sys_acl_get_entry( SMB_ACL_T theacl, int entry_id, SMB_ACL_ENTRY_T *entry_p)
  int sys_acl_get_tag_type( SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *tag_type_p)
- int sys_acl_get_access_bits(SMB_ACL_ENTRY_T entry_d, uint32 *bits)
- void *sys_acl_get_qualifier( SMB_ACL_ENTRY_T entry_d)
+ int sys_acl_get_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T *tag_type_p, uint32 *bits_p, id_t *u_g_id_p)
  SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
  SMB_ACL_T sys_acl_get_fd(int fd)
  SMB_ACL_T sys_acl_init( int count)
  int sys_acl_create_entry( SMB_ACL_T *pacl, SMB_ACL_ENTRY_T *pentry)
- int sys_acl_set_tag_type( SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tagtype)
- int sys_acl_set_qualifier( SMB_ACL_ENTRY_T entry, void *qual)
+ int sys_acl_set_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tag_type, uint32 bits, id_t u_g_id)
  int sys_acl_set_access_bits(SMB_ACL_ENTRY_T entry, uint32 bits)
  int sys_acl_valid( SMB_ACL_T theacl )
  int sys_acl_set_file( const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl)
  int sys_acl_set_fd( int fd, SMB_ACL_T theacl)
  int sys_acl_delete_def_file(const char *path)
-
- The generic POSIX free is the following call. We split this into
- several different free functions as we may need to add tag info
- to structures when emulating the POSIX interface.
-
- int sys_acl_free( void *obj_p)
-
- The calls we actually use are :
-
  int sys_acl_free_acl(SMB_ACL_T posix_acl)
- int sys_acl_free_qualifier(void *qualifier, SMB_ACL_TAG_T tagtype)
 
 */
 
-#if defined(HAVE_POSIX_ACLS)
+#if defined(HAVE_POSIX_ACLS) /*--------------------------------------------*/
 
 /* Identity mapping - easy. */
 
@@ -84,11 +72,6 @@ int sys_acl_get_entry( SMB_ACL_T the_acl, int entry_id, SMB_ACL_ENTRY_T *entry_p
 int sys_acl_get_tag_type( SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *tag_type_p)
 {
 	return acl_get_tag_type( entry_d, tag_type_p);
-}
-
-void *sys_acl_get_qualifier( SMB_ACL_ENTRY_T entry_d)
-{
-	return acl_get_qualifier( entry_d);
 }
 
 SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
@@ -107,15 +90,26 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 #define acl_get_perm(p, b) acl_get_perm_np(p, b)
 #endif
 
-int sys_acl_get_access_bits(SMB_ACL_ENTRY_T entry_d, uint32 *bits)
+int sys_acl_get_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T *tag_type_p, uint32 *bits_p, id_t *u_g_id_p)
 {
-	SMB_ACL_PERMSET_T permset;
-	int rc;
-	if ((rc = acl_get_permset(entry_d, &permset)) != 0)
-		return rc;
-	*bits = (acl_get_perm(permset, ACL_READ) ? 4 : 0)
-	      | (acl_get_perm(permset, ACL_WRITE) ? 2 : 0)
-	      | (acl_get_perm(permset, ACL_EXECUTE) ? 1 : 0);
+	acl_permset_t permset;
+
+	if (acl_get_tag_type(entry, tag_type_p) != 0
+	 || acl_get_permset(entry, &permset) != 0)
+		return -1;
+
+	*bits_p = (acl_get_perm(permset, ACL_READ) ? 4 : 0)
+		| (acl_get_perm(permset, ACL_WRITE) ? 2 : 0)
+		| (acl_get_perm(permset, ACL_EXECUTE) ? 1 : 0);
+
+	if (*tag_type_p == SMB_ACL_USER || *tag_type_p == SMB_ACL_GROUP) {
+		void *qual;
+		if ((qual = acl_get_qualifier(entry)) == NULL)
+			return -1;
+		*u_g_id_p = *(id_t*)qual;
+		acl_free(qual);
+	}
+
 	return 0;
 }
 
@@ -129,19 +123,22 @@ int sys_acl_create_entry( SMB_ACL_T *pacl, SMB_ACL_ENTRY_T *pentry)
 	return acl_create_entry(pacl, pentry);
 }
 
-int sys_acl_set_tag_type( SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tagtype)
+int sys_acl_set_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tag_type, uint32 bits, id_t u_g_id)
 {
-	return acl_set_tag_type(entry, tagtype);
-}
+	if (acl_set_tag_type(entry, tag_type) != 0)
+		return -1;
 
-int sys_acl_set_qualifier( SMB_ACL_ENTRY_T entry, void *qual)
-{
-	return acl_set_qualifier(entry, qual);
+	if (tag_type == SMB_ACL_USER || tag_type == SMB_ACL_GROUP) {
+		if (acl_set_qualifier(entry, (void*)&u_g_id) != 0)
+			return -1;
+	}
+
+	return sys_acl_set_access_bits(entry, bits);
 }
 
 int sys_acl_set_access_bits(SMB_ACL_ENTRY_T entry, uint32 bits)
 {
-	SMB_ACL_PERMSET_T permset;
+	acl_permset_t permset;
 	int rc;
 	if ((rc = acl_get_permset(entry, &permset)) != 0)
 		return rc;
@@ -165,10 +162,12 @@ int sys_acl_set_file(const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl)
 	return acl_set_file(name, acltype, theacl);
 }
 
+#if 0
 int sys_acl_set_fd( int fd, SMB_ACL_T theacl)
 {
 	return acl_set_fd(fd, theacl);
 }
+#endif
 
 int sys_acl_delete_def_file(const char *name)
 {
@@ -180,12 +179,7 @@ int sys_acl_free_acl(SMB_ACL_T the_acl)
 	return acl_free(the_acl);
 }
 
-int sys_acl_free_qualifier(void *qual, UNUSED(SMB_ACL_TAG_T tagtype))
-{
-	return acl_free(qual);
-}
-
-#elif defined(HAVE_TRU64_ACLS)
+#elif defined(HAVE_TRU64_ACLS) /*--------------------------------------------*/
 /*
  * The interface to DEC/Compaq Tru64 UNIX ACLs
  * is based on Draft 13 of the POSIX spec which is
@@ -218,11 +212,6 @@ int sys_acl_get_tag_type( SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *tag_type_p)
 	return acl_get_tag_type( entry_d, tag_type_p);
 }
 
-void *sys_acl_get_qualifier( SMB_ACL_ENTRY_T entry_d)
-{
-	return acl_get_qualifier( entry_d);
-}
-
 SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
 {
 	return acl_get_file((char *)path_p, type);
@@ -235,13 +224,24 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 }
 #endif
 
-int sys_acl_get_access_bits(SMB_ACL_ENTRY_T entry_d, uint32 *bits)
+int sys_acl_get_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T *tag_type_p, uint32 *bits_p, id_t *u_g_id_p)
 {
-	SMB_ACL_PERMSET_T permset;
-	int rc;
-	if ((rc = acl_get_permset(entry_d, &permset)) != 0)
-		return rc;
-	*bits = *permset & 7;	/* Tru64 doesn't have acl_get_perm() */
+	acl_permset_t permset;
+
+	if (acl_get_tag_type(entry, tag_type_p) != 0
+	 || acl_get_permset(entry, &permset) != 0)
+		return -1;
+
+	*bits_p = *permset & 7;	/* Tru64 doesn't have acl_get_perm() */
+
+	if (*tag_type_p == SMB_ACL_USER || *tag_type_p == SMB_ACL_GROUP) {
+		void *qual;
+		if ((qual = acl_get_qualifier(entry)) == NULL)
+			return -1;
+		*u_g_id_p = *(id_t*)qual;
+		acl_free_qualifier(qual, *tag_type_p);
+	}
+
 	return 0;
 }
 
@@ -262,19 +262,22 @@ int sys_acl_create_entry( SMB_ACL_T *pacl, SMB_ACL_ENTRY_T *pentry)
 	return 0;
 }
 
-int sys_acl_set_tag_type( SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tagtype)
+int sys_acl_set_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tag_type, uint32 bits, id_t u_g_id)
 {
-	return acl_set_tag_type(entry, tagtype);
-}
+	if (acl_set_tag_type(entry, tag_type) != 0)
+		return -1;
 
-int sys_acl_set_qualifier( SMB_ACL_ENTRY_T entry, void *qual)
-{
-	return acl_set_qualifier(entry, qual);
+	if (tag_type == SMB_ACL_USER || tag_type == SMB_ACL_GROUP) {
+		if (acl_set_qualifier(entry, (void*)&u_g_id) != 0)
+			return -1;
+	}
+
+	return sys_acl_set_access_bits(entry, bits);
 }
 
 int sys_acl_set_access_bits(SMB_ACL_ENTRY_T entry, uint32 bits)
 {
-	SMB_ACL_PERMSET_T permset;
+	acl_permset_t permset;
 	int rc;
 	if ((rc = acl_get_permset(entry, &permset)) != 0)
 		return rc;
@@ -294,10 +297,12 @@ int sys_acl_set_file( const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl
 	return acl_set_file((char *)name, acltype, theacl);
 }
 
+#if 0
 int sys_acl_set_fd( int fd, SMB_ACL_T theacl)
 {
 	return acl_set_fd(fd, ACL_TYPE_ACCESS, theacl);
 }
+#endif
 
 int sys_acl_delete_def_file(const char *name)
 {
@@ -309,12 +314,7 @@ int sys_acl_free_acl(SMB_ACL_T the_acl)
 	return acl_free(the_acl);
 }
 
-int sys_acl_free_qualifier(void *qual, SMB_ACL_TAG_T tagtype)
-{
-	return acl_free_qualifier(qual, tagtype);
-}
-
-#elif defined(HAVE_UNIXWARE_ACLS) || defined(HAVE_SOLARIS_ACLS)
+#elif defined(HAVE_UNIXWARE_ACLS) || defined(HAVE_SOLARIS_ACLS) /*-----------*/
 
 /*
  * Donated by Michael Davidson <md@sco.COM> for UnixWare / OpenUNIX.
@@ -384,17 +384,6 @@ int sys_acl_get_tag_type(SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *type_p)
 	*type_p = entry_d->a_type;
 
 	return 0;
-}
-
-void *sys_acl_get_qualifier(SMB_ACL_ENTRY_T entry_d)
-{
-	if (entry_d->a_type != SMB_ACL_USER
-	    && entry_d->a_type != SMB_ACL_GROUP) {
-		errno = EINVAL;
-		return NULL;
-	}
-
-	return &entry_d->a_id;
 }
 
 /*
@@ -534,9 +523,15 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 }
 #endif
 
-int sys_acl_get_access_bits(SMB_ACL_ENTRY_T entry_d, uint32 *bits)
+int sys_acl_get_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T *tag_type_p, uint32 *bits_p, id_t *u_g_id_p)
 {
-	*bits = entry_d->a_perm;
+	*tag_type_p = entry->a_type;
+
+	*bits_p = entry->a_perm;
+
+	if (*tag_type_p == SMB_ACL_USER || *tag_type_p == SMB_ACL_GROUP)
+		*u_g_id_p = entry->a_id;
+	
 	return 0;
 }
 
@@ -592,34 +587,14 @@ int sys_acl_create_entry(SMB_ACL_T *acl_p, SMB_ACL_ENTRY_T *entry_p)
 	return 0;
 }
 
-int sys_acl_set_tag_type(SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T tag_type)
+int sys_acl_set_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tag_type, uint32 bits, id_t u_g_id)
 {
-	switch (tag_type) {
-		case SMB_ACL_USER:
-		case SMB_ACL_USER_OBJ:
-		case SMB_ACL_GROUP:
-		case SMB_ACL_GROUP_OBJ:
-		case SMB_ACL_OTHER:
-		case SMB_ACL_MASK:
-			entry_d->a_type = tag_type;
-			break;
-		default:
-			errno = EINVAL;
-			return -1;
-	}
+	entry->a_type = tag_type;
 
-	return 0;
-}
+	if (tag_type == SMB_ACL_USER || tag_type == SMB_ACL_GROUP)
+		entry->a_id = u_g_id;
 
-int sys_acl_set_qualifier(SMB_ACL_ENTRY_T entry_d, void *qual_p)
-{
-	if (entry_d->a_type != SMB_ACL_GROUP
-	    && entry_d->a_type != SMB_ACL_USER) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	entry_d->a_id = *((id_t *)qual_p);
+	entry->a_perm = bits;
 
 	return 0;
 }
@@ -752,6 +727,7 @@ int sys_acl_set_file(const char *name, SMB_ACL_TYPE_T type, SMB_ACL_T acl_d)
 	return ret;
 }
 
+#if 0
 int sys_acl_set_fd(int fd, SMB_ACL_T acl_d)
 {
 	if (acl_sort(acl_d) != 0) {
@@ -760,6 +736,7 @@ int sys_acl_set_fd(int fd, SMB_ACL_T acl_d)
 
 	return facl(fd, SETACL, acl_d->count, &acl_d->acl[0]);
 }
+#endif
 
 int sys_acl_delete_def_file(const char *path)
 {
@@ -787,12 +764,8 @@ int sys_acl_free_acl(SMB_ACL_T acl_d)
 	return 0;
 }
 
-int sys_acl_free_qualifier(UNUSED(void *qual), UNUSED(SMB_ACL_TAG_T tagtype))
-{
-	return 0;
-}
+#elif defined(HAVE_HPUX_ACLS) /*---------------------------------------------*/
 
-#elif defined(HAVE_HPUX_ACLS)
 #include <dl.h>
 
 /*
@@ -883,17 +856,6 @@ int sys_acl_get_tag_type(SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *type_p)
 	*type_p = entry_d->a_type;
 
 	return 0;
-}
-
-void *sys_acl_get_qualifier(SMB_ACL_ENTRY_T entry_d)
-{
-	if (entry_d->a_type != SMB_ACL_USER
-	    && entry_d->a_type != SMB_ACL_GROUP) {
-		errno = EINVAL;
-		return NULL;
-	}
-
-	return &entry_d->a_id;
 }
 
 /*
@@ -1017,9 +979,14 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 }
 #endif
 
-int sys_acl_get_access_bits(SMB_ACL_ENTRY_T entry_d, uint32 *bits)
+int sys_acl_get_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T *tag_type_p, uint32 *bits_p, id_t *u_g_id_p)
 {
-	*bits = entry_d->a_perm;
+	*tag_type_p = entry->a_type;
+
+	*bits_p = entry->a_perm;
+
+	if (*tag_type_p == SMB_ACL_USER || *tag_type_p == SMB_ACL_GROUP)
+		*u_g_id_p = entry->a_id;
 
 	return 0;
 }
@@ -1076,34 +1043,14 @@ int sys_acl_create_entry(SMB_ACL_T *acl_p, SMB_ACL_ENTRY_T *entry_p)
 	return 0;
 }
 
-int sys_acl_set_tag_type(SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T tag_type)
+int sys_acl_set_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tag_type, uint32 bits, id_t u_g_id)
 {
-	switch (tag_type) {
-		case SMB_ACL_USER:
-		case SMB_ACL_USER_OBJ:
-		case SMB_ACL_GROUP:
-		case SMB_ACL_GROUP_OBJ:
-		case SMB_ACL_OTHER:
-		case SMB_ACL_MASK:
-			entry_d->a_type = tag_type;
-			break;
-		default:
-			errno = EINVAL;
-			return -1;
-	}
+	entry->a_type = tag_type;
 
-	return 0;
-}
+	if (tag_type == SMB_ACL_USER || tag_type == SMB_ACL_GROUP)
+		entry->a_id = u_g_id;
 
-int sys_acl_set_qualifier(SMB_ACL_ENTRY_T entry_d, void *qual_p)
-{
-	if (entry_d->a_type != SMB_ACL_GROUP
-	    && entry_d->a_type != SMB_ACL_USER) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	entry_d->a_id = *((id_t *)qual_p);
+	entry->a_perm = bits;
 
 	return 0;
 }
@@ -1594,12 +1541,7 @@ int sys_acl_free_acl(SMB_ACL_T acl_d)
 	return 0;
 }
 
-int sys_acl_free_qualifier(void *qual, SMB_ACL_TAG_T tagtype)
-{
-	return 0;
-}
-
-#elif defined(HAVE_IRIX_ACLS)
+#elif defined(HAVE_IRIX_ACLS) /*---------------------------------------------*/
 
 int sys_acl_get_entry(SMB_ACL_T acl_d, int entry_id, SMB_ACL_ENTRY_T *entry_p)
 {
@@ -1638,17 +1580,6 @@ int sys_acl_get_tag_type(SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *type_p)
 	return 0;
 }
 
-void *sys_acl_get_qualifier(SMB_ACL_ENTRY_T entry_d)
-{
-	if (entry_d->ae_tag != SMB_ACL_USER
-	    && entry_d->ae_tag != SMB_ACL_GROUP) {
-		errno = EINVAL;
-		return NULL;
-	}
-
-	return &entry_d->ae_id;
-}
-
 SMB_ACL_T sys_acl_get_file(const char *path_p, SMB_ACL_TYPE_T type)
 {
 	SMB_ACL_T	a;
@@ -1685,9 +1616,14 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 }
 #endif
 
-int sys_acl_get_access_bits(SMB_ACL_ENTRY_T entry_d, uint32 *bits)
+int sys_acl_get_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T *tag_type_p, uint32 *bits_p, id_t *u_g_id_p)
 {
-	*bits = entry_d->ae_perm;
+	*tag_type_p = entry->ae_tag;
+
+	*bits_p = entry->ae_perm;
+
+	if (*tag_type_p == SMB_ACL_USER || *tag_type_p == SMB_ACL_GROUP)
+		*u_g_id_p = entry->ae_id;
 
 	return 0;
 }
@@ -1739,34 +1675,14 @@ int sys_acl_create_entry(SMB_ACL_T *acl_p, SMB_ACL_ENTRY_T *entry_p)
 	return 0;
 }
 
-int sys_acl_set_tag_type(SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T tag_type)
+int sys_acl_set_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tag_type, uint32 bits, id_t u_g_id)
 {
-	switch (tag_type) {
-		case SMB_ACL_USER:
-		case SMB_ACL_USER_OBJ:
-		case SMB_ACL_GROUP:
-		case SMB_ACL_GROUP_OBJ:
-		case SMB_ACL_OTHER:
-		case SMB_ACL_MASK:
-			entry_d->ae_tag = tag_type;
-			break;
-		default:
-			errno = EINVAL;
-			return -1;
-	}
+	entry->ae_tag = tag_type;
 
-	return 0;
-}
+	if (tag_type == SMB_ACL_USER || tag_type == SMB_ACL_GROUP)
+		entry->ae_id = u_g_id;
 
-int sys_acl_set_qualifier(SMB_ACL_ENTRY_T entry_d, void *qual_p)
-{
-	if (entry_d->ae_tag != SMB_ACL_GROUP
-	    && entry_d->ae_tag != SMB_ACL_USER) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	entry_d->ae_id = *((id_t *)qual_p);
+	entry->ae_perm = bits;
 
 	return 0;
 }
@@ -1788,10 +1704,12 @@ int sys_acl_set_file(const char *name, SMB_ACL_TYPE_T type, SMB_ACL_T acl_d)
 	return acl_set_file(name, type, acl_d->aclp);
 }
 
+#if 0
 int sys_acl_set_fd(int fd, SMB_ACL_T acl_d)
 {
 	return acl_set_fd(fd, acl_d->aclp);
 }
+#endif
 
 int sys_acl_delete_def_file(const char *name)
 {
@@ -1807,12 +1725,7 @@ int sys_acl_free_acl(SMB_ACL_T acl_d)
 	return 0;
 }
 
-int sys_acl_free_qualifier(void *qual, SMB_ACL_TAG_T tagtype)
-{
-	return 0;
-}
-
-#elif defined(HAVE_AIX_ACLS)
+#elif defined(HAVE_AIX_ACLS) /*----------------------------------------------*/
 
 /* Donated by Medha Date, mdate@austin.ibm.com, for IBM */
 
@@ -1873,30 +1786,12 @@ int sys_acl_get_tag_type( SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *tag_type_p)
 	case SMB_ACL_OTHER:
 		*tag_type_p = entry_d->ace_id->id_type;
 		break;
- 
+
 	default:
 		return(-1);
 	}
 
 	return(0);
-}
-
-int sys_acl_get_access_bits(SMB_ACL_ENTRY_T entry_d, uint32 *bits)
-{
-	SMB_ACL_PERMSET_T permset;
-	DEBUG(10,("Starting AIX sys_acl_get_access_bits\n"));
-	permset = &entry_d->ace_access;
-	DEBUG(10,("*permset is %d\n",*permset));
-	*bits = (*permset & S_IRUSR ? 4 : 0)
-	      | (*permset & S_IWUSR ? 2 : 0)
-	      | (*permset & S_IXUSR ? 1 : 0);
-	DEBUG(10,("Ending AIX sys_acl_get_access_bits\n"));
-	return(0);
-}
-
-void *sys_acl_get_qualifier( SMB_ACL_ENTRY_T entry_d)
-{
-	return(entry_d->ace_id->id_data);
 }
 
 SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
@@ -2336,6 +2231,26 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 }
 #endif
 
+int sys_acl_get_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T *tag_type_p, uint32 *bits_p, id_t *u_g_id_p)
+{
+	uint *permset;
+
+	if (sys_acl_get_tag_type(entry, tag_type_p) != 0)
+		return -1;
+
+	if (*tag_type_p == SMB_ACL_USER || *tag_type_p == SMB_ACL_GROUP)
+		*u_g_id_p = entry->ace_id->id_data;
+
+	permset = &entry->ace_access;
+
+	DEBUG(10,("*permset is %d\n",*permset));
+	*bits_p = (*permset & S_IRUSR ? 4 : 0)
+		| (*permset & S_IWUSR ? 2 : 0)
+		| (*permset & S_IXUSR ? 1 : 0);
+
+	return 0;
+}
+
 SMB_ACL_T sys_acl_init( int count)
 {
 	struct acl_entry_link *theacl = NULL;
@@ -2406,20 +2321,18 @@ int sys_acl_create_entry( SMB_ACL_T *pacl, SMB_ACL_ENTRY_T *pentry)
 	return(0);
 }
 
-int sys_acl_set_tag_type( SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tagtype)
+int sys_acl_set_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tag_type, uint32 bits, id_t u_g_id)
 {
-	DEBUG(10,("Starting AIX sys_acl_set_tag_type\n"));
-	entry->ace_id->id_type = tagtype;
+	entry->ace_id->id_type = tag_type;
 	DEBUG(10,("The tag type is %d\n",entry->ace_id->id_type));
-	DEBUG(10,("Ending AIX sys_acl_set_tag_type\n"));
-}
 
-int sys_acl_set_qualifier( SMB_ACL_ENTRY_T entry, void *qual)
-{
-	DEBUG(10,("Starting AIX sys_acl_set_qualifier\n"));
-	memcpy(entry->ace_id->id_data,qual,sizeof(uid_t));
-	DEBUG(10,("Ending AIX sys_acl_set_qualifier\n"));
-	return(0);
+	if (tag_type == SMB_ACL_USER || tag_type == SMB_ACL_GROUP)
+		memcpy(entry->ace_id->id_data, &u_g_id, sizeof (id_t));
+
+	entry->ace_access = bits;
+	DEBUG(10,("entry->ace_access = %d\n",entry->ace_access));
+
+	return 0;
 }
 
 int sys_acl_set_access_bits(SMB_ACL_ENTRY_T entry, uint32 bits)
@@ -2547,6 +2460,7 @@ int sys_acl_set_file( const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl
 	return(rc);
 }
 
+#if 0
 int sys_acl_set_fd( int fd, SMB_ACL_T theacl)
 {
 	struct acl_entry_link *acl_entry_link = NULL;
@@ -2635,6 +2549,7 @@ int sys_acl_set_fd( int fd, SMB_ACL_T theacl)
 	DEBUG(10,("Exiting sys_acl_set_fd\n"));
 	return(rc);
 }
+#endif
 
 int sys_acl_delete_def_file(const char *name)
 {
@@ -2659,9 +2574,169 @@ int sys_acl_free_acl(SMB_ACL_T posix_acl)
 	return(0);
 }
 
-int sys_acl_free_qualifier(void *qual, SMB_ACL_TAG_T tagtype)
+#elif defined(HAVE_OSX_ACLS) /*----------------------------------------------*/
+
+#define OSX_BROKEN_GETENTRY /* returns 0 instead of 1 */
+
+#include <membership.h>
+
+int sys_acl_get_entry(SMB_ACL_T the_acl, int entry_id, SMB_ACL_ENTRY_T *entry_p)
 {
-	return(0);
+	int ret = acl_get_entry(the_acl, entry_id, entry_p);
+#ifdef OSX_BROKEN_GETENTRY
+	if (ret == 0)
+		ret = 1;
+	else if (ret == -1 && errno == 22)
+		ret = 0;
+#endif
+	return ret;
+}
+
+SMB_ACL_T sys_acl_get_file(const char *path_p, SMB_ACL_TYPE_T type)
+{
+	if (type == ACL_TYPE_DEFAULT) {
+		errno = ENOTSUP;
+		return NULL;
+	}
+	errno = 0;
+	return acl_get_file(path_p, type);
+}
+
+#if 0
+SMB_ACL_T sys_acl_get_fd(int fd)
+{
+	return acl_get_fd(fd);
+}
+#endif
+
+int sys_acl_get_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T *tag_type_p, uint32 *bits_p, id_t *u_g_id_p)
+{
+	uuid_t *uup;
+	acl_tag_t tag;
+	acl_flagset_t flagset;
+	acl_permset_t permset;
+	uint32 bits, fb, bb, pb;
+	int user_type = -1;
+	int rc;
+
+	if (acl_get_tag_type(entry, &tag) != 0
+	 || acl_get_flagset_np(entry, &flagset) != 0
+	 || acl_get_permset(entry, &permset) != 0
+	 || (uup = acl_get_qualifier(entry)) == NULL)
+		return -1;
+
+	rc = mbr_uuid_to_id(*uup, u_g_id_p, &user_type);
+	acl_free(uup);
+	if (rc != 0)
+		return rc;
+
+	if (user_type == ID_TYPE_UID)
+		*tag_type_p = SMB_ACL_USER;
+	else
+		*tag_type_p = SMB_ACL_GROUP;
+
+	bits = tag == ACL_EXTENDED_ALLOW ? 1 : 0;
+
+	for (fb = (1u<<4), bb = (1u<<1); bb < (1u<<12); fb *= 2, bb *= 2) {
+		if (acl_get_flag_np(flagset, fb) == 1)
+			bits |= bb;
+	}
+
+	for (pb = (1u<<1), bb = (1u<<12); bb < (1u<<25); pb *= 2, bb *= 2) {
+		if (acl_get_perm_np(permset, pb) == 1)
+			bits |= bb;
+	}
+
+	*bits_p = bits;
+
+	return 0;
+}
+
+SMB_ACL_T sys_acl_init(int count)
+{
+	return acl_init(count);
+}
+
+int sys_acl_create_entry(SMB_ACL_T *pacl, SMB_ACL_ENTRY_T *pentry)
+{
+	return acl_create_entry(pacl, pentry);
+}
+
+int sys_acl_set_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tag_type, uint32 bits, id_t u_g_id)
+{
+	acl_flagset_t flagset;
+	acl_permset_t permset;
+	uint32 fb, bb, pb;
+	int is_user = tag_type == SMB_ACL_USER;
+	uuid_t uu;
+	int rc;
+
+	tag_type = bits & 1 ? ACL_EXTENDED_ALLOW : ACL_EXTENDED_DENY;
+
+	if (acl_get_flagset_np(entry, &flagset) != 0
+	 || acl_get_permset(entry, &permset) != 0)
+		return -1;
+
+	acl_clear_flags_np(flagset);
+	acl_clear_perms(permset);
+
+	for (fb = (1u<<4), bb = (1u<<1); bb < (1u<<12); fb *= 2, bb *= 2) {
+		if (bits & bb)
+			acl_add_flag_np(flagset, fb);
+	}
+
+	/* Highest bit in "bits" is reserved for rsync's use. */
+	for (pb = (1u<<1), bb = (1u<<12); bb < (1u<<25); pb *= 2, bb *= 2) {
+		if (bits & bb)
+			acl_add_perm(permset, pb);
+	}
+
+	if (is_user)
+		rc = mbr_uid_to_uuid(u_g_id, uu);
+	else
+		rc = mbr_gid_to_uuid(u_g_id, uu);
+
+	if (acl_set_tag_type(entry, tag_type) != 0
+	 || acl_set_qualifier(entry, &uu) != 0
+	 || acl_set_permset(entry, permset) != 0
+	 || acl_set_flagset_np(entry, flagset) != 0)
+		return -1;
+
+	return 0;
+}
+
+#if 0
+int sys_acl_set_access_bits(SMB_ACL_ENTRY_T entry, uint32 bits)
+{
+	return -1; /* Not needed for OS X. */
+}
+#endif
+
+int sys_acl_valid(SMB_ACL_T theacl)
+{
+	return acl_valid(theacl);
+}
+
+int sys_acl_set_file(const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl)
+{
+	return acl_set_file(name, acltype, theacl);
+}
+
+#if 0
+int sys_acl_set_fd(int fd, SMB_ACL_T theacl)
+{
+	return acl_set_fd(fd, theacl);
+}
+#endif
+
+int sys_acl_delete_def_file(const char *name)
+{
+	return acl_delete_def_file(name);
+}
+
+int sys_acl_free_acl(SMB_ACL_T the_acl)
+{
+	return acl_free(the_acl);
 }
 
 #else /* No ACLs. */
@@ -2677,6 +2752,10 @@ int sys_acl_free_qualifier(void *qual, SMB_ACL_TAG_T tagtype)
 
 int no_acl_syscall_error(int err)
 {
+#ifdef HAVE_OSX_ACLS
+	if (err == ENOENT)
+		return 1; /* Weird problem with directory ACLs. */
+#endif
 #if defined(ENOSYS)
 	if (err == ENOSYS) {
 		return 1;

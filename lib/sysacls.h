@@ -33,13 +33,12 @@
 #define SMB_REALLOC(mem, cnt) realloc_array(mem, char, cnt)
 #define slprintf snprintf
 
-#if defined HAVE_POSIX_ACLS
+#if defined HAVE_POSIX_ACLS /*-----------------------------------------------*/
 
 /* This is an identity mapping (just remove the SMB_). */
 
 #define SMB_ACL_TAG_T		acl_tag_t
 #define SMB_ACL_TYPE_T		acl_type_t
-#define SMB_ACL_PERMSET_T	acl_permset_t
 
 /* Types of ACLs. */
 #define SMB_ACL_USER		ACL_USER
@@ -64,13 +63,12 @@
 
 #define SMB_ACL_NEED_SORT
 
-#elif defined HAVE_TRU64_ACLS
+#elif defined HAVE_TRU64_ACLS /*---------------------------------------------*/
 
 /* This is for DEC/Compaq Tru64 UNIX */
 
 #define SMB_ACL_TAG_T		acl_tag_t
 #define SMB_ACL_TYPE_T		acl_type_t
-#define SMB_ACL_PERMSET_T	acl_permset_t
 
 /* Types of ACLs. */
 #define SMB_ACL_USER		ACL_USER
@@ -95,7 +93,7 @@
 
 #define SMB_ACL_NEED_SORT
 
-#elif defined HAVE_UNIXWARE_ACLS || defined HAVE_SOLARIS_ACLS
+#elif defined HAVE_UNIXWARE_ACLS || defined HAVE_SOLARIS_ACLS /*-------------*/
 
 /* Donated by Michael Davidson <md@sco.COM> for UnixWare / OpenUNIX.
  * Modified by Toomas Soome <tsoome@ut.ee> for Solaris.  */
@@ -103,7 +101,6 @@
 /* SVR4.2 ES/MP ACLs */
 typedef int SMB_ACL_TAG_T;
 typedef int SMB_ACL_TYPE_T;
-typedef ushort *SMB_ACL_PERMSET_T;
 
 /* Types of ACLs. */
 #define SMB_ACL_USER		USER
@@ -137,7 +134,7 @@ typedef struct acl *SMB_ACL_ENTRY_T;
 #define SMB_ACL_LOSES_SPECIAL_MODE_BITS
 #endif
 
-#elif defined HAVE_HPUX_ACLS
+#elif defined HAVE_HPUX_ACLS /*----------------------------------------------*/
 
 /* Based on the Solaris & UnixWare code. */
 
@@ -147,7 +144,6 @@ typedef struct acl *SMB_ACL_ENTRY_T;
 /* SVR4.2 ES/MP ACLs */
 typedef int SMB_ACL_TAG_T;
 typedef int SMB_ACL_TYPE_T;
-typedef ushort *SMB_ACL_PERMSET_T;
 
 /* Types of ACLs. */
 #define SMB_ACL_USER		USER
@@ -177,13 +173,12 @@ typedef struct acl *SMB_ACL_ENTRY_T;
 
 #define SMB_ACL_NEED_SORT
 
-#elif defined HAVE_IRIX_ACLS
+#elif defined HAVE_IRIX_ACLS /*----------------------------------------------*/
 
 /* IRIX ACLs */
 
 #define SMB_ACL_TAG_T		acl_tag_t
 #define SMB_ACL_TYPE_T		acl_type_t
-#define SMB_ACL_PERMSET_T	acl_permset_t
 
 /* Types of ACLs. */
 #define SMB_ACL_USER		ACL_USER
@@ -212,14 +207,12 @@ typedef struct SMB_ACL_T {
 
 #define SMB_ACL_NEED_SORT
 
-#elif defined HAVE_AIX_ACLS
+#elif defined HAVE_AIX_ACLS /*-----------------------------------------------*/
 
 /* Donated by Medha Date, mdate@austin.ibm.com, for IBM */
 
 #include "/usr/include/acl.h"
 
-typedef uint *SMB_ACL_PERMSET_T;
- 
 struct acl_entry_link{
 	struct acl_entry_link *prevp;
 	struct new_acl_entry *entryp;
@@ -248,7 +241,6 @@ struct new_acl_entry{
 #define SMB_ACL_OTHER		5
 #define SMB_ACL_MASK		6
 
-
 #define SMB_ACL_FIRST_ENTRY	1
 #define SMB_ACL_NEXT_ENTRY	2
 
@@ -260,7 +252,32 @@ struct new_acl_entry{
 
 #define SMB_ACL_NEED_SORT
 
-#else
+#elif defined(HAVE_OSX_ACLS) /*----------------------------------------------*/
+
+/* Special handling for OS X ACLs */
+
+#define SMB_ACL_TAG_T		acl_tag_t
+#define SMB_ACL_TYPE_T		acl_type_t
+
+#define SMB_ACL_T		acl_t
+
+#define SMB_ACL_ENTRY_T		acl_entry_t
+
+#define SMB_ACL_USER		1
+#define SMB_ACL_GROUP		2
+
+#define SMB_ACL_FIRST_ENTRY	ACL_FIRST_ENTRY
+#define SMB_ACL_NEXT_ENTRY	ACL_NEXT_ENTRY
+
+#define SMB_ACL_TYPE_ACCESS	ACL_TYPE_EXTENDED
+#define SMB_ACL_TYPE_DEFAULT	ACL_TYPE_DEFAULT
+
+#define SMB_ACL_VALID_NAME_BITS	0x7FFFFFFF
+#define SMB_ACL_VALID_OBJ_BITS	0
+
+/*#undef SMB_ACL_NEED_SORT*/
+
+#else /*---------------------------------------------------------------------*/
 
 /* Unknown platform. */
 
@@ -270,21 +287,18 @@ struct new_acl_entry{
 
 int sys_acl_get_entry(SMB_ACL_T the_acl, int entry_id, SMB_ACL_ENTRY_T *entry_p);
 int sys_acl_get_tag_type(SMB_ACL_ENTRY_T entry_d, SMB_ACL_TAG_T *tag_type_p);
-int sys_acl_get_access_bits(SMB_ACL_ENTRY_T entry_d, uint32 *bits);
-void *sys_acl_get_qualifier(SMB_ACL_ENTRY_T entry_d);
+int sys_acl_get_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T *tag_type_p, uint32 *bits_p, id_t *u_g_id_p);
 SMB_ACL_T sys_acl_get_file(const char *path_p, SMB_ACL_TYPE_T type);
 SMB_ACL_T sys_acl_get_fd(int fd);
 SMB_ACL_T sys_acl_init(int count);
 int sys_acl_create_entry(SMB_ACL_T *pacl, SMB_ACL_ENTRY_T *pentry);
-int sys_acl_set_tag_type(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tagtype);
-int sys_acl_set_qualifier(SMB_ACL_ENTRY_T entry, void *qual);
+int sys_acl_set_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tagtype, uint32 bits, id_t u_g_id);
 int sys_acl_set_access_bits(SMB_ACL_ENTRY_T entry, uint32 bits);
 int sys_acl_valid(SMB_ACL_T theacl);
 int sys_acl_set_file(const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl);
 int sys_acl_set_fd(int fd, SMB_ACL_T theacl);
 int sys_acl_delete_def_file(const char *name);
 int sys_acl_free_acl(SMB_ACL_T the_acl);
-int sys_acl_free_qualifier(void *qual, SMB_ACL_TAG_T tagtype);
 int no_acl_syscall_error(int err);
 
 #endif /* SUPPORT_ACLS */
