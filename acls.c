@@ -252,35 +252,27 @@ static BOOL unpack_smb_acl(SMB_ACL_T sacl, rsync_acl *racl)
 	     rc = sys_acl_get_entry(sacl, SMB_ACL_NEXT_ENTRY, &entry)) {
 		SMB_ACL_TAG_T tag_type;
 		uint32 access;
-		void *qualifier;
+		id_t g_u_id;
 		id_access *ida;
-		if ((rc = sys_acl_get_tag_type(entry, &tag_type)) != 0) {
-			errfun = "sys_acl_get_tag_type";
-			break;
-		}
-		if ((rc = sys_acl_get_access_bits(entry, &access)) != 0) {
-			errfun = "sys_acl_get_access_bits";
+		if ((rc = sys_acl_get_info(entry, &tag_type, &access, &g_u_id)) != 0) {
+			errfun = "sys_acl_get_info";
 			break;
 		}
 		/* continue == done with entry; break == store in temporary ida list */
 		switch (tag_type) {
+#ifndef HAVE_OSX_ACLS
 		case SMB_ACL_USER_OBJ:
 			if (racl->user_obj == NO_ENTRY)
 				racl->user_obj = access;
 			else
 				rprintf(FINFO, "unpack_smb_acl: warning: duplicate USER_OBJ entry ignored\n");
 			continue;
-		case SMB_ACL_USER:
-			access |= NAME_IS_USER;
-			break;
 		case SMB_ACL_GROUP_OBJ:
 			if (racl->group_obj == NO_ENTRY)
 				racl->group_obj = access;
 			else
 				rprintf(FINFO, "unpack_smb_acl: warning: duplicate GROUP_OBJ entry ignored\n");
 			continue;
-		case SMB_ACL_GROUP:
-			break;
 		case SMB_ACL_MASK:
 			if (racl->mask_obj == NO_ENTRY)
 				racl->mask_obj = access;
@@ -293,19 +285,19 @@ static BOOL unpack_smb_acl(SMB_ACL_T sacl, rsync_acl *racl)
 			else
 				rprintf(FINFO, "unpack_smb_acl: warning: duplicate OTHER entry ignored\n");
 			continue;
+#endif
+		case SMB_ACL_USER:
+			access |= NAME_IS_USER;
+			break;
+		case SMB_ACL_GROUP:
+			break;
 		default:
 			rprintf(FINFO, "unpack_smb_acl: warning: entry with unrecognized tag type ignored\n");
 			continue;
 		}
-		if (!(qualifier = sys_acl_get_qualifier(entry))) {
-			errfun = "sys_acl_get_tag_type";
-			rc = EINVAL;
-			break;
-		}
 		ida = EXPAND_ITEM_LIST(&temp_ida_list, id_access, -10);
-		ida->id = *((id_t *)qualifier);
+		ida->id = g_u_id;
 		ida->access = access;
-		sys_acl_free_qualifier(qualifier, tag_type);
 	}
 	if (rc) {
 		rsyserr(FERROR, errno, "unpack_smb_acl: %s()", errfun);
@@ -359,6 +351,7 @@ static BOOL unpack_smb_acl(SMB_ACL_T sacl, rsync_acl *racl)
 #define COE(func,args) CALL_OR_ERROR(func,args,#func)
 #define COE2(func,args) CALL_OR_ERROR(func,args,NULL)
 
+#ifndef HAVE_OSX_ACLS
 /* Store the permissions in the system ACL entry. */
 static int store_access_in_entry(uint32 access, SMB_ACL_ENTRY_T entry)
 {
@@ -368,6 +361,7 @@ static int store_access_in_entry(uint32 access, SMB_ACL_ENTRY_T entry)
 	}
 	return 0;
 }
+#endif
 
 /* Pack rsync ACL -> system ACL verbatim.  Return whether we succeeded. */
 static BOOL pack_smb_acl(SMB_ACL_T *smb_acl, const rsync_acl *racl)
@@ -385,9 +379,10 @@ static BOOL pack_smb_acl(SMB_ACL_T *smb_acl, const rsync_acl *racl)
 		return False;
 	}
 
+#ifndef HAVE_OSX_ACLS
 	COE( sys_acl_create_entry,(smb_acl, &entry) );
-	COE( sys_acl_set_tag_type,(entry, SMB_ACL_USER_OBJ) );
-	COE2( store_access_in_entry,(racl->user_obj & ~NO_ENTRY, entry) );
+	COE( sys_acl_set_info,(entry, SMB_ACL_USER_OBJ, racl->user_obj & ~NO_ENTRY, 0) );
+#endif
 
 	for (ida = racl->names.idas, count = racl->names.count; count; ida++, count--) {
 #ifdef SMB_ACL_NEED_SORT
@@ -395,45 +390,40 @@ static BOOL pack_smb_acl(SMB_ACL_T *smb_acl, const rsync_acl *racl)
 			break;
 #endif
 		COE( sys_acl_create_entry,(smb_acl, &entry) );
+		COE( sys_acl_set_info,(entry,
 #ifdef SMB_ACL_NEED_SORT
-		COE( sys_acl_set_tag_type,(entry, SMB_ACL_USER) );
+				       SMB_ACL_USER,
 #else
-		COE( sys_acl_set_tag_type,(entry, ida->access & NAME_IS_USER
-						? SMB_ACL_USER : SMB_ACL_GROUP) );
+				       ida->access & NAME_IS_USER ? SMB_ACL_USER : SMB_ACL_GROUP,
 #endif
-		COE( sys_acl_set_qualifier,(entry, (void*)&ida->id) );
-		COE2( store_access_in_entry,(ida->access & ~NAME_IS_USER, entry) );
+				       ida->access & ~NAME_IS_USER, ida->id) );
 	}
 
+#ifndef HAVE_OSX_ACLS
 	COE( sys_acl_create_entry,(smb_acl, &entry) );
-	COE( sys_acl_set_tag_type,(entry, SMB_ACL_GROUP_OBJ) );
-	COE2( store_access_in_entry,(racl->group_obj & ~NO_ENTRY, entry) );
+	COE( sys_acl_set_info,(entry, SMB_ACL_GROUP_OBJ, racl->group_obj & ~NO_ENTRY, 0) );
 
 #ifdef SMB_ACL_NEED_SORT
 	for ( ; count; ida++, count--) {
 		COE( sys_acl_create_entry,(smb_acl, &entry) );
-		COE( sys_acl_set_tag_type,(entry, SMB_ACL_GROUP) );
-		COE( sys_acl_set_qualifier,(entry, (void*)&ida->id) );
-		COE2( store_access_in_entry,(ida->access, entry) );
+		COE( sys_acl_set_info,(entry, SMB_ACL_GROUP, ida->access, ida->id) );
 	}
 #endif
 
 #ifdef ACLS_NEED_MASK
 	mask_bits = racl->mask_obj == NO_ENTRY ? racl->group_obj & ~NO_ENTRY : racl->mask_obj;
 	COE( sys_acl_create_entry,(smb_acl, &entry) );
-	COE( sys_acl_set_tag_type,(entry, SMB_ACL_MASK) );
-	COE2( store_access_in_entry,(mask_bits, entry) );
+	COE( sys_acl_set_info,(entry, SMB_ACL_MASK, mask_bits, NULL) );
 #else
 	if (racl->mask_obj != NO_ENTRY) {
 		COE( sys_acl_create_entry,(smb_acl, &entry) );
-		COE( sys_acl_set_tag_type,(entry, SMB_ACL_MASK) );
-		COE2( store_access_in_entry,(racl->mask_obj, entry) );
+		COE( sys_acl_set_info,(entry, SMB_ACL_MASK, racl->mask_obj, 0) );
 	}
 #endif
 
 	COE( sys_acl_create_entry,(smb_acl, &entry) );
-	COE( sys_acl_set_tag_type,(entry, SMB_ACL_OTHER) );
-	COE2( store_access_in_entry,(racl->other_obj & ~NO_ENTRY, entry) );
+	COE( sys_acl_set_info,(entry, SMB_ACL_OTHER, racl->other_obj & ~NO_ENTRY, 0) );
+#endif
 
 #ifdef DEBUG
 	if (sys_acl_valid(*smb_acl) < 0)
@@ -522,13 +512,6 @@ int get_acl(const char *fname, stat_x *sxp)
 }
 
 /* === Send functions === */
-
-/* The general strategy with the tag_type <-> character mapping is that
- * lowercase implies that no qualifier follows, where uppercase does.
- * A similar idiom for the ACL type (access or default) itself, but
- * lowercase in this instance means there's no ACL following, so the
- * ACL is a repeat, so the receiver should reuse the last of the same
- * type ACL. */
 
 /* Send the ida list over the file descriptor. */
 static void send_ida_entries(const ida_entries *idal, int f)
@@ -726,8 +709,11 @@ static int recv_rsync_acl(item_list *racl_list, SMB_ACL_TYPE_T type, int f)
 			duo_item->racl.group_obj &= duo_item->racl.mask_obj | NO_ENTRY;
 			duo_item->racl.mask_obj = NO_ENTRY;
 		}
-	} else if (duo_item->racl.mask_obj == NO_ENTRY) /* Must be non-empty with lists. */
+	}
+#ifndef HAVE_OSX_ACLS
+	else if (duo_item->racl.mask_obj == NO_ENTRY) /* Must be non-empty with lists. */
 		duo_item->racl.mask_obj = (computed_mask_bits | duo_item->racl.group_obj) & ~NO_ENTRY;
+#endif
 
 	duo_item->sacl = NULL;
 
@@ -774,6 +760,7 @@ void cache_acl(struct file_struct *file, stat_x *sxp)
 	}
 }
 
+#ifndef HAVE_OSX_ACLS
 static mode_t change_sacl_perms(SMB_ACL_T sacl, rsync_acl *racl, mode_t old_mode, mode_t mode)
 {
 	SMB_ACL_ENTRY_T entry;
@@ -849,6 +836,7 @@ static mode_t change_sacl_perms(SMB_ACL_T sacl, rsync_acl *racl, mode_t old_mode
 	/* Return the mode of the file on disk, as we will set them. */
 	return (old_mode & ~ACCESSPERMS) | (mode & ACCESSPERMS);
 }
+#endif
 
 static int set_rsync_acl(const char *fname, acl_duo *duo_item,
 			 SMB_ACL_TYPE_T type, stat_x *sxp, mode_t mode)
@@ -865,12 +853,16 @@ static int set_rsync_acl(const char *fname, acl_duo *duo_item,
 		if (!duo_item->sacl
 		 && !pack_smb_acl(&duo_item->sacl, &duo_item->racl))
 			return -1;
+#ifdef HAVE_OSX_ACLS
+		mode = 0; /* eliminate compiler warning */
+#else
 		if (type == SMB_ACL_TYPE_ACCESS) {
 			cur_mode = change_sacl_perms(duo_item->sacl, &duo_item->racl,
 						     cur_mode, mode);
 			if (cur_mode == (mode_t)~0)
 				return 0;
 		}
+#endif
 		if (sys_acl_set_file(fname, type, duo_item->sacl) < 0) {
 			rsyserr(FERROR, errno, "set_acl: sys_acl_set_file(%s, %s)",
 			fname, str_acl_type(type));
