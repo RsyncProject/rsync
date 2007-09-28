@@ -874,7 +874,9 @@ else
 	LIBS="$LIBS -lpacl"
 	;;
     darwin*)
-	AC_MSG_RESULT(MacOS ACLs not yet supported)
+	AC_MSG_RESULT(Using OS X ACLs)
+	AC_DEFINE(HAVE_OSX_ACLS, 1, [true if you have Mac OS X ACLs])
+	AC_DEFINE(SUPPORT_ACLS, 1)
 	;;
     *)
 	AC_MSG_RESULT(running tests:)
