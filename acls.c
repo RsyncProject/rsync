@@ -467,9 +467,43 @@ static int find_matching_rsync_acl(const rsync_acl *racl, SMB_ACL_TYPE_T type,
 static int get_rsync_acl(const char *fname, rsync_acl *racl,
 			 SMB_ACL_TYPE_T type, mode_t mode)
 {
-	SMB_ACL_T sacl = sys_acl_get_file(fname, type);
+	SMB_ACL_T sacl;
 
-	if (sacl) {
+#ifdef SUPPORT_XATTRS
+	/* --fake-super support: load ACLs from an xattr. */
+	if (am_root < 0) {
+		char *buf;
+		size_t len;
+		int cnt;
+
+		if ((buf = get_xattr_acl(fname, type == SMB_ACL_TYPE_ACCESS, &len)) == NULL)
+			return 0;
+		cnt = (len - 4*4) / (4+4);
+		if (len < 4*4 || len != (size_t)cnt*(4+4) + 4*4)
+			return -1;
+
+		racl->user_obj = IVAL(buf, 0);
+		racl->group_obj = IVAL(buf, 4);
+		racl->mask_obj = IVAL(buf, 8);
+		racl->other_obj = IVAL(buf, 12);
+
+		if (cnt) {
+			char *bp = buf + 4*4;
+			id_access *ida;
+			if (!(ida = racl->names.idas = new_array(id_access, cnt)))
+				out_of_memory("get_rsync_acl");
+			racl->names.count = cnt;
+			for ( ; cnt--; ida++, bp += 4+4) {
+				ida->id = IVAL(bp, 0);
+				ida->access = IVAL(bp, 4);
+			}
+		}
+		free(buf);
+		return 0;
+	}
+#endif
+
+	if ((sacl = sys_acl_get_file(fname, type)) != 0) {
 		BOOL ok = unpack_smb_acl(sacl, racl);
 
 		sys_acl_free_acl(sacl);
@@ -612,7 +646,7 @@ static uint32 recv_acl_access(uchar *name_follows_ptr, int f)
 	if (name_follows_ptr) {
 		int flags = access & 3;
 		access >>= 2;
-		if (access & ~SMB_ACL_VALID_NAME_BITS)
+		if (am_root >= 0 && access & ~SMB_ACL_VALID_NAME_BITS)
 			goto value_error;
 		if (flags & XFLAG_NAME_FOLLOWS)
 			*name_follows_ptr = 1;
@@ -620,7 +654,7 @@ static uint32 recv_acl_access(uchar *name_follows_ptr, int f)
 			*name_follows_ptr = 0;
 		if (flags & XFLAG_NAME_IS_USER)
 			access |= NAME_IS_USER;
-	} else if (access & ~SMB_ACL_VALID_OBJ_BITS) {
+	} else if (am_root >= 0 && access & ~SMB_ACL_VALID_OBJ_BITS) {
 	  value_error:
 		rprintf(FERROR, "recv_acl_access: value out of range: %x\n",
 			access);
@@ -702,6 +736,10 @@ static int recv_rsync_acl(item_list *racl_list, SMB_ACL_TYPE_T type, int f)
 	if (flags & XMIT_NAME_LIST)
 		computed_mask_bits |= recv_ida_entries(&duo_item->racl.names, f);
 
+#ifdef HAVE_OSX_ACLS
+	/* If we received a superfluous mask, throw it away. */
+	duo_item->racl.mask_obj = NO_ENTRY;
+#else
 	if (!duo_item->racl.names.count) {
 		/* If we received a superfluous mask, throw it away. */
 		if (duo_item->racl.mask_obj != NO_ENTRY) {
@@ -709,9 +747,7 @@ static int recv_rsync_acl(item_list *racl_list, SMB_ACL_TYPE_T type, int f)
 			duo_item->racl.group_obj &= duo_item->racl.mask_obj | NO_ENTRY;
 			duo_item->racl.mask_obj = NO_ENTRY;
 		}
-	}
-#ifndef HAVE_OSX_ACLS
-	else if (duo_item->racl.mask_obj == NO_ENTRY) /* Must be non-empty with lists. */
+	} else if (duo_item->racl.mask_obj == NO_ENTRY) /* Must be non-empty with lists. */
 		duo_item->racl.mask_obj = (computed_mask_bits | duo_item->racl.group_obj) & ~NO_ENTRY;
 #endif
 
@@ -843,11 +879,44 @@ static int set_rsync_acl(const char *fname, acl_duo *duo_item,
 {
 	if (type == SMB_ACL_TYPE_DEFAULT
 	 && duo_item->racl.user_obj == NO_ENTRY) {
-		if (sys_acl_delete_def_file(fname) < 0) {
+		int rc;
+#ifdef SUPPORT_XATTRS
+		/* --fake-super support: delete default ACL from xattrs. */
+		if (am_root < 0)
+			rc = del_def_xattr_acl(fname);
+		else
+#endif
+			rc = sys_acl_delete_def_file(fname);
+		if (rc < 0) {
 			rsyserr(FERROR, errno, "set_acl: sys_acl_delete_def_file(%s)",
 				fname);
 			return -1;
 		}
+#ifdef SUPPORT_XATTRS
+	} else if (am_root < 0) {
+		/* --fake-super support: store ACLs in an xattr. */
+		int cnt = duo_item->racl.names.count;
+		size_t len = 4*4 + cnt * (4+4);
+		char *buf = new_array(char, len);
+		int rc;
+
+		SIVAL(buf, 0, duo_item->racl.user_obj);
+		SIVAL(buf, 4, duo_item->racl.group_obj);
+		SIVAL(buf, 8, duo_item->racl.mask_obj);
+		SIVAL(buf, 12, duo_item->racl.other_obj);
+
+		if (cnt) {
+			char *bp = buf + 4*4;
+			id_access *ida = duo_item->racl.names.idas;
+			for ( ; cnt--; ida++, bp += 4+4) {
+				SIVAL(bp, 0, ida->id);
+				SIVAL(bp, 4, ida->access);
+			}
+		}
+		rc = set_xattr_acl(fname, type == SMB_ACL_TYPE_ACCESS, buf, len);
+		free(buf);
+		return rc;
+#endif
 	} else {
 		mode_t cur_mode = sxp->st.st_mode;
 		if (!duo_item->sacl
