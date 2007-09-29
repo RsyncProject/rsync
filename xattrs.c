@@ -64,6 +64,8 @@ extern int checksum_seed;
 #define RPRE_LEN ((int)sizeof RSYNC_PREFIX - 1)
 
 #define XSTAT_ATTR RSYNC_PREFIX "%stat"
+#define XACC_ACL_ATTR RSYNC_PREFIX "%aacl"
+#define XDEF_ACL_ATTR RSYNC_PREFIX "%dacl"
 
 typedef struct {
 	char *datum, *name;
@@ -797,6 +799,31 @@ int set_xattr(const char *fname, const struct file_struct *file,
 	ndx = F_XATTR(file);
 	return rsync_xal_set(fname, lst + ndx, fnamecmp, sxp);
 }
+
+#ifdef SUPPORT_ACLS
+char *get_xattr_acl(const char *fname, int is_access_acl, size_t *len_p)
+{
+	const char *name = is_access_acl ? XACC_ACL_ATTR : XDEF_ACL_ATTR;
+	return get_xattr_data(fname, name, len_p, 1);
+}
+
+int set_xattr_acl(const char *fname, int is_access_acl, const char *buf, size_t buf_len)
+{
+	const char *name = is_access_acl ? XACC_ACL_ATTR : XDEF_ACL_ATTR;
+	if (sys_lsetxattr(fname, name, buf, buf_len) < 0) {
+		rsyserr(FERROR, errno,
+			"set_xattr_acl: lsetxattr(\"%s\",\"%s\") failed",
+			fname, name);
+		return -1;
+	}
+	return 0;
+}
+
+int del_def_xattr_acl(const char *fname)
+{
+	return sys_lremovexattr(fname, XDEF_ACL_ATTR);
+}
+#endif
 
 int get_stat_xattr(const char *fname, int fd, STRUCT_STAT *fst, STRUCT_STAT *xst)
 {
