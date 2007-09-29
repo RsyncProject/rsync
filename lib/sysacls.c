@@ -2616,7 +2616,7 @@ int sys_acl_get_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T *tag_type_p, uint32 *b
 	acl_flagset_t flagset;
 	acl_permset_t permset;
 	uint32 bits, fb, bb, pb;
-	int user_type = -1;
+	int id_type = -1;
 	int rc;
 
 	if (acl_get_tag_type(entry, &tag) != 0
@@ -2625,12 +2625,12 @@ int sys_acl_get_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T *tag_type_p, uint32 *b
 	 || (uup = acl_get_qualifier(entry)) == NULL)
 		return -1;
 
-	rc = mbr_uuid_to_id(*uup, u_g_id_p, &user_type);
+	rc = mbr_uuid_to_id(*uup, u_g_id_p, &id_type);
 	acl_free(uup);
 	if (rc != 0)
 		return rc;
 
-	if (user_type == ID_TYPE_UID)
+	if (id_type == ID_TYPE_UID)
 		*tag_type_p = SMB_ACL_USER;
 	else
 		*tag_type_p = SMB_ACL_GROUP;
@@ -2685,7 +2685,6 @@ int sys_acl_set_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tag_type, uint32 bits,
 			acl_add_flag_np(flagset, fb);
 	}
 
-	/* Highest bit in "bits" is reserved for rsync's use. */
 	for (pb = (1u<<1), bb = (1u<<12); bb < (1u<<25); pb *= 2, bb *= 2) {
 		if (bits & bb)
 			acl_add_perm(permset, pb);
