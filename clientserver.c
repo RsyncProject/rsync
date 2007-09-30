@@ -839,10 +839,57 @@ int start_daemon(int f_in, int f_out)
 	return rsync_module(f_in, f_out, i, addr, host);
 }
 
+static void create_pid_file(pid_t pid)
+{
+	char *pid_file = lp_pid_file();
+	char pidbuf[16];
+	int fd;
+
+	if (!pid_file || !*pid_file)
+		return;
+
+	cleanup_set_pid(pid);
+	if ((fd = do_open(pid_file, O_WRONLY|O_CREAT|O_TRUNC, 0666 & ~orig_umask)) == -1) {
+		cleanup_set_pid(0);
+		rsyserr(FLOG, errno, "failed to create pid file %s", pid_file);
+		exit_cleanup(RERR_FILEIO);
+	}
+	snprintf(pidbuf, sizeof pidbuf, "%ld\n", (long)pid);
+	write(fd, pidbuf, strlen(pidbuf));
+	close(fd);
+}
+
+/* Become a daemon, discarding the controlling terminal. */
+static void become_daemon(void)
+{
+	int i;
+	pid_t pid = fork();
+
+	if (pid) {
+		create_pid_file(pid);
+		_exit(0);
+	}
+
+	/* detach from the terminal */
+#ifdef HAVE_SETSID
+	setsid();
+#elif defined TIOCNOTTY
+	i = open("/dev/tty", O_RDWR);
+	if (i >= 0) {
+		ioctl(i, (int)TIOCNOTTY, (char *)0);
+		close(i);
+	}
+#endif
+	/* make sure that stdin, stdout an stderr don't stuff things
+	 * up (library functions, for example) */
+	for (i = 0; i < 3; i++) {
+		close(i);
+		open("/dev/null", O_RDWR);
+	}
+}
+
 int daemon_main(void)
 {
-	char *pid_file;
-
 	if (is_a_socket(STDIN_FILENO)) {
 		int i;
 
@@ -857,11 +904,15 @@ int daemon_main(void)
 		return start_daemon(STDIN_FILENO, STDIN_FILENO);
 	}
 
-	if (!no_detach)
-		become_daemon();
-
-	if (!lp_load(config_file, 1))
+	if (!lp_load(config_file, 1)) {
+		fprintf(stderr, "Failed to parse config file: %s\n", config_file);
 		exit_cleanup(RERR_SYNTAX);
+	}
+
+	if (no_detach)
+		create_pid_file(getpid());
+	else
+		become_daemon();
 
 	if (rsync_port == 0 && (rsync_port = lp_rsync_port()) == 0)
 		rsync_port = RSYNC_PORT;
@@ -875,23 +926,6 @@ int daemon_main(void)
 	/* TODO: If listening on a particular address, then show that
 	 * address too.  In fact, why not just do inet_ntop on the
 	 * local address??? */
-
-	if (((pid_file = lp_pid_file()) != NULL) && (*pid_file != '\0')) {
-		char pidbuf[16];
-		int fd;
-		pid_t pid = getpid();
-		cleanup_set_pid(pid);
-		if ((fd = do_open(lp_pid_file(), O_WRONLY|O_CREAT|O_TRUNC,
-					0666 & ~orig_umask)) == -1) {
-			cleanup_set_pid(0);
-			rsyserr(FLOG, errno, "failed to create pid file %s",
-				pid_file);
-			exit_cleanup(RERR_FILEIO);
-		}
-		snprintf(pidbuf, sizeof pidbuf, "%ld\n", (long)pid);
-		write(fd, pidbuf, strlen(pidbuf));
-		close(fd);
-	}
 
 	start_accept_loop(rsync_port, start_daemon);
 	return -1;
