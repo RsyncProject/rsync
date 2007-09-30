@@ -1200,9 +1200,9 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 			break;
 #else
 			/* FIXME: this should probably be ignored with a
- 			 * warning and then countermeasures taken to
- 			 * restrict group and other access in the presence
- 			 * of any more restrictive ACLs, but this is safe
+			 * warning and then countermeasures taken to
+			 * restrict group and other access in the presence
+			 * of any more restrictive ACLs, but this is safe
 			 * for now */
 			snprintf(err_buf,sizeof(err_buf),
                                  "ACLs are not supported on this %s\n",
@@ -1446,10 +1446,10 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 		snprintf(err_buf, sizeof err_buf,
 			"--suffix cannot be a null string without --backup-dir\n");
 		return 0;
- 	} else if (make_backups && delete_mode && !delete_excluded && !am_server) {
- 		snprintf(backup_dir_buf, sizeof backup_dir_buf,
+	} else if (make_backups && delete_mode && !delete_excluded && !am_server) {
+		snprintf(backup_dir_buf, sizeof backup_dir_buf,
 			"P *%s", backup_suffix);
- 		parse_rule(&filter_list, backup_dir_buf, 0, 0);
+		parse_rule(&filter_list, backup_dir_buf, 0, 0);
 	}
 
 	if (make_backups && !backup_dir) {

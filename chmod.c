@@ -104,12 +104,12 @@ struct chmod_mode_struct *parse_chmod(const char *modestr,
 			case 'D':
 				if (flags & FLAG_FILES_ONLY)
 					state = STATE_ERROR;
-			  	flags |= FLAG_DIRS_ONLY;
+				flags |= FLAG_DIRS_ONLY;
 				break;
 			case 'F':
 				if (flags & FLAG_DIRS_ONLY)
 					state = STATE_ERROR;
-			  	flags |= FLAG_FILES_ONLY;
+				flags |= FLAG_FILES_ONLY;
 				break;
 			case 'u':
 				where |= 0100;
@@ -150,7 +150,7 @@ struct chmod_mode_struct *parse_chmod(const char *modestr,
 				what |= 2;
 				break;
 			case 'X':
-			  	flags |= FLAG_X_KEEP;
+				flags |= FLAG_X_KEEP;
 				/* FALL THROUGH */
 			case 'x':
 				what |= 1;
