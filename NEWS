@@ -2,6 +2,15 @@ NEWS for rsync 3.0.0 (UNRELEASED)
 Protocol: 30 (changed)
 Changes since 2.6.9:
 
+  USER-VISIBLE CHANGES:
+
+   - The handling of implied directories when using --relative has changed
+     to send them as directories (e.g. no implied dir is ever sent as a
+     symlink).  This avoids unexpected behavior and should not adversely
+     affect most people.  If you're one of those rare people who relied
+     upon having an implied dir be duplicated as a symlink, either specify
+     --keep-dirlinks or --no-implied-dirs.
+
   BUG FIXES:
 
     - Fixed the output of -ii when combined with one of the --*-dest options:
@@ -15,10 +24,10 @@ Changes since 2.6.9:
       signal.  This fixes a problem with the pre-xfer exec function not being
       able to get the exit status from the script.
 
-    - A negated filter rule now sends the negation option when sending the
-      filter rules.
+    - A negated filter rule (with a '!' modifier) no longer loses the negation
+      when sending the filter rules to the remote rsync.
 
-    - Fixed a problem with the --out-format (aka --log-format) option:  it
+    - Fixed a problem with the --out-format (aka --log-format) option %f:  it
       would output superfluous directory information for a non-daemon rsync.
 
     - Fixed a problem with -vv (double --verbose) and --stats when "pushing"
@@ -32,15 +41,29 @@ Changes since 2.6.9:
     - Make sure that directory permissions of a newly-created destination
       directory are handled right when --perms is left off.
 
+    - The itemized output of a newly-created destination directory is now
+      output as a creation event, not a change event.
+
     - Improved --hard-link so that more corner cases are handled correctly
       when combined with options such as --link-dest and/or --ignore-existing.
+
+    - The --append option no longer updates a file that has the same size.
+
+    - Fixed a bug when combining --backup and --backup-dir with --inplace:
+      any missing backup directories are now created.
+
+    - Fixed a bug when using --backup and --inplace with --whole-file or
+      --read-batch: backup files are actually created now.
 
   ENHANCEMENTS:
 
     - A new incremental-recursion algorithm is now used when rsync is talking
-      to another 3.0.0 version.  This starts the transfer going more quickly
+      to another 3.x version.  This starts the transfer going more quickly
       (before all the files have been found), and requires much less memory.
       See the --recursive option in the manpage for some restrictions.
+
+    - Saved memory in the non-incremental-recursion algorithm for typical
+      option values (usually saving from 21-29 bytes per file).
 
     - The default --delete algorithm is now --delete-during when talking to a
       3.x rsync.  This is a faster scan than using --delete-before (which is
@@ -51,14 +74,15 @@ Changes since 2.6.9:
       files at the end of the transfer without needing a separate delete pass.
 
     - Added the --acls (-A) option to preserve Access Control Lists.  This is
-      an improved version of the prior patch that was available.  (If you need
-      to have backward compatibility with old, patched versions, the new
-      acls.diff patch that will add that.)
+      an improved version of the prior patch that was available, and it even
+      supports OS X ACLs.  (If you need to have backward compatibility with
+      old, patched versions of rsync, apply the acls.diff file from the patches
+      dir.)
 
     - Added the --xattrs (-X) option to preserver extended attributes.  This is
       an improved version of the prior patch that was available.  (If you need
-      to have backward compatibility with old, patched versions, the new
-      xattrs.diff patch that will add that.)
+      to have backward compatibility with old, patched versions of rsync, apply
+      the xattrs.diff file from the patches dir.)
 
     - Added the --fake-super option that allows a non-super user to preserve
       all attributes of a file by using a special extended-attribute idiom.
@@ -67,25 +91,29 @@ Changes since 2.6.9:
     - Added the --iconv option, which allows rsync to convert filenames from
       one character-set to another during the transfer.  The default is to make
       this feature available as long as your system has iconv_open().  If
-      compilation fails, specify --disable-iconv to configure and rebuild.  If
-      you want rsync to perform character-set conversions by default, you can
-      specify --enable-iconv=CONVERT_STRING with the default value for the
-      --iconv option that you wish to use.  For example, --enable-iconv=. is a
-      good choice.  See the rsync man page for an explanation of the --iconv
-      option's settings.
+      compilation fails, specify --disable-iconv to configure, and then
+      rebuild.  If you want rsync to perform character-set conversions by
+      default, you can specify --enable-iconv=CONVERT_STRING with the default
+      value for the --iconv option that you wish to use.  For example,
+      --enable-iconv=. is a good choice.  See the rsync manpage for an
+      explanation of the --iconv option's settings.
 
     - Added the --skip-compress=LIST option to override of the default list of
       file suffixes that will not be compressed when using --compress.
+      
+    - The daemon's default for "dont compress" was extended to include:
+	  *.7z *.mp[34] *.mov *.avi *.ogg *.jpg *.jpeg
+      The matching routine was also optimized to run more quickly.
 
     - The --max-delete option now outputs a warning if it skipped any file
       deletions, including a count of how many deletions were skipped.  (Older
       versions just silently stopped deleting things.)
 
     - You may specify --max-delete=0 to a 3.0.0 client to request that it warn
-      about any files that it wants to delete without deleting anything.  If
-      you're not sure what version the client is, you can use the less-obvious
-      --max-delete=-1, as old and new versions will both treat that as the
-      same request (though older versions don't warn).
+      about extraneous files without deleting anything.  If you're not sure
+      what version the client is, you can use the less-obvious --max-delete=-1,
+      as both old and new versions will treat that as the same request (though
+      older versions don't warn).
 
     - The --hard-link option now uses less memory on both the sending and
       receiving side for all protocol versions.  For protocol 30, the use of a
@@ -97,7 +125,43 @@ Changes since 2.6.9:
       side when speaking an older protocol (note that older rsync versions kept
       the device+inode information on both sides).
 
-    - A lot more --no-OPTION override options are now supported.
+    - The filter rules now support a perishable ("p") modifier that marks rules
+      that should not have an effect in a directory that is being deleted.  e.g.
+      -f '-p .svn/' would only affect "live" .svn directories.
+
+    - We now support a lot more --no-OPTION override options.
+
+    - If we get an error setting the time on a symlink, we don't complain about
+      it anymore (since some operating systems don't support that, and it's not
+      that important).
+
+    - Improved the dashes and double-quotes in the nroff manpage output.
+
+    - Protocol 30 now uses MD5 checksums instead of MD4.
+
+    - If a daemon module's "path" value is not an absolute pathname, make it
+      absolute.
+
+    - Changed the --append option to not checksum the existing data in the
+      destination file, which speeds up file appending.
+
+    - Added the --append-verify option, which works like the older --append
+      option (verifying the existing data in the destination file).  For
+      compatibility with older rsync versions, any use of --append that is
+      talking protocol 29 or older will revert to the --append-verify method.
+
+    - Documented and extended the support for the RSYNC_CONNECT_PROG variable
+      that can be used to enhance rsync's daemon mode.
+
+    - Added the --protect-args (-s) option, that tells rsync to send most of
+      the command-line args at the start of the transfer rather than as args
+      to the remote-shell command.  This protects them from space-splitting,
+      and other (non-wildcard) special shell characters.
+
+    - Rsync now allows multiple remote-source args to be specified rather than
+      having to rely on a special space-splitting side-effect of the remote-
+      shell.  (Additional remote args must specify the same host or have no
+      hostname.)
 
   INTERNAL:
 
@@ -113,6 +177,8 @@ Changes since 2.6.9:
 
     - Added some isType() functions that make dealing with signed characters
       easier without forcing variables via casts.
+
+    - Changed strcat/strcpy/sprintf function calls to use safer versions.
 
     - Upgraded the included popt version to 1.10.2 and improved its use of
       string-handling functions.
@@ -136,8 +202,15 @@ Changes since 2.6.9:
 
     - Rsync is now licensed under the GPLv3 or later.
 
+    - When running the tests, we now put our per-test temp dirs into a sub-
+      directory named testtmp (which is created, if missing).  This allows
+      someone to symlink the testtmp directory to another filesystem (which is
+      useful if the build dir's filesystem does not support ACLs and xattrs,
+      and another file system does).
+
     - Rsync now has a way of handling protocol-version changes during the
       development of a new protocol version.  This exchange of sub-version
       info does not interfere with the {MIN,MAX}_PROTOCOL_VERSION checking
-      in older versions (which would be the case if every minor change made
-      to the protocol in CVS incremented the main PROTOCOL_VERSION value).
+      in older versions (since we'd quickly exceed the MAX_PROTOCOL_VERSION
+      if we incremented the main PROTOCOL_VERSION value for every minor
+      change during development).
