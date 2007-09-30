@@ -1126,15 +1126,15 @@ static int start_client(int argc, char *argv[])
 	if (!read_batch) { /* for read_batch, NO source is specified */
 		char *path = check_for_hostspec(argv[0], &shell_machine, &rsync_port);
 		if (path) { /* source is remote */
-			char *dummy1;
-			int dummy2;
+			char *dummy_host;
+			int dummy_port = 0;
 			*argv = path;
 			remote_argv = argv;
 			remote_argc = argc;
 			argv += argc - 1;
 			if (argc == 1 || **argv == ':')
 				argc = 0; /* no dest arg */
-			else if (check_for_hostspec(*argv, &dummy1, &dummy2)) {
+			else if (check_for_hostspec(*argv, &dummy_host, &dummy_port)) {
 				rprintf(FERROR,
 					"The source and destination cannot both be remote.\n");
 				exit_cleanup(RERR_SYNTAX);
@@ -1197,26 +1197,41 @@ static int start_client(int argc, char *argv[])
 	}
 
 	if (am_sender) {
-		char *dummy1;
-		int dummy2;
+		char *dummy_host;
+		int dummy_port = rsync_port;
 		int i;
 		/* For local source, extra source args must not have hostspec. */
 		for (i = 1; i < argc; i++) {
-			if (check_for_hostspec(argv[i], &dummy1, &dummy2)) {
+			if (check_for_hostspec(argv[i], &dummy_host, &dummy_port)) {
 				rprintf(FERROR, "Unexpected remote arg: %s\n", argv[i]);
 				exit_cleanup(RERR_SYNTAX);
 			}
 		}
 	} else {
+		char *dummy_host;
+		int dummy_port = rsync_port;
 		int i;
-		/* For remote source, any extra source args must be ":SOURCE" args. */
+		/* For remote source, any extra source args must have either
+		 * the same hostname or an empty hostname. */
 		for (i = 1; i < remote_argc; i++) {
-			if (*remote_argv[i] != ':') {
+			char *arg = check_for_hostspec(remote_argv[i], &dummy_host, &dummy_port);
+			if (!arg) {
 				rprintf(FERROR, "Unexpected local arg: %s\n", remote_argv[i]);
 				rprintf(FERROR, "If arg is a remote file/dir, prefix it with a colon (:).\n");
 				exit_cleanup(RERR_SYNTAX);
 			}
-			remote_argv[i]++;
+			if (*dummy_host && strcmp(dummy_host, shell_machine) != 0) {
+				rprintf(FERROR, "All source args must come from the same machine.\n");
+				exit_cleanup(RERR_SYNTAX);
+			}
+			if (rsync_port != dummy_port) {
+				if (!rsync_port || !dummy_port)
+					rprintf(FERROR, "All source args must use the same hostspec format.\n");
+				else
+					rprintf(FERROR, "All source args must use the same port number.\n");
+				exit_cleanup(RERR_SYNTAX);
+			}
+			remote_argv[i] = arg;
 		}
 		if (argc == 0)
 			list_only |= 1;
