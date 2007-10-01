@@ -2,7 +2,7 @@ NEWS for rsync 3.0.0 (UNRELEASED)
 Protocol: 30 (changed)
 Changes since 2.6.9:
 
-  USER-VISIBLE CHANGES:
+  NOTABLE CHANGE:
 
    - The handling of implied directories when using --relative has changed
      to send them as directories (e.g. no implied dir is ever sent as a
@@ -54,6 +54,12 @@ Changes since 2.6.9:
 
     - Fixed a bug when using --backup and --inplace with --whole-file or
       --read-batch: backup files are actually created now.
+
+    - Starting up an extra copy of an rsync daemon does not delete the pidfile
+      for the running daemon -- if the pidfile exists, the extra program will
+      exit with an error.
+
+    - The daemon pidfile is checked and created sooner in the startup sequence.
 
   ENHANCEMENTS:
 
@@ -129,18 +135,14 @@ Changes since 2.6.9:
       that should not have an effect in a directory that is being deleted.  e.g.
       -f '-p .svn/' would only affect "live" .svn directories.
 
-    - We now support a lot more --no-OPTION override options.
-
     - If we get an error setting the time on a symlink, we don't complain about
       it anymore (since some operating systems don't support that, and it's not
       that important).
 
-    - Improved the dashes and double-quotes in the nroff manpage output.
-
     - Protocol 30 now uses MD5 checksums instead of MD4.
 
-    - If a daemon module's "path" value is not an absolute pathname, make it
-      absolute.
+    - If a daemon module's "path" value is not an absolute pathname, the code
+      now makes it absolute internally (making it work properly).
 
     - Changed the --append option to not checksum the existing data in the
       destination file, which speeds up file appending.
@@ -151,17 +153,21 @@ Changes since 2.6.9:
       talking protocol 29 or older will revert to the --append-verify method.
 
     - Documented and extended the support for the RSYNC_CONNECT_PROG variable
-      that can be used to enhance rsync's daemon mode.
+      that can be used to enhance the client side of a daemon connection.
 
     - Added the --protect-args (-s) option, that tells rsync to send most of
       the command-line args at the start of the transfer rather than as args
       to the remote-shell command.  This protects them from space-splitting,
-      and other (non-wildcard) special shell characters.
+      and only interprets basic wildcard special shell characters (*?[).
 
     - Rsync now allows multiple remote-source args to be specified rather than
       having to rely on a special space-splitting side-effect of the remote-
       shell.  (Additional remote args must specify the same host or have no
       hostname.)
+
+    - Improved the dashes and double-quotes in the nroff manpage output.
+
+    - We now support a lot more --no-OPTION override options.
 
   INTERNAL:
 
