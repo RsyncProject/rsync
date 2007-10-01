@@ -85,7 +85,8 @@ usually contains site information and any legal notices. The default
 is no motd file.
 
 dit(bf(pid file)) The "pid file" option tells the rsync daemon to write
-its process ID to that file.
+its process ID to that file.  If the file already exists, the rsync
+daemon will abort rather than overwrite the file.
 
 dit(bf(port)) You can override the default port the daemon will listen on
 by specifying this value (defaults to 873).  This is ignored if the daemon
