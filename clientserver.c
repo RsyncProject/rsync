@@ -839,18 +839,20 @@ int start_daemon(int f_in, int f_out)
 	return rsync_module(f_in, f_out, i, addr, host);
 }
 
-static void create_pid_file(pid_t pid)
+static void create_pid_file(void)
 {
 	char *pid_file = lp_pid_file();
 	char pidbuf[16];
+	pid_t pid = getpid();
 	int fd;
 
 	if (!pid_file || !*pid_file)
 		return;
 
 	cleanup_set_pid(pid);
-	if ((fd = do_open(pid_file, O_WRONLY|O_CREAT|O_TRUNC, 0666 & ~orig_umask)) == -1) {
+	if ((fd = do_open(pid_file, O_WRONLY|O_CREAT|O_EXCL, 0666 & ~orig_umask)) == -1) {
 		cleanup_set_pid(0);
+		fprintf(stderr, "failed to create pid file %s: %s\n", pid_file, strerror(errno));
 		rsyserr(FLOG, errno, "failed to create pid file %s", pid_file);
 		exit_cleanup(RERR_FILEIO);
 	}
@@ -866,9 +868,14 @@ static void become_daemon(void)
 	pid_t pid = fork();
 
 	if (pid) {
-		create_pid_file(pid);
+		if (pid < 0) {
+			fprintf(stderr, "failed to fork: %s\n", strerror(errno));
+			exit_cleanup(RERR_FILEIO);
+		}
 		_exit(0);
 	}
+
+	create_pid_file();
 
 	/* detach from the terminal */
 #ifdef HAVE_SETSID
@@ -890,6 +897,13 @@ static void become_daemon(void)
 
 int daemon_main(void)
 {
+	if (!config_file) {
+		if (am_server && am_root <= 0)
+			config_file = RSYNCD_USERCONF;
+		else
+			config_file = RSYNCD_SYSCONF;
+	}
+
 	if (is_a_socket(STDIN_FILENO)) {
 		int i;
 
@@ -910,7 +924,7 @@ int daemon_main(void)
 	}
 
 	if (no_detach)
-		create_pid_file(getpid());
+		create_pid_file();
 	else
 		become_daemon();
 
