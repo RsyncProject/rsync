@@ -1,5 +1,5 @@
 mailto(rsync-bugs@samba.org)
-manpage(rsyncd.conf)(5)(6 Nov 2006)()()
+manpage(rsyncd.conf)(5)(4 Oct 2007)()()
 manpagename(rsyncd.conf)(configuration file for rsync in daemon mode)
 manpagesynopsis()
 
@@ -614,7 +614,7 @@ url(http://rsync.samba.org/)(http://rsync.samba.org/)
 
 manpagesection(VERSION)
 
-This man page is current for version 2.6.9 of rsync.
+This man page is current for version 3.0.0pre1 of rsync.
 
 manpagesection(CREDITS)
 
