@@ -2239,7 +2239,7 @@ int sys_acl_get_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T *tag_type_p, uint32 *b
 		return -1;
 
 	if (*tag_type_p == SMB_ACL_USER || *tag_type_p == SMB_ACL_GROUP)
-		*u_g_id_p = entry->ace_id->id_data;
+		memcpy(u_g_id_p, entry->ace_id->id_data, sizeof (id_t));
 
 	permset = &entry->ace_access;
 
@@ -2452,7 +2452,7 @@ int sys_acl_set_file( const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl
 		memcpy(acl_entry->ace_id->id_data, &user_id, sizeof(uid_t));
 	}
 
-	rc = chacl(name,file_acl,file_acl->acl_len);
+	rc = chacl((char*)name,file_acl,file_acl->acl_len);
 	DEBUG(10,("errno is %d\n",errno));
 	DEBUG(10,("return code is %d\n",rc));
 	SAFE_FREE(file_acl);
