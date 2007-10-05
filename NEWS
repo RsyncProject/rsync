@@ -61,6 +61,9 @@ Changes since 2.6.9:
 
     - The daemon pidfile is checked and created sooner in the startup sequence.
 
+    - If a daemon module's "path" value is not an absolute pathname, the code
+      now makes it absolute internally (making it work properly).
+
   ENHANCEMENTS:
 
     - A new incremental-recursion algorithm is now used when rsync is talking
@@ -68,7 +71,7 @@ Changes since 2.6.9:
       (before all the files have been found), and requires much less memory.
       See the --recursive option in the manpage for some restrictions.
 
-    - Saved memory in the non-incremental-recursion algorithm for typical
+    - Lowered memory use in the non-incremental-recursion algorithm for typical
       option values (usually saving from 21-29 bytes per file).
 
     - The default --delete algorithm is now --delete-during when talking to a
@@ -81,6 +84,11 @@ Changes since 2.6.9:
       shell.  Additional remote args must specify the same host or have an
       empty hostname, as seen here:  :file1  ::module/file2.  This means that
       local use of brace expansion now works:  rsync -av host:path/{f1,f2} .
+
+    - Added the --protect-args (-s) option, that tells rsync to send most of
+      the command-line args at the start of the transfer rather than as args
+      to the remote-shell command.  This protects them from space-splitting,
+      and only interprets basic wildcard special shell characters (*?[).
 
     - Added the --delete-delay option, which is a more efficient way to delete
       files at the end of the transfer without needing a separate delete pass.
@@ -107,10 +115,10 @@ Changes since 2.6.9:
       rebuild.  If you want rsync to perform character-set conversions by
       default, you can specify --enable-iconv=CONVERT_STRING with the default
       value for the --iconv option that you wish to use.  For example,
-      --enable-iconv=. is a good choice.  See the rsync manpage for an
+      "--enable-iconv=." is a good choice.  See the rsync manpage for an
       explanation of the --iconv option's settings.
 
-    - Added the --skip-compress=LIST option to override of the default list of
+    - Added the --skip-compress=LIST option to override the default list of
       file suffixes that will not be compressed when using --compress.
       
     - The daemon's default for "dont compress" was extended to include:
@@ -147,9 +155,6 @@ Changes since 2.6.9:
 
     - Protocol 30 now uses MD5 checksums instead of MD4.
 
-    - If a daemon module's "path" value is not an absolute pathname, the code
-      now makes it absolute internally (making it work properly).
-
     - Changed the --append option to not checksum the existing data in the
       destination file, which speeds up file appending.
 
@@ -160,11 +165,6 @@ Changes since 2.6.9:
 
     - Documented and extended the support for the RSYNC_CONNECT_PROG variable
       that can be used to enhance the client side of a daemon connection.
-
-    - Added the --protect-args (-s) option, that tells rsync to send most of
-      the command-line args at the start of the transfer rather than as args
-      to the remote-shell command.  This protects them from space-splitting,
-      and only interprets basic wildcard special shell characters (*?[).
 
     - Improved the dashes and double-quotes in the nroff manpage output.
 
@@ -216,8 +216,10 @@ Changes since 2.6.9:
       and another file system does).
 
     - Rsync now has a way of handling protocol-version changes during the
-      development of a new protocol version.  This exchange of sub-version
-      info does not interfere with the {MIN,MAX}_PROTOCOL_VERSION checking
-      in older versions (since we'd quickly exceed the MAX_PROTOCOL_VERSION
-      if we incremented the main PROTOCOL_VERSION value for every minor
-      change during development).
+      development of a new protocol version.  This causes any out-of-sync
+      versions to speak an older protocol rather than fail in a cryptic manner.
+      This addition makes it safe to deploy a pre-release version that may
+      interact with the public.  This new exchange of sub-version info does not
+      interfere with the {MIN,MAX}_PROTOCOL_VERSION checking algorithm (which
+      does not have enough range to allow the main protocol number to be
+      incremented for every minor tweak in that happens during development).
