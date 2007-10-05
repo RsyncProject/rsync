@@ -377,6 +377,9 @@ enum msgcode {
 #ifdef ICONV_CONST
 #undef ICONV_CONST
 #endif
+#ifdef ICONV_OPTION
+#undef ICONV_OPTION
+#endif
 #ifdef iconv_t
 #undef iconv_t
 #endif
