@@ -390,13 +390,10 @@ static BOOL pack_smb_acl(SMB_ACL_T *smb_acl, const rsync_acl *racl)
 			break;
 #endif
 		COE( sys_acl_create_entry,(smb_acl, &entry) );
-		COE( sys_acl_set_info,(entry,
-#ifdef SMB_ACL_NEED_SORT
-				       SMB_ACL_USER,
-#else
-				       ida->access & NAME_IS_USER ? SMB_ACL_USER : SMB_ACL_GROUP,
-#endif
-				       ida->access & ~NAME_IS_USER, ida->id) );
+		COE( sys_acl_set_info,
+		    (entry,
+		     ida->access & NAME_IS_USER ? SMB_ACL_USER : SMB_ACL_GROUP,
+		     ida->access & ~NAME_IS_USER, ida->id) );
 	}
 
 #ifndef HAVE_OSX_ACLS
