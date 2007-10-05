@@ -2,7 +2,7 @@ NEWS for rsync 3.0.0 (UNRELEASED)
 Protocol: 30 (changed)
 Changes since 2.6.9:
 
-  NOTABLE CHANGE:
+  NOTABLE CHANGE IN BEHAVIOR:
 
    - The handling of implied directories when using --relative has changed
      to send them as directories (e.g. no implied dir is ever sent as a
@@ -75,6 +75,12 @@ Changes since 2.6.9:
       3.x rsync.  This is a faster scan than using --delete-before (which is
       the default when talking to older rsync versions), and is compatible with
       the new incremental recursion mode.
+
+    - Rsync now allows multiple remote-source args to be specified rather than
+      having to rely on a special space-splitting side-effect of the remote-
+      shell.  Additional remote args must specify the same host or have an
+      empty hostname, as seen here:  :file1  ::module/file2.  This means that
+      local use of brace expansion now works:  rsync -av host:path/{f1,f2} .
 
     - Added the --delete-delay option, which is a more efficient way to delete
       files at the end of the transfer without needing a separate delete pass.
@@ -159,11 +165,6 @@ Changes since 2.6.9:
       the command-line args at the start of the transfer rather than as args
       to the remote-shell command.  This protects them from space-splitting,
       and only interprets basic wildcard special shell characters (*?[).
-
-    - Rsync now allows multiple remote-source args to be specified rather than
-      having to rely on a special space-splitting side-effect of the remote-
-      shell.  (Additional remote args must specify the same host or have no
-      hostname.)
 
     - Improved the dashes and double-quotes in the nroff manpage output.
 
