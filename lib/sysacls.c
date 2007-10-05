@@ -1100,7 +1100,7 @@ struct hpux_acl_types {
  *                  acl types.
  */
 
-static int hpux_count_obj(int acl_count, struct acl *aclp, struct hpux_acl_types *acl_type_count)
+static void hpux_count_obj(int acl_count, struct acl *aclp, struct hpux_acl_types *acl_type_count)
 {
 	int i;
 
