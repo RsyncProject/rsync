@@ -4,12 +4,19 @@ Changes since 2.6.9:
 
   NOTABLE CHANGE IN BEHAVIOR:
 
-   - The handling of implied directories when using --relative has changed
-     to send them as directories (e.g. no implied dir is ever sent as a
-     symlink).  This avoids unexpected behavior and should not adversely
-     affect most people.  If you're one of those rare people who relied
-     upon having an implied dir be duplicated as a symlink, either specify
-     --keep-dirlinks or --no-implied-dirs.
+    - The handling of implied directories when using --relative has changed to
+      send them as directories (e.g. no implied dir is ever sent as a symlink).
+      This avoids unexpected behavior and should not adversely affect most
+      people.  If you're one of those rare people who relied upon having an
+      implied dir be duplicated as a symlink, you should specify the transfer
+      of the symlink and the transfer of the referent directory as separate
+      args.  (See also --keep-dirlinks and --no-implied-dirs.)
+
+    - Requesting a remote file list without specifying -r (--recursive) now
+      sends the -d (--dirs) option to the remote rsync rather than sending -r
+      along with an extra exclude of /*/*.  If the remote rsync does not
+      understand the -d option (i.e. it is 2.6.3 or older), you will need to
+      specify   -r --exclude='/*/*'   manually.
 
   BUG FIXES:
 
