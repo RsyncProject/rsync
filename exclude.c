@@ -26,7 +26,6 @@ extern int verbose;
 extern int am_server;
 extern int am_sender;
 extern int eol_nulls;
-extern int list_only;
 extern int recurse;
 extern int io_error;
 extern int local_server;
@@ -1214,11 +1213,6 @@ void send_filter_list(int f_out)
 			parse_rule(&filter_list, ":C", 0, 0);
 		parse_rule(&filter_list, "-C", 0, 0);
 	}
-
-	/* This is a complete hack - blame Rusty.  FIXME!
-	 * Remove this hack when older rsyncs (below 2.6.4) are gone. */
-	if (list_only == 1 && !recurse)
-		parse_rule(&filter_list, "/*/*", MATCHFLG_NO_PREFIXES, 0);
 
 	send_rules(f_out, &filter_list);
 
