@@ -1682,7 +1682,8 @@ void server_options(char **args, int *argc_p)
 		argstr[x++] = 'n';
 	if (preserve_links)
 		argstr[x++] = 'l';
-	if (xfer_dirs > (recurse || !delete_mode || !am_sender ? 1 : 0))
+	if ((list_only && !recurse) || xfer_dirs > 1
+	 || (xfer_dirs && !recurse && delete_mode && am_sender))
 		argstr[x++] = 'd';
 	if (am_sender) {
 		if (keep_dirlinks)
@@ -1751,12 +1752,6 @@ void server_options(char **args, int *argc_p)
 		argstr[x++] = 'S';
 	if (do_compression)
 		argstr[x++] = 'z';
-
-	/* This is a complete hack - blame Rusty.  FIXME!
-	 * This hack is only needed for older rsync versions that
-	 * don't understand the --list-only option. */
-	if (list_only == 1 && !recurse)
-		argstr[x++] = 'r';
 
 #if SUBPROTOCOL_VERSION != 0
 	/* If we're speaking a pre-release version of a protocol, we tell
