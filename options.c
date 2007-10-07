@@ -1249,7 +1249,6 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 		else
 			need_unsorted_flist = 1;
 	}
-	setup_iconv();
 #endif
 
 	if (protect_args == 1) {

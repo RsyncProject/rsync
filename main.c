@@ -448,13 +448,16 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 		*f_out_p = from_gen_pipe[1];
 		*f_in_p = batch_fd;
 		ret = -1; /* no child pid */
+		setup_iconv();
 	} else if (local_server) {
 		/* If the user didn't request --[no-]whole-file, force
 		 * it on, but only if we're not batch processing. */
 		if (whole_file < 0 && !write_batch)
 			whole_file = 1;
 		ret = local_child(argc, args, f_in_p, f_out_p, child_main);
+		setup_iconv();
 	} else {
+		setup_iconv();
 		if (protect_args) {
 			int fd;
 #ifdef ICONV_OPTION
@@ -1476,7 +1479,9 @@ int main(int argc,char *argv[])
 	if (write_batch < 0)
 		dry_run = 1;
 
-	if (am_daemon && !am_server)
+	if (am_server)
+		setup_iconv();
+	else if (am_daemon)
 		return daemon_main();
 
 	if (am_server && protect_args) {
