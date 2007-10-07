@@ -1138,9 +1138,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		rprintf(FINFO, "recv_generator(%s,%d)\n", fname, ndx);
 
 	if (list_only) {
-		if (S_ISDIR(file->mode)
-		 && ((relative_paths && !implied_dirs && !(file->flags & FLAG_XFER_DIR))
-		  || (inc_recurse && ndx != cur_flist->ndx_start - 1)))
+		if (S_ISDIR(file->mode) && inc_recurse
+		 && ((!implied_dirs && !(file->flags & FLAG_XFER_DIR))
+		  || ndx != cur_flist->ndx_start - 1))
 			return;
 		list_file_entry(file);
 		return;
@@ -1248,7 +1248,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (S_ISDIR(file->mode)) {
-		if (!implied_dirs && !(file->flags & FLAG_XFER_DIR))
+		if (inc_recurse && !implied_dirs && !(file->flags & FLAG_XFER_DIR))
 			goto cleanup;
 		if (inc_recurse && ndx != cur_flist->ndx_start - 1) {
 			/* In inc_recurse mode we want ot make sure any missing
@@ -1832,7 +1832,7 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 	for (i = start; i <= end; i++, counter++) {
 		file = flist->files[i];
 		if (!S_ISDIR(file->mode)
-		 || (relative_paths && !implied_dirs && !(file->flags & FLAG_XFER_DIR)))
+		 || (inc_recurse && !implied_dirs && !(file->flags & FLAG_XFER_DIR)))
 			continue;
 		if (verbose > 3) {
 			fname = f_name(file, NULL);
