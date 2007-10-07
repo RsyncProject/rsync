@@ -1139,7 +1139,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (list_only) {
 		if (S_ISDIR(file->mode)
-		 && ((!implied_dirs && !(file->flags & FLAG_XFER_DIR))
+		 && ((relative_paths && !implied_dirs && !(file->flags & FLAG_XFER_DIR))
 		  || (inc_recurse && ndx != cur_flist->ndx_start - 1)))
 			return;
 		list_file_entry(file);
