@@ -50,6 +50,7 @@ extern int preserve_hard_links;
 extern int protocol_version;
 extern int file_total;
 extern int recurse;
+extern int xfer_dirs;
 extern int protect_args;
 extern int relative_paths;
 extern int sanitize_paths;
@@ -1048,8 +1049,10 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			io_start_multiplex_out();
 	}
 
-	if (argc == 0)
+	if (argc == 0) {
 		list_only |= 1;
+		xfer_dirs |= 1;
+	}
 
 	send_filter_list(read_batch ? -1 : f_out);
 
@@ -1161,7 +1164,8 @@ static int start_client(int argc, char *argv[])
 				static char *dotarg[1] = { "." };
 				p = dotarg[0];
 				remote_argv = dotarg;
-				list_only = 1;
+				list_only |= 1;
+				xfer_dirs |= 1;
 			}
 			remote_argc = 1;
 
@@ -1233,8 +1237,10 @@ static int start_client(int argc, char *argv[])
 			}
 			remote_argv[i] = arg;
 		}
-		if (argc == 0)
+		if (argc == 0) {
 			list_only |= 1;
+			xfer_dirs |= 1;
+		}
 	}
 
 	if (daemon_over_rsh < 0)
