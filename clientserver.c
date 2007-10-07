@@ -215,9 +215,6 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 	if (exchange_protocols(f_in, f_out, line, sizeof line, 1) < 0)
 		return -1;
 
-	if (list_only && protocol_version >= 29)
-		list_only |= 2;
-
 	/* set daemon_over_rsh to false since we need to build the
 	 * true set of args passed through the rsh/ssh connection;
 	 * this is a no-op for direct-socket-connection mode */
