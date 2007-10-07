@@ -864,7 +864,12 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (S_ISDIR(mode)) {
 		if (basename_len == 1+1 && *basename == '.') /* +1 for '\0' */
 			F_DEPTH(file)--;
-		if (xflags & XMIT_TOP_DIR) {
+		if (protocol_version >= 30) {
+			if (!(xflags & XMIT_NON_XFER_DIR))
+				file->flags |= FLAG_XFER_DIR;
+			if (xflags & XMIT_TOP_DIR)
+				file->flags |= FLAG_TOP_DIR;
+		} else if (xflags & XMIT_TOP_DIR) {
 			in_del_hier = recurse;
 			del_hier_name_len = F_DEPTH(file) == 0 ? 0 : l1 + l2;
 			if (relative_paths && del_hier_name_len > 2
@@ -872,9 +877,6 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 			    && lastname[del_hier_name_len-2] == '/')
 				del_hier_name_len -= 2;
 			file->flags |= FLAG_TOP_DIR | FLAG_XFER_DIR;
-		} else if (protocol_version >= 30) {
-			if (!(xflags & XMIT_NON_XFER_DIR))
-				file->flags |= FLAG_XFER_DIR;
 		} else if (in_del_hier) {
 			if (!relative_paths || !del_hier_name_len
 			 || (l1 >= del_hier_name_len
@@ -1611,14 +1613,9 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 					full_fname(fbuf));
 				continue;
 			}
-			send_file_name(f, flist, fbuf, &st,
-			    recurse || xfer_dirs ? FLAG_TOP_DIR | flags : flags,
-			    ALL_FILTERS);
-		} else {
-			send_file_name(f, flist, fbuf, NULL,
-			    recurse ? FLAG_TOP_DIR | flags : flags,
-			    ALL_FILTERS);
-		}
+			send_file_name(f, flist, fbuf, &st, FLAG_TOP_DIR | flags, ALL_FILTERS);
+		} else
+			send_file_name(f, flist, fbuf, NULL, FLAG_TOP_DIR | flags, ALL_FILTERS);
 	}
 
 	free(relname_list);
@@ -1740,7 +1737,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	struct timeval start_tv, end_tv;
 	int64 start_write;
 	int use_ff_fd = 0;
-	int flags, disable_buffering;
+	int disable_buffering;
+	int flags = recurse ? FLAG_XFER_DIR : 0;
 	int reading_remotely = filesfrom_host != NULL;
 	int rl_flags = (reading_remotely ? 0 : RL_DUMP_COMMENTS)
 #ifdef ICONV_OPTION
@@ -1765,11 +1763,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	flist = cur_flist = flist_new(0, "send_file_list");
 	if (inc_recurse) {
 		dir_flist = flist_new(FLIST_TEMP, "send_file_list");
-		flags = FLAG_DIVERT_DIRS | FLAG_XFER_DIR;
-	} else {
+		flags |= FLAG_DIVERT_DIRS;
+	} else
 		dir_flist = cur_flist;
-		flags = FLAG_XFER_DIR;
-	}
 
 	disable_buffering = io_start_buffering_out(f);
 	if (filesfrom_fd >= 0) {
@@ -1870,9 +1866,14 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				} else
 					break;
 			}
-			if (len == 1 && fn[0] == '/')
-				fn[len++] = '.';
 			fn[len] = '\0';
+			if (len == 1) {
+				if (fn[0] == '/') {
+					fn = "/.";
+					len = 2;
+				} else if (fn[0] == '.')
+					is_dot_dir = 1;
+			}
 			/* Reject a ".." dir in the active part of the path. */
 			for (p = fn; (p = strstr(p, "..")) != NULL; p += 2) {
 				if ((p[2] == '/' || p[2] == '\0')
@@ -1888,6 +1889,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (!*fn) {
 			len = 1;
 			fn = ".";
+			is_dot_dir = 1;
 		}
 
 		dirlen = dir ? strlen(dir) : 0;
@@ -1937,7 +1939,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 		if (recurse || (xfer_dirs && is_dot_dir)) {
 			struct file_struct *file;
-			int top_flags = FLAG_TOP_DIR | flags;
+			int top_flags = FLAG_TOP_DIR | FLAG_XFER_DIR | flags;
 			file = send_file_name(f, flist, fbuf, &st,
 					      top_flags, ALL_FILTERS);
 			if (file && !inc_recurse)
