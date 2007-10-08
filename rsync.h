@@ -50,7 +50,7 @@
 #define XMIT_LONG_NAME (1<<6)
 #define XMIT_SAME_TIME (1<<7)
 #define XMIT_SAME_RDEV_MAJOR (1<<8)	/* protocols 28 - now (devices only) */
-#define XMIT_NON_XFER_DIR (1<<8)	/* protocols 30 - now (dirs only) */
+#define XMIT_NO_CONTENT_DIR (1<<8)	/* protocols 30 - now (dirs only) */
 #define XMIT_HLINKED (1<<9)		/* protocols 28 - now */
 #define XMIT_SAME_DEV_pre30 (1<<10)	/* protocols 28 - 29  */
 #define XMIT_USER_NAME_FOLLOWS (1<<10)	/* protocols 30 - now */
@@ -63,14 +63,15 @@
 #define FLAG_TOP_DIR (1<<0)	/* sender/receiver/generator */
 #define FLAG_FILE_SENT (1<<1)	/* sender/receiver/generator */
 #define FLAG_DIR_CREATED (1<<1)	/* generator */
-#define FLAG_XFER_DIR (1<<2)	/* sender/receiver/generator */
+#define FLAG_CONTENT_DIR (1<<2)	/* sender/receiver/generator */
 #define FLAG_MOUNT_DIR (1<<3)	/* sender/generator */
 #define FLAG_DUPLICATE (1<<4)	/* sender */
 #define FLAG_MISSING_DIR (1<<4)	/* generator */
-#define FLAG_HLINKED (1<<5)	/* receiver/generator */
-#define FLAG_HLINK_FIRST (1<<6)	/* receiver/generator */
+#define FLAG_HLINKED (1<<5)	/* receiver/generator (checked on all types) */
+#define FLAG_HLINK_FIRST (1<<6)	/* receiver/generator (w/FLAG_HLINKED) */
+#define FLAG_IMPLIED_DIR (1<<6)	/* sender/receiver/generator (dirs only) */
 #define FLAG_HLINK_LAST (1<<7)	/* receiver/generator */
-#define FLAG_HLINK_DONE (1<<8)	/* receiver/generator */
+#define FLAG_HLINK_DONE (1<<8)	/* receiver/generator (checked on all types) */
 #define FLAG_LENGTH64 (1<<9)	/* sender/receiver/generator */
 #define FLAG_SKIP_GROUP (1<<10)	/* receiver/generator */
 
@@ -89,7 +90,7 @@
 /* This is used when working on a new protocol version in CVS, and should
  * be a new non-zero value for each CVS change that affects the protocol.
  * It must ALWAYS be 0 when the protocol goes final! */
-#define SUBPROTOCOL_VERSION 9
+#define SUBPROTOCOL_VERSION 10
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
