@@ -496,7 +496,7 @@ static void do_delete_pass(void)
 	for (j = 0; j < cur_flist->used; j++) {
 		struct file_struct *file = cur_flist->sorted[j];
 
-		if (!(file->flags & FLAG_XFER_DIR))
+		if (!(file->flags & FLAG_CONTENT_DIR))
 			continue;
 
 		f_name(file, fbuf);
@@ -1131,16 +1131,16 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	char *fnamecmp, *partialptr, *backupptr = NULL;
 	char fnamecmpbuf[MAXPATHLEN];
 	uchar fnamecmp_type;
-	int implied_dirs_are_missing = relative_paths && !implied_dirs && !inc_recurse;
+	int implied_dirs_are_missing = relative_paths && !implied_dirs && protocol_version < 30;
 	int del_opts = delete_mode || force_delete ? DEL_RECURSE : 0;
 
 	if (verbose > 2)
 		rprintf(FINFO, "recv_generator(%s,%d)\n", fname, ndx);
 
 	if (list_only) {
-		if (S_ISDIR(file->mode) && inc_recurse
-		 && ((!implied_dirs && !(file->flags & FLAG_XFER_DIR))
-		  || ndx != cur_flist->ndx_start - 1))
+		if (S_ISDIR(file->mode)
+		 && ((!implied_dirs && file->flags & FLAG_IMPLIED_DIR)
+		  || (inc_recurse && ndx != cur_flist->ndx_start - 1)))
 			return;
 		list_file_entry(file);
 		return;
@@ -1248,7 +1248,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (S_ISDIR(file->mode)) {
-		if (inc_recurse && !implied_dirs && !(file->flags & FLAG_XFER_DIR))
+		if (!implied_dirs && file->flags & FLAG_IMPLIED_DIR)
 			goto cleanup;
 		if (inc_recurse && ndx != cur_flist->ndx_start - 1) {
 			/* In inc_recurse mode we want ot make sure any missing
@@ -1345,7 +1345,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 		}
 		else if (delete_during && f_out != -1 && !phase && dry_run < 2
-		    && (file->flags & FLAG_XFER_DIR))
+		    && (file->flags & FLAG_CONTENT_DIR))
 			delete_in_dir(fname, file, &real_sx.st.st_dev);
 		goto cleanup;
 	}
@@ -1832,7 +1832,7 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 	for (i = start; i <= end; i++, counter++) {
 		file = flist->files[i];
 		if (!S_ISDIR(file->mode)
-		 || (inc_recurse && !implied_dirs && !(file->flags & FLAG_XFER_DIR)))
+		 || (!implied_dirs && file->flags & FLAG_IMPLIED_DIR))
 			continue;
 		if (verbose > 3) {
 			fname = f_name(file, NULL);
@@ -2002,7 +2002,7 @@ void generate_files(int f_out, const char *local_name)
 			ndx = cur_flist->ndx_start - 1;
 			recv_generator(fbuf, fp, ndx, itemizing, code, f_out);
 			if (delete_during && dry_run < 2) {
-				if (BITS_SETnUNSET(fp->flags, FLAG_XFER_DIR, FLAG_MISSING_DIR)) {
+				if (BITS_SETnUNSET(fp->flags, FLAG_CONTENT_DIR, FLAG_MISSING_DIR)) {
 					dev_t dirdev;
 					if (one_file_system) {
 						uint32 *devp = F_DIR_DEV_P(fp);
