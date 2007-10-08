@@ -376,15 +376,21 @@ static void send_file_entry(int f, struct file_struct *file, int ndx, int first_
 #endif
 		f_name(file, fname);
 
-	xflags = file->flags & FLAG_TOP_DIR; /* FLAG_TOP_DIR == XMIT_TOP_DIR */
+	/* Initialize starting value of xflags. */
+	if (protocol_version >= 30 && S_ISDIR(file->mode)) {
+		if (file->flags & FLAG_CONTENT_DIR)
+			xflags = file->flags & FLAG_TOP_DIR;
+		else if (file->flags & FLAG_IMPLIED_DIR)
+			xflags = XMIT_TOP_DIR | XMIT_NO_CONTENT_DIR;
+		else
+			xflags = XMIT_NO_CONTENT_DIR;
+	} else
+		xflags = file->flags & FLAG_TOP_DIR; /* FLAG_TOP_DIR == XMIT_TOP_DIR */
 
 	if (file->mode == mode)
 		xflags |= XMIT_SAME_MODE;
 	else
 		mode = file->mode;
-
-	if (protocol_version >= 30 && S_ISDIR(mode) && !(file->flags & FLAG_XFER_DIR))
-		xflags |= XMIT_NON_XFER_DIR;
 
 	if ((preserve_devices && IS_DEVICE(mode))
 	 || (preserve_specials && IS_SPECIAL(mode))) {
@@ -865,10 +871,12 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		if (basename_len == 1+1 && *basename == '.') /* +1 for '\0' */
 			F_DEPTH(file)--;
 		if (protocol_version >= 30) {
-			if (!(xflags & XMIT_NON_XFER_DIR))
-				file->flags |= FLAG_XFER_DIR;
-			if (xflags & XMIT_TOP_DIR)
-				file->flags |= FLAG_TOP_DIR;
+			if (!(xflags & XMIT_NO_CONTENT_DIR)) {
+				if (xflags & XMIT_TOP_DIR)
+					file->flags |= FLAG_TOP_DIR;
+				file->flags |= FLAG_CONTENT_DIR;
+			} else if (xflags & XMIT_TOP_DIR)
+				file->flags |= FLAG_IMPLIED_DIR;
 		} else if (xflags & XMIT_TOP_DIR) {
 			in_del_hier = recurse;
 			del_hier_name_len = F_DEPTH(file) == 0 ? 0 : l1 + l2;
@@ -876,12 +884,12 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 			    && lastname[del_hier_name_len-1] == '.'
 			    && lastname[del_hier_name_len-2] == '/')
 				del_hier_name_len -= 2;
-			file->flags |= FLAG_TOP_DIR | FLAG_XFER_DIR;
+			file->flags |= FLAG_TOP_DIR | FLAG_CONTENT_DIR;
 		} else if (in_del_hier) {
 			if (!relative_paths || !del_hier_name_len
 			 || (l1 >= del_hier_name_len
 			  && lastname[del_hier_name_len] == '/'))
-				file->flags |= FLAG_XFER_DIR;
+				file->flags |= FLAG_CONTENT_DIR;
 			else
 				in_del_hier = 0;
 		}
@@ -1046,7 +1054,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		/* -x only affects dirs because we need to avoid recursing
 		 * into a mount-point directory, not to avoid copying a
 		 * symlinked file if -L (or similar) was specified. */
-		if (one_file_system && flags & FLAG_XFER_DIR) {
+		if (one_file_system && flags & FLAG_CONTENT_DIR) {
 			if (flags & FLAG_TOP_DIR)
 				filesystem_dev = st.st_dev;
 			else if (st.st_dev != filesystem_dev) {
@@ -1062,7 +1070,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			}
 		}
 	} else
-		flags &= ~FLAG_XFER_DIR;
+		flags &= ~FLAG_CONTENT_DIR;
 
 	if (is_excluded(thisname, S_ISDIR(st.st_mode) != 0, filter_level)) {
 		if (ignore_perishable)
@@ -1499,7 +1507,7 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 	char *slash;
 	int len, need_new_dir;
 
-	flags &= ~FLAG_XFER_DIR;
+	flags = (flags | FLAG_IMPLIED_DIR) & ~(FLAG_TOP_DIR | FLAG_CONTENT_DIR);
 
 	if (inc_recurse) {
 		if (lastpath_struct && F_PATHNAME(lastpath_struct) == pathname
@@ -1565,7 +1573,7 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 {
 	char fbuf[MAXPATHLEN];
 	item_list *relname_list;
-	int len, dlen, flags = FLAG_DIVERT_DIRS | FLAG_XFER_DIR;
+	int len, dlen, flags = FLAG_DIVERT_DIRS | FLAG_CONTENT_DIR;
 	size_t j;
 
 	f_name(file, fbuf);
@@ -1578,7 +1586,7 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 
 	change_local_filter_dir(fbuf, dlen, send_dir_depth);
 
-	if (BITS_SETnUNSET(file->flags, FLAG_XFER_DIR, FLAG_MOUNT_DIR))
+	if (BITS_SETnUNSET(file->flags, FLAG_CONTENT_DIR, FLAG_MOUNT_DIR))
 		send_directory(f, flist, fbuf, dlen, flags);
 
 	if (!relative_paths)
@@ -1668,8 +1676,8 @@ void send_extra_file_list(int f, int at_least)
 			send_dir_ndx = dir_ndx;
 			file = dir_flist->sorted[dir_ndx];
 			/* Try to avoid some duplicate scanning of identical dirs. */
-			if (F_PATHNAME(file) == pathname && prev_flags & FLAG_XFER_DIR)
-				file->flags &= ~FLAG_XFER_DIR;
+			if (F_PATHNAME(file) == pathname && prev_flags & FLAG_CONTENT_DIR)
+				file->flags &= ~FLAG_CONTENT_DIR;
 			send1extra(f, file, flist);
 			prev_flags = file->flags;
 			dp = F_DIR_NODE_P(file);
@@ -1738,7 +1746,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	int64 start_write;
 	int use_ff_fd = 0;
 	int disable_buffering;
-	int flags = recurse ? FLAG_XFER_DIR : 0;
+	int flags = recurse ? FLAG_CONTENT_DIR : 0;
 	int reading_remotely = filesfrom_host != NULL;
 	int rl_flags = (reading_remotely ? 0 : RL_DUMP_COMMENTS)
 #ifdef ICONV_OPTION
@@ -1754,6 +1762,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 	start_write = stats.total_written;
 	gettimeofday(&start_tv, NULL);
+
+	if (relative_paths && protocol_version >= 30)
+		implied_dirs = 1; /* We send flagged implied dirs */
 
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && protocol_version >= 30 && !cur_flist)
@@ -1939,7 +1950,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 		if (recurse || (xfer_dirs && is_dot_dir)) {
 			struct file_struct *file;
-			int top_flags = FLAG_TOP_DIR | FLAG_XFER_DIR | flags;
+			int top_flags = FLAG_TOP_DIR | FLAG_CONTENT_DIR | flags;
 			file = send_file_name(f, flist, fbuf, &st,
 					      top_flags, ALL_FILTERS);
 			if (file && !inc_recurse)
@@ -2391,8 +2402,10 @@ static void clean_flist(struct file_list *flist, int strip_root)
 				else {
 					if (am_sender)
 						file->flags |= FLAG_DUPLICATE;
-					else    /* Make sure we don't lose vital flags. */
-						fp->flags |= file->flags & (FLAG_TOP_DIR|FLAG_XFER_DIR);
+					else { /* Make sure we merge our vital flags. */
+						fp->flags |= file->flags & (FLAG_TOP_DIR|FLAG_CONTENT_DIR);
+						fp->flags &= file->flags | ~FLAG_IMPLIED_DIR;
+					}
 					keep = j, drop = i;
 				}
 			} else
