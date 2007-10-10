@@ -144,7 +144,9 @@ pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 			close(to_child_pipe[0]);
 		if (from_child_pipe[1] != STDOUT_FILENO)
 			close(from_child_pipe[1]);
+#ifdef ICONV_CONST
 		setup_iconv();
+#endif
 		child_main(argc, argv);
 	}
 
