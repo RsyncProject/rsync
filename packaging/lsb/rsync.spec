@@ -1,4 +1,4 @@
-Summary: A program for synchronizing files over a network.
+Summary: A fast, versatile, remote (and local) file-copying tool
 Name: rsync
 Version: 3.0.0pre2
 Release: 1
@@ -11,13 +11,15 @@ BuildRoot: /var/tmp/%{name}-root
 License: GPL
 
 %description
-Rsync uses a reliable algorithm to bring remote and host files into
-sync very quickly. Rsync is fast because it just sends the differences
-in the files over the network instead of sending the complete
-files. Rsync is often used as a very powerful mirroring process or
-just as a more capable replacement for the rcp command. A technical
-report which describes the rsync algorithm is included in this
-package.
+Rsync is a fast and extraordinarily versatile file copying tool.  It can
+copy locally, to/from another host over any remote shell, or to/from a
+remote rsync daemon.  It offers a large number of options that control
+every aspect of its behavior and permit very flexible specification of the
+set of files to be copied.  It is famous for its delta-transfer algorithm,
+which reduces the amount of data sent over the network by sending only the
+differences between the source files and the existing files in the
+destination.  Rsync is widely used for backups and mirroring and as an
+improved copy command for everyday use.
 
 %prep
 %setup -q
@@ -43,46 +45,5 @@ rm -rf $RPM_BUILD_ROOT
 %{_mandir}/man5/rsyncd.conf.5*
 
 %changelog
-* Thu Jan 30 2003 Horst von Brand <vonbrand@inf.utfsm.cl>
-  Fixed "Sept" date in %changelog here
-  Use %{_mandir} to point to manpages
-  Support for compressed manpages (* at end catches them in %files)
-  Add doc/README-SGML and doc/rsync.sgml to %doc
-
-* Mon Sep 11 2000 John H Terpstra <jht@turbolinux.com>
-  Changed target paths to be Linux Standards Base compliant
-
-* Mon Jan 25 1999 Stefan Hornburg <racke@linuxia.de>
-  quoted RPM_OPT_FLAGS for the sake of robustness
-
-* Mon May 18 1998 Andrew Tridgell <tridge@samba.anu.edu.au>
-  reworked for auto-building when I release rsync (tridge@samba.anu.edu.au)
-
-* Sat May 16 1998 John H Terpstra <jht@aquasoft.com.au>
-  Upgraded to Rsync 2.0.6
-    -new feature anonymous rsync
-
-* Mon Apr  6 1998 Douglas N. Arnold <dna@math.psu.edu>
-
-Upgrade to rsync version 1.7.2.
-
-* Sun Mar  1 1998 Douglas N. Arnold <dna@math.psu.edu>
-
-Built 1.6.9-1 based on the 1.6.3-2 spec file of John A. Martin.
-Changes from 1.6.3-2 packaging: added latex and dvips commands
-to create tech_report.ps.
-
-* Mon Aug 25 1997 John A. Martin <jam@jamux.com>
-
-Built 1.6.3-2 after finding no rsync-1.6.3-1.src.rpm although there
-was an ftp://ftp.redhat.com/pub/contrib/alpha/rsync-1.6.3-1.alpha.rpm
-showing no packager nor signature but giving 
-"Source RPM: rsync-1.6.3-1.src.rpm".
-
-Changes from 1.6.2-1 packaging: added '$RPM_OPT_FLAGS' to make, strip
-to '%build', removed '%prefix'.
-
-* Thu Apr 10 1997 Michael De La Rue <miked@ed.ac.uk>
-
-rsync-1.6.2-1 packaged.  (This entry by jam to credit Michael for the
-previous package(s).)
+* Wed Oct 11 2007 Wayne Davison <wayned@samba.org>
+Released 3.0.0pre2.
