@@ -45,5 +45,5 @@ rm -rf $RPM_BUILD_ROOT
 %{_mandir}/man5/rsyncd.conf.5*
 
 %changelog
-* Wed Oct 11 2007 Wayne Davison <wayned@samba.org>
+* Thu Oct 11 2007 Wayne Davison <wayned@samba.org>
 Released 3.0.0pre2.
