@@ -5,11 +5,11 @@ manpagesynopsis()
 
 verb(Local:  rsync [OPTION...] SRC... [DEST]
 
-Transfer via remote shell:
+Access via remote shell:
   Pull: rsync [OPTION...] [USER@]HOST:SRC... [DEST]
   Push: rsync [OPTION...] SRC... [USER@]HOST:DEST
 
-Transfer via rsync daemon:
+Access via rsync daemon:
   Pull: rsync [OPTION...] [USER@]HOST::SRC... [DEST]
         rsync [OPTION...] rsync://[USER@]HOST[:PORT]/SRC... [DEST]
   Push: rsync [OPTION...] SRC... [USER@]HOST::DEST
