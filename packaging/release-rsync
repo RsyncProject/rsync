@@ -166,7 +166,7 @@ foreach my $fn (@tweak_files) {
     } elsif ($fn =~ /\.spec/) {
 	s/^(Version:) .*/$1 $version/m;
 	s/^(Release:) .*/$1 $release/m;
-	s/^(Released) .*/$1 $release./m;
+	s/^(Released) .*/$1 $version./m;
 	s/^\* \w\w\w \w\w\w \d\d \d\d\d\d (.*)/$cl_today $1/m;
     } elsif ($fn =~ /\.yo/) {
 	s/^(manpage\([^)]+\)\(\d+\)\()[^)]+(\).*)/$1$today$2/m;
