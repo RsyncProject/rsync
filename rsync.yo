@@ -15,25 +15,26 @@ Access via rsync daemon:
   Push: rsync [OPTION...] SRC... [USER@]HOST::DEST
         rsync [OPTION...] SRC... rsync://[USER@]HOST[:PORT]/DEST)
 
-Usages without a DEST list the source files instead of copying.
+Usages with just one SRC arg and no DEST arg will list the source files
+instead of copying.
 
 manpagedescription()
 
-Rsync is a program that behaves in much the same way that rcp does,
-but has many more options and uses the rsync remote-update protocol to
-greatly speed up file transfers when the destination file is being
-updated.
+Rsync is a fast and extraordinarily versatile file copying tool.  It can
+copy locally, to/from another host over any remote shell, or to/from a
+remote rsync daemon.  It offers a large number of options that control
+every aspect of its behavior and permit very flexible specification of the
+set of files to be copied.  It is famous for its delta-transfer algorithm,
+which reduces the amount of data sent over the network by sending only the
+differences between the source files and the existing files in the
+destination.  Rsync is widely used for backups and mirroring and as an
+improved copy command for everyday use.
 
-The rsync remote-update protocol allows rsync to transfer just the
-differences between two sets of files across the network connection, using
-an efficient checksum-search algorithm described in the technical
-report that accompanies this package.
-
-Rsync finds files that need to be transferred using a "quick check" algorithm
-that looks for files that have changed in size or in last-modified time (by
-default).  Any changes in the other preserved attributes (as requested by
-options) are made on the destination file directly when the quick check
-indicates that the file's data does not need to be updated.
+Rsync finds files that need to be transferred using a "quick check"
+algorithm (by default) that looks for files that have changed in size or
+in last-modified time.  Any changes in the other preserved attributes (as
+requested by options) are made on the destination file directly when the
+quick check indicates that the file's data does not need to be updated.
 
 Some of the additional features of rsync are:
 
