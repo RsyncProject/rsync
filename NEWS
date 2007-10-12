@@ -2,7 +2,7 @@ NEWS for rsync 3.0.0 (UNRELEASED)
 Protocol: 30 (changed)
 Changes since 2.6.9:
 
-  NOTABLE CHANGE IN BEHAVIOR:
+  NOTABLE CHANGES IN BEHAVIOR:
 
     - The handling of implied directories when using --relative has changed to
       send them as directories (e.g. no implied dir is ever sent as a symlink).
@@ -16,7 +16,7 @@ Changes since 2.6.9:
       sends the -d (--dirs) option to the remote rsync rather than sending -r
       along with an extra exclude of /*/*.  If the remote rsync does not
       understand the -d option (i.e. it is 2.6.3 or older), you will need to
-      specify   -r --exclude='/*/*'   manually.
+      either turn off -d (--no-d), or specify  -r --exclude='/*/*'  manually.
 
   BUG FIXES:
 
