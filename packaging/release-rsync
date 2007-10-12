@@ -16,9 +16,9 @@ my $dest = $ENV{HOME} . '/samba-rsync-ftp';
 my $releasedir = $ENV{HOME} . '/release';
 my $cvsroot = $ENV{CVSROOT} = 'samba.org:/data/cvs';
 
+my $cl_today = time2str('* %a %b %d %Y', time);
 my $ztoday = time2str('%d %b %Y', time);
-my $today = $ztoday;
-$today =~ s/^0//;
+(my $today = $ztoday) =~ s/^0//;
 
 my $break = <<EOT;
 ==========================================================================
@@ -166,6 +166,8 @@ foreach my $fn (@tweak_files) {
     } elsif ($fn =~ /\.spec/) {
 	s/^(Version:) .*/$1 $version/m;
 	s/^(Release:) .*/$1 $release/m;
+	s/^(Released) .*/$1 $release./m;
+	s/^\* \w\w\w \w\w\w \d\d \d\d\d\d (.*)/$cl_today $1/m;
     } elsif ($fn =~ /\.yo/) {
 	s/^(manpage\([^)]+\)\(\d+\)\()[^)]+(\).*)/$1$today$2/m;
 	s/^(This man ?page is current for version) \S+ (of rsync)/$1 $version $2/m;
