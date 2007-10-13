@@ -747,6 +747,12 @@ bf(--recursive) option, rsync will skip all directories it encounters (and
 output a message to that effect for each one).  If you specify both
 bf(--dirs) and bf(--recursive), bf(--recursive) takes precedence.
 
+This option is implied by the bf(--list-only) option (including an implied
+bf(--list-only) usage) if bf(--recursive) wasn't specified (so that
+directories are seen in the listing).  Specify bf(--no-dirs) (or bf(--no-d))
+if you want to override this.  This option is also implied by
+bf(--files-from).
+
 dit(bf(-l, --links)) When symlinks are encountered, recreate the
 symlink on the destination.
 
@@ -1073,9 +1079,9 @@ Prior to rsync 2.6.7, this option would have no effect unless bf(--recursive)
 was enabled.  Beginning with 2.6.7, deletions will also occur when bf(--dirs)
 (bf(-d)) is enabled, but only for directories whose contents are being copied.
 
-This option can be dangerous if used incorrectly!  It is a very good idea
-to run first using the bf(--dry-run) option (bf(-n)) to see what files would be
-deleted to make sure important files aren't listed.
+This option can be dangerous if used incorrectly!  It is a very good idea to
+first try a run using the bf(--dry-run) option (bf(-n)) to see what files are
+going to be deleted.
 
 If the sending side detects any I/O errors, then the deletion of any
 files at the destination will be automatically disabled. This is to
@@ -1922,15 +1928,21 @@ dit(bf(--list-only)) This option will cause the source files to be listed
 instead of transferred.  This option is inferred if there is a single source
 arg and no destination specified, so its main uses are: (1) to turn a copy
 command that includes a
-destination arg into a file-listing command, (2) to be able to specify more
-than one local source arg (note: be sure to include the destination), or
-(3) to avoid the automatically added "bf(-r --exclude='/*/*')" options that
-rsync usually uses as a compatibility kluge when generating a non-recursive
-listing.  Caution: keep in mind that a source arg with a wild-card is expanded
-by the shell into multiple args, so it is never safe to try to list such an arg
+destination arg into a file-listing command, or (2) to be able to specify
+more than one source arg (note: be sure to include the destination).
+Caution: keep in mind that a source arg with a wild-card is expanded by the
+shell into multiple args, so it is never safe to try to list such an arg
 without using this option.  For example:
 
 verb(    rsync -av --list-only foo* dest/)
+
+Compatibility note:  when requesting a remote listing of files from an rsync
+that is version 2.6.3 or older, you may encounter an error if you ask for a
+non-recursive listing.  This is because a file listing implies the bf(--dirs)
+option w/o bf(--recursive), and older rsyncs don't have that option.  To
+avoid this problem, either specify the bf(--no-dirs) option (if you don't
+need to expand a directory's content), or turn on recursion and exclude
+the content of subdirectories: bf(-r --exclude='/*/*').
 
 dit(bf(--bwlimit=KBPS)) This option allows you to specify a maximum
 transfer rate in kilobytes per second. This option is most effective when
