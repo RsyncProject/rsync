@@ -388,6 +388,12 @@ static void read_msg_fd(void)
 			goto invalid_msg;
 		flist_eof = 1;
 		break;
+	case MSG_IO_ERROR:
+		if (len != 4)
+			goto invalid_msg;
+		readfd(fd, buf, len);
+		io_error |= IVAL(buf, 0);
+		break;
 	case MSG_DELETED:
 		if (len >= (int)sizeof buf || !am_generator)
 			goto invalid_msg;
@@ -1041,6 +1047,7 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 			if (msg_bytes != 4)
 				goto invalid_msg;
 			read_loop(fd, line, msg_bytes);
+			send_msg_int(MSG_IO_ERROR, IVAL(line, 0));
 			io_error |= IVAL(line, 0);
 			break;
 		case MSG_DELETED:
