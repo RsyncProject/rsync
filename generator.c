@@ -1251,7 +1251,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (!implied_dirs && file->flags & FLAG_IMPLIED_DIR)
 			goto cleanup;
 		if (inc_recurse && ndx != cur_flist->ndx_start - 1) {
-			/* In inc_recurse mode we want ot make sure any missing
+			/* In inc_recurse mode we want to make sure any missing
 			 * directories get created while we're still processing
 			 * the parent dir (which allows us to touch the parent
 			 * dir's mtime right away).  We will handle the dir in
