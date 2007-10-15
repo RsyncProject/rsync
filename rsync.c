@@ -401,9 +401,9 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	change_gid = gid_ndx && !(file->flags & FLAG_SKIP_GROUP)
 		  && sxp->st.st_gid != (gid_t)F_GROUP(file);
 #if !defined HAVE_LCHOWN && !defined CHOWN_MODIFIES_SYMLINK
-	if (S_ISLNK(sxp->st.st_mode))
+	if (S_ISLNK(sxp->st.st_mode)) {
 		;
-	else
+	} else
 #endif
 	if (change_uid || change_gid) {
 		if (verbose > 2) {
