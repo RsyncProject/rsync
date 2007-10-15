@@ -562,6 +562,11 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 		  && (!(iflags & ITEM_XNAME_FOLLOWS) || *xname))
 		 || (keep_time && cmp_time(file->modtime, sxp->st.st_mtime) != 0))
 			iflags |= ITEM_REPORT_TIME;
+#ifndef HAVE_LCHMOD
+		if (S_ISLNK(file->mode)) {
+			;
+		} else
+#endif
 		if (!BITS_EQUAL(sxp->st.st_mode, file->mode, CHMOD_BITS))
 			iflags |= ITEM_REPORT_PERMS;
 		if (uid_ndx && am_root && (uid_t)F_OWNER(file) != sxp->st.st_uid)
