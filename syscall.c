@@ -25,6 +25,9 @@
 #if !defined MKNOD_CREATES_SOCKETS && defined HAVE_SYS_UN_H
 #include <sys/un.h>
 #endif
+#ifdef HAVE_SYS_ATTR_H
+#include <sys/attr.h>
+#endif
 
 extern int dry_run;
 extern int am_root;
@@ -151,6 +154,14 @@ int do_chmod(const char *path, mode_t mode)
 	if (S_ISLNK(mode)) {
 #ifdef HAVE_LCHMOD
 		code = lchmod(path, mode & CHMOD_BITS);
+#elif defined HAVE_SETATTRLIST
+		struct attrlist attrList;
+		uint32_t m = mode & CHMOD_BITS; /* manpage is wrong: not mode_t! */
+
+		memset(&attrList, 0, sizeof attrList);
+		attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
+		attrList.commonattr = ATTR_CMN_ACCESSMASK;
+		code = setattrlist(path, &attrList, &m, sizeof m, FSOPT_NOFOLLOW);
 #else
 		code = 1;
 #endif
