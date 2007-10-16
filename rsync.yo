@@ -2834,23 +2834,25 @@ The primary ftp site for rsync is
 url(ftp://rsync.samba.org/pub/rsync)(ftp://rsync.samba.org/pub/rsync).
 
 We would be delighted to hear from you if you like this program.
+Please contact the mailing-list at rsync@lists.samba.org.
 
 This program uses the excellent zlib compression library written by
 Jean-loup Gailly and Mark Adler.
 
 manpagesection(THANKS)
 
-Thanks to Richard Brent, Brendan Mackay, Bill Waite, Stephen Rothwell
-and David Bell for helpful suggestions, patches and testing of rsync.
-I've probably missed some people, my apologies if I have.
+Especial thanks go out to: John Van Essen, Matt McCutchen, Wesley W. Terpstra,
+David Dykstra, Jos Backus, Sebastian Krahmer, Martin Pool, and our
+gone-but-not-forgotten compadre, J.W. Schultz.
 
-Especial thanks also to: David Dykstra, Jos Backus, Sebastian Krahmer,
-Martin Pool, Wayne Davison, J.W. Schultz.
+Thanks also to Richard Brent, Brendan Mackay, Bill Waite, Stephen Rothwell
+and David Bell.  I've probably missed some people, my apologies if I have.
 
 manpageauthor()
 
 rsync was originally written by Andrew Tridgell and Paul Mackerras.
-Many people have later contributed to it.
+Many people have later contributed to it.  It is currently maintained
+by Wayne Davison.
 
 Mailing lists for support and development are available at
 url(http://lists.samba.org)(lists.samba.org)
