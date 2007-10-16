@@ -104,8 +104,11 @@ static void check_sub_protocol(void)
 
 void set_allow_inc_recurse(void)
 {
-	if (!recurse || delete_before || delete_after || use_qsort
-	 || (!am_sender && (delay_updates || prune_empty_dirs)))
+	if (!recurse || use_qsort)
+		allow_inc_recurse = 0;
+	else if (!am_sender
+	 && (delete_before || delete_after
+	  || delay_updates || prune_empty_dirs))
 		allow_inc_recurse = 0;
 	else if (am_server && !local_server
 	 && (!shell_cmd || strchr(shell_cmd, 'i') == NULL))
