@@ -1861,6 +1861,8 @@ void start_write_batch(int fd)
 	 * actual communication so far depends on whether a daemon
 	 * is involved. */
 	write_int(batch_fd, protocol_version);
+	if (protocol_version >= 30)
+		write_byte(batch_fd, inc_recurse);
 	write_int(batch_fd, checksum_seed);
 
 	if (am_sender)
