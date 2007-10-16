@@ -102,6 +102,16 @@ static void check_sub_protocol(void)
 		protocol_version--;
 }
 
+void set_allow_inc_recurse(void)
+{
+	if (!recurse || delete_before || delete_after || use_qsort
+	 || (!am_sender && (delay_updates || prune_empty_dirs)))
+		allow_inc_recurse = 0;
+	else if (am_server && !local_server
+	 && (!shell_cmd || strchr(shell_cmd, 'i') == NULL))
+		allow_inc_recurse = 0;
+}
+
 void setup_protocol(int f_out,int f_in)
 {
 	if (am_sender)
@@ -116,6 +126,9 @@ void setup_protocol(int f_out,int f_in)
 		acls_ndx = ++file_extra_cnt;
 	if (preserve_xattrs)
 		xattrs_ndx = ++file_extra_cnt;
+
+	if (am_server)
+		set_allow_inc_recurse();
 
 	if (remote_protocol == 0) {
 		if (am_server && !local_server)
@@ -216,21 +229,18 @@ void setup_protocol(int f_out,int f_in)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 	} else if (protocol_version >= 30) {
-		if (recurse && allow_inc_recurse
-		 && !delete_before && !delete_after && !delay_updates
-		 && !use_qsort && !prune_empty_dirs)
-			inc_recurse = 1;
-		if (am_server || read_batch) {
-			int i_r = read_byte(f_in);
-			if (i_r && !inc_recurse) {
-				fprintf(stderr,
-				    "Incompatible options specified for inc-recursive %s.\n",
-				    read_batch ? "batch file" : "connection");
-				exit_cleanup(RERR_SYNTAX);
-			}
-			inc_recurse = i_r;
-		} else
+		if (am_server) {
+			inc_recurse = allow_inc_recurse;
 			write_byte(f_out, inc_recurse);
+		} else
+			inc_recurse = read_byte(f_in);
+		if (inc_recurse && !allow_inc_recurse) {
+			/* This should only be able to happen in a batch. */
+			fprintf(stderr,
+			    "Incompatible options specified for inc-recursive %s.\n",
+			    read_batch ? "batch file" : "protocol");
+			exit_cleanup(RERR_SYNTAX);
+		}
 		need_messages_from_generator = 1;
 	}
 
