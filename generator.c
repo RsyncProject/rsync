@@ -562,7 +562,7 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 		  && (!(iflags & ITEM_XNAME_FOLLOWS) || *xname))
 		 || (keep_time && cmp_time(file->modtime, sxp->st.st_mtime) != 0))
 			iflags |= ITEM_REPORT_TIME;
-#ifndef HAVE_LCHMOD
+#if !defined HAVE_LCHMOD && !defined HAVE_SETATTRLIST
 		if (S_ISLNK(file->mode)) {
 			;
 		} else
