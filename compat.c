@@ -220,6 +220,17 @@ void setup_protocol(int f_out,int f_in)
 		 && !delete_before && !delete_after && !delay_updates
 		 && !use_qsort && !prune_empty_dirs)
 			inc_recurse = 1;
+		if (am_server || read_batch) {
+			int i_r = read_byte(f_in);
+			if (i_r && !inc_recurse) {
+				fprintf(stderr,
+				    "Incompatible options specified for inc-recursive %s.\n",
+				    read_batch ? "batch file" : "connection");
+				exit_cleanup(RERR_SYNTAX);
+			}
+			inc_recurse = i_r;
+		} else
+			write_byte(f_out, inc_recurse);
 		need_messages_from_generator = 1;
 	}
 
