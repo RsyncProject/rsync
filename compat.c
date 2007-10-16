@@ -241,7 +241,7 @@ void setup_protocol(int f_out,int f_in)
 			/* This should only be able to happen in a batch. */
 			fprintf(stderr,
 			    "Incompatible options specified for inc-recursive %s.\n",
-			    read_batch ? "batch file" : "protocol");
+			    read_batch ? "batch file" : "connection");
 			exit_cleanup(RERR_SYNTAX);
 		}
 		need_messages_from_generator = 1;
