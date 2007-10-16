@@ -440,6 +440,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 
 	if (read_batch) {
 		int from_gen_pipe[2];
+		set_allow_inc_recurse();
 		if (fd_pair(from_gen_pipe) < 0) {
 			rsyserr(FERROR, errno, "pipe");
 			exit_cleanup(RERR_IPC);
@@ -456,6 +457,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 		 * it on, but only if we're not batch processing. */
 		if (whole_file < 0 && !write_batch)
 			whole_file = 1;
+		set_allow_inc_recurse();
 		ret = local_child(argc, args, f_in_p, f_out_p, child_main);
 #ifdef ICONV_CONST
 		setup_iconv();
