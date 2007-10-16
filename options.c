@@ -1644,11 +1644,7 @@ void server_options(char **args, int *argc_p)
 	static char argstr[64];
 	int ac = *argc_p;
 	char *arg;
-
 	int i, x;
-
-	if (blocking_io == -1)
-		blocking_io = 0;
 
 	/* This should always remain first on the server's command-line. */
 	args[ac++] = "--server";
@@ -1752,14 +1748,20 @@ void server_options(char **args, int *argc_p)
 	if (do_compression)
 		argstr[x++] = 'z';
 
+	/* We make use of the -e option to let the server know about any
+	 * pre-release protocol version && our allow_inc_recurse status. */
+	set_allow_inc_recurse();
 #if SUBPROTOCOL_VERSION != 0
-	/* If we're speaking a pre-release version of a protocol, we tell
-	 * the server about this by (ab)using the -e option. */
 	if (protocol_version == PROTOCOL_VERSION) {
 		x += snprintf(argstr+x, sizeof argstr - x,
-			      "e%d.%d", PROTOCOL_VERSION, SUBPROTOCOL_VERSION);
-	}
+			      "e%d.%d%s", PROTOCOL_VERSION, SUBPROTOCOL_VERSION,
+			      allow_inc_recurse ? "i" : "");
+	} else
 #endif
+	if (allow_inc_recurse) {
+		argstr[x++] = 'e';
+		argstr[x++] = 'i';
+	}
 
 	argstr[x] = '\0';
 
@@ -1924,6 +1926,9 @@ void server_options(char **args, int *argc_p)
 
 	if (numeric_ids)
 		args[ac++] = "--numeric-ids";
+
+	if (use_qsort)
+		args[ac++] = "--use-qsort";
 
 	if (am_sender) {
 		if (ignore_existing)
