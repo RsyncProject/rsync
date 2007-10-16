@@ -1925,9 +1925,6 @@ void server_options(char **args, int *argc_p)
 	if (numeric_ids)
 		args[ac++] = "--numeric-ids";
 
-	if (!allow_inc_recurse)
-		args[ac++] = "--no-i-r";
-
 	if (am_sender) {
 		if (ignore_existing)
 			args[ac++] = "--ignore-existing";
