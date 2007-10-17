@@ -391,6 +391,22 @@ enum msgcode {
 
 #include "lib/pool_alloc.h"
 
+#ifndef HAVE_ID_T
+typedef int id_t;
+#endif
+#ifndef HAVE_PID_T
+typedef int pid_t;
+#endif
+#ifndef HAVE_MODE_T
+typedef int mode_t;
+#endif
+#ifndef HAVE_OFF_T
+typedef long off_t;
+#endif
+#ifndef HAVE_SIZE_T
+typedef unsigned int size_t;
+#endif
+
 #define BOOL int
 
 #ifndef uchar
