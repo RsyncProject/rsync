@@ -1873,6 +1873,7 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 		file = flist->files[ndx - flist->ndx_start];
 		assert(file->flags & FLAG_HLINKED);
 		finish_hard_link(file, f_name(file, fbuf), ndx, NULL, itemizing, code, -1);
+		flist->in_progress--;
 	}
 #endif
 
