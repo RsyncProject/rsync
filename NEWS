@@ -102,17 +102,19 @@ Changes since 2.6.9:
 
     - Added the --acls (-A) option to preserve Access Control Lists.  This is
       an improved version of the prior patch that was available, and it even
-      supports OS X ACLs.  (If you need to have backward compatibility with
-      old, patched versions of rsync, apply the acls.diff file from the patches
-      dir.)
+      supports OS X ACLs.  If you need to have backward compatibility with old,
+      acl-patched versions of rsync, apply the acls.diff file from the patches
+      dir.
 
     - Added the --xattrs (-X) option to preserver extended attributes.  This is
-      an improved version of the prior patch that was available.  (If you need
-      to have backward compatibility with old, patched versions of rsync, apply
-      the xattrs.diff file from the patches dir.)
+      an improved version of the prior patch that was available, and it even
+      supports OS X xattrs (which includes their resource fork data).  If you
+      need to have backward compatibility with old, xattr-patched versions of
+      rsync, apply the xattrs.diff file from the patches dir.
 
     - Added the --fake-super option that allows a non-super user to preserve
       all attributes of a file by using a special extended-attribute idiom.
+      It even supports the storing of foreign ACL data on your backup server.
       There is also an analogous "fake super" option for an rsync daemon.
 
     - Added the --iconv option, which allows rsync to convert filenames from
