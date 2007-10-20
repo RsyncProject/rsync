@@ -335,7 +335,9 @@ static void send_file_entry(int f, struct file_struct *file, int ndx, int first_
 {
 	static time_t modtime;
 	static mode_t mode;
+#ifdef SUPPORT_HARD_LINKS
 	static int64 dev;
+#endif
 	static dev_t rdev;
 	static uint32 rdev_major;
 	static uid_t uid;
@@ -599,7 +601,9 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 {
 	static int64 modtime;
 	static mode_t mode;
+#ifdef SUPPORT_HARD_LINKS
 	static int64 dev;
+#endif
 	static dev_t rdev;
 	static uint32 rdev_major;
 	static uid_t uid;
