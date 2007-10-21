@@ -346,7 +346,8 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 					continue;
 				statret = 1;
 				if (verbose < 2 || !stdout_format_has_i) {
-					itemizing = 0;
+					if (stdout_format_has_i < 2)
+						itemizing = 0;
 					code = FNONE;
 					if (verbose > 1 && maybe_ATTRS_REPORT)
 						rprintf(FCLIENT, "%s is uptodate\n", fname);
