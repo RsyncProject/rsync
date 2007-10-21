@@ -7,10 +7,10 @@ Changes since 2.6.9:
     - The handling of implied directories when using --relative has changed to
       send them as directories (e.g. no implied dir is ever sent as a symlink).
       This avoids unexpected behavior and should not adversely affect most
-      people.  If you're one of those rare people who relied upon having an
-      implied dir be duplicated as a symlink, you should specify the transfer
-      of the symlink and the transfer of the referent directory as separate
-      args.  (See also --keep-dirlinks and --no-implied-dirs.)
+      people.  If you're one of those rare individuals who relied upon having
+      an implied dir be duplicated as a symlink, you should specify the
+      transfer of the symlink and the transfer of the referent directory as
+      separate args.  (See also --keep-dirlinks and --no-implied-dirs.)
 
     - Requesting a remote file list without specifying -r (--recursive) now
       sends the -d (--dirs) option to the remote rsync rather than sending -r
@@ -24,18 +24,18 @@ Changes since 2.6.9:
       it now itemizes all the items, not just the changed ones.
 
     - Made the output of all file types consistent when using a --*-dest
-      option.  Prior versions used to output too many creation events for
+      option.  Prior versions would output too many creation events for
       matching items.
 
     - The code that waits for a child pid now handles being interrupted by a
       signal.  This fixes a problem with the pre-xfer exec function not being
       able to get the exit status from the script.
 
-    - A negated filter rule (with a '!' modifier) no longer loses the negation
-      when sending the filter rules to the remote rsync.
+    - A negated filter rule (i.e. with a '!' modifier) no longer loses the
+      negation when sending the filter rules to the remote rsync.
 
     - Fixed a problem with the --out-format (aka --log-format) option %f:  it
-      would output superfluous directory information for a non-daemon rsync.
+      no longer outputs superfluous directory info for a non-daemon rsync.
 
     - Fixed a problem with -vv (double --verbose) and --stats when "pushing"
       files (which includes local copies).  Version 2.6.9 would complete the
@@ -88,9 +88,9 @@ Changes since 2.6.9:
 
     - Rsync now allows multiple remote-source args to be specified rather than
       having to rely on a special space-splitting side-effect of the remote-
-      shell.  Additional remote args must specify the same host or have an
-      empty hostname, as seen here:  :file1  ::module/file2.  This means that
-      local use of brace expansion now works:  rsync -av host:path/{f1,f2} .
+      shell.  Additional remote args must specify the same host or an empty one
+      (e.g. empty:  :file1  or  ::module/file2).  This means that local use of
+      brace expansion now works:  rsync -av host:dir/{f1,f2} .
 
     - Added the --protect-args (-s) option, that tells rsync to send most of
       the command-line args at the start of the transfer rather than as args
@@ -222,7 +222,7 @@ Changes since 2.6.9:
       directory named testtmp (which is created, if missing).  This allows
       someone to symlink the testtmp directory to another filesystem (which is
       useful if the build dir's filesystem does not support ACLs and xattrs,
-      and another file system does).
+      but another file system does).
 
     - Rsync now has a way of handling protocol-version changes during the
       development of a new protocol version.  This causes any out-of-sync
