@@ -62,9 +62,9 @@ Changes since 2.6.9:
     - Fixed a bug when using --backup and --inplace with --whole-file or
       --read-batch: backup files are actually created now.
 
-    - Starting up an extra copy of an rsync daemon does not delete the pidfile
-      for the running daemon -- if the pidfile exists, the extra program will
-      exit with an error.
+    - Starting up an extra copy of an rsync daemon will not clobber the pidfile
+      for the running daemon -- if the pidfile exists, the new daemon will exit
+      with an error.
 
     - The daemon pidfile is checked and created sooner in the startup sequence.
 
