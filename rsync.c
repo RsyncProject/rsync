@@ -134,8 +134,6 @@ void setup_iconv(void)
 # endif
 }
 
-# ifdef ICONV_OPTION
-
 /* This function converts the characters in the "in" xbuf into characters
  * in the "out" xbuf.  The "len" of the "in" xbuf is used starting from its
  * "pos".  The "size" of the "out" xbuf restricts how many characters can be
@@ -205,7 +203,6 @@ int iconvbufs(iconv_t ic, xbuf *in, xbuf *out, int flags)
 
 	return errno ? -1 : 0;
 }
-# endif
 #endif
 
 int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
