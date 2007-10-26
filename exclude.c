@@ -518,15 +518,14 @@ void change_local_filter_dir(const char *dname, int dlen, int dir_depth)
 	filt_array[cur_depth] = push_local_filters(dname, dlen);
 }
 
-static int rule_matches(char *name, struct filter_struct *ex, int name_is_dir)
+static int rule_matches(char *fname, struct filter_struct *ex, int name_is_dir)
 {
 	int slash_handling, str_cnt = 0, anchored_match = 0;
 	int ret_match = ex->match_flags & MATCHFLG_NEGATE ? 0 : 1;
 	char *p, *pattern = ex->pattern;
 	const char *strings[16]; /* more than enough */
+	char *name = fname + (*fname == '/');
 
-	if (*name == '/')
-		name++;
 	if (!*name)
 		return 0;
 
@@ -536,13 +535,13 @@ static int rule_matches(char *name, struct filter_struct *ex, int name_is_dir)
 		 * just match the name portion of the path. */
 		if ((p = strrchr(name,'/')) != NULL)
 			name = p+1;
-	} else if (ex->match_flags & MATCHFLG_ABS_PATH && *name != '/'
+	} else if (ex->match_flags & MATCHFLG_ABS_PATH && *fname != '/'
 	    && curr_dir_len > module_dirlen + 1) {
 		/* If we're matching against an absolute-path pattern,
 		 * we need to prepend our full path info. */
 		strings[str_cnt++] = curr_dir + module_dirlen + 1;
 		strings[str_cnt++] = "/";
-	} else if (ex->match_flags & MATCHFLG_WILD2_PREFIX && *name != '/') {
+	} else if (ex->match_flags & MATCHFLG_WILD2_PREFIX && *fname != '/') {
 		/* Allow "**"+"/" to match at the start of the string. */
 		strings[str_cnt++] = "/";
 	}
