@@ -46,9 +46,9 @@ static int32 *hash_table;
 #define SUM2HASH2(s1,s2) (((s1) + (s2)) & 0xFFFF)
 #define SUM2HASH(sum) SUM2HASH2((sum)&0xFFFF,(sum)>>16)
 
-static void build_hash_table(struct sum_struct *s)
+static int32 build_hash_table(struct sum_struct *s, int32 start)
 {
-	int32 i;
+	int32 i, end = s->count;
 
 	if (!hash_table) {
 		hash_table = new_array(int32, TABLESIZE);
@@ -58,11 +58,21 @@ static void build_hash_table(struct sum_struct *s)
 
 	memset(hash_table, 0xFF, TABLESIZE * sizeof hash_table[0]);
 
-	for (i = 0; i < s->count; i++) {
+	if (end - start > TABLESIZE*8/10)
+		end = start + TABLESIZE*8/10;
+
+	for (i = start; i < end; i++) {
 		uint32 t = SUM2HASH(s->sums[i].sum1);
 		s->sums[i].chain = hash_table[t];
 		hash_table[t] = i;
 	}
+
+	if (verbose > 2) {
+		rprintf(FINFO, "built hash table for entries %ld - %ld\n",
+			(long)start, (long)end - 1);
+	}
+
+	return end;
 }
 
 
@@ -120,8 +130,8 @@ static void matched(int f, struct sum_struct *s, struct map_struct *buf,
 static void hash_search(int f,struct sum_struct *s,
 			struct map_struct *buf, OFF_T len)
 {
-	OFF_T offset, end;
-	int32 k, want_i, backup;
+	OFF_T offset, end, reset = 0;
+	int32 k, want_i, backup, sum_pos = 0;
 	char sum2[SUM_LENGTH];
 	uint32 s1, s2, sum;
 	int more;
@@ -158,6 +168,11 @@ static void hash_search(int f,struct sum_struct *s,
 	do {
 		int done_csum2 = 0;
 		int32 i;
+
+		if (offset >= reset) {
+			sum_pos = build_hash_table(s, sum_pos);
+			reset = sum_pos * s->blength;
+		}
 
 		if (verbose > 4) {
 			rprintf(FINFO, "offset=%.0f sum=%04x%04x\n",
@@ -336,11 +351,6 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	}
 
 	if (len > 0 && s->count > 0) {
-		build_hash_table(s);
-
-		if (verbose > 2)
-			rprintf(FINFO,"built hash table\n");
-
 		hash_search(f, s, buf, len);
 
 		if (verbose > 2)

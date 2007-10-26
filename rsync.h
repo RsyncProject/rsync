@@ -122,7 +122,7 @@
 #define CHUNK_SIZE (32*1024)
 #define MAX_MAP_SIZE (256*1024)
 #define IO_BUFFER_SIZE (4092)
-#define MAX_BLOCK_SIZE ((int32)1 << 29)
+#define MAX_BLOCK_SIZE ((int32)1 << 17)
 
 #define IOERR_GENERAL	(1<<0) /* For backward compatibility, this must == 1 */
 #define IOERR_VANISHED	(1<<1)
