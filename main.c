@@ -723,7 +723,7 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 	argc--;
 	argv++;
 
-	if (argc == 0 && (recurse || list_only)) {
+	if (argc == 0 && (recurse || xfer_dirs || list_only)) {
 		argc = 1;
 		argv--;
 		argv[0] = ".";

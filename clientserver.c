@@ -192,20 +192,30 @@ static int exchange_protocols(int f_in, int f_out, char *buf, size_t bufsiz, int
 
 int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char *argv[])
 {
-	int i;
+	int i, modlen;
 	char line[BIGPATHBUFLEN];
 	char *sargs[MAX_ARGS];
 	int sargc = 0;
-	char *p, *path = *argv;
+	char *p, *modname;
 
-	if (argc == 0 && !am_sender)
-		list_only |= 1;
+	assert(argc > 0);
 
-	if (*path == '/') {
+	if (**argv == '/') {
 		rprintf(FERROR,
 			"ERROR: The remote path must start with a module name\n");
 		return -1;
 	}
+
+	if (!(p = strchr(*argv, '/')))
+		modlen = strlen(*argv);
+	else
+		modlen = p - *argv;
+
+	if (!(modname = new_array(char, modlen+1+1))) /* room for '/' & '\0' */
+		out_of_memory("start_inband_exchange");
+	strlcpy(modname, *argv, modlen + 1);
+	modname[modlen] = '/';
+	modname[modlen+1] = '\0';
 
 	if (!user)
 		user = getenv("USER");
@@ -232,7 +242,12 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 			rprintf(FERROR, "internal: args[] overflowed in do_cmd()\n");
 			exit_cleanup(RERR_SYNTAX);
 		}
-		sargs[sargc++] = *argv++;
+		if (list_only && strncmp(*argv, modname, modlen) == 0
+		 && argv[0][modlen] == '\0')
+			sargs[sargc++] = modname; /* we send "modname/" */
+		else
+			sargs[sargc++] = *argv;
+		argv++;
 		argc--;
 	}
 
@@ -241,10 +256,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 	if (verbose > 1)
 		print_child_argv("sending daemon args:", sargs);
 
-	p = strchr(path, '/');
-	if (p) *p = '\0';
-	io_printf(f_out, "%s\n", path);
-	if (p) *p = '/';
+	io_printf(f_out, "%.*s\n", modlen, modname);
 
 	/* Old servers may just drop the connection here,
 	 rather than sending a proper EXIT command.  Yuck. */
@@ -302,6 +314,8 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 		if (protocol_version == 22 || !am_sender)
 			io_start_multiplex_in();
 	}
+
+	free(modname);
 
 	return 0;
 }
