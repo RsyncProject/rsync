@@ -171,7 +171,10 @@ static void hash_search(int f,struct sum_struct *s,
 
 		if (offset >= reset) {
 			sum_pos = build_hash_table(s, sum_pos);
-			reset = sum_pos * s->blength;
+			if (sum_pos == s->count)
+				reset = len;
+			else
+				reset = sum_pos * s->blength;
 		}
 
 		if (verbose > 4) {
