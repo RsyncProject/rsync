@@ -364,8 +364,6 @@ int recv_files(int f_in, char *local_name)
 	if (delay_updates)
 		delayed_bits = bitbag_create(cur_flist->used + 1);
 
-	updating_basis = inplace;
-
 	while (1) {
 		cleanup_disable();
 
@@ -498,7 +496,6 @@ int recv_files(int f_in, char *local_name)
 				fnamecmp = get_backup_name(fname);
 				break;
 			case FNAMECMP_FUZZY:
-				updating_basis = 0;
 				if (file->dirname) {
 					pathjoin(fnamecmpbuf, MAXPATHLEN,
 						 file->dirname, xname);
@@ -507,7 +504,6 @@ int recv_files(int f_in, char *local_name)
 					fnamecmp = xname;
 				break;
 			default:
-				updating_basis = 0;
 				if (fnamecmp_type >= basis_dir_cnt) {
 					rprintf(FERROR,
 						"invalid basis_dir index: %d.\n",
@@ -553,6 +549,7 @@ int recv_files(int f_in, char *local_name)
 				fd1 = do_open(fnamecmp, O_RDONLY, 0);
 			}
 		}
+		updating_basis = inplace && fnamecmp == fname;
 
 		if (fd1 == -1) {
 			st.st_mode = 0;
