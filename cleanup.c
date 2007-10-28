@@ -78,8 +78,8 @@ void close_all(void)
  **/
 int cleanup_got_literal = 0;
 
-static char *cleanup_fname;
-static char *cleanup_new_fname;
+static const char *cleanup_fname;
+static const char *cleanup_new_fname;
 static struct file_struct *cleanup_file;
 static int cleanup_fd_r, cleanup_fd_w;
 static pid_t cleanup_pid = 0;
@@ -139,7 +139,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 
 		if (cleanup_got_literal && cleanup_fname && cleanup_new_fname
 		 && keep_partial && handle_partial_dir(cleanup_new_fname, PDIR_CREATE)) {
-			char *fname = cleanup_fname;
+			const char *fname = cleanup_fname;
 			cleanup_fname = NULL;
 			if (cleanup_fd_r != -1)
 				close(cleanup_fd_r);
@@ -213,7 +213,7 @@ void cleanup_disable(void)
 }
 
 
-void cleanup_set(char *fnametmp, char *fname, struct file_struct *file,
+void cleanup_set(const char *fnametmp, const char *fname, struct file_struct *file,
 		 int fd_r, int fd_w)
 {
 	cleanup_fname = fnametmp;

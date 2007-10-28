@@ -83,10 +83,10 @@ static int updating_basis;
  *   As long as it's unique, rsync will work.
  */
 
-int get_tmpname(char *fnametmp, char *fname)
+int get_tmpname(char *fnametmp, const char *fname)
 {
 	int maxname, added, length = 0;
-	char *f;
+	const char *f;
 
 	if (tmpdir) {
 		/* Note: this can't overflow, so the return value is safe */
