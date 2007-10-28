@@ -904,7 +904,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 #ifdef SUPPORT_HARD_LINKS
 	  try_a_copy: /* Copy the file locally. */
 #endif
-		if (copy_file(cmpbuf, fname, file->mode, 0) < 0) {
+		if (!dry_run && copy_file(cmpbuf, fname, file->mode, 0) < 0) {
 			if (verbose) {
 				rsyserr(FINFO, errno, "copy_file %s => %s",
 					full_fname(cmpbuf), fname);
