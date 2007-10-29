@@ -261,14 +261,15 @@ static int safe_read(int desc, char *ptr, size_t len)
 	return n_chars;
 }
 
-/** Copy a file.
+/* Copy a file.  If ofd < 0, copy_file unlinks and opens the "dest" file.
+ * Otherwise, it just writes to and closes the provided file descriptor.
  *
  * This is used in conjunction with the --temp-dir, --backup, and
  * --copy-dest options. */
-int copy_file(const char *source, const char *dest, mode_t mode, int create_bak_dir)
+int copy_file(const char *source, const char *dest, int ofd,
+	      mode_t mode, int create_bak_dir)
 {
 	int ifd;
-	int ofd;
 	char buf[1024 * 8];
 	int len;   /* Number of bytes read into `buf'. */
 
@@ -277,17 +278,19 @@ int copy_file(const char *source, const char *dest, mode_t mode, int create_bak_
 		return -1;
 	}
 
-	if (robust_unlink(dest) && errno != ENOENT) {
-		rsyserr(FERROR, errno, "unlink %s", full_fname(dest));
-		return -1;
-	}
+	if (ofd < 0) {
+		if (robust_unlink(dest) && errno != ENOENT) {
+			rsyserr(FERROR, errno, "unlink %s", full_fname(dest));
+			return -1;
+		}
 
-	if ((ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0
-	 && (!create_bak_dir || errno != ENOENT || make_bak_dir(dest) < 0
-	  || (ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0)) {
-		rsyserr(FERROR, errno, "open %s", full_fname(dest));
-		close(ifd);
-		return -1;
+		if ((ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0
+		 && (!create_bak_dir || errno != ENOENT || make_bak_dir(dest) < 0
+		  || (ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0)) {
+			rsyserr(FERROR, errno, "open %s", full_fname(dest));
+			close(ifd);
+			return -1;
+		}
 	}
 
 	while ((len = safe_read(ifd, buf, sizeof buf)) > 0) {
@@ -407,7 +410,7 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 					return -1;
 				to = partialptr;
 			}
-			if (copy_file(from, to, mode, 0) != 0)
+			if (copy_file(from, to, -1, mode, 0) != 0)
 				return -2;
 			do_unlink(from);
 			return 1;

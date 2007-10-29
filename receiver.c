@@ -123,6 +123,43 @@ int get_tmpname(char *fnametmp, const char *fname)
 	return 1;
 }
 
+/* Opens a temporary file for writing.
+ * Success: Writes name into fnametmp, returns fd.
+ * Failure: Clobbers fnametmp, returns -1.
+ * Calling cleanup_set() is the caller's job. */
+int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
+{
+	int fd;
+
+	if (!get_tmpname(fnametmp, fname))
+		return -1;
+
+	/* We initially set the perms without the setuid/setgid bits or group
+	 * access to ensure that there is no race condition.  They will be
+	 * correctly updated after the right owner and group info is set.
+	 * (Thanks to snabb@epipe.fi for pointing this out.) */
+	fd = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
+
+#if 0
+	/* In most cases parent directories will already exist because their
+	 * information should have been previously transferred, but that may
+	 * not be the case with -R */
+	if (fd == -1 && relative_paths && errno == ENOENT
+	    && create_directory_path(fnametmp) == 0) {
+		/* Get back to name with XXXXXX in it. */
+		get_tmpname(fnametmp, fname);
+		fd = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
+	}
+#endif
+
+	if (fd == -1) {
+		rsyserr(FERROR, errno, "mkstemp %s failed",
+			full_fname(fnametmp));
+		return -1;
+	}
+
+	return fd;
+}
 
 static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 			const char *fname, int fd, OFF_T total_size)
@@ -606,52 +643,20 @@ int recv_files(int f_in, char *local_name)
 			if (fd2 == -1) {
 				rsyserr(FERROR, errno, "open %s failed",
 					full_fname(fname));
-				discard_receive_data(f_in, F_LENGTH(file));
-				if (fd1 != -1)
-					close(fd1);
-				if (inc_recurse)
-					send_msg_int(MSG_NO_SEND, ndx);
-				continue;
 			}
 		} else {
-			if (!get_tmpname(fnametmp,fname)) {
-				discard_receive_data(f_in, F_LENGTH(file));
-				if (fd1 != -1)
-					close(fd1);
-				if (inc_recurse)
-					send_msg_int(MSG_NO_SEND, ndx);
-				continue;
-			}
+			fd2 = open_tmpfile(fnametmp, fname, file);
+			if (fd2 != -1)
+				cleanup_set(fnametmp, partialptr, file, fd1, fd2);
+		}
 
-			/* we initially set the perms without the
-			 * setuid/setgid bits to ensure that there is no race
-			 * condition. They are then correctly updated after
-			 * the lchown. Thanks to snabb@epipe.fi for pointing
-			 * this out.  We also set it initially without group
-			 * access because of a similar race condition. */
-			fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
-
-			/* in most cases parent directories will already exist
-			 * because their information should have been previously
-			 * transferred, but that may not be the case with -R */
-			if (fd2 == -1 && relative_paths && errno == ENOENT
-			    && create_directory_path(fnametmp) == 0) {
-				/* Get back to name with XXXXXX in it. */
-				get_tmpname(fnametmp, fname);
-				fd2 = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
-			}
-			if (fd2 == -1) {
-				rsyserr(FERROR, errno, "mkstemp %s failed",
-					full_fname(fnametmp));
-				discard_receive_data(f_in, F_LENGTH(file));
-				if (fd1 != -1)
-					close(fd1);
-				if (inc_recurse)
-					send_msg_int(MSG_NO_SEND, ndx);
-				continue;
-			}
-
-			cleanup_set(fnametmp, partialptr, file, fd1, fd2);
+		if (fd2 == -1) {
+			discard_receive_data(f_in, F_LENGTH(file));
+			if (fd1 != -1)
+				close(fd1);
+			if (inc_recurse)
+				send_msg_int(MSG_NO_SEND, ndx);
+			continue;
 		}
 
 		/* log the transfer */

@@ -317,7 +317,7 @@ static int flush_delete_delay(void)
 static int remember_delete(struct file_struct *file, const char *fname)
 {
 	int len;
-	
+
 	while (1) {
 		len = snprintf(deldelay_buf + deldelay_cnt,
 			       deldelay_size - deldelay_cnt,
@@ -830,6 +830,42 @@ static int find_fuzzy(struct file_struct *file, struct file_list *dirlist)
 	return lowest_j;
 }
 
+/* Copy a file found in our --copy-dest handling. */
+static int copy_altdest_file(const char *src, const char *dest, struct file_struct *file)
+{
+	char buf[MAXPATHLEN];
+	const char *copy_to, *partialptr;
+	int fd_w;
+
+	if (inplace) {
+		/* Let copy_file open the destination in place. */
+		fd_w = -1;
+		copy_to = dest;
+	} else {
+		fd_w = open_tmpfile(buf, dest, file);
+		if (fd_w < 0)
+			return -1;
+		copy_to = buf;
+	}
+	cleanup_set(copy_to, NULL, NULL, -1, -1);
+	if (copy_file(src, copy_to, fd_w, file->mode, 0) < 0) {
+		if (verbose) {
+			rsyserr(FINFO, errno, "copy_file %s => %s",
+				full_fname(src), copy_to);
+		}
+		/* Try to clean up. */
+		unlink(copy_to);
+		cleanup_disable();
+		return -1;
+	}
+	partialptr = partial_dir ? partial_dir_fname(dest) : NULL;
+	if (partialptr && *partialptr == '/')
+		partialptr = NULL;
+	finish_transfer(dest, copy_to, src, partialptr, file, 1, 0);
+	cleanup_disable();
+	return 0;
+}
+
 /* This is only called for regular files.  We return -2 if we've finished
  * handling the file, -1 if no dest-linking occurred, or a non-negative
  * value if we found an alternate basis file. */
@@ -904,14 +940,8 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 #ifdef SUPPORT_HARD_LINKS
 	  try_a_copy: /* Copy the file locally. */
 #endif
-		if (!dry_run && copy_file(cmpbuf, fname, file->mode, 0) < 0) {
-			if (verbose) {
-				rsyserr(FINFO, errno, "copy_file %s => %s",
-					full_fname(cmpbuf), fname);
-			}
+		if (!dry_run && copy_altdest_file(cmpbuf, fname, file) < 0)
 			return -1;
-		}
-		set_file_attrs(fname, file, NULL, cmpbuf, 0);
 		if (itemizing)
 			itemize(cmpbuf, file, ndx, 0, sxp, ITEM_LOCAL_CHANGE, 0, NULL);
 #ifdef SUPPORT_XATTRS
@@ -1680,7 +1710,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				goto cleanup;
 			if (!(back_file = make_file(fname, NULL, NULL, 0, NO_FILTERS)))
 				goto pretend_missing;
-			if (copy_file(fname, backupptr, back_file->mode, 1) < 0) {
+			if (copy_file(fname, backupptr, -1, back_file->mode, 1) < 0) {
 				unmake_file(back_file);
 				back_file = NULL;
 				goto cleanup;
