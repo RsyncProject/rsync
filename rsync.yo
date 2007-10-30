@@ -801,6 +801,14 @@ directory, and receives the file into the new directory.  With
 bf(--keep-dirlinks), the receiver keeps the symlink and "file" ends up in
 "bar".
 
+One note of caution:  if you use bf(--keep-dirlinks), you must trust all
+the symlinks in the copy!  If it is possible for an untrusted user to
+create their own symlink to any directory, the user could then (on a
+subsequent copy) replace the symlink with a real directory and affect the
+content of whatever directory the symlink references.  For backup copies,
+you are better off using something like a bind mount instead of a symlink
+to modify your receiving hierarchy.
+
 See also bf(--copy-dirlinks) for an analogous option for the sending side.
 
 dit(bf(-H, --hard-links)) This tells rsync to look for hard-linked files in
