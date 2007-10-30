@@ -1058,20 +1058,18 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		/* -x only affects dirs because we need to avoid recursing
 		 * into a mount-point directory, not to avoid copying a
 		 * symlinked file if -L (or similar) was specified. */
-		if (one_file_system && flags & FLAG_CONTENT_DIR) {
-			if (flags & FLAG_TOP_DIR)
-				filesystem_dev = st.st_dev;
-			else if (st.st_dev != filesystem_dev) {
-				if (one_file_system > 1) {
-					if (verbose > 1) {
-						rprintf(FINFO,
-						    "[%s] skipping mount-point dir %s\n",
-						    who_am_i(), thisname);
-					}
-					return NULL;
+		if (one_file_system && st.st_dev != filesystem_dev
+		 && BITS_SETnUNSET(flags, FLAG_CONTENT_DIR, FLAG_TOP_DIR)) {
+			if (one_file_system > 1) {
+				if (verbose > 1) {
+					rprintf(FINFO,
+					    "[%s] skipping mount-point dir %s\n",
+					    who_am_i(), thisname);
 				}
-				flags |= FLAG_MOUNT_DIR;
+				return NULL;
 			}
+			flags |= FLAG_MOUNT_DIR;
+			flags &= ~FLAG_CONTENT_DIR;
 		}
 	} else
 		flags &= ~FLAG_CONTENT_DIR;
@@ -1590,8 +1588,19 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 
 	change_local_filter_dir(fbuf, dlen, send_dir_depth);
 
-	if (BITS_SETnUNSET(file->flags, FLAG_CONTENT_DIR, FLAG_MOUNT_DIR))
+	if (file->flags & FLAG_CONTENT_DIR) {
+		if (one_file_system) {
+			STRUCT_STAT st;
+			if (link_stat(fbuf, &st, copy_dirlinks) != 0) {
+				io_error |= IOERR_GENERAL;
+				rsyserr(FERROR, errno, "link_stat %s failed",
+					full_fname(fbuf));
+				return;
+			}
+			filesystem_dev = st.st_dev;
+		}
 		send_directory(f, flist, fbuf, dlen, flags);
+	}
 
 	if (!relative_paths)
 		return;
@@ -1951,6 +1960,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			if (fn != p || (*lp && *lp != '/'))
 				send_implied_dirs(f, flist, fbuf, slash, p, flags, 0);
 		}
+
+		if (one_file_system)
+			filesystem_dev = st.st_dev;
 
 		if (recurse || (xfer_dirs && is_dot_dir)) {
 			struct file_struct *file;
