@@ -690,11 +690,14 @@ int count_dir_elements(const char *p)
 	return cnt;
 }
 
-/* Turns multiple adjacent slashes into a single slash, gets rid of "./"
- * elements (but not a trailing dot dir), removes a trailing slash, and
- * optionally collapses ".." elements (except for those at the start of the
- * string).  If the resulting name would be empty, change it into a ".". */
-unsigned int clean_fname(char *name, BOOL collapse_dot_dot)
+/* Turns multiple adjacent slashes into a single slash, drops interior "."
+ * elements, drops an intial "./" unless CFN_KEEP_LEADING_DOT_DIR is flagged,
+ * will even drop a trailing '.' after a '/' if CFN_DROP_TRAILING_DOT_DIR is
+ * flagged, removes a trailing slash (perhaps after removing the aforementioned
+ * dot) unless CFN_KEEP_TRAILING_SLASH is flagged, will even collapse ".."
+ * elements (except at the start of the string) if CFN_COLLAPSE_DOT_DOT_DIRS
+ * is flagged.  If the resulting name would be empty, we return ".". */
+unsigned int clean_fname(char *name, int flags)
 {
 	char *limit = name - 1, *t = name, *f = name;
 	int anchored;
@@ -704,6 +707,10 @@ unsigned int clean_fname(char *name, BOOL collapse_dot_dot)
 
 	if ((anchored = *f == '/') != 0)
 		*t++ = *f++;
+	else if (flags & CFN_KEEP_LEADING_DOT_DIR && *f == '.' && f[1] == '/') {
+		*t++ = *f++;
+		*t++ = *f++;
+	}
 	while (*f) {
 		/* discard extra slashes */
 		if (*f == '/') {
@@ -711,14 +718,16 @@ unsigned int clean_fname(char *name, BOOL collapse_dot_dot)
 			continue;
 		}
 		if (*f == '.') {
-			/* discard "." dirs (but NOT a trailing '.'!) */
+			/* discard interior "." dirs */
 			if (f[1] == '/') {
 				f += 2;
 				continue;
 			}
+			if (f[1] == '\0' && flags & CFN_DROP_TRAILING_DOT_DIR)
+				break;
 			/* collapse ".." dirs */
-			if (collapse_dot_dot
-			    && f[1] == '.' && (f[2] == '/' || !f[2])) {
+			if (flags & CFN_COLLAPSE_DOT_DOT_DIRS
+			 && f[1] == '.' && (f[2] == '/' || !f[2])) {
 				char *s = t - 1;
 				if (s == name && anchored) {
 					f += 2;
@@ -736,7 +745,7 @@ unsigned int clean_fname(char *name, BOOL collapse_dot_dot)
 		while (*f && (*t++ = *f++) != '/') {}
 	}
 
-	if (t > name+anchored && t[-1] == '/')
+	if (t > name+anchored && t[-1] == '/' && !(flags & CFN_KEEP_TRAILING_SLASH))
 		t--;
 	if (t == name)
 		*t++ = '.';
@@ -905,7 +914,7 @@ int push_dir(const char *dir, int set_path_only)
 		curr_dir_len += len;
 	}
 
-	curr_dir_len = clean_fname(curr_dir, 1);
+	curr_dir_len = clean_fname(curr_dir, CFN_COLLAPSE_DOT_DOT_DIRS);
 	if (sanitize_paths) {
 		if (module_dirlen > curr_dir_len)
 			module_dirlen = curr_dir_len;
