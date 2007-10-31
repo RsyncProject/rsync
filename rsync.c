@@ -265,7 +265,8 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 	  invalid_ndx:
 		rprintf(FERROR,
 			"Invalid file index: %d (%d - %d) with iflags %x [%s]\n",
-			ndx, first_flist->ndx_start - 1, first_flist->prev->ndx_end,
+			ndx, first_flist ? first_flist->ndx_start - 1 : -1,
+			first_flist ? first_flist->prev->ndx_end : -1,
 			iflags, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
 	}
