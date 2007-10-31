@@ -1009,7 +1009,7 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 					out_of_memory("parse_arguments");
 				if (!*cp)
 					goto options_rejected;
-				clean_fname(cp, 1);
+				clean_fname(cp, CFN_COLLAPSE_DOT_DOT_DIRS);
 				rej = check_filter(&server_filter_list, cp, 0) < 0;
 				free(cp);
 				if (rej)
@@ -1405,14 +1405,14 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 		if (tmpdir) {
 			if (!*tmpdir)
 				goto options_rejected;
-			clean_fname(tmpdir, 1);
+			clean_fname(tmpdir, CFN_COLLAPSE_DOT_DOT_DIRS);
 			if (check_filter(elp, tmpdir, 1) < 0)
 				goto options_rejected;
 		}
 		if (backup_dir) {
 			if (!*backup_dir)
 				goto options_rejected;
-			clean_fname(backup_dir, 1);
+			clean_fname(backup_dir, CFN_COLLAPSE_DOT_DOT_DIRS);
 			if (check_filter(elp, backup_dir, 1) < 0)
 				goto options_rejected;
 		}
@@ -1565,7 +1565,7 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 		}
 		if (partial_dir) {
 			if (*partial_dir)
-				clean_fname(partial_dir, 1);
+				clean_fname(partial_dir, CFN_COLLAPSE_DOT_DOT_DIRS);
 			if (!*partial_dir || strcmp(partial_dir, ".") == 0)
 				partial_dir = NULL;
 			if (!partial_dir && refused_partial) {
@@ -1606,7 +1606,7 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 			if (server_filter_list.head) {
 				if (!*files_from)
 					goto options_rejected;
-				clean_fname(files_from, 1);
+				clean_fname(files_from, CFN_COLLAPSE_DOT_DOT_DIRS);
 				if (check_filter(&server_filter_list, files_from, 0) < 0)
 					goto options_rejected;
 			}

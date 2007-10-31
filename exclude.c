@@ -304,7 +304,7 @@ static char *parse_merge_name(const char *merge_file, unsigned int *len_ptr,
 		fn_len = strlen(fn);
 	} else {
 		strlcpy(fn, merge_file, len_ptr ? *len_ptr + 1 : MAXPATHLEN);
-		fn_len = clean_fname(fn, 1);
+		fn_len = clean_fname(fn, CFN_COLLAPSE_DOT_DOT_DIRS);
 	}
 
 	/* If the name isn't in buf yet, it's wasn't absolute. */
@@ -315,7 +315,7 @@ static char *parse_merge_name(const char *merge_file, unsigned int *len_ptr,
 		}
 		memcpy(buf, dirbuf + prefix_skip, dirbuf_len - prefix_skip);
 		memcpy(buf + dirbuf_len - prefix_skip, fn, fn_len + 1);
-		fn_len = clean_fname(buf, 1);
+		fn_len = clean_fname(buf, CFN_COLLAPSE_DOT_DOT_DIRS);
 	}
 
 	if (len_ptr)
@@ -337,7 +337,7 @@ void set_filter_dir(const char *dir, unsigned int dirlen)
 		len = 0;
 	memcpy(dirbuf + len, dir, dirlen);
 	dirbuf[dirlen + len] = '\0';
-	dirbuf_len = clean_fname(dirbuf, 1);
+	dirbuf_len = clean_fname(dirbuf, CFN_COLLAPSE_DOT_DOT_DIRS);
 	if (dirbuf_len > 1 && dirbuf[dirbuf_len-1] == '.'
 	    && dirbuf[dirbuf_len-2] == '/')
 		dirbuf_len -= 2;
@@ -373,7 +373,7 @@ static BOOL setup_merge_file(struct filter_struct *ex,
 	else
 		pathjoin(buf, MAXPATHLEN, dirbuf, x);
 
-	len = clean_fname(buf, 1);
+	len = clean_fname(buf, CFN_COLLAPSE_DOT_DOT_DIRS);
 	if (len != 1 && len < MAXPATHLEN-1) {
 		buf[len++] = '/';
 		buf[len] = '\0';
@@ -1012,7 +1012,7 @@ void parse_filter_file(struct filter_list_struct *listp, const char *fname,
 	if (*fname != '-' || fname[1] || am_server) {
 		if (server_filter_list.head) {
 			strlcpy(line, fname, sizeof line);
-			clean_fname(line, 1);
+			clean_fname(line, CFN_COLLAPSE_DOT_DOT_DIRS);
 			if (check_filter(&server_filter_list, line, 0) < 0)
 				fp = NULL;
 			else
