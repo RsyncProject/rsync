@@ -87,10 +87,14 @@ int checksum_len;
 dev_t filesystem_dev; /* used to implement -x */
 
 struct file_list *cur_flist, *first_flist, *dir_flist;
-int send_dir_ndx = -1, send_dir_depth = 0;
+int send_dir_ndx = -1, send_dir_depth = -1;
 int flist_cnt = 0; /* how many (non-tmp) file list objects exist */
 int file_total = 0; /* total of all active items over all file-lists */
 int flist_eof = 0; /* all the file-lists are now known */
+
+#define NORMAL_NAME 0
+#define SLASH_ENDING_NAME 1
+#define DOT_NAME 2
 
 /* Starting from protocol version 26, we always use 64-bit ino_t and dev_t
  * internally, even if this platform does not allow files to have 64-bit inums.
@@ -1411,6 +1415,9 @@ static void add_dirs_to_tree(int parent_ndx, struct file_list *from_flist,
 		dir_flist->files[dir_flist->used++] = file;
 		dir_cnt--;
 
+		if (file->basename[0] == '.' && file->basename[1] == '\0')
+			continue;
+
 		if (dp)
 			DIR_NEXT_SIBLING(dp) = dir_flist->used - 1;
 		else if (parent_dp)
@@ -1501,7 +1508,7 @@ static int lastpath_len = 0;
 static struct file_struct *lastpath_struct;
 
 static void send_implied_dirs(int f, struct file_list *flist, char *fname,
-			      char *start, char *limit, int flags, int is_dot_dir)
+			      char *start, char *limit, int flags, char name_type)
 {
 	struct file_struct *file;
 	item_list *relname_list;
@@ -1567,7 +1574,7 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 	rnpp = EXPAND_ITEM_LIST(relname_list, relnamecache *, 32);
 	if (!(*rnpp = (relnamecache*)new_array(char, sizeof (relnamecache) + len)))
 		out_of_memory("send_implied_dirs");
-	(*rnpp)->is_dot_dir = is_dot_dir;
+	(*rnpp)->name_type = name_type;
 	strlcpy((*rnpp)->fname, limit+1, len + 1);
 }
 
@@ -1612,7 +1619,7 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 	for (j = 0; j < relname_list->count; j++) {
 		char *slash;
 		relnamecache *rnp = ((relnamecache**)relname_list->items)[j];
-		int is_dot_dir = rnp->is_dot_dir;
+		char name_type = rnp->name_type;
 
 		fbuf[dlen] = '/';
 		len = strlcpy(fbuf + dlen + 1, rnp->fname, sizeof fbuf - dlen - 1);
@@ -1622,11 +1629,11 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 
 		slash = strchr(fbuf+dlen+1, '/');
 		if (slash) {
-			send_implied_dirs(f, flist, fbuf, fbuf+dlen+1, slash, flags, is_dot_dir);
+			send_implied_dirs(f, flist, fbuf, fbuf+dlen+1, slash, flags, name_type);
 			continue;
 		}
 
-		if (is_dot_dir) {
+		if (name_type != NORMAL_NAME) {
 			STRUCT_STAT st;
 			if (link_stat(fbuf, &st, 1) != 0) {
 				io_error |= IOERR_GENERAL;
@@ -1802,9 +1809,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	}
 
 	while (1) {
-		char fbuf[MAXPATHLEN];
-		char *fn;
-		int is_dot_dir;
+		char fbuf[MAXPATHLEN], *fn, name_type;
 
 		if (use_ff_fd) {
 			if (read_line(filesfrom_fd, fbuf, sizeof fbuf, rl_flags) == 0)
@@ -1821,7 +1826,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		len = strlen(fbuf);
 		if (relative_paths) {
 			/* We clean up fbuf below. */
-			is_dot_dir = 0;
+			name_type = NORMAL_NAME;
 		} else if (!len || fbuf[len - 1] == '/') {
 			if (len == 2 && fbuf[0] == '.') {
 				/* Turn "./" into just "." rather than "./." */
@@ -1832,7 +1837,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				fbuf[len++] = '.';
 				fbuf[len] = '\0';
 			}
-			is_dot_dir = 1;
+			name_type = DOT_NAME;
 		} else if (len > 1 && fbuf[len-1] == '.' && fbuf[len-2] == '.'
 		    && (len == 2 || fbuf[len-3] == '/')) {
 			if (len + 2 >= MAXPATHLEN)
@@ -1840,11 +1845,11 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			fbuf[len++] = '/';
 			fbuf[len++] = '.';
 			fbuf[len] = '\0';
-			is_dot_dir = 1;
-		} else {
-			is_dot_dir = fbuf[len-1] == '.'
-				   && (len == 1 || fbuf[len-2] == '/');
-		}
+			name_type = DOT_NAME;
+		} else if (fbuf[len-1] == '.' && (len == 1 || fbuf[len-2] == '/'))
+			name_type = DOT_NAME;
+		else
+			name_type = NORMAL_NAME;
 
 		dir = NULL;
 
@@ -1867,36 +1872,29 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 					dir = "/";
 				else
 					dir = fbuf;
-				len -= p - fbuf + 3;
 				fn = p + 3;
+				while (*fn == '/')
+					fn++;
+				if (!*fn)
+					*--fn = '\0'; /* ensure room for '.' */
 			} else
 				fn = fbuf;
-			/* Get rid of trailing "/" and "/.". */
-			while (len) {
-				if (fn[len - 1] == '/') {
-					is_dot_dir = 1;
-					if (!--len && !dir) {
-						len++;
-						break;
-					}
-				}
-				else if (len >= 2 && fn[len - 1] == '.'
-						  && fn[len - 2] == '/') {
-					is_dot_dir = 1;
-					if (!(len -= 2) && !dir) {
-						len++;
-						break;
-					}
-				} else
-					break;
-			}
-			fn[len] = '\0';
+			len = clean_fname(fn, CFN_KEEP_LEADING_DOT_DIR
+					    | CFN_KEEP_TRAILING_SLASH
+					    | CFN_DROP_TRAILING_DOT_DIR);
 			if (len == 1) {
 				if (fn[0] == '/') {
 					fn = "/.";
 					len = 2;
+					name_type = DOT_NAME;
 				} else if (fn[0] == '.')
-					is_dot_dir = 1;
+					name_type = DOT_NAME;
+			} else if (fn[len-1] == '/') {
+				fn[--len] = '\0';
+				if (len == 1 && *fn == '.')
+					name_type = DOT_NAME;
+				else
+					name_type = SLASH_ENDING_NAME;
 			}
 			/* Reject a ".." dir in the active part of the path. */
 			for (p = fn; (p = strstr(p, "..")) != NULL; p += 2) {
@@ -1904,7 +1902,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				 && (p == fn || p[-1] == '/')) {
 					rprintf(FERROR,
 					    "found \"..\" dir in relative path: %s\n",
-					    fbuf);
+					    fn);
 					exit_cleanup(RERR_SYNTAX);
 				}
 			}
@@ -1913,7 +1911,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (!*fn) {
 			len = 1;
 			fn = ".";
-			is_dot_dir = 1;
+			name_type = DOT_NAME;
 		}
 
 		dirlen = dir ? strlen(dir) : 0;
@@ -1928,7 +1926,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (fn != fbuf)
 			memmove(fbuf, fn, len + 1);
 
-		if (link_stat(fbuf, &st, copy_dirlinks || is_dot_dir) != 0) {
+		if (link_stat(fbuf, &st, copy_dirlinks || name_type != NORMAL_NAME) != 0) {
 			io_error |= IOERR_GENERAL;
 			rsyserr(FERROR, errno, "link_stat %s failed",
 				full_fname(fbuf));
@@ -1942,8 +1940,14 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 		if (inc_recurse && relative_paths && *fbuf) {
 			if ((p = strchr(fbuf+1, '/')) != NULL) {
-				send_implied_dirs(f, flist, fbuf, fbuf, p, flags, is_dot_dir);
-				continue;
+				if (p - fbuf == 1 && *fbuf == '.') {
+					if ((fn = strchr(p+1, '/')) != NULL)
+						p = fn;
+				} else
+					fn = p;
+				send_implied_dirs(f, flist, fbuf, fbuf, p, flags, name_type);
+				if (fn == p)
+					continue;
 			}
 		} else if (implied_dirs && (p=strrchr(fbuf,'/')) && p != fbuf) {
 			/* Send the implied directories at the start of the
@@ -1964,12 +1968,20 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (one_file_system)
 			filesystem_dev = st.st_dev;
 
-		if (recurse || (xfer_dirs && is_dot_dir)) {
+		if (recurse || (xfer_dirs && name_type != NORMAL_NAME)) {
 			struct file_struct *file;
 			int top_flags = FLAG_TOP_DIR | FLAG_CONTENT_DIR | flags;
 			file = send_file_name(f, flist, fbuf, &st,
 					      top_flags, ALL_FILTERS);
-			if (file && !inc_recurse)
+			if (inc_recurse) {
+				if (name_type == DOT_NAME) {
+					if (send_dir_depth < 0) {
+						send_dir_depth = 0;
+						change_local_filter_dir(fbuf, len, send_dir_depth);
+					}
+					send_directory(f, flist, fbuf, len, flags);
+				}
+			} else if (file)
 				send_if_directory(f, flist, file, fbuf, len, flags);
 		} else
 			send_file_name(f, flist, fbuf, &st, flags, ALL_FILTERS);
@@ -2051,7 +2063,10 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		rprintf(FINFO, "send_file_list done\n");
 
 	if (inc_recurse) {
+		send_dir_depth = 1;
 		add_dirs_to_tree(-1, flist, dir_count);
+		if (!file_total || strcmp(flist->sorted[0]->basename, ".") != 0) 
+			flist->parent_ndx = -1;
 		flist_done_allocating(flist);
 		if (send_dir_ndx < 0) {
 			write_ndx(f, NDX_FLIST_EOF);
@@ -2091,7 +2106,7 @@ struct file_list *recv_file_list(int f)
 	flist = flist_new(0, "recv_file_list");
 
 	if (inc_recurse) {
-		if (flist->ndx_start == 0)
+		if (flist->ndx_start == 1)
 			dir_flist = flist_new(FLIST_TEMP, "recv_file_list");
 		dstart = dir_flist->used;
 	} else {
@@ -2125,7 +2140,7 @@ struct file_list *recv_file_list(int f)
 	file_total += flist->used;
 
 	flist->ndx_end = flist->ndx_start + flist->used - 1;
-	if (inc_recurse && flist->ndx_start)
+	if (inc_recurse && flist->ndx_start > 1)
 		flist->ndx_end -= dir_flist->used - dstart;
 
 	if (verbose > 2)
@@ -2176,6 +2191,9 @@ struct file_list *recv_file_list(int f)
 			read_int(f);
 		else
 			io_error |= read_int(f);
+	} else if (inc_recurse && flist->ndx_start == 1) {
+		if (!file_total || strcmp(flist->sorted[0]->basename, ".") != 0) 
+			flist->parent_ndx = -1;
 	}
 
 	if (verbose > 3)
@@ -2304,6 +2322,8 @@ struct file_list *flist_new(int flags, char *msg)
 						out_of_memory, POOL_INTERN);
 			if (!flist->file_pool)
 				out_of_memory(msg);
+
+			flist->ndx_start = 1;
 
 			first_flist = cur_flist = flist->prev = flist;
 		} else {
