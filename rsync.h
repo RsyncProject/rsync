@@ -183,6 +183,10 @@
 #define SIGNIFICANT_ITEM_FLAGS (~(\
 	ITEM_BASIS_TYPE_FOLLOWS | ITEM_XNAME_FOLLOWS | ITEM_LOCAL_CHANGE))
 
+#define CFN_KEEP_LEADING_DOT_DIR (1<<0)
+#define CFN_KEEP_TRAILING_SLASH (1<<1)
+#define CFN_DROP_TRAILING_DOT_DIR (1<<2)
+#define CFN_COLLAPSE_DOT_DOT_DIRS (1<<3)
 
 /* Log-message categories.  Only FERROR and FINFO get sent over the socket,
  * but FLOG and FSOCKERR can be sent over the receiver -> generator pipe.
@@ -837,7 +841,7 @@ typedef struct {
 #define RL_CONVERT (1<<2)
 
 typedef struct {
-	char is_dot_dir;
+	char name_type;
 	char fname[1]; /* has variable size */
 } relnamecache;
 
