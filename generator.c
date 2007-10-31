@@ -1957,7 +1957,7 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 
 		if (delete_during == 2 || !dir_tweaking) {
 			/* Skip directory touch-up. */
-		} else if (first_flist->ndx_start != 0)
+		} else if (first_flist->parent_ndx >= 0)
 			touch_up_dirs(dir_flist, first_flist->parent_ndx);
 
 		flist_free(first_flist); /* updates first_flist */
@@ -2032,7 +2032,7 @@ void generate_files(int f_out, const char *local_name)
 		}
 #endif
 
-		if (inc_recurse && cur_flist->ndx_start) {
+		if (inc_recurse && cur_flist->parent_ndx >= 0) {
 			struct file_struct *fp = dir_flist->files[cur_flist->parent_ndx];
 			f_name(fp, fbuf);
 			ndx = cur_flist->ndx_start - 1;
