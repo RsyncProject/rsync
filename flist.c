@@ -2323,7 +2323,7 @@ struct file_list *flist_new(int flags, char *msg)
 			if (!flist->file_pool)
 				out_of_memory(msg);
 
-			flist->ndx_start = 1;
+			flist->ndx_start = inc_recurse ? 1 : 0;
 
 			first_flist = cur_flist = flist->prev = flist;
 		} else {
