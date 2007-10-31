@@ -65,6 +65,9 @@ extern int protocol_version;
 extern int sanitize_paths;
 extern struct stats stats;
 extern char *filesfrom_host;
+#ifdef ICONV_OPTION
+extern char *iconv_opt;
+#endif
 
 extern char curr_dir[MAXPATHLEN];
 
@@ -1717,8 +1720,11 @@ void send_extra_file_list(int f, int at_least)
 
 		clean_flist(flist, 0);
 
-		flist->ndx_end = flist->ndx_start + flist->used - 1
-			       - (dir_count - dstart);
+		flist->ndx_end = flist->ndx_start + flist->used - 1;
+#ifdef ICONV_OPTION
+		if (!iconv_opt)
+#endif
+			flist->ndx_end -= (dir_count - dstart);
 
 		add_dirs_to_tree(send_dir_ndx, flist, dir_count - dstart);
 		flist_done_allocating(flist);
@@ -2140,7 +2146,11 @@ struct file_list *recv_file_list(int f)
 	file_total += flist->used;
 
 	flist->ndx_end = flist->ndx_start + flist->used - 1;
-	if (inc_recurse && flist->ndx_start > 1)
+	if (inc_recurse
+#ifdef ICONV_OPTION
+	 && !iconv_opt
+#endif
+	 && flist->ndx_start > 1)
 		flist->ndx_end -= dir_flist->used - dstart;
 
 	if (verbose > 2)
@@ -2563,7 +2573,7 @@ static void output_flist(struct file_list *flist)
 	rprintf(FINFO, "[%s] flist start=%d, end=%d, used=%d, low=%d, high=%d\n",
 		who, flist->ndx_start, flist->ndx_end, flist->used, flist->low, flist->high);
 	for (i = 0; i < flist->used; i++) {
-		file = flist->sorted[i];
+		file = flist->files[i];
 		if ((am_root || am_sender) && uid_ndx) {
 			snprintf(uidbuf, sizeof uidbuf, " uid=%u",
 				 F_OWNER(file));
