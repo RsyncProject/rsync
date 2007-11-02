@@ -152,7 +152,7 @@ int set_modtime(const char *fname, time_t modtime, mode_t mode)
 		}
 # endif
 		return utimes(fname, t);
-#elif defined HAVE_UTIMBUF
+#elif defined HAVE_STRUCT_UTIMBUF
 		struct utimbuf tbuf;
 		tbuf.actime = time(NULL);
 		tbuf.modtime = modtime;
