@@ -331,7 +331,9 @@ enum msgcode {
 #include <stdarg.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#ifdef HAVE_NETDB_H
 #include <netdb.h>
+#endif
 #include <syslog.h>
 #include <sys/file.h>
 
