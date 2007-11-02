@@ -435,6 +435,8 @@ dnl AC_MSG_NOTICE([Looking in libraries: $LIBS])
 AC_CHECK_FUNCS(inet_ntop, , [AC_LIBOBJ(lib/inet_ntop)])
 AC_CHECK_FUNCS(inet_pton, , [AC_LIBOBJ(lib/inet_pton)])
 
+AC_HAVE_TYPE([struct addrinfo], [#include <netdb.h>])
+
 # Irix 6.5 has getaddrinfo but not the corresponding defines, so use
 #   builtin getaddrinfo if one of the defines don't exist
 AC_CACHE_CHECK([whether defines needed by getaddrinfo exist],
@@ -448,7 +450,7 @@ AC_CACHE_CHECK([whether defines needed by getaddrinfo exist],
 			#endif],
 			rsync_cv_HAVE_GETADDR_DEFINES=yes,
 			rsync_cv_HAVE_GETADDR_DEFINES=no)])
-if test x"$rsync_cv_HAVE_GETADDR_DEFINES" = x"yes"; then
+if test x"$rsync_cv_HAVE_GETADDR_DEFINES" = x"yes" -a x"$ac_cv_type_struct_addrinfo" = x"yes"; then
 	# Tru64 UNIX has getaddrinfo() but has it renamed in libc as
 	# something else so we must include <netdb.h> to get the
 	# redefinition.
@@ -459,13 +461,11 @@ if test x"$rsync_cv_HAVE_GETADDR_DEFINES" = x"yes"; then
 		#include <netdb.h>],[getaddrinfo(NULL, NULL, NULL, NULL);],
 			[AC_MSG_RESULT([yes])
 			AC_DEFINE(HAVE_GETADDRINFO, 1,
-				[Define to 1 if you have the "getaddrinfo" function.])],
+				[Define to 1 if you have the "getaddrinfo" function and required types.])],
 			[AC_MSG_RESULT([no])
 			AC_LIBOBJ(lib/getaddrinfo)])])
-	AC_CHECK_FUNCS(getnameinfo, , [AC_LIBOBJ(lib/getnameinfo)])
 else
 	AC_LIBOBJ(lib/getaddrinfo)
-	AC_LIBOBJ(lib/getnameinfo)
 fi
 
 AC_CHECK_MEMBER([struct sockaddr.sa_len],
@@ -494,15 +494,6 @@ AC_CHECK_MEMBER([struct sockaddr_un.sun_len],
 #include <netinet/in.h>
 ])
 
-AC_MSG_CHECKING(struct sockaddr_storage)
-AC_TRY_COMPILE([#include <sys/types.h>
-#include <sys/socket.h>],
-[struct sockaddr_storage x;],
-	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_SOCKADDR_STORAGE, 1,
-		[Define to 1 if you have struct sockaddr_storage.] ),
-	AC_MSG_RESULT(no))
-
 AC_CHECK_MEMBER([struct sockaddr_in6.sin6_scope_id],
 		[ AC_DEFINE(HAVE_SOCKADDR_IN6_SCOPE_ID, 1, [Do we have sockaddr_in6.sin6_scope_id?]) ],
 		[],
@@ -512,8 +503,7 @@ AC_CHECK_MEMBER([struct sockaddr_in6.sin6_scope_id],
 #include <netinet/in.h>
 ])
 
-AC_MSG_CHECKING(struct stat64)
-AC_TRY_COMPILE([#include <stdio.h>
+AC_HAVE_TYPE([struct stat64], [#include <stdio.h>
 #if HAVE_SYS_TYPES_H
 # include <sys/types.h>
 #endif
@@ -528,10 +518,7 @@ AC_TRY_COMPILE([#include <stdio.h>
 #  include <stdlib.h>
 # endif
 #endif
-],[struct stat64 st;],
-    AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_STRUCT_STAT64,1,[Define to 1 if you have struct stat64.]),
-    AC_MSG_RESULT(no))
+])
 
 # if we can't find strcasecmp, look in -lresolv (for Unixware at least)
 #
@@ -689,13 +676,13 @@ if test x"$rsync_cv_HAVE_BROKEN_READDIR" = x"yes"; then
     AC_DEFINE(HAVE_BROKEN_READDIR, 1, [Define to 1 if readdir() is broken])
 fi
 
-AC_CACHE_CHECK([for utimbuf],rsync_cv_HAVE_UTIMBUF,[
+AC_CACHE_CHECK([for utimbuf],rsync_cv_HAVE_STRUCT_UTIMBUF,[
 AC_TRY_COMPILE([#include <sys/types.h>
 #include <utime.h>],
 [struct utimbuf tbuf;  tbuf.actime = 0; tbuf.modtime = 1; exit(utime("foo.c",&tbuf));],
-rsync_cv_HAVE_UTIMBUF=yes,rsync_cv_HAVE_UTIMBUF=no)])
-if test x"$rsync_cv_HAVE_UTIMBUF" = x"yes"; then
-    AC_DEFINE(HAVE_UTIMBUF, 1, [Define to 1 if you have the "struct utimbuf" type])
+rsync_cv_HAVE_STRUCT_UTIMBUF=yes,rsync_cv_HAVE_STRUCT_UTIMBUF=no)])
+if test x"$rsync_cv_HAVE_STRUCT_UTIMBUF" = x"yes"; then
+    AC_DEFINE(HAVE_STRUCT_UTIMBUF, 1, [Define to 1 if you have the "struct utimbuf" type])
 fi
 
 AC_CACHE_CHECK([if gettimeofday takes tz argument],rsync_cv_HAVE_GETTIMEOFDAY_TZ,[
