@@ -2027,14 +2027,8 @@ void generate_files(int f_out, const char *local_name)
 	do {
 #ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && inc_recurse) {
-			while (!flist_eof) {
-				int cnt = first_flist->prev
-				        ? first_flist->prev->ndx_end - first_flist->ndx_start + 1
-					: first_flist->ndx_end - first_flist->ndx_start + 1;
-				if (cnt >= FILECNT_LOOKAHEAD/2)
-					break;
+			while (!flist_eof && file_total < FILECNT_LOOKAHEAD/2)
 				wait_for_receiver();
-			}
 		}
 #endif
 

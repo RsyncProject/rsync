@@ -1657,19 +1657,17 @@ void send_extra_file_list(int f, int at_least)
 	struct file_list *flist;
 	int64 start_write;
 	uint16 prev_flags;
-	int future_cnt, save_io_error = io_error;
+	int old_cnt, save_io_error = io_error;
 
 	if (flist_eof)
 		return;
 
 	/* Keep sending data until we have the requested number of
 	 * files in the upcoming file-lists. */
-	if (cur_flist->next) {
-		flist = first_flist->prev; /* the newest flist */
-		future_cnt = flist->ndx_end - cur_flist->next->ndx_start + 1;
-	} else
-		future_cnt = 0;
-	while (future_cnt < at_least) {
+	old_cnt = cur_flist->used;
+	for (flist = first_flist; flist != cur_flist; flist = flist->next)
+		old_cnt += flist->used;
+	while (file_total - old_cnt < at_least) {
 		struct file_struct *file = dir_flist->sorted[send_dir_ndx];
 		int dir_ndx, dstart = dir_count;
 		const char *pathname = F_PATHNAME(file);
@@ -1730,7 +1728,6 @@ void send_extra_file_list(int f, int at_least)
 		flist_done_allocating(flist);
 
 		file_total += flist->used;
-		future_cnt += flist->used;
 		stats.flist_size += stats.total_written - start_write;
 		stats.num_files += flist->used;
 		if (verbose > 3)
