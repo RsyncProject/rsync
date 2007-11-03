@@ -517,6 +517,14 @@ static void do_delete_pass(void)
 
 int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 {
+#if !defined HAVE_LCHMOD && !defined HAVE_SETATTRLIST
+	if (S_ISLNK(file->mode)) {
+		;
+	} else
+#endif
+	if (preserve_times && cmp_time(sxp->st.st_mtime, file->modtime) != 0)
+		return 0;
+
 	if (preserve_perms && !BITS_EQUAL(sxp->st.st_mode, file->mode, CHMOD_BITS))
 		return 0;
 
