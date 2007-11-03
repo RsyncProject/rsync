@@ -211,7 +211,7 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 	int len, iflags = 0;
 	struct file_list *flist;
 	uchar fnamecmp_type = FNAMECMP_FNAME;
-	int ndx;
+	int ndx, save_verbose = verbose;
 
   read_loop:
 	while (1) {
@@ -239,15 +239,17 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 		}
 
 		/* Send everything read from f_in to msg_fd_out. */
-		send_msg_int(MSG_FLIST, ndx);
-		start_flist_forward(f_in);
 		if (verbose > 3) {
 			rprintf(FINFO, "[%s] receiving flist for dir %d\n",
 				who_am_i(), ndx);
 		}
+		verbose = 0;
+		send_msg_int(MSG_FLIST, ndx);
+		start_flist_forward(f_in);
 		flist = recv_file_list(f_in);
 		flist->parent_ndx = ndx;
 		stop_flist_forward();
+		verbose = save_verbose;
 	}
 
 	iflags = protocol_version >= 29 ? read_shortint(f_in)
