@@ -100,7 +100,7 @@ static char ff_lastchar;
 #ifdef ICONV_OPTION
 static xbuf iconv_buf = EMPTY_XBUF;
 #endif
-static int defer_forwarding_messages = 0;
+static int defer_forwarding_messages = 0, defer_forwarding_keep = 0;
 static int select_timeout = SELECT_TIMEOUT;
 static int active_filecnt = 0;
 static OFF_T active_bytecnt = 0;
@@ -440,7 +440,7 @@ static void read_msg_fd(void)
 
 	no_flush--;
 	msg_fd_in = fd;
-	if (!--defer_forwarding_messages)
+	if (!--defer_forwarding_messages && !no_flush)
 		msg_flush();
 }
 
@@ -480,7 +480,9 @@ static void mplex_write(int fd, enum msgcode code, const char *buf, size_t len, 
 	else
 		memcpy(buffer + 4, buf, n);
 
+	defer_forwarding_keep = 1; /* defer_forwarding_messages++ on return */
 	writefd_unbuffered(fd, buffer, n+4);
+	defer_forwarding_keep = 0;
 
 	len -= n;
 	buf += n;
@@ -492,22 +494,18 @@ static void mplex_write(int fd, enum msgcode code, const char *buf, size_t len, 
 		INIT_CONST_XBUF(outbuf, buffer);
 		INIT_XBUF(inbuf, (char*)buf, len, -1);
 
-		defer_forwarding_messages++;
 		do {
 			iconvbufs(ic_send, &inbuf, &outbuf,
 				  ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE);
 			writefd_unbuffered(fd, outbuf.buf, outbuf.len);
 		} while (inbuf.len);
-		if (!--defer_forwarding_messages)
-			msg_flush();
 	} else
 #endif
-	if (len) {
-		defer_forwarding_messages++;
+	if (len)
 		writefd_unbuffered(fd, buf, len);
-		if (!--defer_forwarding_messages)
-			msg_flush();
-	}
+
+	if (!--defer_forwarding_messages && !no_flush)
+		msg_flush();
 }
 
 int send_msg(enum msgcode code, const char *buf, int len, int convert)
@@ -1512,7 +1510,8 @@ static void writefd_unbuffered(int fd, const char *buf, size_t len)
 	}
 
 	no_flush--;
-	if (!(defer_forwarding_messages -= defer_inc))
+	defer_inc -= defer_forwarding_keep;
+	if (!(defer_forwarding_messages -= defer_inc) && !no_flush)
 		msg_flush();
 }
 
