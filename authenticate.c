@@ -21,6 +21,7 @@
 #include "rsync.h"
 
 extern char *password_file;
+extern int log_got_error;
 
 /***************************************************************************
 encode a buffer using base64 - simple and slow algorithm. null terminates
@@ -306,6 +307,9 @@ void auth_client(int fd, const char *user, const char *challenge)
                  */
 		pass = getpass("Password: ");
 	}
+
+	/* Any errors output during password handling aren't transfer errors. */
+	log_got_error = 0;
 
 	if (!pass)
 		pass = "";
