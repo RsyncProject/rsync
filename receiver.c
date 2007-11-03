@@ -60,7 +60,7 @@ extern struct filter_list_struct server_filter_list;
 static struct bitbag *delayed_bits = NULL;
 static int phase = 0, redoing = 0;
 /* We're either updating the basis file or an identical copy: */
-static int updating_basis;
+static int updating_basis_or_equiv;
 
 /*
  * get_tmpname() - create a tmp filename for a given filename
@@ -259,7 +259,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 			sum_update(map, len);
 		}
 
-		if (updating_basis) {
+		if (updating_basis_or_equiv) {
 			if (offset == offset2 && fd != -1) {
 				OFF_T pos;
 				if (flush_write_file(fd) < 0)
@@ -553,14 +553,18 @@ int recv_files(int f_in, char *local_name)
 				break;
 			}
 			if (!fnamecmp || (server_filter_list.head
-			  && check_filter(&server_filter_list, fname, 0) < 0))
+			  && check_filter(&server_filter_list, fname, 0) < 0)) {
 				fnamecmp = fname;
+				fnamecmp_type = FNAMECMP_FNAME;
+			}
 		} else {
 			/* Reminder: --inplace && --partial-dir are never
 			 * enabled at the same time. */
 			if (inplace && make_backups > 0) {
 				if (!(fnamecmp = get_backup_name(fname)))
 					fnamecmp = fname;
+				else
+					fnamecmp_type = FNAMECMP_BACKUP;
 			} else if (partial_dir && partialptr)
 				fnamecmp = partialptr;
 			else
@@ -586,7 +590,9 @@ int recv_files(int f_in, char *local_name)
 				fd1 = do_open(fnamecmp, O_RDONLY, 0);
 			}
 		}
-		updating_basis = inplace && fnamecmp == fname;
+
+		updating_basis_or_equiv = inplace
+		    && (fnamecmp == fname || fnamecmp_type == FNAMECMP_BACKUP);
 
 		if (fd1 == -1) {
 			st.st_mode = 0;
