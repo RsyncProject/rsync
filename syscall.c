@@ -211,6 +211,7 @@ int do_mkstemp(char *template, mode_t perms)
 {
 	RETURN_ERROR_IF(dry_run, 0);
 	RETURN_ERROR_IF(read_only, EROFS);
+	perms |= S_IWUSR;
 
 #if defined HAVE_SECURE_MKSTEMP && defined HAVE_FCHMOD && (!defined HAVE_OPEN64 || defined HAVE_MKSTEMP64)
 	{
