@@ -421,7 +421,7 @@ void usage(enum logcode F)
   rprintf(F,"     --read-batch=FILE       read a batched update from FILE\n");
   rprintf(F,"     --protocol=NUM          force an older protocol version to be used\n");
 #ifdef ICONV_OPTION
-  rprintf(F,"     --iconv=CONVERT_SPEC    request charset conversion of filesnames\n");
+  rprintf(F,"     --iconv=CONVERT_SPEC    request charset conversion of filenames\n");
 #endif
   rprintf(F," -4, --ipv4                  prefer IPv4\n");
   rprintf(F," -6, --ipv6                  prefer IPv6\n");

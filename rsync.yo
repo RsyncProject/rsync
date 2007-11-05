@@ -225,7 +225,7 @@ verb(  export RSYNC_CONNECT_PROG='ssh proxyhost nc %H 873'
   rsync -av targethost1::module/src/ /dest/
   rsync -av rsync:://targethost2/module/src/ /dest/ )
 
-The command specifed above uses ssh to run nc (netcat) on a proxyhost,
+The command specified above uses ssh to run nc (netcat) on a proxyhost,
 which forwards all data to port 873 (the rsync daemon) on the targethost
 (%H).
 
@@ -328,7 +328,7 @@ to the detailed description below for a complete description.  verb(
  -u, --update                skip files that are newer on the receiver
      --inplace               update destination files in-place
      --append                append data onto shorter files
-     --append-verify         --append w/old data in file cheksum
+     --append-verify         --append w/old data in file checksum
  -d, --dirs                  transfer directories without recursing
  -l, --links                 copy symlinks as symlinks
  -L, --copy-links            transform symlink into referent file/dir
@@ -421,7 +421,7 @@ to the detailed description below for a complete description.  verb(
      --only-write-batch=FILE like --write-batch but w/o updating dest
      --read-batch=FILE       read a batched update from FILE
      --protocol=NUM          force an older protocol version to be used
-     --iconv=CONVERT_SPEC    request charset conversion of filesnames
+     --iconv=CONVERT_SPEC    request charset conversion of filenames
      --checksum-seed=NUM     set block/file checksum seed (advanced)
  -4, --ipv4                  prefer IPv4
  -6, --ipv6                  prefer IPv6
@@ -995,7 +995,7 @@ files we create can always be accessed/changed by the creating user).
 This option also handles ACLs (if bf(--acls) was specified) and non-user
 extended attributes (if bf(--xattrs) was specified).
 
-This is a good way to backup data withou using a super-user, and to store
+This is a good way to backup data without using a super-user, and to store
 ACLs from incompatible systems.
 
 The bf(--fake-super) option only affects the side where the option is used.
@@ -1005,7 +1005,7 @@ path:
 quote(tt(  rsync -av --rsync-path="rsync --fake-super" /src/ host:/dest/))
 
 Since there is only one "side" in a local copy, this option affects both
-the sending and recieving of files.  You'll need to specify a copy using
+the sending and receiving of files.  You'll need to specify a copy using
 "localhost" if you need to avoid this, possibly using the "lsh" shell
 script (from the support directory) as a substitute for an actual remote
 shell (see bf(--rsh)).
