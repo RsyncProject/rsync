@@ -903,9 +903,6 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 		case 2:
 			if (!unchanged_attrs(cmpbuf, file, sxp))
 				continue;
-			if (always_checksum > 0 && preserve_times
-			 && cmp_time(sxp->st.st_mtime, file->modtime))
-				continue;
 			best_match = j;
 			match_level = 3;
 			break;
