@@ -161,7 +161,10 @@ static char *get_xattr_data(const char *fname, const char *name, size_t *len_ptr
 			    int no_missing_error)
 {
 	size_t datum_len = sys_lgetxattr(fname, name, NULL, 0);
+	size_t extra_len = *len_ptr;
 	char *ptr;
+
+	*len_ptr = datum_len;
 
 	if (datum_len == (size_t)-1) {
 		if (errno == ENOTSUP || no_missing_error)
@@ -172,11 +175,11 @@ static char *get_xattr_data(const char *fname, const char *name, size_t *len_ptr
 		return NULL;
 	}
 
-	if (datum_len + *len_ptr < datum_len /* checks for overflow */
-	 || !(ptr = new_array(char, datum_len + *len_ptr)))
+	if (!datum_len && !extra_len)
+		extra_len = 1; /* request non-zero amount of memory */
+	if (datum_len + extra_len < datum_len /* checks for overflow */
+	 || !(ptr = new_array(char, datum_len + extra_len)))
 		out_of_memory("get_xattr_data");
-
-	*len_ptr = datum_len;
 
 	if (datum_len) {
 		size_t len = sys_lgetxattr(fname, name, ptr, datum_len);
