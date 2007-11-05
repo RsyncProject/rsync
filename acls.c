@@ -476,8 +476,10 @@ static int get_rsync_acl(const char *fname, rsync_acl *racl,
 		if ((buf = get_xattr_acl(fname, type == SMB_ACL_TYPE_ACCESS, &len)) == NULL)
 			return 0;
 		cnt = (len - 4*4) / (4+4);
-		if (len < 4*4 || len != (size_t)cnt*(4+4) + 4*4)
+		if (len < 4*4 || len != (size_t)cnt*(4+4) + 4*4) {
+			free(buf);
 			return -1;
+		}
 
 		racl->user_obj = IVAL(buf, 0);
 		racl->group_obj = IVAL(buf, 4);
