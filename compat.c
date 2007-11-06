@@ -54,16 +54,15 @@ extern char *dest_option;
 extern char *files_from;
 extern char *filesfrom_host;
 extern struct filter_list_struct filter_list;
+extern int need_unsorted_flist;
 #ifdef ICONV_OPTION
-extern char *iconv_opt;
 extern iconv_t ic_send, ic_recv;
 #endif
 
 /* These index values are for the file-list's extra-attribute array. */
-int uid_ndx, gid_ndx, acls_ndx, xattrs_ndx;
-#ifdef ICONV_OPTION
-int ic_ndx;
+int uid_ndx, gid_ndx, acls_ndx, xattrs_ndx, unsort_ndx;
 
+#ifdef ICONV_OPTION
 int filesfrom_convert = 0;
 #endif
 
@@ -247,10 +246,8 @@ void setup_protocol(int f_out,int f_in)
 		need_messages_from_generator = 1;
 	}
 
-#ifdef ICONV_OPTION
-	if (iconv_opt && (!am_sender || inc_recurse))
-		ic_ndx = ++file_extra_cnt;
-#endif
+	if (need_unsorted_flist && (!am_sender || inc_recurse))
+		unsort_ndx = ++file_extra_cnt;
 
 	if (partial_dir && *partial_dir != '/' && (!am_server || local_server)) {
 		int flags = MATCHFLG_NO_PREFIXES | MATCHFLG_DIRECTORY;

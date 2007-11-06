@@ -34,11 +34,9 @@ extern int protocol_version;
 extern int remove_source_files;
 extern int stdout_format_has_i;
 extern int maybe_ATTRS_REPORT;
+extern int unsort_ndx;
 extern char *basis_dir[];
 extern struct file_list *cur_flist;
-#ifdef ICONV_OPTION
-extern int ic_ndx;
-#endif
 
 #ifdef SUPPORT_HARD_LINKS
 
@@ -145,11 +143,9 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 				break;
 			F_HL_PREV(file) = prev;
 			/* The linked list must use raw ndx values. */
-#ifdef ICONV_OPTION
-			if (ic_ndx)
+			if (unsort_ndx)
 				prev = F_NDX(file);
 			else
-#endif
 				prev = ndx_list[from] + hlink_flist->ndx_start;
 		}
 		if (prev < 0 && !inc_recurse) {
@@ -163,11 +159,9 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 		file->flags |= FLAG_HLINK_LAST;
 		F_HL_PREV(file) = prev;
 		if (inc_recurse && CVAL(node->data, 0) == 0) {
-#ifdef ICONV_OPTION
-			if (ic_ndx)
+			if (unsort_ndx)
 				prev = F_NDX(file);
 			else
-#endif
 				prev = ndx_list[from] + hlink_flist->ndx_start;
 			SIVAL(node->data, 1, prev);
 		}

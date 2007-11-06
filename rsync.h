@@ -647,7 +647,7 @@ extern int xattrs_ndx;
 #define F_GROUP(f) REQ_EXTRA(f, gid_ndx)->unum
 #define F_ACL(f) REQ_EXTRA(f, acls_ndx)->num
 #define F_XATTR(f) REQ_EXTRA(f, xattrs_ndx)->num
-#define F_NDX(f) REQ_EXTRA(f, ic_ndx)->num
+#define F_NDX(f) REQ_EXTRA(f, unsort_ndx)->num
 
 /* These items are per-entry optional: */
 #define F_HL_GNUM(f) OPT_EXTRA(f, LEN64_BUMP(f))->num /* non-dirs */

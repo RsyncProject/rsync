@@ -185,8 +185,8 @@ int list_only = 0;
 #define MAX_BATCH_NAME_LEN 256	/* Must be less than MAXPATHLEN-13 */
 char *batch_name = NULL;
 
-#ifdef ICONV_OPTION
 int need_unsorted_flist = 0;
+#ifdef ICONV_OPTION
 char *iconv_opt = ICONV_OPTION;
 #endif
 

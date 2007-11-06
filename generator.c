@@ -95,9 +95,7 @@ extern char *backup_suffix;
 extern int backup_suffix_len;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct filter_list_struct server_filter_list;
-#ifdef ICONV_OPTION
-extern int ic_ndx;
-#endif
+extern int unsort_ndx;
 
 int ignore_perishable = 0;
 int non_perishable_cnt = 0;
@@ -2060,11 +2058,9 @@ void generate_files(int f_out, const char *local_name)
 			if (!F_IS_ACTIVE(file))
 				continue;
 
-#ifdef ICONV_OPTION
-			if (ic_ndx)
+			if (unsort_ndx)
 				ndx = F_NDX(file);
 			else
-#endif
 				ndx = i + cur_flist->ndx_start;
 
 			if (solo_file)

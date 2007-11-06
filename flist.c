@@ -63,11 +63,10 @@ extern int copy_links;
 extern int copy_unsafe_links;
 extern int protocol_version;
 extern int sanitize_paths;
+extern int need_unsorted_flist;
+extern int unsort_ndx;
 extern struct stats stats;
 extern char *filesfrom_host;
-#ifdef ICONV_OPTION
-extern char *iconv_opt;
-#endif
 
 extern char curr_dir[MAXPATHLEN];
 
@@ -77,9 +76,7 @@ extern struct filter_list_struct filter_list;
 extern struct filter_list_struct server_filter_list;
 
 #ifdef ICONV_OPTION
-extern int ic_ndx;
 extern int filesfrom_convert;
-extern int need_unsorted_flist;
 extern iconv_t ic_send, ic_recv;
 #endif
 
@@ -867,10 +864,8 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		F_GROUP(file) = gid;
 		file->flags |= gid_flags;
 	}
-#ifdef ICONV_OPTION
-	if (ic_ndx)
+	if (unsort_ndx)
 		F_NDX(file) = flist->used + flist->ndx_start;
-#endif
 
 	if (basename != thisname) {
 		file->dirname = lastdir;
@@ -1229,10 +1224,8 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	if (basename_len == 0+1)
 		return NULL;
 
-#ifdef ICONV_OPTION
-	if (ic_ndx)
+	if (unsort_ndx)
 		F_NDX(file) = dir_count - 1;
-#endif
 
 	return file;
 }
@@ -1676,11 +1669,9 @@ void send_extra_file_list(int f, int at_least)
 		flist = flist_new(0, "send_extra_file_list");
 		start_write = stats.total_written;
 
-#ifdef ICONV_OPTION
-		if (ic_ndx)
+		if (unsort_ndx)
 			dir_ndx = F_NDX(file);
 		else
-#endif
 			dir_ndx = send_dir_ndx;
 		write_ndx(f, NDX_FLIST_OFFSET - dir_ndx);
 		flist->parent_ndx = dir_ndx;
@@ -1706,22 +1697,18 @@ void send_extra_file_list(int f, int at_least)
 
 		write_byte(f, 0);
 
-#ifdef ICONV_OPTION
 		if (need_unsorted_flist) {
 			if (!(flist->sorted = new_array(struct file_struct *, flist->used)))
 				out_of_memory("send_extra_file_list");
 			memcpy(flist->sorted, flist->files,
 			       flist->used * sizeof (struct file_struct*));
 		} else
-#endif
 			flist->sorted = flist->files;
 
 		clean_flist(flist, 0);
 
 		flist->ndx_end = flist->ndx_start + flist->used - 1;
-#ifdef ICONV_OPTION
-		if (!iconv_opt)
-#endif
+		if (!need_unsorted_flist)
 			flist->ndx_end -= (dir_count - dstart);
 
 		add_dirs_to_tree(send_dir_ndx, flist, dir_count - dstart);
@@ -2019,7 +2006,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	 * receiving side to ask for whatever name it kept.  For incremental
 	 * recursion mode, the sender marks duplicate dirs so that it can
 	 * send them together in a single file-list. */
-#ifdef ICONV_OPTION
 	if (need_unsorted_flist) {
 		if (inc_recurse) {
 			if (!(flist->sorted = new_array(struct file_struct *, flist->used)))
@@ -2032,9 +2018,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			flist->low = 0;
 			flist->high = flist->used - 1;
 		}
-	} else
-#endif
-	{
+	} else {
 		flist->sorted = flist->files;
 		clean_flist(flist, 0);
 	}
@@ -2143,11 +2127,7 @@ struct file_list *recv_file_list(int f)
 	file_total += flist->used;
 
 	flist->ndx_end = flist->ndx_start + flist->used - 1;
-	if (inc_recurse
-#ifdef ICONV_OPTION
-	 && !iconv_opt
-#endif
-	 && flist->ndx_start > 1)
+	if (inc_recurse && !need_unsorted_flist && flist->ndx_start > 1)
 		flist->ndx_end -= dir_flist->used - dstart;
 
 	if (verbose > 2)
@@ -2156,7 +2136,6 @@ struct file_list *recv_file_list(int f)
 	if (show_filelist_p())
 		finish_filelist_progress(flist);
 
-#ifdef ICONV_OPTION
 	if (need_unsorted_flist) {
 		/* Create an extra array of index pointers that we can sort for
 		 * the generator's use (for wading through the files in sorted
@@ -2175,9 +2154,7 @@ struct file_list *recv_file_list(int f)
 			       (dir_flist->used - dstart) * sizeof (struct file_struct*));
 			fsort(dir_flist->sorted + dstart, dir_flist->used - dstart);
 		}
-	} else
-#endif
-	{
+	} else {
 		flist->sorted = flist->files;
 		if (inc_recurse && dir_flist->used > dstart) {
 			dir_flist->sorted = dir_flist->files;
