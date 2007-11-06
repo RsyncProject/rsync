@@ -84,6 +84,7 @@ extern int list_only;
 extern int read_batch;
 extern int safe_symlinks;
 extern long block_size; /* "long" because popt can't set an int32. */
+extern int unsort_ndx;
 extern int max_delete;
 extern int force_delete;
 extern int one_file_system;
@@ -95,7 +96,6 @@ extern char *backup_suffix;
 extern int backup_suffix_len;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct filter_list_struct server_filter_list;
-extern int unsort_ndx;
 
 int ignore_perishable = 0;
 int non_perishable_cnt = 0;
