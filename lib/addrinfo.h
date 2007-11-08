@@ -124,7 +124,6 @@ TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 #endif
 
 #ifndef HAVE_STRUCT_ADDRINFO
-
 struct addrinfo
 {
 	int			ai_flags;
@@ -136,8 +135,15 @@ struct addrinfo
 	char	   *ai_canonname;
 	struct addrinfo *ai_next;
 };
-#endif   /* HAVE_STRUCT_ADDRINFO */
+#endif   /* !HAVE_STRUCT_ADDRINFO */
 
+#ifndef HAVE_STRUCT_SOCKADDR_STORAGE
+struct sockaddr_storage {
+	unsigned short ss_family;
+	unsigned long ss_align;
+	char ss_padding[128 - sizeof (unsigned long)];
+};
+#endif	/* !HAVE_STRUCT_SOCKADDR_STORAGE */
 
 #ifndef HAVE_GETADDRINFO
 
@@ -169,6 +175,6 @@ extern const char *gai_strerror(int errcode);
 extern int getnameinfo(const struct sockaddr * sa, socklen_t salen,
 			char *node, size_t nodelen,
 			char *service, size_t servicelen, int flags);
-#endif   /* HAVE_GETADDRINFO */
+#endif   /* !HAVE_GETADDRINFO */
 
 #endif   /* ADDRINFO_H */

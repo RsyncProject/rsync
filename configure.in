@@ -436,6 +436,8 @@ AC_CHECK_FUNCS(inet_ntop, , [AC_LIBOBJ(lib/inet_ntop)])
 AC_CHECK_FUNCS(inet_pton, , [AC_LIBOBJ(lib/inet_pton)])
 
 AC_HAVE_TYPE([struct addrinfo], [#include <netdb.h>])
+AC_HAVE_TYPE([struct sockaddr_storage], [#include <sys/types.h>
+#include <sys/socket.h>])
 
 # Irix 6.5 has getaddrinfo but not the corresponding defines, so use
 #   builtin getaddrinfo if one of the defines don't exist
