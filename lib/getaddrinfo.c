@@ -153,7 +153,7 @@ static struct addrinfo *alloc_entry(const struct addrinfo *hints,
  */
 
 static int getaddr_info_single_addr(const char *service,
-				uint32_t addr,
+				uint32 addr,
 				const struct addrinfo *hints,
 				struct addrinfo **res)
 {
