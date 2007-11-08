@@ -53,8 +53,15 @@ TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 #define SMB_STRDUP(s) strdup(s)
 #endif
 
+#ifndef HOST_NAME_MAX
+#define HOST_NAME_MAX 255
+#endif
+
 static int check_hostent_err(struct hostent *hp)
 {
+#ifndef INET6
+	extern int h_errno;
+#endif
 	if (!hp) {
 		switch (h_errno) {
 			case HOST_NOT_FOUND:
@@ -399,8 +406,8 @@ static int gethostnameinfo(const struct sockaddr *sa,
 
 	if (!(flags & NI_NUMERICHOST)) {
 		struct hostent *hp = gethostbyaddr(
-				&((struct sockaddr_in *)sa)->sin_addr,
-				sizeof(struct in_addr),
+				(void *)&((struct sockaddr_in *)sa)->sin_addr,
+				sizeof (struct in_addr),
 				sa->sa_family);
 		ret = check_hostent_err(hp);
 		if (ret == 0) {
@@ -481,7 +488,7 @@ int getnameinfo(const struct sockaddr *sa, socklen_t salen,
 		return EAI_FAIL;
 	}
 
-	if (salen < sizeof(struct sockaddr_in)) {
+	if (salen < (socklen_t)sizeof (struct sockaddr_in)) {
 		return EAI_FAIL;
 	}
 
