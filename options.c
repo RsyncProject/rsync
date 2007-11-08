@@ -351,7 +351,7 @@ void usage(enum logcode F)
   rprintf(F,"     --fake-super            store/recover privileged attrs using xattrs\n");
 #endif
   rprintf(F," -S, --sparse                handle sparse files efficiently\n");
-  rprintf(F," -n, --dry-run               show what would have been transferred\n");
+  rprintf(F," -n, --dry-run               perform a trial run with no changes made\n");
   rprintf(F," -W, --whole-file            copy files whole (without rsync algorithm)\n");
   rprintf(F," -x, --one-file-system       don't cross filesystem boundaries\n");
   rprintf(F," -B, --block-size=SIZE       force a fixed checksum block-size\n");

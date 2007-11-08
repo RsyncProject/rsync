@@ -352,7 +352,7 @@ to the detailed description below for a complete description.  verb(
      --super                 receiver attempts super-user activities
      --fake-super            store/recover privileged attrs using xattrs
  -S, --sparse                handle sparse files efficiently
- -n, --dry-run               show what would have been transferred
+ -n, --dry-run               perform a trial run with no changes made
  -W, --whole-file            copy files whole (without rsync algorithm)
  -x, --one-file-system       don't cross filesystem boundaries
  -B, --block-size=SIZE       force a fixed checksum block-size
@@ -1022,8 +1022,20 @@ NOTE: Don't use this option when the destination is a Solaris "tmpfs"
 filesystem. It doesn't seem to handle seeks over null regions
 correctly and ends up corrupting the files.
 
-dit(bf(-n, --dry-run)) This tells rsync to not do any file transfers,
-instead it will just report the actions it would have taken.
+dit(bf(-n, --dry-run)) This makes rsync perform a trial run that doesn't
+make any changes (and produces mostly the same output as a real run).  It
+is most commonly used in combination with the bf(-v, --verbose) and/or
+bf(-i, --itemize-changes) options to see what an rsync command is going
+to do before one actually runs it.
+
+The output of bf(--itemize-changes) is supposed to be exactly the same on a
+dry run and a subsequent real run (barring intentional trickery and system
+call failures); if it isn't, that's a bug.  Other output is the same to the
+extent practical, but may differ in some areas.  Notably, a dry run does not
+send the actual data for file transfers, so bf(--progress) has no effect,
+the "bytes sent", "bytes received", "literal data", and "matched data"
+statistics are too small, and the "speedup" value is equivalent to a run
+where no file transfers are needed.
 
 dit(bf(-W, --whole-file)) With this option the delta transfer algorithm
 is not used and the whole file is sent as-is instead.  The transfer may be
