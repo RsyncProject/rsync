@@ -71,6 +71,12 @@ Changes since 2.6.9:
     - If a daemon module's "path" value is not an absolute pathname, the code
       now makes it absolute internally (making it work properly).
 
+    - Ensure that a temporary file always has owner-write permission while we
+      are writing to it.  This avoids problems with some network filesystems.
+
+    - Any errors output about password-file reading no longer cause an error at
+      the end of the run about a partial transfer.
+
   ENHANCEMENTS:
 
     - A new incremental-recursion algorithm is now used when rsync is talking
@@ -213,6 +219,10 @@ Changes since 2.6.9:
 
     - Improved J.W.'s pool_alloc routines to add a way of freeing older
       sections of a pool's memory.
+
+    - The getaddrinfo.c compatibility code in the "lib" dir was replaced with
+      some new code (derived from samba, derived from PostgreSQL) that has a
+      better license than the old code.
 
   DEVELOPER RELATED:
 
