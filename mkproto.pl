@@ -26,7 +26,7 @@ while (<>) {
     } elsif (/^FN_(LOCAL|GLOBAL)_([^(]+)\(([^,()]+)/) {
 	$ret = $FN_MAP{$2};
 	$func = $3;
-	$arg = $1 eq 'LOCAL' ? 'int ' : 'void';
+	$arg = $1 eq 'LOCAL' ? 'int module_id' : 'void';
 	$protos .= "$ret$func($arg);\n";
     } elsif (/^static|^extern/ || /[;]/ || !/^[A-Za-z][A-Za-z0-9_]* /) {
 	;
