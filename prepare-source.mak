@@ -1,6 +1,6 @@
-gen: gen_no_man man
+gen: conf proto.h man
 
-gen_no_man: configure.sh config.h.in proto.h
+conf: configure.sh config.h.in
 
 configure.sh: configure.in aclocal.m4
 	autoconf -o configure.sh
