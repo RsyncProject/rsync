@@ -65,8 +65,8 @@ install: all
 	${INSTALLCMD} ${INSTALL_STRIP} -m 755 rsync$(EXEEXT) ${DESTDIR}${bindir}
 	-mkdir -p ${DESTDIR}${mandir}/man1
 	-mkdir -p ${DESTDIR}${mandir}/man5
-	${INSTALLMAN} -m 644 $(srcdir)/rsync.1 ${DESTDIR}${mandir}/man1
-	${INSTALLMAN} -m 644 $(srcdir)/rsyncd.conf.5 ${DESTDIR}${mandir}/man5
+	-${INSTALLMAN} -m 644 $(srcdir)/rsync.1 ${DESTDIR}${mandir}/man1
+	-${INSTALLMAN} -m 644 $(srcdir)/rsyncd.conf.5 ${DESTDIR}${mandir}/man5
 
 install-strip:
 	$(MAKE) INSTALL_STRIP='-s' install
