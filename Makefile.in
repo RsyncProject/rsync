@@ -106,6 +106,9 @@ t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 gen:
 	cd $(srcdir) && $(MAKE) -f prepare-source.mak gen
 
+gensend: gen
+	rsync -aivzc configure.sh config.h.in proto.h samba.org:/home/ftp/pub/rsync/generated-files/
+
 man:
 	cd $(srcdir) && $(MAKE) -f prepare-source.mak man
 
