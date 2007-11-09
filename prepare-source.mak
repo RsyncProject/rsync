@@ -9,12 +9,7 @@ config.h.in: configure.in aclocal.m4
 	autoheader && touch config.h.in
 
 proto.h: *.c lib/compat.c
-	cat *.c lib/compat.c | awk -f mkproto.awk >proto.h.new
-	if diff proto.h proto.h.new >/dev/null 2>&1; then \
-	  rm proto.h.new; \
-	else \
-	  mv proto.h.new proto.h; \
-	fi
+	perl mkproto.pl *.c lib/compat.c
 
 man: rsync.1 rsyncd.conf.5
 
