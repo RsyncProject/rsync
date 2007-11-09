@@ -272,9 +272,10 @@ static void output_summary(void)
 			"sent %s bytes  received %s bytes  %s bytes/sec\n",
 			human_num(total_written), human_num(total_read),
 			human_dnum((total_written + total_read)/(0.5 + (endtime - starttime)), 2));
-		rprintf(FINFO, "total size is %s  speedup is %.2f\n",
+		rprintf(FINFO, "total size is %s  speedup is %.2f%s\n",
 			human_num(stats.total_size),
-			(double)stats.total_size / (total_written+total_read));
+			(double)stats.total_size / (total_written+total_read),
+			dry_run ? " (DRY RUN)" : "");
 	}
 
 	fflush(stdout);

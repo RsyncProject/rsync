@@ -18,6 +18,9 @@ Changes since 2.6.9:
       understand the -d option (i.e. it is 2.6.3 or older), you will need to
       either turn off -d (--no-d), or specify  -r --exclude='/*/*'  manually.
 
+    - In --dry-run mode, the last line of the verbose summary text is output
+      with a "(DRY RUN)" suffix to help remind you that no updates were made.
+
   BUG FIXES:
 
     - Fixed the output of -ii when combined with one of the --*-dest options:
