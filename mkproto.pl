@@ -2,7 +2,7 @@
 use strict;
 
 my $old_protos = '';
-if (open(IN, '<', 'proto.h')) {
+if (open(IN, 'proto.h')) {
     $old_protos = join('', <IN>);
     close IN;
 }
@@ -45,7 +45,7 @@ while (<>) {
 }
 
 if ($old_protos ne $protos) {
-    open(OUT, '>', 'proto.h') or die $!;
+    open(OUT, '>proto.h') or die $!;
     print OUT $protos;
     close OUT;
 }
