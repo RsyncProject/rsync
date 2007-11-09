@@ -128,11 +128,10 @@ cleantests:
 distclean: clean
 	rm -f Makefile config.h config.status
 	rm -f $(srcdir)/Makefile $(srcdir)/config.h $(srcdir)/config.status
-
 	rm -f config.cache config.log
 	rm -f $(srcdir)/config.cache $(srcdir)/config.log
-
 	rm -f shconfig $(srcdir)/shconfig
+	rm -f configure.sh config.h.in proto.h rsync.1 rsyncd.conf.5
 
 # this target is really just for my use. It only works on a limited
 # range of machines and is used to produce a list of potentially
