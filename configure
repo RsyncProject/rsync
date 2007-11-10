@@ -1,0 +1,27 @@
+#!/bin/sh -e
+# This configure script ensures that the configure.sh script exists, and
+# if not, it tries to fetch rsync's generated files or build them.  We
+# then transfer control to the configure.sh script to do the real work.
+
+dir=`dirname $0`
+realconfigure="$dir/configure.sh"
+
+if [ ! -f "$realconfigure" ]; then
+    if test x"$dir" != x -a x"$dir" != x.; then
+	curdir=`pwd`
+	cd "$dir"
+    else
+	curdir=''
+    fi
+    make -f prepare-source.mak proto.h
+    if make -f prepare-source.mak conf; then
+	:
+    else
+	rsync -avz rsync://rsync.samba.org/rsyncftp/generated-files/'c*' .
+    fi
+    if test x"$curdir" != x; then
+	cd "$curdir"
+    fi
+fi
+
+exec "$realconfigure" "${@}"
