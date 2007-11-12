@@ -20,10 +20,11 @@ my $incl_generated_files;
 $incl_generated_files = shift if @ARGV && $ARGV[0] eq '--gen';
 
 system "git-checkout master" and exit 1;
+my $last_touch = time;
 
 if ($incl_generated_files) {
-    die "'a' already exists.\n" if -e 'a';
-    die "'b' already exists.\n" if -e 'b';
+    die "'a' must not exist in the current directory.\n" if -e 'a';
+    die "'b' must not exist in the current directory.\n" if -e 'b';
     system "./prepare-source && rsync -a @extra_files a/" and exit 1;
 }
 
@@ -49,11 +50,14 @@ close PIPE;
 
 foreach my $patch (@patches) {
     print "======== $patch ========\n";
+    sleep 1 if $incl_generated_files && $last_touch == time;
     if ($local_patch{$patch}) {
 	system "git-checkout patch/$patch" and exit 1;
     } else {
 	system "git-checkout --track -b patch/$patch origin/patch/$patch" and exit 1;
     }
+    $last_touch = time;
+
     my $parent = 'master';
     open(IN, '<', 'PATCH') or next;
     open(OUT, '>', "patches/$patch.diff") or die $!;
@@ -70,7 +74,7 @@ foreach my $patch (@patches) {
     if (system("git-rebase -m $parent") != 0) {
 	print qq|"git-rebase -m $parent" incomplete -- please fix.\n|;
 	$ENV{PS1} = "[$parent] patch/$patch: ";
-	system $ENV{SHELL};
+	system $ENV{SHELL} and exit 1;
     }
 
     open(PIPE, '-|', 'git-diff', 'master') or die $!;
@@ -102,4 +106,5 @@ if ($incl_generated_files) {
 }
 
 print "-------- master --------\n";
+sleep 1 if $last_touch == time;
 system "git-checkout master && ./prepare-source";
