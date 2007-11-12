@@ -1,0 +1,101 @@
+#!/usr/bin/perl -w
+# This script is used to turn one or more of the "patch/*" branches
+# into one or more diffs in the "patches" directory.  Pass the option
+# --gen if you want generated files in the diffs.  Pass the name of
+# one or more diffs if you want to just update a subset of all the
+# diffs.
+
+use strict;
+
+die "No 'patches' directory present in the current dir.\n" unless -d 'patches';
+die "No '.git' directory present in the current dir.\n" unless -d '.git';
+
+open(IN, '<', 'prepare-source.mak') or die "Couldn't open prepare-source.mak: $!\n";
+$_ = join('', <IN>);
+close IN;
+
+my @extra_files = m{\n([^\s:]+):.*\n\t\S}g;
+my $incl_generated_files;
+
+$incl_generated_files = shift if @ARGV && $ARGV[0] eq '--gen';
+
+system "git-checkout master" and exit 1;
+
+if ($incl_generated_files) {
+    die "'a' already exists.\n" if -e 'a';
+    die "'b' already exists.\n" if -e 'b';
+    system "./prepare-source && rsync -a @extra_files a/" and exit 1;
+}
+
+my(@patches, %local_patch);
+if (@ARGV) {
+    foreach (@ARGV) {
+	s{^(patches|patch|origin/patch)/} {};
+	s{\.diff$} {};
+	push(@patches, $_);
+    }
+    open(PIPE, '-|', 'git-branch', '-l') or die $!;
+} else {
+    open(PIPE, '-|', 'git-branch', '-a') or die $!;
+}
+while (<PIPE>) {
+    if (m# origin/patch/(.*)#) {
+	push(@patches, $1);
+    } elsif (m# patch/(.*)#) {
+	$local_patch{$1} = 1;
+    }
+}
+close PIPE;
+
+foreach my $patch (@patches) {
+    print "======== $patch ========\n";
+    if ($local_patch{$patch}) {
+	system "git-checkout patch/$patch" and exit 1;
+    } else {
+	system "git-checkout --track -b patch/$patch origin/patch/$patch" and exit 1;
+    }
+    my $parent = 'master';
+    open(IN, '<', 'PATCH') or next;
+    open(OUT, '>', "patches/$patch.diff") or die $!;
+
+    while (<IN>) {
+	if (m#patch -p1 <patch/(\S+)\.diff# && $1 ne $patch) {
+	    $parent = $1;
+	}
+	print OUT $_;
+    }
+    close IN;
+    print OUT "\n";
+
+    system "git-rebase -m $parent || $ENV{SHELL}";
+
+    open(PIPE, '-|', 'git-diff', 'master') or die $!;
+    while (<PIPE>) {
+	last if m{^diff --git a/PATCH b/PATCH$};
+	print OUT $_;
+    }
+    while (<PIPE>) {
+	last if m{^diff --git a/};
+    }
+    print OUT $_, <PIPE>;
+    close PIPE;
+
+    if ($incl_generated_files) {
+	system "./prepare-source && rsync -a @extra_files b/" and exit 1;
+	open(PIPE, '-|', 'diff', '-up', 'a', 'b') or die $!;
+	while (<PIPE>) {
+	    s/^((?:---|\+\+\+) [^\t]+)\t.*/$1/;
+	    print OUT $_;
+	}
+	close PIPE;
+    }
+
+    close OUT;
+}
+
+if ($incl_generated_files) {
+    system "rm -rf a b";
+}
+
+print "-------- master --------\n";
+system "git-checkout master && ./prepare-source";
