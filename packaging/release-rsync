@@ -194,8 +194,8 @@ rename("a/configure", "a/configure.sh"); # XXX remove soon
 
 system "rsync -a @extra_files rsync-$version/";
 
-system "git-commit -a -m 'Preparing for release of $version'";
-system "git-tag -s -m 'Version $version.' v$version";
+system "git-commit -a -m 'Preparing for release of $version'" and exit 1;
+system "git-tag -s -m 'Version $version.' v$version" and exit 1;
 
 # When creating a pre-release after a normal release, there's nothing to move.
 if ($diffdir ne $dest) {
