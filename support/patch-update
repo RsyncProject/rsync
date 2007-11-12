@@ -67,7 +67,11 @@ foreach my $patch (@patches) {
     close IN;
     print OUT "\n";
 
-    system "git-rebase -m $parent || $ENV{SHELL}";
+    if (system("git-rebase -m $parent") != 0) {
+	print qq|"git-rebase -m $parent" incomplete -- please fix.\n|;
+	$ENV{PS1} = "[$parent] patch/$patch: ";
+	system $ENV{SHELL};
+    }
 
     open(PIPE, '-|', 'git-diff', 'master') or die $!;
     while (<PIPE>) {
