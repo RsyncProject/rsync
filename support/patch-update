@@ -15,18 +15,15 @@ $_ = join('', <IN>);
 close IN;
 
 my @extra_files = m{\n([^\s:]+):.*\n\t\S}g;
-my $incl_generated_files;
-
-$incl_generated_files = shift if @ARGV && $ARGV[0] eq '--gen';
+my $incl_generated_files = shift if @ARGV && $ARGV[0] eq '--gen';
 
 system "git-checkout master" and exit 1;
-my $last_touch = time;
-
 if ($incl_generated_files) {
     die "'a' must not exist in the current directory.\n" if -e 'a';
     die "'b' must not exist in the current directory.\n" if -e 'b';
     system "./prepare-source && rsync -a @extra_files a/" and exit 1;
 }
+my $last_touch = time;
 
 my(@patches, %local_patch);
 if (@ARGV) {
@@ -56,15 +53,14 @@ foreach my $patch (@patches) {
     } else {
 	system "git-checkout --track -b patch/$patch origin/patch/$patch" and exit 1;
     }
-    $last_touch = time;
 
     my $parent = 'master';
-    open(IN, '<', 'PATCH') or next;
+    open(IN, '<', "PATCH.$patch") or next;
     open(OUT, '>', "patches/$patch.diff") or die $!;
 
     while (<IN>) {
-	if (m#patch -p1 <patch/(\S+)\.diff# && $1 ne $patch) {
-	    $parent = $1;
+	if (m#patch -p1 <patches/(\S+)\.diff# && $1 ne $patch) {
+	    $parent = "patch/$1";
 	}
 	print OUT $_;
     }
@@ -77,19 +73,24 @@ foreach my $patch (@patches) {
 	system $ENV{SHELL} and exit 1;
     }
 
-    open(PIPE, '-|', 'git-diff', 'master') or die $!;
-    while (<PIPE>) {
-	last if m{^diff --git a/PATCH b/PATCH$};
+    if ($incl_generated_files) {
+	system "./prepare-source && rsync -a @extra_files b/" and exit 1;
+    }
+    $last_touch = time;
+
+    open(PIPE, '-|', 'git-diff', $parent) or die $!;
+    DIFF: while (<PIPE>) {
+	while (m{^diff --git a/PATCH}) {
+	    while (<PIPE>) {
+		last if m{^diff --git a/};
+	    }
+	    last DIFF if !defined $_;
+	}
 	print OUT $_;
     }
-    while (<PIPE>) {
-	last if m{^diff --git a/};
-    }
-    print OUT $_, <PIPE>;
     close PIPE;
 
     if ($incl_generated_files) {
-	system "./prepare-source && rsync -a @extra_files b/" and exit 1;
 	open(PIPE, '-|', 'diff', '-up', 'a', 'b') or die $!;
 	while (<PIPE>) {
 	    s/^((?:---|\+\+\+) [^\t]+)\t.*/$1/;
