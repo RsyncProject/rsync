@@ -1,4 +1,5 @@
 *.[oa]
+*~
 dummy
 ID
 Makefile
@@ -33,3 +34,4 @@ config.status
 /doc/rsync.ps
 /testsuite/chown-fake.test
 /testsuite/devices-fake.test
+/patches
