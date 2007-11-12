@@ -26,7 +26,6 @@ extern int verbose;
 extern int am_server;
 extern int am_sender;
 extern int eol_nulls;
-extern int recurse;
 extern int io_error;
 extern int local_server;
 extern int prune_empty_dirs;
