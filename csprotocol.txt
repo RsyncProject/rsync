@@ -3,21 +3,22 @@ basically a summary of clientserver.c and authenticate.c.
 
  -- Martin Pool <mbp@samba.org>
 
-$Id$
-
-
-
 
 This is the protocol used for rsync --daemon; i.e. connections to port
 873 rather than invocations over a remote shell.
 
 When the server accepts a connection, it prints a greeting
 
-  @RSYNCD: <version>
+  @RSYNCD: <version>.<subprotocol>
 
-where <version> is the numeric version; currently 24.  It follows this
-with a free text message-of-the-day.  It expects to see a similar
-greeting back from the client.
+where <version> is the numeric version (see PROTOCOL_VERSION in rsync.h)
+'.' is a literal period, and <subprotocol> is the numeric subprotocol
+version (see SUBPROTOCOL_VERSION -- it will be 0 for final releases).
+Protocols prior to 30 only output <version> alone.  The daemon expects
+to see a similar greeting back from the client.  For protocols prior to
+30, an absent ".<subprotocol>" value is assumed to be 0.  For protocol
+30, an absent value is a fatal error.  The daemon then follows this line
+with a free-format text message-of-the-day (if any is defined).
 
 The server is now in the connected state.  The client can either send
 the command
@@ -75,8 +76,13 @@ stay tuned (or write it yourself!).
 ------------
 Protocol version changes
 
-25	 (2001-08-20, 2.4.7pre2) 
+30	(2007-10-04, 3.0.0pre1)
 
-	 Send an explicit "@RSYNC EXIT" command at the end of the
-	 module listing.  We never intentionally end the transmission
-	 by just closing the socket anymore.
+	The use of a ".<subprotocol>" number was added to
+	@RSYNCD: <version>.<subprotocol>
+
+25	(2001-08-20, 2.4.7pre2) 
+
+	Send an explicit "@RSYNC EXIT" command at the end of the
+	module listing.  We never intentionally end the transmission
+	by just closing the socket anymore.
