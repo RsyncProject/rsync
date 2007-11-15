@@ -14,16 +14,13 @@ use strict;
 use Getopt::Long;
 use Date::Format;
 
-# Choose any dir where a pristine rsync has been checked out of CVS.
-our $unpacked = $ENV{HOME} . '/release/nightly';
 # Where the local copy of /home/ftp/pub/rsync/nightly should be updated.
-our $nightly = $ENV{HOME} . '/samba-rsync-ftp/nightly';
-our $nightly_symlink = "$nightly/rsync-HEAD.tar.gz";
+our $dest = $ENV{HOME} . '/samba-rsync-ftp/nightly';
+our $nightly_symlink = "$dest/rsync-HEAD.tar.gz";
 
-our($cvs_update, $make_tar, $upload, $help_opt);
+our($make_tar, $upload, $help_opt);
 &Getopt::Long::Configure('bundling');
 &usage if !&GetOptions(
-    'cvs-update|c' => \$cvs_update,
     'make-tar|t' => \$make_tar,
     'upload|u' => \$upload,
     'help|h' => \$help_opt,
@@ -33,68 +30,55 @@ our $name = time2str('rsync-HEAD-%Y%m%d-%H%M%Z', time, 'GMT');
 our $ztoday = time2str('%d %b %Y', time);
 our $today = $ztoday;
 
-chdir($unpacked) or die $!;
-
-if ($cvs_update) {
-    print "Updating from cvs...\n";
-    system 'cvs -q up' and die $!;
-}
+die "$dest does not exist\n" unless -d $dest;
+die "There is no .git dir in the current directory.\n" unless -d '.git';
+die "There is no rsync checkout in the current directory.\n" unless -f 'rsyncd.conf.yo';
 
 if ($make_tar) {
-    print "Generating list of active CVS files...\n";
-    my($dir, @files);
-    open(CVS, '-|', 'cvs status 2>&1') or die $!;
-    while (<CVS>) {
-	if (/^cvs status: Examining (.*)/) {
-	    if ($1 eq '.') {
-		$dir = '';
-	    } else {
-		push(@files, $1);
-		$dir = $1 . '/';
-	    }
-	} elsif (/^File: (.*?)\s+Status: (.*)/ && $1 ne '.cvsignore') {
-	    push(@files, $dir . $1);
-	    if ($2 ne 'Up-to-date') {
-		print "*** Not up-to-date: $dir$1\n";
-	    }
-	}
-    }
-    close CVS;
+    open(IN, '-|', 'git-status') or die $!;
+    my $status = join('', <IN>);
+    close IN;
+    die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
+    die "The checkout is not on the master branch.\n" unless $status =~ /^# On branch master\n/;
 
-    print "Creating $unpacked/$name.tar.gz\n";
-    chdir('..') or die $!;
-    rename($unpacked, $name) or die $!;
-    open(TAR, '|-', "fakeroot tar --files-from=- --no-recursion --mode=g-w -czf $nightly/$name.tar.gz $name") or die $!;
-    foreach (@files) {
-	print TAR "$name/$_\n";
-    }
-    close TAR;
-    rename($name, $unpacked) or die $!;
+    open(IN, '<', 'prepare-source.mak') or die "Couldn't open prepare-source.mak: $!\n";
+    $_ = join('', <IN>);
+    close IN;
+
+    my @extra_files = m{\n([^\s:]+):.*\n\t\S}g;
+    map { s#^#$name/# } @extra_files;
+
+    print "Creating $name.tar.gz\n";
+    system "./prepare-source && touch proto.h";
+    symlink('.', $name);
+    system "git-archive --format=tar --prefix=$name/ HEAD >$dest/$name.tar";
+    system "fakeroot tar rf $dest/$name.tar @extra_files; gzip -9 $dest/$name.tar";
+    unlink($name);
     unlink($nightly_symlink);
     symlink("$name.tar.gz", $nightly_symlink);
 }
 
-chdir($nightly) or die $!;
-
 foreach my $fn (qw( rsync.yo rsyncd.conf.yo )) {
-    my $html_fn = $fn;
-    $html_fn =~ s/\.yo/.html/;
+    my $yo_tmp = "$dest/$fn";
+    (my $html_fn = "$dest/$fn") =~ s/\.yo/.html/;
 
-    open(IN, '<', "$unpacked/$fn") or die $!;
+    open(IN, '<', $fn) or die $!;
     undef $/; $_ = <IN>; $/ = "\n";
     close IN;
 
     s/^(manpage\([^)]+\)\(\d+\)\()[^)]+(\).*)/$1$today$2/m;
     #s/^(This man ?page is current for version) \S+ (of rsync)/$1 $version $2/m;
 
-    open(OUT, '>', $fn) or die $!;
+    open(OUT, '>', $yo_tmp) or die $!;
     print OUT $_;
     close OUT;
 
-    system "yodl2html -o $html_fn $fn";
+    system 'yodl2html', '-o', $html_fn, $yo_tmp;
 
-    unlink($fn);
+    unlink($yo_tmp);
 }
+
+chdir($dest) or die $!;
 
 my $cnt = 0;
 open(PIPE, '-|', 'ls -1t rsync-HEAD-*') or die $!;
@@ -122,8 +106,7 @@ sub usage
     die <<EOT;
 Usage: nightly-rsync [OPTIONS]
 
- -c, --cvs-update  update $unpacked via CVS.
- -t, --make-tar    create a new tar file in $nightly
+ -t, --make-tar    create a new tar file in $dest
  -u, --upload      upload the revised nightly dir to samba.org
  -h, --help        display this help
 EOT
