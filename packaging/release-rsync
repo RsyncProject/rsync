@@ -238,14 +238,14 @@ if ($diffdir ne $dest) {
 }
 
 print "Creating $srctar_file ...\n";
-system "git-archive --format=tar --prefix=rsync-$version/ v$version >$dest/srctmp.tar";
-system "fakeroot tar rf $dest/srctmp.tar rsync-$version/*; gzip -9 <$dest/srctmp.tar >$srctar_file";
-unlink("$dest/srctmp.tar");
+(my $srctar_tmp = $srctar_file) =~ s/\.gz$//;
+system "git-archive --format=tar --prefix=rsync-$version/ v$version >$srctar_tmp";
+system "fakeroot tar rf $srctar_tmp rsync-$version/*; gzip -9 $srctar_tmp";
 
 print "Creating $diff_file ...\n";
 rename("rsync-$version", 'b');
-my $sed_script = 's/^((---|\+\+\+) [^\t]+)\t.*/\1/';
-system "(diff -up a b | sed -r '$sed_script'; git-diff v$lastversion v$version) | gzip -9 >$diff_file";
+my $sed_script = 's:^((---|\+\+\+) [ab]/[^\t]+)\t.*:\1:';
+system "(git-diff v$lastversion v$version; diff -up a b | sed -r '$sed_script') | gzip -9 >$diff_file";
 system "rm -rf a b";
 
 system "support/patch-update --gen";
