@@ -45,8 +45,58 @@ while (<PIPE>) {
 }
 close PIPE;
 
+my(%parent, %description);
 foreach my $patch (@patches) {
+    my $branch = ($local_patch{$patch} ? '' : 'origin/') . "patch/$patch";
+    open(PIPE, '-|', 'git-diff', "master...$branch", '--', "PATCH.$patch") or die $!;
+    while (<PIPE>) {
+	last if /^@@ /;
+    }
+    my $desc = '';
+    while (<PIPE>) {
+	next if /^-/; # huh??
+	s/^.//;
+	if (m#patch -p1 <patches/(\S+)\.diff# && $1 ne $patch) {
+	    $parent{$patch} = $1;
+	}
+	$desc .= $_;
+    }
+    $description{$patch} = $desc;
+}
+
+my %completed;
+foreach my $patch (@patches) {
+    next if $completed{$patch}++;
+    update_patch($patch);
+}
+
+if ($incl_generated_files) {
+    system "rm -rf a b";
+}
+
+print "-------- master --------\n";
+sleep 1 if $last_touch == time;
+system "git-checkout master && ./prepare-source";
+
+exit;
+
+
+sub update_patch
+{
+    my($patch) = @_;
+
+    my $parent = $parent{$patch};
+    if (defined $parent) {
+	unless ($completed{$parent}++) {
+	    update_patch($parent);
+	}
+	$parent = "patch/$parent";
+    } else {
+	$parent = 'master';
+    }
+
     print "======== $patch ========\n";
+
     sleep 1 if $incl_generated_files && $last_touch == time;
     if ($local_patch{$patch}) {
 	system "git-checkout patch/$patch" and exit 1;
@@ -54,18 +104,8 @@ foreach my $patch (@patches) {
 	system "git-checkout --track -b patch/$patch origin/patch/$patch" and exit 1;
     }
 
-    my $parent = 'master';
-    open(IN, '<', "PATCH.$patch") or next;
     open(OUT, '>', "patches/$patch.diff") or die $!;
-
-    while (<IN>) {
-	if (m#patch -p1 <patches/(\S+)\.diff# && $1 ne $patch) {
-	    $parent = "patch/$1";
-	}
-	print OUT $_;
-    }
-    close IN;
-    print OUT "\n";
+    print OUT $description{$patch}, "\n";
 
     if (system("git-rebase -m $parent") != 0) {
 	print qq|"git-rebase -m $parent" incomplete -- please fix.\n|;
@@ -101,11 +141,3 @@ foreach my $patch (@patches) {
 
     close OUT;
 }
-
-if ($incl_generated_files) {
-    system "rm -rf a b";
-}
-
-print "-------- master --------\n";
-sleep 1 if $last_touch == time;
-system "git-checkout master && ./prepare-source";
