@@ -662,7 +662,7 @@ extern int xattrs_ndx;
 
 /* This optional item might follow an F_HL_*() item.
  * (Note: a device doesn't need to check LEN64_BUMP(f).) */
-#define F_RDEV_P(f) (&OPT_EXTRA(f, HLINK_BUMP(f) + 2 - 1)->unum)
+#define F_RDEV_P(f) (&OPT_EXTRA(f, HLINK_BUMP(f) + DEV_EXTRA_CNT - 1)->unum)
 
 /* The sum is only present on regular files. */
 #define F_SUM(f) ((char*)OPT_EXTRA(f, LEN64_BUMP(f) + HLINK_BUMP(f) \
