@@ -1427,7 +1427,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT);
 				if (itemizing)
 					itemize(fname, file, ndx, 0, &sx, 0, 0, NULL);
-#ifdef SUPPORT_HARD_LINKS
+#if defined SUPPORT_HARD_LINKS && defined CAN_HARDLINK_SYMLINK
 				if (preserve_hard_links && F_IS_HLINKED(file))
 					finish_hard_link(file, fname, ndx, &sx.st, itemizing, code, -1);
 #endif
