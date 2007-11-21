@@ -21,6 +21,7 @@ if [ ! -f "$realconfigure" ]; then
 	rsync -avz rsync://rsync.samba.org/rsyncftp/generated-files/'c*' .
     else
 	echo 'Failed to build configure.sh and/or config.h.in -- giving up.' >&2
+	rm -f "$realconfigure"
 	exit 1
     fi
     if test x"$curdir" != x; then
