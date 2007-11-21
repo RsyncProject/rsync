@@ -926,10 +926,10 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 	if (sanitize_paths) {
 		char **dir;
 		for (dir = basis_dir; *dir; dir++) {
-			*dir = sanitize_path(NULL, *dir, NULL, curr_dir_depth, NULL);
+			*dir = sanitize_path(NULL, *dir, NULL, curr_dir_depth);
 		}
 		if (partial_dir) {
-			partial_dir = sanitize_path(NULL, partial_dir, NULL, curr_dir_depth, NULL);
+			partial_dir = sanitize_path(NULL, partial_dir, NULL, curr_dir_depth);
 		}
 	}
 	fix_basis_dirs();

@@ -549,7 +549,7 @@ void glob_expand(char *s, char ***argv_ptr, int *argc_ptr, int *maxargs_ptr)
 		s = ".";
 
 	if (sanitize_paths)
-		s = sanitize_path(NULL, s, "", 0, NULL);
+		s = sanitize_path(NULL, s, "", 0);
 	else
 		s = strdup(s);
 	if (!s)
@@ -766,8 +766,7 @@ unsigned int clean_fname(char *name, int flags)
  * Specify NULL to get the default of "module_dir".
  *
  * The depth var is a count of how many '..'s to allow at the start of the
- * path.  If symlink is set, combine its value with the "p" value to get
- * the target path, and **return NULL if any '..'s try to escape**.
+ * path.
  *
  * We also clean the path in a manner similar to clean_fname() but with a
  * few differences:
@@ -777,16 +776,10 @@ unsigned int clean_fname(char *name, int flags)
  * ALWAYS collapses ".." elements (except for those at the start of the
  * string up to "depth" deep).  If the resulting name would be empty,
  * change it into a ".". */
-char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth,
-		    const char *symlink)
+char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
 {
-	char *start, *sanp, *save_dest = dest;
+	char *start, *sanp;
 	int rlen = 0, leave_one_dotdir = relative_paths;
-
-	if (symlink && *symlink == '/') {
-		p = symlink;
-		symlink = "";
-	}
 
 	if (dest != p) {
 		int plen = strlen(p);
@@ -810,18 +803,7 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth,
 	}
 
 	start = sanp = dest + rlen;
-	while (1) {
-		if (*p == '\0') {
-			if (!symlink || !*symlink)
-				break;
-			while (sanp != start && sanp[-1] != '/') {
-				/* strip last element */
-				sanp--;
-			}
-			/* Append a relative symlink */
-			p = symlink;
-			symlink = "";
-		}
+	while (*p) {
 		/* discard leading or extra slashes */
 		if (*p == '/') {
 			p++;
@@ -843,11 +825,6 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth,
 		if (*p == '.' && p[1] == '.' && (p[2] == '/' || p[2] == '\0')) {
 			/* ".." component followed by slash or end */
 			if (depth <= 0 || sanp != start) {
-				if (symlink && sanp == start) {
-					if (!save_dest)
-						free(dest);
-					return NULL;
-				}
 				p += 2;
 				if (sanp != start) {
 					/* back up sanp one level */

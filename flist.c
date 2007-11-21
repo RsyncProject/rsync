@@ -671,7 +671,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	clean_fname(thisname, 0);
 
 	if (sanitize_paths)
-		sanitize_path(thisname, thisname, "", 0, NULL);
+		sanitize_path(thisname, thisname, "", 0);
 
 	if ((basename = strrchr(thisname, '/')) != NULL) {
 		int len = basename++ - thisname;
@@ -917,7 +917,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		} else
 			read_sbuf(f, bp, linkname_len - 1);
 		if (sanitize_paths)
-			sanitize_path(bp, bp, "", lastdir_depth, NULL);
+			sanitize_path(bp, bp, "", lastdir_depth);
 	}
 #endif
 
@@ -1008,7 +1008,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	}
 	clean_fname(thisname, 0);
 	if (sanitize_paths)
-		sanitize_path(thisname, thisname, "", 0, NULL);
+		sanitize_path(thisname, thisname, "", 0);
 
 	if (stp && S_ISDIR(stp->st_mode)) {
 		st = *stp; /* Needed for "symlink/." with --relative. */
@@ -1804,13 +1804,13 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (use_ff_fd) {
 			if (read_line(filesfrom_fd, fbuf, sizeof fbuf, rl_flags) == 0)
 				break;
-			sanitize_path(fbuf, fbuf, "", 0, NULL);
+			sanitize_path(fbuf, fbuf, "", 0);
 		} else {
 			if (argc-- == 0)
 				break;
 			strlcpy(fbuf, *argv++, MAXPATHLEN);
 			if (sanitize_paths)
-				sanitize_path(fbuf, fbuf, "", 0, NULL);
+				sanitize_path(fbuf, fbuf, "", 0);
 		}
 
 		len = strlen(fbuf);
