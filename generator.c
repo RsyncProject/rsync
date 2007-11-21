@@ -2040,7 +2040,7 @@ void generate_files(int f_out, const char *local_name)
 			f_name(fp, fbuf);
 			ndx = cur_flist->ndx_start - 1;
 			recv_generator(fbuf, fp, ndx, itemizing, code, f_out);
-			if (delete_during && dry_run < 2) {
+			if (delete_during && dry_run < 2 && !list_only) {
 				if (BITS_SETnUNSET(fp->flags, FLAG_CONTENT_DIR, FLAG_MISSING_DIR)) {
 					dev_t dirdev;
 					if (one_file_system) {
