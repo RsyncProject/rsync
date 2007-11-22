@@ -23,6 +23,7 @@
 #include "ifuncs.h"
 
 extern int verbose;
+extern int dry_run;
 extern int output_motd;
 extern int list_only;
 extern int am_sender;
@@ -39,6 +40,7 @@ extern int remote_protocol;
 extern int protocol_version;
 extern int io_timeout;
 extern int no_detach;
+extern int write_batch;
 extern int default_af_hint;
 extern int logfile_format_has_i;
 extern int logfile_format_has_o_or_i;
@@ -681,6 +683,8 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	am_server = 1; /* Don't let someone try to be tricky. */
 	if (lp_ignore_errors(module_id))
 		ignore_errors = 1;
+	if (write_batch < 0)
+		dry_run = 1;
 
 	if (lp_fake_super(i))
 		am_root = -1;
