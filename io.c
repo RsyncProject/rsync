@@ -468,41 +468,38 @@ static void mplex_write(int fd, enum msgcode code, const char *buf, size_t len, 
 	char buffer[BIGPATHBUFLEN]; /* Oversized for use by iconv code. */
 	size_t n = len;
 
-	SIVAL(buffer, 0, ((MPLEX_BASE + (int)code)<<24) + len);
-
 #ifdef ICONV_OPTION
-	if (convert && ic_send == (iconv_t)-1)
-#endif
-		convert = 0;
+	/* We need to convert buf before doing anything else so that we
+	 * can include the (converted) byte length in the message header. */
+	if (convert && ic_send != (iconv_t)-1) {
+		xbuf outbuf, inbuf;
 
-	if (convert || n > 1024 - 4) /* BIGPATHBUFLEN can handle 1024 bytes */
-		n = 0;
+		INIT_XBUF(outbuf, buffer + 4, 0, sizeof buffer - 4);
+		INIT_XBUF(inbuf, (char*)buf, len, -1);
+
+		iconvbufs(ic_send, &inbuf, &outbuf,
+			  ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE);
+		if (inbuf.len > 0) {
+			rprintf(FERROR, "overflowed conversion buffer in mplex_write");
+			exit_cleanup(RERR_UNSUPPORTED);
+		}
+
+		n = len = outbuf.len;
+	} else
+#endif
+	if (n > 1024 - 4) /* BIGPATHBUFLEN can handle 1024 bytes */
+		n = 0;    /* We'd rather do 2 writes than too much memcpy(). */
 	else
 		memcpy(buffer + 4, buf, n);
+
+	SIVAL(buffer, 0, ((MPLEX_BASE + (int)code)<<24) + len);
 
 	defer_forwarding_keep = 1; /* defer_forwarding_messages++ on return */
 	writefd_unbuffered(fd, buffer, n+4);
 	defer_forwarding_keep = 0;
 
-	len -= n;
-	buf += n;
-
-#ifdef ICONV_OPTION
-	if (convert) {
-		xbuf outbuf, inbuf;
-
-		INIT_CONST_XBUF(outbuf, buffer);
-		INIT_XBUF(inbuf, (char*)buf, len, -1);
-
-		do {
-			iconvbufs(ic_send, &inbuf, &outbuf,
-				  ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE);
-			writefd_unbuffered(fd, outbuf.buf, outbuf.len);
-		} while (inbuf.len);
-	} else
-#endif
-	if (len)
-		writefd_unbuffered(fd, buf, len);
+	if (len > n)
+		writefd_unbuffered(fd, buf+n, len-n);
 
 	if (!--defer_forwarding_messages && !no_flush)
 		msg_flush();
@@ -1060,7 +1057,7 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 				int pos = 0;
 
 				INIT_CONST_XBUF(outbuf, line);
-				inbuf.buf = ibuf;
+				INIT_XBUF(inbuf, ibuf, 0, -1);
 
 				while (msg_bytes) {
 					inbuf.len = msg_bytes > sizeof ibuf
