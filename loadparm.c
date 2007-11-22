@@ -558,7 +558,7 @@ static int map_parameter(char *parmname)
       if (strwicmp(parm_table[iIndex].label, parmname) == 0)
          return(iIndex);
 
-   rprintf(FERROR, "Unknown Parameter encountered: \"%s\"\n", parmname);
+   rprintf(FLOG, "Unknown Parameter encountered: \"%s\"\n", parmname);
    return(-1);
 }
 
@@ -584,7 +584,7 @@ static BOOL set_boolean(BOOL *pb, char *parmvalue)
          *pb = False;
       else
       {
-         rprintf(FERROR, "Badly formed boolean in configuration file: \"%s\".\n",
+         rprintf(FLOG, "Badly formed boolean in configuration file: \"%s\".\n",
                parmvalue);
          bRetval = False;
       }
@@ -671,7 +671,7 @@ static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
 
    if (parmnum < 0)
      {
-       rprintf(FERROR, "IGNORING unknown parameter \"%s\"\n", parmname);
+       rprintf(FLOG, "IGNORING unknown parameter \"%s\"\n", parmname);
        return(True);
      }
 
@@ -682,7 +682,7 @@ static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
      parm_ptr = def_ptr;
    } else {
        if (parm_table[parmnum].class == P_GLOBAL) {
-	   rprintf(FERROR, "Global parameter %s found in service section!\n",parmname);
+	   rprintf(FLOG, "Global parameter %s found in service section!\n",parmname);
 	   return(True);
 	 }
        parm_ptr = ((char *)pSERVICE(snum)) + PTR_DIFF(def_ptr,&sDefault);
@@ -794,7 +794,7 @@ static BOOL do_section(char *sectionname)
 
        if ((iServiceIndex=add_a_service(&sDefault,sectionname)) < 0)
 	 {
-	   rprintf(FERROR,"Failed to add a new service\n");
+	   rprintf(FLOG, "Failed to add a new service\n");
 	   return(False);
 	 }
      }

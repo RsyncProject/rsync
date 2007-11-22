@@ -211,7 +211,7 @@ static BOOL Section( FILE *InFile, BOOL (*sfunc)(char *) )
       bufr   = realloc_array( bufr, char, bSize );
       if( NULL == bufr )
         {
-        rprintf(FERROR, "%s Memory re-allocation failure.", func);
+        rprintf(FLOG, "%s Memory re-allocation failure.", func);
         return( False );
         }
       }
@@ -223,7 +223,7 @@ static BOOL Section( FILE *InFile, BOOL (*sfunc)(char *) )
         bufr[end] = '\0';
         if( 0 == end )                  /* Don't allow an empty name.       */
           {
-          rprintf(FERROR, "%s Empty section name in configuration file.\n", func );
+          rprintf(FLOG, "%s Empty section name in configuration file.\n", func );
           return( False );
           }
         if( !sfunc( bufr ) )            /* Got a valid name.  Deal with it. */
@@ -236,7 +236,7 @@ static BOOL Section( FILE *InFile, BOOL (*sfunc)(char *) )
         if( i < 0 )
           {
           bufr[end] = '\0';
-          rprintf(FERROR, "%s Badly formed line in configuration file: %s\n",
+          rprintf(FLOG, "%s Badly formed line in configuration file: %s\n",
                    func, bufr );
           return( False );
           }
@@ -261,7 +261,7 @@ static BOOL Section( FILE *InFile, BOOL (*sfunc)(char *) )
     }
 
   /* We arrive here if we've met the EOF before the closing bracket. */
-  rprintf(FERROR, "%s Unexpected EOF in the configuration file: %s\n", func, bufr );
+  rprintf(FLOG, "%s Unexpected EOF in the configuration file: %s\n", func, bufr );
   return( False );
   } /* Section */
 
@@ -305,7 +305,7 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
       bufr   = realloc_array( bufr, char, bSize );
       if( NULL == bufr )
         {
-        rprintf(FERROR, "%s Memory re-allocation failure.", func) ;
+        rprintf(FLOG, "%s Memory re-allocation failure.", func) ;
         return( False );
         }
       }
@@ -315,7 +315,7 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
       case '=':                 /* Equal sign marks end of param name. */
         if( 0 == end )              /* Don't allow an empty name.      */
           {
-          rprintf(FERROR, "%s Invalid parameter name in config. file.\n", func );
+          rprintf(FLOG, "%s Invalid parameter name in config. file.\n", func );
           return( False );
           }
         bufr[end++] = '\0';         /* Mark end of string & advance.   */
@@ -329,7 +329,7 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
         if( i < 0 )
           {
           bufr[end] = '\0';
-          rprintf(FERROR, "%s Ignoring badly formed line in configuration file: %s\n",
+          rprintf(FLOG, "%s Ignoring badly formed line in configuration file: %s\n",
                    func, bufr );
           return( True );
           }
@@ -340,7 +340,7 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
       case '\0':                /* Shouldn't have EOF within param name. */
       case EOF:
         bufr[i] = '\0';
-        rprintf(FERROR, "%s Unexpected end-of-file at: %s\n", func, bufr );
+        rprintf(FLOG, "%s Unexpected end-of-file at: %s\n", func, bufr );
         return( True );
 
       default:
@@ -370,7 +370,7 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
       bufr   = realloc_array( bufr, char, bSize );
       if( NULL == bufr )
         {
-        rprintf(FERROR, "%s Memory re-allocation failure.", func) ;
+        rprintf(FLOG, "%s Memory re-allocation failure.", func) ;
         return( False );
         }
       }
@@ -485,14 +485,14 @@ static FILE *OpenConfFile( char *FileName )
 
   if( NULL == FileName || 0 == *FileName )
     {
-    rprintf(FERROR,"%s No configuration filename specified.\n", func);
+    rprintf(FLOG, "%s No configuration filename specified.\n", func);
     return( NULL );
     }
 
   OpenedFile = fopen( FileName, "r" );
   if( NULL == OpenedFile )
     {
-    rsyserr(FERROR, errno, "unable to open configuration file \"%s\"",
+    rsyserr(FLOG, errno, "unable to open configuration file \"%s\"",
 	    FileName);
     }
 
@@ -534,7 +534,7 @@ BOOL pm_process( char *FileName,
     bufr = new_array( char, bSize );
     if( NULL == bufr )
       {
-      rprintf(FERROR,"%s memory allocation failure.\n", func);
+      rprintf(FLOG, "%s memory allocation failure.\n", func);
       fclose(InFile);
       return( False );
       }
@@ -548,7 +548,7 @@ BOOL pm_process( char *FileName,
 
   if( !result )                               /* Generic failure. */
     {
-    rprintf(FERROR,"%s Failed.  Error returned from params.c:parse().\n", func);
+    rprintf(FLOG, "%s Failed.  Error returned from params.c:parse().\n", func);
     return( False );
     }
 
