@@ -413,15 +413,17 @@ static void read_msg_fd(void)
 		readfd(fd, buf, 4);
 		got_flist_entry_status(FES_NO_SEND, buf);
 		break;
-	case MSG_SOCKERR:
+	case MSG_ERROR_SOCKET:
 	case MSG_CLIENT:
 		if (!am_generator)
 			goto invalid_msg;
-		if (tag == MSG_SOCKERR)
+		if (tag == MSG_ERROR_SOCKET)
 			io_end_multiplex_out();
 		/* FALL THROUGH */
 	case MSG_INFO:
 	case MSG_ERROR:
+	case MSG_ERROR_XFER:
+	case MSG_WARNING:
 	case MSG_LOG:
 		while (len) {
 			n = len;
@@ -751,7 +753,7 @@ static int read_timeout(int fd, char *buf, size_t len)
 			/* Don't write errors on a dead socket. */
 			if (fd == sock_f_in) {
 				io_end_multiplex_out();
-				rsyserr(FSOCKERR, errno, "read error");
+				rsyserr(FERROR_SOCKET, errno, "read error");
 			} else
 				rsyserr(FERROR, errno, "read error");
 			exit_cleanup(RERR_STREAMIO);
@@ -1106,6 +1108,8 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 			break;
 		case MSG_INFO:
 		case MSG_ERROR:
+		case MSG_ERROR_XFER:
+		case MSG_WARNING:
 			if (msg_bytes >= sizeof line) {
 			    overflow:
 				rprintf(FERROR,

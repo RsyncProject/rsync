@@ -350,7 +350,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		if (dry_run)
 			return 1;
 		if (link_stat(fname, &sx2.st, 0) < 0) {
-			rsyserr(FERROR, errno, "stat %s failed",
+			rsyserr(FERROR_XFER, errno, "stat %s failed",
 				full_fname(fname));
 			return 0;
 		}
@@ -389,7 +389,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	    && cmp_time(sxp->st.st_mtime, file->modtime) != 0) {
 		int ret = set_modtime(fname, file->modtime, sxp->st.st_mode);
 		if (ret < 0) {
-			rsyserr(FERROR, errno, "failed to set times on %s",
+			rsyserr(FERROR_XFER, errno, "failed to set times on %s",
 				full_fname(fname));
 			goto cleanup;
 		}
@@ -425,7 +425,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		    change_gid ? (gid_t)F_GROUP(file) : sxp->st.st_gid) != 0) {
 			/* shouldn't have attempted to change uid or gid
 			 * unless have the privilege */
-			rsyserr(FERROR, errno, "%s %s failed",
+			rsyserr(FERROR_XFER, errno, "%s %s failed",
 			    change_uid ? "chown" : "chgrp",
 			    full_fname(fname));
 			goto cleanup;
@@ -458,7 +458,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	if (!BITS_EQUAL(sxp->st.st_mode, new_mode, CHMOD_BITS)) {
 		int ret = am_root < 0 ? 0 : do_chmod(fname, new_mode);
 		if (ret < 0) {
-			rsyserr(FERROR, errno,
+			rsyserr(FERROR_XFER, errno,
 				"failed to set permissions on %s",
 				full_fname(fname));
 			goto cleanup;
@@ -533,7 +533,7 @@ void finish_transfer(const char *fname, const char *fnametmp,
 	ret = robust_rename(fnametmp, fname, partialptr,
 			    file->mode & INITACCESSPERMS);
 	if (ret < 0) {
-		rsyserr(FERROR, errno, "%s %s -> \"%s\"",
+		rsyserr(FERROR_XFER, errno, "%s %s -> \"%s\"",
 			ret == -2 ? "copy" : "rename",
 			full_fname(fnametmp), fname);
 		do_unlink(fnametmp);
@@ -553,7 +553,7 @@ void finish_transfer(const char *fname, const char *fnametmp,
 
 	if (partialptr) {
 		if (do_rename(fnametmp, fname) < 0) {
-			rsyserr(FERROR, errno, "rename %s -> \"%s\"",
+			rsyserr(FERROR_XFER, errno, "rename %s -> \"%s\"",
 				full_fname(fnametmp), fname);
 		} else
 			handle_partial_dir(partialptr, PDIR_DELETE);

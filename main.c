@@ -41,7 +41,7 @@ extern int remove_source_files;
 extern int need_messages_from_generator;
 extern int kluge_around_eof;
 extern int do_stats;
-extern int log_got_error;
+extern int got_xfer_error;
 extern int module_id;
 extern int copy_links;
 extern int copy_dirlinks;
@@ -1310,7 +1310,7 @@ static RETSIGTYPE sigusr2_handler(UNUSED(int val))
 	if (!am_server)
 		output_summary();
 	close_all();
-	if (log_got_error)
+	if (got_xfer_error)
 		_exit(RERR_PARTIAL);
 	_exit(0);
 }

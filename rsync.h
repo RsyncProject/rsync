@@ -90,7 +90,7 @@
 /* This is used when working on a new protocol version in CVS, and should
  * be a new non-zero value for each CVS change that affects the protocol.
  * It must ALWAYS be 0 when the protocol goes final! */
-#define SUBPROTOCOL_VERSION 14
+#define SUBPROTOCOL_VERSION 15
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
@@ -188,17 +188,24 @@
 #define CFN_DROP_TRAILING_DOT_DIR (1<<2)
 #define CFN_COLLAPSE_DOT_DOT_DIRS (1<<3)
 
-/* Log-message categories.  Only FERROR and FINFO get sent over the socket,
- * but FLOG and FSOCKERR can be sent over the receiver -> generator pipe.
- * FLOG only goes to the log file, not the client; FCLIENT is the opposite. */
-enum logcode { FNONE=0, FERROR=1, FINFO=2, FLOG=3, FCLIENT=4, FSOCKERR=5 };
+/* Log-message categories.  FLOG only goes to the log file, not the client;
+ * FCLIENT is the opposite. */
+enum logcode {
+    FNONE=0, /* never sent */
+    FERROR_XFER=1, FINFO=2, /* sent over socket for any protocol */
+    FERROR=3, FWARNING=4, /* sent over socket for protocols >= 30 */
+    FERROR_SOCKET=5, FLOG=6, /* only sent via receiver -> generator pipe */
+    FCLIENT=7 /* never transmitted (e.g. server converts to FINFO) */
+};
 
 /* Messages types that are sent over the message channel.  The logcode
  * values must all be present here with identical numbers. */
 enum msgcode {
 	MSG_DATA=0,	/* raw data on the multiplexed stream */
-	MSG_ERROR=FERROR, MSG_INFO=FINFO, /* remote logging */
-	MSG_LOG=FLOG, MSG_CLIENT=FCLIENT, MSG_SOCKERR=FSOCKERR, /* sibling logging */
+	MSG_ERROR_XFER=FERROR_XFER, MSG_INFO=FINFO, /* remote logging */
+	MSG_ERROR=FERROR, MSG_WARNING=FWARNING, /* protocol-30 remote logging */
+	MSG_ERROR_SOCKET=FERROR_SOCKET, /* sibling logging */
+	MSG_LOG=FLOG, MSG_CLIENT=FCLIENT, /* sibling logging */
 	MSG_REDO=9,	/* reprocess indicated flist index */
 	MSG_FLIST=20,	/* extra file list over sibling socket */
 	MSG_FLIST_EOF=21,/* we've transmitted all the file lists */

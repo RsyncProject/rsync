@@ -196,7 +196,7 @@ static enum delret delete_item(char *fbuf, int mode, char *replace, int flags)
 
   check_ret:
 	if (replace && ret != DR_SUCCESS) {
-		rprintf(FERROR, "could not make way for new %s: %s\n",
+		rprintf(FERROR_XFER, "could not make way for new %s: %s\n",
 			replace, fbuf);
 	}
 	return ret;
@@ -1082,7 +1082,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 #endif
 		 && !S_ISDIR(file->mode)) {
 			if (do_link(cmpbuf, fname) < 0) {
-				rsyserr(FERROR, errno,
+				rsyserr(FERROR_XFER, errno,
 					"failed to hard-link %s with %s",
 					cmpbuf, fname);
 				return j;
@@ -1239,7 +1239,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			if (relative_paths && !implied_dirs
 			 && do_stat(dn, &sx.st) < 0
 			 && create_directory_path(fname) < 0) {
-				rsyserr(FERROR, errno,
+				rsyserr(FERROR_XFER, errno,
 					"recv_generator: mkdir %s failed",
 					full_fname(dn));
 			}
@@ -1342,7 +1342,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			if (!relative_paths || errno != ENOENT
 			    || create_directory_path(fname) < 0
 			    || (do_mkdir(fname, file->mode) < 0 && errno != EEXIST)) {
-				rsyserr(FERROR, errno,
+				rsyserr(FERROR_XFER, errno,
 					"recv_generator: mkdir %s failed",
 					full_fname(fname));
 			  skipping_dir_contents:
@@ -1365,7 +1365,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (!am_root && !(file->mode & S_IWUSR) && dir_tweaking) {
 			mode_t mode = file->mode | S_IWUSR;
 			if (do_chmod(fname, mode) < 0) {
-				rsyserr(FERROR, errno,
+				rsyserr(FERROR_XFER, errno,
 					"failed to modify permissions on %s",
 					full_fname(fname));
 			}
@@ -1462,7 +1462,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 #endif
 		if (do_symlink(sl, fname) != 0) {
-			rsyserr(FERROR, errno, "symlink %s -> \"%s\" failed",
+			rsyserr(FERROR_XFER, errno, "symlink %s -> \"%s\" failed",
 				full_fname(fname), sl);
 		} else {
 			set_file_attrs(fname, file, NULL, NULL, 0);
@@ -1546,7 +1546,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				(long)major(rdev), (long)minor(rdev));
 		}
 		if (do_mknod(fname, file->mode, rdev) < 0) {
-			rsyserr(FERROR, errno, "mknod %s failed",
+			rsyserr(FERROR_XFER, errno, "mknod %s failed",
 				full_fname(fname));
 		} else {
 			set_file_attrs(fname, file, NULL, NULL, 0);
@@ -1664,7 +1664,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 #endif
 		if (stat_errno == ENOENT)
 			goto notify_others;
-		rsyserr(FERROR, stat_errno, "recv_generator: failed to stat %s",
+		rsyserr(FERROR_XFER, stat_errno, "recv_generator: failed to stat %s",
 			full_fname(fname));
 		goto cleanup;
 	}
@@ -1754,7 +1754,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			goto pretend_missing;
 		}
 		if (robust_unlink(backupptr) && errno != ENOENT) {
-			rsyserr(FERROR, errno, "unlink %s",
+			rsyserr(FERROR_XFER, errno, "unlink %s",
 				full_fname(backupptr));
 			unmake_file(back_file);
 			back_file = NULL;
@@ -1764,7 +1764,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if ((f_copy = do_open(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0
 		 && (errno != ENOENT || make_bak_dir(backupptr) < 0
 		  || (f_copy = do_open(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0)) {
-			rsyserr(FERROR, errno, "open %s",
+			rsyserr(FERROR_XFER, errno, "open %s",
 				full_fname(backupptr));
 			unmake_file(back_file);
 			back_file = NULL;

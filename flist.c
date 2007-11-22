@@ -726,7 +726,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 			modtime = read_varlong(f, 4);
 #if SIZEOF_TIME_T < SIZEOF_INT64
 			if ((modtime > INT_MAX || modtime < INT_MIN) && !am_generator) {
-				rprintf(FERROR,
+				rprintf(FERROR_XFER,
 				    "Time value of %s truncated on receiver.\n",
 				    lastname);
 			}
@@ -1029,20 +1029,20 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			if (copy_links && x_lstat(thisname, &st, NULL) == 0
 			    && S_ISLNK(st.st_mode)) {
 				io_error |= IOERR_GENERAL;
-				rprintf(FERROR, "symlink has no referent: %s\n",
+				rprintf(FERROR_XFER, "symlink has no referent: %s\n",
 					full_fname(thisname));
 			} else
 #endif
 			{
 				enum logcode c = am_daemon && protocol_version < 28
-				    ? FERROR : FINFO;
+					       ? FERROR : FWARNING;
 				io_error |= IOERR_VANISHED;
 				rprintf(c, "file has vanished: %s\n",
 					full_fname(thisname));
 			}
 		} else {
 			io_error |= IOERR_GENERAL;
-			rsyserr(FERROR, save_errno, "readlink %s failed",
+			rsyserr(FERROR_XFER, save_errno, "readlink %s failed",
 				full_fname(thisname));
 		}
 		return NULL;
@@ -1310,7 +1310,7 @@ static void send_if_directory(int f, struct file_list *flist,
 			fbuf[--len] = '\0';
 		if (len >= MAXPATHLEN - 1) {
 			io_error |= IOERR_GENERAL;
-			rprintf(FERROR, "skipping long-named directory: %s\n",
+			rprintf(FERROR_XFER, "skipping long-named directory: %s\n",
 				full_fname(fbuf));
 			return;
 		}
@@ -1449,7 +1449,7 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 
 	if (!(d = opendir(fbuf))) {
 		io_error |= IOERR_GENERAL;
-		rsyserr(FERROR, errno, "opendir %s failed", full_fname(fbuf));
+		rsyserr(FERROR_XFER, errno, "opendir %s failed", full_fname(fbuf));
 		return;
 	}
 
@@ -1486,7 +1486,7 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 
 	if (errno) {
 		io_error |= IOERR_GENERAL;
-		rsyserr(FERROR, errno, "readdir(%s)", full_fname(fbuf));
+		rsyserr(FERROR_XFER, errno, "readdir(%s)", full_fname(fbuf));
 	}
 
 	closedir(d);
@@ -1596,7 +1596,7 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 			STRUCT_STAT st;
 			if (link_stat(fbuf, &st, copy_dirlinks) != 0) {
 				io_error |= IOERR_GENERAL;
-				rsyserr(FERROR, errno, "link_stat %s failed",
+				rsyserr(FERROR_XFER, errno, "link_stat %s failed",
 					full_fname(fbuf));
 				return;
 			}
@@ -1633,7 +1633,7 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 			STRUCT_STAT st;
 			if (link_stat(fbuf, &st, 1) != 0) {
 				io_error |= IOERR_GENERAL;
-				rsyserr(FERROR, errno, "link_stat %s failed",
+				rsyserr(FERROR_XFER, errno, "link_stat %s failed",
 					full_fname(fbuf));
 				continue;
 			}
@@ -1791,7 +1791,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	disable_buffering = io_start_buffering_out(f);
 	if (filesfrom_fd >= 0) {
 		if (argv[0] && !push_dir(argv[0], 0)) {
-			rsyserr(FERROR, errno, "push_dir %s failed in %s",
+			rsyserr(FERROR_XFER, errno, "push_dir %s failed in %s",
 				full_fname(argv[0]), curr_dir);
 			exit_cleanup(RERR_FILESELECT);
 		}
@@ -1918,7 +1918,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 		if (link_stat(fbuf, &st, copy_dirlinks || name_type != NORMAL_NAME) != 0) {
 			io_error |= IOERR_GENERAL;
-			rsyserr(FERROR, errno, "link_stat %s failed",
+			rsyserr(FERROR_XFER, errno, "link_stat %s failed",
 				full_fname(fbuf));
 			continue;
 		}

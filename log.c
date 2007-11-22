@@ -61,7 +61,7 @@ static int logfile_was_closed;
 static FILE *logfile_fp;
 struct stats stats;
 
-int log_got_error = 0;
+int got_xfer_error = 0;
 
 struct {
         int code;
@@ -235,8 +235,8 @@ static void filtered_fwrite(FILE *f, const char *buf, int len, int use_isprint)
 }
 
 /* this is the underlying (unformatted) rsync debugging function. Call
- * it with FINFO, FERROR or FLOG.  Note: recursion can happen with
- * certain fatal conditions. */
+ * it with FINFO, FERROR_*, FWARNING, FLOG, or FCLIENT.  Note: recursion
+ * can happen with certain fatal conditions. */
 void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 {
 	int trailing_CR_or_NL;
@@ -259,7 +259,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		return;
 	}
 
-	if (code == FSOCKERR) /* This gets simplified for a non-sibling. */
+	if (code == FERROR_SOCKET) /* This gets simplified for a non-sibling. */
 		code = FERROR;
 
 	if (code == FCLIENT)
@@ -267,7 +267,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 	else if (am_daemon || logfile_name) {
 		static int in_block;
 		char msg[2048];
-		int priority = code == FERROR ? LOG_WARNING : LOG_INFO;
+		int priority = code == FINFO || code == FLOG ? LOG_INFO :  LOG_WARNING;
 
 		if (in_block)
 			return;
@@ -283,12 +283,19 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 	} else if (code == FLOG)
 		return;
 
-	if (quiet && code != FERROR)
+	if (quiet && code == FINFO)
 		return;
 
 	if (am_server) {
+		enum msgcode msg = (enum msgcode)code;
+		if (protocol_version < 30) {
+			if (msg == MSG_ERROR)
+				msg = MSG_ERROR_XFER;
+			else if (msg == MSG_WARNING)
+				msg = MSG_INFO;
+		}
 		/* Pass the message to the non-server side. */
-		if (send_msg((enum msgcode)code, buf, len, !is_utf8))
+		if (send_msg(msg, buf, len, !is_utf8))
 			return;
 		if (am_daemon) {
 			/* TODO: can we send the error to the user somehow? */
@@ -297,8 +304,11 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 	}
 
 	switch (code) {
+	case FERROR_XFER:
+		got_xfer_error = 1;
+		/* CONTINUE */
 	case FERROR:
-		log_got_error = 1;
+	case FWARNING:
 		f = stderr;
 		break;
 	case FINFO:
@@ -342,8 +352,8 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 	}
 }
 
-/* This is the rsync debugging function. Call it with FINFO, FERROR or
- * FLOG. */
+/* This is the rsync debugging function. Call it with FINFO, FERROR_*,
+ * FWARNING, FLOG, or FCLIENT. */
 void rprintf(enum logcode code, const char *format, ...)
 {
 	va_list ap;
@@ -421,10 +431,10 @@ void rflush(enum logcode code)
 	if (am_daemon || code == FLOG)
 		return;
 
-	if (code == FERROR || am_server)
-		f = stderr;
-	else
+	if (code == FINFO && !am_server)
 		f = stdout;
+	else
+		f = stderr;
 
 	fflush(f);
 }
@@ -801,7 +811,7 @@ void log_exit(int code, const char *file, int line)
 
 		/* VANISHED is not an error, only a warning */
 		if (code == RERR_VANISHED) {
-			rprintf(FINFO, "rsync warning: %s (code %d) at %s(%d) [%s=%s]\n",
+			rprintf(FWARNING, "rsync warning: %s (code %d) at %s(%d) [%s=%s]\n",
 				name, code, file, line, who_am_i(), RSYNC_VERSION);
 		} else {
 			rprintf(FERROR, "rsync error: %s (code %d) at %s(%d) [%s=%s]\n",

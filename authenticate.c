@@ -21,7 +21,6 @@
 #include "rsync.h"
 
 extern char *password_file;
-extern int log_got_error;
 
 /***************************************************************************
 encode a buffer using base64 - simple and slow algorithm. null terminates
@@ -164,7 +163,7 @@ static const char *getpassf(const char *filename)
 		return NULL;
 
 	if ((fd = open(filename,O_RDONLY)) < 0) {
-		rsyserr(FERROR, errno, "could not open password file \"%s\"",
+		rsyserr(FWARNING, errno, "could not open password file \"%s\"",
 			filename);
 		if (envpw)
 			rprintf(FINFO, "falling back to RSYNC_PASSWORD environment variable.\n");
@@ -172,18 +171,18 @@ static const char *getpassf(const char *filename)
 	}
 
 	if (do_stat(filename, &st) == -1) {
-		rsyserr(FERROR, errno, "stat(%s)", filename);
+		rsyserr(FWARNING, errno, "stat(%s)", filename);
 		ok = 0;
 	} else if ((st.st_mode & 06) != 0) {
-		rprintf(FERROR, "password file must not be other-accessible\n");
+		rprintf(FWARNING, "password file must not be other-accessible\n");
 		ok = 0;
 	} else if (MY_UID() == 0 && st.st_uid != 0) {
-		rprintf(FERROR, "password file must be owned by root when running as root\n");
+		rprintf(FWARNING, "password file must be owned by root when running as root\n");
 		ok = 0;
 	}
 	if (!ok) {
 		close(fd);
-		rprintf(FERROR, "continuing without password file\n");
+		rprintf(FWARNING, "continuing without password file\n");
 		if (envpw)
 			rprintf(FINFO, "falling back to RSYNC_PASSWORD environment variable.\n");
 		return NULL;
@@ -307,9 +306,6 @@ void auth_client(int fd, const char *user, const char *challenge)
                  */
 		pass = getpass("Password: ");
 	}
-
-	/* Any errors output during password handling aren't transfer errors. */
-	log_got_error = 0;
 
 	if (!pass)
 		pass = "";

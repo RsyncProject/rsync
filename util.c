@@ -274,20 +274,20 @@ int copy_file(const char *source, const char *dest, int ofd,
 	int len;   /* Number of bytes read into `buf'. */
 
 	if ((ifd = do_open(source, O_RDONLY, 0)) < 0) {
-		rsyserr(FERROR, errno, "open %s", full_fname(source));
+		rsyserr(FERROR_XFER, errno, "open %s", full_fname(source));
 		return -1;
 	}
 
 	if (ofd < 0) {
 		if (robust_unlink(dest) && errno != ENOENT) {
-			rsyserr(FERROR, errno, "unlink %s", full_fname(dest));
+			rsyserr(FERROR_XFER, errno, "unlink %s", full_fname(dest));
 			return -1;
 		}
 
 		if ((ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0
 		 && (!create_bak_dir || errno != ENOENT || make_bak_dir(dest) < 0
 		  || (ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0)) {
-			rsyserr(FERROR, errno, "open %s", full_fname(dest));
+			rsyserr(FERROR_XFER, errno, "open %s", full_fname(dest));
 			close(ifd);
 			return -1;
 		}
@@ -295,7 +295,7 @@ int copy_file(const char *source, const char *dest, int ofd,
 
 	while ((len = safe_read(ifd, buf, sizeof buf)) > 0) {
 		if (full_write(ofd, buf, len) < 0) {
-			rsyserr(FERROR, errno, "write %s", full_fname(dest));
+			rsyserr(FERROR_XFER, errno, "write %s", full_fname(dest));
 			close(ifd);
 			close(ofd);
 			return -1;
@@ -303,19 +303,19 @@ int copy_file(const char *source, const char *dest, int ofd,
 	}
 
 	if (len < 0) {
-		rsyserr(FERROR, errno, "read %s", full_fname(source));
+		rsyserr(FERROR_XFER, errno, "read %s", full_fname(source));
 		close(ifd);
 		close(ofd);
 		return -1;
 	}
 
 	if (close(ifd) < 0) {
-		rsyserr(FINFO, errno, "close failed on %s",
+		rsyserr(FWARNING, errno, "close failed on %s",
 			full_fname(source));
 	}
 
 	if (close(ofd) < 0) {
-		rsyserr(FERROR, errno, "close failed on %s",
+		rsyserr(FERROR_XFER, errno, "close failed on %s",
 			full_fname(dest));
 		return -1;
 	}
@@ -371,7 +371,7 @@ int robust_unlink(const char *fname)
 	} while ((rc = access(path, 0)) == 0 && counter != start);
 
 	if (verbose > 0) {
-		rprintf(FINFO,"renaming %s to %s because of text busy\n",
+		rprintf(FWARNING, "renaming %s to %s because of text busy\n",
 			fname, path);
 	}
 

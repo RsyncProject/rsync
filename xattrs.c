@@ -132,7 +132,7 @@ static ssize_t get_xattr_names(const char *fname)
 	if (errno == ERANGE) {
 		list_len = sys_llistxattr(fname, NULL, 0);
 		if (list_len < 0) {
-			rsyserr(FERROR, errno,
+			rsyserr(FERROR_XFER, errno,
 				"get_xattr_names: llistxattr(\"%s\",0) failed",
 				fname);
 			return -1;
@@ -148,7 +148,7 @@ static ssize_t get_xattr_names(const char *fname)
 			return list_len;
 	}
 
-	rsyserr(FERROR, errno,
+	rsyserr(FERROR_XFER, errno,
 		"get_xattr_names: llistxattr(\"%s\",%ld) failed",
 		fname, (long)namebuf_len);
 	return -1;
@@ -169,7 +169,7 @@ static char *get_xattr_data(const char *fname, const char *name, size_t *len_ptr
 	if (datum_len == (size_t)-1) {
 		if (errno == ENOTSUP || no_missing_error)
 			return NULL;
-		rsyserr(FERROR, errno,
+		rsyserr(FERROR_XFER, errno,
 			"get_xattr_data: lgetxattr(\"%s\",\"%s\",0) failed",
 			fname, name);
 		return NULL;
@@ -185,11 +185,11 @@ static char *get_xattr_data(const char *fname, const char *name, size_t *len_ptr
 		size_t len = sys_lgetxattr(fname, name, ptr, datum_len);
 		if (len != datum_len) {
 			if (len == (size_t)-1) {
-				rsyserr(FERROR, errno,
+				rsyserr(FERROR_XFER, errno,
 				    "get_xattr_data: lgetxattr(\"%s\",\"%s\",%ld)"
 				    " failed", fname, name, (long)datum_len);
 			} else {
-				rprintf(FERROR,
+				rprintf(FERROR_XFER,
 				    "get_xattr_data: lgetxattr(\"%s\",\"%s\",%ld)"
 				    " returned %ld\n", fname, name,
 				    (long)datum_len, (long)len);
@@ -722,7 +722,7 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 			if (fname == fnamecmp)
 				; /* Value is already set when identical */
 			else if (sys_lsetxattr(fname, name, ptr, len) < 0) {
-				rsyserr(FERROR, errno,
+				rsyserr(FERROR_XFER, errno,
 					"rsync_xal_set: lsetxattr(\"%s\",\"%s\") failed",
 					fname, name);
 				ret = -1;
@@ -745,7 +745,7 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 		}
 
 		if (sys_lsetxattr(fname, name, rxas[i].datum, rxas[i].datum_len) < 0) {
-			rsyserr(FERROR, errno,
+			rsyserr(FERROR_XFER, errno,
 				"rsync_xal_set: lsetxattr(\"%s\",\"%s\") failed",
 				fname, name);
 			ret = -1;
@@ -772,7 +772,7 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 		}
 		if (i == xalp->count) {
 			if (sys_lremovexattr(fname, name) < 0) {
-				rsyserr(FERROR, errno,
+				rsyserr(FERROR_XFER, errno,
 					"rsync_xal_clear: lremovexattr(\"%s\",\"%s\") failed",
 					fname, name);
 				ret = -1;
@@ -815,7 +815,7 @@ int set_xattr_acl(const char *fname, int is_access_acl, const char *buf, size_t 
 {
 	const char *name = is_access_acl ? XACC_ACL_ATTR : XDEF_ACL_ATTR;
 	if (sys_lsetxattr(fname, name, buf, buf_len) < 0) {
-		rsyserr(FERROR, errno,
+		rsyserr(FERROR_XFER, errno,
 			"set_xattr_acl: lsetxattr(\"%s\",\"%s\") failed",
 			fname, name);
 		return -1;
@@ -860,7 +860,7 @@ int get_stat_xattr(const char *fname, int fd, STRUCT_STAT *fst, STRUCT_STAT *xst
 			xst->st_gid = 0;
 			return 0;
 		}
-		rsyserr(FERROR, errno, "failed to read xattr %s for %s",
+		rsyserr(FERROR_XFER, errno, "failed to read xattr %s for %s",
 			XSTAT_ATTR, full_fname(fname));
 		return -1;
 	}
@@ -891,13 +891,13 @@ int set_stat_xattr(const char *fname, struct file_struct *file)
 		return 0;
 
 	if (read_only || list_only) {
-		rsyserr(FERROR, EROFS, "failed to write xattr %s for %s",
+		rsyserr(FERROR_XFER, EROFS, "failed to write xattr %s for %s",
 			XSTAT_ATTR, full_fname(fname));
 		return -1;
 	}
 
 	if (x_lstat(fname, &fst, &xst) < 0) {
-		rsyserr(FERROR, errno, "failed to re-stat %s",
+		rsyserr(FERROR_XFER, errno, "failed to re-stat %s",
 			full_fname(fname));
 		return -1;
 	}
@@ -923,7 +923,7 @@ int set_stat_xattr(const char *fname, struct file_struct *file)
 	 && fst.st_uid == F_OWNER(file) && fst.st_gid == F_GROUP(file)) {
 		/* xst.st_mode will be 0 if there's no current stat xattr */
 		if (xst.st_mode && sys_lremovexattr(fname, XSTAT_ATTR) < 0) {
-			rsyserr(FERROR, errno,
+			rsyserr(FERROR_XFER, errno,
 				"delete of stat xattr failed for %s",
 				full_fname(fname));
 			return -1;
@@ -941,7 +941,7 @@ int set_stat_xattr(const char *fname, struct file_struct *file)
 		if (sys_lsetxattr(fname, XSTAT_ATTR, buf, len) < 0) {
 			if (errno == EPERM && S_ISLNK(fst.st_mode))
 				return 0;
-			rsyserr(FERROR, errno,
+			rsyserr(FERROR_XFER, errno,
 				"failed to write xattr %s for %s",
 				XSTAT_ATTR, full_fname(fname));
 			return -1;

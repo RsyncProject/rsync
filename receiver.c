@@ -110,7 +110,7 @@ int get_tmpname(char *fnametmp, const char *fname)
 	maxname = MIN(MAXPATHLEN - 7 - length, NAME_MAX - 8);
 
 	if (maxname < 1) {
-		rprintf(FERROR, "temporary filename too long: %s\n", fname);
+		rprintf(FERROR_XFER, "temporary filename too long: %s\n", fname);
 		fnametmp[0] = '\0';
 		return 0;
 	}
@@ -153,7 +153,7 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 #endif
 
 	if (fd == -1) {
-		rsyserr(FERROR, errno, "mkstemp %s failed",
+		rsyserr(FERROR_XFER, errno, "mkstemp %s failed",
 			full_fname(fnametmp));
 		return -1;
 	}
@@ -211,7 +211,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		}
 		offset = sum.flength;
 		if (fd != -1 && (j = do_lseek(fd, offset, SEEK_SET)) != offset) {
-			rsyserr(FERROR, errno, "lseek of %s returned %.0f, not %.0f",
+			rsyserr(FERROR_XFER, errno, "lseek of %s returned %.0f, not %.0f",
 				full_fname(fname), (double)j, (double)offset);
 			exit_cleanup(RERR_FILEIO);
 		}
@@ -266,7 +266,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 					goto report_write_error;
 				offset += len;
 				if ((pos = do_lseek(fd, len, SEEK_CUR)) != offset) {
-					rsyserr(FERROR, errno,
+					rsyserr(FERROR_XFER, errno,
 						"lseek of %s returned %.0f, not %.0f",
 						full_fname(fname),
 						(double)pos, (double)offset);
@@ -293,7 +293,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 	if (fd != -1 && offset > 0 && sparse_end(fd) != 0) {
 	    report_write_error:
-		rsyserr(FERROR, errno, "write failed on %s",
+		rsyserr(FERROR_XFER, errno, "write failed on %s",
 			full_fname(fname));
 		exit_cleanup(RERR_FILEIO);
 	}
@@ -335,7 +335,7 @@ static void handle_delayed_updates(char *local_name)
 			/* We don't use robust_rename() here because the
 			 * partial-dir must be on the same drive. */
 			if (do_rename(partialptr, fname) < 0) {
-				rsyserr(FERROR, errno,
+				rsyserr(FERROR_XFER, errno,
 					"rename failed for %s (from %s)",
 					full_fname(fname), partialptr);
 			} else {
@@ -598,7 +598,7 @@ int recv_files(int f_in, char *local_name)
 			st.st_mode = 0;
 			st.st_size = 0;
 		} else if (do_fstat(fd1,&st) != 0) {
-			rsyserr(FERROR, errno, "fstat %s failed",
+			rsyserr(FERROR_XFER, errno, "fstat %s failed",
 				full_fname(fnamecmp));
 			discard_receive_data(f_in, F_LENGTH(file));
 			close(fd1);
@@ -613,7 +613,7 @@ int recv_files(int f_in, char *local_name)
 			 * and the underlying robust_unlink could cope
 			 * with directories
 			 */
-			rprintf(FERROR,"recv_files: %s is a directory\n",
+			rprintf(FERROR_XFER, "recv_files: %s is a directory\n",
 				full_fname(fnamecmp));
 			discard_receive_data(f_in, F_LENGTH(file));
 			close(fd1);
@@ -647,7 +647,7 @@ int recv_files(int f_in, char *local_name)
 		if (inplace)  {
 			fd2 = do_open(fname, O_WRONLY|O_CREAT, 0600);
 			if (fd2 == -1) {
-				rsyserr(FERROR, errno, "open %s failed",
+				rsyserr(FERROR_XFER, errno, "open %s failed",
 					full_fname(fname));
 			}
 		} else {
@@ -719,7 +719,7 @@ int recv_files(int f_in, char *local_name)
 			 || (preserve_hard_links && F_IS_HLINKED(file)))
 				send_msg_int(MSG_SUCCESS, ndx);
 		} else if (!recv_ok) {
-			enum logcode msgtype = redoing || read_batch ? FERROR : FINFO;
+			enum logcode msgtype = redoing || read_batch ? FERROR : FWARNING;
 			if (msgtype == FERROR || verbose) {
 				char *errstr, *redostr, *keptstr;
 				if (!(keep_partial && partialptr) && !inplace)

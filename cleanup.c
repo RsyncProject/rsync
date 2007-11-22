@@ -26,7 +26,7 @@ extern int am_server;
 extern int am_daemon;
 extern int io_error;
 extern int keep_partial;
-extern int log_got_error;
+extern int got_xfer_error;
 extern char *partial_dir;
 extern char *logfile_name;
 
@@ -174,7 +174,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 				code = exit_code = RERR_DEL_LIMIT;
 			if (io_error & IOERR_VANISHED)
 				code = exit_code = RERR_VANISHED;
-			if (io_error & IOERR_GENERAL || log_got_error)
+			if (io_error & IOERR_GENERAL || got_xfer_error)
 				code = exit_code = RERR_PARTIAL;
 		}
 

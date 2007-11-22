@@ -217,7 +217,7 @@ static int maybe_hard_link(struct file_struct *file, int ndx,
 			if (!make_backup(fname))
 				return -1;
 		} else if (robust_unlink(fname)) {
-			rsyserr(FERROR, errno, "unlink %s failed",
+			rsyserr(FERROR_XFER, errno, "unlink %s failed",
 				full_fname(fname));
 			return -1;
 		}
@@ -317,7 +317,7 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 	}
 
 	if (link_stat(prev_name, &prev_st, 0) < 0) {
-		rsyserr(FERROR, errno, "stat %s failed",
+		rsyserr(FERROR_XFER, errno, "stat %s failed",
 			full_fname(prev_name));
 		return -1;
 	}
@@ -393,7 +393,7 @@ int hard_link_one(struct file_struct *file, const char *fname,
 				return -1;
 			code = FINFO;
 		} else
-			code = FERROR;
+			code = FERROR_XFER;
 		rsyserr(code, errno, "link %s => %s failed",
 			full_fname(fname), oldname);
 		return 0;
@@ -417,7 +417,7 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 
 	if (stp == NULL && prev_ndx >= 0) {
 		if (link_stat(fname, &st, 0) < 0) {
-			rsyserr(FERROR, errno, "stat %s failed",
+			rsyserr(FERROR_XFER, errno, "stat %s failed",
 				full_fname(fname));
 			return;
 		}

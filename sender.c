@@ -289,13 +289,13 @@ void send_files(int f_in, int f_out)
 			if (errno == ENOENT) {
 				enum logcode c = am_daemon
 				    && protocol_version < 28 ? FERROR
-							     : FINFO;
+							     : FWARNING;
 				io_error |= IOERR_VANISHED;
 				rprintf(c, "file has vanished: %s\n",
 					full_fname(fname));
 			} else {
 				io_error |= IOERR_GENERAL;
-				rsyserr(FERROR, errno,
+				rsyserr(FERROR_XFER, errno,
 					"send_files failed to open %s",
 					full_fname(fname));
 			}
@@ -349,7 +349,7 @@ void send_files(int f_in, int f_out)
 			j = unmap_file(mbuf);
 			if (j) {
 				io_error |= IOERR_GENERAL;
-				rsyserr(FERROR, j,
+				rsyserr(FERROR_XFER, j,
 					"read errors mapping %s",
 					full_fname(fname));
 			}

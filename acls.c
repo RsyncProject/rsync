@@ -300,7 +300,7 @@ static BOOL unpack_smb_acl(SMB_ACL_T sacl, rsync_acl *racl)
 		ida->access = access;
 	}
 	if (rc) {
-		rsyserr(FERROR, errno, "unpack_smb_acl: %s()", errfun);
+		rsyserr(FERROR_XFER, errno, "unpack_smb_acl: %s()", errfun);
 		rsync_acl_free(racl);
 		return False;
 	}
@@ -356,7 +356,7 @@ static BOOL unpack_smb_acl(SMB_ACL_T sacl, rsync_acl *racl)
 static int store_access_in_entry(uint32 access, SMB_ACL_ENTRY_T entry)
 {
 	if (sys_acl_set_access_bits(entry, access)) {
-		rsyserr(FERROR, errno, "store_access_in_entry sys_acl_set_access_bits()");
+		rsyserr(FERROR_XFER, errno, "store_access_in_entry sys_acl_set_access_bits()");
 		return -1;
 	}
 	return 0;
@@ -375,7 +375,7 @@ static BOOL pack_smb_acl(SMB_ACL_T *smb_acl, const rsync_acl *racl)
 	SMB_ACL_ENTRY_T entry;
 
 	if (!(*smb_acl = sys_acl_init(calc_sacl_entries(racl)))) {
-		rsyserr(FERROR, errno, "pack_smb_acl: sys_acl_init()");
+		rsyserr(FERROR_XFER, errno, "pack_smb_acl: sys_acl_init()");
 		return False;
 	}
 
@@ -424,14 +424,14 @@ static BOOL pack_smb_acl(SMB_ACL_T *smb_acl, const rsync_acl *racl)
 
 #ifdef DEBUG
 	if (sys_acl_valid(*smb_acl) < 0)
-		rprintf(FERROR, "pack_smb_acl: warning: system says the ACL I packed is invalid\n");
+		rprintf(FERROR_XFER, "pack_smb_acl: warning: system says the ACL I packed is invalid\n");
 #endif
 
 	return True;
 
   error_exit:
 	if (errfun) {
-		rsyserr(FERROR, errno, "pack_smb_acl %s()", errfun);
+		rsyserr(FERROR_XFER, errno, "pack_smb_acl %s()", errfun);
 	}
 	sys_acl_free_acl(*smb_acl);
 	return False;
@@ -514,7 +514,7 @@ static int get_rsync_acl(const char *fname, rsync_acl *racl,
 		if (type == SMB_ACL_TYPE_ACCESS)
 			rsync_acl_fake_perms(racl, mode);
 	} else {
-		rsyserr(FERROR, errno, "get_acl: sys_acl_get_file(%s, %s)",
+		rsyserr(FERROR_XFER, errno, "get_acl: sys_acl_get_file(%s, %s)",
 			fname, str_acl_type(type));
 		return -1;
 	}
@@ -655,7 +655,7 @@ static uint32 recv_acl_access(uchar *name_follows_ptr, int f)
 			access |= NAME_IS_USER;
 	} else if (am_root >= 0 && access & ~SMB_ACL_VALID_OBJ_BITS) {
 	  value_error:
-		rprintf(FERROR, "recv_acl_access: value out of range: %x\n",
+		rprintf(FERROR_XFER, "recv_acl_access: value out of range: %x\n",
 			access);
 		exit_cleanup(RERR_STREAMIO);
 	}
@@ -710,7 +710,7 @@ static int recv_rsync_acl(item_list *racl_list, SMB_ACL_TYPE_T type, int f)
 	int ndx = read_varint(f);
 
 	if (ndx < 0 || (size_t)ndx > racl_list->count) {
-		rprintf(FERROR, "recv_acl_index: %s ACL index %d > %d\n",
+		rprintf(FERROR_XFER, "recv_acl_index: %s ACL index %d > %d\n",
 			str_acl_type(type), ndx, (int)racl_list->count);
 		exit_cleanup(RERR_STREAMIO);
 	}
@@ -855,7 +855,7 @@ static mode_t change_sacl_perms(SMB_ACL_T sacl, rsync_acl *racl, mode_t old_mode
 	if (rc) {
 	  error_exit:
 		if (errfun) {
-			rsyserr(FERROR, errno, "change_sacl_perms: %s()",
+			rsyserr(FERROR_XFER, errno, "change_sacl_perms: %s()",
 				errfun);
 		}
 		return (mode_t)~0;
@@ -887,7 +887,7 @@ static int set_rsync_acl(const char *fname, acl_duo *duo_item,
 #endif
 			rc = sys_acl_delete_def_file(fname);
 		if (rc < 0) {
-			rsyserr(FERROR, errno, "set_acl: sys_acl_delete_def_file(%s)",
+			rsyserr(FERROR_XFER, errno, "set_acl: sys_acl_delete_def_file(%s)",
 				fname);
 			return -1;
 		}
@@ -932,7 +932,7 @@ static int set_rsync_acl(const char *fname, acl_duo *duo_item,
 		}
 #endif
 		if (sys_acl_set_file(fname, type, duo_item->sacl) < 0) {
-			rsyserr(FERROR, errno, "set_acl: sys_acl_set_file(%s, %s)",
+			rsyserr(FERROR_XFER, errno, "set_acl: sys_acl_set_file(%s, %s)",
 			fname, str_acl_type(type));
 			return -1;
 		}
@@ -1052,7 +1052,8 @@ int default_perms_for_dir(const char *dir)
 			}
 			/* Otherwise fall through. */
 		default:
-			rprintf(FERROR, "default_perms_for_dir: sys_acl_get_file(%s, %s): %s, falling back on umask\n",
+			rprintf(FWARNING,
+				"default_perms_for_dir: sys_acl_get_file(%s, %s): %s, falling back on umask\n",
 				dir, str_acl_type(SMB_ACL_TYPE_DEFAULT), strerror(errno));
 		}
 		return perms;
@@ -1063,7 +1064,7 @@ int default_perms_for_dir(const char *dir)
 	ok = unpack_smb_acl(sacl, &racl);
 	sys_acl_free_acl(sacl);
 	if (!ok) {
-		rprintf(FERROR, "default_perms_for_dir: unpack_smb_acl failed, falling back on umask\n");
+		rprintf(FWARNING, "default_perms_for_dir: unpack_smb_acl failed, falling back on umask\n");
 		return perms;
 	}
 
