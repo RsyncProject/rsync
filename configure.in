@@ -123,6 +123,11 @@ else
 fi
 AC_DEFINE_UNQUOTED(RSYNC_RSH, "$RSYNC_RSH", [default -e command])
 
+AC_CHECK_PROG(HAVE_YODL2MAN, yodl2man, 1, 0)
+if test x$HAVE_YODL2MAN = x1; then
+    MAKE_MAN=man
+fi
+
 AC_ARG_WITH(nobody-group,
     AC_HELP_STRING([--with-nobody-group=GROUP],
 		   [set the default unprivileged group (default nobody or nogroup)]),
@@ -813,6 +818,7 @@ AC_SUBST(OBJ_SAVE)
 AC_SUBST(OBJ_RESTORE)
 AC_SUBST(CC_SHOBJ_FLAG)
 AC_SUBST(BUILD_POPT)
+AC_SUBST(MAKE_MAN)
 
 AC_CHECK_HEADERS(sys/acl.h acl/libacl.h)
 AC_CHECK_FUNCS(_acl __acl _facl __facl)

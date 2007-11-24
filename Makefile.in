@@ -59,7 +59,7 @@ CHECK_OBJS=getgroups.o getfsdev.o t_stub.o t_unsafe.o trimslash.o wildtest.o
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -c $< @CC_SHOBJ_FLAG@
 @OBJ_RESTORE@
 
-all: rsync$(EXEEXT)
+all: rsync$(EXEEXT) @MAKE_MAN@
 
 install: all
 	-mkdir -p ${DESTDIR}${bindir}
@@ -104,17 +104,31 @@ T_UNSAFE_OBJ = t_unsafe.o syscall.o util.o t_stub.o lib/compat.o lib/snprintf.o
 t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
 
-gen:
-	cd $(srcdir) && $(MAKE) -f prepare-source.mak gen
+gen: conf proto.h man
+
+conf:
+	cd $(srcdir) && $(MAKE) -f prepare-source.mak conf
 
 gensend: gen
 	rsync -aivzc $(GENFILES) samba.org:/home/ftp/pub/rsync/generated-files/
 
-man:
-	cd $(srcdir) && $(MAKE) -f prepare-source.mak man
+proto: proto.h-tstamp
 
-proto:
-	cd $(srcdir) && $(MAKE) -f prepare-source.mak proto.h
+proto.h: proto.h-tstamp
+
+proto.h-tstamp: *.c lib/compat.c
+	perl mkproto.pl *.c lib/compat.c
+	touch proto.h-tstamp
+
+man: rsync.1 rsyncd.conf.5
+
+rsync.1: rsync.yo
+	yodl2man -o rsync.1 rsync.yo
+	-./tweak_manpage rsync.1
+
+rsyncd.conf.5: rsyncd.conf.yo
+	yodl2man -o rsyncd.conf.5 rsyncd.conf.yo
+	-./tweak_manpage rsyncd.conf.5
 
 clean: cleantests
 	rm -f *~ $(OBJS) $(TLS_OBJ) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_SYMLINKS) \
