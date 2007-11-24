@@ -230,7 +230,7 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 #endif
 
 		/* No rsync.%FOO attributes are copied w/o 2 -X options. */
-		if (preserve_xattrs < 2 && name_len > RPRE_LEN
+		if (am_sender && preserve_xattrs < 2 && name_len > RPRE_LEN
 		 && name[RPRE_LEN] == '%' && HAS_PREFIX(name, RSYNC_PREFIX))
 			continue;
 
@@ -523,12 +523,12 @@ void xattr_clear_locals(struct file_struct *file)
  * any needed xattrs with a flag that lets us know they need to be sent to
  * the receiver.  When called by the receiver, reads the sent data and
  * stores it in place of its checksum. */
-void recv_xattr_request(struct file_struct *file, int f_in)
+int recv_xattr_request(struct file_struct *file, int f_in)
 {
 	item_list *lst = rsync_xal_l.items;
 	char *old_datum, *name;
 	rsync_xa *rxa;
-	int rel_pos, cnt;
+	int rel_pos, cnt, got_xattr_data = 0;
 
 	if (F_XATTR(file) < 0) {
 		rprintf(FERROR, "recv_xattr_request: internal data error!\n");
@@ -566,7 +566,10 @@ void recv_xattr_request(struct file_struct *file, int f_in)
 		rxa->name = name;
 		free(old_datum);
 		read_buf(f_in, rxa->datum, rxa->datum_len);
+		got_xattr_data = 1;
 	}
+
+	return got_xattr_data;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -765,6 +768,9 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 			    : !HAS_PREFIX(name, USER_PREFIX))
 			continue;
 #endif
+		if (am_root < 0 && name_len > RPRE_LEN
+		 && name[RPRE_LEN] == '%' && strcmp(name, XSTAT_ATTR) == 0)
+			continue;
 
 		for (i = 0; i < xalp->count; i++) {
 			if (strcmp(name, rxas[i].name) == 0)
@@ -881,7 +887,7 @@ int get_stat_xattr(const char *fname, int fd, STRUCT_STAT *fst, STRUCT_STAT *xst
 	return 0;
 }
 
-int set_stat_xattr(const char *fname, struct file_struct *file)
+int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode)
 {
 	STRUCT_STAT fst, xst;
 	dev_t rdev;
@@ -903,7 +909,7 @@ int set_stat_xattr(const char *fname, struct file_struct *file)
 	}
 
 	fst.st_mode &= (_S_IFMT | CHMOD_BITS);
-	fmode = file->mode & (_S_IFMT | CHMOD_BITS);
+	fmode = new_mode & (_S_IFMT | CHMOD_BITS);
 
 	if (IS_DEVICE(fmode) || IS_SPECIAL(fmode)) {
 		uint32 *devp = F_RDEV_P(file);

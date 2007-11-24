@@ -371,6 +371,9 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		new_mode |= S_ISGID;
 	}
 
+	if (daemon_chmod_modes && !S_ISLNK(new_mode))
+		new_mode = tweak_mode(new_mode, daemon_chmod_modes);
+
 #ifdef SUPPORT_ACLS
 	if (preserve_acls && !S_ISLNK(file->mode) && !ACL_READY(*sxp))
 		get_acl(fname, sxp);
@@ -380,7 +383,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	if (preserve_xattrs && fnamecmp)
 		set_xattr(fname, file, fnamecmp, sxp);
 	if (am_root < 0)
-		set_stat_xattr(fname, file);
+		set_stat_xattr(fname, file, new_mode);
 #endif
 
 	if (!preserve_times || (S_ISDIR(sxp->st.st_mode) && preserve_times == 1))
@@ -439,9 +442,6 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		}
 		updated = 1;
 	}
-
-	if (daemon_chmod_modes && !S_ISLNK(new_mode))
-		new_mode = tweak_mode(new_mode, daemon_chmod_modes);
 
 #ifdef SUPPORT_ACLS
 	/* It's OK to call set_acl() now, even for a dir, as the generator
