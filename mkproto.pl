@@ -44,3 +44,5 @@ if ($old_protos ne $protos) {
     print OUT $protos;
     close OUT;
 }
+
+open(OUT, '>proto.h-tstamp') and close OUT;
