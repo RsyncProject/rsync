@@ -380,10 +380,10 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 #endif
 
 #ifdef SUPPORT_XATTRS
-	if (preserve_xattrs && fnamecmp)
-		set_xattr(fname, file, fnamecmp, sxp);
 	if (am_root < 0)
 		set_stat_xattr(fname, file, new_mode);
+	if (preserve_xattrs && fnamecmp)
+		set_xattr(fname, file, fnamecmp, sxp);
 #endif
 
 	if (!preserve_times || (S_ISDIR(sxp->st.st_mode) && preserve_times == 1))
