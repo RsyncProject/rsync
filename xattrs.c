@@ -216,7 +216,7 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 		return -1;
 
 	for (name = namebuf; list_len > 0; name += name_len) {
-		rsync_xa *rxas;
+		rsync_xa *rxa;
 
 		name_len = strlen(name) + 1;
 		list_len -= name_len;
@@ -230,9 +230,12 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 #endif
 
 		/* No rsync.%FOO attributes are copied w/o 2 -X options. */
-		if (am_sender && preserve_xattrs < 2 && name_len > RPRE_LEN
-		 && name[RPRE_LEN] == '%' && HAS_PREFIX(name, RSYNC_PREFIX))
-			continue;
+		if (name_len > RPRE_LEN && name[RPRE_LEN] == '%'
+		 && HAS_PREFIX(name, RSYNC_PREFIX)) {
+			if ((am_sender && preserve_xattrs < 2)
+			 || (am_root < 0 && strcmp(name, XSTAT_ATTR) == 0))
+				continue;
+		}
 
 		datum_len = name_len; /* Pass extra size to get_xattr_data() */
 		if (!(ptr = get_xattr_data(fname, name, &datum_len, 0)))
@@ -253,19 +256,19 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 			name_offset = datum_len;
 
 #ifdef HAVE_LINUX_XATTRS
-		if (am_root < 0 && name_len > RPRE_LEN
+		if (am_root < 0 && name_len > RPRE_LEN && name[RPRE_LEN] != '%'
 		 && HAS_PREFIX(name, RSYNC_PREFIX)) {
 			name += RPRE_LEN;
 			name_len -= RPRE_LEN;
 		}
 #endif
 
-		rxas = EXPAND_ITEM_LIST(xalp, rsync_xa, RSYNC_XAL_INITIAL);
-		rxas->name = ptr + name_offset;
-		memcpy(rxas->name, name, name_len);
-		rxas->datum = ptr;
-		rxas->name_len = name_len;
-		rxas->datum_len = datum_len;
+		rxa = EXPAND_ITEM_LIST(xalp, rsync_xa, RSYNC_XAL_INITIAL);
+		rxa->name = ptr + name_offset;
+		memcpy(rxa->name, name, name_len);
+		rxa->datum = ptr;
+		rxa->name_len = name_len;
+		rxa->datum_len = datum_len;
 	}
 	if (xalp->count > 1)
 		qsort(xalp->items, xalp->count, sizeof (rsync_xa), rsync_xal_compare_names);
@@ -486,8 +489,11 @@ void send_xattr_request(const char *fname, struct file_struct *file, int f_out)
 			char *ptr;
 
 			/* Re-read the long datum. */
-			if (!(ptr = get_xattr_data(fname, rxa->name, &len, 0)))
+			if (!(ptr = get_xattr_data(fname, rxa->name, &len, 0))) {
+				rprintf(FERROR_XFER, "failed to re-read xattr %s for %s\n", rxa->name, fname);
+				write_varint(f_out, 0);
 				continue;
+			}
 
 			write_varint(f_out, len); /* length might have changed! */
 			write_buf(f_out, ptr, len);
