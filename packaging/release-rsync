@@ -17,11 +17,18 @@ my $ztoday = time2str('%d %b %Y', time);
 
 my $curdir = Cwd::cwd;
 
-open(IN, '<', 'prepare-source.mak') or die "Couldn't open prepare-source.mak: $!\n";
-$_ = join('', <IN>);
+my @extra_files;
+open(IN, '<', 'Makefile.in') or die "Couldn't open Makefile.in: $!\n";
+while (<IN>) {
+    if (s/^GENFILES=//) {
+	while (s/\\$//) {
+	    $_ .= <IN>;
+	}
+	@extra_files = split(' ', $_);
+	last;
+    }
+}
 close IN;
-
-my @extra_files = m{\n([^\s:]+):.*\n\t\S}g;
 
 my $break = <<EOT;
 ==========================================================================
@@ -154,7 +161,7 @@ foreach my $fn (@tweak_files) {
     close OUT;
 }
 
-system "./prepare-source && touch proto.h";
+system "make gen";
 
 print $break;
 system "git-diff --color |less -p '^diff .*'";

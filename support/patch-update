@@ -10,18 +10,26 @@ use strict;
 die "No 'patches' directory present in the current dir.\n" unless -d 'patches';
 die "No '.git' directory present in the current dir.\n" unless -d '.git';
 
-open(IN, '<', 'prepare-source.mak') or die "Couldn't open prepare-source.mak: $!\n";
-$_ = join('', <IN>);
+my @extra_files;
+open(IN, '<', 'Makefile.in') or die "Couldn't open Makefile.in: $!\n";
+while (<IN>) {
+    if (s/^GENFILES=//) {
+	while (s/\\$//) {
+	    $_ .= <IN>;
+	}
+	@extra_files = split(' ', $_);
+	last;
+    }
+}
 close IN;
 
-my @extra_files = m{\n([^\s:]+):.*\n\t\S}g;
 my $incl_generated_files = shift if @ARGV && $ARGV[0] eq '--gen';
 
 system "git-checkout master" and exit 1;
 if ($incl_generated_files) {
     die "'a' must not exist in the current directory.\n" if -e 'a';
     die "'b' must not exist in the current directory.\n" if -e 'b';
-    system "./prepare-source && rsync -a @extra_files a/" and exit 1;
+    system "make gen && rsync -a @extra_files a/" and exit 1;
 }
 my $last_touch = time;
 
@@ -74,10 +82,6 @@ if ($incl_generated_files) {
     system "rm -rf a b";
 }
 
-print "-------- master --------\n";
-sleep 1 if $last_touch == time;
-system "git-checkout master && ./prepare-source";
-
 exit;
 
 
@@ -114,7 +118,7 @@ sub update_patch
     }
 
     if ($incl_generated_files) {
-	system "./prepare-source && rsync -a @extra_files b/" and exit 1;
+	system "make gen && rsync -a @extra_files b/" and exit 1;
     }
     $last_touch = time;
 

@@ -41,15 +41,22 @@ if ($make_tar) {
     die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
     die "The checkout is not on the master branch.\n" unless $status =~ /^# On branch master\n/;
 
-    open(IN, '<', 'prepare-source.mak') or die "Couldn't open prepare-source.mak: $!\n";
-    $_ = join('', <IN>);
+    my @extra_files;
+    open(IN, '<', 'Makefile.in') or die "Couldn't open Makefile.in: $!\n";
+    while (<IN>) {
+	if (s/^GENFILES=//) {
+	    while (s/\\$//) {
+		$_ .= <IN>;
+	    }
+	    @extra_files = split(' ', $_);
+	    last;
+	}
+    }
     close IN;
-
-    my @extra_files = m{\n([^\s:]+):.*\n\t\S}g;
     map { s#^#$name/# } @extra_files;
 
     print "Creating $name.tar.gz\n";
-    system "./prepare-source && touch proto.h";
+    system "make gen";
     symlink('.', $name);
     system "git-archive --format=tar --prefix=$name/ HEAD >$dest/$name.tar";
     system "fakeroot tar rf $dest/$name.tar @extra_files; gzip -9 $dest/$name.tar";
