@@ -59,7 +59,7 @@ CHECK_OBJS=getgroups.o getfsdev.o t_stub.o t_unsafe.o trimslash.o wildtest.o
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -c $< @CC_SHOBJ_FLAG@
 @OBJ_RESTORE@
 
-all: rsync$(EXEEXT) @MAKE_MAN@
+all: conf_stop rsync$(EXEEXT) @MAKE_MAN@
 
 install: all
 	-mkdir -p ${DESTDIR}${bindir}
@@ -106,11 +106,20 @@ t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 
 gen: conf proto.h man
 
+gensend: gen
+	rsync -aivzc $(GENFILES) samba.org:/home/ftp/pub/rsync/generated-files/
+
 conf:
 	cd $(srcdir) && $(MAKE) -f prepare-source.mak conf
 
-gensend: gen
-	rsync -aivzc $(GENFILES) samba.org:/home/ftp/pub/rsync/generated-files/
+conf_stop: configure.sh config.h.in
+
+configure.sh config.h.in: configure.in aclocal.m4
+	autoconf -o configure.sh
+	autoheader && touch config.h.in
+	@echo 'Configure files changed -- perhaps run:'
+	@echo '  ./config.status --recheck; ./config.status'
+	@exit 1
 
 proto: proto.h-tstamp
 
