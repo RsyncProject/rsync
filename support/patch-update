@@ -82,6 +82,9 @@ if ($incl_generated_files) {
     system "rm -rf a b";
 }
 
+sleep 1 if $last_touch == time;
+system "git-checkout master";
+
 exit;
 
 
