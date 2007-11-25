@@ -124,6 +124,7 @@ configure.sh config.h.in: configure.in aclocal.m4
 proto: proto.h-tstamp
 
 proto.h: proto.h-tstamp
+	@ls -l proto.h
 
 proto.h-tstamp: *.c lib/compat.c
 	perl mkproto.pl *.c lib/compat.c
