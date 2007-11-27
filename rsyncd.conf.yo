@@ -190,6 +190,12 @@ every symlink's value.  There is a perl script in the support directory
 of the source code named "munge-symlinks" that can be used to add or remove
 this prefix from your symlinks.
 
+When this option is disabled on a writable module and "use chroot" is off,
+incoming symlinks will be modified to drop a leading slash and to remove ".."
+path elements that rsync believes will allow a symlink to escape the module's
+hierarchy.  There are tricky ways to work around this, though, so you had
+better trust your users if you choose this combination of options.
+
 dit(bf(max connections)) The "max connections" option allows you to
 specify the maximum number of simultaneous connections you will allow.
 Any clients connecting when the maximum has been reached will receive a

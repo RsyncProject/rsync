@@ -927,8 +927,11 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 			bp += SYMLINK_PREFIX_LEN;
 			linkname_len -= SYMLINK_PREFIX_LEN;
 			read_sbuf(f, bp, linkname_len - 1);
-		} else
+		} else {
 			read_sbuf(f, bp, linkname_len - 1);
+			if (sanitize_paths)
+				sanitize_path(bp, bp, "", lastdir_depth);
+		}
 	}
 #endif
 
