@@ -234,6 +234,7 @@ build_rsyncd_conf() {
 
 pid file = $pidfile
 use chroot = no
+munge symlinks = no
 hosts allow = localhost 127.0.0.0/24 192.168.0.0/16 10.0.0.0/8 $hostname
 log file = $logfile
 log format = %i %h [%a] %m (%u) %l %f%L

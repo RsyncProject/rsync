@@ -58,6 +58,7 @@ extern char curr_dir[];
 char *auth_user;
 int read_only = 0;
 int module_id = -1;
+int munge_symlinks = 0;
 struct chmod_mode_struct *daemon_chmod_modes;
 
 /* module_dirlen is the length of the module_dir string when in daemon
@@ -622,6 +623,18 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 			return -1;
 		}
 		sanitize_paths = 1;
+	}
+
+	if ((munge_symlinks = lp_munge_symlinks(i)) < 0)
+		munge_symlinks = !use_chroot;
+	if (munge_symlinks) {
+		STRUCT_STAT st;
+		if (stat(SYMLINK_PREFIX, &st) == 0 && S_ISDIR(st.st_mode)) {
+			rprintf(FLOG, "Symlink munging is unsupported when a %s directory exists.\n",
+				SYMLINK_PREFIX);
+			io_printf(f_out, "@ERROR: daemon security issue -- contact admin\n", name);
+			exit_cleanup(RERR_UNSUPPORTED);
+		}
 	}
 
 	if (am_root) {

@@ -130,12 +130,15 @@ the advantage of extra protection against possible implementation security
 holes, but it has the disadvantages of requiring super-user privileges,
 of not being able to follow symbolic links that are either absolute or outside
 of the new root path, and of complicating the preservation of usernames and groups
-(see below).  When "use chroot" is false, for security reasons,
-symlinks may only be relative paths pointing to other files within the root
-path, and leading slashes are removed from most absolute paths (options
-such as bf(--backup-dir), bf(--compare-dest), etc. interpret an absolute path as
-rooted in the module's "path" dir, just as if chroot was specified).
-The default for "use chroot" is true.
+(see below).  When "use chroot" is false, rsync will: (1) munge symlinks by
+default for security reasons (see "munge symlinks" for a way to turn this
+off, but only if you trust your users), (2) substitute leading slashes in
+absolute paths with the module's path (so that options such as
+bf(--backup-dir), bf(--compare-dest), etc. interpret an absolute path as
+rooted in the module's "path" dir), and (3) trim ".." path elements from
+args if rsync believes they would escape the chroot.
+The default for "use chroot" is true, and is the safer choice (especially
+if the module is not read-only).
 
 In order to preserve usernames and groupnames, rsync needs to be able to
 use the standard library functions for looking up names and IDs (i.e.
@@ -158,6 +161,34 @@ rule "/some/dir/**" just to be sure that rsync will not allow deeper
 access to some of the excluded files inside the directory (rsync tries to
 do this automatically, but you might as well specify both to be extra
 sure).
+
+dit(bf(munge symlinks))  The "munge symlinks" option tells rsync to modify
+all incoming symlinks in a way that makes them unusable but recoverable
+(see below).  This should help protect your files from user trickery when
+your daemon module is writable.  The default is disabled when "use chroot"
+is on and enabled when "use chroot" is off.
+
+If you disable this option on a daemon that is not read-only, there
+are tricks that a user can play with uploaded symlinks to access
+daemon-excluded items (if your module has any), and, if "use chroot"
+is off, rsync can even be tricked into showing or changing data that
+is outside the module's path (as access-permissions allow).
+
+The way rsync disables the use of symlinks is to prefix each one with
+the string "/rsyncd-munged/".  This prevents the links from being used
+as long as that directory does not exist.  When this option is enabled,
+rsync will refuse to run if that path is a directory or a symlink to
+a directory.  When using the "munge symlinks" option in a chroot area,
+you should add this path to the exclude setting for the module so that
+the user can't try to create it.
+
+Note:  rsync makes no attempt to verify that any pre-existing symlinks in
+the hierarchy are as safe as you want them to be.  If you setup an rsync
+daemon on a new area or locally add symlinks, you can manually protect your
+symlinks from being abused by prefixing "/rsyncd-munged/" to the start of
+every symlink's value.  There is a perl script in the support directory
+of the source code named "munge-symlinks" that can be used to add or remove
+this prefix from your symlinks.
 
 dit(bf(max connections)) The "max connections" option allows you to
 specify the maximum number of simultaneous connections you will allow.

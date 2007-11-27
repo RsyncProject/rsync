@@ -1,0 +1,60 @@
+#!/usr/bin/perl
+# This script will either prefix all symlink values with the string
+# "/rsyncd-munged/" or remove that prefix.
+
+use strict;
+use Getopt::Long;
+
+my $SYMLINK_PREFIX = '/rsyncd-munged/';
+
+my $munge_opt;
+
+&GetOptions(
+    'munge' => sub { $munge_opt = 1 },
+    'unmunge' => sub { $munge_opt = 0 },
+    'all' => \( my $all_opt ),
+    'help|h' => \( my $help_opt ),
+) or &usage;
+
+&usage if $help_opt || !defined $munge_opt;
+
+my $munged_re = $all_opt ? qr/^($SYMLINK_PREFIX)+(?=.)/ : qr/^$SYMLINK_PREFIX(?=.)/;
+
+push(@ARGV, '.') unless @ARGV;
+
+open(PIPE, '-|', 'find', @ARGV, '-type', 'l') or die $!;
+
+while (<PIPE>) {
+    chomp;
+    my $lnk = readlink($_) or next;
+    if ($munge_opt) {
+	next if !$all_opt && $lnk =~ /$munged_re/;
+	$lnk =~ s/^/$SYMLINK_PREFIX/;
+    } else {
+	next unless $lnk =~ s/$munged_re//;
+    }
+    if (!unlink($_)) {
+	warn "Unable to unlink symlink: $_ ($!)\n";
+    } elsif (!symlink($lnk, $_)) {
+	warn "Unable to recreate symlink: $_ -> $lnk ($!)\n";
+    } else {
+	print "$_ -> $lnk\n";
+    }
+}
+
+close PIPE;
+exit;
+
+sub usage
+{
+    die <<EOT;
+Usage: munge-symlinks --munge|--unmunge [--all] [DIR|SYMLINK...]
+
+--munge      Add the $SYMLINK_PREFIX prefix to symlinks if not already
+             present, or always when combined with --all.
+--unmunge    Remove one $SYMLINK_PREFIX prefix from symlinks or all
+             such prefixes with --all.
+
+See the "munge symlinks" option in the rsyncd.conf manpage for more details.
+EOT
+}

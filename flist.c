@@ -63,6 +63,7 @@ extern int copy_links;
 extern int copy_unsafe_links;
 extern int protocol_version;
 extern int sanitize_paths;
+extern int munge_symlinks;
 extern int need_unsorted_flist;
 extern int unsort_ndx;
 extern struct stats stats;
@@ -199,6 +200,11 @@ static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
 					path, linkbuf);
 			}
 			return x_stat(path, stp, NULL);
+		}
+		if (munge_symlinks && am_sender && llen > SYMLINK_PREFIX_LEN
+		 && strncmp(linkbuf, SYMLINK_PREFIX, SYMLINK_PREFIX_LEN) == 0) {
+			memmove(linkbuf, linkbuf + SYMLINK_PREFIX_LEN,
+				llen - SYMLINK_PREFIX_LEN + 1);
 		}
 	}
 	return 0;
@@ -794,6 +800,8 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 				linkname_len - 1);
 			overflow_exit("recv_file_entry");
 		}
+		if (munge_symlinks)
+			linkname_len += SYMLINK_PREFIX_LEN;
 	}
 	else
 #endif
@@ -914,10 +922,13 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		if (first_hlink_ndx >= flist->ndx_start) {
 			struct file_struct *first = flist->files[first_hlink_ndx - flist->ndx_start];
 			memcpy(bp, F_SYMLINK(first), linkname_len);
+		} else if (munge_symlinks) {
+			strlcpy(bp, SYMLINK_PREFIX, linkname_len);
+			bp += SYMLINK_PREFIX_LEN;
+			linkname_len -= SYMLINK_PREFIX_LEN;
+			read_sbuf(f, bp, linkname_len - 1);
 		} else
 			read_sbuf(f, bp, linkname_len - 1);
-		if (sanitize_paths)
-			sanitize_path(bp, bp, "", lastdir_depth);
 	}
 #endif
 
