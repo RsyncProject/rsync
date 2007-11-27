@@ -43,7 +43,7 @@ die "There is no .git dir in the current directory.\n" unless -d '.git';
 die "'a' must not exist in the current directory.\n" if -e 'a';
 die "'b' must not exist in the current directory.\n" if -e 'b';
 
-open(IN, '-|', 'git-status') or die $!;
+open(IN, '-|', 'git status') or die $!;
 my $status = join('', <IN>);
 close IN;
 die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
@@ -161,10 +161,10 @@ foreach my $fn (@tweak_files) {
     close OUT;
 }
 
-system "make gen";
+system 'make gen';
 
 print $break;
-system "git-diff --color |less -p '^diff .*'";
+system "git diff --color | less -p '^diff .*'";
 
 my $srctar_name = "rsync-$version.tar.gz";
 my $pattar_name = "rsync-patches-$version.tar.gz";
@@ -201,8 +201,8 @@ rename("a/configure", "a/configure.sh"); # XXX remove soon
 
 system "rsync -a @extra_files rsync-$version/";
 
-system "git-commit -a -m 'Preparing for release of $version'" and exit 1;
-system "git-tag -s -m 'Version $version.' v$version" and exit 1;
+system "git commit -a -m 'Preparing for release of $version'" and exit 1;
+system "git tag -s -m 'Version $version.' v$version" and exit 1;
 
 # When creating a pre-release after a normal release, there's nothing to move.
 if ($diffdir ne $dest) {
@@ -246,13 +246,13 @@ if ($diffdir ne $dest) {
 
 print "Creating $srctar_file ...\n";
 (my $srctar_tmp = $srctar_file) =~ s/\.gz$//;
-system "git-archive --format=tar --prefix=rsync-$version/ v$version >$srctar_tmp";
+system "git archive --format=tar --prefix=rsync-$version/ v$version >$srctar_tmp";
 system "fakeroot tar rf $srctar_tmp rsync-$version/*; gzip -9 $srctar_tmp";
 
 print "Creating $diff_file ...\n";
 rename("rsync-$version", 'b');
 my $sed_script = 's:^((---|\+\+\+) [ab]/[^\t]+)\t.*:\1:';
-system "(git-diff v$lastversion v$version; diff -up a b | sed -r '$sed_script') | gzip -9 >$diff_file";
+system "(git diff v$lastversion v$version; diff -up a b | sed -r '$sed_script') | gzip -9 >$diff_file";
 system "rm -rf a b";
 
 system "support/patch-update --gen";
@@ -265,7 +265,7 @@ print "Updating the other files in $dest ...\n";
 system "rsync -a README NEWS OLDNEWS TODO $dest";
 unlink("$dest/rsync-$version-NEWS");
 link("$dest/NEWS", "$dest/rsync-$version-NEWS");
-system "git-log --name-status | gzip -9 >$dest/changelog.gz";
+system "git log --name-status | gzip -9 >$dest/changelog.gz";
 
 system "yodl2html -o $dest/rsync.html rsync.yo";
 system "yodl2html -o $dest/rsyncd.conf.html rsyncd.conf.yo";

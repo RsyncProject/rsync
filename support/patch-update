@@ -25,7 +25,7 @@ close IN;
 
 my $incl_generated_files = shift if @ARGV && $ARGV[0] eq '--gen';
 
-system "git-checkout master" and exit 1;
+system "git checkout master" and exit 1;
 if ($incl_generated_files) {
     die "'a' must not exist in the current directory.\n" if -e 'a';
     die "'b' must not exist in the current directory.\n" if -e 'b';
@@ -40,9 +40,9 @@ if (@ARGV) {
 	s{\.diff$} {};
 	push(@patches, $_);
     }
-    open(PIPE, '-|', 'git-branch', '-l') or die $!;
+    open(PIPE, '-|', 'git', 'branch', '-l') or die $!;
 } else {
-    open(PIPE, '-|', 'git-branch', '-a') or die $!;
+    open(PIPE, '-|', 'git', 'branch', '-a') or die $!;
 }
 while (<PIPE>) {
     if (m# origin/patch/(.*)#) {
@@ -56,14 +56,11 @@ close PIPE;
 my(%parent, %description);
 foreach my $patch (@patches) {
     my $branch = ($local_patch{$patch} ? '' : 'origin/') . "patch/$patch";
-    open(PIPE, '-|', 'git-diff', "master...$branch", '--', "PATCH.$patch") or die $!;
-    while (<PIPE>) {
-	last if /^@@ /;
-    }
     my $desc = '';
+    open(PIPE, '-|', 'git', 'diff', '-U1000', "master...$branch", '--', "PATCH.$patch") or die $!;
     while (<PIPE>) {
-	next if /^-/; # huh??
-	s/^.//;
+	next if m{^\Q+++\E b/PATCH};
+	next unless s/^[ +]//;
 	if (m#patch -p1 <patches/(\S+)\.diff# && $1 ne $patch) {
 	    $parent{$patch} = $1;
 	}
@@ -83,7 +80,7 @@ if ($incl_generated_files) {
 }
 
 sleep 1 if $last_touch == time;
-system "git-checkout master";
+system "git checkout master";
 
 exit;
 
@@ -106,16 +103,16 @@ sub update_patch
 
     sleep 1 if $incl_generated_files && $last_touch == time;
     if ($local_patch{$patch}) {
-	system "git-checkout patch/$patch" and exit 1;
+	system "git checkout patch/$patch" and exit 1;
     } else {
-	system "git-checkout --track -b patch/$patch origin/patch/$patch" and exit 1;
+	system "git checkout --track -b patch/$patch origin/patch/$patch" and exit 1;
     }
 
     open(OUT, '>', "patches/$patch.diff") or die $!;
     print OUT $description{$patch}, "\n";
 
-    if (system("git-rebase -m $parent") != 0) {
-	print qq|"git-rebase -m $parent" incomplete -- please fix.\n|;
+    if (system("git rebase -m $parent") != 0) {
+	print qq|"git rebase -m $parent" incomplete -- please fix.\n|;
 	$ENV{PS1} = "[$parent] patch/$patch: ";
 	system $ENV{SHELL} and exit 1;
     }
@@ -125,7 +122,7 @@ sub update_patch
     }
     $last_touch = time;
 
-    open(PIPE, '-|', 'git-diff', $parent) or die $!;
+    open(PIPE, '-|', 'git', 'diff', $parent) or die $!;
     DIFF: while (<PIPE>) {
 	while (m{^diff --git a/PATCH}) {
 	    while (<PIPE>) {
@@ -133,6 +130,7 @@ sub update_patch
 	    }
 	    last DIFF if !defined $_;
 	}
+	next if /^index /;
 	print OUT $_;
     }
     close PIPE;

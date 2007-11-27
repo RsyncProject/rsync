@@ -35,7 +35,7 @@ die "There is no .git dir in the current directory.\n" unless -d '.git';
 die "There is no rsync checkout in the current directory.\n" unless -f 'rsyncd.conf.yo';
 
 if ($make_tar) {
-    open(IN, '-|', 'git-status') or die $!;
+    open(IN, '-|', 'git status') or die $!;
     my $status = join('', <IN>);
     close IN;
     die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
@@ -56,9 +56,9 @@ if ($make_tar) {
     map { s#^#$name/# } @extra_files;
 
     print "Creating $name.tar.gz\n";
-    system "make gen";
+    system 'make gen';
     symlink('.', $name);
-    system "git-archive --format=tar --prefix=$name/ HEAD >$dest/$name.tar";
+    system "git archive --format=tar --prefix=$name/ HEAD >$dest/$name.tar";
     system "fakeroot tar rf $dest/$name.tar @extra_files; gzip -9 $dest/$name.tar";
     unlink($name);
     unlink($nightly_symlink);
