@@ -378,7 +378,8 @@ to the detailed description below for a complete description.  verb(
      --delay-updates         put all updated files into place at end
  -m, --prune-empty-dirs      prune empty directory chains from file-list
      --numeric-ids           don't map uid/gid values by user/group name
-     --timeout=TIME          set I/O timeout in seconds
+     --timeout=SECONDS       set I/O timeout in seconds
+     --contimeout=SECONDS    set daemon connection timeout in seconds
  -I, --ignore-times          don't skip files that match size and time
      --size-only             skip files that match in size
      --modify-window=NUM     compare mod-times with reduced accuracy
@@ -1582,6 +1583,10 @@ dit(bf(--timeout=TIMEOUT)) This option allows you to set a maximum I/O
 timeout in seconds. If no data is transferred for the specified time
 then rsync will exit. The default is 0, which means no timeout.
 
+dit(bf(--contimeout)) This option allows you to set the amount of time
+that rsync will wait for its connection to an rsync daemon to succeed.
+If the timeout is reached, rsync exits with an error.
+
 dit(bf(--address)) By default rsync will bind to the wildcard address when
 connecting to an rsync daemon.  The bf(--address) option allows you to
 specify a specific IP address (or hostname) to bind to.  See also this
@@ -2775,6 +2780,7 @@ dit(bf(23)) Partial transfer due to error
 dit(bf(24)) Partial transfer due to vanished source files
 dit(bf(25)) The --max-delete limit stopped deletions
 dit(bf(30)) Timeout in data send/receive
+dit(bf(35)) Timeout waiting for daemon connection
 enddit()
 
 manpagesection(ENVIRONMENT VARIABLES)

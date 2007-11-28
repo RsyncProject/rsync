@@ -63,6 +63,7 @@ extern int read_batch;
 extern int write_batch;
 extern int batch_fd;
 extern int filesfrom_fd;
+extern int connect_timeout;
 extern pid_t cleanup_child_pid;
 extern struct stats stats;
 extern char *filesfrom_host;
@@ -1261,6 +1262,12 @@ static int start_client(int argc, char *argv[])
 	if (password_file && !daemon_over_rsh) {
 		rprintf(FERROR, "The --password-file option may only be "
 				"used when accessing an rsync daemon.\n");
+		exit_cleanup(RERR_SYNTAX);
+	}
+
+	if (connect_timeout) {
+		rprintf(FERROR, "The --contimeout option may only be "
+				"used when connecting to an rsync daemon.\n");
 		exit_cleanup(RERR_SYNTAX);
 	}
 

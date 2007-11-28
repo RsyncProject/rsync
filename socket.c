@@ -32,6 +32,7 @@
 
 extern char *bind_address;
 extern int default_af_hint;
+extern int connect_timeout;
 
 #ifdef HAVE_SIGACTION
 static struct sigaction sigact;
@@ -157,6 +158,11 @@ int try_bind_local(int s, int ai_family, int ai_socktype,
 	return -1;
 }
 
+/* connect() timeout handler based on alarm() */
+static RETSIGTYPE contimeout_handler(UNUSED(int val))
+{
+	connect_timeout = -1;
+}
 
 /**
  * Open a socket to a tcp remote host with the specified port .
@@ -261,11 +267,27 @@ int open_socket_out(char *host, int port, const char *bind_addr,
 			s = -1;
 			continue;
 		}
-		if (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
+		if (connect_timeout > 0) {
+			SIGACTION(SIGALRM, contimeout_handler);
+			alarm(connect_timeout);
+		}
+
+		while (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
+			if (connect_timeout < 0)
+				exit_cleanup(RERR_CONTIMEOUT);
+			if (errno == EINTR)
+				continue;
 			close(s);
 			s = -1;
-			continue;
+			break;
 		}
+
+		if (connect_timeout > 0)
+			alarm(0);
+
+		if (s < 0)
+			continue;
+
 		if (proxied
 		 && establish_proxy_connection(s, host, port,
 					       proxy_user, proxy_pass) != 0) {

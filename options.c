@@ -99,6 +99,7 @@ int xfer_dirs = -1;
 int am_daemon = 0;
 int do_stats = 0;
 int do_progress = 0;
+int connect_timeout = 0;
 int keep_partial = 0;
 int safe_symlinks = 0;
 int copy_unsafe_links = 0;
@@ -377,7 +378,8 @@ void usage(enum logcode F)
   rprintf(F,"     --delay-updates         put all updated files into place at transfer's end\n");
   rprintf(F," -m, --prune-empty-dirs      prune empty directory chains from the file-list\n");
   rprintf(F,"     --numeric-ids           don't map uid/gid values by user/group name\n");
-  rprintf(F,"     --timeout=TIME          set I/O timeout in seconds\n");
+  rprintf(F,"     --timeout=SECONDS       set I/O timeout in seconds\n");
+  rprintf(F,"     --contimeout=SECONDS    set daemon connection timeout in seconds\n");
   rprintf(F," -I, --ignore-times          don't skip files that match in size and mod-time\n");
   rprintf(F,"     --size-only             skip files that match in size\n");
   rprintf(F,"     --modify-window=NUM     compare mod-times with reduced accuracy\n");
@@ -603,6 +605,7 @@ static struct poptOption long_options[] = {
   {"no-numeric-ids",   0,  POPT_ARG_VAL,    &numeric_ids, 0, 0, 0 },
   {"timeout",          0,  POPT_ARG_INT,    &io_timeout, 0, 0, 0 },
   {"no-timeout",       0,  POPT_ARG_VAL,    &io_timeout, 0, 0, 0 },
+  {"contimeout",       0,  POPT_ARG_INT,    &connect_timeout, 0, 0, 0 },
   {"rsh",             'e', POPT_ARG_STRING, &shell_cmd, 0, 0, 0 },
   {"rsync-path",       0,  POPT_ARG_STRING, &rsync_path, 0, 0, 0 },
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir, 0, 0, 0 },

@@ -86,6 +86,7 @@ struct {
 	{ RERR_PARTIAL    , "some files could not be transferred" },
 	{ RERR_VANISHED   , "some files vanished before they could be transferred" },
 	{ RERR_TIMEOUT    , "timeout in data send/receive" },
+	{ RERR_CONTIMEOUT , "timeout waiting for daemon connection" },
 	{ RERR_CMD_FAILED , "remote shell failed" },
 	{ RERR_CMD_KILLED , "remote shell killed" },
 	{ RERR_CMD_RUN    , "remote command could not be run" },
