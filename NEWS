@@ -21,6 +21,12 @@ Changes since 2.6.9:
     - In --dry-run mode, the last line of the verbose summary text is output
       with a "(DRY RUN)" suffix to help remind you that no updates were made.
 
+    - A writable rsync daemon that disables "use chroot" now defaults to a
+      symlink-munging behavior designed to make symlinks safer while also
+      allowing absolute symlinks to be stored and retrieved.  This also has
+      the effect of making symlinks unusable while they're in the daemon's
+      hierarchy.  See the daemon option "munge symlinks" for full details.
+
   BUG FIXES:
 
     - Fixed the output of -ii when combined with one of the --*-dest options:
@@ -79,6 +85,9 @@ Changes since 2.6.9:
 
     - Any errors output about password-file reading no longer cause an error at
       the end of the run about a partial transfer.
+
+    - Using --only-write-batch to a daemon receiver now work properly (older
+      versions would update some files while writing the batch).
 
   ENHANCEMENTS:
 
@@ -181,6 +190,9 @@ Changes since 2.6.9:
       compatibility with older rsync versions, any use of --append that is
       talking protocol 29 or older will revert to the --append-verify method.
 
+    - Added the --contimeout=SECONDS option that lets the user specify a
+      connection timeout for rsync daemon access.
+
     - Documented and extended the support for the RSYNC_CONNECT_PROG variable
       that can be used to enhance the client side of a daemon connection.
 
@@ -218,6 +230,12 @@ Changes since 2.6.9:
     - Make sure that a daemon process doesn't mind if the client was weird and
       omitted the --server option.
 
+    - There are more internal logging categories available in protocol 30 than
+      the age-old FINFO and FERROR, including FERROR_XFER and FWARN.  These new
+      categories allow some errors and warnings to go to stderr without causing
+      an erroneous end-of-run warning about some files not being able to be
+      transferred.
+
     - Improved the use of "const" on pointers.
 
     - Improved J.W.'s pool_alloc routines to add a way of freeing older
@@ -230,6 +248,22 @@ Changes since 2.6.9:
   DEVELOPER RELATED:
 
     - Rsync is now licensed under the GPLv3 or later.
+
+    - Rsync is now being maintained in a "git" repository instead of CVS
+      (though the old CVS repository still exists).  Several maintenance
+      scripts were updated to work with git.
+
+    - Generated files are no longer committed into the source repository.  The
+      autoconf and autoheader commands are now automatically run during the
+      normal use of "configure" and "make".  The latest dev versions of all
+      generated files can also be copied from the samba.org web site (see the
+      "magic" configure script that now comes with rsync for its location).
+
+    - The "patches" directory of diff files is now built from branches in the
+      rsync git repository (branch patch/FOO creates file patches/FOO.diff).
+
+    - The proto.h file is now built using a simple perl script rather than a
+      complex awk script, which proved to be more widely compatible.
 
     - When running the tests, we now put our per-test temp dirs into a sub-
       directory named testtmp (which is created, if missing).  This allows
@@ -245,3 +279,6 @@ Changes since 2.6.9:
       interfere with the {MIN,MAX}_PROTOCOL_VERSION checking algorithm (which
       does not have enough range to allow the main protocol number to be
       incremented for every minor tweak in that happens during development).
+
+    - The csprotocol.txt file was updated to mention the daemon protocol change
+      in the 3.0.0 release.
