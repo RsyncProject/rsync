@@ -194,9 +194,10 @@ print "<Press Enter to continue> ";
 $_ = <STDIN>;
 
 @_ = @extra_files;
-map { s#^#a/# } @_;
+map { s#^#rsync-$lastversion/# } @_;
 $_[0] =~ s/configure\.sh/configure/; # XXX remove soon
 system "tar xzf $lasttar_file @_";
+rename("rsync-$lastversion", 'a');
 rename("a/configure", "a/configure.sh"); # XXX remove soon
 
 system "rsync -a @extra_files rsync-$version/";
