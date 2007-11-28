@@ -39,40 +39,51 @@ static int total_matches;
 
 extern struct stats stats;
 
-#define TABLESIZE (1<<16)
+#define TRADITIONAL_TABLESIZE (1<<16)
 
+static uint32 tablesize;
 static int32 *hash_table;
 
 #define SUM2HASH2(s1,s2) (((s1) + (s2)) & 0xFFFF)
 #define SUM2HASH(sum) SUM2HASH2((sum)&0xFFFF,(sum)>>16)
 
-static int32 build_hash_table(struct sum_struct *s, int32 start)
-{
-	int32 i, end = s->count;
+#define BIG_SUM2HASH(sum) ((sum)%tablesize)
 
-	if (!hash_table) {
-		hash_table = new_array(int32, TABLESIZE);
+static void build_hash_table(struct sum_struct *s)
+{
+	static uint32 alloc_size;
+	int32 i;
+
+	/* Dynamically calculate the hash table size so that the hash load
+	 * for big files is about 80%.  A number greater than the traditional
+	 * size must be odd or s2 will not be able to span the entire set. */
+	tablesize = (uint32)(s->count/8) * 10 + 11;
+	if (tablesize < TRADITIONAL_TABLESIZE)
+		tablesize = TRADITIONAL_TABLESIZE;
+	if (tablesize > alloc_size || tablesize < alloc_size - 16*1024) {
+		if (hash_table)
+			free(hash_table);
+		hash_table = new_array(int32, tablesize);
 		if (!hash_table)
 			out_of_memory("build_hash_table");
+		alloc_size = tablesize;
 	}
 
-	memset(hash_table, 0xFF, TABLESIZE * sizeof hash_table[0]);
+	memset(hash_table, 0xFF, tablesize * sizeof hash_table[0]);
 
-	if (end - start > TABLESIZE*8/10)
-		end = start + TABLESIZE*8/10;
-
-	for (i = start; i < end; i++) {
-		uint32 t = SUM2HASH(s->sums[i].sum1);
-		s->sums[i].chain = hash_table[t];
-		hash_table[t] = i;
+	if (tablesize == TRADITIONAL_TABLESIZE) {
+		for (i = 0; i < s->count; i++) {
+			uint32 t = SUM2HASH(s->sums[i].sum1);
+			s->sums[i].chain = hash_table[t];
+			hash_table[t] = i;
+		}
+	} else {
+		for (i = 0; i < s->count; i++) {
+			uint32 t = BIG_SUM2HASH(s->sums[i].sum1);
+			s->sums[i].chain = hash_table[t];
+			hash_table[t] = i;
+		}
 	}
-
-	if (verbose > 2) {
-		rprintf(FINFO, "built hash table for entries %ld - %ld\n",
-			(long)start, (long)end - 1);
-	}
-
-	return end;
 }
 
 
@@ -130,8 +141,8 @@ static void matched(int f, struct sum_struct *s, struct map_struct *buf,
 static void hash_search(int f,struct sum_struct *s,
 			struct map_struct *buf, OFF_T len)
 {
-	OFF_T offset, end, reset = 0;
-	int32 k, want_i, backup, sum_pos = 0;
+	OFF_T offset, end;
+	int32 k, want_i, backup;
 	char sum2[SUM_LENGTH];
 	uint32 s1, s2, sum;
 	int more;
@@ -169,24 +180,21 @@ static void hash_search(int f,struct sum_struct *s,
 		int done_csum2 = 0;
 		int32 i;
 
-		if (offset >= reset) {
-			sum_pos = build_hash_table(s, sum_pos);
-			if (sum_pos == s->count)
-				reset = len;
-			else
-				reset = sum_pos * s->blength;
-		}
-
 		if (verbose > 4) {
 			rprintf(FINFO, "offset=%.0f sum=%04x%04x\n",
 				(double)offset, s2 & 0xFFFF, s1 & 0xFFFF);
 		}
 
-		i = hash_table[SUM2HASH2(s1,s2)];
-		if (i < 0)
-			goto null_hash;
+		if (tablesize == TRADITIONAL_TABLESIZE) {
+			if ((i = hash_table[SUM2HASH2(s1,s2)]) < 0)
+				goto null_hash;
+			sum = (s1 & 0xffff) | (s2 << 16);
+		} else {
+			sum = (s1 & 0xffff) | (s2 << 16);
+			if ((i = hash_table[BIG_SUM2HASH(sum)]) < 0)
+				goto null_hash;
+		}
 
-		sum = (s1 & 0xffff) | (s2 << 16);
 		hash_hits++;
 		do {
 			int32 l;
@@ -354,6 +362,11 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	}
 
 	if (len > 0 && s->count > 0) {
+		build_hash_table(s);
+
+		if (verbose > 2)
+			rprintf(FINFO,"built hash table\n");
+
 		hash_search(f, s, buf, len);
 
 		if (verbose > 2)
