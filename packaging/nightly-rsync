@@ -29,6 +29,7 @@ our($make_tar, $upload, $help_opt);
 our $name = time2str('rsync-HEAD-%Y%m%d-%H%M%Z', time, 'GMT');
 our $ztoday = time2str('%d %b %Y', time);
 our $today = $ztoday;
+our $gen_target = $upload ? 'gensend' : 'gen';
 
 die "$dest does not exist\n" unless -d $dest;
 die "There is no .git dir in the current directory.\n" unless -d '.git';
@@ -53,14 +54,13 @@ if ($make_tar) {
 	}
     }
     close IN;
-    map { s#^#$name/# } @extra_files;
 
     print "Creating $name.tar.gz\n";
-    system 'make gen';
-    symlink('.', $name);
-    system "git archive --format=tar --prefix=$name/ HEAD >$dest/$name.tar";
-    system "fakeroot tar rf $dest/$name.tar @extra_files; gzip -9 $dest/$name.tar";
-    unlink($name);
+    system "make $gen_target; rsync -a @extra_files $name/";
+    system "git archive --format=tar --prefix=$name/ HEAD | tar xf -";
+    system "support/git-set-file-times --prefix=$name/";
+    system "fakeroot tar czf $dest/$name.tar.gz $name; rm -rf $name";
+
     unlink($nightly_symlink);
     symlink("$name.tar.gz", $nightly_symlink);
 }

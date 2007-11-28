@@ -161,8 +161,6 @@ foreach my $fn (@tweak_files) {
     close OUT;
 }
 
-system 'make gen';
-
 print $break;
 system "git diff --color | less -p '^diff .*'";
 
@@ -192,15 +190,6 @@ About to:
 EOT
 print "<Press Enter to continue> ";
 $_ = <STDIN>;
-
-@_ = @extra_files;
-map { s#^#rsync-$lastversion/# } @_;
-$_[0] =~ s/configure\.sh/configure/; # XXX remove soon
-system "tar xzf $lasttar_file @_";
-rename("rsync-$lastversion", 'a');
-rename("a/configure", "a/configure.sh"); # XXX remove soon
-
-system "rsync -a @extra_files rsync-$version/";
 
 system "git commit -a -m 'Preparing for release of $version'" and exit 1;
 system "git tag -s -m 'Version $version.' v$version" and exit 1;
@@ -245,21 +234,26 @@ if ($diffdir ne $dest) {
     chdir($curdir) or die $!;
 }
 
-print "Creating $srctar_file ...\n";
-(my $srctar_tmp = $srctar_file) =~ s/\.gz$//;
-system "git archive --format=tar --prefix=rsync-$version/ v$version >$srctar_tmp";
-system "fakeroot tar rf $srctar_tmp rsync-$version/*; gzip -9 $srctar_tmp";
-
 print "Creating $diff_file ...\n";
-rename("rsync-$version", 'b');
+@_ = @extra_files;
+map { s#^#rsync-$lastversion/# } @_;
+system "tar xzf $lasttar_file @_";
+rename("rsync-$lastversion", 'a');
+system "make gen; rsync -a @extra_files b/";
 my $sed_script = 's:^((---|\+\+\+) [ab]/[^\t]+)\t.*:\1:';
 system "(git diff v$lastversion v$version; diff -up a b | sed -r '$sed_script') | gzip -9 >$diff_file";
-system "rm -rf a b";
+system "rm -rf a";
+rename('b', "rsync-$version");
+
+print "Creating $srctar_file ...\n";
+system "git archive --format=tar --prefix=rsync-$version/ v$version | tar xf -";
+system "support/git-set-file-times --prefix=rsync-$version/";
+system "fakeroot tar czf $srctar_file rsync-$version; rm -rf rsync-$version";
 
 system "support/patch-update --gen";
 
 symlink('.', "rsync-$version");
-system "tar czf $pattar_file rsync-$version/patches";
+system "fakeroot tar czf $pattar_file rsync-$version/patches";
 unlink("rsync-$version");
 
 print "Updating the other files in $dest ...\n";

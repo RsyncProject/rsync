@@ -8,6 +8,7 @@ use strict;
 
 my %ls;
 my $commit_time;
+my $prefix = @ARGV && $ARGV[0] =~ s/^--prefix=// ? shift : '';
 
 $/ = "\0";
 open FH, 'git ls-files -z|' or die $!;
@@ -27,6 +28,7 @@ while (<FH>) {
 	my @files = delete @ls{split(/\0/, $_)};
 	@files = grep { defined $_ } @files;
 	next unless @files;
+	map { s/^/$prefix/ } @files;
 	utime $commit_time, $commit_time, @files;
     }
     last unless %ls;
