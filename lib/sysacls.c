@@ -1735,6 +1735,13 @@ int sys_acl_get_entry( SMB_ACL_T theacl, int entry_id, SMB_ACL_ENTRY_T *entry_p)
 	struct new_acl_entry *entry;
 	int keep_going;
 
+	if (entry_id == SMB_ACL_FIRST_ENTRY)
+		theacl->count = 0;
+	else if (entry_id != SMB_ACL_NEXT_ENTRY) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	DEBUG(10,("This is the count: %d\n",theacl->count));
 
 	/* Check if count was previously set to -1. *
@@ -1804,7 +1811,6 @@ SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
 	struct acl_entry_link *acl_entry_link_head;
 	int i;
 	int rc = 0;
-	uid_t user_id;
 
 	/* AIX has no DEFAULT */
 	if  ( type == SMB_ACL_TYPE_DEFAULT ) {
@@ -2025,7 +2031,6 @@ SMB_ACL_T sys_acl_get_fd(int fd)
 	struct acl_entry_link *acl_entry_link_head;
 	int i;
 	int rc = 0;
-	uid_t user_id;
 
 	/* Get the acl using fstatacl */
    
@@ -2255,6 +2260,11 @@ SMB_ACL_T sys_acl_init( int count)
 {
 	struct acl_entry_link *theacl = NULL;
  
+	if (count < 0) {
+		errno = EINVAL;
+		return NULL;
+	}
+
 	DEBUG(10,("Entering sys_acl_init\n"));
 
 	theacl = SMB_MALLOC_P(struct acl_entry_link);
@@ -2373,7 +2383,6 @@ int sys_acl_set_file( const char *name, SMB_ACL_TYPE_T acltype, SMB_ACL_T theacl
 	struct acl_entry *acl_entry = NULL;
 	struct ace_id *ace_id = NULL;
 	uint id_type;
-	uint ace_access;
 	uint user_id;
 	uint acl_length;
 	uint rc;
@@ -2551,7 +2560,7 @@ int sys_acl_set_fd( int fd, SMB_ACL_T theacl)
 }
 #endif
 
-int sys_acl_delete_def_file(const char *name)
+int sys_acl_delete_def_file(UNUSED(const char *name))
 {
 	/* AIX has no default ACL */
 	return 0;
