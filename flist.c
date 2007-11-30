@@ -731,7 +731,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		if (protocol_version >= 30) {
 			modtime = read_varlong(f, 4);
 #if SIZEOF_TIME_T < SIZEOF_INT64
-			if ((modtime > INT_MAX || modtime < INT_MIN) && !am_generator) {
+			if (!am_generator && (int64)(time_t)modtime != modtime) {
 				rprintf(FERROR_XFER,
 				    "Time value of %s truncated on receiver.\n",
 				    lastname);
@@ -829,11 +829,6 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (file_length > 0xFFFFFFFFu && S_ISREG(mode))
 		extra_len += EXTRA_LEN;
 
-#if EXTRA_ROUNDING > 0
-	if (extra_len & (EXTRA_ROUNDING * EXTRA_LEN))
-		extra_len = (extra_len | (EXTRA_ROUNDING * EXTRA_LEN)) + EXTRA_LEN;
-#endif
-
 	if (inc_recurse && S_ISDIR(mode)) {
 		if (one_file_system) {
 			/* Room to save the dir's device for -x */
@@ -842,6 +837,11 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		pool = dir_flist->file_pool;
 	} else
 		pool = flist->file_pool;
+
+#if EXTRA_ROUNDING > 0
+	if (extra_len & (EXTRA_ROUNDING * EXTRA_LEN))
+		extra_len = (extra_len | (EXTRA_ROUNDING * EXTRA_LEN)) + EXTRA_LEN;
+#endif
 
 	alloc_len = FILE_STRUCT_LEN + extra_len + basename_len
 		  + linkname_len;
