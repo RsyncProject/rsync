@@ -51,7 +51,7 @@ CHECK_PROGS = rsync$(EXEEXT) tls$(EXEEXT) getgroups$(EXEEXT) getfsdev$(EXEEXT) \
 CHECK_SYMLINKS = testsuite/chown-fake.test testsuite/devices-fake.test
 
 # Objects for CHECK_PROGS to clean
-CHECK_OBJS=getgroups.o getfsdev.o t_stub.o t_unsafe.o trimslash.o wildtest.o
+CHECK_OBJS=tls.o getgroups.o getfsdev.o t_stub.o t_unsafe.o trimslash.o wildtest.o
 
 # note that the -I. is needed to handle config.h when using VPATH
 .c.o:
@@ -74,6 +74,9 @@ install-strip:
 
 rsync$(EXEEXT): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
+
+$(OBJS): $(HEADERS)
+$(CHECK_OBJS): $(HEADERS)
 
 flist.o: rounding.h
 
@@ -101,8 +104,6 @@ trimslash$(EXEEXT): $(TRIMSLASH_OBJ)
 T_UNSAFE_OBJ = t_unsafe.o syscall.o util.o t_stub.o lib/compat.o lib/snprintf.o
 t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
-
-$(OBJS) $(TLS_OBJ) $(TRIMSLASH_OBJ) $(T_UNSAFE_OBJ): $(HEADERS)
 
 gen: conf proto.h man
 
@@ -140,7 +141,7 @@ rsyncd.conf.5: rsyncd.conf.yo
 	-./tweak_manpage rsyncd.conf.5
 
 clean: cleantests
-	rm -f *~ $(OBJS) $(TLS_OBJ) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_SYMLINKS) \
+	rm -f *~ $(OBJS) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_SYMLINKS) \
 		mkrounding mkrounding.h rounding.h
 
 cleantests:
