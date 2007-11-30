@@ -75,8 +75,6 @@ install-strip:
 rsync$(EXEEXT): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
-$(OBJS): $(HEADERS)
-
 flist.o: rounding.h
 
 rounding.h: mkrounding$(EXEEXT)
@@ -103,6 +101,8 @@ trimslash$(EXEEXT): $(TRIMSLASH_OBJ)
 T_UNSAFE_OBJ = t_unsafe.o syscall.o util.o t_stub.o lib/compat.o lib/snprintf.o
 t_unsafe$(EXEEXT): $(T_UNSAFE_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(T_UNSAFE_OBJ) $(LIBS)
+
+$(OBJS) $(TLS_OBJ) $(TRIMSLASH_OBJ) $(T_UNSAFE_OBJ): $(HEADERS)
 
 gen: conf proto.h man
 
@@ -186,7 +186,7 @@ check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 check29: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh --protocol=29
 
-wildtest.o: wildtest.c lib/wildmatch.c rsync.h
+wildtest.o: wildtest.c lib/wildmatch.c rsync.h config.h
 wildtest$(EXEEXT): wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@ $(LIBS)
 
