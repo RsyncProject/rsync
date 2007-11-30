@@ -231,11 +231,12 @@ void setup_protocol(int f_out,int f_in)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 	} else if (protocol_version >= 30) {
+		/* The inc_recurse var MUST be set to 0 or 1. */
 		if (am_server) {
-			inc_recurse = allow_inc_recurse;
+			inc_recurse = allow_inc_recurse ? 1 : 0;
 			write_byte(f_out, inc_recurse);
 		} else
-			inc_recurse = read_byte(f_in);
+			inc_recurse = read_byte(f_in) ? 1 : 0;
 		if (inc_recurse && !allow_inc_recurse) {
 			/* This should only be able to happen in a batch. */
 			fprintf(stderr,
