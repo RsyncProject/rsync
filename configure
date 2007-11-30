@@ -17,7 +17,12 @@ if [ ! -f "$realconfigure" ]; then
 	:
     elif [ -f "$HOME/build_farm/build_test.fns" ]; then
 	# Allow the build farm to grab latest files via rsync.
-	rsync -pvz rsync://rsync.samba.org/rsyncftp/generated-files/'c*' .
+	if perl --version >/dev/null; then
+	    files='c*'
+	else
+	    files='[cp]*'
+	fi
+	rsync -pvz rsync://rsync.samba.org/rsyncftp/generated-files/"$files" .
     else
 	echo 'Failed to build configure.sh and/or config.h.in -- giving up.' >&2
 	rm -f "$realconfigure"
