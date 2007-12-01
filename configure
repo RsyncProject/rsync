@@ -6,23 +6,21 @@
 dir=`dirname $0`
 realconfigure="$dir/configure.sh"
 
-if [ ! -f "$realconfigure" ]; then
+if test ! -f "$realconfigure"; then
     if test x"$dir" != x -a x"$dir" != x.; then
 	curdir=`pwd`
 	cd "$dir"
     else
 	curdir=''
     fi
-    if make -f prepare-source.mak conf; then
-	:
-    elif [ -f "$HOME/build_farm/build_test.fns" ]; then
+    if test -f "$HOME/build_farm/build_test.fns"; then
 	# Allow the build farm to grab latest files via rsync.
-	if perl --version >/dev/null; then
-	    files='c*'
-	else
-	    files='[cp]*'
-	fi
-	rsync -pvz rsync://rsync.samba.org/rsyncftp/generated-files/"$files" .
+	fetch=fetch
+    else
+	fetch=''
+    fi
+    if ./prepare-source $fetch; then
+	:
     else
 	echo 'Failed to build configure.sh and/or config.h.in -- giving up.' >&2
 	rm -f "$realconfigure"
