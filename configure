@@ -7,27 +7,18 @@ dir=`dirname $0`
 realconfigure="$dir/configure.sh"
 
 if test ! -f "$realconfigure"; then
-    if test x"$dir" != x -a x"$dir" != x.; then
-	curdir=`pwd`
-	cd "$dir"
-    else
-	curdir=''
-    fi
     if test -f "$HOME/build_farm/build_test.fns"; then
 	# Allow the build farm to grab latest files via rsync.
 	fetch=fetch
     else
 	fetch=''
     fi
-    if ./prepare-source $fetch; then
+    if "$dir/prepare-source" $fetch; then
 	:
     else
 	echo 'Failed to build configure.sh and/or config.h.in -- giving up.' >&2
 	rm -f "$realconfigure"
 	exit 1
-    fi
-    if test x"$curdir" != x; then
-	cd "$curdir"
     fi
 fi
 

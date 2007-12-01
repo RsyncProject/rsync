@@ -127,8 +127,8 @@ proto: proto.h-tstamp
 proto.h: proto.h-tstamp
 	@echo ' ' >/dev/null
 
-proto.h-tstamp: *.c lib/compat.c
-	perl mkproto.pl *.c lib/compat.c
+proto.h-tstamp: $(srcdir)/*.c $(srcdir)/lib/compat.c
+	perl mkproto.pl $(srcdir)/*.c $(srcdir)/lib/compat.c
 
 man: rsync.1 rsyncd.conf.5
 
