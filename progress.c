@@ -22,8 +22,10 @@
 
 #include "rsync.h"
 
-extern struct stats stats;
 extern int am_server;
+extern int need_unsorted_flist;
+extern struct stats stats;
+extern struct file_list *cur_flist;
 
 #define PROGRESS_HISTORY_SECS 5
 
@@ -41,6 +43,7 @@ struct progress_history {
 static struct progress_history ph_start;
 static struct progress_history ph_list[PROGRESS_HISTORY_SECS];
 static int newest_hpos, oldest_hpos;
+static int current_file_index;
 
 static unsigned long msdiff(struct timeval *t1, struct timeval *t2)
 {
@@ -104,12 +107,21 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 	if (is_last) {
 		snprintf(eol, sizeof eol, " (xfer#%d, to-check=%d/%d)\n",
 			stats.num_transferred_files,
-			stats.num_files - stats.current_file_index - 1,
+			stats.num_files - current_file_index - 1,
 			stats.num_files);
 	} else
 		strlcpy(eol, "\r", sizeof eol);
 	rprintf(FCLIENT, "%12s %3d%% %7.2f%s %s%s",
 		human_num(ofs), pct, rate, units, rembuf, eol);
+}
+
+void set_current_file_index(struct file_struct *file, int ndx)
+{
+	if (need_unsorted_flist)
+		current_file_index = flist_find(cur_flist, file) + cur_flist->ndx_start;
+	else
+		current_file_index = ndx;
+	current_file_index -= cur_flist->flist_num;
 }
 
 void end_progress(OFF_T size)

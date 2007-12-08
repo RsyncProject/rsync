@@ -265,7 +265,8 @@ void send_files(int f_in, int f_out)
 		updating_basis_file = inplace && (protocol_version >= 29
 			? fnamecmp_type == FNAMECMP_FNAME : make_backups <= 0);
 
-		stats.current_file_index = ndx;
+		if (!am_server && do_progress)
+			set_current_file_index(file, ndx);
 		stats.num_transferred_files++;
 		stats.total_transferred_size += F_LENGTH(file);
 

@@ -481,9 +481,11 @@ int recv_files(int f_in, char *local_name)
 			}
 		}
 
-		stats.current_file_index = ndx;
+		if (!am_server && do_progress)
+			set_current_file_index(file, ndx);
 		stats.num_transferred_files++;
 		stats.total_transferred_size += F_LENGTH(file);
+
 		cleanup_got_literal = 0;
 
 		if (server_filter_list.head

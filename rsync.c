@@ -264,12 +264,13 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 	}
 
 	if (!(flist = flist_for_ndx(ndx))) {
+		int start, used;
 	  invalid_ndx:
+		start = first_flist ? first_flist->ndx_start : 0;
+		used = first_flist ? first_flist->used : 0;
 		rprintf(FERROR,
 			"Invalid file index: %d (%d - %d) with iflags %x [%s]\n",
-			ndx, first_flist ? first_flist->ndx_start - 1 : -1,
-			first_flist ? first_flist->prev->ndx_end : -1,
-			iflags, who_am_i());
+			ndx, start - 1, start + used -1, iflags, who_am_i());
 		exit_cleanup(RERR_PROTOCOL);
 	}
 	cur_flist = flist;
@@ -572,7 +573,7 @@ struct file_list *flist_for_ndx(int ndx)
 			return NULL;
 		flist = flist->prev;
 	}
-	while (ndx > flist->ndx_end) {
+	while (ndx >= flist->ndx_start + flist->used) {
 		if (!(flist = flist->next))
 			return NULL;
 	}

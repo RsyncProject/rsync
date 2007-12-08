@@ -93,7 +93,7 @@
 /* This is used when working on a new protocol version in CVS, and should
  * be a new non-zero value for each CVS change that affects the protocol.
  * It must ALWAYS be 0 when the protocol goes final! */
-#define SUBPROTOCOL_VERSION 15
+#define SUBPROTOCOL_VERSION 16
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
@@ -723,7 +723,7 @@ struct file_list {
 	int used, malloced;
 	int low, high;  /* 0-relative index values excluding empties */
 	int ndx_start;  /* the start offset for inc_recurse mode */
-	int ndx_end;    /* the end offset for inc_recurse mode */
+	int flist_num;  /* 1-relative file_list number or 0 */
 	int parent_ndx; /* dir_flist index of parent directory */
 	int in_progress, to_redo;
 };
@@ -814,7 +814,6 @@ struct stats {
 	int64 flist_size;
 	int num_files;
 	int num_transferred_files;
-	int current_file_index;
 };
 
 struct chmod_mode_struct;
