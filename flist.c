@@ -1111,7 +1111,6 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			extra_len += DIRNODE_EXTRA_CNT * EXTRA_LEN;
 			if (relative_paths)
 				extra_len += PTR_EXTRA_CNT * EXTRA_LEN;
-			dir_count++;
 			pool = dir_flist->file_pool;
 		} else
 			pool = flist->file_pool;
@@ -1236,7 +1235,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		return NULL;
 
 	if (unsort_ndx)
-		F_NDX(file) = dir_count - 1;
+		F_NDX(file) = dir_count;
 
 	return file;
 }
@@ -1289,6 +1288,8 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 	flist_expand(flist, 1);
 	flist->files[flist->used++] = file;
 	if (f >= 0) {
+		if (S_ISDIR(file->mode))
+			dir_count++;
 		send_file_entry(f, file, flist->used - 1, flist->ndx_start);
 #ifdef SUPPORT_ACLS
 		if (preserve_acls && !S_ISLNK(file->mode)) {
