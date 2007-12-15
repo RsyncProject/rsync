@@ -898,6 +898,9 @@ int push_dir(const char *dir, int set_path_only)
 		curr_dir_depth = count_dir_elements(curr_dir + module_dirlen);
 	}
 
+	if (verbose >= 5)
+		rprintf(FINFO, "[%s] dir is now %s\n", who_am_i(), curr_dir);
+
 	return 1;
 }
 
