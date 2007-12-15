@@ -353,7 +353,7 @@ void usage(enum logcode F)
 #endif
   rprintf(F," -S, --sparse                handle sparse files efficiently\n");
   rprintf(F," -n, --dry-run               perform a trial run with no changes made\n");
-  rprintf(F," -W, --whole-file            copy files whole (without rsync algorithm)\n");
+  rprintf(F," -W, --whole-file            copy files whole (without delta-xfer algorithm)\n");
   rprintf(F," -x, --one-file-system       don't cross filesystem boundaries\n");
   rprintf(F," -B, --block-size=SIZE       force a fixed checksum block-size\n");
   rprintf(F," -e, --rsh=COMMAND           specify the remote shell to use\n");
