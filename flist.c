@@ -1231,8 +1231,11 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			file->mode = save_mode;
 	}
 
-	if (basename_len == 0+1)
+	if (basename_len == 0+1) {
+		if (!pool)
+			unmake_file(file);
 		return NULL;
+	}
 
 	if (unsort_ndx)
 		F_NDX(file) = dir_count;
