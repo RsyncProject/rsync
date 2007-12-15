@@ -68,6 +68,7 @@ extern pid_t cleanup_child_pid;
 extern struct stats stats;
 extern char *filesfrom_host;
 extern char *partial_dir;
+extern char *dest_option;
 extern char *basis_dir[];
 extern char *rsync_path;
 extern char *shell_cmd;
@@ -638,36 +639,41 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	return cp + 1;
 }
 
-/* Call this if the destination dir (which is assumed to be in curr_dir)
- * does not yet exist and we can't create it due to being in dry-run
- * mode.  We'll fix dirs that can be relative to the non-existent dir. */
-static void fix_basis_dirs(void)
+/* This function checks on our alternate-basis directories.  If we're in
+ * dry-run mode and the destination dir does not yet exist, we'll try to
+ * tweak any dest-relative paths to make them work for a dry-run (the
+ * destination dir must be in curr_dir[] when this function is called).
+ * We also report if any arg that is non-existent or not a directory. */
+static void check_alt_basis_dirs(void)
 {
-	char **dir, *new, *slash;
-	int len;
+	STRUCT_STAT st;
+	char **dir_p, *slash = strrchr(curr_dir, '/');
 
-	if (dry_run <= 1)
-		return;
-
-	slash = strrchr(curr_dir, '/');
-
-	for (dir = basis_dir; *dir; dir++) {
-		if (**dir == '/')
-			continue;
-		len = curr_dir_len + 1 + strlen(*dir) + 1;
-		if (!(new = new_array(char, len)))
-			out_of_memory("fix_basis_dirs");
-		if (slash && strncmp(*dir, "../", 3) == 0) {
-		    /* We want to remove only one leading "../" prefix for
-		     * the directory we couldn't create in dry-run mode:
-		     * this ensures that any other ".." references get
-		     * evaluated the same as they would for a live copy. */
-		    *slash = '\0';
-		    pathjoin(new, len, curr_dir, *dir + 3);
-		    *slash = '/';
-		} else
-		    pathjoin(new, len, curr_dir, *dir);
-		*dir = new;
+	for (dir_p = basis_dir; *dir_p; dir_p++) {
+		if (dry_run > 1 && **dir_p != '/') {
+			int len = curr_dir_len + 1 + strlen(*dir_p) + 1;
+			char *new = new_array(char, len);
+			if (!new)
+				out_of_memory("check_alt_basis_dirs");
+			if (slash && strncmp(*dir_p, "../", 3) == 0) {
+			    /* We want to remove only one leading "../" prefix for
+			     * the directory we couldn't create in dry-run mode:
+			     * this ensures that any other ".." references get
+			     * evaluated the same as they would for a live copy. */
+			    *slash = '\0';
+			    pathjoin(new, len, curr_dir, *dir_p + 3);
+			    *slash = '/';
+			} else
+			    pathjoin(new, len, curr_dir, *dir_p);
+			*dir_p = new;
+		}
+		if (do_stat(*dir_p, &st) < 0) {
+			rprintf(FWARNING, "%s arg does not exist: %s\n",
+				dest_option, *dir_p);
+		} else if (!S_ISDIR(st.st_mode)) {
+			rprintf(FWARNING, "%s arg is not a dir: %s\n",
+				dest_option, *dir_p);
+		}
 	}
 }
 
@@ -925,15 +931,13 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 	/* Now that we know what our destination directory turned out to be,
 	 * we can sanitize the --link-/copy-/compare-dest args correctly. */
 	if (sanitize_paths) {
-		char **dir;
-		for (dir = basis_dir; *dir; dir++) {
-			*dir = sanitize_path(NULL, *dir, NULL, curr_dir_depth);
-		}
-		if (partial_dir) {
+		char **dir_p;
+		for (dir_p = basis_dir; *dir_p; dir_p++)
+			*dir_p = sanitize_path(NULL, *dir_p, NULL, curr_dir_depth);
+		if (partial_dir)
 			partial_dir = sanitize_path(NULL, partial_dir, NULL, curr_dir_depth);
-		}
 	}
-	fix_basis_dirs();
+	check_alt_basis_dirs();
 
 	if (server_filter_list.head) {
 		char **dir;
@@ -1083,7 +1087,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	if (flist && flist->used > 0) {
 		local_name = get_local_name(flist, argv[0]);
 
-		fix_basis_dirs();
+		check_alt_basis_dirs();
 
 		exit_code2 = do_recv(f_in, f_out, local_name);
 	} else {
