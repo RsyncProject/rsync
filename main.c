@@ -65,6 +65,7 @@ extern int batch_fd;
 extern int filesfrom_fd;
 extern int connect_timeout;
 extern pid_t cleanup_child_pid;
+extern unsigned int module_dirlen;
 extern struct stats stats;
 extern char *filesfrom_host;
 extern char *partial_dir;
@@ -332,7 +333,6 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 	int i, argc = 0;
 	char *args[MAX_ARGS];
 	pid_t ret;
-	char *dir = NULL;
 	int dash_l_set = 0;
 
 	if (!read_batch && !local_server) {
@@ -507,9 +507,6 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 		} else
 			ret = piped_child(args, f_in_p, f_out_p);
 	}
-
-	if (dir)
-		free(dir);
 
 	return ret;
 
@@ -869,7 +866,6 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 	int exit_code;
 	struct file_list *flist;
 	char *local_name = NULL;
-	char *dir = NULL;
 	int save_verbose = verbose;
 
 	if (filesfrom_fd >= 0) {
@@ -890,7 +886,7 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 	}
 
 	if (argc > 0) {
-		dir = argv[0];
+		char *dir = argv[0];
 		argc--;
 		argv++;
 		if (!am_daemon && !push_dir(dir, 0)) {
@@ -940,15 +936,18 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 	check_alt_basis_dirs();
 
 	if (server_filter_list.head) {
-		char **dir;
+		char **dir_p;
 		struct filter_list_struct *elp = &server_filter_list;
 
-		for (dir = basis_dir; *dir; dir++) {
-			if (check_filter(elp, *dir, 1) < 0)
+		for (dir_p = basis_dir; *dir_p; dir_p++) {
+			char *dir = *dir_p;
+			if (*dir == '/')
+				dir += module_dirlen;
+			if (check_filter(elp, dir, 1) < 0)
 				goto options_rejected;
 		}
 		if (partial_dir && *partial_dir == '/'
-		 && check_filter(elp, partial_dir, 1) < 0) {
+		 && check_filter(elp, partial_dir + module_dirlen, 1) < 0) {
 		    options_rejected:
 			rprintf(FERROR,
 				"Your options have been rejected by the server.\n");

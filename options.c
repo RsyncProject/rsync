@@ -27,6 +27,7 @@
 extern int module_id;
 extern int sanitize_paths;
 extern int daemon_over_rsh;
+extern unsigned int module_dirlen;
 extern struct filter_list_struct filter_list;
 extern struct filter_list_struct server_filter_list;
 
@@ -1007,13 +1008,14 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 				arg = sanitize_path(NULL, arg, NULL, 0);
 			if (server_filter_list.head) {
 				int rej;
-				char *cp = strdup(arg);
+				char *dir, *cp = strdup(arg);
 				if (!cp)
 					out_of_memory("parse_arguments");
 				if (!*cp)
 					goto options_rejected;
-				clean_fname(cp, CFN_COLLAPSE_DOT_DOT_DIRS);
-				rej = check_filter(&server_filter_list, cp, 0) < 0;
+				dir = cp + (*cp == '/' ? module_dirlen : 0);
+				clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
+				rej = check_filter(&server_filter_list, dir, 0) < 0;
 				free(cp);
 				if (rej)
 					goto options_rejected;
@@ -1406,17 +1408,21 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 	if (server_filter_list.head && !am_sender) {
 		struct filter_list_struct *elp = &server_filter_list;
 		if (tmpdir) {
+			char *dir;
 			if (!*tmpdir)
 				goto options_rejected;
-			clean_fname(tmpdir, CFN_COLLAPSE_DOT_DOT_DIRS);
-			if (check_filter(elp, tmpdir, 1) < 0)
+			dir = tmpdir + (*tmpdir == '/' ? module_dirlen : 0);
+			clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
+			if (check_filter(elp, dir, 1) < 0)
 				goto options_rejected;
 		}
 		if (backup_dir) {
+			char *dir;
 			if (!*backup_dir)
 				goto options_rejected;
-			clean_fname(backup_dir, CFN_COLLAPSE_DOT_DOT_DIRS);
-			if (check_filter(elp, backup_dir, 1) < 0)
+			dir = backup_dir + (*backup_dir == '/' ? module_dirlen : 0);
+			clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
+			if (check_filter(elp, dir, 1) < 0)
 				goto options_rejected;
 		}
 	}
@@ -1607,10 +1613,12 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 			if (sanitize_paths)
 				files_from = sanitize_path(NULL, files_from, NULL, 0);
 			if (server_filter_list.head) {
+				char *dir;
 				if (!*files_from)
 					goto options_rejected;
-				clean_fname(files_from, CFN_COLLAPSE_DOT_DOT_DIRS);
-				if (check_filter(&server_filter_list, files_from, 0) < 0)
+				dir = files_from + (*files_from == '/' ? module_dirlen : 0);
+				clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
+				if (check_filter(&server_filter_list, dir, 0) < 0)
 					goto options_rejected;
 			}
 			filesfrom_fd = open(files_from, O_RDONLY|O_BINARY);
