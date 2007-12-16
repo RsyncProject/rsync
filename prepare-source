@@ -15,6 +15,8 @@ elif test x"$1" = x"fetch"; then
 	files='[cp]*'
     fi
     rsync -pvz rsync://rsync.samba.org/rsyncftp/generated-files/"$files" .
+elif test x"$1" = x"fetchall"; then
+    rsync -pvz rsync://rsync.samba.org/rsyncftp/generated-files/'*' .
 else
     exit 1
 fi
