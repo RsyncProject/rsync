@@ -389,6 +389,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx, int first_
 
 	/* Initialize starting value of xflags. */
 	if (protocol_version >= 30 && S_ISDIR(file->mode)) {
+		dir_count++;
 		if (file->flags & FLAG_CONTENT_DIR)
 			xflags = file->flags & FLAG_TOP_DIR;
 		else if (file->flags & FLAG_IMPLIED_DIR)
@@ -1291,8 +1292,6 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 	flist_expand(flist, 1);
 	flist->files[flist->used++] = file;
 	if (f >= 0) {
-		if (S_ISDIR(file->mode))
-			dir_count++;
 		send_file_entry(f, file, flist->used - 1, flist->ndx_start);
 #ifdef SUPPORT_ACLS
 		if (preserve_acls && !S_ISLNK(file->mode)) {
@@ -1975,7 +1974,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			file = send_file_name(f, flist, fbuf, &st,
 					      top_flags, ALL_FILTERS);
 			if (inc_recurse) {
-				if (name_type == DOT_NAME) {
+				if (name_type == DOT_NAME && file) {
 					if (send_dir_depth < 0) {
 						send_dir_depth = 0;
 						change_local_filter_dir(fbuf, len, send_dir_depth);
