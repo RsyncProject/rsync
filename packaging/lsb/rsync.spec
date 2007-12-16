@@ -1,6 +1,6 @@
 Summary: A fast, versatile, remote (and local) file-copying tool
 Name: rsync
-Version: 3.0.0pre6
+Version: 3.0.0pre7
 Release: 1
 Group: Applications/Internet
 Source:	ftp://rsync.samba.org/pub/rsync/rsync-%{version}.tar.gz
@@ -45,5 +45,5 @@ rm -rf $RPM_BUILD_ROOT
 %{_mandir}/man5/rsyncd.conf.5*
 
 %changelog
-* Wed Nov 28 2007 Wayne Davison <wayned@samba.org>
-Released 3.0.0pre6.
+* Sun Dec 16 2007 Wayne Davison <wayned@samba.org>
+Released 3.0.0pre7.
