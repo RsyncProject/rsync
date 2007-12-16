@@ -253,7 +253,7 @@ system "fakeroot tar czf $srctar_file rsync-$version; rm -rf rsync-$version";
 system "support/patch-update --gen";
 
 symlink('.', "rsync-$version");
-system "fakeroot tar czf $pattar_file rsync-$version/patches";
+system "fakeroot tar chzf $pattar_file rsync-$version/patches";
 unlink("rsync-$version");
 
 print "Updating the other files in $dest ...\n";
