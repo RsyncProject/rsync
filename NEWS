@@ -29,6 +29,11 @@ Changes since 2.6.9:
 
   BUG FIXES:
 
+    - A daemon with "use chroot = no" and excluded items listed in the daemon
+      config file now properly checks an absolute-path arg specified for these
+      options:  --compare-dest, --link-dest, --copy-dest, --partial-dir,
+      --backup-dir, --temp-dir, and --files-from.
+
     - Fixed the output of -ii when combined with one of the --*-dest options:
       it now itemizes all the items, not just the changed ones.
 
@@ -175,6 +180,10 @@ Changes since 2.6.9:
     - The filter rules now support a perishable ("p") modifier that marks rules
       that should not have an effect in a directory that is being deleted.  e.g.
       -f '-p .svn/' would only affect "live" .svn directories.
+
+    - Rsync checks all the alternate-destination args for validity (e.g.
+      --link-dest).  This lets the user know when they specified a directory
+      that does not exist.
 
     - If we get an error setting the time on a symlink, we don't complain about
       it anymore (since some operating systems don't support that, and it's not
