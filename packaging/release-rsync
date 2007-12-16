@@ -123,8 +123,6 @@ EOT
 print "<Press Enter to continue> ";
 $_ = <STDIN>;
 
-print $break;
-
 my @tweak_files = ( glob('packaging/*.spec'), glob('packaging/*/*.spec'),
 		    glob('*.yo'), qw( configure.in ) );
 
@@ -194,6 +192,12 @@ $_ = <STDIN>;
 system "git commit -a -m 'Preparing for release of $version'" and exit 1;
 system "git tag -s -m 'Version $version.' v$version" and exit 1;
 
+# Extract some files from the old tar before we do the shuffle.
+@_ = @extra_files;
+map { s#^#rsync-$lastversion/# } @_;
+system "tar xzf $lasttar_file @_";
+rename("rsync-$lastversion", 'a');
+
 # When creating a pre-release after a normal release, there's nothing to move.
 if ($diffdir ne $dest) {
     chdir($dest) or die $!;
@@ -235,10 +239,6 @@ if ($diffdir ne $dest) {
 }
 
 print "Creating $diff_file ...\n";
-@_ = @extra_files;
-map { s#^#rsync-$lastversion/# } @_;
-system "tar xzf $lasttar_file @_";
-rename("rsync-$lastversion", 'a');
 system "make gen; rsync -a @extra_files b/";
 my $sed_script = 's:^((---|\+\+\+) [ab]/[^\t]+)\t.*:\1:';
 system "(git diff v$lastversion v$version; diff -up a b | sed -r '$sed_script') | gzip -9 >$diff_file";
