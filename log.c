@@ -307,7 +307,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 	switch (code) {
 	case FERROR_XFER:
 		got_xfer_error = 1;
-		/* CONTINUE */
+		/* FALL THROUGH */
 	case FERROR:
 	case FWARNING:
 		f = stderr;
