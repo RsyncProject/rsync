@@ -9,11 +9,11 @@ realconfigure="$dir/configure.sh"
 if test ! -f "$realconfigure"; then
     if test -f "$HOME/build_farm/build_test.fns"; then
 	# Allow the build farm to grab latest files via rsync.
-	fetch=fetch
+	actions='build fetch'
     else
-	fetch=''
+	actions='build'
     fi
-    if "$dir/prepare-source" $fetch; then
+    if "$dir/prepare-source" $actions; then
 	:
     else
 	echo 'Failed to build configure.sh and/or config.h.in -- giving up.' >&2

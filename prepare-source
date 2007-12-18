@@ -1,22 +1,51 @@
 #!/bin/sh
-# Use autoconf and autoheader to create configure.sh and config.h.in.
-# If unsuccessful and the "fetch" option was provided, grab the latest
-# development versions of these files (only useful with a dev checkout).
+# Either use autoconf and autoheader to create configure.sh and config.h.in
+# or (optionally) fetch the latest development versions of generated files.
+#
+# Specify one action or more than one to provide a fall-back:
+#
+#   build     build the config files [the default w/no arg]
+#   fetch     fetch the latest dev config files
+#   fetchgen  fetch all the latest dev generated files
+#   fetchSRC  fetch the latest dev source files [NON-GENERATED FILES]
+#
+# The script stops after the first successful action.
+
 dir=`dirname $0`
 if test x"$dir" != x -a x"$dir" != x.; then
     cd "$dir"
 fi
-if make -f prepare-source.mak; then
-    :
-elif test x"$1" = x"fetch"; then
-    if perl --version >/dev/null 2>/dev/null; then
-	files='c*'
-    else
-	files='[cp]*'
-    fi
-    rsync -pvz rsync://rsync.samba.org/rsyncftp/generated-files/"$files" .
-elif test x"$1" = x"fetchall"; then
-    rsync -pvz rsync://rsync.samba.org/rsyncftp/generated-files/'*' .
-else
-    exit 1
+
+if test $# = 0; then
+    set -- build
 fi
+
+for action in "${@}"; do
+    case "$action" in
+    build|make)
+	make -f prepare-source.mak
+	;;
+    fetch)
+	if perl --version >/dev/null 2>/dev/null; then
+	    files='c*'
+	else
+	    files='[cp]*'
+	fi
+	rsync -pvz rsync://rsync.samba.org/rsyncftp/generated-files/"$files" .
+	;;
+    fetchgen)
+	rsync -pvz rsync://rsync.samba.org/rsyncftp/generated-files/'*' .
+	;;
+    fetchSRC)
+	rsync -pvrz --exclude=/.git/ rsync://rsync.samba.org/ftp/pub/unpacked/rsync/ .
+	;;
+    *)
+	echo "Unknown action: $action"
+	exit 1
+    esac
+    if test $? = 0; then
+	exit
+    fi
+done
+
+exit 1
