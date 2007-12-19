@@ -3,7 +3,7 @@ Name: rsync
 Version: 3.0.0pre7
 Release: 1
 Group: Applications/Internet
-Source:	ftp://rsync.samba.org/pub/rsync/rsync-%{version}.tar.gz
+Source:	http://rsync.samba.org/ftp/rsync/rsync-%{version}.tar.gz
 URL: http://rsync.samba.org/
 
 Prefix: %{_prefix}
