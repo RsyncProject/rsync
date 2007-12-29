@@ -119,8 +119,12 @@ configure.sh config.h.in: configure.in aclocal.m4
 	autoconf -o configure.sh
 	autoheader && touch config.h.in
 	@echo 'Configure files changed -- perhaps run:'
-	@echo '  ./config.status --recheck; ./config.status'
+	@echo '  make reconfigure'
 	@exit 1
+
+reconfigure:
+	./config.status --recheck
+	./config.status
 
 proto: proto.h-tstamp
 
