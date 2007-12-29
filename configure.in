@@ -554,6 +554,11 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd strdup chown chmod lchmod mknod mkfifo \
     strerror putenv iconv_open locale_charset nl_langinfo getxattr \
     extattr_get_link sigaction sigprocmask setattrlist)
 
+dnl cygwin iconv.h defines iconv_open as libiconv_open
+if test x"$ac_cv_func_iconv_open" != x"yes"; then
+    AC_CHECK_FUNC(libiconv_open, [ac_cv_func_iconv_open=yes; AC_DEFINE(HAVE_ICONV_OPEN, 1)])
+fi
+
 AC_CHECK_FUNCS(getpgrp tcgetpgrp)
 if test $ac_cv_func_getpgrp = yes; then
     AC_FUNC_GETPGRP
