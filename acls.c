@@ -556,7 +556,7 @@ static void send_ida_entries(const ida_entries *idal, int f)
 
 	for (ida = idal->idas; count--; ida++) {
 		uint32 xbits = ida->access << 2;
-		char *name;
+		const char *name;
 		if (ida->access & NAME_IS_USER) {
 			xbits |= XFLAG_NAME_IS_USER;
 			name = add_uid(ida->id);

@@ -351,7 +351,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx, int first_
 	static uint32 rdev_major;
 	static uid_t uid;
 	static gid_t gid;
-	static char *user_name, *group_name;
+	static const char *user_name, *group_name;
 	static char lastname[MAXPATHLEN];
 	char fname[MAXPATHLEN];
 	int first_hlink_ndx = -1;

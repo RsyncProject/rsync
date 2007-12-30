@@ -43,7 +43,7 @@ extern int numeric_ids;
 
 struct idlist {
 	struct idlist *next;
-	char *name;
+	const char *name;
 	id_t id, id2;
 	uint16 flags;
 };
@@ -51,7 +51,7 @@ struct idlist {
 static struct idlist *uidlist;
 static struct idlist *gidlist;
 
-static struct idlist *add_to_list(struct idlist **root, id_t id, char *name,
+static struct idlist *add_to_list(struct idlist **root, id_t id, const char *name,
 				  id_t id2, uint16 flags)
 {
 	struct idlist *node = new(struct idlist);
@@ -67,7 +67,7 @@ static struct idlist *add_to_list(struct idlist **root, id_t id, char *name,
 }
 
 /* turn a uid into a user name */
-static char *uid_to_name(uid_t uid)
+static const char *uid_to_name(uid_t uid)
 {
 	struct passwd *pass = getpwuid(uid);
 	if (pass)
@@ -76,7 +76,7 @@ static char *uid_to_name(uid_t uid)
 }
 
 /* turn a gid into a group name */
-static char *gid_to_name(gid_t gid)
+static const char *gid_to_name(gid_t gid)
 {
 	struct group *grp = getgrgid(gid);
 	if (grp)
@@ -237,7 +237,7 @@ gid_t match_gid(gid_t gid, uint16 *flags_ptr)
 }
 
 /* Add a uid to the list of uids.  Only called on sending side. */
-char *add_uid(uid_t uid)
+const char *add_uid(uid_t uid)
 {
 	struct idlist *list;
 	struct idlist *node;
@@ -255,7 +255,7 @@ char *add_uid(uid_t uid)
 }
 
 /* Add a gid to the list of gids.  Only called on sending side. */
-char *add_gid(gid_t gid)
+const char *add_gid(gid_t gid)
 {
 	struct idlist *list;
 	struct idlist *node;
