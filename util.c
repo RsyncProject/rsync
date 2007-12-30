@@ -466,31 +466,27 @@ void kill_all(int sig)
 }
 
 /** Turn a user name into a uid */
-int name_to_uid(const char *name, uid_t *uid)
+int name_to_uid(const char *name, uid_t *uid_p)
 {
 	struct passwd *pass;
 	if (!name || !*name)
 		return 0;
-	pass = getpwnam(name);
-	if (pass) {
-		*uid = pass->pw_uid;
-		return 1;
-	}
-	return 0;
+	if (!(pass = getpwnam(name)))
+		return 0;
+	*uid_p = pass->pw_uid;
+	return 1;
 }
 
 /** Turn a group name into a gid */
-int name_to_gid(const char *name, gid_t *gid)
+int name_to_gid(const char *name, gid_t *gid_p)
 {
 	struct group *grp;
 	if (!name || !*name)
 		return 0;
-	grp = getgrnam(name);
-	if (grp) {
-		*gid = grp->gr_gid;
-		return 1;
-	}
-	return 0;
+	if (!(grp = getgrnam(name)))
+		return 0;
+	*gid_p = grp->gr_gid;
+	return 1;
 }
 
 /** Lock a byte range in a open file */
