@@ -504,15 +504,17 @@ RETSIGTYPE sig_int(UNUSED(int val))
 }
 
 /* Finish off a file transfer: renaming the file and setting the file's
- * attributes (e.g. permissions, ownership, etc.).  If partialptr is not
- * NULL and the robust_rename() call is forced to copy the temp file, we
- * stage the file into the partial-dir and then rename it into place. */
-void finish_transfer(const char *fname, const char *fnametmp,
-		     const char *fnamecmp, const char *partialptr,
-		     struct file_struct *file, int ok_to_set_time,
-		     int overwriting_basis)
+ * attributes (e.g. permissions, ownership, etc.).  If the robust_rename()
+ * call is forced to copy the temp file and partialptr is both non-NULL and
+ * not an absolute path, we stage the file into the partial-dir and then
+ * rename it into place.  This returns 1 on succcess or 0 on failure. */
+int finish_transfer(const char *fname, const char *fnametmp,
+		    const char *fnamecmp, const char *partialptr,
+		    struct file_struct *file, int ok_to_set_time,
+		    int overwriting_basis)
 {
 	int ret;
+	const char *temp_copy_name = partialptr && *partialptr != '/' ? partialptr : NULL;
 
 	if (inplace) {
 		if (verbose > 2)
@@ -522,7 +524,7 @@ void finish_transfer(const char *fname, const char *fnametmp,
 	}
 
 	if (make_backups > 0 && overwriting_basis && !make_backup(fname))
-		return;
+		return 1;
 
 	/* Change permissions before putting the file into place. */
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
@@ -531,34 +533,39 @@ void finish_transfer(const char *fname, const char *fnametmp,
 	/* move tmp file over real file */
 	if (verbose > 2)
 		rprintf(FINFO, "renaming %s to %s\n", fnametmp, fname);
-	ret = robust_rename(fnametmp, fname, partialptr,
+	ret = robust_rename(fnametmp, fname, temp_copy_name,
 			    file->mode & INITACCESSPERMS);
 	if (ret < 0) {
 		rsyserr(FERROR_XFER, errno, "%s %s -> \"%s\"",
 			ret == -2 ? "copy" : "rename",
 			full_fname(fnametmp), fname);
-		do_unlink(fnametmp);
-		return;
+		if (!partialptr || (ret == -2 && temp_copy_name)
+		 || robust_rename(fnametmp, partialptr, NULL,
+				  file->mode & INITACCESSPERMS) < 0)
+			do_unlink(fnametmp);
+		return 0;
 	}
 	if (ret == 0) {
 		/* The file was moved into place (not copied), so it's done. */
-		return;
+		return 1;
 	}
 	/* The file was copied, so tweak the perms of the copied file.  If it
 	 * was copied to partialptr, move it into its final destination. */
-	fnametmp = partialptr ? partialptr : fname;
+	fnametmp = temp_copy_name ? temp_copy_name : fname;
 
   do_set_file_attrs:
 	set_file_attrs(fnametmp, file, NULL, fnamecmp,
 		       ok_to_set_time ? 0 : ATTRS_SKIP_MTIME);
 
-	if (partialptr) {
+	if (temp_copy_name) {
 		if (do_rename(fnametmp, fname) < 0) {
 			rsyserr(FERROR_XFER, errno, "rename %s -> \"%s\"",
 				full_fname(fnametmp), fname);
-		} else
-			handle_partial_dir(partialptr, PDIR_DELETE);
+			return 0;
+		}
+		handle_partial_dir(temp_copy_name, PDIR_DELETE);
 	}
+	return 1;
 }
 
 struct file_list *flist_for_ndx(int ndx)

@@ -841,7 +841,7 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 {
 	char buf[MAXPATHLEN];
 	const char *copy_to, *partialptr;
-	int fd_w;
+	int ok, fd_w;
 
 	if (inplace) {
 		/* Let copy_file open the destination in place. */
@@ -865,11 +865,9 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 		return -1;
 	}
 	partialptr = partial_dir ? partial_dir_fname(dest) : NULL;
-	if (partialptr && *partialptr == '/')
-		partialptr = NULL;
-	finish_transfer(dest, copy_to, src, partialptr, file, 1, 0);
+	ok = finish_transfer(dest, copy_to, src, partialptr, file, 1, 0);
 	cleanup_disable();
-	return 0;
+	return ok ? 0 : -1;
 }
 
 /* This is only called for regular files.  We return -2 if we've finished

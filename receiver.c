@@ -688,26 +688,23 @@ int recv_files(int f_in, char *local_name)
 		}
 
 		if ((recv_ok && (!delay_updates || !partialptr)) || inplace) {
-			char *temp_copy_name;
 			if (partialptr == fname)
-				partialptr = temp_copy_name = NULL;
-			else if (*partial_dir == '/')
-				temp_copy_name = NULL;
-			else
-				temp_copy_name = partialptr;
-			finish_transfer(fname, fnametmp, fnamecmp,
-					temp_copy_name, file, recv_ok, 1);
-			if (fnamecmp == partialptr) {
+				partialptr = NULL;
+			if (!finish_transfer(fname, fnametmp, fnamecmp,
+					     partialptr, file, recv_ok, 1))
+				recv_ok = -1;
+			else if (fnamecmp == partialptr) {
 				do_unlink(partialptr);
 				handle_partial_dir(partialptr, PDIR_DELETE);
 			}
 		} else if (keep_partial && partialptr
 		    && handle_partial_dir(partialptr, PDIR_CREATE)) {
-			finish_transfer(partialptr, fnametmp, fnamecmp, NULL,
-					file, recv_ok, !partial_dir);
-			if (delay_updates && recv_ok) {
-				bitbag_set_bit(delayed_bits, ndx);
+			if (!finish_transfer(partialptr, fnametmp, fnamecmp, NULL,
+					     file, recv_ok, !partial_dir))
 				recv_ok = -1;
+			else if (delay_updates && recv_ok) {
+				bitbag_set_bit(delayed_bits, ndx);
+				recv_ok = 2;
 			}
 		} else {
 			partialptr = NULL;
@@ -716,11 +713,13 @@ int recv_files(int f_in, char *local_name)
 
 		cleanup_disable();
 
-		if (recv_ok > 0) {
+		switch (recv_ok) {
+		case 1:
 			if (remove_source_files || inc_recurse
 			 || (preserve_hard_links && F_IS_HLINKED(file)))
 				send_msg_int(MSG_SUCCESS, ndx);
-		} else if (!recv_ok) {
+			break;
+		case 0: {
 			enum logcode msgtype = redoing || read_batch ? FERROR : FWARNING;
 			if (msgtype == FERROR || verbose) {
 				char *errstr, *redostr, *keptstr;
@@ -746,6 +745,12 @@ int recv_files(int f_in, char *local_name)
 				file->flags |= FLAG_FILE_SENT;
 			} else if (inc_recurse)
 				send_msg_int(MSG_NO_SEND, ndx);
+			break;
+		    }
+		case -1:
+			if (inc_recurse)
+				send_msg_int(MSG_NO_SEND, ndx);
+			break;
 		}
 	}
 	if (make_backups < 0)
