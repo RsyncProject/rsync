@@ -29,7 +29,6 @@ config.status
 /t_unsafe
 /wildtest
 /getfsdev
-/mkrounding
 /rounding.h
 /doc/rsync.pdf
 /doc/rsync.ps
