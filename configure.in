@@ -824,6 +824,7 @@ AC_SUBST(OBJ_RESTORE)
 AC_SUBST(CC_SHOBJ_FLAG)
 AC_SUBST(BUILD_POPT)
 AC_SUBST(MAKE_MAN)
+AC_SUBST(cross_compiling)
 
 AC_CHECK_HEADERS(sys/acl.h acl/libacl.h)
 AC_CHECK_FUNCS(_acl __acl _facl __facl)

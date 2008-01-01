@@ -34,6 +34,12 @@ Changes since 2.6.9:
       options:  --compare-dest, --link-dest, --copy-dest, --partial-dir,
       --backup-dir, --temp-dir, and --files-from.
 
+    - If a file's data arrived successfully on the receiving side but the
+      rename of the tempory file to the destination file failed AND the
+      --remove-souce-files (or the deprecated --remove-sent-files) option
+      was specified, rsync no longer erroneously removes the associated
+      source file.
+
     - Fixed the output of -ii when combined with one of the --*-dest options:
       it now itemizes all the items, not just the changed ones.
 

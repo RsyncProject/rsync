@@ -81,7 +81,14 @@ $(CHECK_OBJS): $(HEADERS)
 flist.o: rounding.h
 
 rounding.h: mkrounding$(EXEEXT)
-	./mkrounding$(EXEEXT) >rounding.h
+	@if test x@cross_compiling@ = xno; then \
+	    ./mkrounding$(EXEEXT) >rounding.h; \
+	else \
+	    echo "Copy the mkrounding$(EXEEXT) command to the target machine and run it like this:"; \
+	    echo "    ./mkrounding$(EXEEXT) >rounding.h"; \
+	    echo "Then copy the resulting rounding.h file to this build machine and rerun \"make\"."; \
+	    exit 1; \
+	fi
 
 mkrounding$(EXEEXT): mkrounding.c rsync.h
 	@sed '1,/^struct file_struct/d; /^}/,$$d' <$(srcdir)/rsync.h >mkrounding.h
