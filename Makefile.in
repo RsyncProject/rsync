@@ -80,9 +80,9 @@ $(CHECK_OBJS): $(HEADERS)
 
 flist.o: rounding.h
 
-rounding.h: mkrounding.c rsync.h
+rounding.h: rounding.c rsync.h
 	@for r in 0 1 3; do \
-	    if $(CC) $(CFLAGS) $(LDFLAGS) -o mkrounding -DEXTRA_ROUNDING=$$r -I. $(srcdir)/mkrounding.c >/dev/null 2>&1; then \
+	    if $(CC) $(CFLAGS) $(LDFLAGS) -o rounding -DEXTRA_ROUNDING=$$r -I. $(srcdir)/rounding.c >/dev/null 2>&1; then \
 		echo "#define EXTRA_ROUNDING $$r" >rounding.h; \
 		if test -f "$$HOME/build_farm/build_test.fns"; then \
 		    echo "EXTRA_ROUNDING is $$r" >&2; \
@@ -90,7 +90,7 @@ rounding.h: mkrounding.c rsync.h
 		break; \
 	    fi; \
 	done
-	@rm -f mkrounding
+	@rm -f rounding
 	@if test -f rounding.h; then : ; else \
 	    echo "Failed to create rounding.h!"; \
 	    exit 1; \
@@ -154,7 +154,7 @@ rsyncd.conf.5: rsyncd.conf.yo
 
 clean: cleantests
 	rm -f *~ $(OBJS) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_SYMLINKS) \
-		mkrounding rounding.h
+		rounding rounding.h
 
 cleantests:
 	rm -rf ./testtmp*
