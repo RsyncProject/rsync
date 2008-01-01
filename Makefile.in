@@ -59,7 +59,7 @@ CHECK_OBJS=tls.o getgroups.o getfsdev.o t_stub.o t_unsafe.o trimslash.o wildtest
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -c $< @CC_SHOBJ_FLAG@
 @OBJ_RESTORE@
 
-all: conf_stop rsync$(EXEEXT) @MAKE_MAN@
+all: conf_stop make_stop rsync$(EXEEXT) @MAKE_MAN@
 
 install: all
 	-mkdir -p ${DESTDIR}${bindir}
@@ -133,6 +133,13 @@ configure.sh config.h.in: configure.in aclocal.m4
 reconfigure:
 	./config.status --recheck
 	./config.status
+
+make_stop: Makefile
+
+Makefile: Makefile.in config.status
+	@./config.status
+	@echo "Makefile updated -- rerun your make command."
+	@exit 1
 
 proto: proto.h-tstamp
 
