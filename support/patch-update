@@ -59,7 +59,9 @@ foreach my $patch (@patches) {
     my $desc = '';
     open(PIPE, '-|', 'git', 'diff', '-U1000', "master...$branch", '--', "PATCH.$patch") or die $!;
     while (<PIPE>) {
-	next if m{^\Q+++\E b/PATCH};
+	last if /^@@ /;
+    }
+    while (<PIPE>) {
 	next unless s/^[ +]//;
 	if (m#patch -p1 <patches/(\S+)\.diff# && $1 ne $patch) {
 	    $parent{$patch} = $1;

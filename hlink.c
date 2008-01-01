@@ -143,7 +143,7 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 			if (gnum != gnum_next)
 				break;
 			F_HL_PREV(file) = prev;
-			/* The linked list must use raw ndx values. */
+			/* The linked list uses over-the-wire ndx values. */
 			if (unsort_ndx)
 				prev = F_NDX(file);
 			else
@@ -275,13 +275,13 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 	if (!prev_name) {
 		struct file_struct *prev_file = flist->files[prev_ndx - flist->ndx_start];
 
-		/* Is the previous link is not complete yet? */
+		/* Is the previous link not complete yet? */
 		if (!(prev_file->flags & FLAG_HLINK_DONE)) {
 			/* Is the previous link being transferred? */
 			if (prev_file->flags & FLAG_FILE_SENT) {
-				/* Add ourselves to the list of files that will be
-				 * updated when the transfer completes, and mark
-				 * ourself as waiting for the transfer. */
+				/* Add ourselves to the list of files that will
+				 * be updated when the transfer completes, and
+				 * mark ourself as waiting for the transfer. */
 				F_HL_PREV(file) = F_HL_PREV(prev_file);
 				F_HL_PREV(prev_file) = ndx;
 				file->flags |= FLAG_FILE_SENT;

@@ -180,7 +180,7 @@ as long as that directory does not exist.  When this option is enabled,
 rsync will refuse to run if that path is a directory or a symlink to
 a directory.  When using the "munge symlinks" option in a chroot area,
 you should add this path to the exclude setting for the module so that
-the user can't try to create it.
+a user can't try to create it.
 
 Note:  rsync makes no attempt to verify that any pre-existing symlinks in
 the hierarchy are as safe as you want them to be.  If you setup an rsync
