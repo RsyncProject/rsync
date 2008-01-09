@@ -1830,7 +1830,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		} else if (!len || fbuf[len - 1] == '/') {
 			if (len == 2 && fbuf[0] == '.') {
 				/* Turn "./" into just "." rather than "./." */
-				fbuf[1] = '\0';
+				fbuf[--len] = '\0';
 			} else {
 				if (len + 1 >= MAXPATHLEN)
 					overflow_exit("send_file_list");
