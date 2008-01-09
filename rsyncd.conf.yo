@@ -113,6 +113,10 @@ After the global options you should define a number of modules, each
 module exports a directory tree as a symbolic name. Modules are
 exported by specifying a module name in square brackets [module]
 followed by the options for that module.
+The module name cannot contain a slash or a closing square bracket.  If the
+name contains whitespace, each internal sequence of whitespace will be
+changed into a single space, while leading or trailing whitespace will be
+discarded.
 
 startdit()
 

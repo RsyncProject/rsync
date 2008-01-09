@@ -784,6 +784,11 @@ static BOOL do_section(char *sectionname)
      return(True);
    }
 
+   if (strchr(sectionname, '/') != NULL) {
+     rprintf(FLOG, "Warning: invalid section name in configuration file: %s\n", sectionname);
+     return False;
+   }
+
    /* if we have a current service, tidy it up before moving on */
    bRetval = True;
 
