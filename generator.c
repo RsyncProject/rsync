@@ -1897,57 +1897,63 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 	char fbuf[MAXPATHLEN];
 	int ndx;
 
+	while (1) {
 #ifdef SUPPORT_HARD_LINKS
-	while (preserve_hard_links && (ndx = get_hlink_num()) != -1) {
-		flist = flist_for_ndx(ndx);
-		assert(flist != NULL);
-		file = flist->files[ndx - flist->ndx_start];
-		assert(file->flags & FLAG_HLINKED);
-		finish_hard_link(file, f_name(file, fbuf), ndx, NULL, itemizing, code, -1);
-		flist->in_progress--;
-	}
+		if (preserve_hard_links && (ndx = get_hlink_num()) != -1) {
+			flist = flist_for_ndx(ndx);
+			assert(flist != NULL);
+			file = flist->files[ndx - flist->ndx_start];
+			assert(file->flags & FLAG_HLINKED);
+			finish_hard_link(file, f_name(file, fbuf), ndx, NULL, itemizing, code, -1);
+			flist->in_progress--;
+			continue;
+		}
 #endif
 
-	while (check_redo && (ndx = get_redo_num()) != -1) {
-		csum_length = SUM_LENGTH;
-		max_size = -max_size;
-		min_size = -min_size;
-		ignore_existing = -ignore_existing;
-		ignore_non_existing = -ignore_non_existing;
-		update_only = -update_only;
-		always_checksum = -always_checksum;
-		size_only = -size_only;
-		append_mode = -append_mode;
-		make_backups = -make_backups; /* avoid dup backup w/inplace */
-		ignore_times++;
+		if (check_redo && (ndx = get_redo_num()) != -1) {
+			csum_length = SUM_LENGTH;
+			max_size = -max_size;
+			min_size = -min_size;
+			ignore_existing = -ignore_existing;
+			ignore_non_existing = -ignore_non_existing;
+			update_only = -update_only;
+			always_checksum = -always_checksum;
+			size_only = -size_only;
+			append_mode = -append_mode;
+			make_backups = -make_backups; /* avoid dup backup w/inplace */
+			ignore_times++;
 
-		flist = cur_flist;
-		cur_flist = flist_for_ndx(ndx);
+			flist = cur_flist;
+			cur_flist = flist_for_ndx(ndx);
 
-		file = cur_flist->files[ndx - cur_flist->ndx_start];
-		if (solo_file)
-			strlcpy(fbuf, solo_file, sizeof fbuf);
-		else
-			f_name(file, fbuf);
-		recv_generator(fbuf, file, ndx, itemizing, code, sock_f_out);
-		cur_flist->to_redo--;
+			file = cur_flist->files[ndx - cur_flist->ndx_start];
+			if (solo_file)
+				strlcpy(fbuf, solo_file, sizeof fbuf);
+			else
+				f_name(file, fbuf);
+			recv_generator(fbuf, file, ndx, itemizing, code, sock_f_out);
+			cur_flist->to_redo--;
 
-		cur_flist = flist;
+			cur_flist = flist;
 
-		csum_length = SHORT_SUM_LENGTH;
-		max_size = -max_size;
-		min_size = -min_size;
-		ignore_existing = -ignore_existing;
-		ignore_non_existing = -ignore_non_existing;
-		update_only = -update_only;
-		always_checksum = -always_checksum;
-		size_only = -size_only;
-		append_mode = -append_mode;
-		make_backups = -make_backups;
-		ignore_times--;
-	}
+			csum_length = SHORT_SUM_LENGTH;
+			max_size = -max_size;
+			min_size = -min_size;
+			ignore_existing = -ignore_existing;
+			ignore_non_existing = -ignore_non_existing;
+			update_only = -update_only;
+			always_checksum = -always_checksum;
+			size_only = -size_only;
+			append_mode = -append_mode;
+			make_backups = -make_backups;
+			ignore_times--;
+			continue;
+		}
 
-	while (cur_flist != first_flist) { /* only possible with inc_recurse */
+		if (cur_flist == first_flist)
+			break;
+
+		/* We only get here if inc_recurse is enabled. */
 		if (first_flist->in_progress || first_flist->to_redo)
 			break;
 
