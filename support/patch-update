@@ -7,7 +7,16 @@
 
 use strict;
 
-die "No 'patches' directory present in the current dir.\n" unless -d 'patches';
+my $patches_dir = 'patches';
+my $incl_generated_files;
+
+if (@ARGV && $ARGV[0] =~ /^--gen(?:=(\S+))?$/) {
+    $patches_dir = $1 if defined $1;
+    $incl_generated_files = 1;
+    shift;
+}
+
+die "No '$patches_dir' directory was found.\n" unless -d $patches_dir;
 die "No '.git' directory present in the current dir.\n" unless -d '.git';
 
 my @extra_files;
@@ -23,13 +32,11 @@ while (<IN>) {
 }
 close IN;
 
-my $incl_generated_files = shift if @ARGV && $ARGV[0] eq '--gen';
-
 system "git checkout master" and exit 1;
 if ($incl_generated_files) {
     die "'a' must not exist in the current directory.\n" if -e 'a';
     die "'b' must not exist in the current directory.\n" if -e 'b';
-    system "make gen && rsync -a @extra_files a/" and exit 1;
+    system "./config.status Makefile && make gen && rsync -a @extra_files a/" and exit 1;
 }
 my $last_touch = time;
 
@@ -110,7 +117,7 @@ sub update_patch
 	system "git checkout --track -b patch/$patch origin/patch/$patch" and exit 1;
     }
 
-    open(OUT, '>', "patches/$patch.diff") or die $!;
+    open(OUT, '>', "$patches_dir/$patch.diff") or die $!;
     print OUT $description{$patch}, "\n";
 
     if (system("git rebase -m $parent") != 0) {
@@ -120,7 +127,7 @@ sub update_patch
     }
 
     if ($incl_generated_files) {
-	system "make gen && rsync -a @extra_files b/" and exit 1;
+	system "./config.status Makefile && make gen && rsync -a @extra_files b/" and exit 1;
     }
     $last_touch = time;
 

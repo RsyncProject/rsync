@@ -239,7 +239,7 @@ if ($diffdir ne $dest) {
 }
 
 print "Creating $diff_file ...\n";
-system "make gen; rsync -a @extra_files b/";
+system "./config.status Makefile; make gen; rsync -a @extra_files b/";
 my $sed_script = 's:^((---|\+\+\+) [ab]/[^\t]+)\t.*:\1:';
 system "(git diff v$lastversion v$version; diff -up a b | sed -r '$sed_script') | gzip -9 >$diff_file";
 system "rm -rf a";
@@ -250,11 +250,10 @@ system "git archive --format=tar --prefix=rsync-$version/ v$version | tar xf -";
 system "support/git-set-file-times --prefix=rsync-$version/";
 system "fakeroot tar czf $srctar_file rsync-$version; rm -rf rsync-$version";
 
-system "support/patch-update --gen";
-
-symlink('.', "rsync-$version");
-system "fakeroot tar chzf $pattar_file rsync-$version/patches";
-unlink("rsync-$version");
+mkdir("rsync-$version", 0755);
+mkdir("rsync-$version/patches", 0755);
+system "support/patch-update --gen=rsync-$version/patches";
+system "fakeroot tar chzf $pattar_file rsync-$version/patches; rm -rf rsync-$version";
 
 print "Updating the other files in $dest ...\n";
 system "rsync -a README NEWS OLDNEWS TODO $dest";
