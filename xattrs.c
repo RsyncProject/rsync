@@ -70,6 +70,7 @@ extern int checksum_seed;
 typedef struct {
 	char *datum, *name;
 	size_t datum_len, name_len;
+	int num;
 } rsync_xa;
 
 static size_t namebuf_len = 0;
@@ -210,14 +211,14 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 #ifdef HAVE_LINUX_XATTRS
 	int user_only = am_sender ? 0 : !am_root;
 #endif
+	rsync_xa *rxa;
+	int count;
 
 	/* This puts the name list into the "namebuf" buffer. */
 	if ((list_len = get_xattr_names(fname)) < 0)
 		return -1;
 
 	for (name = namebuf; list_len > 0; name += name_len) {
-		rsync_xa *rxa;
-
 		name_len = strlen(name) + 1;
 		list_len -= name_len;
 
@@ -270,8 +271,12 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 		rxa->name_len = name_len;
 		rxa->datum_len = datum_len;
 	}
-	if (xalp->count > 1)
-		qsort(xalp->items, xalp->count, sizeof (rsync_xa), rsync_xal_compare_names);
+	count = xalp->count;
+	rxa = xalp->items;
+	if (count > 1)
+		qsort(rxa, count, sizeof (rsync_xa), rsync_xal_compare_names);
+	for (rxa += count-1; count; count--, rxa--)
+		rxa->num = count;
 	return 0;
 }
 
@@ -459,12 +464,11 @@ int xattr_diff(struct file_struct *file, stat_x *sxp, int find_all)
 void send_xattr_request(const char *fname, struct file_struct *file, int f_out)
 {
 	item_list *lst = rsync_xal_l.items;
-	int j, cnt, prior_req = -1;
+	int cnt, prior_req = 0;
 	rsync_xa *rxa;
 
 	lst += F_XATTR(file);
-	cnt = lst->count;
-	for (rxa = lst->items, j = 0; j < cnt; rxa++, j++) {
+	for (rxa = lst->items, cnt = lst->count; cnt--; rxa++) {
 		if (rxa->datum_len <= MAX_FULL_DATUM)
 			continue;
 		switch (rxa->datum[0]) {
@@ -481,8 +485,8 @@ void send_xattr_request(const char *fname, struct file_struct *file, int f_out)
 		/* Flag that we handled this abbreviated item. */
 		rxa->datum[0] = XSTATE_DONE;
 
-		write_varint(f_out, j - prior_req);
-		prior_req = j;
+		write_varint(f_out, rxa->num - prior_req);
+		prior_req = rxa->num;
 
 		if (fname) {
 			size_t len = 0;
@@ -534,7 +538,7 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 	item_list *lst = rsync_xal_l.items;
 	char *old_datum, *name;
 	rsync_xa *rxa;
-	int rel_pos, cnt, got_xattr_data = 0;
+	int rel_pos, cnt, num, got_xattr_data = 0;
 
 	if (F_XATTR(file) < 0) {
 		rprintf(FERROR, "recv_xattr_request: internal data error!\n");
@@ -544,13 +548,20 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 
 	cnt = lst->count;
 	rxa = lst->items;
-	rxa -= 1;
+	num = 0;
 	while ((rel_pos = read_varint(f_in)) != 0) {
-		rxa += rel_pos;
-		cnt -= rel_pos;
-		if (cnt < 0 || rxa->datum_len <= MAX_FULL_DATUM
-		 || rxa->datum[0] != XSTATE_ABBREV) {
-			rprintf(FERROR, "recv_xattr_request: internal abbrev error!\n");
+		num += rel_pos;
+		while (cnt && rxa->num < num) {
+		    rxa++;
+		    cnt--;
+		}
+		if (!cnt || rxa->num != num) {
+			rprintf(FERROR, "[%s] could not find xattr #%d for %s\n",
+				who_am_i(), num, f_name(file, NULL));
+			exit_cleanup(RERR_STREAMIO);
+		}
+		if (rxa->datum_len <= MAX_FULL_DATUM || rxa->datum[0] != XSTATE_ABBREV) {
+			rprintf(FERROR, "[%s] internal abbrev error!\n", who_am_i());
 			exit_cleanup(RERR_STREAMIO);
 		}
 
@@ -584,7 +595,7 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 void receive_xattr(struct file_struct *file, int f)
 {
 	static item_list temp_xattr = EMPTY_ITEM_LIST;
-	int count;
+	int count, num;
 	int ndx = read_varint(f);
 
 	if (ndx < 0 || (size_t)ndx > rsync_xal_l.count) {
@@ -603,7 +614,7 @@ void receive_xattr(struct file_struct *file, int f)
 		temp_xattr.count = 0;
 	}
 
-	while (count--) {
+	for (num = 1; num <= count; num++) {
 		char *ptr, *name;
 		rsync_xa *rxa;
 		size_t name_len = read_varint(f);
@@ -627,14 +638,14 @@ void receive_xattr(struct file_struct *file, int f)
 		}
 #ifdef HAVE_LINUX_XATTRS
 		/* Non-root can only save the user namespace. */
-			if (am_root <= 0 && !HAS_PREFIX(name, USER_PREFIX)) {
-				if (!am_root) {
-					free(ptr);
-					continue;
-				}
-				name -= RPRE_LEN;
-				name_len += RPRE_LEN;
-				memcpy(name, RSYNC_PREFIX, RPRE_LEN);
+		if (am_root <= 0 && !HAS_PREFIX(name, USER_PREFIX)) {
+			if (!am_root) {
+				free(ptr);
+				continue;
+			}
+			name -= RPRE_LEN;
+			name_len += RPRE_LEN;
+			memcpy(name, RSYNC_PREFIX, RPRE_LEN);
 		}
 #else
 		/* This OS only has a user namespace, so we either
@@ -663,6 +674,7 @@ void receive_xattr(struct file_struct *file, int f)
 		rxa->datum = ptr;
 		rxa->name_len = name_len;
 		rxa->datum_len = datum_len;
+		rxa->num = num;
 	}
 
 	ndx = rsync_xal_l.count; /* pre-incremented count */
