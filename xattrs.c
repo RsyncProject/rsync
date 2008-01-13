@@ -47,7 +47,6 @@ extern int checksum_seed;
 #define XSTATE_ABBREV	0
 #define XSTATE_DONE	1
 #define XSTATE_TODO	2
-#define XSTATE_LOCAL	3
 
 #define USER_PREFIX "user."
 #define UPRE_LEN ((int)sizeof USER_PREFIX - 1)
@@ -472,9 +471,11 @@ void send_xattr_request(const char *fname, struct file_struct *file, int f_out)
 		if (rxa->datum_len <= MAX_FULL_DATUM)
 			continue;
 		switch (rxa->datum[0]) {
-		case XSTATE_LOCAL:
-			/* Items set locally will get cached by receiver. */
-			rxa->datum[0] = XSTATE_DONE;
+		case XSTATE_ABBREV:
+			/* Items left abbreviated matched the sender's checksum, so
+			 * the receiver will cache the local data for future use. */
+			if (am_generator)
+				rxa->datum[0] = XSTATE_DONE;
 			continue;
 		case XSTATE_TODO:
 			break;
@@ -506,27 +507,6 @@ void send_xattr_request(const char *fname, struct file_struct *file, int f_out)
 	}
 
 	write_byte(f_out, 0); /* end the list */
-}
-
-/* Any items set locally by the generator that the receiver doesn't
- * get told about get changed back to XSTATE_ABBREV. */
-void xattr_clear_locals(struct file_struct *file)
-{
-	item_list *lst = rsync_xal_l.items;
-	rsync_xa *rxa;
-	int cnt;
-
-	if (F_XATTR(file) < 0)
-		return;
-
-	lst += F_XATTR(file);
-	cnt = lst->count;
-	for (rxa = lst->items; cnt--; rxa++) {
-		if (rxa->datum_len <= MAX_FULL_DATUM)
-			continue;
-		if (rxa->datum[0] == XSTATE_LOCAL)
-			rxa->datum[0] = XSTATE_ABBREV;
-	}
 }
 
 /* When called by the sender, read the request from the generator and mark
@@ -751,8 +731,6 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 				sxp->st.st_mtime = (time_t)-1;
 
 			if (am_generator) { /* generator items stay abbreviated */
-				if (rxas[i].datum[0] == XSTATE_ABBREV)
-					rxas[i].datum[0] = XSTATE_LOCAL;
 				free(ptr);
 				continue;
 			}

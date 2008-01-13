@@ -34,18 +34,19 @@ case "`xattr 2>&1`" in
     ;;
 esac
 
-makepath "$fromdir/foo"
+makepath "$fromdir/foo/bar"
 echo now >"$fromdir/file0"
 echo something >"$fromdir/file1"
 echo else >"$fromdir/file2"
 echo deep >"$fromdir/foo/file3"
 echo normal >"$fromdir/file4"
+echo deeper >"$fromdir/foo/bar/file5"
 
 makepath "$chkdir/foo"
 echo wow >"$chkdir/file1"
 cp -p "$fromdir/foo/file3" "$chkdir/foo"
 
-files='foo file0 file1 file2 foo/file3 file4'
+files='foo file0 file1 file2 foo/file3 file4 foo/bar/file5'
 
 cd "$fromdir"
 
@@ -61,10 +62,10 @@ xset user.foo foo file2
 xset user.bar bar file2
 xset user.long 'a long attribute for our new file that tests to ensure that this works' file2
 
-xset user.foo 'new foo' foo/file3
-xset user.bar 'new bar' foo/file3
-xset user.long 'this is also a long attribute that will be truncated in the initial data send' foo/file3
-xset user.equal 'this long attribute should remain the same and not need to be transferred' foo/file3
+xset user.foo 'new foo' foo/file3 foo/bar/file5
+xset user.bar 'new bar' foo/file3 foo/bar/file5
+xset user.long 'this is also a long attribute that will be truncated in the initial data send' foo/file3 foo/bar/file5
+xset user.equal 'this long attribute should remain the same and not need to be transferred' foo/file3 foo/bar/file5
 
 xset user.short 'old short' "$chkdir/file1"
 xset user.extra 'remove me' "$chkdir/file1"

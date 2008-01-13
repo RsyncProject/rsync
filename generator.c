@@ -945,10 +945,6 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 			return -1;
 		if (itemizing)
 			itemize(cmpbuf, file, ndx, 0, sxp, ITEM_LOCAL_CHANGE, 0, NULL);
-#ifdef SUPPORT_XATTRS
-		if (preserve_xattrs)
-			xattr_clear_locals(file);
-#endif
 		if (maybe_ATTRS_REPORT
 		 && ((!itemizing && verbose && match_level == 2)
 		  || (verbose > 1 && match_level == 3))) {
