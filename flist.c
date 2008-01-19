@@ -1525,8 +1525,10 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 	relnamecache **rnpp;
 	char *slash;
 	int len, need_new_dir;
+	struct filter_list_struct save_filter_list = filter_list;
 
 	flags = (flags | FLAG_IMPLIED_DIR) & ~(FLAG_TOP_DIR | FLAG_CONTENT_DIR);
+	filter_list.head = filter_list.tail = NULL; /* Don't filter implied dirs. */
 
 	if (inc_recurse) {
 		if (lastpath_struct && F_PATHNAME(lastpath_struct) == pathname
@@ -1568,11 +1570,11 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 		xfer_dirs = save_xfer_dirs;
 
 		if (!inc_recurse)
-			return;
+			goto done;
 	}
 
 	if (!lastpath_struct)
-		return; /* dir must have vanished */
+		goto done; /* dir must have vanished */
 
 	len = strlen(limit+1);
 	memcpy(&relname_list, F_DIR_RELNAMES_P(lastpath_struct), sizeof relname_list);
@@ -1586,6 +1588,9 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 		out_of_memory("send_implied_dirs");
 	(*rnpp)->name_type = name_type;
 	strlcpy((*rnpp)->fname, limit+1, len + 1);
+
+done:
+	filter_list = save_filter_list;
 }
 
 static void send1extra(int f, struct file_struct *file, struct file_list *flist)
