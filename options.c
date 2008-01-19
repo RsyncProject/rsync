@@ -1306,7 +1306,8 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 			batch_name = NULL;
 		} else if (dry_run)
 			write_batch = 0;
-	}
+	} else if (write_batch < 0 && dry_run)
+		write_batch = 0;
 	if (read_batch && files_from) {
 		snprintf(err_buf, sizeof err_buf,
 			"--read-batch cannot be used with --files-from\n");
