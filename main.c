@@ -278,7 +278,7 @@ static void output_summary(void)
 		rprintf(FINFO, "total size is %s  speedup is %.2f%s\n",
 			human_num(stats.total_size),
 			(double)stats.total_size / (total_written+total_read),
-			dry_run ? " (DRY RUN)" : "");
+			write_batch < 0 ? " (BATCH ONLY)" : dry_run ? " (DRY RUN)" : "");
 	}
 
 	fflush(stdout);
