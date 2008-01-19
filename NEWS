@@ -11,6 +11,7 @@ Changes since 2.6.9:
       an implied dir be duplicated as a symlink, you should specify the
       transfer of the symlink and the transfer of the referent directory as
       separate args.  (See also --keep-dirlinks and --no-implied-dirs.)
+      Also, exclude rules no longer have a partial affect on implied dirs.
 
     - Requesting a remote file list without specifying -r (--recursive) now
       sends the -d (--dirs) option to the remote rsync rather than sending -r
@@ -96,6 +97,10 @@ Changes since 2.6.9:
 
     - Any errors output about password-file reading no longer cause an error at
       the end of the run about a partial transfer.
+
+    - The --read-batch option for protocol 30 now ensures that several more
+      options are set correctly for the current batch file:  --iconv, --acls,
+      --xattrs, --inplace, --append, and --append-verify.
 
     - Using --only-write-batch to a daemon receiver now work properly (older
       versions would update some files while writing the batch).

@@ -31,15 +31,25 @@ extern int preserve_hard_links;
 extern int preserve_devices;
 extern int preserve_uid;
 extern int preserve_gid;
+extern int preserve_acls;
+extern int preserve_xattrs;
 extern int always_checksum;
 extern int do_compression;
 extern int def_compress_level;
+extern int inplace;
+extern int append_mode;
 extern int protocol_version;
 extern char *batch_name;
+#ifdef ICONV_OPTION
+extern char *iconv_opt;
+#endif
 
 extern struct filter_list_struct filter_list;
 
 static int tweaked_compress_level;
+static int tweaked_append;
+static int tweaked_append_verify;
+static int tweaked_iconv;
 
 static int *flag_ptr[] = {
 	&recurse,		/* 0 */
@@ -51,6 +61,12 @@ static int *flag_ptr[] = {
 	&always_checksum,	/* 6 */
 	&xfer_dirs,		/* 7 (protocol 29) */
 	&tweaked_compress_level,/* 8 (protocol 29) */
+	&tweaked_iconv,		/* 9  (protocol 30) */
+	&preserve_acls,		/* 10 (protocol 30) */
+	&preserve_xattrs,	/* 11 (protocol 30) */
+	&inplace,		/* 12 (protocol 30) */
+	&tweaked_append,	/* 13 (protocol 30) */
+	&tweaked_append_verify,	/* 14 (protocol 30) */
 	NULL
 };
 
@@ -64,6 +80,12 @@ static char *flag_name[] = {
 	"--checksum (-c)",
 	"--dirs (-d)",
 	"--compress (-z)",
+	"--iconv",
+	"--acls (-A)",
+	"--xattrs (-X)",
+	"--inplace",
+	"--append",
+	"--append-verify",
 	NULL
 };
 
@@ -76,11 +98,18 @@ void write_stream_flags(int fd)
 #else
 #error internal logic error!  Fix def_compress_level logic above and below too!
 #endif
+	tweaked_append = append_mode == 1;
+	tweaked_append_verify = append_mode == 2;
+#ifdef ICONV_OPTION
+	tweaked_iconv = iconv_opt != NULL;
+#endif
 
 	/* Start the batch file with a bitmap of data-stream-affecting
 	 * flags. */
 	if (protocol_version < 29)
 		flag_ptr[7] = NULL;
+	else if (protocol_version < 30)
+		flag_ptr[9] = NULL;
 	for (i = 0, flags = 0; flag_ptr[i]; i++) {
 		if (*flag_ptr[i])
 			flags |= 1 << i;
@@ -94,9 +123,22 @@ void read_stream_flags(int fd)
 
 	if (protocol_version < 29)
 		flag_ptr[7] = NULL;
+	else if (protocol_version < 30)
+		flag_ptr[9] = NULL;
+	tweaked_append = append_mode == 1;
+	tweaked_append_verify = append_mode == 2;
+#ifdef ICONV_OPTION
+	tweaked_iconv = iconv_opt != NULL;
+#endif
 	for (i = 0, flags = read_int(fd); flag_ptr[i]; i++) {
 		int set = flags & (1 << i) ? 1 : 0;
 		if (*flag_ptr[i] != set) {
+			if (i == 9) {
+				rprintf(FERROR, 
+					"%s specify the --iconv option to use this batch file.\n",
+					set ? "Please" : "Do not");
+				exit_cleanup(RERR_SYNTAX);
+			}
 			if (verbose) {
 				rprintf(FINFO,
 					"%sing the %s option to match the batchfile.\n",
@@ -118,6 +160,10 @@ void read_stream_flags(int fd)
 		do_compression = 1;
 		def_compress_level = tweaked_compress_level - 2;
 	}
+	if (tweaked_append)
+		append_mode = 1;
+	else if (tweaked_append_verify)
+		append_mode = 2;
 }
 
 static void write_arg(int fd, char *arg)
@@ -179,7 +225,7 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 	if (fd < 0) {
 		rsyserr(FERROR, errno, "Batch file %s open error",
 			filename);
-		exit_cleanup(1);
+		exit_cleanup(RERR_FILESELECT);
 	}
 
 	/* Write argvs info to BATCH.sh file */
@@ -225,6 +271,6 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 	if (write(fd, "\n", 1) != 1 || close(fd) < 0) {
 		rsyserr(FERROR, errno, "Batch file %s write error",
 			filename);
-		exit_cleanup(1);
+		exit_cleanup(RERR_FILEIO);
 	}
 }
