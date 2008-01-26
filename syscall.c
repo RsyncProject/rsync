@@ -34,6 +34,7 @@ extern int am_root;
 extern int read_only;
 extern int list_only;
 extern int preserve_perms;
+extern int preserve_executability;
 
 #define RETURN_ERROR_IF(x,e) \
 	do { \
@@ -167,7 +168,7 @@ int do_chmod(const char *path, mode_t mode)
 #endif
 	} else
 		code = chmod(path, mode & CHMOD_BITS);
-	if (code != 0 && preserve_perms)
+	if (code != 0 && (preserve_perms || preserve_executability))
 	    return code;
 	return 0;
 }

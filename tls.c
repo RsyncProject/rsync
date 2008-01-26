@@ -46,6 +46,7 @@ int am_root = 0;
 int read_only = 1;
 int list_only = 0;
 int preserve_perms = 0;
+int preserve_executability = 0;
 
 #ifdef SUPPORT_XATTRS
 

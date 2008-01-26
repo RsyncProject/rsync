@@ -29,6 +29,7 @@ int read_only = 0;
 int list_only = 0;
 int verbose = 0;
 int preserve_perms = 0;
+int preserve_executability = 0;
 
 int
 main(int argc, char **argv)
