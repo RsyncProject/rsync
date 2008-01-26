@@ -2015,7 +2015,8 @@ dit(bf(--iconv=CONVERT_SPEC)) Rsync can convert filenames between character
 sets using this option.  Using a CONVERT_SPEC of "." tells rsync to look up
 the default character-set via the locale setting.  Alternately, you can
 fully specify what conversion to do by giving a local and a remote charset
-separated by a comma (local first), e.g. bf(--iconv=utf8,iso88591).
+separated by a comma (local first), e.g. bf(--iconv=utf8,iso88591).  (Run
+"iconv --list" to see a list of the charset names that a machine supports.)
 Finally, you can specify a CONVERT_SPEC of "-" to turn off any conversion.
 The default setting of this option is site-specific, and can also be
 affected via the RSYNC_ICONV environment variable.
