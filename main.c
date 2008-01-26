@@ -82,6 +82,7 @@ extern struct filter_list_struct server_filter_list;
 extern iconv_t ic_send;
 #endif
 
+uid_t our_uid;
 int local_server = 0;
 int daemon_over_rsh = 0;
 mode_t orig_umask = 0;
@@ -1427,7 +1428,8 @@ int main(int argc,char *argv[])
 #endif
 
 	starttime = time(NULL);
-	am_root = (MY_UID() == 0);
+	our_uid = MY_UID();
+	am_root = our_uid == 0;
 
 	memset(&stats, 0, sizeof(stats));
 

@@ -91,6 +91,7 @@ extern int one_file_system;
 extern struct stats stats;
 extern dev_t filesystem_dev;
 extern mode_t orig_umask;
+extern uid_t our_uid;
 extern char *backup_dir;
 extern char *backup_suffix;
 extern int backup_suffix_len;
@@ -113,7 +114,8 @@ static int need_retouch_dir_perms;
 static const char *solo_file = NULL;
 
 /* For calling delete_item() and delete_dir_contents(). */
-#define DEL_RECURSE		(1<<1) /* recurse */
+#define DEL_OWNED_BY_US 	(1<<0) /* file/dir has our uid */
+#define DEL_RECURSE		(1<<1) /* if dir, delete all contents */
 #define DEL_DIR_IS_EMPTY	(1<<2) /* internal delete_FUNCTIONS use only */
 
 enum nonregtype {
@@ -150,6 +152,9 @@ static enum delret delete_item(char *fbuf, int mode, char *replace, int flags)
 		rprintf(FINFO, "delete_item(%s) mode=%o flags=%d\n",
 			fbuf, mode, flags);
 	}
+
+	if (!am_root && !(mode & S_IWUSR) && flags & DEL_OWNED_BY_US)
+		do_chmod(fbuf, mode |= S_IWUSR);
 
 	if (S_ISDIR(mode) && !(flags & DEL_DIR_IS_EMPTY)) {
 		ignore_perishable = 1;
@@ -258,10 +263,17 @@ static enum delret delete_dir_contents(char *fname, int flags)
 		}
 
 		strlcpy(p, fp->basename, remainder);
+		if (F_OWNER(fp) == our_uid)
+			flags |= DEL_OWNED_BY_US;
+		else
+			flags &= DEL_OWNED_BY_US;
 		/* Save stack by recursing to ourself directly. */
-		if (S_ISDIR(fp->mode)
-		 && delete_dir_contents(fname, flags | DEL_RECURSE) != DR_SUCCESS)
-			ret = DR_NOT_EMPTY;
+		if (S_ISDIR(fp->mode)) {
+			if (!am_root && !(fp->mode & S_IWUSR) && flags & DEL_OWNED_BY_US)
+				do_chmod(fname, fp->mode |= S_IWUSR);
+			if (delete_dir_contents(fname, flags | DEL_RECURSE) != DR_SUCCESS)
+				ret = DR_NOT_EMPTY;
+		}
 		if (delete_item(fname, fp->mode, NULL, flags) != DR_SUCCESS)
 			ret = DR_NOT_EMPTY;
 	}
@@ -312,14 +324,17 @@ static int flush_delete_delay(void)
 	return 1;
 }
 
-static int remember_delete(struct file_struct *file, const char *fname)
+static int remember_delete(struct file_struct *file, const char *fname, int flags)
 {
+	const char *plus = (!am_root && !(file->mode & S_IWUSR) && flags & DEL_OWNED_BY_US)
+			 ? "+" : "";
 	int len;
 
 	while (1) {
 		len = snprintf(deldelay_buf + deldelay_cnt,
 			       deldelay_size - deldelay_cnt,
-			       "%x %s%c", (int)file->mode, fname, '\0');
+			       "%s%x %s%c",
+			       plus, (int)file->mode, fname, '\0');
 		if ((deldelay_cnt += len) <= deldelay_size)
 			break;
 		if (deldelay_fd < 0 && !start_delete_delay_temp())
@@ -332,7 +347,7 @@ static int remember_delete(struct file_struct *file, const char *fname)
 	return 1;
 }
 
-static int read_delay_line(char *buf)
+static int read_delay_line(char *buf, int *own_flag_p)
 {
 	static int read_pos = 0;
 	int j, len, mode;
@@ -373,6 +388,11 @@ static int read_delay_line(char *buf)
 	}
 
 	bp = deldelay_buf + read_pos;
+	if (*bp == '+') {
+		bp++;
+		*own_flag_p = DEL_OWNED_BY_US;
+	} else
+		*own_flag_p = 0;
 
 	if (sscanf(bp, "%x ", &mode) != 1) {
 	  invalid_data:
@@ -397,15 +417,15 @@ static int read_delay_line(char *buf)
 
 static void do_delayed_deletions(char *delbuf)
 {
-	int mode;
+	int mode, own_flag;
 
 	if (deldelay_fd >= 0) {
 		if (deldelay_cnt && !flush_delete_delay())
 			return;
 		lseek(deldelay_fd, 0, 0);
 	}
-	while ((mode = read_delay_line(delbuf)) >= 0)
-		delete_item(delbuf, mode, NULL, DEL_RECURSE);
+	while ((mode = read_delay_line(delbuf, &own_flag)) >= 0)
+		delete_item(delbuf, mode, NULL, own_flag | DEL_RECURSE);
 	if (deldelay_fd >= 0)
 		close(deldelay_fd);
 }
@@ -467,12 +487,14 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 			continue;
 		}
 		if (flist_find(cur_flist, fp) < 0) {
+			int flags = DEL_RECURSE
+				  | (F_OWNER(fp) == our_uid ? DEL_OWNED_BY_US : 0);
 			f_name(fp, delbuf);
 			if (delete_during == 2) {
-				if (!remember_delete(fp, delbuf))
+				if (!remember_delete(fp, delbuf, flags))
 					break;
 			} else
-				delete_item(delbuf, fp->mode, NULL, DEL_RECURSE);
+				delete_item(delbuf, fp->mode, NULL, flags);
 		}
 	}
 
@@ -1278,6 +1300,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 		return;
 	}
+
+	if (statret == 0 && F_OWNER(file) == our_uid)
+		del_opts |= DEL_OWNED_BY_US;
 
 	if (S_ISDIR(file->mode)) {
 		if (!implied_dirs && file->flags & FLAG_IMPLIED_DIR)
