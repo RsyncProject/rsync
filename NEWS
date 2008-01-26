@@ -11,7 +11,7 @@ Changes since 2.6.9:
       an implied dir be duplicated as a symlink, you should specify the
       transfer of the symlink and the transfer of the referent directory as
       separate args.  (See also --keep-dirlinks and --no-implied-dirs.)
-      Also, exclude rules no longer have a partial affect on implied dirs.
+      Also, exclude rules no longer have a partial effect on implied dirs.
 
     - Requesting a remote file list without specifying -r (--recursive) now
       sends the -d (--dirs) option to the remote rsync rather than sending -r
@@ -22,7 +22,7 @@ Changes since 2.6.9:
     - In --dry-run mode, the last line of the verbose summary text is output
       with a "(DRY RUN)" suffix to help remind you that no updates were made.
 
-    - A writable rsync daemon that disables "use chroot" now defaults to a
+    - A writable rsync daemon with "use chroot" disabled now defaults to a
       symlink-munging behavior designed to make symlinks safer while also
       allowing absolute symlinks to be stored and retrieved.  This also has
       the effect of making symlinks unusable while they're in the daemon's
@@ -36,8 +36,8 @@ Changes since 2.6.9:
       --backup-dir, --temp-dir, and --files-from.
 
     - If a file's data arrived successfully on the receiving side but the
-      rename of the tempory file to the destination file failed AND the
-      --remove-souce-files (or the deprecated --remove-sent-files) option
+      rename of the temporary file to the destination file failed AND the
+      --remove-source-files (or the deprecated --remove-sent-files) option
       was specified, rsync no longer erroneously removes the associated
       source file.
 
@@ -137,7 +137,7 @@ Changes since 2.6.9:
     - Added the --acls (-A) option to preserve Access Control Lists.  This is
       an improved version of the prior patch that was available, and it even
       supports OS X ACLs.  If you need to have backward compatibility with old,
-      acl-patched versions of rsync, apply the acls.diff file from the patches
+      ACL-patched versions of rsync, apply the acls.diff file from the patches
       dir.
 
     - Added the --xattrs (-X) option to preserver extended attributes.  This is
