@@ -171,6 +171,8 @@ void setup_protocol(int f_out,int f_in)
 			PROTOCOL_VERSION, am_server? "Server" : "Client");
 		exit_cleanup(RERR_PROTOCOL);
 	}
+	if (read_batch)
+		check_batch_flags();
 
 	if (protocol_version < 30) {
 		if (append_mode == 1)

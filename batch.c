@@ -35,7 +35,6 @@ extern int preserve_acls;
 extern int preserve_xattrs;
 extern int always_checksum;
 extern int do_compression;
-extern int def_compress_level;
 extern int inplace;
 extern int append_mode;
 extern int protocol_version;
@@ -46,7 +45,8 @@ extern char *iconv_opt;
 
 extern struct filter_list_struct filter_list;
 
-static int tweaked_compress_level;
+int batch_stream_flags;
+
 static int tweaked_append;
 static int tweaked_append_verify;
 static int tweaked_iconv;
@@ -60,7 +60,7 @@ static int *flag_ptr[] = {
 	&preserve_hard_links,	/* 5 */
 	&always_checksum,	/* 6 */
 	&xfer_dirs,		/* 7 (protocol 29) */
-	&tweaked_compress_level,/* 8 (protocol 29) */
+	&do_compression,	/* 8 (protocol 29) */
 	&tweaked_iconv,		/* 9  (protocol 30) */
 	&preserve_acls,		/* 10 (protocol 30) */
 	&preserve_xattrs,	/* 11 (protocol 30) */
@@ -93,11 +93,6 @@ void write_stream_flags(int fd)
 {
 	int i, flags;
 
-#if Z_DEFAULT_COMPRESSION == -1
-	tweaked_compress_level = do_compression ? def_compress_level + 2 : 0;
-#else
-#error internal logic error!  Fix def_compress_level logic above and below too!
-#endif
 	tweaked_append = append_mode == 1;
 	tweaked_append_verify = append_mode == 2;
 #ifdef ICONV_OPTION
@@ -106,10 +101,6 @@ void write_stream_flags(int fd)
 
 	/* Start the batch file with a bitmap of data-stream-affecting
 	 * flags. */
-	if (protocol_version < 29)
-		flag_ptr[7] = NULL;
-	else if (protocol_version < 30)
-		flag_ptr[9] = NULL;
 	for (i = 0, flags = 0; flag_ptr[i]; i++) {
 		if (*flag_ptr[i])
 			flags |= 1 << i;
@@ -119,7 +110,12 @@ void write_stream_flags(int fd)
 
 void read_stream_flags(int fd)
 {
-	int i, flags;
+	batch_stream_flags = read_int(fd);
+}
+
+void check_batch_flags(void)
+{
+	int i;
 
 	if (protocol_version < 29)
 		flag_ptr[7] = NULL;
@@ -130,11 +126,11 @@ void read_stream_flags(int fd)
 #ifdef ICONV_OPTION
 	tweaked_iconv = iconv_opt != NULL;
 #endif
-	for (i = 0, flags = read_int(fd); flag_ptr[i]; i++) {
-		int set = flags & (1 << i) ? 1 : 0;
+	for (i = 0; flag_ptr[i]; i++) {
+		int set = batch_stream_flags & (1 << i) ? 1 : 0;
 		if (*flag_ptr[i] != set) {
 			if (i == 9) {
-				rprintf(FERROR, 
+				rprintf(FERROR,
 					"%s specify the --iconv option to use this batch file.\n",
 					set ? "Please" : "Do not");
 				exit_cleanup(RERR_SYNTAX);
@@ -154,12 +150,6 @@ void read_stream_flags(int fd)
 			xfer_dirs = 0;
 	}
 
-	if (tweaked_compress_level == 0 || tweaked_compress_level == 2)
-		do_compression = 0;
-	else {
-		do_compression = 1;
-		def_compress_level = tweaked_compress_level - 2;
-	}
 	if (tweaked_append)
 		append_mode = 1;
 	else if (tweaked_append_verify)
