@@ -641,7 +641,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
  * dry-run mode and the destination dir does not yet exist, we'll try to
  * tweak any dest-relative paths to make them work for a dry-run (the
  * destination dir must be in curr_dir[] when this function is called).
- * We also report if any arg that is non-existent or not a directory. */
+ * We also warn about any arg that is non-existent or not a directory. */
 static void check_alt_basis_dirs(void)
 {
 	STRUCT_STAT st;
