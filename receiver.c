@@ -352,10 +352,11 @@ static int get_next_gen_ndx(int fd, int next_gen_ndx, int desired_ndx)
 {
 	while (next_gen_ndx < desired_ndx) {
 		if (next_gen_ndx >= 0) {
-			rprintf(FINFO,
+			struct file_struct *file = cur_flist->files[next_gen_ndx];
+			rprintf(FERROR_XFER,
 				"(No batched update for%s \"%s\")\n",
-				redoing ? " resend of" : "",
-				f_name(cur_flist->files[next_gen_ndx], NULL));
+				file->flags & FLAG_FILE_SENT ? " resend of" : "",
+				f_name(file, NULL));
 		}
 		next_gen_ndx = read_int(fd);
 		if (next_gen_ndx == -1) {
@@ -720,8 +721,8 @@ int recv_files(int f_in, char *local_name)
 				send_msg_int(MSG_SUCCESS, ndx);
 			break;
 		case 0: {
-			enum logcode msgtype = redoing || read_batch ? FERROR : FWARNING;
-			if (msgtype == FERROR || verbose) {
+			enum logcode msgtype = redoing ? FERROR_XFER : FWARNING;
+			if (msgtype == FERROR_XFER || verbose) {
 				char *errstr, *redostr, *keptstr;
 				if (!(keep_partial && partialptr) && !inplace)
 					keptstr = "discarded";
@@ -729,16 +730,18 @@ int recv_files(int f_in, char *local_name)
 					keptstr = "put into partial-dir";
 				else
 					keptstr = "retained";
-				if (msgtype == FERROR) {
+				if (msgtype == FERROR_XFER) {
 					errstr = "ERROR";
 					redostr = "";
 				} else {
 					errstr = "WARNING";
-					redostr = " (will try again)";
+					redostr = read_batch ? " (may try again)"
+							     : " (will try again)";
 				}
 				rprintf(msgtype,
 					"%s: %s failed verification -- update %s%s.\n",
-					errstr, fname, keptstr, redostr);
+					errstr, local_name ? f_name(file, NULL) : fname,
+					keptstr, redostr);
 			}
 			if (!redoing) {
 				send_msg_int(MSG_REDO, ndx);
