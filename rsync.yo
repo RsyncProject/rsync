@@ -1944,6 +1944,8 @@ dit(bf(--password-file)) This option allows you to provide a password in a
 file for accessing an rsync daemon.  The file must not be world readable.
 It should contain just the password as a single line.
 
+This option does not supply a password to a remote shell transport such as
+ssh; to learn how to do that, consult the remote shell's documentation.
 When accessing an rsync daemon using a remote shell as the transport, this
 option only comes into effect after the remote shell finishes its
 authentication (i.e. if you have also specified a password in the daemon's
@@ -2801,7 +2803,8 @@ rsync daemon. You should set RSYNC_PROXY to a hostname:port pair.
 dit(bf(RSYNC_PASSWORD)) Setting RSYNC_PASSWORD to the required
 password allows you to run authenticated rsync connections to an rsync
 daemon without user intervention. Note that this does not supply a
-password to a shell transport such as ssh.
+password to a remote shell transport such as ssh; to learn how to do that,
+consult the remote shell's documentation.
 dit(bf(USER) or bf(LOGNAME)) The USER or LOGNAME environment variables
 are used to determine the default username sent to an rsync daemon.
 If neither is set, the username defaults to "nobody".
