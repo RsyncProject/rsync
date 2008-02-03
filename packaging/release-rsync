@@ -252,7 +252,7 @@ system "fakeroot tar czf $srctar_file rsync-$version; rm -rf rsync-$version";
 
 mkdir("rsync-$version", 0755);
 mkdir("rsync-$version/patches", 0755);
-system "support/patch-update --gen=rsync-$version/patches";
+system "support/patch-update --skip-check --gen=rsync-$version/patches";
 system "fakeroot tar chzf $pattar_file rsync-$version/patches; rm -rf rsync-$version";
 
 print "Updating the other files in $dest ...\n";

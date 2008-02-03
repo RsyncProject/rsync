@@ -6,18 +6,34 @@
 # diffs.
 
 use strict;
+use Getopt::Long;
 
 my $patches_dir = 'patches';
-my $incl_generated_files;
+my $tmp_dir = "patches.$$";
 
-if (@ARGV && $ARGV[0] =~ /^--gen(?:=(\S+))?$/) {
-    $patches_dir = $1 if defined $1;
+&Getopt::Long::Configure('bundling');
+&usage if !&GetOptions(
+    'skip-check' => \( my $skip_branch_check ),
+    'gen:s' => \( my $incl_generated_files ),
+    'help|h' => \( my $help_opt ),
+);
+&usage if $help_opt;
+
+if (defined $incl_generated_files) {
+    $patches_dir = $incl_generated_files if $incl_generated_files ne '';
     $incl_generated_files = 1;
-    shift;
 }
 
 die "No '$patches_dir' directory was found.\n" unless -d $patches_dir;
 die "No '.git' directory present in the current dir.\n" unless -d '.git';
+
+unless ($skip_branch_check) {
+    open(IN, '-|', 'git status') or die $!;
+    my $status = join('', <IN>);
+    close IN;
+    die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
+    die "The checkout is not on the master branch.\n" unless $status =~ /^# On branch master\n/;
+}
 
 my @extra_files;
 open(IN, '<', 'Makefile.in') or die "Couldn't open Makefile.in: $!\n";
@@ -32,11 +48,10 @@ while (<IN>) {
 }
 close IN;
 
-system "git checkout master" and exit 1;
 if ($incl_generated_files) {
-    die "'a' must not exist in the current directory.\n" if -e 'a';
-    die "'b' must not exist in the current directory.\n" if -e 'b';
-    system "./config.status Makefile && make gen && rsync -a @extra_files a/" and exit 1;
+    die "'$tmp_dir' must not exist in the current directory.\n" if -e $tmp_dir;
+    mkdir($tmp_dir, 0700) or die "Unable to mkdir($tmp_dir): $!\n";
+    system "./config.status Makefile && make gen && rsync -a @extra_files $tmp_dir/master/" and exit 1;
 }
 my $last_touch = time;
 
@@ -85,11 +100,11 @@ foreach my $patch (@patches) {
 }
 
 if ($incl_generated_files) {
-    system "rm -rf a b";
+    system "rm -rf $tmp_dir";
 }
 
 sleep 1 if $last_touch == time;
-system "git checkout master";
+system "git checkout master" and die $!;
 
 exit;
 
@@ -127,7 +142,7 @@ sub update_patch
     }
 
     if ($incl_generated_files) {
-	system "./config.status Makefile && make gen && rsync -a @extra_files b/" and exit 1;
+	system "./config.status Makefile && make gen && rsync -a @extra_files $tmp_dir/$patch/" and exit 1;
     }
     $last_touch = time;
 
@@ -145,13 +160,28 @@ sub update_patch
     close PIPE;
 
     if ($incl_generated_files) {
-	open(PIPE, '-|', 'diff', '-up', 'a', 'b') or die $!;
+	$parent =~ s#.*/##;
+	open(PIPE, '-|', 'diff', '-up', "$tmp_dir/$parent", "$tmp_dir/$patch") or die $!;
 	while (<PIPE>) {
-	    s/^((?:---|\+\+\+) [^\t]+)\t.*/$1/;
+	    s#^(diff -up) $tmp_dir/[^/]+/(.*?) $tmp_dir/[^/]+/(.*)#$1 a/$2 b/$3#o;
+	    s#^\Q---\E $tmp_dir/[^/]+/([^\t]+)\t.*#--- a/$1#o;
+	    s#^\Q+++\E $tmp_dir/[^/]+/([^\t]+)\t.*#+++ b/$1#o;
 	    print OUT $_;
 	}
 	close PIPE;
     }
 
     close OUT;
+}
+
+exit;
+
+sub usage
+{
+    die <<EOT;
+Usage: patch-update [OPTIONS]
+
+--gen[=DIR]   Inlcude generated files.
+--skip-check  Skip the master-branch, clean-checkout check.
+EOT
 }
