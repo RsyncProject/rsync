@@ -117,6 +117,13 @@ static const char *solo_file = NULL;
 #define DEL_OWNED_BY_US 	(1<<0) /* file/dir has our uid */
 #define DEL_RECURSE		(1<<1) /* if dir, delete all contents */
 #define DEL_DIR_IS_EMPTY	(1<<2) /* internal delete_FUNCTIONS use only */
+#define DEL_FOR_FILE		(1<<3) /* making room for a replacement file */
+#define DEL_FOR_DIR		(1<<4) /* making room for a replacement dir */
+#define DEL_FOR_SYMLINK 	(1<<5) /* making room for a replacement symlink */
+#define DEL_FOR_DEVICE		(1<<6) /* making room for a replacement device */
+#define DEL_FOR_SPECIAL 	(1<<7) /* making room for a replacement special */
+
+#define DEL_MAKE_ROOM (DEL_FOR_FILE|DEL_FOR_DIR|DEL_FOR_SYMLINK|DEL_FOR_DEVICE|DEL_FOR_SPECIAL)
 
 enum nonregtype {
     TYPE_DIR, TYPE_SPECIAL, TYPE_DEVICE, TYPE_SYMLINK
@@ -128,7 +135,6 @@ enum delret {
 
 /* Forward declaration for delete_item(). */
 static enum delret delete_dir_contents(char *fname, int flags);
-
 
 static int is_backup_file(char *fn)
 {
@@ -142,7 +148,7 @@ static int is_backup_file(char *fn)
  * Note that fbuf must point to a MAXPATHLEN buffer if the mode indicates it's
  * a directory! (The buffer is used for recursion, but returned unchanged.)
  */
-static enum delret delete_item(char *fbuf, int mode, char *replace, int flags)
+static enum delret delete_item(char *fbuf, int mode, int flags)
 {
 	enum delret ret;
 	char *what;
@@ -166,7 +172,7 @@ static enum delret delete_item(char *fbuf, int mode, char *replace, int flags)
 		/* OK: try to delete the directory. */
 	}
 
-	if (!replace && max_delete >= 0 && ++deletion_count > max_delete)
+	if (!(flags & DEL_MAKE_ROOM) && max_delete >= 0 && ++deletion_count > max_delete)
 		return DR_AT_LIMIT;
 
 	if (S_ISDIR(mode)) {
@@ -181,7 +187,7 @@ static enum delret delete_item(char *fbuf, int mode, char *replace, int flags)
 	}
 
 	if (ok) {
-		if (!replace)
+		if (!(flags & DEL_MAKE_ROOM))
 			log_delete(fbuf, mode);
 		ret = DR_SUCCESS;
 	} else {
@@ -200,9 +206,18 @@ static enum delret delete_item(char *fbuf, int mode, char *replace, int flags)
 	}
 
   check_ret:
-	if (replace && ret != DR_SUCCESS) {
+	if (ret != DR_SUCCESS && flags & DEL_MAKE_ROOM) {
+		const char *desc;
+		switch (flags & DEL_MAKE_ROOM) {
+		case DEL_FOR_FILE: desc = "regular file"; break;
+		case DEL_FOR_DIR: desc = "directory"; break;
+		case DEL_FOR_SYMLINK: desc = "symlink"; break;
+		case DEL_FOR_DEVICE: desc = "device file"; break;
+		case DEL_FOR_SPECIAL: desc = "special file"; break;
+		default: exit_cleanup(RERR_UNSUPPORTED); /* IMPOSSIBLE */
+		}
 		rprintf(FERROR_XFER, "could not make way for new %s: %s\n",
-			replace, fbuf);
+			desc, fbuf);
 	}
 	return ret;
 }
@@ -247,7 +262,7 @@ static enum delret delete_dir_contents(char *fname, int flags)
 	remainder = MAXPATHLEN - (p - fname);
 
 	/* We do our own recursion, so make delete_item() non-recursive. */
-	flags = (flags & ~DEL_RECURSE) | DEL_DIR_IS_EMPTY;
+	flags = (flags & ~(DEL_RECURSE|DEL_MAKE_ROOM)) | DEL_DIR_IS_EMPTY;
 
 	for (j = dirlist->used; j--; ) {
 		struct file_struct *fp = dirlist->files[j];
@@ -274,7 +289,7 @@ static enum delret delete_dir_contents(char *fname, int flags)
 			if (delete_dir_contents(fname, flags | DEL_RECURSE) != DR_SUCCESS)
 				ret = DR_NOT_EMPTY;
 		}
-		if (delete_item(fname, fp->mode, NULL, flags) != DR_SUCCESS)
+		if (delete_item(fname, fp->mode, flags) != DR_SUCCESS)
 			ret = DR_NOT_EMPTY;
 	}
 
@@ -425,7 +440,7 @@ static void do_delayed_deletions(char *delbuf)
 		lseek(deldelay_fd, 0, 0);
 	}
 	while ((mode = read_delay_line(delbuf, &own_flag)) >= 0)
-		delete_item(delbuf, mode, NULL, own_flag | DEL_RECURSE);
+		delete_item(delbuf, mode, own_flag | DEL_RECURSE);
 	if (deldelay_fd >= 0)
 		close(deldelay_fd);
 }
@@ -494,7 +509,7 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 				if (!remember_delete(fp, delbuf, flags))
 					break;
 			} else
-				delete_item(delbuf, fp->mode, NULL, flags);
+				delete_item(delbuf, fp->mode, flags);
 		}
 	}
 
@@ -1315,7 +1330,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			 * full later (right before we handle its contents). */
 			if (statret == 0
 			 && (S_ISDIR(sx.st.st_mode)
-			  || delete_item(fname, sx.st.st_mode, "directory", del_opts) != 0))
+			  || delete_item(fname, sx.st.st_mode, del_opts | DEL_FOR_DIR) != 0))
 				goto cleanup; /* Any errors get reported later. */
 			if (do_mkdir(fname, file->mode & 0700) == 0)
 				file->flags |= FLAG_DIR_CREATED;
@@ -1327,7 +1342,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		 * we need to delete it.  If it doesn't exist, then
 		 * (perhaps recursively) create it. */
 		if (statret == 0 && !S_ISDIR(sx.st.st_mode)) {
-			if (delete_item(fname, sx.st.st_mode, "directory", del_opts) != 0)
+			if (delete_item(fname, sx.st.st_mode, del_opts | DEL_FOR_DIR) != 0)
 				goto skipping_dir_contents;
 			statret = -1;
 		}
@@ -1456,7 +1471,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 			/* Not the right symlink (or not a symlink), so
 			 * delete it. */
-			if (delete_item(fname, sx.st.st_mode, "symlink", del_opts) != 0)
+			if (delete_item(fname, sx.st.st_mode, del_opts | DEL_FOR_SYMLINK) != 0)
 				goto cleanup;
 		} else if (basis_dir[0] != NULL) {
 			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &sx,
@@ -1510,15 +1525,15 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		uint32 *devp = F_RDEV_P(file);
 		dev_t rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
 		if (statret == 0) {
-			char *t;
+			int del_for_flag;
 			if (IS_DEVICE(file->mode)) {
 				if (!IS_DEVICE(sx.st.st_mode))
 					statret = -1;
-				t = "device file";
+				del_for_flag = DEL_FOR_DEVICE;
 			} else {
 				if (!IS_SPECIAL(sx.st.st_mode))
 					statret = -1;
-				t = "special file";
+				del_for_flag = DEL_FOR_SPECIAL;
 			}
 			if (statret == 0
 			 && BITS_EQUAL(sx.st.st_mode, file->mode, _S_IFMT)
@@ -1535,7 +1550,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					goto return_with_success;
 				goto cleanup;
 			}
-			if (delete_item(fname, sx.st.st_mode, t, del_opts) != 0)
+			if (delete_item(fname, sx.st.st_mode, del_opts | del_for_flag) != 0)
 				goto cleanup;
 		} else if (basis_dir[0] != NULL) {
 			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &sx,
@@ -1626,7 +1641,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	fnamecmp_type = FNAMECMP_FNAME;
 
 	if (statret == 0 && !S_ISREG(sx.st.st_mode)) {
-		if (delete_item(fname, sx.st.st_mode, "regular file", del_opts) != 0)
+		if (delete_item(fname, sx.st.st_mode, del_opts | DEL_FOR_FILE) != 0)
 			goto cleanup;
 		statret = -1;
 		stat_errno = ENOENT;
