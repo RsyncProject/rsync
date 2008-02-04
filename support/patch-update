@@ -104,7 +104,7 @@ if ($incl_generated_files) {
 }
 
 sleep 1 if $last_touch == time;
-system "git checkout master" and die $!;
+system "git checkout master" and exit 1;
 
 exit;
 
@@ -181,7 +181,7 @@ sub usage
     die <<EOT;
 Usage: patch-update [OPTIONS]
 
---gen[=DIR]   Inlcude generated files.
---skip-check  Skip the master-branch, clean-checkout check.
+--gen[=DIR]   Include generated files.  Optional dest DIR overrides "patches".
+--skip-check  Skip the check that ensures starting with a clean master branch.
 EOT
 }
