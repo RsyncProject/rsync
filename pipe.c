@@ -133,6 +133,12 @@ pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 		filesfrom_fd = -1;
 		chmod_modes = NULL; /* Let the sending side handle this. */
 
+		/* Let the client side handle this. */
+		if (logfile_name) {
+			logfile_name = NULL;
+			logfile_close();
+		}
+
 		if (dup2(to_child_pipe[0], STDIN_FILENO) < 0 ||
 		    close(to_child_pipe[1]) < 0 ||
 		    close(from_child_pipe[0]) < 0 ||
@@ -148,12 +154,6 @@ pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 		setup_iconv();
 #endif
 		child_main(argc, argv);
-	}
-
-	/* Let the client side handle this. */
-	if (logfile_name) {
-		logfile_name = NULL;
-		logfile_close();
 	}
 
 	if (close(from_child_pipe[1]) < 0 ||
