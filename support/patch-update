@@ -56,16 +56,9 @@ if ($incl_generated_files) {
 my $last_touch = time;
 
 my(@patches, %local_patch);
-if (@ARGV) {
-    foreach (@ARGV) {
-	s{^(patches|patch|origin/patch)/} {};
-	s{\.diff$} {};
-	push(@patches, $_);
-    }
-    open(PIPE, '-|', 'git', 'branch', '-l') or die $!;
-} else {
-    open(PIPE, '-|', 'git', 'branch', '-a') or die $!;
-}
+
+# Start by finding all patches so that we can load all possible parents.
+open(PIPE, '-|', 'git', 'branch', '-a') or die $!;
 while (<PIPE>) {
     if (m# origin/patch/(.*)#) {
 	push(@patches, $1);
@@ -91,6 +84,16 @@ foreach my $patch (@patches) {
 	$desc .= $_;
     }
     $description{$patch} = $desc;
+}
+
+if (@ARGV) {
+    # Limit the list of patches to actually process based on @ARGV.
+    @patches = ( );
+    foreach (@ARGV) {
+	s{^(patches|patch|origin/patch)/} {};
+	s{\.diff$} {};
+	push(@patches, $_);
+    }
 }
 
 my %completed;
