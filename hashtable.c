@@ -24,7 +24,7 @@
 struct hashtable *hashtable_create(int size, int key64)
 {
 	struct hashtable *tbl;
-	int node_size = key64 ? sizeof (struct ht_int64_node )
+	int node_size = key64 ? sizeof (struct ht_int64_node)
 			      : sizeof (struct ht_int32_node);
 
 	/* Pick a power of 2 that can hold the requested size. */
@@ -41,6 +41,7 @@ struct hashtable *hashtable_create(int size, int key64)
 	tbl->size = size;
 	tbl->entries = 0;
 	tbl->node_size = node_size;
+	tbl->key64 = key64;
 
 	return tbl;
 }
@@ -55,7 +56,7 @@ void hashtable_destroy(struct hashtable *tbl)
  * already existing.  Returns NULL if not allocating and not found. */
 void *hashtable_find(struct hashtable *tbl, int64 key, int allocate_if_missing)
 {
-	int key64 = (tbl->node_size > sizeof (struct ht_int32_node));
+	int key64 = tbl->key64;
 	struct ht_int32_node *node;
 	uint32 ndx;
 

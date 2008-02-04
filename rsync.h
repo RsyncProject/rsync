@@ -540,6 +540,7 @@ struct hashtable {
 	void *nodes;
 	int32 size, entries;
 	uint32 node_size;
+	int key64;
 };
 
 struct ht_int32_node {
