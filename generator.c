@@ -281,7 +281,7 @@ static enum delret delete_dir_contents(char *fname, int flags)
 		if (F_OWNER(fp) == our_uid)
 			flags |= DEL_OWNED_BY_US;
 		else
-			flags &= DEL_OWNED_BY_US;
+			flags &= ~DEL_OWNED_BY_US;
 		/* Save stack by recursing to ourself directly. */
 		if (S_ISDIR(fp->mode)) {
 			if (!am_root && !(fp->mode & S_IWUSR) && flags & DEL_OWNED_BY_US)
@@ -1316,7 +1316,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (statret == 0 && F_OWNER(file) == our_uid)
+	if (statret == 0 && sx.st.st_uid == our_uid)
 		del_opts |= DEL_OWNED_BY_US;
 
 	if (S_ISDIR(file->mode)) {
