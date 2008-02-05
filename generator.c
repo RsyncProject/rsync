@@ -278,7 +278,7 @@ static enum delret delete_dir_contents(char *fname, int flags)
 		}
 
 		strlcpy(p, fp->basename, remainder);
-		if (F_OWNER(fp) == our_uid)
+		if (!uid_ndx || (uid_t)F_OWNER(fp) == our_uid)
 			flags |= DEL_OWNED_BY_US;
 		else
 			flags &= ~DEL_OWNED_BY_US;
@@ -503,7 +503,7 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 		}
 		if (flist_find(cur_flist, fp) < 0) {
 			int flags = DEL_RECURSE
-				  | (F_OWNER(fp) == our_uid ? DEL_OWNED_BY_US : 0);
+				  | (!uid_ndx || (uid_t)F_OWNER(fp) == our_uid ? DEL_OWNED_BY_US : 0);
 			f_name(fp, delbuf);
 			if (delete_during == 2) {
 				if (!remember_delete(fp, delbuf, flags))
