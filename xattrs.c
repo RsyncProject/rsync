@@ -111,6 +111,7 @@ static int rsync_xal_compare_names(const void *x1, const void *x2)
 static ssize_t get_xattr_names(const char *fname)
 {
 	ssize_t list_len;
+	double arg;
 
 	if (!namebuf) {
 		namebuf_len = 1024;
@@ -119,23 +120,26 @@ static ssize_t get_xattr_names(const char *fname)
 			out_of_memory("get_xattr_names");
 	}
 
-	/* The length returned includes all the '\0' terminators. */
-	list_len = sys_llistxattr(fname, namebuf, namebuf_len);
-	if (list_len > (ssize_t)namebuf_len) {
-		list_len = -1;
-		errno = ERANGE;
-	}
-	if (list_len >= 0)
-		return list_len;
-	if (errno == ENOTSUP)
-		return 0;
-	if (errno == ERANGE) {
+	while (1) {
+		/* The length returned includes all the '\0' terminators. */
+		list_len = sys_llistxattr(fname, namebuf, namebuf_len);
+		if (list_len >= 0) {
+			if ((size_t)list_len <= namebuf_len)
+				break;
+		} else if (errno == ENOTSUP)
+			return 0;
+		else if (errno != ERANGE) {
+			arg = (double)namebuf_len;
+		  got_error:
+			rsyserr(FERROR_XFER, errno,
+				"get_xattr_names: llistxattr(\"%s\",%.0f) failed",
+				fname, arg);
+			return -1;
+		}
 		list_len = sys_llistxattr(fname, NULL, 0);
 		if (list_len < 0) {
-			rsyserr(FERROR_XFER, errno,
-				"get_xattr_names: llistxattr(\"%s\",0) failed",
-				fname);
-			return -1;
+			arg = 0;
+			goto got_error;
 		}
 		if (namebuf_len)
 			free(namebuf);
@@ -143,15 +147,9 @@ static ssize_t get_xattr_names(const char *fname)
 		namebuf = new_array(char, namebuf_len);
 		if (!namebuf)
 			out_of_memory("get_xattr_names");
-		list_len = sys_llistxattr(fname, namebuf, namebuf_len);
-		if (list_len >= 0)
-			return list_len;
 	}
 
-	rsyserr(FERROR_XFER, errno,
-		"get_xattr_names: llistxattr(\"%s\",%ld) failed",
-		fname, (long)namebuf_len);
-	return -1;
+	return list_len;
 }
 
 /* On entry, the *len_ptr parameter contains the size of the extra space we
