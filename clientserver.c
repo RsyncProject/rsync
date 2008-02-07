@@ -703,6 +703,10 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	if (write_batch < 0)
 		dry_run = 1;
 
+#ifdef ICONV_CONST
+	setup_iconv();
+#endif
+
 	if (lp_fake_super(i))
 		am_root = -1;
 	else if (am_root < 0) /* Treat --fake-super from client as --super. */
