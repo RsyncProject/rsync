@@ -422,24 +422,24 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 					fname, (unsigned)sxp->st.st_gid, F_GROUP(file));
 			}
 		}
-		if (am_root < 0) {
-			;
-		} else if (do_lchown(fname,
-		    change_uid ? (uid_t)F_OWNER(file) : sxp->st.st_uid,
-		    change_gid ? (gid_t)F_GROUP(file) : sxp->st.st_gid) != 0) {
-			/* shouldn't have attempted to change uid or gid
-			 * unless have the privilege */
-			rsyserr(FERROR_XFER, errno, "%s %s failed",
-			    change_uid ? "chown" : "chgrp",
-			    full_fname(fname));
-			goto cleanup;
-		} else
-		/* a lchown had been done - we have to re-stat if the
-		 * destination had the setuid or setgid bits set due
-		 * to the side effect of the chown call */
-		if (sxp->st.st_mode & (S_ISUID | S_ISGID)) {
-			link_stat(fname, &sxp->st,
-				  keep_dirlinks && S_ISDIR(sxp->st.st_mode));
+		if (am_root >= 0) {
+			if (do_lchown(fname,
+			    change_uid ? (uid_t)F_OWNER(file) : sxp->st.st_uid,
+			    change_gid ? (gid_t)F_GROUP(file) : sxp->st.st_gid) != 0) {
+				/* We shouldn't have attempted to change uid
+				 * or gid unless have the privilege. */
+				rsyserr(FERROR_XFER, errno, "%s %s failed",
+				    change_uid ? "chown" : "chgrp",
+				    full_fname(fname));
+				goto cleanup;
+			}
+			/* A lchown had been done, so we need to re-stat if
+			 * the destination had the setuid or setgid bits set
+			 * (due to the side effect of the chown call). */
+			if (sxp->st.st_mode & (S_ISUID | S_ISGID)) {
+				link_stat(fname, &sxp->st,
+					  keep_dirlinks && S_ISDIR(sxp->st.st_mode));
+			}
 		}
 		updated = 1;
 	}
