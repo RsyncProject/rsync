@@ -1229,11 +1229,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				excluded_dir = file;
 			}
 		  skipping:
-			if (verbose) {
-				rprintf(FINFO,
-					"skipping server-excluded file \"%s\"\n",
-					fname);
-			}
+			rprintf(FERROR_XFER,
+				"skipping daemon-excluded file \"%s\"\n",
+				fname);
 			return;
 		}
 	}
