@@ -393,7 +393,7 @@ int hard_link_one(struct file_struct *file, const char *fname,
 		enum logcode code;
 		if (terse) {
 			if (!verbose)
-				return -1;
+				return 0;
 			code = FINFO;
 		} else
 			code = FERROR_XFER;
