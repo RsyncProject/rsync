@@ -138,8 +138,8 @@ sub update_patch
     open(OUT, '>', "$patches_dir/$patch.diff") or die $!;
     print OUT $description{$patch}, "\n";
 
-    if (system("git rebase -m $parent") != 0) {
-	print qq|"git rebase -m $parent" incomplete -- please fix.\n|;
+    if (system("git merge $parent") != 0) {
+	print qq|"git merge $parent" incomplete -- please fix.\n|;
 	$ENV{PS1} = "[$parent] patch/$patch: ";
 	system $ENV{SHELL} and exit 1;
     }
