@@ -147,8 +147,8 @@ int set_modtime(const char *fname, time_t modtime, mode_t mode)
 		t[1].tv_usec = 0;
 # ifdef HAVE_LUTIMES
 		if (S_ISLNK(mode)) {
-			if (lutimes(fname, t) < 0 && errno != ENOSYS)
-				return -1;
+			if (lutimes(fname, t) < 0)
+				return errno == ENOSYS ? 1 : -1;
 			return 0;
 		}
 # endif
