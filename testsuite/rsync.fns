@@ -256,6 +256,25 @@ gid = 0
 	path = $scratchdir
 	read only = no
 EOF
+
+    # Build a helper script to ignore exit code 23
+    ignore23="$scratchdir/ignore23"
+    echo "building help script $ignore23"
+
+    cat >"$ignore23" <<'EOT'
+if "${@}"; then
+    exit
+fi
+
+ret=$?
+
+if test $ret = 23; then
+    exit
+fi
+
+exit $ret
+EOT
+chmod +x "$ignore23"
 }
 
 

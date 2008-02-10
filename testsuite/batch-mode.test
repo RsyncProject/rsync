@@ -43,7 +43,7 @@ runtest "BATCH.sh use of --read-batch" 'checkit "./BATCH.sh" "$chkdir" "$todir"'
 
 rm -rf "$todir"
 mkdir "$todir" || test_fail "failed to restore empty destination directory"
-runtest "daemon recv --write-batch" 'checkit "$RSYNC -av --write-batch=BATCH \"$fromdir/\" rsync://localhost/test-to" "$chkdir" "$todir"'
+runtest "daemon recv --write-batch" 'checkit "\"$ignore23\" $RSYNC -av --write-batch=BATCH \"$fromdir/\" rsync://localhost/test-to" "$chkdir" "$todir"'
 
 # The script would have aborted on error, so getting here means we pass.
 exit 0
