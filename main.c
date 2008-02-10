@@ -45,6 +45,7 @@ extern int got_xfer_error;
 extern int module_id;
 extern int copy_links;
 extern int copy_dirlinks;
+extern int copy_unsafe_links;
 extern int keep_dirlinks;
 extern int preserve_hard_links;
 extern int protocol_version;
@@ -759,7 +760,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 
 	/* The receiving side mustn't obey this, or an existing symlink that
 	 * points to an identical file won't be replaced by the referent. */
-	copy_links = copy_dirlinks = 0;
+	copy_links = copy_dirlinks = copy_unsafe_links = 0;
 
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && !inc_recurse)
