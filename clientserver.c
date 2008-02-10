@@ -245,7 +245,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 			rprintf(FERROR, "internal: args[] overflowed in do_cmd()\n");
 			exit_cleanup(RERR_SYNTAX);
 		}
-		if (list_only && strncmp(*argv, modname, modlen) == 0
+		if (strncmp(*argv, modname, modlen) == 0
 		 && argv[0][modlen] == '\0')
 			sargs[sargc++] = modname; /* we send "modname/" */
 		else
