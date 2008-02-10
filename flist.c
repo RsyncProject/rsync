@@ -1037,9 +1037,15 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		}
 		if (save_errno == ENOENT) {
 #ifdef SUPPORT_LINKS
-			/* Avoid "vanished" error if symlink points nowhere. */
-			if (copy_links && x_lstat(thisname, &st, NULL) == 0
-			    && S_ISLNK(st.st_mode)) {
+			/* When our options tell us to follow a symlink that
+			 * points nowhere, tell the user about the symlink
+			 * instead of giving a "vanished" message.  We only
+			 * dereference a symlink if one of the --copy*links
+			 * options was specified, so there's no need for the
+			 * extra lstat() if one of these options isn't on. */
+			if ((copy_links || copy_unsafe_links || copy_dirlinks)
+			 && x_lstat(thisname, &st, NULL) == 0
+			 && S_ISLNK(st.st_mode)) {
 				io_error |= IOERR_GENERAL;
 				rprintf(FERROR_XFER, "symlink has no referent: %s\n",
 					full_fname(thisname));
