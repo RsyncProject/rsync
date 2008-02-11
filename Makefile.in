@@ -130,7 +130,7 @@ configure.sh config.h.in: configure.in aclocal.m4
 	@echo '  make reconfigure'
 	@exit 1
 
-reconfigure:
+reconfigure: configure.sh
 	./config.status --recheck
 	./config.status
 
