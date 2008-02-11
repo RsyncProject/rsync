@@ -110,6 +110,8 @@ Changes since 2.6.9:
       symlink and --copy-unsafe-links or --copy-dirlinks are used (the code
       already handled this for --copy-links).
 
+    - Fixed the combination of --only-write-batch and --dry-run.
+
   ENHANCEMENTS:
 
     - A new incremental-recursion algorithm is now used when rsync is talking
@@ -168,7 +170,7 @@ Changes since 2.6.9:
 
     - Added the --skip-compress=LIST option to override the default list of
       file suffixes that will not be compressed when using --compress.
-      
+
     - The daemon's default for "dont compress" was extended to include:
 	  *.7z *.mp[34] *.mov *.avi *.ogg *.jpg *.jpeg
       The matching routine was also optimized to run more quickly.
@@ -234,6 +236,9 @@ Changes since 2.6.9:
       than the glibc version of qsort() and mergesort() in my testing.
 
     - Rsync now supports the transfer of 64-bit timestamps (time_t values).
+
+    - Made the file-deletion code use a little less stack when recursing
+      through a directory hierarchy of extraneous files.
 
     - Fixed a build problem with older (2.x) versions of gcc.
 
