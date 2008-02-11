@@ -21,6 +21,7 @@ Changes since 2.6.9:
 
     - In --dry-run mode, the last line of the verbose summary text is output
       with a "(DRY RUN)" suffix to help remind you that no updates were made.
+      Similarly, --only-write-batch outputs "(BATCH ONLY)".
 
     - A writable rsync daemon with "use chroot" disabled now defaults to a
       symlink-munging behavior designed to make symlinks safer while also
@@ -104,6 +105,10 @@ Changes since 2.6.9:
 
     - Using --only-write-batch to a daemon receiver now work properly (older
       versions would update some files while writing the batch).
+
+    - Avoid outputing a "file has vanished" message when the file is a broken
+      symlink and --copy-unsafe-links or --copy-dirlinks are used (the code
+      already handled this for --copy-links).
 
   ENHANCEMENTS:
 
