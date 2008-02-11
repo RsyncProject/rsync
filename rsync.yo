@@ -817,11 +817,24 @@ the transfer and link together the corresponding files on the receiving
 side.  Without this option, hard-linked files in the transfer are treated
 as though they were separate files.
 
-Note that rsync can only detect hard links if both parts of the link
-are in the list of files being sent.
+When you are updating a non-empty destination, this option only ensures
+that files that are hard-linked together on the source are hard-linked
+together on the destination.  It does NOT currently endeavor to break
+already existing hard links on the destination that do not exist between
+the source files.  Note, however, that if one or more extra-linked files
+have content changes, they will become unlinked when updated (assuming you
+are not using the bf(--inplace) option).
+
+Note that rsync can only detect hard links between files that are inside
+the transfer set.  If rsync updates a file that has extra hard-link
+connections to files outside the transfer, that linkage will be broken.  If
+you are tempted to use the bf(--inplace) option to avoid this breakage, be
+very careful that you know how your files are being updated so that you are
+certain that no unintended changes happen due to lingering hard links (and
+see the bf(--inplace) option for more caveats).
 
 If incremental recursion is active (see bf(--recursive)), rsync may transfer
-a missing hard-linked file before it finds that another link for the file
+a missing hard-linked file before it finds that another link for that contents
 exists elsewhere in the hierarchy.  This does not affect the accuracy of
 the transfer, just its efficiency.  One way to avoid this is to disable
 incremental recursion using the bf(--no-inc-recursive) option.
@@ -1293,7 +1306,10 @@ exclude certain files from the list of files to be transferred. This is
 most useful in combination with a recursive transfer.
 
 You may use as many bf(--filter) options on the command line as you like
-to build up the list of files to exclude.
+to build up the list of files to exclude.  If the filter contains whitespace,
+be sure to quote it so that the shell gives the rule to rsync as a single
+argument.  The text below also mentions that you can use an underscore to
+replace the space that separates a rule from its arg.
 
 See the FILTER RULES section for detailed information on this option.
 
