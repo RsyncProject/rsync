@@ -171,11 +171,14 @@ cleantests:
 # the source directory.
 distclean: clean
 	rm -f Makefile config.h config.status
+	rm -f lib/dummy popt/dummy zlib/dummy
 	rm -f $(srcdir)/Makefile $(srcdir)/config.h $(srcdir)/config.status
+	rm -f $(srcdir)/lib/dummy $(srcdir)/popt/dummy $(srcdir)/zlib/dummy
 	rm -f config.cache config.log
 	rm -f $(srcdir)/config.cache $(srcdir)/config.log
 	rm -f shconfig $(srcdir)/shconfig
 	rm -f $(GENFILES)
+	rm -rf autom4te.cache
 
 # this target is really just for my use. It only works on a limited
 # range of machines and is used to produce a list of potentially
