@@ -528,7 +528,7 @@ either a changed size or a changed checksum are selected for transfer.
 
 Note that rsync always verifies that each em(transferred) file was
 correctly reconstructed on the receiving side by checking a whole-file
-checksum that is generated when as the file is transferred, but that
+checksum that is generated as the file is transferred, but that
 automatic after-the-transfer verification has nothing to do with this
 option's before-the-transfer "Does this file need to be updated?" check.
 
