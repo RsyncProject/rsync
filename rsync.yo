@@ -1422,7 +1422,7 @@ characters are not translated (such as ~, $, ;, &, etc.).  Wildcards are
 expanded on the remote host by rsync (instead of the shell doing it).
 
 If you use this option with bf(--iconv), the args will also be translated
-from the local to the remote character set.  The translation happens before
+from the local to the remote character-set.  The translation happens before
 wild-cards are expanded.  See also the bf(--files-from) option.
 
 dit(bf(-T, --temp-dir=DIR)) This option instructs rsync to use DIR as a
@@ -2033,11 +2033,16 @@ dit(bf(--iconv=CONVERT_SPEC)) Rsync can convert filenames between character
 sets using this option.  Using a CONVERT_SPEC of "." tells rsync to look up
 the default character-set via the locale setting.  Alternately, you can
 fully specify what conversion to do by giving a local and a remote charset
-separated by a comma (local first), e.g. bf(--iconv=utf8,iso88591).  (Run
-"iconv --list" to see a list of the charset names that a machine supports.)
-Finally, you can specify a CONVERT_SPEC of "-" to turn off any conversion.
+separated by a comma in the order bf(--iconv=LOCAL,REMOTE), e.g.
+bf(--iconv=utf8,iso88591).  This order ensures that the option
+will stay the same whether you're pushing or pulling files.
+Finally, you can specify either bf(--no-iconv) or a CONVERT_SPEC of "-"
+to turn off any conversion.
 The default setting of this option is site-specific, and can also be
 affected via the RSYNC_ICONV environment variable.
+
+For a list of what charset names your local iconv library supports, you can
+run "iconv --list".
 
 If you specify the bf(--protect-args) option (bf(-s)), rsync will translate
 the filenames you specify on the command-line that are being sent to the
@@ -2048,6 +2053,11 @@ Note that rsync does not do any conversion of names in filter files
 specifying matching rules that can match on both sides of the transfer.
 For instance, you can specify extra include/exclude rules if there are
 filename differences on the two sides that need to be accounted for.
+
+When you pass an bf(--iconv) option to an rsync daemon that allows it, the
+daemon uses the charset specified in its "charset" configuration parameter
+regardless of the remote charset you actually pass.  Thus, you may feel free to
+specify just the local charset for a daemon transfer (e.g. bf(--iconv=utf8)).
 
 dit(bf(-4, --ipv4) or bf(-6, --ipv6)) Tells rsync to prefer IPv4/IPv6
 when creating sockets.  This only affects sockets that rsync has direct

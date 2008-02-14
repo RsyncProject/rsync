@@ -124,6 +124,7 @@ static global Globals;
 typedef struct
 {
 	char *auth_users;
+	char *charset;
 	char *comment;
 	char *dont_compress;
 	char *exclude;
@@ -158,6 +159,7 @@ typedef struct
 	BOOL ignore_nonreadable;
 	BOOL list;
 	BOOL munge_symlinks;
+	BOOL numeric_ids;
 	BOOL read_only;
 	BOOL strict_modes;
 	BOOL transfer_logging;
@@ -173,7 +175,8 @@ typedef struct
 static service sDefault =
 {
  /* auth_users; */		NULL,
- /* comment; */			NULL,
+ /* charset; */ 		NULL,
+ /* comment; */ 		NULL,
  /* dont_compress; */		DEFAULT_DONT_COMPRESS,
  /* exclude; */			NULL,
  /* exclude_from; */		NULL,
@@ -207,6 +210,7 @@ static service sDefault =
  /* ignore_nonreadable; */	False,
  /* list; */			True,
  /* munge_symlinks; */		(BOOL)-1,
+ /* numeric_ids; */		(BOOL)-1,
  /* read_only; */		True,
  /* strict_modes; */		True,
  /* transfer_logging; */	False,
@@ -301,6 +305,7 @@ static struct parm_struct parm_table[] =
  {"socket options",    P_STRING, P_GLOBAL,&Globals.socket_options,     NULL,0},
 
  {"auth users",        P_STRING, P_LOCAL, &sDefault.auth_users,        NULL,0},
+ {"charset",           P_STRING, P_LOCAL, &sDefault.charset,           NULL,0},
  {"comment",           P_STRING, P_LOCAL, &sDefault.comment,           NULL,0},
  {"dont compress",     P_STRING, P_LOCAL, &sDefault.dont_compress,     NULL,0},
  {"exclude from",      P_STRING, P_LOCAL, &sDefault.exclude_from,      NULL,0},
@@ -322,6 +327,7 @@ static struct parm_struct parm_table[] =
  {"max connections",   P_INTEGER,P_LOCAL, &sDefault.max_connections,   NULL,0},
  {"max verbosity",     P_INTEGER,P_LOCAL, &sDefault.max_verbosity,     NULL,0},
  {"munge symlinks",    P_BOOL,   P_LOCAL, &sDefault.munge_symlinks,    NULL,0},
+ {"numeric ids",       P_BOOL,   P_LOCAL, &sDefault.numeric_ids,       NULL,0},
  {"name",              P_STRING, P_LOCAL, &sDefault.name,              NULL,0},
  {"outgoing chmod",    P_STRING, P_LOCAL, &sDefault.outgoing_chmod,    NULL,0},
  {"path",              P_PATH,   P_LOCAL, &sDefault.path,              NULL,0},
@@ -392,6 +398,7 @@ FN_GLOBAL_STRING(lp_socket_options, &Globals.socket_options)
 FN_GLOBAL_INTEGER(lp_rsync_port, &Globals.rsync_port)
 
 FN_LOCAL_STRING(lp_auth_users, auth_users)
+FN_LOCAL_STRING(lp_charset, charset)
 FN_LOCAL_STRING(lp_comment, comment)
 FN_LOCAL_STRING(lp_dont_compress, dont_compress)
 FN_LOCAL_STRING(lp_exclude, exclude)
@@ -413,12 +420,12 @@ FN_LOCAL_STRING(lp_postxfer_exec, postxfer_exec)
 FN_LOCAL_STRING(lp_prexfer_exec, prexfer_exec)
 FN_LOCAL_STRING(lp_refuse_options, refuse_options)
 FN_LOCAL_STRING(lp_secrets_file, secrets_file)
-FN_LOCAL_INTEGER(lp_syslog_facility, syslog_facility)
 FN_LOCAL_STRING(lp_temp_dir, temp_dir)
 FN_LOCAL_STRING(lp_uid, uid)
 
 FN_LOCAL_INTEGER(lp_max_connections, max_connections)
 FN_LOCAL_INTEGER(lp_max_verbosity, max_verbosity)
+FN_LOCAL_INTEGER(lp_syslog_facility, syslog_facility)
 FN_LOCAL_INTEGER(lp_timeout, timeout)
 
 FN_LOCAL_BOOL(lp_fake_super, fake_super)
@@ -426,6 +433,7 @@ FN_LOCAL_BOOL(lp_ignore_errors, ignore_errors)
 FN_LOCAL_BOOL(lp_ignore_nonreadable, ignore_nonreadable)
 FN_LOCAL_BOOL(lp_list, list)
 FN_LOCAL_BOOL(lp_munge_symlinks, munge_symlinks)
+FN_LOCAL_BOOL(lp_numeric_ids, numeric_ids)
 FN_LOCAL_BOOL(lp_read_only, read_only)
 FN_LOCAL_BOOL(lp_strict_modes, strict_modes)
 FN_LOCAL_BOOL(lp_transfer_logging, transfer_logging)

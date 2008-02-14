@@ -35,6 +35,7 @@ extern int ignore_errors;
 extern int kluge_around_eof;
 extern int daemon_over_rsh;
 extern int sanitize_paths;
+extern int numeric_ids;
 extern int filesfrom_fd;
 extern int remote_protocol;
 extern int protocol_version;
@@ -54,6 +55,10 @@ extern char *tmpdir;
 extern struct chmod_mode_struct *chmod_modes;
 extern struct filter_list_struct server_filter_list;
 extern char curr_dir[];
+#ifdef ICONV_OPTION
+extern char *iconv_opt;
+extern iconv_t ic_send, ic_recv;
+#endif
 
 char *auth_user;
 int read_only = 0;
@@ -385,6 +390,13 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	pid_t pre_exec_pid = 0;
 	char *request = NULL;
 
+#ifdef ICONV_CONST
+	iconv_opt = lp_charset(i);
+	if (*iconv_opt)
+		setup_iconv();
+	iconv_opt = NULL;
+#endif
+
 	if (!allow_access(addr, host, lp_hosts_allow(i), lp_hosts_deny(i))) {
 		rprintf(FLOG, "rsync denied on module %s from %s (%s)\n",
 			name, host, addr);
@@ -703,10 +715,6 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	if (write_batch < 0)
 		dry_run = 1;
 
-#ifdef ICONV_CONST
-	setup_iconv();
-#endif
-
 	if (lp_fake_super(i))
 		am_root = -1;
 	else if (am_root < 0) /* Treat --fake-super from client as --super. */
@@ -771,6 +779,21 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 		msleep(400);
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
+
+	if (!iconv_opt) {
+		if (ic_send != (iconv_t)-1) {
+			iconv_close(ic_send);
+			ic_send = (iconv_t)-1;
+		}
+		if (ic_recv != (iconv_t)-1) {
+			iconv_close(ic_recv);
+			ic_recv = (iconv_t)-1;
+		}
+	}
+
+	if (!numeric_ids
+	 && (use_chroot ? lp_numeric_ids(i) != False : lp_numeric_ids(i) == True))
+		numeric_ids = -1; /* Set --numeric-ids w/o breaking protocol. */
 
 	if (lp_timeout(i) && lp_timeout(i) > io_timeout)
 		set_io_timeout(lp_timeout(i));

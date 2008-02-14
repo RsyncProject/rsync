@@ -27,7 +27,7 @@ Changes since 2.6.9:
       symlink-munging behavior designed to make symlinks safer while also
       allowing absolute symlinks to be stored and retrieved.  This also has
       the effect of making symlinks unusable while they're in the daemon's
-      hierarchy.  See the daemon option "munge symlinks" for full details.
+      hierarchy.  See the daemon's "munge symlinks" parameter for details.
 
   BUG FIXES:
 
@@ -35,6 +35,14 @@ Changes since 2.6.9:
       config file now properly checks an absolute-path arg specified for these
       options:  --compare-dest, --link-dest, --copy-dest, --partial-dir,
       --backup-dir, --temp-dir, and --files-from.
+
+    - A daemon can now be told to disable all user- and group-name translation
+      on a per-module basis.  This avoids a potential problem with a writable
+      daemon module that has "use chroot" enabled -- if precautions weren't
+      taken, a user could try to add a missing library and get rsync to use
+      it.  This makes rsync safer by default, and more configurable when id-
+      translation is not desired.  See the daemon's "numeric ids" parameter
+      for full details.
 
     - If a file's data arrived successfully on the receiving side but the
       rename of the temporary file to the destination file failed AND the
@@ -106,7 +114,7 @@ Changes since 2.6.9:
     - Using --only-write-batch to a daemon receiver now work properly (older
       versions would update some files while writing the batch).
 
-    - Avoid outputing a "file has vanished" message when the file is a broken
+    - Avoid outputting a "file has vanished" message when the file is a broken
       symlink and --copy-unsafe-links or --copy-dirlinks are used (the code
       already handled this for --copy-links).
 
@@ -156,7 +164,7 @@ Changes since 2.6.9:
     - Added the --fake-super option that allows a non-super user to preserve
       all attributes of a file by using a special extended-attribute idiom.
       It even supports the storing of foreign ACL data on your backup server.
-      There is also an analogous "fake super" option for an rsync daemon.
+      There is also an analogous "fake super" parameter for an rsync daemon.
 
     - Added the --iconv option, which allows rsync to convert filenames from
       one character-set to another during the transfer.  The default is to make
@@ -167,6 +175,9 @@ Changes since 2.6.9:
       value for the --iconv option that you wish to use.  For example,
       "--enable-iconv=." is a good choice.  See the rsync manpage for an
       explanation of the --iconv option's settings.
+
+    - A new daemon config parameter, "charset", lets you control the character-
+      set that is used during an --iconv transfer to/from a daemon module.
 
     - Added the --skip-compress=LIST option to override the default list of
       file suffixes that will not be compressed when using --compress.

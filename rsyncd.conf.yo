@@ -133,8 +133,9 @@ to the "path" before starting the file transfer with the client.  This has
 the advantage of extra protection against possible implementation security
 holes, but it has the disadvantages of requiring super-user privileges,
 of not being able to follow symbolic links that are either absolute or outside
-of the new root path, and of complicating the preservation of usernames and groups
-(see below).  When "use chroot" is false, rsync will: (1) munge symlinks by
+of the new root path, and of complicating the preservation of users and groups
+by name (see below).
+When "use chroot" is false, rsync will: (1) munge symlinks by
 default for security reasons (see "munge symlinks" for a way to turn this
 off, but only if you trust your users), (2) substitute leading slashes in
 absolute paths with the module's path (so that options such as
@@ -144,27 +145,38 @@ args if rsync believes they would escape the chroot.
 The default for "use chroot" is true, and is the safer choice (especially
 if the module is not read-only).
 
-In order to preserve usernames and groupnames, rsync needs to be able to
+When this option is enabled, rsync will not attempt to map users and groups
+by name (by default), but instead copy IDs as though bf(--numeric-ids) had
+been specified.  In order to enable name-mapping, rsync needs to be able to
 use the standard library functions for looking up names and IDs (i.e.
-code(getpwuid()), code(getgrgid()), code(getpwname()), and code(getgrnam())).  This means a
-process in the chroot namespace will need to have access to the resources
+code(getpwuid()), code(getgrgid()), code(getpwname()), and code(getgrnam())).
+This means the rsync
+process in the chroot hierarchy will need to have access to the resources
 used by these library functions (traditionally /etc/passwd and
-/etc/group).  If these resources are not available, rsync will only be
-able to copy the IDs, just as if the bf(--numeric-ids) option had been
-specified.
+/etc/group, but perhaps additional dynamic libraries as well).
 
-Note that you are free to setup user/group information in the chroot area
-differently from your normal system.  For example, you could abbreviate
-the list of users and groups.  Also, you can protect this information from
-being downloaded/uploaded by adding an exclude rule to the rsyncd.conf file
-(e.g. "bf(exclude = /etc/**)").  Note that having the exclusion affect uploads
-is a relatively new feature in rsync, so make sure your daemon is
-at least 2.6.3 to effect this.  Also note that it is safest to exclude a
-directory and all its contents combining the rule "/some/dir/" with the
-rule "/some/dir/**" just to be sure that rsync will not allow deeper
-access to some of the excluded files inside the directory (rsync tries to
-do this automatically, but you might as well specify both to be extra
-sure).
+If you copy the necessary resources into the module's chroot area, you
+should protect them through your OS's normal user/group or ACL settings (to
+prevent the rsync module's user from being able to change them), and then
+hide them from the user's view via "exclude" (see how in the discussion of
+that option).  At that point it will be safe to enable the mapping of users
+and groups by name using the "numeric ids" daemon option (see below).
+
+Note also that you are free to setup custom user/group information in the
+chroot area that is different from your normal system.  For example, you
+could abbreviate the list of users and groups.
+
+dit(bf(numeric ids)) Enabling the "numeric ids" option disables the mapping
+of users and groups by name for the current daemon module.  This prevents
+the daemon from trying to load any user/group-related files or libraries.
+Enabling this option makes the transfer behave as if the client had passed
+the bf(--numeric-ids) command-line option.  By default, this parameter is
+enabled for chroot modules and disabled for non-chroot modules.
+
+A chroot-enabled module should not have this option enabled unless you've
+taken steps to ensure that the module has the necessary resources it needs
+to translate names, and that it is not possible for a user to change those
+resources.
 
 dit(bf(munge symlinks))  The "munge symlinks" option tells rsync to modify
 all incoming symlinks in a way that makes them unusable but recoverable
@@ -199,6 +211,19 @@ incoming symlinks will be modified to drop a leading slash and to remove ".."
 path elements that rsync believes will allow a symlink to escape the module's
 hierarchy.  There are tricky ways to work around this, though, so you had
 better trust your users if you choose this combination of options.
+
+dit(bf(charset)) This specifies the name of the character set in which the
+module's filenames are stored.  If the client uses an bf(--iconv) option,
+the daemon will use the value of the "charset" parameter regardless of the
+character set the client actually passed.  This allows the daemon to
+support charset conversion in a chroot module without extra files in the
+chroot area, and also ensures that name-translation is done in a consistent
+manner.  If the "charset" parameter is not set, the bf(--iconv) option is
+refused, just as if "iconv" had been specified via "refuse options".
+
+If you wish to force users to always use bf(--iconv) for a particular
+module, add "no-iconv" to the "refuse options" parameter.  Keep in mind
+that this will restrict access to your module to very new rsync clients.
 
 dit(bf(max connections)) The "max connections" option allows you to
 specify the maximum number of simultaneous connections you will allow.
@@ -296,6 +321,13 @@ the daemon: that is, it excludes files received by a client when receiving
 from a daemon and files deleted on a daemon when sending to a daemon, but
 it doesn't exclude files from being deleted on a client when receiving
 from a daemon.
+
+When you want to exclude a directory and all its contents, it is safest to
+use a rule that does both, such as "/some/dir/***" (the three stars tells
+rsync to exclude the directory itself and everything inside it).  This is
+better than just excluding the directory alone with "/some/dir/", as it
+helps to guard against attempts to trick rsync into accessing files deeper
+in the hierarchy.
 
 dit(bf(exclude from)) The "exclude from" option specifies a filename
 on the daemon that contains exclude patterns, one per line.
@@ -509,9 +541,9 @@ quote(tt(    refuse options = c delete))
 The reason the above refuses all delete options is that the options imply
 bf(--delete), and implied options are refused just like explicit options.
 As an additional safety feature, the refusal of "delete" also refuses
-bf(remove-sent-files) when the daemon is the sender; if you want the latter
+bf(remove-source-files) when the daemon is the sender; if you want the latter
 without the former, instead refuse "delete-*" -- that refuses all the
-delete modes without affecting bf(--remove-sent-files).
+delete modes without affecting bf(--remove-source-files).
 
 When an option is refused, the daemon prints an error message and exits.
 To prevent all compression when serving files,
@@ -533,7 +565,7 @@ of the patterns will not be compressed during transfer.
 
 See the bf(--skip-compress) option in the bf(rsync)(1) manpage for the list
 of file suffixes that are not compressed by default.  Specifying a value
-for the bf(dont compress) option changes the default when the daemon is
+for the "dont compress" option changes the default when the daemon is
 the sender.
 
 dit(bf(pre-xfer exec), bf(post-xfer exec)) You may specify a command to be run

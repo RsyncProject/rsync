@@ -202,7 +202,7 @@ static int itemize_changes = 0;
 static int refused_delete, refused_archive_part, refused_compress;
 static int refused_partial, refused_progress, refused_delete_before;
 static int refused_delete_during;
-static int refused_inplace;
+static int refused_inplace, refused_no_iconv;
 static char *max_size_arg, *min_size_arg;
 static char tmp_partialdir[] = ".~tmp~";
 
@@ -441,7 +441,7 @@ enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_FILTER, OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST, OPT_HELP,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW, OPT_MIN_SIZE, OPT_CHMOD,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_MAX_SIZE,
-      OPT_NO_D, OPT_APPEND,
+      OPT_NO_D, OPT_APPEND, OPT_NO_ICONV,
       OPT_SERVER, OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -612,6 +612,7 @@ static struct poptOption long_options[] = {
   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir, 0, 0, 0 },
 #ifdef ICONV_OPTION
   {"iconv",            0,  POPT_ARG_STRING, &iconv_opt, 0, 0, 0 },
+  {"no-iconv",         0,  POPT_ARG_NONE,   0, OPT_NO_ICONV, 0, 0 },
 #endif
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
@@ -758,6 +759,8 @@ static void set_refuse_options(char *bp)
 						refused_progress = op->val;
 					else if (wildmatch("inplace", op->longName))
 						refused_inplace = op->val;
+					else if (wildmatch("no-iconv", op->longName))
+						refused_no_iconv = op->val;
 					break;
 				}
 				if (!is_wild)
@@ -878,8 +881,11 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 
 	if (ref && *ref)
 		set_refuse_options(ref);
-	if (am_daemon)
+	if (am_daemon) {
 		set_refuse_options("log-file*");
+		if (!*lp_charset(module_id))
+			set_refuse_options("iconv");
+	}
 
 #ifdef ICONV_OPTION
 	if (!am_daemon && !protect_args && (arg = getenv("RSYNC_ICONV")) != NULL && *arg)
@@ -1127,6 +1133,10 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 			read_batch = 1;
 			break;
 
+		case OPT_NO_ICONV:
+			iconv_opt = NULL;
+			break;
+
 		case OPT_MAX_SIZE:
 			if ((max_size = parse_size_arg(&max_size_arg, 'b')) <= 0) {
 				snprintf(err_buf, sizeof err_buf,
@@ -1253,6 +1263,10 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 			iconv_opt = NULL;
 		else
 			need_unsorted_flist = 1;
+	}
+	if (refused_no_iconv && !iconv_opt) {
+		create_refuse_error(refused_no_iconv);
+		return 0;
 	}
 #endif
 
