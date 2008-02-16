@@ -480,9 +480,6 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	/* TODO: Perhaps take a list of gids, and make them into the
 	 * supplementary groups. */
 
-	/* We do a push_dir() without actually calling chdir() in order
-	 * to make sure that the module's path is absolute.  After this
-	 * check, module_dir will be set to an absolute path. */
 	module_dir = lp_path(i);
 	if (use_chroot) {
 		if ((p = strstr(module_dir, "/./")) != NULL) {
@@ -492,6 +489,8 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 			out_of_memory("rsync_module");
 	}
 
+	/* We do a push_dir() that doesn't actually call chdir()
+	 * just to make a relative path absolute. */
 	strlcpy(line, curr_dir, sizeof line);
 	if (!push_dir(module_dir, 1))
 		goto chdir_failed;

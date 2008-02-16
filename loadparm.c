@@ -327,8 +327,8 @@ static struct parm_struct parm_table[] =
  {"max connections",   P_INTEGER,P_LOCAL, &sDefault.max_connections,   NULL,0},
  {"max verbosity",     P_INTEGER,P_LOCAL, &sDefault.max_verbosity,     NULL,0},
  {"munge symlinks",    P_BOOL,   P_LOCAL, &sDefault.munge_symlinks,    NULL,0},
- {"numeric ids",       P_BOOL,   P_LOCAL, &sDefault.numeric_ids,       NULL,0},
  {"name",              P_STRING, P_LOCAL, &sDefault.name,              NULL,0},
+ {"numeric ids",       P_BOOL,   P_LOCAL, &sDefault.numeric_ids,       NULL,0},
  {"outgoing chmod",    P_STRING, P_LOCAL, &sDefault.outgoing_chmod,    NULL,0},
  {"path",              P_PATH,   P_LOCAL, &sDefault.path,              NULL,0},
 #ifdef HAVE_PUTENV
