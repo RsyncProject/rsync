@@ -181,7 +181,7 @@ About to:
     - create patches tar, "$pattar_name"
     - create release diffs, "$diff_name"
     - update patch branches and generate patch/* files
-    - update README, *NEWS, TODO, and changelog
+    - update README, *NEWS, TODO, and ChangeLog
     - update rsync*.html man pages
     - gpg-sign the release files
 
@@ -259,7 +259,7 @@ print "Updating the other files in $dest ...\n";
 system "rsync -a README NEWS OLDNEWS TODO $dest";
 unlink("$dest/rsync-$version-NEWS");
 link("$dest/NEWS", "$dest/rsync-$version-NEWS");
-system "git log --name-status | gzip -9 >$dest/changelog.gz";
+system "git log --name-status | gzip -9 >$dest/ChangeLog.gz";
 
 system "yodl2html -o $dest/rsync.html rsync.yo";
 system "yodl2html -o $dest/rsyncd.conf.html rsyncd.conf.yo";
