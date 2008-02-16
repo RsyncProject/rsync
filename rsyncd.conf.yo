@@ -135,13 +135,26 @@ holes, but it has the disadvantages of requiring super-user privileges,
 of not being able to follow symbolic links that are either absolute or outside
 of the new root path, and of complicating the preservation of users and groups
 by name (see below).
-When "use chroot" is false, rsync will: (1) munge symlinks by
+
+As an additional safety feature, you can specify a dot-dir in the module's
+"path" to indicate the point where the chroot should occur.  This allows rsync
+to run in a chroot with a non-"/" path for the top of the transfer hierarchy.
+Doing this guards against unintended library loading (since those absolute
+paths will not be inside the transfer hierarchy unless you have used an unwise
+pathname), and lets you setup libraries for the chroot that are outside of the
+transfer.  For example, specifying "/var/rsync/./module1" will chroot to the
+"/var/rsync" directory and set the inside-chroot path to "/module1".  If you
+had omitted the dot-dir, the chroot would have used the whole path, and the
+inside-chroot path would have been "/".
+
+When "use chroot" is false or the inside-chroot path is not "/", rsync will:
+(1) munge symlinks by
 default for security reasons (see "munge symlinks" for a way to turn this
 off, but only if you trust your users), (2) substitute leading slashes in
 absolute paths with the module's path (so that options such as
 bf(--backup-dir), bf(--compare-dest), etc. interpret an absolute path as
 rooted in the module's "path" dir), and (3) trim ".." path elements from
-args if rsync believes they would escape the chroot.
+args if rsync believes they would escape the module hierarchy.
 The default for "use chroot" is true, and is the safer choice (especially
 if the module is not read-only).
 
@@ -182,7 +195,7 @@ dit(bf(munge symlinks))  The "munge symlinks" option tells rsync to modify
 all incoming symlinks in a way that makes them unusable but recoverable
 (see below).  This should help protect your files from user trickery when
 your daemon module is writable.  The default is disabled when "use chroot"
-is on and enabled when "use chroot" is off.
+is on and the inside-chroot path is "/", otherwise it is enabled.
 
 If you disable this option on a daemon that is not read-only, there
 are tricks that a user can play with uploaded symlinks to access
@@ -194,8 +207,9 @@ The way rsync disables the use of symlinks is to prefix each one with
 the string "/rsyncd-munged/".  This prevents the links from being used
 as long as that directory does not exist.  When this option is enabled,
 rsync will refuse to run if that path is a directory or a symlink to
-a directory.  When using the "munge symlinks" option in a chroot area,
-you should add this path to the exclude setting for the module so that
+a directory.  When using the "munge symlinks" option in a chroot area
+that has an inside-chroot path of "/", you should add "/rsyncd-munged/"
+to the exclude setting for the module so that
 a user can't try to create it.
 
 Note:  rsync makes no attempt to verify that any pre-existing symlinks in
@@ -206,7 +220,8 @@ every symlink's value.  There is a perl script in the support directory
 of the source code named "munge-symlinks" that can be used to add or remove
 this prefix from your symlinks.
 
-When this option is disabled on a writable module and "use chroot" is off,
+When this option is disabled on a writable module and "use chroot" is off
+(or the inside-chroot path is not "/"),
 incoming symlinks will be modified to drop a leading slash and to remove ".."
 path elements that rsync believes will allow a symlink to escape the module's
 hierarchy.  There are tricky ways to work around this, though, so you had
@@ -635,21 +650,21 @@ A more sophisticated example would be:
 verb(
 uid = nobody
 gid = nobody
-use chroot = no
+use chroot = yes
 max connections = 4
 syslog facility = local5
 pid file = /var/run/rsyncd.pid
 
 [ftp]
-        path = /var/ftp/pub
+        path = /var/ftp/./pub
         comment = whole ftp area (approx 6.1 GB)
 
 [sambaftp]
-        path = /var/ftp/pub/samba
+        path = /var/ftp/./pub/samba
         comment = Samba ftp area (approx 300 MB)
 
 [rsyncftp]
-        path = /var/ftp/pub/rsync
+        path = /var/ftp/./pub/rsync
         comment = rsync ftp area (approx 6 MB)
 
 [sambawww]

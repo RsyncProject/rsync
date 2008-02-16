@@ -44,6 +44,11 @@ Changes since 2.6.9:
       translation is not desired.  See the daemon's "numeric ids" parameter
       for full details.
 
+    - A chroot daemon can now indicate which part of its path should affect the
+      chroot call, and which part should become an inside-chroot path for the
+      module.  This allows you to have outside-the-transfer paths (such as for
+      libraries) even when you enable chroot protection.
+
     - If a file's data arrived successfully on the receiving side but the
       rename of the temporary file to the destination file failed AND the
       --remove-source-files (or the deprecated --remove-sent-files) option
