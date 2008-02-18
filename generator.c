@@ -41,6 +41,7 @@ extern int preserve_links;
 extern int preserve_devices;
 extern int preserve_specials;
 extern int preserve_hard_links;
+extern int preserve_executability;
 extern int preserve_perms;
 extern int preserve_times;
 extern int uid_ndx;
@@ -563,6 +564,9 @@ int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 	if (preserve_perms && !BITS_EQUAL(sxp->st.st_mode, file->mode, CHMOD_BITS))
 		return 0;
 
+	if (preserve_executability && ((sxp->st.st_mode & 0111) != 0) ^ ((file->mode & 0111) != 0))
+		return 0;
+
 	if (am_root && uid_ndx && sxp->st.st_uid != (uid_t)F_OWNER(file))
 		return 0;
 
@@ -610,7 +614,8 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 			;
 		} else
 #endif
-		if (!BITS_EQUAL(sxp->st.st_mode, file->mode, CHMOD_BITS))
+		if ((preserve_perms || preserve_executability)
+		 && !BITS_EQUAL(sxp->st.st_mode, file->mode, CHMOD_BITS))
 			iflags |= ITEM_REPORT_PERMS;
 		if (uid_ndx && am_root && (uid_t)F_OWNER(file) != sxp->st.st_uid)
 			iflags |= ITEM_REPORT_OWNER;
@@ -960,7 +965,7 @@ static int try_dests_reg(struct file_struct *file, char *fname, int ndx,
 				goto try_a_copy;
 			if (preserve_hard_links && F_IS_HLINKED(file))
 				finish_hard_link(file, fname, ndx, &sxp->st, itemizing, code, j);
-			if (itemizing && (verbose > 1 || stdout_format_has_i > 1)) {
+			if (!maybe_ATTRS_REPORT && (verbose > 1 || stdout_format_has_i > 1)) {
 				itemize(cmpbuf, file, ndx, 1, sxp,
 					ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS,
 					0, "");
