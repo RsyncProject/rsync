@@ -1432,7 +1432,7 @@ file in the same directory as the associated destination file.
 
 This option is most often used when the receiving disk partition does not
 have enough free space to hold a copy of the largest file in the transfer.
-In this case (i.e. when the scratch directory in on a different disk
+In this case (i.e. when the scratch directory is on a different disk
 partition), rsync will not be able to rename each received temporary file
 over the top of the associated destination file, but instead must copy it
 into place.  Rsync does this by copying the file over the top of the
