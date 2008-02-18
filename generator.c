@@ -1202,29 +1202,33 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	uchar fnamecmp_type;
 	int implied_dirs_are_missing = relative_paths && !implied_dirs && protocol_version < 30;
 	int del_opts = delete_mode || force_delete ? DEL_RECURSE : 0;
+	int is_dir = !S_ISDIR(file->mode) ? 0
+		   : inc_recurse && ndx != cur_flist->ndx_start - 1 ? -1
+		   : 1;
 
 	if (verbose > 2)
 		rprintf(FINFO, "recv_generator(%s,%d)\n", fname, ndx);
 
 	if (list_only) {
-		if (S_ISDIR(file->mode)
-		 && ((!implied_dirs && file->flags & FLAG_IMPLIED_DIR)
-		  || (inc_recurse && ndx != cur_flist->ndx_start - 1)))
+		if (is_dir < 0
+		 || (is_dir && !implied_dirs && file->flags & FLAG_IMPLIED_DIR))
 			return;
 		list_file_entry(file);
 		return;
 	}
 
 	if (server_filter_list.head) {
+		int filtered = check_filter(&server_filter_list, fname, is_dir) < 0;
+		if (is_dir < 0 && filtered)
+			return;
 		if (excluded_below >= 0) {
 			if (F_DEPTH(file) > excluded_below
 			 && (!implied_dirs_are_missing || f_name_has_prefix(file, excluded_dir)))
 				goto skipping;
 			excluded_below = -1;
 		}
-		if (check_filter(&server_filter_list, fname,
-				 S_ISDIR(file->mode)) < 0) {
-			if (S_ISDIR(file->mode)) {
+		if (filtered) {
+			if (is_dir) {
 				excluded_below = F_DEPTH(file);
 				excluded_dir = file;
 			}
@@ -1243,7 +1247,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				dry_run--;
 			missing_below = -1;
 		} else if (!dry_run) {
-			if (S_ISDIR(file->mode))
+			if (is_dir)
 				file->flags |= FLAG_MISSING_DIR;
 			return;
 		}
@@ -1291,18 +1295,14 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			need_fuzzy_dirlist = 0;
 		}
 
-		statret = link_stat(fname, &sx.st,
-				    keep_dirlinks && S_ISDIR(file->mode));
+		statret = link_stat(fname, &sx.st, keep_dirlinks && is_dir);
 		stat_errno = errno;
 	}
 
 	if (ignore_non_existing > 0 && statret == -1 && stat_errno == ENOENT) {
-		if (verbose > 1) {
-			rprintf(FINFO, "not creating new %s \"%s\"\n",
-				S_ISDIR(file->mode) ? "directory" : "file",
-				fname);
-		}
-		if (S_ISDIR(file->mode)) {
+		if (is_dir) {
+			if (is_dir < 0)
+				return;
 			if (missing_below < 0) {
 				if (dry_run)
 					dry_run++;
@@ -1311,16 +1311,20 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 			file->flags |= FLAG_MISSING_DIR;
 		}
+		if (verbose > 1) {
+			rprintf(FINFO, "not creating new %s \"%s\"\n",
+				is_dir ? "directory" : "file", fname);
+		}
 		return;
 	}
 
 	if (statret == 0 && sx.st.st_uid == our_uid)
 		del_opts |= DEL_OWNED_BY_US;
 
-	if (S_ISDIR(file->mode)) {
+	if (is_dir) {
 		if (!implied_dirs && file->flags & FLAG_IMPLIED_DIR)
 			goto cleanup;
-		if (inc_recurse && ndx != cur_flist->ndx_start - 1) {
+		if (is_dir < 0) {
 			/* In inc_recurse mode we want to make sure any missing
 			 * directories get created while we're still processing
 			 * the parent dir (which allows us to touch the parent
