@@ -1656,6 +1656,8 @@ quote(itemization(
   bf(--hard-links)).
   it() A bf(.) means that the item is not being updated (though it might
   have attributes that are being modified).
+  it() A bf(*) means that the rest of the itemized-output area contains
+  a message (e.g. "deleting").
 ))
 
 The file-types that replace the bf(X) are: bf(f) for a file, a bf(d) for a
