@@ -502,7 +502,7 @@ int recv_files(int f_in, char *local_name)
 			continue;
 		}
 		if (write_batch < 0) {
-			log_item(FINFO, file, &stats, iflags, NULL);
+			log_item(FCLIENT, file, &stats, iflags, NULL);
 			if (!am_server)
 				discard_receive_data(f_in, F_LENGTH(file));
 			continue;
