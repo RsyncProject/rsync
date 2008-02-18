@@ -1681,8 +1681,8 @@ quote(itemization(
   it() A bf(t) means the modification time is different and is being updated
   to the sender's value (requires bf(--times)).  An alternate value of bf(T)
   means that the modification time will be set to the transfer time, which happens
-  anytime a symlink is transferred, or when a regular file or device is
-  transferred without bf(--times).
+  when a file/symlink/device is updated without bf(--times) and when a
+  symlink is changed and the receiver can't set its time.
   it() A bf(p) means the permissions are different and are being updated to
   the sender's value (requires bf(--perms)).
   it() An bf(o) means the owner is different and is being updated to the

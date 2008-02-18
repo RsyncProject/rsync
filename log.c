@@ -41,6 +41,7 @@ extern int stdout_format_has_i;
 extern int stdout_format_has_o_or_i;
 extern int logfile_format_has_i;
 extern int logfile_format_has_o_or_i;
+extern int receiver_symlink_times;
 extern mode_t orig_umask;
 extern char *auth_user;
 extern char *stdout_format;
@@ -638,7 +639,8 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			c[2] = !(iflags & ITEM_REPORT_CHECKSUM) ? '.' : 'c';
 			c[3] = !(iflags & ITEM_REPORT_SIZE) ? '.' : 's';
 			c[4] = !(iflags & ITEM_REPORT_TIME) ? '.'
-			     : !preserve_times || S_ISLNK(file->mode) ? 'T' : 't';
+			     : !preserve_times || (!receiver_symlink_times && S_ISLNK(file->mode))
+			     ? 'T' : 't';
 			c[5] = !(iflags & ITEM_REPORT_PERMS) ? '.' : 'p';
 			c[6] = !(iflags & ITEM_REPORT_OWNER) ? '.' : 'o';
 			c[7] = !(iflags & ITEM_REPORT_GROUP) ? '.' : 'g';

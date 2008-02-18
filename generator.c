@@ -27,6 +27,7 @@ extern int dry_run;
 extern int do_xfers;
 extern int stdout_format_has_i;
 extern int logfile_format_has_i;
+extern int receiver_symlink_times;
 extern int am_root;
 extern int am_server;
 extern int am_daemon;
@@ -553,7 +554,7 @@ static void do_delete_pass(void)
 
 int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 {
-#ifndef HAVE_LUTIMES
+#if !defined HAVE_LUTIMES || !defined HAVE_UTIMES
 	if (S_ISLNK(file->mode)) {
 		;
 	} else
@@ -599,8 +600,11 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 {
 	if (statret >= 0) { /* A from-dest-dir statret can == 1! */
 		int keep_time = !preserve_times ? 0
-		    : S_ISDIR(file->mode) ? preserve_times > 1
-		    : !S_ISLNK(file->mode);
+		    : S_ISDIR(file->mode) ? preserve_times > 1 :
+#if defined HAVE_LUTIMES && defined HAVE_UTIMES
+		    (receiver_symlink_times && !(file->flags & FLAG_TIME_FAILED)) ||
+#endif
+		    !S_ISLNK(file->mode);
 
 		if (S_ISREG(file->mode) && F_LENGTH(file) != sxp->st.st_size)
 			iflags |= ITEM_REPORT_SIZE;

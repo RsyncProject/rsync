@@ -77,6 +77,7 @@
 #define FLAG_HLINK_DONE (1<<8)	/* receiver/generator (checked on all types) */
 #define FLAG_LENGTH64 (1<<9)	/* sender/receiver/generator */
 #define FLAG_SKIP_GROUP (1<<10)	/* receiver/generator */
+#define FLAG_TIME_FAILED (1<<11)/* generator */
 
 /* These flags are passed to functions but not stored. */
 
@@ -93,7 +94,7 @@
 /* This is used when working on a new protocol version in CVS, and should
  * be a new non-zero value for each CVS change that affects the protocol.
  * It must ALWAYS be 0 when the protocol goes final! */
-#define SUBPROTOCOL_VERSION 16
+#define SUBPROTOCOL_VERSION 17
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on

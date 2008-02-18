@@ -48,7 +48,7 @@ extern int preserve_acls;
 extern int preserve_xattrs;
 extern int need_messages_from_generator;
 extern int delete_mode, delete_before, delete_during, delete_after;
-extern char *shell_cmd; /* contains VER.SUB string if client is a pre-release */
+extern char *shell_cmd;
 extern char *partial_dir;
 extern char *dest_option;
 extern char *files_from;
@@ -62,9 +62,16 @@ extern iconv_t ic_send, ic_recv;
 /* These index values are for the file-list's extra-attribute array. */
 int uid_ndx, gid_ndx, acls_ndx, xattrs_ndx, unsort_ndx;
 
+int receiver_symlink_times = 0; /* receiver can set the time on a symlink */
+
 #ifdef ICONV_OPTION
 int filesfrom_convert = 0;
 #endif
+
+#define CF_INC_RECURSE	 (1<<0)
+#define CF_SYMLINK_TIMES (1<<1)
+
+static const char *client_info;
 
 /* The server makes sure that if either side only supports a pre-release
  * version of a protocol, that both sides must speak a compatible version
@@ -79,8 +86,9 @@ static void check_sub_protocol(void)
 	int our_sub = 0;
 #endif
 
-	if (!shell_cmd || !(dot = strchr(shell_cmd, '.'))
-	 || !(their_protocol = atoi(shell_cmd))
+	/* client_info starts with VER.SUB string if client is a pre-release. */
+	if (!(their_protocol = atoi(client_info))
+	 || !(dot = strchr(client_info, '.'))
 	 || !(their_sub = atoi(dot+1))) {
 #if SUBPROTOCOL_VERSION != 0
 		if (our_sub)
@@ -103,6 +111,8 @@ static void check_sub_protocol(void)
 
 void set_allow_inc_recurse(void)
 {
+	client_info = shell_cmd ? shell_cmd : "";
+
 	if (!recurse || use_qsort)
 		allow_inc_recurse = 0;
 	else if (!am_sender
@@ -110,7 +120,7 @@ void set_allow_inc_recurse(void)
 	  || delay_updates || prune_empty_dirs))
 		allow_inc_recurse = 0;
 	else if (am_server && !local_server
-	 && (!shell_cmd || strchr(shell_cmd, 'i') == NULL))
+	 && (strchr(client_info, 'i') == NULL))
 		allow_inc_recurse = 0;
 }
 
@@ -233,12 +243,26 @@ void setup_protocol(int f_out,int f_in)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 	} else if (protocol_version >= 30) {
-		/* The inc_recurse var MUST be set to 0 or 1. */
+		int compat_flags;
 		if (am_server) {
-			inc_recurse = allow_inc_recurse ? 1 : 0;
-			write_byte(f_out, inc_recurse);
+			compat_flags = allow_inc_recurse ? CF_INC_RECURSE : 0;
+#if defined HAVE_LUTIMES && defined HAVE_UTIMES
+			compat_flags |= CF_SYMLINK_TIMES;
+#endif
+			write_byte(f_out, compat_flags);
 		} else
-			inc_recurse = read_byte(f_in) ? 1 : 0;
+			compat_flags = read_byte(f_in);
+		/* The inc_recurse var MUST be set to 0 or 1. */
+		inc_recurse = compat_flags & CF_INC_RECURSE ? 1 : 0;
+		if (am_sender) {
+			receiver_symlink_times = am_server
+			    ? strchr(client_info, 'L') != NULL
+			    : !!(compat_flags & CF_SYMLINK_TIMES);
+		}
+#if defined HAVE_LUTIMES && defined HAVE_UTIMES
+		else
+			receiver_symlink_times = 1;
+#endif
 		if (inc_recurse && !allow_inc_recurse) {
 			/* This should only be able to happen in a batch. */
 			fprintf(stderr,

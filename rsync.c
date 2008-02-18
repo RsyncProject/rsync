@@ -399,6 +399,8 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		}
 		if (ret == 0) /* ret == 1 if symlink could not be set */
 			updated = 1;
+		else
+			file->flags |= FLAG_TIME_FAILED;
 	}
 
 	change_uid = am_root && uid_ndx && sxp->st.st_uid != (uid_t)F_OWNER(file);

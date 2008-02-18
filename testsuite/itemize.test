@@ -27,13 +27,26 @@ umask 022
 ln "$fromdir/foo/config1" "$fromdir/foo/extra"
 
 # Check if the OS can hard-link symlinks or not
-ln -s no-such-dir "$to2dir"
-if ln "$to2dir" "$to2dir.test" 2>/dev/null; then
+if ln "$fromdir/foo/sym" "$to2dir" 2>/dev/null; then
     L=hL
 else
     L=cL
 fi
-rm -f "$to2dir" "$to2dir.test"
+rm -f "$to2dir"
+
+# Check if rsync can preserve time on symlinks
+case "$RSYNC" in
+*protocol=2*)
+    T=.T
+    ;;
+*)
+    if $RSYNC --version | grep ", symtimes" >/dev/null; then
+	T=.t
+    else
+	T=.T
+    fi
+    ;;
+esac
 
 $RSYNC -iplr "$fromdir/" "$todir/" \
     | tee "$outfile"
@@ -82,7 +95,7 @@ cat <<EOT >"$chkfile"
 .d..t...... foo/
 .f..t...... foo/config1
 >fcstp..... foo/config2
-cL..T...... foo/sym -> ../bar/baz/rsync
+cL.$T...... foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 3 failed"
 
@@ -142,6 +155,21 @@ diff $diffopt "$chkfile" "$outfile" || test_fail "test 7 failed"
 $RSYNC -ivvplrtH --copy-dest=../to "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 filter_outfile
+case `tail -1 "$outfile"` in
+cL..t*)
+    sym_dots='..t......'
+    L_sym_dots='cL..t......'
+    is_uptodate='-> ../bar/baz/rsync'
+    echo "cL$sym_dots foo/sym $is_uptodate" >"$chkfile.extra"
+    L=cL
+    ;;
+*)
+    sym_dots='         '
+    L_sym_dots='.L         '
+    is_uptodate='is uptodate'
+    touch "$chkfile.extra"
+    ;;
+esac
 cat <<EOT >"$chkfile"
 cd          ./
 cd          bar/
@@ -151,14 +179,14 @@ cd          foo/
 cf          foo/config1
 cf          foo/config2
 hf          foo/extra => foo/config1
-cL          foo/sym -> ../bar/baz/rsync
+cL$sym_dots foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 8 failed"
 
 rm -rf "$to2dir"
 $RSYNC -iplrtH --copy-dest=../to "$fromdir/" "$to2dir/" \
     | tee "$outfile"
-cat <<EOT >"$chkfile"
+cat - "$chkfile.extra" <<EOT >"$chkfile"
 hf          foo/extra => foo/config1
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 9 failed"
@@ -176,7 +204,7 @@ foo/ is uptodate
 foo/config1 is uptodate
 foo/config2 is uptodate
 foo/extra => foo/config1
-foo/sym is uptodate
+foo/sym $is_uptodate
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 10 failed"
 
@@ -193,21 +221,21 @@ cd          foo/
 hf          foo/config1
 hf          foo/config2
 hf          foo/extra => foo/config1
-$L          foo/sym -> ../bar/baz/rsync
+$L$sym_dots foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 11 failed"
 
 rm -rf "$to2dir"
 $RSYNC -iplrtH --dry-run --link-dest=../to "$fromdir/" "$to2dir/" \
     | tee "$outfile"
-cat <<EOT >"$chkfile"
+cat - "$chkfile.extra" <<EOT >"$chkfile"
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 12 failed"
 
 rm -rf "$to2dir"
 $RSYNC -iplrtH --link-dest=../to "$fromdir/" "$to2dir/" \
     | tee "$outfile"
-cat <<EOT >"$chkfile"
+cat - "$chkfile.extra" <<EOT >"$chkfile"
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 13 failed"
 
@@ -224,7 +252,7 @@ foo/ is uptodate
 foo/config1 is uptodate
 foo/config2 is uptodate
 foo/extra is uptodate
-foo/sym is uptodate
+foo/sym $is_uptodate
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 14 failed"
 
@@ -241,14 +269,14 @@ cd          foo/
 .f          foo/config1
 .f          foo/config2
 .f          foo/extra
-.L          foo/sym -> ../bar/baz/rsync
+$L_sym_dots foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 15 failed"
 
 rm -rf "$to2dir"
 $RSYNC -iplrtH --compare-dest="$todir" "$fromdir/" "$to2dir/" \
     | tee "$outfile"
-cat <<EOT >"$chkfile"
+cat - "$chkfile.extra" <<EOT >"$chkfile"
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 16 failed"
 
@@ -265,7 +293,7 @@ foo/ is uptodate
 foo/config1 is uptodate
 foo/config2 is uptodate
 foo/extra is uptodate
-foo/sym is uptodate
+foo/sym $is_uptodate
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 17 failed"
 

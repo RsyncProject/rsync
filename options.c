@@ -218,6 +218,7 @@ static void print_rsync_version(enum logcode f)
 	char const *got_socketpair = "no ";
 	char const *have_inplace = "no ";
 	char const *hardlinks = "no ";
+	char const *symtimes = "no ";
 	char const *acls = "no ";
 	char const *xattrs = "no ";
 	char const *links = "no ";
@@ -252,6 +253,9 @@ static void print_rsync_version(enum logcode f)
 #ifdef ICONV_OPTION
 	iconv = "";
 #endif
+#if defined HAVE_LUTIMES && defined HAVE_UTIMES
+	symtimes = "";
+#endif
 
 	rprintf(f, "%s  version %s  protocol version %d%s\n",
 		RSYNC_NAME, RSYNC_VERSION, PROTOCOL_VERSION, subprotocol);
@@ -265,8 +269,8 @@ static void print_rsync_version(enum logcode f)
 		(int)(sizeof (int64) * 8));
 	rprintf(f, "    %ssocketpairs, %shardlinks, %ssymlinks, %sIPv6, batchfiles, %sinplace,\n",
 		got_socketpair, hardlinks, links, ipv6, have_inplace);
-	rprintf(f, "    %sappend, %sACLs, %sxattrs, %siconv\n",
-		have_inplace, acls, xattrs, iconv);
+	rprintf(f, "    %sappend, %sACLs, %sxattrs, %siconv, %ssymtimes\n",
+		have_inplace, acls, xattrs, iconv, symtimes);
 
 #ifdef MAINTAINER_MODE
 	rprintf(f, "Panic Action: \"%s\"\n", get_panic_action());
@@ -1777,24 +1781,24 @@ void server_options(char **args, int *argc_p)
 		argstr[x++] = 'z';
 
 	/* We make use of the -e option to let the server know about any
-	 * pre-release protocol version && our allow_inc_recurse status. */
-	set_allow_inc_recurse();
+	 * pre-release protocol version && some behavior flags. */
+	argstr[x++] = 'e';
 #if SUBPROTOCOL_VERSION != 0
 	if (protocol_version == PROTOCOL_VERSION) {
 		x += snprintf(argstr+x, sizeof argstr - x,
-			      "e%d.%d%s", PROTOCOL_VERSION, SUBPROTOCOL_VERSION,
-			      allow_inc_recurse ? "i" : "");
+			      "%d.%d", PROTOCOL_VERSION, SUBPROTOCOL_VERSION);
 	} else
 #endif
-	if (allow_inc_recurse) {
-		argstr[x++] = 'e';
+		argstr[x++] = '.';
+	set_allow_inc_recurse();
+	if (allow_inc_recurse)
 		argstr[x++] = 'i';
-	}
-
+#if defined HAVE_LUTIMES && defined HAVE_UTIMES
+	argstr[x++] = 'L';
+#endif
 	argstr[x] = '\0';
 
-	if (x != 1)
-		args[ac++] = argstr;
+	args[ac++] = argstr;
 
 #ifdef ICONV_OPTION
 	if (iconv_opt) {
