@@ -623,7 +623,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			break;
 		case 'i':
 			if (iflags & ITEM_DELETED) {
-				n = "*deleting";
+				n = "*deleting  ";
 				break;
 			}
 			n  = c = buf2 + MAXPATHLEN - 32;
