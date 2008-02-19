@@ -1140,7 +1140,9 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 			break;
 
 		case OPT_NO_ICONV:
+#ifdef ICONV_OPTION
 			iconv_opt = NULL;
+#endif
 			break;
 
 		case OPT_MAX_SIZE:

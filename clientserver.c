@@ -391,7 +391,7 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	pid_t pre_exec_pid = 0;
 	char *request = NULL;
 
-#ifdef ICONV_CONST
+#ifdef ICONV_OPTION
 	iconv_opt = lp_charset(i);
 	if (*iconv_opt)
 		setup_iconv();
@@ -806,6 +806,7 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
 
+#ifdef ICONV_OPTION
 	if (!iconv_opt) {
 		if (ic_send != (iconv_t)-1) {
 			iconv_close(ic_send);
@@ -816,6 +817,7 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 			ic_recv = (iconv_t)-1;
 		}
 	}
+#endif
 
 	if (!numeric_ids
 	 && (use_chroot ? lp_numeric_ids(i) != False : lp_numeric_ids(i) == True))
