@@ -41,6 +41,7 @@ extern int am_generator;
 extern int am_starting_up;
 extern int allow_8bit_chars;
 extern int protocol_version;
+extern int receiver_symlink_times;
 extern int uid_ndx;
 extern int gid_ndx;
 extern int inc_recurse;
@@ -399,7 +400,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 		}
 		if (ret == 0) /* ret == 1 if symlink could not be set */
 			updated = 1;
-		else
+		else if (receiver_symlink_times)
 			file->flags |= FLAG_TIME_FAILED;
 	}
 
