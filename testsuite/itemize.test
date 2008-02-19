@@ -26,13 +26,15 @@ ln -s ../bar/baz/rsync "$fromdir/foo/sym"
 umask 022
 ln "$fromdir/foo/config1" "$fromdir/foo/extra"
 
-# Check if the OS can hard-link symlinks or not
-if ln "$fromdir/foo/sym" "$to2dir" 2>/dev/null; then
+# Check if the OS can hard-link symlinks or not.
+# (Note: the link we check MUST NOT point to a valid file!)
+ln -s no-such-dir "$to2dir"
+if ln "$to2dir" "$to2dir.test" 2>/dev/null; then
     L=hL
 else
     L=cL
 fi
-rm -f "$to2dir"
+rm -f "$to2dir" "$to2dir.test"
 
 # Check if rsync can preserve time on symlinks
 case "$RSYNC" in
