@@ -84,7 +84,7 @@ static const char *gid_to_name(gid_t gid)
 	return NULL;
 }
 
-static uid_t map_uid(uid_t id, char *name)
+static uid_t map_uid(uid_t id, const char *name)
 {
 	uid_t uid;
 	if (id != 0 && name_to_uid(name, &uid))
@@ -92,7 +92,7 @@ static uid_t map_uid(uid_t id, char *name)
 	return id;
 }
 
-static gid_t map_gid(gid_t id, char *name)
+static gid_t map_gid(gid_t id, const char *name)
 {
 	gid_t gid;
 	if (id != 0 && name_to_gid(name, &gid))
@@ -160,7 +160,7 @@ static int is_in_group(gid_t gid)
 }
 
 /* Add a uid to the list of uids.  Only called on receiving side. */
-static struct idlist *recv_add_uid(uid_t id, char *name)
+static struct idlist *recv_add_uid(uid_t id, const char *name)
 {
 	uid_t id2 = name ? map_uid(id, name) : id;
 	struct idlist *node;
@@ -176,7 +176,7 @@ static struct idlist *recv_add_uid(uid_t id, char *name)
 }
 
 /* Add a gid to the list of gids.  Only called on receiving side. */
-static struct idlist *recv_add_gid(gid_t id, char *name)
+static struct idlist *recv_add_gid(gid_t id, const char *name)
 {
 	gid_t id2 = name ? map_gid(id, name) : id;
 	struct idlist *node;
