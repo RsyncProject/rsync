@@ -190,6 +190,7 @@ print "<Press Enter to continue> ";
 $_ = <STDIN>;
 
 system "git commit -a -m 'Preparing for release of $version'" and exit 1;
+print "Sign the tag:\n";
 system "git tag -s -m 'Version $version.' v$version" and exit 1;
 
 # Extract some files from the old tar before we do the shuffle.
@@ -265,9 +266,14 @@ system "yodl2html -o $dest/rsync.html rsync.yo";
 system "yodl2html -o $dest/rsyncd.conf.html rsyncd.conf.yo";
 
 chdir($dest) or die $!;
-system "gpg -ba $srctar_name; gpg -ba $pattar_name; gpg -ba $diff_name";
-print $break, <<EOT;
+my $cnt = 0;
+foreach my $fn ($srctar_name, $pattar_name, $diff_name) {
+    print ++$cnt, ". Sign file \"$fn\":";
+    system "gpg -ba $fn";
+}
+print $break, <<'EOT';
 
-All done.  Remember to announce the release on *BOTH*
-rsync-announce\@lists.samba.org and rsync\@lists.samba.org!
+Local changes are done.  When you're satisfied, push the git repository
+and rsync the release files.  Remember to announce the release on *BOTH*
+rsync-announce@lists.samba.org and rsync@lists.samba.org (and the web)!
 EOT
