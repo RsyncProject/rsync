@@ -13,7 +13,7 @@ Changes since 2.6.9:
       separate args.  (See also --keep-dirlinks and --no-implied-dirs.)
       Also, exclude rules no longer have a partial effect on implied dirs.
 
-    - Requesting a remote file list without specifying -r (--recursive) now
+    - Requesting a remote file-listing without specifying -r (--recursive) now
       sends the -d (--dirs) option to the remote rsync rather than sending -r
       along with an extra exclude of /*/*.  If the remote rsync does not
       understand the -d option (i.e. it is 2.6.3 or older), you will need to
@@ -28,6 +28,12 @@ Changes since 2.6.9:
       allowing absolute symlinks to be stored and retrieved.  This also has
       the effect of making symlinks unusable while they're in the daemon's
       hierarchy.  See the daemon's "munge symlinks" parameter for details.
+
+    - Starting up an extra copy of an rsync daemon will not clobber the pidfile
+      for the running daemon -- if the pidfile exists, the new daemon will exit
+      with an error.  This means that your wrapper script that starts the rsync
+      daemon should be made to handle lock-breaking (if you want any automatic
+      breaking of locks to be done).
 
   BUG FIXES:
 
@@ -47,7 +53,8 @@ Changes since 2.6.9:
     - A chroot daemon can now indicate which part of its path should affect the
       chroot call, and which part should become an inside-chroot path for the
       module.  This allows you to have outside-the-transfer paths (such as for
-      libraries) even when you enable chroot protection.
+      libraries) even when you enable chroot protection.  The idiom used in the
+      rsyncd.conf file is:  path = /chroot/dirs/./dirs/inside
 
     - If a file's data arrived successfully on the receiving side but the
       rename of the temporary file to the destination file failed AND the
@@ -97,17 +104,14 @@ Changes since 2.6.9:
     - Fixed a bug when using --backup and --inplace with --whole-file or
       --read-batch: backup files are actually created now.
 
-    - Starting up an extra copy of an rsync daemon will not clobber the pidfile
-      for the running daemon -- if the pidfile exists, the new daemon will exit
-      with an error.
-
     - The daemon pidfile is checked and created sooner in the startup sequence.
 
     - If a daemon module's "path" value is not an absolute pathname, the code
       now makes it absolute internally (making it work properly).
 
     - Ensure that a temporary file always has owner-write permission while we
-      are writing to it.  This avoids problems with some network filesystems.
+      are writing to it.  This avoids problems with some network filesystems
+      when transfering read-only files.
 
     - Any errors output about password-file reading no longer cause an error at
       the end of the run about a partial transfer.
@@ -116,11 +120,11 @@ Changes since 2.6.9:
       options are set correctly for the current batch file:  --iconv, --acls,
       --xattrs, --inplace, --append, and --append-verify.
 
-    - Using --only-write-batch to a daemon receiver now work properly (older
+    - Using --only-write-batch to a daemon receiver now works properly (older
       versions would update some files while writing the batch).
 
     - Avoid outputting a "file has vanished" message when the file is a broken
-      symlink and --copy-unsafe-links or --copy-dirlinks are used (the code
+      symlink and --copy-unsafe-links or --copy-dirlinks is used (the code
       already handled this for --copy-links).
 
     - Fixed the combination of --only-write-batch and --dry-run.
@@ -143,8 +147,8 @@ Changes since 2.6.9:
     - Rsync now allows multiple remote-source args to be specified rather than
       having to rely on a special space-splitting side-effect of the remote-
       shell.  Additional remote args must specify the same host or an empty one
-      (e.g. empty:  :file1  or  ::module/file2).  This means that local use of
-      brace expansion now works:  rsync -av host:dir/{f1,f2} .
+      (e.g. empty:  :file1  or  ::module/file2).  For example, this means that
+      local use of brace expansion now works:  rsync -av host:dir/{f1,f2} .
 
     - Added the --protect-args (-s) option, that tells rsync to send most of
       the command-line args at the start of the transfer rather than as args
@@ -160,7 +164,7 @@ Changes since 2.6.9:
       ACL-patched versions of rsync, apply the acls.diff file from the patches
       dir.
 
-    - Added the --xattrs (-X) option to preserver extended attributes.  This is
+    - Added the --xattrs (-X) option to preserve extended attributes.  This is
       an improved version of the prior patch that was available, and it even
       supports OS X xattrs (which includes their resource fork data).  If you
       need to have backward compatibility with old, xattr-patched versions of
@@ -172,9 +176,9 @@ Changes since 2.6.9:
       There is also an analogous "fake super" parameter for an rsync daemon.
 
     - Added the --iconv option, which allows rsync to convert filenames from
-      one character-set to another during the transfer.  The default is to make
-      this feature available as long as your system has iconv_open().  If
-      compilation fails, specify --disable-iconv to configure, and then
+      one character-set to another during the transfer.  The default is to
+      make this feature available as long as your system has iconv_open().
+      If compilation fails, specify --disable-iconv to configure, and then
       rebuild.  If you want rsync to perform character-set conversions by
       default, you can specify --enable-iconv=CONVERT_STRING with the default
       value for the --iconv option that you wish to use.  For example,
@@ -182,14 +186,16 @@ Changes since 2.6.9:
       explanation of the --iconv option's settings.
 
     - A new daemon config parameter, "charset", lets you control the character-
-      set that is used during an --iconv transfer to/from a daemon module.
+      set that is used during an --iconv transfer to/from a daemon module.  You
+      can also set your daemon to refuse "no-iconv" if you want to force the
+      client to use an --iconv transfer (requiring an rsync 3.x client).
 
     - Added the --skip-compress=LIST option to override the default list of
-      file suffixes that will not be compressed when using --compress.
+      file suffixes that will not be compressed when using --compress (-z).
 
     - The daemon's default for "dont compress" was extended to include:
 	  *.7z *.mp[34] *.mov *.avi *.ogg *.jpg *.jpeg
-      The matching routine was also optimized to run more quickly.
+      The name-matching routine was also optimized to run more quickly.
 
     - The --max-delete option now outputs a warning if it skipped any file
       deletions, including a count of how many deletions were skipped.  (Older
@@ -241,15 +247,15 @@ Changes since 2.6.9:
 
     - Improved the dashes and double-quotes in the nroff manpage output.
 
-    - We now support a lot more --no-OPTION override options.
+    - Rsync now supports a lot more --no-OPTION override options.
 
   INTERNAL:
 
     - The file-list sorting algorithm now uses a sort that keeps any same-
       named items in the same order as they were specified.  This allows
       rsync to always ensure that the first of the duplicates is the one
-      that will be included in the copy.  The new sort was also faster
-      than the glibc version of qsort() and mergesort() in my testing.
+      that will be included in the copy.  The new sort is also faster
+      than the glibc version of qsort() and mergesort().
 
     - Rsync now supports the transfer of 64-bit timestamps (time_t values).
 
@@ -284,8 +290,8 @@ Changes since 2.6.9:
 
     - Improved the use of "const" on pointers.
 
-    - Improved J.W.'s pool_alloc routines to add a way of freeing older
-      sections of a pool's memory.
+    - Improved J.W.'s pool_alloc routines to add a way of incrementally freeing
+      older sections of a pool's memory.
 
     - The getaddrinfo.c compatibility code in the "lib" dir was replaced with
       some new code (derived from samba, derived from PostgreSQL) that has a
@@ -296,14 +302,14 @@ Changes since 2.6.9:
     - Rsync is now licensed under the GPLv3 or later.
 
     - Rsync is now being maintained in a "git" repository instead of CVS
-      (though the old CVS repository still exists).  Several maintenance
-      scripts were updated to work with git.
+      (though the old CVS repository still exists for historical access).
+      Several maintenance scripts were updated to work with git.
 
     - Generated files are no longer committed into the source repository.  The
       autoconf and autoheader commands are now automatically run during the
       normal use of "configure" and "make".  The latest dev versions of all
       generated files can also be copied from the samba.org web site (see the
-      "magic" configure script that now comes with rsync for its location).
+      prepare-source script's fetch option).
 
     - The "patches" directory of diff files is now built from branches in the
       rsync git repository (branch patch/FOO creates file patches/FOO.diff).
@@ -315,12 +321,12 @@ Changes since 2.6.9:
       directory named testtmp (which is created, if missing).  This allows
       someone to symlink the testtmp directory to another filesystem (which is
       useful if the build dir's filesystem does not support ACLs and xattrs,
-      but another file system does).
+      but another filesystem does).
 
     - Rsync now has a way of handling protocol-version changes during the
       development of a new protocol version.  This causes any out-of-sync
       versions to speak an older protocol rather than fail in a cryptic manner.
-      This addition makes it safe to deploy a pre-release version that may
+      This addition makes it safer to deploy a pre-release version that may
       interact with the public.  This new exchange of sub-version info does not
       interfere with the {MIN,MAX}_PROTOCOL_VERSION checking algorithm (which
       does not have enough range to allow the main protocol number to be
