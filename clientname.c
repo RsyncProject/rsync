@@ -266,7 +266,7 @@ int compare_addrinfo_sockaddr(const struct addrinfo *ai,
 
 		if (ai->ai_addrlen < sizeof (struct sockaddr_in6)) {
 			rprintf(FLOG, "%s: too short sockaddr_in6; length=%d\n",
-				fn, ai->ai_addrlen);
+				fn, (int)ai->ai_addrlen);
 			return 1;
 		}
 
