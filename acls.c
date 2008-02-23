@@ -92,9 +92,17 @@ static item_list default_acl_list = EMPTY_ITEM_LIST;
 
 static const char *str_acl_type(SMB_ACL_TYPE_T type)
 {
-	return type == SMB_ACL_TYPE_ACCESS ? "SMB_ACL_TYPE_ACCESS"
-	     : type == SMB_ACL_TYPE_DEFAULT ? "SMB_ACL_TYPE_DEFAULT"
-	     : "unknown SMB_ACL_TYPE_T";
+	switch (type) {
+	case SMB_ACL_TYPE_ACCESS:
+#ifdef HAVE_OSX_ACLS
+		return "ACL_TYPE_EXTENDED";
+#else
+		return "ACL_TYPE_ACCESS";
+#endif
+	case SMB_ACL_TYPE_DEFAULT:
+		return "ACL_TYPE_DEFAULT";
+	}
+	return "unknown ACL type!";
 }
 
 static int calc_sacl_entries(const rsync_acl *racl)
@@ -933,7 +941,7 @@ static int set_rsync_acl(const char *fname, acl_duo *duo_item,
 #endif
 		if (sys_acl_set_file(fname, type, duo_item->sacl) < 0) {
 			rsyserr(FERROR_XFER, errno, "set_acl: sys_acl_set_file(%s, %s)",
-			fname, str_acl_type(type));
+				fname, str_acl_type(type));
 			return -1;
 		}
 		if (type == SMB_ACL_TYPE_ACCESS)
