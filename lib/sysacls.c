@@ -2703,6 +2703,8 @@ int sys_acl_set_info(SMB_ACL_ENTRY_T entry, SMB_ACL_TAG_T tag_type, uint32 bits,
 		rc = mbr_uid_to_uuid(u_g_id, uu);
 	else
 		rc = mbr_gid_to_uuid(u_g_id, uu);
+	if (rc != 0)
+		return rc;
 
 	if (acl_set_tag_type(entry, tag_type) != 0
 	 || acl_set_qualifier(entry, &uu) != 0
