@@ -101,6 +101,8 @@ static const char *str_acl_type(SMB_ACL_TYPE_T type)
 #endif
 	case SMB_ACL_TYPE_DEFAULT:
 		return "ACL_TYPE_DEFAULT";
+	default:
+		break;
 	}
 	return "unknown ACL type!";
 }
