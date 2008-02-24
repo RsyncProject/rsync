@@ -27,13 +27,13 @@ if (defined $incl_generated_files) {
 die "No '$patches_dir' directory was found.\n" unless -d $patches_dir;
 die "No '.git' directory present in the current dir.\n" unless -d '.git';
 
+open(IN, '-|', 'git status') or die $!;
+my $status = join('', <IN>);
+close IN;
 unless ($skip_branch_check) {
-    open(IN, '-|', 'git status') or die $!;
-    my $status = join('', <IN>);
-    close IN;
     die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
-    die "The checkout is not on the master branch.\n" unless $status =~ /^# On branch master\n/;
 }
+my($starting_branch) = $status =~ /^# On branch (.+)\n/;
 
 my @extra_files;
 open(IN, '<', 'Makefile.in') or die "Couldn't open Makefile.in: $!\n";
@@ -107,7 +107,7 @@ if ($incl_generated_files) {
 }
 
 sleep 1 if $last_touch == time;
-system "git checkout master" and exit 1;
+system "git checkout $starting_branch" and exit 1;
 
 exit;
 
@@ -185,6 +185,6 @@ sub usage
 Usage: patch-update [OPTIONS]
 
 --gen[=DIR]   Include generated files.  Optional dest DIR overrides "patches".
---skip-check  Skip the check that ensures starting with a clean master branch.
+--skip-check  Skip the check that ensures starting with a clean branch.
 EOT
 }
