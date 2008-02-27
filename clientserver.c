@@ -120,6 +120,10 @@ int start_socket_client(char *host, int remote_argc, char *remote_argv[],
 
 	set_socket_options(fd, sockopts);
 
+#ifdef ICONV_CONST
+	setup_iconv();
+#endif
+
 	ret = start_inband_exchange(fd, fd, user, remote_argc, remote_argv);
 
 	return ret ? ret : client_run(fd, fd, -1, argc, argv);
