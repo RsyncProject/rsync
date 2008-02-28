@@ -116,7 +116,7 @@ static int need_retouch_dir_perms;
 static const char *solo_file = NULL;
 
 /* For calling delete_item() and delete_dir_contents(). */
-#define DEL_OWNED_BY_US 	(1<<0) /* file/dir has our uid */
+#define DEL_NO_UID_WRITE 	(1<<0) /* file/dir has our uid w/o write perm */
 #define DEL_RECURSE		(1<<1) /* if dir, delete all contents */
 #define DEL_DIR_IS_EMPTY	(1<<2) /* internal delete_FUNCTIONS use only */
 #define DEL_FOR_FILE		(1<<3) /* making room for a replacement file */
@@ -136,7 +136,7 @@ enum delret {
 };
 
 /* Forward declaration for delete_item(). */
-static enum delret delete_dir_contents(char *fname, int flags);
+static enum delret delete_dir_contents(char *fname, uint16 flags);
 
 static int is_backup_file(char *fn)
 {
@@ -150,7 +150,7 @@ static int is_backup_file(char *fn)
  * Note that fbuf must point to a MAXPATHLEN buffer if the mode indicates it's
  * a directory! (The buffer is used for recursion, but returned unchanged.)
  */
-static enum delret delete_item(char *fbuf, int mode, int flags)
+static enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 {
 	enum delret ret;
 	char *what;
@@ -158,17 +158,26 @@ static enum delret delete_item(char *fbuf, int mode, int flags)
 
 	if (verbose > 2) {
 		rprintf(FINFO, "delete_item(%s) mode=%o flags=%d\n",
-			fbuf, mode, flags);
+			fbuf, (int)mode, (int)flags);
 	}
 
-	if (!am_root && !(mode & S_IWUSR) && flags & DEL_OWNED_BY_US)
-		do_chmod(fbuf, mode |= S_IWUSR);
+	if (flags & DEL_NO_UID_WRITE)
+		do_chmod(fbuf, mode | S_IWUSR);
 
 	if (S_ISDIR(mode) && !(flags & DEL_DIR_IS_EMPTY)) {
+		int save_uid_ndx = uid_ndx;
+		/* This only happens on the first call to delete_item() since
+		 * delete_dir_contents() always calls us w/DEL_DIR_IS_EMPTY. */
+		if (!uid_ndx)
+			uid_ndx = ++file_extra_cnt;
 		ignore_perishable = 1;
 		/* If DEL_RECURSE is not set, this just reports emptiness. */
 		ret = delete_dir_contents(fbuf, flags);
 		ignore_perishable = 0;
+		if (!save_uid_ndx) {
+			--file_extra_cnt;
+			uid_ndx = 0;
+		}
 		if (ret == DR_NOT_EMPTY || ret == DR_AT_LIMIT)
 			goto check_ret;
 		/* OK: try to delete the directory. */
@@ -229,7 +238,7 @@ static enum delret delete_item(char *fbuf, int mode, int flags)
  * DR_NOT_EMPTY.  Note that fname must point to a MAXPATHLEN buffer!  (The
  * buffer is used for recursion, but returned unchanged.)
  */
-static enum delret delete_dir_contents(char *fname, int flags)
+static enum delret delete_dir_contents(char *fname, uint16 flags)
 {
 	struct file_list *dirlist;
 	enum delret ret;
@@ -264,7 +273,8 @@ static enum delret delete_dir_contents(char *fname, int flags)
 	remainder = MAXPATHLEN - (p - fname);
 
 	/* We do our own recursion, so make delete_item() non-recursive. */
-	flags = (flags & ~(DEL_RECURSE|DEL_MAKE_ROOM)) | DEL_DIR_IS_EMPTY;
+	flags = (flags & ~(DEL_RECURSE|DEL_MAKE_ROOM|DEL_NO_UID_WRITE))
+	      | DEL_DIR_IS_EMPTY;
 
 	for (j = dirlist->used; j--; ) {
 		struct file_struct *fp = dirlist->files[j];
@@ -280,14 +290,10 @@ static enum delret delete_dir_contents(char *fname, int flags)
 		}
 
 		strlcpy(p, fp->basename, remainder);
-		if (!uid_ndx || (uid_t)F_OWNER(fp) == our_uid)
-			flags |= DEL_OWNED_BY_US;
-		else
-			flags &= ~DEL_OWNED_BY_US;
+		if (!(fp->mode & S_IWUSR) && !am_root && (uid_t)F_OWNER(fp) == our_uid)
+			do_chmod(fname, fp->mode | S_IWUSR);
 		/* Save stack by recursing to ourself directly. */
 		if (S_ISDIR(fp->mode)) {
-			if (!am_root && !(fp->mode & S_IWUSR) && flags & DEL_OWNED_BY_US)
-				do_chmod(fname, fp->mode |= S_IWUSR);
 			if (delete_dir_contents(fname, flags | DEL_RECURSE) != DR_SUCCESS)
 				ret = DR_NOT_EMPTY;
 		}
@@ -330,10 +336,12 @@ static int start_delete_delay_temp(void)
 
 static int flush_delete_delay(void)
 {
+	if (deldelay_fd < 0 && !start_delete_delay_temp())
+		return 0;
 	if (write(deldelay_fd, deldelay_buf, deldelay_cnt) != deldelay_cnt) {
 		rsyserr(FERROR, errno, "flush of delete-delay buffer");
 		delete_during = 0;
-		delete_after = 1;
+		delete_after = !inc_recurse;
 		close(deldelay_fd);
 		return 0;
 	}
@@ -343,19 +351,21 @@ static int flush_delete_delay(void)
 
 static int remember_delete(struct file_struct *file, const char *fname, int flags)
 {
-	const char *plus = (!am_root && !(file->mode & S_IWUSR) && flags & DEL_OWNED_BY_US)
-			 ? "+" : "";
 	int len;
+
+	if (deldelay_cnt == deldelay_size && !flush_delete_delay())
+		return 0;
+
+	if (flags & DEL_NO_UID_WRITE)
+		deldelay_buf[deldelay_cnt++] = '!';
 
 	while (1) {
 		len = snprintf(deldelay_buf + deldelay_cnt,
 			       deldelay_size - deldelay_cnt,
-			       "%s%x %s%c",
-			       plus, (int)file->mode, fname, '\0');
+			       "%x %s%c",
+			       (int)file->mode, fname, '\0');
 		if ((deldelay_cnt += len) <= deldelay_size)
 			break;
-		if (deldelay_fd < 0 && !start_delete_delay_temp())
-			return 0;
 		deldelay_cnt -= len;
 		if (!flush_delete_delay())
 			return 0;
@@ -364,7 +374,7 @@ static int remember_delete(struct file_struct *file, const char *fname, int flag
 	return 1;
 }
 
-static int read_delay_line(char *buf, int *own_flag_p)
+static int read_delay_line(char *buf, int *flags_p)
 {
 	static int read_pos = 0;
 	int j, len, mode;
@@ -405,11 +415,11 @@ static int read_delay_line(char *buf, int *own_flag_p)
 	}
 
 	bp = deldelay_buf + read_pos;
-	if (*bp == '+') {
+	if (*bp == '!') {
 		bp++;
-		*own_flag_p = DEL_OWNED_BY_US;
+		*flags_p = DEL_NO_UID_WRITE;
 	} else
-		*own_flag_p = 0;
+		*flags_p = 0;
 
 	if (sscanf(bp, "%x ", &mode) != 1) {
 	  invalid_data:
@@ -434,15 +444,15 @@ static int read_delay_line(char *buf, int *own_flag_p)
 
 static void do_delayed_deletions(char *delbuf)
 {
-	int mode, own_flag;
+	int mode, flags;
 
 	if (deldelay_fd >= 0) {
 		if (deldelay_cnt && !flush_delete_delay())
 			return;
 		lseek(deldelay_fd, 0, 0);
 	}
-	while ((mode = read_delay_line(delbuf, &own_flag)) >= 0)
-		delete_item(delbuf, mode, own_flag | DEL_RECURSE);
+	while ((mode = read_delay_line(delbuf, &flags)) >= 0)
+		delete_item(delbuf, mode, flags | DEL_RECURSE);
 	if (deldelay_fd >= 0)
 		close(deldelay_fd);
 }
@@ -458,6 +468,7 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 	struct file_list *dirlist;
 	char delbuf[MAXPATHLEN];
 	int dlen, i;
+	int save_uid_ndx = uid_ndx;
 
 	if (!fbuf) {
 		change_local_filter_dir(NULL, 0, 0);
@@ -489,6 +500,9 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 			return;
 	}
 
+	if (!uid_ndx)
+		uid_ndx = ++file_extra_cnt;
+
 	dirlist = get_dirlist(fbuf, dlen, 0);
 
 	/* If an item in dirlist is not found in flist, delete it
@@ -504,8 +518,9 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 			continue;
 		}
 		if (flist_find(cur_flist, fp) < 0) {
-			int flags = DEL_RECURSE
-				  | (!uid_ndx || (uid_t)F_OWNER(fp) == our_uid ? DEL_OWNED_BY_US : 0);
+			int flags = DEL_RECURSE;
+			if (!(fp->mode & S_IWUSR) && !am_root && (uid_t)F_OWNER(fp) == our_uid)
+				flags |= DEL_NO_UID_WRITE;
 			f_name(fp, delbuf);
 			if (delete_during == 2) {
 				if (!remember_delete(fp, delbuf, flags))
@@ -516,6 +531,11 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 	}
 
 	flist_free(dirlist);
+
+	if (!save_uid_ndx) {
+		--file_extra_cnt;
+		uid_ndx = 0;
+	}
 }
 
 /* This deletes any files on the receiving side that are not present on the
@@ -1327,8 +1347,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (statret == 0 && sx.st.st_uid == our_uid)
-		del_opts |= DEL_OWNED_BY_US;
+	if (statret == 0 && !(sx.st.st_mode & S_IWUSR)
+	 && !am_root && sx.st.st_uid == our_uid)
+		del_opts |= DEL_NO_UID_WRITE;
 
 	if (is_dir) {
 		if (!implied_dirs && file->flags & FLAG_IMPLIED_DIR)
