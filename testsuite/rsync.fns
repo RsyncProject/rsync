@@ -23,6 +23,11 @@ fromdir="$tmpdir/from"
 todir="$tmpdir/to"
 chkdir="$tmpdir/chk"
 
+# For itemized output:
+all_plus='+++++++++'
+allspace='         '
+dots='.....' # trailing dots after changes
+
 # Berkley's nice.
 PATH="$PATH:/usr/ucb"
 

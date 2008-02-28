@@ -53,15 +53,15 @@ esac
 $RSYNC -iplr "$fromdir/" "$todir/" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
-cd+++++++++ ./
-cd+++++++++ bar/
-cd+++++++++ bar/baz/
->f+++++++++ bar/baz/rsync
-cd+++++++++ foo/
->f+++++++++ foo/config1
->f+++++++++ foo/config2
->f+++++++++ foo/extra
-cL+++++++++ foo/sym -> ../bar/baz/rsync
+cd$all_plus ./
+cd$all_plus bar/
+cd$all_plus bar/baz/
+>f$all_plus bar/baz/rsync
+cd$all_plus foo/
+>f$all_plus foo/config1
+>f$all_plus foo/config2
+>f$all_plus foo/extra
+cL$all_plus foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 1 failed"
 
@@ -73,10 +73,10 @@ chmod 601 "$fromdir/foo/config2"
 $RSYNC -iplrH "$fromdir/" "$todir/" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
->f..T...... bar/baz/rsync
->f..T...... foo/config1
->f.sTp..... foo/config2
-hf..T...... foo/extra => foo/config1
+>f..T.$dots bar/baz/rsync
+>f..T.$dots foo/config1
+>f.sTp$dots foo/config2
+hf..T.$dots foo/extra => foo/config1
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 2 failed"
 
@@ -93,11 +93,11 @@ chmod 777 "$todir/bar/baz/rsync"
 $RSYNC -iplrtc "$fromdir/" "$todir/" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
-.f..tp..... bar/baz/rsync
-.d..t...... foo/
-.f..t...... foo/config1
->fcstp..... foo/config2
-cL.$T...... foo/sym -> ../bar/baz/rsync
+.f..tp$dots bar/baz/rsync
+.d..t.$dots foo/
+.f..t.$dots foo/config1
+>fcstp$dots foo/config2
+cL.$T.$dots foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 3 failed"
 
@@ -122,15 +122,15 @@ $RSYNC -ivvplrtH "$fromdir/" "$todir/" \
     | tee "$outfile"
 filter_outfile
 cat <<EOT >"$chkfile"
-.d          ./
-.d          bar/
-.d          bar/baz/
-.f...p..... bar/baz/rsync
-.d          foo/
-.f          foo/config1
->f..t...... foo/config2
-hf          foo/extra
-.L          foo/sym -> ../bar/baz/rsync
+.d$allspace ./
+.d$allspace bar/
+.d$allspace bar/baz/
+.f...p$dots bar/baz/rsync
+.d$allspace foo/
+.f$allspace foo/config1
+>f..t.$dots foo/config2
+hf$allspace foo/extra
+.L$allspace foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 5 failed"
 
@@ -149,8 +149,8 @@ touch "$todir/foo/config2"
 $RSYNC -iplrtH "$fromdir/" "$todir/" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
-.f...p..... foo/config1
->f..t...... foo/config2
+.f...p$dots foo/config1
+>f..t.$dots foo/config2
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 7 failed"
 
@@ -159,28 +159,28 @@ $RSYNC -ivvplrtH --copy-dest=../to "$fromdir/" "$to2dir/" \
 filter_outfile
 case `tail -1 "$outfile"` in
 cL..t*)
-    sym_dots='..t......'
-    L_sym_dots='cL..t......'
+    sym_dots="..t.$dots"
+    L_sym_dots="cL$sym_dots"
     is_uptodate='-> ../bar/baz/rsync'
     echo "cL$sym_dots foo/sym $is_uptodate" >"$chkfile.extra"
     L=cL
     ;;
 *)
-    sym_dots='         '
-    L_sym_dots='.L         '
+    sym_dots="$allspace"
+    L_sym_dots=".L$allspace"
     is_uptodate='is uptodate'
     touch "$chkfile.extra"
     ;;
 esac
 cat <<EOT >"$chkfile"
-cd          ./
-cd          bar/
-cd          bar/baz/
-cf          bar/baz/rsync
-cd          foo/
-cf          foo/config1
-cf          foo/config2
-hf          foo/extra => foo/config1
+cd$allspace ./
+cd$allspace bar/
+cd$allspace bar/baz/
+cf$allspace bar/baz/rsync
+cd$allspace foo/
+cf$allspace foo/config1
+cf$allspace foo/config2
+hf$allspace foo/extra => foo/config1
 cL$sym_dots foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 8 failed"
@@ -189,7 +189,7 @@ rm -rf "$to2dir"
 $RSYNC -iplrtH --copy-dest=../to "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 cat - "$chkfile.extra" <<EOT >"$chkfile"
-hf          foo/extra => foo/config1
+hf$allspace foo/extra => foo/config1
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 9 failed"
 
@@ -215,14 +215,14 @@ $RSYNC -ivvplrtH --link-dest="$todir" "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 filter_outfile
 cat <<EOT >"$chkfile"
-cd          ./
-cd          bar/
-cd          bar/baz/
-hf          bar/baz/rsync
-cd          foo/
-hf          foo/config1
-hf          foo/config2
-hf          foo/extra => foo/config1
+cd$allspace ./
+cd$allspace bar/
+cd$allspace bar/baz/
+hf$allspace bar/baz/rsync
+cd$allspace foo/
+hf$allspace foo/config1
+hf$allspace foo/config2
+hf$allspace foo/extra => foo/config1
 $L$sym_dots foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 11 failed"
@@ -263,14 +263,14 @@ $RSYNC -ivvplrtH --compare-dest="$todir" "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 filter_outfile
 cat <<EOT >"$chkfile"
-cd          ./
-cd          bar/
-cd          bar/baz/
-.f          bar/baz/rsync
-cd          foo/
-.f          foo/config1
-.f          foo/config2
-.f          foo/extra
+cd$allspace ./
+cd$allspace bar/
+cd$allspace bar/baz/
+.f$allspace bar/baz/rsync
+cd$allspace foo/
+.f$allspace foo/config1
+.f$allspace foo/config2
+.f$allspace foo/extra
 $L_sym_dots foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 15 failed"
