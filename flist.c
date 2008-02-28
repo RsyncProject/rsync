@@ -44,6 +44,8 @@ extern int filesfrom_fd;
 extern int one_file_system;
 extern int copy_dirlinks;
 extern int keep_dirlinks;
+extern int preserve_uid;
+extern int preserve_gid;
 extern int preserve_acls;
 extern int preserve_xattrs;
 extern int preserve_links;
@@ -422,24 +424,24 @@ static void send_file_entry(int f, struct file_struct *file, int ndx, int first_
 		}
 	} else if (protocol_version < 28)
 		rdev = MAKEDEV(0, 0);
-	if (uid_ndx) {
+	if (preserve_uid) {
 		if ((uid_t)F_OWNER(file) == uid && *lastname)
 			xflags |= XMIT_SAME_UID;
 		else {
 			uid = F_OWNER(file);
-			if (uid_ndx && !numeric_ids) {
+			if (!numeric_ids) {
 				user_name = add_uid(uid);
 				if (inc_recurse && user_name)
 					xflags |= XMIT_USER_NAME_FOLLOWS;
 			}
 		}
 	}
-	if (gid_ndx) {
+	if (preserve_gid) {
 		if ((gid_t)F_GROUP(file) == gid && *lastname)
 			xflags |= XMIT_SAME_GID;
 		else {
 			gid = F_GROUP(file);
-			if (gid_ndx && !numeric_ids) {
+			if (!numeric_ids) {
 				group_name = add_gid(gid);
 				if (inc_recurse && group_name)
 					xflags |= XMIT_GROUP_NAME_FOLLOWS;
@@ -522,7 +524,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx, int first_
 	}
 	if (!(xflags & XMIT_SAME_MODE))
 		write_int(f, to_wire_mode(mode));
-	if (uid_ndx && !(xflags & XMIT_SAME_UID)) {
+	if (preserve_uid && !(xflags & XMIT_SAME_UID)) {
 		if (protocol_version < 30)
 			write_int(f, uid);
 		else {
@@ -534,7 +536,7 @@ static void send_file_entry(int f, struct file_struct *file, int ndx, int first_
 			}
 		}
 	}
-	if (gid_ndx && !(xflags & XMIT_SAME_GID)) {
+	if (preserve_gid && !(xflags & XMIT_SAME_GID)) {
 		if (protocol_version < 30)
 			write_int(f, gid);
 		else {
@@ -706,9 +708,9 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 			file_length = F_LENGTH(first);
 			modtime = first->modtime;
 			mode = first->mode;
-			if (uid_ndx)
+			if (preserve_uid)
 				uid = F_OWNER(first);
-			if (gid_ndx)
+			if (preserve_gid)
 				gid = F_GROUP(first);
 			if ((preserve_devices && IS_DEVICE(mode))
 			 || (preserve_specials && IS_SPECIAL(mode))) {
@@ -745,7 +747,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (chmod_modes && !S_ISLNK(mode))
 		mode = tweak_mode(mode, chmod_modes);
 
-	if (uid_ndx && !(xflags & XMIT_SAME_UID)) {
+	if (preserve_uid && !(xflags & XMIT_SAME_UID)) {
 		if (protocol_version < 30)
 			uid = (uid_t)read_int(f);
 		else {
@@ -756,7 +758,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 				uid = match_uid(uid);
 		}
 	}
-	if (gid_ndx && !(xflags & XMIT_SAME_GID)) {
+	if (preserve_gid && !(xflags & XMIT_SAME_GID)) {
 		if (protocol_version < 30)
 			gid = (gid_t)read_int(f);
 		else {
@@ -865,9 +867,9 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		OPT_EXTRA(file, 0)->unum = (uint32)(file_length >> 32);
 	}
 	file->mode = mode;
-	if (uid_ndx)
+	if (preserve_uid)
 		F_OWNER(file) = uid;
-	if (gid_ndx) {
+	if (preserve_gid) {
 		F_GROUP(file) = gid;
 		file->flags |= gid_flags;
 	}
@@ -1199,9 +1201,9 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		OPT_EXTRA(file, 0)->unum = (uint32)(st.st_size >> 32);
 	}
 	file->mode = st.st_mode;
-	if (uid_ndx)
+	if (uid_ndx) /* Check uid_ndx instead of preserve_uid for del support */
 		F_OWNER(file) = st.st_uid;
-	if (gid_ndx)
+	if (gid_ndx) /* Check gid_ndx instead of preserve_gid for del support */
 		F_GROUP(file) = st.st_gid;
 
 	if (basename != thisname)
