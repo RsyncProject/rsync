@@ -58,13 +58,13 @@ while (<IN>) {
     }
 }
 close IN;
-if ($lastversion =~ /dev$/) {
-    open(IN, '<', 'OLDNEWS') or die $!;
-    $_ = <IN>;
-    close IN;
-    ($lastversion) = /(\d+\.\d+\.\d+)/;
-}
 
+open(IN, '<', 'OLDNEWS') or die $!;
+$_ = <IN>;
+close IN;
+my($lastrelease) = /(\d+\.\d+\.\d+)/;
+
+$lastversion = $lastrelease if $lastversion =~ /dev$/;
 my $version = $lastversion;
 $version =~ s/dev/pre1/ || $version =~ s/pre(\d+)/ 'pre' . ($1 + 1) /e;
 
@@ -75,7 +75,7 @@ if ($_ eq '.') {
 } elsif ($_ ne '') {
     $version = $_;
 }
-$version =~ s/[-.]*pre[-.]*/pre/;
+$lastversion = $lastrelease unless $version =~ s/[-.]*pre[-.]*/pre/;
 
 print "Enter the previous version to produce a patch against: [$lastversion] ";
 chomp($_ = <STDIN>);
@@ -190,7 +190,7 @@ print "<Press Enter to continue> ";
 $_ = <STDIN>;
 
 system "git commit -a -m 'Preparing for release of $version'" and exit 1;
-print "Sign the tag:\n";
+print "\nSign the tag:";
 system "git tag -s -m 'Version $version.' v$version" and exit 1;
 
 # Extract some files from the old tar before we do the shuffle.
@@ -242,7 +242,7 @@ if ($diffdir ne $dest) {
 print "Creating $diff_file ...\n";
 system "./config.status Makefile; make gen; rsync -a @extra_files b/";
 my $sed_script = 's:^((---|\+\+\+) [ab]/[^\t]+)\t.*:\1:';
-system "(git diff v$lastversion v$version; diff -up a b | sed -r '$sed_script') | gzip -9 >$diff_file";
+system "(git diff v$lastversion v$version; diff -upN a b | sed -r '$sed_script') | gzip -9 >$diff_file";
 system "rm -rf a";
 rename('b', "rsync-$version");
 
