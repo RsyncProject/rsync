@@ -129,6 +129,9 @@ Changes since 2.6.9:
 
     - Fixed the combination of --only-write-batch and --dry-run.
 
+    - Fixed rsync's ability to remove files that are not writable by the file's
+      owner when rsync is running as the same user.
+
   ENHANCEMENTS:
 
     - A new incremental-recursion algorithm is now used when rsync is talking
@@ -313,6 +316,8 @@ Changes since 2.6.9:
 
     - The "patches" directory of diff files is now built from branches in the
       rsync git repository (branch patch/FOO creates file patches/FOO.diff).
+      This directory is now distributed in a separate separate tar file named
+      rsync-patches-VERSION.tar.gz instead of the main rsync-VERSION.tar.gz.
 
     - The proto.h file is now built using a simple perl script rather than a
       complex awk script, which proved to be more widely compatible.
