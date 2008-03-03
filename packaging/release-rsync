@@ -128,37 +128,53 @@ EOT
 print "<Press Enter to continue> ";
 $_ = <STDIN>;
 
-my @tweak_files = ( glob('packaging/*.spec'), glob('packaging/*/*.spec'),
-		    glob('*.yo'), qw( configure.in options.c ) );
+(my $finalversion = $version) =~ s/pre\d+//;
+my %specvars = ( 'Version:' => $version, 'Release:' => $release,
+		 'Released' => "$version." );
+my @tweak_files = ( glob('packaging/*.spec'), glob('packaging/*/*.spec'), glob('*.yo'),
+		    qw( configure.in rsync.h NEWS OLDNEWS options.c ) );
 
-if ($version !~ /pre/) {
-    push(@tweak_files, qw( rsync.h NEWS OLDNEWS ));
-}
 foreach my $fn (@tweak_files) {
     open(IN, '<', $fn) or die $!;
     undef $/; $_ = <IN>; $/ = "\n";
     close IN;
     if ($fn =~ /configure/) {
-	s/^RSYNC_VERSION=.*/RSYNC_VERSION=$version/m;
+	s/^RSYNC_VERSION=.*/RSYNC_VERSION=$version/m
+	    or die "Unable to update RSYNC_VERSION in $fn\n";
     } elsif ($fn =~ /\.spec/) {
-	s/^(Version:) .*/$1 $version/m;
-	s/^(Release:) .*/$1 $release/m;
-	s/^(Released) .*/$1 $version./m;
-	s/^\* \w\w\w \w\w\w \d\d \d\d\d\d (.*)/$cl_today $1/m;
+	while (my($str, $val) = each %specvars) {
+	    s/^\Q$str\E .*/$str $val/m
+		or die "Unable to update $str in $fn\n";
+	}
+	s/^\* \w\w\w \w\w\w \d\d \d\d\d\d (.*)/$cl_today $1/m
+	    or die "Unable to update ChangeLog header in $fn\n";
     } elsif ($fn =~ /\.yo/) {
-	s/^(manpage\([^)]+\)\(\d+\)\()[^)]+(\).*)/$1$today$2/m;
-	s/^(This man ?page is current for version) \S+ (of rsync)/$1 $version $2/m;
-    } elsif ($fn eq 'NEWS') {
-	s/^(NEWS for rsync \Q$version\E) \(UNRELEASED\)\s*\n/$1 ($today)\n/mi
-	    or die "Couldn't update NEWS file with release date!\n";
+	s/^(manpage\([^)]+\)\(\d+\)\()[^)]+(\).*)/$1$today$2/m
+	    or die "Unable to update date in manpage() header in $fn\n";
+	s/^(This man ?page is current for version) \S+ (of rsync)/$1 $version $2/m
+	    or die "Unable to update current version info in $fn\n";
     } elsif ($fn eq 'rsync.h') {
-	s/(#define\s+SUBPROTOCOL_VERSION)\s+\d+/$1 0/;
+	s/(#define\s+SUBPROTOCOL_VERSION)\s+\d+/$1 0/
+	    or die "Unable to find SUBPROTOCOL_VERSION define in $fn\n";
+	next if $version =~ /pre/;
+    } elsif ($fn eq 'NEWS') {
+	s/^(NEWS for rsync \Q$finalversion\E) \(UNRELEASED\)\s*\n/$1 ($today)\n/mi
+	    or die "The first line of $fn is not in the right format.  It must be:\n"
+		 . "NEWS for rsync $finalversion (UNRELEASED)\n";
+	next if $version =~ /pre/;
     } elsif ($fn eq 'OLDNEWS') {
-	s/^\t\S\S\s\S\S\S\s\d\d\d\d(\t\Q$version\E)/\t$ztoday$1/m
-	    or die "Couldn't update OLDNEWS file with release date!\n";
+	s/^\t\S\S\s\S\S\S\s\d\d\d\d(\t\Q$finalversion\E)/\t$ztoday$1/m
+	    or die "Unable to find \"?? ??? $year\t$finalversion\" line in $fn\n";
+	next if $version =~ /pre/;
     } elsif ($fn eq 'options.c') {
-	s/(rprintf\(f, "Copyright \(C\) 1996-)\d+/$1$year/;
-	s/(Copyright \(C\) 2002-)\d+( Wayne Davison)/$1$year$2/;
+	if (s/(Copyright \(C\) 2002-)(\d+)( Wayne Davison)/$1$year$3/
+	 && $2 ne $year) {
+	    die "Copyright comments need to be updated to $year in all files!\n";
+	}
+	# Adjust the year in the --version output.
+	s/(rprintf\(f, "Copyright \(C\) 1996-)(\d+)/$1$year/
+	    or die "Unable to find Copyright string in --version output of $fn\n";
+	next if $2 eq $year;
     } else {
 	die "Unrecognized file in \@tweak_files: $fn\n";
     }
