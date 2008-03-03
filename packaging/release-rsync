@@ -11,8 +11,10 @@ use Date::Format;
 
 my $dest = $ENV{HOME} . '/samba-rsync-ftp';
 
-my $cl_today = time2str('* %a %b %d %Y', time);
-my $ztoday = time2str('%d %b %Y', time);
+my $now = time;
+my $cl_today = time2str('* %a %b %d %Y', $now);
+my $year = time2str('%Y', $now);
+my $ztoday = time2str('%d %b %Y', $now);
 (my $today = $ztoday) =~ s/^0//;
 
 my $curdir = Cwd::cwd;
@@ -49,23 +51,23 @@ close IN;
 die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
 die "The checkout is not on the master branch.\n" unless $status =~ /^# On branch master\n/;
 
-my $lastversion;
+my $confversion;
 open(IN, '<', 'configure.in') or die $!;
 while (<IN>) {
     if (/^RSYNC_VERSION=(.*)/) {
-	$lastversion = $1;
+	$confversion = $1;
 	last;
     }
 }
 close IN;
+die "Unable to find RSYNC_VERSION in configure.in\n" unless defined $confversion;
 
 open(IN, '<', 'OLDNEWS') or die $!;
 $_ = <IN>;
 close IN;
-my($lastrelease) = /(\d+\.\d+\.\d+)/;
+my($lastversion) = /(\d+\.\d+\.\d+)/;
 
-$lastversion = $lastrelease if $lastversion =~ /dev$/;
-my $version = $lastversion;
+my $version = $confversion;
 $version =~ s/dev/pre1/ || $version =~ s/pre(\d+)/ 'pre' . ($1 + 1) /e;
 
 print "Please enter the version number of this release: [$version] ";
@@ -75,7 +77,10 @@ if ($_ eq '.') {
 } elsif ($_ ne '') {
     $version = $_;
 }
-$lastversion = $lastrelease unless $version =~ s/[-.]*pre[-.]*/pre/;
+
+if ($version =~ s/[-.]*pre[-.]*/pre/ && $confversion !~ /dev$/) {
+    $lastversion = $confversion;
+}
 
 print "Enter the previous version to produce a patch against: [$lastversion] ";
 chomp($_ = <STDIN>);
@@ -124,7 +129,7 @@ print "<Press Enter to continue> ";
 $_ = <STDIN>;
 
 my @tweak_files = ( glob('packaging/*.spec'), glob('packaging/*/*.spec'),
-		    glob('*.yo'), qw( configure.in ) );
+		    glob('*.yo'), qw( configure.in options.c ) );
 
 if ($version !~ /pre/) {
     push(@tweak_files, qw( rsync.h NEWS OLDNEWS ));
@@ -151,6 +156,9 @@ foreach my $fn (@tweak_files) {
     } elsif ($fn eq 'OLDNEWS') {
 	s/^\t\S\S\s\S\S\S\s\d\d\d\d(\t\Q$version\E)/\t$ztoday$1/m
 	    or die "Couldn't update OLDNEWS file with release date!\n";
+    } elsif ($fn eq 'options.c') {
+	s/(rprintf\(f, "Copyright \(C\) 1996-)\d+/$1$year/;
+	s/(Copyright \(C\) 2002-)\d+( Wayne Davison)/$1$year$2/;
     } else {
 	die "Unrecognized file in \@tweak_files: $fn\n";
     }
