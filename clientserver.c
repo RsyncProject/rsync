@@ -864,6 +864,17 @@ static void send_listing(int fd)
 		io_printf(fd,"@RSYNCD: EXIT\n");
 }
 
+static int load_config(int globals_only)
+{
+	if (!config_file) {
+		if (am_server && am_root <= 0)
+			config_file = RSYNCD_USERCONF;
+		else
+			config_file = RSYNCD_SYSCONF;
+	}
+	return lp_load(config_file, globals_only);
+}
+
 /* this is called when a connection is established to a client
    and we want to start talking. The setup of the system is done from
    here */
@@ -879,7 +890,7 @@ int start_daemon(int f_in, int f_out)
 	 * might cause log-file output to occur.  This ensures that the
 	 * "log file" param gets honored for the 2 non-forked use-cases
 	 * (when rsync is run by init and run by a remote shell). */
-	if (!lp_load(config_file, 0))
+	if (!load_config(0))
 		exit_cleanup(RERR_SYNTAX);
 
 	addr = client_addr(f_in);
@@ -988,13 +999,6 @@ static void become_daemon(void)
 
 int daemon_main(void)
 {
-	if (!config_file) {
-		if (am_server && am_root <= 0)
-			config_file = RSYNCD_USERCONF;
-		else
-			config_file = RSYNCD_SYSCONF;
-	}
-
 	if (is_a_socket(STDIN_FILENO)) {
 		int i;
 
@@ -1009,7 +1013,7 @@ int daemon_main(void)
 		return start_daemon(STDIN_FILENO, STDIN_FILENO);
 	}
 
-	if (!lp_load(config_file, 1)) {
+	if (!load_config(1)) {
 		fprintf(stderr, "Failed to parse config file: %s\n", config_file);
 		exit_cleanup(RERR_SYNTAX);
 	}
