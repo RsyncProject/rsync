@@ -1949,8 +1949,12 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 		fname = f_name(file, NULL);
 		if (!(file->mode & S_IWUSR))
 			do_chmod(fname, file->mode);
-		if (need_retouch_dir_times)
-			set_modtime(fname, file->modtime, file->mode);
+		if (need_retouch_dir_times) {
+			STRUCT_STAT st;
+			if (link_stat(fname, &st, 0) == 0
+			 && cmp_time(st.st_mtime, file->modtime) != 0)
+				set_modtime(fname, file->modtime, file->mode);
+		}
 		if (allowed_lull && !(counter % lull_mod))
 			maybe_send_keepalive();
 		else if (!(counter & 0xFF))
