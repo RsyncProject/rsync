@@ -92,19 +92,20 @@ print "Please enter the RPM release number of this release: [$release] ";
 chomp($_ = <STDIN>);
 $release = $_ if $_ ne '';
 
-my $diffdir;
-my $skipping;
+my($srcdir,$srcdiffdir,$lastsrcdir,$skipping);
 if ($lastversion =~ /pre/) {
     if ($version !~ /pre/) {
 	die "You should not diff a release version against a pre-release version.\n";
     }
-    $diffdir = "$dest/old-previews";
+    $srcdir = $srcdiffdir = $lastsrcdir = 'src-previews';
     $skipping = ' ** SKIPPING **';
 } elsif ($version =~ /pre/) {
-    $diffdir = $dest;
+    $srcdir = $srcdiffdir = 'src-previews';
+    $lastsrcdir = 'src';
     $skipping = ' ** SKIPPING **';
 } else {
-    $diffdir = "$dest/old-versions";
+    $srcdir = $lastsrcdir = 'src';
+    $srcdiffdir = 'src-diffs';
     $skipping = '';
 }
 
@@ -113,7 +114,9 @@ print "\n", $break, <<EOT;
 \$lastversion is "$lastversion"
 \$dest is "$dest"
 \$curdir is "$curdir"
-\$diffdir is "$diffdir"
+\$srcdir is "$srcdir"
+\$srcdiffdir is "$srcdiffdir"
+\$lastsrcdir is "$lastsrcdir"
 \$release is "$release"
 
 About to:
@@ -189,18 +192,19 @@ system "git diff --color | less -p '^diff .*'";
 my $srctar_name = "rsync-$version.tar.gz";
 my $pattar_name = "rsync-patches-$version.tar.gz";
 my $diff_name = "rsync-$lastversion-$version.diffs.gz";
-my $srctar_file = "$dest/$srctar_name";
-my $pattar_file = "$dest/$pattar_name";
-my $diff_file = "$dest/$diff_name";
-my $lasttar_file = "$dest/rsync-$lastversion.tar.gz";
+my $srctar_file = "$dest/$srcdir/$srctar_name";
+my $pattar_file = "$dest/$srcdir/$pattar_name";
+my $diff_file = "$dest/$srcdiffdir/$diff_name";
+my $news_file = "$dest/$srcdir/rsync-$version-NEWS";
+my $lasttar_file = "$dest/$lastsrcdir/rsync-$lastversion.tar.gz";
 
 print $break, <<EOT;
 
 About to:
     - commit all changes
     - tag this release as v$version
-    - move the old tar/diff files into the appropriate old-* dirs
-    - hard-link the moved tar/diff files on samba.org
+    - remove hard-linked top-level files for outdated version$skipping
+    - hard-link src files into top-level dir$skipping
     - create release tar, "$srctar_name"
     - create patches tar, "$pattar_name"
     - create release diffs, "$diff_name"
@@ -217,51 +221,11 @@ system "git commit -a -m 'Preparing for release of $version'" and exit 1;
 print "\nSign the tag:";
 system "git tag -s -m 'Version $version.' v$version" and exit 1;
 
-# Extract some files from the old tar before we do the shuffle.
+# Extract the generated files from the old tar.
 @_ = @extra_files;
 map { s#^#rsync-$lastversion/# } @_;
 system "tar xzf $lasttar_file @_";
 rename("rsync-$lastversion", 'a');
-
-# When creating a pre-release after a normal release, there's nothing to move.
-if ($diffdir ne $dest) {
-    chdir($dest) or die $!;
-
-    print "Shuffling old files ...\n";
-
-    # We need to run this regardless of $lastversion's "pre"ness.
-    my @moved_files;
-    foreach my $fn (glob('rsync*pre*.tar.gz*'), glob('rsync*pre*-NEWS')) {
-	link($fn, "old-previews/$fn") or die $!;
-	push(@moved_files, $fn);
-    }
-
-    if ($version !~ /pre/) {
-	foreach my $fn (glob('rsync*.tar.gz*'), glob('rsync*-NEWS')) {
-	    next if $fn =~ /^rsync.*pre/;
-	    link($fn, "old-versions/$fn") or die $!;
-	    push(@moved_files, $fn);
-	}
-
-	foreach my $fn (glob('rsync*pre*.diffs.gz*')) {
-	    unlink($fn);
-	}
-
-	foreach my $fn (glob('rsync*.diffs.gz*')) {
-	    link($fn, "old-patches/$fn") or die $!;
-	    push(@moved_files, $fn);
-	}
-    }
-
-    # Optimize our future upload (in the absence of --detect-renamed) by
-    # using rsync to hard-link the above files on samba.org.
-    system "rsync -avHOC --include='rsync*.gz*' --include='old-*/' --exclude='*' . samba.org:/home/ftp/pub/rsync";
-    foreach (@moved_files) {
-	unlink($_);
-    }
-
-    chdir($curdir) or die $!;
-}
 
 print "Creating $diff_file ...\n";
 system "./config.status Makefile; make gen; rsync -a @extra_files b/";
@@ -282,19 +246,31 @@ system "fakeroot tar chzf $pattar_file rsync-$version/patches; rm -rf rsync-$ver
 
 print "Updating the other files in $dest ...\n";
 system "rsync -a README NEWS OLDNEWS TODO $dest";
-unlink("$dest/rsync-$version-NEWS");
-link("$dest/NEWS", "$dest/rsync-$version-NEWS");
+unlink($news_file);
+link("$dest/NEWS", $news_file);
 system "git log --name-status | gzip -9 >$dest/ChangeLog.gz";
 
 system "yodl2html -o $dest/rsync.html rsync.yo";
 system "yodl2html -o $dest/rsyncd.conf.html rsyncd.conf.yo";
 
-chdir($dest) or die $!;
 my $cnt = 0;
-foreach my $fn ($srctar_name, $pattar_name, $diff_name) {
+print "\n";
+foreach my $fn ($srctar_file, $pattar_file, $diff_file) {
     print ++$cnt, ". Sign file \"$fn\":";
     system "gpg -ba $fn";
 }
+
+if ($version !~ /pre/) {
+    system "rm $dest/rsync-*{.tar.gz,.asc,-NEWS} $dest/src-preview/rsync-*diffs.gz";
+
+    foreach my $fn ($srctar_file, "$srctar_file.asc",
+		    $pattar_file, "$pattar_file.asc",
+		    $diff_file, "$diff_file.asc", $news_file) {
+	(my $top_fn = $fn) =~ s#/src(-\w+)?/#/#;
+	link($fn, $top_fn);
+    }
+}
+
 print $break, <<'EOT';
 
 Local changes are done.  When you're satisfied, push the git repository
