@@ -4,13 +4,19 @@
 # is included in the rrsync script.
 use strict;
 
-our(%short_no_arg, %short_with_num, %long_opt);
+our %short_no_arg;
+our %short_with_num;
+our %long_opt = (
+    'no-i-r' => 0,
+    'fake-super' => 0,
+    'log-file' => 3,
+);
 our $last_long_opt;
 
 open(IN, '../options.c') or die "Unable to open ../options.c: $!\n";
 
 while (<IN>) {
-    if (/\Qargstr[x++]\E = '(.)'/) {
+    if (/\Qargstr[x++]\E = '([^.ie])'/) {
 	$short_no_arg{$1} = 1;
 	undef $last_long_opt;
     } elsif (/\Qasprintf(\E[^,]+, "-([a-zA-Z0-9])\%l?[ud]"/) {
