@@ -228,9 +228,9 @@ Changes since 2.6.9:
       --link-dest).  This lets the user know when they specified a directory
       that does not exist.
 
-    - If we get an error setting the time on a symlink, we don't complain about
-      it anymore (since some operating systems don't support that, and it's not
-      that important).
+    - If we get an ENOSYS error setting the time on a symlink, we don't
+      complain about it anymore (for those systems that even support the
+      setting of the modify-time on a symlink).
 
     - Protocol 30 now uses MD5 checksums instead of MD4.
 
