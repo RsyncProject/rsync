@@ -203,8 +203,7 @@ print $break, <<EOT;
 About to:
     - commit all changes
     - tag this release as v$version
-    - remove hard-linked top-level files for outdated version$skipping
-    - hard-link src files into top-level dir$skipping
+    - update hard-linked top-level files for new version$skipping
     - create release tar, "$srctar_name"
     - create patches tar, "$pattar_name"
     - create release diffs, "$diff_name"
