@@ -32,6 +32,7 @@ extern int am_daemon;
 extern int am_root;
 extern int rsync_port;
 extern int ignore_errors;
+extern int preserve_xattrs;
 extern int kluge_around_eof;
 extern int daemon_over_rsh;
 extern int sanitize_paths;
@@ -745,9 +746,11 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	if (write_batch < 0)
 		dry_run = 1;
 
-	if (lp_fake_super(i))
+	if (lp_fake_super(i)) {
+		if (preserve_xattrs > 1)
+			preserve_xattrs = 1;
 		am_root = -1;
-	else if (am_root < 0) /* Treat --fake-super from client as --super. */
+	} else if (am_root < 0) /* Treat --fake-super from client as --super. */
 		am_root = 2;
 
 	if (filesfrom_fd == 0)

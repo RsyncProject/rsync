@@ -1314,7 +1314,13 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 	}
 #endif
 
-#ifndef SUPPORT_XATTRS
+#ifdef SUPPORT_XATTRS
+	if (am_root < 0 && preserve_xattrs > 1) {
+		snprintf(err_buf, sizeof err_buf,
+			 "--fake-super conflicts with -XX\n");
+		return 0;
+	}
+#else
 	if (am_root < 0) {
 		snprintf(err_buf, sizeof err_buf,
 			 "--fake-super requires an rsync with extended attributes enabled\n");
