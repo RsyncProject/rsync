@@ -62,9 +62,12 @@ extern int checksum_seed;
 #endif
 #define RPRE_LEN ((int)sizeof RSYNC_PREFIX - 1)
 
-#define XSTAT_ATTR RSYNC_PREFIX "%stat"
-#define XACC_ACL_ATTR RSYNC_PREFIX "%aacl"
-#define XDEF_ACL_ATTR RSYNC_PREFIX "%dacl"
+#define XSTAT_SUFFIX "stat"
+#define XSTAT_ATTR RSYNC_PREFIX "%" XSTAT_SUFFIX
+#define XACC_ACL_SUFFIX "aacl"
+#define XACC_ACL_ATTR RSYNC_PREFIX "%" XACC_ACL_SUFFIX
+#define XDEF_ACL_SUFFIX "dacl"
+#define XDEF_ACL_ATTR RSYNC_PREFIX "%" XDEF_ACL_SUFFIX
 
 typedef struct {
 	char *datum, *name;
@@ -231,7 +234,10 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 		if (name_len > RPRE_LEN && name[RPRE_LEN] == '%'
 		 && HAS_PREFIX(name, RSYNC_PREFIX)) {
 			if ((am_sender && preserve_xattrs < 2)
-			 || (am_root < 0 && strcmp(name, XSTAT_ATTR) == 0))
+			 || (am_root < 0
+			  && (strcmp(name+RPRE_LEN+1, XSTAT_SUFFIX) == 0
+			   || strcmp(name+RPRE_LEN+1, XACC_ACL_SUFFIX) == 0
+			   || strcmp(name+RPRE_LEN+1, XDEF_ACL_SUFFIX) == 0)))
 				continue;
 		}
 
@@ -252,14 +258,6 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 			sum_end(ptr + 1);
 		} else
 			name_offset = datum_len;
-
-#ifdef HAVE_LINUX_XATTRS
-		if (am_root < 0 && name_len > RPRE_LEN && name[RPRE_LEN] != '%'
-		 && HAS_PREFIX(name, RSYNC_PREFIX)) {
-			name += RPRE_LEN;
-			name_len -= RPRE_LEN;
-		}
-#endif
 
 		rxa = EXPAND_ITEM_LIST(xalp, rsync_xa, RSYNC_XAL_INITIAL);
 		rxa->name = ptr + name_offset;
@@ -352,25 +350,33 @@ int send_xattr(stat_x *sxp, int f)
 		int count = sxp->xattr->count;
 		write_varint(f, count);
 		for (rxa = sxp->xattr->items; count--; rxa++) {
+			int name_len = rxa->name_len;
+			const char *name = rxa->name;
+			/* Strip the rsync prefix from disguised namespaces. */
+			if (
 #ifdef HAVE_LINUX_XATTRS
-			write_varint(f, rxa->name_len);
-			write_varint(f, rxa->datum_len);
-			write_buf(f, rxa->name, rxa->name_len);
-#else
-			/* We strip the rsync prefix from disguised namespaces
-			 * and put everything else in the user namespace. */
-			if (HAS_PREFIX(rxa->name, RSYNC_PREFIX)
-			 && rxa->name[RPRE_LEN] != '%') {
-				write_varint(f, rxa->name_len - RPRE_LEN);
-				write_varint(f, rxa->datum_len);
-				write_buf(f, rxa->name + RPRE_LEN, rxa->name_len - RPRE_LEN);
-			} else {
-				write_varint(f, rxa->name_len + UPRE_LEN);
-				write_varint(f, rxa->datum_len);
-				write_buf(f, USER_PREFIX, UPRE_LEN);
-				write_buf(f, rxa->name, rxa->name_len);
+			    am_root < 0
+#endif
+			 && name_len > RPRE_LEN && name[RPRE_LEN] != '%'
+			 && HAS_PREFIX(name, RSYNC_PREFIX)) {
+				name += RPRE_LEN;
+				name_len -= RPRE_LEN;
+			}
+#ifndef HAVE_LINUX_XATTRS
+			else {
+				/* Put everything else in the user namespace. */
+				name_len += UPRE_LEN;
 			}
 #endif
+			write_varint(f, name_len);
+			write_varint(f, rxa->datum_len);
+#ifndef HAVE_LINUX_XATTRS
+			if (name_len > rxa->name_len) {
+				write_buf(f, USER_PREFIX, UPRE_LEN);
+				name_len -= UPRE_LEN;
+			}
+#endif
+			write_buf(f, name, name_len);
 			if (rxa->datum_len > MAX_FULL_DATUM)
 				write_buf(f, rxa->datum + 1, MAX_DIGEST_LEN);
 			else
@@ -574,6 +580,11 @@ void receive_xattr(struct file_struct *file, int f)
 {
 	static item_list temp_xattr = EMPTY_ITEM_LIST;
 	int count, num;
+#ifdef HAVE_LINUX_XATTRS
+	int need_sort = 0;
+#else
+	int need_sort = 1;
+#endif
 	int ndx = read_varint(f);
 
 	if (ndx < 0 || (size_t)ndx > rsync_xal_l.count) {
@@ -624,6 +635,7 @@ void receive_xattr(struct file_struct *file, int f)
 			name -= RPRE_LEN;
 			name_len += RPRE_LEN;
 			memcpy(name, RSYNC_PREFIX, RPRE_LEN);
+			need_sort = 1;
 		}
 #else
 		/* This OS only has a user namespace, so we either
@@ -654,6 +666,9 @@ void receive_xattr(struct file_struct *file, int f)
 		rxa->datum_len = datum_len;
 		rxa->num = num;
 	}
+
+	if (need_sort && count > 1)
+		qsort(temp_xattr.items, count, sizeof (rsync_xa), rsync_xal_compare_names);
 
 	ndx = rsync_xal_l.count; /* pre-incremented count */
 	rsync_xal_store(&temp_xattr); /* adds item to rsync_xal_l */

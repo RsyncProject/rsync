@@ -20,6 +20,7 @@ case "`xattr 2>&1`" in
     xls() {
 	xattr -l "${@}"
     }
+    RUSR='rsync'
     ;;
 *)
     xset() {
@@ -31,6 +32,7 @@ case "`xattr 2>&1`" in
     xls() {
 	getfattr -d "${@}"
     }
+    RUSR='user.rsync'
     ;;
 esac
 
@@ -65,13 +67,15 @@ xset user.long 'a long attribute for our new file that tests to ensure that this
 xset user.foo 'new foo' foo/file3 foo/bar/file5
 xset user.bar 'new bar' foo/file3 foo/bar/file5
 xset user.long 'this is also a long attribute that will be truncated in the initial data send' foo/file3 foo/bar/file5
-xset user.equal 'this long attribute should remain the same and not need to be transferred' foo/file3 foo/bar/file5
+xset $RUSR.equal 'this long attribute should remain the same and not need to be transferred' foo/file3 foo/bar/file5
+xset $RUSR.equal 'this short' foo/file3 foo/bar/file5
 
 xset user.short 'old short' "$chkdir/file1"
 xset user.extra 'remove me' "$chkdir/file1"
 
 xset user.foo 'old foo' "$chkdir/foo/file3"
-xset user.equal 'this long attribute should remain the same and not need to be transferred' "$chkdir/foo/file3"
+xset $RUSR.equal 'this long attribute should remain the same and not need to be transferred' "$chkdir/foo/file3"
+xset $RUSR.equal 'this short' "$chkdir/foo/file3"
 
 xls $files >"$scratchdir/xattrs.txt"
 
@@ -95,10 +99,17 @@ xls $files >"$scratchdir/xattrs.txt"
 
 rm -rf "$todir"
 
-checkit "$RSYNC -aiX --link-dest=../chk . ../to" "$chkdir" "$todir"
+checkit "$RSYNC -aiX --fake-super --link-dest=../chk . ../to" "$chkdir" "$todir"
 
 cd "$todir"
 xls $files | diff $diffopt "$scratchdir/xattrs.txt" -
+
+sed -n -e '/\.\/file1$/d' -e '/^[^ ]* *[^ ]* *[^ ]* *1 /p' "$scratchdir/ls-to" >"$scratchdir/ls-diff"
+if [ -s "$scratchdir/ls-diff" ]; then
+    echo "Missing hard links on:"
+    cat "$scratchdir/ls-diff"
+    exit 1
+fi
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0
