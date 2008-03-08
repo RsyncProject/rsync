@@ -350,15 +350,14 @@ int send_xattr(stat_x *sxp, int f)
 		int count = sxp->xattr->count;
 		write_varint(f, count);
 		for (rxa = sxp->xattr->items; count--; rxa++) {
-			int name_len = rxa->name_len;
+			size_t name_len = rxa->name_len;
 			const char *name = rxa->name;
 			/* Strip the rsync prefix from disguised namespaces. */
-			if (
+			if (name_len > RPRE_LEN
 #ifdef HAVE_LINUX_XATTRS
-			    am_root < 0
+			 && am_root < 0
 #endif
-			 && name_len > RPRE_LEN && name[RPRE_LEN] != '%'
-			 && HAS_PREFIX(name, RSYNC_PREFIX)) {
+			 && name[RPRE_LEN] != '%' && HAS_PREFIX(name, RSYNC_PREFIX)) {
 				name += RPRE_LEN;
 				name_len -= RPRE_LEN;
 			}
@@ -699,7 +698,8 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 	ssize_t list_len;
 	size_t i, len;
 	char *name, *ptr, sum[MAX_DIGEST_LEN];
-	int name_len, ret = 0;
+	size_t name_len;
+	int ret = 0;
 
 	/* This puts the current name list into the "namebuf" buffer. */
 	if ((list_len = get_xattr_names(fname)) < 0)
