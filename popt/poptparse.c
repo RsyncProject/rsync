@@ -163,8 +163,10 @@ int poptConfigFileToString(FILE *fp, char ** argstrp, /*@unused@*/ UNUSED(int fl
 	    p++;
 
 	linelen = strlen(p);
-	if (linelen >= maxlinelen-1)
+	if (linelen >= maxlinelen-1) {
+	    free(argstr);
 	    return POPT_ERROR_OVERFLOW;	/* XXX line too long */
+	}
 
 	if (*p == '\0' || *p == '\n') continue;	/* line is empty */
 	if (*p == '#') continue;		/* comment line */

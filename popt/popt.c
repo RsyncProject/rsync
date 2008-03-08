@@ -809,16 +809,20 @@ int poptGetNextOpt(poptContext con)
 		    *oe++ = '\0';
 		    /* XXX longArg is mapped back to persistent storage. */
 		    longArg = origOptString + (oe - localOptString);
-		}
+		} else
+		    oe = NULL;
 
 		opt = findOption(con->options, optString, '\0', &cb, &cbData,
 				 singleDash);
 		if (!opt && !singleDash)
 		    return POPT_ERROR_BADOPT;
+		if (!opt && oe)
+		    oe[-1] = '='; /* restore overwritten '=' */
 	    }
 
 	    if (!opt) {
 		con->os->nextCharArg = origOptString + 1;
+		longArg = NULL;
 	    } else {
 		if (con->os == con->optionStack &&
 		   opt->argInfo & POPT_ARGFLAG_STRIP)
@@ -856,7 +860,7 @@ int poptGetNextOpt(poptContext con)
 
 	    origOptString++;
 	    if (*origOptString != '\0')
-		con->os->nextCharArg = origOptString;
+		con->os->nextCharArg = origOptString + (*origOptString == '=');
 	}
 	/*@=branchstate@*/
 

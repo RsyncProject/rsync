@@ -121,7 +121,7 @@ getArgDescrip(const struct poptOption * opt,
     if (opt->argDescrip) return D_(translation_domain, opt->argDescrip);
 
     switch (opt->argInfo & POPT_ARG_MASK) {
-    case POPT_ARG_NONE:		return POPT_("NONE");
+    /*case POPT_ARG_NONE:	return POPT_("NONE");*/ /* impossible */
 #ifdef	DYING
     case POPT_ARG_VAL:		return POPT_("VAL");
 #else
@@ -766,6 +766,9 @@ static int showShortOptions(const struct poptOption * opt, FILE * fp,
     /* bufsize larger then the ascii set, lazy alloca on top level call. */
     char * s = (str != NULL ? str : memset(alloca(300), 0, 300));
     int len = 0;
+
+    if (s == NULL)
+	return 0;
 
 /*@-boundswrite@*/
     if (opt != NULL)
