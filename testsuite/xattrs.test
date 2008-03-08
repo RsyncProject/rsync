@@ -68,14 +68,12 @@ xset user.foo 'new foo' foo/file3 foo/bar/file5
 xset user.bar 'new bar' foo/file3 foo/bar/file5
 xset user.long 'this is also a long attribute that will be truncated in the initial data send' foo/file3 foo/bar/file5
 xset $RUSR.equal 'this long attribute should remain the same and not need to be transferred' foo/file3 foo/bar/file5
-xset $RUSR.equal 'this short' foo/file3 foo/bar/file5
 
 xset user.short 'old short' "$chkdir/file1"
 xset user.extra 'remove me' "$chkdir/file1"
 
 xset user.foo 'old foo' "$chkdir/foo/file3"
 xset $RUSR.equal 'this long attribute should remain the same and not need to be transferred' "$chkdir/foo/file3"
-xset $RUSR.equal 'this short' "$chkdir/foo/file3"
 
 xls $files >"$scratchdir/xattrs.txt"
 
