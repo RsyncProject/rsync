@@ -169,7 +169,7 @@ int do_chmod(const char *path, mode_t mode)
 	} else
 		code = chmod(path, mode & CHMOD_BITS);
 	if (code != 0 && (preserve_perms || preserve_executability))
-	    return code;
+		return code;
 	return 0;
 }
 #endif

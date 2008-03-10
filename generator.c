@@ -582,10 +582,11 @@ int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 	if (preserve_times && cmp_time(sxp->st.st_mtime, file->modtime) != 0)
 		return 0;
 
-	if (preserve_perms && !BITS_EQUAL(sxp->st.st_mode, file->mode, CHMOD_BITS))
-		return 0;
-
-	if (preserve_executability && ((sxp->st.st_mode & 0111 ? 1 : 0) ^ (file->mode & 0111 ? 1 : 0)))
+	if (preserve_perms) {
+		if (!BITS_EQUAL(sxp->st.st_mode, file->mode, CHMOD_BITS))
+			return 0;
+	} else if (preserve_executability
+	 && ((sxp->st.st_mode & 0111 ? 1 : 0) ^ (file->mode & 0111 ? 1 : 0)))
 		return 0;
 
 	if (am_root && uid_ndx && sxp->st.st_uid != (uid_t)F_OWNER(file))
@@ -638,8 +639,11 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 			;
 		} else
 #endif
-		if ((preserve_perms || preserve_executability)
-		 && !BITS_EQUAL(sxp->st.st_mode, file->mode, CHMOD_BITS))
+		if (preserve_perms) {
+			if (!BITS_EQUAL(sxp->st.st_mode, file->mode, CHMOD_BITS))
+				iflags |= ITEM_REPORT_PERMS;
+		} else if (preserve_executability
+		 && ((sxp->st.st_mode & 0111 ? 1 : 0) ^ (file->mode & 0111 ? 1 : 0)))
 			iflags |= ITEM_REPORT_PERMS;
 		if (uid_ndx && am_root && (uid_t)F_OWNER(file) != sxp->st.st_uid)
 			iflags |= ITEM_REPORT_OWNER;
