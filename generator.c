@@ -27,7 +27,6 @@ extern int dry_run;
 extern int do_xfers;
 extern int stdout_format_has_i;
 extern int logfile_format_has_i;
-extern int receiver_symlink_times;
 extern int am_root;
 extern int am_server;
 extern int am_daemon;
@@ -2081,7 +2080,7 @@ void generate_files(int f_out, const char *local_name)
 	need_retouch_dir_times = preserve_times > 1;
 	lull_mod = allowed_lull * 5;
 	symlink_timeset_failed_flags = ITEM_REPORT_TIME
-				     | (receiver_symlink_times ? ITEM_REPORT_TIMEFAIL : 0 );
+	    | (protocol_version >= 30 || !am_server ? ITEM_REPORT_TIMEFAIL : 0);
 
 	if (verbose > 2)
 		rprintf(FINFO, "generator starting pid=%ld\n", (long)getpid());
