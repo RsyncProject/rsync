@@ -577,6 +577,7 @@ static struct poptOption long_options[] = {
   {"link-dest",        0,  POPT_ARG_STRING, 0, OPT_LINK_DEST, 0, 0 },
   {"fuzzy",           'y', POPT_ARG_VAL,    &fuzzy_basis, 1, 0, 0 },
   {"no-fuzzy",         0,  POPT_ARG_VAL,    &fuzzy_basis, 0, 0, 0 },
+  {"no-y",             0,  POPT_ARG_VAL,    &fuzzy_basis, 0, 0, 0 },
   {"compress",        'z', POPT_ARG_NONE,   0, 'z', 0, 0 },
   {"no-compress",      0,  POPT_ARG_VAL,    &do_compression, 0, 0, 0 },
   {"no-z",             0,  POPT_ARG_VAL,    &do_compression, 0, 0, 0 },
