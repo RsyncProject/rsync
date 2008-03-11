@@ -632,15 +632,21 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			      ? iflags & ITEM_XNAME_FOLLOWS ? 'h' : 'c'
 			     : !(iflags & ITEM_TRANSFER) ? '.'
 			     : !local_server && *op == 's' ? '<' : '>';
-			c[1] = S_ISDIR(file->mode) ? 'd'
-			     : IS_SPECIAL(file->mode) ? 'S'
-			     : IS_DEVICE(file->mode) ? 'D'
-			     : S_ISLNK(file->mode) ? 'L' : 'f';
-			c[2] = !(iflags & ITEM_REPORT_CHECKSUM) ? '.' : 'c';
-			c[3] = !(iflags & ITEM_REPORT_SIZE) ? '.' : 's';
-			c[4] = !(iflags & ITEM_REPORT_TIME) ? '.'
-			     : !preserve_times || (!receiver_symlink_times && S_ISLNK(file->mode))
-			     ? 'T' : 't';
+			if (S_ISLNK(file->mode)) {
+				c[1] = 'L';
+				c[3] = '.';
+				c[4] = !(iflags & ITEM_REPORT_TIME) ? '.'
+				     : !preserve_times || !receiver_symlink_times
+				    || (iflags & ITEM_REPORT_TIMEFAIL) ? 'T' : 't';
+			} else {
+				c[1] = S_ISDIR(file->mode) ? 'd'
+				     : IS_SPECIAL(file->mode) ? 'S'
+				     : IS_DEVICE(file->mode) ? 'D' : 'f';
+				c[3] = !(iflags & ITEM_REPORT_SIZE) ? '.' : 's';
+				c[4] = !(iflags & ITEM_REPORT_TIME) ? '.'
+				     : !preserve_times ? 'T' : 't';
+			}
+			c[2] = !(iflags & ITEM_REPORT_CHANGE) ? '.' : 'c';
 			c[5] = !(iflags & ITEM_REPORT_PERMS) ? '.' : 'p';
 			c[6] = !(iflags & ITEM_REPORT_OWNER) ? '.' : 'o';
 			c[7] = !(iflags & ITEM_REPORT_GROUP) ? '.' : 'g';

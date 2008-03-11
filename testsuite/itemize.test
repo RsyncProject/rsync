@@ -96,7 +96,7 @@ cat <<EOT >"$chkfile"
 .d..t.$dots foo/
 .f..t.$dots foo/config1
 >fcstp$dots foo/config2
-cL.$T.$dots foo/sym -> ../bar/baz/rsync
+cLc$T.$dots foo/sym -> ../bar/baz/rsync
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 3 failed"
 
@@ -157,8 +157,8 @@ $RSYNC -ivvplrtH --copy-dest=../to "$fromdir/" "$to2dir/" \
     | tee "$outfile"
 filter_outfile
 case `tail -1 "$outfile"` in
-cL..t*)
-    sym_dots="..t.$dots"
+cLc.t*)
+    sym_dots="c.t.$dots"
     L_sym_dots="cL$sym_dots"
     is_uptodate='-> ../bar/baz/rsync'
     echo "cL$sym_dots foo/sym $is_uptodate" >"$chkfile.extra"

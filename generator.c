@@ -27,7 +27,6 @@ extern int dry_run;
 extern int do_xfers;
 extern int stdout_format_has_i;
 extern int logfile_format_has_i;
-extern int receiver_symlink_times;
 extern int am_root;
 extern int am_server;
 extern int am_daemon;
@@ -111,6 +110,7 @@ static char *deldelay_buf = NULL;
 static int deldelay_fd = -1;
 static int lull_mod;
 static int dir_tweaking;
+static int symlink_timeset_failed_flags;
 static int need_retouch_dir_times;
 static int need_retouch_dir_perms;
 static const char *solo_file = NULL;
@@ -623,16 +623,20 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 		int keep_time = !preserve_times ? 0
 		    : S_ISDIR(file->mode) ? preserve_times > 1 :
 #if defined HAVE_LUTIMES && defined HAVE_UTIMES
-		    (receiver_symlink_times && !(file->flags & FLAG_TIME_FAILED)) ||
-#endif
+		    1;
+#else
 		    !S_ISLNK(file->mode);
+#endif
 
 		if (S_ISREG(file->mode) && F_LENGTH(file) != sxp->st.st_size)
 			iflags |= ITEM_REPORT_SIZE;
-		if ((iflags & (ITEM_TRANSFER|ITEM_LOCAL_CHANGE) && !keep_time
-		  && !(iflags & ITEM_MATCHED)
+		if (file->flags & FLAG_TIME_FAILED) { /* symlinks only */
+			if (iflags & ITEM_LOCAL_CHANGE)
+				iflags |= symlink_timeset_failed_flags;
+		} else if (keep_time
+		 ? cmp_time(file->modtime, sxp->st.st_mtime) != 0
+		 : iflags & (ITEM_TRANSFER|ITEM_LOCAL_CHANGE) && !(iflags & ITEM_MATCHED)
 		  && (!(iflags & ITEM_XNAME_FOLLOWS) || *xname))
-		 || (keep_time && cmp_time(file->modtime, sxp->st.st_mtime) != 0))
 			iflags |= ITEM_REPORT_TIME;
 #if !defined HAVE_LCHMOD && !defined HAVE_SETATTRLIST
 		if (S_ISLNK(file->mode)) {
@@ -1159,8 +1163,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 		if (itemizing && stdout_format_has_i
 		 && (verbose > 1 || stdout_format_has_i > 1)) {
 			int chg = compare_dest && type != TYPE_DIR ? 0
-			    : ITEM_LOCAL_CHANGE
-			     + (match_level == 3 ? ITEM_XNAME_FOLLOWS : 0);
+			    : ITEM_LOCAL_CHANGE + (match_level == 3 ? ITEM_XNAME_FOLLOWS : 0);
 			char *lp = match_level == 3 ? "" : NULL;
 			itemize(cmpbuf, file, ndx, 0, sxp, chg + ITEM_MATCHED, 0, lp);
 		}
@@ -1538,7 +1541,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			set_file_attrs(fname, file, NULL, NULL, 0);
 			if (itemizing) {
 				itemize(fname, file, ndx, statret, &sx,
-					ITEM_LOCAL_CHANGE, 0, NULL);
+					ITEM_LOCAL_CHANGE|ITEM_REPORT_CHANGE, 0, NULL);
 			}
 			if (code != FNONE && verbose)
 				rprintf(code, "%s -> %s\n", fname, sl);
@@ -1622,7 +1625,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			set_file_attrs(fname, file, NULL, NULL, 0);
 			if (itemizing) {
 				itemize(fname, file, ndx, statret, &sx,
-					ITEM_LOCAL_CHANGE, 0, NULL);
+					ITEM_LOCAL_CHANGE|ITEM_REPORT_CHANGE, 0, NULL);
 			}
 			if (code != FNONE && verbose)
 				rprintf(code, "%s\n", fname);
@@ -1865,7 +1868,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (itemizing) {
 		int iflags = ITEM_TRANSFER;
 		if (always_checksum > 0)
-			iflags |= ITEM_REPORT_CHECKSUM;
+			iflags |= ITEM_REPORT_CHANGE;
 		if (fnamecmp_type != FNAMECMP_FNAME)
 			iflags |= ITEM_BASIS_TYPE_FOLLOWS;
 		if (fnamecmp_type == FNAMECMP_FUZZY)
@@ -2076,6 +2079,8 @@ void generate_files(int f_out, const char *local_name)
 	dir_tweaking = !(list_only || solo_file || dry_run);
 	need_retouch_dir_times = preserve_times > 1;
 	lull_mod = allowed_lull * 5;
+	symlink_timeset_failed_flags = ITEM_REPORT_TIME
+				     | (protocol_version >= 30 ? ITEM_REPORT_TIMEFAIL : 0 );
 
 	if (verbose > 2)
 		rprintf(FINFO, "generator starting pid=%ld\n", (long)getpid());

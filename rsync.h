@@ -166,8 +166,9 @@
 
 /* For use by the itemize_changes code */
 #define ITEM_REPORT_ATIME (1<<0)
-#define ITEM_REPORT_CHECKSUM (1<<1)
-#define ITEM_REPORT_SIZE (1<<2)
+#define ITEM_REPORT_CHANGE (1<<1)
+#define ITEM_REPORT_SIZE (1<<2)     /* regular files only */
+#define ITEM_REPORT_TIMEFAIL (1<<2) /* symlinks only */
 #define ITEM_REPORT_TIME (1<<3)
 #define ITEM_REPORT_PERMS (1<<4)
 #define ITEM_REPORT_OWNER (1<<5)

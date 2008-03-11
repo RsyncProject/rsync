@@ -271,6 +271,10 @@ void setup_protocol(int f_out,int f_in)
 			exit_cleanup(RERR_SYNTAX);
 		}
 		need_messages_from_generator = 1;
+#if defined HAVE_LUTIMES && defined HAVE_UTIMES
+	} else if (!am_sender) {
+		receiver_symlink_times = 1;
+#endif
 	}
 
 	if (need_unsorted_flist && (!am_sender || inc_recurse))
