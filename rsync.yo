@@ -1678,8 +1678,8 @@ quote(itemization(
   (requires bf(--checksum)) or that a symlink, device, or special file has
   a changed value.
   Note that if you are sending files to an rsync prior to 3.0.1, this
-  change flag will be present for checksum-differing regular files.
-  it() A bf(s) means the size of the file is different and will be updated
+  change flag will be present only for checksum-differing regular files.
+  it() A bf(s) means the size of a regular file is different and will be updated
   by the file transfer.
   it() A bf(t) means the modification time is different and is being updated
   to the sender's value (requires bf(--times)).  An alternate value of bf(T)
