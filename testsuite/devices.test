@@ -78,14 +78,14 @@ ln "$fromdir/block3" "$fromdir/block2.5" || echo "Skipping hard-linked device te
 mkfifo "$fromdir/fifo" || mknod "$fromdir/fifo" p || test_skipped "Can't run mkfifo"
 touch -r "$fromdir/block" "$fromdir/block2"
 
-$RSYNC -ait "$fromdir/block" "$todir/block2" \
+$RSYNC -ai "$fromdir/block" "$todir/block2" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
 cD$all_plus block
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 1 failed"
 
-$RSYNC -ait "$fromdir/block2" "$todir/block" \
+$RSYNC -ai "$fromdir/block2" "$todir/block" \
     | tee "$outfile"
 cat <<EOT >"$chkfile"
 cD$all_plus block2
