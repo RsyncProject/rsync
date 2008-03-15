@@ -312,7 +312,9 @@ AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     unistd.h utime.h grp.h compat.h sys/param.h ctype.h sys/wait.h \
     sys/ioctl.h sys/filio.h string.h stdlib.h sys/socket.h sys/mode.h \
     sys/un.h sys/attr.h glob.h mcheck.h arpa/inet.h arpa/nameser.h locale.h \
-    netdb.h malloc.h float.h limits.h iconv.h libcharset.h langinfo.h)
+    netdb.h malloc.h float.h limits.h iconv.h libcharset.h langinfo.h \
+    sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h \
+    popt/popt.h)
 AC_HEADER_MAJOR
 
 AC_CACHE_CHECK([if makedev takes 3 args],rsync_cv_MAKEDEV_TAKES_3_ARGS,[
@@ -654,6 +656,13 @@ fi
 if test x"$with_included_popt" != x"yes"; then
     AC_CHECK_LIB(popt, poptGetContext, , [with_included_popt=yes])
 fi
+if test x"$ac_cv_header_popt_popt_h" = x"yes"; then
+    # If the system has /usr/include/popt/popt.h, we enable the
+    # included popt because an attempt to "#include <popt/popt.h>"
+    # would use our included header file anyway (due to -I.), and
+    # might conflit with the system popt.
+    with_included_popt=yes
+fi
 
 AC_MSG_CHECKING([whether to use included libpopt])
 if test x"$with_included_popt" = x"yes"; then
@@ -825,7 +834,6 @@ AC_SUBST(CC_SHOBJ_FLAG)
 AC_SUBST(BUILD_POPT)
 AC_SUBST(MAKE_MAN)
 
-AC_CHECK_HEADERS(sys/acl.h acl/libacl.h)
 AC_CHECK_FUNCS(_acl __acl _facl __facl)
 #################################################
 # check for ACL support
@@ -906,10 +914,6 @@ samba_cv_HAVE_ACL_GET_PERM_NP=yes,samba_cv_HAVE_ACL_GET_PERM_NP=no)])
 	;;
     esac
 fi
-
-AC_CHECK_HEADERS(attr/xattr.h)
-AC_CHECK_HEADERS(sys/xattr.h)
-AC_CHECK_HEADERS(sys/extattr.h)
 
 #################################################
 # check for extended attribute support

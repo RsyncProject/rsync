@@ -35,7 +35,7 @@
  * change. */
 
 #include "rsync.h"
-#include "popt.h"
+#include <popt.h>
 #include "lib/sysxattrs.h"
 
 #define PROGRAM "tls"
