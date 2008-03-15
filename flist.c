@@ -854,7 +854,6 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	bp += FILE_STRUCT_LEN;
 
 	memcpy(bp, basename, basename_len);
-	bp += basename_len;
 
 #ifdef SUPPORT_HARD_LINKS
 	if (xflags & XMIT_HLINKED)
@@ -919,6 +918,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 
 #ifdef SUPPORT_LINKS
 	if (linkname_len) {
+		bp += basename_len;
 		if (first_hlink_ndx >= flist->ndx_start) {
 			struct file_struct *first = flist->files[first_hlink_ndx - flist->ndx_start];
 			memcpy(bp, F_SYMLINK(first), linkname_len);
@@ -1177,7 +1177,6 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	bp += FILE_STRUCT_LEN;
 
 	memcpy(bp, basename, basename_len);
-	bp += basename_len;
 
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && flist && flist->prev) {
@@ -1216,7 +1215,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 
 #ifdef SUPPORT_LINKS
 	if (linkname_len)
-		memcpy(bp, linkname, linkname_len);
+		memcpy(bp + basename_len, linkname, linkname_len);
 #endif
 
 	if (always_checksum && am_sender && S_ISREG(st.st_mode))
