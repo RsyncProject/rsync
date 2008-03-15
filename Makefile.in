@@ -82,7 +82,7 @@ flist.o: rounding.h
 
 rounding.h: rounding.c rsync.h
 	@for r in 0 1 3; do \
-	    if $(CC) $(CFLAGS) $(LDFLAGS) -o rounding -DEXTRA_ROUNDING=$$r -I. $(srcdir)/rounding.c >rounding.out 2>&1; then \
+	    if $(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) -o rounding -DEXTRA_ROUNDING=$$r -I. $(srcdir)/rounding.c >rounding.out 2>&1; then \
 		echo "#define EXTRA_ROUNDING $$r" >rounding.h; \
 		if test -f "$$HOME/build_farm/build_test.fns"; then \
 		    echo "EXTRA_ROUNDING is $$r" >&2; \
