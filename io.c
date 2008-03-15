@@ -45,6 +45,7 @@ extern int inc_recurse;
 extern int io_error;
 extern int eol_nulls;
 extern int flist_eof;
+extern int list_only;
 extern int read_batch;
 extern int csum_length;
 extern int protect_args;
@@ -104,6 +105,7 @@ static int defer_forwarding_messages = 0, defer_forwarding_keep = 0;
 static int select_timeout = SELECT_TIMEOUT;
 static int active_filecnt = 0;
 static OFF_T active_bytecnt = 0;
+static int first_message = 1;
 
 static char int_byte_extra[64] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* (00 - 3F)/4 */
@@ -111,6 +113,9 @@ static char int_byte_extra[64] = {
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* (80 - BF)/4 */
 	2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5, 6, /* (C0 - FF)/4 */
 };
+
+#define REMOTE_OPTION_ERROR "rsync: on remote machine: -"
+#define REMOTE_OPTION_ERROR2 ": unknown option"
 
 enum festatus { FES_SUCCESS, FES_REDO, FES_NO_SEND };
 
@@ -318,6 +323,37 @@ static void msg_flush(void)
 			defer_forwarding_messages--;
 			free(m);
 		}
+	}
+}
+
+static void check_for_d_option_error(const char *msg)
+{
+	static char rsync263_opts[] = "BCDHIKLPRSTWabceghlnopqrtuvxz";
+	char *colon;
+	int saw_d = 0;
+
+	if (*msg != 'r'
+	 || strncmp(msg, REMOTE_OPTION_ERROR, sizeof REMOTE_OPTION_ERROR - 1) != 0)
+		return;
+
+	msg += sizeof REMOTE_OPTION_ERROR - 1;
+	if (*msg == '-' || (colon = strchr(msg, ':')) == NULL
+	 || strncmp(colon, REMOTE_OPTION_ERROR2, sizeof REMOTE_OPTION_ERROR2 - 1) != 0)
+		return;
+
+	for ( ; *msg != ':'; msg++) {
+		if (*msg == 'd')
+			saw_d = 1;
+		else if (*msg == 'e')
+			break;
+		else if (strchr(rsync263_opts, *msg) == NULL)
+			return;
+	}
+
+	if (saw_d) {
+		rprintf(FWARNING,
+			"*** Try adding \"-r --exclude='/*/*'\" "
+			"if remote rsync is <= 2.6.3 ***\n");
 	}
 }
 
@@ -1119,6 +1155,13 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 			}
 			read_loop(fd, line, msg_bytes);
 			rwrite((enum logcode)tag, line, msg_bytes, 1);
+			if (first_message) {
+				if (list_only && !am_sender && tag == 1) {
+					line[msg_bytes] = '\0';
+					check_for_d_option_error(line);
+				}
+				first_message = 0;
+			}
 			break;
 		default:
 			rprintf(FERROR, "unexpected tag %d [%s]\n",
