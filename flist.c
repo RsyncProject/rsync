@@ -819,9 +819,9 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 #endif
 
 #ifdef SUPPORT_ACLS
-	/* We need one or two index int32s when we're preserving ACLs. */
-	if (preserve_acls)
-		extra_len += (S_ISDIR(mode) ? 2 : 1) * EXTRA_LEN;
+	/* Directories need an extra int32 for the default ACL. */
+	if (preserve_acls && S_ISDIR(mode))
+		extra_len += EXTRA_LEN;
 #endif
 
 	if (always_checksum && S_ISREG(mode))
@@ -854,7 +854,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	bp += FILE_STRUCT_LEN;
 
 	memcpy(bp, basename, basename_len);
-	bp += basename_len + linkname_len; /* skip space for symlink too */
+	bp += basename_len;
 
 #ifdef SUPPORT_HARD_LINKS
 	if (xflags & XMIT_HLINKED)
@@ -919,7 +919,6 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 
 #ifdef SUPPORT_LINKS
 	if (linkname_len) {
-		bp = (char*)file->basename + basename_len;
 		if (first_hlink_ndx >= flist->ndx_start) {
 			struct file_struct *first = flist->files[first_hlink_ndx - flist->ndx_start];
 			memcpy(bp, F_SYMLINK(first), linkname_len);
@@ -1123,8 +1122,14 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			pool = dir_flist->file_pool;
 		} else
 			pool = flist->file_pool;
-	} else
+	} else {
+#ifdef SUPPORT_ACLS
+		/* Directories need an extra int32 for the default ACL. */
+		if (preserve_acls && S_ISDIR(st.st_mode))
+			extra_len += EXTRA_LEN;
+#endif
 		pool = NULL;
+	}
 
 	if (verbose > 2) {
 		rprintf(FINFO, "[%s] make_file(%s,*,%d)\n",
@@ -1172,7 +1177,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	bp += FILE_STRUCT_LEN;
 
 	memcpy(bp, basename, basename_len);
-	bp += basename_len + linkname_len; /* skip space for symlink too */
+	bp += basename_len;
 
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && flist && flist->prev) {
@@ -1210,16 +1215,17 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		file->dirname = lastdir;
 
 #ifdef SUPPORT_LINKS
-	if (linkname_len) {
-		bp = (char*)file->basename + basename_len;
+	if (linkname_len)
 		memcpy(bp, linkname, linkname_len);
-	}
 #endif
 
 	if (always_checksum && am_sender && S_ISREG(st.st_mode))
 		file_checksum(thisname, tmp_sum, st.st_size);
 
-	F_PATHNAME(file) = pathname;
+	if (am_sender)
+		F_PATHNAME(file) = pathname;
+	else if (!pool)
+		F_DEPTH(file) = extra_len / EXTRA_LEN;
 
 	/* This code is only used by the receiver when it is building
 	 * a list of files for a delete pass. */
@@ -1255,12 +1261,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 /* Only called for temporary file_struct entries created by make_file(). */
 void unmake_file(struct file_struct *file)
 {
-	int extra_cnt = file_extra_cnt + LEN64_BUMP(file);
-#if EXTRA_ROUNDING > 0
-	if (extra_cnt & EXTRA_ROUNDING)
-		extra_cnt = (extra_cnt | EXTRA_ROUNDING) + 1;
-#endif
-	free(REQ_EXTRA(file, extra_cnt));
+	free(REQ_EXTRA(file, F_DEPTH(file)));
 }
 
 static struct file_struct *send_file_name(int f, struct file_list *flist,
