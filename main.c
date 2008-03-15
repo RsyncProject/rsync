@@ -79,9 +79,6 @@ extern char *password_file;
 extern char curr_dir[MAXPATHLEN];
 extern struct file_list *first_flist;
 extern struct filter_list_struct server_filter_list;
-#ifdef ICONV_OPTION
-extern iconv_t ic_send;
-#endif
 
 uid_t our_uid;
 int local_server = 0;
@@ -334,7 +331,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 {
 	int i, argc = 0;
 	char *args[MAX_ARGS];
-	pid_t ret;
+	pid_t pid;
 	int dash_l_set = 0;
 
 	if (!read_batch && !local_server) {
@@ -453,7 +450,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 		batch_gen_fd = from_gen_pipe[0];
 		*f_out_p = from_gen_pipe[1];
 		*f_in_p = batch_fd;
-		ret = -1; /* no child pid */
+		pid = (pid_t)-1; /* no child pid */
 #ifdef ICONV_CONST
 		setup_iconv();
 #endif
@@ -463,54 +460,20 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 		if (whole_file < 0 && !write_batch)
 			whole_file = 1;
 		set_allow_inc_recurse();
-		ret = local_child(argc, args, f_in_p, f_out_p, child_main);
+		pid = local_child(argc, args, f_in_p, f_out_p, child_main);
 #ifdef ICONV_CONST
 		setup_iconv();
 #endif
 	} else {
+		pid = piped_child(args, f_in_p, f_out_p);
 #ifdef ICONV_CONST
 		setup_iconv();
 #endif
-		if (protect_args) {
-			int fd;
-#ifdef ICONV_OPTION
-			int convert = ic_send != (iconv_t)-1;
-			xbuf outbuf, inbuf;
-
-			if (convert)
-				alloc_xbuf(&outbuf, 1024);
-#endif
-
-			ret = piped_child(args, f_in_p, f_out_p);
-
-			for (i = 0; args[i]; i++) {} /* find first NULL */
-			args[i] = "rsync"; /* set a new arg0 */
-			if (verbose > 1)
-				print_child_argv("protected args:", args + i + 1);
-			fd = *f_out_p;
-			do {
-#ifdef ICONV_OPTION
-				if (convert) {
-					INIT_XBUF_STRLEN(inbuf, args[i]);
-					iconvbufs(ic_send, &inbuf, &outbuf,
-						  ICB_EXPAND_OUT | ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE);
-					outbuf.buf[outbuf.len] = '\0';
-					write_buf(fd, outbuf.buf, outbuf.len + 1);
-					outbuf.len = 0;
-				} else
-#endif
-					write_buf(fd, args[i], strlen(args[i]) + 1);
-			} while (args[++i]);
-			write_byte(fd, 0);
-#ifdef ICONV_OPTION
-			if (convert)
-				free(outbuf.buf);
-#endif
-		} else
-			ret = piped_child(args, f_in_p, f_out_p);
+		if (protect_args)
+			send_protected_args(*f_out_p, args);
 	}
 
-	return ret;
+	return pid;
 
   oom:
 	out_of_memory("do_cmd");
@@ -1447,7 +1410,7 @@ int main(int argc,char *argv[])
 	setlocale(LC_CTYPE, "");
 #endif
 
-	if (!parse_arguments(&argc, (const char ***) &argv, 1)) {
+	if (!parse_arguments(&argc, (const char ***) &argv)) {
 		/* FIXME: We ought to call the same error-handling
 		 * code here, rather than relying on getopt. */
 		option_error();
@@ -1512,7 +1475,7 @@ int main(int argc,char *argv[])
 		char buf[MAXPATHLEN];
 		protect_args = 2;
 		read_args(STDIN_FILENO, NULL, buf, sizeof buf, 1, &argv, &argc, NULL);
-		if (!parse_arguments(&argc, (const char ***) &argv, 1)) {
+		if (!parse_arguments(&argc, (const char ***) &argv)) {
 			option_error();
 			exit_cleanup(RERR_SYNTAX);
 		}

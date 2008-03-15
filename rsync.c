@@ -205,6 +205,41 @@ int iconvbufs(iconv_t ic, xbuf *in, xbuf *out, int flags)
 }
 #endif
 
+void send_protected_args(int fd, char *args[])
+{
+#ifdef ICONV_OPTION
+	int i, convert = ic_send != (iconv_t)-1;
+	xbuf outbuf, inbuf;
+
+	if (convert)
+		alloc_xbuf(&outbuf, 1024);
+#endif
+
+	for (i = 0; args[i]; i++) {} /* find first NULL */
+	args[i] = "rsync"; /* set a new arg0 */
+	if (verbose > 1)
+		print_child_argv("protected args:", args + i + 1);
+	do {
+#ifdef ICONV_OPTION
+		if (convert) {
+			INIT_XBUF_STRLEN(inbuf, args[i]);
+			iconvbufs(ic_send, &inbuf, &outbuf,
+				  ICB_EXPAND_OUT | ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE);
+			outbuf.buf[outbuf.len] = '\0';
+			write_buf(fd, outbuf.buf, outbuf.len + 1);
+			outbuf.len = 0;
+		} else
+#endif
+			write_buf(fd, args[i], strlen(args[i]) + 1);
+	} while (args[++i]);
+	write_byte(fd, 0);
+
+#ifdef ICONV_OPTION
+	if (convert)
+		free(outbuf.buf);
+#endif
+}
+
 int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 		       char *buf, int *len_ptr)
 {

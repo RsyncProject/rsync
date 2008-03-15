@@ -22,6 +22,7 @@
 #include "rsync.h"
 #include "ifuncs.h"
 
+extern int quiet;
 extern int verbose;
 extern int dry_run;
 extern int output_motd;
@@ -31,6 +32,7 @@ extern int am_server;
 extern int am_daemon;
 extern int am_root;
 extern int rsync_port;
+extern int protect_args;
 extern int ignore_errors;
 extern int preserve_xattrs;
 extern int kluge_around_eof;
@@ -314,6 +316,8 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 
 	if (rl_nulls) {
 		for (i = 0; i < sargc; i++) {
+			if (!sargs[i]) /* stop at --protect-args NULL */
+				break;
 			write_sbuf(f_out, sargs[i]);
 			write_byte(f_out, 0);
 		}
@@ -323,6 +327,9 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 			io_printf(f_out, "%s\n", sargs[i]);
 		write_sbuf(f_out, "\n");
 	}
+
+	if (protect_args)
+		send_protected_args(f_out, sargs);
 
 	if (protocol_version < 23) {
 		if (protocol_version == 22 || !am_sender)
@@ -335,16 +342,24 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 }
 
 static char *finish_pre_exec(pid_t pid, int fd, char *request,
-			     int argc, char *argv[])
+			     char **early_argv, char **argv)
 {
-	int j, status = -1;
+	int j = 0, status = -1;
 
 	if (!request)
 		request = "(NONE)";
 
 	write_buf(fd, request, strlen(request)+1);
-	for (j = 0; j < argc; j++)
+	if (early_argv) {
+		for ( ; *early_argv; early_argv++)
+			write_buf(fd, *early_argv, strlen(*early_argv)+1);
+		j = 1; /* Skip arg0 name in argv. */
+	}
+	for ( ; argv[j]; j++) {
 		write_buf(fd, argv[j], strlen(argv[j])+1);
+		if (argv[j][0] == '.' && argv[j][1] == '\0')
+			break;
+	}
 	write_byte(fd, 0);
 
 	close(fd);
@@ -384,8 +399,8 @@ static int read_arg_from_pipe(int fd, char *buf, int limit)
 
 static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 {
-	int argc, opt_cnt;
-	char **argv, *chroot_path = NULL;
+	int argc;
+	char **argv, **orig_argv, **orig_early_argv, *chroot_path = NULL;
 	char line[BIGPATHBUFLEN];
 	uid_t uid = (uid_t)-2;  /* canonically "nobody" */
 	gid_t gid = (gid_t)-2;
@@ -731,16 +746,30 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 
 	io_printf(f_out, "@RSYNCD: OK\n");
 
-	opt_cnt = read_args(f_in, name, line, sizeof line, rl_nulls, &argv, &argc, &request);
+	read_args(f_in, name, line, sizeof line, rl_nulls, &argv, &argc, &request);
+	orig_argv = argv;
+
+	verbose = 0; /* future verbosity is controlled by client options */
+	ret = parse_arguments(&argc, (const char ***) &argv);
+	if (protect_args && ret) {
+		orig_early_argv = orig_argv;
+		protect_args = 2;
+		read_args(f_in, name, line, sizeof line, 1, &argv, &argc, &request);
+		orig_argv = argv;
+		ret = parse_arguments(&argc, (const char ***) &argv);
+	} else
+		orig_early_argv = NULL;
 
 	if (pre_exec_pid) {
 		err_msg = finish_pre_exec(pre_exec_pid, pre_exec_fd, request,
-					  opt_cnt, argv);
+					  orig_early_argv, orig_argv);
 	}
 
-	verbose = 0; /* future verbosity is controlled by client options */
-	ret = parse_arguments(&argc, (const char ***) &argv, 0);
+	if (orig_early_argv)
+		free(orig_early_argv);
+
 	am_server = 1; /* Don't let someone try to be tricky. */
+	quiet = 0;
 	if (lp_ignore_errors(module_id))
 		ignore_errors = 1;
 	if (write_batch < 0)

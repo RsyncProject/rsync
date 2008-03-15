@@ -874,8 +874,8 @@ int read_line(int fd, char *buf, size_t bufsiz, int flags)
 	return s - buf;
 }
 
-int read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
-	      char ***argv_p, int *argc_p, char **request_p)
+void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
+	       char ***argv_p, int *argc_p, char **request_p)
 {
 	int maxargs = MAX_ARGS;
 	int dot_pos = 0;
@@ -889,14 +889,14 @@ int read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 
 	if (!(argv = new_array(char *, maxargs)))
 		out_of_memory("read_args");
-	if (mod_name)
+	if (mod_name && !protect_args)
 		argv[argc++] = "rsyncd";
 
 	while (1) {
 		if (read_line(f_in, buf, bufsiz, rl_flags) == 0)
 			break;
 
-		if (argc == maxargs) {
+		if (argc == maxargs-1) {
 			maxargs += MAX_ARGS;
 			if (!(argv = realloc_array(argv, char *, maxargs)))
 				out_of_memory("read_args");
@@ -919,11 +919,10 @@ int read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 				dot_pos = argc;
 		}
 	}
+	argv[argc] = NULL;
 
 	*argc_p = argc;
 	*argv_p = argv;
-
-	return dot_pos ? dot_pos : argc;
 }
 
 int io_start_buffering_out(int f_out)

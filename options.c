@@ -25,6 +25,7 @@
 #include "zlib/zlib.h"
 
 extern int module_id;
+extern int local_server;
 extern int sanitize_paths;
 extern int daemon_over_rsh;
 extern unsigned int module_dirlen;
@@ -889,7 +890,7 @@ static void create_refuse_error(int which)
  *
  * @retval 0 on error, with err_buf containing an explanation
  **/
-int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
+int parse_arguments(int *argc_p, const char ***argv_p)
 {
 	static poptContext pc;
 	char *ref = lp_refuse_options(module_id);
@@ -1092,8 +1093,7 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 			break;
 
 		case 'q':
-			if (frommain)
-				quiet++;
+			quiet++;
 			break;
 
 		case 'x':
@@ -1290,12 +1290,8 @@ int parse_arguments(int *argc_p, const char ***argv_p, int frommain)
 	}
 #endif
 
-	if (protect_args == 1) {
-		if (!frommain)
-			protect_args = 0;
-		else if (am_server)
-			return 1;
-	}
+	if (protect_args == 1 && am_server)
+		return 1;
 
 #ifndef SUPPORT_LINKS
 	if (preserve_links && !am_sender) {
@@ -1833,7 +1829,7 @@ void server_options(char **args, int *argc_p)
 	}
 #endif
 
-	if (protect_args) /* initial args break here */
+	if (protect_args && !local_server) /* unprotected args stop here */
 		args[ac++] = NULL;
 
 	if (list_only > 1)
