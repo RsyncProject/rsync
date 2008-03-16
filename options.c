@@ -902,8 +902,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		set_refuse_options(ref);
 	if (am_daemon) {
 		set_refuse_options("log-file*");
+#ifdef ICONV_OPTION
 		if (!*lp_charset(module_id))
 			set_refuse_options("iconv");
+#endif
 	}
 
 #ifdef ICONV_OPTION
