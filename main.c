@@ -341,7 +341,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 			cmd = rsh_env;
 		if (!cmd)
 			cmd = RSYNC_RSH;
-		cmd = strdup(cmd);
+		cmd = strdup(cmd); /* MEMORY LEAK */
 		if (!cmd)
 			goto oom;
 

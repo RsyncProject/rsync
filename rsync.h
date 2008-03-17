@@ -1107,6 +1107,11 @@ size_t strlcat(char *d, const char *s, size_t bufsize);
 #define MY_GID() getgid()
 #endif
 
+#ifdef FORCE_FD_ZERO_MEMSET
+#undef FD_ZERO
+#define FD_ZERO(fdsetp) memset(fdsetp, 0, sizeof (fd_set))
+#endif
+
 extern int verbose;
 
 #ifndef HAVE_INET_NTOP

@@ -505,7 +505,7 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 		if ((p = strstr(module_dir, "/./")) != NULL) {
 			*p = '\0';
 			p += 2;
-		} else if ((p = strdup("/")) == NULL)
+		} else if ((p = strdup("/")) == NULL) /* MEMORY LEAK */
 			out_of_memory("rsync_module");
 	}
 
