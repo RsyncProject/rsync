@@ -207,8 +207,9 @@ int iconvbufs(iconv_t ic, xbuf *in, xbuf *out, int flags)
 
 void send_protected_args(int fd, char *args[])
 {
+	int i;
 #ifdef ICONV_OPTION
-	int i, convert = ic_send != (iconv_t)-1;
+	int convert = ic_send != (iconv_t)-1;
 	xbuf outbuf, inbuf;
 
 	if (convert)
