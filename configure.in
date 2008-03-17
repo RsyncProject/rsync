@@ -314,7 +314,7 @@ AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     sys/un.h sys/attr.h glob.h mcheck.h arpa/inet.h arpa/nameser.h locale.h \
     netdb.h malloc.h float.h limits.h iconv.h libcharset.h langinfo.h \
     sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h \
-    popt/popt.h)
+    popt.h popt/popt.h)
 AC_HEADER_MAJOR
 
 AC_CACHE_CHECK([if makedev takes 3 args],rsync_cv_MAKEDEV_TAKES_3_ARGS,[
@@ -661,6 +661,8 @@ if test x"$ac_cv_header_popt_popt_h" = x"yes"; then
     # included popt because an attempt to "#include <popt/popt.h>"
     # would use our included header file anyway (due to -I.), and
     # might conflit with the system popt.
+    with_included_popt=yes
+elif test x"$ac_cv_header_popt_h" != x"yes"; then
     with_included_popt=yes
 fi
 
