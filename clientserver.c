@@ -214,7 +214,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 	int sargc = 0;
 	char *p, *modname;
 
-	assert(argc > 0);
+	assert(argc > 0 && *argv != NULL);
 
 	if (**argv == '/') {
 		rprintf(FERROR,

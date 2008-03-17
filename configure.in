@@ -970,7 +970,7 @@ if test x"$enable_acl_support" = x"no" -o x"$enable_xattr_support" = x"no" -o x"
 fi
 
 case "$CC" in
-checker*)
+' checker'*|checker*)
     AC_DEFINE(FORCE_FD_ZERO_MEMSET, 1, [Used to make "checker" understand that FD_ZERO() clears memory.])
     ;;
 esac
