@@ -1358,6 +1358,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	 && !am_root && sx.st.st_uid == our_uid)
 		del_opts |= DEL_NO_UID_WRITE;
 
+	if (ignore_existing > 0 && statret == 0
+	 && (!is_dir || !S_ISDIR(sx.st.st_mode))) {
+		if (verbose > 1 && is_dir >= 0)
+			rprintf(FINFO, "%s exists\n", fname);
+		goto cleanup;
+	}
+
 	if (is_dir) {
 		if (!implied_dirs && file->flags & FLAG_IMPLIED_DIR)
 			goto cleanup;
@@ -1660,12 +1667,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				fname = f_name(file, NULL);
 			rprintf(FINFO, "%s is under min-size\n", fname);
 		}
-		goto cleanup;
-	}
-
-	if (ignore_existing > 0 && statret == 0) {
-		if (verbose > 1)
-			rprintf(FINFO, "%s exists\n", fname);
 		goto cleanup;
 	}
 
