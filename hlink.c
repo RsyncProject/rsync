@@ -125,12 +125,16 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 				prev = -1;
 			} else if (CVAL(node->data, 0) == 0) {
 				struct file_list *flist;
-				struct file_struct *fp;
 				prev = IVAL(node->data, 1);
 				flist = flist_for_ndx(prev);
-				assert(flist != NULL);
-				fp = flist->files[prev - flist->ndx_start];
-				fp->flags &= ~FLAG_HLINK_LAST;
+				if (flist)
+					flist->files[prev - flist->ndx_start]->flags &= ~FLAG_HLINK_LAST;
+				else {
+					/* We skipped all prior files in this
+					 * group, so mark this as a "first". */
+					file->flags |= FLAG_HLINK_FIRST;
+					prev = -1;
+				}
 			} else
 				prev = -1;
 		} else {
@@ -240,20 +244,45 @@ static int maybe_hard_link(struct file_struct *file, int ndx,
 }
 
 /* Figure out if a prior entry is still there or if we just have a
- * cached name for it.  Never called with a FLAG_HLINK_FIRST entry. */
-static char *check_prior(int prev_ndx, int gnum, struct file_list **flist_p)
+ * cached name for it. */
+static char *check_prior(struct file_struct *file, int gnum,
+			 int *prev_ndx_p, struct file_list **flist_p)
 {
-	struct file_list *flist = flist_for_ndx(prev_ndx);
+	struct file_struct *fp;
+	struct file_list *flist;
 	struct ht_int32_node *node;
+	int prev_ndx = F_HL_PREV(file);
 
-	if (flist) {
-		*flist_p = flist;
-		return NULL;
+	while (1) {
+		if (prev_ndx < 0) {
+			*prev_ndx_p = prev_ndx;
+			*flist_p = NULL;
+			return NULL;
+		}
+		if ((flist = flist_for_ndx(prev_ndx)) == NULL)
+			break;
+		fp = flist->files[prev_ndx - flist->ndx_start];
+		if (!(fp->flags & FLAG_SKIP_HLINK)) {
+			*prev_ndx_p = prev_ndx;
+			*flist_p = flist;
+			return NULL;
+		}
+		F_HL_PREV(file) = prev_ndx = F_HL_PREV(fp);
 	}
 
 	node = hashtable_find(prior_hlinks, gnum, 0);
 	assert(node != NULL && node->data);
-	assert(CVAL(node->data, 0) != 0);
+
+	if (CVAL(node->data, 0) == 0) {
+		/* The prior file must have been skipped. */
+		F_HL_PREV(file) = prev_ndx = -1;
+		*prev_ndx_p = prev_ndx;
+		*flist_p = NULL;
+		return NULL;
+	}
+
+	*prev_ndx_p = prev_ndx;
+	*flist_p = flist;
 	return node->data;
 }
 
@@ -268,12 +297,20 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 	char *realname, *prev_name;
 	struct file_list *flist;
 	int gnum = inc_recurse ? F_HL_GNUM(file) : -1;
-	int prev_ndx = F_HL_PREV(file);
+	int prev_ndx;
 
-	prev_name = realname = check_prior(prev_ndx, gnum, &flist);
+	prev_name = realname = check_prior(file, gnum, &prev_ndx, &flist);
 
 	if (!prev_name) {
-		struct file_struct *prev_file = flist->files[prev_ndx - flist->ndx_start];
+		struct file_struct *prev_file;
+
+		if (!flist) {
+			/* The previous file was skipped, so this one is
+			 * treated as if it were the first in its group. */
+			return 0;
+		}
+
+		prev_file = flist->files[prev_ndx - flist->ndx_start];
 
 		/* Is the previous link not complete yet? */
 		if (!(prev_file->flags & FLAG_HLINK_DONE)) {
@@ -294,8 +331,8 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 		/* There is a finished file to link with! */
 		if (!(prev_file->flags & FLAG_HLINK_FIRST)) {
 			/* The previous previous is FIRST when prev is not. */
-			prev_ndx = F_HL_PREV(prev_file);
-			prev_name = realname = check_prior(prev_ndx, gnum, &flist);
+			prev_name = realname = check_prior(prev_file, gnum, &prev_ndx, &flist);
+			assert(prev_name != NULL || flist != NULL);
 			/* Update our previous pointer to point to the FIRST. */
 			F_HL_PREV(file) = prev_ndx;
 		}
@@ -473,5 +510,26 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 		if (!(node->data = strdup(our_name)))
 			out_of_memory("finish_hard_link");
 	}
+}
+
+int skip_hard_link(struct file_struct *file, struct file_list **flist_p)
+{
+	struct file_list *flist;
+	int prev_ndx;
+
+	file->flags |= FLAG_SKIP_HLINK;
+	if (!(file->flags & FLAG_HLINK_LAST))
+		return -1;
+
+	check_prior(file, F_HL_GNUM(file), &prev_ndx, &flist);
+	if (prev_ndx >= 0) {
+		file = flist->files[prev_ndx - flist->ndx_start];
+		if (file->flags & (FLAG_HLINK_DONE|FLAG_FILE_SENT))
+			return -1;
+		file->flags |= FLAG_HLINK_LAST;
+		*flist_p = flist;
+	}
+
+	return prev_ndx;
 }
 #endif

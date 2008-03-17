@@ -67,7 +67,8 @@
 #define FLAG_FILE_SENT (1<<1)	/* sender/receiver/generator */
 #define FLAG_DIR_CREATED (1<<1)	/* generator */
 #define FLAG_CONTENT_DIR (1<<2)	/* sender/receiver/generator */
-#define FLAG_MOUNT_DIR (1<<3)	/* sender/generator */
+#define FLAG_MOUNT_DIR (1<<3)	/* sender/generator (dirs only) */
+#define FLAG_SKIP_HLINK (1<<3)	/* receiver/generator (w/FLAG_HLINKED) */
 #define FLAG_DUPLICATE (1<<4)	/* sender */
 #define FLAG_MISSING_DIR (1<<4)	/* generator */
 #define FLAG_HLINKED (1<<5)	/* receiver/generator (checked on all types) */

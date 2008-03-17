@@ -135,8 +135,12 @@ enum delret {
     DR_SUCCESS = 0, DR_FAILURE, DR_AT_LIMIT, DR_NOT_EMPTY
 };
 
-/* Forward declaration for delete_item(). */
+/* Forward declarations. */
 static enum delret delete_dir_contents(char *fname, uint16 flags);
+#ifdef SUPPORT_HARD_LINKS
+static void handle_skipped_hlink(struct file_struct *file, int itemizing,
+				 enum logcode code, int f_out);
+#endif
 
 static int is_backup_file(char *fn)
 {
@@ -1215,7 +1219,8 @@ static int dflt_perms;
  * regular files that have changed, we try to find a basis file and then
  * start sending checksums.  The ndx is the file's unique index value.
  *
- * When fname is non-null, it must point to a MAXPATHLEN buffer!
+ * The fname parameter must point to a MAXPATHLEN buffer!  (e.g it gets
+ * passed to delete_item(), which can use it during a recursive delete.)
  *
  * Note that f_out is set to -1 when doing final directory-permission and
  * modification-time repair. */
@@ -1269,6 +1274,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				excluded_dir = file;
 			}
 		  skipping:
+#ifdef SUPPORT_HARD_LINKS
+			if (F_IS_HLINKED(file))
+				handle_skipped_hlink(file, itemizing, code, f_out);
+#endif
 			rprintf(FERROR_XFER,
 				"skipping daemon-excluded file \"%s\"\n",
 				fname);
@@ -1285,6 +1294,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		} else if (!dry_run) {
 			if (is_dir)
 				file->flags |= FLAG_MISSING_DIR;
+#ifdef SUPPORT_HARD_LINKS
+			if (F_IS_HLINKED(file))
+				handle_skipped_hlink(file, itemizing, code, f_out);
+#endif
 			return;
 		}
 	}
@@ -1347,6 +1360,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 			file->flags |= FLAG_MISSING_DIR;
 		}
+#ifdef SUPPORT_HARD_LINKS
+		else if (F_IS_HLINKED(file))
+			handle_skipped_hlink(file, itemizing, code, f_out);
+#endif
 		if (verbose > 1) {
 			rprintf(FINFO, "not creating new %s \"%s\"\n",
 				is_dir ? "directory" : "file", fname);
@@ -1362,6 +1379,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	 && (!is_dir || !S_ISDIR(sx.st.st_mode))) {
 		if (verbose > 1 && is_dir >= 0)
 			rprintf(FINFO, "%s exists\n", fname);
+#ifdef SUPPORT_HARD_LINKS
+		if (F_IS_HLINKED(file))
+			handle_skipped_hlink(file, itemizing, code, f_out);
+#endif
 		goto cleanup;
 	}
 
@@ -1674,6 +1695,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	    && cmp_time(sx.st.st_mtime, file->modtime) > 0) {
 		if (verbose > 1)
 			rprintf(FINFO, "%s is newer\n", fname);
+#ifdef SUPPORT_HARD_LINKS
+		if (F_IS_HLINKED(file))
+			handle_skipped_hlink(file, itemizing, code, f_out);
+#endif
 		goto cleanup;
 	}
 
@@ -1768,6 +1793,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (append_mode > 0 && sx.st.st_size >= F_LENGTH(file)) {
+#ifdef SUPPORT_HARD_LINKS
+		if (F_IS_HLINKED(file))
+			handle_skipped_hlink(file, itemizing, code, f_out);
+#endif
 		goto cleanup;
 	}
 
@@ -1926,6 +1955,28 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 #endif
 	return;
 }
+
+#ifdef SUPPORT_HARD_LINKS
+static void handle_skipped_hlink(struct file_struct *file, int itemizing,
+				 enum logcode code, int f_out)
+{
+	char fbuf[MAXPATHLEN];
+	int new_last_ndx;
+	struct file_list *save_flist = cur_flist;
+
+	/* If we skip the last item in a chain of links and there was a
+	 * prior non-skipped hard-link waiting to finish, finish it now. */
+	if ((new_last_ndx = skip_hard_link(file, &cur_flist)) < 0)
+		return;
+
+	file = cur_flist->files[new_last_ndx - cur_flist->ndx_start];
+	cur_flist->in_progress--; /* undo prior increment */
+	f_name(file, fbuf);
+	recv_generator(fbuf, file, new_last_ndx, itemizing, code, f_out);
+
+	cur_flist = save_flist;
+}
+#endif
 
 static void touch_up_dirs(struct file_list *flist, int ndx)
 {
