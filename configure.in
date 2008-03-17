@@ -660,7 +660,7 @@ if test x"$ac_cv_header_popt_popt_h" = x"yes"; then
     # If the system has /usr/include/popt/popt.h, we enable the
     # included popt because an attempt to "#include <popt/popt.h>"
     # would use our included header file anyway (due to -I.), and
-    # might conflit with the system popt.
+    # might conflict with the system popt.
     with_included_popt=yes
 elif test x"$ac_cv_header_popt_h" != x"yes"; then
     with_included_popt=yes

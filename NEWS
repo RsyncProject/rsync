@@ -20,10 +20,10 @@ Changes since 3.0.0:
       CPPFLAGS to be used.  Also improved the error reporting if the building
       of rounding.h fails.
 
-    - Fixed the use of th --protect-args (-s) option when talking to a daemon.
+    - Fixed the use of the --protect-args (-s) option when talking to a daemon.
 
     - Fixed the --ignore-existing option's protection of files on the receiver
-      that are non-regular file son the sender (e.g. if a symlink or a dir on
+      that are non-regular files on the sender (e.g. if a symlink or a dir on
       the sender is trying to replace a file on the receiver).  The reverse
       protection (protecting a dir/symlink/device from being replaced by a
       file) was already working.
