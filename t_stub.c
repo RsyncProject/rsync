@@ -56,7 +56,7 @@ struct filter_list_struct server_filter_list;
 	exit(code);
 }
 
- int check_filter(UNUSED(struct filter_list_struct *listp), UNUSED(char *name),
+ int check_filter(UNUSED(struct filter_list_struct *listp), UNUSED(const char *name),
 		   UNUSED(int name_is_dir))
 {
 	/* This function doesn't really get called in this test context, so

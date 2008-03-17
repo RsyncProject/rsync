@@ -517,13 +517,13 @@ void change_local_filter_dir(const char *dname, int dlen, int dir_depth)
 	filt_array[cur_depth] = push_local_filters(dname, dlen);
 }
 
-static int rule_matches(char *fname, struct filter_struct *ex, int name_is_dir)
+static int rule_matches(const char *fname, struct filter_struct *ex, int name_is_dir)
 {
 	int slash_handling, str_cnt = 0, anchored_match = 0;
 	int ret_match = ex->match_flags & MATCHFLG_NEGATE ? 0 : 1;
 	char *p, *pattern = ex->pattern;
 	const char *strings[16]; /* more than enough */
-	char *name = fname + (*fname == '/');
+	const char *name = fname + (*fname == '/');
 
 	if (!*name)
 		return 0;
@@ -620,7 +620,7 @@ static void report_filter_result(char const *name,
  * Return -1 if file "name" is defined to be excluded by the specified
  * exclude list, 1 if it is included, and 0 if it was not matched.
  */
-int check_filter(struct filter_list_struct *listp, char *name, int name_is_dir)
+int check_filter(struct filter_list_struct *listp, const char *name, int name_is_dir)
 {
 	struct filter_struct *ent;
 
