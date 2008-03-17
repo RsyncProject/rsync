@@ -958,6 +958,17 @@ else
     esac
 fi
 
+if test x"$enable_acl_support" = x"no" -o x"$enable_xattr_support" = x"no" -o x"$enable_iconv" = x"no"; then
+    AC_MSG_CHECKING([whether $CC supports -Wno-unused-parameter])
+    OLD_CFLAGS="$CFLAGS"
+    CFLAGS="$CFLAGS -Wno-unused-parameter"
+    AC_COMPILE_IFELSE([ ], [rsync_warn_flag=yes], [rsync_warn_flag=no])
+    AC_MSG_RESULT([$rsync_warn_flag])
+    if test x"$rsync_warn_flag" = x"no"; then
+	CFLAGS="$OLD_CFLAGS"
+    fi
+fi
+
 AC_CONFIG_FILES([Makefile lib/dummy zlib/dummy popt/dummy shconfig])
 AC_OUTPUT
 
