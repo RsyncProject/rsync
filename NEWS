@@ -4,16 +4,91 @@ Changes since 3.0.0:
 
   BUG FIXES:
 
-    - ...
+    - Fixed a crash bug when a single-use rsync daemon (via remote shell) was
+      run without specifying a --config=FILE option.
+
+    - Fixed a crash when backing up a directory that has a default ACL.
+
+    - Fixed a bug in the handling of xattr values that could cause rsync to
+      not think that a file's extended attributes are up-to-date.
+
+    - Fixed the working of --fake-super with --link-dest and --xattrs.
+
+    - Fixed a hang when combining --dry-run with --remove-source-files.
+
+    - Fixed the building of the rounding.h file on systems that need custom
+      CPPFLAGS to be used.  Also improved the error reporting if the building
+      of rounding.h fails.
+
+    - Fixed the use of th --protect-args (-s) option when talking to a daemon.
+
+    - Fixed the --ignore-existing option's protection of files on the receiver
+      that are non-regular file son the sender (e.g. if a symlink or a dir on
+      the sender is trying to replace a file on the receiver).  The reverse
+      protection (protecting a dir/symlink/device from being replaced by a
+      file) was already working.
+
+    - Fixed an assert failure if --hard-links is combined with an option that
+      can cause a file in a set of hard-linked files to be skipped (i.e. if
+      --append, --ignore-existing, etc. affects one or more files in a hard-
+      linked set of files, but not all of them).
+
+    - Avoid setting the time on a directory that already has the modify time
+      that we're setting.  This avoids tweaking the dir's ctime.
+
+    - Fixed the 'T'-flag itemizing of symlinks when --time isn't preserved.
+
+    - Fixed a glitch in the itemizing of permissions with the -E option.
+
+    - Added the 'c'-flag to the itemizing of non-regular files so that the
+      itemized output doesn't get hidden if there were no attribute changes,
+      and also so that the itemizing of a --copy-links run will distinguish
+      between copying an identical non-regular file and the creation of a
+      revised version with a new value (e.g. symlink referent, device
+      numbers).
+
+    - The --append option's restricting of transfers to those that add data no
+      longer prevents the updating of non-content changes to otherwise up-to-
+      date files (i.e. those with the same content but differing permissions,
+      ownership, xattrs, etc.).
+
+    - Don't allow --fake-super to be specified with -XX (double --xattrs)
+      because they conflict.  If a daemon has "fake super" enabled, it
+      automatically downgrades a -XX request to -X.
+
+    - A daemon doesn't try to auto-refuse the "iconv" option if iconv-support
+      wasn't compiled in to the daemon (avoiding a warning in the logs).
+
+    - Fixed the support/rrsync script to work with the latest options that
+      rsync sends (including its flag-specifying use of -e to the server).
 
   ENHANCEMENTS:
 
-    - ...
+    - When getting an error while asking an older rsync daemon for a file
+      listing, rsync will try to notice if the error is a rejection of the
+      --dirs (-d) option and let the user know how to work around the issue.
+
+    - Added a few more --no-OPTION overrides.
+
+    - Improved the documentation of the --append option.
 
   INTERNAL:
 
-    - ...
+    - Fixed a couple minor bugs in the included popt library (ones which I
+      sent to the official popt project for inclusion in the 1.14 release).
+
+    - Fixed a stat() call that should have been do_stat() so that the proper
+      normal/64-bit stat() function gets called.  (Was in an area that should
+      not have caused problems, though.)
 
   DEVELOPER RELATED:
 
-    - ...
+    - The configure script tries to get the user's compiler to not warn about
+      unused function parameters if the build is not including one or more of
+      the ACL/xattrs/iconv features.
+
+    - The configure script now has better checks for figuring out if the
+      included popt should be used or not.
+
+    - Updated the build scripts to work with a revised FTP directory
+      structure.
