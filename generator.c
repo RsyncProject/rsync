@@ -279,7 +279,7 @@ static enum delret delete_dir_contents(char *fname, uint16 flags)
 	for (j = dirlist->used; j--; ) {
 		struct file_struct *fp = dirlist->files[j];
 
-		if (fp->flags & FLAG_MOUNT_DIR) {
+		if (fp->flags & FLAG_MOUNT_DIR && S_ISDIR(fp->mode)) {
 			if (verbose > 1) {
 				rprintf(FINFO,
 				    "mount point, %s, pins parent directory\n",
@@ -511,7 +511,7 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 		struct file_struct *fp = dirlist->files[i];
 		if (!F_IS_ACTIVE(fp))
 			continue;
-		if (fp->flags & FLAG_MOUNT_DIR) {
+		if (fp->flags & FLAG_MOUNT_DIR && S_ISDIR(fp->mode)) {
 			if (verbose > 1)
 				rprintf(FINFO, "cannot delete mount point: %s\n",
 					f_name(fp, NULL));
