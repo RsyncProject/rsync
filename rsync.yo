@@ -723,9 +723,12 @@ receiving user.
 dit(bf(--append)) This causes rsync to update a file by appending data onto
 the end of the file, which presumes that the data that already exists on
 the receiving side is identical with the start of the file on the sending
-side.  Any files that are the same size or longer on the receiving side
-are skipped.  Files that do not yet exist on the receiving side are
-transferred, regardless of size.  Implies bf(--inplace),
+side.  If a file needs to be transferred and its size on the receiver is
+the same or longer than the size on the sender, the file is skipped.  This
+does not interfere with the updating of a file's non-content attributes
+(e.g. permissions, ownership, etc.) when the file does not need to be
+transferred, nor does it affect the updating of any non-regular files.
+Implies bf(--inplace),
 but does not conflict with bf(--sparse) (since it is always extending a
 file's length).
 

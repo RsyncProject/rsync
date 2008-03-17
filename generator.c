@@ -1743,9 +1743,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		goto cleanup;
 	}
 
-	if (append_mode > 0 && sx.st.st_size >= F_LENGTH(file))
-		goto cleanup;
-
 	if (fnamecmp_type <= FNAMECMP_BASIS_DIR_HIGH)
 		;
 	else if (fnamecmp_type == FNAMECMP_FUZZY)
@@ -1767,6 +1764,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	  return_with_success:
 		if (!dry_run)
 			send_msg_int(MSG_SUCCESS, ndx);
+		goto cleanup;
+	}
+
+	if (append_mode > 0 && sx.st.st_size >= F_LENGTH(file)) {
 		goto cleanup;
 	}
 
