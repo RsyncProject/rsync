@@ -456,7 +456,7 @@ tt(    fe80::%link1/ffff:ffff:ffff:ffff::)nl()
 )
 
 You can also combine "hosts allow" with a separate "hosts deny"
-option. If both options are specified then the "hosts allow" option s
+option. If both options are specified then the "hosts allow" option is
 checked first and a match results in the client being able to
 connect. The "hosts deny" option is then checked and a match means
 that the host is rejected. If the host does not match either the
