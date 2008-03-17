@@ -691,7 +691,7 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 		munge_symlinks = !use_chroot || module_dirlen;
 	if (munge_symlinks) {
 		STRUCT_STAT st;
-		if (stat(SYMLINK_PREFIX, &st) == 0 && S_ISDIR(st.st_mode)) {
+		if (do_stat(SYMLINK_PREFIX, &st) == 0 && S_ISDIR(st.st_mode)) {
 			rprintf(FLOG, "Symlink munging is unsupported when a %s directory exists.\n",
 				SYMLINK_PREFIX);
 			io_printf(f_out, "@ERROR: daemon security issue -- contact admin\n", name);
