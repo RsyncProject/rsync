@@ -525,6 +525,8 @@ void glob_expand(char *s, char ***argv_ptr, int *argc_ptr, int *maxargs_ptr)
 	char **argv = *argv_ptr;
 	int argc = *argc_ptr;
 	int maxargs = *maxargs_ptr;
+	int count, have_glob_results;
+
 #if !defined HAVE_GLOB || !defined HAVE_GLOB_H
 	if (argc == maxargs) {
 		maxargs += MAX_ARGS;
@@ -553,25 +555,52 @@ void glob_expand(char *s, char ***argv_ptr, int *argc_ptr, int *maxargs_ptr)
 		out_of_memory("glob_expand");
 
 	memset(&globbuf, 0, sizeof globbuf);
-	if (!filter_server_path(s))
-		glob(s, 0, NULL, &globbuf);
-	if (MAX((int)globbuf.gl_pathc, 1) > maxargs - argc) {
-		maxargs += globbuf.gl_pathc + MAX_ARGS;
+	glob(s, 0, NULL, &globbuf);
+	/* Note: we check the first match against the filter list,
+	 * just in case the user specified a wildcard in the path. */
+	if ((count = globbuf.gl_pathc) > 0) {
+		if (filter_server_path(globbuf.gl_pathv[0])) {
+			int slashes = 0;
+			char *cp;
+			/* Truncate original arg at glob's truncation point. */
+			for (cp = globbuf.gl_pathv[0]; *cp; cp++) {
+				if (*cp == '/')
+					slashes++;
+			}
+			for (cp = s; *cp; cp++) {
+				if (*cp == '/') {
+					if (--slashes <= 0) {
+						*cp = '\0';
+						break;
+					}
+				}
+			}
+			have_glob_results = 0;
+			count = 1;
+		} else
+			have_glob_results = 1;
+	} else {
+		/* This truncates "s" at a filtered element, if present. */
+		filter_server_path(s);
+		have_glob_results = 0;
+		count = 1;
+	}
+	if (count + argc > maxargs) {
+		maxargs += count + MAX_ARGS;
 		if (!(argv = realloc_array(argv, char *, maxargs)))
 			out_of_memory("glob_expand");
 		*argv_ptr = argv;
 		*maxargs_ptr = maxargs;
 	}
-	if (globbuf.gl_pathc == 0)
-		argv[argc++] = s;
-	else {
+	if (have_glob_results) {
 		int i;
 		free(s);
-		for (i = 0; i < (int)globbuf.gl_pathc; i++) {
+		for (i = 0; i < count; i++) {
 			if (!(argv[argc++] = strdup(globbuf.gl_pathv[i])))
 				out_of_memory("glob_expand");
 		}
-	}
+	} else
+		argv[argc++] = s;
 	globfree(&globbuf);
 #endif
 	*argc_ptr = argc;
