@@ -507,6 +507,14 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	if (!dest_path || list_only)
 		return NULL;
 
+	if (server_filter_list.head
+	 && (check_filter(&server_filter_list, dest_path, 0 != 0) < 0
+	  || check_filter(&server_filter_list, dest_path, 1 != 0) < 0)) {
+		rprintf(FERROR, "skipping daemon-excluded destination \"%s\"\n",
+			dest_path);
+		exit_cleanup(RERR_FILESELECT);
+	}
+
 	/* See what currently exists at the destination. */
 	if ((statret = do_stat(dest_path, &st)) == 0) {
 		/* If the destination is a dir, enter it and use mode 1. */
