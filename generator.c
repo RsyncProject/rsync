@@ -1227,9 +1227,9 @@ static int dflt_perms;
 static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			   int itemizing, enum logcode code, int f_out)
 {
-	static int missing_below = -1, excluded_below = -1;
+	static int missing_below = -1;
 	static const char *parent_dirname = "";
-	static struct file_struct *missing_dir = NULL, *excluded_dir = NULL;
+	static struct file_struct *missing_dir = NULL;
 	static struct file_list *fuzzy_dirlist = NULL;
 	static int need_fuzzy_dirlist = 0;
 	struct file_struct *fuzzy_file = NULL;
@@ -1258,33 +1258,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (server_filter_list.head) {
-		int filtered = check_filter(&server_filter_list, fname, is_dir) < 0;
-		if (is_dir < 0 && filtered)
-			return;
-		if (excluded_below >= 0) {
-			if (F_DEPTH(file) > excluded_below
-			 && (!implied_dirs_are_missing || f_name_has_prefix(file, excluded_dir)))
-				goto skipping;
-			excluded_below = -1;
-		}
-		if (filtered) {
-			if (is_dir) {
-				excluded_below = F_DEPTH(file);
-				excluded_dir = file;
-			}
-		  skipping:
-#ifdef SUPPORT_HARD_LINKS
-			if (F_IS_HLINKED(file))
-				handle_skipped_hlink(file, itemizing, code, f_out);
-#endif
-			rprintf(FERROR_XFER,
-				"skipping daemon-excluded file \"%s\"\n",
-				fname);
-			return;
-		}
-	}
-
 	if (missing_below >= 0) {
 		if (F_DEPTH(file) <= missing_below
 		 || (implied_dirs_are_missing && !f_name_has_prefix(file, missing_dir))) {
@@ -1301,6 +1274,24 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			return;
 		}
 	}
+
+	if (server_filter_list.head) {
+		if (check_filter(&server_filter_list, fname, is_dir) < 0) {
+			if (is_dir < 0)
+				return;
+#ifdef SUPPORT_HARD_LINKS
+			if (F_IS_HLINKED(file))
+				handle_skipped_hlink(file, itemizing, code, f_out);
+#endif
+			rprintf(FERROR_XFER,
+				"skipping daemon-excluded %s \"%s\"\n",
+				is_dir ? "directory" : "file", fname);
+			if (is_dir)
+				goto skipping_dir_contents;
+			return;
+		}
+	}
+
 #ifdef SUPPORT_ACLS
 	sx.acc_acl = sx.def_acl = NULL;
 #endif
