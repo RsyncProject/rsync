@@ -322,9 +322,7 @@ if the client tries to pull them, are skipped with an error message if the
 client tries to push them (triggering exit code 23), and are never deleted from
 the module.  You can use daemon filters to prevent clients from downloading or
 tampering with private administrative files, such as files you may add to
-support uid/gid name translations.  Only one "filter" parameter can apply to a
-given module in the config file, so put all the rules you want in a single
-parameter.
+support uid/gid name translations.
 
 The daemon filter chain is built from the "filter", "include from", "include",
 "exclude from", and "exclude" parameters, in that order of priority.  Anchored
@@ -336,11 +334,12 @@ subtree; the easiest way to do this is with a triple-star pattern like
 The "filter" parameter takes a space-separated list of daemon filter rules,
 though it is smart enough to know not to split a token at an internal space in
 a rule (e.g. "- /foo  - /bar" is parsed as two rules).  You may specify one or
-more merge-file rules using the normal syntax.  Note that per-directory
-merge-file rules do not provide as much protection as global rules, but they
-can be used to make bf(--delete) work better during a client download operation
-if the per-dir merge files are included in the transfer and the client requests
-that they be used.
+more merge-file rules using the normal syntax.  Only one "filter" parameter can
+apply to a given module in the config file, so put all the rules you want in a
+single parameter.  Note that per-directory merge-file rules do not provide as
+much protection as global rules, but they can be used to make bf(--delete) work
+better during a client download operation if the per-dir merge files are
+included in the transfer and the client requests that they be used.
 
 dit(bf(exclude)) The "exclude" parameter takes a space-separated list of daemon
 exclude patterns.  As with the client bf(--exclude) option, patterns can be
