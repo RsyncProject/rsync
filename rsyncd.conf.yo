@@ -314,56 +314,55 @@ daemon side to behave as if the bf(--fake-user) command-line option had
 been specified.  This allows the full attributes of a file to be stored
 without having to have the daemon actually running as root.
 
-dit(bf(filter)) The "filter" option allows you to specify a space-separated
-list of filter rules that the daemon will not allow to be read or written.
-This is only superficially equivalent to the client specifying these
-patterns with the bf(--filter) option.  Only one "filter" option may be
-specified, but it may contain as many rules as you like, including
-merge-file rules.  Note that per-directory merge-file rules do not provide
-as much protection as global rules, but they can be used to make bf(--delete)
-work better when a client downloads the daemon's files (if the per-dir
-merge files are included in the transfer).
+dit(bf(filter)) The daemon has its own filter chain that determines what files
+it will let the client access.  This chain is not sent to the client and is
+independent of any filters the client may have specified.  Files excluded by
+the daemon filter chain (bf(daemon-excluded) files) are treated as non-existent
+if the client tries to pull them, are skipped with an error message if the
+client tries to push them (triggering exit code 23), and are never deleted from
+the module.  You can use daemon filters to prevent clients from downloading or
+tampering with private administrative files, such as files you may add to
+support uid/gid name translations.  Only one "filter" parameter can apply to a
+given module in the config file, so put all the rules you want in a single
+parameter.
 
-dit(bf(exclude)) The "exclude" option allows you to specify a
-space-separated list of patterns that the daemon will not allow to be read
-or written.  This is only superficially equivalent to the client
-specifying these patterns with the bf(--exclude) option.  Only one "exclude"
-option may be specified, but you can use "-" and "+" before patterns to
-specify exclude/include.
+The daemon filter chain is built from the "filter", "include from", "include",
+"exclude from", and "exclude" parameters, in that order of priority.  Anchored
+patterns are anchored at the root of the module.  To prevent access to an
+entire subtree, for example, "/secret", you em(must) exclude everything in the
+subtree; the easiest way to do this is with a triple-star pattern like
+"/secret/***".
 
-Because this exclude list is not passed to the client it only applies on
-the daemon: that is, it excludes files received by a client when receiving
-from a daemon and files deleted on a daemon when sending to a daemon, but
-it doesn't exclude files from being deleted on a client when receiving
-from a daemon.
+The "filter" parameter takes a space-separated list of daemon filter rules,
+though it is smart enough to know not to split a token at an internal space in
+a rule (e.g. "- /foo  - /bar" is parsed as two rules).  You may specify one or
+more merge-file rules using the normal syntax.  Note that per-directory
+merge-file rules do not provide as much protection as global rules, but they
+can be used to make bf(--delete) work better during a client download operation
+if the per-dir merge files are included in the transfer and the client requests
+that they be used.
 
-When you want to exclude a directory and all its contents, it is safest to
-use a rule that does both, such as "/some/dir/***" (the three stars tells
-rsync to exclude the directory itself and everything inside it).  This is
-better than just excluding the directory alone with "/some/dir/", as it
-helps to guard against attempts to trick rsync into accessing files deeper
-in the hierarchy.
+dit(bf(exclude)) The "exclude" parameter takes a space-separated list of daemon
+exclude patterns.  As with the client bf(--exclude) option, patterns can be
+qualified with "- " or "+ " to explicitly indicate exclude/include.  Only one
+"exclude" parameter can apply to a given module.  See the "filter" parameter
+for a description of how excluded files affect the daemon.
 
-dit(bf(exclude from)) The "exclude from" option specifies a filename
-on the daemon that contains exclude patterns, one per line.
-This is only superficially equivalent
-to the client specifying the bf(--exclude-from) option with an equivalent file.
-See the "exclude" option above.
+dit(bf(include)) Use an "include" to override the effects of the "exclude"
+parameter.  Only one "include" parameter can apply to a given module.  See the
+"filter" parameter for a description of how excluded files affect the daemon.
 
-dit(bf(include)) The "include" option allows you to specify a
-space-separated list of patterns which rsync should not exclude. This is
-only superficially equivalent to the client specifying these patterns with
-the bf(--include) option because it applies only on the daemon.  This is
-useful as it allows you to build up quite complex exclude/include rules.
-Only one "include" option may be specified, but you can use "+" and "-"
-before patterns to switch include/exclude.  See the "exclude" option
-above.
+dit(bf(exclude from)) The "exclude from" parameter specifies the name of a file
+on the daemon that contains daemon exclude patterns, one per line.  Only one
+"exclude from" parameter can apply to a given module; if you have multiple
+exclude-from files, you can specify them as a merge file in the "filter"
+parameter.  See the "filter" parameter for a description of how excluded files
+affect the daemon.
 
-dit(bf(include from)) The "include from" option specifies a filename
-on the daemon that contains include patterns, one per line. This is
-only superficially equivalent to the client specifying the
-bf(--include-from) option with a equivalent file.
-See the "exclude" option above.
+dit(bf(include from)) Analogue of "exclude from" for a file of daemon include
+patterns.  Only one "include from" parameter can apply to a given module.  See
+the "filter" parameter for a description of how excluded files affect the
+daemon.
 
 dit(bf(incoming chmod)) This option allows you to specify a set of
 comma-separated chmod strings that will affect the permissions of all
