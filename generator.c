@@ -1268,16 +1268,18 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (skip_dir && is_below(file, skip_dir)) {
-		if (is_dir)
-			file->flags |= FLAG_MISSING_DIR;
+	if (skip_dir) {
+		if (is_below(file, skip_dir)) {
+			if (is_dir)
+				file->flags |= FLAG_MISSING_DIR;
 #ifdef SUPPORT_HARD_LINKS
-		else if (F_IS_HLINKED(file))
-			handle_skipped_hlink(file, itemizing, code, f_out);
+			else if (F_IS_HLINKED(file))
+				handle_skipped_hlink(file, itemizing, code, f_out);
 #endif
-		return;
-	} else
+			return;
+		}
 		skip_dir = NULL;
+	}
 
 	if (server_filter_list.head) {
 		if (check_filter(&server_filter_list, fname, is_dir) < 0) {
@@ -1312,8 +1314,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		statret = -1;
 		stat_errno = ENOENT;
 	} else {
-		dry_missing_dir = NULL;
 		const char *dn = file->dirname ? file->dirname : ".";
+		dry_missing_dir = NULL;
 		if (parent_dirname != dn && strcmp(parent_dirname, dn) != 0) {
 			if (relative_paths && !implied_dirs
 			 && do_stat(dn, &sx.st) < 0) {
@@ -1409,7 +1411,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			statret = -1;
 		}
 		if (dry_run && statret != 0) {
-			dry_missing_dir = file;
+			if (!dry_missing_dir)
+				dry_missing_dir = file;
 			file->flags |= FLAG_MISSING_DIR;
 		}
 		real_ret = statret;

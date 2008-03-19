@@ -7,8 +7,7 @@
 
 . $srcdir/testsuite/rsync.fns
 
-mkdir "$fromdir" "$todir"
-mkdir "$fromdir/subdir"
+makepath "$fromdir/subdir" "$todir"
 echo data >"$fromdir/subdir/file"
 echo data >"$todir/other"
 
@@ -24,5 +23,5 @@ $RSYNC -n -r -R --no-implied-dirs -y "$fromdir/./subdir/file" "$todir/" \
 
 # Test 3: --delete-after pass skipped when last dir is dry-missing
 $RSYNC -n -r --delete-after -i "$fromdir/" "$todir/" | tee "$scratchdir/out"
-grep '^\*deleting   other' "$scratchdir/out" >/dev/null \
+grep '^\*deleting * other' "$scratchdir/out" >/dev/null \
 	|| test_fail 'test 3 failed'
