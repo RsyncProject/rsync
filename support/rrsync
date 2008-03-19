@@ -39,6 +39,7 @@ die "$0: Restricted directory does not exist!\n" if $subdir ne '/' && !-d $subdi
 my $command = $ENV{SSH_ORIGINAL_COMMAND};
 die "$0: Not invoked via sshd\n$Usage"	unless defined $command;
 die "$0: SSH_ORIGINAL_COMMAND='$command' is not rsync\n" unless $command =~ s/^rsync\s+//;
+die "$0: --server option is not first\n" unless $command =~ /^--server\s/;
 our $am_sender = $command =~ /^--server\s+--sender\s/; # Restrictive on purpose!
 die "$0 -ro: sending to read-only server not allowed\n" if $ro && !$am_sender;
 
@@ -65,7 +66,7 @@ our %long_opt = (
   'compress-level' => 1,
   'copy-dest' => 2,
   'copy-unsafe-links' => 0,
-  'daemon' => 0,
+  'daemon' => -1,
   'delay-updates' => 0,
   'delete' => 0,
   'delete-after' => 0,
