@@ -1213,6 +1213,14 @@ static void list_file_entry(struct file_struct *f)
 static int phase = 0;
 static int dflt_perms;
 
+static int implied_dirs_are_missing;
+/* Helper for recv_generator's skip_dir and dry_missing_dir tests. */
+static BOOL is_below(struct file_struct *file, struct file_struct *subtree)
+{
+	return F_DEPTH(file) > F_DEPTH(subtree)
+		&& (!implied_dirs_are_missing || f_name_has_prefix(file, subtree));
+}
+
 /* Acts on the indicated item in cur_flist whose name is fname.  If a dir,
  * make sure it exists, and has the right permissions/timestamp info.  For
  * all other non-regular files (symlinks, etc.) we create them here.  For
@@ -1227,9 +1235,12 @@ static int dflt_perms;
 static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			   int itemizing, enum logcode code, int f_out)
 {
-	static int missing_below = -1;
 	static const char *parent_dirname = "";
-	static struct file_struct *missing_dir = NULL;
+	/* Missing dir not created due to --dry-run; will still be scanned. */
+	static struct file_struct *dry_missing_dir = NULL;
+	/* Missing dir whose contents are skipped altogether due to
+	 * --ignore-non-existing, daemon exclude, or mkdir failure. */
+	static struct file_struct *skip_dir = NULL;
 	static struct file_list *fuzzy_dirlist = NULL;
 	static int need_fuzzy_dirlist = 0;
 	struct file_struct *fuzzy_file = NULL;
@@ -1241,7 +1252,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	char *fnamecmp, *partialptr, *backupptr = NULL;
 	char fnamecmpbuf[MAXPATHLEN];
 	uchar fnamecmp_type;
-	int implied_dirs_are_missing = relative_paths && !implied_dirs && protocol_version < 30;
 	int del_opts = delete_mode || force_delete ? DEL_RECURSE : 0;
 	int is_dir = !S_ISDIR(file->mode) ? 0
 		   : inc_recurse && ndx != cur_flist->ndx_start - 1 ? -1
@@ -1258,22 +1268,16 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		return;
 	}
 
-	if (missing_below >= 0) {
-		if (F_DEPTH(file) <= missing_below
-		 || (implied_dirs_are_missing && !f_name_has_prefix(file, missing_dir))) {
-			if (dry_run)
-				dry_run--;
-			missing_below = -1;
-		} else if (!dry_run) {
-			if (is_dir)
-				file->flags |= FLAG_MISSING_DIR;
+	if (skip_dir && is_below(file, skip_dir)) {
+		if (is_dir)
+			file->flags |= FLAG_MISSING_DIR;
 #ifdef SUPPORT_HARD_LINKS
-			if (F_IS_HLINKED(file))
-				handle_skipped_hlink(file, itemizing, code, f_out);
+		else if (F_IS_HLINKED(file))
+			handle_skipped_hlink(file, itemizing, code, f_out);
 #endif
-			return;
-		}
-	}
+		return;
+	} else
+		skip_dir = NULL;
 
 	if (server_filter_list.head) {
 		if (check_filter(&server_filter_list, fname, is_dir) < 0) {
@@ -1298,7 +1302,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 #ifdef SUPPORT_XATTRS
 	sx.xattr = NULL;
 #endif
-	if (dry_run > 1) {
+	if (dry_run > 1 || (dry_missing_dir && is_below(file, dry_missing_dir))) {
+	  parent_is_dry_missing:
 		if (fuzzy_dirlist) {
 			flist_free(fuzzy_dirlist);
 			fuzzy_dirlist = NULL;
@@ -1307,14 +1312,18 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		statret = -1;
 		stat_errno = ENOENT;
 	} else {
+		dry_missing_dir = NULL;
 		const char *dn = file->dirname ? file->dirname : ".";
 		if (parent_dirname != dn && strcmp(parent_dirname, dn) != 0) {
 			if (relative_paths && !implied_dirs
-			 && do_stat(dn, &sx.st) < 0
-			 && create_directory_path(fname) < 0) {
-				rsyserr(FERROR_XFER, errno,
-					"recv_generator: mkdir %s failed",
-					full_fname(dn));
+			 && do_stat(dn, &sx.st) < 0) {
+				if (dry_run)
+					goto parent_is_dry_missing;
+				if (create_directory_path(fname) < 0) {
+					rsyserr(FERROR_XFER, errno,
+						"recv_generator: mkdir %s failed",
+						full_fname(dn));
+				}
 			}
 			if (fuzzy_dirlist) {
 				flist_free(fuzzy_dirlist);
@@ -1343,12 +1352,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (is_dir) {
 			if (is_dir < 0)
 				return;
-			if (missing_below < 0) {
-				if (dry_run)
-					dry_run++;
-				missing_below = F_DEPTH(file);
-				missing_dir = file;
-			}
+			skip_dir = file;
 			file->flags |= FLAG_MISSING_DIR;
 		}
 #ifdef SUPPORT_HARD_LINKS
@@ -1404,10 +1408,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				goto skipping_dir_contents;
 			statret = -1;
 		}
-		if (dry_run && statret != 0 && missing_below < 0) {
-			missing_below = F_DEPTH(file);
-			missing_dir = file;
-			dry_run++;
+		if (dry_run && statret != 0) {
+			dry_missing_dir = file;
+			file->flags |= FLAG_MISSING_DIR;
 		}
 		real_ret = statret;
 		real_sx = sx;
@@ -1440,8 +1443,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			  skipping_dir_contents:
 				rprintf(FERROR,
 				    "*** Skipping any contents from this failed directory ***\n");
-				missing_below = F_DEPTH(file);
-				missing_dir = file;
+				skip_dir = file;
 				file->flags |= FLAG_MISSING_DIR;
 				goto cleanup;
 			}
@@ -1474,8 +1476,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				DEV_MINOR(devp) = minor(real_sx.st.st_dev);
 			}
 		}
-		else if (delete_during && f_out != -1 && !phase && dry_run < 2
-		    && (file->flags & FLAG_CONTENT_DIR))
+		else if (delete_during && f_out != -1 && !phase
+		    && BITS_SETnUNSET(file->flags, FLAG_CONTENT_DIR, FLAG_MISSING_DIR))
 			delete_in_dir(fname, file, &real_sx.st.st_dev);
 		goto cleanup;
 	}
@@ -1729,7 +1731,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	} else
 		partialptr = NULL;
 
-	if (statret != 0 && fuzzy_dirlist && dry_run <= 1) {
+	if (statret != 0 && fuzzy_dirlist) {
 		int j = find_fuzzy(file, fuzzy_dirlist);
 		if (j >= 0) {
 			fuzzy_file = fuzzy_dirlist->files[j];
@@ -2125,6 +2127,7 @@ void generate_files(int f_out, const char *local_name)
 	lull_mod = allowed_lull * 5;
 	symlink_timeset_failed_flags = ITEM_REPORT_TIME
 	    | (protocol_version >= 30 || !am_server ? ITEM_REPORT_TIMEFAIL : 0);
+	implied_dirs_are_missing = relative_paths && !implied_dirs && protocol_version < 30;
 
 	if (verbose > 2)
 		rprintf(FINFO, "generator starting pid=%ld\n", (long)getpid());
