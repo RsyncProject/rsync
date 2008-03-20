@@ -33,7 +33,7 @@ extern char *module_dir;
 extern unsigned int module_dirlen;
 extern mode_t orig_umask;
 extern char *partial_dir;
-extern struct filter_list_struct server_filter_list;
+extern struct filter_list_struct daemon_filter_list;
 
 int sanitize_paths = 0;
 
@@ -503,14 +503,13 @@ int lock_range(int fd, int offset, int len)
 	return fcntl(fd,F_SETLK,&lock) == 0;
 }
 
-static int filter_server_path(char *arg)
+static int filter_daemon_path(char *arg)
 {
-	char *s;
-
-	if (server_filter_list.head) {
+	if (daemon_filter_list.head) {
+		char *s;
 		for (s = arg; (s = strchr(s, '/')) != NULL; ) {
 			*s = '\0';
-			if (check_filter(&server_filter_list, arg, 1) < 0) {
+			if (check_filter(&daemon_filter_list, arg, 1) < 0) {
 				/* We must leave arg truncated! */
 				return 1;
 			}
@@ -538,7 +537,7 @@ void glob_expand(char *s, char ***argv_ptr, int *argc_ptr, int *maxargs_ptr)
 	if (!*s)
 		s = ".";
 	s = argv[argc++] = strdup(s);
-	filter_server_path(s);
+	filter_daemon_path(s);
 #else
 	glob_t globbuf;
 
@@ -559,7 +558,7 @@ void glob_expand(char *s, char ***argv_ptr, int *argc_ptr, int *maxargs_ptr)
 	/* Note: we check the first match against the filter list,
 	 * just in case the user specified a wildcard in the path. */
 	if ((count = globbuf.gl_pathc) > 0) {
-		if (filter_server_path(globbuf.gl_pathv[0])) {
+		if (filter_daemon_path(globbuf.gl_pathv[0])) {
 			int slashes = 0;
 			char *cp;
 			/* Truncate original arg at glob's truncation point. */
@@ -581,7 +580,7 @@ void glob_expand(char *s, char ***argv_ptr, int *argc_ptr, int *maxargs_ptr)
 			have_glob_results = 1;
 	} else {
 		/* This truncates "s" at a filtered element, if present. */
-		filter_server_path(s);
+		filter_daemon_path(s);
 		have_glob_results = 0;
 		count = 1;
 	}
@@ -1004,13 +1003,13 @@ char *partial_dir_fname(const char *fname)
 		fn = fname;
 	if ((int)pathjoin(t, sz, partial_dir, fn) >= sz)
 		return NULL;
-	if (server_filter_list.head) {
+	if (daemon_filter_list.head) {
 		t = strrchr(partial_fname, '/');
 		*t = '\0';
-		if (check_filter(&server_filter_list, partial_fname, 1) < 0)
+		if (check_filter(&daemon_filter_list, partial_fname, 1) < 0)
 			return NULL;
 		*t = '/';
-		if (check_filter(&server_filter_list, partial_fname, 0) < 0)
+		if (check_filter(&daemon_filter_list, partial_fname, 0) < 0)
 			return NULL;
 	}
 

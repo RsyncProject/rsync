@@ -30,7 +30,7 @@ extern int sanitize_paths;
 extern int daemon_over_rsh;
 extern unsigned int module_dirlen;
 extern struct filter_list_struct filter_list;
-extern struct filter_list_struct server_filter_list;
+extern struct filter_list_struct daemon_filter_list;
 
 int make_backups = 0;
 
@@ -1033,7 +1033,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			arg = poptGetOptArg(pc);
 			if (sanitize_paths)
 				arg = sanitize_path(NULL, arg, NULL, 0);
-			if (server_filter_list.head) {
+			if (daemon_filter_list.head) {
 				int rej;
 				char *dir, *cp = strdup(arg);
 				if (!cp)
@@ -1042,7 +1042,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 					goto options_rejected;
 				dir = cp + (*cp == '/' ? module_dirlen : 0);
 				clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
-				rej = check_filter(&server_filter_list, dir, 0) < 0;
+				rej = check_filter(&daemon_filter_list, dir, 0) < 0;
 				free(cp);
 				if (rej)
 					goto options_rejected;
@@ -1444,8 +1444,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		if (backup_dir)
 			backup_dir = sanitize_path(NULL, backup_dir, NULL, 0);
 	}
-	if (server_filter_list.head && !am_sender) {
-		struct filter_list_struct *elp = &server_filter_list;
+	if (daemon_filter_list.head && !am_sender) {
+		struct filter_list_struct *elp = &daemon_filter_list;
 		if (tmpdir) {
 			char *dir;
 			if (!*tmpdir)
@@ -1651,13 +1651,13 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		} else {
 			if (sanitize_paths)
 				files_from = sanitize_path(NULL, files_from, NULL, 0);
-			if (server_filter_list.head) {
+			if (daemon_filter_list.head) {
 				char *dir;
 				if (!*files_from)
 					goto options_rejected;
 				dir = files_from + (*files_from == '/' ? module_dirlen : 0);
 				clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
-				if (check_filter(&server_filter_list, dir, 0) < 0)
+				if (check_filter(&daemon_filter_list, dir, 0) < 0)
 					goto options_rejected;
 			}
 			filesfrom_fd = open(files_from, O_RDONLY|O_BINARY);

@@ -97,7 +97,7 @@ extern char *backup_dir;
 extern char *backup_suffix;
 extern int backup_suffix_len;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
-extern struct filter_list_struct server_filter_list;
+extern struct filter_list_struct daemon_filter_list;
 
 int ignore_perishable = 0;
 int non_perishable_cnt = 0;
@@ -1281,8 +1281,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		skip_dir = NULL;
 	}
 
-	if (server_filter_list.head) {
-		if (check_filter(&server_filter_list, fname, is_dir) < 0) {
+	if (daemon_filter_list.head) {
+		if (check_filter(&daemon_filter_list, fname, is_dir) < 0) {
 			if (is_dir < 0)
 				return;
 #ifdef SUPPORT_HARD_LINKS

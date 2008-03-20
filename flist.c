@@ -76,7 +76,7 @@ extern char curr_dir[MAXPATHLEN];
 extern struct chmod_mode_struct *chmod_modes;
 
 extern struct filter_list_struct filter_list;
-extern struct filter_list_struct server_filter_list;
+extern struct filter_list_struct daemon_filter_list;
 
 #ifdef ICONV_OPTION
 extern int filesfrom_convert;
@@ -234,8 +234,8 @@ int link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
 
 static inline int is_daemon_excluded(const char *fname, int is_dir)
 {
-	if (server_filter_list.head
-	 && check_filter(&server_filter_list, fname, is_dir) < 0) {
+	if (daemon_filter_list.head
+	 && check_filter(&daemon_filter_list, fname, is_dir) < 0) {
 		errno = ENOENT;
 		return 1;
 	}

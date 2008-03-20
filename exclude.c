@@ -43,7 +43,7 @@ extern unsigned int module_dirlen;
 
 struct filter_list_struct filter_list = { 0, 0, "" };
 struct filter_list_struct cvs_filter_list = { 0, 0, " [global CVS]" };
-struct filter_list_struct server_filter_list = { 0, 0, " [daemon]" };
+struct filter_list_struct daemon_filter_list = { 0, 0, " [daemon]" };
 
 /* Need room enough for ":MODS " prefix plus some room to grow. */
 #define MAX_RULE_PREFIX (16)
@@ -1009,10 +1009,10 @@ void parse_filter_file(struct filter_list_struct *listp, const char *fname,
 		return;
 
 	if (*fname != '-' || fname[1] || am_server) {
-		if (server_filter_list.head) {
+		if (daemon_filter_list.head) {
 			strlcpy(line, fname, sizeof line);
 			clean_fname(line, CFN_COLLAPSE_DOT_DOT_DIRS);
-			if (check_filter(&server_filter_list, line, 0) < 0)
+			if (check_filter(&daemon_filter_list, line, 0) < 0)
 				fp = NULL;
 			else
 				fp = fopen(line, "rb");

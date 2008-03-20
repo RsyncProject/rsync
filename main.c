@@ -78,7 +78,7 @@ extern char *batch_name;
 extern char *password_file;
 extern char curr_dir[MAXPATHLEN];
 extern struct file_list *first_flist;
-extern struct filter_list_struct server_filter_list;
+extern struct filter_list_struct daemon_filter_list;
 
 uid_t our_uid;
 int local_server = 0;
@@ -507,9 +507,9 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	if (!dest_path || list_only)
 		return NULL;
 
-	if (server_filter_list.head
-	 && (check_filter(&server_filter_list, dest_path, 0 != 0) < 0
-	  || check_filter(&server_filter_list, dest_path, 1 != 0) < 0)) {
+	if (daemon_filter_list.head
+	 && (check_filter(&daemon_filter_list, dest_path, 0 != 0) < 0
+	  || check_filter(&daemon_filter_list, dest_path, 1 != 0) < 0)) {
 		rprintf(FERROR, "skipping daemon-excluded destination \"%s\"\n",
 			dest_path);
 		exit_cleanup(RERR_FILESELECT);
@@ -908,9 +908,9 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 	}
 	check_alt_basis_dirs();
 
-	if (server_filter_list.head) {
+	if (daemon_filter_list.head) {
 		char **dir_p;
-		struct filter_list_struct *elp = &server_filter_list;
+		struct filter_list_struct *elp = &daemon_filter_list;
 
 		for (dir_p = basis_dir; *dir_p; dir_p++) {
 			char *dir = *dir_p;

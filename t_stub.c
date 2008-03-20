@@ -29,7 +29,7 @@ int module_dirlen = 0;
 mode_t orig_umask = 002;
 char *partial_dir;
 char *module_dir;
-struct filter_list_struct server_filter_list;
+struct filter_list_struct daemon_filter_list;
 
  void rprintf(UNUSED(enum logcode code), const char *format, ...)
 {

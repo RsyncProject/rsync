@@ -55,7 +55,7 @@ extern char *tmpdir;
 extern char *partial_dir;
 extern char *basis_dir[];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
-extern struct filter_list_struct server_filter_list;
+extern struct filter_list_struct daemon_filter_list;
 
 static struct bitbag *delayed_bits = NULL;
 static int phase = 0, redoing = 0;
@@ -489,8 +489,8 @@ int recv_files(int f_in, char *local_name)
 
 		cleanup_got_literal = 0;
 
-		if (server_filter_list.head
-		    && check_filter(&server_filter_list, fname, 0) < 0) {
+		if (daemon_filter_list.head
+		    && check_filter(&daemon_filter_list, fname, 0) < 0) {
 			rprintf(FERROR, "attempt to hack rsync failed.\n");
 			exit_cleanup(RERR_PROTOCOL);
 		}
@@ -555,8 +555,8 @@ int recv_files(int f_in, char *local_name)
 				fnamecmp = fnamecmpbuf;
 				break;
 			}
-			if (!fnamecmp || (server_filter_list.head
-			  && check_filter(&server_filter_list, fname, 0) < 0)) {
+			if (!fnamecmp || (daemon_filter_list.head
+			  && check_filter(&daemon_filter_list, fname, 0) < 0)) {
 				fnamecmp = fname;
 				fnamecmp_type = FNAMECMP_FNAME;
 			}
