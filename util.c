@@ -547,11 +547,15 @@ void glob_expand(char *s, char ***argv_ptr, int *argc_ptr, int *maxargs_ptr)
 		s = ".";
 
 	if (sanitize_paths)
-		s = sanitize_path(NULL, s, "", 0);
-	else
+		s = sanitize_path(NULL, s, "", 0, SP_KEEP_DOT_DIRS);
+	else {
 		s = strdup(s);
-	if (!s)
-		out_of_memory("glob_expand");
+		if (!s)
+			out_of_memory("glob_expand");
+		clean_fname(s, CFN_KEEP_DOT_DIRS
+			     | CFN_KEEP_TRAILING_SLASH
+			     | CFN_COLLAPSE_DOT_DOT_DIRS);
+	}
 
 	memset(&globbuf, 0, sizeof globbuf);
 	glob(s, 0, NULL, &globbuf);
@@ -715,13 +719,13 @@ int count_dir_elements(const char *p)
 	return cnt;
 }
 
-/* Turns multiple adjacent slashes into a single slash, drops interior "."
- * elements, drops an intial "./" unless CFN_KEEP_LEADING_DOT_DIR is flagged,
- * will even drop a trailing '.' after a '/' if CFN_DROP_TRAILING_DOT_DIR is
- * flagged, removes a trailing slash (perhaps after removing the aforementioned
- * dot) unless CFN_KEEP_TRAILING_SLASH is flagged, will even collapse ".."
- * elements (except at the start of the string) if CFN_COLLAPSE_DOT_DOT_DIRS
- * is flagged.  If the resulting name would be empty, we return ".". */
+/* Turns multiple adjacent slashes into a single slash, drops all leading or
+ * interior "." elements unless CFN_KEEP_DOT_DIRS is flagged.  Will also drop
+ * a trailing '.' after a '/' if CFN_DROP_TRAILING_DOT_DIR is flagged, removes
+ * a trailing slash (perhaps after removing the aforementioned dot) unless
+ * CFN_KEEP_TRAILING_SLASH is flagged, and will also collapse ".." elements
+ * (except at the start) if CFN_COLLAPSE_DOT_DOT_DIRS is flagged.  If the
+ * resulting name would be empty, returns ".". */
 unsigned int clean_fname(char *name, int flags)
 {
 	char *limit = name - 1, *t = name, *f = name;
@@ -732,7 +736,7 @@ unsigned int clean_fname(char *name, int flags)
 
 	if ((anchored = *f == '/') != 0)
 		*t++ = *f++;
-	else if (flags & CFN_KEEP_LEADING_DOT_DIR && *f == '.' && f[1] == '/') {
+	else if (flags & CFN_KEEP_DOT_DIRS && *f == '.' && f[1] == '/') {
 		*t++ = *f++;
 		*t++ = *f++;
 	}
@@ -744,7 +748,7 @@ unsigned int clean_fname(char *name, int flags)
 		}
 		if (*f == '.') {
 			/* discard interior "." dirs */
-			if (f[1] == '/') {
+			if (f[1] == '/' && !(flags & CFN_KEEP_DOT_DIRS)) {
 				f += 2;
 				continue;
 			}
@@ -801,10 +805,11 @@ unsigned int clean_fname(char *name, int flags)
  * ALWAYS collapses ".." elements (except for those at the start of the
  * string up to "depth" deep).  If the resulting name would be empty,
  * change it into a ".". */
-char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
+char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth,
+		    int flags)
 {
 	char *start, *sanp;
-	int rlen = 0, leave_one_dotdir = relative_paths;
+	int rlen = 0, drop_dot_dirs = !relative_paths || !(flags & SP_KEEP_DOT_DIRS);
 
 	if (dest != p) {
 		int plen = strlen(p);
@@ -827,6 +832,11 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
 		}
 	}
 
+	if (drop_dot_dirs) {
+		while (*p == '.' && p[1] == '/')
+			p += 2;
+	}
+
 	start = sanp = dest + rlen;
 	/* This loop iterates once per filename component in p, pointing at
 	 * the start of the name (past any prior slash) for each iteration. */
@@ -836,10 +846,8 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
 			p++;
 			continue;
 		}
-		if (*p == '.' && (p[1] == '/' || p[1] == '\0')) {
-			if (leave_one_dotdir && p[1])
-				leave_one_dotdir = 0;
-			else {
+		if (drop_dot_dirs) {
+			if (*p == '.' && (p[1] == '/' || p[1] == '\0')) {
 				/* skip "." component */
 				p++;
 				continue;
@@ -852,10 +860,8 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
 				if (sanp != start) {
 					/* back up sanp one level */
 					--sanp; /* now pointing at slash */
-					while (sanp > start && sanp[-1] != '/') {
-						/* skip back up to slash */
+					while (sanp > start && sanp[-1] != '/')
 						sanp--;
-					}
 				}
 				continue;
 			}

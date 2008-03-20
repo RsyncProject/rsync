@@ -687,7 +687,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	clean_fname(thisname, 0);
 
 	if (sanitize_paths)
-		sanitize_path(thisname, thisname, "", 0);
+		sanitize_path(thisname, thisname, "", 0, SP_DEFAULT);
 
 	if ((basename = strrchr(thisname, '/')) != NULL) {
 		int len = basename++ - thisname;
@@ -939,7 +939,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		} else {
 			read_sbuf(f, bp, linkname_len - 1);
 			if (sanitize_paths)
-				sanitize_path(bp, bp, "", lastdir_depth);
+				sanitize_path(bp, bp, "", lastdir_depth, SP_DEFAULT);
 		}
 	}
 #endif
@@ -1030,7 +1030,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	}
 	clean_fname(thisname, 0);
 	if (sanitize_paths)
-		sanitize_path(thisname, thisname, "", 0);
+		sanitize_path(thisname, thisname, "", 0, SP_DEFAULT);
 
 	if (stp && S_ISDIR(stp->st_mode)) {
 		st = *stp; /* Needed for "symlink/." with --relative. */
@@ -1795,6 +1795,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		     | (filesfrom_convert ? RL_CONVERT : 0)
 #endif
 		     | (eol_nulls || reading_remotely ? RL_EOL_NULLS : 0);
+	int implied_dot_dir = 0;
 
 	rprintf(FLOG, "building file list\n");
 	if (show_filelist_p())
@@ -1836,13 +1837,13 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (use_ff_fd) {
 			if (read_line(filesfrom_fd, fbuf, sizeof fbuf, rl_flags) == 0)
 				break;
-			sanitize_path(fbuf, fbuf, "", 0);
+			sanitize_path(fbuf, fbuf, "", 0, SP_KEEP_DOT_DIRS);
 		} else {
 			if (argc-- == 0)
 				break;
 			strlcpy(fbuf, *argv++, MAXPATHLEN);
 			if (sanitize_paths)
-				sanitize_path(fbuf, fbuf, "", 0);
+				sanitize_path(fbuf, fbuf, "", 0, SP_KEEP_DOT_DIRS);
 		}
 
 		len = strlen(fbuf);
@@ -1892,8 +1893,10 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				*p = '\0';
 				if (p == fbuf)
 					dir = "/";
-				else
+				else {
 					dir = fbuf;
+					clean_fname(dir, 0);
+				}
 				fn = p + 3;
 				while (*fn == '/')
 					fn++;
@@ -1901,8 +1904,15 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 					*--fn = '\0'; /* ensure room for '.' */
 			} else
 				fn = fbuf;
-			len = clean_fname(fn, CFN_KEEP_LEADING_DOT_DIR
-					    | CFN_KEEP_TRAILING_SLASH
+			/* A leading ./ can be used in relative mode to affect
+			 * the dest dir without its name being in the path. */
+			if (*fn == '.' && fn[1] == '/' && !implied_dot_dir) {
+				send_file_name(f, flist, ".", NULL,
+				    (flags | FLAG_IMPLIED_DIR) & ~FLAG_CONTENT_DIR,
+				    ALL_FILTERS);
+				implied_dot_dir = 1;
+			}
+			len = clean_fname(fn, CFN_KEEP_TRAILING_SLASH
 					    | CFN_DROP_TRAILING_DOT_DIR);
 			if (len == 1) {
 				if (fn[0] == '/') {
@@ -1996,15 +2006,17 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			int top_flags = FLAG_TOP_DIR | FLAG_CONTENT_DIR | flags;
 			file = send_file_name(f, flist, fbuf, &st,
 					      top_flags, ALL_FILTERS);
+			if (!file)
+				continue;
 			if (inc_recurse) {
-				if (name_type == DOT_NAME && file) {
+				if (name_type == DOT_NAME) {
 					if (send_dir_depth < 0) {
 						send_dir_depth = 0;
 						change_local_filter_dir(fbuf, len, send_dir_depth);
 					}
 					send_directory(f, flist, fbuf, len, flags);
 				}
-			} else if (file)
+			} else
 				send_if_directory(f, flist, file, fbuf, len, flags);
 		} else
 			send_file_name(f, flist, fbuf, &st, flags, ALL_FILTERS);

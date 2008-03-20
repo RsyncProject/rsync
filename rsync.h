@@ -189,10 +189,13 @@
 #define SIGNIFICANT_ITEM_FLAGS (~(\
 	ITEM_BASIS_TYPE_FOLLOWS | ITEM_XNAME_FOLLOWS | ITEM_LOCAL_CHANGE))
 
-#define CFN_KEEP_LEADING_DOT_DIR (1<<0)
+#define CFN_KEEP_DOT_DIRS (1<<0)
 #define CFN_KEEP_TRAILING_SLASH (1<<1)
 #define CFN_DROP_TRAILING_DOT_DIR (1<<2)
 #define CFN_COLLAPSE_DOT_DOT_DIRS (1<<3)
+
+#define SP_DEFAULT 0
+#define SP_KEEP_DOT_DIRS (1<<0)
 
 /* Log-message categories.  FLOG only goes to the log file, not the client;
  * FCLIENT is the opposite. */

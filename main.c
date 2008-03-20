@@ -902,9 +902,9 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 	if (sanitize_paths) {
 		char **dir_p;
 		for (dir_p = basis_dir; *dir_p; dir_p++)
-			*dir_p = sanitize_path(NULL, *dir_p, NULL, curr_dir_depth);
+			*dir_p = sanitize_path(NULL, *dir_p, NULL, curr_dir_depth, SP_DEFAULT);
 		if (partial_dir)
-			partial_dir = sanitize_path(NULL, partial_dir, NULL, curr_dir_depth);
+			partial_dir = sanitize_path(NULL, partial_dir, NULL, curr_dir_depth, SP_DEFAULT);
 	}
 	check_alt_basis_dirs();
 

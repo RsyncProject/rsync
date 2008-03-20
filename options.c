@@ -1032,7 +1032,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		case OPT_INCLUDE_FROM:
 			arg = poptGetOptArg(pc);
 			if (sanitize_paths)
-				arg = sanitize_path(NULL, arg, NULL, 0);
+				arg = sanitize_path(NULL, arg, NULL, 0, SP_DEFAULT);
 			if (daemon_filter_list.head) {
 				int rej;
 				char *dir, *cp = strdup(arg);
@@ -1438,11 +1438,11 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	if (sanitize_paths) {
 		int i;
 		for (i = argc; i-- > 0; )
-			argv[i] = sanitize_path(NULL, argv[i], "", 0);
+			argv[i] = sanitize_path(NULL, argv[i], "", 0, SP_KEEP_DOT_DIRS);
 		if (tmpdir)
-			tmpdir = sanitize_path(NULL, tmpdir, NULL, 0);
+			tmpdir = sanitize_path(NULL, tmpdir, NULL, 0, SP_DEFAULT);
 		if (backup_dir)
-			backup_dir = sanitize_path(NULL, backup_dir, NULL, 0);
+			backup_dir = sanitize_path(NULL, backup_dir, NULL, 0, SP_DEFAULT);
 	}
 	if (daemon_filter_list.head && !am_sender) {
 		struct filter_list_struct *elp = &daemon_filter_list;
@@ -1650,7 +1650,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			}
 		} else {
 			if (sanitize_paths)
-				files_from = sanitize_path(NULL, files_from, NULL, 0);
+				files_from = sanitize_path(NULL, files_from, NULL, 0, SP_DEFAULT);
 			if (daemon_filter_list.head) {
 				char *dir;
 				if (!*files_from)
