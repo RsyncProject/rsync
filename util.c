@@ -569,7 +569,7 @@ void glob_expand(char *s, char ***argv_ptr, int *argc_ptr, int *maxargs_ptr)
 			}
 			for (cp = s; *cp; cp++) {
 				if (*cp == '/') {
-					if (--slashes <= 0) {
+					if (slashes-- <= 0) {
 						*cp = '\0';
 						break;
 					}
@@ -829,16 +829,14 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth)
 	}
 
 	start = sanp = dest + rlen;
+	/* This loop iterates once per filename component in p, pointing at
+	 * the start of the name (past any prior slash) for each iteration. */
 	while (*p) {
 		/* discard leading or extra slashes */
 		if (*p == '/') {
 			p++;
 			continue;
 		}
-		/* this loop iterates once per filename component in p.
-		 * both p (and sanp if the original had a slash) should
-		 * always be left pointing after a slash
-		 */
 		if (*p == '.' && (p[1] == '/' || p[1] == '\0')) {
 			if (leave_one_dotdir && p[1])
 				leave_one_dotdir = 0;
