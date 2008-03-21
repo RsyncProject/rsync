@@ -3,7 +3,8 @@ Name: rsync
 Version: 3.0.0
 Release: 1
 Group: Applications/Internet
-Source:	http://rsync.samba.org/ftp/rsync/rsync-%{version}.tar.gz
+Source0: http://rsync.samba.org/ftp/rsync/rsync-%{version}.tar.gz
+Source1: http://rsync.samba.org/ftp/rsync/rsync-patches-%{version}.tar.gz
 URL: http://rsync.samba.org/
 
 Prefix: %{_prefix}
@@ -22,7 +23,14 @@ destination.  Rsync is widely used for backups and mirroring and as an
 improved copy command for everyday use.
 
 %prep
+# Choose one -- setup source only, or setup source + rsync-patches:
 %setup -q
+#%setup -q -b1
+
+# If you you used "%setup -q -b1", choose the patches you wish to apply:
+#patch -p1 <patches/acls.diff
+#patch -p1 <patches/xattrs.diff
+#patch -p1 <patches/checksum-reading.diff
 
 %build
 %configure
@@ -34,12 +42,16 @@ rm -rf $RPM_BUILD_ROOT
 
 %makeinstall
 
+mkdir -p $RPM_BUILD_ROOT/etc/xinetd.d
+install -m 644 packaging/lsb/rsync.xinetd $RPM_BUILD_ROOT/etc/xinetd.d/rsync
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root)
 %doc COPYING README tech_report.tex
+%config(noreplace) /etc/xinetd.d/rsync
 %{_prefix}/bin/rsync
 %{_mandir}/man1/rsync.1*
 %{_mandir}/man5/rsyncd.conf.5*
@@ -47,3 +59,7 @@ rm -rf $RPM_BUILD_ROOT
 %changelog
 * Sat Mar 01 2008 Wayne Davison <wayned@samba.org>
 Released 3.0.0.
+
+* Fri Mar 21 2008 Wayne Davison <wayned@samba.org>
+Added installation of /etc/xinetd.d/rsync file and some commented-out
+lines that demonstrate how to use the rsync-patches tar file.
