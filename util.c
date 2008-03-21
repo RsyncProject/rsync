@@ -510,8 +510,10 @@ int lock_range(int fd, int offset, int len)
 static inline void call_glob_match(const char *name, int len, int from_glob,
 				   char *arg, int abpos, int fbpos);
 
-static char *arg_buf, *filt_buf, **glob_argv;
-static int absize, fbsize, glob_maxargs, glob_argc;
+static struct glob_data {
+	char *arg_buf, *filt_buf, **argv;
+	int absize, fbsize, maxargs, argc;
+} glob;
 
 static void glob_match(char *arg, int abpos, int fbpos)
 {
@@ -520,15 +522,17 @@ static void glob_match(char *arg, int abpos, int fbpos)
 
 	while (*arg == '.' && arg[1] == '/') {
 		if (fbpos < 0) {
-			if (fbsize < absize)
-				filt_buf = realloc_array(filt_buf, char, fbsize = absize);
-			memcpy(filt_buf, arg_buf, abpos + 1);
+			if (glob.fbsize < glob.absize) {
+				glob.filt_buf = realloc_array(glob.filt_buf,
+						char, glob.fbsize = glob.absize);
+			}
+			memcpy(glob.filt_buf, glob.arg_buf, abpos + 1);
 			fbpos = abpos;
 		}
-		ENSURE_MEMSPACE(arg_buf, char, absize, abpos + 2);
-		arg_buf[abpos++] = *arg++;
-		arg_buf[abpos++] = *arg++;
-		arg_buf[abpos] = '\0';
+		ENSURE_MEMSPACE(glob.arg_buf, char, glob.absize, abpos + 2);
+		glob.arg_buf[abpos++] = *arg++;
+		glob.arg_buf[abpos++] = *arg++;
+		glob.arg_buf[abpos] = '\0';
 	}
 	if ((slash = strchr(arg, '/')) != NULL) {
 		*slash = '\0';
@@ -539,7 +543,7 @@ static void glob_match(char *arg, int abpos, int fbpos)
 		struct dirent *di;
 		DIR *d;
 
-		if (!(d = opendir(abpos ? arg_buf : ".")))
+		if (!(d = opendir(abpos ? glob.arg_buf : ".")))
 			return;
 		while ((di = readdir(d)) != NULL) {
 			char *dname = d_name(di);
@@ -567,25 +571,25 @@ static inline void call_glob_match(const char *name, int len, int from_glob,
 {
 	char *use_buf;
 
-	ENSURE_MEMSPACE(arg_buf, char, absize, abpos + len + 2);
-	memcpy(arg_buf + abpos, name, len);
+	ENSURE_MEMSPACE(glob.arg_buf, char, glob.absize, abpos + len + 2);
+	memcpy(glob.arg_buf + abpos, name, len);
 	abpos += len;
-	arg_buf[abpos] = '\0';
+	glob.arg_buf[abpos] = '\0';
 
 	if (fbpos >= 0) {
-		ENSURE_MEMSPACE(filt_buf, char, fbsize, fbpos + len + 2);
-		memcpy(filt_buf + fbpos, name, len);
+		ENSURE_MEMSPACE(glob.filt_buf, char, glob.fbsize, fbpos + len + 2);
+		memcpy(glob.filt_buf + fbpos, name, len);
 		fbpos += len;
-		filt_buf[fbpos] = '\0';
-		use_buf = filt_buf;
+		glob.filt_buf[fbpos] = '\0';
+		use_buf = glob.filt_buf;
 	} else
-		use_buf = arg_buf;
+		use_buf = glob.arg_buf;
 
 	if (from_glob || arg) {
 		STRUCT_STAT st;
 		int is_dir;
 
-		if (do_stat(arg_buf, &st) != 0) {
+		if (do_stat(glob.arg_buf, &st) != 0) {
 			if (from_glob)
 				return;
 			is_dir = 0;
@@ -604,16 +608,16 @@ static inline void call_glob_match(const char *name, int len, int from_glob,
 	}
 
 	if (arg) {
-		arg_buf[abpos++] = '/';
-		arg_buf[abpos] = '\0';
+		glob.arg_buf[abpos++] = '/';
+		glob.arg_buf[abpos] = '\0';
 		if (fbpos >= 0) {
-			filt_buf[fbpos++] = '/';
-			filt_buf[fbpos] = '\0';
+			glob.filt_buf[fbpos++] = '/';
+			glob.filt_buf[fbpos] = '\0';
 		}
 		glob_match(arg, abpos, fbpos);
 	} else {
-		ENSURE_MEMSPACE(glob_argv, char *, glob_maxargs, glob_argc + 1);
-		if (!(glob_argv[glob_argc++] = strdup(arg_buf)))
+		ENSURE_MEMSPACE(glob.argv, char *, glob.maxargs, glob.argc + 1);
+		if (!(glob.argv[glob.argc++] = strdup(glob.arg_buf)))
 			out_of_memory("glob_match");
 	}
 }
@@ -622,8 +626,16 @@ static inline void call_glob_match(const char *name, int len, int from_glob,
  * daemon-excluded files/dirs will not be matched by the wildcards. */
 void glob_expand(const char *arg, char ***argv_p, int *argc_p, int *maxargs_p)
 {
+	int save_argc;
 	char *s;
-	int save_argc = *argc_p;
+
+	if (!arg) {
+		if (glob.filt_buf)
+			free(glob.filt_buf);
+		free(glob.arg_buf);
+		memset(&glob, 0, sizeof glob);
+		return;
+	}
 
 	if (sanitize_paths)
 		s = sanitize_path(NULL, arg, "", 0, SP_KEEP_DOT_DIRS);
@@ -636,36 +648,31 @@ void glob_expand(const char *arg, char ***argv_p, int *argc_p, int *maxargs_p)
 			     | CFN_COLLAPSE_DOT_DOT_DIRS);
 	}
 
-	if (!(arg_buf = new_array(char, absize = MAXPATHLEN)))
+	if (glob.absize < MAXPATHLEN
+	 && !(glob.arg_buf = realloc_array(glob.arg_buf, char, glob.absize = MAXPATHLEN)))
 		out_of_memory("glob_expand");
-	*arg_buf = '\0';
-	filt_buf = NULL;
-	fbsize = 0;
+	*glob.arg_buf = '\0';
 
-	glob_argc = *argc_p;
-	glob_argv = *argv_p;
-	glob_maxargs = *maxargs_p;
+	glob.argc = save_argc = *argc_p;
+	glob.argv = *argv_p;
+	glob.maxargs = *maxargs_p;
 
-	if (glob_maxargs < MAX_ARGS
-	 && !(glob_argv = realloc_array(glob_argv, char *, glob_maxargs = MAX_ARGS)))
+	if (glob.maxargs < MAX_ARGS
+	 && !(glob.argv = realloc_array(glob.argv, char *, glob.maxargs = MAX_ARGS)))
 		out_of_memory("glob_expand");
 
 	glob_match(s, 0, -1);
 
 	/* The arg didn't match anything, so add the failed arg to the list. */
-	if (glob_argc == save_argc) {
-		ENSURE_MEMSPACE(glob_argv, char *, glob_maxargs, glob_argc + 1);
-		glob_argv[glob_argc++] = s;
+	if (glob.argc == save_argc) {
+		ENSURE_MEMSPACE(glob.argv, char *, glob.maxargs, glob.argc + 1);
+		glob.argv[glob.argc++] = s;
 	} else
 		free(s);
 
-	*maxargs_p = glob_maxargs;
-	*argv_p = glob_argv;
-	*argc_p = glob_argc;
-
-	if (filt_buf)
-		free(filt_buf);
-	free(arg_buf);
+	*maxargs_p = glob.maxargs;
+	*argv_p = glob.argv;
+	*argc_p = glob.argc;
 }
 
 /* This routine is only used in daemon mode. */

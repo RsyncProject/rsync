@@ -921,6 +921,8 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 	}
 	argv[argc] = NULL;
 
+	glob_expand(NULL, NULL, NULL, NULL);
+
 	*argc_p = argc;
 	*argv_p = argv;
 }
