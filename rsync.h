@@ -336,10 +336,6 @@ enum msgcode {
 #endif
 #endif
 
-#ifdef HAVE_GLOB_H
-#include <glob.h>
-#endif
-
 /* these are needed for the uid/gid mapping code */
 #include <pwd.h>
 #include <grp.h>

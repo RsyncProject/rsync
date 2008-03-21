@@ -503,53 +503,132 @@ int lock_range(int fd, int offset, int len)
 	return fcntl(fd,F_SETLK,&lock) == 0;
 }
 
-static int filter_daemon_path(char *arg)
+#define ENSURE_MEMSPACE(buf, type, sz, req) \
+	if ((req) >= sz && !(buf = realloc_array(buf, type, sz *= 2))) \
+		out_of_memory("ENSURE_MEMSPACE")
+
+static inline void call_glob_match(const char *name, int len, int from_glob,
+				   char *arg, int abpos, int fbpos);
+
+static char *arg_buf, *filt_buf, **glob_argv;
+static int absize, fbsize, glob_maxargs, glob_argc;
+
+static void glob_match(char *arg, int abpos, int fbpos)
 {
-	if (daemon_filter_list.head) {
-		char *s;
-		for (s = arg; (s = strchr(s, '/')) != NULL; ) {
-			*s = '\0';
-			if (check_filter(&daemon_filter_list, arg, 1) < 0) {
-				/* We must leave arg truncated! */
-				return 1;
-			}
-			*s++ = '/';
+	int len;
+	char *slash;
+
+	while (*arg == '.' && arg[1] == '/') {
+		if (fbpos < 0) {
+			if (fbsize < absize)
+				filt_buf = realloc_array(filt_buf, char, fbsize = absize);
+			memcpy(filt_buf, arg_buf, abpos + 1);
+			fbpos = abpos;
 		}
+		ENSURE_MEMSPACE(arg_buf, char, absize, abpos + 2);
+		arg_buf[abpos++] = *arg++;
+		arg_buf[abpos++] = *arg++;
+		arg_buf[abpos] = '\0';
 	}
-	return 0;
+	if ((slash = strchr(arg, '/')) != NULL) {
+		*slash = '\0';
+		len = slash - arg;
+	} else
+		len = strlen(arg);
+	if (strpbrk(arg, "*?[")) {
+		struct dirent *di;
+		DIR *d;
+
+		if (!(d = opendir(abpos ? arg_buf : ".")))
+			return;
+		while ((di = readdir(d)) != NULL) {
+			char *dname = d_name(di);
+			if (dname[0] == '.' && (dname[1] == '\0'
+			  || (dname[1] == '.' && dname[2] == '\0')))
+				continue;
+			if (!wildmatch(arg, dname))
+				continue;
+			call_glob_match(dname, strlen(dname), 1,
+					slash ? arg + len + 1 : NULL,
+					abpos, fbpos);
+		}
+		closedir(d);
+	} else {
+		call_glob_match(arg, len, 0,
+				slash ? arg + len + 1 : NULL,
+				abpos, fbpos);
+	}
+	if (slash)
+		*slash = '/';
 }
 
-void glob_expand(char *s, char ***argv_ptr, int *argc_ptr, int *maxargs_ptr)
+static inline void call_glob_match(const char *name, int len, int from_glob,
+				   char *arg, int abpos, int fbpos)
 {
-	char **argv = *argv_ptr;
-	int argc = *argc_ptr;
-	int maxargs = *maxargs_ptr;
-	int count, have_glob_results;
+	char *use_buf;
 
-#if !defined HAVE_GLOB || !defined HAVE_GLOB_H
-	if (argc == maxargs) {
-		maxargs += MAX_ARGS;
-		if (!(argv = realloc_array(argv, char *, maxargs)))
-			out_of_memory("glob_expand");
-		*argv_ptr = argv;
-		*maxargs_ptr = maxargs;
+	ENSURE_MEMSPACE(arg_buf, char, absize, abpos + len + 2);
+	memcpy(arg_buf + abpos, name, len);
+	abpos += len;
+	arg_buf[abpos] = '\0';
+
+	if (fbpos >= 0) {
+		ENSURE_MEMSPACE(filt_buf, char, fbsize, fbpos + len + 2);
+		memcpy(filt_buf + fbpos, name, len);
+		fbpos += len;
+		filt_buf[fbpos] = '\0';
+		use_buf = filt_buf;
+	} else
+		use_buf = arg_buf;
+
+	if (from_glob || arg) {
+		STRUCT_STAT st;
+		int is_dir;
+
+		if (do_stat(arg_buf, &st) != 0) {
+			if (from_glob)
+				return;
+			is_dir = 0;
+		} else {
+			is_dir = S_ISDIR(st.st_mode) != 0;
+			if (arg && !is_dir)
+				return;
+		}
+
+		if (daemon_filter_list.head
+		 && check_filter(&daemon_filter_list, use_buf, is_dir) < 0) {
+			if (from_glob)
+				return;
+			arg = NULL;
+		}
 	}
-	if (!*s)
-		s = ".";
-	s = argv[argc++] = strdup(s);
-	filter_daemon_path(s);
-#else
-	glob_t globbuf;
 
-	if (maxargs <= argc)
-		return;
-	if (!*s)
-		s = ".";
+	if (arg) {
+		arg_buf[abpos++] = '/';
+		arg_buf[abpos] = '\0';
+		if (fbpos >= 0) {
+			filt_buf[fbpos++] = '/';
+			filt_buf[fbpos] = '\0';
+		}
+		glob_match(arg, abpos, fbpos);
+	} else {
+		ENSURE_MEMSPACE(glob_argv, char *, glob_maxargs, glob_argc + 1);
+		if (!(glob_argv[glob_argc++] = strdup(arg_buf)))
+			out_of_memory("glob_match");
+	}
+}
+
+/* This routine performs wild-card expansion of the pathname in "arg".  Any
+ * daemon-excluded files/dirs will not be matched by the wildcards. */
+void glob_expand(const char *arg, char ***argv_p, int *argc_p, int *maxargs_p)
+{
+	char *s;
+	int save_argc = *argc_p;
 
 	if (sanitize_paths)
-		s = sanitize_path(NULL, s, "", 0, SP_KEEP_DOT_DIRS);
+		s = sanitize_path(NULL, arg, "", 0, SP_KEEP_DOT_DIRS);
 	else {
-		s = strdup(s);
+		s = strdup(arg);
 		if (!s)
 			out_of_memory("glob_expand");
 		clean_fname(s, CFN_KEEP_DOT_DIRS
@@ -557,60 +636,40 @@ void glob_expand(char *s, char ***argv_ptr, int *argc_ptr, int *maxargs_ptr)
 			     | CFN_COLLAPSE_DOT_DOT_DIRS);
 	}
 
-	memset(&globbuf, 0, sizeof globbuf);
-	glob(s, 0, NULL, &globbuf);
-	/* Note: we check the first match against the filter list,
-	 * just in case the user specified a wildcard in the path. */
-	if ((count = globbuf.gl_pathc) > 0) {
-		if (filter_daemon_path(globbuf.gl_pathv[0])) {
-			int slashes = 0;
-			char *cp;
-			/* Truncate original arg at glob's truncation point. */
-			for (cp = globbuf.gl_pathv[0]; *cp; cp++) {
-				if (*cp == '/')
-					slashes++;
-			}
-			for (cp = s; *cp; cp++) {
-				if (*cp == '/') {
-					if (slashes-- <= 0) {
-						*cp = '\0';
-						break;
-					}
-				}
-			}
-			have_glob_results = 0;
-			count = 1;
-		} else
-			have_glob_results = 1;
-	} else {
-		/* This truncates "s" at a filtered element, if present. */
-		filter_daemon_path(s);
-		have_glob_results = 0;
-		count = 1;
-	}
-	if (count + argc > maxargs) {
-		maxargs += count + MAX_ARGS;
-		if (!(argv = realloc_array(argv, char *, maxargs)))
-			out_of_memory("glob_expand");
-		*argv_ptr = argv;
-		*maxargs_ptr = maxargs;
-	}
-	if (have_glob_results) {
-		int i;
-		free(s);
-		for (i = 0; i < count; i++) {
-			if (!(argv[argc++] = strdup(globbuf.gl_pathv[i])))
-				out_of_memory("glob_expand");
-		}
+	if (!(arg_buf = new_array(char, absize = MAXPATHLEN)))
+		out_of_memory("glob_expand");
+	*arg_buf = '\0';
+	filt_buf = NULL;
+	fbsize = 0;
+
+	glob_argc = *argc_p;
+	glob_argv = *argv_p;
+	glob_maxargs = *maxargs_p;
+
+	if (glob_maxargs < MAX_ARGS
+	 && !(glob_argv = realloc_array(glob_argv, char *, glob_maxargs = MAX_ARGS)))
+		out_of_memory("glob_expand");
+
+	glob_match(s, 0, -1);
+
+	/* The arg didn't match anything, so add the failed arg to the list. */
+	if (glob_argc == save_argc) {
+		ENSURE_MEMSPACE(glob_argv, char *, glob_maxargs, glob_argc + 1);
+		glob_argv[glob_argc++] = s;
 	} else
-		argv[argc++] = s;
-	globfree(&globbuf);
-#endif
-	*argc_ptr = argc;
+		free(s);
+
+	*maxargs_p = glob_maxargs;
+	*argv_p = glob_argv;
+	*argc_p = glob_argc;
+
+	if (filt_buf)
+		free(filt_buf);
+	free(arg_buf);
 }
 
 /* This routine is only used in daemon mode. */
-void glob_expand_module(char *base1, char *arg, char ***argv_ptr, int *argc_ptr, int *maxargs_ptr)
+void glob_expand_module(char *base1, char *arg, char ***argv_p, int *argc_p, int *maxargs_p)
 {
 	char *p, *s;
 	char *base = base1;
@@ -632,7 +691,7 @@ void glob_expand_module(char *base1, char *arg, char ***argv_ptr, int *argc_ptr,
 	for (s = arg; *s; s = p + base_len) {
 		if ((p = strstr(s, base)) != NULL)
 			*p = '\0'; /* split it at this point */
-		glob_expand(s, argv_ptr, argc_ptr, maxargs_ptr);
+		glob_expand(s, argv_p, argc_p, maxargs_p);
 		if (!p)
 			break;
 	}

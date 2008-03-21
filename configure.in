@@ -311,7 +311,7 @@ AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS(sys/fcntl.h sys/select.h fcntl.h sys/time.h sys/unistd.h \
     unistd.h utime.h grp.h compat.h sys/param.h ctype.h sys/wait.h \
     sys/ioctl.h sys/filio.h string.h stdlib.h sys/socket.h sys/mode.h \
-    sys/un.h sys/attr.h glob.h mcheck.h arpa/inet.h arpa/nameser.h locale.h \
+    sys/un.h sys/attr.h mcheck.h arpa/inet.h arpa/nameser.h locale.h \
     netdb.h malloc.h float.h limits.h iconv.h libcharset.h langinfo.h \
     sys/acl.h acl/libacl.h attr/xattr.h sys/xattr.h sys/extattr.h \
     popt.h popt/popt.h)
@@ -550,7 +550,7 @@ AC_FUNC_UTIME_NULL
 AC_FUNC_ALLOCA
 AC_CHECK_FUNCS(waitpid wait4 getcwd strdup chown chmod lchmod mknod mkfifo \
     fchmod fstat ftruncate strchr readlink link utime utimes lutimes strftime \
-    memmove lchown vsnprintf snprintf vasprintf asprintf setsid glob strpbrk \
+    memmove lchown vsnprintf snprintf vasprintf asprintf setsid strpbrk \
     strlcat strlcpy strtol mallinfo getgroups setgroups geteuid getegid \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \
     strerror putenv iconv_open locale_charset nl_langinfo getxattr \
