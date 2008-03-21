@@ -623,10 +623,11 @@ static inline void call_glob_match(const char *name, int len, int from_glob,
 }
 
 /* This routine performs wild-card expansion of the pathname in "arg".  Any
- * daemon-excluded files/dirs will not be matched by the wildcards. */
-void glob_expand(const char *arg, char ***argv_p, int *argc_p, int *maxargs_p)
+ * daemon-excluded files/dirs will not be matched by the wildcards.  Returns 0
+ * if a wild-card string is the only returned item (due to matching nothing). */
+int glob_expand(const char *arg, char ***argv_p, int *argc_p, int *maxargs_p)
 {
-	int save_argc;
+	int ret, save_argc;
 	char *s;
 
 	if (!arg) {
@@ -634,7 +635,7 @@ void glob_expand(const char *arg, char ***argv_p, int *argc_p, int *maxargs_p)
 			free(glob.filt_buf);
 		free(glob.arg_buf);
 		memset(&glob, 0, sizeof glob);
-		return;
+		return -1;
 	}
 
 	if (sanitize_paths)
@@ -657,8 +658,8 @@ void glob_expand(const char *arg, char ***argv_p, int *argc_p, int *maxargs_p)
 	glob.argv = *argv_p;
 	glob.maxargs = *maxargs_p;
 
-	if (glob.maxargs < MAX_ARGS
-	 && !(glob.argv = realloc_array(glob.argv, char *, glob.maxargs = MAX_ARGS)))
+	if (glob.maxargs < 100
+	 && !(glob.argv = realloc_array(glob.argv, char *, glob.maxargs = 100)))
 		out_of_memory("glob_expand");
 
 	glob_match(s, 0, -1);
@@ -667,12 +668,17 @@ void glob_expand(const char *arg, char ***argv_p, int *argc_p, int *maxargs_p)
 	if (glob.argc == save_argc) {
 		ENSURE_MEMSPACE(glob.argv, char *, glob.maxargs, glob.argc + 1);
 		glob.argv[glob.argc++] = s;
-	} else
+		ret = 0;
+	} else {
 		free(s);
+		ret = 1;
+	}
 
 	*maxargs_p = glob.maxargs;
 	*argv_p = glob.argv;
 	*argc_p = glob.argc;
+
+	return ret;
 }
 
 /* This routine is only used in daemon mode. */
