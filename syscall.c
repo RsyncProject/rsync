@@ -282,12 +282,3 @@ OFF_T do_lseek(int fd, OFF_T offset, int whence)
 	return lseek(fd, offset, whence);
 #endif
 }
-
-char *d_name(struct dirent *di)
-{
-#ifdef HAVE_BROKEN_READDIR
-	return (di->d_name - 2);
-#else
-	return di->d_name;
-#endif
-}
