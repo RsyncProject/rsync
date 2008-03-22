@@ -119,7 +119,7 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 {
 	struct filter_struct *ret;
 	const char *cp;
-	unsigned int pre_len;
+	unsigned int pre_len, slash_cnt = 0;
 
 	if (verbose > 2) {
 		rprintf(FINFO, "[%s] add_rule(%s%.*s%s)%s\n",
@@ -145,9 +145,19 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 	if (!(ret = new0(struct filter_struct)))
 		out_of_memory("add_rule");
 
+	if (pat_len > 1 && pat[pat_len-1] == '/') {
+		pat_len--;
+		mflags |= MATCHFLG_DIRECTORY;
+	}
+
+	for (cp = pat; cp < pat + pat_len; cp++) {
+		if (*cp == '/')
+			slash_cnt++;
+	}
+
 	if (!(mflags & (MATCHFLG_ABS_PATH | MATCHFLG_MERGE_FILE))
 	 && ((xflags & (XFLG_ANCHORED2ABS|XFLG_ABS_IF_SLASH) && *pat == '/')
-	  || (xflags & XFLG_ABS_IF_SLASH && strchr(pat, '/') != NULL))) {
+	  || (xflags & XFLG_ABS_IF_SLASH && slash_cnt))) {
 		mflags |= MATCHFLG_ABS_PATH;
 		if (*pat == '/')
 			pre_len = dirbuf_len - module_dirlen - 1;
@@ -155,10 +165,16 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 			pre_len = 0;
 	} else
 		pre_len = 0;
+
 	if (!(ret->pattern = new_array(char, pre_len + pat_len + 1)))
 		out_of_memory("add_rule");
-	if (pre_len)
+	if (pre_len) {
 		memcpy(ret->pattern, dirbuf + module_dirlen, pre_len);
+		for (cp = ret->pattern; cp < ret->pattern + pre_len; cp++) {
+			if (*cp == '/')
+				slash_cnt++;
+		}
+	}
 	strlcpy(ret->pattern + pre_len, pat, pat_len + 1);
 	pat_len += pre_len;
 
@@ -176,11 +192,6 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 			 && ret->pattern[pat_len-1] == '*')
 				mflags |= MATCHFLG_WILD3_SUFFIX;
 		}
-	}
-
-	if (pat_len > 1 && ret->pattern[pat_len-1] == '/') {
-		ret->pattern[pat_len-1] = 0;
-		mflags |= MATCHFLG_DIRECTORY;
 	}
 
 	if (mflags & MATCHFLG_PERDIR_MERGE) {
@@ -226,10 +237,8 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 				out_of_memory("add_rule");
 		}
 		mergelist_parents[mergelist_cnt++] = ret;
-	} else {
-		for (cp = ret->pattern; (cp = strchr(cp, '/')) != NULL; cp++)
-			ret->u.slash_cnt++;
-	}
+	} else
+		ret->u.slash_cnt = slash_cnt;
 
 	ret->match_flags = mflags;
 
