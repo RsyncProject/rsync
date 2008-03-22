@@ -36,6 +36,15 @@ Changes since 3.0.0:
     - Avoid setting the time on a directory that already has the modify time
       that we're setting.  This avoids tweaking the dir's ctime.
 
+    - Improved the daemon-exclude handling to do a better job of excluding
+      a wider range of path entries.  It also sends the user an error about
+      "missing" files instead of silently ignoring them.
+
+    - Fixed some glitches with the dry-run code's missing-directory
+      handling, including a problem when combined with --fuzzy.
+
+    - Fixed some glitches with the skipped-directory handling.
+
     - Fixed the 'T'-flag itemizing of symlinks when --time isn't preserved.
 
     - Fixed a glitch in the itemizing of permissions with the -E option.
@@ -72,6 +81,9 @@ Changes since 3.0.0:
 
     - Improved the documentation of the --append option.
 
+    - Improved the documentation of the filter/exclude/include daemon
+      parameters.
+
   INTERNAL:
 
     - Fixed a couple minor bugs in the included popt library (ones which I
@@ -81,6 +93,11 @@ Changes since 3.0.0:
       normal/64-bit stat() function gets called.  (Was in an area that should
       not have caused problems, though.)
 
+    - Changed the file-glob code to do a directory scan without using the
+      "glob" and "glob.h".  This lets us do the globbing with less memory
+      churn, and also avoid adding daemon-excluded items to the returned
+      args.
+
   DEVELOPER RELATED:
 
     - The configure script tries to get the user's compiler to not warn about
@@ -89,6 +106,9 @@ Changes since 3.0.0:
 
     - The configure script now has better checks for figuring out if the
       included popt should be used or not.
+
+    - The RPM spec file was updated to have (1) comments for how to use the
+      rsync-patch tar file, and (2) an /etc/xinetd.d/rsync file.
 
     - Updated the build scripts to work with a revised FTP directory
       structure.
