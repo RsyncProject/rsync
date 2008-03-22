@@ -586,22 +586,15 @@ static inline void call_glob_match(const char *name, int len, int from_glob,
 		STRUCT_STAT st;
 		int is_dir;
 
-		if (do_stat(glob.arg_buf, &st) != 0) {
-			if (from_glob)
-				return;
-			is_dir = 0;
-		} else {
-			is_dir = S_ISDIR(st.st_mode) != 0;
-			if (arg && !is_dir)
-				return;
-		}
+		if (do_stat(glob.arg_buf, &st) != 0)
+			return;
+		is_dir = S_ISDIR(st.st_mode) != 0;
+		if (arg && !is_dir)
+			return;
 
 		if (daemon_filter_list.head
-		 && check_filter(&daemon_filter_list, use_buf, is_dir) < 0) {
-			if (from_glob)
-				return;
-			arg = NULL;
-		}
+		 && check_filter(&daemon_filter_list, use_buf, is_dir) < 0)
+			return;
 	}
 
 	if (arg) {

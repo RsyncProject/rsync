@@ -242,6 +242,32 @@ static inline int is_daemon_excluded(const char *fname, int is_dir)
 	return 0;
 }
 
+static inline int path_is_daemon_excluded(char *path, int ignore_filename)
+{
+	if (daemon_filter_list.head && path) {
+		char *slash = path;
+
+		while ((slash = strchr(slash+1, '/')) != NULL) {
+			int ret;
+			*slash = '\0';
+			ret = check_filter(&daemon_filter_list, path, 1);
+			*slash = '/';
+			if (ret < 0) {
+				errno = ENOENT;
+				return 1;
+			}
+		}
+
+		if (!ignore_filename
+		 && check_filter(&daemon_filter_list, path, 1) < 0) {
+			errno = ENOENT;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 /* This function is used to check if a file should be included/excluded
  * from the list of files based on its name and type etc.  The value of
  * filter_level is set to either SERVER_FILTERS or ALL_FILTERS. */
@@ -1948,6 +1974,12 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 		dirlen = dir ? strlen(dir) : 0;
 		if (dirlen != lastdir_len || memcmp(lastdir, dir, dirlen) != 0) {
+			if (path_is_daemon_excluded(dir, 0)) {
+				io_error |= IOERR_GENERAL;
+				rsyserr(FERROR, errno, "push_dir %s failed in %s",
+					full_fname(dir), curr_dir);
+				continue;
+			}
 			if (!push_pathname(dir ? strdup(dir) : NULL, dirlen))
 				continue;
 			lastdir = pathname;
@@ -1959,7 +1991,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			memmove(fbuf, fn, len + 1);
 
 		if (link_stat(fbuf, &st, copy_dirlinks || name_type != NORMAL_NAME) != 0
-		 || is_daemon_excluded(fbuf, S_ISDIR(st.st_mode) != 0)) {
+		 || is_daemon_excluded(fbuf, S_ISDIR(st.st_mode) != 0)
+		 || (relative_paths && path_is_daemon_excluded(fbuf, 1))) {
 			io_error |= IOERR_GENERAL;
 			rsyserr(FERROR_XFER, errno, "link_stat %s failed",
 				full_fname(fbuf));
