@@ -119,7 +119,7 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 {
 	struct filter_struct *ret;
 	const char *cp;
-	unsigned int ex_len;
+	unsigned int pre_len;
 
 	if (verbose > 2) {
 		rprintf(FINFO, "[%s] add_rule(%s%.*s%s)%s\n",
@@ -150,17 +150,17 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 	  || (xflags & XFLG_ABS_IF_SLASH && strchr(pat, '/') != NULL))) {
 		mflags |= MATCHFLG_ABS_PATH;
 		if (*pat == '/')
-			ex_len = dirbuf_len - module_dirlen - 1;
+			pre_len = dirbuf_len - module_dirlen - 1;
 		else
-			ex_len = 0;
+			pre_len = 0;
 	} else
-		ex_len = 0;
-	if (!(ret->pattern = new_array(char, ex_len + pat_len + 1)))
+		pre_len = 0;
+	if (!(ret->pattern = new_array(char, pre_len + pat_len + 1)))
 		out_of_memory("add_rule");
-	if (ex_len)
-		memcpy(ret->pattern, dirbuf + module_dirlen, ex_len);
-	strlcpy(ret->pattern + ex_len, pat, pat_len + 1);
-	pat_len += ex_len;
+	if (pre_len)
+		memcpy(ret->pattern, dirbuf + module_dirlen, pre_len);
+	strlcpy(ret->pattern + pre_len, pat, pat_len + 1);
+	pat_len += pre_len;
 
 	if (strpbrk(ret->pattern, "*[?")) {
 		mflags |= MATCHFLG_WILD;
