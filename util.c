@@ -504,8 +504,8 @@ int lock_range(int fd, int offset, int len)
 }
 
 #define ENSURE_MEMSPACE(buf, type, sz, req) \
-	if ((req) >= sz && !(buf = realloc_array(buf, type, sz *= 2))) \
-		out_of_memory("ENSURE_MEMSPACE")
+	if ((req) > sz && !(buf = realloc_array(buf, type, sz = MAX(sz * 2, req)))) \
+		out_of_memory("glob_expand")
 
 static inline void call_glob_match(const char *name, int len, int from_glob,
 				   char *arg, int abpos, int fbpos);
@@ -522,14 +522,11 @@ static void glob_match(char *arg, int abpos, int fbpos)
 
 	while (*arg == '.' && arg[1] == '/') {
 		if (fbpos < 0) {
-			if (glob.fbsize < glob.absize) {
-				glob.filt_buf = realloc_array(glob.filt_buf,
-						char, glob.fbsize = glob.absize);
-			}
+			ENSURE_MEMSPACE(glob.filt_buf, char, glob.fbsize, glob.absize);
 			memcpy(glob.filt_buf, glob.arg_buf, abpos + 1);
 			fbpos = abpos;
 		}
-		ENSURE_MEMSPACE(glob.arg_buf, char, glob.absize, abpos + 2);
+		ENSURE_MEMSPACE(glob.arg_buf, char, glob.absize, abpos + 3);
 		glob.arg_buf[abpos++] = *arg++;
 		glob.arg_buf[abpos++] = *arg++;
 		glob.arg_buf[abpos] = '\0';
@@ -649,18 +646,14 @@ int glob_expand(const char *arg, char ***argv_p, int *argc_p, int *maxargs_p)
 			     | CFN_COLLAPSE_DOT_DOT_DIRS);
 	}
 
-	if (glob.absize < MAXPATHLEN
-	 && !(glob.arg_buf = realloc_array(glob.arg_buf, char, glob.absize = MAXPATHLEN)))
-		out_of_memory("glob_expand");
+	ENSURE_MEMSPACE(glob.arg_buf, char, glob.absize, MAXPATHLEN);
 	*glob.arg_buf = '\0';
 
 	glob.argc = save_argc = *argc_p;
 	glob.argv = *argv_p;
 	glob.maxargs = *maxargs_p;
 
-	if (glob.maxargs < 100
-	 && !(glob.argv = realloc_array(glob.argv, char *, glob.maxargs = 100)))
-		out_of_memory("glob_expand");
+	ENSURE_MEMSPACE(glob.argv, char *, glob.maxargs, 100);
 
 	glob_match(s, 0, -1);
 
