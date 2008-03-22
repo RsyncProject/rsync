@@ -533,24 +533,24 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 
 	p = lp_filter(i);
 	parse_rule(&daemon_filter_list, p, MATCHFLG_WORD_SPLIT,
-		   XFLG_ABS_IF_SLASH);
+		   XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3);
 
 	p = lp_include_from(i);
 	parse_filter_file(&daemon_filter_list, p, MATCHFLG_INCLUDE,
-	    XFLG_ABS_IF_SLASH | XFLG_OLD_PREFIXES | XFLG_FATAL_ERRORS);
+	    XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES | XFLG_FATAL_ERRORS);
 
 	p = lp_include(i);
 	parse_rule(&daemon_filter_list, p,
 		   MATCHFLG_INCLUDE | MATCHFLG_WORD_SPLIT,
-		   XFLG_ABS_IF_SLASH | XFLG_OLD_PREFIXES);
+		   XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES);
 
 	p = lp_exclude_from(i);
 	parse_filter_file(&daemon_filter_list, p, 0,
-	    XFLG_ABS_IF_SLASH | XFLG_OLD_PREFIXES | XFLG_FATAL_ERRORS);
+	    XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES | XFLG_FATAL_ERRORS);
 
 	p = lp_exclude(i);
 	parse_rule(&daemon_filter_list, p, MATCHFLG_WORD_SPLIT,
-		   XFLG_ABS_IF_SLASH | XFLG_OLD_PREFIXES);
+		   XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES);
 
 	log_init(1);
 

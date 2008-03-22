@@ -52,6 +52,8 @@ struct filter_list_struct daemon_filter_list = { 0, 0, " [daemon]" };
 #define MODIFIERS_INCL_EXCL "/!Crsp"
 #define MODIFIERS_HIDE_PROTECT "/!p"
 
+#define SLASH_WILD3_SUFFIX "/***"
+
 /* The dirbuf is set by push_local_filters() to the current subdirectory
  * relative to curr_dir that is being processed.  The path always has a
  * trailing slash appended, and the variable dirbuf_len contains the length
@@ -119,7 +121,7 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 {
 	struct filter_struct *ret;
 	const char *cp;
-	unsigned int pre_len, slash_cnt = 0;
+	unsigned int pre_len, suf_len, slash_cnt = 0;
 
 	if (verbose > 2) {
 		rprintf(FINFO, "[%s] add_rule(%s%.*s%s)%s\n",
@@ -166,7 +168,15 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 	} else
 		pre_len = 0;
 
-	if (!(ret->pattern = new_array(char, pre_len + pat_len + 1)))
+	/* The daemon wants dir-exclude rules to get an appended "/" + "***". */
+	if (xflags & XFLG_DIR2WILD3
+	 && BITS_SETnUNSET(mflags, MATCHFLG_DIRECTORY, MATCHFLG_INCLUDE)) {
+		mflags &= ~MATCHFLG_DIRECTORY;
+		suf_len = sizeof SLASH_WILD3_SUFFIX - 1;
+	} else
+		suf_len = 0;
+
+	if (!(ret->pattern = new_array(char, pre_len + pat_len + suf_len + 1)))
 		out_of_memory("add_rule");
 	if (pre_len) {
 		memcpy(ret->pattern, dirbuf + module_dirlen, pre_len);
@@ -177,6 +187,11 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 	}
 	strlcpy(ret->pattern + pre_len, pat, pat_len + 1);
 	pat_len += pre_len;
+	if (suf_len) {
+		memcpy(ret->pattern + pat_len, SLASH_WILD3_SUFFIX, suf_len+1);
+		pat_len += suf_len;
+		slash_cnt++;
+	}
 
 	if (strpbrk(ret->pattern, "*[?")) {
 		mflags |= MATCHFLG_WILD;

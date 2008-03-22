@@ -145,8 +145,9 @@
 
 #define XFLG_FATAL_ERRORS	(1<<0)
 #define XFLG_OLD_PREFIXES	(1<<1)
-#define XFLG_ANCHORED2ABS	(1<<2)
-#define XFLG_ABS_IF_SLASH	(1<<3)
+#define XFLG_ANCHORED2ABS	(1<<2) /* leading slash indicates absolute */
+#define XFLG_ABS_IF_SLASH	(1<<3) /* leading or interior slash is absolute */
+#define XFLG_DIR2WILD3		(1<<4) /* dir/ match gets trailing *** added */
 
 #define ATTRS_REPORT		(1<<0)
 #define ATTRS_SKIP_MTIME	(1<<1)
