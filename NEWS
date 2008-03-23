@@ -2,6 +2,15 @@ NEWS for rsync 3.0.1 (UNRELEASED)
 Protocol: 30 (unchanged)
 Changes since 3.0.0:
 
+  NOTABLE CHANGES IN BEHAVIOR:
+
+    - Added the 'c'-flag to the itemizing of non-regular files so that the
+      itemized output doesn't get hidden if there were no attribute changes,
+      and also so that the itemizing of a --copy-links run will distinguish
+      between copying an identical non-regular file and the creation of a
+      revised version with a new value (e.g. a changed symlink referent, a
+      new device number, etc.).
+
   BUG FIXES:
 
     - Fixed a crash bug when a single-use rsync daemon (via remote shell) was
@@ -29,16 +38,16 @@ Changes since 3.0.0:
       file) was already working.
 
     - Fixed an assert failure if --hard-links is combined with an option that
-      can cause a file in a set of hard-linked files to be skipped (i.e. if
-      --append, --ignore-existing, etc. affects one or more files in a hard-
-      linked set of files, but not all of them).
+      can skip a file in a set of hard-linked files (i.e. --ignore-existing,
+      --append, etc.), without skipping all the files in the set.
 
-    - Avoid setting the time on a directory that already has the modify time
-      that we're setting.  This avoids tweaking the dir's ctime.
+    - Avoid setting the modify time on a directory that already has the right
+      modify time set.  This avoids tweaking the dir's ctime.
 
-    - Improved the daemon-exclude handling to do a better job of excluding
-      a wider range of path entries.  It also sends the user an error about
-      "missing" files instead of silently ignoring them.
+    - Improved the daemon-exclude handling to do a better job of applying the
+      exclude rules to path entries.  It also sends the user an error just as
+      if the files were actually missing (instead of silently ignoring the
+      user's args).
 
     - Fixed some glitches with the dry-run code's missing-directory
       handling, including a problem when combined with --fuzzy.
@@ -49,21 +58,17 @@ Changes since 3.0.0:
 
     - Fixed a glitch in the itemizing of permissions with the -E option.
 
-    - Added the 'c'-flag to the itemizing of non-regular files so that the
-      itemized output doesn't get hidden if there were no attribute changes,
-      and also so that the itemizing of a --copy-links run will distinguish
-      between copying an identical non-regular file and the creation of a
-      revised version with a new value (e.g. symlink referent, device
-      numbers).
-
     - The --append option's restricting of transfers to those that add data no
       longer prevents the updating of non-content changes to otherwise up-to-
       date files (i.e. those with the same content but differing permissions,
       ownership, xattrs, etc.).
 
     - Don't allow --fake-super to be specified with -XX (double --xattrs)
-      because they conflict.  If a daemon has "fake super" enabled, it
-      automatically downgrades a -XX request to -X.
+      because the options conflict.  If a daemon has "fake super" enabled,
+      it automatically downgrades a -XX request to -X.
+
+    - Fixed a couple bugs in the parsing of daemon-config excludes that could
+      make a floating exclude rule get treated as matching an absolute path.
 
     - A daemon doesn't try to auto-refuse the "iconv" option if iconv-support
       wasn't compiled in to the daemon (avoiding a warning in the logs).
@@ -105,7 +110,7 @@ Changes since 3.0.0:
       the ACL/xattrs/iconv features.
 
     - The configure script now has better checks for figuring out if the
-      included popt should be used or not.
+      included popt code should be used or not.
 
     - The RPM spec file was updated to have (1) comments for how to use the
       rsync-patch tar file, and (2) an /etc/xinetd.d/rsync file.
