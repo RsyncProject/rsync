@@ -55,18 +55,20 @@ if ($incl_generated_files) {
 }
 my $last_touch = time;
 
-my(@patches, %local_patch);
+my(%patches, %local_patch);
 
 # Start by finding all patches so that we can load all possible parents.
 open(PIPE, '-|', 'git', 'branch', '-a') or die $!;
 while (<PIPE>) {
     if (m# origin/patch/(.*)#) {
-	push(@patches, $1);
+	$patches{$1} = 1;
     } elsif (m# patch/(.*)#) {
-	$local_patch{$1} = 1;
+	$patches{$1} = $local_patch{$1} = 1;
     }
 }
 close PIPE;
+
+my @patches = sort keys %patches;
 
 my(%parent, %description);
 foreach my $patch (@patches) {
