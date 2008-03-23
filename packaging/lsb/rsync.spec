@@ -1,10 +1,11 @@
 Summary: A fast, versatile, remote (and local) file-copying tool
 Name: rsync
 Version: 3.0.0
+%define fullversion %{version}
 Release: 1
 Group: Applications/Internet
-Source0: http://rsync.samba.org/ftp/rsync/rsync-%{version}.tar.gz
-Source1: http://rsync.samba.org/ftp/rsync/rsync-patches-%{version}.tar.gz
+Source0: http://rsync.samba.org/ftp/rsync/%{name}-%{fullversion}.tar.gz
+Source1: http://rsync.samba.org/ftp/rsync/%{name}-patches-%{fullversion}.tar.gz
 URL: http://rsync.samba.org/
 
 Prefix: %{_prefix}
@@ -24,8 +25,8 @@ improved copy command for everyday use.
 
 %prep
 # Choose one -- setup source only, or setup source + rsync-patches:
-%setup -q
-#%setup -q -b1
+%setup -q -n %{name}-%{fullversion}
+#%setup -q -n %{name}-%{fullversion} -b1
 
 # If you you used "%setup -q -b1", choose the patches you wish to apply:
 #patch -p1 <patches/acls.diff

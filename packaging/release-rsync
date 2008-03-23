@@ -87,19 +87,22 @@ chomp($_ = <STDIN>);
 $lastversion = $_ if $_ ne '';
 $lastversion =~ s/[-.]*pre[-.]*/pre/;
 
-my $release = 1;
+my $pre = $version =~ /(pre\d+)/ ? $1 : '';
+
+my $release = $pre ? '0.1' : '1';
 print "Please enter the RPM release number of this release: [$release] ";
 chomp($_ = <STDIN>);
 $release = $_ if $_ ne '';
+$release .= ".$pre" if $pre;
 
 my($srcdir,$srcdiffdir,$lastsrcdir,$skipping);
 if ($lastversion =~ /pre/) {
-    if ($version !~ /pre/) {
+    if (!$pre) {
 	die "You should not diff a release version against a pre-release version.\n";
     }
     $srcdir = $srcdiffdir = $lastsrcdir = 'src-previews';
     $skipping = ' ** SKIPPING **';
-} elsif ($version =~ /pre/) {
+} elsif ($pre) {
     $srcdir = $srcdiffdir = 'src-previews';
     $lastsrcdir = 'src';
     $skipping = ' ** SKIPPING **';
@@ -132,8 +135,8 @@ print "<Press Enter to continue> ";
 $_ = <STDIN>;
 
 (my $finalversion = $version) =~ s/pre\d+//;
-my %specvars = ( 'Version:' => $version, 'Release:' => $release,
-		 'Released' => "$version." );
+my %specvars = ( 'Version:' => $finalversion, 'Release:' => $release,
+		 '%define fullversion' => "\%{version}$pre", 'Released' => "$version." );
 my @tweak_files = ( glob('packaging/*.spec'), glob('packaging/*/*.spec'), glob('*.yo'),
 		    qw( configure.in rsync.h NEWS OLDNEWS options.c ) );
 
@@ -159,16 +162,16 @@ foreach my $fn (@tweak_files) {
     } elsif ($fn eq 'rsync.h') {
 	s/(#define\s+SUBPROTOCOL_VERSION)\s+\d+/$1 0/
 	    or die "Unable to find SUBPROTOCOL_VERSION define in $fn\n";
-	next if $version =~ /pre/;
+	next if $pre;
     } elsif ($fn eq 'NEWS') {
 	s/^(NEWS for rsync \Q$finalversion\E) \(UNRELEASED\)\s*\n/$1 ($today)\n/mi
 	    or die "The first line of $fn is not in the right format.  It must be:\n"
 		 . "NEWS for rsync $finalversion (UNRELEASED)\n";
-	next if $version =~ /pre/;
+	next if $pre;
     } elsif ($fn eq 'OLDNEWS') {
 	s/^\t\S\S\s\S\S\S\s\d\d\d\d(\t\Q$finalversion\E)/\t$ztoday$1/m
 	    or die "Unable to find \"?? ??? $year\t$finalversion\" line in $fn\n";
-	next if $version =~ /pre/;
+	next if $pre;
     } elsif ($fn eq 'options.c') {
 	if (s/(Copyright \(C\) 2002-)(\d+)( Wayne Davison)/$1$year$3/
 	 && $2 ne $year) {
@@ -259,7 +262,7 @@ foreach my $fn ($srctar_file, $pattar_file, $diff_file) {
     system "gpg -ba $fn";
 }
 
-if ($version !~ /pre/) {
+if (!$pre) {
     system "rm $dest/rsync-*{.tar.gz,.asc,-NEWS} $dest/src-preview/rsync-*diffs.gz";
 
     foreach my $fn ($srctar_file, "$srctar_file.asc",
