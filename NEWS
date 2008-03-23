@@ -112,7 +112,14 @@ Changes since 3.0.0:
     - The configure script now has better checks for figuring out if the
       included popt code should be used or not.
 
-    - The RPM spec file was updated to have (1) comments for how to use the
+    - Fixed two testsuite glitches: avoid a failure if someone's "cd" command
+      outputs the current directory when cd-ing to a relative path, and made
+      the itemized test query how rsync was built to determine if it should
+      expect hard-linked symlinks or not.
+
+    - Updated the testsuite to verify that various bug fixes remain fixed.
+
+    - The RPM spec file was updated to have: (1) comments for how to use the
       rsync-patch tar file, and (2) an /etc/xinetd.d/rsync file.
 
     - Updated the build scripts to work with a revised FTP directory
