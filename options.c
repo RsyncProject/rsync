@@ -475,6 +475,8 @@ static struct poptOption long_options[] = {
   {"dirs",            'd', POPT_ARG_VAL,    &xfer_dirs, 2, 0, 0 },
   {"no-dirs",          0,  POPT_ARG_VAL,    &xfer_dirs, 0, 0, 0 },
   {"no-d",             0,  POPT_ARG_VAL,    &xfer_dirs, 0, 0, 0 },
+  {"old-dirs",         0,  POPT_ARG_VAL,    &xfer_dirs, 4, 0, 0 },
+  {"old-d",            0,  POPT_ARG_VAL,    &xfer_dirs, 4, 0, 0 },
   {"perms",           'p', POPT_ARG_VAL,    &preserve_perms, 1, 0, 0 },
   {"no-perms",         0,  POPT_ARG_VAL,    &preserve_perms, 0, 0, 0 },
   {"no-p",             0,  POPT_ARG_VAL,    &preserve_perms, 0, 0, 0 },
@@ -1295,6 +1297,9 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	if (protect_args == 1 && am_server)
 		return 1;
 
+	*argv_p = argv = poptGetArgs(pc);
+	*argc_p = argc = count_args(argv);
+
 #ifndef SUPPORT_LINKS
 	if (preserve_links && !am_sender) {
 		snprintf(err_buf, sizeof err_buf,
@@ -1382,8 +1387,16 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			xfer_dirs = 1;
 	}
 
-	if (xfer_dirs < 1)
-		xfer_dirs = recurse || list_only;
+	if (argc < 2 && !read_batch)
+		list_only |= 1;
+
+	if (xfer_dirs >= 4) {
+		parse_rule(&filter_list, "- /*/*", 0, 0);
+		recurse = xfer_dirs = 1;
+	} else if (recurse)
+		xfer_dirs = 1;
+	else if (xfer_dirs < 0)
+		xfer_dirs = list_only ? 1 : 0;
 
 	if (relative_paths < 0)
 		relative_paths = files_from? 1 : 0;
@@ -1431,9 +1444,6 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 		need_messages_from_generator = 1;
 	}
-
-	*argv_p = argv = poptGetArgs(pc);
-	*argc_p = argc = count_args(argv);
 
 	if (sanitize_paths) {
 		int i;
@@ -1727,8 +1737,8 @@ void server_options(char **args, int *argc_p)
 		argstr[x++] = 'n';
 	if (preserve_links)
 		argstr[x++] = 'l';
-	if ((list_only && !recurse) || xfer_dirs > 1
-	 || (xfer_dirs && !recurse && delete_mode && am_sender))
+	if ((xfer_dirs >= 2 && xfer_dirs < 4)
+	 || (xfer_dirs && !recurse && (list_only || (delete_mode && am_sender))))
 		argstr[x++] = 'd';
 	if (am_sender) {
 		if (keep_dirlinks)

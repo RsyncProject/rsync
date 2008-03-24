@@ -352,8 +352,7 @@ static void check_for_d_option_error(const char *msg)
 
 	if (saw_d) {
 		rprintf(FWARNING,
-			"*** Try adding \"-r --exclude='/*/*'\" "
-			"if remote rsync is <= 2.6.3 ***\n");
+		    "*** Try using \"--old-d\" if remote rsync is <= 2.6.3 ***\n");
 	}
 }
 

@@ -78,6 +78,10 @@ Changes since 3.0.0:
 
   ENHANCEMENTS:
 
+    - Added the --old-dirs (--old-d) option to make it easier for a user to
+      ask for file-listings with older rsync versions (this is easier than
+      having to type "-r --exclude='/*/*'" manually).
+
     - When getting an error while asking an older rsync daemon for a file
       listing, rsync will try to notice if the error is a rejection of the
       --dirs (-d) option and let the user know how to work around the issue.

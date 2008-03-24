@@ -751,11 +751,15 @@ bf(--recursive) option, rsync will skip all directories it encounters (and
 output a message to that effect for each one).  If you specify both
 bf(--dirs) and bf(--recursive), bf(--recursive) takes precedence.
 
-This option is implied by the bf(--list-only) option (including an implied
+The bf(--dirs) option is implied by the bf(--files-from) option
+or the bf(--list-only) option (including an implied
 bf(--list-only) usage) if bf(--recursive) wasn't specified (so that
 directories are seen in the listing).  Specify bf(--no-dirs) (or bf(--no-d))
-if you want to override this.  This option is also implied by
-bf(--files-from).
+if you want to turn this off.
+
+There is also a backward-compatibility helper option, bf(--old-dirs) (or
+bf(--old-d)) that tells rsync to use a hack of "-r --exclude='/*/*'" to get
+an older rsync to list a single directory without recursing.
 
 dit(bf(-l, --links)) When symlinks are encountered, recreate the
 symlink on the destination.

@@ -1038,11 +1038,6 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			io_start_multiplex_out();
 	}
 
-	if (argc == 0) {
-		list_only |= 1;
-		xfer_dirs |= 1;
-	}
-
 	send_filter_list(read_batch ? -1 : f_out);
 
 	if (filesfrom_fd >= 0) {
@@ -1153,8 +1148,6 @@ static int start_client(int argc, char *argv[])
 				static char *dotarg[1] = { "." };
 				p = dotarg[0];
 				remote_argv = dotarg;
-				list_only |= 1;
-				xfer_dirs |= 1;
 			}
 			remote_argc = 1;
 
@@ -1225,10 +1218,6 @@ static int start_client(int argc, char *argv[])
 				exit_cleanup(RERR_SYNTAX);
 			}
 			remote_argv[i] = arg;
-		}
-		if (argc == 0) {
-			list_only |= 1;
-			xfer_dirs |= 1;
 		}
 	}
 
