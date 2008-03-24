@@ -508,8 +508,8 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		return NULL;
 
 	if (daemon_filter_list.head
-	 && (check_filter(&daemon_filter_list, dest_path, 0 != 0) < 0
-	  || check_filter(&daemon_filter_list, dest_path, 1 != 0) < 0)) {
+	 && (check_filter(&daemon_filter_list, FLOG, dest_path, 0 != 0) < 0
+	  || check_filter(&daemon_filter_list, FLOG, dest_path, 1 != 0) < 0)) {
 		rprintf(FERROR, "skipping daemon-excluded destination \"%s\"\n",
 			dest_path);
 		exit_cleanup(RERR_FILESELECT);
@@ -916,11 +916,11 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 			char *dir = *dir_p;
 			if (*dir == '/')
 				dir += module_dirlen;
-			if (check_filter(elp, dir, 1) < 0)
+			if (check_filter(elp, FLOG, dir, 1) < 0)
 				goto options_rejected;
 		}
 		if (partial_dir && *partial_dir == '/'
-		 && check_filter(elp, partial_dir + module_dirlen, 1) < 0) {
+		 && check_filter(elp, FLOG, partial_dir + module_dirlen, 1) < 0) {
 		    options_rejected:
 			rprintf(FERROR,
 				"Your options have been rejected by the server.\n");

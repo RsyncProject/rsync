@@ -47,7 +47,8 @@ Changes since 3.0.0:
     - Improved the daemon-exclude handling to do a better job of applying the
       exclude rules to path entries.  It also sends the user an error just as
       if the files were actually missing (instead of silently ignoring the
-      user's args).
+      user's args), and avoids sending the user the filter-action messages
+      for these non-user-initiated rules.
 
     - Fixed some glitches with the dry-run code's missing-directory
       handling, including a problem when combined with --fuzzy.

@@ -1044,7 +1044,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 					goto options_rejected;
 				dir = cp + (*cp == '/' ? module_dirlen : 0);
 				clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
-				rej = check_filter(&daemon_filter_list, dir, 0) < 0;
+				rej = check_filter(&daemon_filter_list, FLOG, dir, 0) < 0;
 				free(cp);
 				if (rej)
 					goto options_rejected;
@@ -1462,7 +1462,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				goto options_rejected;
 			dir = tmpdir + (*tmpdir == '/' ? module_dirlen : 0);
 			clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
-			if (check_filter(elp, dir, 1) < 0)
+			if (check_filter(elp, FLOG, dir, 1) < 0)
 				goto options_rejected;
 		}
 		if (backup_dir) {
@@ -1471,7 +1471,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				goto options_rejected;
 			dir = backup_dir + (*backup_dir == '/' ? module_dirlen : 0);
 			clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
-			if (check_filter(elp, dir, 1) < 0)
+			if (check_filter(elp, FLOG, dir, 1) < 0)
 				goto options_rejected;
 		}
 	}
@@ -1667,7 +1667,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 					goto options_rejected;
 				dir = files_from + (*files_from == '/' ? module_dirlen : 0);
 				clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
-				if (check_filter(&daemon_filter_list, dir, 0) < 0)
+				if (check_filter(&daemon_filter_list, FLOG, dir, 0) < 0)
 					goto options_rejected;
 			}
 			filesfrom_fd = open(files_from, O_RDONLY|O_BINARY);

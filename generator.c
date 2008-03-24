@@ -1282,7 +1282,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (daemon_filter_list.head) {
-		if (check_filter(&daemon_filter_list, fname, is_dir) < 0) {
+		if (check_filter(&daemon_filter_list, FLOG, fname, is_dir) < 0) {
 			if (is_dir < 0)
 				return;
 #ifdef SUPPORT_HARD_LINKS

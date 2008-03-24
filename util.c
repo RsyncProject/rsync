@@ -593,7 +593,7 @@ static inline void call_glob_match(const char *name, int len, int from_glob,
 			return;
 
 		if (daemon_filter_list.head
-		 && check_filter(&daemon_filter_list, use_buf, is_dir) < 0)
+		 && check_filter(&daemon_filter_list, FLOG, use_buf, is_dir) < 0)
 			return;
 	}
 
@@ -1070,10 +1070,10 @@ char *partial_dir_fname(const char *fname)
 	if (daemon_filter_list.head) {
 		t = strrchr(partial_fname, '/');
 		*t = '\0';
-		if (check_filter(&daemon_filter_list, partial_fname, 1) < 0)
+		if (check_filter(&daemon_filter_list, FLOG, partial_fname, 1) < 0)
 			return NULL;
 		*t = '/';
-		if (check_filter(&daemon_filter_list, partial_fname, 0) < 0)
+		if (check_filter(&daemon_filter_list, FLOG, partial_fname, 0) < 0)
 			return NULL;
 	}
 

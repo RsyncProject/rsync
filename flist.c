@@ -235,7 +235,7 @@ int link_stat(const char *path, STRUCT_STAT *stp, int follow_dirlinks)
 static inline int is_daemon_excluded(const char *fname, int is_dir)
 {
 	if (daemon_filter_list.head
-	 && check_filter(&daemon_filter_list, fname, is_dir) < 0) {
+	 && check_filter(&daemon_filter_list, FLOG, fname, is_dir) < 0) {
 		errno = ENOENT;
 		return 1;
 	}
@@ -250,7 +250,7 @@ static inline int path_is_daemon_excluded(char *path, int ignore_filename)
 		while ((slash = strchr(slash+1, '/')) != NULL) {
 			int ret;
 			*slash = '\0';
-			ret = check_filter(&daemon_filter_list, path, 1);
+			ret = check_filter(&daemon_filter_list, FLOG, path, 1);
 			*slash = '/';
 			if (ret < 0) {
 				errno = ENOENT;
@@ -259,7 +259,7 @@ static inline int path_is_daemon_excluded(char *path, int ignore_filename)
 		}
 
 		if (!ignore_filename
-		 && check_filter(&daemon_filter_list, path, 1) < 0) {
+		 && check_filter(&daemon_filter_list, FLOG, path, 1) < 0) {
 			errno = ENOENT;
 			return 1;
 		}
@@ -293,7 +293,7 @@ static int is_excluded(const char *fname, int is_dir, int filter_level)
 	if (filter_level != ALL_FILTERS)
 		return 0;
 	if (filter_list.head
-	    && check_filter(&filter_list, fname, is_dir) < 0)
+	    && check_filter(&filter_list, FINFO, fname, is_dir) < 0)
 		return 1;
 	return 0;
 }

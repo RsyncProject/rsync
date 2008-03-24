@@ -620,7 +620,7 @@ static int rule_matches(const char *fname, struct filter_struct *ex, int name_is
 }
 
 
-static void report_filter_result(char const *name,
+static void report_filter_result(enum logcode code, char const *name,
                                  struct filter_struct const *ent,
                                  int name_is_dir, const char *type)
 {
@@ -632,7 +632,7 @@ static void report_filter_result(char const *name,
 		static char *actions[2][2]
 		    = { {"show", "hid"}, {"risk", "protect"} };
 		const char *w = who_am_i();
-		rprintf(FINFO, "[%s] %sing %s %s because of pattern %s%s%s\n",
+		rprintf(code, "[%s] %sing %s %s because of pattern %s%s%s\n",
 		    w, actions[*w!='s'][!(ent->match_flags&MATCHFLG_INCLUDE)],
 		    name_is_dir ? "directory" : "file", name, ent->pattern,
 		    ent->match_flags & MATCHFLG_DIRECTORY ? "/" : "", type);
@@ -644,7 +644,8 @@ static void report_filter_result(char const *name,
  * Return -1 if file "name" is defined to be excluded by the specified
  * exclude list, 1 if it is included, and 0 if it was not matched.
  */
-int check_filter(struct filter_list_struct *listp, const char *name, int name_is_dir)
+int check_filter(struct filter_list_struct *listp, enum logcode code,
+		 const char *name, int name_is_dir)
 {
 	struct filter_struct *ent;
 
@@ -652,22 +653,22 @@ int check_filter(struct filter_list_struct *listp, const char *name, int name_is
 		if (ignore_perishable && ent->match_flags & MATCHFLG_PERISHABLE)
 			continue;
 		if (ent->match_flags & MATCHFLG_PERDIR_MERGE) {
-			int rc = check_filter(ent->u.mergelist, name,
+			int rc = check_filter(ent->u.mergelist, code, name,
 					      name_is_dir);
 			if (rc)
 				return rc;
 			continue;
 		}
 		if (ent->match_flags & MATCHFLG_CVS_IGNORE) {
-			int rc = check_filter(&cvs_filter_list, name,
+			int rc = check_filter(&cvs_filter_list, code, name,
 					      name_is_dir);
 			if (rc)
 				return rc;
 			continue;
 		}
 		if (rule_matches(name, ent, name_is_dir)) {
-			report_filter_result(name, ent, name_is_dir,
-					      listp->debug_type);
+			report_filter_result(code, name, ent, name_is_dir,
+					     listp->debug_type);
 			return ent->match_flags & MATCHFLG_INCLUDE ? 1 : -1;
 		}
 	}
@@ -1036,7 +1037,7 @@ void parse_filter_file(struct filter_list_struct *listp, const char *fname,
 		if (daemon_filter_list.head) {
 			strlcpy(line, fname, sizeof line);
 			clean_fname(line, CFN_COLLAPSE_DOT_DOT_DIRS);
-			if (check_filter(&daemon_filter_list, line, 0) < 0)
+			if (check_filter(&daemon_filter_list, FLOG, line, 0) < 0)
 				fp = NULL;
 			else
 				fp = fopen(line, "rb");

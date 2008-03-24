@@ -490,7 +490,7 @@ int recv_files(int f_in, char *local_name)
 		cleanup_got_literal = 0;
 
 		if (daemon_filter_list.head
-		    && check_filter(&daemon_filter_list, fname, 0) < 0) {
+		    && check_filter(&daemon_filter_list, FLOG, fname, 0) < 0) {
 			rprintf(FERROR, "attempt to hack rsync failed.\n");
 			exit_cleanup(RERR_PROTOCOL);
 		}
@@ -556,7 +556,7 @@ int recv_files(int f_in, char *local_name)
 				break;
 			}
 			if (!fnamecmp || (daemon_filter_list.head
-			  && check_filter(&daemon_filter_list, fname, 0) < 0)) {
+			  && check_filter(&daemon_filter_list, FLOG, fname, 0) < 0)) {
 				fnamecmp = fname;
 				fnamecmp_type = FNAMECMP_FNAME;
 			}
