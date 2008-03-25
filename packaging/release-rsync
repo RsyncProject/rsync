@@ -7,9 +7,12 @@ use strict;
 # ~/samba-rsync-ftp dir will be ready to be rsynced to samba.org.
 
 use Cwd;
+use Term::ReadKey;
 use Date::Format;
 
 my $dest = $ENV{HOME} . '/samba-rsync-ftp';
+my $passfile = $ENV{HOME} . '/.rsyncpass';
+my $path = $ENV{PATH};
 
 my $now = time;
 my $cl_today = time2str('* %a %b %d %Y', $now);
@@ -18,6 +21,10 @@ my $ztoday = time2str('%d %b %Y', $now);
 (my $today = $ztoday) =~ s/^0//;
 
 my $curdir = Cwd::cwd;
+
+END {
+    unlink($passfile);
+}
 
 my @extra_files;
 open(IN, '<', 'Makefile.in') or die "Couldn't open Makefile.in: $!\n";
@@ -77,6 +84,14 @@ if ($_ eq '.') {
 } elsif ($_ ne '') {
     $version = $_;
 }
+die "Invalid version: `$version'\n" unless $version =~ /^[\d.]+(pre\d+)?$/;
+
+if (`git tag -l v$version` ne '') {
+    print "Tag v$version already exists.\n\nDelete tag or quit? [q/del] ";
+    $_ = <STDIN>;
+    exit 1 unless /^del/i;
+    system "git tag -d v$version";
+}
 
 if ($version =~ s/[-.]*pre[-.]*/pre/ && $confversion !~ /dev$/) {
     $lastversion = $confversion;
@@ -126,7 +141,7 @@ About to:
     - make sure that SUBPROTOCOL_VERSION is 0$skipping
     - tweak the version in configure.in and the spec files
     - tweak NEWS and OLDNEWS to update the release date$skipping
-    - tweak the date in the *.yo files and generate the man pages
+    - tweak the date in the *.yo files and generate the manpages
     - generate configure.sh, config.h.in, and proto.h
     - page through the differences
 
@@ -204,24 +219,69 @@ my $lasttar_file = "$dest/$lastsrcdir/rsync-$lastversion.tar.gz";
 print $break, <<EOT;
 
 About to:
-    - commit all changes
-    - tag this release as v$version
-    - update hard-linked top-level files for new version$skipping
-    - create release tar, "$srctar_name"
-    - create patches tar, "$pattar_name"
+    - commit all version changes
+    - merge the master branch into the patch/* branches
+    - update the files in the "patches" dir and OPTIONALLY
+      (if you type 'y') to launch a shell for each patch
+
+EOT
+print "<Press Enter OR 'y' to continue> ";
+my $ans = <STDIN>;
+
+system "git commit -a -m 'Preparing for release of $version'" and exit 1;
+
+print "Updating files in \"patches\" dir ...\n";
+system "support/patch-update";
+
+if ($ans =~ /^y/i) {
+    print "\nVisiting all \"patch/*\" branches ...\n";
+    system "support/patch-update --shell";
+}
+
+print $break, <<EOT;
+
+About to:
+    - create signed tag for this release: v$version
     - create release diffs, "$diff_name"
-    - update patch branches and generate patch/* files
-    - update README, *NEWS, TODO, and ChangeLog
-    - update rsync*.html man pages
+    - create release tar, "$srctar_name"
+    - generate rsync-$version/patches/* files
+    - create patches tar, "$pattar_name"
+    - update top-level README, *NEWS, TODO, and ChangeLog
+    - update top-level rsync*.html manpages
     - gpg-sign the release files
+    - update hard-linked top-level release files$skipping
 
 EOT
 print "<Press Enter to continue> ";
 $_ = <STDIN>;
 
-system "git commit -a -m 'Preparing for release of $version'" and exit 1;
-print "\nSign the tag:";
-system "git tag -s -m 'Version $version.' v$version" and exit 1;
+my $passphrase;
+while (1) {
+    ReadMode('noecho');
+    print "\nEnter your GPG pass-phrase: ";
+    chomp($passphrase = <STDIN>);
+    ReadMode(0);
+    print "\n";
+
+    # Briefly create a temp file with the passphrase for git's tagging use.
+    my $oldmask = umask 077;
+    unlink($passfile);
+    open(OUT, '>', $passfile) or die $!;
+    print OUT $passphrase, "\n";
+    close OUT;
+    umask $oldmask;
+    $ENV{'GPG_PASSFILE'} = $passfile;
+
+    # We want to use our passphrase-providing "gpg" script, so modify the PATH.
+    $ENV{PATH} = "packaging/bin:$path";
+    $_ = `git tag -s -m 'Version $version.' v$version 2>&1`;
+    $ENV{PATH} = $path;
+    unlink($passfile);
+    print $_;
+    next if /bad passphrase/;
+    last unless /failed/;
+    exit 1;
+}
 
 # Extract the generated files from the old tar.
 @_ = @extra_files;
@@ -241,9 +301,12 @@ system "git archive --format=tar --prefix=rsync-$version/ v$version | tar xf -";
 system "support/git-set-file-times --prefix=rsync-$version/";
 system "fakeroot tar czf $srctar_file rsync-$version; rm -rf rsync-$version";
 
+print "Updating files in \"rsync-$version/patches\" dir ...\n";
 mkdir("rsync-$version", 0755);
 mkdir("rsync-$version/patches", 0755);
 system "support/patch-update --skip-check --gen=rsync-$version/patches";
+
+print "Creating $pattar_file ...\n";
 system "fakeroot tar chzf $pattar_file rsync-$version/patches; rm -rf rsync-$version";
 
 print "Updating the other files in $dest ...\n";
@@ -255,11 +318,11 @@ system "git log --name-status | gzip -9 >$dest/ChangeLog.gz";
 system "yodl2html -o $dest/rsync.html rsync.yo";
 system "yodl2html -o $dest/rsyncd.conf.html rsyncd.conf.yo";
 
-my $cnt = 0;
-print "\n";
 foreach my $fn ($srctar_file, $pattar_file, $diff_file) {
-    print ++$cnt, ". Sign file \"$fn\":";
-    system "gpg -ba $fn";
+    unlink("$fn.asc");
+    open(GPG, '|-', "gpg --batch --passphrase-fd=0 -ba $fn") or die $!;
+    print GPG $passphrase, "\n";
+    close GPG;
 }
 
 if (!$pre) {

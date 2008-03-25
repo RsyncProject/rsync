@@ -1,0 +1,6 @@
+#!/bin/sh -e
+# This script gets git to run gpg with a --passphrase-file option.
+
+PATH=`echo $PATH | sed 's/^[^:]*://'`
+
+gpg --batch --passphrase-file=$GPG_PASSFILE "${@}"
