@@ -377,7 +377,7 @@ int push_pathname(const char *dir, int len)
 	return 1;
 }
 
-static void send_file_entry(int f, struct file_struct *file, int ndx, int first_ndx)
+static void send_file_entry(int f, const char *fname, struct file_struct *file, int ndx, int first_ndx)
 {
 	static time_t modtime;
 	static mode_t mode;
@@ -390,39 +390,9 @@ static void send_file_entry(int f, struct file_struct *file, int ndx, int first_
 	static gid_t gid;
 	static const char *user_name, *group_name;
 	static char lastname[MAXPATHLEN];
-	char fname[MAXPATHLEN];
 	int first_hlink_ndx = -1;
 	int l1, l2;
 	int xflags;
-
-#ifdef ICONV_OPTION
-	if (ic_send != (iconv_t)-1) {
-		xbuf outbuf, inbuf;
-
-		INIT_CONST_XBUF(outbuf, fname);
-
-		if (file->dirname) {
-			INIT_XBUF_STRLEN(inbuf, (char*)file->dirname);
-			outbuf.size -= 2; /* Reserve room for '/' & 1 more char. */
-			if (iconvbufs(ic_send, &inbuf, &outbuf, 0) < 0)
-				goto convert_error;
-			outbuf.size += 2;
-			outbuf.buf[outbuf.len++] = '/';
-		}
-
-		INIT_XBUF_STRLEN(inbuf, (char*)file->basename);
-		if (iconvbufs(ic_send, &inbuf, &outbuf, 0) < 0) {
-		  convert_error:
-			io_error |= IOERR_GENERAL;
-			rprintf(FINFO,
-			    "[%s] cannot convert filename: %s (%s)\n",
-			    who_am_i(), f_name(file, fname), strerror(errno));
-			return;
-		}
-		outbuf.buf[outbuf.len] = '\0';
-	} else
-#endif
-		f_name(file, fname);
 
 	/* Initialize starting value of xflags. */
 	if (protocol_version >= 30 && S_ISDIR(file->mode)) {
@@ -710,7 +680,8 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	}
 #endif
 
-	clean_fname(thisname, 0);
+	if (*thisname)
+		clean_fname(thisname, 0);
 
 	if (sanitize_paths)
 		sanitize_path(thisname, thisname, "", 0, SP_DEFAULT);
@@ -1299,13 +1270,10 @@ void unmake_file(struct file_struct *file)
 }
 
 static struct file_struct *send_file_name(int f, struct file_list *flist,
-					  char *fname, STRUCT_STAT *stp,
+					  const char *fname, STRUCT_STAT *stp,
 					  int flags, int filter_level)
 {
 	struct file_struct *file;
-#if defined SUPPORT_ACLS || defined SUPPORT_XATTRS
-	stat_x sx;
-#endif
 
 	file = make_file(fname, flist, stp, flags, filter_level);
 	if (!file)
@@ -1314,28 +1282,59 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 	if (chmod_modes && !S_ISLNK(file->mode))
 		file->mode = tweak_mode(file->mode, chmod_modes);
 
+	if (f >= 0) {
+		char fbuf[MAXPATHLEN];
+#if defined SUPPORT_ACLS || defined SUPPORT_XATTRS
+		stat_x sx;
+#endif
+
+#ifdef ICONV_OPTION
+		if (ic_send != (iconv_t)-1) {
+			xbuf outbuf, inbuf;
+
+			INIT_CONST_XBUF(outbuf, fbuf);
+
+			if (file->dirname) {
+				INIT_XBUF_STRLEN(inbuf, (char*)file->dirname);
+				outbuf.size -= 2; /* Reserve room for '/' & 1 more char. */
+				if (iconvbufs(ic_send, &inbuf, &outbuf, 0) < 0)
+					goto convert_error;
+				outbuf.size += 2;
+				outbuf.buf[outbuf.len++] = '/';
+			}
+
+			INIT_XBUF_STRLEN(inbuf, (char*)file->basename);
+			if (iconvbufs(ic_send, &inbuf, &outbuf, 0) < 0) {
+			  convert_error:
+				io_error |= IOERR_GENERAL;
+				rprintf(FINFO,
+				    "[%s] cannot convert filename: %s (%s)\n",
+				    who_am_i(), f_name(file, fbuf), strerror(errno));
+				return NULL;
+			}
+			outbuf.buf[outbuf.len] = '\0';
+		} else
+#endif
+			f_name(file, fbuf);
+
 #ifdef SUPPORT_ACLS
-	if (preserve_acls && !S_ISLNK(file->mode) && f >= 0) {
-		sx.st.st_mode = file->mode;
-		sx.acc_acl = sx.def_acl = NULL;
-		if (get_acl(fname, &sx) < 0)
-			return NULL;
-	}
+		if (preserve_acls && !S_ISLNK(file->mode)) {
+			sx.st.st_mode = file->mode;
+			sx.acc_acl = sx.def_acl = NULL;
+			if (get_acl(fname, &sx) < 0)
+				return NULL;
+		}
 #endif
 #ifdef SUPPORT_XATTRS
-	if (preserve_xattrs && f >= 0) {
-		sx.xattr = NULL;
-		if (get_xattr(fname, &sx) < 0)
-			return NULL;
-	}
+		if (preserve_xattrs) {
+			sx.xattr = NULL;
+			if (get_xattr(fname, &sx) < 0)
+				return NULL;
+		}
 #endif
 
-	maybe_emit_filelist_progress(flist->used + flist_count_offset);
+		send_file_entry(f, fbuf, file, flist->used, flist->ndx_start);
 
-	flist_expand(flist, 1);
-	flist->files[flist->used++] = file;
-	if (f >= 0) {
-		send_file_entry(f, file, flist->used - 1, flist->ndx_start);
 #ifdef SUPPORT_ACLS
 		if (preserve_acls && !S_ISLNK(file->mode)) {
 			send_acl(&sx, f);
@@ -1349,6 +1348,12 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 		}
 #endif
 	}
+
+	maybe_emit_filelist_progress(flist->used + flist_count_offset);
+
+	flist_expand(flist, 1);
+	flist->files[flist->used++] = file;
+
 	return file;
 }
 
