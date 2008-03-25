@@ -14,6 +14,7 @@ my $tmp_dir = "patches.$$";
 &Getopt::Long::Configure('bundling');
 &usage if !&GetOptions(
     'skip-check' => \( my $skip_branch_check ),
+    'shell|s' => \( my $launch_shell ),
     'gen:s' => \( my $incl_generated_files ),
     'help|h' => \( my $help_opt ),
 );
@@ -27,13 +28,10 @@ if (defined $incl_generated_files) {
 die "No '$patches_dir' directory was found.\n" unless -d $patches_dir;
 die "No '.git' directory present in the current dir.\n" unless -d '.git';
 
-open(IN, '-|', 'git status') or die $!;
-my $status = join('', <IN>);
-close IN;
-unless ($skip_branch_check) {
-    die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
+my($status, $is_clean, $starting_branch) = &check_git_status;
+if (!$skip_branch_check && !$is_clean) {
+    die "The checkout is not clean:\n", $status;
 }
-my($starting_branch) = $status =~ /^# On branch (.+)\n/;
 
 my @extra_files;
 open(IN, '<', 'Makefile.in') or die "Couldn't open Makefile.in: $!\n";
@@ -101,7 +99,7 @@ if (@ARGV) {
 my %completed;
 foreach my $patch (@patches) {
     next if $completed{$patch}++;
-    update_patch($patch);
+    last unless update_patch($patch);
 }
 
 if ($incl_generated_files) {
@@ -132,22 +130,33 @@ sub update_patch
 
     sleep 1 if $incl_generated_files && $last_touch == time;
     if ($local_patch{$patch}) {
-	system "git checkout patch/$patch" and exit 1;
+	system "git checkout patch/$patch" and return 0;
     } else {
-	system "git checkout --track -b patch/$patch origin/patch/$patch" and exit 1;
+	system "git checkout --track -b patch/$patch origin/patch/$patch" and return 0;
+    }
+
+    my $ok = system("git merge $parent") == 0;
+    if (!$ok || $launch_shell) {
+	print qq|"git merge $parent" incomplete -- please fix.\n| if !$ok;
+	$ENV{PS1} = "[$parent] patch/$patch: ";
+	while (1) {
+	    if (system($ENV{SHELL}) != 0) {
+		print "Abort? [n/y] ";
+		$_ = <STDIN>;
+		next unless /^y/i;
+		return 0;
+	    }
+	    ($status, $is_clean) = &check_git_status;
+	    last if $is_clean;
+	    print $status;
+	}
     }
 
     open(OUT, '>', "$patches_dir/$patch.diff") or die $!;
     print OUT $description{$patch}, "\n";
 
-    if (system("git merge $parent") != 0) {
-	print qq|"git merge $parent" incomplete -- please fix.\n|;
-	$ENV{PS1} = "[$parent] patch/$patch: ";
-	system $ENV{SHELL} and exit 1;
-    }
-
     if ($incl_generated_files) {
-	system "./config.status Makefile && make gen && rsync -a @extra_files $tmp_dir/$patch/" and exit 1;
+	system "./config.status Makefile && make gen && rsync -a @extra_files $tmp_dir/$patch/";
     }
     $last_touch = time;
 
@@ -177,9 +186,21 @@ sub update_patch
     }
 
     close OUT;
+
+    1;
 }
 
 exit;
+
+sub check_git_status
+{
+    open(IN, '-|', 'git status') or die $!;
+    my $status = join('', <IN>);
+    close IN;
+    my $is_clean = $status =~ /\nnothing to commit \(working directory clean\)/;
+    my($starting_branch) = $status =~ /^# On branch (.+)\n/;
+    ($status, $is_clean, $starting_branch);
+}
 
 sub usage
 {
