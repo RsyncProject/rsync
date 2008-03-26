@@ -1561,18 +1561,16 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 	}
 }
 
-static char lastpath[MAXPATHLEN] = "";
-static int lastpath_len = 0;
-static struct file_struct *lastpath_struct;
-
 static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 			      char *start, char *limit, int flags, char name_type)
 {
+	static char lastpath[MAXPATHLEN] = "";
+	static int lastpath_len = 0;
+	static struct file_struct *lastpath_struct = NULL;
 	struct file_struct *file;
 	item_list *relname_list;
 	relnamecache **rnpp;
-	char *slash;
-	int len, need_new_dir;
+	int len, need_new_dir, depth = 0;
 	struct filter_list_struct save_filter_list = filter_list;
 
 	flags = (flags | FLAG_IMPLIED_DIR) & ~(FLAG_TOP_DIR | FLAG_CONTENT_DIR);
@@ -1585,12 +1583,31 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 			need_new_dir = 0;
 		else
 			need_new_dir = 1;
-	} else
+	} else {
+		char *tp = fname, *lp = lastpath;
+		/* Skip any initial directories in our path that we
+		 * have in common with lastpath. */
+		assert(start == fname);
+		for ( ; ; tp++, lp++) {
+			if (tp == limit) {
+				if (*lp == '/' || *lp == '\0')
+					goto done;
+				break;
+			}
+			if (*lp != *tp)
+				break;
+			if (*tp == '/') {
+				start = tp;
+				depth++;
+			}
+		}
 		need_new_dir = 1;
+	}
 
 	if (need_new_dir) {
 		int save_copy_links = copy_links;
 		int save_xfer_dirs = xfer_dirs;
+		char *slash;
 
 		copy_links = xfer_dirs = 1;
 
@@ -1598,7 +1615,10 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 
 		for (slash = start; (slash = strchr(slash+1, '/')) != NULL; ) {
 			*slash = '\0';
-			send_file_name(f, flist, fname, NULL, flags, ALL_FILTERS);
+			file = send_file_name(f, flist, fname, NULL, flags, ALL_FILTERS);
+			depth++;
+			if (!inc_recurse && file && S_ISDIR(file->mode))
+				change_local_filter_dir(fname, strlen(fname), depth);
 			*slash = '/';
 		}
 
@@ -1607,7 +1627,8 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 			if (file && !S_ISDIR(file->mode))
 				file = NULL;
 			lastpath_struct = file;
-		}
+		} else if (file && S_ISDIR(file->mode))
+			change_local_filter_dir(fname, strlen(fname), ++depth);
 
 		strlcpy(lastpath, fname, sizeof lastpath);
 		lastpath_len = limit - fname;
@@ -2023,17 +2044,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		} else if (implied_dirs && (p=strrchr(fbuf,'/')) && p != fbuf) {
 			/* Send the implied directories at the start of the
 			 * source spec, so we get their permissions right. */
-			char *lp = lastpath, *slash = fbuf;
-			*p = '\0';
-			/* Skip any initial directories in our path that we
-			 * have in common with lastpath. */
-			for (fn = fbuf; *fn && *lp == *fn; lp++, fn++) {
-				if (*fn == '/')
-					slash = fn;
-			}
-			*p = '/';
-			if (fn != p || (*lp && *lp != '/'))
-				send_implied_dirs(f, flist, fbuf, slash, p, flags, 0);
+			send_implied_dirs(f, flist, fbuf, fbuf, p, flags, 0);
 		}
 
 		if (one_file_system)
