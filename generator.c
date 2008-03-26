@@ -557,10 +557,13 @@ static void do_delete_pass(void)
 	for (j = 0; j < cur_flist->used; j++) {
 		struct file_struct *file = cur_flist->sorted[j];
 
-		if (!(file->flags & FLAG_CONTENT_DIR))
-			continue;
-
 		f_name(file, fbuf);
+
+		if (!(file->flags & FLAG_CONTENT_DIR)) {
+			change_local_filter_dir(fbuf, strlen(fbuf), F_DEPTH(file));
+			continue;
+		}
+
 		if (verbose > 1 && file->flags & FLAG_TOP_DIR)
 			rprintf(FINFO, "deleting in %s\n", fbuf);
 
@@ -1480,8 +1483,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 		}
 		else if (delete_during && f_out != -1 && !phase
-		    && BITS_SETnUNSET(file->flags, FLAG_CONTENT_DIR, FLAG_MISSING_DIR))
-			delete_in_dir(fname, file, &real_sx.st.st_dev);
+		    && !(file->flags & FLAG_MISSING_DIR)) {
+			if (file->flags & FLAG_CONTENT_DIR)
+				delete_in_dir(fname, file, &real_sx.st.st_dev);
+			else
+				change_local_filter_dir(fname, strlen(fname), F_DEPTH(file));
+
+		}
 		goto cleanup;
 	}
 
@@ -2175,16 +2183,18 @@ void generate_files(int f_out, const char *local_name)
 			f_name(fp, fbuf);
 			ndx = cur_flist->ndx_start - 1;
 			recv_generator(fbuf, fp, ndx, itemizing, code, f_out);
-			if (delete_during && dry_run < 2 && !list_only) {
-				if (BITS_SETnUNSET(fp->flags, FLAG_CONTENT_DIR, FLAG_MISSING_DIR)) {
+			if (delete_during && dry_run < 2 && !list_only
+			 && !(fp->flags & FLAG_MISSING_DIR)) {
+				if (fp->flags & FLAG_CONTENT_DIR) {
 					dev_t dirdev;
 					if (one_file_system) {
 						uint32 *devp = F_DIR_DEV_P(fp);
 						dirdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
 					} else
 						dirdev = MAKEDEV(0, 0);
-					delete_in_dir(f_name(fp, fbuf), fp, &dirdev);
-				}
+					delete_in_dir(fbuf, fp, &dirdev);
+				} else
+					change_local_filter_dir(fbuf, strlen(fbuf), F_DEPTH(fp));
 			}
 		}
 		for (i = cur_flist->low; i <= cur_flist->high; i++) {
