@@ -332,12 +332,13 @@ static char *parse_merge_name(const char *merge_file, unsigned int *len_ptr,
 
 	/* If the name isn't in buf yet, it's wasn't absolute. */
 	if (fn != buf) {
-		if (dirbuf_len + fn_len >= MAXPATHLEN) {
+		int d_len = dirbuf_len - prefix_skip;
+		if (d_len + fn_len >= MAXPATHLEN) {
 			rprintf(FERROR, "merge-file name overflows: %s\n", fn);
 			return NULL;
 		}
-		memcpy(buf, dirbuf + prefix_skip, dirbuf_len - prefix_skip);
-		memcpy(buf + dirbuf_len - prefix_skip, fn, fn_len + 1);
+		memcpy(buf, dirbuf + prefix_skip, d_len);
+		memcpy(buf + d_len, fn, fn_len + 1);
 		fn_len = clean_fname(buf, CFN_COLLAPSE_DOT_DOT_DIRS);
 	}
 
