@@ -25,6 +25,9 @@ Changes since 3.0.0:
 
     - Fixed a hang when combining --dry-run with --remove-source-files.
 
+    - Fixed a bug with --iconv's handling of files that cannot be converted:
+      a failed name can no longer cause a transfer failure.
+
     - Fixed the building of the rounding.h file on systems that need custom
       CPPFLAGS to be used.  Also improved the error reporting if the building
       of rounding.h fails.
@@ -73,6 +76,8 @@ Changes since 3.0.0:
 
     - A daemon doesn't try to auto-refuse the "iconv" option if iconv-support
       wasn't compiled in to the daemon (avoiding a warning in the logs).
+
+    - Fixed the inclusion of per-dir merge files from implied dirs.
 
     - Fixed the support/rrsync script to work with the latest options that
       rsync sends (including its flag-specifying use of -e to the server).
