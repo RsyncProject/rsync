@@ -429,28 +429,24 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file, 
 		}
 	} else if (protocol_version < 28)
 		rdev = MAKEDEV(0, 0);
-	if (preserve_uid) {
-		if ((uid_t)F_OWNER(file) == uid && *lastname)
-			xflags |= XMIT_SAME_UID;
-		else {
-			uid = F_OWNER(file);
-			if (!numeric_ids) {
-				user_name = add_uid(uid);
-				if (inc_recurse && user_name)
-					xflags |= XMIT_USER_NAME_FOLLOWS;
-			}
+	if (!preserve_uid || ((uid_t)F_OWNER(file) == uid && *lastname))
+		xflags |= XMIT_SAME_UID;
+	else {
+		uid = F_OWNER(file);
+		if (!numeric_ids) {
+			user_name = add_uid(uid);
+			if (inc_recurse && user_name)
+				xflags |= XMIT_USER_NAME_FOLLOWS;
 		}
 	}
-	if (preserve_gid) {
-		if ((gid_t)F_GROUP(file) == gid && *lastname)
-			xflags |= XMIT_SAME_GID;
-		else {
-			gid = F_GROUP(file);
-			if (!numeric_ids) {
-				group_name = add_gid(gid);
-				if (inc_recurse && group_name)
-					xflags |= XMIT_GROUP_NAME_FOLLOWS;
-			}
+	if (!preserve_gid || ((gid_t)F_GROUP(file) == gid && *lastname))
+		xflags |= XMIT_SAME_GID;
+	else {
+		gid = F_GROUP(file);
+		if (!numeric_ids) {
+			group_name = add_gid(gid);
+			if (inc_recurse && group_name)
+				xflags |= XMIT_GROUP_NAME_FOLLOWS;
 		}
 	}
 	if (file->modtime == modtime)
@@ -467,15 +463,14 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file, 
 				np->data = (void*)(long)(first_ndx + ndx + 1);
 				xflags |= XMIT_HLINK_FIRST;
 			}
-			xflags |= XMIT_HLINKED;
 		} else {
 			if (tmp_dev == dev) {
 				if (protocol_version >= 28)
 					xflags |= XMIT_SAME_DEV_pre30;
 			} else
 				dev = tmp_dev;
-			xflags |= XMIT_HLINKED;
 		}
+		xflags |= XMIT_HLINKED;
 	}
 #endif
 
