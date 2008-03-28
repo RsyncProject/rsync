@@ -38,9 +38,20 @@ echo "extra extra" >>"$todir/name1"
 checkit "$RSYNC -aHivv --no-whole-file '$fromdir/' '$todir/'" "$fromdir" "$todir"
 
 # Add a new link in a new subdirectory to test that we don't try to link
-# the files before the directory gets created.
-mkdir "$fromdir/subdir"
-ln "$name1" "$fromdir/subdir/new-file"
+# the files before the directory gets created.  We also create a bunch of
+# extra files to ensure that an incremental-recursion transfer works across
+# distant files.
+makepath "$fromdir/subdir/down/deep"
+
+files=''
+for x in 0 1 2 3 4 5 6 7 8 9 a b c d e f g h i j k l m n o p q r s t u v w x y z; do
+    for y in 0 1 2 3 4 5 6 7 8 9 a b c d e f g h i j k l m n o p q r s t u v w x y z; do
+	files="$files $x$y"
+    done
+done
+(cd "$fromdir/subdir"; touch $files)
+
+ln "$name1" "$fromdir/subdir/down/deep/new-file"
 rm "$todir/text"
 
 checkit "$RSYNC -aHivv '$fromdir/' '$todir/'" "$fromdir" "$todir"
