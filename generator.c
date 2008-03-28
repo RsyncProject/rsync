@@ -1488,7 +1488,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				delete_in_dir(fname, file, &real_sx.st.st_dev);
 			else
 				change_local_filter_dir(fname, strlen(fname), F_DEPTH(file));
-
 		}
 		goto cleanup;
 	}
