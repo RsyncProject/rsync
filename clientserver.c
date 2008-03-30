@@ -509,15 +509,15 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 			out_of_memory("rsync_module");
 	}
 
-	/* We do a push_dir() that doesn't actually call chdir()
+	/* We do a change_dir() that doesn't actually call chdir()
 	 * just to make a relative path absolute. */
 	strlcpy(line, curr_dir, sizeof line);
-	if (!push_dir(module_dir, 1))
+	if (!change_dir(module_dir, CD_SKIP_CHDIR))
 		goto chdir_failed;
 	if (strcmp(curr_dir, module_dir) != 0
 	 && (module_dir = strdup(curr_dir)) == NULL)
 		out_of_memory("rsync_module");
-	push_dir(line, 1); /* Restore curr_dir. */
+	change_dir(line, CD_SKIP_CHDIR); /* Restore curr_dir. */
 
 	if (use_chroot) {
 		chroot_path = module_dir;
@@ -673,12 +673,12 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 			io_printf(f_out, "@ERROR: chroot failed\n");
 			return -1;
 		}
-		if (!push_dir(module_dir, 0))
+		if (!change_dir(module_dir, CD_NORMAL))
 			goto chdir_failed;
 		if (module_dirlen)
 			sanitize_paths = 1;
 	} else {
-		if (!push_dir(module_dir, 0)) {
+		if (!change_dir(module_dir, CD_NORMAL)) {
 		  chdir_failed:
 			rsyserr(FLOG, errno, "chdir %s failed\n", module_dir);
 			io_printf(f_out, "@ERROR: chdir failed\n");

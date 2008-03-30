@@ -199,6 +199,9 @@
 #define SP_DEFAULT 0
 #define SP_KEEP_DOT_DIRS (1<<0)
 
+#define CD_NORMAL 0
+#define CD_SKIP_CHDIR 1
+
 /* Log-message categories.  FLOG only goes to the log file, not the client;
  * FCLIENT is the opposite. */
 enum logcode {

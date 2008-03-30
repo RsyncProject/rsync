@@ -242,10 +242,10 @@ static inline int is_daemon_excluded(const char *fname, int is_dir)
 	return 0;
 }
 
-static inline int path_is_daemon_excluded(const char *path, int ignore_filename)
+static inline int path_is_daemon_excluded(char *path, int ignore_filename)
 {
 	if (daemon_filter_list.head) {
-		char *slash = (char*)path;
+		char *slash = path;
 
 		while ((slash = strchr(slash+1, '/')) != NULL) {
 			int ret;
@@ -293,7 +293,6 @@ static void send_directory(int f, struct file_list *flist,
 static const char *pathname, *orig_dir;
 static int pathname_len;
 
-
 /* Make sure flist can hold at least flist->used + extra entries. */
 static void flist_expand(struct file_list *flist, int extra)
 {
@@ -339,28 +338,46 @@ static void flist_done_allocating(struct file_list *flist)
 		flist->pool_boundary = ptr;
 }
 
-int push_pathname(const char *dir, int len)
+/* Call this with EITHER (1) "file, NULL, 0" to chdir() to the file's
+ * F_PATHNAME(), or (2) "NULL, dir, dirlen" to chdir() to the supplied dir,
+ * with dir == NULL taken to be the starting directory, and dirlen < 0
+ * indicating that strdup(dir) should be called and then the -dirlen length
+ * value checked to ensure that it is not daemon-excluded. */
+int change_pathname(struct file_struct *file, const char *dir, int dirlen)
 {
-	if (dir == pathname)
-		return 1;
-
-	if (!orig_dir)
-		orig_dir = strdup(curr_dir);
-
-	if (pathname && !pop_dir(orig_dir)) {
-		rsyserr(FERROR, errno, "pop_dir %s failed",
-			full_fname(orig_dir));
-		exit_cleanup(RERR_FILESELECT);
+	if (dirlen < 0) {
+		char *cpy = strdup(dir);
+		if (*cpy != '/')
+			change_dir(orig_dir, CD_SKIP_CHDIR);
+		if (path_is_daemon_excluded(cpy, 0))
+			goto chdir_error;
+		dir = cpy;
+		dirlen = -dirlen;
+	} else {
+		if (file) {
+			if (pathname == F_PATHNAME(file))
+				return 1;
+			dir = F_PATHNAME(file);
+			if (dir)
+				dirlen = strlen(dir);
+		} else if (pathname == dir)
+			return 1;
+		if (dir && *dir != '/')
+			change_dir(orig_dir, CD_SKIP_CHDIR);
 	}
 
-	if (dir && (path_is_daemon_excluded(dir, 0) || !push_dir(dir, 0))) {
+	if (!change_dir(dir ? dir : orig_dir, CD_NORMAL)) {
+	  chdir_error:
 		io_error |= IOERR_GENERAL;
-		rsyserr(FERROR, errno, "push_dir %s failed", full_fname(dir));
+		rsyserr(FERROR, errno, "change_dir %s failed", full_fname(dir));
+		change_dir(orig_dir, CD_NORMAL);
+		pathname = NULL;
+		pathname_len = 0;
 		return 0;
 	}
 
 	pathname = dir;
-	pathname_len = len >= 0 ? len : dir ? (int)strlen(dir) : 0;
+	pathname_len = dirlen;
 
 	return 1;
 }
@@ -1666,10 +1683,8 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 	f_name(file, fbuf);
 	dlen = strlen(fbuf);
 
-	if (F_PATHNAME(file) != pathname) {
-		if (!push_pathname(F_PATHNAME(file), -1))
-			exit_cleanup(RERR_FILESELECT);
-	}
+	if (!change_pathname(file, NULL, 0))
+		exit_cleanup(RERR_FILESELECT);
 
 	change_local_filter_dir(fbuf, dlen, send_dir_depth);
 
@@ -1852,6 +1867,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	start_write = stats.total_written;
 	gettimeofday(&start_tv, NULL);
 
+	if (!orig_dir)
+		orig_dir = strdup(curr_dir);
+
 	if (relative_paths && protocol_version >= 30)
 		implied_dirs = 1; /* We send flagged implied dirs */
 
@@ -1869,8 +1887,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 	disable_buffering = io_start_buffering_out(f);
 	if (filesfrom_fd >= 0) {
-		if (argv[0] && !push_dir(argv[0], 0)) {
-			rsyserr(FERROR_XFER, errno, "push_dir %s failed",
+		if (argv[0] && !change_dir(argv[0], CD_NORMAL)) {
+			rsyserr(FERROR_XFER, errno, "change_dir %s failed",
 				full_fname(argv[0]));
 			exit_cleanup(RERR_FILESELECT);
 		}
@@ -1994,11 +2012,11 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 		dirlen = dir ? strlen(dir) : 0;
 		if (dirlen != lastdir_len || memcmp(lastdir, dir, dirlen) != 0) {
-			if (!push_pathname(dir ? strdup(dir) : NULL, dirlen))
+			if (!change_pathname(NULL, dir, -dirlen))
 				continue;
 			lastdir = pathname;
 			lastdir_len = pathname_len;
-		} else if (!push_pathname(lastdir, lastdir_len))
+		} else if (!change_pathname(NULL, lastdir, lastdir_len))
 			continue;
 
 		if (fn != fbuf)

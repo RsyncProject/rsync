@@ -943,7 +943,7 @@ char *sanitize_path(char *dest, const char *p, const char *rootdir, int depth,
 /* Like chdir(), but it keeps track of the current directory (in the
  * global "curr_dir"), and ensures that the path size doesn't overflow.
  * Also cleans the path using the clean_fname() function. */
-int push_dir(const char *dir, int set_path_only)
+int change_dir(const char *dir, int set_path_only)
 {
 	static int initialised;
 	unsigned int len;
@@ -961,21 +961,26 @@ int push_dir(const char *dir, int set_path_only)
 	if (len == 1 && *dir == '.')
 		return 1;
 
-	if ((*dir == '/' ? len : curr_dir_len + 1 + len) >= sizeof curr_dir) {
-		errno = ENAMETOOLONG;
-		return 0;
-	}
-
-	if (!set_path_only && chdir(dir))
-		return 0;
-
 	if (*dir == '/') {
+		if (len >= sizeof curr_dir) {
+			errno = ENAMETOOLONG;
+			return 0;
+		}
+		if (!set_path_only && chdir(dir))
+			return 0;
 		memcpy(curr_dir, dir, len + 1);
-		curr_dir_len = len;
 	} else {
-		curr_dir[curr_dir_len++] = '/';
-		memcpy(curr_dir + curr_dir_len, dir, len + 1);
-		curr_dir_len += len;
+		if (curr_dir_len + 1 + len >= sizeof curr_dir) {
+			errno = ENAMETOOLONG;
+			return 0;
+		}
+		curr_dir[curr_dir_len] = '/';
+		memcpy(curr_dir + curr_dir_len + 1, dir, len + 1);
+
+		if (!set_path_only && chdir(curr_dir)) {
+			curr_dir[curr_dir_len] = '\0';
+			return 0;
+		}
 	}
 
 	curr_dir_len = clean_fname(curr_dir, CFN_COLLAPSE_DOT_DOT_DIRS);
@@ -986,28 +991,7 @@ int push_dir(const char *dir, int set_path_only)
 	}
 
 	if (verbose >= 5 && !set_path_only)
-		rprintf(FINFO, "[%s] push_dir(%s)\n", who_am_i(), curr_dir);
-
-	return 1;
-}
-
-/**
- * Reverse a push_dir() call.  You must pass in an absolute path
- * that was copied from a prior value of "curr_dir".
- **/
-int pop_dir(const char *dir)
-{
-	if (chdir(dir))
-		return 0;
-
-	curr_dir_len = strlcpy(curr_dir, dir, sizeof curr_dir);
-	if (curr_dir_len >= sizeof curr_dir)
-		curr_dir_len = sizeof curr_dir - 1;
-	if (sanitize_paths)
-		curr_dir_depth = count_dir_elements(curr_dir + module_dirlen);
-
-	if (verbose >= 5)
-		rprintf(FINFO, "[%s] pop_dir(%s)\n", who_am_i(), curr_dir);
+		rprintf(FINFO, "[%s] change_dir(%s)\n", who_am_i(), curr_dir);
 
 	return 1;
 }

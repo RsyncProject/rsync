@@ -519,8 +519,8 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	if ((statret = do_stat(dest_path, &st)) == 0) {
 		/* If the destination is a dir, enter it and use mode 1. */
 		if (S_ISDIR(st.st_mode)) {
-			if (!push_dir(dest_path, 0)) {
-				rsyserr(FERROR, errno, "push_dir#1 %s failed",
+			if (!change_dir(dest_path, CD_NORMAL)) {
+				rsyserr(FERROR, errno, "change_dir#1 %s failed",
 					full_fname(dest_path));
 				exit_cleanup(RERR_FILESELECT);
 			}
@@ -579,8 +579,8 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 			dry_run++;
 		}
 
-		if (!push_dir(dest_path, dry_run > 1)) {
-			rsyserr(FERROR, errno, "push_dir#2 %s failed",
+		if (!change_dir(dest_path, dry_run > 1 ? CD_SKIP_CHDIR : CD_NORMAL)) {
+			rsyserr(FERROR, errno, "change_dir#2 %s failed",
 				full_fname(dest_path));
 			exit_cleanup(RERR_FILESELECT);
 		}
@@ -599,8 +599,8 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		dest_path = "/";
 
 	*cp = '\0';
-	if (!push_dir(dest_path, 0)) {
-		rsyserr(FERROR, errno, "push_dir#3 %s failed",
+	if (!change_dir(dest_path, CD_NORMAL)) {
+		rsyserr(FERROR, errno, "change_dir#3 %s failed",
 			full_fname(dest_path));
 		exit_cleanup(RERR_FILESELECT);
 	}
@@ -692,8 +692,8 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 	}
 
 	if (!relative_paths) {
-		if (!push_dir(dir, 0)) {
-			rsyserr(FERROR, errno, "push_dir#3 %s failed",
+		if (!change_dir(dir, CD_NORMAL)) {
+			rsyserr(FERROR, errno, "change_dir#3 %s failed",
 				full_fname(dir));
 			exit_cleanup(RERR_FILESELECT);
 		}
@@ -862,8 +862,8 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 		char *dir = argv[0];
 		argc--;
 		argv++;
-		if (!am_daemon && !push_dir(dir, 0)) {
-			rsyserr(FERROR, errno, "push_dir#4 %s failed",
+		if (!am_daemon && !change_dir(dir, CD_NORMAL)) {
+			rsyserr(FERROR, errno, "change_dir#4 %s failed",
 				full_fname(dir));
 			exit_cleanup(RERR_FILESELECT);
 		}
@@ -1428,11 +1428,11 @@ int main(int argc,char *argv[])
 	SIGACTION(SIGXFSZ, SIG_IGN);
 #endif
 
-	/* Initialize push_dir here because on some old systems getcwd
+	/* Initialize change_dir() here because on some old systems getcwd
 	 * (implemented by forking "pwd" and reading its output) doesn't
 	 * work when there are other child processes.  Also, on all systems
 	 * that implement getcwd that way "pwd" can't be found after chroot. */
-	push_dir(NULL, 0);
+	change_dir(NULL, CD_NORMAL);
 
 	init_flist();
 
@@ -1456,7 +1456,6 @@ int main(int argc,char *argv[])
 			read_stream_flags(batch_fd);
 		else
 			write_stream_flags(batch_fd);
-
 	}
 	if (write_batch < 0)
 		dry_run = 1;

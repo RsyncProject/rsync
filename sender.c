@@ -135,7 +135,7 @@ void successful_send(int ndx)
 	}
 
 	file = flist->files[ndx - flist->ndx_start];
-	if (!push_pathname(F_PATHNAME(file), -1))
+	if (!change_pathname(file, NULL, 0))
 		return;
 	f_name(file, fname);
 
@@ -221,7 +221,7 @@ void send_files(int f_in, int f_out)
 		} else {
 			path = slash = "";
 		}
-		if (!push_pathname(F_PATHNAME(file), -1))
+		if (!change_pathname(file, NULL, 0))
 			continue;
 		f_name(file, fname);
 
