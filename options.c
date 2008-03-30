@@ -1275,7 +1275,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 	}
 
-	if (human_readable && argc == 2) {
+	if (human_readable && argc == 2 && !am_server) {
 		/* Allow the old meaning of 'h' (--help) on its own. */
 		usage(FINFO);
 		exit_cleanup(0);
@@ -1387,7 +1387,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			xfer_dirs = 1;
 	}
 
-	if (argc < 2 && !read_batch)
+	if (argc < 2 && !read_batch && !am_server)
 		list_only |= 1;
 
 	if (xfer_dirs >= 4) {
