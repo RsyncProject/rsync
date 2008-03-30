@@ -242,10 +242,10 @@ static inline int is_daemon_excluded(const char *fname, int is_dir)
 	return 0;
 }
 
-static inline int path_is_daemon_excluded(char *path, int ignore_filename)
+static inline int path_is_daemon_excluded(const char *path, int ignore_filename)
 {
-	if (daemon_filter_list.head && path) {
-		char *slash = path;
+	if (daemon_filter_list.head) {
+		char *slash = (char*)path;
 
 		while ((slash = strchr(slash+1, '/')) != NULL) {
 			int ret;
@@ -353,10 +353,9 @@ int push_pathname(const char *dir, int len)
 		exit_cleanup(RERR_FILESELECT);
 	}
 
-	if (dir && !push_dir(dir, 0)) {
+	if (dir && (path_is_daemon_excluded(dir, 0) || !push_dir(dir, 0))) {
 		io_error |= IOERR_GENERAL;
-		rsyserr(FERROR, errno, "push_dir %s failed in %s",
-			full_fname(dir), curr_dir);
+		rsyserr(FERROR, errno, "push_dir %s failed", full_fname(dir));
 		return 0;
 	}
 
@@ -1871,8 +1870,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	disable_buffering = io_start_buffering_out(f);
 	if (filesfrom_fd >= 0) {
 		if (argv[0] && !push_dir(argv[0], 0)) {
-			rsyserr(FERROR_XFER, errno, "push_dir %s failed in %s",
-				full_fname(argv[0]), curr_dir);
+			rsyserr(FERROR_XFER, errno, "push_dir %s failed",
+				full_fname(argv[0]));
 			exit_cleanup(RERR_FILESELECT);
 		}
 		use_ff_fd = 1;
@@ -1995,12 +1994,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 		dirlen = dir ? strlen(dir) : 0;
 		if (dirlen != lastdir_len || memcmp(lastdir, dir, dirlen) != 0) {
-			if (path_is_daemon_excluded(dir, 0)) {
-				io_error |= IOERR_GENERAL;
-				rsyserr(FERROR, errno, "push_dir %s failed in %s",
-					full_fname(dir), curr_dir);
-				continue;
-			}
 			if (!push_pathname(dir ? strdup(dir) : NULL, dirlen))
 				continue;
 			lastdir = pathname;
