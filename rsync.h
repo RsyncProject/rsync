@@ -83,6 +83,7 @@
 /* These flags are passed to functions but not stored. */
 
 #define FLAG_DIVERT_DIRS (1<<16)/* sender */
+#define FLAG_DOTDIR_NAME (1<<17)/* sender */
 
 #define BITS_SET(val,bits) (((val) & (bits)) == (bits))
 #define BITS_SETnUNSET(val,onbits,offbits) (((val) & ((onbits)|(offbits))) == (onbits))

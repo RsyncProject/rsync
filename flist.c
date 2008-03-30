@@ -97,7 +97,7 @@ int flist_eof = 0; /* all the file-lists are now known */
 
 #define NORMAL_NAME 0
 #define SLASH_ENDING_NAME 1
-#define DOT_NAME 2
+#define DOTDIR_NAME 2
 
 /* Starting from protocol version 26, we always use 64-bit ino_t and dev_t
  * internally, even if this platform does not allow files to have 64-bit inums.
@@ -277,17 +277,6 @@ static int is_excluded(const char *fname, int is_dir, int filter_level)
 	if (filter_level == NO_FILTERS)
 		return 0;
 #endif
-	if (fname) {
-		/* never exclude '.', even if somebody does --exclude '*' */
-		if (fname[0] == '.' && !fname[1])
-			return 0;
-		/* Handle the -R version of the '.' dir. */
-		if (fname[0] == '/') {
-			int len = strlen(fname);
-			if (fname[len-1] == '.' && fname[len-2] == '/')
-				return 0;
-		}
-	}
 	if (is_daemon_excluded(fname, is_dir))
 		return 1;
 	if (filter_level != ALL_FILTERS)
@@ -1014,6 +1003,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	const char *basename;
 	alloc_pool_t *pool;
 	STRUCT_STAT st;
+	int excl_ret;
 	char *bp;
 
 	if (strlcpy(thisname, fname, sizeof thisname) >= sizeof thisname) {
@@ -1096,7 +1086,17 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	} else
 		flags &= ~FLAG_CONTENT_DIR;
 
-	if (is_excluded(thisname, S_ISDIR(st.st_mode) != 0, filter_level)) {
+	if (S_ISDIR(st.st_mode)) {
+		if (flags & FLAG_DOTDIR_NAME) {
+			/* A "." fname (or "/." fname in relative mode) is
+			 * never excluded.  No other trailing-dotdir names
+			 * are possible. */
+			excl_ret = 0;
+		} else
+			excl_ret = is_excluded(thisname, 1, filter_level);
+	} else
+		excl_ret = is_excluded(thisname, 0, filter_level);
+	if (excl_ret) {
 		if (ignore_perishable)
 			non_perishable_cnt++;
 		return NULL;
@@ -1835,7 +1835,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	int64 start_write;
 	int use_ff_fd = 0;
 	int disable_buffering;
-	int flags = recurse ? FLAG_CONTENT_DIR : 0;
+	int arg_flags, flags = recurse ? FLAG_CONTENT_DIR : 0;
 	int reading_remotely = filesfrom_host != NULL;
 	int rl_flags = (reading_remotely ? 0 : RL_DUMP_COMMENTS)
 #ifdef ICONV_OPTION
@@ -1907,7 +1907,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				fbuf[len++] = '.';
 				fbuf[len] = '\0';
 			}
-			name_type = DOT_NAME;
+			name_type = DOTDIR_NAME;
 		} else if (len > 1 && fbuf[len-1] == '.' && fbuf[len-2] == '.'
 		    && (len == 2 || fbuf[len-3] == '/')) {
 			if (len + 2 >= MAXPATHLEN)
@@ -1915,9 +1915,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			fbuf[len++] = '/';
 			fbuf[len++] = '.';
 			fbuf[len] = '\0';
-			name_type = DOT_NAME;
+			name_type = DOTDIR_NAME;
 		} else if (fbuf[len-1] == '.' && (len == 1 || fbuf[len-2] == '/'))
-			name_type = DOT_NAME;
+			name_type = DOTDIR_NAME;
 		else
 			name_type = NORMAL_NAME;
 
@@ -1965,13 +1965,13 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				if (fn[0] == '/') {
 					fn = "/.";
 					len = 2;
-					name_type = DOT_NAME;
+					name_type = DOTDIR_NAME;
 				} else if (fn[0] == '.')
-					name_type = DOT_NAME;
+					name_type = DOTDIR_NAME;
 			} else if (fn[len-1] == '/') {
 				fn[--len] = '\0';
 				if (len == 1 && *fn == '.')
-					name_type = DOT_NAME;
+					name_type = DOTDIR_NAME;
 				else
 					name_type = SLASH_ENDING_NAME;
 			}
@@ -1990,7 +1990,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (!*fn) {
 			len = 1;
 			fn = ".";
-			name_type = DOT_NAME;
+			name_type = DOTDIR_NAME;
 		}
 
 		dirlen = dir ? strlen(dir) : 0;
@@ -2012,7 +2012,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			memmove(fbuf, fn, len + 1);
 
 		if (link_stat(fbuf, &st, copy_dirlinks || name_type != NORMAL_NAME) != 0
-		 || is_daemon_excluded(fbuf, S_ISDIR(st.st_mode) != 0)
+		 || (name_type != DOTDIR_NAME && is_daemon_excluded(fbuf, S_ISDIR(st.st_mode)))
 		 || (relative_paths && path_is_daemon_excluded(fbuf, 1))) {
 			io_error |= IOERR_GENERAL;
 			rsyserr(FERROR_XFER, errno, "link_stat %s failed",
@@ -2045,15 +2045,17 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (one_file_system)
 			filesystem_dev = st.st_dev;
 
+		arg_flags = name_type == DOTDIR_NAME ? FLAG_DOTDIR_NAME : 0;
+
 		if (recurse || (xfer_dirs && name_type != NORMAL_NAME)) {
 			struct file_struct *file;
-			int top_flags = FLAG_TOP_DIR | FLAG_CONTENT_DIR | flags;
+			arg_flags |= FLAG_TOP_DIR | FLAG_CONTENT_DIR;
 			file = send_file_name(f, flist, fbuf, &st,
-					      top_flags, ALL_FILTERS);
+					      arg_flags | flags, ALL_FILTERS);
 			if (!file)
 				continue;
 			if (inc_recurse) {
-				if (name_type == DOT_NAME) {
+				if (name_type == DOTDIR_NAME) {
 					if (send_dir_depth < 0) {
 						send_dir_depth = 0;
 						change_local_filter_dir(fbuf, len, send_dir_depth);
@@ -2063,7 +2065,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			} else
 				send_if_directory(f, flist, file, fbuf, len, flags);
 		} else
-			send_file_name(f, flist, fbuf, &st, flags, ALL_FILTERS);
+			send_file_name(f, flist, fbuf, &st, arg_flags | flags, ALL_FILTERS);
 	}
 
 	gettimeofday(&end_tv, NULL);
