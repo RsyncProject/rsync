@@ -4,8 +4,8 @@ Version: 3.0.1
 %define fullversion %{version}pre3
 Release: 0.1.pre3
 Group: Applications/Internet
-Source0: http://rsync.samba.org/ftp/rsync/%{name}-%{fullversion}.tar.gz
-Source1: http://rsync.samba.org/ftp/rsync/%{name}-patches-%{fullversion}.tar.gz
+Source0: http://rsync.samba.org/ftp/rsync/rsync-%{fullversion}.tar.gz
+Source1: http://rsync.samba.org/ftp/rsync/rsync-patches-%{fullversion}.tar.gz
 URL: http://rsync.samba.org/
 
 Prefix: %{_prefix}
@@ -25,8 +25,8 @@ improved copy command for everyday use.
 
 %prep
 # Choose one -- setup source only, or setup source + rsync-patches:
-%setup -q -n %{name}-%{fullversion}
-#%setup -q -n %{name}-%{fullversion} -b1
+%setup -q -n rsync-%{fullversion}
+#%setup -q -b1 -n rsync-%{fullversion}
 
 # If you you used "%setup -q -b1", choose the patches you wish to apply:
 #patch -p1 <patches/acls.diff
