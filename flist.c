@@ -366,18 +366,22 @@ int change_pathname(struct file_struct *file, const char *dir, int dirlen)
 			change_dir(orig_dir, CD_SKIP_CHDIR);
 	}
 
-	if (!change_dir(dir ? dir : orig_dir, CD_NORMAL)) {
+	pathname = dir;
+	pathname_len = dirlen;
+
+	if (!dir)
+		dir = orig_dir;
+
+	if (!change_dir(dir, CD_NORMAL)) {
 	  chdir_error:
 		io_error |= IOERR_GENERAL;
 		rsyserr(FERROR, errno, "change_dir %s failed", full_fname(dir));
-		change_dir(orig_dir, CD_NORMAL);
+		if (dir != orig_dir)
+			change_dir(orig_dir, CD_NORMAL);
 		pathname = NULL;
 		pathname_len = 0;
 		return 0;
 	}
-
-	pathname = dir;
-	pathname_len = dirlen;
 
 	return 1;
 }
