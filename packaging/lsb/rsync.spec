@@ -3,9 +3,10 @@ Name: rsync
 Version: 3.0.1
 %define fullversion %{version}pre3
 Release: 0.1.pre3
+%define srcdir src-previews
 Group: Applications/Internet
-Source0: http://rsync.samba.org/ftp/rsync/rsync-%{fullversion}.tar.gz
-Source1: http://rsync.samba.org/ftp/rsync/rsync-patches-%{fullversion}.tar.gz
+Source0: http://rsync.samba.org/ftp/rsync/%{srcdir}/rsync-%{fullversion}.tar.gz
+Source1: http://rsync.samba.org/ftp/rsync/%{srcdir}/rsync-patches-%{fullversion}.tar.gz
 URL: http://rsync.samba.org/
 
 Prefix: %{_prefix}

@@ -151,7 +151,8 @@ $_ = <STDIN>;
 
 (my $finalversion = $version) =~ s/pre\d+//;
 my %specvars = ( 'Version:' => $finalversion, 'Release:' => $release,
-		 '%define fullversion' => "\%{version}$pre", 'Released' => "$version." );
+		 '%define fullversion' => "\%{version}$pre", 'Released' => "$version.",
+		 '%define srcdir' => $srcdir );
 my @tweak_files = ( glob('packaging/*.spec'), glob('packaging/*/*.spec'), glob('*.yo'),
 		    qw( configure.in rsync.h NEWS OLDNEWS options.c ) );
 
