@@ -32,9 +32,11 @@ improved copy command for everyday use.
 # If you you used "%setup -q -b1", choose the patches you wish to apply:
 #patch -p1 <patches/acls.diff
 #patch -p1 <patches/xattrs.diff
-#patch -p1 <patches/checksum-reading.diff
+#patch -p1 <patches/remote-option.diff
+#patch -p1 <patches/db.diff
 
 %build
+#./prepare-source
 %configure
 
 make
@@ -47,6 +49,8 @@ rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT/etc/xinetd.d
 install -m 644 packaging/lsb/rsync.xinetd $RPM_BUILD_ROOT/etc/xinetd.d/rsync
 
+#install -p -m 755 support/rsyncdb $RPM_BUILD_ROOT/usr/bin/rsyncdb
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
@@ -54,7 +58,7 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 %doc COPYING README tech_report.tex
 %config(noreplace) /etc/xinetd.d/rsync
-%{_prefix}/bin/rsync
+%{_prefix}/bin/rsync*
 %{_mandir}/man1/rsync.1*
 %{_mandir}/man5/rsyncd.conf.5*
 
