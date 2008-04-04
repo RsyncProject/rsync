@@ -327,7 +327,7 @@ foreach my $fn ($srctar_file, $pattar_file, $diff_file) {
 }
 
 if (!$pre) {
-    system "rm $dest/rsync-*{.tar.gz,.asc,-NEWS} $dest/src-preview/rsync-*diffs.gz";
+    system "rm $dest/rsync-*.gz $dest/rsync-*.asc $dest/rsync-*-NEWS $dest/src-previews/rsync-*diffs.gz*";
 
     foreach my $fn ($srctar_file, "$srctar_file.asc",
 		    $pattar_file, "$pattar_file.asc",
