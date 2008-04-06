@@ -35,6 +35,9 @@ improved copy command for everyday use.
 #patch -p1 <patches/remote-option.diff
 #patch -p1 <patches/db.diff
 
+# Avoid extra perl dependencies for scripts going into doc dir.
+chmod -x support/*
+
 %build
 #./prepare-source
 %configure
@@ -56,7 +59,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root)
-%doc COPYING README tech_report.tex
+%doc COPYING NEWS OLDNEWS README support/ tech_report.tex
 %config(noreplace) /etc/xinetd.d/rsync
 %{_prefix}/bin/rsync*
 %{_mandir}/man1/rsync.1*
