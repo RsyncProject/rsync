@@ -1,3 +1,141 @@
+NEWS for rsync 3.0.1 (3 Apr 2008)
+Protocol: 30 (unchanged)
+Changes since 3.0.0:
+
+  NOTABLE CHANGES IN BEHAVIOR:
+
+    - Added the 'c'-flag to the itemizing of non-regular files so that the
+      itemized output doesn't get hidden if there were no attribute changes,
+      and also so that the itemizing of a --copy-links run will distinguish
+      between copying an identical non-regular file and the creation of a
+      revised version with a new value (e.g. a changed symlink referent, a
+      new device number, etc.).
+
+  BUG FIXES:
+
+    - Fixed a crash bug when a single-use rsync daemon (via remote shell) was
+      run without specifying a --config=FILE option.
+
+    - Fixed a crash when backing up a directory that has a default ACL.
+
+    - Fixed a bug in the handling of xattr values that could cause rsync to
+      not think that a file's extended attributes are up-to-date.
+
+    - Fixed the working of --fake-super with --link-dest and --xattrs.
+
+    - Fixed a hang when combining --dry-run with --remove-source-files.
+
+    - Fixed a bug with --iconv's handling of files that cannot be converted:
+      a failed name can no longer cause a transfer failure.
+
+    - Fixed the building of the rounding.h file on systems that need custom
+      CPPFLAGS to be used.  Also improved the error reporting if the building
+      of rounding.h fails.
+
+    - Fixed the use of the --protect-args (-s) option when talking to a daemon.
+
+    - Fixed the --ignore-existing option's protection of files on the receiver
+      that are non-regular files on the sender (e.g. if a symlink or a dir on
+      the sender is trying to replace a file on the receiver).  The reverse
+      protection (protecting a dir/symlink/device from being replaced by a
+      file) was already working.
+
+    - Fixed an assert failure if --hard-links is combined with an option that
+      can skip a file in a set of hard-linked files (i.e. --ignore-existing,
+      --append, etc.), without skipping all the files in the set.
+
+    - Avoid setting the modify time on a directory that already has the right
+      modify time set.  This avoids tweaking the dir's ctime.
+
+    - Improved the daemon-exclude handling to do a better job of applying the
+      exclude rules to path entries.  It also sends the user an error just as
+      if the files were actually missing (instead of silently ignoring the
+      user's args), and avoids sending the user the filter-action messages
+      for these non-user-initiated rules.
+
+    - Fixed some glitches with the dry-run code's missing-directory
+      handling, including a problem when combined with --fuzzy.
+
+    - Fixed some glitches with the skipped-directory handling.
+
+    - Fixed the 'T'-flag itemizing of symlinks when --time isn't preserved.
+
+    - Fixed a glitch in the itemizing of permissions with the -E option.
+
+    - The --append option's restricting of transfers to those that add data no
+      longer prevents the updating of non-content changes to otherwise up-to-
+      date files (i.e. those with the same content but differing permissions,
+      ownership, xattrs, etc.).
+
+    - Don't allow --fake-super to be specified with -XX (double --xattrs)
+      because the options conflict.  If a daemon has "fake super" enabled,
+      it automatically downgrades a -XX request to -X.
+
+    - Fixed a couple bugs in the parsing of daemon-config excludes that could
+      make a floating exclude rule get treated as matching an absolute path.
+
+    - A daemon doesn't try to auto-refuse the "iconv" option if iconv-support
+      wasn't compiled in to the daemon (avoiding a warning in the logs).
+
+    - Fixed the inclusion of per-dir merge files from implied dirs.
+
+    - Fixed the support/rrsync script to work with the latest options that
+      rsync sends (including its flag-specifying use of -e to the server).
+
+  ENHANCEMENTS:
+
+    - Added the --old-dirs (--old-d) option to make it easier for a user to
+      ask for file-listings with older rsync versions (this is easier than
+      having to type "-r --exclude='/*/*'" manually).
+
+    - When getting an error while asking an older rsync daemon for a file
+      listing, rsync will try to notice if the error is a rejection of the
+      --dirs (-d) option and let the user know how to work around the issue.
+
+    - Added a few more --no-OPTION overrides.
+
+    - Improved the documentation of the --append option.
+
+    - Improved the documentation of the filter/exclude/include daemon
+      parameters.
+
+  INTERNAL:
+
+    - Fixed a couple minor bugs in the included popt library (ones which I
+      sent to the official popt project for inclusion in the 1.14 release).
+
+    - Fixed a stat() call that should have been do_stat() so that the proper
+      normal/64-bit stat() function gets called.  (Was in an area that should
+      not have caused problems, though.)
+
+    - Changed the file-glob code to do a directory scan without using the
+      "glob" and "glob.h".  This lets us do the globbing with less memory
+      churn, and also avoid adding daemon-excluded items to the returned
+      args.
+
+  DEVELOPER RELATED:
+
+    - The configure script tries to get the user's compiler to not warn about
+      unused function parameters if the build is not including one or more of
+      the ACL/xattrs/iconv features.
+
+    - The configure script now has better checks for figuring out if the
+      included popt code should be used or not.
+
+    - Fixed two testsuite glitches: avoid a failure if someone's "cd" command
+      outputs the current directory when cd-ing to a relative path, and made
+      the itemized test query how rsync was built to determine if it should
+      expect hard-linked symlinks or not.
+
+    - Updated the testsuite to verify that various bug fixes remain fixed.
+
+    - The RPM spec file was updated to have: (1) comments for how to use the
+      rsync-patch tar file, and (2) an /etc/xinetd.d/rsync file.
+
+    - Updated the build scripts to work with a revised FTP directory
+      structure.
+
+
 NEWS for rsync 3.0.0 (1 Mar 2008)
 Protocol: 30 (changed)
 Changes since 2.6.9:
@@ -2587,6 +2725,7 @@ Changes since 2.4.6:
 
 Partial Protocol History
 	RELEASE DATE	VER.	DATE OF COMMIT*	PROTOCOL
+	?? Apr 2008	3.0.2			30
 	03 Apr 2008	3.0.1			30
 	01 Mar 2008	3.0.0	11 Nov 2006	30
 	06 Nov 2006	2.6.9			29
