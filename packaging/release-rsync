@@ -232,11 +232,11 @@ my $ans = <STDIN>;
 system "git commit -a -m 'Preparing for release of $version'" and exit 1;
 
 print "Updating files in \"patches\" dir ...\n";
-system "support/patch-update";
+system "packaging/patch-update";
 
 if ($ans =~ /^y/i) {
     print "\nVisiting all \"patch/*\" branches ...\n";
-    system "support/patch-update --shell";
+    system "packaging/patch-update --shell";
 }
 
 print $break, <<EOT;
@@ -305,7 +305,7 @@ system "fakeroot tar czf $srctar_file rsync-$version; rm -rf rsync-$version";
 print "Updating files in \"rsync-$version/patches\" dir ...\n";
 mkdir("rsync-$version", 0755);
 mkdir("rsync-$version/patches", 0755);
-system "support/patch-update --skip-check --gen=rsync-$version/patches";
+system "packaging/patch-update --skip-check --gen=rsync-$version/patches";
 
 print "Creating $pattar_file ...\n";
 system "fakeroot tar chzf $pattar_file rsync-$version/patches; rm -rf rsync-$version";
