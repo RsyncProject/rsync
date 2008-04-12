@@ -582,7 +582,7 @@ static inline void call_glob_match(const char *name, int len, int from_glob,
 	} else
 		use_buf = glob.arg_buf;
 
-	if (from_glob || arg) {
+	if (from_glob || (arg && len)) {
 		STRUCT_STAT st;
 		int is_dir;
 
