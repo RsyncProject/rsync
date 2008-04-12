@@ -45,7 +45,16 @@ cd "$scratchdir"
 
 ln -s test-rsyncd.conf rsyncd.conf
 
-$RSYNC -ve $SSH --rsync-path="$RSYNC" localhost::
+confopt=''
+case `id -u` in
+0)
+    # Root needs to specify the config file, or it uses /etc/rsyncd.conf.
+    echo "Forcing --config=$conf"
+    confopt=" --config=$conf"
+    ;;
+esac
+
+$RSYNC -ve $SSH --rsync-path="$RSYNC$confopt" localhost::
 
 RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon"
 export RSYNC_CONNECT_PROG
