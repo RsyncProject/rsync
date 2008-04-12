@@ -1,18 +1,15 @@
-NEWS for rsync 3.0.2 (8 Apr 2008)
+NEWS for rsync 3.0.3 (UNRELEASED)
 Protocol: 30 (unchanged)
-Changes since 3.0.1:
+Changes since 3.0.2:
 
   BUG FIXES:
 
-    - Fixed a potential buffer overflow in the xattr code.
+    - ...
 
   ENHANCEMENTS:
 
-    - None.
+    - ...
 
   DEVELOPER RELATED:
 
-    - The RPM spec file was improved to install more useful files.
-
-    - A few developer-oriented scripts were moved from the support dir
-      to the packaging dir.
+    - Fixed a testcase failure if the tests are run as root.
