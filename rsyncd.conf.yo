@@ -69,7 +69,7 @@ Note that you should bf(not) send the rsync daemon a HUP signal to force
 it to reread the tt(rsyncd.conf) file. The file is re-read on each client
 connection.
 
-manpagesection(GLOBAL OPTIONS)
+manpagesection(GLOBAL PARAMETERS)
 
 The first parameters in the file (before a [module] header) are the
 global parameters.
@@ -79,12 +79,12 @@ config file in which case the supplied value will override the
 default for that parameter.
 
 startdit()
-dit(bf(motd file)) The "motd file" option allows you to specify a
+dit(bf(motd file)) This parameter allows you to specify a
 "message of the day" to display to clients on each connect. This
 usually contains site information and any legal notices. The default
 is no motd file.
 
-dit(bf(pid file)) The "pid file" option tells the rsync daemon to write
+dit(bf(pid file)) This parameter tells the rsync daemon to write
 its process ID to that file.  If the file already exists, the rsync
 daemon will abort rather than overwrite the file.
 
@@ -96,7 +96,7 @@ dit(bf(address)) You can override the default IP address the daemon
 will listen on by specifying this value.  This is ignored if the daemon is
 being run by inetd, and is superseded by the bf(--address) command-line option.
 
-dit(bf(socket options)) This option can provide endless fun for people
+dit(bf(socket options)) This parameter can provide endless fun for people
 who like to tune their systems to the utmost degree. You can set all
 sorts of socket options which may make transfers faster (or
 slower!). Read the man page for the code(setsockopt()) system call for
@@ -107,12 +107,12 @@ bf(--sockopts) command-line option.
 enddit()
 
 
-manpagesection(MODULE OPTIONS)
+manpagesection(MODULE PARAMETERS)
 
-After the global options you should define a number of modules, each
+After the global parameters you should define a number of modules, each
 module exports a directory tree as a symbolic name. Modules are
 exported by specifying a module name in square brackets [module]
-followed by the options for that module.
+followed by the parameters for that module.
 The module name cannot contain a slash or a closing square bracket.  If the
 name contains whitespace, each internal sequence of whitespace will be
 changed into a single space, while leading or trailing whitespace will be
@@ -120,12 +120,12 @@ discarded.
 
 startdit()
 
-dit(bf(comment)) The "comment" option specifies a description string
+dit(bf(comment)) This parameter specifies a description string
 that is displayed next to the module name when clients obtain a list
 of available modules. The default is no comment.
 
-dit(bf(path)) The "path" option specifies the directory in the daemon's
-filesystem to make available in this module.  You must specify this option
+dit(bf(path)) This parameter specifies the directory in the daemon's
+filesystem to make available in this module.  You must specify this parameter
 for each module in tt(rsyncd.conf).
 
 dit(bf(use chroot)) If "use chroot" is true, the rsync daemon will chroot
@@ -158,7 +158,7 @@ args if rsync believes they would escape the module hierarchy.
 The default for "use chroot" is true, and is the safer choice (especially
 if the module is not read-only).
 
-When this option is enabled, rsync will not attempt to map users and groups
+When this parameter is enabled, rsync will not attempt to map users and groups
 by name (by default), but instead copy IDs as though bf(--numeric-ids) had
 been specified.  In order to enable name-mapping, rsync needs to be able to
 use the standard library functions for looking up names and IDs (i.e.
@@ -172,32 +172,32 @@ If you copy the necessary resources into the module's chroot area, you
 should protect them through your OS's normal user/group or ACL settings (to
 prevent the rsync module's user from being able to change them), and then
 hide them from the user's view via "exclude" (see how in the discussion of
-that option).  At that point it will be safe to enable the mapping of users
-and groups by name using the "numeric ids" daemon option (see below).
+that parameter).  At that point it will be safe to enable the mapping of users
+and groups by name using the "numeric ids" daemon parameter (see below).
 
 Note also that you are free to setup custom user/group information in the
 chroot area that is different from your normal system.  For example, you
 could abbreviate the list of users and groups.
 
-dit(bf(numeric ids)) Enabling the "numeric ids" option disables the mapping
+dit(bf(numeric ids)) Enabling this parameter disables the mapping
 of users and groups by name for the current daemon module.  This prevents
 the daemon from trying to load any user/group-related files or libraries.
-Enabling this option makes the transfer behave as if the client had passed
+This enabling makes the transfer behave as if the client had passed
 the bf(--numeric-ids) command-line option.  By default, this parameter is
 enabled for chroot modules and disabled for non-chroot modules.
 
-A chroot-enabled module should not have this option enabled unless you've
+A chroot-enabled module should not have this parameter enabled unless you've
 taken steps to ensure that the module has the necessary resources it needs
 to translate names, and that it is not possible for a user to change those
 resources.
 
-dit(bf(munge symlinks))  The "munge symlinks" option tells rsync to modify
+dit(bf(munge symlinks)) This parameter tells rsync to modify
 all incoming symlinks in a way that makes them unusable but recoverable
 (see below).  This should help protect your files from user trickery when
 your daemon module is writable.  The default is disabled when "use chroot"
 is on and the inside-chroot path is "/", otherwise it is enabled.
 
-If you disable this option on a daemon that is not read-only, there
+If you disable this parameter on a daemon that is not read-only, there
 are tricks that a user can play with uploaded symlinks to access
 daemon-excluded items (if your module has any), and, if "use chroot"
 is off, rsync can even be tricked into showing or changing data that
@@ -205,9 +205,9 @@ is outside the module's path (as access-permissions allow).
 
 The way rsync disables the use of symlinks is to prefix each one with
 the string "/rsyncd-munged/".  This prevents the links from being used
-as long as that directory does not exist.  When this option is enabled,
+as long as that directory does not exist.  When this parameter is enabled,
 rsync will refuse to run if that path is a directory or a symlink to
-a directory.  When using the "munge symlinks" option in a chroot area
+a directory.  When using the "munge symlinks" parameter in a chroot area
 that has an inside-chroot path of "/", you should add "/rsyncd-munged/"
 to the exclude setting for the module so that
 a user can't try to create it.
@@ -220,12 +220,12 @@ every symlink's value.  There is a perl script in the support directory
 of the source code named "munge-symlinks" that can be used to add or remove
 this prefix from your symlinks.
 
-When this option is disabled on a writable module and "use chroot" is off
+When this parameter is disabled on a writable module and "use chroot" is off
 (or the inside-chroot path is not "/"),
 incoming symlinks will be modified to drop a leading slash and to remove ".."
 path elements that rsync believes will allow a symlink to escape the module's
 hierarchy.  There are tricky ways to work around this, though, so you had
-better trust your users if you choose this combination of options.
+better trust your users if you choose this combination of parameters.
 
 dit(bf(charset)) This specifies the name of the character set in which the
 module's filenames are stored.  If the client uses an bf(--iconv) option,
@@ -240,14 +240,14 @@ If you wish to force users to always use bf(--iconv) for a particular
 module, add "no-iconv" to the "refuse options" parameter.  Keep in mind
 that this will restrict access to your module to very new rsync clients.
 
-dit(bf(max connections)) The "max connections" option allows you to
+dit(bf(max connections)) This parameter allows you to
 specify the maximum number of simultaneous connections you will allow.
 Any clients connecting when the maximum has been reached will receive a
 message telling them to try later.  The default is 0, which means no limit.
 A negative value disables the module.
-See also the "lock file" option.
+See also the "lock file" parameter.
 
-dit(bf(log file)) When the "log file" option is set to a non-empty
+dit(bf(log file)) When the "log file" parameter is set to a non-empty
 string, the rsync daemon will log messages to the indicated file rather
 than using syslog. This is particularly useful on systems (such as AIX)
 where code(syslog()) doesn't work for chrooted programs.  The file is
@@ -260,7 +260,7 @@ If the daemon fails to open to specified file, it will fall back to
 using syslog and output an error about the failure.  (Note that the
 failure to open the specified log file used to be a fatal error.)
 
-dit(bf(syslog facility)) The "syslog facility" option allows you to
+dit(bf(syslog facility)) This parameter allows you to
 specify the syslog facility name to use when logging messages from the
 rsync daemon. You may use any standard syslog facility name which is
 defined on your system. Common names are auth, authpriv, cron, daemon,
@@ -270,43 +270,43 @@ is daemon.  This setting has no effect if the "log file" setting is a
 non-empty string (either set in the per-modules settings, or inherited
 from the global settings).
 
-dit(bf(max verbosity)) The "max verbosity" option allows you to control
+dit(bf(max verbosity)) This parameter allows you to control
 the maximum amount of verbose information that you'll allow the daemon to
 generate (since the information goes into the log file). The default is 1,
 which allows the client to request one level of verbosity.
 
-dit(bf(lock file)) The "lock file" option specifies the file to use to
-support the "max connections" option. The rsync daemon uses record
+dit(bf(lock file)) This parameter specifies the file to use to
+support the "max connections" parameter. The rsync daemon uses record
 locking on this file to ensure that the max connections limit is not
 exceeded for the modules sharing the lock file.
 The default is tt(/var/run/rsyncd.lock).
 
-dit(bf(read only)) The "read only" option determines whether clients
+dit(bf(read only)) This parameter determines whether clients
 will be able to upload files or not. If "read only" is true then any
 attempted uploads will fail. If "read only" is false then uploads will
 be possible if file permissions on the daemon side allow them. The default
 is for all modules to be read only.
 
-dit(bf(write only)) The "write only" option determines whether clients
+dit(bf(write only)) This parameter determines whether clients
 will be able to download files or not. If "write only" is true then any
 attempted downloads will fail. If "write only" is false then downloads
 will be possible if file permissions on the daemon side allow them.  The
-default is for this option to be disabled.
+default is for this parameter to be disabled.
 
-dit(bf(list)) The "list" option determines if this module should be
+dit(bf(list)) This parameter determines if this module should be
 listed when the client asks for a listing of available modules. By
 setting this to false you can create hidden modules. The default is
 for modules to be listable.
 
-dit(bf(uid)) The "uid" option specifies the user name or user ID that
+dit(bf(uid)) This parameter specifies the user name or user ID that
 file transfers to and from that module should take place as when the daemon
-was run as root. In combination with the "gid" option this determines what
+was run as root. In combination with the "gid" parameter this determines what
 file permissions are available. The default is uid -2, which is normally
 the user "nobody".
 
-dit(bf(gid)) The "gid" option specifies the group name or group ID that
+dit(bf(gid)) This parameter specifies the group name or group ID that
 file transfers to and from that module should take place as when the daemon
-was run as root. This complements the "uid" option. The default is gid -2,
+was run as root. This complements the "uid" parameter. The default is gid -2,
 which is normally the group "nobody".
 
 dit(bf(fake super)) Setting "fake super = yes" for a module causes the
@@ -341,7 +341,7 @@ much protection as global rules, but they can be used to make bf(--delete) work
 better during a client download operation if the per-dir merge files are
 included in the transfer and the client requests that they be used.
 
-dit(bf(exclude)) The "exclude" parameter takes a space-separated list of daemon
+dit(bf(exclude)) This parameter takes a space-separated list of daemon
 exclude patterns.  As with the client bf(--exclude) option, patterns can be
 qualified with "- " or "+ " to explicitly indicate exclude/include.  Only one
 "exclude" parameter can apply to a given module.  See the "filter" parameter
@@ -351,7 +351,7 @@ dit(bf(include)) Use an "include" to override the effects of the "exclude"
 parameter.  Only one "include" parameter can apply to a given module.  See the
 "filter" parameter for a description of how excluded files affect the daemon.
 
-dit(bf(exclude from)) The "exclude from" parameter specifies the name of a file
+dit(bf(exclude from)) This parameter specifies the name of a file
 on the daemon that contains daemon exclude patterns, one per line.  Only one
 "exclude from" parameter can apply to a given module; if you have multiple
 exclude-from files, you can specify them as a merge file in the "filter"
@@ -363,7 +363,7 @@ patterns.  Only one "include from" parameter can apply to a given module.  See
 the "filter" parameter for a description of how excluded files affect the
 daemon.
 
-dit(bf(incoming chmod)) This option allows you to specify a set of
+dit(bf(incoming chmod)) This parameter allows you to specify a set of
 comma-separated chmod strings that will affect the permissions of all
 incoming files (files that are being received by the daemon).  These
 changes happen after all other permission calculations, and this will
@@ -372,7 +372,7 @@ client does not specify bf(--perms).
 See the description of the bf(--chmod) rsync option and the bf(chmod)(1)
 manpage for information on the format of this string.
 
-dit(bf(outgoing chmod)) This option allows you to specify a set of
+dit(bf(outgoing chmod)) This parameter allows you to specify a set of
 comma-separated chmod strings that will affect the permissions of all
 outgoing files (files that are being sent out from the daemon).  These
 changes happen first, making the sent permissions appear to be different
@@ -382,7 +382,7 @@ be on to the clients.
 See the description of the bf(--chmod) rsync option and the bf(chmod)(1)
 manpage for information on the format of this string.
 
-dit(bf(auth users)) The "auth users" option specifies a comma and
+dit(bf(auth users)) This parameter specifies a comma and
 space-separated list of usernames that will be allowed to connect to
 this module. The usernames do not need to exist on the local
 system. The usernames may also contain shell wildcard characters. If
@@ -390,7 +390,7 @@ system. The usernames may also contain shell wildcard characters. If
 username and password to connect to the module. A challenge response
 authentication protocol is used for this exchange. The plain text
 usernames and passwords are stored in the file specified by the
-"secrets file" option. The default is for all users to be able to
+"secrets file" parameter. The default is for all users to be able to
 connect without a password (this is called "anonymous rsync").
 
 See also the "CONNECTING TO AN RSYNC DAEMON OVER A REMOTE SHELL
@@ -398,28 +398,28 @@ PROGRAM" section in bf(rsync)(1) for information on how handle an
 rsyncd.conf-level username that differs from the remote-shell-level
 username when using a remote shell to connect to an rsync daemon.
 
-dit(bf(secrets file)) The "secrets file" option specifies the name of
+dit(bf(secrets file)) This parameter specifies the name of
 a file that contains the username:password pairs used for
 authenticating this module. This file is only consulted if the "auth
-users" option is specified. The file is line based and contains
+users" parameter is specified. The file is line based and contains
 username:password pairs separated by a single colon. Any line starting
 with a hash (#) is considered a comment and is skipped. The passwords
 can contain any characters but be warned that many operating systems
 limit the length of passwords that can be typed at the client end, so
 you may find that passwords longer than 8 characters don't work.
 
-There is no default for the "secrets file" option, you must choose a name
+There is no default for the "secrets file" parameter, you must choose a name
 (such as tt(/etc/rsyncd.secrets)).  The file must normally not be readable
 by "other"; see "strict modes".
 
-dit(bf(strict modes)) The "strict modes" option determines whether or not
+dit(bf(strict modes)) This parameter determines whether or not
 the permissions on the secrets file will be checked.  If "strict modes" is
 true, then the secrets file must not be readable by any user ID other
 than the one that the rsync daemon is running under.  If "strict modes" is
-false, the check is not performed.  The default is true.  This option
+false, the check is not performed.  The default is true.  This parameter
 was added to accommodate rsync running on the Windows operating system.
 
-dit(bf(hosts allow)) The "hosts allow" option allows you to specify a
+dit(bf(hosts allow)) This parameter allows you to specify a
 list of patterns that are matched against a connecting clients
 hostname and IP address. If none of the patterns match then the
 connection is rejected.
@@ -454,28 +454,28 @@ tt(    fe80::%link1/ffff:ffff:ffff:ffff::)nl()
 )
 
 You can also combine "hosts allow" with a separate "hosts deny"
-option. If both options are specified then the "hosts allow" option is
+parameter. If both parameters are specified then the "hosts allow" parameter is
 checked first and a match results in the client being able to
-connect. The "hosts deny" option is then checked and a match means
+connect. The "hosts deny" parameter is then checked and a match means
 that the host is rejected. If the host does not match either the
 "hosts allow" or the "hosts deny" patterns then it is allowed to
 connect.
 
-The default is no "hosts allow" option, which means all hosts can connect.
+The default is no "hosts allow" parameter, which means all hosts can connect.
 
-dit(bf(hosts deny)) The "hosts deny" option allows you to specify a
+dit(bf(hosts deny)) This parameter allows you to specify a
 list of patterns that are matched against a connecting clients
 hostname and IP address. If the pattern matches then the connection is
-rejected. See the "hosts allow" option for more information.
+rejected. See the "hosts allow" parameter for more information.
 
-The default is no "hosts deny" option, which means all hosts can connect.
+The default is no "hosts deny" parameter, which means all hosts can connect.
 
-dit(bf(ignore errors)) The "ignore errors" option tells rsyncd to
+dit(bf(ignore errors)) This parameter tells rsyncd to
 ignore I/O errors on the daemon when deciding whether to run the delete
 phase of the transfer. Normally rsync skips the bf(--delete) step if any
 I/O errors have occurred in order to prevent disastrous deletion due
 to a temporary resource shortage or other I/O error. In some cases this
-test is counter productive so you can use this option to turn off this
+test is counter productive so you can use this parameter to turn off this
 behavior.
 
 dit(bf(ignore nonreadable)) This tells the rsync daemon to completely
@@ -483,14 +483,14 @@ ignore files that are not readable by the user. This is useful for
 public archives that may have some non-readable files among the
 directories, and the sysadmin doesn't want those files to be seen at all.
 
-dit(bf(transfer logging)) The "transfer logging" option enables per-file
+dit(bf(transfer logging)) This parameter enables per-file
 logging of downloads and uploads in a format somewhat similar to that
 used by ftp daemons.  The daemon always logs the transfer at the end, so
 if a transfer is aborted, no mention will be made in the log file.
 
-If you want to customize the log lines, see the "log format" option.
+If you want to customize the log lines, see the "log format" parameter.
 
-dit(bf(log format)) The "log format" option allows you to specify the
+dit(bf(log format)) This parameter allows you to specify the
 format used for logging file transfers when transfer logging is enabled.
 The format is a text string containing embedded single-character escape
 sequences prefixed with a percent (%) character.  An optional numeric
@@ -498,7 +498,7 @@ field width may also be specified between the percent and the escape
 letter (e.g. "bf(%-50n %8l %07p)").
 
 The default log format is "%o %h [%a] %m (%u) %f %l", and a "%t [%p] "
-is always prefixed when using the "log file" option.
+is always prefixed when using the "log file" parameter.
 (A perl script that will summarize this default log format is included
 in the rsync source code distribution in the "support" subdirectory:
 rsyncstats.)
@@ -534,14 +534,14 @@ Note that some of the logged output changes when talking with older
 rsync versions.  For instance, deleted files were only output as verbose
 messages prior to rsync 2.6.4.
 
-dit(bf(timeout)) The "timeout" option allows you to override the
-clients choice for I/O timeout for this module. Using this option you
+dit(bf(timeout)) This parameter allows you to override the
+clients choice for I/O timeout for this module. Using this parameter you
 can ensure that rsync won't wait on a dead client forever. The timeout
 is specified in seconds. A value of zero means no timeout and is the
 default. A good choice for anonymous rsync daemons may be 600 (giving
 a 10 minute timeout).
 
-dit(bf(refuse options)) The "refuse options" option allows you to
+dit(bf(refuse options)) This parameter allows you to
 specify a space-separated list of rsync command line options that will
 be refused by your rsync daemon.
 You may specify the full option name, its one-letter abbreviation, or a
@@ -564,21 +564,21 @@ you can use "dont compress = *" (see below)
 instead of "refuse options = compress" to avoid returning an error to a
 client that requests compression.
 
-dit(bf(dont compress)) The "dont compress" option allows you to select
+dit(bf(dont compress)) This parameter allows you to select
 filenames based on wildcard patterns that should not be compressed
-when pulling files from the daemon (no analogous option exists to
+when pulling files from the daemon (no analogous parameter exists to
 govern the pushing of files to a daemon).
 Compression is expensive in terms of CPU usage, so it
 is usually good to not try to compress files that won't compress well,
 such as already compressed files.
 
-The "dont compress" option takes a space-separated list of
+The "dont compress" parameter takes a space-separated list of
 case-insensitive wildcard patterns. Any source filename matching one
 of the patterns will not be compressed during transfer.
 
-See the bf(--skip-compress) option in the bf(rsync)(1) manpage for the list
+See the bf(--skip-compress) parameter in the bf(rsync)(1) manpage for the list
 of file suffixes that are not compressed by default.  Specifying a value
-for the "dont compress" option changes the default when the daemon is
+for the "dont compress" parameter changes the default when the daemon is
 the sender.
 
 dit(bf(pre-xfer exec), bf(post-xfer exec)) You may specify a command to be run
