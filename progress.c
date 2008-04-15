@@ -40,6 +40,8 @@ struct progress_history {
 	OFF_T ofs;
 };
 
+int progress_is_active = 0;
+
 static struct progress_history ph_start;
 static struct progress_history ph_list[PROGRESS_HISTORY_SECS];
 static int newest_hpos, oldest_hpos;
@@ -109,8 +111,11 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 			stats.num_transferred_files,
 			stats.num_files - current_file_index - 1,
 			stats.num_files);
-	} else
+		progress_is_active = 0;
+	} else {
 		strlcpy(eol, "\r", sizeof eol);
+		progress_is_active = 1;
+	}
 	rprintf(FCLIENT, "%12s %3d%% %7.2f%s %s%s",
 		human_num(ofs), pct, rate, units, rembuf, eol);
 }
