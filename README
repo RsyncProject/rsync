@@ -1,122 +1,135 @@
 WHAT IS RSYNC?
 --------------
 
-rsync is a replacement for scp/rcp that has many more features.
+Rsync is a fast and extraordinarily versatile file copying tool for
+both remote and local files.
 
-rsync uses the "rsync algorithm" which provides a very fast method for
-bringing remote files into sync. It does this by sending just the
+Rsync uses a delta-transfer algorithm which provides a very fast method
+for bringing remote files into sync.  It does this by sending just the
 differences in the files across the link, without requiring that both
-sets of files are present at one of the ends of the link beforehand.
-At first glance this may seem impossible because the calculation of
-diffs between two files normally requires local access to both
-files. 
+sets of files are present at one of the ends of the link beforehand.  At
+first glance this may seem impossible because the calculation of diffs
+between two files normally requires local access to both files.
 
-A technical report describing the rsync algorithm is included with
-this package. 
+A technical report describing the rsync algorithm is included with this
+package.
 
 
 USAGE
 -----
 
-Basically you use rsync just like rcp, but rsync has many additional
-options.  To get a complete list of supported options type
+Basically you use rsync just like scp, but rsync has many additional
+options.  To get a complete list of supported options type:
 
-  rsync --help
+    rsync --help
 
-and see the manual for more information.
+See the manpage for more detailed information.
 
 
 SETUP
 -----
 
-Rsync normally uses ssh or rsh for communication.  It does not need to
-be setuid and requires no special privileges for installation.  You
-must, however, have a working ssh or rsh system.  Using ssh is
-recommended for its security features.
+Rsync normally uses ssh or rsh for communication with remote systems.
+It does not need to be setuid and requires no special privileges for
+installation.  You must, however, have a working ssh or rsh system.
+Using ssh is recommended for its security features.
 
 Alternatively, rsync can run in `daemon' mode, listening on a socket.
 This is generally used for public file distribution, although
 authentication and access control are available.
 
-To install rsync, first run the "configure" script. This will create a
-Makefile and config.h appropriate for your system. Then type
-"make". 
+To install rsync, first run the "configure" script.  This will create a
+Makefile and config.h appropriate for your system.  Then type "make".
 
 Note that on some systems you will have to force configure not to use
 gcc because gcc may not support some features (such as 64 bit file
-offsets) that your system may support. Set the environment variable CC
+offsets) that your system may support.  Set the environment variable CC
 to the name of your native compiler before running configure in this
-case. 
+case.
 
 Once built put a copy of rsync in your search path on the local and
-remote systems (or use "make install"). That's it!
+remote systems (or use "make install").  That's it!
+
 
 RSYNC DAEMONS
 -------------
 
-rsync can also talk to "rsync daemons" which can provide anonymous or
-authenticated rsync. See the rsyncd.conf(5) man page for details on how
-to setup an rsync daemon. See the rsync(1) man page for info on how to
+Rsync can also talk to "rsync daemons" which can provide anonymous or
+authenticated rsync.  See the rsyncd.conf(5) man page for details on how
+to setup an rsync daemon.  See the rsync(1) man page for info on how to
 connect to an rsync daemon.
 
 
-MAILING LIST
-------------
+WEB SITE
+--------
 
-There is a mailing list for the discussion of rsync and its
-applications. It is open to anyone to join. I will announce new
-versions on this list. 
+The main rsync web site is here:
 
-To join the mailing list see the web page at http://lists.samba.org/
+    http://rsync.samba.org/
 
-To send mail to everyone on the list send it to rsync@lists.samba.org
+You'll find a FAQ list, downloads, resources, HTML versions of the
+manpages, etc.
+
+
+MAILING LISTS
+-------------
+
+There is a mailing list for the discussion of rsync and its applications
+that is open to anyone to join.  New releases are announced on this
+list, and there is also an announcement-only mailing list for those that
+want official announcements.  See the mailing-list page for full
+details:
+
+    http://rsync.samba.org/lists.html
 
 
 BUG REPORTS
 -----------
 
-If you have web access then please look at
+To visit this web page for full the details on bug reporting:
 
-  http://rsync.samba.org/
+    http://rsync.samba.org/bugzilla.html
 
-That page contains links to the current bug list, and information on
-how to report a bug well.  You might also like to try searching the
-internet for the error message you've received, or looking in the
-mailing list archives at
+That page contains links to the current bug list, and information on how
+to report a bug well.  You might also like to try searching the Internet
+for the error message you've received, or looking in the mailing list
+archives at:
 
-  http://mail-archive.com/rsync@lists.samba.org/
+    http://mail-archive.com/rsync@lists.samba.org/
 
 To send a bug report, follow the instructions on the bug-tracking
 page of the web site.
 
-If you don't have web access, email your bug report to
-rsync@lists.samba.org.
+Alternately, email your bug report to rsync@lists.samba.org .
 
 
-CVS TREE
---------
+GIT REPOSITORY
+--------------
 
 If you want to get the very latest version of rsync direct from the
-source code repository then you can use anonymous cvs. You will need a
-recent version of cvs then use the following commands:
+source code repository then you can use git:
 
-	cvs -d :pserver:cvs@pserver.samba.org:/cvsroot login
-	Password: cvs
+    git clone git://git.samba.org/rsync.git
 
-	cvs -d :pserver:cvs@pserver.samba.org:/cvsroot co rsync
+See the download page for full details on all the ways to grab the
+source, including nightly tar files, web-browsing of the git repository,
+etc.:
 
-Look at the cvs documentation for more details.
+    http://rsync.samba.org/download.html
 
 
 COPYRIGHT
 ---------
 
-rsync was originally written by Andrew Tridgell and has been improved
-by many developers around the world.  rsync may be used, modified and
-redistributed only under the terms of the GNU General Public License,
-found in the file COPYING in this distribution, or at 
+Rsync was originally written by Andrew Tridgell and is currently
+maintained by Wayne Davison.   It has been improved by many developers
+from around the world.
 
-  http://www.fsf.org/licenses/gpl.html
+Rsync may be used, modified and redistributed only under the terms of
+the GNU General Public License, found in the file COPYING in this
+distribution, or at:
+
+    http://www.fsf.org/licenses/gpl.html
 
 
 AVAILABILITY

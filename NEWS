@@ -4,7 +4,8 @@ Changes since 3.0.2:
 
   BUG FIXES:
 
-    - ...
+    - Fixed a wildcard matching problem in the daemon when a module has
+      "use chroot" enabled.
 
   ENHANCEMENTS:
 
