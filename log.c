@@ -517,7 +517,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			break;
 		case 'M':
 			n = c = timestring(file->modtime);
-			while ((c = strchr(p, ' ')) != NULL)
+			while ((c = strchr(c, ' ')) != NULL)
 				*c = '-';
 			break;
 		case 'B':
