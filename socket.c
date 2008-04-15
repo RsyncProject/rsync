@@ -31,6 +31,7 @@
 #include <netinet/tcp.h>
 
 extern char *bind_address;
+extern char *sockopts;
 extern int default_af_hint;
 extern int connect_timeout;
 
@@ -272,6 +273,7 @@ int open_socket_out(char *host, int port, const char *bind_addr,
 			alarm(connect_timeout);
 		}
 
+		set_socket_options(s, sockopts);
 		while (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
 			if (connect_timeout < 0)
 				exit_cleanup(RERR_CONTIMEOUT);
@@ -433,6 +435,10 @@ static int *open_socket_in(int type, int port, const char *bind_addr,
 
 		setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
 			   (char *)&one, sizeof one);
+		if (sockopts)
+			set_socket_options(s, sockopts);
+		else
+			set_socket_options(s, lp_socket_options());
 
 #ifdef IPV6_V6ONLY
 		if (resp->ai_family == AF_INET6) {

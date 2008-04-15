@@ -121,8 +121,6 @@ int start_socket_client(char *host, int remote_argc, char *remote_argv[],
 	if (fd == -1)
 		exit_cleanup(RERR_SOCKETIO);
 
-	set_socket_options(fd, sockopts);
-
 #ifdef ICONV_CONST
 	setup_iconv();
 #endif
@@ -931,10 +929,6 @@ int start_daemon(int f_in, int f_out)
 
 	if (!am_server) {
 		set_socket_options(f_in, "SO_KEEPALIVE");
-		if (sockopts)
-			set_socket_options(f_in, sockopts);
-		else
-			set_socket_options(f_in, lp_socket_options());
 		set_nonblocking(f_in);
 	}
 
