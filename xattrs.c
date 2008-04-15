@@ -178,8 +178,9 @@ static char *get_xattr_data(const char *fname, const char *name, size_t *len_ptr
 
 	if (!datum_len && !extra_len)
 		extra_len = 1; /* request non-zero amount of memory */
-	if (datum_len + extra_len < datum_len /* checks for overflow */
-	 || !(ptr = new_array(char, datum_len + extra_len)))
+	if (datum_len + extra_len < datum_len)
+		overflow_exit("get_xattr_data");
+	if (!(ptr = new_array(char, datum_len + extra_len)))
 		out_of_memory("get_xattr_data");
 
 	if (datum_len) {
@@ -557,7 +558,7 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 		rxa->datum_len = read_varint(f_in);
 
 		if (rxa->name_len + rxa->datum_len < rxa->name_len)
-			out_of_memory("recv_xattr_request"); /* overflow */
+			overflow_exit("recv_xattr_request");
 		rxa->datum = new_array(char, rxa->datum_len + rxa->name_len);
 		if (!rxa->datum)
 			out_of_memory("recv_xattr_request");
@@ -609,10 +610,9 @@ void receive_xattr(struct file_struct *file, int f)
 		size_t datum_len = read_varint(f);
 		size_t dget_len = datum_len > MAX_FULL_DATUM ? 1 + MAX_DIGEST_LEN : datum_len;
 		size_t extra_len = MIGHT_NEED_RPRE ? RPRE_LEN : 0;
-		if (dget_len + extra_len < dget_len)
-			out_of_memory("receive_xattr"); /* overflow */
-		if (dget_len + extra_len + name_len < dget_len)
-			out_of_memory("receive_xattr"); /* overflow */
+		if ((dget_len + extra_len < dget_len)
+		 || (dget_len + extra_len + name_len < dget_len))
+			overflow_exit("receive_xattr");
 		ptr = new_array(char, dget_len + extra_len + name_len);
 		if (!ptr)
 			out_of_memory("receive_xattr");
