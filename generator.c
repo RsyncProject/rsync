@@ -1284,7 +1284,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		skip_dir = NULL;
 	}
 
-	if (daemon_filter_list.head) {
+	if (daemon_filter_list.head && (*fname != '.' || fname[1])) {
 		if (check_filter(&daemon_filter_list, FLOG, fname, is_dir) < 0) {
 			if (is_dir < 0)
 				return;
