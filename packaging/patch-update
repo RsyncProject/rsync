@@ -51,7 +51,7 @@ if ($incl_generated_files) {
     mkdir($tmp_dir, 0700) or die "Unable to mkdir($tmp_dir): $!\n";
     system "./config.status Makefile && make gen && rsync -a @extra_files $tmp_dir/master/" and exit 1;
 }
-my $last_touch = time;
+our $last_touch = time;
 
 my(%patches, %local_patch);
 
@@ -106,7 +106,7 @@ if ($incl_generated_files) {
     system "rm -rf $tmp_dir";
 }
 
-sleep 1 if $last_touch == time;
+sleep 1 while $last_touch >= time;
 system "git checkout $starting_branch" and exit 1;
 
 exit;
@@ -128,7 +128,7 @@ sub update_patch
 
     print "======== $patch ========\n";
 
-    sleep 1 if $incl_generated_files && $last_touch == time;
+    sleep 1 while $incl_generated_files && $last_touch >= time;
     if ($local_patch{$patch}) {
 	system "git checkout patch/$patch" and return 0;
     } else {
@@ -156,7 +156,7 @@ sub update_patch
     print OUT $description{$patch}, "\n";
 
     if ($incl_generated_files) {
-	system "./config.status Makefile && make gen && rsync -a @extra_files $tmp_dir/$patch/";
+	system "./config.status Makefile && make gen && rsync -a @extra_files $tmp_dir/$patch/" and exit 1;
     }
     $last_touch = time;
 
