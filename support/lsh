@@ -6,18 +6,30 @@
 # we get a -l USER option, we try to use "sudo -u USER" to run the
 # command.
 
+user=''
 prefix=''
-
-cd # Default path is home dir, just like ssh.
+do_cd=y # Default path is user's home dir, just like ssh.
 
 while : ; do
     case "$1" in
-    -l) shift ; prefix="sudo -u $1"; shift ;;
-    -l*) prefix=`echo $1 | sed 's/-l/sudo -u /'`; shift ;;
+    -l) user="$2"; shift; shift ;;
+    -l*) user=`echo $1 | sed 's/^-l//'`; shift ;;
+    --no-cd) do_cd=n; shift ;;
     -*) shift ;;
     localhost) shift; break ;;
-    *) exit 1 ;;
+    *) echo "lsh: unable to connect to host $1" 1>&2; exit 1 ;;
     esac
 done
+
+if [ "$user" ]; then
+    prefix="sudo -H -u $user"
+    if [ $do_cd = y ]; then
+	home=`perl -e "print((getpwnam("$user"))[7])"`
+	# Yeah, this may fail, but attempts to get sudo to cd are harder.
+	cd $home
+    fi
+elif [ $do_cd = y ]; then
+    cd
+fi
 
 eval $prefix "${@}"

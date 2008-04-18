@@ -10,20 +10,7 @@
 
 . "$suitedir/rsync.fns"
 
-SSH="$scratchdir/pretend-ssh"
-
-cat >"$SSH" <<'EOT'
-while : ; do
-    case "$1" in
-    -*) shift ;;
-    localhost) shift; break ;;
-    *) exit 1 ;;
-    esac
-done
-
-eval "${@}"
-EOT
-chmod +x "$SSH"
+SSH=support/lsh
 
 if test x"$rsync_enable_ssh_tests" = xyes; then
     if type ssh >/dev/null ; then
@@ -31,7 +18,7 @@ if test x"$rsync_enable_ssh_tests" = xyes; then
     fi
 fi
 
-if ! [ "`"$SSH" -o'BatchMode yes' localhost echo yes`" = "yes" ]; then
+if ! [ "`$SSH -o'BatchMode yes' localhost echo yes`" = "yes" ]; then
     test_skipped "Skipping SSH tests because ssh conection to localhost not authorised"
 fi
 

@@ -24,20 +24,7 @@
 
 . "$suitedir/rsync.fns"
 
-SSH="$scratchdir/pretend-ssh"
-
-cat >"$SSH" <<'EOT'
-while : ; do
-    case "$1" in
-    -*) shift ;;
-    localhost) shift; break ;;
-    *) exit 1 ;;
-    esac
-done
-
-eval "${@}"
-EOT
-chmod +x "$SSH"
+SSH="src/support/lsh --no-cd"
 
 build_rsyncd_conf
 
@@ -54,7 +41,7 @@ case `id -u` in
     ;;
 esac
 
-$RSYNC -ve $SSH --rsync-path="$RSYNC$confopt" localhost::
+$RSYNC -ve "$SSH" --rsync-path="$RSYNC$confopt" localhost::
 
 RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon"
 export RSYNC_CONNECT_PROG
