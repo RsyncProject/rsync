@@ -11,6 +11,8 @@
 
 . "$suitedir/rsync.fns"
 
+SSH=support/lsh
+
 outfile="$scratchdir/rsync.out"
 
 # Build some hardlinks
@@ -44,8 +46,8 @@ checkit "$RSYNC -aHivv --no-whole-file '$fromdir/' '$todir/'" "$fromdir" "$todir
 makepath "$fromdir/subdir/down/deep"
 
 files=''
-for x in 0 1 2 3 4 5 6 7 8 9 a b c d e f g h i j k l m n o p q r s t u v w x y z; do
-    for y in 0 1 2 3 4 5 6 7 8 9 a b c d e f g h i j k l m n o p q r s t u v w x y z; do
+for x in a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 8 9; do
+    for y in a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 8 9; do
 	files="$files $x$y"
     done
 done
@@ -54,7 +56,7 @@ done
 ln "$name1" "$fromdir/subdir/down/deep/new-file"
 rm "$todir/text"
 
-checkit "$RSYNC -aHivv '$fromdir/' '$todir/'" "$fromdir" "$todir"
+checkit "$RSYNC -aHivve '$SSH' --rsync-path='$RSYNC' '$fromdir/' localhost:'$todir/'" "$fromdir" "$todir"
 
 # Do some duplicate copies using --link-dest and --copy-dest to test that
 # we hard-link all locally-inherited items.
