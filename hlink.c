@@ -266,7 +266,8 @@ static char *check_prior(struct file_struct *file, int gnum,
 		F_HL_PREV(file) = prev_ndx = F_HL_PREV(fp);
 	}
 
-	if ((node = hashtable_find(prior_hlinks, gnum, 0)) != NULL) {
+	if (inc_recurse
+	 && (node = hashtable_find(prior_hlinks, gnum, 0)) != NULL) {
 		assert(node->data != NULL);
 		if (CVAL(node->data, 0) != 0) {
 			*prev_ndx_p = -1;
