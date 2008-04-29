@@ -37,7 +37,7 @@ extern int stdout_format_has_i;
 extern int maybe_ATTRS_REPORT;
 extern int unsort_ndx;
 extern char *basis_dir[];
-extern struct file_list *cur_flist;
+extern struct file_list *cur_flist, *first_flist;
 
 #ifdef SUPPORT_HARD_LINKS
 
@@ -447,7 +447,7 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 {
 	stat_x prev_sx;
 	STRUCT_STAT st;
-	char alt_name[MAXPATHLEN], *prev_name;
+	char prev_name[MAXPATHLEN], alt_name[MAXPATHLEN];
 	const char *our_name;
 	struct file_list *flist;
 	int prev_statret, ndx, prev_ndx = F_HL_PREV(file);
@@ -478,13 +478,20 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 	while ((ndx = prev_ndx) >= 0) {
 		int val;
 		flist = flist_for_ndx(ndx);
-		assert(flist != NULL);
+		if (flist == NULL) {
+			int start1 = first_flist ? first_flist->ndx_start : 0;
+			int start2 = first_flist ? first_flist->prev->ndx_start : 0;
+			int used = first_flist ? first_flist->prev->used : 0;
+			rprintf(FERROR,
+				"File index not found: %d (%d - %d)\n",
+				ndx, start1 - 1, start2 + used - 1);
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		file = flist->files[ndx - flist->ndx_start];
 		file->flags = (file->flags & ~FLAG_HLINK_FIRST) | FLAG_HLINK_DONE;
 		prev_ndx = F_HL_PREV(file);
 		F_HL_PREV(file) = fin_ndx;
-		prev_name = f_name(file, NULL);
-		prev_statret = link_stat(prev_name, &prev_sx.st, 0);
+		prev_statret = link_stat(f_name(file, prev_name), &prev_sx.st, 0);
 		val = maybe_hard_link(file, ndx, prev_name, prev_statret, &prev_sx,
 				      our_name, stp, fname, itemizing, code);
 		flist->in_progress--;
