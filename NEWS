@@ -7,10 +7,32 @@ Changes since 3.0.2:
     - Fixed a wildcard matching problem in the daemon when a module has
       "use chroot" enabled.
 
+    - Fixed a crash bug in the hard-link code.
+
+    - The generator no longer allows a '.' dir to be excluded by a daemon-
+      exclude rule.
+
+    - Fixed the conversion of spaces into dashes in the %M log escape.
+
+    - Moved the setting of the socket options prior to the connect().
+
+    - If rsync exits in the middle of a --progress output, it now outputs a
+      newline to prevent the progress line from being overwritten.
+
+    - Fixed a problem with how a destination path with a trailing slash was
+      compared against the daemon excludes.
+
+    - Use the overflow_exit() function for overflows, not out_of_memory().
+
   ENHANCEMENTS:
 
-    - ...
+    - The rsyncd.conf manpage now consistently refers to the parameters in
+      the daemon config file as "parameters".
 
   DEVELOPER RELATED:
 
-    - Fixed a testcase failure if the tests are run as root.
+    - Fixed a testcase failure if the tests are run as root and made some
+      compatibility improvements.
+
+    - Ensure that the early patches don't cause any generated-file hunks to
+      bleed-over into patches that follow.
