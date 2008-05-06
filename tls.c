@@ -45,6 +45,8 @@ int dry_run = 0;
 int am_root = 0;
 int read_only = 1;
 int list_only = 0;
+int link_times = 0;
+int link_owner = 0;
 int preserve_perms = 0;
 int preserve_executability = 0;
 
@@ -134,12 +136,14 @@ static void list_file(const char *fname)
 
 	/* On some BSD platforms the mode bits of a symlink are
 	 * undefined.  Also it tends not to be possible to reset a
-	 * symlink's mtime, so we have to ignore it too. */
+	 * symlink's mtime, so we default to ignoring it too. */
 	if (S_ISLNK(buf.st_mode)) {
 		int len;
 		buf.st_mode &= ~0777;
-		buf.st_mtime = (time_t)0;
-		buf.st_uid = buf.st_gid = 0;
+		if (!link_times)
+			buf.st_mtime = (time_t)0;
+		if (!link_owner)
+			buf.st_uid = buf.st_gid = 0;
 		strlcpy(linkbuf, " -> ", sizeof linkbuf);
 		/* const-cast required for silly UNICOS headers */
 		len = readlink((char *) fname, linkbuf+4, sizeof(linkbuf) - 4);
@@ -184,6 +188,8 @@ static void list_file(const char *fname)
 
 static struct poptOption long_options[] = {
   /* longName, shortName, argInfo, argPtr, value, descrip, argDesc */
+  {"link-times",      'l', POPT_ARG_NONE,   &link_times, 0, 0, 0 },
+  {"link-owner",      'L', POPT_ARG_NONE,   &link_owner, 0, 0, 0 },
 #ifdef SUPPORT_XATTRS
   {"fake-super",      'f', POPT_ARG_VAL,    &am_root, -1, 0, 0 },
 #endif
@@ -197,6 +203,8 @@ static void tls_usage(int ret)
   fprintf(F,"usage: " PROGRAM " [OPTIONS] FILE ...\n");
   fprintf(F,"Trivial file listing program for portably checking rsync\n");
   fprintf(F,"\nOptions:\n");
+  fprintf(F," -l, --link-times            display the time on a symlink\n");
+  fprintf(F," -L, --link-owner            display the owner+group on a symlink\n");
 #ifdef SUPPORT_XATTRS
   fprintf(F," -f, --fake-super            display attributes including fake-super xattrs\n");
 #endif

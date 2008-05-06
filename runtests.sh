@@ -154,12 +154,21 @@ fi
 RSYNC="$rsync_bin $*"
 #RSYNC="valgrind $rsync_bin $*"
 
-export POSIXLY_CORRECT TOOLDIR srcdir RSYNC
+TLS_ARGS=''
+if egrep '^#define HAVE_UTIMES 1' "$srcdir/config.h" >/dev/null; then
+    TLS_ARGS="$TLS_ARGS -l"
+fi
+if egrep '#undef CHOWN_MODIFIES_SYMLINK' "$srcdir/config.h" >/dev/null; then
+    TLS_ARGS="$TLS_ARGS -L"
+fi
+
+export POSIXLY_CORRECT TOOLDIR srcdir RSYNC TLS_ARGS
 
 echo "============================================================"
 echo "$0 running in $TOOLDIR"
 echo "    rsync_bin=$RSYNC"
 echo "    srcdir=$srcdir"
+echo "    TLS_ARGS=$TLS_ARGS"
 
 if [ -f /usr/bin/whoami ]; then
     testuser=`/usr/bin/whoami`
