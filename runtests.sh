@@ -155,7 +155,7 @@ RSYNC="$rsync_bin $*"
 #RSYNC="valgrind $rsync_bin $*"
 
 TLS_ARGS=''
-if egrep '^#define HAVE_UTIMES 1' "$srcdir/config.h" >/dev/null; then
+if egrep '^#define HAVE_LUTIMES 1' "$srcdir/config.h" >/dev/null; then
     TLS_ARGS="$TLS_ARGS -l"
 fi
 if egrep '#undef CHOWN_MODIFIES_SYMLINK' "$srcdir/config.h" >/dev/null; then
