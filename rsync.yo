@@ -697,13 +697,25 @@ date is on the objects.  In other words, if the source has a directory
 where the destination has a file, the transfer would occur regardless of
 the timestamps.
 
-dit(bf(--inplace)) This causes rsync not to create a new copy of the file
-and then move it into place.  Instead rsync will overwrite the existing
-file, meaning that the rsync algorithm can't accomplish the full amount of
-network reduction it might be able to otherwise (since it does not yet try
-to sort data matches).  One exception to this is if you combine the option
-with bf(--backup), since rsync is smart enough to use the backup file as the
-basis file for the transfer.
+dit(bf(--inplace)) This option changes how rsync transfers a file when the
+file's data needs to be updated: instead of the default method of creating
+a new copy of the file and moving it into place when it is complete, rsync
+instead writes the updated data directly to the destination file.
+
+This has several effects: (1) in-use binaries cannot be updated (either the
+OS will prevent this from happening, or binaries that attempt to swap-in
+their data will misbehave or crash), (2) the file's data will be in an
+inconsistent state during the transfer, (3) a file's data may be left in an
+inconsistent state after the transfer if the transfer is interrupted or if
+an update fails, (4) a file that does not have write permissions can not be
+updated, and (5) the efficiency of rsync's delta-transfer algorithm may be
+reduced if some data in the destination file is overwritten before it can
+be copied to a position later in the file (one exception to this is if you
+combine this option with bf(--backup), since rsync is smart enough to use
+the backup file as the basis file for the transfer).
+
+WARNING: you should not use this option to update files that are being
+accessed by others, so be careful when choosing to use this for a copy.
 
 This option is useful for transfer of large files with block-based changes
 or appended data, and also on systems that are disk bound, not network
@@ -713,12 +725,6 @@ The option implies bf(--partial) (since an interrupted transfer does not delete
 the file), but conflicts with bf(--partial-dir) and bf(--delay-updates).
 Prior to rsync 2.6.4 bf(--inplace) was also incompatible with bf(--compare-dest)
 and bf(--link-dest).
-
-WARNING: The file's data will be in an inconsistent state during the
-transfer (and possibly afterward if the transfer gets interrupted), so you
-should not use this option to update files that are in use.  Also note that
-rsync will be unable to update a file in-place that is not writable by the
-receiving user.
 
 dit(bf(--append)) This causes rsync to update a file by appending data onto
 the end of the file, which presumes that the data that already exists on
@@ -986,7 +992,7 @@ with the files and update them on the remote system.  Note that if this
 option is not used, the optimization that excludes files that have not been
 modified cannot be effective; in other words, a missing bf(-t) or bf(-a) will
 cause the next transfer to behave as if it used bf(-I), causing all files to be
-updated (though the rsync algorithm will make the update fairly efficient
+updated (though rsync's delta-transfer algorithm will make the update fairly efficient
 if the files haven't actually changed, you're much better off using bf(-t)).
 
 dit(bf(-O, --omit-dir-times)) This tells rsync to omit directories when
@@ -1058,7 +1064,7 @@ the "bytes sent", "bytes received", "literal data", and "matched data"
 statistics are too small, and the "speedup" value is equivalent to a run
 where no file transfers are needed.
 
-dit(bf(-W, --whole-file)) With this option the delta-transfer algorithm
+dit(bf(-W, --whole-file)) With this option rsync's delta-transfer algorithm
 is not used and the whole file is sent as-is instead.  The transfer may be
 faster if this option is used when the bandwidth between the source and
 destination machines is higher than the bandwidth to disk (especially when the
@@ -1225,7 +1231,7 @@ transferring small, junk files.
 See the bf(--max-size) option for a description of SIZE.
 
 dit(bf(-B, --block-size=BLOCKSIZE)) This forces the block size used in
-the rsync algorithm to a fixed value.  It is normally selected based on
+rsync's delta-transfer algorithm to a fixed value.  It is normally selected based on
 the size of each file being updated.  See the technical report for details.
 
 dit(bf(-e, --rsh=COMMAND)) This option allows you to choose an alternative
@@ -1759,14 +1765,14 @@ For a list of the possible escape characters, see the "log format" setting
 in the rsyncd.conf manpage.
 
 dit(bf(--stats)) This tells rsync to print a verbose set of statistics
-on the file transfer, allowing you to tell how effective the rsync
+on the file transfer, allowing you to tell how effective rsync's delta-transfer
 algorithm is for your data.
 
 The current statistics are as follows: quote(itemization(
   it() bf(Number of files) is the count of all "files" (in the generic
   sense), which includes directories, symlinks, etc.
   it() bf(Number of files transferred) is the count of normal files that
-  were updated via the rsync algorithm, which does not include created
+  were updated via rsync's delta-transfer algorithm, which does not include created
   dirs, symlinks, etc.
   it() bf(Total file size) is the total sum of all file sizes in the transfer.
   This does not count any size for directories or special files, but does
@@ -1827,7 +1833,7 @@ after it has served its purpose.
 Note that if bf(--whole-file) is specified (or implied), any partial-dir
 file that is found for a file that is being updated will simply be removed
 (since
-rsync is sending files without using the delta transfer algorithm).
+rsync is sending files without using rsync's delta-transfer algorithm).
 
 Rsync will create the em(DIR) if it is missing (just the last dir -- not
 the whole path).  This makes it easy to use a relative path (such as
@@ -1945,7 +1951,7 @@ sender's file, which is being reconstructed at a rate of 110.64 kilobytes
 per second, and the transfer will finish in 4 seconds if the current rate
 is maintained until the end.
 
-These statistics can be misleading if the delta transfer algorithm is
+These statistics can be misleading if rsync's delta-transfer algorithm is
 in use.  For example, if the sender's file consists of the basis file
 followed by additional data, the reported rate will probably drop
 dramatically when the receiver gets to the literal data, and the transfer
