@@ -9,10 +9,15 @@ Changes since 3.0.2:
 
     - Fixed a crash bug in the hard-link code.
 
+    - Fixed the combination of --xattrs and --backup.
+
     - The generator no longer allows a '.' dir to be excluded by a daemon-
       exclude rule.
 
     - Fixed the conversion of spaces into dashes in the %M log escape.
+
+    - Fixed several places in the code that were not returning the right
+      errno when a function failed.
 
     - Moved the setting of the socket options prior to the connect().
 
@@ -28,6 +33,8 @@ Changes since 3.0.2:
 
     - The rsyncd.conf manpage now consistently refers to the parameters in
       the daemon config file as "parameters".
+
+    - The description of the --inplace option was improved.
 
   DEVELOPER RELATED:
 
