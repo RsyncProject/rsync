@@ -180,10 +180,19 @@ int make_bak_dir(const char *fullpath)
 /* robustly move a file, creating new directory structures if necessary */
 static int robust_move(const char *src, char *dst)
 {
-	if (robust_rename(src, dst, NULL, 0755) < 0
-	 && (errno != ENOENT || make_bak_dir(dst) < 0
-	  || robust_rename(src, dst, NULL, 0755) < 0))
-		return -1;
+	if (robust_rename(src, dst, NULL, 0755) < 0) {
+		int save_errno = errno ? errno : EINVAL; /* 0 paranoia */
+		if (errno == ENOENT && make_bak_dir(dst) == 0) {
+			if (robust_rename(src, dst, NULL, 0755) < 0)
+				save_errno = errno ? errno : save_errno;
+			else
+				save_errno = 0;
+		}
+		if (save_errno) {
+			errno = save_errno;
+			return -1;
+		}
+	}
 	return 0;
 }
 
@@ -237,11 +246,18 @@ static int keep_backup(const char *fname)
 		uint32 *devp = F_RDEV_P(file);
 		dev_t rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
 		do_unlink(buf);
-		if (do_mknod(buf, file->mode, rdev) < 0
-		    && (errno != ENOENT || make_bak_dir(buf) < 0
-		     || do_mknod(buf, file->mode, rdev) < 0)) {
-			rsyserr(FERROR, errno, "mknod %s failed",
-				full_fname(buf));
+		if (do_mknod(buf, file->mode, rdev) < 0) {
+			int save_errno = errno ? errno : EINVAL; /* 0 paranoia */
+			if (errno == ENOENT && make_bak_dir(buf) == 0) {
+				if (do_mknod(buf, file->mode, rdev) < 0)
+					save_errno = errno ? errno : save_errno;
+				else
+					save_errno = 0;
+			}
+			if (save_errno) {
+				rsyserr(FERROR, save_errno, "mknod %s failed",
+					full_fname(buf));
+			}
 		} else if (verbose > 2) {
 			rprintf(FINFO, "make_backup: DEVICE %s successful.\n",
 				fname);
@@ -252,11 +268,18 @@ static int keep_backup(const char *fname)
 
 	if (!kept && S_ISDIR(file->mode)) {
 		/* make an empty directory */
-		if (do_mkdir(buf, file->mode) < 0
-		    && (errno != ENOENT || make_bak_dir(buf) < 0
-		     || do_mkdir(buf, file->mode) < 0)) {
-			rsyserr(FINFO, errno, "mkdir %s failed",
-				full_fname(buf));
+		if (do_mkdir(buf, file->mode) < 0) {
+			int save_errno = errno ? errno : EINVAL; /* 0 paranoia */
+			if (errno == ENOENT && make_bak_dir(buf) == 0) {
+				if (do_mkdir(buf, file->mode) < 0)
+					save_errno = errno ? errno : save_errno;
+				else
+					save_errno = 0;
+			}
+			if (save_errno) {
+				rsyserr(FINFO, save_errno, "mkdir %s failed",
+					full_fname(buf));
+			}
 		}
 
 		ret_code = do_rmdir(fname);
@@ -278,11 +301,18 @@ static int keep_backup(const char *fname)
 			kept = 1;
 		} else {
 			do_unlink(buf);
-			if (do_symlink(sl, buf) < 0
-			    && (errno != ENOENT || make_bak_dir(buf) < 0
-			     || do_symlink(sl, buf) < 0)) {
-				rsyserr(FERROR, errno, "link %s -> \"%s\"",
-					full_fname(buf), sl);
+			if (do_symlink(sl, buf) < 0) {
+				int save_errno = errno ? errno : EINVAL; /* 0 paranoia */
+				if (errno == ENOENT && make_bak_dir(buf) == 0) {
+					if (do_symlink(sl, buf) < 0)
+						save_errno = errno ? errno : save_errno;
+					else
+						save_errno = 0;
+				}
+				if (save_errno) {
+					rsyserr(FERROR, save_errno, "link %s -> \"%s\"",
+						full_fname(buf), sl);
+				}
 			}
 			do_unlink(fname);
 			kept = 1;

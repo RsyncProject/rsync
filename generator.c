@@ -1868,15 +1868,21 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			close(fd);
 			goto cleanup;
 		}
-		if ((f_copy = do_open(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0
-		 && (errno != ENOENT || make_bak_dir(backupptr) < 0
-		  || (f_copy = do_open(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0)) {
-			rsyserr(FERROR_XFER, errno, "open %s",
-				full_fname(backupptr));
-			unmake_file(back_file);
-			back_file = NULL;
-			close(fd);
-			goto cleanup;
+		if ((f_copy = do_open(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0) {
+			int save_errno = errno ? errno : EINVAL; /* 0 paranoia */
+			if (errno == ENOENT && make_bak_dir(backupptr) == 0) {
+				if ((f_copy = do_open(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0)
+					save_errno = errno ? errno : save_errno;
+				else
+					save_errno = 0;
+			}
+			if (save_errno) {
+				rsyserr(FERROR_XFER, save_errno, "open %s", full_fname(backupptr));
+				unmake_file(back_file);
+				back_file = NULL;
+				close(fd);
+				goto cleanup;
+			}
 		}
 		fnamecmp_type = FNAMECMP_BACKUP;
 	}
