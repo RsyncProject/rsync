@@ -29,6 +29,7 @@ extern int module_id;
 extern int modify_window;
 extern int relative_paths;
 extern int human_readable;
+extern int preserve_xattrs;
 extern char *module_dir;
 extern unsigned int module_dirlen;
 extern mode_t orig_umask;
@@ -264,6 +265,8 @@ static int safe_read(int desc, char *ptr, size_t len)
 
 /* Copy a file.  If ofd < 0, copy_file unlinks and opens the "dest" file.
  * Otherwise, it just writes to and closes the provided file descriptor.
+ * In either case, if --xattrs are being preserved, the dest file will
+ * have its xattrs set from the source file.
  *
  * This is used in conjunction with the --temp-dir, --backup, and
  * --copy-dest options. */
@@ -338,6 +341,11 @@ int copy_file(const char *source, const char *dest, int ofd,
 		errno = save_errno;
 		return -1;
 	}
+
+#ifdef SUPPORT_XATTRS
+	if (preserve_xattrs)
+		copy_xattrs(source, dest);
+#endif
 
 	return 0;
 }

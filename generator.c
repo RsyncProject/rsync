@@ -1944,9 +1944,16 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
   cleanup:
 	if (back_file) {
+		int save_preserve_xattrs = preserve_xattrs;
 		if (f_copy >= 0)
 			close(f_copy);
+#ifdef SUPPORT_XATTRS
+		if (preserve_xattrs)
+			copy_xattrs(fname, backupptr);
+#endif
+		preserve_xattrs = 0;
 		set_file_attrs(backupptr, back_file, NULL, NULL, 0);
+		preserve_xattrs = save_preserve_xattrs;
 		if (verbose > 1) {
 			rprintf(FINFO, "backed up %s to %s\n",
 				fname, backupptr);

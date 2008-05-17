@@ -204,6 +204,7 @@ static int keep_backup(const char *fname)
 	stat_x sx;
 	struct file_struct *file;
 	char *buf;
+	int save_preserve_xattrs = preserve_xattrs;
 	int kept = 0;
 	int ret_code;
 
@@ -338,7 +339,9 @@ static int keep_backup(const char *fname)
 			robust_unlink(fname); /* Just in case... */
 		}
 	}
+	preserve_xattrs = 0;
 	set_file_attrs(buf, file, NULL, fname, 0);
+	preserve_xattrs = save_preserve_xattrs;
 	unmake_file(file);
 
 	if (verbose > 1) {
