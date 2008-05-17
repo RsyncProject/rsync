@@ -245,10 +245,11 @@ static int keep_backup(const char *fname)
 	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
 	 || (preserve_specials && IS_SPECIAL(file->mode))) {
 		uint32 *devp = F_RDEV_P(file);
+		int save_errno;
 		dev_t rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
 		do_unlink(buf);
 		if (do_mknod(buf, file->mode, rdev) < 0) {
-			int save_errno = errno ? errno : EINVAL; /* 0 paranoia */
+			save_errno = errno ? errno : EINVAL; /* 0 paranoia */
 			if (errno == ENOENT && make_bak_dir(buf) == 0) {
 				if (do_mknod(buf, file->mode, rdev) < 0)
 					save_errno = errno ? errno : save_errno;
@@ -259,7 +260,9 @@ static int keep_backup(const char *fname)
 				rsyserr(FERROR, save_errno, "mknod %s failed",
 					full_fname(buf));
 			}
-		} else if (verbose > 2) {
+		} else
+			save_errno = 0;
+		if (verbose > 2 && save_errno == 0) {
 			rprintf(FINFO, "make_backup: DEVICE %s successful.\n",
 				fname);
 		}
