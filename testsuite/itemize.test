@@ -28,8 +28,7 @@ ln "$fromdir/foo/config1" "$fromdir/foo/extra"
 rm -f "$to2dir"
 
 # Check if rsync is set to hard-link symlinks.
-confile=`echo "$scratchdir" | sed 's;/testtmp/itemize$;/config.h;'`
-if egrep '^#define CAN_HARDLINK_SYMLINK 1' "$confile" >/dev/null; then
+if egrep '^#define CAN_HARDLINK_SYMLINK 1' config.h >/dev/null; then
     L=hL
 else
     L=cL

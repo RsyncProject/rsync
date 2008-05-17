@@ -11,7 +11,7 @@
 
 . "$suitedir/rsync.fns"
 
-SSH=support/lsh
+SSH="$scratchdir/src/support/lsh"
 
 outfile="$scratchdir/rsync.out"
 
