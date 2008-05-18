@@ -238,7 +238,10 @@ prep_scratch() {
     # Get rid of default ACLs and dir-setgid to avoid confusing some tests.
     $setfacl_nodef "$scratchdir" || true
     chmod g-s "$scratchdir"
-    ln -s "$srcdir" "$scratchdir/src"
+    case "$srcdir" in
+    /*) ln -s "$srcdir" "$scratchdir/src" ;;
+    *)  ln -s "$TOOLDIR/$srcdir" "$scratchdir/src" ;;
+    esac
     return 0
 }
 
