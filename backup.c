@@ -244,14 +244,12 @@ static int keep_backup(const char *fname)
 	/* Check to see if this is a device file, or link */
 	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
 	 || (preserve_specials && IS_SPECIAL(file->mode))) {
-		uint32 *devp = F_RDEV_P(file);
 		int save_errno;
-		dev_t rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
 		do_unlink(buf);
-		if (do_mknod(buf, file->mode, rdev) < 0) {
+		if (do_mknod(buf, file->mode, sx.st.st_rdev) < 0) {
 			save_errno = errno ? errno : EINVAL; /* 0 paranoia */
 			if (errno == ENOENT && make_bak_dir(buf) == 0) {
-				if (do_mknod(buf, file->mode, rdev) < 0)
+				if (do_mknod(buf, file->mode, sx.st.st_rdev) < 0)
 					save_errno = errno ? errno : save_errno;
 				else
 					save_errno = 0;
