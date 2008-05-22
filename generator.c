@@ -922,6 +922,7 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 {
 	char buf[MAXPATHLEN];
 	const char *copy_to, *partialptr;
+	int save_preserve_xattrs = preserve_xattrs;
 	int ok, fd_w;
 
 	if (inplace) {
@@ -946,7 +947,9 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 		return -1;
 	}
 	partialptr = partial_dir ? partial_dir_fname(dest) : NULL;
+	preserve_xattrs = 0; /* xattrs were copied with file */
 	ok = finish_transfer(dest, copy_to, src, partialptr, file, 1, 0);
+	preserve_xattrs = save_preserve_xattrs;
 	cleanup_disable();
 	return ok ? 0 : -1;
 }
@@ -1948,10 +1951,11 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		if (f_copy >= 0)
 			close(f_copy);
 #ifdef SUPPORT_XATTRS
-		if (preserve_xattrs)
+		if (preserve_xattrs) {
 			copy_xattrs(fname, backupptr);
+			preserve_xattrs = 0;
+		}
 #endif
-		preserve_xattrs = 0;
 		set_file_attrs(backupptr, back_file, NULL, NULL, 0);
 		preserve_xattrs = save_preserve_xattrs;
 		if (verbose > 1) {

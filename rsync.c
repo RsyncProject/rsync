@@ -564,7 +564,8 @@ int finish_transfer(const char *fname, const char *fnametmp,
 	if (make_backups > 0 && overwriting_basis) {
 		if (!make_backup(fname))
 			return 1;
-		fnamecmp = get_backup_name(fname);
+		if (fnamecmp == fname)
+			fnamecmp = get_backup_name(fname);
 	}
 
 	/* Change permissions before putting the file into place. */
