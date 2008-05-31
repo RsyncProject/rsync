@@ -19,14 +19,22 @@
 # checking the log file
 # password authentication
 
-# TODO: Put the common framework in a common file, so that we can have
-# subtests fail and keep going.
-
 . "$suitedir/rsync.fns"
 
+chkfile="$scratchdir/rsync.chk"
+outfile="$scratchdir/rsync.out"
+
 SSH="src/support/lsh --no-cd"
+DIR_REPL='s/^\(d[^ ]*\)  *[0-9][0-9]* /\1         DIR /'
+LS_REPL='s;[0-9][0-9][0-9][0-9]/[0-9][0-9]/[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9];####/##/## ##:##:##;'
 
 build_rsyncd_conf
+
+makepath "$fromdir/foo" "$fromdir/bar/baz"
+makepath "$todir"
+echo one >"$fromdir/foo/one"
+echo two >"$fromdir/bar/two"
+echo three >"$fromdir/bar/baz/three"
 
 cd "$scratchdir"
 
@@ -46,4 +54,36 @@ $RSYNC -ve "$SSH" --rsync-path="$RSYNC$confopt" localhost::
 RSYNC_CONNECT_PROG="$RSYNC --config=$conf --daemon"
 export RSYNC_CONNECT_PROG
 
-$RSYNC -v localhost::
+$RSYNC -v localhost:: \
+    | tee "$outfile"
+# These have a space-padded 15-char name, then a tab, then a comment.
+sed 's/NOCOMMENT//' <<EOT >"$chkfile"
+test-from      	r/o
+test-to        	r/w
+test-scratch   	NOCOMMENT
+EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 1 failed"
+
+$RSYNC -r localhost::test-hidden \
+    | sed "$DIR_REPL" | sed "$LS_REPL" \
+    | tee "$outfile"
+cat <<EOT >"$chkfile"
+drwxr-xr-x         DIR ####/##/## ##:##:## .
+drwxr-xr-x         DIR ####/##/## ##:##:## bar
+-rw-r--r--           4 ####/##/## ##:##:## bar/two
+drwxr-xr-x         DIR ####/##/## ##:##:## bar/baz
+-rw-r--r--           6 ####/##/## ##:##:## bar/baz/three
+drwxr-xr-x         DIR ####/##/## ##:##:## foo
+-rw-r--r--           4 ####/##/## ##:##:## foo/one
+EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 2 failed"
+
+$RSYNC -r localhost::test-from/f* \
+    | sed "$DIR_REPL" | sed "$LS_REPL" \
+    | tee "$outfile"
+cat <<EOT >"$chkfile"
+drwxr-xr-x         DIR ####/##/## ##:##:## foo
+-rw-r--r--           4 ####/##/## ##:##:## foo/one
+EOT
+diff $diffopt "$chkfile" "$outfile" || test_fail "test 3 failed"
+

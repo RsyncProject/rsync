@@ -244,7 +244,7 @@ hosts allow = localhost 127.0.0.0/24 192.168.0.0/16 10.0.0.0/8 $hostname
 log file = $logfile
 log format = %i %h [%a] %m (%u) %l %f%L
 transfer logging = yes
-exclude = foobar.baz
+exclude = ? foobar.baz
 max verbosity = 9
 uid = 0
 gid = 0
@@ -252,14 +252,20 @@ gid = 0
 [test-from]
 	path = $fromdir
 	read only = yes
+	comment = r/o
 
 [test-to]
 	path = $todir
 	read only = no
+	comment = r/w
 
 [test-scratch]
 	path = $scratchdir
 	read only = no
+
+[test-hidden]
+	path = $fromdir
+	list = no
 EOF
 
     # Build a helper script to ignore exit code 23
