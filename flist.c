@@ -2041,7 +2041,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		}
 
 		if (inc_recurse && relative_paths && *fbuf) {
-			if ((p = strchr(fbuf+1, '/')) != NULL) {
+			if ((p = strchr(fbuf+1, '/')) != NULL
+			 && !is_excluded(fbuf, S_ISDIR(st.st_mode) != 0, ALL_FILTERS)) {
 				if (p - fbuf == 1 && *fbuf == '.') {
 					if ((fn = strchr(p+1, '/')) != NULL)
 						p = fn;
@@ -2051,7 +2052,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				if (fn == p)
 					continue;
 			}
-		} else if (implied_dirs && (p=strrchr(fbuf,'/')) && p != fbuf) {
+		} else if (implied_dirs && (p=strrchr(fbuf,'/')) && p != fbuf
+		    && !is_excluded(fbuf, S_ISDIR(st.st_mode) != 0, ALL_FILTERS)) {
 			/* Send the implied directories at the start of the
 			 * source spec, so we get their permissions right. */
 			send_implied_dirs(f, flist, fbuf, fbuf, p, flags, 0);

@@ -33,6 +33,9 @@ Changes since 3.0.2:
       (i.e. several hundred TB), warn the user and avoid sending an invalid
       checksum struct over the wire.
 
+    - If an source arg is excluded, --relative no longer adds the excluded
+      arg's implied dirs to the transfer.
+
     - Use the overflow_exit() function for overflows, not out_of_memory().
 
   ENHANCEMENTS:
