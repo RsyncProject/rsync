@@ -1023,7 +1023,6 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	const char *basename;
 	alloc_pool_t *pool;
 	STRUCT_STAT st;
-	int excl_ret;
 	char *bp;
 
 	if (strlcpy(thisname, fname, sizeof thisname) >= sizeof thisname) {
@@ -1078,7 +1077,6 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		return NULL;
 	}
 
-	/* backup.c calls us with filter_level set to NO_FILTERS. */
 	if (filter_level == NO_FILTERS)
 		goto skip_filters;
 
@@ -1106,17 +1104,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	} else
 		flags &= ~FLAG_CONTENT_DIR;
 
-	if (S_ISDIR(st.st_mode)) {
-		if (flags & FLAG_DOTDIR_NAME) {
-			/* A "." fname (or "/." fname in relative mode) is
-			 * never excluded.  No other trailing-dotdir names
-			 * are possible. */
-			excl_ret = 0;
-		} else
-			excl_ret = is_excluded(thisname, 1, filter_level);
-	} else
-		excl_ret = is_excluded(thisname, 0, filter_level);
-	if (excl_ret) {
+	if (is_excluded(thisname, S_ISDIR(st.st_mode) != 0, filter_level)) {
 		if (ignore_perishable)
 			non_perishable_cnt++;
 		return NULL;
@@ -1853,7 +1841,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	int64 start_write;
 	int use_ff_fd = 0;
 	int disable_buffering;
-	int arg_flags, flags = recurse ? FLAG_CONTENT_DIR : 0;
+	int flags = recurse ? FLAG_CONTENT_DIR : 0;
 	int reading_remotely = filesfrom_host != NULL;
 	int rl_flags = (reading_remotely ? 0 : RL_DUMP_COMMENTS)
 #ifdef ICONV_OPTION
@@ -2035,14 +2023,18 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			continue;
 		}
 
+		/* A dot-dir should not be excluded! */
+		if (name_type != DOTDIR_NAME
+		 && is_excluded(fbuf, S_ISDIR(st.st_mode) != 0, ALL_FILTERS))
+			continue;
+
 		if (S_ISDIR(st.st_mode) && !xfer_dirs) {
 			rprintf(FINFO, "skipping directory %s\n", fbuf);
 			continue;
 		}
 
 		if (inc_recurse && relative_paths && *fbuf) {
-			if ((p = strchr(fbuf+1, '/')) != NULL
-			 && !is_excluded(fbuf, S_ISDIR(st.st_mode) != 0, ALL_FILTERS)) {
+			if ((p = strchr(fbuf+1, '/')) != NULL) {
 				if (p - fbuf == 1 && *fbuf == '.') {
 					if ((fn = strchr(p+1, '/')) != NULL)
 						p = fn;
@@ -2052,8 +2044,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				if (fn == p)
 					continue;
 			}
-		} else if (implied_dirs && (p=strrchr(fbuf,'/')) && p != fbuf
-		    && !is_excluded(fbuf, S_ISDIR(st.st_mode) != 0, ALL_FILTERS)) {
+		} else if (implied_dirs && (p=strrchr(fbuf,'/')) && p != fbuf) {
 			/* Send the implied directories at the start of the
 			 * source spec, so we get their permissions right. */
 			send_implied_dirs(f, flist, fbuf, fbuf, p, flags, 0);
@@ -2062,13 +2053,11 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (one_file_system)
 			filesystem_dev = st.st_dev;
 
-		arg_flags = name_type == DOTDIR_NAME ? FLAG_DOTDIR_NAME : 0;
-
 		if (recurse || (xfer_dirs && name_type != NORMAL_NAME)) {
 			struct file_struct *file;
-			arg_flags |= FLAG_TOP_DIR | FLAG_CONTENT_DIR;
 			file = send_file_name(f, flist, fbuf, &st,
-					      arg_flags | flags, ALL_FILTERS);
+					      FLAG_TOP_DIR | FLAG_CONTENT_DIR | flags,
+					      NO_FILTERS);
 			if (!file)
 				continue;
 			if (inc_recurse) {
@@ -2082,7 +2071,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			} else
 				send_if_directory(f, flist, file, fbuf, len, flags);
 		} else
-			send_file_name(f, flist, fbuf, &st, arg_flags | flags, ALL_FILTERS);
+			send_file_name(f, flist, fbuf, &st, flags, NO_FILTERS);
 	}
 
 	gettimeofday(&end_tv, NULL);
