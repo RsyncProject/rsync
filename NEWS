@@ -19,6 +19,8 @@ Changes since 3.0.2:
     - Fixed several places in the code that were not returning the right
       errno when a function failed.
 
+    - Fixed the backing up of a device or special file into a backup dir.
+
     - Moved the setting of the socket options prior to the connect().
 
     - If rsync exits in the middle of a --progress output, it now outputs a
@@ -26,6 +28,10 @@ Changes since 3.0.2:
 
     - Fixed a problem with how a destination path with a trailing slash was
       compared against the daemon excludes.
+
+    - If a file's length is so huge that we overflow a checksum buffer count
+      (i.e. several hundred TB), warn the user and avoid sending an invalid
+      checksum struct over the wire.
 
     - Use the overflow_exit() function for overflows, not out_of_memory().
 

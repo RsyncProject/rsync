@@ -753,6 +753,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 {
 	int32 blength;
 	int s2length;
+	int64 l;
 
 	if (block_size)
 		blength = block_size;
@@ -760,7 +761,6 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 		blength = BLOCK_SIZE;
 	else {
 		int32 c;
-		int64 l;
 		int cnt;
 		for (c = 1, l = len, cnt = 0; l >>= 2; c <<= 1, cnt++) {}
 		if (cnt >= 31 || c >= MAX_BLOCK_SIZE)
@@ -783,7 +783,6 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 		s2length = SUM_LENGTH;
 	} else {
 		int32 c;
-		int64 l;
 		int b = BLOCKSUM_BIAS;
 		for (l = len; l >>= 1; b += 2) {}
 		for (c = blength; (c >>= 1) && b; b--) {}
@@ -797,7 +796,10 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 	sum->blength	= blength;
 	sum->s2length	= s2length;
 	sum->remainder	= (int32)(len % blength);
-	sum->count	= (int32)(len / blength) + (sum->remainder != 0);
+	sum->count	= (int32)(l = (len / blength) + (sum->remainder != 0));
+
+	if ((int64)sum->count != l)
+		sum->count = -1;
 
 	if (sum->count && verbose > 2) {
 		rprintf(FINFO,
@@ -813,7 +815,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
  *
  * Generate approximately one checksum every block_len bytes.
  */
-static void generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
+static int generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 {
 	int32 i;
 	struct map_struct *mapbuf;
@@ -821,10 +823,12 @@ static void generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 	OFF_T offset = 0;
 
 	sum_sizes_sqroot(&sum, len);
+	if (sum.count < 0)
+		return -1;
 	write_sum_head(f_out, &sum);
 
 	if (append_mode > 0 && f_copy < 0)
-		return;
+		return 0;
 
 	if (len > 0)
 		mapbuf = map_file(fd, len, MAX_MAP_SIZE, sum.blength);
@@ -861,6 +865,8 @@ static void generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 
 	if (mapbuf)
 		unmap_file(mapbuf);
+
+	return 0;
 }
 
 
@@ -1938,10 +1944,15 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (read_batch)
 		goto cleanup;
 
-	if (statret != 0 || whole_file)
+	if (statret != 0 || whole_file || sx.st.st_size <= 0)
 		write_sum_head(f_out, NULL);
 	else {
-		generate_and_send_sums(fd, sx.st.st_size, f_out, f_copy);
+		if (generate_and_send_sums(fd, sx.st.st_size, f_out, f_copy) < 0) {
+			rprintf(FWARNING,
+			    "WARNING: file is too large for checksum sending: %s\n",
+			    fnamecmp);
+			write_sum_head(f_out, NULL);
+		}
 		close(fd);
 	}
 
