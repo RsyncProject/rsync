@@ -509,12 +509,13 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 
 	if (daemon_filter_list.head) {
 		char *slash = strrchr(dest_path, '/');
-		if (slash && slash[1] == '\0')
+		if (slash && (slash[1] == '\0' || (slash[1] == '.' && slash[2] == '\0')))
 			*slash = '\0';
 		else
 			slash = NULL;
-		if (check_filter(&daemon_filter_list, FLOG, dest_path, 0) < 0
-		 || check_filter(&daemon_filter_list, FLOG, dest_path, 1) < 0) {
+		if ((*dest_path != '.' || dest_path[1] != '\0')
+		 && (check_filter(&daemon_filter_list, FLOG, dest_path, 0) < 0
+		  || check_filter(&daemon_filter_list, FLOG, dest_path, 1) < 0)) {
 			rprintf(FERROR, "skipping daemon-excluded destination \"%s\"\n",
 				dest_path);
 			exit_cleanup(RERR_FILESELECT);
