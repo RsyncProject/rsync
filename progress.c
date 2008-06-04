@@ -111,13 +111,13 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 			stats.num_transferred_files,
 			stats.num_files - current_file_index - 1,
 			stats.num_files);
-		progress_is_active = 0;
-	} else {
+	} else
 		strlcpy(eol, "\r", sizeof eol);
-		progress_is_active = 1;
-	}
+	progress_is_active = 0;
 	rprintf(FCLIENT, "%12s %3d%% %7.2f%s %s%s",
 		human_num(ofs), pct, rate, units, rembuf, eol);
+	if (!is_last)
+		progress_is_active = 1;
 }
 
 void set_current_file_index(struct file_struct *file, int ndx)

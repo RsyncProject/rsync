@@ -37,6 +37,7 @@ extern int protocol_version;
 extern int preserve_times;
 extern int uid_ndx;
 extern int gid_ndx;
+extern int progress_is_active;
 extern int stdout_format_has_i;
 extern int stdout_format_has_o_or_i;
 extern int logfile_format_has_i;
@@ -318,6 +319,11 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		break;
 	default:
 		exit_cleanup(RERR_MESSAGEIO);
+	}
+
+	if (progress_is_active && !am_server) {
+		fputc('\n', f);
+		progress_is_active = 0;
 	}
 
 	trailing_CR_or_NL = len && (buf[len-1] == '\n' || buf[len-1] == '\r')

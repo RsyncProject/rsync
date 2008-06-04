@@ -27,7 +27,6 @@ extern int am_daemon;
 extern int io_error;
 extern int keep_partial;
 extern int got_xfer_error;
-extern int progress_is_active;
 extern char *partial_dir;
 extern char *logfile_name;
 
@@ -115,9 +114,6 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 #include "case_N.h" /* case 0: cleanup_step++; */
 
 		exit_code = unmodified_code = code;
-
-		if (progress_is_active && exit_code && !am_server)
-			rprintf(FINFO, "\n");
 
 		if (verbose > 3) {
 			rprintf(FINFO,
