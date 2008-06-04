@@ -104,7 +104,9 @@ void *hashtable_find(struct hashtable *tbl, int64 key, int allocate_if_missing)
 		a = b = c = 0xdeadbeef + (8 << 2);
 
 #define rot(x,k) (((x)<<(k)) ^ ((x)>>(32-(k))))
+#if SIZEOF_INT64 >= 8
 		b += (uint32)(key >> 32);
+#endif
 		a += (uint32)key;
 		c ^= b; c -= rot(b, 14);
 		a ^= c; a -= rot(c, 11);

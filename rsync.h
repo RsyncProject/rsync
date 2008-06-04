@@ -497,10 +497,12 @@ typedef unsigned int size_t;
 #if SIZEOF_OFF_T == 8 || !SIZEOF_OFF64_T || !defined HAVE_STRUCT_STAT64
 #define OFF_T off_t
 #define STRUCT_STAT struct stat
+#define SIZEOF_CAPITAL_OFF_T SIZEOF_OFF_T
 #else
 #define OFF_T off64_t
 #define STRUCT_STAT struct stat64
 #define USE_STAT64_FUNCS 1
+#define SIZEOF_CAPITAL_OFF_T SIZEOF_OFF64_T
 #endif
 
 /* CAVEAT: on some systems, int64 will really be a 32-bit integer IFF

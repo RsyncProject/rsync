@@ -638,7 +638,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	int alloc_len, basename_len, linkname_len;
 	int extra_len = file_extra_cnt * EXTRA_LEN;
 	int first_hlink_ndx = -1;
-	OFF_T file_length;
+	int64 file_length;
 	const char *basename;
 	struct file_struct *file;
 	alloc_pool_t *pool;
@@ -837,8 +837,14 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (always_checksum && S_ISREG(mode))
 		extra_len += SUM_EXTRA_CNT * EXTRA_LEN;
 
+#if SIZEOF_INT64 >= 8
 	if (file_length > 0xFFFFFFFFu && S_ISREG(mode))
 		extra_len += EXTRA_LEN;
+#endif
+	if (file_length < 0) {
+		rprintf(FERROR, "Offset underflow: file-length is negative\n");
+		exit_cleanup(RERR_UNSUPPORTED);
+	}
 
 	if (inc_recurse && S_ISDIR(mode)) {
 		if (one_file_system) {
@@ -871,10 +877,17 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 #endif
 	file->modtime = (time_t)modtime;
 	file->len32 = (uint32)file_length;
+#if SIZEOF_INT64 >= 8
 	if (file_length > 0xFFFFFFFFu && S_ISREG(mode)) {
+#if SIZEOF_CAPITAL_OFF_T < 8
+		rprintf(FERROR, "Offset overflow: attempted 64-bit file-length\n");
+		exit_cleanup(RERR_UNSUPPORTED);
+#else
 		file->flags |= FLAG_LENGTH64;
 		OPT_EXTRA(file, 0)->unum = (uint32)(file_length >> 32);
+#endif
 	}
+#endif
 	file->mode = mode;
 	if (preserve_uid)
 		F_OWNER(file) = uid;
@@ -1163,8 +1176,10 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	linkname_len = 0;
 #endif
 
+#if SIZEOF_CAPITAL_OFF_T >= 8
 	if (st.st_size > 0xFFFFFFFFu && S_ISREG(st.st_mode))
 		extra_len += EXTRA_LEN;
+#endif
 
 #if EXTRA_ROUNDING > 0
 	if (extra_len & (EXTRA_ROUNDING * EXTRA_LEN))
@@ -1209,10 +1224,12 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	file->flags = flags;
 	file->modtime = st.st_mtime;
 	file->len32 = (uint32)st.st_size;
+#if SIZEOF_CAPITAL_OFF_T >= 8
 	if (st.st_size > 0xFFFFFFFFu && S_ISREG(st.st_mode)) {
 		file->flags |= FLAG_LENGTH64;
 		OPT_EXTRA(file, 0)->unum = (uint32)(st.st_size >> 32);
 	}
+#endif
 	file->mode = st.st_mode;
 	if (uid_ndx) /* Check uid_ndx instead of preserve_uid for del support */
 		F_OWNER(file) = st.st_uid;
