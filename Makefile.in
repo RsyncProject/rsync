@@ -146,7 +146,7 @@ Makefile: Makefile.in config.status
 proto: proto.h-tstamp
 
 proto.h: proto.h-tstamp
-	@echo ' ' >/dev/null
+	@if test -f proto.h; then :; else cp -p $(srcdir)/proto.h .; fi
 
 proto.h-tstamp: $(srcdir)/*.c $(srcdir)/lib/compat.c
 	perl $(srcdir)/mkproto.pl $(srcdir)/*.c $(srcdir)/lib/compat.c
