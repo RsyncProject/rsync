@@ -2210,7 +2210,10 @@ void generate_files(int f_out, const char *local_name)
 
 		if (inc_recurse && cur_flist->parent_ndx >= 0) {
 			struct file_struct *fp = dir_flist->files[cur_flist->parent_ndx];
-			f_name(fp, fbuf);
+			if (solo_file)
+				strlcpy(fbuf, solo_file, sizeof fbuf);
+			else
+				f_name(fp, fbuf);
 			ndx = cur_flist->ndx_start - 1;
 			recv_generator(fbuf, fp, ndx, itemizing, code, f_out);
 			if (delete_during && dry_run < 2 && !list_only
