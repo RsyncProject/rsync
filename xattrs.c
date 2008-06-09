@@ -503,9 +503,11 @@ int xattr_diff(struct file_struct *file, stat_x *sxp, int find_all)
 	return !xattrs_equal;
 }
 
-/* When called by the generator with a NULL fname, this tells the sender
- * which abbreviated xattr values we need.  When called by the sender
- * (with a non-NULL fname), we send all the extra xattr data it needs. */
+/* When called by the generator (with a NULL fname), this tells the sender
+ * all the abbreviated xattr values we need.  When called by the sender
+ * (with a non-NULL fname), we send all the extra xattr data it needs.
+ * The generator may also call with f_out < 0 to just change all the
+ * XSTATE_ABBREV states into XSTATE_DONE. */
 void send_xattr_request(const char *fname, struct file_struct *file, int f_out)
 {
 	item_list *lst = rsync_xal_l.items;
@@ -524,6 +526,7 @@ void send_xattr_request(const char *fname, struct file_struct *file, int f_out)
 				rxa->datum[0] = XSTATE_DONE;
 			continue;
 		case XSTATE_TODO:
+			assert(f_out >= 0);
 			break;
 		default:
 			continue;
@@ -552,7 +555,8 @@ void send_xattr_request(const char *fname, struct file_struct *file, int f_out)
 		}
 	}
 
-	write_byte(f_out, 0); /* end the list */
+	if (f_out >= 0)
+		write_byte(f_out, 0); /* end the list */
 }
 
 /* When called by the sender, read the request from the generator and mark

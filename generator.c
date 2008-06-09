@@ -697,8 +697,11 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 			if (iflags & ITEM_XNAME_FOLLOWS)
 				write_vstring(sock_f_out, xname, strlen(xname));
 #ifdef SUPPORT_XATTRS
-			if (iflags & ITEM_REPORT_XATTR && !dry_run)
-				send_xattr_request(NULL, file, sock_f_out);
+			if (preserve_xattrs && !dry_run
+			 && iflags & (ITEM_REPORT_XATTR|ITEM_TRANSFER)) {
+				send_xattr_request(NULL, file,
+					iflags & ITEM_REPORT_XATTR ? sock_f_out : -1);
+			}
 #endif
 		} else if (ndx >= 0) {
 			enum logcode code = logfile_format_has_i ? FINFO : FCLIENT;
