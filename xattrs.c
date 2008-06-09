@@ -44,9 +44,9 @@ extern int checksum_seed;
 
 #define XATTR_ABBREV(x) ((size_t)((x).name - (x).datum) < (x).datum_len)
 
-#define XSTATE_ABBREV	0
-#define XSTATE_DONE	1
-#define XSTATE_TODO	2
+#define XSTATE_ABBREV	1
+#define XSTATE_DONE	2
+#define XSTATE_TODO	3
 
 #define USER_PREFIX "user."
 #define UPRE_LEN ((int)sizeof USER_PREFIX - 1)
@@ -590,8 +590,9 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 				who_am_i(), num, f_name(file, NULL));
 			exit_cleanup(RERR_STREAMIO);
 		}
-		if (rxa->datum_len <= MAX_FULL_DATUM || rxa->datum[0] != XSTATE_ABBREV) {
-			rprintf(FERROR, "[%s] internal abbrev error!\n", who_am_i());
+		if (!XATTR_ABBREV(*rxa) || rxa->datum[0] != XSTATE_ABBREV) {
+			rprintf(FERROR, "[%s] internal abbrev error on %s (%s, len=%d)!\n",
+				who_am_i(), f_name(file, NULL), rxa->name, rxa->datum_len);
 			exit_cleanup(RERR_STREAMIO);
 		}
 

@@ -128,7 +128,7 @@ cd "$fromdir"
 rm "$todir/file2"
 
 echo extra >file1
-rsync -aX file1 ../chk/
+rsync -aX . ../chk/
 
 checkit "$RSYNC -aiiX . ../to" "$chkdir" "$todir"
 
