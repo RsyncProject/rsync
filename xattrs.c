@@ -591,8 +591,8 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 			exit_cleanup(RERR_STREAMIO);
 		}
 		if (!XATTR_ABBREV(*rxa) || rxa->datum[0] != XSTATE_ABBREV) {
-			rprintf(FERROR, "[%s] internal abbrev error on %s (%s, len=%d)!\n",
-				who_am_i(), f_name(file, NULL), rxa->name, rxa->datum_len);
+			rprintf(FERROR, "[%s] internal abbrev error on %s (%s, len=%ld)!\n",
+				who_am_i(), f_name(file, NULL), rxa->name, (long)rxa->datum_len);
 			exit_cleanup(RERR_STREAMIO);
 		}
 
