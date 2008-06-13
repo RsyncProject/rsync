@@ -1444,6 +1444,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			if (j == -2) {
 				itemizing = 0;
 				code = FNONE;
+				statret = 1;
 			} else if (j >= 0)
 				statret = 1;
 		}
@@ -1466,6 +1467,10 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				goto cleanup;
 			}
 		}
+#ifdef SUPPORT_XATTRS
+		if (preserve_xattrs && statret == 1)
+			copy_xattrs(fnamecmpbuf, fname);
+#endif
 		if (set_file_attrs(fname, file, real_ret ? NULL : &real_sx, NULL, 0)
 		    && verbose && code != FNONE && f_out != -1)
 			rprintf(code, "%s/\n", fname);

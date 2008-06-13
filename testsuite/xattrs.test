@@ -64,6 +64,10 @@ xset user.foo foo file2
 xset user.bar bar file2
 xset user.long 'a long attribute for our new file that tests to ensure that this works' file2
 
+xset user.dir1 'need to test directory xattrs too' foo
+xset user.dir2 'another xattr' foo
+xset user.dir3 'this is one last one for the moment' foo
+
 xset user.foo 'new foo' foo/file3 foo/bar/file5
 xset user.bar 'new bar' foo/file3 foo/bar/file5
 xset user.long 'this is also a long attribute that will be truncated in the initial data send' foo/file3 foo/bar/file5
