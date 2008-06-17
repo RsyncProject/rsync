@@ -52,6 +52,29 @@ runtest() {
     fi
 }
 
+set_cp_destdir() {
+    while test $# -gt 1; do
+	shift
+    done
+    destdir="$1"
+}
+
+# Perform a "cp -p", making sure that timestamps are really the same,
+# even if the copy rounded microsecond times on the destination file.
+cp_touch() {
+    cp -p "${@}" || test_fail "cp -p failed"
+    if test $# -gt 2 -o -d "$2"; then
+	set_cp_destdir "${@}" # sets destdir var
+	while test $# -gt 1; do
+	    destname="$destdir/`basename $1`"
+	    touch -r "$destname" "$1" "$destname"
+	    shift
+	done
+    else
+	touch -r "$2" "$1" "$2"
+    fi
+}
+
 # Call this if you want to filter out verbose messages (-v or -vv) from
 # the output of an rsync run (whittling the output down to just the file
 # messages).  This isn't needed if you use -i without -v.

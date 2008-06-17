@@ -13,7 +13,7 @@ mkdir "$fromdir"
 mkdir "$todir"
 
 cp -p "$srcdir"/rsync.c "$fromdir"/rsync.c
-cp -p "$fromdir"/rsync.c "$todir"/rsync2.c
+cp_touch "$fromdir"/rsync.c "$todir"/rsync2.c
 sleep 1
 
 # Let's do it!

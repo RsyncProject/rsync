@@ -46,7 +46,7 @@ echo deeper >"$fromdir/foo/bar/file5"
 
 makepath "$chkdir/foo"
 echo wow >"$chkdir/file1"
-cp -p "$fromdir/foo/file3" "$chkdir/foo"
+cp_touch "$fromdir/foo/file3" "$chkdir/foo"
 
 files='foo file0 file1 file2 foo/file3 file4 foo/bar/file5'
 

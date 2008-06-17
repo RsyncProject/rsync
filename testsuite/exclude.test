@@ -153,13 +153,13 @@ checkit "$RSYNC -avvC --filter='merge $excl' --delete-excluded \
 
 rm "$chkdir"/foo/file1
 rm "$chkdir"/bar/down/to/bar/baz/*.deep
-cp -p "$fromdir"/bar/down/to/foo/*.junk "$chkdir"/bar/down/to/foo
-cp -p "$fromdir"/bar/down/to/foo/to "$chkdir"/bar/down/to/foo
+cp_touch "$fromdir"/bar/down/to/foo/*.junk "$chkdir"/bar/down/to/foo
+cp_touch "$fromdir"/bar/down/to/foo/to "$chkdir"/bar/down/to/foo
 
 $RSYNC -av --existing -f 'show .filt*' -f 'hide,! */' --del "$fromdir/" "$todir/"
 
 echo retained >"$todir"/bar/down/to/bar/baz/nodel.deep
-cp -p "$todir"/bar/down/to/bar/baz/nodel.deep "$chkdir"/bar/down/to/bar/baz
+cp_touch "$todir"/bar/down/to/bar/baz/nodel.deep "$chkdir"/bar/down/to/bar/baz
 
 $RSYNC -av --existing --filter='-! */' "$fromdir/" "$chkdir/"
 

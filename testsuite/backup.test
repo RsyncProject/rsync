@@ -36,7 +36,7 @@ for fn in deep/name1 deep/name2; do
 done
 
 echo deleted-file >"$todir/dname"
-cp -p "$todir/dname" "$chkdir"
+cp_touch "$todir/dname" "$chkdir"
 
 checkit "$RSYNC -avv --no-whole-file --delete-delay \
     --backup --backup-dir='$bakdir' '$fromdir/' '$todir/'" "$fromdir" "$todir" \

@@ -76,7 +76,8 @@ mknod "$fromdir/block2" b 42 73 || test_skipped "Can't create block device node"
 mknod "$fromdir/block3" b 105 73 || test_skipped "Can't create block device node"
 ln "$fromdir/block3" "$fromdir/block2.5" || echo "Skipping hard-linked device test..."
 mkfifo "$fromdir/fifo" || mknod "$fromdir/fifo" p || test_skipped "Can't run mkfifo"
-touch -r "$fromdir/block" "$fromdir/block2"
+# Work around time rounding/truncating issue by touching both files.
+touch -r "$fromdir/block" "$fromdir/block" "$fromdir/block2"
 
 $RSYNC -ai "$fromdir/block" "$todir/block2" \
     | tee "$outfile"
