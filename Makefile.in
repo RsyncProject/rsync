@@ -66,8 +66,8 @@ install: all
 	${INSTALLCMD} ${INSTALL_STRIP} -m 755 rsync$(EXEEXT) ${DESTDIR}${bindir}
 	-mkdir -p ${DESTDIR}${mandir}/man1
 	-mkdir -p ${DESTDIR}${mandir}/man5
-	if test -f $(srcdir)/rsync.1; then ${INSTALLMAN} -m 644 $(srcdir)/rsync.1 ${DESTDIR}${mandir}/man1; fi
-	if test -f $(srcdir)/rsyncd.conf.5; then ${INSTALLMAN} -m 644 $(srcdir)/rsyncd.conf.5 ${DESTDIR}${mandir}/man5; fi
+	if test -f rsync.1; then ${INSTALLMAN} -m 644 rsync.1 ${DESTDIR}${mandir}/man1; fi
+	if test -f rsyncd.conf.5; then ${INSTALLMAN} -m 644 rsyncd.conf.5 ${DESTDIR}${mandir}/man5; fi
 
 install-strip:
 	$(MAKE) INSTALL_STRIP='-s' install
@@ -152,6 +152,8 @@ proto.h-tstamp: $(srcdir)/*.c $(srcdir)/lib/compat.c
 	perl $(srcdir)/mkproto.pl $(srcdir)/*.c $(srcdir)/lib/compat.c
 
 man: rsync.1 rsyncd.conf.5
+	@if test -f rsync.1; then :; else cp -p $(srcdir)/rsync.1 .; fi
+	@if test -f rsyncd.conf.5; then :; else cp -p $(srcdir)/rsyncd.conf.5 .; fi
 
 rsync.1: rsync.yo
 	yodl2man -o rsync.1 $(srcdir)/rsync.yo
