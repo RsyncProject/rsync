@@ -129,6 +129,9 @@
 #define IO_BUFFER_SIZE (4092)
 #define MAX_BLOCK_SIZE ((int32)1 << 17)
 
+/* For compatibility with older rsyncs */
+#define OLD_MAX_BLOCK_SIZE ((int32)1 << 29)
+
 #define IOERR_GENERAL	(1<<0) /* For backward compatibility, this must == 1 */
 #define IOERR_VANISHED	(1<<1)
 #define IOERR_DEL_LIMIT (1<<2)

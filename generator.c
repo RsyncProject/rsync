@@ -763,11 +763,12 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 	else if (len <= BLOCK_SIZE * BLOCK_SIZE)
 		blength = BLOCK_SIZE;
 	else {
+		int32 max_blength = protocol_version < 30 ? OLD_MAX_BLOCK_SIZE : MAX_BLOCK_SIZE;
 		int32 c;
 		int cnt;
 		for (c = 1, l = len, cnt = 0; l >>= 2; c <<= 1, cnt++) {}
-		if (cnt >= 31 || c >= MAX_BLOCK_SIZE)
-			blength = MAX_BLOCK_SIZE;
+		if (c < 0 || c >= max_blength)
+			blength = max_blength;
 		else {
 		    blength = 0;
 		    do {

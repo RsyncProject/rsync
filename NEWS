@@ -39,11 +39,14 @@ Changes since 3.0.2:
     - Fixed a problem with how a destination path with a trailing slash or
       a trailing dot-dir was compared against the daemon excludes.
 
+    - Fixed the sending of large (size > 16GB) files when talking to an older
+      rsync (protocols < 30):  we now use a compatible block size limit.
+
     - If a file's length is so huge that we overflow a checksum buffer count
       (i.e. several hundred TB), warn the user and avoid sending an invalid
       checksum struct over the wire.
 
-    - If an source arg is excluded, --relative no longer adds the excluded
+    - If a source arg is excluded, --relative no longer adds the excluded
       arg's implied dirs to the transfer.  This fix also made the exclude
       check happen in the better place in the sending code.
 
