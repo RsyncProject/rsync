@@ -1022,7 +1022,12 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
  * and performing extensive checks against global options.
  *
  * Returns a pointer to the new file struct, or NULL if there was an error
- * or this file should be excluded. */
+ * or this file should be excluded.
+ *
+ * Note: Any error (here or in send_file_name) that results in the omission of
+ * an existent source file from the file list should set
+ * "io_error |= IOERR_GENERAL" to avoid deletion of the file from the
+ * destination if --delete is on. */
 struct file_struct *make_file(const char *fname, struct file_list *flist,
 			      STRUCT_STAT *stp, int flags, int filter_level)
 {
@@ -1039,6 +1044,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	char *bp;
 
 	if (strlcpy(thisname, fname, sizeof thisname) >= sizeof thisname) {
+		io_error |= IOERR_GENERAL;
 		rprintf(FINFO, "skipping overly long name: %s\n", fname);
 		return NULL;
 	}
@@ -1341,15 +1347,19 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 		if (preserve_acls && !S_ISLNK(file->mode)) {
 			sx.st.st_mode = file->mode;
 			sx.acc_acl = sx.def_acl = NULL;
-			if (get_acl(fname, &sx) < 0)
+			if (get_acl(fname, &sx) < 0) {
+				io_error |= IOERR_GENERAL;
 				return NULL;
+			}
 		}
 #endif
 #ifdef SUPPORT_XATTRS
 		if (preserve_xattrs) {
 			sx.xattr = NULL;
-			if (get_xattr(fname, &sx) < 0)
+			if (get_xattr(fname, &sx) < 0) {
+				io_error |= IOERR_GENERAL;
 				return NULL;
+			}
 		}
 #endif
 
