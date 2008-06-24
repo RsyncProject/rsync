@@ -1,20 +1,22 @@
 #!/bin/bash
-# deny-rsync [message]: send an rsync-protocol error message
+# Send an error message via the rsync-protocol to a non-daemon client rsync.
+#
+# Usage:  deny-rsync "message"
 
 protocol_version=29
 exit_code=4 # same as a daemon that refuses an option
 
-# byte_escape 29 ==> \035
+# e.g. byte_escape 29 => \035
 function byte_escape {
-    octbyte="000$(bc <<<"obase=8; $1")"
-    echo -n "\\${octbyte: -3}"
+    echo -ne "\\0$(printf "%o" $1)"
 }
 
 msg="$1"
-if [ "${#msg}" -gt 255 ]; then
-    # message is too long for this naive script to handle
-    msg="${msg:0:252}..."
+if [ "${#msg}" -gt 254 ]; then
+    # truncate a message that is too long for this naive script to handle
+    msg="${msg:0:251}..."
 fi
+msglen=$(( ${#msg} + 1 )) # add 1 for the newline we append below
 
 # send protocol version
 echo -ne "$(byte_escape $protocol_version)\\000\\000\\000"
@@ -22,10 +24,13 @@ echo -ne "$(byte_escape $protocol_version)\\000\\000\\000"
 # send checksum seed
 echo -ne "\\000\\000\\000\\000"
 
-# the following is equivalent to rwrite(FERROR, $msg)
+# the following is equivalent to rwrite(FERROR, "$msg\n")
 # message header: length 17; MPLEX_BASE + code FERROR
-echo -ne "$(byte_escape ${#msg})\\000\\000\\010"
+echo -ne "$(byte_escape $msglen)\\000\\000\\010"
 # data
-echo -n "$msg"
+echo -E "$msg"
+
+# make sure the client gets the message and not a write error
+sleep 1
 
 exit $exit_code
