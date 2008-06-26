@@ -1953,9 +1953,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if (read_batch)
 		goto cleanup;
 
-	if (statret != 0 || whole_file || sx.st.st_size <= 0)
+	if (statret != 0 || whole_file)
 		write_sum_head(f_out, NULL);
-	else {
+	else if (sx.st.st_size <= 0) {
+		write_sum_head(f_out, NULL);
+		close(fd);
+	} else {
 		if (generate_and_send_sums(fd, sx.st.st_size, f_out, f_copy) < 0) {
 			rprintf(FWARNING,
 			    "WARNING: file is too large for checksum sending: %s\n",
