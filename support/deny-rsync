@@ -18,19 +18,19 @@ if [ "${#msg}" -gt 254 ]; then
 fi
 msglen=$(( ${#msg} + 1 )) # add 1 for the newline we append below
 
-# send protocol version
+# Send protocol version.  All numbers are LSB-first 4-byte ints.
 echo -ne "$(byte_escape $protocol_version)\\000\\000\\000"
 
-# send checksum seed
+# Send a zero checksum seed.
 echo -ne "\\000\\000\\000\\000"
 
-# the following is equivalent to rwrite(FERROR, "$msg\n")
-# message header: length 17; MPLEX_BASE + code FERROR
+# The following is equivalent to rprintf(FERROR_XFER, "%s\n", $msg).
+# 1. Message header: ((MPLEX_BASE + FERROR_XFER) << 24) + $msglen.
 echo -ne "$(byte_escape $msglen)\\000\\000\\010"
-# data
+# 2. The actual data.
 echo -E "$msg"
 
-# make sure the client gets the message and not a write error
+# Make sure the client gets our message, not a write failure.
 sleep 1
 
 exit $exit_code

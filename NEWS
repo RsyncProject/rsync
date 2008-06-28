@@ -62,6 +62,12 @@ Changes since 3.0.2:
 
     - The description of the --inplace option was improved.
 
+  EXTRAS:
+
+    - Added a new script in the support directory, deny-rsync, which allows
+      an admin to (temporarily) replace the rsync command with a script that
+      sends an error message to the remote client via the rsync protocol.
+
   DEVELOPER RELATED:
 
     - Fixed a testcase failure if the tests are run as root and made some
