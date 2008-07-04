@@ -1117,7 +1117,7 @@ directories that are being synchronized.  You must have asked rsync to
 send the whole directory (e.g. "dir" or "dir/") without using a wildcard
 for the directory's contents (e.g. "dir/*") since the wildcard is expanded
 by the shell and rsync thus gets a request to transfer individual files, not
-the files' parent directory.  Files that are excluded from transfer are
+the files' parent directory.  Files that are excluded from the transfer are
 also excluded from being deleted unless you use the bf(--delete-excluded)
 option or mark the rules as only matching on the sending side (see the
 include/exclude modifiers in the FILTER RULES section).
@@ -1139,7 +1139,7 @@ destination.  You can override this with the bf(--ignore-errors) option.
 The bf(--delete) option may be combined with one of the --delete-WHEN options
 without conflict, as well as bf(--delete-excluded).  However, if none of the
 --delete-WHEN options are specified, rsync will choose the
-bf(--delete-during) algorithm when talking to an rsync 3.0.0 or newer, and
+bf(--delete-during) algorithm when talking to rsync 3.0.0 or newer, and
 the bf(--delete-before) algorithm when talking to an older rsync.  See also
 bf(--delete-delay) and bf(--delete-after).
 
@@ -1156,19 +1156,26 @@ algorithm that requires rsync to scan all the files in the transfer into
 memory at once (see bf(--recursive)).
 
 dit(bf(--delete-during, --del)) Request that the file-deletions on the
-receiving side be done incrementally as the transfer happens.  This is
-a faster method than choosing the before- or after-transfer algorithm,
-but it is only supported beginning with rsync version 2.6.4.
+receiving side be done incrementally as the transfer happens.  The
+per-directory delete scan is done right before each directory is checked
+for updates, so it behaves like a more efficient bf(--delete-before),
+including doing the deletions prior to any per-directory filter files
+being updated.  This option was first added in rsync version 2.6.4.
 See bf(--delete) (which is implied) for more details on file-deletion.
 
 dit(bf(--delete-delay)) Request that the file-deletions on the receiving
-side be computed during the transfer, and then removed after the transfer
-completes.  If the number of removed files overflows an internal buffer, a
+side be computed during the transfer (like bf(--delete-during)), and then
+removed after the transfer completes.  This is useful when combined with
+bf(--delay-updates) and/or bf(--fuzzy), and is more efficient than using
+bf(--delete-after) (but can behave differently, since bf(--delete-after)
+computes the deletions in a separate pass after all updates are done).
+If the number of removed files overflows an internal buffer, a
 temporary file will be created on the receiving side to hold the names (it
 is removed while open, so you shouldn't see it during the transfer).  If
 the creation of the temporary file fails, rsync will try to fall back to
 using bf(--delete-after) (which it cannot do if bf(--recursive) is doing an
 incremental scan).
+See bf(--delete) (which is implied) for more details on file-deletion.
 
 dit(bf(--delete-after)) Request that the file-deletions on the receiving
 side be done after the transfer has completed.  This is useful if you
