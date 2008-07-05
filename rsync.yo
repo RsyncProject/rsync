@@ -412,6 +412,7 @@ to the detailed description below for a complete description.  verb(
      --progress              show progress during transfer
  -P                          same as --partial --progress
  -i, --itemize-changes       output a change-summary for all updates
+ -M, --remote-option=OPTION  send OPTION to the remote side only
      --out-format=FORMAT     output updates using the specified FORMAT
      --log-file=FILE         log what we're doing to the specified FILE
      --log-file-format=FMT   log updates using the specified FMT
@@ -1026,16 +1027,16 @@ This is a good way to backup data without using a super-user, and to store
 ACLs from incompatible systems.
 
 The bf(--fake-super) option only affects the side where the option is used.
-To affect the remote side of a remote-shell connection, specify an rsync
-path:
+To affect the remote side of a remote-shell connection, use the
+bf(--remote-option) (bf(-M)) option:
 
-quote(tt(  rsync -av --rsync-path="rsync --fake-super" /src/ host:/dest/))
+quote(tt(  rsync -av -M--fake-super /src/ host:/dest/))
 
-Since there is only one "side" in a local copy, this option affects both
-the sending and receiving of files.  You'll need to specify a copy using
-"localhost" if you need to avoid this, possibly using the "lsh" shell
-script (from the support directory) as a substitute for an actual remote
-shell (see bf(--rsh)).
+For a local copy, this option affects both the source and the destination.
+If you wish a local copy to enable this option just for the destination
+files, specify bf(-M--fake-super).  If you wish a local copy to enable
+this option just for the source files, combine bf(--fake-super) with
+bf(-M--super).
 
 This option is overridden by both bf(--super) and bf(--no-super).
 
@@ -1287,6 +1288,36 @@ One tricky example is to set a different default directory on the remote
 machine for use with the bf(--relative) option.  For instance:
 
 quote(tt(    rsync -avR --rsync-path="cd /a/b && rsync" host:c/d /e/))
+
+dit(bf(-M, --remote-option=OPTION)) This option is used for more advanced
+situations where you want certain effects to be limited to one side of the
+transfer only.  For instance, if you want to pass bf(--log-file=FILE) and
+bf(--fake-super) to the remote system, specify it like this:
+
+quote(tt(    rsync -av -M --log-file=foo -M--fake-super src/ dest/))
+
+If you want to have an option affect only the local side of a transfer when
+it normally affects both sides, send its negation to the remote side.  Like
+this:
+
+quote(tt(    rsync -av -x -M--no-x src/ dest/))
+
+Be cautious using this, as it is possible to toggle an option that will cause
+rsync to have a different idea about what data to expect next over the socket,
+and that will make it fail in a cryptic fashion.
+
+Note that it is best to use a separate bf(--remote-option) for each option you
+want to pass.  This makes your useage compatible with the bf(--protect-args)
+option.  If that option is off, any spaces in your remote options will be split
+by the remote shell unless you take steps to protect them.
+
+When performing a local transfer, the "local" side is the sender and the
+"remote" side is the receiver.
+
+Note some versions of the popt option-parsing library have a bug in them that
+prevents you from using an adjacent arg with an equal in it next to a short
+option letter (e.g. tt(-M--log-file=/tmp/foo).  If this bug affects your
+version of popt, you can use the version of popt that is included with rsync.
 
 dit(bf(-C, --cvs-exclude)) This is a useful shorthand for excluding a
 broad range of files that you often don't want to transfer between
@@ -1759,7 +1790,7 @@ option if you wish to override this.
 Here's a example command that requests the remote side to log what is
 happening:
 
-verb(  rsync -av --rsync-path="rsync --log-file=/tmp/rlog" src/ dest/)
+verb(  rsync -av --remote-option=--log-file=/tmp/rlog src/ dest/)
 
 This is very useful if you need to debug why a connection is closing
 unexpectedly.

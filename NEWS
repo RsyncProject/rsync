@@ -9,7 +9,8 @@ Changes since 3.0.3:
 
   ENHANCEMENTS:
 
-    - ...
+    - Added the --remote-option=OPT (-M OPT) command-line option that is useful
+      for things like sending a remote --log-file=FILE or --fake-super option.
 
   DEVELOPER RELATED:
 

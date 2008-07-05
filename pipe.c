@@ -28,6 +28,8 @@ extern int blocking_io;
 extern int filesfrom_fd;
 extern mode_t orig_umask;
 extern char *logfile_name;
+extern int remote_option_cnt;
+extern const char **remote_options;
 extern struct chmod_mode_struct *chmod_modes;
 
 /**
@@ -137,6 +139,15 @@ pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 		if (logfile_name) {
 			logfile_name = NULL;
 			logfile_close();
+		}
+
+		if (remote_option_cnt) {
+			int rc = remote_option_cnt + 1;
+			const char **rv = remote_options;
+			if (!parse_arguments(&rc, &rv)) {
+				option_error();
+				exit_cleanup(RERR_SYNTAX);
+			}
 		}
 
 		if (dup2(to_child_pipe[0], STDIN_FILENO) < 0 ||

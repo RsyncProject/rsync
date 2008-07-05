@@ -174,6 +174,10 @@ int link_dest = 0;
 int basis_dir_cnt = 0;
 char *dest_option = NULL;
 
+static int remote_option_alloc = 0;
+int remote_option_cnt = 0;
+const char **remote_options = NULL;
+
 int verbose = 0;
 int quiet = 0;
 int output_motd = 1;
@@ -387,6 +391,7 @@ void usage(enum logcode F)
   rprintf(F,"     --timeout=SECONDS       set I/O timeout in seconds\n");
   rprintf(F,"     --contimeout=SECONDS    set daemon connection timeout in seconds\n");
   rprintf(F," -I, --ignore-times          don't skip files that match in size and mod-time\n");
+  rprintf(F," -M, --remote-option=OPTION  send OPTION to the remote side only\n");
   rprintf(F,"     --size-only             skip files that match in size\n");
   rprintf(F,"     --modify-window=NUM     compare mod-times with reduced accuracy\n");
   rprintf(F," -T, --temp-dir=DIR          create temporary files in directory DIR\n");
@@ -645,6 +650,7 @@ static struct poptOption long_options[] = {
   {"password-file",    0,  POPT_ARG_STRING, &password_file, 0, 0, 0 },
   {"blocking-io",      0,  POPT_ARG_VAL,    &blocking_io, 1, 0, 0 },
   {"no-blocking-io",   0,  POPT_ARG_VAL,    &blocking_io, 0, 0, 0 },
+  {"remote-option",   'M', POPT_ARG_STRING, 0, 'M', 0, 0 },
   {"protocol",         0,  POPT_ARG_INT,    &protocol_version, 0, 0, 0 },
   {"checksum-seed",    0,  POPT_ARG_INT,    &checksum_seed, 0, 0, 0 },
   {"server",           0,  POPT_ARG_NONE,   0, OPT_SERVER, 0, 0 },
@@ -1138,6 +1144,26 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				create_refuse_error(refused_compress);
 				return 0;
 			}
+			break;
+
+		case 'M':
+			arg = poptGetOptArg(pc);
+			if (*arg != '-') {
+				snprintf(err_buf, sizeof err_buf,
+					"Remote option must start with a dash: %s\n", arg);
+				return 0;
+			}
+			if (remote_option_cnt+2 >= remote_option_alloc) {
+				remote_option_alloc += 16;
+				remote_options = realloc_array(remote_options,
+							const char *, remote_option_alloc);
+				if (!remote_options)
+					out_of_memory("parse_arguments");
+				if (!remote_option_cnt)
+					remote_options[0] = "ARG0";
+			}
+			remote_options[++remote_option_cnt] = arg;
+			remote_options[remote_option_cnt+1] = NULL;
 			break;
 
 		case OPT_WRITE_BATCH:
@@ -1830,6 +1856,11 @@ void server_options(char **args, int *argc_p)
 #endif
 	argstr[x] = '\0';
 
+	if (x > (int)sizeof argstr) { /* Not possible... */
+		rprintf(FERROR, "argstr overflow in server_options().\n");
+		exit_cleanup(RERR_MALLOC);
+	}
+
 	args[ac++] = argstr;
 
 #ifdef ICONV_OPTION
@@ -2051,6 +2082,21 @@ void server_options(char **args, int *argc_p)
 		args[ac++] = "--remove-source-files";
 	else if (remove_source_files)
 		args[ac++] = "--remove-sent-files";
+
+	if (ac > MAX_SERVER_ARGS) { /* Not possible... */
+		rprintf(FERROR, "argc overflow in server_options().\n");
+		exit_cleanup(RERR_MALLOC);
+	}
+
+	if (remote_option_cnt) {
+		int j;
+		if (ac + remote_option_cnt > MAX_SERVER_ARGS) {
+			rprintf(FERROR, "too many remote options specified.\n");
+			exit_cleanup(RERR_SYNTAX);
+		}
+		for (j = 1; j <= remote_option_cnt; j++)
+			args[ac++] = (char*)remote_options[j];
+	}
 
 	*argc_p = ac;
 	return;
