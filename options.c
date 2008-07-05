@@ -1532,8 +1532,12 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		log_before_transfer = !am_server;
 	}
 
-	if (do_progress && !verbose && !log_before_transfer && !am_server)
-		verbose = 1;
+	if (do_progress) {
+		if (am_server)
+			do_progress = 0;
+		else if (!verbose && !log_before_transfer && !am_server)
+			verbose = 1;
+	}
 
 	if (dry_run)
 		do_xfers = 0;

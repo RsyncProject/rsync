@@ -71,6 +71,11 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 	double rate, remain;
 
 	if (is_last) {
+		snprintf(eol, sizeof eol,
+			" (xfer#%d, to-check=%d/%d)\n",
+			stats.num_transferred_files,
+			stats.num_files - current_file_index - 1,
+			stats.num_files);
 		/* Compute stats based on the starting info. */
 		if (!ph_start.time.tv_sec
 		    || !(diff = msdiff(&ph_start.time, now)))
@@ -79,6 +84,7 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 		/* Switch to total time taken for our last update. */
 		remain = (double) diff / 1000.0;
 	} else {
+		strlcpy(eol, "  ", sizeof eol);
 		/* Compute stats based on recent progress. */
 		if (!(diff = msdiff(&ph_list[oldest_hpos].time, now)))
 			diff = 1;
@@ -106,18 +112,13 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 			 (int) remain % 60);
 	}
 
-	if (is_last) {
-		snprintf(eol, sizeof eol, " (xfer#%d, to-check=%d/%d)\n",
-			stats.num_transferred_files,
-			stats.num_files - current_file_index - 1,
-			stats.num_files);
-	} else
-		strlcpy(eol, "\r", sizeof eol);
 	progress_is_active = 0;
-	rprintf(FCLIENT, "%12s %3d%% %7.2f%s %s%s",
+	rprintf(FCLIENT, "\r%12s %3d%% %7.2f%s %s%s",
 		human_num(ofs), pct, rate, units, rembuf, eol);
-	if (!is_last)
+	if (!is_last) {
 		progress_is_active = 1;
+		fflush(stdout);
+	}
 }
 
 void set_current_file_index(struct file_struct *file, int ndx)

@@ -321,13 +321,19 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		exit_cleanup(RERR_MESSAGEIO);
 	}
 
-	if (progress_is_active && !am_server) {
+	if (progress_is_active) {
 		fputc('\n', f);
 		progress_is_active = 0;
 	}
 
 	trailing_CR_or_NL = len && (buf[len-1] == '\n' || buf[len-1] == '\r')
 			  ? buf[--len] : 0;
+
+	if (len && buf[0] == '\r') {
+		fputc('\r', f);
+		buf++;
+		len--;
+	}
 
 #ifdef ICONV_CONST
 	if (ic != (iconv_t)-1) {

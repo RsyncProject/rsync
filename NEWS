@@ -4,7 +4,8 @@ Changes since 3.0.3:
 
   BUG FIXES:
 
-    - ...
+    - Changed the way --progress overwrites its prior output in order to make
+      it nearly impossible for the progress to get overwritten by an error.
 
   ENHANCEMENTS:
 
