@@ -2164,7 +2164,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	if (inc_recurse) {
 		send_dir_depth = 1;
 		add_dirs_to_tree(-1, flist, dir_count);
-		if (!file_total || strcmp(flist->sorted[0]->basename, ".") != 0) 
+		if (!file_total || strcmp(flist->sorted[0]->basename, ".") != 0)
 			flist->parent_ndx = -1;
 		flist_done_allocating(flist);
 		if (send_dir_ndx < 0) {
@@ -2288,7 +2288,7 @@ struct file_list *recv_file_list(int f)
 		else
 			io_error |= read_int(f);
 	} else if (inc_recurse && flist->ndx_start == 1) {
-		if (!file_total || strcmp(flist->sorted[0]->basename, ".") != 0) 
+		if (!file_total || strcmp(flist->sorted[0]->basename, ".") != 0)
 			flist->parent_ndx = -1;
 	}
 
