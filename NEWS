@@ -12,6 +12,9 @@ Changes since 3.0.3:
     - Added the --remote-option=OPT (-M OPT) command-line option that is useful
       for things like sending a remote --log-file=FILE or --fake-super option.
 
+    - Rsync will not send an -e option to the server if the user specifies the
+      --protocol=29 option.  This lets rsync3 use an overly-restrictive server.
+
   DEVELOPER RELATED:
 
     - ...

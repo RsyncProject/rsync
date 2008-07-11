@@ -1838,22 +1838,28 @@ void server_options(char **args, int *argc_p)
 	if (do_compression)
 		argstr[x++] = 'z';
 
-	/* We make use of the -e option to let the server know about any
-	 * pre-release protocol version && some behavior flags. */
-	argstr[x++] = 'e';
-#if SUBPROTOCOL_VERSION != 0
-	if (protocol_version == PROTOCOL_VERSION) {
-		x += snprintf(argstr+x, sizeof argstr - x,
-			      "%d.%d", PROTOCOL_VERSION, SUBPROTOCOL_VERSION);
-	} else
-#endif
-		argstr[x++] = '.';
 	set_allow_inc_recurse();
-	if (allow_inc_recurse)
-		argstr[x++] = 'i';
-#if defined HAVE_LUTIMES && defined HAVE_UTIMES
-	argstr[x++] = 'L';
+
+	/* Checking the pre-negotiated value allows --protocol=29 override. */
+	if (protocol_version >= 30) {
+		/* We make use of the -e option to let the server know about
+		 * any pre-release protocol version && some behavior flags. */
+		argstr[x++] = 'e';
+#if SUBPROTOCOL_VERSION != 0
+		if (protocol_version == PROTOCOL_VERSION) {
+			x += snprintf(argstr+x, sizeof argstr - x,
+				      "%d.%d",
+				      PROTOCOL_VERSION, SUBPROTOCOL_VERSION);
+		} else
 #endif
+			argstr[x++] = '.';
+		if (allow_inc_recurse)
+			argstr[x++] = 'i';
+#if defined HAVE_LUTIMES && defined HAVE_UTIMES
+		argstr[x++] = 'L';
+#endif
+	}
+
 	argstr[x] = '\0';
 
 	if (x > (int)sizeof argstr) { /* Not possible... */
