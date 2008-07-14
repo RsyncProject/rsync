@@ -21,8 +21,6 @@
 
 #include "rsync.h"
 
-extern int verbose;
-extern int do_progress;
 extern int checksum_seed;
 extern int append_mode;
 
@@ -108,7 +106,7 @@ static void matched(int f, struct sum_struct *s, struct map_struct *buf,
 	int32 n = (int32)(offset - last_match); /* max value: block_size (int32) */
 	int32 j;
 
-	if (verbose > 2 && i >= 0) {
+	if (DEBUG_GTE(CHKSUM, 2) && i >= 0) {
 		rprintf(FINFO,
 			"match at %.0f last_match=%.0f j=%d len=%ld n=%ld\n",
 			(double)offset, (double)last_match, i,
@@ -133,7 +131,7 @@ static void matched(int f, struct sum_struct *s, struct map_struct *buf,
 	else
 		last_match = offset;
 
-	if (buf && do_progress)
+	if (buf && INFO_GTE(PROGRESS, 1))
 		show_progress(last_match, buf->file_size);
 }
 
@@ -152,7 +150,7 @@ static void hash_search(int f,struct sum_struct *s,
 	 * coding of the output to work more efficiently. */
 	want_i = 0;
 
-	if (verbose > 2) {
+	if (DEBUG_GTE(CHKSUM, 2)) {
 		rprintf(FINFO, "hash search b=%ld len=%.0f\n",
 			(long)s->blength, (double)len);
 	}
@@ -164,14 +162,14 @@ static void hash_search(int f,struct sum_struct *s,
 	sum = get_checksum1((char *)map, k);
 	s1 = sum & 0xFFFF;
 	s2 = sum >> 16;
-	if (verbose > 3)
+	if (DEBUG_GTE(CHKSUM, 3))
 		rprintf(FINFO, "sum=%.8x k=%ld\n", sum, (long)k);
 
 	offset = 0;
 
 	end = len + 1 - s->sums[s->count-1].len;
 
-	if (verbose > 3) {
+	if (DEBUG_GTE(CHKSUM, 3)) {
 		rprintf(FINFO, "hash search s->blength=%ld len=%.0f count=%.0f\n",
 			(long)s->blength, (double)len, (double)s->count);
 	}
@@ -180,7 +178,7 @@ static void hash_search(int f,struct sum_struct *s,
 		int done_csum2 = 0;
 		int32 i;
 
-		if (verbose > 4) {
+		if (DEBUG_GTE(CHKSUM, 4)) {
 			rprintf(FINFO, "offset=%.0f sum=%04x%04x\n",
 				(double)offset, s2 & 0xFFFF, s1 & 0xFFFF);
 		}
@@ -213,7 +211,7 @@ static void hash_search(int f,struct sum_struct *s,
 			    && !(s->sums[i].flags & SUMFLG_SAME_OFFSET))
 				continue;
 
-			if (verbose > 3) {
+			if (DEBUG_GTE(CHKSUM, 3)) {
 				rprintf(FINFO,
 					"potential match at %.0f i=%ld sum=%08x\n",
 					(double)offset, (long)i, sum);
@@ -344,7 +342,7 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 		if (append_mode == 2) {
 			OFF_T j = 0;
 			for (j = CHUNK_SIZE; j < s->flength; j += CHUNK_SIZE) {
-				if (buf && do_progress)
+				if (buf && INFO_GTE(PROGRESS, 1))
 					show_progress(last_match, buf->file_size);
 				sum_update(map_ptr(buf, last_match, CHUNK_SIZE),
 					   CHUNK_SIZE);
@@ -352,7 +350,7 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 			}
 			if (last_match < s->flength) {
 				int32 n = (int32)(s->flength - last_match);
-				if (buf && do_progress)
+				if (buf && INFO_GTE(PROGRESS, 1))
 					show_progress(last_match, buf->file_size);
 				sum_update(map_ptr(buf, last_match, n), n);
 			}
@@ -364,12 +362,12 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	if (len > 0 && s->count > 0) {
 		build_hash_table(s);
 
-		if (verbose > 2)
+		if (DEBUG_GTE(CHKSUM, 2))
 			rprintf(FINFO,"built hash table\n");
 
 		hash_search(f, s, buf, len);
 
-		if (verbose > 2)
+		if (DEBUG_GTE(CHKSUM, 2))
 			rprintf(FINFO,"done hash search\n");
 	} else {
 		OFF_T j;
@@ -384,11 +382,11 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 	if (buf && buf->status != 0)
 		file_sum[0]++;
 
-	if (verbose > 2)
+	if (DEBUG_GTE(CHKSUM, 2))
 		rprintf(FINFO,"sending file_sum\n");
 	write_buf(f, file_sum, sum_len);
 
-	if (verbose > 2)
+	if (DEBUG_GTE(CHKSUM, 2))
 		rprintf(FINFO, "false_alarms=%d hash_hits=%d matches=%d\n",
 			false_alarms, hash_hits, matches);
 
@@ -400,7 +398,7 @@ void match_sums(int f, struct sum_struct *s, struct map_struct *buf, OFF_T len)
 
 void match_report(void)
 {
-	if (verbose <= 1)
+	if (!DEBUG_GTE(CHKSUM, 1))
 		return;
 
 	rprintf(FINFO,

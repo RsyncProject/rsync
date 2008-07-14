@@ -27,7 +27,7 @@ extern int am_daemon;
 extern int io_error;
 extern int keep_partial;
 extern int got_xfer_error;
-extern int progress_is_active;
+extern int output_needs_newline;
 extern char *partial_dir;
 extern char *logfile_name;
 
@@ -116,12 +116,12 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 
 		exit_code = unmodified_code = code;
 
-		if (progress_is_active) {
+		if (output_needs_newline) {
 			fputc('\n', stdout);
-			progress_is_active = 0;
+			output_needs_newline = 0;
 		}
 
-		if (verbose > 3) {
+		if (DEBUG_GTE(EXIT, 2)) {
 			rprintf(FINFO,
 				"_exit_cleanup(code=%d, file=%s, line=%d): entered\n",
 				code, file, line);
@@ -184,13 +184,13 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 				code = exit_code = RERR_PARTIAL;
 		}
 
-		if (code || am_daemon || (logfile_name && (am_server || !verbose)))
+		if (code || am_daemon || (logfile_name && (am_server || !INFO_GTE(STATS, 1))))
 			log_exit(code, file, line);
 
 		/* FALLTHROUGH */
 #include "case_N.h"
 
-		if (verbose > 2) {
+		if (DEBUG_GTE(EXIT, 1)) {
 			rprintf(FINFO,
 				"_exit_cleanup(code=%d, file=%s, line=%d): "
 				"about to call exit(%d)\n",

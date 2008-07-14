@@ -22,7 +22,6 @@
 #include "rsync.h"
 #include "ifuncs.h"
 
-extern int verbose;
 extern int dry_run;
 extern int am_daemon;
 extern int am_server;
@@ -37,7 +36,6 @@ extern int protocol_version;
 extern int preserve_times;
 extern int uid_ndx;
 extern int gid_ndx;
-extern int progress_is_active;
 extern int stdout_format_has_i;
 extern int stdout_format_has_o_or_i;
 extern int logfile_format_has_i;
@@ -64,6 +62,7 @@ static FILE *logfile_fp;
 struct stats stats;
 
 int got_xfer_error = 0;
+int output_needs_newline = 0;
 
 struct {
         int code;
@@ -321,9 +320,9 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		exit_cleanup(RERR_MESSAGEIO);
 	}
 
-	if (progress_is_active) {
+	if (output_needs_newline) {
 		fputc('\n', f);
-		progress_is_active = 0;
+		output_needs_newline = 0;
 	}
 
 	trailing_CR_or_NL = len && (buf[len-1] == '\n' || buf[len-1] == '\r')
@@ -445,7 +444,7 @@ void rflush(enum logcode code)
 	if (am_daemon || code == FLOG)
 		return;
 
-	if (code == FINFO && !am_server)
+	if (!am_server && (code == FINFO || code == FCLIENT))
 		f = stdout;
 	else
 		f = stderr;
@@ -767,7 +766,7 @@ void maybe_log_item(struct file_struct *file, int iflags, int itemizing,
 {
 	int significant_flags = iflags & SIGNIFICANT_ITEM_FLAGS;
 	int see_item = itemizing && (significant_flags || *buf
-		|| stdout_format_has_i > 1 || (verbose > 1 && stdout_format_has_i));
+		|| stdout_format_has_i > 1 || (INFO_GTE(NAME, 2) && stdout_format_has_i));
 	int local_change = iflags & ITEM_LOCAL_CHANGE && significant_flags;
 	if (am_server) {
 		if (logfile_name && !dry_run && see_item
@@ -791,7 +790,7 @@ void log_delete(const char *fname, int mode)
 
 	x.file.mode = mode;
 
-	if (!verbose && !stdout_format)
+	if (!INFO_GTE(DEL, 1) && !stdout_format)
 		;
 	else if (am_server && protocol_version >= 29 && len < MAXPATHLEN) {
 		if (S_ISDIR(mode))

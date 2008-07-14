@@ -27,7 +27,6 @@
 #include <langinfo.h>
 #endif
 
-extern int verbose;
 extern int dry_run;
 extern int preserve_acls;
 extern int preserve_xattrs;
@@ -84,7 +83,7 @@ void setup_iconv(void)
 		/* It's OK if this fails... */
 		ic_chck = iconv_open(defset, defset);
 
-		if (verbose > 3) {
+		if (DEBUG_GTE(ICONV, 1)) {
 			if (ic_chck == (iconv_t)-1) {
 				rprintf(FINFO,
 					"note: iconv_open(\"%s\", \"%s\") failed (%d)"
@@ -126,7 +125,7 @@ void setup_iconv(void)
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
 
-	if (verbose > 1) {
+	if (INFO_GTE(MISC, 2)) {
 		rprintf(FINFO, "%s charset: %s\n",
 			am_server ? "server" : "client",
 			*charset ? charset : "[LOCALE]");
@@ -218,7 +217,7 @@ void send_protected_args(int fd, char *args[])
 
 	for (i = 0; args[i]; i++) {} /* find first NULL */
 	args[i] = "rsync"; /* set a new arg0 */
-	if (verbose > 1)
+	if (DEBUG_GTE(CMD, 1))
 		print_child_argv("protected args:", args + i + 1);
 	do {
 #ifdef ICONV_OPTION
@@ -247,7 +246,7 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 	int len, iflags = 0;
 	struct file_list *flist;
 	uchar fnamecmp_type = FNAMECMP_FNAME;
-	int ndx, save_verbose = verbose;
+	int ndx;
 
   read_loop:
 	while (1) {
@@ -275,17 +274,17 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 		}
 
 		/* Send everything read from f_in to msg_fd_out. */
-		if (verbose > 3) {
+		if (DEBUG_GTE(FLIST, 2)) {
 			rprintf(FINFO, "[%s] receiving flist for dir %d\n",
 				who_am_i(), ndx);
 		}
-		verbose = 0;
+		negate_output_levels(); /* turn off all info/debug output */
 		send_msg_int(MSG_FLIST, ndx);
 		start_flist_forward(f_in);
 		flist = recv_file_list(f_in);
 		flist->parent_ndx = ndx;
 		stop_flist_forward();
-		verbose = save_verbose;
+		negate_output_levels(); /* restore info/debug output */
 	}
 
 	iflags = protocol_version >= 29 ? read_shortint(f_in)
@@ -448,7 +447,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	} else
 #endif
 	if (change_uid || change_gid) {
-		if (verbose > 2) {
+		if (DEBUG_GTE(OWN, 1)) {
 			if (change_uid) {
 				rprintf(FINFO,
 					"set uid of %s from %u to %u\n",
@@ -507,7 +506,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	}
 #endif
 
-	if (verbose > 1 && flags & ATTRS_REPORT) {
+	if (INFO_GTE(NAME, 2) && flags & ATTRS_REPORT) {
 		if (updated)
 			rprintf(FCLIENT, "%s\n", fname);
 		else
@@ -555,7 +554,7 @@ int finish_transfer(const char *fname, const char *fnametmp,
 	const char *temp_copy_name = partialptr && *partialptr != '/' ? partialptr : NULL;
 
 	if (inplace) {
-		if (verbose > 2)
+		if (DEBUG_GTE(RECV, 1))
 			rprintf(FINFO, "finishing %s\n", fname);
 		fnametmp = fname;
 		goto do_set_file_attrs;
@@ -573,7 +572,7 @@ int finish_transfer(const char *fname, const char *fnametmp,
 		       ok_to_set_time ? 0 : ATTRS_SKIP_MTIME);
 
 	/* move tmp file over real file */
-	if (verbose > 2)
+	if (DEBUG_GTE(RECV, 1))
 		rprintf(FINFO, "renaming %s to %s\n", fnametmp, fname);
 	ret = robust_rename(fnametmp, fname, temp_copy_name,
 			    file->mode & INITACCESSPERMS);

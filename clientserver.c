@@ -23,7 +23,6 @@
 #include "ifuncs.h"
 
 extern int quiet;
-extern int verbose;
 extern int dry_run;
 extern int output_motd;
 extern int list_only;
@@ -267,7 +266,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 
 	sargs[sargc] = NULL;
 
-	if (verbose > 1)
+	if (DEBUG_GTE(CMD, 1))
 		print_child_argv("sending daemon args:", sargs);
 
 	io_printf(f_out, "%.*s\n", modlen, modname);
@@ -747,7 +746,7 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	read_args(f_in, name, line, sizeof line, rl_nulls, &argv, &argc, &request);
 	orig_argv = argv;
 
-	verbose = 0; /* future verbosity is controlled by client options */
+	reset_output_levels(); /* future verbosity is controlled by client options */
 	ret = parse_arguments(&argc, (const char ***) &argv);
 	if (protect_args && ret) {
 		orig_early_argv = orig_argv;
@@ -798,8 +797,7 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 
 #ifndef DEBUG
 	/* don't allow the logs to be flooded too fast */
-	if (verbose > lp_max_verbosity(i))
-		verbose = lp_max_verbosity(i);
+	limit_output_verbosity(lp_max_verbosity(i));
 #endif
 
 	if (protocol_version < 23

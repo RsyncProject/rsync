@@ -408,7 +408,7 @@ static void read_msg_fd(void)
 		/* Read extra file list from receiver. */
 		assert(iobuf_in != NULL);
 		assert(iobuf_f_in == fd);
-		if (verbose > 3) {
+		if (DEBUG_GTE(FLIST, 2)) {
 			rprintf(FINFO, "[%s] receiving flist for dir %d\n",
 				who_am_i(), IVAL(buf,0));
 		}

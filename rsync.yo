@@ -314,6 +314,8 @@ manpagesection(OPTIONS SUMMARY)
 Here is a short summary of the options available in rsync. Please refer
 to the detailed description below for a complete description.  verb(
  -v, --verbose               increase verbosity
+     --info=FLAGS            fine-grained informational verbosity
+     --debug=FLAGS           fine-grained debug verbosity
  -q, --quiet                 suppress non-error messages
      --no-motd               suppress daemon-mode MOTD (see caveat)
  -c, --checksum              skip based on checksum, not mod-time & size
@@ -465,23 +467,61 @@ dit(bf(--version)) print the rsync version number and exit.
 dit(bf(-v, --verbose)) This option increases the amount of information you
 are given during the transfer.  By default, rsync works silently. A
 single bf(-v) will give you information about what files are being
-transferred and a brief summary at the end. Two bf(-v) flags will give you
+transferred and a brief summary at the end. Two bf(-v) options will give you
 information on what files are being skipped and slightly more
-information at the end. More than two bf(-v) flags should only be used if
+information at the end. More than two bf(-v) options should only be used if
 you are debugging rsync.
 
-Note that the names of the transferred files that are output are done using
-a default bf(--out-format) of "%n%L", which tells you just the name of the
-file and, if the item is a link, where it points.  At the single bf(-v)
-level of verbosity, this does not mention when a file gets its attributes
-changed.  If you ask for an itemized list of changed attributes (either
-bf(--itemize-changes) or adding "%i" to the bf(--out-format) setting), the
-output (on the client) increases to mention all items that are changed in
-any way.  See the bf(--out-format) option for more details.
+In a modern rsync, the bf(-v) option is equivalent to the setting of groups
+of bf(--info) and bf(--debug) options.  You can choose to use these newer
+options in addition to, or in place of using bf(--verbose), as any
+fine-grained settings override the implied settings of bf(-v).  Both
+bf(--info) and bf(--debug) have a way to ask for help that tells you
+exactly what flags are set for each increase in verbosity.
+
+dit(bf(--info=FLAGS))
+This option lets you have fine-grained control over the
+information
+output you want to see.  An individual flag name may be followed by a level
+number, with 0 meaning to silence that output, 1 being the default output
+level, and higher numbers increasing the output of that flag (for those
+that support higher levels).  Use
+bf(--info=help)
+to see all the available flag names, what they output, and what flag names
+are added for each increase in the verbose level.  Some examples:
+
+verb(    rsync -a --info=progress2 src/ dest/
+    rsync -avv --info=stats2,misc1,flist0 src/ dest/ )
+
+Note that bf(--info=name)'s output is affected by the bf(--out-format) and
+bf(--itemize-changes) (bf(-i)) options.  See those options for more
+information on what is output and when.
+
+This option was added to 3.1.0, so an older rsync on the server side might
+reject your attempts at fine-grained control (if one or more flags needed
+to be send to the server and the server was too old to understand them).
+
+dit(bf(--debug=FLAGS))
+This option lets you have fine-grained control over the
+debug
+output you want to see.  An individual flag name may be followed by a level
+number, with 0 meaning to silence that output, 1 being the default output
+level, and higher numbers increasing the output of that flag (for those
+that support higher levels).  Use
+bf(--debug=help)
+to see all the available flag names, what they output, and what flag names
+are added for each increase in the verbose level.  Some examples:
+
+verb(    rsync -avvv --debug=none src/ dest/
+    rsync -avA --del --debug=del2,acl src/ dest/ )
+
+This option was added to 3.1.0, so an older rsync on the server side might
+reject your attempts at fine-grained control (if one or more flags needed
+to be send to the server and the server was too old to understand them).
 
 dit(bf(-q, --quiet)) This option decreases the amount of information you
 are given during the transfer, notably suppressing information messages
-from the remote server. This flag is useful when invoking rsync from
+from the remote server. This option name is useful when invoking rsync from
 cron.
 
 dit(bf(--no-motd)) This option affects the information that is output
@@ -1756,22 +1796,22 @@ you are talking to a recent enough rsync that it logs deletions instead of
 outputting them as a verbose message).
 
 dit(bf(--out-format=FORMAT)) This allows you to specify exactly what the
-rsync client outputs to the user on a per-update basis.  The format is a text
-string containing embedded single-character escape sequences prefixed with
-a percent (%) character.  For a list of the possible escape characters, see
-the "log format" setting in the rsyncd.conf manpage.
+rsync client outputs to the user on a per-update basis.  The format is a
+text string containing embedded single-character escape sequences prefixed
+with a percent (%) character.   A default format of "%n%L" is assumed if
+either bf(--info=name) or bf(-v) is specified (this tells you just the name
+of the file and, if the item is a link, where it points).  For a full list
+of the possible escape characters, see the "log format" setting in the
+rsyncd.conf manpage.
 
-Specifying this option will mention each file, dir, etc. that gets updated
-in a significant way (a transferred file, a recreated symlink/device, or a
-touched directory).  In addition, if the itemize-changes escape (%i) is
-included in the string, the logging of names increases to mention any
-item that is changed in any way (as long as the receiving side is at least
-2.6.4).  See the bf(--itemize-changes) option for a description of the
-output of "%i".
-
-The bf(--verbose) option implies a format of "%n%L", but you can use
-bf(--out-format) without bf(--verbose) if you like, or you can override
-the format of its per-file output using this option.
+Specifying the bf(--out-format) option implies the bf(--info=name) option,
+which will mention each file, dir, etc. that gets updated in a significant
+way (a transferred file, a recreated symlink/device, or a touched
+directory).  In addition, if the itemize-changes escape (%i) is included in
+the string (e.g. if the bf(--itemize-changes) option was used), the logging
+of names increases to mention any item that is changed in any way (as long
+as the receiving side is at least 2.6.4).  See the bf(--itemize-changes)
+option for a description of the output of "%i".
 
 Rsync will output the out-format string prior to a file's transfer unless
 one of the transfer-statistic escapes is requested, in which case the
@@ -1804,7 +1844,9 @@ in the rsyncd.conf manpage.
 
 dit(bf(--stats)) This tells rsync to print a verbose set of statistics
 on the file transfer, allowing you to tell how effective rsync's delta-transfer
-algorithm is for your data.
+algorithm is for your data.  This option is equivalent to bf(--info=stats2)
+if combined with 0 or 1 bf(-v) options, or bf(--info=stats3) if combined
+with 2 or more bf(-v) options.
 
 The current statistics are as follows: quote(itemization(
   it() bf(Number of files) is the count of all "files" (in the generic
@@ -1977,7 +2019,9 @@ in place of the hide-filter (if that is more natural to you).
 dit(bf(--progress)) This option tells rsync to print information
 showing the progress of the transfer. This gives a bored user
 something to watch.
-Implies bf(--verbose) if it wasn't already specified.
+With a modern rsync this is the same as specifying
+bf(--info=flist2,name,progress), but any user-supplied settings for those
+info flags takes precedence (e.g. "--info=flist0 --progress").
 
 While rsync is transferring a regular file, it updates a progress line that
 looks like this:
@@ -2011,6 +2055,13 @@ the 396 total files in the file-list.
 dit(bf(-P)) The bf(-P) option is equivalent to bf(--partial) bf(--progress).  Its
 purpose is to make it much easier to specify these two options for a long
 transfer that may be interrupted.
+
+There is also a bf(--info=progress2) option that outputs statistics based
+on the whole transfer, rather than individual files.  Use this flag without
+outputting a filename (e.g. avoid bf(-v) or specify bf(--info=name0) if you
+want to see how the transfer is doing without scrolling the screen with a
+lot of names.  (You don't need to specify the bf(--progress) option in
+order to use bf(--info=progress2).)
 
 dit(bf(--password-file)) This option allows you to provide a password in a
 file for accessing an rsync daemon.  The file must not be world readable.

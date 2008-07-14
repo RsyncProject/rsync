@@ -22,7 +22,6 @@
 
 #include "rsync.h"
 
-extern int verbose;
 extern int dry_run;
 extern int list_only;
 extern int am_sender;
@@ -215,7 +214,7 @@ static int maybe_hard_link(struct file_struct *file, int ndx,
 					ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS,
 					0, "");
 			}
-			if (verbose > 1 && maybe_ATTRS_REPORT)
+			if (INFO_GTE(NAME, 2) && maybe_ATTRS_REPORT)
 				rprintf(FCLIENT, "%s is uptodate\n", fname);
 			file->flags |= FLAG_HLINK_DONE;
 			return 0;
@@ -236,7 +235,7 @@ static int maybe_hard_link(struct file_struct *file, int ndx,
 				ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS, 0,
 				realname);
 		}
-		if (code != FNONE && verbose)
+		if (code != FNONE && INFO_GTE(NAME, 1))
 			rprintf(code, "%s => %s\n", fname, realname);
 		return 0;
 	}
@@ -377,10 +376,10 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 					continue;
 				statret = 1;
 				if (stdout_format_has_i == 0
-				 || (verbose < 2 && stdout_format_has_i < 2)) {
+				 || (!INFO_GTE(NAME, 2) && stdout_format_has_i < 2)) {
 					itemizing = 0;
 					code = FNONE;
-					if (verbose > 1 && maybe_ATTRS_REPORT)
+					if (INFO_GTE(NAME, 2) && maybe_ATTRS_REPORT)
 						rprintf(FCLIENT, "%s is uptodate\n", fname);
 				}
 				break;
@@ -426,7 +425,7 @@ int hard_link_one(struct file_struct *file, const char *fname,
 	if (do_link(oldname, fname) < 0) {
 		enum logcode code;
 		if (terse) {
-			if (!verbose)
+			if (!INFO_GTE(NAME, 1))
 				return 0;
 			code = FINFO;
 		} else

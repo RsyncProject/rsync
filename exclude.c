@@ -22,7 +22,6 @@
 
 #include "rsync.h"
 
-extern int verbose;
 extern int am_server;
 extern int am_sender;
 extern int eol_nulls;
@@ -123,7 +122,7 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 	const char *cp;
 	unsigned int pre_len, suf_len, slash_cnt = 0;
 
-	if (verbose > 2) {
+	if (DEBUG_GTE(FILTER, 2)) {
 		rprintf(FINFO, "[%s] add_rule(%s%.*s%s)%s\n",
 			who_am_i(), get_rule_prefix(mflags, pat, 0, NULL),
 			(int)pat_len, pat,
@@ -455,7 +454,7 @@ void *push_local_filters(const char *dir, unsigned int dirlen)
 		struct filter_struct *ex = mergelist_parents[i];
 		struct filter_list_struct *lp = ex->u.mergelist;
 
-		if (verbose > 2) {
+		if (DEBUG_GTE(FILTER, 2)) {
 			rprintf(FINFO, "[%s] pushing filter list%s\n",
 				who_am_i(), lp->debug_type);
 		}
@@ -495,7 +494,7 @@ void pop_local_filters(void *mem)
 		struct filter_struct *ex = mergelist_parents[i];
 		struct filter_list_struct *lp = ex->u.mergelist;
 
-		if (verbose > 2) {
+		if (DEBUG_GTE(FILTER, 2)) {
 			rprintf(FINFO, "[%s] popping filter list%s\n",
 				who_am_i(), lp->debug_type);
 		}
@@ -629,7 +628,7 @@ static void report_filter_result(enum logcode code, char const *name,
 	 * then it is stripped out by add_rule().  So as a special
 	 * case we add it back in here. */
 
-	if (verbose >= 2) {
+	if (DEBUG_GTE(FILTER, 1)) {
 		static char *actions[2][2]
 		    = { {"show", "hid"}, {"risk", "protect"} };
 		const char *w = who_am_i();
@@ -973,7 +972,7 @@ void parse_rule(struct filter_list_struct *listp, const char *pattern,
 		}
 
 		if (new_mflags & MATCHFLG_CLEAR_LIST) {
-			if (verbose > 2) {
+			if (DEBUG_GTE(FILTER, 2)) {
 				rprintf(FINFO,
 					"[%s] clearing filter list%s\n",
 					who_am_i(), listp->debug_type);
@@ -1047,7 +1046,7 @@ void parse_filter_file(struct filter_list_struct *listp, const char *fname,
 	} else
 		fp = stdin;
 
-	if (verbose > 2) {
+	if (DEBUG_GTE(FILTER, 2)) {
 		rprintf(FINFO, "[%s] parse_filter_file(%s,%x,%x)%s\n",
 			who_am_i(), fname, mflags, xflags,
 			fp ? "" : " [not found]");

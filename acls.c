@@ -1081,7 +1081,7 @@ int default_perms_for_dir(const char *dir)
 	/* Apply the permission-bit entries of the default ACL, if any. */
 	if (racl.user_obj != NO_ENTRY) {
 		perms = rsync_acl_get_perms(&racl);
-		if (verbose > 2)
+		if (DEBUG_GTE(ACL, 1))
 			rprintf(FINFO, "got ACL-based default perms %o for directory %s\n", perms, dir);
 	}
 

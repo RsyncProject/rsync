@@ -135,7 +135,7 @@ void check_batch_flags(void)
 					set ? "Please" : "Do not");
 				exit_cleanup(RERR_SYNTAX);
 			}
-			if (verbose) {
+			if (INFO_GTE(MISC, 1)) {
 				rprintf(FINFO,
 					"%sing the %s option to match the batchfile.\n",
 					set ? "Sett" : "Clear", flag_name[i]);

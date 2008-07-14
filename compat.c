@@ -25,7 +25,6 @@ int remote_protocol = 0;
 int file_extra_cnt = 0; /* count of file-list extras that everyone gets */
 int inc_recurse = 0;
 
-extern int verbose;
 extern int am_server;
 extern int am_sender;
 extern int local_server;
@@ -157,7 +156,7 @@ void setup_protocol(int f_out,int f_in)
 		exit_cleanup(RERR_PROTOCOL);
 	}
 
-	if (verbose > 3) {
+	if (DEBUG_GTE(PROTO, 1)) {
 		rprintf(FINFO, "(%s) Protocol versions: remote=%d, negotiated=%d\n",
 			am_server? "Server" : "Client", remote_protocol, protocol_version);
 	}

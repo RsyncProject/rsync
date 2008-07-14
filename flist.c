@@ -25,14 +25,12 @@
 #include "rounding.h"
 #include "io.h"
 
-extern int verbose;
 extern int am_root;
 extern int am_server;
 extern int am_daemon;
 extern int am_sender;
 extern int am_generator;
 extern int inc_recurse;
-extern int do_progress;
 extern int always_checksum;
 extern int module_id;
 extern int ignore_errors;
@@ -67,6 +65,7 @@ extern int protocol_version;
 extern int sanitize_paths;
 extern int munge_symlinks;
 extern int need_unsorted_flist;
+extern int output_needs_newline;
 extern int unsort_ndx;
 extern struct stats stats;
 extern char *filesfrom_host;
@@ -129,7 +128,7 @@ static void output_flist(struct file_list *flist);
 
 void init_flist(void)
 {
-	if (verbose > 4) {
+	if (DEBUG_GTE(FLIST, 4)) {
 		rprintf(FINFO, "FILE_STRUCT_LEN=%d, EXTRA_LEN=%d\n",
 			(int)FILE_STRUCT_LEN, (int)EXTRA_LEN);
 	}
@@ -140,14 +139,13 @@ void init_flist(void)
 
 static int show_filelist_p(void)
 {
-	return verbose && xfer_dirs && !am_server && !inc_recurse;
+	return INFO_GTE(FLIST, 1) && xfer_dirs && !am_server && !inc_recurse;
 }
 
 static void start_filelist_progress(char *kind)
 {
 	rprintf(FCLIENT, "%s ... ", kind);
-	if (verbose > 1 || do_progress)
-		rprintf(FCLIENT, "\n");
+	output_needs_newline = 1;
 	rflush(FINFO);
 }
 
@@ -158,18 +156,20 @@ static void emit_filelist_progress(int count)
 
 static void maybe_emit_filelist_progress(int count)
 {
-	if (do_progress && show_filelist_p() && (count % 100) == 0)
+	if (INFO_GTE(FLIST, 2) && show_filelist_p() && (count % 100) == 0)
 		emit_filelist_progress(count);
 }
 
 static void finish_filelist_progress(const struct file_list *flist)
 {
-	if (do_progress) {
+	if (INFO_GTE(FLIST, 2)) {
 		/* This overwrites the progress line */
 		rprintf(FINFO, "%d file%sto consider\n",
 			flist->used, flist->used == 1 ? " " : "s ");
-	} else
+	} else {
+		output_needs_newline = 0;
 		rprintf(FINFO, "done\n");
+	}
 }
 
 void show_flist_stats(void)
@@ -196,7 +196,7 @@ static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
 			return -1;
 		linkbuf[llen] = '\0';
 		if (copy_unsafe_links && unsafe_symlink(linkbuf, path)) {
-			if (verbose > 1) {
+			if (INFO_GTE(SYMSAFE, 1)) {
 				rprintf(FINFO,"copying unsafe symlink \"%s\" -> \"%s\"\n",
 					path, linkbuf);
 			}
@@ -316,7 +316,7 @@ static void flist_expand(struct file_list *flist, int extra)
 	new_ptr = realloc_array(flist->files, struct file_struct *,
 				flist->malloced);
 
-	if (verbose >= 2 && flist->malloced != FLIST_START) {
+	if (DEBUG_GTE(FLIST, 1) && flist->malloced != FLIST_START) {
 		rprintf(FCLIENT, "[%s] expand file_list pointer array to %.0f bytes, did%s move\n",
 		    who_am_i(),
 		    (double)sizeof flist->files[0] * flist->malloced,
@@ -1110,7 +1110,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		if (one_file_system && st.st_dev != filesystem_dev
 		 && BITS_SETnUNSET(flags, FLAG_CONTENT_DIR, FLAG_TOP_DIR)) {
 			if (one_file_system > 1) {
-				if (verbose > 1) {
+				if (INFO_GTE(MOUNT, 1)) {
 					rprintf(FINFO,
 					    "[%s] skipping mount-point dir %s\n",
 					    who_am_i(), thisname);
@@ -1159,7 +1159,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		pool = NULL;
 	}
 
-	if (verbose > 2) {
+	if (DEBUG_GTE(FLIST, 2)) {
 		rprintf(FINFO, "[%s] make_file(%s,*,%d)\n",
 			who_am_i(), thisname, filter_level);
 	}
@@ -1829,7 +1829,7 @@ void send_extra_file_list(int f, int at_least)
 		file_total += flist->used;
 		stats.flist_size += stats.total_written - start_write;
 		stats.num_files += flist->used;
-		if (verbose > 3)
+		if (DEBUG_GTE(FLIST, 3))
 			output_flist(flist);
 
 		if (DIR_FIRST_CHILD(dp) >= 0) {
@@ -1880,7 +1880,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	rprintf(FLOG, "building file list\n");
 	if (show_filelist_p())
 		start_filelist_progress("building file list");
-	else if (inc_recurse && verbose && !am_server)
+	else if (inc_recurse && INFO_GTE(FLIST, 1) && !am_server)
 		rprintf(FCLIENT, "sending incremental file list\n");
 
 	start_write = stats.total_written;
@@ -2155,10 +2155,10 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	stats.flist_size = stats.total_written - start_write;
 	stats.num_files = flist->used;
 
-	if (verbose > 3)
+	if (DEBUG_GTE(FLIST, 3))
 		output_flist(flist);
 
-	if (verbose > 2)
+	if (DEBUG_GTE(FLIST, 2))
 		rprintf(FINFO, "send_file_list done\n");
 
 	if (inc_recurse) {
@@ -2192,7 +2192,7 @@ struct file_list *recv_file_list(int f)
 		rprintf(FLOG, "receiving file list\n");
 	if (show_filelist_p())
 		start_filelist_progress("receiving file list");
-	else if (inc_recurse && verbose && !am_server && !first_flist)
+	else if (inc_recurse && INFO_GTE(FLIST, 1) && !am_server && !first_flist)
 		rprintf(FCLIENT, "receiving incremental file list\n");
 
 	start_read = stats.total_read;
@@ -2231,14 +2231,14 @@ struct file_list *recv_file_list(int f)
 
 		maybe_emit_filelist_progress(flist->used);
 
-		if (verbose > 2) {
+		if (DEBUG_GTE(FLIST, 2)) {
 			rprintf(FINFO, "recv_file_name(%s)\n",
 				f_name(file, NULL));
 		}
 	}
 	file_total += flist->used;
 
-	if (verbose > 2)
+	if (DEBUG_GTE(FLIST, 2))
 		rprintf(FINFO, "received %d names\n", flist->used);
 
 	if (show_filelist_p())
@@ -2292,10 +2292,10 @@ struct file_list *recv_file_list(int f)
 			flist->parent_ndx = -1;
 	}
 
-	if (verbose > 3)
+	if (DEBUG_GTE(FLIST, 3))
 		output_flist(flist);
 
-	if (verbose > 2)
+	if (DEBUG_GTE(FLIST, 2))
 		rprintf(FINFO, "recv_file_list done\n");
 
 	stats.flist_size += stats.total_read - start_read;
@@ -2323,7 +2323,7 @@ void recv_additional_file_list(int f)
 				NDX_FLIST_OFFSET - dir_flist->used + 1);
 			exit_cleanup(RERR_PROTOCOL);
 		}
-		if (verbose > 3) {
+		if (DEBUG_GTE(FLIST, 3)) {
 			rprintf(FINFO, "[%s] receiving flist for dir %d\n",
 				who_am_i(), ndx);
 		}
@@ -2545,7 +2545,7 @@ static void flist_sort_and_clean(struct file_list *flist, int strip_root)
 				keep = j, drop = i;
 
 			if (!am_sender) {
-				if (verbose > 1) {
+				if (DEBUG_GTE(DUP, 1)) {
 					rprintf(FINFO,
 					    "removing duplicate name %s from file list (%d)\n",
 					    f_name(file, fbuf), drop + flist->ndx_start);
@@ -2903,7 +2903,7 @@ struct file_list *get_dirlist(char *dirname, int dlen, int ignore_filter_rules)
 	send_directory(ignore_filter_rules ? -2 : -1, dirlist, dirname, dlen, 0);
 	xfer_dirs = save_xfer_dirs;
 	recurse = save_recurse;
-	if (do_progress)
+	if (INFO_GTE(PROGRESS, 1))
 		flist_count_offset += dirlist->used;
 
 	prune_empty_dirs = 0;
@@ -2911,7 +2911,7 @@ struct file_list *get_dirlist(char *dirname, int dlen, int ignore_filter_rules)
 	flist_sort_and_clean(dirlist, 0);
 	prune_empty_dirs = save_prune_empty_dirs;
 
-	if (verbose > 3)
+	if (DEBUG_GTE(FLIST, 3))
 		output_flist(dirlist);
 
 	return dirlist;

@@ -268,7 +268,7 @@ log file = $logfile
 log format = %i %h [%a] %m (%u) %l %f%L
 transfer logging = yes
 exclude = ? foobar.baz
-max verbosity = 9
+max verbosity = 4
 uid = 0
 gid = 0
 

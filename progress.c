@@ -24,6 +24,7 @@
 
 extern int am_server;
 extern int need_unsorted_flist;
+extern int output_needs_newline;
 extern struct stats stats;
 extern struct file_list *cur_flist;
 
@@ -39,8 +40,6 @@ struct progress_history {
 	struct timeval time;
 	OFF_T ofs;
 };
-
-int progress_is_active = 0;
 
 static struct progress_history ph_start;
 static struct progress_history ph_list[PROGRESS_HISTORY_SECS];
@@ -66,16 +65,26 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 {
 	char rembuf[64], eol[128];
 	const char *units;
-	int pct = ofs == size ? 100 : (int) (100.0 * ofs / size);
 	unsigned long diff;
 	double rate, remain;
+	int pct;
 
 	if (is_last) {
-		snprintf(eol, sizeof eol,
+		int len = snprintf(eol, sizeof eol,
 			" (xfer#%d, to-check=%d/%d)\n",
 			stats.num_transferred_files,
 			stats.num_files - current_file_index - 1,
 			stats.num_files);
+		if (INFO_GTE(PROGRESS, 2)) {
+			static int last_len = 0;
+			/* Drop \n and pad with spaces if line got shorter. */
+			if (last_len < --len)
+				last_len = len;
+			eol[last_len] = '\0';
+			while (last_len > len)
+				eol[--last_len] = ' ';
+			is_last = 0;
+		}
 		/* Compute stats based on the starting info. */
 		if (!ph_start.time.tv_sec
 		    || !(diff = msdiff(&ph_start.time, now)))
@@ -112,18 +121,21 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 			 (int) remain % 60);
 	}
 
-	progress_is_active = 0;
+	output_needs_newline = 0;
+	pct = ofs == size ? 100 : (int) (100.0 * ofs / size);
 	rprintf(FCLIENT, "\r%12s %3d%% %7.2f%s %s%s",
 		human_num(ofs), pct, rate, units, rembuf, eol);
 	if (!is_last) {
-		progress_is_active = 1;
-		fflush(stdout);
+		output_needs_newline = 1;
+		rflush(FCLIENT);
 	}
 }
 
 void set_current_file_index(struct file_struct *file, int ndx)
 {
-	if (need_unsorted_flist)
+	if (!file)
+		current_file_index = cur_flist->used + cur_flist->ndx_start - 1;
+	else if (need_unsorted_flist)
 		current_file_index = flist_find(cur_flist, file) + cur_flist->ndx_start;
 	else
 		current_file_index = ndx;
@@ -135,9 +147,14 @@ void end_progress(OFF_T size)
 	if (!am_server) {
 		struct timeval now;
 		gettimeofday(&now, NULL);
-		rprint_progress(size, size, &now, True);
+		if (INFO_GTE(PROGRESS, 2)) {
+			rprint_progress(stats.total_transferred_size,
+					stats.total_size, &now, True);
+		} else {
+			rprint_progress(size, size, &now, True);
+			memset(&ph_start, 0, sizeof ph_start);
+		}
 	}
-	memset(&ph_start, 0, sizeof ph_start);
 }
 
 void show_progress(OFF_T ofs, OFF_T size)
@@ -193,5 +210,9 @@ void show_progress(OFF_T ofs, OFF_T size)
 		return;
 #endif
 
-	rprint_progress(ofs, size, &now, False);
+	if (INFO_GTE(PROGRESS, 2)) {
+		rprint_progress(stats.total_transferred_size,
+				stats.total_size, &now, False);
+	} else
+		rprint_progress(ofs, size, &now, False);
 }

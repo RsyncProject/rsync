@@ -21,11 +21,9 @@
 
 #include "rsync.h"
 
-extern int verbose;
 extern int dry_run;
 extern int do_xfers;
 extern int am_server;
-extern int do_progress;
 extern int inc_recurse;
 extern int log_before_transfer;
 extern int stdout_format_has_i;
@@ -180,7 +178,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	if (fd_r >= 0 && size_r > 0) {
 		int32 read_size = MAX(sum.blength * 2, 16*1024);
 		mapbuf = map_file(fd_r, size_r, read_size, sum.blength);
-		if (verbose > 2) {
+		if (DEBUG_GTE(CHKSUM, 2)) {
 			rprintf(FINFO, "recv mapped %s of size %.0f\n",
 				fname_r, (double)size_r);
 		}
@@ -196,7 +194,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 			sum.flength -= sum.blength - sum.remainder;
 		if (append_mode == 2) {
 			for (j = CHUNK_SIZE; j < sum.flength; j += CHUNK_SIZE) {
-				if (do_progress)
+				if (INFO_GTE(PROGRESS, 1))
 					show_progress(offset, total_size);
 				sum_update(map_ptr(mapbuf, offset, CHUNK_SIZE),
 					   CHUNK_SIZE);
@@ -204,7 +202,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 			}
 			if (offset < sum.flength) {
 				int32 len = (int32)(sum.flength - offset);
-				if (do_progress)
+				if (INFO_GTE(PROGRESS, 1))
 					show_progress(offset, total_size);
 				sum_update(map_ptr(mapbuf, offset, len), len);
 			}
@@ -218,11 +216,11 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	}
 
 	while ((i = recv_token(f_in, &data)) != 0) {
-		if (do_progress)
+		if (INFO_GTE(PROGRESS, 1))
 			show_progress(offset, total_size);
 
 		if (i > 0) {
-			if (verbose > 3) {
+			if (DEBUG_GTE(CHKSUM, 3)) {
 				rprintf(FINFO,"data recv %d at %.0f\n",
 					i,(double)offset);
 			}
@@ -246,7 +244,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 		stats.matched_data += len;
 
-		if (verbose > 3) {
+		if (DEBUG_GTE(CHKSUM, 3)) {
 			rprintf(FINFO,
 				"chunk[%d] of size %ld at %.0f offset=%.0f\n",
 				i, (long)len, (double)offset2, (double)offset);
@@ -288,7 +286,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		ftruncate(fd, offset);
 #endif
 
-	if (do_progress)
+	if (INFO_GTE(PROGRESS, 1))
 		end_progress(total_size);
 
 	if (fd != -1 && offset > 0 && sparse_end(fd) != 0) {
@@ -304,7 +302,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		unmap_file(mapbuf);
 
 	read_buf(f_in, file_sum2, sum_len);
-	if (verbose > 2)
+	if (DEBUG_GTE(CHKSUM, 2))
 		rprintf(FINFO,"got file_sum\n");
 	if (fd != -1 && memcmp(file_sum1, file_sum2, sum_len) != 0)
 		return 0;
@@ -328,7 +326,7 @@ static void handle_delayed_updates(char *local_name)
 		if ((partialptr = partial_dir_fname(fname)) != NULL) {
 			if (make_backups > 0 && !make_backup(fname))
 				continue;
-			if (verbose > 2) {
+			if (DEBUG_GTE(RECV, 1)) {
 				rprintf(FINFO, "renaming %s to %s\n",
 					partialptr, fname);
 			}
@@ -396,7 +394,7 @@ int recv_files(int f_in, char *local_name)
 #endif
 	int ndx, recv_ok;
 
-	if (verbose > 2)
+	if (DEBUG_GTE(RECV, 1))
 		rprintf(FINFO, "recv_files(%d) starting\n", cur_flist->used);
 
 	if (delay_updates)
@@ -409,6 +407,10 @@ int recv_files(int f_in, char *local_name)
 		ndx = read_ndx_and_attrs(f_in, &iflags, &fnamecmp_type,
 					 xname, &xlen);
 		if (ndx == NDX_DONE) {
+			if (!am_server && INFO_GTE(PROGRESS, 2) && cur_flist) {
+				set_current_file_index(NULL, 0);
+				end_progress(0);
+			}
 			if (inc_recurse && first_flist) {
 				flist_free(first_flist);
 				if (first_flist)
@@ -423,7 +425,7 @@ int recv_files(int f_in, char *local_name)
 			}
 			if (++phase > max_phase)
 				break;
-			if (verbose > 2)
+			if (DEBUG_GTE(RECV, 1))
 				rprintf(FINFO, "recv_files phase=%d\n", phase);
 			if (phase == 2 && delay_updates)
 				handle_delayed_updates(local_name);
@@ -437,7 +439,7 @@ int recv_files(int f_in, char *local_name)
 			file = dir_flist->files[cur_flist->parent_ndx];
 		fname = local_name ? local_name : f_name(file, fbuf);
 
-		if (verbose > 2)
+		if (DEBUG_GTE(RECV, 1))
 			rprintf(FINFO, "recv_files(%s)\n", fname);
 
 #ifdef SUPPORT_XATTRS
@@ -482,7 +484,7 @@ int recv_files(int f_in, char *local_name)
 			}
 		}
 
-		if (!am_server && do_progress)
+		if (!am_server && INFO_GTE(PROGRESS, 1))
 			set_current_file_index(file, ndx);
 		stats.num_transferred_files++;
 		stats.total_transferred_size += F_LENGTH(file);
@@ -671,7 +673,7 @@ int recv_files(int f_in, char *local_name)
 		/* log the transfer */
 		if (log_before_transfer)
 			log_item(FCLIENT, file, &initial_stats, iflags, NULL);
-		else if (!am_server && verbose && do_progress)
+		else if (!am_server && INFO_GTE(NAME, 1) && INFO_EQ(PROGRESS, 1))
 			rprintf(FINFO, "%s\n", fname);
 
 		/* recv file data */
@@ -722,7 +724,7 @@ int recv_files(int f_in, char *local_name)
 			break;
 		case 0: {
 			enum logcode msgtype = redoing ? FERROR_XFER : FWARNING;
-			if (msgtype == FERROR_XFER || verbose) {
+			if (msgtype == FERROR_XFER || INFO_GTE(NAME, 1)) {
 				char *errstr, *redostr, *keptstr;
 				if (!(keep_partial && partialptr) && !inplace)
 					keptstr = "discarded";
@@ -762,7 +764,7 @@ int recv_files(int f_in, char *local_name)
 	if (phase == 2 && delay_updates) /* for protocol_version < 29 */
 		handle_delayed_updates(local_name);
 
-	if (verbose > 2)
+	if (DEBUG_GTE(RECV, 1))
 		rprintf(FINFO,"recv_files finished\n");
 
 	return 0;

@@ -232,7 +232,7 @@ int open_socket_out(char *host, int port, const char *bind_addr,
 		}
 		*cp++ = '\0';
 		strlcpy(portbuf, cp, sizeof portbuf);
-		if (verbose >= 2) {
+		if (DEBUG_GTE(CONNECT, 1)) {
 			rprintf(FINFO, "connection via http proxy %s port %s\n",
 				h, portbuf);
 		}
@@ -361,7 +361,7 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_addr,
 		*t = '\0';
 	}
 
-	if (verbose >= 2) {
+	if (DEBUG_GTE(CONNECT, 1)) {
 		rprintf(FINFO, "%sopening tcp connection to %s port %d\n",
 			prog ? "Using RSYNC_CONNECT_PROG instead of " : "",
 			host, port);
@@ -473,7 +473,7 @@ static int *open_socket_in(int type, int port, const char *bind_addr,
 	/* Only output the socket()/bind() messages if we were totally
 	 * unsuccessful, or if the daemon is being run with -vv. */
 	for (s = 0; s < ecnt; s++) {
-		if (!i || verbose > 1)
+		if (!i || DEBUG_GTE(BIND, 1))
 			rwrite(FLOG, errmsgs[s], strlen(errmsgs[s]), 0);
 		free(errmsgs[s]);
 	}
@@ -829,7 +829,7 @@ int sock_exec(const char *prog)
 		rsyserr(FERROR, errno, "socketpair_tcp failed");
 		return -1;
 	}
-	if (verbose >= 2)
+	if (DEBUG_GTE(CMD, 1))
 		rprintf(FINFO, "Running socket program: \"%s\"\n", prog);
 	if (fork() == 0) {
 		close(fd[0]);

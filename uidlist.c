@@ -26,7 +26,6 @@
 #include "rsync.h"
 #include "io.h"
 
-extern int verbose;
 extern int am_root;
 extern int preserve_uid;
 extern int preserve_gid;
@@ -126,7 +125,7 @@ static int is_in_group(gid_t gid)
 		}
 		if (n == ngroups)
 			gidset[ngroups++] = mygid;
-		if (verbose > 3) {
+		if (DEBUG_GTE(OWN, 2)) {
 			int pos;
 			char *gidbuf = new_array(char, ngroups*21+32);
 			if (!gidbuf)
@@ -152,7 +151,7 @@ static int is_in_group(gid_t gid)
 	static gid_t mygid = GID_NONE;
 	if (mygid == GID_NONE) {
 		mygid = MY_GID();
-		if (verbose > 3)
+		if (DEBUG_GTE(OWN, 2))
 			rprintf(FINFO, "process has gid %u\n", (unsigned)mygid);
 	}
 	return gid == mygid;
@@ -167,7 +166,7 @@ static struct idlist *recv_add_uid(uid_t id, const char *name)
 
 	node = add_to_list(&uidlist, id, name, id2, 0);
 
-	if (verbose > 3) {
+	if (DEBUG_GTE(OWN, 2)) {
 		rprintf(FINFO, "uid %u(%s) maps to %u\n",
 			(unsigned)id, name ? name : "", (unsigned)id2);
 	}
@@ -184,7 +183,7 @@ static struct idlist *recv_add_gid(gid_t id, const char *name)
 	node = add_to_list(&gidlist, id, name, id2,
 		!am_root && !is_in_group(id2) ? FLAG_SKIP_GROUP : 0);
 
-	if (verbose > 3) {
+	if (DEBUG_GTE(OWN, 2)) {
 		rprintf(FINFO, "gid %u(%s) maps to %u\n",
 			(unsigned)id, name ? name : "", (unsigned)id2);
 	}

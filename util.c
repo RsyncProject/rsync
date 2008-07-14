@@ -23,7 +23,6 @@
 #include "rsync.h"
 #include "ifuncs.h"
 
-extern int verbose;
 extern int dry_run;
 extern int module_id;
 extern int modify_window;
@@ -130,7 +129,7 @@ int set_modtime(const char *fname, time_t modtime, mode_t mode)
 		return 1;
 #endif
 
-	if (verbose > 2) {
+	if (DEBUG_GTE(TIME, 1)) {
 		rprintf(FINFO, "set modtime of %s to (%ld) %s",
 			fname, (long)modtime,
 			asctime(localtime(&modtime)));
@@ -397,7 +396,7 @@ int robust_unlink(const char *fname)
 			counter = 1;
 	} while ((rc = access(path, 0)) == 0 && counter != start);
 
-	if (verbose > 0) {
+	if (INFO_GTE(MISC, 1)) {
 		rprintf(FWARNING, "renaming %s to %s because of text busy\n",
 			fname, path);
 	}
@@ -1019,7 +1018,7 @@ int change_dir(const char *dir, int set_path_only)
 		curr_dir_depth = count_dir_elements(curr_dir + module_dirlen);
 	}
 
-	if (verbose >= 5 && !set_path_only)
+	if (DEBUG_GTE(CHDIR, 1) && !set_path_only)
 		rprintf(FINFO, "[%s] change_dir(%s)\n", who_am_i(), curr_dir);
 
 	return 1;
@@ -1583,7 +1582,7 @@ void *expand_item_list(item_list *lp, size_t item_size,
 			overflow_exit("expand_item_list");
 		/* Using _realloc_array() lets us pass the size, not a type. */
 		new_ptr = _realloc_array(lp->items, item_size, new_size);
-		if (verbose >= 4) {
+		if (DEBUG_GTE(FLIST, 3)) {
 			rprintf(FINFO, "[%s] expand %s to %.0f bytes, did%s move\n",
 				who_am_i(), desc, (double)new_size * item_size,
 				new_ptr == lp->items ? " not" : "");

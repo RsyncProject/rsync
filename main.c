@@ -27,7 +27,6 @@
 #include <locale.h>
 #endif
 
-extern int verbose;
 extern int dry_run;
 extern int list_only;
 extern int am_root;
@@ -38,9 +37,9 @@ extern int am_daemon;
 extern int inc_recurse;
 extern int blocking_io;
 extern int remove_source_files;
+extern int output_needs_newline;
 extern int need_messages_from_generator;
 extern int kluge_around_eof;
-extern int do_stats;
 extern int got_xfer_error;
 extern int module_id;
 extern int copy_links;
@@ -183,7 +182,7 @@ static void handle_stats(int f)
 	total_read = stats.total_read;
 	total_written = stats.total_written;
 
-	if (do_stats && verbose > 1) {
+	if (INFO_GTE(STATS, 3)) {
 		/* These come out from every process */
 		show_malloc_stats();
 		show_flist_stats();
@@ -239,7 +238,7 @@ static void handle_stats(int f)
 
 static void output_summary(void)
 {
-	if (do_stats) {
+	if (INFO_GTE(STATS, 2)) {
 		rprintf(FCLIENT, "\n");
 		rprintf(FINFO,"Number of files: %d\n", stats.num_files);
 		rprintf(FINFO,"Number of files transferred: %d\n",
@@ -268,7 +267,7 @@ static void output_summary(void)
 			human_num(total_read));
 	}
 
-	if (verbose || do_stats) {
+	if (INFO_GTE(STATS, 1)) {
 		rprintf(FCLIENT, "\n");
 		rprintf(FINFO,
 			"sent %s bytes  received %s bytes  %s bytes/sec\n",
@@ -434,7 +433,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 
 	args[argc] = NULL;
 
-	if (verbose > 3) {
+	if (DEBUG_GTE(CMD, 2)) {
 		for (i = 0; i < argc; i++)
 			rprintf(FCLIENT, "cmd[%d]=%s ", i, args[i]);
 		rprintf(FCLIENT, "\n");
@@ -499,7 +498,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	int statret;
 	char *cp;
 
-	if (verbose > 2) {
+	if (DEBUG_GTE(RECV, 1)) {
 		rprintf(FINFO, "get_local_name count=%d %s\n",
 			file_total, NS(dest_path));
 	}
@@ -580,7 +579,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 		 && strcmp(flist->files[flist->low]->basename, ".") == 0)
 			flist->files[0]->flags |= FLAG_DIR_CREATED;
 
-		if (verbose)
+		if (INFO_GTE(NAME, 1))
 			rprintf(FINFO, "created directory %s\n", dest_path);
 
 		if (dry_run) {
@@ -682,7 +681,7 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 	struct file_list *flist;
 	char *dir = argv[0];
 
-	if (verbose > 2) {
+	if (DEBUG_GTE(SEND, 1)) {
 		rprintf(FINFO, "server_sender starting pid=%ld\n",
 			(long)getpid());
 	}
@@ -775,6 +774,11 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		io_flush(FULL_FLUSH);
 		handle_stats(f_in);
 
+		if (output_needs_newline) {
+			fputc('\n', stdout);
+			output_needs_newline = 0;
+		}
+
 		send_msg(MSG_DONE, "", 1, 0);
 		write_varlong(error_pipe[1], stats.total_read, 3);
 		io_flush(FULL_FLUSH);
@@ -848,15 +852,17 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 	int exit_code;
 	struct file_list *flist;
 	char *local_name = NULL;
-	int save_verbose = verbose;
+	int negated_levels;
 
 	if (filesfrom_fd >= 0) {
 		/* We can't mix messages with files-from data on the socket,
-		 * so temporarily turn off verbose messages. */
-		verbose = 0;
-	}
+		 * so temporarily turn off info/debug messages. */
+		negate_output_levels();
+		negated_levels = 1;
+	} else
+		negated_levels = 0;
 
-	if (verbose > 2) {
+	if (DEBUG_GTE(RECV, 1)) {
 		rprintf(FINFO, "server_recv(%d) starting pid=%ld\n",
 			argc, (long)getpid());
 	}
@@ -901,7 +907,9 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 	}
 	if (inc_recurse && file_total == 1)
 		recv_additional_file_list(f_in);
-	verbose = save_verbose;
+
+	if (negated_levels)
+		negate_output_levels();
 
 	if (argc > 0)
 		local_name = get_local_name(flist,argv[0]);
@@ -1017,7 +1025,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			start_write_batch(f_out);
 		flist = send_file_list(f_out, argc, argv);
 		set_msg_fd_in(-1);
-		if (verbose > 3)
+		if (DEBUG_GTE(FLIST, 3))
 			rprintf(FINFO,"file list sent\n");
 
 		if (protocol_version >= 23)
@@ -1030,7 +1038,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		if (protocol_version >= 24)
 			read_final_goodbye(f_in);
 		if (pid != -1) {
-			if (verbose > 3)
+			if (DEBUG_GTE(EXIT, 2))
 				rprintf(FINFO,"client_run waiting on %d\n", (int) pid);
 			io_flush(FULL_FLUSH);
 			wait_process_with_flush(pid, &exit_code);
@@ -1072,7 +1080,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	}
 
 	if (pid != -1) {
-		if (verbose > 3)
+		if (DEBUG_GTE(RECV, 1))
 			rprintf(FINFO,"client_run2 waiting on %d\n", (int) pid);
 		io_flush(FULL_FLUSH);
 		wait_process_with_flush(pid, &exit_code);
@@ -1254,7 +1262,7 @@ static int start_client(int argc, char *argv[])
 		}
 	}
 
-	if (verbose > 3) {
+	if (DEBUG_GTE(CMD, 2)) {
 		rprintf(FINFO,"cmd=%s machine=%s user=%s path=%s\n",
 			NS(shell_cmd), NS(shell_machine), NS(shell_user),
 			remote_argv ? NS(remote_argv[0]) : "");

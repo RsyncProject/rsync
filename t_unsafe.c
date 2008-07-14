@@ -27,9 +27,9 @@ int dry_run = 0;
 int am_root = 0;
 int read_only = 0;
 int list_only = 0;
-int verbose = 0;
 int preserve_perms = 0;
 int preserve_executability = 0;
+short info_levels[10], debug_levels[10];
 
 int
 main(int argc, char **argv)

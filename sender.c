@@ -21,7 +21,6 @@
 
 #include "rsync.h"
 
-extern int verbose;
 extern int dry_run;
 extern int do_xfers;
 extern int am_server;
@@ -39,7 +38,6 @@ extern int protocol_version;
 extern int remove_source_files;
 extern int updating_basis_file;
 extern int make_backups;
-extern int do_progress;
 extern int inplace;
 extern int batch_fd;
 extern int write_batch;
@@ -71,7 +69,7 @@ static struct sum_struct *receive_sums(int f)
 
 	s->sums = NULL;
 
-	if (verbose > 3) {
+	if (DEBUG_GTE(CHKSUM, 3)) {
 		rprintf(FINFO, "count=%.0f n=%ld rem=%ld\n",
 			(double)s->count, (long)s->blength, (long)s->remainder);
 	}
@@ -105,7 +103,7 @@ static struct sum_struct *receive_sums(int f)
 		if (allowed_lull && !(i % lull_mod))
 			maybe_send_keepalive();
 
-		if (verbose > 3) {
+		if (DEBUG_GTE(CHKSUM, 3)) {
 			rprintf(FINFO,
 				"chunk[%d] len=%d offset=%.0f sum1=%08x\n",
 				i, s->sums[i].len, (double)s->sums[i].offset,
@@ -140,7 +138,7 @@ void successful_send(int ndx)
 	f_name(file, fname);
 
 	if (do_unlink(fname) == 0) {
-		if (verbose > 1)
+		if (INFO_GTE(REMOVE, 1))
 			rprintf(FINFO, "sender removed %s\n", fname);
 	} else
 		rsyserr(FERROR, errno, "sender failed to remove %s", fname);
@@ -182,7 +180,7 @@ void send_files(int f_in, int f_out)
 	int f_xfer = write_batch < 0 ? batch_fd : f_out;
 	int ndx, j;
 
-	if (verbose > 2)
+	if (DEBUG_GTE(SEND, 1))
 		rprintf(FINFO, "send_files starting\n");
 
 	while (1) {
@@ -193,6 +191,10 @@ void send_files(int f_in, int f_out)
 		ndx = read_ndx_and_attrs(f_in, &iflags, &fnamecmp_type,
 					 xname, &xlen);
 		if (ndx == NDX_DONE) {
+			if (!am_server && INFO_GTE(PROGRESS, 2) && cur_flist) {
+				set_current_file_index(NULL, 0);
+				end_progress(0);
+			}
 			if (inc_recurse && first_flist) {
 				flist_free(first_flist);
 				if (first_flist) {
@@ -202,7 +204,7 @@ void send_files(int f_in, int f_out)
 			}
 			if (++phase > max_phase)
 				break;
-			if (verbose > 2)
+			if (DEBUG_GTE(SEND, 1))
 				rprintf(FINFO, "send_files phase=%d\n", phase);
 			write_ndx(f_out, NDX_DONE);
 			continue;
@@ -225,7 +227,7 @@ void send_files(int f_in, int f_out)
 			continue;
 		f_name(file, fname);
 
-		if (verbose > 2)
+		if (DEBUG_GTE(SEND, 1))
 			rprintf(FINFO, "send_files(%d, %s%s%s)\n", ndx, path,slash,fname);
 
 #ifdef SUPPORT_XATTRS
@@ -265,7 +267,7 @@ void send_files(int f_in, int f_out)
 		updating_basis_file = inplace && (protocol_version >= 29
 			? fnamecmp_type == FNAMECMP_FNAME : make_backups <= 0);
 
-		if (!am_server && do_progress)
+		if (!am_server && INFO_GTE(PROGRESS, 1))
 			set_current_file_index(file, ndx);
 		stats.num_transferred_files++;
 		stats.total_transferred_size += F_LENGTH(file);
@@ -321,7 +323,7 @@ void send_files(int f_in, int f_out)
 		} else
 			mbuf = NULL;
 
-		if (verbose > 2) {
+		if (DEBUG_GTE(CHKSUM, 2)) {
 			rprintf(FINFO, "send_files mapped %s%s%s of size %.0f\n",
 				path,slash,fname, (double)st.st_size);
 		}
@@ -330,18 +332,18 @@ void send_files(int f_in, int f_out)
 				    fnamecmp_type, xname, xlen);
 		write_sum_head(f_xfer, s);
 
-		if (verbose > 2)
+		if (DEBUG_GTE(CHKSUM, 2))
 			rprintf(FINFO, "calling match_sums %s%s%s\n", path,slash,fname);
 
 		if (log_before_transfer)
 			log_item(FCLIENT, file, &initial_stats, iflags, NULL);
-		else if (!am_server && verbose && do_progress)
+		else if (!am_server && INFO_GTE(NAME, 1) && INFO_EQ(PROGRESS, 1))
 			rprintf(FCLIENT, "%s\n", fname);
 
 		set_compression(fname);
 
 		match_sums(f_xfer, s, mbuf, st.st_size);
-		if (do_progress)
+		if (INFO_GTE(PROGRESS, 1))
 			end_progress(st.st_size);
 
 		log_item(log_code, file, &initial_stats, iflags, NULL);
@@ -359,7 +361,7 @@ void send_files(int f_in, int f_out)
 
 		free_sums(s);
 
-		if (verbose > 2)
+		if (DEBUG_GTE(SEND, 1))
 			rprintf(FINFO, "sender finished %s%s%s\n", path,slash,fname);
 
 		/* Flag that we actually sent this entry. */
@@ -368,7 +370,7 @@ void send_files(int f_in, int f_out)
 	if (make_backups < 0)
 		make_backups = -make_backups;
 
-	if (verbose > 2)
+	if (DEBUG_GTE(SEND, 1))
 		rprintf(FINFO, "send files finished\n");
 
 	match_report();

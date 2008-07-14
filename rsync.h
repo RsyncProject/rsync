@@ -1120,7 +1120,51 @@ size_t strlcat(char *d, const char *s, size_t bufsize);
 #define FD_ZERO(fdsetp) memset(fdsetp, 0, sizeof (fd_set))
 #endif
 
-extern int verbose;
+extern short info_levels[], debug_levels[];
+
+#define INFO_GTE(flag, lvl) (info_levels[INFO_##flag] >= (lvl))
+#define INFO_EQ(flag, lvl) (info_levels[INFO_##flag] == (lvl))
+#define DEBUG_GTE(flag, lvl) (debug_levels[DEBUG_##flag] >= (lvl))
+#define DEBUG_EQ(flag, lvl) (debug_levels[DEBUG_##flag] == (lvl))
+
+#define INFO_BACKUP 0
+#define INFO_COPY (INFO_BACKUP+1)
+#define INFO_DEL (INFO_COPY+1)
+#define INFO_FLIST (INFO_DEL+1)
+#define INFO_MISC (INFO_FLIST+1)
+#define INFO_MOUNT (INFO_MISC+1)
+#define INFO_NAME (INFO_MOUNT+1)
+#define INFO_PROGRESS (INFO_NAME+1)
+#define INFO_REMOVE (INFO_PROGRESS+1)
+#define INFO_SKIP (INFO_REMOVE+1)
+#define INFO_STATS (INFO_SKIP+1)
+#define INFO_SYMSAFE (INFO_STATS+1)
+
+#define COUNT_INFO (INFO_SYMSAFE+1)
+
+#define DEBUG_ACL 0
+#define DEBUG_BACKUP (DEBUG_ACL+1)
+#define DEBUG_BIND (DEBUG_BACKUP+1)
+#define DEBUG_CHDIR (DEBUG_BIND+1)
+#define DEBUG_CONNECT (DEBUG_CHDIR+1)
+#define DEBUG_CHKSUM (DEBUG_CONNECT+1)
+#define DEBUG_CMD (DEBUG_CHKSUM+1)
+#define DEBUG_DEL (DEBUG_CMD+1)
+#define DEBUG_DUP (DEBUG_DEL+1)
+#define DEBUG_EXIT (DEBUG_DUP+1)
+#define DEBUG_FILTER (DEBUG_EXIT+1)
+#define DEBUG_FLIST (DEBUG_FILTER+1)
+#define DEBUG_FUZZY (DEBUG_FLIST+1)
+#define DEBUG_GENR (DEBUG_FUZZY+1)
+#define DEBUG_HLINK (DEBUG_GENR+1)
+#define DEBUG_ICONV (DEBUG_HLINK+1)
+#define DEBUG_OWN (DEBUG_ICONV+1)
+#define DEBUG_PROTO (DEBUG_OWN+1)
+#define DEBUG_RECV (DEBUG_PROTO+1)
+#define DEBUG_SEND (DEBUG_RECV+1)
+#define DEBUG_TIME (DEBUG_SEND+1)
+
+#define COUNT_DEBUG (DEBUG_TIME+1)
 
 #ifndef HAVE_INET_NTOP
 const char *inet_ntop(int af, const void *src, char *dst, size_t size);

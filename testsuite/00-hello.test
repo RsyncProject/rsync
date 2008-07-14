@@ -2,4 +2,8 @@
 
 echo $0 running
 
-$RSYNC --version || exit 1
+$RSYNC --version || test_fail '--version output failed'
+
+$RSYNC --info=help || test_fail '--info=help output failed'
+
+$RSYNC --debug=help || test_fail '--debug=help output failed'

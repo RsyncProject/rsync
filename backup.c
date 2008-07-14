@@ -20,7 +20,6 @@
 
 #include "rsync.h"
 
-extern int verbose;
 extern int am_root;
 extern int preserve_acls;
 extern int preserve_xattrs;
@@ -62,7 +61,7 @@ static int make_simple_backup(const char *fname)
 
 	while (1) {
 		if (do_rename(fname, fnamebak) == 0) {
-			if (verbose > 1) {
+			if (INFO_GTE(BACKUP, 1)) {
 				rprintf(FINFO, "backed up %s to %s\n",
 					fname, fnamebak);
 			}
@@ -260,7 +259,7 @@ static int keep_backup(const char *fname)
 			}
 		} else
 			save_errno = 0;
-		if (verbose > 2 && save_errno == 0) {
+		if (DEBUG_GTE(BACKUP, 1) && save_errno == 0) {
 			rprintf(FINFO, "make_backup: DEVICE %s successful.\n",
 				fname);
 		}
@@ -285,7 +284,7 @@ static int keep_backup(const char *fname)
 		}
 
 		ret_code = do_rmdir(fname);
-		if (verbose > 2) {
+		if (DEBUG_GTE(BACKUP, 1)) {
 			rprintf(FINFO, "make_backup: RMDIR %s returns %i\n",
 				full_fname(fname), ret_code);
 		}
@@ -296,7 +295,7 @@ static int keep_backup(const char *fname)
 	if (!kept && preserve_links && S_ISLNK(file->mode)) {
 		const char *sl = F_SYMLINK(file);
 		if (safe_symlinks && unsafe_symlink(sl, buf)) {
-			if (verbose) {
+			if (INFO_GTE(SYMSAFE, 1)) {
 				rprintf(FINFO, "ignoring unsafe symlink %s -> %s\n",
 					full_fname(buf), sl);
 			}
@@ -345,7 +344,7 @@ static int keep_backup(const char *fname)
 	preserve_xattrs = save_preserve_xattrs;
 	unmake_file(file);
 
-	if (verbose > 1) {
+	if (INFO_GTE(BACKUP, 1)) {
 		rprintf(FINFO, "backed up %s to %s\n",
 			fname, buf);
 	}
