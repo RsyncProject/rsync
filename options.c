@@ -207,7 +207,7 @@ static char *debug_verbosity[] = {
 
 #define MAX_VERBOSITY ((int)(sizeof debug_verbosity / sizeof debug_verbosity[0]) - 1)
 
-static char *info_verbosity[MAX_VERBOSITY] = {
+static char *info_verbosity[1+MAX_VERBOSITY] = {
 	/*0*/ NULL,
 	/*1*/ "copy,del,flist,misc,name,stats,symsafe",
 	/*2*/ "backup,misc2,mount,name2,remove,skip",
