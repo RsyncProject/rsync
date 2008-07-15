@@ -1,5 +1,10 @@
 #! /bin/sh
 
+test_fail() {
+    echo "$@" >&2
+    exit 1
+}
+
 echo $0 running
 
 $RSYNC --version || test_fail '--version output failed'
