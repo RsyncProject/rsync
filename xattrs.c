@@ -294,7 +294,7 @@ int copy_xattrs(const char *source, const char *dest)
 	size_t datum_len;
 	char *name, *ptr;
 #ifdef HAVE_LINUX_XATTRS
-	int user_only = am_sender ? 0 : !am_root;
+	int user_only = am_sender ? 0 : am_root <= 0;
 #endif
 
 	/* This puts the name list into the "namebuf" buffer. */
@@ -745,6 +745,9 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 	ssize_t list_len;
 	size_t i, len;
 	char *name, *ptr, sum[MAX_DIGEST_LEN];
+#ifdef HAVE_LINUX_XATTRS
+	int user_only = am_root <= 0;
+#endif
 	size_t name_len;
 	int ret = 0;
 
@@ -820,8 +823,8 @@ static int rsync_xal_set(const char *fname, item_list *xalp,
 #ifdef HAVE_LINUX_XATTRS
 		/* We always ignore the system namespace, and non-root
 		 * ignores everything but the user namespace. */
-		if (am_root ? HAS_PREFIX(name, SYSTEM_PREFIX)
-			    : !HAS_PREFIX(name, USER_PREFIX))
+		if (user_only ? !HAS_PREFIX(name, USER_PREFIX)
+			      : HAS_PREFIX(name, SYSTEM_PREFIX))
 			continue;
 #endif
 		if (am_root < 0 && name_len > RPRE_LEN
