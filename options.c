@@ -237,7 +237,7 @@ struct output_struct {
 
 #define INFO_WORD(flag, where, help) { #flag, help, INFO_##flag, where, 0 }
 
-static struct output_struct info_words[] = {
+static struct output_struct info_words[COUNT_INFO+1] = {
 	INFO_WORD(BACKUP, W_REC, "Mention files backed up"),
 	INFO_WORD(COPY, W_REC, "Mention files copied locally on the receiving side"),
 	INFO_WORD(DEL, W_REC, "Mention deletions on the receiving side"),
@@ -255,7 +255,7 @@ static struct output_struct info_words[] = {
 
 #define DEBUG_WORD(flag, where, help) { #flag, help, DEBUG_##flag, where, 0 }
 
-static struct output_struct debug_words[] = {
+static struct output_struct debug_words[COUNT_DEBUG+1] = {
 	DEBUG_WORD(ACL, W_SND|W_REC, "Debug extra ACL info"),
 	DEBUG_WORD(BACKUP, W_REC, "Debug backup actions (levels 1-2)"),
 	DEBUG_WORD(BIND, W_CLI, "Debug socket bind actions"),
@@ -391,7 +391,7 @@ static char *make_output_option(struct output_struct *words, short *levels, shor
 }
 
 static void parse_output_words(struct output_struct *words, short *levels,
-			       const char *str, int priority)
+			       const char *str, short priority)
 {
 	const char *s;
 	int j, len, lev;
@@ -429,7 +429,8 @@ static void parse_output_words(struct output_struct *words, short *levels,
 			}
 		}
 		if (len && !words[j].name) {
-			rprintf(FERROR, "Unknown %s item: %.*s\n", words[j].help, len, str);
+			rprintf(FERROR, "Unknown %s item: \"%.*s\"\n",
+				words[j].help, len, str);
 			exit_cleanup(RERR_SYNTAX);
 		}
 		if (!s)
@@ -442,8 +443,11 @@ static void parse_output_words(struct output_struct *words, short *levels,
 static void output_item_help(struct output_struct *words)
 {
 	short *levels = words == info_words ? info_levels : debug_levels;
+	char **verbosity = words == info_words ? info_verbosity : debug_verbosity;
 	char buf[128], *opt, *fmt = "%-10s %s\n";
 	int j;
+
+	reset_output_levels();
 
 	rprintf(FINFO, "Use OPT or OPT1 for level 1 output, OPT2 for level 2, etc.; OPT0 silences.\n");
 	rprintf(FINFO, "\n");
@@ -464,23 +468,18 @@ static void output_item_help(struct output_struct *words)
 	rprintf(FINFO, "Options added for each increase in verbose level:\n");
 
 	for (j = 1; j <= MAX_VERBOSITY; j++) {
-		reset_output_levels();
-		if (words == info_words)
-			parse_output_words(info_words, levels, info_verbosity[j], HELP_PRIORITY);
-		else
-			parse_output_words(debug_words, levels, debug_verbosity[j], HELP_PRIORITY);
+		parse_output_words(words, levels, verbosity[j], HELP_PRIORITY);
 		opt = make_output_option(words, levels, W_CLI|W_SRV|W_SND|W_REC);
 		if (opt) {
 			rprintf(FINFO, "%d) %s\n", j, strchr(opt, '=')+1);
 			free(opt);
 		}
+		reset_output_levels();
 	}
-
-	reset_output_levels();
 }
 
 /* The --verbose option now sets info+debug flags. */
-static void set_output_verbosity(int level, int priority)
+static void set_output_verbosity(int level, short priority)
 {
 	int j;
 
