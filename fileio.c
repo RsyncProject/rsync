@@ -232,8 +232,8 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 	if (map->p_fd_offset != read_start) {
 		OFF_T ret = do_lseek(map->fd, read_start, SEEK_SET);
 		if (ret != read_start) {
-			rsyserr(FERROR, errno, "lseek returned %.0f, not %.0f",
-				(double)ret, (double)read_start);
+			rsyserr(FERROR, errno, "lseek returned %s, not %s",
+				big_num(ret, 0), big_num(read_start, 0));
 			exit_cleanup(RERR_FILEIO);
 		}
 		map->p_fd_offset = read_start;

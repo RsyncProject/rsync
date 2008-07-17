@@ -818,10 +818,10 @@ void log_delete(const char *fname, int mode)
 void log_exit(int code, const char *file, int line)
 {
 	if (code == 0) {
-		rprintf(FLOG,"sent %.0f bytes  received %.0f bytes  total size %.0f\n",
-			(double)stats.total_written,
-			(double)stats.total_read,
-			(double)stats.total_size);
+		rprintf(FLOG,"sent %s bytes  received %s bytes  total size %s\n",
+			big_num(stats.total_written, 0),
+			big_num(stats.total_read, 0),
+			big_num(stats.total_size, 0));
 	} else if (am_server != 2) {
 		const char *name;
 

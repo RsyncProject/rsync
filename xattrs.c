@@ -114,7 +114,7 @@ static int rsync_xal_compare_names(const void *x1, const void *x2)
 static ssize_t get_xattr_names(const char *fname)
 {
 	ssize_t list_len;
-	double arg;
+	int64 arg;
 
 	if (!namebuf) {
 		namebuf_len = 1024;
@@ -132,11 +132,11 @@ static ssize_t get_xattr_names(const char *fname)
 		} else if (errno == ENOTSUP)
 			return 0;
 		else if (errno != ERANGE) {
-			arg = (double)namebuf_len;
+			arg = namebuf_len;
 		  got_error:
 			rsyserr(FERROR_XFER, errno,
-				"get_xattr_names: llistxattr(\"%s\",%.0f) failed",
-				fname, arg);
+				"get_xattr_names: llistxattr(\"%s\",%s) failed",
+				fname, big_num(arg, 0));
 			return -1;
 		}
 		list_len = sys_llistxattr(fname, NULL, 0);

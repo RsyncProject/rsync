@@ -25,6 +25,7 @@
 extern int am_server;
 extern int need_unsorted_flist;
 extern int output_needs_newline;
+extern int human_readable;
 extern struct stats stats;
 extern struct file_list *cur_flist;
 
@@ -124,7 +125,7 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 	output_needs_newline = 0;
 	pct = ofs == size ? 100 : (int) (100.0 * ofs / size);
 	rprintf(FCLIENT, "\r%12s %3d%% %7.2f%s %s%s",
-		human_num(ofs), pct, rate, units, rembuf, eol);
+		big_num(ofs, human_readable), pct, rate, units, rembuf, eol);
 	if (!is_last) {
 		output_needs_newline = 1;
 		rflush(FCLIENT);

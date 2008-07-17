@@ -36,6 +36,7 @@ extern int am_generator;
 extern int am_daemon;
 extern int inc_recurse;
 extern int blocking_io;
+extern int human_readable;
 extern int remove_source_files;
 extern int output_needs_newline;
 extern int need_messages_from_generator;
@@ -244,15 +245,15 @@ static void output_summary(void)
 		rprintf(FINFO,"Number of files transferred: %d\n",
 			stats.num_transferred_files);
 		rprintf(FINFO,"Total file size: %s bytes\n",
-			human_num(stats.total_size));
+			big_num(stats.total_size, human_readable));
 		rprintf(FINFO,"Total transferred file size: %s bytes\n",
-			human_num(stats.total_transferred_size));
+			big_num(stats.total_transferred_size, human_readable));
 		rprintf(FINFO,"Literal data: %s bytes\n",
-			human_num(stats.literal_data));
+			big_num(stats.literal_data, human_readable));
 		rprintf(FINFO,"Matched data: %s bytes\n",
-			human_num(stats.matched_data));
+			big_num(stats.matched_data, human_readable));
 		rprintf(FINFO,"File list size: %s\n",
-			human_num(stats.flist_size));
+			big_num(stats.flist_size, human_readable));
 		if (stats.flist_buildtime) {
 			rprintf(FINFO,
 				"File list generation time: %.3f seconds\n",
@@ -262,19 +263,20 @@ static void output_summary(void)
 				(double)stats.flist_xfertime / 1000);
 		}
 		rprintf(FINFO,"Total bytes sent: %s\n",
-			human_num(total_written));
+			big_num(total_written, human_readable));
 		rprintf(FINFO,"Total bytes received: %s\n",
-			human_num(total_read));
+			big_num(total_read, human_readable));
 	}
 
 	if (INFO_GTE(STATS, 1)) {
 		rprintf(FCLIENT, "\n");
 		rprintf(FINFO,
 			"sent %s bytes  received %s bytes  %s bytes/sec\n",
-			human_num(total_written), human_num(total_read),
+			big_num(total_written, human_readable),
+			big_num(total_read, human_readable),
 			human_dnum((total_written + total_read)/(0.5 + (endtime - starttime)), 2));
 		rprintf(FINFO, "total size is %s  speedup is %.2f%s\n",
-			human_num(stats.total_size),
+			big_num(stats.total_size, human_readable),
 			(double)stats.total_size / (total_written+total_read),
 			write_batch < 0 ? " (BATCH ONLY)" : dry_run ? " (DRY RUN)" : "");
 	}

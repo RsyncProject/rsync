@@ -179,8 +179,8 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		int32 read_size = MAX(sum.blength * 2, 16*1024);
 		mapbuf = map_file(fd_r, size_r, read_size, sum.blength);
 		if (DEBUG_GTE(CHKSUM, 2)) {
-			rprintf(FINFO, "recv mapped %s of size %.0f\n",
-				fname_r, (double)size_r);
+			rprintf(FINFO, "recv mapped %s of size %s\n",
+				fname_r, big_num(size_r, 0));
 		}
 	} else
 		mapbuf = NULL;
@@ -209,8 +209,8 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		}
 		offset = sum.flength;
 		if (fd != -1 && (j = do_lseek(fd, offset, SEEK_SET)) != offset) {
-			rsyserr(FERROR_XFER, errno, "lseek of %s returned %.0f, not %.0f",
-				full_fname(fname), (double)j, (double)offset);
+			rsyserr(FERROR_XFER, errno, "lseek of %s returned %s, not %s",
+				full_fname(fname), big_num(j, 0), big_num(offset, 0));
 			exit_cleanup(RERR_FILEIO);
 		}
 	}
@@ -221,8 +221,8 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 		if (i > 0) {
 			if (DEBUG_GTE(CHKSUM, 3)) {
-				rprintf(FINFO,"data recv %d at %.0f\n",
-					i,(double)offset);
+				rprintf(FINFO,"data recv %d at %s\n",
+					i, big_num(offset, 0));
 			}
 
 			stats.literal_data += i;
@@ -246,8 +246,8 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 		if (DEBUG_GTE(CHKSUM, 3)) {
 			rprintf(FINFO,
-				"chunk[%d] of size %ld at %.0f offset=%.0f\n",
-				i, (long)len, (double)offset2, (double)offset);
+				"chunk[%d] of size %ld at %s offset=%s\n",
+				i, (long)len, big_num(offset2, 0), big_num(offset, 0));
 		}
 
 		if (mapbuf) {
@@ -265,9 +265,9 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 				offset += len;
 				if ((pos = do_lseek(fd, len, SEEK_CUR)) != offset) {
 					rsyserr(FERROR_XFER, errno,
-						"lseek of %s returned %.0f, not %.0f",
+						"lseek of %s returned %s, not %s",
 						full_fname(fname),
-						(double)pos, (double)offset);
+						big_num(pos, 0), big_num(offset, 0));
 					exit_cleanup(RERR_FILEIO);
 				}
 				continue;

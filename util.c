@@ -1188,10 +1188,10 @@ int unsafe_symlink(const char *dest, const char *src)
 	return (depth < 0);
 }
 
-/* Return the int64 number as a string.  If the --human-readable option was
- * specified, we may output the number in K, M, or G units.  We can return
- * up to 4 buffers at a time. */
-char *human_num(int64 num)
+/* Return the int64 number as a string.  If the human_flag arg is non-zero,
+ * we may output the number in K, M, or G units.  We can return up to 4
+ * buffers at a time. */
+char *big_num(int64 num, int human_flag)
 {
 	static char bufs[4][128]; /* more than enough room */
 	static unsigned int n;
@@ -1199,9 +1199,9 @@ char *human_num(int64 num)
 
 	n = (n + 1) % (sizeof bufs / sizeof bufs[0]);
 
-	if (human_readable) {
+	if (human_flag) {
 		char units = '\0';
-		int mult = human_readable == 1 ? 1000 : 1024;
+		int mult = human_flag == 1 ? 1000 : 1024;
 		double dnum = 0;
 		if (num > mult*mult*mult) {
 			dnum = (double)num / (mult*mult*mult);
@@ -1233,10 +1233,10 @@ char *human_num(int64 num)
 
 /* Return the double number as a string.  If the --human-readable option was
  * specified, we may output the number in K, M, or G units.  We use a buffer
- * from human_num() to return our result. */
+ * from big_num() to return our result. */
 char *human_dnum(double dnum, int decimal_digits)
 {
-	char *buf = human_num(dnum);
+	char *buf = big_num(dnum, human_readable);
 	int len = strlen(buf);
 	if (isDigit(buf + len - 1)) {
 		/* There's extra room in buf prior to the start of the num. */
@@ -1583,8 +1583,8 @@ void *expand_item_list(item_list *lp, size_t item_size,
 		/* Using _realloc_array() lets us pass the size, not a type. */
 		new_ptr = _realloc_array(lp->items, item_size, new_size);
 		if (DEBUG_GTE(FLIST, 3)) {
-			rprintf(FINFO, "[%s] expand %s to %.0f bytes, did%s move\n",
-				who_am_i(), desc, (double)new_size * item_size,
+			rprintf(FINFO, "[%s] expand %s to %s bytes, did%s move\n",
+				who_am_i(), desc, big_num(new_size * item_size, 0),
 				new_ptr == lp->items ? " not" : "");
 		}
 		if (!new_ptr)

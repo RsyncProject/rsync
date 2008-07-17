@@ -70,8 +70,8 @@ static struct sum_struct *receive_sums(int f)
 	s->sums = NULL;
 
 	if (DEBUG_GTE(CHKSUM, 3)) {
-		rprintf(FINFO, "count=%.0f n=%ld rem=%ld\n",
-			(double)s->count, (long)s->blength, (long)s->remainder);
+		rprintf(FINFO, "count=%s n=%ld rem=%ld\n",
+			big_num(s->count, 0), (long)s->blength, (long)s->remainder);
 	}
 
 	if (append_mode > 0) {
@@ -105,8 +105,8 @@ static struct sum_struct *receive_sums(int f)
 
 		if (DEBUG_GTE(CHKSUM, 3)) {
 			rprintf(FINFO,
-				"chunk[%d] len=%d offset=%.0f sum1=%08x\n",
-				i, s->sums[i].len, (double)s->sums[i].offset,
+				"chunk[%d] len=%d offset=%s sum1=%08x\n",
+				i, s->sums[i].len, big_num(s->sums[i].offset, 0),
 				s->sums[i].sum1);
 		}
 	}
@@ -324,8 +324,8 @@ void send_files(int f_in, int f_out)
 			mbuf = NULL;
 
 		if (DEBUG_GTE(CHKSUM, 2)) {
-			rprintf(FINFO, "send_files mapped %s%s%s of size %.0f\n",
-				path,slash,fname, (double)st.st_size);
+			rprintf(FINFO, "send_files mapped %s%s%s of size %s\n",
+				path,slash,fname, big_num(st.st_size, 0));
 		}
 
 		write_ndx_and_attrs(f_out, ndx, iflags, fname, file,

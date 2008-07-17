@@ -629,8 +629,8 @@ static void whine_about_eof(int fd)
 	}
 
 	rprintf(FERROR, RSYNC_NAME ": connection unexpectedly closed "
-		"(%.0f bytes received so far) [%s]\n",
-		(double)stats.total_read, who_am_i());
+		"(%s bytes received so far) [%s]\n",
+		big_num(stats.total_read, 0), who_am_i());
 
 	exit_cleanup(RERR_STREAMIO);
 }

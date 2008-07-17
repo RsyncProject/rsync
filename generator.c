@@ -805,9 +805,9 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 
 	if (sum->count && DEBUG_GTE(CHKSUM, 2)) {
 		rprintf(FINFO,
-			"count=%.0f rem=%ld blength=%ld s2length=%d flength=%.0f\n",
-			(double)sum->count, (long)sum->remainder, (long)sum->blength,
-			sum->s2length, (double)sum->flength);
+			"count=%s rem=%ld blength=%ld s2length=%d flength=%s\n",
+			big_num(sum->count, 0), (long)sum->remainder, (long)sum->blength,
+			sum->s2length, big_num(sum->flength, 0));
 	}
 }
 
@@ -857,8 +857,8 @@ static int generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 
 		if (DEBUG_GTE(CHKSUM, 3)) {
 			rprintf(FINFO,
-				"chunk[%.0f] offset=%.0f len=%ld sum1=%08lx\n",
-				(double)i, (double)offset - n1, (long)n1,
+				"chunk[%s] offset=%s len=%ld sum1=%08lx\n",
+				big_num(i, 0), big_num(offset - n1, 0), (long)n1,
 				(unsigned long)sum1);
 		}
 		write_int(f_out, sum1);
@@ -1904,8 +1904,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (DEBUG_GTE(CHKSUM, 3)) {
-		rprintf(FINFO, "gen mapped %s of size %.0f\n",
-			fnamecmp, (double)sx.st.st_size);
+		rprintf(FINFO, "gen mapped %s of size %s\n",
+			fnamecmp, big_num(sx.st.st_size, 0));
 	}
 
 	if (DEBUG_GTE(CHKSUM, 2))

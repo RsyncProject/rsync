@@ -108,8 +108,8 @@ static void matched(int f, struct sum_struct *s, struct map_struct *buf,
 
 	if (DEBUG_GTE(CHKSUM, 2) && i >= 0) {
 		rprintf(FINFO,
-			"match at %.0f last_match=%.0f j=%d len=%ld n=%ld\n",
-			(double)offset, (double)last_match, i,
+			"match at %s last_match=%s j=%d len=%ld n=%ld\n",
+			big_num(offset, 0), big_num(last_match, 0), i,
 			(long)s->sums[i].len, (long)n);
 	}
 
@@ -151,8 +151,8 @@ static void hash_search(int f,struct sum_struct *s,
 	want_i = 0;
 
 	if (DEBUG_GTE(CHKSUM, 2)) {
-		rprintf(FINFO, "hash search b=%ld len=%.0f\n",
-			(long)s->blength, (double)len);
+		rprintf(FINFO, "hash search b=%ld len=%s\n",
+			(long)s->blength, big_num(len, 0));
 	}
 
 	k = (int32)MIN(len, (OFF_T)s->blength);
@@ -170,8 +170,8 @@ static void hash_search(int f,struct sum_struct *s,
 	end = len + 1 - s->sums[s->count-1].len;
 
 	if (DEBUG_GTE(CHKSUM, 3)) {
-		rprintf(FINFO, "hash search s->blength=%ld len=%.0f count=%.0f\n",
-			(long)s->blength, (double)len, (double)s->count);
+		rprintf(FINFO, "hash search s->blength=%ld len=%s count=%s\n",
+			(long)s->blength, big_num(len, 0), big_num(s->count, 0));
 	}
 
 	do {
@@ -179,8 +179,8 @@ static void hash_search(int f,struct sum_struct *s,
 		int32 i;
 
 		if (DEBUG_GTE(CHKSUM, 4)) {
-			rprintf(FINFO, "offset=%.0f sum=%04x%04x\n",
-				(double)offset, s2 & 0xFFFF, s1 & 0xFFFF);
+			rprintf(FINFO, "offset=%s sum=%04x%04x\n",
+				big_num(offset, 0), s2 & 0xFFFF, s1 & 0xFFFF);
 		}
 
 		if (tablesize == TRADITIONAL_TABLESIZE) {
@@ -213,8 +213,8 @@ static void hash_search(int f,struct sum_struct *s,
 
 			if (DEBUG_GTE(CHKSUM, 3)) {
 				rprintf(FINFO,
-					"potential match at %.0f i=%ld sum=%08x\n",
-					(double)offset, (long)i, sum);
+					"potential match at %s i=%ld sum=%08x\n",
+					big_num(offset, 0), (long)i, sum);
 			}
 
 			if (!done_csum2) {
@@ -402,7 +402,7 @@ void match_report(void)
 		return;
 
 	rprintf(FINFO,
-		"total: matches=%d  hash_hits=%d  false_alarms=%d data=%.0f\n",
+		"total: matches=%d  hash_hits=%d  false_alarms=%d data=%s\n",
 		total_matches, total_hash_hits, total_false_alarms,
-		(double)stats.literal_data);
+		big_num(stats.literal_data, 0));
 }
