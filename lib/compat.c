@@ -151,3 +151,46 @@ int sys_gettimeofday(struct timeval *tv)
 	return gettimeofday(tv);
 #endif
 }
+
+/* Return the int64 number as a string.  If the human_flag arg is non-zero,
+ * we may output the number in K, M, or G units.  We can return up to 4
+ * buffers at a time. */
+char *big_num(int64 num, int human_flag)
+{
+	static char bufs[4][128]; /* more than enough room */
+	static unsigned int n;
+	char *s;
+
+	n = (n + 1) % (sizeof bufs / sizeof bufs[0]);
+
+	if (human_flag) {
+		char units = '\0';
+		int mult = human_flag == 1 ? 1000 : 1024;
+		double dnum = 0;
+		if (num > mult*mult*mult) {
+			dnum = (double)num / (mult*mult*mult);
+			units = 'G';
+		} else if (num > mult*mult) {
+			dnum = (double)num / (mult*mult);
+			units = 'M';
+		} else if (num > mult) {
+			dnum = (double)num / mult;
+			units = 'K';
+		}
+		if (units) {
+			snprintf(bufs[n], sizeof bufs[0], "%.2f%c", dnum, units);
+			return bufs[n];
+		}
+	}
+
+	s = bufs[n] + sizeof bufs[0] - 1;
+	*s = '\0';
+
+	if (!num)
+		*--s = '0';
+	while (num) {
+		*--s = (char)(num % 10) + '0';
+		num /= 10;
+	}
+	return s;
+}
