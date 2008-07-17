@@ -41,7 +41,7 @@ struct hashtable *hashtable_create(int size, int key64)
 	tbl->size = size;
 	tbl->entries = 0;
 	tbl->node_size = node_size;
-	tbl->key64 = key64;
+	tbl->key64 = (short)key64;
 
 	return tbl;
 }

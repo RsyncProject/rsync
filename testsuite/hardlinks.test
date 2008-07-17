@@ -33,11 +33,11 @@ ln "$name2" "$name3" || fail "Can't create hardlink"
 cp "$name2" "$name4" || fail "Can't copy file"
 cat $srcdir/*.c >"$fromdir/text"
 
-checkit "$RSYNC -aHivv '$fromdir/' '$todir/'" "$fromdir" "$todir"
+checkit "$RSYNC -aHivv --debug=hlink5 '$fromdir/' '$todir/'" "$fromdir" "$todir"
 
 echo "extra extra" >>"$todir/name1"
 
-checkit "$RSYNC -aHivv --no-whole-file '$fromdir/' '$todir/'" "$fromdir" "$todir"
+checkit "$RSYNC -aHivv --debug=hlink5 --no-whole-file '$fromdir/' '$todir/'" "$fromdir" "$todir"
 
 # Add a new link in a new subdirectory to test that we don't try to link
 # the files before the directory gets created.  We also create a bunch of
@@ -56,27 +56,27 @@ done
 ln "$name1" "$fromdir/subdir/down/deep/new-file"
 rm "$todir/text"
 
-checkit "$RSYNC -aHivve '$SSH' --rsync-path='$RSYNC' '$fromdir/' localhost:'$todir/'" "$fromdir" "$todir"
+checkit "$RSYNC -aHivve '$SSH' --debug=hlink5 --rsync-path='$RSYNC' '$fromdir/' localhost:'$todir/'" "$fromdir" "$todir"
 
 # Do some duplicate copies using --link-dest and --copy-dest to test that
 # we hard-link all locally-inherited items.
-checkit "$RSYNC -aHivv --link-dest='$todir' '$fromdir/' '$chkdir/'" "$todir" "$chkdir"
+checkit "$RSYNC -aHivv --debug=hlink5 --link-dest='$todir' '$fromdir/' '$chkdir/'" "$todir" "$chkdir"
 
 rm -rf "$chkdir"
-checkit "$RSYNC -aHivv --copy-dest='$todir' '$fromdir/' '$chkdir/'" "$fromdir" "$chkdir"
+checkit "$RSYNC -aHivv --debug=hlink5 --copy-dest='$todir' '$fromdir/' '$chkdir/'" "$fromdir" "$chkdir"
 
 # Create a hard link that has only one part in the hierarchy.
 echo "This is another file" >"$fromdir/solo"
 ln "$fromdir/solo" "$chkdir/solo" || fail "Can't create hardlink"
 
 # Make sure that the checksum data doesn't slide due to an HLINK_BUMP() change.
-$RSYNC -aHivc "$fromdir/" "$chkdir/" | tee "$outfile"
+$RSYNC -aHivc --debug=hlink5 "$fromdir/" "$chkdir/" | tee "$outfile"
 grep solo "$outfile" && test_fail "Erroneous copy of solo file occurred!"
 
 # Make sure there's nothing wrong with sending a single file with -H
 # enabled (this has broken twice so far, so we need this test).
 rm -rf "$todir"
-$RSYNC -aHivv "$name1" "$todir/"
+$RSYNC -aHivv --debug=hlink5 "$name1" "$todir/"
 diff $diffopt "$name1" "$todir" || test_fail "solo copy of name1 failed"
 
 # The script would have aborted on error, so getting here means we've won.

@@ -68,8 +68,14 @@ struct ht_int64_node *idev_find(int64 dev, int64 ino)
 	if (!dev_node || dev_node->key != dev) {
 		/* We keep a separate hash table of inodes for every device. */
 		dev_node = hashtable_find(dev_tbl, dev, 1);
-		if (!(tbl = dev_node->data))
+		if (!(tbl = dev_node->data)) {
 			tbl = dev_node->data = hashtable_create(512, SIZEOF_INT64 == 8);
+			if (DEBUG_GTE(HLINK, 1)) {
+				rprintf(FINFO,
+				    "created inode hashtable for dev %s\n",
+				    big_num(dev, 0));
+			}
+		}
 	} else
 		tbl = dev_node->data;
 

@@ -399,7 +399,9 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file, 
 	static gid_t gid;
 	static const char *user_name, *group_name;
 	static char lastname[MAXPATHLEN];
+#ifdef SUPPORT_HARD_LINKS
 	int first_hlink_ndx = -1;
+#endif
 	int l1, l2;
 	int xflags;
 
@@ -472,6 +474,12 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file, 
 				np->data = (void*)(long)(first_ndx + ndx + 1);
 				xflags |= XMIT_HLINK_FIRST;
 			}
+			if (DEBUG_GTE(HLINK, 1)) {
+				rprintf(FINFO, "found %s dev:inode %s:%s (#%ld)\n",
+				    xflags & XMIT_HLINK_FIRST ? "first" : "matching",
+				    big_num(tmp_dev, 0), big_num(tmp_ino, 0),
+				    (long)np->data - 1);
+			}
 		} else {
 			if (tmp_dev == dev) {
 				if (protocol_version >= 28)
@@ -518,11 +526,16 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file, 
 		write_byte(f, l2);
 	write_buf(f, fname + l1, l2);
 
+#ifdef SUPPORT_HARD_LINKS
 	if (first_hlink_ndx >= 0) {
 		write_varint(f, first_hlink_ndx);
-		if (first_hlink_ndx >= first_ndx)
+		if (first_hlink_ndx >= first_ndx) {
+			if (DEBUG_GTE(HLINK, 2))
+				rprintf(FINFO, "sending abbr. entry\n");
 			goto the_end;
+		}
 	}
+#endif
 
 	write_varlong30(f, F_LENGTH(file), 3);
 	if (!(xflags & XMIT_SAME_TIME)) {
@@ -609,7 +622,9 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file, 
 		write_buf(f, sum, checksum_len);
 	}
 
+#ifdef SUPPORT_HARD_LINKS
   the_end:
+#endif
 	strlcpy(lastname, fname, MAXPATHLEN);
 
 	if (S_ISREG(mode) || S_ISLNK(mode))
@@ -712,6 +727,11 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 				"hard-link reference out of range: %d (%d)\n",
 				first_hlink_ndx, flist->ndx_start + flist->used);
 			exit_cleanup(RERR_PROTOCOL);
+		}
+		if (DEBUG_GTE(HLINK, 2)) {
+			rprintf(FINFO, "hard-link reference #%d (%sabbr.)\n",
+				first_hlink_ndx,
+				first_hlink_ndx >= flist->ndx_start ? "" : "un");
 		}
 		if (first_hlink_ndx >= flist->ndx_start) {
 			struct file_struct *first = flist->files[first_hlink_ndx - flist->ndx_start];
