@@ -14,16 +14,16 @@ hands_setup
 runtest "basic operation" 'checkit "$RSYNC -av \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
 
 ln "$fromdir/filelist" "$fromdir/dir"
-runtest "hard links" 'checkit "$RSYNC -avH \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
+runtest "hard links" 'checkit "$RSYNC -avH --debug=hlink \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
 
 rm "$todir/text"
-runtest "one file" 'checkit "$RSYNC -avH \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
+runtest "one file" 'checkit "$RSYNC -avH --debug=hlink \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
 
 echo "extra line" >> "$todir/text"
-runtest "extra data" 'checkit "$RSYNC -avH --no-whole-file \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
+runtest "extra data" 'checkit "$RSYNC -avH --debug=hlink --no-whole-file \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
 
 cp "$fromdir/text" "$todir/ThisShouldGo"
-runtest " --delete" 'checkit "$RSYNC --delete -avH \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
+runtest " --delete" 'checkit "$RSYNC --delete -avH --debug=hlink \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
 
 cd "$tmpdir"
 rm -rf to from/*dir
