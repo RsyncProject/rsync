@@ -3,10 +3,13 @@
 dummy
 ID
 Makefile
+Makefile.old
 configure.sh
+configure.sh.old
 config.cache
 config.h
 config.h.in
+config.h.in.old
 config.log
 config.status
 /proto.h
