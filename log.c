@@ -499,9 +499,9 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 				n = client_addr(0);
 			break;
 		case 'l':
-			strlcat(fmt, ".0f", sizeof fmt);
+			strlcat(fmt, "s", sizeof fmt);
 			snprintf(buf2, sizeof buf2, fmt,
-				 (double)F_LENGTH(file));
+				 big_num(F_LENGTH(file), 0));
 			n = buf2;
 			break;
 		case 'U':
@@ -617,8 +617,8 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 				b = stats.total_read -
 					initial_stats->total_read;
 			}
-			strlcat(fmt, ".0f", sizeof fmt);
-			snprintf(buf2, sizeof buf2, fmt, (double)b);
+			strlcat(fmt, "s", sizeof fmt);
+			snprintf(buf2, sizeof buf2, fmt, big_num(b, 0));
 			n = buf2;
 			break;
 		case 'c':
@@ -629,8 +629,8 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 				b = stats.total_read -
 					initial_stats->total_read;
 			}
-			strlcat(fmt, ".0f", sizeof fmt);
-			snprintf(buf2, sizeof buf2, fmt, (double)b);
+			strlcat(fmt, "s", sizeof fmt);
+			snprintf(buf2, sizeof buf2, fmt, big_num(b, 0));
 			n = buf2;
 			break;
 		case 'i':

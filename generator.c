@@ -1198,7 +1198,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 static void list_file_entry(struct file_struct *f)
 {
 	char permbuf[PERMSTRING_SIZE];
-	double len;
+	int64 len;
 
 	if (!F_IS_ACTIVE(f)) {
 		/* this can happen if duplicate names were removed */
@@ -1212,14 +1212,14 @@ static void list_file_entry(struct file_struct *f)
 
 #ifdef SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(f->mode)) {
-		rprintf(FINFO, "%s %11.0f %s %s -> %s\n",
-			permbuf, len, timestring(f->modtime),
+		rprintf(FINFO, "%s %11s %s %s -> %s\n",
+			permbuf, big_num(len, 0), timestring(f->modtime),
 			f_name(f, NULL), F_SYMLINK(f));
 	} else
 #endif
 	{
-		rprintf(FINFO, "%s %11.0f %s %s\n",
-			permbuf, len, timestring(f->modtime),
+		rprintf(FINFO, "%s %11s %s %s\n",
+			permbuf, big_num(len, 0), timestring(f->modtime),
 			f_name(f, NULL));
 	}
 }

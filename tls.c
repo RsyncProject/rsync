@@ -179,8 +179,8 @@ static void list_file(const char *fname)
 		printf("%5ld,%6ld",
 		    (long)major(buf.st_rdev),
 		    (long)minor(buf.st_rdev));
-	} else /* NB: use double for size since it might not fit in a long. */
-		printf("%12.0f", (double)buf.st_size);
+	} else
+		printf("%12s", big_num(buf.st_size, 0));
 	printf(" %6ld.%-6ld %6ld %s %s%s\n",
 	       (long)buf.st_uid, (long)buf.st_gid, (long)buf.st_nlink,
 	       datebuf, fname, linkbuf);
