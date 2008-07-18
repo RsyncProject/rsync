@@ -196,7 +196,7 @@ char *iconv_opt = ICONV_OPTION;
 
 struct chmod_mode_struct *chmod_modes = NULL;
 
-static char *debug_verbosity[] = {
+static const char *debug_verbosity[] = {
 	/*0*/ NULL,
 	/*1*/ NULL,
 	/*2*/ "bind,cmd,chksum,connect,del,dup,filter,flist",
@@ -207,7 +207,7 @@ static char *debug_verbosity[] = {
 
 #define MAX_VERBOSITY ((int)(sizeof debug_verbosity / sizeof debug_verbosity[0]) - 1)
 
-static char *info_verbosity[1+MAX_VERBOSITY] = {
+static const char *info_verbosity[1+MAX_VERBOSITY] = {
 	/*0*/ NULL,
 	/*1*/ "copy,del,flist,misc,name,stats,symsafe",
 	/*2*/ "backup,misc2,mount,name2,remove,skip",
@@ -230,12 +230,13 @@ short info_levels[COUNT_INFO], debug_levels[COUNT_DEBUG];
 struct output_struct {
 	char *name;	/* The name of the info/debug flag. */
 	char *help;	/* The description of the info/debug flag. */
-	short flag;	/* The flag's value, for consistency check. */
-	short where;	/* Bits indicating where the flag is used. */
-	short priority; /* See *_PRIORITY defines. */
+	uchar namelen;  /* The length of the name string. */
+	uchar flag;	/* The flag's value, for consistency check. */
+	uchar where;	/* Bits indicating where the flag is used. */
+	uchar priority; /* See *_PRIORITY defines. */
 };
 
-#define INFO_WORD(flag, where, help) { #flag, help, INFO_##flag, where, 0 }
+#define INFO_WORD(flag, where, help) { #flag, help, sizeof #flag - 1, INFO_##flag, where, 0 }
 
 static struct output_struct info_words[COUNT_INFO+1] = {
 	INFO_WORD(BACKUP, W_REC, "Mention files backed up"),
@@ -250,10 +251,10 @@ static struct output_struct info_words[COUNT_INFO+1] = {
 	INFO_WORD(SKIP, W_REC, "Mention files that are skipped due to options used"),
 	INFO_WORD(STATS, W_CLI|W_SRV, "Mention statistics at end of run (levels 1-3)"),
 	INFO_WORD(SYMSAFE, W_SND|W_REC, "Mention symlinks that are unsafe"),
-	{ NULL, "--info", 0, 0, 0 }
+	{ NULL, "--info", 0, 0, 0, 0 }
 };
 
-#define DEBUG_WORD(flag, where, help) { #flag, help, DEBUG_##flag, where, 0 }
+#define DEBUG_WORD(flag, where, help) { #flag, help, sizeof #flag - 1, DEBUG_##flag, where, 0 }
 
 static struct output_struct debug_words[COUNT_DEBUG+1] = {
 	DEBUG_WORD(ACL, W_SND|W_REC, "Debug extra ACL info"),
@@ -277,7 +278,7 @@ static struct output_struct debug_words[COUNT_DEBUG+1] = {
 	DEBUG_WORD(RECV, W_REC, "Debug receiver functions"),
 	DEBUG_WORD(SEND, W_SND, "Debug sender functions"),
 	DEBUG_WORD(TIME, W_REC, "Debug setting of modified times (levels 1-2)"),
-	{ NULL, "--debug", 0, 0, 0 }
+	{ NULL, "--debug", 0, 0, 0, 0 }
 };
 
 static int verbose = 0;
@@ -306,7 +307,7 @@ static void output_item_help(struct output_struct *words);
  * the --info or --debug setting, skipping any implied options (by -v, etc.).
  * This is used both when conveying the user's options to the server, and
  * when the help output wants to tell the user what options are implied. */
-static char *make_output_option(struct output_struct *words, short *levels, short where)
+static char *make_output_option(struct output_struct *words, short *levels, uchar where)
 {
 	char *str = words == info_words ? "--info=" : "--debug=";
 	int j, counts[MAX_OUT_LEVEL+1], pos, skipped = 0, len = 0, max = 0, lev = 0;
@@ -391,7 +392,7 @@ static char *make_output_option(struct output_struct *words, short *levels, shor
 }
 
 static void parse_output_words(struct output_struct *words, short *levels,
-			       const char *str, short priority)
+			       const char *str, uchar priority)
 {
 	const char *s;
 	int j, len, lev;
@@ -419,7 +420,7 @@ static void parse_output_words(struct output_struct *words, short *levels,
 			len = 0;
 		for (j = 0; words[j].name; j++) {
 			if (!len
-			 || (strncasecmp(str, words[j].name, len) == 0 && !words[j].name[len])) {
+			 || (len == words[j].namelen && strncasecmp(str, words[j].name, len) == 0)) {
 				if (priority >= words[j].priority) {
 					words[j].priority = priority;
 					levels[j] = lev;
@@ -443,7 +444,7 @@ static void parse_output_words(struct output_struct *words, short *levels,
 static void output_item_help(struct output_struct *words)
 {
 	short *levels = words == info_words ? info_levels : debug_levels;
-	char **verbosity = words == info_words ? info_verbosity : debug_verbosity;
+	const char **verbosity = words == info_words ? info_verbosity : debug_verbosity;
 	char buf[128], *opt, *fmt = "%-10s %s\n";
 	int j;
 
@@ -479,7 +480,7 @@ static void output_item_help(struct output_struct *words)
 }
 
 /* The --verbose option now sets info+debug flags. */
-static void set_output_verbosity(int level, short priority)
+static void set_output_verbosity(int level, uchar priority)
 {
 	int j;
 
@@ -2082,7 +2083,7 @@ void server_options(char **args, int *argc_p)
 {
 	static char argstr[64];
 	int ac = *argc_p;
-	short where;
+	uchar where;
 	char *arg;
 	int i, x;
 
