@@ -95,25 +95,39 @@ for
 .I quantum
 will produce a quantum that should meet maximal alignment
 on most platforms.
-If
-.B POOL_QALIGN
+Unless
+.B POOL_NO_QALIGN
 is set in the
 .IR flags ,
 allocations will be aligned to addresses that are a
 multiple of
 .IR quantum .
+A
+.B NULL
+may be specified for the
+.I bomb
+function pointer if it is not needed.  (See the
+.B pool_alloc()
+function for how it is used.)
 If
 .B POOL_CLEAR
 is set in the
 .IR flags ,
 all allocations from the pool will be initialized to zeros.
-You may specify a
-.B NULL
-for the
-.I bomb
-function pointer if you don't wish to use it.  (See the
-.B pool_alloc()
-function for how it is used.)
+If either
+.B POOL_PREPEND
+or
+.B POOL_INTERN
+is specified in the
+.IR flags ,
+each extent's data structure will be allocated at the start of the
+.IR size -length
+buffer (rather than as a separate, non-pool allocation), with the
+former extending the
+.I size
+to hold the structure, and the latter subtracting the structure's
+length from the indicated
+.IR size .
 .P
 .B pool_destroy()
 destroys an allocation
@@ -131,8 +145,8 @@ is
 .BR 0 ,
 .I quantum
 bytes will be allocated.
-If the pool has been created with
-.BR POOL_QALIGN ,
+If the pool has been created without
+.BR POOL_NO_QALIGN ,
 every chunk of memory that is returned will be suitably aligned.
 You can use this with the default
 .I quantum
@@ -169,7 +183,7 @@ an extent), its memory will be completely freed back to the system.
 If
 .I addr
 is
-.BR 0 ,
+.BR NULL ,
 no memory will be freed, but subsequent allocations will come
 from a new extent.
 .P

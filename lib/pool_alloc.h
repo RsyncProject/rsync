@@ -1,7 +1,7 @@
 #include <stddef.h>
 
 #define POOL_CLEAR	(1<<0)		/* zero fill allocations	*/
-#define POOL_QALIGN	(1<<1)		/* align data to quanta		*/
+#define POOL_NO_QALIGN	(1<<1)		/* don't align data to quanta	*/
 #define POOL_INTERN	(1<<2)		/* Allocate extent structures	*/
 #define POOL_PREPEND	(1<<3)		/*   or prepend to extent data	*/
 

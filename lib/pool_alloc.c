@@ -2,7 +2,7 @@
 
 #define POOL_DEF_EXTENT	(32 * 1024)
 
-#define POOL_QALIGN_P2	(1<<16)
+#define POOL_QALIGN_P2		(1<<16)		/* power-of-2 qalign	*/
 
 struct alloc_pool
 {
@@ -72,8 +72,8 @@ pool_create(size_t size, size_t quantum, void (*bomb)(const char *), int flags)
 	}
 
 	if (quantum <= 1)
-		flags &= ~(POOL_QALIGN | POOL_QALIGN_P2);
-	else if (flags & POOL_QALIGN) {
+		flags = (flags | POOL_NO_QALIGN) & ~POOL_QALIGN_P2;
+	else if (!(flags & POOL_NO_QALIGN)) {
 		if (size % quantum)
 			size += quantum - size % quantum;
 		/* If quantum is a power of 2, we'll avoid using modulus. */
@@ -123,7 +123,7 @@ pool_alloc(alloc_pool_t p, size_t len, const char *bomb_msg)
 	else if (pool->flags & POOL_QALIGN_P2) {
 		if (len & (pool->quantum - 1))
 			len += pool->quantum - (len & (pool->quantum - 1));
-	} else if (pool->flags & POOL_QALIGN) {
+	} else if (!(pool->flags & POOL_NO_QALIGN)) {
 		if (len % pool->quantum)
 			len += pool->quantum - len % pool->quantum;
 	}
@@ -185,12 +185,21 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 	if (!pool)
 		return;
 
+	if (!addr) {
+		/* A NULL addr starts a fresh extent for new allocations. */
+		if ((cur = pool->extents) != NULL && cur->free != pool->size) {
+			cur->bound += cur->free;
+			cur->free = 0;
+		}
+		return;
+	}
+
 	if (!len)
 		len = pool->quantum;
 	else if (pool->flags & POOL_QALIGN_P2) {
 		if (len & (pool->quantum - 1))
 			len += pool->quantum - (len & (pool->quantum - 1));
-	} else if (pool->flags & POOL_QALIGN) {
+	} else if (!(pool->flags & POOL_NO_QALIGN)) {
 		if (len % pool->quantum)
 			len += pool->quantum - len % pool->quantum;
 	}
