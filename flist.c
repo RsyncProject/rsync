@@ -475,10 +475,15 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file, 
 				xflags |= XMIT_HLINK_FIRST;
 			}
 			if (DEBUG_GTE(HLINK, 1)) {
-				rprintf(FINFO, "found %s dev:inode %s:%s (#%ld)\n",
-				    xflags & XMIT_HLINK_FIRST ? "first" : "matching",
-				    big_num(tmp_dev, 0), big_num(tmp_ino, 0),
-				    (long)np->data - 1);
+				if (first_hlink_ndx >= 0) {
+					rprintf(FINFO, "[%s] #%d hard-links #%d (%sabbrev)\n",
+						who_am_i(), first_ndx + ndx, first_hlink_ndx,
+						first_hlink_ndx >= first_ndx ? "" : "un");
+				} else if (DEBUG_GTE(HLINK, 3)) {
+					rprintf(FINFO, "[%s] dev:inode for #%d is %s:%s\n",
+						who_am_i(), first_ndx + ndx,
+						big_num(tmp_dev, 0), big_num(tmp_ino, 0));
+				}
 			}
 		} else {
 			if (tmp_dev == dev) {
@@ -529,11 +534,8 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file, 
 #ifdef SUPPORT_HARD_LINKS
 	if (first_hlink_ndx >= 0) {
 		write_varint(f, first_hlink_ndx);
-		if (first_hlink_ndx >= first_ndx) {
-			if (DEBUG_GTE(HLINK, 2))
-				rprintf(FINFO, "sending abbr. entry\n");
+		if (first_hlink_ndx >= first_ndx)
 			goto the_end;
-		}
 	}
 #endif
 
@@ -728,9 +730,9 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 				first_hlink_ndx, flist->ndx_start + flist->used);
 			exit_cleanup(RERR_PROTOCOL);
 		}
-		if (DEBUG_GTE(HLINK, 2)) {
-			rprintf(FINFO, "hard-link reference #%d (%sabbr.)\n",
-				first_hlink_ndx,
+		if (DEBUG_GTE(HLINK, 1)) {
+			rprintf(FINFO, "[%s] #%d hard-links #%d (%sabbrev)\n",
+				who_am_i(), flist->used+flist->ndx_start, first_hlink_ndx,
 				first_hlink_ndx >= flist->ndx_start ? "" : "un");
 		}
 		if (first_hlink_ndx >= flist->ndx_start) {
