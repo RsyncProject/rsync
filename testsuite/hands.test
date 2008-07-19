@@ -14,7 +14,7 @@ hands_setup
 runtest "basic operation" 'checkit "$RSYNC -av \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
 
 ln "$fromdir/filelist" "$fromdir/dir"
-runtest "hard links" 'checkit "$RSYNC -avH --debug=hlink5 \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
+runtest "hard links" 'checkit "$RSYNC -avH --debug=hlink5,flist5 \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
 
 rm "$todir/text"
 runtest "one file" 'checkit "$RSYNC -avH --debug=hlink5 \"$fromdir/\" \"$todir\"" "$fromdir/" "$todir"'
