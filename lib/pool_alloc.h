@@ -3,7 +3,7 @@
 #define POOL_CLEAR	(1<<0)		/* zero fill allocations	*/
 #define POOL_QALIGN	(1<<1)		/* align data to quanta		*/
 #define POOL_INTERN	(1<<2)		/* Allocate extent structures	*/
-#define POOL_APPEND	(1<<3)		/*   or appended to extent data	*/
+#define POOL_PREPEND	(1<<3)		/*   or prepend to extent data	*/
 
 typedef void *alloc_pool_t;
 

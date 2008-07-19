@@ -2,6 +2,8 @@
 
 #define POOL_DEF_EXTENT	(32 * 1024)
 
+#define POOL_QALIGN_P2	(1<<16)
+
 struct alloc_pool
 {
 	size_t			size;		/* extent size		*/
@@ -13,7 +15,7 @@ struct alloc_pool
 
 	/* statistical data */
 	unsigned long		e_created;	/* extents created	*/
-	unsigned long		e_freed;	/* extents detroyed	*/
+	unsigned long		e_freed;	/* extents destroyed	*/
 	int64			n_allocated;	/* calls to alloc	*/
 	int64			n_freed;	/* calls to free	*/
 	int64			b_allocated;	/* cum. bytes allocated	*/
@@ -24,14 +26,16 @@ struct pool_extent
 {
 	void			*start;		/* starting address	*/
 	size_t			free;		/* free bytecount	*/
-	size_t			bound;		/* bytes bound by padding,
-						 * overhead and freed	*/
+	size_t			bound;		/* trapped free bytes	*/
 	struct pool_extent	*next;
 };
 
 struct align_test {
-	void *foo;
-	int64 bar;
+	uchar foo;
+	union {
+	    int64 i;
+	    void *p;
+	} bar;
 };
 
 #define MINALIGN	offsetof(struct align_test, bar)
@@ -43,20 +47,42 @@ struct align_test {
 alloc_pool_t
 pool_create(size_t size, size_t quantum, void (*bomb)(const char *), int flags)
 {
-	struct alloc_pool	*pool;
+	struct alloc_pool *pool;
 
-	if (!(pool = new(struct alloc_pool)))
-		return pool;
-	memset(pool, 0, sizeof (struct alloc_pool));
+	if (!(pool = new0(struct alloc_pool)))
+		return NULL;
 
-	pool->size = size	/* round extent size to min alignment reqs */
-	    ? (size + MINALIGN - 1) & ~(MINALIGN - 1)
-	    : POOL_DEF_EXTENT;
-	if (flags & POOL_INTERN) {
-		pool->size -= sizeof (struct pool_extent);
-		flags |= POOL_APPEND;
+	if ((MINALIGN & (MINALIGN - 1)) != 0) {
+		if (bomb)
+			(*bomb)("Compiler error: MINALIGN is not a power of 2\n");
+		return NULL;
 	}
-	pool->quantum = quantum ? quantum : MINALIGN;
+
+	if (!size)
+		size = POOL_DEF_EXTENT;
+	if (!quantum)
+		quantum = MINALIGN;
+
+	if (flags & POOL_INTERN) {
+		if (size <= sizeof (struct pool_extent))
+			size = quantum;
+		else
+			size -= sizeof (struct pool_extent);
+		flags |= POOL_PREPEND;
+	}
+
+	if (quantum <= 1)
+		flags &= ~(POOL_QALIGN | POOL_QALIGN_P2);
+	else if (flags & POOL_QALIGN) {
+		if (size % quantum)
+			size += quantum - size % quantum;
+		/* If quantum is a power of 2, we'll avoid using modulus. */
+		if (!(quantum & (quantum - 1)))
+			flags |= POOL_QALIGN_P2;
+	}
+
+	pool->size = size;
+	pool->quantum = quantum;
 	pool->bomb = bomb;
 	pool->flags = flags;
 
@@ -67,17 +93,21 @@ void
 pool_destroy(alloc_pool_t p)
 {
 	struct alloc_pool *pool = (struct alloc_pool *) p;
-	struct pool_extent	*cur, *next;
+	struct pool_extent *cur, *next;
 
 	if (!pool)
 		return;
 
 	for (cur = pool->extents; cur; cur = next) {
 		next = cur->next;
-		free(cur->start);
-		if (!(pool->flags & POOL_APPEND))
+		if (pool->flags & POOL_PREPEND)
+			free(cur->start - sizeof (struct pool_extent));
+		else {
+			free(cur->start);
 			free(cur);
+		}
 	}
+
 	free(pool);
 }
 
@@ -90,45 +120,40 @@ pool_alloc(alloc_pool_t p, size_t len, const char *bomb_msg)
 
 	if (!len)
 		len = pool->quantum;
-	else if (pool->quantum > 1 && len % pool->quantum)
-		len += pool->quantum - len % pool->quantum;
+	else if (pool->flags & POOL_QALIGN_P2) {
+		if (len & (pool->quantum - 1))
+			len += pool->quantum - (len & (pool->quantum - 1));
+	} else if (pool->flags & POOL_QALIGN) {
+		if (len % pool->quantum)
+			len += pool->quantum - len % pool->quantum;
+	}
 
 	if (len > pool->size)
 		goto bomb_out;
 
 	if (!pool->extents || len > pool->extents->free) {
-		void	*start;
-		size_t	free;
-		size_t	bound;
-		size_t	skew;
-		size_t	asize;
+		void *start;
+		size_t asize;
 		struct pool_extent *ext;
 
-		free = pool->size;
-		bound = 0;
-
 		asize = pool->size;
-		if (pool->flags & POOL_APPEND)
+		if (pool->flags & POOL_PREPEND)
 			asize += sizeof (struct pool_extent);
 
 		if (!(start = new_array(char, asize)))
 			goto bomb_out;
 
 		if (pool->flags & POOL_CLEAR)
-			memset(start, 0, free);
+			memset(start, 0, asize);
 
-		if (pool->flags & POOL_APPEND)
-			ext = PTR_ADD(start, free);
-		else if (!(ext = new(struct pool_extent)))
+		if (pool->flags & POOL_PREPEND) {
+			ext = start;
+			start += sizeof (struct pool_extent);
+		} else if (!(ext = new(struct pool_extent)))
 			goto bomb_out;
-		if (pool->flags & POOL_QALIGN && pool->quantum > 1
-		    && (skew = (size_t)PTR_ADD(start, free) % pool->quantum)) {
-			bound  += skew;
-			free -= skew;
-		}
 		ext->start = start;
-		ext->free = free;
-		ext->bound = bound;
+		ext->free = pool->size;
+		ext->bound = 0;
 		ext->next = pool->extents;
 		pool->extents = ext;
 
@@ -162,8 +187,13 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 
 	if (!len)
 		len = pool->quantum;
-	else if (pool->quantum > 1 && len % pool->quantum)
-		len += pool->quantum - len % pool->quantum;
+	else if (pool->flags & POOL_QALIGN_P2) {
+		if (len & (pool->quantum - 1))
+			len += pool->quantum - (len & (pool->quantum - 1));
+	} else if (pool->flags & POOL_QALIGN) {
+		if (len % pool->quantum)
+			len += pool->quantum - len % pool->quantum;
+	}
 
 	pool->n_freed++;
 	pool->b_freed += len;
@@ -179,19 +209,12 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 	if (!prev) {
 		/* The "live" extent is kept ready for more allocations. */
 		if (cur->free + cur->bound + len >= pool->size) {
-			size_t skew;
-
 			if (pool->flags & POOL_CLEAR) {
 				memset(PTR_ADD(cur->start, cur->free), 0,
 				       pool->size - cur->free);
 			}
 			cur->free = pool->size;
 			cur->bound = 0;
-			if (pool->flags & POOL_QALIGN && pool->quantum > 1
-			    && (skew = (size_t)PTR_ADD(cur->start, cur->free) % pool->quantum)) {
-				cur->bound += skew;
-				cur->free -= skew;
-			}
 		} else if (addr == PTR_ADD(cur->start, cur->free)) {
 			if (pool->flags & POOL_CLEAR)
 				memset(addr, 0, len);
@@ -203,9 +226,12 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 
 		if (cur->free + cur->bound >= pool->size) {
 			prev->next = cur->next;
-			free(cur->start);
-			if (!(pool->flags & POOL_APPEND))
+			if (pool->flags & POOL_PREPEND)
+				free(cur->start - sizeof (struct pool_extent));
+			else {
+				free(cur->start);
 				free(cur);
+			}
 			pool->e_freed++;
 		} else if (prev != pool->extents) {
 			/* Move the extent to be the first non-live extent. */
@@ -242,18 +268,11 @@ pool_free_old(alloc_pool_t p, void *addr)
 			prev->next = NULL;
 			next = cur;
 		} else {
-			size_t skew;
-
 			/* The most recent live extent can just be reset. */
 			if (pool->flags & POOL_CLEAR)
 				memset(addr, 0, pool->size - cur->free);
 			cur->free = pool->size;
 			cur->bound = 0;
-			if (pool->flags & POOL_QALIGN && pool->quantum > 1
-			    && (skew = (size_t)PTR_ADD(cur->start, cur->free) % pool->quantum)) {
-				cur->bound += skew;
-				cur->free -= skew;
-			}
 			next = cur->next;
 			cur->next = NULL;
 		}
@@ -264,9 +283,12 @@ pool_free_old(alloc_pool_t p, void *addr)
 
 	while ((cur = next) != NULL) {
 		next = cur->next;
-		free(cur->start);
-		if (!(pool->flags & POOL_APPEND))
+		if (pool->flags & POOL_PREPEND)
+			free(cur->start - sizeof (struct pool_extent));
+		else {
+			free(cur->start);
 			free(cur);
+		}
 		pool->e_freed++;
 	}
 }
@@ -308,7 +330,7 @@ void
 pool_stats(alloc_pool_t p, int fd, int summarize)
 {
 	struct alloc_pool *pool = (struct alloc_pool *) p;
-	struct pool_extent	*cur;
+	struct pool_extent *cur;
 	char buf[BUFSIZ];
 
 	if (!pool)
