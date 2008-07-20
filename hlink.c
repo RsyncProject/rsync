@@ -70,7 +70,7 @@ struct ht_int64_node *idev_find(int64 dev, int64 ino)
 		dev_node = hashtable_find(dev_tbl, dev, 1);
 		if (!(tbl = dev_node->data)) {
 			tbl = dev_node->data = hashtable_create(512, SIZEOF_INT64 == 8);
-			if (DEBUG_GTE(HLINK, 2)) {
+			if (DEBUG_GTE(HLINK, 3)) {
 				rprintf(FINFO,
 				    "[%s] created hashtable for dev %s\n",
 				    who_am_i(), big_num(dev, 0));
@@ -309,6 +309,10 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 		if (!flist) {
 			/* The previous file was skipped, so this one is
 			 * treated as if it were the first in its group. */
+			if (DEBUG_GTE(HLINK, 2)) {
+				rprintf(FINFO, "hlink for %d (%s,%d): virtual first\n",
+					ndx, f_name(file, NULL), gnum);
+			}
 			return 0;
 		}
 
@@ -325,7 +329,15 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 				F_HL_PREV(prev_file) = ndx;
 				file->flags |= FLAG_FILE_SENT;
 				cur_flist->in_progress++;
+				if (DEBUG_GTE(HLINK, 2)) {
+					rprintf(FINFO, "hlink for %d (%s,%d): waiting for %d\n",
+						ndx, f_name(file, NULL), gnum, F_HL_PREV(file));
+				}
 				return 1;
+			}
+			if (DEBUG_GTE(HLINK, 2)) {
+				rprintf(FINFO, "hlink for %d (%s,%d): looking for a leader\n",
+					ndx, f_name(file, NULL), gnum);
 			}
 			return 0;
 		}
@@ -334,7 +346,6 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 		if (!(prev_file->flags & FLAG_HLINK_FIRST)) {
 			/* The previous previous is FIRST when prev is not. */
 			prev_name = realname = check_prior(prev_file, gnum, &prev_ndx, &flist);
-			assert(prev_name != NULL || flist != NULL);
 			/* Update our previous pointer to point to the FIRST. */
 			F_HL_PREV(file) = prev_ndx;
 		}
@@ -342,9 +353,14 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 		if (!prev_name) {
 			int alt_dest;
 
+			assert(flist != NULL);
 			prev_file = flist->files[prev_ndx - flist->ndx_start];
 			/* F_HL_PREV() is alt_dest value when DONE && FIRST. */
 			alt_dest = F_HL_PREV(prev_file);
+			if (DEBUG_GTE(HLINK, 2)) {
+				rprintf(FINFO, "hlink for %d (%s,%d): found flist match (alt %d)\n",
+					ndx, f_name(file, NULL), gnum, alt_dest);
+			}
 
 			if (alt_dest >= 0 && dry_run) {
 				pathjoin(namebuf, MAXPATHLEN, basis_dir[alt_dest],
@@ -356,6 +372,11 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 				realname = prev_name;
 			}
 		}
+	}
+
+	if (DEBUG_GTE(HLINK, 2)) {
+		rprintf(FINFO, "hlink for %d (%s,%d): leader is %d (%s)\n",
+			ndx, f_name(file, NULL), gnum, prev_ndx, prev_name);
 	}
 
 	if (link_stat(prev_name, &prev_st, 0) < 0) {
