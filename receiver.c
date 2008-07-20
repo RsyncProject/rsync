@@ -44,6 +44,7 @@ extern int remove_source_files;
 extern int append_mode;
 extern int sparse_files;
 extern int keep_partial;
+extern int checksum_len;
 extern int checksum_seed;
 extern int inplace;
 extern int delay_updates;
@@ -52,6 +53,7 @@ extern struct stats stats;
 extern char *tmpdir;
 extern char *partial_dir;
 extern char *basis_dir[];
+extern char sender_file_sum[];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct filter_list_struct daemon_filter_list;
 
@@ -163,10 +165,9 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 			const char *fname, int fd, OFF_T total_size)
 {
 	static char file_sum1[MAX_DIGEST_LEN];
-	static char file_sum2[MAX_DIGEST_LEN];
 	struct map_struct *mapbuf;
 	struct sum_struct sum;
-	int32 len, sum_len;
+	int32 len;
 	OFF_T offset = 0;
 	OFF_T offset2;
 	char *data;
@@ -296,15 +297,16 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		exit_cleanup(RERR_FILEIO);
 	}
 
-	sum_len = sum_end(file_sum1);
+	if (sum_end(file_sum1) != checksum_len)
+		overflow_exit("checksum_len"); /* Impossible... */
 
 	if (mapbuf)
 		unmap_file(mapbuf);
 
-	read_buf(f_in, file_sum2, sum_len);
+	read_buf(f_in, sender_file_sum, checksum_len);
 	if (DEBUG_GTE(CHKSUM, 2))
 		rprintf(FINFO,"got file_sum\n");
-	if (fd != -1 && memcmp(file_sum1, file_sum2, sum_len) != 0)
+	if (fd != -1 && memcmp(file_sum1, sender_file_sum, checksum_len) != 0)
 		return 0;
 	return 1;
 }

@@ -37,6 +37,7 @@ extern int am_daemon;
 extern int inc_recurse;
 extern int blocking_io;
 extern int human_readable;
+extern int always_checksum;
 extern int remove_source_files;
 extern int output_needs_newline;
 extern int need_messages_from_generator;
@@ -68,6 +69,8 @@ extern int connect_timeout;
 extern pid_t cleanup_child_pid;
 extern unsigned int module_dirlen;
 extern struct stats stats;
+extern char *stdout_format;
+extern char *logfile_format;
 extern char *filesfrom_host;
 extern char *partial_dir;
 extern char *dest_option;
@@ -85,6 +88,7 @@ int local_server = 0;
 int daemon_over_rsh = 0;
 mode_t orig_umask = 0;
 int batch_gen_fd = -1;
+int sender_keeps_checksum = 0;
 
 /* There's probably never more than at most 2 outstanding child processes,
  * but set it higher, just in case. */
@@ -1013,6 +1017,12 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 	if (am_sender) {
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
+
+		if (always_checksum
+		 && (log_format_has(stdout_format, 'C')
+		  || log_format_has(logfile_format, 'C')))
+			sender_keeps_checksum = 1;
+
 		if (protocol_version >= 30)
 			io_start_multiplex_out();
 		else

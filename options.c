@@ -1901,7 +1901,8 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		else if (log_format_has(stdout_format, 'i'))
 			stdout_format_has_i = itemize_changes | 1;
 		if (!log_format_has(stdout_format, 'b')
-		 && !log_format_has(stdout_format, 'c'))
+		 && !log_format_has(stdout_format, 'c')
+		 && !log_format_has(stdout_format, 'C'))
 			log_before_transfer = !am_server;
 	} else if (itemize_changes) {
 		stdout_format = "%i %n%L";

@@ -10,6 +10,10 @@ Changes since 3.0.3:
     - Improved the keep-alive in-loop check in the generator to work properly
       in incremental recursion mode.
 
+    - Fixed a couple issues in the --fake-super handling of xattrs when the
+      destination files have root-level attributes (e.g. selinux values) that
+      a non-root copy can't affect.
+
   ENHANCEMENTS:
 
     - Added the --remote-option=OPT (-M OPT) command-line option that is useful
@@ -19,9 +23,22 @@ Changes since 3.0.3:
       control over what is output.  Added an extra type of --progress output
       using --info=progress2.
 
+    - Added the "%C" escape to the log-output handling, which will output the
+      MD5 checksum of any transferred file, or all files if --checksum was
+      specified (when protocol 30 or above is in effect).
+
     - Rsync will not send an -e option to the server if the user specifies the
       --protocol=29 option.  This lets rsync3 use an overly-restrictive server.
 
   DEVELOPER RELATED:
 
-    - ...
+    - Added more conditional debug output.
+
+    - Really big numbers are now output using our own big-num routine rather
+      than casting them to a double and using a %.0f conversion.
+
+    - The pool_alloc library has received some minor improvements in alignment
+      handling.
+
+    - The Makefile will not halt for just a timestamp change on the Makefile
+      or the configure files, only for actual changes in content.

@@ -31,8 +31,10 @@ extern int local_server;
 extern int quiet;
 extern int module_id;
 extern int msg_fd_out;
+extern int checksum_len;
 extern int allow_8bit_chars;
 extern int protocol_version;
+extern int always_checksum;
 extern int preserve_times;
 extern int uid_ndx;
 extern int gid_ndx;
@@ -55,6 +57,7 @@ extern iconv_t ic_send, ic_recv;
 extern char curr_dir[];
 extern char *module_dir;
 extern unsigned int module_dirlen;
+extern char sender_file_sum[];
 
 static int log_initialised;
 static int logfile_was_closed;
@@ -631,6 +634,28 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			}
 			strlcat(fmt, "s", sizeof fmt);
 			snprintf(buf2, sizeof buf2, fmt, big_num(b, 0));
+			n = buf2;
+			break;
+		case 'C':
+			if (protocol_version >= 30
+			 && (iflags & ITEM_TRANSFER
+			  || (always_checksum && S_ISREG(file->mode)))) {
+				int i, x1, x2;
+				const char *sum = iflags & ITEM_TRANSFER
+						? sender_file_sum : F_SUM(file);
+				c = buf2 + checksum_len*2;
+				*c = '\0';
+				for (i = checksum_len; --i >= 0; ) {
+					x1 = CVAL(sum, i);
+					x2 = x1 >> 4;
+					x1 &= 0xF;
+					*--c = x1 <= 9 ? x1 + '0' : x1 + 'a' - 10;
+					*--c = x2 <= 9 ? x2 + '0' : x2 + 'a' - 10;
+				}
+			} else {
+				memset(buf2, ' ', checksum_len*2);
+				buf2[checksum_len*2] = '\0';
+			}
 			n = buf2;
 			break;
 		case 'i':

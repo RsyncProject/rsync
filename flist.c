@@ -66,6 +66,7 @@ extern int sanitize_paths;
 extern int munge_symlinks;
 extern int need_unsorted_flist;
 extern int output_needs_newline;
+extern int sender_keeps_checksum;
 extern int unsort_ndx;
 extern struct stats stats;
 extern char *filesfrom_host;
@@ -1209,6 +1210,12 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		extra_len += EXTRA_LEN;
 #endif
 
+	if (always_checksum && am_sender && S_ISREG(st.st_mode)) {
+		file_checksum(thisname, tmp_sum, st.st_size);
+		if (sender_keeps_checksum)
+			extra_len += SUM_EXTRA_CNT * EXTRA_LEN;
+	}
+
 #if EXTRA_ROUNDING > 0
 	if (extra_len & (EXTRA_ROUNDING * EXTRA_LEN))
 		extra_len = (extra_len | (EXTRA_ROUNDING * EXTRA_LEN)) + EXTRA_LEN;
@@ -1272,9 +1279,6 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		memcpy(bp + basename_len, linkname, linkname_len);
 #endif
 
-	if (always_checksum && am_sender && S_ISREG(st.st_mode))
-		file_checksum(thisname, tmp_sum, st.st_size);
-
 	if (am_sender)
 		F_PATHNAME(file) = pathname;
 	else if (!pool)
@@ -1304,6 +1308,9 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			unmake_file(file);
 		return NULL;
 	}
+
+	if (sender_keeps_checksum && S_ISREG(st.st_mode))
+		memcpy(F_SUM(file), tmp_sum, checksum_len);
 
 	if (unsort_ndx)
 		F_NDX(file) = dir_count;

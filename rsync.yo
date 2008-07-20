@@ -2182,7 +2182,7 @@ by the server and defaults to the current code(time()).  This option
 is used to set a specific checksum seed, which is useful for
 applications that want repeatable block and file checksums, or
 in the case where the user wants a more random checksum seed.
-Note that setting NUM to 0 causes rsync to use the default of code(time())
+Setting NUM to 0 causes rsync to use the default of code(time())
 for checksum seed.
 enddit()
 
