@@ -45,6 +45,7 @@ extern int gid_ndx;
 extern int inc_recurse;
 extern int inplace;
 extern int flist_eof;
+extern int msgs2stderr;
 extern int keep_dirlinks;
 extern int make_backups;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
@@ -278,13 +279,15 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 			rprintf(FINFO, "[%s] receiving flist for dir %d\n",
 				who_am_i(), ndx);
 		}
-		negate_output_levels(); /* turn off all info/debug output */
+		if (!msgs2stderr)
+			negate_output_levels(); /* turn off all info/debug output */
 		send_msg_int(MSG_FLIST, ndx);
 		start_flist_forward(f_in);
 		flist = recv_file_list(f_in);
 		flist->parent_ndx = ndx;
 		stop_flist_forward();
-		negate_output_levels(); /* restore info/debug output */
+		if (!msgs2stderr)
+			negate_output_levels(); /* restore info/debug output */
 	}
 
 	iflags = protocol_version >= 29 ? read_shortint(f_in)

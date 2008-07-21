@@ -83,6 +83,7 @@ int am_starting_up = 1;
 int relative_paths = -1;
 int implied_dirs = 1;
 int numeric_ids = 0;
+int msgs2stderr = 0;
 int allow_8bit_chars = 0;
 int force_delete = 0;
 int io_timeout = 0;
@@ -795,6 +796,7 @@ static struct poptOption long_options[] = {
   {"no-v",             0,  POPT_ARG_VAL,    &verbose, 0, 0, 0 },
   {"info",             0,  POPT_ARG_STRING, 0, OPT_INFO, 0, 0 },
   {"debug",            0,  POPT_ARG_STRING, 0, OPT_DEBUG, 0, 0 },
+  {"msgs2stderr",      0,  POPT_ARG_NONE,   &msgs2stderr, 0, 0, 0 },
   {"quiet",           'q', POPT_ARG_NONE,   0, 'q', 0, 0 },
   {"motd",             0,  POPT_ARG_VAL,    &output_motd, 1, 0, 0 },
   {"no-motd",          0,  POPT_ARG_VAL,    &output_motd, 0, 0, 0 },

@@ -43,6 +43,7 @@ extern int output_needs_newline;
 extern int need_messages_from_generator;
 extern int kluge_around_eof;
 extern int got_xfer_error;
+extern int msgs2stderr;
 extern int module_id;
 extern int copy_links;
 extern int copy_dirlinks;
@@ -860,7 +861,7 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 	char *local_name = NULL;
 	int negated_levels;
 
-	if (filesfrom_fd >= 0) {
+	if (filesfrom_fd >= 0 && !msgs2stderr) {
 		/* We can't mix messages with files-from data on the socket,
 		 * so temporarily turn off info/debug messages. */
 		negate_output_levels();

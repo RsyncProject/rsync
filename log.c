@@ -36,6 +36,7 @@ extern int allow_8bit_chars;
 extern int protocol_version;
 extern int always_checksum;
 extern int preserve_times;
+extern int msgs2stderr;
 extern int uid_ndx;
 extern int gid_ndx;
 extern int stdout_format_has_i;
@@ -257,6 +258,11 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 	if (len < 0)
 		exit_cleanup(RERR_MESSAGEIO);
 
+	if (msgs2stderr && code != FLOG) {
+		f = stderr;
+		goto output_msg;
+	}
+
 	if (am_server && msg_fd_out >= 0) {
 		assert(!is_utf8);
 		/* Pass the message to our sibling. */
@@ -323,6 +329,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		exit_cleanup(RERR_MESSAGEIO);
 	}
 
+output_msg:
 	if (output_needs_newline) {
 		fputc('\n', f);
 		output_needs_newline = 0;
