@@ -179,7 +179,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	if (fd_r >= 0 && size_r > 0) {
 		int32 read_size = MAX(sum.blength * 2, 16*1024);
 		mapbuf = map_file(fd_r, size_r, read_size, sum.blength);
-		if (DEBUG_GTE(CHKSUM, 2)) {
+		if (DEBUG_GTE(DELTASUM, 2)) {
 			rprintf(FINFO, "recv mapped %s of size %s\n",
 				fname_r, big_num(size_r, 0));
 		}
@@ -221,7 +221,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 			show_progress(offset, total_size);
 
 		if (i > 0) {
-			if (DEBUG_GTE(CHKSUM, 3)) {
+			if (DEBUG_GTE(DELTASUM, 3)) {
 				rprintf(FINFO,"data recv %d at %s\n",
 					i, big_num(offset, 0));
 			}
@@ -245,7 +245,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 
 		stats.matched_data += len;
 
-		if (DEBUG_GTE(CHKSUM, 3)) {
+		if (DEBUG_GTE(DELTASUM, 3)) {
 			rprintf(FINFO,
 				"chunk[%d] of size %ld at %s offset=%s\n",
 				i, (long)len, big_num(offset2, 0), big_num(offset, 0));
@@ -304,7 +304,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		unmap_file(mapbuf);
 
 	read_buf(f_in, sender_file_sum, checksum_len);
-	if (DEBUG_GTE(CHKSUM, 2))
+	if (DEBUG_GTE(DELTASUM, 2))
 		rprintf(FINFO,"got file_sum\n");
 	if (fd != -1 && memcmp(file_sum1, sender_file_sum, checksum_len) != 0)
 		return 0;

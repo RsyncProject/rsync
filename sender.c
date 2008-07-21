@@ -69,7 +69,7 @@ static struct sum_struct *receive_sums(int f)
 
 	s->sums = NULL;
 
-	if (DEBUG_GTE(CHKSUM, 3)) {
+	if (DEBUG_GTE(DELTASUM, 3)) {
 		rprintf(FINFO, "count=%s n=%ld rem=%ld\n",
 			big_num(s->count, 0), (long)s->blength, (long)s->remainder);
 	}
@@ -103,7 +103,7 @@ static struct sum_struct *receive_sums(int f)
 		if (allowed_lull && !(i % lull_mod))
 			maybe_send_keepalive();
 
-		if (DEBUG_GTE(CHKSUM, 3)) {
+		if (DEBUG_GTE(DELTASUM, 3)) {
 			rprintf(FINFO,
 				"chunk[%d] len=%d offset=%s sum1=%08x\n",
 				i, s->sums[i].len, big_num(s->sums[i].offset, 0),
@@ -323,7 +323,7 @@ void send_files(int f_in, int f_out)
 		} else
 			mbuf = NULL;
 
-		if (DEBUG_GTE(CHKSUM, 2)) {
+		if (DEBUG_GTE(DELTASUM, 2)) {
 			rprintf(FINFO, "send_files mapped %s%s%s of size %s\n",
 				path,slash,fname, big_num(st.st_size, 0));
 		}
@@ -332,7 +332,7 @@ void send_files(int f_in, int f_out)
 				    fnamecmp_type, xname, xlen);
 		write_sum_head(f_xfer, s);
 
-		if (DEBUG_GTE(CHKSUM, 2))
+		if (DEBUG_GTE(DELTASUM, 2))
 			rprintf(FINFO, "calling match_sums %s%s%s\n", path,slash,fname);
 
 		if (log_before_transfer)

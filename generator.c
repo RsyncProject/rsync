@@ -803,7 +803,7 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 	if ((int64)sum->count != l)
 		sum->count = -1;
 
-	if (sum->count && DEBUG_GTE(CHKSUM, 2)) {
+	if (sum->count && DEBUG_GTE(DELTASUM, 2)) {
 		rprintf(FINFO,
 			"count=%s rem=%ld blength=%ld s2length=%d flength=%s\n",
 			big_num(sum->count, 0), (long)sum->remainder, (long)sum->blength,
@@ -855,7 +855,7 @@ static int generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 		sum1 = get_checksum1(map, n1);
 		get_checksum2(map, n1, sum2);
 
-		if (DEBUG_GTE(CHKSUM, 3)) {
+		if (DEBUG_GTE(DELTASUM, 3)) {
 			rprintf(FINFO,
 				"chunk[%s] offset=%s len=%ld sum1=%08lx\n",
 				big_num(i, 0), big_num(offset - n1, 0), (long)n1,
@@ -1903,12 +1903,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		fnamecmp_type = FNAMECMP_BACKUP;
 	}
 
-	if (DEBUG_GTE(CHKSUM, 3)) {
+	if (DEBUG_GTE(DELTASUM, 3)) {
 		rprintf(FINFO, "gen mapped %s of size %s\n",
 			fnamecmp, big_num(sx.st.st_size, 0));
 	}
 
-	if (DEBUG_GTE(CHKSUM, 2))
+	if (DEBUG_GTE(DELTASUM, 2))
 		rprintf(FINFO, "generating and sending sums for %d\n", ndx);
 
   notify_others:

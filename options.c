@@ -199,10 +199,10 @@ struct chmod_mode_struct *chmod_modes = NULL;
 static const char *debug_verbosity[] = {
 	/*0*/ NULL,
 	/*1*/ NULL,
-	/*2*/ "bind,cmd,chksum,connect,del,dup,filter,flist",
-	/*3*/ "acl,backup,chksum2,del2,exit,filter2,flist2,fuzzy,genr,own,recv,send,time",
-	/*4*/ "cmd2,chksum3,del3,exit2,flist3,iconv,own2,proto,time2",
-	/*5*/ "chdir,chksum4,flist4,fuzzy2,hlink",
+	/*2*/ "bind,cmd,deltasum,connect,del,dup,filter,flist",
+	/*3*/ "acl,backup,deltasum2,del2,exit,filter2,flist2,fuzzy,genr,own,recv,send,time",
+	/*4*/ "cmd2,deltasum3,del3,exit2,flist3,iconv,own2,proto,time2",
+	/*5*/ "chdir,deltasum4,flist4,fuzzy2,hlink",
 };
 
 #define MAX_VERBOSITY ((int)(sizeof debug_verbosity / sizeof debug_verbosity[0]) - 1)
@@ -262,9 +262,9 @@ static struct output_struct debug_words[COUNT_DEBUG+1] = {
 	DEBUG_WORD(BIND, W_CLI, "Debug socket bind actions"),
 	DEBUG_WORD(CHDIR, W_CLI|W_SRV, "Debug when the current directory changes"),
 	DEBUG_WORD(CONNECT, W_CLI, "Debug connection events"),
-	DEBUG_WORD(CHKSUM, W_SND|W_REC, "Debug delta-transfer checksumming (levels 1-4)"),
 	DEBUG_WORD(CMD, W_CLI, "Debug commands+options that are issued (levels 1-2)"),
 	DEBUG_WORD(DEL, W_REC, "Debug delete actions (levels 1-3)"),
+	DEBUG_WORD(DELTASUM, W_SND|W_REC, "Debug delta-transfer checksumming (levels 1-4)"),
 	DEBUG_WORD(DUP, W_REC, "Debug weeding of duplicate names"),
 	DEBUG_WORD(EXIT, W_CLI|W_SRV, "Debug exit events (levels 1-2)"),
 	DEBUG_WORD(FILTER, W_SND|W_REC, "Debug filter actions (levels 1-2)"),
