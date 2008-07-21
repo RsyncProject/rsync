@@ -52,8 +52,8 @@ extern mode_t orig_umask;
 extern struct stats stats;
 extern char *tmpdir;
 extern char *partial_dir;
-extern char *basis_dir[];
-extern char sender_file_sum[];
+extern char *basis_dir[MAX_BASIS_DIRS+1];
+extern char sender_file_sum[MAX_DIGEST_LEN];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct filter_list_struct daemon_filter_list;
 

@@ -55,10 +55,10 @@ extern iconv_t ic_chck;
 #ifdef ICONV_OPTION
 extern iconv_t ic_send, ic_recv;
 #endif
-extern char curr_dir[];
+extern char curr_dir[MAXPATHLEN];
 extern char *module_dir;
 extern unsigned int module_dirlen;
-extern char sender_file_sum[];
+extern char sender_file_sum[MAX_DIGEST_LEN];
 
 static int log_initialised;
 static int logfile_was_closed;

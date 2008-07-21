@@ -75,12 +75,12 @@ extern char *logfile_format;
 extern char *filesfrom_host;
 extern char *partial_dir;
 extern char *dest_option;
-extern char *basis_dir[];
 extern char *rsync_path;
 extern char *shell_cmd;
 extern char *batch_name;
 extern char *password_file;
 extern char curr_dir[MAXPATHLEN];
+extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *first_flist;
 extern struct filter_list_struct daemon_filter_list;
 

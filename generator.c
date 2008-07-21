@@ -74,7 +74,6 @@ extern int fuzzy_basis;
 extern int always_checksum;
 extern int checksum_len;
 extern char *partial_dir;
-extern char *basis_dir[];
 extern int compare_dest;
 extern int copy_dest;
 extern int link_dest;
@@ -94,6 +93,7 @@ extern uid_t our_uid;
 extern char *backup_dir;
 extern char *backup_suffix;
 extern int backup_suffix_len;
+extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct filter_list_struct daemon_filter_list;
 
