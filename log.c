@@ -258,10 +258,8 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 	if (len < 0)
 		exit_cleanup(RERR_MESSAGEIO);
 
-	if (msgs2stderr && code != FLOG) {
-		f = stderr;
+	if (msgs2stderr > 0 && code != FLOG)
 		goto output_msg;
-	}
 
 	if (am_server && msg_fd_out >= 0) {
 		assert(!is_utf8);
@@ -312,8 +310,10 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 			/* TODO: can we send the error to the user somehow? */
 			return;
 		}
+		msgs2stderr = -1;
 	}
 
+output_msg:
 	switch (code) {
 	case FERROR_XFER:
 		got_xfer_error = 1;
@@ -323,13 +323,13 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 		f = stderr;
 		break;
 	case FINFO:
-		f = am_server ? stderr : stdout;
+	case FCLIENT:
+		f = msgs2stderr ? stderr : stdout;
 		break;
 	default:
 		exit_cleanup(RERR_MESSAGEIO);
 	}
 
-output_msg:
 	if (output_needs_newline) {
 		fputc('\n', f);
 		output_needs_newline = 0;

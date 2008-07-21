@@ -105,7 +105,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		code = exit_code;
 
 	/* If this is the exit at the end of the run, the server side
-	 * should not attempt to output a message (see log.c). */
+	 * should not attempt to output a message (see log_exit()). */
 	if (am_server && code == 0)
 		am_server = 2;
 
