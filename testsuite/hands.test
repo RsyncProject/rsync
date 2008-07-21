@@ -9,7 +9,7 @@
 
 hands_setup
 
-DEBUG_OPTS="--debug=all5,deltasum0 --msgs2stderr"
+DEBUG_OPTS="--debug=all0,deltasum0"
 
 # Main script starts here
 
