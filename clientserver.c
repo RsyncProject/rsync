@@ -49,7 +49,6 @@ extern int logfile_format_has_i;
 extern int logfile_format_has_o_or_i;
 extern mode_t orig_umask;
 extern char *bind_address;
-extern char *sockopts;
 extern char *config_file;
 extern char *logfile_format;
 extern char *files_from;

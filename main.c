@@ -32,7 +32,6 @@ extern int list_only;
 extern int am_root;
 extern int am_server;
 extern int am_sender;
-extern int am_generator;
 extern int am_daemon;
 extern int inc_recurse;
 extern int blocking_io;
@@ -85,6 +84,7 @@ extern struct file_list *first_flist;
 extern struct filter_list_struct daemon_filter_list;
 
 uid_t our_uid;
+int am_generator = 0;
 int local_server = 0;
 int daemon_over_rsh = 0;
 mode_t orig_umask = 0;

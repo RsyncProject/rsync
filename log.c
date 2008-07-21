@@ -53,7 +53,7 @@ extern char *logfile_name;
 extern iconv_t ic_chck;
 #endif
 #ifdef ICONV_OPTION
-extern iconv_t ic_send, ic_recv;
+extern iconv_t ic_recv;
 #endif
 extern char curr_dir[MAXPATHLEN];
 extern char *module_dir;

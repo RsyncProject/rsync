@@ -78,7 +78,6 @@ int def_compress_level = Z_DEFAULT_COMPRESSION;
 int am_root = 0; /* 0 = normal, 1 = root, 2 = --super, -1 = --fake-super */
 int am_server = 0;
 int am_sender = 0;
-int am_generator = 0;
 int am_starting_up = 1;
 int relative_paths = -1;
 int implied_dirs = 1;
@@ -87,7 +86,6 @@ int msgs2stderr = 0;
 int allow_8bit_chars = 0;
 int force_delete = 0;
 int io_timeout = 0;
-int allowed_lull = 0;
 int prune_empty_dirs = 0;
 int use_qsort = 0;
 char *files_from = NULL;

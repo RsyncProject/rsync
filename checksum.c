@@ -24,8 +24,6 @@
 extern int checksum_seed;
 extern int protocol_version;
 
-int csum_length = SHORT_SUM_LENGTH; /* initial value */
-
 /*
   a simple 32 bit checksum that can be upadted from either end
   (inspired by Mark Adler's Adler-32 checksum)
