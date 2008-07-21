@@ -4,6 +4,9 @@ Changes since 3.0.3:
 
   BUG FIXES:
 
+    - Fixed a bug in the hard-linking code where it would sometimes try to
+      allocate 0 bytes of memory (which fails on system OSes).
+
     - Changed the way --progress overwrites its prior output in order to make
       it nearly impossible for the progress to get overwritten by an error.
 
