@@ -142,7 +142,7 @@ void *hashtable_find(struct hashtable *tbl, int64 key, int allocate_if_missing)
 	if (key64)
 		((struct ht_int64_node*)node)->key = key;
 	else
-		node->key = key;
+		node->key = (int32)key;
 	tbl->entries++;
 	return node;
 }
