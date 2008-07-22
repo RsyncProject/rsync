@@ -511,7 +511,7 @@ static void mplex_write(int fd, enum msgcode code, const char *buf, size_t len, 
 		xbuf outbuf, inbuf;
 
 		INIT_XBUF(outbuf, buffer + 4, 0, sizeof buffer - 4);
-		INIT_XBUF(inbuf, (char*)buf, len, -1);
+		INIT_XBUF(inbuf, (char*)buf, len, (size_t)-1);
 
 		iconvbufs(ic_send, &inbuf, &outbuf,
 			  ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE);
@@ -1093,7 +1093,7 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 				int add_null = 0;
 
 				INIT_CONST_XBUF(outbuf, line);
-				INIT_XBUF(inbuf, ibuf, 0, -1);
+				INIT_XBUF(inbuf, ibuf, 0, (size_t)-1);
 
 				while (msg_bytes) {
 					inbuf.len = msg_bytes > sizeof ibuf

@@ -851,7 +851,7 @@ typedef struct {
 } xbuf;
 
 #define INIT_XBUF(xb, str, ln, sz) (xb).buf = (str), (xb).len = (ln), (xb).size = (sz), (xb).pos = 0
-#define INIT_XBUF_STRLEN(xb, str) (xb).buf = (str), (xb).len = strlen((xb).buf), (xb).size = (-1), (xb).pos = 0
+#define INIT_XBUF_STRLEN(xb, str) (xb).buf = (str), (xb).len = strlen((xb).buf), (xb).size = (size_t)-1, (xb).pos = 0
 /* This one is used to make an output xbuf based on a char[] buffer: */
 #define INIT_CONST_XBUF(xb, bf) (xb).buf = (bf), (xb).size = sizeof (bf), (xb).len = (xb).pos = 0
 

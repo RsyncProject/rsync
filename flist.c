@@ -689,7 +689,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		xbuf outbuf, inbuf;
 
 		INIT_CONST_XBUF(outbuf, thisname);
-		INIT_XBUF(inbuf, lastname, basename_len, -1);
+		INIT_XBUF(inbuf, lastname, basename_len, (size_t)-1);
 
 		if (iconvbufs(ic_recv, &inbuf, &outbuf, 0) < 0) {
 			io_error |= IOERR_GENERAL;

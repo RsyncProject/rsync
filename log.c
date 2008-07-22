@@ -351,7 +351,7 @@ output_msg:
 		int ierrno;
 
 		INIT_CONST_XBUF(outbuf, convbuf);
-		INIT_XBUF(inbuf, (char*)buf, len, -1);
+		INIT_XBUF(inbuf, (char*)buf, len, (size_t)-1);
 
 		while (inbuf.len) {
 			iconvbufs(ic, &inbuf, &outbuf, 0);
