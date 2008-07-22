@@ -13,6 +13,7 @@ my $tmp_dir = "patches.$$";
 
 &Getopt::Long::Configure('bundling');
 &usage if !&GetOptions(
+    'branch|b=s' => \( my $master_branch = 'master' ),
     'skip-check' => \( my $skip_branch_check ),
     'shell|s' => \( my $launch_shell ),
     'gen:s' => \( my $incl_generated_files ),
@@ -72,7 +73,7 @@ my(%parent, %description);
 foreach my $patch (@patches) {
     my $branch = ($local_patch{$patch} ? '' : 'origin/') . "patch/$patch";
     my $desc = '';
-    open(PIPE, '-|', 'git', 'diff', '-U1000', "master...$branch", '--', "PATCH.$patch") or die $!;
+    open(PIPE, '-|', 'git', 'diff', '-U1000', "$master_branch...$branch", '--', "PATCH.$patch") or die $!;
     while (<PIPE>) {
 	last if /^@@ /;
     }
@@ -123,7 +124,7 @@ sub update_patch
 	}
 	$parent = "patch/$parent";
     } else {
-	$parent = 'master';
+	$parent = $master_branch;
     }
 
     print "======== $patch ========\n";
@@ -174,8 +175,13 @@ sub update_patch
     close PIPE;
 
     if ($incl_generated_files) {
-	$parent =~ s#.*/##;
-	open(PIPE, '-|', 'diff', '-up', "$tmp_dir/$parent", "$tmp_dir/$patch") or die $!;
+	my $parent_dir;
+	if ($parent eq $master_branch) {
+	    $parent_dir = 'master';
+	} else {
+	    ($parent_dir) = $parent =~ m{([^/]+)$};
+	}
+	open(PIPE, '-|', 'diff', '-up', "$tmp_dir/$parent_dir", "$tmp_dir/$patch") or die $!;
 	while (<PIPE>) {
 	    s#^(diff -up) $tmp_dir/[^/]+/(.*?) $tmp_dir/[^/]+/(.*)#$1 a/$2 b/$3#o;
 	    s#^\Q---\E $tmp_dir/[^/]+/([^\t]+)\t.*#--- a/$1#o;
