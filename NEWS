@@ -1,89 +1,12 @@
-NEWS for rsync 3.0.3 (29 Jun 2008)
+NEWS for rsync 3.0.4 (UNRELEASED)
 Protocol: 30 (unchanged)
-Changes since 3.0.2:
+Changes since 3.0.3:
 
   BUG FIXES:
 
-    - Fixed a wildcard matching problem in the daemon when a module has
-      "use chroot" enabled.
-
-    - Fixed a crash bug in the hard-link code.
-
-    - Fixed the sending of xattr directory information when the code finds a
-      --link-dest or --copy-dest directory with unchanged xattrs -- the
-      destination directory now gets these unchanged xattrs properly applied.
-
-    - Fixed an xattr-sending glitch that could cause an "Internal abbrev"
-      error.
-
-    - Fixed the combination of --xattrs and --backup.
-
-    - The generator no longer allows a '.' dir to be excluded by a daemon-
-      exclude rule.
-
-    - Fixed deletion handling when copying a single, empty directory (with no
-      files) to a differently named, non-existent directory.
-
-    - Fixed the conversion of spaces into dashes in the %M log escape.
-
-    - Fixed several places in the code that were not returning the right
-      errno when a function failed.
-
-    - Fixed the backing up of a device or special file into a backup dir.
-
-    - Moved the setting of the socket options prior to the connect().
-
-    - If rsync exits in the middle of a --progress output, it now outputs a
-      newline to help prevent the progress line from being overwritten.
-
-    - Fixed a problem with how a destination path with a trailing slash or
-      a trailing dot-dir was compared against the daemon excludes.
-
-    - Fixed the sending of large (size > 16GB) files when talking to an older
-      rsync (protocols < 30):  we now use a compatible block size limit.
-
-    - If a file's length is so huge that we overflow a checksum buffer count
-      (i.e. several hundred TB), warn the user and avoid sending an invalid
-      checksum struct over the wire.
-
-    - If a source arg is excluded, --relative no longer adds the excluded
-      arg's implied dirs to the transfer.  This fix also made the exclude
-      check happen in the better place in the sending code.
-
-    - Use the overflow_exit() function for overflows, not out_of_memory().
-
-    - Improved the code to better handle a system that has only 32-bit file
-      offsets.
+    - Changed the hard-link code to never try to allocate 0 bytes of memory.
+      This fixes a failure on some Operating Systems, such as AIX.
 
   ENHANCEMENTS:
 
-    - The rsyncd.conf manpage now consistently refers to the parameters in
-      the daemon config file as "parameters".
-
-    - The description of the --inplace option was improved.
-
-  EXTRAS:
-
-    - Added a new script in the support directory, deny-rsync, which allows
-      an admin to (temporarily) replace the rsync command with a script that
-      sends an error message to the remote client via the rsync protocol.
-
-  DEVELOPER RELATED:
-
-    - Fixed a testcase failure if the tests are run as root and made some
-      compatibility improvements.
-
-    - Improved the daemon tests, including checking module comments, the
-      listing of files, and the ensuring that daemon excludes can't affect
-      a dot-dir arg.
-
-    - Improved some build rules for those that build in a separate directory
-      from the source, including better install rules for the man pages, and
-      the fixing of a proto.h-tstamp rule that could make the binaries get
-      rebuild without cause.
-
-    - Improved the testsuite to work around a problem with some utilities
-      (e.g. cp -p & touch -r) rounding sub-second timestamps.
-
-    - Ensure that the early patches don't cause any generated-file hunks to
-      bleed-over into patches that follow.
+    - NONE
