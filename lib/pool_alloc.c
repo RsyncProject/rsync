@@ -24,10 +24,10 @@ struct alloc_pool
 
 struct pool_extent
 {
+	struct pool_extent	*next;
 	void			*start;		/* starting address	*/
 	size_t			free;		/* free bytecount	*/
 	size_t			bound;		/* trapped free bytes	*/
-	struct pool_extent	*next;
 };
 
 struct align_test {
@@ -101,7 +101,7 @@ pool_destroy(alloc_pool_t p)
 	for (cur = pool->extents; cur; cur = next) {
 		next = cur->next;
 		if (pool->flags & POOL_PREPEND)
-			free(cur->start - sizeof (struct pool_extent));
+			free(PTR_ADD(cur->start, -sizeof (struct pool_extent)));
 		else {
 			free(cur->start);
 			free(cur);
@@ -148,7 +148,7 @@ pool_alloc(alloc_pool_t p, size_t len, const char *bomb_msg)
 
 		if (pool->flags & POOL_PREPEND) {
 			ext = start;
-			start += sizeof (struct pool_extent);
+			start = PTR_ADD(start, sizeof (struct pool_extent));
 		} else if (!(ext = new(struct pool_extent)))
 			goto bomb_out;
 		ext->start = start;
@@ -236,7 +236,7 @@ pool_free(alloc_pool_t p, size_t len, void *addr)
 		if (cur->free + cur->bound >= pool->size) {
 			prev->next = cur->next;
 			if (pool->flags & POOL_PREPEND)
-				free(cur->start - sizeof (struct pool_extent));
+				free(PTR_ADD(cur->start, -sizeof (struct pool_extent)));
 			else {
 				free(cur->start);
 				free(cur);
@@ -293,7 +293,7 @@ pool_free_old(alloc_pool_t p, void *addr)
 	while ((cur = next) != NULL) {
 		next = cur->next;
 		if (pool->flags & POOL_PREPEND)
-			free(cur->start - sizeof (struct pool_extent));
+			free(PTR_ADD(cur->start, -sizeof (struct pool_extent)));
 		else {
 			free(cur->start);
 			free(cur);
