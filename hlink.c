@@ -179,7 +179,7 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
  * to first when we're done. */
 void match_hard_links(struct file_list *flist)
 {
-	if (!list_only) {
+	if (!list_only && flist->used) {
 		int i, ndx_count = 0;
 		int32 *ndx_list;
 
