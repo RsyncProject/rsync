@@ -108,7 +108,7 @@ static int deletion_count = 0; /* used to implement --max-delete */
 static int deldelay_size = 0, deldelay_cnt = 0;
 static char *deldelay_buf = NULL;
 static int deldelay_fd = -1;
-static int lull_mod;
+static int loopchk_limit;
 static int dir_tweaking;
 static int symlink_timeset_failed_flags;
 static int need_retouch_dir_times;
@@ -2058,10 +2058,13 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 			 && cmp_time(st.st_mtime, file->modtime) != 0)
 				set_modtime(fname, file->modtime, file->mode);
 		}
-		if (allowed_lull && !(counter % lull_mod))
-			maybe_send_keepalive();
-		else if (!(counter & 0xFF))
-			maybe_flush_socket(0);
+		if (counter >= loopchk_limit) {
+			if (allowed_lull)
+				maybe_send_keepalive();
+			else
+				maybe_flush_socket(0);
+			counter = 0;
+		}
 	}
 }
 
@@ -2148,7 +2151,7 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 
 void generate_files(int f_out, const char *local_name)
 {
-	int i, ndx;
+	int i, ndx, next_loopchk = 0;
 	char fbuf[MAXPATHLEN];
 	int itemizing;
 	enum logcode code;
@@ -2174,7 +2177,7 @@ void generate_files(int f_out, const char *local_name)
 	solo_file = local_name;
 	dir_tweaking = !(list_only || solo_file || dry_run);
 	need_retouch_dir_times = preserve_times > 1;
-	lull_mod = allowed_lull * 5;
+	loopchk_limit = allowed_lull ? allowed_lull * 5 : 200;
 	symlink_timeset_failed_flags = ITEM_REPORT_TIME
 	    | (protocol_version >= 30 || !am_server ? ITEM_REPORT_TIMEFAIL : 0);
 	implied_dirs_are_missing = relative_paths && !implied_dirs && protocol_version < 30;
@@ -2258,10 +2261,13 @@ void generate_files(int f_out, const char *local_name)
 
 			check_for_finished_files(itemizing, code, 0);
 
-			if (allowed_lull && !(i % lull_mod))
-				maybe_send_keepalive();
-			else if (!(i & 0xFF))
-				maybe_flush_socket(0);
+			if (i + cur_flist->ndx_start >= next_loopchk) {
+				if (allowed_lull)
+					maybe_send_keepalive();
+				else
+					maybe_flush_socket(0);
+				next_loopchk += loopchk_limit;
+			}
 		}
 
 		if (!inc_recurse) {

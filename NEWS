@@ -11,6 +11,9 @@ Changes since 3.0.3:
       destination files have root-level attributes (e.g. selinux values) that
       a non-root copy can't affect.
 
+    - Improved the keep-alive in-loop check in the generator to work properly
+      in incremental recursion mode.
+
     - Fixed a potential alignment issue in the IRIX ACL code when allocating
       the initial "struct acl" object.  Also, cast mallocs to avoid warnings.
 
