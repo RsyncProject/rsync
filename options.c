@@ -1808,22 +1808,28 @@ void server_options(char **args, int *argc_p)
 	if (do_compression)
 		argstr[x++] = 'z';
 
-	/* We make use of the -e option to let the server know about any
-	 * pre-release protocol version && some behavior flags. */
-	argstr[x++] = 'e';
-#if SUBPROTOCOL_VERSION != 0
-	if (protocol_version == PROTOCOL_VERSION) {
-		x += snprintf(argstr+x, sizeof argstr - x,
-			      "%d.%d", PROTOCOL_VERSION, SUBPROTOCOL_VERSION);
-	} else
-#endif
-		argstr[x++] = '.';
 	set_allow_inc_recurse();
-	if (allow_inc_recurse)
-		argstr[x++] = 'i';
-#if defined HAVE_LUTIMES && defined HAVE_UTIMES
-	argstr[x++] = 'L';
+
+	/* Checking the pre-negotiated value allows --protocol=29 override. */
+	if (protocol_version >= 30) {
+		/* We make use of the -e option to let the server know about
+		 * any pre-release protocol version && some behavior flags. */
+		argstr[x++] = 'e';
+#if SUBPROTOCOL_VERSION != 0
+		if (protocol_version == PROTOCOL_VERSION) {
+			x += snprintf(argstr+x, sizeof argstr - x,
+				      "%d.%d",
+				      PROTOCOL_VERSION, SUBPROTOCOL_VERSION);
+		} else
 #endif
+			argstr[x++] = '.';
+		if (allow_inc_recurse)
+			argstr[x++] = 'i';
+#if defined HAVE_LUTIMES && defined HAVE_UTIMES
+		argstr[x++] = 'L';
+#endif
+	}
+
 	argstr[x] = '\0';
 
 	args[ac++] = argstr;
@@ -2008,7 +2014,6 @@ void server_options(char **args, int *argc_p)
 			 *   and it may be an older version that doesn't know this
 			 *   option, so don't send it if client is the sender.
 			 */
-			int i;
 			for (i = 0; i < basis_dir_cnt; i++) {
 				args[ac++] = dest_option;
 				args[ac++] = basis_dir[i];

@@ -7,6 +7,12 @@ Changes since 3.0.3:
     - Changed the hard-link code to never try to allocate 0 bytes of memory.
       This fixes a failure on some Operating Systems, such as AIX.
 
+    -  Fixed a potential alignment issue in the IRIX ACL code when allocating
+       the initial "struct acl" object.  Also, cast mallocs to avoid warnings.
+
   ENHANCEMENTS:
 
-    - NONE
+    - Rsync will avoid sending an -e option to the server if an older protocol
+      in requested (and thus the option would not be useful).  This lets the
+      user specify the --protocol=29 option to access an overly-restrictive
+      server.
