@@ -126,11 +126,23 @@ conf:
 conf_stop: configure.sh config.h.in
 
 configure.sh config.h.in: configure.in aclocal.m4
+	@if test -f configure.sh; then cp -p configure.sh configure.sh.old; else touch configure.sh.old; fi
+	@if test -f config.h.in; then cp -p config.h.in config.h.in.old; else touch config.h.in.old; fi
 	autoconf -o configure.sh
 	autoheader && touch config.h.in
-	@echo 'Configure files changed -- perhaps run:'
-	@echo '  make reconfigure'
-	@exit 1
+	@if diff configure.sh configure.sh.old >/dev/null 2>&1; then \
+	    echo "configure.sh is unchanged."; \
+	    rm configure.sh.old; \
+	fi
+	@if diff config.h.in config.h.in.old >/dev/null 2>&1; then \
+	    echo "config.h.in is unchanged."; \
+	    rm config.h.in.old; \
+	fi
+	@if test -f configure.sh.old -o -f config.h.in.old; then \
+	    echo 'Configure files changed -- perhaps run:'; \
+	    echo '  make reconfigure'; \
+	    exit 1; \
+	fi
 
 reconfigure: configure.sh
 	./config.status --recheck
@@ -139,9 +151,15 @@ reconfigure: configure.sh
 make_stop: Makefile
 
 Makefile: Makefile.in config.status
+	@if test -f Makefile; then cp -p Makefile Makefile.old; else touch Makefile.old; fi
 	@./config.status
-	@echo "Makefile updated -- rerun your make command."
-	@exit 1
+	@if diff Makefile Makefile.old >/dev/null 2>&1; then \
+	    echo "Makefile is unchanged."; \
+	    rm Makefile.old; \
+	else \
+	    echo "Makefile updated -- rerun your make command."; \
+	    exit 1; \
+	fi
 
 proto: proto.h-tstamp
 
@@ -165,7 +183,7 @@ rsyncd.conf.5: rsyncd.conf.yo
 
 clean: cleantests
 	rm -f *~ $(OBJS) $(CHECK_PROGS) $(CHECK_OBJS) $(CHECK_SYMLINKS) \
-		rounding rounding.h
+		rounding rounding.h *.old
 
 cleantests:
 	rm -rf ./testtmp*

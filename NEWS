@@ -4,15 +4,15 @@ Changes since 3.0.3:
 
   BUG FIXES:
 
-    - Changed the hard-link code to never try to allocate 0 bytes of memory.
-      This fixes a failure on some Operating Systems, such as AIX.
-
-    -  Fixed a potential alignment issue in the IRIX ACL code when allocating
-       the initial "struct acl" object.  Also, cast mallocs to avoid warnings.
+    - Fixed a bug in the hard-linking code where it would sometimes try to
+      allocate 0 bytes of memory (which fails on OSes, such as AIX).
 
     - Fixed a couple issues in the --fake-super handling of xattrs when the
       destination files have root-level attributes (e.g. selinux values) that
       a non-root copy can't affect.
+
+    - Fixed a potential alignment issue in the IRIX ACL code when allocating
+      the initial "struct acl" object.  Also, cast mallocs to avoid warnings.
 
   ENHANCEMENTS:
 
@@ -20,3 +20,10 @@ Changes since 3.0.3:
       in requested (and thus the option would not be useful).  This lets the
       user specify the --protocol=29 option to access an overly-restrictive
       server.
+
+  DEVELOPER RELATED:
+
+    - The Makefile will not halt for just a timestamp change on the Makefile
+      or the configure files, only for actual changes in content.
+
+    - Enhanced the release scripts to be able to handle a branch release.
