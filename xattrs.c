@@ -210,7 +210,7 @@ static int rsync_xal_get(const char *fname, item_list *xalp)
 	size_t datum_len, name_offset;
 	char *name, *ptr;
 #ifdef HAVE_LINUX_XATTRS
-	int user_only = am_sender ? 0 : !am_root;
+	int user_only = am_sender ? 0 : am_root <= 0;
 #endif
 	rsync_xa *rxa;
 	int count;
@@ -294,7 +294,7 @@ int copy_xattrs(const char *source, const char *dest)
 	size_t datum_len;
 	char *name, *ptr;
 #ifdef HAVE_LINUX_XATTRS
-	int user_only = am_sender ? 0 : am_root <= 0;
+	int user_only = am_root <= 0;
 #endif
 
 	/* This puts the name list into the "namebuf" buffer. */

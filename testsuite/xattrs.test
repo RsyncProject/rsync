@@ -99,8 +99,12 @@ rm -rf "$todir"
 
 xset user.nice 'this is nice, but different' file1
 
+checkit "$RSYNC -aiX --fake-super . ../chk" "$fromdir" "$chkdir"
+
+cd "$chkdir"
 xls $files >"$scratchdir/xattrs.txt"
 
+cd "$fromdir"
 checkit "$RSYNC -aiX --fake-super --link-dest=../chk . ../to" "$chkdir" "$todir"
 
 cd "$todir"

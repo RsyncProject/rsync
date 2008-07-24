@@ -5,14 +5,14 @@ Changes since 3.0.3:
   BUG FIXES:
 
     - Fixed a bug in the hard-linking code where it would sometimes try to
-      allocate 0 bytes of memory (which fails on OSes, such as AIX).
+      allocate 0 bytes of memory (which fails on some OSes, such as AIX).
 
     - Fixed a couple issues in the --fake-super handling of xattrs when the
       destination files have root-level attributes (e.g. selinux values) that
       a non-root copy can't affect.
 
-    - Improved the keep-alive in-loop check in the generator to work properly
-      in incremental recursion mode.
+    - Improved the keep-alive check in the generator to fire consistently in
+      incremental-recursion mode when --timeout is enabled.
 
     - Fixed a potential alignment issue in the IRIX ACL code when allocating
       the initial "struct acl" object.  Also, cast mallocs to avoid warnings.
@@ -20,9 +20,9 @@ Changes since 3.0.3:
   ENHANCEMENTS:
 
     - Rsync will avoid sending an -e option to the server if an older protocol
-      in requested (and thus the option would not be useful).  This lets the
+      is requested (and thus the option would not be useful).  This lets the
       user specify the --protocol=29 option to access an overly-restrictive
-      server.
+      server that is rejecting the protocol-30 use of -e to the server.
 
   DEVELOPER RELATED:
 
