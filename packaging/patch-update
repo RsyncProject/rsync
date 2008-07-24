@@ -13,6 +13,7 @@ my $tmp_dir = "patches.$$";
 
 &Getopt::Long::Configure('bundling');
 &usage if !&GetOptions(
+    'branch|b=s' => \( my $master_branch = 'master' ),
     'skip-check' => \( my $skip_branch_check ),
     'shell|s' => \( my $launch_shell ),
     'gen:s' => \( my $incl_generated_files ),
@@ -53,15 +54,13 @@ if ($incl_generated_files) {
 }
 our $last_touch = time;
 
-my(%patches, %local_patch);
+my %patches;
 
 # Start by finding all patches so that we can load all possible parents.
-open(PIPE, '-|', 'git', 'branch', '-a') or die $!;
+open(PIPE, '-|', 'git', 'branch', '-l') or die $!;
 while (<PIPE>) {
-    if (m# origin/patch/(.*)#) {
+    if (m# patch/(.*)#) {
 	$patches{$1} = 1;
-    } elsif (m# patch/(.*)#) {
-	$patches{$1} = $local_patch{$1} = 1;
     }
 }
 close PIPE;
@@ -70,19 +69,23 @@ my @patches = sort keys %patches;
 
 my(%parent, %description);
 foreach my $patch (@patches) {
-    my $branch = ($local_patch{$patch} ? '' : 'origin/') . "patch/$patch";
+    my $branch = "patch/$patch";
     my $desc = '';
-    open(PIPE, '-|', 'git', 'diff', '-U1000', "master...$branch", '--', "PATCH.$patch") or die $!;
+    open(PIPE, '-|', 'git', 'diff', '-U1000', "$master_branch...$branch", '--', "PATCH.$patch") or die $!;
     while (<PIPE>) {
 	last if /^@@ /;
     }
     while (<PIPE>) {
 	next unless s/^[ +]//;
 	if (m#patch -p1 <patches/(\S+)\.diff# && $1 ne $patch) {
-	    $parent{$patch} = $1;
+	    my $parent = $parent{$patch} = $1;
+	    if (!$patches{$parent}) {
+		die "Parent of $patch is not a local branch: $parent\n";
+	    }
 	}
 	$desc .= $_;
     }
+    close PIPE;
     $description{$patch} = $desc;
 }
 
@@ -90,8 +93,11 @@ if (@ARGV) {
     # Limit the list of patches to actually process based on @ARGV.
     @patches = ( );
     foreach (@ARGV) {
-	s{^(patches|patch|origin/patch)/} {};
+	s{^patch(es)?/} {};
 	s{\.diff$} {};
+	if (!$patches{$_}) {
+	    die "Local branch not available for patch: $_\n";
+	}
 	push(@patches, $_);
     }
 }
@@ -123,17 +129,13 @@ sub update_patch
 	}
 	$parent = "patch/$parent";
     } else {
-	$parent = 'master';
+	$parent = $master_branch;
     }
 
     print "======== $patch ========\n";
 
     sleep 1 while $incl_generated_files && $last_touch >= time;
-    if ($local_patch{$patch}) {
-	system "git checkout patch/$patch" and return 0;
-    } else {
-	system "git checkout --track -b patch/$patch origin/patch/$patch" and return 0;
-    }
+    system "git checkout patch/$patch" and return 0;
 
     my $ok = system("git merge $parent") == 0;
     if (!$ok || $launch_shell) {
@@ -174,8 +176,13 @@ sub update_patch
     close PIPE;
 
     if ($incl_generated_files) {
-	$parent =~ s#.*/##;
-	open(PIPE, '-|', 'diff', '-up', "$tmp_dir/$parent", "$tmp_dir/$patch") or die $!;
+	my $parent_dir;
+	if ($parent eq $master_branch) {
+	    $parent_dir = 'master';
+	} else {
+	    ($parent_dir) = $parent =~ m{([^/]+)$};
+	}
+	open(PIPE, '-|', 'diff', '-up', "$tmp_dir/$parent_dir", "$tmp_dir/$patch") or die $!;
 	while (<PIPE>) {
 	    s#^(diff -up) $tmp_dir/[^/]+/(.*?) $tmp_dir/[^/]+/(.*)#$1 a/$2 b/$3#o;
 	    s#^\Q---\E $tmp_dir/[^/]+/([^\t]+)\t.*#--- a/$1#o;

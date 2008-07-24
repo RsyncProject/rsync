@@ -1,21 +1,11 @@
 NEWS for rsync 3.1.0 (UNRELEASED)
 Protocol: 30 (unchanged)
-Changes since 3.0.3:
+Changes since 3.0.4:
 
   BUG FIXES:
 
-    - Fixed a bug in the hard-linking code where it would sometimes try to
-      allocate 0 bytes of memory (which fails on system OSes).
-
     - Changed the way --progress overwrites its prior output in order to make
       it nearly impossible for the progress to get overwritten by an error.
-
-    - Improved the keep-alive in-loop check in the generator to work properly
-      in incremental recursion mode.
-
-    - Fixed a couple issues in the --fake-super handling of xattrs when the
-      destination files have root-level attributes (e.g. selinux values) that
-      a non-root copy can't affect.
 
   ENHANCEMENTS:
 
@@ -30,9 +20,6 @@ Changes since 3.0.3:
       MD5 checksum of any transferred file, or all files if --checksum was
       specified (when protocol 30 or above is in effect).
 
-    - Rsync will not send an -e option to the server if the user specifies the
-      --protocol=29 option.  This lets rsync3 use an overly-restrictive server.
-
   DEVELOPER RELATED:
 
     - Added more conditional debug output.
@@ -42,6 +29,3 @@ Changes since 3.0.3:
 
     - The pool_alloc library has received some minor improvements in alignment
       handling.
-
-    - The Makefile will not halt for just a timestamp change on the Makefile
-      or the configure files, only for actual changes in content.

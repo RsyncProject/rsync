@@ -7,12 +7,20 @@ use strict;
 # ~/samba-rsync-ftp dir will be ready to be rsynced to samba.org.
 
 use Cwd;
+use Getopt::Long;
 use Term::ReadKey;
 use Date::Format;
 
 my $dest = $ENV{HOME} . '/samba-rsync-ftp';
 my $passfile = $ENV{HOME} . '/.rsyncpass';
 my $path = $ENV{PATH};
+
+&Getopt::Long::Configure('bundling');
+&usage if !&GetOptions(
+    'branch|b=s' => \( my $master_branch = 'master' ),
+    'help|h' => \( my $help_opt ),
+);
+&usage if $help_opt;
 
 my $now = time;
 my $cl_today = time2str('* %a %b %d %Y', $now);
@@ -56,7 +64,7 @@ open(IN, '-|', 'git status') or die $!;
 my $status = join('', <IN>);
 close IN;
 die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
-die "The checkout is not on the master branch.\n" unless $status =~ /^# On branch master\n/;
+die "The checkout is not on the $master_branch branch.\n" unless $status =~ /^# On branch $master_branch\n/;
 
 my $confversion;
 open(IN, '<', 'configure.in') or die $!;
@@ -221,7 +229,7 @@ print $break, <<EOT;
 
 About to:
     - commit all version changes
-    - merge the master branch into the patch/* branches
+    - merge the $master_branch branch into the patch/* branches
     - update the files in the "patches" dir and OPTIONALLY
       (if you type 'y') to launch a shell for each patch
 
@@ -232,11 +240,11 @@ my $ans = <STDIN>;
 system "git commit -a -m 'Preparing for release of $version'" and exit 1;
 
 print "Updating files in \"patches\" dir ...\n";
-system "packaging/patch-update";
+system "packaging/patch-update --branch=$master_branch";
 
 if ($ans =~ /^y/i) {
     print "\nVisiting all \"patch/*\" branches ...\n";
-    system "packaging/patch-update --shell";
+    system "packaging/patch-update --branch=$master_branch --shell";
 }
 
 print $break, <<EOT;
@@ -305,7 +313,7 @@ system "fakeroot tar czf $srctar_file rsync-$version; rm -rf rsync-$version";
 print "Updating files in \"rsync-$version/patches\" dir ...\n";
 mkdir("rsync-$version", 0755);
 mkdir("rsync-$version/patches", 0755);
-system "packaging/patch-update --skip-check --gen=rsync-$version/patches";
+system "packaging/patch-update --skip-check --branch=$master_branch --gen=rsync-$version/patches";
 
 print "Creating $pattar_file ...\n";
 system "fakeroot tar chzf $pattar_file rsync-$version/patches; rm -rf rsync-$version";
@@ -343,3 +351,15 @@ Local changes are done.  When you're satisfied, push the git repository
 and rsync the release files.  Remember to announce the release on *BOTH*
 rsync-announce@lists.samba.org and rsync@lists.samba.org (and the web)!
 EOT
+
+exit;
+
+sub usage
+{
+    die <<EOT;
+Usage: release-rsync [OPTIONS]
+
+-b, --branch=BRANCH   The branch to release (default: master)
+-h, --help            Display this help message
+EOT
+}
