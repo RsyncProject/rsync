@@ -10,6 +10,10 @@ Changes since 3.0.3:
     -  Fixed a potential alignment issue in the IRIX ACL code when allocating
        the initial "struct acl" object.  Also, cast mallocs to avoid warnings.
 
+    - Fixed a couple issues in the --fake-super handling of xattrs when the
+      destination files have root-level attributes (e.g. selinux values) that
+      a non-root copy can't affect.
+
   ENHANCEMENTS:
 
     - Rsync will avoid sending an -e option to the server if an older protocol
