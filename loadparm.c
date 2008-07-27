@@ -761,7 +761,7 @@ BOOL set_dparams(int syntax_check_only)
 		*equal = '\0';
 		if (syntax_check_only) {
 			if (map_parameter(params[j]) < 0) {
-				rprintf(FCLIENT, "Unknown parameter \"%s\"\n", params[j]);
+				rprintf(FERROR, "Unknown parameter \"%s\"\n", params[j]);
 				*equal = '=';
 				return False;
 			}

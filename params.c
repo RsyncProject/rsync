@@ -225,7 +225,7 @@ static BOOL Section( FILE *InFile, BOOL (*sfunc)(char *) )
         bufr[end] = '\0';
         if( 0 == end )                  /* Don't allow an empty name.       */
           {
-          rprintf(FLOG, "%s Empty section name in configuration file.\n", func );
+          rprintf(FLOG, "%s Empty section name in config file.\n", func );
           return( False );
           }
         if( !sfunc( bufr ) )            /* Got a valid name.  Deal with it. */
@@ -238,7 +238,7 @@ static BOOL Section( FILE *InFile, BOOL (*sfunc)(char *) )
         if( i < 0 )
           {
           bufr[end] = '\0';
-          rprintf(FLOG, "%s Badly formed line in configuration file: %s\n",
+          rprintf(FLOG, "%s Badly formed line in config file: %s\n",
                    func, bufr );
           return( False );
           }
@@ -263,7 +263,7 @@ static BOOL Section( FILE *InFile, BOOL (*sfunc)(char *) )
     }
 
   /* We arrive here if we've met the EOF before the closing bracket. */
-  rprintf(FLOG, "%s Unexpected EOF in the configuration file: %s\n", func, bufr );
+  rprintf(FLOG, "%s Unexpected EOF in the config file: %s\n", func, bufr );
   return( False );
   } /* Section */
 
@@ -317,13 +317,12 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
       case '=':                 /* Equal sign marks end of param name. */
         if( 0 == end )              /* Don't allow an empty name.      */
           {
-          rprintf(FLOG, "%s Invalid parameter name in config. file.\n", func );
+          rprintf(FLOG, "%s Invalid parameter name in config file.\n", func );
           return( False );
           }
         bufr[end++] = '\0';         /* Mark end of string & advance.   */
-        i       = end;              /* New string starts here.         */
-        vstart  = end;              /* New string is parameter value.  */
-        bufr[i] = '\0';             /* New string is nul, for now.     */
+        i = vstart = end;           /* New string starts here.         */
+        c = EatWhitespace(InFile);
         break;
 
       case '\n':                /* Find continuation char, else error. */
@@ -331,7 +330,7 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
         if( i < 0 )
           {
           bufr[end] = '\0';
-          rprintf(FLOG, "%s Ignoring badly formed line in configuration file: %s\n",
+          rprintf(FLOG, "%s Ignoring badly formed line in config file: %s\n",
                    func, bufr );
           return( True );
           }
@@ -344,6 +343,19 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
         bufr[i] = '\0';
         rprintf(FLOG, "%s Unexpected end-of-file at: %s\n", func, bufr );
         return( True );
+
+      case ' ':
+      case '\t':
+        /* A directive divides at the first space or tab. */
+        if (*bufr == '&') {
+          bufr[end++] = '\0';
+          i = vstart = end;
+          c = EatWhitespace(InFile);
+          if (c == '=')
+            c = EatWhitespace(InFile);
+          break;
+        }
+        /* FALL THROUGH */
 
       default:
         if( isspace( c ) )     /* One ' ' per whitespace region.       */
@@ -362,7 +374,6 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
     }
 
   /* Now parse the value. */
-  c = EatWhitespace( InFile );  /* Again, trim leading whitespace. */
   while( (EOF !=c) && (c > 0) )
     {
 
@@ -418,8 +429,10 @@ static int include_config(char *include, int manage_globals)
     STRUCT_STAT sb;
     int ret;
 
-    if (do_stat(include, &sb) < 0)
+    if (do_stat(include, &sb) < 0) {
+	rsyserr(FLOG, errno, "unable to stat config file \"%s\"", include);
 	return 0;
+    }
 
     if (S_ISREG(sb.st_mode)) {
 	if (manage_globals && the_sfunc)
@@ -434,8 +447,10 @@ static int include_config(char *include, int manage_globals)
 	size_t j;
 	DIR *d;
 
-	if (!(d = opendir(include)))
+	if (!(d = opendir(include))) {
+	    rsyserr(FLOG, errno, "unable to open config dir \"%s\"", include);
 	    return 0;
+	}
 
 	memset(&conf_list, 0, sizeof conf_list);
 
@@ -476,11 +491,11 @@ static int include_config(char *include, int manage_globals)
 
 static int parse_directives(char *name, char *val)
 {
-    if (strcasecmp(name, "include") == 0)
+    if (strcasecmp(name, "&include") == 0)
         return include_config(val, 1);
-    if (strcasecmp(name, "merge") == 0)
+    if (strcasecmp(name, "&merge") == 0)
         return include_config(val, 0);
-    rprintf(FLOG, "Unknown directive: &%s.\n", name);
+    rprintf(FLOG, "Unknown directive: %s.\n", name);
     return 0;
 }
 
@@ -541,7 +556,6 @@ static int Parse( FILE *InFile,
       case '&':                         /* Handle directives */
         the_sfunc = sfunc;
         the_pfunc = pfunc;
-        c = EatWhitespace( InFile );
         c = Parameter( InFile, parse_directives, c );
         if (c != 1)
           return c;
@@ -560,7 +574,7 @@ static int Parse( FILE *InFile,
 
 static FILE *OpenConfFile( char *FileName )
   /* ------------------------------------------------------------------------ **
-   * Open a configuration file.
+   * Open a config file.
    *
    *  Input:  FileName  - The pathname of the config file to be opened.
    *
@@ -575,14 +589,14 @@ static FILE *OpenConfFile( char *FileName )
 
   if( NULL == FileName || 0 == *FileName )
     {
-    rprintf(FLOG, "%s No configuration filename specified.\n", func);
+    rprintf(FLOG, "%s No config filename specified.\n", func);
     return( NULL );
     }
 
   OpenedFile = fopen( FileName, "r" );
   if( NULL == OpenedFile )
     {
-    rsyserr(FLOG, errno, "unable to open configuration file \"%s\"",
+    rsyserr(FLOG, errno, "unable to open config file \"%s\"",
 	    FileName);
     }
 
