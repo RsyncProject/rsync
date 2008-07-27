@@ -93,6 +93,8 @@
 
 static char *bufr  = NULL;
 static int   bSize = 0;
+static BOOL  (*the_sfunc)(char *);
+static BOOL  (*the_pfunc)(char *, char *);
 
 /* -------------------------------------------------------------------------- **
  * Functions...
@@ -406,7 +408,71 @@ static BOOL Parameter( FILE *InFile, BOOL (*pfunc)(char *, char *), int c )
   return( pfunc( bufr, &bufr[vstart] ) );   /* Pass name & value to pfunc().  */
   } /* Parameter */
 
-static BOOL Parse( FILE *InFile,
+static int name_cmp(const void *n1, const void *n2)
+{
+    return strcmp(*(char * const *)n1, *(char * const *)n2);
+}
+
+static int include_config(char *include, int manage_globals)
+{
+    item_list conf_list;
+    struct dirent *di;
+    char buf[MAXPATHLEN], **bpp;
+    int ret = 1;
+    size_t j;
+    DIR *d;
+
+    memset(&conf_list, 0, sizeof conf_list);
+
+    if ((d = opendir(include)) != NULL) {
+        while ((di = readdir(d)) != NULL) {
+            char *dname = d_name(di);
+            if (!wildmatch("*.conf", dname))
+                continue;
+            bpp = EXPAND_ITEM_LIST(&conf_list, char *, 32);
+            pathjoin(buf, sizeof buf, include, dname);
+            *bpp = strdup(buf);
+        }
+        closedir(d);
+    } else {
+        STRUCT_STAT sb;
+        if (stat(include, &sb) < 0)
+            return 0;
+        bpp = EXPAND_ITEM_LIST(&conf_list, char *, 1);
+        *bpp = strdup(include);
+    }
+
+    if (conf_list.count > 1)
+        qsort(conf_list.items, conf_list.count, sizeof (char *), name_cmp);
+
+    bpp = conf_list.items;
+    for (j = 0; j < conf_list.count; j++) {
+	if (manage_globals && the_sfunc)
+	    the_sfunc(j == 0 ? "]push" : "]reset");
+        if ((ret = pm_process(bpp[j], the_sfunc, the_pfunc)) != 1)
+            break;
+    }
+
+    if (manage_globals && the_sfunc && conf_list.count)
+	the_sfunc("]pop");
+
+    for (j = 0; j < conf_list.count; j++)
+        free(bpp[j]);
+
+    return ret;
+}
+
+static int parse_directives(char *name, char *val)
+{
+    if (strcasecmp(name, "include") == 0)
+        return include_config(val, 1);
+    if (strcasecmp(name, "merge") == 0)
+        return include_config(val, 0);
+    rprintf(FLOG, "Unknown directive: &%s.\n", name);
+    return 0;
+}
+
+static int Parse( FILE *InFile,
                    BOOL (*sfunc)(char *),
                    BOOL (*pfunc)(char *, char *) )
   /* ------------------------------------------------------------------------ **
@@ -418,7 +484,8 @@ static BOOL Parse( FILE *InFile,
    *          pfunc   - Function to be called when a parameter is scanned.
    *                    See Parameter().
    *
-   *  Output: True if the file was successfully scanned, else False.
+   *  Output: 1 if the file was successfully scanned, 2 if the file was
+   *  scanned until a section header with no section function, else 0.
    *
    *  Notes:  The input can be viewed in terms of 'lines'.  There are four
    *          types of lines:
@@ -427,7 +494,7 @@ static BOOL Parse( FILE *InFile,
    *                         The remainder of the line is ignored.
    *            Section    - First non-whitespace character is a '['.
    *            Parameter  - The default case.
-   * 
+   *
    * ------------------------------------------------------------------------ **
    */
   {
@@ -448,24 +515,35 @@ static BOOL Parse( FILE *InFile,
         break;
 
       case '[':                         /* Section Header. */
-	      if (!sfunc) return True;
-	      if( !Section( InFile, sfunc ) )
-		      return( False );
-	      c = EatWhitespace( InFile );
-	      break;
+        if (!sfunc)
+          return 2;
+        if( !Section( InFile, sfunc ) )
+          return 0;
+        c = EatWhitespace( InFile );
+        break;
 
       case '\\':                        /* Bogus backslash. */
         c = EatWhitespace( InFile );
         break;
 
+      case '&':                         /* Handle directives */
+        the_sfunc = sfunc;
+        the_pfunc = pfunc;
+        c = EatWhitespace( InFile );
+        c = Parameter( InFile, parse_directives, c );
+        if (c != 1)
+          return c;
+        c = EatWhitespace( InFile );
+        break;
+
       default:                          /* Parameter line. */
         if( !Parameter( InFile, pfunc, c ) )
-          return( False );
+          return 0;
         c = EatWhitespace( InFile );
         break;
       }
     }
-  return( True );
+  return 1;
   } /* Parse */
 
 static FILE *OpenConfFile( char *FileName )
@@ -499,7 +577,7 @@ static FILE *OpenConfFile( char *FileName )
   return( OpenedFile );
   } /* OpenConfFile */
 
-BOOL pm_process( char *FileName,
+int pm_process( char *FileName,
                  BOOL (*sfunc)(char *),
                  BOOL (*pfunc)(char *, char *) )
   /* ------------------------------------------------------------------------ **
@@ -511,7 +589,8 @@ BOOL pm_process( char *FileName,
    *          pfunc     - A pointer to a function that will be called when
    *                      a parameter name and value are discovered.
    *
-   *  Output: TRUE if the file was successfully parsed, else FALSE.
+   *  Output: 1 if the file was successfully parsed, 2 if parsing ended at a
+   *  section header w/o a section function, else 0.
    *
    * ------------------------------------------------------------------------ **
    */
@@ -549,10 +628,10 @@ BOOL pm_process( char *FileName,
   if( !result )                               /* Generic failure. */
     {
     rprintf(FLOG, "%s Failed.  Error returned from params.c:parse().\n", func);
-    return( False );
+    return 0;
     }
 
-  return( True );                             /* Generic success. */
+  return result;
   } /* pm_process */
 
 /* -------------------------------------------------------------------------- */

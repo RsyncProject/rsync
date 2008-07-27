@@ -154,6 +154,11 @@ typedef struct {
 	BOOL write_only;
 } section;
 
+typedef struct {
+	global g;
+	section s;
+} global_and_section;
+
 /* This is a default section used to prime a sections structure.  In order
  * to make these easy to keep sorted in the same way as the variables
  * above, use the variable name in the leading comment, including a
@@ -205,6 +210,7 @@ static section sDefault = {
 
 /* local variables */
 static item_list section_list = EMPTY_ITEM_LIST;
+static item_list section_stack = EMPTY_ITEM_LIST;
 static int iSectionIndex = -1;
 static BOOL bInGlobalSection = True;
 
@@ -676,7 +682,29 @@ static BOOL do_parameter(char *parmname, char *parmvalue)
  * Returns True on success, False on failure. */
 static BOOL do_section(char *sectionname)
 {
-	BOOL isglobal = strwicmp(sectionname, GLOBAL_NAME) == 0;
+	BOOL isglobal;
+
+	if (*sectionname == ']') { /* A special push/pop/reset directive from params.c */
+		bInGlobalSection = 1;
+		if (strcmp(sectionname+1, "push") == 0) {
+			global_and_section *gs = EXPAND_ITEM_LIST(&section_stack, global_and_section, 2);
+			memcpy(&gs->g, &Globals, sizeof Globals);
+			memcpy(&gs->s, &sDefault, sizeof sDefault);
+		} else if (strcmp(sectionname+1, "pop") == 0
+		 || strcmp(sectionname+1, "reset") == 0) {
+			global_and_section *gs = ((global_and_section *)section_stack.items) + section_stack.count - 1;
+			if (!section_stack.count)
+				return False;
+			memcpy(&Globals, &gs->g, sizeof Globals);
+			memcpy(&sDefault, &gs->s, sizeof sDefault);
+			if (sectionname[1] == 'p')
+				section_stack.count--;
+		} else
+			return False;
+		return True;
+	}
+
+	isglobal = strwicmp(sectionname, GLOBAL_NAME) == 0;
 
 	/* if we were in a global section then do the local inits */
 	if (bInGlobalSection && !isglobal)
@@ -714,7 +742,7 @@ static BOOL do_section(char *sectionname)
 
 /* Load the modules from the config file. Return True on success,
  * False on failure. */
-BOOL lp_load(char *pszFname, int globals_only)
+int lp_load(char *pszFname, int globals_only)
 {
 	pstring n2;
 

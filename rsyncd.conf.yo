@@ -616,6 +616,49 @@ module's uid/gid setting) without any chroot restrictions.
 
 enddit()
 
+manpagesection(CONFIG DIRECTIVES)
+
+There are currently two config directives available that allow a config file to
+incorporate the contents of other files:  bf(&include) and bf(&merge).  Both
+allow a reference to either a file or a directory.  They differ in how
+segregated the file's contents are considered to be.  The bf(&include)
+directive treats each file as more distinct, with each one inheriting the
+defaults of the parent file, and starting the parameter parsing as
+globals/defaults.  The bf(&merge) directive, on the other hand, treats the
+file's contents as if it were simply inserted in place of the directive, and
+thus it can contain parameters that can be set inside a parent file's module
+settings, or whatever you like.
+
+When an bf(&include) or bf(&merge) directive refers to a directory, it will read
+in all the bf(*.conf) files contained inside that directory (without any
+recursive scanning), with the files sorted into alpha order.  So, if you have a
+directory named "rsyncd.d" with the files "foo.conf", "bar.conf", and
+"baz.conf" inside it, this directive:
+
+verb(    &include = /path/rsyncd.d )
+
+would be the same as this set of directives:
+
+verb(    &include = /path/rsyncd.d/bar.conf
+    &include = /path/rsyncd.d/baz.conf
+    &include = /path/rsyncd.d/foo.conf )
+
+except that it adjusts as files are added and removed from the directory.
+
+The advantage of the bf(&include) directive is that you can define one or more
+modules in a separate file with only the defaults you set in the parent file
+affecting it, so you don't need to worry about the settings of a prior include
+file changing a default.  For instance, this is a useful /etc/rsyncd.conf file:
+
+verb(    port = 873
+    log file = /path/rsync.log
+    pid file = /var/lock/rsync.lock
+
+    &include /etc/rsyncd.d )
+
+The advantage of the bf(&merge) directive is that you can load config snippets
+that can be included into multiple module definitions.
+
 manpagesection(AUTHENTICATION STRENGTH)
 
 The authentication protocol used in rsync is a 128 bit MD4 based
