@@ -879,7 +879,7 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
    with "list = False". */
 static void send_listing(int fd)
 {
-	int n = lp_numservices();
+	int n = lp_num_modules();
 	int i;
 
 	for (i = 0; i < n; i++) {

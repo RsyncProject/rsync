@@ -23,16 +23,16 @@
 /* Load parameters.
  *
  *  This module provides suitable callback functions for the params
- *  module. It builds the internal table of service details which is
+ *  module. It builds the internal table of section details which is
  *  then used by the rest of the server.
  *
  * To add a parameter:
  *
- * 1) add it to the global or service structure definition
+ * 1) add it to the global or section structure definition
  * 2) add it to the parm_table
  * 3) add it to the list of available functions (eg: using FN_GLOBAL_STRING())
- * 4) If it's a global then initialise it in init_globals. If a local
- *    (ie. service) parameter then initialise it in the sDefault structure
+ * 4) If it's a global then initialise it in init_globals. If a local module
+ *    (ie. section) parameter then initialise it in the sDefault structure
  *
  *
  * Notes:
@@ -87,9 +87,9 @@ struct parm_struct {
 #endif
 
 /* some helpful bits */
-#define pSERVICE(i) ServicePtrs[i]
-#define iSERVICE(i) (*pSERVICE(i))
-#define LP_SNUM_OK(iService) (((iService) >= 0) && ((iService) < iNumServices))
+#define pSECTION(i) SectionPtrs[i]
+#define iSECTION(i) (*pSECTION(i))
+#define LP_SNUM_OK(i) ((i) >= 0 && (i) < iNumSections)
 
 /*
  * This structure describes global (ie., server-wide) parameters.
@@ -106,7 +106,7 @@ typedef struct {
 static global Globals;
 
 /*
- * This structure describes a single service.  Their order must match the
+ * This structure describes a single section.  Their order must match the
  * initializers below, which you can accomplish by keeping each sub-section
  * sorted.  (e.g. in vim, just visually select each subsection and use !sort.)
  */
@@ -153,13 +153,13 @@ typedef struct {
 	BOOL transfer_logging;
 	BOOL use_chroot;
 	BOOL write_only;
-} service;
+} section;
 
-/* This is a default service used to prime a services structure.  In order
+/* This is a default section used to prime a sections structure.  In order
  * to make these easy to keep sorted in the same way as the variables
  * above, use the variable name in the leading comment, including a
  * trailing ';' (to avoid a sorting problem with trailing digits). */
-static service sDefault = {
+static section sDefault = {
  /* auth_users; */		NULL,
  /* charset; */ 		NULL,
  /* comment; */ 		NULL,
@@ -205,9 +205,9 @@ static service sDefault = {
 };
 
 /* local variables */
-static service **ServicePtrs = NULL;
-static int iNumServices = 0;
-static int iServiceIndex = 0;
+static section **SectionPtrs = NULL;
+static int iNumSections = 0;
+static int iSectionIndex = -1;
 static BOOL bInGlobalSection = True;
 
 #define NUMPARAMETERS (sizeof (parm_table) / sizeof (struct parm_struct))
@@ -359,13 +359,13 @@ static void init_locals(void)
  int fn_name(void) {return *(int *)(ptr);}
 
 #define FN_LOCAL_STRING(fn_name, val) \
- char *fn_name(int i) {return LP_SNUM_OK(i) && pSERVICE(i)->val? pSERVICE(i)->val : (sDefault.val? sDefault.val : "");}
+ char *fn_name(int i) {return LP_SNUM_OK(i) && iSECTION(i).val? iSECTION(i).val : (sDefault.val? sDefault.val : "");}
 #define FN_LOCAL_BOOL(fn_name, val) \
- BOOL fn_name(int i) {return LP_SNUM_OK(i)? pSERVICE(i)->val : sDefault.val;}
+ BOOL fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : sDefault.val;}
 #define FN_LOCAL_CHAR(fn_name, val) \
- char fn_name(int i) {return LP_SNUM_OK(i)? pSERVICE(i)->val : sDefault.val;}
+ char fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : sDefault.val;}
 #define FN_LOCAL_INTEGER(fn_name, val) \
- int fn_name(int i) {return LP_SNUM_OK(i)? pSERVICE(i)->val : sDefault.val;}
+ int fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : sDefault.val;}
 
 FN_GLOBAL_STRING(lp_bind_address, &Globals.bind_address)
 FN_GLOBAL_STRING(lp_motd_file, &Globals.motd_file)
@@ -437,16 +437,16 @@ static void string_set(char **s, const char *v)
 		exit_cleanup(RERR_MALLOC);
 }
 
-/* Copy a service structure to another. */
-static void copy_service(service *pserviceDest, service *pserviceSource)
+/* Copy a section structure to another. */
+static void copy_section(section *psectionDest, section *psectionSource)
 {
 	int i;
 
 	for (i = 0; parm_table[i].label; i++) {
 		if (parm_table[i].ptr && parm_table[i].class == P_LOCAL) {
 			void *def_ptr = parm_table[i].ptr;
-			void *src_ptr = ((char *)pserviceSource) + PTR_DIFF(def_ptr, &sDefault);
-			void *dest_ptr = ((char *)pserviceDest) + PTR_DIFF(def_ptr, &sDefault);
+			void *src_ptr = ((char *)psectionSource) + PTR_DIFF(def_ptr, &sDefault);
+			void *dest_ptr = ((char *)psectionDest) + PTR_DIFF(def_ptr, &sDefault);
 
 			switch (parm_table[i].type) {
 			case P_BOOL:
@@ -476,11 +476,11 @@ static void copy_service(service *pserviceDest, service *pserviceSource)
 	}
 }
 
-/* Initialise a service to the defaults. */
-static void init_service(service *pservice)
+/* Initialise a section to the defaults. */
+static void init_section(section *psection)
 {
-	memset((char *)pservice, 0, sizeof (service));
-	copy_service(pservice, &sDefault);
+	memset((char *)psection, 0, sizeof (section));
+	copy_section(psection, &sDefault);
 }
 
 /* Do a case-insensitive, whitespace-ignoring string compare. */
@@ -511,15 +511,15 @@ static int strwicmp(char *psz1, char *psz2)
 	return *psz1 - *psz2;
 }
 
-/* Find a service by name. Otherwise works like get_service. */
-static int getservicebyname(char *name, service *pserviceDest)
+/* Find a section by name. Otherwise works like get_section. */
+static int getsectionbyname(char *name, section *psectionDest)
 {
 	int i;
 
-	for (i = iNumServices - 1; i >= 0; i--) {
-		if (strwicmp(iSERVICE(i).name, name) == 0) {
-			if (pserviceDest != NULL)
-				copy_service(pserviceDest, pSERVICE(i));
+	for (i = iNumSections - 1; i >= 0; i--) {
+		if (strwicmp(iSECTION(i).name, name) == 0) {
+			if (psectionDest != NULL)
+				copy_section(psectionDest, pSECTION(i));
 			break;
 		}
 	}
@@ -527,33 +527,33 @@ static int getservicebyname(char *name, service *pserviceDest)
 	return i;
 }
 
-/* Add a new service to the services array, with defaults set. */
-static int add_a_service(char *name)
+/* Add a new section to the sections array w/the default values. */
+static int add_a_section(char *name)
 {
 	int i;
-	int num_to_alloc = iNumServices+1;
+	int num_to_alloc = iNumSections+1;
 
 	/* it might already exist */
 	if (name) {
-		i = getservicebyname(name, NULL);
+		i = getsectionbyname(name, NULL);
 		if (i >= 0)
 			return i;
 	}
 
-	i = iNumServices;
-	ServicePtrs = realloc_array(ServicePtrs, service *, num_to_alloc);
+	i = iNumSections;
+	SectionPtrs = realloc_array(SectionPtrs, section *, num_to_alloc);
 
-	if (ServicePtrs)
-		pSERVICE(iNumServices) = new(service);
+	if (SectionPtrs)
+		pSECTION(iNumSections) = new(section);
 
-	if (!ServicePtrs || !pSERVICE(iNumServices))
+	if (!SectionPtrs || !pSECTION(iNumSections))
 		return -1;
 
-	iNumServices++;
+	iNumSections++;
 
-	init_service(pSERVICE(i));
+	init_section(pSECTION(i));
 	if (name)
-		string_set(&iSERVICE(i).name, name);
+		string_set(&iSECTION(i).name, name);
 
 	return i;
 }
@@ -617,10 +617,10 @@ static BOOL do_parameter(char *parmname, char *parmvalue)
 		parm_ptr = def_ptr;
 	else {
 		if (parm_table[parmnum].class == P_GLOBAL) {
-			rprintf(FLOG, "Global parameter %s found in service section!\n", parmname);
+			rprintf(FLOG, "Global parameter %s found in module section!\n", parmname);
 			return True;
 		}
-		parm_ptr = ((char *)pSERVICE(iServiceIndex)) + PTR_DIFF(def_ptr, &sDefault);
+		parm_ptr = ((char *)pSECTION(iSectionIndex)) + PTR_DIFF(def_ptr, &sDefault);
 	}
 
 	/* now switch on the type of variable it is */
@@ -700,8 +700,8 @@ static BOOL do_section(char *sectionname)
 		return True;
 
 #if 0
-	/* If we have a current service, tidy it up before moving on. */
-	if (iServiceIndex >= 0) {
+	/* If we have a current section, tidy it up before moving on. */
+	if (iSectionIndex >= 0) {
 		/* Add any tidy work as needed ... */
 		if (problem)
 			return False;
@@ -713,7 +713,7 @@ static BOOL do_section(char *sectionname)
 		return False;
 	}
 
-	if ((iServiceIndex = add_a_service(sectionname)) < 0) {
+	if ((iSectionIndex = add_a_section(sectionname)) < 0) {
 		rprintf(FLOG, "Failed to add a new module\n");
 		bInGlobalSection = True;
 		return False;
@@ -722,7 +722,7 @@ static BOOL do_section(char *sectionname)
 	return True;
 }
 
-/* Load the services array from the services file. Return True on success,
+/* Load the modules from the config file. Return True on success,
  * False on failure. */
 BOOL lp_load(char *pszFname, int globals_only)
 {
@@ -734,26 +734,26 @@ BOOL lp_load(char *pszFname, int globals_only)
 
 	pstrcpy(n2, pszFname);
 
-	/* We get sections first, so have to start 'behind' to make up */
-	iServiceIndex = -1;
+	/* We get sections first, so have to start 'behind' to make up. */
+	iSectionIndex = -1;
 	return pm_process(n2, globals_only ? NULL : do_section, do_parameter);
 }
 
-/* Return the max number of services. */
-int lp_numservices(void)
+/* Return the max number of modules (sections). */
+int lp_num_modules(void)
 {
-	return iNumServices;
+	return iNumSections;
 }
 
-/* Return the number of the service with the given name, or -1 if it doesn't
+/* Return the number of the module with the given name, or -1 if it doesn't
  * exist. Note that this is a DIFFERENT ANIMAL from the internal function
- * getservicebyname()! This works ONLY if all services have been loaded,
- * and does not copy the found service. */
+ * getsectionbyname()! This works ONLY if all sections have been loaded,
+ * and does not copy the found section. */
 int lp_number(char *name)
 {
 	int i;
 
-	for (i = iNumServices - 1; i >= 0; i--) {
+	for (i = iNumSections - 1; i >= 0; i--) {
 		if (strcmp(lp_name(i), name) == 0)
 			break;
 	}
