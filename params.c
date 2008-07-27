@@ -415,49 +415,61 @@ static int name_cmp(const void *n1, const void *n2)
 
 static int include_config(char *include, int manage_globals)
 {
-    item_list conf_list;
-    struct dirent *di;
-    char buf[MAXPATHLEN], **bpp;
-    int ret = 1;
-    size_t j;
-    DIR *d;
+    STRUCT_STAT sb;
+    int ret;
 
-    memset(&conf_list, 0, sizeof conf_list);
+    if (do_stat(include, &sb) < 0)
+	return 0;
 
-    if ((d = opendir(include)) != NULL) {
-        while ((di = readdir(d)) != NULL) {
-            char *dname = d_name(di);
-            if (!wildmatch("*.conf", dname))
-                continue;
-            bpp = EXPAND_ITEM_LIST(&conf_list, char *, 32);
-            pathjoin(buf, sizeof buf, include, dname);
-            *bpp = strdup(buf);
-        }
-        closedir(d);
-    } else {
-        STRUCT_STAT sb;
-        if (stat(include, &sb) < 0)
-            return 0;
-        bpp = EXPAND_ITEM_LIST(&conf_list, char *, 1);
-        *bpp = strdup(include);
-    }
-
-    if (conf_list.count > 1)
-        qsort(conf_list.items, conf_list.count, sizeof (char *), name_cmp);
-
-    bpp = conf_list.items;
-    for (j = 0; j < conf_list.count; j++) {
+    if (S_ISREG(sb.st_mode)) {
 	if (manage_globals && the_sfunc)
-	    the_sfunc(j == 0 ? "]push" : "]reset");
-        if ((ret = pm_process(bpp[j], the_sfunc, the_pfunc)) != 1)
-            break;
-    }
+	    the_sfunc("]push");
+	ret = pm_process(include, the_sfunc, the_pfunc);
+	if (manage_globals && the_sfunc)
+	    the_sfunc("]pop");
+    } else if (S_ISDIR(sb.st_mode)) {
+	char buf[MAXPATHLEN], **bpp;
+	item_list conf_list;
+	struct dirent *di;
+	size_t j;
+	DIR *d;
 
-    if (manage_globals && the_sfunc && conf_list.count)
-	the_sfunc("]pop");
+	if (!(d = opendir(include)))
+	    return 0;
 
-    for (j = 0; j < conf_list.count; j++)
-        free(bpp[j]);
+	memset(&conf_list, 0, sizeof conf_list);
+
+	while ((di = readdir(d)) != NULL) {
+	    char *dname = d_name(di);
+	    if (!wildmatch("*.conf", dname))
+		continue;
+	    bpp = EXPAND_ITEM_LIST(&conf_list, char *, 32);
+	    pathjoin(buf, sizeof buf, include, dname);
+	    *bpp = strdup(buf);
+	}
+	closedir(d);
+
+	if (!(bpp = conf_list.items))
+	    return 1;
+
+	if (conf_list.count > 1)
+	    qsort(bpp, conf_list.count, sizeof (char *), name_cmp);
+
+	for (j = 0, ret = 1; j < conf_list.count; j++) {
+	    if (manage_globals && the_sfunc)
+		the_sfunc(j == 0 ? "]push" : "]reset");
+	    if ((ret = pm_process(bpp[j], the_sfunc, the_pfunc)) != 1)
+		break;
+	}
+
+	if (manage_globals && the_sfunc)
+	    the_sfunc("]pop");
+
+	for (j = 0; j < conf_list.count; j++)
+	    free(bpp[j]);
+	free(bpp);
+    } else
+	ret = 0;
 
     return ret;
 }
