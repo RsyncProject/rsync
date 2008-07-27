@@ -1040,6 +1040,7 @@ int daemon_main(void)
 		fprintf(stderr, "Failed to parse config file: %s\n", config_file);
 		exit_cleanup(RERR_SYNTAX);
 	}
+	set_dparams(0);
 
 	if (no_detach)
 		create_pid_file();

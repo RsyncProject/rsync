@@ -438,6 +438,7 @@ accepted: verb(
      --address=ADDRESS       bind to the specified address
      --bwlimit=KBPS          limit I/O bandwidth; KBytes per second
      --config=FILE           specify alternate rsyncd.conf file
+ -M, --dparam=OVERRIDE       override global daemon config parameter
      --no-detach             do not detach from the parent
      --port=PORT             listen on alternate port number
      --log-file=FILE         override the "log file" setting
@@ -2219,6 +2220,14 @@ the default.  This is only relevant when bf(--daemon) is specified.
 The default is /etc/rsyncd.conf unless the daemon is running over
 a remote shell program and the remote user is not the super-user; in that case
 the default is rsyncd.conf in the current directory (typically $HOME).
+
+dit(bf(-M, --dparam=OVERRIDE)) This option can be used to set a daemon-config
+parameter when starting up rsync in daemon mode.  It is equivalent to adding
+the parameter at the end of the global settings prior to the first module's
+definition.  The parameter names can be specified without spaces, if you so
+desire.  For instance:
+
+verb(    rsync --daemon -M pidfile=/path/rsync.pid )
 
 dit(bf(--no-detach)) When running as a daemon, this option instructs
 rsync to not detach itself and become a background process.  This

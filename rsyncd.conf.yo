@@ -83,10 +83,14 @@ dit(bf(motd file)) This parameter allows you to specify a
 "message of the day" to display to clients on each connect. This
 usually contains site information and any legal notices. The default
 is no motd file.
+This can be overridden by the bf(--dparam=motdfile=FILE)
+command-line option when starting the daemon.
 
 dit(bf(pid file)) This parameter tells the rsync daemon to write
 its process ID to that file.  If the file already exists, the rsync
 daemon will abort rather than overwrite the file.
+This can be overridden by the bf(--dparam=pidfile=FILE)
+command-line option when starting the daemon.
 
 dit(bf(port)) You can override the default port the daemon will listen on
 by specifying this value (defaults to 873).  This is ignored if the daemon
@@ -101,11 +105,10 @@ who like to tune their systems to the utmost degree. You can set all
 sorts of socket options which may make transfers faster (or
 slower!). Read the man page for the code(setsockopt()) system call for
 details on some of the options you may be able to set. By default no
-special socket options are set.  These settings are superseded by the
-bf(--sockopts) command-line option.
+special socket options are set.  These settings can also be specified
+via the bf(--sockopts) command-line option.
 
 enddit()
-
 
 manpagesection(MODULE PARAMETERS)
 
@@ -256,9 +259,15 @@ the transfer.  If this value is set on a per-module basis instead of
 globally, the global log will still contain any authorization failures
 or config-file error messages.
 
-If the daemon fails to open to specified file, it will fall back to
+If the daemon fails to open the specified file, it will fall back to
 using syslog and output an error about the failure.  (Note that the
 failure to open the specified log file used to be a fatal error.)
+
+This setting can be overridden by using the bf(--log-file=FILE) or
+bf(--dparam=logfile=FILE) command-line options.  The former overrides
+all the log-file parameters of the daemon and all module settings.
+The latter sets the daemon's log file and the default for all the
+modules, which still allows modules to override the default setting.
 
 dit(bf(syslog facility)) This parameter allows you to
 specify the syslog facility name to use when logging messages from the

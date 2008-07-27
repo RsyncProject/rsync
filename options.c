@@ -121,6 +121,7 @@ int inplace = 0;
 int delay_updates = 0;
 long block_size = 0; /* "long" because popt can't set an int32. */
 char *skip_compress = NULL;
+item_list dparam_list = EMPTY_ITEM_LIST;
 
 /** Network address family. **/
 int default_af_hint
@@ -992,6 +993,7 @@ static struct poptOption long_options[] = {
   /* All the following options switch us into daemon-mode option-parsing. */
   {"config",           0,  POPT_ARG_STRING, 0, OPT_DAEMON, 0, 0 },
   {"daemon",           0,  POPT_ARG_NONE,   0, OPT_DAEMON, 0, 0 },
+  {"dparam",           0,  POPT_ARG_STRING, 0, OPT_DAEMON, 0, 0 },
   {"detach",           0,  POPT_ARG_NONE,   0, OPT_DAEMON, 0, 0 },
   {"no-detach",        0,  POPT_ARG_NONE,   0, OPT_DAEMON, 0, 0 },
   {0,0,0,0, 0, 0, 0}
@@ -1006,6 +1008,7 @@ static void daemon_usage(enum logcode F)
   rprintf(F,"     --address=ADDRESS       bind to the specified address\n");
   rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth; KBytes per second\n");
   rprintf(F,"     --config=FILE           specify alternate rsyncd.conf file\n");
+  rprintf(F," -M, --dparam=OVERRIDE       override global daemon config parameter\n");
   rprintf(F,"     --no-detach             do not detach from the parent\n");
   rprintf(F,"     --port=PORT             listen on alternate port number\n");
   rprintf(F,"     --log-file=FILE         override the \"log file\" setting\n");
@@ -1027,6 +1030,7 @@ static struct poptOption long_daemon_options[] = {
   {"bwlimit",          0,  POPT_ARG_INT,    &daemon_bwlimit, 0, 0, 0 },
   {"config",           0,  POPT_ARG_STRING, &config_file, 0, 0, 0 },
   {"daemon",           0,  POPT_ARG_NONE,   &daemon_opt, 0, 0, 0 },
+  {"dparam",          'M', POPT_ARG_STRING, 0, 'M', 0, 0 },
   {"ipv4",            '4', POPT_ARG_VAL,    &default_af_hint, AF_INET, 0, 0 },
   {"ipv6",            '6', POPT_ARG_VAL,    &default_af_hint, AF_INET6, 0, 0 },
   {"detach",           0,  POPT_ARG_VAL,    &no_detach, 0, 0, 0 },
@@ -1310,10 +1314,23 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			pc = poptGetContext(RSYNC_NAME, argc, argv,
 					    long_daemon_options, 0);
 			while ((opt = poptGetNextOpt(pc)) != -1) {
+				char **cpp;
 				switch (opt) {
 				case 'h':
 					daemon_usage(FINFO);
 					exit_cleanup(0);
+
+				case 'M':
+					arg = poptGetOptArg(pc);
+					if (!strchr(arg, '=')) {
+						rprintf(FERROR,
+						    "--dparam value is missing an '=': %s\n",
+						    arg);
+						goto daemon_error;
+					}
+					cpp = EXPAND_ITEM_LIST(&dparam_list, char *, 4);
+					*cpp = strdup(arg);
+					break;
 
 				case 'v':
 					verbose++;
@@ -1327,6 +1344,9 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 					goto daemon_error;
 				}
 			}
+
+			if (dparam_list.count && !set_dparams(1))
+				exit_cleanup(RERR_SYNTAX);
 
 			if (tmpdir && strlen(tmpdir) >= MAXPATHLEN - 10) {
 				snprintf(err_buf, sizeof err_buf,

@@ -45,6 +45,9 @@
 
 #include "rsync.h"
 #include "ifuncs.h"
+
+extern item_list dparam_list;
+
 #define strequal(a, b) (strcasecmp(a, b)==0)
 #define BOOLSTR(b) ((b) ? "Yes" : "No")
 
@@ -699,8 +702,11 @@ static BOOL do_section(char *sectionname)
 	isglobal = strwicmp(sectionname, GLOBAL_NAME) == 0;
 
 	/* if we were in a global section then do the local inits */
-	if (bInGlobalSection && !isglobal)
+	if (bInGlobalSection && !isglobal) {
+		if (!section_list.count)
+			set_dparams(0);
 		init_locals();
+	}
 
 	/* if we've just struck a global section, note the fact. */
 	bInGlobalSection = isglobal;
@@ -743,6 +749,30 @@ int lp_load(char *pszFname, int globals_only)
 	/* We get sections first, so have to start 'behind' to make up. */
 	iSectionIndex = -1;
 	return pm_process(pszFname, globals_only ? NULL : do_section, do_parameter);
+}
+
+BOOL set_dparams(int syntax_check_only)
+{
+	char *equal, *val, **params = dparam_list.items;
+	unsigned j;
+
+	for (j = 0; j < dparam_list.count; j++) {
+		equal = strchr(params[j], '='); /* options.c verified this */
+		*equal = '\0';
+		if (syntax_check_only) {
+			if (map_parameter(params[j]) < 0) {
+				rprintf(FCLIENT, "Unknown parameter \"%s\"\n", params[j]);
+				*equal = '=';
+				return False;
+			}
+		} else {
+			for (val = equal+1; isSpace(val); val++) {}
+			do_parameter(params[j], val);
+		}
+		*equal = '=';
+	}
+
+	return True;
 }
 
 /* Return the max number of modules (sections). */
