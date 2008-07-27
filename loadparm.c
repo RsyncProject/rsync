@@ -417,22 +417,6 @@ FN_LOCAL_BOOL(lp_transfer_logging, transfer_logging)
 FN_LOCAL_BOOL(lp_use_chroot, use_chroot)
 FN_LOCAL_BOOL(lp_write_only, write_only)
 
-/* local prototypes */
-static int    strwicmp(char *psz1, char *psz2);
-static int    map_parameter(char *parmname);
-static BOOL   set_boolean(BOOL *pb, char *parmvalue);
-static int    getservicebyname(char *name, service *pserviceDest);
-static void   copy_service(service *pserviceDest, service *pserviceSource);
-static BOOL   do_parameter(char *parmname, char *parmvalue);
-static BOOL   do_section(char *sectionname);
-
-/* Initialise a service to the defaults. */
-static void init_service(service *pservice)
-{
-	memset((char *)pservice, 0, sizeof (service));
-	copy_service(pservice, &sDefault);
-}
-
 /* Assign a copy of v to *s.  Handles NULL strings.  *v must
  * be initialized when this is called, either to NULL or a malloc'd
  * string.
@@ -451,123 +435,6 @@ static void string_set(char **s, const char *v)
 	}
 	if (!(*s = strdup(v)))
 		exit_cleanup(RERR_MALLOC);
-}
-
-/* Add a new service to the services array, with defaults set. */
-static int add_a_service(service *pservice, char *name)
-{
-	int i;
-	service tservice;
-	int num_to_alloc = iNumServices+1;
-
-	tservice = *pservice;
-
-	/* it might already exist */
-	if (name) {
-		i = getservicebyname(name, NULL);
-		if (i >= 0)
-			return i;
-	}
-
-	i = iNumServices;
-	ServicePtrs = realloc_array(ServicePtrs, service *, num_to_alloc);
-
-	if (ServicePtrs)
-		pSERVICE(iNumServices) = new(service);
-
-	if (!ServicePtrs || !pSERVICE(iNumServices))
-		return -1;
-
-	iNumServices++;
-
-	init_service(pSERVICE(i));
-	copy_service(pSERVICE(i), &tservice);
-	if (name)
-		string_set(&iSERVICE(i).name, name);
-
-	return i;
-}
-
-/* Do a case-insensitive, whitespace-ignoring string compare. */
-static int strwicmp(char *psz1, char *psz2)
-{
-	/* if BOTH strings are NULL, return TRUE, if ONE is NULL return */
-	/* appropriate value. */
-	if (psz1 == psz2)
-		return 0;
-
-	if (psz1 == NULL)
-		return -1;
-
-	if (psz2 == NULL)
-		return 1;
-
-	/* sync the strings on first non-whitespace */
-	while (1) {
-		while (isSpace(psz1))
-			psz1++;
-		while (isSpace(psz2))
-			psz2++;
-		if (toUpper(psz1) != toUpper(psz2) || *psz1 == '\0' || *psz2 == '\0')
-			break;
-		psz1++;
-		psz2++;
-	}
-	return *psz1 - *psz2;
-}
-
-/* Map a parameter's string representation to something we can use.
- * Returns False if the parameter string is not recognised, else TRUE. */
-static int map_parameter(char *parmname)
-{
-	int iIndex;
-
-	if (*parmname == '-')
-		return -1;
-
-	for (iIndex = 0; parm_table[iIndex].label; iIndex++) {
-		if (strwicmp(parm_table[iIndex].label, parmname) == 0)
-			return iIndex;
-	}
-
-	rprintf(FLOG, "Unknown Parameter encountered: \"%s\"\n", parmname);
-	return -1;
-}
-
-/* Set a boolean variable from the text value stored in the passed string.
- * Returns True in success, False if the passed string does not correctly
- * represent a boolean. */
-static BOOL set_boolean(BOOL *pb, char *parmvalue)
-{
-	if (strwicmp(parmvalue, "yes") == 0
-	 || strwicmp(parmvalue, "true") == 0
-	 || strwicmp(parmvalue, "1") == 0)
-		*pb = True;
-	else if (strwicmp(parmvalue, "no") == 0
-	      || strwicmp(parmvalue, "False") == 0
-	      || strwicmp(parmvalue, "0") == 0)
-		*pb = False;
-	else {
-		rprintf(FLOG, "Badly formed boolean in configuration file: \"%s\".\n", parmvalue);
-		return False;
-	}
-	return True;
-}
-
-/* Find a service by name. Otherwise works like get_service. */
-static int getservicebyname(char *name, service *pserviceDest)
-{
-	int i;
-
-	for (i = iNumServices - 1; i >= 0; i--) {
-		if (strwicmp(iSERVICE(i).name, name) == 0) {
-			if (pserviceDest != NULL)
-				copy_service(pserviceDest, pSERVICE(i));
-			break;
-		}
-	}
-
-	return i;
 }
 
 /* Copy a service structure to another. */
@@ -609,8 +476,128 @@ static void copy_service(service *pserviceDest, service *pserviceSource)
 	}
 }
 
+/* Initialise a service to the defaults. */
+static void init_service(service *pservice)
+{
+	memset((char *)pservice, 0, sizeof (service));
+	copy_service(pservice, &sDefault);
+}
+
+/* Do a case-insensitive, whitespace-ignoring string compare. */
+static int strwicmp(char *psz1, char *psz2)
+{
+	/* if BOTH strings are NULL, return TRUE, if ONE is NULL return */
+	/* appropriate value. */
+	if (psz1 == psz2)
+		return 0;
+
+	if (psz1 == NULL)
+		return -1;
+
+	if (psz2 == NULL)
+		return 1;
+
+	/* sync the strings on first non-whitespace */
+	while (1) {
+		while (isSpace(psz1))
+			psz1++;
+		while (isSpace(psz2))
+			psz2++;
+		if (toUpper(psz1) != toUpper(psz2) || *psz1 == '\0' || *psz2 == '\0')
+			break;
+		psz1++;
+		psz2++;
+	}
+	return *psz1 - *psz2;
+}
+
+/* Find a service by name. Otherwise works like get_service. */
+static int getservicebyname(char *name, service *pserviceDest)
+{
+	int i;
+
+	for (i = iNumServices - 1; i >= 0; i--) {
+		if (strwicmp(iSERVICE(i).name, name) == 0) {
+			if (pserviceDest != NULL)
+				copy_service(pserviceDest, pSERVICE(i));
+			break;
+		}
+	}
+
+	return i;
+}
+
+/* Add a new service to the services array, with defaults set. */
+static int add_a_service(char *name)
+{
+	int i;
+	int num_to_alloc = iNumServices+1;
+
+	/* it might already exist */
+	if (name) {
+		i = getservicebyname(name, NULL);
+		if (i >= 0)
+			return i;
+	}
+
+	i = iNumServices;
+	ServicePtrs = realloc_array(ServicePtrs, service *, num_to_alloc);
+
+	if (ServicePtrs)
+		pSERVICE(iNumServices) = new(service);
+
+	if (!ServicePtrs || !pSERVICE(iNumServices))
+		return -1;
+
+	iNumServices++;
+
+	init_service(pSERVICE(i));
+	if (name)
+		string_set(&iSERVICE(i).name, name);
+
+	return i;
+}
+
+/* Map a parameter's string representation to something we can use.
+ * Returns False if the parameter string is not recognised, else TRUE. */
+static int map_parameter(char *parmname)
+{
+	int iIndex;
+
+	if (*parmname == '-')
+		return -1;
+
+	for (iIndex = 0; parm_table[iIndex].label; iIndex++) {
+		if (strwicmp(parm_table[iIndex].label, parmname) == 0)
+			return iIndex;
+	}
+
+	rprintf(FLOG, "Unknown Parameter encountered: \"%s\"\n", parmname);
+	return -1;
+}
+
+/* Set a boolean variable from the text value stored in the passed string.
+ * Returns True in success, False if the passed string does not correctly
+ * represent a boolean. */
+static BOOL set_boolean(BOOL *pb, char *parmvalue)
+{
+	if (strwicmp(parmvalue, "yes") == 0
+	 || strwicmp(parmvalue, "true") == 0
+	 || strwicmp(parmvalue, "1") == 0)
+		*pb = True;
+	else if (strwicmp(parmvalue, "no") == 0
+	      || strwicmp(parmvalue, "False") == 0
+	      || strwicmp(parmvalue, "0") == 0)
+		*pb = False;
+	else {
+		rprintf(FLOG, "Badly formed boolean in configuration file: \"%s\".\n", parmvalue);
+		return False;
+	}
+	return True;
+}
+
 /* Process a parameter. */
-static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
+static BOOL do_parameter(char *parmname, char *parmvalue)
 {
 	int parmnum, i;
 	void *parm_ptr=NULL; /* where we are going to store the result */
@@ -626,15 +613,14 @@ static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
 
 	def_ptr = parm_table[parmnum].ptr;
 
-	/* we might point at a service, the default service or a global */
-	if (snum < 0)
+	if (bInGlobalSection)
 		parm_ptr = def_ptr;
 	else {
 		if (parm_table[parmnum].class == P_GLOBAL) {
 			rprintf(FLOG, "Global parameter %s found in service section!\n", parmname);
 			return True;
 		}
-		parm_ptr = ((char *)pSERVICE(snum)) + PTR_DIFF(def_ptr, &sDefault);
+		parm_ptr = ((char *)pSERVICE(iServiceIndex)) + PTR_DIFF(def_ptr, &sDefault);
 	}
 
 	/* now switch on the type of variable it is */
@@ -696,12 +682,6 @@ static BOOL lp_do_parameter(int snum, char *parmname, char *parmvalue)
 	return True;
 }
 
-/* Process a parameter.  */
-static BOOL do_parameter(char *parmname, char *parmvalue)
-{
-	return lp_do_parameter(bInGlobalSection?-2:iServiceIndex, parmname, parmvalue);
-}
-
 /* Process a new section (rsync module).
  * Returns True on success, False on failure. */
 static BOOL do_section(char *sectionname)
@@ -733,8 +713,9 @@ static BOOL do_section(char *sectionname)
 		return False;
 	}
 
-	if ((iServiceIndex = add_a_service(&sDefault, sectionname)) < 0) {
+	if ((iServiceIndex = add_a_service(sectionname)) < 0) {
 		rprintf(FLOG, "Failed to add a new module\n");
+		bInGlobalSection = True;
 		return False;
 	}
 
