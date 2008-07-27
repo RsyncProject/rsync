@@ -87,9 +87,8 @@ struct parm_struct {
 #endif
 
 /* some helpful bits */
-#define pSECTION(i) SectionPtrs[i]
-#define iSECTION(i) (*pSECTION(i))
-#define LP_SNUM_OK(i) ((i) >= 0 && (i) < iNumSections)
+#define iSECTION(i) ((section*)section_list.items)[i]
+#define LP_SNUM_OK(i) ((i) >= 0 && (i) < (int)section_list.count)
 
 /*
  * This structure describes global (ie., server-wide) parameters.
@@ -205,8 +204,7 @@ static section sDefault = {
 };
 
 /* local variables */
-static section **SectionPtrs = NULL;
-static int iNumSections = 0;
+static item_list section_list = EMPTY_ITEM_LIST;
 static int iSectionIndex = -1;
 static BOOL bInGlobalSection = True;
 
@@ -516,10 +514,10 @@ static int getsectionbyname(char *name, section *psectionDest)
 {
 	int i;
 
-	for (i = iNumSections - 1; i >= 0; i--) {
+	for (i = section_list.count - 1; i >= 0; i--) {
 		if (strwicmp(iSECTION(i).name, name) == 0) {
 			if (psectionDest != NULL)
-				copy_section(psectionDest, pSECTION(i));
+				copy_section(psectionDest, &iSECTION(i));
 			break;
 		}
 	}
@@ -531,7 +529,7 @@ static int getsectionbyname(char *name, section *psectionDest)
 static int add_a_section(char *name)
 {
 	int i;
-	int num_to_alloc = iNumSections+1;
+	section *s;
 
 	/* it might already exist */
 	if (name) {
@@ -540,20 +538,12 @@ static int add_a_section(char *name)
 			return i;
 	}
 
-	i = iNumSections;
-	SectionPtrs = realloc_array(SectionPtrs, section *, num_to_alloc);
+	i = section_list.count;
+	s = EXPAND_ITEM_LIST(&section_list, section, 2);
 
-	if (SectionPtrs)
-		pSECTION(iNumSections) = new(section);
-
-	if (!SectionPtrs || !pSECTION(iNumSections))
-		return -1;
-
-	iNumSections++;
-
-	init_section(pSECTION(i));
+	init_section(s);
 	if (name)
-		string_set(&iSECTION(i).name, name);
+		string_set(&s->name, name);
 
 	return i;
 }
@@ -620,7 +610,7 @@ static BOOL do_parameter(char *parmname, char *parmvalue)
 			rprintf(FLOG, "Global parameter %s found in module section!\n", parmname);
 			return True;
 		}
-		parm_ptr = ((char *)pSECTION(iSectionIndex)) + PTR_DIFF(def_ptr, &sDefault);
+		parm_ptr = ((char *)&iSECTION(iSectionIndex)) + PTR_DIFF(def_ptr, &sDefault);
 	}
 
 	/* now switch on the type of variable it is */
@@ -742,7 +732,7 @@ BOOL lp_load(char *pszFname, int globals_only)
 /* Return the max number of modules (sections). */
 int lp_num_modules(void)
 {
-	return iNumSections;
+	return section_list.count;
 }
 
 /* Return the number of the module with the given name, or -1 if it doesn't
@@ -753,7 +743,7 @@ int lp_number(char *name)
 {
 	int i;
 
-	for (i = iNumSections - 1; i >= 0; i--) {
+	for (i = section_list.count - 1; i >= 0; i--) {
 		if (strcmp(lp_name(i), name) == 0)
 			break;
 	}
