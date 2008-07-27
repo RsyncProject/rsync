@@ -45,11 +45,8 @@
 
 #include "rsync.h"
 #include "ifuncs.h"
-#define PTR_DIFF(p1, p2) ((ptrdiff_t)(((char *)(p1)) - (char *)(p2)))
 #define strequal(a, b) (strcasecmp(a, b)==0)
 #define BOOLSTR(b) ((b) ? "Yes" : "No")
-typedef char pstring[1024];
-#define pstrcpy(a, b) strlcpy((a), (b), sizeof (pstring))
 
 #ifndef LOG_DAEMON
 #define LOG_DAEMON 0
@@ -60,12 +57,12 @@ typedef char pstring[1024];
 
 /* the following are used by loadparm for option lists */
 typedef enum {
-	P_BOOL, P_BOOLREV, P_CHAR, P_INTEGER, P_OCTAL,
-	P_PATH, P_STRING, P_GSTRING, P_ENUM, P_SEP
+	P_BOOL, P_BOOLREV, P_CHAR, P_INTEGER,
+	P_OCTAL, P_PATH, P_STRING, P_ENUM
 } parm_type;
 
 typedef enum {
-	P_LOCAL, P_GLOBAL, P_SEPARATOR, P_NONE
+	P_LOCAL, P_GLOBAL, P_NONE
 } parm_class;
 
 struct enum_list {
@@ -89,6 +86,7 @@ struct parm_struct {
 /* some helpful bits */
 #define iSECTION(i) ((section*)section_list.items)[i]
 #define LP_SNUM_OK(i) ((i) >= 0 && (i) < (int)section_list.count)
+#define SECTION_PTR(s, p) (((char*)(s)) + (ptrdiff_t)(((char *)(p)) - (char *)&sDefault))
 
 /*
  * This structure describes global (ie., server-wide) parameters.
@@ -449,8 +447,8 @@ static void copy_section(section *psectionDest, section *psectionSource)
 	for (i = 0; parm_table[i].label; i++) {
 		if (parm_table[i].ptr && parm_table[i].class == P_LOCAL) {
 			void *def_ptr = parm_table[i].ptr;
-			void *src_ptr = ((char *)psectionSource) + PTR_DIFF(def_ptr, &sDefault);
-			void *dest_ptr = ((char *)psectionDest) + PTR_DIFF(def_ptr, &sDefault);
+			void *src_ptr = SECTION_PTR(psectionSource, def_ptr);
+			void *dest_ptr = SECTION_PTR(psectionDest, def_ptr);
 
 			switch (parm_table[i].type) {
 			case P_BOOL:
@@ -596,8 +594,8 @@ static BOOL set_boolean(BOOL *pb, char *parmvalue)
 static BOOL do_parameter(char *parmname, char *parmvalue)
 {
 	int parmnum, i;
-	void *parm_ptr=NULL; /* where we are going to store the result */
-	void *def_ptr=NULL;
+	void *parm_ptr; /* where we are going to store the result */
+	void *def_ptr;
 	char *cp;
 
 	parmnum = map_parameter(parmname);
@@ -616,7 +614,7 @@ static BOOL do_parameter(char *parmname, char *parmvalue)
 			rprintf(FLOG, "Global parameter %s found in module section!\n", parmname);
 			return True;
 		}
-		parm_ptr = ((char *)&iSECTION(iSectionIndex)) + PTR_DIFF(def_ptr, &sDefault);
+		parm_ptr = SECTION_PTR(&iSECTION(iSectionIndex), def_ptr);
 	}
 
 	/* now switch on the type of variable it is */
@@ -655,12 +653,8 @@ static BOOL do_parameter(char *parmname, char *parmvalue)
 		string_set(parm_ptr, parmvalue);
 		break;
 
-	case P_GSTRING:
-		strlcpy((char *)parm_ptr, parmvalue, sizeof (pstring));
-		break;
-
 	case P_ENUM:
-		for (i=0;parm_table[parmnum].enum_list[i].name;i++) {
+		for (i=0; parm_table[parmnum].enum_list[i].name; i++) {
 			if (strequal(parmvalue, parm_table[parmnum].enum_list[i].name)) {
 				*(int *)parm_ptr = parm_table[parmnum].enum_list[i].value;
 				break;
@@ -670,8 +664,6 @@ static BOOL do_parameter(char *parmname, char *parmvalue)
 			if (atoi(parmvalue) > 0)
 				*(int *)parm_ptr = atoi(parmvalue);
 		}
-		break;
-	case P_SEP:
 		break;
 	}
 
@@ -744,17 +736,13 @@ static BOOL do_section(char *sectionname)
  * False on failure. */
 int lp_load(char *pszFname, int globals_only)
 {
-	pstring n2;
-
 	bInGlobalSection = True;
 
 	init_globals();
 
-	pstrcpy(n2, pszFname);
-
 	/* We get sections first, so have to start 'behind' to make up. */
 	iSectionIndex = -1;
-	return pm_process(n2, globals_only ? NULL : do_section, do_parameter);
+	return pm_process(pszFname, globals_only ? NULL : do_section, do_parameter);
 }
 
 /* Return the max number of modules (sections). */
