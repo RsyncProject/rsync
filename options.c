@@ -102,6 +102,7 @@ int connect_timeout = 0;
 int keep_partial = 0;
 int safe_symlinks = 0;
 int copy_unsafe_links = 0;
+int munge_symlinks = 0;
 int size_only = 0;
 int daemon_bwlimit = 0;
 int bwlimit = 0;
@@ -670,6 +671,7 @@ void usage(enum logcode F)
   rprintf(F," -L, --copy-links            transform symlink into referent file/dir\n");
   rprintf(F,"     --copy-unsafe-links     only \"unsafe\" symlinks are transformed\n");
   rprintf(F,"     --safe-links            ignore symlinks that point outside the source tree\n");
+  rprintf(F,"     --munge-links           munge symlinks to make them safer (but unusable)\n");
   rprintf(F," -k, --copy-dirlinks         transform symlink to a dir into referent dir\n");
   rprintf(F," -K, --keep-dirlinks         treat symlinked dir on receiver as dir\n");
   rprintf(F," -H, --hard-links            preserve hard links\n");
@@ -855,6 +857,8 @@ static struct poptOption long_options[] = {
   {"copy-links",      'L', POPT_ARG_NONE,   &copy_links, 0, 0, 0 },
   {"copy-unsafe-links",0,  POPT_ARG_NONE,   &copy_unsafe_links, 0, 0, 0 },
   {"safe-links",       0,  POPT_ARG_NONE,   &safe_symlinks, 0, 0, 0 },
+  {"munge-links",      0,  POPT_ARG_VAL,    &munge_symlinks, 1, 0, 0 },
+  {"no-munge-links",   0,  POPT_ARG_VAL,    &munge_symlinks, 0, 0, 0 },
   {"copy-dirlinks",   'k', POPT_ARG_NONE,   &copy_dirlinks, 0, 0, 0 },
   {"keep-dirlinks",   'K', POPT_ARG_NONE,   &keep_dirlinks, 0, 0, 0 },
   {"hard-links",      'H', POPT_ARG_NONE,   0, 'H', 0, 0 },
@@ -1840,6 +1844,17 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			return 0;
 		}
 		need_messages_from_generator = 1;
+	}
+
+	if (munge_symlinks && !am_daemon) {
+		STRUCT_STAT st;
+		char prefix[SYMLINK_PREFIX_LEN]; /* NOT +1 ! */
+		strlcpy(prefix, SYMLINK_PREFIX, sizeof prefix); /* trim the trailing slash */
+		if (do_stat(prefix, &st) == 0 && S_ISDIR(st.st_mode)) {
+			rprintf(FERROR, "Symlink munging is unsafe when a %s directory exists.\n",
+				prefix);
+			exit_cleanup(RERR_UNSUPPORTED);
+		}
 	}
 
 	if (sanitize_paths) {

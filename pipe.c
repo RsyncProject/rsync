@@ -26,6 +26,7 @@ extern int am_sender;
 extern int am_server;
 extern int blocking_io;
 extern int filesfrom_fd;
+extern int munge_symlinks;
 extern mode_t orig_umask;
 extern char *logfile_name;
 extern int remote_option_cnt;
@@ -133,6 +134,7 @@ pid_t local_child(int argc, char **argv, int *f_in, int *f_out,
 		am_sender = 0;
 		am_server = 1;
 		filesfrom_fd = -1;
+		munge_symlinks = 0; /* Each side needs its own option. */
 		chmod_modes = NULL; /* Let the sending side handle this. */
 
 		/* Let the client side handle this. */

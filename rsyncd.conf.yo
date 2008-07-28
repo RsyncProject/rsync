@@ -195,8 +195,9 @@ to translate names, and that it is not possible for a user to change those
 resources.
 
 dit(bf(munge symlinks)) This parameter tells rsync to modify
-all incoming symlinks in a way that makes them unusable but recoverable
-(see below).  This should help protect your files from user trickery when
+all symlinks in the same way as the (non-daemon-affecting)
+bf(--munge-links) command-line option (using a method described below).
+This should help protect your files from user trickery when
 your daemon module is writable.  The default is disabled when "use chroot"
 is on and the inside-chroot path is "/", otherwise it is enabled.
 
@@ -216,7 +217,8 @@ to the exclude setting for the module so that
 a user can't try to create it.
 
 Note:  rsync makes no attempt to verify that any pre-existing symlinks in
-the hierarchy are as safe as you want them to be.  If you setup an rsync
+the module's hierarchy are as safe as you want them to be (unless, of
+course, it just copied in the whole hierarchy).  If you setup an rsync
 daemon on a new area or locally add symlinks, you can manually protect your
 symlinks from being abused by prefixing "/rsyncd-munged/" to the start of
 every symlink's value.  There is a perl script in the support directory

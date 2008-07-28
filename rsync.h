@@ -32,7 +32,7 @@
 #define DEFAULT_LOCK_FILE "/var/run/rsyncd.lock"
 #define URL_PREFIX "rsync://"
 
-#define SYMLINK_PREFIX "/rsyncd-munged/"
+#define SYMLINK_PREFIX "/rsyncd-munged/"  /* This MUST have a trailing slash! */
 #define SYMLINK_PREFIX_LEN ((int)sizeof SYMLINK_PREFIX - 1)
 
 #define BACKUP_SUFFIX "~"

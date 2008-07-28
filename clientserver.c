@@ -36,6 +36,7 @@ extern int ignore_errors;
 extern int preserve_xattrs;
 extern int kluge_around_eof;
 extern int daemon_over_rsh;
+extern int munge_symlinks;
 extern int sanitize_paths;
 extern int numeric_ids;
 extern int filesfrom_fd;
@@ -64,7 +65,6 @@ extern iconv_t ic_send, ic_recv;
 char *auth_user;
 int read_only = 0;
 int module_id = -1;
-int munge_symlinks = 0;
 struct chmod_mode_struct *daemon_chmod_modes;
 
 /* module_dirlen is the length of the module_dir string when in daemon
@@ -404,6 +404,7 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	char *name = lp_name(i);
 	int use_chroot = lp_use_chroot(i);
 	int ret, pre_exec_fd = -1;
+	int save_munge_symlinks;
 	pid_t pre_exec_pid = 0;
 	char *request = NULL;
 
@@ -687,9 +688,11 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 		munge_symlinks = !use_chroot || module_dirlen;
 	if (munge_symlinks) {
 		STRUCT_STAT st;
-		if (do_stat(SYMLINK_PREFIX, &st) == 0 && S_ISDIR(st.st_mode)) {
-			rprintf(FLOG, "Symlink munging is unsupported when a %s directory exists.\n",
-				SYMLINK_PREFIX);
+		char prefix[SYMLINK_PREFIX_LEN]; /* NOT +1 ! */
+		strlcpy(prefix, SYMLINK_PREFIX, sizeof prefix); /* trim the trailing slash */
+		if (do_stat(prefix, &st) == 0 && S_ISDIR(st.st_mode)) {
+			rprintf(FLOG, "Symlink munging is unsafe when a %s directory exists.\n",
+				prefix);
 			io_printf(f_out, "@ERROR: daemon security issue -- contact admin\n", name);
 			exit_cleanup(RERR_UNSUPPORTED);
 		}
@@ -745,6 +748,8 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	read_args(f_in, name, line, sizeof line, rl_nulls, &argv, &argc, &request);
 	orig_argv = argv;
 
+	save_munge_symlinks = munge_symlinks;
+
 	reset_output_levels(); /* future verbosity is controlled by client options */
 	ret = parse_arguments(&argc, (const char ***) &argv);
 	if (protect_args && ret) {
@@ -755,6 +760,8 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 		ret = parse_arguments(&argc, (const char ***) &argv);
 	} else
 		orig_early_argv = NULL;
+
+	munge_symlinks = save_munge_symlinks; /* The client mustn't control this. */
 
 	if (pre_exec_pid) {
 		err_msg = finish_pre_exec(pre_exec_pid, pre_exec_fd, request,

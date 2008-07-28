@@ -336,6 +336,7 @@ to the detailed description below for a complete description.  verb(
  -L, --copy-links            transform symlink into referent file/dir
      --copy-unsafe-links     only "unsafe" symlinks are transformed
      --safe-links            ignore symlinks that point outside the tree
+     --munge-links           munge symlinks to make them safer
  -k, --copy-dirlinks         transform symlink to dir into referent dir
  -K, --keep-dirlinks         treat symlinked dir on receiver as dir
  -H, --hard-links            preserve hard links
@@ -831,6 +832,25 @@ dit(bf(--safe-links)) This tells rsync to ignore any symbolic links
 which point outside the copied tree. All absolute symlinks are
 also ignored. Using this option in conjunction with bf(--relative) may
 give unexpected results.
+
+dit(bf(--munge-links)) This option tells rsync to (1) modify all symlinks on
+the receiving side in a way that makes them unusable but recoverable (see
+below), or (2) to unmunge symlinks on the sending side that had been stored in
+a munged state.  This is useful if you don't quite trust the source of the data
+to not try to slip in a symlink to a unexpected place.
+
+The way rsync disables the use of symlinks is to prefix each one with the
+string "/rsyncd-munged/".  This prevents the links from being used as long as
+that directory does not exist.  When this option is enabled, rsync will refuse
+to run if that path is a directory or a symlink to a directory.
+
+The option only affects the client side of the transfer, so if you need it to
+affect the server, specify it via bf(--remote-option).  (Note that in a local
+transfer, the client side is the sender.)
+
+This option has no affect on a daemon, since the daemon configures whether it
+wants munged symlinks via its "munge symlinks" parameter.  See also the
+"munge-symlinks" perl script in the support directory of the source code.
 
 dit(bf(-k, --copy-dirlinks)) This option causes the sending side to treat
 a symlink to a directory as though it were a real directory.  This is
