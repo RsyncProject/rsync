@@ -1621,6 +1621,11 @@ An example:
 
 quote(tt(  rsync -av --link-dest=$PWD/prior_dir host:src_dir/ new_dir/))
 
+If file's aren't linking, double-check their attributes.  Also check if some
+attributes are getting forced outside of rsync's control, such a mount option
+that squishes root to a single user, or mounts a removable drive with generic
+ownership (such as OS X's "Ignore ownership on this volume" option).
+
 Beginning in version 2.6.4, multiple bf(--link-dest) directories may be
 provided, which will cause rsync to search the list in the order specified
 for an exact match.
