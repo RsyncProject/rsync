@@ -101,11 +101,10 @@ who like to tune their systems to the utmost degree. You can set all
 sorts of socket options which may make transfers faster (or
 slower!). Read the man page for the code(setsockopt()) system call for
 details on some of the options you may be able to set. By default no
-special socket options are set.  These settings are superseded by the
-bf(--sockopts) command-line option.
+special socket options are set.  These settings can also be specified
+via the bf(--sockopts) command-line option.
 
 enddit()
-
 
 manpagesection(MODULE PARAMETERS)
 
@@ -213,7 +212,8 @@ to the exclude setting for the module so that
 a user can't try to create it.
 
 Note:  rsync makes no attempt to verify that any pre-existing symlinks in
-the hierarchy are as safe as you want them to be.  If you setup an rsync
+the module's hierarchy are as safe as you want them to be (unless, of
+course, it just copied in the whole hierarchy).  If you setup an rsync
 daemon on a new area or locally add symlinks, you can manually protect your
 symlinks from being abused by prefixing "/rsyncd-munged/" to the start of
 every symlink's value.  There is a perl script in the support directory
@@ -256,7 +256,7 @@ the transfer.  If this value is set on a per-module basis instead of
 globally, the global log will still contain any authorization failures
 or config-file error messages.
 
-If the daemon fails to open to specified file, it will fall back to
+If the daemon fails to open the specified file, it will fall back to
 using syslog and output an error about the failure.  (Note that the
 failure to open the specified log file used to be a fatal error.)
 
@@ -509,7 +509,7 @@ quote(itemization(
   it() %a the remote IP address
   it() %b the number of bytes actually transferred
   it() %B the permission bits of the file (e.g. rwxrwxrwt)
-  it() %c the checksum bytes received for this file (only when sending)
+  it() %c the total size of the block checksums received for the basis file (only when sending)
   it() %f the filename (long form on sender; no trailing "/")
   it() %G the gid of the file (decimal) or "DEFAULT"
   it() %h the remote host name

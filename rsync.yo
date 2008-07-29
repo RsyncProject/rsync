@@ -464,9 +464,9 @@ dit(bf(--version)) print the rsync version number and exit.
 dit(bf(-v, --verbose)) This option increases the amount of information you
 are given during the transfer.  By default, rsync works silently. A
 single bf(-v) will give you information about what files are being
-transferred and a brief summary at the end. Two bf(-v) flags will give you
+transferred and a brief summary at the end. Two bf(-v) options will give you
 information on what files are being skipped and slightly more
-information at the end. More than two bf(-v) flags should only be used if
+information at the end. More than two bf(-v) options should only be used if
 you are debugging rsync.
 
 Note that the names of the transferred files that are output are done using
@@ -480,7 +480,7 @@ any way.  See the bf(--out-format) option for more details.
 
 dit(bf(-q, --quiet)) This option decreases the amount of information you
 are given during the transfer, notably suppressing information messages
-from the remote server. This flag is useful when invoking rsync from
+from the remote server. This option is useful when invoking rsync from
 cron.
 
 dit(bf(--no-motd)) This option affects the information that is output
@@ -1117,7 +1117,7 @@ directories that are being synchronized.  You must have asked rsync to
 send the whole directory (e.g. "dir" or "dir/") without using a wildcard
 for the directory's contents (e.g. "dir/*") since the wildcard is expanded
 by the shell and rsync thus gets a request to transfer individual files, not
-the files' parent directory.  Files that are excluded from transfer are
+the files' parent directory.  Files that are excluded from the transfer are
 also excluded from being deleted unless you use the bf(--delete-excluded)
 option or mark the rules as only matching on the sending side (see the
 include/exclude modifiers in the FILTER RULES section).
@@ -1139,7 +1139,7 @@ destination.  You can override this with the bf(--ignore-errors) option.
 The bf(--delete) option may be combined with one of the --delete-WHEN options
 without conflict, as well as bf(--delete-excluded).  However, if none of the
 --delete-WHEN options are specified, rsync will choose the
-bf(--delete-during) algorithm when talking to an rsync 3.0.0 or newer, and
+bf(--delete-during) algorithm when talking to rsync 3.0.0 or newer, and
 the bf(--delete-before) algorithm when talking to an older rsync.  See also
 bf(--delete-delay) and bf(--delete-after).
 
@@ -1156,19 +1156,26 @@ algorithm that requires rsync to scan all the files in the transfer into
 memory at once (see bf(--recursive)).
 
 dit(bf(--delete-during, --del)) Request that the file-deletions on the
-receiving side be done incrementally as the transfer happens.  This is
-a faster method than choosing the before- or after-transfer algorithm,
-but it is only supported beginning with rsync version 2.6.4.
+receiving side be done incrementally as the transfer happens.  The
+per-directory delete scan is done right before each directory is checked
+for updates, so it behaves like a more efficient bf(--delete-before),
+including doing the deletions prior to any per-directory filter files
+being updated.  This option was first added in rsync version 2.6.4.
 See bf(--delete) (which is implied) for more details on file-deletion.
 
 dit(bf(--delete-delay)) Request that the file-deletions on the receiving
-side be computed during the transfer, and then removed after the transfer
-completes.  If the number of removed files overflows an internal buffer, a
+side be computed during the transfer (like bf(--delete-during)), and then
+removed after the transfer completes.  This is useful when combined with
+bf(--delay-updates) and/or bf(--fuzzy), and is more efficient than using
+bf(--delete-after) (but can behave differently, since bf(--delete-after)
+computes the deletions in a separate pass after all updates are done).
+If the number of removed files overflows an internal buffer, a
 temporary file will be created on the receiving side to hold the names (it
 is removed while open, so you shouldn't see it during the transfer).  If
 the creation of the temporary file fails, rsync will try to fall back to
 using bf(--delete-after) (which it cannot do if bf(--recursive) is doing an
 incremental scan).
+See bf(--delete) (which is implied) for more details on file-deletion.
 
 dit(bf(--delete-after)) Request that the file-deletions on the receiving
 side be done after the transfer has completed.  This is useful if you
@@ -1718,22 +1725,22 @@ you are talking to a recent enough rsync that it logs deletions instead of
 outputting them as a verbose message).
 
 dit(bf(--out-format=FORMAT)) This allows you to specify exactly what the
-rsync client outputs to the user on a per-update basis.  The format is a text
-string containing embedded single-character escape sequences prefixed with
-a percent (%) character.  For a list of the possible escape characters, see
-the "log format" setting in the rsyncd.conf manpage.
+rsync client outputs to the user on a per-update basis.  The format is a
+text string containing embedded single-character escape sequences prefixed
+with a percent (%) character.   A default format of "%n%L" is assumed if
+bf(-v) is specified (which reports the name
+of the file and, if the item is a link, where it points).  For a full list
+of the possible escape characters, see the "log format" setting in the
+rsyncd.conf manpage.
 
-Specifying this option will mention each file, dir, etc. that gets updated
-in a significant way (a transferred file, a recreated symlink/device, or a
-touched directory).  In addition, if the itemize-changes escape (%i) is
-included in the string, the logging of names increases to mention any
-item that is changed in any way (as long as the receiving side is at least
-2.6.4).  See the bf(--itemize-changes) option for a description of the
-output of "%i".
-
-The bf(--verbose) option implies a format of "%n%L", but you can use
-bf(--out-format) without bf(--verbose) if you like, or you can override
-the format of its per-file output using this option.
+Specifying the bf(--out-format) option
+will mention each file, dir, etc. that gets updated in a significant
+way (a transferred file, a recreated symlink/device, or a touched
+directory).  In addition, if the itemize-changes escape (%i) is included in
+the string (e.g. if the bf(--itemize-changes) option was used), the logging
+of names increases to mention any item that is changed in any way (as long
+as the receiving side is at least 2.6.4).  See the bf(--itemize-changes)
+option for a description of the output of "%i".
 
 Rsync will output the out-format string prior to a file's transfer unless
 one of the transfer-statistic escapes is requested, in which case the
@@ -2093,7 +2100,7 @@ by the server and defaults to the current code(time()).  This option
 is used to set a specific checksum seed, which is useful for
 applications that want repeatable block and file checksums, or
 in the case where the user wants a more random checksum seed.
-Note that setting NUM to 0 causes rsync to use the default of code(time())
+Setting NUM to 0 causes rsync to use the default of code(time())
 for checksum seed.
 enddit()
 
