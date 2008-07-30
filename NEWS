@@ -7,6 +7,9 @@ Changes since 3.0.3:
     - Fixed a bug in the hard-linking code where it would sometimes try to
       allocate 0 bytes of memory (which fails on some OSes, such as AIX).
 
+    - Fixed the hard-linking of files from a device that has a device number
+      of 0 (which seems to be a common device number on NetBSD).
+
     - Fixed a couple issues in the --fake-super handling of xattrs when the
       destination files have root-level attributes (e.g. selinux values) that
       a non-root copy can't affect.

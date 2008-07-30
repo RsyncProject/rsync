@@ -1213,8 +1213,8 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		if (protocol_version >= 28
 		 ? (!S_ISDIR(st.st_mode) && st.st_nlink > 1)
 		 : S_ISREG(st.st_mode)) {
-			tmp_dev = st.st_dev;
-			tmp_ino = st.st_ino;
+			tmp_dev = (int64)st.st_dev + 1;
+			tmp_ino = (int64)st.st_ino;
 		} else
 			tmp_dev = 0;
 	}
