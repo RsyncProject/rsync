@@ -381,6 +381,11 @@ Changes since 2.6.9:
     - Fixed rsync's ability to remove files that are not writable by the file's
       owner when rsync is running as the same user.
 
+    - When transferring large files, the sender's hashtable of checksums is
+      kept at a more reasonable state of fullness (no more than 80% full) so
+      that the scanning of the hashtable will not bog down as the number of
+      blocks increases.
+
   ENHANCEMENTS:
 
     - A new incremental-recursion algorithm is now used when rsync is talking
