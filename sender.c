@@ -281,7 +281,7 @@ void send_files(int f_in, int f_out)
 
 		if (!(s = receive_sums(f_in))) {
 			io_error |= IOERR_GENERAL;
-			rprintf(FERROR, "receive_sums failed\n");
+			rprintf(FERROR_XFER, "receive_sums failed\n");
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
@@ -309,7 +309,7 @@ void send_files(int f_in, int f_out)
 		/* map the local file */
 		if (do_fstat(fd, &st) != 0) {
 			io_error |= IOERR_GENERAL;
-			rsyserr(FERROR, errno, "fstat failed");
+			rsyserr(FERROR_XFER, errno, "fstat failed");
 			free_sums(s);
 			close(fd);
 			exit_cleanup(RERR_PROTOCOL);

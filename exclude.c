@@ -476,7 +476,7 @@ void *push_local_filters(const char *dir, unsigned int dirlen)
 					  XFLG_ANCHORED2ABS);
 		} else {
 			io_error |= IOERR_GENERAL;
-			rprintf(FINFO,
+			rprintf(FERROR,
 			    "cannot add local filter rules in long-named directory: %s\n",
 			    full_fname(dirbuf));
 		}

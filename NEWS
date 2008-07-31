@@ -20,6 +20,8 @@ Changes since 3.0.3:
     - Fixed a potential alignment issue in the IRIX ACL code when allocating
       the initial "struct acl" object.  Also, cast mallocs to avoid warnings.
 
+    - Changed some errors that were going to stdout to go to stderr.
+
   ENHANCEMENTS:
 
     - Rsync will avoid sending an -e option to the server if an older protocol

@@ -2335,7 +2335,7 @@ void generate_files(int f_out, const char *local_name)
 		touch_up_dirs(dir_flist, -1);
 
 	if (max_delete >= 0 && deletion_count > max_delete) {
-		rprintf(FINFO,
+		rprintf(FWARNING,
 			"Deletions stopped due to --max-delete limit (%d skipped)\n",
 			deletion_count - max_delete);
 		io_error |= IOERR_DEL_LIMIT;
