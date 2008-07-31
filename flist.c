@@ -376,7 +376,7 @@ int change_pathname(struct file_struct *file, const char *dir, int dirlen)
 	if (!change_dir(dir, CD_NORMAL)) {
 	  chdir_error:
 		io_error |= IOERR_GENERAL;
-		rsyserr(FERROR, errno, "change_dir %s failed", full_fname(dir));
+		rsyserr(FERROR_XFER, errno, "change_dir %s failed", full_fname(dir));
 		if (dir != orig_dir)
 			change_dir(orig_dir, CD_NORMAL);
 		pathname = NULL;
@@ -693,7 +693,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 
 		if (iconvbufs(ic_recv, &inbuf, &outbuf, 0) < 0) {
 			io_error |= IOERR_GENERAL;
-			rprintf(FINFO,
+			rprintf(FERROR_XFER,
 			    "[%s] cannot convert filename: %s (%s)\n",
 			    who_am_i(), lastname, strerror(errno));
 			outbuf.len = 0;
@@ -1068,7 +1068,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 
 	if (strlcpy(thisname, fname, sizeof thisname) >= sizeof thisname) {
 		io_error |= IOERR_GENERAL;
-		rprintf(FINFO, "skipping overly long name: %s\n", fname);
+		rprintf(FERROR_XFER, "skipping overly long name: %s\n", fname);
 		return NULL;
 	}
 	clean_fname(thisname, 0);
@@ -1362,7 +1362,7 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 			if (iconvbufs(ic_send, &inbuf, &outbuf, 0) < 0) {
 			  convert_error:
 				io_error |= IOERR_GENERAL;
-				rprintf(FINFO,
+				rprintf(FERROR_XFER,
 				    "[%s] cannot convert filename: %s (%s)\n",
 				    who_am_i(), f_name(file, fbuf), strerror(errno));
 				return NULL;
@@ -1587,14 +1587,14 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 			continue;
 		if (strlcpy(p, dname, remainder) >= remainder) {
 			io_error |= IOERR_GENERAL;
-			rprintf(FINFO,
+			rprintf(FERROR_XFER,
 				"cannot send long-named file %s\n",
 				full_fname(fbuf));
 			continue;
 		}
 		if (dname[0] == '\0') {
 			io_error |= IOERR_GENERAL;
-			rprintf(FINFO,
+			rprintf(FERROR_XFER,
 				"cannot send file with empty name in %s\n",
 				full_fname(fbuf));
 			continue;
