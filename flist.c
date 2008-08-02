@@ -387,7 +387,11 @@ int change_pathname(struct file_struct *file, const char *dir, int dirlen)
 	return 1;
 }
 
-static void send_file_entry(int f, const char *fname, struct file_struct *file, int ndx, int first_ndx)
+static void send_file_entry(int f, const char *fname, struct file_struct *file,
+#ifdef SUPPORT_LINKS
+			    const char *symlink_name, int symlink_len,
+#endif
+			    int ndx, int first_ndx)
 {
 	static time_t modtime;
 	static mode_t mode;
@@ -591,11 +595,9 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file, 
 	}
 
 #ifdef SUPPORT_LINKS
-	if (preserve_links && S_ISLNK(mode)) {
-		const char *sl = F_SYMLINK(file);
-		int len = strlen(sl);
-		write_varint30(f, len);
-		write_buf(f, sl, len);
+	if (symlink_len) {
+		write_varint30(f, symlink_len);
+		write_buf(f, symlink_name, symlink_len);
 	}
 #endif
 
@@ -698,7 +700,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 			    who_am_i(), lastname, strerror(errno));
 			outbuf.len = 0;
 		}
-		outbuf.buf[outbuf.len] = '\0';
+		thisname[outbuf.len] = '\0';
 	}
 #endif
 
@@ -834,6 +836,13 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 				linkname_len - 1);
 			overflow_exit("recv_file_entry");
 		}
+#ifdef ICONV_OPTION
+		/* We don't know how much extra room we need to convert
+		 * the as-yet-unread symlink name when converting it,
+		 * so let's hope that a double-size buffer is plenty. */
+		if (ic_recv != (iconv_t)-1)
+			linkname_len = linkname_len * 2 + 1;
+#endif
 		if (munge_symlinks)
 			linkname_len += SYMLINK_PREFIX_LEN;
 	}
@@ -968,14 +977,40 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		if (first_hlink_ndx >= flist->ndx_start) {
 			struct file_struct *first = flist->files[first_hlink_ndx - flist->ndx_start];
 			memcpy(bp, F_SYMLINK(first), linkname_len);
-		} else if (munge_symlinks) {
-			strlcpy(bp, SYMLINK_PREFIX, linkname_len);
-			bp += SYMLINK_PREFIX_LEN;
-			linkname_len -= SYMLINK_PREFIX_LEN;
-			read_sbuf(f, bp, linkname_len - 1);
 		} else {
-			read_sbuf(f, bp, linkname_len - 1);
-			if (sanitize_paths)
+			if (munge_symlinks) {
+				strlcpy(bp, SYMLINK_PREFIX, linkname_len);
+				bp += SYMLINK_PREFIX_LEN;
+				linkname_len -= SYMLINK_PREFIX_LEN;
+			}
+#ifdef ICONV_OPTION
+			if (ic_recv != (iconv_t)-1) {
+				xbuf outbuf, inbuf;
+
+				alloc_len = linkname_len;
+				linkname_len /= 2; /* (linkname_len-1) / 2 for odd values. */
+
+				/* Read the symlink name into the end of our double-sized
+				 * buffer and then convert it into the right spot. */
+				INIT_XBUF(inbuf, bp + alloc_len - linkname_len,
+					  linkname_len - 1, (size_t)-1);
+				read_sbuf(f, inbuf.buf, inbuf.len);
+				INIT_XBUF(outbuf, bp, 0, alloc_len);
+
+				if (iconvbufs(ic_recv, &inbuf, &outbuf, 0) < 0) {
+					io_error |= IOERR_GENERAL;
+					rprintf(FERROR_XFER,
+					    "[%s] cannot convert symlink name for: %s (%s)\n",
+					    who_am_i(), full_fname(thisname), strerror(errno));
+					bp = (char*)file->basename;
+					*bp++ = '\0';
+					outbuf.len = 0;
+				}
+				bp[outbuf.len] = '\0';
+			} else
+#endif
+				read_sbuf(f, bp, linkname_len - 1);
+			if (sanitize_paths && !munge_symlinks && *bp)
 				sanitize_path(bp, bp, "", lastdir_depth, SP_DEFAULT);
 		}
 	}
@@ -1339,8 +1374,25 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 
 	if (f >= 0) {
 		char fbuf[MAXPATHLEN];
+#ifdef SUPPORT_LINKS
+		const char *symlink_name;
+		int symlink_len;
+#ifdef ICONV_OPTION
+		char symlink_buf[MAXPATHLEN];
+#endif
+#endif
 #if defined SUPPORT_ACLS || defined SUPPORT_XATTRS
 		stat_x sx;
+#endif
+
+#ifdef SUPPORT_LINKS
+		if (preserve_links && S_ISLNK(file->mode)) {
+			symlink_name = F_SYMLINK(file);
+			symlink_len = strlen(symlink_name);
+		} else {
+			symlink_name = NULL;
+			symlink_len = 0;
+		}
 #endif
 
 #ifdef ICONV_OPTION
@@ -1355,7 +1407,7 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 				if (iconvbufs(ic_send, &inbuf, &outbuf, 0) < 0)
 					goto convert_error;
 				outbuf.size += 2;
-				outbuf.buf[outbuf.len++] = '/';
+				fbuf[outbuf.len++] = '/';
 			}
 
 			INIT_XBUF_STRLEN(inbuf, (char*)file->basename);
@@ -1367,7 +1419,26 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 				    who_am_i(), f_name(file, fbuf), strerror(errno));
 				return NULL;
 			}
-			outbuf.buf[outbuf.len] = '\0';
+			fbuf[outbuf.len] = '\0';
+
+#ifdef SUPPORT_LINKS
+			if (symlink_len) {
+				INIT_XBUF(inbuf, (char*)symlink_name, symlink_len, (size_t)-1);
+				INIT_CONST_XBUF(outbuf, symlink_buf);
+				if (iconvbufs(ic_send, &inbuf, &outbuf, 0) < 0) {
+					io_error |= IOERR_GENERAL;
+					f_name(file, fbuf);
+					rprintf(FERROR_XFER,
+					    "[%s] cannot convert symlink name for: %s (%s)\n",
+					    who_am_i(), full_fname(fbuf), strerror(errno));
+					return NULL;
+				}
+				symlink_buf[outbuf.len] = '\0';
+
+				symlink_name = symlink_buf;
+				symlink_len = outbuf.len;
+			}
+#endif
 		} else
 #endif
 			f_name(file, fbuf);
@@ -1392,7 +1463,11 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 		}
 #endif
 
-		send_file_entry(f, fbuf, file, flist->used, flist->ndx_start);
+		send_file_entry(f, fbuf, file,
+#ifdef SUPPORT_LINKS
+				symlink_name, symlink_len,
+#endif
+				flist->used, flist->ndx_start);
 
 #ifdef SUPPORT_ACLS
 		if (preserve_acls && !S_ISLNK(file->mode)) {
@@ -2262,8 +2337,8 @@ struct file_list *recv_file_list(int f)
 		maybe_emit_filelist_progress(flist->used);
 
 		if (DEBUG_GTE(FLIST, 2)) {
-			rprintf(FINFO, "recv_file_name(%s)\n",
-				f_name(file, NULL));
+			char *name = f_name(file, NULL);
+			rprintf(FINFO, "recv_file_name(%s)\n", NS(name));
 		}
 	}
 	file_total += flist->used;
