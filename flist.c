@@ -65,6 +65,7 @@ extern int protocol_version;
 extern int sanitize_paths;
 extern int munge_symlinks;
 extern int need_unsorted_flist;
+extern int sender_symlink_iconv;
 extern int output_needs_newline;
 extern int sender_keeps_checksum;
 extern int unsort_ndx;
@@ -840,7 +841,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		/* We don't know how much extra room we need to convert
 		 * the as-yet-unread symlink name when converting it,
 		 * so let's hope that a double-size buffer is plenty. */
-		if (ic_recv != (iconv_t)-1)
+		if (sender_symlink_iconv)
 			linkname_len = linkname_len * 2 + 1;
 #endif
 		if (munge_symlinks)
@@ -984,7 +985,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 				linkname_len -= SYMLINK_PREFIX_LEN;
 			}
 #ifdef ICONV_OPTION
-			if (ic_recv != (iconv_t)-1) {
+			if (sender_symlink_iconv) {
 				xbuf outbuf, inbuf;
 
 				alloc_len = linkname_len;
@@ -1422,7 +1423,7 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 			fbuf[outbuf.len] = '\0';
 
 #ifdef SUPPORT_LINKS
-			if (symlink_len) {
+			if (symlink_len && sender_symlink_iconv) {
 				INIT_XBUF(inbuf, (char*)symlink_name, symlink_len, (size_t)-1);
 				INIT_CONST_XBUF(outbuf, symlink_buf);
 				if (iconvbufs(ic_send, &inbuf, &outbuf, 0) < 0) {

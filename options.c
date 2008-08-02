@@ -2245,6 +2245,9 @@ void server_options(char **args, int *argc_p)
 #if defined HAVE_LUTIMES && defined HAVE_UTIMES
 		argstr[x++] = 'L';
 #endif
+#ifdef ICONV_OPTION
+		argstr[x++] = 's';
+#endif
 	}
 
 	if (x >= (int)sizeof argstr) { /* Not possible... */
