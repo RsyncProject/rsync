@@ -263,13 +263,17 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 
 	if (am_server && msg_fd_out >= 0) {
 		assert(!is_utf8);
-		/* Pass the message to our sibling. */
+		/* Pass the message to our sibling in native charset. */
 		send_msg((enum msgcode)code, buf, len, 0);
 		return;
 	}
 
 	if (code == FERROR_SOCKET) /* This gets simplified for a non-sibling. */
 		code = FERROR;
+	else if (code == FERROR_UTF8) {
+		is_utf8 = 1;
+		code = FERROR;
+	}
 
 	if (code == FCLIENT)
 		code = FINFO;

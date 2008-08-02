@@ -696,7 +696,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 
 		if (iconvbufs(ic_recv, &inbuf, &outbuf, 0) < 0) {
 			io_error |= IOERR_GENERAL;
-			rprintf(FERROR_XFER,
+			rprintf(FERROR_UTF8,
 			    "[%s] cannot convert filename: %s (%s)\n",
 			    who_am_i(), lastname, strerror(errno));
 			outbuf.len = 0;
