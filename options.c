@@ -200,9 +200,9 @@ struct chmod_mode_struct *chmod_modes = NULL;
 static const char *debug_verbosity[] = {
 	/*0*/ NULL,
 	/*1*/ NULL,
-	/*2*/ "bind,cmd,deltasum,connect,del,dup,filter,flist",
+	/*2*/ "bind,cmd,connect,del,deltasum,dup,filter,flist,iconv",
 	/*3*/ "acl,backup,deltasum2,del2,exit,filter2,flist2,fuzzy,genr,own,recv,send,time",
-	/*4*/ "cmd2,deltasum3,del3,exit2,flist3,iconv,own2,proto,time2",
+	/*4*/ "cmd2,deltasum3,del3,exit2,flist3,iconv2,own2,proto,time2",
 	/*5*/ "chdir,deltasum4,flist4,fuzzy2,hlink",
 };
 
@@ -211,7 +211,7 @@ static const char *debug_verbosity[] = {
 static const char *info_verbosity[1+MAX_VERBOSITY] = {
 	/*0*/ NULL,
 	/*1*/ "copy,del,flist,misc,name,stats,symsafe",
-	/*2*/ "backup,misc2,mount,name2,remove,skip",
+	/*2*/ "backup,mount,name2,remove,skip",
 };
 
 #define MAX_OUT_LEVEL 4 /* The largest N allowed for any flagN word. */
@@ -244,7 +244,7 @@ static struct output_struct info_words[COUNT_INFO+1] = {
 	INFO_WORD(COPY, W_REC, "Mention files copied locally on the receiving side"),
 	INFO_WORD(DEL, W_REC, "Mention deletions on the receiving side"),
 	INFO_WORD(FLIST, W_CLI, "Mention file-list receiving/sending (levels 1-2)"),
-	INFO_WORD(MISC, W_SND|W_REC, "Mention miscellaneous information (levels 1-2)"),
+	INFO_WORD(MISC, W_SND|W_REC, "Mention miscellaneous information"),
 	INFO_WORD(MOUNT, W_SND|W_REC, "Mention mounts that were found or skipped"),
 	INFO_WORD(NAME, W_SND|W_REC, "Mention 1) updated file/dir names, 2) unchanged names"),
 	INFO_WORD(PROGRESS, W_CLI, "Mention 1) per-file progress or 2) total transfer progress"),
@@ -273,7 +273,7 @@ static struct output_struct debug_words[COUNT_DEBUG+1] = {
 	DEBUG_WORD(FUZZY, W_REC, "Debug fuzzy scoring (levels 1-2)"),
 	DEBUG_WORD(GENR, W_REC, "Debug generator functions"),
 	DEBUG_WORD(HLINK, W_SND|W_REC, "Debug hard-link actions"),
-	DEBUG_WORD(ICONV, W_CLI|W_SRV, "Debug iconv (character conversion)"),
+	DEBUG_WORD(ICONV, W_CLI|W_SRV, "Debug iconv character conversions (levels 1-2)"),
 	DEBUG_WORD(OWN, W_REC, "Debug ownership changes in users & groups (levels 1-2)"),
 	DEBUG_WORD(PROTO, W_CLI|W_SRV, "Debug protocol information"),
 	DEBUG_WORD(RECV, W_REC, "Debug receiver functions"),

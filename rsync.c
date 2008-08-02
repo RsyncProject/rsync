@@ -80,23 +80,23 @@ void setup_iconv(void)
 # endif
 
 	if (!am_server && !allow_8bit_chars) {
-
 		/* It's OK if this fails... */
 		ic_chck = iconv_open(defset, defset);
 
-		if (DEBUG_GTE(ICONV, 1)) {
+		if (DEBUG_GTE(ICONV, 2)) {
 			if (ic_chck == (iconv_t)-1) {
 				rprintf(FINFO,
-					"note: iconv_open(\"%s\", \"%s\") failed (%d)"
-					" -- using isprint() instead of iconv().\n",
+					"msg checking via isprint()"
+					" (iconv_open(\"%s\", \"%s\") errno: %d)\n",
 					defset, defset, errno);
 			} else {
 				rprintf(FINFO,
-					"note: iconv_open(\"%s\", \"%s\") succeeded.\n",
-					defset, defset);
+					"msg checking charset: %s\n",
+					defset);
 			}
 		}
-	}
+	} else
+		ic_chck = (iconv_t)-1;
 
 # ifdef ICONV_OPTION
 	if (!iconv_opt)
@@ -126,10 +126,9 @@ void setup_iconv(void)
 		exit_cleanup(RERR_UNSUPPORTED);
 	}
 
-	if (INFO_GTE(MISC, 2)) {
-		rprintf(FINFO, "%s charset: %s\n",
-			am_server ? "server" : "client",
-			*charset ? charset : "[LOCALE]");
+	if (DEBUG_GTE(ICONV, 1)) {
+		rprintf(FINFO, "[%s] charset: %s\n",
+			who_am_i(), *charset ? charset : "[LOCALE]");
 	}
 # endif
 }
