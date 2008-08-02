@@ -698,23 +698,30 @@ int recv_files(int f_in, char *local_name)
 				do_unlink(partialptr);
 				handle_partial_dir(partialptr, PDIR_DELETE);
 			}
-		} else if (keep_partial && partialptr
-		    && handle_partial_dir(partialptr, PDIR_CREATE)) {
-			if (!finish_transfer(partialptr, fnametmp, fnamecmp, NULL,
-					     file, recv_ok, !partial_dir))
+		} else if (keep_partial && partialptr) {
+			if (!handle_partial_dir(partialptr, PDIR_CREATE)) {
+				rprintf(FERROR,
+				    "Unable to create partial-dir for %s -- discarding %s.\n",
+				    local_name ? local_name : f_name(file, NULL),
+				    recv_ok ? "completed file" : "partial file");
+				do_unlink(fnametmp);
+				recv_ok = -1;
+			} else if (!finish_transfer(partialptr, fnametmp, fnamecmp, NULL,
+						    file, recv_ok, !partial_dir))
 				recv_ok = -1;
 			else if (delay_updates && recv_ok) {
 				bitbag_set_bit(delayed_bits, ndx);
 				recv_ok = 2;
-			}
-		} else {
-			partialptr = NULL;
+			} else
+				partialptr = NULL;
+		} else
 			do_unlink(fnametmp);
-		}
 
 		cleanup_disable();
 
 		switch (recv_ok) {
+		case 2:
+			break;
 		case 1:
 			if (remove_source_files || inc_recurse
 			 || (preserve_hard_links && F_IS_HLINKED(file)))

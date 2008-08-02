@@ -10,6 +10,11 @@ Changes since 3.0.3:
     - Fixed the hard-linking of files from a device that has a device number
       of 0 (which seems to be a common device number on NetBSD).
 
+    - Fixed the handling of a --partial-dir that cannot be created.  This
+      particularly impacts the --delay-updates option (since the files cannot
+      be delayed without a partial-dir), and was potentially destructive if
+      the --remove-source-files was also specified.
+
     - Fixed a couple issues in the --fake-super handling of xattrs when the
       destination files have root-level attributes (e.g. selinux values) that
       a non-root copy can't affect.
