@@ -63,6 +63,7 @@ int allowed_lull = 0;
 int ignore_timeout = 0;
 int batch_fd = -1;
 int msgdone_cnt = 0;
+int check_for_io_err = 0;
 
 /* Ignore an EOF error if non-zero. See whine_about_eof(). */
 int kluge_around_eof = 0;
@@ -379,6 +380,8 @@ static void read_msg_fd(void)
 	len = tag & 0xFFFFFF;
 	tag = (tag >> 24) - MPLEX_BASE;
 
+	check_for_io_err = 0;
+
 	switch (tag) {
 	case MSG_DONE:
 		if (len < 0 || len > 1 || !am_generator) {
@@ -413,6 +416,9 @@ static void read_msg_fd(void)
 		}
 		flist = recv_file_list(fd);
 		flist->parent_ndx = IVAL(buf,0);
+		/* If the sender is going to send us an MSG_IO_ERROR value, it
+		 * will always be the very next message following MSG_FLIST. */
+		check_for_io_err = 1;
 #ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links)
 			match_hard_links(flist);
@@ -1059,6 +1065,8 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 
 		msg_bytes = tag & 0xFFFFFF;
 		tag = (tag >> 24) - MPLEX_BASE;
+
+		check_for_io_err = 0;
 
 		switch (tag) {
 		case MSG_DATA:

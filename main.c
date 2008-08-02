@@ -64,8 +64,11 @@ extern int whole_file;
 extern int read_batch;
 extern int write_batch;
 extern int batch_fd;
+extern int flist_eof;
 extern int filesfrom_fd;
+extern int delete_during;
 extern int connect_timeout;
+extern int check_for_io_err;
 extern pid_t cleanup_child_pid;
 extern unsigned int module_dirlen;
 extern struct stats stats;
@@ -764,6 +767,8 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		rsyserr(FERROR, errno, "fork failed in do_recv");
 		exit_cleanup(RERR_IPC);
 	}
+
+	check_for_io_err = inc_recurse && delete_during && !flist_eof;
 
 	if (pid == 0) {
 		close(error_pipe[0]);
