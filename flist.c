@@ -816,7 +816,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		}
 #ifdef ICONV_OPTION
 		/* We don't know how much extra room we need to convert
-		 * the as-yet-unread symlink name when converting it,
+		 * the as-yet-unread symlink data when converting it,
 		 * so let's hope that a double-size buffer is plenty. */
 		if (sender_symlink_iconv)
 			linkname_len = linkname_len * 2 + 1;
@@ -968,7 +968,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 				alloc_len = linkname_len;
 				linkname_len /= 2; /* (linkname_len-1) / 2 for odd values. */
 
-				/* Read the symlink name into the end of our double-sized
+				/* Read the symlink data into the end of our double-sized
 				 * buffer and then convert it into the right spot. */
 				INIT_XBUF(inbuf, bp + alloc_len - linkname_len,
 					  linkname_len - 1, (size_t)-1);
@@ -978,7 +978,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 				if (iconvbufs(ic_recv, &inbuf, &outbuf, 0) < 0) {
 					io_error |= IOERR_GENERAL;
 					rprintf(FERROR_XFER,
-					    "[%s] cannot convert symlink name for: %s (%s)\n",
+					    "[%s] cannot convert symlink data for: %s (%s)\n",
 					    who_am_i(), full_fname(thisname), strerror(errno));
 					bp = (char*)file->basename;
 					*bp++ = '\0';
@@ -1401,7 +1401,7 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 					io_error |= IOERR_GENERAL;
 					f_name(file, fbuf);
 					rprintf(FERROR_XFER,
-					    "[%s] cannot convert symlink name for: %s (%s)\n",
+					    "[%s] cannot convert symlink data for: %s (%s)\n",
 					    who_am_i(), full_fname(fbuf), strerror(errno));
 					return NULL;
 				}
