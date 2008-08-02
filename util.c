@@ -437,7 +437,7 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 		case EXDEV:
 			if (partialptr) {
 				if (!handle_partial_dir(partialptr,PDIR_CREATE))
-					return -1;
+					return -2;
 				to = partialptr;
 			}
 			if (copy_file(from, to, -1, mode, 0) != 0)
@@ -1112,12 +1112,16 @@ int handle_partial_dir(const char *fname, int create)
 		STRUCT_STAT st;
 		int statret = do_lstat(dir, &st);
 		if (statret == 0 && !S_ISDIR(st.st_mode)) {
-			if (do_unlink(dir) < 0)
+			if (do_unlink(dir) < 0) {
+				*fn = '/';
 				return 0;
+			}
 			statret = -1;
 		}
-		if (statret < 0 && do_mkdir(dir, 0700) < 0)
+		if (statret < 0 && do_mkdir(dir, 0700) < 0) {
+			*fn = '/';
 			return 0;
+		}
 	} else
 		do_rmdir(dir);
 	*fn = '/';
