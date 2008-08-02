@@ -28,6 +28,9 @@ Changes since 3.0.3:
     - When using --iconv, if a filename fails to convert on the receiving side,
       this no longer interferes with deletions in the root-dir of the transfer.
 
+    - When using --iconv, if a server-side receiver can't convert a filename,
+      it now outputs the name back to the client without mangling the charset.
+
     - Fixed a bug where --delete-during could delete in a directory before it
       noticed that the sending side sent an I/O error for that directory.
 

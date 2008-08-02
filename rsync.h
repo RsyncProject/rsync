@@ -211,6 +211,7 @@ enum logcode {
     FERROR_XFER=1, FINFO=2, /* sent over socket for any protocol */
     FERROR=3, FWARNING=4, /* sent over socket for protocols >= 30 */
     FERROR_SOCKET=5, FLOG=6, /* only sent via receiver -> generator pipe */
+    FERROR_UTF8=8, /* only sent via receiver -> generator pipe */
     FCLIENT=7 /* never transmitted (e.g. server converts to FINFO) */
 };
 
@@ -221,6 +222,7 @@ enum msgcode {
 	MSG_ERROR_XFER=FERROR_XFER, MSG_INFO=FINFO, /* remote logging */
 	MSG_ERROR=FERROR, MSG_WARNING=FWARNING, /* protocol-30 remote logging */
 	MSG_ERROR_SOCKET=FERROR_SOCKET, /* sibling logging */
+	MSG_ERROR_UTF8=FERROR_UTF8, /* sibling logging */
 	MSG_LOG=FLOG, MSG_CLIENT=FCLIENT, /* sibling logging */
 	MSG_REDO=9,	/* reprocess indicated flist index */
 	MSG_FLIST=20,	/* extra file list over sibling socket */

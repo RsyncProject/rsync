@@ -455,6 +455,7 @@ static void read_msg_fd(void)
 		got_flist_entry_status(FES_NO_SEND, buf);
 		break;
 	case MSG_ERROR_SOCKET:
+	case MSG_ERROR_UTF8:
 	case MSG_CLIENT:
 		if (!am_generator)
 			goto invalid_msg;
