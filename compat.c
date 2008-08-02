@@ -57,12 +57,14 @@ extern struct filter_list_struct filter_list;
 extern int need_unsorted_flist;
 #ifdef ICONV_OPTION
 extern iconv_t ic_send, ic_recv;
+extern char *iconv_opt;
 #endif
 
 /* These index values are for the file-list's extra-attribute array. */
 int uid_ndx, gid_ndx, acls_ndx, xattrs_ndx, unsort_ndx;
 
 int receiver_symlink_times = 0; /* receiver can set the time on a symlink */
+int sender_symlink_iconv = 0;	/* sender should convert symlink content */
 
 #ifdef ICONV_OPTION
 int filesfrom_convert = 0;
@@ -70,6 +72,7 @@ int filesfrom_convert = 0;
 
 #define CF_INC_RECURSE	 (1<<0)
 #define CF_SYMLINK_TIMES (1<<1)
+#define CF_SYMLINK_ICONV (1<<2)
 
 static const char *client_info;
 
@@ -249,6 +252,9 @@ void setup_protocol(int f_out,int f_in)
 #if defined HAVE_LUTIMES && defined HAVE_UTIMES
 			compat_flags |= CF_SYMLINK_TIMES;
 #endif
+#ifdef ICONV_OPTION
+			compat_flags |= CF_SYMLINK_ICONV;
+#endif
 			write_byte(f_out, compat_flags);
 		} else
 			compat_flags = read_byte(f_in);
@@ -262,6 +268,11 @@ void setup_protocol(int f_out,int f_in)
 #if defined HAVE_LUTIMES && defined HAVE_UTIMES
 		else
 			receiver_symlink_times = 1;
+#endif
+#ifdef ICONV_OPTION
+		sender_symlink_iconv = iconv_opt && (am_server
+		    ? strchr(client_info, 's') != NULL
+		    : !!(compat_flags & CF_SYMLINK_ICONV));
 #endif
 		if (inc_recurse && !allow_inc_recurse) {
 			/* This should only be able to happen in a batch. */

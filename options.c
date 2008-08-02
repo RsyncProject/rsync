@@ -1828,6 +1828,14 @@ void server_options(char **args, int *argc_p)
 #if defined HAVE_LUTIMES && defined HAVE_UTIMES
 		argstr[x++] = 'L';
 #endif
+#ifdef ICONV_OPTION
+		argstr[x++] = 's';
+#endif
+	}
+
+	if (x >= (int)sizeof argstr) { /* Not possible... */
+		rprintf(FERROR, "argstr overflow in server_options().\n");
+		exit_cleanup(RERR_MALLOC);
 	}
 
 	argstr[x] = '\0';
@@ -2052,6 +2060,11 @@ void server_options(char **args, int *argc_p)
 		args[ac++] = "--remove-source-files";
 	else if (remove_source_files)
 		args[ac++] = "--remove-sent-files";
+
+	if (ac > MAX_SERVER_ARGS) { /* Not possible... */
+		rprintf(FERROR, "argc overflow in server_options().\n");
+		exit_cleanup(RERR_MALLOC);
+	}
 
 	*argc_p = ac;
 	return;
