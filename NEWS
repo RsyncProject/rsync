@@ -22,6 +22,9 @@ Changes since 3.0.3:
     - Improved the keep-alive check in the generator to fire consistently in
       incremental-recursion mode when --timeout is enabled.
 
+    - The --iconv option now converts the content of a symlink too, instead
+      of leaving it in the wrong character-set.
+
     - When using --iconv, if a filename fails to convert on the receiving side,
       this no longer interferes with deletions in the root-dir of the transfer.
 
