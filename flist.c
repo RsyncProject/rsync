@@ -816,10 +816,10 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		}
 #ifdef ICONV_OPTION
 		/* We don't know how much extra room we need to convert
-		 * the as-yet-unread symlink data when converting it,
-		 * so let's hope that a double-size buffer is plenty. */
+		 * the as-yet-unread symlink data, so let's hope that a
+		 * double-size buffer is plenty. */
 		if (sender_symlink_iconv)
-			linkname_len = linkname_len * 2 + 1;
+			linkname_len *= 2;
 #endif
 		if (munge_symlinks)
 			linkname_len += SYMLINK_PREFIX_LEN;
@@ -966,7 +966,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 				xbuf outbuf, inbuf;
 
 				alloc_len = linkname_len;
-				linkname_len /= 2; /* (linkname_len-1) / 2 for odd values. */
+				linkname_len /= 2;
 
 				/* Read the symlink data into the end of our double-sized
 				 * buffer and then convert it into the right spot. */
