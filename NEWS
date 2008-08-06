@@ -23,10 +23,13 @@ Changes since 3.0.3:
       incremental-recursion mode when --timeout is enabled.
 
     - The --iconv option now converts the content of a symlink too, instead
-      of leaving it in the wrong character-set.
+      of leaving it in the wrong character-set (requires 3.0.4 on both sides
+      of the transfer).
 
     - When using --iconv, if a filename fails to convert on the receiving side,
-      this no longer interferes with deletions in the root-dir of the transfer.
+      this no longer makes deletions in the root-dir of the transfer fail
+      silently (the user should see the warning about deletions being disabled
+      due to IO error when --ignore-errors was not specified).
 
     - When using --iconv, if a server-side receiver can't convert a filename,
       it now outputs the name back to the client without mangling the charset.
