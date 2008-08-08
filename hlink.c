@@ -119,7 +119,8 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 		if (inc_recurse) {
 			node = hashtable_find(prior_hlinks, gnum, 1);
 			if (!node->data) {
-				node->data = new_array0(char, 5);
+				if (!(node->data = new_array0(char, 5)))
+					out_of_memory("match_gnums");
 				assert(gnum >= hlink_flist->ndx_start);
 				file->flags |= FLAG_HLINK_FIRST;
 				prev = -1;
