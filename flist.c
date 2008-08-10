@@ -1126,7 +1126,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			}
 		} else {
 			io_error |= IOERR_GENERAL;
-			rsyserr(FERROR_XFER, save_errno, "readlink %s failed",
+			rsyserr(FERROR_XFER, save_errno, "readlink_stat(%s) failed",
 				full_fname(thisname));
 		}
 		return NULL;
