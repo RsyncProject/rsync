@@ -184,9 +184,7 @@ static int flist_ndx_pop(struct flist_ndx_list *lp)
 static void got_flist_entry_status(enum festatus status, const char *buf)
 {
 	int ndx = IVAL(buf, 0);
-	struct file_list *flist = flist_for_ndx(ndx);
-
-	assert(flist != NULL);
+	struct file_list *flist = flist_for_ndx(ndx, "got_flist_entry_status");
 
 	if (remove_source_files) {
 		active_filecnt--;

@@ -37,7 +37,7 @@ extern int stdout_format_has_i;
 extern int maybe_ATTRS_REPORT;
 extern int unsort_ndx;
 extern char *basis_dir[];
-extern struct file_list *cur_flist, *first_flist;
+extern struct file_list *cur_flist;
 
 #ifdef SUPPORT_HARD_LINKS
 
@@ -127,7 +127,7 @@ static void match_gnums(int32 *ndx_list, int ndx_count)
 			} else if (CVAL(node->data, 0) == 0) {
 				struct file_list *flist;
 				prev = IVAL(node->data, 1);
-				flist = flist_for_ndx(prev);
+				flist = flist_for_ndx(prev, NULL);
 				if (flist)
 					flist->files[prev - flist->ndx_start]->flags &= ~FLAG_HLINK_LAST;
 				else {
@@ -256,7 +256,7 @@ static char *check_prior(struct file_struct *file, int gnum,
 	while (1) {
 		struct file_list *flist;
 		if (prev_ndx < 0
-		 || (flist = flist_for_ndx(prev_ndx)) == NULL)
+		 || (flist = flist_for_ndx(prev_ndx, NULL)) == NULL)
 			break;
 		fp = flist->files[prev_ndx - flist->ndx_start];
 		if (!(fp->flags & FLAG_SKIP_HLINK)) {
@@ -478,16 +478,7 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 
 	while ((ndx = prev_ndx) >= 0) {
 		int val;
-		flist = flist_for_ndx(ndx);
-		if (flist == NULL) {
-			int start1 = first_flist ? first_flist->ndx_start : 0;
-			int start2 = first_flist ? first_flist->prev->ndx_start : 0;
-			int used = first_flist ? first_flist->prev->used : 0;
-			rprintf(FERROR,
-				"File index not found: %d (%d - %d)\n",
-				ndx, start1 - 1, start2 + used - 1);
-			exit_cleanup(RERR_PROTOCOL);
-		}
+		flist = flist_for_ndx(ndx, "finish_hard_link");
 		file = flist->files[ndx - flist->ndx_start];
 		file->flags = (file->flags & ~FLAG_HLINK_FIRST) | FLAG_HLINK_DONE;
 		prev_ndx = F_HL_PREV(file);

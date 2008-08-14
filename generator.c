@@ -2079,8 +2079,7 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 	while (1) {
 #ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && (ndx = get_hlink_num()) != -1) {
-			flist = flist_for_ndx(ndx);
-			assert(flist != NULL);
+			flist = flist_for_ndx(ndx, "check_for_finished_files.1");
 			file = flist->files[ndx - flist->ndx_start];
 			assert(file->flags & FLAG_HLINKED);
 			finish_hard_link(file, f_name(file, fbuf), ndx, NULL, itemizing, code, -1);
@@ -2103,7 +2102,7 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 			ignore_times++;
 
 			flist = cur_flist;
-			cur_flist = flist_for_ndx(ndx);
+			cur_flist = flist_for_ndx(ndx, "check_for_finished_files.2");
 
 			file = cur_flist->files[ndx - cur_flist->ndx_start];
 			if (solo_file)

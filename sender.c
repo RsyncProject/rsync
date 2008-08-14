@@ -127,13 +127,7 @@ void successful_send(int ndx)
 	if (!remove_source_files)
 		return;
 
-	if (!(flist = flist_for_ndx(ndx))) {
-		rprintf(FERROR,
-			"INTERNAL ERROR: unable to find flist for item %d\n",
-			ndx);
-		return;
-	}
-
+	flist = flist_for_ndx(ndx, "successful_send");
 	file = flist->files[ndx - flist->ndx_start];
 	if (!change_pathname(file, NULL, 0))
 		return;
