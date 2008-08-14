@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# instant-rsyncd lets you quickly set up and start a simple, unprivileged rsync
+# daemon with a single module in the current directory.  I've found it
+# invaluable for quick testing, and I use it when writing a list of commands
+# that people can paste into a terminal to reproduce a daemon-related bug.
+# Sysadmins deploying an rsync daemon for the first time may find it helpful as
+# a starting point.
+#
+# Usage: instant-rsyncd MODULE PORT RSYNCD-USERNAME [RSYNC-PATH]
+# The script asks for the rsyncd user's password twice on stdin, once to set it
+# and once to log in to test the daemon.
+# -- Matt McCutchen <matt@mattmccutchen.net>
+
+set -e
+
+dir="$(pwd)"
+
+if [ "$#" -lt 3 ]; then
+	echo "I would install an rsync daemon in $dir if you gave me"
+	echo "a module name, a port, and an rsync username."
+	exit 1
+fi
+
+module="$1"
+port="$2"
+user="$3"
+rsync="$4"
+if [ ! "$rsync" ]; then
+	rsync=rsync
+fi
+
+moduledir="${dir%/}/$module"
+
+echo
+echo "I'm about to install an rsync daemon in $dir."
+echo "It will listen on port $port for requests giving rsync username $user"
+echo "and the password you are about to specify.  It will serve a module"
+echo "$module corresponding to $moduledir."
+echo
+
+IFS='' read -s -p 'Desired password: ' password
+
+mkdir "$module"
+
+cat >rsyncd.conf <<EOF
+log file = rsyncd.log
+pid file = rsyncd.pid
+port = $port
+use chroot = no
+
+[$module]
+	path = $module
+	read only = false
+	auth users = $user
+	secrets file = $module.secrets
+EOF
+
+touch "$module".secrets
+chmod go-rwx "$module".secrets
+cat >"$module".secrets <<EOF
+$user:$password
+EOF
+
+cat >start <<EOF
+#!/bin/bash
+set -e
+cd \`dirname \$0\`
+! [ -e rsyncd.pid ] || {
+	echo "Is the daemon already running?  If not, delete rsyncd.pid."
+	exit 1
+}
+$rsync --daemon --config=rsyncd.conf
+EOF
+chmod +x start
+
+cat >stop <<"EOF"
+#!/bin/bash
+set -e
+cd `dirname $0`
+! [ -e rsyncd.pid ] || kill -s SIGTERM $(< rsyncd.pid)
+EOF
+chmod +x stop
+
+path="rsync://$user@$(hostname):$port/$module/"
+
+if ./start; then
+	sleep .2
+	echo
+	echo "I tried to start the daemon.  The log file rsyncd.log says:"
+	echo
+	cat rsyncd.log
+	echo
+	echo "You can start and stop it with ./start and ./stop respectively."
+	echo "You can customize the configuration file rsyncd.conf."
+	echo
+	echo "Give rsync the following path to access the module:"
+	echo "    $path"
+	echo
+	echo "Let's test the daemon now.  Enter the password you chose."
+	echo '$' $rsync --list-only "$path"
+	$rsync --list-only "$path"
+	echo
+	echo "You should see an empty folder; it's $moduledir."
+else
+	echo "Something went wrong.  Do you see an error message?"
+fi
