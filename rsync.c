@@ -265,8 +265,17 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 		check_for_io_err = 0;
 		if (ndx == NDX_DONE)
 			return ndx;
-		if (!inc_recurse || am_sender)
-			goto invalid_ndx;
+		if (!inc_recurse || am_sender) {
+			int last;
+			if (first_flist)
+				last = first_flist->prev->ndx_start + first_flist->prev->used - 1;
+			else
+				last = -1;
+			rprintf(FERROR,
+				"Invalid file index: %d (%d - %d) [%s]\n",
+				ndx, NDX_DONE, last, who_am_i());
+			exit_cleanup(RERR_PROTOCOL);
+		}
 		if (ndx == NDX_FLIST_EOF) {
 			flist_eof = 1;
 			send_msg(MSG_FLIST_EOF, "", 0, 0);
@@ -276,9 +285,10 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 		if (ndx < 0 || ndx >= dir_flist->used) {
 			ndx = NDX_FLIST_OFFSET - ndx;
 			rprintf(FERROR,
-				"[%s] Invalid dir index: %d (%d - %d)\n",
-				who_am_i(), ndx, NDX_FLIST_OFFSET,
-				NDX_FLIST_OFFSET - dir_flist->used + 1);
+				"Invalid dir index: %d (%d - %d) [%s]\n",
+				ndx, NDX_FLIST_OFFSET,
+				NDX_FLIST_OFFSET - dir_flist->used + 1,
+				who_am_i());
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
@@ -313,17 +323,7 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 		goto read_loop;
 	}
 
-	if (!(flist = flist_for_ndx(ndx))) {
-		int start, used;
-	  invalid_ndx:
-		start = first_flist ? first_flist->ndx_start : 0;
-		used = first_flist ? first_flist->used : 0;
-		rprintf(FERROR,
-			"Invalid file index: %d (%d - %d) with iflags %x [%s]\n",
-			ndx, start - 1, start + used -1, iflags, who_am_i());
-		exit_cleanup(RERR_PROTOCOL);
-	}
-	cur_flist = flist;
+	cur_flist = flist_for_ndx(ndx, "read_ndx_and_attrs");
 
 	if (iflags & ITEM_BASIS_TYPE_FOLLOWS)
 		fnamecmp_type = read_byte(f_in);
@@ -624,23 +624,40 @@ int finish_transfer(const char *fname, const char *fnametmp,
 	return 1;
 }
 
-struct file_list *flist_for_ndx(int ndx)
+struct file_list *flist_for_ndx(int ndx, const char *fatal_error_loc)
 {
 	struct file_list *flist = cur_flist;
 
 	if (!flist && !(flist = first_flist))
-		return NULL;
+		goto not_found;
 
 	while (ndx < flist->ndx_start-1) {
 		if (flist == first_flist)
-			return NULL;
+			goto not_found;
 		flist = flist->prev;
 	}
 	while (ndx >= flist->ndx_start + flist->used) {
 		if (!(flist = flist->next))
-			return NULL;
+			goto not_found;
 	}
 	return flist;
+
+  not_found:
+	if (fatal_error_loc) {
+		int first, last;
+		if (first_flist) {
+			first = first_flist->ndx_start - 1;
+			last = first_flist->prev->ndx_start + first_flist->prev->used - 1;
+		} else {
+			first = 0;
+			last = -1;
+		}
+		rprintf(FERROR,
+			"File-list index %d not in %d - %d (%s) [%s]\n",
+			ndx, first, last, fatal_error_loc, who_am_i());
+		exit_cleanup(RERR_PROTOCOL);
+	}
+	return NULL;
 }
 
 const char *who_am_i(void)
