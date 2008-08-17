@@ -49,6 +49,8 @@ Changes since 3.0.3:
       user specify the --protocol=29 option to access an overly-restrictive
       server that is rejecting the protocol-30 use of -e to the server.
 
+    - Improved the message output for an RERR_PARTIAL exit.
+
   DEVELOPER RELATED:
 
     - The Makefile will not halt for just a timestamp change on the Makefile
