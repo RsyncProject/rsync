@@ -35,6 +35,7 @@ config.status
 /rounding.h
 /doc/rsync.pdf
 /doc/rsync.ps
+/support/savetransfer
 /testsuite/chown-fake.test
 /testsuite/devices-fake.test
 /patches
