@@ -2239,7 +2239,7 @@ void generate_files(int f_out, const char *local_name)
 						dirdev = MAKEDEV(0, 0);
 					/* We must be sure we've had a chance to receive an I/O
 					 * error for this directory before we delete in it. */
-					while (check_for_io_err && !cur_flist->next)
+					while (check_for_io_err && !cur_flist->next && !flist_eof)
 						wait_for_receiver();
 					delete_in_dir(fbuf, fp, &dirdev);
 				} else
