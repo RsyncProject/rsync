@@ -246,7 +246,7 @@ static void filtered_fwrite(FILE *f, const char *buf, int len, int use_isprint)
 void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 {
 	int trailing_CR_or_NL;
-	FILE *f = NULL;
+	FILE *f = msgs2stderr ? stderr : stdout;
 #ifdef ICONV_OPTION
 	iconv_t ic = is_utf8 && ic_recv != (iconv_t)-1 ? ic_recv : ic_chck;
 #else
@@ -258,7 +258,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 	if (len < 0)
 		exit_cleanup(RERR_MESSAGEIO);
 
-	if (msgs2stderr > 0 && code != FLOG)
+	if (msgs2stderr && code != FLOG)
 		goto output_msg;
 
 	if (am_server && msg_fd_out >= 0) {
@@ -314,7 +314,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 			/* TODO: can we send the error to the user somehow? */
 			return;
 		}
-		msgs2stderr = -1;
+		f = stderr;
 	}
 
 output_msg:
@@ -328,7 +328,6 @@ output_msg:
 		break;
 	case FINFO:
 	case FCLIENT:
-		f = msgs2stderr ? stderr : stdout;
 		break;
 	default:
 		exit_cleanup(RERR_MESSAGEIO);
@@ -453,7 +452,7 @@ void rsyserr(enum logcode code, int errcode, const char *format, ...)
 
 void rflush(enum logcode code)
 {
-	FILE *f = NULL;
+	FILE *f;
 
 	if (am_daemon || code == FLOG)
 		return;
