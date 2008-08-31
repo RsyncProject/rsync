@@ -48,8 +48,6 @@ extern int inplace;
 extern int flist_eof;
 extern int keep_dirlinks;
 extern int make_backups;
-extern int delete_during;
-extern int check_for_io_err;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct chmod_mode_struct *daemon_chmod_modes;
 #ifdef ICONV_OPTION
@@ -255,15 +253,8 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 	while (1) {
 		ndx = read_ndx(f_in);
 
-		if (ndx >= 0) {
-			if (check_for_io_err) {
-				/* Let generator know there was no I/O error. */
-				send_msg_int(MSG_IO_ERROR, 0);
-				check_for_io_err = 0;
-			}
+		if (ndx >= 0)
 			break;
-		}
-		check_for_io_err = 0;
 		if (ndx == NDX_DONE)
 			return ndx;
 		if (!inc_recurse || am_sender) {
@@ -305,10 +296,6 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 		flist->parent_ndx = ndx;
 		stop_flist_forward();
 		verbose = save_verbose;
-		/* If the sender is going to send us an MSG_IO_ERROR value, it
-		 * will always be the very next message following a file list. */
-		if (delete_during)
-			check_for_io_err = 1;
 	}
 
 	iflags = protocol_version >= 29 ? read_shortint(f_in)
