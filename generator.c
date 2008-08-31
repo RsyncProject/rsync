@@ -86,7 +86,6 @@ extern int unsort_ndx;
 extern int max_delete;
 extern int force_delete;
 extern int one_file_system;
-extern int check_for_io_err;
 extern struct stats stats;
 extern dev_t filesystem_dev;
 extern mode_t orig_umask;
@@ -2236,10 +2235,6 @@ void generate_files(int f_out, const char *local_name)
 						dirdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
 					} else
 						dirdev = MAKEDEV(0, 0);
-					/* We must be sure we've had a chance to receive an I/O
-					 * error for this directory before we delete in it. */
-					while (check_for_io_err && !cur_flist->next && !flist_eof)
-						wait_for_receiver();
 					delete_in_dir(fbuf, fp, &dirdev);
 				} else
 					change_local_filter_dir(fbuf, strlen(fbuf), F_DEPTH(fp));

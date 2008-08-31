@@ -1916,7 +1916,12 @@ void send_extra_file_list(int f, int at_least)
 			dp = F_DIR_NODE_P(file);
 		}
 
-		write_byte(f, 0);
+		if (protocol_version < 31 || io_error == save_io_error || ignore_errors)
+			write_byte(f, 0);
+		else {
+			write_shortint(f, XMIT_EXTENDED_FLAGS|XMIT_IO_ERROR_ENDLIST);
+			write_int(f, io_error);
+		}
 
 		if (need_unsorted_flist) {
 			if (!(flist->sorted = new_array(struct file_struct *, flist->used)))
@@ -1957,7 +1962,7 @@ void send_extra_file_list(int f, int at_least)
 	}
 
   finish:
-	if (io_error != save_io_error && !ignore_errors)
+	if (io_error != save_io_error && protocol_version == 30 && !ignore_errors)
 		send_msg_int(MSG_IO_ERROR, io_error);
 }
 
@@ -2213,7 +2218,13 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		stats.flist_buildtime = 1;
 	start_tv = end_tv;
 
-	write_byte(f, 0); /* Indicate end of file list */
+	/* Indicate end of file list */
+	if (protocol_version < 31 || io_error == 0 || ignore_errors)
+		write_byte(f, 0);
+	else {
+		write_shortint(f, XMIT_EXTENDED_FLAGS|XMIT_IO_ERROR_ENDLIST);
+		write_int(f, io_error);
+	}
 
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && protocol_version >= 30 && !inc_recurse)
@@ -2251,7 +2262,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	/* send the io_error flag */
 	if (protocol_version < 30)
 		write_int(f, ignore_errors ? 0 : io_error);
-	else if (io_error && !ignore_errors)
+	else if (io_error && protocol_version == 30 && !ignore_errors)
 		send_msg_int(MSG_IO_ERROR, io_error);
 
 	if (disable_buffering)
@@ -2322,10 +2333,22 @@ struct file_list *recv_file_list(int f)
 	while ((flags = read_byte(f)) != 0) {
 		struct file_struct *file;
 
-		flist_expand(flist, 1);
-
 		if (protocol_version >= 28 && (flags & XMIT_EXTENDED_FLAGS))
 			flags |= read_byte(f) << 8;
+
+		if (flags == (XMIT_EXTENDED_FLAGS|XMIT_IO_ERROR_ENDLIST)) {
+			int err;
+			if (protocol_version < 31) {
+				rprintf(FERROR, "Invalid flist flag: %x\n", flags);
+				exit_cleanup(RERR_PROTOCOL);
+			}
+			err = read_int(f);
+			if (!ignore_errors)
+				io_error |= err;
+			break;
+		}
+
+		flist_expand(flist, 1);
 		file = recv_file_entry(flist, flags, f);
 
 		if (inc_recurse && S_ISDIR(file->mode)) {
@@ -2389,10 +2412,9 @@ struct file_list *recv_file_list(int f)
 
 	if (protocol_version < 30) {
 		/* Recv the io_error flag */
-		if (ignore_errors)
-			read_int(f);
-		else
-			io_error |= read_int(f);
+		int err = read_int(f);
+		if (!ignore_errors)
+			io_error |= err;
 	} else if (inc_recurse && flist->ndx_start == 1) {
 		if (!file_total || strcmp(flist->sorted[flist->low]->basename, ".") != 0)
 			flist->parent_ndx = -1;
