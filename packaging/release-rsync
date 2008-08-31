@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 use strict;
 
 # This script expects the directory ~/samba-rsync-ftp to exist and to be a
@@ -64,7 +64,15 @@ open(IN, '-|', 'git status') or die $!;
 my $status = join('', <IN>);
 close IN;
 die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
-die "The checkout is not on the $master_branch branch.\n" unless $status =~ /^# On branch $master_branch\n/;
+my($cur_branch) = $status =~ /^# On branch (.+)\n/;
+if ($cur_branch ne $master_branch) {
+    print "The checkout is not on the $master_branch branch.\n";
+    exit 1 if $master_branch ne 'master';
+    print "Do you want to release branch $cur_branch? [n] ";
+    $_ = <STDIN>;
+    exit 1 unless /^y/i;
+    $master_branch = $cur_branch;
+}
 
 my $confversion;
 open(IN, '<', 'configure.in') or die $!;
@@ -79,8 +87,27 @@ die "Unable to find RSYNC_VERSION in configure.in\n" unless defined $confversion
 
 open(IN, '<', 'OLDNEWS') or die $!;
 $_ = <IN>;
-close IN;
 my($lastversion) = /(\d+\.\d+\.\d+)/;
+my($last_protocol_version, %pdate);
+while (<IN>) {
+    if (my($ver,$pdate,$pver) = /^\s+\S\S\s\S\S\S\s\d\d\d\d\s+(\d+\.\d+\.\d+)\s+(\d\d \w\w\w \d\d\d\d\s+)?(\d+)$/) {
+	$pdate{$ver} = $pdate if defined $pdate;
+	$last_protocol_version = $pver if $ver eq $lastversion;
+    }
+}
+close IN;
+die "Unable to determine protocol_version for $lastversion.\n" unless defined $last_protocol_version;
+
+my $protocol_version;
+open(IN, '<', 'rsync.h') or die $!;
+while (<IN>) {
+    if (/^#define\s+PROTOCOL_VERSION\s+(\d+)/) {
+	$protocol_version = $1;
+	last;
+    }
+}
+close IN;
+die "Unable to determine the current PROTOCOL_VERSION.\n" unless defined $protocol_version;
 
 my $version = $confversion;
 $version =~ s/dev/pre1/ || $version =~ s/pre(\d+)/ 'pre' . ($1 + 1) /e;
@@ -118,6 +145,23 @@ chomp($_ = <STDIN>);
 $release = $_ if $_ ne '';
 $release .= ".$pre" if $pre;
 
+(my $finalversion = $version) =~ s/pre\d+//;
+my($proto_changed,$proto_change_date);
+if ($protocol_version eq $last_protocol_version) {
+    $proto_changed = 'unchanged';
+    $proto_change_date = "\t\t";
+} else {
+    $proto_changed = 'changed';
+    if (!defined($proto_change_date = $pdate{$finalversion})) {
+	while (1) {
+	    print "On what date did the protocol change to $protocol_version get checked in? (dd Mmm yyyy) ";
+	    chomp($_ = <STDIN>);
+	    last if /^\d\d \w\w\w \d\d\d\d$/;
+	}
+	$proto_change_date = "$_\t";
+    }
+}
+
 my($srcdir,$srcdiffdir,$lastsrcdir,$skipping);
 if ($lastversion =~ /pre/) {
     if (!$pre) {
@@ -146,9 +190,9 @@ print "\n", $break, <<EOT;
 \$release is "$release"
 
 About to:
-    - make sure that SUBPROTOCOL_VERSION is 0$skipping
+    - tweak SUBPROTOCOL_VERSION in rsync.h, if needed
     - tweak the version in configure.in and the spec files
-    - tweak NEWS and OLDNEWS to update the release date$skipping
+    - tweak NEWS and OLDNEWS to ensure header values are correct
     - tweak the date in the *.yo files and generate the manpages
     - generate configure.sh, config.h.in, and proto.h
     - page through the differences
@@ -157,7 +201,6 @@ EOT
 print "<Press Enter to continue> ";
 $_ = <STDIN>;
 
-(my $finalversion = $version) =~ s/pre\d+//;
 my %specvars = ( 'Version:' => $finalversion, 'Release:' => $release,
 		 '%define fullversion' => "\%{version}$pre", 'Released' => "$version.",
 		 '%define srcdir' => $srcdir );
@@ -184,18 +227,19 @@ foreach my $fn (@tweak_files) {
 	s/^(This man ?page is current for version) \S+ (of rsync)/$1 $version $2/m
 	    or die "Unable to update current version info in $fn\n";
     } elsif ($fn eq 'rsync.h') {
-	s/(#define\s+SUBPROTOCOL_VERSION)\s+\d+/$1 0/
+	s{(#define\s+SUBPROTOCOL_VERSION)\s+(\d+)}
+	 { $1 . ' ' . get_subprotocol_version($2) }e
 	    or die "Unable to find SUBPROTOCOL_VERSION define in $fn\n";
-	next if $pre;
     } elsif ($fn eq 'NEWS') {
-	s/^(NEWS for rsync \Q$finalversion\E) \(UNRELEASED\)\s*\n/$1 ($today)\n/mi
-	    or die "The first line of $fn is not in the right format.  It must be:\n"
-		 . "NEWS for rsync $finalversion (UNRELEASED)\n";
-	next if $pre;
+	s{^(NEWS for rsync \Q$finalversion\E )(\(UNRELEASED\))\s*(\nProtocol: )(\d+) (\([^)]+\))\n}
+	 { $1 . ($pre ? $2 : "($today)") . "$3$protocol_version ($proto_changed)\n" }ei
+	    or die "The first 2 lines of $fn are not in the right format.  They must be:\n"
+		 . "NEWS for rsync $finalversion (UNRELEASED)\n"
+		 . "Protocol: $protocol_version ($proto_changed)\n";
     } elsif ($fn eq 'OLDNEWS') {
-	s/^\t\S\S\s\S\S\S\s\d\d\d\d(\t\Q$finalversion\E)/\t$ztoday$1/m
+	s{^(\t\S\S\s\S\S\S\s\d\d\d\d)(\t\Q$finalversion\E\t).*}
+	 { ($pre ? $1 : "\t$ztoday") . $2 . $proto_change_date . $protocol_version }em
 	    or die "Unable to find \"?? ??? $year\t$finalversion\" line in $fn\n";
-	next if $pre;
     } elsif ($fn eq 'options.c') {
 	if (s/(Copyright \(C\) 2002-)(\d+)( Wayne Davison)/$1$year$3/
 	 && $2 ne $year) {
@@ -353,6 +397,15 @@ rsync-announce@lists.samba.org and rsync@lists.samba.org (and the web)!
 EOT
 
 exit;
+
+sub get_subprotocol_version
+{
+    my($subver) = @_;
+    if ($pre && $proto_changed eq 'changed') {
+	return $subver == 0 ? 1 : $subver;
+    }
+    0;
+}
 
 sub usage
 {
