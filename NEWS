@@ -39,6 +39,9 @@ Changes since 3.0.3:
 
     - Changed some errors that were going to stdout to go to stderr.
 
+    - Made human_num() and human_dnum() able to output a negative number
+      (rather than outputting a cryptic string of punctuation).
+
   ENHANCEMENTS:
 
     - Rsync will avoid sending an -e option to the server if an older protocol

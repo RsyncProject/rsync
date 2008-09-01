@@ -1193,6 +1193,28 @@ int unsafe_symlink(const char *dest, const char *src)
 	return (depth < 0);
 }
 
+#define HUMANIFY(mult) \
+	do { \
+		if (num >= mult || num <= -mult) { \
+			double dnum = (double)num / mult; \
+			char units; \
+			if (num < 0) \
+				dnum = -dnum; \
+			if (dnum < mult) \
+				units = 'K'; \
+			else if ((dnum /= mult) < mult) \
+				units = 'M'; \
+			else { \
+				dnum /= mult; \
+				units = 'G'; \
+			} \
+			if (num < 0) \
+				dnum = -dnum; \
+			snprintf(bufs[n], sizeof bufs[0], "%.2f%c", dnum, units); \
+			return bufs[n]; \
+		} \
+	} while (0)
+
 /* Return the int64 number as a string.  If the --human-readable option was
  * specified, we may output the number in K, M, or G units.  We can return
  * up to 4 buffers at a time. */
@@ -1201,27 +1223,15 @@ char *human_num(int64 num)
 	static char bufs[4][128]; /* more than enough room */
 	static unsigned int n;
 	char *s;
+	int negated;
 
 	n = (n + 1) % (sizeof bufs / sizeof bufs[0]);
 
 	if (human_readable) {
-		char units = '\0';
-		int mult = human_readable == 1 ? 1000 : 1024;
-		double dnum = 0;
-		if (num > mult*mult*mult) {
-			dnum = (double)num / (mult*mult*mult);
-			units = 'G';
-		} else if (num > mult*mult) {
-			dnum = (double)num / (mult*mult);
-			units = 'M';
-		} else if (num > mult) {
-			dnum = (double)num / mult;
-			units = 'K';
-		}
-		if (units) {
-			snprintf(bufs[n], sizeof bufs[0], "%.2f%c", dnum, units);
-			return bufs[n];
-		}
+		if (human_readable == 1)
+			HUMANIFY(1000);
+		else
+			HUMANIFY(1024);
 	}
 
 	s = bufs[n] + sizeof bufs[0] - 1;
@@ -1229,10 +1239,23 @@ char *human_num(int64 num)
 
 	if (!num)
 		*--s = '0';
+	if (num < 0) {
+		/* A maximum-size negated number can't fit as a positive,
+		 * so do one digit in negated form to start us off. */
+		*--s = (char)(-(num % 10)) + '0';
+		num = -(num / 10);
+		negated = 1;
+	} else
+		negated = 0;
+
 	while (num) {
 		*--s = (char)(num % 10) + '0';
 		num /= 10;
 	}
+
+	if (negated)
+		*--s = '-';
+
 	return s;
 }
 
@@ -1245,8 +1268,8 @@ char *human_dnum(double dnum, int decimal_digits)
 	int len = strlen(buf);
 	if (isDigit(buf + len - 1)) {
 		/* There's extra room in buf prior to the start of the num. */
-		buf -= decimal_digits + 1;
-		snprintf(buf, len + decimal_digits + 2, "%.*f", decimal_digits, dnum);
+		buf -= decimal_digits + 2;
+		snprintf(buf, len + decimal_digits + 3, "%.*f", decimal_digits, dnum);
 	}
 	return buf;
 }
