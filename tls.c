@@ -49,6 +49,7 @@ int link_times = 0;
 int link_owner = 0;
 int preserve_perms = 0;
 int preserve_executability = 0;
+char number_separator;
 
 #ifdef SUPPORT_XATTRS
 
@@ -180,7 +181,7 @@ static void list_file(const char *fname)
 		    (long)major(buf.st_rdev),
 		    (long)minor(buf.st_rdev));
 	} else
-		printf("%12s", big_num(buf.st_size, 0));
+		printf("%15s", do_big_num(buf.st_size, 1, NULL));
 	printf(" %6ld.%-6ld %6ld %s %s%s\n",
 	       (long)buf.st_uid, (long)buf.st_gid, (long)buf.st_nlink,
 	       datebuf, fname, linkbuf);
@@ -217,6 +218,7 @@ main(int argc, char *argv[])
 {
 	poptContext pc;
 	const char **extra_args;
+	char buf[32];
 	int opt;
 
 	pc = poptGetContext(PROGRAM, argc, (const char **)argv,
@@ -237,6 +239,12 @@ main(int argc, char *argv[])
 	extra_args = poptGetArgs(pc);
 	if (!extra_args || *extra_args == NULL)
 		tls_usage(1);
+
+	snprintf(buf, sizeof buf, "%f", 3.14);
+	if (strchr(buf, '.') != NULL)
+		number_separator = ',';
+	else
+		number_separator = '.';
 
 	for (; *extra_args; extra_args++)
 		list_file(*extra_args);

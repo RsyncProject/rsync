@@ -20,6 +20,7 @@
  */
 
 #include "rsync.h"
+#include "ifuncs.h"
 
 #ifndef ENODATA
 #define ENODATA EAGAIN
@@ -233,7 +234,7 @@ char *map_ptr(struct map_struct *map, OFF_T offset, int32 len)
 		OFF_T ret = do_lseek(map->fd, read_start, SEEK_SET);
 		if (ret != read_start) {
 			rsyserr(FERROR, errno, "lseek returned %s, not %s",
-				big_num(ret, 0), big_num(read_start, 0));
+				big_num(ret), big_num(read_start));
 			exit_cleanup(RERR_FILEIO);
 		}
 		map->p_fd_offset = read_start;

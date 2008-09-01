@@ -93,7 +93,7 @@ int filesfrom_fd = -1;
 char *filesfrom_host = NULL;
 int eol_nulls = 0;
 int protect_args = 0;
-int human_readable = 0;
+int human_readable = 1;
 int recurse = 0;
 int allow_inc_recurse = 1;
 int xfer_dirs = -1;
@@ -121,6 +121,7 @@ int checksum_seed = 0;
 int inplace = 0;
 int delay_updates = 0;
 long block_size = 0; /* "long" because popt can't set an int32. */
+char number_separator;
 char *skip_compress = NULL;
 item_list dparam_list = EMPTY_ITEM_LIST;
 
@@ -1669,7 +1670,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		}
 	}
 
-	if (human_readable && argc == 2 && !am_server) {
+	if (human_readable > 1 && argc == 2 && !am_server) {
 		/* Allow the old meaning of 'h' (--help) on its own. */
 		usage(FINFO);
 		exit_cleanup(0);
@@ -1680,6 +1681,15 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	if (do_stats && !am_server) {
 		parse_output_words(info_words, info_levels,
 			verbose > 1 ? "stats3" : "stats2", DEFAULT_PRIORITY);
+	}
+
+	if (human_readable) {
+		char buf[32];
+		snprintf(buf, sizeof buf, "%f", 3.14);
+		if (strchr(buf, '.') != NULL)
+			number_separator = ',';
+		else
+			number_separator = '.';
 	}
 
 #ifdef ICONV_OPTION

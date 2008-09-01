@@ -321,7 +321,7 @@ static void flist_expand(struct file_list *flist, int extra)
 	if (DEBUG_GTE(FLIST, 1) && flist->malloced != FLIST_START) {
 		rprintf(FCLIENT, "[%s] expand file_list pointer array to %s bytes, did%s move\n",
 		    who_am_i(),
-		    big_num(sizeof flist->files[0] * flist->malloced, 0),
+		    big_num(sizeof flist->files[0] * flist->malloced),
 		    (new_ptr == flist->files) ? " not" : "");
 	}
 
@@ -488,7 +488,7 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 				} else if (DEBUG_GTE(HLINK, 3)) {
 					rprintf(FINFO, "[%s] dev:inode for #%d is %s:%s\n",
 						who_am_i(), first_ndx + ndx,
-						big_num(tmp_dev, 0), big_num(tmp_ino, 0));
+						big_num(tmp_dev), big_num(tmp_ino));
 				}
 			}
 		} else {
@@ -2819,7 +2819,7 @@ static void output_flist(struct file_list *flist)
 			"[%s] i=%d %s %s%s%s%s mode=0%o len=%s%s%s flags=%x\n",
 			who, i + flist->ndx_start,
 			root, dir, slash, name, trail,
-			(int)file->mode, big_num(F_LENGTH(file), 0),
+			(int)file->mode, comma_num(F_LENGTH(file)),
 			uidbuf, gidbuf, file->flags);
 	}
 }

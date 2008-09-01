@@ -21,6 +21,7 @@
  */
 
 #include "rsync.h"
+#include "ifuncs.h"
 
 extern int dry_run;
 extern int do_xfers;
@@ -53,6 +54,7 @@ extern int ignore_errors;
 extern int remove_source_files;
 extern int delay_updates;
 extern int update_only;
+extern int human_readable;
 extern int ignore_existing;
 extern int ignore_non_existing;
 extern int inplace;
@@ -806,8 +808,8 @@ static void sum_sizes_sqroot(struct sum_struct *sum, int64 len)
 	if (sum->count && DEBUG_GTE(DELTASUM, 2)) {
 		rprintf(FINFO,
 			"count=%s rem=%ld blength=%ld s2length=%d flength=%s\n",
-			big_num(sum->count, 0), (long)sum->remainder, (long)sum->blength,
-			sum->s2length, big_num(sum->flength, 0));
+			big_num(sum->count), (long)sum->remainder, (long)sum->blength,
+			sum->s2length, big_num(sum->flength));
 	}
 }
 
@@ -858,7 +860,7 @@ static int generate_and_send_sums(int fd, OFF_T len, int f_out, int f_copy)
 		if (DEBUG_GTE(DELTASUM, 3)) {
 			rprintf(FINFO,
 				"chunk[%s] offset=%s len=%ld sum1=%08lx\n",
-				big_num(i, 0), big_num(offset - n1, 0), (long)n1,
+				big_num(i), big_num(offset - n1), (long)n1,
 				(unsigned long)sum1);
 		}
 		write_int(f_out, sum1);
@@ -1199,6 +1201,7 @@ static void list_file_entry(struct file_struct *f)
 {
 	char permbuf[PERMSTRING_SIZE];
 	int64 len;
+	int colwidth = human_readable ? 14 : 11;
 
 	if (!F_IS_ACTIVE(f)) {
 		/* this can happen if duplicate names were removed */
@@ -1212,15 +1215,16 @@ static void list_file_entry(struct file_struct *f)
 
 #ifdef SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(f->mode)) {
-		rprintf(FINFO, "%s %11s %s %s -> %s\n",
-			permbuf, big_num(len, 0), timestring(f->modtime),
-			f_name(f, NULL), F_SYMLINK(f));
+		rprintf(FINFO, "%s %*s %s %s -> %s\n",
+			permbuf, colwidth, comma_num(len),
+			timestring(f->modtime), f_name(f, NULL),
+			F_SYMLINK(f));
 	} else
 #endif
 	{
-		rprintf(FINFO, "%s %11s %s %s\n",
-			permbuf, big_num(len, 0), timestring(f->modtime),
-			f_name(f, NULL));
+		rprintf(FINFO, "%s %*s %s %s\n",
+			permbuf, colwidth, comma_num(len),
+			timestring(f->modtime), f_name(f, NULL));
 	}
 }
 
@@ -1905,7 +1909,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if (DEBUG_GTE(DELTASUM, 3)) {
 		rprintf(FINFO, "gen mapped %s of size %s\n",
-			fnamecmp, big_num(sx.st.st_size, 0));
+			fnamecmp, big_num(sx.st.st_size));
 	}
 
 	if (DEBUG_GTE(DELTASUM, 2))

@@ -20,6 +20,7 @@
  */
 
 #include "rsync.h"
+#include "ifuncs.h"
 
 extern int dry_run;
 extern int do_xfers;
@@ -181,7 +182,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		mapbuf = map_file(fd_r, size_r, read_size, sum.blength);
 		if (DEBUG_GTE(DELTASUM, 2)) {
 			rprintf(FINFO, "recv mapped %s of size %s\n",
-				fname_r, big_num(size_r, 0));
+				fname_r, big_num(size_r));
 		}
 	} else
 		mapbuf = NULL;
@@ -211,7 +212,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		offset = sum.flength;
 		if (fd != -1 && (j = do_lseek(fd, offset, SEEK_SET)) != offset) {
 			rsyserr(FERROR_XFER, errno, "lseek of %s returned %s, not %s",
-				full_fname(fname), big_num(j, 0), big_num(offset, 0));
+				full_fname(fname), big_num(j), big_num(offset));
 			exit_cleanup(RERR_FILEIO);
 		}
 	}
@@ -223,7 +224,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		if (i > 0) {
 			if (DEBUG_GTE(DELTASUM, 3)) {
 				rprintf(FINFO,"data recv %d at %s\n",
-					i, big_num(offset, 0));
+					i, big_num(offset));
 			}
 
 			stats.literal_data += i;
@@ -248,7 +249,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		if (DEBUG_GTE(DELTASUM, 3)) {
 			rprintf(FINFO,
 				"chunk[%d] of size %ld at %s offset=%s\n",
-				i, (long)len, big_num(offset2, 0), big_num(offset, 0));
+				i, (long)len, big_num(offset2), big_num(offset));
 		}
 
 		if (mapbuf) {
@@ -268,7 +269,7 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 					rsyserr(FERROR_XFER, errno,
 						"lseek of %s returned %s, not %s",
 						full_fname(fname),
-						big_num(pos, 0), big_num(offset, 0));
+						big_num(pos), big_num(offset));
 					exit_cleanup(RERR_FILEIO);
 				}
 				continue;

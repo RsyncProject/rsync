@@ -20,6 +20,9 @@
  */
 
 #include "rsync.h"
+#include "ifuncs.h"
+
+extern char number_separator;
 
 #ifndef HAVE_STRDUP
  char *strdup(char *s)
@@ -152,45 +155,112 @@ int sys_gettimeofday(struct timeval *tv)
 #endif
 }
 
+#define HUMANIFY(mult) \
+	do { \
+		if (num >= mult || num <= -mult) { \
+			double dnum = (double)num / mult; \
+			char units; \
+			if (num < 0) \
+				dnum = -dnum; \
+			if (dnum < mult) \
+				units = 'K'; \
+			else if ((dnum /= mult) < mult) \
+				units = 'M'; \
+			else if ((dnum /= mult) < mult) \
+				units = 'G'; \
+			else { \
+				dnum /= mult; \
+				units = 'T'; \
+			} \
+			if (num < 0) \
+				dnum = -dnum; \
+			snprintf(bufs[n], sizeof bufs[0], "%.2f%c", dnum, units); \
+			return bufs[n]; \
+		} \
+	} while (0)
+
 /* Return the int64 number as a string.  If the human_flag arg is non-zero,
- * we may output the number in K, M, or G units.  We can return up to 4
- * buffers at a time. */
-char *big_num(int64 num, int human_flag)
+ * we may output the number in K, M, G, or T units.  If we don't add a unit
+ * suffix, we will append the fract string, if it is non-NULL.  We can
+ * return up to 4 buffers at a time. */
+char *do_big_num(int64 num, int human_flag, const char *fract)
 {
 	static char bufs[4][128]; /* more than enough room */
 	static unsigned int n;
 	char *s;
+	int len, negated;
 
 	n = (n + 1) % (sizeof bufs / sizeof bufs[0]);
 
-	if (human_flag) {
-		char units = '\0';
-		int mult = human_flag == 1 ? 1000 : 1024;
-		double dnum = 0;
-		if (num > mult*mult*mult) {
-			dnum = (double)num / (mult*mult*mult);
-			units = 'G';
-		} else if (num > mult*mult) {
-			dnum = (double)num / (mult*mult);
-			units = 'M';
-		} else if (num > mult) {
-			dnum = (double)num / mult;
-			units = 'K';
-		}
-		if (units) {
-			snprintf(bufs[n], sizeof bufs[0], "%.2f%c", dnum, units);
-			return bufs[n];
-		}
+	if (human_flag > 1) {
+		if (human_flag == 2)
+			HUMANIFY(1000);
+		else
+			HUMANIFY(1024);
 	}
 
 	s = bufs[n] + sizeof bufs[0] - 1;
-	*s = '\0';
+	if (fract) {
+		len = strlen(fract);
+		s -= len;
+		strlcpy(s, fract, len + 1);
+	} else
+		*s = '\0';
+
+	len = 0;
 
 	if (!num)
 		*--s = '0';
+	if (num < 0) {
+		/* A maximum-size negated number can't fit as a positive,
+		 * so do one digit in negated form to start us off. */
+		*--s = (char)(-(num % 10)) + '0';
+		num = -(num / 10);
+		len++;
+		negated = 1;
+	} else
+		negated = 0;
+
 	while (num) {
+		if (human_flag) {
+			if (len == 3) {
+				*--s = number_separator;
+				len = 1;
+			} else
+				len++;
+		}
 		*--s = (char)(num % 10) + '0';
 		num /= 10;
 	}
+
+	if (negated)
+		*--s = '-';
+
 	return s;
+}
+
+/* Return the double number as a string.  If the human_flag option is > 1,
+ * we may output the number in K, M, G, or T units.  The buffer we use for
+ * our result is either a single static buffer defined here, or a buffer
+ * we get from do_big_num(). */
+char *do_big_dnum(double dnum, int human_flag, int decimal_digits)
+{
+	static char tmp_buf[128];
+#if SIZEOF_INT64 >= 8
+	char *fract;
+
+	snprintf(tmp_buf, sizeof tmp_buf, "%.*f", decimal_digits, dnum);
+
+	if (!human_flag || (dnum < 1000.0 && dnum > -1000.0))
+		return tmp_buf;
+
+	for (fract = tmp_buf+1; isDigit(fract); fract++) {}
+
+	return do_big_num((int64)dnum, human_flag, fract);
+#else
+	/* A big number might lose digits converting to a too-short int64,
+	 * so let's just return the raw double conversion. */
+	snprintf(tmp_buf, sizeof tmp_buf, "%.*f", decimal_digits, dnum);
+	return tmp_buf;
+#endif
 }

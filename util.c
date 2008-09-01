@@ -27,7 +27,6 @@ extern int dry_run;
 extern int module_id;
 extern int modify_window;
 extern int relative_paths;
-extern int human_readable;
 extern int preserve_xattrs;
 extern char *module_dir;
 extern unsigned int module_dirlen;
@@ -1192,21 +1191,6 @@ int unsafe_symlink(const char *dest, const char *src)
 	return (depth < 0);
 }
 
-/* Return the double number as a string.  If the --human-readable option was
- * specified, we may output the number in K, M, or G units.  We use a buffer
- * from big_num() to return our result. */
-char *human_dnum(double dnum, int decimal_digits)
-{
-	char *buf = big_num(dnum, human_readable);
-	int len = strlen(buf);
-	if (isDigit(buf + len - 1)) {
-		/* There's extra room in buf prior to the start of the num. */
-		buf -= decimal_digits + 1;
-		snprintf(buf, len + decimal_digits + 2, "%.*f", decimal_digits, dnum);
-	}
-	return buf;
-}
-
 /* Return the date and time as a string.  Some callers tweak returned buf. */
 char *timestring(time_t t)
 {
@@ -1545,7 +1529,7 @@ void *expand_item_list(item_list *lp, size_t item_size,
 		new_ptr = _realloc_array(lp->items, item_size, new_size);
 		if (DEBUG_GTE(FLIST, 3)) {
 			rprintf(FINFO, "[%s] expand %s to %s bytes, did%s move\n",
-				who_am_i(), desc, big_num(new_size * item_size, 0),
+				who_am_i(), desc, big_num(new_size * item_size),
 				new_ptr == lp->items ? " not" : "");
 		}
 		if (!new_ptr)

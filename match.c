@@ -20,6 +20,7 @@
  */
 
 #include "rsync.h"
+#include "ifuncs.h"
 
 extern int checksum_seed;
 extern int append_mode;
@@ -111,7 +112,7 @@ static void matched(int f, struct sum_struct *s, struct map_struct *buf,
 	if (DEBUG_GTE(DELTASUM, 2) && i >= 0) {
 		rprintf(FINFO,
 			"match at %s last_match=%s j=%d len=%ld n=%ld\n",
-			big_num(offset, 0), big_num(last_match, 0), i,
+			big_num(offset), big_num(last_match), i,
 			(long)s->sums[i].len, (long)n);
 	}
 
@@ -154,7 +155,7 @@ static void hash_search(int f,struct sum_struct *s,
 
 	if (DEBUG_GTE(DELTASUM, 2)) {
 		rprintf(FINFO, "hash search b=%ld len=%s\n",
-			(long)s->blength, big_num(len, 0));
+			(long)s->blength, big_num(len));
 	}
 
 	k = (int32)MIN(len, (OFF_T)s->blength);
@@ -173,7 +174,7 @@ static void hash_search(int f,struct sum_struct *s,
 
 	if (DEBUG_GTE(DELTASUM, 3)) {
 		rprintf(FINFO, "hash search s->blength=%ld len=%s count=%s\n",
-			(long)s->blength, big_num(len, 0), big_num(s->count, 0));
+			(long)s->blength, big_num(len), big_num(s->count));
 	}
 
 	do {
@@ -182,7 +183,7 @@ static void hash_search(int f,struct sum_struct *s,
 
 		if (DEBUG_GTE(DELTASUM, 4)) {
 			rprintf(FINFO, "offset=%s sum=%04x%04x\n",
-				big_num(offset, 0), s2 & 0xFFFF, s1 & 0xFFFF);
+				big_num(offset), s2 & 0xFFFF, s1 & 0xFFFF);
 		}
 
 		if (tablesize == TRADITIONAL_TABLESIZE) {
@@ -216,7 +217,7 @@ static void hash_search(int f,struct sum_struct *s,
 			if (DEBUG_GTE(DELTASUM, 3)) {
 				rprintf(FINFO,
 					"potential match at %s i=%ld sum=%08x\n",
-					big_num(offset, 0), (long)i, sum);
+					big_num(offset), (long)i, sum);
 			}
 
 			if (!done_csum2) {
@@ -413,5 +414,5 @@ void match_report(void)
 	rprintf(FINFO,
 		"total: matches=%d  hash_hits=%d  false_alarms=%d data=%s\n",
 		total_matches, total_hash_hits, total_false_alarms,
-		big_num(stats.literal_data, 0));
+		big_num(stats.literal_data));
 }

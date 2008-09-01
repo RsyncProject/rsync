@@ -514,7 +514,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 		case 'l':
 			strlcat(fmt, "s", sizeof fmt);
 			snprintf(buf2, sizeof buf2, fmt,
-				 big_num(F_LENGTH(file), 0));
+				 comma_num(F_LENGTH(file)));
 			n = buf2;
 			break;
 		case 'U':
@@ -631,7 +631,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 					initial_stats->total_read;
 			}
 			strlcat(fmt, "s", sizeof fmt);
-			snprintf(buf2, sizeof buf2, fmt, big_num(b, 0));
+			snprintf(buf2, sizeof buf2, fmt, comma_num(b));
 			n = buf2;
 			break;
 		case 'c':
@@ -643,7 +643,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 					initial_stats->total_read;
 			}
 			strlcat(fmt, "s", sizeof fmt);
-			snprintf(buf2, sizeof buf2, fmt, big_num(b, 0));
+			snprintf(buf2, sizeof buf2, fmt, comma_num(b));
 			n = buf2;
 			break;
 		case 'C':
@@ -854,9 +854,9 @@ void log_exit(int code, const char *file, int line)
 {
 	if (code == 0) {
 		rprintf(FLOG,"sent %s bytes  received %s bytes  total size %s\n",
-			big_num(stats.total_written, 0),
-			big_num(stats.total_read, 0),
-			big_num(stats.total_size, 0));
+			comma_num(stats.total_written),
+			comma_num(stats.total_read),
+			comma_num(stats.total_size));
 	} else if (am_server != 2) {
 		const char *name;
 

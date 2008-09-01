@@ -35,7 +35,6 @@ extern int am_sender;
 extern int am_daemon;
 extern int inc_recurse;
 extern int blocking_io;
-extern int human_readable;
 extern int always_checksum;
 extern int remove_source_files;
 extern int output_needs_newline;
@@ -246,43 +245,42 @@ static void output_summary(void)
 {
 	if (INFO_GTE(STATS, 2)) {
 		rprintf(FCLIENT, "\n");
-		rprintf(FINFO,"Number of files: %d\n", stats.num_files);
-		rprintf(FINFO,"Number of files transferred: %d\n",
-			stats.num_transferred_files);
+		rprintf(FINFO,"Number of files: %s\n", comma_num(stats.num_files));
+		rprintf(FINFO,"Number of files transferred: %s\n",
+			comma_num(stats.num_transferred_files));
 		rprintf(FINFO,"Total file size: %s bytes\n",
-			big_num(stats.total_size, human_readable));
+			human_num(stats.total_size));
 		rprintf(FINFO,"Total transferred file size: %s bytes\n",
-			big_num(stats.total_transferred_size, human_readable));
+			human_num(stats.total_transferred_size));
 		rprintf(FINFO,"Literal data: %s bytes\n",
-			big_num(stats.literal_data, human_readable));
+			human_num(stats.literal_data));
 		rprintf(FINFO,"Matched data: %s bytes\n",
-			big_num(stats.matched_data, human_readable));
+			human_num(stats.matched_data));
 		rprintf(FINFO,"File list size: %s\n",
-			big_num(stats.flist_size, human_readable));
+			human_num(stats.flist_size));
 		if (stats.flist_buildtime) {
 			rprintf(FINFO,
-				"File list generation time: %.3f seconds\n",
-				(double)stats.flist_buildtime / 1000);
+				"File list generation time: %s seconds\n",
+				comma_dnum((double)stats.flist_buildtime / 1000, 3));
 			rprintf(FINFO,
-				"File list transfer time: %.3f seconds\n",
-				(double)stats.flist_xfertime / 1000);
+				"File list transfer time: %s seconds\n",
+				comma_dnum((double)stats.flist_xfertime / 1000, 3));
 		}
 		rprintf(FINFO,"Total bytes sent: %s\n",
-			big_num(total_written, human_readable));
+			human_num(total_written));
 		rprintf(FINFO,"Total bytes received: %s\n",
-			big_num(total_read, human_readable));
+			human_num(total_read));
 	}
 
 	if (INFO_GTE(STATS, 1)) {
 		rprintf(FCLIENT, "\n");
 		rprintf(FINFO,
 			"sent %s bytes  received %s bytes  %s bytes/sec\n",
-			big_num(total_written, human_readable),
-			big_num(total_read, human_readable),
+			human_num(total_written), human_num(total_read),
 			human_dnum((total_written + total_read)/(0.5 + (endtime - starttime)), 2));
-		rprintf(FINFO, "total size is %s  speedup is %.2f%s\n",
-			big_num(stats.total_size, human_readable),
-			(double)stats.total_size / (total_written+total_read),
+		rprintf(FINFO, "total size is %s  speedup is %s%s\n",
+			human_num(stats.total_size),
+			comma_dnum((double)stats.total_size / (total_written+total_read), 2),
 			write_batch < 0 ? " (BATCH ONLY)" : dry_run ? " (DRY RUN)" : "");
 	}
 

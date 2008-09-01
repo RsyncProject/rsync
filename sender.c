@@ -20,6 +20,7 @@
  */
 
 #include "rsync.h"
+#include "ifuncs.h"
 
 extern int dry_run;
 extern int do_xfers;
@@ -71,7 +72,7 @@ static struct sum_struct *receive_sums(int f)
 
 	if (DEBUG_GTE(DELTASUM, 3)) {
 		rprintf(FINFO, "count=%s n=%ld rem=%ld\n",
-			big_num(s->count, 0), (long)s->blength, (long)s->remainder);
+			big_num(s->count), (long)s->blength, (long)s->remainder);
 	}
 
 	if (append_mode > 0) {
@@ -106,7 +107,7 @@ static struct sum_struct *receive_sums(int f)
 		if (DEBUG_GTE(DELTASUM, 3)) {
 			rprintf(FINFO,
 				"chunk[%d] len=%d offset=%s sum1=%08x\n",
-				i, s->sums[i].len, big_num(s->sums[i].offset, 0),
+				i, s->sums[i].len, big_num(s->sums[i].offset),
 				s->sums[i].sum1);
 		}
 	}
@@ -319,7 +320,7 @@ void send_files(int f_in, int f_out)
 
 		if (DEBUG_GTE(DELTASUM, 2)) {
 			rprintf(FINFO, "send_files mapped %s%s%s of size %s\n",
-				path,slash,fname, big_num(st.st_size, 0));
+				path,slash,fname, big_num(st.st_size));
 		}
 
 		write_ndx_and_attrs(f_out, ndx, iflags, fname, file,

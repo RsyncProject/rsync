@@ -1918,10 +1918,24 @@ would output as "\#012".  A literal backslash that is in a filename is not
 escaped unless it is followed by a hash and 3 digits (0-9).
 
 dit(bf(-h, --human-readable)) Output numbers in a more human-readable format.
-This makes big numbers output using larger units, with a K, M, or G suffix.  If
-this option was specified once, these units are K (1000), M (1000*1000), and
-G (1000*1000*1000); if the option is repeated, the units are powers of 1024
-instead of 1000.
+There are 3 possible levels:  (1) output numbers with a separator between each
+set of 3 digits (either a comma or a period, depending on if the decimal point
+is represented by a period or a comma); (2) output numbers in units of 1000
+(with a character suffix for larger units -- see below); (3) output numbers in
+units of 1024.
+
+The default is human-readable level 1.  Each bf(-h) option increases the level
+by one.  You can take the level down to 0 (to output numbers as pure digits) by
+specifing the bf(--no-human-readable) (bf(--no-h)) option.
+
+The unit letters that are appended in levels 2 and 3 are: K (kilo), M (mega),
+G (giga), or T (tera).  For example, a 1234567-byte file would output as 1.23M
+in level-2 (assuming that a period is your local decimal point).
+
+Backward compatibility note:  versions of rsync prior to 3.1.0 do not support
+human-readable level 1, and they default to level 0.  Thus, specifying one or
+two bf(-h) options behaves the same in old and new versions as long as you
+didn't specify a bf(--no-h) option prior to one or more bf(-h) options.
 
 dit(bf(--partial)) By default, rsync will delete any partially
 transferred file if the transfer is interrupted. In some circumstances

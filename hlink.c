@@ -21,6 +21,7 @@
  */
 
 #include "rsync.h"
+#include "ifuncs.h"
 
 extern int dry_run;
 extern int list_only;
@@ -73,7 +74,7 @@ struct ht_int64_node *idev_find(int64 dev, int64 ino)
 			if (DEBUG_GTE(HLINK, 3)) {
 				rprintf(FINFO,
 				    "[%s] created hashtable for dev %s\n",
-				    who_am_i(), big_num(dev, 0));
+				    who_am_i(), big_num(dev));
 			}
 		}
 	} else
