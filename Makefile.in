@@ -27,7 +27,8 @@ VERSION=@VERSION@
 .SUFFIXES: .c .o
 
 GENFILES=configure.sh config.h.in proto.h proto.h-tstamp rsync.1 rsyncd.conf.5
-HEADERS=byteorder.h config.h errcode.h proto.h rsync.h ifuncs.h lib/pool_alloc.h
+HEADERS=byteorder.h config.h errcode.h proto.h rsync.h ifuncs.h itypes.h inums.h \
+	lib/pool_alloc.h
 LIBOBJ=lib/wildmatch.o lib/compat.o lib/snprintf.o lib/mdfour.o lib/md5.o \
 	lib/permstring.o lib/pool_alloc.o lib/sysacls.o lib/sysxattrs.o @LIBOBJS@
 ZLIBOBJ=zlib/deflate.o zlib/inffast.o zlib/inflate.o zlib/inftrees.o \

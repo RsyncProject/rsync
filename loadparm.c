@@ -44,7 +44,7 @@
  */
 
 #include "rsync.h"
-#include "ifuncs.h"
+#include "itypes.h"
 
 extern item_list dparam_list;
 

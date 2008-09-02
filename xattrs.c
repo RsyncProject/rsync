@@ -21,6 +21,7 @@
 
 #include "rsync.h"
 #include "ifuncs.h"
+#include "inums.h"
 #include "lib/sysxattrs.h"
 
 #ifdef SUPPORT_XATTRS

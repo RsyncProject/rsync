@@ -21,7 +21,7 @@
  */
 
 #include "rsync.h"
-#include "ifuncs.h"
+#include "inums.h"
 
 extern int am_server;
 extern int need_unsorted_flist;

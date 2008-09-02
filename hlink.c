@@ -21,7 +21,7 @@
  */
 
 #include "rsync.h"
-#include "ifuncs.h"
+#include "inums.h"
 
 extern int dry_run;
 extern int list_only;

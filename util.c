@@ -22,6 +22,8 @@
 
 #include "rsync.h"
 #include "ifuncs.h"
+#include "itypes.h"
+#include "inums.h"
 
 extern int dry_run;
 extern int module_id;

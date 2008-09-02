@@ -75,6 +75,7 @@
 
 #include "rsync.h"
 #include "ifuncs.h"
+#include "itypes.h"
 
 /* -------------------------------------------------------------------------- **
  * Constants...

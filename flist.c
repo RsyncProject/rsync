@@ -23,6 +23,7 @@
 #include "rsync.h"
 #include "ifuncs.h"
 #include "rounding.h"
+#include "inums.h"
 #include "io.h"
 
 extern int am_root;

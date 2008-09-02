@@ -20,7 +20,7 @@
  */
 
 #include "rsync.h"
-#include "ifuncs.h"
+#include "inums.h"
 
 extern int checksum_seed;
 extern int append_mode;

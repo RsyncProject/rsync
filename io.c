@@ -29,6 +29,7 @@
 
 #include "rsync.h"
 #include "ifuncs.h"
+#include "inums.h"
 
 /** If no timeout is specified then use a 60 second select timeout */
 #define SELECT_TIMEOUT 60

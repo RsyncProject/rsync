@@ -20,7 +20,7 @@
  */
 
 #include "rsync.h"
-#include "ifuncs.h"
+#include "inums.h"
 
 #ifndef ENODATA
 #define ENODATA EAGAIN

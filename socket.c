@@ -25,7 +25,7 @@
  * emulate it using the KAME implementation. */
 
 #include "rsync.h"
-#include "ifuncs.h"
+#include "itypes.h"
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>

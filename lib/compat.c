@@ -20,7 +20,7 @@
  */
 
 #include "rsync.h"
-#include "ifuncs.h"
+#include "itypes.h"
 
 extern char number_separator;
 

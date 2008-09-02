@@ -21,7 +21,7 @@
  */
 
 #include "rsync.h"
-#include "ifuncs.h"
+#include "inums.h"
 #include "io.h"
 #if defined CONFIG_LOCALE && defined HAVE_LOCALE_H
 #include <locale.h>
