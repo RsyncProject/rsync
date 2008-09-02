@@ -480,7 +480,7 @@ static BOOL setup_merge_file(int mergelist_num, struct filter_struct *ex,
 
 struct local_filter_state {
 	int mergelist_cnt;
-	struct filter_list_struct mergelists[0];
+	struct filter_list_struct mergelists[1];
 };
 
 /* Each time rsync changes to a new directory it call this function to
@@ -505,7 +505,7 @@ void *push_local_filters(const char *dir, unsigned int dirlen)
 
 	push = (struct local_filter_state *)new_array(char,
 			  sizeof (struct local_filter_state)
-			+ mergelist_cnt * sizeof (struct filter_list_struct));
+			+ (mergelist_cnt-1) * sizeof (struct filter_list_struct));
 	if (!push)
 		out_of_memory("push_local_filters");
 
