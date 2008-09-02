@@ -814,6 +814,7 @@ struct filter_struct {
 struct filter_list_struct {
 	struct filter_struct *head;
 	struct filter_struct *tail;
+	struct filter_struct *parent_dirscan_head;
 	char *debug_type;
 };
 
