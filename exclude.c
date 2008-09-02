@@ -40,9 +40,9 @@ extern char curr_dir[MAXPATHLEN];
 extern unsigned int curr_dir_len;
 extern unsigned int module_dirlen;
 
-struct filter_list_struct filter_list = { 0, 0, 0, "" };
-struct filter_list_struct cvs_filter_list = { 0, 0, 0, " [global CVS]" };
-struct filter_list_struct daemon_filter_list = { 0, 0, 0, " [daemon]" };
+struct filter_list_struct filter_list = { .debug_type = "" };
+struct filter_list_struct cvs_filter_list = { .debug_type = " [global CVS]" };
+struct filter_list_struct daemon_filter_list = { .debug_type = " [daemon]" };
 
 /* Need room enough for ":MODS " prefix plus some room to grow. */
 #define MAX_RULE_PREFIX (16)
@@ -104,10 +104,11 @@ static int mergelist_size = 0;
 
 static void teardown_mergelist(struct filter_struct *ex)
 {
-	if (DEBUG_GTE(FILTER, 2))
+	if (DEBUG_GTE(FILTER, 2)) {
 		rprintf(FINFO, "[%s] deactivating mergelist #%d%s\n",
 			who_am_i(), mergelist_cnt - 1,
 			ex->u.mergelist->debug_type);
+	}
 
 	/* We should deactivate mergelists in LIFO order. */
 	assert(mergelist_cnt > 0);
@@ -286,9 +287,10 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 			if (!mergelist_parents)
 				out_of_memory("add_rule");
 		}
-		if (DEBUG_GTE(FILTER, 2))
+		if (DEBUG_GTE(FILTER, 2)) {
 			rprintf(FINFO, "[%s] activating mergelist #%d%s\n",
 				who_am_i(), mergelist_cnt, lp->debug_type);
+		}
 		mergelist_parents[mergelist_cnt++] = ret;
 	} else
 		ret->u.slash_cnt = slash_cnt;
@@ -421,9 +423,10 @@ static BOOL setup_merge_file(int mergelist_num, struct filter_struct *ex,
 	if (!(x = parse_merge_name(pat, NULL, 0)) || *x != '/')
 		return 0;
 
-	if (DEBUG_GTE(FILTER, 2))
+	if (DEBUG_GTE(FILTER, 2)) {
 		rprintf(FINFO, "[%s] performing parent_dirscan for mergelist #%d%s\n",
 			who_am_i(), mergelist_num, lp->debug_type);
+	}
 	y = strrchr(x, '/');
 	*y = '\0';
 	ex->pattern = strdup(y+1);
@@ -467,9 +470,10 @@ static BOOL setup_merge_file(int mergelist_num, struct filter_struct *ex,
 	/* Save current head for freeing when the mergelist becomes inactive. */
 	lp->parent_dirscan_head = lp->head;
 	parent_dirscan = False;
-	if (DEBUG_GTE(FILTER, 2))
+	if (DEBUG_GTE(FILTER, 2)) {
 		rprintf(FINFO, "[%s] completed parent_dirscan for mergelist #%d%s\n",
 			who_am_i(), mergelist_num, lp->debug_type);
+	}
 	free(pat);
 	return 1;
 }
@@ -489,15 +493,18 @@ void *push_local_filters(const char *dir, unsigned int dirlen)
 	int i;
 
 	set_filter_dir(dir, dirlen);
-	if (DEBUG_GTE(FILTER, 2))
+	if (DEBUG_GTE(FILTER, 2)) {
 		rprintf(FINFO, "[%s] pushing local filters for %s\n",
 			who_am_i(), dirbuf);
+	}
 
-	if (!mergelist_cnt)
+	if (!mergelist_cnt) {
 		/* No old state to save and no new merge files to push. */
 		return NULL;
+	}
 
-	push = (struct local_filter_state *) malloc(sizeof (struct local_filter_state)
+	push = (struct local_filter_state *)new_array(char,
+			  sizeof (struct local_filter_state)
 			+ mergelist_cnt * sizeof (struct filter_list_struct));
 	if (!push)
 		out_of_memory("push_local_filters");
@@ -573,9 +580,10 @@ void pop_local_filters(void *mem)
 			 * below.  (Counterpart to setup_merge_file call in
 			 * push_local_filters.  Must be done here, not in
 			 * free_filter, for LIFO order.) */
-			if (DEBUG_GTE(FILTER, 2))
+			if (DEBUG_GTE(FILTER, 2)) {
 				rprintf(FINFO, "[%s] freeing parent_dirscan filters of mergelist #%d%s\n",
 					who_am_i(), i, ex->u.mergelist->debug_type);
+			}
 			free_filters(lp->parent_dirscan_head);
 			lp->parent_dirscan_head = NULL;
 		}
@@ -585,9 +593,10 @@ void pop_local_filters(void *mem)
 	 * should be those with a state to be restored. */
 	assert(mergelist_cnt == old_mergelist_cnt);
 
-	if (!pop)
+	if (!pop) {
 		/* No state to restore. */
 		return;
+	}
 
 	for (i = 0; i < mergelist_cnt; i++) {
 		memcpy(mergelist_parents[i]->u.mergelist, &pop->mergelists[i],
@@ -705,8 +714,8 @@ static int rule_matches(const char *fname, struct filter_struct *ex, int name_is
 
 
 static void report_filter_result(enum logcode code, char const *name,
-                                 struct filter_struct const *ent,
-                                 int name_is_dir, const char *type)
+				 struct filter_struct const *ent,
+				 int name_is_dir, const char *type)
 {
 	/* If a trailing slash is present to match only directories,
 	 * then it is stripped out by add_rule().  So as a special
