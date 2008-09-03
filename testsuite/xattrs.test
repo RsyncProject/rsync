@@ -120,10 +120,10 @@ fi
 cd "$fromdir"
 rm -rf "$todir" "$chkdir"
 
-rsync -aX file1 file2
-rsync -aX file1 file2 ../chk/
-rsync -aX --del ../chk/ .
-rsync -aX file1 ../lnk/
+$RSYNC -aX file1 file2
+$RSYNC -aX file1 file2 ../chk/
+$RSYNC -aX --del ../chk/ .
+$RSYNC -aX file1 ../lnk/
 
 xls file1 file2 >"$scratchdir/xattrs.txt"
 
@@ -136,7 +136,7 @@ cd "$fromdir"
 rm "$todir/file2"
 
 echo extra >file1
-rsync -aX . ../chk/
+$RSYNC -aX . ../chk/
 
 checkit "$RSYNC -aiiX . ../to" "$chkdir" "$todir"
 
