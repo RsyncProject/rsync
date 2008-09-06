@@ -28,11 +28,12 @@ Changes since 3.0.3:
 
     - When using --iconv, if a filename fails to convert on the receiving side,
       this no longer makes deletions in the root-dir of the transfer fail
-      silently (the user should see the warning about deletions being disabled
-      due to IO error when --ignore-errors was not specified).
+      silently (the user now gets a warning about deletions being disabled
+      due to IO error as long as --ignore-errors was not specified).
 
     - When using --iconv, if a server-side receiver can't convert a filename,
-      it now outputs the name back to the client without mangling the charset.
+      the error message sent back to the client no longer mangles the name
+      with the wrong charset conversion.
 
     - Fixed a potential alignment issue in the IRIX ACL code when allocating
       the initial "struct acl" object.  Also, cast mallocs to avoid warnings.
@@ -56,4 +57,8 @@ Changes since 3.0.3:
     - The Makefile will not halt for just a timestamp change on the Makefile
       or the configure files, only for actual changes in content.
 
-    - Enhanced the release scripts to be able to handle a branch release.
+    - Changed some commands in the testsuite's xattrs.test that called "rsync"
+      instead of "$RSYNC".
+
+    - Enhanced the release scripts to be able to handle a branch release and
+      to do even more consistency checks on the files.
