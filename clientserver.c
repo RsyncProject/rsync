@@ -396,7 +396,7 @@ static int read_arg_from_pipe(int fd, char *buf, int limit)
 static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 {
 	int argc;
-	char **argv, **orig_argv, **orig_early_argv, *chroot_path = NULL;
+	char **argv, **orig_argv, **orig_early_argv, *module_chdir;
 	char line[BIGPATHBUFLEN];
 	uid_t uid = (uid_t)-2;  /* canonically "nobody" */
 	gid_t gid = (gid_t)-2;
@@ -500,26 +500,32 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 	module_dir = lp_path(i);
 	if (use_chroot) {
 		if ((p = strstr(module_dir, "/./")) != NULL) {
-			*p = '\0';
-			p += 2;
-		} else if ((p = strdup("/")) == NULL) /* MEMORY LEAK */
-			out_of_memory("rsync_module");
-	}
+			int len = p - module_dir + 1;
+			if (!(module_chdir = new_array(char, len))) /* MEMORY LEAK */
+				out_of_memory("rsync_module");
+			strlcpy(module_chdir, module_dir, len);
+			if (!(p = strdup(p + 2)))
+				out_of_memory("rsync_module");
+			clean_fname(module_dir, CFN_COLLAPSE_DOT_DOT_DIRS | CFN_DROP_TRAILING_DOT_DIR);
+			module_dir = p;
+		} else {
+			module_chdir = module_dir;
+			if ((module_dir = strdup("/")) == NULL)
+				out_of_memory("rsync_module");
+		}
+	} else
+		module_chdir = module_dir;
 
 	/* We do a change_dir() that doesn't actually call chdir()
 	 * just to make a relative path absolute. */
 	strlcpy(line, curr_dir, sizeof line);
-	if (!change_dir(module_dir, CD_SKIP_CHDIR))
+	if (!change_dir(module_chdir, CD_SKIP_CHDIR))
 		goto chdir_failed;
-	if (strcmp(curr_dir, module_dir) != 0
-	 && (module_dir = strdup(curr_dir)) == NULL)
+	if (strcmp(curr_dir, module_chdir) != 0
+	 && (module_chdir = strdup(curr_dir)) == NULL) /* MEMORY LEAK */
 		out_of_memory("rsync_module");
 	change_dir(line, CD_SKIP_CHDIR); /* Restore curr_dir. */
 
-	if (use_chroot) {
-		chroot_path = module_dir;
-		module_dir = p; /* p is "/" or our inside-chroot path */
-	}
 	module_dirlen = clean_fname(module_dir, CFN_COLLAPSE_DOT_DOT_DIRS | CFN_DROP_TRAILING_DOT_DIR);
 
 	if (module_dirlen == 1) {
@@ -556,16 +562,8 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 		char *modname, *modpath, *hostaddr, *hostname, *username;
 		int status;
 
-		if (!use_chroot)
-			p = module_dir;
-		else if (module_dirlen) {
-			pathjoin(line, sizeof line, chroot_path, module_dir+1);
-			p = line;
-		} else
-			p = chroot_path;
-
 		if (asprintf(&modname, "RSYNC_MODULE_NAME=%s", name) < 0
-		 || asprintf(&modpath, "RSYNC_MODULE_PATH=%s", p) < 0
+		 || asprintf(&modpath, "RSYNC_MODULE_PATH=%s", lp_path(i)) < 0
 		 || asprintf(&hostaddr, "RSYNC_HOST_ADDR=%s", addr) < 0
 		 || asprintf(&hostname, "RSYNC_HOST_NAME=%s", host) < 0
 		 || asprintf(&username, "RSYNC_USER_NAME=%s", auth_user) < 0)
@@ -665,24 +663,22 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 		 * a warning, unless a "require chroot" flag is set,
 		 * in which case we fail.
 		 */
-		if (chroot(chroot_path)) {
-			rsyserr(FLOG, errno, "chroot %s failed", chroot_path);
+		if (chroot(module_chdir)) {
+			rsyserr(FLOG, errno, "chroot %s failed", module_chdir);
 			io_printf(f_out, "@ERROR: chroot failed\n");
 			return -1;
 		}
-		if (!change_dir(module_dir, CD_NORMAL))
-			goto chdir_failed;
-		if (module_dirlen)
-			sanitize_paths = 1;
-	} else {
-		if (!change_dir(module_dir, CD_NORMAL)) {
-		  chdir_failed:
-			rsyserr(FLOG, errno, "chdir %s failed\n", module_dir);
-			io_printf(f_out, "@ERROR: chdir failed\n");
-			return -1;
-		}
-		sanitize_paths = 1;
+		module_chdir = module_dir;
 	}
+
+	if (!change_dir(module_chdir, CD_NORMAL)) {
+	  chdir_failed:
+		rsyserr(FLOG, errno, "chdir %s failed\n", module_chdir);
+		io_printf(f_out, "@ERROR: chdir failed\n");
+		return -1;
+	}
+	if (module_dirlen || !use_chroot)
+		sanitize_paths = 1;
 
 	if ((munge_symlinks = lp_munge_symlinks(i)) < 0)
 		munge_symlinks = !use_chroot || module_dirlen;
