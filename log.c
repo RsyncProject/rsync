@@ -57,6 +57,7 @@ extern iconv_t ic_chck;
 extern iconv_t ic_recv;
 #endif
 extern char curr_dir[MAXPATHLEN];
+extern char *full_module_path;
 extern unsigned int module_dirlen;
 extern char sender_file_sum[MAX_DIGEST_LEN];
 
@@ -617,7 +618,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			n = timestring(time(NULL));
 			break;
 		case 'P':
-			n = lp_path(module_id);
+			n = full_module_path;
 			break;
 		case 'u':
 			n = auth_user;
