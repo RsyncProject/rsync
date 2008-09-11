@@ -20,6 +20,11 @@ Changes since 3.0.4:
       MD5 checksum of any transferred file, or all files if --checksum was
       specified (when protocol 30 or above is in effect).
 
+  EXTRAS:
+
+    - Added an "instant-rsyncd" script to the support directory, which makes
+      it easy to configure a simple rsync daemon in the current directory.
+
   DEVELOPER RELATED:
 
     - Added more conditional debug output.
