@@ -351,6 +351,8 @@ static void handle_delayed_updates(char *local_name)
 
 static int get_next_gen_ndx(int fd, int next_gen_ndx, int desired_ndx)
 {
+	static int batch_eof = 0;
+
 	while (next_gen_ndx < desired_ndx) {
 		if (next_gen_ndx >= 0) {
 			struct file_struct *file = cur_flist->files[next_gen_ndx];
@@ -359,14 +361,16 @@ static int get_next_gen_ndx(int fd, int next_gen_ndx, int desired_ndx)
 				file->flags & FLAG_FILE_SENT ? " resend of" : "",
 				f_name(file, NULL));
 		}
-		next_gen_ndx = read_int(fd);
+		next_gen_ndx = batch_eof ? -1 : read_int(fd);
 		if (next_gen_ndx == -1) {
 			if (inc_recurse)
 				next_gen_ndx = first_flist->prev->used + first_flist->prev->ndx_start;
 			else
 				next_gen_ndx = cur_flist->used;
+			batch_eof = 1;
 		}
 	}
+
 	return next_gen_ndx;
 }
 
@@ -520,8 +524,6 @@ int recv_files(int f_in, char *local_name)
 					"(Skipping batched update for \"%s\")\n",
 					fname);
 				discard_receive_data(f_in, F_LENGTH(file));
-				if (inc_recurse)
-					send_msg_int(MSG_NO_SEND, ndx);
 				continue;
 			}
 			next_gen_ndx = -1;
