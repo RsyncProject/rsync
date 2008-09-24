@@ -2267,7 +2267,8 @@ void server_options(char **args, int *argc_p)
 
 	argstr[x] = '\0';
 
-	args[ac++] = argstr;
+	if (x > 1)
+		args[ac++] = argstr;
 
 #ifdef ICONV_OPTION
 	if (iconv_opt) {
