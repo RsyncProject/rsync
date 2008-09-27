@@ -4,3 +4,20 @@ Changes since 3.0.4:
 
   BUG FIXES:
 
+    - Initialize xattr data in a couple spots in the hlink code, which avoids a
+      crash when the xattr pointer's memory happens to start out non-zero.
+      Also fixed the itemizing of an alt-dest file's xattrs when hard-linking.
+
+    - Don't send a bogus "-" option to an older server if there were no short
+      options specified.
+
+    - Fixed skipping of unneeded updates in a batch file when incremental
+      recursion is active.  Added a test for this.  Made batch-mode handle
+      redos properly (and without hanging).
+
+    - Fix the %P logfile escape when the daemon logs from inside a chroot.
+
+    - Properly ignore (superfluous) source args on a --read-batch command.
+
+    - Improved the manpage's description of the '*' wildcard to remove the
+      confusing "non-empty" qualifier.

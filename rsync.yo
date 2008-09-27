@@ -2276,7 +2276,7 @@ itemization(
   it() rsync chooses between doing a simple string match and wildcard
   matching by checking if the pattern contains one of these three wildcard
   characters: '*', '?', and '[' .
-  it() a '*' matches any non-empty path component (it stops at slashes).
+  it() a '*' matches any path component, but it stops at slashes.
   it() use '**' to match anything, including slashes.
   it() a '?' matches any character except a slash (/).
   it() a '[' introduces a character class, such as [a-z] or [[:alpha:]].
