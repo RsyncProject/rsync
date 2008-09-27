@@ -30,6 +30,7 @@ extern int inc_recurse;
 extern int do_xfers;
 extern int link_dest;
 extern int preserve_acls;
+extern int preserve_xattrs;
 extern int make_backups;
 extern int protocol_version;
 extern int remove_source_files;
@@ -368,6 +369,9 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 #ifdef SUPPORT_ACLS
 		alt_sx.acc_acl = alt_sx.def_acl = NULL;
 #endif
+#ifdef SUPPORT_XATTRS
+		alt_sx.xattr = NULL;
+#endif
 		do {
 			pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
 			if (link_stat(cmpbuf, &alt_sx.st, 0) < 0)
@@ -396,19 +400,37 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 			sxp->st = alt_sx.st;
 #ifdef SUPPORT_ACLS
 			if (preserve_acls && !S_ISLNK(file->mode)) {
-				if (!ACL_READY(*sxp))
+				free_acl(sxp);
+				if (!ACL_READY(alt_sx))
 					get_acl(cmpbuf, sxp);
 				else {
 					sxp->acc_acl = alt_sx.acc_acl;
 					sxp->def_acl = alt_sx.def_acl;
+					alt_sx.acc_acl = alt_sx.def_acl = NULL;
 				}
 			}
 #endif
-		}
-#ifdef SUPPORT_ACLS
-		else if (preserve_acls)
-			free_acl(&alt_sx);
+#ifdef SUPPORT_XATTRS
+			if (preserve_xattrs) {
+				free_xattr(sxp);
+				if (!XATTR_READY(alt_sx))
+					get_xattr(cmpbuf, sxp);
+				else {
+					sxp->xattr = alt_sx.xattr;
+					alt_sx.xattr = NULL;
+				}
+			}
 #endif
+		} else {
+#ifdef SUPPORT_ACLS
+			if (preserve_acls)
+				free_acl(&alt_sx);
+#endif
+#ifdef SUPPORT_XATTRS
+			if (preserve_xattrs)
+				free_xattr(&alt_sx);
+#endif
+		}
 	}
 
 	if (maybe_hard_link(file, ndx, fname, statret, sxp, prev_name, &prev_st,
@@ -475,6 +497,9 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 #ifdef SUPPORT_ACLS
 	prev_sx.acc_acl = prev_sx.def_acl = NULL;
 #endif
+#ifdef SUPPORT_XATTRS
+	prev_sx.xattr = NULL;
+#endif
 
 	while ((ndx = prev_ndx) >= 0) {
 		int val;
@@ -490,6 +515,10 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 #ifdef SUPPORT_ACLS
 		if (preserve_acls)
 			free_acl(&prev_sx);
+#endif
+#ifdef SUPPORT_XATTRS
+		if (preserve_xattrs)
+			free_xattr(&prev_sx);
 #endif
 		if (val < 0)
 			continue;
