@@ -55,7 +55,7 @@ extern iconv_t ic_chck;
 extern iconv_t ic_send, ic_recv;
 #endif
 extern char curr_dir[];
-extern char *module_dir;
+extern char *full_module_path;
 extern unsigned int module_dirlen;
 
 static int log_initialised;
@@ -603,7 +603,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			n = timestring(time(NULL));
 			break;
 		case 'P':
-			n = module_dir;
+			n = full_module_path;
 			break;
 		case 'u':
 			n = auth_user;
