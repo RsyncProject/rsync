@@ -1,64 +1,6 @@
-NEWS for rsync 3.0.4 (6 Sep 2008)
+NEWS for rsync 3.0.5 (UNRELEASED)
 Protocol: 30 (unchanged)
-Changes since 3.0.3:
+Changes since 3.0.4:
 
   BUG FIXES:
 
-    - Fixed a bug in the hard-linking code where it would sometimes try to
-      allocate 0 bytes of memory (which fails on some OSes, such as AIX).
-
-    - Fixed the hard-linking of files from a device that has a device number
-      of 0 (which seems to be a common device number on NetBSD).
-
-    - Fixed the handling of a --partial-dir that cannot be created.  This
-      particularly impacts the --delay-updates option (since the files cannot
-      be delayed without a partial-dir), and was potentially destructive if
-      the --remove-source-files was also specified.
-
-    - Fixed a couple issues in the --fake-super handling of xattrs when the
-      destination files have root-level attributes (e.g. selinux values) that
-      a non-root copy can't affect.
-
-    - Improved the keep-alive check in the generator to fire consistently in
-      incremental-recursion mode when --timeout is enabled.
-
-    - The --iconv option now converts the content of a symlink too, instead
-      of leaving it in the wrong character-set (requires 3.0.4 on both sides
-      of the transfer).
-
-    - When using --iconv, if a filename fails to convert on the receiving side,
-      this no longer makes deletions in the root-dir of the transfer fail
-      silently (the user now gets a warning about deletions being disabled
-      due to IO error as long as --ignore-errors was not specified).
-
-    - When using --iconv, if a server-side receiver can't convert a filename,
-      the error message sent back to the client no longer mangles the name
-      with the wrong charset conversion.
-
-    - Fixed a potential alignment issue in the IRIX ACL code when allocating
-      the initial "struct acl" object.  Also, cast mallocs to avoid warnings.
-
-    - Changed some errors that were going to stdout to go to stderr.
-
-    - Made human_num() and human_dnum() able to output a negative number
-      (rather than outputting a cryptic string of punctuation).
-
-  ENHANCEMENTS:
-
-    - Rsync will avoid sending an -e option to the server if an older protocol
-      is requested (and thus the option would not be useful).  This lets the
-      user specify the --protocol=29 option to access an overly-restrictive
-      server that is rejecting the protocol-30 use of -e to the server.
-
-    - Improved the message output for an RERR_PARTIAL exit.
-
-  DEVELOPER RELATED:
-
-    - The Makefile will not halt for just a timestamp change on the Makefile
-      or the configure files, only for actual changes in content.
-
-    - Changed some commands in the testsuite's xattrs.test that called "rsync"
-      instead of "$RSYNC".
-
-    - Enhanced the release scripts to be able to handle a branch release and
-      to do even more consistency checks on the files.
