@@ -164,6 +164,11 @@ static void got_flist_entry_status(enum festatus status, const char *buf)
 		}
 		break;
 	case FES_REDO:
+		if (read_batch) {
+			if (inc_recurse)
+				flist->in_progress++;
+			break;
+		}
 		if (inc_recurse)
 			flist->to_redo++;
 		flist_ndx_push(&redo_list, ndx);
