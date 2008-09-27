@@ -73,7 +73,7 @@ static void rprint_progress(OFF_T ofs, OFF_T size, struct timeval *now,
 	if (is_last) {
 		int len = snprintf(eol, sizeof eol,
 			" (xfr#%d, to-chk=%d/%d)\n",
-			stats.num_transferred_files,
+			stats.xferred_files,
 			stats.num_files - current_file_index - 1,
 			stats.num_files);
 		if (INFO_GTE(PROGRESS, 2)) {

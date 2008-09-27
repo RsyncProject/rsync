@@ -487,6 +487,21 @@ int recv_files(int f_in, char *local_name)
 			if (preserve_xattrs && iflags & ITEM_REPORT_XATTR && !dry_run)
 				set_file_attrs(fname, file, NULL, fname, 0);
 #endif
+			if (iflags & ITEM_IS_NEW) {
+				stats.created_files++;
+				if (S_ISREG(file->mode)) {
+					/* Nothing further to count. */
+				} else if (S_ISDIR(file->mode))
+					stats.created_dirs++;
+#ifdef SUPPORT_LINKS
+				else if (S_ISLNK(file->mode))
+					stats.created_symlinks++;
+#endif
+				else if (IS_DEVICE(file->mode))
+					stats.created_devices++;
+				else
+					stats.created_specials++;
+			}
 			continue;
 		}
 		if (phase == 2) {
@@ -516,11 +531,13 @@ int recv_files(int f_in, char *local_name)
 				csum_length = SHORT_SUM_LENGTH;
 				redoing = 0;
 			}
+			if (iflags & ITEM_IS_NEW)
+				stats.created_files++;
 		}
 
 		if (!am_server && INFO_GTE(PROGRESS, 1))
 			set_current_file_index(file, ndx);
-		stats.num_transferred_files++;
+		stats.xferred_files++;
 		stats.total_transferred_size += F_LENGTH(file);
 
 		cleanup_got_literal = 0;
@@ -807,6 +824,11 @@ int recv_files(int f_in, char *local_name)
 
 	if (phase == 2 && delay_updates) /* for protocol_version < 29 */
 		handle_delayed_updates(local_name);
+
+	if (read_batch) {
+		read_int(batch_gen_fd); /* Discard -1 */
+		read_del_stats(batch_gen_fd);
+	}
 
 	if (DEBUG_GTE(RECV, 1))
 		rprintf(FINFO,"recv_files finished\n");

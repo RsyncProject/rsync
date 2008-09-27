@@ -201,6 +201,8 @@ void send_files(int f_in, int f_out)
 				break;
 			if (DEBUG_GTE(SEND, 1))
 				rprintf(FINFO, "send_files phase=%d\n", phase);
+			if (phase == 2)
+				read_del_stats(f_in);
 			write_ndx(f_out, NDX_DONE);
 			continue;
 		}
@@ -234,6 +236,21 @@ void send_files(int f_in, int f_out)
 			maybe_log_item(file, iflags, itemizing, xname);
 			write_ndx_and_attrs(f_out, ndx, iflags, fname, file,
 					    fnamecmp_type, xname, xlen);
+			if (iflags & ITEM_IS_NEW) {
+				stats.created_files++;
+				if (S_ISREG(file->mode)) {
+					/* Nothing further to count. */
+				} else if (S_ISDIR(file->mode))
+					stats.created_dirs++;
+#ifdef SUPPORT_LINKS
+				else if (S_ISLNK(file->mode))
+					stats.created_symlinks++;
+#endif
+				else if (IS_DEVICE(file->mode))
+					stats.created_devices++;
+				else
+					stats.created_specials++;
+			}
 			continue;
 		}
 		if (phase == 2) {
@@ -257,6 +274,8 @@ void send_files(int f_in, int f_out)
 				append_mode = -append_mode;
 				csum_length = SHORT_SUM_LENGTH;
 			}
+			if (iflags & ITEM_IS_NEW)
+				stats.created_files++;
 		}
 
 		updating_basis_file = inplace && (protocol_version >= 29
@@ -264,7 +283,7 @@ void send_files(int f_in, int f_out)
 
 		if (!am_server && INFO_GTE(PROGRESS, 1))
 			set_current_file_index(file, ndx);
-		stats.num_transferred_files++;
+		stats.xferred_files++;
 		stats.total_transferred_size += F_LENGTH(file);
 
 		if (!do_xfers) { /* log the transfer */

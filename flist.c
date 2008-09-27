@@ -124,7 +124,6 @@ static char tmp_sum[MAX_DIGEST_LEN];
 
 static char empty_sum[MAX_DIGEST_LEN];
 static int flist_count_offset; /* for --delete --progress */
-static int dir_count = 0;
 
 static void flist_sort_and_clean(struct file_list *flist, int strip_root);
 static void output_flist(struct file_list *flist);
@@ -412,17 +411,29 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 	int l1, l2;
 	int xflags;
 
-	/* Initialize starting value of xflags. */
-	if (protocol_version >= 30 && S_ISDIR(file->mode)) {
-		dir_count++;
-		if (file->flags & FLAG_CONTENT_DIR)
-			xflags = file->flags & FLAG_TOP_DIR;
-		else if (file->flags & FLAG_IMPLIED_DIR)
-			xflags = XMIT_TOP_DIR | XMIT_NO_CONTENT_DIR;
+	/* Initialize starting value of xflags and adjust counts. */
+	if (S_ISREG(file->mode))
+		xflags = 0;
+	else if (S_ISDIR(file->mode)) {
+		stats.num_dirs++;
+		if (protocol_version >= 30) {
+			if (file->flags & FLAG_CONTENT_DIR)
+				xflags = file->flags & FLAG_TOP_DIR;
+			else if (file->flags & FLAG_IMPLIED_DIR)
+				xflags = XMIT_TOP_DIR | XMIT_NO_CONTENT_DIR;
+			else
+				xflags = XMIT_NO_CONTENT_DIR;
+		} else
+			xflags = file->flags & FLAG_TOP_DIR; /* FLAG_TOP_DIR == XMIT_TOP_DIR */
+	} else {
+		if (S_ISLNK(file->mode))
+			stats.num_symlinks++;
+		else if (IS_DEVICE(file->mode))
+			stats.num_devices++;
 		else
-			xflags = XMIT_NO_CONTENT_DIR;
-	} else
-		xflags = file->flags & FLAG_TOP_DIR; /* FLAG_TOP_DIR == XMIT_TOP_DIR */
+			stats.num_specials++;
+		xflags = 0;
+	}
 
 	if (file->mode == mode)
 		xflags |= XMIT_SAME_MODE;
@@ -1350,7 +1361,7 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		memcpy(F_SUM(file), tmp_sum, checksum_len);
 
 	if (unsort_ndx)
-		F_NDX(file) = dir_count;
+		F_NDX(file) = stats.num_dirs;
 
 	return file;
 }
@@ -1884,7 +1895,7 @@ void send_extra_file_list(int f, int at_least)
 		old_cnt += flist->used;
 	while (file_total - old_cnt < at_least) {
 		struct file_struct *file = dir_flist->sorted[send_dir_ndx];
-		int dir_ndx, dstart = dir_count;
+		int dir_ndx, dstart = stats.num_dirs;
 		const char *pathname = F_PATHNAME(file);
 		int32 *dp;
 
@@ -1934,7 +1945,7 @@ void send_extra_file_list(int f, int at_least)
 
 		flist_sort_and_clean(flist, 0);
 
-		add_dirs_to_tree(send_dir_ndx, flist, dir_count - dstart);
+		add_dirs_to_tree(send_dir_ndx, flist, stats.num_dirs - dstart);
 		flist_done_allocating(flist);
 
 		file_total += flist->used;
@@ -2280,7 +2291,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 
 	if (inc_recurse) {
 		send_dir_depth = 1;
-		add_dirs_to_tree(-1, flist, dir_count);
+		add_dirs_to_tree(-1, flist, stats.num_dirs);
 		if (!file_total || strcmp(flist->sorted[flist->low]->basename, ".") != 0)
 			flist->parent_ndx = -1;
 		flist_done_allocating(flist);
@@ -2352,10 +2363,20 @@ struct file_list *recv_file_list(int f)
 		flist_expand(flist, 1);
 		file = recv_file_entry(flist, flags, f);
 
-		if (inc_recurse && S_ISDIR(file->mode)) {
-			flist_expand(dir_flist, 1);
-			dir_flist->files[dir_flist->used++] = file;
-		}
+		if (S_ISREG(file->mode)) {
+			/* Already counted */
+		} else if (S_ISDIR(file->mode)) {
+			if (inc_recurse) {
+				flist_expand(dir_flist, 1);
+				dir_flist->files[dir_flist->used++] = file;
+			}
+			stats.num_dirs++;
+		} else if (S_ISLNK(file->mode))
+			stats.num_symlinks++;
+		else if (IS_DEVICE(file->mode))
+			stats.num_symlinks++;
+		else
+			stats.num_specials++;
 
 		flist->files[flist->used++] = file;
 

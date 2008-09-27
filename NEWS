@@ -16,6 +16,16 @@ Changes since 3.0.4:
       control over what is output.  Added an extra type of --progress output
       using --info=progress2.
 
+    - Output numbers in 3-digit groups by default (e.g. 1,234,567).  (See the
+      --human-readable option for a way to turn it off.)
+
+    - Added a "T" (terabyte) category to the --human-readable size suffixes.
+
+    - Enhanced the --stats output: 1) to mention how many files were created
+      (protocol >= 28), 2) to mention how many files were deleted (new for
+      protocol 31), and 3) to follow the file-count, created-count, and
+      deleted-count with a break-out list of each count by type.
+
     - Added the "%C" escape to the log-output handling, which will output the
       MD5 checksum of any transferred file, or all files if --checksum was
       specified (when protocol 30 or above is in effect).

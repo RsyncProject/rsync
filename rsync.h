@@ -96,7 +96,7 @@
 /* This is used when working on a new protocol version in CVS, and should
  * be a new non-zero value for each CVS change that affects the protocol.
  * It must ALWAYS be 0 when the protocol goes final (and NEVER before)! */
-#define SUBPROTOCOL_VERSION 1
+#define SUBPROTOCOL_VERSION 2
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
@@ -828,8 +828,10 @@ struct stats {
 	int64 flist_buildtime;
 	int64 flist_xfertime;
 	int64 flist_size;
-	int num_files;
-	int num_transferred_files;
+	int num_files, num_dirs, num_symlinks, num_devices, num_specials;
+	int created_files, created_dirs, created_symlinks, created_devices, created_specials;
+	int deleted_files, deleted_dirs, deleted_symlinks, deleted_devices, deleted_specials;
+	int xferred_files;
 };
 
 struct chmod_mode_struct;

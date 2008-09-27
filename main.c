@@ -171,6 +171,30 @@ static void wait_process_with_flush(pid_t pid, int *exit_code_ptr)
 		*exit_code_ptr = WEXITSTATUS(status);
 }
 
+void write_del_stats(int f)
+{
+	if (!INFO_GTE(STATS, 2) || protocol_version < 31)
+		return;
+	write_varint(f, stats.deleted_files - stats.deleted_dirs
+		      - stats.deleted_symlinks - stats.deleted_devices
+		      - stats.deleted_specials);
+	write_varint(f, stats.deleted_dirs);
+	write_varint(f, stats.deleted_symlinks);
+	write_varint(f, stats.deleted_devices);
+	write_varint(f, stats.deleted_specials);
+}
+
+void read_del_stats(int f)
+{
+	if (!INFO_GTE(STATS, 2) || protocol_version < 31)
+		return;
+	stats.deleted_files = read_varint(f);
+	stats.deleted_files += stats.deleted_dirs = read_varint(f);
+	stats.deleted_files += stats.deleted_symlinks = read_varint(f);
+	stats.deleted_files += stats.deleted_devices = read_varint(f);
+	stats.deleted_files += stats.deleted_specials = read_varint(f);
+}
+
 /* This function gets called from all 3 processes.  We want the client side
  * to actually output the text, but the sender is the only process that has
  * all the stats we need.  So, if we're a client sender, we do the report.
@@ -210,6 +234,7 @@ static void handle_stats(int f)
 				write_varlong30(f, stats.flist_buildtime, 3);
 				write_varlong30(f, stats.flist_xfertime, 3);
 			}
+			write_del_stats(f);
 		}
 		return;
 	}
@@ -228,6 +253,8 @@ static void handle_stats(int f)
 			stats.flist_buildtime = read_varlong30(f, 3);
 			stats.flist_xfertime = read_varlong30(f, 3);
 		}
+		if (!read_batch)
+			read_del_stats(f);
 	} else if (write_batch) {
 		/* The --read-batch process is going to be a client
 		 * receiver, so we need to give it the stats. */
@@ -238,16 +265,44 @@ static void handle_stats(int f)
 			write_varlong30(batch_fd, stats.flist_buildtime, 3);
 			write_varlong30(batch_fd, stats.flist_xfertime, 3);
 		}
+		/* We don't write the del stats into the batch file -- they
+		 * come from the generator when reading the batch. */
 	}
+}
+
+static void output_itemized_counts(const char *prefix, int *counts)
+{
+	static char *labels[] = { "reg", "dir", "link", "dev", "special" };
+	char buf[1024], *pre = " (";
+	int j, len = 0;
+	int total = counts[0];
+	if (total) {
+		counts[0] -= counts[1] + counts[2] + counts[3] + counts[4];
+		for (j = 0; j < 5; j++) {
+			if (counts[j]) {
+				len += snprintf(buf+len, sizeof buf - len - 2,
+					"%s%s: %s",
+					pre, labels[j], comma_num(counts[j]));
+				pre = ", ";
+			}
+		}
+		buf[len++] = ')';
+	}
+	buf[len] = '\0';
+	rprintf(FINFO, "%s: %s%s\n", prefix, comma_num(total), buf);
 }
 
 static void output_summary(void)
 {
 	if (INFO_GTE(STATS, 2)) {
 		rprintf(FCLIENT, "\n");
-		rprintf(FINFO,"Number of files: %s\n", comma_num(stats.num_files));
-		rprintf(FINFO,"Number of files transferred: %s\n",
-			comma_num(stats.num_transferred_files));
+		output_itemized_counts("Number of files", &stats.num_files);
+		if (protocol_version >= 29)
+			output_itemized_counts("Number of created files", &stats.created_files);
+		if (protocol_version >= 31)
+			output_itemized_counts("Number of deleted files", &stats.deleted_files);
+		rprintf(FINFO,"Number of regular files transferred: %s\n",
+			comma_num(stats.xferred_files));
 		rprintf(FINFO,"Total file size: %s bytes\n",
 			human_num(stats.total_size));
 		rprintf(FINFO,"Total transferred file size: %s bytes\n",

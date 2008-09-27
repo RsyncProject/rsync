@@ -104,7 +104,7 @@ int non_perishable_cnt = 0;
 int maybe_ATTRS_REPORT = 0;
 
 static dev_t dev_zero;
-static int deletion_count = 0; /* used to implement --max-delete */
+static int skipped_deletes = 0;
 static int deldelay_size = 0, deldelay_cnt = 0;
 static char *deldelay_buf = NULL;
 static int deldelay_fd = -1;
@@ -187,8 +187,10 @@ static enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 		/* OK: try to delete the directory. */
 	}
 
-	if (!(flags & DEL_MAKE_ROOM) && max_delete >= 0 && ++deletion_count > max_delete)
+	if (!(flags & DEL_MAKE_ROOM) && max_delete >= 0 && stats.deleted_files >= max_delete) {
+		skipped_deletes++;
 		return DR_AT_LIMIT;
+	}
 
 	if (S_ISDIR(mode)) {
 		what = "rmdir";
@@ -202,8 +204,22 @@ static enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 	}
 
 	if (ok) {
-		if (!(flags & DEL_MAKE_ROOM))
+		if (!(flags & DEL_MAKE_ROOM)) {
 			log_delete(fbuf, mode);
+			stats.deleted_files++;
+			if (S_ISREG(mode)) {
+				/* Nothing more to count */
+			} else if (S_ISDIR(mode))
+				stats.deleted_dirs++;
+#ifdef SUPPORT_LINKS
+			else if (S_ISLNK(mode))
+				stats.deleted_symlinks++;
+#endif
+			else if (IS_DEVICE(mode))
+				stats.deleted_symlinks++;
+			else
+				stats.deleted_specials++;
+		}
 		ret = DR_SUCCESS;
 	} else {
 		if (S_ISDIR(mode) && errno == ENOTEMPTY) {
@@ -214,10 +230,8 @@ static enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 			rsyserr(FERROR, errno, "delete_file: %s(%s) failed",
 				what, fbuf);
 			ret = DR_FAILURE;
-		} else {
-			deletion_count--;
+		} else
 			ret = DR_SUCCESS;
-		}
 	}
 
   check_ret:
@@ -2285,7 +2299,7 @@ void generate_files(int f_out, const char *local_name)
 		}
 	} while ((cur_flist = cur_flist->next) != NULL);
 
-	if (read_batch)
+	if (read_batch && inc_recurse)
 		write_ndx(f_out, NDX_DONE);
 
 	if (delete_during)
@@ -2306,6 +2320,8 @@ void generate_files(int f_out, const char *local_name)
 		rprintf(FINFO, "generate_files phase=%d\n", phase);
 
 	write_ndx(f_out, NDX_DONE);
+	write_del_stats(f_out);
+
 	/* Reduce round-trip lag-time for a useless delay-updates phase. */
 	if (protocol_version >= 29 && !delay_updates)
 		write_ndx(f_out, NDX_DONE);
@@ -2341,10 +2357,10 @@ void generate_files(int f_out, const char *local_name)
 	 && dir_tweaking && (!inc_recurse || delete_during == 2))
 		touch_up_dirs(dir_flist, -1);
 
-	if (max_delete >= 0 && deletion_count > max_delete) {
+	if (max_delete >= 0 && skipped_deletes) {
 		rprintf(FWARNING,
 			"Deletions stopped due to --max-delete limit (%d skipped)\n",
-			deletion_count - max_delete);
+			skipped_deletes);
 		io_error |= IOERR_DEL_LIMIT;
 	}
 
