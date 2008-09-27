@@ -59,6 +59,7 @@ extern struct filter_list_struct daemon_filter_list;
 
 static struct bitbag *delayed_bits = NULL;
 static int phase = 0, redoing = 0;
+static flist_ndx_list batch_redo_list;
 /* We're either updating the basis file or an identical copy: */
 static int updating_basis_or_equiv;
 
@@ -348,25 +349,60 @@ static void handle_delayed_updates(char *local_name)
 	}
 }
 
-static int get_next_gen_ndx(int fd, int next_gen_ndx, int desired_ndx)
+static void no_batched_update(int ndx, BOOL is_redo)
 {
-	while (next_gen_ndx < desired_ndx) {
-		if (next_gen_ndx >= 0) {
-			struct file_struct *file = cur_flist->files[next_gen_ndx];
-			rprintf(FERROR_XFER,
-				"(No batched update for%s \"%s\")\n",
-				file->flags & FLAG_FILE_SENT ? " resend of" : "",
-				f_name(file, NULL));
-		}
-		next_gen_ndx = read_int(fd);
-		if (next_gen_ndx == -1) {
-			if (inc_recurse)
-				next_gen_ndx = first_flist->prev->used + first_flist->prev->ndx_start;
-			else
-				next_gen_ndx = cur_flist->used;
+	struct file_list *flist = flist_for_ndx(ndx, "no_batched_update");
+	struct file_struct *file = flist->files[ndx - flist->ndx_start];
+
+	rprintf(FERROR_XFER, "(No batched update for%s \"%s\")\n",
+		is_redo ? " resend of" : "", f_name(file, NULL));
+
+	if (inc_recurse)
+		send_msg_int(MSG_NO_SEND, ndx);
+}
+
+static int we_want_redo(int desired_ndx)
+{
+	static int redo_ndx = -1;
+
+	while (redo_ndx < desired_ndx) {
+		if (redo_ndx >= 0)
+			no_batched_update(redo_ndx, True);
+		if ((redo_ndx = flist_ndx_pop(&batch_redo_list)) < 0)
+			return 0;
+	}
+
+	if (redo_ndx == desired_ndx) {
+		redo_ndx = -1;
+		return 1;
+	}
+
+	return 0;
+}
+
+static int gen_wants_ndx(int desired_ndx)
+{
+	static int next_ndx = -1;
+	static BOOL got_eof = 0;
+
+	if (got_eof)
+		return 0;
+
+	while (next_ndx < desired_ndx) {
+		if (next_ndx >= 0)
+			no_batched_update(next_ndx, False);
+		if ((next_ndx = read_int(batch_gen_fd)) < 0) {
+			got_eof = True;
+			return 0;
 		}
 	}
-	return next_gen_ndx;
+
+	if (next_ndx == desired_ndx) {
+		next_ndx = -1;
+		return 1;
+	}
+
+	return 0;
 }
 
 /**
@@ -375,7 +411,6 @@ static int get_next_gen_ndx(int fd, int next_gen_ndx, int desired_ndx)
  * Receiver process runs on the same host as the generator process. */
 int recv_files(int f_in, char *local_name)
 {
-	int next_gen_ndx = -1;
 	int fd1,fd2;
 	STRUCT_STAT st;
 	int iflags, xlen;
@@ -410,17 +445,13 @@ int recv_files(int f_in, char *local_name)
 					 xname, &xlen);
 		if (ndx == NDX_DONE) {
 			if (inc_recurse && first_flist) {
+				if (read_batch)
+					gen_wants_ndx(first_flist->used + first_flist->ndx_start);
 				flist_free(first_flist);
 				if (first_flist)
 					continue;
-			}
-			if (read_batch && cur_flist) {
-				int high = inc_recurse
-				    ? first_flist->prev->used + first_flist->prev->ndx_start
-				    : cur_flist->used;
-				get_next_gen_ndx(batch_gen_fd, next_gen_ndx, high);
-				next_gen_ndx = -1;
-			}
+			} else if (read_batch && first_flist)
+				gen_wants_ndx(first_flist->used);
 			if (++phase > max_phase)
 				break;
 			if (verbose > 2)
@@ -509,17 +540,15 @@ int recv_files(int f_in, char *local_name)
 		}
 
 		if (read_batch) {
-			next_gen_ndx = get_next_gen_ndx(batch_gen_fd, next_gen_ndx, ndx);
-			if (ndx < next_gen_ndx) {
+			if (!(redoing ? we_want_redo(ndx) : gen_wants_ndx(ndx))) {
 				rprintf(FINFO,
-					"(Skipping batched update for \"%s\")\n",
+					"(Skipping batched update for%s \"%s\")\n",
+					redoing ? " resend of" : "",
 					fname);
 				discard_receive_data(f_in, F_LENGTH(file));
-				if (inc_recurse)
-					send_msg_int(MSG_NO_SEND, ndx);
+				file->flags |= FLAG_FILE_SENT;
 				continue;
 			}
-			next_gen_ndx = -1;
 		}
 
 		partialptr = partial_dir ? partial_dir_fname(fname) : fname;
@@ -719,6 +748,9 @@ int recv_files(int f_in, char *local_name)
 
 		cleanup_disable();
 
+		if (read_batch)
+			file->flags |= FLAG_FILE_SENT;
+
 		switch (recv_ok) {
 		case 2:
 			break;
@@ -751,6 +783,8 @@ int recv_files(int f_in, char *local_name)
 					keptstr, redostr);
 			}
 			if (!redoing) {
+				if (read_batch)
+					flist_ndx_push(&batch_redo_list, ndx);
 				send_msg_int(MSG_REDO, ndx);
 				file->flags |= FLAG_FILE_SENT;
 			} else if (inc_recurse)

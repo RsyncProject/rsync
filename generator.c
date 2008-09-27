@@ -2282,6 +2282,9 @@ void generate_files(int f_out, const char *local_name)
 		}
 	} while ((cur_flist = cur_flist->next) != NULL);
 
+	if (read_batch && inc_recurse)
+		write_ndx(f_out, NDX_DONE);
+
 	if (delete_during)
 		delete_in_dir(NULL, NULL, &dev_zero);
 	phase++;
