@@ -832,6 +832,15 @@ struct stats {
 
 struct chmod_mode_struct;
 
+struct flist_ndx_item {
+	struct flist_ndx_item *next;
+	int ndx;
+};
+
+typedef struct {
+	struct flist_ndx_item *head, *tail;
+} flist_ndx_list;
+
 #define EMPTY_ITEM_LIST {NULL, 0, 0}
 
 typedef struct {

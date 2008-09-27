@@ -124,16 +124,7 @@ static void writefd(int fd, const char *buf, size_t len);
 static void writefd_unbuffered(int fd, const char *buf, size_t len);
 static void mplex_write(int fd, enum msgcode code, const char *buf, size_t len, int convert);
 
-struct flist_ndx_item {
-	struct flist_ndx_item *next;
-	int ndx;
-};
-
-struct flist_ndx_list {
-	struct flist_ndx_item *head, *tail;
-};
-
-static struct flist_ndx_list redo_list, hlink_list;
+static flist_ndx_list redo_list, hlink_list;
 
 struct msg_list_item {
 	struct msg_list_item *next;
@@ -146,39 +137,6 @@ struct msg_list {
 };
 
 static struct msg_list msg_queue;
-
-static void flist_ndx_push(struct flist_ndx_list *lp, int ndx)
-{
-	struct flist_ndx_item *item;
-
-	if (!(item = new(struct flist_ndx_item)))
-		out_of_memory("flist_ndx_push");
-	item->next = NULL;
-	item->ndx = ndx;
-	if (lp->tail)
-		lp->tail->next = item;
-	else
-		lp->head = item;
-	lp->tail = item;
-}
-
-static int flist_ndx_pop(struct flist_ndx_list *lp)
-{
-	struct flist_ndx_item *next;
-	int ndx;
-
-	if (!lp->head)
-		return -1;
-
-	ndx = lp->head->ndx;
-	next = lp->head->next;
-	free(lp->head);
-	lp->head = next;
-	if (!next)
-		lp->tail = NULL;
-
-	return ndx;
-}
 
 static void got_flist_entry_status(enum festatus status, const char *buf)
 {
