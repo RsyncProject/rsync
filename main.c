@@ -1206,8 +1206,8 @@ static int start_client(int argc, char *argv[])
 			rprintf(FERROR, "remote destination is not allowed with --read-batch\n");
 			exit_cleanup(RERR_SYNTAX);
 		}
-		remote_argv = argv + argc - 1;
-		remote_argc = 1;
+		remote_argv = argv += argc - 1;
+		remote_argc = argc = 1;
 	}
 
 	if (am_sender) {
