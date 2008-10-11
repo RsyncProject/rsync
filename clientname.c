@@ -108,6 +108,9 @@ char *client_name(int fd)
 		struct addrinfo hint, *answer;
 		int err;
 
+		if (strcmp(addr, "0.0.0.0") == 0)
+			return name_buf;
+
 		memset(&hint, 0, sizeof hint);
 
 #ifdef AI_NUMERICHOST
