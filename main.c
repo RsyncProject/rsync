@@ -528,7 +528,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 #ifdef ICONV_CONST
 		setup_iconv();
 #endif
-		if (protect_args)
+		if (protect_args && !daemon_over_rsh)
 			send_protected_args(*f_out_p, args);
 	}
 
