@@ -13,11 +13,23 @@ Changes since 3.0.4:
 
     - Fixed skipping of unneeded updates in a batch file when incremental
       recursion is active.  Added a test for this.  Made batch-mode handle
-      redos properly (and without hanging).
+      "redo" files properly (and without hanging).
 
     - Fix the %P logfile escape when the daemon logs from inside a chroot.
+
+    - Fixed the use of -s (--protect-args) when used with a remote source or
+      destination that had an empty path (e.g. "host:").  Also fixed a problem
+      when -s was used when accessing a daemon via a remote-shell.
+
+    - Got rid of an annoying delay when accessing a daemon via a remote-shell.
 
     - Properly ignore (superfluous) source args on a --read-batch command.
 
     - Improved the manpage's description of the '*' wildcard to remove the
       confusing "non-empty" qualifier.
+
+  ENHANCEMENTS:
+
+    - Made the support/atomic-rsync script able to perform a fully atomic
+      update of the copied hierarchy when the destination is setup using a
+      particular symlink idiom.
