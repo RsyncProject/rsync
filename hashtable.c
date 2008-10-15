@@ -23,13 +23,13 @@
 
 struct hashtable *hashtable_create(int size, int key64)
 {
+	int req = size;
 	struct hashtable *tbl;
 	int node_size = key64 ? sizeof (struct ht_int64_node)
 			      : sizeof (struct ht_int32_node);
 
 	/* Pick a power of 2 that can hold the requested size. */
 	if (size & (size-1) || size < 16) {
-		int req = size;
 		size = 16;
 		while (size < req)
 			size *= 2;
@@ -43,11 +43,25 @@ struct hashtable *hashtable_create(int size, int key64)
 	tbl->node_size = node_size;
 	tbl->key64 = (short)key64;
 
+	if (DEBUG_GTE(HASH, 1)) {
+		char buf[32];
+		if (req != size)
+			snprintf(buf, sizeof buf, "req: %d, ", req);
+		else
+			*buf = '\0';
+		rprintf(FINFO, "[%s] created hashtable %lx (%ssize: %d, keys: %d-bit)\n",
+			who_am_i(), (long)tbl, buf, size, key64 ? 64 : 32);
+	}
+
 	return tbl;
 }
 
 void hashtable_destroy(struct hashtable *tbl)
 {
+	if (DEBUG_GTE(HASH, 1)) {
+		rprintf(FINFO, "[%s] destroyed hashtable %lx (size: %d, keys: %d-bit)\n",
+			who_am_i(), (long)tbl, tbl->size, tbl->key64 ? 64 : 32);
+	}
 	free(tbl->nodes);
 	free(tbl);
 }
@@ -69,6 +83,11 @@ void *hashtable_find(struct hashtable *tbl, int64 key, int allocate_if_missing)
 			out_of_memory("hashtable_node");
 		tbl->size = size;
 		tbl->entries = 0;
+
+		if (DEBUG_GTE(HASH, 1)) {
+			rprintf(FINFO, "[%s] growing hashtable %lx (size: %d, keys: %d-bit)\n",
+				who_am_i(), (long)tbl, size, key64 ? 64 : 32);
+		}
 
 		for (i = size / 2; i-- > 0; ) {
 			struct ht_int32_node *move_node = HT_NODE(tbl, old_nodes, i);

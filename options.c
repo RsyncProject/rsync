@@ -204,7 +204,7 @@ static const char *debug_verbosity[] = {
 	/*2*/ "bind,cmd,connect,del,deltasum,dup,filter,flist,iconv",
 	/*3*/ "acl,backup,deltasum2,del2,exit,filter2,flist2,fuzzy,genr,own,recv,send,time",
 	/*4*/ "cmd2,deltasum3,del3,exit2,flist3,iconv2,own2,proto,time2",
-	/*5*/ "chdir,deltasum4,flist4,fuzzy2,hlink",
+	/*5*/ "chdir,deltasum4,flist4,fuzzy2,hash,hlink",
 };
 
 #define MAX_VERBOSITY ((int)(sizeof debug_verbosity / sizeof debug_verbosity[0]) - 1)
@@ -273,6 +273,7 @@ static struct output_struct debug_words[COUNT_DEBUG+1] = {
 	DEBUG_WORD(FLIST, W_SND|W_REC, "Debug file-list operations (levels 1-4)"),
 	DEBUG_WORD(FUZZY, W_REC, "Debug fuzzy scoring (levels 1-2)"),
 	DEBUG_WORD(GENR, W_REC, "Debug generator functions"),
+	DEBUG_WORD(HASH, W_SND|W_REC, "Debug hashtable code"),
 	DEBUG_WORD(HLINK, W_SND|W_REC, "Debug hard-link actions"),
 	DEBUG_WORD(ICONV, W_CLI|W_SRV, "Debug iconv character conversions (levels 1-2)"),
 	DEBUG_WORD(OWN, W_REC, "Debug ownership changes in users & groups (levels 1-2)"),
