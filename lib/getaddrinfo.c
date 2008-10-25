@@ -492,13 +492,10 @@ int getnameinfo(const struct sockaddr *sa, socklen_t salen,
 		return EAI_FAIL;
 	}
 
-	/* We don't support those. */
-	if ((node && !(flags & NI_NUMERICHOST))
-		|| (service && !(flags & NI_NUMERICSERV)))
-		return EAI_FAIL;
-
 	if (node) {
-		return gethostnameinfo(sa, node, nodelen, flags);
+		int ret = gethostnameinfo(sa, node, nodelen, flags);
+		if (ret)
+			return ret;
 	}
 
 	if (service) {
