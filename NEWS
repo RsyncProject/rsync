@@ -28,6 +28,9 @@ Changes since 3.0.4:
     - Improved the manpage's description of the '*' wildcard to remove the
       confusing "non-empty" qualifier.
 
+    - Fixed reverse lookups in the compatibility-library version of
+      getnameinfo().
+
   ENHANCEMENTS:
 
     - Made the support/atomic-rsync script able to perform a fully atomic
