@@ -70,6 +70,10 @@ destination, the files are listed in an output format similar to "ls -l".
 As expected, if neither the source or destination path specify a remote
 host, the copy occurs locally (see also the bf(--list-only) option).
 
+Rsync refers to the local side as the "client" and the remote side as the
+"server".  Don't confuse "server" with an rsync daemon -- a daemon is always a
+server, but a server can be either a daemon or a remote-shell spawned process.
+
 manpagesection(SETUP)
 
 See the file README for installation instructions.
