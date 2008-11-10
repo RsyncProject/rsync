@@ -156,27 +156,37 @@ void check_batch_flags(void)
 		append_mode = 2;
 }
 
-static void write_arg(int fd, char *arg)
+static int write_arg(int fd, char *arg)
 {
 	char *x, *s;
+	int len, ret = 0;
 
 	if (*arg == '-' && (x = strchr(arg, '=')) != NULL) {
-		write(fd, arg, x - arg + 1);
+		if (write(fd, arg, x - arg + 1) != x - arg + 1)
+			ret = -1;
 		arg += x - arg + 1;
 	}
 
 	if (strpbrk(arg, " \"'&;|[]()$#!*?^\\") != NULL) {
-		write(fd, "'", 1);
+		if (write(fd, "'", 1) != 1)
+			ret = -1;
 		for (s = arg; (x = strchr(s, '\'')) != NULL; s = x + 1) {
-			write(fd, s, x - s + 1);
-			write(fd, "'", 1);
+			if (write(fd, s, x - s + 1) != x - s + 1
+			 || write(fd, "'", 1) != 1)
+				ret = -1;
 		}
-		write(fd, s, strlen(s));
-		write(fd, "'", 1);
-		return;
+		len = strlen(s);
+		if (write(fd, s, len) != len
+		 || write(fd, "'", 1) != 1)
+			ret = -1;
+		return ret;
 	}
 
-	write(fd, arg, strlen(arg));
+	len = strlen(arg);
+	if (write(fd, arg, len) != len)
+		ret = -1;
+
+	return ret;
 }
 
 static void write_filter_rules(int fd)
@@ -205,7 +215,7 @@ static void write_filter_rules(int fd)
  * (hopefully) work. */
 void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 {
-	int fd, i, len;
+	int fd, i, len, err = 0;
 	char *p, filename[MAXPATHLEN];
 
 	stringjoin(filename, sizeof filename,
@@ -219,7 +229,8 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 	}
 
 	/* Write argvs info to BATCH.sh file */
-	write_arg(fd, argv[0]);
+	if (write_arg(fd, argv[0]) < 0)
+		err = 1;
 	if (filter_list.head) {
 		if (protocol_version >= 29)
 			write_sbuf(fd, " --filter=._-");
@@ -240,25 +251,31 @@ void write_batch_shell_file(int argc, char *argv[], int file_arg_cnt)
 			i++;
 			continue;
 		}
-		write(fd, " ", 1);
+		if (write(fd, " ", 1) != 1)
+			err = 1;
 		if (strncmp(p, "--write-batch", len = 13) == 0
 		 || strncmp(p, "--only-write-batch", len = 18) == 0) {
-			write(fd, "--read-batch", 12);
+			if (write(fd, "--read-batch", 12) != 12)
+				err = 1;
 			if (p[len] == '=') {
-				write(fd, "=", 1);
-				write_arg(fd, p + len + 1);
+				if (write(fd, "=", 1) != 1
+				 || write_arg(fd, p + len + 1) < 0)
+					err = 1;
 			}
-		} else
-			write_arg(fd, p);
+		} else {
+			if (write_arg(fd, p) < 0)
+				err = 1;
+		}
 	}
 	if (!(p = check_for_hostspec(argv[argc - 1], &p, &i)))
 		p = argv[argc - 1];
-	write(fd, " ${1:-", 6);
-	write_arg(fd, p);
+	if (write(fd, " ${1:-", 6) != 6
+	 || write_arg(fd, p) < 0)
+		err = 1;
 	write_byte(fd, '}');
 	if (filter_list.head)
 		write_filter_rules(fd);
-	if (write(fd, "\n", 1) != 1 || close(fd) < 0) {
+	if (write(fd, "\n", 1) != 1 || close(fd) < 0 || err) {
 		rsyserr(FERROR, errno, "Batch file %s write error",
 			filename);
 		exit_cleanup(RERR_FILEIO);
