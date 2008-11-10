@@ -1962,9 +1962,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	start_write = stats.total_written;
 	gettimeofday(&start_tv, NULL);
 
-	if (!orig_dir)
-		orig_dir = strdup(curr_dir);
-
 	if (relative_paths && protocol_version >= 30)
 		implied_dirs = 1; /* We send flagged implied dirs */
 
@@ -1989,6 +1986,9 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		}
 		use_ff_fd = 1;
 	}
+
+	if (!orig_dir)
+		orig_dir = strdup(curr_dir);
 
 	while (1) {
 		char fbuf[MAXPATHLEN], *fn, name_type;
