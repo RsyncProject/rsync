@@ -979,7 +979,10 @@ int change_dir(const char *dir, int set_path_only)
 
 	if (!initialised) {
 		initialised = 1;
-		getcwd(curr_dir, sizeof curr_dir - 1);
+		if (getcwd(curr_dir, sizeof curr_dir - 1) == NULL) {
+			rsyserr(FERROR, errno, "getcwd()");
+			exit_cleanup(RERR_FILESELECT);
+		}
 		curr_dir_len = strlen(curr_dir);
 	}
 

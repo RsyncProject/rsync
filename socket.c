@@ -823,6 +823,7 @@ static int socketpair_tcp(int fd[2])
  **/
 int sock_exec(const char *prog)
 {
+	pid_t pid;
 	int fd[2];
 
 	if (socketpair_tcp(fd) != 0) {
@@ -831,14 +832,23 @@ int sock_exec(const char *prog)
 	}
 	if (DEBUG_GTE(CMD, 1))
 		rprintf(FINFO, "Running socket program: \"%s\"\n", prog);
-	if (fork() == 0) {
+
+	pid = fork();
+	if (pid < 0) {
+		rsyserr(FERROR, errno, "fork");
+		exit_cleanup(RERR_IPC);
+	}
+
+	if (pid == 0) {
 		close(fd[0]);
-		close(0);
-		close(1);
-		dup(fd[1]);
-		dup(fd[1]);
+		if (dup2(fd[1], STDIN_FILENO) < 0
+		 || dup2(fd[1], STDOUT_FILENO) < 0) {
+			fprintf(stderr, "Failed to run \"%s\"\n", prog);
+			exit(1);
+		}
 		exit(system(prog));
 	}
+
 	close(fd[1]);
 	return fd[0];
 }
