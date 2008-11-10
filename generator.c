@@ -521,7 +521,10 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 					f_name(fp, NULL));
 			continue;
 		}
-		if (flist_find(cur_flist, fp) < 0) {
+		/* Here we want to match regardless of file type.  Replacement
+		 * of a file with one of another type is handled separately by
+		 * a delete_item call with a DEL_MAKE_ROOM flag. */
+		if (flist_find_ignore_dirness(cur_flist, fp) < 0) {
 			int flags = DEL_RECURSE;
 			if (!(fp->mode & S_IWUSR) && !am_root && (uid_t)F_OWNER(fp) == our_uid)
 				flags |= DEL_NO_UID_WRITE;

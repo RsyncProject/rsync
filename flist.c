@@ -1294,25 +1294,6 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	else if (!pool)
 		F_DEPTH(file) = extra_len / EXTRA_LEN;
 
-	/* This code is only used by the receiver when it is building
-	 * a list of files for a delete pass. */
-	if (keep_dirlinks && linkname_len && flist) {
-		STRUCT_STAT st2;
-		int save_mode = file->mode;
-		file->mode = S_IFDIR; /* Find a directory with our name. */
-		if (flist_find(dir_flist, file) >= 0
-		 && x_stat(thisname, &st2, NULL) == 0 && S_ISDIR(st2.st_mode)) {
-			file->modtime = st2.st_mtime;
-			file->len32 = 0;
-			file->mode = st2.st_mode;
-			if (uid_ndx)
-				F_OWNER(file) = st2.st_uid;
-			if (gid_ndx)
-				F_GROUP(file) = st2.st_gid;
-		} else
-			file->mode = save_mode;
-	}
-
 	if (basename_len == 0+1) {
 		if (!pool)
 			unmake_file(file);
@@ -2457,6 +2438,28 @@ int flist_find(struct file_list *flist, struct file_struct *f)
 			high = mid - 1;
 	}
 	return -1;
+}
+
+/* Search for an identically-named item in the file list.  Differs from
+ * flist_find in that an item that agrees with "f" in directory-ness is
+ * preferred but one that does not is still found. */
+int flist_find_ignore_dirness(struct file_list *flist, struct file_struct *f)
+{
+	mode_t save_mode;
+	int ndx;
+
+	/* First look for an item that agrees in directory-ness. */
+	ndx = flist_find(flist, f);
+	if (ndx >= 0)
+		return ndx;
+
+	/* Temporarily flip f->mode to look for an item of opposite
+	 * directory-ness. */
+	save_mode = f->mode;
+	f->mode = S_ISDIR(f->mode) ? S_IFREG : S_IFDIR;
+	ndx = flist_find(flist, f);
+	f->mode = save_mode;
+	return ndx;
 }
 
 /*
