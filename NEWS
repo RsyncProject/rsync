@@ -21,6 +21,8 @@ Changes since 3.0.4:
       destination that had an empty path (e.g. "host:").  Also fixed a problem
       when -s was used when accessing a daemon via a remote-shell.
 
+    - Fixed a potential (hard to trigger) hang when using --remove-source-files.
+
     - Got rid of an annoying delay when accessing a daemon via a remote-shell.
 
     - Properly ignore (superfluous) source args on a --read-batch command.
