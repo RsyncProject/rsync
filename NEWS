@@ -24,6 +24,9 @@ Changes since 3.0.4:
     - Fixed the use of a dot-dir path (e.g. foo/./bar) inside of a --files-from
       file when the root of the transfer isn't the current directory.
 
+    - Fixed a bug with "-K --delete" removing symlinks to directories in when
+      incremental recursion is active.
+
     - Fixed a potential (hard to trigger) hang when using --remove-source-files.
 
     - Got rid of an annoying delay when accessing a daemon via a remote-shell.
