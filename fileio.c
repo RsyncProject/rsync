@@ -48,9 +48,9 @@ int sparse_end(int f)
 }
 
 
-static int write_sparse(int f, char *buf, size_t len)
+static int write_sparse(int f, char *buf, int len)
 {
-	size_t l1 = 0, l2 = 0;
+	int l1 = 0, l2 = 0;
 	int ret;
 
 	for (l1 = 0; l1 < len && buf[l1] == 0; l1++) {}
@@ -108,7 +108,7 @@ int flush_write_file(int f)
  * write_file does not allow incomplete writes.  It loops internally
  * until len bytes are written or errno is set.
  */
-int write_file(int f,char *buf,size_t len)
+int write_file(int f, char *buf, int len)
 {
 	int ret = 0;
 
@@ -125,7 +125,7 @@ int write_file(int f,char *buf,size_t len)
 				if (!wf_writeBuf)
 					out_of_memory("write_file");
 			}
-			r1 = MIN(len, wf_writeBufSize - wf_writeBufCnt);
+			r1 = (int)MIN((size_t)len, wf_writeBufSize - wf_writeBufCnt);
 			if (r1) {
 				memcpy(wf_writeBuf + wf_writeBufCnt, buf, r1);
 				wf_writeBufCnt += r1;
