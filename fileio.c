@@ -28,7 +28,7 @@
 extern int sparse_files;
 
 static char last_byte;
-static size_t sparse_seek = 0;
+static OFF_T sparse_seek = 0;
 
 int sparse_end(int f)
 {
