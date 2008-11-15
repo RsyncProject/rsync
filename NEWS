@@ -21,13 +21,13 @@ Changes since 3.0.4:
       destination that had an empty path (e.g. "host:").  Also fixed a problem
       when -s was used when accessing a daemon via a remote-shell.
 
-    - Fixed the use of a dot-dir path (e.g. foo/./bar) inside of a --files-from
+    - Fixed the use of a dot-dir path (e.g. foo/./bar) inside a --files-from
       file when the root of the transfer isn't the current directory.
 
-    - Fixed a bug with "-K --delete" removing symlinks to directories in when
+    - Fixed a bug with "-K --delete" removing symlinks to directories when
       incremental recursion is active.
 
-    - Fixed a potential (hard to trigger) hang when using --remove-source-files.
+    - Fixed a hard to trigger hang when using --remove-source-files.
 
     - Got rid of an annoying delay when accessing a daemon via a remote-shell.
 
@@ -38,6 +38,16 @@ Changes since 3.0.4:
 
     - Fixed reverse lookups in the compatibility-library version of
       getnameinfo().
+
+    - Fixed a bug when using --sparse on a sparse file that has over 2GB of
+      consecutive sparse data.
+
+    - Got rid of a bunch of "warn_unused_result" compiler warnings.
+
+    - If an ftruncate() on a received file fails, it now causes a partial-
+      transfer warning.
+
+    - Allow a path with a leading "//" to be preserved (CYGWIN only).
 
   ENHANCEMENTS:
 
