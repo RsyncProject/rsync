@@ -134,16 +134,20 @@ configure.sh config.h.in: configure.in aclocal.m4
 	@if diff configure.sh configure.sh.old >/dev/null 2>&1; then \
 	    echo "configure.sh is unchanged."; \
 	    rm configure.sh.old; \
+	else \
+	    echo "configure.sh has CHANGED."; \
 	fi
 	@if diff config.h.in config.h.in.old >/dev/null 2>&1; then \
 	    echo "config.h.in is unchanged."; \
 	    rm config.h.in.old; \
+	else \
+	    echo "config.h.in has CHANGED."; \
 	fi
 	@if test -f configure.sh.old -o -f config.h.in.old; then \
 	    if test "$(MAKECMDGOALS)" = reconfigure; then \
-		echo 'Configure files changed -- continuing with "make reconfigure".'; \
+		echo 'Continuing with "make reconfigure".'; \
 	    else \
-		echo 'Configure files changed -- perhaps run:'; \
+		echo 'You may need to run:'; \
 		echo '  make reconfigure'; \
 		exit 1; \
 	    fi \
