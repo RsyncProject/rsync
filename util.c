@@ -806,7 +806,8 @@ int count_dir_elements(const char *p)
 	return cnt;
 }
 
-/* Turns multiple adjacent slashes into a single slash, drops all leading or
+/* Turns multiple adjacent slashes into a single slash (possible exception:
+ * the preserving of two leading slashes at the start), drops all leading or
  * interior "." elements unless CFN_KEEP_DOT_DIRS is flagged.  Will also drop
  * a trailing '.' after a '/' if CFN_DROP_TRAILING_DOT_DIR is flagged, removes
  * a trailing slash (perhaps after removing the aforementioned dot) unless
@@ -821,9 +822,16 @@ unsigned int clean_fname(char *name, int flags)
 	if (!name)
 		return 0;
 
-	if ((anchored = *f == '/') != 0)
+	if ((anchored = *f == '/') != 0) {
 		*t++ = *f++;
-	else if (flags & CFN_KEEP_DOT_DIRS && *f == '.' && f[1] == '/') {
+#ifdef __CYGWIN__
+		/* If there are exactly 2 slashes at the start, preserve
+		 * them.  Would break daemon excludes unless the paths are
+		 * really treated differently, so used this sparingly. */
+		if (*f == '/' && f[1] != '/')
+			*t++ = *f++;
+#endif
+	} else if (flags & CFN_KEEP_DOT_DIRS && *f == '.' && f[1] == '/') {
 		*t++ = *f++;
 		*t++ = *f++;
 	}
