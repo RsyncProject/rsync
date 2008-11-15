@@ -285,11 +285,10 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 		goto report_write_error;
 
 #ifdef HAVE_FTRUNCATE
-	if (inplace && fd != -1) {
-		if (ftruncate(fd, offset) < 0) {
-			rsyserr(FWARNING, errno, "ftruncate failed on %s",
-				full_fname(fname));
-		}
+	if (inplace && fd != -1
+	 && ftruncate(fd, offset) < 0) {
+		rsyserr(FERROR_XFER, errno, "ftruncate failed on %s",
+			full_fname(fname));
 	}
 #endif
 
