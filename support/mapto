@@ -1,0 +1,5 @@
+#!/usr/bin/perl
+while (<>) {
+    push @_, "$1:$2" if /^(\w+):[^:]+:(\d+)/;
+}
+print join(',', @_), "\n";

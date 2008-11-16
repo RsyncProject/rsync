@@ -24,6 +24,8 @@
  * are special. */
 
 #include "rsync.h"
+#include "ifuncs.h"
+#include "itypes.h"
 #include "io.h"
 
 extern int am_root;
@@ -31,6 +33,8 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_acls;
 extern int numeric_ids;
+extern char *usermap;
+extern char *groupmap;
 
 #ifdef HAVE_GETGROUPS
 # ifndef GETGROUPS_T
@@ -40,6 +44,9 @@ extern int numeric_ids;
 
 #define GID_NONE ((gid_t)-1)
 
+#define NFLAGS_WILD_NAME_MATCH (1<<0)
+#define NFLAGS_NAME_MATCH (1<<1)
+
 struct idlist {
 	struct idlist *next;
 	const char *name;
@@ -47,8 +54,8 @@ struct idlist {
 	uint16 flags;
 };
 
-static struct idlist *uidlist;
-static struct idlist *gidlist;
+static struct idlist *uidlist, *uidmap;
+static struct idlist *gidlist, *gidmap;
 
 static struct idlist *add_to_list(struct idlist **root, id_t id, const char *name,
 				  id_t id2, uint16 flags)
@@ -81,22 +88,6 @@ static const char *gid_to_name(gid_t gid)
 	if (grp)
 		return strdup(grp->gr_name);
 	return NULL;
-}
-
-static uid_t map_uid(uid_t id, const char *name)
-{
-	uid_t uid;
-	if (id != 0 && name_to_uid(name, &uid))
-		return uid;
-	return id;
-}
-
-static gid_t map_gid(gid_t id, const char *name)
-{
-	gid_t gid;
-	if (id != 0 && name_to_gid(name, &gid))
-		return gid;
-	return id;
 }
 
 static int is_in_group(gid_t gid)
@@ -158,34 +149,53 @@ static int is_in_group(gid_t gid)
 #endif
 }
 
-/* Add a uid to the list of uids.  Only called on receiving side. */
-static struct idlist *recv_add_uid(uid_t id, const char *name)
+/* Add a uid/gid to its list of ids.  Only called on receiving side. */
+static struct idlist *recv_add_id(struct idlist **idlist_ptr, struct idlist *idmap,
+				  id_t id, const char *name)
 {
-	uid_t id2 = name ? map_uid(id, name) : id;
 	struct idlist *node;
+	int flag;
+	id_t id2;
 
-	node = add_to_list(&uidlist, id, name, id2, 0);
+	if (!name)
+		name = "";
 
-	if (DEBUG_GTE(OWN, 2)) {
-		rprintf(FINFO, "uid %u(%s) maps to %u\n",
-			(unsigned)id, name ? name : "", (unsigned)id2);
+	for (node = idmap; node; node = node->next) {
+		if (node->flags & NFLAGS_WILD_NAME_MATCH) {
+			if (!wildmatch(node->name, name))
+				continue;
+		} else if (node->flags & NFLAGS_NAME_MATCH) {
+			if (strcmp(node->name, name) != 0)
+				continue;
+		} else if (node->name) {
+			if (id < node->id || id > (unsigned long)node->name)
+				continue;
+		} else {
+			if (node->id != id)
+				continue;
+		}
+		break;
 	}
+	if (node)
+		id2 = node->id2;
+	else if (*name && id) {
+		if (idmap == uidmap) {
+			uid_t uid;
+			id2 = name_to_uid(name, &uid) ? uid : id;
+		} else {
+			gid_t gid;
+			id2 = name_to_gid(name, &gid) ? gid : id;
+		}
+	} else
+		id2 = id;
 
-	return node;
-}
-
-/* Add a gid to the list of gids.  Only called on receiving side. */
-static struct idlist *recv_add_gid(gid_t id, const char *name)
-{
-	gid_t id2 = name ? map_gid(id, name) : id;
-	struct idlist *node;
-
-	node = add_to_list(&gidlist, id, name, id2,
-		!am_root && !is_in_group(id2) ? FLAG_SKIP_GROUP : 0);
+	flag = idmap == gidmap && !am_root && !is_in_group(id2) ? FLAG_SKIP_GROUP : 0;
+	node = add_to_list(idlist_ptr, id, *name ? name : NULL, id2, flag);
 
 	if (DEBUG_GTE(OWN, 2)) {
-		rprintf(FINFO, "gid %u(%s) maps to %u\n",
-			(unsigned)id, name ? name : "", (unsigned)id2);
+		rprintf(FINFO, "%sid %u(%s) maps to %u\n",
+			idmap == uidmap ? "u" : "g",
+			(unsigned)id, name, (unsigned)id2);
 	}
 
 	return node;
@@ -194,11 +204,8 @@ static struct idlist *recv_add_gid(gid_t id, const char *name)
 /* this function is a definate candidate for a faster algorithm */
 uid_t match_uid(uid_t uid)
 {
-	static uid_t last_in, last_out;
+	static uid_t last_in = -1, last_out = -1;
 	struct idlist *list;
-
-	if (uid == 0)
-		return 0;
 
 	if (uid == last_in)
 		return last_out;
@@ -207,10 +214,13 @@ uid_t match_uid(uid_t uid)
 
 	for (list = uidlist; list; list = list->next) {
 		if (list->id == uid)
-			return last_out = list->id2;
+			break;
 	}
 
-	return last_out = uid;
+	if (!list)
+		list = recv_add_id(&uidlist, uidmap, uid, NULL);
+
+	return last_out = list->id2;
 }
 
 gid_t match_gid(gid_t gid, uint16 *flags_ptr)
@@ -226,7 +236,7 @@ gid_t match_gid(gid_t gid, uint16 *flags_ptr)
 				break;
 		}
 		if (!list)
-			list = recv_add_gid(gid, NULL);
+			list = recv_add_id(&gidlist, gidmap, gid, NULL);
 		last = list;
 	}
 
@@ -319,7 +329,7 @@ uid_t recv_user_name(int f, uid_t uid)
 		free(name);
 		name = NULL;
 	}
-	node = recv_add_uid(uid, name); /* node keeps name's memory */
+	node = recv_add_id(&uidlist, uidmap, uid, name); /* node keeps name's memory */
 	return node->id2;
 }
 
@@ -335,7 +345,7 @@ gid_t recv_group_name(int f, gid_t gid, uint16 *flags_ptr)
 		free(name);
 		name = NULL;
 	}
-	node = recv_add_gid(gid, name); /* node keeps name's memory */
+	node = recv_add_id(&gidlist, gidmap, gid, name); /* node keeps name's memory */
 	if (flags_ptr && node->flags & FLAG_SKIP_GROUP)
 		*flags_ptr |= FLAG_SKIP_GROUP;
 	return node->id2;
@@ -362,17 +372,103 @@ void recv_id_list(int f, struct file_list *flist)
 
 	/* Now convert all the uids/gids from sender values to our values. */
 #ifdef SUPPORT_ACLS
-	if (preserve_acls && !numeric_ids)
+	if (preserve_acls && (!numeric_ids || usermap || groupmap))
 		match_acl_ids();
 #endif
-	if (am_root && preserve_uid && !numeric_ids) {
+	if (am_root && preserve_uid && (!numeric_ids || usermap)) {
 		for (i = 0; i < flist->used; i++)
 			F_OWNER(flist->files[i]) = match_uid(F_OWNER(flist->files[i]));
 	}
-	if (preserve_gid && (!am_root || !numeric_ids)) {
+	if (preserve_gid && (!am_root || !numeric_ids || groupmap)) {
 		for (i = 0; i < flist->used; i++) {
 			F_GROUP(flist->files[i]) = match_gid(F_GROUP(flist->files[i]),
 							     &flist->files[i]->flags);
 		}
 	}
+}
+
+void parse_name_map(char *map, BOOL usernames)
+{
+	struct idlist **idmap_ptr = usernames ? &uidmap : &gidmap;
+	struct idlist **idlist_ptr = usernames ? &uidlist : &gidlist;
+	char *colon, *end, *name, *cp = map + strlen(map);
+	id_t id1;
+	uint16 flags;
+
+	/* Parse the list in reverse, so the order in the struct is right. */
+	while (1) {
+		end = cp;
+		while (cp > map && cp[-1] != ',') cp--;
+		if (!(colon = strchr(cp, ':'))) {
+			rprintf(FERROR, "No colon found in --%smap: %s\n",
+				usernames ? "user" : "group", cp);
+			exit_cleanup(RERR_SYNTAX);
+		}
+		if (!colon[1]) {
+			rprintf(FERROR, "No name found after colon --%smap: %s\n",
+				usernames ? "user" : "group", cp);
+			exit_cleanup(RERR_SYNTAX);
+		}
+		*colon = '\0';
+
+		if (isDigit(cp)) {
+			char *dash = strchr(cp, '-');
+			if (strspn(cp, "0123456789-") != (size_t)(colon - cp)
+			 || (dash && (!dash[1] || strchr(dash+1, '-')))) {
+			  bad_number:
+				rprintf(FERROR, "Invalid number in --%smap: %s\n",
+					usernames ? "user" : "group", cp);
+				exit_cleanup(RERR_SYNTAX);
+			}
+			if (dash)
+				name = (char *)atol(dash+1);
+			else
+				name = (char *)0;
+			flags = 0;
+			id1 = atol(cp);
+		} else if (strpbrk(cp, "*[?")) {
+			flags = NFLAGS_WILD_NAME_MATCH;
+			name = cp;
+			id1 = 0;
+		} else {
+			flags = NFLAGS_NAME_MATCH;
+			name = cp;
+			id1 = 0;
+		}
+
+		if (isDigit(colon+1)) {
+			if (strspn(colon+1, "0123456789") != (size_t)(end - colon - 1)) {
+				cp = colon+1;
+				goto bad_number;
+			}
+			add_to_list(idmap_ptr, id1, name, atol(colon+1), flags);
+		} else if (usernames) {
+			uid_t uid;
+			if (name_to_uid(colon+1, &uid))
+				add_to_list(idmap_ptr, id1, name, uid, flags);
+			else {
+				rprintf(FERROR,
+				    "Unknown --usermap name on receiver: %s\n",
+				    colon+1);
+			}
+		} else {
+			gid_t gid;
+			if (name_to_gid(colon+1, &gid))
+				add_to_list(idmap_ptr, id1, name, gid, flags);
+			else {
+				rprintf(FERROR,
+				    "Unknown --groupmap name on receiver: %s\n",
+				    colon+1);
+			}
+		}
+
+		if (cp == map)
+			break;
+
+		*--cp = '\0'; /* replace comma */
+	}
+
+	/* The 0 user/group doesn't get its name sent, so add it explicitly. */
+	recv_add_id(idlist_ptr, *idmap_ptr, 0,
+		    numeric_ids ? NULL : usernames ? uid_to_name(0) : gid_to_name(0));
 }

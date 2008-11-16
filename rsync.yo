@@ -385,6 +385,9 @@ to the detailed description below for a complete description.  verb(
      --delay-updates         put all updated files into place at end
  -m, --prune-empty-dirs      prune empty directory chains from file-list
      --numeric-ids           don't map uid/gid values by user/group name
+     --usermap=STRING        custom username mapping
+     --groupmap=STRING       custom groupname mapping
+     --chown=USER:GROUP      simple username/groupname mapping
      --timeout=SECONDS       set I/O timeout in seconds
      --contimeout=SECONDS    set daemon connection timeout in seconds
  -I, --ignore-times          don't skip files that match size and time
@@ -1715,6 +1718,57 @@ from the source system is used instead.  See also the comments on the
 "use chroot" setting in the rsyncd.conf manpage for information on how
 the chroot setting affects rsync's ability to look up the names of the
 users and groups and what you can do about it.
+
+dit(bf(--usermap=STRING, --groupmap=STRING)) These options allow you to
+specify users and groups that should be mapped to other values by the
+receiving side.  The bf(STRING) is one or more bf(FROM):bf(TO) pairs of
+values separated by commas.  Any matching bf(FROM) value from the sender is
+replaced with a bf(TO) value from the receiver.  You may specify usernames
+or user IDs for the bf(FROM) and bf(TO) values, and the bf(FROM) value may
+also be a wild-card string, which will be matched against the sender's
+names (wild-cards do NOT match against ID numbers, though see below for
+why a '*' matches everything).  You may instead specify a range of ID
+numbers via an inclusive range: LOW-HIGH.  For example:
+
+verb(  --usermap=0-99:nobody,wayne:admin,*:normal --groupmap=usr:1,1:usr)
+
+The first match in the list is the one that is used.  You should specify
+all your user mappings using a single bf(--usermap) option, and/or all
+your group mappings using a single bf(--groupmap) option.
+
+Note that the sender's name for the 0 user and group are not transmitted
+to the receiver, so you should either match these values using a 0, or use
+the names in effect on the receiving side (typically "root").  All other
+bf(FROM) names match those in use on the sending side.  All bf(TO) names
+match those in use on the receiving side.
+
+Any IDs that do not have a name on the sending side are treated as having an
+empty name for the purpose of matching.  This allows them to be matched via
+a "*" or using an empty name.  For instance:
+
+verb(  --usermap=:nobody --groupmap=*:nobody)
+
+When the bf(--numeric-ids) option is used, the sender does not send any
+names, so all the IDs are treated as having an empty name.  This means that
+you will need to specify numeric bf(FROM) values if you want to map these
+nameless IDs to different values.
+
+For the bf(--usermap) option to have any effect, the bf(-o) (bf(--owner))
+option must be used (or implied), and the receiver will need to be running
+as a super-user (see also the bf(--fake-super) option).  For the bf(--groupmap)
+option to have any effect, the bf(-g) (bf(--groups)) option must be used
+(or implied), and the receiver will need to have permissions to set that
+group.
+
+dit(bf(--chown=USER:GROUP)) This option forces all files to be owned by USER
+with group GROUP.  This is a simpler interface than using bf(--usermap) and
+bf(--groupmap) directly, but it is implemented using those options internally,
+so you cannot mix them.  If either the USER or GROUP is empty, no mapping for
+the omitted user/group will occur.  If GROUP is empty, the trailing colon may
+be omitted, but if USER is empty, a leading colon must be supplied.
+
+If you specify "--chown=foo:bar, this is exactly the same as specifying
+"--usermap=*:foo --groupmap=*:bar", only easier.
 
 dit(bf(--timeout=TIMEOUT)) This option allows you to set a maximum I/O
 timeout in seconds. If no data is transferred for the specified time

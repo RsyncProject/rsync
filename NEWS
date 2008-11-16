@@ -26,6 +26,9 @@ Changes since 3.0.4:
       protocol 31), and 3) to follow the file-count, created-count, and
       deleted-count with a break-out list of each count by type.
 
+    - Added the --usermap/--groupmap/--chown options for manipulating file
+      ownership during the copy.
+
     - Added the "%C" escape to the log-output handling, which will output the
       MD5 checksum of any transferred file, or all files if --checksum was
       specified (when protocol 30 or above is in effect).

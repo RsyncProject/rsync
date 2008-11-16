@@ -72,6 +72,7 @@ extern int sender_keeps_checksum;
 extern int unsort_ndx;
 extern struct stats stats;
 extern char *filesfrom_host;
+extern char *usermap, *groupmap;
 
 extern char curr_dir[MAXPATHLEN];
 
@@ -802,7 +803,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 			uid = (uid_t)read_varint(f);
 			if (xflags & XMIT_USER_NAME_FOLLOWS)
 				uid = recv_user_name(f, uid);
-			else if (inc_recurse && am_root && !numeric_ids)
+			else if (inc_recurse && am_root && (!numeric_ids || usermap))
 				uid = match_uid(uid);
 		}
 	}
@@ -814,7 +815,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 			gid_flags = 0;
 			if (xflags & XMIT_GROUP_NAME_FOLLOWS)
 				gid = recv_group_name(f, gid, &gid_flags);
-			else if (inc_recurse && (!am_root || !numeric_ids))
+			else if (inc_recurse && (!am_root || !numeric_ids || groupmap))
 				gid = match_gid(gid, &gid_flags);
 		}
 	}
@@ -2303,6 +2304,10 @@ struct file_list *recv_file_list(int f)
 		else if (inc_recurse && INFO_GTE(FLIST, 1) && !am_server)
 			rprintf(FCLIENT, "receiving incremental file list\n");
 		rprintf(FLOG, "receiving file list\n");
+		if (usermap)
+			parse_name_map(usermap, True);
+		if (groupmap)
+			parse_name_map(groupmap, False);
 	}
 
 	start_read = stats.total_read;

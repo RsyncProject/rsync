@@ -167,6 +167,8 @@ char *rsync_path = RSYNC_PATH;
 char *backup_dir = NULL;
 char backup_dir_buf[MAXPATHLEN];
 char *sockopts = NULL;
+char *usermap = NULL;
+char *groupmap = NULL;
 int rsync_port = 0;
 int compare_dest = 0;
 int copy_dest = 0;
@@ -296,6 +298,7 @@ static int refused_delete, refused_archive_part, refused_compress;
 static int refused_partial, refused_progress, refused_delete_before;
 static int refused_delete_during;
 static int refused_inplace, refused_no_iconv;
+static BOOL usermap_via_chown, groupmap_via_chown;
 static char *max_size_arg, *min_size_arg;
 static char tmp_partialdir[] = ".~tmp~";
 
@@ -725,6 +728,9 @@ void usage(enum logcode F)
   rprintf(F,"     --delay-updates         put all updated files into place at transfer's end\n");
   rprintf(F," -m, --prune-empty-dirs      prune empty directory chains from the file-list\n");
   rprintf(F,"     --numeric-ids           don't map uid/gid values by user/group name\n");
+  rprintf(F,"     --usermap=STRING        custom username mapping\n");
+  rprintf(F,"     --groupmap=STRING       custom groupname mapping\n");
+  rprintf(F,"     --chown=USER:GROUP      simple username/groupname mapping\n");
   rprintf(F,"     --timeout=SECONDS       set I/O timeout in seconds\n");
   rprintf(F,"     --contimeout=SECONDS    set daemon connection timeout in seconds\n");
   rprintf(F," -I, --ignore-times          don't skip files that match in size and mod-time\n");
@@ -789,6 +795,7 @@ enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW, OPT_MIN_SIZE, OPT_CHMOD,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_MAX_SIZE,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG,
+      OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN,
       OPT_SERVER, OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -969,6 +976,9 @@ static struct poptOption long_options[] = {
   {"no-s",             0,  POPT_ARG_VAL,    &protect_args, 0, 0, 0},
   {"numeric-ids",      0,  POPT_ARG_VAL,    &numeric_ids, 1, 0, 0 },
   {"no-numeric-ids",   0,  POPT_ARG_VAL,    &numeric_ids, 0, 0, 0 },
+  {"usermap",          0,  POPT_ARG_STRING, 0, OPT_USERMAP, 0, 0 },
+  {"groupmap",         0,  POPT_ARG_STRING, 0, OPT_GROUPMAP, 0, 0 },
+  {"chown",            0,  POPT_ARG_STRING, 0, OPT_CHOWN, 0, 0 },
   {"timeout",          0,  POPT_ARG_INT,    &io_timeout, 0, 0, 0 },
   {"no-timeout",       0,  POPT_ARG_VAL,    &io_timeout, 0, 0, 0 },
   {"contimeout",       0,  POPT_ARG_INT,    &connect_timeout, 0, 0, 0 },
@@ -1624,6 +1634,76 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			arg = poptGetOptArg(pc);
 			parse_output_words(debug_words, debug_levels, arg, USER_PRIORITY);
 			break;
+
+		case OPT_USERMAP:
+			if (usermap) {
+				if (usermap_via_chown) {
+					snprintf(err_buf, sizeof err_buf,
+					    "--usermap conflicts with prior --chown.\n");
+					return 0;
+				}
+				snprintf(err_buf, sizeof err_buf,
+				    "You can only specify --usermap once.\n");
+				return 0;
+			}
+			usermap = (char *)poptGetOptArg(pc);
+			usermap_via_chown = False;
+			break;
+
+		case OPT_GROUPMAP:
+			if (groupmap) {
+				if (groupmap_via_chown) {
+					snprintf(err_buf, sizeof err_buf,
+					    "--groupmap conflicts with prior --chown.\n");
+					return 0;
+				}
+				snprintf(err_buf, sizeof err_buf,
+				    "You can only specify --groupmap once.\n");
+				return 0;
+			}
+			groupmap = (char *)poptGetOptArg(pc);
+			groupmap_via_chown = False;
+			break;
+
+		case OPT_CHOWN: {
+			const char *chown = poptGetOptArg(pc);
+			int len;
+			if ((arg = strchr(chown, ':')) != NULL)
+				len = arg++ - chown;
+			else
+				len = strlen(chown);
+			if (len) {
+				if (usermap) {
+					if (!usermap_via_chown) {
+						snprintf(err_buf, sizeof err_buf,
+						    "--chown conflicts with prior --usermap.\n");
+						return 0;
+					}
+					snprintf(err_buf, sizeof err_buf,
+					    "You can only specify a user-affecting --chown once.\n");
+					return 0;
+				}
+				if (asprintf(&usermap, "*:%.*s", len, chown) < 0)
+					out_of_memory("parse_arguments");
+				usermap_via_chown = True;
+			}
+			if (arg && *arg) {
+				if (groupmap) {
+					if (!groupmap_via_chown) {
+						snprintf(err_buf, sizeof err_buf,
+						    "--chown conflicts with prior --groupmap.\n");
+						return 0;
+					}
+					snprintf(err_buf, sizeof err_buf,
+					    "You can only specify a group-affecting --chown once.\n");
+					return 0;
+				}
+				if (asprintf(&groupmap, "*:%s", arg) < 0)
+					out_of_memory("parse_arguments");
+				groupmap_via_chown = True;
+			}
+			break;
+		}
 
 		case OPT_HELP:
 			usage(FINFO);
@@ -2435,6 +2515,18 @@ void server_options(char **args, int *argc_p)
 		args[ac++] = "--use-qsort";
 
 	if (am_sender) {
+		if (usermap) {
+			if (asprintf(&arg, "--usermap=%s", usermap) < 0)
+				goto oom;
+			args[ac++] = arg;
+		}
+
+		if (groupmap) {
+			if (asprintf(&arg, "--groupmap=%s", groupmap) < 0)
+				goto oom;
+			args[ac++] = arg;
+		}
+
 		if (ignore_existing)
 			args[ac++] = "--ignore-existing";
 
