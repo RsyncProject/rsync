@@ -38,6 +38,10 @@ Changes since 3.0.4:
     - Added an "instant-rsyncd" script to the support directory, which makes
       it easy to configure a simple rsync daemon in the current directory.
 
+    - Added the "mapfrom" and "mapto" scripts to the support directory, which
+      makes it easier to do user/group mapping in a local transfer based on
+      passwd/group files from another machine.
+
   DEVELOPER RELATED:
 
     - Added more conditional debug output.
