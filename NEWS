@@ -42,6 +42,9 @@ Changes since 3.0.4:
     - Fixed a bug when using --sparse on a sparse file that has over 2GB of
       consecutive sparse data.
 
+    - Fixed a problem with --delete-delay reporting an error when it was ready
+      to remove a directory that was now gone.
+
     - Got rid of a bunch of "warn_unused_result" compiler warnings.
 
     - If an ftruncate() on a received file fails, it now causes a partial-
