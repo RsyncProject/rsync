@@ -1639,6 +1639,8 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 	assert(flist != NULL);
 
 	if (!(d = opendir(fbuf))) {
+		if (errno == ENOENT)
+			return;
 		io_error |= IOERR_GENERAL;
 		rsyserr(FERROR_XFER, errno, "opendir %s failed", full_fname(fbuf));
 		return;
