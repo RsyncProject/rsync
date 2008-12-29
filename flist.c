@@ -2246,6 +2246,7 @@ struct file_list *recv_file_list(int f)
 	struct file_list *flist;
 	int dstart, flags;
 	int64 start_read;
+	int save_verbose = verbose;
 
 	if (!first_flist)
 		rprintf(FLOG, "receiving file list\n");
@@ -2272,6 +2273,8 @@ struct file_list *recv_file_list(int f)
 		dstart = 0;
 	}
 
+	if (am_server && verbose > 2)
+		verbose = 2;
 	while ((flags = read_byte(f)) != 0) {
 		struct file_struct *file;
 
@@ -2296,6 +2299,7 @@ struct file_list *recv_file_list(int f)
 		}
 	}
 	file_total += flist->used;
+	verbose = save_verbose;
 
 	if (verbose > 2)
 		rprintf(FINFO, "received %d names\n", flist->used);
