@@ -240,6 +240,22 @@ enum msgcode {
 #define NDX_FLIST_EOF -2
 #define NDX_FLIST_OFFSET -101
 
+/* For calling delete_item() and delete_dir_contents(). */
+#define DEL_NO_UID_WRITE 	(1<<0) /* file/dir has our uid w/o write perm */
+#define DEL_RECURSE		(1<<1) /* if dir, delete all contents */
+#define DEL_DIR_IS_EMPTY	(1<<2) /* internal delete_FUNCTIONS use only */
+#define DEL_FOR_FILE		(1<<3) /* making room for a replacement file */
+#define DEL_FOR_DIR		(1<<4) /* making room for a replacement dir */
+#define DEL_FOR_SYMLINK 	(1<<5) /* making room for a replacement symlink */
+#define DEL_FOR_DEVICE		(1<<6) /* making room for a replacement device */
+#define DEL_FOR_SPECIAL 	(1<<7) /* making room for a replacement special */
+
+#define DEL_MAKE_ROOM (DEL_FOR_FILE|DEL_FOR_DIR|DEL_FOR_SYMLINK|DEL_FOR_DEVICE|DEL_FOR_SPECIAL)
+
+enum delret {
+	DR_SUCCESS = 0, DR_FAILURE, DR_AT_LIMIT, DR_NOT_EMPTY
+};
+
 #include "errcode.h"
 
 #include "config.h"

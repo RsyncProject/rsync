@@ -89,23 +89,18 @@ extern int unsort_ndx;
 extern int max_delete;
 extern int force_delete;
 extern int one_file_system;
+extern int skipped_deletes;
 extern struct stats stats;
 extern dev_t filesystem_dev;
 extern mode_t orig_umask;
 extern uid_t our_uid;
-extern char *backup_dir;
-extern char *backup_suffix;
-extern int backup_suffix_len;
 extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern struct filter_list_struct daemon_filter_list;
 
-int ignore_perishable = 0;
-int non_perishable_cnt = 0;
 int maybe_ATTRS_REPORT = 0;
 
 static dev_t dev_zero;
-static int skipped_deletes = 0;
 static int deldelay_size = 0, deldelay_cnt = 0;
 static char *deldelay_buf = NULL;
 static int deldelay_fd = -1;
@@ -116,222 +111,15 @@ static int need_retouch_dir_times;
 static int need_retouch_dir_perms;
 static const char *solo_file = NULL;
 
-/* For calling delete_item() and delete_dir_contents(). */
-#define DEL_NO_UID_WRITE 	(1<<0) /* file/dir has our uid w/o write perm */
-#define DEL_RECURSE		(1<<1) /* if dir, delete all contents */
-#define DEL_DIR_IS_EMPTY	(1<<2) /* internal delete_FUNCTIONS use only */
-#define DEL_FOR_FILE		(1<<3) /* making room for a replacement file */
-#define DEL_FOR_DIR		(1<<4) /* making room for a replacement dir */
-#define DEL_FOR_SYMLINK 	(1<<5) /* making room for a replacement symlink */
-#define DEL_FOR_DEVICE		(1<<6) /* making room for a replacement device */
-#define DEL_FOR_SPECIAL 	(1<<7) /* making room for a replacement special */
-
-#define DEL_MAKE_ROOM (DEL_FOR_FILE|DEL_FOR_DIR|DEL_FOR_SYMLINK|DEL_FOR_DEVICE|DEL_FOR_SPECIAL)
-
 enum nonregtype {
     TYPE_DIR, TYPE_SPECIAL, TYPE_DEVICE, TYPE_SYMLINK
 };
 
-enum delret {
-    DR_SUCCESS = 0, DR_FAILURE, DR_AT_LIMIT, DR_NOT_EMPTY
-};
-
 /* Forward declarations. */
-static enum delret delete_dir_contents(char *fname, uint16 flags);
 #ifdef SUPPORT_HARD_LINKS
 static void handle_skipped_hlink(struct file_struct *file, int itemizing,
 				 enum logcode code, int f_out);
 #endif
-
-static int is_backup_file(char *fn)
-{
-	int k = strlen(fn) - backup_suffix_len;
-	return k > 0 && strcmp(fn+k, backup_suffix) == 0;
-}
-
-/* Delete a file or directory.  If DEL_RECURSE is set in the flags, this will
- * delete recursively.
- *
- * Note that fbuf must point to a MAXPATHLEN buffer if the mode indicates it's
- * a directory! (The buffer is used for recursion, but returned unchanged.)
- */
-static enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
-{
-	enum delret ret;
-	char *what;
-	int ok;
-
-	if (DEBUG_GTE(DEL, 2)) {
-		rprintf(FINFO, "delete_item(%s) mode=%o flags=%d\n",
-			fbuf, (int)mode, (int)flags);
-	}
-
-	if (flags & DEL_NO_UID_WRITE)
-		do_chmod(fbuf, mode | S_IWUSR);
-
-	if (S_ISDIR(mode) && !(flags & DEL_DIR_IS_EMPTY)) {
-		int save_uid_ndx = uid_ndx;
-		/* This only happens on the first call to delete_item() since
-		 * delete_dir_contents() always calls us w/DEL_DIR_IS_EMPTY. */
-		if (!uid_ndx)
-			uid_ndx = ++file_extra_cnt;
-		ignore_perishable = 1;
-		/* If DEL_RECURSE is not set, this just reports emptiness. */
-		ret = delete_dir_contents(fbuf, flags);
-		ignore_perishable = 0;
-		if (!save_uid_ndx) {
-			--file_extra_cnt;
-			uid_ndx = 0;
-		}
-		if (ret == DR_NOT_EMPTY || ret == DR_AT_LIMIT)
-			goto check_ret;
-		/* OK: try to delete the directory. */
-	}
-
-	if (!(flags & DEL_MAKE_ROOM) && max_delete >= 0 && stats.deleted_files >= max_delete) {
-		skipped_deletes++;
-		return DR_AT_LIMIT;
-	}
-
-	if (S_ISDIR(mode)) {
-		what = "rmdir";
-		ok = do_rmdir(fbuf) == 0;
-	} else if (make_backups > 0 && (backup_dir || !is_backup_file(fbuf))) {
-		what = "make_backup";
-		ok = make_backup(fbuf);
-	} else {
-		what = "unlink";
-		ok = robust_unlink(fbuf) == 0;
-	}
-
-	if (ok) {
-		if (!(flags & DEL_MAKE_ROOM)) {
-			log_delete(fbuf, mode);
-			stats.deleted_files++;
-			if (S_ISREG(mode)) {
-				/* Nothing more to count */
-			} else if (S_ISDIR(mode))
-				stats.deleted_dirs++;
-#ifdef SUPPORT_LINKS
-			else if (S_ISLNK(mode))
-				stats.deleted_symlinks++;
-#endif
-			else if (IS_DEVICE(mode))
-				stats.deleted_symlinks++;
-			else
-				stats.deleted_specials++;
-		}
-		ret = DR_SUCCESS;
-	} else {
-		if (S_ISDIR(mode) && errno == ENOTEMPTY) {
-			rprintf(FINFO, "cannot delete non-empty directory: %s\n",
-				fbuf);
-			ret = DR_NOT_EMPTY;
-		} else if (errno != ENOENT) {
-			rsyserr(FERROR, errno, "delete_file: %s(%s) failed",
-				what, fbuf);
-			ret = DR_FAILURE;
-		} else
-			ret = DR_SUCCESS;
-	}
-
-  check_ret:
-	if (ret != DR_SUCCESS && flags & DEL_MAKE_ROOM) {
-		const char *desc;
-		switch (flags & DEL_MAKE_ROOM) {
-		case DEL_FOR_FILE: desc = "regular file"; break;
-		case DEL_FOR_DIR: desc = "directory"; break;
-		case DEL_FOR_SYMLINK: desc = "symlink"; break;
-		case DEL_FOR_DEVICE: desc = "device file"; break;
-		case DEL_FOR_SPECIAL: desc = "special file"; break;
-		default: exit_cleanup(RERR_UNSUPPORTED); /* IMPOSSIBLE */
-		}
-		rprintf(FERROR_XFER, "could not make way for new %s: %s\n",
-			desc, fbuf);
-	}
-	return ret;
-}
-
-/* The directory is about to be deleted: if DEL_RECURSE is given, delete all
- * its contents, otherwise just checks for content.  Returns DR_SUCCESS or
- * DR_NOT_EMPTY.  Note that fname must point to a MAXPATHLEN buffer!  (The
- * buffer is used for recursion, but returned unchanged.)
- */
-static enum delret delete_dir_contents(char *fname, uint16 flags)
-{
-	struct file_list *dirlist;
-	enum delret ret;
-	unsigned remainder;
-	void *save_filters;
-	int j, dlen;
-	char *p;
-
-	if (DEBUG_GTE(DEL, 3)) {
-		rprintf(FINFO, "delete_dir_contents(%s) flags=%d\n",
-			fname, flags);
-	}
-
-	dlen = strlen(fname);
-	save_filters = push_local_filters(fname, dlen);
-
-	non_perishable_cnt = 0;
-	dirlist = get_dirlist(fname, dlen, 0);
-	ret = non_perishable_cnt ? DR_NOT_EMPTY : DR_SUCCESS;
-
-	if (!dirlist->used)
-		goto done;
-
-	if (!(flags & DEL_RECURSE)) {
-		ret = DR_NOT_EMPTY;
-		goto done;
-	}
-
-	p = fname + dlen;
-	if (dlen != 1 || *fname != '/')
-		*p++ = '/';
-	remainder = MAXPATHLEN - (p - fname);
-
-	/* We do our own recursion, so make delete_item() non-recursive. */
-	flags = (flags & ~(DEL_RECURSE|DEL_MAKE_ROOM|DEL_NO_UID_WRITE))
-	      | DEL_DIR_IS_EMPTY;
-
-	for (j = dirlist->used; j--; ) {
-		struct file_struct *fp = dirlist->files[j];
-
-		if (fp->flags & FLAG_MOUNT_DIR && S_ISDIR(fp->mode)) {
-			if (DEBUG_GTE(DEL, 1)) {
-				rprintf(FINFO,
-				    "mount point, %s, pins parent directory\n",
-				    f_name(fp, NULL));
-			}
-			ret = DR_NOT_EMPTY;
-			continue;
-		}
-
-		strlcpy(p, fp->basename, remainder);
-		if (!(fp->mode & S_IWUSR) && !am_root && (uid_t)F_OWNER(fp) == our_uid)
-			do_chmod(fname, fp->mode | S_IWUSR);
-		/* Save stack by recursing to ourself directly. */
-		if (S_ISDIR(fp->mode)) {
-			if (delete_dir_contents(fname, flags | DEL_RECURSE) != DR_SUCCESS)
-				ret = DR_NOT_EMPTY;
-		}
-		if (delete_item(fname, fp->mode, flags) != DR_SUCCESS)
-			ret = DR_NOT_EMPTY;
-	}
-
-	fname[dlen] = '\0';
-
-  done:
-	flist_free(dirlist);
-	pop_local_filters(save_filters);
-
-	if (ret == DR_NOT_EMPTY) {
-		rprintf(FINFO, "cannot delete non-empty directory: %s\n",
-			fname);
-	}
-	return ret;
-}
 
 static int start_delete_delay_temp(void)
 {
