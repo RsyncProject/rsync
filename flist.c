@@ -1378,6 +1378,7 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 #endif
 #if defined SUPPORT_ACLS || defined SUPPORT_XATTRS
 		stat_x sx;
+		init_stat_x(&sx);
 #endif
 
 #ifdef SUPPORT_LINKS
@@ -1441,7 +1442,6 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 #ifdef SUPPORT_ACLS
 		if (preserve_acls && !S_ISLNK(file->mode)) {
 			sx.st.st_mode = file->mode;
-			sx.acc_acl = sx.def_acl = NULL;
 			if (get_acl(fname, &sx) < 0) {
 				io_error |= IOERR_GENERAL;
 				return NULL;
@@ -1450,7 +1450,6 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 #endif
 #ifdef SUPPORT_XATTRS
 		if (preserve_xattrs) {
-			sx.xattr = NULL;
 			if (get_xattr(fname, &sx) < 0) {
 				io_error |= IOERR_GENERAL;
 				return NULL;

@@ -395,12 +395,7 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 				full_fname(fname));
 			return 0;
 		}
-#ifdef SUPPORT_ACLS
-		sx2.acc_acl = sx2.def_acl = NULL;
-#endif
-#ifdef SUPPORT_XATTRS
-		sx2.xattr = NULL;
-#endif
+		init_stat_x(&sx2);
 		sxp = &sx2;
 		inherit = !preserve_perms;
 	} else

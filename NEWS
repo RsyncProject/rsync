@@ -51,3 +51,5 @@ Changes since 3.0.4:
 
     - The pool_alloc library has received some minor improvements in alignment
       handling.
+
+    - Added init_stat_x() function to avoid duplication of acl/xattr init code.

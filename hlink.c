@@ -22,6 +22,7 @@
 
 #include "rsync.h"
 #include "inums.h"
+#include "ifuncs.h"
 
 extern int dry_run;
 extern int list_only;
@@ -393,12 +394,7 @@ int hard_link_check(struct file_struct *file, int ndx, const char *fname,
 		char cmpbuf[MAXPATHLEN];
 		stat_x alt_sx;
 		int j = 0;
-#ifdef SUPPORT_ACLS
-		alt_sx.acc_acl = alt_sx.def_acl = NULL;
-#endif
-#ifdef SUPPORT_XATTRS
-		alt_sx.xattr = NULL;
-#endif
+		init_stat_x(&alt_sx);
 		do {
 			pathjoin(cmpbuf, MAXPATHLEN, basis_dir[j], fname);
 			if (link_stat(cmpbuf, &alt_sx.st, 0) < 0)
@@ -521,12 +517,7 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 	} else
 		our_name = fname;
 
-#ifdef SUPPORT_ACLS
-	prev_sx.acc_acl = prev_sx.def_acl = NULL;
-#endif
-#ifdef SUPPORT_XATTRS
-	prev_sx.xattr = NULL;
-#endif
+	init_stat_x(&prev_sx);
 
 	while ((ndx = prev_ndx) >= 0) {
 		int val;

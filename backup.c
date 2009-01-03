@@ -19,6 +19,7 @@
  */
 
 #include "rsync.h"
+#include "ifuncs.h"
 
 extern int am_root;
 extern int preserve_acls;
@@ -131,17 +132,12 @@ int make_bak_dir(const char *fullpath)
 		if (p >= rel) {
 			/* Try to transfer the directory settings of the
 			 * actual dir that the files are coming from. */
+			init_stat_x(&sx);
 			if (x_stat(rel, &sx.st, NULL) < 0) {
 				rsyserr(FERROR, errno,
 					"make_bak_dir stat %s failed",
 					full_fname(rel));
 			} else {
-#ifdef SUPPORT_ACLS
-				sx.acc_acl = sx.def_acl = NULL;
-#endif
-#ifdef SUPPORT_XATTRS
-				sx.xattr = NULL;
-#endif
 				if (!(file = make_file(rel, NULL, NULL, 0, NO_FILTERS)))
 					continue;
 #ifdef SUPPORT_ACLS
@@ -207,15 +203,10 @@ static int keep_backup(const char *fname)
 	int kept = 0;
 	int ret_code;
 
-	/* return if no file to keep */
+	init_stat_x(&sx);
+	/* Return success if no file to keep. */
 	if (x_lstat(fname, &sx.st, NULL) < 0)
 		return 1;
-#ifdef SUPPORT_ACLS
-	sx.acc_acl = sx.def_acl = NULL;
-#endif
-#ifdef SUPPORT_XATTRS
-	sx.xattr = NULL;
-#endif
 
 	if (!(file = make_file(fname, NULL, NULL, 0, NO_FILTERS)))
 		return 1; /* the file could have disappeared */

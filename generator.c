@@ -22,6 +22,7 @@
 
 #include "rsync.h"
 #include "inums.h"
+#include "ifuncs.h"
 
 extern int dry_run;
 extern int do_xfers;
@@ -1333,12 +1334,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 	}
 
-#ifdef SUPPORT_ACLS
-	sx.acc_acl = sx.def_acl = NULL;
-#endif
-#ifdef SUPPORT_XATTRS
-	sx.xattr = NULL;
-#endif
+	init_stat_x(&sx);
 	if (dry_run > 1 || (dry_missing_dir && is_below(file, dry_missing_dir))) {
 	  parent_is_dry_missing:
 		if (fuzzy_dirlist) {
