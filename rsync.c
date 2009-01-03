@@ -561,9 +561,10 @@ int finish_transfer(const char *fname, const char *fnametmp,
 	}
 
 	if (make_backups > 0 && overwriting_basis) {
-		if (!make_backup(fname))
+		int ok = make_backup(fname, False);
+		if (!ok)
 			return 1;
-		if (fnamecmp == fname)
+		if (ok == 1 && fnamecmp == fname)
 			fnamecmp = get_backup_name(fname);
 	}
 

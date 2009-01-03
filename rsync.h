@@ -249,6 +249,7 @@ enum msgcode {
 #define DEL_FOR_SYMLINK 	(1<<5) /* making room for a replacement symlink */
 #define DEL_FOR_DEVICE		(1<<6) /* making room for a replacement device */
 #define DEL_FOR_SPECIAL 	(1<<7) /* making room for a replacement special */
+#define DEL_FOR_BACKUP	 	(1<<8) /* the delete is for a backup operation */
 
 #define DEL_MAKE_ROOM (DEL_FOR_FILE|DEL_FOR_DIR|DEL_FOR_SYMLINK|DEL_FOR_DEVICE|DEL_FOR_SPECIAL)
 

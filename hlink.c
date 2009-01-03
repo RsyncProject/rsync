@@ -217,6 +217,7 @@ static int maybe_hard_link(struct file_struct *file, int ndx,
 			   const char *realname, int itemizing, enum logcode code)
 {
 	if (statret == 0) {
+		int ok = 0;
 		if (sxp->st.st_dev == old_stp->st_dev
 		 && sxp->st.st_ino == old_stp->st_ino) {
 			if (itemizing) {
@@ -229,10 +230,9 @@ static int maybe_hard_link(struct file_struct *file, int ndx,
 			file->flags |= FLAG_HLINK_DONE;
 			return 0;
 		}
-		if (make_backups > 0) {
-			if (!make_backup(fname))
-				return -1;
-		} else if (robust_unlink(fname)) {
+		if (make_backups > 0 && (ok = make_backup(fname, True)) == 0)
+			return -1;
+		if (ok != 1 && robust_unlink(fname) && errno != ENOENT) {
 			rsyserr(FERROR_XFER, errno, "unlink %s failed",
 				full_fname(fname));
 			return -1;

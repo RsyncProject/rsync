@@ -11,7 +11,7 @@
 
 bakdir="$tmpdir/bak"
 
-makepath "$fromdir/deep" "$bakdir"
+makepath "$fromdir/deep" "$bakdir/dname"
 name1="$fromdir/deep/name1"
 name2="$fromdir/deep/name2"
 
@@ -20,13 +20,13 @@ outfile="$scratchdir/rsync.out"
 cat "$srcdir"/[gr]*.[ch] > "$name1"
 cat "$srcdir"/[et]*.[ch] > "$name2"
 
-checkit "$RSYNC -avv '$fromdir/' '$todir/'" "$fromdir" "$todir"
+checkit "$RSYNC -ai --info=backup '$fromdir/' '$todir/'" "$fromdir" "$todir"
 
-checkit "$RSYNC -avv '$fromdir/' '$chkdir/'" "$fromdir" "$chkdir"
+checkit "$RSYNC -ai --info=backup '$fromdir/' '$chkdir/'" "$fromdir" "$chkdir"
 cat "$srcdir"/[fgpr]*.[ch] > "$name1"
 cat "$srcdir"/[etw]*.[ch] > "$name2"
 
-$RSYNC -avv --no-whole-file --backup "$fromdir/" "$todir/" \
+$RSYNC -ai --info=backup --no-whole-file --backup "$fromdir/" "$todir/" \
     | tee "$outfile"
 for fn in deep/name1 deep/name2; do
     grep "backed up $fn to $fn~" "$outfile" >/dev/null || test_fail "no backup message output for $fn"
@@ -38,7 +38,7 @@ done
 echo deleted-file >"$todir/dname"
 cp_touch "$todir/dname" "$chkdir"
 
-checkit "$RSYNC -avv --no-whole-file --delete-delay \
+checkit "$RSYNC -ai --info=backup --no-whole-file --delete-delay \
     --backup --backup-dir='$bakdir' '$fromdir/' '$todir/'" "$fromdir" "$todir" \
     | tee "$outfile"
 
@@ -48,11 +48,11 @@ done
 diff -r $diffopt "$chkdir" "$bakdir" || test_fail "backup dir contents are bogus"
 rm "$bakdir/dname"
 
-checkit "$RSYNC -avv --del '$fromdir/' '$chkdir/'" "$fromdir" "$chkdir"
+checkit "$RSYNC -ai --info=backup --del '$fromdir/' '$chkdir/'" "$fromdir" "$chkdir"
 cat "$srcdir"/[efgr]*.[ch] > "$name1"
 cat "$srcdir"/[ew]*.[ch] > "$name2"
 
-checkit "$RSYNC -avv --inplace --no-whole-file --backup --backup-dir='$bakdir' '$fromdir/' '$todir/'" "$fromdir" "$todir" \
+checkit "$RSYNC -ai --info=backup --inplace --no-whole-file --backup --backup-dir='$bakdir' '$fromdir/' '$todir/'" "$fromdir" "$todir" \
     | tee "$outfile"
 
 for fn in deep/name1 deep/name2; do
@@ -60,7 +60,7 @@ for fn in deep/name1 deep/name2; do
 done
 diff -r $diffopt "$chkdir" "$bakdir" || test_fail "backup dir contents are bogus"
 
-checkit "$RSYNC -avv --inplace --no-whole-file '$fromdir/' '$bakdir/'" "$fromdir" "$bakdir"
+checkit "$RSYNC -ai --info=backup --inplace --no-whole-file '$fromdir/' '$bakdir/'" "$fromdir" "$bakdir"
 
 # The script would have aborted on error, so getting here means we've won.
 exit 0

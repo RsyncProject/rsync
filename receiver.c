@@ -331,7 +331,7 @@ static void handle_delayed_updates(char *local_name)
 		struct file_struct *file = cur_flist->files[ndx];
 		fname = local_name ? local_name : f_name(file, NULL);
 		if ((partialptr = partial_dir_fname(fname)) != NULL) {
-			if (make_backups > 0 && !make_backup(fname))
+			if (make_backups > 0 && !make_backup(fname, False))
 				continue;
 			if (DEBUG_GTE(RECV, 1)) {
 				rprintf(FINFO, "renaming %s to %s\n",

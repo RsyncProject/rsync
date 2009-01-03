@@ -169,12 +169,18 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 	if (S_ISDIR(mode)) {
 		what = "rmdir";
 		ok = do_rmdir(fbuf) == 0;
-	} else if (make_backups > 0 && (backup_dir || !is_backup_file(fbuf))) {
-		what = "make_backup";
-		ok = make_backup(fbuf);
 	} else {
-		what = "unlink";
-		ok = robust_unlink(fbuf) == 0;
+		if (make_backups > 0 && (backup_dir || !is_backup_file(fbuf))) {
+			what = "make_backup";
+			ok = make_backup(fbuf, True);
+			if (ok == 2) {
+				what = "unlink";
+				ok = robust_unlink(fbuf) == 0;
+			}
+		} else {
+			what = "unlink";
+			ok = robust_unlink(fbuf) == 0;
+		}
 	}
 
 	if (ok) {
@@ -219,8 +225,24 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 		case DEL_FOR_SPECIAL: desc = "special file"; break;
 		default: exit_cleanup(RERR_UNSUPPORTED); /* IMPOSSIBLE */
 		}
-		rprintf(FERROR_XFER, "could not make way for new %s: %s\n",
+		rprintf(FERROR_XFER, "could not make way for %s %s: %s\n",
+			flags & DEL_FOR_BACKUP ? "backup" : "new",
 			desc, fbuf);
 	}
 	return ret;
+}
+
+uint16 get_del_for_flag(uint16 mode)
+{
+	if (S_ISREG(mode))
+		return DEL_FOR_FILE;
+	if (S_ISDIR(mode))
+		return DEL_FOR_DIR;
+	if (S_ISLNK(mode))
+		return DEL_FOR_SYMLINK;
+	if (IS_DEVICE(mode))
+		return DEL_FOR_DEVICE;
+	if (IS_SPECIAL(mode))
+		return DEL_FOR_SPECIAL;
+	exit_cleanup(RERR_UNSUPPORTED); /* IMPOSSIBLE */
 }
