@@ -13,7 +13,7 @@ AC_DEFINE_UNQUOTED(RSYNC_VERSION, ["$RSYNC_VERSION"], [rsync release version])
 
 LDFLAGS=${LDFLAGS-""}
 
-AC_CANONICAL_TARGET([])
+AC_CANONICAL_HOST
 
 dnl Checks for programs.
 AC_PROG_CC
@@ -762,7 +762,7 @@ rsync_cv_HAVE_SECURE_MKSTEMP=yes,
 rsync_cv_HAVE_SECURE_MKSTEMP=no,
 rsync_cv_HAVE_SECURE_MKSTEMP=cross)])
 if test x"$rsync_cv_HAVE_SECURE_MKSTEMP" = x"yes"; then
-    case $target_os in
+    case $host_os in
     hpux*)
 	dnl HP-UX has a broken mkstemp() implementation they refuse to fix,
 	dnl so we noisily skip using it.  See HP change request JAGaf34426
