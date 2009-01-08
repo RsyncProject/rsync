@@ -174,10 +174,10 @@ while ($command =~ /((?:[^\s\\]+|\\.[^\s\\]*)+)/g) {
   } else {
     if ($subdir ne '/') {
       # Validate args to ensure they don't try to leave our restricted dir.
-      s#//+#/#g;
-      s#^/##;
-      s#^$#.#;
-      die "Do not use .. in any path!\n" if m#(^|/)\\?\.\\?\.(\\?/|$)#;
+      s{//+}{/}g;
+      s{^/}{};
+      s{^$}{.};
+      die "$0: do not use .. in any path!\n" if m{(^|/)\\?\.\\?\.(\\?/|$)};
     }
     push(@args, bsd_glob($_, GLOB_LIMIT|GLOB_NOCHECK|GLOB_BRACE|GLOB_QUOTE));
   }
@@ -204,10 +204,10 @@ sub check_arg
   my($opt, $arg, $type) = @_;
   $arg =~ s/\\(.)/$1/g;
   if ($subdir ne '/' && ($type == 3 || ($type == 2 && !$am_sender))) {
-    $arg =~ s#//#/#g;
+    $arg =~ s{//}{/}g;
     die "Do not use .. in --$opt; anchor the path at the root of your restricted dir.\n"
-      if $arg =~ m#(^|/)\.\.(/|$)#;
-    $arg =~ s#^/#$subdir/#;
+      if $arg =~ m{(^|/)\.\.(/|$)};
+    $arg =~ s{^/}{$subdir/};
   }
   $arg;
 }
