@@ -370,8 +370,8 @@ to the detailed description below for a complete description.  verb(
      --remove-source-files   sender removes synchronized files (non-dir)
      --del                   an alias for --delete-during
      --delete                delete extraneous files from dest dirs
-     --delete-before         receiver deletes before transfer (default)
-     --delete-during         receiver deletes during xfer, not before
+     --delete-before         receiver deletes before xfer, not during
+     --delete-during         receiver deletes during transfer (default)
      --delete-delay          find deletions during, delete after
      --delete-after          receiver deletes after transfer, not before
      --delete-excluded       also delete excluded files from dest dirs
