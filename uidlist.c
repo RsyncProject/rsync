@@ -179,7 +179,7 @@ static struct idlist *recv_add_id(struct idlist **idlist_ptr, struct idlist *idm
 	if (node)
 		id2 = node->id2;
 	else if (*name && id) {
-		if (idmap == uidmap) {
+		if (idlist_ptr == &uidlist) {
 			uid_t uid;
 			id2 = name_to_uid(name, &uid) ? uid : id;
 		} else {
@@ -189,12 +189,12 @@ static struct idlist *recv_add_id(struct idlist **idlist_ptr, struct idlist *idm
 	} else
 		id2 = id;
 
-	flag = idmap == gidmap && !am_root && !is_in_group(id2) ? FLAG_SKIP_GROUP : 0;
+	flag = idlist_ptr == &gidlist && !am_root && !is_in_group(id2) ? FLAG_SKIP_GROUP : 0;
 	node = add_to_list(idlist_ptr, id, *name ? name : NULL, id2, flag);
 
 	if (DEBUG_GTE(OWN, 2)) {
 		rprintf(FINFO, "%sid %u(%s) maps to %u\n",
-			idmap == uidmap ? "u" : "g",
+			idlist_ptr == &uidlist ? "u" : "g",
 			(unsigned)id, name, (unsigned)id2);
 	}
 
