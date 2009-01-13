@@ -578,7 +578,7 @@ void start_accept_loop(int port, int (*fn)(int, int))
 		fds = deffds;
 #endif
 
-		if (select(maxfd + 1, &fds, NULL, NULL, NULL) != 1)
+		if (select(maxfd + 1, &fds, NULL, NULL, NULL) < 1)
 			continue;
 
 		for (i = 0, fd = -1; sp[i] >= 0; i++) {
