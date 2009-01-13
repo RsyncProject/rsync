@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash
 
 # instant-rsyncd lets you quickly set up and start a simple, unprivileged rsync
 # daemon with a single module in the current directory.  I've found it
@@ -11,6 +11,8 @@
 # The script asks for the rsyncd user's password twice on stdin, once to set it
 # and once to log in to test the daemon.
 # -- Matt McCutchen <matt@mattmccutchen.net>
+
+set -e
 
 dir="$(pwd)"
 

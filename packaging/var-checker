@@ -1,9 +1,10 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 # This script checks the *.c files for extraneous "extern" variables,
 # for vars that are defined but not used, and for inconsistent array
 # sizes.  Run it from inside the main rsync directory.
 
 use strict;
+use warnings;
 
 my %add_syscall_c = map { $_ => 1 } qw( t_stub.c t_unsafe.c tls.c trimslash.c );
 my %add_compat_c = map { $_ => 1 } qw( t_stub.c tls.c trimslash.c wildtest.c );

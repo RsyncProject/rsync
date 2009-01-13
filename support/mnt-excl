@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 # This script takes a command-line arg of a source directory
 # that will be passed to rsync, and generates a set of excludes
 # that will exclude all mount points from the list.  This is
@@ -25,6 +25,7 @@
 # awk '{print $2}' /proc/mounts | rsync -f 'merge,/- -' host:/dir /dest/
 
 use strict;
+use warnings;
 use Cwd 'abs_path';
 
 my $file = '/proc/mounts';
