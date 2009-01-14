@@ -1760,7 +1760,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 	set_output_verbosity(verbose, DEFAULT_PRIORITY);
 
-	if (do_stats && !am_server) {
+	if (do_stats) {
 		parse_output_words(info_words, info_levels,
 			verbose > 1 ? "stats3" : "stats2", DEFAULT_PRIORITY);
 	}
@@ -2367,6 +2367,9 @@ void server_options(char **args, int *argc_p)
 
 	if (protect_args && !local_server) /* unprotected args stop here */
 		args[ac++] = NULL;
+
+	if (do_stats)
+		args[ac++] = "--stats";
 
 	if (list_only > 1)
 		args[ac++] = "--list-only";
