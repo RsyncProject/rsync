@@ -1915,7 +1915,7 @@ void send_extra_file_list(int f, int at_least)
 			write_byte(f, 0);
 		else {
 			write_shortint(f, XMIT_EXTENDED_FLAGS|XMIT_IO_ERROR_ENDLIST);
-			write_int(f, io_error);
+			write_varint(f, io_error);
 		}
 
 		if (need_unsorted_flist) {
@@ -2218,7 +2218,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		write_byte(f, 0);
 	else {
 		write_shortint(f, XMIT_EXTENDED_FLAGS|XMIT_IO_ERROR_ENDLIST);
-		write_int(f, io_error);
+		write_varint(f, io_error);
 	}
 
 #ifdef SUPPORT_HARD_LINKS
@@ -2341,7 +2341,7 @@ struct file_list *recv_file_list(int f)
 				rprintf(FERROR, "Invalid flist flag: %x\n", flags);
 				exit_cleanup(RERR_PROTOCOL);
 			}
-			err = read_int(f);
+			err = read_varint(f);
 			if (!ignore_errors)
 				io_error |= err;
 			break;
