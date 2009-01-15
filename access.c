@@ -20,14 +20,14 @@
 
 #include "rsync.h"
 
-static int match_hostname(char *host, char *tok)
+static int match_hostname(const char *host, const char *tok)
 {
 	if (!host || !*host)
 		return 0;
-	return wildmatch(tok, host);
+	return iwildmatch(tok, host);
 }
 
-static int match_binary(char *b1, char *b2, char *mask, int addrlen)
+static int match_binary(const char *b1, const char *b2, const char *mask, int addrlen)
 {
 	int i;
 
@@ -56,7 +56,7 @@ static void make_mask(char *mask, int plen, int addrlen)
 	return;
 }
 
-static int match_address(char *addr, char *tok)
+static int match_address(const char *addr, const char *tok)
 {
 	char *p;
 	struct addrinfo hints, *resa, *rest;
@@ -210,7 +210,7 @@ static int match_address(char *addr, char *tok)
 	return ret;
 }
 
-static int access_match(char *list, char *addr, char *host)
+static int access_match(const char *list, const char *addr, const char *host)
 {
 	char *tok;
 	char *list2 = strdup(list);
@@ -219,8 +219,6 @@ static int access_match(char *list, char *addr, char *host)
 		out_of_memory("access_match");
 
 	strlower(list2);
-	if (host)
-		strlower(host);
 
 	for (tok = strtok(list2, " ,\t"); tok; tok = strtok(NULL, " ,\t")) {
 		if (match_hostname(host, tok) || match_address(addr, tok)) {
@@ -233,7 +231,8 @@ static int access_match(char *list, char *addr, char *host)
 	return 0;
 }
 
-int allow_access(char *addr, char *host, char *allow_list, char *deny_list)
+int allow_access(const char *addr, const char *host,
+		 const char *allow_list, const char *deny_list)
 {
 	if (allow_list && !*allow_list)
 		allow_list = NULL;

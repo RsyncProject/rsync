@@ -408,7 +408,7 @@ static int path_failure(int f_out, const char *dir, BOOL was_chdir)
 	return -1;
 }
 
-static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
+static int rsync_module(int f_in, int f_out, int i, const char *addr, const char *host)
 {
 	int argc;
 	char **argv, **orig_argv, **orig_early_argv, *module_chdir;
@@ -922,7 +922,7 @@ static int load_config(int globals_only)
 int start_daemon(int f_in, int f_out)
 {
 	char line[1024];
-	char *addr, *host;
+	const char *addr, *host;
 	int i;
 
 	io_set_sock_fds(f_in, f_out);
