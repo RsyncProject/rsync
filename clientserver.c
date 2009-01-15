@@ -81,6 +81,9 @@ static int rl_nulls = 0;
 static struct sigaction sigact;
 #endif
 
+/* Used when "reverse lookup" is off. */
+const char undetermined_hostname[] = "UNDETERMINED";
+
 /**
  * Run a client connected to an rsyncd.  The alternative to this
  * function for remote-shell connections is do_cmd().
@@ -426,6 +429,11 @@ static int rsync_module(int f_in, int f_out, int i, char *addr, char *host)
 		setup_iconv();
 	iconv_opt = NULL;
 #endif
+
+	/* If reverse lookup is disabled globally but enabled for this module,
+	 * we need to do it now before the access check. */
+	if (host == undetermined_hostname && lp_reverse_lookup(i))
+		host = client_name(f_in);
 
 	if (!allow_access(addr, host, lp_hosts_allow(i), lp_hosts_deny(i))) {
 		rprintf(FLOG, "rsync denied on module %s from %s (%s)\n",
@@ -927,7 +935,7 @@ int start_daemon(int f_in, int f_out)
 		exit_cleanup(RERR_SYNTAX);
 
 	addr = client_addr(f_in);
-	host = client_name(f_in);
+	host = lp_reverse_lookup(-1) ? client_name(f_in) : undetermined_hostname;
 	rprintf(FLOG, "connect from %s (%s)\n", host, addr);
 
 	if (!am_server) {

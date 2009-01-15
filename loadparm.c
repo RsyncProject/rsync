@@ -149,6 +149,7 @@ typedef struct {
 	BOOL munge_symlinks;
 	BOOL numeric_ids;
 	BOOL read_only;
+	BOOL reverse_lookup;
 	BOOL strict_modes;
 	BOOL transfer_logging;
 	BOOL use_chroot;
@@ -203,6 +204,7 @@ static section sDefault = {
  /* munge_symlinks; */		(BOOL)-1,
  /* numeric_ids; */		(BOOL)-1,
  /* read_only; */		True,
+ /* reverse_lookup; */		True,
  /* strict_modes; */		True,
  /* transfer_logging; */	False,
  /* use_chroot; */		True,
@@ -327,6 +329,7 @@ static struct parm_struct parm_table[] =
 #endif
  {"read only",         P_BOOL,   P_LOCAL, &sDefault.read_only,         NULL,0},
  {"refuse options",    P_STRING, P_LOCAL, &sDefault.refuse_options,    NULL,0},
+ {"reverse lookup",    P_BOOL,   P_LOCAL, &sDefault.reverse_lookup,    NULL,0},
  {"secrets file",      P_STRING, P_LOCAL, &sDefault.secrets_file,      NULL,0},
  {"strict modes",      P_BOOL,   P_LOCAL, &sDefault.strict_modes,      NULL,0},
  {"syslog facility",   P_ENUM,   P_LOCAL, &sDefault.syslog_facility,enum_facilities,0},
@@ -417,6 +420,7 @@ FN_LOCAL_BOOL(lp_list, list)
 FN_LOCAL_BOOL(lp_munge_symlinks, munge_symlinks)
 FN_LOCAL_BOOL(lp_numeric_ids, numeric_ids)
 FN_LOCAL_BOOL(lp_read_only, read_only)
+FN_LOCAL_BOOL(lp_reverse_lookup, reverse_lookup)
 FN_LOCAL_BOOL(lp_strict_modes, strict_modes)
 FN_LOCAL_BOOL(lp_transfer_logging, transfer_logging)
 FN_LOCAL_BOOL(lp_use_chroot, use_chroot)

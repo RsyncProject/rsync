@@ -33,6 +33,9 @@ Changes since 3.0.4:
       MD5 checksum of any transferred file, or all files if --checksum was
       specified (when protocol 30 or above is in effect).
 
+    - Added the "reverse lookup" parameter to the rsync daemon config file to
+      allow reverse-DNS lookups to be disabled.
+
   EXTRAS:
 
     - Added an "instant-rsyncd" script to the support directory, which makes

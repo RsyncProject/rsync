@@ -60,6 +60,7 @@ extern char curr_dir[MAXPATHLEN];
 extern char *full_module_path;
 extern unsigned int module_dirlen;
 extern char sender_file_sum[MAX_DIGEST_LEN];
+extern const char undetermined_hostname[];
 
 static int log_initialised;
 static int logfile_was_closed;
@@ -503,10 +504,16 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 		*c = '\0';
 		n = NULL;
 
+		/* Note for %h and %a: it doesn't matter what fd we pass to
+		 * client_{name,addr} because rsync_module will already have
+		 * forced the answer to be cached (assuming, of course, for %h
+		 * that lp_reverse_lookup(module_id) is true). */
 		switch (*p) {
 		case 'h':
-			if (am_daemon)
-				n = client_name(0);
+			if (am_daemon) {
+				n = lp_reverse_lookup(module_id)
+				  ? client_name(0) : undetermined_hostname;
+			}
 			break;
 		case 'a':
 			if (am_daemon)

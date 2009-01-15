@@ -304,10 +304,14 @@ attempted downloads will fail. If "write only" is false then downloads
 will be possible if file permissions on the daemon side allow them.  The
 default is for this parameter to be disabled.
 
-dit(bf(list)) This parameter determines if this module should be
-listed when the client asks for a listing of available modules. By
-setting this to false you can create hidden modules. The default is
-for modules to be listable.
+dit(bf(list)) This parameter determines whether this module is
+listed when the client asks for a listing of available modules.  In addition,
+if this is false, the daemon will pretend the module does not exist
+when a client denied by "hosts allow" or "hosts deny" attempts to access it.
+Realize that if "reverse lookup" is disabled globally but enabled for the
+module, the resulting reverse lookup to a potentially client-controlled DNS
+server may still reveal to the client that it hit an existing module.
+The default is for modules to be listable.
 
 dit(bf(uid)) This parameter specifies the user name or user ID that
 file transfers to and from that module should take place as when the daemon
@@ -450,7 +454,8 @@ quote(itemization(
   addresses which match the masked IP address will be allowed in.
   it() a hostname. The hostname as determined by a reverse lookup will
   be matched (case insensitive) against the pattern. Only an exact
-  match is allowed in.
+  match is allowed in.  This only works if "reverse lookup" is enabled
+  (the default).
   it() a hostname pattern using wildcards. These are matched using the
   same rules as normal unix filename matching. If the pattern matches
   then the client is allowed in.
@@ -480,6 +485,18 @@ hostname and IP address. If the pattern matches then the connection is
 rejected. See the "hosts allow" parameter for more information.
 
 The default is no "hosts deny" parameter, which means all hosts can connect.
+
+dit(bf(reverse lookup)) Controls whether the daemon performs a reverse lookup
+on the client's IP address to determine its hostname, which is used for
+"hosts allow"/"hosts deny" checks and the "%h" log escape.  This is enabled by
+default, but you may wish to disable it to save time if you know the lookup will
+not return a useful result, in which case the daemon will use the name
+"UNDETERMINED" instead.
+
+If this parameter is enabled globally (even by default), rsync performs the
+lookup as soon as a client connects, so disabling it for a module will not
+avoid the lookup.  Thus, you probably want to disable it globally and then
+enable it for modules that need the information.
 
 dit(bf(ignore errors)) This parameter tells rsyncd to
 ignore I/O errors on the daemon when deciding whether to run the delete
