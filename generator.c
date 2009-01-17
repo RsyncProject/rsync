@@ -2137,10 +2137,9 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 		if (first_flist->in_progress || first_flist->to_redo)
 			break;
 
-		if (!read_batch) {
-			write_ndx(sock_f_out, NDX_DONE);
+		write_ndx(sock_f_out, NDX_DONE);
+		if (!read_batch)
 			maybe_flush_socket(1);
-		}
 
 		if (delete_during == 2 || !dir_tweaking) {
 			/* Skip directory touch-up. */
@@ -2284,9 +2283,6 @@ void generate_files(int f_out, const char *local_name)
 			wait_for_receiver();
 		}
 	} while ((cur_flist = cur_flist->next) != NULL);
-
-	if (read_batch && inc_recurse)
-		write_ndx(f_out, NDX_DONE);
 
 	if (delete_during)
 		delete_in_dir(NULL, NULL, &dev_zero);

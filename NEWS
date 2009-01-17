@@ -4,7 +4,15 @@ Changes since 3.0.5:
 
   BUG FIXES:
 
-    - ...
+    - Fixed a hang in the batch-reading code with incremental recursion.
+
+    - Fixed the daemon's socket code to handle the simultaneous arrival of
+      multiple connections.
+
+    - Fixed the rrsync script to avoid a server-side problem when -e is at the
+      start of the short options.
+
+    - Fixed configure's erroneous use of target.
 
   ENHANCEMENTS:
 
