@@ -96,7 +96,7 @@
 /* This is used when working on a new protocol version in CVS, and should
  * be a new non-zero value for each CVS change that affects the protocol.
  * It must ALWAYS be 0 when the protocol goes final (and NEVER before)! */
-#define SUBPROTOCOL_VERSION 3
+#define SUBPROTOCOL_VERSION 4
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
@@ -226,6 +226,7 @@ enum msgcode {
 	MSG_ERROR_UTF8=FERROR_UTF8, /* sibling logging */
 	MSG_LOG=FLOG, MSG_CLIENT=FCLIENT, /* sibling logging */
 	MSG_REDO=9,	/* reprocess indicated flist index */
+	MSG_DEL_STATS=10,/* delete-statistics data follows */
 	MSG_FLIST=20,	/* extra file list over sibling socket */
 	MSG_FLIST_EOF=21,/* we've transmitted all the file lists */
 	MSG_IO_ERROR=22,/* the sending side had an I/O error */
@@ -238,6 +239,7 @@ enum msgcode {
 
 #define NDX_DONE -1
 #define NDX_FLIST_EOF -2
+#define NDX_DEL_STATS -2
 #define NDX_FLIST_OFFSET -101
 
 /* For calling delete_item() and delete_dir_contents(). */

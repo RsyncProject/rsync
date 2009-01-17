@@ -173,8 +173,10 @@ static void wait_process_with_flush(pid_t pid, int *exit_code_ptr)
 
 void write_del_stats(int f)
 {
-	if (!INFO_GTE(STATS, 2) || protocol_version < 31)
-		return;
+	if (read_batch)
+		write_int(f, NDX_DEL_STATS);
+	else
+		send_msg(MSG_DEL_STATS, "", 0, 0);
 	write_varint(f, stats.deleted_files - stats.deleted_dirs
 		      - stats.deleted_symlinks - stats.deleted_devices
 		      - stats.deleted_specials);
@@ -186,8 +188,6 @@ void write_del_stats(int f)
 
 void read_del_stats(int f)
 {
-	if (!INFO_GTE(STATS, 2) || protocol_version < 31)
-		return;
 	stats.deleted_files = read_varint(f);
 	stats.deleted_files += stats.deleted_dirs = read_varint(f);
 	stats.deleted_files += stats.deleted_symlinks = read_varint(f);
@@ -234,7 +234,6 @@ static void handle_stats(int f)
 				write_varlong30(f, stats.flist_buildtime, 3);
 				write_varlong30(f, stats.flist_xfertime, 3);
 			}
-			write_del_stats(f);
 		}
 		return;
 	}
@@ -253,8 +252,6 @@ static void handle_stats(int f)
 			stats.flist_buildtime = read_varlong30(f, 3);
 			stats.flist_xfertime = read_varlong30(f, 3);
 		}
-		if (!read_batch)
-			read_del_stats(f);
 	} else if (write_batch) {
 		/* The --read-batch process is going to be a client
 		 * receiver, so we need to give it the stats. */
@@ -265,8 +262,6 @@ static void handle_stats(int f)
 			write_varlong30(batch_fd, stats.flist_buildtime, 3);
 			write_varlong30(batch_fd, stats.flist_xfertime, 3);
 		}
-		/* We don't write the del stats into the batch file -- they
-		 * come from the generator when reading the batch. */
 	}
 }
 
@@ -716,7 +711,7 @@ static void check_alt_basis_dirs(void)
 }
 
 /* This is only called by the sender. */
-static void read_final_goodbye(int f_in)
+static void read_final_goodbye(int f_in, int f_out)
 {
 	int i, iflags, xlen;
 	uchar fnamecmp_type;
@@ -725,8 +720,19 @@ static void read_final_goodbye(int f_in)
 	if (protocol_version < 29)
 		i = read_int(f_in);
 	else {
-		i = read_ndx_and_attrs(f_in, &iflags, &fnamecmp_type,
-				       xname, &xlen);
+		i = read_ndx_and_attrs(f_in, &iflags, &fnamecmp_type, xname, &xlen);
+		if (protocol_version >= 31 && i == NDX_DONE) {
+			if (am_sender)
+				write_ndx(f_out, NDX_DONE);
+			else {
+				if (batch_gen_fd >= 0) {
+					while (read_int(batch_gen_fd) != NDX_DEL_STATS) {}
+					read_del_stats(batch_gen_fd);
+				}
+				send_msg(MSG_DONE, "", 0, 0);
+			}
+			i = read_ndx_and_attrs(f_in, &iflags, &fnamecmp_type, xname, &xlen);
+		}
 	}
 
 	if (i != NDX_DONE) {
@@ -785,7 +791,7 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 	io_flush(FULL_FLUSH);
 	handle_stats(f_out);
 	if (protocol_version >= 24)
-		read_final_goodbye(f_in);
+		read_final_goodbye(f_in, f_out);
 	io_flush(FULL_FLUSH);
 	exit_cleanup(0);
 }
@@ -846,15 +852,10 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		/* Handle any keep-alive packets from the post-processing work
 		 * that the generator does. */
 		if (protocol_version >= 29) {
-			int iflags, xlen;
-			uchar fnamecmp_type;
-			char xname[MAXPATHLEN];
-
 			kluge_around_eof = -1;
 
 			/* This should only get stopped via a USR2 signal. */
-			read_ndx_and_attrs(f_in, &iflags, &fnamecmp_type,
-					   xname, &xlen);
+			read_final_goodbye(f_in, f_out);
 
 			rprintf(FERROR, "Invalid packet at end of run [%s]\n",
 				who_am_i());
@@ -1102,7 +1103,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		io_flush(FULL_FLUSH);
 		handle_stats(-1);
 		if (protocol_version >= 24)
-			read_final_goodbye(f_in);
+			read_final_goodbye(f_in, f_out);
 		if (pid != -1) {
 			if (DEBUG_GTE(EXIT, 2))
 				rprintf(FINFO,"client_run waiting on %d\n", (int) pid);

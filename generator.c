@@ -121,6 +121,9 @@ static void handle_skipped_hlink(struct file_struct *file, int itemizing,
 				 enum logcode code, int f_out);
 #endif
 
+#define EARLY_DELAY_DONE_MSG() (!delay_updates)
+#define EARLY_DELETE_DONE_MSG() (!(delete_during == 2 || delete_after))
+
 static int start_delete_delay_temp(void)
 {
 	char fnametmp[MAXPATHLEN];
@@ -2103,11 +2106,17 @@ void generate_files(int f_out, const char *local_name)
 		rprintf(FINFO, "generate_files phase=%d\n", phase);
 
 	write_ndx(f_out, NDX_DONE);
-	write_del_stats(f_out);
 
 	/* Reduce round-trip lag-time for a useless delay-updates phase. */
-	if (protocol_version >= 29 && !delay_updates)
+	if (protocol_version >= 29 && EARLY_DELAY_DONE_MSG())
 		write_ndx(f_out, NDX_DONE);
+
+	if (protocol_version >= 31 && EARLY_DELETE_DONE_MSG()) {
+		if ((INFO_GTE(STATS, 2) && (delete_mode || force_delete)) || read_batch)
+			write_del_stats(f_out);
+		if (EARLY_DELAY_DONE_MSG()) /* Can't send this before delay */
+			write_ndx(f_out, NDX_DONE);
+	}
 
 	/* Read MSG_DONE for the redo phase (and any prior messages). */
 	while (1) {
@@ -2121,8 +2130,11 @@ void generate_files(int f_out, const char *local_name)
 		phase++;
 		if (DEBUG_GTE(GENR, 1))
 			rprintf(FINFO, "generate_files phase=%d\n", phase);
-		if (delay_updates)
+		if (!EARLY_DELAY_DONE_MSG()) {
 			write_ndx(f_out, NDX_DONE);
+			if (protocol_version >= 31 && EARLY_DELETE_DONE_MSG())
+				write_ndx(f_out, NDX_DONE);
+		}
 		/* Read MSG_DONE for delay-updates phase & prior messages. */
 		while (msgdone_cnt == 2)
 			wait_for_receiver();
@@ -2136,16 +2148,28 @@ void generate_files(int f_out, const char *local_name)
 	if (delete_after && !solo_file && file_total > 0)
 		do_delete_pass();
 
-	if ((need_retouch_dir_perms || need_retouch_dir_times)
-	 && dir_tweaking && (!inc_recurse || delete_during == 2))
-		touch_up_dirs(dir_flist, -1);
-
 	if (max_delete >= 0 && skipped_deletes) {
 		rprintf(FWARNING,
 			"Deletions stopped due to --max-delete limit (%d skipped)\n",
 			skipped_deletes);
 		io_error |= IOERR_DEL_LIMIT;
 	}
+
+	if (protocol_version >= 31) {
+		if (!EARLY_DELETE_DONE_MSG()) {
+			if (INFO_GTE(STATS, 2) || read_batch)
+				write_del_stats(f_out);
+			write_ndx(f_out, NDX_DONE);
+		}
+
+		/* Read MSG_DONE for late-delete phase & prior messages. */
+		while (msgdone_cnt == 3)
+			wait_for_receiver();
+	}
+
+	if ((need_retouch_dir_perms || need_retouch_dir_times)
+	 && dir_tweaking && (!inc_recurse || delete_during == 2))
+		touch_up_dirs(dir_flist, -1);
 
 	if (DEBUG_GTE(GENR, 1))
 		rprintf(FINFO, "generate_files finished\n");

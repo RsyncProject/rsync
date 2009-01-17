@@ -201,8 +201,6 @@ void send_files(int f_in, int f_out)
 				break;
 			if (DEBUG_GTE(SEND, 1))
 				rprintf(FINFO, "send_files phase=%d\n", phase);
-			if (phase == 2)
-				read_del_stats(f_in);
 			write_ndx(f_out, NDX_DONE);
 			continue;
 		}

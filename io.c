@@ -1049,6 +1049,13 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 			send_msg_int(MSG_IO_ERROR, IVAL(line, 0));
 			io_error |= IVAL(line, 0);
 			break;
+		case MSG_DEL_STATS:
+			if (msg_bytes)
+				goto invalid_msg;
+			read_del_stats(fd);
+			if (am_sender && am_server)
+				write_del_stats(sock_f_out);
+			break;
 		case MSG_DELETED:
 			if (msg_bytes >= sizeof line)
 				goto overflow;
