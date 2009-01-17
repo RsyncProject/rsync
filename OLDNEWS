@@ -1,3 +1,67 @@
+NEWS for rsync 3.0.5 (28 Dec 2008)
+Protocol: 30 (unchanged)
+Changes since 3.0.4:
+
+  BUG FIXES:
+
+    - Initialize xattr data in a couple spots in the hlink code, which avoids a
+      crash when the xattr pointer's memory happens to start out non-zero.
+      Also fixed the itemizing of an alt-dest file's xattrs when hard-linking.
+
+    - Don't send a bogus "-" option to an older server if there were no short
+      options specified.
+
+    - Fixed skipping of unneeded updates in a batch file when incremental
+      recursion is active.  Added a test for this.  Made batch-mode handle
+      "redo" files properly (and without hanging).
+
+    - Fix the %P logfile escape when the daemon logs from inside a chroot.
+
+    - Fixed the use of -s (--protect-args) when used with a remote source or
+      destination that had an empty path (e.g. "host:").  Also fixed a problem
+      when -s was used when accessing a daemon via a remote-shell.
+
+    - Fixed the use of a dot-dir path (e.g. foo/./bar) inside a --files-from
+      file when the root of the transfer isn't the current directory.
+
+    - Fixed a bug with "-K --delete" removing symlinks to directories when
+      incremental recursion is active.
+
+    - Fixed a hard to trigger hang when using --remove-source-files.
+
+    - Got rid of an annoying delay when accessing a daemon via a remote-shell.
+
+    - Properly ignore (superfluous) source args on a --read-batch command.
+
+    - Improved the manpage's description of the '*' wildcard to remove the
+      confusing "non-empty" qualifier.
+
+    - Fixed reverse lookups in the compatibility-library version of
+      getnameinfo().
+
+    - Fixed a bug when using --sparse on a sparse file that has over 2GB of
+      consecutive sparse data.
+
+    - Avoid a hang when using at least 3 --verbose options on a transfer with a
+      client sender (which includes local copying).
+
+    - Fixed a problem with --delete-delay reporting an error when it was ready
+      to remove a directory that was now gone.
+
+    - Got rid of a bunch of "warn_unused_result" compiler warnings.
+
+    - If an ftruncate() on a received file fails, it now causes a partial-
+      transfer warning.
+
+    - Allow a path with a leading "//" to be preserved (CYGWIN only).
+
+  ENHANCEMENTS:
+
+    - Made the support/atomic-rsync script able to perform a fully atomic
+      update of the copied hierarchy when the destination is setup using a
+      particular symlink idiom.
+
+
 NEWS for rsync 3.0.4 (6 Sep 2008)
 Protocol: 30 (unchanged)
 Changes since 3.0.3:
@@ -2907,6 +2971,7 @@ Changes since 2.4.6:
 
 Partial Protocol History
 	RELEASE DATE	VER.	DATE OF COMMIT*	PROTOCOL
+	?? Feb 2009	3.0.6			30
 	28 Dec 2008	3.0.5			30
 	06 Sep 2008	3.0.4			30
 	29 Jun 2008	3.0.3			30
