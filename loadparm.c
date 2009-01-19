@@ -32,8 +32,7 @@
  * 2) add it to the parm_table
  * 3) add it to the list of available functions (eg: using FN_GLOBAL_STRING())
  * 4) If it's a global then initialise it in init_globals. If a local module
- *    (ie. section) parameter then initialise it in the sDefault structure
- *
+ *    (ie. section) parameter then initialise it in the Locals structure
  *
  * Notes:
  *   The configuration file is processed sequentially for speed. For this
@@ -89,7 +88,7 @@ struct parm_struct {
 /* some helpful bits */
 #define iSECTION(i) ((section*)section_list.items)[i]
 #define LP_SNUM_OK(i) ((i) >= 0 && (i) < (int)section_list.count)
-#define SECTION_PTR(s, p) (((char*)(s)) + (ptrdiff_t)(((char *)(p)) - (char *)&sDefault))
+#define SECTION_PTR(s, p) (((char*)(s)) + (ptrdiff_t)(((char*)(p))-(char*)&Locals))
 
 /*
  * This structure describes global (ie., server-wide) parameters.
@@ -165,7 +164,7 @@ typedef struct {
  * to make these easy to keep sorted in the same way as the variables
  * above, use the variable name in the leading comment, including a
  * trailing ';' (to avoid a sorting problem with trailing digits). */
-static section sDefault = {
+static section Locals = {
  /* auth_users; */		NULL,
  /* charset; */ 		NULL,
  /* comment; */ 		NULL,
@@ -286,8 +285,6 @@ static struct enum_list enum_facilities[] = {
 	{ -1, NULL }
 };
 
-
-/* note that we do not initialise the defaults union - it is not allowed in ANSI C */
 static struct parm_struct parm_table[] =
 {
  {"address",           P_STRING, P_GLOBAL,&Globals.bind_address,       NULL,0},
@@ -296,49 +293,49 @@ static struct parm_struct parm_table[] =
  {"port",              P_INTEGER,P_GLOBAL,&Globals.rsync_port,         NULL,0},
  {"socket options",    P_STRING, P_GLOBAL,&Globals.socket_options,     NULL,0},
 
- {"auth users",        P_STRING, P_LOCAL, &sDefault.auth_users,        NULL,0},
- {"charset",           P_STRING, P_LOCAL, &sDefault.charset,           NULL,0},
- {"comment",           P_STRING, P_LOCAL, &sDefault.comment,           NULL,0},
- {"dont compress",     P_STRING, P_LOCAL, &sDefault.dont_compress,     NULL,0},
- {"exclude from",      P_STRING, P_LOCAL, &sDefault.exclude_from,      NULL,0},
- {"exclude",           P_STRING, P_LOCAL, &sDefault.exclude,           NULL,0},
- {"fake super",        P_BOOL,   P_LOCAL, &sDefault.fake_super,        NULL,0},
- {"filter",            P_STRING, P_LOCAL, &sDefault.filter,            NULL,0},
- {"gid",               P_STRING, P_LOCAL, &sDefault.gid,               NULL,0},
- {"hosts allow",       P_STRING, P_LOCAL, &sDefault.hosts_allow,       NULL,0},
- {"hosts deny",        P_STRING, P_LOCAL, &sDefault.hosts_deny,        NULL,0},
- {"ignore errors",     P_BOOL,   P_LOCAL, &sDefault.ignore_errors,     NULL,0},
- {"ignore nonreadable",P_BOOL,   P_LOCAL, &sDefault.ignore_nonreadable,NULL,0},
- {"include from",      P_STRING, P_LOCAL, &sDefault.include_from,      NULL,0},
- {"include",           P_STRING, P_LOCAL, &sDefault.include,           NULL,0},
- {"incoming chmod",    P_STRING, P_LOCAL, &sDefault.incoming_chmod,    NULL,0},
- {"list",              P_BOOL,   P_LOCAL, &sDefault.list,              NULL,0},
- {"lock file",         P_STRING, P_LOCAL, &sDefault.lock_file,         NULL,0},
- {"log file",          P_STRING, P_LOCAL, &sDefault.log_file,          NULL,0},
- {"log format",        P_STRING, P_LOCAL, &sDefault.log_format,        NULL,0},
- {"max connections",   P_INTEGER,P_LOCAL, &sDefault.max_connections,   NULL,0},
- {"max verbosity",     P_INTEGER,P_LOCAL, &sDefault.max_verbosity,     NULL,0},
- {"munge symlinks",    P_BOOL,   P_LOCAL, &sDefault.munge_symlinks,    NULL,0},
- {"name",              P_STRING, P_LOCAL, &sDefault.name,              NULL,0},
- {"numeric ids",       P_BOOL,   P_LOCAL, &sDefault.numeric_ids,       NULL,0},
- {"outgoing chmod",    P_STRING, P_LOCAL, &sDefault.outgoing_chmod,    NULL,0},
- {"path",              P_PATH,   P_LOCAL, &sDefault.path,              NULL,0},
+ {"auth users",        P_STRING, P_LOCAL, &Locals.auth_users,          NULL,0},
+ {"charset",           P_STRING, P_LOCAL, &Locals.charset,             NULL,0},
+ {"comment",           P_STRING, P_LOCAL, &Locals.comment,             NULL,0},
+ {"dont compress",     P_STRING, P_LOCAL, &Locals.dont_compress,       NULL,0},
+ {"exclude from",      P_STRING, P_LOCAL, &Locals.exclude_from,        NULL,0},
+ {"exclude",           P_STRING, P_LOCAL, &Locals.exclude,             NULL,0},
+ {"fake super",        P_BOOL,   P_LOCAL, &Locals.fake_super,          NULL,0},
+ {"filter",            P_STRING, P_LOCAL, &Locals.filter,              NULL,0},
+ {"gid",               P_STRING, P_LOCAL, &Locals.gid,                 NULL,0},
+ {"hosts allow",       P_STRING, P_LOCAL, &Locals.hosts_allow,         NULL,0},
+ {"hosts deny",        P_STRING, P_LOCAL, &Locals.hosts_deny,          NULL,0},
+ {"ignore errors",     P_BOOL,   P_LOCAL, &Locals.ignore_errors,       NULL,0},
+ {"ignore nonreadable",P_BOOL,   P_LOCAL, &Locals.ignore_nonreadable,  NULL,0},
+ {"include from",      P_STRING, P_LOCAL, &Locals.include_from,        NULL,0},
+ {"include",           P_STRING, P_LOCAL, &Locals.include,             NULL,0},
+ {"incoming chmod",    P_STRING, P_LOCAL, &Locals.incoming_chmod,      NULL,0},
+ {"list",              P_BOOL,   P_LOCAL, &Locals.list,                NULL,0},
+ {"lock file",         P_STRING, P_LOCAL, &Locals.lock_file,           NULL,0},
+ {"log file",          P_STRING, P_LOCAL, &Locals.log_file,            NULL,0},
+ {"log format",        P_STRING, P_LOCAL, &Locals.log_format,          NULL,0},
+ {"max connections",   P_INTEGER,P_LOCAL, &Locals.max_connections,     NULL,0},
+ {"max verbosity",     P_INTEGER,P_LOCAL, &Locals.max_verbosity,       NULL,0},
+ {"munge symlinks",    P_BOOL,   P_LOCAL, &Locals.munge_symlinks,      NULL,0},
+ {"name",              P_STRING, P_LOCAL, &Locals.name,                NULL,0},
+ {"numeric ids",       P_BOOL,   P_LOCAL, &Locals.numeric_ids,         NULL,0},
+ {"outgoing chmod",    P_STRING, P_LOCAL, &Locals.outgoing_chmod,      NULL,0},
+ {"path",              P_PATH,   P_LOCAL, &Locals.path,                NULL,0},
 #ifdef HAVE_PUTENV
- {"post-xfer exec",    P_STRING, P_LOCAL, &sDefault.postxfer_exec,     NULL,0},
- {"pre-xfer exec",     P_STRING, P_LOCAL, &sDefault.prexfer_exec,      NULL,0},
+ {"post-xfer exec",    P_STRING, P_LOCAL, &Locals.postxfer_exec,       NULL,0},
+ {"pre-xfer exec",     P_STRING, P_LOCAL, &Locals.prexfer_exec,        NULL,0},
 #endif
- {"read only",         P_BOOL,   P_LOCAL, &sDefault.read_only,         NULL,0},
- {"refuse options",    P_STRING, P_LOCAL, &sDefault.refuse_options,    NULL,0},
- {"reverse lookup",    P_BOOL,   P_LOCAL, &sDefault.reverse_lookup,    NULL,0},
- {"secrets file",      P_STRING, P_LOCAL, &sDefault.secrets_file,      NULL,0},
- {"strict modes",      P_BOOL,   P_LOCAL, &sDefault.strict_modes,      NULL,0},
- {"syslog facility",   P_ENUM,   P_LOCAL, &sDefault.syslog_facility,enum_facilities,0},
- {"temp dir",          P_PATH,   P_LOCAL, &sDefault.temp_dir,          NULL,0},
- {"timeout",           P_INTEGER,P_LOCAL, &sDefault.timeout,           NULL,0},
- {"transfer logging",  P_BOOL,   P_LOCAL, &sDefault.transfer_logging,  NULL,0},
- {"uid",               P_STRING, P_LOCAL, &sDefault.uid,               NULL,0},
- {"use chroot",        P_BOOL,   P_LOCAL, &sDefault.use_chroot,        NULL,0},
- {"write only",        P_BOOL,   P_LOCAL, &sDefault.write_only,        NULL,0},
+ {"read only",         P_BOOL,   P_LOCAL, &Locals.read_only,           NULL,0},
+ {"refuse options",    P_STRING, P_LOCAL, &Locals.refuse_options,      NULL,0},
+ {"reverse lookup",    P_BOOL,   P_LOCAL, &Locals.reverse_lookup,      NULL,0},
+ {"secrets file",      P_STRING, P_LOCAL, &Locals.secrets_file,        NULL,0},
+ {"strict modes",      P_BOOL,   P_LOCAL, &Locals.strict_modes,        NULL,0},
+ {"syslog facility",   P_ENUM,   P_LOCAL, &Locals.syslog_facility,     enum_facilities,0},
+ {"temp dir",          P_PATH,   P_LOCAL, &Locals.temp_dir,            NULL,0},
+ {"timeout",           P_INTEGER,P_LOCAL, &Locals.timeout,             NULL,0},
+ {"transfer logging",  P_BOOL,   P_LOCAL, &Locals.transfer_logging,    NULL,0},
+ {"uid",               P_STRING, P_LOCAL, &Locals.uid,                 NULL,0},
+ {"use chroot",        P_BOOL,   P_LOCAL, &Locals.use_chroot,          NULL,0},
+ {"write only",        P_BOOL,   P_LOCAL, &Locals.write_only,          NULL,0},
  {NULL,                P_BOOL,   P_NONE,  NULL,                        NULL,0}
 };
 
@@ -348,7 +345,7 @@ static void init_globals(void)
 	memset(&Globals, 0, sizeof Globals);
 }
 
-/* Initialise the sDefault parameter structure. */
+/* Initialise the Locals parameter structure. */
 static void init_locals(void)
 {
 	/* Nothing needed yet... */
@@ -367,13 +364,13 @@ static void init_locals(void)
  int fn_name(void) {return *(int *)(ptr);}
 
 #define FN_LOCAL_STRING(fn_name, val) \
- char *fn_name(int i) {return LP_SNUM_OK(i) && iSECTION(i).val? iSECTION(i).val : (sDefault.val? sDefault.val : "");}
+ char *fn_name(int i) {return LP_SNUM_OK(i) && iSECTION(i).val? iSECTION(i).val : (Locals.val? Locals.val : "");}
 #define FN_LOCAL_BOOL(fn_name, val) \
- BOOL fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : sDefault.val;}
+ BOOL fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : Locals.val;}
 #define FN_LOCAL_CHAR(fn_name, val) \
- char fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : sDefault.val;}
+ char fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : Locals.val;}
 #define FN_LOCAL_INTEGER(fn_name, val) \
- int fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : sDefault.val;}
+ int fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : Locals.val;}
 
 FN_GLOBAL_STRING(lp_bind_address, &Globals.bind_address)
 FN_GLOBAL_STRING(lp_motd_file, &Globals.motd_file)
@@ -433,7 +430,7 @@ FN_LOCAL_BOOL(lp_write_only, write_only)
  * FIXME There is a small leak here in that sometimes the existing
  * value will be dynamically allocated, and the old copy is lost.
  * However, we can't always deallocate the old value, because in the
- * case of sDefault, it points to a static string.  It would be nice
+ * case of Locals, it points to a static string.  It would be nice
  * to have either all-strdup'd values, or to never need to free
  * memory. */
 static void string_set(char **s, const char *v)
@@ -489,7 +486,7 @@ static void copy_section(section *psectionDest, section *psectionSource)
 static void init_section(section *psection)
 {
 	memset((char *)psection, 0, sizeof (section));
-	copy_section(psection, &sDefault);
+	copy_section(psection, &Locals);
 }
 
 /* Do a case-insensitive, whitespace-ignoring string compare. */
@@ -688,14 +685,14 @@ static BOOL do_section(char *sectionname)
 		if (strcmp(sectionname+1, "push") == 0) {
 			global_and_section *gs = EXPAND_ITEM_LIST(&section_stack, global_and_section, 2);
 			memcpy(&gs->g, &Globals, sizeof Globals);
-			memcpy(&gs->s, &sDefault, sizeof sDefault);
+			memcpy(&gs->s, &Locals, sizeof Locals);
 		} else if (strcmp(sectionname+1, "pop") == 0
 		 || strcmp(sectionname+1, "reset") == 0) {
 			global_and_section *gs = ((global_and_section *)section_stack.items) + section_stack.count - 1;
 			if (!section_stack.count)
 				return False;
 			memcpy(&Globals, &gs->g, sizeof Globals);
-			memcpy(&sDefault, &gs->s, sizeof sDefault);
+			memcpy(&Locals, &gs->s, sizeof Locals);
 			if (sectionname[1] == 'p')
 				section_stack.count--;
 		} else
