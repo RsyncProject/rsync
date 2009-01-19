@@ -31,8 +31,7 @@
  * 1) add it to the global_vars or local_vars structure definition
  * 2) add it to the parm_table
  * 3) add it to the list of available functions (eg: using FN_GLOBAL_STRING())
- * 4) If it's a global then initialise it in init_globals. If a local module
- *    (ie. section) parameter then initialise it in the Locals structure
+ * 4) initialise it in the Defaults static stucture
  *
  * Notes:
  *   The configuration file is processed sequentially for speed. For this
@@ -155,16 +154,30 @@ typedef struct {
 	BOOL write_only;
 } local_vars;
 
+static local_vars Locals;
+
 typedef struct {
 	global_vars g;
 	local_vars l;
 } all_vars;
 
-/* This is a default section used to prime a sections structure.  In order
+/* This is used to reset all values before a config read.  In order
  * to make these easy to keep sorted in the same way as the variables
  * above, use the variable name in the leading comment, including a
  * trailing ';' (to avoid a sorting problem with trailing digits). */
-static local_vars Locals = {
+static const all_vars Defaults = {
+ /* ==== global_vars ==== */
+ {
+ /* bind_address; */		NULL,
+ /* motd_file; */		NULL,
+ /* pid_file; */		NULL,
+ /* socket_options; */		NULL,
+
+ /* rsync_port; */		0,
+ },
+
+ /* ==== local_vars ==== */
+ {
  /* auth_users; */		NULL,
  /* charset; */ 		NULL,
  /* comment; */ 		NULL,
@@ -208,6 +221,7 @@ static local_vars Locals = {
  /* transfer_logging; */	False,
  /* use_chroot; */		True,
  /* write_only; */		False,
+ }
 };
 
 /* local variables */
@@ -339,16 +353,11 @@ static struct parm_struct parm_table[] =
  {NULL,                P_BOOL,   P_NONE,  NULL,                        NULL,0}
 };
 
-/* Initialise the global parameter structure. */
-static void init_globals(void)
+/* Initialise the Default all_vars structure. */
+static void reset_all_vars(void)
 {
-	memset(&Globals, 0, sizeof Globals);
-}
-
-/* Initialise the Locals parameter structure. */
-static void init_locals(void)
-{
-	/* Nothing needed yet... */
+	memcpy(&Globals, &Defaults.g, sizeof Globals);
+	memcpy(&Locals, &Defaults.l, sizeof Locals);
 }
 
 /* In this section all the functions that are used to access the
@@ -699,11 +708,10 @@ static BOOL do_section(char *sectionname)
 
 	isglobal = strwicmp(sectionname, GLOBAL_NAME) == 0;
 
-	/* if we were in a global section then do the local inits */
+	/* At the end of the global section, add any --dparam items. */
 	if (bInGlobalSection && !isglobal) {
 		if (!section_list.count)
 			set_dparams(0);
-		init_locals();
 	}
 
 	/* if we've just struck a global section, note the fact. */
@@ -742,7 +750,7 @@ int lp_load(char *pszFname, int globals_only)
 {
 	bInGlobalSection = True;
 
-	init_globals();
+	reset_all_vars();
 
 	/* We get sections first, so have to start 'behind' to make up. */
 	iSectionIndex = -1;
