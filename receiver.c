@@ -384,12 +384,11 @@ static int we_want_redo(int desired_ndx)
 	return 0;
 }
 
-static int gen_wants_ndx(int desired_ndx)
+static int gen_wants_ndx(int desired_ndx, int flist_num)
 {
 	static int next_ndx = -1;
 	static int done_cnt = 0;
 	static BOOL got_eof = False;
-	int flist_num = first_flist->flist_num;
 
 	if (got_eof)
 		return 0;
@@ -461,13 +460,17 @@ int recv_files(int f_in, char *local_name)
 				end_progress(0);
 			}
 			if (inc_recurse && first_flist) {
-				if (read_batch)
-					gen_wants_ndx(first_flist->used + first_flist->ndx_start);
+				if (read_batch) {
+					ndx = first_flist->used + first_flist->ndx_start;
+					gen_wants_ndx(ndx, first_flist->flist_num);
+				}
 				flist_free(first_flist);
 				if (first_flist)
 					continue;
-			} else if (read_batch && first_flist)
-				gen_wants_ndx(first_flist->used);
+			} else if (read_batch && first_flist) {
+				ndx = first_flist->used;
+				gen_wants_ndx(ndx, first_flist->flist_num);
+			}
 			if (++phase > max_phase)
 				break;
 			if (DEBUG_GTE(RECV, 1))
@@ -573,7 +576,10 @@ int recv_files(int f_in, char *local_name)
 		}
 
 		if (read_batch) {
-			if (!(redoing ? we_want_redo(ndx) : gen_wants_ndx(ndx))) {
+			int wanted = redoing
+				   ? we_want_redo(ndx)
+				   : gen_wants_ndx(ndx, cur_flist->flist_num);
+			if (!wanted) {
 				rprintf(FINFO,
 					"(Skipping batched update for%s \"%s\")\n",
 					redoing ? " resend of" : "",
