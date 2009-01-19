@@ -440,7 +440,7 @@ static void string_set(char **s, const char *v)
 		return;
 	}
 	if (!(*s = strdup(v)))
-		exit_cleanup(RERR_MALLOC);
+		out_of_memory("string_set");
 }
 
 /* Copy the local_vars, duplicating any strings in the source. */
@@ -518,16 +518,13 @@ static int strwicmp(char *psz1, char *psz2)
 }
 
 /* Find a section by name. Otherwise works like get_section. */
-static int getsectionbyname(char *name, local_vars *psectionDest)
+static int getsectionbyname(char *name)
 {
 	int i;
 
 	for (i = section_list.count - 1; i >= 0; i--) {
-		if (strwicmp(iSECTION(i).name, name) == 0) {
-			if (psectionDest != NULL)
-				copy_section(psectionDest, &iSECTION(i));
+		if (strwicmp(iSECTION(i).name, name) == 0)
 			break;
-		}
 	}
 
 	return i;
@@ -541,7 +538,7 @@ static int add_a_section(char *name)
 
 	/* it might already exist */
 	if (name) {
-		i = getsectionbyname(name, NULL);
+		i = getsectionbyname(name);
 		if (i >= 0)
 			return i;
 	}
