@@ -28,7 +28,7 @@
  *
  * To add a parameter:
  *
- * 1) add it to the global or section structure definition
+ * 1) add it to the global_vars or local_vars structure definition
  * 2) add it to the parm_table
  * 3) add it to the list of available functions (eg: using FN_GLOBAL_STRING())
  * 4) If it's a global then initialise it in init_globals. If a local module
@@ -86,7 +86,7 @@ struct parm_struct {
 #endif
 
 /* some helpful bits */
-#define iSECTION(i) ((section*)section_list.items)[i]
+#define iSECTION(i) ((local_vars*)section_list.items)[i]
 #define LP_SNUM_OK(i) ((i) >= 0 && (i) < (int)section_list.count)
 #define SECTION_PTR(s, p) (((char*)(s)) + (ptrdiff_t)(((char*)(p))-(char*)&Locals))
 
@@ -100,9 +100,9 @@ typedef struct {
 	char *socket_options;
 
 	int rsync_port;
-} global;
+} global_vars;
 
-static global Globals;
+static global_vars Globals;
 
 /*
  * This structure describes a single section.  Their order must match the
@@ -153,18 +153,18 @@ typedef struct {
 	BOOL transfer_logging;
 	BOOL use_chroot;
 	BOOL write_only;
-} section;
+} local_vars;
 
 typedef struct {
-	global g;
-	section s;
-} global_and_section;
+	global_vars g;
+	local_vars l;
+} all_vars;
 
 /* This is a default section used to prime a sections structure.  In order
  * to make these easy to keep sorted in the same way as the variables
  * above, use the variable name in the leading comment, including a
  * trailing ';' (to avoid a sorting problem with trailing digits). */
-static section Locals = {
+static local_vars Locals = {
  /* auth_users; */		NULL,
  /* charset; */ 		NULL,
  /* comment; */ 		NULL,
@@ -443,8 +443,8 @@ static void string_set(char **s, const char *v)
 		exit_cleanup(RERR_MALLOC);
 }
 
-/* Copy a section structure to another. */
-static void copy_section(section *psectionDest, section *psectionSource)
+/* Copy the local_vars, duplicating any strings in the source. */
+static void copy_section(local_vars *psectionDest, local_vars *psectionSource)
 {
 	int i;
 
@@ -483,9 +483,9 @@ static void copy_section(section *psectionDest, section *psectionSource)
 }
 
 /* Initialise a section to the defaults. */
-static void init_section(section *psection)
+static void init_section(local_vars *psection)
 {
-	memset((char *)psection, 0, sizeof (section));
+	memset(psection, 0, sizeof Locals);
 	copy_section(psection, &Locals);
 }
 
@@ -518,7 +518,7 @@ static int strwicmp(char *psz1, char *psz2)
 }
 
 /* Find a section by name. Otherwise works like get_section. */
-static int getsectionbyname(char *name, section *psectionDest)
+static int getsectionbyname(char *name, local_vars *psectionDest)
 {
 	int i;
 
@@ -537,7 +537,7 @@ static int getsectionbyname(char *name, section *psectionDest)
 static int add_a_section(char *name)
 {
 	int i;
-	section *s;
+	local_vars *s;
 
 	/* it might already exist */
 	if (name) {
@@ -547,7 +547,7 @@ static int add_a_section(char *name)
 	}
 
 	i = section_list.count;
-	s = EXPAND_ITEM_LIST(&section_list, section, 2);
+	s = EXPAND_ITEM_LIST(&section_list, local_vars, 2);
 
 	init_section(s);
 	if (name)
@@ -683,16 +683,16 @@ static BOOL do_section(char *sectionname)
 	if (*sectionname == ']') { /* A special push/pop/reset directive from params.c */
 		bInGlobalSection = 1;
 		if (strcmp(sectionname+1, "push") == 0) {
-			global_and_section *gs = EXPAND_ITEM_LIST(&section_stack, global_and_section, 2);
-			memcpy(&gs->g, &Globals, sizeof Globals);
-			memcpy(&gs->s, &Locals, sizeof Locals);
+			all_vars *vp = EXPAND_ITEM_LIST(&section_stack, all_vars, 2);
+			memcpy(&vp->g, &Globals, sizeof Globals);
+			memcpy(&vp->l, &Locals, sizeof Locals);
 		} else if (strcmp(sectionname+1, "pop") == 0
 		 || strcmp(sectionname+1, "reset") == 0) {
-			global_and_section *gs = ((global_and_section *)section_stack.items) + section_stack.count - 1;
+			all_vars *vp = ((all_vars*)section_stack.items) + section_stack.count - 1;
 			if (!section_stack.count)
 				return False;
-			memcpy(&Globals, &gs->g, sizeof Globals);
-			memcpy(&Locals, &gs->s, sizeof Locals);
+			memcpy(&Globals, &vp->g, sizeof Globals);
+			memcpy(&Locals, &vp->l, sizeof Locals);
 			if (sectionname[1] == 'p')
 				section_stack.count--;
 		} else
