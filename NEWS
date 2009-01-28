@@ -9,6 +9,8 @@ Changes since 3.0.5:
     - Fixed the daemon's socket code to handle the simultaneous arrival of
       multiple connections.
 
+    - Fixed the parsing of an [IPv6_LITERAL_ADDR] when a USER@ is prefixed.
+
     - Fixed the rrsync script to avoid a server-side problem when -e is at the
       start of the short options.
 
