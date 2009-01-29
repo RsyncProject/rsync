@@ -2626,17 +2626,18 @@ void server_options(char **args, int *argc_p)
  * (required for parsing) [ and ] chars elided from the returned string. */
 static char *parse_hostspec(char *str, char **path_start_ptr, int *port_ptr)
 {
-	char *s = str;
-	char *host_start = str;
+	char *s, *host_start = str;
 	int hostlen = 0, userlen = 0;
 	char *ret;
 
-	for ( ; ; s++) {
+	for (s = str; ; s++) {
 		if (!*s) {
 			/* It is only OK if we run out of string with rsync:// */
-			if (port_ptr)
-				break;
-			return NULL;
+			if (!port_ptr)
+				return NULL;
+			if (!hostlen)
+				hostlen = s - host_start;
+			break;
 		}
 		if (*s == ':' || *s == '/') {
 			if (!hostlen)
@@ -2647,7 +2648,7 @@ static char *parse_hostspec(char *str, char **path_start_ptr, int *port_ptr)
 			} else if (port_ptr) {
 				*port_ptr = atoi(s);
 				while (isDigit(s)) s++;
-				if (*s++ != '/')
+				if (*s && *s++ != '/')
 					return NULL;
 			}
 			break;
