@@ -2368,9 +2368,6 @@ void server_options(char **args, int *argc_p)
 	if (protect_args && !local_server) /* unprotected args stop here */
 		args[ac++] = NULL;
 
-	if (do_stats)
-		args[ac++] = "--stats";
-
 	if (list_only > 1)
 		args[ac++] = "--list-only";
 
@@ -2472,6 +2469,8 @@ void server_options(char **args, int *argc_p)
 			args[ac++] = "--super";
 		if (size_only)
 			args[ac++] = "--size-only";
+		if (do_stats)
+			args[ac++] = "--stats";
 	} else {
 		if (skip_compress) {
 			if (asprintf(&arg, "--skip-compress=%s", skip_compress) < 0)
