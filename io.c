@@ -1418,6 +1418,22 @@ static void sleep_for_bwlimit(int bytes_written)
 	total_written = (sleep_usec - elapsed_usec) * bwlimit / (ONE_SEC/1024);
 }
 
+static const char *what_fd_is(int fd)
+{
+	static char buf[20];
+
+	if (fd == sock_f_out)
+		return "socket";
+	else if (fd == msg_fd_out)
+		return "message fd";
+	else if (fd == batch_fd)
+		return "batch file";
+	else {
+		snprintf(buf, sizeof buf, "fd %d", fd);
+		return buf;
+	}
+}
+
 /* Write len bytes to the file descriptor fd, looping as necessary to get
  * the job done and also (in certain circumstances) reading any data on
  * msg_fd_in to avoid deadlock.
@@ -1496,8 +1512,8 @@ static void writefd_unbuffered(int fd, const char *buf, size_t len)
 			if (am_server && fd == msg_fd_out)
 				exit_cleanup(RERR_STREAMIO);
 			rsyserr(FERROR, errno,
-				"writefd_unbuffered failed to write %ld bytes [%s]",
-				(long)len, who_am_i());
+				"writefd_unbuffered failed to write %ld bytes to %s [%s]",
+				(long)len, what_fd_is(fd), who_am_i());
 			/* If the other side is sending us error messages, try
 			 * to grab any messages they sent before they died. */
 			while (!am_server && fd == sock_f_out && io_multiplexing_in) {
@@ -1555,10 +1571,8 @@ static void writefd(int fd, const char *buf, size_t len)
 	if (fd == sock_f_out)
 		stats.total_written += len;
 
-	if (fd == write_batch_monitor_out) {
-		if ((size_t)write(batch_fd, buf, len) != len)
-			exit_cleanup(RERR_FILEIO);
-	}
+	if (fd == write_batch_monitor_out)
+		writefd_unbuffered(batch_fd, buf, len);
 
 	if (!iobuf_out || fd != iobuf_f_out) {
 		writefd_unbuffered(fd, buf, len);
