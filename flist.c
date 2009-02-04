@@ -1342,6 +1342,14 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 		if (preserve_links && S_ISLNK(file->mode)) {
 			symlink_name = F_SYMLINK(file);
 			symlink_len = strlen(symlink_name);
+			if (symlink_len == 0) {
+				io_error |= IOERR_GENERAL;
+				f_name(file, fbuf);
+				rprintf(FERROR_XFER,
+				    "skipping symlink with 0-length value: %s\n",
+				    full_fname(fbuf));
+				return NULL;
+			}
 		} else {
 			symlink_name = NULL;
 			symlink_len = 0;
