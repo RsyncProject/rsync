@@ -87,7 +87,7 @@ struct parm_struct {
 /* some helpful bits */
 #define iSECTION(i) ((local_vars*)section_list.items)[i]
 #define LP_SNUM_OK(i) ((i) >= 0 && (i) < (int)section_list.count)
-#define SECTION_PTR(s, p) (((char*)(s)) + (ptrdiff_t)(((char*)(p))-(char*)&Locals))
+#define SECTION_PTR(s, p) (((char*)(s)) + (ptrdiff_t)(((char*)(p))-(char*)&Vars.l))
 
 /*
  * This structure describes global (ie., server-wide) parameters.
@@ -100,8 +100,6 @@ typedef struct {
 
 	int rsync_port;
 } global_vars;
-
-static global_vars Globals;
 
 /*
  * This structure describes a single section.  Their order must match the
@@ -154,15 +152,18 @@ typedef struct {
 	BOOL write_only;
 } local_vars;
 
-static local_vars Locals;
-
+/* This structure describes the global variables (g) as well as the globally
+ * specified values of the local variables (l), which are used when modules
+ * don't specify their own values. */
 typedef struct {
 	global_vars g;
 	local_vars l;
 } all_vars;
 
-/* This is used to reset all values before a config read.  In order
- * to make these easy to keep sorted in the same way as the variables
+/* The application defaults for all the variables.  "Defaults" is
+ * used to re-initialize "Vars" before each config-file read.
+ *
+ * In order to keep these sorted in the same way as the structure
  * above, use the variable name in the leading comment, including a
  * trailing ';' (to avoid a sorting problem with trailing digits). */
 static const all_vars Defaults = {
@@ -224,9 +225,15 @@ static const all_vars Defaults = {
  }
 };
 
-/* local variables */
+/* The currently configured values for all the variables. */
+static all_vars Vars;
+
+/* Stack of "Vars" values used by the &include directive. */
+static item_list Vars_stack = EMPTY_ITEM_LIST;
+
+/* The array of section values that holds all the defined modules. */
 static item_list section_list = EMPTY_ITEM_LIST;
-static item_list section_stack = EMPTY_ITEM_LIST;
+
 static int iSectionIndex = -1;
 static BOOL bInGlobalSection = True;
 
@@ -301,63 +308,62 @@ static struct enum_list enum_facilities[] = {
 
 static struct parm_struct parm_table[] =
 {
- {"address",           P_STRING, P_GLOBAL,&Globals.bind_address,       NULL,0},
- {"motd file",         P_STRING, P_GLOBAL,&Globals.motd_file,          NULL,0},
- {"pid file",          P_STRING, P_GLOBAL,&Globals.pid_file,           NULL,0},
- {"port",              P_INTEGER,P_GLOBAL,&Globals.rsync_port,         NULL,0},
- {"socket options",    P_STRING, P_GLOBAL,&Globals.socket_options,     NULL,0},
+ {"address",           P_STRING, P_GLOBAL,&Vars.g.bind_address,        NULL,0},
+ {"motd file",         P_STRING, P_GLOBAL,&Vars.g.motd_file,           NULL,0},
+ {"pid file",          P_STRING, P_GLOBAL,&Vars.g.pid_file,            NULL,0},
+ {"port",              P_INTEGER,P_GLOBAL,&Vars.g.rsync_port,          NULL,0},
+ {"socket options",    P_STRING, P_GLOBAL,&Vars.g.socket_options,      NULL,0},
 
- {"auth users",        P_STRING, P_LOCAL, &Locals.auth_users,          NULL,0},
- {"charset",           P_STRING, P_LOCAL, &Locals.charset,             NULL,0},
- {"comment",           P_STRING, P_LOCAL, &Locals.comment,             NULL,0},
- {"dont compress",     P_STRING, P_LOCAL, &Locals.dont_compress,       NULL,0},
- {"exclude from",      P_STRING, P_LOCAL, &Locals.exclude_from,        NULL,0},
- {"exclude",           P_STRING, P_LOCAL, &Locals.exclude,             NULL,0},
- {"fake super",        P_BOOL,   P_LOCAL, &Locals.fake_super,          NULL,0},
- {"filter",            P_STRING, P_LOCAL, &Locals.filter,              NULL,0},
- {"gid",               P_STRING, P_LOCAL, &Locals.gid,                 NULL,0},
- {"hosts allow",       P_STRING, P_LOCAL, &Locals.hosts_allow,         NULL,0},
- {"hosts deny",        P_STRING, P_LOCAL, &Locals.hosts_deny,          NULL,0},
- {"ignore errors",     P_BOOL,   P_LOCAL, &Locals.ignore_errors,       NULL,0},
- {"ignore nonreadable",P_BOOL,   P_LOCAL, &Locals.ignore_nonreadable,  NULL,0},
- {"include from",      P_STRING, P_LOCAL, &Locals.include_from,        NULL,0},
- {"include",           P_STRING, P_LOCAL, &Locals.include,             NULL,0},
- {"incoming chmod",    P_STRING, P_LOCAL, &Locals.incoming_chmod,      NULL,0},
- {"list",              P_BOOL,   P_LOCAL, &Locals.list,                NULL,0},
- {"lock file",         P_STRING, P_LOCAL, &Locals.lock_file,           NULL,0},
- {"log file",          P_STRING, P_LOCAL, &Locals.log_file,            NULL,0},
- {"log format",        P_STRING, P_LOCAL, &Locals.log_format,          NULL,0},
- {"max connections",   P_INTEGER,P_LOCAL, &Locals.max_connections,     NULL,0},
- {"max verbosity",     P_INTEGER,P_LOCAL, &Locals.max_verbosity,       NULL,0},
- {"munge symlinks",    P_BOOL,   P_LOCAL, &Locals.munge_symlinks,      NULL,0},
- {"name",              P_STRING, P_LOCAL, &Locals.name,                NULL,0},
- {"numeric ids",       P_BOOL,   P_LOCAL, &Locals.numeric_ids,         NULL,0},
- {"outgoing chmod",    P_STRING, P_LOCAL, &Locals.outgoing_chmod,      NULL,0},
- {"path",              P_PATH,   P_LOCAL, &Locals.path,                NULL,0},
+ {"auth users",        P_STRING, P_LOCAL, &Vars.l.auth_users,          NULL,0},
+ {"charset",           P_STRING, P_LOCAL, &Vars.l.charset,             NULL,0},
+ {"comment",           P_STRING, P_LOCAL, &Vars.l.comment,             NULL,0},
+ {"dont compress",     P_STRING, P_LOCAL, &Vars.l.dont_compress,       NULL,0},
+ {"exclude from",      P_STRING, P_LOCAL, &Vars.l.exclude_from,        NULL,0},
+ {"exclude",           P_STRING, P_LOCAL, &Vars.l.exclude,             NULL,0},
+ {"fake super",        P_BOOL,   P_LOCAL, &Vars.l.fake_super,          NULL,0},
+ {"filter",            P_STRING, P_LOCAL, &Vars.l.filter,              NULL,0},
+ {"gid",               P_STRING, P_LOCAL, &Vars.l.gid,                 NULL,0},
+ {"hosts allow",       P_STRING, P_LOCAL, &Vars.l.hosts_allow,         NULL,0},
+ {"hosts deny",        P_STRING, P_LOCAL, &Vars.l.hosts_deny,          NULL,0},
+ {"ignore errors",     P_BOOL,   P_LOCAL, &Vars.l.ignore_errors,       NULL,0},
+ {"ignore nonreadable",P_BOOL,   P_LOCAL, &Vars.l.ignore_nonreadable,  NULL,0},
+ {"include from",      P_STRING, P_LOCAL, &Vars.l.include_from,        NULL,0},
+ {"include",           P_STRING, P_LOCAL, &Vars.l.include,             NULL,0},
+ {"incoming chmod",    P_STRING, P_LOCAL, &Vars.l.incoming_chmod,      NULL,0},
+ {"list",              P_BOOL,   P_LOCAL, &Vars.l.list,                NULL,0},
+ {"lock file",         P_STRING, P_LOCAL, &Vars.l.lock_file,           NULL,0},
+ {"log file",          P_STRING, P_LOCAL, &Vars.l.log_file,            NULL,0},
+ {"log format",        P_STRING, P_LOCAL, &Vars.l.log_format,          NULL,0},
+ {"max connections",   P_INTEGER,P_LOCAL, &Vars.l.max_connections,     NULL,0},
+ {"max verbosity",     P_INTEGER,P_LOCAL, &Vars.l.max_verbosity,       NULL,0},
+ {"munge symlinks",    P_BOOL,   P_LOCAL, &Vars.l.munge_symlinks,      NULL,0},
+ {"name",              P_STRING, P_LOCAL, &Vars.l.name,                NULL,0},
+ {"numeric ids",       P_BOOL,   P_LOCAL, &Vars.l.numeric_ids,         NULL,0},
+ {"outgoing chmod",    P_STRING, P_LOCAL, &Vars.l.outgoing_chmod,      NULL,0},
+ {"path",              P_PATH,   P_LOCAL, &Vars.l.path,                NULL,0},
 #ifdef HAVE_PUTENV
- {"post-xfer exec",    P_STRING, P_LOCAL, &Locals.postxfer_exec,       NULL,0},
- {"pre-xfer exec",     P_STRING, P_LOCAL, &Locals.prexfer_exec,        NULL,0},
+ {"post-xfer exec",    P_STRING, P_LOCAL, &Vars.l.postxfer_exec,       NULL,0},
+ {"pre-xfer exec",     P_STRING, P_LOCAL, &Vars.l.prexfer_exec,        NULL,0},
 #endif
- {"read only",         P_BOOL,   P_LOCAL, &Locals.read_only,           NULL,0},
- {"refuse options",    P_STRING, P_LOCAL, &Locals.refuse_options,      NULL,0},
- {"reverse lookup",    P_BOOL,   P_LOCAL, &Locals.reverse_lookup,      NULL,0},
- {"secrets file",      P_STRING, P_LOCAL, &Locals.secrets_file,        NULL,0},
- {"strict modes",      P_BOOL,   P_LOCAL, &Locals.strict_modes,        NULL,0},
- {"syslog facility",   P_ENUM,   P_LOCAL, &Locals.syslog_facility,     enum_facilities,0},
- {"temp dir",          P_PATH,   P_LOCAL, &Locals.temp_dir,            NULL,0},
- {"timeout",           P_INTEGER,P_LOCAL, &Locals.timeout,             NULL,0},
- {"transfer logging",  P_BOOL,   P_LOCAL, &Locals.transfer_logging,    NULL,0},
- {"uid",               P_STRING, P_LOCAL, &Locals.uid,                 NULL,0},
- {"use chroot",        P_BOOL,   P_LOCAL, &Locals.use_chroot,          NULL,0},
- {"write only",        P_BOOL,   P_LOCAL, &Locals.write_only,          NULL,0},
+ {"read only",         P_BOOL,   P_LOCAL, &Vars.l.read_only,           NULL,0},
+ {"refuse options",    P_STRING, P_LOCAL, &Vars.l.refuse_options,      NULL,0},
+ {"reverse lookup",    P_BOOL,   P_LOCAL, &Vars.l.reverse_lookup,      NULL,0},
+ {"secrets file",      P_STRING, P_LOCAL, &Vars.l.secrets_file,        NULL,0},
+ {"strict modes",      P_BOOL,   P_LOCAL, &Vars.l.strict_modes,        NULL,0},
+ {"syslog facility",   P_ENUM,   P_LOCAL, &Vars.l.syslog_facility,     enum_facilities,0},
+ {"temp dir",          P_PATH,   P_LOCAL, &Vars.l.temp_dir,            NULL,0},
+ {"timeout",           P_INTEGER,P_LOCAL, &Vars.l.timeout,             NULL,0},
+ {"transfer logging",  P_BOOL,   P_LOCAL, &Vars.l.transfer_logging,    NULL,0},
+ {"uid",               P_STRING, P_LOCAL, &Vars.l.uid,                 NULL,0},
+ {"use chroot",        P_BOOL,   P_LOCAL, &Vars.l.use_chroot,          NULL,0},
+ {"write only",        P_BOOL,   P_LOCAL, &Vars.l.write_only,          NULL,0},
  {NULL,                P_BOOL,   P_NONE,  NULL,                        NULL,0}
 };
 
 /* Initialise the Default all_vars structure. */
 static void reset_all_vars(void)
 {
-	memcpy(&Globals, &Defaults.g, sizeof Globals);
-	memcpy(&Locals, &Defaults.l, sizeof Locals);
+	memcpy(&Vars, &Defaults, sizeof Vars);
 }
 
 /* In this section all the functions that are used to access the
@@ -373,20 +379,20 @@ static void reset_all_vars(void)
  int fn_name(void) {return *(int *)(ptr);}
 
 #define FN_LOCAL_STRING(fn_name, val) \
- char *fn_name(int i) {return LP_SNUM_OK(i) && iSECTION(i).val? iSECTION(i).val : (Locals.val? Locals.val : "");}
+ char *fn_name(int i) {return LP_SNUM_OK(i) && iSECTION(i).val? iSECTION(i).val : (Vars.l.val? Vars.l.val : "");}
 #define FN_LOCAL_BOOL(fn_name, val) \
- BOOL fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : Locals.val;}
+ BOOL fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : Vars.l.val;}
 #define FN_LOCAL_CHAR(fn_name, val) \
- char fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : Locals.val;}
+ char fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : Vars.l.val;}
 #define FN_LOCAL_INTEGER(fn_name, val) \
- int fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : Locals.val;}
+ int fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : Vars.l.val;}
 
-FN_GLOBAL_STRING(lp_bind_address, &Globals.bind_address)
-FN_GLOBAL_STRING(lp_motd_file, &Globals.motd_file)
-FN_GLOBAL_STRING(lp_pid_file, &Globals.pid_file)
-FN_GLOBAL_STRING(lp_socket_options, &Globals.socket_options)
+FN_GLOBAL_STRING(lp_bind_address, &Vars.g.bind_address)
+FN_GLOBAL_STRING(lp_motd_file, &Vars.g.motd_file)
+FN_GLOBAL_STRING(lp_pid_file, &Vars.g.pid_file)
+FN_GLOBAL_STRING(lp_socket_options, &Vars.g.socket_options)
 
-FN_GLOBAL_INTEGER(lp_rsync_port, &Globals.rsync_port)
+FN_GLOBAL_INTEGER(lp_rsync_port, &Vars.g.rsync_port)
 
 FN_LOCAL_STRING(lp_auth_users, auth_users)
 FN_LOCAL_STRING(lp_charset, charset)
@@ -438,8 +444,8 @@ FN_LOCAL_BOOL(lp_write_only, write_only)
  *
  * FIXME There is a small leak here in that sometimes the existing
  * value will be dynamically allocated, and the old copy is lost.
- * However, we can't always deallocate the old value, because in the
- * case of Locals, it points to a static string.  It would be nice
+ * However, we can't always deallocate the old value, because the
+ * initial values in Defaults.l are static strings.  It would be nice
  * to have either all-strdup'd values, or to never need to free
  * memory. */
 static void string_set(char **s, const char *v)
@@ -494,8 +500,8 @@ static void copy_section(local_vars *psectionDest, local_vars *psectionSource)
 /* Initialise a section to the defaults. */
 static void init_section(local_vars *psection)
 {
-	memset(psection, 0, sizeof Locals);
-	copy_section(psection, &Locals);
+	memset(psection, 0, sizeof (local_vars));
+	copy_section(psection, &Vars.l);
 }
 
 /* Do a case-insensitive, whitespace-ignoring string compare. */
@@ -689,18 +695,16 @@ static BOOL do_section(char *sectionname)
 	if (*sectionname == ']') { /* A special push/pop/reset directive from params.c */
 		bInGlobalSection = 1;
 		if (strcmp(sectionname+1, "push") == 0) {
-			all_vars *vp = EXPAND_ITEM_LIST(&section_stack, all_vars, 2);
-			memcpy(&vp->g, &Globals, sizeof Globals);
-			memcpy(&vp->l, &Locals, sizeof Locals);
+			all_vars *vp = EXPAND_ITEM_LIST(&Vars_stack, all_vars, 2);
+			memcpy(vp, &Vars, sizeof Vars);
 		} else if (strcmp(sectionname+1, "pop") == 0
 		 || strcmp(sectionname+1, "reset") == 0) {
-			all_vars *vp = ((all_vars*)section_stack.items) + section_stack.count - 1;
-			if (!section_stack.count)
+			all_vars *vp = ((all_vars*)Vars_stack.items) + Vars_stack.count - 1;
+			if (!Vars_stack.count)
 				return False;
-			memcpy(&Globals, &vp->g, sizeof Globals);
-			memcpy(&Locals, &vp->l, sizeof Locals);
+			memcpy(&Vars, vp, sizeof Vars);
 			if (sectionname[1] == 'p')
-				section_stack.count--;
+				Vars_stack.count--;
 		} else
 			return False;
 		return True;
