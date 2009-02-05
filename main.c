@@ -1016,7 +1016,6 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		if (write_batch && !am_server)
 			start_write_batch(f_out);
 		flist = send_file_list(f_out, argc, argv);
-		set_msg_fd_in(-1);
 		if (verbose > 3)
 			rprintf(FINFO,"file list sent\n");
 
