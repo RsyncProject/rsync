@@ -2262,6 +2262,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	if (numeric_ids <= 0 && !inc_recurse)
 		send_id_list(f);
 
+	set_msg_fd_in(-1);
+
 	/* send the io_error flag */
 	if (protocol_version < 30)
 		write_int(f, ignore_errors ? 0 : io_error);
