@@ -89,9 +89,7 @@ struct parm_struct {
 #define LP_SNUM_OK(i) ((i) >= 0 && (i) < (int)section_list.count)
 #define SECTION_PTR(s, p) (((char*)(s)) + (ptrdiff_t)(((char*)(p))-(char*)&Vars.l))
 
-/*
- * This structure describes global (ie., server-wide) parameters.
- */
+/* This structure describes global (ie., server-wide) parameters. */
 typedef struct {
 	char *bind_address;
 	char *motd_file;
@@ -101,11 +99,10 @@ typedef struct {
 	int rsync_port;
 } global_vars;
 
-/*
- * This structure describes a single section.  Their order must match the
+/* This structure describes a single section.  Their order must match the
  * initializers below, which you can accomplish by keeping each sub-section
  * sorted.  (e.g. in vim, just visually select each subsection and use !sort.)
- */
+ * NOTE: the char* variables MUST all remain at the start of the stuct! */
 typedef struct {
 	char *auth_users;
 	char *charset;
@@ -132,6 +129,8 @@ typedef struct {
 	char *secrets_file;
 	char *temp_dir;
 	char *uid;
+/* NOTE: update this macro if the last char* variable changes! */
+#define LOCAL_STRING_COUNT() (offsetof(local_vars, uid) / sizeof (char*) + 1)
 
 	int max_connections;
 	int max_verbosity;
@@ -438,62 +437,31 @@ FN_LOCAL_BOOL(lp_transfer_logging, transfer_logging)
 FN_LOCAL_BOOL(lp_use_chroot, use_chroot)
 FN_LOCAL_BOOL(lp_write_only, write_only)
 
-/* Assign a copy of v to *s.  Handles NULL strings.  *v must
- * be initialized when this is called, either to NULL or a malloc'd
- * string.
- *
- * FIXME There is a small leak here in that sometimes the existing
- * value will be dynamically allocated, and the old copy is lost.
- * However, we can't always deallocate the old value, because the
- * initial values in Defaults.l are static strings.  It would be nice
- * to have either all-strdup'd values, or to never need to free
- * memory. */
-static void string_set(char **s, const char *v)
+/* Assign a copy of v to *s.  Handles NULL strings.  We don't worry
+ * about overwriting a malloc'd string because the long-running
+ * (port-listening) daemon only loads the config file once, and the
+ * per-job (forked or xinitd-ran) daemon only re-reads the file at
+ * the start, so any lost memory is inconsequential. */
+static inline void string_set(char **s, const char *v)
 {
-	if (!v) {
+	if (!v)
 		*s = NULL;
-		return;
-	}
-	if (!(*s = strdup(v)))
+	else if (!(*s = strdup(v)))
 		out_of_memory("string_set");
 }
 
-/* Copy the local_vars, duplicating any strings in the source. */
+/* Copy the local_vars, strdup'ing any strings.  NOTE:  this depends on
+ * the structure starting with a contiguous list of the char* variables,
+ * and having an accurate count in the LOCAL_STRING_COUNT() macro. */
 static void copy_section(local_vars *psectionDest, local_vars *psectionSource)
 {
-	int i;
+	int count = LOCAL_STRING_COUNT();
+	char **strings = (char**)psectionDest;
 
-	for (i = 0; parm_table[i].label; i++) {
-		if (parm_table[i].ptr && parm_table[i].class == P_LOCAL) {
-			void *def_ptr = parm_table[i].ptr;
-			void *src_ptr = SECTION_PTR(psectionSource, def_ptr);
-			void *dest_ptr = SECTION_PTR(psectionDest, def_ptr);
-
-			switch (parm_table[i].type) {
-			case P_BOOL:
-			case P_BOOLREV:
-				*(BOOL *)dest_ptr = *(BOOL *)src_ptr;
-				break;
-
-			case P_INTEGER:
-			case P_ENUM:
-			case P_OCTAL:
-				*(int *)dest_ptr = *(int *)src_ptr;
-				break;
-
-			case P_CHAR:
-				*(char *)dest_ptr = *(char *)src_ptr;
-				break;
-
-			case P_PATH:
-			case P_STRING:
-				string_set(dest_ptr, *(char **)src_ptr);
-				break;
-
-			default:
-				break;
-			}
-		}
+	memcpy(psectionDest, psectionSource, sizeof psectionDest[0]);
+	while (count--) {
+		if (strings[count] && !(strings[count] = strdup(strings[count])))
+			out_of_memory("copy_section");
 	}
 }
 
