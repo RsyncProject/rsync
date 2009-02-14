@@ -22,6 +22,7 @@ Changes since 3.0.5:
 
     - Fixed configure's erroneous use of target.
 
-  ENHANCEMENTS:
+    - Fixed configure's --disable-debug option.
 
-    - ...
+    - Fixed a run-time issue for systems that can't find iconv_open() by adding
+      the --disable-iconv-open configure option.
