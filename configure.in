@@ -15,6 +15,25 @@ LDFLAGS=${LDFLAGS-""}
 
 AC_CANONICAL_HOST
 
+# We must decide this before testing the compiler.
+
+# Please allow this to default to yes, so that your users have more
+# chance of getting a useful stack trace if problems occur.
+
+AC_MSG_CHECKING([whether to include debugging symbols])
+AC_ARG_ENABLE(debug,
+	AC_HELP_STRING([--disable-debug],
+		[disable debugging symbols and features]))
+
+if test x"$enable_debug" = x"no"; then
+    AC_MSG_RESULT(no)
+    ac_cv_prog_cc_g=no
+else
+    AC_MSG_RESULT([yes])
+    dnl AC_DEFINE(DEBUG, 1, [Define to turn on debugging code that may slow normal operation])
+    # leave ac_cv_prog_cc_g alone; AC_PROG_CC will try to include -g if it can
+fi
+
 dnl Checks for programs.
 AC_PROG_CC
 AC_PROG_CPP
@@ -29,27 +48,6 @@ AC_DEFINE([_GNU_SOURCE], 1,
 if test x"$ac_cv_prog_cc_stdc" = x"no"; then
 	AC_MSG_WARN([rsync requires an ANSI C compiler and you don't seem to have one])
 fi
-
-# We must decide this before testing the compiler.
-
-# Please allow this to default to yes, so that your users have more
-# chance of getting a useful stack trace if problems occur.
-
-AC_MSG_CHECKING([whether to include debugging symbols])
-AC_ARG_ENABLE(debug,
-	AC_HELP_STRING([--disable-debug],
-		[disable debugging symbols and features]))
-
-if test x"$enable_debug" = x"no"; then
-    AC_MSG_RESULT(no)
-    CFLAGS=${CFLAGS-"-O"}
-else
-    AC_MSG_RESULT([yes])
-    # leave CFLAGS alone; AC_PROG_CC will try to include -g if it can
-    dnl AC_DEFINE(DEBUG, 1, [Define to turn on debugging code that may slow normal operation])
-    dnl CFLAGS=${CFLAGS-"-g"}
-fi
-
 
 AC_ARG_ENABLE(profile,
 	AC_HELP_STRING([--enable-profile],
