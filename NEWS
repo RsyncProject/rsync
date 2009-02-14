@@ -20,6 +20,9 @@ Changes since 3.0.5:
     - Fixed the rrsync script to avoid a server-side problem when -e is at the
       start of the short options.
 
+    - Fixed a problem where a vanished directory could turn into an exit code
+      23 instead of the proper exit code 24.
+
     - Fixed configure's erroneous use of target.
 
     - Fixed configure's --disable-debug option.
