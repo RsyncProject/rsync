@@ -1586,6 +1586,19 @@ static void add_dirs_to_tree(int parent_ndx, struct file_list *from_flist,
 		DIR_NEXT_SIBLING(dp) = -1;
 }
 
+static void interpret_stat_error(const char *fname, int is_dir)
+{
+	if (errno == ENOENT) {
+		io_error |= IOERR_VANISHED;
+		rprintf(FWARNING, "%s has vanished: %s\n",
+			is_dir ? "directory" : "file", full_fname(fname));
+	} else {
+		io_error |= IOERR_GENERAL;
+		rsyserr(FERROR_XFER, errno, "link_stat %s failed",
+			full_fname(fname));
+	}
+}
+
 /* This function is normally called by the sender, but the receiving side also
  * calls it from get_dirlist() with f set to -1 so that we just construct the
  * file list in memory without sending it over the wire.  Also, get_dirlist()
@@ -1605,8 +1618,11 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 	assert(flist != NULL);
 
 	if (!(d = opendir(fbuf))) {
-		if (errno == ENOENT)
+		if (errno == ENOENT) {
+			if (am_sender) /* Can abuse this for vanished error w/ENOENT: */
+				interpret_stat_error(fbuf, True);
 			return;
+		}
 		io_error |= IOERR_GENERAL;
 		rsyserr(FERROR_XFER, errno, "opendir %s failed", full_fname(fbuf));
 		return;
@@ -1778,9 +1794,7 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 		if (one_file_system) {
 			STRUCT_STAT st;
 			if (link_stat(fbuf, &st, copy_dirlinks) != 0) {
-				io_error |= IOERR_GENERAL;
-				rsyserr(FERROR_XFER, errno, "link_stat %s failed",
-					full_fname(fbuf));
+				interpret_stat_error(fbuf, True);
 				return;
 			}
 			filesystem_dev = st.st_dev;
@@ -1815,9 +1829,7 @@ static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 		if (name_type != NORMAL_NAME) {
 			STRUCT_STAT st;
 			if (link_stat(fbuf, &st, 1) != 0) {
-				io_error |= IOERR_GENERAL;
-				rsyserr(FERROR_XFER, errno, "link_stat %s failed",
-					full_fname(fbuf));
+				interpret_stat_error(fbuf, True);
 				continue;
 			}
 			send_file_name(f, flist, fbuf, &st, FLAG_TOP_DIR | flags, ALL_FILTERS);
