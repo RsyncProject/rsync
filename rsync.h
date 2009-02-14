@@ -396,7 +396,7 @@ enum msgcode {
 # include <limits.h>
 #endif
 
-#if defined HAVE_ICONV_OPEN && defined HAVE_ICONV_H
+#if defined USE_ICONV_OPEN && defined HAVE_ICONV_H
 #include <iconv.h>
 #ifndef ICONV_CONST
 #define ICONV_CONST
