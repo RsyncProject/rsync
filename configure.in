@@ -564,10 +564,19 @@ if test $ac_cv_func_getpgrp = yes; then
     AC_FUNC_GETPGRP
 fi
 
+AC_ARG_ENABLE(iconv-open,
+    AC_HELP_STRING([--disable-iconv-open],
+	    [disable all use of iconv_open() function]),
+    [], [enable_iconv_open=$ac_cv_func_iconv_open])
+
+if test x"$enable_iconv_open" != x"no"; then
+    AC_DEFINE(USE_ICONV_OPEN, 1, [Define to 1 if you want rsync to make use of iconv_open()])
+fi
+
 AC_ARG_ENABLE(iconv,
     AC_HELP_STRING([--disable-iconv],
 	    [disable rsync's --iconv option]),
-    [], [enable_iconv=$ac_cv_func_iconv_open])
+    [], [enable_iconv=$enable_iconv_open])
 AH_TEMPLATE([ICONV_OPTION],
 [Define if you want the --iconv option.  Specifing a value will set the
 default iconv setting (a NULL means no --iconv processing by default).])
