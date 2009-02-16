@@ -2163,7 +2163,8 @@ order to use bf(--info=progress2).)
 
 dit(bf(--password-file)) This option allows you to provide a password in a
 file for accessing an rsync daemon.  The file must not be world readable.
-It should contain just the password as a single line.
+It should contain just the password as the first line of the file (all
+other lines are ignored).
 
 This option does not supply a password to a remote shell transport such as
 ssh; to learn how to do that, consult the remote shell's documentation.
