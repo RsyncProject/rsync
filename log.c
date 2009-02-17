@@ -493,12 +493,21 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 	buf[total] = '\0';
 
 	for (p = buf; (p = strchr(p, '%')) != NULL; ) {
+		int humanize = 0;
 		s = p++;
 		c = fmt + 1;
+		while (*p == '\'') {
+			humanize++;
+			p++;
+		}
 		if (*p == '-')
 			*c++ = *p++;
 		while (isDigit(p) && c - fmt < (int)(sizeof fmt) - 8)
 			*c++ = *p++;
+		while (*p == '\'') {
+			humanize++;
+			p++;
+		}
 		if (!*p)
 			break;
 		*c = '\0';
@@ -522,7 +531,7 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 		case 'l':
 			strlcat(fmt, "s", sizeof fmt);
 			snprintf(buf2, sizeof buf2, fmt,
-				 comma_num(F_LENGTH(file)));
+				 do_big_num(F_LENGTH(file), humanize, NULL));
 			n = buf2;
 			break;
 		case 'U':
@@ -639,7 +648,8 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 					initial_stats->total_read;
 			}
 			strlcat(fmt, "s", sizeof fmt);
-			snprintf(buf2, sizeof buf2, fmt, comma_num(b));
+			snprintf(buf2, sizeof buf2, fmt,
+				 do_big_num(b, humanize, NULL));
 			n = buf2;
 			break;
 		case 'c':
@@ -651,7 +661,8 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 					initial_stats->total_read;
 			}
 			strlcat(fmt, "s", sizeof fmt);
-			snprintf(buf2, sizeof buf2, fmt, comma_num(b));
+			snprintf(buf2, sizeof buf2, fmt,
+				 do_big_num(b, humanize, NULL));
 			n = buf2;
 			break;
 		case 'C':

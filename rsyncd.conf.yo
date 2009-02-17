@@ -524,6 +524,11 @@ The format is a text string containing embedded single-character escape
 sequences prefixed with a percent (%) character.  An optional numeric
 field width may also be specified between the percent and the escape
 letter (e.g. "bf(%-50n %8l %07p)").
+In addition, one or more apostrophes may be specified prior to a numerical
+escape to indicate that the numerical value should be made more human-readable.
+The 3 supported levels are the same as for the bf(--human-readable)
+command-line option, though the default is for human-readability to be off.
+Each added apostrophe increases the level (e.g. "bf(%''l %'b %f)").
 
 The default log format is "%o %h [%a] %m (%u) %f %l", and a "%t [%p] "
 is always prefixed when using the "log file" parameter.

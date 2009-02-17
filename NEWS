@@ -16,8 +16,10 @@ Changes since 3.0.4:
       control over what is output.  Added an extra type of --progress output
       using --info=progress2.
 
-    - Output numbers in 3-digit groups by default (e.g. 1,234,567).  (See the
-      --human-readable option for a way to turn it off.)
+    - Output numbers in 3-digit groups by default (e.g. 1,234,567).  See the
+      --human-readable option for a way to turn it off.  See also the daemon's
+      "log format" parameter for a modifier that can request digit-grouping or
+      human-readable output in log escapes (including --out-format).
 
     - Added a "T" (terabyte) category to the --human-readable size suffixes.
 
