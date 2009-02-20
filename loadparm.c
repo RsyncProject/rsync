@@ -185,7 +185,7 @@ static const all_vars Defaults = {
  /* exclude; */			NULL,
  /* exclude_from; */		NULL,
  /* filter; */			NULL,
- /* gid; */			NOBODY_GROUP,
+ /* gid; */			NULL,
  /* hosts_allow; */		NULL,
  /* hosts_deny; */		NULL,
  /* include; */			NULL,
@@ -202,7 +202,7 @@ static const all_vars Defaults = {
  /* refuse_options; */		NULL,
  /* secrets_file; */		NULL,
  /* temp_dir; */ 		NULL,
- /* uid; */			NOBODY_USER,
+ /* uid; */			NULL,
 
  /* max_connections; */		0,
  /* max_verbosity; */		1,

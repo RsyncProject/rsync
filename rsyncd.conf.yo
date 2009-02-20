@@ -316,13 +316,19 @@ The default is for modules to be listable.
 dit(bf(uid)) This parameter specifies the user name or user ID that
 file transfers to and from that module should take place as when the daemon
 was run as root. In combination with the "gid" parameter this determines what
-file permissions are available. The default is uid -2, which is normally
-the user "nobody".
+file permissions are available. The default when run by a super-user is to
+switch to the system's "nobody" user.  The default for a non-super-user is to
+not try to change the user.  See also the "gid" parameter.
 
-dit(bf(gid)) This parameter specifies the group name or group ID that
-file transfers to and from that module should take place as when the daemon
-was run as root. This complements the "uid" parameter. The default is gid -2,
-which is normally the group "nobody".
+dit(bf(gid)) This parameter specifies one or more group names/IDs that will be
+used when accessing the module.  The first one will be the default group, and
+any extra ones be set as supplemental groups.  You may also specify a "*" as
+the first gid in the list, which will be replaced by all the normal groups for
+the transfer's user (see "uid").  The default when run by a super-user is to
+switch to your OS's "nobody" (or perhaps "nogroup") group with no other
+supplementary groups.  The default for a non-super-user is to not change any
+group attributes (and indeed, your OS may not allow a non-super-user to try to
+change their group settings).
 
 dit(bf(fake super)) Setting "fake super = yes" for a module causes the
 daemon side to behave as if the bf(--fake-user) command-line option had

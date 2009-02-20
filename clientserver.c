@@ -62,6 +62,8 @@ extern char *iconv_opt;
 extern iconv_t ic_send, ic_recv;
 #endif
 
+#define MAX_GID_LIST 32
+
 char *auth_user;
 int read_only = 0;
 int module_id = -1;
@@ -80,6 +82,9 @@ static int rl_nulls = 0;
 #ifdef HAVE_SIGACTION
 static struct sigaction sigact;
 #endif
+
+static gid_t gid_list[MAX_GID_LIST];
+static int gid_count = 0;
 
 /* Used when "reverse lookup" is off. */
 const char undetermined_hostname[] = "UNDETERMINED";
@@ -408,13 +413,75 @@ static int path_failure(int f_out, const char *dir, BOOL was_chdir)
 	return -1;
 }
 
+static int add_a_group(int f_out, const char *gname)
+{
+	gid_t gid;
+	if (!name_to_gid(gname, &gid)) {
+		if (!isDigit(gname)) {
+			rprintf(FLOG, "Invalid gid %s\n", gname);
+			io_printf(f_out, "@ERROR: invalid gid %s\n", gname);
+			return -1;
+		}
+		gid = atol(gname);
+	}
+	if (gid_count == MAX_GID_LIST) {
+		rprintf(FLOG, "Too many groups specified via gid parameter.\n");
+		io_printf(f_out, "@ERROR: too many groups\n");
+		return -1;
+	}
+	gid_list[gid_count++] = gid;
+	return 0;
+}
+
+static struct passwd *want_all_groups(int f_out, uid_t uid)
+{
+#if defined HAVE_GETGROUPLIST || defined HAVE_INITGROUPS
+	struct passwd *pw;
+	if ((pw = getpwuid(uid)) == NULL) {
+		rsyserr(FLOG, errno, "getpwuid failed");
+		io_printf(f_out, "@ERROR: getpwuid failed\n");
+		return NULL;
+	}
+# ifdef HAVE_GETGROUPLIST
+	/* Get all the process's groups, with the pw_gid group first. */
+	gid_count = MAX_GID_LIST;
+	if (getgrouplist(pw->pw_name, pw->pw_gid, gid_list, &gid_count) < 0) {
+		rsyserr(FLOG, errno, "getgrouplist failed");
+		io_printf(f_out, "@ERROR: getgrouplist failed\n");
+		return NULL;
+	}
+	/* Paranoia: is the default group not first in the list? */
+	if (gid_list[0] != pw->pw_gid) {
+		int j;
+		for (j = 0; j < gid_count; j++) {
+			if (gid_list[j] == pw->pw_gid) {
+				gid_list[j] = gid_list[0];
+				gid_list[0] = pw->pw_gid;
+				break;
+			}
+		}
+	}
+# else
+	/* Start with the default group and initgroups() will add the reset. */
+	gid_count = 1;
+	gid_list[0] = pw->pw_gid;
+# endif
+	return pw;
+#else
+	rprintf(FLOG, "This rsync does not support a gid of \"*\"\n");
+	io_printf(f_out, "@ERROR: invalid gid setting.\n");
+	return NULL;
+#endif
+}
+
 static int rsync_module(int f_in, int f_out, int i, const char *addr, const char *host)
 {
 	int argc;
 	char **argv, **orig_argv, **orig_early_argv, *module_chdir;
 	char line[BIGPATHBUFLEN];
-	uid_t uid = (uid_t)-2;  /* canonically "nobody" */
-	gid_t gid = (gid_t)-2;
+	struct passwd *pw = NULL;
+	uid_t uid;
+	int set_uid;
 	char *p, *err_msg = NULL;
 	char *name = lp_name(i);
 	int use_chroot = lp_use_chroot(i);
@@ -486,36 +553,46 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	if (logfile_format_has_i || log_format_has(logfile_format, 'o'))
 		logfile_format_has_o_or_i = 1;
 
-	am_root = (MY_UID() == 0);
+	uid = MY_UID();
+	am_root = (uid == 0);
 
-	if (am_root) {
-		p = lp_uid(i);
+	p = *lp_uid(i) ? lp_uid(i) : am_root ? NOBODY_USER : NULL;
+	if (p) {
 		if (!name_to_uid(p, &uid)) {
 			if (!isDigit(p)) {
 				rprintf(FLOG, "Invalid uid %s\n", p);
 				io_printf(f_out, "@ERROR: invalid uid %s\n", p);
 				return -1;
 			}
-			uid = atoi(p);
+			uid = atol(p);
 		}
+		set_uid = 1;
+	} else
+		set_uid = 0;
 
-		p = lp_gid(i);
-		if (!name_to_gid(p, &gid)) {
-			if (!isDigit(p)) {
-				rprintf(FLOG, "Invalid gid %s\n", p);
-				io_printf(f_out, "@ERROR: invalid gid %s\n", p);
+	p = *lp_gid(i) ? strtok(lp_gid(i), ", ") : NULL;
+	if (p) {
+		/* The "*" gid must be the first item in the list. */
+		if (strcmp(p, "*") == 0) {
+			if ((pw = want_all_groups(f_out, uid)) == NULL)
+				return -1;
+		} else if (add_a_group(f_out, p) < 0)
+			return -1;
+		while ((p = strtok(NULL, ", ")) != NULL) {
+#if defined HAVE_INITGROUPS && !defined HAVE_GETGROUPLIST
+			if (pw) {
+				rprintf(FLOG, "This rsync cannot add groups after \"*\".\n");
+				io_printf(f_out, "@ERROR: invalid gid setting.\n");
 				return -1;
 			}
-			gid = atoi(p);
+#endif
+			if (add_a_group(f_out, p) < 0)
+				return -1;
 		}
+	} else if (am_root) {
+		if (add_a_group(f_out, NOBODY_GROUP) < 0)
+			return -1;
 	}
-
-	/* TODO: If we're not root, but the configuration requests
-	 * that we change to some uid other than the current one, then
-	 * log a warning. */
-
-	/* TODO: Perhaps take a list of gids, and make them into the
-	 * supplementary groups. */
 
 	module_dir = lp_path(i);
 	if (use_chroot) {
@@ -705,34 +782,33 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		}
 	}
 
-	if (am_root) {
-		/* XXXX: You could argue that if the daemon is started
-		 * by a non-root user and they explicitly specify a
-		 * gid, then we should try to change to that gid --
-		 * this could be possible if it's already in their
-		 * supplementary groups. */
-
-		/* TODO: Perhaps we need to document that if rsyncd is
-		 * started by somebody other than root it will inherit
-		 * all their supplementary groups. */
-
-		if (setgid(gid)) {
-			rsyserr(FLOG, errno, "setgid %d failed", (int)gid);
+	if (gid_count) {
+		if (setgid(gid_list[0])) {
+			rsyserr(FLOG, errno, "setgid %ld failed", (long)gid_list[0]);
 			io_printf(f_out, "@ERROR: setgid failed\n");
 			return -1;
 		}
 #ifdef HAVE_SETGROUPS
-		/* Get rid of any supplementary groups this process
-		 * might have inheristed. */
-		if (setgroups(1, &gid)) {
+		/* Set the group(s) we want to be active. */
+		if (setgroups(gid_count, gid_list)) {
 			rsyserr(FLOG, errno, "setgroups failed");
 			io_printf(f_out, "@ERROR: setgroups failed\n");
 			return -1;
 		}
 #endif
+#if defined HAVE_INITGROUPS && !defined HAVE_GETGROUPLIST
+		/* pw is set if the user wants all the user's groups. */
+		if (pw && initgroups(pw->pw_name, pw->pw_gid) < 0) {
+			rsyserr(FLOG, errno, "initgroups failed");
+			io_printf(f_out, "@ERROR: initgroups failed\n");
+			return -1;
+		}
+#endif
+	}
 
+	if (set_uid) {
 		if (setuid(uid)) {
-			rsyserr(FLOG, errno, "setuid %d failed", (int)uid);
+			rsyserr(FLOG, errno, "setuid %ld failed", (long)uid);
 			io_printf(f_out, "@ERROR: setuid failed\n");
 			return -1;
 		}

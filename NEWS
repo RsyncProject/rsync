@@ -38,6 +38,10 @@ Changes since 3.0.4:
     - Added the "reverse lookup" parameter to the rsync daemon config file to
       allow reverse-DNS lookups to be disabled.
 
+    - Added a way for supplementary groups to be specified in the rsyncd.conf
+      file.  Also made explicitly-set uid/gid values no longer ignored by a
+      daemon that was not run by a super-user.
+
   EXTRAS:
 
     - Added an "instant-rsyncd" script to the support directory, which makes

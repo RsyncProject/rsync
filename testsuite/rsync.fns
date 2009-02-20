@@ -269,8 +269,8 @@ log format = %i %h [%a] %m (%u) %l %f%L
 transfer logging = yes
 exclude = ? foobar.baz
 max verbosity = 4
-uid = 0
-gid = 0
+#uid = 0
+#gid = 0
 
 [test-from]
 	path = $fromdir
