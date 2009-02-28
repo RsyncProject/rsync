@@ -2141,14 +2141,24 @@ was finishing the matched part of the file.
 When the file transfer finishes, rsync replaces the progress line with a
 summary line that looks like this:
 
-verb(     1238099 100%  146.38kB/s    0:00:08  (xfer#5, to-check=169/396))
+verb(      1,238,099 100%  146.38kB/s    0:00:08  (xfr#5, to-chk=169/396))
 
-In this example, the file was 1238099 bytes long in total, the average rate
+In this example, the file was 1,238,099 bytes long in total, the average rate
 of transfer for the whole file was 146.38 kilobytes per second over the 8
 seconds that it took to complete, it was the 5th transfer of a regular file
 during the current rsync session, and there are 169 more files for the
 receiver to check (to see if they are up-to-date or not) remaining out of
 the 396 total files in the file-list.
+
+In an incremental recursion scan, rsync won't know the total number of files
+in the file-list until it reaches the ends of the scan, but since it starts to
+transfer files during the scan, it will display a line with the text "ir-chk"
+(for incremental recursion check) instead of "to-chk" until the point that it
+knows the full size of the list, at which point it will switch to using
+"to-chk".  Thus, seeing "ir-chk" lets you know that the total count of files
+in the file list is still going to increase (and each time it does, the count
+of files left to check  will increase by the number of the files added to the
+list).
 
 dit(bf(-P)) The bf(-P) option is equivalent to bf(--partial) bf(--progress).  Its
 purpose is to make it much easier to specify these two options for a long

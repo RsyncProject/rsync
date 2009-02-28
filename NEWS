@@ -2,6 +2,24 @@ NEWS for rsync 3.1.0 (UNRELEASED)
 Protocol: 31 (changed)
 Changes since 3.0.4:
 
+  OUTPUT CHANGES:
+
+    - Output numbers in 3-digit groups by default (e.g. 1,234,567).  See the
+      --human-readable option for a way to turn it off.  See also the daemon's
+      "log format" parameter and related command-line options (including
+      --out-format) for a modifier that can be used to request digit-grouping
+      or human-readable output in log escapes. (Note that log output is
+      unchanged by default.)
+
+    - The output of the --progress option has changed:  the string "xfer" was
+      shortened to "xfr", and the string "to-check" was shortened to "to-chk",
+      both designed to make room for the (by default) wider display of file
+      size numbers without making the total line-length longer.  Also, when
+      incremental recursion is enabled, the string "ir-chk" will be used
+      instead of "to-chk" up until the incremental-recursion scan is done,
+      letting you know that the value to check and the total value will still
+      be increasing as new files are found.
+
   BUG FIXES:
 
     - Changed the way --progress overwrites its prior output in order to make
@@ -15,11 +33,6 @@ Changes since 3.0.4:
     - Added the --info=FLAGS and --debug=FLAGS options to allow finer-grained
       control over what is output.  Added an extra type of --progress output
       using --info=progress2.
-
-    - Output numbers in 3-digit groups by default (e.g. 1,234,567).  See the
-      --human-readable option for a way to turn it off.  See also the daemon's
-      "log format" parameter for a modifier that can request digit-grouping or
-      human-readable output in log escapes (including --out-format).
 
     - Added a "T" (terabyte) category to the --human-readable size suffixes.
 

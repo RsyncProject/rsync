@@ -2310,7 +2310,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			 * file-list to check if this is a 1-file xfer. */
 			send_extra_file_list(f, 1);
 		}
-	}
+	} else
+		flist_eof = 1;
 
 	return flist;
 }
@@ -2436,8 +2437,10 @@ struct file_list *recv_file_list(int f)
 
 	if (inc_recurse)
 		flist_done_allocating(flist);
-	else if (f >= 0)
+	else if (f >= 0) {
 		recv_id_list(f, flist);
+		flist_eof = 1;
+	}
 
 	flist_sort_and_clean(flist, relative_paths);
 
