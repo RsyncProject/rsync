@@ -50,6 +50,7 @@ extern int delete_mode;
 extern int delete_before;
 extern int delete_during;
 extern int delete_after;
+extern int delete_missing_args;
 extern int msgdone_cnt;
 extern int ignore_errors;
 extern int remove_source_files;
@@ -1170,6 +1171,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 		statret = link_stat(fname, &sx.st, keep_dirlinks && is_dir);
 		stat_errno = errno;
+	}
+
+	if (delete_missing_args && file->mode == 0) {
+		if (statret == 0)
+			delete_item(fname, sx.st.st_mode, del_opts);
+		return;
 	}
 
 	if (ignore_non_existing > 0 && statret == -1 && stat_errno == ENOENT) {

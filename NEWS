@@ -34,6 +34,10 @@ Changes since 3.0.4:
       control over what is output.  Added an extra type of --progress output
       using --info=progress2.
 
+    - Added the --delete-missing option to delete user-specified files on the
+      receiver that are missing on the sender (normally the absence of user-
+      specified files generates an error).
+
     - Added a "T" (terabyte) category to the --human-readable size suffixes.
 
     - Enhanced the --stats output: 1) to mention how many files were created

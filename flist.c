@@ -51,6 +51,7 @@ extern int preserve_links;
 extern int preserve_hard_links;
 extern int preserve_devices;
 extern int preserve_specials;
+extern int delete_missing_args;
 extern int uid_ndx;
 extern int gid_ndx;
 extern int eol_nulls;
@@ -431,7 +432,7 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 			stats.num_symlinks++;
 		else if (IS_DEVICE(file->mode))
 			stats.num_devices++;
-		else
+		else if (IS_SPECIAL(file->mode))
 			stats.num_specials++;
 		xflags = 0;
 	}
@@ -1124,8 +1125,10 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 	if (sanitize_paths)
 		sanitize_path(thisname, thisname, "", 0, SP_DEFAULT);
 
-	if (stp && S_ISDIR(stp->st_mode)) {
-		st = *stp; /* Needed for "symlink/." with --relative. */
+	if (stp && (S_ISDIR(stp->st_mode) || stp->st_mode == 0)) {
+		/* This is needed to handle a "symlink/." with a --relative
+		 * dir, or a request to delete a specific file. */
+		st = *stp;
 		*linkname = '\0'; /* make IBM code checker happy */
 	} else if (readlink_stat(thisname, &st, linkname) != 0) {
 		int save_errno = errno;
@@ -1165,6 +1168,11 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 			rsyserr(FERROR_XFER, save_errno, "readlink_stat(%s) failed",
 				full_fname(thisname));
 		}
+		return NULL;
+	} else if (st.st_mode == 0) {
+		io_error |= IOERR_GENERAL;
+		rprintf(FINFO, "skipping file with bogus (zero) st_mode: %s\n",
+			full_fname(thisname));
 		return NULL;
 	}
 
@@ -2169,10 +2177,15 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (link_stat(fbuf, &st, copy_dirlinks || name_type != NORMAL_NAME) != 0
 		 || (name_type != DOTDIR_NAME && is_daemon_excluded(fbuf, S_ISDIR(st.st_mode)))
 		 || (relative_paths && path_is_daemon_excluded(fbuf, 1))) {
-			io_error |= IOERR_GENERAL;
-			rsyserr(FERROR_XFER, errno, "link_stat %s failed",
-				full_fname(fbuf));
-			continue;
+			if (errno == ENOENT && delete_missing_args) {
+				/* Rsync will treat a mode of 0 as deleted. */
+				memset(&st, 0, sizeof st);
+			} else {
+				io_error |= IOERR_GENERAL;
+				rsyserr(FERROR_XFER, errno, "link_stat %s failed",
+					full_fname(fbuf));
+				continue;
+			}
 		}
 
 		/* A dot-dir should not be excluded! */

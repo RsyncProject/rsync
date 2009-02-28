@@ -375,6 +375,7 @@ to the detailed description below for a complete description.  verb(
      --delete-delay          find deletions during, delete after
      --delete-after          receiver deletes after transfer, not before
      --delete-excluded       also delete excluded files from dest dirs
+     --delete-missing-args   receiver deletes each missing source arg
      --ignore-errors         delete even if there are I/O errors
      --force                 force deletion of dirs even if not empty
      --max-delete=NUM        don't delete more than NUM files
@@ -1262,6 +1263,13 @@ See the FILTER RULES section for a way to make individual exclusions behave
 this way on the receiver, and for a way to protect files from
 bf(--delete-excluded).
 See bf(--delete) (which is implied) for more details on file-deletion.
+
+dit(bf(--delete-missing-args)) Any source arg that is found to me missing is
+treated as a request to delete the file by the receiver rather than the sender
+generating a missing-file error.  Does not affect vanished files discovered
+through recursive scanning of directories, just the args mentioned on the
+command-line or in the bf(--files-from) list.  Can be used with or without any
+other type of delete processing.
 
 dit(bf(--ignore-errors)) Tells bf(--delete) to go ahead and delete files
 even when there are I/O errors.

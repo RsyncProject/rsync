@@ -69,6 +69,7 @@ int delete_during = 0;
 int delete_before = 0;
 int delete_after = 0;
 int delete_excluded = 0;
+int delete_missing_args = 0;
 int remove_source_files = 0;
 int one_file_system = 0;
 int protocol_version = PROTOCOL_VERSION;
@@ -718,6 +719,7 @@ void usage(enum logcode F)
   rprintf(F,"     --delete-delay          find deletions during, delete after\n");
   rprintf(F,"     --delete-after          receiver deletes after transfer, not during\n");
   rprintf(F,"     --delete-excluded       also delete excluded files from destination dirs\n");
+  rprintf(F,"     --delete-missing-args   receiver deletes each missing source arg\n");
   rprintf(F,"     --ignore-errors         delete even if there are I/O errors\n");
   rprintf(F,"     --force                 force deletion of directories even if not empty\n");
   rprintf(F,"     --max-delete=NUM        don't delete more than NUM files\n");
@@ -908,6 +910,7 @@ static struct poptOption long_options[] = {
   {"delete-delay",     0,  POPT_ARG_VAL,    &delete_during, 2, 0, 0 },
   {"delete-after",     0,  POPT_ARG_NONE,   &delete_after, 0, 0, 0 },
   {"delete-excluded",  0,  POPT_ARG_NONE,   &delete_excluded, 0, 0, 0 },
+  {"delete-missing-args",0,POPT_ARG_NONE,   &delete_missing_args, 0, 0, 0 },
   {"remove-sent-files",0,  POPT_ARG_VAL,    &remove_source_files, 2, 0, 0 }, /* deprecated */
   {"remove-source-files",0,POPT_ARG_VAL,    &remove_source_files, 1, 0, 0 },
   {"force",            0,  POPT_ARG_VAL,    &force_delete, 1, 0, 0 },
@@ -1922,7 +1925,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		return 0;
 	}
 
-	if (delete_mode && refused_delete) {
+	if (refused_delete && (delete_mode || delete_missing_args)) {
 		create_refuse_error(refused_delete);
 		return 0;
 	}
@@ -2478,6 +2481,9 @@ void server_options(char **args, int *argc_p)
 			args[ac++] = arg;
 		}
 	}
+
+	if (delete_missing_args)
+		args[ac++] = "--delete-missing-args";
 
 	if (modify_window_set) {
 		if (asprintf(&arg, "--modify-window=%d", modify_window) < 0)
