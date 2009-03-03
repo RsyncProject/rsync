@@ -284,7 +284,7 @@ int make_backup(const char *fname, BOOL prefer_rename)
 #ifdef SUPPORT_LINKS
 	if (!ret && preserve_links && S_ISLNK(file->mode)) {
 		const char *sl = F_SYMLINK(file);
-		if (safe_symlinks && unsafe_symlink(sl, buf)) {
+		if (safe_symlinks && unsafe_symlink(sl, fname)) {
 			if (INFO_GTE(SYMSAFE, 1)) {
 				rprintf(FINFO, "ignoring unsafe symlink %s -> %s\n",
 					full_fname(buf), sl);
