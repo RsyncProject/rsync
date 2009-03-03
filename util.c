@@ -1168,11 +1168,12 @@ int handle_partial_dir(const char *fname, int create)
 	return 1;
 }
 
-/**
- * Determine if a symlink points outside the current directory tree.
+/* Determine if a symlink points outside the current directory tree.
  * This is considered "unsafe" because e.g. when mirroring somebody
  * else's machine it might allow them to establish a symlink to
  * /etc/passwd, and then read it through a web server.
+ *
+ * Returns 1 if unsafe, 0 if safe.
  *
  * Null symlinks and absolute symlinks are always unsafe.
  *
@@ -1181,17 +1182,11 @@ int handle_partial_dir(const char *fname, int create)
  * transferred directory.  We are not allowed to go back up and
  * reenter.
  *
- * @param dest Target of the symlink in question.
+ * "dest" is the target of the symlink in question.
  *
- * @param src Top source directory currently applicable.  Basically this
- * is the first parameter to rsync in a simple invocation, but it's
- * modified by flist.c in slightly complex ways.
- *
- * @retval True if unsafe
- * @retval False is unsafe
- *
- * @sa t_unsafe.c
- **/
+ * "src" is the top source directory currently applicable at the level
+ * of the referenced symlink.  This is usually the symlink's full path
+ * (including its name), as referenced from the root of the transfer. */
 int unsafe_symlink(const char *dest, const char *src)
 {
 	const char *name, *slash;
@@ -1203,33 +1198,33 @@ int unsafe_symlink(const char *dest, const char *src)
 
 	/* find out what our safety margin is */
 	for (name = src; (slash = strchr(name, '/')) != 0; name = slash+1) {
-		if (strncmp(name, "../", 3) == 0) {
-			depth = 0;
-		} else if (strncmp(name, "./", 2) == 0) {
-			/* nothing */
-		} else {
+		/* ".." segment starts the count over.  "." segment is ignored. */
+		if (*name == '.' && (name[1] == '/' || (name[1] == '.' && name[2] == '/'))) {
+			if (name[1] == '.')
+				depth = 0;
+		} else
 			depth++;
-		}
+		while (slash[1] == '/') slash++; /* just in case src isn't clean */
 	}
-	if (strcmp(name, "..") == 0)
+	if (*name == '.' && name[1] == '.' && name[2] == '\0')
 		depth = 0;
 
 	for (name = dest; (slash = strchr(name, '/')) != 0; name = slash+1) {
-		if (strncmp(name, "../", 3) == 0) {
-			/* if at any point we go outside the current directory
-			   then stop - it is unsafe */
-			if (--depth < 0)
-				return 1;
-		} else if (strncmp(name, "./", 2) == 0) {
-			/* nothing */
-		} else {
+		if (*name == '.' && (name[1] == '/' || (name[1] == '.' && name[2] == '/'))) {
+			if (name[1] == '.') {
+				/* if at any point we go outside the current directory
+				   then stop - it is unsafe */
+				if (--depth < 0)
+					return 1;
+			}
+		} else
 			depth++;
-		}
+		while (slash[1] == '/') slash++;
 	}
-	if (strcmp(name, "..") == 0)
+	if (*name == '.' && name[1] == '.' && name[2] == '\0')
 		depth--;
 
-	return (depth < 0);
+	return depth < 0;
 }
 
 #define HUMANIFY(mult) \
