@@ -295,7 +295,7 @@ static int keep_backup(const char *fname)
 #ifdef SUPPORT_LINKS
 	if (!kept && preserve_links && S_ISLNK(file->mode)) {
 		const char *sl = F_SYMLINK(file);
-		if (safe_symlinks && unsafe_symlink(sl, buf)) {
+		if (safe_symlinks && unsafe_symlink(sl, fname)) {
 			if (verbose) {
 				rprintf(FINFO, "ignoring unsafe symlink %s -> %s\n",
 					full_fname(buf), sl);
