@@ -1031,7 +1031,11 @@ static void list_file_entry(struct file_struct *f)
 			F_SYMLINK(f));
 	} else
 #endif
-	{
+	if (delete_missing_args && !f->mode) {
+		rprintf(FINFO, "%-*s %s\n",
+			colwidth + 31, "*missing",
+			f_name(f, NULL));
+	} else {
 		rprintf(FINFO, "%s %*s %s %s\n",
 			permbuf, colwidth, comma_num(len),
 			timestring(f->modtime), f_name(f, NULL));
