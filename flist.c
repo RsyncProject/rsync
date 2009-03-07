@@ -794,7 +794,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 	if (!(xflags & XMIT_SAME_MODE))
 		mode = from_wire_mode(read_int(f));
 
-	if (chmod_modes && !S_ISLNK(mode))
+	if (chmod_modes && !S_ISLNK(mode) && mode)
 		mode = tweak_mode(mode, chmod_modes);
 
 	if (preserve_uid && !(xflags & XMIT_SAME_UID)) {
@@ -1372,7 +1372,7 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 	if (!file)
 		return NULL;
 
-	if (chmod_modes && !S_ISLNK(file->mode))
+	if (chmod_modes && !S_ISLNK(file->mode) && file->mode)
 		file->mode = tweak_mode(file->mode, chmod_modes);
 
 	if (f >= 0) {
