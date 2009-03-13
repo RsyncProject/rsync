@@ -2189,7 +2189,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		}
 
 		/* A dot-dir should not be excluded! */
-		if (name_type != DOTDIR_NAME
+		if (name_type != DOTDIR_NAME && st.st_mode != 0
 		 && is_excluded(fbuf, S_ISDIR(st.st_mode) != 0, ALL_FILTERS))
 			continue;
 

@@ -97,7 +97,7 @@ extern mode_t orig_umask;
 extern uid_t our_uid;
 extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
-extern struct filter_list_struct daemon_filter_list;
+extern struct filter_list_struct filter_list, daemon_filter_list;
 
 int maybe_ATTRS_REPORT = 0;
 
@@ -1178,6 +1178,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	}
 
 	if (delete_missing_args && file->mode == 0) {
+		if (filter_list.head && check_filter(&filter_list, FINFO, fname, is_dir) < 0)
+			return;
 		if (statret == 0)
 			delete_item(fname, sx.st.st_mode, del_opts);
 		return;
