@@ -69,7 +69,6 @@ int delete_during = 0;
 int delete_before = 0;
 int delete_after = 0;
 int delete_excluded = 0;
-int delete_missing_args = 0;
 int remove_source_files = 0;
 int one_file_system = 0;
 int protocol_version = PROTOCOL_VERSION;
@@ -82,6 +81,7 @@ int am_sender = 0;
 int am_starting_up = 1;
 int relative_paths = -1;
 int implied_dirs = 1;
+int missing_args = 0; /* 0 = FERROR_XFER, 1 = ignore, 2 = delete */
 int numeric_ids = 0;
 int msgs2stderr = 0;
 int allow_8bit_chars = 0;
@@ -719,7 +719,8 @@ void usage(enum logcode F)
   rprintf(F,"     --delete-delay          find deletions during, delete after\n");
   rprintf(F,"     --delete-after          receiver deletes after transfer, not during\n");
   rprintf(F,"     --delete-excluded       also delete excluded files from destination dirs\n");
-  rprintf(F,"     --delete-missing-args   receiver deletes each missing source arg\n");
+  rprintf(F,"     --ignore-missing-args   ignore missing source args without error\n");
+  rprintf(F,"     --delete-missing-args   delete missing source args from destination\n");
   rprintf(F,"     --ignore-errors         delete even if there are I/O errors\n");
   rprintf(F,"     --force                 force deletion of directories even if not empty\n");
   rprintf(F,"     --max-delete=NUM        don't delete more than NUM files\n");
@@ -910,7 +911,8 @@ static struct poptOption long_options[] = {
   {"delete-delay",     0,  POPT_ARG_VAL,    &delete_during, 2, 0, 0 },
   {"delete-after",     0,  POPT_ARG_NONE,   &delete_after, 0, 0, 0 },
   {"delete-excluded",  0,  POPT_ARG_NONE,   &delete_excluded, 0, 0, 0 },
-  {"delete-missing-args",0,POPT_ARG_NONE,   &delete_missing_args, 0, 0, 0 },
+  {"delete-missing-args",0,POPT_BIT_SET,    &missing_args, 2, 0, 0 },
+  {"ignore-missing-args",0,POPT_BIT_SET,    &missing_args, 1, 0, 0 },
   {"remove-sent-files",0,  POPT_ARG_VAL,    &remove_source_files, 2, 0, 0 }, /* deprecated */
   {"remove-source-files",0,POPT_ARG_VAL,    &remove_source_files, 1, 0, 0 },
   {"force",            0,  POPT_ARG_VAL,    &force_delete, 1, 0, 0 },
@@ -1925,7 +1927,9 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		return 0;
 	}
 
-	if (refused_delete && (delete_mode || delete_missing_args)) {
+	if (missing_args == 3) /* simplify if both options were specified */
+		missing_args = 2;
+	if (refused_delete && (delete_mode || missing_args == 2)) {
 		create_refuse_error(refused_delete);
 		return 0;
 	}
@@ -2482,8 +2486,12 @@ void server_options(char **args, int *argc_p)
 		}
 	}
 
-	if (delete_missing_args)
+	/* --delete-missing-args needs the cooperation of both sides, but
+	 * the sender can handle --ignore-missing-args by itself. */
+	if (missing_args == 2)
 		args[ac++] = "--delete-missing-args";
+	else if (missing_args == 1 && !am_sender)
+		args[ac++] = "--ignore-missing-args";
 
 	if (modify_window_set) {
 		if (asprintf(&arg, "--modify-window=%d", modify_window) < 0)

@@ -51,7 +51,7 @@ extern int preserve_links;
 extern int preserve_hard_links;
 extern int preserve_devices;
 extern int preserve_specials;
-extern int delete_missing_args;
+extern int missing_args;
 extern int uid_ndx;
 extern int gid_ndx;
 extern int eol_nulls;
@@ -2177,14 +2177,21 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (link_stat(fbuf, &st, copy_dirlinks || name_type != NORMAL_NAME) != 0
 		 || (name_type != DOTDIR_NAME && is_daemon_excluded(fbuf, S_ISDIR(st.st_mode)))
 		 || (relative_paths && path_is_daemon_excluded(fbuf, 1))) {
-			if (errno == ENOENT && delete_missing_args) {
-				/* Rsync will treat a mode of 0 as deleted. */
-				memset(&st, 0, sizeof st);
-			} else {
-				io_error |= IOERR_GENERAL;
+			if (errno != ENOENT || missing_args == 0) {
+				/* This is a transfer error, but inhibit deletion
+				 * only if we might be omitting an existing file. */
+				if (errno != ENOENT)
+					io_error |= IOERR_GENERAL;
 				rsyserr(FERROR_XFER, errno, "link_stat %s failed",
 					full_fname(fbuf));
 				continue;
+			} else if (missing_args == 1) {
+				/* Just ignore the arg. */
+				continue;
+			} else /* (missing_args == 2) */ {
+				/* Send the arg as a "missing" entry with
+				 * mode 0, which tells the generator to delete it. */
+				memset(&st, 0, sizeof st);
 			}
 		}
 

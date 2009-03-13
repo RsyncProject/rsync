@@ -375,7 +375,8 @@ to the detailed description below for a complete description.  verb(
      --delete-delay          find deletions during, delete after
      --delete-after          receiver deletes after transfer, not before
      --delete-excluded       also delete excluded files from dest dirs
-     --delete-missing-args   receiver deletes each missing source arg
+     --ignore-missing-args   ignore missing source args without error
+     --delete-missing-args   delete missing source args from destination
      --ignore-errors         delete even if there are I/O errors
      --force                 force deletion of dirs even if not empty
      --max-delete=NUM        don't delete more than NUM files
@@ -1264,12 +1265,22 @@ this way on the receiver, and for a way to protect files from
 bf(--delete-excluded).
 See bf(--delete) (which is implied) for more details on file-deletion.
 
-dit(bf(--delete-missing-args)) Any source arg that is found to me missing is
-treated as a request to delete the file by the receiver rather than the sender
-generating a missing-file error.  Does not affect vanished files discovered
-through recursive scanning of directories, just the args mentioned on the
-command-line or in the bf(--files-from) list.  Can be used with or without any
-other type of delete processing.
+dit(bf(--ignore-missing-args)) When rsync is first processing the explicitly
+requested source files (e.g. command-line arguments or bf(--files-from)
+entries), it is normally an error if the file cannot be found.  This option
+suppresses that error, and does not try to transfer the file.  This does not
+affect subsequent vanished-file errors if a file was initially found to be
+present and later is no longer there.
+
+dit(bf(--delete-missing-args)) This option takes the behavior of (the implied)
+bf(--ignore-missing-args) option a step farther:  each missing arg will become
+a deletion request of the corresponding destination file on the receiving side
+(should it exist).  If the destination file is a non-empty directory, it will
+only be successfully deleted if --force or --delete are in effect.  Other than
+that, this option is independent of any other type of delete processing.
+
+The missing source files are represented by special file-list entries which
+display as a "*missing" entry in the bf(--list-only) output.
 
 dit(bf(--ignore-errors)) Tells bf(--delete) to go ahead and delete files
 even when there are I/O errors.

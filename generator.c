@@ -50,7 +50,7 @@ extern int delete_mode;
 extern int delete_before;
 extern int delete_during;
 extern int delete_after;
-extern int delete_missing_args;
+extern int missing_args;
 extern int msgdone_cnt;
 extern int ignore_errors;
 extern int remove_source_files;
@@ -1031,7 +1031,7 @@ static void list_file_entry(struct file_struct *f)
 			F_SYMLINK(f));
 	} else
 #endif
-	if (delete_missing_args && !f->mode) {
+	if (missing_args == 2 && f->mode == 0) {
 		rprintf(FINFO, "%-*s %s\n",
 			colwidth + 31, "*missing",
 			f_name(f, NULL));
@@ -1177,7 +1177,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		stat_errno = errno;
 	}
 
-	if (delete_missing_args && file->mode == 0) {
+	if (missing_args == 2 && file->mode == 0) {
 		if (filter_list.head && check_filter(&filter_list, FINFO, fname, is_dir) < 0)
 			return;
 		if (statret == 0)
