@@ -271,7 +271,7 @@ void setup_protocol(int f_out,int f_in)
 #endif
 #ifdef ICONV_OPTION
 		sender_symlink_iconv = iconv_opt && (am_server
-		    ? strchr(client_info, 's') != NULL
+		    ? local_server || strchr(client_info, 's') != NULL
 		    : !!(compat_flags & CF_SYMLINK_ICONV));
 #endif
 		if (inc_recurse && !allow_inc_recurse) {
