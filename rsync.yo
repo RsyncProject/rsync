@@ -2859,26 +2859,25 @@ of the destination trees.  The write-batch option causes the rsync
 client to store in a "batch file" all the information needed to repeat
 this operation against other, identical destination trees.
 
-To apply the recorded changes to another destination tree, run rsync
-with the read-batch option, specifying the name of the same batch
-file, and the destination tree.  Rsync updates the destination tree
-using the information stored in the batch file.
-
-For convenience, one additional file is creating when the write-batch
-option is used.  This file's name is created by appending
-".sh" to the batch filename.  The .sh file contains
-a command-line suitable for updating a destination tree using that
-batch file. It can be executed using a Bourne (or Bourne-like) shell,
-optionally
-passing in an alternate destination tree pathname which is then used
-instead of the original path. This is useful when the destination tree
-path differs from the original destination tree path.
-
 Generating the batch file once saves having to perform the file
 status, checksum, and data block generation more than once when
 updating multiple destination trees. Multicast transport protocols can
 be used to transfer the batch update files in parallel to many hosts
 at once, instead of sending the same data to every host individually.
+
+To apply the recorded changes to another destination tree, run rsync
+with the read-batch option, specifying the name of the same batch
+file, and the destination tree.  Rsync updates the destination tree
+using the information stored in the batch file.
+
+For your convenience, a script file is also created when the write-batch
+option is used:  it will be named the same as the batch file with ".sh"
+appended.  This script file contains a command-line suitable for updating a
+destination tree using the associated batch file. It can be executed using
+a Bourne (or Bourne-like) shell, optionally passing in an alternate
+destination tree pathname which is then used instead of the original
+destination path.  This is useful when the destination tree path on the
+current host differs from the one used to create the batch file.
 
 Examples:
 
