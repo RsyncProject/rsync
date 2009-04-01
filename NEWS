@@ -28,6 +28,10 @@ Changes since 3.0.5:
 
     - Fixed the --iconv conversion of symlinks when doing a local copy.
 
+    - Fixed a problem where --one-file-system was not stopping deletions on the
+      receiving side when a mount-point directory did not match a directory in
+      the transfer.
+
     - Fixed configure's erroneous use of target.
 
     - Fixed configure's --disable-debug option.
