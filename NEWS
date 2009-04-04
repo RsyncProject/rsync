@@ -32,6 +32,8 @@ Changes since 3.0.5:
       receiving side when a mount-point directory did not match a directory in
       the transfer.
 
+    - Fixed the use of --dry-run with --read-batch.
+
     - Fixed configure's erroneous use of target.
 
     - Fixed configure's --disable-debug option.
