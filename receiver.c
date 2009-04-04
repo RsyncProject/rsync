@@ -361,7 +361,7 @@ static void no_batched_update(int ndx, BOOL is_redo)
 	rprintf(FERROR_XFER, "(No batched update for%s \"%s\")\n",
 		is_redo ? " resend of" : "", f_name(file, NULL));
 
-	if (inc_recurse)
+	if (inc_recurse && !dry_run)
 		send_msg_int(MSG_NO_SEND, ndx);
 }
 
@@ -562,19 +562,6 @@ int recv_files(int f_in, char *local_name)
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		if (!do_xfers) { /* log the transfer */
-			log_item(FCLIENT, file, &stats, iflags, NULL);
-			if (read_batch)
-				discard_receive_data(f_in, F_LENGTH(file));
-			continue;
-		}
-		if (write_batch < 0) {
-			log_item(FCLIENT, file, &stats, iflags, NULL);
-			if (!am_server)
-				discard_receive_data(f_in, F_LENGTH(file));
-			continue;
-		}
-
 		if (read_batch) {
 			int wanted = redoing
 				   ? we_want_redo(ndx)
@@ -588,6 +575,19 @@ int recv_files(int f_in, char *local_name)
 				file->flags |= FLAG_FILE_SENT;
 				continue;
 			}
+		}
+
+		if (!do_xfers) { /* log the transfer */
+			log_item(FCLIENT, file, &stats, iflags, NULL);
+			if (read_batch)
+				discard_receive_data(f_in, F_LENGTH(file));
+			continue;
+		}
+		if (write_batch < 0) {
+			log_item(FCLIENT, file, &stats, iflags, NULL);
+			if (!am_server)
+				discard_receive_data(f_in, F_LENGTH(file));
+			continue;
 		}
 
 		partialptr = partial_dir ? partial_dir_fname(fname) : fname;
