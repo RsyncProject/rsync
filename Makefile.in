@@ -60,7 +60,7 @@ CHECK_OBJS=tls.o getgroups.o getfsdev.o t_stub.o t_unsafe.o trimslash.o wildtest
 	$(CC) -I. -I$(srcdir) $(CFLAGS) $(CPPFLAGS) -c $< @CC_SHOBJ_FLAG@
 @OBJ_RESTORE@
 
-all: conf_stop make_stop rsync$(EXEEXT) @MAKE_MAN@
+all: Makefile rsync$(EXEEXT) @MAKE_MAN@
 
 install: all
 	-mkdir -p ${DESTDIR}${bindir}
@@ -124,8 +124,6 @@ gensend: gen
 conf:
 	cd $(srcdir) && $(MAKE) -f prepare-source.mak conf
 
-conf_stop: configure.sh config.h.in
-
 configure.sh config.h.in: configure.in aclocal.m4
 	@if test -f configure.sh; then cp -p configure.sh configure.sh.old; else touch configure.sh.old; fi
 	@if test -f config.h.in; then cp -p config.h.in config.h.in.old; else touch config.h.in.old; fi
@@ -157,9 +155,7 @@ reconfigure: configure.sh
 	./config.status --recheck
 	./config.status
 
-make_stop: Makefile
-
-Makefile: Makefile.in config.status
+Makefile: Makefile.in config.status configure.sh config.h.in
 	@if test -f Makefile; then cp -p Makefile Makefile.old; else touch Makefile.old; fi
 	@./config.status
 	@if diff Makefile Makefile.old >/dev/null 2>&1; then \
