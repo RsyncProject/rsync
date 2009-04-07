@@ -518,7 +518,7 @@ dit(bf(-c, --checksum)) This changes the way rsync checks if the files have
 been changed and are in need of a transfer.  Without this option, rsync
 uses a "quick check" that (by default) checks if each file's size and time
 of last modification match between the sender and receiver.  This option
-changes this to compare a 128-bit MD4 checksum for each file that has a
+changes this to compare a 128-bit checksum for each file that has a
 matching size.  Generating the checksums means that both sides will expend
 a lot of disk I/O reading all the data in the files in the transfer (and
 this is prior to any reading that will be done to transfer changed files),
@@ -535,6 +535,9 @@ correctly reconstructed on the receiving side by checking a whole-file
 checksum that is generated as the file is transferred, but that
 automatic after-the-transfer verification has nothing to do with this
 option's before-the-transfer "Does this file need to be updated?" check.
+
+For protocol 30 and beyond (first supported in 3.0.0), the checksum used is
+MD5.  For older protocols, the checksum used is MD4.
 
 dit(bf(-a, --archive)) This is equivalent to bf(-rlptgoD). It is a quick
 way of saying you want recursion and want to preserve almost
@@ -1780,6 +1783,9 @@ specify an empty string, updated files will not be mentioned in the log file.
 For a list of the possible escape characters, see the "log format" setting
 in the rsyncd.conf manpage.
 
+The default FORMAT used if bf(--log-file) is specified and this option is not
+is '%i %n%L'.
+
 dit(bf(--stats)) This tells rsync to print a verbose set of statistics
 on the file transfer, allowing you to tell how effective rsync's delta-transfer
 algorithm is for your data.
@@ -2102,9 +2108,9 @@ If rsync was complied without support for IPv6, the bf(--ipv6) option
 will have no effect.  The bf(--version) output will tell you if this
 is the case.
 
-dit(bf(--checksum-seed=NUM)) Set the MD4 checksum seed to the integer
+dit(bf(--checksum-seed=NUM)) Set the checksum seed to the integer
 NUM.  This 4 byte checksum seed is included in each block and file
-MD4 checksum calculation.  By default the checksum seed is generated
+checksum calculation.  By default the checksum seed is generated
 by the server and defaults to the current code(time()).  This option
 is used to set a specific checksum seed, which is useful for
 applications that want repeatable block and file checksums, or
