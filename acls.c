@@ -88,6 +88,9 @@ static const rsync_acl empty_rsync_acl = {
 static item_list access_acl_list = EMPTY_ITEM_LIST;
 static item_list default_acl_list = EMPTY_ITEM_LIST;
 
+static size_t prior_access_count = (size_t)-1;
+static size_t prior_default_count = (size_t)-1;
+
 /* === Calculations on ACL types === */
 
 static const char *str_acl_type(SMB_ACL_TYPE_T type)
@@ -788,14 +791,47 @@ static int cache_rsync_acl(rsync_acl *racl, SMB_ACL_TYPE_T type, item_list *racl
 
 /* Turn the ACL data in stat_x into cached ACL data, setting the index
  * values in the file struct. */
-void cache_acl(struct file_struct *file, stat_x *sxp)
+void cache_tmp_acl(struct file_struct *file, stat_x *sxp)
 {
+	if (prior_access_count == (size_t)-1)
+		prior_access_count = access_acl_list.count;
+
 	F_ACL(file) = cache_rsync_acl(sxp->acc_acl,
 				      SMB_ACL_TYPE_ACCESS, &access_acl_list);
 
 	if (S_ISDIR(sxp->st.st_mode)) {
+		if (prior_default_count == (size_t)-1)
+			prior_default_count = default_acl_list.count;
 		F_DIR_DEFACL(file) = cache_rsync_acl(sxp->def_acl,
 				      SMB_ACL_TYPE_DEFAULT, &default_acl_list);
+	}
+}
+
+static void uncache_duo_acls(item_list *duo_list, size_t start)
+{
+	acl_duo *duo_item = duo_list->items;
+	acl_duo *duo_start = duo_item + start;
+
+	duo_item += duo_list->count;
+	duo_list->count = start;
+
+	while (duo_item-- > duo_start) {
+		rsync_acl_free(&duo_item->racl);
+		if (duo_item->sacl)
+			sys_acl_free_acl(duo_item->sacl);
+	}
+}
+
+void uncache_tmp_acls(void)
+{
+	if (prior_access_count != (size_t)-1) {
+		uncache_duo_acls(&access_acl_list, prior_access_count);
+		prior_access_count = (size_t)-1;
+	}
+
+	if (prior_default_count != (size_t)-1) {
+		uncache_duo_acls(&default_acl_list, prior_default_count);
+		prior_default_count = (size_t)-1;
 	}
 }
 

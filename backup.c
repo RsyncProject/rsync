@@ -106,19 +106,25 @@ int make_bak_dir(const char *fullpath)
 #ifdef SUPPORT_ACLS
 				if (preserve_acls && !S_ISLNK(file->mode)) {
 					get_acl(rel, &sx);
-					cache_acl(file, &sx);
+					cache_tmp_acl(file, &sx);
 					free_acl(&sx);
 				}
 #endif
 #ifdef SUPPORT_XATTRS
 				if (preserve_xattrs) {
 					get_xattr(rel, &sx);
-					cache_xattr(file, &sx);
+					cache_tmp_xattr(file, &sx);
 					free_xattr(&sx);
 				}
 #endif
 				set_file_attrs(fbuf, file, NULL, NULL, 0);
 				unmake_file(file);
+#ifdef SUPPORT_ACLS
+				uncache_tmp_acls();
+#endif
+#ifdef SUPPORT_XATTRS
+				uncache_tmp_xattrs();
+#endif
 			}
 		}
 		*p = '/';
@@ -219,14 +225,14 @@ int make_backup(const char *fname, BOOL prefer_rename)
 #ifdef SUPPORT_ACLS
 	if (preserve_acls && !S_ISLNK(file->mode)) {
 		get_acl(fname, &sx);
-		cache_acl(file, &sx);
+		cache_tmp_acl(file, &sx);
 		free_acl(&sx);
 	}
 #endif
 #ifdef SUPPORT_XATTRS
 	if (preserve_xattrs) {
 		get_xattr(fname, &sx);
-		cache_xattr(file, &sx);
+		cache_tmp_xattr(file, &sx);
 		free_xattr(&sx);
 	}
 #endif
@@ -313,6 +319,12 @@ int make_backup(const char *fname, BOOL prefer_rename)
 		rprintf(FINFO, "make_bak: skipping non-regular file %s\n",
 			fname);
 		unmake_file(file);
+#ifdef SUPPORT_ACLS
+		uncache_tmp_acls();
+#endif
+#ifdef SUPPORT_XATTRS
+		uncache_tmp_xattrs();
+#endif
 		return 2;
 	}
 
@@ -322,6 +334,12 @@ int make_backup(const char *fname, BOOL prefer_rename)
 			rsyserr(FERROR, errno, "keep_backup failed: %s -> \"%s\"",
 				full_fname(fname), buf);
 			unmake_file(file);
+#ifdef SUPPORT_ACLS
+			uncache_tmp_acls();
+#endif
+#ifdef SUPPORT_XATTRS
+			uncache_tmp_xattrs();
+#endif
 			return 0;
 		}
 		ret = 2;
@@ -333,6 +351,12 @@ int make_backup(const char *fname, BOOL prefer_rename)
 	preserve_xattrs = save_preserve_xattrs;
 
 	unmake_file(file);
+#ifdef SUPPORT_ACLS
+	uncache_tmp_acls();
+#endif
+#ifdef SUPPORT_XATTRS
+	uncache_tmp_xattrs();
+#endif
 
   success:
 	if (INFO_GTE(BACKUP, 1)) {

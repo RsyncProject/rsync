@@ -82,6 +82,8 @@ static char *namebuf = NULL;
 static item_list empty_xattr = EMPTY_ITEM_LIST;
 static item_list rsync_xal_l = EMPTY_ITEM_LIST;
 
+static size_t prior_xattr_count = (size_t)-1;
+
 /* ------------------------------------------------------------------------- */
 
 static void rsync_xal_free(item_list *xalp)
@@ -725,18 +727,35 @@ void receive_xattr(struct file_struct *file, int f)
 
 /* Turn the xattr data in stat_x into cached xattr data, setting the index
  * values in the file struct. */
-void cache_xattr(struct file_struct *file, stat_x *sxp)
+void cache_tmp_xattr(struct file_struct *file, stat_x *sxp)
 {
 	int ndx;
 
 	if (!sxp->xattr)
 		return;
 
+	if (prior_xattr_count == (size_t)-1)
+		prior_xattr_count = rsync_xal_l.count;
 	ndx = find_matching_xattr(sxp->xattr);
 	if (ndx < 0)
 		rsync_xal_store(sxp->xattr); /* adds item to rsync_xal_l */
 
 	F_XATTR(file) = ndx;
+}
+
+void uncache_tmp_xattrs(void)
+{
+	if (prior_xattr_count != (size_t)-1) {
+		item_list *xattr_item = rsync_xal_l.items;
+		item_list *xattr_start = xattr_item + prior_xattr_count;
+		xattr_item += rsync_xal_l.count;
+		rsync_xal_l.count = prior_xattr_count;
+		while (xattr_item-- > xattr_start) {
+			rsync_xal_free(xattr_item);
+			free(xattr_item);
+		}
+		prior_xattr_count = (size_t)-1;
+	}
 }
 
 static int rsync_xal_set(const char *fname, item_list *xalp,
