@@ -137,7 +137,8 @@ static void rsync_acl_strip_perms(rsync_acl *racl)
 	else {
 		if (racl->group_obj == racl->mask_obj)
 			racl->group_obj = NO_ENTRY;
-		racl->mask_obj = NO_ENTRY;
+		if (racl->names.count != 0)
+			racl->mask_obj = NO_ENTRY;
 	}
 	racl->other_obj = NO_ENTRY;
 }
@@ -749,14 +750,7 @@ static int recv_rsync_acl(item_list *racl_list, SMB_ACL_TYPE_T type, int f)
 	/* If we received a superfluous mask, throw it away. */
 	duo_item->racl.mask_obj = NO_ENTRY;
 #else
-	if (!duo_item->racl.names.count) {
-		/* If we received a superfluous mask, throw it away. */
-		if (duo_item->racl.mask_obj != NO_ENTRY) {
-			/* Mask off the group perms with it first. */
-			duo_item->racl.group_obj &= duo_item->racl.mask_obj | NO_ENTRY;
-			duo_item->racl.mask_obj = NO_ENTRY;
-		}
-	} else if (duo_item->racl.mask_obj == NO_ENTRY) /* Must be non-empty with lists. */
+	if (duo_item->racl.names.count && duo_item->racl.mask_obj == NO_ENTRY) /* Must be non-empty with lists. */
 		duo_item->racl.mask_obj = (computed_mask_bits | duo_item->racl.group_obj) & ~NO_ENTRY;
 #endif
 
