@@ -161,8 +161,12 @@ Makefile: Makefile.in config.status configure.sh config.h.in
 	    echo "Makefile is unchanged."; \
 	    rm Makefile.old; \
 	else \
-	    echo "Makefile updated -- rerun your make command."; \
-	    exit 1; \
+	    if test "$(MAKECMDGOALS)" = reconfigure; then \
+		echo 'Continuing with "make reconfigure".'; \
+	    else \
+		echo "Makefile updated -- rerun your make command."; \
+		exit 1; \
+	    fi \
 	fi
 
 proto: proto.h-tstamp
