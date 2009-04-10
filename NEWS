@@ -34,6 +34,9 @@ Changes since 3.0.5:
 
     - Fixed the dropping of an ACL mask when no named ACL values were present.
 
+    - Fixed an ACL/xattr corruption issue where the --backup option could cause
+      rsync to associate the wrong ACL/xattr information with received files.
+
     - Fixed the use of --dry-run with --read-batch.
 
     - Fixed configure's erroneous use of target.

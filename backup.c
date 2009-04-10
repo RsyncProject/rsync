@@ -148,19 +148,25 @@ int make_bak_dir(const char *fullpath)
 #ifdef SUPPORT_ACLS
 				if (preserve_acls && !S_ISLNK(file->mode)) {
 					get_acl(rel, &sx);
-					cache_acl(file, &sx);
+					cache_tmp_acl(file, &sx);
 					free_acl(&sx);
 				}
 #endif
 #ifdef SUPPORT_XATTRS
 				if (preserve_xattrs) {
 					get_xattr(rel, &sx);
-					cache_xattr(file, &sx);
+					cache_tmp_xattr(file, &sx);
 					free_xattr(&sx);
 				}
 #endif
 				set_file_attrs(fbuf, file, NULL, NULL, 0);
 				unmake_file(file);
+#ifdef SUPPORT_ACLS
+				uncache_tmp_acls();
+#endif
+#ifdef SUPPORT_XATTRS
+				uncache_tmp_xattrs();
+#endif
 			}
 		}
 		*p = '/';
@@ -223,20 +229,26 @@ static int keep_backup(const char *fname)
 
 	if (!(buf = get_backup_name(fname))) {
 		unmake_file(file);
+#ifdef SUPPORT_ACLS
+		uncache_tmp_acls();
+#endif
+#ifdef SUPPORT_XATTRS
+		uncache_tmp_xattrs();
+#endif
 		return 0;
 	}
 
 #ifdef SUPPORT_ACLS
 	if (preserve_acls && !S_ISLNK(file->mode)) {
 		get_acl(fname, &sx);
-		cache_acl(file, &sx);
+		cache_tmp_acl(file, &sx);
 		free_acl(&sx);
 	}
 #endif
 #ifdef SUPPORT_XATTRS
 	if (preserve_xattrs) {
 		get_xattr(fname, &sx);
-		cache_xattr(file, &sx);
+		cache_tmp_xattr(file, &sx);
 		free_xattr(&sx);
 	}
 #endif
@@ -326,6 +338,12 @@ static int keep_backup(const char *fname)
 		rprintf(FINFO, "make_bak: skipping non-regular file %s\n",
 			fname);
 		unmake_file(file);
+#ifdef SUPPORT_ACLS
+		uncache_tmp_acls();
+#endif
+#ifdef SUPPORT_XATTRS
+		uncache_tmp_xattrs();
+#endif
 		return 1;
 	}
 
@@ -344,6 +362,12 @@ static int keep_backup(const char *fname)
 	set_file_attrs(buf, file, NULL, fname, 0);
 	preserve_xattrs = save_preserve_xattrs;
 	unmake_file(file);
+#ifdef SUPPORT_ACLS
+	uncache_tmp_acls();
+#endif
+#ifdef SUPPORT_XATTRS
+	uncache_tmp_xattrs();
+#endif
 
 	if (verbose > 1) {
 		rprintf(FINFO, "backed up %s to %s\n",
