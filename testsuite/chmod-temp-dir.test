@@ -13,7 +13,10 @@
 
 hands_setup
 
-tmpdir2=/tmp
+tmpdir2=$RSYNC_TEST_TMP
+if [ x"$tmpdir2" = x ]; then
+    tmpdir2=/tmp
+fi
 sdev=`$TOOLDIR/getfsdev $scratchdir`
 tdev=`$TOOLDIR/getfsdev $tmpdir2`
 if [ x$sdev = x$tdev ]; then
