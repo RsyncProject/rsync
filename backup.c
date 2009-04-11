@@ -145,28 +145,23 @@ int make_bak_dir(const char *fullpath)
 static inline int link_or_rename(const char *from, const char *to,
 				 BOOL prefer_rename, STRUCT_STAT *stp)
 {
-	if (S_ISLNK(stp->st_mode)) {
-		if (prefer_rename)
-			goto do_rename;
-#ifndef CAN_HARDLINK_SYMLINK
-		return 0; /* Use copy code. */
-#endif
-	}
-	if (IS_SPECIAL(stp->st_mode) || IS_DEVICE(stp->st_mode)) {
-		if (prefer_rename)
-			goto do_rename;
-#ifndef CAN_HARDLINK_SPECIAL
-		return 0; /* Use copy code. */
-#endif
-	}
 #ifdef SUPPORT_HARD_LINKS
-	if (!S_ISDIR(stp->st_mode)) {
-		if (do_link(from, to) == 0)
-			return 2;
-		return 0;
+	if (!prefer_rename) {
+#ifndef CAN_HARDLINK_SYMLINK
+		if (S_ISLNK(stp->st_mode))
+			return 0; /* Use copy code. */
+#endif
+#ifndef CAN_HARDLINK_SPECIAL
+		if (IS_SPECIAL(stp->st_mode) || IS_DEVICE(stp->st_mode))
+			return 0; /* Use copy code. */
+#endif
+		if (!S_ISDIR(stp->st_mode)) {
+			if (do_link(from, to) == 0)
+				return 2;
+			return 0;
+		}
 	}
 #endif
-  do_rename:
 	if (do_rename(from, to) == 0) {
 		if (stp->st_nlink > 1 && !S_ISDIR(stp->st_mode)) {
 			/* If someone has hard-linked the file into the backup
@@ -201,7 +196,7 @@ int make_backup(const char *fname, BOOL prefer_rename)
 	 * linking is possible. */
 	if ((ret = link_or_rename(fname, buf, prefer_rename, &sx.st)) != 0)
 		goto success;
-	if (errno == EEXIST) {
+	if (errno == EEXIST || errno == EISDIR) {
 		STRUCT_STAT bakst;
 		if (do_lstat(buf, &bakst) == 0) {
 			int flags = get_del_for_flag(bakst.st_mode) | DEL_FOR_BACKUP | DEL_RECURSE;
