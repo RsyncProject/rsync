@@ -756,7 +756,7 @@ static int copy_altdest_file(const char *src, const char *dest, struct file_stru
 		copy_to = buf;
 	}
 	cleanup_set(copy_to, NULL, NULL, -1, -1);
-	if (copy_file(src, copy_to, fd_w, file->mode, 0) < 0) {
+	if (copy_file(src, copy_to, fd_w, file->mode) < 0) {
 		if (INFO_GTE(COPY, 1)) {
 			rsyserr(FINFO, errno, "copy_file %s => %s",
 				full_fname(src), copy_to);
@@ -1148,7 +1148,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			 && do_stat(dn, &sx.st) < 0) {
 				if (dry_run)
 					goto parent_is_dry_missing;
-				if (create_directory_path(fname) < 0) {
+				if (make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH) < 0) {
 					rsyserr(FERROR_XFER, errno,
 						"recv_generator: mkdir %s failed",
 						full_fname(dn));
@@ -1274,8 +1274,8 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 		if (real_ret != 0 && do_mkdir(fname,file->mode) < 0 && errno != EEXIST) {
 			if (!relative_paths || errno != ENOENT
-			    || create_directory_path(fname) < 0
-			    || (do_mkdir(fname, file->mode) < 0 && errno != EEXIST)) {
+			 || make_path(fname, MKP_DROP_NAME | MKP_SKIP_SLASH) < 0
+			 || (do_mkdir(fname, file->mode) < 0 && errno != EEXIST)) {
 				rsyserr(FERROR_XFER, errno,
 					"recv_generator: mkdir %s failed",
 					full_fname(fname));
@@ -1657,7 +1657,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 				goto cleanup;
 			if (!(back_file = make_file(fname, NULL, NULL, 0, NO_FILTERS)))
 				goto pretend_missing;
-			if (copy_file(fname, backupptr, -1, back_file->mode, 1) < 0) {
+			if (copy_file(fname, backupptr, -1, back_file->mode) < 0) {
 				unmake_file(back_file);
 				back_file = NULL;
 				goto cleanup;
@@ -1706,20 +1706,11 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			goto cleanup;
 		}
 		if ((f_copy = do_open(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0) {
-			int save_errno = errno ? errno : EINVAL; /* 0 paranoia */
-			if (errno == ENOENT && make_bak_dir(backupptr) == 0) {
-				if ((f_copy = do_open(backupptr, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, 0600)) < 0)
-					save_errno = errno ? errno : save_errno;
-				else
-					save_errno = 0;
-			}
-			if (save_errno) {
-				rsyserr(FERROR_XFER, save_errno, "open %s", full_fname(backupptr));
-				unmake_file(back_file);
-				back_file = NULL;
-				close(fd);
-				goto cleanup;
-			}
+			rsyserr(FERROR_XFER, errno, "open %s", full_fname(backupptr));
+			unmake_file(back_file);
+			back_file = NULL;
+			close(fd);
+			goto cleanup;
 		}
 		fnamecmp_type = FNAMECMP_BACKUP;
 	}

@@ -77,7 +77,9 @@ extern char *rsync_path;
 extern char *shell_cmd;
 extern char *batch_name;
 extern char *password_file;
+extern char *backup_dir;
 extern char curr_dir[MAXPATHLEN];
+extern char backup_dir_buf[MAXPATHLEN];
 extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *first_flist;
 extern struct filter_list_struct daemon_filter_list;
@@ -815,6 +817,18 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	if (fd_pair(error_pipe) < 0) {
 		rsyserr(FERROR, errno, "pipe failed in do_recv");
 		exit_cleanup(RERR_IPC);
+	}
+
+	if (backup_dir) {
+		int ret = make_path(backup_dir_buf, MKP_DROP_NAME); /* drops trailing slash */
+		if (ret < 0)
+			exit_cleanup(RERR_SYNTAX);
+		if (ret)
+			rprintf(FINFO, "Created backup_dir %s\n", backup_dir_buf);
+		else if (INFO_GTE(BACKUP, 1)) {
+			char *dir = *backup_dir_buf ? backup_dir_buf : ".";
+			rprintf(FINFO, "backup_dir is %s\n", dir);
+		}
 	}
 
 	io_flush(NORMAL_FLUSH);

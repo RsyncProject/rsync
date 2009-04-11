@@ -65,11 +65,6 @@ struct filter_list_struct daemon_filter_list;
 	return 0;
 }
 
- int make_bak_dir(UNUSED(const char *fullpath))
-{
-	return -1;
-}
-
  int copy_xattrs(UNUSED(const char *source), UNUSED(const char *dest))
 {
 	return -1;

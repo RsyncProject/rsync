@@ -259,6 +259,10 @@ enum delret {
 	DR_SUCCESS = 0, DR_FAILURE, DR_AT_LIMIT, DR_NOT_EMPTY
 };
 
+/* Defines for make_path() */
+#define MKP_DROP_NAME		(1<<0) /* drop trailing filename or trailing slash */
+#define MKP_SKIP_SLASH		(1<<1) /* skip one or more leading slashes */
+
 #include "errcode.h"
 
 #include "config.h"

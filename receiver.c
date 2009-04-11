@@ -147,7 +147,7 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 	 * information should have been previously transferred, but that may
 	 * not be the case with -R */
 	if (fd == -1 && relative_paths && errno == ENOENT
-	    && create_directory_path(fnametmp) == 0) {
+	 && make_path(fnametmp, MKP_SKIP_SLASH | MKP_DROP_NAME) == 0) {
 		/* Get back to name with XXXXXX in it. */
 		get_tmpname(fnametmp, fname);
 		fd = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);

@@ -185,26 +185,75 @@ int mkdir_defmode(char *fname)
 }
 
 /* Create any necessary directories in fname.  Any missing directories are
- * created with default permissions. */
-int create_directory_path(char *fname)
+ * created with default permissions.  Returns < 0 on error, or the number
+ * of directories created. */
+int make_path(char *fname, int flags)
 {
-	char *p;
+	char *end, *p;
 	int ret = 0;
 
-	while (*fname == '/')
-		fname++;
-	while (strncmp(fname, "./", 2) == 0)
+	if (flags & MKP_SKIP_SLASH) {
+		while (*fname == '/')
+			fname++;
+	}
+
+	while (*fname == '.' && fname[1] == '/')
 		fname += 2;
 
-	umask(orig_umask);
-	p = fname;
-	while ((p = strchr(p,'/')) != NULL) {
-		*p = '\0';
-		if (do_mkdir(fname, ACCESSPERMS) < 0 && errno != EEXIST)
-		    ret = -1;
-		*p++ = '/';
+	if (flags & MKP_DROP_NAME) {
+		end = strrchr(fname, '/');
+		if (!end)
+			return 0;
+		*end = '\0';
+	} else
+		end = fname + strlen(fname);
+
+	umask(orig_umask); /* NOTE: don't return before setting this back to 0! */
+
+	/* Try to find an existing dir, starting from the deepest dir. */
+	for (p = end; ; ) {
+		if (do_mkdir(fname, ACCESSPERMS) == 0) {
+			ret++;
+			break;
+		}
+		if (errno != ENOENT) {
+			if (errno != EEXIST)
+				ret = -ret - 1;
+			break;
+		}
+		while (1) {
+			if (p == fname) {
+				ret = -ret - 1;
+				goto double_break;
+			}
+			if (*--p == '/') {
+				if (p == fname) {
+					ret = -ret - 1; /* impossible... */
+					goto double_break;
+				}
+				*p = '\0';
+				break;
+			}
+		}
 	}
+  double_break:
+
+	/* Make all the dirs that we didn't find on the way here. */
+	while (p != end) {
+		*p = '/';
+		p += strlen(p);
+		if (ret < 0) /* Skip mkdir on error, but keep restoring the path. */
+			continue;
+		if (do_mkdir(fname, ACCESSPERMS) < 0)
+			ret = -ret - 1;
+		else
+			ret++;
+	}
+
 	umask(0);
+
+	if (flags & MKP_DROP_NAME)
+		*end = '/';
 
 	return ret;
 }
@@ -270,8 +319,7 @@ static int safe_read(int desc, char *ptr, size_t len)
  *
  * This is used in conjunction with the --temp-dir, --backup, and
  * --copy-dest options. */
-int copy_file(const char *source, const char *dest, int ofd,
-	      mode_t mode, int create_bak_dir)
+int copy_file(const char *source, const char *dest, int ofd, mode_t mode)
 {
 	int ifd;
 	char buf[1024 * 8];
@@ -293,19 +341,11 @@ int copy_file(const char *source, const char *dest, int ofd,
 		}
 
 		if ((ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0) {
-			int save_errno = errno ? errno : EINVAL; /* 0 paranoia */
-			if (create_bak_dir && errno == ENOENT && make_bak_dir(dest) == 0) {
-				if ((ofd = do_open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL, mode)) < 0)
-					save_errno = errno ? errno : save_errno;
-				else
-					save_errno = 0;
-			}
-			if (save_errno) {
-				rsyserr(FERROR_XFER, save_errno, "open %s", full_fname(dest));
-				close(ifd);
-				errno = save_errno;
-				return -1;
-			}
+			int save_errno = errno;
+			rsyserr(FERROR_XFER, save_errno, "open %s", full_fname(dest));
+			close(ifd);
+			errno = save_errno;
+			return -1;
 		}
 	}
 
@@ -440,7 +480,7 @@ int robust_rename(const char *from, const char *to, const char *partialptr,
 					return -2;
 				to = partialptr;
 			}
-			if (copy_file(from, to, -1, mode, 0) != 0)
+			if (copy_file(from, to, -1, mode) != 0)
 				return -2;
 			do_unlink(from);
 			return 1;
