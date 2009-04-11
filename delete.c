@@ -170,7 +170,7 @@ enum delret delete_item(char *fbuf, uint16 mode, uint16 flags)
 		what = "rmdir";
 		ok = do_rmdir(fbuf) == 0;
 	} else {
-		if (make_backups > 0 && (backup_dir || !is_backup_file(fbuf))) {
+		if (make_backups > 0 && !(flags & DEL_FOR_BACKUP) && (backup_dir || !is_backup_file(fbuf))) {
 			what = "make_backup";
 			ok = make_backup(fbuf, True);
 			if (ok == 2) {
