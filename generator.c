@@ -507,7 +507,7 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 			if (iflags & ITEM_XNAME_FOLLOWS)
 				write_vstring(sock_f_out, xname, strlen(xname));
 #ifdef SUPPORT_XATTRS
-			if (preserve_xattrs && !dry_run
+			if (preserve_xattrs && do_xfers
 			 && iflags & (ITEM_REPORT_XATTR|ITEM_TRANSFER)) {
 				send_xattr_request(NULL, file,
 					iflags & ITEM_REPORT_XATTR ? sock_f_out : -1);
