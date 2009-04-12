@@ -1854,6 +1854,12 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			"--read-batch cannot be used with --files-from\n");
 		return 0;
 	}
+	if (read_batch && remove_source_files) {
+		snprintf(err_buf, sizeof err_buf,
+			"--read-batch cannot be used with --remove-%s-files\n",
+			remove_source_files == 1 ? "source" : "sent");
+		return 0;
+	}
 	if (batch_name && strlen(batch_name) > MAX_BATCH_NAME_LEN) {
 		snprintf(err_buf, sizeof err_buf,
 			"the batch-file name must be %d characters or less.\n",
