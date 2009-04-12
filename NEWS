@@ -47,3 +47,6 @@ Changes since 3.0.5:
 
     - Fixed a run-time issue for systems that can't find iconv_open() by adding
       the --disable-iconv-open configure option.
+
+    - Complain and die if the user tries to combine --remove-source-files (or
+      the deprecated --remove-sent-files) with --read-batch.
