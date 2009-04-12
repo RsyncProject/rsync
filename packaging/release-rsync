@@ -15,6 +15,7 @@ use Date::Format;
 my $dest = $ENV{HOME} . '/samba-rsync-ftp';
 my $passfile = $ENV{HOME} . '/.rsyncpass';
 my $path = $ENV{PATH};
+my $make_gen_cmd = 'make -f prepare-source.mak conf && ./config.status && make gen';
 
 &Getopt::Long::Configure('bundling');
 &usage if !&GetOptions(
@@ -344,7 +345,7 @@ system "tar xzf $lasttar_file @_";
 rename("rsync-$lastversion", 'a');
 
 print "Creating $diff_file ...\n";
-system "./config.status Makefile; make gen; rsync -a @extra_files b/";
+system "$make_gen_cmd && rsync -a @extra_files b/" and exit 1;
 my $sed_script = 's:^((---|\+\+\+) [ab]/[^\t]+)\t.*:\1:';
 system "(git diff v$lastversion v$version; diff -upN a b | sed -r '$sed_script') | gzip -9 >$diff_file";
 system "rm -rf a";

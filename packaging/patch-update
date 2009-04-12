@@ -11,6 +11,7 @@ use Getopt::Long;
 
 my $patches_dir = 'patches';
 my $tmp_dir = "patches.$$";
+my $make_gen_cmd = 'make -f prepare-source.mak conf && ./config.status && make gen';
 
 &Getopt::Long::Configure('bundling');
 &usage if !&GetOptions(
@@ -51,7 +52,7 @@ close IN;
 if ($incl_generated_files) {
     die "'$tmp_dir' must not exist in the current directory.\n" if -e $tmp_dir;
     mkdir($tmp_dir, 0700) or die "Unable to mkdir($tmp_dir): $!\n";
-    system "./config.status Makefile && make gen && rsync -a @extra_files $tmp_dir/master/" and exit 1;
+    system "$make_gen_cmd && rsync -a @extra_files $tmp_dir/master/" and exit 1;
 }
 our $last_touch = time;
 
@@ -159,7 +160,7 @@ sub update_patch
     print OUT $description{$patch}, "\n";
 
     if ($incl_generated_files) {
-	system "./config.status Makefile && make gen && rsync -a @extra_files $tmp_dir/$patch/" and exit 1;
+	system "$make_gen_cmd && rsync -a @extra_files $tmp_dir/$patch/" and exit 1;
     }
     $last_touch = time;
 
