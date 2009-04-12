@@ -825,10 +825,8 @@ static int do_recv(int f_in, int f_out, char *local_name)
 			exit_cleanup(RERR_SYNTAX);
 		if (ret)
 			rprintf(FINFO, "Created backup_dir %s\n", backup_dir_buf);
-		else if (INFO_GTE(BACKUP, 1)) {
-			char *dir = *backup_dir_buf ? backup_dir_buf : ".";
-			rprintf(FINFO, "backup_dir is %s\n", dir);
-		}
+		else if (INFO_GTE(BACKUP, 1))
+			rprintf(FINFO, "backup_dir is %s\n", backup_dir_buf);
 	}
 
 	io_flush(NORMAL_FLUSH);

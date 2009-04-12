@@ -2008,13 +2008,21 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				"the --backup-dir path is WAY too long.\n");
 			return 0;
 		}
-		if (backup_dir_len && backup_dir_buf[backup_dir_len - 1] != '/') {
+		if (!backup_dir_len) {
+			backup_dir_len = -1;
+			backup_dir = NULL;
+		} else if (backup_dir_buf[backup_dir_len - 1] != '/') {
 			backup_dir_buf[backup_dir_len++] = '/';
 			backup_dir_buf[backup_dir_len] = '\0';
 		}
+	}
+	if (backup_dir) {
+		/* No need for a suffix or a protect rule. */
 	} else if (!backup_suffix_len && (!am_server || !am_sender)) {
 		snprintf(err_buf, sizeof err_buf,
-			"--suffix cannot be a null string without --backup-dir\n");
+			"--suffix cannot be empty %s\n", backup_dir_len < 0
+			? "when --backup-dir is the same as the dest dir"
+			: "without a --backup-dir");
 		return 0;
 	} else if (make_backups && delete_mode && !delete_excluded && !am_server) {
 		snprintf(backup_dir_buf, sizeof backup_dir_buf,
