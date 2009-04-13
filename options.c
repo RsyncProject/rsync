@@ -204,18 +204,18 @@ struct chmod_mode_struct *chmod_modes = NULL;
 static const char *debug_verbosity[] = {
 	/*0*/ NULL,
 	/*1*/ NULL,
-	/*2*/ "bind,cmd,connect,del,deltasum,dup,filter,flist,iconv",
-	/*3*/ "acl,backup,deltasum2,del2,exit,filter2,flist2,fuzzy,genr,own,recv,send,time",
-	/*4*/ "cmd2,deltasum3,del3,exit2,flist3,iconv2,own2,proto,time2",
-	/*5*/ "chdir,deltasum4,flist4,fuzzy2,hash,hlink",
+	/*2*/ "BIND,CMD,CONNECT,DEL,DELTASUM,DUP,FILTER,FLIST,ICONV",
+	/*3*/ "ACL,BACKUP,DELTASUM2,DEL2,EXIT,FILTER2,FLIST2,FUZZY,GENR,OWN,RECV,SEND,TIME",
+	/*4*/ "CMD2,DELTASUM3,DEL3,EXIT2,FLIST3,ICONV2,OWN2,PROTO,TIME2",
+	/*5*/ "CHDIR,DELTASUM4,FLIST4,FUZZY2,HASH,HLINK",
 };
 
 #define MAX_VERBOSITY ((int)(sizeof debug_verbosity / sizeof debug_verbosity[0]) - 1)
 
 static const char *info_verbosity[1+MAX_VERBOSITY] = {
 	/*0*/ NULL,
-	/*1*/ "copy,del,flist,misc,name,stats,symsafe",
-	/*2*/ "backup,mount,name2,remove,skip",
+	/*1*/ "COPY,DEL,FLIST,MISC,NAME,STATS,SYMSAFE",
+	/*2*/ "BACKUP,MOUNT,NAME2,REMOVE,SKIP",
 };
 
 #define MAX_OUT_LEVEL 4 /* The largest N allowed for any flagN word. */
