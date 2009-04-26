@@ -51,3 +51,5 @@ Changes since 3.0.5:
 
     - Complain and die if the user tries to combine --remove-source-files (or
       the deprecated --remove-sent-files) with --read-batch.
+
+    - Fixed an failure transferring special files from Solaris to Linux.

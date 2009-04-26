@@ -1124,8 +1124,8 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 		}
 		switch (type) {
 		case TYPE_DIR:
-			break;
 		case TYPE_SPECIAL:
+			break;
 		case TYPE_DEVICE:
 			devp = F_RDEV_P(file);
 			if (sxp->st.st_rdev != MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp)))
@@ -1613,8 +1613,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 
 	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
 	 || (preserve_specials && IS_SPECIAL(file->mode))) {
-		uint32 *devp = F_RDEV_P(file);
-		dev_t rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
+		dev_t rdev;
+		if (IS_DEVICE(file->mode)) {
+			uint32 *devp = F_RDEV_P(file);
+			rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
+		} else
+			rdev = 0;
 		if (statret == 0) {
 			int del_for_flag;
 			if (IS_DEVICE(file->mode)) {
@@ -1628,7 +1632,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			}
 			if (statret == 0
 			 && BITS_EQUAL(sx.st.st_mode, file->mode, _S_IFMT)
-			 && sx.st.st_rdev == rdev) {
+			 && (IS_SPECIAL(sx.st.st_mode) || sx.st.st_rdev == rdev)) {
 				/* The device or special file is identical. */
 				set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT);
 				if (itemizing)

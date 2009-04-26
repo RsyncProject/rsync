@@ -425,8 +425,7 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 	else
 		mode = file->mode;
 
-	if ((preserve_devices && IS_DEVICE(mode))
-	 || (preserve_specials && IS_SPECIAL(mode))) {
+	if (preserve_devices && IS_DEVICE(mode)) {
 		if (protocol_version < 28) {
 			if (tmp_rdev == rdev)
 				xflags |= XMIT_SAME_RDEV_pre28;
@@ -439,6 +438,17 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 			else
 				rdev_major = major(rdev);
 			if (protocol_version < 30 && (uint32)minor(rdev) <= 0xFFu)
+				xflags |= XMIT_RDEV_MINOR_8_pre30;
+		}
+	} else if (preserve_specials && IS_SPECIAL(mode)) {
+		/* Special files don't need an rdev number, so just make
+		 * the historical transmission of the value efficient. */
+		if (protocol_version < 28)
+			xflags |= XMIT_SAME_RDEV_pre28;
+		else {
+			rdev = MAKEDEV(major(rdev), 0);
+			xflags |= XMIT_SAME_RDEV_MAJOR;
+			if (protocol_version < 30)
 				xflags |= XMIT_RDEV_MINOR_8_pre30;
 		}
 	} else if (protocol_version < 28)
@@ -725,8 +735,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 				uid = F_OWNER(first);
 			if (preserve_gid)
 				gid = F_GROUP(first);
-			if ((preserve_devices && IS_DEVICE(mode))
-			 || (preserve_specials && IS_SPECIAL(mode))) {
+			if (preserve_devices && IS_DEVICE(mode)) {
 				uint32 *devp = F_RDEV_P(first);
 				rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
 				extra_len += DEV_EXTRA_CNT * EXTRA_LEN;
@@ -801,7 +810,8 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 				rdev_minor = read_int(f);
 			rdev = MAKEDEV(rdev_major, rdev_minor);
 		}
-		extra_len += DEV_EXTRA_CNT * EXTRA_LEN;
+		if (IS_DEVICE(mode))
+			extra_len += DEV_EXTRA_CNT * EXTRA_LEN;
 		file_length = 0;
 	} else if (protocol_version < 28)
 		rdev = MAKEDEV(0, 0);
@@ -942,8 +952,7 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 		}
 	}
 
-	if ((preserve_devices && IS_DEVICE(mode))
-	 || (preserve_specials && IS_SPECIAL(mode))) {
+	if (preserve_devices && IS_DEVICE(mode)) {
 		uint32 *devp = F_RDEV_P(file);
 		DEV_MAJOR(devp) = major(rdev);
 		DEV_MINOR(devp) = minor(rdev);
@@ -1257,10 +1266,11 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 #endif
 
 #ifdef HAVE_STRUCT_STAT_ST_RDEV
-	if (IS_DEVICE(st.st_mode) || IS_SPECIAL(st.st_mode)) {
+	if (IS_DEVICE(st.st_mode)) {
 		tmp_rdev = st.st_rdev;
 		st.st_size = 0;
-	}
+	} else if (IS_SPECIAL(st.st_mode))
+		st.st_size = 0;
 #endif
 
 	file->flags = flags;
