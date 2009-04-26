@@ -990,7 +990,7 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode)
 	fst.st_mode &= (_S_IFMT | CHMOD_BITS);
 	fmode = new_mode & (_S_IFMT | CHMOD_BITS);
 
-	if (IS_DEVICE(fmode) || IS_SPECIAL(fmode)) {
+	if (IS_DEVICE(fmode)) {
 		uint32 *devp = F_RDEV_P(file);
 		rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
 	} else
@@ -1001,7 +1001,7 @@ int set_stat_xattr(const char *fname, struct file_struct *file, mode_t new_mode)
 	     | (S_ISDIR(fst.st_mode) ? 0700 : 0600);
 	if (fst.st_mode != mode)
 		do_chmod(fname, mode);
-	if (!IS_DEVICE(fst.st_mode) && !IS_SPECIAL(fst.st_mode))
+	if (!IS_DEVICE(fst.st_mode))
 		fst.st_rdev = 0; /* just in case */
 
 	if (mode == fmode && fst.st_rdev == rdev
