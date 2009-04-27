@@ -752,6 +752,10 @@ date is on the objects.  In other words, if the source has a directory
 where the destination has a file, the transfer would occur regardless of
 the timestamps.
 
+This option is a transfer rule, not an exclude, so it doesn't affect the
+data that goes into the file-lists, and thus it doesn't affect deletions.
+It just limits the files that the receiver requests to be transferred.
+
 dit(bf(--inplace)) This option changes how rsync transfers a file when the
 file's data needs to be updated: instead of the default method of creating
 a new copy of the file and moving it into place when it is complete, rsync
@@ -1169,9 +1173,17 @@ yet on the destination.  If this option is
 combined with the bf(--ignore-existing) option, no files will be updated
 (which can be useful if all you want to do is delete extraneous files).
 
+This option is a transfer rule, not an exclude, so it doesn't affect the
+data that goes into the file-lists, and thus it doesn't affect deletions.
+It just limits the files that the receiver requests to be transferred.
+
 dit(bf(--ignore-existing)) This tells rsync to skip updating files that
 already exist on the destination (this does em(not) ignore existing
 directories, or nothing would get done).  See also bf(--existing).
+
+This option is a transfer rule, not an exclude, so it doesn't affect the
+data that goes into the file-lists, and thus it doesn't affect deletions.
+It just limits the files that the receiver requests to be transferred.
 
 This option can be useful for those doing backups using the bf(--link-dest)
 option when they need to continue a backup run that got interrupted.  Since
@@ -1312,6 +1324,10 @@ file that is larger than the specified SIZE. The SIZE value can be
 suffixed with a string to indicate a size multiplier, and
 may be a fractional value (e.g. "bf(--max-size=1.5m)").
 
+This option is a transfer rule, not an exclude, so it doesn't affect the
+data that goes into the file-lists, and thus it doesn't affect deletions.
+It just limits the files that the receiver requests to be transferred.
+
 The suffixes are as follows: "K" (or "KiB") is a kibibyte (1024),
 "M" (or "MiB") is a mebibyte (1024*1024), and "G" (or "GiB") is a
 gibibyte (1024*1024*1024).
@@ -1326,7 +1342,7 @@ Examples: --max-size=1.5mb-1 is 1499999 bytes, and --max-size=2g+1 is
 dit(bf(--min-size=SIZE)) This tells rsync to avoid transferring any
 file that is smaller than the specified SIZE, which can help in not
 transferring small, junk files.
-See the bf(--max-size) option for a description of SIZE.
+See the bf(--max-size) option for a description of SIZE and other information.
 
 dit(bf(-B, --block-size=BLOCKSIZE)) This forces the block size used in
 rsync's delta-transfer algorithm to a fixed value.  It is normally selected based on
@@ -2116,11 +2132,16 @@ creation of a bunch of useless directories when the sending rsync is
 recursively scanning a hierarchy of files using include/exclude/filter
 rules.
 
+Note that the use of transfer rules, such as the bf(--min-size) option, does
+not affect what goes into the file list, and thus does not leave directories
+empty, even if none of the files in a directory match the transfer rule.
+
 Because the file-list is actually being pruned, this option also affects
 what directories get deleted when a delete is active.  However, keep in
 mind that excluded files and directories can prevent existing items from
-being deleted (because an exclude hides source files and protects
-destination files).
+being deleted due to an exclude both hiding source files and protecting
+destination files.  See the perishable filter-rule option for how to avoid
+this.
 
 You can prevent the pruning of certain empty directories from the file-list
 by using a global "protect" filter.  For instance, this option would ensure
