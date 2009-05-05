@@ -2589,6 +2589,39 @@ itemization(
   explicitly included or it would be excluded by the "*")
 )
 
+The following modifiers are accepted after a "+" or "-":
+
+itemization(
+  it() A bf(/) specifies that the include/exclude rule should be matched
+  against the absolute pathname of the current item.  For example,
+  "-/ /etc/passwd" would exclude the passwd file any time the transfer
+  was sending files from the "/etc" directory, and "-/ subdir/foo"
+  would always exclude "foo" when it is in a dir named "subdir", even
+  if "foo" is at the root of the current transfer.
+  it() A bf(!) specifies that the include/exclude should take effect if
+  the pattern fails to match.  For instance, "-! */" would exclude all
+  non-directories.
+  it() A bf(C) is used to indicate that all the global CVS-exclude rules
+  should be inserted as excludes in place of the "-C".  No arg should
+  follow.
+  it() An bf(s) is used to indicate that the rule applies to the sending
+  side.  When a rule affects the sending side, it prevents files from
+  being transferred.  The default is for a rule to affect both sides
+  unless bf(--delete-excluded) was specified, in which case default rules
+  become sender-side only.  See also the hide (H) and show (S) rules,
+  which are an alternate way to specify sending-side includes/excludes.
+  it() An bf(r) is used to indicate that the rule applies to the receiving
+  side.  When a rule affects the receiving side, it prevents files from
+  being deleted.  See the bf(s) modifier for more info.  See also the
+  protect (P) and risk (R) rules, which are an alternate way to
+  specify receiver-side includes/excludes.
+  it() A bf(p) indicates that a rule is perishable, meaning that it is
+  ignored in directories that are being deleted.  For instance, the bf(-C)
+  option's default rules that exclude things like "CVS" and "*.o" are
+  marked as perishable, and will not prevent a directory that was removed
+  on the source from being deleted on the destination.
+)
+
 manpagesection(MERGE-FILE FILTER RULES)
 
 You can merge whole files into your filter rules by specifying either a
@@ -2637,44 +2670,11 @@ itemization(
   "- foo + bar" is parsed as two rules (assuming that prefix-parsing wasn't
   also disabled).
   it() You may also specify any of the modifiers for the "+" or "-" rules
-  (below) in order to have the rules that are read in from the file
+  (above) in order to have the rules that are read in from the file
   default to having that modifier set.  For instance, "merge,-/ .excl" would
   treat the contents of .excl as absolute-path excludes,
   while "dir-merge,s .filt" and ":sC" would each make all their
   per-directory rules apply only on the sending side.
-)
-
-The following modifiers are accepted after a "+" or "-":
-
-itemization(
-  it() A bf(/) specifies that the include/exclude rule should be matched
-  against the absolute pathname of the current item.  For example,
-  "-/ /etc/passwd" would exclude the passwd file any time the transfer
-  was sending files from the "/etc" directory, and "-/ subdir/foo"
-  would always exclude "foo" when it is in a dir named "subdir", even
-  if "foo" is at the root of the current transfer.
-  it() A bf(!) specifies that the include/exclude should take effect if
-  the pattern fails to match.  For instance, "-! */" would exclude all
-  non-directories.
-  it() A bf(C) is used to indicate that all the global CVS-exclude rules
-  should be inserted as excludes in place of the "-C".  No arg should
-  follow.
-  it() An bf(s) is used to indicate that the rule applies to the sending
-  side.  When a rule affects the sending side, it prevents files from
-  being transferred.  The default is for a rule to affect both sides
-  unless bf(--delete-excluded) was specified, in which case default rules
-  become sender-side only.  See also the hide (H) and show (S) rules,
-  which are an alternate way to specify sending-side includes/excludes.
-  it() An bf(r) is used to indicate that the rule applies to the receiving
-  side.  When a rule affects the receiving side, it prevents files from
-  being deleted.  See the bf(s) modifier for more info.  See also the
-  protect (P) and risk (R) rules, which are an alternate way to
-  specify receiver-side includes/excludes.
-  it() A bf(p) indicates that a rule is perishable, meaning that it is
-  ignored in directories that are being deleted.  For instance, the bf(-C)
-  option's default rules that exclude things like "CVS" and "*.o" are
-  marked as perishable, and will not prevent a directory that was removed
-  on the source from being deleted on the destination.
 )
 
 Per-directory rules are inherited in all subdirectories of the directory
