@@ -181,10 +181,10 @@ static struct idlist *recv_add_id(struct idlist **idlist_ptr, struct idlist *idm
 	else if (*name && id) {
 		if (idlist_ptr == &uidlist) {
 			uid_t uid;
-			id2 = name_to_uid(name, &uid) ? uid : id;
+			id2 = user_to_uid(name, &uid, False) ? uid : id;
 		} else {
 			gid_t gid;
-			id2 = name_to_gid(name, &gid) ? gid : id;
+			id2 = group_to_gid(name, &gid, False) ? gid : id;
 		}
 	} else
 		id2 = id;
@@ -415,7 +415,6 @@ void parse_name_map(char *map, BOOL usernames)
 			char *dash = strchr(cp, '-');
 			if (strspn(cp, "0123456789-") != (size_t)(colon - cp)
 			 || (dash && (!dash[1] || strchr(dash+1, '-')))) {
-			  bad_number:
 				rprintf(FERROR, "Invalid number in --%smap: %s\n",
 					usernames ? "user" : "group", cp);
 				exit_cleanup(RERR_SYNTAX);
@@ -436,15 +435,9 @@ void parse_name_map(char *map, BOOL usernames)
 			id1 = 0;
 		}
 
-		if (isDigit(colon+1)) {
-			if (strspn(colon+1, "0123456789") != (size_t)(end - colon - 1)) {
-				cp = colon+1;
-				goto bad_number;
-			}
-			add_to_list(idmap_ptr, id1, name, atol(colon+1), flags);
-		} else if (usernames) {
+		if (usernames) {
 			uid_t uid;
-			if (name_to_uid(colon+1, &uid))
+			if (user_to_uid(colon+1, &uid, True))
 				add_to_list(idmap_ptr, id1, name, uid, flags);
 			else {
 				rprintf(FERROR,
@@ -453,7 +446,7 @@ void parse_name_map(char *map, BOOL usernames)
 			}
 		} else {
 			gid_t gid;
-			if (name_to_gid(colon+1, &gid))
+			if (group_to_gid(colon+1, &gid, True))
 				add_to_list(idmap_ptr, id1, name, gid, flags);
 			else {
 				rprintf(FERROR,

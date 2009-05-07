@@ -416,13 +416,10 @@ static int path_failure(int f_out, const char *dir, BOOL was_chdir)
 static int add_a_group(int f_out, const char *gname)
 {
 	gid_t gid;
-	if (!name_to_gid(gname, &gid)) {
-		if (!isDigit(gname)) {
-			rprintf(FLOG, "Invalid gid %s\n", gname);
-			io_printf(f_out, "@ERROR: invalid gid %s\n", gname);
-			return -1;
-		}
-		gid = atol(gname);
+	if (!group_to_gid(gname, &gid, True)) {
+		rprintf(FLOG, "Invalid gid %s\n", gname);
+		io_printf(f_out, "@ERROR: invalid gid %s\n", gname);
+		return -1;
 	}
 	if (gid_count == MAX_GID_LIST) {
 		rprintf(FLOG, "Too many groups specified via gid parameter.\n");
@@ -558,13 +555,10 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 
 	p = *lp_uid(i) ? lp_uid(i) : am_root ? NOBODY_USER : NULL;
 	if (p) {
-		if (!name_to_uid(p, &uid)) {
-			if (!isDigit(p)) {
-				rprintf(FLOG, "Invalid uid %s\n", p);
-				io_printf(f_out, "@ERROR: invalid uid %s\n", p);
-				return -1;
-			}
-			uid = atol(p);
+		if (!user_to_uid(p, &uid, True)) {
+			rprintf(FLOG, "Invalid uid %s\n", p);
+			io_printf(f_out, "@ERROR: invalid uid %s\n", p);
+			return -1;
 		}
 		set_uid = 1;
 	} else
