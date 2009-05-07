@@ -1018,7 +1018,7 @@ all groups (not just the current user's groups) via the bf(--groups)
 option, and copying devices via the bf(--devices) option.  This is useful
 for systems that allow such activities without being the super-user, and
 also for ensuring that you will get errors if the receiving side isn't
-being running as the super-user.  To turn off super-user activities, the
+being run as the super-user.  To turn off super-user activities, the
 super-user can use bf(--no-super).
 
 dit(bf(--fake-super)) When this option is enabled, rsync simulates
