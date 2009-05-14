@@ -1815,7 +1815,11 @@ SMB_ACL_T sys_acl_get_file( const char *path_p, SMB_ACL_TYPE_T type)
 
 	/* AIX has no DEFAULT */
 	if  ( type == SMB_ACL_TYPE_DEFAULT ) {
+#ifdef ENOTSUP
 		errno = ENOTSUP;
+#else
+		errno = ENOSYS;
+#endif
 		return NULL;
 	}
 
