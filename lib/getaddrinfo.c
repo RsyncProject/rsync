@@ -295,9 +295,8 @@ int getaddrinfo(const char *node,
 					res);
 		} else if (hints.ai_flags & AI_NUMERICHOST) {
 			struct in_addr ip;
-			if (!inet_aton(node, &ip)) {
+			if (inet_pton(AF_INET, node, &ip) <= 0)
 				return EAI_FAIL;
-			}
 			return getaddr_info_single_addr(service,
 					ntohl(ip.s_addr),
 					&hints,
