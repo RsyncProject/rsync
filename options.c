@@ -1409,7 +1409,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 
 		case OPT_INCLUDE:
 			parse_rule(&filter_list, poptGetOptArg(pc),
-				   MATCHFLG_INCLUDE, XFLG_OLD_PREFIXES);
+				   FILTRULE_INCLUDE, XFLG_OLD_PREFIXES);
 			break;
 
 		case OPT_EXCLUDE_FROM:
@@ -1432,7 +1432,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 					goto options_rejected;
 			}
 			parse_filter_file(&filter_list, arg,
-				opt == OPT_INCLUDE_FROM ? MATCHFLG_INCLUDE : 0,
+				opt == OPT_INCLUDE_FROM ? FILTRULE_INCLUDE : 0,
 				XFLG_FATAL_ERRORS | XFLG_OLD_PREFIXES);
 			break;
 

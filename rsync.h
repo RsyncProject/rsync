@@ -798,36 +798,36 @@ struct map_struct {
 	int status;		/* first errno from read errors		*/
 };
 
-#define MATCHFLG_WILD		(1<<0) /* pattern has '*', '[', and/or '?' */
-#define MATCHFLG_WILD2		(1<<1) /* pattern has '**' */
-#define MATCHFLG_WILD2_PREFIX	(1<<2) /* pattern starts with "**" */
-#define MATCHFLG_WILD3_SUFFIX	(1<<3) /* pattern ends with "***" */
-#define MATCHFLG_ABS_PATH	(1<<4) /* path-match on absolute path */
-#define MATCHFLG_INCLUDE	(1<<5) /* this is an include, not an exclude */
-#define MATCHFLG_DIRECTORY	(1<<6) /* this matches only directories */
-#define MATCHFLG_WORD_SPLIT	(1<<7) /* split rules on whitespace */
-#define MATCHFLG_NO_INHERIT	(1<<8) /* don't inherit these rules */
-#define MATCHFLG_NO_PREFIXES	(1<<9) /* parse no prefixes from patterns */
-#define MATCHFLG_MERGE_FILE	(1<<10)/* specifies a file to merge */
-#define MATCHFLG_PERDIR_MERGE	(1<<11)/* merge-file is searched per-dir */
-#define MATCHFLG_EXCLUDE_SELF	(1<<12)/* merge-file name should be excluded */
-#define MATCHFLG_FINISH_SETUP	(1<<13)/* per-dir merge file needs setup */
-#define MATCHFLG_NEGATE 	(1<<14)/* rule matches when pattern does not */
-#define MATCHFLG_CVS_IGNORE	(1<<15)/* rule was -C or :C */
-#define MATCHFLG_SENDER_SIDE	(1<<16)/* rule applies to the sending side */
-#define MATCHFLG_RECEIVER_SIDE	(1<<17)/* rule applies to the receiving side */
-#define MATCHFLG_CLEAR_LIST 	(1<<18)/* this item is the "!" token */
-#define MATCHFLG_PERISHABLE	(1<<19)/* perishable if parent dir goes away */
+#define FILTRULE_WILD		(1<<0) /* pattern has '*', '[', and/or '?' */
+#define FILTRULE_WILD2		(1<<1) /* pattern has '**' */
+#define FILTRULE_WILD2_PREFIX	(1<<2) /* pattern starts with "**" */
+#define FILTRULE_WILD3_SUFFIX	(1<<3) /* pattern ends with "***" */
+#define FILTRULE_ABS_PATH	(1<<4) /* path-match on absolute path */
+#define FILTRULE_INCLUDE	(1<<5) /* this is an include, not an exclude */
+#define FILTRULE_DIRECTORY	(1<<6) /* this matches only directories */
+#define FILTRULE_WORD_SPLIT	(1<<7) /* split rules on whitespace */
+#define FILTRULE_NO_INHERIT	(1<<8) /* don't inherit these rules */
+#define FILTRULE_NO_PREFIXES	(1<<9) /* parse no prefixes from patterns */
+#define FILTRULE_MERGE_FILE	(1<<10)/* specifies a file to merge */
+#define FILTRULE_PERDIR_MERGE	(1<<11)/* merge-file is searched per-dir */
+#define FILTRULE_EXCLUDE_SELF	(1<<12)/* merge-file name should be excluded */
+#define FILTRULE_FINISH_SETUP	(1<<13)/* per-dir merge file needs setup */
+#define FILTRULE_NEGATE 	(1<<14)/* rule matches when pattern does not */
+#define FILTRULE_CVS_IGNORE	(1<<15)/* rule was -C or :C */
+#define FILTRULE_SENDER_SIDE	(1<<16)/* rule applies to the sending side */
+#define FILTRULE_RECEIVER_SIDE	(1<<17)/* rule applies to the receiving side */
+#define FILTRULE_CLEAR_LIST	(1<<18)/* this item is the "!" token */
+#define FILTRULE_PERISHABLE	(1<<19)/* perishable if parent dir goes away */
 
-#define MATCHFLGS_FROM_CONTAINER (MATCHFLG_ABS_PATH | MATCHFLG_INCLUDE \
-				| MATCHFLG_DIRECTORY | MATCHFLG_SENDER_SIDE \
-				| MATCHFLG_NEGATE | MATCHFLG_RECEIVER_SIDE \
-				| MATCHFLG_PERISHABLE)
+#define FILTRULES_FROM_CONTAINER (FILTRULE_ABS_PATH | FILTRULE_INCLUDE \
+				| FILTRULE_DIRECTORY | FILTRULE_SENDER_SIDE \
+				| FILTRULE_NEGATE | FILTRULE_RECEIVER_SIDE \
+				| FILTRULE_PERISHABLE)
 
 struct filter_struct {
 	struct filter_struct *next;
 	char *pattern;
-	uint32 match_flags;
+	uint32 rflags;
 	union {
 		int slash_cnt;
 		struct filter_list_struct *mergelist;

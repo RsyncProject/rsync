@@ -291,10 +291,10 @@ void setup_protocol(int f_out,int f_in)
 		unsort_ndx = ++file_extra_cnt;
 
 	if (partial_dir && *partial_dir != '/' && (!am_server || local_server)) {
-		int flags = MATCHFLG_NO_PREFIXES | MATCHFLG_DIRECTORY;
+		int rflags = FILTRULE_NO_PREFIXES | FILTRULE_DIRECTORY;
 		if (!am_sender || protocol_version >= 30)
-			flags |= MATCHFLG_PERISHABLE;
-		parse_rule(&filter_list, partial_dir, flags, 0);
+			rflags |= FILTRULE_PERISHABLE;
+		parse_rule(&filter_list, partial_dir, rflags, 0);
 	}
 
 

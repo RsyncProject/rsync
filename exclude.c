@@ -124,7 +124,7 @@ static void teardown_mergelist(struct filter_struct *ex)
 
 static void free_filter(struct filter_struct *ex)
 {
-	if (ex->match_flags & MATCHFLG_PERDIR_MERGE)
+	if (ex->rflags & FILTRULE_PERDIR_MERGE)
 		teardown_mergelist(ex);
 	free(ex->pattern);
 	free(ex);
@@ -153,7 +153,7 @@ static void free_filters(struct filter_struct *head)
 /* Build a filter structure given a filter pattern.  The value in "pat"
  * is not null-terminated. */
 static void add_rule(struct filter_list_struct *listp, const char *pat,
-		     unsigned int pat_len, uint32 mflags, int xflags)
+		     unsigned int pat_len, uint32 rflags, int xflags)
 {
 	struct filter_struct *ret;
 	const char *cp;
@@ -161,21 +161,21 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 
 	if (DEBUG_GTE(FILTER, 2)) {
 		rprintf(FINFO, "[%s] add_rule(%s%.*s%s)%s\n",
-			who_am_i(), get_rule_prefix(mflags, pat, 0, NULL),
+			who_am_i(), get_rule_prefix(rflags, pat, 0, NULL),
 			(int)pat_len, pat,
-			(mflags & MATCHFLG_DIRECTORY) ? "/" : "",
+			(rflags & FILTRULE_DIRECTORY) ? "/" : "",
 			listp->debug_type);
 	}
 
 	/* These flags also indicate that we're reading a list that
 	 * needs to be filtered now, not post-filtered later. */
 	if (xflags & (XFLG_ANCHORED2ABS|XFLG_ABS_IF_SLASH)) {
-		uint32 mf = mflags & (MATCHFLG_RECEIVER_SIDE|MATCHFLG_SENDER_SIDE);
+		uint32 mf = rflags & (FILTRULE_RECEIVER_SIDE|FILTRULE_SENDER_SIDE);
 		if (am_sender) {
-			if (mf == MATCHFLG_RECEIVER_SIDE)
+			if (mf == FILTRULE_RECEIVER_SIDE)
 				return;
 		} else {
-			if (mf == MATCHFLG_SENDER_SIDE)
+			if (mf == FILTRULE_SENDER_SIDE)
 				return;
 		}
 	}
@@ -185,7 +185,7 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 
 	if (pat_len > 1 && pat[pat_len-1] == '/') {
 		pat_len--;
-		mflags |= MATCHFLG_DIRECTORY;
+		rflags |= FILTRULE_DIRECTORY;
 	}
 
 	for (cp = pat; cp < pat + pat_len; cp++) {
@@ -193,10 +193,10 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 			slash_cnt++;
 	}
 
-	if (!(mflags & (MATCHFLG_ABS_PATH | MATCHFLG_MERGE_FILE))
+	if (!(rflags & (FILTRULE_ABS_PATH | FILTRULE_MERGE_FILE))
 	 && ((xflags & (XFLG_ANCHORED2ABS|XFLG_ABS_IF_SLASH) && *pat == '/')
 	  || (xflags & XFLG_ABS_IF_SLASH && slash_cnt))) {
-		mflags |= MATCHFLG_ABS_PATH;
+		rflags |= FILTRULE_ABS_PATH;
 		if (*pat == '/')
 			pre_len = dirbuf_len - module_dirlen - 1;
 		else
@@ -206,8 +206,8 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 
 	/* The daemon wants dir-exclude rules to get an appended "/" + "***". */
 	if (xflags & XFLG_DIR2WILD3
-	 && BITS_SETnUNSET(mflags, MATCHFLG_DIRECTORY, MATCHFLG_INCLUDE)) {
-		mflags &= ~MATCHFLG_DIRECTORY;
+	 && BITS_SETnUNSET(rflags, FILTRULE_DIRECTORY, FILTRULE_INCLUDE)) {
+		rflags &= ~FILTRULE_DIRECTORY;
 		suf_len = sizeof SLASH_WILD3_SUFFIX - 1;
 	} else
 		suf_len = 0;
@@ -230,22 +230,22 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 	}
 
 	if (strpbrk(ret->pattern, "*[?")) {
-		mflags |= MATCHFLG_WILD;
+		rflags |= FILTRULE_WILD;
 		if ((cp = strstr(ret->pattern, "**")) != NULL) {
-			mflags |= MATCHFLG_WILD2;
+			rflags |= FILTRULE_WILD2;
 			/* If the pattern starts with **, note that. */
 			if (cp == ret->pattern)
-				mflags |= MATCHFLG_WILD2_PREFIX;
+				rflags |= FILTRULE_WILD2_PREFIX;
 			/* If the pattern ends with ***, note that. */
 			if (pat_len >= 3
 			 && ret->pattern[pat_len-3] == '*'
 			 && ret->pattern[pat_len-2] == '*'
 			 && ret->pattern[pat_len-1] == '*')
-				mflags |= MATCHFLG_WILD3_SUFFIX;
+				rflags |= FILTRULE_WILD3_SUFFIX;
 		}
 	}
 
-	if (mflags & MATCHFLG_PERDIR_MERGE) {
+	if (rflags & FILTRULE_PERDIR_MERGE) {
 		struct filter_list_struct *lp;
 		unsigned int len;
 		int i;
@@ -295,7 +295,7 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 	} else
 		ret->u.slash_cnt = slash_cnt;
 
-	ret->match_flags = mflags;
+	ret->rflags = rflags;
 
 	if (!listp->tail) {
 		ret->next = listp->head;
@@ -454,8 +454,8 @@ static BOOL setup_merge_file(int mergelist_num, struct filter_struct *ex,
 		*y = '\0';
 		dirbuf_len = y - dirbuf;
 		strlcpy(x, ex->pattern, MAXPATHLEN - (x - buf));
-		parse_filter_file(lp, buf, ex->match_flags, XFLG_ANCHORED2ABS);
-		if (ex->match_flags & MATCHFLG_NO_INHERIT) {
+		parse_filter_file(lp, buf, ex->rflags, XFLG_ANCHORED2ABS);
+		if (ex->rflags & FILTRULE_NO_INHERIT) {
 			/* Free the undesired rules to clean up any per-dir
 			 * mergelists they defined.  Otherwise pop_local_filters
 			 * may crash trying to restore nonexistent state for
@@ -527,18 +527,18 @@ void *push_local_filters(const char *dir, unsigned int dirlen)
 		}
 
 		lp->tail = NULL; /* Switch any local rules to inherited. */
-		if (ex->match_flags & MATCHFLG_NO_INHERIT)
+		if (ex->rflags & FILTRULE_NO_INHERIT)
 			lp->head = NULL;
 
-		if (ex->match_flags & MATCHFLG_FINISH_SETUP) {
-			ex->match_flags &= ~MATCHFLG_FINISH_SETUP;
+		if (ex->rflags & FILTRULE_FINISH_SETUP) {
+			ex->rflags &= ~FILTRULE_FINISH_SETUP;
 			if (setup_merge_file(i, ex, lp))
 				set_filter_dir(dir, dirlen);
 		}
 
 		if (strlcpy(dirbuf + dirbuf_len, ex->pattern,
 		    MAXPATHLEN - dirbuf_len) < MAXPATHLEN - dirbuf_len) {
-			parse_filter_file(lp, dirbuf, ex->match_flags,
+			parse_filter_file(lp, dirbuf, ex->rflags,
 					  XFLG_ANCHORED2ABS);
 		} else {
 			io_error |= IOERR_GENERAL;
@@ -637,7 +637,7 @@ void change_local_filter_dir(const char *dname, int dlen, int dir_depth)
 static int rule_matches(const char *fname, struct filter_struct *ex, int name_is_dir)
 {
 	int slash_handling, str_cnt = 0, anchored_match = 0;
-	int ret_match = ex->match_flags & MATCHFLG_NEGATE ? 0 : 1;
+	int ret_match = ex->rflags & FILTRULE_NEGATE ? 0 : 1;
 	char *p, *pattern = ex->pattern;
 	const char *strings[16]; /* more than enough */
 	const char *name = fname + (*fname == '/');
@@ -645,28 +645,28 @@ static int rule_matches(const char *fname, struct filter_struct *ex, int name_is
 	if (!*name)
 		return 0;
 
-	if (!ex->u.slash_cnt && !(ex->match_flags & MATCHFLG_WILD2)) {
+	if (!ex->u.slash_cnt && !(ex->rflags & FILTRULE_WILD2)) {
 		/* If the pattern does not have any slashes AND it does
 		 * not have a "**" (which could match a slash), then we
 		 * just match the name portion of the path. */
 		if ((p = strrchr(name,'/')) != NULL)
 			name = p+1;
-	} else if (ex->match_flags & MATCHFLG_ABS_PATH && *fname != '/'
+	} else if (ex->rflags & FILTRULE_ABS_PATH && *fname != '/'
 	    && curr_dir_len > module_dirlen + 1) {
 		/* If we're matching against an absolute-path pattern,
 		 * we need to prepend our full path info. */
 		strings[str_cnt++] = curr_dir + module_dirlen + 1;
 		strings[str_cnt++] = "/";
-	} else if (ex->match_flags & MATCHFLG_WILD2_PREFIX && *fname != '/') {
+	} else if (ex->rflags & FILTRULE_WILD2_PREFIX && *fname != '/') {
 		/* Allow "**"+"/" to match at the start of the string. */
 		strings[str_cnt++] = "/";
 	}
 	strings[str_cnt++] = name;
 	if (name_is_dir) {
 		/* Allow a trailing "/"+"***" to match the directory. */
-		if (ex->match_flags & MATCHFLG_WILD3_SUFFIX)
+		if (ex->rflags & FILTRULE_WILD3_SUFFIX)
 			strings[str_cnt++] = "/";
-	} else if (ex->match_flags & MATCHFLG_DIRECTORY)
+	} else if (ex->rflags & FILTRULE_DIRECTORY)
 		return !ret_match;
 	strings[str_cnt] = NULL;
 
@@ -676,12 +676,12 @@ static int rule_matches(const char *fname, struct filter_struct *ex, int name_is
 	}
 
 	if (!anchored_match && ex->u.slash_cnt
-	    && !(ex->match_flags & MATCHFLG_WILD2)) {
+	    && !(ex->rflags & FILTRULE_WILD2)) {
 		/* A non-anchored match with an infix slash and no "**"
 		 * needs to match the last slash_cnt+1 name elements. */
 		slash_handling = ex->u.slash_cnt + 1;
-	} else if (!anchored_match && !(ex->match_flags & MATCHFLG_WILD2_PREFIX)
-				   && ex->match_flags & MATCHFLG_WILD2) {
+	} else if (!anchored_match && !(ex->rflags & FILTRULE_WILD2_PREFIX)
+				   && ex->rflags & FILTRULE_WILD2) {
 		/* A non-anchored match with an infix or trailing "**" (but not
 		 * a prefixed "**") needs to try matching after every slash. */
 		slash_handling = -1;
@@ -690,7 +690,7 @@ static int rule_matches(const char *fname, struct filter_struct *ex, int name_is
 		slash_handling = 0;
 	}
 
-	if (ex->match_flags & MATCHFLG_WILD) {
+	if (ex->rflags & FILTRULE_WILD) {
 		if (wildmatch_array(pattern, strings, slash_handling))
 			return ret_match;
 	} else if (str_cnt > 1) {
@@ -726,9 +726,9 @@ static void report_filter_result(enum logcode code, char const *name,
 		    = { {"show", "hid"}, {"risk", "protect"} };
 		const char *w = who_am_i();
 		rprintf(code, "[%s] %sing %s %s because of pattern %s%s%s\n",
-		    w, actions[*w!='s'][!(ent->match_flags&MATCHFLG_INCLUDE)],
+		    w, actions[*w!='s'][!(ent->rflags & FILTRULE_INCLUDE)],
 		    name_is_dir ? "directory" : "file", name, ent->pattern,
-		    ent->match_flags & MATCHFLG_DIRECTORY ? "/" : "", type);
+		    ent->rflags & FILTRULE_DIRECTORY ? "/" : "", type);
 	}
 }
 
@@ -743,16 +743,16 @@ int check_filter(struct filter_list_struct *listp, enum logcode code,
 	struct filter_struct *ent;
 
 	for (ent = listp->head; ent; ent = ent->next) {
-		if (ignore_perishable && ent->match_flags & MATCHFLG_PERISHABLE)
+		if (ignore_perishable && ent->rflags & FILTRULE_PERISHABLE)
 			continue;
-		if (ent->match_flags & MATCHFLG_PERDIR_MERGE) {
+		if (ent->rflags & FILTRULE_PERDIR_MERGE) {
 			int rc = check_filter(ent->u.mergelist, code, name,
 					      name_is_dir);
 			if (rc)
 				return rc;
 			continue;
 		}
-		if (ent->match_flags & MATCHFLG_CVS_IGNORE) {
+		if (ent->rflags & FILTRULE_CVS_IGNORE) {
 			int rc = check_filter(&cvs_filter_list, code, name,
 					      name_is_dir);
 			if (rc)
@@ -762,7 +762,7 @@ int check_filter(struct filter_list_struct *listp, enum logcode code,
 		if (rule_matches(name, ent, name_is_dir)) {
 			report_filter_result(code, name, ent, name_is_dir,
 					     listp->debug_type);
-			return ent->match_flags & MATCHFLG_INCLUDE ? 1 : -1;
+			return ent->rflags & FILTRULE_INCLUDE ? 1 : -1;
 		}
 	}
 
@@ -786,17 +786,17 @@ static const uchar *rule_strcmp(const uchar *str, const char *rule, int rule_len
  * be '\0' terminated, so use the returned length to limit the string.
  * Also, be sure to add this length to the returned pointer before passing
  * it back to ask for the next token.  This routine parses the "!" (list-
- * clearing) token and (depending on the mflags) the various prefixes.
- * The *mflags_ptr value will be set on exit to the new MATCHFLG_* bits
+ * clearing) token and (depending on the rflags) the various prefixes.
+ * The *rflags_ptr value will be set on exit to the new FILTRULE_* bits
  * for the current token. */
-static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
-				  unsigned int *len_ptr, uint32 *mflags_ptr)
+static const char *parse_rule_tok(const char *p, uint32 rflags, int xflags,
+				  unsigned int *len_ptr, uint32 *rflags_ptr)
 {
 	const uchar *s = (const uchar *)p;
-	uint32 new_mflags;
+	uint32 new_rflags;
 	unsigned int len;
 
-	if (mflags & MATCHFLG_WORD_SPLIT) {
+	if (rflags & FILTRULE_WORD_SPLIT) {
 		/* Skip over any initial whitespace. */
 		while (isspace(*s))
 			s++;
@@ -806,26 +806,26 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 	if (!*s)
 		return NULL;
 
-	new_mflags = mflags & MATCHFLGS_FROM_CONTAINER;
+	new_rflags = rflags & FILTRULES_FROM_CONTAINER;
 
 	/* Figure out what kind of a filter rule "s" is pointing at.  Note
-	 * that if MATCHFLG_NO_PREFIXES is set, the rule is either an include
-	 * or an exclude based on the inheritance of the MATCHFLG_INCLUDE
+	 * that if FILTRULE_NO_PREFIXES is set, the rule is either an include
+	 * or an exclude based on the inheritance of the FILTRULE_INCLUDE
 	 * flag (above).  XFLG_OLD_PREFIXES indicates a compatibility mode
 	 * for old include/exclude patterns where just "+ " and "- " are
 	 * allowed as optional prefixes.  */
-	if (mflags & MATCHFLG_NO_PREFIXES) {
-		if (*s == '!' && mflags & MATCHFLG_CVS_IGNORE)
-			new_mflags |= MATCHFLG_CLEAR_LIST; /* Tentative! */
+	if (rflags & FILTRULE_NO_PREFIXES) {
+		if (*s == '!' && rflags & FILTRULE_CVS_IGNORE)
+			new_rflags |= FILTRULE_CLEAR_LIST; /* Tentative! */
 	} else if (xflags & XFLG_OLD_PREFIXES) {
 		if (*s == '-' && s[1] == ' ') {
-			new_mflags &= ~MATCHFLG_INCLUDE;
+			new_rflags &= ~FILTRULE_INCLUDE;
 			s += 2;
 		} else if (*s == '+' && s[1] == ' ') {
-			new_mflags |= MATCHFLG_INCLUDE;
+			new_rflags |= FILTRULE_INCLUDE;
 			s += 2;
 		} else if (*s == '!')
-			new_mflags |= MATCHFLG_CLEAR_LIST; /* Tentative! */
+			new_rflags |= FILTRULE_CLEAR_LIST; /* Tentative! */
 	} else {
 		char ch = 0, *mods = "";
 		switch (*s) {
@@ -873,35 +873,35 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 		}
 		switch (ch) {
 		case ':':
-			new_mflags |= MATCHFLG_PERDIR_MERGE
-				    | MATCHFLG_FINISH_SETUP;
+			new_rflags |= FILTRULE_PERDIR_MERGE
+				    | FILTRULE_FINISH_SETUP;
 			/* FALL THROUGH */
 		case '.':
-			new_mflags |= MATCHFLG_MERGE_FILE;
+			new_rflags |= FILTRULE_MERGE_FILE;
 			mods = MODIFIERS_INCL_EXCL MODIFIERS_MERGE_FILE;
 			break;
 		case '+':
-			new_mflags |= MATCHFLG_INCLUDE;
+			new_rflags |= FILTRULE_INCLUDE;
 			/* FALL THROUGH */
 		case '-':
 			mods = MODIFIERS_INCL_EXCL;
 			break;
 		case 'S':
-			new_mflags |= MATCHFLG_INCLUDE;
+			new_rflags |= FILTRULE_INCLUDE;
 			/* FALL THROUGH */
 		case 'H':
-			new_mflags |= MATCHFLG_SENDER_SIDE;
+			new_rflags |= FILTRULE_SENDER_SIDE;
 			mods = MODIFIERS_HIDE_PROTECT;
 			break;
 		case 'R':
-			new_mflags |= MATCHFLG_INCLUDE;
+			new_rflags |= FILTRULE_INCLUDE;
 			/* FALL THROUGH */
 		case 'P':
-			new_mflags |= MATCHFLG_RECEIVER_SIDE;
+			new_rflags |= FILTRULE_RECEIVER_SIDE;
 			mods = MODIFIERS_HIDE_PROTECT;
 			break;
 		case '!':
-			new_mflags |= MATCHFLG_CLEAR_LIST;
+			new_rflags |= FILTRULE_CLEAR_LIST;
 			mods = NULL;
 			break;
 		default:
@@ -910,7 +910,7 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 		}
 		while (mods && *++s && *s != ' ' && *s != '_') {
 			if (strchr(mods, *s) == NULL) {
-				if (mflags & MATCHFLG_WORD_SPLIT && isspace(*s)) {
+				if (rflags & FILTRULE_WORD_SPLIT && isspace(*s)) {
 					s--;
 					break;
 				}
@@ -922,47 +922,47 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 			}
 			switch (*s) {
 			case '-':
-				if (new_mflags & MATCHFLG_NO_PREFIXES)
+				if (new_rflags & FILTRULE_NO_PREFIXES)
 				    goto invalid;
-				new_mflags |= MATCHFLG_NO_PREFIXES;
+				new_rflags |= FILTRULE_NO_PREFIXES;
 				break;
 			case '+':
-				if (new_mflags & MATCHFLG_NO_PREFIXES)
+				if (new_rflags & FILTRULE_NO_PREFIXES)
 				    goto invalid;
-				new_mflags |= MATCHFLG_NO_PREFIXES
-					    | MATCHFLG_INCLUDE;
+				new_rflags |= FILTRULE_NO_PREFIXES
+					    | FILTRULE_INCLUDE;
 				break;
 			case '/':
-				new_mflags |= MATCHFLG_ABS_PATH;
+				new_rflags |= FILTRULE_ABS_PATH;
 				break;
 			case '!':
-				new_mflags |= MATCHFLG_NEGATE;
+				new_rflags |= FILTRULE_NEGATE;
 				break;
 			case 'C':
-				if (new_mflags & MATCHFLG_NO_PREFIXES)
+				if (new_rflags & FILTRULE_NO_PREFIXES)
 				    goto invalid;
-				new_mflags |= MATCHFLG_NO_PREFIXES
-					    | MATCHFLG_WORD_SPLIT
-					    | MATCHFLG_NO_INHERIT
-					    | MATCHFLG_CVS_IGNORE;
+				new_rflags |= FILTRULE_NO_PREFIXES
+					    | FILTRULE_WORD_SPLIT
+					    | FILTRULE_NO_INHERIT
+					    | FILTRULE_CVS_IGNORE;
 				break;
 			case 'e':
-				new_mflags |= MATCHFLG_EXCLUDE_SELF;
+				new_rflags |= FILTRULE_EXCLUDE_SELF;
 				break;
 			case 'n':
-				new_mflags |= MATCHFLG_NO_INHERIT;
+				new_rflags |= FILTRULE_NO_INHERIT;
 				break;
 			case 'p':
-				new_mflags |= MATCHFLG_PERISHABLE;
+				new_rflags |= FILTRULE_PERISHABLE;
 				break;
 			case 'r':
-				new_mflags |= MATCHFLG_RECEIVER_SIDE;
+				new_rflags |= FILTRULE_RECEIVER_SIDE;
 				break;
 			case 's':
-				new_mflags |= MATCHFLG_SENDER_SIDE;
+				new_rflags |= FILTRULE_SENDER_SIDE;
 				break;
 			case 'w':
-				new_mflags |= MATCHFLG_WORD_SPLIT;
+				new_rflags |= FILTRULE_WORD_SPLIT;
 				break;
 			}
 		}
@@ -970,7 +970,7 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 			s++;
 	}
 
-	if (mflags & MATCHFLG_WORD_SPLIT) {
+	if (rflags & FILTRULE_WORD_SPLIT) {
 		const uchar *cp = s;
 		/* Token ends at whitespace or the end of the string. */
 		while (!isspace(*cp) && *cp != '\0')
@@ -979,16 +979,16 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 	} else
 		len = strlen((char*)s);
 
-	if (new_mflags & MATCHFLG_CLEAR_LIST) {
-		if (!(mflags & MATCHFLG_NO_PREFIXES)
+	if (new_rflags & FILTRULE_CLEAR_LIST) {
+		if (!(rflags & FILTRULE_NO_PREFIXES)
 		 && !(xflags & XFLG_OLD_PREFIXES) && len) {
 			rprintf(FERROR,
 				"'!' rule has trailing characters: %s\n", p);
 			exit_cleanup(RERR_SYNTAX);
 		}
 		if (len > 1)
-			new_mflags &= ~MATCHFLG_CLEAR_LIST;
-	} else if (!len && !(new_mflags & MATCHFLG_CVS_IGNORE)) {
+			new_rflags &= ~FILTRULE_CLEAR_LIST;
+	} else if (!len && !(new_rflags & FILTRULE_CVS_IGNORE)) {
 		rprintf(FERROR, "unexpected end of filter rule: %s\n", p);
 		exit_cleanup(RERR_SYNTAX);
 	}
@@ -997,13 +997,13 @@ static const char *parse_rule_tok(const char *p, uint32 mflags, int xflags,
 	 * sender-side rule.  We also affect per-dir merge files that take
 	 * no prefixes as a simple optimization. */
 	if (delete_excluded
-	 && !(new_mflags & (MATCHFLG_RECEIVER_SIDE|MATCHFLG_SENDER_SIDE))
-	 && (!(new_mflags & MATCHFLG_PERDIR_MERGE)
-	  || new_mflags & MATCHFLG_NO_PREFIXES))
-		new_mflags |= MATCHFLG_SENDER_SIDE;
+	 && !(new_rflags & (FILTRULE_RECEIVER_SIDE|FILTRULE_SENDER_SIDE))
+	 && (!(new_rflags & FILTRULE_PERDIR_MERGE)
+	  || new_rflags & FILTRULE_NO_PREFIXES))
+		new_rflags |= FILTRULE_SENDER_SIDE;
 
 	*len_ptr = len;
-	*mflags_ptr = new_mflags;
+	*rflags_ptr = new_rflags;
 	return (const char *)s;
 }
 
@@ -1018,7 +1018,7 @@ static char default_cvsignore[] =
 	/* The rest we added to suit ourself. */
 	" .svn/ .git/ .bzr/";
 
-static void get_cvs_excludes(uint32 mflags)
+static void get_cvs_excludes(uint32 rflags)
 {
 	static int initialized = 0;
 	char *p, fname[MAXPATHLEN];
@@ -1028,22 +1028,22 @@ static void get_cvs_excludes(uint32 mflags)
 	initialized = 1;
 
 	parse_rule(&cvs_filter_list, default_cvsignore,
-		   mflags | (protocol_version >= 30 ? MATCHFLG_PERISHABLE : 0),
+		   rflags | (protocol_version >= 30 ? FILTRULE_PERISHABLE : 0),
 		   0);
 
 	p = module_id >= 0 && lp_use_chroot(module_id) ? "/" : getenv("HOME");
 	if (p && pathjoin(fname, MAXPATHLEN, p, ".cvsignore") < MAXPATHLEN)
-		parse_filter_file(&cvs_filter_list, fname, mflags, 0);
+		parse_filter_file(&cvs_filter_list, fname, rflags, 0);
 
-	parse_rule(&cvs_filter_list, getenv("CVSIGNORE"), mflags, 0);
+	parse_rule(&cvs_filter_list, getenv("CVSIGNORE"), rflags, 0);
 }
 
 
 void parse_rule(struct filter_list_struct *listp, const char *pattern,
-		uint32 mflags, int xflags)
+		uint32 rflags, int xflags)
 {
 	unsigned int pat_len;
-	uint32 new_mflags;
+	uint32 new_rflags;
 	const char *cp, *p;
 
 	if (!pattern)
@@ -1051,8 +1051,8 @@ void parse_rule(struct filter_list_struct *listp, const char *pattern,
 
 	while (1) {
 		/* Remember that the returned string is NOT '\0' terminated! */
-		cp = parse_rule_tok(pattern, mflags, xflags,
-				    &pat_len, &new_mflags);
+		cp = parse_rule_tok(pattern, rflags, xflags,
+				    &pat_len, &new_rflags);
 		if (!cp)
 			break;
 
@@ -1064,7 +1064,7 @@ void parse_rule(struct filter_list_struct *listp, const char *pattern,
 			continue;
 		}
 
-		if (new_mflags & MATCHFLG_CLEAR_LIST) {
+		if (new_rflags & FILTRULE_CLEAR_LIST) {
 			if (DEBUG_GTE(FILTER, 2)) {
 				rprintf(FINFO,
 					"[%s] clearing filter list%s\n",
@@ -1074,54 +1074,54 @@ void parse_rule(struct filter_list_struct *listp, const char *pattern,
 			continue;
 		}
 
-		if (new_mflags & MATCHFLG_MERGE_FILE) {
+		if (new_rflags & FILTRULE_MERGE_FILE) {
 			unsigned int len;
 			if (!pat_len) {
 				cp = ".cvsignore";
 				pat_len = 10;
 			}
 			len = pat_len;
-			if (new_mflags & MATCHFLG_EXCLUDE_SELF) {
+			if (new_rflags & FILTRULE_EXCLUDE_SELF) {
 				const char *name = cp + len;
 				while (name > cp && name[-1] != '/') name--;
 				len -= name - cp;
 				add_rule(listp, name, len, 0, 0);
-				new_mflags &= ~MATCHFLG_EXCLUDE_SELF;
+				new_rflags &= ~FILTRULE_EXCLUDE_SELF;
 				len = pat_len;
 			}
-			if (new_mflags & MATCHFLG_PERDIR_MERGE) {
+			if (new_rflags & FILTRULE_PERDIR_MERGE) {
 				if (parent_dirscan) {
 					if (!(p = parse_merge_name(cp, &len,
 								module_dirlen)))
 						continue;
-					add_rule(listp, p, len, new_mflags, 0);
+					add_rule(listp, p, len, new_rflags, 0);
 					continue;
 				}
 			} else {
 				if (!(p = parse_merge_name(cp, &len, 0)))
 					continue;
-				parse_filter_file(listp, p, new_mflags,
+				parse_filter_file(listp, p, new_rflags,
 						  XFLG_FATAL_ERRORS);
 				continue;
 			}
 		}
 
-		add_rule(listp, cp, pat_len, new_mflags, xflags);
+		add_rule(listp, cp, pat_len, new_rflags, xflags);
 
-		if (new_mflags & MATCHFLG_CVS_IGNORE
-		    && !(new_mflags & MATCHFLG_MERGE_FILE))
-			get_cvs_excludes(new_mflags);
+		if (new_rflags & FILTRULE_CVS_IGNORE
+		    && !(new_rflags & FILTRULE_MERGE_FILE))
+			get_cvs_excludes(new_rflags);
 	}
 }
 
 
 void parse_filter_file(struct filter_list_struct *listp, const char *fname,
-		       uint32 mflags, int xflags)
+		       uint32 rflags, int xflags)
 {
 	FILE *fp;
 	char line[BIGPATHBUFLEN];
 	char *eob = line + sizeof line - 1;
-	int word_split = mflags & MATCHFLG_WORD_SPLIT;
+	int word_split = rflags & FILTRULE_WORD_SPLIT;
 
 	if (!fname || !*fname)
 		return;
@@ -1141,7 +1141,7 @@ void parse_filter_file(struct filter_list_struct *listp, const char *fname,
 
 	if (DEBUG_GTE(FILTER, 2)) {
 		rprintf(FINFO, "[%s] parse_filter_file(%s,%x,%x)%s\n",
-			who_am_i(), fname, mflags, xflags,
+			who_am_i(), fname, rflags, xflags,
 			fp ? "" : " [not found]");
 	}
 
@@ -1149,7 +1149,7 @@ void parse_filter_file(struct filter_list_struct *listp, const char *fname,
 		if (xflags & XFLG_FATAL_ERRORS) {
 			rsyserr(FERROR, errno,
 				"failed to open %sclude file %s",
-				mflags & MATCHFLG_INCLUDE ? "in" : "ex",
+				rflags & FILTRULE_INCLUDE ? "in" : "ex",
 				fname);
 			exit_cleanup(RERR_FILEIO);
 		}
@@ -1184,7 +1184,7 @@ void parse_filter_file(struct filter_list_struct *listp, const char *fname,
 		*s = '\0';
 		/* Skip an empty token and (when line parsing) comments. */
 		if (*line && (word_split || (*line != ';' && *line != '#')))
-			parse_rule(listp, line, mflags, xflags);
+			parse_rule(listp, line, rflags, xflags);
 		if (ch == EOF)
 			break;
 	}
@@ -1194,18 +1194,18 @@ void parse_filter_file(struct filter_list_struct *listp, const char *fname,
 /* If the "for_xfer" flag is set, the prefix is made compatible with the
  * current protocol_version (if possible) or a NULL is returned (if not
  * possible). */
-char *get_rule_prefix(int match_flags, const char *pat, int for_xfer,
+char *get_rule_prefix(int rflags, const char *pat, int for_xfer,
 		      unsigned int *plen_ptr)
 {
 	static char buf[MAX_RULE_PREFIX+1];
 	char *op = buf;
 	int legal_len = for_xfer && protocol_version < 29 ? 1 : MAX_RULE_PREFIX-1;
 
-	if (match_flags & MATCHFLG_PERDIR_MERGE) {
+	if (rflags & FILTRULE_PERDIR_MERGE) {
 		if (legal_len == 1)
 			return NULL;
 		*op++ = ':';
-	} else if (match_flags & MATCHFLG_INCLUDE)
+	} else if (rflags & FILTRULE_INCLUDE)
 		*op++ = '+';
 	else if (legal_len != 1
 	    || ((*pat == '-' || *pat == '+') && pat[1] == ' '))
@@ -1213,32 +1213,32 @@ char *get_rule_prefix(int match_flags, const char *pat, int for_xfer,
 	else
 		legal_len = 0;
 
-	if (match_flags & MATCHFLG_NEGATE)
+	if (rflags & FILTRULE_NEGATE)
 		*op++ = '!';
-	if (match_flags & MATCHFLG_CVS_IGNORE)
+	if (rflags & FILTRULE_CVS_IGNORE)
 		*op++ = 'C';
 	else {
-		if (match_flags & MATCHFLG_NO_INHERIT)
+		if (rflags & FILTRULE_NO_INHERIT)
 			*op++ = 'n';
-		if (match_flags & MATCHFLG_WORD_SPLIT)
+		if (rflags & FILTRULE_WORD_SPLIT)
 			*op++ = 'w';
-		if (match_flags & MATCHFLG_NO_PREFIXES) {
-			if (match_flags & MATCHFLG_INCLUDE)
+		if (rflags & FILTRULE_NO_PREFIXES) {
+			if (rflags & FILTRULE_INCLUDE)
 				*op++ = '+';
 			else
 				*op++ = '-';
 		}
 	}
-	if (match_flags & MATCHFLG_EXCLUDE_SELF)
+	if (rflags & FILTRULE_EXCLUDE_SELF)
 		*op++ = 'e';
-	if (match_flags & MATCHFLG_SENDER_SIDE
+	if (rflags & FILTRULE_SENDER_SIDE
 	    && (!for_xfer || protocol_version >= 29))
 		*op++ = 's';
-	if (match_flags & MATCHFLG_RECEIVER_SIDE
+	if (rflags & FILTRULE_RECEIVER_SIDE
 	    && (!for_xfer || protocol_version >= 29
 	     || (delete_excluded && am_sender)))
 		*op++ = 'r';
-	if (match_flags & MATCHFLG_PERISHABLE) {
+	if (rflags & FILTRULE_PERISHABLE) {
 		if (!for_xfer || protocol_version >= 30)
 			*op++ = 'p';
 		else if (am_sender)
@@ -1270,13 +1270,13 @@ static void send_rules(int f_out, struct filter_list_struct *flp)
 		 * backward compatibility problem, and we elide any no-prefix
 		 * merge files as an optimization (since they can only have
 		 * include/exclude rules). */
-		if (ent->match_flags & MATCHFLG_SENDER_SIDE)
+		if (ent->rflags & FILTRULE_SENDER_SIDE)
 			elide = am_sender ? 1 : -1;
-		if (ent->match_flags & MATCHFLG_RECEIVER_SIDE)
+		if (ent->rflags & FILTRULE_RECEIVER_SIDE)
 			elide = elide ? 0 : am_sender ? -1 : 1;
 		else if (delete_excluded && !elide
-		 && (!(ent->match_flags & MATCHFLG_PERDIR_MERGE)
-		  || ent->match_flags & MATCHFLG_NO_PREFIXES))
+		 && (!(ent->rflags & FILTRULE_PERDIR_MERGE)
+		  || ent->rflags & FILTRULE_NO_PREFIXES))
 			elide = am_sender ? 1 : -1;
 		if (elide < 0) {
 			if (prev)
@@ -1287,14 +1287,14 @@ static void send_rules(int f_out, struct filter_list_struct *flp)
 			prev = ent;
 		if (elide > 0)
 			continue;
-		if (ent->match_flags & MATCHFLG_CVS_IGNORE
-		    && !(ent->match_flags & MATCHFLG_MERGE_FILE)) {
+		if (ent->rflags & FILTRULE_CVS_IGNORE
+		    && !(ent->rflags & FILTRULE_MERGE_FILE)) {
 			int f = am_sender || protocol_version < 29 ? f_out : -2;
 			send_rules(f, &cvs_filter_list);
 			if (f == f_out)
 				continue;
 		}
-		p = get_rule_prefix(ent->match_flags, ent->pattern, 1, &plen);
+		p = get_rule_prefix(ent->rflags, ent->pattern, 1, &plen);
 		if (!p) {
 			rprintf(FERROR,
 				"filter rules are too modern for remote rsync.\n");
@@ -1303,7 +1303,7 @@ static void send_rules(int f_out, struct filter_list_struct *flp)
 		if (f_out < 0)
 			continue;
 		len = strlen(ent->pattern);
-		dlen = ent->match_flags & MATCHFLG_DIRECTORY ? 1 : 0;
+		dlen = ent->rflags & FILTRULE_DIRECTORY ? 1 : 0;
 		if (!(plen + len + dlen))
 			continue;
 		write_int(f_out, plen + len + dlen);

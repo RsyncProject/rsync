@@ -620,16 +620,16 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		set_filter_dir(module_dir, module_dirlen);
 
 	p = lp_filter(i);
-	parse_rule(&daemon_filter_list, p, MATCHFLG_WORD_SPLIT,
+	parse_rule(&daemon_filter_list, p, FILTRULE_WORD_SPLIT,
 		   XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3);
 
 	p = lp_include_from(i);
-	parse_filter_file(&daemon_filter_list, p, MATCHFLG_INCLUDE,
+	parse_filter_file(&daemon_filter_list, p, FILTRULE_INCLUDE,
 	    XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES | XFLG_FATAL_ERRORS);
 
 	p = lp_include(i);
 	parse_rule(&daemon_filter_list, p,
-		   MATCHFLG_INCLUDE | MATCHFLG_WORD_SPLIT,
+		   FILTRULE_INCLUDE | FILTRULE_WORD_SPLIT,
 		   XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES);
 
 	p = lp_exclude_from(i);
@@ -637,7 +637,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	    XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES | XFLG_FATAL_ERRORS);
 
 	p = lp_exclude(i);
-	parse_rule(&daemon_filter_list, p, MATCHFLG_WORD_SPLIT,
+	parse_rule(&daemon_filter_list, p, FILTRULE_WORD_SPLIT,
 		   XFLG_ABS_IF_SLASH | XFLG_DIR2WILD3 | XFLG_OLD_PREFIXES);
 
 	log_init(1);
