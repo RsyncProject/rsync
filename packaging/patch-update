@@ -36,6 +36,17 @@ if (!$skip_branch_check && !$is_clean) {
     die "The checkout is not clean:\n", $status;
 }
 
+my $master_commit;
+open PIPE, '-|', "git log -1 --no-color $master_branch" or die $!;
+while (<PIPE>) {
+    if (/^commit (\S+)/) {
+	$master_commit = $1;
+	last;
+    }
+}
+close PIPE;
+die "Unable to determine commit hash for master branch: $master_branch\n" unless defined $master_commit;
+
 my @extra_files;
 open(IN, '<', 'Makefile.in') or die "Couldn't open Makefile.in: $!\n";
 while (<IN>) {
@@ -125,13 +136,15 @@ sub update_patch
     my($patch) = @_;
 
     my $parent = $parent{$patch};
+    my $based_on;
     if (defined $parent) {
 	unless ($completed{$parent}++) {
 	    update_patch($parent);
 	}
-	$parent = "patch/$parent";
+	$based_on = $parent = "patch/$parent";
     } else {
 	$parent = $master_branch;
+	$based_on = $master_commit;
     }
 
     print "======== $patch ========\n";
@@ -139,9 +152,9 @@ sub update_patch
     sleep 1 while $incl_generated_files && $last_touch >= time;
     system "git checkout patch/$patch" and return 0;
 
-    my $ok = system("git merge $parent") == 0;
+    my $ok = system("git merge $based_on") == 0;
     if (!$ok || $launch_shell) {
-	print qq|"git merge $parent" incomplete -- please fix.\n| if !$ok;
+	print qq|"git merge $based_on" incomplete -- please fix.\n| if !$ok;
 	$ENV{PS1} = "[$parent] patch/$patch: ";
 	while (1) {
 	    if (system($ENV{SHELL}) != 0) {
@@ -157,14 +170,14 @@ sub update_patch
     }
 
     open(OUT, '>', "$patches_dir/$patch.diff") or die $!;
-    print OUT $description{$patch}, "\n";
+    print OUT $description{$patch}, "\nbased-on: $based_on\n";
 
     if ($incl_generated_files) {
 	system "$make_gen_cmd && rsync -a @extra_files $tmp_dir/$patch/" and exit 1;
     }
     $last_touch = time;
 
-    open(PIPE, '-|', 'git', 'diff', $parent) or die $!;
+    open(PIPE, '-|', 'git', 'diff', $based_on) or die $!;
     DIFF: while (<PIPE>) {
 	while (m{^diff --git a/PATCH}) {
 	    while (<PIPE>) {
