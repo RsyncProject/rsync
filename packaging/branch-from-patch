@@ -1,0 +1,183 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use Getopt::Long;
+
+&Getopt::Long::Configure('bundling');
+&usage if !&GetOptions(
+    'branch|b=s' => \( my $master_branch = 'master' ),
+    'skip-check' => \( my $skip_branch_check ),
+    'delete' => \( my $delete_local_branches ),
+    'help|h' => \( my $help_opt ),
+);
+&usage if $help_opt;
+
+my %local_branch;
+open PIPE, '-|', 'git branch -l' or die "Unable to fork: $!\n";
+while (<PIPE>) {
+    if (m# patch/(.*)#) {
+	$local_branch{$1} = 1;
+    }
+}
+close PIPE;
+
+if ($delete_local_branches) {
+    foreach my $name (sort keys %local_branch) {
+	my $branch = "patch/$name";
+	system 'git', 'branch', '-D', $branch and exit 1;
+    }
+    %local_branch = ( );
+}
+
+open IN, '-|', 'git status' or die $!;
+my $status = join('', <IN>);
+close IN;
+die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
+die "The checkout is not on the $master_branch branch.\n" unless $status =~ /^# On branch $master_branch\n/;
+
+my @patch_list;
+foreach (@ARGV) {
+    if (!-f $_) {
+	die "File not found: $_\n";
+    }
+    die "Filename is not a .diff file: $_\n" unless /\.diff$/;
+    push @patch_list, $_;
+}
+
+exit unless @patch_list;
+
+my(%scanned, %created, %info);
+
+foreach my $patch (@patch_list) {
+    my($where, $name) = $patch =~ m{^(.*?)([^/]+)\.diff$};
+    next if $scanned{$name}++;
+
+    open IN, '<', $patch or die "Unable to open $patch: $!\n";
+
+    my $info = '';
+    my $commit;
+    while (<IN>) {
+	if (m#^based-on: (\S+)#) {
+	    $commit = $1;
+	    last;
+	}
+	last if m#^index .*\.\..* \d#;
+	last if m#^diff --git #;
+	last if m#^--- (old|a)/#;
+	$info .= $_;
+    }
+    close IN;
+
+    $info =~ s/\s+\Z/\n/;
+
+    my $parent = $master_branch;
+    my @patches = $info =~ m#patch -p1 <patches/(\S+)\.diff#g;
+    if (@patches) {
+	if ($patches[-1] eq $name) {
+	    pop @patches;
+	} else {
+	    warn "No identity patch line in $patch\n";
+	}
+	if (@patches) {
+	    $parent = pop @patches;
+	    if (!$scanned{$parent}) {
+		unless (-f "$where$parent.diff") {
+		    die "Unknown parent of $patch: $parent\n";
+		}
+		# Add parent to @patch_list so that we will look for the
+		# parent's parent.  Any duplicates will just be ignored.
+		push @patch_list, "$where$parent.diff";
+	    }
+	}
+    } else {
+	warn "No patch lines found in $patch\n";
+    }
+
+    $info{$name} = [ $parent, $info, $commit ];
+}
+
+foreach my $patch (@patch_list) {
+    create_branch($patch);
+}
+
+system 'git', 'checkout', $master_branch and exit 1;
+
+exit;
+
+sub create_branch
+{
+    my($patch) = @_;
+    my($where, $name) = $patch =~ m{^(.*?)([^/]+)\.diff$};
+
+    return if $created{$name}++;
+
+    my $ref = $info{$name};
+    my($parent, $info, $commit) = @$ref;
+
+    my $parent_branch;
+    if ($parent eq $master_branch) {
+	$parent_branch = $master_branch;
+	$parent_branch = $commit if defined $commit;
+    } else {
+	create_branch("$where/$parent.diff");
+	$parent_branch = "patch/$parent";
+    }
+
+    my $branch = "patch/$name";
+    print "\n", '=' x 64, "\nProcessing $branch ($parent_branch)\n";
+
+    if ($local_branch{$name}) {
+	system 'git', 'branch', '-D', $branch and exit 1;
+    }
+
+    system 'git', 'checkout', '-b', $branch, $parent_branch and exit 1;
+
+    open OUT, '>', "PATCH.$name" or die $!;
+    print OUT $info;
+    close OUT;
+    system 'git', 'add', "PATCH.$name" and exit 1;
+
+    open IN, '<', $patch or die "Unable to open $patch: $!\n";
+    $_ = join('', <IN>);
+    close IN;
+
+    open PIPE, '|-', 'patch -p1' or die $!;
+    print PIPE $_;
+    close PIPE;
+
+    system 'rm -f *.orig */*.orig';
+
+    while (m#\nnew file mode (\d+)\s+--- /dev/null\s+\Q+++\E b/(.*)#g) {
+	chmod oct($1), $2;
+	system 'git', 'add', $2;
+    }
+
+    while (1) {
+	system 'git status';
+	print 'Press Enter to commit, Ctrl-C to abort, or type a wild-name to add a new file: ';
+	$_ = <STDIN>;
+	last if /^$/;
+	chomp;
+	system "git add $_";
+    }
+
+    while (system 'git', 'commit', '-a', '-m', "Creating branch from $name.diff.") {
+	exit 1 if system '/bin/zsh';
+    }
+}
+
+sub usage
+{
+    die <<EOT;
+Usage branch-from-patch [OPTIONS] patches/DIFF...
+
+Options:
+-b, --branch=BRANCH  Create branches relative to BRANCH if no "based-on"
+                     header was found in the patch file.
+    --skip-check     Skip the check that ensures starting with a clean branch.
+    --delete         Delete all the local patch/* branches, not just the ones
+                     that are being recreated.
+-h, --help           Output this help message.
+EOT
+}
