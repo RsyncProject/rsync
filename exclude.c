@@ -47,10 +47,6 @@ filter_rule_list daemon_filter_list = { .debug_type = " [daemon]" };
 /* Need room enough for ":MODS " prefix plus some room to grow. */
 #define MAX_RULE_PREFIX (16)
 
-#define MODIFIERS_MERGE_FILE "-+Cenw"
-#define MODIFIERS_INCL_EXCL "/!Crsp"
-#define MODIFIERS_HIDE_PROTECT "/!p"
-
 #define SLASH_WILD3_SUFFIX "/***"
 
 /* The dirbuf is set by push_local_filters() to the current subdirectory
@@ -124,8 +120,6 @@ static void teardown_mergelist(filter_rule *ex)
 
 static void free_filter(filter_rule *ex)
 {
-	if (ex->rflags & FILTRULE_PERDIR_MERGE)
-		teardown_mergelist(ex);
 	free(ex->pattern);
 	free(ex);
 }
@@ -145,47 +139,46 @@ static void free_filters(filter_rule *head)
 
 	while (rev_head) {
 		filter_rule *prev = rev_head->next;
+		/* Tear down mergelists here, not in free_filter, so that we
+		 * affect only real filter lists and not temporarily allocated
+		 * filters. */
+		if (rev_head->rflags & FILTRULE_PERDIR_MERGE)
+			teardown_mergelist(rev_head);
 		free_filter(rev_head);
 		rev_head = prev;
 	}
 }
 
 /* Build a filter structure given a filter pattern.  The value in "pat"
- * is not null-terminated. */
-static void add_rule(filter_rule_list *listp, const char *pat,
-		     unsigned int pat_len, uint32 rflags, int xflags)
+ * is not null-terminated.  "rule" is either held or freed, so the
+ * caller should not free it. */
+static void add_rule(filter_rule_list *listp, const char *pat, unsigned int pat_len,
+		     filter_rule *rule, int xflags)
 {
-	filter_rule *rule;
 	const char *cp;
 	unsigned int pre_len, suf_len, slash_cnt = 0;
 
 	if (DEBUG_GTE(FILTER, 2)) {
 		rprintf(FINFO, "[%s] add_rule(%s%.*s%s)%s\n",
-			who_am_i(), get_rule_prefix(rflags, pat, 0, NULL),
+			who_am_i(), get_rule_prefix(rule, pat, 0, NULL),
 			(int)pat_len, pat,
-			(rflags & FILTRULE_DIRECTORY) ? "/" : "",
+			(rule->rflags & FILTRULE_DIRECTORY) ? "/" : "",
 			listp->debug_type);
 	}
 
 	/* These flags also indicate that we're reading a list that
 	 * needs to be filtered now, not post-filtered later. */
-	if (xflags & (XFLG_ANCHORED2ABS|XFLG_ABS_IF_SLASH)) {
-		uint32 mf = rflags & (FILTRULE_RECEIVER_SIDE|FILTRULE_SENDER_SIDE);
-		if (am_sender) {
-			if (mf == FILTRULE_RECEIVER_SIDE)
-				return;
-		} else {
-			if (mf == FILTRULE_SENDER_SIDE)
-				return;
-		}
+	if (xflags & (XFLG_ANCHORED2ABS|XFLG_ABS_IF_SLASH)
+		&& (rule->rflags & FILTRULES_SIDES)
+			== (am_sender ? FILTRULE_RECEIVER_SIDE : FILTRULE_SENDER_SIDE)) {
+		/* This filter applies only to the other side.  Drop it. */
+		free_filter(rule);
+		return;
 	}
-
-	if (!(rule = new0(filter_rule)))
-		out_of_memory("add_rule");
 
 	if (pat_len > 1 && pat[pat_len-1] == '/') {
 		pat_len--;
-		rflags |= FILTRULE_DIRECTORY;
+		rule->rflags |= FILTRULE_DIRECTORY;
 	}
 
 	for (cp = pat; cp < pat + pat_len; cp++) {
@@ -193,10 +186,10 @@ static void add_rule(filter_rule_list *listp, const char *pat,
 			slash_cnt++;
 	}
 
-	if (!(rflags & (FILTRULE_ABS_PATH | FILTRULE_MERGE_FILE))
+	if (!(rule->rflags & (FILTRULE_ABS_PATH | FILTRULE_MERGE_FILE))
 	 && ((xflags & (XFLG_ANCHORED2ABS|XFLG_ABS_IF_SLASH) && *pat == '/')
 	  || (xflags & XFLG_ABS_IF_SLASH && slash_cnt))) {
-		rflags |= FILTRULE_ABS_PATH;
+		rule->rflags |= FILTRULE_ABS_PATH;
 		if (*pat == '/')
 			pre_len = dirbuf_len - module_dirlen - 1;
 		else
@@ -206,8 +199,8 @@ static void add_rule(filter_rule_list *listp, const char *pat,
 
 	/* The daemon wants dir-exclude rules to get an appended "/" + "***". */
 	if (xflags & XFLG_DIR2WILD3
-	 && BITS_SETnUNSET(rflags, FILTRULE_DIRECTORY, FILTRULE_INCLUDE)) {
-		rflags &= ~FILTRULE_DIRECTORY;
+	 && BITS_SETnUNSET(rule->rflags, FILTRULE_DIRECTORY, FILTRULE_INCLUDE)) {
+		rule->rflags &= ~FILTRULE_DIRECTORY;
 		suf_len = sizeof SLASH_WILD3_SUFFIX - 1;
 	} else
 		suf_len = 0;
@@ -230,22 +223,22 @@ static void add_rule(filter_rule_list *listp, const char *pat,
 	}
 
 	if (strpbrk(rule->pattern, "*[?")) {
-		rflags |= FILTRULE_WILD;
+		rule->rflags |= FILTRULE_WILD;
 		if ((cp = strstr(rule->pattern, "**")) != NULL) {
-			rflags |= FILTRULE_WILD2;
+			rule->rflags |= FILTRULE_WILD2;
 			/* If the pattern starts with **, note that. */
 			if (cp == rule->pattern)
-				rflags |= FILTRULE_WILD2_PREFIX;
+				rule->rflags |= FILTRULE_WILD2_PREFIX;
 			/* If the pattern ends with ***, note that. */
 			if (pat_len >= 3
 			 && rule->pattern[pat_len-3] == '*'
 			 && rule->pattern[pat_len-2] == '*'
 			 && rule->pattern[pat_len-1] == '*')
-				rflags |= FILTRULE_WILD3_SUFFIX;
+				rule->rflags |= FILTRULE_WILD3_SUFFIX;
 		}
 	}
 
-	if (rflags & FILTRULE_PERDIR_MERGE) {
+	if (rule->rflags & FILTRULE_PERDIR_MERGE) {
 		filter_rule_list *lp;
 		unsigned int len;
 		int i;
@@ -293,8 +286,6 @@ static void add_rule(filter_rule_list *listp, const char *pat,
 		mergelist_parents[mergelist_cnt++] = rule;
 	} else
 		rule->u.slash_cnt = slash_cnt;
-
-	rule->rflags = rflags;
 
 	if (!listp->tail) {
 		rule->next = listp->head;
@@ -453,7 +444,7 @@ static BOOL setup_merge_file(int mergelist_num, filter_rule *ex,
 		*y = '\0';
 		dirbuf_len = y - dirbuf;
 		strlcpy(x, ex->pattern, MAXPATHLEN - (x - buf));
-		parse_filter_file(lp, buf, ex->rflags, XFLG_ANCHORED2ABS);
+		parse_filter_file(lp, buf, ex, XFLG_ANCHORED2ABS);
 		if (ex->rflags & FILTRULE_NO_INHERIT) {
 			/* Free the undesired rules to clean up any per-dir
 			 * mergelists they defined.  Otherwise pop_local_filters
@@ -537,7 +528,7 @@ void *push_local_filters(const char *dir, unsigned int dirlen)
 
 		if (strlcpy(dirbuf + dirbuf_len, ex->pattern,
 		    MAXPATHLEN - dirbuf_len) < MAXPATHLEN - dirbuf_len) {
-			parse_filter_file(lp, dirbuf, ex->rflags,
+			parse_filter_file(lp, dirbuf, ex,
 					  XFLG_ANCHORED2ABS);
 		} else {
 			io_error |= IOERR_GENERAL;
@@ -777,31 +768,42 @@ static const uchar *rule_strcmp(const uchar *str, const char *rule, int rule_len
 	return NULL;
 }
 
-/* Get the next include/exclude arg from the string.  The token will not
- * be '\0' terminated, so use the returned length to limit the string.
- * Also, be sure to add this length to the returned pointer before passing
- * it back to ask for the next token.  This routine parses the "!" (list-
- * clearing) token and (depending on the rflags) the various prefixes.
- * The *rflags_ptr value will be set on exit to the new FILTRULE_* bits
- * for the current token. */
-static const char *parse_rule_tok(const char *p, uint32 rflags, int xflags,
-				  unsigned int *len_ptr, uint32 *rflags_ptr)
+#define FILTRULES_FROM_CONTAINER (FILTRULE_ABS_PATH | FILTRULE_INCLUDE \
+				| FILTRULE_DIRECTORY | FILTRULE_NEGATE \
+				| FILTRULE_PERISHABLE)
+
+/* Gets the next include/exclude rule from *rulestr_ptr and advances
+ * *rulestr_ptr to point beyond it.  Stores the pattern's start (within
+ * *rulestr_ptr) and length in *pat_ptr and *pat_len_ptr, and returns a newly
+ * allocated filter_rule containing the rest of the information.  Returns
+ * NULL if there are no more rules in the input.
+ *
+ * The template provides defaults for the new rule to inherit, and the
+ * template rflags and the xflags additionally affect parsing. */
+static filter_rule *parse_rule_tok(const char **rulestr_ptr,
+				   const filter_rule *template, int xflags,
+				   const char **pat_ptr, unsigned int *pat_len_ptr)
 {
-	const uchar *s = (const uchar *)p;
-	uint32 new_rflags;
+	const uchar *s = (const uchar *)*rulestr_ptr;
+	filter_rule *rule;
 	unsigned int len;
 
-	if (rflags & FILTRULE_WORD_SPLIT) {
+	if (template->rflags & FILTRULE_WORD_SPLIT) {
 		/* Skip over any initial whitespace. */
 		while (isspace(*s))
 			s++;
 		/* Update to point to real start of rule. */
-		p = (const char *)s;
+		*rulestr_ptr = (const char *)s;
 	}
 	if (!*s)
 		return NULL;
 
-	new_rflags = rflags & FILTRULES_FROM_CONTAINER;
+	if (!(rule = new0(filter_rule)))
+		out_of_memory("parse_rule_tok");
+
+	/* Inherit from the template.  Don't inherit FILTRULES_SIDES; we check
+	 * that later. */
+	rule->rflags = template->rflags & FILTRULES_FROM_CONTAINER;
 
 	/* Figure out what kind of a filter rule "s" is pointing at.  Note
 	 * that if FILTRULE_NO_PREFIXES is set, the rule is either an include
@@ -809,20 +811,21 @@ static const char *parse_rule_tok(const char *p, uint32 rflags, int xflags,
 	 * flag (above).  XFLG_OLD_PREFIXES indicates a compatibility mode
 	 * for old include/exclude patterns where just "+ " and "- " are
 	 * allowed as optional prefixes.  */
-	if (rflags & FILTRULE_NO_PREFIXES) {
-		if (*s == '!' && rflags & FILTRULE_CVS_IGNORE)
-			new_rflags |= FILTRULE_CLEAR_LIST; /* Tentative! */
+	if (template->rflags & FILTRULE_NO_PREFIXES) {
+		if (*s == '!' && template->rflags & FILTRULE_CVS_IGNORE)
+			rule->rflags |= FILTRULE_CLEAR_LIST; /* Tentative! */
 	} else if (xflags & XFLG_OLD_PREFIXES) {
 		if (*s == '-' && s[1] == ' ') {
-			new_rflags &= ~FILTRULE_INCLUDE;
+			rule->rflags &= ~FILTRULE_INCLUDE;
 			s += 2;
 		} else if (*s == '+' && s[1] == ' ') {
-			new_rflags |= FILTRULE_INCLUDE;
+			rule->rflags |= FILTRULE_INCLUDE;
 			s += 2;
 		} else if (*s == '!')
-			new_rflags |= FILTRULE_CLEAR_LIST; /* Tentative! */
+			rule->rflags |= FILTRULE_CLEAR_LIST; /* Tentative! */
 	} else {
-		char ch = 0, *mods = "";
+		char ch = 0;
+		BOOL prefix_specifies_side = False;
 		switch (*s) {
 		case 'c':
 			if ((s = RULE_STRCMP(s, "clear")) != NULL)
@@ -868,104 +871,126 @@ static const char *parse_rule_tok(const char *p, uint32 rflags, int xflags,
 		}
 		switch (ch) {
 		case ':':
-			new_rflags |= FILTRULE_PERDIR_MERGE
-				    | FILTRULE_FINISH_SETUP;
+			rule->rflags |= FILTRULE_PERDIR_MERGE
+				       | FILTRULE_FINISH_SETUP;
 			/* FALL THROUGH */
 		case '.':
-			new_rflags |= FILTRULE_MERGE_FILE;
-			mods = MODIFIERS_INCL_EXCL MODIFIERS_MERGE_FILE;
+			rule->rflags |= FILTRULE_MERGE_FILE;
 			break;
 		case '+':
-			new_rflags |= FILTRULE_INCLUDE;
-			/* FALL THROUGH */
+			rule->rflags |= FILTRULE_INCLUDE;
+			break;
 		case '-':
-			mods = MODIFIERS_INCL_EXCL;
 			break;
 		case 'S':
-			new_rflags |= FILTRULE_INCLUDE;
+			rule->rflags |= FILTRULE_INCLUDE;
 			/* FALL THROUGH */
 		case 'H':
-			new_rflags |= FILTRULE_SENDER_SIDE;
-			mods = MODIFIERS_HIDE_PROTECT;
+			rule->rflags |= FILTRULE_SENDER_SIDE;
+			prefix_specifies_side = True;
 			break;
 		case 'R':
-			new_rflags |= FILTRULE_INCLUDE;
+			rule->rflags |= FILTRULE_INCLUDE;
 			/* FALL THROUGH */
 		case 'P':
-			new_rflags |= FILTRULE_RECEIVER_SIDE;
-			mods = MODIFIERS_HIDE_PROTECT;
+			rule->rflags |= FILTRULE_RECEIVER_SIDE;
+			prefix_specifies_side = True;
 			break;
 		case '!':
-			new_rflags |= FILTRULE_CLEAR_LIST;
-			mods = NULL;
+			rule->rflags |= FILTRULE_CLEAR_LIST;
 			break;
 		default:
-			rprintf(FERROR, "Unknown filter rule: `%s'\n", p);
+			rprintf(FERROR, "Unknown filter rule: `%s'\n", *rulestr_ptr);
 			exit_cleanup(RERR_SYNTAX);
 		}
-		while (mods && *++s && *s != ' ' && *s != '_') {
-			if (strchr(mods, *s) == NULL) {
-				if (rflags & FILTRULE_WORD_SPLIT && isspace(*s)) {
-					s--;
-					break;
-				}
-			    invalid:
-				rprintf(FERROR,
-					"invalid modifier sequence at '%c' in filter rule: %s\n",
-					*s, p);
-				exit_cleanup(RERR_SYNTAX);
+		while (ch != '!' && *++s && *s != ' ' && *s != '_') {
+			if (template->rflags & FILTRULE_WORD_SPLIT && isspace(*s)) {
+				s--;
+				break;
 			}
 			switch (*s) {
+			default:
+			    invalid:
+				rprintf(FERROR,
+					"invalid modifier '%c' at position %d in filter rule: %s\n",
+					*s, s - (const uchar *)*rulestr_ptr, *rulestr_ptr);
+				exit_cleanup(RERR_SYNTAX);
 			case '-':
-				if (new_rflags & FILTRULE_NO_PREFIXES)
-				    goto invalid;
-				new_rflags |= FILTRULE_NO_PREFIXES;
+				if (!BITS_SETnUNSET(rule->rflags, FILTRULE_MERGE_FILE, FILTRULE_NO_PREFIXES))
+					goto invalid;
+				rule->rflags |= FILTRULE_NO_PREFIXES;
 				break;
 			case '+':
-				if (new_rflags & FILTRULE_NO_PREFIXES)
-				    goto invalid;
-				new_rflags |= FILTRULE_NO_PREFIXES
-					    | FILTRULE_INCLUDE;
+				if (!BITS_SETnUNSET(rule->rflags, FILTRULE_MERGE_FILE, FILTRULE_NO_PREFIXES))
+					goto invalid;
+				rule->rflags |= FILTRULE_NO_PREFIXES
+					      | FILTRULE_INCLUDE;
 				break;
 			case '/':
-				new_rflags |= FILTRULE_ABS_PATH;
+				rule->rflags |= FILTRULE_ABS_PATH;
 				break;
 			case '!':
-				new_rflags |= FILTRULE_NEGATE;
+				/* Negation really goes with the pattern, so it
+				 * isn't useful as a merge-file default. */
+				if (rule->rflags & FILTRULE_MERGE_FILE)
+					goto invalid;
+				rule->rflags |= FILTRULE_NEGATE;
 				break;
 			case 'C':
-				if (new_rflags & FILTRULE_NO_PREFIXES)
-				    goto invalid;
-				new_rflags |= FILTRULE_NO_PREFIXES
-					    | FILTRULE_WORD_SPLIT
-					    | FILTRULE_NO_INHERIT
-					    | FILTRULE_CVS_IGNORE;
+				if (rule->rflags & FILTRULE_NO_PREFIXES || prefix_specifies_side)
+					goto invalid;
+				rule->rflags |= FILTRULE_NO_PREFIXES
+					      | FILTRULE_WORD_SPLIT
+					      | FILTRULE_NO_INHERIT
+					      | FILTRULE_CVS_IGNORE;
 				break;
 			case 'e':
-				new_rflags |= FILTRULE_EXCLUDE_SELF;
+				if (!(rule->rflags & FILTRULE_MERGE_FILE))
+					goto invalid;
+				rule->rflags |= FILTRULE_EXCLUDE_SELF;
 				break;
 			case 'n':
-				new_rflags |= FILTRULE_NO_INHERIT;
+				if (!(rule->rflags & FILTRULE_MERGE_FILE))
+					goto invalid;
+				rule->rflags |= FILTRULE_NO_INHERIT;
 				break;
 			case 'p':
-				new_rflags |= FILTRULE_PERISHABLE;
+				rule->rflags |= FILTRULE_PERISHABLE;
 				break;
 			case 'r':
-				new_rflags |= FILTRULE_RECEIVER_SIDE;
+				if (prefix_specifies_side)
+					goto invalid;
+				rule->rflags |= FILTRULE_RECEIVER_SIDE;
 				break;
 			case 's':
-				new_rflags |= FILTRULE_SENDER_SIDE;
+				if (prefix_specifies_side)
+					goto invalid;
+				rule->rflags |= FILTRULE_SENDER_SIDE;
 				break;
 			case 'w':
-				new_rflags |= FILTRULE_WORD_SPLIT;
+				if (!(rule->rflags & FILTRULE_MERGE_FILE))
+					goto invalid;
+				rule->rflags |= FILTRULE_WORD_SPLIT;
 				break;
 			}
 		}
 		if (*s)
 			s++;
 	}
+	if (template->rflags & FILTRULES_SIDES) {
+		if (rule->rflags & FILTRULES_SIDES) {
+			/* The filter and template both specify side(s).  This
+			 * is dodgy (and won't work correctly if the template is
+			 * a one-sided per-dir merge rule), so reject it. */
+			rprintf(FERROR,
+				"specified-side merge file contains specified-side filter: %s\n",
+				*rulestr_ptr);
+			exit_cleanup(RERR_SYNTAX);
+		}
+		rule->rflags |= template->rflags & FILTRULES_SIDES;
+	}
 
-	if (rflags & FILTRULE_WORD_SPLIT) {
+	if (template->rflags & FILTRULE_WORD_SPLIT) {
 		const uchar *cp = s;
 		/* Token ends at whitespace or the end of the string. */
 		while (!isspace(*cp) && *cp != '\0')
@@ -974,17 +999,17 @@ static const char *parse_rule_tok(const char *p, uint32 rflags, int xflags,
 	} else
 		len = strlen((char*)s);
 
-	if (new_rflags & FILTRULE_CLEAR_LIST) {
-		if (!(rflags & FILTRULE_NO_PREFIXES)
+	if (rule->rflags & FILTRULE_CLEAR_LIST) {
+		if (!(rule->rflags & FILTRULE_NO_PREFIXES)
 		 && !(xflags & XFLG_OLD_PREFIXES) && len) {
 			rprintf(FERROR,
-				"'!' rule has trailing characters: %s\n", p);
+				"'!' rule has trailing characters: %s\n", *rulestr_ptr);
 			exit_cleanup(RERR_SYNTAX);
 		}
 		if (len > 1)
-			new_rflags &= ~FILTRULE_CLEAR_LIST;
-	} else if (!len && !(new_rflags & FILTRULE_CVS_IGNORE)) {
-		rprintf(FERROR, "unexpected end of filter rule: %s\n", p);
+			rule->rflags &= ~FILTRULE_CLEAR_LIST;
+	} else if (!len && !(rule->rflags & FILTRULE_CVS_IGNORE)) {
+		rprintf(FERROR, "unexpected end of filter rule: %s\n", *rulestr_ptr);
 		exit_cleanup(RERR_SYNTAX);
 	}
 
@@ -992,14 +1017,15 @@ static const char *parse_rule_tok(const char *p, uint32 rflags, int xflags,
 	 * sender-side rule.  We also affect per-dir merge files that take
 	 * no prefixes as a simple optimization. */
 	if (delete_excluded
-	 && !(new_rflags & (FILTRULE_RECEIVER_SIDE|FILTRULE_SENDER_SIDE))
-	 && (!(new_rflags & FILTRULE_PERDIR_MERGE)
-	  || new_rflags & FILTRULE_NO_PREFIXES))
-		new_rflags |= FILTRULE_SENDER_SIDE;
+	 && !(rule->rflags & FILTRULES_SIDES)
+	 && (!(rule->rflags & FILTRULE_PERDIR_MERGE)
+	  || rule->rflags & FILTRULE_NO_PREFIXES))
+		rule->rflags |= FILTRULE_SENDER_SIDE;
 
-	*len_ptr = len;
-	*rflags_ptr = new_rflags;
-	return (const char *)s;
+	*pat_ptr = (const char *)s;
+	*pat_len_ptr = len;
+	*rulestr_ptr = *pat_ptr + len;
+	return rule;
 }
 
 static char default_cvsignore[] =
@@ -1021,39 +1047,50 @@ static void get_cvs_excludes(uint32 rflags)
 		return;
 	initialized = 1;
 
-	parse_rule(&cvs_filter_list, default_cvsignore,
-		   rflags | (protocol_version >= 30 ? FILTRULE_PERISHABLE : 0),
-		   0);
+	parse_filter_str(&cvs_filter_list, default_cvsignore,
+			 rule_template(rflags | (protocol_version >= 30 ? FILTRULE_PERISHABLE : 0)),
+			 0);
 
 	p = module_id >= 0 && lp_use_chroot(module_id) ? "/" : getenv("HOME");
 	if (p && pathjoin(fname, MAXPATHLEN, p, ".cvsignore") < MAXPATHLEN)
-		parse_filter_file(&cvs_filter_list, fname, rflags, 0);
+		parse_filter_file(&cvs_filter_list, fname, rule_template(rflags), 0);
 
-	parse_rule(&cvs_filter_list, getenv("CVSIGNORE"), rflags, 0);
+	parse_filter_str(&cvs_filter_list, getenv("CVSIGNORE"), rule_template(rflags), 0);
 }
 
-void parse_rule(filter_rule_list *listp, const char *pattern, uint32 rflags, int xflags)
+const filter_rule *rule_template(uint32 rflags)
 {
+	static filter_rule template; /* zero-initialized */
+	template.rflags = rflags;
+	return &template;
+}
+
+void parse_filter_str(filter_rule_list *listp, const char *rulestr,
+		     const filter_rule *template, int xflags)
+{
+	filter_rule *rule;
 	const char *pat;
 	unsigned int pat_len;
-	uint32 new_rflags;
 
-	if (!pattern)
+	if (!rulestr)
 		return;
 
 	while (1) {
-		/* Remember that the returned string is NOT '\0' terminated! */
-		if (!(pat = parse_rule_tok(pattern, rflags, xflags, &pat_len, &new_rflags)))
-			break;
+		uint32 new_rflags;
 
-		pattern = pat + pat_len;
+		/* Remember that the returned string is NOT '\0' terminated! */
+		if (!(rule = parse_rule_tok(&rulestr, template, xflags, &pat, &pat_len)))
+			break;
 
 		if (pat_len >= MAXPATHLEN) {
 			rprintf(FERROR, "discarding over-long filter: %.*s\n",
 				(int)pat_len, pat);
+		    free_continue:
+			free_filter(rule);
 			continue;
 		}
 
+		new_rflags = rule->rflags;
 		if (new_rflags & FILTRULE_CLEAR_LIST) {
 			if (DEBUG_GTE(FILTER, 2)) {
 				rprintf(FINFO,
@@ -1061,41 +1098,46 @@ void parse_rule(filter_rule_list *listp, const char *pattern, uint32 rflags, int
 					who_am_i(), listp->debug_type);
 			}
 			clear_filter_list(listp);
-			continue;
+			goto free_continue;
 		}
 
 		if (new_rflags & FILTRULE_MERGE_FILE) {
-			unsigned int len;
 			if (!pat_len) {
 				pat = ".cvsignore";
 				pat_len = 10;
 			}
-			len = pat_len;
 			if (new_rflags & FILTRULE_EXCLUDE_SELF) {
-				const char *name = pat + len;
-				while (name > pat && name[-1] != '/') name--;
-				add_rule(listp, name, len - (name - pat), 0, 0);
-				new_rflags &= ~FILTRULE_EXCLUDE_SELF;
+				const char *name;
+				filter_rule *excl_self;
+
+				if (!(excl_self = new0(filter_rule)))
+					out_of_memory("parse_filter_str");
+				/* Find the beginning of the basename and add an exclude for it. */
+				for (name = pat + pat_len; name > pat && name[-1] != '/'; name--) {}
+				add_rule(listp, name, (pat + pat_len) - name, excl_self, 0);
+				rule->rflags &= ~FILTRULE_EXCLUDE_SELF;
 			}
 			if (new_rflags & FILTRULE_PERDIR_MERGE) {
 				if (parent_dirscan) {
 					const char *p;
-					if (!(p = parse_merge_name(pat, &len, module_dirlen)))
-						continue;
-					add_rule(listp, p, len, new_rflags, 0);
+					unsigned int len = pat_len;
+					if ((p = parse_merge_name(pat, &len, module_dirlen)))
+						add_rule(listp, p, len, rule, 0);
+					else
+						free_filter(rule);
 					continue;
 				}
 			} else {
 				const char *p;
-				if (!(p = parse_merge_name(pat, &len, 0)))
-					continue;
-				parse_filter_file(listp, p, new_rflags,
-						  XFLG_FATAL_ERRORS);
+				unsigned int len = pat_len;
+				if ((p = parse_merge_name(pat, &len, 0)))
+					parse_filter_file(listp, p, rule, XFLG_FATAL_ERRORS);
+				free_filter(rule);
 				continue;
 			}
 		}
 
-		add_rule(listp, pat, pat_len, new_rflags, xflags);
+		add_rule(listp, pat, pat_len, rule, xflags);
 
 		if (new_rflags & FILTRULE_CVS_IGNORE
 		    && !(new_rflags & FILTRULE_MERGE_FILE))
@@ -1103,13 +1145,12 @@ void parse_rule(filter_rule_list *listp, const char *pattern, uint32 rflags, int
 	}
 }
 
-void parse_filter_file(filter_rule_list *listp, const char *fname,
-		       uint32 rflags, int xflags)
+void parse_filter_file(filter_rule_list *listp, const char *fname, const filter_rule *template, int xflags)
 {
 	FILE *fp;
 	char line[BIGPATHBUFLEN];
 	char *eob = line + sizeof line - 1;
-	int word_split = rflags & FILTRULE_WORD_SPLIT;
+	BOOL word_split = (template->rflags & FILTRULE_WORD_SPLIT) != 0;
 
 	if (!fname || !*fname)
 		return;
@@ -1129,7 +1170,7 @@ void parse_filter_file(filter_rule_list *listp, const char *fname,
 
 	if (DEBUG_GTE(FILTER, 2)) {
 		rprintf(FINFO, "[%s] parse_filter_file(%s,%x,%x)%s\n",
-			who_am_i(), fname, rflags, xflags,
+			who_am_i(), fname, template->rflags, xflags,
 			fp ? "" : " [not found]");
 	}
 
@@ -1137,7 +1178,7 @@ void parse_filter_file(filter_rule_list *listp, const char *fname,
 		if (xflags & XFLG_FATAL_ERRORS) {
 			rsyserr(FERROR, errno,
 				"failed to open %sclude file %s",
-				rflags & FILTRULE_INCLUDE ? "in" : "ex",
+				template->rflags & FILTRULE_INCLUDE ? "in" : "ex",
 				fname);
 			exit_cleanup(RERR_FILEIO);
 		}
@@ -1172,7 +1213,7 @@ void parse_filter_file(filter_rule_list *listp, const char *fname,
 		*s = '\0';
 		/* Skip an empty token and (when line parsing) comments. */
 		if (*line && (word_split || (*line != ';' && *line != '#')))
-			parse_rule(listp, line, rflags, xflags);
+			parse_filter_str(listp, line, template, xflags);
 		if (ch == EOF)
 			break;
 	}
@@ -1182,18 +1223,18 @@ void parse_filter_file(filter_rule_list *listp, const char *fname,
 /* If the "for_xfer" flag is set, the prefix is made compatible with the
  * current protocol_version (if possible) or a NULL is returned (if not
  * possible). */
-char *get_rule_prefix(int rflags, const char *pat, int for_xfer,
+char *get_rule_prefix(filter_rule *rule, const char *pat, int for_xfer,
 		      unsigned int *plen_ptr)
 {
 	static char buf[MAX_RULE_PREFIX+1];
 	char *op = buf;
 	int legal_len = for_xfer && protocol_version < 29 ? 1 : MAX_RULE_PREFIX-1;
 
-	if (rflags & FILTRULE_PERDIR_MERGE) {
+	if (rule->rflags & FILTRULE_PERDIR_MERGE) {
 		if (legal_len == 1)
 			return NULL;
 		*op++ = ':';
-	} else if (rflags & FILTRULE_INCLUDE)
+	} else if (rule->rflags & FILTRULE_INCLUDE)
 		*op++ = '+';
 	else if (legal_len != 1
 	    || ((*pat == '-' || *pat == '+') && pat[1] == ' '))
@@ -1201,32 +1242,34 @@ char *get_rule_prefix(int rflags, const char *pat, int for_xfer,
 	else
 		legal_len = 0;
 
-	if (rflags & FILTRULE_NEGATE)
+	if (rule->rflags & FILTRULE_ABS_PATH)
+		*op++ = '/';
+	if (rule->rflags & FILTRULE_NEGATE)
 		*op++ = '!';
-	if (rflags & FILTRULE_CVS_IGNORE)
+	if (rule->rflags & FILTRULE_CVS_IGNORE)
 		*op++ = 'C';
 	else {
-		if (rflags & FILTRULE_NO_INHERIT)
+		if (rule->rflags & FILTRULE_NO_INHERIT)
 			*op++ = 'n';
-		if (rflags & FILTRULE_WORD_SPLIT)
+		if (rule->rflags & FILTRULE_WORD_SPLIT)
 			*op++ = 'w';
-		if (rflags & FILTRULE_NO_PREFIXES) {
-			if (rflags & FILTRULE_INCLUDE)
+		if (rule->rflags & FILTRULE_NO_PREFIXES) {
+			if (rule->rflags & FILTRULE_INCLUDE)
 				*op++ = '+';
 			else
 				*op++ = '-';
 		}
 	}
-	if (rflags & FILTRULE_EXCLUDE_SELF)
+	if (rule->rflags & FILTRULE_EXCLUDE_SELF)
 		*op++ = 'e';
-	if (rflags & FILTRULE_SENDER_SIDE
+	if (rule->rflags & FILTRULE_SENDER_SIDE
 	    && (!for_xfer || protocol_version >= 29))
 		*op++ = 's';
-	if (rflags & FILTRULE_RECEIVER_SIDE
+	if (rule->rflags & FILTRULE_RECEIVER_SIDE
 	    && (!for_xfer || protocol_version >= 29
 	     || (delete_excluded && am_sender)))
 		*op++ = 'r';
-	if (rflags & FILTRULE_PERISHABLE) {
+	if (rule->rflags & FILTRULE_PERISHABLE) {
 		if (!for_xfer || protocol_version >= 30)
 			*op++ = 'p';
 		else if (am_sender)
@@ -1282,7 +1325,7 @@ static void send_rules(int f_out, filter_rule_list *flp)
 			if (f == f_out)
 				continue;
 		}
-		p = get_rule_prefix(ent->rflags, ent->pattern, 1, &plen);
+		p = get_rule_prefix(ent, ent->pattern, 1, &plen);
 		if (!p) {
 			rprintf(FERROR,
 				"filter rules are too modern for remote rsync.\n");
@@ -1314,8 +1357,8 @@ void send_filter_list(int f_out)
 		f_out = -1;
 	if (cvs_exclude && am_sender) {
 		if (protocol_version >= 29)
-			parse_rule(&filter_list, ":C", 0, 0);
-		parse_rule(&filter_list, "-C", 0, 0);
+			parse_filter_str(&filter_list, ":C", rule_template(0), 0);
+		parse_filter_str(&filter_list, "-C", rule_template(0), 0);
 	}
 
 	send_rules(f_out, &filter_list);
@@ -1325,9 +1368,9 @@ void send_filter_list(int f_out)
 
 	if (cvs_exclude) {
 		if (!am_sender || protocol_version < 29)
-			parse_rule(&filter_list, ":C", 0, 0);
+			parse_filter_str(&filter_list, ":C", rule_template(0), 0);
 		if (!am_sender)
-			parse_rule(&filter_list, "-C", 0, 0);
+			parse_filter_str(&filter_list, "-C", rule_template(0), 0);
 	}
 }
 
@@ -1346,15 +1389,15 @@ void recv_filter_list(int f_in)
 			if (len >= sizeof line)
 				overflow_exit("recv_rules");
 			read_sbuf(f_in, line, len);
-			parse_rule(&filter_list, line, 0, xflags);
+			parse_filter_str(&filter_list, line, rule_template(0), xflags);
 		}
 	}
 
 	if (cvs_exclude) {
 		if (local_server || am_sender || protocol_version < 29)
-			parse_rule(&filter_list, ":C", 0, 0);
+			parse_filter_str(&filter_list, ":C", rule_template(0), 0);
 		if (local_server || am_sender)
-			parse_rule(&filter_list, "-C", 0, 0);
+			parse_filter_str(&filter_list, "-C", rule_template(0), 0);
 	}
 
 	if (local_server) /* filter out any rules that aren't for us. */

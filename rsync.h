@@ -819,10 +819,7 @@ struct map_struct {
 #define FILTRULE_CLEAR_LIST	(1<<18)/* this item is the "!" token */
 #define FILTRULE_PERISHABLE	(1<<19)/* perishable if parent dir goes away */
 
-#define FILTRULES_FROM_CONTAINER (FILTRULE_ABS_PATH | FILTRULE_INCLUDE \
-				| FILTRULE_DIRECTORY | FILTRULE_SENDER_SIDE \
-				| FILTRULE_NEGATE | FILTRULE_RECEIVER_SIDE \
-				| FILTRULE_PERISHABLE)
+#define FILTRULES_SIDES (FILTRULE_SENDER_SIDE | FILTRULE_RECEIVER_SIDE)
 
 typedef struct filter_struct {
 	struct filter_struct *next;

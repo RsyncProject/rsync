@@ -2671,10 +2671,14 @@ itemization(
   also disabled).
   it() You may also specify any of the modifiers for the "+" or "-" rules
   (above) in order to have the rules that are read in from the file
-  default to having that modifier set.  For instance, "merge,-/ .excl" would
+  default to having that modifier set (except for the bf(!) modifier, which
+  would not be useful).  For instance, "merge,-/ .excl" would
   treat the contents of .excl as absolute-path excludes,
   while "dir-merge,s .filt" and ":sC" would each make all their
-  per-directory rules apply only on the sending side.
+  per-directory rules apply only on the sending side.  If the merge rule
+  specifies sides to affect (via the bf(s) or bf(r) modifier or both),
+  then the rules in the file must not specify sides (via a modifier or
+  a rule prefix such as bf(hide)).
 )
 
 Per-directory rules are inherited in all subdirectories of the directory

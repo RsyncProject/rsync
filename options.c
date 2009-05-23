@@ -1399,17 +1399,18 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			break;
 
 		case OPT_FILTER:
-			parse_rule(&filter_list, poptGetOptArg(pc), 0, 0);
+			parse_filter_str(&filter_list, poptGetOptArg(pc),
+					rule_template(0), 0);
 			break;
 
 		case OPT_EXCLUDE:
-			parse_rule(&filter_list, poptGetOptArg(pc),
-				   0, XFLG_OLD_PREFIXES);
+			parse_filter_str(&filter_list, poptGetOptArg(pc),
+					rule_template(0), XFLG_OLD_PREFIXES);
 			break;
 
 		case OPT_INCLUDE:
-			parse_rule(&filter_list, poptGetOptArg(pc),
-				   FILTRULE_INCLUDE, XFLG_OLD_PREFIXES);
+			parse_filter_str(&filter_list, poptGetOptArg(pc),
+					rule_template(FILTRULE_INCLUDE), XFLG_OLD_PREFIXES);
 			break;
 
 		case OPT_EXCLUDE_FROM:
@@ -1432,7 +1433,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 					goto options_rejected;
 			}
 			parse_filter_file(&filter_list, arg,
-				opt == OPT_INCLUDE_FROM ? FILTRULE_INCLUDE : 0,
+				rule_template(opt == OPT_INCLUDE_FROM ? FILTRULE_INCLUDE : 0),
 				XFLG_FATAL_ERRORS | XFLG_OLD_PREFIXES);
 			break;
 
@@ -1489,10 +1490,10 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		case 'F':
 			switch (++F_option_cnt) {
 			case 1:
-				parse_rule(&filter_list,": /.rsync-filter",0,0);
+				parse_filter_str(&filter_list,": /.rsync-filter",rule_template(0),0);
 				break;
 			case 2:
-				parse_rule(&filter_list,"- .rsync-filter",0,0);
+				parse_filter_str(&filter_list,"- .rsync-filter",rule_template(0),0);
 				break;
 			}
 			break;
@@ -1895,7 +1896,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 		list_only |= 1;
 
 	if (xfer_dirs >= 4) {
-		parse_rule(&filter_list, "- /*/*", 0, 0);
+		parse_filter_str(&filter_list, "- /*/*", rule_template(0), 0);
 		recurse = xfer_dirs = 1;
 	} else if (recurse)
 		xfer_dirs = 1;
@@ -2033,7 +2034,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	} else if (make_backups && delete_mode && !delete_excluded && !am_server) {
 		snprintf(backup_dir_buf, sizeof backup_dir_buf,
 			"P *%s", backup_suffix);
-		parse_rule(&filter_list, backup_dir_buf, 0, 0);
+		parse_filter_str(&filter_list, backup_dir_buf, rule_template(0), 0);
 	}
 
 	if (make_backups && !backup_dir) {

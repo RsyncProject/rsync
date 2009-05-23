@@ -294,7 +294,7 @@ void setup_protocol(int f_out,int f_in)
 		int rflags = FILTRULE_NO_PREFIXES | FILTRULE_DIRECTORY;
 		if (!am_sender || protocol_version >= 30)
 			rflags |= FILTRULE_PERISHABLE;
-		parse_rule(&filter_list, partial_dir, rflags, 0);
+		parse_filter_str(&filter_list, partial_dir, rule_template(rflags), 0);
 	}
 
 
