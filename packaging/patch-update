@@ -227,9 +227,15 @@ sub check_git_status
 sub usage
 {
     die <<EOT;
-Usage: patch-update [OPTIONS]
+Usage: patch-update [OPTIONS] [patches/DIFF...]
 
---gen[=DIR]   Include generated files.  Optional dest DIR overrides "patches".
---skip-check  Skip the check that ensures starting with a clean branch.
+Options:
+-b, --branch=BRANCH  The master branch to merge into the patch/* branches.
+    --gen[=DIR]      Include generated files.  Optional destination DIR
+                     arg overrides the default of using the "patches" dir.
+    --skip-check     Skip the check that ensures starting with a clean branch.
+-s, --shell          Launch a shell for every patch/* branch updated, not
+                     just when a conflict occurs.
+-h, --help           Output this help message.
 EOT
 }
