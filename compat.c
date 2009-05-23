@@ -52,7 +52,7 @@ extern char *partial_dir;
 extern char *dest_option;
 extern char *files_from;
 extern char *filesfrom_host;
-extern struct filter_list_struct filter_list;
+extern filter_rule_list filter_list;
 extern int need_unsorted_flist;
 #ifdef ICONV_OPTION
 extern iconv_t ic_send, ic_recv;

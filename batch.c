@@ -43,7 +43,7 @@ extern char *batch_name;
 extern char *iconv_opt;
 #endif
 
-extern struct filter_list_struct filter_list;
+extern filter_rule_list filter_list;
 
 int batch_stream_flags;
 
@@ -191,7 +191,7 @@ static int write_arg(int fd, char *arg)
 
 static void write_filter_rules(int fd)
 {
-	struct filter_struct *ent;
+	filter_rule *ent;
 
 	write_sbuf(fd, " <<'#E#'\n");
 	for (ent = filter_list.head; ent; ent = ent->next) {

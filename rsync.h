@@ -824,7 +824,7 @@ struct map_struct {
 				| FILTRULE_NEGATE | FILTRULE_RECEIVER_SIDE \
 				| FILTRULE_PERISHABLE)
 
-struct filter_struct {
+typedef struct filter_struct {
 	struct filter_struct *next;
 	char *pattern;
 	uint32 rflags;
@@ -832,14 +832,14 @@ struct filter_struct {
 		int slash_cnt;
 		struct filter_list_struct *mergelist;
 	} u;
-};
+} filter_rule;
 
-struct filter_list_struct {
-	struct filter_struct *head;
-	struct filter_struct *tail;
-	struct filter_struct *parent_dirscan_head;
+typedef struct filter_list_struct {
+	filter_rule *head;
+	filter_rule *tail;
+	filter_rule *parent_dirscan_head;
 	char *debug_type;
-};
+} filter_rule_list;
 
 struct stats {
 	int64 total_size;

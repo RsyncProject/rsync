@@ -82,7 +82,7 @@ extern char curr_dir[MAXPATHLEN];
 extern char backup_dir_buf[MAXPATHLEN];
 extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *first_flist;
-extern struct filter_list_struct daemon_filter_list;
+extern filter_rule_list daemon_filter_list;
 
 uid_t our_uid;
 int am_generator = 0;
@@ -1000,7 +1000,7 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 
 	if (daemon_filter_list.head) {
 		char **dir_p;
-		struct filter_list_struct *elp = &daemon_filter_list;
+		filter_rule_list *elp = &daemon_filter_list;
 
 		for (dir_p = basis_dir; *dir_p; dir_p++) {
 			char *dir = *dir_p;

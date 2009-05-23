@@ -29,8 +29,8 @@ extern int local_server;
 extern int sanitize_paths;
 extern int daemon_over_rsh;
 extern unsigned int module_dirlen;
-extern struct filter_list_struct filter_list;
-extern struct filter_list_struct daemon_filter_list;
+extern filter_rule_list filter_list;
+extern filter_rule_list daemon_filter_list;
 
 int make_backups = 0;
 
@@ -1972,7 +1972,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 			backup_dir = sanitize_path(NULL, backup_dir, NULL, 0, SP_DEFAULT);
 	}
 	if (daemon_filter_list.head && !am_sender) {
-		struct filter_list_struct *elp = &daemon_filter_list;
+		filter_rule_list *elp = &daemon_filter_list;
 		if (tmpdir) {
 			char *dir;
 			if (!*tmpdir)

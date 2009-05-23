@@ -34,7 +34,7 @@ extern char *module_dir;
 extern unsigned int module_dirlen;
 extern mode_t orig_umask;
 extern char *partial_dir;
-extern struct filter_list_struct daemon_filter_list;
+extern filter_rule_list daemon_filter_list;
 
 int sanitize_paths = 0;
 

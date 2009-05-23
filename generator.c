@@ -97,7 +97,7 @@ extern mode_t orig_umask;
 extern uid_t our_uid;
 extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
-extern struct filter_list_struct filter_list, daemon_filter_list;
+extern filter_rule_list filter_list, daemon_filter_list;
 
 int maybe_ATTRS_REPORT = 0;
 

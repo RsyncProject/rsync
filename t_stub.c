@@ -30,7 +30,7 @@ mode_t orig_umask = 002;
 char number_separator = ',';
 char *partial_dir;
 char *module_dir;
-struct filter_list_struct daemon_filter_list;
+filter_rule_list daemon_filter_list;
 
  void rprintf(UNUSED(enum logcode code), const char *format, ...)
 {
@@ -57,7 +57,7 @@ struct filter_list_struct daemon_filter_list;
 	exit(code);
 }
 
- int check_filter(UNUSED(struct filter_list_struct *listp), UNUSED(enum logcode code),
+ int check_filter(UNUSED(filter_rule_list *listp), UNUSED(enum logcode code),
 		  UNUSED(const char *name), UNUSED(int name_is_dir))
 {
 	/* This function doesn't really get called in this test context, so

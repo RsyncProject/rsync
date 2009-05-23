@@ -79,8 +79,8 @@ extern char curr_dir[MAXPATHLEN];
 
 extern struct chmod_mode_struct *chmod_modes;
 
-extern struct filter_list_struct filter_list;
-extern struct filter_list_struct daemon_filter_list;
+extern filter_rule_list filter_list;
+extern filter_rule_list daemon_filter_list;
 
 #ifdef ICONV_OPTION
 extern int filesfrom_convert;
@@ -1743,7 +1743,7 @@ static void send_implied_dirs(int f, struct file_list *flist, char *fname,
 	item_list *relname_list;
 	relnamecache **rnpp;
 	int len, need_new_dir, depth = 0;
-	struct filter_list_struct save_filter_list = filter_list;
+	filter_rule_list save_filter_list = filter_list;
 
 	flags = (flags | FLAG_IMPLIED_DIR) & ~(FLAG_TOP_DIR | FLAG_CONTENT_DIR);
 	filter_list.head = filter_list.tail = NULL; /* Don't filter implied dirs. */

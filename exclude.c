@@ -40,9 +40,9 @@ extern char curr_dir[MAXPATHLEN];
 extern unsigned int curr_dir_len;
 extern unsigned int module_dirlen;
 
-struct filter_list_struct filter_list = { .debug_type = "" };
-struct filter_list_struct cvs_filter_list = { .debug_type = " [global CVS]" };
-struct filter_list_struct daemon_filter_list = { .debug_type = " [daemon]" };
+filter_rule_list filter_list = { .debug_type = "" };
+filter_rule_list cvs_filter_list = { .debug_type = " [global CVS]" };
+filter_rule_list daemon_filter_list = { .debug_type = " [daemon]" };
 
 /* Need room enough for ":MODS " prefix plus some room to grow. */
 #define MAX_RULE_PREFIX (16)
@@ -67,7 +67,7 @@ static BOOL parent_dirscan = False;
 /* This array contains a list of all the currently active per-dir merge
  * files.  This makes it easier to save the appropriate values when we
  * "push" down into each subdirectory. */
-static struct filter_struct **mergelist_parents;
+static filter_rule **mergelist_parents;
 static int mergelist_cnt = 0;
 static int mergelist_size = 0;
 
@@ -102,7 +102,7 @@ static int mergelist_size = 0;
  * values (so we can pop back to them later) and set the tail to NULL.
  */
 
-static void teardown_mergelist(struct filter_struct *ex)
+static void teardown_mergelist(filter_rule *ex)
 {
 	if (DEBUG_GTE(FILTER, 2)) {
 		rprintf(FINFO, "[%s] deactivating mergelist #%d%s\n",
@@ -122,7 +122,7 @@ static void teardown_mergelist(struct filter_struct *ex)
 	mergelist_cnt--;
 }
 
-static void free_filter(struct filter_struct *ex)
+static void free_filter(filter_rule *ex)
 {
 	if (ex->rflags & FILTRULE_PERDIR_MERGE)
 		teardown_mergelist(ex);
@@ -130,21 +130,21 @@ static void free_filter(struct filter_struct *ex)
 	free(ex);
 }
 
-static void free_filters(struct filter_struct *head)
+static void free_filters(filter_rule *head)
 {
-	struct filter_struct *rev_head = NULL;
+	filter_rule *rev_head = NULL;
 
 	/* Reverse the list so we deactivate mergelists in the proper LIFO
 	 * order. */
 	while (head) {
-		struct filter_struct *next = head->next;
+		filter_rule *next = head->next;
 		head->next = rev_head;
 		rev_head = head;
 		head = next;
 	}
 
 	while (rev_head) {
-		struct filter_struct *prev = rev_head->next;
+		filter_rule *prev = rev_head->next;
 		free_filter(rev_head);
 		rev_head = prev;
 	}
@@ -152,10 +152,10 @@ static void free_filters(struct filter_struct *head)
 
 /* Build a filter structure given a filter pattern.  The value in "pat"
  * is not null-terminated. */
-static void add_rule(struct filter_list_struct *listp, const char *pat,
+static void add_rule(filter_rule_list *listp, const char *pat,
 		     unsigned int pat_len, uint32 rflags, int xflags)
 {
-	struct filter_struct *ret;
+	filter_rule *ret;
 	const char *cp;
 	unsigned int pre_len, suf_len, slash_cnt = 0;
 
@@ -180,7 +180,7 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 		}
 	}
 
-	if (!(ret = new0(struct filter_struct)))
+	if (!(ret = new0(filter_rule)))
 		out_of_memory("add_rule");
 
 	if (pat_len > 1 && pat[pat_len-1] == '/') {
@@ -246,7 +246,7 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 	}
 
 	if (rflags & FILTRULE_PERDIR_MERGE) {
-		struct filter_list_struct *lp;
+		filter_rule_list *lp;
 		unsigned int len;
 		int i;
 
@@ -258,7 +258,7 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 		/* If the local merge file was already mentioned, don't
 		 * add it again. */
 		for (i = 0; i < mergelist_cnt; i++) {
-			struct filter_struct *ex = mergelist_parents[i];
+			filter_rule *ex = mergelist_parents[i];
 			const char *s = strrchr(ex->pattern, '/');
 			if (s)
 				s++;
@@ -272,7 +272,7 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 			}
 		}
 
-		if (!(lp = new_array(struct filter_list_struct, 1)))
+		if (!(lp = new_array(filter_rule_list, 1)))
 			out_of_memory("add_rule");
 		lp->head = lp->tail = lp->parent_dirscan_head = NULL;
 		if (asprintf(&lp->debug_type, " [per-dir %s]", cp) < 0)
@@ -282,7 +282,7 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 		if (mergelist_cnt == mergelist_size) {
 			mergelist_size += 5;
 			mergelist_parents = realloc_array(mergelist_parents,
-						struct filter_struct *,
+						filter_rule *,
 						mergelist_size);
 			if (!mergelist_parents)
 				out_of_memory("add_rule");
@@ -307,7 +307,7 @@ static void add_rule(struct filter_list_struct *listp, const char *pat,
 	}
 }
 
-static void clear_filter_list(struct filter_list_struct *listp)
+static void clear_filter_list(filter_rule_list *listp)
 {
 	if (listp->tail) {
 		/* Truncate any inherited items from the local list. */
@@ -413,8 +413,8 @@ void set_filter_dir(const char *dir, unsigned int dirlen)
  * parent directory of the first transfer dir.  If it does, we scan all the
  * dirs from that point through the parent dir of the transfer dir looking
  * for the per-dir merge-file in each one. */
-static BOOL setup_merge_file(int mergelist_num, struct filter_struct *ex,
-			     struct filter_list_struct *lp)
+static BOOL setup_merge_file(int mergelist_num, filter_rule *ex,
+			     filter_rule_list *lp)
 {
 	char buf[MAXPATHLEN];
 	char *x, *y, *pat = ex->pattern;
@@ -480,7 +480,7 @@ static BOOL setup_merge_file(int mergelist_num, struct filter_struct *ex,
 
 struct local_filter_state {
 	int mergelist_cnt;
-	struct filter_list_struct mergelists[1];
+	filter_rule_list mergelists[1];
 };
 
 /* Each time rsync changes to a new directory it call this function to
@@ -505,21 +505,21 @@ void *push_local_filters(const char *dir, unsigned int dirlen)
 
 	push = (struct local_filter_state *)new_array(char,
 			  sizeof (struct local_filter_state)
-			+ (mergelist_cnt-1) * sizeof (struct filter_list_struct));
+			+ (mergelist_cnt-1) * sizeof (filter_rule_list));
 	if (!push)
 		out_of_memory("push_local_filters");
 
 	push->mergelist_cnt = mergelist_cnt;
 	for (i = 0; i < mergelist_cnt; i++) {
 		memcpy(&push->mergelists[i], mergelist_parents[i]->u.mergelist,
-		       sizeof (struct filter_list_struct));
+		       sizeof (filter_rule_list));
 	}
 
 	/* Note: parse_filter_file() might increase mergelist_cnt, so keep
 	 * this loop separate from the above loop. */
 	for (i = 0; i < mergelist_cnt; i++) {
-		struct filter_struct *ex = mergelist_parents[i];
-		struct filter_list_struct *lp = ex->u.mergelist;
+		filter_rule *ex = mergelist_parents[i];
+		filter_rule_list *lp = ex->u.mergelist;
 
 		if (DEBUG_GTE(FILTER, 2)) {
 			rprintf(FINFO, "[%s] pushing mergelist #%d%s\n",
@@ -562,8 +562,8 @@ void pop_local_filters(void *mem)
 		rprintf(FINFO, "[%s] popping local filters\n", who_am_i());
 
 	for (i = mergelist_cnt; i-- > 0; ) {
-		struct filter_struct *ex = mergelist_parents[i];
-		struct filter_list_struct *lp = ex->u.mergelist;
+		filter_rule *ex = mergelist_parents[i];
+		filter_rule_list *lp = ex->u.mergelist;
 
 		if (DEBUG_GTE(FILTER, 2)) {
 			rprintf(FINFO, "[%s] popping mergelist #%d%s\n",
@@ -600,7 +600,7 @@ void pop_local_filters(void *mem)
 
 	for (i = 0; i < mergelist_cnt; i++) {
 		memcpy(mergelist_parents[i]->u.mergelist, &pop->mergelists[i],
-		       sizeof (struct filter_list_struct));
+		       sizeof (filter_rule_list));
 	}
 
 	free(pop);
@@ -634,7 +634,7 @@ void change_local_filter_dir(const char *dname, int dlen, int dir_depth)
 	filt_array[cur_depth] = push_local_filters(dname, dlen);
 }
 
-static int rule_matches(const char *fname, struct filter_struct *ex, int name_is_dir)
+static int rule_matches(const char *fname, filter_rule *ex, int name_is_dir)
 {
 	int slash_handling, str_cnt = 0, anchored_match = 0;
 	int ret_match = ex->rflags & FILTRULE_NEGATE ? 0 : 1;
@@ -714,7 +714,7 @@ static int rule_matches(const char *fname, struct filter_struct *ex, int name_is
 
 
 static void report_filter_result(enum logcode code, char const *name,
-				 struct filter_struct const *ent,
+				 filter_rule const *ent,
 				 int name_is_dir, const char *type)
 {
 	/* If a trailing slash is present to match only directories,
@@ -737,10 +737,10 @@ static void report_filter_result(enum logcode code, char const *name,
  * Return -1 if file "name" is defined to be excluded by the specified
  * exclude list, 1 if it is included, and 0 if it was not matched.
  */
-int check_filter(struct filter_list_struct *listp, enum logcode code,
+int check_filter(filter_rule_list *listp, enum logcode code,
 		 const char *name, int name_is_dir)
 {
-	struct filter_struct *ent;
+	filter_rule *ent;
 
 	for (ent = listp->head; ent; ent = ent->next) {
 		if (ignore_perishable && ent->rflags & FILTRULE_PERISHABLE)
@@ -1039,7 +1039,7 @@ static void get_cvs_excludes(uint32 rflags)
 }
 
 
-void parse_rule(struct filter_list_struct *listp, const char *pattern,
+void parse_rule(filter_rule_list *listp, const char *pattern,
 		uint32 rflags, int xflags)
 {
 	unsigned int pat_len;
@@ -1115,7 +1115,7 @@ void parse_rule(struct filter_list_struct *listp, const char *pattern,
 }
 
 
-void parse_filter_file(struct filter_list_struct *listp, const char *fname,
+void parse_filter_file(filter_rule_list *listp, const char *fname,
 		       uint32 rflags, int xflags)
 {
 	FILE *fp;
@@ -1254,9 +1254,9 @@ char *get_rule_prefix(int rflags, const char *pat, int for_xfer,
 	return buf;
 }
 
-static void send_rules(int f_out, struct filter_list_struct *flp)
+static void send_rules(int f_out, filter_rule_list *flp)
 {
-	struct filter_struct *ent, *prev = NULL;
+	filter_rule *ent, *prev = NULL;
 
 	for (ent = flp->head; ent; ent = ent->next) {
 		unsigned int len, plen, dlen;

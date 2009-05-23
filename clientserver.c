@@ -55,7 +55,7 @@ extern char *logfile_format;
 extern char *files_from;
 extern char *tmpdir;
 extern struct chmod_mode_struct *chmod_modes;
-extern struct filter_list_struct daemon_filter_list;
+extern filter_rule_list daemon_filter_list;
 extern char curr_dir[MAXPATHLEN];
 #ifdef ICONV_OPTION
 extern char *iconv_opt;
