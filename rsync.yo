@@ -1080,7 +1080,8 @@ is not used and the whole file is sent as-is instead.  The transfer may be
 faster if this option is used when the bandwidth between the source and
 destination machines is higher than the bandwidth to disk (especially when the
 "disk" is actually a networked filesystem).  This is the default when both
-the source and destination are specified as local paths.
+the source and destination are specified as local paths, but only if no
+batch-writing option is in effect.
 
 dit(bf(-x, --one-file-system)) This tells rsync to avoid crossing a
 filesystem boundary when recursing.  This does not limit the user's ability
