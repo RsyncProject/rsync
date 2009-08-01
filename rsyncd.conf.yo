@@ -393,8 +393,8 @@ usernames and passwords are stored in the file specified by the
 "secrets file" parameter. The default is for all users to be able to
 connect without a password (this is called "anonymous rsync").
 
-See also the "CONNECTING TO AN RSYNC DAEMON OVER A REMOTE SHELL
-PROGRAM" section in bf(rsync)(1) for information on how handle an
+See also the section entitled "USING RSYNC-DAEMON FEATURES VIA A REMOTE
+SHELL CONNECTION" in bf(rsync)(1) for information on how handle an
 rsyncd.conf-level username that differs from the remote-shell-level
 username when using a remote shell to connect to an rsync daemon.
 
