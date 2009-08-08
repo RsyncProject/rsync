@@ -126,6 +126,128 @@ ssize_t sys_llistxattr(const char *path, char *list, size_t size)
 	return len;
 }
 
+#elif HAVE_SOLARIS_XATTRS
+
+static read_xattr(int attrfd, void *buf, size_t buflen)
+{
+	size_t bufpos;
+
+	for (bufpos = 0; bufpos < buflen; )  {
+		size_t r = read(attrfd, buf + bufpos, buflen - bufpos);
+		if (r <= 0) {
+			if (r < 0)
+				bufpos = -1;
+			break;
+		}
+		bufpos += r;
+	}
+
+	close(attrfd);
+
+	return bufpos;
+}
+
+ssize_t sys_lgetxattr(const char *path, const char *name, void *value, size_t size)
+{
+	int attrfd;
+
+	if ((attrfd = attropen(path, name, O_RDONLY)) < 0) {
+		errno = ENOATTR;
+		return -1;
+	}
+
+	return read_xattr(attrfd, value, size);
+}
+
+ssize_t sys_fgetxattr(int filedes, const char *name, void *value, size_t size)
+{
+	int attrfd;
+
+	if ((attrfd = openat(filedes,name,O_RDONLY)) < 0) {
+		errno = ENOATTR;
+		return -1;
+	}
+
+	return read_xattr(attrfd, value, size);
+
+}
+
+int sys_lsetxattr(const char *path, const char *name, const void *value, size_t size)
+{
+	int attrfd;
+	size_t bufpos;
+	mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
+
+	if ((attrfd = attropen(path, name, AT_SYMLINK_NOFOLLOW|O_CREAT|O_RDWR, mode)) < 0)
+		return -1;
+
+	for (bufpos = 0; bufpos < size; ) {
+		size_t w = write(attrfd, value+bufpos, size);
+		if (w <= 0) {
+			bufpos = -1;
+			break;
+		}
+		bufpos += w;
+
+	}
+
+	close(attrfd);
+
+	return bufpos;
+}
+
+int sys_lremovexattr(const char *path, const char *name)
+{
+	int attrdirfd;
+	int ret;
+
+	if ((attrdirfd = attropen(path, ".", O_RDONLY)) < 0)
+		return -1;
+
+	ret = unlinkat(attrdirfd, name, 0);
+
+	close(attrdirfd);
+
+	return ret;
+}
+
+ssize_t sys_llistxattr(const char *path, char *list, size_t size)
+{
+	int attrdirfd;
+	DIR *dirp;
+	struct dirent *dp;
+	int len = 0;
+
+	if ((attrdirfd = attropen(path, ".", O_RDONLY)) < 0) {
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	if ((dirp = fdopendir(attrdirfd)) == NULL) {
+		close(attrdirfd);
+		return -1;
+	}
+
+	while ((dp = readdir(dirp))) {
+		int namelen = strlen(dp->d_name);
+
+		if (dp->d_name[0] == '.' && (namelen == 1 || (namelen == 2 && dp->d_name[1] == '.')))
+			continue;
+		if (namelen == 11 && dp->d_name[0] == 'S' && strncmp(dp->d_name, "SUNWattr_r", 10) == 0
+		 && (dp->d_name[10] == 'o' || dp->d_name[10] == 'w'))
+			continue;
+
+		memcpy(list, dp->d_name, namelen+1);
+		list += namelen;
+		len += namelen;
+	}
+
+	closedir(dirp);
+	close(attrdirfd);
+
+	return len;
+}
+
 #else
 
 #error You need to create xattr compatibility functions.
