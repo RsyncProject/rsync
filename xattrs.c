@@ -284,6 +284,20 @@ int get_xattr(const char *fname, stat_x *sxp)
 {
 	sxp->xattr = new(item_list);
 	*sxp->xattr = empty_xattr;
+
+#ifdef NO_SPECIAL_XATTRS
+	if (IS_SPECIAL(sxp->st.st_mode))
+		return 0;
+#endif
+#ifdef NO_DEVICE_XATTRS
+	if (IS_DEVICE(sxp->st.st_mode))
+		return 0;
+#endif
+#ifdef NO_SYMLINK_XATTRS
+	if (S_ISLNK(sxp->st.st_mode))
+		return 0;
+#endif
+
 	if (rsync_xal_get(fname, sxp->xattr) < 0) {
 		free_xattr(sxp);
 		return -1;
@@ -883,6 +897,25 @@ int set_xattr(const char *fname, const struct file_struct *file,
 		errno = EROFS;
 		return -1;
 	}
+
+#ifdef NO_SPECIAL_XATTRS
+	if (IS_SPECIAL(sxp->st.st_mode)) {
+		errno = ENOTSUP;
+		return -1;
+	}
+#endif
+#ifdef NO_DEVICE_XATTRS
+	if (IS_DEVICE(sxp->st.st_mode)) {
+		errno = ENOTSUP;
+		return -1;
+	}
+#endif
+#ifdef NO_SYMLINK_XATTRS
+	if (S_ISLNK(sxp->st.st_mode)) {
+		errno = ENOTSUP;
+		return -1;
+	}
+#endif
 
 	ndx = F_XATTR(file);
 	return rsync_xal_set(fname, lst + ndx, fnamecmp, sxp);
