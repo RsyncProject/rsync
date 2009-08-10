@@ -913,7 +913,7 @@ static filter_rule *parse_rule_tok(const char **rulestr_ptr,
 			    invalid:
 				rprintf(FERROR,
 					"invalid modifier '%c' at position %d in filter rule: %s\n",
-					*s, s - (const uchar *)*rulestr_ptr, *rulestr_ptr);
+					*s, (int)(s - (const uchar *)*rulestr_ptr), *rulestr_ptr);
 				exit_cleanup(RERR_SYNTAX);
 			case '-':
 				if (!BITS_SETnUNSET(rule->rflags, FILTRULE_MERGE_FILE, FILTRULE_NO_PREFIXES))
