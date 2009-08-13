@@ -966,6 +966,12 @@ else
 	AC_DEFINE(HAVE_FREEBSD_XATTRS, 1, [True if you have FreeBSD xattrs])
 	AC_DEFINE(SUPPORT_XATTRS, 1)
 	;;
+    solaris*)
+	AC_MSG_RESULT(Using Solaris xattrs)
+	AC_DEFINE(HAVE_SOLARIS_XATTRS, 1, [True if you have Solaris xattrs])
+	AC_DEFINE(SUPPORT_XATTRS, 1)
+	AC_DEFINE(NO_SYMLINK_XATTRS, 1, [True if symlinks don't support xattrs])
+	;;
     *)
 	if test x"$enable_xattr_support" = x"yes"; then
 	    AC_MSG_ERROR(Failed to find extended attribute support)

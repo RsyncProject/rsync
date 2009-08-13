@@ -128,23 +128,39 @@ ssize_t sys_llistxattr(const char *path, char *list, size_t size)
 
 #elif HAVE_SOLARIS_XATTRS
 
-static read_xattr(int attrfd, void *buf, size_t buflen)
+static ssize_t read_xattr(int attrfd, void *buf, size_t buflen)
 {
-	size_t bufpos;
+	STRUCT_STAT sb;
+	ssize_t ret;
 
-	for (bufpos = 0; bufpos < buflen; )  {
-		size_t r = read(attrfd, buf + bufpos, buflen - bufpos);
-		if (r <= 0) {
-			if (r < 0)
+	if (fstat(fd, &sb) < 0)
+		ret = -1;
+	else if (sb.st_size > SSIZE_MAX) {
+		errno = ERANGE;
+		ret = -1;
+	} else if (size == 0)
+		ret = sb.st_size;
+	else if (sb.st_size > size) {
+		errno = ERANGE;
+		ret = -1;
+	} else {
+		size_t bufpos;
+		for (bufpos = 0; bufpos < buflen; ) {
+			ssize_t cnt = read(attrfd, buf + bufpos, buflen - bufpos);
+			if (cnt <= 0) {
+				if (cnt < 0 && errno == EINTR)
+					continue;
 				bufpos = -1;
-			break;
+				break;
+			}
+			bufpos += cnt;
 		}
-		bufpos += r;
+		ret = bufpos;
 	}
 
 	close(attrfd);
 
-	return bufpos;
+	return ret;
 }
 
 ssize_t sys_lgetxattr(const char *path, const char *name, void *value, size_t size)
@@ -163,13 +179,12 @@ ssize_t sys_fgetxattr(int filedes, const char *name, void *value, size_t size)
 {
 	int attrfd;
 
-	if ((attrfd = openat(filedes,name,O_RDONLY)) < 0) {
+	if ((attrfd = openat(filedes, name, O_RDONLY|O_XATTR, 0)) < 0) {
 		errno = ENOATTR;
 		return -1;
 	}
 
 	return read_xattr(attrfd, value, size);
-
 }
 
 int sys_lsetxattr(const char *path, const char *name, const void *value, size_t size)
@@ -178,22 +193,23 @@ int sys_lsetxattr(const char *path, const char *name, const void *value, size_t 
 	size_t bufpos;
 	mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 
-	if ((attrfd = attropen(path, name, AT_SYMLINK_NOFOLLOW|O_CREAT|O_RDWR, mode)) < 0)
+	if ((attrfd = attropen(path, name, O_CREAT|O_WRONLY|O_NOFOLLOW, mode)) < 0)
 		return -1;
 
 	for (bufpos = 0; bufpos < size; ) {
-		size_t w = write(attrfd, value+bufpos, size);
-		if (w <= 0) {
+		ssize_t cnt = write(attrfd, value+bufpos, size);
+		if (cnt <= 0) {
+			if (cnt < 0 && errno == EINTR)
+				continue;
 			bufpos = -1;
 			break;
 		}
-		bufpos += w;
-
+		bufpos += cnt;
 	}
 
 	close(attrfd);
 
-	return bufpos;
+	return bufpos > 0 ? 0 : -1;
 }
 
 int sys_lremovexattr(const char *path, const char *name)
@@ -201,7 +217,7 @@ int sys_lremovexattr(const char *path, const char *name)
 	int attrdirfd;
 	int ret;
 
-	if ((attrdirfd = attropen(path, ".", O_RDONLY)) < 0)
+	if ((attrdirfd = attropen(path, ".", O_RDWR)) < 0)
 		return -1;
 
 	ret = unlinkat(attrdirfd, name, 0);
@@ -216,7 +232,7 @@ ssize_t sys_llistxattr(const char *path, char *list, size_t size)
 	int attrdirfd;
 	DIR *dirp;
 	struct dirent *dp;
-	int len = 0;
+	ssize_t ret = 0;
 
 	if ((attrdirfd = attropen(path, ".", O_RDONLY)) < 0) {
 		errno = ENOTSUP;
@@ -229,23 +245,27 @@ ssize_t sys_llistxattr(const char *path, char *list, size_t size)
 	}
 
 	while ((dp = readdir(dirp))) {
-		int namelen = strlen(dp->d_name);
+		int len = strlen(dp->d_name);
 
-		if (dp->d_name[0] == '.' && (namelen == 1 || (namelen == 2 && dp->d_name[1] == '.')))
+		if (dp->d_name[0] == '.' && (len == 1 || (len == 2 && dp->d_name[1] == '.')))
 			continue;
-		if (namelen == 11 && dp->d_name[0] == 'S' && strncmp(dp->d_name, "SUNWattr_r", 10) == 0
+		if (len == 11 && dp->d_name[0] == 'S' && strncmp(dp->d_name, "SUNWattr_r", 10) == 0
 		 && (dp->d_name[10] == 'o' || dp->d_name[10] == 'w'))
 			continue;
 
-		memcpy(list, dp->d_name, namelen+1);
-		list += namelen;
-		len += namelen;
+		if ((ret += len+1) > size) {
+			ret = -1;
+			errno = ERANGE;
+			break;
+		}
+		memcpy(list, dp->d_name, len+1);
+		list += len+1;
 	}
 
 	closedir(dirp);
 	close(attrdirfd);
 
-	return len;
+	return ret;
 }
 
 #else
