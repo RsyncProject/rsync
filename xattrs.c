@@ -751,7 +751,7 @@ void uncache_tmp_xattrs(void)
 		rsync_xal_l.count = prior_xattr_count;
 		while (xattr_item-- > xattr_start) {
 			rsync_xal_free(xattr_item);
-			free(xattr_item);
+			free(xattr_item->items);
 		}
 		prior_xattr_count = (size_t)-1;
 	}
