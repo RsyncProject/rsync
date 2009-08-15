@@ -254,6 +254,8 @@ ssize_t sys_llistxattr(const char *path, char *list, size_t size)
 			continue;
 
 		if ((ret += len+1) > size) {
+			if (size == 0)
+				continue;
 			ret = -1;
 			errno = ERANGE;
 			break;
