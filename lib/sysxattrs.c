@@ -133,14 +133,14 @@ static ssize_t read_xattr(int attrfd, void *buf, size_t buflen)
 	STRUCT_STAT sb;
 	ssize_t ret;
 
-	if (fstat(fd, &sb) < 0)
+	if (fstat(attrfd, &sb) < 0)
 		ret = -1;
 	else if (sb.st_size > SSIZE_MAX) {
 		errno = ERANGE;
 		ret = -1;
-	} else if (size == 0)
+	} else if (buflen == 0)
 		ret = sb.st_size;
-	else if (sb.st_size > size) {
+	else if (sb.st_size > buflen) {
 		errno = ERANGE;
 		ret = -1;
 	} else {
