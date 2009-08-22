@@ -45,6 +45,8 @@ extern int inc_recurse;
 extern int io_error;
 extern int eol_nulls;
 extern int flist_eof;
+extern int file_total;
+extern int file_old_total;
 extern int list_only;
 extern int read_batch;
 extern int protect_args;
@@ -645,7 +647,12 @@ static int read_timeout(int fd, char *buf, size_t len)
 				maxfd = new_fd;
 		}
 
-		tv.tv_sec = select_timeout;
+		if (am_sender && inc_recurse && !flist_eof && !defer_forwarding_messages && !cnt
+		 && file_total - file_old_total < MAX_FILECNT_LOOKAHEAD
+		 && file_total - file_old_total >= MIN_FILECNT_LOOKAHEAD)
+			tv.tv_sec = 0;
+		else
+			tv.tv_sec = select_timeout;
 		tv.tv_usec = 0;
 
 		errno = 0;
@@ -657,7 +664,10 @@ static int read_timeout(int fd, char *buf, size_t len)
 				defer_forwarding_messages = 0;
 				exit_cleanup(RERR_SOCKETIO);
 			}
-			check_timeout();
+			if (am_sender && tv.tv_sec == 0)
+				send_extra_file_list(sock_f_out, -1);
+			else
+				check_timeout();
 			continue;
 		}
 

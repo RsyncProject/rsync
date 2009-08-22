@@ -179,7 +179,7 @@ void send_files(int f_in, int f_out)
 
 	while (1) {
 		if (inc_recurse)
-			send_extra_file_list(f_out, FILECNT_LOOKAHEAD);
+			send_extra_file_list(f_out, MIN_FILECNT_LOOKAHEAD);
 
 		/* This call also sets cur_flist. */
 		ndx = read_ndx_and_attrs(f_in, &iflags, &fnamecmp_type,
@@ -205,7 +205,7 @@ void send_files(int f_in, int f_out)
 		}
 
 		if (inc_recurse)
-			send_extra_file_list(f_out, FILECNT_LOOKAHEAD);
+			send_extra_file_list(f_out, MIN_FILECNT_LOOKAHEAD);
 
 		if (ndx - cur_flist->ndx_start >= 0)
 			file = cur_flist->files[ndx - cur_flist->ndx_start];

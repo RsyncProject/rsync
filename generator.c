@@ -1949,8 +1949,12 @@ void check_for_finished_files(int itemizing, enum logcode code, int check_redo)
 			break;
 
 		write_ndx(sock_f_out, NDX_DONE);
-		if (!read_batch)
-			maybe_flush_socket(1);
+		if (!read_batch && !flist_eof) {
+			int old_total = 0;
+			for (flist = first_flist; flist != cur_flist; flist = flist->next)
+				old_total += flist->used;
+			maybe_flush_socket(!flist_eof && file_total - old_total < MIN_FILECNT_LOOKAHEAD/2);
+		}
 
 		if (delete_during == 2 || !dir_tweaking) {
 			/* Skip directory touch-up. */
@@ -2028,7 +2032,7 @@ void generate_files(int f_out, const char *local_name)
 	do {
 #ifdef SUPPORT_HARD_LINKS
 		if (preserve_hard_links && inc_recurse) {
-			while (!flist_eof && file_total < FILECNT_LOOKAHEAD/2)
+			while (!flist_eof && file_total < MIN_FILECNT_LOOKAHEAD/2)
 				wait_for_receiver();
 		}
 #endif

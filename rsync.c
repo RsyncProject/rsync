@@ -45,6 +45,7 @@ extern int gid_ndx;
 extern int inc_recurse;
 extern int inplace;
 extern int flist_eof;
+extern int file_old_total;
 extern int msgs2stderr;
 extern int keep_dirlinks;
 extern int make_backups;
@@ -313,7 +314,15 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 		goto read_loop;
 	}
 
-	cur_flist = flist_for_ndx(ndx, "read_ndx_and_attrs");
+	flist = flist_for_ndx(ndx, "read_ndx_and_attrs");
+	if (flist != cur_flist) {
+		cur_flist = flist;
+		if (am_sender) {
+			file_old_total = cur_flist->used;
+			for (flist = first_flist; flist != cur_flist; flist = flist->next)
+				file_old_total += flist->used;
+		}
+	}
 
 	if (iflags & ITEM_BASIS_TYPE_FOLLOWS)
 		fnamecmp_type = read_byte(f_in);

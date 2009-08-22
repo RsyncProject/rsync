@@ -97,6 +97,7 @@ struct file_list *cur_flist, *first_flist, *dir_flist;
 int send_dir_ndx = -1, send_dir_depth = -1;
 int flist_cnt = 0; /* how many (non-tmp) file list objects exist */
 int file_total = 0; /* total of all active items over all file-lists */
+int file_old_total = 0; /* total of active items that will soon be gone */
 int flist_eof = 0; /* all the file-lists are now known */
 
 #define NORMAL_NAME 0
@@ -1905,17 +1906,17 @@ void send_extra_file_list(int f, int at_least)
 	struct file_list *flist;
 	int64 start_write;
 	uint16 prev_flags;
-	int old_cnt, save_io_error = io_error;
+	int save_io_error = io_error;
 
 	if (flist_eof)
 		return;
 
+	if (at_least < 0)
+		at_least = file_total - file_old_total + 1;
+
 	/* Keep sending data until we have the requested number of
 	 * files in the upcoming file-lists. */
-	old_cnt = cur_flist->used;
-	for (flist = first_flist; flist != cur_flist; flist = flist->next)
-		old_cnt += flist->used;
-	while (file_total - old_cnt < at_least) {
+	while (file_total - file_old_total < at_least) {
 		struct file_struct *file = dir_flist->sorted[send_dir_ndx];
 		int dir_ndx, dstart = stats.num_dirs;
 		const char *pathname = F_PATHNAME(file);
