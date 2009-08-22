@@ -21,7 +21,11 @@ sdev=`$TOOLDIR/getfsdev $scratchdir`
 tdev=`$TOOLDIR/getfsdev $tmpdir2`
 if [ x$sdev = x$tdev ]; then
     tmpdir2=/var/tmp
-    tdev=`$TOOLDIR/getfsdev $tmpdir2`
+    if [ -d $tmpdir2 ]; then
+	tdev=`$TOOLDIR/getfsdev $tmpdir2`
+    else
+	tdev="$sdev"
+    fi
     [ x$sdev = x$tdev ] && test_skipped "Can't find a tmp dir on a different file system"
 fi
 
