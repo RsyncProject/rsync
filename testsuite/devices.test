@@ -109,8 +109,8 @@ cat <<EOT >"$chkfile"
 .d..t.$dots ./
 cDc.t.$dots block
 cDc...$dots block2
-cD$all_plus block3
-hD$all_plus block2.5 => block3
+cD$all_plus block2.5
+hD$all_plus block3 => block2.5
 cD$all_plus char
 cD$all_plus char2
 cD$all_plus char3

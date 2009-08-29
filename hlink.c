@@ -212,12 +212,11 @@ void match_hard_links(struct file_list *flist)
 }
 
 static int maybe_hard_link(struct file_struct *file, int ndx,
-			   const char *fname, int statret, stat_x *sxp,
+			   char *fname, int statret, stat_x *sxp,
 			   const char *oldname, STRUCT_STAT *old_stp,
 			   const char *realname, int itemizing, enum logcode code)
 {
 	if (statret == 0) {
-		int ok = 0;
 		if (sxp->st.st_dev == old_stp->st_dev
 		 && sxp->st.st_ino == old_stp->st_ino) {
 			if (itemizing) {
@@ -230,16 +229,9 @@ static int maybe_hard_link(struct file_struct *file, int ndx,
 			file->flags |= FLAG_HLINK_DONE;
 			return 0;
 		}
-		if (make_backups > 0 && (ok = make_backup(fname, True)) == 0)
-			return -1;
-		if (ok != 1 && robust_unlink(fname) && errno != ENOENT) {
-			rsyserr(FERROR_XFER, errno, "unlink %s failed",
-				full_fname(fname));
-			return -1;
-		}
 	}
 
-	if (hard_link_one(file, fname, oldname, 0)) {
+	if (atomic_create(file, fname, oldname, MAKEDEV(0, 0), sxp, statret == 0 ? DEL_FOR_FILE : 0)) {
 		if (itemizing) {
 			itemize(fname, file, ndx, statret, sxp,
 				ITEM_LOCAL_CHANGE | ITEM_XNAME_FOLLOWS, 0,
@@ -249,6 +241,7 @@ static int maybe_hard_link(struct file_struct *file, int ndx,
 			rprintf(code, "%s => %s\n", fname, realname);
 		return 0;
 	}
+
 	return -1;
 }
 
@@ -294,7 +287,7 @@ static char *check_prior(struct file_struct *file, int gnum,
 
 /* Only called if FLAG_HLINKED is set and FLAG_HLINK_FIRST is not.  Returns:
  * 0 = process the file, 1 = skip the file, -1 = error occurred. */
-int hard_link_check(struct file_struct *file, int ndx, const char *fname,
+int hard_link_check(struct file_struct *file, int ndx, char *fname,
 		    int statret, stat_x *sxp, int itemizing,
 		    enum logcode code)
 {

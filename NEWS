@@ -63,6 +63,12 @@ Changes since 3.0.4:
       file.  Also made explicitly-set uid/gid values no longer ignored by a
       daemon that was not run by a super-user.
 
+    - When replacing a non-dir with a symlink/hard-link/device/special-file,
+      the update should now be done in an atomic manner.
+
+    - When backing up a file, try to hard-link the file into place so that the
+      upcoming replacement of the destination file will be atomic.
+
   EXTRAS:
 
     - Added an "instant-rsyncd" script to the support directory, which makes

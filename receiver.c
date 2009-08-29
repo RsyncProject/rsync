@@ -64,31 +64,36 @@ static flist_ndx_list batch_redo_list;
 /* We're either updating the basis file or an identical copy: */
 static int updating_basis_or_equiv;
 
-/*
- * get_tmpname() - create a tmp filename for a given filename
- *
- *   If a tmpdir is defined, use that as the directory to
- *   put it in.  Otherwise, the tmp filename is in the same
- *   directory as the given name.  Note that there may be no
- *   directory at all in the given name!
- *
- *   The tmp filename is basically the given filename with a
- *   dot prepended, and .XXXXXX appended (for mkstemp() to
- *   put its unique gunk in).  Take care to not exceed
- *   either the MAXPATHLEN or NAME_MAX, esp. the last, as
- *   the basename basically becomes 8 chars longer. In that
- *   case, the original name is shortened sufficiently to
- *   make it all fit.
- *
- *   Of course, there's no real reason for the tmp name to
- *   look like the original, except to satisfy us humans.
- *   As long as it's unique, rsync will work.
- */
+#define TMPNAME_SUFFIX ".XXXXXX"
+#define TMPNAME_SUFFIX_LEN ((int)sizeof TMPNAME_SUFFIX - 1)
+#define MAX_UNIQUE_NUMBER 999999
+#define MAX_UNIQUE_LOOP 100
 
-int get_tmpname(char *fnametmp, const char *fname)
+/* get_tmpname() - create a tmp filename for a given filename
+ *
+ * If a tmpdir is defined, use that as the directory to put it in.  Otherwise,
+ * the tmp filename is in the same directory as the given name.  Note that
+ * there may be no directory at all in the given name!
+ *
+ * The tmp filename is basically the given filename with a dot prepended, and
+ * .XXXXXX appended (for mkstemp() to put its unique gunk in).  We take care
+ * to not exceed either the MAXPATHLEN or NAME_MAX, especially the last, as
+ * the basename basically becomes 8 characters longer.  In such a case, the
+ * original name is shortened sufficiently to make it all fit.
+ *
+ * If the make_unique arg is True, the XXXXXX string is replaced with a unique
+ * string that doesn't exist at the time of the check.  This is intended to be
+ * used for creating hard links, symlinks, devices, and special files, since
+ * normal files should be handled by mkstemp() for safety.
+ *
+ * Of course, the only reason the file is based on the original name is to
+ * make it easier to figure out what purpose a temp file is serving when a
+ * transfer is in progress. */
+int get_tmpname(char *fnametmp, const char *fname, BOOL make_unique)
 {
 	int maxname, added, length = 0;
 	const char *f;
+	char *suf;
 
 	if (tmpdir) {
 		/* Note: this can't overflow, so the return value is safe */
@@ -108,8 +113,9 @@ int get_tmpname(char *fnametmp, const char *fname)
 	fnametmp[length++] = '.';
 
 	/* The maxname value is bufsize, and includes space for the '\0'.
-	 * (Note that NAME_MAX get -8 for the leading '.' above.) */
-	maxname = MIN(MAXPATHLEN - 7 - length, NAME_MAX - 8);
+	 * NAME_MAX needs an extra -1 for the name's leading dot. */
+	maxname = MIN(MAXPATHLEN - length - TMPNAME_SUFFIX_LEN,
+		      NAME_MAX - 1 - TMPNAME_SUFFIX_LEN);
 
 	if (maxname < 1) {
 		rprintf(FERROR_XFER, "temporary filename too long: %s\n", fname);
@@ -120,7 +126,33 @@ int get_tmpname(char *fnametmp, const char *fname)
 	added = strlcpy(fnametmp + length, f, maxname);
 	if (added >= maxname)
 		added = maxname - 1;
-	memcpy(fnametmp + length + added, ".XXXXXX", 8);
+	suf = fnametmp + length + added;
+
+	if (make_unique) {
+		static unsigned counter_limit;
+		unsigned counter;
+
+		if (!counter_limit) {
+			counter_limit = (unsigned)getpid() + MAX_UNIQUE_LOOP;
+			if (counter_limit > MAX_UNIQUE_NUMBER || counter_limit < MAX_UNIQUE_LOOP)
+				counter_limit = MAX_UNIQUE_LOOP;
+		}
+		counter = counter_limit - MAX_UNIQUE_LOOP;
+
+		/* This doesn't have to be very good because we don't need
+		 * to worry about someone trying to guess the values:  all
+		 * a conflict will do is cause a device, special file, hard
+		 * link, or symlink to fail to be created.  Also: avoid
+		 * using mktemp() due to gcc's annoying warning. */
+		while (1) {
+			snprintf(suf, TMPNAME_SUFFIX_LEN+1, ".%d", counter);
+			if (access(fnametmp, 0) < 0)
+				break;
+			if (++counter >= counter_limit)
+				return 0;
+		}
+	} else
+		memcpy(suf, TMPNAME_SUFFIX, TMPNAME_SUFFIX_LEN+1);
 
 	return 1;
 }
@@ -133,7 +165,7 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 {
 	int fd;
 
-	if (!get_tmpname(fnametmp, fname))
+	if (!get_tmpname(fnametmp, fname, False))
 		return -1;
 
 	/* We initially set the perms without the setuid/setgid bits or group
@@ -149,7 +181,7 @@ int open_tmpfile(char *fnametmp, const char *fname, struct file_struct *file)
 	if (fd == -1 && relative_paths && errno == ENOENT
 	 && make_path(fnametmp, MKP_SKIP_SLASH | MKP_DROP_NAME) == 0) {
 		/* Get back to name with XXXXXX in it. */
-		get_tmpname(fnametmp, fname);
+		get_tmpname(fnametmp, fname, False);
 		fd = do_mkstemp(fnametmp, file->mode & INITACCESSPERMS);
 	}
 #endif

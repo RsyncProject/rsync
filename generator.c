@@ -95,6 +95,7 @@ extern struct stats stats;
 extern dev_t filesystem_dev;
 extern mode_t orig_umask;
 extern uid_t our_uid;
+extern char *tmpdir;
 extern char *basis_dir[MAX_BASIS_DIRS+1];
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 extern filter_rule_list filter_list, daemon_filter_list;
@@ -131,7 +132,7 @@ static int start_delete_delay_temp(void)
 	int save_dry_run = dry_run;
 
 	dry_run = 0;
-	if (!get_tmpname(fnametmp, "deldelay")
+	if (!get_tmpname(fnametmp, "deldelay", False)
 	 || (deldelay_fd = do_mkstemp(fnametmp, 0600)) < 0) {
 		rprintf(FINFO, "NOTE: Unable to create delete-delay temp file%s.\n",
 			inc_recurse ? "" : " -- switching to --delete-after");
@@ -1360,10 +1361,9 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			char lnk[MAXPATHLEN];
 			int len;
 
-			if (!S_ISLNK(sx.st.st_mode))
-				statret = -1;
-			else if ((len = readlink(fname, lnk, MAXPATHLEN-1)) > 0
-			      && strncmp(lnk, sl, len) == 0 && sl[len] == '\0') {
+			if (S_ISLNK(sx.st.st_mode)
+			 && (len = readlink(fname, lnk, MAXPATHLEN-1)) > 0
+			 && strncmp(lnk, sl, len) == 0 && sl[len] == '\0') {
 				/* The link is pointing to the right place. */
 				set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT);
 				if (itemizing)
@@ -1376,10 +1376,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					goto return_with_success;
 				goto cleanup;
 			}
-			/* Not the right symlink (or not a symlink), so
-			 * delete it. */
-			if (delete_item(fname, sx.st.st_mode, del_opts | DEL_FOR_SYMLINK) != 0)
-				goto cleanup;
 		} else if (basis_dir[0] != NULL) {
 			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &sx,
 					      itemizing, code);
@@ -1396,18 +1392,11 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			} else if (j >= 0)
 				statret = 1;
 		}
-#ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_HLINK_NOT_LAST(file)) {
-			cur_flist->in_progress++;
-			goto cleanup;
-		}
-#endif
-		if (do_symlink(sl, fname) != 0) {
-			rsyserr(FERROR_XFER, errno, "symlink %s -> \"%s\" failed",
-				full_fname(fname), sl);
-		} else {
+		if (atomic_create(file, fname, sl, MAKEDEV(0, 0), &sx, statret == 0 ? DEL_FOR_SYMLINK : 0)) {
 			set_file_attrs(fname, file, NULL, NULL, 0);
 			if (itemizing) {
+				if (statret == 0 && !S_ISLNK(sx.st.st_mode))
+					statret = -1;
 				itemize(fname, file, ndx, statret, &sx,
 					ITEM_LOCAL_CHANGE|ITEM_REPORT_CHANGE, 0, NULL);
 			}
@@ -1430,13 +1419,13 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 	if ((am_root && preserve_devices && IS_DEVICE(file->mode))
 	 || (preserve_specials && IS_SPECIAL(file->mode))) {
 		dev_t rdev;
+		int del_for_flag = 0;
 		if (IS_DEVICE(file->mode)) {
 			uint32 *devp = F_RDEV_P(file);
 			rdev = MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp));
 		} else
 			rdev = 0;
 		if (statret == 0) {
-			int del_for_flag;
 			if (IS_DEVICE(file->mode)) {
 				if (!IS_DEVICE(sx.st.st_mode))
 					statret = -1;
@@ -1461,8 +1450,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 					goto return_with_success;
 				goto cleanup;
 			}
-			if (delete_item(fname, sx.st.st_mode, del_opts | del_for_flag) != 0)
-				goto cleanup;
 		} else if (basis_dir[0] != NULL) {
 			int j = try_dests_non(file, fname, ndx, fnamecmpbuf, &sx,
 					      itemizing, code);
@@ -1479,21 +1466,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			} else if (j >= 0)
 				statret = 1;
 		}
-#ifdef SUPPORT_HARD_LINKS
-		if (preserve_hard_links && F_HLINK_NOT_LAST(file)) {
-			cur_flist->in_progress++;
-			goto cleanup;
-		}
-#endif
 		if (DEBUG_GTE(GENR, 1)) {
 			rprintf(FINFO, "mknod(%s, 0%o, [%ld,%ld])\n",
 				fname, (int)file->mode,
 				(long)major(rdev), (long)minor(rdev));
 		}
-		if (do_mknod(fname, file->mode, rdev) < 0) {
-			rsyserr(FERROR_XFER, errno, "mknod %s failed",
-				full_fname(fname));
-		} else {
+		if (atomic_create(file, fname, NULL, rdev, &sx, del_for_flag)) {
 			set_file_attrs(fname, file, NULL, NULL, 0);
 			if (itemizing) {
 				itemize(fname, file, ndx, statret, &sx,
@@ -1811,6 +1789,74 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		free_xattr(&sx);
 #endif
 	return;
+}
+
+/* If we are replacing an existing hard link, symlink, device, or special file,
+ * create a temp-name item and rename it into place.  Only a symlink or hard
+ * link puts a non-NULL value into the lnk arg.  Only a device puts a non-0
+ * value into the rdev arg.  Specify 0 for the del_for_flag if there is not a
+ * file to replace.  This returns 1 on success and 0 on failure. */
+int atomic_create(struct file_struct *file, char *fname, const char *lnk,
+		  dev_t rdev, stat_x *sxp, int del_for_flag)
+{
+	char tmpname[MAXPATHLEN];
+	const char *create_name;
+	int skip_atomic, dir_in_the_way = del_for_flag && S_ISDIR(sxp->st.st_mode);
+
+	if (!del_for_flag || dir_in_the_way || tmpdir || !get_tmpname(tmpname, fname, True))
+		skip_atomic = 1;
+	else
+		skip_atomic = 0;
+
+	if (del_for_flag) {
+		if (make_backups > 0 && !dir_in_the_way) {
+			if (!make_backup(fname, skip_atomic))
+				return 0;
+		} else if (skip_atomic) {
+			int del_opts = delete_mode || force_delete ? DEL_RECURSE : 0;
+			if (delete_item(fname, sxp->st.st_mode, del_opts | del_for_flag) != 0)
+				return 0;
+		}
+	}
+
+	create_name = skip_atomic ? fname : tmpname;
+
+	if (lnk) {
+#ifdef SUPPORT_LINKS
+		if (S_ISLNK(file->mode)
+#ifdef SUPPORT_HARD_LINKS /* The first symlink in a hard-linked cluster is always created. */
+		 && (!F_IS_HLINKED(file) || file->flags & FLAG_HLINK_FIRST)
+#endif
+		 ) {
+			if (do_symlink(lnk, create_name) < 0) {
+				rsyserr(FERROR_XFER, errno, "symlink %s -> \"%s\" failed",
+					full_fname(create_name), lnk);
+				return 0;
+			}
+		} else
+#endif
+#ifdef SUPPORT_HARD_LINKS
+		if (!hard_link_one(file, create_name, lnk, 0))
+			return 0;
+#endif
+	} else {
+		if (do_mknod(create_name, file->mode, rdev) < 0) {
+			rsyserr(FERROR_XFER, errno, "mknod %s failed",
+				full_fname(create_name));
+			return 0;
+		}
+	}
+
+	if (!skip_atomic) {
+		if (do_rename(tmpname, fname) < 0) {
+			rsyserr(FERROR_XFER, errno, "rename %s -> \"%s\" failed",
+				full_fname(tmpname), full_fname(fname));
+			do_unlink(tmpname);
+			return 0;
+		}
+	}
+
+	return 1;
 }
 
 #ifdef SUPPORT_HARD_LINKS
