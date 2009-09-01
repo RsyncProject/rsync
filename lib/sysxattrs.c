@@ -145,8 +145,8 @@ static ssize_t read_xattr(int attrfd, void *buf, size_t buflen)
 		ret = -1;
 	} else {
 		size_t bufpos;
-		for (bufpos = 0; bufpos < buflen; ) {
-			ssize_t cnt = read(attrfd, buf + bufpos, buflen - bufpos);
+		for (bufpos = 0; bufpos < sb.st_size; ) {
+			ssize_t cnt = read(attrfd, buf + bufpos, sb.st_size - bufpos);
 			if (cnt <= 0) {
 				if (cnt < 0 && errno == EINTR)
 					continue;
