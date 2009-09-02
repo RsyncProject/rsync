@@ -23,6 +23,7 @@
 /* These are to make syscall.o shut up. */
 int dry_run = 0;
 int am_root = 0;
+int am_sender = 1;
 int read_only = 1;
 int list_only = 0;
 int preserve_perms = 0;

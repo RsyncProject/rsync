@@ -946,7 +946,7 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			break;
 		case TYPE_SYMLINK:
 #ifdef SUPPORT_LINKS
-			if ((len = readlink(cmpbuf, lnk, MAXPATHLEN-1)) <= 0)
+			if ((len = do_readlink(cmpbuf, lnk, MAXPATHLEN-1)) <= 0)
 				continue;
 			lnk[len] = '\0';
 			if (strcmp(lnk, F_SYMLINK(file)) != 0)
@@ -1369,7 +1369,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 			int len;
 
 			if (S_ISLNK(sx.st.st_mode)
-			 && (len = readlink(fname, lnk, MAXPATHLEN-1)) > 0
+			 && (len = do_readlink(fname, lnk, MAXPATHLEN-1)) > 0
 			 && strncmp(lnk, sl, len) == 0 && sl[len] == '\0') {
 				/* The link is pointing to the right place. */
 				set_file_attrs(fname, file, &sx, NULL, maybe_ATTRS_REPORT);

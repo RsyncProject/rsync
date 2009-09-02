@@ -196,7 +196,7 @@ static int readlink_stat(const char *path, STRUCT_STAT *stp, char *linkbuf)
 	if (link_stat(path, stp, copy_dirlinks) < 0)
 		return -1;
 	if (S_ISLNK(stp->st_mode)) {
-		int llen = readlink(path, linkbuf, MAXPATHLEN - 1);
+		int llen = do_readlink(path, linkbuf, MAXPATHLEN - 1);
 		if (llen < 0)
 			return -1;
 		linkbuf[llen] = '\0';

@@ -31,6 +31,7 @@
 
 extern int dry_run;
 extern int am_root;
+extern int am_sender;
 extern int read_only;
 extern int list_only;
 extern int preserve_perms;
@@ -58,8 +59,48 @@ int do_symlink(const char *lnk, const char *fname)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
+
+#ifdef NO_SYMLINK_XATTRS
+	/* For --fake-super, we create a normal file with mode 0600
+	 * and write the lnk into it. */
+	if (am_root < 0) {
+		int ok, len = strlen(lnk);
+		int fd = open(fname, O_WRONLY|O_CREAT|O_TRUNC, S_IWUSR|S_IRUSR);
+		if (fd < 0)
+			return -1;
+		ok = write(fd, lnk, len) == len;
+		if (close(fd) < 0)
+			ok = 0;
+		return ok ? 0 : -1;
+	}
+#endif
+
 	return symlink(lnk, fname);
 }
+
+#ifdef NO_SYMLINK_XATTRS
+ssize_t do_readlink(const char *path, char *buf, size_t bufsiz)
+{
+	/* For --fake-super, we read the link from the file. */
+	if (am_root < 0) {
+		int fd = open(path, O_RDONLY|O_NOFOLLOW);
+		if (fd >= 0) {
+			int len = read(fd, buf, bufsiz);
+			close(fd);
+			return len;
+		}
+		if (errno != ELOOP)
+			return -1;
+		/* A real symlink needs to be turned into a fake one on the receiving
+		 * side, so tell the generator that the link has no length. */
+		if (!am_sender)
+			return 0;
+		/* Otherwise fall through and let the sender report the real length. */
+	}
+
+	return readlink(path, buf, bufsiz);
+}
+#endif
 #endif
 
 #ifdef HAVE_LINK

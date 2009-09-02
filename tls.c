@@ -43,6 +43,7 @@
 /* These are to make syscall.o shut up. */
 int dry_run = 0;
 int am_root = 0;
+int am_sender = 1;
 int read_only = 1;
 int list_only = 0;
 int link_times = 0;
@@ -147,9 +148,9 @@ static void list_file(const char *fname)
 			buf.st_uid = buf.st_gid = 0;
 		strlcpy(linkbuf, " -> ", sizeof linkbuf);
 		/* const-cast required for silly UNICOS headers */
-		len = readlink((char *) fname, linkbuf+4, sizeof(linkbuf) - 4);
+		len = do_readlink((char *) fname, linkbuf+4, sizeof(linkbuf) - 4);
 		if (len == -1)
-			failed("readlink", fname);
+			failed("do_readlink", fname);
 		else
 			/* it's not nul-terminated */
 			linkbuf[4+len] = 0;
