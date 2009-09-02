@@ -85,6 +85,7 @@ extern struct file_list *first_flist;
 extern filter_rule_list daemon_filter_list;
 
 uid_t our_uid;
+gid_t our_gid;
 int am_generator = 0;
 int local_server = 0;
 int daemon_over_rsh = 0;
@@ -1485,6 +1486,7 @@ int main(int argc,char *argv[])
 
 	starttime = time(NULL);
 	our_uid = MY_UID();
+	our_gid = MY_GID();
 	am_root = our_uid == 0;
 
 	memset(&stats, 0, sizeof(stats));

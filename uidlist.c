@@ -33,6 +33,7 @@ extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_acls;
 extern int numeric_ids;
+extern gid_t our_gid;
 extern char *usermap;
 extern char *groupmap;
 
@@ -101,7 +102,6 @@ static int is_in_group(gid_t gid)
 	if (gid == last_in)
 		return last_out;
 	if (ngroups < -1) {
-		gid_t mygid = MY_GID();
 		if ((ngroups = getgroups(0, NULL)) < 0)
 			ngroups = 0;
 		gidset = new_array(GETGROUPS_T, ngroups+1);
@@ -111,11 +111,11 @@ static int is_in_group(gid_t gid)
 			ngroups = getgroups(ngroups, gidset);
 		/* The default gid might not be in the list on some systems. */
 		for (n = 0; n < ngroups; n++) {
-			if (gidset[n] == mygid)
+			if (gidset[n] == our_gid)
 				break;
 		}
 		if (n == ngroups)
-			gidset[ngroups++] = mygid;
+			gidset[ngroups++] = our_gid;
 		if (DEBUG_GTE(OWN, 2)) {
 			int pos;
 			char *gidbuf = new_array(char, ngroups*21+32);
@@ -139,13 +139,7 @@ static int is_in_group(gid_t gid)
 	return last_out = 0;
 
 #else
-	static gid_t mygid = GID_NONE;
-	if (mygid == GID_NONE) {
-		mygid = MY_GID();
-		if (DEBUG_GTE(OWN, 2))
-			rprintf(FINFO, "process has gid %u\n", (unsigned)mygid);
-	}
-	return gid == mygid;
+	return gid == our_gid;
 #endif
 }
 
