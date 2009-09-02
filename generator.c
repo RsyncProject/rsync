@@ -874,12 +874,15 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			 char *cmpbuf, stat_x *sxp, int itemizing,
 			 enum logcode code)
 {
-	char lnk[MAXPATHLEN];
 	int best_match = -1;
 	int match_level = 0;
 	enum nonregtype type;
 	uint32 *devp;
-	int len, j = 0;
+#ifdef SUPPORT_LINKS
+	char lnk[MAXPATHLEN];
+	int len;
+#endif
+	int j = 0;
 
 #ifndef SUPPORT_LINKS
 	if (S_ISLNK(file->mode))
@@ -919,11 +922,13 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			if (!IS_DEVICE(sxp->st.st_mode))
 				continue;
 			break;
-#ifdef SUPPORT_LINKS
 		case TYPE_SYMLINK:
+#ifdef SUPPORT_LINKS
 			if (!S_ISLNK(sxp->st.st_mode))
 				continue;
 			break;
+#else
+			return -1;
 #endif
 		}
 		if (match_level < 1) {
@@ -939,14 +944,16 @@ static int try_dests_non(struct file_struct *file, char *fname, int ndx,
 			if (sxp->st.st_rdev != MAKEDEV(DEV_MAJOR(devp), DEV_MINOR(devp)))
 				continue;
 			break;
-#ifdef SUPPORT_LINKS
 		case TYPE_SYMLINK:
+#ifdef SUPPORT_LINKS
 			if ((len = readlink(cmpbuf, lnk, MAXPATHLEN-1)) <= 0)
 				continue;
 			lnk[len] = '\0';
 			if (strcmp(lnk, F_SYMLINK(file)) != 0)
 				continue;
 			break;
+#else
+			return -1;
 #endif
 		}
 		if (match_level < 2) {

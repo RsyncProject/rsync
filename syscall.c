@@ -53,12 +53,14 @@ int do_unlink(const char *fname)
 	return unlink(fname);
 }
 
-int do_symlink(const char *fname1, const char *fname2)
+#ifdef SUPPORT_LINKS
+int do_symlink(const char *lnk, const char *fname)
 {
 	if (dry_run) return 0;
 	RETURN_ERROR_IF_RO_OR_LO;
-	return symlink(fname1, fname2);
+	return symlink(lnk, fname);
 }
+#endif
 
 #ifdef HAVE_LINK
 int do_link(const char *fname1, const char *fname2)
