@@ -173,6 +173,7 @@ void send_files(int f_in, int f_out)
 	int itemizing = am_server ? logfile_format_has_i : stdout_format_has_i;
 	enum logcode log_code = log_before_transfer ? FLOG : FINFO;
 	int f_xfer = write_batch < 0 ? batch_fd : f_out;
+	int save_io_error = io_error;
 	int ndx, j;
 
 	if (verbose > 2)
@@ -360,6 +361,9 @@ void send_files(int f_in, int f_out)
 	}
 	if (make_backups < 0)
 		make_backups = -make_backups;
+
+	if (io_error != save_io_error && protocol_version >= 30)
+		send_msg_int(MSG_IO_ERROR, io_error);
 
 	if (verbose > 2)
 		rprintf(FINFO, "send files finished\n");
