@@ -45,12 +45,12 @@ static void add_suffix(struct suffix_tree **prior, char ltr, const char *str)
 
 	if (ltr == '[') {
 		const char *after = strchr(str, ']');
-		/* Just skip bogus character classes. */
-		if (!after++)
+		/* Treat "[foo" and "[]" as having a literal '['. */
+		if (after && after++ != str+1) {
+			while ((ltr = *str++) != ']')
+				add_suffix(prior, ltr, after);
 			return;
-		while ((ltr = *str++) != ']')
-			add_suffix(prior, ltr, after);
-		return;
+		}
 	}
 
 	for (node = *prior; node; prior = &node->sibling, node = node->sibling) {
@@ -100,7 +100,6 @@ static void add_nocompress_suffixes(const char *str)
 		} while (*++f != '/' && *f);
 		*t++ = '\0';
 
-		fprintf(stderr, "adding `%s'\n", buf);
 		add_suffix(&suftree, *buf, buf+1);
 	}
 
