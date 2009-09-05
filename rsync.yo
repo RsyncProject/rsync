@@ -1723,7 +1723,7 @@ You may specify an empty string to indicate that no file should be skipped.
 
 Simple character-class matching is supported: each must consist of a list
 of letters inside the square brackets (e.g. no special classes, such as
-"[:alpha:]", are supported).
+"[:alpha:]", are supported, and '-' has no special meaning).
 
 The characters asterisk (*) and question-mark (?) have no special meaning.
 
@@ -1732,10 +1732,32 @@ matches 2 suffixes):
 
 verb(    --skip-compress=gz/jpg/mp[34]/7z/bz2)
 
-The default list of suffixes that will not be compressed is this (several
-of these are newly added for 3.0.0):
+The default list of suffixes that will not be compressed is this (in this
+version of rsync):
 
-verb(    gz/zip/z/rpm/deb/iso/bz2/t[gb]z/7z/mp[34]/mov/avi/ogg/jpg/jpeg)
+bf(7z)
+bf(ace)
+bf(avi)
+bf(bz2)
+bf(deb)
+bf(gpg)
+bf(gz)
+bf(iso)
+bf(jpeg)
+bf(jpg)
+bf(lzma)
+bf(lzo)
+bf(mov)
+bf(mp3)
+bf(mp4)
+bf(ogg)
+bf(rar)
+bf(rpm)
+bf(rzip)
+bf(tbz)
+bf(tgz)
+bf(z)
+bf(zip)
 
 This list will be replaced by your bf(--skip-compress) list in all but one
 situation: a copy from a daemon rsync will add your skipped suffixes to

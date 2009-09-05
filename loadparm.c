@@ -54,7 +54,8 @@ extern item_list dparam_list;
 #endif
 
 #define DEFAULT_DONT_COMPRESS "*.gz *.zip *.z *.rpm *.deb *.iso *.bz2" \
-	" *.t[gb]z *.7z *.mp[34] *.mov *.avi *.ogg *.jpg *.jpeg"
+	" *.t[gb]z *.7z *.mp[34] *.mov *.avi *.ogg *.jpg *.jpeg" \
+	" *.lzo *.rzip *.lzma *.rar *.ace *.gpg"
 
 /* the following are used by loadparm for option lists */
 typedef enum {
