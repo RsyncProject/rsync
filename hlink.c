@@ -377,9 +377,13 @@ int hard_link_check(struct file_struct *file, int ndx, char *fname,
 	}
 
 	if (link_stat(prev_name, &prev_st, 0) < 0) {
-		rsyserr(FERROR_XFER, errno, "stat %s failed",
-			full_fname(prev_name));
-		return -1;
+		if (!dry_run || errno != ENOENT) {
+			rsyserr(FERROR_XFER, errno, "stat %s failed", full_fname(prev_name));
+			return -1;
+		}
+		/* A new hard-link will get a new dev & inode, so approximate
+		 * those values in dry-run mode by zeroing them. */
+		memset(&prev_st, 0, sizeof prev_st);
 	}
 
 	if (statret < 0 && basis_dir[0] != NULL) {
