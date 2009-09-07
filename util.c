@@ -123,7 +123,7 @@ NORETURN void overflow_exit(const char *str)
 	exit_cleanup(RERR_MALLOC);
 }
 
-int set_modtime(const char *fname, time_t modtime, mode_t mode)
+int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
 {
 #ifndef CAN_SET_SYMLINK_TIMES
 	if (S_ISLNK(mode))
@@ -140,12 +140,21 @@ int set_modtime(const char *fname, time_t modtime, mode_t mode)
 		return 0;
 
 	{
-#if defined HAVE_UTIMES || defined HAVE_LUTIMES
+#ifdef HAVE_UTIMENSAT
+		struct timespec t[2];
+		t[0].tv_sec = 0;
+		t[0].tv_nsec = UTIME_NOW;
+		t[1].tv_sec = modtime;
+		t[1].tv_nsec = mod_nsec;
+		if (utimensat(AT_FDCWD, fname, t, AT_SYMLINK_NOFOLLOW) < 0)
+			return S_ISLNK(mode) && errno == ENOSYS ? 1 : -1;
+		return 0;
+#elif defined HAVE_UTIMES || defined HAVE_LUTIMES
 		struct timeval t[2];
 		t[0].tv_sec = time(NULL);
 		t[0].tv_usec = 0;
 		t[1].tv_sec = modtime;
-		t[1].tv_usec = 0;
+		t[1].tv_usec = mod_nsec / 1000;
 # ifdef HAVE_LUTIMES
 		if (lutimes(fname, t) < 0)
 			return S_ISLNK(mode) && errno == ENOSYS ? 1 : -1;

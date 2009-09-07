@@ -370,7 +370,18 @@ AC_TYPE_SIGNAL
 AC_TYPE_UID_T
 AC_CHECK_TYPES([mode_t,off_t,size_t,pid_t,id_t])
 AC_TYPE_GETGROUPS
-AC_CHECK_MEMBERS([struct stat.st_rdev])
+AC_CHECK_MEMBERS([struct stat.st_rdev,
+		  struct stat.st_mtimensec,
+		  struct stat.st_mtim.tv_nsec],,,[
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif])
 
 TYPE_SOCKLEN_T
 
@@ -563,7 +574,7 @@ AC_CHECK_FUNCS(waitpid wait4 getcwd strdup chown chmod lchmod mknod mkfifo \
     setlocale setmode open64 lseek64 mkstemp64 mtrace va_copy __va_copy \
     strerror putenv iconv_open locale_charset nl_langinfo getxattr \
     extattr_get_link sigaction sigprocmask setattrlist getgrouplist \
-    initgroups)
+    initgroups utimensat)
 
 dnl cygwin iconv.h defines iconv_open as libiconv_open
 if test x"$ac_cv_func_iconv_open" != x"yes"; then

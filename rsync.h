@@ -61,6 +61,7 @@
 #define XMIT_GROUP_NAME_FOLLOWS (1<<11) /* protocols 30 - now */
 #define XMIT_HLINK_FIRST (1<<12)	/* protocols 30 - now (HLINKED files only) */
 #define XMIT_IO_ERROR_ENDLIST (1<<12)	/* protocols 31 - now (w/XMIT_EXTENDED_FLAGS) */
+#define XMIT_MOD_NSEC (1<<13)		/* protocols 31 - now */
 
 /* These flags are used in the live flist data. */
 
@@ -80,6 +81,7 @@
 #define FLAG_LENGTH64 (1<<9)	/* sender/receiver/generator */
 #define FLAG_SKIP_GROUP (1<<10)	/* receiver/generator */
 #define FLAG_TIME_FAILED (1<<11)/* generator */
+#define FLAG_MOD_NSEC (1<<12)	/* sender/receiver/generator */
 
 /* These flags are passed to functions but not stored. */
 
@@ -96,7 +98,7 @@
 /* This is used when working on a new protocol version in CVS, and should
  * be a new non-zero value for each CVS change that affects the protocol.
  * It must ALWAYS be 0 when the protocol goes final (and NEVER before)! */
-#define SUBPROTOCOL_VERSION 6
+#define SUBPROTOCOL_VERSION 7
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
@@ -359,7 +361,7 @@ enum delret {
 #include <utime.h>
 #endif
 
-#ifdef HAVE_LUTIMES
+#if defined HAVE_UTIMENSAT || defined HAVE_LUTIMES
 #define CAN_SET_SYMLINK_TIMES 1
 #endif
 
@@ -674,7 +676,9 @@ extern int xattrs_ndx;
 #define REQ_EXTRA(f,ndx) ((union file_extras*)(f) - (ndx))
 #define OPT_EXTRA(f,bump) ((union file_extras*)(f) - file_extra_cnt - 1 - (bump))
 
+#define NSEC_BUMP(f) ((f)->flags & FLAG_MOD_NSEC ? 1 : 0)
 #define LEN64_BUMP(f) ((f)->flags & FLAG_LENGTH64 ? 1 : 0)
+#define START_BUMP(f) (NSEC_BUMP(f) + LEN64_BUMP(f))
 #define HLINK_BUMP(f) ((f)->flags & (FLAG_HLINKED|FLAG_HLINK_DONE) ? inc_recurse+1 : 0)
 #define ACL_BUMP(f) (acls_ndx ? 1 : 0)
 
@@ -685,6 +689,8 @@ extern int xattrs_ndx;
 #define F_LENGTH(f) ((int64)(f)->len32 + ((f)->flags & FLAG_LENGTH64 \
 		   ? (int64)OPT_EXTRA(f, 0)->unum << 32 : 0))
 #endif
+
+#define F_MOD_NSEC(f) ((f)->flags & FLAG_MOD_NSEC ? OPT_EXTRA(f, LEN64_BUMP(f))->unum : 0)
 
 /* If there is a symlink string, it is always right after the basename */
 #define F_SYMLINK(f) ((f)->basename + strlen((f)->basename) + 1)
@@ -703,22 +709,21 @@ extern int xattrs_ndx;
 #define F_NDX(f) REQ_EXTRA(f, unsort_ndx)->num
 
 /* These items are per-entry optional: */
-#define F_HL_GNUM(f) OPT_EXTRA(f, LEN64_BUMP(f))->num /* non-dirs */
-#define F_HL_PREV(f) OPT_EXTRA(f, LEN64_BUMP(f)+inc_recurse)->num /* non-dirs */
-#define F_DIR_NODE_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) \
+#define F_HL_GNUM(f) OPT_EXTRA(f, START_BUMP(f))->num /* non-dirs */
+#define F_HL_PREV(f) OPT_EXTRA(f, START_BUMP(f)+inc_recurse)->num /* non-dirs */
+#define F_DIR_NODE_P(f) (&OPT_EXTRA(f, START_BUMP(f) \
 				+ DIRNODE_EXTRA_CNT - 1)->num) /* sender dirs */
-#define F_DIR_RELNAMES_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) + DIRNODE_EXTRA_CNT \
+#define F_DIR_RELNAMES_P(f) (&OPT_EXTRA(f, START_BUMP(f) + DIRNODE_EXTRA_CNT \
 				+ PTR_EXTRA_CNT - 1)->num) /* sender dirs */
-#define F_DIR_DEFACL(f) OPT_EXTRA(f, LEN64_BUMP(f))->unum /* receiver dirs */
-#define F_DIR_DEV_P(f) (&OPT_EXTRA(f, LEN64_BUMP(f) + ACL_BUMP(f) \
+#define F_DIR_DEFACL(f) OPT_EXTRA(f, START_BUMP(f))->unum /* receiver dirs */
+#define F_DIR_DEV_P(f) (&OPT_EXTRA(f, START_BUMP(f) + ACL_BUMP(f) \
 				+ DEV_EXTRA_CNT - 1)->unum) /* receiver dirs */
 
-/* This optional item might follow an F_HL_*() item.
- * (Note: a device doesn't need to check LEN64_BUMP(f).) */
-#define F_RDEV_P(f) (&OPT_EXTRA(f, HLINK_BUMP(f) + DEV_EXTRA_CNT - 1)->unum)
+/* This optional item might follow an F_HL_*() item. */
+#define F_RDEV_P(f) (&OPT_EXTRA(f, START_BUMP(f) + HLINK_BUMP(f) + DEV_EXTRA_CNT - 1)->unum)
 
 /* The sum is only present on regular files. */
-#define F_SUM(f) ((char*)OPT_EXTRA(f, LEN64_BUMP(f) + HLINK_BUMP(f) \
+#define F_SUM(f) ((char*)OPT_EXTRA(f, START_BUMP(f) + HLINK_BUMP(f) \
 				    + SUM_EXTRA_CNT - 1))
 
 /* Some utility defines: */

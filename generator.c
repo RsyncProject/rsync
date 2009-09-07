@@ -1923,7 +1923,7 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 			STRUCT_STAT st;
 			if (link_stat(fname, &st, 0) == 0
 			 && cmp_time(st.st_mtime, file->modtime) != 0)
-				set_modtime(fname, file->modtime, file->mode);
+				set_modtime(fname, file->modtime, F_MOD_NSEC(file), file->mode);
 		}
 		if (counter >= loopchk_limit) {
 			if (allowed_lull)

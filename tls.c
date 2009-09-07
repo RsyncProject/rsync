@@ -48,9 +48,18 @@ int read_only = 1;
 int list_only = 0;
 int link_times = 0;
 int link_owner = 0;
+int nsec_times = 0;
 int preserve_perms = 0;
 int preserve_executability = 0;
 char number_separator;
+
+#ifdef HAVE_UTIMENSAT
+#ifdef HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC
+#define ST_MTIME_NSEC st_mtim.tv_nsec
+#elif defined(HAVE_STRUCT_STAT_ST_MTIMENSEC)
+#define ST_MTIME_NSEC st_mtimensec
+#endif
+#endif
 
 #ifdef SUPPORT_XATTRS
 
@@ -161,9 +170,10 @@ static void list_file(const char *fname)
 	permstring(permbuf, buf.st_mode);
 
 	if (buf.st_mtime) {
+		int len;
 		mt = gmtime(&buf.st_mtime);
 
-		snprintf(datebuf, sizeof datebuf,
+		len = snprintf(datebuf, sizeof datebuf,
 			"%04d-%02d-%02d %02d:%02d:%02d",
 			(int)mt->tm_year + 1900,
 			(int)mt->tm_mon + 1,
@@ -171,8 +181,17 @@ static void list_file(const char *fname)
 			(int)mt->tm_hour,
 			(int)mt->tm_min,
 			(int)mt->tm_sec);
-	} else
-		strlcpy(datebuf, "                   ", sizeof datebuf);
+#ifdef ST_MTIME_NSEC
+		if (nsec_times) {
+			snprintf(datebuf + len, sizeof datebuf - len,
+				".%09d", (int)buf.ST_MTIME_NSEC);
+		}
+#endif
+	} else {
+		int len = MIN(19 + 9*nsec_times, (int)sizeof datebuf - 1);
+		memset(datebuf, ' ', len);
+		datebuf[len] = '\0';
+	}
 
 	/* TODO: Perhaps escape special characters in fname? */
 
@@ -194,6 +213,9 @@ static struct poptOption long_options[] = {
   {"link-owner",      'L', POPT_ARG_NONE,   &link_owner, 0, 0, 0 },
 #ifdef SUPPORT_XATTRS
   {"fake-super",      'f', POPT_ARG_VAL,    &am_root, -1, 0, 0 },
+#endif
+#ifdef ST_MTIME_NSEC
+  {"nsec",            's', POPT_ARG_NONE,   &nsec_times, 0, 0, 0 },
 #endif
   {"help",            'h', POPT_ARG_NONE,   0, 'h', 0, 0 },
   {0,0,0,0,0,0,0}
