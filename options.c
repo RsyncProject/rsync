@@ -1930,7 +1930,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	}
 	if (!xfer_dirs && delete_mode) {
 		snprintf(err_buf, sizeof err_buf,
-			"--delete does not work without -r or -d.\n");
+			"--delete does not work without --recursive (-r) or --dirs (-d).\n");
 		return 0;
 	}
 
