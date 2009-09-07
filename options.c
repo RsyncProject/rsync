@@ -596,7 +596,7 @@ static void print_rsync_version(enum logcode f)
 #ifdef ICONV_OPTION
 	iconv = "";
 #endif
-#if defined HAVE_LUTIMES && defined HAVE_UTIMES
+#ifdef CAN_SET_SYMLINK_TIMES
 	symtimes = "";
 #endif
 
@@ -2358,7 +2358,7 @@ void server_options(char **args, int *argc_p)
 			argstr[x++] = '.';
 		if (allow_inc_recurse)
 			argstr[x++] = 'i';
-#if defined HAVE_LUTIMES && defined HAVE_UTIMES
+#ifdef CAN_SET_SYMLINK_TIMES
 		argstr[x++] = 'L';
 #endif
 #ifdef ICONV_OPTION

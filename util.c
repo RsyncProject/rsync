@@ -125,7 +125,7 @@ NORETURN void overflow_exit(const char *str)
 
 int set_modtime(const char *fname, time_t modtime, mode_t mode)
 {
-#if !defined HAVE_LUTIMES || !defined HAVE_UTIMES
+#ifndef CAN_SET_SYMLINK_TIMES
 	if (S_ISLNK(mode))
 		return 1;
 #endif
@@ -140,20 +140,19 @@ int set_modtime(const char *fname, time_t modtime, mode_t mode)
 		return 0;
 
 	{
-#ifdef HAVE_UTIMES
+#if defined HAVE_UTIMES || defined HAVE_LUTIMES
 		struct timeval t[2];
 		t[0].tv_sec = time(NULL);
 		t[0].tv_usec = 0;
 		t[1].tv_sec = modtime;
 		t[1].tv_usec = 0;
 # ifdef HAVE_LUTIMES
-		if (S_ISLNK(mode)) {
-			if (lutimes(fname, t) < 0)
-				return errno == ENOSYS ? 1 : -1;
-			return 0;
-		}
-# endif
+		if (lutimes(fname, t) < 0)
+			return S_ISLNK(mode) && errno == ENOSYS ? 1 : -1;
+		return 0;
+# else
 		return utimes(fname, t);
+# endif
 #elif defined HAVE_STRUCT_UTIMBUF
 		struct utimbuf tbuf;
 		tbuf.actime = time(NULL);

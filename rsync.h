@@ -359,6 +359,10 @@ enum delret {
 #include <utime.h>
 #endif
 
+#ifdef HAVE_LUTIMES
+#define CAN_SET_SYMLINK_TIMES 1
+#endif
+
 #ifdef HAVE_SYS_SELECT_H
 #include <sys/select.h>
 #endif

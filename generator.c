@@ -392,7 +392,7 @@ static void do_delete_pass(void)
 
 int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 {
-#if !defined HAVE_LUTIMES || !defined HAVE_UTIMES
+#ifndef CAN_SET_SYMLINK_TIMES
 	if (S_ISLNK(file->mode)) {
 		;
 	} else
@@ -440,7 +440,7 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 	if (statret >= 0) { /* A from-dest-dir statret can == 1! */
 		int keep_time = !preserve_times ? 0
 		    : S_ISDIR(file->mode) ? preserve_times > 1 :
-#if defined HAVE_LUTIMES && defined HAVE_UTIMES
+#ifdef CAN_SET_SYMLINK_TIMES
 		    1;
 #else
 		    !S_ISLNK(file->mode);
