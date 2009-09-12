@@ -674,8 +674,7 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 		stats.total_size += F_LENGTH(file);
 }
 
-static struct file_struct *recv_file_entry(struct file_list *flist,
-					   int xflags, int f)
+static struct file_struct *recv_file_entry(int f, struct file_list *flist, int xflags)
 {
 	static int64 modtime;
 	static mode_t mode;
@@ -1116,11 +1115,11 @@ static struct file_struct *recv_file_entry(struct file_list *flist,
 
 #ifdef SUPPORT_ACLS
 	if (preserve_acls && !S_ISLNK(mode))
-		receive_acl(file, f);
+		receive_acl(f, file);
 #endif
 #ifdef SUPPORT_XATTRS
 	if (preserve_xattrs)
-		receive_xattr(file, f );
+		receive_xattr(f, file);
 #endif
 
 	if (S_ISREG(mode) || S_ISLNK(mode))
@@ -1531,13 +1530,13 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 
 #ifdef SUPPORT_ACLS
 		if (preserve_acls && !S_ISLNK(file->mode)) {
-			send_acl(&sx, f);
+			send_acl(f, &sx);
 			free_acl(&sx);
 		}
 #endif
 #ifdef SUPPORT_XATTRS
 		if (preserve_xattrs) {
-			F_XATTR(file) = send_xattr(&sx, f);
+			F_XATTR(file) = send_xattr(f, &sx);
 			free_xattr(&sx);
 		}
 #endif
@@ -2441,7 +2440,7 @@ struct file_list *recv_file_list(int f)
 		}
 
 		flist_expand(flist, 1);
-		file = recv_file_entry(flist, flags, f);
+		file = recv_file_entry(f, flist, flags);
 
 		if (S_ISREG(file->mode)) {
 			/* Already counted */
