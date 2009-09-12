@@ -135,16 +135,21 @@ static int rsync_acl_get_perms(const rsync_acl *racl)
 
 /* Removes the permission-bit entries from the ACL because these
  * can be reconstructed from the file's mode. */
-static void rsync_acl_strip_perms(rsync_acl *racl)
+static void rsync_acl_strip_perms(stat_x *sxp)
 {
+	rsync_acl *racl = sxp->acc_acl;
+
 	racl->user_obj = NO_ENTRY;
 	if (racl->mask_obj == NO_ENTRY)
 		racl->group_obj = NO_ENTRY;
 	else {
-		if (racl->group_obj == racl->mask_obj)
+		int group_perms = (sxp->st.st_mode >> 3) & 7;
+		if (racl->group_obj == group_perms)
 			racl->group_obj = NO_ENTRY;
-		if (racl->names.count != 0)
+#ifndef HAVE_SOLARIS_ACLS
+		if (racl->names.count != 0 && racl->mask_obj == group_perms)
 			racl->mask_obj = NO_ENTRY;
+#endif
 	}
 	racl->other_obj = NO_ENTRY;
 }
@@ -342,15 +347,6 @@ static BOOL unpack_smb_acl(SMB_ACL_T sacl, rsync_acl *racl)
 
 	/* Truncate the temporary list now that its idas have been saved. */
 	temp_ida_list.count = 0;
-
-#ifdef ACLS_NEED_MASK
-	if (!racl->names.count && racl->mask_obj != NO_ENTRY) {
-		/* Throw away a superfluous mask, but mask off the
-		 * group perms with it first. */
-		racl->group_obj &= racl->mask_obj;
-		racl->mask_obj = NO_ENTRY;
-	}
-#endif
 
 	return True;
 }
@@ -658,7 +654,7 @@ void send_acl(int f, stat_x *sxp)
 		rsync_acl_fake_perms(sxp->acc_acl, sxp->st.st_mode);
 	}
 	/* Avoid sending values that can be inferred from other data. */
-	rsync_acl_strip_perms(sxp->acc_acl);
+	rsync_acl_strip_perms(sxp);
 
 	send_rsync_acl(f, sxp->acc_acl, SMB_ACL_TYPE_ACCESS, &access_acl_list);
 
@@ -736,7 +732,7 @@ static uchar recv_ida_entries(int f, ida_entries *ent)
 	return computed_mask_bits & ~NO_ENTRY;
 }
 
-static int recv_rsync_acl(int f, item_list *racl_list, SMB_ACL_TYPE_T type)
+static int recv_rsync_acl(int f, item_list *racl_list, SMB_ACL_TYPE_T type, mode_t mode)
 {
 	uchar computed_mask_bits = 0;
 	acl_duo *duo_item;
@@ -773,8 +769,14 @@ static int recv_rsync_acl(int f, item_list *racl_list, SMB_ACL_TYPE_T type)
 	/* If we received a superfluous mask, throw it away. */
 	duo_item->racl.mask_obj = NO_ENTRY;
 #else
-	if (duo_item->racl.names.count && duo_item->racl.mask_obj == NO_ENTRY) /* Must be non-empty with lists. */
-		duo_item->racl.mask_obj = (computed_mask_bits | duo_item->racl.group_obj) & ~NO_ENTRY;
+	if (duo_item->racl.names.count && duo_item->racl.mask_obj == NO_ENTRY) {
+		/* Mask must be non-empty with lists. */
+		if (type == SMB_ACL_TYPE_ACCESS)
+			computed_mask_bits = (mode >> 3) & 7;
+		else
+			computed_mask_bits |= duo_item->racl.group_obj & ~NO_ENTRY;
+		duo_item->racl.mask_obj = computed_mask_bits;
+	}
 #endif
 
 	duo_item->sacl = NULL;
@@ -785,10 +787,10 @@ static int recv_rsync_acl(int f, item_list *racl_list, SMB_ACL_TYPE_T type)
 /* Receive the ACL info the sender has included for this file-list entry. */
 void receive_acl(int f, struct file_struct *file)
 {
-	F_ACL(file) = recv_rsync_acl(f, &access_acl_list, SMB_ACL_TYPE_ACCESS);
+	F_ACL(file) = recv_rsync_acl(f, &access_acl_list, SMB_ACL_TYPE_ACCESS, file->mode);
 
 	if (S_ISDIR(file->mode))
-		F_DIR_DEFACL(file) = recv_rsync_acl(f, &default_acl_list, SMB_ACL_TYPE_DEFAULT);
+		F_DIR_DEFACL(file) = recv_rsync_acl(f, &default_acl_list, SMB_ACL_TYPE_DEFAULT, 0);
 }
 
 static int cache_rsync_acl(rsync_acl *racl, SMB_ACL_TYPE_T type, item_list *racl_list)
@@ -900,12 +902,14 @@ static mode_t change_sacl_perms(SMB_ACL_T sacl, rsync_acl *racl, mode_t old_mode
 			COE2( store_access_in_entry,((mode >> 3) & 7, entry) );
 			break;
 		case SMB_ACL_MASK:
+#ifndef HAVE_SOLARIS_ACLS
 #ifndef ACLS_NEED_MASK
 			/* mask is only empty when we don't need it. */
 			if (racl->mask_obj == NO_ENTRY)
 				break;
 #endif
 			COE2( store_access_in_entry,((mode >> 3) & 7, entry) );
+#endif
 			break;
 		case SMB_ACL_OTHER:
 			COE2( store_access_in_entry,(mode & 7, entry) );
