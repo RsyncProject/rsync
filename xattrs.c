@@ -406,7 +406,7 @@ static void rsync_xal_store(item_list *xalp)
 }
 
 /* Send the make_xattr()-generated xattr list for this flist entry. */
-int send_xattr(stat_x *sxp, int f)
+int send_xattr(int f, stat_x *sxp)
 {
 	int ndx = find_matching_xattr(sxp->xattr);
 
@@ -648,7 +648,7 @@ int recv_xattr_request(struct file_struct *file, int f_in)
 /* ------------------------------------------------------------------------- */
 
 /* receive and build the rsync_xattr_lists */
-void receive_xattr(struct file_struct *file, int f)
+void receive_xattr(int f, struct file_struct *file)
 {
 	static item_list temp_xattr = EMPTY_ITEM_LIST;
 	int count, num;
