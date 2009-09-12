@@ -751,7 +751,7 @@ static int recv_rsync_acl(int f, item_list *racl_list, SMB_ACL_TYPE_T type)
 
 	if (ndx != 0)
 		return ndx - 1;
-	
+
 	ndx = racl_list->count;
 	duo_item = EXPAND_ITEM_LIST(racl_list, acl_duo, 1000);
 	duo_item->racl = empty_rsync_acl;
@@ -1003,17 +1003,17 @@ static int set_rsync_acl(const char *fname, acl_duo *duo_item,
 	return 0;
 }
 
-/* Set ACL on indicated filename.
+/* Given a fname, this sets extended access ACL entries, the default ACL (for a
+ * dir), and the regular mode bits on the file.  Call this with fname set to
+ * NULL to just check if the ACL is different.
  *
- * This sets extended access ACL entries and default ACL.  If convenient,
- * it sets permission bits along with the access ACL and signals having
- * done so by modifying sxp->st.st_mode.
+ * If the ACL operation has a side-effect of changing the file's mode, the
+ * sxp->st.st_mode value will be changed to match.
  *
- * Returns 1 for unchanged, 0 for changed, -1 for failed.  Call this
- * with fname set to NULL to just check if the ACL is unchanged. */
-int set_acl(const char *fname, const struct file_struct *file, stat_x *sxp)
+ * Returns 0 for an unchanged ACL, 1 for changed, -1 for failed. */
+int set_acl(const char *fname, const struct file_struct *file, stat_x *sxp, mode_t new_mode)
 {
-	int unchanged = 1;
+	int changed = 0;
 	int32 ndx;
 	BOOL eq;
 
@@ -1027,18 +1027,18 @@ int set_acl(const char *fname, const struct file_struct *file, stat_x *sxp)
 		acl_duo *duo_item = access_acl_list.items;
 		duo_item += ndx;
 		eq = sxp->acc_acl
-		  && rsync_acl_equal_enough(sxp->acc_acl, &duo_item->racl, file->mode);
+		  && rsync_acl_equal_enough(sxp->acc_acl, &duo_item->racl, new_mode);
 		if (!eq) {
-			unchanged = 0;
+			changed = 1;
 			if (!dry_run && fname
 			 && set_rsync_acl(fname, duo_item, SMB_ACL_TYPE_ACCESS,
-					  sxp, file->mode) < 0)
-				unchanged = -1;
+					  sxp, new_mode) < 0)
+				return -1;
 		}
 	}
 
-	if (!S_ISDIR(sxp->st.st_mode))
-		return unchanged;
+	if (!S_ISDIR(new_mode))
+		return changed;
 
 	ndx = F_DIR_DEFACL(file);
 	if (ndx >= 0 && (size_t)ndx < default_acl_list.count) {
@@ -1046,16 +1046,15 @@ int set_acl(const char *fname, const struct file_struct *file, stat_x *sxp)
 		duo_item += ndx;
 		eq = sxp->def_acl && rsync_acl_equal(sxp->def_acl, &duo_item->racl);
 		if (!eq) {
-			if (unchanged > 0)
-				unchanged = 0;
+			changed = 1;
 			if (!dry_run && fname
 			 && set_rsync_acl(fname, duo_item, SMB_ACL_TYPE_DEFAULT,
-					  sxp, file->mode) < 0)
-				unchanged = -1;
+					  sxp, new_mode) < 0)
+				return -1;
 		}
 	}
 
-	return unchanged;
+	return changed;
 }
 
 /* Non-incremental recursion needs to convert all the received IDs.

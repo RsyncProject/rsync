@@ -591,7 +591,7 @@ int unchanged_attrs(const char *fname, struct file_struct *file, stat_x *sxp)
 	if (preserve_acls && !S_ISLNK(file->mode)) {
 		if (!ACL_READY(*sxp))
 			get_acl(fname, sxp);
-		if (set_acl(NULL, file, sxp) == 0)
+		if (set_acl(NULL, file, sxp, file->mode))
 			return 0;
 	}
 #endif
@@ -650,7 +650,7 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 		if (preserve_acls && !S_ISLNK(file->mode)) {
 			if (!ACL_READY(*sxp))
 				get_acl(fnamecmp, sxp);
-			if (set_acl(NULL, file, sxp) == 0)
+			if (set_acl(NULL, file, sxp, file->mode))
 				iflags |= ITEM_REPORT_ACL;
 		}
 #endif
