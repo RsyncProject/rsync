@@ -497,8 +497,10 @@ int set_file_attrs(const char *fname, struct file_struct *file, stat_x *sxp,
 	 * If set_acl() changes permission bits in the process of setting
 	 * an access ACL, it changes sxp->st.st_mode so we know whether we
 	 * need to chmod(). */
-	if (preserve_acls && !S_ISLNK(new_mode) && set_acl(fname, file, sxp) == 0)
-		updated = 1;
+	if (preserve_acls && !S_ISLNK(new_mode)) {
+		if (set_acl(fname, file, sxp, new_mode) > 0)
+			updated = 1;
+	}
 #endif
 
 #ifdef HAVE_CHMOD
