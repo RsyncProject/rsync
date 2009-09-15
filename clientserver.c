@@ -339,7 +339,7 @@ int start_inband_exchange(int f_in, int f_out, const char *user, int argc, char 
 
 	if (protocol_version < 23) {
 		if (protocol_version == 22 || !am_sender)
-			io_start_multiplex_in();
+			io_start_multiplex_in(f_in);
 	}
 
 	free(modname);
@@ -885,7 +885,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 
 	if (protocol_version < 23
 	    && (protocol_version == 22 || am_sender))
-		io_start_multiplex_out();
+		io_start_multiplex_out(f_out);
 	else if (!ret || err_msg) {
 		/* We have to get I/O multiplexing started so that we can
 		 * get the error back to the client.  This means getting
@@ -909,7 +909,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 			if (files_from)
 				write_byte(f_out, 0);
 		}
-		io_start_multiplex_out();
+		io_start_multiplex_out(f_out);
 	}
 
 	if (!ret || err_msg) {

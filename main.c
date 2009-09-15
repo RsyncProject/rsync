@@ -847,7 +847,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 
 		/* set place to send errors */
 		set_msg_fd_out(error_pipe[1]);
-		io_start_buffering_out(error_pipe[1]);
+		io_start_multiplex_out(error_pipe[1]);
 
 		recv_files(f_in, local_name);
 		io_flush(FULL_FLUSH);
@@ -895,7 +895,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	io_start_buffering_out(f_out);
 
 	set_msg_fd_in(error_pipe[0]);
-	io_start_buffering_in(error_pipe[0]);
+	io_start_multiplex_in(error_pipe[0]);
 
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && inc_recurse) {
@@ -959,7 +959,7 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 	}
 
 	if (protocol_version >= 30)
-		io_start_multiplex_in();
+		io_start_multiplex_in(f_in);
 	else
 		io_start_buffering_in(f_in);
 	recv_filter_list(f_in);
@@ -1040,12 +1040,12 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 	setup_protocol(f_out, f_in);
 
 	if (protocol_version >= 23)
-		io_start_multiplex_out();
+		io_start_multiplex_out(f_out);
 
 	if (am_sender) {
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
 		if (need_messages_from_generator)
-			io_start_multiplex_in();
+			io_start_multiplex_in(f_in);
 		recv_filter_list(f_in);
 		do_server_sender(f_in, f_out, argc, argv);
 	} else
@@ -1092,7 +1092,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			sender_keeps_checksum = 1;
 
 		if (protocol_version >= 30)
-			io_start_multiplex_out();
+			io_start_multiplex_out(f_out);
 		else
 			io_start_buffering_out(f_out);
 		if (!filesfrom_host)
@@ -1108,7 +1108,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			rprintf(FINFO,"file list sent\n");
 
 		if (protocol_version >= 23)
-			io_start_multiplex_in();
+			io_start_multiplex_in(f_in);
 
 		io_flush(NORMAL_FLUSH);
 		send_files(f_in, f_out);
@@ -1129,9 +1129,9 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 	if (!read_batch) {
 		if (protocol_version >= 23)
-			io_start_multiplex_in();
+			io_start_multiplex_in(f_in);
 		if (need_messages_from_generator)
-			io_start_multiplex_out();
+			io_start_multiplex_out(f_out);
 	}
 
 	send_filter_list(read_batch ? -1 : f_out);
