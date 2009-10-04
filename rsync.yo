@@ -881,6 +881,17 @@ bf(--force) or bf(--delete) is in effect).
 See also bf(--keep-dirlinks) for an analogous option for the receiving
 side.
 
+bf(--copy-dirlinks) applies to all symlinks to directories in the source.  If
+you want to follow only a few specified symlinks, a trick you can use is to
+pass them as additional source args with a trailing slash, using bf(--relative)
+to make the paths match up right.  For example:
+
+quote(tt(rsync -r --relative src/./ src/./follow-me/ dest/))
+
+This works because rsync calls bf(lstat)(2) on the source arg as given, and the
+trailing slash makes bf(lstat)(2) follow the symlink, giving rise to a directory
+in the file-list which overrides the symlink found during the scan of "src/./".
+
 dit(bf(-K, --keep-dirlinks)) This option causes the receiving side to treat
 a symlink to a directory as though it were a real directory, but only if it
 matches a real directory from the sender.  Without this option, the
