@@ -629,13 +629,13 @@ static int read_timeout(int fd, char *buf, size_t len)
 		if (n <= 0) {
 			if (n == 0)
 				whine_about_eof(fd); /* Doesn't return. */
-			if (errno == EINTR || errno == EWOULDBLOCK
-			    || errno == EAGAIN)
+			if (errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN)
 				continue;
 
 			/* Don't write errors on a dead socket. */
 			if (fd == sock_f_in) {
-				io_end_multiplex_out();
+				if (am_sender)
+					io_multiplexing_out = 0;
 				rsyserr(FERROR_SOCKET, errno, "read error");
 			} else
 				rsyserr(FERROR, errno, "read error");
@@ -1026,7 +1026,7 @@ static void read_a_msg(int fd)
 		if (!am_generator)
 			goto invalid_msg;
 		if (tag == MSG_ERROR_SOCKET)
-			io_end_multiplex_out();
+			io_multiplexing_out = 0;
 		/* FALL THROUGH */
 	case MSG_INFO:
 	case MSG_ERROR:
@@ -1467,7 +1467,7 @@ static void writefd_unbuffered(int fd, const char *buf, size_t len)
 
 			/* Don't try to write errors back across the stream. */
 			if (fd == sock_f_out)
-				io_end_multiplex_out();
+				io_multiplexing_out = 0;
 			/* Don't try to write errors down a failing msg pipe. */
 			if (am_server && fd == msg_fd_out)
 				exit_cleanup(RERR_STREAMIO);

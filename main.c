@@ -63,6 +63,8 @@ extern int whole_file;
 extern int read_batch;
 extern int write_batch;
 extern int batch_fd;
+extern int sock_f_in;
+extern int sock_f_out;
 extern int filesfrom_fd;
 extern int connect_timeout;
 extern pid_t cleanup_child_pid;
@@ -841,6 +843,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		close(error_pipe[0]);
 		if (f_in != f_out)
 			close(f_out);
+		sock_f_out = -1;
 
 		/* we can't let two processes write to the socket at one time */
 		io_end_multiplex_out();
@@ -891,6 +894,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	close(error_pipe[1]);
 	if (f_in != f_out)
 		close(f_in);
+	sock_f_in = -1;
 
 	io_start_buffering_out(f_out);
 
