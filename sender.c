@@ -32,6 +32,7 @@ extern int logfile_format_has_i;
 extern int csum_length;
 extern int append_mode;
 extern int io_error;
+extern int flist_eof;
 extern int allowed_lull;
 extern int preserve_xattrs;
 extern int protocol_version;
@@ -43,6 +44,8 @@ extern int batch_fd;
 extern int write_batch;
 extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
+
+BOOL extra_flist_sending_enabled;
 
 /**
  * @file
@@ -179,12 +182,16 @@ void send_files(int f_in, int f_out)
 		rprintf(FINFO, "send_files starting\n");
 
 	while (1) {
-		if (inc_recurse)
+		if (inc_recurse) {
 			send_extra_file_list(f_out, MIN_FILECNT_LOOKAHEAD);
+			extra_flist_sending_enabled = !flist_eof;
+		}
 
 		/* This call also sets cur_flist. */
 		ndx = read_ndx_and_attrs(f_in, &iflags, &fnamecmp_type,
 					 xname, &xlen);
+		extra_flist_sending_enabled = False;
+
 		if (ndx == NDX_DONE) {
 			if (!am_server && INFO_GTE(PROGRESS, 2) && cur_flist) {
 				set_current_file_index(NULL, 0);

@@ -54,6 +54,7 @@ extern int checksum_seed;
 extern int protocol_version;
 extern int remove_source_files;
 extern int preserve_hard_links;
+extern BOOL extra_flist_sending_enabled;
 extern struct stats stats;
 extern struct file_list *cur_flist;
 #ifdef ICONV_OPTION
@@ -520,11 +521,15 @@ static int read_timeout(int fd, char *buf, size_t len)
 				maxfd = new_fd;
 		}
 
-		if (am_sender && inc_recurse && !flist_eof && !defer_forwarding_messages && !cnt
-		 && file_total - file_old_total < MAX_FILECNT_LOOKAHEAD
-		 && file_total - file_old_total >= MIN_FILECNT_LOOKAHEAD)
-			tv.tv_sec = 0;
-		else
+		if (extra_flist_sending_enabled && !defer_forwarding_messages) {
+			if (file_total - file_old_total < MAX_FILECNT_LOOKAHEAD
+			 && file_total - file_old_total >= MIN_FILECNT_LOOKAHEAD)
+				tv.tv_sec = 0;
+			else {
+				extra_flist_sending_enabled = False;
+				tv.tv_sec = select_timeout;
+			}
+		} else
 			tv.tv_sec = select_timeout;
 		tv.tv_usec = 0;
 
@@ -537,9 +542,11 @@ static int read_timeout(int fd, char *buf, size_t len)
 				defer_forwarding_messages = 0;
 				exit_cleanup(RERR_SOCKETIO);
 			}
-			if (am_sender && tv.tv_sec == 0)
+			if (extra_flist_sending_enabled && !defer_forwarding_messages) {
+				extra_flist_sending_enabled = False;
 				send_extra_file_list(sock_f_out, -1);
-			else
+				extra_flist_sending_enabled = !flist_eof;
+			} else
 				check_timeout();
 			continue;
 		}
