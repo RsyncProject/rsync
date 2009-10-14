@@ -38,22 +38,22 @@ static void md5_process(md_context *ctx, const uchar data[CSUM_CHUNK])
 	C = ctx->C;
 	D = ctx->D;
 
-	X[0] = IVAL(data, 0);
-	X[1] = IVAL(data, 4);
-	X[2] = IVAL(data, 8);
-	X[3] = IVAL(data, 12);
-	X[4] = IVAL(data, 16);
-	X[5] = IVAL(data, 20);
-	X[6] = IVAL(data, 24);
-	X[7] = IVAL(data, 28);
-	X[8] = IVAL(data, 32);
-	X[9] = IVAL(data, 36);
-	X[10] = IVAL(data, 40);
-	X[11] = IVAL(data, 44);
-	X[12] = IVAL(data, 48);
-	X[13] = IVAL(data, 52);
-	X[14] = IVAL(data, 56);
-	X[15] = IVAL(data, 60);
+	X[0] = IVALu(data, 0);
+	X[1] = IVALu(data, 4);
+	X[2] = IVALu(data, 8);
+	X[3] = IVALu(data, 12);
+	X[4] = IVALu(data, 16);
+	X[5] = IVALu(data, 20);
+	X[6] = IVALu(data, 24);
+	X[7] = IVALu(data, 28);
+	X[8] = IVALu(data, 32);
+	X[9] = IVALu(data, 36);
+	X[10] = IVALu(data, 40);
+	X[11] = IVALu(data, 44);
+	X[12] = IVALu(data, 48);
+	X[13] = IVALu(data, 52);
+	X[14] = IVALu(data, 56);
+	X[15] = IVALu(data, 60);
 
 #define S(x,n) ((x << n) | ((x & 0xFFFFFFFF) >> (32 - n)))
 
@@ -192,8 +192,8 @@ void md5_result(md_context *ctx, uchar digest[MD5_DIGEST_LEN])
 	     | (ctx->totalN2 <<  3);
 	low  = (ctx->totalN <<  3);
 
-	SIVAL(msglen, 0, low);
-	SIVAL(msglen, 4, high);
+	SIVALu(msglen, 0, low);
+	SIVALu(msglen, 4, high);
 
 	last = ctx->totalN & 0x3F;
 	padn = last < 56 ? 56 - last : 120 - last;
@@ -201,10 +201,10 @@ void md5_result(md_context *ctx, uchar digest[MD5_DIGEST_LEN])
 	md5_update(ctx, md5_padding, padn);
 	md5_update(ctx, msglen, 8);
 
-	SIVAL(digest, 0, ctx->A);
-	SIVAL(digest, 4, ctx->B);
-	SIVAL(digest, 8, ctx->C);
-	SIVAL(digest, 12, ctx->D);
+	SIVALu(digest, 0, ctx->A);
+	SIVALu(digest, 4, ctx->B);
+	SIVALu(digest, 8, ctx->C);
+	SIVALu(digest, 12, ctx->D);
 }
 
 void get_md5(uchar *out, const uchar *input, int n)

@@ -87,7 +87,7 @@ void *hashtable_find(struct hashtable *tbl, int64 key, int allocate_if_missing)
 		uchar buf[4], *keyp = buf;
 		int i;
 
-		SIVAL(buf, 0, key);
+		SIVALu(buf, 0, key);
 		for (ndx = 0, i = 0; i < 4; i++) {
 			ndx += keyp[i];
 			ndx += (ndx << 10);
