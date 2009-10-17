@@ -78,6 +78,18 @@ You may also include any module parameters in the global part of the
 config file in which case the supplied value will override the
 default for that parameter.
 
+You may use references to environment variables in the values of parameters.
+String parameters will have %VAR% references expanded as late as possible (when
+the string is used in the program), allowing for the use of variables that
+rsync sets at connection time, such as RSYNC_USER_NAME.  Non-string parameters
+(such as true/false settings) are expanded when read from the config file.  If
+a variable does not exist in the environment, or if a sequence of characters is
+not a valid reference (such as an un-paired percent sign), the raw characters
+are passed through unchanged.  This helps with backward compatibility and
+safety (e.g. expanding a non-existent %VAR% to an empty string in a path could
+result in a very unsafe path).  Anyone that needs to insert a literal % string
+into a value should use %%.
+
 startdit()
 dit(bf(motd file)) This parameter allows you to specify a
 "message of the day" to display to clients on each connect. This
@@ -121,6 +133,9 @@ name contains whitespace, each internal sequence of whitespace will be
 changed into a single space, while leading or trailing whitespace will be
 discarded.
 
+As with GLOBAL PARAMETERS, you may use references to environment variables in
+the values of parameters.  See the GLOBAL PARAMETERS section for more details.
+
 startdit()
 
 dit(bf(comment)) This parameter specifies a description string
@@ -129,7 +144,12 @@ of available modules. The default is no comment.
 
 dit(bf(path)) This parameter specifies the directory in the daemon's
 filesystem to make available in this module.  You must specify this parameter
-for each module in tt(rsyncd.conf).
+for each module in tt(rsyncd.conf).  You may base the path's value off
+of an environment variable, even one that is set by rsync when the user
+connects.  For example, this would use the authorizing user's name in the
+path:
+
+verb(    path = /home/%RSYNC_USER_NAME% )
 
 dit(bf(use chroot)) If "use chroot" is true, the rsync daemon will chroot
 to the "path" before starting the file transfer with the client.  This has
@@ -319,6 +339,13 @@ was run as root. In combination with the "gid" parameter this determines what
 file permissions are available. The default when run by a super-user is to
 switch to the system's "nobody" user.  The default for a non-super-user is to
 not try to change the user.  See also the "gid" parameter.
+
+The RSYNC_USER_NAME environment variable may be used to request that rsync run
+as the authorizing user.  For example, if you want a rsync to run as the same
+user that was received for the rsync authentication, this setup is useful:
+
+verb(    uid = %RSYNC_USER_NAME%
+    gid = * )
 
 dit(bf(gid)) This parameter specifies one or more group names/IDs that will be
 used when accessing the module.  The first one will be the default group, and

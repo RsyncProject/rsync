@@ -366,11 +366,61 @@ static void reset_all_vars(void)
 	memcpy(&Vars, &Defaults, sizeof Vars);
 }
 
+/* Expand %VAR% references.  Any unknown vars or unrecognized
+ * syntax leaves the raw chars unchanged. */
+static char *expand_vars(char *str)
+{
+	char *buf, *t, *f;
+	int bufsize;
+
+	if (strchr(str, '%') == NULL)
+		return str;
+
+	bufsize = strlen(str) + 2048;
+	if ((buf = new_array(char, bufsize+1)) == NULL) /* +1 for trailing '\0' */
+		out_of_memory("expand_vars");
+
+	for (t = buf, f = str; bufsize && *f; ) {
+		if (*f == '%' && *++f != '%') {
+			char *percent = strchr(f, '%');
+			if (percent) {
+				char *val;
+				*percent = '\0';
+				val = getenv(f);
+				*percent = '%';
+				if (val) {
+					int len = strlcpy(t, val, bufsize+1);
+					if (len > bufsize)
+						break;
+					bufsize -= len;
+					t += len;
+					f = percent + 1;
+					continue;
+				}
+			}
+			f--;
+		}
+		*t++ = *f++;
+		bufsize--;
+	}
+	*t = '\0';
+
+	if (*f) {
+		rprintf(FLOG, "Overflowed buf in expand_vars() trying to expand: %s\n", str);
+		exit_cleanup(RERR_MALLOC);
+	}
+
+	if (bufsize && (buf = realloc(buf, t - buf + 1)) == NULL)
+		out_of_memory("expand_vars");
+
+	return buf;
+}
+
 /* In this section all the functions that are used to access the
  * parameters from the rest of the program are defined. */
 
 #define FN_GLOBAL_STRING(fn_name, ptr) \
- char *fn_name(void) {return *(char **)(ptr) ? *(char **)(ptr) : "";}
+ char *fn_name(void) {return expand_vars(*(char **)(ptr) ? *(char **)(ptr) : "");}
 #define FN_GLOBAL_BOOL(fn_name, ptr) \
  BOOL fn_name(void) {return *(BOOL *)(ptr);}
 #define FN_GLOBAL_CHAR(fn_name, ptr) \
@@ -379,7 +429,7 @@ static void reset_all_vars(void)
  int fn_name(void) {return *(int *)(ptr);}
 
 #define FN_LOCAL_STRING(fn_name, val) \
- char *fn_name(int i) {return LP_SNUM_OK(i) && iSECTION(i).val? iSECTION(i).val : (Vars.l.val? Vars.l.val : "");}
+ char *fn_name(int i) {return expand_vars(LP_SNUM_OK(i) && iSECTION(i).val ? iSECTION(i).val : Vars.l.val ? Vars.l.val : "");}
 #define FN_LOCAL_BOOL(fn_name, val) \
  BOOL fn_name(int i) {return LP_SNUM_OK(i)? iSECTION(i).val : Vars.l.val;}
 #define FN_LOCAL_CHAR(fn_name, val) \
@@ -603,6 +653,17 @@ static BOOL do_parameter(char *parmname, char *parmvalue)
 	}
 
 	/* now switch on the type of variable it is */
+	switch (parm_table[parmnum].type) {
+	case P_PATH:
+	case P_STRING:
+		/* delay expansion of vars */
+		break;
+	default:
+		/* expand any %VARS% now */
+		parmvalue = expand_vars(parmvalue);
+		break;
+	}
+
 	switch (parm_table[parmnum].type) {
 	case P_BOOL:
 		set_boolean(parm_ptr, parmvalue);

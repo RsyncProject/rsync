@@ -382,6 +382,7 @@ static char *finish_pre_exec(pid_t pid, int fd, char *request,
 	return NULL;
 }
 
+#ifdef HAVE_PUTENV
 static int read_arg_from_pipe(int fd, char *buf, int limit)
 {
 	char *bp = buf, *eob = buf + limit - 1;
@@ -402,6 +403,7 @@ static int read_arg_from_pipe(int fd, char *buf, int limit)
 
 	return bp - buf;
 }
+#endif
 
 static int path_failure(int f_out, const char *dir, BOOL was_chdir)
 {
@@ -471,6 +473,26 @@ static struct passwd *want_all_groups(int f_out, uid_t uid)
 #endif
 }
 
+static void set_env_str(const char *var, const char *str)
+{
+#ifdef HAVE_PUTENV
+	char *mem;
+	if (asprintf(&mem, "%s=%s", var, str) < 0)
+		out_of_memory("set_env_str");
+	putenv(mem);
+#endif
+}
+
+#ifdef HAVE_PUTENV
+static void set_env_num(const char *var, long num)
+{
+	char *mem;
+	if (asprintf(&mem, "%s=%ld", var, num) < 0)
+		out_of_memory("set_env_num");
+	putenv(mem);
+}
+#endif
+
 static int rsync_module(int f_in, int f_out, int i, const char *addr, const char *host)
 {
 	int argc;
@@ -487,6 +509,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	pid_t pre_exec_pid = 0;
 	char *request = NULL;
 
+	set_env_str("RSYNC_MODULE_NAME", name);
+
 #ifdef ICONV_OPTION
 	iconv_opt = lp_charset(i);
 	if (*iconv_opt)
@@ -498,6 +522,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	 * we need to do it now before the access check. */
 	if (host == undetermined_hostname && lp_reverse_lookup(i))
 		host = client_name(f_in);
+	set_env_str("RSYNC_HOST_NAME", host);
+	set_env_str("RSYNC_HOST_ADDR", addr);
 
 	if (!allow_access(addr, host, lp_hosts_allow(i), lp_hosts_deny(i))) {
 		rprintf(FLOG, "rsync denied on module %s from %s (%s)\n",
@@ -537,6 +563,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		io_printf(f_out, "@ERROR: auth failed on module %s\n", name);
 		return -1;
 	}
+	set_env_str("RSYNC_USER_NAME", auth_user);
 
 	module_id = i;
 
@@ -612,6 +639,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 			return path_failure(f_out, module_dir, False);
 		full_module_path = module_dir = module_chdir;
 	}
+	set_env_str("RSYNC_MODULE_PATH", full_module_path);
 
 	if (module_dirlen == 1) {
 		module_dirlen = 0;
@@ -644,20 +672,8 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 
 #ifdef HAVE_PUTENV
 	if (*lp_prexfer_exec(i) || *lp_postxfer_exec(i)) {
-		char *modname, *modpath, *hostaddr, *hostname, *username;
 		int status;
 
-		if (asprintf(&modname, "RSYNC_MODULE_NAME=%s", name) < 0
-		 || asprintf(&modpath, "RSYNC_MODULE_PATH=%s", full_module_path) < 0
-		 || asprintf(&hostaddr, "RSYNC_HOST_ADDR=%s", addr) < 0
-		 || asprintf(&hostname, "RSYNC_HOST_NAME=%s", host) < 0
-		 || asprintf(&username, "RSYNC_USER_NAME=%s", auth_user) < 0)
-			out_of_memory("rsync_module");
-		putenv(modname);
-		putenv(modpath);
-		putenv(hostaddr);
-		putenv(hostname);
-		putenv(username);
 		umask(orig_umask);
 		/* For post-xfer exec, fork a new process to run the rsync
 		 * daemon while this process waits for the exit status and
@@ -670,18 +686,15 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 				return -1;
 			}
 			if (pid) {
-				if (asprintf(&p, "RSYNC_PID=%ld", (long)pid) > 0)
-					putenv(p);
+				set_env_num("RSYNC_PID", (long)pid);
 				if (wait_process(pid, &status, 0) < 0)
 					status = -1;
-				if (asprintf(&p, "RSYNC_RAW_STATUS=%d", status) > 0)
-					putenv(p);
+				set_env_num("RSYNC_RAW_STATUS", status);
 				if (WIFEXITED(status))
 					status = WEXITSTATUS(status);
 				else
 					status = -1;
-				if (asprintf(&p, "RSYNC_EXIT_STATUS=%d", status) > 0)
-					putenv(p);
+				set_env_num("RSYNC_EXIT_STATUS", status);
 				if (system(lp_postxfer_exec(i)) < 0)
 					status = -1;
 				_exit(status);
@@ -692,8 +705,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 		 * send us the user's request via a pipe. */
 		if (*lp_prexfer_exec(i)) {
 			int fds[2];
-			if (asprintf(&p, "RSYNC_PID=%ld", (long)getpid()) > 0)
-				putenv(p);
+			set_env_num("RSYNC_PID", (long)getpid());
 			if (pipe(fds) < 0 || (pre_exec_pid = fork()) < 0) {
 				rsyserr(FLOG, errno, "pre-xfer exec preparation failed");
 				io_printf(f_out, "@ERROR: pre-xfer exec preparation failed\n");
@@ -707,8 +719,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 				len = read_arg_from_pipe(fds[0], buf, BIGPATHBUFLEN);
 				if (len <= 0)
 					_exit(1);
-				if (asprintf(&p, "RSYNC_REQUEST=%s", buf) > 0)
-					putenv(p);
+				set_env_str("RSYNC_REQUEST", buf);
 				for (j = 0; ; j++) {
 					len = read_arg_from_pipe(fds[0], buf,
 								 BIGPATHBUFLEN);
