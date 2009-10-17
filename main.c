@@ -67,7 +67,9 @@ extern int sock_f_in;
 extern int sock_f_out;
 extern int filesfrom_fd;
 extern int connect_timeout;
+extern int send_msgs_to_gen;
 extern pid_t cleanup_child_pid;
+extern size_t bwlimit_writemax;
 extern unsigned int module_dirlen;
 extern struct stats stats;
 extern char *stdout_format;
@@ -181,7 +183,7 @@ void write_del_stats(int f)
 	if (read_batch)
 		write_int(f, NDX_DEL_STATS);
 	else
-		send_msg(MSG_DEL_STATS, "", 0, 0);
+		write_ndx(f, NDX_DEL_STATS);
 	write_varint(f, stats.deleted_files - stats.deleted_dirs
 		      - stats.deleted_symlinks - stats.deleted_devices
 		      - stats.deleted_specials);
@@ -725,7 +727,7 @@ static void read_final_goodbye(int f_in, int f_out)
 	if (protocol_version < 29)
 		i = read_int(f_in);
 	else {
-		i = read_ndx_and_attrs(f_in, &iflags, &fnamecmp_type, xname, &xlen);
+		i = read_ndx_and_attrs(f_in, f_out, &iflags, &fnamecmp_type, xname, &xlen);
 		if (protocol_version >= 31 && i == NDX_DONE) {
 			if (am_sender)
 				write_ndx(f_out, NDX_DONE);
@@ -734,9 +736,9 @@ static void read_final_goodbye(int f_in, int f_out)
 					while (read_int(batch_gen_fd) != NDX_DEL_STATS) {}
 					read_del_stats(batch_gen_fd);
 				}
-				send_msg(MSG_DONE, "", 0, 0);
+				write_int(f_out, NDX_DONE);
 			}
-			i = read_ndx_and_attrs(f_in, &iflags, &fnamecmp_type, xname, &xlen);
+			i = read_ndx_and_attrs(f_in, f_out, &iflags, &fnamecmp_type, xname, &xlen);
 		}
 	}
 
@@ -832,7 +834,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 			rprintf(FINFO, "backup_dir is %s\n", backup_dir_buf);
 	}
 
-	io_flush(NORMAL_FLUSH);
+	io_flush(FULL_FLUSH);
 
 	if ((pid = do_fork()) == -1) {
 		rsyserr(FERROR, errno, "fork failed in do_recv");
@@ -840,19 +842,24 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	}
 
 	if (pid == 0) {
+		send_msgs_to_gen = am_server;
+
 		close(error_pipe[0]);
+
+		/* We can't let two processes write to the socket at one time. */
+		io_end_multiplex_out(False);
 		if (f_in != f_out)
 			close(f_out);
 		sock_f_out = -1;
+		f_out = error_pipe[1];
 
-		/* we can't let two processes write to the socket at one time */
-		io_end_multiplex_out();
+		bwlimit_writemax = 0; /* receiver doesn't need to do this */
 
-		/* set place to send errors */
-		set_msg_fd_out(error_pipe[1]);
-		io_start_multiplex_out(error_pipe[1]);
+		if (read_batch)
+			io_start_buffering_in(f_in);
+		io_start_multiplex_out(f_out);
 
-		recv_files(f_in, local_name);
+		recv_files(f_in, f_out, local_name);
 		io_flush(FULL_FLUSH);
 		handle_stats(f_in);
 
@@ -861,8 +868,8 @@ static int do_recv(int f_in, int f_out, char *local_name)
 			output_needs_newline = 0;
 		}
 
-		send_msg(MSG_DONE, "", 1, 0);
-		write_varlong(error_pipe[1], stats.total_read, 3);
+		write_int(f_out, NDX_DONE);
+		send_msg(MSG_STATS, (char*)&stats.total_read, sizeof stats.total_read, 0);
 		io_flush(FULL_FLUSH);
 
 		/* Handle any keep-alive packets from the post-processing work
@@ -887,7 +894,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 
 	am_generator = 1;
 
-	io_end_multiplex_in();
+	io_end_multiplex_in(False);
 	if (write_batch && !am_server)
 		stop_write_batch();
 
@@ -895,11 +902,10 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	if (f_in != f_out)
 		close(f_in);
 	sock_f_in = -1;
+	f_in = error_pipe[0];
 
 	io_start_buffering_out(f_out);
-
-	set_msg_fd_in(error_pipe[0]);
-	io_start_multiplex_in(error_pipe[0]);
+	io_start_multiplex_in(f_in);
 
 #ifdef SUPPORT_HARD_LINKS
 	if (preserve_hard_links && inc_recurse) {
@@ -919,7 +925,6 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	}
 	io_flush(FULL_FLUSH);
 
-	set_msg_fd_in(-1);
 	kill(pid, SIGUSR2);
 	wait_process_with_flush(pid, &exit_code);
 	return exit_code;
@@ -932,7 +937,7 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 	char *local_name = NULL;
 	int negated_levels;
 
-	if (filesfrom_fd >= 0 && !msgs2stderr) {
+	if (filesfrom_fd >= 0 && !msgs2stderr && protocol_version < 31) {
 		/* We can't mix messages with files-from data on the socket,
 		 * so temporarily turn off info/debug messages. */
 		negate_output_levels();
@@ -974,7 +979,7 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 		 * need the IO routines to automatically write out the names
 		 * onto our f_out socket as we read the file-list.  This
 		 * avoids both deadlock and extra delays/buffers. */
-		io_set_filesfrom_fds(filesfrom_fd, f_out);
+		start_filesfrom_forwarding(filesfrom_fd);
 		filesfrom_fd = -1;
 	}
 
@@ -1057,11 +1062,8 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 	exit_cleanup(0);
 }
 
-
-/*
- * This is called once the connection has been negotiated.  It is used
- * for rsyncd, remote-shell, and local connections.
- */
+/* This is called once the connection has been negotiated.  It is used
+ * for rsyncd, remote-shell, and local connections. */
 int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 {
 	struct file_list *flist = NULL;
@@ -1099,8 +1101,8 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			io_start_multiplex_out(f_out);
 		else
 			io_start_buffering_out(f_out);
-		if (!filesfrom_host)
-			set_msg_fd_in(f_in);
+		if (protocol_version >= 31 || (!filesfrom_host && protocol_version >= 23))
+			io_start_multiplex_in(f_in);
 		send_filter_list(f_out);
 		if (filesfrom_host)
 			filesfrom_fd = f_in;
@@ -1111,7 +1113,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 		if (DEBUG_GTE(FLIST, 3))
 			rprintf(FINFO,"file list sent\n");
 
-		if (protocol_version >= 23)
+		if (protocol_version < 31 && filesfrom_host && protocol_version >= 23)
 			io_start_multiplex_in(f_in);
 
 		io_flush(NORMAL_FLUSH);
@@ -1141,7 +1143,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 	send_filter_list(read_batch ? -1 : f_out);
 
 	if (filesfrom_fd >= 0) {
-		io_set_filesfrom_fds(filesfrom_fd, f_out);
+		start_filesfrom_forwarding(filesfrom_fd);
 		filesfrom_fd = -1;
 	}
 
@@ -1188,14 +1190,12 @@ static int copy_argv(char *argv[])
 }
 
 
-/**
- * Start a client for either type of remote connection.  Work out
+/* Start a client for either type of remote connection.  Work out
  * whether the arguments request a remote shell or rsyncd connection,
  * and call the appropriate connection function, then run_client.
  *
  * Calls either start_socket_client (for sockets) or do_cmd and
- * client_run (for ssh).
- **/
+ * client_run (for ssh). */
 static int start_client(int argc, char *argv[])
 {
 	char *p, *shell_machine = NULL, *shell_user = NULL;

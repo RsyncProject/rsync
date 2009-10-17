@@ -31,7 +31,6 @@ extern int am_generator;
 extern int local_server;
 extern int quiet;
 extern int module_id;
-extern int msg_fd_out;
 extern int checksum_len;
 extern int allow_8bit_chars;
 extern int protocol_version;
@@ -69,6 +68,7 @@ struct stats stats;
 
 int got_xfer_error = 0;
 int output_needs_newline = 0;
+int send_msgs_to_gen = 0;
 
 struct {
         int code;
@@ -263,7 +263,7 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 	if (msgs2stderr && code != FLOG)
 		goto output_msg;
 
-	if (am_server && msg_fd_out >= 0) {
+	if (send_msgs_to_gen) {
 		assert(!is_utf8);
 		/* Pass the message to our sibling in native charset. */
 		send_msg((enum msgcode)code, buf, len, 0);

@@ -2022,6 +2022,8 @@ void send_extra_file_list(int f, int at_least)
 				if ((send_dir_ndx = DIR_PARENT(dp)) < 0) {
 					write_ndx(f, NDX_FLIST_EOF);
 					flist_eof = 1;
+					if (DEBUG_GTE(FLIST, 3))
+						rprintf(FINFO, "[%s] flist_eof=1\n", who_am_i());
 					change_local_filter_dir(NULL, 0, 0);
 					goto finish;
 				}
@@ -2343,8 +2345,6 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	if (numeric_ids <= 0 && !inc_recurse)
 		send_id_list(f);
 
-	set_msg_fd_in(-1);
-
 	/* send the io_error flag */
 	if (protocol_version < 30)
 		write_int(f, ignore_errors ? 0 : io_error);
@@ -2352,7 +2352,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		send_msg_int(MSG_IO_ERROR, io_error);
 
 	if (disable_buffering)
-		io_end_buffering_out();
+		io_end_buffering_out(True);
 
 	stats.flist_size = stats.total_written - start_write;
 	stats.num_files = flist->used;
@@ -2372,6 +2372,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		if (send_dir_ndx < 0) {
 			write_ndx(f, NDX_FLIST_EOF);
 			flist_eof = 1;
+			if (DEBUG_GTE(FLIST, 3))
+				rprintf(FINFO, "[%s] flist_eof=1\n", who_am_i());
 		}
 		else if (file_total == 1) {
 			/* If we're creating incremental file-lists and there
@@ -2379,8 +2381,11 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			 * file-list to check if this is a 1-file xfer. */
 			send_extra_file_list(f, 1);
 		}
-	} else
+	} else {
 		flist_eof = 1;
+		if (DEBUG_GTE(FLIST, 3))
+			rprintf(FINFO, "[%s] flist_eof=1\n", who_am_i());
+	}
 
 	return flist;
 }
@@ -2509,6 +2514,8 @@ struct file_list *recv_file_list(int f)
 	else if (f >= 0) {
 		recv_id_list(f, flist);
 		flist_eof = 1;
+		if (DEBUG_GTE(FLIST, 3))
+			rprintf(FINFO, "[%s] flist_eof=1\n", who_am_i());
 	}
 
 	flist_sort_and_clean(flist, relative_paths);
@@ -2543,6 +2550,8 @@ void recv_additional_file_list(int f)
 	int ndx = read_ndx(f);
 	if (ndx == NDX_FLIST_EOF) {
 		flist_eof = 1;
+		if (DEBUG_GTE(FLIST, 3))
+			rprintf(FINFO, "[%s] flist_eof=1\n", who_am_i());
 		change_local_filter_dir(NULL, 0, 0);
 	} else {
 		ndx = NDX_FLIST_OFFSET - ndx;

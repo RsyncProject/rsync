@@ -279,6 +279,7 @@ static struct output_struct debug_words[COUNT_DEBUG+1] = {
 	DEBUG_WORD(HASH, W_SND|W_REC, "Debug hashtable code"),
 	DEBUG_WORD(HLINK, W_SND|W_REC, "Debug hard-link actions"),
 	DEBUG_WORD(ICONV, W_CLI|W_SRV, "Debug iconv character conversions (levels 1-2)"),
+	DEBUG_WORD(IO, W_CLI|W_SRV, "Debug I/O routines (levels 1-4)"),
 	DEBUG_WORD(OWN, W_REC, "Debug ownership changes in users & groups (levels 1-2)"),
 	DEBUG_WORD(PROTO, W_CLI|W_SRV, "Debug protocol information"),
 	DEBUG_WORD(RECV, W_REC, "Debug receiver functions"),

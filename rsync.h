@@ -98,7 +98,7 @@
 /* This is used when working on a new protocol version in CVS, and should
  * be a new non-zero value for each CVS change that affects the protocol.
  * It must ALWAYS be 0 when the protocol goes final (and NEVER before)! */
-#define SUBPROTOCOL_VERSION 7
+#define SUBPROTOCOL_VERSION 8
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
@@ -130,7 +130,7 @@
 #define WRITE_SIZE (32*1024)
 #define CHUNK_SIZE (32*1024)
 #define MAX_MAP_SIZE (256*1024)
-#define IO_BUFFER_SIZE (4092)
+#define IO_BUFFER_SIZE (32*1024)
 #define MAX_BLOCK_SIZE ((int32)1 << 17)
 
 /* For compatibility with older rsyncs */
@@ -229,20 +229,17 @@ enum msgcode {
 	MSG_ERROR_UTF8=FERROR_UTF8, /* sibling logging */
 	MSG_LOG=FLOG, MSG_CLIENT=FCLIENT, /* sibling logging */
 	MSG_REDO=9,	/* reprocess indicated flist index */
-	MSG_DEL_STATS=10,/* delete-statistics data follows */
-	MSG_FLIST=20,	/* extra file list over sibling socket */
-	MSG_FLIST_EOF=21,/* we've transmitted all the file lists */
+	MSG_STATS=10,	/* message has stats data for generator */
 	MSG_IO_ERROR=22,/* the sending side had an I/O error */
 	MSG_NOOP=42,	/* a do-nothing message */
 	MSG_SUCCESS=100,/* successfully updated indicated flist index */
 	MSG_DELETED=101,/* successfully deleted a file on receiving side */
 	MSG_NO_SEND=102,/* sender failed to open a file we wanted */
-	MSG_DONE=86	/* current phase is done */
 };
 
 #define NDX_DONE -1
 #define NDX_FLIST_EOF -2
-#define NDX_DEL_STATS -2
+#define NDX_DEL_STATS -3
 #define NDX_FLIST_OFFSET -101
 
 /* For calling delete_item() and delete_dir_contents(). */
@@ -903,6 +900,7 @@ typedef struct {
 #define ICB_EXPAND_OUT (1<<0)
 #define ICB_INCLUDE_BAD (1<<1)
 #define ICB_INCLUDE_INCOMPLETE (1<<2)
+#define ICB_CIRCULAR_OUT (1<<3)
 
 #define RL_EOL_NULLS (1<<0)
 #define RL_DUMP_COMMENTS (1<<1)
@@ -1207,7 +1205,8 @@ extern short info_levels[], debug_levels[];
 #define DEBUG_HASH (DEBUG_GENR+1)
 #define DEBUG_HLINK (DEBUG_HASH+1)
 #define DEBUG_ICONV (DEBUG_HLINK+1)
-#define DEBUG_OWN (DEBUG_ICONV+1)
+#define DEBUG_IO (DEBUG_ICONV+1)
+#define DEBUG_OWN (DEBUG_IO+1)
 #define DEBUG_PROTO (DEBUG_OWN+1)
 #define DEBUG_RECV (DEBUG_PROTO+1)
 #define DEBUG_SEND (DEBUG_RECV+1)

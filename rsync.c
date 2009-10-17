@@ -134,11 +134,23 @@ void setup_iconv(void)
 # endif
 }
 
+/* Move any bytes in the overflow space to the start.  This avoids any issue
+ * with a multibyte sequence that needs to span the end of the buffer. */
+static void wrap_overflow(xbuf *out, int siz)
+{
+	if (DEBUG_GTE(IO, 4))
+		rprintf(FINFO, "[%s] wrap-bytes moved: %d (iconvbufs)\n", who_am_i(), siz);
+	memcpy(out->buf, out->buf + out->size, siz);
+}
+
 /* This function converts the characters in the "in" xbuf into characters
  * in the "out" xbuf.  The "len" of the "in" xbuf is used starting from its
  * "pos".  The "size" of the "out" xbuf restricts how many characters can be
  * stored, starting at its "pos+len" position.  Note that the last byte of
  * the buffer is never used, which reserves space for a terminating '\0'.
+ * If ICB_CIRCULAR_OUT is set, the output data can wrap around to the start,
+ * and the buf IS ASSUMED TO HAVE AN EXTRA 4 BYTES OF OVERFLOW SPACE at the
+ * end (the buffer will also not be expanded if it is already allocated).
  * We return a 0 on success or a -1 on error.  An error also sets errno to
  * E2BIG, EILSEQ, or EINVAL (see below); otherwise errno will be set to 0.
  * The "in" xbuf is altered to update "pos" and "len".  The "out" xbuf has
@@ -153,7 +165,7 @@ void setup_iconv(void)
 int iconvbufs(iconv_t ic, xbuf *in, xbuf *out, int flags)
 {
 	ICONV_CONST char *ibuf;
-	size_t icnt, ocnt;
+	size_t icnt, ocnt, opos;
 	char *obuf;
 
 	if (!out->size && flags & ICB_EXPAND_OUT)
@@ -165,8 +177,20 @@ int iconvbufs(iconv_t ic, xbuf *in, xbuf *out, int flags)
 	ibuf = in->buf + in->pos;
 	icnt = in->len;
 
-	obuf = out->buf + (out->pos + out->len);
-	ocnt = out->size - (out->pos + out->len) - 1;
+	opos = out->pos + out->len;
+	if (flags & ICB_CIRCULAR_OUT) {
+		if (opos >= out->size) {
+			opos -= out->size;
+			ocnt = out->pos - opos - 1;
+		} else {
+			/* We only make use of the 4 bytes of overflow buffer
+			 * if there is room to move the bytes to the start of
+			 * the circular buffer. */
+			ocnt = out->size - opos + MIN((ssize_t)out->pos - 1, 4);
+		}
+	} else
+		ocnt = out->size - opos - 1;
+	obuf = out->buf + opos;
 
 	while (icnt) {
 		while (iconv(ic, &ibuf, &icnt, &obuf, &ocnt) == (size_t)-1) {
@@ -179,8 +203,14 @@ int iconvbufs(iconv_t ic, xbuf *in, xbuf *out, int flags)
 				if (!(flags & ICB_INCLUDE_BAD))
 					goto finish;
 			} else {
-				size_t opos = obuf - out->buf;
-				if (!(flags & ICB_EXPAND_OUT)) {
+				opos = obuf - out->buf;
+				if (flags & ICB_CIRCULAR_OUT && opos > out->size) {
+					wrap_overflow(out, opos -= out->size);
+					obuf = out->buf + opos;
+					if ((ocnt = out->pos - opos - 1) > 0)
+						continue;
+				}
+				if (!(flags & ICB_EXPAND_OUT) || flags & ICB_CIRCULAR_OUT) {
 					errno = E2BIG;
 					goto finish;
 				}
@@ -197,9 +227,17 @@ int iconvbufs(iconv_t ic, xbuf *in, xbuf *out, int flags)
 	errno = 0;
 
   finish:
+	opos = obuf - out->buf;
+	if (flags & ICB_CIRCULAR_OUT) {
+		if (opos > out->size)
+			wrap_overflow(out, opos - out->size);
+		else if (opos < out->pos)
+			opos += out->size;
+	}
+	out->len = opos - out->pos;
+
 	in->len = icnt;
 	in->pos = ibuf - in->buf;
-	out->len = obuf - out->buf - out->pos;
 
 	return errno ? -1 : 0;
 }
@@ -244,7 +282,7 @@ void send_protected_args(int fd, char *args[])
 #endif
 }
 
-int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
+int read_ndx_and_attrs(int f_in, int f_out, int *iflag_ptr, uchar *type_ptr,
 		       char *buf, int *len_ptr)
 {
 	int len, iflags = 0;
@@ -260,6 +298,12 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 			break;
 		if (ndx == NDX_DONE)
 			return ndx;
+		if (ndx == NDX_DEL_STATS) {
+			read_del_stats(f_in);
+			if (am_sender && am_server)
+				write_del_stats(f_out);
+			continue;
+		}
 		if (!inc_recurse || am_sender) {
 			int last;
 			if (first_flist)
@@ -273,7 +317,9 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 		}
 		if (ndx == NDX_FLIST_EOF) {
 			flist_eof = 1;
-			send_msg(MSG_FLIST_EOF, "", 0, 0);
+			if (DEBUG_GTE(FLIST, 3))
+				rprintf(FINFO, "[%s] flist_eof=1\n", who_am_i());
+			write_int(f_out, NDX_FLIST_EOF);
 			continue;
 		}
 		ndx = NDX_FLIST_OFFSET - ndx;
@@ -287,20 +333,15 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 			exit_cleanup(RERR_PROTOCOL);
 		}
 
-		/* Send everything read from f_in to msg_fd_out. */
 		if (DEBUG_GTE(FLIST, 2)) {
 			rprintf(FINFO, "[%s] receiving flist for dir %d\n",
 				who_am_i(), ndx);
 		}
-		if (!msgs2stderr)
-			negate_output_levels(); /* turn off all info/debug output */
-		send_msg_int(MSG_FLIST, ndx);
-		start_flist_forward(f_in);
+		/* Send all the data we read for this flist to the generator. */
+		start_flist_forward(ndx);
 		flist = recv_file_list(f_in);
 		flist->parent_ndx = ndx;
 		stop_flist_forward();
-		if (!msgs2stderr)
-			negate_output_levels(); /* restore info/debug output */
 	}
 
 	iflags = protocol_version >= 29 ? read_shortint(f_in)

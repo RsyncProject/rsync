@@ -188,7 +188,7 @@ void send_files(int f_in, int f_out)
 		}
 
 		/* This call also sets cur_flist. */
-		ndx = read_ndx_and_attrs(f_in, &iflags, &fnamecmp_type,
+		ndx = read_ndx_and_attrs(f_in, f_out, &iflags, &fnamecmp_type,
 					 xname, &xlen);
 		extra_flist_sending_enabled = False;
 

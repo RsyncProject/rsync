@@ -108,9 +108,9 @@ filter_outfile
 cat <<EOT >"$chkfile"
 bar/baz/rsync is uptodate
 foo/config1 is uptodate
-foo/config2
 foo/extra is uptodate
 foo/sym is uptodate
+foo/config2
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 4 failed"
 
@@ -203,8 +203,8 @@ bar/baz/rsync is uptodate
 foo/ is uptodate
 foo/config1 is uptodate
 foo/config2 is uptodate
-foo/extra => foo/config1
 foo/sym $is_uptodate
+foo/extra => foo/config1
 EOT
 diff $diffopt "$chkfile" "$outfile" || test_fail "test 10 failed"
 

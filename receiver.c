@@ -425,6 +425,9 @@ static int gen_wants_ndx(int desired_ndx, int flist_num)
 	if (got_eof)
 		return 0;
 
+	/* TODO: integrate gen-reading I/O into perform_io() so this is not needed? */
+	io_flush(FULL_FLUSH);
+
 	while (next_ndx < desired_ndx) {
 		if (inc_recurse && flist_num <= done_cnt)
 			return 0;
@@ -452,7 +455,7 @@ static int gen_wants_ndx(int desired_ndx, int flist_num)
  * main routine for receiver process.
  *
  * Receiver process runs on the same host as the generator process. */
-int recv_files(int f_in, char *local_name)
+int recv_files(int f_in, int f_out, char *local_name)
 {
 	int fd1,fd2;
 	STRUCT_STAT st;
@@ -484,7 +487,7 @@ int recv_files(int f_in, char *local_name)
 		cleanup_disable();
 
 		/* This call also sets cur_flist. */
-		ndx = read_ndx_and_attrs(f_in, &iflags, &fnamecmp_type,
+		ndx = read_ndx_and_attrs(f_in, f_out, &iflags, &fnamecmp_type,
 					 xname, &xlen);
 		if (ndx == NDX_DONE) {
 			if (!am_server && INFO_GTE(PROGRESS, 2) && cur_flist) {
@@ -509,7 +512,7 @@ int recv_files(int f_in, char *local_name)
 				rprintf(FINFO, "recv_files phase=%d\n", phase);
 			if (phase == 2 && delay_updates)
 				handle_delayed_updates(local_name);
-			send_msg(MSG_DONE, "", 0, 0);
+			write_int(f_out, NDX_DONE);
 			continue;
 		}
 
