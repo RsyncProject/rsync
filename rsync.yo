@@ -674,7 +674,7 @@ quote(tt(   rsync -avR /foo/./bar/baz.c remote:/tmp/))
 
 That would create /tmp/bar/baz.c on the remote machine.  (Note that the
 dot must be followed by a slash, so "/foo/." would not be abbreviated.)
-(2) For older rsync versions, you would need to use a chdir to limit the
+For older rsync versions, you would need to use a chdir to limit the
 source path.  For example, when pushing files:
 
 quote(tt(   (cd /foo; rsync -avR bar/baz.c remote:/tmp/) ))
@@ -756,8 +756,8 @@ This option is a transfer rule, not an exclude, so it doesn't affect the
 data that goes into the file-lists, and thus it doesn't affect deletions.
 It just limits the files that the receiver requests to be transferred.
 
-dit(bf(--inplace)) This option changes how rsync transfers a file when the
-file's data needs to be updated: instead of the default method of creating
+dit(bf(--inplace)) This option changes how rsync transfers a file when
+its data needs to be updated: instead of the default method of creating
 a new copy of the file and moving it into place when it is complete, rsync
 instead writes the updated data directly to the destination file.
 
@@ -776,7 +776,7 @@ the backup file as the basis file for the transfer).
 WARNING: you should not use this option to update files that are being
 accessed by others, so be careful when choosing to use this for a copy.
 
-This option is useful for transfer of large files with block-based changes
+This option is useful for transferring large files with block-based changes
 or appended data, and also on systems that are disk bound, not network
 bound.
 
@@ -1015,7 +1015,7 @@ a normal user, see the bf(--fake-super) option.
 
 dit(bf(--chmod)) This option tells rsync to apply one or more
 comma-separated "chmod" strings to the permission of the files in the
-transfer.  The resulting value is treated as though it was the permissions
+transfer.  The resulting value is treated as though it were the permissions
 that the sending side supplied for the file, which means that this option
 can seem to have no effect on existing files if bf(--perms) is not enabled.
 
@@ -1124,8 +1124,8 @@ up less space on the destination.  Conflicts with bf(--inplace) because it's
 not possible to overwrite data in a sparse fashion.
 
 NOTE: Don't use this option when the destination is a Solaris "tmpfs"
-filesystem. It doesn't seem to handle seeks over null regions
-correctly and ends up corrupting the files.
+filesystem. It seems to have problems seeking over null regions,
+and ends up corrupting the files.
 
 dit(bf(-n, --dry-run)) This makes rsync perform a trial run that doesn't
 make any changes (and produces mostly the same output as a real run).  It
@@ -1135,12 +1135,12 @@ to do before one actually runs it.
 
 The output of bf(--itemize-changes) is supposed to be exactly the same on a
 dry run and a subsequent real run (barring intentional trickery and system
-call failures); if it isn't, that's a bug.  Other output is the same to the
-extent practical, but may differ in some areas.  Notably, a dry run does not
+call failures); if it isn't, that's a bug.  Other output should be mostly
+unchanged, but may differ in some areas.  Notably, a dry run does not
 send the actual data for file transfers, so bf(--progress) has no effect,
 the "bytes sent", "bytes received", "literal data", and "matched data"
 statistics are too small, and the "speedup" value is equivalent to a run
-where no file transfers are needed.
+where no file transfers were needed.
 
 dit(bf(-W, --whole-file)) With this option rsync's delta-transfer algorithm
 is not used and the whole file is sent as-is instead.  The transfer may be
@@ -1220,7 +1220,7 @@ going to be deleted.
 If the sending side detects any I/O errors, then the deletion of any
 files at the destination will be automatically disabled. This is to
 prevent temporary filesystem failures (such as NFS errors) on the
-sending side causing a massive deletion of files on the
+sending side from causing a massive deletion of files on the
 destination.  You can override this with the bf(--ignore-errors) option.
 
 The bf(--delete) option may be combined with one of the --delete-WHEN options
@@ -3024,9 +3024,9 @@ bf(--links).
 If bf(--copy-links) is specified, then symlinks are "collapsed" by
 copying their referent, rather than the symlink.
 
-rsync also distinguishes "safe" and "unsafe" symbolic links.  An
-example where this might be used is a web site mirror that wishes
-ensure the rsync module they copy does not include symbolic links to
+Rsync can also distinguish "safe" and "unsafe" symbolic links.  An
+example where this might be used is a web site mirror that wishes to
+ensure that the rsync module that is copied does not include symbolic links to
 bf(/etc/passwd) in the public section of the site.  Using
 bf(--copy-unsafe-links) will cause any links to be copied as the file
 they point to on the destination.  Using bf(--safe-links) will cause
@@ -3193,7 +3193,7 @@ Jean-loup Gailly and Mark Adler.
 
 manpagesection(THANKS)
 
-Especial thanks go out to: John Van Essen, Matt McCutchen, Wesley W. Terpstra,
+Special thanks go out to: John Van Essen, Matt McCutchen, Wesley W. Terpstra,
 David Dykstra, Jos Backus, Sebastian Krahmer, Martin Pool, and our
 gone-but-not-forgotten compadre, J.W. Schultz.
 
