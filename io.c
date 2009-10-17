@@ -1197,7 +1197,8 @@ void io_end_buffering_out(BOOL free_buffers)
 
 void maybe_flush_socket(int important)
 {
-	if (iobuf.out.buf && iobuf.out.len && (important || time(NULL) - last_io_out >= 5))
+	if (flist_eof && iobuf.out.buf && iobuf.out.len > iobuf.out_empty_len
+	 && (important || time(NULL) - last_io_out >= 5))
 		io_flush(NORMAL_FLUSH);
 }
 
