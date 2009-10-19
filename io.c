@@ -471,8 +471,8 @@ static char *perform_io(size_t needed, int flags)
 			if (!(iobuf.in.buf = realloc_array(iobuf.in.buf, char, needed)))
 				out_of_memory("perform_io");
 			if (DEBUG_GTE(IO, 4)) {
-				rprintf(FINFO, "[%s] resized input buffer from %d to %d bytes.\n",
-					who_am_i(), iobuf.in.size, needed);
+				rprintf(FINFO, "[%s] resized input buffer from %ld to %ld bytes.\n",
+					who_am_i(), (long)iobuf.in.size, (long)needed);
 			}
 			iobuf.in.size = needed;
 		}
@@ -482,8 +482,8 @@ static char *perform_io(size_t needed, int flags)
 			memmove(iobuf.in.buf, iobuf.in.buf + iobuf.in.pos, iobuf.in.len);
 			if (DEBUG_GTE(IO, 4)) {
 				rprintf(FINFO,
-					"[%s] moved %d bytes from %d to 0 in the input buffer (size=%d, needed=%d).\n",
-					who_am_i(), iobuf.in.len, iobuf.in.pos, iobuf.in.size, needed);
+					"[%s] moved %ld bytes from %ld to 0 in the input buffer (size=%ld, needed=%ld).\n",
+					who_am_i(), (long)iobuf.in.len, (long)iobuf.in.pos, (long)iobuf.in.size, (long)needed);
 			}
 			if (iobuf.raw_input_ends_before)
 				iobuf.raw_input_ends_before -= iobuf.in.pos;
