@@ -432,46 +432,33 @@ static int add_a_group(int f_out, const char *gname)
 	return 0;
 }
 
+#ifdef HAVE_GETGROUPLIST
+static int want_all_groups(int f_out, uid_t uid)
+{
+	const char *err;
+	gid_count = MAX_GID_LIST;
+	if ((err = getallgroups(uid, gid_list, &gid_count)) != NULL) {
+		rsyserr(FLOG, errno, "%s", err);
+		io_printf(f_out, "@ERROR: %s\n", err);
+		return -1;
+	}
+	return 0;
+}
+#elif defined HAVE_INITGROUPS
 static struct passwd *want_all_groups(int f_out, uid_t uid)
 {
-#if defined HAVE_GETGROUPLIST || defined HAVE_INITGROUPS
 	struct passwd *pw;
 	if ((pw = getpwuid(uid)) == NULL) {
 		rsyserr(FLOG, errno, "getpwuid failed");
 		io_printf(f_out, "@ERROR: getpwuid failed\n");
 		return NULL;
 	}
-# ifdef HAVE_GETGROUPLIST
-	/* Get all the process's groups, with the pw_gid group first. */
-	gid_count = MAX_GID_LIST;
-	if (getgrouplist(pw->pw_name, pw->pw_gid, gid_list, &gid_count) < 0) {
-		rsyserr(FLOG, errno, "getgrouplist failed");
-		io_printf(f_out, "@ERROR: getgrouplist failed\n");
-		return NULL;
-	}
-	/* Paranoia: is the default group not first in the list? */
-	if (gid_list[0] != pw->pw_gid) {
-		int j;
-		for (j = 0; j < gid_count; j++) {
-			if (gid_list[j] == pw->pw_gid) {
-				gid_list[j] = gid_list[0];
-				gid_list[0] = pw->pw_gid;
-				break;
-			}
-		}
-	}
-# else
 	/* Start with the default group and initgroups() will add the reset. */
 	gid_count = 1;
 	gid_list[0] = pw->pw_gid;
-# endif
 	return pw;
-#else
-	rprintf(FLOG, "This rsync does not support a gid of \"*\"\n");
-	io_printf(f_out, "@ERROR: invalid gid setting.\n");
-	return NULL;
-#endif
 }
+#endif
 
 static void set_env_str(const char *var, const char *str)
 {
@@ -498,7 +485,9 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	int argc;
 	char **argv, **orig_argv, **orig_early_argv, *module_chdir;
 	char line[BIGPATHBUFLEN];
+#if defined HAVE_INITGROUPS && !defined HAVE_GETGROUPLIST
 	struct passwd *pw = NULL;
+#endif
 	uid_t uid;
 	int set_uid;
 	char *p, *err_msg = NULL;
@@ -595,8 +584,17 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	if (p) {
 		/* The "*" gid must be the first item in the list. */
 		if (strcmp(p, "*") == 0) {
+#ifdef HAVE_GETGROUPLIST
+			if (want_all_groups(f_out, uid) < 0)
+				return -1;
+#elif defined HAVE_INITGROUPS
 			if ((pw = want_all_groups(f_out, uid)) == NULL)
 				return -1;
+#else
+			rprintf(FLOG, "This rsync does not support a gid of \"*\"\n");
+			io_printf(f_out, "@ERROR: invalid gid setting.\n");
+			return -1;
+#endif
 		} else if (add_a_group(f_out, p) < 0)
 			return -1;
 		while ((p = strtok(NULL, ", ")) != NULL) {

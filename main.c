@@ -43,6 +43,7 @@ extern int kluge_around_eof;
 extern int got_xfer_error;
 extern int msgs2stderr;
 extern int module_id;
+extern int read_only;
 extern int copy_links;
 extern int copy_dirlinks;
 extern int copy_unsafe_links;
@@ -764,7 +765,7 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 		exit_cleanup(RERR_SYNTAX);
 		return;
 	}
-	if (am_daemon && lp_read_only(module_id) && remove_source_files) {
+	if (am_daemon && read_only && remove_source_files) {
 		rprintf(FERROR,
 		    "ERROR: --remove-%s-files cannot be used with a read-only module\n",
 		    remove_source_files == 1 ? "source" : "sent");
@@ -950,7 +951,7 @@ static void do_server_recv(int f_in, int f_out, int argc, char *argv[])
 			argc, (long)getpid());
 	}
 
-	if (am_daemon && lp_read_only(module_id)) {
+	if (am_daemon && read_only) {
 		rprintf(FERROR,"ERROR: module is read only\n");
 		exit_cleanup(RERR_SYNTAX);
 		return;

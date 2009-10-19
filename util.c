@@ -542,38 +542,6 @@ void kill_all(int sig)
 	}
 }
 
-/* Parse a user name or (optionally) a number into a uid */
-int user_to_uid(const char *name, uid_t *uid_p, BOOL num_ok)
-{
-	struct passwd *pass;
-	if (!name || !*name)
-		return 0;
-	if (num_ok && name[strspn(name, "0123456789")] == '\0') {
-		*uid_p = atol(name);
-		return 1;
-	}
-	if (!(pass = getpwnam(name)))
-		return 0;
-	*uid_p = pass->pw_uid;
-	return 1;
-}
-
-/* Parse a group name or (optionally) a number into a gid */
-int group_to_gid(const char *name, gid_t *gid_p, BOOL num_ok)
-{
-	struct group *grp;
-	if (!name || !*name)
-		return 0;
-	if (num_ok && name[strspn(name, "0123456789")] == '\0') {
-		*gid_p = atol(name);
-		return 1;
-	}
-	if (!(grp = getgrnam(name)))
-		return 0;
-	*gid_p = grp->gr_gid;
-	return 1;
-}
-
 /** Lock a byte range in a open file */
 int lock_range(int fd, int offset, int len)
 {

@@ -74,7 +74,7 @@ static struct idlist *add_to_list(struct idlist **root, id_t id, const char *nam
 }
 
 /* turn a uid into a user name */
-static const char *uid_to_name(uid_t uid)
+char *uid_to_user(uid_t uid)
 {
 	struct passwd *pass = getpwuid(uid);
 	if (pass)
@@ -83,12 +83,44 @@ static const char *uid_to_name(uid_t uid)
 }
 
 /* turn a gid into a group name */
-static const char *gid_to_name(gid_t gid)
+char *gid_to_group(gid_t gid)
 {
 	struct group *grp = getgrgid(gid);
 	if (grp)
 		return strdup(grp->gr_name);
 	return NULL;
+}
+
+/* Parse a user name or (optionally) a number into a uid */
+int user_to_uid(const char *name, uid_t *uid_p, BOOL num_ok)
+{
+	struct passwd *pass;
+	if (!name || !*name)
+		return 0;
+	if (num_ok && name[strspn(name, "0123456789")] == '\0') {
+		*uid_p = atol(name);
+		return 1;
+	}
+	if (!(pass = getpwnam(name)))
+		return 0;
+	*uid_p = pass->pw_uid;
+	return 1;
+}
+
+/* Parse a group name or (optionally) a number into a gid */
+int group_to_gid(const char *name, gid_t *gid_p, BOOL num_ok)
+{
+	struct group *grp;
+	if (!name || !*name)
+		return 0;
+	if (num_ok && name[strspn(name, "0123456789")] == '\0') {
+		*gid_p = atol(name);
+		return 1;
+	}
+	if (!(grp = getgrnam(name)))
+		return 0;
+	*gid_p = grp->gr_gid;
+	return 1;
 }
 
 static int is_in_group(gid_t gid)
@@ -253,7 +285,7 @@ const char *add_uid(uid_t uid)
 			return NULL;
 	}
 
-	node = add_to_list(&uidlist, uid, uid_to_name(uid), 0, 0);
+	node = add_to_list(&uidlist, uid, uid_to_user(uid), 0, 0);
 	return node->name;
 }
 
@@ -271,7 +303,7 @@ const char *add_gid(gid_t gid)
 			return NULL;
 	}
 
-	node = add_to_list(&gidlist, gid, gid_to_name(gid), 0, 0);
+	node = add_to_list(&gidlist, gid, gid_to_group(gid), 0, 0);
 	return node->name;
 }
 
@@ -457,5 +489,29 @@ void parse_name_map(char *map, BOOL usernames)
 
 	/* The 0 user/group doesn't get its name sent, so add it explicitly. */
 	recv_add_id(idlist_ptr, *idmap_ptr, 0,
-		    numeric_ids ? NULL : usernames ? uid_to_name(0) : gid_to_name(0));
+		    numeric_ids ? NULL : usernames ? uid_to_user(0) : gid_to_group(0));
 }
+
+#ifdef HAVE_GETGROUPLIST
+const char *getallgroups(uid_t uid, gid_t *gid_list, int *size_ptr)
+{
+	struct passwd *pw;
+	if ((pw = getpwuid(uid)) == NULL)
+		return "getpwuid failed";
+	/* Get all the process's groups, with the pw_gid group first. */
+	if (getgrouplist(pw->pw_name, pw->pw_gid, gid_list, size_ptr) < 0)
+		return "getgrouplist failed";
+	/* Paranoia: is the default group not first in the list? */
+	if (gid_list[0] != pw->pw_gid) {
+		int j;
+		for (j = 0; j < *size_ptr; j++) {
+			if (gid_list[j] == pw->pw_gid) {
+				gid_list[j] = gid_list[0];
+				gid_list[0] = pw->pw_gid;
+				break;
+			}
+		}
+	}
+	return NULL;
+}
+#endif
