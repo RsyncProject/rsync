@@ -215,7 +215,7 @@ static const char *debug_verbosity[] = {
 static const char *info_verbosity[1+MAX_VERBOSITY] = {
 	/*0*/ NULL,
 	/*1*/ "COPY,DEL,FLIST,MISC,NAME,STATS,SYMSAFE",
-	/*2*/ "BACKUP,MOUNT,NAME2,REMOVE,SKIP",
+	/*2*/ "BACKUP,MISC2,MOUNT,NAME2,REMOVE,SKIP",
 };
 
 #define MAX_OUT_LEVEL 4 /* The largest N allowed for any flagN word. */
@@ -248,7 +248,7 @@ static struct output_struct info_words[COUNT_INFO+1] = {
 	INFO_WORD(COPY, W_REC, "Mention files copied locally on the receiving side"),
 	INFO_WORD(DEL, W_REC, "Mention deletions on the receiving side"),
 	INFO_WORD(FLIST, W_CLI, "Mention file-list receiving/sending (levels 1-2)"),
-	INFO_WORD(MISC, W_SND|W_REC, "Mention miscellaneous information"),
+	INFO_WORD(MISC, W_SND|W_REC, "Mention miscellaneous information (levels 1-2)"),
 	INFO_WORD(MOUNT, W_SND|W_REC, "Mention mounts that were found or skipped"),
 	INFO_WORD(NAME, W_SND|W_REC, "Mention 1) updated file/dir names, 2) unchanged names"),
 	INFO_WORD(PROGRESS, W_CLI, "Mention 1) per-file progress or 2) total transfer progress"),
