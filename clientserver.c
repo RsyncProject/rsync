@@ -947,7 +947,7 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	 && (use_chroot ? lp_numeric_ids(i) != False : lp_numeric_ids(i) == True))
 		numeric_ids = -1; /* Set --numeric-ids w/o breaking protocol. */
 
-	if (lp_timeout(i) && lp_timeout(i) > io_timeout)
+	if (lp_timeout(i) && (!io_timeout || lp_timeout(i) < io_timeout))
 		set_io_timeout(lp_timeout(i));
 
 	/* If we have some incoming/outgoing chmod changes, append them to
