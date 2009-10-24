@@ -95,6 +95,7 @@ static int write_batch_monitor_out = -1;
 
 static int ff_forward_fd = -1;
 static char ff_lastchar;
+static xbuf ff_xb = EMPTY_XBUF;
 #ifdef ICONV_OPTION
 static xbuf iconv_buf = EMPTY_XBUF;
 #endif
@@ -338,18 +339,15 @@ static void safe_write(int fd, const char *buf, size_t len)
  * a chunk of data and put it into the output buffer. */
 static void forward_filesfrom_data(void)
 {
-	char buf[FILESFROM_BUFLEN];
 	int len;
-	xbuf x;
 
-	INIT_CONST_XBUF(x, buf);
-
-	len = read(ff_forward_fd, x.buf, x.size);
+	len = read(ff_forward_fd, ff_xb.buf + ff_xb.len, ff_xb.size - ff_xb.len);
 	if (len <= 0) {
 		if (len == 0 || errno != EINTR) {
 			/* Send end-of-file marker */
-			write_buf(iobuf.out_fd, "\0\0", ff_lastchar ? 2 : 1);
 			ff_forward_fd = -1;
+			write_buf(iobuf.out_fd, "\0\0", ff_lastchar ? 2 : 1);
+			free_xbuf(&ff_xb);
 			if (protocol_version < 31)
 				io_start_multiplex_out(iobuf.out_fd);
 		}
@@ -359,47 +357,84 @@ static void forward_filesfrom_data(void)
 	if (DEBUG_GTE(IO, 2))
 		rprintf(FINFO, "[%s] files-from read=%ld\n", who_am_i(), (long)len);
 
+#ifdef ICONV_OPTION
+	len += ff_xb.len;
+#endif
+
 	if (!eol_nulls) {
-		char *s = x.buf + len;
+		char *s = ff_xb.buf + len;
 		/* Transform CR and/or LF into '\0' */
-		while (s-- > x.buf) {
+		while (s-- > ff_xb.buf) {
 			if (*s == '\n' || *s == '\r')
 				*s = '\0';
 		}
 	}
+
 	if (ff_lastchar)
-		x.pos = 0;
+		ff_xb.pos = 0;
 	else {
-		char *s = x.buf;
+		char *s = ff_xb.buf;
 		/* Last buf ended with a '\0', so don't let this buf start with one. */
 		while (len && *s == '\0')
 			s++, len--;
-		x.pos = s - x.buf;
+		ff_xb.pos = s - ff_xb.buf;
 	}
+
+#ifdef ICONV_OPTION
+	if (filesfrom_convert && len) {
+		char *sob = ff_xb.buf + ff_xb.pos, *s = sob;
+		char *eob = sob + len;
+		int flags = ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE | ICB_CIRCULAR_OUT;
+		if (ff_lastchar == '\0')
+			flags |= ICB_INIT;
+		/* Convert/send each null-terminated string separately, skipping empties. */
+		while (s != eob) {
+			if (*s++ == '\0') {
+				ff_xb.len = s - sob - 1;
+				if (iconvbufs(ic_send, &ff_xb, &iobuf.out, flags) < 0)
+					exit_cleanup(RERR_PROTOCOL); /* impossible? */
+				write_buf(iobuf.out_fd, s-1, 1); /* Send the '\0'. */
+				while (s != eob && *s == '\0')
+					s++;
+				sob = s;
+				ff_xb.pos = sob - ff_xb.buf;
+				flags |= ICB_INIT;
+			}
+		}
+
+		if ((ff_xb.len = s - sob) == 0)
+			ff_lastchar = '\0';
+		else {
+			/* Handle a partial string specially, saving any incomplete chars. */
+			flags &= ~ICB_INCLUDE_INCOMPLETE;
+			if (iconvbufs(ic_send, &ff_xb, &iobuf.out, flags) < 0) {
+				if (errno == E2BIG)
+					exit_cleanup(RERR_PROTOCOL); /* impossible? */
+				if (ff_xb.pos)
+					memmove(ff_xb.buf, ff_xb.buf + ff_xb.pos, ff_xb.len);
+			}
+			ff_lastchar = 'x'; /* Anything non-zero. */
+		}
+	} else
+#endif
+
 	if (len) {
-		char *f = x.buf + x.pos;
-		char *t = x.buf;
+		char *f = ff_xb.buf + ff_xb.pos;
+		char *t = ff_xb.buf;
 		char *eob = f + len;
 		/* Eliminate any multi-'\0' runs. */
 		while (f != eob) {
 			if (!(*t++ = *f++)) {
-				while (f != eob && !*f)
-					f++, len--;
+				while (f != eob && *f == '\0')
+					f++;
 			}
 		}
 		ff_lastchar = f[-1];
-	}
-#ifdef ICONV_OPTION
-	if (filesfrom_convert) {
-		/* TODO would it help to translate each string between nulls separately? */
-		x.len = len;
-		iconvbufs(ic_send, &x, &iobuf.out, ICB_INCLUDE_BAD|ICB_INCLUDE_INCOMPLETE|ICB_CIRCULAR_OUT|ICB_INIT);
-	} else
-#endif
-	if (len) {
-		/* This will not circle back to perform_io() because we only get
-		 * called when there is plenty of room in the output buffer. */
-		write_buf(iobuf.out_fd, x.buf, len);
+		if ((len = t - ff_xb.buf) != 0) {
+			/* This will not circle back to perform_io() because we only get
+			 * called when there is plenty of room in the output buffer. */
+			write_buf(iobuf.out_fd, ff_xb.buf, len);
+		}
 	}
 }
 
@@ -993,6 +1028,8 @@ void start_filesfrom_forwarding(int fd)
 		io_end_multiplex_out(False);
 		iobuf.out_fd = save_fd;
 	}
+
+	alloc_xbuf(&ff_xb, FILESFROM_BUFLEN);
 }
 
 /* Read a line into the "buf" buffer. */
@@ -1289,20 +1326,26 @@ static void read_a_msg(void)
 			xbuf outbuf, inbuf;
 			char ibuf[512];
 			int add_null = 0;
+			int flags = ICB_INCLUDE_BAD | ICB_INIT;
 
 			INIT_CONST_XBUF(outbuf, line);
 			INIT_XBUF(inbuf, ibuf, 0, (size_t)-1);
 
 			while (msg_bytes) {
+				size_t len = msg_bytes > sizeof ibuf - inbuf.len ? sizeof ibuf - inbuf.len : msg_bytes;
+				memcpy(ibuf + inbuf.len, perform_io(len, PIO_INPUT_AND_CONSUME), len);
 				inbuf.pos = 0;
-				inbuf.len = msg_bytes > sizeof ibuf ? sizeof ibuf : msg_bytes;
-				memcpy(inbuf.buf, perform_io(inbuf.len, PIO_INPUT_AND_CONSUME), inbuf.len);
-				if (!(msg_bytes -= inbuf.len)
-				 && !ibuf[inbuf.len-1])
+				inbuf.len += len;
+				if (!(msg_bytes -= len) && !ibuf[inbuf.len-1])
 					inbuf.len--, add_null = 1;
-				if (iconvbufs(ic_send, &inbuf, &outbuf,
-				    ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE | ICB_INIT) < 0)
-					goto overflow;
+				if (iconvbufs(ic_send, &inbuf, &outbuf, flags) < 0) {
+					if (errno == E2BIG)
+						goto overflow;
+					/* Buffer ended with an incomplete char, so move the
+					 * bytes to the start of the buffer and continue. */
+					memmove(ibuf, ibuf + inbuf.pos, inbuf.len);
+				}
+				flags &= ~ICB_INIT;
 			}
 			if (add_null) {
 				if (outbuf.len == outbuf.size)
