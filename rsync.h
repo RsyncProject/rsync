@@ -901,6 +901,7 @@ typedef struct {
 #define ICB_INCLUDE_BAD (1<<1)
 #define ICB_INCLUDE_INCOMPLETE (1<<2)
 #define ICB_CIRCULAR_OUT (1<<3)
+#define ICB_INIT (1<<4)
 
 #define RL_EOL_NULLS (1<<0)
 #define RL_DUMP_COMMENTS (1<<1)

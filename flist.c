@@ -731,7 +731,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 		INIT_CONST_XBUF(outbuf, thisname);
 		INIT_XBUF(inbuf, lastname, basename_len, (size_t)-1);
 
-		if (iconvbufs(ic_recv, &inbuf, &outbuf, 0) < 0) {
+		if (iconvbufs(ic_recv, &inbuf, &outbuf, ICB_INIT) < 0) {
 			io_error |= IOERR_GENERAL;
 			rprintf(FERROR_UTF8,
 			    "[%s] cannot convert filename: %s (%s)\n",
@@ -1049,7 +1049,7 @@ static struct file_struct *recv_file_entry(int f, struct file_list *flist, int x
 				read_sbuf(f, inbuf.buf, inbuf.len);
 				INIT_XBUF(outbuf, bp, 0, alloc_len);
 
-				if (iconvbufs(ic_recv, &inbuf, &outbuf, 0) < 0) {
+				if (iconvbufs(ic_recv, &inbuf, &outbuf, ICB_INIT) < 0) {
 					io_error |= IOERR_GENERAL;
 					rprintf(FERROR_XFER,
 					    "[%s] cannot convert symlink data for: %s (%s)\n",
@@ -1464,14 +1464,14 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 			if (file->dirname) {
 				INIT_XBUF_STRLEN(inbuf, (char*)file->dirname);
 				outbuf.size -= 2; /* Reserve room for '/' & 1 more char. */
-				if (iconvbufs(ic_send, &inbuf, &outbuf, 0) < 0)
+				if (iconvbufs(ic_send, &inbuf, &outbuf, ICB_INIT) < 0)
 					goto convert_error;
 				outbuf.size += 2;
 				fbuf[outbuf.len++] = '/';
 			}
 
 			INIT_XBUF_STRLEN(inbuf, (char*)file->basename);
-			if (iconvbufs(ic_send, &inbuf, &outbuf, 0) < 0) {
+			if (iconvbufs(ic_send, &inbuf, &outbuf, ICB_INIT) < 0) {
 			  convert_error:
 				io_error |= IOERR_GENERAL;
 				rprintf(FERROR_XFER,
@@ -1485,7 +1485,7 @@ static struct file_struct *send_file_name(int f, struct file_list *flist,
 			if (symlink_len && sender_symlink_iconv) {
 				INIT_XBUF(inbuf, (char*)symlink_name, symlink_len, (size_t)-1);
 				INIT_CONST_XBUF(outbuf, symlink_buf);
-				if (iconvbufs(ic_send, &inbuf, &outbuf, 0) < 0) {
+				if (iconvbufs(ic_send, &inbuf, &outbuf, ICB_INIT) < 0) {
 					io_error |= IOERR_GENERAL;
 					f_name(file, fbuf);
 					rprintf(FERROR_XFER,

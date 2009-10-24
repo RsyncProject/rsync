@@ -359,7 +359,7 @@ output_msg:
 		INIT_XBUF(inbuf, (char*)buf, len, (size_t)-1);
 
 		while (inbuf.len) {
-			iconvbufs(ic, &inbuf, &outbuf, 0);
+			iconvbufs(ic, &inbuf, &outbuf, inbuf.pos ? 0 : ICB_INIT);
 			ierrno = errno;
 			if (outbuf.len) {
 				filtered_fwrite(f, convbuf, outbuf.len, 0);

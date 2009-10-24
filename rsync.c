@@ -160,8 +160,8 @@ static void wrap_overflow(xbuf *out, int siz)
  * "flags", any badly-encoded chars are included verbatim in the "out" xbuf,
  * so EILSEQ will not be returned.  Likewise for ICB_INCLUDE_INCOMPLETE with
  * respect to an incomplete multi-byte char at the end, which ensures that
- * EINVAL is not returned.  Anytime "in.pos" is 0 we will reset the iconv()
- * state prior to processing the characters. */
+ * EINVAL is not returned.  If ICB_INIT is set, the iconv() conversion state
+ * is initialized prior to processing the characters. */
 int iconvbufs(iconv_t ic, xbuf *in, xbuf *out, int flags)
 {
 	ICONV_CONST char *ibuf;
@@ -171,7 +171,7 @@ int iconvbufs(iconv_t ic, xbuf *in, xbuf *out, int flags)
 	if (!out->size && flags & ICB_EXPAND_OUT)
 		alloc_xbuf(out, 1024);
 
-	if (!in->pos)
+	if (flags & ICB_INIT)
 		iconv(ic, NULL, 0, NULL, 0);
 
 	ibuf = in->buf + in->pos;
@@ -265,7 +265,7 @@ void send_protected_args(int fd, char *args[])
 		else if (convert) {
 			INIT_XBUF_STRLEN(inbuf, args[i]);
 			iconvbufs(ic_send, &inbuf, &outbuf,
-				  ICB_EXPAND_OUT | ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE);
+				  ICB_EXPAND_OUT | ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE | ICB_INIT);
 			outbuf.buf[outbuf.len] = '\0';
 			write_buf(fd, outbuf.buf, outbuf.len + 1);
 			outbuf.len = 0;

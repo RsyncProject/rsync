@@ -378,7 +378,7 @@ static void forward_filesfrom_data(void)
 	}
 	if (len) {
 		char *f = x.buf + x.pos;
-		char *t = f; /* Keep any non-zero offset to avoid iconv reset. */
+		char *t = x.buf;
 		char *eob = f + len;
 		/* Eliminate any multi-'\0' runs. */
 		while (f != eob) {
@@ -393,7 +393,7 @@ static void forward_filesfrom_data(void)
 	if (filesfrom_convert) {
 		/* TODO would it help to translate each string between nulls separately? */
 		x.len = len;
-		iconvbufs(ic_send, &x, &iobuf.out, ICB_INCLUDE_BAD|ICB_INCLUDE_INCOMPLETE|ICB_CIRCULAR_OUT);
+		iconvbufs(ic_send, &x, &iobuf.out, ICB_INCLUDE_BAD|ICB_INCLUDE_INCOMPLETE|ICB_CIRCULAR_OUT|ICB_INIT);
 	} else
 #endif
 	if (len) {
@@ -803,7 +803,7 @@ int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 
 		len = iobuf.msg.len;
 		iconvbufs(ic_send, &inbuf, &iobuf.msg,
-			  ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE | ICB_CIRCULAR_OUT);
+			  ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE | ICB_CIRCULAR_OUT | ICB_INIT);
 		if (inbuf.len > 0) {
 			rprintf(FERROR, "overflowed iobuf.msg buffer in send_msg");
 			exit_cleanup(RERR_UNSUPPORTED);
@@ -1039,7 +1039,7 @@ int read_line(int fd, char *buf, size_t bufsiz, int flags)
 		iconv_buf.pos = 0;
 		iconv_buf.len = s - iconv_buf.buf;
 		iconvbufs(ic_recv, &iconv_buf, &outbuf,
-			  ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE);
+			  ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE | ICB_INIT);
 		outbuf.buf[outbuf.len] = '\0';
 		return outbuf.len;
 	}
@@ -1301,13 +1301,14 @@ static void read_a_msg(void)
 			INIT_XBUF(inbuf, ibuf, 0, (size_t)-1);
 
 			while (msg_bytes) {
+				inbuf.pos = 0;
 				inbuf.len = msg_bytes > sizeof ibuf ? sizeof ibuf : msg_bytes;
 				memcpy(inbuf.buf, perform_io(inbuf.len, PIO_INPUT_AND_CONSUME), inbuf.len);
 				if (!(msg_bytes -= inbuf.len)
 				 && !ibuf[inbuf.len-1])
 					inbuf.len--, add_null = 1;
 				if (iconvbufs(ic_send, &inbuf, &outbuf,
-				    ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE) < 0)
+				    ICB_INCLUDE_BAD | ICB_INCLUDE_INCOMPLETE | ICB_INIT) < 0)
 					goto overflow;
 			}
 			if (add_null) {
