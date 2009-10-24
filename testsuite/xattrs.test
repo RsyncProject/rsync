@@ -5,7 +5,7 @@
 
 # Test that rsync handles basic xattr preservation.
 
-. $srcdir/testsuite/rsync.fns
+. $suitedir/rsync.fns
 
 $RSYNC --version | grep ", xattrs" >/dev/null || test_skipped "Rsync is configured without xattr support"
 

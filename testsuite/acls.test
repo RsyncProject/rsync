@@ -5,7 +5,7 @@
 
 # Test that rsync handles basic ACL preservation.
 
-. $srcdir/testsuite/rsync.fns
+. $suitedir/rsync.fns
 
 $RSYNC --version | grep ", ACLs" >/dev/null || test_skipped "Rsync is configured without ACL support"
 
