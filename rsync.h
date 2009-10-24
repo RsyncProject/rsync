@@ -903,6 +903,13 @@ typedef struct {
 #define ICB_CIRCULAR_OUT (1<<3)
 #define ICB_INIT (1<<4)
 
+#define IOBUF_KEEP_BUFS 0
+#define IOBUF_FREE_BUFS 1
+
+#define MPLX_SWITCHING IOBUF_KEEP_BUFS
+#define MPLX_ALL_DONE IOBUF_FREE_BUFS
+#define MPLX_TO_BUFFERED 2
+
 #define RL_EOL_NULLS (1<<0)
 #define RL_DUMP_COMMENTS (1<<1)
 #define RL_CONVERT (1<<2)

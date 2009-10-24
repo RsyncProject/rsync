@@ -348,7 +348,7 @@ static void forward_filesfrom_data(void)
 			ff_forward_fd = -1;
 			write_buf(iobuf.out_fd, "\0\0", ff_lastchar ? 2 : 1);
 			free_xbuf(&ff_xb);
-			if (protocol_version < 31)
+			if (protocol_version == 30)
 				io_start_multiplex_out(iobuf.out_fd);
 		}
 		return;
@@ -1016,18 +1016,15 @@ int get_hlink_num(void)
  * for recv_file_list() to use. */
 void start_filesfrom_forwarding(int fd)
 {
-	ff_forward_fd = fd;
-	if (protocol_version < 31) {
-		int save_fd = iobuf.out_fd;
+	if (protocol_version == 30) {
 		/* Older protocols send the files-from data w/o packaging it in
-		 * multiplexed I/O packets.  To match this, we temporarily turn
-		 * off the multiplexing of our output w/o disabling buffering. */
-		assert(OUT_MULTIPLEXED);
-		/* Be extra, extra sure no messages go out before files-from data. */
-		iobuf.msg.pos = iobuf.msg.len = 0;
-		io_end_multiplex_out(False);
-		iobuf.out_fd = save_fd;
+		 * multiplexed I/O packets, but protocol 30 messed up and did
+		 * this after starting multiplexing.  We'll temporarily switch
+		 * to buffered I/O to match this behavior. */
+		iobuf.msg.pos = iobuf.msg.len = 0; /* Be extra sure no messages go out. */
+		io_end_multiplex_out(MPLX_TO_BUFFERED);
 	}
+	ff_forward_fd = fd;
 
 	alloc_xbuf(&ff_xb, FILESFROM_BUFLEN);
 }
@@ -1192,9 +1189,9 @@ int io_start_buffering_in(int f_in)
 
 void io_end_buffering_in(BOOL free_buffers)
 {
-	if (DEBUG_GTE(IO, 2)) {
-		rprintf(FINFO, "[%s] io_end_buffering_in(%s)\n",
-			who_am_i(), free_buffers ? "True" : "False");
+	if (msgs2stderr && DEBUG_GTE(IO, 2)) {
+		rprintf(FINFO, "[%s] io_end_buffering_in(IOBUF_%s_BUFS)\n",
+			who_am_i(), free_buffers ? "FREE" : "KEEP");
 	}
 
 	if (free_buffers)
@@ -1207,9 +1204,9 @@ void io_end_buffering_in(BOOL free_buffers)
 
 void io_end_buffering_out(BOOL free_buffers)
 {
-	if (DEBUG_GTE(IO, 2)) {
-		rprintf(FINFO, "[%s] io_end_buffering_out(%s)\n",
-			who_am_i(), free_buffers ? "True" : "False");
+	if (msgs2stderr && DEBUG_GTE(IO, 2)) {
+		rprintf(FINFO, "[%s] io_end_buffering_out(IOBUF_%s_BUFS)\n",
+			who_am_i(), free_buffers ? "FREE" : "KEEP");
 	}
 
 	io_flush(FULL_FLUSH);
@@ -1217,9 +1214,6 @@ void io_end_buffering_out(BOOL free_buffers)
 	if (free_buffers) {
 		free_xbuf(&iobuf.out);
 		free_xbuf(&iobuf.msg);
-	} else {
-		iobuf.out.pos = iobuf.out.len = 0;
-		iobuf.msg.pos = iobuf.msg.len = 0;
 	}
 
 	iobuf.out_fd = -1;
@@ -2045,10 +2039,10 @@ void io_printf(int fd, const char *format, ...)
 /* Setup for multiplexing a MSG_* stream with the data stream. */
 void io_start_multiplex_out(int fd)
 {
+	io_flush(FULL_FLUSH);
+
 	if (msgs2stderr && DEBUG_GTE(IO, 2))
 		rprintf(FINFO, "[%s] io_start_multiplex_out(%d)\n", who_am_i(), fd);
-
-	io_flush(FULL_FLUSH);
 
 	iobuf.out_empty_len = 4; /* See also OUT_MULTIPLEXED */
 	io_start_buffering_out(fd);
@@ -2067,27 +2061,32 @@ void io_start_multiplex_in(int fd)
 	io_start_buffering_in(fd);
 }
 
-void io_end_multiplex_in(BOOL free_buffers)
+void io_end_multiplex_in(int mode)
 {
-	if (DEBUG_GTE(IO, 2)) {
-		rprintf(FINFO, "[%s] io_end_multiplex_in(%s)\n",
-			who_am_i(), free_buffers ? "True" : "False");
-	}
+	if (msgs2stderr && DEBUG_GTE(IO, 2))
+		rprintf(FINFO, "[%s] io_end_multiplex_in(mode=%d)\n", who_am_i(), mode);
 
 	iobuf.in_multiplexed = False;
-	iobuf.raw_input_ends_before = 0;
-	io_end_buffering_in(free_buffers);
+	if (mode == MPLX_SWITCHING)
+		iobuf.raw_input_ends_before = 0;
+	else
+		assert(iobuf.raw_input_ends_before == 0);
+	if (mode != MPLX_TO_BUFFERED)
+		io_end_buffering_in(mode);
 }
 
 /* Stop output multiplexing. */
-void io_end_multiplex_out(BOOL free_buffers)
+void io_end_multiplex_out(int mode)
 {
-	if (DEBUG_GTE(IO, 2)) {
-		rprintf(FINFO, "[%s] io_end_multiplex_out(%s)\n",
-			who_am_i(), free_buffers ? "True" : "False");
-	}
+	if (msgs2stderr && DEBUG_GTE(IO, 2))
+		rprintf(FINFO, "[%s] io_end_multiplex_out(mode=%d)\n", who_am_i(), mode);
 
-	io_end_buffering_out(free_buffers);
+	if (mode != MPLX_TO_BUFFERED)
+		io_end_buffering_out(mode);
+	else
+		io_flush(FULL_FLUSH);
+
+	iobuf.out.len = 0;
 	iobuf.out_empty_len = 0;
 }
 

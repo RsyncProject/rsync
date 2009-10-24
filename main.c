@@ -848,7 +848,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 		close(error_pipe[0]);
 
 		/* We can't let two processes write to the socket at one time. */
-		io_end_multiplex_out(False);
+		io_end_multiplex_out(MPLX_SWITCHING);
 		if (f_in != f_out)
 			close(f_out);
 		sock_f_out = -1;
@@ -895,7 +895,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 
 	am_generator = 1;
 
-	io_end_multiplex_in(False);
+	io_end_multiplex_in(MPLX_SWITCHING);
 	if (write_batch && !am_server)
 		stop_write_batch();
 
@@ -1056,6 +1056,8 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
 		if (need_messages_from_generator)
 			io_start_multiplex_in(f_in);
+		else
+			io_start_buffering_in(f_in);
 		recv_filter_list(f_in);
 		do_server_sender(f_in, f_out, argc, argv);
 	} else
@@ -1104,6 +1106,8 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			io_start_buffering_out(f_out);
 		if (protocol_version >= 31 || (!filesfrom_host && protocol_version >= 23))
 			io_start_multiplex_in(f_in);
+		else
+			io_start_buffering_in(f_in);
 		send_filter_list(f_out);
 		if (filesfrom_host)
 			filesfrom_fd = f_in;
@@ -1139,6 +1143,8 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 			io_start_multiplex_in(f_in);
 		if (need_messages_from_generator)
 			io_start_multiplex_out(f_out);
+		else
+			io_start_buffering_out(f_out);
 	}
 
 	send_filter_list(read_batch ? -1 : f_out);
