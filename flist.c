@@ -52,7 +52,6 @@ extern int preserve_hard_links;
 extern int preserve_devices;
 extern int preserve_specials;
 extern int missing_args;
-extern int sock_f_in;
 extern int uid_ndx;
 extern int gid_ndx;
 extern int eol_nulls;
@@ -2052,7 +2051,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	struct timeval start_tv, end_tv;
 	int64 start_write;
 	int use_ff_fd = 0;
-	int disable_buffering;
+	int disable_buffering, reenable_multiplex = -1;
 	int flags = recurse ? FLAG_CONTENT_DIR : 0;
 	int reading_remotely = filesfrom_host != NULL;
 	int rl_flags = (reading_remotely ? 0 : RL_DUMP_COMMENTS)
@@ -2093,12 +2092,11 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 				full_fname(argv[0]));
 			exit_cleanup(RERR_FILESELECT);
 		}
-		if (protocol_version == 30) {
-			/* Older protocols send the files-from data w/o packaging it in
-			 * multiplexed I/O packets, but protocol 30 messed up and did
-			 * this after starting multiplexing.  We'll temporarily switch
+		if (protocol_version < 31) {
+			/* Older protocols send the files-from data w/o packaging
+			 * it in multiplexed I/O packets, so temporarily switch
 			 * to buffered I/O to match this behavior. */
-			io_end_multiplex_in(MPLX_TO_BUFFERED);
+			reenable_multiplex = io_end_multiplex_in(MPLX_TO_BUFFERED);
 		}
 		use_ff_fd = 1;
 	}
@@ -2305,8 +2303,8 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 			send_file_name(f, flist, fbuf, &st, flags, NO_FILTERS);
 	}
 
-	if (use_ff_fd && protocol_version == 30)
-		io_start_multiplex_in(sock_f_in);
+	if (reenable_multiplex >= 0)
+		io_start_multiplex_in(reenable_multiplex);
 
 	gettimeofday(&end_tv, NULL);
 	stats.flist_buildtime = (int64)(end_tv.tv_sec - start_tv.tv_sec) * 1000

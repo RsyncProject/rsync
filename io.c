@@ -94,7 +94,8 @@ static int write_batch_monitor_in = -1;
 static int write_batch_monitor_out = -1;
 
 static int ff_forward_fd = -1;
-static char ff_lastchar;
+static int ff_reenable_multiplex = -1;
+static char ff_lastchar = '\0';
 static xbuf ff_xb = EMPTY_XBUF;
 #ifdef ICONV_OPTION
 static xbuf iconv_buf = EMPTY_XBUF;
@@ -348,8 +349,8 @@ static void forward_filesfrom_data(void)
 			ff_forward_fd = -1;
 			write_buf(iobuf.out_fd, "\0\0", ff_lastchar ? 2 : 1);
 			free_xbuf(&ff_xb);
-			if (protocol_version == 30)
-				io_start_multiplex_out(iobuf.out_fd);
+			if (ff_reenable_multiplex >= 0)
+				io_start_multiplex_out(ff_reenable_multiplex);
 		}
 		return;
 	}
@@ -1016,13 +1017,12 @@ int get_hlink_num(void)
  * for recv_file_list() to use. */
 void start_filesfrom_forwarding(int fd)
 {
-	if (protocol_version == 30) {
-		/* Older protocols send the files-from data w/o packaging it in
-		 * multiplexed I/O packets, but protocol 30 messed up and did
-		 * this after starting multiplexing.  We'll temporarily switch
+	if (protocol_version < 31 && OUT_MULTIPLEXED) {
+		/* Older protocols send the files-from data w/o packaging
+		 * it in multiplexed I/O packets, so temporarily switch
 		 * to buffered I/O to match this behavior. */
 		iobuf.msg.pos = iobuf.msg.len = 0; /* Be extra sure no messages go out. */
-		io_end_multiplex_out(MPLX_TO_BUFFERED);
+		ff_reenable_multiplex = io_end_multiplex_out(MPLX_TO_BUFFERED);
 	}
 	ff_forward_fd = fd;
 
@@ -1135,7 +1135,7 @@ void read_args(int f_in, char *mod_name, char *buf, size_t bufsiz, int rl_nulls,
 	*argv_p = argv;
 }
 
-int io_start_buffering_out(int f_out)
+BOOL io_start_buffering_out(int f_out)
 {
 	if (msgs2stderr && DEBUG_GTE(IO, 2))
 		rprintf(FINFO, "[%s] io_start_buffering_out(%d)\n", who_am_i(), f_out);
@@ -1151,7 +1151,7 @@ int io_start_buffering_out(int f_out)
 		if (iobuf.out_fd == -1)
 			iobuf.out_fd = f_out;
 		assert(f_out == iobuf.out_fd);
-		return 0;
+		return False;
 	}
 
 	iobuf.out.size = IO_BUFFER_SIZE * 2 - 4;
@@ -1161,10 +1161,10 @@ int io_start_buffering_out(int f_out)
 	iobuf.out.pos = iobuf.out.len = 0;
 	iobuf.out_fd = f_out;
 
-	return 1;
+	return True;
 }
 
-int io_start_buffering_in(int f_in)
+BOOL io_start_buffering_in(int f_in)
 {
 	if (msgs2stderr && DEBUG_GTE(IO, 2))
 		rprintf(FINFO, "[%s] io_start_buffering_in(%d)\n", who_am_i(), f_in);
@@ -1173,7 +1173,7 @@ int io_start_buffering_in(int f_in)
 		if (iobuf.in_fd == -1)
 			iobuf.in_fd = f_in;
 		assert(f_in == iobuf.in_fd);
-		return 0;
+		return False;
 	}
 
 	iobuf.in.size = IO_BUFFER_SIZE;
@@ -1184,7 +1184,7 @@ int io_start_buffering_in(int f_in)
 
 	iobuf.in_fd = f_in;
 
-	return 1;
+	return True;
 }
 
 void io_end_buffering_in(BOOL free_buffers)
@@ -2061,8 +2061,10 @@ void io_start_multiplex_in(int fd)
 	io_start_buffering_in(fd);
 }
 
-void io_end_multiplex_in(int mode)
+int io_end_multiplex_in(int mode)
 {
+	int ret = iobuf.in_multiplexed ? iobuf.in_fd : -1;
+
 	if (msgs2stderr && DEBUG_GTE(IO, 2))
 		rprintf(FINFO, "[%s] io_end_multiplex_in(mode=%d)\n", who_am_i(), mode);
 
@@ -2073,11 +2075,14 @@ void io_end_multiplex_in(int mode)
 		assert(iobuf.raw_input_ends_before == 0);
 	if (mode != MPLX_TO_BUFFERED)
 		io_end_buffering_in(mode);
+
+	return ret;
 }
 
-/* Stop output multiplexing. */
-void io_end_multiplex_out(int mode)
+int io_end_multiplex_out(int mode)
 {
+	int ret = iobuf.out_empty_len ? iobuf.out_fd : -1;
+
 	if (msgs2stderr && DEBUG_GTE(IO, 2))
 		rprintf(FINFO, "[%s] io_end_multiplex_out(mode=%d)\n", who_am_i(), mode);
 
@@ -2088,6 +2093,8 @@ void io_end_multiplex_out(int mode)
 
 	iobuf.out.len = 0;
 	iobuf.out_empty_len = 0;
+
+	return ret;
 }
 
 void start_write_batch(int fd)
