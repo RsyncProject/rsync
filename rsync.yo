@@ -1561,6 +1561,11 @@ quote(tt(   rsync -a --files-from=:/path/file-list src:/ /tmp/copy))
 This would copy all the files specified in the /path/file-list file that
 was located on the remote "src" host.
 
+If the bf(--iconv) and bf(--protect-args) options are specified and the
+bf(--files-from) filenames are being sent from one host to another, the
+filenames will be translated from the sending host's charset to the
+receiving host's charset.
+
 dit(bf(-0, --from0)) This tells rsync that the rules/filenames it reads from a
 file are terminated by a null ('\0') character, not a NL, CR, or CR+LF.
 This affects bf(--exclude-from), bf(--include-from), bf(--files-from), and any
@@ -1568,18 +1573,14 @@ merged files specified in a bf(--filter) rule.
 It does not affect bf(--cvs-exclude) (since all names read from a .cvsignore
 file are split on whitespace).
 
-If the bf(--iconv) and bf(--protect-args) options are specified and the
-bf(--files-from) filenames are being sent from one host to another, the
-filenames will be translated from the sending host's charset to the
-receiving host's charset.
-
-dit(bf(-s, --protect-args)) This option sends all filenames and some options to
+dit(bf(-s, --protect-args)) This option sends all filenames and most options to
 the remote rsync without allowing the remote shell to interpret them.  This
 means that spaces are not split in names, and any non-wildcard special
 characters are not translated (such as ~, $, ;, &, etc.).  Wildcards are
 expanded on the remote host by rsync (instead of the shell doing it).
 
-If you use this option with bf(--iconv), the args will also be translated
+If you use this option with bf(--iconv), the args related to the remote
+side will also be translated
 from the local to the remote character-set.  The translation happens before
 wild-cards are expanded.  See also the bf(--files-from) option.
 
