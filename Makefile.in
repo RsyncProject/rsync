@@ -240,6 +240,9 @@ check: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 check29: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
 	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh --protocol=29
 
+check30: all $(CHECK_PROGS) $(CHECK_SYMLINKS)
+	rsync_bin=`pwd`/rsync$(EXEEXT) $(srcdir)/runtests.sh --protocol=30
+
 wildtest.o: wildtest.c lib/wildmatch.c rsync.h config.h
 wildtest$(EXEEXT): wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ wildtest.o lib/compat.o lib/snprintf.o @BUILD_POPT@ $(LIBS)
