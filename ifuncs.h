@@ -35,6 +35,14 @@ realloc_xbuf(xbuf *xb, size_t sz)
 	xb->size = sz;
 }
 
+static inline void
+free_xbuf(xbuf *xb)
+{
+	if (xb->buf)
+		free(xb->buf);
+	memset(xb, 0, sizeof (xbuf));
+}
+
 static inline int
 to_wire_mode(mode_t mode)
 {

@@ -1153,13 +1153,6 @@ int io_start_buffering_in(int f_in)
 	return 1;
 }
 
-static void free_xbuf(xbuf *x)
-{
-	if (x->buf)
-		free(x->buf);
-	memset(x, 0, sizeof (xbuf));
-}
-
 void io_end_buffering_in(BOOL free_buffers)
 {
 	if (DEBUG_GTE(IO, 2)) {
