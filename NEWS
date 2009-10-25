@@ -9,7 +9,9 @@ Changes since 3.0.4:
       "log format" parameter and related command-line options (including
       --out-format) for a modifier that can be used to request digit-grouping
       or human-readable output in log escapes. (Note that log output is
-      unchanged by default.)
+      unchanged by default.)  When some level of human-readable output is
+      enabled, the column width for the file size in the --list-only output
+      is increased.
 
     - The output of the --progress option has changed:  the string "xfer" was
       shortened to "xfr", and the string "to-check" was shortened to "to-chk",
@@ -20,13 +22,26 @@ Changes since 3.0.4:
       letting you know that the value to check and the total value will still
       be increasing as new files are found.
 
+    - Enhanced the --stats output: 1) to mention how many files were created
+      (protocol >= 28), 2) to mention how many files were deleted (new for
+      protocol 31, but only output when --delete is in effect), and 3) to
+      follow the file-count, created-count, and deleted-count with a subcount
+      list broken down by type.
+
   BUG FIXES:
+
+    - Fixed a bug in incremental recursion transfers where an I/O error might
+      not get noticed in time for the receiving side to disable deletions
+      (requires protocol 31).
 
     - Changed the way --progress overwrites its prior output in order to make
       it nearly impossible for the progress to get overwritten by an error.
 
     - An absolute-path filter rule (i.e. with a '/' modifier) no longer loses
       its modifier when sending the filter rules to the remote rsync.
+
+    - Fixed some rare bugs in --iconv processing that might cause a multibyte
+      character to get translated incorrectly.
 
   ENHANCEMENTS:
 
@@ -37,17 +52,16 @@ Changes since 3.0.4:
       control over what is output.  Added an extra type of --progress output
       using --info=progress2.
 
+    - The --msgs2stderr option can help with debugging rsync by allowing the
+      debug messages to get output to stderr rather than travel via the socket
+      protocol.
+
     - Added the --delete-missing-args and --ignore-missing-args options to
       either delete or ignore user-specified files on the receiver that are
       missing on the sender (normally the absence of user-specified files
       generates an error).
 
     - Added a "T" (terabyte) category to the --human-readable size suffixes.
-
-    - Enhanced the --stats output: 1) to mention how many files were created
-      (protocol >= 28), 2) to mention how many files were deleted (new for
-      protocol 31), and 3) to follow the file-count, created-count, and
-      deleted-count with a break-out list of each count by type.
 
     - Added the --usermap/--groupmap/--chown options for manipulating file
       ownership during the copy.
@@ -59,15 +73,29 @@ Changes since 3.0.4:
     - Added the "reverse lookup" parameter to the rsync daemon config file to
       allow reverse-DNS lookups to be disabled.
 
-    - Added a way for supplementary groups to be specified in the rsyncd.conf
-      file.  Also made explicitly-set uid/gid values no longer ignored by a
-      daemon that was not run by a super-user.
+    - Added a way for more than one group to be specified in the daemon's
+      config file, including a way to specify that you want all of the
+      specified user's groups without having to name them.  Also changed the
+      daemon to complain about an inability to set explicitly-specified uid/gid
+      values, even when not run by a super-user.
+
+    - Added a way to reference environment variables in a daemon's config file
+      (using %VAR% references).
 
     - When replacing a non-dir with a symlink/hard-link/device/special-file,
       the update should now be done in an atomic manner.
 
+    - Fixed a free of the wrong pointer in uncache_tmp_xattrs() (which only
+      sometimes affects an --xattr transfer when --backup is used).
+
     - When backing up a file, try to hard-link the file into place so that the
       upcoming replacement of the destination file will be atomic.
+
+    - Added the ability to synchronize nano-second modified times.
+
+    - Added a few more default suffixes for the "dont compress" settings.
+
+    - Added some Solaris xattr code.
 
   EXTRAS:
 
@@ -78,12 +106,21 @@ Changes since 3.0.4:
       makes it easier to do user/group mapping in a local transfer based on
       passwd/group files from another machine.
 
-  DEVELOPER RELATED:
+  INTERNAL:
+
+    - The I/O code was rewritten to be simpler and do bigger buffered reads
+      over the socket.  The I/O between the receiver and the generator was
+      changed to be standard multiplexed-I/O (like that over the socket).
+
+    - The sender tries to use any dead time while the generator is looking for
+      files to transfer in order to do sender-side directory scanning in a more
+      parallel manner.
+
+    - A daemon can now inform a client about a daemon-configured timeout value
+      so that the client can assist in the keep-alive activity (protocol 31).
 
     - The filter code received some refactoring to make it more extendable, to
       read better, and do better sanity checking.
-
-    - Added more conditional debug output.
 
     - Really big numbers are now output using our own big-num routine rather
       than casting them to a double and using a %.0f conversion.
@@ -92,3 +129,7 @@ Changes since 3.0.4:
       handling.
 
     - Added init_stat_x() function to avoid duplication of acl/xattr init code.
+
+  DEVELOPER RELATED:
+
+    - Added more conditional debug output.
