@@ -171,7 +171,6 @@ void send_files(int f_in, int f_out)
 	int iflags, xlen;
 	struct file_struct *file;
 	int phase = 0, max_phase = protocol_version >= 29 ? 2 : 1;
-	struct stats initial_stats;
 	int itemizing = am_server ? logfile_format_has_i : stdout_format_has_i;
 	enum logcode log_code = log_before_transfer ? FLOG : FINFO;
 	int f_xfer = write_batch < 0 ? batch_fd : f_out;
@@ -291,14 +290,15 @@ void send_files(int f_in, int f_out)
 		stats.xferred_files++;
 		stats.total_transferred_size += F_LENGTH(file);
 
+		if (!log_before_transfer)
+			remember_initial_stats();
+
 		if (!do_xfers) { /* log the transfer */
-			log_item(FCLIENT, file, &stats, iflags, NULL);
+			log_item(FCLIENT, file, iflags, NULL);
 			write_ndx_and_attrs(f_out, ndx, iflags, fname, file,
 					    fnamecmp_type, xname, xlen);
 			continue;
 		}
-
-		initial_stats = stats;
 
 		if (!(s = receive_sums(f_in))) {
 			io_error |= IOERR_GENERAL;
@@ -355,7 +355,7 @@ void send_files(int f_in, int f_out)
 			rprintf(FINFO, "calling match_sums %s%s%s\n", path,slash,fname);
 
 		if (log_before_transfer)
-			log_item(FCLIENT, file, &initial_stats, iflags, NULL);
+			log_item(FCLIENT, file, iflags, NULL);
 		else if (!am_server && INFO_GTE(NAME, 1) && INFO_EQ(PROGRESS, 1))
 			rprintf(FCLIENT, "%s\n", fname);
 
@@ -365,7 +365,7 @@ void send_files(int f_in, int f_out)
 		if (INFO_GTE(PROGRESS, 1))
 			end_progress(st.st_size);
 
-		log_item(log_code, file, &initial_stats, iflags, NULL);
+		log_item(log_code, file, iflags, NULL);
 
 		if (mbuf) {
 			j = unmap_file(mbuf);

@@ -516,7 +516,7 @@ void itemize(const char *fnamecmp, struct file_struct *file, int ndx, int statre
 #endif
 		} else if (ndx >= 0) {
 			enum logcode code = logfile_format_has_i ? FINFO : FCLIENT;
-			log_item(code, file, &stats, iflags, xname);
+			log_item(code, file, iflags, xname);
 		}
 	}
 }

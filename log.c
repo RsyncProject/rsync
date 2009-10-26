@@ -44,6 +44,8 @@ extern int stdout_format_has_o_or_i;
 extern int logfile_format_has_i;
 extern int logfile_format_has_o_or_i;
 extern int receiver_symlink_times;
+extern int64 total_data_written;
+extern int64 total_data_read;
 extern mode_t orig_umask;
 extern char *auth_user;
 extern char *stdout_format;
@@ -69,6 +71,9 @@ struct stats stats;
 int got_xfer_error = 0;
 int output_needs_newline = 0;
 int send_msgs_to_gen = 0;
+
+static int64 initial_data_written;
+static int64 initial_data_read;
 
 struct {
         int code;
@@ -467,10 +472,15 @@ void rflush(enum logcode code)
 	fflush(f);
 }
 
+void remember_initial_stats(void)
+{
+	initial_data_read = total_data_read;
+	initial_data_written = total_data_written;
+}
+
 /* A generic logging routine for send/recv, with parameter substitiution. */
 static void log_formatted(enum logcode code, const char *format, const char *op,
-			  struct file_struct *file, const char *fname,
-			  struct stats *initial_stats, int iflags,
+			  struct file_struct *file, const char *fname, int iflags,
 			  const char *hlink)
 {
 	char buf[MAXPATHLEN+1024], buf2[MAXPATHLEN], fmt[32];
@@ -640,26 +650,24 @@ static void log_formatted(enum logcode code, const char *format, const char *op,
 			n = auth_user;
 			break;
 		case 'b':
-			if (am_sender) {
-				b = stats.total_written -
-					initial_stats->total_written;
-			} else {
-				b = stats.total_read -
-					initial_stats->total_read;
-			}
+			if (!(iflags & ITEM_TRANSFER))
+				b = 0;
+			else if (am_sender)
+				b = total_data_written - initial_data_written;
+			else
+				b = total_data_read - initial_data_read;
 			strlcat(fmt, "s", sizeof fmt);
 			snprintf(buf2, sizeof buf2, fmt,
 				 do_big_num(b, humanize, NULL));
 			n = buf2;
 			break;
 		case 'c':
-			if (!am_sender) {
-				b = stats.total_written -
-					initial_stats->total_written;
-			} else {
-				b = stats.total_read -
-					initial_stats->total_read;
-			}
+			if (!(iflags & ITEM_TRANSFER))
+				b = 0;
+			else if (!am_sender)
+				b = total_data_written - initial_data_written;
+			else
+				b = total_data_read - initial_data_read;
 			strlcat(fmt, "s", sizeof fmt);
 			snprintf(buf2, sizeof buf2, fmt,
 				 do_big_num(b, humanize, NULL));
@@ -802,19 +810,14 @@ int log_format_has(const char *format, char esc)
 /* Log the transfer of a file.  If the code is FCLIENT, the output just goes
  * to stdout.  If it is FLOG, it just goes to the log file.  Otherwise we
  * output to both. */
-void log_item(enum logcode code, struct file_struct *file,
-	      struct stats *initial_stats, int iflags, const char *hlink)
+void log_item(enum logcode code, struct file_struct *file, int iflags, const char *hlink)
 {
 	const char *s_or_r = am_sender ? "send" : "recv";
 
-	if (code != FLOG && stdout_format && !am_server) {
-		log_formatted(FCLIENT, stdout_format, s_or_r,
-			      file, NULL, initial_stats, iflags, hlink);
-	}
-	if (code != FCLIENT && logfile_format && *logfile_format) {
-		log_formatted(FLOG, logfile_format, s_or_r,
-			      file, NULL, initial_stats, iflags, hlink);
-	}
+	if (code != FLOG && stdout_format && !am_server)
+		log_formatted(FCLIENT, stdout_format, s_or_r, file, NULL, iflags, hlink);
+	if (code != FCLIENT && logfile_format && *logfile_format)
+		log_formatted(FLOG, logfile_format, s_or_r, file, NULL, iflags, hlink);
 }
 
 void maybe_log_item(struct file_struct *file, int iflags, int itemizing,
@@ -827,11 +830,11 @@ void maybe_log_item(struct file_struct *file, int iflags, int itemizing,
 	if (am_server) {
 		if (logfile_name && !dry_run && see_item
 		 && (significant_flags || logfile_format_has_i))
-			log_item(FLOG, file, &stats, iflags, buf);
+			log_item(FLOG, file, iflags, buf);
 	} else if (see_item || local_change || *buf
 	    || (S_ISDIR(file->mode) && significant_flags)) {
 		enum logcode code = significant_flags || logfile_format_has_i ? FINFO : FCLIENT;
-		log_item(code, file, &stats, iflags, buf);
+		log_item(code, file, iflags, buf);
 	}
 }
 
@@ -854,15 +857,14 @@ void log_delete(const char *fname, int mode)
 		send_msg(MSG_DELETED, fname, len, am_generator);
 	} else {
 		fmt = stdout_format_has_o_or_i ? stdout_format : "deleting %n";
-		log_formatted(FCLIENT, fmt, "del.", &x.file, fname, &stats,
-			      ITEM_DELETED, NULL);
+		log_formatted(FCLIENT, fmt, "del.", &x.file, fname, ITEM_DELETED, NULL);
 	}
 
 	if (!logfile_name || dry_run || !logfile_format)
 		return;
 
 	fmt = logfile_format_has_o_or_i ? logfile_format : "deleting %n";
-	log_formatted(FLOG, fmt, "del.", &x.file, fname, &stats, ITEM_DELETED, NULL);
+	log_formatted(FLOG, fmt, "del.", &x.file, fname, ITEM_DELETED, NULL);
 }
 
 /*

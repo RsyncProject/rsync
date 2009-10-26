@@ -76,6 +76,9 @@ int kluge_around_eof = 0;
 int sock_f_in = -1;
 int sock_f_out = -1;
 
+int64 total_data_read = 0;
+int64 total_data_written = 0;
+
 static struct {
 	xbuf in, out, msg;
 	int in_fd;
@@ -1578,6 +1581,7 @@ void read_buf(int f, char *buf, size_t len)
 
 	if (!IN_MULTIPLEXED) {
 		memcpy(buf, perform_io(len, PIO_INPUT_AND_CONSUME), len);
+		total_data_read += len;
 		if (forward_flist_data)
 			write_buf(iobuf.out_fd, buf, len);
 	  batch_copy:
@@ -1601,6 +1605,7 @@ void read_buf(int f, char *buf, size_t len)
 		/* The bytes at the "data" pointer will survive long
 		 * enough to make a copy, but not past future I/O. */
 		memcpy(buf, data, siz);
+		total_data_read += siz;
 
 		if (forward_flist_data)
 			write_buf(iobuf.out_fd, buf, siz);
@@ -1873,6 +1878,7 @@ void write_buf(int f, const char *buf, size_t len)
 		memcpy(iobuf.out.buf + pos, buf, len);
 
 	iobuf.out.len += len;
+	total_data_written += len;
 
   batch_copy:
 	if (f == write_batch_monitor_out)

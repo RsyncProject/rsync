@@ -467,7 +467,6 @@ int recv_files(int f_in, int f_out, char *local_name)
 	char fnamecmpbuf[MAXPATHLEN];
 	uchar fnamecmp_type;
 	struct file_struct *file;
-	struct stats initial_stats;
 	int itemizing = am_server ? logfile_format_has_i : stdout_format_has_i;
 	enum logcode log_code = log_before_transfer ? FLOG : FINFO;
 	int max_phase = protocol_version >= 29 ? 2 : 1;
@@ -612,14 +611,17 @@ int recv_files(int f_in, int f_out, char *local_name)
 			}
 		}
 
+		if (!log_before_transfer)
+			remember_initial_stats();
+
 		if (!do_xfers) { /* log the transfer */
-			log_item(FCLIENT, file, &stats, iflags, NULL);
+			log_item(FCLIENT, file, iflags, NULL);
 			if (read_batch)
 				discard_receive_data(f_in, F_LENGTH(file));
 			continue;
 		}
 		if (write_batch < 0) {
-			log_item(FCLIENT, file, &stats, iflags, NULL);
+			log_item(FCLIENT, file, iflags, NULL);
 			if (!am_server)
 				discard_receive_data(f_in, F_LENGTH(file));
 			continue;
@@ -676,8 +678,6 @@ int recv_files(int f_in, int f_out, char *local_name)
 			else
 				fnamecmp = fname;
 		}
-
-		initial_stats = stats;
 
 		/* open the file */
 		fd1 = do_open(fnamecmp, O_RDONLY, 0);
@@ -773,7 +773,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 
 		/* log the transfer */
 		if (log_before_transfer)
-			log_item(FCLIENT, file, &initial_stats, iflags, NULL);
+			log_item(FCLIENT, file, iflags, NULL);
 		else if (!am_server && INFO_GTE(NAME, 1) && INFO_EQ(PROGRESS, 1))
 			rprintf(FINFO, "%s\n", fname);
 
@@ -781,7 +781,7 @@ int recv_files(int f_in, int f_out, char *local_name)
 		recv_ok = receive_data(f_in, fnamecmp, fd1, st.st_size,
 				       fname, fd2, F_LENGTH(file));
 
-		log_item(log_code, file, &initial_stats, iflags, NULL);
+		log_item(log_code, file, iflags, NULL);
 
 		if (fd1 != -1)
 			close(fd1);
