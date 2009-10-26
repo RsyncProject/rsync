@@ -785,10 +785,12 @@ int log_format_has(const char *format, char esc)
 		return 0;
 
 	for (p = format; (p = strchr(p, '%')) != NULL; ) {
-		if (*++p == '-')
+		for (p++; *p == '\''; p++) {}
+		if (*p == '-')
 			p++;
 		while (isDigit(p))
 			p++;
+		while (*p == '\'') p++;
 		if (!*p)
 			break;
 		if (*p == esc)
