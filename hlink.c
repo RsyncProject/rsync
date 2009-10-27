@@ -32,7 +32,6 @@ extern int do_xfers;
 extern int link_dest;
 extern int preserve_acls;
 extern int preserve_xattrs;
-extern int make_backups;
 extern int protocol_version;
 extern int remove_source_files;
 extern int stdout_format_has_i;

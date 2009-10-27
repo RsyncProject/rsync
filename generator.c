@@ -91,7 +91,6 @@ extern int max_delete;
 extern int force_delete;
 extern int one_file_system;
 extern int skipped_deletes;
-extern struct stats stats;
 extern dev_t filesystem_dev;
 extern mode_t orig_umask;
 extern uid_t our_uid;

@@ -46,7 +46,6 @@ extern int inc_recurse;
 extern int inplace;
 extern int flist_eof;
 extern int file_old_total;
-extern int msgs2stderr;
 extern int keep_dirlinks;
 extern int make_backups;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
