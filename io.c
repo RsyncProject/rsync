@@ -1264,7 +1264,7 @@ void stop_flist_forward(void)
 static void read_a_msg(void)
 {
 	char *data, line[BIGPATHBUFLEN];
-	int tag;
+	int tag, val;
 	size_t msg_bytes;
 
 	data = perform_io(4, PIO_INPUT_AND_CONSUME);
@@ -1305,6 +1305,17 @@ static void read_a_msg(void)
 		io_error |= IVAL(data, 0);
 		if (!am_generator)
 			send_msg(MSG_IO_ERROR, data, 4, 0);
+		break;
+	case MSG_IO_TIMEOUT:
+		if (msg_bytes != 4 || am_sender || am_generator)
+			goto invalid_msg;
+		data = perform_io(4, PIO_INPUT_AND_CONSUME);
+		val = IVAL(data, 0);
+		if (!io_timeout || io_timeout > val) {
+			if (INFO_GTE(MISC, 2))
+				rprintf(FINFO, "Setting --timeout=%d to match server\n", val);
+			io_timeout = val;
+		}
 		break;
 	case MSG_NOOP:
 		if (am_sender)

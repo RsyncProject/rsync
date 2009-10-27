@@ -27,8 +27,6 @@ int inc_recurse = 0;
 
 extern int am_server;
 extern int am_sender;
-extern int am_daemon;
-extern int io_timeout;
 extern int local_server;
 extern int inplace;
 extern int recurse;
@@ -74,7 +72,6 @@ int filesfrom_convert = 0;
 #define CF_INC_RECURSE	 (1<<0)
 #define CF_SYMLINK_TIMES (1<<1)
 #define CF_SYMLINK_ICONV (1<<2)
-#define CF_TIMEOUT_ACTIVE (1<<3)
 
 static const char *client_info;
 
@@ -257,21 +254,9 @@ void setup_protocol(int f_out,int f_in)
 #ifdef ICONV_OPTION
 			compat_flags |= CF_SYMLINK_ICONV;
 #endif
-			if (am_daemon && io_timeout && protocol_version >= 31)
-				compat_flags |= CF_TIMEOUT_ACTIVE;
 			write_byte(f_out, compat_flags);
-			if (compat_flags & CF_TIMEOUT_ACTIVE)
-				write_varint(f_out, io_timeout);
 		} else {
 			compat_flags = read_byte(f_in);
-			if (compat_flags & CF_TIMEOUT_ACTIVE) {
-				int timeout = read_varint(f_in);
-				if (!io_timeout || io_timeout > timeout) {
-					if (INFO_GTE(MISC, 2))
-						rprintf(FINFO, "Setting --timeout=%d to match server\n", timeout);
-					io_timeout = timeout;
-				}
-			}
 		}
 		/* The inc_recurse var MUST be set to 0 or 1. */
 		inc_recurse = compat_flags & CF_INC_RECURSE ? 1 : 0;

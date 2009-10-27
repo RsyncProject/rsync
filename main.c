@@ -29,6 +29,7 @@
 
 extern int dry_run;
 extern int list_only;
+extern int io_timeout;
 extern int am_root;
 extern int am_server;
 extern int am_sender;
@@ -1051,6 +1052,8 @@ void start_server(int f_in, int f_out, int argc, char *argv[])
 
 	if (protocol_version >= 23)
 		io_start_multiplex_out(f_out);
+	if (am_daemon && io_timeout && protocol_version >= 31)
+		send_msg_int(MSG_IO_TIMEOUT, io_timeout);
 
 	if (am_sender) {
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
