@@ -2349,6 +2349,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 		flist->sorted = flist->files;
 	flist_sort_and_clean(flist, 0);
 	file_total += flist->used;
+	file_old_total += flist->used;
 
 	if (numeric_ids <= 0 && !inc_recurse)
 		send_id_list(f);

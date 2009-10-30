@@ -42,6 +42,7 @@ extern int make_backups;
 extern int inplace;
 extern int batch_fd;
 extern int write_batch;
+extern int file_old_total;
 extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 
@@ -197,8 +198,11 @@ void send_files(int f_in, int f_out)
 				end_progress(0);
 			}
 			if (inc_recurse && first_flist) {
+				file_old_total -= first_flist->used;
 				flist_free(first_flist);
 				if (first_flist) {
+					if (first_flist == cur_flist)
+						file_old_total = cur_flist->used;
 					write_ndx(f_out, NDX_DONE);
 					continue;
 				}
