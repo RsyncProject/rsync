@@ -330,13 +330,17 @@ output_msg:
 		got_xfer_error = 1;
 		/* FALL THROUGH */
 	case FERROR:
+	case FERROR_UTF8:
+	case FERROR_SOCKET:
 	case FWARNING:
 		f = stderr;
 		break;
+	case FLOG:
 	case FINFO:
 	case FCLIENT:
 		break;
 	default:
+		fprintf(stderr, "Unknown logcode in rwrite(): %d\n", (int)code);
 		exit_cleanup(RERR_MESSAGEIO);
 	}
 
