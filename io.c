@@ -1307,7 +1307,7 @@ static void read_a_msg(void)
 			send_msg(MSG_IO_ERROR, data, 4, 0);
 		break;
 	case MSG_IO_TIMEOUT:
-		if (msg_bytes != 4 || am_sender || am_generator)
+		if (msg_bytes != 4 || am_server || am_generator)
 			goto invalid_msg;
 		data = perform_io(4, PIO_INPUT_AND_CONSUME);
 		val = IVAL(data, 0);
