@@ -265,10 +265,16 @@ void rwrite(enum logcode code, const char *buf, int len, int is_utf8)
 	if (len < 0)
 		exit_cleanup(RERR_MESSAGEIO);
 
-	if (msgs2stderr && code != FLOG)
-		goto output_msg;
-
-	if (send_msgs_to_gen) {
+	if (msgs2stderr) {
+		if (!am_daemon) {
+			if (code == FLOG)
+				return;
+			goto output_msg;
+		}
+		if (code == FCLIENT)
+			return;
+		code = FLOG;
+	} else if (send_msgs_to_gen) {
 		assert(!is_utf8);
 		/* Pass the message to our sibling in native charset. */
 		send_msg((enum msgcode)code, buf, len, 0);
