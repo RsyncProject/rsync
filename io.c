@@ -807,6 +807,7 @@ void noop_io_until_death(void)
 	char buf[1024];
 
 	kluge_around_eof = 1;
+	set_io_timeout(10);
 
 	while (1)
 		read_buf(iobuf.in_fd, buf, sizeof buf);
@@ -1324,7 +1325,7 @@ static void read_a_msg(void)
 		if (!io_timeout || io_timeout > val) {
 			if (INFO_GTE(MISC, 2))
 				rprintf(FINFO, "Setting --timeout=%d to match server\n", val);
-			io_timeout = val;
+			set_io_timeout(val);
 		}
 		break;
 	case MSG_NOOP:
