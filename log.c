@@ -804,7 +804,7 @@ int log_format_has(const char *format, char esc)
 		return 0;
 
 	for (p = format; (p = strchr(p, '%')) != NULL; ) {
-		for (p++; *p == '\''; p++) {}
+		for (p++; *p == '\''; p++) {} /*SHARED ITERATOR*/
 		if (*p == '-')
 			p++;
 		while (isDigit(p))

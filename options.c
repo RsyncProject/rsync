@@ -1421,14 +1421,16 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				arg = sanitize_path(NULL, arg, NULL, 0, SP_DEFAULT);
 			if (daemon_filter_list.head) {
 				int rej;
-				char *dir, *cp = strdup(arg);
+				char *cp = strdup(arg);
 				if (!cp)
 					out_of_memory("parse_arguments");
 				if (!*cp)
-					goto options_rejected;
-				dir = cp + (*cp == '/' ? module_dirlen : 0);
-				clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
-				rej = check_filter(&daemon_filter_list, FLOG, dir, 0) < 0;
+					rej = 1;
+				else {
+					char *dir = cp + (*cp == '/' ? module_dirlen : 0);
+					clean_fname(dir, CFN_COLLAPSE_DOT_DOT_DIRS);
+					rej = check_filter(&daemon_filter_list, FLOG, dir, 0) < 0;
+				}
 				free(cp);
 				if (rej)
 					goto options_rejected;
