@@ -24,9 +24,12 @@
 
 extern int am_server;
 extern int am_daemon;
+extern int am_sender;
+extern int am_generator;
 extern int io_error;
 extern int keep_partial;
 extern int got_xfer_error;
+extern int protocol_version;
 extern int output_needs_newline;
 extern char *partial_dir;
 extern char *logfile_name;
@@ -130,6 +133,17 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		/* FALLTHROUGH */
 #include "case_N.h"
 
+		if (exit_code && exit_code != RERR_RCVR_ERROR
+		 && exit_code != RERR_STREAMIO && exit_code != RERR_SIGNAL1
+		 && (protocol_version >= 31 || (!am_sender && !am_generator))) {
+			send_msg_int(MSG_ERROR_EXIT, exit_code);
+			if (am_server && !am_sender && !am_generator)
+				noop_io_until_death();
+		}
+
+		/* FALLTHROUGH */
+#include "case_N.h"
+
 		if (cleanup_child_pid != -1) {
 			int status;
 			int pid = wait_process(cleanup_child_pid, &status, WNOHANG);
@@ -160,7 +174,8 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		/* FALLTHROUGH */
 #include "case_N.h"
 
-		io_flush(FULL_FLUSH);
+		if (!code || am_server || (!am_sender && !am_generator))
+			io_flush(FULL_FLUSH);
 
 		/* FALLTHROUGH */
 #include "case_N.h"
@@ -184,7 +199,8 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 				code = exit_code = RERR_PARTIAL;
 		}
 
-		if (code || am_daemon || (logfile_name && (am_server || !INFO_GTE(STATS, 1))))
+		if ((code && code != RERR_RCVR_ERROR)
+		 || am_daemon || (logfile_name && (am_server || !INFO_GTE(STATS, 1))))
 			log_exit(code, file, line);
 
 		/* FALLTHROUGH */

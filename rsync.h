@@ -98,7 +98,7 @@
 /* This is used when working on a new protocol version in CVS, and should
  * be a new non-zero value for each CVS change that affects the protocol.
  * It must ALWAYS be 0 when the protocol goes final (and NEVER before)! */
-#define SUBPROTOCOL_VERSION 10
+#define SUBPROTOCOL_VERSION 11
 
 /* We refuse to interoperate with versions that are not in this range.
  * Note that we assume we'll work with later versions: the onus is on
@@ -233,6 +233,7 @@ enum msgcode {
 	MSG_IO_ERROR=22,/* the sending side had an I/O error */
 	MSG_IO_TIMEOUT=33,/* tell client about a daemon's timeout value */
 	MSG_NOOP=42,	/* a do-nothing message */
+	MSG_ERROR_EXIT=86, /* used by siblings and by protocol-31 */
 	MSG_SUCCESS=100,/* successfully updated indicated flist index */
 	MSG_DELETED=101,/* successfully deleted a file on receiving side */
 	MSG_NO_SEND=102,/* sender failed to open a file we wanted */

@@ -97,13 +97,14 @@ struct {
 	{ RERR_MALLOC     , "error allocating core memory buffers" },
 	{ RERR_PARTIAL    , "some files/attrs were not transferred (see previous errors)" },
 	{ RERR_VANISHED   , "some files vanished before they could be transferred" },
+	{ RERR_DEL_LIMIT  , "the --max-delete limit stopped deletions" },
 	{ RERR_TIMEOUT    , "timeout in data send/receive" },
 	{ RERR_CONTIMEOUT , "timeout waiting for daemon connection" },
+	{ RERR_RCVR_ERROR , "exiting due to receiver error" },
 	{ RERR_CMD_FAILED , "remote shell failed" },
 	{ RERR_CMD_KILLED , "remote shell killed" },
 	{ RERR_CMD_RUN    , "remote command could not be run" },
 	{ RERR_CMD_NOTFOUND,"remote command not found" },
-	{ RERR_DEL_LIMIT  , "the --max-delete limit stopped deletions" },
 	{ 0, NULL }
 };
 

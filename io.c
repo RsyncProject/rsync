@@ -752,7 +752,7 @@ static char *perform_io(size_t needed, int flags)
 					/* Don't write errors on a dead socket. */
 					msgs2stderr = 1;
 					out->len = iobuf.raw_flushing_ends_before = out->pos = 0;
-					rsyserr(FERROR_SOCKET, errno, "write error");
+					rsyserr(FERROR_SOCKET, errno, "[%s] write error", who_am_i());
 					exit_cleanup(RERR_STREAMIO);
 				}
 			}
@@ -800,6 +800,16 @@ static char *perform_io(size_t needed, int flags)
 	}
 
 	return data;
+}
+
+void noop_io_until_death(void)
+{
+	char buf[1024];
+
+	kluge_around_eof = 1;
+
+	while (1)
+		read_buf(iobuf.in_fd, buf, sizeof buf);
 }
 
 /* Buffer a message for the multiplexed output stream.  Is never used for MSG_DATA. */
@@ -1426,6 +1436,16 @@ static void read_a_msg(void)
 			first_message = 0;
 		}
 		break;
+	case MSG_ERROR_EXIT:
+		if (msg_bytes != 4)
+			goto invalid_msg;
+		data = perform_io(4, PIO_INPUT_AND_CONSUME);
+		val = IVAL(data, 0);
+		if (am_generator && protocol_version >= 31)
+			send_msg_int(MSG_ERROR_EXIT, val);
+		if (am_generator)
+			val = RERR_RCVR_ERROR; /* avoids duplicate errors */
+		exit_cleanup(val);
 	default:
 		rprintf(FERROR, "unexpected tag %d [%s%s]\n",
 			tag, who_am_i(), inc_recurse ? "/inc" : "");
