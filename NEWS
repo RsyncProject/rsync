@@ -43,6 +43,11 @@ Changes since 3.0.4:
     - Fixed some rare bugs in --iconv processing that might cause a multibyte
       character to get translated incorrectly.
 
+    - Improved abnormal-exit error messages.  This should help the client side
+      to receive errors from the server when it is exiting abnormally, and
+      should also avoid dying with an "connection unexpectedly closed" exit
+      when the closed connection is really expected.
+
   ENHANCEMENTS:
 
     - Added the --remote-option=OPT (-M OPT) command-line option that is useful
