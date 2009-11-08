@@ -337,7 +337,7 @@ void send_files(int f_in, int f_out)
 			rsyserr(FERROR_XFER, errno, "fstat failed");
 			free_sums(s);
 			close(fd);
-			exit_cleanup(RERR_PROTOCOL);
+			exit_cleanup(RERR_FILEIO);
 		}
 
 		if (st.st_size) {
