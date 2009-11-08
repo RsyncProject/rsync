@@ -94,14 +94,18 @@ pid_t cleanup_child_pid = -1;
 NORETURN void _exit_cleanup(int code, const char *file, int line)
 {
 	static int cleanup_step = 0;
-	static int exit_code = 0;
+	static int exit_code = 0, exit_line = 0;
+	static const char *exit_file = NULL;
 	static int unmodified_code = 0;
 
 	SIGACTION(SIGUSR1, SIG_IGN);
 	SIGACTION(SIGUSR2, SIG_IGN);
 
-	if (exit_code) /* Preserve first error code when recursing. */
+	if (exit_code) { /* Preserve first exit info when recursing. */
 		code = exit_code;
+		file = exit_file;
+		line = exit_line;
+	}
 
 	/* If this is the exit at the end of the run, the server side
 	 * should not attempt to output a message (see log.c). */
@@ -114,6 +118,8 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 #include "case_N.h" /* case 0: cleanup_step++; */
 
 		exit_code = unmodified_code = code;
+		exit_file = file;
+		exit_line = line;
 
 		if (verbose > 3) {
 			rprintf(FINFO,
