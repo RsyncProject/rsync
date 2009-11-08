@@ -346,7 +346,7 @@ output_msg:
 	case FCLIENT:
 		break;
 	default:
-		fprintf(stderr, "Unknown logcode in rwrite(): %d\n", (int)code);
+		fprintf(stderr, "Unknown logcode in rwrite(): %d [%s]\n", (int)code, who_am_i());
 		exit_cleanup(RERR_MESSAGEIO);
 	}
 
