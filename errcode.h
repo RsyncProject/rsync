@@ -47,8 +47,6 @@
 #define RERR_TIMEOUT    30      /* timeout in data send/receive */
 #define RERR_CONTIMEOUT 35      /* timeout waiting for daemon connection */
 
-#define RERR_RCVR_ERROR 42      /* receiver is exiting with an error */
-
 /* Although it doesn't seem to be specified anywhere,
  * ssh and the shell seem to return these values:
  *

@@ -807,7 +807,7 @@ void noop_io_until_death(void)
 	char buf[1024];
 
 	kluge_around_eof = 1;
-	set_io_timeout(10);
+	set_io_timeout(protocol_version >= 31 ? 10 : 1);
 
 	while (1)
 		read_buf(iobuf.in_fd, buf, sizeof buf);
@@ -1438,15 +1438,26 @@ static void read_a_msg(void)
 		}
 		break;
 	case MSG_ERROR_EXIT:
-		if (msg_bytes != 4)
+		if (msg_bytes == 0) {
+			if (!am_sender && !am_generator) {
+				send_msg(MSG_ERROR_EXIT, "", 0, 0);
+				io_flush(FULL_FLUSH);
+			}
+			val = 0;
+		} else if (msg_bytes == 4) {
+			data = perform_io(4, PIO_INPUT_AND_CONSUME);
+			val = IVAL(data, 0);
+			if (protocol_version >= 31) {
+				if (am_generator)
+					send_msg_int(MSG_ERROR_EXIT, val);
+				else
+					send_msg(MSG_ERROR_EXIT, "", 0, 0);
+			}
+		} else
 			goto invalid_msg;
-		data = perform_io(4, PIO_INPUT_AND_CONSUME);
-		val = IVAL(data, 0);
-		if (am_generator && protocol_version >= 31)
-			send_msg_int(MSG_ERROR_EXIT, val);
-		if (am_generator)
-			val = RERR_RCVR_ERROR; /* avoids duplicate errors */
-		exit_cleanup(val);
+		/* Send a negative linenum so that we don't end up
+		 * with a duplicate exit message. */
+		_exit_cleanup(val, __FILE__, 0 - __LINE__);
 	default:
 		rprintf(FERROR, "unexpected tag %d [%s%s]\n",
 			tag, who_am_i(), inc_recurse ? "/inc" : "");

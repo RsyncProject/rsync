@@ -139,17 +139,6 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		/* FALLTHROUGH */
 #include "case_N.h"
 
-		if (exit_code && exit_code != RERR_RCVR_ERROR
-		 && exit_code != RERR_STREAMIO && exit_code != RERR_SIGNAL1
-		 && (protocol_version >= 31 || (!am_sender && !am_generator))) {
-			send_msg_int(MSG_ERROR_EXIT, exit_code);
-			if (am_server && !am_sender && !am_generator)
-				noop_io_until_death();
-		}
-
-		/* FALLTHROUGH */
-#include "case_N.h"
-
 		if (cleanup_child_pid != -1) {
 			int status;
 			int pid = wait_process(cleanup_child_pid, &status, WNOHANG);
@@ -205,7 +194,9 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 				code = exit_code = RERR_PARTIAL;
 		}
 
-		if ((code && code != RERR_RCVR_ERROR)
+		/* If line < 0, this exit is after a MSG_ERROR_EXIT event, so
+		 * we don't want to output a duplicate error. */
+		if ((code && line > 0)
 		 || am_daemon || (logfile_name && (am_server || !INFO_GTE(STATS, 1))))
 			log_exit(code, file, line);
 
@@ -217,6 +208,16 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 				"_exit_cleanup(code=%d, file=%s, line=%d): "
 				"about to call exit(%d)\n",
 				unmodified_code, file, line, code);
+		}
+
+		/* FALLTHROUGH */
+#include "case_N.h"
+
+		if (exit_code && exit_code != RERR_STREAMIO && exit_code != RERR_SIGNAL1
+		 && (protocol_version >= 31 || am_server || (!am_sender && !am_generator))) {
+			if (line > 0)
+				send_msg_int(MSG_ERROR_EXIT, exit_code);
+			noop_io_until_death();
 		}
 
 		/* FALLTHROUGH */
