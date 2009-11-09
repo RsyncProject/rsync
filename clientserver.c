@@ -809,7 +809,11 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	}
 
 	if (set_uid) {
-		if (setuid(uid) || seteuid(uid)) {
+		if (setuid(uid) < 0
+#ifdef HAVE_SETEUID
+		 || seteuid(uid) < 0
+#endif
+		) {
 			rsyserr(FLOG, errno, "setuid %ld failed", (long)uid);
 			io_printf(f_out, "@ERROR: setuid failed\n");
 			return -1;
