@@ -430,7 +430,7 @@ to the detailed description below for a complete description.  verb(
      --log-file-format=FMT   log updates using the specified FMT
      --password-file=FILE    read daemon-access password from FILE
      --list-only             list the files instead of copying them
-     --bwlimit=KBPS          limit I/O bandwidth; KBytes per second
+     --bwlimit=RATE          limit socket I/O bandwidth
      --write-batch=FILE      write a batched update to FILE
      --only-write-batch=FILE like --write-batch but w/o updating dest
      --read-batch=FILE       read a batched update from FILE
@@ -446,7 +446,7 @@ Rsync can also be run as a daemon, in which case the following options are
 accepted: verb(
      --daemon                run as an rsync daemon
      --address=ADDRESS       bind to the specified address
-     --bwlimit=KBPS          limit I/O bandwidth; KBytes per second
+     --bwlimit=RATE          limit socket I/O bandwidth
      --config=FILE           specify alternate rsyncd.conf file
  -M, --dparam=OVERRIDE       override global daemon config parameter
      --no-detach             do not detach from the parent
@@ -2273,13 +2273,27 @@ avoid this problem, either specify the bf(--no-dirs) option (if you don't
 need to expand a directory's content), or turn on recursion and exclude
 the content of subdirectories: bf(-r --exclude='/*/*').
 
-dit(bf(--bwlimit=KBPS)) This option allows you to specify a maximum
-transfer rate in kilobytes per second. This option is most effective when
-using rsync with large files (several megabytes and up). Due to the nature
-of rsync transfers, blocks of data are sent, then if rsync determines the
-transfer was too fast, it will wait before sending the next data block. The
-result is an average transfer rate equaling the specified limit. A value
-of zero specifies no limit.
+dit(bf(--bwlimit=RATE)) This option allows you to specify the maximum transfer
+rate for the data sent over the socket, specified in units per second.  The
+RATE value can be suffixed with a string to indicate a size multiplier, and may
+be a fractional value (e.g.  "bf(--bwlimit=1.5m)").  If no suffix is specified,
+the value will be assumed to be in units of 1024 bytes (as if "K" or "KiB" had
+been appended).  See the bf(--max-size) option for a description of all the
+available suffixes. A value of zero specifies no limit.
+
+For backward-compatibility reasons, the rate limit will be rounded to the
+nearest KiB unit, so no rate smaller than 1024 bytes per second is possible.
+
+Rsync writes data over the socket in blocks, and this option both limits the
+size of the blocks that rsync writes, and tries to keep the average transfer
+rate at the requested limit.  Some "burstiness" may be seen where rsync writes
+out a block of data and then sleeps to bring the average rate into compliance.
+
+Due to the internal buffering of data, the bf(--progress) option may not be an
+accurate reflection on how fast the data is being sent.  This is because some
+files can show up as being rapidly sent when the data is quickly buffered,
+while other can show up as very slow when the flushing of the output buffer
+occurs.  This may be fixed in a future version.
 
 dit(bf(--write-batch=FILE)) Record a file that can later be applied to
 another identical destination with bf(--read-batch). See the "BATCH MODE"
@@ -2387,11 +2401,10 @@ allows you to specify a specific IP address (or hostname) to bind to.  This
 makes virtual hosting possible in conjunction with the bf(--config) option.
 See also the "address" global option in the rsyncd.conf manpage.
 
-dit(bf(--bwlimit=KBPS)) This option allows you to specify a maximum
-transfer rate in kilobytes per second for the data the daemon sends.
-The client can still specify a smaller bf(--bwlimit) value, but their
-requested value will be rounded down if they try to exceed it.  See the
-client version of this option (above) for some extra details.
+dit(bf(--bwlimit=RATE)) This option allows you to specify the maximum transfer
+rate for the data the daemon sends over the socket.  The client can still
+specify a smaller bf(--bwlimit) value, but no larger value will be allowed.
+See the client version of this option (above) for some extra details.
 
 dit(bf(--config=FILE)) This specifies an alternate config file than
 the default.  This is only relevant when bf(--daemon) is specified.

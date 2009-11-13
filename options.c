@@ -301,7 +301,7 @@ static int refused_partial, refused_progress, refused_delete_before;
 static int refused_delete_during;
 static int refused_inplace, refused_no_iconv;
 static BOOL usermap_via_chown, groupmap_via_chown;
-static char *max_size_arg, *min_size_arg;
+static char *bwlimit_arg, *max_size_arg, *min_size_arg;
 static char tmp_partialdir[] = ".~tmp~";
 
 /** Local address to bind.  As a character string because it's
@@ -775,7 +775,7 @@ void usage(enum logcode F)
   rprintf(F,"     --log-file-format=FMT   log updates using the specified FMT\n");
   rprintf(F,"     --password-file=FILE    read daemon-access password from FILE\n");
   rprintf(F,"     --list-only             list the files instead of copying them\n");
-  rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth; KBytes per second\n");
+  rprintf(F,"     --bwlimit=RATE          limit socket I/O bandwidth\n");
   rprintf(F,"     --write-batch=FILE      write a batched update to FILE\n");
   rprintf(F,"     --only-write-batch=FILE like --write-batch but w/o updating destination\n");
   rprintf(F,"     --read-batch=FILE       read a batched update from FILE\n");
@@ -799,7 +799,7 @@ enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
       OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW, OPT_MIN_SIZE, OPT_CHMOD,
       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_MAX_SIZE,
       OPT_NO_D, OPT_APPEND, OPT_NO_ICONV, OPT_INFO, OPT_DEBUG,
-      OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN,
+      OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN, OPT_BWLIMIT,
       OPT_SERVER, OPT_REFUSED_BASE = 9000};
 
 static struct poptOption long_options[] = {
@@ -964,7 +964,7 @@ static struct poptOption long_options[] = {
   {"itemize-changes", 'i', POPT_ARG_NONE,   0, 'i', 0, 0 },
   {"no-itemize-changes",0, POPT_ARG_VAL,    &itemize_changes, 0, 0, 0 },
   {"no-i",             0,  POPT_ARG_VAL,    &itemize_changes, 0, 0, 0 },
-  {"bwlimit",          0,  POPT_ARG_INT,    &bwlimit, 0, 0, 0 },
+  {"bwlimit",          0,  POPT_ARG_STRING, &bwlimit_arg, OPT_BWLIMIT, 0, 0 },
   {"no-bwlimit",       0,  POPT_ARG_VAL,    &bwlimit, 0, 0, 0 },
   {"backup",          'b', POPT_ARG_VAL,    &make_backups, 1, 0, 0 },
   {"no-backup",        0,  POPT_ARG_VAL,    &make_backups, 0, 0, 0 },
@@ -1029,7 +1029,7 @@ static void daemon_usage(enum logcode F)
   rprintf(F,"\n");
   rprintf(F,"Usage: rsync --daemon [OPTION]...\n");
   rprintf(F,"     --address=ADDRESS       bind to the specified address\n");
-  rprintf(F,"     --bwlimit=KBPS          limit I/O bandwidth; KBytes per second\n");
+  rprintf(F,"     --bwlimit=RATE          limit socket I/O bandwidth\n");
   rprintf(F,"     --config=FILE           specify alternate rsyncd.conf file\n");
   rprintf(F," -M, --dparam=OVERRIDE       override global daemon config parameter\n");
   rprintf(F,"     --no-detach             do not detach from the parent\n");
@@ -1220,7 +1220,7 @@ static OFF_T parse_size_arg(char **size_arg, char def_suf)
 		size += atoi(arg), make_compatible = 1, arg += 2;
 	if (*arg)
 		return -1;
-	if (size > 0 && make_compatible) {
+	if (size > 0 && make_compatible && def_suf == 'b') {
 		/* We convert this manually because we may need %lld precision,
 		 * and that's not a portable sprintf() escape. */
 		char buf[128], *s = buf + sizeof buf - 1;
@@ -1582,6 +1582,23 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 					"--min-size value is invalid: %s\n",
 					min_size_arg);
 				return 0;
+			}
+			break;
+
+		case OPT_BWLIMIT:
+			{
+				OFF_T limit = parse_size_arg(&bwlimit_arg, 'K');
+				if (limit < 0) {
+					snprintf(err_buf, sizeof err_buf,
+						"--bwlimit value is invalid: %s\n", bwlimit_arg);
+					return 0;
+				}
+				bwlimit = (limit + 512) / 1024;
+				if (limit && !bwlimit) {
+					snprintf(err_buf, sizeof err_buf,
+						"--bwlimit value is too small: %s\n", bwlimit_arg);
+					return 0;
+				}
 			}
 			break;
 
