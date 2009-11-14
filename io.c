@@ -541,8 +541,8 @@ static char *perform_io(size_t needed, int flags)
 		if (DEBUG_GTE(IO, 3)) {
 			rprintf(FINFO, "[%s] perform_io(%ld, outroom) needs to flush %ld\n",
 				who_am_i(), (long)needed,
-				iobuf.out.len > iobuf.out.size - needed
-				? (long)iobuf.out.len - (iobuf.out.size - needed) : 0L);
+				iobuf.out.len + needed > iobuf.out.size
+				? (long)(iobuf.out.len + needed - iobuf.out.size) : 0L);
 		}
 		break;
 
@@ -557,8 +557,8 @@ static char *perform_io(size_t needed, int flags)
 		if (DEBUG_GTE(IO, 3)) {
 			rprintf(FINFO, "[%s] perform_io(%ld, msgroom) needs to flush %ld\n",
 				who_am_i(), (long)needed,
-				iobuf.out.len > iobuf.msg.size - needed
-				? (long)iobuf.out.len - (iobuf.msg.size - needed) : 0L);
+				iobuf.msg.len + needed > iobuf.msg.size
+				? (long)(iobuf.msg.len + needed - iobuf.msg.size) : 0L);
 		}
 		break;
 
@@ -578,11 +578,13 @@ static char *perform_io(size_t needed, int flags)
 				goto double_break;
 			break;
 		case PIO_NEED_OUTROOM:
-			if (iobuf.out.len <= iobuf.out.size - needed)
+			/* Note that iobuf.out_empty_len doesn't factor into this check
+			 * because iobuf.out.len already holds any needed header len. */
+			if (iobuf.out.len + needed <= iobuf.out.size)
 				goto double_break;
 			break;
 		case PIO_NEED_MSGROOM:
-			if (iobuf.msg.len <= iobuf.msg.size - needed)
+			if (iobuf.msg.len + needed <= iobuf.msg.size)
 				goto double_break;
 			break;
 		}
