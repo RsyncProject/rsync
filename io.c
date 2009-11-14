@@ -638,6 +638,7 @@ static char *perform_io(size_t needed, int flags)
 					iobuf.raw_data_header_pos = iobuf.raw_flushing_ends_before;
 					if (iobuf.raw_data_header_pos >= iobuf.out.size)
 						iobuf.raw_data_header_pos -= iobuf.out.size;
+					/* Yes, it is possible for this to make len > size for a while. */
 					iobuf.out.len += 4;
 				}
 
@@ -1906,7 +1907,7 @@ void write_buf(int f, const char *buf, size_t len)
 		goto batch_copy;
 	}
 
-	if (iobuf.out.size - iobuf.out.len < len)
+	if (iobuf.out.len + len > iobuf.out.size)
 		perform_io(len, PIO_NEED_OUTROOM);
 
 	pos = iobuf.out.pos + iobuf.out.len; /* Must be set after any flushing. */
