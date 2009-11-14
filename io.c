@@ -773,8 +773,7 @@ static char *perform_io(size_t needed, int flags)
 				if (iobuf.raw_flushing_ends_before)
 					iobuf.raw_flushing_ends_before -= out->size;
 				out->pos = 0;
-			}
-			if (out->pos == iobuf.raw_flushing_ends_before)
+			} else if (out->pos == iobuf.raw_flushing_ends_before)
 				iobuf.raw_flushing_ends_before = 0;
 			if ((out->len -= n) == empty_buf_len) {
 				out->pos = 0;
@@ -831,7 +830,7 @@ int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 	if (convert > 0 && ic_send == (iconv_t)-1)
 		convert = 0;
 	if (convert > 0) {
-		/* Ensuring double-size room leaves space for a potential conversion. */
+		/* Ensuring double-size room leaves space for maximal conversion expansion. */
 		if (iobuf.msg.len + len*2 + 4 > iobuf.msg.size)
 			perform_io(len*2 + 4, PIO_NEED_MSGROOM);
 	} else
@@ -844,7 +843,7 @@ int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 		pos -= iobuf.msg.size;
 	hdr = iobuf.msg.buf + pos;
 
-	iobuf.msg.len += 4; /* Leave room for the coming header bytes. */
+	iobuf.msg.len += 4; /* Allocate room for the coming header bytes. */
 
 #ifdef ICONV_OPTION
 	if (convert > 0) {
@@ -1165,7 +1164,8 @@ BOOL io_start_buffering_out(int f_out)
 	if (iobuf.out.buf) {
 		if (iobuf.out_fd == -1)
 			iobuf.out_fd = f_out;
-		assert(f_out == iobuf.out_fd);
+		else
+			assert(f_out == iobuf.out_fd);
 		return False;
 	}
 
@@ -1187,7 +1187,8 @@ BOOL io_start_buffering_in(int f_in)
 	if (iobuf.in.buf) {
 		if (iobuf.in_fd == -1)
 			iobuf.in_fd = f_in;
-		assert(f_in == iobuf.in_fd);
+		else
+			assert(f_in == iobuf.in_fd);
 		return False;
 	}
 
