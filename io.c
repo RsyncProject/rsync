@@ -676,8 +676,7 @@ static char *perform_io(size_t needed, int flags)
 		}
 
 		if (extra_flist_sending_enabled) {
-			if (file_total - file_old_total < MAX_FILECNT_LOOKAHEAD
-			 && file_total - file_old_total >= MIN_FILECNT_LOOKAHEAD)
+			if (file_total - file_old_total < MAX_FILECNT_LOOKAHEAD)
 				tv.tv_sec = 0;
 			else {
 				extra_flist_sending_enabled = False;
