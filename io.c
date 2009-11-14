@@ -614,21 +614,20 @@ static char *perform_io(size_t needed, int flags)
 			if (iobuf.raw_flushing_ends_before
 			 || (!iobuf.msg.len && iobuf.out.len > iobuf.out_empty_len && !(flags & PIO_NEED_MSGROOM))) {
 				if (OUT_MULTIPLEXED && !iobuf.raw_flushing_ends_before) {
-					size_t val;
-
 					/* The iobuf.raw_flushing_ends_before value can point off the end
 					 * of the iobuf.out buffer for a while, for easier subtracting. */
 					iobuf.raw_flushing_ends_before = iobuf.out.pos + iobuf.out.len;
 
 					SIVAL(iobuf.out.buf + iobuf.raw_data_header_pos, 0,
 					      ((MPLEX_BASE + (int)MSG_DATA)<<24) + iobuf.out.len - 4);
-					if ((val = iobuf.out.size - iobuf.raw_data_header_pos) < 4) {
+					if (iobuf.raw_data_header_pos + 4 > iobuf.out.size) {
+						int siz = (int)(iobuf.raw_data_header_pos + 4 - iobuf.out.size);
 						/* We used some of the overflow bytes, so move them. */
 						if (DEBUG_GTE(IO, 4)) {
 							rprintf(FINFO, "[%s] wrap-bytes moved: %d (perform_io)\n",
-								who_am_i(), (int)val);
+								who_am_i(), siz);
 						}
-						memcpy(iobuf.out.buf, iobuf.out.buf + iobuf.out.size, 4 - val);
+						memcpy(iobuf.out.buf, iobuf.out.buf + iobuf.out.size, siz);
 					}
 
 					if (DEBUG_GTE(IO, 1)) {
@@ -883,10 +882,10 @@ int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 	SIVAL(hdr, 0, ((MPLEX_BASE + (int)code)<<24) + len);
 	/* If the header used any overflow bytes, move them to the start. */
 	if ((pos = hdr+4 - iobuf.msg.buf) > iobuf.msg.size) {
-		size_t siz = pos - iobuf.msg.size;
+		int siz = (int)(pos - iobuf.msg.size);
 		if (DEBUG_GTE(IO, 4))
-			rprintf(FINFO, "[%s] wrap-bytes moved: %d (send_msg)\n", who_am_i(), (int)siz);
-		memcpy(iobuf.msg.buf, hdr+4 - siz, siz);
+			rprintf(FINFO, "[%s] wrap-bytes moved: %d (send_msg)\n", who_am_i(), siz);
+		memcpy(iobuf.msg.buf, iobuf.msg.buf + iobuf.msg.size, siz);
 	}
 
 	if (want_debug && convert > 0)
