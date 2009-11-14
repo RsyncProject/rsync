@@ -1316,9 +1316,10 @@ static void read_a_msg(void)
 		if (msg_bytes != 4 || am_sender)
 			goto invalid_msg;
 		data = perform_io(4, PIO_INPUT_AND_CONSUME);
-		io_error |= IVAL(data, 0);
+		val = IVAL(data, 0);
+		io_error |= val;
 		if (!am_generator)
-			send_msg(MSG_IO_ERROR, data, 4, 0);
+			send_msg_int(MSG_IO_ERROR, val);
 		break;
 	case MSG_IO_TIMEOUT:
 		if (msg_bytes != 4 || am_server || am_generator)
@@ -1395,19 +1396,21 @@ static void read_a_msg(void)
 			exit_cleanup(RERR_STREAMIO);
 		}
 		data = perform_io(4, PIO_INPUT_AND_CONSUME);
+		val = IVAL(data, 0);
 		if (am_generator)
-			got_flist_entry_status(FES_SUCCESS, IVAL(data, 0));
+			got_flist_entry_status(FES_SUCCESS, val);
 		else
-			successful_send(IVAL(data, 0));
+			successful_send(val);
 		break;
 	case MSG_NO_SEND:
 		if (msg_bytes != 4)
 			goto invalid_msg;
 		data = perform_io(4, PIO_INPUT_AND_CONSUME);
+		val = IVAL(data, 0);
 		if (am_generator)
-			got_flist_entry_status(FES_NO_SEND, IVAL(data, 0));
+			got_flist_entry_status(FES_NO_SEND, val);
 		else
-			send_msg(MSG_NO_SEND, data, 4, 0);
+			send_msg_int(MSG_NO_SEND, val);
 		break;
 	case MSG_ERROR_SOCKET:
 	case MSG_ERROR_UTF8:
