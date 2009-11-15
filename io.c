@@ -136,6 +136,7 @@ enum festatus { FES_SUCCESS, FES_REDO, FES_NO_SEND };
 
 static flist_ndx_list redo_list, hlink_list;
 
+static void drain_multiplex_messages(void);
 static void sleep_for_bwlimit(int bytes_written);
 
 static void check_timeout(void)
@@ -173,9 +174,9 @@ static void check_timeout(void)
  * There is another case for older protocol versions (< 24) where the module
  * listing was not terminated, so we must ignore an EOF error in that case and
  * exit.  In this situation, kluge_around_eof will be > 0. */
-static NORETURN void whine_about_eof(int fd)
+static NORETURN void whine_about_eof(BOOL allow_kluge)
 {
-	if (kluge_around_eof && fd == sock_f_in) {
+	if (kluge_around_eof && allow_kluge) {
 		int i;
 		if (kluge_around_eof > 0)
 			exit_cleanup(0);
@@ -661,11 +662,19 @@ static char *perform_io(size_t needed, int flags)
 		if (max_fd < 0) {
 			switch (flags & PIO_NEED_FLAGS) {
 			case PIO_NEED_INPUT:
+				iobuf.in.len = 0;
+				if (kluge_around_eof == 2)
+					exit_cleanup(0);
+				if (iobuf.in_fd == -2)
+					whine_about_eof(True);
 				rprintf(FERROR, "error in perform_io: no fd for input.\n");
 				exit_cleanup(RERR_PROTOCOL);
 			case PIO_NEED_OUTROOM:
 			case PIO_NEED_MSGROOM:
 				msgs2stderr = 1;
+				drain_multiplex_messages();
+				if (iobuf.out_fd == -2)
+					whine_about_eof(True);
 				rprintf(FERROR, "error in perform_io: no fd for output.\n");
 				exit_cleanup(RERR_PROTOCOL);
 			default:
@@ -709,8 +718,9 @@ static char *perform_io(size_t needed, int flags)
 			int n;
 			if ((n = read(iobuf.in_fd, iobuf.in.buf + pos, len)) <= 0) {
 				if (n == 0) {
+					/* Signal that input has become invalid. */
 					if (!read_batch || batch_fd < 0 || am_generator)
-						whine_about_eof(iobuf.in_fd); /* Doesn't return. */
+						iobuf.in_fd = -2;
 					batch_fd = -1;
 					continue;
 				}
@@ -752,8 +762,10 @@ static char *perform_io(size_t needed, int flags)
 				else {
 					/* Don't write errors on a dead socket. */
 					msgs2stderr = 1;
-					out->len = iobuf.raw_flushing_ends_before = out->pos = 0;
+					iobuf.out_fd = -2;
+					iobuf.out.len = iobuf.msg.len = iobuf.raw_flushing_ends_before = 0;
 					rsyserr(FERROR_SOCKET, errno, "[%s] write error", who_am_i());
+					drain_multiplex_messages();
 					exit_cleanup(RERR_STREAMIO);
 				}
 			}
@@ -806,7 +818,7 @@ void noop_io_until_death(void)
 {
 	char buf[1024];
 
-	kluge_around_eof = 1;
+	kluge_around_eof = 2;
 	/* For protocol 31: setting an I/O timeout ensures that if something
 	 * inexplicably weird happens, we won't hang around forever.  For older
 	 * protocols: we can't tell the other side to die, so we linger a brief
@@ -1475,6 +1487,23 @@ static void read_a_msg(void)
 	}
 }
 
+static void drain_multiplex_messages(void)
+{
+	while (IN_MULTIPLEXED && iobuf.in.len) {
+		if (iobuf.raw_input_ends_before) {
+			size_t raw_len = iobuf.raw_input_ends_before - iobuf.in.pos;
+			iobuf.raw_input_ends_before = 0;
+			if (raw_len >= iobuf.in.len) {
+				iobuf.in.len = 0;
+				break;
+			}
+			iobuf.in.pos += raw_len;
+			iobuf.in.len -= raw_len;
+		}
+		read_a_msg();
+	}
+}
+
 void wait_for_receiver(void)
 {
 	if (!iobuf.raw_input_ends_before)
@@ -1628,7 +1657,7 @@ void read_buf(int f, char *buf, size_t len)
 {
 	if (f != iobuf.in_fd) {
 		if (safe_read(f, buf, len) != len)
-			whine_about_eof(f); /* Doesn't return. */
+			whine_about_eof(False); /* Doesn't return. */
 		goto batch_copy;
 	}
 

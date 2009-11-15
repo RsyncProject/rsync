@@ -214,7 +214,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 #include "case_N.h"
 
 		if (exit_code && exit_code != RERR_STREAMIO && exit_code != RERR_SIGNAL1
-		 && (protocol_version >= 31 || am_server || (!am_sender && !am_generator))) {
+		 && (protocol_version >= 31 || (!am_sender && !am_generator))) {
 			if (line > 0)
 				send_msg_int(MSG_ERROR_EXIT, exit_code);
 			noop_io_until_death();
