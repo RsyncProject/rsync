@@ -807,7 +807,12 @@ void noop_io_until_death(void)
 	char buf[1024];
 
 	kluge_around_eof = 1;
-	set_io_timeout(protocol_version >= 31 ? 10 : 1);
+	/* For protocol 31: setting an I/O timeout ensures that if something
+	 * inexplicably weird happens, we won't hang around forever.  For older
+	 * protocols: we can't tell the other side to die, so we linger a brief
+	 * time (to try to give our error messages time to arrive) and then let
+	 * the "unexpectedly" closed socket tell them to die. */
+	set_io_timeout(protocol_version >= 31 ? 30 : 1);
 
 	while (1)
 		read_buf(iobuf.in_fd, buf, sizeof buf);
