@@ -734,7 +734,7 @@ static char *perform_io(size_t needed, int flags)
 						rsyserr(FERROR_SOCKET, errno, "read error");
 					} else
 						rsyserr(FERROR, errno, "read error");
-					exit_cleanup(RERR_STREAMIO);
+					exit_cleanup(RERR_SOCKETIO);
 				}
 			}
 			if (msgs2stderr && DEBUG_GTE(IO, 2))
@@ -766,7 +766,7 @@ static char *perform_io(size_t needed, int flags)
 					iobuf.out.len = iobuf.msg.len = iobuf.raw_flushing_ends_before = 0;
 					rsyserr(FERROR_SOCKET, errno, "[%s] write error", who_am_i());
 					drain_multiplex_messages();
-					exit_cleanup(RERR_STREAMIO);
+					exit_cleanup(RERR_SOCKETIO);
 				}
 			}
 			if (msgs2stderr && DEBUG_GTE(IO, 2)) {
@@ -819,12 +819,10 @@ void noop_io_until_death(void)
 	char buf[1024];
 
 	kluge_around_eof = 2;
-	/* For protocol 31: setting an I/O timeout ensures that if something
-	 * inexplicably weird happens, we won't hang around forever.  For older
-	 * protocols: we can't tell the other side to die, so we linger a brief
-	 * time (to try to give our error messages time to arrive) and then let
-	 * the "unexpectedly" closed socket tell them to die. */
-	set_io_timeout(protocol_version >= 31 ? 30 : 1);
+	/* Setting an I/O timeout ensures that if something inexplicably weird
+	 * happens, we won't hang around forever. */
+	if (!io_timeout)
+		set_io_timeout(60);
 
 	while (1)
 		read_buf(iobuf.in_fd, buf, sizeof buf);
@@ -2114,11 +2112,11 @@ void io_printf(int fd, const char *format, ...)
 	va_end(ap);
 
 	if (len < 0)
-		exit_cleanup(RERR_STREAMIO);
+		exit_cleanup(RERR_PROTOCOL);
 
 	if (len > (int)sizeof buf) {
 		rprintf(FERROR, "io_printf() was too long for the buffer.\n");
-		exit_cleanup(RERR_STREAMIO);
+		exit_cleanup(RERR_PROTOCOL);
 	}
 
 	write_sbuf(fd, buf);

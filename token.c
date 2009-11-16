@@ -306,7 +306,7 @@ send_deflated_token(int f, int32 token, struct map_struct *buf, OFF_T offset,
 					 Z_DEFLATED, -15, 8,
 					 Z_DEFAULT_STRATEGY) != Z_OK) {
 				rprintf(FERROR, "compression init failed\n");
-				exit_cleanup(RERR_STREAMIO);
+				exit_cleanup(RERR_PROTOCOL);
 			}
 			if ((obuf = new_array(char, OBUF_SIZE)) == NULL)
 				out_of_memory("send_deflated_token");
@@ -450,7 +450,7 @@ static int32 recv_deflated_token(int f, char **data)
 				rx_strm.zfree = NULL;
 				if (inflateInit2(&rx_strm, -15) != Z_OK) {
 					rprintf(FERROR, "inflate init failed\n");
-					exit_cleanup(RERR_STREAMIO);
+					exit_cleanup(RERR_PROTOCOL);
 				}
 				if (!(cbuf = new_array(char, MAX_DATA_COUNT))
 				    || !(dbuf = new_array(char, AVAIL_OUT_SIZE(CHUNK_SIZE))))
