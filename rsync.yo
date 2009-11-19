@@ -713,17 +713,26 @@ its data needs to be updated: instead of the default method of creating
 a new copy of the file and moving it into place when it is complete, rsync
 instead writes the updated data directly to the destination file.
 
-This has several effects: (1) in-use binaries cannot be updated (either the
-OS will prevent this from happening, or binaries that attempt to swap-in
-their data will misbehave or crash), (2) the file's data will be in an
-inconsistent state during the transfer, (3) a file's data may be left in an
-inconsistent state after the transfer if the transfer is interrupted or if
-an update fails, (4) a file that does not have write permissions can not be
-updated, and (5) the efficiency of rsync's delta-transfer algorithm may be
-reduced if some data in the destination file is overwritten before it can
-be copied to a position later in the file (one exception to this is if you
-combine this option with bf(--backup), since rsync is smart enough to use
-the backup file as the basis file for the transfer).
+This has several effects:
+
+quote(itemization(
+  it() Hard links are not broken.  This means the new data will be visible
+  through other hard links to the destination file.  Moreover, attempts to
+  copy differing source files onto a multiply-linked destination file will
+  result in a "tug of war" with the destination data changing back and forth.
+  it() In-use binaries cannot be updated (either the OS will prevent this from
+  happening, or binaries that attempt to swap-in their data will misbehave or
+  crash).
+  it() The file's data will be in an inconsistent state during the transfer
+  and will be left that way if the transfer is interrupted or if an update
+  fails.
+  it() A file that does not have write permissions cannot be updated.
+  it() The efficiency of rsync's delta-transfer algorithm may be reduced if
+  some data in the destination file is overwritten before it can be copied to
+  a position later in the file.  This does not apply if you use bf(--backup),
+  since rsync is smart enough to use the backup file as the basis file for the
+  transfer.
+))
 
 WARNING: you should not use this option to update files that are being
 accessed by others, so be careful when choosing to use this for a copy.
@@ -837,17 +846,23 @@ to modify your receiving hierarchy.
 See also bf(--copy-dirlinks) for an analogous option for the sending side.
 
 dit(bf(-H, --hard-links)) This tells rsync to look for hard-linked files in
-the transfer and link together the corresponding files on the receiving
-side.  Without this option, hard-linked files in the transfer are treated
+the source and link together the corresponding files on the destination.
+Without this option, hard-linked files in the source are treated
 as though they were separate files.
 
-When you are updating a non-empty destination, this option only ensures
-that files that are hard-linked together on the source are hard-linked
-together on the destination.  It does NOT currently endeavor to break
-already existing hard links on the destination that do not exist between
-the source files.  Note, however, that if one or more extra-linked files
-have content changes, they will become unlinked when updated (assuming you
-are not using the bf(--inplace) option).
+This option does NOT necessarily ensure that the pattern of hard links on the
+destination exactly matches that on the source.  Cases in which the
+destination may end up with extra hard links include the following:
+
+quote(itemization(
+  it() If the destination already contains hard links, rsync will not break
+  them explicitly.  However, if one or more of the paths have content
+  differences, the normal file-update process will break those links, unless
+  you are using the bf(--inplace) option.
+  it() If you specify a bf(--link-dest) directory that contains hard links,
+  rsync may use the same bf(--link-dest) file multiple times via several of
+  its paths.
+))
 
 Note that rsync can only detect hard links between files that are inside
 the transfer set.  If rsync updates a file that has extra hard-link
