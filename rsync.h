@@ -136,6 +136,8 @@
 /* For compatibility with older rsyncs */
 #define OLD_MAX_BLOCK_SIZE ((int32)1 << 29)
 
+#define ROUND_UP_1024(siz) ((siz) & (1024-1) ? ((siz) | (1024-1)) + 1 : (siz))
+
 #define IOERR_GENERAL	(1<<0) /* For backward compatibility, this must == 1 */
 #define IOERR_VANISHED	(1<<1)
 #define IOERR_DEL_LIMIT (1<<2)

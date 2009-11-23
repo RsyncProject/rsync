@@ -115,6 +115,17 @@ static char int_byte_extra[64] = {
 	2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5, 6, /* (C0 - FF)/4 */
 };
 
+/* Our I/O buffers are sized with no bits on in the lowest byte of the "size"
+ * (indeed, our rounding of sizes in 1024-byte units assures more than this).
+ * This allows the code that is storing bytes near the physical end of a
+ * circular buffer to temporarily reduce the buffer's size (in order to make
+ * some storing idioms easier), while also making it simple to restore the
+ * buffer's actual size when the buffer's "pos" wraps around to the start (we
+ * just round the buffer's size up again). */
+
+#define IOBUF_WAS_REDUCED(siz) ((siz) & 0xFF)
+#define IOBUF_RESTORE_SIZE(siz) (((siz) | 0xFF) + 1)
+
 #define IN_MULTIPLEXED (iobuf.in_multiplexed)
 #define OUT_MULTIPLEXED (iobuf.out_empty_len != 0)
 
@@ -443,6 +454,39 @@ static void forward_filesfrom_data(void)
 	}
 }
 
+void reduce_iobuf_size(xbuf *out, size_t new_size)
+{
+	if (new_size < out->size) {
+		if (DEBUG_GTE(IO, 4)) {
+			const char *name = out == &iobuf.out ? "iobuf.out"
+					 : out == &iobuf.msg ? "iobuf.msg"
+					 : NULL;
+			if (name) {
+				rprintf(FINFO, "[%s] reduced size of %s (-%d)\n",
+					who_am_i(), name, (int)(out->size - new_size));
+			}
+		}
+		out->size = new_size;
+	}
+}
+
+void restore_iobuf_size(xbuf *out)
+{
+	if (IOBUF_WAS_REDUCED(out->size)) {
+		size_t new_size = IOBUF_RESTORE_SIZE(out->size);
+		if (DEBUG_GTE(IO, 4)) {
+			const char *name = out == &iobuf.out ? "iobuf.out"
+					 : out == &iobuf.msg ? "iobuf.msg"
+					 : NULL;
+			if (name) {
+				rprintf(FINFO, "[%s] restored size of %s (+%d)\n",
+					who_am_i(), name, (int)(new_size - out->size));
+			}
+		}
+		out->size = new_size;
+	}
+}
+
 /* Perform buffered input and output until specified conditions are met.  When
  * given a "needed" read requirement, we'll return without doing any I/O if the
  * iobuf.in bytes are already available.  When reading, we'll read as many
@@ -508,13 +552,12 @@ static char *perform_io(size_t needed, int flags)
 		 * Also make sure it will fit in the free space at the end, or
 		 * else we need to shift some bytes. */
 		if (needed && iobuf.in.size < needed) {
-			if (!(iobuf.in.buf = realloc_array(iobuf.in.buf, char, needed)))
-				out_of_memory("perform_io");
+			size_t new_size = ROUND_UP_1024(needed);
 			if (DEBUG_GTE(IO, 4)) {
-				rprintf(FINFO, "[%s] resized input buffer from %ld to %ld bytes.\n",
-					who_am_i(), (long)iobuf.in.size, (long)needed);
+				rprintf(FINFO, "[%s] resizing input buffer from %ld to %ld bytes.\n",
+					who_am_i(), (long)iobuf.in.size, (long)new_size);
 			}
-			iobuf.in.size = needed;
+			realloc_xbuf(&iobuf.in, new_size);
 		}
 		if (iobuf.in.size - iobuf.in.pos < needed
 		 || (iobuf.in.len < needed && iobuf.in.len < 1024
@@ -621,15 +664,6 @@ static char *perform_io(size_t needed, int flags)
 
 					SIVAL(iobuf.out.buf + iobuf.raw_data_header_pos, 0,
 					      ((MPLEX_BASE + (int)MSG_DATA)<<24) + iobuf.out.len - 4);
-					if (iobuf.raw_data_header_pos + 4 > iobuf.out.size) {
-						int siz = (int)(iobuf.raw_data_header_pos + 4 - iobuf.out.size);
-						/* We used some of the overflow bytes, so move them. */
-						if (DEBUG_GTE(IO, 4)) {
-							rprintf(FINFO, "[%s] wrap-bytes moved: %d (perform_io)\n",
-								who_am_i(), siz);
-						}
-						memcpy(iobuf.out.buf, iobuf.out.buf + iobuf.out.size, siz);
-					}
 
 					if (DEBUG_GTE(IO, 1)) {
 						rprintf(FINFO, "[%s] send_msg(%d, %ld)\n",
@@ -640,6 +674,13 @@ static char *perform_io(size_t needed, int flags)
 					iobuf.raw_data_header_pos = iobuf.raw_flushing_ends_before;
 					if (iobuf.raw_data_header_pos >= iobuf.out.size)
 						iobuf.raw_data_header_pos -= iobuf.out.size;
+					else if (iobuf.raw_data_header_pos + 4 > iobuf.out.size) {
+						/* The 4-byte header won't fit at the end of the buffer,
+						 * so we'll temporarily reduce the output buffer's size
+						 * and put the header at the start of the buffer. */
+						reduce_iobuf_size(&iobuf.out, iobuf.raw_data_header_pos);
+						iobuf.raw_data_header_pos = 0;
+					}
 					/* Yes, it is possible for this to make len > size for a while. */
 					iobuf.out.len += 4;
 				}
@@ -785,10 +826,12 @@ static char *perform_io(size_t needed, int flags)
 				if (iobuf.raw_flushing_ends_before)
 					iobuf.raw_flushing_ends_before -= out->size;
 				out->pos = 0;
+				restore_iobuf_size(out);
 			} else if (out->pos == iobuf.raw_flushing_ends_before)
 				iobuf.raw_flushing_ends_before = 0;
 			if ((out->len -= n) == empty_buf_len) {
 				out->pos = 0;
+				restore_iobuf_size(out);
 				if (empty_buf_len)
 					iobuf.raw_data_header_pos = 0;
 			}
@@ -832,7 +875,7 @@ void noop_io_until_death(void)
 int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 {
 	char *hdr;
-	size_t pos;
+	size_t needed, pos;
 	BOOL want_debug = DEBUG_GTE(IO, 1) && convert >= 0 && (msgs2stderr || code != MSG_INFO);
 
 	if (!OUT_MULTIPLEXED)
@@ -841,21 +884,32 @@ int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 	if (want_debug)
 		rprintf(FINFO, "[%s] send_msg(%d, %ld)\n", who_am_i(), (int)code, (long)len);
 
+	/* When checking for enough free space for this message, we need to
+	 * make sure that there is space for the 4-byte header, plus we'll
+	 * assume that we may waste up to 3 bytes (if the header doesn't fit
+	 * at the physical end of the buffer). */
 #ifdef ICONV_OPTION
 	if (convert > 0 && ic_send == (iconv_t)-1)
 		convert = 0;
 	if (convert > 0) {
 		/* Ensuring double-size room leaves space for maximal conversion expansion. */
-		if (iobuf.msg.len + len*2 + 4 > iobuf.msg.size)
-			perform_io(len*2 + 4, PIO_NEED_MSGROOM);
+		needed = len*2 + 4 + 3;
 	} else
 #endif
-	if (iobuf.msg.len + len + 4 > iobuf.msg.size)
-		perform_io(len + 4, PIO_NEED_MSGROOM);
+		needed = len + 4 + 3;
+	if (iobuf.msg.len + needed > iobuf.msg.size)
+		perform_io(needed, PIO_NEED_MSGROOM);
 
 	pos = iobuf.msg.pos + iobuf.msg.len; /* Must be set after any flushing. */
 	if (pos >= iobuf.msg.size)
 		pos -= iobuf.msg.size;
+	else if (pos + 4 > iobuf.msg.size) {
+		/* The 4-byte header won't fit at the end of the buffer,
+		 * so we'll temporarily reduce the message buffer's size
+		 * and put the header at the start of the buffer. */
+		reduce_iobuf_size(&iobuf.msg, pos);
+		pos = 0;
+	}
 	hdr = iobuf.msg.buf + pos;
 
 	iobuf.msg.len += 4; /* Allocate room for the coming header bytes. */
@@ -893,13 +947,6 @@ int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 	}
 
 	SIVAL(hdr, 0, ((MPLEX_BASE + (int)code)<<24) + len);
-	/* If the header used any overflow bytes, move them to the start. */
-	if ((pos = hdr+4 - iobuf.msg.buf) > iobuf.msg.size) {
-		int siz = (int)(pos - iobuf.msg.size);
-		if (DEBUG_GTE(IO, 4))
-			rprintf(FINFO, "[%s] wrap-bytes moved: %d (send_msg)\n", who_am_i(), siz);
-		memcpy(iobuf.msg.buf, iobuf.msg.buf + iobuf.msg.size, siz);
-	}
 
 	if (want_debug && convert > 0)
 		rprintf(FINFO, "[%s] converted msg len=%ld\n", who_am_i(), (long)len);
@@ -1169,13 +1216,6 @@ BOOL io_start_buffering_out(int f_out)
 	if (msgs2stderr && DEBUG_GTE(IO, 2))
 		rprintf(FINFO, "[%s] io_start_buffering_out(%d)\n", who_am_i(), f_out);
 
-	if (OUT_MULTIPLEXED && !iobuf.msg.buf) {
-		iobuf.msg.size = IO_BUFFER_SIZE - 4;
-		if (!(iobuf.msg.buf = new_array(char, iobuf.msg.size + 4)))
-			out_of_memory("io_start_buffering_out");
-		iobuf.msg.pos = iobuf.msg.len = 0;
-	}
-
 	if (iobuf.out.buf) {
 		if (iobuf.out_fd == -1)
 			iobuf.out_fd = f_out;
@@ -1184,11 +1224,7 @@ BOOL io_start_buffering_out(int f_out)
 		return False;
 	}
 
-	iobuf.out.size = IO_BUFFER_SIZE * 2 - 4;
-	/* The 4 overflow bytes makes some circular-buffer wrapping operations easier. */
-	if (!(iobuf.out.buf = new_array(char, iobuf.out.size + 4)))
-		out_of_memory("io_start_buffering_out");
-	iobuf.out.pos = iobuf.out.len = 0;
+	alloc_xbuf(&iobuf.out, ROUND_UP_1024(IO_BUFFER_SIZE * 2));
 	iobuf.out_fd = f_out;
 
 	return True;
@@ -1207,12 +1243,7 @@ BOOL io_start_buffering_in(int f_in)
 		return False;
 	}
 
-	iobuf.in.size = IO_BUFFER_SIZE;
-	if (!(iobuf.in.buf = new_array(char, iobuf.in.size)))
-		out_of_memory("io_start_buffering_in");
-
-	iobuf.in.pos = iobuf.in.len = 0;
-
+	alloc_xbuf(&iobuf.in, ROUND_UP_1024(IO_BUFFER_SIZE));
 	iobuf.in_fd = f_in;
 
 	return True;
@@ -2129,6 +2160,9 @@ void io_start_multiplex_out(int fd)
 
 	if (msgs2stderr && DEBUG_GTE(IO, 2))
 		rprintf(FINFO, "[%s] io_start_multiplex_out(%d)\n", who_am_i(), fd);
+
+	if (!iobuf.msg.buf)
+		alloc_xbuf(&iobuf.msg, ROUND_UP_1024(IO_BUFFER_SIZE));
 
 	iobuf.out_empty_len = 4; /* See also OUT_MULTIPLEXED */
 	io_start_buffering_out(fd);

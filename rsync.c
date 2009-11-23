@@ -133,42 +133,53 @@ void setup_iconv(void)
 # endif
 }
 
-/* Move any bytes in the overflow space to the start.  This avoids any issue
- * with a multibyte sequence that needs to span the end of the buffer. */
-static void wrap_overflow(xbuf *out, int siz)
-{
-	if (DEBUG_GTE(IO, 4))
-		rprintf(FINFO, "[%s] wrap-bytes moved: %d (iconvbufs)\n", who_am_i(), siz);
-	memcpy(out->buf, out->buf + out->size, siz);
-}
-
-/* This function converts the characters in the "in" xbuf into characters
- * in the "out" xbuf.  The "len" of the "in" xbuf is used starting from its
- * "pos".  The "size" of the "out" xbuf restricts how many characters can be
- * stored, starting at its "pos+len" position.  Note that the last byte of
- * the buffer is never used, which reserves space for a terminating '\0'.
- * If ICB_CIRCULAR_OUT is set, the output data can wrap around to the start,
- * and the buf IS ASSUMED TO HAVE AN EXTRA 4 BYTES OF OVERFLOW SPACE at the
- * end (the buffer will also not be expanded if it is already allocated).
+/* This function converts the chars in the "in" xbuf into characters in the
+ * "out" xbuf.  The ".len" chars of the "in" xbuf is used starting from its
+ * ".pos".  The ".size" of the "out" xbuf restricts how many characters can
+ * be stored, starting at its ".pos+.len" position.  Note that the last byte
+ * of the "out" xbuf is not used, which reserves space for a trailing '\0'
+ * (though it is up to the caller to store a trailing '\0', as needed).
+ *
  * We return a 0 on success or a -1 on error.  An error also sets errno to
  * E2BIG, EILSEQ, or EINVAL (see below); otherwise errno will be set to 0.
- * The "in" xbuf is altered to update "pos" and "len".  The "out" xbuf has
- * data appended, and its "len" incremented.   If ICB_EXPAND_OUT is set in
- * "flags", the "out" xbuf will also be allocated if empty, and expanded if
- * too small (so E2BIG will not be returned).  If ICB_INCLUDE_BAD is set in
- * "flags", any badly-encoded chars are included verbatim in the "out" xbuf,
- * so EILSEQ will not be returned.  Likewise for ICB_INCLUDE_INCOMPLETE with
- * respect to an incomplete multi-byte char at the end, which ensures that
- * EINVAL is not returned.  If ICB_INIT is set, the iconv() conversion state
- * is initialized prior to processing the characters. */
+ * The "in" xbuf is altered to update ".pos" and ".len".  The "out" xbuf has
+ * data appended, and its ".len" incremented (see below for a ".size" note).
+ *
+ * If ICB_CIRCULAR_OUT is set in "flags", the chars going into the "out" xbuf
+ * can wrap around to the start, and the xbuf may have its ".size" reduced
+ * (presumably by 1 byte) if the iconv code doesn't have space to store a
+ * multi-byte character at the physical end of the ".buf" (though no reducing
+ * happens if ".pos" is < 1, since there is no room to wrap around).
+ *
+ * If ICB_EXPAND_OUT is set in "flags", the "out" xbuf will be allocated if
+ * empty, and (as long as ICB_CIRCULAR_OUT is not set) expanded if too small.
+ * This prevents the return of E2BIG (except for a circular xbuf).
+ *
+ * If ICB_INCLUDE_BAD is set in "flags", any badly-encoded chars are included
+ * verbatim in the "out" xbuf, so EILSEQ will not be returned.
+ *
+ * If ICB_INCLUDE_INCOMPLETE is set in "flags", any incomplete multi-byte
+ * chars are included, which ensures that EINVAL is not returned.
+ *
+ * If ICB_INIT is set, the iconv() conversion state is initialized prior to
+ * processing the characters. */
 int iconvbufs(iconv_t ic, xbuf *in, xbuf *out, int flags)
 {
 	ICONV_CONST char *ibuf;
 	size_t icnt, ocnt, opos;
 	char *obuf;
 
-	if (!out->size && flags & ICB_EXPAND_OUT)
-		alloc_xbuf(out, 1024);
+	if (!out->size && flags & ICB_EXPAND_OUT) {
+		size_t siz = ROUND_UP_1024(in->len * 2);
+		alloc_xbuf(out, siz);
+	} else if (out->len+1 >= out->size) {
+		/* There is no room to even start storing data. */
+		if (!(flags & ICB_EXPAND_OUT) || flags & ICB_CIRCULAR_OUT) {
+			errno = E2BIG;
+			return -1;
+		}
+		realloc_xbuf(out, out->size + ROUND_UP_1024(in->len * 2));
+	}
 
 	if (flags & ICB_INIT)
 		iconv(ic, NULL, 0, NULL, 0);
@@ -180,12 +191,13 @@ int iconvbufs(iconv_t ic, xbuf *in, xbuf *out, int flags)
 	if (flags & ICB_CIRCULAR_OUT) {
 		if (opos >= out->size) {
 			opos -= out->size;
+			/* We know that out->pos is not 0 due to the "no room" check
+			 * above, so this can't go "negative". */
 			ocnt = out->pos - opos - 1;
 		} else {
-			/* We only make use of the 4 bytes of overflow buffer
-			 * if there is room to move the bytes to the start of
-			 * the circular buffer. */
-			ocnt = out->size - opos + MIN((ssize_t)out->pos - 1, 4);
+			/* Allow the use of all bytes to the physical end of the buffer
+			 * unless pos is 0, in which case we reserve our trailing '\0'. */
+			ocnt = out->size - opos - (out->pos ? 0 : 1);
 		}
 	} else
 		ocnt = out->size - opos - 1;
@@ -201,22 +213,32 @@ int iconvbufs(iconv_t ic, xbuf *in, xbuf *out, int flags)
 			} else if (errno == EILSEQ) {
 				if (!(flags & ICB_INCLUDE_BAD))
 					goto finish;
-			} else {
+			} else if (errno == E2BIG) {
+				size_t siz;
 				opos = obuf - out->buf;
-				if (flags & ICB_CIRCULAR_OUT && opos > out->size) {
-					wrap_overflow(out, opos -= out->size);
-					obuf = out->buf + opos;
-					if ((ocnt = out->pos - opos - 1) > 0)
-						continue;
+				if (flags & ICB_CIRCULAR_OUT && out->pos > 1 && opos > out->pos) {
+					/* We are in a divided circular buffer at the physical
+					 * end with room to wrap to the start.  If iconv() refused
+					 * to use one or more trailing bytes in the buffer, we
+					 * set the size to ignore the unused bytes. */
+					if (opos < out->size)
+						reduce_iobuf_size(out, opos);
+					obuf = out->buf;
+					ocnt = out->pos - 1;
+					continue;
 				}
 				if (!(flags & ICB_EXPAND_OUT) || flags & ICB_CIRCULAR_OUT) {
 					errno = E2BIG;
 					goto finish;
 				}
-				realloc_xbuf(out, out->size + 1024);
+				siz = ROUND_UP_1024(in->len * 2);
+				realloc_xbuf(out, out->size + siz);
 				obuf = out->buf + opos;
-				ocnt += 1024;
+				ocnt += siz;
 				continue;
+			} else {
+				rsyserr(FERROR, errno, "unexpected error from iconv()");
+				exit_cleanup(RERR_UNSUPPORTED);
 			}
 			*obuf++ = *ibuf++;
 			ocnt--, icnt--;
@@ -227,12 +249,8 @@ int iconvbufs(iconv_t ic, xbuf *in, xbuf *out, int flags)
 
   finish:
 	opos = obuf - out->buf;
-	if (flags & ICB_CIRCULAR_OUT) {
-		if (opos > out->size)
-			wrap_overflow(out, opos - out->size);
-		else if (opos < out->pos)
-			opos += out->size;
-	}
+	if (flags & ICB_CIRCULAR_OUT && opos < out->pos)
+		opos += out->size;
 	out->len = opos - out->pos;
 
 	in->len = icnt;
