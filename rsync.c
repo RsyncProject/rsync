@@ -149,7 +149,7 @@ void setup_iconv(void)
  * can wrap around to the start, and the xbuf may have its ".size" reduced
  * (presumably by 1 byte) if the iconv code doesn't have space to store a
  * multi-byte character at the physical end of the ".buf" (though no reducing
- * happens if ".pos" is < 1, since there is no room to wrap around).
+ * happens if ".pos" is <= 1, since there is no room to wrap around).
  *
  * If ICB_EXPAND_OUT is set in "flags", the "out" xbuf will be allocated if
  * empty, and (as long as ICB_CIRCULAR_OUT is not set) expanded if too small.
