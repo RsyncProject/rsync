@@ -196,7 +196,7 @@ AC_ARG_ENABLE(ipv6,
 		[don't even try to use IPv6]))
 if test x"$enable_ipv6" != x"no"; then
 	AC_MSG_CHECKING([ipv6 stack type])
-	for i in inria kame linux-glibc linux-inet6 solaris toshiba v6d zeta; do
+	for i in inria kame linux-glibc linux-inet6 solaris toshiba v6d zeta cygwin; do
 		case $i in
 		inria)
 			# http://www.kame.net/
@@ -281,6 +281,15 @@ yes
 				[ipv6type=$i;
 				ipv6lib=inet6;
 				ipv6libdir=/usr/local/v6/lib;
+				AC_DEFINE(INET6, 1, [true if you have IPv6])])
+			;;
+		cygwin)
+			AC_EGREP_CPP(yes, [
+#include <netinet/in.h>
+#ifdef _CYGWIN_IN6_H
+yes
+#endif],
+				[ipv6type=$i;
 				AC_DEFINE(INET6, 1, [true if you have IPv6])])
 			;;
 		esac
