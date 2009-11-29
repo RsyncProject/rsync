@@ -1892,6 +1892,7 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 	static int counter = 0;
 	struct file_struct *file;
 	char *fname;
+	BOOL fix_dir_perms;
 	int i, start, end;
 
 	if (ndx < 0) {
@@ -1912,11 +1913,13 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 			rprintf(FINFO, "touch_up_dirs: %s (%d)\n",
 				NS(fname), i);
 		}
+		/* Be sure not to retouch permissions with --fake-super. */
+		fix_dir_perms = !am_root && !(file->mode & S_IWUSR);
 		if (!F_IS_ACTIVE(file) || file->flags & FLAG_MISSING_DIR
-		 || (!need_retouch_dir_times && file->mode & S_IWUSR))
+		 || !(need_retouch_dir_times || fix_dir_perms))
 			continue;
 		fname = f_name(file, NULL);
-		if (!(file->mode & S_IWUSR))
+		if (fix_dir_perms)
 			do_chmod(fname, file->mode);
 		if (need_retouch_dir_times) {
 			STRUCT_STAT st;
