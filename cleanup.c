@@ -34,6 +34,8 @@ extern int output_needs_newline;
 extern char *partial_dir;
 extern char *logfile_name;
 
+BOOL shutting_down = False;
+
 #ifdef HAVE_SIGACTION
 static struct sigaction sigact;
 #endif
@@ -132,8 +134,8 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 
 		if (DEBUG_GTE(EXIT, 2)) {
 			rprintf(FINFO,
-				"_exit_cleanup(code=%d, file=%s, line=%d): entered\n",
-				code, file, line);
+				"[%s] _exit_cleanup(code=%d, file=%s, line=%d): entered\n",
+				who_am_i(), code, file, line);
 		}
 
 		/* FALLTHROUGH */
@@ -205,18 +207,23 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 
 		if (DEBUG_GTE(EXIT, 1)) {
 			rprintf(FINFO,
-				"_exit_cleanup(code=%d, file=%s, line=%d): "
+				"[%s] _exit_cleanup(code=%d, file=%s, line=%d): "
 				"about to call exit(%d)\n",
-				unmodified_code, file, line, code);
+				who_am_i(), unmodified_code, file, line, code);
 		}
 
 		/* FALLTHROUGH */
 #include "case_N.h"
 
 		if (exit_code && exit_code != RERR_SOCKETIO && exit_code != RERR_STREAMIO && exit_code != RERR_SIGNAL1
-		 && (protocol_version >= 31 || (!am_sender && !am_generator))) {
-			if (line > 0)
+		 && !shutting_down && (protocol_version >= 31 || (!am_sender && !am_generator))) {
+			if (line > 0) {
+				if (DEBUG_GTE(EXIT, 3)) {
+					rprintf(FINFO, "[%s] sending MSG_ERROR_EXIT with exit_code %d\n",
+						who_am_i(), exit_code);
+				}
 				send_msg_int(MSG_ERROR_EXIT, exit_code);
+			}
 			noop_io_until_death();
 		}
 

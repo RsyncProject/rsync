@@ -1489,8 +1489,14 @@ static void read_a_msg(void)
 		}
 		break;
 	case MSG_ERROR_EXIT:
+		if (DEBUG_GTE(EXIT, 3))
+			rprintf(FINFO, "[%s] got MSG_ERROR_EXIT with %d bytes\n", who_am_i(), msg_bytes);
 		if (msg_bytes == 0) {
 			if (!am_sender && !am_generator) {
+				if (DEBUG_GTE(EXIT, 3)) {
+					rprintf(FINFO, "[%s] sending MSG_ERROR_EXIT (len 0)\n",
+						who_am_i());
+				}
 				send_msg(MSG_ERROR_EXIT, "", 0, 0);
 				io_flush(FULL_FLUSH);
 			}
@@ -1499,10 +1505,19 @@ static void read_a_msg(void)
 			data = perform_io(4, PIO_INPUT_AND_CONSUME);
 			val = IVAL(data, 0);
 			if (protocol_version >= 31) {
-				if (am_generator)
+				if (am_generator) {
+					if (DEBUG_GTE(EXIT, 3)) {
+						rprintf(FINFO, "[%s] sending MSG_ERROR_EXIT with exit_code %d\n",
+							who_am_i(), val);
+					}
 					send_msg_int(MSG_ERROR_EXIT, val);
-				else
+				} else {
+					if (DEBUG_GTE(EXIT, 3)) {
+						rprintf(FINFO, "[%s] sending MSG_ERROR_EXIT (len 0)\n",
+							who_am_i());
+					}
 					send_msg(MSG_ERROR_EXIT, "", 0, 0);
+				}
 			}
 		} else
 			goto invalid_msg;

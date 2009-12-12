@@ -271,7 +271,7 @@ static struct output_struct debug_words[COUNT_DEBUG+1] = {
 	DEBUG_WORD(DEL, W_REC, "Debug delete actions (levels 1-3)"),
 	DEBUG_WORD(DELTASUM, W_SND|W_REC, "Debug delta-transfer checksumming (levels 1-4)"),
 	DEBUG_WORD(DUP, W_REC, "Debug weeding of duplicate names"),
-	DEBUG_WORD(EXIT, W_CLI|W_SRV, "Debug exit events (levels 1-2)"),
+	DEBUG_WORD(EXIT, W_CLI|W_SRV, "Debug exit events (levels 1-3)"),
 	DEBUG_WORD(FILTER, W_SND|W_REC, "Debug filter actions (levels 1-2)"),
 	DEBUG_WORD(FLIST, W_SND|W_REC, "Debug file-list operations (levels 1-4)"),
 	DEBUG_WORD(FUZZY, W_REC, "Debug fuzzy scoring (levels 1-2)"),

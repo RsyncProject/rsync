@@ -73,6 +73,7 @@ extern int send_msgs_to_gen;
 extern pid_t cleanup_child_pid;
 extern size_t bwlimit_writemax;
 extern unsigned int module_dirlen;
+extern BOOL shutting_down;
 extern struct stats stats;
 extern char *stdout_format;
 extern char *logfile_format;
@@ -726,6 +727,8 @@ static void read_final_goodbye(int f_in, int f_out)
 	uchar fnamecmp_type;
 	char xname[MAXPATHLEN];
 
+	shutting_down = True;
+
 	if (protocol_version < 29)
 		i = read_int(f_in);
 	else {
@@ -921,6 +924,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 
 	handle_stats(-1);
 	io_flush(FULL_FLUSH);
+	shutting_down = True;
 	if (protocol_version >= 24) {
 		/* send a final goodbye message */
 		write_ndx(f_out, NDX_DONE);
