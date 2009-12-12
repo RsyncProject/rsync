@@ -73,6 +73,7 @@ extern int send_msgs_to_gen;
 extern pid_t cleanup_child_pid;
 extern size_t bwlimit_writemax;
 extern unsigned int module_dirlen;
+extern BOOL flist_receiving_enabled;
 extern BOOL shutting_down;
 extern struct stats stats;
 extern char *stdout_format;
@@ -898,6 +899,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	}
 
 	am_generator = 1;
+	flist_receiving_enabled = True;
 
 	io_end_multiplex_in(MPLX_SWITCHING);
 	if (write_batch && !am_server)
