@@ -1364,7 +1364,7 @@ static int start_client(int argc, char *argv[])
 	if (DEBUG_GTE(CMD, 2)) {
 		rprintf(FINFO,"cmd=%s machine=%s user=%s path=%s\n",
 			NS(shell_cmd), NS(shell_machine), NS(shell_user),
-			remote_argv ? NS(remote_argv[0]) : "");
+			NS(remote_argv[0]));
 	}
 
 	pid = do_cmd(shell_cmd, shell_machine, shell_user, remote_argv, remote_argc,
