@@ -1435,11 +1435,11 @@ const char *find_filename_suffix(const char *fn, int fn_len, int *len_ptr)
 
 #define UNIT (1 << 16)
 
-uint32 fuzzy_distance(const char *s1, int len1, const char *s2, int len2)
+uint32 fuzzy_distance(const char *s1, unsigned len1, const char *s2, unsigned len2)
 {
 	uint32 a[MAXPATHLEN], diag, above, left, diag_inc, above_inc, left_inc;
 	int32 cost;
-	int i1, i2;
+	unsigned i1, i2;
 
 	if (!len1 || !len2) {
 		if (!len1) {
