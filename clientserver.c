@@ -50,14 +50,12 @@ extern int logfile_format_has_i;
 extern int logfile_format_has_o_or_i;
 extern mode_t orig_umask;
 extern char *bind_address;
-extern char *sockopts;
 extern char *config_file;
 extern char *logfile_format;
 extern char *files_from;
 extern char *tmpdir;
 extern struct chmod_mode_struct *chmod_modes;
 extern struct filter_list_struct daemon_filter_list;
-extern char curr_dir[];
 #ifdef ICONV_OPTION
 extern char *iconv_opt;
 extern iconv_t ic_send, ic_recv;

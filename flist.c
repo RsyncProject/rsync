@@ -43,7 +43,6 @@ extern int xfer_dirs;
 extern int filesfrom_fd;
 extern int one_file_system;
 extern int copy_dirlinks;
-extern int keep_dirlinks;
 extern int preserve_uid;
 extern int preserve_gid;
 extern int preserve_acls;
