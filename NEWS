@@ -1,55 +1,15 @@
-NEWS for rsync 3.0.6 (8 May 2009)
+NEWS for rsync 3.0.7 (UNRELEASED)
 Protocol: 30 (unchanged)
-Changes since 3.0.5:
+Changes since 3.0.6:
 
   BUG FIXES:
 
-    - Fixed a --read-batch hang when rsync is reading a batch file that was
-      created from an incremental-recursion transfer.
+    - Fixed a bogus free when using --xattrs with --backup.
 
-    - Fixed the daemon's socket code to handle the simultaneous arrival of
-      multiple connections.
+    - Avoid an error when --dry-run  was trying to stat a prior hard-link file
+      that hasn't really been created.
 
-    - Fix --safe-links/--copy-unsafe-links to properly handle symlinks that
-      have consecutive slashes in the value.
+    - Improved --skip-compress's error handling of bad character sets and got
+      rid of a lingering debug fprintf().
 
-    - Fixed the parsing of an [IPv6_LITERAL_ADDR] when a USER@ is prefixed.
-
-    - The sender now skips a (bogus) symlink that has a 0-length value, which
-      avoids a transfer error in the receiver.
-
-    - Fixed a case where the sender could die with a tag-0 error if there was
-      an I/O during the sending of the file list.
-
-    - Fixed the rrsync script to avoid a server-side problem when -e is at the
-      start of the short options.
-
-    - Fixed a problem where a vanished directory could turn into an exit code
-      23 instead of the proper exit code 24.
-
-    - Fixed the --iconv conversion of symlinks when doing a local copy.
-
-    - Fixed a problem where --one-file-system was not stopping deletions on the
-      receiving side when a mount-point directory did not match a directory in
-      the transfer.
-
-    - Fixed the dropping of an ACL mask when no named ACL values were present.
-
-    - Fixed an ACL/xattr corruption issue where the --backup option could cause
-      rsync to associate the wrong ACL/xattr information with received files.
-
-    - Fixed the use of --xattrs with --only-write-batch.
-
-    - Fixed the use of --dry-run with --read-batch.
-
-    - Fixed configure's erroneous use of target.
-
-    - Fixed configure's --disable-debug option.
-
-    - Fixed a run-time issue for systems that can't find iconv_open() by adding
-      the --disable-iconv-open configure option.
-
-    - Complain and die if the user tries to combine --remove-source-files (or
-      the deprecated --remove-sent-files) with --read-batch.
-
-    - Fixed an failure transferring special files from Solaris to Linux.
+    - Fixed the daemon's conveyance of io_error value from the sender.
