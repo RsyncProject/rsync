@@ -262,7 +262,7 @@ do
     prep_scratch
 
     set +e
-    sh $RUNSHFLAGS "$testscript" >"$scratchdir/test.log" 2>&1
+    "$TOOLDIR/"testrun $RUNSHFLAGS "$testscript" >"$scratchdir/test.log" 2>&1
     result=$?
     set -e
 

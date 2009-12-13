@@ -28,6 +28,7 @@ config.status
 /tests-dont-exist
 /testtmp
 /tls
+/testrun
 /trimslash
 /t_unsafe
 /wildtest
