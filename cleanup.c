@@ -108,7 +108,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 	}
 
 	/* If this is the exit at the end of the run, the server side
-	 * should not attempt to output a message (see log.c). */
+	 * should not attempt to output a message (see log_exit()). */
 	if (am_server && code == 0)
 		am_server = 2;
 
@@ -123,8 +123,8 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 
 		if (verbose > 3) {
 			rprintf(FINFO,
-				"_exit_cleanup(code=%d, file=%s, line=%d): entered\n",
-				code, file, line);
+				"[%s] _exit_cleanup(code=%d, file=%s, line=%d): entered\n",
+				who_am_i(), code, file, line);
 		}
 
 		/* FALLTHROUGH */
@@ -192,9 +192,9 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 
 		if (verbose > 2) {
 			rprintf(FINFO,
-				"_exit_cleanup(code=%d, file=%s, line=%d): "
+				"[%s] _exit_cleanup(code=%d, file=%s, line=%d): "
 				"about to call exit(%d)\n",
-				unmodified_code, file, line, code);
+				who_am_i(), unmodified_code, file, line, code);
 		}
 
 		/* FALLTHROUGH */
