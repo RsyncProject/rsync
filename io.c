@@ -776,7 +776,7 @@ static char *perform_io(size_t needed, int flags)
 			iobuf.in.len += n;
 		}
 
-		if (iobuf.out_fd >= 0 && FD_ISSET(iobuf.out_fd, &w_fds)) {
+		if (out && FD_ISSET(iobuf.out_fd, &w_fds)) {
 			size_t len = iobuf.raw_flushing_ends_before ? iobuf.raw_flushing_ends_before - out->pos : out->len;
 			int n;
 
