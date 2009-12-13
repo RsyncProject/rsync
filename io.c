@@ -1347,7 +1347,7 @@ void stop_flist_forward(void)
 /* Read a message from a multiplexed source. */
 static void read_a_msg(void)
 {
-	char line[BIGPATHBUFLEN];
+	char data[BIGPATHBUFLEN];
 	int tag, val;
 	size_t msg_bytes;
 
@@ -1402,11 +1402,11 @@ static void read_a_msg(void)
 			maybe_send_keepalive();
 		break;
 	case MSG_DELETED:
-		if (msg_bytes >= sizeof line)
+		if (msg_bytes >= sizeof data)
 			goto overflow;
 		if (am_generator) {
-			raw_read_buf(line, msg_bytes);
-			send_msg(MSG_DELETED, line, msg_bytes, 1);
+			raw_read_buf(data, msg_bytes);
+			send_msg(MSG_DELETED, data, msg_bytes, 1);
 			break;
 		}
 #ifdef ICONV_OPTION
@@ -1416,7 +1416,7 @@ static void read_a_msg(void)
 			int add_null = 0;
 			int flags = ICB_INCLUDE_BAD | ICB_INIT;
 
-			INIT_CONST_XBUF(outbuf, line);
+			INIT_CONST_XBUF(outbuf, data);
 			INIT_XBUF(inbuf, ibuf, 0, (size_t)-1);
 
 			while (msg_bytes) {
@@ -1443,13 +1443,13 @@ static void read_a_msg(void)
 			msg_bytes = outbuf.len;
 		} else
 #endif
-			raw_read_buf(line, msg_bytes);
+			raw_read_buf(data, msg_bytes);
 		/* A directory name was sent with the trailing null */
-		if (msg_bytes > 0 && !line[msg_bytes-1])
-			log_delete(line, S_IFDIR);
+		if (msg_bytes > 0 && !data[msg_bytes-1])
+			log_delete(data, S_IFDIR);
 		else {
-			line[msg_bytes] = '\0';
-			log_delete(line, S_IFREG);
+			data[msg_bytes] = '\0';
+			log_delete(data, S_IFREG);
 		}
 		break;
 	case MSG_SUCCESS:
@@ -1488,7 +1488,7 @@ static void read_a_msg(void)
 	case MSG_ERROR:
 	case MSG_ERROR_XFER:
 	case MSG_WARNING:
-		if (msg_bytes >= sizeof line) {
+		if (msg_bytes >= sizeof data) {
 		    overflow:
 			rprintf(FERROR,
 				"multiplexing overflow %d:%lu [%s%s]\n",
@@ -1496,12 +1496,12 @@ static void read_a_msg(void)
 				inc_recurse ? "/inc" : "");
 			exit_cleanup(RERR_STREAMIO);
 		}
-		raw_read_buf(line, msg_bytes);
-		rwrite((enum logcode)tag, line, msg_bytes, !am_generator);
+		raw_read_buf(data, msg_bytes);
+		rwrite((enum logcode)tag, data, msg_bytes, !am_generator);
 		if (first_message) {
-			if (list_only && !am_sender && tag == 1 && msg_bytes < sizeof line) {
-				line[msg_bytes] = '\0';
-				check_for_d_option_error(line);
+			if (list_only && !am_sender && tag == 1 && msg_bytes < sizeof data) {
+				data[msg_bytes] = '\0';
+				check_for_d_option_error(data);
 			}
 			first_message = 0;
 		}
