@@ -13,3 +13,33 @@ Changes since 3.0.6:
       rid of a lingering debug fprintf().
 
     - Fixed the daemon's conveyance of io_error value from the sender.
+
+    - An rsync daemon use seteuid() (when available) if it used setuid().
+
+    - Get the permissions right on a --fake-super transferred directory that
+      needs more owner permissions to emulate root behavior.
+
+    - Improved the "--delete does not work without -r or -d" message.
+
+    - Some misc manpage improvements.
+
+    - Fixed the chmod-temp-dir testsuite on a system without /var/tmp.
+
+    - Make sure that a timeout specified in the daemon's config is used as a
+      maximum timeout value when the user also specifies a timeout.
+
+    - Improved the error-exit reporting when rsync gets an error trying to
+      cleanup after an error:  the initial error is reported.
+
+    - Improved configure's detection of IPv6 for solaris and cygwin.
+
+    - The AIX sysacls routines will now return ENOSYS if ENOTSUP is missing.
+
+    - Made our (only used if missing) getaddrinfo() routine use inet_pton()
+      (which we also provide) instead of inet_aton().
+
+  DEVELOPER RELATED:
+
+    - Got rid of type-punned compiler warnings output by newer gcc versions.
+
+    - The Makefile now ensures that proto.h will be rebuilt if config.h changes.
