@@ -42,7 +42,7 @@ cd "$scratchdir"
 ln -s test-rsyncd.conf rsyncd.conf
 
 confopt=''
-case `id -u` in
+case `get_testuid` in
 0)
     # Root needs to specify the config file, or it uses /etc/rsyncd.conf.
     echo "Forcing --config=$conf"
