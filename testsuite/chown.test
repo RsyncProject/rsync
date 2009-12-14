@@ -37,7 +37,7 @@ case $0 in
     ;;
 *)
     RSYNC="$RSYNC --super"
-    case `id -u` in
+    case `get_testuid` in
     '') ;; # If "id" failed, try to continue...
     0)  ;;
     *)  if [ -f /usr/bin/fakeroot ]; then

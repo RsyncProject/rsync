@@ -100,6 +100,10 @@ rsync_ls_lR() {
     find "$@" -print | sort | sed 's/ /\\ /g' | xargs "$TOOLDIR/tls" $TLS_ARGS
 }
 
+get_testuid() {
+    id 2>/dev/null | sed 's/^[^0-9]*\([0-9][0-9]*\).*/\1/'
+}
+
 check_perms() {
     perms=`"$TOOLDIR/tls" "$1" | sed 's/^[-d]\(.........\).*/\1/'`
     if test $perms = $2; then
