@@ -395,7 +395,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 		    int *f_in_p, int *f_out_p)
 {
 	int i, argc = 0;
-	char *args[MAX_ARGS];
+	char *args[MAX_ARGS], *need_to_free = NULL;
 	pid_t pid;
 	int dash_l_set = 0;
 
@@ -406,7 +406,7 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 			cmd = rsh_env;
 		if (!cmd)
 			cmd = RSYNC_RSH;
-		cmd = strdup(cmd); /*MEMORY LEAK*/
+		cmd = need_to_free = strdup(cmd);
 		if (!cmd)
 			goto oom;
 
@@ -537,6 +537,9 @@ static pid_t do_cmd(char *cmd, char *machine, char *user, char **remote_argv, in
 		if (protect_args && !daemon_over_rsh)
 			send_protected_args(*f_out_p, args);
 	}
+
+	if (need_to_free)
+		free(need_to_free);
 
 	return pid;
 
