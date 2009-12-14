@@ -2,7 +2,7 @@
 
 #include "rsync.h"
 
-#define MAX_TEST_SECONDS (3*60)
+#define MAX_TEST_SECONDS (5*60)
 
  int main(int argc, char *argv[])
 {
