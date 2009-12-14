@@ -194,7 +194,7 @@ static struct idlist *recv_add_id(struct idlist **idlist_ptr, struct idlist *idm
 			if (strcmp(node->name, name) != 0)
 				continue;
 		} else if (node->name) {
-			if (id < node->id || id > (unsigned long)node->name)
+			if (id < node->id || (unsigned long)id > (unsigned long)node->name)
 				continue;
 		} else {
 			if (node->id != id)
