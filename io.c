@@ -1534,7 +1534,7 @@ static void read_a_msg(void)
 			goto invalid_msg;
 		iobuf.in_multiplexed = 1;
 		if (DEBUG_GTE(EXIT, 3))
-			rprintf(FINFO, "[%s] got MSG_ERROR_EXIT with %d bytes\n", who_am_i(), msg_bytes);
+			rprintf(FINFO, "[%s] got MSG_ERROR_EXIT with %ld bytes\n", who_am_i(), (long)msg_bytes);
 		if (msg_bytes == 0) {
 			if (!am_sender && !am_generator) {
 				if (DEBUG_GTE(EXIT, 3)) {
