@@ -38,7 +38,6 @@ extern int bwlimit;
 extern size_t bwlimit_writemax;
 extern int io_timeout;
 extern int am_server;
-extern int am_daemon;
 extern int am_sender;
 extern int am_generator;
 extern int msgs2stderr;
@@ -168,10 +167,10 @@ static void check_timeout(void)
 	t = time(NULL);
 
 	if (t - last_io_in >= io_timeout) {
-		if (!am_server && !am_daemon) {
-			rprintf(FERROR, "io timeout after %d seconds -- exiting\n",
-				(int)(t-last_io_in));
-		}
+		if (am_server)
+			msgs2stderr = 1;
+		rprintf(FERROR, "[%s] io timeout after %d seconds -- exiting\n",
+			who_am_i(), (int)(t-last_io_in));
 		exit_cleanup(RERR_TIMEOUT);
 	}
 }
