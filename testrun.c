@@ -2,17 +2,24 @@
 
 #include "rsync.h"
 
-#define MAX_TEST_SECONDS (5*60)
+#define DEFAULT_TIMEOUT_SECS (5*60)
+#define TIMEOUT_ENV "TESTRUN_TIMEOUT"
 
  int main(int argc, char *argv[])
 {
 	pid_t pid;
-	int status, slept = 0;
+	char *timeout_env;
+	int status, timeout_secs, slept = 0;
 
 	if (argc < 2) {
 		fprintf(stderr, "Usage: testrun [SHELL_OPTIONS] TESTSUITE_SCRIPT [ARGS]\n");
 		exit(1);
 	}
+
+	if ((timeout_env = getenv(TIMEOUT_ENV)) != NULL)
+		timeout_secs = atoi(timeout_env);
+	else
+		timeout_secs = DEFAULT_TIMEOUT_SECS;
 
 	if ((pid = fork()) < 0) {
 		fprintf(stderr, "TESTRUN ERROR: fork failed: %s\n", strerror(errno));
@@ -36,8 +43,8 @@
 			fprintf(stderr, "TESTRUN ERROR: waitpid failed: %s\n", strerror(errno));
 			exit(1);
 		}
-		if (slept++ > MAX_TEST_SECONDS) {
-			fprintf(stderr, "TESTRUN TIMEOUT: test took over %d seconds.\n", MAX_TEST_SECONDS);
+		if (slept++ > timeout_secs) {
+			fprintf(stderr, "TESTRUN TIMEOUT: test took over %d seconds.\n", timeout_secs);
 			if (kill(pid, SIGTERM) < 0)
 				fprintf(stderr, "TESTRUN ERROR: failed to kill pid %ld: %s\n", (long)pid, strerror(errno));
 			else
