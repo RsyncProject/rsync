@@ -896,7 +896,7 @@ void noop_io_until_death(void)
 		read_buf(iobuf.in_fd, buf, sizeof buf);
 }
 
-/* Buffer a message for the multiplexed output stream.  Is never used for MSG_DATA. */
+/* Buffer a message for the multiplexed output stream.  Is not used for (normal) MSG_DATA. */
 int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 {
 	char *hdr;
@@ -958,8 +958,8 @@ int send_msg(enum msgcode code, const char *buf, size_t len, int convert)
 	{
 		size_t siz;
 
-		if ((pos += 4) >= iobuf.msg.size)
-			pos -= iobuf.msg.size;
+		if ((pos += 4) == iobuf.msg.size)
+			pos = 0;
 
 		/* Handle a split copy if we wrap around the end of the circular buffer. */
 		if (pos >= iobuf.msg.pos && (siz = iobuf.msg.size - pos) < len) {
@@ -1313,18 +1313,16 @@ void maybe_flush_socket(int important)
 		io_flush(NORMAL_FLUSH);
 }
 
+/* This never adds new non-msg-buffer data, since we don't know the state
+ * of the raw-data buffer. */
 void maybe_send_keepalive(void)
 {
 	if (time(NULL) - last_io_out >= allowed_lull) {
 		if (!iobuf.msg.len && iobuf.out.len == iobuf.out_empty_len) {
-			if (protocol_version < 29)
-				return; /* there's nothing we can do */
 			if (protocol_version >= 30)
 				send_msg(MSG_NOOP, "", 0, 0);
-			else {
-				write_int(iobuf.out_fd, cur_flist->used);
-				write_shortint(iobuf.out_fd, ITEM_IS_NEW);
-			}
+			else
+				send_msg(MSG_DATA, "", 0, 0);
 		}
 		if (iobuf.msg.len)
 			perform_io(iobuf.msg.size - iobuf.msg.len + 1, PIO_NEED_MSGROOM);
@@ -1373,7 +1371,8 @@ static void read_a_msg(void)
 		 * possible that this points off the end of the buffer, in
 		 * which case the gradual reading of the input stream will
 		 * cause this value to decrease and eventually become real. */
-		iobuf.raw_input_ends_before = iobuf.in.pos + msg_bytes;
+		if (msg_bytes)
+			iobuf.raw_input_ends_before = iobuf.in.pos + msg_bytes;
 		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_STATS:
@@ -1410,9 +1409,11 @@ static void read_a_msg(void)
 		}
 		break;
 	case MSG_NOOP:
+		if (msg_bytes != 0)
+			goto invalid_msg;
+		iobuf.in_multiplexed = 1;
 		if (am_sender)
 			maybe_send_keepalive();
-		iobuf.in_multiplexed = 1;
 		break;
 	case MSG_DELETED:
 		if (msg_bytes >= sizeof data)
@@ -1543,23 +1544,19 @@ static void read_a_msg(void)
 				send_msg(MSG_ERROR_EXIT, "", 0, 0);
 				io_flush(FULL_FLUSH);
 			}
-			val = 0;
-		} else {
-			val = raw_read_int();
-			if (protocol_version >= 31) {
-				if (am_generator) {
-					if (DEBUG_GTE(EXIT, 3)) {
-						rprintf(FINFO, "[%s] sending MSG_ERROR_EXIT with exit_code %d\n",
-							who_am_i(), val);
-					}
-					send_msg_int(MSG_ERROR_EXIT, val);
-				} else {
-					if (DEBUG_GTE(EXIT, 3)) {
-						rprintf(FINFO, "[%s] sending MSG_ERROR_EXIT (len 0)\n",
-							who_am_i());
-					}
-					send_msg(MSG_ERROR_EXIT, "", 0, 0);
+		} else if (protocol_version >= 31) {
+			if (am_generator) {
+				if (DEBUG_GTE(EXIT, 3)) {
+					rprintf(FINFO, "[%s] sending MSG_ERROR_EXIT with exit_code %d\n",
+						who_am_i(), val);
 				}
+				send_msg_int(MSG_ERROR_EXIT, val);
+			} else {
+				if (DEBUG_GTE(EXIT, 3)) {
+					rprintf(FINFO, "[%s] sending MSG_ERROR_EXIT (len 0)\n",
+						who_am_i());
+				}
+				send_msg(MSG_ERROR_EXIT, "", 0, 0);
 			}
 		}
 		/* Send a negative linenum so that we don't end up
