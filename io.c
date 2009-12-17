@@ -489,23 +489,25 @@ void restore_iobuf_size(xbuf *out)
 	}
 }
 
-/* Perform buffered input and output until specified conditions are met.  When
- * given a "needed" read requirement, we'll return without doing any I/O if the
- * iobuf.in bytes are already available.  When reading, we'll read as many
- * bytes as we can into the buffer, and return as soon as we meet the minimum
- * read requirement.  When given a "needed" write requirement, we'll return
- * without doing any I/O if that many bytes will fit in the output buffer (we
- * check either iobuf.out or iobuf.msg, depending on the flags).  When writing,
- * we write out as much as we can, and return as soon as the given free-space
- * requirement is available.
+/* Perform buffered input and/or output until specified conditions are met.
+ * When given a "needed" read or write request, this returns without doing any
+ * I/O if the needed input bytes or write space is already available.  Once I/O
+ * is needed, this will try to do whatever reading and/or writing is currently
+ * possible, up to the maximum buffer allowances, no matter if this is a read
+ * or write request.  However, the I/O stops as soon as the required input
+ * bytes or output space is available.  If this is not a read request, the
+ * routine may also do some advantageous reading of messages from a multiplexed
+ * input source (which ensures that we don't jam up with everyone in their
+ * "need to write" code and nobody reading the accumulated data that would make
+ * writing possible).
  *
- * The iobuf.out and iobuf.msg buffers are circular, so some writes into them
- * will need to be split when the data needs to wrap around to the start.  In
- * order to help make this easier for some operations (such as the use of
- * SIVAL() into the buffer) a buffer may be temporarily shortened, but the
- * original size will be automatically restored.  The iobuf.in buffer is also
- * circular, so callers may need to split their reading of the data if it spans
- * the end.  See also the 3 raw_* iobuf vars that are used in the handling of
+ * The iobuf.in, .out and .msg buffers are all circular.  Callers need to be
+ * aware that some data copies will need to be split when the bytes wrap around
+ * from the end to the start.  In order to help make writing into the output
+ * buffers easier for some operations (such as the use of SIVAL() into the
+ * buffer) a buffer may be temporarily shortened by a small amount, but the
+ * original size will be automatically restored when the .pos wraps to the
+ * start.  See also the 3 raw_* iobuf vars that are used in the handling of
  * MSG_DATA bytes as they are read-from/written-into the buffers.
  *
  * When writing, we flush data in the following priority order:
@@ -1370,7 +1372,7 @@ static void read_a_msg(void)
 		 * the buffer the msg data will end once it is read.  It is
 		 * possible that this points off the end of the buffer, in
 		 * which case the gradual reading of the input stream will
-		 * cause this value to decrease and eventually become real. */
+		 * cause this value to wrap around and eventually become real. */
 		if (msg_bytes)
 			iobuf.raw_input_ends_before = iobuf.in.pos + msg_bytes;
 		iobuf.in_multiplexed = 1;
