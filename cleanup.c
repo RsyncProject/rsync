@@ -24,6 +24,7 @@
 
 extern int am_server;
 extern int am_daemon;
+extern int am_receiver;
 extern int io_error;
 extern int keep_partial;
 extern int got_xfer_error;
@@ -160,7 +161,8 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		/* FALLTHROUGH */
 #include "case_N.h"
 
-		io_flush(FULL_FLUSH);
+		if (!code || am_server || am_receiver)
+			io_flush(FULL_FLUSH);
 
 		/* FALLTHROUGH */
 #include "case_N.h"

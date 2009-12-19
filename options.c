@@ -78,7 +78,6 @@ int def_compress_level = Z_DEFAULT_COMPRESSION;
 int am_root = 0; /* 0 = normal, 1 = root, 2 = --super, -1 = --fake-super */
 int am_server = 0;
 int am_sender = 0;
-int am_generator = 0;
 int am_starting_up = 1;
 int relative_paths = -1;
 int implied_dirs = 1;
