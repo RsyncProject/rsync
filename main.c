@@ -94,7 +94,8 @@ extern filter_rule_list daemon_filter_list;
 
 uid_t our_uid;
 gid_t our_gid;
-int am_generator = 0;
+int am_receiver = 0;  /* Only set to 1 after the receiver/generator fork. */
+int am_generator = 0; /* Only set to 1 after the receiver/generator fork. */
 int local_server = 0;
 int daemon_over_rsh = 0;
 mode_t orig_umask = 0;
@@ -851,6 +852,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	}
 
 	if (pid == 0) {
+		am_receiver = 1;
 		send_msgs_to_gen = am_server;
 
 		close(error_pipe[0]);

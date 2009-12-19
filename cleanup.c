@@ -24,8 +24,7 @@
 
 extern int am_server;
 extern int am_daemon;
-extern int am_sender;
-extern int am_generator;
+extern int am_receiver;
 extern int io_error;
 extern int keep_partial;
 extern int got_xfer_error;
@@ -171,7 +170,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 		/* FALLTHROUGH */
 #include "case_N.h"
 
-		if (!code || am_server || (!am_sender && !am_generator))
+		if (!code || am_server || am_receiver)
 			io_flush(FULL_FLUSH);
 
 		/* FALLTHROUGH */
@@ -216,7 +215,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 #include "case_N.h"
 
 		if (exit_code && exit_code != RERR_SOCKETIO && exit_code != RERR_STREAMIO && exit_code != RERR_SIGNAL1
-		 && !shutting_down && (protocol_version >= 31 || (!am_sender && !am_generator))) {
+		 && !shutting_down && (protocol_version >= 31 || am_receiver)) {
 			if (line > 0) {
 				if (DEBUG_GTE(EXIT, 3)) {
 					rprintf(FINFO, "[%s] sending MSG_ERROR_EXIT with exit_code %d\n",

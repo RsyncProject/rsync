@@ -36,6 +36,7 @@ extern int preserve_times;
 extern int am_root;
 extern int am_server;
 extern int am_sender;
+extern int am_receiver;
 extern int am_generator;
 extern int am_starting_up;
 extern int allow_8bit_chars;
@@ -719,5 +720,8 @@ const char *who_am_i(void)
 {
 	if (am_starting_up)
 		return am_server ? "server" : "client";
-	return am_sender ? "sender" : am_generator ? "generator" : "receiver";
+	return am_sender ? "sender"
+	     : am_generator ? "generator"
+	     : am_receiver ? "receiver"
+	     : "Receiver"; /* pre-forked receiver */
 }
