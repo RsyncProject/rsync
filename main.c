@@ -33,7 +33,6 @@ extern int list_only;
 extern int am_root;
 extern int am_server;
 extern int am_sender;
-extern int am_generator;
 extern int am_daemon;
 extern int inc_recurse;
 extern int blocking_io;

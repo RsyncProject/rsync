@@ -40,6 +40,7 @@ extern int allowed_lull;
 extern int am_server;
 extern int am_daemon;
 extern int am_sender;
+extern int am_receiver;
 extern int am_generator;
 extern int inc_recurse;
 extern int io_error;
@@ -61,7 +62,6 @@ extern iconv_t ic_send, ic_recv;
 #endif
 
 const char phase_unknown[] = "unknown";
-int ignore_timeout = 0;
 int batch_fd = -1;
 int msgdone_cnt = 0;
 
@@ -119,6 +119,32 @@ static char int_byte_extra[64] = {
 
 enum festatus { FES_SUCCESS, FES_REDO, FES_NO_SEND };
 
+static void check_timeout(void)
+{
+	time_t t, chk;
+
+	/* On the receiving side, the generator is now handling timeouts, so
+	 * the receiver ignores them.  Note that the am_receiver flag is not
+	 * set until the receiver forks from the generator, so timeouts will be
+	 * based on receiving data on the receiving side until that event. */
+	if (!io_timeout || am_receiver)
+		return;
+
+	t = time(NULL);
+
+	if (!last_io_in)
+		last_io_in = t;
+
+	chk = MAX(last_io_out, last_io_in);
+	if (t - chk >= io_timeout) {
+		if (am_server || am_daemon)
+			exit_cleanup(RERR_TIMEOUT);
+		rprintf(FERROR, "[%s] io timeout after %d seconds -- exiting\n",
+			who_am_i(), (int)(t-chk));
+		exit_cleanup(RERR_TIMEOUT);
+	}
+}
+
 static void readfd(int fd, char *buffer, size_t N);
 static void writefd(int fd, const char *buf, size_t len);
 static void writefd_unbuffered(int fd, const char *buf, size_t len);
@@ -175,29 +201,6 @@ static void got_flist_entry_status(enum festatus status, const char *buf)
 		break;
 	case FES_NO_SEND:
 		break;
-	}
-}
-
-static void check_timeout(void)
-{
-	time_t t;
-
-	if (!io_timeout || ignore_timeout)
-		return;
-
-	if (!last_io_in) {
-		last_io_in = time(NULL);
-		return;
-	}
-
-	t = time(NULL);
-
-	if (t - last_io_in >= io_timeout) {
-		if (!am_server && !am_daemon) {
-			rprintf(FERROR, "io timeout after %d seconds -- exiting\n",
-				(int)(t-last_io_in));
-		}
-		exit_cleanup(RERR_TIMEOUT);
 	}
 }
 
@@ -945,15 +948,18 @@ void maybe_flush_socket(int important)
 		io_flush(NORMAL_FLUSH);
 }
 
+/* Older rsync versions used to send either a MSG_NOOP (protocol 30) or a
+ * raw-data-based keep-alive (protocol 29), both of which implied forwarding of
+ * the message through the sender.  Since the new timeout method does not need
+ * any forwarding, we just send an empty MSG_DATA message, which works with all
+ * rsync versions.  This avoids any message forwarding, and leaves the raw-data
+ * stream alone (since we can never be quite sure if that stream is in the
+ * right state for a keep-alive message). */
 void maybe_send_keepalive(void)
 {
 	if (time(NULL) - last_io_out >= allowed_lull) {
-		if (!iobuf_out || !iobuf_out_cnt) {
-			if (protocol_version >= 30)
-				send_msg(MSG_NOOP, "", 0, 0);
-			else
-				send_msg(MSG_DATA, "", 0, 0);
-		}
+		if (!iobuf_out || !iobuf_out_cnt)
+			send_msg(MSG_DATA, "", 0, 0);
 		if (iobuf_out)
 			io_flush(NORMAL_FLUSH);
 	}
@@ -1035,6 +1041,9 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 			iobuf_in_ndx = 0;
 			break;
 		case MSG_NOOP:
+			/* Support protocol-30 keep-alive method. */
+			if (msg_bytes != 0)
+				goto invalid_msg;
 			if (am_sender)
 				maybe_send_keepalive();
 			break;
@@ -1515,7 +1524,6 @@ static void writefd_unbuffered(int fd, const char *buf, size_t len)
 			while (!am_server && fd == sock_f_out && io_multiplexing_in) {
 				char buf[1024];
 				set_io_timeout(30);
-				ignore_timeout = 0;
 				readfd_unbuffered(sock_f_in, buf, sizeof buf);
 			}
 			exit_cleanup(RERR_STREAMIO);

@@ -81,7 +81,6 @@ void setup_iconv(void)
 # endif
 
 	if (!am_server && !allow_8bit_chars) {
-
 		/* It's OK if this fails... */
 		ic_chck = iconv_open(defset, defset);
 
@@ -305,9 +304,8 @@ int read_ndx_and_attrs(int f_in, int *iflag_ptr, uchar *type_ptr,
 	iflags = protocol_version >= 29 ? read_shortint(f_in)
 		   : ITEM_TRANSFER | ITEM_MISSING_DATA;
 
-	/* Honor the old-style keep-alive indicator. */
-	if (protocol_version < 30
-	 && ndx == cur_flist->used && iflags == ITEM_IS_NEW) {
+	/* Support the protocol-29 keep-alive style. */
+	if (protocol_version < 30 && ndx == cur_flist->used && iflags == ITEM_IS_NEW) {
 		if (am_sender)
 			maybe_send_keepalive();
 		goto read_loop;

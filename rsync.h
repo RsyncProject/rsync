@@ -32,7 +32,7 @@
 #define DEFAULT_LOCK_FILE "/var/run/rsyncd.lock"
 #define URL_PREFIX "rsync://"
 
-#define SYMLINK_PREFIX "/rsyncd-munged/"
+#define SYMLINK_PREFIX "/rsyncd-munged/"  /* This MUST have a trailing slash! */
 #define SYMLINK_PREFIX_LEN ((int)sizeof SYMLINK_PREFIX - 1)
 
 #define BACKUP_SUFFIX "~"
@@ -228,7 +228,7 @@ enum msgcode {
 	MSG_FLIST=20,	/* extra file list over sibling socket */
 	MSG_FLIST_EOF=21,/* we've transmitted all the file lists */
 	MSG_IO_ERROR=22,/* the sending side had an I/O error */
-	MSG_NOOP=42,	/* a do-nothing message */
+	MSG_NOOP=42,	/* a do-nothing message (legacy protocol-30 only) */
 	MSG_SUCCESS=100,/* successfully updated indicated flist index */
 	MSG_DELETED=101,/* successfully deleted a file on receiving side */
 	MSG_NO_SEND=102,/* sender failed to open a file we wanted */
