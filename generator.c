@@ -71,7 +71,6 @@ extern int io_error;
 extern int flist_eof;
 extern int allowed_lull;
 extern int sock_f_out;
-extern int ignore_timeout;
 extern int protocol_version;
 extern int file_total;
 extern int fuzzy_basis;
@@ -290,7 +289,7 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 		rprintf(FINFO, "delete_in_dir(%s)\n", fbuf);
 
 	if (allowed_lull)
-		maybe_send_keepalive();
+		maybe_send_keepalive(time(NULL), True);
 
 	if (io_error && !ignore_errors) {
 		if (already_warned)
@@ -1929,7 +1928,7 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 		}
 		if (counter >= loopchk_limit) {
 			if (allowed_lull)
-				maybe_send_keepalive();
+				maybe_send_keepalive(time(NULL), True);
 			else
 				maybe_flush_socket(0);
 			counter = 0;
@@ -2076,12 +2075,6 @@ void generate_files(int f_out, const char *local_name)
 			: "enabled");
 	}
 
-	/* Since we often fill up the outgoing socket and then just sit around
-	 * waiting for the other 2 processes to do their thing, we don't want
-	 * to exit on a timeout.  If the data stops flowing, the receiver will
-	 * notice that and let us know via the redo pipe (or its closing). */
-	ignore_timeout = 1;
-
 	dflt_perms = (ACCESSPERMS & ~orig_umask);
 
 	do {
@@ -2135,7 +2128,7 @@ void generate_files(int f_out, const char *local_name)
 
 			if (i + cur_flist->ndx_start >= next_loopchk) {
 				if (allowed_lull)
-					maybe_send_keepalive();
+					maybe_send_keepalive(time(NULL), True);
 				else
 					maybe_flush_socket(0);
 				next_loopchk += loopchk_limit;

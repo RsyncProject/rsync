@@ -39,6 +39,7 @@ extern size_t bwlimit_writemax;
 extern int io_timeout;
 extern int am_server;
 extern int am_sender;
+extern int am_receiver;
 extern int am_generator;
 extern int msgs2stderr;
 extern int inc_recurse;
@@ -64,11 +65,11 @@ extern iconv_t ic_send, ic_recv;
 
 int csum_length = SHORT_SUM_LENGTH; /* initial value */
 int allowed_lull = 0;
-int ignore_timeout = 0;
 int batch_fd = -1;
 int msgdone_cnt = 0;
 int forward_flist_data = 0;
 BOOL flist_receiving_enabled = False;
+BOOL we_send_keepalive_messages = False;
 
 /* Ignore an EOF error if non-zero. See whine_about_eof(). */
 int kluge_around_eof = 0;
@@ -152,25 +153,35 @@ static void read_a_msg(void);
 static void drain_multiplex_messages(void);
 static void sleep_for_bwlimit(int bytes_written);
 
-static void check_timeout(void)
+static void check_timeout(BOOL allow_keepalive)
 {
-	time_t t;
+	time_t t, chk;
 
-	if (!io_timeout || ignore_timeout)
+	/* On the receiving side, the generator is now handling timeouts, so
+	 * the receiver ignores them.  Note that the am_receiver flag is not
+	 * set until the receiver forks from the generator, so timeouts will be
+	 * based on receiving data on the receiving side until that event. */
+	if (!io_timeout || am_receiver)
 		return;
-
-	if (!last_io_in) {
-		last_io_in = time(NULL);
-		return;
-	}
 
 	t = time(NULL);
 
-	if (t - last_io_in >= io_timeout) {
+	if (allow_keepalive && we_send_keepalive_messages) {
+		/* This may put data into iobuf.msg w/o flushing. */
+		maybe_send_keepalive(t, False);
+	}
+
+	if (!last_io_in)
+		last_io_in = t;
+	if (!last_io_out)
+		last_io_out = t;
+
+	chk = MAX(last_io_out, last_io_in);
+	if (t - chk >= io_timeout) {
 		if (am_server)
 			msgs2stderr = 1;
 		rprintf(FERROR, "[%s] io timeout after %d seconds -- exiting\n",
-			who_am_i(), (int)(t-last_io_in));
+			who_am_i(), (int)(t-chk));
 		exit_cleanup(RERR_TIMEOUT);
 	}
 }
@@ -252,7 +263,8 @@ static size_t safe_read(int fd, char *buf, size_t len)
 					who_am_i());
 				exit_cleanup(RERR_FILEIO);
 			}
-			check_timeout();
+			if (we_send_keepalive_messages)
+				maybe_send_keepalive(time(NULL), True);
 			continue;
 		}
 
@@ -336,7 +348,8 @@ static void safe_write(int fd, const char *buf, size_t len)
 					what_fd_is(fd), who_am_i());
 				exit_cleanup(RERR_FILEIO);
 			}
-			check_timeout();
+			if (we_send_keepalive_messages)
+				maybe_send_keepalive(time(NULL), True);
 			continue;
 		}
 
@@ -733,7 +746,7 @@ static char *perform_io(size_t needed, int flags)
 				send_extra_file_list(sock_f_out, -1);
 				extra_flist_sending_enabled = !flist_eof;
 			} else
-				check_timeout();
+				check_timeout((flags & PIO_NEED_INPUT) != 0);
 			FD_ZERO(&r_fds); /* Just in case... */
 			FD_ZERO(&w_fds);
 		}
@@ -1315,18 +1328,21 @@ void maybe_flush_socket(int important)
 		io_flush(NORMAL_FLUSH);
 }
 
-/* This never adds new non-msg-buffer data, since we don't know the state
- * of the raw-data buffer. */
-void maybe_send_keepalive(void)
+/* Older rsync versions used to send either a MSG_NOOP (protocol 30) or a
+ * raw-data-based keep-alive (protocol 29), both of which implied forwarding of
+ * the message through the sender.  Since the new timeout method does not need
+ * any forwarding, we just send an empty MSG_DATA message, which works with all
+ * rsync versions.  This avoids any message forwarding, and leaves the raw-data
+ * stream alone (since we can never be quite sure if that stream is in the
+ * right state for a keep-alive message). */
+void maybe_send_keepalive(time_t now, BOOL allow_flush)
 {
-	if (time(NULL) - last_io_out >= allowed_lull) {
-		if (!iobuf.msg.len && iobuf.out.len == iobuf.out_empty_len) {
-			if (protocol_version >= 30)
-				send_msg(MSG_NOOP, "", 0, 0);
-			else
-				send_msg(MSG_DATA, "", 0, 0);
-		}
-		if (iobuf.msg.len)
+	if (now - last_io_out >= allowed_lull) {
+		if (!iobuf.msg.len && iobuf.out.len == iobuf.out_empty_len)
+			send_msg(MSG_DATA, "", 0, 0);
+		if (!allow_flush) {
+			/* Let the caller worry about writing out the data. */
+		} else if (iobuf.msg.len)
 			perform_io(iobuf.msg.size - iobuf.msg.len + 1, PIO_NEED_MSGROOM);
 		else if (iobuf.out.len > iobuf.out_empty_len)
 			io_flush(NORMAL_FLUSH);
@@ -1411,11 +1427,12 @@ static void read_a_msg(void)
 		}
 		break;
 	case MSG_NOOP:
+		/* Support protocol-30 keep-alive method. */
 		if (msg_bytes != 0)
 			goto invalid_msg;
 		iobuf.in_multiplexed = 1;
 		if (am_sender)
-			maybe_send_keepalive();
+			maybe_send_keepalive(time(NULL), True);
 		break;
 	case MSG_DELETED:
 		if (msg_bytes >= sizeof data)

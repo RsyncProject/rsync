@@ -73,6 +73,7 @@ extern int send_msgs_to_gen;
 extern pid_t cleanup_child_pid;
 extern size_t bwlimit_writemax;
 extern unsigned int module_dirlen;
+extern BOOL we_send_keepalive_messages;
 extern BOOL flist_receiving_enabled;
 extern BOOL shutting_down;
 extern struct stats stats;
@@ -764,6 +765,8 @@ static void do_server_sender(int f_in, int f_out, int argc, char *argv[])
 	struct file_list *flist;
 	char *dir = argv[0];
 
+	we_send_keepalive_messages = io_timeout != 0 && protocol_version < 31;
+
 	if (DEBUG_GTE(SEND, 1)) {
 		rprintf(FINFO, "server_sender starting pid=%ld\n",
 			(long)getpid());
@@ -904,6 +907,7 @@ static int do_recv(int f_in, int f_out, char *local_name)
 	}
 
 	am_generator = 1;
+	we_send_keepalive_messages = io_timeout != 0;
 	flist_receiving_enabled = True;
 
 	io_end_multiplex_in(MPLX_SWITCHING);
@@ -1108,6 +1112,7 @@ int client_run(int f_in, int f_out, pid_t pid, int argc, char *argv[])
 
 	if (am_sender) {
 		keep_dirlinks = 0; /* Must be disabled on the sender. */
+		we_send_keepalive_messages = io_timeout != 0 && protocol_version < 31;
 
 		if (always_checksum
 		 && (log_format_has(stdout_format, 'C')

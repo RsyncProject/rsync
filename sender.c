@@ -43,6 +43,7 @@ extern int inplace;
 extern int batch_fd;
 extern int write_batch;
 extern int file_old_total;
+extern BOOL we_send_keepalive_messages;
 extern struct stats stats;
 extern struct file_list *cur_flist, *first_flist, *dir_flist;
 
@@ -104,8 +105,8 @@ static struct sum_struct *receive_sums(int f)
 			s->sums[i].len = s->blength;
 		offset += s->sums[i].len;
 
-		if (allowed_lull && !(i % lull_mod))
-			maybe_send_keepalive();
+		if (we_send_keepalive_messages && !(i % lull_mod))
+			maybe_send_keepalive(time(NULL), True);
 
 		if (DEBUG_GTE(DELTASUM, 3)) {
 			rprintf(FINFO,

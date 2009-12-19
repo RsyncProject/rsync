@@ -234,7 +234,7 @@ enum msgcode {
 	MSG_STATS=10,	/* message has stats data for generator */
 	MSG_IO_ERROR=22,/* the sending side had an I/O error */
 	MSG_IO_TIMEOUT=33,/* tell client about a daemon's timeout value */
-	MSG_NOOP=42,	/* a do-nothing message */
+	MSG_NOOP=42,	/* a do-nothing message (legacy protocol-30 only) */
 	MSG_ERROR_EXIT=86, /* used by siblings and by protocol-31 */
 	MSG_SUCCESS=100,/* successfully updated indicated flist index */
 	MSG_DELETED=101,/* successfully deleted a file on receiving side */
