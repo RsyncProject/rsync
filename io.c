@@ -173,8 +173,6 @@ static void check_timeout(BOOL allow_keepalive)
 
 	if (!last_io_in)
 		last_io_in = t;
-	if (!last_io_out)
-		last_io_out = t;
 
 	chk = MAX(last_io_out, last_io_in);
 	if (t - chk >= io_timeout) {
