@@ -50,6 +50,7 @@ extern int preserve_links;
 extern int preserve_hard_links;
 extern int preserve_devices;
 extern int preserve_specials;
+extern int delete_during;
 extern int missing_args;
 extern int uid_ndx;
 extern int gid_ndx;
@@ -65,6 +66,7 @@ extern int copy_unsafe_links;
 extern int protocol_version;
 extern int sanitize_paths;
 extern int munge_symlinks;
+extern int use_safe_inc_flist;
 extern int need_unsorted_flist;
 extern int sender_symlink_iconv;
 extern int output_needs_newline;
@@ -1872,6 +1874,15 @@ done:
 	filter_list = save_filter_list;
 }
 
+static NORETURN void fatal_unsafe_io_error(void)
+{
+	/* This (sadly) can only happen when pushing data because
+	 * the sender does not know about what kind of delete
+	 * is in effect on the receiving side when pulling. */
+	rprintf(FERROR_XFER, "FATAL I/O ERROR: dying to avoid a --delete-during issue with a pre-3.0.7 receiver.\n");
+	exit_cleanup(RERR_UNSUPPORTED);
+}
+
 static void send1extra(int f, struct file_struct *file, struct file_list *flist)
 {
 	char fbuf[MAXPATHLEN];
@@ -1987,11 +1998,15 @@ void send_extra_file_list(int f, int at_least)
 			dp = F_DIR_NODE_P(file);
 		}
 
-		if (protocol_version < 31 || io_error == save_io_error || ignore_errors)
+		if (io_error == save_io_error || ignore_errors)
 			write_byte(f, 0);
-		else {
+		else if (use_safe_inc_flist) {
 			write_shortint(f, XMIT_EXTENDED_FLAGS|XMIT_IO_ERROR_ENDLIST);
 			write_varint(f, io_error);
+		} else {
+			if (delete_during)
+				fatal_unsafe_io_error();
+			write_byte(f, 0);
 		}
 
 		if (need_unsorted_flist) {
@@ -2313,11 +2328,15 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	start_tv = end_tv;
 
 	/* Indicate end of file list */
-	if (protocol_version < 31 || io_error == 0 || ignore_errors)
+	if (io_error == 0 || ignore_errors)
 		write_byte(f, 0);
-	else {
+	else if (use_safe_inc_flist) {
 		write_shortint(f, XMIT_EXTENDED_FLAGS|XMIT_IO_ERROR_ENDLIST);
 		write_varint(f, io_error);
+	} else {
+		if (delete_during && inc_recurse)
+			fatal_unsafe_io_error();
+		write_byte(f, 0);
 	}
 
 #ifdef SUPPORT_HARD_LINKS
@@ -2357,7 +2376,7 @@ struct file_list *send_file_list(int f, int argc, char *argv[])
 	/* send the io_error flag */
 	if (protocol_version < 30)
 		write_int(f, ignore_errors ? 0 : io_error);
-	else if (io_error && protocol_version == 30 && !ignore_errors)
+	else if (!use_safe_inc_flist && io_error && !ignore_errors)
 		send_msg_int(MSG_IO_ERROR, io_error);
 
 	if (disable_buffering)
@@ -2443,7 +2462,7 @@ struct file_list *recv_file_list(int f)
 
 		if (flags == (XMIT_EXTENDED_FLAGS|XMIT_IO_ERROR_ENDLIST)) {
 			int err;
-			if (protocol_version < 31) {
+			if (!use_safe_inc_flist) {
 				rprintf(FERROR, "Invalid flist flag: %x\n", flags);
 				exit_cleanup(RERR_PROTOCOL);
 			}

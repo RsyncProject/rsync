@@ -30,10 +30,6 @@ Changes since 3.0.4:
 
   BUG FIXES:
 
-    - Fixed a bug in incremental recursion transfers where an I/O error might
-      not get noticed in time for the receiving side to disable deletions
-      (requires protocol 31).
-
     - Changed the way --progress overwrites its prior output in order to make
       it nearly impossible for the progress to get overwritten by an error.
 
