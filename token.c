@@ -598,7 +598,7 @@ static void see_deflate_token(char *buf, int32 len)
 		rx_strm.next_out = (Bytef *)dbuf;
 		rx_strm.avail_out = AVAIL_OUT_SIZE(CHUNK_SIZE);
 		r = inflate(&rx_strm, Z_SYNC_FLUSH);
-		if (r != Z_OK) {
+		if (r != Z_OK && r != Z_BUF_ERROR) {
 			rprintf(FERROR, "inflate (token) returned %d\n", r);
 			exit_cleanup(RERR_STREAMIO);
 		}
