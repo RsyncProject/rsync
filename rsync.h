@@ -60,6 +60,7 @@
 #define XMIT_RDEV_MINOR_8_pre30 (1<<11)	/* protocols 28 - 29  */
 #define XMIT_GROUP_NAME_FOLLOWS (1<<11) /* protocols 30 - now */
 #define XMIT_HLINK_FIRST (1<<12)	/* protocols 30 - now (HLINKED files only) */
+#define XMIT_IO_ERROR_ENDLIST (1<<12)	/* protocols 31*- now (w/XMIT_EXTENDED_FLAGS) (also protocol 30 w/'f' compat flag) */
 
 /* These flags are used in the live flist data. */
 

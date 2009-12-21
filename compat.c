@@ -24,6 +24,7 @@
 int remote_protocol = 0;
 int file_extra_cnt = 0; /* count of file-list extras that everyone gets */
 int inc_recurse = 0;
+int use_safe_inc_flist = 0;
 
 extern int verbose;
 extern int am_server;
@@ -73,6 +74,7 @@ int filesfrom_convert = 0;
 #define CF_INC_RECURSE	 (1<<0)
 #define CF_SYMLINK_TIMES (1<<1)
 #define CF_SYMLINK_ICONV (1<<2)
+#define CF_SAFE_FLIST	 (1<<3)
 
 static const char *client_info;
 
@@ -255,6 +257,8 @@ void setup_protocol(int f_out,int f_in)
 #ifdef ICONV_OPTION
 			compat_flags |= CF_SYMLINK_ICONV;
 #endif
+			if (local_server || strchr(client_info, 'f') != NULL)
+				compat_flags |= CF_SAFE_FLIST;
 			write_byte(f_out, compat_flags);
 		} else
 			compat_flags = read_byte(f_in);
@@ -281,6 +285,7 @@ void setup_protocol(int f_out,int f_in)
 			    read_batch ? "batch file" : "connection");
 			exit_cleanup(RERR_SYNTAX);
 		}
+		use_safe_inc_flist = !!(compat_flags & CF_SAFE_FLIST);
 		need_messages_from_generator = 1;
 #if defined HAVE_LUTIMES && defined HAVE_UTIMES
 	} else if (!am_sender) {

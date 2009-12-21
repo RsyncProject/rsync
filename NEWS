@@ -12,6 +12,10 @@ Changes since 3.0.6:
     - Fixed a problem with --compress (-z) where the receiving side could
       return the error "inflate (token) returned -5".
 
+    - Fixed a bug where --delete-during could delete in a directory before it
+      noticed that the sending side sent an I/O error for that directory (both
+      sides of the transfer must be at least 3.0.7).
+
     - Improved --skip-compress's error handling of bad character-sets and got
       rid of a lingering debug fprintf().
 

@@ -1837,6 +1837,7 @@ void server_options(char **args, int *argc_p)
 #ifdef ICONV_OPTION
 		argstr[x++] = 's';
 #endif
+		argstr[x++] = 'f';
 	}
 
 	if (x >= (int)sizeof argstr) { /* Not possible... */
