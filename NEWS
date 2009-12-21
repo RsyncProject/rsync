@@ -21,8 +21,10 @@ Changes since 3.0.6:
 
     - Improved the "--delete does not work without -r or -d" message.
 
-    - Tweaked the sending of NOOP messages (which try to prevent a timeout) to
-      work with older protocols (supporting rsync 2.6.3 and older).
+    - Improved rsync's handling of --timeout to avoid weird timeout cases and
+      to make keep-alive messages work even with older (pre-2.6.4) rsyncs (by
+      discovering a workable keep-alive signal that can be used with rsyncs
+      that don't support explicit keep-alive messages).
 
     - Some misc manpage improvements.
 
