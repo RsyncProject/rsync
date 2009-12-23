@@ -229,7 +229,7 @@ enum msgcode {
 	MSG_FLIST=20,	/* extra file list over sibling socket */
 	MSG_FLIST_EOF=21,/* we've transmitted all the file lists */
 	MSG_IO_ERROR=22,/* the sending side had an I/O error */
-	MSG_NOOP=42,	/* a do-nothing message (legacy protocol-30 only) */
+	MSG_NOOP=42,	/* a do-nothing message */
 	MSG_SUCCESS=100,/* successfully updated indicated flist index */
 	MSG_DELETED=101,/* successfully deleted a file on receiving side */
 	MSG_NO_SEND=102,/* sender failed to open a file we wanted */

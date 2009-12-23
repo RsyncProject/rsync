@@ -40,7 +40,6 @@ extern int allowed_lull;
 extern int am_server;
 extern int am_daemon;
 extern int am_sender;
-extern int am_receiver;
 extern int am_generator;
 extern int inc_recurse;
 extern int io_error;
@@ -62,6 +61,7 @@ extern iconv_t ic_send, ic_recv;
 #endif
 
 const char phase_unknown[] = "unknown";
+int ignore_timeout = 0;
 int batch_fd = -1;
 int msgdone_cnt = 0;
 
@@ -123,11 +123,7 @@ static void check_timeout(void)
 {
 	time_t t, chk;
 
-	/* On the receiving side, the generator is now handling timeouts, so
-	 * the receiver ignores them.  Note that the am_receiver flag is not
-	 * set until the receiver forks from the generator, so timeouts will be
-	 * based on receiving data on the receiving side until that event. */
-	if (!io_timeout || am_receiver)
+	if (!io_timeout || ignore_timeout)
 		return;
 
 	t = time(NULL);
@@ -215,13 +211,15 @@ void io_set_sock_fds(int f_in, int f_out)
 void set_io_timeout(int secs)
 {
 	io_timeout = secs;
+	allowed_lull = (io_timeout + 1) / 2;
 
-	if (!io_timeout || io_timeout > SELECT_TIMEOUT)
+	if (!io_timeout || allowed_lull > SELECT_TIMEOUT)
 		select_timeout = SELECT_TIMEOUT;
 	else
-		select_timeout = io_timeout;
+		select_timeout = allowed_lull;
 
-	allowed_lull = read_batch ? 0 : (io_timeout + 1) / 2;
+	if (read_batch)
+		allowed_lull = 0;
 }
 
 /* Setup the fd used to receive MSG_* messages.  Only needed during the
@@ -948,18 +946,19 @@ void maybe_flush_socket(int important)
 		io_flush(NORMAL_FLUSH);
 }
 
-/* Older rsync versions used to send either a MSG_NOOP (protocol 30) or a
- * raw-data-based keep-alive (protocol 29), both of which implied forwarding of
- * the message through the sender.  Since the new timeout method does not need
- * any forwarding, we just send an empty MSG_DATA message, which works with all
- * rsync versions.  This avoids any message forwarding, and leaves the raw-data
- * stream alone (since we can never be quite sure if that stream is in the
- * right state for a keep-alive message). */
 void maybe_send_keepalive(void)
 {
 	if (time(NULL) - last_io_out >= allowed_lull) {
-		if (!iobuf_out || !iobuf_out_cnt)
-			send_msg(MSG_DATA, "", 0, 0);
+		if (!iobuf_out || !iobuf_out_cnt) {
+			if (protocol_version < 29)
+				send_msg(MSG_DATA, "", 0, 0);
+			else if (protocol_version >= 30)
+				send_msg(MSG_NOOP, "", 0, 0);
+			else {
+				write_int(sock_f_out, cur_flist->used);
+				write_shortint(sock_f_out, ITEM_IS_NEW);
+			}
+		}
 		if (iobuf_out)
 			io_flush(NORMAL_FLUSH);
 	}
@@ -1043,7 +1042,6 @@ static int readfd_unbuffered(int fd, char *buf, size_t len)
 			iobuf_in_ndx = 0;
 			break;
 		case MSG_NOOP:
-			/* Support protocol-30 keep-alive method. */
 			if (msg_bytes != 0)
 				goto invalid_msg;
 			if (am_sender)
@@ -1526,6 +1524,7 @@ static void writefd_unbuffered(int fd, const char *buf, size_t len)
 			while (!am_server && fd == sock_f_out && io_multiplexing_in) {
 				char buf[1024];
 				set_io_timeout(30);
+				ignore_timeout = 0;
 				readfd_unbuffered(sock_f_in, buf, sizeof buf);
 			}
 			exit_cleanup(RERR_STREAMIO);

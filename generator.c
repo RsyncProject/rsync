@@ -69,6 +69,7 @@ extern int io_error;
 extern int flist_eof;
 extern int allowed_lull;
 extern int sock_f_out;
+extern int ignore_timeout;
 extern int protocol_version;
 extern int file_total;
 extern int fuzzy_basis;
@@ -2210,6 +2211,12 @@ void generate_files(int f_out, const char *local_name)
 			? "disabled for local transfer or --whole-file"
 			: "enabled");
 	}
+
+	/* Since we often fill up the outgoing socket and then just sit around
+	 * waiting for the other 2 processes to do their thing, we don't want
+	 * to exit on a timeout.  If the data stops flowing, the receiver will
+	 * notice that and let us know via the message pipe (or its closing). */
+	ignore_timeout = 1;
 
 	dflt_perms = (ACCESSPERMS & ~orig_umask);
 
