@@ -1405,12 +1405,12 @@ static void read_a_msg(void)
 		got_flist_entry_status(FES_REDO, val);
 		break;
 	case MSG_IO_ERROR:
-		if (msg_bytes != 4 || am_sender)
+		if (msg_bytes != 4)
 			goto invalid_msg;
 		val = raw_read_int();
 		iobuf.in_multiplexed = 1;
 		io_error |= val;
-		if (!am_generator)
+		if (am_receiver)
 			send_msg_int(MSG_IO_ERROR, val);
 		break;
 	case MSG_IO_TIMEOUT:
