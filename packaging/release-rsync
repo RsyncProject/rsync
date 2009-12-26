@@ -1,12 +1,11 @@
 #!/usr/bin/perl
-use strict;
-use warnings;
-
 # This script expects the directory ~/samba-rsync-ftp to exist and to be a
 # copy of the /home/ftp/pub/rsync dir on samba.org.  When the script is done,
 # the git repository in the current directory will be updated, and the local
 # ~/samba-rsync-ftp dir will be ready to be rsynced to samba.org.
 
+use strict;
+use warnings;
 use Cwd;
 use Getopt::Long;
 use Term::ReadKey;
@@ -62,9 +61,7 @@ die "There is no .git dir in the current directory.\n" unless -d '.git';
 die "'a' must not exist in the current directory.\n" if -e 'a';
 die "'b' must not exist in the current directory.\n" if -e 'b';
 
-open(IN, '-|', 'git status') or die $!;
-my $status = join('', <IN>);
-close IN;
+my $status = `git status`;
 die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
 my($cur_branch) = $status =~ /^# On branch (.+)\n/;
 if ($cur_branch ne $master_branch) {
@@ -74,6 +71,19 @@ if ($cur_branch ne $master_branch) {
     $_ = <STDIN>;
     exit 1 unless /^y/i;
     $master_branch = $cur_branch;
+}
+
+if (-d 'patches/.git') {
+    $status = `cd patches && git status`;
+    die "The *patches* checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
+    ($cur_branch) = $status =~ /^# On branch (.+)\n/;
+    if ($cur_branch ne $master_branch) {
+	print "The *patches* checkout is on branch $cur_branch, not branch $master_branch.\n";
+	print "Do you want to change it to branch $master_branch? [n] ";
+	$_ = <STDIN>;
+	exit 1 unless /^y/i;
+	system "cd patches && git checkout '$master_branch'";
+    }
 }
 
 my $confversion;
@@ -293,6 +303,10 @@ if ($ans =~ /^y/i) {
     system "packaging/patch-update --branch=$master_branch --shell";
 }
 
+if (-d 'patches/.git') {
+    system "cd patches && git commit -a -m 'The patches for $version.'" and exit 1;
+}
+
 print $break, <<EOT;
 
 About to:
@@ -309,6 +323,9 @@ About to:
 EOT
 print "<Press Enter to continue> ";
 $_ = <STDIN>;
+
+# We want to use our passphrase-providing "gpg" script, so modify the PATH.
+$ENV{PATH} = "$curdir/packaging/bin:$path";
 
 my $passphrase;
 while (1) {
@@ -327,16 +344,22 @@ while (1) {
     umask $oldmask;
     $ENV{'GPG_PASSFILE'} = $passfile;
 
-    # We want to use our passphrase-providing "gpg" script, so modify the PATH.
-    $ENV{PATH} = "packaging/bin:$path";
     $_ = `git tag -s -m 'Version $version.' v$version 2>&1`;
-    $ENV{PATH} = $path;
-    unlink($passfile);
     print $_;
     next if /bad passphrase/;
-    last unless /failed/;
-    exit 1;
+    exit 1 if /failed/;
+
+    if (-d 'patches/.git') {
+	$_ = `cd patches && git tag -s -m 'Version $version.' v$version 2>&1`;
+	print $_;
+	exit 1 if /bad passphrase|failed/;
+    }
+
+    unlink($passfile);
+    last;
 }
+
+$ENV{PATH} = $path;
 
 # Extract the generated files from the old tar.
 @_ = @extra_files;
