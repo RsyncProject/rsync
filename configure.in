@@ -78,6 +78,12 @@ fi
 AC_ARG_WITH(included-popt,
         AC_HELP_STRING([--with-included-popt], [use bundled popt library, not from system]))
 
+AC_ARG_WITH(protected-args,
+        AC_HELP_STRING([--with-protected-args], [make --protected-args option the default]))
+if test x"$with_protected_args" = x"yes"; then
+	AC_DEFINE_UNQUOTED(RSYNC_USE_PROTECTED_ARGS, 1, [Define to 1 if --protected-args should be the default])
+fi
+
 AC_ARG_WITH(rsync-path,
 	AC_HELP_STRING([--with-rsync-path=PATH], [set default --rsync-path to PATH (default: rsync)]),
 	[ RSYNC_PATH="$with_rsync_path" ],

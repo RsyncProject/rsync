@@ -93,7 +93,7 @@ char *files_from = NULL;
 int filesfrom_fd = -1;
 char *filesfrom_host = NULL;
 int eol_nulls = 0;
-int protect_args = 0;
+int protect_args = -1;
 int human_readable = 1;
 int recurse = 0;
 int allow_inc_recurse = 1;
@@ -1278,7 +1278,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	}
 
 #ifdef ICONV_OPTION
-	if (!am_daemon && !protect_args && (arg = getenv("RSYNC_ICONV")) != NULL && *arg)
+	if (!am_daemon && protect_args <= 0 && (arg = getenv("RSYNC_ICONV")) != NULL && *arg)
 		iconv_opt = strdup(arg);
 #endif
 
@@ -1333,6 +1333,7 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 #ifdef ICONV_OPTION
 			iconv_opt = NULL;
 #endif
+			protect_args = 0;
 			poptFreeContext(pc);
 			pc = poptGetContext(RSYNC_NAME, argc, argv,
 					    long_daemon_options, 0);
@@ -1776,6 +1777,15 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 				 poptStrerror(opt));
 			return 0;
 		}
+	}
+
+	if (protect_args < 0) {
+#ifdef RSYNC_USE_PROTECTED_ARGS
+		if (!am_server)
+			protect_args = 1;
+		else
+#endif
+			protect_args = 0;
 	}
 
 	if (human_readable > 1 && argc == 2 && !am_server) {
