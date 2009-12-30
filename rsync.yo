@@ -1584,6 +1584,20 @@ side will also be translated
 from the local to the remote character-set.  The translation happens before
 wild-cards are expanded.  See also the bf(--files-from) option.
 
+You may also control this option via the RSYNC_PROTECT_ARGS environment
+variable.  If this variable has a non-zero value, this option will be enabled
+by default, otherwise it will be disabled by default.  Either state is
+overridden by a manually specified positive or negative version of this option
+(note that bf(--no-s) and bf(--no-protect-args) are the negative versions).
+Since this option was first introduced in 3.0.0, you'll need to make sure it's
+disabled if you ever need to interact with a remote rsync that is older than
+that.
+
+Rsync can also be configured (at build time) to have this option enabled by
+default (with is overridden by both the environment and the command-line).
+This option will eventually become a new default setting at some
+as-yet-undetermined point in the future.
+
 dit(bf(-T, --temp-dir=DIR)) This option instructs rsync to use DIR as a
 scratch directory when creating temporary copies of the files transferred
 on the receiving side.  The default behavior is to create each temporary
@@ -3129,7 +3143,10 @@ dit(bf(CVSIGNORE)) The CVSIGNORE environment variable supplements any
 ignore patterns in .cvsignore files. See the bf(--cvs-exclude) option for
 more details.
 dit(bf(RSYNC_ICONV)) Specify a default bf(--iconv) setting using this
-environment variable.
+environment variable. (First supported in 3.0.0.)
+dit(bf(RSYNC_PROTECT_ARGS)) Specify a non-zero numeric value if you want the
+bf(--protect-args) option to be enabled by default, or a zero value to make
+sure that it is disabled by default. (First supported in 3.1.0.)
 dit(bf(RSYNC_RSH)) The RSYNC_RSH environment variable allows you to
 override the default shell used as the transport for rsync.  Command line
 options are permitted after the command name, just as in the bf(-e) option.

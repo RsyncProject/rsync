@@ -1780,12 +1780,17 @@ int parse_arguments(int *argc_p, const char ***argv_p)
 	}
 
 	if (protect_args < 0) {
-#ifdef RSYNC_USE_PROTECTED_ARGS
-		if (!am_server)
-			protect_args = 1;
-		else
-#endif
+		if (am_server)
 			protect_args = 0;
+		else if ((arg = getenv("RSYNC_PROTECT_ARGS")) != NULL && *arg)
+			protect_args = atoi(arg) ? 1 : 0;
+		else {
+#ifdef RSYNC_USE_PROTECTED_ARGS
+			protect_args = 1;
+#else
+			protect_args = 0;
+#endif
+		}
 	}
 
 	if (human_readable > 1 && argc == 2 && !am_server) {

@@ -33,16 +33,13 @@ Changes since 3.0.4:
     - Changed the way --progress overwrites its prior output in order to make
       it nearly impossible for the progress to get overwritten by an error.
 
-    - An absolute-path filter rule (i.e. with a '/' modifier) no longer loses
-      its modifier when sending the filter rules to the remote rsync.
-
     - Fixed some rare bugs in --iconv processing that might cause a multibyte
       character to get translated incorrectly.
 
-    - Improved abnormal-exit error messages.  This should help the client side
-      to receive errors from the server when it is exiting abnormally, and
-      should also avoid dying with an "connection unexpectedly closed" exit
-      when the closed connection is really expected.
+    - Improved the propagation of abnormal-exit error messages.  This should
+      help the client side to receive errors from the server when it is exiting
+      abnormally, and should also avoid dying with an "connection unexpectedly
+      closed" exit when the closed connection is really expected.
 
   ENHANCEMENTS:
 
@@ -95,6 +92,9 @@ Changes since 3.0.4:
     - Added the ability to synchronize nano-second modified times.
 
     - Added a few more default suffixes for the "dont compress" settings.
+
+    - Added the checking of the RSYNC_PROTECT_ARGS environment variable to allow
+      the default for the --protect-args command-line option to be overridden.
 
     - Added some Solaris xattr code.
 
