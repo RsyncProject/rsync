@@ -61,30 +61,8 @@ die "There is no .git dir in the current directory.\n" unless -d '.git';
 die "'a' must not exist in the current directory.\n" if -e 'a';
 die "'b' must not exist in the current directory.\n" if -e 'b';
 
-my $status = `git status`;
-die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
-my($cur_branch) = $status =~ /^# On branch (.+)\n/;
-if ($cur_branch ne $master_branch) {
-    print "The checkout is not on the $master_branch branch.\n";
-    exit 1 if $master_branch ne 'master';
-    print "Do you want to release branch $cur_branch? [n] ";
-    $_ = <STDIN>;
-    exit 1 unless /^y/i;
-    $master_branch = $cur_branch;
-}
-
-if (-d 'patches/.git') {
-    $status = `cd patches && git status`;
-    die "The *patches* checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
-    ($cur_branch) = $status =~ /^# On branch (.+)\n/;
-    if ($cur_branch ne $master_branch) {
-	print "The *patches* checkout is on branch $cur_branch, not branch $master_branch.\n";
-	print "Do you want to change it to branch $master_branch? [n] ";
-	$_ = <STDIN>;
-	exit 1 unless /^y/i;
-	system "cd patches && git checkout '$master_branch'";
-    }
-}
+require 'packaging/git-status.pl';
+check_git_state($master_branch, 1, 1);
 
 my $confversion;
 open(IN, '<', 'configure.in') or die $!;
@@ -285,7 +263,7 @@ print $break, <<EOT;
 
 About to:
     - commit all version changes
-    - merge the $master_branch branch into the patch/* branches
+    - merge the $master_branch branch into the patch/$master_branch/* branches
     - update the files in the "patches" dir and OPTIONALLY
       (if you type 'y') to launch a shell for each patch
 
@@ -299,7 +277,7 @@ print "Updating files in \"patches\" dir ...\n";
 system "packaging/patch-update --branch=$master_branch";
 
 if ($ans =~ /^y/i) {
-    print "\nVisiting all \"patch/*\" branches ...\n";
+    print "\nVisiting all \"patch/$master_branch/*\" branches ...\n";
     system "packaging/patch-update --branch=$master_branch --shell";
 }
 

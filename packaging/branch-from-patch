@@ -16,7 +16,7 @@ use Getopt::Long;
 my %local_branch;
 open PIPE, '-|', 'git branch -l' or die "Unable to fork: $!\n";
 while (<PIPE>) {
-    if (m# patch/(.*)#) {
+    if (m# patch/\Q$master_branch\E/(.*)#o) {
 	$local_branch{$1} = 1;
     }
 }
@@ -24,17 +24,14 @@ close PIPE;
 
 if ($delete_local_branches) {
     foreach my $name (sort keys %local_branch) {
-	my $branch = "patch/$name";
+	my $branch = "patch/$master_branch/$name";
 	system 'git', 'branch', '-D', $branch and exit 1;
     }
     %local_branch = ( );
 }
 
-open IN, '-|', 'git status' or die $!;
-my $status = join('', <IN>);
-close IN;
-die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to commit \(working directory clean\)/;
-die "The checkout is not on the $master_branch branch.\n" unless $status =~ /^# On branch $master_branch\n/;
+require 'packaging/git-status.pl';
+check_git_state($master_branch, !$skip_branch_check, 1);
 
 my @patch_list;
 foreach (@ARGV) {
@@ -121,10 +118,10 @@ sub create_branch
 	$parent_branch = $commit if defined $commit;
     } else {
 	create_branch("$where/$parent.diff");
-	$parent_branch = "patch/$parent";
+	$parent_branch = "patch/$master_branch/$parent";
     }
 
-    my $branch = "patch/$name";
+    my $branch = "patch/$master_branch/$name";
     print "\n", '=' x 64, "\nProcessing $branch ($parent_branch)\n";
 
     if ($local_branch{$name}) {
@@ -176,7 +173,7 @@ Options:
 -b, --branch=BRANCH  Create branches relative to BRANCH if no "based-on"
                      header was found in the patch file.
     --skip-check     Skip the check that ensures starting with a clean branch.
-    --delete         Delete all the local patch/* branches, not just the ones
+    --delete         Delete all the local patch/BASE/* branches, not just the ones
                      that are being recreated.
 -h, --help           Output this help message.
 EOT
