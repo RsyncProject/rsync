@@ -26,6 +26,9 @@ Changes since 3.0.6:
     - Get the permissions right on a --fake-super transferred directory that
       needs more owner permissions to emulate root behavior.
 
+    - An absolute-path filter rule (i.e. with a '/' modifier) no longer loses
+      its modifier when sending the filter rules to the remote rsync.
+
     - Improved the "--delete does not work without -r or -d" message.
 
     - Improved rsync's handling of --timeout to avoid a weird timeout case
