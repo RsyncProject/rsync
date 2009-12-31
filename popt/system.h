@@ -85,7 +85,7 @@ char *alloca(size_t size);
 #   endif
 #  endif
 # endif
-#elif defined(__GNUC__) && defined(__STRICT_ANSI__)
+#elif !defined(alloca)
 #define alloca __builtin_alloca
 #endif
 
