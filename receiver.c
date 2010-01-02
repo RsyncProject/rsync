@@ -48,6 +48,7 @@ extern int keep_partial;
 extern int checksum_len;
 extern int checksum_seed;
 extern int inplace;
+extern int allowed_lull;
 extern int delay_updates;
 extern mode_t orig_umask;
 extern struct stats stats;
@@ -253,6 +254,9 @@ static int receive_data(int f_in, char *fname_r, int fd_r, OFF_T size_r,
 	while ((i = recv_token(f_in, &data)) != 0) {
 		if (INFO_GTE(PROGRESS, 1))
 			show_progress(offset, total_size);
+
+		if (allowed_lull)
+			maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH | MSK_ACTIVE_RECEIVER);
 
 		if (i > 0) {
 			if (DEBUG_GTE(DELTASUM, 3)) {

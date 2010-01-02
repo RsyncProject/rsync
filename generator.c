@@ -289,7 +289,7 @@ static void delete_in_dir(char *fbuf, struct file_struct *file, dev_t *fs_dev)
 		rprintf(FINFO, "delete_in_dir(%s)\n", fbuf);
 
 	if (allowed_lull)
-		maybe_send_keepalive(time(NULL), True);
+		maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH);
 
 	if (io_error && !ignore_errors) {
 		if (already_warned)
@@ -1928,7 +1928,7 @@ static void touch_up_dirs(struct file_list *flist, int ndx)
 		}
 		if (counter >= loopchk_limit) {
 			if (allowed_lull)
-				maybe_send_keepalive(time(NULL), True);
+				maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH);
 			else
 				maybe_flush_socket(0);
 			counter = 0;
@@ -2128,7 +2128,7 @@ void generate_files(int f_out, const char *local_name)
 
 			if (i + cur_flist->ndx_start >= next_loopchk) {
 				if (allowed_lull)
-					maybe_send_keepalive(time(NULL), True);
+					maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH);
 				else
 					maybe_flush_socket(0);
 				next_loopchk += loopchk_limit;

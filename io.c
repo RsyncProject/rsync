@@ -69,7 +69,6 @@ int batch_fd = -1;
 int msgdone_cnt = 0;
 int forward_flist_data = 0;
 BOOL flist_receiving_enabled = False;
-BOOL we_send_keepalive_messages = False;
 
 /* Ignore an EOF error if non-zero. See whine_about_eof(). */
 int kluge_around_eof = 0;
@@ -157,22 +156,32 @@ static void check_timeout(BOOL allow_keepalive)
 {
 	time_t t, chk;
 
-	/* On the receiving side, the generator is now handling timeouts, so
-	 * the receiver ignores them.  Note that the am_receiver flag is not
-	 * set until the receiver forks from the generator, so timeouts will be
-	 * based on receiving data on the receiving side until that event. */
-	if (!io_timeout || am_receiver)
+	/* On the receiving side, the generator is now the one that decides
+	 * when a timeout has occurred.  When it is sifting through a lot of
+	 * files looking for work, it will be sending keep-alive messages to
+	 * the sender, and even though the receiver won't be sending/receiving
+	 * anything (not even keep-alive messages), the successful writes to
+	 * the sender will keep things going.  If the receiver is actively
+	 * receiving data, it will ensure that the generator knows that it is
+	 * not idle by sending the generator keep-alive messages (since the
+	 * generator might be blocked trying to send checksums, it needs to
+	 * know that the receiver is active).  Thus, as long as one or the
+	 * other is successfully doing work, the generator will not timeout. */
+	if (!io_timeout)
 		return;
 
 	t = time(NULL);
 
-	if (allow_keepalive && we_send_keepalive_messages) {
+	if (allow_keepalive) {
 		/* This may put data into iobuf.msg w/o flushing. */
-		maybe_send_keepalive(t, False);
+		maybe_send_keepalive(t, 0);
 	}
 
 	if (!last_io_in)
 		last_io_in = t;
+
+	if (am_receiver)
+		return;
 
 	chk = MAX(last_io_out, last_io_in);
 	if (t - chk >= io_timeout) {
@@ -261,8 +270,8 @@ static size_t safe_read(int fd, char *buf, size_t len)
 					who_am_i());
 				exit_cleanup(RERR_FILEIO);
 			}
-			if (we_send_keepalive_messages)
-				maybe_send_keepalive(time(NULL), True);
+			if (io_timeout)
+				maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH);
 			continue;
 		}
 
@@ -346,8 +355,8 @@ static void safe_write(int fd, const char *buf, size_t len)
 					what_fd_is(fd), who_am_i());
 				exit_cleanup(RERR_FILEIO);
 			}
-			if (we_send_keepalive_messages)
-				maybe_send_keepalive(time(NULL), True);
+			if (io_timeout)
+				maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH);
 			continue;
 		}
 
@@ -781,8 +790,11 @@ static char *perform_io(size_t needed, int flags)
 			if (msgs2stderr && DEBUG_GTE(IO, 2))
 				rprintf(FINFO, "[%s] recv=%ld\n", who_am_i(), (long)n);
 
-			if (io_timeout)
+			if (io_timeout) {
 				last_io_in = time(NULL);
+				if (flags & PIO_NEED_INPUT)
+					maybe_send_keepalive(last_io_in, 0);
+			}
 			stats.total_read += n;
 
 			iobuf.in.len += n;
@@ -1053,13 +1065,15 @@ void io_set_sock_fds(int f_in, int f_out)
 void set_io_timeout(int secs)
 {
 	io_timeout = secs;
+	allowed_lull = (io_timeout + 1) / 2;
 
-	if (!io_timeout || io_timeout > SELECT_TIMEOUT)
+	if (!io_timeout || allowed_lull > SELECT_TIMEOUT)
 		select_timeout = SELECT_TIMEOUT;
 	else
-		select_timeout = io_timeout;
+		select_timeout = allowed_lull;
 
-	allowed_lull = read_batch ? 0 : (io_timeout + 1) / 2;
+	if (read_batch)
+		allowed_lull = 0;
 }
 
 static void check_for_d_option_error(const char *msg)
@@ -1333,12 +1347,20 @@ void maybe_flush_socket(int important)
  * rsync versions.  This avoids any message forwarding, and leaves the raw-data
  * stream alone (since we can never be quite sure if that stream is in the
  * right state for a keep-alive message). */
-void maybe_send_keepalive(time_t now, BOOL allow_flush)
+void maybe_send_keepalive(time_t now, int flags)
 {
+	if (flags & MSK_ACTIVE_RECEIVER)
+		last_io_in = now; /* Fudge things when we're working hard on the files. */
+
 	if (now - last_io_out >= allowed_lull) {
+		/* The receiver is special:  it only sends keep-alive messages if it is
+		 * actively receiving data.  Otherwise, it lets the generator timeout. */
+		if (am_receiver && now - last_io_in >= io_timeout)
+			return;
+
 		if (!iobuf.msg.len && iobuf.out.len == iobuf.out_empty_len)
 			send_msg(MSG_DATA, "", 0, 0);
-		if (!allow_flush) {
+		if (!(flags & MSK_ALLOW_FLUSH)) {
 			/* Let the caller worry about writing out the data. */
 		} else if (iobuf.msg.len)
 			perform_io(iobuf.msg.size - iobuf.msg.len + 1, PIO_NEED_MSGROOM);
@@ -1430,7 +1452,7 @@ static void read_a_msg(void)
 			goto invalid_msg;
 		iobuf.in_multiplexed = 1;
 		if (am_sender)
-			maybe_send_keepalive(time(NULL), True);
+			maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH);
 		break;
 	case MSG_DELETED:
 		if (msg_bytes >= sizeof data)

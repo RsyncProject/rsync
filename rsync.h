@@ -235,7 +235,7 @@ enum msgcode {
 	MSG_IO_ERROR=22,/* the sending side had an I/O error */
 	MSG_IO_TIMEOUT=33,/* tell client about a daemon's timeout value */
 	MSG_NOOP=42,	/* a do-nothing message (legacy protocol-30 only) */
-	MSG_ERROR_EXIT=86, /* used by siblings and by protocol-31 */
+	MSG_ERROR_EXIT=86, /* synchronize an error exit (siblings and protocol >= 31) */
 	MSG_SUCCESS=100,/* successfully updated indicated flist index */
 	MSG_DELETED=101,/* successfully deleted a file on receiving side */
 	MSG_NO_SEND=102,/* sender failed to open a file we wanted */
@@ -266,6 +266,10 @@ enum delret {
 /* Defines for make_path() */
 #define MKP_DROP_NAME		(1<<0) /* drop trailing filename or trailing slash */
 #define MKP_SKIP_SLASH		(1<<1) /* skip one or more leading slashes */
+
+/* Defines for maybe_send_keepalive() */
+#define MSK_ALLOW_FLUSH 	(1<<0)
+#define MSK_ACTIVE_RECEIVER 	(1<<1)
 
 #include "errcode.h"
 

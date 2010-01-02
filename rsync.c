@@ -368,7 +368,7 @@ int read_ndx_and_attrs(int f_in, int f_out, int *iflag_ptr, uchar *type_ptr,
 	/* Support the protocol-29 keep-alive style. */
 	if (protocol_version < 30 && ndx == cur_flist->used && iflags == ITEM_IS_NEW) {
 		if (am_sender)
-			maybe_send_keepalive(time(NULL), True);
+			maybe_send_keepalive(time(NULL), MSK_ALLOW_FLUSH);
 		goto read_loop;
 	}
 
