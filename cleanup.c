@@ -215,7 +215,7 @@ NORETURN void _exit_cleanup(int code, const char *file, int line)
 #include "case_N.h"
 
 		if (exit_code && exit_code != RERR_SOCKETIO && exit_code != RERR_STREAMIO && exit_code != RERR_SIGNAL1
-		 && !shutting_down && (protocol_version >= 31 || am_receiver)) {
+		 && exit_code != RERR_TIMEOUT && !shutting_down && (protocol_version >= 31 || am_receiver)) {
 			if (line > 0) {
 				if (DEBUG_GTE(EXIT, 3)) {
 					rprintf(FINFO, "[%s] sending MSG_ERROR_EXIT with exit_code %d\n",
