@@ -1521,9 +1521,10 @@ int main(int argc,char *argv[])
 		exit_cleanup(RERR_SYNTAX);
 	}
 
-	/* we set a 0 umask so that correct file permissions can be
-	 * carried across */
-	orig_umask = umask(0);
+	/* Get the umask for use in permission calculations.  We no longer set
+	 * it to zero; that is ugly and pointless now that all the callers that
+	 * relied on it have been reeducated to work with default ACLs. */
+	umask(orig_umask = umask(0));
 
 #if defined CONFIG_LOCALE && defined HAVE_SETLOCALE
 	setlocale(LC_CTYPE, "");

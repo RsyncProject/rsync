@@ -27,7 +27,6 @@ extern int am_server;
 extern int blocking_io;
 extern int filesfrom_fd;
 extern int munge_symlinks;
-extern mode_t orig_umask;
 extern char *logfile_name;
 extern int remote_option_cnt;
 extern const char **remote_options;
@@ -78,7 +77,6 @@ pid_t piped_child(char **command, int *f_in, int *f_out)
 			close(to_child_pipe[0]);
 		if (from_child_pipe[1] != STDOUT_FILENO)
 			close(from_child_pipe[1]);
-		umask(orig_umask);
 		set_blocking(STDIN_FILENO);
 		if (blocking_io > 0)
 			set_blocking(STDOUT_FILENO);

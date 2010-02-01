@@ -48,7 +48,6 @@ extern int write_batch;
 extern int default_af_hint;
 extern int logfile_format_has_i;
 extern int logfile_format_has_o_or_i;
-extern mode_t orig_umask;
 extern char *bind_address;
 extern char *config_file;
 extern char *logfile_format;
@@ -676,7 +675,6 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 	if (*lp_prexfer_exec(i) || *lp_postxfer_exec(i)) {
 		int status;
 
-		umask(orig_umask);
 		/* For post-xfer exec, fork a new process to run the rsync
 		 * daemon while this process waits for the exit status and
 		 * runs the indicated command at that point. */
@@ -745,7 +743,6 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 			set_blocking(fds[1]);
 			pre_exec_fd = fds[1];
 		}
-		umask(0);
 	}
 #endif
 
@@ -1076,7 +1073,7 @@ static void create_pid_file(void)
 		return;
 
 	cleanup_set_pid(pid);
-	if ((fd = do_open(pid_file, O_WRONLY|O_CREAT|O_EXCL, 0666 & ~orig_umask)) == -1) {
+	if ((fd = do_open(pid_file, O_WRONLY|O_CREAT|O_EXCL, 0666)) == -1) {
 	  failure:
 		cleanup_set_pid(0);
 		fprintf(stderr, "failed to create pid file %s: %s\n", pid_file, strerror(errno));

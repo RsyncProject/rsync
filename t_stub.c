@@ -26,7 +26,6 @@ int module_id = -1;
 int relative_paths = 0;
 int module_dirlen = 0;
 int preserve_xattrs = 0;
-mode_t orig_umask = 002;
 char number_separator = ',';
 char *partial_dir;
 char *module_dir;

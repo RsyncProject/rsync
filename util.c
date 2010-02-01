@@ -32,7 +32,6 @@ extern int relative_paths;
 extern int preserve_xattrs;
 extern char *module_dir;
 extern unsigned int module_dirlen;
-extern mode_t orig_umask;
 extern char *partial_dir;
 extern filter_rule_list daemon_filter_list;
 
@@ -178,18 +177,11 @@ int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
 	}
 }
 
-/* This creates a new directory with default permissions.  Since there
- * might be some directory-default permissions affecting this, we can't
- * force the permissions directly using the original umask and mkdir(). */
+/* This creates a new directory with default permissions.  Now that we
+ * leave the original umask set, we can just mkdir with mode 777. */
 int mkdir_defmode(char *fname)
 {
-	int ret;
-
-	umask(orig_umask);
-	ret = do_mkdir(fname, ACCESSPERMS);
-	umask(0);
-
-	return ret;
+	return do_mkdir(fname, ACCESSPERMS);
 }
 
 /* Create any necessary directories in fname.  Any missing directories are
@@ -215,8 +207,6 @@ int make_path(char *fname, int flags)
 		*end = '\0';
 	} else
 		end = fname + strlen(fname);
-
-	umask(orig_umask); /* NOTE: don't return before setting this back to 0! */
 
 	/* Try to find an existing dir, starting from the deepest dir. */
 	for (p = end; ; ) {
@@ -257,8 +247,6 @@ int make_path(char *fname, int flags)
 		else
 			ret++;
 	}
-
-	umask(0);
 
 	if (flags & MKP_DROP_NAME)
 		*end = '/';
