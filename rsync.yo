@@ -978,6 +978,10 @@ super-user copies all namespaces except system.*.  A normal user only copies
 the user.* namespace.  To be able to backup and restore non-user namespaces as
 a normal user, see the bf(--fake-super) option.
 
+Note that this option does not copy rsyncs special xattr values (e.g. those
+used by bf(--fake-super)) unless you repeat the option (e.g. -XX).  This
+"copy all xattrs" mode cannot be used with bf(--fake-super).
+
 dit(bf(--chmod)) This option tells rsync to apply one or more
 comma-separated "chmod" strings to the permission of the files in the
 transfer.  The resulting value is treated as though it were the permissions
