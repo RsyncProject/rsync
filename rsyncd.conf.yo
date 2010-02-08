@@ -358,7 +358,7 @@ group attributes (and indeed, your OS may not allow a non-super-user to try to
 change their group settings).
 
 dit(bf(fake super)) Setting "fake super = yes" for a module causes the
-daemon side to behave as if the bf(--fake-user) command-line option had
+daemon side to behave as if the bf(--fake-super) command-line option had
 been specified.  This allows the full attributes of a file to be stored
 without having to have the daemon actually running as root.
 
