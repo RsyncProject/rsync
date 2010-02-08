@@ -310,7 +310,7 @@ was run as root. This complements the "uid" parameter. The default is gid -2,
 which is normally the group "nobody".
 
 dit(bf(fake super)) Setting "fake super = yes" for a module causes the
-daemon side to behave as if the bf(--fake-user) command-line option had
+daemon side to behave as if the bf(--fake-super) command-line option had
 been specified.  This allows the full attributes of a file to be stored
 without having to have the daemon actually running as root.
 
