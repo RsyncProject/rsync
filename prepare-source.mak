@@ -1,7 +1,7 @@
 conf: configure.sh config.h.in
 
-configure.sh: configure.in aclocal.m4
+configure.sh: configure.ac aclocal.m4
 	autoconf -o configure.sh
 
-config.h.in: configure.in aclocal.m4
+config.h.in: configure.ac aclocal.m4
 	autoheader && touch config.h.in

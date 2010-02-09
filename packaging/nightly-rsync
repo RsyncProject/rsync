@@ -57,7 +57,7 @@ if ($make_tar) {
     close IN;
 
     my $confversion;
-    open(IN, '<', 'configure.in') or die "Unable to open configure.in: $!\n";
+    open(IN, '<', 'configure.ac') or die "Unable to open configure.ac: $!\n";
     while (<IN>) {
 	if (/^RSYNC_VERSION=(.*)/) {
 	    $confversion = $1;
@@ -65,7 +65,7 @@ if ($make_tar) {
 	}
     }
     close IN;
-    die "Unable to find RSYNC_VERSION in configure.in\n" unless defined $confversion;
+    die "Unable to find RSYNC_VERSION in configure.ac\n" unless defined $confversion;
 
     open(IN, '<', 'OLDNEWS') or die "Unable to open OLDNEWS: $!\n";
     $_ = <IN>;
