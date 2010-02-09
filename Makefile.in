@@ -123,7 +123,7 @@ gensend: gen
 conf:
 	cd $(srcdir) && $(MAKE) -f prepare-source.mak conf
 
-configure.sh config.h.in: configure.in aclocal.m4
+configure.sh config.h.in: configure.ac aclocal.m4
 	@if test -f configure.sh; then cp -p configure.sh configure.sh.old; else touch configure.sh.old; fi
 	@if test -f config.h.in; then cp -p config.h.in config.h.in.old; else touch config.h.in.old; fi
 	autoconf -o configure.sh

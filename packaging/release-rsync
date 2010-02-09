@@ -67,7 +67,7 @@ die "The checkout is not clean:\n", $status unless $status =~ /\nnothing to comm
 die "The checkout is not on the $master_branch branch.\n" unless $status =~ /^# On branch $master_branch\n/;
 
 my $confversion;
-open(IN, '<', 'configure.in') or die $!;
+open(IN, '<', 'configure.ac') or die $!;
 while (<IN>) {
     if (/^RSYNC_VERSION=(.*)/) {
 	$confversion = $1;
@@ -75,7 +75,7 @@ while (<IN>) {
     }
 }
 close IN;
-die "Unable to find RSYNC_VERSION in configure.in\n" unless defined $confversion;
+die "Unable to find RSYNC_VERSION in configure.ac\n" unless defined $confversion;
 
 open(IN, '<', 'OLDNEWS') or die $!;
 $_ = <IN>;
@@ -146,9 +146,9 @@ print "\n", $break, <<EOT;
 \$release is "$release"
 
 About to:
-    - make sure that SUBPROTOCOL_VERSION is 0$skipping
-    - tweak the version in configure.in and the spec files
-    - tweak NEWS and OLDNEWS to update the release date$skipping
+    - tweak SUBPROTOCOL_VERSION in rsync.h, if needed
+    - tweak the version in configure.ac and the spec files
+    - tweak NEWS and OLDNEWS to ensure header values are correct
     - tweak the date in the *.yo files and generate the manpages
     - generate configure.sh, config.h.in, and proto.h
     - page through the differences
@@ -162,7 +162,7 @@ my %specvars = ( 'Version:' => $finalversion, 'Release:' => $release,
 		 '%define fullversion' => "\%{version}$pre", 'Released' => "$version.",
 		 '%define srcdir' => $srcdir );
 my @tweak_files = ( glob('packaging/*.spec'), glob('packaging/*/*.spec'), glob('*.yo'),
-		    qw( configure.in rsync.h NEWS OLDNEWS options.c ) );
+		    qw( configure.ac rsync.h NEWS OLDNEWS options.c ) );
 
 foreach my $fn (@tweak_files) {
     open(IN, '<', $fn) or die $!;
