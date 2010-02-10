@@ -853,7 +853,7 @@ void log_delete(const char *fname, int mode)
 	static struct {
 		union file_extras ex[4]; /* just in case... */
 		struct file_struct file;
-	} x;
+	} x; /* Zero-initialized due to static declaration. */
 	int len = strlen(fname);
 	const char *fmt;
 
