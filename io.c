@@ -50,6 +50,7 @@ extern int file_total;
 extern int file_old_total;
 extern int list_only;
 extern int read_batch;
+extern int compat_flags;
 extern int protect_args;
 extern int checksum_seed;
 extern int protocol_version;
@@ -2318,7 +2319,7 @@ void start_write_batch(int fd)
 	 * is involved. */
 	write_int(batch_fd, protocol_version);
 	if (protocol_version >= 30)
-		write_byte(batch_fd, inc_recurse);
+		write_byte(batch_fd, compat_flags);
 	write_int(batch_fd, checksum_seed);
 
 	if (am_sender)
