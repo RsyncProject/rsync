@@ -34,6 +34,26 @@ extern char backup_dir_buf[MAXPATHLEN];
 extern char *backup_suffix;
 extern char *backup_dir;
 
+/* Returns -1 on error, 0 on missing dir, and 1 on present dir. */
+static int validate_backup_dir(void)
+{
+	STRUCT_STAT st;
+
+	if (do_lstat(backup_dir_buf, &st) < 0) {
+		if (errno == ENOENT)
+			return 0;
+		rsyserr(FERROR, errno, "backup lstat %s failed", backup_dir_buf);
+		return -1;
+	}
+	if (!S_ISDIR(st.st_mode)) {
+		int flags = get_del_for_flag(st.st_mode) | DEL_FOR_BACKUP | DEL_RECURSE;
+		if (delete_item(backup_dir_buf, st.st_mode, flags) == 0)
+			return 0;
+		return -1;
+	}
+	return 1;
+}
+
 /* Create a backup path from the given fname, putting the result into
  * backup_dir_buf.  Any new directories (compared to the prior backup
  * path) are ensured to exist as directories, replacing anything else
@@ -41,7 +61,7 @@ extern char *backup_dir;
 static BOOL copy_valid_path(const char *fname)
 {
 	const char *f;
-	int flags;
+	int val;
 	BOOL ret = True;
 	stat_x sx;
 	char *b, *rel = backup_dir_buf + backup_dir_len, *name = rel;
@@ -62,17 +82,10 @@ static BOOL copy_valid_path(const char *fname)
 			return True;
 		*b = '\0';
 
-		if (do_lstat(backup_dir_buf, &sx.st) < 0) {
-			if (errno == ENOENT)
-				break;
-			rsyserr(FERROR, errno, "backup lstat %s failed", backup_dir_buf);
-			*name = '\0';
-			return False;
-		}
-		if (!S_ISDIR(sx.st.st_mode)) {
-			flags = get_del_for_flag(sx.st.st_mode) | DEL_FOR_BACKUP | DEL_RECURSE;
-			if (delete_item(backup_dir_buf, sx.st.st_mode, flags) == 0)
-				break;
+		val = validate_backup_dir();
+		if (val == 0)
+			break;
+		if (val < 0) {
 			*name = '\0';
 			return False;
 		}
@@ -85,11 +98,18 @@ static BOOL copy_valid_path(const char *fname)
 	for ( ; b; name = b + 1, b = strchr(name, '/')) {
 		*b = '\0';
 
-		if (mkdir_defmode(backup_dir_buf) < 0) {
-			rsyserr(FERROR, errno, "backup mkdir %s failed", backup_dir_buf);
+		while (mkdir_defmode(backup_dir_buf) < 0) {
+			if (errno == EEXIST) {
+				val = validate_backup_dir();
+				if (val > 0)
+					break;
+				if (val == 0)
+					continue;
+			} else
+				rsyserr(FERROR, errno, "backup mkdir %s failed", backup_dir_buf);
 			*name = '\0';
 			ret = False;
-			break;
+			goto cleanup;
 		}
 
 		/* Try to transfer the directory settings of the actual dir
@@ -120,6 +140,8 @@ static BOOL copy_valid_path(const char *fname)
 
 		*b = '/';
 	}
+
+  cleanup:
 
 #ifdef SUPPORT_ACLS
 	uncache_tmp_acls();
