@@ -959,8 +959,8 @@ The source and destination systems must have compatible ACL entries for this
 option to work properly.  See the bf(--fake-super) option for a way to backup
 and restore ACLs that are not compatible.
 
-dit(bf(-X, --xattrs)) This option causes rsync to update the remote
-extended attributes to be the same as the local ones.
+dit(bf(-X, --xattrs)) This option causes rsync to update the destination
+extended attributes to be the same as the source ones.
 
 For systems that support extended-attribute namespaces, a copy being done by a
 super-user copies all namespaces except system.*.  A normal user only copies
