@@ -276,8 +276,8 @@ int make_backup(const char *fname, BOOL prefer_rename)
 		const char *sl = F_SYMLINK(file);
 		if (safe_symlinks && unsafe_symlink(sl, fname)) {
 			if (INFO_GTE(SYMSAFE, 1)) {
-				rprintf(FINFO, "ignoring unsafe symlink %s -> %s\n",
-					full_fname(buf), sl);
+				rprintf(FINFO, "not backing up unsafe symlink \"%s\" -> \"%s\"\n",
+					fname, sl);
 			}
 			ret = 2;
 		} else {
