@@ -309,8 +309,8 @@ static int keep_backup(const char *fname)
 		const char *sl = F_SYMLINK(file);
 		if (safe_symlinks && unsafe_symlink(sl, fname)) {
 			if (verbose) {
-				rprintf(FINFO, "ignoring unsafe symlink %s -> %s\n",
-					full_fname(buf), sl);
+				rprintf(FINFO, "not backing up unsafe symlink \"%s\" -> \"%s\"\n",
+					fname, sl);
 			}
 			kept = 1;
 		} else {
