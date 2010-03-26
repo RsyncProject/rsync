@@ -1640,21 +1640,29 @@ static void send_directory(int f, struct file_list *flist, char *fbuf, int len,
 	}
 
 	p = fbuf + len;
-	if (len != 1 || *fbuf != '/')
+	if (len == 1 && *fbuf == '/')
+		remainder = MAXPATHLEN - 1;
+	else if (len < MAXPATHLEN-1) {
 		*p++ = '/';
-	*p = '\0';
-	remainder = MAXPATHLEN - (p - fbuf);
+		*p = '\0';
+		remainder = MAXPATHLEN - (len + 1);
+	} else
+		remainder = 0;
 
 	for (errno = 0, di = readdir(d); di; errno = 0, di = readdir(d)) {
 		char *dname = d_name(di);
 		if (dname[0] == '.' && (dname[1] == '\0'
 		    || (dname[1] == '.' && dname[2] == '\0')))
 			continue;
-		if (strlcpy(p, dname, remainder) >= remainder) {
+		unsigned name_len = strlcpy(p, dname, remainder);
+		if (name_len >= remainder) {
+			char save = fbuf[len];
+			fbuf[len] = '\0';
 			io_error |= IOERR_GENERAL;
 			rprintf(FERROR_XFER,
-				"cannot send long-named file %s\n",
-				full_fname(fbuf));
+				"filename overflows max-path len by %u: %s/%s\n",
+				name_len - remainder + 1, fbuf, dname);
+			fbuf[len] = save;
 			continue;
 		}
 		if (dname[0] == '\0') {
