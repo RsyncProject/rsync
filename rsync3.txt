@@ -13,7 +13,7 @@ Good things about the current implementation:
 
   - Fairly reliable.
 
-  - The choice of runnning over a plain TCP socket or tunneling over
+  - The choice of running over a plain TCP socket or tunneling over
     ssh.
 
   - rsync operations are idempotent: you can always run the same
