@@ -1,6 +1,6 @@
 -*- indented-text -*-
 
-Notes towards a new version of rsync 
+Notes towards a new version of rsync
 Martin Pool <mbp@samba.org>, September 2001.
 
 
@@ -51,7 +51,7 @@ Bad things about the current implementation:
     hard to modify/extend
 
   - Both the program and the protocol assume a single non-interactive
-    one-way transfer 
+    one-way transfer
 
   - A list of all files are held in memory for the entire transfer,
     which cripples scalability to large file trees
@@ -88,7 +88,7 @@ Protocol philosophy:
 
 Questionable features:
 
-  These are neat, but not necessarily clean or worth preserving.  
+  These are neat, but not necessarily clean or worth preserving.
 
   - The remote rsync can be wrapped by some other program, such as in
     tridge's rsync-mail scripts.  The general feature of sending and
@@ -100,7 +100,7 @@ Desirable features:
 
   These don't really require architectural changes; they're just
   something to keep in mind.
- 
+
   - Synchronize ACLs and extended attributes
 
   - Anonymous servers should be efficient
@@ -122,7 +122,7 @@ Desirable features:
     Alternatively, as long as transfers are idempotent, we can just
     restart the whole thing.  [NFSv4]
 
-  - Scripting support.  
+  - Scripting support.
 
   - Propagate atimes and do not modify them.  This is very ugly on
     Unix.  It might be better to try to add O_NOATIME to kernels, and
@@ -224,7 +224,7 @@ Scripting hooks:
   - What basis file to use
 
   - Logging
-  
+
   - Whether to allow transfers (for public servers)
 
   - Authentication
@@ -275,7 +275,7 @@ Pie-in-the-sky features:
 
   These might have a severe impact on the protocol, and are not
   clearly in our core requirements.  It looks like in many of them
-  having scripting hooks will allow us 
+  having scripting hooks will allow us
 
   - Transport over UDP multicast.  The hard part is handling multiple
     destinations which have different basis files.  We can look at
@@ -344,7 +344,7 @@ In favour of using a new protocol:
 
   - If we start from scratch, it can be documented as we go, and we
     can avoid design decisions that make the protocol complex or
-    implementation-bound. 
+    implementation-bound.
 
 
 Error handling:
@@ -365,7 +365,7 @@ Concurrency:
   - We can do nonblocking network IO, but not so for disk.
 
   - It makes sense to on the destination be generating signatures and
-    applying patches at the same time. 
+    applying patches at the same time.
 
   - Can structure this with nonblocking, threads, separate processes,
     etc.
@@ -381,7 +381,7 @@ Uses:
     http://www.ietf.org/proceedings/00jul/00july-133.htm#P24510_1276764
 
   - Sync with PDA
- 
+
   - Network backup systems
 
   - CVS filemover
@@ -419,7 +419,7 @@ Filesystem migration:
 Atomic updates:
 
   The NFSv4 working group wants atomic migration.  Most of the
-  responsibility for this lies on the NFS server or OS.  
+  responsibility for this lies on the NFS server or OS.
 
   If migrating a whole tree, then we could do a nearly-atomic rename
   at the end.  This ties in to having separate basis and destination
@@ -427,11 +427,11 @@ Atomic updates:
 
   There's no way in Unix to replace a whole set of files atomically.
   However, if we get them all onto the destination machine and then do
-  the updates quickly it would greatly reduce the window.  
+  the updates quickly it would greatly reduce the window.
 
 
 Scalability:
- 
+
   We should aim to work well on machines in use in a year or two.
   That probably means transfers of many millions of files in one
   batch, and gigabytes or terabytes of data.
@@ -466,4 +466,4 @@ Related work:
   - http://freshmeat.net/search/?site=Freshmeat&q=mirror&section=projects
 
   - BitTorrent -- p2p mirroring
-    http://bitconjurer.org/BitTorrent/ 
+    http://bitconjurer.org/BitTorrent/
