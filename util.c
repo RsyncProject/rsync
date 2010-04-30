@@ -177,13 +177,6 @@ int set_modtime(const char *fname, time_t modtime, uint32 mod_nsec, mode_t mode)
 	}
 }
 
-/* This creates a new directory with default permissions.  Now that we
- * leave the original umask set, we can just mkdir with mode 777. */
-int mkdir_defmode(char *fname)
-{
-	return do_mkdir(fname, ACCESSPERMS);
-}
-
 /* Create any necessary directories in fname.  Any missing directories are
  * created with default permissions.  Returns < 0 on error, or the number
  * of directories created. */

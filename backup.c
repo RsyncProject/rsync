@@ -98,7 +98,7 @@ static BOOL copy_valid_path(const char *fname)
 	for ( ; b; name = b + 1, b = strchr(name, '/')) {
 		*b = '\0';
 
-		while (mkdir_defmode(backup_dir_buf) < 0) {
+		while (do_mkdir(backup_dir_buf, ACCESSPERMS) < 0) {
 			if (errno == EEXIST) {
 				val = validate_backup_dir();
 				if (val > 0)

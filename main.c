@@ -639,7 +639,7 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 			exit_cleanup(RERR_SYNTAX);
 		}
 
-		if (mkdir_defmode(dest_path) != 0) {
+		if (do_mkdir(dest_path, ACCESSPERMS) != 0) {
 			rsyserr(FERROR, errno, "mkdir %s failed",
 				full_fname(dest_path));
 			exit_cleanup(RERR_FILEIO);
