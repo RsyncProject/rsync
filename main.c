@@ -576,6 +576,10 @@ static char *get_local_name(struct file_list *flist, char *dest_path)
 	if (!dest_path || list_only)
 		return NULL;
 
+	/* Treat an empty string as a copy into the current directory. */
+	if (!*dest_path)
+	    dest_path = ".";
+
 	if (daemon_filter_list.head) {
 		char *slash = strrchr(dest_path, '/');
 		if (slash && (slash[1] == '\0' || (slash[1] == '.' && slash[2] == '\0')))
