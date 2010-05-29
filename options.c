@@ -277,7 +277,7 @@ static struct output_struct debug_words[COUNT_DEBUG+1] = {
 	DEBUG_WORD(FUZZY, W_REC, "Debug fuzzy scoring (levels 1-2)"),
 	DEBUG_WORD(GENR, W_REC, "Debug generator functions"),
 	DEBUG_WORD(HASH, W_SND|W_REC, "Debug hashtable code"),
-	DEBUG_WORD(HLINK, W_SND|W_REC, "Debug hard-link actions"),
+	DEBUG_WORD(HLINK, W_SND|W_REC, "Debug hard-link actions (levels 1-3)"),
 	DEBUG_WORD(ICONV, W_CLI|W_SRV, "Debug iconv character conversions (levels 1-2)"),
 	DEBUG_WORD(IO, W_CLI|W_SRV, "Debug I/O routines (levels 1-4)"),
 	DEBUG_WORD(OWN, W_REC, "Debug ownership changes in users & groups (levels 1-2)"),
