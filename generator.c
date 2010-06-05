@@ -1119,6 +1119,7 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		skip_dir = NULL;
 	}
 
+	init_stat_x(&sx);
 	if (daemon_filter_list.head && (*fname != '.' || fname[1])) {
 		if (check_filter(&daemon_filter_list, FLOG, fname, is_dir) < 0) {
 			if (is_dir < 0)
@@ -1136,7 +1137,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 	}
 
-	init_stat_x(&sx);
 	if (dry_run > 1 || (dry_missing_dir && is_below(file, dry_missing_dir))) {
 	  parent_is_dry_missing:
 		if (fuzzy_dirlist) {
