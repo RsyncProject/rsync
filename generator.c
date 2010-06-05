@@ -1300,6 +1300,12 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		skip_dir = NULL;
 	}
 
+#ifdef SUPPORT_ACLS
+	sx.acc_acl = sx.def_acl = NULL;
+#endif
+#ifdef SUPPORT_XATTRS
+	sx.xattr = NULL;
+#endif
 	if (daemon_filter_list.head && (*fname != '.' || fname[1])) {
 		if (check_filter(&daemon_filter_list, FLOG, fname, is_dir) < 0) {
 			if (is_dir < 0)
@@ -1317,12 +1323,6 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		}
 	}
 
-#ifdef SUPPORT_ACLS
-	sx.acc_acl = sx.def_acl = NULL;
-#endif
-#ifdef SUPPORT_XATTRS
-	sx.xattr = NULL;
-#endif
 	if (dry_run > 1 || (dry_missing_dir && is_below(file, dry_missing_dir))) {
 	  parent_is_dry_missing:
 		if (fuzzy_dirlist) {
