@@ -192,6 +192,8 @@ void set_compression(const char *fname)
 		return;
 
 	while (1) {
+		if (isUpper(&ltr))
+			ltr = toLower(&ltr);
 		while (node->letter != ltr) {
 			if (node->letter > ltr)
 				return;
