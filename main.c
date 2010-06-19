@@ -130,7 +130,7 @@ static void show_malloc_stats(void);
 pid_t wait_process(pid_t pid, int *status_ptr, int flags)
 {
 	pid_t waited_pid;
-	
+
 	do {
 		waited_pid = waitpid(pid, status_ptr, flags);
 	} while (waited_pid == -1 && errno == EINTR);
