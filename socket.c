@@ -39,12 +39,11 @@ extern int connect_timeout;
 static struct sigaction sigact;
 #endif
 
-/**
- * Establish a proxy connection on an open socket to a web proxy by
- * using the CONNECT method. If proxy_user and proxy_pass are not NULL,
- * they are used to authenticate to the proxy using the "Basic"
- * proxy-authorization protocol
- **/
+static int sock_exec(const char *prog);
+
+/* Establish a proxy connection on an open socket to a web proxy by using the
+ * CONNECT method.  If proxy_user and proxy_pass are not NULL, they are used to
+ * authenticate to the proxy using the "Basic" proxy-authorization protocol. */
 static int establish_proxy_connection(int fd, char *host, int port,
 				      char *proxy_user, char *proxy_pass)
 {
@@ -125,10 +124,8 @@ static int establish_proxy_connection(int fd, char *host, int port,
 }
 
 
-/**
- * Try to set the local address for a newly-created socket.  Return -1
- * if this fails.
- **/
+/* Try to set the local address for a newly-created socket.
+ * Return -1 if this fails. */
 int try_bind_local(int s, int ai_family, int ai_socktype,
 		   const char *bind_addr)
 {
@@ -165,26 +162,22 @@ static RETSIGTYPE contimeout_handler(UNUSED(int val))
 	connect_timeout = -1;
 }
 
-/**
- * Open a socket to a tcp remote host with the specified port .
+/* Open a socket to a tcp remote host with the specified port.
  *
  * Based on code from Warren.  Proxy support by Stephen Rothwell.
  * getaddrinfo() rewrite contributed by KAME.net.
  *
- * Now that we support IPv6 we need to look up the remote machine's
- * address first, using @p af_hint to set a preference for the type
- * of address.  Then depending on whether it has v4 or v6 addresses we
- * try to open a connection.
+ * Now that we support IPv6 we need to look up the remote machine's address
+ * first, using af_hint to set a preference for the type of address.  Then
+ * depending on whether it has v4 or v6 addresses we try to open a connection.
  *
- * The loop allows for machines with some addresses which may not be
- * reachable, perhaps because we can't e.g. route ipv6 to that network
- * but we can get ip4 packets through.
+ * The loop allows for machines with some addresses which may not be reachable,
+ * perhaps because we can't e.g. route ipv6 to that network but we can get ip4
+ * packets through.
  *
- * @param bind_addr Local address to use.  Normally NULL to bind
- * the wildcard address.
+ * bind_addr: local address to use.  Normally NULL to bind the wildcard address.
  *
- * @param af_hint Address family, e.g. AF_INET or AF_INET6.
- **/
+ * af_hint: address family, e.g. AF_INET or AF_INET6. */
 int open_socket_out(char *host, int port, const char *bind_addr,
 		    int af_hint)
 {
@@ -308,8 +301,7 @@ int open_socket_out(char *host, int port, const char *bind_addr,
 }
 
 
-/**
- * Open an outgoing socket, but allow for it to be intercepted by
+/* Open an outgoing socket, but allow for it to be intercepted by
  * $RSYNC_CONNECT_PROG, which will execute a program across a TCP
  * socketpair rather than really opening a socket.
  *
@@ -318,8 +310,7 @@ int open_socket_out(char *host, int port, const char *bind_addr,
  *
  * This is based on the Samba LIBSMB_PROG feature.
  *
- * @param bind_addr Local address to use.  Normally NULL to get the stack default.
- **/
+ * bind_addr: local address to use.  Normally NULL to get the stack default. */
 int open_socket_out_wrapped(char *host, int port, const char *bind_addr,
 			    int af_hint)
 {
@@ -372,9 +363,7 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_addr,
 }
 
 
-
-/**
- * Open one or more sockets for incoming data using the specified type,
+/* Open one or more sockets for incoming data using the specified type,
  * port, and address.
  *
  * The getaddrinfo() call may return several address results, e.g. for
@@ -383,9 +372,7 @@ int open_socket_out_wrapped(char *host, int port, const char *bind_addr,
  * We return an array of file-descriptors to the sockets, with a trailing
  * -1 value to indicate the end of the list.
  *
- * @param bind_addr Local address to bind, or NULL to allow it to
- * default.
- **/
+ * bind_addr: local address to bind, or NULL to allow it to default. */
 static int *open_socket_in(int type, int port, const char *bind_addr,
 			   int af_hint)
 {
@@ -490,9 +477,7 @@ static int *open_socket_in(int type, int port, const char *bind_addr,
 }
 
 
-/*
- * Determine if a file descriptor is in fact a socket
- */
+/* Determine if a file descriptor is in fact a socket. */
 int is_a_socket(int fd)
 {
 	int v;
@@ -660,13 +645,11 @@ struct
 #ifdef SO_RCVTIMEO
   {"SO_RCVTIMEO",       SOL_SOCKET,    SO_RCVTIMEO,     0,                 OPT_INT},
 #endif
-  {NULL,0,0,0,0}};
+  {NULL,0,0,0,0}
+};
 
 
-
-/**
- * Set user socket options
- **/
+/* Set user socket options. */
 void set_socket_options(int fd, char *options)
 {
 	char *tok;
@@ -732,15 +715,10 @@ void set_socket_options(int fd, char *options)
 }
 
 
-/**
- * This is like socketpair but uses tcp. It is used by the Samba
- * regression test code.
- *
- * The function guarantees that nobody else can attach to the socket,
- * or if they do that this function fails and the socket gets closed
- * returns 0 on success, -1 on failure the resulting file descriptors
- * are symmetrical.
- **/
+/* This is like socketpair but uses tcp.  The function guarantees that nobody
+ * else can attach to the socket, or if they do that this function fails and
+ * the socket gets closed.  Returns 0 on success, -1 on failure.  The resulting
+ * file descriptors are symmetrical.  Currently only for RSYNC_CONNECT_PROG. */
 static int socketpair_tcp(int fd[2])
 {
 	int listener;
@@ -761,16 +739,12 @@ static int socketpair_tcp(int fd[2])
 	sock2.sin_len = sizeof sock2;
 #endif
 	sock2.sin_family = PF_INET;
+	sock2.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-	bind(listener, (struct sockaddr *)&sock2, sizeof sock2);
-
-	if (listen(listener, 1) != 0)
-		goto failed;
-
-	if (getsockname(listener, (struct sockaddr *)&sock, &socklen) != 0)
-		goto failed;
-
-	if ((fd[1] = socket(PF_INET, SOCK_STREAM, 0)) == -1)
+	if (bind(listener, (struct sockaddr *)&sock2, sizeof sock2) != 0
+	 || listen(listener, 1) != 0
+	 || getsockname(listener, (struct sockaddr *)&sock, &socklen) != 0
+	 || (fd[1] = socket(PF_INET, SOCK_STREAM, 0)) == -1)
 		goto failed;
 
 	set_nonblocking(fd[1]);
@@ -783,7 +757,7 @@ static int socketpair_tcp(int fd[2])
 	} else
 		connect_done = 1;
 
-	if ((fd[0] = accept(listener, (struct sockaddr *)&sock, &socklen)) == -1)
+	if ((fd[0] = accept(listener, (struct sockaddr *)&sock2, &socklen)) == -1)
 		goto failed;
 
 	close(listener);
@@ -811,17 +785,13 @@ static int socketpair_tcp(int fd[2])
 }
 
 
-
-/**
- * Run a program on a local tcp socket, so that we can talk to it's
- * stdin and stdout.  This is used to fake a connection to a daemon
- * for testing -- not for the normal case of running SSH.
+/* Run a program on a local tcp socket, so that we can talk to it's stdin and
+ * stdout.  This is used to fake a connection to a daemon for testing -- not
+ * for the normal case of running SSH.
  *
- * @return a socket which is attached to a subprocess running
- * "prog". stdin and stdout are attached. stderr is left attached to
- * the original stderr
- **/
-int sock_exec(const char *prog)
+ * Retruns a socket which is attached to a subprocess running "prog". stdin and
+ * stdout are attached. stderr is left attached to the original stderr. */
+static int sock_exec(const char *prog)
 {
 	pid_t pid;
 	int fd[2];
