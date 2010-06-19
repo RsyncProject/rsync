@@ -686,6 +686,9 @@ static int rsync_module(int f_in, int f_out, int i, const char *addr, const char
 				return -1;
 			}
 			if (pid) {
+				close(f_in);
+				if (f_out != f_in)
+					close(f_out);
 				set_env_num("RSYNC_PID", (long)pid);
 				if (wait_process(pid, &status, 0) < 0)
 					status = -1;
