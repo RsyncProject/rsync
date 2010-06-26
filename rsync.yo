@@ -2043,10 +2043,23 @@ with 2 or more bf(-v) options.
 
 The current statistics are as follows: quote(itemization(
   it() bf(Number of files) is the count of all "files" (in the generic
-  sense), which includes directories, symlinks, etc.
-  it() bf(Number of files transferred) is the count of normal files that
-  were updated via rsync's delta-transfer algorithm, which does not include created
-  dirs, symlinks, etc.
+  sense), which includes directories, symlinks, etc.  The total count will
+  be followed by a list of counts by filetype (if the total is non-zero).
+  For example: "(reg: 5, dir: 3, link: 2, dev: 1, special: 1)" lists the
+  totals for regular files, directories, symlinks, devices, and special
+  files.  If any of value is 0, it is completely omitted from the list.
+  it() bf(Number of created files) is the count of how many "files" (generic
+  sense) were created (as opposed to updated).  The total count will be
+  followed by a list of counts by filetype (if the total is non-zero).
+  it() bf(Number of deleted files) is the count of how many "files" (generic
+  sense) were created (as opposed to updated).  The total count will be
+  followed by a list of counts by filetype (if the total is non-zero).
+  Note that this line is only output if deletions are in effect, and only
+  if protocol 31 is being used (the default for rsync 3.1.x).
+  it() bf(Number of regular files transferred) is the count of normal files
+  that were updated via rsync's delta-transfer algorithm, which does not
+  include dirs, symlinks, etc.  Note that rsync 3.1.0 added the word
+  "regular" into this heading.
   it() bf(Total file size) is the total sum of all file sizes in the transfer.
   This does not count any size for directories or special files, but does
   include the size of symlinks.
@@ -2101,8 +2114,9 @@ in level-2 (assuming that a period is your local decimal point).
 
 Backward compatibility note:  versions of rsync prior to 3.1.0 do not support
 human-readable level 1, and they default to level 0.  Thus, specifying one or
-two bf(-h) options behaves the same in old and new versions as long as you
-didn't specify a bf(--no-h) option prior to one or more bf(-h) options.
+two bf(-h) options will behave in a comparable manner in old and new versions
+as long as you didn't specify a bf(--no-h) option prior to one or more bf(-h)
+options.  See the bf(--list-only) option for one difference.
 
 dit(bf(--partial)) By default, rsync will delete any partially
 transferred file if the transfer is interrupted. In some circumstances
@@ -2308,6 +2322,14 @@ shell into multiple args, so it is never safe to try to list such an arg
 without using this option.  For example:
 
 verb(    rsync -av --list-only foo* dest/)
+
+Starting with rsync 3.1.0, the sizes output by bf(--list-only) are affected
+by the bf(--human-readable) option.  By default they will contain digit
+separators, but higher levels of readability will output the sizes with
+unit suffixes.  Note also that the column width for the size output has
+increased from 11 to 14 characters for all human-readable levels.  Use
+bf(--no-h) if you want just digits in the sizes, and the old column width
+of 11 characters.
 
 Compatibility note:  when requesting a remote listing of files from an rsync
 that is version 2.6.3 or older, you may encounter an error if you ask for a
