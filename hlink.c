@@ -552,7 +552,11 @@ void finish_hard_link(struct file_struct *file, const char *fname, int fin_ndx,
 			rprintf(FERROR, "Hlink node data for %d is NULL (%s)\n", gnum, f_name(file, prev_name));
 			exit_cleanup(RERR_MESSAGEIO);
 		}
-		assert(CVAL(node->data, 0) == 0);
+		if (CVAL(node->data, 0) != 0) {
+			rprintf(FERROR, "Hlink node data for %d already has path=%s (%s)\n",
+				gnum, (char*)node->data, f_name(file, prev_name));
+			exit_cleanup(RERR_MESSAGEIO);
+		}
 		free(node->data);
 		if (!(node->data = strdup(our_name)))
 			out_of_memory("finish_hard_link");
