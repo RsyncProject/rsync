@@ -9,9 +9,13 @@ Changes since 3.0.4:
       "log format" parameter and related command-line options (including
       --out-format) for a modifier that can be used to request digit-grouping
       or human-readable output in log escapes. (Note that log output is
-      unchanged by default.)  When some level of human-readable output is
-      enabled, the column width for the file size in the --list-only output
-      is increased.
+      unchanged by default.)
+
+    - The --list-only option is now affected by the --human-readable setting.
+      It will display digit groupings by default, and unit suffixes if higher
+      levels of readability are requested.  Also, the column width for the size
+      output has increased from 11 to 14 characters when human readability is
+      enabled.  Use --no-h to get the old-style output and column size.
 
     - The output of the --progress option has changed:  the string "xfer" was
       shortened to "xfr", and the string "to-check" was shortened to "to-chk",
@@ -23,10 +27,12 @@ Changes since 3.0.4:
       be increasing as new files are found.
 
     - Enhanced the --stats output: 1) to mention how many files were created
-      (protocol >= 28), 2) to mention how many files were deleted (new for
-      protocol 31, but only output when --delete is in effect), and 3) to
+      (protocol >= 28), 2) to mention how many files were deleted (a new line
+      for protocol 31, but only output when --delete is in effect), and 3) to
       follow the file-count, created-count, and deleted-count with a subcount
-      list broken down by type.
+      list that shows the counts by type.  The wording of the transferred count
+      has also changed so that it is clearer that it is only a count of regular
+      files.
 
   BUG FIXES:
 
