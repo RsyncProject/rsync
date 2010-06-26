@@ -692,10 +692,10 @@ extern int xattrs_ndx;
 #define F_LENGTH(f) ((int64)(f)->len32)
 #else
 #define F_LENGTH(f) ((int64)(f)->len32 + ((f)->flags & FLAG_LENGTH64 \
-		   ? (int64)OPT_EXTRA(f, 0)->unum << 32 : 0))
+		   ? (int64)OPT_EXTRA(f, NSEC_BUMP(f))->unum << 32 : 0))
 #endif
 
-#define F_MOD_NSEC(f) ((f)->flags & FLAG_MOD_NSEC ? OPT_EXTRA(f, LEN64_BUMP(f))->unum : 0)
+#define F_MOD_NSEC(f) ((f)->flags & FLAG_MOD_NSEC ? OPT_EXTRA(f, 0)->unum : 0)
 
 /* If there is a symlink string, it is always right after the basename */
 #define F_SYMLINK(f) ((f)->basename + strlen((f)->basename) + 1)
