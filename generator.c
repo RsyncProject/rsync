@@ -1032,7 +1032,7 @@ static void list_file_entry(struct file_struct *f)
 #ifdef SUPPORT_LINKS
 	if (preserve_links && S_ISLNK(f->mode)) {
 		rprintf(FINFO, "%s %*s %s %s -> %s\n",
-			permbuf, colwidth, comma_num(len),
+			permbuf, colwidth, human_num(len),
 			timestring(f->modtime), f_name(f, NULL),
 			F_SYMLINK(f));
 	} else
@@ -1043,7 +1043,7 @@ static void list_file_entry(struct file_struct *f)
 			f_name(f, NULL));
 	} else {
 		rprintf(FINFO, "%s %*s %s %s\n",
-			permbuf, colwidth, comma_num(len),
+			permbuf, colwidth, human_num(len),
 			timestring(f->modtime), f_name(f, NULL));
 	}
 }
