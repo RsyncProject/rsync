@@ -688,6 +688,12 @@ specify a backup suffix using the bf(--suffix) option
 (otherwise the files backed up in the specified directory
 will keep their original filenames).
 
+Note that if you specify a relative path, the backup directory will be
+relative to the destination directory, so you probably want to specify
+either an absolute path or a path that starts with "../".  If an rsync
+daemon is the receiver, the backup dir cannot go outside the module's path
+hierarchy, so take extra care not to delete it or copy into it.
+
 dit(bf(--suffix=SUFFIX)) This option allows you to override the default
 backup suffix used with the bf(--backup) (bf(-b)) option. The default suffix is a ~
 if no -bf(-backup-dir) was specified, otherwise it is an empty string.
