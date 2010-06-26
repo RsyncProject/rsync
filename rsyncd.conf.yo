@@ -87,8 +87,8 @@ a variable does not exist in the environment, or if a sequence of characters is
 not a valid reference (such as an un-paired percent sign), the raw characters
 are passed through unchanged.  This helps with backward compatibility and
 safety (e.g. expanding a non-existent %VAR% to an empty string in a path could
-result in a very unsafe path).  Anyone that needs to insert a literal % string
-into a value should use %%.
+result in a very unsafe path).  The safest way to insert a literal % into a
+value is to use %%.
 
 startdit()
 dit(bf(motd file)) This parameter allows you to specify a
@@ -144,10 +144,12 @@ of available modules. The default is no comment.
 
 dit(bf(path)) This parameter specifies the directory in the daemon's
 filesystem to make available in this module.  You must specify this parameter
-for each module in tt(rsyncd.conf).  You may base the path's value off
-of an environment variable, even one that is set by rsync when the user
-connects.  For example, this would use the authorizing user's name in the
-path:
+for each module in tt(rsyncd.conf).
+
+You may base the path's value off of an environment variable by surrounding
+the variable name with percent signs.  You can even reference a variable
+that is set by rsync when the user connects.
+For example, this would use the authorizing user's name in the path:
 
 verb(    path = /home/%RSYNC_USER_NAME% )
 
