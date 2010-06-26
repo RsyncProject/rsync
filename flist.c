@@ -642,14 +642,16 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 
 #ifdef SUPPORT_HARD_LINKS
 	if (tmp_dev != -1 && protocol_version < 30) {
+		/* Older protocols expect the dev number to be transmitted
+		 * 1-incremented so that it is never zero. */
 		if (protocol_version < 26) {
 			/* 32-bit dev_t and ino_t */
-			write_int(f, (int32)dev);
+			write_int(f, (int32)(dev+1));
 			write_int(f, (int32)tmp_ino);
 		} else {
 			/* 64-bit dev_t and ino_t */
 			if (!(xflags & XMIT_SAME_DEV_pre30))
-				write_longint(f, dev);
+				write_longint(f, dev+1);
 			write_longint(f, tmp_ino);
 		}
 	}
