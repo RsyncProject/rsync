@@ -1354,10 +1354,11 @@ static void recv_generator(char *fname, struct file_struct *file, int ndx,
 		const char *sl = F_SYMLINK(file);
 		if (safe_symlinks && unsafe_symlink(sl, fname)) {
 			if (INFO_GTE(NAME, 1)) {
-				if (solo_file)
+				if (solo_file) {
 					/* fname contains the destination path, but we
 					 * want to report the source path. */
 					fname = f_name(file, NULL);
+				}
 				rprintf(FINFO,
 					"ignoring unsafe symlink \"%s\" -> \"%s\"\n",
 					fname, sl);
