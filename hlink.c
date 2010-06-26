@@ -57,7 +57,7 @@ static struct file_list *hlink_flist;
 void init_hard_links(void)
 {
 	if (am_sender || protocol_version < 30)
-		dev_tbl = hashtable_create(16, SIZEOF_INT64 == 8);
+		dev_tbl = hashtable_create(16, 1);
 	else if (inc_recurse)
 		prior_hlinks = hashtable_create(1024, 0);
 }
@@ -67,11 +67,12 @@ struct ht_int64_node *idev_find(int64 dev, int64 ino)
 	static struct ht_int64_node *dev_node = NULL;
 	struct hashtable *tbl;
 
-	if (!dev_node || dev_node->key != dev) {
+	/* Note that some OSes have a dev == 0, so increment to avoid storing a 0. */
+	if (!dev_node || dev_node->key != dev+1) {
 		/* We keep a separate hash table of inodes for every device. */
-		dev_node = hashtable_find(dev_tbl, dev, 1);
+		dev_node = hashtable_find(dev_tbl, dev+1, 1);
 		if (!(tbl = dev_node->data))
-			tbl = dev_node->data = hashtable_create(512, SIZEOF_INT64 == 8);
+			tbl = dev_node->data = hashtable_create(512, 1);
 	} else
 		tbl = dev_node->data;
 

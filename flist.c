@@ -118,7 +118,7 @@ int flist_eof = 0; /* all the file-lists are now known */
  * will survive just long enough to be used by send_file_entry(). */
 static dev_t tmp_rdev;
 #ifdef SUPPORT_HARD_LINKS
-static int64 tmp_dev, tmp_ino;
+static int64 tmp_dev = -1, tmp_ino;
 #endif
 static char tmp_sum[MAX_DIGEST_LEN];
 
@@ -480,7 +480,7 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 		modtime = file->modtime;
 
 #ifdef SUPPORT_HARD_LINKS
-	if (tmp_dev != 0) {
+	if (tmp_dev != -1) {
 		if (protocol_version >= 30) {
 			struct ht_int64_node *np = idev_find(tmp_dev, tmp_ino);
 			first_hlink_ndx = (int32)(long)np->data - 1;
@@ -598,15 +598,17 @@ static void send_file_entry(int f, const char *fname, struct file_struct *file,
 #endif
 
 #ifdef SUPPORT_HARD_LINKS
-	if (tmp_dev != 0 && protocol_version < 30) {
+	if (tmp_dev != -1 && protocol_version < 30) {
+		/* Older protocols expect the dev number to be transmitted
+		 * 1-incremented so that it is never zero. */
 		if (protocol_version < 26) {
 			/* 32-bit dev_t and ino_t */
-			write_int(f, (int32)dev);
+			write_int(f, (int32)(dev+1));
 			write_int(f, (int32)tmp_ino);
 		} else {
 			/* 64-bit dev_t and ino_t */
 			if (!(xflags & XMIT_SAME_DEV_pre30))
-				write_longint(f, dev);
+				write_longint(f, dev+1);
 			write_longint(f, tmp_ino);
 		}
 	}
@@ -1259,10 +1261,10 @@ struct file_struct *make_file(const char *fname, struct file_list *flist,
 		if (protocol_version >= 28
 		 ? (!S_ISDIR(st.st_mode) && st.st_nlink > 1)
 		 : S_ISREG(st.st_mode)) {
-			tmp_dev = (int64)st.st_dev + 1;
+			tmp_dev = (int64)st.st_dev;
 			tmp_ino = (int64)st.st_ino;
 		} else
-			tmp_dev = 0;
+			tmp_dev = -1;
 	}
 #endif
 
